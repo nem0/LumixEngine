@@ -95,7 +95,7 @@ public:
 		int y,
 		int w,
 		int h,
-		const uint8* data,
+		const u8* data,
 		int bytes_per_pixel) = 0;
 
 	virtual float getCapsuleRadius(ComponentHandle cmp) = 0;
@@ -173,13 +173,13 @@ public:
 	virtual float getControllerRadius(ComponentHandle cmp) = 0;
 	virtual float getControllerHeight(ComponentHandle cmp) = 0;
 
-	virtual RagdollBone* createRagdollBone(ComponentHandle cmp, uint32 bone_name_hash) = 0;
+	virtual RagdollBone* createRagdollBone(ComponentHandle cmp, u32 bone_name_hash) = 0;
 	virtual void destroyRagdollBone(ComponentHandle cmp, RagdollBone* bone) = 0;
 	virtual physx::PxJoint* getRagdollBoneJoint(RagdollBone* bone) const = 0;
 	virtual RagdollBone* getRagdollRootBone(ComponentHandle cmp) const = 0;
 	virtual RagdollBone* getRagdollBoneChild(RagdollBone* bone) = 0;
 	virtual RagdollBone* getRagdollBoneSibling(RagdollBone* bone) = 0;
-	virtual RagdollBone* getRagdollBoneByName(ComponentHandle cmp, uint32 bone_name_hash) = 0;
+	virtual RagdollBone* getRagdollBoneByName(ComponentHandle cmp, u32 bone_name_hash) = 0;
 	virtual float getRagdollBoneHeight(RagdollBone* bone) = 0;
 	virtual float getRagdollBoneRadius(RagdollBone* bone) = 0;
 	virtual void setRagdollBoneHeight(RagdollBone* bone, float value) = 0;
@@ -203,8 +203,8 @@ public:
 	virtual void addCollisionLayer() = 0;
 	virtual void removeCollisionLayer() = 0;
 
-	virtual uint32 getDebugVisualizationFlags() const = 0;
-	virtual void setDebugVisualizationFlags(uint32 flags) = 0;
+	virtual u32 getDebugVisualizationFlags() const = 0;
+	virtual void setDebugVisualizationFlags(u32 flags) = 0;
 	virtual void setVisualizationCullingBox(const Vec3& min, const Vec3& max) = 0;
 
 	virtual int getActorCount() const = 0;

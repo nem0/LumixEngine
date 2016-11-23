@@ -252,7 +252,7 @@ public:
 
 	void set(ComponentUID cmp, int index, InputBlob& stream) const override
 	{
-		int32 i;
+		i32 i;
 		stream.read(&i, sizeof(i));
 		if(index < 0)
 		{
@@ -267,7 +267,7 @@ public:
 
 	void get(ComponentUID cmp, int index, OutputBlob& stream) const override
 	{
-		int32 i = 0;
+		i32 i = 0;
 		if(index < 0)
 		{
 			i = (static_cast<S*>(cmp.scene)->*m_single.getter)(cmp.handle);

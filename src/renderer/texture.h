@@ -22,16 +22,16 @@ class LUMIX_RENDERER_API Texture LUMIX_FINAL : public Resource
 		bool create(int w, int h, void* data);
 		void destroy();
 
-		const uint8* getData() const { return data.empty() ? nullptr : &data[0]; }
-		uint8* getData() { return data.empty() ? nullptr : &data[0]; }
+		const u8* getData() const { return data.empty() ? nullptr : &data[0]; }
+		u8* getData() { return data.empty() ? nullptr : &data[0]; }
 		void addDataReference();
 		void removeDataReference();
 		void onDataUpdated(int x, int y, int w, int h);
 		void save();
-		void setFlags(uint32 flags);
-		void setFlag(uint32 flag, bool value);
-		uint32 getPixelNearest(int x, int y) const;
-		uint32 getPixel(float x, float y) const;
+		void setFlags(u32 flags);
+		void setFlag(u32 flag, bool value);
+		u32 getPixelNearest(int x, int y) const;
+		u32 getPixel(float x, float y) const;
 
 		static unsigned int compareTGA(IAllocator& allocator, FS::IFile* file1, FS::IFile* file2, int difference);
 
@@ -43,11 +43,11 @@ class LUMIX_RENDERER_API Texture LUMIX_FINAL : public Resource
 		int layers;
 		int mips;
 		bool is_cubemap;
-		uint32 bgfx_flags;
+		u32 bgfx_flags;
 		bgfx::TextureHandle handle;
 		IAllocator& allocator;
 		int data_reference;
-		Array<uint8> data;
+		Array<u8> data;
 
 	private:
 		void unload(void) override;

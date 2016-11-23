@@ -34,10 +34,10 @@ public:
 
 	struct Uniform
 	{
-		uint32 name_hash;
+		u32 name_hash;
 		union
 		{
-			int32 int_value;
+			i32 int_value;
 			float float_value;
 			float vec3[3];
 			float vec2[2];
@@ -55,7 +55,7 @@ public:
 	void setColor(const Vec3& specular) { m_color = specular;  createCommandBuffer(); }
 	float getAlphaRef() const { return m_alpha_ref; }
 	void setAlphaRef(float value);
-	uint64 getRenderStates() const { return m_render_states; }
+	u64 getRenderStates() const { return m_render_states; }
 	void enableBackfaceCulling(bool enable);
 	bool isBackfaceCulling() const;
 
@@ -67,7 +67,7 @@ public:
 	Texture* getTexture(int i) const { return i < m_texture_count ? m_textures[i] : nullptr; }
 	const char* getTextureUniform(int i);
 	Texture* getTextureByUniform(const char* uniform) const;
-	bool isTextureDefine(uint8 define_idx) const;
+	bool isTextureDefine(u8 define_idx) const;
 	void setTexture(int i, Texture* texture);
 	void setTexturePath(int i, const Path& path);
 	bool save(JsonSerializer& serializer);
@@ -76,23 +76,23 @@ public:
 	const Uniform& getUniform(int index) const { return m_uniforms[index]; }
 	ShaderInstance& getShaderInstance() { ASSERT(m_shader_instance); return *m_shader_instance; }
 	const ShaderInstance& getShaderInstance() const { ASSERT(m_shader_instance); return *m_shader_instance; }
-	const uint8* getCommandBuffer() const { return m_command_buffer; }
+	const u8* getCommandBuffer() const { return m_command_buffer; }
 	void createCommandBuffer();
 	int getRenderLayer() const { return m_render_layer; }
 	void setRenderLayer(int layer);
-	uint64 getRenderLayerMask() const { return m_render_layer_mask; }
+	u64 getRenderLayerMask() const { return m_render_layer_mask; }
 	int getLayersCount() const { return m_layers_count; }
 	void setLayersCount(int layers);
 
-	void setDefine(uint8 define_idx, bool enabled);
-	bool hasDefine(uint8 define_idx) const;
-	bool isDefined(uint8 define_idx) const;
+	void setDefine(u8 define_idx, bool enabled);
+	bool hasDefine(u8 define_idx) const;
+	bool isDefined(u8 define_idx) const;
 
-	void setCustomFlag(uint32 flag) { m_custom_flags |= flag; }
-	void unsetCustomFlag(uint32 flag) { m_custom_flags &= ~flag; }
-	bool isCustomFlag(uint32 flag) const { return (m_custom_flags & flag) == flag; }
+	void setCustomFlag(u32 flag) { m_custom_flags |= flag; }
+	void unsetCustomFlag(u32 flag) { m_custom_flags &= ~flag; }
+	bool isCustomFlag(u32 flag) const { return (m_custom_flags & flag) == flag; }
 
-	static uint32 getCustomFlag(const char* flag_name);
+	static u32 getCustomFlag(const char* flag_name);
 	static const char* getCustomFlagName(int index);
 	static int getCustomFlagCount();
 
@@ -115,15 +115,15 @@ private:
 	int m_texture_count;
 	Array<Uniform> m_uniforms;
 	IAllocator& m_allocator;
-	uint64 m_render_states;
+	u64 m_render_states;
 	Vec3 m_color;
 	float m_shininess;
 	float m_alpha_ref;
-	uint32 m_define_mask;
-	uint8* m_command_buffer;
-	uint32 m_custom_flags;
+	u32 m_define_mask;
+	u8* m_command_buffer;
+	u32 m_custom_flags;
 	int m_render_layer;
-	uint64 m_render_layer_mask;
+	u64 m_render_layer_mask;
 	int m_layers_count;
 };
 

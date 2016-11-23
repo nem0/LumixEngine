@@ -310,28 +310,6 @@ struct DockContext
 	}
 
 
-	void checkNonexistent()
-	{
-		int frame_limit = ImMax(0, ImGui::GetFrameCount() - 2);
-		for (Dock* dock : m_docks)
-		{
-			if (dock->isContainer()) continue;
-			if (dock->status == Status_Float) continue;
-			if (dock->last_frame < frame_limit)
-			{
-				++dock->invalid_frames;
-				if (dock->invalid_frames > 2)
-				{
-					doUndock(*dock);
-					dock->status = Status_Float;
-				}
-				return;
-			}
-			dock->invalid_frames = 0;
-		}
-	}
-
-
 	void beginPanel()
 	{
 		ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
@@ -353,8 +331,6 @@ struct DockContext
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0);
 		Begin("###DockPanel", nullptr, flags);
 		splits();
-
-		checkNonexistent();
 	}
 
 
@@ -955,7 +931,7 @@ struct DockContext
 
 			ImGuiContext& g = *GImGui;
 
-			if (g.ActiveId == GetCurrentWindow()->MoveID && g.IO.MouseDown[0])
+			if (g.ActiveId == GetCurrentWindow()->MoveId && g.IO.MouseDown[0])
 			{
 				m_drag_offset = GetMousePos() - dock.pos;
 				doUndock(dock);
@@ -1035,7 +1011,7 @@ struct DockContext
 		for (int i = 0; i < m_docks.size(); ++i)
 		{
 			Dock& dock = *m_docks[i];
-			file << "dock" << (Lumix::uint64)&dock << " = {\n";
+			file << "dock" << (Lumix::u64)&dock << " = {\n";
 			file << "index = " << i << ",\n";
 			file << "label = \"" << dock.label << "\",\n";
 			file << "x = " << (int)dock.pos.x << ",\n";

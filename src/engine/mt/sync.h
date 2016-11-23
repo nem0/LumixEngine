@@ -14,13 +14,13 @@ namespace MT
 	typedef void* SemaphoreHandle;
 	typedef void* MutexHandle;
 	typedef void* EventHandle;
-	typedef volatile int32 SpinMutexHandle;
+	typedef volatile i32 SpinMutexHandle;
 #elif defined __linux__
 	struct SemaphoreHandle
 	{
 		pthread_mutex_t mutex;
 		pthread_cond_t cond;
-		int32 count;
+		i32 count;
 	};
 	typedef pthread_mutex_t MutexHandle;
 	struct EventHandle
@@ -29,7 +29,7 @@ namespace MT
 		pthread_cond_t cond;
 		bool signaled;
 	};
-	typedef volatile int32 SpinMutexHandle;
+	typedef volatile i32 SpinMutexHandle;
 #endif
 	
 

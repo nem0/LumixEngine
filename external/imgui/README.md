@@ -7,9 +7,9 @@ dear imgui,
 
 [![Patreon](https://cloud.githubusercontent.com/assets/8225057/5990484/70413560-a9ab-11e4-8942-1a63607c0b00.png)](http://www.patreon.com/imgui) [![PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=5Q73FPZ9C526U)
 
-dear imgui (AKA ImGui), is a bloat-free graphical user interface library for C++. It outputs vertex buffers that you can render in your 3D-pipeline enabled application. It is fast, portable, renderer agnostic and self-contained (no external dependencies).
+dear imgui (AKA ImGui), is a bloat-free graphical user interface library for C++. It outputs optimized vertex buffers that you can render anytime in your 3D-pipeline enabled application. It is fast, portable, renderer agnostic and self-contained (no external dependencies).
 
-ImGui is designed to enable fast iteration and empower programmers to create content creation tools and visualization/debug tools (as opposed to UI for the average end-user). It favors simplicity and productivity toward this goal, and thus lacks certain features normally found in more high-level libraries.
+ImGui is designed to enable fast iteration and empower programmers to create content creation tools and visualization/ debug tools (as opposed to UI for the average end-user). It favors simplicity and productivity toward this goal, and thus lacks certain features normally found in more high-level libraries.
 
 ImGui is particularly suited to integration in realtime 3D applications, fullscreen applications, embedded applications, games, or any applications on consoles platforms where operating system features are non-standard. 
 
@@ -33,13 +33,15 @@ Your code passes mouse/keyboard inputs and settings to ImGui (see example applic
 
 ImGui outputs vertex buffers and simple command-lists that you can render in your application. The number of draw calls and state changes is typically very small. Because it doesn't know or touch graphics state directly, you can call ImGui commands anywhere in your code (e.g. in the middle of a running algorithm, or in the middle of your own rendering process). Refer to the sample applications in the examples/ folder for instructions on how to integrate ImGui with your existing codebase. 
 
+_A common misunderstanding is that some people think immediate mode gui == immediate mode rendering, which usually implies hammering your driver/GPU with a bunch of inefficient draw calls and state changes, as the gui functions as called by the user. Some lazy IMGUI-style librairies may work this way but this is NOT what Dear ImGui does. Dear ImGui outputs vertex buffers and a small list of draw calls batches. It never touches your GPU directly. The draw call batches are rather optimal and you can render them later, in your app or even remotely._
+
 ImGui allows you create elaborate tools as well as very short-lived ones. On the extreme side of short-liveness: using the Edit&Continue feature of modern compilers you can add a few widgets to tweaks variables while your application is running, and remove the code a minute later! ImGui is not just for tweaking values. You can use it to trace a running algorithm by just emitting text commands. You can use it along with your own reflection data to browse your dataset live. You can use it to expose the internals of a subsystem in your engine, to create a logger, an inspection tool, a profiler, a debugger, etc.  
 
-Demo
-----
+Binaries/Demo
+-------------
 
 You should be able to build the examples from sources (tested on Windows/Mac/Linux). If you don't, let me know! If you want to have a quick look at the features of ImGui, you can download Windows binaries of the demo app here.
-- [imgui-demo-binaries-20151226.zip](http://www.miracleworld.net/imgui/binaries/imgui-demo-binaries-20151226.zip) (Windows binaries, ImGui 1.47 2015/12/26, 4 executables, 515 KB)
+- [imgui-demo-binaries-20161113.zip](http://www.miracleworld.net/imgui/binaries/imgui-demo-binaries-20161113.zip) (Windows binaries, ImGui 1.49+ 2016/11/13, 5 executables, 588 KB)
 
 
 Gallery
@@ -95,18 +97,22 @@ Frequently Asked Question (FAQ)
 The library started its life and is best known as "ImGui" only due to the fact that I didn't give it a proper name when I released it. However, the term IMGUI (immediate-mode graphical user interface) was coined before and is being used in variety of other situations. It seemed confusing and unfair to hog the name. To reduce the ambiguity without affecting existing codebases, I have decided on an alternate, longer name "dear imgui" that people can use to refer to this specific library in ambiguous situations.
 
 <b>How do I update to a newer version of ImGui?</b>
-<br><b>Can I have multiple widgets with the same label? Can I have widget without a label? (Yes)</b>
+<br><b>What is ImTextureID and how do I display an image?</b>
 <br><b>I integrated ImGui in my engine and the text or lines are blurry..</b>
 <br><b>I integrated ImGui in my engine and some elements are disappearing when I move windows around..</b>
+<br><b>How can I have multiple widgets with the same label? Can I have widget without a label? (Yes). A primer on the purpose of labels/IDs.</b>
+<br><b>How can I tell when ImGui wants my mouse/keyboard inputs and when I can pass them to my application?</b>
 <br><b>How can I load a different font than the default?</b>
+<br><b>How can I easily use icons in my application?</b>
 <br><b>How can I load multiple fonts?</b>
 <br><b>How can I display and input non-latin characters such as Chinese, Japanese, Korean, Cyrillic?</b>
+<br><b>How can I use the drawing facilities without an ImGui window? (using ImDrawList API)</b>
 
 See the FAQ in imgui.cpp for answers.
 
 <b>How do you use ImGui on a platform that may not have a mouse or keyboard?</b>
 
-I recommend using [Synergy](http://synergy-project.org) ([sources](https://github.com/synergy/synergy)). In particular, the _src/micro/uSynergy.c_ file contains a small client that you can use on any platform to connect to your host PC. You can seamlessly use your PC input devices from a video game console or a tablet. ImGui allows to increase the hit box of widgets (via the _TouchPadding_ setting) to accommodate a little for the lack of precision of touch inputs, but it is recommended you use a mouse to allow optimising for screen real-estate.
+I recommend using [Synergy](http://synergy-project.org) ([sources](https://github.com/symless/synergy)). In particular, the _src/micro/uSynergy.c_ file contains a small client that you can use on any platform to connect to your host PC. You can seamlessly use your PC input devices from a video game console or a tablet. ImGui allows to increase the hit box of widgets (via the _TouchPadding_ setting) to accommodate a little for the lack of precision of touch inputs, but it is recommended you use a mouse to allow optimising for screen real-estate.
 
 <b>Can you create elaborate/serious tools with ImGui?</b>
 
@@ -116,7 +122,7 @@ ImGui is very programmer centric and the immediate-mode GUI paradigm might requi
 
 <b>Is ImGui fast?</b>
 
-Probably fast enough for most uses. Down to the fundation of its visual design, ImGui is engineered to be fairly performant both in term of CPU and GPU usage. Running elaborate code and creating elaborate UI will of course have a cost but ImGui aims to minimize it.
+Probably fast enough for most uses. Down to the foundation of its visual design, ImGui is engineered to be fairly performant both in term of CPU and GPU usage. Running elaborate code and creating elaborate UI will of course have a cost but ImGui aims to minimize it.
 
 Mileage may vary but the following screenshot can give you a rough idea of the cost of running and rendering UI code (In the case of a trivial demo application like this one, your driver/os setup are likely to be the bottleneck. Testing performance as part of a real application is recommended).
 
@@ -162,13 +168,19 @@ Embeds [stb_textedit.h, stb_truetype.h, stb_rectpack.h](https://github.com/nothi
 
 Inspiration, feedback, and testing for early versions: Casey Muratori, Atman Binstock, Mikko Mononen, Emmanuel Briney, Stefan Kamoda, Anton Mikhailov, Matt Willis. And everybody posting feedback, questions and patches on the GitHub.
 
-ImGui development is financially supported on [**Patreon**](http://www.patreon.com/imgui).
+Ongoing ImGui development is financially supported on [**Patreon**](http://www.patreon.com/imgui).
 
-Special supporters:
-- Jetha Chan, Wild Sheep Studio, Pastagames, Mārtiņš Možeiko, Daniel Collin, Stefano Cristiano.
+Double-chocolate sponsors:
+- Media Molecule
+- Mobigame
+- Insomniac Games (sponsored the gamepad/keyboard navigation branch)
+- Aras Pranckevičius
 
-And:
-- Michel Courtine, César Leblic, Dale Kim, Alex Evans, Rui Figueira, Paul Patrashcu, Jerome Lanquetot, Ctrl Alt Ninja, Paul Fleming, Neil Henning, Stephan Dilly, Neil Blakey-Milner, Aleksei, NeiloGD, Justin Paver, FiniteSol, Vincent Pancaldi, James Billot, Robin Hübner, furrtek, Eric, Simon Barratt, Game Atelier, Julian Bosch, Simon Lundmark, Vincent Hamm.
+Salty caramel supporters:
+- Jetha Chan, Wild Sheep Studio, Pastagames, Mārtiņš Možeiko, Daniel Collin, Recognition Robotics, Chris Genova, ikrima, Glenn Fiedler, Geoffrey Evans, Dakko Dakko.
+
+Caramel supporters:
+- Michel Courtine, César Leblic, Dale Kim, Alex Evans, Rui Figueira, Paul Patrashcu, Jerome Lanquetot, Ctrl Alt Ninja, Paul Fleming, Neil Henning, Stephan Dilly, Neil Blakey-Milner, Aleksei, NeiloGD, Justin Paver, FiniteSol, Vincent Pancaldi, James Billot, Robin Hübner, furrtek, Eric, Simon Barratt, Game Atelier, Julian Bosch, Simon Lundmark, Vincent Hamm, Farhan Wali, Jeff Roberts, Matt Reyer, Colin Riley, Victor Martins, Josh Simmons, Garrett Hoofman, Sergio Gonzales, Andrew Berridge, Roy Eltham, Game Preservation Society, [Kit framework](http://svkonsult.se/kit), Josh Faust, Martin Donlon, Quinton, Felix.
 
 And other supporters; thanks!
 

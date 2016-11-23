@@ -255,6 +255,7 @@ public:
 		m_engine->getPluginManager().load("lua_script");
 		m_engine->getPluginManager().load("physics");
 		m_engine->getPluginManager().load("gui");
+		m_engine->getPluginManager().load("game");
 		m_engine->getInputSystem().enable(true);
 		Lumix::Renderer* renderer = static_cast<Lumix::Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
 		m_pipeline = Lumix::Pipeline::create(*renderer, Lumix::Path(m_pipeline_path), m_engine->getAllocator());
@@ -333,15 +334,15 @@ public:
 		#pragma pack(1)
 			struct Header
 			{
-				Lumix::uint32 magic;
+				Lumix::u32 magic;
 				int version;
-				Lumix::uint32 hash;
-				Lumix::uint32 engine_hash;
+				Lumix::u32 hash;
+				Lumix::u32 engine_hash;
 			};
 		#pragma pack()
 		Header header;
 		blob.read(header);
-		if (Lumix::crc32((const uint8_t*)blob.getData() + sizeof(header), blob.getSize() - sizeof(header)) !=
+		if (Lumix::crc32((const Lumix::u8*)blob.getData() + sizeof(header), blob.getSize() - sizeof(header)) !=
 			header.hash)
 		{
 			Lumix::g_log_error.log("App") << "Universe corrupted";
@@ -466,7 +467,7 @@ public:
 		if (frame_time < 1 / 60.0f)
 		{
 			PROFILE_BLOCK("sleep");
-			Lumix::MT::sleep(Lumix::uint32(1000 / 60.0f - frame_time * 1000));
+			Lumix::MT::sleep(Lumix::u32(1000 / 60.0f - frame_time * 1000));
 		}
 		handleEvents();
 	}

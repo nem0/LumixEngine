@@ -54,7 +54,7 @@ static const ComponentType POINT_LIGHT_TYPE = PropertyRegister::getComponentType
 static const ComponentType GLOBAL_LIGHT_TYPE = PropertyRegister::getComponentType("global_light");
 static const ComponentType MODEL_INSTANCE_TYPE = PropertyRegister::getComponentType("renderable");
 static const ComponentType ENVIRONMENT_PROBE_TYPE = PropertyRegister::getComponentType("environment_probe");
-static const uint32 RENDERER_HASH = crc32("renderer");
+static const u32 RENDERER_HASH = crc32("renderer");
 static const ResourceType MATERIAL_TYPE("material");
 static const ResourceType SHADER_TYPE("shader");
 static const ResourceType TEXTURE_TYPE("texture");
@@ -199,20 +199,20 @@ struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 			auto* texture = material->getTexture(i);
 			copyString(buf, texture ? texture->getPath().c_str() : "");
 			if (m_app.getAssetBrowser()->resourceInput(
-					slot.name, StaticString<30>("", (uint64)&slot), buf, sizeof(buf), TEXTURE_TYPE))
+					slot.name, StaticString<30>("", (u64)&slot), buf, sizeof(buf), TEXTURE_TYPE))
 			{
 				material->setTexturePath(i, Path(buf));
 			}
 			if (!texture) continue;
 
 			ImGui::SameLine();
-			StaticString<50> popup_name("pu", (uint64)texture, slot.name);
-			StaticString<50> label("Advanced###adv", (uint64)texture, slot.name);
+			StaticString<50> popup_name("pu", (u64)texture, slot.name);
+			StaticString<50> label("Advanced###adv", (u64)texture, slot.name);
 			if (ImGui::Button(label)) ImGui::OpenPopup(popup_name);
 
 			if (ImGui::BeginPopup(popup_name))
 			{
-				static const struct { const char* name; uint32 value; } FLAGS[] = {
+				static const struct { const char* name; u32 value; } FLAGS[] = {
 					{"SRGB", BGFX_TEXTURE_SRGB},
 					{"u clamp", BGFX_TEXTURE_U_CLAMP},
 					{"v clamp", BGFX_TEXTURE_V_CLAMP},
@@ -778,7 +778,7 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 	}
 
 
-	bool saveCubemap(ComponentUID cmp, const Array<uint8>& data, int texture_size)
+	bool saveCubemap(ComponentUID cmp, const Array<u8>& data, int texture_size)
 	{
 		crn_uint32 size;
 		crn_comp_params comp_params;
@@ -795,7 +795,7 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		comp_params.m_faces = 6;
 		for (int i = 0; i < 6; ++i)
 		{
-			comp_params.m_pImages[i][0] = (Lumix::uint32*)&data[i * texture_size * texture_size * 4];
+			comp_params.m_pImages[i][0] = (Lumix::u32*)&data[i * texture_size * texture_size * 4];
 		}
 		crn_mipmap_params mipmap_params;
 		mipmap_params.m_mode = cCRNMipModeGenerateMips;
@@ -809,7 +809,7 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 
 		Lumix::FS::OsFile file;
 		const char* base_path = m_app.getWorldEditor()->getEngine().getDiskFileDevice()->getBasePath();
-		uint64 universe_guid = m_app.getWorldEditor()->getUniverse()->getPath().getHash();
+		u64 universe_guid = m_app.getWorldEditor()->getUniverse()->getPath().getHash();
 		Lumix::StaticString<Lumix::MAX_PATH_LENGTH> path(base_path, "universes/", universe_guid);
 		if (!PlatformInterface::makePath(path)) g_log_error.log("Editor") << "Failed to create " << path;
 		path << "/probes/";
@@ -830,13 +830,13 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 	}
 
 
-	void flipY(uint32* data, int texture_size)
+	void flipY(u32* data, int texture_size)
 	{
 		for (int y = 0; y < texture_size / 2; ++y)
 		{
 			for (int x = 0; x < texture_size; ++x)
 			{
-				uint32 t = data[x + y * texture_size];
+				u32 t = data[x + y * texture_size];
 				data[x + y * texture_size] = data[x + (texture_size - y - 1) * texture_size];
 				data[x + (texture_size - y - 1) * texture_size] = t;
 			}
@@ -844,14 +844,14 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 	}
 
 
-	void flipX(uint32* data, int texture_size)
+	void flipX(u32* data, int texture_size)
 	{
 		for (int y = 0; y < texture_size; ++y)
 		{
-			uint32* tmp = (uint32*)&data[y * texture_size];
+			u32* tmp = (u32*)&data[y * texture_size];
 			for (int x = 0; x < texture_size / 2; ++x)
 			{
-				uint32 t = tmp[x];
+				u32 t = tmp[x];
 				tmp[x] = tmp[texture_size - x - 1];
 				tmp[texture_size - x - 1] = t;
 			}
@@ -874,7 +874,7 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		Engine& engine = world_editor->getEngine();
 		auto& plugin_manager = engine.getPluginManager();
 		IAllocator& allocator = engine.getAllocator();
-		Lumix::Array<Lumix::uint8> data(allocator);
+		Lumix::Array<Lumix::u8> data(allocator);
 		data.resize(6 * TEXTURE_SIZE * TEXTURE_SIZE * 4);
 
 		bgfx::TextureHandle texture =
@@ -930,7 +930,7 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 
 			if (is_opengl) continue;
 
-			uint32* tmp = (uint32*)&data[i * TEXTURE_SIZE * TEXTURE_SIZE * 4];
+			u32* tmp = (u32*)&data[i * TEXTURE_SIZE * TEXTURE_SIZE * 4];
 			if (i == 2 || i == 3)
 			{
 				flipY(tmp, TEXTURE_SIZE);
@@ -1067,7 +1067,7 @@ struct SceneViewPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		}
 
 
-		void addDebugCross(const Vec3& pos, float size, uint32 color, float life) override
+		void addDebugCross(const Vec3& pos, float size, u32 color, float life) override
 		{
 			m_render_scene->addDebugCross(pos, size, color, life);
 		}
@@ -1087,13 +1087,13 @@ struct SceneViewPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		}
 
 
-		void addDebugLine(const Vec3& from, const Vec3& to, uint32 color, float life) override
+		void addDebugLine(const Vec3& from, const Vec3& to, u32 color, float life) override
 		{
 			m_render_scene->addDebugLine(from, to, color, life);
 		}
 
 
-		void addDebugCube(const Vec3& minimum, const Vec3& maximum, uint32 color, float life) override
+		void addDebugCube(const Vec3& minimum, const Vec3& maximum, u32 color, float life) override
 		{
 			m_render_scene->addDebugCube(minimum, maximum, color, life);
 		}
@@ -1257,7 +1257,7 @@ struct SceneViewPlugin LUMIX_FINAL : public StudioApp::IPlugin
 
 
 		void render(const Matrix& mtx,
-			uint16* indices,
+			u16* indices,
 			int indices_count,
 			Vertex* vertices,
 			int vertices_count,
@@ -1276,9 +1276,9 @@ struct SceneViewPlugin LUMIX_FINAL : public StudioApp::IPlugin
 			bgfx::allocTransientIndexBuffer(&index_buffer, indices_count);
 
 			copyMemory(vertex_buffer.data, vertices, vertices_count * renderer.getBasicVertexDecl().getStride());
-			copyMemory(index_buffer.data, indices, indices_count * sizeof(uint16));
+			copyMemory(index_buffer.data, indices, indices_count * sizeof(u16));
 
-			uint64 flags = BGFX_STATE_DEPTH_TEST_LEQUAL;
+			u64 flags = BGFX_STATE_DEPTH_TEST_LEQUAL;
 			if (lines) flags |= BGFX_STATE_PT_LINES;
 			m_pipeline.render(vertex_buffer,
 				index_buffer,
@@ -1306,8 +1306,9 @@ struct SceneViewPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	{
 		auto& editor = *app.getWorldEditor();
 		auto& allocator = editor.getAllocator();
-		m_action = LUMIX_NEW(allocator, Action)("Scene View", "scene_view");
-		m_action->func.bind<SceneViewPlugin, &SceneViewPlugin::onAction>(this);
+		Action* action = LUMIX_NEW(allocator, Action)("Scene View", "scene_view");
+		action->func.bind<SceneViewPlugin, &SceneViewPlugin::onAction>(this);
+		app.addWindowAction(action);
 		m_render_interface = LUMIX_NEW(allocator, RenderInterfaceImpl)(editor, *m_scene_view.getPipeline());
 		editor.setRenderInterface(m_render_interface);
 		m_app.getAssetBrowser()->resourceChanged().bind<SceneViewPlugin, &SceneViewPlugin::onResourceChanged>(this);
@@ -1319,6 +1320,9 @@ struct SceneViewPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		m_app.getAssetBrowser()->resourceChanged().unbind<SceneViewPlugin, &SceneViewPlugin::onResourceChanged>(this);
 		m_scene_view.shutdown();
 	}
+
+
+	const char* getName() const override { return "scene_view"; }
 
 
 	void onResourceChanged(const Path& path, const char* /*ext*/)
@@ -1397,11 +1401,11 @@ struct FurPainter LUMIX_FINAL : public WorldEditor::Plugin
 
 	struct Point
 	{
-		int64 x, y;
+		i64 x, y;
 	};
 
 
-	static int64 orient2D(const Point& a, const Point& b, const Point& c)
+	static i64 orient2D(const Point& a, const Point& b, const Point& c)
 	{
 		return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
 	}
@@ -1426,17 +1430,17 @@ struct FurPainter LUMIX_FINAL : public WorldEditor::Plugin
 		Texture* texture = model->getMesh(0).material->getTexture(0);
 		if (!texture || texture->data.empty()) return;
 
-		uint8* mem = (uint8*)app.getWorldEditor()->getAllocator().allocate(texture->width * texture->height);
+		u8* mem = (u8*)app.getWorldEditor()->getAllocator().allocate(texture->width * texture->height);
 
 		ASSERT(!texture->data.empty());
 
-		const uint16* idx16 = model->getIndices16();
-		const uint32* idx32 = model->getIndices32();
+		const u16* idx16 = model->getIndices16();
+		const u32* idx32 = model->getIndices32();
 		const Vec3* vertices = &model->getVertices()[0];
 		setMemory(mem, 0, texture->width * texture->height);
 		for (int i = 0, c = model->getIndicesCount(); i < c; i += 3)
 		{
-			uint32 idx[3];
+			u32 idx[3];
 			if (idx16)
 			{
 				idx[0] = idx16[i];
@@ -1464,11 +1468,11 @@ struct FurPainter LUMIX_FINAL : public WorldEditor::Plugin
 			rasterizeTriangle2(texture->width, mem, v);
 		}
 
-		uint32* data = (uint32*)&texture->data[0];
+		u32* data = (u32*)&texture->data[0];
 		struct DistanceFieldCell
 		{
-			uint32 distance;
-			uint32 color;
+			u32 distance;
+			u32 color;
 		};
 
 		Array<DistanceFieldCell> distance_field(app.getWorldEditor()->getAllocator());
@@ -1542,22 +1546,22 @@ struct FurPainter LUMIX_FINAL : public WorldEditor::Plugin
 	}
 
 
-	void rasterizeTriangle2(int width, uint8* mem, Vertex v[3]) const
+	void rasterizeTriangle2(int width, u8* mem, Vertex v[3]) const
 	{
 		float squared_radius_rcp = 1.0f / (brush_radius * brush_radius);
 
-		static const int64 substep = 256;
-		static const int64 submask = substep - 1;
-		static const int64 stepshift = 8;
+		static const i64 substep = 256;
+		static const i64 submask = substep - 1;
+		static const i64 stepshift = 8;
 
-		Point v0 = { int64(v[0].uv.x * substep), int64(v[0].uv.y * substep) };
-		Point v1 = { int64(v[1].uv.x * substep), int64(v[1].uv.y * substep) };
-		Point v2 = { int64(v[2].uv.x * substep), int64(v[2].uv.y * substep) };
+		Point v0 = { i64(v[0].uv.x * substep), i64(v[0].uv.y * substep) };
+		Point v1 = { i64(v[1].uv.x * substep), i64(v[1].uv.y * substep) };
+		Point v2 = { i64(v[2].uv.x * substep), i64(v[2].uv.y * substep) };
 
-		int64 minX = Math::minimum(v0.x, v1.x, v2.x);
-		int64 minY = Math::minimum(v0.y, v1.y, v2.y);
-		int64 maxX = Math::maximum(v0.x, v1.x, v2.x) + substep;
-		int64 maxY = Math::maximum(v0.y, v1.y, v2.y) + substep;
+		i64 minX = Math::minimum(v0.x, v1.x, v2.x);
+		i64 minY = Math::minimum(v0.y, v1.y, v2.y);
+		i64 maxX = Math::maximum(v0.x, v1.x, v2.x) + substep;
+		i64 maxY = Math::maximum(v0.y, v1.y, v2.y) + substep;
 
 		minX = ((minX + submask) & ~submask) - 1;
 		minY = ((minY + submask) & ~submask) - 1;
@@ -1567,9 +1571,9 @@ struct FurPainter LUMIX_FINAL : public WorldEditor::Plugin
 		{
 			for (p.x = minX; p.x <= maxX; p.x += substep)
 			{
-				int64 w0 = orient2D(v1, v2, p);
-				int64 w1 = orient2D(v2, v0, p);
-				int64 w2 = orient2D(v0, v1, p);
+				i64 w0 = orient2D(v1, v2, p);
+				i64 w1 = orient2D(v2, v0, p);
+				i64 w2 = orient2D(v0, v1, p);
 
 				if (w0 >= 0 && w1 >= 0 && w2 >= 0)
 				{
@@ -1584,18 +1588,18 @@ struct FurPainter LUMIX_FINAL : public WorldEditor::Plugin
 	{
 		float squared_radius_rcp = 1.0f / (brush_radius * brush_radius);
 
-		static const int64 substep = 256;
-		static const int64 submask = substep - 1;
-		static const int64 stepshift = 8;
+		static const i64 substep = 256;
+		static const i64 submask = substep - 1;
+		static const i64 stepshift = 8;
 
-		Point v0 = {int64(v[0].uv.x * substep), int64(v[0].uv.y * substep)};
-		Point v1 = {int64(v[1].uv.x * substep), int64(v[1].uv.y * substep)};
-		Point v2 = {int64(v[2].uv.x * substep), int64(v[2].uv.y * substep)};
+		Point v0 = {i64(v[0].uv.x * substep), i64(v[0].uv.y * substep)};
+		Point v1 = {i64(v[1].uv.x * substep), i64(v[1].uv.y * substep)};
+		Point v2 = {i64(v[2].uv.x * substep), i64(v[2].uv.y * substep)};
 
-		int64 minX = Math::minimum(v0.x, v1.x, v2.x);
-		int64 minY = Math::minimum(v0.y, v1.y, v2.y);
-		int64 maxX = Math::maximum(v0.x, v1.x, v2.x) + substep;
-		int64 maxY = Math::maximum(v0.y, v1.y, v2.y) + substep;
+		i64 minX = Math::minimum(v0.x, v1.x, v2.x);
+		i64 minY = Math::minimum(v0.y, v1.y, v2.y);
+		i64 maxX = Math::maximum(v0.x, v1.x, v2.x) + substep;
+		i64 maxY = Math::maximum(v0.y, v1.y, v2.y) + substep;
 
 		minX = ((minX + submask) & ~submask) - 1;
 		minY = ((minY + submask) & ~submask) - 1;
@@ -1605,9 +1609,9 @@ struct FurPainter LUMIX_FINAL : public WorldEditor::Plugin
 		{
 			for (p.x = minX; p.x <= maxX; p.x += substep)
 			{
-				int64 w0 = orient2D(v1, v2, p);
-				int64 w1 = orient2D(v2, v0, p);
-				int64 w2 = orient2D(v0, v1, p);
+				i64 w0 = orient2D(v1, v2, p);
+				i64 w1 = orient2D(v2, v0, p);
+				i64 w2 = orient2D(v0, v1, p);
 
 				if (w0 >= 0 && w1 >= 0 && w2 >= 0)
 				{
@@ -1616,10 +1620,10 @@ struct FurPainter LUMIX_FINAL : public WorldEditor::Plugin
 					float q = 1 - (center - pos).squaredLength() * squared_radius_rcp;
 					if (q <= 0) continue;
 						
-					uint32& val = ((uint32*)&texture->data[0])[(p.x >> stepshift) + (p.y >> stepshift) * texture->width];
+					u32& val = ((u32*)&texture->data[0])[(p.x >> stepshift) + (p.y >> stepshift) * texture->width];
 					float alpha = ((val & 0xff000000) >> 24) / 255.0f;
 					alpha = brush_strength * q + alpha * (1 - q);
-					val = val & 0x00ffFFFF | (uint32)(alpha * 255.0f) << 24;
+					val = val & 0x00ffFFFF | (u32)(alpha * 255.0f) << 24;
 				}
 			}
 		}
@@ -1630,15 +1634,15 @@ struct FurPainter LUMIX_FINAL : public WorldEditor::Plugin
 	{
 		ASSERT(!texture->data.empty());
 
-		const uint16* idx16 = model->getIndices16();
-		const uint32* idx32 = model->getIndices32();
+		const u16* idx16 = model->getIndices16();
+		const u32* idx32 = model->getIndices32();
 		const Vec3* vertices = &model->getVertices()[0];
 		Vec2 min((float)texture->width, (float)texture->height);
 		Vec2 max(0, 0);
 		int tri_count = 0;
 		for (int i = 0, c = model->getIndicesCount(); i < c; i += 3)
 		{
-			uint32 idx[3];
+			u32 idx[3];
 			if (idx16)
 			{
 				idx[0] = idx16[i];
@@ -1740,10 +1744,14 @@ struct FurPainterPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		, is_opened(false)
 	{
 		fur_painter = LUMIX_NEW(app.getWorldEditor()->getAllocator(), FurPainter)(_app);
-		m_action = LUMIX_NEW(app.getWorldEditor()->getAllocator(), Action)("Fur Painter", "fur_painter");
-		m_action->func.bind<FurPainterPlugin, &FurPainterPlugin::onAction>(this);
-		m_action->is_selected.bind<FurPainterPlugin, &FurPainterPlugin::isOpened>(this);
+		Action* action = LUMIX_NEW(app.getWorldEditor()->getAllocator(), Action)("Fur Painter", "fur_painter");
+		action->func.bind<FurPainterPlugin, &FurPainterPlugin::onAction>(this);
+		action->is_selected.bind<FurPainterPlugin, &FurPainterPlugin::isOpened>(this);
+		app.addWindowAction(action);
 	}
+
+
+	const char* getName() const override { return "fur_painter"; }
 
 
 	bool isOpened() const { return is_opened; }
@@ -1883,9 +1891,10 @@ struct GameViewPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	{
 		auto& editor = *app.getWorldEditor();
 		m_engine = &editor.getEngine();
-		m_action = LUMIX_NEW(editor.getAllocator(), Action)("Game View", "game_view");
-		m_action->func.bind<GameViewPlugin, &GameViewPlugin::onAction>(this);
-		m_action->is_selected.bind<GameViewPlugin, &GameViewPlugin::isOpened>(this);
+		Action* action = LUMIX_NEW(editor.getAllocator(), Action)("Game View", "game_view");
+		action->func.bind<GameViewPlugin, &GameViewPlugin::onAction>(this);
+		action->is_selected.bind<GameViewPlugin, &GameViewPlugin::isOpened>(this);
+		app.addWindowAction(action);
 		m_game_view.m_is_opened = false;
 		m_game_view.init(editor);
 
@@ -1938,6 +1947,9 @@ struct GameViewPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		shutdownImGui();
 		m_game_view.shutdown();
 	}
+
+
+	const char* getName() const override { return "game_view"; }
 
 
 	bool isOpened() const { return m_game_view.m_is_opened; }
@@ -2029,9 +2041,9 @@ struct GameViewPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		bgfx::allocTransientIndexBuffer(&index_buffer, num_indices);
 
 		copyMemory(vertex_buffer.data, &cmd_list->VtxBuffer[0], num_vertices * decl.getStride());
-		copyMemory(index_buffer.data, &cmd_list->IdxBuffer[0], num_indices * sizeof(uint16));
+		copyMemory(index_buffer.data, &cmd_list->IdxBuffer[0], num_indices * sizeof(u16));
 
-		uint32 elem_offset = 0;
+		u32 elem_offset = 0;
 		const ImDrawCmd* pcmd_begin = cmd_list->CmdBuffer.begin();
 		const ImDrawCmd* pcmd_end = cmd_list->CmdBuffer.end();
 		for (const ImDrawCmd* pcmd = pcmd_begin; pcmd != pcmd_end; pcmd++)
@@ -2045,16 +2057,16 @@ struct GameViewPlugin LUMIX_FINAL : public StudioApp::IPlugin
 
 			if (0 == pcmd->ElemCount) continue;
 
-			m_gui_pipeline->setScissor(uint16(Math::maximum(pcmd->ClipRect.x, 0.0f)),
-				uint16(Math::maximum(pcmd->ClipRect.y, 0.0f)),
-				uint16(Math::minimum(pcmd->ClipRect.z, 65535.0f) - Math::maximum(pcmd->ClipRect.x, 0.0f)),
-				uint16(Math::minimum(pcmd->ClipRect.w, 65535.0f) - Math::maximum(pcmd->ClipRect.y, 0.0f)));
+			m_gui_pipeline->setScissor(u16(Math::maximum(pcmd->ClipRect.x, 0.0f)),
+				u16(Math::maximum(pcmd->ClipRect.y, 0.0f)),
+				u16(Math::minimum(pcmd->ClipRect.z, 65535.0f) - Math::maximum(pcmd->ClipRect.x, 0.0f)),
+				u16(Math::minimum(pcmd->ClipRect.w, 65535.0f) - Math::maximum(pcmd->ClipRect.y, 0.0f)));
 
 			auto material = m_material;
 			const auto& texture_id =
 				pcmd->TextureId ? *(bgfx::TextureHandle*)pcmd->TextureId : material->getTexture(0)->handle;
 			auto texture_uniform = material->getShader()->m_texture_slots[0].uniform_handle;
-			uint64 render_states = material->getRenderStates();
+			u64 render_states = material->getRenderStates();
 			if (&m_scene_view.getTextureHandle() == &texture_id)
 			{
 				render_states &= ~BGFX_STATE_BLEND_MASK;
@@ -2096,9 +2108,10 @@ struct ShaderEditorPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		: m_shader_editor(app.getWorldEditor()->getAllocator())
 		, m_app(app)
 	{
-		m_action = LUMIX_NEW(app.getWorldEditor()->getAllocator(), Action)("Shader Editor", "shaderEditor");
-		m_action->func.bind<ShaderEditorPlugin, &ShaderEditorPlugin::onAction>(this);
-		m_action->is_selected.bind<ShaderEditorPlugin, &ShaderEditorPlugin::isOpened>(this);
+		Action* action = LUMIX_NEW(app.getWorldEditor()->getAllocator(), Action)("Shader Editor", "shaderEditor");
+		action->func.bind<ShaderEditorPlugin, &ShaderEditorPlugin::onAction>(this);
+		action->is_selected.bind<ShaderEditorPlugin, &ShaderEditorPlugin::isOpened>(this);
+		app.addWindowAction(action);
 		m_shader_editor.m_is_opened = false;
 
 		m_compiler = LUMIX_NEW(app.getWorldEditor()->getAllocator(), ShaderCompiler)(app, *app.getLogUI());
@@ -2114,6 +2127,7 @@ struct ShaderEditorPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	~ShaderEditorPlugin() { LUMIX_DELETE(m_app.getWorldEditor()->getAllocator(), m_compiler); }
 
 
+	const char* getName() const override { return "shader_editor"; }
 	void update(float) override { m_compiler->update(); }
 	void onAction() { m_shader_editor.m_is_opened = !m_shader_editor.m_is_opened; }
 	void onWindowGUI() override { m_shader_editor.onGUI(); }

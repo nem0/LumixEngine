@@ -53,7 +53,7 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc,
 	desc.get(first_entity_cmp, index, stream);
 	Lumix::InputBlob tmp(stream);
 
-	Lumix::StaticString<100> desc_name(desc.getName(), "###", (Lumix::uint64)&desc);
+	Lumix::StaticString<100> desc_name(desc.getName(), "###", (Lumix::u64)&desc);
 
 	switch (desc.getType())
 	{
@@ -178,7 +178,7 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc,
 		auto& resource_descriptor = static_cast<Lumix::IResourcePropertyDescriptor&>(desc);
 		Lumix::ResourceType rm_type = resource_descriptor.getResourceType();
 		if (m_app.getAssetBrowser()->resourceInput(
-				desc.getName(), Lumix::StaticString<20>("", (Lumix::uint64)&desc), buf, sizeof(buf), rm_type))
+				desc.getName(), Lumix::StaticString<20>("", (Lumix::u64)&desc), buf, sizeof(buf), rm_type))
 		{
 			m_editor.setProperty(cmp_type, index, desc, &entities[0], entities.size(), buf, Lumix::stringLength(buf) + 1);
 		}
@@ -426,7 +426,7 @@ void PropertyGrid::showArrayProperty(const Lumix::Array<Lumix::Entity>& entities
 	cmp.scene = m_editor.getUniverse()->getScene(cmp_type);
 	cmp.entity = entities[0];
 	cmp.handle = cmp.scene->getComponent(cmp.entity, cmp.type);
-	Lumix::StaticString<100> desc_name(desc.getName(), "###", (Lumix::uint64)&desc);
+	Lumix::StaticString<100> desc_name(desc.getName(), "###", (Lumix::u64)&desc);
 
 	if (!ImGui::CollapsingHeader(desc_name, nullptr, ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_DefaultOpen)) return;
 	if (entities.size() > 1)
@@ -541,7 +541,6 @@ bool PropertyGrid::entityInput(const char* label, const char* str_id, Lumix::Ent
 			return true;
 		}
 	}
-
 
 	ImGui::SameLine();
 	ImGui::Text("%s", label);

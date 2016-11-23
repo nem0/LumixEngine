@@ -31,7 +31,7 @@ namespace Lumix
 		LUMIX_DELETE(m_allocator, static_cast<Texture*>(&resource));
 	}
 
-	uint8* TextureManager::getBuffer(int32 size)
+	u8* TextureManager::getBuffer(i32 size)
 	{
 		if (m_buffer_size < size)
 		{
@@ -41,7 +41,7 @@ namespace Lumix
 		}
 		if (m_buffer == nullptr)
 		{
-			m_buffer = (uint8*)m_allocator.allocate(sizeof(uint8) * size);
+			m_buffer = (u8*)m_allocator.allocate(sizeof(u8) * size);
 			m_buffer_size = size;
 		}
 		return m_buffer;

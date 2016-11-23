@@ -22,7 +22,7 @@ public:
 	struct Vertex
 	{
 		Lumix::Vec3 position;
-		uint32 color;
+		u32 color;
 		float u, v;
 	};
 
@@ -45,13 +45,13 @@ public:
 	virtual Vec3 getModelCenter(Entity entity) = 0;
 	virtual ImTextureID loadTexture(const Lumix::Path& path) = 0;
 	virtual void unloadTexture(ImTextureID handle) = 0;
-	virtual void addDebugCube(const Vec3& minimum, const Vec3& maximum, uint32 color, float life) = 0;
-	virtual void addDebugCross(const Vec3& pos, float size, uint32 color, float life) = 0;
-	virtual void addDebugLine(const Vec3& from, const Vec3& to, uint32 color, float life) = 0;
+	virtual void addDebugCube(const Vec3& minimum, const Vec3& maximum, u32 color, float life) = 0;
+	virtual void addDebugCross(const Vec3& pos, float size, u32 color, float life) = 0;
+	virtual void addDebugLine(const Vec3& from, const Vec3& to, u32 color, float life) = 0;
 	virtual WorldEditor::RayHit castRay(const Vec3& origin, const Vec3& dir, ComponentHandle ignored) = 0;
 	virtual Path getModelInstancePath(ComponentHandle cmp) = 0;
 	virtual void render(const Matrix& mtx,
-		uint16* indices,
+		u16* indices,
 		int indices_count,
 		Vertex* vertices,
 		int vertices_count,

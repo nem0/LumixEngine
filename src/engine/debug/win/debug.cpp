@@ -106,7 +106,7 @@ StackNode* StackTree::getParent(StackNode* node)
 bool StackTree::getFunction(StackNode* node, char* out, int max_size, int* line)
 {
 	HANDLE process = GetCurrentProcess();
-	uint8 symbol_mem[sizeof(SYMBOL_INFO) + 256 * sizeof(char)] = {};
+	u8 symbol_mem[sizeof(SYMBOL_INFO) + 256 * sizeof(char)] = {};
 	SYMBOL_INFO* symbol = reinterpret_cast<SYMBOL_INFO*>(symbol_mem);
 	symbol->MaxNameLen = 255;
 	symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
@@ -132,7 +132,7 @@ void StackTree::printCallstack(StackNode* node)
 	while (node)
 	{
 		HANDLE process = GetCurrentProcess();
-		uint8 symbol_mem[sizeof(SYMBOL_INFO) + 256 * sizeof(char)];
+		u8 symbol_mem[sizeof(SYMBOL_INFO) + 256 * sizeof(char)];
 		SYMBOL_INFO* symbol = reinterpret_cast<SYMBOL_INFO*>(symbol_mem);
 		memset(symbol_mem, 0, sizeof(symbol_mem));
 		symbol->MaxNameLen = 255;
@@ -148,7 +148,7 @@ void StackTree::printCallstack(StackNode* node)
 				OutputDebugString(line.FileName);
 				OutputDebugString("(");
 				char tmp[20];
-				toCString((uint32)line.LineNumber, tmp, sizeof(tmp));
+				toCString((u32)line.LineNumber, tmp, sizeof(tmp));
 				OutputDebugString(tmp);
 				OutputDebugString("):");
 			}
@@ -238,9 +238,9 @@ StackNode* StackTree::record()
 }
 
 
-static const uint32 UNINITIALIZED_MEMORY_PATTERN = 0xCD;
-static const uint32 FREED_MEMORY_PATTERN = 0xDD;
-static const uint32 ALLOCATION_GUARD = 0xFDFDFDFD;
+static const u32 UNINITIALIZED_MEMORY_PATTERN = 0xCD;
+static const u32 FREED_MEMORY_PATTERN = 0xDD;
+static const u32 ALLOCATION_GUARD = 0xFDFDFDFD;
 
 
 Allocator::Allocator(IAllocator& source)
@@ -308,8 +308,8 @@ void Allocator::checkGuards()
 	{
 		auto user_ptr = getUserPtrFromAllocationInfo(info);
 		void* system_ptr = getSystemFromUser(user_ptr);
-		ASSERT(*(uint32*)system_ptr == ALLOCATION_GUARD);
-		ASSERT(*(uint32*)((uint8*)user_ptr + info->size) == ALLOCATION_GUARD);
+		ASSERT(*(u32*)system_ptr == ALLOCATION_GUARD);
+		ASSERT(*(u32*)((u8*)user_ptr + info->size) == ALLOCATION_GUARD);
 
 		info = info->next;
 	}
@@ -337,38 +337,38 @@ size_t Allocator::getNeededMemory(size_t size, size_t align)
 
 Allocator::AllocationInfo* Allocator::getAllocationInfoFromSystem(void* system_ptr)
 {
-	return (AllocationInfo*)(m_are_guards_enabled ? (uint8*)system_ptr + sizeof(ALLOCATION_GUARD)
+	return (AllocationInfo*)(m_are_guards_enabled ? (u8*)system_ptr + sizeof(ALLOCATION_GUARD)
 												  : system_ptr);
 }
 
 
 void* Allocator::getUserPtrFromAllocationInfo(AllocationInfo* info)
 {
-	return ((uint8*)info + sizeof(AllocationInfo));
+	return ((u8*)info + sizeof(AllocationInfo));
 }
 
 
 Allocator::AllocationInfo* Allocator::getAllocationInfoFromUser(void* user_ptr)
 {
-	return (AllocationInfo*)((uint8*)user_ptr - sizeof(AllocationInfo));
+	return (AllocationInfo*)((u8*)user_ptr - sizeof(AllocationInfo));
 }
 
 
-uint8* Allocator::getUserFromSystem(void* system_ptr, size_t align)
+u8* Allocator::getUserFromSystem(void* system_ptr, size_t align)
 {
 	size_t diff = (m_are_guards_enabled ? sizeof(ALLOCATION_GUARD) : 0) + sizeof(AllocationInfo);
 
 	if (align) diff += (align - diff % align) % align;
-	return (uint8*)system_ptr + diff;
+	return (u8*)system_ptr + diff;
 }
 
 
-uint8* Allocator::getSystemFromUser(void* user_ptr)
+u8* Allocator::getSystemFromUser(void* user_ptr)
 {
 	AllocationInfo* info = getAllocationInfoFromUser(user_ptr);
 	size_t diff = (m_are_guards_enabled ? sizeof(ALLOCATION_GUARD) : 0) + sizeof(AllocationInfo);
 	if (info->align) diff += (info->align - diff % info->align) % info->align;
-	return (uint8*)user_ptr - diff;
+	return (u8*)user_ptr - diff;
 }
 
 
@@ -400,7 +400,7 @@ void* Allocator::allocate_aligned(size_t size, size_t align)
 #else
 	void* system_ptr;
 	AllocationInfo* info;
-	uint8* user_ptr;
+	u8* user_ptr;
 
 	size_t system_size = getNeededMemory(size, align);
 	{
@@ -420,7 +420,7 @@ void* Allocator::allocate_aligned(size_t size, size_t align)
 		m_total_size += size;
 	} // because of the SpinLock
 
-	info->align = uint16(align);
+	info->align = u16(align);
 	info->stack_leaf = m_stack_tree.record();
 	info->size = size;
 	if (m_is_fill_enabled)
@@ -430,8 +430,8 @@ void* Allocator::allocate_aligned(size_t size, size_t align)
 
 	if (m_are_guards_enabled)
 	{
-		*(uint32*)system_ptr = ALLOCATION_GUARD;
-		*(uint32*)((uint8*)system_ptr + system_size - sizeof(ALLOCATION_GUARD)) = ALLOCATION_GUARD;
+		*(u32*)system_ptr = ALLOCATION_GUARD;
+		*(u32*)((u8*)system_ptr + system_size - sizeof(ALLOCATION_GUARD)) = ALLOCATION_GUARD;
 	}
 
 	return user_ptr;
@@ -455,9 +455,9 @@ void Allocator::deallocate_aligned(void* user_ptr)
 
 		if (m_are_guards_enabled)
 		{
-			ASSERT(*(uint32*)system_ptr == ALLOCATION_GUARD);
+			ASSERT(*(u32*)system_ptr == ALLOCATION_GUARD);
 			size_t system_size = getNeededMemory(info->size, info->align);
-			ASSERT(*(uint32*)((uint8*)system_ptr + system_size - sizeof(ALLOCATION_GUARD)) == ALLOCATION_GUARD);
+			ASSERT(*(u32*)((u8*)system_ptr + system_size - sizeof(ALLOCATION_GUARD)) == ALLOCATION_GUARD);
 		}
 
 		{
@@ -536,8 +536,8 @@ void* Allocator::allocate(size_t size)
 
 	if (m_are_guards_enabled)
 	{
-		*(uint32*)system_ptr = ALLOCATION_GUARD;
-		*(uint32*)((uint8*)system_ptr + system_size - sizeof(ALLOCATION_GUARD)) = ALLOCATION_GUARD;
+		*(u32*)system_ptr = ALLOCATION_GUARD;
+		*(u32*)((u8*)system_ptr + system_size - sizeof(ALLOCATION_GUARD)) = ALLOCATION_GUARD;
 	}
 
 	return user_ptr;
@@ -560,9 +560,9 @@ void Allocator::deallocate(void* user_ptr)
 
 		if (m_are_guards_enabled)
 		{
-			ASSERT(*(uint32*)system_ptr == ALLOCATION_GUARD);
+			ASSERT(*(u32*)system_ptr == ALLOCATION_GUARD);
 			size_t system_size = getNeededMemory(info->size);
-			ASSERT(*(uint32*)((uint8*)system_ptr + system_size - sizeof(ALLOCATION_GUARD)) == ALLOCATION_GUARD);
+			ASSERT(*(u32*)((u8*)system_ptr + system_size - sizeof(ALLOCATION_GUARD)) == ALLOCATION_GUARD);
 		}
 
 		{

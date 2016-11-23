@@ -16,7 +16,7 @@ namespace MT
 
 	
 #ifdef _WIN32
-	typedef uint32 ThreadID;
+	typedef u32 ThreadID;
 #else
 	typedef pthread_t ThreadID;
 #endif
@@ -24,13 +24,13 @@ namespace MT
 
 LUMIX_ENGINE_API void setThreadName(ThreadID thread_id,
 									const char* thread_name);
-LUMIX_ENGINE_API void sleep(uint32 milliseconds);
+LUMIX_ENGINE_API void sleep(u32 milliseconds);
 LUMIX_ENGINE_API void yield();
 
-LUMIX_ENGINE_API uint32 getCPUsCount();
+LUMIX_ENGINE_API u32 getCPUsCount();
 
 LUMIX_ENGINE_API ThreadID getCurrentThreadID();
-LUMIX_ENGINE_API uint32 getThreadAffinityMask();
+LUMIX_ENGINE_API u32 getThreadAffinityMask();
 
 } //! namespace MT
 

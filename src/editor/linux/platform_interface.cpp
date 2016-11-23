@@ -334,11 +334,11 @@ bool dirExists(const char* path)
 }
 
 
-Lumix::uint64 getLastModified(const char* file)
+Lumix::u64 getLastModified(const char* file)
 {
 	struct stat tmp;
-	Lumix::uint64 ret = 0;
-	ret = tmp.st_mtim.tv_sec * 1000 + Lumix::uint64(tmp.st_mtim.tv_nsec / 1000000);
+	Lumix::u64 ret = 0;
+	ret = tmp.st_mtim.tv_sec * 1000 + Lumix::u64(tmp.st_mtim.tv_nsec / 1000000);
 	return ret;
 }
 

@@ -42,7 +42,7 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 		ImGuiIO& io = ImGui::GetIO();
 		
 		m_font = io.Fonts->AddFontFromFileTTF("bin/VeraMono.ttf", 20);
-		uint8* pixels;
+		u8* pixels;
 		int w, h;
 		io.Fonts->GetTexDataAsRGBA32(&pixels, &w, &h);
 		auto* material_manager = m_engine.getResourceManager().get(MATERIAL_TYPE);
@@ -100,6 +100,9 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 		REGISTER_FUNCTION(beginGUI);
 		REGISTER_FUNCTION(endGUI);
 		REGISTER_FUNCTION(enableCursor);
+		REGISTER_FUNCTION(getMouseX);
+		REGISTER_FUNCTION(getMouseY);
+		REGISTER_FUNCTION(isMouseClicked);
 
 		LuaWrapper::createSystemVariable(L, "Gui", "instance", this);
 
@@ -154,9 +157,9 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 		bgfx::allocTransientIndexBuffer(&index_buffer, num_indices);
 
 		copyMemory(vertex_buffer.data, &cmd_list->VtxBuffer[0], num_vertices * decl.getStride());
-		copyMemory(index_buffer.data, &cmd_list->IdxBuffer[0], num_indices * sizeof(uint16));
+		copyMemory(index_buffer.data, &cmd_list->IdxBuffer[0], num_indices * sizeof(u16));
 
-		uint32 elem_offset = 0;
+		u32 elem_offset = 0;
 		const ImDrawCmd* pcmd_begin = cmd_list->CmdBuffer.begin();
 		const ImDrawCmd* pcmd_end = cmd_list->CmdBuffer.end();
 		for (const ImDrawCmd* pcmd = pcmd_begin; pcmd != pcmd_end; pcmd++)
@@ -170,10 +173,10 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 
 			if (0 == pcmd->ElemCount) continue;
 
-			pipeline->setScissor(uint16(Math::maximum(pcmd->ClipRect.x, 0.0f)),
-				uint16(Math::maximum(pcmd->ClipRect.y, 0.0f)),
-				uint16(Math::minimum(pcmd->ClipRect.z, 65535.0f) - Math::maximum(pcmd->ClipRect.x, 0.0f)),
-				uint16(Math::minimum(pcmd->ClipRect.w, 65535.0f) - Math::maximum(pcmd->ClipRect.y, 0.0f)));
+			pipeline->setScissor(u16(Math::maximum(pcmd->ClipRect.x, 0.0f)),
+				u16(Math::maximum(pcmd->ClipRect.y, 0.0f)),
+				u16(Math::minimum(pcmd->ClipRect.z, 65535.0f) - Math::maximum(pcmd->ClipRect.x, 0.0f)),
+				u16(Math::minimum(pcmd->ClipRect.w, 65535.0f) - Math::maximum(pcmd->ClipRect.y, 0.0f)));
 
 			auto material = m_material;
 			const auto& texture_id =
@@ -221,7 +224,7 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 	}
 
 
-	void beginGUI()
+	void beginGUI() override
 	{
 		m_original_context = ImGui::GetCurrentContext();
 		ImGui::SetCurrentContext(m_context);
@@ -229,10 +232,30 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 	}
 
 
-	void endGUI()
+	void endGUI() override
 	{
 		ImGui::PopFont();
 		ImGui::SetCurrentContext(m_original_context);
+	}
+
+
+	float getMouseX() const
+	{
+		Vec2 mouse_pos = m_engine.getInputSystem().getMousePos() - m_interface->getPos();
+		return mouse_pos.x;
+	}
+
+
+	bool isMouseClicked(int button)
+	{
+		return ImGui::IsMouseClicked(button);
+	}
+
+
+	float getMouseY() const
+	{
+		Vec2 mouse_pos = m_engine.getInputSystem().getMousePos() - m_interface->getPos();
+		return mouse_pos.y;
 	}
 
 

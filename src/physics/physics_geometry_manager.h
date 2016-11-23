@@ -45,15 +45,15 @@ class PhysicsGeometryManager LUMIX_FINAL : public ResourceManagerBase
 class PhysicsGeometry LUMIX_FINAL : public Resource
 {
 	public:
-		static const uint32 HEADER_MAGIC = 0x5f4c5046; // '_LPF'
+		static const u32 HEADER_MAGIC = 0x5f4c5046; // '_LPF'
 		struct Header
 		{
-			uint32 m_magic;
-			uint32 m_version;
-			uint32 m_convex;
+			u32 m_magic;
+			u32 m_version;
+			u32 m_convex;
 		};
 
-		enum class Versions : uint32
+		enum class Versions : u32
 		{
 			FIRST,
 

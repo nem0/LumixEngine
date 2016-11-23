@@ -26,10 +26,10 @@ void UT_blob(const char* params)
 	blob.write(c);
 	LUMIX_EXPECT(blob.getPos() == sizeof(b) + sizeof(c));
 
-	int32 i = 123456;
+	i32 i = 123456;
 	blob.write(i);
 
-	uint32 ui = 0xABCDEF01;
+	u32 ui = 0xABCDEF01;
 	blob.write(ui);
 
 	float f = Lumix::Math::PI;
@@ -56,10 +56,10 @@ void UT_blob(const char* params)
 	char c2;
 	input.read(c2);
 
-	int32 i2;
+	i32 i2;
 	input.read(i2);
 
-	uint32 ui2;
+	u32 ui2;
 	input.read(ui2);
 
 	float f2;

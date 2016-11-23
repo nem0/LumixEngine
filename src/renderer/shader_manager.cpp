@@ -36,7 +36,7 @@ void ShaderManager::destroyResource(Resource& resource)
 }
 
 
-uint8* ShaderManager::getBuffer(int32 size)
+u8* ShaderManager::getBuffer(i32 size)
 {
 	if (m_buffer_size < size)
 	{
@@ -46,7 +46,7 @@ uint8* ShaderManager::getBuffer(int32 size)
 	}
 	if (m_buffer == nullptr)
 	{
-		m_buffer = (uint8*)m_allocator.allocate(sizeof(uint8) * size);
+		m_buffer = (u8*)m_allocator.allocate(sizeof(u8) * size);
 		m_buffer_size = size;
 	}
 	return m_buffer;

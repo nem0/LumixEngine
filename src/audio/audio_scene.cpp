@@ -1,18 +1,19 @@
 #include "audio_scene.h"
+#include "animation/animation_system.h"
 #include "audio_device.h"
 #include "audio_system.h"
 #include "clip_manager.h"
 #include "engine/blob.h"
 #include "engine/crc32.h"
+#include "engine/engine.h"
 #include "engine/iallocator.h"
 #include "engine/lua_wrapper.h"
 #include "engine/matrix.h"
 #include "engine/property_register.h"
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
-#include "engine/engine.h"
-#include "lua_script/lua_script_system.h"
 #include "engine/universe/universe.h"
+#include "lua_script/lua_script_system.h"
 
 
 namespace Lumix
@@ -111,6 +112,37 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 		return -1;
 	}
 
+	void updateAnimationEvents()
+	{
+		if (!m_animation_scene) return;
+		
+		InputBlob blob(m_animation_scene->getEventStream());
+		u32 sound_type = crc32("sound");
+		while (blob.getPosition() < blob.getSize())
+		{
+			u32 type;
+			u8 size;
+			ComponentHandle cmp;
+			blob.read(type);
+			blob.read(cmp);
+			blob.read(size);
+			if (type == sound_type)
+			{
+				SoundAnimationEvent event;
+				blob.read(event);
+				ClipInfo* clip = getClipInfo(event.clip);
+				Entity entity = m_animation_scene->getControllerEntity(cmp);
+				if (clip)
+				{
+					play(entity, clip, event.is_3d);
+				}
+			}
+			else
+			{
+				blob.skip(size);
+			}
+		}
+	}
 
 	void update(float time_delta, bool paused) override
 	{
@@ -143,6 +175,8 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 			}
 		}
 		m_device.update(time_delta);
+
+		updateAnimationEvents();
 	}
 
 
@@ -160,6 +194,7 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 
 	void startGame() override
 	{
+		m_animation_scene = (AnimationScene*)m_universe.getScene(crc32("animation"));
 		for (AmbientSound& sound : m_ambient_sounds)
 		{
 			if (sound.clip) sound.playing_sound = play(sound.entity, sound.clip, sound.is_3d);
@@ -169,6 +204,7 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 
 	void stopGame() override
 	{
+		m_animation_scene = nullptr;
 		for (auto& i : m_playing_sounds)
 		{
 			if (i.buffer_id != AudioDevice::INVALID_BUFFER_HANDLE)
@@ -498,6 +534,17 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 	}
 
 
+	ClipInfo* getClipInfo(u32 hash) override
+	{
+		for (auto* i : m_clips)
+		{
+			if (i->name_hash == hash) return i;
+		}
+
+		return nullptr;
+	}
+
+
 	ClipInfo* getClipInfo(int index) override
 	{
 		return m_clips[index];
@@ -606,6 +653,7 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 	Array<ClipInfo*> m_clips;
 	AudioSystem& m_system;
 	PlayingSound m_playing_sounds[AudioDevice::MAX_PLAYING_SOUNDS];
+	AnimationScene* m_animation_scene = nullptr;
 };
 
 

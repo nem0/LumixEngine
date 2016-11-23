@@ -1,6 +1,7 @@
 #pragma once
 
 
+#include "engine/blob.h"
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"

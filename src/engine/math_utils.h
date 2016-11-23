@@ -104,7 +104,7 @@ LUMIX_FORCE_INLINE T clamp(T value, T min_value, T max_value)
 	return minimum(maximum(value, min_value), max_value);
 }
 
-inline uint32 nextPow2(uint32 v)
+inline u32 nextPow2(u32 v)
 {
 	v--;
 	v |= v >> 1;
@@ -116,10 +116,10 @@ inline uint32 nextPow2(uint32 v)
 	return v;
 }
 
-inline uint32 log2(uint32 v)
+inline u32 log2(u32 v)
 {
-	uint32 r;
-	uint32 shift;
+	u32 r;
+	u32 shift;
 	r = (v > 0xffff) << 4; v >>= r;
 	shift = (v > 0xff) << 3; v >>= shift; r |= shift;
 	shift = (v > 0xf) << 2; v >>= shift; r |= shift;
@@ -147,6 +147,14 @@ LUMIX_FORCE_INLINE float radiansToDegrees(float angle)
 
 LUMIX_ENGINE_API Vec3 radiansToDegrees(const Vec3& v);
 
+inline float angleDiff(float a, float b)
+{
+	float delta = a - b;
+	if (delta > PI) return PI * 2 - delta;
+	if (delta < -PI) return PI * 2 + delta;
+	return delta;
+}
+
 inline float easeInOut(float t)
 {
 	float scaled_t = t * 2;
@@ -160,9 +168,9 @@ inline float easeInOut(float t)
 
 
 LUMIX_ENGINE_API float pow(float base, float exponent);
-LUMIX_ENGINE_API uint32 rand();
-LUMIX_ENGINE_API uint32 rand(uint32 from, uint32 to);
-LUMIX_ENGINE_API void seedRandom(uint32 seed);
+LUMIX_ENGINE_API u32 rand();
+LUMIX_ENGINE_API u32 rand(u32 from, u32 to);
+LUMIX_ENGINE_API void seedRandom(u32 seed);
 LUMIX_ENGINE_API float randFloat();
 LUMIX_ENGINE_API float randFloat(float from, float to);
 

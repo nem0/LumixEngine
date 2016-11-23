@@ -41,7 +41,7 @@ static const ComponentType SPHERICAL_JOINT_TYPE = PropertyRegister::getComponent
 static const ComponentType D6_JOINT_TYPE = PropertyRegister::getComponentType("d6_joint");
 static const ResourceType TEXTURE_TYPE("texture");
 static const ResourceType PHYSICS_TYPE("physics");
-static const uint32 RENDERER_HASH = crc32("renderer");
+static const u32 RENDERER_HASH = crc32("renderer");
 
 
 enum class PhysicsSceneVersion : int
@@ -99,7 +99,7 @@ struct OutputStream LUMIX_FINAL : public physx::PxOutputStream
 	explicit OutputStream(IAllocator& allocator)
 		: allocator(allocator)
 	{
-		data = (uint8*)allocator.allocate(sizeof(uint8) * 4096);
+		data = (u8*)allocator.allocate(sizeof(u8) * 4096);
 		capacity = 4096;
 		size = 0;
 	}
@@ -113,8 +113,8 @@ struct OutputStream LUMIX_FINAL : public physx::PxOutputStream
 		{
 			int new_capacity =
 				Math::maximum(size + (int)count, capacity + 4096);
-			uint8* new_data =
-				(uint8*)allocator.allocate(sizeof(uint8) * new_capacity);
+			u8* new_data =
+				(u8*)allocator.allocate(sizeof(u8) * new_capacity);
 			copyMemory(new_data, data, size);
 			allocator.deallocate(data);
 			data = new_data;
@@ -125,7 +125,7 @@ struct OutputStream LUMIX_FINAL : public physx::PxOutputStream
 		return count;
 	}
 
-	uint8* data;
+	u8* data;
 	IAllocator& allocator;
 	int capacity;
 	int size;
@@ -385,13 +385,13 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	uint32 getDebugVisualizationFlags() const override
+	u32 getDebugVisualizationFlags() const override
 	{
 		return m_debug_visualization_flags;
 	}
 
 
-	void setDebugVisualizationFlags(uint32 flags) override
+	void setDebugVisualizationFlags(u32 flags) override
 	{
 		if (flags == m_debug_visualization_flags) return;
 
@@ -650,7 +650,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		int y,
 		int width,
 		int height,
-		const uint8* src_data,
+		const u8* src_data,
 		int bytes_per_pixel) override
 	{
 		PROFILE_FUNCTION();
@@ -666,14 +666,14 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		heights.resize(width * height);
 		if (bytes_per_pixel == 2)
 		{
-			const int16* LUMIX_RESTRICT data = (const int16*)src_data;
+			const i16* LUMIX_RESTRICT data = (const i16*)src_data;
 			for (int j = 0; j < height; ++j)
 			{
 				for (int i = 0; i < width; ++i)
 				{
 					int idx = j + i * height;
 					int idx2 = i + j * width;
-					heights[idx].height = physx::PxI16((int32)data[idx2] - 0x7fff);
+					heights[idx].height = physx::PxI16((i32)data[idx2] - 0x7fff);
 					heights[idx].materialIndex0 = heights[idx].materialIndex1 = 0;
 					heights[idx].setTessFlag();
 				}
@@ -682,14 +682,14 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		else
 		{
 			ASSERT(bytes_per_pixel == 1);
-			const uint8* LUMIX_RESTRICT data = src_data;
+			const u8* LUMIX_RESTRICT data = src_data;
 			for (int j = 0; j < height; ++j)
 			{
 				for (int i = 0; i < width; ++i)
 				{
 					int idx = j + i * height;
 					int idx2 = i + j * width;
-					heights[idx].height = physx::PxI16((int32)data[idx2] - 0x7f);
+					heights[idx].height = physx::PxI16((i32)data[idx2] - 0x7f);
 					heights[idx].materialIndex0 = heights[idx].materialIndex1 = 0;
 					heights[idx].setTessFlag();
 				}
@@ -1736,7 +1736,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	RagdollBone* getRagdollBoneByName(ComponentHandle cmp, uint32 bone_name_hash) override
+	RagdollBone* getRagdollBoneByName(ComponentHandle cmp, u32 bone_name_hash) override
 	{
 		Entity entity = {cmp.index};
 		auto* render_scene = static_cast<RenderScene*>(m_universe.getScene(RENDERER_HASH));
@@ -2022,7 +2022,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	RagdollBone* createRagdollBone(ComponentHandle cmp, uint32 bone_name_hash) override
+	RagdollBone* createRagdollBone(ComponentHandle cmp, u32 bone_name_hash) override
 	{
 		auto* render_scene = static_cast<RenderScene*>(m_universe.getScene(RENDERER_HASH));
 		ASSERT(render_scene);
@@ -2354,14 +2354,14 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		if (bytes_per_pixel == 2)
 		{
 			PROFILE_BLOCK("copyData");
-			const int16* LUMIX_RESTRICT data = (const int16*)terrain.m_heightmap->getData();
+			const i16* LUMIX_RESTRICT data = (const i16*)terrain.m_heightmap->getData();
 			for (int j = 0; j < height; ++j)
 			{
 				int idx = j * width;
 				for (int i = 0; i < width; ++i)
 				{
 					int idx2 = j + i * height;
-					heights[idx].height = physx::PxI16((int32)data[idx2] - 0x7fff);
+					heights[idx].height = physx::PxI16((i32)data[idx2] - 0x7fff);
 					heights[idx].materialIndex0 = heights[idx].materialIndex1 = 0;
 					heights[idx].setTessFlag();
 					++idx;
@@ -2371,14 +2371,14 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		else
 		{
 			PROFILE_BLOCK("copyData");
-			const uint8* data = terrain.m_heightmap->getData();
+			const u8* data = terrain.m_heightmap->getData();
 			for (int j = 0; j < height; ++j)
 			{
 				for (int i = 0; i < width; ++i)
 				{
 					int idx = i + j * width;
 					int idx2 = j + i * height;
-					heights[idx].height = physx::PxI16((int32)data[idx2 * bytes_per_pixel] - 0x7f);
+					heights[idx].height = physx::PxI16((i32)data[idx2 * bytes_per_pixel] - 0x7f);
 					heights[idx].materialIndex0 = heights[idx].materialIndex1 = 0;
 					heights[idx].setTessFlag();
 				}
@@ -2696,7 +2696,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		physx::PxShape* shapes;
 		auto* px_actor = actor->physx_actor;
 		auto* resource = actor->resource;
-		serializer.write((int32)actor->type);
+		serializer.write((i32)actor->type);
 		switch (actor->type)
 		{
 			case ActorType::BOX:
@@ -2741,7 +2741,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		actor->layer = 0;
 		if (version > (int)PhysicsSceneVersion::LAYERS) serializer.read(actor->layer);
 
-		serializer.read((int32&)actor->type);
+		serializer.read((i32&)actor->type);
 
 		switch (actor->type)
 		{
@@ -2825,20 +2825,20 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		serializer.write(m_layers_count);
 		serializer.write(m_layers_names);
 		serializer.write(m_collision_filter);
-		serializer.write((int32)m_actors.size());
+		serializer.write((i32)m_actors.size());
 		for (auto* actor : m_actors)
 		{
 			serializer.write(isDynamic({actor->entity.index}));
 			serializer.write(actor->entity);
 			serializeActor(serializer, actor);
 		}
-		serializer.write((int32)m_controllers.size());
+		serializer.write((i32)m_controllers.size());
 		for (const auto& controller : m_controllers)
 		{
 			serializer.write(controller.m_entity);
 			serializer.write(controller.m_layer);
 		}
-		serializer.write((int32)m_terrains.size());
+		serializer.write((i32)m_terrains.size());
 		for (auto& terrain : m_terrains)
 		{
 			serializer.write(terrain.m_entity);
@@ -2872,7 +2872,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 				serializer.write(joint->getTolerance());
 				serializer.write(joint->getStiffness());
 				serializer.write(joint->getDamping());
-				uint32 flags = (physx::PxU32)joint->getDistanceJointFlags();
+				u32 flags = (physx::PxU32)joint->getDistanceJointFlags();
 				serializer.write(flags);
 				break;
 			}
@@ -2880,7 +2880,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			{
 				auto* joint = bone->parent_joint->is<physx::PxRevoluteJoint>();
 				serializer.write(joint->getLimit());
-				uint32 flags = (physx::PxU32)joint->getRevoluteJointFlags();
+				u32 flags = (physx::PxU32)joint->getRevoluteJointFlags();
 				serializer.write(flags);
 				break;
 			}
@@ -2902,7 +2902,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			{
 				auto* joint = bone->parent_joint->is<physx::PxSphericalJoint>();
 				serializer.write(joint->getLimitCone());
-				uint32 flags = (physx::PxU32)joint->getSphericalJointFlags();
+				u32 flags = (physx::PxU32)joint->getSphericalJointFlags();
 				serializer.write(flags);
 				break;
 			}
@@ -2983,7 +2983,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 				joint->setStiffness(value);
 				serializer.read(value);
 				joint->setDamping(value);
-				uint32 flags;
+				u32 flags;
 				serializer.read(flags);
 				joint->setDistanceJointFlags((physx::PxDistanceJointFlags)flags);
 				break;
@@ -2994,7 +2994,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 				physx::PxJointAngularLimitPair limit(0, 0);
 				serializer.read(limit);
 				joint->setLimit(limit);
-				uint32 flags;
+				u32 flags;
 				serializer.read(flags);
 				joint->setRevoluteJointFlags((physx::PxRevoluteJointFlags)flags);
 				break;
@@ -3005,7 +3005,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 				physx::PxJointLimitCone limit(0, 0);
 				serializer.read(limit);
 				joint->setLimitCone(limit);
-				uint32 flags;
+				u32 flags;
 				serializer.read(flags);
 				joint->setSphericalJointFlags((physx::PxSphericalJointFlags)flags);
 				break;
@@ -3136,7 +3136,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 				case physx::PxJointConcreteType::eSPHERICAL:
 				{
 					auto* px_joint = static_cast<physx::PxSphericalJoint*>(joint.physx);
-					uint32 flags = (uint32)px_joint->getSphericalJointFlags();
+					u32 flags = (u32)px_joint->getSphericalJointFlags();
 					serializer.write(flags);
 					auto limit = px_joint->getLimitCone();
 					serializer.write(limit);
@@ -3145,7 +3145,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 				case physx::PxJointConcreteType::eREVOLUTE:
 				{
 					auto* px_joint = static_cast<physx::PxRevoluteJoint*>(joint.physx);
-					uint32 flags = (uint32)px_joint->getRevoluteJointFlags();
+					u32 flags = (u32)px_joint->getRevoluteJointFlags();
 					serializer.write(flags);
 					auto limit = px_joint->getLimit();
 					serializer.write(limit);
@@ -3154,7 +3154,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 				case physx::PxJointConcreteType::eDISTANCE:
 				{
 					auto* px_joint = static_cast<physx::PxDistanceJoint*>(joint.physx);
-					uint32 flags = (uint32)px_joint->getDistanceJointFlags();
+					u32 flags = (u32)px_joint->getDistanceJointFlags();
 					serializer.write(flags);
 					serializer.write(px_joint->getDamping());
 					serializer.write(px_joint->getStiffness());
@@ -3186,7 +3186,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 	void deserializeActors(InputBlob& serializer, int version)
 	{
-		int32 count;
+		i32 count;
 		serializer.read(count);
 		m_actors.reserve(count);
 		for (int i = 0; i < count; ++i)
@@ -3208,7 +3208,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 	void deserializeControllers(InputBlob& serializer, int version)
 	{
-		int32 count;
+		i32 count;
 		serializer.read(count);
 		for (int i = 0; i < count; ++i)
 		{
@@ -3241,7 +3241,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			cDesc.behaviorCallback = nullptr;
 			Vec3 position = m_universe.getPosition(entity);
 			cDesc.position.set(position.x, position.y - cDesc.height * 0.5f, position.z);
-			c.m_controller = m_controller_manager->createController(*m_system->getPhysics(), m_scene, cDesc);
+			c.m_controller = m_controller_manager->createController(cDesc);
 			c.m_entity = entity;
 			m_universe.addComponent(entity, CONTROLLER_TYPE, this, {i});
 		}
@@ -3312,7 +3312,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 						nullptr,
 						physx::PxTransform::createIdentity());
 					joint.physx = px_joint;
-					uint32 flags;
+					u32 flags;
 					serializer.read(flags);
 					px_joint->setSphericalJointFlags(physx::PxSphericalJointFlags(flags));
 					physx::PxJointLimitCone limit(0, 0);
@@ -3329,7 +3329,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 						nullptr,
 						physx::PxTransform::createIdentity());
 					joint.physx = px_joint;
-					uint32 flags;
+					u32 flags;
 					serializer.read(flags);
 					px_joint->setRevoluteJointFlags(physx::PxRevoluteJointFlags(flags));
 					physx::PxJointAngularLimitPair limit(0, 0);
@@ -3346,7 +3346,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 						nullptr,
 						physx::PxTransform::createIdentity());
 					joint.physx = px_joint;
-					uint32 flags;
+					u32 flags;
 					serializer.read(flags);
 					px_joint->setDistanceJointFlags(physx::PxDistanceJointFlags(flags));
 					float tmp;
@@ -3402,7 +3402,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 	void deserializeTerrains(InputBlob& serializer, int version)
 	{
-		int32 count;
+		i32 count;
 		serializer.read(count);
 		for (int i = 0; i < count; ++i)
 		{
@@ -3560,9 +3560,9 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	Array<RigidActor*> m_dynamic_actors;
 	bool m_is_game_running;
 	bool m_is_updating_ragdoll;
-	uint32 m_debug_visualization_flags;
+	u32 m_debug_visualization_flags;
 	Array<QueuedForce> m_queued_forces;
-	uint32 m_collision_filter[32];
+	u32 m_collision_filter[32];
 	char m_layers_names[32][30];
 	int m_layers_count;
 };

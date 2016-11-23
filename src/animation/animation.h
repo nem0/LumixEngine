@@ -1,5 +1,6 @@
 #pragma once
 
+#include "engine/matrix.h"
 #include "engine/resource.h"
 #include "engine/resource_manager_base.h"
 
@@ -40,24 +41,28 @@ private:
 class Animation LUMIX_FINAL : public Resource
 {
 	public:
-		static const uint32 HEADER_MAGIC = 0x5f4c4146; // '_LAF'
+		static const u32 HEADER_MAGIC = 0x5f4c4146; // '_LAF'
 
 	public:
 		struct Header
 		{
-			uint32 magic;
-			uint32 version;
-			uint32 fps;
+			u32 magic;
+			u32 version;
+			u32 fps;
 		};
 
 	public:
 		Animation(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
 
+		int getRootMotionBoneIdx() const { return m_root_motion_bone_idx; }
+		Transform getBoneTransform(float time, int bone_idx) const;
 		void getRelativePose(float time, Pose& pose, Model& model) const;
 		void getRelativePose(float time, Pose& pose, Model& model, float weight) const;
 		int getFrameCount() const { return m_frame_count; }
 		float getLength() const { return m_frame_count / (float)m_fps; }
 		int getFPS() const { return m_fps; }
+		int getBoneCount() const { return m_bones.size(); }
+		int getBoneIndex(u32 name) const;
 
 	private:
 		IAllocator& getAllocator();
@@ -69,17 +74,18 @@ class Animation LUMIX_FINAL : public Resource
 		int	m_frame_count;
 		struct Bone
 		{
-			uint32 name;
+			u32 name;
 			int pos_count;
-			const uint16* pos_times;
+			const u16* pos_times;
 			const Vec3* pos;
 			int rot_count;
-			const uint16* rot_times;
+			const u16* rot_times;
 			const Quat* rot;
 		};
 		Array<Bone> m_bones;
-		Array<uint8> m_mem;
+		Array<u8> m_mem;
 		int m_fps;
+		int m_root_motion_bone_idx;
 };
 
 

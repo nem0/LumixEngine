@@ -5,7 +5,7 @@
 
 namespace Lumix
 {
-	template<class T, int32 chunk_size>
+	template<class T, i32 chunk_size>
 	class FreeList : public IAllocator
 	{
 	public:
@@ -15,7 +15,7 @@ namespace Lumix
 			m_heap = static_cast<T*>(allocator.allocate_aligned(sizeof(T) * chunk_size, ALIGN_OF(T)));
 			m_pool_index = chunk_size;
 
-			for (int32 i = 0; i < chunk_size; i++)
+			for (i32 i = 0; i < chunk_size; i++)
 			{
 				m_pool[i] = &m_heap[i];
 			}
@@ -67,38 +67,38 @@ namespace Lumix
 
 	private:
 		IAllocator&	m_allocator;
-		int32		m_pool_index;
+		i32		m_pool_index;
 		T*			m_pool[chunk_size];
 		T*			m_heap;
 	};
 
-	template<int32 chunk_size>
-	class FreeList<int32, chunk_size>
+	template<i32 chunk_size>
+	class FreeList<i32, chunk_size>
 	{
 	public:
 		FreeList()
 		{
 			m_pool_index = chunk_size;
 
-			for (int32 i = 0; i < chunk_size; i++)
+			for (i32 i = 0; i < chunk_size; i++)
 			{
 				m_pool[i] = i;
 			}
 		}
 
-		int32 alloc(void)
+		i32 alloc(void)
 		{
 			return m_pool_index > 0 ? m_pool[--m_pool_index] : (-1);
 		}
 
-		void release(int32 id)
+		void release(i32 id)
 		{
 			ASSERT (id >= 0 && id < chunk_size);
 			m_pool[m_pool_index++] = id;
 		}
 
 	private:
-		int32		m_pool_index;
-		int32		m_pool[chunk_size];
+		i32		m_pool_index;
+		i32		m_pool[chunk_size];
 	};
 } // ~namespace Lumix

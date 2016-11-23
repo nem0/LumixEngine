@@ -20,6 +20,6 @@ public:
 	static void destroy(ProfilerUI& ui);
 
 	bool m_is_opened;
-	Lumix::uint64 m_frame_start;
-	Lumix::uint64 m_frame_end;
+	Lumix::u64 m_frame_start;
+	Lumix::u64 m_frame_end;
 };

@@ -30,9 +30,9 @@ namespace Lumix
 
 			OsFile& operator <<(const char* text);
 			OsFile& operator <<(char c) { write(&c, sizeof(c)); return *this; }
-			OsFile& operator <<(int32 value);
-			OsFile& operator <<(uint32 value);
-			OsFile& operator <<(uint64 value);
+			OsFile& operator <<(i32 value);
+			OsFile& operator <<(u32 value);
+			OsFile& operator <<(u64 value);
 			OsFile& operator <<(float value);
 
 			static bool fileExists(const char* path);

@@ -35,7 +35,7 @@ namespace Lumix
 	{
 		if (!m_is_enabled) return;
 		
-		static const uint32 COLOR = 0x00ff00ff;
+		static const u32 COLOR = 0x00ff00ff;
 		interface.addDebugCross(m_from, 0.3f, COLOR, 0);
 		interface.addDebugCross(m_to, 0.3f, COLOR, 0);
 		interface.addDebugLine(m_from, m_to, COLOR, 0);

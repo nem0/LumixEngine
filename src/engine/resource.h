@@ -18,7 +18,7 @@ struct LUMIX_ENGINE_API ResourceType
 {
 	ResourceType() : type(0) {}
 	explicit ResourceType(const char* type_name);
-	uint32 type;
+	u32 type;
 	bool operator !=(const ResourceType& rhs) const { return rhs.type != type; }
 	bool operator ==(const ResourceType& rhs) const { return rhs.type == type; }
 };
@@ -31,7 +31,7 @@ class LUMIX_ENGINE_API Resource
 public:
 	friend class ResourceManagerBase;
 
-	enum class State : uint32
+	enum class State : u32
 	{
 		EMPTY = 0,
 		READY,
@@ -46,7 +46,7 @@ public:
 	bool isEmpty() const { return State::EMPTY == m_current_state; }
 	bool isReady() const { return State::READY == m_current_state; }
 	bool isFailure() const { return State::FAILURE == m_current_state; }
-	uint32 getRefCount() const { return m_ref_count; }
+	u32 getRefCount() const { return m_ref_count; }
 	ObserverCallback& getObserverCb() { return m_cb; }
 	size_t size() const { return m_size; }
 	const Path& getPath() const { return m_path; }
@@ -77,7 +77,7 @@ protected:
 
 protected:
 	State m_desired_state;
-	uint16 m_empty_dep_count;
+	u16 m_empty_dep_count;
 	size_t m_size;
 	ResourceManagerBase& m_resource_manager;
 
@@ -88,8 +88,8 @@ private:
 	void doLoad();
 	void fileLoaded(FS::IFile& file, bool success);
 	void onStateChanged(State old_state, State new_state, Resource&);
-	uint32 addRef(void) { return ++m_ref_count; }
-	uint32 remRef(void) { return --m_ref_count; }
+	u32 addRef(void) { return ++m_ref_count; }
+	u32 remRef(void) { return --m_ref_count; }
 
 	Resource(const Resource&);
 	void operator=(const Resource&);
@@ -97,10 +97,10 @@ private:
 private:
 	ObserverCallback m_cb;
 	Path m_path;
-	uint16 m_ref_count;
-	uint16 m_failed_dep_count;
+	u16 m_ref_count;
+	u16 m_failed_dep_count;
 	State m_current_state;
-	uint32 m_async_op;
+	u32 m_async_op;
 }; // class Resource
 
 

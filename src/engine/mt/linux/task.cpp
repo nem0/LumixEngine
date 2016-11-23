@@ -22,7 +22,7 @@ struct TaskImpl
 	bool is_running;
 	pthread_t handle;
 	const char* thread_name;
-	uint32 affinity_mask;
+	u32 affinity_mask;
 	Task* owner;
 };
 
@@ -31,7 +31,7 @@ static void* threadFunction(void* ptr)
 	struct TaskImpl* impl = reinterpret_cast<TaskImpl*>(ptr);
 	setThreadName(getCurrentThreadID(), impl->thread_name);
 	Profiler::setThreadName(impl->thread_name);
-	uint32 ret = 0xffffFFFF;
+	u32 ret = 0xffffFFFF;
 	if (!impl->force_exit) ret = impl->owner->task();
 	impl->exited = true;
 	impl->is_running = false;
@@ -75,7 +75,7 @@ bool Task::destroy()
 	return pthread_join(m_implementation->handle, nullptr) == 0;
 }
 
-void Task::setAffinityMask(uint32 affinity_mask)
+void Task::setAffinityMask(u32 affinity_mask)
 {
 	cpu_set_t set;
 	CPU_ZERO(&set);
@@ -90,7 +90,7 @@ void Task::setAffinityMask(uint32 affinity_mask)
 	pthread_setaffinity_np(m_implementation->handle, sizeof(set), &set);
 }
 
-uint32 Task::getAffinityMask() const
+u32 Task::getAffinityMask() const
 {
 	return m_implementation->affinity_mask;
 }

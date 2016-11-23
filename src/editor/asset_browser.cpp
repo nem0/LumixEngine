@@ -19,7 +19,7 @@
 
 
 static const Lumix::ResourceType UNIVERSE_TYPE("universe");
-static const Lumix::uint32 SOURCE_HASH = Lumix::crc32("source");
+static const Lumix::u32 SOURCE_HASH = Lumix::crc32("source");
 
 
 Lumix::ResourceType AssetBrowser::getResourceType(const char* path) const
@@ -376,7 +376,7 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* bu
 	pos.x += text_width;
 	ImGui::BeginGroup();
 	ImGui::AlignFirstTextHeightToWidgets();
-	ImGui::PushTextWrapPos(text_width);
+	ImGui::PushTextWrapPos(pos.x);
 	ImGui::Text("%s", c);
 	ImGui::PopTextWrapPos();
 	ImGui::SameLine();

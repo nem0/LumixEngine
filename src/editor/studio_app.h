@@ -27,19 +27,21 @@ class WorldEditor;
 }
 
 
+struct Action;
+
+
 class LUMIX_EDITOR_API StudioApp
 {
 public:
-	class IPlugin
+	struct IPlugin
 	{
-	public:
 		virtual ~IPlugin() {}
 
 		virtual void onWindowGUI() = 0;
 		virtual bool hasFocus() { return false; }
 		virtual void update(float) {}
-
-		struct Action* m_action;
+		virtual void pluginAdded(IPlugin& plugin) {}
+		virtual const char* getName() const = 0;
 	};
 
 	struct IAddComponentPlugin
@@ -106,7 +108,8 @@ public:
 	virtual const Lumix::Array<Action*>& getActions() = 0;
 	virtual Lumix::Array<Action*>& getToolbarActions() = 0;
 	virtual void addAction(Action* action) = 0;
-	virtual Action& getAction(const char* name) = 0;
+	virtual void addWindowAction(Action* action) = 0;
+	virtual Action* getAction(const char* name) = 0;
 	virtual SDL_Window* getWindow() = 0;
 	virtual void startDrag(DragData::Type type, const void* data, int size) = 0;
 	virtual DragData getDragData() = 0;

@@ -88,11 +88,11 @@ bool PackFileDevice::mount(const char* path)
 	m_file.close();
 	if(!m_file.open(path, Mode::OPEN_AND_READ, m_allocator)) return false;
 
-	int32 count;
+	i32 count;
 	m_file.read(&count, sizeof(count));
 	for(int i = 0; i < count; ++i)
 	{
-		uint32 hash;
+		u32 hash;
 		m_file.read(&hash, sizeof(hash));
 		PackFileInfo info;
 		m_file.read(&info, sizeof(info));

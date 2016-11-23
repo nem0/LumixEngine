@@ -19,13 +19,13 @@ namespace Lumix
 
 static const ComponentType MODEL_INSTANCE_TYPE = PropertyRegister::getComponentType("renderable");
 static const float INFLUENCE_DISTANCE = 0.3f;
-static const uint32 X_COLOR = 0xff6363cf;
-static const uint32 Y_COLOR = 0xff63cf63;
-static const uint32 Z_COLOR = 0xffcf6363;
-static const uint32 SELECTED_COLOR = 0xff63cfcf;
+static const u32 X_COLOR = 0xff6363cf;
+static const u32 Y_COLOR = 0xff63cf63;
+static const u32 Z_COLOR = 0xffcf6363;
+static const u32 SELECTED_COLOR = 0xff63cfcf;
 
 
-enum class Axis : uint32
+enum class Axis : u32
 {
 	NONE,
 	X,
@@ -44,7 +44,7 @@ enum class Pivot
 };
 
 
-enum class Mode : uint32
+enum class Mode : u32
 {
 	ROTATE,
 	TRANSLATE,
@@ -156,7 +156,7 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 		Matrix mtx = gizmo_mtx * scale_mtx;
 
 		RenderInterface::Vertex vertices[9];
-		uint16 indices[9];
+		u16 indices[9];
 		vertices[0].position = Vec3(0, 0, 0);
 		vertices[0].color = transform_axis == Axis::X ? SELECTED_COLOR : X_COLOR;
 		indices[0] = 0;
@@ -216,10 +216,10 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 	}
 
 
-	void renderQuarterRing(const Matrix& mtx, const Vec3& a, const Vec3& b, uint32 color)
+	void renderQuarterRing(const Matrix& mtx, const Vec3& a, const Vec3& b, u32 color)
 	{
 		RenderInterface::Vertex vertices[1200];
-		uint16 indices[1200];
+		u16 indices[1200];
 		const float ANGLE_STEP = Math::degreesToRadians(1.0f / 100.0f * 360.0f);
 		Vec3 n = crossProduct(a, b) * 0.05f;
 		int offset = -1;

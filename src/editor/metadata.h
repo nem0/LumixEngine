@@ -14,16 +14,16 @@ public:
 	bool load();
 	bool save();
 
-	bool setRawMemory(Lumix::uint32 file, Lumix::uint32 key, const void* data, size_t size);
-	bool setInt(Lumix::uint32 file, Lumix::uint32 key, int value);
-	bool setString(Lumix::uint32 file, Lumix::uint32 key, const char* value);
+	bool setRawMemory(Lumix::u32 file, Lumix::u32 key, const void* data, size_t size);
+	bool setInt(Lumix::u32 file, Lumix::u32 key, int value);
+	bool setString(Lumix::u32 file, Lumix::u32 key, const char* value);
 
-	int getInt(Lumix::uint32 file, Lumix::uint32 key) const;
-	bool getString(Lumix::uint32 file, Lumix::uint32 key, char* out, int max_size) const;
-	const void* getRawMemory(Lumix::uint32 file, Lumix::uint32 key) const;
-	size_t getRawMemorySize(Lumix::uint32 file, Lumix::uint32 key) const;
+	int getInt(Lumix::u32 file, Lumix::u32 key) const;
+	bool getString(Lumix::u32 file, Lumix::u32 key, char* out, int max_size) const;
+	const void* getRawMemory(Lumix::u32 file, Lumix::u32 key) const;
+	size_t getRawMemorySize(Lumix::u32 file, Lumix::u32 key) const;
 
-	bool hasKey(Lumix::uint32 file, Lumix::uint32 key) const;
+	bool hasKey(Lumix::u32 file, Lumix::u32 key) const;
 
 private:
 	struct DataItem
@@ -50,9 +50,9 @@ private:
 		};
 	};
 
-	const DataItem* getData(Lumix::uint32 file, Lumix::uint32 key) const;
-	DataItem* getOrCreateData(Lumix::uint32 file, Lumix::uint32 key);
+	const DataItem* getData(Lumix::u32 file, Lumix::u32 key) const;
+	DataItem* getOrCreateData(Lumix::u32 file, Lumix::u32 key);
 
-	Lumix::AssociativeArray<Lumix::uint32, Lumix::AssociativeArray<Lumix::uint32, DataItem> > m_data;
+	Lumix::AssociativeArray<Lumix::u32, Lumix::AssociativeArray<Lumix::u32, DataItem> > m_data;
 	Lumix::IAllocator& m_allocator;
 };

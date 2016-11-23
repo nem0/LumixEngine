@@ -23,7 +23,7 @@ class WorldEditor;
 
 struct PrefabEntity
 {
-	uint32 path_hash;
+	u32 path_hash;
 	Entity prev;
 	Entity next;
 };
@@ -40,9 +40,9 @@ public:
 	virtual void serialize(OutputBlob& serializer) = 0;
 	virtual void deserialize(InputBlob& serializer, bool has_prefabs) = 0;
 	virtual void createTemplateFromEntity(const char* name, Entity entity) = 0;
-	virtual uint32 getTemplate(Entity entity) = 0;
-	virtual void setTemplate(Entity entity, uint32 template_name_hash) = 0;
-	virtual const Array<Entity>& getInstances(uint32 template_name_hash) = 0;
+	virtual u32 getTemplate(Entity entity) = 0;
+	virtual void setTemplate(Entity entity, u32 template_name_hash) = 0;
+	virtual const Array<Entity>& getInstances(u32 template_name_hash) = 0;
 	virtual Array<string>& getTemplateNames() = 0;
 	virtual Entity createInstance(const char* name, const Vec3& position, const Quat& rot, float size) = 0;
 	virtual void refreshPrefabs() = 0;

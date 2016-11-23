@@ -559,7 +559,7 @@ void ProfilerUIImpl::onFrame()
 	int thread_count = Lumix::Profiler::getThreadCount();
 	for (int i = 0; i < thread_count; ++i)
 	{
-		Lumix::uint32 thread_id = Lumix::Profiler::getThreadID(i);
+		Lumix::u32 thread_id = Lumix::Profiler::getThreadID(i);
 		auto* root = Lumix::Profiler::getRootBlock(thread_id);
 		if (m_threads.size() <= i)
 		{
@@ -628,7 +628,7 @@ void ProfilerUIImpl::showProfileBlock(Block* block, int column)
 					case Lumix::Profiler::BlockType::TIME:
 					{
 						auto frame = m_current_frame < 0 ? block->m_frames.back() : block->m_frames[m_current_frame];
-						if (ImGui::Selectable(Lumix::StaticString<50>("") << frame * 1000.0f << "###t" << (Lumix::int64)block,
+						if (ImGui::Selectable(Lumix::StaticString<50>("") << frame * 1000.0f << "###t" << (Lumix::i64)block,
 								m_current_block == block))
 						{
 							m_current_block = block;
@@ -643,7 +643,7 @@ void ProfilerUIImpl::showProfileBlock(Block* block, int column)
 					{
 						int int_value =
 							m_current_frame < 0 ? block->m_int_values.back() : block->m_int_values[m_current_frame];
-						if (ImGui::Selectable(Lumix::StaticString<50>("") << int_value << "###c" << (Lumix::int64)block,
+						if (ImGui::Selectable(Lumix::StaticString<50>("") << int_value << "###c" << (Lumix::i64)block,
 								m_current_block == block,
 								ImGuiSelectableFlags_SpanAllColumns))
 						{
@@ -676,7 +676,7 @@ void ProfilerUIImpl::showProfileBlock(Block* block, int column)
 						}
 
 						if (ImGui::Selectable(
-								Lumix::StaticString<50>("") << frame * 1000.0f << "###t" << (Lumix::int64)block,
+								Lumix::StaticString<50>("") << frame * 1000.0f << "###t" << (Lumix::i64)block,
 								m_current_block == block))
 						{
 							m_current_block = block;
@@ -1012,7 +1012,7 @@ static void showThreadColumn(ProfilerUIImpl& profiler, Column column)
 	for (int i = 0; i < profiler.m_threads.size(); ++i)
 	{
 		auto* root = profiler.m_threads[i].root;
-		Lumix::uint32 thread_id = Lumix::Profiler::getThreadID(i);
+		Lumix::u32 thread_id = Lumix::Profiler::getThreadID(i);
 		const char* thread_name = Lumix::Profiler::getThreadName(thread_id);
 		if (column != NAME)
 		{

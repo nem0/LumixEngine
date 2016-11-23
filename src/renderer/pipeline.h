@@ -36,7 +36,7 @@ struct CommandBufferGenerator
 {
 	CommandBufferGenerator();
 
-	void setTexture(uint8 stage,
+	void setTexture(u8 stage,
 		const bgfx::UniformHandle& uniform,
 		const bgfx::TextureHandle& texture);
 	void setUniform(const bgfx::UniformHandle& uniform, const Vec4& value);
@@ -46,13 +46,13 @@ struct CommandBufferGenerator
 	void setLocalShadowmap(const bgfx::TextureHandle& shadowmap);
 	void setGlobalShadowmap();
 	int getSize() const { return int(pointer - buffer); }
-	void getData(uint8* data);
+	void getData(u8* data);
 	void clear();
 	void beginAppend();
 	void end();
 
-	uint8 buffer[1024];
-	uint8* pointer;
+	u8 buffer[1024];
+	u8* pointer;
 };
 
 
@@ -70,7 +70,7 @@ class LUMIX_RENDERER_API Pipeline
 		{
 			Delegate<void> callback;
 			char name[30];
-			uint32 hash;
+			u32 hash;
 		};
 
 	public:
@@ -93,15 +93,15 @@ class LUMIX_RENDERER_API Pipeline
 		virtual CustomCommandHandler& addCustomCommandHandler(const char* name) = 0;
 		virtual void setViewProjection(const Matrix& mtx, int width, int height) = 0;
 		virtual void setScissor(int x, int y, int width, int height) = 0;
-		virtual bool checkAvailTransientBuffers(uint32 num_vertices,
+		virtual bool checkAvailTransientBuffers(u32 num_vertices,
 			const bgfx::VertexDecl& decl,
-			uint32 num_indices) = 0;
+			u32 num_indices) = 0;
 		virtual void allocTransientBuffers(bgfx::TransientVertexBuffer* tvb,
-			uint32 num_vertices,
+			u32 num_vertices,
 			const bgfx::VertexDecl& decl,
 			bgfx::TransientIndexBuffer* tib,
-			uint32 num_indices) = 0;
-		virtual bgfx::TextureHandle createTexture(int width, int height, const uint32* rgba_data) = 0;
+			u32 num_indices) = 0;
+		virtual bgfx::TextureHandle createTexture(int width, int height, const u32* rgba_data) = 0;
 		virtual void destroyTexture(bgfx::TextureHandle texture) = 0;
 		virtual void setTexture(int slot,
 			bgfx::TextureHandle texture,
@@ -113,7 +113,7 @@ class LUMIX_RENDERER_API Pipeline
 			const Matrix& mtx,
 			int first_index,
 			int num_indices,
-			uint64 render_states,
+			u64 render_states,
 			struct ShaderInstance& shader_instance) = 0;
 		virtual void renderModel(Model& model, const Matrix& mtx) = 0;
 		virtual void toggleStats() = 0;

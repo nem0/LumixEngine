@@ -58,11 +58,11 @@ struct LUMIX_RENDERER_API Mesh
 
 	void set(int attribute_array_offset, int attribute_array_size, int indices_offset, int index_count);
 
-	int32 instance_idx;
-	int32 attribute_array_offset;
-	int32 attribute_array_size;
-	int32 indices_offset;
-	int32 indices_count;
+	i32 instance_idx;
+	i32 attribute_array_offset;
+	i32 attribute_array_size;
+	i32 indices_offset;
+	i32 indices_count;
 	Material* material;
 	string name;
 };
@@ -78,17 +78,17 @@ struct LODMeshIndices
 class LUMIX_RENDERER_API Model LUMIX_FINAL : public Resource
 {
 public:
-	typedef HashMap<uint32, int> BoneMap;
+	typedef HashMap<u32, int> BoneMap;
 
 #pragma pack(1)
 	struct FileHeader
 	{
-		uint32 magic;
-		uint32 version;
+		u32 magic;
+		u32 version;
 	};
 #pragma pack()
 
-	enum class FileVersion : uint32
+	enum class FileVersion : u32
 	{
 		FIRST,
 		WITH_FLAGS,
@@ -97,7 +97,7 @@ public:
 		LATEST // keep this last
 	};
 
-	enum class Flags : uint32
+	enum class Flags : u32
 	{
 		INDICES_16BIT = 1 << 0
 	};
@@ -153,24 +153,24 @@ public:
 	int getBoneCount() const { return m_bones.size(); }
 	const Bone& getBone(int i) const { return m_bones[i]; }
 	int getFirstNonrootBoneIndex() const { return m_first_nonroot_bone_index; }
-	BoneMap::iterator getBoneIndex(uint32 hash) { return m_bone_map.find(hash); }
+	BoneMap::iterator getBoneIndex(u32 hash) { return m_bone_map.find(hash); }
 	void getPose(Pose& pose);
 	float getBoundingRadius() const { return m_bounding_radius; }
 	RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, const Matrix& model_transform);
 	const AABB& getAABB() const { return m_aabb; }
 	LOD* getLODs() { return m_lods; }
-	const uint16* getIndices16() const { return areIndices16() ? (uint16*)&m_indices[0] : nullptr; }
-	const uint32* getIndices32() const { return areIndices16() ? nullptr : (uint32*)&m_indices[0]; }
-	bool areIndices16() const { return (m_flags & (uint32)Flags::INDICES_16BIT) != 0; }
+	const u16* getIndices16() const { return areIndices16() ? (u16*)&m_indices[0] : nullptr; }
+	const u32* getIndices32() const { return areIndices16() ? nullptr : (u32*)&m_indices[0]; }
+	bool areIndices16() const { return (m_flags & (u32)Flags::INDICES_16BIT) != 0; }
 	int getIndicesCount() const { return m_indices.size() / (areIndices16() ? 2 : 4); }
 	const Array<Vec3>& getVertices() const { return m_vertices; }
 	const Array<Vec2>& getUVs() const { return m_uvs; }
-	uint32 getFlags() const { return m_flags;	}
+	u32 getFlags() const { return m_flags;	}
 
 	static void registerLuaAPI(lua_State* L);
 
 public:
-	static const uint32 FILE_MAGIC = 0x5f4c4d4f; // == '_LMO'
+	static const u32 FILE_MAGIC = 0x5f4c4d4f; // == '_LMO'
 	static const int MAX_LOD_COUNT = 4;
 
 private:
@@ -184,7 +184,7 @@ private:
 	bool parseMeshes(FS::IFile& file, FileVersion version);
 	bool parseLODs(FS::IFile& file);
 	int getBoneIdx(const char* name);
-	void computeRuntimeData(const uint8* vertices);
+	void computeRuntimeData(const u8* vertices);
 
 	void unload(void) override;
 	bool load(FS::IFile& file) override;
@@ -196,14 +196,14 @@ private:
 	bgfx::VertexBufferHandle m_vertices_handle;
 	Array<Mesh> m_meshes;
 	Array<Bone> m_bones;
-	Array<uint8> m_indices;
+	Array<u8> m_indices;
 	Array<Vec3> m_vertices;
 	Array<Vec2> m_uvs;
 	LOD m_lods[MAX_LOD_COUNT];
 	float m_bounding_radius;
 	BoneMap m_bone_map;
 	AABB m_aabb;
-	uint32 m_flags;
+	u32 m_flags;
 	int m_first_nonroot_bone_index;
 };
 

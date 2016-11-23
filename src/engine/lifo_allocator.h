@@ -28,8 +28,8 @@ namespace Lumix
 
 			void* allocate(size_t size) override
 			{
-				uint8* new_address = (uint8*)m_current;
-				ASSERT(new_address + size <= (uint8*)m_bucket + m_bucket_size);
+				u8* new_address = (u8*)m_current;
+				ASSERT(new_address + size <= (u8*)m_bucket + m_bucket_size);
 				m_current = new_address + size + sizeof(size_t);
 				*(size_t*)(new_address + size) = size;
 				return new_address;
@@ -39,8 +39,8 @@ namespace Lumix
 			void deallocate(void* ptr) override
 			{
 				if (!ptr) return;
-				size_t last_size = *(size_t*)((uint8*)m_current - sizeof(size_t));
-				uint8* last_mem = (uint8*)m_current - last_size - sizeof(size_t);
+				size_t last_size = *(size_t*)((u8*)m_current - sizeof(size_t));
+				u8* last_mem = (u8*)m_current - last_size - sizeof(size_t);
 				ASSERT(last_mem == ptr);
 				m_current = ptr;
 			}
@@ -50,8 +50,8 @@ namespace Lumix
 			{
 				if (!ptr) return allocate(size);
 
-				size_t last_size = *(size_t*)((uint8*)m_current - sizeof(size_t));
-				uint8* last_mem = (uint8*)m_current - last_size - sizeof(size_t);
+				size_t last_size = *(size_t*)((u8*)m_current - sizeof(size_t));
+				u8* last_mem = (u8*)m_current - last_size - sizeof(size_t);
 				ASSERT(last_mem == ptr);
 				m_current = last_mem + size + sizeof(size_t);
 				*(size_t*)(last_mem + size) = size;
@@ -62,8 +62,8 @@ namespace Lumix
 			void* allocate_aligned(size_t size, size_t align) override
 			{
 				size_t padding = (align - ((uintptr)m_current % align)) % align;
-				uint8* new_address = (uint8*)m_current + padding;
-				ASSERT(new_address + size <= (uint8*)m_bucket + m_bucket_size);
+				u8* new_address = (u8*)m_current + padding;
+				ASSERT(new_address + size <= (u8*)m_bucket + m_bucket_size);
 				m_current = new_address + size + sizeof(size_t);
 				*(size_t*)(new_address + size) = size + padding;
 				ASSERT((uintptr)new_address % align == 0);
@@ -74,8 +74,8 @@ namespace Lumix
 			void deallocate_aligned(void* ptr) override
 			{
 				if (!ptr) return;
-				size_t last_size_with_padding = *(size_t*)((uint8*)m_current - sizeof(size_t));
-				uint8* last_mem = (uint8*)m_current - last_size_with_padding - sizeof(size_t);
+				size_t last_size_with_padding = *(size_t*)((u8*)m_current - sizeof(size_t));
+				u8* last_mem = (u8*)m_current - last_size_with_padding - sizeof(size_t);
 				m_current = ptr;
 			}
 
@@ -84,12 +84,12 @@ namespace Lumix
 			{
 				if (!ptr) return allocate_aligned(size, align);
 
-				size_t last_size_with_padding = *(size_t*)((uint8*)m_current - sizeof(size_t));
-				uint8* last_mem = (uint8*)m_current - last_size_with_padding - sizeof(size_t);
+				size_t last_size_with_padding = *(size_t*)((u8*)m_current - sizeof(size_t));
+				u8* last_mem = (u8*)m_current - last_size_with_padding - sizeof(size_t);
 
 				size_t padding = (align - ((uintptr)last_mem % align)) % align;
-				uint8* new_address = (uint8*)last_mem + padding;
-				ASSERT(new_address + size <= (uint8*)m_bucket + m_bucket_size);
+				u8* new_address = (u8*)last_mem + padding;
+				ASSERT(new_address + size <= (u8*)m_bucket + m_bucket_size);
 				m_current = new_address + size + sizeof(size_t);
 				*(size_t*)(new_address + size) = size + padding;
 				ASSERT((uintptr)new_address % align == 0);

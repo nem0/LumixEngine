@@ -24,7 +24,7 @@ public:
 	TCPAcceptor(IAllocator& allocator);
 	~TCPAcceptor();
 
-	bool start(const char* ip, uint16 port);
+	bool start(const char* ip, u16 port);
 	TCPStream* accept();
 	void close(TCPStream* stream);
 
@@ -40,7 +40,7 @@ public:
 	TCPConnector(IAllocator& allocator);
 	~TCPConnector();
 
-	TCPStream* connect(const char* ip, uint16 port);
+	TCPStream* connect(const char* ip, u16 port);
 	void close(TCPStream* stream);
 
 private:
@@ -61,7 +61,7 @@ public:
 	template <typename T> LUMIX_FORCE_INLINE bool read(T& val) { return read(&val, sizeof(val)); }
 	template <typename T> LUMIX_FORCE_INLINE bool write(T val) { return write(&val, sizeof(val)); }
 
-	bool readString(char* string, uint32 max_size);
+	bool readString(char* string, u32 max_size);
 	bool writeString(const char* string);
 
 	bool read(void* buffer, size_t size);

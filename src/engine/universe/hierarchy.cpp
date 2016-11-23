@@ -316,7 +316,7 @@ public:
 	void serialize(OutputBlob& serializer) override
 	{
 		int size = m_parents.size();
-		serializer.write((int32)size);
+		serializer.write((i32)size);
 		Parents::iterator iter = m_parents.begin(), end = m_parents.end();
 		while (iter != end)
 		{
@@ -329,7 +329,7 @@ public:
 
 	void deserialize(InputBlob& serializer, int /*version*/) override
 	{
-		int32 size;
+		i32 size;
 		serializer.read(size);
 		for (int i = 0; i < size; ++i)
 		{
@@ -364,9 +364,10 @@ private:
 };
 
 
-IScene* HierarchyPlugin::createScene(Universe& ctx)
+void HierarchyPlugin::createScenes(Universe& ctx)
 {
-	return Hierarchy::create(*this, ctx, m_allocator);
+	auto* scene = Hierarchy::create(*this, ctx, m_allocator);
+	ctx.addScene(scene);
 }
 
 

@@ -1,18 +1,20 @@
 #include "audio_system.h"
+#include "animation/animation_system.h"
 #include "audio_device.h"
 #include "audio_scene.h"
 #include "clip_manager.h"
-#include "engine/path.h"
-#include "engine/resource_manager.h"
 #include "editor/asset_browser.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
+#include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/iplugin.h"
+#include "engine/path.h"
 #include "engine/plugin_manager.h"
-#include "engine/property_register.h"
 #include "engine/property_descriptor.h"
+#include "engine/property_register.h"
+#include "engine/resource_manager.h"
 #include "renderer/render_scene.h"
 
 
@@ -82,9 +84,10 @@ struct AudioSystemImpl LUMIX_FINAL : public AudioSystem
 	const char* getName() const override { return "audio"; }
 
 
-	IScene* createScene(Universe& ctx) override
+	void createScenes(Universe& ctx) override
 	{
-		return AudioScene::createInstance(*this, ctx, m_engine.getAllocator());
+		auto* scene = AudioScene::createInstance(*this, ctx, m_engine.getAllocator());
+		ctx.addScene(scene);
 	}
 
 

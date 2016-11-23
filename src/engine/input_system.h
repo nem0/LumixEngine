@@ -43,14 +43,14 @@ namespace Lumix
 			virtual ~InputSystem() {}
 			virtual void enable(bool enabled) = 0;
 			virtual void update(float dt) = 0;
-			virtual float getActionValue(uint32 action) = 0;
+			virtual float getActionValue(u32 action) = 0;
 			virtual void injectMouseXMove(float rel, float abs) = 0;
 			virtual void injectMouseYMove(float rel, float abs) = 0;
 			virtual float getMouseXMove() const = 0;
 			virtual float getMouseYMove() const = 0;
 			virtual bool  isMouseDown(MouseButton button) = 0;
 			virtual Vec2 getMousePos() const = 0;
-			virtual void addAction(uint32 action, InputType type, int key, int controller_id) = 0;
+			virtual void addAction(u32 action, InputType type, int key, int controller_id) = 0;
 	};
 
 

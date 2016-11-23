@@ -33,7 +33,7 @@ template <typename T, typename T2> class AssociativeArray;
 template <typename T> class DelegateList;
 
 
-enum class RenderSceneVersion : int32
+enum class RenderSceneVersion : i32
 {
 	PARTICLES,
 	WHOLE_LIGHTS,
@@ -100,7 +100,7 @@ struct ModelInstance
 	Entity entity;
 	Mesh* meshes;
 	bool custom_meshes;
-	int8 mesh_count;
+	i8 mesh_count;
 };
 
 
@@ -130,7 +130,7 @@ struct DebugTriangle
 	Vec3 p0;
 	Vec3 p1;
 	Vec3 p2;
-	uint32 color;
+	u32 color;
 	float life;
 };
 
@@ -139,7 +139,7 @@ struct DebugLine
 {
 	Vec3 from;
 	Vec3 to;
-	uint32 color;
+	u32 color;
 	float life;
 };
 
@@ -147,7 +147,7 @@ struct DebugLine
 struct DebugPoint
 {
 	Vec3 pos;
-	uint32 color;
+	u32 color;
 	float life;
 };
 
@@ -180,32 +180,32 @@ public:
 	virtual void addDebugTriangle(const Vec3& p0,
 		const Vec3& p1,
 		const Vec3& p2,
-		uint32 color,
+		u32 color,
 		float life) = 0;
-	virtual void addDebugPoint(const Vec3& pos, uint32 color, float life) = 0;
+	virtual void addDebugPoint(const Vec3& pos, u32 color, float life) = 0;
 	virtual void addDebugCone(const Vec3& vertex,
 		const Vec3& dir,
 		const Vec3& axis0,
 		const Vec3& axis1,
-		uint32 color,
+		u32 color,
 		float life) = 0;
 
-	virtual void addDebugLine(const Vec3& from, const Vec3& to, uint32 color, float life) = 0;
-	virtual void addDebugCross(const Vec3& center, float size, uint32 color, float life) = 0;
+	virtual void addDebugLine(const Vec3& from, const Vec3& to, u32 color, float life) = 0;
+	virtual void addDebugCross(const Vec3& center, float size, u32 color, float life) = 0;
 	virtual void addDebugCube(const Vec3& pos,
 		const Vec3& dir,
 		const Vec3& up,
 		const Vec3& right,
-		uint32 color,
+		u32 color,
 		float life) = 0;
-	virtual void addDebugCube(const Vec3& from, const Vec3& max, uint32 color, float life) = 0;
-	virtual void addDebugCubeSolid(const Vec3& from, const Vec3& max, uint32 color, float life) = 0;
+	virtual void addDebugCube(const Vec3& from, const Vec3& max, u32 color, float life) = 0;
+	virtual void addDebugCubeSolid(const Vec3& from, const Vec3& max, u32 color, float life) = 0;
 	virtual void addDebugCircle(const Vec3& center,
 		const Vec3& up,
 		float radius,
-		uint32 color,
+		u32 color,
 		float life) = 0;
-	virtual void addDebugSphere(const Vec3& center, float radius, uint32 color, float life) = 0;
+	virtual void addDebugSphere(const Vec3& center, float radius, u32 color, float life) = 0;
 	virtual void addDebugFrustum(const Vec3& position,
 		const Vec3& direction,
 		const Vec3& up,
@@ -213,27 +213,27 @@ public:
 		float ratio,
 		float near_distance,
 		float far_distance,
-		uint32 color,
+		u32 color,
 		float life) = 0;
 
-	virtual void addDebugFrustum(const Frustum& frustum, uint32 color, float life) = 0;
+	virtual void addDebugFrustum(const Frustum& frustum, u32 color, float life) = 0;
 
 	virtual void addDebugCapsule(const Vec3& position,
 		float height,
 		float radius,
-		uint32 color,
+		u32 color,
 		float life) = 0;
 
 	virtual void addDebugCapsule(const Matrix& transform,
 		float height,
 		float radius,
-		uint32 color,
+		u32 color,
 		float life) = 0;
 
 	virtual void addDebugCylinder(const Vec3& position,
 		const Vec3& up,
 		float radius,
-		uint32 color,
+		u32 color,
 		float life) = 0;
 
 	virtual Entity getBoneAttachmentParent(ComponentHandle cmp) = 0;
@@ -340,7 +340,7 @@ public:
 	virtual void setModelInstancePath(ComponentHandle cmp, const Path& path) = 0;
 	virtual Array<Array<ModelInstanceMesh>>& getModelInstanceInfos(const Frustum& frustum,
 		const Vec3& lod_ref_point,
-		uint64 layer_mask) = 0;
+		u64 layer_mask) = 0;
 	virtual void getModelInstanceEntities(const Frustum& frustum, Array<Entity>& entities) = 0;
 	virtual Entity getModelInstanceEntity(ComponentHandle cmp) = 0;
 	virtual ComponentHandle getFirstModelInstance() = 0;

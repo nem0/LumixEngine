@@ -24,7 +24,7 @@ class ResourceManagerBase;
 
 class LUMIX_ENGINE_API ResourceManager
 {
-	typedef HashMap<uint32, ResourceManagerBase*> ResourceManagerTable;
+	typedef HashMap<u32, ResourceManagerBase*> ResourceManagerTable;
 
 public:
 	explicit ResourceManager(IAllocator& allocator);

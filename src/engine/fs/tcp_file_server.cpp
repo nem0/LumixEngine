@@ -41,12 +41,12 @@ public:
 
 	void openFile(Net::TCPStream* stream)
 	{
-		int32 mode = 0;
+		i32 mode = 0;
 		stream->read(mode);
 		stream->readString(m_buffer, lengthOf(m_buffer));
 
-		int32 ret = -2;
-		int32 id = m_ids.alloc();
+		i32 ret = -2;
+		i32 id = m_ids.alloc();
 		if (id > 0)
 		{
 			OsFile* file = LUMIX_NEW(getAllocator(), OsFile)();
@@ -77,17 +77,17 @@ public:
 	void read(Net::TCPStream* stream)
 	{
 		bool read_successful = true;
-		uint32 id = 0xffffFFFF;
+		u32 id = 0xffffFFFF;
 		stream->read(id);
 		OsFile* file = m_files[id];
 
-		uint32 size = 0;
+		u32 size = 0;
 		stream->read(size);
 
 		while (size > 0)
 		{
-			int32 read = (int32)size > lengthOf(m_buffer) ? lengthOf(m_buffer)
-														   : (int32)size;
+			i32 read = (i32)size > lengthOf(m_buffer) ? lengthOf(m_buffer)
+														   : (i32)size;
 			read_successful &= file->read((void*)m_buffer, read);
 			stream->write((const void*)m_buffer, read);
 			size -= read;
@@ -99,7 +99,7 @@ public:
 
 	void close(Net::TCPStream* stream)
 	{
-		uint32 id = 0xffffFFFF;
+		u32 id = 0xffffFFFF;
 		stream->read(id);
 		OsFile* file = m_files[id];
 		m_ids.release(id);
@@ -112,17 +112,17 @@ public:
 	void write(Net::TCPStream* stream)
 	{
 		bool write_successful = true;
-		uint32 id = 0xffffFFFF;
+		u32 id = 0xffffFFFF;
 		stream->read(id);
 		OsFile* file = m_files[id];
 
-		uint32 size = 0;
+		u32 size = 0;
 		stream->read(size);
 
 		while (size > 0)
 		{
-			int32 read = (int32)size > lengthOf(m_buffer) ? lengthOf(m_buffer)
-														   : (int32)size;
+			i32 read = (i32)size > lengthOf(m_buffer) ? lengthOf(m_buffer)
+														   : (i32)size;
 			write_successful &= stream->read((void*)m_buffer, read);
 			file->write(m_buffer, read);
 			size -= read;
@@ -134,38 +134,38 @@ public:
 
 	void seek(Net::TCPStream* stream)
 	{
-		uint32 id = 0xffffFFFF;
+		u32 id = 0xffffFFFF;
 		stream->read(id);
 		OsFile* file = m_files[id];
 
-		uint32 base = 0;
-		int32 offset = 0;
+		u32 base = 0;
+		i32 offset = 0;
 		stream->read(base);
 		stream->read(offset);
 
-		uint32 res = (uint8)file->seek((SeekMode)base, offset);
+		u32 res = (u8)file->seek((SeekMode)base, offset);
 		stream->write(res);
 	}
 
 
 	void size(Net::TCPStream* stream)
 	{
-		uint32 id = 0xffffFFFF;
+		u32 id = 0xffffFFFF;
 		stream->read(id);
 		OsFile* file = m_files[id];
 
-		uint32 size = (uint32)file->size();
+		u32 size = (u32)file->size();
 		stream->write(size);
 	}
 
 
 	void pos(Net::TCPStream* stream)
 	{
-		uint32 id = 0xffffFFFF;
+		u32 id = 0xffffFFFF;
 		stream->read(id);
 		OsFile* file = m_files[id];
 
-		uint32 pos = (uint32)file->pos();
+		u32 pos = (u32)file->pos();
 		stream->write(pos);
 	}
 
@@ -180,7 +180,7 @@ public:
 		while (!quit)
 		{
 			PROFILE_BLOCK("File server operation")
-			int32 op = 0;
+			i32 op = 0;
 			stream->read(op);
 			switch (op)
 			{
@@ -247,7 +247,7 @@ private:
 	Net::TCPAcceptor m_acceptor;
 	char m_buffer[0x50000];
 	OsFile* m_files[0x50000];
-	FreeList<int32, 0x50000> m_ids;
+	FreeList<i32, 0x50000> m_ids;
 	Path m_base_path;
 };
 

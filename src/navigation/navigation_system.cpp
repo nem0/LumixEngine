@@ -1,4 +1,4 @@
-#include "engine/lumix.h"
+#include "navigation_system.h"
 #include "engine/array.h"
 #include "engine/base_proxy_allocator.h"
 #include "engine/blob.h"
@@ -8,25 +8,25 @@
 #include "engine/iallocator.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
+#include "engine/lumix.h"
 #include "engine/profiler.h"
 #include "engine/property_descriptor.h"
 #include "engine/property_register.h"
-#include "engine/vec.h"
 #include "engine/universe/universe.h"
+#include "engine/vec.h"
 #include "lua_script/lua_script_system.h"
-#include "navigation_system.h"
-#include "renderer/model.h"
 #include "renderer/material.h"
+#include "renderer/model.h"
 #include "renderer/render_scene.h"
 #include "renderer/texture.h"
-#include <cmath>
-#include <DetourCrowd.h>
 #include <DetourAlloc.h>
+#include <DetourCrowd.h>
 #include <DetourNavMesh.h>
-#include <DetourNavMeshQuery.h>
 #include <DetourNavMeshBuilder.h>
+#include <DetourNavMeshQuery.h>
 #include <Recast.h>
 #include <RecastAlloc.h>
+#include <cmath>
 
 
 namespace Lumix
@@ -46,6 +46,8 @@ struct Agent
 	float height;
 	int agent;
 	bool is_finished;
+	Vec3 root_motion = {0, 0, 0};
+	float speed = 0;
 };
 
 
@@ -102,7 +104,7 @@ struct NavigationSystem LUMIX_FINAL : public IPlugin
 
 	void registerProperties();
 	const char* getName() const override { return "navigation"; }
-	IScene* createScene(Universe& universe) override;
+	void createScenes(Universe& universe) override;
 	void destroyScene(IScene* scene) override;
 
 	BaseProxyAllocator m_allocator;
@@ -262,7 +264,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 					Vec3 p3 = pos + rot.rotate(Vec3(x, h3, z));
 
 					Vec3 n = crossProduct(p1 - p0, p0 - p2).normalized();
-					uint8 area = n.y > walkable_threshold ? RC_WALKABLE_AREA : 0;
+					u8 area = n.y > walkable_threshold ? RC_WALKABLE_AREA : 0;
 					rcRasterizeTriangle(&ctx, &p0.x, &p1.x, &p2.x, area, solid);
 
 					n = crossProduct(p2 - p0, p0 - p3).normalized();
@@ -284,8 +286,8 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 		auto render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
 		if (!render_scene) return;
 
-		uint32 no_navigation_flag = Material::getCustomFlag("no_navigation");
-		uint32 nonwalkable_flag = Material::getCustomFlag("nonwalkable");
+		u32 no_navigation_flag = Material::getCustomFlag("no_navigation");
+		u32 nonwalkable_flag = Material::getCustomFlag("nonwalkable");
 		for (auto model_instance = render_scene->getFirstModelInstance(); model_instance != INVALID_COMPONENT;
 			 model_instance = render_scene->getNextModelInstance(model_instance))
 		{
@@ -311,7 +313,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 					&model->getVertices()[mesh.attribute_array_offset / model->getVertexDecl().getStride()];
 				if (is16)
 				{
-					const uint16* indices16 = model->getIndices16();
+					const u16* indices16 = model->getIndices16();
 					for (int i = 0; i < mesh.indices_count; i += 3)
 					{
 						Vec3 a = mtx.transform(vertices[indices16[mesh.indices_offset + i]]);
@@ -319,13 +321,13 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 						Vec3 c = mtx.transform(vertices[indices16[mesh.indices_offset + i + 2]]);
 
 						Vec3 n = crossProduct(a - b, a - c).normalized();
-						uint8 area = n.y > walkable_threshold && is_walkable ? RC_WALKABLE_AREA : 0;
+						u8 area = n.y > walkable_threshold && is_walkable ? RC_WALKABLE_AREA : 0;
 						rcRasterizeTriangle(&ctx, &a.x, &b.x, &c.x, area, solid);
 					}
 				}
 				else
 				{
-					const uint32* indices32 = model->getIndices32();
+					const u32* indices32 = model->getIndices32();
 					for (int i = 0; i < mesh.indices_count; i += 3)
 					{
 						Vec3 a = mtx.transform(vertices[indices32[mesh.indices_offset + i]]);
@@ -333,7 +335,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 						Vec3 c = mtx.transform(vertices[indices32[mesh.indices_offset + i + 2]]);
 
 						Vec3 n = crossProduct(a - b, a - c).normalized();
-						uint8 area = n.y > walkable_threshold && is_walkable ? RC_WALKABLE_AREA : 0;
+						u8 area = n.y > walkable_threshold && is_walkable ? RC_WALKABLE_AREA : 0;
 						rcRasterizeTriangle(&ctx, &a.x, &b.x, &c.x, area, solid);
 					}
 				}
@@ -365,25 +367,57 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	}
 
 
+	float getAgentSpeed(Entity entity) override
+	{
+		return m_agents[entity].speed;
+	}
+
+
+	void setAgentRootMotion(Entity entity, const Vec3& root_motion) override
+	{
+		m_agents[entity].root_motion = root_motion;
+	}
+
+
+	Vec3 getAgentVelocity(Entity entity) override
+	{
+		Agent& agent = m_agents[entity];
+		const dtCrowdAgent* dt_agent = m_crowd->getAgent(agent.agent);
+		if (!dt_agent) return {0, 0, 0};
+		return *(Vec3*)dt_agent->vel;
+	}
+
+
 	void update(float time_delta, bool paused) override
 	{
 		PROFILE_FUNCTION();
 		if (!m_crowd) return;
+		if (paused) return;
 		m_crowd->update(time_delta, nullptr);
+		
+		for (auto& agent : m_agents)
+		{
+			const dtCrowdAgent* dt_agent = m_crowd->getAgent(agent.agent);
+			if (dt_agent->paused) continue;
+
+			Vec3 pos = m_universe.getPosition(agent.entity);
+			Quat rot = m_universe.getRotation(agent.entity);
+			Vec3 diff = *(Vec3*)dt_agent->npos - pos;
+			*(Vec3*)dt_agent->npos = pos + rot.rotate(agent.root_motion);
+			agent.root_motion.set(0, 0, 0);
+			agent.speed = diff.length() / time_delta;
+		}
+		
+		m_crowd->doMove(time_delta);
 
 		for (auto& agent : m_agents)
 		{
 			const dtCrowdAgent* dt_agent = m_crowd->getAgent(agent.agent);
+			if (dt_agent->paused) continue;
+
 			m_universe.setPosition(agent.entity, *(Vec3*)dt_agent->npos);
 			Vec3 velocity = *(Vec3*)dt_agent->vel;
 			float speed = velocity.length();
-			if (dt_agent->ncorners > 0 && speed > 0)
-			{
-				velocity *= 1 / speed;
-				float yaw = atan2(velocity.x, velocity.z);
-				Quat rot(Vec3(0, 1, 0), yaw);
-				m_universe.setRotation(agent.entity, rot);
-			}
 
 			if (dt_agent->ncorners == 0)
 			{
@@ -483,7 +517,6 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 		const Agent& agent = iter.value();
 
 		const dtCrowdAgent* dt_agent = m_crowd->getAgent(agent.agent);
-		if (dt_agent->targetPathqRef == DT_PATHQ_INVALID) return;
 
 		const dtPolyRef* path = dt_agent->corridor.getPath();
 		const int npath = dt_agent->corridor.getPathCount();
@@ -572,7 +605,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 			{
 				int data_size;
 				file.read(&data_size, sizeof(data_size));
-				uint8* data = (uint8*)dtAlloc(data_size, DT_ALLOC_PERM);
+				u8* data = (u8*)dtAlloc(data_size, DT_ALLOC_PERM);
 				file.read(data, data_size);
 				if (dtStatusFailed(m_navmesh->addTile(data, data_size, DT_TILE_FREE_DATA, 0, 0)))
 				{
@@ -680,7 +713,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 
 				const rcCompactCell& c = chf.cells[x + y * chf.width];
 
-				for (uint32 i = c.index, ni = c.index + c.count; i < ni; ++i)
+				for (u32 i = c.index, ni = c.index + c.count; i < ni; ++i)
 				{
 					float vy = orig.y + float(chf.spans[i].y) * ch;
 					render_scene->addDebugTriangle(
@@ -903,6 +936,18 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	}
 
 
+	void setActorActive(Entity entity, bool active) override
+	{
+		if (!m_crowd) return;
+		if (entity == INVALID_ENTITY) return;
+		auto iter = m_agents.find(entity);
+		if (iter == m_agents.end()) return;
+		Agent& agent = iter.value();
+		dtCrowdAgent* dt_agent = m_crowd->getEditableAgent(agent.agent);
+		if (dt_agent) dt_agent->paused = !active;
+	}
+
+
 	bool navigate(Entity entity, const Vec3& dest, float speed) override
 	{
 		if (!m_navquery) return false;
@@ -918,7 +963,16 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 		dtCrowdAgentParams params = m_crowd->getAgent(agent.agent)->params;
 		params.maxSpeed = speed;
 		m_crowd->updateAgentParameters(agent.agent, &params);
-		return m_crowd->requestMoveTarget(agent.agent, end_poly_ref, &dest.x);
+		if (m_crowd->requestMoveTarget(agent.agent, end_poly_ref, &dest.x))
+		{
+			agent.is_finished = false;
+		}
+		else
+		{
+			g_log_warning.log("Navigation") << "requestMoveTarget failed";
+			agent.is_finished = true;
+		}
+		return !agent.is_finished;
 	}
 
 
@@ -1380,9 +1434,10 @@ void NavigationSystem::registerProperties()
 }
 
 
-IScene* NavigationSystem::createScene(Universe& universe)
+void NavigationSystem::createScenes(Universe& universe)
 {
-	return LUMIX_NEW(m_allocator, NavigationSceneImpl)(*this, universe, m_allocator);
+	auto* scene = LUMIX_NEW(m_allocator, NavigationSceneImpl)(*this, universe, m_allocator);
+	universe.addScene(scene);
 }
 
 
@@ -1409,6 +1464,7 @@ static void registerLuaAPI(lua_State* L)
 
 	REGISTER_FUNCTION(generateNavmesh);
 	REGISTER_FUNCTION(navigate);
+	REGISTER_FUNCTION(setActorActive);
 	REGISTER_FUNCTION(cancelNavigation);
 	REGISTER_FUNCTION(debugDrawNavmesh);
 	REGISTER_FUNCTION(debugDrawCompactHeightfield);

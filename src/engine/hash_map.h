@@ -34,31 +34,31 @@ namespace Lumix
 	template<class Key> 
 	struct HashFunc
 	{
-		static uint32 get(const Key& key);
+		static u32 get(const Key& key);
 	};
 
 	// https://gist.github.com/badboy/6267743
 	template<>
-	struct HashFunc<uint64>
+	struct HashFunc<u64>
 	{
-		static uint32 get(const uint64& key)
+		static u32 get(const u64& key)
 		{
-			uint64 tmp = (~key) + (key << 18);
+			u64 tmp = (~key) + (key << 18);
 			tmp = tmp ^ (tmp >> 31);
 			tmp = tmp * 21;
 			tmp = tmp ^ (tmp >> 11);
 			tmp = tmp + (tmp << 6);
 			tmp = tmp ^ (tmp >> 22);
-			return (uint32)tmp;
+			return (u32)tmp;
 		}
 	};
 
 	template<>
-	struct HashFunc<int32>
+	struct HashFunc<i32>
 	{
-		static uint32 get(const int32& key)
+		static u32 get(const i32& key)
 		{
-			uint32 x = ((key >> 16) ^ key) * 0x45d9f3b;
+			u32 x = ((key >> 16) ^ key) * 0x45d9f3b;
 			x = ((x >> 16) ^ x) * 0x45d9f3b;
 			x = ((x >> 16) ^ x);
 			return x;
@@ -68,39 +68,39 @@ namespace Lumix
 	template<>
 	struct HashFunc<ComponentType>
 	{
-		static uint32 get(const ComponentType& key)
+		static u32 get(const ComponentType& key)
 		{
-			static_assert(sizeof(int32) == sizeof(key.index), "Check this");
-			return HashFunc<int32>::get(key.index);
+			static_assert(sizeof(i32) == sizeof(key.index), "Check this");
+			return HashFunc<i32>::get(key.index);
 		}
 	};
 
 	template<>
 	struct HashFunc<ComponentHandle>
 	{
-		static uint32 get(const ComponentHandle& key)
+		static u32 get(const ComponentHandle& key)
 		{
-			static_assert(sizeof(int32) == sizeof(key.index), "Check this");
-			return HashFunc<int32>::get(key.index);
+			static_assert(sizeof(i32) == sizeof(key.index), "Check this");
+			return HashFunc<i32>::get(key.index);
 		}
 	};
 
 	template<>
 	struct HashFunc<Entity>
 	{
-		static uint32 get(const Entity& key)
+		static u32 get(const Entity& key)
 		{
-			static_assert(sizeof(int32) == sizeof(key.index), "Check this");
-			return HashFunc<int32>::get(key.index);
+			static_assert(sizeof(i32) == sizeof(key.index), "Check this");
+			return HashFunc<i32>::get(key.index);
 		}
 	};
 
 	template<>
-	struct HashFunc<uint32>
+	struct HashFunc<u32>
 	{
-		static uint32 get(const uint32& key)
+		static u32 get(const u32& key)
 		{
-			uint32 x = ((key >> 16) ^ key) * 0x45d9f3b;
+			u32 x = ((key >> 16) ^ key) * 0x45d9f3b;
 			x = ((x >> 16) ^ x) * 0x45d9f3b;
 			x = ((x >> 16) ^ x);
 			return x;
@@ -110,19 +110,19 @@ namespace Lumix
 	template<>
 	struct HashFunc<void*>
 	{
-		static uint32 get(const void* key)
+		static u32 get(const void* key)
 		{
 			#ifdef PLATFORM64
-				uint64 tmp = (uint64)key;
+				u64 tmp = (u64)key;
 				tmp = (~tmp) + (tmp << 18);
 				tmp = tmp ^ (tmp >> 31);
 				tmp = tmp * 21;
 				tmp = tmp ^ (tmp >> 11);
 				tmp = tmp + (tmp << 6);
 				tmp = tmp ^ (tmp >> 22);
-				return (uint32)tmp;
+				return (u32)tmp;
 			#else
-				size_t x = ((int32(key) >> 16) ^ int32(key)) * 0x45d9f3b;
+				size_t x = ((i32(key) >> 16) ^ i32(key)) * 0x45d9f3b;
 				x = ((x >> 16) ^ x) * 0x45d9f3b;
 				x = ((x >> 16) ^ x);
 				return x;
@@ -133,9 +133,9 @@ namespace Lumix
 	template<>
 	struct HashFunc<char*>
 	{
-		static uint32 get(const char* key)
+		static u32 get(const char* key)
 		{
-			uint32 result = 0x55555555;
+			u32 result = 0x55555555;
 
 			while (*key) 
 			{ 
@@ -156,7 +156,7 @@ namespace Lumix
 		typedef Hasher hasher_type;
 		typedef HashMap<key_type, value_type, hasher_type> my_type;
 		typedef HashNode<key_type, value_type> node_type;
-		typedef uint32 size_type;
+		typedef u32 size_type;
 
 		friend class HashMapIterator;
 		friend class ConstHashMapIterator;
@@ -561,7 +561,7 @@ namespace Lumix
 				node_type* n = &src[i];
 				while (nullptr != n && src_sentinel != n->m_next)
 				{
-					int32 pos = getPosition(n->m_key);
+					i32 pos = getPosition(n->m_key);
 					node_type* new_node = getEmptyNode(pos);
 					copyMemory(new_node, n, sizeof(node_type));
 					new_node->m_next = nullptr;

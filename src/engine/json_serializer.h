@@ -35,9 +35,9 @@ namespace Lumix
 			// serialize
 			void serialize(const char* label, Entity value);
 			void serialize(const char* label, ComponentHandle value);
-			void serialize(const char* label, uint32 value);
+			void serialize(const char* label, u32 value);
 			void serialize(const char* label, float value);
-			void serialize(const char* label, int32 value);
+			void serialize(const char* label, i32 value);
 			void serialize(const char* label, const char* value);
 			void serialize(const char* label, const Path& value);
 			void serialize(const char* label, bool value);
@@ -48,9 +48,9 @@ namespace Lumix
 			void endArray();
 			void serializeArrayItem(Entity value);
 			void serializeArrayItem(ComponentHandle value);
-			void serializeArrayItem(uint32 value);
-			void serializeArrayItem(int32 value);
-			void serializeArrayItem(int64 value);
+			void serializeArrayItem(u32 value);
+			void serializeArrayItem(i32 value);
+			void serializeArrayItem(i64 value);
 			void serializeArrayItem(float value);
 			void serializeArrayItem(bool value);
 			void serializeArrayItem(const char* value);
@@ -58,9 +58,9 @@ namespace Lumix
 			// deserialize
 			void deserialize(const char* label, Entity& value, Entity default_value);
 			void deserialize(const char* label, ComponentHandle& value, ComponentHandle default_value);
-			void deserialize(const char* label, uint32& value, uint32 default_value);
+			void deserialize(const char* label, u32& value, u32 default_value);
 			void deserialize(const char* label, float& value, float default_value);
-			void deserialize(const char* label, int32& value, int32 default_value);
+			void deserialize(const char* label, i32& value, i32 default_value);
 			void deserialize(const char* label, char* value, int max_length, const char* default_value);
 			void deserialize(const char* label, Path& value, const Path& default_value);
 			void deserialize(const char* label, bool& value, bool default_value);
@@ -68,16 +68,16 @@ namespace Lumix
 			void deserialize(Path& path, const Path& default_value);
 			void deserialize(bool& value, bool default_value);
 			void deserialize(float& value, float default_value);
-			void deserialize(int32& value, int32 default_value);
+			void deserialize(i32& value, i32 default_value);
 			void deserializeArrayBegin(const char* label);
 			void deserializeArrayBegin();
 			void deserializeArrayEnd();
 			bool isArrayEnd();
 			void deserializeArrayItem(Entity& value, Entity default_value);
 			void deserializeArrayItem(ComponentHandle& value, ComponentHandle default_value);
-			void deserializeArrayItem(uint32& value, uint32 default_value);
-			void deserializeArrayItem(int32& value, int32 default_value);
-			void deserializeArrayItem(int64& value, int64 default_value);
+			void deserializeArrayItem(u32& value, u32 default_value);
+			void deserializeArrayItem(i32& value, i32 default_value);
+			void deserializeArrayItem(i64& value, i64 default_value);
 			void deserializeArrayItem(float& value, float default_value);
 			void deserializeArrayItem(bool& value, bool default_value);
 			void deserializeArrayItem(char* value, int max_length, const char* default_value);

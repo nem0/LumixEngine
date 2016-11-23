@@ -157,7 +157,7 @@ namespace Lumix
 		};
 
 
-		LUMIX_FORCE_INLINE void expect(ExpressionLHS<bool> expr, const char* file, uint32 line)
+		LUMIX_FORCE_INLINE void expect(ExpressionLHS<bool> expr, const char* file, u32 line)
 		{
 			if (!expr.value)
 			{
@@ -167,7 +167,7 @@ namespace Lumix
 
 
 		template <typename T1, typename T2>
-		LUMIX_FORCE_INLINE void expect(Expression<T1, T2> expr, const char* file, uint32 line)
+		LUMIX_FORCE_INLINE void expect(Expression<T1, T2> expr, const char* file, u32 line)
 		{
 			if(!expr.result)
 			{

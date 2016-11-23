@@ -10,7 +10,7 @@
 #include "unit_tests/suite/unit_test.h"
 
 
-using Lumix::int8;
-using Lumix::uint8;
-using Lumix::int32;
-using Lumix::uint32;
+using Lumix::i8;
+using Lumix::u8;
+using Lumix::i32;
+using Lumix::u32;

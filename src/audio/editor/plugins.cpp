@@ -1,6 +1,8 @@
-#include "audio_system.h"
+#include "animation/animation_system.h"
+#include "animation/editor/animation_editor.h"
 #include "audio_device.h"
 #include "audio_scene.h"
+#include "audio_system.h"
 #include "clip_manager.h"
 #include "editor/asset_browser.h"
 #include "editor/property_grid.h"
@@ -117,10 +119,46 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	{
 		m_filter[0] = 0;
 		m_is_opened = false;
-		m_action = LUMIX_NEW(app.getWorldEditor()->getAllocator(), Action)("Clip manager", "clip_manager");
-		m_action->func.bind<StudioAppPlugin, &StudioAppPlugin::onAction>(this);
-		m_action->is_selected.bind<StudioAppPlugin, &StudioAppPlugin::isOpened>(this);
+		Action* action = LUMIX_NEW(app.getWorldEditor()->getAllocator(), Action)("Clip manager", "clip_manager");
+		action->func.bind<StudioAppPlugin, &StudioAppPlugin::onAction>(this);
+		action->is_selected.bind<StudioAppPlugin, &StudioAppPlugin::isOpened>(this);
+		app.addWindowAction(action);
 	}
+
+
+	void pluginAdded(IPlugin& plugin) override
+	{
+		if (!equalStrings(plugin.getName(), "animation_editor")) return;
+
+		auto& anim_editor = (AnimEditor::AnimationEditor&)plugin;
+		auto& event_type = anim_editor.createEventType("sound");
+		event_type.size = sizeof(SoundAnimationEvent);
+		event_type.label = "Sound";
+		event_type.editor.bind<StudioAppPlugin, &StudioAppPlugin::onSoundEventGUI>(this);
+	}
+
+
+	void onSoundEventGUI(u8* data, AnimEditor::Component& component)
+	{
+		auto* ev = (SoundAnimationEvent*)data;
+		AudioScene* scene = (AudioScene*)m_app.getWorldEditor()->getUniverse()->getScene(crc32("audio"));
+		auto getter = [](void* data, int idx, const char** out) -> bool {
+			auto* scene = (AudioScene*)data;
+			*out = scene->getClipName(idx);
+			return true;
+		};
+		int current = 0;
+		AudioScene::ClipInfo* clip = scene->getClipInfo(ev->clip);
+		current = clip ? scene->getClipInfoIndex(clip) : -1;
+
+		if (ImGui::Combo("Clip", &current, getter, scene, scene->getClipCount()))
+		{
+			ev->clip = scene->getClipInfo(current)->name_hash;
+		}
+	}
+
+
+	const char* getName() const override { return "audio"; }
 
 
 	bool isOpened() const { return m_is_opened; }

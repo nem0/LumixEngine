@@ -27,10 +27,10 @@ enum class BlockType
 LUMIX_ENGINE_API MT::ThreadID getThreadID(int index);
 LUMIX_ENGINE_API void setThreadName(const char* name);
 LUMIX_ENGINE_API const char* getThreadName(MT::ThreadID thread_id);
-LUMIX_ENGINE_API int getThreadIndex(uint32 id);
+LUMIX_ENGINE_API int getThreadIndex(u32 id);
 LUMIX_ENGINE_API int getThreadCount();
 
-LUMIX_ENGINE_API uint64 now();
+LUMIX_ENGINE_API u64 now();
 LUMIX_ENGINE_API Block* getRootBlock(MT::ThreadID thread_id);
 LUMIX_ENGINE_API int getBlockInt(Block* block);
 LUMIX_ENGINE_API BlockType getBlockType(Block* block);
@@ -38,8 +38,8 @@ LUMIX_ENGINE_API Block* getBlockFirstChild(Block* block);
 LUMIX_ENGINE_API Block* getBlockNext(Block* block);
 LUMIX_ENGINE_API float getBlockLength(Block* block);
 LUMIX_ENGINE_API int getBlockHitCount(Block* block);
-LUMIX_ENGINE_API uint64 getBlockHitStart(Block* block, int hit_index);
-LUMIX_ENGINE_API uint64 getBlockHitLength(Block* block, int hit_index);
+LUMIX_ENGINE_API u64 getBlockHitStart(Block* block, int hit_index);
+LUMIX_ENGINE_API u64 getBlockHitLength(Block* block, int hit_index);
 LUMIX_ENGINE_API const char* getBlockName(Block* block);
 
 LUMIX_ENGINE_API void record(const char* name, int value);

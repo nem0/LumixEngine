@@ -176,7 +176,7 @@ namespace ImGui
 				overlay_text,
 				NULL,
 				NULL,
-				ImGuiAlign_Center);
+				ImVec2(0.5f, 0.5f));
 		}
 
 		RenderText(ImVec2(frame_bb.Max.x + style.ItemInnerSpacing.x, inner_bb.Min.y), label);
@@ -901,6 +901,84 @@ namespace ImGui
 		{
 			size->y = ImMax(1.0f, ImGui::GetIO().MouseDelta.y + size->y);
 		}
+	}
+
+	static float s_max_timeline_value;
+
+
+	bool BeginTimeline(const char* str_id, float max_value)
+	{
+		s_max_timeline_value = max_value;
+		return BeginChild(str_id);
+	}
+
+
+	static const float TIMELINE_RADIUS = 6;
+
+
+	bool TimelineEvent(const char* str_id, float* value)
+	{
+		ImGuiWindow* win = GetCurrentWindow();
+		const ImU32 inactive_color = ColorConvertFloat4ToU32(GImGui->Style.Colors[ImGuiCol_Button]);
+		const ImU32 active_color = ColorConvertFloat4ToU32(GImGui->Style.Colors[ImGuiCol_ButtonHovered]);
+		const ImU32 line_color = ColorConvertFloat4ToU32(GImGui->Style.Colors[ImGuiCol_ColumnActive]);
+		bool changed = false;
+		ImVec2 cursor_pos = win->DC.CursorPos;
+
+		ImVec2 pos = cursor_pos;
+		pos.x += win->Size.x * *value / s_max_timeline_value + TIMELINE_RADIUS;
+		pos.y += TIMELINE_RADIUS;
+
+		SetCursorScreenPos(pos - ImVec2(TIMELINE_RADIUS, TIMELINE_RADIUS));
+		InvisibleButton(str_id, ImVec2(2 * TIMELINE_RADIUS, 2 * TIMELINE_RADIUS));
+		if (IsItemActive() || IsItemHovered())
+		{
+			ImGui::SetTooltip("%f", *value);
+			ImVec2 a(pos.x, GetWindowContentRegionMin().y + win->Pos.y);
+			ImVec2 b(pos.x, GetWindowContentRegionMax().y + win->Pos.y);
+			win->DrawList->AddLine(a, b, line_color);
+		}
+		if (IsItemActive() && IsMouseDragging(0))
+		{
+			*value += GetIO().MouseDelta.x / win->Size.x * s_max_timeline_value;
+			changed = true;
+		}
+		win->DrawList->AddCircleFilled(
+			pos, TIMELINE_RADIUS, IsItemActive() || IsItemHovered() ? active_color : inactive_color);
+		ImGui::SetCursorScreenPos(cursor_pos);
+		return changed;
+	}
+
+
+	void EndTimeline()
+	{
+		ImGuiWindow* win = GetCurrentWindow();
+
+		ImU32 color = ColorConvertFloat4ToU32(GImGui->Style.Colors[ImGuiCol_Button]);
+		ImU32 line_color = ColorConvertFloat4ToU32(GImGui->Style.Colors[ImGuiCol_Border]);
+		ImU32 text_color = ColorConvertFloat4ToU32(GImGui->Style.Colors[ImGuiCol_Text]);
+		float rounding = GImGui->Style.ScrollbarRounding;
+		ImVec2 start(GetWindowContentRegionMin().x + win->Pos.x,
+			GetWindowContentRegionMax().y - GetTextLineHeightWithSpacing() + win->Pos.y);
+		ImVec2 end = GetWindowContentRegionMax() + win->Pos;
+
+		win->DrawList->AddRectFilled(start, end, color, rounding);
+
+		const int LINE_COUNT = 5;
+		const ImVec2 text_offset(0, GetTextLineHeightWithSpacing());
+		for (int i = 0; i < LINE_COUNT; ++i)
+		{
+			ImVec2 a = GetWindowContentRegionMin() + win->Pos + ImVec2(TIMELINE_RADIUS, 0);
+			a.x += i * GetWindowContentRegionWidth() / LINE_COUNT;
+			ImVec2 b = a;
+			b.y = start.y;
+			win->DrawList->AddLine(a, b, line_color);
+			char tmp[256];
+			ImFormatString(tmp, sizeof(tmp), "%.2f", i * s_max_timeline_value / LINE_COUNT);
+			win->DrawList->AddText(b, text_color, tmp);
+		}
+
+		EndChild();
 	}
 
 

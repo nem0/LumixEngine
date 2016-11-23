@@ -118,6 +118,8 @@ struct dtCrowdAgent
 	/// True if the agent is active, false if the agent is in an unused slot in the agent pool.
 	bool active;
 
+	bool paused;
+
 	/// The type of mesh polygon the agent is traversing. (See: #CrowdAgentState)
 	unsigned char state;
 
@@ -205,6 +207,7 @@ class dtCrowd
 	int m_maxAgents;
 	dtCrowdAgent* m_agents;
 	dtCrowdAgent** m_activeAgents;
+	int m_numActiveAgents;
 	dtCrowdAgentAnimation* m_agentAnims;
 	
 	dtPathQueue m_pathq;
@@ -317,6 +320,8 @@ public:
 	///  @param[out]	debug	A debug object to load with debug information. [Opt]
 	void update(const float dt, dtCrowdAgentDebugInfo* debug);
 	
+	void doMove(float dt);
+
 	/// Gets the filter used by the crowd.
 	/// @return The filter used by the crowd.
 	inline const dtQueryFilter* getFilter(const int i) const { return (i >= 0 && i < DT_CROWD_MAX_QUERY_FILTER_TYPE) ? &m_filters[i] : 0; }

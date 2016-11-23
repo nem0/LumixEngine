@@ -30,11 +30,11 @@ public:
 private:
 	struct PackFileInfo
 	{
-		uint64 offset;
-		uint64 size;
+		u64 offset;
+		u64 size;
 	};
 
-	HashMap<uint32, PackFileInfo> m_files;
+	HashMap<u32, PackFileInfo> m_files;
 	size_t m_offset;
 	OsFile m_file;
 	IAllocator& m_allocator;

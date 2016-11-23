@@ -56,6 +56,7 @@ struct ImportAnimation
 {
 	bool import;
 	struct aiAnimation* animation;
+	int root_motion_bone_idx = -1;
 	const aiScene* scene;
 	char output_filename[Lumix::MAX_PATH_LENGTH];
 };
@@ -78,7 +79,7 @@ struct ImportMesh
 	int material;
 	Lumix::Array<unsigned int> map_to_input;
 	Lumix::Array<unsigned int> map_from_input;
-	Lumix::Array<Lumix::int32> indices;
+	Lumix::Array<Lumix::i32> indices;
 };
 
 
@@ -113,6 +114,7 @@ class ImportAssetDialog LUMIX_FINAL : public StudioApp::IPlugin
 		void onWindowGUI() override;
 		DDSConvertCallbackData& getDDSConvertCallbackData() { return m_dds_convert_callback; }
 		int importAsset(lua_State* L);
+		const char* getName() const override { return "import_asset"; }
 
 	public:
 		bool m_is_opened;
@@ -139,7 +141,7 @@ class ImportAssetDialog LUMIX_FINAL : public StudioApp::IPlugin
 
 	public:
 		Lumix::WorldEditor& m_editor;
-		Lumix::Array<Lumix::uint32> m_saved_textures;
+		Lumix::Array<Lumix::u32> m_saved_textures;
 		Lumix::Array<Assimp::Importer> m_importers;
 		Lumix::Array<Lumix::StaticString<Lumix::MAX_PATH_LENGTH> > m_sources;
 		Lumix::Array<ImportAnimation> m_animations;
@@ -156,6 +158,7 @@ class ImportAssetDialog LUMIX_FINAL : public StudioApp::IPlugin
 			bool gen_smooth_normal;
 			bool remove_doubles;
 			Orientation orientation;
+			Orientation root_orientation;
 			bool make_convex;
 			bool all_nodes;
 			float position_error;

@@ -208,13 +208,13 @@ float pow(float base, float exponent)
 }
 
 
-uint32 rand()
+u32 rand()
 {
 	return getRandomGenerator()();
 }
 
 
-uint32 rand(uint32 from, uint32 to)
+u32 rand(u32 from, u32 to)
 {
 	std::uniform_int_distribution<> dist(from, to);
 	return dist(getRandomGenerator());
@@ -228,7 +228,7 @@ float randFloat()
 }
 
 
-void seedRandom(uint32 seed)
+void seedRandom(u32 seed)
 {
 	getRandomGenerator().seed(seed);
 }

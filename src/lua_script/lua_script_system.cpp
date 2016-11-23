@@ -18,6 +18,7 @@
 #include "engine/property_descriptor.h"
 #include "engine/property_register.h"
 #include "engine/resource_manager.h"
+#include "engine/string.h"
 #include "engine/universe/universe.h"
 #include "lua_script/lua_script_manager.h"
 
@@ -45,7 +46,7 @@ namespace Lumix
 		explicit LuaScriptSystemImpl(Engine& engine);
 		virtual ~LuaScriptSystemImpl();
 
-		IScene* createScene(Universe& universe) override;
+		void createScenes(Universe& universe) override;
 		void destroyScene(IScene* scene) override;
 		const char* getName() const override { return "lua_script"; }
 		LuaScriptManager& getScriptManager() { return m_script_manager; }
@@ -102,7 +103,7 @@ namespace Lumix
 			}
 
 
-			static int getProperty(ScriptInstance& inst, uint32 hash)
+			static int getProperty(ScriptInstance& inst, u32 hash)
 			{
 				for(int i = 0, c = inst.m_properties.size(); i < c; ++i)
 				{
@@ -114,8 +115,8 @@ namespace Lumix
 
 			void detectProperties(ScriptInstance& inst)
 			{
-				static const uint32 INDEX_HASH = crc32("__index");
-				static const uint32 THIS_HASH = crc32("this");
+				static const u32 INDEX_HASH = crc32("__index");
+				static const u32 THIS_HASH = crc32("this");
 				lua_State* L = inst.m_state;
 				bool is_env_valid = lua_rawgeti(L, LUA_REGISTRYINDEX, inst.m_environment) == LUA_TTABLE;
 				ASSERT(is_env_valid);
@@ -132,7 +133,7 @@ namespace Lumix
 						const char* name = lua_tostring(L, -2);
 						if(name[0] != '_')
 						{
-							uint32 hash = crc32(name);
+							u32 hash = crc32(name);
 							if (m_scene.m_property_names.find(hash) < 0)
 							{
 								m_scene.m_property_names.emplace(hash, name, allocator);
@@ -161,6 +162,7 @@ namespace Lumix
 									switch (lua_type(inst.m_state, -1))
 									{
 									case LUA_TBOOLEAN: prop.type = Property::BOOLEAN; break;
+									case LUA_TSTRING: prop.type = Property::STRING; break;
 									default: prop.type = Property::FLOAT;
 									}
 									prop.name_hash = hash;
@@ -425,7 +427,7 @@ namespace Lumix
 				blob.read(prop_count);
 				for (int j = 0; j < prop_count; ++j)
 				{
-					uint32 hash;
+					u32 hash;
 					blob.read(hash);
 					int prop_index = scr->getProperty(inst, hash);
 					if (prop_index < 0)
@@ -483,7 +485,7 @@ namespace Lumix
 			int tmp = lua_getglobal(L, "g_scene_lua_script");
 			ASSERT(tmp == LUA_TLIGHTUSERDATA);
 			auto* scene = LuaWrapper::toType<LuaScriptSceneImpl*>(L, -1);
-			uint32 prop_name_hash = crc32(prop_name);
+			u32 prop_name_hash = crc32(prop_name);
 			for (auto& prop : scene->m_current_script_instance->m_properties)
 			{
 				if (prop.name_hash == prop_name_hash)
@@ -880,7 +882,7 @@ namespace Lumix
 		}
 
 
-		const char* getPropertyName(uint32 name_hash) const
+		const char* getPropertyName(u32 name_hash) const
 		{
 			int idx = m_property_names.find(name_hash);
 			if(idx >= 0) return m_property_names.at(idx).c_str();
@@ -1180,7 +1182,7 @@ namespace Lumix
 		{
 			ASSERT(max_size > 0);
 
-			uint32 hash = crc32(property_name);
+			u32 hash = crc32(property_name);
 			auto& inst = m_scripts[{cmp.index}]->m_scripts[scr_index];
 			if (inst.m_script->isReady())
 			{
@@ -1229,11 +1231,16 @@ namespace Lumix
 				break;
 				case Property::ENTITY:
 				{
-					Entity val = {(int)lua_tointeger(scr.m_state, -1)};
+					Entity val = { (int)lua_tointeger(scr.m_state, -1) };
 					toCString(val.index, out, max_size);
 				}
 				break;
-				case Property::RESOURCE: 
+				case Property::STRING:
+				{
+					copyString(out, max_size, lua_tostring(scr.m_state, -1));
+				}
+				break;
+				case Property::RESOURCE:
 				{
 					int res_idx = LuaWrapper::toType<int>(scr.m_state, -1);
 					Resource* res = m_system.m_engine.getLuaResource(res_idx);
@@ -1450,7 +1457,7 @@ namespace Lumix
 
 		Property& getScriptProperty(ComponentHandle cmp, int scr_index, const char* name)
 		{
-			uint32 name_hash = crc32(name);
+			u32 name_hash = crc32(name);
 			ScriptComponent* script_cmp = m_scripts[{cmp.index}];
 			for (auto& prop : script_cmp->m_scripts[scr_index].m_properties)
 			{
@@ -1568,7 +1575,7 @@ namespace Lumix
 
 		LuaScriptSystemImpl& m_system;
 		HashMap<Entity, ScriptComponent*> m_scripts;
-		AssociativeArray<uint32, string> m_property_names;
+		AssociativeArray<u32, string> m_property_names;
 		Universe& m_universe;
 		Array<UpdateData> m_updates;
 		Array<TimerData> m_timers;
@@ -1599,9 +1606,10 @@ namespace Lumix
 	}
 
 
-	IScene* LuaScriptSystemImpl::createScene(Universe& ctx)
+	void LuaScriptSystemImpl::createScenes(Universe& ctx)
 	{
-		return LUMIX_NEW(m_allocator, LuaScriptSceneImpl)(*this, ctx);
+		auto* scene = LUMIX_NEW(m_allocator, LuaScriptSceneImpl)(*this, ctx);
+		ctx.addScene(scene);
 	}
 
 

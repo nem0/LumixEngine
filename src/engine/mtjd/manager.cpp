@@ -29,12 +29,12 @@ struct ManagerImpl LUMIX_FINAL : public Manager
 		, m_pending_trans(allocator)
 	{
 #if !LUMIX_SINGLE_THREAD()
-		uint32 threads_num = getCpuThreadsCount();
+		u32 threads_num = getCpuThreadsCount();
 
 		m_scheduler.create("MTJD::Scheduler");
 
 		m_worker_tasks.reserve(threads_num);
-		for (uint32 i = 0; i < threads_num; ++i)
+		for (u32 i = 0; i < threads_num; ++i)
 		{
 			auto& task = m_worker_tasks.emplace(m_allocator);
 			task.create("MTJD::WorkerTask", this, &m_trans_queue);
@@ -48,8 +48,8 @@ struct ManagerImpl LUMIX_FINAL : public Manager
 	{
 #if !LUMIX_SINGLE_THREAD()
 
-		uint32 threads_num = getCpuThreadsCount();
-		for (uint32 i = 0; i < threads_num; ++i)
+		u32 threads_num = getCpuThreadsCount();
+		for (u32 i = 0; i < threads_num; ++i)
 		{
 			m_trans_queue.abort();
 		}
@@ -66,7 +66,7 @@ struct ManagerImpl LUMIX_FINAL : public Manager
 #endif
 	}
 
-	uint32 getCpuThreadsCount() const override
+	u32 getCpuThreadsCount() const override
 	{
 #if !LUMIX_SINGLE_THREAD()
 
@@ -127,7 +127,7 @@ struct ManagerImpl LUMIX_FINAL : public Manager
 	{
 #if !LUMIX_SINGLE_THREAD()
 
-		uint32 count = MT::atomicIncrement(&m_scheduling_counter);
+		u32 count = MT::atomicIncrement(&m_scheduling_counter);
 		if (1 == count)
 		{
 			do
@@ -164,7 +164,7 @@ struct ManagerImpl LUMIX_FINAL : public Manager
 	{
 #if !LUMIX_SINGLE_THREAD()
 
-		for (int32 i = 0; i < (int32)Priority::Count; ++i)
+		for (i32 i = 0; i < (i32)Priority::Count; ++i)
 		{
 			if (!m_ready_to_execute[i].isEmpty())
 			{
@@ -187,17 +187,17 @@ struct ManagerImpl LUMIX_FINAL : public Manager
 
 #if !LUMIX_SINGLE_THREAD()
 
-		Job** jobEntry = m_ready_to_execute[(int32)job->getPriority()].alloc(true);
+		Job** jobEntry = m_ready_to_execute[(i32)job->getPriority()].alloc(true);
 		if (jobEntry)
 		{
 			*jobEntry = job;
-			m_ready_to_execute[(int32)job->getPriority()].push(jobEntry, true);
+			m_ready_to_execute[(i32)job->getPriority()].push(jobEntry, true);
 		}
 
 #endif
 	}
 
-	uint32 getAffinityMask(uint32) const
+	u32 getAffinityMask(u32) const
 	{
 		return MT::getThreadAffinityMask();
 	}
@@ -211,7 +211,7 @@ struct ManagerImpl LUMIX_FINAL : public Manager
 		Scheduler			m_scheduler;
 	#endif
 
-	volatile int32 m_scheduling_counter;
+	volatile i32 m_scheduling_counter;
 
 
 }; // struct ManagerImpl

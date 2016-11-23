@@ -34,7 +34,7 @@ static const ComponentType DISTANCE_JOINT_TYPE = PropertyRegister::getComponentT
 static const ComponentType HINGE_JOINT_TYPE = PropertyRegister::getComponentType("hinge_joint");
 static const ComponentType SPHERICAL_JOINT_TYPE = PropertyRegister::getComponentType("spherical_joint");
 static const ComponentType D6_JOINT_TYPE = PropertyRegister::getComponentType("d6_joint");
-static const uint32 RENDERER_HASH = crc32("renderer");
+static const u32 RENDERER_HASH = crc32("renderer");
 static const ResourceType PHYSICS_TYPE("physics");
 
 
@@ -230,7 +230,7 @@ struct EditorPlugin LUMIX_FINAL : public WorldEditor::Plugin
 		Vec3 force = phy_scene->getDistanceJointLinearForce(cmp.handle);
 
 		float t = Math::minimum(force.length() / 10.0f, 1.0f);
-		uint32 color = 0xff000000 + (uint32(t * 0xff) << 16) + uint32((1 - t) * 0xff);
+		u32 color = 0xff000000 + (u32(t * 0xff) << 16) + u32((1 - t) * 0xff);
 		render_scene->addDebugLine(pos + right, pos, color, 0);
 		static const float ANGLE_STEP = Math::PI * 2 * float(TWIST_COUNT) / SEGMENT_COUNT;
 		float c = cosf(0);
@@ -415,15 +415,19 @@ struct EditorPlugin LUMIX_FINAL : public WorldEditor::Plugin
 
 struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 {
-	explicit StudioAppPlugin(Lumix::WorldEditor& editor)
-		: m_editor(editor)
+	explicit StudioAppPlugin(StudioApp& app)
+		: m_editor(*app.getWorldEditor())
 		, m_selected_bone(-1)
 		, m_is_window_opened(false)
 	{
-		m_action = LUMIX_NEW(m_editor.getAllocator(), Action)("Physics", "physics");
-		m_action->func.bind<StudioAppPlugin, &StudioAppPlugin::onAction>(this);
-		m_action->is_selected.bind<StudioAppPlugin, &StudioAppPlugin::isOpened>(this);
+		Action* action = LUMIX_NEW(m_editor.getAllocator(), Action)("Physics", "physics");
+		action->func.bind<StudioAppPlugin, &StudioAppPlugin::onAction>(this);
+		action->is_selected.bind<StudioAppPlugin, &StudioAppPlugin::isOpened>(this);
+		app.addWindowAction(action);
 	}
+
+
+	const char* getName() const override { return "physics"; }
 
 
 	bool isOpened() const { return m_is_window_opened; }
@@ -586,7 +590,7 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 
 		if (!ImGui::CollapsingHeader("Visualization")) return;
 
-		uint32 viz_flags = scene->getDebugVisualizationFlags();
+		u32 viz_flags = scene->getDebugVisualizationFlags();
 		auto flag_gui = [&viz_flags](const char* label, int flag) {
 			bool b = (viz_flags & (1 << flag)) != 0;
 			if (ImGui::Checkbox(label, &b))
@@ -701,7 +705,7 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 
 			if (visualize)
 			{
-				uint32 color = m_selected_bone == i ? 0xffff0000 : 0xff0000ff;
+				u32 color = m_selected_bone == i ? 0xffff0000 : 0xff0000ff;
 				render_scene.addDebugLine(
 					mtx.transform(bone.transform.pos), mtx.transform(child_bone.transform.pos), color, 0);
 			}
@@ -796,7 +800,7 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		RagdollBone* selected_bone = nullptr;
 		if (m_selected_bone >= 0 && m_selected_bone < model->getBoneCount())
 		{
-			uint32 hash = crc32(model->getBone(m_selected_bone).name.c_str());
+			u32 hash = crc32(model->getBone(m_selected_bone).name.c_str());
 			selected_bone = phy_scene->getRagdollBoneByName(cmp, hash);
 		}
 		if (visualize) renderBone(*render_scene, *phy_scene, phy_scene->getRagdollRootBone(cmp), selected_bone);
@@ -834,7 +838,7 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	}
 
 
-	void onBonePropertiesGUI(PhysicsScene& scene, ComponentHandle cmp, uint32 bone_name_hash)
+	void onBonePropertiesGUI(PhysicsScene& scene, ComponentHandle cmp, u32 bone_name_hash)
 	{
 		auto* bone_handle = scene.getRagdollBoneByName(cmp, bone_name_hash);
 		if (!bone_handle)
@@ -1058,7 +1062,7 @@ LUMIX_STUDIO_ENTRY(physics)
 	auto& editor = *app.getWorldEditor();
 	auto& allocator = editor.getAllocator();
 
-	app.addPlugin(*LUMIX_NEW(allocator, StudioAppPlugin)(editor));
+	app.addPlugin(*LUMIX_NEW(allocator, StudioAppPlugin)(app));
 	editor.addPlugin(*LUMIX_NEW(allocator, EditorPlugin)(editor));
 	app.getAssetBrowser()->addPlugin(*LUMIX_NEW(allocator, PhysicsGeometryPlugin)(app));
 }

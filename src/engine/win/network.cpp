@@ -25,7 +25,7 @@ TCPAcceptor::~TCPAcceptor()
 }
 
 
-bool TCPAcceptor::start(const char* ip, uint16 port)
+bool TCPAcceptor::start(const char* ip, u16 port)
 {
 	WORD sockVer;
 	WSADATA wsaData;
@@ -76,7 +76,7 @@ TCPConnector::~TCPConnector()
 }
 
 
-TCPStream* TCPConnector::connect(const char* ip, uint16 port)
+TCPStream* TCPConnector::connect(const char* ip, u16 port)
 {
 	WORD sockVer;
 	WSADATA wsaData;
@@ -111,9 +111,9 @@ TCPStream::~TCPStream()
 }
 
 
-bool TCPStream::readString(char* string, uint32 max_size)
+bool TCPStream::readString(char* string, u32 max_size)
 {
-	uint32 len = 0;
+	u32 len = 0;
 	bool ret = true;
 	ret &= read(len);
 	ASSERT(len < max_size);
@@ -125,7 +125,7 @@ bool TCPStream::readString(char* string, uint32 max_size)
 
 bool TCPStream::writeString(const char* string)
 {
-	uint32 len = (uint32)stringLength(string) + 1;
+	u32 len = (u32)stringLength(string) + 1;
 	bool ret = write(len);
 	ret &= write((const void*)string, len);
 
@@ -135,7 +135,7 @@ bool TCPStream::writeString(const char* string)
 
 bool TCPStream::read(void* buffer, size_t size)
 {
-	int32 to_receive = (int32)size;
+	i32 to_receive = (i32)size;
 	char* ptr = static_cast<char*>(buffer);
 
 	do
