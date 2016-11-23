@@ -3,6 +3,7 @@
 #include "animation/animation_system.h"
 #include "animation/controller.h"
 #include "animation/editor/state_machine_editor.h"
+#include "animation/events.h"
 #include "animation/state_machine.h"
 #include "editor/asset_browser.h"
 #include "editor/platform_interface.h"
@@ -42,6 +43,7 @@ AnimationEditor::AnimationEditor(StudioApp& app)
 	, m_editor_opened(false)
 	, m_inputs_opened(false)
 	, m_offset(0, 0)
+	, m_event_types(app.getWorldEditor()->getAllocator())
 {
 	m_path[0] = 0;
 	IAllocator& allocator = app.getWorldEditor()->getAllocator();
@@ -61,6 +63,11 @@ AnimationEditor::AnimationEditor(StudioApp& app)
 	auto* anim_sys = (AnimationSystem*)engine.getPluginManager().getPlugin("animation");
 	m_resource = LUMIX_NEW(allocator, ControllerResource)(*anim_sys, *this, *manager, allocator);
 	m_container = (Container*)m_resource->getRoot();
+
+	EventType& event_type = createEventType("set_input");
+	event_type.size = sizeof(Anim::SetInputEvent);
+	event_type.label = "Set Input";
+	event_type.editor.bind<AnimationEditor, &AnimationEditor::onSetInputGUI>(this);
 }
 
 
@@ -70,6 +77,38 @@ AnimationEditor::~AnimationEditor()
 	LUMIX_DELETE(allocator, m_resource);
 }
 
+
+AnimationEditor::EventType& AnimationEditor::getEventType(Lumix::u32 type)
+{
+	for (auto& i : m_event_types)
+	{
+		if (i.type == type) return i;
+	}
+	return m_event_types[0];
+}
+
+
+void AnimationEditor::onSetInputGUI(u8* data, Component& component)
+{
+	auto event = (Anim::SetInputEvent*)data;
+	auto& input_decl = component.getController().getEngineResource()->getInputDecl();
+	auto getter = [](void* data, int idx, const char** out) -> bool {
+		auto& input_decl = *(Anim::InputDecl*)data;
+		*out = input_decl.inputs[idx].name;
+		return true;
+	};
+	ImGui::Combo("Input", &event->input_idx, getter, &input_decl, input_decl.inputs_count);
+	if (event->input_idx >= 0 && event->input_idx < input_decl.inputs_count)
+	{
+		switch (input_decl.inputs[event->input_idx].type)
+		{
+			case Anim::InputDecl::BOOL: ImGui::Checkbox("Value", &event->b_value); break;
+			case Anim::InputDecl::INT: ImGui::InputInt("Value", &event->i_value); break;
+			case Anim::InputDecl::FLOAT: ImGui::InputFloat("Value", &event->f_value); break;
+			default: ASSERT(false); break;
+		}
+	}
+}
 
 
 void AnimationEditor::onWindowGUI()
@@ -216,6 +255,20 @@ void AnimationEditor::newController()
 	auto* anim_sys = (AnimationSystem*)engine.getPluginManager().getPlugin("animation");
 	m_resource = LUMIX_NEW(allocator, ControllerResource)(*anim_sys, *this, *manager, allocator);
 	m_container = (Container*)m_resource->getRoot();
+}
+
+
+int AnimationEditor::getEventTypesCount() const
+{
+	return m_event_types.size();
+}
+
+
+AnimationEditor::EventType& AnimationEditor::createEventType(const char* type)
+{
+	EventType& event_type = m_event_types.emplace();
+	event_type.type = crc32(type);
+	return event_type;
 }
 
 

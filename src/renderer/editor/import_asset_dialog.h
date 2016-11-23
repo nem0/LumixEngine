@@ -114,6 +114,7 @@ class ImportAssetDialog LUMIX_FINAL : public StudioApp::IPlugin
 		void onWindowGUI() override;
 		DDSConvertCallbackData& getDDSConvertCallbackData() { return m_dds_convert_callback; }
 		int importAsset(lua_State* L);
+		const char* getName() const override { return "import_asset"; }
 
 	public:
 		bool m_is_opened;

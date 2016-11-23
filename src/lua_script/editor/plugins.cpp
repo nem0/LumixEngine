@@ -565,6 +565,9 @@ struct ConsolePlugin LUMIX_FINAL : public StudioApp::IPlugin
 	}
 
 
+	const char* getName() const override { return "script_console"; }
+
+
 	bool isOpened() const { return opened; }
 	void toggleOpened() { opened = !opened; }
 

@@ -130,7 +130,7 @@ class PluginManagerImpl LUMIX_FINAL : public PluginManager
 					}
 					else
 					{
-						m_plugins.push(plugin);
+						addPlugin(plugin);
 						m_libraries.push(lib);
 						m_library_loaded.invoke(lib);
 						g_log_info.log("Core") << "Plugin loaded.";
@@ -150,7 +150,7 @@ class PluginManagerImpl LUMIX_FINAL : public PluginManager
 				if (plugin)
 				{
 					g_log_info.log("Core") << "Plugin loaded.";
-					m_plugins.push(plugin);
+					addPlugin(plugin);
 					return plugin;
 				}
 				g_log_warning.log("Core") << "Failed to load plugin.";
@@ -165,6 +165,11 @@ class PluginManagerImpl LUMIX_FINAL : public PluginManager
 		void addPlugin(IPlugin* plugin) override
 		{
 			m_plugins.push(plugin);
+			for (auto* i : m_plugins)
+			{
+				i->pluginAdded(*plugin);
+				plugin->pluginAdded(*i);
+			}
 		}
 
 

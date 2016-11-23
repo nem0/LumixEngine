@@ -56,6 +56,7 @@ public:
 		Container* current)
 	{
 	}
+	ControllerResource& getController() { return m_controller; }
 
 	Lumix::Anim::Component* engine_cmp;
 

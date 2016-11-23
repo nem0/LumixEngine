@@ -1322,6 +1322,9 @@ struct SceneViewPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	}
 
 
+	const char* getName() const override { return "scene_view"; }
+
+
 	void onResourceChanged(const Path& path, const char* /*ext*/)
 	{
 		if (m_scene_view.getPipeline()->getPath() == path) m_scene_view.getPipeline()->load();
@@ -1748,6 +1751,9 @@ struct FurPainterPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	}
 
 
+	const char* getName() const override { return "fur_painter"; }
+
+
 	bool isOpened() const { return is_opened; }
 	void onAction() { is_opened = !is_opened; }
 
@@ -1943,6 +1949,9 @@ struct GameViewPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	}
 
 
+	const char* getName() const override { return "game_view"; }
+
+
 	bool isOpened() const { return m_game_view.m_is_opened; }
 
 
@@ -2118,6 +2127,7 @@ struct ShaderEditorPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	~ShaderEditorPlugin() { LUMIX_DELETE(m_app.getWorldEditor()->getAllocator(), m_compiler); }
 
 
+	const char* getName() const override { return "shader_editor"; }
 	void update(float) override { m_compiler->update(); }
 	void onAction() { m_shader_editor.m_is_opened = !m_shader_editor.m_is_opened; }
 	void onWindowGUI() override { m_shader_editor.onGUI(); }
