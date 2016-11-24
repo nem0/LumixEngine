@@ -881,6 +881,7 @@ void StateMachine::drawInside(ImDrawList* draw, const ImVec2& canvas_screen_pos)
 			{
 				LUMIX_DELETE(m_controller.getAllocator(), m_context_cmp);
 				if (m_selected_component == m_context_cmp) m_selected_component = nullptr;
+				if (m_drag_source == m_context_cmp) m_drag_source = nullptr;
 				m_context_cmp = nullptr;
 			}
 		}
