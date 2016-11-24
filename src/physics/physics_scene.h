@@ -173,6 +173,7 @@ public:
 	virtual float getControllerRadius(ComponentHandle cmp) = 0;
 	virtual float getControllerHeight(ComponentHandle cmp) = 0;
 	virtual bool isControllerTouchingDown(ComponentHandle cmp) = 0;
+	virtual void resizeController(ComponentHandle cmp, float height) = 0;
 
 	virtual RagdollBone* createRagdollBone(ComponentHandle cmp, u32 bone_name_hash) = 0;
 	virtual void destroyRagdollBone(ComponentHandle cmp, RagdollBone* bone) = 0;

@@ -2230,6 +2230,14 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
+	void resizeController(ComponentHandle cmp, float height) override
+	{
+		Controller& ctrl = m_controllers[{cmp.index}];
+		ctrl.m_height = height;
+		ctrl.m_controller->resize(height);
+	}
+
+
 	ComponentHandle getController(Entity entity) override
 	{
 		int idx = m_controllers.find(entity);
