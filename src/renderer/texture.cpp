@@ -452,7 +452,7 @@ static bool loadTGA(Texture& texture, FS::IFile& file)
 	{
 		for (long y = 0; y < header.height; y++)
 		{
-			long idx = y * header.width * bytes_per_pixel;
+			long idx = y * header.width * 4;
 			for (long x = 0; x < header.width; x++)
 			{
 				file.read(&image_dest[idx + 2], sizeof(u8));
