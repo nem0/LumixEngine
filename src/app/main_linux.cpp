@@ -335,7 +335,7 @@ struct App
 		m_engine->update(*m_universe);
 		m_pipeline->render();
 		auto* renderer = m_engine->getPluginManager().getPlugin("renderer");
-		static_cast<Lumix::Renderer*>(renderer)->frame();
+		static_cast<Lumix::Renderer*>(renderer)->frame(false);
 		m_engine->getFileSystem().updateAsyncTransactions();
 		if (frame_time < 1 / 60.0f)
 		{
