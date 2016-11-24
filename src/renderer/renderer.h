@@ -27,7 +27,7 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 {
 	public:
 		virtual ~Renderer() {}
-		virtual void frame() = 0;
+		virtual void frame(bool capture) = 0;
 		virtual void resize(int width, int height) = 0;
 		virtual int getViewCounter() const = 0;
 		virtual void viewCounterAdd() = 0;

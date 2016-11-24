@@ -766,7 +766,7 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		auto& plugin_manager = world_editor->getEngine().getPluginManager();
 		Renderer*  renderer = static_cast<Renderer*>(plugin_manager.getPlugin("renderer"));
 		auto& allocator = world_editor->getAllocator();
-		Lumix::Path pipeline_path("pipelines/game_view.lua");
+		Lumix::Path pipeline_path("pipelines/probe.lua");
 		m_pipeline = Pipeline::create(*renderer, pipeline_path, allocator);
 		m_pipeline->load();
 	}
@@ -811,9 +811,15 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		const char* base_path = m_app.getWorldEditor()->getEngine().getDiskFileDevice()->getBasePath();
 		u64 universe_guid = m_app.getWorldEditor()->getUniverse()->getPath().getHash();
 		Lumix::StaticString<Lumix::MAX_PATH_LENGTH> path(base_path, "universes/", universe_guid);
-		if (!PlatformInterface::makePath(path)) g_log_error.log("Editor") << "Failed to create " << path;
+		if (!PlatformInterface::makePath(path) && !PlatformInterface::dirExists(path))
+		{
+			g_log_error.log("Editor") << "Failed to create " << path;
+		}
 		path << "/probes/";
-		if (!PlatformInterface::makePath(path)) g_log_error.log("Editor") << "Failed to create " << path;
+		if (!PlatformInterface::makePath(path) && !PlatformInterface::dirExists(path))
+		{
+			g_log_error.log("Editor") << "Failed to create " << path;
+		}
 		path << cmp.handle.index << ".dds";
 		auto& allocator = m_app.getWorldEditor()->getAllocator();
 		if (!file.open(path, Lumix::FS::Mode::CREATE_AND_WRITE, allocator))
@@ -874,21 +880,14 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		Engine& engine = world_editor->getEngine();
 		auto& plugin_manager = engine.getPluginManager();
 		IAllocator& allocator = engine.getAllocator();
-		Lumix::Array<Lumix::u8> data(allocator);
-		data.resize(6 * TEXTURE_SIZE * TEXTURE_SIZE * 4);
 
-		bgfx::TextureHandle texture =
-			bgfx::createTexture2D(TEXTURE_SIZE, TEXTURE_SIZE, false, 1, bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK);
-		
 		Vec3 probe_position = universe->getPosition(cmp.entity);
 		auto* scene = static_cast<RenderScene*>(universe->getScene(RENDERER_HASH));
-		ComponentHandle original_camera = scene->getCameraInSlot("main");
+		ComponentHandle camera_cmp = scene->getCameraInSlot("probe");
+		if (!isValid(camera_cmp)) return;
 
-		if(original_camera != INVALID_COMPONENT) scene->setCameraSlot(original_camera, "");
-		Entity camera_entity = universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
-		ComponentHandle camera_cmp = scene->createComponent(CAMERA_TYPE, camera_entity);
-		scene->setCameraSlot(camera_cmp, "main");
-		scene->setCameraFOV(camera_cmp, 90);
+		Entity camera_entity = scene->getCameraEntity(camera_cmp);
+		scene->setCameraFOV(camera_cmp, Math::degreesToRadians(90));
 
 		m_pipeline->setScene(scene);
 		m_pipeline->setViewport(0, 0, TEXTURE_SIZE, TEXTURE_SIZE);
@@ -899,8 +898,12 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		Vec3 ups[] = {{0, 1, 0}, {0, 1, 0}, {0, 0, 1}, {0, 0, -1}, {0, 1, 0}, {0, 1, 0}};
 		Vec3 ups_opengl[] = { { 0, -1, 0 },{ 0, -1, 0 },{ 0, 0, 1 },{ 0, 0, -1 },{ 0, -1, 0 },{ 0, -1, 0 } };
 
-		renderer->frame(); // submit
-		renderer->frame(); // wait for gpu
+		Lumix::Array<Lumix::u8> data(allocator);
+		data.resize(6 * TEXTURE_SIZE * TEXTURE_SIZE * 4);
+		bgfx::TextureHandle texture =
+			bgfx::createTexture2D(TEXTURE_SIZE, TEXTURE_SIZE, false, 1, bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK);
+		renderer->frame(false); // submit
+		renderer->frame(false); // wait for gpu
 
 		bool is_opengl = renderer->isOpenGL();
 		for (int i = 0; i < 6; ++i)
@@ -925,8 +928,8 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 			bgfx::setViewName(renderer->getViewCounter(), "probe_read");
 			bgfx::readTexture(texture, &data[i * TEXTURE_SIZE * TEXTURE_SIZE * 4]);
 			bgfx::touch(renderer->getViewCounter());
-			renderer->frame(); // submit
-			renderer->frame(); // wait for gpu
+			renderer->frame(false); // submit
+			renderer->frame(false); // wait for gpu
 
 			if (is_opengl) continue;
 
@@ -943,10 +946,6 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		saveCubemap(cmp, data, TEXTURE_SIZE);
 		bgfx::destroyTexture(texture);
 		
-		scene->destroyComponent(camera_cmp, CAMERA_TYPE);
-		universe->destroyEntity(camera_entity);
-		if (original_camera != INVALID_COMPONENT) scene->setCameraSlot(original_camera, "main");
-
 		scene->reloadEnvironmentProbe(cmp.handle);
 	}
 
@@ -1997,7 +1996,7 @@ struct GameViewPlugin LUMIX_FINAL : public StudioApp::IPlugin
 
 		Renderer* renderer = static_cast<Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
 
-		renderer->frame();
+		renderer->frame(false);
 	}
 
 

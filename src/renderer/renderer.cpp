@@ -788,10 +788,10 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	}
 
 
-	void frame() override
+	void frame(bool capture) override
 	{
 		PROFILE_FUNCTION();
-		bgfx::frame();
+		bgfx::frame(capture);
 		m_view_counter = 0;
 	}
 
