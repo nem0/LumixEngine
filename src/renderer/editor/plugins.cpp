@@ -212,12 +212,14 @@ struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 
 			if (ImGui::BeginPopup(popup_name))
 			{
-				static const struct { const char* name; u32 value; } FLAGS[] = {
-					{"SRGB", BGFX_TEXTURE_SRGB},
-					{"u clamp", BGFX_TEXTURE_U_CLAMP},
-					{"v clamp", BGFX_TEXTURE_V_CLAMP},
-					{"Min point", BGFX_TEXTURE_MIN_POINT},
-					{"Mag point", BGFX_TEXTURE_MAG_POINT}};
+				static const struct { const char* name; u32 value; u32 unset_flag; } FLAGS[] = {
+					{"SRGB", BGFX_TEXTURE_SRGB, 0},
+					{"u clamp", BGFX_TEXTURE_U_CLAMP, 0},
+					{"v clamp", BGFX_TEXTURE_V_CLAMP, 0},
+					{"Min point", BGFX_TEXTURE_MIN_POINT, BGFX_TEXTURE_MIN_ANISOTROPIC},
+					{"Mag point", BGFX_TEXTURE_MAG_POINT, BGFX_TEXTURE_MAG_ANISOTROPIC},
+					{"Min anisotropic", BGFX_TEXTURE_MIN_ANISOTROPIC, BGFX_TEXTURE_MIN_POINT},
+					{"Mag anisotropic", BGFX_TEXTURE_MAG_ANISOTROPIC, BGFX_TEXTURE_MAG_POINT}};
 
 				for (auto& flag : FLAGS)
 				{
@@ -225,6 +227,10 @@ struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 					if (ImGui::Checkbox(flag.name, &b))
 					{
 						ImGui::CloseCurrentPopup();
+						if (flag.unset_flag)
+						{
+							texture->setFlag(flag.unset_flag, false);
+						}
 						texture->setFlag(flag.value, b);
 					}
 				}
