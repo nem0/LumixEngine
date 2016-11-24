@@ -55,7 +55,7 @@ public:
 	int getEventTypesCount() const override;
 	EventType& createEventType(const char* type) override;
 	EventType& getEventTypeByIdx(int idx) override  { return m_event_types[idx]; }
-	EventType& getEventType(Lumix::u32 type) override;
+	EventType& getEventType(u32 type) override;
 
 private:
 	void newController();
@@ -71,7 +71,7 @@ private:
 	void animSetGUI();
 	void menuGUI();
 	void dropFile(const char* path, const ImVec2& canvas_screen_pos);
-	void onSetInputGUI(Lumix::u8* data, Component& component);
+	void onSetInputGUI(u8* data, Component& component);
 
 private:
 	StudioApp& m_app;
@@ -80,8 +80,8 @@ private:
 	ImVec2 m_offset;
 	ControllerResource* m_resource;
 	Container* m_container;
-	char m_path[Lumix::MAX_PATH_LENGTH];
-	Lumix::Array<EventType> m_event_types;
+	StaticString<MAX_PATH_LENGTH> m_path;
+	Array<EventType> m_event_types;
 };
 
 
@@ -92,7 +92,7 @@ AnimationEditor::AnimationEditor(StudioApp& app)
 	, m_offset(0, 0)
 	, m_event_types(app.getWorldEditor()->getAllocator())
 {
-	m_path[0] = 0;
+	m_path = "";
 	IAllocator& allocator = app.getWorldEditor()->getAllocator();
 
 	auto* action = LUMIX_NEW(allocator, Action)("Animation Editor", "animation_editor");
@@ -125,7 +125,7 @@ AnimationEditor::~AnimationEditor()
 }
 
 
-AnimationEditor::EventType& AnimationEditor::getEventType(Lumix::u32 type)
+AnimationEditor::EventType& AnimationEditor::getEventType(u32 type)
 {
 	for (auto& i : m_event_types)
 	{
@@ -167,14 +167,16 @@ void AnimationEditor::onWindowGUI()
 
 void AnimationEditor::saveAs()
 {
-	if (!PlatformInterface::getSaveFilename(m_path, lengthOf(m_path), "Animation controllers\0*.act\0", "")) return;
+	if (!PlatformInterface::getSaveFilename(m_path.data, lengthOf(m_path.data), "Animation controllers\0*.act\0", "")) return;
 	save();
 }
 
 
 void AnimationEditor::save()
 {
-	if (m_path[0] == 0 && !PlatformInterface::getSaveFilename(m_path, lengthOf(m_path), "Animation controllers\0*.act\0", "")) return;
+	if (m_path[0] == 0 &&
+		!PlatformInterface::getSaveFilename(m_path.data, lengthOf(m_path.data), "Animation controllers\0*.act\0", ""))
+		return;
 	IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
 	OutputBlob blob(allocator);
 	m_resource->serialize(blob);
@@ -255,7 +257,7 @@ void AnimationEditor::loadFromEntity()
 	auto* scene = (AnimationScene*)m_app.getWorldEditor()->getUniverse()->getScene(ANIMABLE_HASH);
 	ComponentHandle ctrl = scene->getComponent(entities[0], CONTROLLER_TYPE);
 	if (!isValid(ctrl)) return;
-	copyString(m_path, scene->getControllerSource(ctrl).c_str());
+	m_path = scene->getControllerSource(ctrl).c_str();
 	load();
 }
 
@@ -288,7 +290,7 @@ void AnimationEditor::load()
 
 void AnimationEditor::loadFromFile()
 {
-	if (!PlatformInterface::getOpenFilename(m_path, lengthOf(m_path), "Animation controllers\0*.act\0", "")) return;
+	if (!PlatformInterface::getOpenFilename(m_path.data, lengthOf(m_path.data), "Animation controllers\0*.act\0", "")) return;
 	load();
 }
 
@@ -302,6 +304,7 @@ void AnimationEditor::newController()
 	auto* anim_sys = (AnimationSystem*)engine.getPluginManager().getPlugin("animation");
 	m_resource = LUMIX_NEW(allocator, ControllerResource)(*anim_sys, *this, *manager, allocator);
 	m_container = (Container*)m_resource->getRoot();
+	m_path = "";
 }
 
 
