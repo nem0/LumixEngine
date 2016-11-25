@@ -157,6 +157,49 @@ public:
 };
 
 
+class Blend1DNode : public Container
+{
+public:
+	struct RootEdge;
+	struct RootNode : public Node
+	{
+		RootNode(Container* parent, ControllerResource& controller);
+
+		Lumix::Array<RootEdge*> edges;
+	};
+
+public:
+	Blend1DNode(Lumix::Anim::Component* engine_cmp, Container* parent, ControllerResource& controller);
+
+	void compile() override;
+	void onGUI() override;
+	void debug(ImDrawList* draw, const ImVec2& canvas_screen_pos, Lumix::Anim::ComponentInstance* runtime) override;
+	void serialize(Lumix::OutputBlob& blob) override;
+	void deserialize(Lumix::InputBlob& blob) override;
+	void drawInside(ImDrawList* draw, const ImVec2& canvas_screen_pos) override;
+	RootNode* getRootNode() const { return m_root_node; }
+	void removeChild(Component* component) override;
+
+private:
+	void createState(Lumix::Anim::Component::Type type, const ImVec2& pos);
+	RootEdge* createRootEdge(Node* node);
+
+private:
+	enum MouseStatus
+	{
+		NONE,
+		DOWN_LEFT,
+		DOWN_RIGHT,
+		DRAG_NODE,
+		NEW_EDGE
+	} m_mouse_status;
+	int m_input = -1;
+	Node* m_drag_source = nullptr;
+	RootNode* m_root_node;
+	Component* m_context_cmp = nullptr;
+};
+
+
 struct EntryNode : public Node
 {
 	EntryNode(Container* parent, ControllerResource& controller);

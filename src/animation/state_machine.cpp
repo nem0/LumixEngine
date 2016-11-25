@@ -5,6 +5,7 @@
 #include "engine/blob.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
+#include "engine/log.h"
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
@@ -190,6 +191,138 @@ void Node::deserialize(InputBlob& blob, Container* parent)
 }
 
 
+struct Blend1DNodeInstance : public NodeInstance
+{
+	Blend1DNodeInstance(Blend1DNode& _node)
+		: NodeInstance(_node)
+		, node(_node)
+	{
+	}
+
+
+	Transform getRootMotion() const override { return Transform({0, 0, 0}, {0, 0, 0, 1}); }
+
+
+	float getTime() const override { return time; }
+	float getLength() const override { return a0 ? a0->getLength() : 0; }
+
+
+	void fillPose(Engine& engine, Pose& pose, Model& model, float weight) override
+	{
+		if (!a0 || !a1) return;
+		a0->fillPose(engine, pose, model, weight);
+		a1->fillPose(engine, pose, model, weight * current_weight);
+	}
+
+
+	ComponentInstance* update(RunningContext& rc, bool check_edges) override
+	{
+		if (!instances[0]) return check_edges ? checkOutEdges(node, rc) : this;
+		
+		float old_time = time;
+		time += rc.time_delta;
+		float length = instances[0]->getLength();
+		time = fmod(time, length);
+
+		float input_value = *(float*)&rc.input[node.input_offset];
+		current_weight = 0;
+		a0 = instances[node.items.size() - 1];
+		a1 = a0;
+		if (node.items[0].value > input_value)
+		{
+			a0 = instances[0];
+			a1 = instances[0];
+		}
+		else
+		{
+			for (int i = 1; i < node.items.size(); ++i)
+			{
+				if (node.items[i].value > input_value)
+				{
+					a0 = instances[i - 1];
+					a1 = instances[i];
+					current_weight = (node.items[i - 1].value - input_value) / (node.items[i - 1].value - node.items[i].value);
+					break;
+				}
+			}
+		}
+		for (int i = 0; i < lengthOf(instances) && i < node.items.size(); ++i)
+		{
+			if (!instances[i]) break;
+			instances[i]->update(rc, false);
+		}
+		queueEvents(rc, old_time, time, length);
+
+		return check_edges ? checkOutEdges(node, rc) : this;
+	}
+
+
+	void enter(RunningContext& rc, ComponentInstance* from) override
+	{
+		time = 0;
+		if (node.items.size() > lengthOf(instances))
+		{
+			g_log_error.log("Animation") << "Too many nodes in Blend1D, only " << lengthOf(instances) << " are used.";
+		}
+		for (int i = 0; i < node.items.size() && i < lengthOf(instances); ++i)
+		{
+			instances[i] = (NodeInstance*)node.items[i].node->createInstance(*rc.allocator);
+			instances[i]->enter(rc, nullptr);
+		}
+	}
+
+	NodeInstance* a0 = nullptr;
+	NodeInstance* a1 = nullptr;
+	float current_weight = 1;
+	NodeInstance* instances[16];
+	Blend1DNode& node;
+	float time;
+};
+
+
+Blend1DNode::Blend1DNode(IAllocator& allocator)
+	: Container(Component::BLEND1D, allocator)
+	, items(allocator)
+{
+}
+
+
+ComponentInstance* Blend1DNode::createInstance(IAllocator& allocator)
+{
+	return LUMIX_NEW(allocator, Blend1DNodeInstance)(*this);
+}
+
+
+void Blend1DNode::serialize(OutputBlob& blob)
+{
+	Container::serialize(blob);
+	blob.write(items.size());
+	for (Item& item : items)
+	{
+		blob.write(item.node->uid);
+		blob.write(item.value);
+	}
+	blob.write(input_offset);
+}
+
+
+void Blend1DNode::deserialize(InputBlob& blob, Container* parent)
+{
+	Container::deserialize(blob, parent);
+	int count;
+	blob.read(count);
+	items.resize(count);
+	for (Item& item : items)
+	{
+		int uid;
+		blob.read(uid);
+		item.node = (Node*)getChildByUID(uid);
+		blob.read(item.value);
+	}
+	blob.read(input_offset);
+}
+
+
 AnimationNode::AnimationNode(IAllocator& allocator)
 	: Node(Component::SIMPLE_ANIMATION, allocator)
 	, animations_hashes(allocator)
@@ -309,7 +442,7 @@ struct AnimationNodeInstance : public NodeInstance
 		{
 			resource->getRelativePose(time, pose, model, weight);
 		}
-		else
+		else if (weight > 0)
 		{
 			resource->getRelativePose(time, pose, model);
 		}
@@ -550,6 +683,7 @@ Component* createComponent(Component::Type type, IAllocator& allocator)
 {
 	switch (type)
 	{
+		case Component::BLEND1D: return LUMIX_NEW(allocator, Blend1DNode)(allocator);
 		case Component::EDGE: return LUMIX_NEW(allocator, Edge)(allocator);
 		case Component::STATE_MACHINE: return LUMIX_NEW(allocator, StateMachine)(allocator);
 		case Component::SIMPLE_ANIMATION: return LUMIX_NEW(allocator, AnimationNode)(allocator);
