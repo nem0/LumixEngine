@@ -54,7 +54,8 @@ struct Component
 	{
 		SIMPLE_ANIMATION,
 		EDGE,
-		STATE_MACHINE
+		STATE_MACHINE,
+		BLEND1D
 	};
 
 	Component(Type _type) : type(_type), uid(-1) {}
@@ -132,6 +133,24 @@ struct AnimationNode : public Node
 	bool looped = true;
 	bool new_on_loop = true;
 	int root_rotation_input_offset = -1;
+};
+
+
+struct Blend1DNode : public Container
+{
+	Blend1DNode(IAllocator& allocator);
+	ComponentInstance* createInstance(IAllocator& allocator) override;
+	void serialize(OutputBlob& blob) override;
+	void deserialize(InputBlob& blob, Container* parent) override;
+
+	struct Item
+	{
+		Node* node = nullptr;
+		float value = 0;
+	};
+
+	Array<Item> items;
+	int input_offset = 0;
 };
 
 

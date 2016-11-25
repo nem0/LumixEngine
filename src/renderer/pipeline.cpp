@@ -732,11 +732,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	void applyCamera(const char* slot)
 	{
 		ComponentHandle cmp = m_scene->getCameraInSlot(slot);
-		if (!isValid(cmp))
-		{
-			g_log_error.log("Renderer") << "Trying to use camera from emtpy slot " << slot;
-			return;
-		}
+		if (!isValid(cmp)) return;
 
 		m_scene->setCameraScreenSize(cmp, m_width, m_height);
 		m_applied_camera = cmp;
