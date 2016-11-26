@@ -626,14 +626,9 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 
 		if (!controller.root)
 		{
-			if (controller.resource->isReady())
-			{
-				initControllerRuntime(controller);
-			}
-			else
-			{
-				return;
-			}
+			if (!controller.resource->isReady()) return;
+
+			initControllerRuntime(controller);
 		}
 
 		Anim::RunningContext rc;
@@ -649,8 +644,8 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		ComponentHandle model_instance = m_render_scene->getModelInstanceComponent(controller.entity);
 		if (model_instance == INVALID_COMPONENT) return;
 
-		auto* pose = m_render_scene->getPose(model_instance);
-		auto* model = m_render_scene->getModelInstanceModel(model_instance);
+		Pose* pose = m_render_scene->getPose(model_instance);
+		Model* model = m_render_scene->getModelInstanceModel(model_instance);
 
 		model->getPose(*pose);
 		pose->computeRelative(*model);

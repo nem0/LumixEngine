@@ -12,6 +12,7 @@
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
 #include <cmath>
+#include <cstdlib>
 
 
 using namespace Lumix;
