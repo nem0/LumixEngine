@@ -506,6 +506,16 @@ Blend1DNode::Blend1DNode(Anim::Component* engine_cmp, Container* parent, Control
 }
 
 
+void Blend1DNode::dropSlot(const char* name, u32 slot, const ImVec2& canvas_screen_pos)
+{
+	createState(Anim::Component::SIMPLE_ANIMATION, ImGui::GetMousePos() - canvas_screen_pos);
+	auto* node = (AnimationNode*)m_selected_component;
+	node->name = name;
+	auto* engine_node = (Anim::AnimationNode*)node->engine_cmp;
+	engine_node->animations_hashes.emplace(slot);
+}
+
+
 void Blend1DNode::removeChild(Component* component)
 {
 	Container::removeChild(component);
