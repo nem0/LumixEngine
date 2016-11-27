@@ -597,10 +597,10 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
-	void initControllerRuntime(Controller& controller)
+	bool initControllerRuntime(Controller& controller)
 	{
-		if (!controller.resource->isReady()) return;
-		if (controller.input.empty()) return;
+		if (!controller.resource->isReady()) return false;
+		if (controller.resource->getInputDecl().getSize() == 0) return false;
 		controller.root = controller.resource->createInstance(m_anim_system.m_allocator);
 		controller.input.resize(controller.resource->getInputDecl().getSize());
 		setMemory(&controller.input[0], 0, controller.input.size());
@@ -613,6 +613,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		rc.event_stream = &m_event_stream;
 		rc.controller = {controller.entity.index};
 		controller.root->enter(rc, nullptr);
+		return true;
 	}
 
 
@@ -625,12 +626,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 			return;
 		}
 
-		if (!controller.root)
-		{
-			if (!controller.resource->isReady()) return;
-
-			initControllerRuntime(controller);
-		}
+		if (!controller.root && !initControllerRuntime(controller)) return;
 
 		Anim::RunningContext rc;
 		rc.time_delta = time_delta;
