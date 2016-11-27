@@ -87,6 +87,20 @@ static ImVec2 getEdgeStartPoint(Node* a, Node* b, bool is_dir)
 }
 
 
+static void drawEdge(ImDrawList* draw, Node* from_node, Node* to_node, u32 color, const ImVec2& canvas_screen_pos)
+{
+	ImVec2 from = getEdgeStartPoint(from_node, to_node, true) + canvas_screen_pos;
+	ImVec2 to = getEdgeStartPoint(to_node, from_node, false) + canvas_screen_pos;
+	draw->AddLine(from, to, color);
+	ImVec2 dir = to - from;
+	dir = dir * (1 / sqrt(dot(dir, dir))) * 5;
+	ImVec2 right(dir.y, -dir.x);
+	draw->AddLine(to, to - dir + right, color);
+	draw->AddLine(to, to - dir - right, color);
+
+}
+
+
 Component::~Component()
 {
 	if (getParent())
@@ -475,14 +489,7 @@ struct Blend1DNode::RootEdge : public Component
 	{
 		u32 color = ImGui::ColorConvertFloat4ToU32(
 			selected ? ImGui::GetStyle().Colors[ImGuiCol_ButtonHovered] : ImGui::GetStyle().Colors[ImGuiCol_Button]);
-		ImVec2 from = getEdgeStartPoint(m_parent->getRootNode(), m_to, true) + canvas_screen_pos;
-		ImVec2 to = getEdgeStartPoint(m_to, m_parent->getRootNode(), false) + canvas_screen_pos;
-		draw->AddLine(from, to, color);
-		ImVec2 dir = to - from;
-		dir = dir * (1 / sqrt(dot(dir, dir))) * 5;
-		ImVec2 right(dir.y, -dir.x);
-		draw->AddLine(to, to - dir + right, color);
-		draw->AddLine(to, to - dir - right, color);
+		drawEdge(draw, m_parent->getRootNode(), m_to, color, canvas_screen_pos);
 		if (ImGui::IsMouseClicked(0) && hitTest(ImGui::GetMousePos() - canvas_screen_pos))
 		{
 			return true;
@@ -503,6 +510,43 @@ Blend1DNode::Blend1DNode(Anim::Component* engine_cmp, Container* parent, Control
 {
 	m_root_node = LUMIX_NEW(controller.getAllocator(), RootNode)(this, controller);
 	m_editor_cmps.push(m_root_node);
+}
+
+
+void Blend1DNode::debugInside(ImDrawList* draw,
+	const ImVec2& canvas_screen_pos,
+	Anim::ComponentInstance* runtime,
+	Container* current)
+{
+	if (runtime->source.type != Anim::Component::BLEND1D) return;
+	auto* runtime_b1 = (Anim::Blend1DNodeInstance*)runtime;
+	auto& children_runtime = runtime_b1->instances;
+	auto& source = (Anim::Blend1DNode&)runtime->source;
+	for (int i = 0; i < source.children.size() && i < lengthOf(children_runtime); ++i)
+	{
+		auto* child_runtime = (Anim::NodeInstance*)children_runtime[i];
+		auto* child = getChildByUID(child_runtime->source.uid);
+		if (!child) continue;
+
+		if (current == this)
+		{
+			if (runtime_b1->a0 == child_runtime || runtime_b1->a1 == child_runtime)
+			{
+				child->debug(draw, canvas_screen_pos, child_runtime);
+				float t = runtime_b1->current_weight;
+				if (runtime_b1->a0 == child_runtime) t = 1 - t;
+				ImVec2 to = getEdgeStartPoint((Node*)child, m_root_node, false);
+				ImVec2 from = getEdgeStartPoint(m_root_node, (Node*)child, true);
+				ImVec2 dir = to - from;
+				to = from + dir*t;
+				draw->AddLine(from + canvas_screen_pos, to + canvas_screen_pos, 0xfff00fff);
+			}
+		}
+		else
+		{
+			child->debugInside(draw, canvas_screen_pos, child_runtime, current);
+		}
+	}
 }
 
 
@@ -930,14 +974,7 @@ struct EntryEdge : public Component
 	{
 		u32 color = ImGui::ColorConvertFloat4ToU32(
 			selected ? ImGui::GetStyle().Colors[ImGuiCol_ButtonHovered] : ImGui::GetStyle().Colors[ImGuiCol_Button]);
-		ImVec2 from = getEdgeStartPoint(m_parent->getEntryNode(), m_to, true) + canvas_screen_pos;
-		ImVec2 to = getEdgeStartPoint(m_to, m_parent->getEntryNode(), false) + canvas_screen_pos;
-		draw->AddLine(from, to, color);
-		ImVec2 dir = to - from;
-		dir = dir * (1 / sqrt(dot(dir, dir))) * 5;
-		ImVec2 right(dir.y, -dir.x);
-		draw->AddLine(to, to - dir + right, color);
-		draw->AddLine(to, to - dir - right, color);
+		drawEdge(draw, m_parent->getEntryNode(), m_to, color, canvas_screen_pos);;
 		if (ImGui::IsMouseClicked(0) && hitTest(ImGui::GetMousePos() - canvas_screen_pos))
 		{
 			return true;

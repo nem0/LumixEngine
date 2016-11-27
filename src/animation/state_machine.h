@@ -25,6 +25,7 @@ namespace Anim
 {
 
 
+struct Blend1DNode;
 struct Component;
 struct Container;
 struct ComponentInstance;
@@ -133,6 +134,26 @@ struct AnimationNode : public Node
 	bool looped = true;
 	bool new_on_loop = true;
 	int root_rotation_input_offset = -1;
+};
+
+
+struct Blend1DNodeInstance : public NodeInstance
+{
+	Blend1DNodeInstance(Blend1DNode& _node);
+
+	Transform getRootMotion() const override;
+	float getTime() const override { return time; }
+	float getLength() const override { return a0 ? a0->getLength() : 0; }
+	void fillPose(Engine& engine, Pose& pose, Model& model, float weight) override;
+	ComponentInstance* update(RunningContext& rc, bool check_edges) override;
+	void enter(RunningContext& rc, ComponentInstance* from) override;
+
+	NodeInstance* a0 = nullptr;
+	NodeInstance* a1 = nullptr;
+	float current_weight = 1;
+	NodeInstance* instances[16];
+	Blend1DNode& node;
+	float time;
 };
 
 

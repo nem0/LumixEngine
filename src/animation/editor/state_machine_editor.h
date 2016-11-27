@@ -180,7 +180,10 @@ public:
 	RootNode* getRootNode() const { return m_root_node; }
 	void removeChild(Component* component) override;
 	void dropSlot(const char* name, Lumix::u32 slot, const ImVec2& canvas_screen_pos) override;
-
+	void debugInside(ImDrawList* draw,
+		const ImVec2& canvas_screen_pos,
+		Lumix::Anim::ComponentInstance* runtime,
+		Container* current) override;
 
 private:
 	void createState(Lumix::Anim::Component::Type type, const ImVec2& pos);
