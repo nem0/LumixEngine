@@ -49,8 +49,10 @@ public:
 	Material(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
 	~Material();
 
-	float getShininess() const { return m_shininess; }
-	void setShininess(float value) { m_shininess = value; createCommandBuffer(); }
+	float getMetallic() const { return m_metallic; }
+	void setMetallic(float value) { m_metallic = value; createCommandBuffer(); }
+	float getRoughness() const { return m_roughness; }
+	void setRoughness(float value) { m_roughness = value; createCommandBuffer(); }
 	Vec3 getColor() const { return m_color; }
 	void setColor(const Vec3& specular) { m_color = specular;  createCommandBuffer(); }
 	float getAlphaRef() const { return m_alpha_ref; }
@@ -117,8 +119,9 @@ private:
 	IAllocator& m_allocator;
 	u64 m_render_states;
 	Vec3 m_color;
-	float m_shininess;
 	float m_alpha_ref;
+	float m_metallic;
+	float m_roughness;
 	u32 m_define_mask;
 	u8* m_command_buffer;
 	u32 m_custom_flags;

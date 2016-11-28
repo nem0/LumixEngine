@@ -180,10 +180,16 @@ struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 			ImGui::EndPopup();
 		}
 
-		float shininess = material->getShininess();
-		if (ImGui::DragFloat("Shininess", &shininess, 0.1f, 0.0f, 64.0f))
+		float roughness = material->getRoughness();
+		if (ImGui::DragFloat("Roughness", &roughness, 0.01f, 0.0f, 1.0f))
 		{
-			material->setShininess(shininess);
+			material->setRoughness(roughness);
+		}
+
+		float metallic = material->getMetallic();
+		if (ImGui::DragFloat("Metallic", &metallic, 0.01f, 0.0f, 1.0f))
+		{
+			material->setMetallic(metallic);
 		}
 
 		char buf[MAX_PATH_LENGTH];
