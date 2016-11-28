@@ -28,6 +28,7 @@ struct RunningContext
 	u8* input;
 	IAllocator* allocator;
 	struct ComponentInstance* current;
+	struct Edge* edge;
 	AnimSet* anim_set;
 	OutputBlob* event_stream;
 	ComponentHandle controller;

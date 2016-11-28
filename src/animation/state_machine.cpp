@@ -396,6 +396,7 @@ ComponentInstance* NodeInstance::checkOutEdges(Node& node, RunningContext& rc)
 	rc.current = this;
 	for (auto* edge : node.out_edges)
 	{
+		rc.edge = edge;
 		if (edge->condition(rc))
 		{
 			ComponentInstance* new_item = edge->createInstance(*rc.allocator);
