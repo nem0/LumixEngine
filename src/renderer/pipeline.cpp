@@ -22,6 +22,7 @@
 #include "renderer/shader.h"
 #include "renderer/terrain.h"
 #include "renderer/texture.h"
+#include "renderer/texture_manager.h"
 #include "engine/universe/universe.h"
 #include <bgfx/bgfx.h>
 #include <cmath>
@@ -273,6 +274,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		, m_renderer(renderer)
 		, m_default_framebuffer(nullptr)
 		, m_debug_line_material(nullptr)
+		, m_default_cubemap(nullptr)
 		, m_debug_flags(BGFX_DEBUG_TEXT)
 		, m_point_light_shadowmaps(allocator)
 		, m_is_rendering_in_shadowmap(false)
@@ -305,6 +307,8 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 		m_debug_line_material = static_cast<Material*>(
 			renderer.getMaterialManager().load(Lumix::Path("pipelines/editor/debugline.mat")));
+		m_default_cubemap = static_cast<Texture*>(
+			renderer.getTextureManager().load(Lumix::Path("pipelines/pbr/default_probe.dds")));
 
 		createParticleBuffers();
 		createCubeBuffers();
@@ -539,6 +543,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		}
 
 		m_debug_line_material->getResourceManager().unload(*m_debug_line_material);
+		m_default_cubemap->getResourceManager().unload(*m_default_cubemap);
 
 		destroyUniforms();
 
@@ -663,6 +668,42 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 			renderParticlesFromEmitter(*emitter);
 		}
+	}
+
+
+	void bindTexture(int uniform_idx, int texture_idx)
+	{
+		auto* tex = (Texture*)m_renderer.getEngine().getLuaResource(texture_idx);
+		m_current_view->command_buffer.beginAppend();
+		m_current_view->command_buffer.setTexture(15 - m_global_textures_count, m_uniforms[uniform_idx], tex->handle);
+		++m_global_textures_count;
+		m_current_view->command_buffer.end();
+	}
+
+
+	void bindEnvironmentMaps(int irradiance_uniform_idx, int radiance_uniform_idx)
+	{
+		Entity cam = m_scene->getCameraEntity(m_applied_camera);
+		Vec3 pos = m_scene->getUniverse().getPosition(cam);
+		ComponentHandle probe = m_scene->getNearestEnvironmentProbe(pos);
+		m_current_view->command_buffer.beginAppend();
+		if (isValid(probe))
+		{
+			Texture* irradiance = m_scene->getEnvironmentProbeIrradiance(probe);
+			Texture* radiance = m_scene->getEnvironmentProbeRadiance(probe);
+			m_current_view->command_buffer.setTexture(15 - m_global_textures_count, m_uniforms[irradiance_uniform_idx], irradiance->handle);
+			++m_global_textures_count;
+			m_current_view->command_buffer.setTexture(15 - m_global_textures_count, m_uniforms[radiance_uniform_idx], radiance->handle);
+			++m_global_textures_count;
+		}
+		else
+		{
+			m_current_view->command_buffer.setTexture(15 - m_global_textures_count, m_uniforms[irradiance_uniform_idx], m_default_cubemap->handle);
+			++m_global_textures_count;
+			m_current_view->command_buffer.setTexture(15 - m_global_textures_count, m_uniforms[radiance_uniform_idx], m_default_cubemap->handle);
+			++m_global_textures_count;
+		}
+		m_current_view->command_buffer.end();
 	}
 
 
@@ -2733,6 +2774,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	int m_layer_to_view_map[64];
 
 	Material* m_debug_line_material;
+	Texture* m_default_cubemap;
 	bgfx::DynamicVertexBufferHandle m_debug_vertex_buffers[32];
 	bgfx::DynamicIndexBufferHandle m_debug_index_buffer;
 	int m_debug_buffer_idx;
@@ -2931,6 +2973,8 @@ void Pipeline::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(drawQuad);
 	REGISTER_FUNCTION(setPass);
 	REGISTER_FUNCTION(bindFramebufferTexture);
+	REGISTER_FUNCTION(bindTexture);
+	REGISTER_FUNCTION(bindEnvironmentMaps);
 	REGISTER_FUNCTION(applyCamera);
 
 	REGISTER_FUNCTION(disableBlending);

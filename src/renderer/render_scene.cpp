@@ -138,6 +138,8 @@ struct Camera
 struct EnvironmentProbe
 {
 	Texture* texture;
+	Texture* irradiance;
+	Texture* radiance;
 };
 
 
@@ -787,9 +789,15 @@ public:
 			serializer.read(entity);
 			EnvironmentProbe& probe = m_environment_probes.insert(entity);
 			StaticString<Lumix::MAX_PATH_LENGTH> path_str(probe_dir, entity.index, ".dds");
-			Path path(path_str);
-			probe.texture = static_cast<Texture*>(texture_manager->load(path));
-			
+			probe.texture = static_cast<Texture*>(texture_manager->load(Path(path_str)));
+			probe.texture->setFlag(BGFX_TEXTURE_SRGB, true);
+			StaticString<Lumix::MAX_PATH_LENGTH> irr_path_str(probe_dir, entity.index, "_irradiance.dds");
+			probe.irradiance = static_cast<Texture*>(texture_manager->load(Path(irr_path_str)));
+			probe.irradiance->setFlag(BGFX_TEXTURE_SRGB, true);
+			StaticString<Lumix::MAX_PATH_LENGTH> r_path_str(probe_dir, entity.index, "_radiance.dds");
+			probe.radiance = static_cast<Texture*>(texture_manager->load(Path(r_path_str)));
+			probe.radiance->setFlag(BGFX_TEXTURE_SRGB, true);
+
 			ComponentHandle cmp = {entity.index};
 			m_universe.addComponent(entity, ENVIRONMENT_PROBE_TYPE, this, cmp);
 		}
@@ -2283,7 +2291,7 @@ public:
 		texture->onDataUpdated(x, y, w, h);
 	}
 
-
+	
 	static int LUA_getTextureWidth(Texture* texture)
 	{
 		if (!texture) return 0;
@@ -3792,13 +3800,56 @@ public:
 		u64 universe_guid = m_universe.getPath().getHash();
 		StaticString<Lumix::MAX_PATH_LENGTH> path("universes/", universe_guid, "/probes/", cmp.index, ".dds");
 		probe.texture = static_cast<Texture*>(texture_manager->load(Path(path)));
+		probe.texture->setFlag(BGFX_TEXTURE_SRGB, true);
+		path = "universes/";
+		path << universe_guid << "/probes/" << cmp.index << "_irradiance.dds";
+		probe.irradiance = static_cast<Texture*>(texture_manager->load(Path(path)));
+		probe.irradiance->setFlag(BGFX_TEXTURE_SRGB, true);
+		path = "universes/";
+		path << universe_guid << "/probes/" << cmp.index << "_radiance.dds";
+		probe.radiance = static_cast<Texture*>(texture_manager->load(Path(path)));
+		probe.radiance->setFlag(BGFX_TEXTURE_SRGB, true);
 	}
 
 
-	Texture* getEnvironmentProbeTexture(ComponentHandle cmp) const
+	ComponentHandle getNearestEnvironmentProbe(const Vec3& pos) const override
 	{
-		Entity entity = { cmp.index };
+		float nearest_dist_squared = FLT_MAX;
+		Entity nearest = INVALID_ENTITY;
+		for (int i = 0, c = m_environment_probes.size(); i < c; ++i)
+		{
+			Entity probe_entity = m_environment_probes.getKey(i);
+			Vec3 probe_pos = m_universe.getPosition(probe_entity);
+			float dist_squared = (pos - probe_pos).squaredLength();
+			if (dist_squared < nearest_dist_squared)
+			{
+				nearest = probe_entity;
+				nearest_dist_squared = dist_squared;
+			}
+		}
+		if (!isValid(nearest)) return INVALID_COMPONENT;
+		return {nearest.index};
+	}
+
+
+	Texture* getEnvironmentProbeTexture(ComponentHandle cmp) const override
+	{
+		Entity entity = {cmp.index};
 		return m_environment_probes[entity].texture;
+	}
+
+
+	Texture* getEnvironmentProbeIrradiance(ComponentHandle cmp) const override
+	{
+		Entity entity = {cmp.index};
+		return m_environment_probes[entity].irradiance;
+	}
+
+
+	Texture* getEnvironmentProbeRadiance(ComponentHandle cmp) const override
+	{
+		Entity entity = {cmp.index};
+		return m_environment_probes[entity].radiance;
 	}
 
 
@@ -4336,7 +4387,12 @@ public:
 	{
 		EnvironmentProbe& probe = m_environment_probes.insert(entity);
 		auto* texture_manager = m_engine.getResourceManager().get(TEXTURE_TYPE);
-		probe.texture = static_cast<Texture*>(texture_manager->load(Path("models/editor/default_probe.dds")));
+		probe.texture = static_cast<Texture*>(texture_manager->load(Path("pipelines/pbr/default_probe.dds")));
+		probe.texture->setFlag(BGFX_TEXTURE_SRGB, true);
+		probe.irradiance = static_cast<Texture*>(texture_manager->load(Path("pipelines/pbr/default_probe.dds")));
+		probe.irradiance->setFlag(BGFX_TEXTURE_SRGB, true);
+		probe.radiance = static_cast<Texture*>(texture_manager->load(Path("pipelines/pbr/default_probe.dds")));
+		probe.radiance->setFlag(BGFX_TEXTURE_SRGB, true);
 
 		ComponentHandle cmp = {entity.index};
 		m_universe.addComponent(entity, ENVIRONMENT_PROBE_TYPE, this, cmp);

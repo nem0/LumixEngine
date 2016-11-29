@@ -21,6 +21,7 @@ class MaterialManager;
 class ModelManager;
 class Path;
 class Shader;
+class TextureManager;
 
 
 class LUMIX_RENDERER_API Renderer : public IPlugin 
@@ -41,6 +42,7 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 		virtual const bgfx::VertexDecl& getBasic2DVertexDecl() const = 0;
 		virtual MaterialManager& getMaterialManager() = 0;
 		virtual ModelManager& getModelManager() = 0;
+		virtual TextureManager& getTextureManager() = 0;
 		virtual Shader* getDefaultShader() = 0;
 		virtual const bgfx::UniformHandle& getMaterialColorUniform() const = 0;
 		virtual const bgfx::UniformHandle& getRoughnessMetallicUniform() const = 0;

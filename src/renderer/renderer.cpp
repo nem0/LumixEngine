@@ -693,6 +693,12 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	}
 
 
+	TextureManager& getTextureManager() override
+	{
+		return m_texture_manager;
+	}
+
+
 	const bgfx::VertexDecl& getBasicVertexDecl() const override
 	{
 		return m_basic_vertex_decl;
