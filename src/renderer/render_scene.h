@@ -434,7 +434,10 @@ public:
 	virtual void setPointLightSpecularIntensity(ComponentHandle cmp, float color) = 0;
 
 	virtual Texture* getEnvironmentProbeTexture(ComponentHandle cmp) const = 0;
+	virtual Texture* getEnvironmentProbeIrradiance(ComponentHandle cmp) const = 0;
+	virtual Texture* getEnvironmentProbeRadiance(ComponentHandle cmp) const = 0;
 	virtual void reloadEnvironmentProbe(ComponentHandle cmp) = 0;
+	virtual ComponentHandle getNearestEnvironmentProbe(const Vec3& pos) const = 0;
 
 protected:
 	virtual ~RenderScene() {}
