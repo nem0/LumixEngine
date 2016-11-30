@@ -87,7 +87,7 @@ struct AssetBrowserPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 
 			auto handle =
 				device.createBuffer(clip->getData(), clip->getSize(), clip->getChannels(), clip->getSampleRate(), 0);
-			device.play(handle, false);
+			device.play(handle, true);
 			m_playing_clip = handle;
 		}
 		return true;

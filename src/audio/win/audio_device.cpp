@@ -309,7 +309,7 @@ struct AudioDeviceImpl LUMIX_FINAL : public AudioDevice
 	{
 		auto& buffer = m_buffers[m_buffer_map[handle]];
 		buffer.looped = looped;
-		buffer.handle->Play(0, 0, DSBPLAY_LOOPING);
+		buffer.handle->Play(0, 0, looped ? DSBPLAY_LOOPING : 0);
 	}
 
 
@@ -318,6 +318,9 @@ struct AudioDeviceImpl LUMIX_FINAL : public AudioDevice
 		int dense_idx = m_buffer_map[handle];
 		Buffer& buffer = m_buffers[dense_idx];
 		DWORD rel_pc, rel_wc;
+		DWORD status;
+		buffer.handle->GetStatus(&status);
+		if ((status & DSBSTATUS_PLAYING) == 0) return true;
 		buffer.handle->GetCurrentPosition(&rel_pc, &rel_wc);
 		auto rel_written = DWORD(buffer.written % STREAM_SIZE);
 		DWORD abs_pc = buffer.written - (rel_written - rel_pc);
