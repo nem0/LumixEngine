@@ -350,6 +350,7 @@ public:
 		}
 		m_engine->destroyUniverse(*m_universe);
 		m_universe = &m_engine->createUniverse(true);
+		m_universe->setPath(Lumix::Path(m_universe_path));
 		m_pipeline->setScene((Lumix::RenderScene*)m_universe->getScene(Lumix::crc32("renderer")));
 		Lumix::LuaWrapper::createSystemVariable(m_engine->getState(), "App", "universe", m_universe);
 		bool deserialize_succeeded = m_engine->deserialize(*m_universe, blob);
@@ -362,10 +363,11 @@ public:
 
 	void loadUniverse(const char* path)
 	{
+		Lumix::copyString(m_universe_path, path);
 		auto& fs = m_engine->getFileSystem();
 		Lumix::FS::ReadCallback file_read_cb;
 		file_read_cb.bind<App, &App::universeFileLoaded>(this);
-		fs.openAsync(fs.getDefaultDevice(), Lumix::Path(path), Lumix::FS::Mode::OPEN_AND_READ, file_read_cb);
+		fs.openAsync(fs.getDefaultDevice(), Lumix::Path(m_universe_path), Lumix::FS::Mode::OPEN_AND_READ, file_read_cb);
 	}
 
 
@@ -487,6 +489,7 @@ private:
 	Lumix::DefaultAllocator m_main_allocator;
 	Lumix::Debug::Allocator m_allocator;
 	Lumix::Engine* m_engine;
+	char m_universe_path[Lumix::MAX_PATH_LENGTH];
 	Lumix::Universe* m_universe;
 	Lumix::Pipeline* m_pipeline;
 	Lumix::FS::FileSystem* m_file_system;
