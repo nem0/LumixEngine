@@ -794,9 +794,13 @@ public:
 			StaticString<Lumix::MAX_PATH_LENGTH> irr_path_str(probe_dir, entity.index, "_irradiance.dds");
 			probe.irradiance = static_cast<Texture*>(texture_manager->load(Path(irr_path_str)));
 			probe.irradiance->setFlag(BGFX_TEXTURE_SRGB, true);
+			probe.irradiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
+			probe.irradiance->setFlag(BGFX_TEXTURE_MAG_ANISOTROPIC, true);
 			StaticString<Lumix::MAX_PATH_LENGTH> r_path_str(probe_dir, entity.index, "_radiance.dds");
 			probe.radiance = static_cast<Texture*>(texture_manager->load(Path(r_path_str)));
 			probe.radiance->setFlag(BGFX_TEXTURE_SRGB, true);
+			probe.radiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
+			probe.radiance->setFlag(BGFX_TEXTURE_MAG_ANISOTROPIC, true);
 
 			ComponentHandle cmp = {entity.index};
 			m_universe.addComponent(entity, ENVIRONMENT_PROBE_TYPE, this, cmp);
@@ -3805,10 +3809,14 @@ public:
 		path << universe_guid << "/probes/" << cmp.index << "_irradiance.dds";
 		probe.irradiance = static_cast<Texture*>(texture_manager->load(Path(path)));
 		probe.irradiance->setFlag(BGFX_TEXTURE_SRGB, true);
+		probe.irradiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
+		probe.irradiance->setFlag(BGFX_TEXTURE_MAG_ANISOTROPIC, true);
 		path = "universes/";
 		path << universe_guid << "/probes/" << cmp.index << "_radiance.dds";
 		probe.radiance = static_cast<Texture*>(texture_manager->load(Path(path)));
 		probe.radiance->setFlag(BGFX_TEXTURE_SRGB, true);
+		probe.radiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
+		probe.radiance->setFlag(BGFX_TEXTURE_MAG_ANISOTROPIC, true);
 	}
 
 
