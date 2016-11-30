@@ -683,6 +683,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 	void bindEnvironmentMaps(int irradiance_uniform_idx, int radiance_uniform_idx)
 	{
+		if (m_applied_camera == INVALID_COMPONENT) return;
 		Entity cam = m_scene->getCameraEntity(m_applied_camera);
 		Vec3 pos = m_scene->getUniverse().getPosition(cam);
 		ComponentHandle probe = m_scene->getNearestEnvironmentProbe(pos);
