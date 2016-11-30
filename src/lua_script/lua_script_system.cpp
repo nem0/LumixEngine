@@ -1109,28 +1109,12 @@ namespace Lumix
 		void startGame() override
 		{
 			m_is_game_running = true;
-
-			// copy m_scripts to tmp, because scripts can create other scripts -> m_scripts is not const
-			Lumix::Array<ScriptComponent*> tmp(m_system.m_allocator);
-			tmp.reserve(m_scripts.size());
-			for (auto* scr : m_scripts) tmp.push(scr); 
-
-			for (auto* scr : tmp)
-			{
-				for (int j = 0; j < scr->m_scripts.size(); ++j)
-				{
-					auto& instance = scr->m_scripts[j];
-					if (!instance.m_script) continue;
-					if (!instance.m_script->isReady()) continue;
-
-					startScript(instance, false);
-				}
-			}
 		}
 
 
 		void stopGame() override
 		{
+			m_scripts_init_called = false;
 			m_is_game_running = false;
 			m_updates.clear();
 			m_timers.clear();
@@ -1390,6 +1374,28 @@ namespace Lumix
 			PROFILE_FUNCTION();
 			if (paused) return;
 
+			if (m_is_game_running && !m_scripts_init_called)
+			{
+				// copy m_scripts to tmp, because scripts can create other scripts -> m_scripts is not const
+				Lumix::Array<ScriptComponent*> tmp(m_system.m_allocator);
+				tmp.reserve(m_scripts.size());
+				for (auto* scr : m_scripts) tmp.push(scr);
+
+				for (auto* scr : tmp)
+				{
+					for (int j = 0; j < scr->m_scripts.size(); ++j)
+					{
+						auto& instance = scr->m_scripts[j];
+						if (!instance.m_script) continue;
+						if (!instance.m_script->isReady()) continue;
+
+						startScript(instance, false);
+					}
+				}
+				m_scripts_init_called = true;
+			}
+
+
 			int timers_to_remove[1024];
 			int timers_to_remove_count = 0;
 			for (int i = 0, c = m_timers.size(); i < c; ++i)
@@ -1581,8 +1587,9 @@ namespace Lumix
 		Array<TimerData> m_timers;
 		FunctionCall m_function_call;
 		ScriptInstance* m_current_script_instance;
-		bool m_is_api_registered;
-		bool m_is_game_running;
+		bool m_scripts_init_called = false;
+		bool m_is_api_registered = false;
+		bool m_is_game_running = false;
 	};
 
 
