@@ -119,6 +119,15 @@ int Text(lua_State* L)
 }
 
 
+int LabelText(lua_State* L)
+{
+	auto* label = LuaWrapper::checkArg<const char*>(L, 1);
+	auto* text = LuaWrapper::checkArg<const char*>(L, 2);
+	ImGui::LabelText(label, "%s", text);
+	return 0;
+}
+
+
 int Button(lua_State* L)
 {
 	auto* label = LuaWrapper::checkArg<const char*>(L, 1);
@@ -984,6 +993,7 @@ public:
 		LuaImGui::registerCFunction(m_state, "SetStyleColor", &LuaImGui::SetStyleColor);
 		LuaImGui::registerCFunction(m_state, "SliderFloat", &LuaImGui::SliderFloat);
 		LuaImGui::registerCFunction(m_state, "Text", &LuaImGui::Text);
+		LuaImGui::registerCFunction(m_state, "LabelText", &LuaImGui::LabelText);
 
 		lua_pop(m_state, 1);
 
