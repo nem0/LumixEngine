@@ -44,7 +44,7 @@ Material::Material(const Path& path, ResourceManagerBase& resource_manager, IAll
 	, m_render_states(BGFX_STATE_CULL_CW)
 	, m_color(1, 1, 1)
 	, m_metallic(0)
-	, m_roughness(0.6f)
+	, m_roughness(1.0f)
 	, m_shader_instance(nullptr)
 	, m_define_mask(0)
 	, m_command_buffer(&DEFAULT_COMMAND_BUFFER)
@@ -856,7 +856,7 @@ bool Material::load(FS::IFile& file)
 		}
 		else if (equalStrings(label, "roughness"))
 		{
-			serializer.deserialize(m_roughness, 0.6f);
+			serializer.deserialize(m_roughness, 1.0f);
 		}
 		else if (equalStrings(label, "shader"))
 		{
