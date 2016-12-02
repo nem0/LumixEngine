@@ -3130,7 +3130,6 @@ static bool createBillboard(ImportAssetDialog& dialog,
 	static const auto GLOBAL_LIGHT_TYPE = PropertyRegister::getComponentType("global_light");
 	auto light_cmp = render_scene->createComponent(GLOBAL_LIGHT_TYPE, light_entity);
 	render_scene->setGlobalLightIntensity(light_cmp, 0);
-	render_scene->setLightAmbientIntensity(light_cmp, 1);
 
 	while (engine.getFileSystem().hasWork()) engine.getFileSystem().updateAsyncTransactions();
 

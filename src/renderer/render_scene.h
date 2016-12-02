@@ -57,6 +57,7 @@ enum class RenderSceneVersion : i32
 	PARTICLE_EMITTER_LOCAL_SPACE,
 	NEW_GRASS,
 	LAYERS,
+	PBR,
 
 	LATEST,
 	INVALID = -1,
@@ -406,10 +407,6 @@ public:
 	virtual void setGlobalLightIntensity(ComponentHandle cmp, float intensity) = 0;
 	virtual void setPointLightColor(ComponentHandle cmp, const Vec3& color) = 0;
 	virtual void setGlobalLightColor(ComponentHandle cmp, const Vec3& color) = 0;
-	virtual void setGlobalLightSpecular(ComponentHandle cmp, const Vec3& color) = 0;
-	virtual void setGlobalLightSpecularIntensity(ComponentHandle cmp, float intensity) = 0;
-	virtual void setLightAmbientIntensity(ComponentHandle cmp, float intensity) = 0;
-	virtual void setLightAmbientColor(ComponentHandle cmp, const Vec3& color) = 0;
 	virtual void setFogDensity(ComponentHandle cmp, float density) = 0;
 	virtual void setFogColor(ComponentHandle cmp, const Vec3& color) = 0;
 	virtual float getPointLightIntensity(ComponentHandle cmp) = 0;
@@ -418,10 +415,6 @@ public:
 	virtual float getGlobalLightIntensity(ComponentHandle cmp) = 0;
 	virtual Vec3 getPointLightColor(ComponentHandle cmp) = 0;
 	virtual Vec3 getGlobalLightColor(ComponentHandle cmp) = 0;
-	virtual Vec3 getGlobalLightSpecular(ComponentHandle cmp) = 0;
-	virtual float getGlobalLightSpecularIntensity(ComponentHandle cmp) = 0;
-	virtual float getLightAmbientIntensity(ComponentHandle cmp) = 0;
-	virtual Vec3 getLightAmbientColor(ComponentHandle cmp) = 0;
 	virtual float getFogDensity(ComponentHandle cmp) = 0;
 	virtual float getFogBottom(ComponentHandle cmp) = 0;
 	virtual float getFogHeight(ComponentHandle cmp) = 0;

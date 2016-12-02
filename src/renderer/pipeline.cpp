@@ -490,9 +490,6 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			bgfx::createUniform("u_lightPosRadius", bgfx::UniformType::Vec4);
 		m_light_color_attenuation_uniform = bgfx::createUniform("u_lightRgbAttenuation", bgfx::UniformType::Vec4);
 		m_light_dir_fov_uniform = bgfx::createUniform("u_lightDirFov", bgfx::UniformType::Vec4);
-		m_light_specular_uniform =
-			bgfx::createUniform("u_lightSpecular", bgfx::UniformType::Mat4, 64);
-		m_ambient_color_uniform = bgfx::createUniform("u_ambientColor", bgfx::UniformType::Vec4);
 		m_shadowmap_matrices_uniform =
 			bgfx::createUniform("u_shadowmapMatrices", bgfx::UniformType::Mat4, 4);
 		m_bone_matrices_uniform =
@@ -518,9 +515,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		bgfx::destroyUniform(m_light_pos_radius_uniform);
 		bgfx::destroyUniform(m_light_color_attenuation_uniform);
 		bgfx::destroyUniform(m_light_dir_fov_uniform);
-		bgfx::destroyUniform(m_ambient_color_uniform);
 		bgfx::destroyUniform(m_shadowmap_matrices_uniform);
-		bgfx::destroyUniform(m_light_specular_uniform);
 		bgfx::destroyUniform(m_cam_inv_proj_uniform);
 		bgfx::destroyUniform(m_cam_inv_viewproj_uniform);
 		bgfx::destroyUniform(m_cam_view_uniform);
@@ -1629,7 +1624,6 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		m_current_view->command_buffer.setUniform(m_light_pos_radius_uniform, light_pos_radius);
 		m_current_view->command_buffer.setUniform(m_light_color_attenuation_uniform, light_color_attenuation);
 		m_current_view->command_buffer.setUniform(m_light_dir_fov_uniform, light_dir_fov);
-		m_current_view->command_buffer.setUniform(m_light_specular_uniform, light_specular);
 
 		FrameBuffer* shadowmap = nullptr;
 		if (m_scene->getLightCastShadows(light_cmp))
@@ -1686,22 +1680,15 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		Vec3 light_dir = universe.getRotation(light_entity).rotate(Vec3(0, 0, 1));
 		Vec3 diffuse_color = m_scene->getGlobalLightColor(current_light) *
 							 m_scene->getGlobalLightIntensity(current_light);
-		Vec3 ambient_color = m_scene->getLightAmbientColor(current_light) *
-							 m_scene->getLightAmbientIntensity(current_light);
 		Vec3 fog_color = m_scene->getFogColor(current_light);
 		float fog_density = m_scene->getFogDensity(current_light);
-		Vec3 specular = m_scene->getGlobalLightSpecular(current_light);
-		float specular_intensity = m_scene->getGlobalLightSpecularIntensity(current_light);
-		specular *= specular_intensity * specular_intensity;
 		
 		m_current_view->command_buffer.beginAppend();
 		m_current_view->command_buffer.setUniform(m_light_color_attenuation_uniform, Vec4(diffuse_color, 1));
-		m_current_view->command_buffer.setUniform(m_ambient_color_uniform, Vec4(ambient_color, 1));
 		m_current_view->command_buffer.setUniform(m_light_dir_fov_uniform, Vec4(light_dir, 0));
 
 		fog_density *= fog_density * fog_density;
 		m_current_view->command_buffer.setUniform(m_fog_color_density_uniform, Vec4(fog_color, fog_density));
-		m_current_view->command_buffer.setUniform(m_light_specular_uniform, Vec4(specular, 0));
 		m_current_view->command_buffer.setUniform(m_fog_params_uniform,
 			Vec4(m_scene->getFogBottom(current_light),
 								 m_scene->getFogHeight(current_light),
@@ -2755,10 +2742,8 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	bgfx::UniformHandle m_fog_params_uniform;
 	bgfx::UniformHandle m_light_pos_radius_uniform;
 	bgfx::UniformHandle m_light_color_attenuation_uniform;
-	bgfx::UniformHandle m_ambient_color_uniform;
 	bgfx::UniformHandle m_light_dir_fov_uniform;
 	bgfx::UniformHandle m_shadowmap_matrices_uniform;
-	bgfx::UniformHandle m_light_specular_uniform;
 	bgfx::UniformHandle m_terrain_matrix_uniform;
 	bgfx::UniformHandle m_decal_matrix_uniform;
 	bgfx::UniformHandle m_emitter_matrix_uniform;
