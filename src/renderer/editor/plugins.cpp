@@ -394,8 +394,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		
 		auto light_entity = m_universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
 		auto light_cmp = render_scene->createComponent(GLOBAL_LIGHT_TYPE, light_entity);
-		render_scene->setGlobalLightIntensity(light_cmp, 0);
-		render_scene->setLightAmbientIntensity(light_cmp, 1);
+		render_scene->setGlobalLightIntensity(light_cmp, 1);
 		
 		m_camera_entity = m_universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
 		m_camera_cmp = render_scene->createComponent(CAMERA_TYPE, m_camera_entity);
