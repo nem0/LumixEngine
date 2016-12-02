@@ -642,6 +642,8 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		if (model_instance == INVALID_COMPONENT) return;
 
 		Pose* pose = m_render_scene->getPose(model_instance);
+		if (!pose) return;
+
 		Model* model = m_render_scene->getModelInstanceModel(model_instance);
 
 		model->getPose(*pose);
