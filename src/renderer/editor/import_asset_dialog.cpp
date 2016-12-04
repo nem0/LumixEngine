@@ -652,8 +652,9 @@ static void getRelativePath(WorldEditor& editor, char* relative_path, int max_le
 	}
 	else
 	{
-		const char* base_path = editor.getEngine().getPatchFileDevice()->getBasePath();
-		if (compareStringN(base_path, tmp, stringLength(base_path)) == 0)
+		auto* path_fd = editor.getEngine().getPatchFileDevice();
+		const char* base_path = path_fd ? path_fd->getBasePath() : nullptr;
+		if (base_path && compareStringN(base_path, tmp, stringLength(base_path)) == 0)
 		{
 			int base_path_length = stringLength(base_path);
 			const char* rel_path_start = tmp + base_path_length;
