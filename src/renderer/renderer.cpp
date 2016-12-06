@@ -299,34 +299,14 @@ static void registerProperties(IAllocator& allocator)
 
 	PropertyRegister::add("global_light",
 		LUMIX_NEW(allocator, ColorPropertyDescriptor<RenderScene>)(
-			"Ambient color", &RenderScene::getLightAmbientColor, &RenderScene::setLightAmbientColor));
+			"Color", &RenderScene::getGlobalLightColor, &RenderScene::setGlobalLightColor));
 	PropertyRegister::add("global_light",
-		LUMIX_NEW(allocator, ColorPropertyDescriptor<RenderScene>)(
-			"Diffuse color", &RenderScene::getGlobalLightColor, &RenderScene::setGlobalLightColor));
-	PropertyRegister::add("global_light",
-		LUMIX_NEW(allocator, ColorPropertyDescriptor<RenderScene>)(
-			"Specular color", &RenderScene::getGlobalLightSpecular, &RenderScene::setGlobalLightSpecular));
-	PropertyRegister::add("global_light",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Ambient intensity",
-			&RenderScene::getLightAmbientIntensity,
-			&RenderScene::setLightAmbientIntensity,
-			0.0f,
-			FLT_MAX,
-			0.05f));
-	PropertyRegister::add("global_light",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Diffuse intensity",
+		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Intensity",
 			&RenderScene::getGlobalLightIntensity,
 			&RenderScene::setGlobalLightIntensity,
 			0.0f,
 			FLT_MAX,
 			0.05f));
-	PropertyRegister::add("global_light",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Specular intensity",
-			&RenderScene::getGlobalLightSpecularIntensity,
-			&RenderScene::setGlobalLightSpecularIntensity,
-			0,
-			FLT_MAX,
-			0.01f));
 	PropertyRegister::add("global_light",
 		LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec4, RenderScene>)(
 			"Shadow cascades", &RenderScene::getShadowmapCascades, &RenderScene::setShadowmapCascades));
@@ -609,8 +589,10 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 
 		m_current_pass_hash = crc32("MAIN");
 		m_view_counter = 0;
-		m_mat_color_shininess_uniform =
-			bgfx::createUniform("u_materialColorShininess", bgfx::UniformType::Vec4);
+		m_mat_color_uniform =
+			bgfx::createUniform("u_materialColor", bgfx::UniformType::Vec4);
+		m_roughness_metallic_uniform =
+			bgfx::createUniform("u_roughnessMetallic", bgfx::UniformType::Vec4);
 
 		m_basic_vertex_decl.begin()
 			.add(bgfx::Attrib::Position, 3, bgfx::AttribType::Float)
@@ -640,7 +622,8 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 		m_shader_manager.destroy();
 		m_shader_binary_manager.destroy();
 
-		bgfx::destroyUniform(m_mat_color_shininess_uniform);
+		bgfx::destroyUniform(m_mat_color_uniform);
+		bgfx::destroyUniform(m_roughness_metallic_uniform);
 		bgfx::frame();
 		bgfx::frame();
 		bgfx::shutdown();
@@ -687,6 +670,12 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	MaterialManager& getMaterialManager() override
 	{
 		return m_material_manager;
+	}
+
+
+	TextureManager& getTextureManager() override
+	{
+		return m_texture_manager;
 	}
 
 
@@ -770,9 +759,15 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	}
 
 
-	const bgfx::UniformHandle& getMaterialColorShininessUniform() const override
+	const bgfx::UniformHandle& getMaterialColorUniform() const override
 	{
-		return m_mat_color_shininess_uniform;
+		return m_mat_color_uniform;
+	}
+
+
+	const bgfx::UniformHandle& getRoughnessMetallicUniform() const override
+	{
+		return m_roughness_metallic_uniform;
 	}
 
 
@@ -788,10 +783,10 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	}
 
 
-	void frame() override
+	void frame(bool capture) override
 	{
 		PROFILE_FUNCTION();
-		bgfx::frame();
+		bgfx::frame(capture);
 		m_view_counter = 0;
 	}
 
@@ -835,7 +830,8 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	BGFXAllocator m_bgfx_allocator;
 	bgfx::VertexDecl m_basic_vertex_decl;
 	bgfx::VertexDecl m_basic_2d_vertex_decl;
-	bgfx::UniformHandle m_mat_color_shininess_uniform;
+	bgfx::UniformHandle m_mat_color_uniform;
+	bgfx::UniformHandle m_roughness_metallic_uniform;
 };
 
 

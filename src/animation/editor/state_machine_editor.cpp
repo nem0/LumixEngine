@@ -12,6 +12,7 @@
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
 #include <cmath>
+#include <cstdlib>
 
 
 using namespace Lumix;
@@ -65,10 +66,38 @@ static ImVec2 getEdgeStartPoint(const ImVec2 a_pos, const ImVec2 a_size, const I
 }
 
 
+static Component* createComponent(Anim::Component* engine_cmp, Container* parent, ControllerResource& controller)
+{
+	IAllocator& allocator = controller.getAllocator();
+	switch (engine_cmp->type)
+	{
+	case Anim::Component::EDGE: return LUMIX_NEW(allocator, Edge)((Anim::Edge*)engine_cmp, parent, controller);
+	case Anim::Component::BLEND1D: return LUMIX_NEW(allocator, Blend1DNode)((Anim::Blend1DNode*)engine_cmp, parent, controller);
+	case Anim::Component::SIMPLE_ANIMATION:
+		return LUMIX_NEW(allocator, AnimationNode)(engine_cmp, parent, controller);
+	case Anim::Component::STATE_MACHINE: return LUMIX_NEW(allocator, StateMachine)(engine_cmp, parent, controller);
+	default: ASSERT(false); return nullptr;
+	}
+}
+
 
 static ImVec2 getEdgeStartPoint(Node* a, Node* b, bool is_dir)
 {
 	return getEdgeStartPoint(a->pos, a->size, b->pos, b->size, is_dir);
+}
+
+
+static void drawEdge(ImDrawList* draw, Node* from_node, Node* to_node, u32 color, const ImVec2& canvas_screen_pos)
+{
+	ImVec2 from = getEdgeStartPoint(from_node, to_node, true) + canvas_screen_pos;
+	ImVec2 to = getEdgeStartPoint(to_node, from_node, false) + canvas_screen_pos;
+	draw->AddLine(from, to, color);
+	ImVec2 dir = to - from;
+	dir = dir * (1 / sqrt(dot(dir, dir))) * 5;
+	ImVec2 right(dir.y, -dir.x);
+	draw->AddLine(to, to - dir + right, color);
+	draw->AddLine(to, to - dir - right, color);
+
 }
 
 
@@ -392,6 +421,399 @@ bool Edge::hitTest(const ImVec2& on_canvas_pos) const
 }
 
 
+struct Blend1DNode::RootEdge : public Component
+{
+	RootEdge(Blend1DNode* parent, Node* to, ControllerResource& controller)
+		: Component(nullptr, parent, controller)
+		, m_parent(parent)
+		, m_to(to)
+	{
+		parent->getRootNode()->edges.push(this);
+	}
+
+
+	~RootEdge()
+	{
+		m_parent->removeChild(this);
+	}
+
+	void serialize(Lumix::OutputBlob& blob) override {}
+	void deserialize(Lumix::InputBlob& blob) override {}
+	bool hitTest(const ImVec2& on_canvas_pos) const
+	{
+		ImVec2 a = getEdgeStartPoint(m_parent->getRootNode(), m_to, true);
+		ImVec2 b = getEdgeStartPoint(m_to, m_parent->getRootNode(), false);
+
+		ImVec2 dif = a - b;
+		float len_squared = dif.x * dif.x + dif.y * dif.y;
+		float t = Math::clamp(dot(on_canvas_pos - a, b - a) / len_squared, 0.0f, 1.0f);
+		const ImVec2 projection = a + (b - a) * t;
+		ImVec2 dist_vec = on_canvas_pos - projection;
+
+		return dot(dist_vec, dist_vec) < 100;
+	}
+
+
+	void onGUI() override
+	{
+		auto* engine_node = (Anim::Blend1DNode*)m_parent->engine_cmp;
+		bool changed = false;
+		for (auto& item : engine_node->items)
+		{
+			if (item.node == m_to->engine_cmp)
+			{
+				changed = ImGui::InputFloat("Value", &item.value) || changed;
+				break;
+			}
+		}
+
+		if (changed)
+		{
+			auto comparator = [](const void* a, const void* b) -> int {
+				float v0 = ((Anim::Blend1DNode::Item*)a)->value;
+				float v1 = ((Anim::Blend1DNode::Item*)b)->value;
+				if (v0 < v1) return -1;
+				if (v0 > v1) return 1;
+				return 0;
+			};
+
+			qsort(&engine_node->items[0], engine_node->items.size(), sizeof(engine_node->items[0]), comparator);
+		}
+	}
+
+
+	bool isNode() const override { return false; }
+
+
+	bool draw(ImDrawList* draw, const ImVec2& canvas_screen_pos, bool selected) override
+	{
+		u32 color = ImGui::ColorConvertFloat4ToU32(
+			selected ? ImGui::GetStyle().Colors[ImGuiCol_ButtonHovered] : ImGui::GetStyle().Colors[ImGuiCol_Button]);
+		drawEdge(draw, m_parent->getRootNode(), m_to, color, canvas_screen_pos);
+		if (ImGui::IsMouseClicked(0) && hitTest(ImGui::GetMousePos() - canvas_screen_pos))
+		{
+			return true;
+		}
+		return false;
+	}
+
+	Node* getTo() const { return m_to; }
+
+private:
+	Blend1DNode* m_parent;
+	Node* m_to;
+};
+
+
+Blend1DNode::Blend1DNode(Anim::Component* engine_cmp, Container* parent, ControllerResource& controller)
+	: Container(engine_cmp, parent, controller)
+{
+	m_root_node = LUMIX_NEW(controller.getAllocator(), RootNode)(this, controller);
+	m_editor_cmps.push(m_root_node);
+}
+
+
+void Blend1DNode::debugInside(ImDrawList* draw,
+	const ImVec2& canvas_screen_pos,
+	Anim::ComponentInstance* runtime,
+	Container* current)
+{
+	if (runtime->source.type != Anim::Component::BLEND1D) return;
+	auto* runtime_b1 = (Anim::Blend1DNodeInstance*)runtime;
+	auto& children_runtime = runtime_b1->instances;
+	auto& source = (Anim::Blend1DNode&)runtime->source;
+	for (int i = 0; i < source.children.size() && i < lengthOf(children_runtime); ++i)
+	{
+		auto* child_runtime = (Anim::NodeInstance*)children_runtime[i];
+		auto* child = getChildByUID(child_runtime->source.uid);
+		if (!child) continue;
+
+		if (current == this)
+		{
+			if (runtime_b1->a0 == child_runtime || runtime_b1->a1 == child_runtime)
+			{
+				child->debug(draw, canvas_screen_pos, child_runtime);
+				float t = runtime_b1->current_weight;
+				if (runtime_b1->a0 == child_runtime) t = 1 - t;
+				ImVec2 to = getEdgeStartPoint((Node*)child, m_root_node, false);
+				ImVec2 from = getEdgeStartPoint(m_root_node, (Node*)child, true);
+				ImVec2 dir = to - from;
+				to = from + dir*t;
+				draw->AddLine(from + canvas_screen_pos, to + canvas_screen_pos, 0xfff00fff);
+			}
+		}
+		else
+		{
+			child->debugInside(draw, canvas_screen_pos, child_runtime, current);
+		}
+	}
+}
+
+
+void Blend1DNode::dropSlot(const char* name, u32 slot, const ImVec2& canvas_screen_pos)
+{
+	createState(Anim::Component::SIMPLE_ANIMATION, ImGui::GetMousePos() - canvas_screen_pos);
+	auto* node = (AnimationNode*)m_selected_component;
+	node->name = name;
+	auto* engine_node = (Anim::AnimationNode*)node->engine_cmp;
+	engine_node->animations_hashes.emplace(slot);
+}
+
+
+void Blend1DNode::removeChild(Component* component)
+{
+	Container::removeChild(component);
+	auto* engine_b1 = (Anim::Blend1DNode*)engine_cmp;
+	for (int i = 0; i < engine_b1->items.size(); ++i)
+	{
+		if (engine_b1->items[i].node == component->engine_cmp)
+		{
+			engine_b1->items.erase(i);
+			LUMIX_DELETE(m_controller.getAllocator(), m_root_node->edges[i]);
+			break;
+		}
+	}
+}
+
+
+void Blend1DNode::serialize(Lumix::OutputBlob& blob)
+{
+	Container::serialize(blob);
+	m_root_node->serialize(blob);
+	blob.write(m_root_node->edges.size());
+	for (RootEdge* edge : m_root_node->edges)
+	{
+		blob.write(edge->getTo()->engine_cmp->uid);
+	}
+}
+
+
+void Blend1DNode::deserialize(Lumix::InputBlob& blob)
+{
+	Container::deserialize(blob);
+
+	m_root_node->deserialize(blob);
+	int count;
+	blob.read(count);
+	for (int i = 0; i < count; ++i)
+	{
+		int uid;
+		blob.read(uid);
+		Node* node = (Node*)getChildByUID(uid);
+		auto* edge = LUMIX_NEW(m_allocator, RootEdge)(this, node, m_controller);
+		m_editor_cmps.push(edge);
+	}
+
+	auto& input_decl = m_controller.getEngineResource()->getInputDecl();
+	m_input = -1;
+	int offset = ((Anim::Blend1DNode*)engine_cmp)->input_offset;
+	for (int i = 0; i < input_decl.inputs_count; ++i)
+	{
+		if (input_decl.inputs[i].offset == offset)
+		{
+			m_input = i;
+			break;
+		}
+	}
+}
+
+
+void Blend1DNode::createState(Lumix::Anim::Component::Type type, const ImVec2& pos)
+{
+	auto* cmp = (Node*)createComponent(Anim::createComponent(type, m_allocator), this, m_controller);
+	cmp->pos = pos;
+	cmp->size.x = 100;
+	cmp->size.y = 30;
+	cmp->engine_cmp->uid = m_controller.createUID();
+	m_editor_cmps.push(cmp);
+	((Anim::Blend1DNode*)engine_cmp)->children.push(cmp->engine_cmp);
+	m_selected_component = cmp;
+}
+
+
+Blend1DNode::RootEdge* Blend1DNode::createRootEdge(Node* node)
+{
+	auto* edge = LUMIX_NEW(m_allocator, RootEdge)(this, node, m_controller);
+	m_editor_cmps.push(edge);
+
+	auto* engine_b1 = (Anim::Blend1DNode*)engine_cmp;
+	auto& engine_edge = engine_b1->items.emplace();
+	engine_edge.node = (Anim::Node*)node->engine_cmp;
+	return edge;
+}
+
+
+
+void Blend1DNode::drawInside(ImDrawList* draw, const ImVec2& canvas_screen_pos)
+{
+	if (ImGui::IsWindowHovered())
+	{
+		if (ImGui::IsMouseClicked(0)) m_selected_component = nullptr;
+		if (ImGui::IsMouseReleased(1) && m_mouse_status == NONE)
+		{
+			m_context_cmp = nullptr;
+			ImGui::OpenPopup("context_menu");
+		}
+	}
+
+	for (int i = 0; i < m_editor_cmps.size(); ++i)
+	{
+		Component* cmp = m_editor_cmps[i];
+		if (cmp->draw(draw, canvas_screen_pos, m_selected_component == cmp))
+		{
+			m_selected_component = cmp;
+		}
+
+		if (cmp->isNode() && ImGui::IsItemHovered())
+		{
+			if (ImGui::IsMouseClicked(0))
+			{
+				m_drag_source = (Node*)cmp;
+				m_mouse_status = DOWN_LEFT;
+			}
+			if (ImGui::IsMouseClicked(1))
+			{
+				m_drag_source = (Node*)cmp;
+				m_mouse_status = DOWN_RIGHT;
+			}
+		}
+
+		if (m_mouse_status == DOWN_RIGHT && ImGui::IsMouseDragging(1)) m_mouse_status = NEW_EDGE;
+		if (m_mouse_status == DOWN_LEFT && ImGui::IsMouseDragging(0)) m_mouse_status = DRAG_NODE;
+	}
+
+	if (ImGui::IsMouseReleased(1))
+	{
+		Component* hit_cmp = childrenHitTest(ImGui::GetMousePos() - canvas_screen_pos);
+		if (hit_cmp)
+		{
+			if (m_mouse_status == NEW_EDGE)
+			{
+				if (hit_cmp != m_drag_source && hit_cmp->isNode())
+				{
+					if (hit_cmp == m_root_node)
+					{
+						createRootEdge(m_drag_source);
+					}
+					else if (m_drag_source == m_root_node)
+					{
+						createRootEdge((Node*)hit_cmp);
+					}
+					else
+					{
+						auto* engine_parent = ((Anim::Container*)engine_cmp);
+						auto* engine_edge = LUMIX_NEW(m_allocator, Anim::Edge)(m_allocator);
+						engine_edge->uid = m_controller.createUID();
+						engine_edge->from = (Anim::Node*)m_drag_source->engine_cmp;
+						engine_edge->to = (Anim::Node*)hit_cmp->engine_cmp;
+						engine_parent->children.push(engine_edge);
+
+						auto* edge = LUMIX_NEW(m_allocator, Edge)(engine_edge, this, m_controller);
+						m_editor_cmps.push(edge);
+						m_selected_component = edge;
+					}
+				}
+			}
+			else
+			{
+				m_context_cmp = hit_cmp;
+				m_selected_component = hit_cmp;
+				ImGui::OpenPopup("context_menu");
+			}
+		}
+	}
+
+
+	if (m_mouse_status == DRAG_NODE)
+	{
+		m_drag_source->pos = m_drag_source->pos + ImGui::GetIO().MouseDelta;
+	}
+
+	if (ImGui::IsMouseReleased(0) || ImGui::IsMouseReleased(1)) m_mouse_status = NONE;
+
+	if (m_mouse_status == NEW_EDGE)
+	{
+		draw->AddLine(canvas_screen_pos + m_drag_source->pos + m_drag_source->size * 0.5f, ImGui::GetMousePos(), 0xfff00FFF);
+	}
+
+	if (ImGui::BeginPopup("context_menu"))
+	{
+		ImVec2 pos_on_canvas = ImGui::GetMousePos() - canvas_screen_pos;
+		if (ImGui::BeginMenu("Create"))
+		{
+			if (ImGui::MenuItem("Simple")) createState(Anim::Component::SIMPLE_ANIMATION, pos_on_canvas);
+			if (ImGui::MenuItem("State machine")) createState(Anim::Component::STATE_MACHINE, pos_on_canvas);
+			if (ImGui::MenuItem("Blend 1D")) createState(Anim::Component::BLEND1D, pos_on_canvas);
+			ImGui::EndMenu();
+		}
+		if (m_context_cmp && m_context_cmp != m_root_node)
+		{
+			if (ImGui::MenuItem("Remove"))
+			{
+				LUMIX_DELETE(m_controller.getAllocator(), m_context_cmp);
+				if (m_selected_component == m_context_cmp) m_selected_component = nullptr;
+				if (m_drag_source == m_context_cmp) m_drag_source = nullptr;
+				m_context_cmp = nullptr;
+			}
+		}
+		ImGui::EndPopup();
+	}
+}
+
+
+void Blend1DNode::compile()
+{
+	auto* engine_node = (Anim::Blend1DNode*)engine_cmp;
+	Anim::InputDecl& decl = m_controller.getEngineResource()->getInputDecl();
+	if (m_input >= 0)
+	{
+		engine_node->input_offset = decl.inputs[m_input].offset;
+	}
+	else
+	{
+		engine_node->input_offset = -1;
+	}
+}
+
+
+void Blend1DNode::debug(ImDrawList* draw, const ImVec2& canvas_screen_pos, Anim::ComponentInstance* runtime)
+{
+	if (runtime->source.type != engine_cmp->type) return;
+
+	ImVec2 p = canvas_screen_pos + pos;
+	p = p + ImVec2(5, ImGui::GetTextLineHeightWithSpacing() * 1.5f);
+	draw->AddRect(p, p + ImVec2(size.x - 10, 5), 0xfff00fff);
+	float t = Math::clamp(runtime->getTime() / runtime->getLength(), 0.0f, 1.0f);
+	draw->AddRectFilled(p, p + ImVec2((size.x - 10) * t, 5), 0xfff00fff);
+}
+
+
+void Blend1DNode::onGUI()
+{
+	Container::onGUI();
+	if (ImGui::Button("Show Children"))
+	{
+		m_controller.getEditor().setContainer(this);
+	}
+
+	auto* node = (Anim::Blend1DNode*)engine_cmp;
+	auto getter = [](void* data, int idx, const char** out) -> bool {
+		auto* node = (Blend1DNode*)data;
+		auto& slots = node->m_controller.getAnimationSlots();
+		*out = slots[idx].c_str();
+		return true;
+	};
+
+	Anim::InputDecl& decl = m_controller.getEngineResource()->getInputDecl();
+	auto input_getter = [](void* data, int idx, const char** out) -> bool {
+		auto& decl = *(Anim::InputDecl*)data;
+		*out = decl.inputs[idx].name;
+		return true;
+	};
+	ImGui::Combo("Input", &m_input, input_getter, &decl, decl.inputs_count);
+}
+
+
 AnimationNode::AnimationNode(Anim::Component* engine_cmp, Container* parent, ControllerResource& controller)
 	: Node(engine_cmp, parent, controller)
 {
@@ -552,14 +974,7 @@ struct EntryEdge : public Component
 	{
 		u32 color = ImGui::ColorConvertFloat4ToU32(
 			selected ? ImGui::GetStyle().Colors[ImGuiCol_ButtonHovered] : ImGui::GetStyle().Colors[ImGuiCol_Button]);
-		ImVec2 from = getEdgeStartPoint(m_parent->getEntryNode(), m_to, true) + canvas_screen_pos;
-		ImVec2 to = getEdgeStartPoint(m_to, m_parent->getEntryNode(), false) + canvas_screen_pos;
-		draw->AddLine(from, to, color);
-		ImVec2 dir = to - from;
-		dir = dir * (1 / sqrt(dot(dir, dir))) * 5;
-		ImVec2 right(dir.y, -dir.x);
-		draw->AddLine(to, to - dir + right, color);
-		draw->AddLine(to, to - dir - right, color);
+		drawEdge(draw, m_parent->getEntryNode(), m_to, color, canvas_screen_pos);;
 		if (ImGui::IsMouseClicked(0) && hitTest(ImGui::GetMousePos() - canvas_screen_pos))
 		{
 			return true;
@@ -575,6 +990,14 @@ private:
 	StateMachine* m_parent;
 	Node* m_to;
 };
+
+
+Blend1DNode::RootNode::RootNode(Container* parent, ControllerResource& controller)
+	: Node(nullptr, parent, controller)
+	, edges(controller.getAllocator())
+{
+	name = "Root";
+}
 
 
 EntryNode::EntryNode(Container* parent, ControllerResource& controller)
@@ -628,20 +1051,6 @@ void StateMachine::compile()
 		auto* sm = (Anim::StateMachine*)engine_cmp;
 		sm->entries[i].condition.compile(entry->expression, m_controller.getEngineResource()->getInputDecl());
 		++i;
-	}
-}
-
-
-static Component* createComponent(Anim::Component* engine_cmp, Container* parent, ControllerResource& controller)
-{
-	IAllocator& allocator = controller.getAllocator();
-	switch (engine_cmp->type)
-	{
-		case Anim::Component::EDGE: return LUMIX_NEW(allocator, Edge)((Anim::Edge*)engine_cmp, parent, controller);
-		case Anim::Component::SIMPLE_ANIMATION:
-			return LUMIX_NEW(allocator, AnimationNode)(engine_cmp, parent, controller);
-		case Anim::Component::STATE_MACHINE: return LUMIX_NEW(allocator, StateMachine)(engine_cmp, parent, controller);
-		default: ASSERT(false); return nullptr;
 	}
 }
 
@@ -873,6 +1282,7 @@ void StateMachine::drawInside(ImDrawList* draw, const ImVec2& canvas_screen_pos)
 		{
 			if (ImGui::MenuItem("Simple")) createState(Anim::Component::SIMPLE_ANIMATION, pos_on_canvas);
 			if (ImGui::MenuItem("State machine")) createState(Anim::Component::STATE_MACHINE, pos_on_canvas);
+			if (ImGui::MenuItem("Blend 1D")) createState(Anim::Component::BLEND1D, pos_on_canvas);
 			ImGui::EndMenu();
 		}
 		if (m_context_cmp && m_context_cmp != m_entry_node)
@@ -881,6 +1291,7 @@ void StateMachine::drawInside(ImDrawList* draw, const ImVec2& canvas_screen_pos)
 			{
 				LUMIX_DELETE(m_controller.getAllocator(), m_context_cmp);
 				if (m_selected_component == m_context_cmp) m_selected_component = nullptr;
+				if (m_drag_source == m_context_cmp) m_drag_source = nullptr;
 				m_context_cmp = nullptr;
 			}
 		}
@@ -900,7 +1311,7 @@ void StateMachine::dropSlot(const char* name, u32 slot, const ImVec2& canvas_scr
 
 
 ControllerResource::ControllerResource(Lumix::AnimationSystem& anim_system,
-	AnimationEditor& editor,
+	IAnimationEditor& editor,
 	ResourceManagerBase& manager,
 	IAllocator& allocator)
 	: m_animation_slots(allocator)

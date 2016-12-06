@@ -21,13 +21,14 @@ class MaterialManager;
 class ModelManager;
 class Path;
 class Shader;
+class TextureManager;
 
 
 class LUMIX_RENDERER_API Renderer : public IPlugin 
 {
 	public:
 		virtual ~Renderer() {}
-		virtual void frame() = 0;
+		virtual void frame(bool capture) = 0;
 		virtual void resize(int width, int height) = 0;
 		virtual int getViewCounter() const = 0;
 		virtual void viewCounterAdd() = 0;
@@ -41,8 +42,10 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 		virtual const bgfx::VertexDecl& getBasic2DVertexDecl() const = 0;
 		virtual MaterialManager& getMaterialManager() = 0;
 		virtual ModelManager& getModelManager() = 0;
+		virtual TextureManager& getTextureManager() = 0;
 		virtual Shader* getDefaultShader() = 0;
-		virtual const bgfx::UniformHandle& getMaterialColorShininessUniform() const = 0;
+		virtual const bgfx::UniformHandle& getMaterialColorUniform() const = 0;
+		virtual const bgfx::UniformHandle& getRoughnessMetallicUniform() const = 0;
 		virtual bool isOpenGL() const = 0;
 		virtual int getLayersCount() const = 0;
 		virtual int getLayer(const char* name) = 0;

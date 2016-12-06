@@ -76,11 +76,11 @@ static const struct
 	}
 
 } FUNCTIONS[] = {
-	{ "sin", Types::FLOAT,{ Types::FLOAT, Types::NONE } },
-	{ "cos", Types::FLOAT,{ Types::FLOAT, Types::NONE } },
-	{ "time", Types::FLOAT,{ Types::NONE } },
-	{ "length", Types::FLOAT,{ Types::NONE } }
-};
+	{"sin", Types::FLOAT, {Types::FLOAT, Types::NONE}},
+	{"cos", Types::FLOAT, {Types::FLOAT, Types::NONE}},
+	{"time", Types::FLOAT, {Types::NONE}},
+	{"length", Types::FLOAT, {Types::NONE}},
+	{"finishing", Types::BOOL, {Types::NONE}}};
 
 
 class ExpressionCompiler
@@ -420,6 +420,7 @@ void ExpressionVM::callFunction(u16 idx, RunningContext& rc)
 		case 1: push<float>(cos(pop<float>())); break;
 		case 2: push<float>(rc.current->getTime()); break;
 		case 3: push<float>(rc.current->getLength()); break;
+		case 4: push<bool>(rc.current->getTime() > rc.current->getLength() - rc.edge->length); break;
 		default: ASSERT(false); break;
 	}
 }

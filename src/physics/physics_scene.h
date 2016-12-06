@@ -70,7 +70,7 @@ public:
 	virtual ~PhysicsScene() {}
 	virtual void render() = 0;
 	virtual Entity raycast(const Vec3& origin, const Vec3& dir) = 0;
-	virtual bool raycastEx(const Vec3& origin, const Vec3& dir, float distance, RaycastHit& result) = 0;
+	virtual bool raycastEx(const Vec3& origin, const Vec3& dir, float distance, RaycastHit& result, Entity ignored) = 0;
 	virtual PhysicsSystem& getSystem() const = 0;
 
 	virtual ComponentHandle getActorComponent(Entity entity) = 0;
@@ -172,6 +172,8 @@ public:
 	virtual void setControllerLayer(ComponentHandle cmp, int layer) = 0;
 	virtual float getControllerRadius(ComponentHandle cmp) = 0;
 	virtual float getControllerHeight(ComponentHandle cmp) = 0;
+	virtual bool isControllerTouchingDown(ComponentHandle cmp) = 0;
+	virtual void resizeController(ComponentHandle cmp, float height) = 0;
 
 	virtual RagdollBone* createRagdollBone(ComponentHandle cmp, u32 bone_name_hash) = 0;
 	virtual void destroyRagdollBone(ComponentHandle cmp, RagdollBone* bone) = 0;

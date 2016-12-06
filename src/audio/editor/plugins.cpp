@@ -87,7 +87,7 @@ struct AssetBrowserPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 
 			auto handle =
 				device.createBuffer(clip->getData(), clip->getSize(), clip->getChannels(), clip->getSampleRate(), 0);
-			device.play(handle, false);
+			device.play(handle, true);
 			m_playing_clip = handle;
 		}
 		return true;
@@ -130,7 +130,7 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	{
 		if (!equalStrings(plugin.getName(), "animation_editor")) return;
 
-		auto& anim_editor = (AnimEditor::AnimationEditor&)plugin;
+		auto& anim_editor = (AnimEditor::IAnimationEditor&)plugin;
 		auto& event_type = anim_editor.createEventType("sound");
 		event_type.size = sizeof(SoundAnimationEvent);
 		event_type.label = "Sound";

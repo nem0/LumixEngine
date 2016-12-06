@@ -22,6 +22,7 @@
 #include "renderer/shader.h"
 #include "renderer/terrain.h"
 #include "renderer/texture.h"
+#include "renderer/texture_manager.h"
 #include "engine/universe/universe.h"
 #include <bgfx/bgfx.h>
 #include <cmath>
@@ -273,6 +274,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		, m_renderer(renderer)
 		, m_default_framebuffer(nullptr)
 		, m_debug_line_material(nullptr)
+		, m_default_cubemap(nullptr)
 		, m_debug_flags(BGFX_DEBUG_TEXT)
 		, m_point_light_shadowmaps(allocator)
 		, m_is_rendering_in_shadowmap(false)
@@ -305,6 +307,8 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 		m_debug_line_material = static_cast<Material*>(
 			renderer.getMaterialManager().load(Lumix::Path("pipelines/editor/debugline.mat")));
+		m_default_cubemap = static_cast<Texture*>(
+			renderer.getTextureManager().load(Lumix::Path("pipelines/pbr/default_probe.dds")));
 
 		createParticleBuffers();
 		createCubeBuffers();
@@ -486,9 +490,6 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			bgfx::createUniform("u_lightPosRadius", bgfx::UniformType::Vec4);
 		m_light_color_attenuation_uniform = bgfx::createUniform("u_lightRgbAttenuation", bgfx::UniformType::Vec4);
 		m_light_dir_fov_uniform = bgfx::createUniform("u_lightDirFov", bgfx::UniformType::Vec4);
-		m_light_specular_uniform =
-			bgfx::createUniform("u_lightSpecular", bgfx::UniformType::Mat4, 64);
-		m_ambient_color_uniform = bgfx::createUniform("u_ambientColor", bgfx::UniformType::Vec4);
 		m_shadowmap_matrices_uniform =
 			bgfx::createUniform("u_shadowmapMatrices", bgfx::UniformType::Mat4, 4);
 		m_bone_matrices_uniform =
@@ -514,9 +515,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		bgfx::destroyUniform(m_light_pos_radius_uniform);
 		bgfx::destroyUniform(m_light_color_attenuation_uniform);
 		bgfx::destroyUniform(m_light_dir_fov_uniform);
-		bgfx::destroyUniform(m_ambient_color_uniform);
 		bgfx::destroyUniform(m_shadowmap_matrices_uniform);
-		bgfx::destroyUniform(m_light_specular_uniform);
 		bgfx::destroyUniform(m_cam_inv_proj_uniform);
 		bgfx::destroyUniform(m_cam_inv_viewproj_uniform);
 		bgfx::destroyUniform(m_cam_view_uniform);
@@ -539,6 +538,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		}
 
 		m_debug_line_material->getResourceManager().unload(*m_debug_line_material);
+		m_default_cubemap->getResourceManager().unload(*m_default_cubemap);
 
 		destroyUniforms();
 
@@ -663,6 +663,43 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 			renderParticlesFromEmitter(*emitter);
 		}
+	}
+
+
+	void bindTexture(int uniform_idx, int texture_idx)
+	{
+		auto* tex = (Texture*)m_renderer.getEngine().getLuaResource(texture_idx);
+		m_current_view->command_buffer.beginAppend();
+		m_current_view->command_buffer.setTexture(15 - m_global_textures_count, m_uniforms[uniform_idx], tex->handle);
+		++m_global_textures_count;
+		m_current_view->command_buffer.end();
+	}
+
+
+	void bindEnvironmentMaps(int irradiance_uniform_idx, int radiance_uniform_idx)
+	{
+		if (m_applied_camera == INVALID_COMPONENT) return;
+		Entity cam = m_scene->getCameraEntity(m_applied_camera);
+		Vec3 pos = m_scene->getUniverse().getPosition(cam);
+		ComponentHandle probe = m_scene->getNearestEnvironmentProbe(pos);
+		m_current_view->command_buffer.beginAppend();
+		if (isValid(probe))
+		{
+			Texture* irradiance = m_scene->getEnvironmentProbeIrradiance(probe);
+			Texture* radiance = m_scene->getEnvironmentProbeRadiance(probe);
+			m_current_view->command_buffer.setTexture(15 - m_global_textures_count, m_uniforms[irradiance_uniform_idx], irradiance->handle);
+			++m_global_textures_count;
+			m_current_view->command_buffer.setTexture(15 - m_global_textures_count, m_uniforms[radiance_uniform_idx], radiance->handle);
+			++m_global_textures_count;
+		}
+		else
+		{
+			m_current_view->command_buffer.setTexture(15 - m_global_textures_count, m_uniforms[irradiance_uniform_idx], m_default_cubemap->handle);
+			++m_global_textures_count;
+			m_current_view->command_buffer.setTexture(15 - m_global_textures_count, m_uniforms[radiance_uniform_idx], m_default_cubemap->handle);
+			++m_global_textures_count;
+		}
+		m_current_view->command_buffer.end();
 	}
 
 
@@ -1587,7 +1624,6 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		m_current_view->command_buffer.setUniform(m_light_pos_radius_uniform, light_pos_radius);
 		m_current_view->command_buffer.setUniform(m_light_color_attenuation_uniform, light_color_attenuation);
 		m_current_view->command_buffer.setUniform(m_light_dir_fov_uniform, light_dir_fov);
-		m_current_view->command_buffer.setUniform(m_light_specular_uniform, light_specular);
 
 		FrameBuffer* shadowmap = nullptr;
 		if (m_scene->getLightCastShadows(light_cmp))
@@ -1644,22 +1680,15 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		Vec3 light_dir = universe.getRotation(light_entity).rotate(Vec3(0, 0, 1));
 		Vec3 diffuse_color = m_scene->getGlobalLightColor(current_light) *
 							 m_scene->getGlobalLightIntensity(current_light);
-		Vec3 ambient_color = m_scene->getLightAmbientColor(current_light) *
-							 m_scene->getLightAmbientIntensity(current_light);
 		Vec3 fog_color = m_scene->getFogColor(current_light);
 		float fog_density = m_scene->getFogDensity(current_light);
-		Vec3 specular = m_scene->getGlobalLightSpecular(current_light);
-		float specular_intensity = m_scene->getGlobalLightSpecularIntensity(current_light);
-		specular *= specular_intensity * specular_intensity;
 		
 		m_current_view->command_buffer.beginAppend();
 		m_current_view->command_buffer.setUniform(m_light_color_attenuation_uniform, Vec4(diffuse_color, 1));
-		m_current_view->command_buffer.setUniform(m_ambient_color_uniform, Vec4(ambient_color, 1));
 		m_current_view->command_buffer.setUniform(m_light_dir_fov_uniform, Vec4(light_dir, 0));
 
 		fog_density *= fog_density * fog_density;
 		m_current_view->command_buffer.setUniform(m_fog_color_density_uniform, Vec4(fog_color, fog_density));
-		m_current_view->command_buffer.setUniform(m_light_specular_uniform, Vec4(specular, 0));
 		m_current_view->command_buffer.setUniform(m_fog_params_uniform,
 			Vec4(m_scene->getFogBottom(current_light),
 								 m_scene->getFogHeight(current_light),
@@ -2713,10 +2742,8 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	bgfx::UniformHandle m_fog_params_uniform;
 	bgfx::UniformHandle m_light_pos_radius_uniform;
 	bgfx::UniformHandle m_light_color_attenuation_uniform;
-	bgfx::UniformHandle m_ambient_color_uniform;
 	bgfx::UniformHandle m_light_dir_fov_uniform;
 	bgfx::UniformHandle m_shadowmap_matrices_uniform;
-	bgfx::UniformHandle m_light_specular_uniform;
 	bgfx::UniformHandle m_terrain_matrix_uniform;
 	bgfx::UniformHandle m_decal_matrix_uniform;
 	bgfx::UniformHandle m_emitter_matrix_uniform;
@@ -2733,6 +2760,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	int m_layer_to_view_map[64];
 
 	Material* m_debug_line_material;
+	Texture* m_default_cubemap;
 	bgfx::DynamicVertexBufferHandle m_debug_vertex_buffers[32];
 	bgfx::DynamicIndexBufferHandle m_debug_index_buffer;
 	int m_debug_buffer_idx;
@@ -2931,6 +2959,8 @@ void Pipeline::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(drawQuad);
 	REGISTER_FUNCTION(setPass);
 	REGISTER_FUNCTION(bindFramebufferTexture);
+	REGISTER_FUNCTION(bindTexture);
+	REGISTER_FUNCTION(bindEnvironmentMaps);
 	REGISTER_FUNCTION(applyCamera);
 
 	REGISTER_FUNCTION(disableBlending);

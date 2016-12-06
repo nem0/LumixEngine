@@ -225,7 +225,7 @@ namespace Lumix
 			}
 
 
-			const Key& getKey(int index)
+			const Key& getKey(int index) const
 			{
 				return m_keys[index];
 			}

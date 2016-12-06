@@ -24,6 +24,9 @@
 #include <PxPhysicsAPI.h>
 
 
+using namespace physx;
+
+
 namespace Lumix
 {
 
@@ -59,6 +62,7 @@ enum class PhysicsSceneVersion : int
 	KINEMATIC_BONES,
 	RAGDOLL_LAYER,
 	REFACTOR,
+	CONTROLLER_SHAPE,
 
 	LATEST
 };
@@ -73,8 +77,8 @@ struct RagdollBone
 	};
 
 	int pose_bone_idx;
-	physx::PxRigidDynamic* actor;
-	physx::PxJoint* parent_joint;
+	PxRigidDynamic* actor;
+	PxJoint* parent_joint;
 	RagdollBone* child;
 	RagdollBone* next;
 	RagdollBone* prev;
@@ -94,7 +98,7 @@ struct Ragdoll
 };
 
 
-struct OutputStream LUMIX_FINAL : public physx::PxOutputStream
+struct OutputStream LUMIX_FINAL : public PxOutputStream
 {
 	explicit OutputStream(IAllocator& allocator)
 		: allocator(allocator)
@@ -107,7 +111,7 @@ struct OutputStream LUMIX_FINAL : public physx::PxOutputStream
 	~OutputStream() { allocator.deallocate(data); }
 
 
-	virtual physx::PxU32 write(const void* src, physx::PxU32 count)
+	virtual PxU32 write(const void* src, PxU32 count)
 	{
 		if (size + (int)count > capacity)
 		{
@@ -132,7 +136,7 @@ struct OutputStream LUMIX_FINAL : public physx::PxOutputStream
 };
 
 
-struct InputStream LUMIX_FINAL : public physx::PxInputStream
+struct InputStream LUMIX_FINAL : public PxInputStream
 {
 	InputStream(unsigned char* data, int size)
 	{
@@ -141,7 +145,7 @@ struct InputStream LUMIX_FINAL : public physx::PxInputStream
 		pos = 0;
 	}
 
-	virtual physx::PxU32 read(void* dest, physx::PxU32 count)
+	virtual PxU32 read(void* dest, PxU32 count)
 	{
 		if (pos + (int)count <= size)
 		{
@@ -165,19 +169,19 @@ struct InputStream LUMIX_FINAL : public physx::PxInputStream
 };
 
 
-static Vec3 fromPhysx(const physx::PxVec3& v) { return Vec3(v.x, v.y, v.z); }
-static physx::PxVec3 toPhysx(const Vec3& v) { return physx::PxVec3(v.x, v.y, v.z); }
-static Quat fromPhysx(const physx::PxQuat& v) { return Quat(v.x, v.y, v.z, v.w); }
-static physx::PxQuat toPhysx(const Quat& v) { return physx::PxQuat(v.x, v.y, v.z, v.w); }
-static Transform fromPhysx(const physx::PxTransform& v) { return{ fromPhysx(v.p), fromPhysx(v.q) }; }
-static physx::PxTransform toPhysx(const Transform& v) { return {toPhysx(v.pos), toPhysx(v.rot)}; }
+static Vec3 fromPhysx(const PxVec3& v) { return Vec3(v.x, v.y, v.z); }
+static PxVec3 toPhysx(const Vec3& v) { return PxVec3(v.x, v.y, v.z); }
+static Quat fromPhysx(const PxQuat& v) { return Quat(v.x, v.y, v.z, v.w); }
+static PxQuat toPhysx(const Quat& v) { return PxQuat(v.x, v.y, v.z, v.w); }
+static Transform fromPhysx(const PxTransform& v) { return{ fromPhysx(v.p), fromPhysx(v.q) }; }
+static PxTransform toPhysx(const Transform& v) { return {toPhysx(v.pos), toPhysx(v.rot)}; }
 
 
 struct Joint
 {
 	Entity connected_body;
-	physx::PxJoint* physx;
-	physx::PxTransform local_frame0;
+	PxJoint* physx;
+	PxTransform local_frame0;
 };
 
 
@@ -189,7 +193,7 @@ struct Heightfield
 
 	struct PhysicsSceneImpl* m_scene;
 	Entity m_entity;
-	physx::PxRigidActor* m_actor;
+	PxRigidActor* m_actor;
 	Texture* m_heightmap;
 	float m_xz_scale;
 	float m_y_scale;
@@ -199,7 +203,7 @@ struct Heightfield
 
 struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 {
-	struct ContactCallback LUMIX_FINAL : public physx::PxSimulationEventCallback
+	struct ContactCallback LUMIX_FINAL : public PxSimulationEventCallback
 	{
 		explicit ContactCallback(PhysicsSceneImpl& scene)
 			: m_scene(scene)
@@ -207,17 +211,17 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		}
 
 
-		void onContact(const physx::PxContactPairHeader& pairHeader,
-			const physx::PxContactPair* pairs,
-			physx::PxU32 nbPairs) override
+		void onContact(const PxContactPairHeader& pairHeader,
+			const PxContactPair* pairs,
+			PxU32 nbPairs) override
 		{
-			for (physx::PxU32 i = 0; i < nbPairs; i++)
+			for (PxU32 i = 0; i < nbPairs; i++)
 			{
 				const auto& cp = pairs[i];
 
-				if (!(cp.events & physx::PxPairFlag::eNOTIFY_TOUCH_FOUND)) continue;
+				if (!(cp.events & PxPairFlag::eNOTIFY_TOUCH_FOUND)) continue;
 
-				physx::PxContactPairPoint contact;
+				PxContactPairPoint contact;
 				auto contact_count = cp.extractContacts(&contact, 1);
 
 				auto pos = fromPhysx(contact.position);
@@ -228,10 +232,10 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		}
 
 
-		void onTrigger(physx::PxTriggerPair* pairs, physx::PxU32 count) override {}
-		void onConstraintBreak(physx::PxConstraintInfo*, physx::PxU32) override {}
-		void onWake(physx::PxActor**, physx::PxU32) override {}
-		void onSleep(physx::PxActor**, physx::PxU32) override {}
+		void onTrigger(PxTriggerPair* pairs, PxU32 count) override {}
+		void onConstraintBreak(PxConstraintInfo*, PxU32) override {}
+		void onWake(PxActor**, PxU32) override {}
+		void onSleep(PxActor**, PxU32) override {}
 
 
 		PhysicsSceneImpl& m_scene;
@@ -260,12 +264,12 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 		void rescale();
 		void setResource(PhysicsGeometry* resource);
-		void setPhysxActor(physx::PxRigidActor* actor);
+		void setPhysxActor(PxRigidActor* actor);
 
 		Entity entity;
 		int layer;
 		bool is_dynamic;
-		physx::PxRigidActor* physx_actor;
+		PxRigidActor* physx_actor;
 		PhysicsGeometry* resource;
 		PhysicsSceneImpl& scene;
 		ActorType type;
@@ -397,32 +401,32 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 		m_debug_visualization_flags = flags;
 
-		m_scene->setVisualizationParameter(physx::PxVisualizationParameter::eSCALE, flags != 0 ? 1.0f : 0.0f);
+		m_scene->setVisualizationParameter(PxVisualizationParameter::eSCALE, flags != 0 ? 1.0f : 0.0f);
 
 		auto setFlag = [this, flags](int flag) {
-			m_scene->setVisualizationParameter(physx::PxVisualizationParameter::Enum(flag), flags & (1 << flag) ? 1.0f : 0.0f);
+			m_scene->setVisualizationParameter(PxVisualizationParameter::Enum(flag), flags & (1 << flag) ? 1.0f : 0.0f);
 		};
 
-		setFlag(physx::PxVisualizationParameter::eBODY_AXES);
-		setFlag(physx::PxVisualizationParameter::eBODY_LIN_VELOCITY);
-		setFlag(physx::PxVisualizationParameter::eBODY_ANG_VELOCITY);
-		setFlag(physx::PxVisualizationParameter::eCONTACT_NORMAL);
-		setFlag(physx::PxVisualizationParameter::eCONTACT_ERROR);
-		setFlag(physx::PxVisualizationParameter::eCONTACT_FORCE);
-		setFlag(physx::PxVisualizationParameter::eCOLLISION_AXES);
-		setFlag(physx::PxVisualizationParameter::eJOINT_LOCAL_FRAMES);
-		setFlag(physx::PxVisualizationParameter::eJOINT_LIMITS);
-		setFlag(physx::PxVisualizationParameter::eCOLLISION_SHAPES);
-		setFlag(physx::PxVisualizationParameter::eACTOR_AXES);
-		setFlag(physx::PxVisualizationParameter::eCOLLISION_AABBS);
-		setFlag(physx::PxVisualizationParameter::eWORLD_AXES);
-		setFlag(physx::PxVisualizationParameter::eCONTACT_POINT);
+		setFlag(PxVisualizationParameter::eBODY_AXES);
+		setFlag(PxVisualizationParameter::eBODY_LIN_VELOCITY);
+		setFlag(PxVisualizationParameter::eBODY_ANG_VELOCITY);
+		setFlag(PxVisualizationParameter::eCONTACT_NORMAL);
+		setFlag(PxVisualizationParameter::eCONTACT_ERROR);
+		setFlag(PxVisualizationParameter::eCONTACT_FORCE);
+		setFlag(PxVisualizationParameter::eCOLLISION_AXES);
+		setFlag(PxVisualizationParameter::eJOINT_LOCAL_FRAMES);
+		setFlag(PxVisualizationParameter::eJOINT_LIMITS);
+		setFlag(PxVisualizationParameter::eCOLLISION_SHAPES);
+		setFlag(PxVisualizationParameter::eACTOR_AXES);
+		setFlag(PxVisualizationParameter::eCOLLISION_AABBS);
+		setFlag(PxVisualizationParameter::eWORLD_AXES);
+		setFlag(PxVisualizationParameter::eCONTACT_POINT);
 	}
 
 
 	void setVisualizationCullingBox(const Vec3& min, const Vec3& max) override
 	{
-		physx::PxBounds3 box(toPhysx(min), toPhysx(max));
+		PxBounds3 box(toPhysx(min), toPhysx(max));
 		m_scene->setVisualizationCullingBox(box);
 	}
 
@@ -489,10 +493,10 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		auto& controller = m_controllers[{cmp.index}];
 		controller.m_layer = layer;
 
-		physx::PxFilterData data;
+		PxFilterData data;
 		data.word0 = 1 << layer;
 		data.word1 = m_collision_filter[layer];
-		physx::PxShape* shapes[8];
+		PxShape* shapes[8];
 		int shapes_count = controller.m_controller->getActor()->getShapes(shapes, lengthOf(shapes));
 		for (int i = 0; i < shapes_count; ++i)
 		{
@@ -542,8 +546,8 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 	float getSphereRadius(ComponentHandle cmp) override
 	{
-		physx::PxRigidActor* actor = m_actors[{cmp.index}]->physx_actor;
-		physx::PxShape* shapes;
+		PxRigidActor* actor = m_actors[{cmp.index}]->physx_actor;
+		PxShape* shapes;
 		ASSERT(actor->getNbShapes() == 1);
 		if (actor->getShapes(&shapes, 1) != 1) ASSERT(false);
 
@@ -554,11 +558,11 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	void setSphereRadius(ComponentHandle cmp, float value) override
 	{
 		if (value == 0) return;
-		physx::PxRigidActor* actor = m_actors[{cmp.index}]->physx_actor;
-		physx::PxShape* shapes;
+		PxRigidActor* actor = m_actors[{cmp.index}]->physx_actor;
+		PxShape* shapes;
 		if (actor->getNbShapes() == 1 && actor->getShapes(&shapes, 1))
 		{
-			physx::PxSphereGeometry sphere;
+			PxSphereGeometry sphere;
 			bool is_sphere = shapes->getSphereGeometry(sphere);
 			ASSERT(is_sphere);
 			sphere.radius = value;
@@ -569,8 +573,8 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 	float getCapsuleRadius(ComponentHandle cmp) override
 	{
-		physx::PxRigidActor* actor = m_actors[{cmp.index}]->physx_actor;
-		physx::PxShape* shapes;
+		PxRigidActor* actor = m_actors[{cmp.index}]->physx_actor;
+		PxShape* shapes;
 		ASSERT(actor->getNbShapes() == 1);
 		if (actor->getShapes(&shapes, 1) != 1) ASSERT(false);
 
@@ -581,11 +585,11 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	void setCapsuleRadius(ComponentHandle cmp, float value) override
 	{
 		if (value == 0) return;
-		physx::PxRigidActor* actor = m_actors[{cmp.index}]->physx_actor;
-		physx::PxShape* shapes;
+		PxRigidActor* actor = m_actors[{cmp.index}]->physx_actor;
+		PxShape* shapes;
 		if (actor->getNbShapes() == 1 && actor->getShapes(&shapes, 1))
 		{
-			physx::PxCapsuleGeometry capsule;
+			PxCapsuleGeometry capsule;
 			bool is_capsule = shapes->getCapsuleGeometry(capsule);
 			ASSERT(is_capsule);
 			capsule.radius = value;
@@ -596,8 +600,8 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	
 	float getCapsuleHeight(ComponentHandle cmp) override
 	{
-		physx::PxRigidActor* actor = m_actors[{cmp.index}]->physx_actor;
-		physx::PxShape* shapes;
+		PxRigidActor* actor = m_actors[{cmp.index}]->physx_actor;
+		PxShape* shapes;
 		ASSERT(actor->getNbShapes() == 1);
 		if (actor->getShapes(&shapes, 1) != 1) ASSERT(false);
 
@@ -608,11 +612,11 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	void setCapsuleHeight(ComponentHandle cmp, float value) override
 	{
 		if (value == 0) return;
-		physx::PxRigidActor* actor = m_actors[{cmp.index}]->physx_actor;
-		physx::PxShape* shapes;
+		PxRigidActor* actor = m_actors[{cmp.index}]->physx_actor;
+		PxShape* shapes;
 		if (actor->getNbShapes() == 1 && actor->getShapes(&shapes, 1))
 		{
-			physx::PxCapsuleGeometry capsule;
+			PxCapsuleGeometry capsule;
 			bool is_capsule = shapes->getCapsuleGeometry(capsule);
 			ASSERT(is_capsule);
 			capsule.halfHeight = value * 0.5f;
@@ -632,10 +636,10 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 		if (terrain.m_actor)
 		{
-			physx::PxFilterData data;
+			PxFilterData data;
 			data.word0 = 1 << layer;
 			data.word1 = m_collision_filter[layer];
-			physx::PxShape* shapes[8];
+			PxShape* shapes[8];
 			int shapes_count = terrain.m_actor->getShapes(shapes, lengthOf(shapes));
 			for (int i = 0; i < shapes_count; ++i)
 			{
@@ -656,12 +660,12 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		PROFILE_FUNCTION();
 		Heightfield& terrain = m_terrains[{cmp.index}];
 		
-		physx::PxShape* shape;
+		PxShape* shape;
 		terrain.m_actor->getShapes(&shape, 1);
-		physx::PxHeightFieldGeometry geom;
+		PxHeightFieldGeometry geom;
 		shape->getHeightFieldGeometry(geom);
 
-		Array<physx::PxHeightFieldSample> heights(m_allocator);
+		Array<PxHeightFieldSample> heights(m_allocator);
 
 		heights.resize(width * height);
 		if (bytes_per_pixel == 2)
@@ -673,7 +677,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 				{
 					int idx = j + i * height;
 					int idx2 = i + j * width;
-					heights[idx].height = physx::PxI16((i32)data[idx2] - 0x7fff);
+					heights[idx].height = PxI16((i32)data[idx2] - 0x7fff);
 					heights[idx].materialIndex0 = heights[idx].materialIndex1 = 0;
 					heights[idx].setTessFlag();
 				}
@@ -689,19 +693,19 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 				{
 					int idx = j + i * height;
 					int idx2 = i + j * width;
-					heights[idx].height = physx::PxI16((i32)data[idx2] - 0x7f);
+					heights[idx].height = PxI16((i32)data[idx2] - 0x7f);
 					heights[idx].materialIndex0 = heights[idx].materialIndex1 = 0;
 					heights[idx].setTessFlag();
 				}
 			}
 		}
 
-		physx::PxHeightFieldDesc hfDesc;
-		hfDesc.format = physx::PxHeightFieldFormat::eS16_TM;
+		PxHeightFieldDesc hfDesc;
+		hfDesc.format = PxHeightFieldFormat::eS16_TM;
 		hfDesc.nbColumns = height;
 		hfDesc.nbRows = width;
 		hfDesc.samples.data = &heights[0];
-		hfDesc.samples.stride = sizeof(physx::PxHeightFieldSample);
+		hfDesc.samples.stride = sizeof(PxHeightFieldSample);
 		hfDesc.thickness = -1;
 
 		geom.heightField->modifySamples(y, x, hfDesc);
@@ -714,15 +718,15 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	Entity getJointEntity(ComponentHandle cmp) override { return {cmp.index}; }
 
 
-	physx::PxDistanceJoint* getDistanceJoint(ComponentHandle cmp)
+	PxDistanceJoint* getDistanceJoint(ComponentHandle cmp)
 	{
-		return static_cast<physx::PxDistanceJoint*>(m_joints[{cmp.index}].physx);
+		return static_cast<PxDistanceJoint*>(m_joints[{cmp.index}].physx);
 	}
 
 
 	Vec3 getDistanceJointLinearForce(ComponentHandle cmp) override
 	{
-		physx::PxVec3 linear, angular;
+		PxVec3 linear, angular;
 		getDistanceJoint(cmp)->getConstraint()->getForce(linear, angular);
 		return Vec3(linear.x, linear.y, linear.z);
 	}
@@ -767,14 +771,14 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		auto* joint = getDistanceJoint(cmp);
 		joint->setMinDistance(value.x);
 		joint->setMaxDistance(value.y);
-		joint->setDistanceJointFlag(physx::PxDistanceJointFlag::eMIN_DISTANCE_ENABLED, value.x > 0);
-		joint->setDistanceJointFlag(physx::PxDistanceJointFlag::eMAX_DISTANCE_ENABLED, value.y > 0);
+		joint->setDistanceJointFlag(PxDistanceJointFlag::eMIN_DISTANCE_ENABLED, value.x > 0);
+		joint->setDistanceJointFlag(PxDistanceJointFlag::eMAX_DISTANCE_ENABLED, value.y > 0);
 	}
 
 
-	physx::PxD6Joint* getD6Joint(ComponentHandle cmp)
+	PxD6Joint* getD6Joint(ComponentHandle cmp)
 	{
-		return static_cast<physx::PxD6Joint*>(m_joints[{cmp.index}].physx);
+		return static_cast<PxD6Joint*>(m_joints[{cmp.index}].physx);
 	}
 
 
@@ -814,73 +818,73 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 	D6Motion getD6JointXMotion(ComponentHandle cmp) override
 	{
-		return (D6Motion)getD6Joint(cmp)->getMotion(physx::PxD6Axis::eX);
+		return (D6Motion)getD6Joint(cmp)->getMotion(PxD6Axis::eX);
 	}
 
 
 	void setD6JointXMotion(ComponentHandle cmp, D6Motion motion) override
 	{
-		getD6Joint(cmp)->setMotion(physx::PxD6Axis::eX, (physx::PxD6Motion::Enum)motion);
+		getD6Joint(cmp)->setMotion(PxD6Axis::eX, (PxD6Motion::Enum)motion);
 	}
 
 
 	D6Motion getD6JointYMotion(ComponentHandle cmp) override
 	{
-		return (D6Motion)getD6Joint(cmp)->getMotion(physx::PxD6Axis::eY);
+		return (D6Motion)getD6Joint(cmp)->getMotion(PxD6Axis::eY);
 	}
 
 
 	void setD6JointYMotion(ComponentHandle cmp, D6Motion motion) override
 	{
-		getD6Joint(cmp)->setMotion(physx::PxD6Axis::eY, (physx::PxD6Motion::Enum)motion);
+		getD6Joint(cmp)->setMotion(PxD6Axis::eY, (PxD6Motion::Enum)motion);
 	}
 
 
 	D6Motion getD6JointSwing1Motion(ComponentHandle cmp) override
 	{
-		return (D6Motion)getD6Joint(cmp)->getMotion(physx::PxD6Axis::eSWING1);
+		return (D6Motion)getD6Joint(cmp)->getMotion(PxD6Axis::eSWING1);
 	}
 
 
 	void setD6JointSwing1Motion(ComponentHandle cmp, D6Motion motion) override
 	{
-		getD6Joint(cmp)->setMotion(physx::PxD6Axis::eSWING1, (physx::PxD6Motion::Enum)motion);
+		getD6Joint(cmp)->setMotion(PxD6Axis::eSWING1, (PxD6Motion::Enum)motion);
 	}
 
 
 	D6Motion getD6JointSwing2Motion(ComponentHandle cmp) override
 	{
-		return (D6Motion)getD6Joint(cmp)->getMotion(physx::PxD6Axis::eSWING2);
+		return (D6Motion)getD6Joint(cmp)->getMotion(PxD6Axis::eSWING2);
 	}
 
 
 	void setD6JointSwing2Motion(ComponentHandle cmp, D6Motion motion) override
 	{
-		getD6Joint(cmp)->setMotion(physx::PxD6Axis::eSWING2, (physx::PxD6Motion::Enum)motion);
+		getD6Joint(cmp)->setMotion(PxD6Axis::eSWING2, (PxD6Motion::Enum)motion);
 	}
 
 
 	D6Motion getD6JointTwistMotion(ComponentHandle cmp) override
 	{
-		return (D6Motion)getD6Joint(cmp)->getMotion(physx::PxD6Axis::eTWIST);
+		return (D6Motion)getD6Joint(cmp)->getMotion(PxD6Axis::eTWIST);
 	}
 
 
 	void setD6JointTwistMotion(ComponentHandle cmp, D6Motion motion) override
 	{
-		getD6Joint(cmp)->setMotion(physx::PxD6Axis::eTWIST, (physx::PxD6Motion::Enum)motion);
+		getD6Joint(cmp)->setMotion(PxD6Axis::eTWIST, (PxD6Motion::Enum)motion);
 	}
 
 
 	D6Motion getD6JointZMotion(ComponentHandle cmp) override
 	{
-		return (D6Motion)getD6Joint(cmp)->getMotion(physx::PxD6Axis::eZ);
+		return (D6Motion)getD6Joint(cmp)->getMotion(PxD6Axis::eZ);
 	}
 
 
 	void setD6JointZMotion(ComponentHandle cmp, D6Motion motion) override
 	{
-		getD6Joint(cmp)->setMotion(physx::PxD6Axis::eZ, (physx::PxD6Motion::Enum)motion);
+		getD6Joint(cmp)->setMotion(PxD6Axis::eZ, (PxD6Motion::Enum)motion);
 	}
 
 
@@ -915,7 +919,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	{
 		auto& joint = m_joints[{cmp.index}];
 		joint.local_frame0.p = toPhysx(value);
-		joint.physx->setLocalPose(physx::PxJointActorIndex::eACTOR0, joint.local_frame0);
+		joint.physx->setLocalPose(PxJointActorIndex::eACTOR0, joint.local_frame0);
 	}
 
 
@@ -923,7 +927,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	{
 		auto& joint = m_joints[{cmp.index}];
 		joint.local_frame0.q = toPhysx(Quat::vec3ToVec3(Vec3(1, 0, 0), value));
-		joint.physx->setLocalPose(physx::PxJointActorIndex::eACTOR0, joint.local_frame0);
+		joint.physx->setLocalPose(PxJointActorIndex::eACTOR0, joint.local_frame0);
 	}
 
 
@@ -935,35 +939,35 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 	Vec3 getJointAxisDirection(ComponentHandle cmp) override
 	{
-		return fromPhysx(m_joints[{cmp.index}].local_frame0.q.rotate(physx::PxVec3(1, 0, 0)));
+		return fromPhysx(m_joints[{cmp.index}].local_frame0.q.rotate(PxVec3(1, 0, 0)));
 	}
 
 
 	bool getSphericalJointUseLimit(ComponentHandle cmp) override
 	{
-		return static_cast<physx::PxSphericalJoint*>(m_joints[{cmp.index}].physx)
+		return static_cast<PxSphericalJoint*>(m_joints[{cmp.index}].physx)
 			->getSphericalJointFlags()
-			.isSet(physx::PxSphericalJointFlag::eLIMIT_ENABLED);
+			.isSet(PxSphericalJointFlag::eLIMIT_ENABLED);
 	}
 
 
 	void setSphericalJointUseLimit(ComponentHandle cmp, bool use_limit) override
 	{
-		return static_cast<physx::PxSphericalJoint*>(m_joints[{cmp.index}].physx)
-			->setSphericalJointFlag(physx::PxSphericalJointFlag::eLIMIT_ENABLED, use_limit);
+		return static_cast<PxSphericalJoint*>(m_joints[{cmp.index}].physx)
+			->setSphericalJointFlag(PxSphericalJointFlag::eLIMIT_ENABLED, use_limit);
 	}
 
 
 	Vec2 getSphericalJointLimit(ComponentHandle cmp) override
 	{
-		auto cone = static_cast<physx::PxSphericalJoint*>(m_joints[{cmp.index}].physx)->getLimitCone();
+		auto cone = static_cast<PxSphericalJoint*>(m_joints[{cmp.index}].physx)->getLimitCone();
 		return {cone.yAngle, cone.zAngle};
 	}
 
 
 	void setSphericalJointLimit(ComponentHandle cmp, const Vec2& limit) override
 	{
-		auto* joint = static_cast<physx::PxSphericalJoint*>(m_joints[{cmp.index}].physx);
+		auto* joint = static_cast<PxSphericalJoint*>(m_joints[{cmp.index}].physx);
 		auto limit_cone = joint->getLimitCone();
 		limit_cone.yAngle = limit.x;
 		limit_cone.zAngle = limit.y;
@@ -977,7 +981,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	physx::PxJoint* getJoint(ComponentHandle cmp) override
+	PxJoint* getJoint(ComponentHandle cmp) override
 	{
 		return m_joints[{cmp.index}].physx;
 	}
@@ -988,9 +992,9 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		auto& joint = m_joints[{cmp.index}];
 		if (!isValid(joint.connected_body)) return {Vec3(0, 0, 0), Quat(0, 0, 0, 1)};
 		
-		physx::PxRigidActor* a0, *a1;
+		PxRigidActor* a0, *a1;
 		joint.physx->getActors(a0, a1);
-		if (a1) return fromPhysx(joint.physx->getLocalPose(physx::PxJointActorIndex::eACTOR1));
+		if (a1) return fromPhysx(joint.physx->getLocalPose(PxJointActorIndex::eACTOR1));
 
 		Transform tr = m_universe.getTransform(joint.connected_body);
 		return tr.inverted() * m_universe.getTransform({cmp.index}) * fromPhysx(joint.local_frame0);
@@ -999,30 +1003,30 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 	void setHingeJointUseLimit(ComponentHandle cmp, bool use_limit) override
 	{
-		auto* joint = static_cast<physx::PxRevoluteJoint*>(m_joints[{cmp.index}].physx);
-		joint->setRevoluteJointFlag(physx::PxRevoluteJointFlag::eLIMIT_ENABLED, use_limit);
+		auto* joint = static_cast<PxRevoluteJoint*>(m_joints[{cmp.index}].physx);
+		joint->setRevoluteJointFlag(PxRevoluteJointFlag::eLIMIT_ENABLED, use_limit);
 	}
 
 
 	bool getHingeJointUseLimit(ComponentHandle cmp) override
 	{
-		auto* joint = static_cast<physx::PxRevoluteJoint*>(m_joints[{cmp.index}].physx);
-		return joint->getRevoluteJointFlags().isSet(physx::PxRevoluteJointFlag::eLIMIT_ENABLED);
+		auto* joint = static_cast<PxRevoluteJoint*>(m_joints[{cmp.index}].physx);
+		return joint->getRevoluteJointFlags().isSet(PxRevoluteJointFlag::eLIMIT_ENABLED);
 	}
 
 
 	Vec2 getHingeJointLimit(ComponentHandle cmp) override
 	{
-		auto* joint = static_cast<physx::PxRevoluteJoint*>(m_joints[{cmp.index}].physx);
-		physx::PxJointAngularLimitPair limit = joint->getLimit();
+		auto* joint = static_cast<PxRevoluteJoint*>(m_joints[{cmp.index}].physx);
+		PxJointAngularLimitPair limit = joint->getLimit();
 		return {limit.lower, limit.upper};
 	}
 
 
 	void setHingeJointLimit(ComponentHandle cmp, const Vec2& limit) override
 	{
-		auto* joint = static_cast<physx::PxRevoluteJoint*>(m_joints[{cmp.index}].physx);
-		physx::PxJointAngularLimitPair px_limit = joint->getLimit();
+		auto* joint = static_cast<PxRevoluteJoint*>(m_joints[{cmp.index}].physx);
+		PxJointAngularLimitPair px_limit = joint->getLimit();
 		px_limit.lower = limit.x;
 		px_limit.upper = limit.y;
 		joint->setLimit(px_limit);
@@ -1031,15 +1035,15 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 	float getHingeJointDamping(ComponentHandle cmp) override
 	{
-		auto* joint = static_cast<physx::PxRevoluteJoint*>(m_joints[{cmp.index}].physx);
+		auto* joint = static_cast<PxRevoluteJoint*>(m_joints[{cmp.index}].physx);
 		return joint->getLimit().damping;
 	}
 
 
 	void setHingeJointDamping(ComponentHandle cmp, float value) override
 	{
-		auto* joint = static_cast<physx::PxRevoluteJoint*>(m_joints[{cmp.index}].physx);
-		physx::PxJointAngularLimitPair px_limit = joint->getLimit();
+		auto* joint = static_cast<PxRevoluteJoint*>(m_joints[{cmp.index}].physx);
+		PxJointAngularLimitPair px_limit = joint->getLimit();
 		px_limit.damping = value;
 		joint->setLimit(px_limit);
 
@@ -1048,15 +1052,15 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 	float getHingeJointStiffness(ComponentHandle cmp) override
 	{
-		auto* joint = static_cast<physx::PxRevoluteJoint*>(m_joints[{cmp.index}].physx);
+		auto* joint = static_cast<PxRevoluteJoint*>(m_joints[{cmp.index}].physx);
 		return joint->getLimit().stiffness;
 	}
 
 
 	void setHingeJointStiffness(ComponentHandle cmp, float value) override
 	{
-		auto* joint = static_cast<physx::PxRevoluteJoint*>(m_joints[{cmp.index}].physx);
-		physx::PxJointAngularLimitPair px_limit = joint->getLimit();
+		auto* joint = static_cast<PxRevoluteJoint*>(m_joints[{cmp.index}].physx);
+		PxJointAngularLimitPair px_limit = joint->getLimit();
 		px_limit.stiffness = value;
 		joint->setLimit(px_limit);
 	}
@@ -1167,15 +1171,15 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		if (m_joints.find(entity) >= 0) return INVALID_COMPONENT;
 		Joint& joint = m_joints.insert(entity);
 		joint.connected_body = INVALID_ENTITY;
-		joint.local_frame0.p = physx::PxVec3(0, 0, 0);
-		joint.local_frame0.q = physx::PxQuat(0, 0, 0, 1);
-		joint.physx = physx::PxDistanceJointCreate(m_scene->getPhysics(),
+		joint.local_frame0.p = PxVec3(0, 0, 0);
+		joint.local_frame0.q = PxQuat(0, 0, 0, 1);
+		joint.physx = PxDistanceJointCreate(m_scene->getPhysics(),
 			m_dummy_actor,
-			physx::PxTransform::createIdentity(),
+			PxTransform::createIdentity(),
 			nullptr,
-			physx::PxTransform::createIdentity());
-		joint.physx->setConstraintFlag(physx::PxConstraintFlag::eVISUALIZATION, true);
-		static_cast<physx::PxDistanceJoint*>(joint.physx)->setDistanceJointFlag(physx::PxDistanceJointFlag::eSPRING_ENABLED, true);
+			PxTransform::createIdentity());
+		joint.physx->setConstraintFlag(PxConstraintFlag::eVISUALIZATION, true);
+		static_cast<PxDistanceJoint*>(joint.physx)->setDistanceJointFlag(PxDistanceJointFlag::eSPRING_ENABLED, true);
 
 		ComponentHandle cmp = {entity.index};
 		m_universe.addComponent(entity, DISTANCE_JOINT_TYPE, this, cmp);
@@ -1188,14 +1192,14 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		if (m_joints.find(entity) >= 0) return INVALID_COMPONENT;
 		Joint& joint = m_joints.insert(entity);
 		joint.connected_body = INVALID_ENTITY;
-		joint.local_frame0.p = physx::PxVec3(0, 0, 0);
-		joint.local_frame0.q = physx::PxQuat(0, 0, 0, 1);
-		joint.physx = physx::PxSphericalJointCreate(m_scene->getPhysics(),
+		joint.local_frame0.p = PxVec3(0, 0, 0);
+		joint.local_frame0.q = PxQuat(0, 0, 0, 1);
+		joint.physx = PxSphericalJointCreate(m_scene->getPhysics(),
 			m_dummy_actor,
-			physx::PxTransform::createIdentity(),
+			PxTransform::createIdentity(),
 			nullptr,
-			physx::PxTransform::createIdentity());
-		joint.physx->setConstraintFlag(physx::PxConstraintFlag::eVISUALIZATION, true);
+			PxTransform::createIdentity());
+		joint.physx->setConstraintFlag(PxConstraintFlag::eVISUALIZATION, true);
 
 		ComponentHandle cmp = {entity.index};
 		m_universe.addComponent(entity, SPHERICAL_JOINT_TYPE, this, cmp);
@@ -1208,18 +1212,18 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		if (m_joints.find(entity) >= 0) return INVALID_COMPONENT;
 		Joint& joint = m_joints.insert(entity);
 		joint.connected_body = INVALID_ENTITY;
-		joint.local_frame0.p = physx::PxVec3(0, 0, 0);
-		joint.local_frame0.q = physx::PxQuat(0, 0, 0, 1);
-		joint.physx = physx::PxD6JointCreate(m_scene->getPhysics(),
+		joint.local_frame0.p = PxVec3(0, 0, 0);
+		joint.local_frame0.q = PxQuat(0, 0, 0, 1);
+		joint.physx = PxD6JointCreate(m_scene->getPhysics(),
 			m_dummy_actor,
-			physx::PxTransform::createIdentity(),
+			PxTransform::createIdentity(),
 			nullptr,
-			physx::PxTransform::createIdentity());
-		auto* d6_joint = static_cast<physx::PxD6Joint*>(joint.physx);
+			PxTransform::createIdentity());
+		auto* d6_joint = static_cast<PxD6Joint*>(joint.physx);
 		auto linear_limit = d6_joint->getLinearLimit();
 		linear_limit.value = 1.0f;
 		d6_joint->setLinearLimit(linear_limit);
-		joint.physx->setConstraintFlag(physx::PxConstraintFlag::eVISUALIZATION, true);
+		joint.physx->setConstraintFlag(PxConstraintFlag::eVISUALIZATION, true);
 
 		ComponentHandle cmp = {entity.index};
 		m_universe.addComponent(entity, D6_JOINT_TYPE, this, cmp);
@@ -1232,14 +1236,14 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		if (m_joints.find(entity) >= 0) return INVALID_COMPONENT;
 		Joint& joint = m_joints.insert(entity);
 		joint.connected_body = INVALID_ENTITY;
-		joint.local_frame0.p = physx::PxVec3(0, 0, 0);
-		joint.local_frame0.q = physx::PxQuat(0, 0, 0, 1);
-		joint.physx = physx::PxRevoluteJointCreate(m_scene->getPhysics(),
+		joint.local_frame0.p = PxVec3(0, 0, 0);
+		joint.local_frame0.q = PxQuat(0, 0, 0, 1);
+		joint.physx = PxRevoluteJointCreate(m_scene->getPhysics(),
 			m_dummy_actor,
-			physx::PxTransform::createIdentity(),
+			PxTransform::createIdentity(),
 			nullptr,
-			physx::PxTransform::createIdentity());
-		joint.physx->setConstraintFlag(physx::PxConstraintFlag::eVISUALIZATION, true);
+			PxTransform::createIdentity());
+		joint.physx->setConstraintFlag(PxConstraintFlag::eVISUALIZATION, true);
 
 		ComponentHandle cmp = { entity.index };
 		m_universe.addComponent(entity, HINGE_JOINT_TYPE, this, cmp);
@@ -1263,7 +1267,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 	ComponentHandle createController(Entity entity)
 	{
-		physx::PxCapsuleControllerDesc cDesc;
+		PxCapsuleControllerDesc cDesc;
 		cDesc.material = m_default_material;
 		cDesc.height = 1.8f;
 		cDesc.radius = 0.25f;
@@ -1282,12 +1286,13 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		c.m_height = cDesc.height;
 		c.m_layer = 0;
 
-		physx::PxFilterData data;
+		PxFilterData data;
 		int controller_layer = c.m_layer;
 		data.word0 = 1 << controller_layer;
 		data.word1 = m_collision_filter[controller_layer];
-		physx::PxShape* shapes[8];
+		PxShape* shapes[8];
 		int shapes_count = c.m_controller->getActor()->getShapes(shapes, lengthOf(shapes));
+		c.m_controller->getActor()->userData = (void*)(intptr_t)entity.index;
 		for (int i = 0; i < shapes_count; ++i)
 		{
 			shapes[i]->setSimulationFilterData(data);
@@ -1306,13 +1311,13 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		m_actors.insert(entity, actor);
 		actor->entity = entity;
 
-		physx::PxCapsuleGeometry geom;
+		PxCapsuleGeometry geom;
 		geom.radius = 0.5f;
 		geom.halfHeight = 1;
 		Transform transform = m_universe.getTransform(entity);
-		physx::PxTransform px_transform = toPhysx(transform);
+		PxTransform px_transform = toPhysx(transform);
 
-		physx::PxRigidStatic* physx_actor =
+		PxRigidStatic* physx_actor =
 			PxCreateStatic(*m_system->getPhysics(), px_transform, geom, *m_default_material);
 		actor->setPhysxActor(physx_actor);
 
@@ -1344,14 +1349,14 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		m_actors.insert(entity, actor);
 		actor->entity = entity;
 
-		physx::PxBoxGeometry geom;
+		PxBoxGeometry geom;
 		geom.halfExtents.x = 1;
 		geom.halfExtents.y = 1;
 		geom.halfExtents.z = 1;
 		Transform transform = m_universe.getTransform(entity);
-		physx::PxTransform px_transform = toPhysx(transform);
+		PxTransform px_transform = toPhysx(transform);
 
-		physx::PxRigidStatic* physx_actor =
+		PxRigidStatic* physx_actor =
 			PxCreateStatic(*m_system->getPhysics(), px_transform, geom, *m_default_material);
 		actor->setPhysxActor(physx_actor);
 
@@ -1368,11 +1373,11 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		m_actors.insert(entity, actor);
 		actor->entity = entity;
 
-		physx::PxSphereGeometry geom;
+		PxSphereGeometry geom;
 		geom.radius = 1;
-		physx::PxTransform transform = toPhysx(m_universe.getTransform(entity));
+		PxTransform transform = toPhysx(m_universe.getTransform(entity));
 
-		physx::PxRigidStatic* physx_actor =
+		PxRigidStatic* physx_actor =
 			PxCreateStatic(*m_system->getPhysics(), transform, geom, *m_default_material);
 		actor->setPhysxActor(physx_actor);
 
@@ -1500,7 +1505,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	{
 		auto* px_actor = m_actors.at(index)->physx_actor;
 		if (!px_actor) return false;
-		return px_actor->getActorFlags().isSet(physx::PxActorFlag::eVISUALIZATION);
+		return px_actor->getActorFlags().isSet(PxActorFlag::eVISUALIZATION);
 	}
 
 
@@ -1508,37 +1513,37 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	{
 		auto* px_actor = m_actors.at(index)->physx_actor;
 		if (!px_actor) return;
-		px_actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, enable);
-		physx::PxShape* shape;
+		px_actor->setActorFlag(PxActorFlag::eVISUALIZATION, enable);
+		PxShape* shape;
 		int count = px_actor->getShapes(&shape, 1);
 		ASSERT(count > 0);
-		shape->setFlag(physx::PxShapeFlag::eVISUALIZATION, enable);
+		shape->setFlag(PxShapeFlag::eVISUALIZATION, enable);
 	}
 
 
 	void render() override
 	{
 		auto& render_scene = *static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
-		const physx::PxRenderBuffer& rb = m_scene->getRenderBuffer();
-		const physx::PxU32 num_lines = Math::minimum(100000U, rb.getNbLines());
+		const PxRenderBuffer& rb = m_scene->getRenderBuffer();
+		const PxU32 num_lines = Math::minimum(100000U, rb.getNbLines());
 		if (num_lines)
 		{
-			const physx::PxDebugLine* PX_RESTRICT lines = rb.getLines();
-			for (physx::PxU32 i = 0; i < num_lines; ++i)
+			const PxDebugLine* PX_RESTRICT lines = rb.getLines();
+			for (PxU32 i = 0; i < num_lines; ++i)
 			{
-				const physx::PxDebugLine& line = lines[i];
+				const PxDebugLine& line = lines[i];
 				Vec3 from = fromPhysx(line.pos0);
 				Vec3 to = fromPhysx(line.pos1);
 				render_scene.addDebugLine(from, to, line.color0, 0);
 			}
 		}
-		const physx::PxU32 num_tris = rb.getNbTriangles();
+		const PxU32 num_tris = rb.getNbTriangles();
 		if (num_tris)
 		{
-			const physx::PxDebugTriangle* PX_RESTRICT tris = rb.getTriangles();
-			for (physx::PxU32 i = 0; i < num_tris; ++i)
+			const PxDebugTriangle* PX_RESTRICT tris = rb.getTriangles();
+			for (PxU32 i = 0; i < num_tris; ++i)
 			{
-				const physx::PxDebugTriangle& tri = tris[i];
+				const PxDebugTriangle& tri = tris[i];
 				render_scene.addDebugTriangle(fromPhysx(tri.pos0), fromPhysx(tri.pos1), fromPhysx(tri.pos2), tri.color0, 0);
 			}
 		}
@@ -1550,7 +1555,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		PROFILE_FUNCTION();
 		for (auto* actor : m_dynamic_actors)
 		{
-			physx::PxTransform trans = actor->physx_actor->getGlobalPose();
+			PxTransform trans = actor->physx_actor->getGlobalPose();
 			m_universe.setPosition(actor->entity, trans.p.x, trans.p.y, trans.p.z);
 			m_universe.setRotation(actor->entity, trans.q.x, trans.q.y, trans.q.z, trans.q.w);
 		}
@@ -1579,8 +1584,8 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		{
 			Vec3 dif = g + controller.m_frame_change;
 			controller.m_frame_change.set(0, 0, 0);
-			const physx::PxExtendedVec3& p = controller.m_controller->getPosition();
-			controller.m_controller->move(toPhysx(dif), 0.01f, time_delta, physx::PxControllerFilters());
+			const PxExtendedVec3& p = controller.m_controller->getPosition();
+			controller.m_controller->move(toPhysx(dif), 0.01f, time_delta, PxControllerFilters());
 
 			float y = (float)p.y - controller.m_height * 0.5f - controller.m_radius;
 			m_universe.setPosition(controller.m_entity, (float)p.x, y, (float)p.z);
@@ -1599,9 +1604,9 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 				return;
 			}
 
-			auto* physx_actor = static_cast<physx::PxRigidDynamic*>(actor->physx_actor);
+			auto* physx_actor = static_cast<PxRigidDynamic*>(actor->physx_actor);
 			if (!physx_actor) return;
-			physx::PxVec3 f(i.force.x, i.force.y, i.force.z);
+			PxVec3 f(i.force.x, i.force.y, i.force.z);
 			physx_actor->addForce(f);
 		}
 		m_queued_forces.clear();
@@ -1623,13 +1628,13 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	physx::PxCapsuleGeometry getCapsuleGeometry(RagdollBone* bone)
+	PxCapsuleGeometry getCapsuleGeometry(RagdollBone* bone)
 	{
-		physx::PxShape* shape;
+		PxShape* shape;
 		int count = bone->actor->getShapes(&shape, 1);
 		ASSERT(count == 1);
 
-		physx::PxCapsuleGeometry geom;
+		PxCapsuleGeometry geom;
 		bool is_capsule = shape->getCapsuleGeometry(geom);
 		ASSERT(is_capsule);
 
@@ -1637,7 +1642,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	physx::PxJoint* getRagdollBoneJoint(RagdollBone* bone) const override
+	PxJoint* getRagdollBoneJoint(RagdollBone* bone) const override
 	{
 		return bone->parent_joint;
 	}
@@ -1678,7 +1683,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		if (value < 0) return;
 		auto geom = getCapsuleGeometry(bone);
 		geom.halfHeight = value * 0.5f;
-		physx::PxShape* shape;
+		PxShape* shape;
 		bone->actor->getShapes(&shape, 1);
 		shape->setGeometry(geom);
 	}
@@ -1689,7 +1694,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		if (value < 0) return;
 		auto geom = getCapsuleGeometry(bone);
 		geom.radius = value;
-		physx::PxShape* shape;
+		PxShape* shape;
 		bone->actor->getShapes(&shape, 1);
 		shape->setGeometry(geom);
 	}
@@ -1718,19 +1723,19 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		bone->bind_transform =
 			(entity_transform.inverted() * transform).inverted() * model->getBone(bone->pose_bone_idx).transform;
 		bone->inv_bind_transform = bone->bind_transform.inverted();
-		physx::PxTransform delta = toPhysx(transform).getInverse() * bone->actor->getGlobalPose();
+		PxTransform delta = toPhysx(transform).getInverse() * bone->actor->getGlobalPose();
 		bone->actor->setGlobalPose(toPhysx(transform));
 
 		if (bone->parent_joint)
 		{
-			physx::PxTransform local_pose1 = bone->parent_joint->getLocalPose(physx::PxJointActorIndex::eACTOR1);
-			bone->parent_joint->setLocalPose(physx::PxJointActorIndex::eACTOR1, delta * local_pose1);
+			PxTransform local_pose1 = bone->parent_joint->getLocalPose(PxJointActorIndex::eACTOR1);
+			bone->parent_joint->setLocalPose(PxJointActorIndex::eACTOR1, delta * local_pose1);
 		}
 		auto* child = bone->child;
 		while (child)
 		{
-			physx::PxTransform local_pose0 = child->parent_joint->getLocalPose(physx::PxJointActorIndex::eACTOR0);
-			child->parent_joint->setLocalPose(physx::PxJointActorIndex::eACTOR0, delta * local_pose0);
+			PxTransform local_pose0 = child->parent_joint->getLocalPose(PxJointActorIndex::eACTOR0);
+			child->parent_joint->setLocalPose(PxJointActorIndex::eACTOR0, delta * local_pose0);
 			child = child->next;
 		}
 	}
@@ -1803,7 +1808,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	void setRagdollBoneKinematic(RagdollBone* bone, bool is_kinematic) override
 	{
 		bone->is_kinematic = is_kinematic;
-		bone->actor->isRigidBody()->setRigidBodyFlag(physx::PxRigidBodyFlag::eKINEMATIC, is_kinematic);
+		bone->actor->isRigidBody()->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, is_kinematic);
 	}
 
 
@@ -1811,7 +1816,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	{
 		if (!bone) return;
 		bone->is_kinematic = is_kinematic;
-		bone->actor->isRigidBody()->setRigidBodyFlag(physx::PxRigidBodyFlag::eKINEMATIC, is_kinematic);
+		bone->actor->isRigidBody()->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, is_kinematic);
 		setRagdollBoneKinematicRecursive(bone->child, is_kinematic);
 		setRagdollBoneKinematicRecursive(bone->next, is_kinematic);
 	}
@@ -1828,74 +1833,74 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	{
 		if (child->parent_joint) child->parent_joint->release();
 
-		physx::PxJointConcreteType::Enum px_type = (physx::PxJointConcreteType::Enum)type;
-		auto d1 = child->actor->getGlobalPose().q.rotate(physx::PxVec3(1, 0, 0));
-		auto d2 = child->parent->actor->getGlobalPose().q.rotate(physx::PxVec3(1, 0, 0));
+		PxJointConcreteType::Enum px_type = (PxJointConcreteType::Enum)type;
+		auto d1 = child->actor->getGlobalPose().q.rotate(PxVec3(1, 0, 0));
+		auto d2 = child->parent->actor->getGlobalPose().q.rotate(PxVec3(1, 0, 0));
 		auto axis = d1.cross(d2).getNormalized();
 		auto pos = child->parent->actor->getGlobalPose().p;
 		auto diff = (pos - child->actor->getGlobalPose().p).getNormalized();
 		if (diff.dot(d2) < 0) d2 = -d2;
 
-		physx::PxShape* shape;
+		PxShape* shape;
 		if (child->parent->actor->getShapes(&shape, 1) == 1)
 		{
-			physx::PxCapsuleGeometry capsule;
+			PxCapsuleGeometry capsule;
 			if (shape->getCapsuleGeometry(capsule))
 			{
 				pos -= (capsule.halfHeight + capsule.radius) * d2;
 			}
 		}
 
-		physx::PxMat44 mat(d1, axis, d1.cross(axis).getNormalized(), pos);
-		physx::PxTransform tr0 = child->parent->actor->getGlobalPose().getInverse() * physx::PxTransform(mat);
-		physx::PxTransform tr1 = child->actor->getGlobalPose().getInverse() * child->parent->actor->getGlobalPose() * tr0;
+		PxMat44 mat(d1, axis, d1.cross(axis).getNormalized(), pos);
+		PxTransform tr0 = child->parent->actor->getGlobalPose().getInverse() * PxTransform(mat);
+		PxTransform tr1 = child->actor->getGlobalPose().getInverse() * child->parent->actor->getGlobalPose() * tr0;
 
-		physx::PxJoint* joint = nullptr;
+		PxJoint* joint = nullptr;
 		switch (px_type)
 		{
-			case physx::PxJointConcreteType::eFIXED:
-				joint = physx::PxFixedJointCreate(m_scene->getPhysics(), child->parent->actor, tr0, child->actor, tr1);
+			case PxJointConcreteType::eFIXED:
+				joint = PxFixedJointCreate(m_scene->getPhysics(), child->parent->actor, tr0, child->actor, tr1);
 				if (joint)
 				{
-					auto* fixed_joint = static_cast<physx::PxFixedJoint*>(joint);
+					auto* fixed_joint = static_cast<PxFixedJoint*>(joint);
 					fixed_joint->setProjectionLinearTolerance(0.1f);
 					fixed_joint->setProjectionAngularTolerance(0.01f);
 				}
 				break;
-			case physx::PxJointConcreteType::eREVOLUTE:
+			case PxJointConcreteType::eREVOLUTE:
 				joint =
-					physx::PxRevoluteJointCreate(m_scene->getPhysics(), child->parent->actor, tr0, child->actor, tr1);
+					PxRevoluteJointCreate(m_scene->getPhysics(), child->parent->actor, tr0, child->actor, tr1);
 				if (joint)
 				{
-					auto* hinge = static_cast<physx::PxRevoluteJoint*>(joint);
+					auto* hinge = static_cast<PxRevoluteJoint*>(joint);
 					hinge->setProjectionLinearTolerance(0.1f);
 					hinge->setProjectionAngularTolerance(0.01f);
 				}
 				break;
-			case physx::PxJointConcreteType::eSPHERICAL:
+			case PxJointConcreteType::eSPHERICAL:
 				joint =
-					physx::PxSphericalJointCreate(m_scene->getPhysics(), child->parent->actor, tr0, child->actor, tr1);
+					PxSphericalJointCreate(m_scene->getPhysics(), child->parent->actor, tr0, child->actor, tr1);
 				if (joint)
 				{
-					auto* spherical = static_cast<physx::PxSphericalJoint*>(joint);
+					auto* spherical = static_cast<PxSphericalJoint*>(joint);
 					spherical->setProjectionLinearTolerance(0.1f);
 				}
 				break;
-			case physx::PxJointConcreteType::eD6:
-				joint = physx::PxD6JointCreate(m_scene->getPhysics(), child->parent->actor, tr0, child->actor, tr1);
+			case PxJointConcreteType::eD6:
+				joint = PxD6JointCreate(m_scene->getPhysics(), child->parent->actor, tr0, child->actor, tr1);
 				if (joint)
 				{
-					physx::PxD6Joint* d6 = ((physx::PxD6Joint*)joint);
+					PxD6Joint* d6 = ((PxD6Joint*)joint);
 					d6->setProjectionLinearTolerance(0.1f);
 					d6->setProjectionAngularTolerance(0.01f);
-					physx::PxJointLinearLimit l = d6->getLinearLimit();
+					PxJointLinearLimit l = d6->getLinearLimit();
 					l.value = 0.01f;
 					d6->setLinearLimit(l);
-					d6->setMotion(physx::PxD6Axis::eSWING1, physx::PxD6Motion::eLIMITED);
-					d6->setMotion(physx::PxD6Axis::eSWING2, physx::PxD6Motion::eLIMITED);
+					d6->setMotion(PxD6Axis::eSWING1, PxD6Motion::eLIMITED);
+					d6->setMotion(PxD6Axis::eSWING2, PxD6Motion::eLIMITED);
 					d6->setProjectionAngularTolerance(0.01f);
 					d6->setProjectionLinearTolerance(0.1f);
-					d6->setSwingLimit(physx::PxJointLimitCone(Math::degreesToRadians(30), Math::degreesToRadians(30)));
+					d6->setSwingLimit(PxJointLimitCone(Math::degreesToRadians(30), Math::degreesToRadians(30)));
 				}
 				break;
 			default: ASSERT(false); break;
@@ -1903,9 +1908,9 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 		if (joint)
 		{
-			joint->setConstraintFlag(physx::PxConstraintFlag::eVISUALIZATION, true);
-			joint->setConstraintFlag(physx::PxConstraintFlag::eCOLLISION_ENABLED, false);
-			joint->setConstraintFlag(physx::PxConstraintFlag::ePROJECTION, true);
+			joint->setConstraintFlag(PxConstraintFlag::eVISUALIZATION, true);
+			joint->setConstraintFlag(PxConstraintFlag::eCOLLISION_ENABLED, false);
+			joint->setConstraintFlag(PxConstraintFlag::ePROJECTION, true);
 		}
 		child->parent_joint = joint;
 	}
@@ -1934,7 +1939,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 				if (child->next) child->next->prev = child;
 				parent->child = child;
 				child->parent = parent;
-				changeRagdollBoneJoint(child, physx::PxJointConcreteType::eREVOLUTE);
+				changeRagdollBoneJoint(child, PxJointConcreteType::eREVOLUTE);
 			}
 			else
 			{
@@ -1968,7 +1973,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		if (child->next) child->next->prev = child;
 		parent->child = child;
 		child->parent = parent;
-		changeRagdollBoneJoint(child, physx::PxJointConcreteType::eD6);
+		changeRagdollBoneJoint(child, PxJointConcreteType::eD6);
 	}
 
 
@@ -2048,16 +2053,16 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		new_bone->inv_bind_transform = new_bone->bind_transform.inverted();
 		transform = m_universe.getTransform(entity) * transform;
 
-		physx::PxCapsuleGeometry geom;
+		PxCapsuleGeometry geom;
 		geom.halfHeight = bone_height * 0.3f;
 		if (geom.halfHeight < 0.001f) geom.halfHeight = 1.0f;
 		geom.radius = geom.halfHeight * 0.5f;
 
-		physx::PxTransform px_transform = toPhysx(transform);
-		new_bone->actor = physx::PxCreateDynamic(m_scene->getPhysics(), px_transform, geom, *m_default_material, 1.0f);
+		PxTransform px_transform = toPhysx(transform);
+		new_bone->actor = PxCreateDynamic(m_scene->getPhysics(), px_transform, geom, *m_default_material, 1.0f);
 		new_bone->actor->isRigidDynamic()->setMass(0.0001f);
 		new_bone->actor->userData = (void*)(intptr_t)entity.index;
-		new_bone->actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
+		new_bone->actor->setActorFlag(PxActorFlag::eVISUALIZATION, true);
 		new_bone->actor->isRigidDynamic()->setSolverIterationCounts(8, 8);
 		m_scene->addActor(*new_bone->actor);
 		updateFilterData(new_bone->actor, 0);
@@ -2098,7 +2103,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		}
 		else
 		{
-			physx::PxTransform bone_pose = bone->actor->getGlobalPose();
+			PxTransform bone_pose = bone->actor->getGlobalPose();
 			auto tr = inv_root * Transform(fromPhysx(bone_pose.p), fromPhysx(bone_pose.q)) * bone->bind_transform;
 			pose->rotations[bone->pose_bone_idx] = tr.rot;
 			pose->positions[bone->pose_bone_idx] = tr.pos;
@@ -2128,7 +2133,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 			if (ragdoll.root && !ragdoll.root->is_kinematic)
 			{
-				physx::PxTransform bone_pose = ragdoll.root->actor->getGlobalPose();
+				PxTransform bone_pose = ragdoll.root->actor->getGlobalPose();
 				m_is_updating_ragdoll = true;
 
 				m_universe.setTransform(ragdoll.entity, fromPhysx(bone_pose) * ragdoll.root_transform);
@@ -2173,7 +2178,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 			Entity entity = m_joints.getKey(i);
 
-			physx::PxRigidActor* actors[2] = { nullptr, nullptr };
+			PxRigidActor* actors[2] = { nullptr, nullptr };
 			int idx = m_actors.find(entity);
 			if (idx >= 0) actors[0] = m_actors.at(idx)->physx_actor;
 			idx = m_actors.find(joint.connected_body);
@@ -2184,15 +2189,15 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			Quat rot0 = m_universe.getRotation(entity);
 			Vec3 pos1 = m_universe.getPosition(joint.connected_body);
 			Quat rot1 = m_universe.getRotation(joint.connected_body);
-			physx::PxTransform entity0_frame(toPhysx(pos0), toPhysx(rot0));
-			physx::PxTransform entity1_frame(toPhysx(pos1), toPhysx(rot1));
+			PxTransform entity0_frame(toPhysx(pos0), toPhysx(rot0));
+			PxTransform entity1_frame(toPhysx(pos1), toPhysx(rot1));
 
-			physx::PxTransform axis_local_frame1 = entity1_frame.getInverse() * entity0_frame * joint.local_frame0;
+			PxTransform axis_local_frame1 = entity1_frame.getInverse() * entity0_frame * joint.local_frame0;
 
-			joint.physx->setLocalPose(physx::PxJointActorIndex::eACTOR0, joint.local_frame0);
-			joint.physx->setLocalPose(physx::PxJointActorIndex::eACTOR1, axis_local_frame1);
+			joint.physx->setLocalPose(PxJointActorIndex::eACTOR0, joint.local_frame0);
+			joint.physx->setLocalPose(PxJointActorIndex::eACTOR1, axis_local_frame1);
 			joint.physx->setActors(actors[0], actors[1]);
-			joint.physx->setConstraintFlag(physx::PxConstraintFlag::eVISUALIZATION, true);
+			joint.physx->setConstraintFlag(PxConstraintFlag::eVISUALIZATION, true);
 		}
 	}
 
@@ -2217,6 +2222,22 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	float getControllerHeight(ComponentHandle cmp) override { return m_controllers[{cmp.index}].m_height; }
 
 
+	bool isControllerTouchingDown(ComponentHandle cmp) override
+	{
+		PxControllerState state;
+		m_controllers[{cmp.index}].m_controller->getState(state);
+		return (state.collisionFlags & PxControllerCollisionFlag::eCOLLISION_DOWN) != 0;
+	}
+
+
+	void resizeController(ComponentHandle cmp, float height) override
+	{
+		Controller& ctrl = m_controllers[{cmp.index}];
+		ctrl.m_height = height;
+		ctrl.m_controller->resize(height);
+	}
+
+
 	ComponentHandle getController(Entity entity) override
 	{
 		int idx = m_controllers.find(entity);
@@ -2233,10 +2254,10 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		RigidActor* actor = m_actors.at(index);
 		if (!actor->physx_actor) return;
 		
-		physx::PxRigidBody* rigid_body = actor->physx_actor->isRigidBody();
+		PxRigidBody* rigid_body = actor->physx_actor->isRigidBody();
 		if (!rigid_body) return;
 
-		physx::PxRigidBodyExt::addForceAtPos(*rigid_body, toPhysx(force), toPhysx(pos));
+		PxRigidBodyExt::addForceAtPos(*rigid_body, toPhysx(force), toPhysx(pos));
 	}
 
 
@@ -2256,7 +2277,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		Vec3 dir = LuaWrapper::checkArg<Vec3>(L, 3);
 
 		RaycastHit hit;
-		if (scene->raycastEx(origin, dir, FLT_MAX, hit))
+		if (scene->raycastEx(origin, dir, FLT_MAX, hit, INVALID_ENTITY))
 		{
 			LuaWrapper::push(L, hit.entity != INVALID_ENTITY);
 			LuaWrapper::push(L, hit.entity);
@@ -2271,33 +2292,58 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	Entity raycast(const Vec3& origin, const Vec3& dir) override
 	{
 		RaycastHit hit;
-		if (raycastEx(origin, dir, FLT_MAX, hit)) return hit.entity;
+		if (raycastEx(origin, dir, FLT_MAX, hit, INVALID_ENTITY)) return hit.entity;
 		return INVALID_ENTITY;
 	}
 
-
-	bool raycastEx(const Vec3& origin, const Vec3& dir, float distance, RaycastHit& result) override
+	struct Filter : public PxQueryFilterCallback
 	{
-		physx::PxVec3 physx_origin(origin.x, origin.y, origin.z);
-		physx::PxVec3 unit_dir(dir.x, dir.y, dir.z);
-		physx::PxReal max_distance = distance;
-		physx::PxRaycastHit hit;
-
-		const physx::PxSceneQueryFlags outputFlags =
-			physx::PxSceneQueryFlag::eDISTANCE | physx::PxSceneQueryFlag::eIMPACT | physx::PxSceneQueryFlag::eNORMAL;
-
-		bool status = m_scene->raycastSingle(physx_origin, unit_dir, max_distance, outputFlags, hit);
-		result.normal.x = hit.normal.x;
-		result.normal.y = hit.normal.y;
-		result.normal.z = hit.normal.z;
-		result.position.x = hit.position.x;
-		result.position.y = hit.position.y;
-		result.position.z = hit.position.z;
-		result.entity = INVALID_ENTITY;
-		if (hit.shape)
+		PxQueryHitType::Enum preFilter(const PxFilterData& filterData,
+			const PxShape* shape,
+			const PxRigidActor* actor,
+			PxHitFlags& queryFlags) override
 		{
-			physx::PxRigidActor* actor = hit.shape->getActor();
-			if (actor && actor->userData) result.entity = {(int)(intptr_t)actor->userData};
+			if(entity.index == (int)(intptr_t)actor->userData) return PxQueryHitType::eNONE;
+			return PxQueryHitType::eBLOCK;
+		}
+
+
+		PxQueryHitType::Enum postFilter(const PxFilterData& filterData, const PxQueryHit& hit) override
+		{
+			return PxQueryHitType::eBLOCK;
+		}
+
+		Entity entity;
+	};
+
+
+	bool raycastEx(const Vec3& origin, const Vec3& dir, float distance, RaycastHit& result, Entity ignored) override
+	{
+		PxVec3 physx_origin(origin.x, origin.y, origin.z);
+		PxVec3 unit_dir(dir.x, dir.y, dir.z);
+		PxReal max_distance = distance;
+
+		const PxHitFlags flags =
+			PxHitFlag::eDISTANCE | PxHitFlag::ePOSITION | PxHitFlag::eNORMAL;
+		PxRaycastBuffer hit;
+		
+		Filter filter;
+		filter.entity = ignored;
+		PxQueryFilterData filter_data;
+		filter_data.flags = PxQueryFlag::eDYNAMIC | PxQueryFlag::eSTATIC | PxQueryFlag::ePREFILTER;
+		bool status =
+			m_scene->raycast(physx_origin, unit_dir, max_distance, hit, flags, filter_data, &filter);
+		result.normal.x = hit.block.normal.x;
+		result.normal.y = hit.block.normal.y;
+		result.normal.z = hit.block.normal.z;
+		result.position.x = hit.block.position.x;
+		result.position.y = hit.block.position.y;
+		result.position.z = hit.block.position.z;
+		result.entity = INVALID_ENTITY;
+		if (hit.block.shape)
+		{
+			PxRigidActor* actor = hit.block.shape->getActor();
+			if (actor) result.entity = {(int)(intptr_t)actor->userData};
 		}
 		return status;
 	}
@@ -2312,7 +2358,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			Vec3 pos = m_universe.getPosition(entity);
 			pos.y += controller.m_height * 0.5f;
 			pos.y += controller.m_radius;
-			physx::PxExtendedVec3 pvec(pos.x, pos.y, pos.z);
+			PxExtendedVec3 pvec(pos.x, pos.y, pos.z);
 			controller.m_controller->setPosition(pvec);
 		}
 
@@ -2345,7 +2391,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	void heightmapLoaded(Heightfield& terrain)
 	{
 		PROFILE_FUNCTION();
-		Array<physx::PxHeightFieldSample> heights(m_allocator);
+		Array<PxHeightFieldSample> heights(m_allocator);
 
 		int width = terrain.m_heightmap->width;
 		int height = terrain.m_heightmap->height;
@@ -2361,7 +2407,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 				for (int i = 0; i < width; ++i)
 				{
 					int idx2 = j + i * height;
-					heights[idx].height = physx::PxI16((i32)data[idx2] - 0x7fff);
+					heights[idx].height = PxI16((i32)data[idx2] - 0x7fff);
 					heights[idx].materialIndex0 = heights[idx].materialIndex1 = 0;
 					heights[idx].setTessFlag();
 					++idx;
@@ -2378,7 +2424,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 				{
 					int idx = i + j * width;
 					int idx2 = j + i * height;
-					heights[idx].height = physx::PxI16((i32)data[idx2 * bytes_per_pixel] - 0x7f);
+					heights[idx].height = PxI16((i32)data[idx2 * bytes_per_pixel] - 0x7f);
 					heights[idx].materialIndex0 = heights[idx].materialIndex1 = 0;
 					heights[idx].setTessFlag();
 				}
@@ -2387,33 +2433,33 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 		{ // PROFILE_BLOCK scope
 			PROFILE_BLOCK("PhysX");
-			physx::PxHeightFieldDesc hfDesc;
-			hfDesc.format = physx::PxHeightFieldFormat::eS16_TM;
+			PxHeightFieldDesc hfDesc;
+			hfDesc.format = PxHeightFieldFormat::eS16_TM;
 			hfDesc.nbColumns = width;
 			hfDesc.nbRows = height;
 			hfDesc.samples.data = &heights[0];
-			hfDesc.samples.stride = sizeof(physx::PxHeightFieldSample);
+			hfDesc.samples.stride = sizeof(PxHeightFieldSample);
 			hfDesc.thickness = -1;
 
-			physx::PxHeightField* heightfield = m_system->getPhysics()->createHeightField(hfDesc);
+			PxHeightField* heightfield = m_system->getPhysics()->createHeightField(hfDesc);
 			float height_scale = bytes_per_pixel == 2 ? 1 / (256 * 256.0f - 1) : 1 / 255.0f;
-			physx::PxHeightFieldGeometry hfGeom(heightfield,
-				physx::PxMeshGeometryFlags(),
+			PxHeightFieldGeometry hfGeom(heightfield,
+				PxMeshGeometryFlags(),
 				height_scale * terrain.m_y_scale,
 				terrain.m_xz_scale,
 				terrain.m_xz_scale);
 			if (terrain.m_actor)
 			{
-				physx::PxRigidActor* actor = terrain.m_actor;
+				PxRigidActor* actor = terrain.m_actor;
 				m_scene->removeActor(*actor);
 				actor->release();
 				terrain.m_actor = nullptr;
 			}
 
-			physx::PxTransform transform = toPhysx(m_universe.getTransform(terrain.m_entity));
+			PxTransform transform = toPhysx(m_universe.getTransform(terrain.m_entity));
 			transform.p.y += terrain.m_y_scale * 0.5f;
 
-			physx::PxRigidActor* actor;
+			PxRigidActor* actor;
 			actor = PxCreateStatic(*m_system->getPhysics(), transform, hfGeom, *m_default_material);
 			if (actor)
 			{
@@ -2421,11 +2467,11 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 				m_scene->addActor(*actor);
 				terrain.m_actor = actor;
 
-				physx::PxFilterData data;
+				PxFilterData data;
 				int terrain_layer = terrain.m_layer;
 				data.word0 = 1 << terrain_layer;
 				data.word1 = m_collision_filter[terrain_layer];
-				physx::PxShape* shapes[8];
+				PxShape* shapes[8];
 				int shapes_count = actor->getShapes(shapes, lengthOf(shapes));
 				for (int i = 0; i < shapes_count; ++i)
 				{
@@ -2436,7 +2482,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			{
 				g_log_error.log("Physics") << "Could not create PhysX heightfield " << terrain.m_heightmap->getPath();
 			}
-			terrain.m_actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
+			terrain.m_actor->setActorFlag(PxActorFlag::eVISUALIZATION, true);
 		}
 	}
 
@@ -2502,12 +2548,12 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	void updateFilterData(physx::PxRigidActor* actor, int layer)
+	void updateFilterData(PxRigidActor* actor, int layer)
 	{
-		physx::PxFilterData data;
+		PxFilterData data;
 		data.word0 = 1 << layer;
 		data.word1 = m_collision_filter[layer];
-		physx::PxShape* shapes[8];
+		PxShape* shapes[8];
 		int shapes_count = actor->getShapes(shapes, lengthOf(shapes));
 		for (int i = 0; i < shapes_count; ++i)
 		{
@@ -2533,8 +2579,8 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 					(*this)(bone->child);
 					(*this)(bone->next);
 				};
-				physx::PxShape* shapes[8];
-				physx::PxFilterData data;
+				PxShape* shapes[8];
+				PxFilterData data;
 			};
 
 			Tmp tmp;
@@ -2547,11 +2593,11 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		for (auto* actor : m_actors)
 		{
 			if (!actor->physx_actor) continue;
-			physx::PxFilterData data;
+			PxFilterData data;
 			int actor_layer = actor->layer;
 			data.word0 = 1 << actor_layer;
 			data.word1 = m_collision_filter[actor_layer];
-			physx::PxShape* shapes[8];
+			PxShape* shapes[8];
 			int shapes_count = actor->physx_actor->getShapes(shapes, lengthOf(shapes));
 			for (int i = 0; i < shapes_count; ++i)
 			{
@@ -2561,11 +2607,11 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 		for (auto& controller : m_controllers)
 		{
-			physx::PxFilterData data;
+			PxFilterData data;
 			int controller_layer = controller.m_layer;
 			data.word0 = 1 << controller_layer;
 			data.word1 = m_collision_filter[controller_layer];
-			physx::PxShape* shapes[8];
+			PxShape* shapes[8];
 			int shapes_count = controller.m_controller->getActor()->getShapes(shapes, lengthOf(shapes));
 			for (int i = 0; i < shapes_count; ++i)
 			{
@@ -2577,11 +2623,11 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		{
 			if (!terrain.m_actor) continue;
 
-			physx::PxFilterData data;
+			PxFilterData data;
 			int terrain_layer = terrain.m_layer;
 			data.word0 = 1 << terrain_layer;
 			data.word1 = m_collision_filter[terrain_layer];
-			physx::PxShape* shapes[8];
+			PxShape* shapes[8];
 			int shapes_count = terrain.m_actor->getShapes(shapes, lengthOf(shapes));
 			for (int i = 0; i < shapes_count; ++i)
 			{
@@ -2620,11 +2666,11 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	Vec3 getHalfExtents(ComponentHandle cmp) override
 	{
 		Vec3 size;
-		physx::PxRigidActor* actor = m_actors[{cmp.index}]->physx_actor;
-		physx::PxShape* shapes;
+		PxRigidActor* actor = m_actors[{cmp.index}]->physx_actor;
+		PxShape* shapes;
 		if (actor->getNbShapes() == 1 && actor->getShapes(&shapes, 1))
 		{
-			physx::PxVec3& half = shapes->getGeometry().box().halfExtents;
+			PxVec3& half = shapes->getGeometry().box().halfExtents;
 			size.x = half.x;
 			size.y = half.y;
 			size.z = half.z;
@@ -2635,14 +2681,14 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 	void setHalfExtents(ComponentHandle cmp, const Vec3& size) override
 	{
-		physx::PxRigidActor* actor = m_actors[{cmp.index}]->physx_actor;
-		physx::PxShape* shapes;
+		PxRigidActor* actor = m_actors[{cmp.index}]->physx_actor;
+		PxShape* shapes;
 		if (actor->getNbShapes() == 1 && actor->getShapes(&shapes, 1))
 		{
-			physx::PxBoxGeometry box;
+			PxBoxGeometry box;
 			bool is_box = shapes->getBoxGeometry(box);
 			ASSERT(is_box);
-			physx::PxVec3& half = box.halfExtents;
+			PxVec3& half = box.halfExtents;
 			half.x = Math::maximum(0.01f, size.x);
 			half.y = Math::maximum(0.01f, size.y);
 			half.z = Math::maximum(0.01f, size.z);
@@ -2667,14 +2713,14 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		{
 			m_dynamic_actors.eraseItemFast(actor);
 		}
-		physx::PxShape* shapes;
+		PxShape* shapes;
 		if (actor->physx_actor && actor->physx_actor->getNbShapes() == 1 &&
 			actor->physx_actor->getShapes(&shapes, 1, 0))
 		{
-			physx::PxGeometryHolder geom = shapes->getGeometry();
-			physx::PxTransform transform = toPhysx(m_universe.getTransform(actor->entity));
+			PxGeometryHolder geom = shapes->getGeometry();
+			PxTransform transform = toPhysx(m_universe.getTransform(actor->entity));
 
-			physx::PxRigidActor* physx_actor;
+			PxRigidActor* physx_actor;
 			if (new_value)
 			{
 				physx_actor = PxCreateDynamic(*m_system->getPhysics(), transform, geom.any(), *m_default_material, 1.0f);
@@ -2693,7 +2739,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	void serializeActor(OutputBlob& serializer, RigidActor* actor)
 	{
 		serializer.write(actor->layer);
-		physx::PxShape* shapes;
+		PxShape* shapes;
 		auto* px_actor = actor->physx_actor;
 		auto* resource = actor->resource;
 		serializer.write((i32)actor->type);
@@ -2703,7 +2749,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			{
 				ASSERT(px_actor->getNbShapes() == 1);
 				px_actor->getShapes(&shapes, 1);
-				physx::PxBoxGeometry geom;
+				PxBoxGeometry geom;
 				if (!shapes->getBoxGeometry(geom)) ASSERT(false);
 				serializer.write(geom.halfExtents.x);
 				serializer.write(geom.halfExtents.y);
@@ -2714,7 +2760,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			{
 				ASSERT(px_actor->getNbShapes() == 1);
 				px_actor->getShapes(&shapes, 1);
-				physx::PxSphereGeometry geom;
+				PxSphereGeometry geom;
 				if (!shapes->getSphereGeometry(geom)) ASSERT(false);
 				serializer.write(geom.radius);
 				break;
@@ -2723,7 +2769,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			{
 				ASSERT(px_actor->getNbShapes() == 1);
 				px_actor->getShapes(&shapes, 1);
-				physx::PxCapsuleGeometry geom;
+				PxCapsuleGeometry geom;
 				if (!shapes->getCapsuleGeometry(geom)) ASSERT(false);
 				serializer.write(geom.halfHeight);
 				serializer.write(geom.radius);
@@ -2747,10 +2793,10 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		{
 			case ActorType::BOX:
 			{
-				physx::PxBoxGeometry box_geom;
-				physx::PxTransform transform = toPhysx(m_universe.getTransform(actor->entity));
+				PxBoxGeometry box_geom;
+				PxTransform transform = toPhysx(m_universe.getTransform(actor->entity));
 				serializer.read(box_geom.halfExtents);
-				physx::PxRigidActor* physx_actor;
+				PxRigidActor* physx_actor;
 				if (isDynamic(cmp))
 				{
 					physx_actor =
@@ -2766,10 +2812,10 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			break;
 			case ActorType::SPHERE:
 			{
-				physx::PxSphereGeometry sphere_geom;
-				physx::PxTransform transform = toPhysx(m_universe.getTransform(actor->entity));
+				PxSphereGeometry sphere_geom;
+				PxTransform transform = toPhysx(m_universe.getTransform(actor->entity));
 				serializer.read(sphere_geom.radius);
-				physx::PxRigidActor* physx_actor;
+				PxRigidActor* physx_actor;
 				if (isDynamic(cmp))
 				{
 					physx_actor =
@@ -2785,11 +2831,11 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			break;
 			case ActorType::CAPSULE:
 			{
-				physx::PxCapsuleGeometry capsule_geom;
-				physx::PxTransform transform = toPhysx(m_universe.getTransform(actor->entity));
+				PxCapsuleGeometry capsule_geom;
+				PxTransform transform = toPhysx(m_universe.getTransform(actor->entity));
 				serializer.read(capsule_geom.halfHeight);
 				serializer.read(capsule_geom.radius);
-				physx::PxRigidActor* physx_actor;
+				PxRigidActor* physx_actor;
 				if (isDynamic(cmp))
 				{
 					physx_actor =
@@ -2837,6 +2883,8 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		{
 			serializer.write(controller.m_entity);
 			serializer.write(controller.m_layer);
+			serializer.write(controller.m_radius);
+			serializer.write(controller.m_height);
 		}
 		serializer.write((i32)m_terrains.size());
 		for (auto& terrain : m_terrains)
@@ -2858,51 +2906,51 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		if (!bone->parent_joint) return;
 
 		serializer.write((int)bone->parent_joint->getConcreteType());
-		serializer.write(bone->parent_joint->getLocalPose(physx::PxJointActorIndex::eACTOR0));
-		serializer.write(bone->parent_joint->getLocalPose(physx::PxJointActorIndex::eACTOR1));
+		serializer.write(bone->parent_joint->getLocalPose(PxJointActorIndex::eACTOR0));
+		serializer.write(bone->parent_joint->getLocalPose(PxJointActorIndex::eACTOR1));
 
-		switch ((physx::PxJointConcreteType::Enum)bone->parent_joint->getConcreteType())
+		switch ((PxJointConcreteType::Enum)bone->parent_joint->getConcreteType())
 		{
-			case physx::PxJointConcreteType::eFIXED: break;
-			case physx::PxJointConcreteType::eDISTANCE:
+			case PxJointConcreteType::eFIXED: break;
+			case PxJointConcreteType::eDISTANCE:
 			{
-				auto* joint = bone->parent_joint->is<physx::PxDistanceJoint>();
+				auto* joint = bone->parent_joint->is<PxDistanceJoint>();
 				serializer.write(joint->getMinDistance());
 				serializer.write(joint->getMaxDistance());
 				serializer.write(joint->getTolerance());
 				serializer.write(joint->getStiffness());
 				serializer.write(joint->getDamping());
-				u32 flags = (physx::PxU32)joint->getDistanceJointFlags();
+				u32 flags = (PxU32)joint->getDistanceJointFlags();
 				serializer.write(flags);
 				break;
 			}
-			case physx::PxJointConcreteType::eREVOLUTE:
+			case PxJointConcreteType::eREVOLUTE:
 			{
-				auto* joint = bone->parent_joint->is<physx::PxRevoluteJoint>();
+				auto* joint = bone->parent_joint->is<PxRevoluteJoint>();
 				serializer.write(joint->getLimit());
-				u32 flags = (physx::PxU32)joint->getRevoluteJointFlags();
+				u32 flags = (PxU32)joint->getRevoluteJointFlags();
 				serializer.write(flags);
 				break;
 			}
-			case physx::PxJointConcreteType::eD6:
+			case PxJointConcreteType::eD6:
 			{
-				auto* joint = bone->parent_joint->is<physx::PxD6Joint>();
+				auto* joint = bone->parent_joint->is<PxD6Joint>();
 				serializer.write(joint->getLinearLimit());
 				serializer.write(joint->getSwingLimit());
 				serializer.write(joint->getTwistLimit());
-				serializer.write(joint->getMotion(physx::PxD6Axis::eX));
-				serializer.write(joint->getMotion(physx::PxD6Axis::eY));
-				serializer.write(joint->getMotion(physx::PxD6Axis::eZ));
-				serializer.write(joint->getMotion(physx::PxD6Axis::eSWING1));
-				serializer.write(joint->getMotion(physx::PxD6Axis::eSWING2));
-				serializer.write(joint->getMotion(physx::PxD6Axis::eTWIST));
+				serializer.write(joint->getMotion(PxD6Axis::eX));
+				serializer.write(joint->getMotion(PxD6Axis::eY));
+				serializer.write(joint->getMotion(PxD6Axis::eZ));
+				serializer.write(joint->getMotion(PxD6Axis::eSWING1));
+				serializer.write(joint->getMotion(PxD6Axis::eSWING2));
+				serializer.write(joint->getMotion(PxD6Axis::eTWIST));
 				break;
 			}
-			case physx::PxJointConcreteType::eSPHERICAL:
+			case PxJointConcreteType::eSPHERICAL:
 			{
-				auto* joint = bone->parent_joint->is<physx::PxSphericalJoint>();
+				auto* joint = bone->parent_joint->is<PxSphericalJoint>();
 				serializer.write(joint->getLimitCone());
-				u32 flags = (physx::PxU32)joint->getSphericalJointFlags();
+				u32 flags = (PxU32)joint->getSphericalJointFlags();
 				serializer.write(flags);
 				break;
 			}
@@ -2919,15 +2967,15 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			return;
 		}
 		serializer.write(bone->pose_bone_idx);
-		physx::PxTransform pose = bone->actor->getGlobalPose();
+		PxTransform pose = bone->actor->getGlobalPose();
 		pose = toPhysx(m_universe.getTransform(ragdoll.entity)).getInverse() * pose;
 		serializer.write(fromPhysx(pose));
 		serializer.write(bone->bind_transform);
 
-		physx::PxShape* shape;
+		PxShape* shape;
 		int shape_count = bone->actor->getShapes(&shape, 1);
 		ASSERT(shape_count == 1);
-		physx::PxBoxGeometry box_geom;
+		PxBoxGeometry box_geom;
 		if (shape->getBoxGeometry(box_geom))
 		{
 			serializer.write(RagdollBone::BOX);
@@ -2935,14 +2983,14 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		}
 		else
 		{
-			physx::PxCapsuleGeometry capsule_geom;
+			PxCapsuleGeometry capsule_geom;
 			bool is_capsule = shape->getCapsuleGeometry(capsule_geom);
 			ASSERT(is_capsule);
 			serializer.write(RagdollBone::CAPSULE);
 			serializer.write(capsule_geom.halfHeight);
 			serializer.write(capsule_geom.radius);
 		}
-		serializer.write(bone->actor->isRigidBody()->getRigidBodyFlags().isSet(physx::PxRigidBodyFlag::eKINEMATIC));
+		serializer.write(bone->actor->isRigidBody()->getRigidBodyFlags().isSet(PxRigidBodyFlag::eKINEMATIC));
 
 		serializeRagdollBone(ragdoll, bone->child, serializer);
 		serializeRagdollBone(ragdoll, bone->next, serializer);
@@ -2961,18 +3009,18 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		serializer.read(type);
 		changeRagdollBoneJoint(bone, type);
 
-		physx::PxTransform local_poses[2];
+		PxTransform local_poses[2];
 		serializer.read(local_poses);
-		bone->parent_joint->setLocalPose(physx::PxJointActorIndex::eACTOR0, local_poses[0]);
-		bone->parent_joint->setLocalPose(physx::PxJointActorIndex::eACTOR1, local_poses[1]);
+		bone->parent_joint->setLocalPose(PxJointActorIndex::eACTOR0, local_poses[0]);
+		bone->parent_joint->setLocalPose(PxJointActorIndex::eACTOR1, local_poses[1]);
 
-		switch ((physx::PxJointConcreteType::Enum)type)
+		switch ((PxJointConcreteType::Enum)type)
 		{
-			case physx::PxJointConcreteType::eFIXED: break;
-			case physx::PxJointConcreteType::eDISTANCE:
+			case PxJointConcreteType::eFIXED: break;
+			case PxJointConcreteType::eDISTANCE:
 			{
-				auto* joint = bone->parent_joint->is<physx::PxDistanceJoint>();
-				physx::PxReal value;
+				auto* joint = bone->parent_joint->is<PxDistanceJoint>();
+				PxReal value;
 				serializer.read(value);
 				joint->setMinDistance(value);
 				serializer.read(value);
@@ -2985,55 +3033,55 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 				joint->setDamping(value);
 				u32 flags;
 				serializer.read(flags);
-				joint->setDistanceJointFlags((physx::PxDistanceJointFlags)flags);
+				joint->setDistanceJointFlags((PxDistanceJointFlags)flags);
 				break;
 			}
-			case physx::PxJointConcreteType::eREVOLUTE:
+			case PxJointConcreteType::eREVOLUTE:
 			{
-				auto* joint = bone->parent_joint->is<physx::PxRevoluteJoint>();
-				physx::PxJointAngularLimitPair limit(0, 0);
+				auto* joint = bone->parent_joint->is<PxRevoluteJoint>();
+				PxJointAngularLimitPair limit(0, 0);
 				serializer.read(limit);
 				joint->setLimit(limit);
 				u32 flags;
 				serializer.read(flags);
-				joint->setRevoluteJointFlags((physx::PxRevoluteJointFlags)flags);
+				joint->setRevoluteJointFlags((PxRevoluteJointFlags)flags);
 				break;
 			}
-			case physx::PxJointConcreteType::eSPHERICAL:
+			case PxJointConcreteType::eSPHERICAL:
 			{
-				auto* joint = bone->parent_joint->is<physx::PxSphericalJoint>();
-				physx::PxJointLimitCone limit(0, 0);
+				auto* joint = bone->parent_joint->is<PxSphericalJoint>();
+				PxJointLimitCone limit(0, 0);
 				serializer.read(limit);
 				joint->setLimitCone(limit);
 				u32 flags;
 				serializer.read(flags);
-				joint->setSphericalJointFlags((physx::PxSphericalJointFlags)flags);
+				joint->setSphericalJointFlags((PxSphericalJointFlags)flags);
 				break;
 			}
-			case physx::PxJointConcreteType::eD6:
+			case PxJointConcreteType::eD6:
 			{
-				auto* joint = bone->parent_joint->is<physx::PxD6Joint>();
+				auto* joint = bone->parent_joint->is<PxD6Joint>();
 				
-				physx::PxJointLinearLimit linear_limit(0, physx::PxSpring(0, 0));
+				PxJointLinearLimit linear_limit(0, PxSpring(0, 0));
 				serializer.read(linear_limit);
 				joint->setLinearLimit(linear_limit);
 
-				physx::PxJointLimitCone swing_limit(0, 0);
+				PxJointLimitCone swing_limit(0, 0);
 				serializer.read(swing_limit);
 				joint->setSwingLimit(swing_limit);
 
-				physx::PxJointAngularLimitPair twist_limit(0, 0);
+				PxJointAngularLimitPair twist_limit(0, 0);
 				serializer.read(twist_limit);
 				joint->setTwistLimit(twist_limit);
 
-				physx::PxD6Motion::Enum motions[6];
+				PxD6Motion::Enum motions[6];
 				serializer.read(motions);
-				joint->setMotion(physx::PxD6Axis::eX, motions[0]);
-				joint->setMotion(physx::PxD6Axis::eY, motions[1]);
-				joint->setMotion(physx::PxD6Axis::eZ, motions[2]);
-				joint->setMotion(physx::PxD6Axis::eSWING1, motions[3]);
-				joint->setMotion(physx::PxD6Axis::eSWING2, motions[4]);
-				joint->setMotion(physx::PxD6Axis::eTWIST, motions[5]);
+				joint->setMotion(PxD6Axis::eX, motions[0]);
+				joint->setMotion(PxD6Axis::eY, motions[1]);
+				joint->setMotion(PxD6Axis::eZ, motions[2]);
+				joint->setMotion(PxD6Axis::eSWING1, motions[3]);
+				joint->setMotion(PxD6Axis::eSWING2, motions[4]);
+				joint->setMotion(PxD6Axis::eTWIST, motions[5]);
 				break;
 			}
 			default: ASSERT(false); break;
@@ -3056,7 +3104,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		serializer.read(bone->bind_transform);
 		bone->inv_bind_transform = bone->bind_transform.inverted();
 
-		physx::PxTransform px_transform = toPhysx(m_universe.getTransform(ragdoll.entity)) * toPhysx(transform);
+		PxTransform px_transform = toPhysx(m_universe.getTransform(ragdoll.entity)) * toPhysx(transform);
 
 		RagdollBone::Type type;
 		serializer.read(type);
@@ -3065,19 +3113,19 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		{
 			case RagdollBone::CAPSULE:
 			{
-				physx::PxCapsuleGeometry shape;
+				PxCapsuleGeometry shape;
 				serializer.read(shape.halfHeight);
 				serializer.read(shape.radius);
 				bone->actor =
-					physx::PxCreateDynamic(m_scene->getPhysics(), px_transform, shape, *m_default_material, 1.0f);
+					PxCreateDynamic(m_scene->getPhysics(), px_transform, shape, *m_default_material, 1.0f);
 				break;
 			}
 			case RagdollBone::BOX:
 			{
-				physx::PxBoxGeometry shape;
+				PxBoxGeometry shape;
 				serializer.read(shape.halfExtents);
 				bone->actor =
-					physx::PxCreateDynamic(m_scene->getPhysics(), px_transform, shape, *m_default_material, 1.0f);
+					PxCreateDynamic(m_scene->getPhysics(), px_transform, shape, *m_default_material, 1.0f);
 				break;
 			}
 			default: ASSERT(false); break;
@@ -3086,12 +3134,12 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		{
 			serializer.read(bone->is_kinematic);
 		}
-		bone->actor->setRigidBodyFlag(physx::PxRigidBodyFlag::eKINEMATIC, bone->is_kinematic);
+		bone->actor->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, bone->is_kinematic);
 		bone->actor->isRigidDynamic()->setSolverIterationCounts(8, 8);
 		bone->actor->isRigidDynamic()->setMass(0.0001f);
 		bone->actor->userData = (void*)(intptr_t)ragdoll.entity.index;
 
-		bone->actor->setActorFlag(physx::PxActorFlag::eVISUALIZATION, true);
+		bone->actor->setActorFlag(PxActorFlag::eVISUALIZATION, true);
 		m_scene->addActor(*bone->actor);
 		updateFilterData(bone->actor, ragdoll.layer);
 
@@ -3131,29 +3179,29 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			serializer.write((int)joint.physx->getConcreteType());
 			serializer.write(joint.connected_body);
 			serializer.write(joint.local_frame0);
-			switch ((physx::PxJointConcreteType::Enum)joint.physx->getConcreteType())
+			switch ((PxJointConcreteType::Enum)joint.physx->getConcreteType())
 			{
-				case physx::PxJointConcreteType::eSPHERICAL:
+				case PxJointConcreteType::eSPHERICAL:
 				{
-					auto* px_joint = static_cast<physx::PxSphericalJoint*>(joint.physx);
+					auto* px_joint = static_cast<PxSphericalJoint*>(joint.physx);
 					u32 flags = (u32)px_joint->getSphericalJointFlags();
 					serializer.write(flags);
 					auto limit = px_joint->getLimitCone();
 					serializer.write(limit);
 					break;
 				}
-				case physx::PxJointConcreteType::eREVOLUTE:
+				case PxJointConcreteType::eREVOLUTE:
 				{
-					auto* px_joint = static_cast<physx::PxRevoluteJoint*>(joint.physx);
+					auto* px_joint = static_cast<PxRevoluteJoint*>(joint.physx);
 					u32 flags = (u32)px_joint->getRevoluteJointFlags();
 					serializer.write(flags);
 					auto limit = px_joint->getLimit();
 					serializer.write(limit);
 					break;
 				}
-				case physx::PxJointConcreteType::eDISTANCE:
+				case PxJointConcreteType::eDISTANCE:
 				{
-					auto* px_joint = static_cast<physx::PxDistanceJoint*>(joint.physx);
+					auto* px_joint = static_cast<PxDistanceJoint*>(joint.physx);
 					u32 flags = (u32)px_joint->getDistanceJointFlags();
 					serializer.write(flags);
 					serializer.write(px_joint->getDamping());
@@ -3163,15 +3211,15 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 					serializer.write(px_joint->getMaxDistance());
 					break;
 				}
-				case physx::PxJointConcreteType::eD6:
+				case PxJointConcreteType::eD6:
 				{
-					auto* px_joint = static_cast<physx::PxD6Joint*>(joint.physx);
-					serializer.write(px_joint->getMotion(physx::PxD6Axis::eX));
-					serializer.write(px_joint->getMotion(physx::PxD6Axis::eY));
-					serializer.write(px_joint->getMotion(physx::PxD6Axis::eZ));
-					serializer.write(px_joint->getMotion(physx::PxD6Axis::eSWING1));
-					serializer.write(px_joint->getMotion(physx::PxD6Axis::eSWING2));
-					serializer.write(px_joint->getMotion(physx::PxD6Axis::eTWIST));
+					auto* px_joint = static_cast<PxD6Joint*>(joint.physx);
+					serializer.write(px_joint->getMotion(PxD6Axis::eX));
+					serializer.write(px_joint->getMotion(PxD6Axis::eY));
+					serializer.write(px_joint->getMotion(PxD6Axis::eZ));
+					serializer.write(px_joint->getMotion(PxD6Axis::eSWING1));
+					serializer.write(px_joint->getMotion(PxD6Axis::eSWING2));
+					serializer.write(px_joint->getMotion(PxD6Axis::eTWIST));
 					serializer.write(px_joint->getLinearLimit());
 					serializer.write(px_joint->getSwingLimit());
 					serializer.write(px_joint->getTwistLimit());
@@ -3230,10 +3278,20 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			{
 				c.m_layer = 0;
 			}
-			physx::PxCapsuleControllerDesc cDesc;
+			if (version > (int)PhysicsSceneVersion::CONTROLLER_SHAPE)
+			{
+				serializer.read(c.m_radius);
+				serializer.read(c.m_height);
+			}
+			else
+			{
+				c.m_radius = 0.25f;
+				c.m_height = 1.8f;
+			}
+			PxCapsuleControllerDesc cDesc;
 			cDesc.material = m_default_material;
-			cDesc.height = 1.8f;
-			cDesc.radius = 0.25f;
+			cDesc.height = c.m_height;
+			cDesc.radius = c.m_radius;
 			cDesc.slopeLimit = 0.0f;
 			cDesc.contactOffset = 0.1f;
 			cDesc.stepOffset = 0.02f;
@@ -3242,6 +3300,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			Vec3 position = m_universe.getPosition(entity);
 			cDesc.position.set(position.x, position.y - cDesc.height * 0.5f, position.z);
 			c.m_controller = m_controller_manager->createController(cDesc);
+			c.m_controller->getActor()->userData = (void*)(intptr_t)entity.index;
 			c.m_entity = entity;
 			m_universe.addComponent(entity, CONTROLLER_TYPE, this, {i});
 		}
@@ -3301,54 +3360,54 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			serializer.read(joint.connected_body);
 			serializer.read(joint.local_frame0);
 			ComponentType cmp_type;
-			switch (physx::PxJointConcreteType::Enum(type))
+			switch (PxJointConcreteType::Enum(type))
 			{
-				case physx::PxJointConcreteType::eSPHERICAL:
+				case PxJointConcreteType::eSPHERICAL:
 				{
 					cmp_type = SPHERICAL_JOINT_TYPE;
-					auto* px_joint = physx::PxSphericalJointCreate(m_scene->getPhysics(),
+					auto* px_joint = PxSphericalJointCreate(m_scene->getPhysics(),
 						m_dummy_actor,
 						joint.local_frame0,
 						nullptr,
-						physx::PxTransform::createIdentity());
+						PxTransform::createIdentity());
 					joint.physx = px_joint;
 					u32 flags;
 					serializer.read(flags);
-					px_joint->setSphericalJointFlags(physx::PxSphericalJointFlags(flags));
-					physx::PxJointLimitCone limit(0, 0);
+					px_joint->setSphericalJointFlags(PxSphericalJointFlags(flags));
+					PxJointLimitCone limit(0, 0);
 					serializer.read(limit);
 					px_joint->setLimitCone(limit);
 					break;
 				}
-				case physx::PxJointConcreteType::eREVOLUTE:
+				case PxJointConcreteType::eREVOLUTE:
 				{
 					cmp_type = HINGE_JOINT_TYPE;
-					auto* px_joint = physx::PxRevoluteJointCreate(m_scene->getPhysics(),
+					auto* px_joint = PxRevoluteJointCreate(m_scene->getPhysics(),
 						m_dummy_actor,
 						joint.local_frame0,
 						nullptr,
-						physx::PxTransform::createIdentity());
+						PxTransform::createIdentity());
 					joint.physx = px_joint;
 					u32 flags;
 					serializer.read(flags);
-					px_joint->setRevoluteJointFlags(physx::PxRevoluteJointFlags(flags));
-					physx::PxJointAngularLimitPair limit(0, 0);
+					px_joint->setRevoluteJointFlags(PxRevoluteJointFlags(flags));
+					PxJointAngularLimitPair limit(0, 0);
 					serializer.read(limit);
 					px_joint->setLimit(limit);
 					break;
 				}
-				case physx::PxJointConcreteType::eDISTANCE:
+				case PxJointConcreteType::eDISTANCE:
 				{
 					cmp_type = DISTANCE_JOINT_TYPE;
-					auto* px_joint = physx::PxDistanceJointCreate(m_scene->getPhysics(),
+					auto* px_joint = PxDistanceJointCreate(m_scene->getPhysics(),
 						m_dummy_actor,
 						joint.local_frame0,
 						nullptr,
-						physx::PxTransform::createIdentity());
+						PxTransform::createIdentity());
 					joint.physx = px_joint;
 					u32 flags;
 					serializer.read(flags);
-					px_joint->setDistanceJointFlags(physx::PxDistanceJointFlags(flags));
+					px_joint->setDistanceJointFlags(PxDistanceJointFlags(flags));
 					float tmp;
 					serializer.read(tmp);
 					px_joint->setDamping(tmp);
@@ -3362,30 +3421,30 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 					px_joint->setMaxDistance(tmp);
 					break;
 				}
-				case physx::PxJointConcreteType::eD6:
+				case PxJointConcreteType::eD6:
 				{
 					cmp_type = D6_JOINT_TYPE;
-					auto* px_joint = physx::PxD6JointCreate(m_scene->getPhysics(),
+					auto* px_joint = PxD6JointCreate(m_scene->getPhysics(),
 						m_dummy_actor,
 						joint.local_frame0,
 						nullptr,
-						physx::PxTransform::createIdentity());
+						PxTransform::createIdentity());
 					joint.physx = px_joint;
 					int motions[6];
 					serializer.read(motions);
-					px_joint->setMotion(physx::PxD6Axis::eX, (physx::PxD6Motion::Enum)motions[0]);
-					px_joint->setMotion(physx::PxD6Axis::eY, (physx::PxD6Motion::Enum)motions[1]);
-					px_joint->setMotion(physx::PxD6Axis::eZ, (physx::PxD6Motion::Enum) motions[2]);
-					px_joint->setMotion(physx::PxD6Axis::eSWING1, (physx::PxD6Motion::Enum)motions[3]);
-					px_joint->setMotion(physx::PxD6Axis::eSWING2, (physx::PxD6Motion::Enum)motions[4]);
-					px_joint->setMotion(physx::PxD6Axis::eTWIST, (physx::PxD6Motion::Enum)motions[5]);
-					physx::PxJointLinearLimit linear_limit(0, physx::PxSpring(0, 0));
+					px_joint->setMotion(PxD6Axis::eX, (PxD6Motion::Enum)motions[0]);
+					px_joint->setMotion(PxD6Axis::eY, (PxD6Motion::Enum)motions[1]);
+					px_joint->setMotion(PxD6Axis::eZ, (PxD6Motion::Enum) motions[2]);
+					px_joint->setMotion(PxD6Axis::eSWING1, (PxD6Motion::Enum)motions[3]);
+					px_joint->setMotion(PxD6Axis::eSWING2, (PxD6Motion::Enum)motions[4]);
+					px_joint->setMotion(PxD6Axis::eTWIST, (PxD6Motion::Enum)motions[5]);
+					PxJointLinearLimit linear_limit(0, PxSpring(0, 0));
 					serializer.read(linear_limit);
 					px_joint->setLinearLimit(linear_limit);
-					physx::PxJointLimitCone swing_limit(0, 0);
+					PxJointLimitCone swing_limit(0, 0);
 					serializer.read(swing_limit);
 					px_joint->setSwingLimit(swing_limit);
-					physx::PxJointAngularLimitPair twist_limit(0, 0);
+					PxJointAngularLimitPair twist_limit(0, 0);
 					serializer.read(twist_limit);
 					px_joint->setTwistLimit(twist_limit);
 					break;
@@ -3472,7 +3531,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			return 0;
 		}
 
-		auto* physx_actor = static_cast<physx::PxRigidDynamic*>(actor->physx_actor);
+		auto* physx_actor = static_cast<PxRigidDynamic*>(actor->physx_actor);
 		if (!physx_actor) return 0;
 		return physx_actor->getLinearVelocity().magnitude();
 	}
@@ -3487,7 +3546,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			return;
 		}
 
-		auto* physx_actor = static_cast<physx::PxRigidDynamic*>(actor->physx_actor);
+		auto* physx_actor = static_cast<PxRigidDynamic*>(actor->physx_actor);
 		if (!physx_actor) return;
 		physx_actor->putToSleep();
 	}
@@ -3501,24 +3560,24 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	static physx::PxFilterFlags filterShader(
-		physx::PxFilterObjectAttributes attributes0, physx::PxFilterData filterData0,
-		physx::PxFilterObjectAttributes attributes1, physx::PxFilterData filterData1,
-		physx::PxPairFlags& pairFlags, const void* constantBlock, physx::PxU32 constantBlockSize)
+	static PxFilterFlags filterShader(
+		PxFilterObjectAttributes attributes0, PxFilterData filterData0,
+		PxFilterObjectAttributes attributes1, PxFilterData filterData1,
+		PxPairFlags& pairFlags, const void* constantBlock, PxU32 constantBlockSize)
 	{
-		if (physx::PxFilterObjectIsTrigger(attributes0) || physx::PxFilterObjectIsTrigger(attributes1))
+		if (PxFilterObjectIsTrigger(attributes0) || PxFilterObjectIsTrigger(attributes1))
 		{
-			pairFlags = physx::PxPairFlag::eTRIGGER_DEFAULT;
-			return physx::PxFilterFlag::eDEFAULT;
+			pairFlags = PxPairFlag::eTRIGGER_DEFAULT;
+			return PxFilterFlag::eDEFAULT;
 		}
 
 		if (!(filterData0.word0 & filterData1.word1) || !(filterData1.word0 & filterData0.word1))
 		{
-			return physx::PxFilterFlag::eKILL;
+			return PxFilterFlag::eKILL;
 		}
-		pairFlags = physx::PxPairFlag::eCONTACT_DEFAULT | physx::PxPairFlag::eNOTIFY_TOUCH_FOUND |
-					physx::PxPairFlag::eNOTIFY_CONTACT_POINTS;
-		return physx::PxFilterFlag::eDEFAULT;
+		pairFlags = PxPairFlag::eCONTACT_DEFAULT | PxPairFlag::eNOTIFY_TOUCH_FOUND |
+					PxPairFlag::eNOTIFY_CONTACT_POINTS;
+		return PxFilterFlag::eDEFAULT;
 	}
 
 
@@ -3531,7 +3590,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 	struct Controller
 	{
-		physx::PxController* m_controller;
+		PxController* m_controller;
 		Entity m_entity;
 		Vec3 m_frame_change;
 		float m_radius;
@@ -3544,12 +3603,12 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	Universe& m_universe;
 	Engine* m_engine;
 	ContactCallback m_contact_callback;
-	physx::PxScene* m_scene;
+	PxScene* m_scene;
 	LuaScriptScene* m_script_scene;
 	PhysicsSystem* m_system;
-	physx::PxRigidDynamic* m_dummy_actor;
-	physx::PxControllerManager* m_controller_manager;
-	physx::PxMaterial* m_default_material;
+	PxRigidDynamic* m_dummy_actor;
+	PxControllerManager* m_controller_manager;
+	PxMaterial* m_default_material;
 
 	AssociativeArray<Entity, RigidActor*> m_actors;
 	AssociativeArray<Entity, Ragdoll> m_ragdolls;
@@ -3573,11 +3632,11 @@ PhysicsScene* PhysicsScene::create(PhysicsSystem& system, Universe& context, Eng
 	PhysicsSceneImpl* impl = LUMIX_NEW(allocator, PhysicsSceneImpl)(context, allocator);
 	impl->m_universe.entityTransformed().bind<PhysicsSceneImpl, &PhysicsSceneImpl::onEntityMoved>(impl);
 	impl->m_engine = &engine;
-	physx::PxSceneDesc sceneDesc(system.getPhysics()->getTolerancesScale());
-	sceneDesc.gravity = physx::PxVec3(0.0f, -9.8f, 0.0f);
+	PxSceneDesc sceneDesc(system.getPhysics()->getTolerancesScale());
+	sceneDesc.gravity = PxVec3(0.0f, -9.8f, 0.0f);
 	if (!sceneDesc.cpuDispatcher)
 	{
-		physx::PxDefaultCpuDispatcher* cpu_dispatcher = physx::PxDefaultCpuDispatcherCreate(1);
+		PxDefaultCpuDispatcher* cpu_dispatcher = PxDefaultCpuDispatcherCreate(1);
 		if (!cpu_dispatcher)
 		{
 			g_log_error.log("Physics") << "PxDefaultCpuDispatcherCreate failed!";
@@ -3599,9 +3658,9 @@ PhysicsScene* PhysicsScene::create(PhysicsSystem& system, Universe& context, Eng
 
 	impl->m_system = &system;
 	impl->m_default_material = impl->m_system->getPhysics()->createMaterial(0.5, 0.5, 0.5);
-	physx::PxSphereGeometry geom(1);
-	impl->m_dummy_actor = physx::PxCreateDynamic(
-		impl->m_scene->getPhysics(), physx::PxTransform::createIdentity(), geom, *impl->m_default_material, 1);
+	PxSphereGeometry geom(1);
+	impl->m_dummy_actor = PxCreateDynamic(
+		impl->m_scene->getPhysics(), PxTransform::createIdentity(), geom, *impl->m_default_material, 1);
 	return impl;
 }
 
@@ -3620,17 +3679,17 @@ void PhysicsSceneImpl::RigidActor::onStateChanged(Resource::State, Resource::Sta
 	{
 		setPhysxActor(nullptr);
 
-		physx::PxTransform transform = toPhysx(scene.getUniverse().getTransform(entity));
+		PxTransform transform = toPhysx(scene.getUniverse().getTransform(entity));
 
-		physx::PxRigidActor* actor;
+		PxRigidActor* actor;
 		bool is_dynamic = scene.isDynamic(this);
 		auto& physics = *scene.m_system->getPhysics();
 
-		physx::PxMeshScale scale(scene.getUniverse().getScale(entity));
-		physx::PxConvexMeshGeometry convex_geom(resource->convex_mesh, scale);
-		physx::PxTriangleMeshGeometry tri_geom(resource->tri_mesh, scale);
-		const physx::PxGeometry* geom = resource->convex_mesh ? static_cast<physx::PxGeometry*>(&convex_geom)
-															  : static_cast<physx::PxGeometry*>(&tri_geom);
+		PxMeshScale scale(scene.getUniverse().getScale(entity));
+		PxConvexMeshGeometry convex_geom(resource->convex_mesh, scale);
+		PxTriangleMeshGeometry tri_geom(resource->tri_mesh, scale);
+		const PxGeometry* geom = resource->convex_mesh ? static_cast<PxGeometry*>(&convex_geom)
+															  : static_cast<PxGeometry*>(&tri_geom);
 
 		if (is_dynamic)
 		{
@@ -3660,7 +3719,7 @@ void PhysicsSceneImpl::RigidActor::rescale()
 }
 
 
-void PhysicsSceneImpl::RigidActor::setPhysxActor(physx::PxRigidActor* actor)
+void PhysicsSceneImpl::RigidActor::setPhysxActor(PxRigidActor* actor)
 {
 	if (physx_actor)
 	{

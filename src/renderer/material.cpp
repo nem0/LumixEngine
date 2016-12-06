@@ -43,7 +43,8 @@ Material::Material(const Path& path, ResourceManagerBase& resource_manager, IAll
 	, m_texture_count(0)
 	, m_render_states(BGFX_STATE_CULL_CW)
 	, m_color(1, 1, 1)
-	, m_shininess(4)
+	, m_metallic(0)
+	, m_roughness(1.0f)
 	, m_shader_instance(nullptr)
 	, m_define_mask(0)
 	, m_command_buffer(&DEFAULT_COMMAND_BUFFER)
@@ -261,7 +262,8 @@ bool Material::save(JsonSerializer& serializer)
 		serializer.endObject();
 	}
 	serializer.endArray();
-	serializer.serialize("shininess", m_shininess);
+	serializer.serialize("metallic", m_metallic);
+	serializer.serialize("roughness", m_roughness);
 	serializer.serialize("alpha_ref", m_alpha_ref);
 	serializer.beginArray("color");
 		serializer.serializeArrayItem(m_color.x);
@@ -489,10 +491,16 @@ void Material::createCommandBuffer()
 		generator.setTexture(i, m_shader->m_texture_slots[i].uniform_handle, m_textures[i]->handle);
 	}
 
-	Vec4 color_shininess(m_color, m_shininess);
+	Vec4 color(m_color, 0);
 	auto& renderer = static_cast<MaterialManager&>(m_resource_manager).getRenderer();
-	auto& uniform = renderer.getMaterialColorShininessUniform();
-	generator.setUniform(uniform, color_shininess);
+	auto& uniform = renderer.getMaterialColorUniform();
+	generator.setUniform(uniform, color);
+
+	Vec4 roughness_metallic(m_roughness, m_metallic, 0, 0);
+	auto& rm_uniform = renderer.getRoughnessMetallicUniform();
+	generator.setUniform(rm_uniform, roughness_metallic);
+	generator.end();
+
 	generator.end();
 
 	m_command_buffer = (u8*)m_allocator.allocate(generator.getSize());
@@ -842,9 +850,13 @@ bool Material::load(FS::IFile& file)
 			serializer.deserializeArrayItem(m_color.z, 1.0f);
 			serializer.deserializeArrayEnd();
 		}
-		else if (equalStrings(label, "shininess"))
+		else if (equalStrings(label, "metallic"))
 		{
-			serializer.deserialize(m_shininess, 4.0f);
+			serializer.deserialize(m_metallic, 0.0f);
+		}
+		else if (equalStrings(label, "roughness"))
+		{
+			serializer.deserialize(m_roughness, 1.0f);
 		}
 		else if (equalStrings(label, "shader"))
 		{

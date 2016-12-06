@@ -597,9 +597,10 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
-	void initControllerRuntime(Controller& controller)
+	bool initControllerRuntime(Controller& controller)
 	{
-		if (!controller.resource->isReady()) return;
+		if (!controller.resource->isReady()) return false;
+		if (controller.resource->getInputDecl().getSize() == 0) return false;
 		controller.root = controller.resource->createInstance(m_anim_system.m_allocator);
 		controller.input.resize(controller.resource->getInputDecl().getSize());
 		setMemory(&controller.input[0], 0, controller.input.size());
@@ -612,6 +613,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		rc.event_stream = &m_event_stream;
 		rc.controller = {controller.entity.index};
 		controller.root->enter(rc, nullptr);
+		return true;
 	}
 
 
@@ -624,17 +626,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 			return;
 		}
 
-		if (!controller.root)
-		{
-			if (controller.resource->isReady())
-			{
-				initControllerRuntime(controller);
-			}
-			else
-			{
-				return;
-			}
-		}
+		if (!controller.root && !initControllerRuntime(controller)) return;
 
 		Anim::RunningContext rc;
 		rc.time_delta = time_delta;
@@ -649,8 +641,10 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		ComponentHandle model_instance = m_render_scene->getModelInstanceComponent(controller.entity);
 		if (model_instance == INVALID_COMPONENT) return;
 
-		auto* pose = m_render_scene->getPose(model_instance);
-		auto* model = m_render_scene->getModelInstanceModel(model_instance);
+		Pose* pose = m_render_scene->getPose(model_instance);
+		if (!pose) return;
+
+		Model* model = m_render_scene->getModelInstanceModel(model_instance);
 
 		model->getPose(*pose);
 		pose->computeRelative(*model);

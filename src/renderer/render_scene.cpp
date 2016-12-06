@@ -104,11 +104,7 @@ struct GlobalLight
 {
 	ComponentHandle m_component;
 	Vec3 m_diffuse_color;
-	float m_specular_intensity;
-	Vec3 m_specular;
 	float m_diffuse_intensity;
-	Vec3 m_ambient_color;
-	float m_ambient_intensity;
 	Vec3 m_fog_color;
 	float m_fog_density;
 	float m_fog_bottom;
@@ -138,6 +134,8 @@ struct Camera
 struct EnvironmentProbe
 {
 	Texture* texture;
+	Texture* irradiance;
+	Texture* radiance;
 };
 
 
@@ -787,9 +785,19 @@ public:
 			serializer.read(entity);
 			EnvironmentProbe& probe = m_environment_probes.insert(entity);
 			StaticString<Lumix::MAX_PATH_LENGTH> path_str(probe_dir, entity.index, ".dds");
-			Path path(path_str);
-			probe.texture = static_cast<Texture*>(texture_manager->load(path));
-			
+			probe.texture = static_cast<Texture*>(texture_manager->load(Path(path_str)));
+			probe.texture->setFlag(BGFX_TEXTURE_SRGB, true);
+			StaticString<Lumix::MAX_PATH_LENGTH> irr_path_str(probe_dir, entity.index, "_irradiance.dds");
+			probe.irradiance = static_cast<Texture*>(texture_manager->load(Path(irr_path_str)));
+			probe.irradiance->setFlag(BGFX_TEXTURE_SRGB, true);
+			probe.irradiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
+			probe.irradiance->setFlag(BGFX_TEXTURE_MAG_ANISOTROPIC, true);
+			StaticString<Lumix::MAX_PATH_LENGTH> r_path_str(probe_dir, entity.index, "_radiance.dds");
+			probe.radiance = static_cast<Texture*>(texture_manager->load(Path(r_path_str)));
+			probe.radiance->setFlag(BGFX_TEXTURE_SRGB, true);
+			probe.radiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
+			probe.radiance->setFlag(BGFX_TEXTURE_MAG_ANISOTROPIC, true);
+
 			ComponentHandle cmp = {entity.index};
 			m_universe.addComponent(entity, ENVIRONMENT_PROBE_TYPE, this, cmp);
 		}
@@ -1068,26 +1076,27 @@ public:
 		for (int i = 0; i < size; ++i)
 		{
 			GlobalLight& light = m_global_lights[i];
-			light.m_specular.set(0, 0, 0);
-			if (version > RenderSceneVersion::SPECULAR_INTENSITY)
+			if (version > RenderSceneVersion::PBR)
 			{
 				serializer.read(light);
 			}
 			else
 			{
+				Vec3 vdummy;
+				float fdummy;
 				serializer.read(light.m_component);
 				serializer.read(light.m_diffuse_color);
-				serializer.read(light.m_specular);
+				if (version > RenderSceneVersion::SPECULAR_INTENSITY) serializer.read(fdummy);
+				serializer.read(vdummy);
 				serializer.read(light.m_diffuse_intensity);
-				serializer.read(light.m_ambient_color);
-				serializer.read(light.m_ambient_intensity);
+				serializer.read(vdummy);
+				serializer.read(fdummy);
 				serializer.read(light.m_fog_color);
 				serializer.read(light.m_fog_density);
 				serializer.read(light.m_fog_bottom);
 				serializer.read(light.m_fog_height);
 				serializer.read(light.m_entity);
 				serializer.read(light.m_cascades);
-				light.m_specular_intensity = 1;
 			}
 			m_universe.addComponent(light.m_entity, GLOBAL_LIGHT_TYPE, this, light.m_component);
 		}
@@ -2283,7 +2292,7 @@ public:
 		texture->onDataUpdated(x, y, w, h);
 	}
 
-
+	
 	static int LUA_getTextureWidth(Texture* texture)
 	{
 		if (!texture) return 0;
@@ -3662,31 +3671,7 @@ public:
 		m_global_lights[getGlobalLightIndex(cmp)].m_diffuse_color = color;
 	}
 
-
-	void setGlobalLightSpecular(ComponentHandle cmp, const Vec3& color) override
-	{
-		m_global_lights[getGlobalLightIndex(cmp)].m_specular = color;
-	}
-
-
-	void setGlobalLightSpecularIntensity(ComponentHandle cmp, float intensity) override
-	{
-		m_global_lights[getGlobalLightIndex(cmp)].m_specular_intensity = intensity;
-	}
-
-
-	void setLightAmbientIntensity(ComponentHandle cmp, float intensity) override
-	{
-		m_global_lights[getGlobalLightIndex(cmp)].m_ambient_intensity = intensity;
-	}
-
-
-	void setLightAmbientColor(ComponentHandle cmp, const Vec3& color) override
-	{
-		m_global_lights[getGlobalLightIndex(cmp)].m_ambient_color = color;
-	}
-
-
+	
 	float getPointLightIntensity(ComponentHandle cmp) override
 	{
 		return m_point_lights[m_point_lights_map[cmp]].m_diffuse_intensity;
@@ -3735,30 +3720,6 @@ public:
 	}
 
 
-	Vec3 getGlobalLightSpecular(ComponentHandle cmp) override
-	{
-		return m_global_lights[getGlobalLightIndex(cmp)].m_specular;
-	}
-
-
-	float getGlobalLightSpecularIntensity(ComponentHandle cmp) override
-	{
-		return m_global_lights[getGlobalLightIndex(cmp)].m_specular_intensity;
-	}
-
-
-	float getLightAmbientIntensity(ComponentHandle cmp) override
-	{
-		return m_global_lights[getGlobalLightIndex(cmp)].m_ambient_intensity;
-	}
-
-
-	Vec3 getLightAmbientColor(ComponentHandle cmp) override
-	{
-		return m_global_lights[getGlobalLightIndex(cmp)].m_ambient_color;
-	}
-
-
 	void setActiveGlobalLight(ComponentHandle cmp) override
 	{
 		m_active_global_light_cmp = cmp;
@@ -3792,13 +3753,60 @@ public:
 		u64 universe_guid = m_universe.getPath().getHash();
 		StaticString<Lumix::MAX_PATH_LENGTH> path("universes/", universe_guid, "/probes/", cmp.index, ".dds");
 		probe.texture = static_cast<Texture*>(texture_manager->load(Path(path)));
+		probe.texture->setFlag(BGFX_TEXTURE_SRGB, true);
+		path = "universes/";
+		path << universe_guid << "/probes/" << cmp.index << "_irradiance.dds";
+		probe.irradiance = static_cast<Texture*>(texture_manager->load(Path(path)));
+		probe.irradiance->setFlag(BGFX_TEXTURE_SRGB, true);
+		probe.irradiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
+		probe.irradiance->setFlag(BGFX_TEXTURE_MAG_ANISOTROPIC, true);
+		path = "universes/";
+		path << universe_guid << "/probes/" << cmp.index << "_radiance.dds";
+		probe.radiance = static_cast<Texture*>(texture_manager->load(Path(path)));
+		probe.radiance->setFlag(BGFX_TEXTURE_SRGB, true);
+		probe.radiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
+		probe.radiance->setFlag(BGFX_TEXTURE_MAG_ANISOTROPIC, true);
 	}
 
 
-	Texture* getEnvironmentProbeTexture(ComponentHandle cmp) const
+	ComponentHandle getNearestEnvironmentProbe(const Vec3& pos) const override
 	{
-		Entity entity = { cmp.index };
+		float nearest_dist_squared = FLT_MAX;
+		Entity nearest = INVALID_ENTITY;
+		for (int i = 0, c = m_environment_probes.size(); i < c; ++i)
+		{
+			Entity probe_entity = m_environment_probes.getKey(i);
+			Vec3 probe_pos = m_universe.getPosition(probe_entity);
+			float dist_squared = (pos - probe_pos).squaredLength();
+			if (dist_squared < nearest_dist_squared)
+			{
+				nearest = probe_entity;
+				nearest_dist_squared = dist_squared;
+			}
+		}
+		if (!isValid(nearest)) return INVALID_COMPONENT;
+		return {nearest.index};
+	}
+
+
+	Texture* getEnvironmentProbeTexture(ComponentHandle cmp) const override
+	{
+		Entity entity = {cmp.index};
 		return m_environment_probes[entity].texture;
+	}
+
+
+	Texture* getEnvironmentProbeIrradiance(ComponentHandle cmp) const override
+	{
+		Entity entity = {cmp.index};
+		return m_environment_probes[entity].irradiance;
+	}
+
+
+	Texture* getEnvironmentProbeRadiance(ComponentHandle cmp) const override
+	{
+		Entity entity = {cmp.index};
+		return m_environment_probes[entity].radiance;
 	}
 
 
@@ -4258,8 +4266,6 @@ public:
 		light.m_entity = entity;
 		light.m_diffuse_color.set(1, 1, 1);
 		light.m_diffuse_intensity = 0;
-		light.m_ambient_color.set(1, 1, 1);
-		light.m_ambient_intensity = 1;
 		light.m_fog_color.set(1, 1, 1);
 		light.m_fog_density = 0;
 		++m_global_light_last_cmp.index;
@@ -4267,8 +4273,6 @@ public:
 		light.m_cascades.set(3, 8, 100, 300);
 		light.m_fog_bottom = 0.0f;
 		light.m_fog_height = 10.0f;
-		light.m_specular.set(0, 0, 0);
-		light.m_specular_intensity = 1;
 
 		if (m_global_lights.size() == 1)
 		{
@@ -4336,7 +4340,12 @@ public:
 	{
 		EnvironmentProbe& probe = m_environment_probes.insert(entity);
 		auto* texture_manager = m_engine.getResourceManager().get(TEXTURE_TYPE);
-		probe.texture = static_cast<Texture*>(texture_manager->load(Path("models/editor/default_probe.dds")));
+		probe.texture = static_cast<Texture*>(texture_manager->load(Path("pipelines/pbr/default_probe.dds")));
+		probe.texture->setFlag(BGFX_TEXTURE_SRGB, true);
+		probe.irradiance = static_cast<Texture*>(texture_manager->load(Path("pipelines/pbr/default_probe.dds")));
+		probe.irradiance->setFlag(BGFX_TEXTURE_SRGB, true);
+		probe.radiance = static_cast<Texture*>(texture_manager->load(Path("pipelines/pbr/default_probe.dds")));
+		probe.radiance->setFlag(BGFX_TEXTURE_SRGB, true);
 
 		ComponentHandle cmp = {entity.index};
 		m_universe.addComponent(entity, ENVIRONMENT_PROBE_TYPE, this, cmp);

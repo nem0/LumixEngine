@@ -452,7 +452,7 @@ static bool loadTGA(Texture& texture, FS::IFile& file)
 	{
 		for (long y = 0; y < header.height; y++)
 		{
-			long idx = y * header.width * bytes_per_pixel;
+			long idx = y * header.width * 4;
 			for (long x = 0; x < header.width; x++)
 			{
 				file.read(&image_dest[idx + 2], sizeof(u8));
@@ -511,7 +511,7 @@ void Texture::removeDataReference()
 }
 
 
-static bool loadDDS(Texture& texture, FS::IFile& file)
+static bool loadDDSorKTX(Texture& texture, FS::IFile& file)
 {
 	bgfx::TextureInfo info;
 	const auto* mem = bgfx::copy(file.getBuffer(), (u32)file.size());
@@ -533,9 +533,9 @@ bool Texture::load(FS::IFile& file)
 	const char* path = getPath().c_str();
 	size_t len = getPath().length();
 	bool loaded = false;
-	if (len > 3 && equalStrings(path + len - 4, ".dds"))
+	if (len > 3 && (equalStrings(path + len - 4, ".dds") || equalStrings(path + len - 4, ".ktx")))
 	{
-		loaded = loadDDS(*this, file);
+		loaded = loadDDSorKTX(*this, file);
 	}
 	else if (len > 3 && equalStrings(path + len - 4, ".raw"))
 	{
