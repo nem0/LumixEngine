@@ -54,6 +54,7 @@ struct DockContext
 			, status(Status_Float)
 			, label(nullptr)
 			, opened(false)
+			, first(true)
 		{
 			location[0] = 0;
 			children[0] = children[1] = nullptr;
