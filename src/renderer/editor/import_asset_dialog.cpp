@@ -948,7 +948,7 @@ struct ImportTask LUMIX_FINAL : public MT::Task
 
 		unsigned int flags = aiProcess_JoinIdenticalVertices | aiProcess_RemoveComponent | aiProcess_GenUVCoords |
 							 aiProcess_RemoveRedundantMaterials | aiProcess_Triangulate | aiProcess_FindInvalidData |
-							 aiProcess_OptimizeGraph | aiProcess_ValidateDataStructure | aiProcess_CalcTangentSpace;
+							 aiProcess_ValidateDataStructure | aiProcess_CalcTangentSpace;
 		flags |= m_dialog.m_model.gen_smooth_normal ? aiProcess_GenSmoothNormals : aiProcess_GenNormals;
 		flags |= m_dialog.m_model.optimize_mesh_on_import ? aiProcess_OptimizeMeshes : 0;
 
@@ -3367,7 +3367,7 @@ void ImportAssetDialog::onWindowGUI()
 				ImGui::Checkbox("Remove doubles", &m_model.remove_doubles);
 				ImGui::DragFloat("Scale", &m_model.mesh_scale, 0.01f, 0.001f, 0);
 				ImGui::Combo("Orientation", &(int&)m_model.orientation, "Y up\0Z up\0-Z up\0-X up\0");
-				ImGui::Combo("Root Orientation", &(int&)m_model.orientation, "Y up\0Z up\0-Z up\0-X up\0");
+				ImGui::Combo("Root Orientation", &(int&)m_model.root_orientation, "Y up\0Z up\0-Z up\0-X up\0");
 				ImGui::Checkbox("Make physics convex", &m_model.make_convex);
 			}
 
