@@ -686,7 +686,7 @@ struct ShaderPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		auto* shader = static_cast<Shader*>(resource);
 		char basename[MAX_PATH_LENGTH];
 		PathUtils::getBasename(basename, lengthOf(basename), resource->getPath().c_str());
-		StaticString<MAX_PATH_LENGTH> path("/pipelines/", basename);
+		StaticString<MAX_PATH_LENGTH> path("/pipelines/", basename, "/", basename);
 		if (ImGui::Button("Open vertex shader"))
 		{
 			path << "_vs.sc";
