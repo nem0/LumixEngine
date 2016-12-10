@@ -6,9 +6,11 @@
 
 namespace Lumix
 {
+	struct IDeserializer;
 	class Engine;
 	class InputBlob;
 	class IPlugin;
+	struct ISerializer;
 	class OutputBlob;
 	class Universe;
 	class Universe;

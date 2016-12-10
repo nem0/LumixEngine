@@ -1,15 +1,16 @@
 #pragma once
 
 
-#include "engine/lumix.h"
 #include "engine/array.h"
 #include "engine/associative_array.h"
 #include "engine/delegate_list.h"
+#include "engine/iplugin.h"
+#include "engine/lumix.h"
 #include "engine/path.h"
 #include "engine/quat.h"
 #include "engine/string.h"
-#include "engine/vec.h"
 #include "engine/universe/component.h"
+#include "engine/vec.h"
 
 
 namespace Lumix
@@ -17,6 +18,8 @@ namespace Lumix
 
 
 class InputBlob;
+struct IDeserializer;
+struct ISerializer;
 struct Matrix;
 class OutputBlob;
 struct Transform;
@@ -32,6 +35,16 @@ enum
 class LUMIX_ENGINE_API Universe
 {
 public:
+	typedef void (IScene::*Serialize)(ISerializer&, ComponentHandle);
+	typedef void (IScene::*Deserialize)(IDeserializer&, Entity);
+	struct ComponentTypeEntry
+	{
+		IScene* scene;
+		void (IScene::*serialize)(ISerializer&, ComponentHandle);
+		 void (IScene::*deserialize)(IDeserializer&, Entity);
+	};
+
+public:
 	explicit Universe(IAllocator& allocator);
 	~Universe();
 
@@ -45,7 +58,14 @@ public:
 	ComponentUID getComponent(Entity entity, ComponentType type) const;
 	ComponentUID getFirstComponent(Entity entity) const;
 	ComponentUID getNextComponent(const ComponentUID& cmp) const;
-	void registerComponentTypeScene(ComponentType type, IScene* scene);
+	ComponentTypeEntry& registerComponentType(ComponentType type) { return m_component_type_map[type.index]; }
+	template <typename T1, typename T2>
+	void registerComponentType(ComponentType type, IScene* scene, T1 serialize, T2 deserialize)
+	{
+		m_component_type_map[type.index].scene = scene;
+		m_component_type_map[type.index].serialize = static_cast<Serialize>(serialize);
+		m_component_type_map[type.index].deserialize = static_cast<Deserialize>(deserialize);
+	}
 	int getEntityCount() const { return m_transformations.size(); }
 
 	int getDenseIdx(Entity entity);
@@ -79,6 +99,8 @@ public:
 	DelegateList<void(const ComponentUID&)>& componentDestroyed() { return m_component_destroyed; }
 	DelegateList<void(const ComponentUID&)>& componentAdded() { return m_component_added; }
 
+	void serializeComponent(ISerializer& serializer, ComponentType type, ComponentHandle cmp);
+	void deserializeComponent(IDeserializer& serializer, Entity entity, ComponentType type);
 	void serialize(OutputBlob& serializer);
 	void deserialize(InputBlob& serializer);
 
@@ -98,8 +120,8 @@ private:
 
 private:
 	IAllocator& m_allocator;
+	ComponentTypeEntry m_component_type_map[MAX_COMPONENTS_TYPES_COUNT];
 	Array<IScene*> m_scenes;
-	IScene* m_component_type_scene_map[MAX_COMPONENTS_TYPES_COUNT];
 	Array<Transformation> m_transformations;
 	Array<u64> m_components;
 	Array<int> m_entity_map;

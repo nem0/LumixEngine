@@ -32,7 +32,8 @@ namespace Lumix
 			void clear();
 
 			OutputBlob& operator << (const char* str);
-			OutputBlob& operator << (int value);
+			OutputBlob& operator << (i64 value);
+			OutputBlob& operator << (i32 value);
 			OutputBlob& operator << (u32 value);
 			OutputBlob& operator << (float value);
 
@@ -70,7 +71,7 @@ namespace Lumix
 			int getPosition() { return m_pos; }
 			void setPosition(int pos) { m_pos = pos; }
 			void rewind() { m_pos = 0; }
-
+			u8 readChar() { ++m_pos; return m_data[m_pos - 1]; }
 
 		private:
 			const u8* m_data;

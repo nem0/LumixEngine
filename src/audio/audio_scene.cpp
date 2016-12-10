@@ -7,6 +7,7 @@
 #include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/iallocator.h"
+#include "engine/iserializer.h"
 #include "engine/lua_wrapper.h"
 #include "engine/matrix.h"
 #include "engine/property_register.h"
@@ -25,6 +26,7 @@ enum class AudioSceneVersion : int
 	ECHO_ZONES,
 	REFACTOR,
 	IS_3D,
+	CLIP_VOLUME,
 
 	LAST
 };
@@ -85,9 +87,58 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 			i.entity = INVALID_ENTITY;
 			i.buffer_id = AudioDevice::INVALID_BUFFER_HANDLE;
 		}
-		context.registerComponentTypeScene(LISTENER_TYPE, this);
-		context.registerComponentTypeScene(AMBIENT_SOUND_TYPE, this);
-		context.registerComponentTypeScene(ECHO_ZONE_TYPE, this);
+		context.registerComponentType(LISTENER_TYPE, this, &AudioSceneImpl::serializeListener, &AudioSceneImpl::deserializeListener);
+		context.registerComponentType(AMBIENT_SOUND_TYPE, this, &AudioSceneImpl::serializeAmbientSound, &AudioSceneImpl::deserializeAmbientSound);
+		context.registerComponentType(ECHO_ZONE_TYPE, this, &AudioSceneImpl::serializeEchoZone, &AudioSceneImpl::deserializeEchoZone);
+	}
+
+
+	void serializeEchoZone(ISerializer& serializer, ComponentHandle cmp)
+	{
+		EchoZone& zone = m_echo_zones[{cmp.index}];
+		serializer.write("radius", zone.radius);
+		serializer.write("delay", zone.delay);
+	}
+
+
+	void deserializeEchoZone(IDeserializer& serializer, Entity entity)
+	{
+		EchoZone& zone = m_echo_zones.insert(entity);
+		zone.entity = entity;
+		serializer.read(&zone.radius);
+		serializer.read(&zone.delay);
+		m_universe.addComponent(entity, ECHO_ZONE_TYPE, this, {entity.index});
+	}
+
+
+	void serializeAmbientSound(ISerializer& serializer, ComponentHandle cmp)
+	{
+		AmbientSound& sound = m_ambient_sounds[{cmp.index}];
+		serializer.write("clip", m_clips.indexOf(sound.clip));
+		serializer.write("is_3d", sound.is_3d);
+	}
+
+
+	void deserializeAmbientSound(IDeserializer& serializer, Entity entity)
+	{
+		AmbientSound& sound = m_ambient_sounds.insert(entity);
+		sound.playing_sound = -1;
+		sound.entity = entity;
+		int clip;
+		serializer.read(&clip);
+		serializer.read(&sound.is_3d);
+		sound.clip = clip >= 0 ? m_clips[clip] : nullptr;
+		m_universe.addComponent(entity, AMBIENT_SOUND_TYPE, this, {entity.index});
+	}
+
+
+	void serializeListener(ISerializer&, ComponentHandle) {}
+
+
+	void deserializeListener(IDeserializer&, Entity entity)
+	{
+		m_listener.entity = entity;
+		m_universe.addComponent(entity, LISTENER_TYPE, this, {0});
 	}
 
 
@@ -358,6 +409,7 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 			serializer.write(clip != nullptr);
 			if (!clip) continue;
 
+			serializer.write(clip->volume);
 			serializer.write(clip->looped);
 			serializer.writeString(clip->name);
 			serializer.writeString(clip->clip->getPath().c_str());
@@ -404,7 +456,8 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 
 			auto* clip = LUMIX_NEW(m_allocator, ClipInfo);
 			m_clips[i] = clip;
-
+			clip->volume = 1;
+			if (version > (int)AudioSceneVersion::CLIP_VOLUME) serializer.read(clip->volume);
 			serializer.read(clip->looped);
 			serializer.readString(clip->name, lengthOf(clip->name));
 			clip->name_hash = crc32(clip->name);
@@ -488,6 +541,7 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 		clip->name_hash = crc32(name);
 		clip->clip = static_cast<Clip*>(m_system.getClipManager().load(path));
 		clip->looped = false;
+		clip->volume = 1;
 		m_clips.push(clip);
 	}
 
@@ -547,6 +601,7 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 
 	ClipInfo* getClipInfo(int index) override
 	{
+		if (index >= m_clips.size()) return nullptr;
 		return m_clips[index];
 	}
 
@@ -580,6 +635,7 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 					flags);
 				if (buffer == AudioDevice::INVALID_BUFFER_HANDLE) return -1;
 				m_device.play(buffer, clip_info->looped);
+				m_device.setVolume(buffer, clip_info->volume);
 
 				auto pos = m_universe.getPosition(entity);
 				m_device.setSourcePosition(buffer, pos.x, pos.y, pos.z);
