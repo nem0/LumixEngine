@@ -9,6 +9,7 @@
 #include "engine/fs/file_system.h"
 #include "engine/iallocator.h"
 #include "engine/iplugin.h"
+#include "engine/iserializer.h"
 #include "engine/json_serializer.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
@@ -308,7 +309,7 @@ namespace Lumix
 			m_function_call.is_in_progress = false;
 			
 			registerAPI();
-			ctx.registerComponentTypeScene(LUA_SCRIPT_TYPE, this);
+			ctx.registerComponentType(LUA_SCRIPT_TYPE, this, &LuaScriptSceneImpl::serializeLuaScript, &LuaScriptSceneImpl::deserializeLuaScript);
 		}
 
 
@@ -1234,6 +1235,77 @@ namespace Lumix
 				default: ASSERT(false); break;
 			}
 			lua_pop(scr.m_state, 2);
+		}
+
+
+		void serializeLuaScript(ISerializer& serializer, ComponentHandle cmp)
+		{
+			ScriptComponent* script = m_scripts[{cmp.index}];
+			serializer.write("count", script->m_scripts.size());
+			for (ScriptInstance& inst : script->m_scripts)
+			{
+				serializer.write("source", inst.m_script ? inst.m_script->getPath().c_str() : "");
+				serializer.write("prop_count", inst.m_properties.size());
+				for (Property& prop : inst.m_properties)
+				{
+					const char* name = getPropertyName(prop.name_hash);
+					serializer.write("prop_name", name ? name : "");
+					int idx = m_property_names.find(prop.name_hash);
+					if (idx >= 0)
+					{
+						const char* name = m_property_names.at(idx).c_str();
+						char tmp[1024];
+						getProperty(prop, name, inst, tmp, lengthOf(tmp));
+						serializer.write("prop_value", tmp);
+					}
+					else
+					{
+						serializer.write("prop_value", "");
+					}
+				}
+			}
+		}
+
+
+		void deserializeLuaScript(IDeserializer& serializer, Entity entity)
+		{
+			auto& allocator = m_system.m_allocator;
+			ScriptComponent* script = LUMIX_NEW(allocator, ScriptComponent)(*this, allocator);
+			ComponentHandle cmp = {entity.index};
+			script->m_entity = entity;
+			m_scripts.insert(entity, script);
+			
+			int count;
+			serializer.read(&count);
+			script->m_scripts.reserve(count);
+			auto* manager = m_system.m_engine.getResourceManager().get(LUA_SCRIPT_RESOURCE_TYPE);
+			for (int i = 0; i < count; ++i)
+			{
+				ScriptInstance& inst = script->m_scripts.emplace(allocator);
+				char tmp[MAX_PATH_LENGTH];
+				serializer.read(tmp, lengthOf(tmp));
+				setScriptPath(cmp, i, Path(tmp));
+
+				int prop_count;
+				serializer.read(&prop_count);
+				for (int j = 0; j < prop_count; ++j)
+				{
+					Property& prop = inst.m_properties.emplace(allocator);
+					prop.type = Property::ANY;
+					char tmp[1024];
+					serializer.read(tmp, lengthOf(tmp));
+					prop.name_hash = crc32(tmp);
+					if (m_property_names.find(prop.name_hash) < 0)
+					{
+						m_property_names.emplace(prop.name_hash, tmp, allocator);
+					}
+					tmp[0] = 0;
+					serializer.read(tmp, lengthOf(tmp));
+					prop.stored_value = tmp;
+				}
+			}
+
+			m_universe.addComponent(entity, LUA_SCRIPT_TYPE, this, cmp);
 		}
 
 

@@ -38,16 +38,12 @@ Universe::Universe(IAllocator& allocator)
 	m_transformations.reserve(RESERVED_ENTITIES_COUNT);
 	m_components.reserve(RESERVED_ENTITIES_COUNT);
 	m_entity_map.reserve(RESERVED_ENTITIES_COUNT);
-	for (int i = 0; i < lengthOf(m_component_type_scene_map); ++i)
-	{
-		m_component_type_scene_map[i] = 0;
-	}
 }
 
 
 IScene* Universe::getScene(ComponentType type) const
 {
-	return m_component_type_scene_map[type.index];
+	return m_component_type_map[type.index].scene;
 }
 
 
@@ -263,7 +259,7 @@ void Universe::destroyEntity(Entity entity)
 		{
 			ComponentType type = {i};
 			auto original_mask = mask;
-			IScene* scene = m_component_type_scene_map[i];
+			IScene* scene = m_component_type_map[i].scene;
 			scene->destroyComponent(scene->getComponent(entity, type), type);
 			mask = m_components[m_entity_map[entity.index]];
 			ASSERT(original_mask != mask);
@@ -324,6 +320,22 @@ Entity Universe::getNextEntity(Entity entity)
 		}
 	}
 	return INVALID_ENTITY;
+}
+
+
+void Universe::serializeComponent(ISerializer& serializer, ComponentType type, ComponentHandle cmp)
+{
+	auto* scene = m_component_type_map[type.index].scene;
+	auto& method = m_component_type_map[type.index].serialize;
+	(scene->*method)(serializer, cmp);
+}
+
+
+void Universe::deserializeComponent(IDeserializer& serializer, Entity entity, ComponentType type)
+{
+	auto* scene = m_component_type_map[type.index].scene;
+	auto& method = m_component_type_map[type.index].deserialize;
+	(scene->*method)(serializer, entity);
 }
 
 
@@ -395,13 +407,6 @@ float Universe::getScale(Entity entity)
 }
 
 
-void Universe::registerComponentTypeScene(ComponentType type, IScene* scene)
-{
-	ASSERT(!m_component_type_scene_map[type.index]);
-	m_component_type_scene_map[type.index] = scene;
-}
-
-
 ComponentUID Universe::getFirstComponent(Entity entity) const
 {
 	u64 mask = m_components[m_entity_map[entity.index]];
@@ -409,7 +414,7 @@ ComponentUID Universe::getFirstComponent(Entity entity) const
 	{
 		if ((mask & (u64(1) << i)) != 0)
 		{
-			IScene* scene = m_component_type_scene_map[i];
+			IScene* scene = m_component_type_map[i].scene;
 			return ComponentUID(entity, {i}, scene, scene->getComponent(entity, {i}));
 		}
 	}
@@ -424,7 +429,7 @@ ComponentUID Universe::getNextComponent(const ComponentUID& cmp) const
 	{
 		if ((mask & (u64(1) << i)) != 0)
 		{
-			IScene* scene = m_component_type_scene_map[i];
+			IScene* scene = m_component_type_map[i].scene;
 			return ComponentUID(cmp.entity, {i}, scene, scene->getComponent(cmp.entity, {i}));
 		}
 	}
@@ -436,7 +441,7 @@ ComponentUID Universe::getComponent(Entity entity, ComponentType component_type)
 {
 	u64 mask = m_components[m_entity_map[entity.index]];
 	if ((mask & (u64(1) << component_type.index)) == 0) return ComponentUID::INVALID;
-	IScene* scene = m_component_type_scene_map[component_type.index];
+	IScene* scene = m_component_type_map[component_type.index].scene;
 	return ComponentUID(entity, component_type, scene, scene->getComponent(entity, component_type));
 }
 

@@ -35,11 +35,10 @@ namespace Lumix
 	class Hierarchy : public IScene
 	{
 		public:
-			class Child
+			struct Child
 			{
-				public:
-					Entity m_entity;
-					Transform m_local_transform;
+				Entity m_entity;
+				Transform m_local_transform;
 			};
 
 			typedef HashMap<Entity, Array<Child>*> Children;

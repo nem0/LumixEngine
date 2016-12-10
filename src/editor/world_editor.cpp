@@ -5,6 +5,7 @@
 #include "editor/entity_template_system.h"
 #include "editor/gizmo.h"
 #include "editor/measure_tool.h"
+#include "editor/platform_interface.h"
 #include "engine/array.h"
 #include "engine/associative_array.h"
 #include "engine/blob.h"
@@ -22,6 +23,7 @@
 #include "engine/input_system.h"
 #include "engine/iplugin.h"
 #include "engine/iproperty_descriptor.h"
+#include "engine/iserializer.h"
 #include "engine/json_serializer.h"
 #include "engine/log.h"
 #include "engine/matrix.h"
@@ -1674,6 +1676,285 @@ public:
 	bool isUniverseChanged() const override { return m_is_universe_changed; }
 
 
+	struct Serializer : public ISerializer
+	{
+		Serializer(OutputBlob& _blob) : blob(_blob) {}
+
+		void write(const char* label, Entity entity) override
+		{
+			blob << "#" << label << "\n\t"
+				<< entity.index << "\n";
+		}
+
+		void write(const char* label, ComponentHandle value) override
+		{
+			blob << "#" << label << "\n\t"
+				<< value.index << "\n";
+		}
+
+		void write(const char* label, const Transform& value) override
+		{
+			blob << "#" << label
+				<< " (" << value.pos.x << ", " << value.pos.y << ", " << value.pos.z << ") "
+				<< " (" << value.rot.x << ", " << value.rot.y << ", " << value.rot.z << ", " << value.rot.w << ")\n\t"
+				<< asU32(value.pos.x) << "\n\t" << asU32(value.pos.y) << "\n\t" << asU32(value.pos.z) << "\n\t"
+				<< asU32(value.rot.x) << "\n\t" << asU32(value.rot.y) << "\n\t" << asU32(value.rot.z) << "\n\t" << asU32(value.rot.w) << "\n";
+		}
+
+		void write(const char* label, const Vec3& value) override
+		{
+			blob << "#" << label
+				<< " (" << value.x << ", " << value.y << ", " << value.z << ")\n\t"
+				<< asU32(value.x) << "\n\t" << asU32(value.y) << "\n\t" << asU32(value.z) << "\n";
+		}
+
+		void write(const char* label, const Vec4& value) override
+		{
+			blob << "#" << label
+				<< " (" << value.x << ", " << value.y << ", " << value.z << ", " << value.w << ")\n\t"
+				<< asU32(value.x) << "\n\t" << asU32(value.y) << "\n\t" << asU32(value.z) << "\n\t" << asU32(value.w) << "\n";
+		}
+
+		void write(const char* label, float value) override
+		{
+			blob << "#" << label << " " << value << "\n\t" << asU32(value) << "\n";
+		}
+
+		void write(const char* label, bool value) override
+		{
+			blob << "#" << label << "\n\t" << (u32)value << "\n";
+		}
+
+		void write(const char* label, const char* value) override
+		{
+			blob << "#" << label << "\n\t\"" << value << "\"\n";
+		}
+
+		void write(const char* label, u32 value) override
+		{
+			blob << "#" << label << "\n\t" << value << "\n";
+		}
+
+		void write(const char* label, i64 value) override
+		{
+			blob << "#" << label << "\n\t" << value << "\n";
+		}
+
+		void write(const char* label, i32 value) override
+		{
+			blob << "#" << label << "\n\t" << value << "\n";
+		}
+
+		void write(const char* label, i8 value) override
+		{
+			blob << "#" << label << "\n\t" << value << "\n";
+		}
+
+		void write(const char* label, u8 value) override
+		{
+			blob << "#" << label << "\n\t" << value << "\n";
+		}
+
+		static u32 asU32(float v)
+		{
+			return *(u32*)&v;
+		}
+
+
+		OutputBlob& blob;
+	};
+
+
+	struct Deserializer : public IDeserializer
+	{
+		Deserializer(InputBlob& _blob)
+			: blob(_blob)
+		{
+		}
+
+		void read(Entity* entity) override
+		{
+			skip();
+			entity->index = readU32();
+		}
+
+
+		void read(Transform* value) override
+		{
+			skip();
+			value->pos.x = asFloat(readU32());
+			skip();
+			value->pos.y = asFloat(readU32());
+			skip();
+			value->pos.z = asFloat(readU32());
+			skip();
+			value->rot.x = asFloat(readU32());
+			skip();
+			value->rot.y = asFloat(readU32());
+			skip();
+			value->rot.z = asFloat(readU32());
+			skip();
+			value->rot.w = asFloat(readU32());
+		}
+
+
+		void read(Vec3* value) override
+		{
+			skip();
+			value->x = asFloat(readU32());
+			skip();
+			value->y = asFloat(readU32());
+			skip();
+			value->z = asFloat(readU32());
+		}
+
+
+		void read(Vec4* value) override
+		{
+			skip();
+			value->x = asFloat(readU32());
+			skip();
+			value->y = asFloat(readU32());
+			skip();
+			value->z = asFloat(readU32());
+			skip();
+			value->w = asFloat(readU32());
+		}
+
+		void read(ComponentHandle* value) override
+		{
+			skip();
+			value->index = readU32();
+		}
+
+
+		void read(float* value) override
+		{
+			skip();
+			*value = asFloat(readU32());
+		}
+
+
+		void read(bool* value) override 
+		{
+			skip();
+			*value = readU32() != 0;
+		}
+
+
+		void read(u32* value) override
+		{
+			skip();
+			*value = readU32();
+		}
+
+
+		void read(i64* value) override
+		{
+			skip();
+			char tmp[40];
+			char* c = tmp;
+			*c = blob.readChar();
+			if (*c == '-')
+			{
+				++c;
+				*c = blob.readChar();
+			}
+			while (*c >= '0' && *c <= '9' && (c - tmp) < lengthOf(tmp))
+			{
+				++c;
+				*c = blob.readChar();
+			}
+			*c = 0;
+			fromCString(tmp, lengthOf(tmp), value);
+		}
+		
+
+		void read(i32* value) override 
+		{
+			skip();
+			char tmp[20];
+			char* c = tmp;
+			*c = blob.readChar();
+			if (*c == '-')
+			{
+				++c;
+				*c = blob.readChar();
+			}
+			while (*c >= '0' && *c <= '9' && (c - tmp) < lengthOf(tmp))
+			{
+				++c;
+				*c = blob.readChar();
+			}
+			*c = 0;
+			fromCString(tmp, lengthOf(tmp), value);
+		}
+
+
+		void read(u8* value) override
+		{
+			skip();
+			*value = (u8)readU32();
+		}
+		
+		
+		void read(i8* value) override
+		{
+			skip();
+			*value = (i8)readU32();
+		}
+
+
+		void read(char* value, int max_size) override
+		{
+			skip();
+			u8 c = blob.readChar();
+			ASSERT(c == '"');
+			char* out = value;
+			*out = blob.readChar();
+			while (*out != '"' && out - value < max_size - 1)
+			{
+				++out;
+				*out = blob.readChar();
+			}
+			ASSERT(*out == '"');
+			*out = 0;
+		}
+
+
+		u32 readU32()
+		{
+			char tmp[20];
+			char* c = tmp;
+			*c = blob.readChar();
+			while (*c >= '0' && *c <= '9' && (c - tmp) < lengthOf(tmp))
+			{
+				++c;
+				*c = blob.readChar();
+			}
+			*c = 0;
+			u32 v;
+			fromCString(tmp, lengthOf(tmp), &v);
+			return v;
+		}
+
+		void skip()
+		{
+			u8 c = blob.readChar();
+			if (c == '#') while (blob.readChar() != '\n');
+			if (c == '\t') return;
+			while (blob.readChar() != '\t');
+		}
+
+		float asFloat(u32 v)
+		{
+			return *(float*)&v;
+		}
+
+		InputBlob& blob;
+	};
+
+
 	void saveUniverse(const Path& path, bool save_path) override
 	{
 		g_log_info.log("Editor") << "Saving universe " << path << "...";
@@ -1692,7 +1973,77 @@ public:
 		m_is_universe_changed = false;
 		fs.close(*file);
 		
+		serialize(path);
+
 		if (save_path) m_universe->setPath(path);
+	}
+
+
+	void deserialize(const Path& path)
+	{
+		if (isValid(m_camera)) m_universe->destroyEntity(m_camera);
+
+		PathUtils::FileInfo file_info(path.c_str());
+		StaticString<MAX_PATH_LENGTH> dir(file_info.m_dir, file_info.m_basename, "/");
+
+		auto file_iter = PlatformInterface::createFileIterator(dir, m_allocator);
+		PlatformInterface::FileInfo info;
+		Array<u8> data(m_allocator);
+		while (PlatformInterface::getNextFile(file_iter, &info))
+		{
+			FS::OsFile file;
+			StaticString<MAX_PATH_LENGTH> filepath(dir, info.filename);
+			if (file.open(filepath, FS::Mode::OPEN_AND_READ, m_allocator))
+			{
+				data.resize((int)file.size());
+				file.read(&data[0], data.size());
+				file.close();
+				InputBlob blob(&data[0], data.size());
+				Deserializer deserializer(blob);
+				Transform tr;
+				deserializer.read(&tr);
+				Entity entity = m_universe->createEntity(tr.pos, tr.rot); // TODO keep id
+				u32 cmp_type;
+				deserializer.read(&cmp_type);
+				while (cmp_type != 0)
+				{
+					m_universe->deserializeComponent(deserializer, entity, PropertyRegister::getComponentTypeFromHash(cmp_type));
+					deserializer.read(&cmp_type);
+				}
+			}
+		}
+		PlatformInterface::destroyFileIterator(file_iter);
+	}
+
+
+	void serialize(const Path& path)
+	{
+		PathUtils::FileInfo file_info(path.c_str());
+		StaticString<MAX_PATH_LENGTH> dir(file_info.m_dir, file_info.m_basename, "/");
+		PlatformInterface::makePath(dir);
+
+		FS::OsFile entity_file;
+		OutputBlob blob(m_allocator);
+		Serializer serializer(blob);
+		for (Entity entity = m_universe->getFirstEntity(); isValid(entity); entity = m_universe->getNextEntity(entity))
+		{
+			blob.clear();
+			serializer.write("transform", m_universe->getTransform(entity));
+			StaticString<MAX_PATH_LENGTH> entity_file_path(dir, entity.index, ".ent");
+			for (ComponentUID cmp = m_universe->getFirstComponent(entity); isValid(cmp.handle); cmp = m_universe->getNextComponent(cmp))
+			{
+				const char* cmp_name = PropertyRegister::getComponentTypeID(cmp.type.index);
+				u32 type_hash = PropertyRegister::getComponentTypeHash(cmp.type);
+				serializer.write(cmp_name, type_hash);
+				m_universe->serializeComponent(serializer, cmp.type, cmp.handle);
+			}
+			serializer.write("cmp_end", (u32)0);
+			if (entity_file.open(entity_file_path, FS::Mode::CREATE_AND_WRITE, m_allocator))
+			{
+				entity_file.write(blob.getData(), blob.getPos());
+				entity_file.close();
+			}
+		}
 	}
 
 
@@ -2251,13 +2602,16 @@ public:
 		ASSERT(success);
 		if (success)
 		{
-			load(file);
-			m_template_system->refreshPrefabs();
+			//load(file);
+			deserialize(m_universe->getPath()); 
+			//m_template_system->refreshPrefabs();
 			char path[MAX_PATH_LENGTH];
 			copyString(path, sizeof(path), m_universe->getPath().c_str());
 			catString(path, sizeof(path), ".lst");
 			copyFile(m_universe->getPath().c_str(), path);
 			m_editor_icons->refresh();
+
+			
 		}
 	}
 

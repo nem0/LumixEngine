@@ -4,6 +4,7 @@
 #include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/fs/file_system.h"
+#include "engine/iserializer.h"
 #include "engine/json_serializer.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
@@ -92,7 +93,7 @@ struct RagdollBone
 struct Ragdoll
 {
 	Entity entity;
-	RagdollBone* root;
+	RagdollBone* root = nullptr;
 	Transform root_transform;
 	int layer;
 };
@@ -308,17 +309,25 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 		m_queued_forces.reserve(64);
 
-		context.registerComponentTypeScene(BOX_ACTOR_TYPE, this);
-		context.registerComponentTypeScene(MESH_ACTOR_TYPE, this);
-		context.registerComponentTypeScene(HEIGHTFIELD_TYPE, this);
-		context.registerComponentTypeScene(CONTROLLER_TYPE, this);
-		context.registerComponentTypeScene(DISTANCE_JOINT_TYPE, this);
-		context.registerComponentTypeScene(HINGE_JOINT_TYPE, this);
-		context.registerComponentTypeScene(CAPSULE_ACTOR_TYPE, this);
-		context.registerComponentTypeScene(SPHERE_ACTOR_TYPE, this);
-		context.registerComponentTypeScene(SPHERICAL_JOINT_TYPE, this);
-		context.registerComponentTypeScene(D6_JOINT_TYPE, this);
-		context.registerComponentTypeScene(RAGDOLL_TYPE, this);
+		#define COMPONENT_TYPE(type, name) \
+			context.registerComponentType(type \
+				, this \
+				, &PhysicsSceneImpl::serialize##name \
+				, &PhysicsSceneImpl::deserialize##name)
+
+		COMPONENT_TYPE(BOX_ACTOR_TYPE, BoxActor);
+		COMPONENT_TYPE(MESH_ACTOR_TYPE, MeshActor);
+		COMPONENT_TYPE(HEIGHTFIELD_TYPE, Heightfield);
+		COMPONENT_TYPE(CONTROLLER_TYPE, Controller);
+		COMPONENT_TYPE(DISTANCE_JOINT_TYPE, DistanceJoint);
+		COMPONENT_TYPE(HINGE_JOINT_TYPE, HingeJoint);
+		COMPONENT_TYPE(CAPSULE_ACTOR_TYPE, CapsuleActor);
+		COMPONENT_TYPE(SPHERE_ACTOR_TYPE, SphereActor);
+		COMPONENT_TYPE(SPHERICAL_JOINT_TYPE, SphericalJoint);
+		COMPONENT_TYPE(D6_JOINT_TYPE, D6Joint);
+		COMPONENT_TYPE(RAGDOLL_TYPE, Ragdoll);
+
+		#undef COMPONENT_TYPE
 	}
 
 
@@ -2736,6 +2745,541 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
+	void serializeHeightfield(ISerializer& serializer, ComponentHandle cmp)
+	{
+		Heightfield& terrain = m_terrains[{cmp.index}];
+		serializer.write("heightmap", terrain.m_heightmap ? terrain.m_heightmap->getPath().c_str() : "");
+		serializer.write("xz_scale", terrain.m_xz_scale);
+		serializer.write("y_scale", terrain.m_y_scale);
+		serializer.write("layer", terrain.m_layer);
+	}
+
+	void deserializeHeightfield(IDeserializer& serializer, Entity entity)
+	{
+		Heightfield terrain;
+		terrain.m_scene = this;
+		terrain.m_entity = entity;
+		char tmp[MAX_PATH_LENGTH];
+		serializer.read(tmp, MAX_PATH_LENGTH);
+		serializer.read(&terrain.m_xz_scale);
+		serializer.read(&terrain.m_y_scale);
+		serializer.read(&terrain.m_layer);
+
+		m_terrains.insert(terrain.m_entity, terrain);
+		ComponentHandle cmp = {terrain.m_entity.index};
+		if (terrain.m_heightmap == nullptr || !equalStrings(tmp, terrain.m_heightmap->getPath().c_str()))
+		{
+			setHeightmap(cmp, Path(tmp));
+		}
+		m_universe.addComponent(terrain.m_entity, HEIGHTFIELD_TYPE, this, cmp);
+	}
+
+
+	void serializeController(ISerializer& serializer, ComponentHandle cmp)
+	{
+		Controller& controller = m_controllers[{cmp.index}];
+		serializer.write("layer", controller.m_layer);
+		serializer.write("radius", controller.m_radius);
+		serializer.write("height", controller.m_height);
+	}
+
+
+	void deserializeController(IDeserializer& serializer, Entity entity)
+	{
+		Controller& c = m_controllers.insert(entity);
+		c.m_frame_change.set(0, 0, 0);
+
+		serializer.read(&c.m_layer);
+		serializer.read(&c.m_radius);
+		serializer.read(&c.m_height);
+
+		PxCapsuleControllerDesc cDesc;
+		cDesc.material = m_default_material;
+		cDesc.height = c.m_height;
+		cDesc.radius = c.m_radius;
+		cDesc.slopeLimit = 0.0f;
+		cDesc.contactOffset = 0.1f;
+		cDesc.stepOffset = 0.02f;
+		cDesc.callback = nullptr;
+		cDesc.behaviorCallback = nullptr;
+		Vec3 position = m_universe.getPosition(entity);
+		cDesc.position.set(position.x, position.y - cDesc.height * 0.5f, position.z);
+		c.m_controller = m_controller_manager->createController(cDesc);
+		c.m_controller->getActor()->userData = (void*)(intptr_t)entity.index;
+		c.m_entity = entity;
+		m_universe.addComponent(entity, CONTROLLER_TYPE, this, {entity.index});
+	}
+
+
+	void serializeRagdoll(ISerializer& serializer, ComponentHandle cmp)
+	{
+		const Ragdoll& ragdoll = m_ragdolls[{cmp.index}];
+		serializer.write("layer", ragdoll.layer);
+		
+		serializeRagdollBone(ragdoll, ragdoll.root, serializer);
+	}
+
+
+	void deserializeRagdoll(IDeserializer& serializer, Entity entity)
+	{
+		Ragdoll& ragdoll = m_ragdolls.insert(entity);
+		
+		ragdoll.entity = entity;
+		ragdoll.root_transform.pos.set(0, 0, 0);
+		ragdoll.root_transform.rot.set(0, 0, 0, 1);
+		serializer.read(&ragdoll.layer);
+
+		setRagdollRoot(ragdoll, deserializeRagdollBone(ragdoll, nullptr, serializer));
+		ComponentHandle cmp = {ragdoll.entity.index};
+		m_universe.addComponent(ragdoll.entity, RAGDOLL_TYPE, this, cmp);
+	}
+	
+
+	static void serializeJoint(ISerializer& serializer, PxSphericalJoint* px_joint)
+	{
+		u32 flags = (u32)px_joint->getSphericalJointFlags();
+		serializer.write("flags", flags);
+		PxJointLimitCone limit = px_joint->getLimitCone();
+		serializer.write("bounce_threshold", limit.bounceThreshold);
+		serializer.write("contact_distance", limit.contactDistance);
+		serializer.write("damping", limit.damping);
+		serializer.write("restitution", limit.restitution);
+		serializer.write("stiffness", limit.stiffness);
+		serializer.write("y_angle", limit.yAngle);
+		serializer.write("z_angle", limit.zAngle);
+	}
+
+
+	void serializeSphericalJoint(ISerializer& serializer, ComponentHandle cmp)
+	{
+		Joint& joint = m_joints[{cmp.index}];
+		serializer.write("connected_body", joint.connected_body);
+		Transform tr = fromPhysx(joint.local_frame0);
+		serializer.write("local_frame", tr);
+		serializeJoint(serializer, static_cast<PxSphericalJoint*>(joint.physx));
+	}
+	
+
+	static void deserializeJoint(IDeserializer& serializer, PxSphericalJoint* px_joint)
+	{
+		u32 flags;
+		serializer.read(&flags);
+		px_joint->setSphericalJointFlags(PxSphericalJointFlags(flags));
+		PxJointLimitCone limit(0, 0);
+		serializer.read(&limit.bounceThreshold);
+		serializer.read(&limit.contactDistance);
+		serializer.read(&limit.damping);
+		serializer.read(&limit.restitution);
+		serializer.read(&limit.stiffness);
+		serializer.read(&limit.yAngle);
+		serializer.read(&limit.zAngle);
+		px_joint->setLimitCone(limit);
+	}
+
+
+	void deserializeSphericalJoint(IDeserializer& serializer, Entity entity)
+	{
+		Joint& joint = m_joints.insert(entity);
+		serializer.read(&joint.connected_body);
+		Transform tr;
+		serializer.read(&tr);
+		joint.local_frame0 = toPhysx(tr);
+		auto* px_joint = PxSphericalJointCreate(m_scene->getPhysics(),
+			m_dummy_actor,
+			joint.local_frame0,
+			nullptr,
+			PxTransform::createIdentity());
+		joint.physx = px_joint;
+		deserializeJoint(serializer, px_joint);
+		m_universe.addComponent(entity, SPHERICAL_JOINT_TYPE, this, {entity.index});
+	}
+
+
+	static void serializeJoint(ISerializer& serializer, PxDistanceJoint* px_joint)
+	{
+		u32 flags = (u32)px_joint->getDistanceJointFlags();
+		serializer.write("flags", flags);
+		serializer.write("damping", px_joint->getDamping());
+		serializer.write("stiffness", px_joint->getStiffness());
+		serializer.write("tolerance", px_joint->getTolerance());
+		serializer.write("min_distance", px_joint->getMinDistance());
+		serializer.write("max_distance", px_joint->getMaxDistance());
+	}
+
+
+	void serializeDistanceJoint(ISerializer& serializer, ComponentHandle cmp)
+	{
+		Joint& joint = m_joints[{cmp.index}];
+		serializer.write("connected_body", joint.connected_body);
+		Transform tr = fromPhysx(joint.local_frame0);
+		serializer.write("local_frame", tr);
+		serializeJoint(serializer, static_cast<PxDistanceJoint*>(joint.physx));
+	}
+
+
+	static void deserializeJoint(IDeserializer& serializer, PxDistanceJoint* px_joint)
+	{
+		u32 flags;
+		serializer.read(&flags);
+		px_joint->setDistanceJointFlags((PxDistanceJointFlags)flags);
+		PxReal value;
+		serializer.read(&value);
+		px_joint->setDamping(value);
+		serializer.read(&value);
+		px_joint->setStiffness(value);
+		serializer.read(&value);
+		px_joint->setTolerance(value);
+		serializer.read(&value);
+		px_joint->setMinDistance(value);
+		serializer.read(&value);
+		px_joint->setMaxDistance(value);
+	}
+
+
+	void deserializeDistanceJoint(IDeserializer& serializer, Entity entity) 
+	{
+		Joint& joint = m_joints.insert(entity);
+		serializer.read(&joint.connected_body);
+		Transform tr;
+		serializer.read(&tr);
+		joint.local_frame0 = toPhysx(tr);
+		auto* px_joint = PxDistanceJointCreate(m_scene->getPhysics(),
+			m_dummy_actor,
+			joint.local_frame0,
+			nullptr,
+			PxTransform::createIdentity());
+		joint.physx = px_joint;
+		deserializeJoint(serializer, px_joint);
+		m_universe.addComponent(entity, DISTANCE_JOINT_TYPE, this, {entity.index});
+	}
+
+
+	static void serializeJoint(ISerializer& serializer, PxD6Joint* px_joint)
+	{
+		serializer.write("z", (int)px_joint->getMotion(PxD6Axis::eX));
+		serializer.write("y", (int)px_joint->getMotion(PxD6Axis::eY));
+		serializer.write("z", (int)px_joint->getMotion(PxD6Axis::eZ));
+		serializer.write("swing1", (int)px_joint->getMotion(PxD6Axis::eSWING1));
+		serializer.write("swing2", (int)px_joint->getMotion(PxD6Axis::eSWING2));
+		serializer.write("twist", (int)px_joint->getMotion(PxD6Axis::eTWIST));
+
+		PxJointLinearLimit linear = px_joint->getLinearLimit();
+		serializer.write("bounce_threshold", linear.bounceThreshold);
+		serializer.write("contact_distance", linear.contactDistance);
+		serializer.write("damping", linear.damping);
+		serializer.write("restitution", linear.restitution);
+		serializer.write("stiffness", linear.stiffness);
+		serializer.write("value", linear.value);
+
+		PxJointLimitCone swing = px_joint->getSwingLimit();
+		serializer.write("bounce_threshold", swing.bounceThreshold);
+		serializer.write("contact_distance", swing.contactDistance);
+		serializer.write("damping", swing.damping);
+		serializer.write("restitution", swing.restitution);
+		serializer.write("stiffness", swing.stiffness);
+		serializer.write("y_angle", swing.yAngle);
+		serializer.write("z_angle", swing.zAngle);
+
+		PxJointAngularLimitPair twist = px_joint->getTwistLimit();
+		serializer.write("bounce_threshold", twist.bounceThreshold);
+		serializer.write("contact_distance", twist.contactDistance);
+		serializer.write("damping", twist.damping);
+		serializer.write("restitution", twist.restitution);
+		serializer.write("stiffness", twist.stiffness);
+		serializer.write("lower", twist.lower);
+		serializer.write("upper", twist.upper);
+	}
+
+
+	void serializeD6Joint(ISerializer& serializer, ComponentHandle cmp)
+	{
+		Joint& joint = m_joints[{cmp.index}];
+		serializer.write("connected_body", joint.connected_body);
+		Transform tr = fromPhysx(joint.local_frame0);
+		serializer.write("local_frame", tr);
+		serializeJoint(serializer, static_cast<PxD6Joint*>(joint.physx));
+	}
+
+
+	static void deserializeJoint(IDeserializer& serializer, PxD6Joint* px_joint)
+	{
+		int tmp;
+		serializer.read(&tmp); 	px_joint->setMotion(PxD6Axis::eX, (PxD6Motion::Enum)tmp);
+		serializer.read(&tmp); 	px_joint->setMotion(PxD6Axis::eY, (PxD6Motion::Enum)tmp);
+		serializer.read(&tmp); 	px_joint->setMotion(PxD6Axis::eZ, (PxD6Motion::Enum)tmp);
+		serializer.read(&tmp); 	px_joint->setMotion(PxD6Axis::eSWING1, (PxD6Motion::Enum)tmp);
+		serializer.read(&tmp); 	px_joint->setMotion(PxD6Axis::eSWING2, (PxD6Motion::Enum)tmp);
+		serializer.read(&tmp); 	px_joint->setMotion(PxD6Axis::eTWIST, (PxD6Motion::Enum)tmp);
+
+		PxJointLinearLimit linear(0, PxSpring(0, 0));
+		serializer.read(&linear.bounceThreshold);
+		serializer.read(&linear.contactDistance);
+		serializer.read(&linear.damping);
+		serializer.read(&linear.restitution);
+		serializer.read(&linear.stiffness);
+		serializer.read(&linear.value);
+		px_joint->setLinearLimit(linear);
+
+		PxJointLimitCone swing(0, 0);
+		serializer.read(&swing.bounceThreshold);
+		serializer.read(&swing.contactDistance);
+		serializer.read(&swing.damping);
+		serializer.read(&swing.restitution);
+		serializer.read(&swing.stiffness);
+		serializer.read(&swing.yAngle);
+		serializer.read(&swing.zAngle);
+		px_joint->setSwingLimit(swing);
+
+		PxJointAngularLimitPair twist(0, 0);
+		serializer.read(&twist.bounceThreshold);
+		serializer.read(&twist.contactDistance);
+		serializer.read(&twist.damping);
+		serializer.read(&twist.restitution);
+		serializer.read(&twist.stiffness);
+		serializer.read(&twist.lower);
+		serializer.read(&twist.upper);
+		px_joint->setTwistLimit(twist);
+	}
+
+
+	void deserializeD6Joint(IDeserializer& serializer, Entity entity)
+	{
+		Joint& joint = m_joints.insert(entity);
+		serializer.read(&joint.connected_body);
+		Transform tr;
+		serializer.read(&tr);
+		joint.local_frame0 = toPhysx(tr);
+		auto* px_joint = PxD6JointCreate(m_scene->getPhysics(),
+			m_dummy_actor,
+			joint.local_frame0,
+			nullptr,
+			PxTransform::createIdentity());
+		joint.physx = px_joint;
+
+		deserializeJoint(serializer, px_joint);
+
+		m_universe.addComponent(entity, D6_JOINT_TYPE, this, {entity.index});
+	}
+
+
+	static void serializeJoint(ISerializer& serializer, PxRevoluteJoint* px_joint)
+	{
+		u32 flags = (u32)px_joint->getRevoluteJointFlags();
+		serializer.write("flags", flags);
+		PxJointAngularLimitPair limit = px_joint->getLimit();
+		serializer.write("bounce_threshold", limit.bounceThreshold);
+		serializer.write("contact_distance", limit.contactDistance);
+		serializer.write("damping", limit.damping);
+		serializer.write("restitution", limit.restitution);
+		serializer.write("stiffness", limit.stiffness);
+		serializer.write("lower", limit.lower);
+		serializer.write("upper", limit.upper);
+	}
+
+
+	void serializeHingeJoint(ISerializer& serializer, ComponentHandle cmp)
+	{
+		Joint& joint = m_joints[{cmp.index}];
+		serializer.write("connected_body", joint.connected_body);
+		Transform tr = fromPhysx(joint.local_frame0);
+		serializer.write("local_frame", tr);
+		serializeJoint(serializer, static_cast<PxRevoluteJoint*>(joint.physx));
+	}
+
+
+	static void deserializeJoint(IDeserializer& serializer, PxRevoluteJoint* px_joint)
+	{
+		u32 flags;
+		serializer.read(&flags);
+		px_joint->setRevoluteJointFlags(PxRevoluteJointFlags(flags));
+		PxJointAngularLimitPair limit(0, 0);
+		serializer.read(&limit.bounceThreshold);
+		serializer.read(&limit.contactDistance);
+		serializer.read(&limit.damping);
+		serializer.read(&limit.restitution);
+		serializer.read(&limit.stiffness);
+		serializer.read(&limit.lower);
+		serializer.read(&limit.upper);
+		px_joint->setLimit(limit);
+	}
+
+
+	void deserializeHingeJoint(IDeserializer& serializer, Entity entity)
+	{
+		Joint& joint = m_joints.insert(entity);
+		serializer.read(&joint.connected_body);
+		Transform tr;
+		serializer.read(&tr);
+		joint.local_frame0 = toPhysx(tr);
+		auto* px_joint = PxRevoluteJointCreate(m_scene->getPhysics(),
+			m_dummy_actor,
+			joint.local_frame0,
+			nullptr,
+			PxTransform::createIdentity());
+		joint.physx = px_joint;
+		deserializeJoint(serializer, px_joint);
+		m_universe.addComponent(entity, HINGE_JOINT_TYPE, this, {entity.index});
+	}
+
+
+	void serializeMeshActor(ISerializer& serializer, ComponentHandle cmp)
+	{
+		RigidActor* actor = m_actors[{cmp.index}];
+		serializer.write("layer", actor->layer);
+		serializer.write("is_dynamic", actor->is_dynamic);
+		serializer.write("source", actor->resource ? actor->resource->getPath().c_str() : "");
+	}
+
+
+	void deserializeMeshActor(IDeserializer& serializer, Entity entity)
+	{
+		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, ActorType::MESH);
+		actor->entity = entity;
+		serializer.read(&actor->layer);
+		serializer.read(&actor->is_dynamic);
+		if (actor->is_dynamic) m_dynamic_actors.push(actor);
+		m_actors.insert(actor->entity, actor);
+
+		char tmp[MAX_PATH_LENGTH];
+		serializer.read(tmp, sizeof(tmp));
+		ResourceManagerBase* manager = m_engine->getResourceManager().get(PHYSICS_TYPE);
+		auto* geometry = manager->load(Lumix::Path(tmp));
+		actor->setResource(static_cast<PhysicsGeometry*>(geometry));
+		
+		m_universe.addComponent(actor->entity, MESH_ACTOR_TYPE, this, {entity.index});
+	}
+
+
+	void serializeBoxActor(ISerializer& serializer, ComponentHandle cmp)
+	{
+		RigidActor* actor = m_actors[{cmp.index}];
+		serializer.write("layer", actor->layer);
+		serializer.write("is_dynamic", actor->is_dynamic);
+		PxShape* shape;
+		ASSERT(actor->physx_actor->getNbShapes() == 1);
+		actor->physx_actor->getShapes(&shape, 1);
+		PxBoxGeometry geom;
+		if (!shape->getBoxGeometry(geom)) ASSERT(false);
+		serializer.write("x", geom.halfExtents.x);
+		serializer.write("y", geom.halfExtents.y);
+		serializer.write("z", geom.halfExtents.z);
+	}
+
+
+	void deserializeBoxActor(IDeserializer& serializer, Entity entity)
+	{
+		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, ActorType::BOX);
+		actor->entity = entity;
+		serializer.read(&actor->layer);
+		serializer.read(&actor->is_dynamic);
+		if (actor->is_dynamic) m_dynamic_actors.push(actor);
+		m_actors.insert(actor->entity, actor);
+
+		PxBoxGeometry box_geom;
+		PxTransform transform = toPhysx(m_universe.getTransform(actor->entity));
+		serializer.read(&box_geom.halfExtents.x);
+		serializer.read(&box_geom.halfExtents.y);
+		serializer.read(&box_geom.halfExtents.z);
+		PxRigidActor* physx_actor;
+		if (actor->is_dynamic)
+		{
+			physx_actor =
+				PxCreateDynamic(*m_system->getPhysics(), transform, box_geom, *m_default_material, 1.0f);
+		}
+		else
+		{
+			physx_actor = PxCreateStatic(*m_system->getPhysics(), transform, box_geom, *m_default_material);
+		}
+		actor->setPhysxActor(physx_actor);
+
+		m_universe.addComponent(entity, BOX_ACTOR_TYPE, this, {entity.index});
+	}
+
+
+	void serializeCapsuleActor(ISerializer& serializer, ComponentHandle cmp)
+	{
+		RigidActor* actor = m_actors[{cmp.index}];
+		serializer.write("layer", actor->layer);
+		serializer.write("is_dynamic", actor->is_dynamic);
+		PxShape* shape;
+		ASSERT(actor->physx_actor->getNbShapes() == 1);
+		actor->physx_actor->getShapes(&shape, 1);
+		PxCapsuleGeometry geom;
+		if (!shape->getCapsuleGeometry(geom)) ASSERT(false);
+		serializer.write("half_height", geom.halfHeight);
+		serializer.write("radius", geom.radius);
+	}
+
+
+	void deserializeCapsuleActor(IDeserializer& serializer, Entity entity)
+	{
+		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, ActorType::CAPSULE);
+		actor->entity = entity;
+		serializer.read(&actor->layer);
+		serializer.read(&actor->is_dynamic);
+		if (actor->is_dynamic) m_dynamic_actors.push(actor);
+		m_actors.insert(actor->entity, actor);
+
+		PxCapsuleGeometry capsule_geom;
+		PxTransform transform = toPhysx(m_universe.getTransform(actor->entity));
+		serializer.read(&capsule_geom.halfHeight);
+		serializer.read(&capsule_geom.radius);
+		PxRigidActor* physx_actor;
+		if (actor->is_dynamic)
+		{
+			physx_actor = PxCreateDynamic(*m_system->getPhysics(), transform, capsule_geom, *m_default_material, 1.0f);
+		}
+		else
+		{
+			physx_actor = PxCreateStatic(*m_system->getPhysics(), transform, capsule_geom, *m_default_material);
+		}
+		actor->setPhysxActor(physx_actor);
+
+		m_universe.addComponent(entity, CAPSULE_ACTOR_TYPE, this, {entity.index});
+	}
+
+
+	void serializeSphereActor(ISerializer& serializer, ComponentHandle cmp)
+	{
+		RigidActor* actor = m_actors[{cmp.index}];
+		serializer.write("layer", actor->layer);
+		serializer.write("is_dynamic", actor->is_dynamic);
+		PxShape* shape;
+		ASSERT(actor->physx_actor->getNbShapes() == 1);
+		actor->physx_actor->getShapes(&shape, 1);
+		PxSphereGeometry geom;
+		if (!shape->getSphereGeometry(geom)) ASSERT(false);
+		serializer.write("radius", geom.radius);
+	}
+
+
+	void deserializeSphereActor(IDeserializer& serializer, Entity entity)
+	{
+		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, ActorType::SPHERE);
+		actor->entity = entity;
+		serializer.read(&actor->layer);
+		serializer.read(&actor->is_dynamic);
+		if (actor->is_dynamic) m_dynamic_actors.push(actor);
+		m_actors.insert(actor->entity, actor);
+
+		PxSphereGeometry sphere_geom;
+		PxTransform transform = toPhysx(m_universe.getTransform(actor->entity));
+		serializer.read(&sphere_geom.radius);
+		PxRigidActor* physx_actor;
+		if (actor->is_dynamic)
+		{
+			physx_actor = PxCreateDynamic(*m_system->getPhysics(), transform, sphere_geom, *m_default_material, 1.0f);
+		}
+		else
+		{
+			physx_actor = PxCreateStatic(*m_system->getPhysics(), transform, sphere_geom, *m_default_material);
+		}
+		actor->setPhysxActor(physx_actor);
+
+		m_universe.addComponent(entity, SPHERE_ACTOR_TYPE, this, {entity.index});
+	}
+
+
 	void serializeActor(OutputBlob& serializer, RigidActor* actor)
 	{
 		serializer.write(actor->layer);
@@ -2900,6 +3444,46 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
+	void serializeRagdollJoint(RagdollBone* bone, ISerializer& serializer)
+	{
+		serializer.write("has_joint", bone->parent_joint != nullptr);
+		if (!bone->parent_joint) return;
+
+		serializer.write("type", (int)bone->parent_joint->getConcreteType());
+		serializer.write("pose0", fromPhysx(bone->parent_joint->getLocalPose(PxJointActorIndex::eACTOR0)));
+		serializer.write("pose1", fromPhysx(bone->parent_joint->getLocalPose(PxJointActorIndex::eACTOR1)));
+
+		switch ((PxJointConcreteType::Enum)bone->parent_joint->getConcreteType())
+		{
+			case PxJointConcreteType::eFIXED: break;
+			case PxJointConcreteType::eDISTANCE:
+			{
+				auto* joint = bone->parent_joint->is<PxDistanceJoint>();
+				serializeJoint(serializer, joint);
+				break;
+			}
+			case PxJointConcreteType::eREVOLUTE:
+			{
+				auto* joint = bone->parent_joint->is<PxRevoluteJoint>();
+				serializeJoint(serializer, joint);
+				break;
+			}
+			case PxJointConcreteType::eD6:
+			{
+				auto* joint = bone->parent_joint->is<PxD6Joint>();
+				serializeJoint(serializer, joint);
+				break;
+			}
+			case PxJointConcreteType::eSPHERICAL:
+			{
+				auto* joint = bone->parent_joint->is<PxSphericalJoint>();
+				serializeJoint(serializer, joint);
+				break;
+			}
+			default: ASSERT(false); break;
+		}
+	}
+
 	void serializeRagdollJoint(RagdollBone* bone, OutputBlob& serializer)
 	{
 		serializer.write(bone->parent_joint != nullptr);
@@ -2958,6 +3542,45 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		}
 	}
 
+
+	void serializeRagdollBone(const Ragdoll& ragdoll, RagdollBone* bone, ISerializer& serializer)
+	{
+		if (!bone)
+		{
+			serializer.write("bone", -1);
+			return;
+		}
+		serializer.write("bone", bone->pose_bone_idx);
+		PxTransform pose = bone->actor->getGlobalPose();
+		pose = toPhysx(m_universe.getTransform(ragdoll.entity)).getInverse() * pose;
+		serializer.write("pose", fromPhysx(pose));
+		serializer.write("bind_transform", bone->bind_transform);
+
+		PxShape* shape;
+		int shape_count = bone->actor->getShapes(&shape, 1);
+		ASSERT(shape_count == 1);
+		PxBoxGeometry box_geom;
+		if (shape->getBoxGeometry(box_geom))
+		{
+			serializer.write("type", RagdollBone::BOX);
+			serializer.write("half_extents", fromPhysx(box_geom.halfExtents));
+		}
+		else
+		{
+			PxCapsuleGeometry capsule_geom;
+			bool is_capsule = shape->getCapsuleGeometry(capsule_geom);
+			ASSERT(is_capsule);
+			serializer.write("type", RagdollBone::CAPSULE);
+			serializer.write("half_height", capsule_geom.halfHeight);
+			serializer.write("radius", capsule_geom.radius);
+		}
+		serializer.write("is_kinematic", bone->actor->isRigidBody()->getRigidBodyFlags().isSet(PxRigidBodyFlag::eKINEMATIC));
+
+		serializeRagdollBone(ragdoll, bone->child, serializer);
+		serializeRagdollBone(ragdoll, bone->next, serializer);
+
+		serializeRagdollJoint(bone, serializer);
+	}
 
 	void serializeRagdollBone(const Ragdoll& ragdoll, RagdollBone* bone, OutputBlob& serializer)
 	{
@@ -3089,6 +3712,54 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
+	void deserializeRagdollJoint(RagdollBone* bone, IDeserializer& serializer)
+	{
+		bool has_joint;
+		serializer.read(&has_joint);
+		if (!has_joint) return;
+
+		int type;
+		serializer.read(&type);
+		changeRagdollBoneJoint(bone, type);
+
+		Transform local_poses[2];
+		serializer.read(&local_poses[0]);
+		serializer.read(&local_poses[1]);
+		bone->parent_joint->setLocalPose(PxJointActorIndex::eACTOR0, toPhysx(local_poses[0]));
+		bone->parent_joint->setLocalPose(PxJointActorIndex::eACTOR1, toPhysx(local_poses[1]));
+
+		switch ((PxJointConcreteType::Enum)type)
+		{
+			case PxJointConcreteType::eFIXED: break;
+			case PxJointConcreteType::eDISTANCE:
+			{
+				auto* joint = bone->parent_joint->is<PxDistanceJoint>();
+				deserializeJoint(serializer, joint);
+				break;
+			}
+			case PxJointConcreteType::eREVOLUTE:
+			{
+				auto* joint = bone->parent_joint->is<PxRevoluteJoint>();
+				deserializeJoint(serializer, joint);
+				break;
+			}
+			case PxJointConcreteType::eSPHERICAL:
+			{
+				auto* joint = bone->parent_joint->is<PxSphericalJoint>();
+				deserializeJoint(serializer, joint);
+				break;
+			}
+			case PxJointConcreteType::eD6:
+			{
+				auto* joint = bone->parent_joint->is<PxD6Joint>();
+				deserializeJoint(serializer, joint);
+				break;
+			}
+			default: ASSERT(false); break;
+		}
+	}
+
+
 	RagdollBone* deserializeRagdollBone(Ragdoll& ragdoll, RagdollBone* parent, InputBlob& serializer, int version)
 	{
 		int pose_bone_idx;
@@ -3154,6 +3825,68 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		return bone;
 	}
 
+
+	RagdollBone* deserializeRagdollBone(Ragdoll& ragdoll, RagdollBone* parent, IDeserializer& serializer)
+	{
+		int pose_bone_idx;
+		serializer.read(&pose_bone_idx);
+		if (pose_bone_idx < 0) return nullptr;
+		auto* bone = LUMIX_NEW(m_allocator, RagdollBone);
+		bone->pose_bone_idx = pose_bone_idx;
+		bone->parent_joint = nullptr;
+		bone->is_kinematic = false;
+		bone->prev = nullptr;
+		Transform transform;
+		serializer.read(&transform);
+		serializer.read(&bone->bind_transform);
+		bone->inv_bind_transform = bone->bind_transform.inverted();
+
+		PxTransform px_transform = toPhysx(m_universe.getTransform(ragdoll.entity)) * toPhysx(transform);
+
+		RagdollBone::Type type;
+		serializer.read((int*)&type);
+
+		switch (type)
+		{
+			case RagdollBone::CAPSULE:
+			{
+				PxCapsuleGeometry shape;
+				serializer.read(&shape.halfHeight);
+				serializer.read(&shape.radius);
+				bone->actor = PxCreateDynamic(m_scene->getPhysics(), px_transform, shape, *m_default_material, 1.0f);
+				break;
+			}
+			case RagdollBone::BOX:
+			{
+				PxBoxGeometry shape;
+				Vec3 e;
+				serializer.read(&e);
+				shape.halfExtents = toPhysx(e);
+				bone->actor = PxCreateDynamic(m_scene->getPhysics(), px_transform, shape, *m_default_material, 1.0f);
+				break;
+			}
+			default: ASSERT(false); break;
+		}
+		serializer.read(&bone->is_kinematic);
+		bone->actor->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, bone->is_kinematic);
+		bone->actor->isRigidDynamic()->setSolverIterationCounts(8, 8);
+		bone->actor->isRigidDynamic()->setMass(0.0001f);
+		bone->actor->userData = (void*)(intptr_t)ragdoll.entity.index;
+
+		bone->actor->setActorFlag(PxActorFlag::eVISUALIZATION, true);
+		m_scene->addActor(*bone->actor);
+		updateFilterData(bone->actor, ragdoll.layer);
+
+		bone->parent = parent;
+
+		bone->child = deserializeRagdollBone(ragdoll, bone, serializer);
+		bone->next = deserializeRagdollBone(ragdoll, parent, serializer);
+		if (bone->next) bone->next->prev = bone;
+
+		deserializeRagdollJoint(bone, serializer);
+
+		return bone;
+	}
 
 
 	void serializeRagdolls(OutputBlob& serializer)
@@ -3302,7 +4035,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			c.m_controller = m_controller_manager->createController(cDesc);
 			c.m_controller->getActor()->userData = (void*)(intptr_t)entity.index;
 			c.m_entity = entity;
-			m_universe.addComponent(entity, CONTROLLER_TYPE, this, {i});
+			m_universe.addComponent(entity, CONTROLLER_TYPE, this, {entity.index});
 		}
 	}
 
