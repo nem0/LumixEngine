@@ -35,6 +35,7 @@ public:
 		char name[30];
 		u32 name_hash;
 		bool looped;
+		float volume = 1;
 	};
 
 public:

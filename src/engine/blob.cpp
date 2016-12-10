@@ -71,9 +71,18 @@ namespace Lumix
 	}
 
 
-	OutputBlob& OutputBlob::operator << (int value)
+	OutputBlob& OutputBlob::operator << (i32 value)
 	{
 		char tmp[20];
+		Lumix::toCString(value, tmp, Lumix::lengthOf(tmp));
+		write(tmp, stringLength(tmp));
+		return *this;
+	}
+
+
+	OutputBlob& OutputBlob::operator << (i64 value)
+	{
+		char tmp[40];
 		Lumix::toCString(value, tmp, Lumix::lengthOf(tmp));
 		write(tmp, stringLength(tmp));
 		return *this;

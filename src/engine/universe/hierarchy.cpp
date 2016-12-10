@@ -2,6 +2,7 @@
 #include "engine/blob.h"
 #include "engine/engine.h"
 #include "engine/hash_map.h"
+#include "engine/iserializer.h"
 #include "engine/json_serializer.h"
 #include "engine/property_register.h"
 #include "universe.h"
@@ -27,7 +28,7 @@ public:
 		, m_allocator(allocator)
 		, m_system(system)
 	{
-		universe.registerComponentTypeScene(HIERARCHY_TYPE_HANDLE, this);
+		universe.registerComponentType(HIERARCHY_TYPE_HANDLE, this, &HierarchyImpl::serializeComponent, &HierarchyImpl::deserializeComponent);
 		m_is_processing = false;
 		universe.entityDestroyed().bind<HierarchyImpl, &HierarchyImpl::onEntityDestroyed>(this);
 		universe.entityTransformed().bind<HierarchyImpl, &HierarchyImpl::onEntityMoved>(this);
@@ -310,6 +311,46 @@ public:
 			return parent_iter.value();
 		}
 		return INVALID_ENTITY;
+	}
+
+
+	void serializeComponent(ISerializer& serializer, ComponentHandle cmp)
+	{
+		Entity entity = {cmp.index};
+		Entity parent = m_parents[entity];
+		serializer.write("parent", parent);
+		if (!isValid(parent)) return;
+
+		auto& children = *m_children[parent];
+		for (Child& child : children)
+		{
+			if (child.m_entity == entity)
+			{
+				serializer.write("tranform", child.m_local_transform);
+				break;
+			}
+		}
+	}
+
+
+	void deserializeComponent(IDeserializer& serializer, Entity entity)
+	{
+		Entity parent;
+		serializer.read(&parent);
+		m_parents.insert(entity, parent);
+		if (isValid(parent))
+		{
+			Children::iterator child_iter = m_children.find(parent);
+			if (!child_iter.isValid())
+			{
+				m_children.insert(parent, LUMIX_NEW(m_allocator, Array<Child>)(m_allocator));
+				child_iter = m_children.find(parent);
+			}
+			Child& c = child_iter.value()->emplace();
+			c.m_entity = entity;
+			serializer.read(&c.m_local_transform);
+		}
+		m_universe.addComponent(entity, HIERARCHY_TYPE_HANDLE, this, {entity.index});
 	}
 
 

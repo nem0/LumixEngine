@@ -1,0 +1,1120 @@
+diff --git a/src/animation/animation_system.cpp b/src/animation/animation_system.cpp
+index 25bad84..9af91fe 100644
+--- a/src/animation/animation_system.cpp
++++ b/src/animation/animation_system.cpp
+@@ -112,12 +112,18 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
+ 	{
+ 		m_is_game_running = false;
+ 		m_render_scene = static_cast<RenderScene*>(universe.getScene(crc32("renderer")));
+-		universe.registerComponentTypeScene(ANIMABLE_TYPE, this);
+-		universe.registerComponentTypeScene(CONTROLLER_TYPE, this);
++		universe.registerComponentType(ANIMABLE_TYPE, this, &AnimationSceneImpl::serializeAnimable, &AnimationSceneImpl::deserializeAnimable);
++		universe.registerComponentType(CONTROLLER_TYPE, this, &AnimationSceneImpl::serializeController, &AnimationSceneImpl::deserializeController);
+ 		ASSERT(m_render_scene);
+ 	}
+ 
+ 
++	void serializeAnimable(ISerializer& serializer, ComponentHandle cmp) {}
++	void deserializeAnimable(IDeserializer& serializer, Entity entity) {}
++	void serializeController(ISerializer& serializer, ComponentHandle cmp) {}
++	void deserializeController(IDeserializer& serializer, Entity entity) {}
++
++
+ 	const OutputBlob& getEventStream() const override
+ 	{
+ 		return m_event_stream;
+diff --git a/src/audio/audio_scene.cpp b/src/audio/audio_scene.cpp
+index ca59164..e2501ed 100644
+--- a/src/audio/audio_scene.cpp
++++ b/src/audio/audio_scene.cpp
+@@ -85,9 +85,45 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
+ 			i.entity = INVALID_ENTITY;
+ 			i.buffer_id = AudioDevice::INVALID_BUFFER_HANDLE;
+ 		}
+-		context.registerComponentTypeScene(LISTENER_TYPE, this);
+-		context.registerComponentTypeScene(AMBIENT_SOUND_TYPE, this);
+-		context.registerComponentTypeScene(ECHO_ZONE_TYPE, this);
++		context.registerComponentType(LISTENER_TYPE, this, &AudioSceneImpl::serializeListener, &AudioSceneImpl::deserializeListener);
++		context.registerComponentType(AMBIENT_SOUND_TYPE, this, &AudioSceneImpl::serializeAmbientSound, &AudioSceneImpl::deserializeAmbientSound);
++		context.registerComponentType(ECHO_ZONE_TYPE, this, &AudioSceneImpl::serializeEchoZone, &AudioSceneImpl::deserializeEchoZone);
++	}
++
++
++	void serializeEchoZone(ISerializer&, ComponentHandle)
++	{
++
++	}
++
++
++	void deserializeEchoZone(IDeserializer&, Entity entity)
++	{
++
++	}
++
++
++	void serializeAmbientSound(ISerializer&, ComponentHandle)
++	{
++
++	}
++
++
++	void deserializeAmbientSound(IDeserializer&, Entity entity)
++	{
++
++	}
++
++
++	void serializeListener(ISerializer&, ComponentHandle)
++	{
++
++	}
++
++
++	void deserializeListener(IDeserializer&, Entity entity)
++	{
++
+ 	}
+ 
+ 
+diff --git a/src/editor/world_editor.cpp b/src/editor/world_editor.cpp
+index 24a9099..cd43f56 100644
+--- a/src/editor/world_editor.cpp
++++ b/src/editor/world_editor.cpp
+@@ -5,6 +5,7 @@
+ #include "editor/entity_template_system.h"
+ #include "editor/gizmo.h"
+ #include "editor/measure_tool.h"
++#include "editor/platform_interface.h"
+ #include "engine/array.h"
+ #include "engine/associative_array.h"
+ #include "engine/blob.h"
+@@ -22,6 +23,7 @@
+ #include "engine/input_system.h"
+ #include "engine/iplugin.h"
+ #include "engine/iproperty_descriptor.h"
++#include "engine/iserializer.h"
+ #include "engine/json_serializer.h"
+ #include "engine/log.h"
+ #include "engine/matrix.h"
+@@ -1674,6 +1676,208 @@ public:
+ 	bool isUniverseChanged() const override { return m_is_universe_changed; }
+ 
+ 
++	struct Serializer : public ISerializer
++	{
++		Serializer(OutputBlob& _blob) : blob(_blob) {}
++
++		void write(const char* label, Entity entity) override
++		{
++			blob << "#" << label << "\n\t"
++				<< entity.index << "\n";
++		}
++		
++		void write(const char* label, const Transform& value) override
++		{
++			blob << "#" << label
++				<< " (" << value.pos.x << ", " << value.pos.y << ", " << value.pos.z << ") "
++				<< " (" << value.rot.x << ", " << value.rot.y << ", " << value.rot.z << ", " << value.rot.w << ")\n\t"
++				<< asU32(value.pos.x) << "\n\t" << asU32(value.pos.y) << "\n\t" << asU32(value.pos.z) << "\n\t"
++				<< asU32(value.rot.x) << "\n\t" << asU32(value.rot.y) << "\n\t" << asU32(value.rot.z) << "\n\t" << asU32(value.rot.w) << "\n";
++		}
++		
++		void write(const char* label, float value) override
++		{
++			blob << "#" << label << " " << value << "\n\t" << asU32(value) << "\n";
++		}
++
++		void write(const char* label, bool value) override
++		{
++			blob << "#" << label << "\n\t" << (u32)value << "\n";
++		}
++
++		void write(const char* label, const char* value) override
++		{
++			blob << "#" << label << "\n\t\"" << value << "\"\n";
++		}
++
++		void write(const char* label, u32 value) override
++		{
++			blob << "#" << label << "\n\t" << value << "\n";
++		}
++
++		void write(const char* label, i32 value) override
++		{
++			blob << "#" << label << "\n\t" << value << "\n";
++		}
++
++		void write(const char* label, i8 value) override
++		{
++			blob << "#" << label << "\n\t" << value << "\n";
++		}
++
++		void write(const char* label, u8 value) override
++		{
++			blob << "#" << label << "\n\t" << value << "\n";
++		}
++
++		static u32 asU32(float v)
++		{
++			return *(u32*)&v;
++		}
++
++
++		OutputBlob& blob;
++	};
++
++
++	struct Deserializer : public IDeserializer
++	{
++		Deserializer(InputBlob& _blob)
++			: blob(_blob)
++		{
++		}
++
++		void read(Entity* entity) override
++		{
++			skip();
++			entity->index = readU32();
++		}
++
++
++		void read(Transform* value) override {
++			skip();
++			value->pos.x = asFloat(readU32());
++			skip();
++			value->pos.y = asFloat(readU32());
++			skip();
++			value->pos.z = asFloat(readU32());
++			skip();
++			value->rot.x = asFloat(readU32());
++			skip();
++			value->rot.y = asFloat(readU32());
++			skip();
++			value->rot.z = asFloat(readU32());
++			skip();
++			value->rot.w = asFloat(readU32());
++		}
++
++
++		void read(float* value) override
++		{
++			skip();
++			*value = asFloat(readU32());
++		}
++
++
++		void read(bool* value) override 
++		{
++			skip();
++			*value = readU32() != 0;
++		}
++
++
++		void read(u32* value) override
++		{
++			skip();
++			*value = readU32();
++		}
++
++
++		void read(i32* value) override 
++		{
++			skip();
++			char tmp[20];
++			char* c = tmp;
++			*c = blob.readChar();
++			if (*c == '-')
++			{
++				++c;
++				*c = blob.readChar();
++			}
++			while (*c >= '0' && *c <= '9' && (c - tmp) < lengthOf(tmp))
++			{
++				++c;
++				*c = blob.readChar();
++			}
++			*c = 0;
++			fromCString(tmp, lengthOf(tmp), value);
++	}
++
++
++		void read(u8* value) override
++		{
++			skip();
++			*value = (u8)readU32();
++		}
++		
++		
++		void read(i8* value) override
++		{
++			skip();
++			*value = (i8)readU32();
++		}
++
++
++		void read(char* value, int max_size) override
++		{
++			skip();
++			u8 c = blob.readChar();
++			ASSERT(c == '"');
++			char* out = value;
++			*out = blob.readChar();
++			while (*out != '"' && out - value < max_size - 1)
++			{
++				++out;
++				*out = blob.readChar();
++			}
++			ASSERT(*out == '"');
++			*out = 0;
++		}
++
++
++		u32 readU32()
++		{
++			char tmp[20];
++			char* c = tmp;
++			*c = blob.readChar();
++			while (*c >= '0' && *c <= '9' && (c - tmp) < lengthOf(tmp))
++			{
++				++c;
++				*c = blob.readChar();
++			}
++			*c = 0;
++			u32 v;
++			fromCString(tmp, lengthOf(tmp), &v);
++			return v;
++		}
++
++		void skip()
++		{
++			u8 c = blob.readChar();
++			if (c == '#') while (blob.readChar() != '\n');
++			if (c == '\t') return;
++			while (blob.readChar() != '\t');
++		}
++
++		float asFloat(u32 v)
++		{
++			return *(float*)&v;
++		}
++
++		InputBlob& blob;
++	};
++
++
+ 	void saveUniverse(const Path& path, bool save_path) override
+ 	{
+ 		g_log_info.log("Editor") << "Saving universe " << path << "...";
+@@ -1692,10 +1896,78 @@ public:
+ 		m_is_universe_changed = false;
+ 		fs.close(*file);
+ 		
++		serialize(path);
++
+ 		if (save_path) m_universe->setPath(path);
+ 	}
+ 
+ 
++	void deserialize(const Path& path)
++	{
++		PathUtils::FileInfo file_info(path.c_str());
++		StaticString<MAX_PATH_LENGTH> dir(file_info.m_dir, file_info.m_basename, "/");
++
++		auto file_iter = PlatformInterface::createFileIterator(dir, m_allocator);
++		PlatformInterface::FileInfo info;
++		Array<u8> data(m_allocator);
++		while (PlatformInterface::getNextFile(file_iter, &info))
++		{
++			FS::OsFile file;
++			StaticString<MAX_PATH_LENGTH> filepath(dir, info.filename);
++			if (file.open(filepath, FS::Mode::OPEN_AND_READ, m_allocator))
++			{
++				data.resize((int)file.size());
++				file.read(&data[0], data.size());
++				file.close();
++				InputBlob blob(&data[0], data.size());
++				Deserializer deserializer(blob);
++				Transform tr;
++				deserializer.read(&tr);
++				Entity entity = m_universe->createEntity(tr.pos, tr.rot); // TODO keep id
++				u32 cmp_type;
++				deserializer.read(&cmp_type);
++				while (cmp_type != 0)
++				{
++					m_universe->deserializeComponent(deserializer, entity, PropertyRegister::getComponentTypeFromHash(cmp_type));
++					deserializer.read(&cmp_type);
++				}
++			}
++		}
++		PlatformInterface::destroyFileIterator(file_iter);
++	}
++
++
++	void serialize(const Path& path)
++	{
++		PathUtils::FileInfo file_info(path.c_str());
++		StaticString<MAX_PATH_LENGTH> dir(file_info.m_dir, file_info.m_basename, "/");
++		PlatformInterface::makePath(dir);
++
++		FS::OsFile entity_file;
++		OutputBlob blob(m_allocator);
++		Serializer serializer(blob);
++		for (Entity entity = m_universe->getFirstEntity(); isValid(entity); entity = m_universe->getNextEntity(entity))
++		{
++			blob.clear();
++			serializer.write("transform", m_universe->getTransform(entity));
++			StaticString<MAX_PATH_LENGTH> entity_file_path(dir, entity.index, ".ent");
++			for (ComponentUID cmp = m_universe->getFirstComponent(entity); isValid(cmp.handle); cmp = m_universe->getNextComponent(cmp))
++			{
++				const char* cmp_name = PropertyRegister::getComponentTypeID(cmp.type.index);
++				u32 type_hash = PropertyRegister::getComponentTypeHash(cmp.type);
++				serializer.write(cmp_name, type_hash);
++				m_universe->serializeComponent(serializer, cmp.type, cmp.handle);
++			}
++			serializer.write("cmp_end", (u32)0);
++			if (entity_file.open(entity_file_path, FS::Mode::CREATE_AND_WRITE, m_allocator))
++			{
++				entity_file.write(blob.getData(), blob.getPos());
++				entity_file.close();
++			}
++		}
++	}
++
++
+ 	void save(FS::IFile& file)
+ 	{
+ 		while (m_engine->getFileSystem().hasWork()) m_engine->getFileSystem().updateAsyncTransactions();
+@@ -2258,6 +2530,8 @@ public:
+ 			catString(path, sizeof(path), ".lst");
+ 			copyFile(m_universe->getPath().c_str(), path);
+ 			m_editor_icons->refresh();
++
++			deserialize(m_universe->getPath());
+ 		}
+ 	}
+ 
+diff --git a/src/engine/blob.h b/src/engine/blob.h
+index e1fa1a0..e160a8c 100644
+--- a/src/engine/blob.h
++++ b/src/engine/blob.h
+@@ -70,7 +70,7 @@ namespace Lumix
+ 			int getPosition() { return m_pos; }
+ 			void setPosition(int pos) { m_pos = pos; }
+ 			void rewind() { m_pos = 0; }
+-
++			u8 readChar() { ++m_pos; return m_data[m_pos - 1]; }
+ 
+ 		private:
+ 			const u8* m_data;
+diff --git a/src/engine/iplugin.h b/src/engine/iplugin.h
+index c8d8410..9e4cd40 100644
+--- a/src/engine/iplugin.h
++++ b/src/engine/iplugin.h
+@@ -6,9 +6,11 @@
+ 
+ namespace Lumix
+ {
++	struct IDeserializer;
+ 	class Engine;
+ 	class InputBlob;
+ 	class IPlugin;
++	struct ISerializer;
+ 	class OutputBlob;
+ 	class Universe;
+ 	class Universe;
+diff --git a/src/engine/iserializer.h b/src/engine/iserializer.h
+new file mode 100644
+index 0000000..0e9c0c5
+--- /dev/null
++++ b/src/engine/iserializer.h
+@@ -0,0 +1,40 @@
++#pragma once
++
++
++#include "lumix.h"
++
++
++namespace Lumix
++{
++
++struct Transform;
++
++struct ISerializer
++{
++	virtual void write(const char* label, Entity entity) = 0;
++	virtual void write(const char* label, const Transform& value) = 0;
++	virtual void write(const char* label, float value) = 0;
++	virtual void write(const char* label, bool value) = 0;
++	virtual void write(const char* label, i32 value) = 0;
++	virtual void write(const char* label, u32 value) = 0;
++	virtual void write(const char* label, i8 value) = 0;
++	virtual void write(const char* label, u8 value) = 0;
++	virtual void write(const char* label, const char* value) = 0;
++};
++
++
++struct IDeserializer
++{
++	virtual void read(Entity* entity) = 0;
++	virtual void read(Transform* value) = 0;
++	virtual void read(float* value) = 0;
++	virtual void read(bool* value) = 0;
++	virtual void read(u32* value) = 0;
++	virtual void read(i32* value) = 0;
++	virtual void read(u8* value) = 0;
++	virtual void read(i8* value) = 0;
++	virtual void read(char* value, int max_size) = 0;
++};
++
++
++}
+\ No newline at end of file
+diff --git a/src/engine/universe/hierarchy.cpp b/src/engine/universe/hierarchy.cpp
+index c5cf129..6af0bae 100644
+--- a/src/engine/universe/hierarchy.cpp
++++ b/src/engine/universe/hierarchy.cpp
+@@ -2,6 +2,7 @@
+ #include "engine/blob.h"
+ #include "engine/engine.h"
+ #include "engine/hash_map.h"
++#include "engine/iserializer.h"
+ #include "engine/json_serializer.h"
+ #include "engine/property_register.h"
+ #include "universe.h"
+@@ -27,7 +28,7 @@ public:
+ 		, m_allocator(allocator)
+ 		, m_system(system)
+ 	{
+-		universe.registerComponentTypeScene(HIERARCHY_TYPE_HANDLE, this);
++		universe.registerComponentType(HIERARCHY_TYPE_HANDLE, this, &HierarchyImpl::serializeComponent, &HierarchyImpl::deserializeComponent);
+ 		m_is_processing = false;
+ 		universe.entityDestroyed().bind<HierarchyImpl, &HierarchyImpl::onEntityDestroyed>(this);
+ 		universe.entityTransformed().bind<HierarchyImpl, &HierarchyImpl::onEntityMoved>(this);
+@@ -313,6 +314,45 @@ public:
+ 	}
+ 
+ 
++	void serializeComponent(ISerializer& serializer, ComponentHandle cmp)
++	{
++		Entity entity = {cmp.index};
++		Entity parent = m_parents[entity];
++		serializer.write("parent", parent);
++		if (!isValid(parent)) return;
++
++		auto& children = *m_children[parent];
++		for (Child& child : children)
++		{
++			if (child.m_entity == entity)
++			{
++				serializer.write("tranform", child.m_local_transform);
++				break;
++			}
++		}
++	}
++
++
++	void deserializeComponent(IDeserializer& serializer, Entity entity)
++	{
++		Entity parent;
++		serializer.read(&parent);
++		m_parents.insert(entity, parent);
++		if (isValid(parent))
++		{
++			Children::iterator child_iter = m_children.find(parent);
++			if (!child_iter.isValid())
++			{
++				m_children.insert(parent, LUMIX_NEW(m_allocator, Array<Child>)(m_allocator));
++				child_iter = m_children.find(parent);
++			}
++			Child& c = child_iter.value()->emplace();
++			serializer.read(&c.m_local_transform);
++		}
++		m_universe.addComponent(entity, HIERARCHY_TYPE_HANDLE, this, {entity.index});
++	}
++
++
+ 	void serialize(OutputBlob& serializer) override
+ 	{
+ 		int size = m_parents.size();
+diff --git a/src/engine/universe/hierarchy.h b/src/engine/universe/hierarchy.h
+index d8ec21f..0d2e378 100644
+--- a/src/engine/universe/hierarchy.h
++++ b/src/engine/universe/hierarchy.h
+@@ -35,11 +35,10 @@ namespace Lumix
+ 	class Hierarchy : public IScene
+ 	{
+ 		public:
+-			class Child
++			struct Child
+ 			{
+-				public:
+-					Entity m_entity;
+-					Transform m_local_transform;
++				Entity m_entity;
++				Transform m_local_transform;
+ 			};
+ 
+ 			typedef HashMap<Entity, Array<Child>*> Children;
+diff --git a/src/engine/universe/universe.cpp b/src/engine/universe/universe.cpp
+index ed7b3b4..e35cbee 100644
+--- a/src/engine/universe/universe.cpp
++++ b/src/engine/universe/universe.cpp
+@@ -38,16 +38,12 @@ Universe::Universe(IAllocator& allocator)
+ 	m_transformations.reserve(RESERVED_ENTITIES_COUNT);
+ 	m_components.reserve(RESERVED_ENTITIES_COUNT);
+ 	m_entity_map.reserve(RESERVED_ENTITIES_COUNT);
+-	for (int i = 0; i < lengthOf(m_component_type_scene_map); ++i)
+-	{
+-		m_component_type_scene_map[i] = 0;
+-	}
+ }
+ 
+ 
+ IScene* Universe::getScene(ComponentType type) const
+ {
+-	return m_component_type_scene_map[type.index];
++	return m_component_type_map[type.index].scene;
+ }
+ 
+ 
+@@ -263,7 +259,7 @@ void Universe::destroyEntity(Entity entity)
+ 		{
+ 			ComponentType type = {i};
+ 			auto original_mask = mask;
+-			IScene* scene = m_component_type_scene_map[i];
++			IScene* scene = m_component_type_map[i].scene;
+ 			scene->destroyComponent(scene->getComponent(entity, type), type);
+ 			mask = m_components[m_entity_map[entity.index]];
+ 			ASSERT(original_mask != mask);
+@@ -327,6 +323,22 @@ Entity Universe::getNextEntity(Entity entity)
+ }
+ 
+ 
++void Universe::serializeComponent(ISerializer& serializer, ComponentType type, ComponentHandle cmp)
++{
++	auto* scene = m_component_type_map[type.index].scene;
++	auto& method = m_component_type_map[type.index].serialize;
++	(scene->*method)(serializer, cmp);
++}
++
++
++void Universe::deserializeComponent(IDeserializer& serializer, Entity entity, ComponentType type)
++{
++	auto* scene = m_component_type_map[type.index].scene;
++	auto& method = m_component_type_map[type.index].deserialize;
++	(scene->*method)(serializer, entity);
++}
++
++
+ void Universe::serialize(OutputBlob& serializer)
+ {
+ 	serializer.write((i32)m_transformations.size());
+@@ -395,13 +407,6 @@ float Universe::getScale(Entity entity)
+ }
+ 
+ 
+-void Universe::registerComponentTypeScene(ComponentType type, IScene* scene)
+-{
+-	ASSERT(!m_component_type_scene_map[type.index]);
+-	m_component_type_scene_map[type.index] = scene;
+-}
+-
+-
+ ComponentUID Universe::getFirstComponent(Entity entity) const
+ {
+ 	u64 mask = m_components[m_entity_map[entity.index]];
+@@ -409,7 +414,7 @@ ComponentUID Universe::getFirstComponent(Entity entity) const
+ 	{
+ 		if ((mask & (u64(1) << i)) != 0)
+ 		{
+-			IScene* scene = m_component_type_scene_map[i];
++			IScene* scene = m_component_type_map[i].scene;
+ 			return ComponentUID(entity, {i}, scene, scene->getComponent(entity, {i}));
+ 		}
+ 	}
+@@ -424,7 +429,7 @@ ComponentUID Universe::getNextComponent(const ComponentUID& cmp) const
+ 	{
+ 		if ((mask & (u64(1) << i)) != 0)
+ 		{
+-			IScene* scene = m_component_type_scene_map[i];
++			IScene* scene = m_component_type_map[i].scene;
+ 			return ComponentUID(cmp.entity, {i}, scene, scene->getComponent(cmp.entity, {i}));
+ 		}
+ 	}
+@@ -436,7 +441,7 @@ ComponentUID Universe::getComponent(Entity entity, ComponentType component_type)
+ {
+ 	u64 mask = m_components[m_entity_map[entity.index]];
+ 	if ((mask & (u64(1) << component_type.index)) == 0) return ComponentUID::INVALID;
+-	IScene* scene = m_component_type_scene_map[component_type.index];
++	IScene* scene = m_component_type_map[component_type.index].scene;
+ 	return ComponentUID(entity, component_type, scene, scene->getComponent(entity, component_type));
+ }
+ 
+diff --git a/src/engine/universe/universe.h b/src/engine/universe/universe.h
+index a4df5dd..386d7a4 100644
+--- a/src/engine/universe/universe.h
++++ b/src/engine/universe/universe.h
+@@ -1,15 +1,16 @@
+ #pragma once
+ 
+ 
+-#include "engine/lumix.h"
+ #include "engine/array.h"
+ #include "engine/associative_array.h"
+ #include "engine/delegate_list.h"
++#include "engine/iplugin.h"
++#include "engine/lumix.h"
+ #include "engine/path.h"
+ #include "engine/quat.h"
+ #include "engine/string.h"
+-#include "engine/vec.h"
+ #include "engine/universe/component.h"
++#include "engine/vec.h"
+ 
+ 
+ namespace Lumix
+@@ -17,6 +18,8 @@ namespace Lumix
+ 
+ 
+ class InputBlob;
++struct IDeserializer;
++struct ISerializer;
+ struct Matrix;
+ class OutputBlob;
+ struct Transform;
+@@ -32,6 +35,16 @@ enum
+ class LUMIX_ENGINE_API Universe
+ {
+ public:
++	typedef void (IScene::*Serialize)(ISerializer&, ComponentHandle);
++	typedef void (IScene::*Deserialize)(IDeserializer&, Entity);
++	struct ComponentTypeEntry
++	{
++		IScene* scene;
++		void (IScene::*serialize)(ISerializer&, ComponentHandle);
++		 void (IScene::*deserialize)(IDeserializer&, Entity);
++	};
++
++public:
+ 	explicit Universe(IAllocator& allocator);
+ 	~Universe();
+ 
+@@ -45,7 +58,14 @@ public:
+ 	ComponentUID getComponent(Entity entity, ComponentType type) const;
+ 	ComponentUID getFirstComponent(Entity entity) const;
+ 	ComponentUID getNextComponent(const ComponentUID& cmp) const;
+-	void registerComponentTypeScene(ComponentType type, IScene* scene);
++	ComponentTypeEntry& registerComponentType(ComponentType type) { return m_component_type_map[type.index]; }
++	template <typename T1, typename T2>
++	void registerComponentType(ComponentType type, IScene* scene, T1 serialize, T2 deserialize)
++	{
++		m_component_type_map[type.index].scene = scene;
++		m_component_type_map[type.index].serialize = static_cast<Serialize>(serialize);
++		m_component_type_map[type.index].deserialize = static_cast<Deserialize>(deserialize);
++	}
+ 	int getEntityCount() const { return m_transformations.size(); }
+ 
+ 	int getDenseIdx(Entity entity);
+@@ -79,6 +99,8 @@ public:
+ 	DelegateList<void(const ComponentUID&)>& componentDestroyed() { return m_component_destroyed; }
+ 	DelegateList<void(const ComponentUID&)>& componentAdded() { return m_component_added; }
+ 
++	void serializeComponent(ISerializer& serializer, ComponentType type, ComponentHandle cmp);
++	void deserializeComponent(IDeserializer& serializer, Entity entity, ComponentType type);
+ 	void serialize(OutputBlob& serializer);
+ 	void deserialize(InputBlob& serializer);
+ 
+@@ -98,8 +120,8 @@ private:
+ 
+ private:
+ 	IAllocator& m_allocator;
++	ComponentTypeEntry m_component_type_map[MAX_COMPONENTS_TYPES_COUNT];
+ 	Array<IScene*> m_scenes;
+-	IScene* m_component_type_scene_map[MAX_COMPONENTS_TYPES_COUNT];
+ 	Array<Transformation> m_transformations;
+ 	Array<u64> m_components;
+ 	Array<int> m_entity_map;
+diff --git a/src/lua_script/lua_script_system.cpp b/src/lua_script/lua_script_system.cpp
+index c27421f..1aa08be 100644
+--- a/src/lua_script/lua_script_system.cpp
++++ b/src/lua_script/lua_script_system.cpp
+@@ -308,7 +308,7 @@ namespace Lumix
+ 			m_function_call.is_in_progress = false;
+ 			
+ 			registerAPI();
+-			ctx.registerComponentTypeScene(LUA_SCRIPT_TYPE, this);
++			ctx.registerComponentType(LUA_SCRIPT_TYPE, this, &LuaScriptSceneImpl::serializeLuaScript, &LuaScriptSceneImpl::deserializeLuaScript);
+ 		}
+ 
+ 
+@@ -1237,6 +1237,18 @@ namespace Lumix
+ 		}
+ 
+ 
++		void serializeLuaScript(ISerializer& serialize, ComponentHandle cmp)
++		{
++
++		}
++
++
++		void deserializeLuaScript(IDeserializer& serialize, Entity entity)
++		{
++
++		}
++
++
+ 		void serialize(OutputBlob& serializer) override
+ 		{
+ 			serializer.write(m_scripts.size());
+diff --git a/src/navigation/navigation_system.cpp b/src/navigation/navigation_system.cpp
+index 2b725a1..e988046 100644
+--- a/src/navigation/navigation_system.cpp
++++ b/src/navigation/navigation_system.cpp
+@@ -144,7 +144,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
+ 	{
+ 		setGeneratorParams(0.3f, 0.1f, 0.3f, 2.0f, 60.0f, 1.5f);
+ 		m_universe.entityTransformed().bind<NavigationSceneImpl, &NavigationSceneImpl::onEntityMoved>(this);
+-		universe.registerComponentTypeScene(NAVMESH_AGENT_TYPE, this);
++		universe.registerComponentType(NAVMESH_AGENT_TYPE, this, &NavigationSceneImpl::serializeAgent, &NavigationSceneImpl::deserializeAgent);
+ 	}
+ 
+ 
+@@ -1330,6 +1330,18 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
+ 	}
+ 
+ 
++	void serializeAgent(ISerializer& serializer, ComponentHandle cmp)
++	{
++
++	}
++
++
++	void deserializeAgent(IDeserializer& serializer, Entity entity)
++	{
++
++	}
++
++
+ 	void serialize(OutputBlob& serializer) override
+ 	{
+ 		int count = m_agents.size();
+diff --git a/src/physics/physics_scene.cpp b/src/physics/physics_scene.cpp
+index 2f66809..ec9c31c 100644
+--- a/src/physics/physics_scene.cpp
++++ b/src/physics/physics_scene.cpp
+@@ -308,17 +308,25 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
+ 
+ 		m_queued_forces.reserve(64);
+ 
+-		context.registerComponentTypeScene(BOX_ACTOR_TYPE, this);
+-		context.registerComponentTypeScene(MESH_ACTOR_TYPE, this);
+-		context.registerComponentTypeScene(HEIGHTFIELD_TYPE, this);
+-		context.registerComponentTypeScene(CONTROLLER_TYPE, this);
+-		context.registerComponentTypeScene(DISTANCE_JOINT_TYPE, this);
+-		context.registerComponentTypeScene(HINGE_JOINT_TYPE, this);
+-		context.registerComponentTypeScene(CAPSULE_ACTOR_TYPE, this);
+-		context.registerComponentTypeScene(SPHERE_ACTOR_TYPE, this);
+-		context.registerComponentTypeScene(SPHERICAL_JOINT_TYPE, this);
+-		context.registerComponentTypeScene(D6_JOINT_TYPE, this);
+-		context.registerComponentTypeScene(RAGDOLL_TYPE, this);
++		#define COMPONENT_TYPE(type, name) \
++			context.registerComponentType(type \
++				, this \
++				, &PhysicsSceneImpl::serialize##name \
++				, &PhysicsSceneImpl::deserialize##name)
++
++		COMPONENT_TYPE(BOX_ACTOR_TYPE, BoxActor);
++		COMPONENT_TYPE(MESH_ACTOR_TYPE, MeshActor);
++		COMPONENT_TYPE(HEIGHTFIELD_TYPE, Heightfield);
++		COMPONENT_TYPE(CONTROLLER_TYPE, Controller);
++		COMPONENT_TYPE(DISTANCE_JOINT_TYPE, DistanceJoint);
++		COMPONENT_TYPE(HINGE_JOINT_TYPE, HingeJoint);
++		COMPONENT_TYPE(CAPSULE_ACTOR_TYPE, CapsuleActor);
++		COMPONENT_TYPE(SPHERE_ACTOR_TYPE, SphereActor);
++		COMPONENT_TYPE(SPHERICAL_JOINT_TYPE, SphericalJoint);
++		COMPONENT_TYPE(D6_JOINT_TYPE, D6Joint);
++		COMPONENT_TYPE(RAGDOLL_TYPE, Ragdoll);
++
++		#undef COMPONENT_TYPE
+ 	}
+ 
+ 
+@@ -2736,6 +2744,30 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
+ 	}
+ 
+ 
++	void serializeBoxActor(ISerializer& serialize, ComponentHandle cmp) {}
++	void deserializeBoxActor(IDeserializer& serialize, Entity entity) {}
++	void serializeMeshActor(ISerializer& serialize, ComponentHandle cmp) {}
++	void deserializeMeshActor(IDeserializer& serialize, Entity entity) {}
++	void serializeCapsuleActor(ISerializer& serialize, ComponentHandle cmp) {}
++	void deserializeCapsuleActor(IDeserializer& serialize, Entity entity) {}
++	void serializeHeightfield(ISerializer& serialize, ComponentHandle cmp) {}
++	void deserializeHeightfield(IDeserializer& serialize, Entity entity) {}
++	void serializeController(ISerializer& serialize, ComponentHandle cmp) {}
++	void deserializeController(IDeserializer& serialize, Entity entity) {}
++	void serializeDistanceJoint(ISerializer& serialize, ComponentHandle cmp) {}
++	void deserializeDistanceJoint(IDeserializer& serialize, Entity entity) {}
++	void serializeD6Joint(ISerializer& serialize, ComponentHandle cmp) {}
++	void deserializeD6Joint(IDeserializer& serialize, Entity entity) {}
++	void serializeHingeJoint(ISerializer& serialize, ComponentHandle cmp) {}
++	void deserializeHingeJoint(IDeserializer& serialize, Entity entity) {}
++	void serializeSphereActor(ISerializer& serialize, ComponentHandle cmp) {}
++	void deserializeSphereActor(IDeserializer& serialize, Entity entity) {}
++	void serializeRagdoll(ISerializer& serialize, ComponentHandle cmp) {}
++	void deserializeRagdoll(IDeserializer& serialize, Entity entity) {}
++	void serializeSphericalJoint(ISerializer& serialize, ComponentHandle cmp) {}
++	void deserializeSphericalJoint(IDeserializer& serialize, Entity entity) {}
++
++
+ 	void serializeActor(OutputBlob& serializer, RigidActor* actor)
+ 	{
+ 		serializer.write(actor->layer);
+diff --git a/src/renderer/render_scene.cpp b/src/renderer/render_scene.cpp
+index 7253434..93e736e 100644
+--- a/src/renderer/render_scene.cpp
++++ b/src/renderer/render_scene.cpp
+@@ -5,6 +5,7 @@
+ #include "engine/crc32.h"
+ #include "engine/fs/file_system.h"
+ #include "engine/geometry.h"
++#include "engine/iserializer.h"
+ #include "engine/json_serializer.h"
+ #include "engine/lifo_allocator.h"
+ #include "engine/log.h"
+@@ -649,6 +650,145 @@ public:
+ 	}
+ 
+ 
++	void serializeModelInstance(ISerializer& serialize, ComponentHandle cmp)
++	{
++		ModelInstance& r = m_model_instances[{cmp.index}];
++		ASSERT(r.entity != INVALID_ENTITY);
++
++		serialize.write("source", r.model ? r.model->getPath().c_str() : "");
++		bool has_changed_materials = r.model && r.model->isReady() && r.meshes != &r.model->getMesh(0);
++		serialize.write("custom_materials", has_changed_materials ? r.mesh_count : 0);
++		if (has_changed_materials)
++		{
++			for (int i = 0; i < r.mesh_count; ++i)
++			{
++				serialize.write("", r.meshes[i].material->getPath().c_str());
++			}
++		}
++	}
++
++	void deserializeModelInstance(IDeserializer& serializer, Entity entity)
++	{
++		while (entity.index >= m_model_instances.size())
++		{
++			auto& r = m_model_instances.emplace();
++			r.entity = INVALID_ENTITY;
++			r.pose = nullptr;
++			r.model = nullptr;
++			r.meshes = nullptr;
++			r.mesh_count = 0;
++		}
++		auto& r = m_model_instances[entity.index];
++		r.entity = entity;
++		r.model = nullptr;
++		r.pose = nullptr;
++		r.custom_meshes = false;
++		r.meshes = nullptr;
++		r.mesh_count = 0;
++
++		r.matrix = m_universe.getMatrix(r.entity);
++
++		char path[MAX_PATH_LENGTH];
++		serializer.read(path, lengthOf(path));
++
++		ComponentHandle cmp = {r.entity.index};
++		if (path[0] != 0)
++		{
++			auto* model = static_cast<Model*>(m_engine.getResourceManager().get(MODEL_TYPE)->load(Path(path)));
++			setModel(cmp, model);
++		}
++
++		int material_count;
++		serializer.read(&material_count);
++		if (material_count > 0)
++		{
++			allocateCustomMeshes(r, material_count);
++			for (int j = 0; j < material_count; ++j)
++			{
++				char path[MAX_PATH_LENGTH];
++				serializer.read(path, lengthOf(path));
++				setModelInstanceMaterial(cmp, j, Path(path));
++			}
++		}
++
++		m_universe.addComponent(r.entity, MODEL_INSTANCE_TYPE, this, cmp);
++	}
++
++
++	void serializeGlobalLight(ISerializer& serialize, ComponentHandle cmp) {}
++	void deserializeGlobalLight(IDeserializer& serialize, Entity entity) {}
++	void serializePointLight(ISerializer& serialize, ComponentHandle cmp) {}
++	void deserializePointLight(IDeserializer& serialize, Entity entity) {}
++	void serializeDecal(ISerializer& serialize, ComponentHandle cmp) {}
++	void deserializeDecal(IDeserializer& serialize, Entity entity) {}
++
++
++	void serializeCamera(ISerializer& serialize, ComponentHandle cmp)
++	{
++		Camera& camera = m_cameras[{cmp.index}];
++		serialize.write("far", camera.far);
++		serialize.write("fov", camera.fov);
++		serialize.write("is_ortho", camera.is_ortho);
++		serialize.write("ortho_size", camera.ortho_size);
++		serialize.write("near", camera.near);
++		serialize.write("slot", camera.slot);
++
++	}
++
++
++	void deserializeCamera(IDeserializer& serializer, Entity entity)
++	{
++		Camera camera;
++		camera.entity = entity;
++		serializer.read(&camera.far);
++		serializer.read(&camera.fov);
++		serializer.read(&camera.is_ortho);
++		serializer.read(&camera.ortho_size);
++		serializer.read(&camera.near);
++		serializer.read(camera.slot, lengthOf(camera.slot));
++		m_cameras.insert(camera.entity, camera);
++		m_universe.addComponent(camera.entity, CAMERA_TYPE, this, {camera.entity.index});
++	}
++
++
++	void serializeTerrain(ISerializer& serialize, ComponentHandle cmp) {}
++	void deserializeTerrain(IDeserializer& serialize, Entity entity) {}
++	void serializeBoneAttachment(ISerializer& serialize, ComponentHandle cmp) {}
++	void deserializeBoneAttachment(IDeserializer& serialize, Entity entity) {}
++	void serializeEnvironmentProbe(ISerializer& serialize, ComponentHandle cmp) {}
++	void deserializeEnvironmentProbe(IDeserializer& serialize, Entity entity) {}
++
++	void serializeParticleEmitter(ISerializer& serialize, ComponentHandle cmp) {}
++	void deserializeParticleEmitter(IDeserializer& serialize, Entity entity) {}
++
++	void serializeParticleEmitterAlpha(ISerializer& serialize, ComponentHandle cmp) {}
++	void deserializeParticleEmitterAlpha(IDeserializer& serialize, Entity entity) {}
++
++	void serializeParticleEmitterAttractor(ISerializer& serialize, ComponentHandle cmp) {}
++	void deserializeParticleEmitterAttractor(IDeserializer& serialize, Entity entity) {}
++
++	void serializeParticleEmitterForce(ISerializer& serialize, ComponentHandle cmp) {}
++	void deserializeParticleEmitterForce(IDeserializer& serialize, Entity entity) {}
++
++	void serializeParticleEmitterLinearMovement(ISerializer& serialize, ComponentHandle cmp) {}
++	void deserializeParticleEmitterLinearMovement(IDeserializer& serialize, Entity entity) {}
++
++	void serializeParticleEmitterPlane(ISerializer& serialize, ComponentHandle cmp) {}
++	void deserializeParticleEmitterPlane(IDeserializer& serialize, Entity entity) {}
++
++	void serializeParticleEmitterSpawnShape(ISerializer& serialize, ComponentHandle cmp) {}
++	void deserializeParticleEmitterSpawnShape(IDeserializer& serialize, Entity entity) {}
++
++	void serializeParticleEmitterSize(ISerializer& serialize, ComponentHandle cmp) {}
++	void deserializeParticleEmitterSize(IDeserializer& serialize, Entity entity) {}
++
++	void serializeParticleEmitterRandomRotation(ISerializer& serialize, ComponentHandle cmp) {}
++	void deserializeParticleEmitterRandomRotation(IDeserializer& serialize, Entity entity) {}
++
++	void serializeParticleEmitterSubimage(ISerializer& serialize, ComponentHandle cmp) {}
++	void deserializeParticleEmitterSubimage(IDeserializer& serialize, Entity entity) {}
++
++
+ 	void serializeBoneAttachments(OutputBlob& serializer)
+ 	{
+ 		serializer.write((i32)m_bone_attachments.size());
+@@ -4459,49 +4599,44 @@ private:
+ 
+ 
+ 
++#define COMPONENT_TYPE(type, name) \
++	{ \
++		type \
++		, static_cast<Universe::Serialize>(&RenderSceneImpl::serialize##name) \
++		, static_cast<Universe::Deserialize>(&RenderSceneImpl::deserialize##name) \
++		, &RenderSceneImpl::create##name \
++		, &RenderSceneImpl::destroy##name \
++	}
++
+ static struct
+ {
+ 	ComponentType type;
++	Universe::Serialize serialize;
++	Universe::Deserialize deserialize;
+ 	ComponentHandle(RenderSceneImpl::*creator)(Entity);
+ 	void (RenderSceneImpl::*destroyer)(ComponentHandle);
+ } COMPONENT_INFOS[] = {
+-	{MODEL_INSTANCE_TYPE, &RenderSceneImpl::createModelInstance, &RenderSceneImpl::destroyModelInstance},
+-	{GLOBAL_LIGHT_TYPE, &RenderSceneImpl::createGlobalLight, &RenderSceneImpl::destroyGlobalLight},
+-	{POINT_LIGHT_TYPE, &RenderSceneImpl::createPointLight, &RenderSceneImpl::destroyPointLight},
+-	{DECAL_TYPE, &RenderSceneImpl::createDecal, &RenderSceneImpl::destroyDecal},
+-	{CAMERA_TYPE, &RenderSceneImpl::createCamera, &RenderSceneImpl::destroyCamera},
+-	{TERRAIN_TYPE, &RenderSceneImpl::createTerrain, &RenderSceneImpl::destroyTerrain},
+-	{PARTICLE_EMITTER_TYPE, &RenderSceneImpl::createParticleEmitter, &RenderSceneImpl::destroyParticleEmitter},
+-	{PARTICLE_EMITTER_ALPHA_TYPE,
+-		&RenderSceneImpl::createParticleEmitterAlpha,
+-		&RenderSceneImpl::destroyParticleEmitterAlpha},
+-	{PARTICLE_EMITTER_FORCE_HASH,
+-		&RenderSceneImpl::createParticleEmitterForce,
+-		&RenderSceneImpl::destroyParticleEmitterForce},
+-	{PARTICLE_EMITTER_ATTRACTOR_HASH,
+-		&RenderSceneImpl::createParticleEmitterAttractor,
+-		&RenderSceneImpl::destroyParticleEmitterAttractor},
+-	{PARTICLE_EMITTER_SUBIMAGE_HASH,
+-		&RenderSceneImpl::createParticleEmitterSubimage,
+-		&RenderSceneImpl::destroyParticleEmitterSubimage},
+-	{PARTICLE_EMITTER_SIZE_HASH,
+-		&RenderSceneImpl::createParticleEmitterSize,
+-		&RenderSceneImpl::destroyParticleEmitterSize},
+-	{PARTICLE_EMITTER_LINEAR_MOVEMENT_HASH,
+-		&RenderSceneImpl::createParticleEmitterLinearMovement,
+-		&RenderSceneImpl::destroyParticleEmitterLinearMovement},
+-	{PARTICLE_EMITTER_SPAWN_SHAPE_HASH,
+-		&RenderSceneImpl::createParticleEmitterSpawnShape,
+-		&RenderSceneImpl::destroyParticleEmitterSpawnShape},
+-	{PARTICLE_EMITTER_RANDOM_ROTATION_HASH,
+-		&RenderSceneImpl::createParticleEmitterRandomRotation,
+-		&RenderSceneImpl::destroyParticleEmitterRandomRotation},
+-	{PARTICLE_EMITTER_PLANE_HASH,
+-		&RenderSceneImpl::createParticleEmitterPlane,
+-		&RenderSceneImpl::destroyParticleEmitterPlane},
+-	{BONE_ATTACHMENT_TYPE, &RenderSceneImpl::createBoneAttachment, &RenderSceneImpl::destroyBoneAttachment},
+-	{ENVIRONMENT_PROBE_TYPE, &RenderSceneImpl::createEnvironmentProbe, &RenderSceneImpl::destroyEnvironmentProbe}};
++	COMPONENT_TYPE(MODEL_INSTANCE_TYPE, ModelInstance),
++	COMPONENT_TYPE(GLOBAL_LIGHT_TYPE, GlobalLight),
++	COMPONENT_TYPE(POINT_LIGHT_TYPE, PointLight),
++	COMPONENT_TYPE(DECAL_TYPE, Decal),
++	COMPONENT_TYPE(CAMERA_TYPE, Camera),
++	COMPONENT_TYPE(TERRAIN_TYPE, Terrain),
++	COMPONENT_TYPE(BONE_ATTACHMENT_TYPE, BoneAttachment),
++	COMPONENT_TYPE(ENVIRONMENT_PROBE_TYPE, EnvironmentProbe),
++	COMPONENT_TYPE(PARTICLE_EMITTER_TYPE, ParticleEmitter),
++	COMPONENT_TYPE(PARTICLE_EMITTER_ALPHA_TYPE, ParticleEmitterAlpha),
++	COMPONENT_TYPE(PARTICLE_EMITTER_ATTRACTOR_HASH, ParticleEmitterAttractor),
++	COMPONENT_TYPE(PARTICLE_EMITTER_FORCE_HASH, ParticleEmitterForce),
++	COMPONENT_TYPE(PARTICLE_EMITTER_LINEAR_MOVEMENT_HASH, ParticleEmitterLinearMovement),
++	COMPONENT_TYPE(PARTICLE_EMITTER_PLANE_HASH, ParticleEmitterPlane),
++	COMPONENT_TYPE(PARTICLE_EMITTER_RANDOM_ROTATION_HASH, ParticleEmitterRandomRotation),
++	COMPONENT_TYPE(PARTICLE_EMITTER_SIZE_HASH, ParticleEmitterSize),
++	COMPONENT_TYPE(PARTICLE_EMITTER_SPAWN_SHAPE_HASH, ParticleEmitterSpawnShape),
++	COMPONENT_TYPE(PARTICLE_EMITTER_SUBIMAGE_HASH, ParticleEmitterSubimage)
++};
+ 
++#undef COMPONENT_TYPE
+ 
+ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
+ 	Engine& engine,
+@@ -4548,7 +4683,7 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
+ 
+ 	for (auto& i : COMPONENT_INFOS)
+ 	{
+-		universe.registerComponentTypeScene(i.type, this);
++		universe.registerComponentType(i.type, this, i.serialize, i.deserialize);
+ 	}
+ }
+ 

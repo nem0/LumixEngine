@@ -7,6 +7,7 @@
 #include "engine/blob.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
+#include "engine/iserializer.h"
 #include "engine/json_serializer.h"
 #include "engine/lua_wrapper.h"
 #include "engine/profiler.h"
@@ -112,9 +113,50 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	{
 		m_is_game_running = false;
 		m_render_scene = static_cast<RenderScene*>(universe.getScene(crc32("renderer")));
-		universe.registerComponentTypeScene(ANIMABLE_TYPE, this);
-		universe.registerComponentTypeScene(CONTROLLER_TYPE, this);
+		universe.registerComponentType(ANIMABLE_TYPE, this, &AnimationSceneImpl::serializeAnimable, &AnimationSceneImpl::deserializeAnimable);
+		universe.registerComponentType(CONTROLLER_TYPE, this, &AnimationSceneImpl::serializeController, &AnimationSceneImpl::deserializeController);
 		ASSERT(m_render_scene);
+	}
+
+
+	void serializeAnimable(ISerializer& serializer, ComponentHandle cmp)
+	{
+		Animable& animable = m_animables[{cmp.index}];
+		serializer.write("time_scale", animable.time_scale);
+		serializer.write("start_time", animable.start_time);
+		serializer.write("animation", animable.animation ? animable.animation->getPath().c_str() : "");
+	}
+
+	void deserializeAnimable(IDeserializer& serializer, Entity entity)
+	{
+		Animable& animable = m_animables.insert(entity);
+		animable.entity = entity;
+		serializer.read(&animable.time_scale);
+		serializer.read(&animable.start_time);
+		char tmp[MAX_PATH_LENGTH];
+		serializer.read(tmp, lengthOf(tmp));
+		auto* res = tmp[0] ? m_engine.getResourceManager().get(ANIMATION_TYPE)->load(Path(tmp)) : nullptr;
+		animable.animation = (Animation*)res;
+		m_universe.addComponent(entity, ANIMABLE_TYPE, this, {entity.index});
+	}
+
+
+	void serializeController(ISerializer& serializer, ComponentHandle cmp)
+	{
+		Controller& controller = m_controllers.get({cmp.index});
+		serializer.write("source", controller.resource ? controller.resource->getPath().c_str() : "");
+	}
+
+
+	void deserializeController(IDeserializer& serializer, Entity entity)
+	{
+		Controller& controller = m_controllers.emplace(entity, m_anim_system.m_allocator);
+		controller.entity = entity;
+		char tmp[MAX_PATH_LENGTH];
+		serializer.read(tmp, lengthOf(tmp));
+		auto* res = tmp[0] ? m_engine.getResourceManager().get(CONTROLLER_RESOURCE_TYPE)->load(Path(tmp)) : nullptr;
+		controller.resource = (Anim::ControllerResource*)res;
+		m_universe.addComponent(entity, CONTROLLER_TYPE, this, {entity.index});
 	}
 
 
