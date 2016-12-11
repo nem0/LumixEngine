@@ -116,7 +116,6 @@ public:
 	StudioAppImpl()
 		: m_is_entity_list_opened(true)
 		, m_finished(false)
-		, m_is_entity_template_list_opened(false)
 		, m_selected_template_name(m_allocator)
 		, m_profiler_ui(nullptr)
 		, m_asset_browser(nullptr)
@@ -507,7 +506,6 @@ public:
 			m_log_ui->onGUI();
 			m_property_grid->onGUI();
 			showEntityList();
-			showEntityTemplateList();
 			for (auto* plugin : m_plugins)
 			{
 				plugin->onWindowGUI();
@@ -732,16 +730,6 @@ public:
 	}
 
 
-	void instantiateTemplate()
-	{
-		if (m_selected_template_name.length() <= 0) return;
-
-		Lumix::Vec3 pos = m_editor->getCameraRaycastHit();
-		auto& template_system = m_editor->getEntityTemplateSystem();
-		template_system.createInstance(m_selected_template_name.c_str(), pos, Lumix::Quat(0, 0, 0, 1), 1);
-	}
-
-
 	void undo() { if (!hasPluginFocus()) m_editor->undo(); }
 	void redo() { if (!hasPluginFocus()) m_editor->redo(); }
 	void copy() { m_editor->copyEntities(); }
@@ -775,6 +763,16 @@ public:
 	void toggleGameMode() { m_editor->toggleGameMode(); }
 	void setTranslateGizmoMode() { m_editor->getGizmo().setTranslateMode(); }
 	void setRotateGizmoMode() { m_editor->getGizmo().setRotateMode(); }
+
+
+	void savePrefab()
+	{
+		char filename[Lumix::MAX_PATH_LENGTH];
+		if (PlatformInterface::getSaveFilename(filename, Lumix::lengthOf(filename), "Prefab files\0*.fab\0", "fab"))
+		{
+			m_editor->getEntityTemplateSystem().savePrefab(Lumix::Path(filename));
+		}
+	}
 
 
 	void autosnapDown() 
@@ -921,20 +919,7 @@ public:
 		}
 		doMenuItem(*getAction("destroyEntity"), is_any_entity_selected);
 
-		if (ImGui::BeginMenu("Create template", is_any_entity_selected))
-		{
-			static char name[255] = "";
-			ImGui::InputText("Name###templatename", name, sizeof(name));
-			if (ImGui::Button("Create"))
-			{
-				auto entity = m_editor->getSelectedEntities()[0];
-				auto& system = m_editor->getEntityTemplateSystem();
-				system.createTemplateFromEntity(name, entity);
-				ImGui::CloseCurrentPopup();
-			}
-			ImGui::EndMenu();
-		}
-		doMenuItem(*getAction("instantiateTemplate"), m_selected_template_name.length() > 0);
+		doMenuItem(*getAction("savePrefab"), is_any_entity_selected);
 		doMenuItem(*getAction("showEntities"), is_any_entity_selected);
 		doMenuItem(*getAction("hideEntities"), is_any_entity_selected);
 		ImGui::EndMenu();
@@ -1030,7 +1015,6 @@ public:
 
 		ImGui::MenuItem("Asset browser", nullptr, &m_asset_browser->m_is_opened);
 		doMenuItem(*getAction("entityList"), true);
-		ImGui::MenuItem("Entity templates", nullptr, &m_is_entity_template_list_opened);
 		ImGui::MenuItem("Log", nullptr, &m_log_ui->m_is_opened);
 		ImGui::MenuItem("Profiler", nullptr, &m_profiler_ui->m_is_opened);
 		ImGui::MenuItem("Properties", nullptr, &m_property_grid->m_is_opened);
@@ -1140,73 +1124,6 @@ public:
 			ImGui::EndMainMenuBar();
 		}
 		return menu_height;
-	}
-
-
-	void showEntityTemplateList()
-	{
-		if (ImGui::BeginDock("Entity Templates", &m_is_entity_template_list_opened))
-		{
-			if (m_editor->getSelectedEntities().size() == 1)
-			{
-				if (ImGui::Button("Create template"))
-				{
-					ImGui::OpenPopup("create template");
-				}
-				if (ImGui::BeginPopup("create template"))
-				{
-					ImGui::InputText("Template name", m_template_name, Lumix::lengthOf(m_template_name));
-					if (ImGui::Button("Create"))
-					{
-						auto entity = m_editor->getSelectedEntities()[0];
-						auto& system = m_editor->getEntityTemplateSystem();
-						system.createTemplateFromEntity(m_template_name, entity);
-						ImGui::CloseCurrentPopup();
-					}
-					ImGui::EndPopup();
-				}
-				ImGui::SameLine();
-			}
-			if (!m_editor->getSelectedEntities().empty())
-			{
-				auto& system = m_editor->getEntityTemplateSystem();
-				bool is_prefab = system.isPrefab();
-
-				if (is_prefab)
-				{
-					if (ImGui::Button("Apply")) system.applyPrefab();
-
-					ImGui::SameLine();
-					if (ImGui::Button("Revert")) system.refreshPrefabs();
-
-					ImGui::SameLine();
-					if (ImGui::Button("Select")) system.selectPrefab();
-				}
-
-				ImGui::SameLine();
-				if (ImGui::Button("Save prefab"))
-				{
-					char tmp[Lumix::MAX_PATH_LENGTH];
-					if (PlatformInterface::getSaveFilename(tmp, Lumix::lengthOf(tmp), "Prefabs\0*.fab\0", "fab"))
-					{
-						system.savePrefab(Lumix::Path(tmp));
-					}
-				}
-			}
-			ImGui::Text("Templates:");
-			auto& template_system = m_editor->getEntityTemplateSystem();
-
-			for (auto& template_name : template_system.getTemplateNames())
-			{
-				bool b = m_selected_template_name == template_name;
-				auto& instances = template_system.getInstances(Lumix::crc32(template_name.c_str()));
-				if (!instances.empty() && ImGui::Selectable(template_name.c_str(), &b))
-				{
-					m_selected_template_name = template_name;
-				}
-			}
-		}
-		ImGui::EndDock();
 	}
 
 
@@ -1363,7 +1280,6 @@ public:
 	{
 		m_settings.m_is_asset_browser_opened = m_asset_browser->m_is_opened;
 		m_settings.m_is_entity_list_opened = m_is_entity_list_opened;
-		m_settings.m_is_entity_template_list_opened = m_is_entity_template_list_opened;
 		m_settings.m_is_log_opened = m_log_ui->m_is_opened;
 		m_settings.m_is_profiler_opened = m_profiler_ui->m_is_opened;
 		m_settings.m_is_properties_opened = m_property_grid->m_is_opened;
@@ -1424,7 +1340,6 @@ public:
 
 		m_asset_browser->m_is_opened = m_settings.m_is_asset_browser_opened;
 		m_is_entity_list_opened = m_settings.m_is_entity_list_opened;
-		m_is_entity_template_list_opened = m_settings.m_is_entity_template_list_opened;
 		m_log_ui->m_is_opened = m_settings.m_is_log_opened;
 		m_profiler_ui->m_is_opened = m_settings.m_is_profiler_opened;
 		m_property_grid->m_is_opened = m_settings.m_is_properties_opened;
@@ -1482,7 +1397,7 @@ public:
 		addAction<&StudioAppImpl::destroyEntity>("Destroy", "destroyEntity", SDLK_DELETE, -1, -1);
 		addAction<&StudioAppImpl::showEntities>("Show", "showEntities");
 		addAction<&StudioAppImpl::hideEntities>("Hide", "hideEntities");
-		addAction<&StudioAppImpl::instantiateTemplate>("Instantiate template", "instantiateTemplate");
+		addAction<&StudioAppImpl::savePrefab>("Save prefab", "savePrefab");
 
 		addAction<&StudioAppImpl::toggleGameMode>("Game Mode", "toggleGameMode")
 			.is_selected.bind<Lumix::WorldEditor, &Lumix::WorldEditor::isGameMode>(m_editor);
@@ -1623,12 +1538,6 @@ public:
 	}
 
 
-	void LUA_createEntityTemplate(Lumix::Entity entity, const char* name)
-	{
-		m_editor->getEntityTemplateSystem().createTemplateFromEntity(name, entity);
-	}
-
-
 	void LUA_exitGameMode()
 	{
 		m_editor->toggleGameMode();
@@ -1663,7 +1572,6 @@ public:
 		REGISTER_FUNCTION(runTest);
 		REGISTER_FUNCTION(exit);
 		REGISTER_FUNCTION(exitGameMode);
-		REGISTER_FUNCTION(createEntityTemplate);
 
 		#undef REGISTER_FUNCTION
 	}
@@ -2257,7 +2165,6 @@ public:
 
 	bool m_is_welcome_screen_opened;
 	bool m_is_entity_list_opened;
-	bool m_is_entity_template_list_opened;
 	DragData m_drag_data;
 	ImFont* m_font;
 };
