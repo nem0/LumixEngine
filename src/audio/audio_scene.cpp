@@ -93,6 +93,49 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 	}
 
 
+	void serialize(ISerializer& serializer)
+	{
+		serializer.write("count", m_clips.size());
+		for (ClipInfo* clip : m_clips)
+		{
+			serializer.write("valid", clip != nullptr);
+			if (!clip) continue;
+
+			serializer.write("volume", clip->volume);
+			serializer.write("looped", clip->looped);
+			serializer.write("name", clip->name);
+			serializer.write("path", clip->clip->getPath().c_str());
+		}
+	}
+
+
+	void deserialize(IDeserializer& serializer)
+	{
+		int count;
+		serializer.read(&count);
+		m_clips.resize(count);
+		for (int i = 0; i < count; ++i)
+		{
+			bool valid;
+			serializer.read(&valid);
+			if (!valid)
+			{
+				m_clips[i] = nullptr;
+				continue;
+			}
+
+			auto* clip = LUMIX_NEW(m_allocator, ClipInfo);
+			m_clips[i] = clip;
+			serializer.read(&clip->volume);
+			serializer.read(&clip->looped);
+			serializer.read(clip->name, lengthOf(clip->name));
+			char path[MAX_PATH_LENGTH];
+			serializer.read(path, lengthOf(path));
+			clip->clip = path[0] ? static_cast<Clip*>(m_system.getClipManager().load(Path(path))) : nullptr;
+		}
+	}
+
+
 	void serializeEchoZone(ISerializer& serializer, ComponentHandle cmp)
 	{
 		EchoZone& zone = m_echo_zones[{cmp.index}];

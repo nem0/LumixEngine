@@ -1984,11 +1984,32 @@ public:
 		if (isValid(m_camera)) m_universe->destroyEntity(m_camera);
 
 		PathUtils::FileInfo file_info(path.c_str());
-		StaticString<MAX_PATH_LENGTH> dir(file_info.m_dir, file_info.m_basename, "/");
-
-		auto file_iter = PlatformInterface::createFileIterator(dir, m_allocator);
-		PlatformInterface::FileInfo info;
+		StaticString<MAX_PATH_LENGTH> scn_dir(file_info.m_dir, file_info.m_basename, "/scenes/");
+		auto scn_file_iter = PlatformInterface::createFileIterator(scn_dir, m_allocator);
 		Array<u8> data(m_allocator);
+		PlatformInterface::FileInfo info;
+		while (PlatformInterface::getNextFile(scn_file_iter, &info))
+		{
+			FS::OsFile file;
+			StaticString<MAX_PATH_LENGTH> filepath(scn_dir, info.filename);
+			if (file.open(filepath, FS::Mode::OPEN_AND_READ, m_allocator))
+			{
+				data.resize((int)file.size());
+				file.read(&data[0], data.size());
+				file.close();
+				InputBlob blob(&data[0], data.size());
+				Deserializer deserializer(blob);
+				char plugin_name[64];
+				PathUtils::getBasename(plugin_name, lengthOf(plugin_name), filepath);
+				IScene* scene = m_universe->getScene(crc32(plugin_name)); // todo if scene does not exist
+				scene->deserialize(deserializer);
+				file.close();
+			}
+		}
+		PlatformInterface::destroyFileIterator(scn_file_iter);
+		
+		StaticString<MAX_PATH_LENGTH> dir(file_info.m_dir, file_info.m_basename, "/");
+		auto file_iter = PlatformInterface::createFileIterator(dir, m_allocator);
 		while (PlatformInterface::getNextFile(file_iter, &info))
 		{
 			FS::OsFile file;
@@ -2002,7 +2023,12 @@ public:
 				Deserializer deserializer(blob);
 				Transform tr;
 				deserializer.read(&tr);
-				Entity entity = m_universe->createEntity(tr.pos, tr.rot); // TODO keep id
+				char tmp[20];
+				PathUtils::getBasename(tmp, lengthOf(tmp), filepath);
+				Entity entity;
+				fromCString(tmp, lengthOf(tmp), &entity.index);
+				m_universe->createEntity(entity);
+				m_universe->setTransform(entity, tr);
 				u32 cmp_type;
 				deserializer.read(&cmp_type);
 				while (cmp_type != 0)
@@ -2025,6 +2051,18 @@ public:
 		FS::OsFile entity_file;
 		OutputBlob blob(m_allocator);
 		Serializer serializer(blob);
+		for (IScene* scene : m_universe->getScenes())
+		{
+			blob.clear();
+			scene->serialize(serializer);
+			StaticString<MAX_PATH_LENGTH> scene_file_path(dir, scene->getPlugin().getName(), ".scn");
+			if (entity_file.open(scene_file_path, FS::Mode::CREATE_AND_WRITE, m_allocator))
+			{
+				entity_file.write(blob.getData(), blob.getPos());
+				entity_file.close();
+			}
+		}
+
 		for (Entity entity = m_universe->getFirstEntity(); isValid(entity); entity = m_universe->getNextEntity(entity))
 		{
 			blob.clear();
@@ -2054,7 +2092,7 @@ public:
 		ASSERT(m_universe);
 
 		OutputBlob blob(m_allocator);
-		blob.reserve(m_universe->getEntityCount() * 100);
+		blob.reserve(64 * 1024);
 
 		Header header = {0xffffFFFF, (int)SerializedVersion::LATEST, 0, 0};
 		blob.write(header);

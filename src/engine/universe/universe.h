@@ -66,10 +66,7 @@ public:
 		m_component_type_map[type.index].serialize = static_cast<Serialize>(serialize);
 		m_component_type_map[type.index].deserialize = static_cast<Deserialize>(deserialize);
 	}
-	int getEntityCount() const { return m_transformations.size(); }
 
-	int getDenseIdx(Entity entity);
-	Entity getEntityFromDenseIdx(int idx);
 	Entity getFirstEntity();
 	Entity getNextEntity(Entity entity);
 	bool nameExists(const char* name) const;
@@ -110,21 +107,31 @@ public:
 	void addScene(IScene* scene);
 
 private:
-	struct Transformation
+	struct EntityData
 	{
-		Entity entity;
-		Vec3 position;
-		Quat rotation;
+		EntityData() {}
+		union
+		{
+			struct
+			{
+				Vec3 position;
+				Quat rotation;
+			};
+			struct
+			{
+				int prev;
+				int next;
+			};
+		};
 		float scale;
+		u64 components;
 	};
 
 private:
 	IAllocator& m_allocator;
 	ComponentTypeEntry m_component_type_map[MAX_COMPONENTS_TYPES_COUNT];
 	Array<IScene*> m_scenes;
-	Array<Transformation> m_transformations;
-	Array<u64> m_components;
-	Array<int> m_entity_map;
+	Array<EntityData> m_entities;
 	AssociativeArray<u32, u32> m_name_to_id_map;
 	AssociativeArray<u32, string> m_id_to_name_map;
 	DelegateList<void(Entity)> m_entity_moved;
