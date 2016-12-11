@@ -229,33 +229,24 @@ void PropertyGrid::showEntityProperty(const Lumix::Array<Lumix::Entity>& entitie
 	cmp.handle = cmp.scene->getComponent(cmp.entity, cmp.type);
 	desc.get(cmp, index, blob);
 	Lumix::Entity entity = *(Lumix::Entity*)blob.getData();
-	int value = m_editor.getUniverse()->getDenseIdx(entity);
-	int count = m_editor.getUniverse()->getEntityCount();
 
-	struct Data
+	char buf[128];
+	getEntityListDisplayName(m_editor, buf, Lumix::lengthOf(buf), entity);
+	ImGui::LabelText(desc.getName(), "%s", buf);
+	ImGui::SameLine();
+	if (ImGui::Button("...")) ImGui::OpenPopup(desc.getName());
+	Lumix::Universe& universe = *m_editor.getUniverse();
+	if (ImGui::BeginPopup(desc.getName()))
 	{
-		Lumix::IPropertyDescriptor* descriptor;
-		Lumix::WorldEditor* editor;
-	};
-
-	auto getter = [](void* data, int index, const char** out) -> bool {
-		auto* combo_data = static_cast<Data*>(data);
-		static char buf[128];
-		Lumix::Entity entity = combo_data->editor->getUniverse()->getEntityFromDenseIdx(index);
-		getEntityListDisplayName(*combo_data->editor, buf, Lumix::lengthOf(buf), entity);
-		*out = buf;
-
-		return true;
-	};
-
-	Data data;
-	data.descriptor = &desc;
-	data.editor = &m_editor;
-
-	if(ImGui::Combo(desc.getName(), &value, getter, &data, count))
-	{
-		Lumix::Entity entity = m_editor.getUniverse()->getEntityFromDenseIdx(value);
-		m_editor.setProperty(cmp_type, index, desc, &entities[0], entities.size(), &entity, sizeof(entity));
+		for (auto i = universe.getFirstEntity(); isValid(i); i = universe.getNextEntity(i))
+		{
+			getEntityListDisplayName(m_editor, buf, Lumix::lengthOf(buf), i);
+			if (ImGui::Selectable(buf))
+			{
+				m_editor.setProperty(cmp_type, index, desc, &entities[0], entities.size(), &i, sizeof(i));
+			}
+		}
+		ImGui::EndPopup();
 	}
 }
 
@@ -560,37 +551,23 @@ bool PropertyGrid::entityInput(const char* label, const char* str_id, Lumix::Ent
 				return true;
 			}
 		}
-		struct ListBoxData
-		{
-			Lumix::WorldEditor* m_editor;
-			Lumix::Universe* universe;
-			char buffer[1024];
-			static bool itemsGetter(void* data, int idx, const char** txt)
-			{
-				auto* d = static_cast<ListBoxData*>(data);
-				auto entity = d->universe->getEntityFromDenseIdx(idx);
-				getEntityListDisplayName(*d->m_editor, d->buffer, sizeof(d->buffer), entity);
-				*txt = d->buffer;
-				return true;
-			}
-		};
-		ListBoxData data;
 		Lumix::Universe* universe = m_editor.getUniverse();
-		data.universe = universe;
-		data.m_editor = &m_editor;
 		static int current_item;
-		if (ImGui::ListBox("Entities",
-			&current_item,
-			&ListBoxData::itemsGetter,
-			&data,
-			universe->getEntityCount(),
-			15))
+		if (ImGui::ListBoxHeader("Entities"))
 		{
-			entity = universe->getEntityFromDenseIdx(current_item);
-			ImGui::CloseCurrentPopup();
-			ImGui::EndPopup();
-			return true;
-		};
+			for (auto i = universe->getFirstEntity(); isValid(i); i = universe->getNextEntity(i))
+			{
+				getEntityListDisplayName(m_editor, buf, Lumix::lengthOf(buf), i);
+				if (ImGui::Selectable(buf))
+				{
+					entity = i;
+					ImGui::CloseCurrentPopup();
+					ImGui::EndPopup();
+					break;
+				}
+			}
+			ImGui::ListBoxFooter();
+		}
 
 		ImGui::EndPopup();
 	}

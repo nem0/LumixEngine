@@ -688,7 +688,6 @@ public:
 	{
 		Universe* univ = LuaWrapper::checkArg<Universe*>(L, 1);
 		int entity_index = LuaWrapper::checkArg<int>(L, 2);
-		if (entity_index < 0 || entity_index > univ->getEntityCount()) return 0;
 
 		if (lua_gettop(L) > 3)
 		{
