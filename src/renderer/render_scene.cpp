@@ -742,6 +742,7 @@ public:
 		serializer.read(&light.m_fog_density);
 		serializer.read(&light.m_fog_height);
 		m_universe.addComponent(light.m_entity, GLOBAL_LIGHT_TYPE, this, light.m_component);
+		m_active_global_light_cmp = light.m_component;
 	}
 	
 	
