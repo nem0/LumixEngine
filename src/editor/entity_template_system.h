@@ -13,7 +13,9 @@ namespace Lumix
 {
 
 
+struct IDeserializer;
 class InputBlob;
+struct ISerializer;
 class OutputBlob;
 class Path;
 struct Quat;
@@ -37,6 +39,8 @@ public:
 
 	virtual ~EntityTemplateSystem() {}
 	virtual void setStudioApp(StudioApp& app) = 0;
+	virtual void serialize(ISerializer& serializer) = 0;
+	virtual void deserialize(IDeserializer& serializer) = 0;
 	virtual void serialize(OutputBlob& serializer) = 0;
 	virtual void deserialize(InputBlob& serializer, bool has_prefabs) = 0;
 	virtual void createTemplateFromEntity(const char* name, Entity entity) = 0;
