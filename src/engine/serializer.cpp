@@ -47,7 +47,13 @@ void TextSerializer::write(const char* label, const Vec3& value)
 void TextSerializer::write(const char* label, const Vec4& value)
 {
 	blob << "#" << label << " (" << value.x << ", " << value.y << ", " << value.z << ", " << value.w << ")\n\t"
-		 << asU32(value.x) << "\n\t" << asU32(value.y) << "\n\t" << asU32(value.z) << "\n\t" << asU32(value.w) << "\n";
+		<< asU32(value.x) << "\n\t" << asU32(value.y) << "\n\t" << asU32(value.z) << "\n\t" << asU32(value.w) << "\n";
+}
+
+void TextSerializer::write(const char* label, const Quat& value)
+{
+	blob << "#" << label << " (" << value.x << ", " << value.y << ", " << value.z << ", " << value.w << ")\n\t"
+		<< asU32(value.x) << "\n\t" << asU32(value.y) << "\n\t" << asU32(value.z) << "\n\t" << asU32(value.w) << "\n";
 }
 
 void TextSerializer::write(const char* label, float value)
@@ -98,8 +104,7 @@ void TextSerializer::write(const char* label, u8 value)
 
 void TextDeserializer::read(Entity* entity)
 {
-	skip();
-	entity->index = readU32();
+	read(&entity->index);
 }
 
 
@@ -144,6 +149,20 @@ void TextDeserializer::read(Vec4* value)
 	skip();
 	value->w = asFloat(readU32());
 }
+
+
+void TextDeserializer::read(Quat* value)
+{
+	skip();
+	value->x = asFloat(readU32());
+	skip();
+	value->y = asFloat(readU32());
+	skip();
+	value->z = asFloat(readU32());
+	skip();
+	value->w = asFloat(readU32());
+}
+
 
 void TextDeserializer::read(ComponentHandle* value)
 {

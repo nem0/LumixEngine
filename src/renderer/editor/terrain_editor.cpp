@@ -969,10 +969,8 @@ bool TerrainEditor::onEntityMouseDown(const Lumix::WorldEditor::RayHit& hit, int
 
 void TerrainEditor::removeEntities(const Lumix::Vec3& hit_pos)
 {
-	/*
-	if (m_selected_entity_templates.empty()) return;
+	if (m_selected_prefabs.empty()) return;
 	auto& template_system = m_world_editor.getEntityTemplateSystem();
-	auto& template_names = template_system.getTemplateNames();
 
 	PROFILE_FUNCTION();
 
@@ -981,12 +979,6 @@ void TerrainEditor::removeEntities(const Lumix::Vec3& hit_pos)
 
 	Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(m_component.scene);
 	Lumix::Frustum frustum;
-	Lumix::Array<Lumix::u32> hashes(m_world_editor.getAllocator());
-	hashes.reserve(m_selected_entity_templates.size());
-	for(int template_idx : m_selected_entity_templates)
-	{
-		hashes.push(Lumix::crc32(template_names[template_idx].c_str()));
-	}
 	frustum.computeOrtho(hit_pos,
 		Lumix::Vec3(0, 0, 1),
 		Lumix::Vec3(0, 1, 0),
@@ -997,21 +989,28 @@ void TerrainEditor::removeEntities(const Lumix::Vec3& hit_pos)
 
 	Lumix::Array<Lumix::Entity> entities(m_world_editor.getAllocator());
 	scene->getModelInstanceEntities(frustum, entities);
-	for(Lumix::Entity entity : entities)
+	if (m_selected_prefabs.empty())
 	{
-		for(auto hash : hashes)
+		for (Lumix::Entity entity : entities)
 		{
-			if(template_system.getTemplate(entity) == hash && template_system.getInstances(hash).size() > 1)
+			if (template_system.getPrefab(entity)) m_world_editor.destroyEntities(&entity, 1);
+		}
+	}
+	else
+	{
+		for (Lumix::Entity entity : entities)
+		{
+			for (auto* res : m_selected_prefabs)
 			{
-				m_world_editor.destroyEntities(&entity, 1);
-				break;
+				if ((template_system.getPrefab(entity) & 0xffffFFFF) == res->getPath().getHash())
+				{
+					m_world_editor.destroyEntities(&entity, 1);
+					break;
+				}
 			}
 		}
 	}
-
-	m_world_editor.endCommandGroup();*/
-	// TODO
-	ASSERT(false);
+	m_world_editor.endCommandGroup();
 }
 
 
@@ -1162,8 +1161,6 @@ void TerrainEditor::paintEntities(const Lumix::Vec3& hit_pos)
 			Lumix::Vec3 terrain_pos = inv_terrain_matrix.transform(pos);
 			if (terrain_pos.x >= 0 && terrain_pos.z >= 0 && terrain_pos.x <= size.x && terrain_pos.z <= size.y)
 			{
-				// TODO check obb collision with other entities, see isOBBCollision
-
 				pos.y = scene->getTerrainHeightAt(m_component.handle, terrain_pos.x, terrain_pos.z) + y;
 				pos.y += terrain_matrix.getTranslation().y;
 				Lumix::Quat rot(0, 0, 0, 1);
@@ -1203,7 +1200,14 @@ void TerrainEditor::paintEntities(const Lumix::Vec3& hit_pos)
 				}
 
 				float size = Lumix::Math::randFloat(m_size_spread.x, m_size_spread.y);
-				template_system.instantiatePrefab(*m_selected_prefabs[0], pos, rot, size);
+				Lumix::Entity entity = template_system.instantiatePrefab(*m_selected_prefabs[0], pos, rot, size);
+
+				Lumix::ComponentHandle cmp = scene->getComponent(entity, MODEL_INSTANCE_TYPE);
+				Lumix::Model* model = scene->getModelInstanceModel(cmp);
+				if (isOBBCollision(*scene, meshes, pos, model, scale))
+				{
+					scene->getUniverse().destroyEntity(entity);
+				}
 			}
 		}
 	}
