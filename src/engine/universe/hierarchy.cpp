@@ -2,9 +2,9 @@
 #include "engine/blob.h"
 #include "engine/engine.h"
 #include "engine/hash_map.h"
-#include "engine/iserializer.h"
 #include "engine/json_serializer.h"
 #include "engine/property_register.h"
+#include "engine/serializer.h"
 #include "universe.h"
 
 

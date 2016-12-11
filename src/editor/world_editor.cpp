@@ -23,7 +23,7 @@
 #include "engine/input_system.h"
 #include "engine/iplugin.h"
 #include "engine/iproperty_descriptor.h"
-#include "engine/iserializer.h"
+#include "engine/serializer.h"
 #include "engine/json_serializer.h"
 #include "engine/log.h"
 #include "engine/matrix.h"
@@ -718,8 +718,8 @@ public:
 		for (int i = 0; i < count; ++i)
 		{
 			if (!m_editor.getUniverse()->getComponent(entities[i], m_component_type).isValid()) continue;
-			u32 tpl = editor.getEntityTemplateSystem().getTemplate(entities[i]);
-			if (tpl == 0)
+			u64 prefab = editor.getEntityTemplateSystem().getPrefab(entities[i]);
+			if (prefab == 0)
 			{
 				ComponentUID component = m_editor.getUniverse()->getComponent(entities[i], component_type);
 				m_property_descriptor->get(component, index, m_old_value);
@@ -727,7 +727,7 @@ public:
 			}
 			else
 			{
-				const Array<Entity>& instances = editor.getEntityTemplateSystem().getInstances(tpl);
+				const Array<Entity>& instances = editor.getEntityTemplateSystem().getInstances(prefab);
 				for (int i = 0; i < instances.size(); ++i)
 				{
 					ComponentUID component = m_editor.getUniverse()->getComponent(instances[i], component_type);
@@ -874,14 +874,14 @@ private:
 			{
 				if (!m_editor.getUniverse()->getComponent(entities[i], type).isValid())
 				{
-					u32 tpl = editor.getEntityTemplateSystem().getTemplate(entities[i]);
-					if (tpl == 0)
+					u64 prefab = editor.getEntityTemplateSystem().getPrefab(entities[i]);
+					if (prefab == 0)
 					{
 						m_entities.push(entities[i]);
 					}
 					else
 					{
-						const Array<Entity>& instances = editor.getEntityTemplateSystem().getInstances(tpl);
+						const Array<Entity>& instances = editor.getEntityTemplateSystem().getInstances(prefab);
 						for (int i = 0; i < instances.size(); ++i)
 						{
 							m_entities.push(instances[i]);
@@ -1080,9 +1080,8 @@ private:
 						}
 					}
 				}
-				u32 tpl = m_editor.getEntityTemplateSystem().getTemplate(m_entities[i]);
-				m_old_values.write(tpl);
-				m_old_values.write(m_editor.getEntityTemplateSystem().getPrefabEntity(m_entities[i]));
+				u64 prefab = m_editor.getEntityTemplateSystem().getPrefab(m_entities[i]);
+				m_old_values.write(prefab);
 
 				universe->destroyEntity(m_entities[i]);
 			}
@@ -1122,12 +1121,9 @@ private:
 						props[k]->set(new_component, -1, blob);
 					}
 				}
-				u32 tpl;
+				u64 tpl;
 				blob.read(tpl);
-				if (tpl) m_editor.getEntityTemplateSystem().setTemplate(new_entity, tpl);
-				PrefabEntity prefab;
-				blob.read(prefab);
-				if (prefab.path_hash) m_editor.getEntityTemplateSystem().setPrefab(new_entity, prefab);
+				if (tpl) m_editor.getEntityTemplateSystem().setPrefab(new_entity, tpl);
 			}
 		}
 
@@ -1177,14 +1173,14 @@ private:
 			for (int i = 0; i < count; ++i)
 			{
 				if (!m_editor.getUniverse()->getComponent(entities[i], m_cmp_type).isValid()) continue;
-				u32 tpl = editor.getEntityTemplateSystem().getTemplate(entities[i]);
-				if (tpl == 0)
+				u64 prefab = editor.getEntityTemplateSystem().getPrefab(entities[i]);
+				if (prefab == 0)
 				{
 					m_entities.push(entities[i]);
 				}
 				else
 				{
-					const Array<Entity>& instances = editor.getEntityTemplateSystem().getInstances(tpl);
+					const Array<Entity>& instances = editor.getEntityTemplateSystem().getInstances(prefab);
 					for (int i = 0; i < instances.size(); ++i)
 					{
 						m_entities.push(instances[i]);
@@ -1676,285 +1672,6 @@ public:
 	bool isUniverseChanged() const override { return m_is_universe_changed; }
 
 
-	struct Serializer : public ISerializer
-	{
-		Serializer(OutputBlob& _blob) : blob(_blob) {}
-
-		void write(const char* label, Entity entity) override
-		{
-			blob << "#" << label << "\n\t"
-				<< entity.index << "\n";
-		}
-
-		void write(const char* label, ComponentHandle value) override
-		{
-			blob << "#" << label << "\n\t"
-				<< value.index << "\n";
-		}
-
-		void write(const char* label, const Transform& value) override
-		{
-			blob << "#" << label
-				<< " (" << value.pos.x << ", " << value.pos.y << ", " << value.pos.z << ") "
-				<< " (" << value.rot.x << ", " << value.rot.y << ", " << value.rot.z << ", " << value.rot.w << ")\n\t"
-				<< asU32(value.pos.x) << "\n\t" << asU32(value.pos.y) << "\n\t" << asU32(value.pos.z) << "\n\t"
-				<< asU32(value.rot.x) << "\n\t" << asU32(value.rot.y) << "\n\t" << asU32(value.rot.z) << "\n\t" << asU32(value.rot.w) << "\n";
-		}
-
-		void write(const char* label, const Vec3& value) override
-		{
-			blob << "#" << label
-				<< " (" << value.x << ", " << value.y << ", " << value.z << ")\n\t"
-				<< asU32(value.x) << "\n\t" << asU32(value.y) << "\n\t" << asU32(value.z) << "\n";
-		}
-
-		void write(const char* label, const Vec4& value) override
-		{
-			blob << "#" << label
-				<< " (" << value.x << ", " << value.y << ", " << value.z << ", " << value.w << ")\n\t"
-				<< asU32(value.x) << "\n\t" << asU32(value.y) << "\n\t" << asU32(value.z) << "\n\t" << asU32(value.w) << "\n";
-		}
-
-		void write(const char* label, float value) override
-		{
-			blob << "#" << label << " " << value << "\n\t" << asU32(value) << "\n";
-		}
-
-		void write(const char* label, bool value) override
-		{
-			blob << "#" << label << "\n\t" << (u32)value << "\n";
-		}
-
-		void write(const char* label, const char* value) override
-		{
-			blob << "#" << label << "\n\t\"" << value << "\"\n";
-		}
-
-		void write(const char* label, u32 value) override
-		{
-			blob << "#" << label << "\n\t" << value << "\n";
-		}
-
-		void write(const char* label, i64 value) override
-		{
-			blob << "#" << label << "\n\t" << value << "\n";
-		}
-
-		void write(const char* label, i32 value) override
-		{
-			blob << "#" << label << "\n\t" << value << "\n";
-		}
-
-		void write(const char* label, i8 value) override
-		{
-			blob << "#" << label << "\n\t" << value << "\n";
-		}
-
-		void write(const char* label, u8 value) override
-		{
-			blob << "#" << label << "\n\t" << value << "\n";
-		}
-
-		static u32 asU32(float v)
-		{
-			return *(u32*)&v;
-		}
-
-
-		OutputBlob& blob;
-	};
-
-
-	struct Deserializer : public IDeserializer
-	{
-		Deserializer(InputBlob& _blob)
-			: blob(_blob)
-		{
-		}
-
-		void read(Entity* entity) override
-		{
-			skip();
-			entity->index = readU32();
-		}
-
-
-		void read(Transform* value) override
-		{
-			skip();
-			value->pos.x = asFloat(readU32());
-			skip();
-			value->pos.y = asFloat(readU32());
-			skip();
-			value->pos.z = asFloat(readU32());
-			skip();
-			value->rot.x = asFloat(readU32());
-			skip();
-			value->rot.y = asFloat(readU32());
-			skip();
-			value->rot.z = asFloat(readU32());
-			skip();
-			value->rot.w = asFloat(readU32());
-		}
-
-
-		void read(Vec3* value) override
-		{
-			skip();
-			value->x = asFloat(readU32());
-			skip();
-			value->y = asFloat(readU32());
-			skip();
-			value->z = asFloat(readU32());
-		}
-
-
-		void read(Vec4* value) override
-		{
-			skip();
-			value->x = asFloat(readU32());
-			skip();
-			value->y = asFloat(readU32());
-			skip();
-			value->z = asFloat(readU32());
-			skip();
-			value->w = asFloat(readU32());
-		}
-
-		void read(ComponentHandle* value) override
-		{
-			skip();
-			value->index = readU32();
-		}
-
-
-		void read(float* value) override
-		{
-			skip();
-			*value = asFloat(readU32());
-		}
-
-
-		void read(bool* value) override 
-		{
-			skip();
-			*value = readU32() != 0;
-		}
-
-
-		void read(u32* value) override
-		{
-			skip();
-			*value = readU32();
-		}
-
-
-		void read(i64* value) override
-		{
-			skip();
-			char tmp[40];
-			char* c = tmp;
-			*c = blob.readChar();
-			if (*c == '-')
-			{
-				++c;
-				*c = blob.readChar();
-			}
-			while (*c >= '0' && *c <= '9' && (c - tmp) < lengthOf(tmp))
-			{
-				++c;
-				*c = blob.readChar();
-			}
-			*c = 0;
-			fromCString(tmp, lengthOf(tmp), value);
-		}
-		
-
-		void read(i32* value) override 
-		{
-			skip();
-			char tmp[20];
-			char* c = tmp;
-			*c = blob.readChar();
-			if (*c == '-')
-			{
-				++c;
-				*c = blob.readChar();
-			}
-			while (*c >= '0' && *c <= '9' && (c - tmp) < lengthOf(tmp))
-			{
-				++c;
-				*c = blob.readChar();
-			}
-			*c = 0;
-			fromCString(tmp, lengthOf(tmp), value);
-		}
-
-
-		void read(u8* value) override
-		{
-			skip();
-			*value = (u8)readU32();
-		}
-		
-		
-		void read(i8* value) override
-		{
-			skip();
-			*value = (i8)readU32();
-		}
-
-
-		void read(char* value, int max_size) override
-		{
-			skip();
-			u8 c = blob.readChar();
-			ASSERT(c == '"');
-			char* out = value;
-			*out = blob.readChar();
-			while (*out != '"' && out - value < max_size - 1)
-			{
-				++out;
-				*out = blob.readChar();
-			}
-			ASSERT(*out == '"');
-			*out = 0;
-		}
-
-
-		u32 readU32()
-		{
-			char tmp[20];
-			char* c = tmp;
-			*c = blob.readChar();
-			while (*c >= '0' && *c <= '9' && (c - tmp) < lengthOf(tmp))
-			{
-				++c;
-				*c = blob.readChar();
-			}
-			*c = 0;
-			u32 v;
-			fromCString(tmp, lengthOf(tmp), &v);
-			return v;
-		}
-
-		void skip()
-		{
-			u8 c = blob.readChar();
-			if (c == '#') while (blob.readChar() != '\n');
-			if (c == '\t') return;
-			while (blob.readChar() != '\t');
-		}
-
-		float asFloat(u32 v)
-		{
-			return *(float*)&v;
-		}
-
-		InputBlob& blob;
-	};
-
-
 	void saveUniverse(const Path& path, bool save_path) override
 	{
 		g_log_info.log("Editor") << "Saving universe " << path << "...";
@@ -1981,6 +1698,7 @@ public:
 
 	void deserialize(const Path& path)
 	{
+		PROFILE_FUNCTION();
 		if (isValid(m_camera)) m_universe->destroyEntity(m_camera);
 
 		PathUtils::FileInfo file_info(path.c_str());
@@ -1996,7 +1714,7 @@ public:
 					data.resize((int)file.size());
 					file.read(&data[0], data.size());
 					InputBlob blob(&data[0], data.size());
-					Deserializer deserializer(blob);
+					TextDeserializer deserializer(blob);
 					x(deserializer);
 				}
 				file.close();
@@ -2006,7 +1724,7 @@ public:
 		while (PlatformInterface::getNextFile(scn_file_iter, &info))
 		{
 			StaticString<MAX_PATH_LENGTH> filepath(scn_dir, info.filename);
-			loadFile(filepath, [&filepath, this](Deserializer& deserializer) {
+			loadFile(filepath, [&filepath, this](TextDeserializer& deserializer) {
 				char plugin_name[64];
 				PathUtils::getBasename(plugin_name, lengthOf(plugin_name), filepath);
 				IScene* scene = m_universe->getScene(crc32(plugin_name)); // todo if scene does not exist
@@ -2016,7 +1734,7 @@ public:
 		PlatformInterface::destroyFileIterator(scn_file_iter);
 		
 		StaticString<MAX_PATH_LENGTH> filepath(file_info.m_dir, file_info.m_basename, "/systems/templates.sys");
-		loadFile(filepath, [this](Deserializer& deserializer) {
+		loadFile(filepath, [this](TextDeserializer& deserializer) {
 			m_template_system->deserialize(deserializer);
 		});
 
@@ -2030,7 +1748,7 @@ public:
 			PathUtils::getBasename(tmp, lengthOf(tmp), filepath);
 			Entity entity;
 			fromCString(tmp, lengthOf(tmp), &entity.index);
-			loadFile(filepath, [this, entity](Deserializer& deserializer) {
+			loadFile(filepath, [this, entity](TextDeserializer& deserializer) {
 				char name[64];
 				deserializer.read(name, lengthOf(name));
 				Transform tr;
@@ -2062,7 +1780,7 @@ public:
 
 		FS::OsFile file;
 		OutputBlob blob(m_allocator);
-		Serializer serializer(blob);
+		TextSerializer serializer(blob);
 		auto saveFile = [&file, this, &blob](const char* path) {
 			if (file.open(path, FS::Mode::CREATE_AND_WRITE, m_allocator))
 			{
@@ -2117,7 +1835,6 @@ public:
 		int hashed_offset = sizeof(header);
 
 		header.engine_hash = m_engine->serialize(*m_universe, blob);
-		m_template_system->serialize(blob);
 		m_entity_groups.serialize(blob);
 		header.hash = crc32((const u8*)blob.getData() + hashed_offset, blob.getPos() - hashed_offset);
 		*(Header*)blob.getData() = header;
@@ -2748,7 +2465,6 @@ public:
 
 		if (m_engine->deserialize(*m_universe, blob))
 		{
-			m_template_system->deserialize(blob, header.version > (int)SerializedVersion::PREFABS);
 			if (header.version > (int)SerializedVersion::ENTITY_GROUPS)
 			{
 				m_entity_groups.deserialize(blob);

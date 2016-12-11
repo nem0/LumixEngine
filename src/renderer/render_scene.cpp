@@ -5,7 +5,6 @@
 #include "engine/crc32.h"
 #include "engine/fs/file_system.h"
 #include "engine/geometry.h"
-#include "engine/iserializer.h"
 #include "engine/json_serializer.h"
 #include "engine/lifo_allocator.h"
 #include "engine/log.h"
@@ -20,6 +19,7 @@
 #include "engine/property_register.h"
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
+#include "engine/serializer.h"
 #include "engine/timer.h"
 
 #include "engine/engine.h"

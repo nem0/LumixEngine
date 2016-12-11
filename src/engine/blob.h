@@ -32,6 +32,7 @@ namespace Lumix
 			void clear();
 
 			OutputBlob& operator << (const char* str);
+			OutputBlob& operator << (u64 value);
 			OutputBlob& operator << (i64 value);
 			OutputBlob& operator << (i32 value);
 			OutputBlob& operator << (u32 value);

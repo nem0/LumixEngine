@@ -286,10 +286,6 @@ void SceneView::handleDrop(float x, float y)
 
 	if (hit.m_is_hit)
 	{
-		if (Lumix::PathUtils::hasExtension(path, "fab"))
-		{
-			m_editor->getEntityTemplateSystem().instantiatePrefab(hit.m_origin + hit.m_t * hit.m_dir, Lumix::Path(path));
-		}
 		if (Lumix::PathUtils::hasExtension(path, "msh"))
 		{
 			auto* command = LUMIX_NEW(m_editor->getAllocator(), InsertMeshCommand)(

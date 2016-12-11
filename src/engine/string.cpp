@@ -298,6 +298,29 @@ const char* fromCString(const char* input, int length, u32* value)
 }
 
 
+const char* fromCString(const char* input, int length, u64* value)
+{
+	if (length > 0)
+	{
+		const char* c = input;
+		*value = 0;
+		if (*c == '-')
+		{
+			return nullptr;
+		}
+		while (length && *c >= '0' && *c <= '9')
+		{
+			*value *= 10;
+			*value += *c - '0';
+			++c;
+			--length;
+		}
+		return c;
+	}
+	return nullptr;
+}
+
+
 bool toCStringPretty(i32 value, char* output, int length)
 {
 	char* c = output;

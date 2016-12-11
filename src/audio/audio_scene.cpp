@@ -7,12 +7,12 @@
 #include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/iallocator.h"
-#include "engine/iserializer.h"
 #include "engine/lua_wrapper.h"
 #include "engine/matrix.h"
 #include "engine/property_register.h"
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
+#include "engine/serializer.h"
 #include "engine/universe/universe.h"
 #include "lua_script/lua_script_system.h"
 
