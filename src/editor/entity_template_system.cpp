@@ -10,6 +10,7 @@
 #include "engine/fs/os_file.h"
 #include "engine/hash_map.h"
 #include "engine/iplugin.h"
+#include "engine/iserializer.h"
 #include "engine/json_serializer.h"
 #include "engine/log.h"
 #include "engine/math_utils.h"
@@ -707,6 +708,55 @@ public:
 			*this, m_editor, name, position, rotation, size);
 		m_editor.executeCommand(command);
 		return command->getEntity();
+	}
+
+
+	void serialize(ISerializer& serializer) override
+	{
+		serializer.write("count", m_template_names.size());
+		for (auto& name : m_template_names)
+		{
+			serializer.write("name", name.c_str());
+		}
+		serializer.write("count", m_instances.size());
+		for (int i = 0; i < m_instances.size(); ++i)
+		{
+			serializer.write("instance", m_instances.getKey(i));
+			Array<Entity>& entities = m_instances.at(i);
+			serializer.write("count", (i32)entities.size());
+			for (int j = 0, c = entities.size(); j < c; ++j)
+			{
+				serializer.write("entity", entities[j]);
+			}
+		}
+	}
+
+
+	void deserialize(IDeserializer& serializer) override
+	{
+		int count;
+		serializer.read(&count);
+		for (int i = 0; i < count; ++i)
+		{
+			char name[64];
+			serializer.read(name, lengthOf(name));
+			m_template_names.emplace(name, m_editor.getAllocator());
+		}
+		serializer.read(&count);
+		for (int i = 0; i < count; ++i)
+		{
+			u32 hash;
+			serializer.read(&hash);
+			i32 instances_per_template;
+			serializer.read(&instances_per_template);
+			Array<Entity>& entities = m_instances.emplace(hash, m_editor.getAllocator());
+			for (int j = 0; j < instances_per_template; ++j)
+			{
+				Entity entity;
+				serializer.read(&entity);
+				entities.push(entity);
+			}
+		}
 	}
 
 
