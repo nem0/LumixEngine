@@ -30,13 +30,6 @@ namespace Lumix
 static const ResourceType PREFAB_TYPE("prefab");
 
 
-struct PrefabInstance
-{
-	Vec3 position;
-	u32 path_hash;
-};
-
-
 class AssetBrowserPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 {
 public:
@@ -84,7 +77,7 @@ public:
 		: m_editor(editor)
 		, m_universe(nullptr)
 		, m_instances(editor.getAllocator())
-		, m_updated(editor.getAllocator())
+		, m_resources(editor.getAllocator())
 		, m_prefabs(editor.getAllocator())
 	{
 		editor.universeCreated().bind<EntityTemplateSystemImpl, &EntityTemplateSystemImpl::onUniverseCreated>(this);
@@ -132,10 +125,11 @@ public:
 	void onUniverseCreated()
 	{
 		m_instances.clear();
-		for (PrefabResource* prefab : m_prefabs)
+		for (PrefabResource* prefab : m_resources)
 		{
 			prefab->getResourceManager().unload(*prefab);
 		}
+		m_resources.clear();
 		m_prefabs.clear();
 		setUniverse(m_editor.getUniverse());
 	}
@@ -144,88 +138,124 @@ public:
 	void onUniverseDestroyed()
 	{
 		m_instances.clear();
-		for (PrefabResource* prefab : m_prefabs)
+		for (PrefabResource* prefab : m_resources)
 		{
 			prefab->getResourceManager().unload(*prefab);
 		}
+		m_resources.clear();
 		m_prefabs.clear();
 		setUniverse(nullptr);
 	}
 
 
+	void link(Entity entity, u64 prefab)
+	{
+		int idx = m_instances.find(prefab);
+		m_prefabs[entity.index].prev = INVALID_ENTITY;
+		if (idx >= 0)
+		{
+			Entity e = m_instances.at(idx);
+			m_prefabs[e.index].prev = entity;
+			m_prefabs[entity.index].next = e;
+		}
+		else
+		{
+			m_prefabs[entity.index].next = INVALID_ENTITY;
+		}
+		m_instances[prefab] = entity;
+	}
+
+
+	void unlink(Entity entity)
+	{
+		EntityPrefab& p = m_prefabs[entity.index];
+		if (m_instances[p.prefab] == entity)
+		{
+			if (isValid(m_prefabs[entity.index].next))
+				m_instances[p.prefab] = m_prefabs[entity.index].next;
+			else
+				m_instances.erase(p.prefab);
+		}
+		if (isValid(p.prev)) m_prefabs[p.prev.index].next = p.next;
+		if (isValid(p.next)) m_prefabs[p.next.index].prev = p.prev;
+	}
+
+
 	void onEntityDestroyed(Entity entity)
 	{
-		u64 prefab = getPrefab(entity);
-		if (prefab != 0)
-		{
-			Array<Entity>& instances = m_instances.get(prefab);
-			instances.eraseItemFast(entity);
-			if (instances.empty()) m_instances.erase(prefab);
-		}
+		if (entity.index >= m_prefabs.size()) return;
+		unlink(entity);
+		m_prefabs[entity.index].prefab = 0;
 	}
 
 
 	void setPrefab(Entity entity, u64 prefab) override
 	{
-		getMutableInstances(prefab).push(entity);
+		reserve(entity);
+		m_prefabs[entity.index].prefab = prefab;
+		link(entity, prefab);
 	}
 
 
 	u64 getPrefab(Entity entity) override
 	{
-		for (int j = 0; j < m_instances.size(); ++j)
+		if (entity.index >= m_prefabs.size()) return 0;
+		return m_prefabs[entity.index].prefab;
+	}
+
+
+	Entity getFirstInstance(u64 prefab) override
+	{
+		int instances_index = m_instances.find(prefab);
+		if (instances_index >= 0) return m_instances.at(instances_index);
+		return INVALID_ENTITY;
+	}
+
+
+	Entity getNextInstance(Entity entity) override
+	{
+		return m_prefabs[entity.index].next;
+	}
+
+
+	void reserve(Entity entity)
+	{
+		while (entity.index >= m_prefabs.size())
 		{
-			Array<Entity>& entities = m_instances.at(j);
-			for (int i = 0, c = entities.size(); i < c; ++i)
-			{
-				if (entities[i] == entity) return m_instances.getKey(j);
-			}
+			auto& i = m_prefabs.emplace();
+			i.prefab = 0;
 		}
-		return 0;
 	}
 
 
-	const Array<Entity>& getInstances(u64 prefab) override
+	Entity instantiatePrefab(PrefabResource& prefab, const Vec3& pos, const Quat& rot, float scale) override
 	{
-		int instances_index = m_instances.find(prefab);
-		if (instances_index >= 0) return m_instances.at(instances_index);
-		return m_instances.emplace(prefab, m_editor.getAllocator());
-	}
-
-
-	Array<Entity>& getMutableInstances(u64 prefab)
-	{
-		int instances_index = m_instances.find(prefab);
-		if (instances_index >= 0) return m_instances.at(instances_index);
-		return m_instances.emplace(prefab, m_editor.getAllocator());
-	}
-
-
-	void instantiatePrefab(PrefabResource& prefab, const Vec3& pos, const Quat& rot, float scale) override
-	{
-		if (m_prefabs.indexOf(&prefab) < 0)
+		if (!m_resources.find(prefab.getPath().getHash()).isValid())
 		{
-			m_prefabs.emplace(&prefab);
+			m_resources.insert(prefab.getPath().getHash(), &prefab);
 			prefab.getResourceManager().load(prefab);
 		}
 		InputBlob blob(prefab.blob.getData(), prefab.blob.getPos());
 		TextDeserializer deserializer(blob);
+		Entity entity = INVALID_ENTITY;
 		while (blob.getPosition() < blob.getSize())
 		{
 			u64 prefab;
 			deserializer.read(&prefab);
-			Array<Entity>& instances = getMutableInstances(prefab);
-			Entity e = m_universe->createEntity(pos, rot);
-			m_universe->setScale(e, scale);
-			instances.emplace(e);
+			entity = m_universe->createEntity(pos, rot);
+			reserve(entity);
+			m_prefabs[entity.index].prefab = prefab;
+			link(entity, prefab);
+			m_universe->setScale(entity, scale);
 			u32 cmp_type;
 			deserializer.read(&cmp_type);
 			while (cmp_type != 0)
 			{
-				m_universe->deserializeComponent(deserializer, e, PropertyRegister::getComponentTypeFromHash(cmp_type));
+				m_universe->deserializeComponent(deserializer, entity, PropertyRegister::getComponentTypeFromHash(cmp_type));
 				deserializer.read(&cmp_type);
 			}
 		}
+		return entity;
 	}
 
 
@@ -275,17 +305,29 @@ public:
 	
 	void serialize(ISerializer& serializer) override
 	{
-		serializer.write("count", m_instances.size());
+		serializer.write("count", m_prefabs.size());
+
+		for (PrefabResource* res : m_resources)
+		{
+			serializer.write("resource", res->getPath().c_str());
+		}
+		serializer.write("resource", "");
+
 		for (int i = 0; i < m_instances.size(); ++i)
 		{
-			serializer.write("instance", m_instances.getKey(i));
-			Array<Entity>& entities = m_instances.at(i);
-			serializer.write("count", (i32)entities.size());
-			for (int j = 0, c = entities.size(); j < c; ++j)
+			u64 prefab = m_instances.getKey(i);
+			if ((prefab & 0xffffFFFF) != prefab) continue;
+			Entity entity = m_instances.at(i);
+			while(isValid(entity))
 			{
-				serializer.write("", entities[j]);
+				serializer.write("prefab", (u32)prefab);
+				serializer.write("pos", m_universe->getPosition(entity));
+				serializer.write("rot", m_universe->getRotation(entity));
+				serializer.write("scale", m_universe->getScale(entity));
+				entity = m_prefabs[entity.index].next;
 			}
 		}
+		serializer.write("prefab", (u32)0);
 	}
 
 
@@ -293,32 +335,50 @@ public:
 	{
 		int count;
 		serializer.read(&count);
-		for (int i = 0; i < count; ++i)
+		reserve({count-1});
+		
+		auto* mng = m_editor.getEngine().getResourceManager().get(PREFAB_TYPE);
+		for (;;)
 		{
-			u32 hash;
-			serializer.read(&hash);
-			i32 instances_per_template;
-			serializer.read(&instances_per_template);
-			Array<Entity>& entities = m_instances.emplace(hash, m_editor.getAllocator());
-			for (int j = 0; j < instances_per_template; ++j)
-			{
-				Entity entity;
-				serializer.read(&entity);
-				entities.push(entity);
-			}
+			char tmp[MAX_PATH_LENGTH];
+			serializer.read(tmp, lengthOf(tmp));
+			if (tmp[0] == 0) break;
+			auto* res = (PrefabResource*)mng->load(Path(tmp));
+			m_resources.insert(res->getPath().getHash(), res);
+		}
+
+		while(m_editor.getEngine().getFileSystem().hasWork())
+			m_editor.getEngine().getFileSystem().updateAsyncTransactions();
+
+		for (;;)
+		{
+			u32 res_hash;
+			serializer.read(&res_hash);
+			if (res_hash == 0) break;
+			
+			Vec3 pos;
+			serializer.read(&pos);
+			Quat rot;
+			serializer.read(&rot);
+			float scale;
+			serializer.read(&scale);
+			instantiatePrefab(*m_resources[res_hash], pos, rot, scale);
 		}
 	}
 
 
-	DelegateList<void()>& updated() override { return m_updated; }
-
-
 private:
-	AssociativeArray<u64, Array<Entity>> m_instances;
-	Array<PrefabResource*> m_prefabs;
+	struct EntityPrefab
+	{
+		u64 prefab;
+		Entity next;
+		Entity prev;
+	};
+	Array<EntityPrefab> m_prefabs;
+	AssociativeArray<u64, Entity> m_instances;
+	HashMap<u32, PrefabResource*> m_resources;
 	Universe* m_universe;
 	WorldEditor& m_editor;
-	DelegateList<void()> m_updated;
 }; // class EntityTemplateSystemImpl
 
 

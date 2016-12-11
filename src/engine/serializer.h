@@ -9,6 +9,7 @@ namespace Lumix
 
 class InputBlob;
 class OutputBlob;
+struct Quat;
 struct Transform;
 struct Vec3;
 struct Vec4;
@@ -21,6 +22,7 @@ struct ISerializer
 	virtual void write(const char* label, const Transform& value) = 0;
 	virtual void write(const char* label, const Vec4& value) = 0;
 	virtual void write(const char* label, const Vec3& value) = 0;
+	virtual void write(const char* label, const Quat& value) = 0;
 	virtual void write(const char* label, float value) = 0;
 	virtual void write(const char* label, bool value) = 0;
 	virtual void write(const char* label, i64 value) = 0;
@@ -40,6 +42,7 @@ struct IDeserializer
 	virtual void read(Transform* value) = 0;
 	virtual void read(Vec4* value) = 0;
 	virtual void read(Vec3* value) = 0;
+	virtual void read(Quat* value) = 0;
 	virtual void read(float* value) = 0;
 	virtual void read(bool* value) = 0;
 	virtual void read(u64* value) = 0;
@@ -61,6 +64,7 @@ struct TextSerializer : public ISerializer
 	virtual void write(const char* label, const Transform& value)  override;
 	virtual void write(const char* label, const Vec4& value)  override;
 	virtual void write(const char* label, const Vec3& value)  override;
+	virtual void write(const char* label, const Quat& value)  override;
 	virtual void write(const char* label, float value)  override;
 	virtual void write(const char* label, bool value)  override;
 	virtual void write(const char* label, i64 value)  override;
@@ -87,6 +91,7 @@ struct TextDeserializer : public IDeserializer
 	virtual void read(Transform* value)  override;
 	virtual void read(Vec4* value)  override;
 	virtual void read(Vec3* value)  override;
+	virtual void read(Quat* value)  override;
 	virtual void read(float* value)  override;
 	virtual void read(bool* value)  override;
 	virtual void read(u64* value)  override;
