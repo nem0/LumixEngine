@@ -1,12 +1,19 @@
+#include "studio_app.h"
+#include "asset_browser.h"
 #include "audio/audio_scene.h"
 #include "audio/clip_manager.h"
-#include "asset_browser.h"
+#include "editor/entity_groups.h"
+#include "editor/entity_template_system.h"
+#include "editor/gizmo.h"
+#include "editor/render_interface.h"
+#include "editor/world_editor.h"
 #include "engine/blob.h"
 #include "engine/command_line_parser.h"
 #include "engine/crc32.h"
 #include "engine/debug/debug.h"
 #include "engine/default_allocator.h"
 #include "engine/engine.h"
+#include "engine/fs/disk_file_device.h"
 #include "engine/fs/file_system.h"
 #include "engine/fs/os_file.h"
 #include "engine/input_system.h"
@@ -22,19 +29,13 @@
 #include "engine/system.h"
 #include "engine/timer.h"
 #include "engine/universe/universe.h"
-#include "editor/gizmo.h"
-#include "editor/entity_groups.h"
-#include "editor/entity_template_system.h"
-#include "editor/render_interface.h"
-#include "editor/world_editor.h"
+#include "imgui/imgui.h"
 #include "log_ui.h"
 #include "metadata.h"
-#include "imgui/imgui.h"
 #include "platform_interface.h"
 #include "profiler_ui.h"
 #include "property_grid.h"
 #include "settings.h"
-#include "studio_app.h"
 #include "utils.h"
 #include <SDL.h>
 #include <SDL_syswm.h>
@@ -768,9 +769,27 @@ public:
 	void savePrefab()
 	{
 		char filename[Lumix::MAX_PATH_LENGTH];
-		if (PlatformInterface::getSaveFilename(filename, Lumix::lengthOf(filename), "Prefab files\0*.fab\0", "fab"))
+		char tmp[Lumix::MAX_PATH_LENGTH];
+		if (PlatformInterface::getSaveFilename(tmp, Lumix::lengthOf(tmp), "Prefab files\0*.fab\0", "fab"))
 		{
-			m_editor->getEntityTemplateSystem().savePrefab(Lumix::Path(filename));
+			Lumix::PathUtils::normalize(tmp, filename, Lumix::lengthOf(tmp));
+			const char* base_path = m_engine->getDiskFileDevice()->getBasePath();
+			if (Lumix::startsWith(filename, base_path))
+			{
+				m_editor->getEntityTemplateSystem().savePrefab(Lumix::Path(filename + Lumix::stringLength(base_path)));
+			}
+			else
+			{
+				base_path = m_engine->getPatchFileDevice() ? m_engine->getPatchFileDevice()->getBasePath() : nullptr;
+				if (base_path && Lumix::startsWith(filename, base_path))
+				{
+					m_editor->getEntityTemplateSystem().savePrefab(Lumix::Path(filename + Lumix::stringLength(base_path)));
+				}
+				else
+				{
+					m_editor->getEntityTemplateSystem().savePrefab(Lumix::Path(filename));
+				}
+			}
 		}
 	}
 

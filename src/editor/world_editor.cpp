@@ -714,11 +714,12 @@ public:
 		, m_new_value(editor.getAllocator())
 		, m_old_value(editor.getAllocator())
 	{
+		auto& prefab_system = editor.getEntityTemplateSystem();
 		m_entities.reserve(count);
 		for (int i = 0; i < count; ++i)
 		{
 			if (!m_editor.getUniverse()->getComponent(entities[i], m_component_type).isValid()) continue;
-			u64 prefab = editor.getEntityTemplateSystem().getPrefab(entities[i]);
+			u64 prefab = prefab_system.getPrefab(entities[i]);
 			if (prefab == 0)
 			{
 				ComponentUID component = m_editor.getUniverse()->getComponent(entities[i], component_type);
@@ -727,12 +728,13 @@ public:
 			}
 			else
 			{
-				const Array<Entity>& instances = editor.getEntityTemplateSystem().getInstances(prefab);
-				for (int i = 0; i < instances.size(); ++i)
+				Entity instance = prefab_system.getFirstInstance(prefab);
+				while(isValid(instance))
 				{
-					ComponentUID component = m_editor.getUniverse()->getComponent(instances[i], component_type);
+					ComponentUID component = m_editor.getUniverse()->getComponent(instance, component_type);
 					m_property_descriptor->get(component, index, m_old_value);
-					m_entities.push(instances[i]);
+					m_entities.push(instance);
+					instance = prefab_system.getNextInstance(instance);
 				}
 			}
 		}
@@ -881,10 +883,11 @@ private:
 					}
 					else
 					{
-						const Array<Entity>& instances = editor.getEntityTemplateSystem().getInstances(prefab);
-						for (int i = 0; i < instances.size(); ++i)
+						Entity instance = editor.getEntityTemplateSystem().getFirstInstance(prefab);
+						while(isValid(instance))
 						{
-							m_entities.push(instances[i]);
+							m_entities.push(instance);
+							instance = editor.getEntityTemplateSystem().getNextInstance(instance);
 						}
 					}
 				}
@@ -1180,10 +1183,11 @@ private:
 				}
 				else
 				{
-					const Array<Entity>& instances = editor.getEntityTemplateSystem().getInstances(prefab);
-					for (int i = 0; i < instances.size(); ++i)
+					Entity instance = editor.getEntityTemplateSystem().getFirstInstance(prefab);
+					while(isValid(instance))
 					{
-						m_entities.push(instances[i]);
+						m_entities.push(instance);
+						instance = editor.getEntityTemplateSystem().getNextInstance(instance);
 					}
 				}
 			}
@@ -1733,11 +1737,6 @@ public:
 		}
 		PlatformInterface::destroyFileIterator(scn_file_iter);
 		
-		StaticString<MAX_PATH_LENGTH> filepath(file_info.m_dir, file_info.m_basename, "/systems/templates.sys");
-		loadFile(filepath, [this](TextDeserializer& deserializer) {
-			m_template_system->deserialize(deserializer);
-		});
-
 		StaticString<MAX_PATH_LENGTH> dir(file_info.m_dir, file_info.m_basename, "/");
 		auto file_iter = PlatformInterface::createFileIterator(dir, m_allocator);
 		while (PlatformInterface::getNextFile(file_iter, &info))
@@ -1769,6 +1768,11 @@ public:
 			});
 		}
 		PlatformInterface::destroyFileIterator(file_iter);
+
+		StaticString<MAX_PATH_LENGTH> filepath(file_info.m_dir, file_info.m_basename, "/systems/templates.sys");
+		loadFile(filepath, [this](TextDeserializer& deserializer) {
+			m_template_system->deserialize(deserializer);
+		});
 	}
 
 
@@ -1803,6 +1807,7 @@ public:
 
 		for (Entity entity = m_universe->getFirstEntity(); isValid(entity); entity = m_universe->getNextEntity(entity))
 		{
+			if (m_template_system->getPrefab(entity) != 0) continue;
 			blob.clear();
 			serializer.write("name", m_universe->getEntityName(entity));
 			serializer.write("transform", m_universe->getTransform(entity));
