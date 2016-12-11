@@ -1994,15 +1994,18 @@ public:
 			StaticString<MAX_PATH_LENGTH> filepath(scn_dir, info.filename);
 			if (file.open(filepath, FS::Mode::OPEN_AND_READ, m_allocator))
 			{
-				data.resize((int)file.size());
-				file.read(&data[0], data.size());
-				file.close();
-				InputBlob blob(&data[0], data.size());
-				Deserializer deserializer(blob);
-				char plugin_name[64];
-				PathUtils::getBasename(plugin_name, lengthOf(plugin_name), filepath);
-				IScene* scene = m_universe->getScene(crc32(plugin_name)); // todo if scene does not exist
-				scene->deserialize(deserializer);
+				if (file.size() > 0)
+				{
+					data.resize((int)file.size());
+					file.read(&data[0], data.size());
+					file.close();
+					InputBlob blob(&data[0], data.size());
+					Deserializer deserializer(blob);
+					char plugin_name[64];
+					PathUtils::getBasename(plugin_name, lengthOf(plugin_name), filepath);
+					IScene* scene = m_universe->getScene(crc32(plugin_name)); // todo if scene does not exist
+					scene->deserialize(deserializer);
+				}
 				file.close();
 			}
 		}
@@ -2021,13 +2024,19 @@ public:
 				file.close();
 				InputBlob blob(&data[0], data.size());
 				Deserializer deserializer(blob);
+				char name[64];
+				deserializer.read(name, lengthOf(name));
 				Transform tr;
 				deserializer.read(&tr);
+				float scale;
+				deserializer.read(&scale);
 				char tmp[20];
 				PathUtils::getBasename(tmp, lengthOf(tmp), filepath);
 				Entity entity;
 				fromCString(tmp, lengthOf(tmp), &entity.index);
 				m_universe->createEntity(entity);
+				if(name[0]) m_universe->setEntityName(entity, name);
+				m_universe->setScale(entity, scale);
 				m_universe->setTransform(entity, tr);
 				u32 cmp_type;
 				deserializer.read(&cmp_type);
@@ -2055,7 +2064,7 @@ public:
 		{
 			blob.clear();
 			scene->serialize(serializer);
-			StaticString<MAX_PATH_LENGTH> scene_file_path(dir, scene->getPlugin().getName(), ".scn");
+			StaticString<MAX_PATH_LENGTH> scene_file_path(dir, "scenes/", scene->getPlugin().getName(), ".scn");
 			if (entity_file.open(scene_file_path, FS::Mode::CREATE_AND_WRITE, m_allocator))
 			{
 				entity_file.write(blob.getData(), blob.getPos());
@@ -2066,7 +2075,9 @@ public:
 		for (Entity entity = m_universe->getFirstEntity(); isValid(entity); entity = m_universe->getNextEntity(entity))
 		{
 			blob.clear();
+			serializer.write("name", m_universe->getEntityName(entity));
 			serializer.write("transform", m_universe->getTransform(entity));
+			serializer.write("scale", m_universe->getScale(entity));
 			StaticString<MAX_PATH_LENGTH> entity_file_path(dir, entity.index, ".ent");
 			for (ComponentUID cmp = m_universe->getFirstComponent(entity); isValid(cmp.handle); cmp = m_universe->getNextComponent(cmp))
 			{
