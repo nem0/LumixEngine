@@ -201,8 +201,8 @@ Terrain::GrassType::~GrassType()
 {
 	if (m_grass_model)
 	{
-		m_grass_model->getResourceManager().unload(*m_grass_model);
 		m_grass_model->getObserverCb().unbind<Terrain, &Terrain::grassLoaded>(&m_terrain);
+		m_grass_model->getResourceManager().unload(*m_grass_model);
 	}
 }
 

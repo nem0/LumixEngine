@@ -83,7 +83,6 @@ public:
 	virtual lua_State* getState() = 0;
 	virtual void runScript(const char* src, int src_length, const char* path) = 0;
 	virtual ComponentUID createComponent(Universe& universe, Entity entity, ComponentType type) = 0;
-	virtual void pasteEntities(const Vec3& position, Universe& universe, InputBlob& blob, Array<Entity>& entities) = 0;
 	virtual IAllocator& getLIFOAllocator() = 0;
 	virtual class Resource* getLuaResource(int idx) const = 0;
 	virtual int addLuaResource(const Path& path, struct ResourceType type) = 0;
