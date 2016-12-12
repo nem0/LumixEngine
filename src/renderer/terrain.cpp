@@ -244,11 +244,13 @@ void Terrain::addGrassType(int index)
 {
 	if(index < 0)
 	{
-		m_grass_types.emplace(*this);
+		m_grass_types.emplace(*this).m_idx = index;
 	}
 	else
 	{
-		m_grass_types.insert(index, GrassType(*this));
+		GrassType type(*this);
+		type.m_idx = index;
+		m_grass_types.insert(index, type);
 	}
 }
 
