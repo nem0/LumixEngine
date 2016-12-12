@@ -39,8 +39,6 @@ class Terrain
 			GrassType(Terrain& terrain);
 			~GrassType();
 
-			void grassLoaded(Resource::State, Resource::State, Resource&);
-
 			Model* m_grass_model;
 			Terrain& m_terrain;
 			i32 m_density;
