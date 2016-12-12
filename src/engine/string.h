@@ -121,6 +121,11 @@ template <int size> struct StaticString
 		return Lumix::equalStrings(data, str);
 	}
 
+	StaticString<size> operator +(const char* rhs)
+	{
+		return StaticString<size>(*this, rhs);
+	}
+
 	operator const char*() const { return data; }
 	char data[size];
 };

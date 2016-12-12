@@ -2,10 +2,10 @@
 
 #include "editor/editor_icon.h"
 #include "editor/entity_groups.h"
-#include "editor/entity_template_system.h"
 #include "editor/gizmo.h"
 #include "editor/measure_tool.h"
 #include "editor/platform_interface.h"
+#include "editor/prefab_system.h"
 #include "engine/array.h"
 #include "engine/associative_array.h"
 #include "engine/blob.h"
@@ -23,7 +23,6 @@
 #include "engine/input_system.h"
 #include "engine/iplugin.h"
 #include "engine/iproperty_descriptor.h"
-#include "engine/serializer.h"
 #include "engine/json_serializer.h"
 #include "engine/log.h"
 #include "engine/matrix.h"
@@ -35,6 +34,7 @@
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
+#include "engine/serializer.h"
 #include "engine/system.h"
 #include "engine/timer.h"
 #include "engine/universe/universe.h"
@@ -189,7 +189,55 @@ public:
 		InputBlob blob(m_blob.getData(), m_blob.getPos());
 
 		m_entities.clear();
-		m_editor.getEngine().pasteEntities(m_position, *m_editor.getUniverse(), blob, m_entities);
+
+		int entity_count;
+		blob.read(entity_count);
+		m_entities.reserve(entity_count);
+
+		Universe& universe = *m_editor.getUniverse();
+		Matrix base_matrix = Matrix::IDENTITY;
+		base_matrix.setTranslation(m_position);
+		for (int i = 0; i < entity_count; ++i)
+		{
+			Matrix mtx;
+			blob.read(mtx);
+			if (i == 0)
+			{
+				Matrix inv = mtx;
+				inv.inverse();
+				base_matrix.copy3x3(mtx);
+				base_matrix = base_matrix * inv;
+				mtx.setTranslation(m_position);
+			}
+			else
+			{
+				mtx = base_matrix * mtx;
+			}
+			Entity new_entity = universe.createEntity(Vec3(0, 0, 0), Quat(0, 0, 0, 1));
+			m_entities.push(new_entity);
+			universe.setMatrix(new_entity, mtx);
+			i32 count;
+			blob.read(count);
+			for (int i = 0; i < count; ++i)
+			{
+				u32 hash;
+				blob.read(hash);
+				ComponentType type = PropertyRegister::getComponentTypeFromHash(hash);
+				ComponentUID cmp = m_editor.getEngine().createComponent(universe, new_entity, type);
+				i32 prop_count;
+				blob.read(prop_count);
+				for (int j = 0; j < prop_count; ++j)
+				{
+					u32 prop_name_hash;
+					blob.read(prop_name_hash);
+					auto* desc = PropertyRegister::getDescriptor(type, prop_name_hash);
+					i32 size;
+					blob.read(size);
+					if (desc) desc->set(cmp, -1, blob);
+					else blob.skip(size);
+				}
+			}
+		}
 
 		return true;
 	}
@@ -714,7 +762,7 @@ public:
 		, m_new_value(editor.getAllocator())
 		, m_old_value(editor.getAllocator())
 	{
-		auto& prefab_system = editor.getEntityTemplateSystem();
+		auto& prefab_system = editor.getPrefabSystem();
 		m_entities.reserve(count);
 		for (int i = 0; i < count; ++i)
 		{
@@ -876,18 +924,18 @@ private:
 			{
 				if (!m_editor.getUniverse()->getComponent(entities[i], type).isValid())
 				{
-					u64 prefab = editor.getEntityTemplateSystem().getPrefab(entities[i]);
+					u64 prefab = editor.getPrefabSystem().getPrefab(entities[i]);
 					if (prefab == 0)
 					{
 						m_entities.push(entities[i]);
 					}
 					else
 					{
-						Entity instance = editor.getEntityTemplateSystem().getFirstInstance(prefab);
+						Entity instance = editor.getPrefabSystem().getFirstInstance(prefab);
 						while(isValid(instance))
 						{
 							m_entities.push(instance);
-							instance = editor.getEntityTemplateSystem().getNextInstance(instance);
+							instance = editor.getPrefabSystem().getNextInstance(instance);
 						}
 					}
 				}
@@ -1083,7 +1131,7 @@ private:
 						}
 					}
 				}
-				u64 prefab = m_editor.getEntityTemplateSystem().getPrefab(m_entities[i]);
+				u64 prefab = m_editor.getPrefabSystem().getPrefab(m_entities[i]);
 				m_old_values.write(prefab);
 
 				universe->destroyEntity(m_entities[i]);
@@ -1126,7 +1174,7 @@ private:
 				}
 				u64 tpl;
 				blob.read(tpl);
-				if (tpl) m_editor.getEntityTemplateSystem().setPrefab(new_entity, tpl);
+				if (tpl) m_editor.getPrefabSystem().setPrefab(new_entity, tpl);
 			}
 		}
 
@@ -1176,18 +1224,18 @@ private:
 			for (int i = 0; i < count; ++i)
 			{
 				if (!m_editor.getUniverse()->getComponent(entities[i], m_cmp_type).isValid()) continue;
-				u64 prefab = editor.getEntityTemplateSystem().getPrefab(entities[i]);
+				u64 prefab = editor.getPrefabSystem().getPrefab(entities[i]);
 				if (prefab == 0)
 				{
 					m_entities.push(entities[i]);
 				}
 				else
 				{
-					Entity instance = editor.getEntityTemplateSystem().getFirstInstance(prefab);
+					Entity instance = editor.getPrefabSystem().getFirstInstance(prefab);
 					while(isValid(instance))
 					{
 						m_entities.push(instance);
-						instance = editor.getEntityTemplateSystem().getNextInstance(instance);
+						instance = editor.getPrefabSystem().getNextInstance(instance);
 					}
 				}
 			}
@@ -1480,7 +1528,7 @@ public:
 
 		destroyUniverse();
 		EditorIcons::destroy(*m_editor_icons);
-		EntityTemplateSystem::destroy(m_template_system);
+		PrefabSystem::destroy(m_template_system);
 
 		LUMIX_DELETE(m_allocator, m_render_interface);
 	}
@@ -1781,6 +1829,9 @@ public:
 		PathUtils::FileInfo file_info(path.c_str());
 		StaticString<MAX_PATH_LENGTH> dir(file_info.m_dir, file_info.m_basename, "/");
 		PlatformInterface::makePath(dir);
+		PlatformInterface::makePath(dir + "probes/");
+		PlatformInterface::makePath(dir + "scenes/");
+		PlatformInterface::makePath(dir + "systems/");
 
 		FS::OsFile file;
 		OutputBlob blob(m_allocator);
@@ -1823,6 +1874,27 @@ public:
 			serializer.write("cmp_end", (u32)0);
 			saveFile(entity_file_path);
 		}
+		cleanUniverseDir(dir);
+	}
+
+
+	void cleanUniverseDir(const char* dir)
+	{
+		PlatformInterface::FileInfo file_info;
+		auto file_iter = PlatformInterface::createFileIterator(dir, m_allocator);
+		while (PlatformInterface::getNextFile(file_iter, &file_info))
+		{
+			char basename[64];
+			PathUtils::getBasename(basename, lengthOf(basename), file_info.filename);
+			Entity entity;
+			fromCString(basename, lengthOf(basename), &entity.index);
+			if (!m_universe->hasEntity(entity))
+			{
+				StaticString<MAX_PATH_LENGTH> filepath(dir, file_info.filename);
+				PlatformInterface::deleteFile(filepath);
+			}
+		}
+		PlatformInterface::destroyFileIterator(file_iter);
 	}
 
 
@@ -2102,13 +2174,13 @@ public:
 	}
 
 
-	void executeCommand(IEditorCommand* command) override
+	IEditorCommand* executeCommand(IEditorCommand* command) override
 	{
 		if (m_is_game_mode)
 		{
 			command->execute();
 			LUMIX_DELETE(m_allocator, command);
-			return;
+			return nullptr;
 		}
 
 		m_is_universe_changed = true;
@@ -2118,7 +2190,7 @@ public:
 			{
 				m_undo_stack[m_undo_index]->execute();
 				LUMIX_DELETE(m_allocator, command);
-				return;
+				return nullptr;
 			}
 		}
 
@@ -2134,11 +2206,10 @@ public:
 			}
 			m_undo_stack.push(command);
 			++m_undo_index;
+			return command;
 		}
-		else
-		{
-			LUMIX_DELETE(m_allocator, command);
-		}
+		LUMIX_DELETE(m_allocator, command);
+		return nullptr;
 	}
 
 
@@ -2197,7 +2268,7 @@ public:
 	}
 
 
-	EntityTemplateSystem& getEntityTemplateSystem() override
+	PrefabSystem& getPrefabSystem() override
 	{
 		return *m_template_system;
 	}
@@ -2380,9 +2451,7 @@ public:
 		ASSERT(success);
 		if (success)
 		{
-			//load(file);
 			deserialize(m_universe->getPath()); 
-			//m_template_system->refreshPrefabs();
 			char path[MAX_PATH_LENGTH];
 			copyString(path, sizeof(path), m_universe->getPath().c_str());
 			catString(path, sizeof(path), ".lst");
@@ -2559,7 +2628,7 @@ public:
 			}
 		}
 
-		m_template_system = EntityTemplateSystem::create(*this);
+		m_template_system = PrefabSystem::create(*this);
 
 		m_editor_command_creators.insert(
 			crc32("begin_group"), &WorldEditorImpl::constructEditorCommand<BeginGroupCommand>);
@@ -3181,7 +3250,7 @@ private:
 	Array<Plugin*> m_plugins;
 	MeasureTool* m_measure_tool;
 	Plugin* m_mouse_handling_plugin;
-	EntityTemplateSystem* m_template_system;
+	PrefabSystem* m_template_system;
 	Array<IEditorCommand*> m_undo_stack;
 	AssociativeArray<u32, EditorCommandCreator> m_editor_command_creators;
 	int m_undo_index;

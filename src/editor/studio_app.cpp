@@ -3,8 +3,8 @@
 #include "audio/audio_scene.h"
 #include "audio/clip_manager.h"
 #include "editor/entity_groups.h"
-#include "editor/entity_template_system.h"
 #include "editor/gizmo.h"
+#include "editor/prefab_system.h"
 #include "editor/render_interface.h"
 #include "editor/world_editor.h"
 #include "engine/blob.h"
@@ -776,18 +776,18 @@ public:
 			const char* base_path = m_engine->getDiskFileDevice()->getBasePath();
 			if (Lumix::startsWith(filename, base_path))
 			{
-				m_editor->getEntityTemplateSystem().savePrefab(Lumix::Path(filename + Lumix::stringLength(base_path)));
+				m_editor->getPrefabSystem().savePrefab(Lumix::Path(filename + Lumix::stringLength(base_path)));
 			}
 			else
 			{
 				base_path = m_engine->getPatchFileDevice() ? m_engine->getPatchFileDevice()->getBasePath() : nullptr;
 				if (base_path && Lumix::startsWith(filename, base_path))
 				{
-					m_editor->getEntityTemplateSystem().savePrefab(Lumix::Path(filename + Lumix::stringLength(base_path)));
+					m_editor->getPrefabSystem().savePrefab(Lumix::Path(filename + Lumix::stringLength(base_path)));
 				}
 				else
 				{
-					m_editor->getEntityTemplateSystem().savePrefab(Lumix::Path(filename));
+					m_editor->getPrefabSystem().savePrefab(Lumix::Path(filename));
 				}
 			}
 		}
@@ -1526,7 +1526,7 @@ public:
 
 	void setStudioApp()
 	{
-		m_editor->getEntityTemplateSystem().setStudioApp(*this);
+		m_editor->getPrefabSystem().setStudioApp(*this);
 		auto& plugin_manager = m_editor->getEngine().getPluginManager();
 		#ifdef STATIC_PLUGINS
 			for (auto* plugin : plugin_manager.getPlugins())

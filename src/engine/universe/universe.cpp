@@ -4,7 +4,9 @@
 #include "engine/iplugin.h"
 #include "engine/json_serializer.h"
 #include "engine/matrix.h"
+#include "engine/prefab.h"
 #include "engine/property_register.h"
+#include "engine/serializer.h"
 #include <cstdint>
 
 
@@ -96,7 +98,7 @@ void Universe::setRotation(Entity entity, float x, float y, float z, float w)
 
 bool Universe::hasEntity(Entity entity) const
 {
-	return entity.index >= 0 && entity.index < m_entities.size();
+	return entity.index >= 0 && entity.index < m_entities.size() && m_entities[entity.index].valid;
 }
 
 
@@ -189,6 +191,7 @@ void Universe::createEntity(Entity entity)
 	while (m_entities.size() <= entity.index)
 	{
 		EntityData& data = m_entities.emplace();
+		data.valid = false;
 		data.prev = -1;
 		data.next = m_first_free_slot;
 		data.scale = -1;
@@ -215,6 +218,7 @@ void Universe::createEntity(Entity entity)
 	data.rotation.set(0, 0, 0, 1);
 	data.scale = 1;
 	data.components = 0;
+	data.valid = true;
 	m_entity_created.invoke(entity);
 }
 
@@ -239,6 +243,7 @@ Entity Universe::createEntity(const Vec3& position, const Quat& rotation)
 	data->rotation = rotation;
 	data->scale = 1;
 	data->components = 0;
+	data->valid = true;
 	m_entity_created.invoke(entity);
 
 	return entity;
@@ -265,6 +270,7 @@ void Universe::destroyEntity(Entity entity)
 
 	m_entities[entity.index].next = m_first_free_slot;
 	m_entities[entity.index].prev = -1;
+	m_entities[entity.index].valid = false;
 	if (m_first_free_slot >= 0)
 	{
 		m_entities[m_first_free_slot].prev = entity.index;
@@ -362,6 +368,32 @@ void Universe::deserialize(InputBlob& serializer)
 	}
 
 	serializer.read(m_first_free_slot);
+}
+
+
+void Universe::instantiatePrefab(const PrefabResource& prefab,
+	const Vec3& pos,
+	const Quat& rot,
+	float scale,
+	Array<Entity>& entities)
+{
+	InputBlob blob(prefab.blob.getData(), prefab.blob.getPos());
+	TextDeserializer deserializer(blob);
+	while (blob.getPosition() < blob.getSize())
+	{
+		u64 prefab;
+		deserializer.read(&prefab);
+		Entity entity = createEntity(pos, rot);
+		entities.push(entity);
+		setScale(entity, scale);
+		u32 cmp_type;
+		deserializer.read(&cmp_type);
+		while (cmp_type != 0)
+		{
+			deserializeComponent(deserializer, entity, PropertyRegister::getComponentTypeFromHash(cmp_type));
+			deserializer.read(&cmp_type);
+		}
+	}
 }
 
 

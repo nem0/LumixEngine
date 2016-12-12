@@ -1,4 +1,4 @@
-#include "entity_template_system.h"
+#include "prefab_system.h"
 #include "editor/asset_browser.h"
 #include "editor/ieditor_command.h"
 #include "editor/studio_app.h"
@@ -33,7 +33,7 @@ static const ResourceType PREFAB_TYPE("prefab");
 class AssetBrowserPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 {
 public:
-	AssetBrowserPlugin(WorldEditor& _editor, EntityTemplateSystem& _system)
+	AssetBrowserPlugin(WorldEditor& _editor, PrefabSystem& _system)
 		: system(_system)
 		, editor(_editor)
 	{}
@@ -42,6 +42,12 @@ public:
 	bool onGUI(Resource* resource, ResourceType type) override
 	{
 		if (type != PREFAB_TYPE) return false;
+
+		if (ImGui::Button("instantiate"))
+		{
+			Array<Entity> entities(editor.getAllocator());
+			system.instantiatePrefab(*(PrefabResource*)resource, editor.getCameraRaycastHit(), {0, 0, 0, 1}, 1);
+		}
 
 		return true;
 	}
@@ -65,24 +71,118 @@ public:
 	}
 
 
-	EntityTemplateSystem& system;
+	PrefabSystem& system;
 	WorldEditor& editor;
 };
 
 
-class EntityTemplateSystemImpl LUMIX_FINAL : public EntityTemplateSystem
+
+
+
+class PrefabSystemImpl LUMIX_FINAL : public PrefabSystem
 {
+	struct InstantiatePrefabCommand LUMIX_FINAL : public IEditorCommand
+	{
+		InstantiatePrefabCommand(WorldEditor& _editor)
+			: editor(_editor)
+			, entities(_editor.getAllocator())
+		{
+		}
+
+
+		~InstantiatePrefabCommand()
+		{
+			prefab->getResourceManager().unload(*prefab);
+		}
+
+
+		bool execute() override
+		{
+			entities.clear();
+			if (!prefab->isReady()) return false;;
+			auto& system = (PrefabSystemImpl&)editor.getPrefabSystem();
+
+			system.instantiatePrefab(*prefab, position, rotation, scale, &entities);
+			return true;
+		}
+
+
+		void undo() override
+		{
+			Universe& universe = *editor.getUniverse();
+			for (auto entity : entities) universe.destroyEntity(entity);
+		}
+
+
+		void serialize(JsonSerializer& serializer) override
+		{
+			serializer.serialize("position_x", position.x);
+			serializer.serialize("position_y", position.y);
+			serializer.serialize("position_z", position.z);
+			serializer.serialize("rotation_x", rotation.x);
+			serializer.serialize("rotation_y", rotation.y);
+			serializer.serialize("rotation_z", rotation.z);
+			serializer.serialize("rotation_w", rotation.w);
+			serializer.serialize("scale", scale);
+			serializer.serialize("path", prefab->getPath().c_str());
+		}
+
+
+		void deserialize(JsonSerializer& serializer) override
+		{
+			serializer.deserialize("position_x", position.x, 0);
+			serializer.deserialize("position_y", position.y, 0);
+			serializer.deserialize("position_z", position.z, 0);
+			serializer.deserialize("rotation_x", rotation.x, 0);
+			serializer.deserialize("rotation_y", rotation.y, 0);
+			serializer.deserialize("rotation_z", rotation.z, 0);
+			serializer.deserialize("rotation_w", rotation.w, 0);
+			serializer.deserialize("scale", scale, 0);
+			char path[MAX_PATH_LENGTH];
+			serializer.deserialize("path_hash", path, lengthOf(path), "");
+			prefab = (PrefabResource*)editor.getEngine().getResourceManager().get(PREFAB_TYPE)->load(Path(path));
+		}
+
+
+		const char* getType() override
+		{
+			return "instantiate_prefab";
+		}
+
+
+		bool merge(IEditorCommand& command) { return false; }
+
+		PrefabResource* prefab;
+		Vec3 position;
+		Quat rotation;
+		float scale;
+		WorldEditor& editor;
+		Array<Entity> entities;
+	};
+
 public:
-	explicit EntityTemplateSystemImpl(WorldEditor& editor)
+	explicit PrefabSystemImpl(WorldEditor& editor)
 		: m_editor(editor)
 		, m_universe(nullptr)
 		, m_instances(editor.getAllocator())
 		, m_resources(editor.getAllocator())
 		, m_prefabs(editor.getAllocator())
 	{
-		editor.universeCreated().bind<EntityTemplateSystemImpl, &EntityTemplateSystemImpl::onUniverseCreated>(this);
-		editor.universeDestroyed().bind<EntityTemplateSystemImpl, &EntityTemplateSystemImpl::onUniverseDestroyed>(this);
+		editor.universeCreated().bind<PrefabSystemImpl, &PrefabSystemImpl::onUniverseCreated>(this);
+		editor.universeDestroyed().bind<PrefabSystemImpl, &PrefabSystemImpl::onUniverseDestroyed>(this);
 		setUniverse(editor.getUniverse());
+		editor.registerEditorCommandCreator(
+			"instantiate_prefab", &PrefabSystemImpl::createInstantiatePrefabCommand);
+	}
+
+
+	~PrefabSystemImpl()
+	{
+		m_editor.universeCreated()
+			.unbind<PrefabSystemImpl, &PrefabSystemImpl::onUniverseCreated>(this);
+		m_editor.universeDestroyed()
+			.unbind<PrefabSystemImpl, &PrefabSystemImpl::onUniverseDestroyed>(this);
+		setUniverse(nullptr);
 	}
 
 
@@ -90,15 +190,11 @@ public:
 	{
 		app.getAssetBrowser()->addPlugin(*LUMIX_NEW(m_editor.getAllocator(), AssetBrowserPlugin)(m_editor, *this));
 	}
+	
 
-
-	~EntityTemplateSystemImpl()
+	static IEditorCommand* createInstantiatePrefabCommand(WorldEditor& editor)
 	{
-		m_editor.universeCreated()
-			.unbind<EntityTemplateSystemImpl, &EntityTemplateSystemImpl::onUniverseCreated>(this);
-		m_editor.universeDestroyed()
-			.unbind<EntityTemplateSystemImpl, &EntityTemplateSystemImpl::onUniverseDestroyed>(this);
-		setUniverse(nullptr);
+		return LUMIX_NEW(editor.getAllocator(), InstantiatePrefabCommand)(editor);
 	}
 
 
@@ -110,14 +206,14 @@ public:
 		if (m_universe)
 		{
 			m_universe->entityDestroyed()
-				.unbind<EntityTemplateSystemImpl, &EntityTemplateSystemImpl::onEntityDestroyed>(
+				.unbind<PrefabSystemImpl, &PrefabSystemImpl::onEntityDestroyed>(
 					this);
 		}
 		m_universe = universe;
 		if (m_universe)
 		{
 			m_universe->entityDestroyed()
-				.bind<EntityTemplateSystemImpl, &EntityTemplateSystemImpl::onEntityDestroyed>(this);
+				.bind<PrefabSystemImpl, &PrefabSystemImpl::onEntityDestroyed>(this);
 		}
 	}
 
@@ -228,7 +324,11 @@ public:
 	}
 
 
-	Entity instantiatePrefab(PrefabResource& prefab, const Vec3& pos, const Quat& rot, float scale) override
+	void instantiatePrefab(PrefabResource& prefab,
+		const Vec3& pos,
+		const Quat& rot,
+		float scale,
+		Array<Entity>* entities)
 	{
 		if (!m_resources.find(prefab.getPath().getHash()).isValid())
 		{
@@ -237,12 +337,12 @@ public:
 		}
 		InputBlob blob(prefab.blob.getData(), prefab.blob.getPos());
 		TextDeserializer deserializer(blob);
-		Entity entity = INVALID_ENTITY;
 		while (blob.getPosition() < blob.getSize())
 		{
 			u64 prefab;
 			deserializer.read(&prefab);
-			entity = m_universe->createEntity(pos, rot);
+			Entity entity = m_universe->createEntity(pos, rot);
+			if(entities) entities->push(entity);
 			reserve(entity);
 			m_prefabs[entity.index].prefab = prefab;
 			link(entity, prefab);
@@ -251,11 +351,23 @@ public:
 			deserializer.read(&cmp_type);
 			while (cmp_type != 0)
 			{
-				m_universe->deserializeComponent(deserializer, entity, PropertyRegister::getComponentTypeFromHash(cmp_type));
+				m_universe->deserializeComponent(
+					deserializer, entity, PropertyRegister::getComponentTypeFromHash(cmp_type));
 				deserializer.read(&cmp_type);
 			}
 		}
-		return entity;
+	}
+
+
+	Array<Entity>* instantiatePrefab(PrefabResource& prefab, const Vec3& pos, const Quat& rot, float scale) override
+	{
+		InstantiatePrefabCommand* cmd = LUMIX_NEW(m_editor.getAllocator(), InstantiatePrefabCommand)(m_editor);
+		cmd->position = pos;
+		cmd->prefab = &prefab;
+		cmd->rotation = rot;
+		cmd->scale = scale;
+		cmd = (InstantiatePrefabCommand*)m_editor.executeCommand(cmd);
+		return cmd ? &cmd->entities : nullptr;
 	}
 
 
@@ -362,7 +474,7 @@ public:
 			serializer.read(&rot);
 			float scale;
 			serializer.read(&scale);
-			instantiatePrefab(*m_resources[res_hash], pos, rot, scale);
+			instantiatePrefab(*m_resources[res_hash], pos, rot, scale, nullptr);
 		}
 	}
 
@@ -379,19 +491,19 @@ private:
 	HashMap<u32, PrefabResource*> m_resources;
 	Universe* m_universe;
 	WorldEditor& m_editor;
-}; // class EntityTemplateSystemImpl
+}; // class PrefabSystemImpl
 
 
-EntityTemplateSystem* EntityTemplateSystem::create(WorldEditor& editor)
+PrefabSystem* PrefabSystem::create(WorldEditor& editor)
 {
-	return LUMIX_NEW(editor.getAllocator(), EntityTemplateSystemImpl)(editor);
+	return LUMIX_NEW(editor.getAllocator(), PrefabSystemImpl)(editor);
 }
 
 
-void EntityTemplateSystem::destroy(EntityTemplateSystem* system)
+void PrefabSystem::destroy(PrefabSystem* system)
 {
 	LUMIX_DELETE(
-		static_cast<EntityTemplateSystemImpl*>(system)->getEditor().getAllocator(), system);
+		static_cast<PrefabSystemImpl*>(system)->getEditor().getAllocator(), system);
 }
 
 

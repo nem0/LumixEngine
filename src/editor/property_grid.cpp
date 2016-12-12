@@ -234,6 +234,7 @@ void PropertyGrid::showEntityProperty(const Lumix::Array<Lumix::Entity>& entitie
 	getEntityListDisplayName(m_editor, buf, Lumix::lengthOf(buf), entity);
 	ImGui::LabelText(desc.getName(), "%s", buf);
 	ImGui::SameLine();
+	ImGui::PushID(desc.getName());
 	if (ImGui::Button("...")) ImGui::OpenPopup(desc.getName());
 	Lumix::Universe& universe = *m_editor.getUniverse();
 	if (ImGui::BeginPopup(desc.getName()))
@@ -248,6 +249,7 @@ void PropertyGrid::showEntityProperty(const Lumix::Array<Lumix::Entity>& entitie
 		}
 		ImGui::EndPopup();
 	}
+	ImGui::PopID();
 }
 
 
