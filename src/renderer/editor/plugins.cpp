@@ -69,7 +69,7 @@ struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 	}
 
 
-	bool acceptExtension(const char* ext, Lumix::ResourceType type) const override
+	bool acceptExtension(const char* ext, ResourceType type) const override
 	{
 		return type == MATERIAL_TYPE && equalStrings(ext, "mat");
 	}
@@ -374,7 +374,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 	}
 
 
-	bool acceptExtension(const char* ext, Lumix::ResourceType type) const override
+	bool acceptExtension(const char* ext, ResourceType type) const override
 	{
 		return type == MODEL_TYPE && equalStrings(ext, "msh");
 	}
@@ -441,7 +441,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		if (ImGui::IsItemHovered() && mouse_down)
 		{
 			auto& input = engine.getInputSystem();
-			auto delta = Lumix::Vec2(input.getMouseXMove(), input.getMouseYMove());
+			auto delta = Vec2(input.getMouseXMove(), input.getMouseYMove());
 
 			if (!m_is_mouse_captured)
 			{
@@ -605,7 +605,7 @@ struct TexturePlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 	}
 
 
-	bool acceptExtension(const char* ext, Lumix::ResourceType type) const override { return false; }
+	bool acceptExtension(const char* ext, ResourceType type) const override { return false; }
 
 
 	bool onGUI(Resource* resource, ResourceType type) override
@@ -673,7 +673,7 @@ struct ShaderPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 	}
 
 
-	bool acceptExtension(const char* ext, Lumix::ResourceType type) const override
+	bool acceptExtension(const char* ext, ResourceType type) const override
 	{
 		return type == SHADER_TYPE && equalStrings("shd", ext);
 	}
@@ -777,7 +777,7 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		auto& plugin_manager = world_editor->getEngine().getPluginManager();
 		Renderer*  renderer = static_cast<Renderer*>(plugin_manager.getPlugin("renderer"));
 		auto& allocator = world_editor->getAllocator();
-		Lumix::Path pipeline_path("pipelines/probe.lua");
+		Path pipeline_path("pipelines/probe.lua");
 		m_pipeline = Pipeline::create(*renderer, pipeline_path, allocator);
 		m_pipeline->load();
 	}
@@ -806,7 +806,7 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		comp_params.m_faces = 6;
 		for (int i = 0; i < 6; ++i)
 		{
-			comp_params.m_pImages[i][0] = (Lumix::u32*)&data[i * texture_size * texture_size * 4];
+			comp_params.m_pImages[i][0] = (u32*)&data[i * texture_size * texture_size * 4];
 		}
 		crn_mipmap_params mipmap_params;
 		mipmap_params.m_mode = cCRNMipModeGenerateMips;
@@ -818,10 +818,11 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 			return false;
 		}
 
-		Lumix::FS::OsFile file;
+		FS::OsFile file;
 		const char* base_path = m_app.getWorldEditor()->getEngine().getDiskFileDevice()->getBasePath();
-		u64 universe_guid = m_app.getWorldEditor()->getUniverse()->getPath().getHash();
-		Lumix::StaticString<Lumix::MAX_PATH_LENGTH> path(base_path, "universes/", universe_guid);
+		char basename[64];
+		PathUtils::getBasename(basename, lengthOf(basename), m_app.getWorldEditor()->getUniverse()->getPath().c_str());
+		StaticString<MAX_PATH_LENGTH> path(base_path, "universes/", basename);
 		if (!PlatformInterface::makePath(path) && !PlatformInterface::dirExists(path))
 		{
 			g_log_error.log("Editor") << "Failed to create " << path;
@@ -833,7 +834,7 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		}
 		path << cmp.handle.index << ".dds";
 		auto& allocator = m_app.getWorldEditor()->getAllocator();
-		if (!file.open(path, Lumix::FS::Mode::CREATE_AND_WRITE, allocator))
+		if (!file.open(path, FS::Mode::CREATE_AND_WRITE, allocator))
 		{
 			g_log_error.log("Editor") << "Failed to create " << path;
 			crn_free_block(compressed_data);
@@ -909,7 +910,7 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		Vec3 ups[] = {{0, 1, 0}, {0, 1, 0}, {0, 0, 1}, {0, 0, -1}, {0, 1, 0}, {0, 1, 0}};
 		Vec3 ups_opengl[] = { { 0, -1, 0 },{ 0, -1, 0 },{ 0, 0, 1 },{ 0, 0, -1 },{ 0, -1, 0 },{ 0, -1, 0 } };
 
-		Lumix::Array<Lumix::u8> data(allocator);
+		Array<u8> data(allocator);
 		data.resize(6 * TEXTURE_SIZE * TEXTURE_SIZE * 4);
 		bgfx::TextureHandle texture =
 			bgfx::createTexture2D(TEXTURE_SIZE, TEXTURE_SIZE, false, 1, bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK);
@@ -1058,7 +1059,7 @@ struct SceneViewPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		}
 
 
-		ImTextureID loadTexture(const Lumix::Path& path) override
+		ImTextureID loadTexture(const Path& path) override
 		{
 			auto& rm = m_editor.getEngine().getResourceManager();
 			auto* texture = static_cast<Texture*>(rm.get(TEXTURE_TYPE)->load(path));

@@ -2745,6 +2745,28 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
+	void serialize(ISerializer& serializer) override
+	{
+		serializer.write("layers_count", m_layers_count);
+		for (int i = 0; i < m_layers_count; ++i)
+		{
+			serializer.write("name", m_layers_names[i]);
+			serializer.write("collision_matrix", m_collision_filter[i]);
+		}
+	}
+
+
+	void deserialize(IDeserializer& serializer) override
+	{
+		serializer.read(&m_layers_count);
+		for (int i = 0; i < m_layers_count; ++i)
+		{
+			serializer.read(m_layers_names[i], lengthOf(m_layers_names[i]));
+			serializer.read(&m_collision_filter[i]);
+		}
+	}
+
+
 	void serializeHeightfield(ISerializer& serializer, ComponentHandle cmp)
 	{
 		Heightfield& terrain = m_terrains[{cmp.index}];

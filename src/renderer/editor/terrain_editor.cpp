@@ -1,8 +1,8 @@
 #include "terrain_editor.h"
 #include "editor/asset_browser.h"
-#include "editor/entity_template_system.h"
 #include "editor/ieditor_command.h"
 #include "editor/platform_interface.h"
+#include "editor/prefab_system.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "engine/blob.h"
@@ -970,7 +970,7 @@ bool TerrainEditor::onEntityMouseDown(const Lumix::WorldEditor::RayHit& hit, int
 void TerrainEditor::removeEntities(const Lumix::Vec3& hit_pos)
 {
 	if (m_selected_prefabs.empty()) return;
-	auto& template_system = m_world_editor.getEntityTemplateSystem();
+	auto& prefab_system = m_world_editor.getPrefabSystem();
 
 	PROFILE_FUNCTION();
 
@@ -993,7 +993,7 @@ void TerrainEditor::removeEntities(const Lumix::Vec3& hit_pos)
 	{
 		for (Lumix::Entity entity : entities)
 		{
-			if (template_system.getPrefab(entity)) m_world_editor.destroyEntities(&entity, 1);
+			if (prefab_system.getPrefab(entity)) m_world_editor.destroyEntities(&entity, 1);
 		}
 	}
 	else
@@ -1002,7 +1002,7 @@ void TerrainEditor::removeEntities(const Lumix::Vec3& hit_pos)
 		{
 			for (auto* res : m_selected_prefabs)
 			{
-				if ((template_system.getPrefab(entity) & 0xffffFFFF) == res->getPath().getHash())
+				if ((prefab_system.getPrefab(entity) & 0xffffFFFF) == res->getPath().getHash())
 				{
 					m_world_editor.destroyEntities(&entity, 1);
 					break;
@@ -1124,7 +1124,7 @@ void TerrainEditor::paintEntities(const Lumix::Vec3& hit_pos)
 {
 	PROFILE_FUNCTION();
 	if (m_selected_prefabs.empty()) return;
-	auto& template_system = m_world_editor.getEntityTemplateSystem();
+	auto& prefab_system = m_world_editor.getPrefabSystem();
 
 	static const Lumix::u32 PAINT_ENTITIES_HASH = Lumix::crc32("paint_entities");
 	m_world_editor.beginCommandGroup(PAINT_ENTITIES_HASH);
@@ -1200,13 +1200,15 @@ void TerrainEditor::paintEntities(const Lumix::Vec3& hit_pos)
 				}
 
 				float size = Lumix::Math::randFloat(m_size_spread.x, m_size_spread.y);
-				Lumix::Entity entity = template_system.instantiatePrefab(*m_selected_prefabs[0], pos, rot, size);
-
-				Lumix::ComponentHandle cmp = scene->getComponent(entity, MODEL_INSTANCE_TYPE);
-				Lumix::Model* model = scene->getModelInstanceModel(cmp);
-				if (isOBBCollision(*scene, meshes, pos, model, scale))
+				auto* entities = prefab_system.instantiatePrefab(*m_selected_prefabs[0], pos, rot, size);
+				if (entities && !entities->empty())
 				{
-					scene->getUniverse().destroyEntity(entity);
+					Lumix::ComponentHandle cmp = scene->getComponent((*entities)[0], MODEL_INSTANCE_TYPE);
+					Lumix::Model* model = scene->getModelInstanceModel(cmp);
+					if (isOBBCollision(*scene, meshes, pos, model, scale))
+					{
+						m_world_editor.undo();
+					}
 				}
 			}
 		}

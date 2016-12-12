@@ -24,6 +24,7 @@ struct Matrix;
 class OutputBlob;
 struct Transform;
 class Universe;
+struct PrefabResource;
 
 
 enum
@@ -84,6 +85,11 @@ public:
 	void setPosition(Entity entity, float x, float y, float z);
 	void setPosition(Entity entity, const Vec3& pos);
 	void setScale(Entity entity, float scale);
+	void instantiatePrefab(const PrefabResource& prefab,
+		const Vec3& pos,
+		const Quat& rot,
+		float scale,
+		Array<Entity>& entities);
 	float getScale(Entity entity);
 	const Vec3& getPosition(Entity entity) const;
 	const Quat& getRotation(Entity entity) const;
@@ -125,6 +131,7 @@ private:
 		};
 		float scale;
 		u64 components;
+		bool valid;
 	};
 
 private:
