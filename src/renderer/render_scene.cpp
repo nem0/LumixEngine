@@ -860,7 +860,6 @@ public:
 		{
 			serializer.write("density", type.m_density);
 			serializer.write("distance", type.m_distance);
-			serializer.write("idx", type.m_idx);
 			serializer.write("model", type.m_grass_model ? type.m_grass_model->getPath().c_str() : "");
 		}
 	}
@@ -884,7 +883,7 @@ public:
 			Terrain::GrassType type(*terrain);
 			serializer.read(&type.m_density);
 			serializer.read(&type.m_distance);
-			serializer.read(&type.m_idx);
+			type.m_idx = i;
 			serializer.read(tmp, lengthOf(tmp));
 			terrain->m_grass_types.push(type);
 			terrain->setGrassTypePath(terrain->m_grass_types.size() - 1, Path(tmp));
