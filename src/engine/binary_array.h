@@ -21,6 +21,7 @@ namespace Lumix
 			{
 				public:
 					Accessor(BinaryArray& array, int index);
+					Accessor(const Accessor& rhs) : m_array(rhs.m_array), m_index(rhs.m_index) {}
 
 
 					Accessor& operator =(const Accessor& value)

@@ -16,6 +16,7 @@ namespace Lumix
 		public:
 			explicit OutputBlob(IAllocator& allocator);
 			OutputBlob(void* data, int size);
+			OutputBlob(const OutputBlob& rhs);
 			OutputBlob(const OutputBlob& blob, IAllocator& allocator);
 			OutputBlob(const InputBlob& blob, IAllocator& allocator);
 			void operator =(const OutputBlob& rhs);

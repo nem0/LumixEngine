@@ -49,7 +49,7 @@ bool getNextFile(FileIterator* iterator, FileInfo* info)
 	info->is_directory = (iterator->ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
 	Lumix::copyString(info->filename, iterator->ffd.cFileName);
 
-	iterator->is_valid = FindNextFile(iterator->handle, &iterator->ffd) == TRUE;
+	iterator->is_valid = FindNextFile(iterator->handle, &iterator->ffd) != FALSE;
 	return true;
 }
 
@@ -169,7 +169,7 @@ bool getSaveFilename(char* out, int max_size, const char* filter, const char* de
 	ofn.lpstrInitialDir = NULL;
 	ofn.Flags = OFN_OVERWRITEPROMPT | OFN_NOCHANGEDIR | OFN_NONETWORKBUTTON;
 
-	return GetSaveFileName(&ofn) == TRUE;
+	return GetSaveFileName(&ofn) != FALSE;
 }
 
 
@@ -202,7 +202,7 @@ bool getOpenFilename(char* out, int max_size, const char* filter, const char* st
 	ofn.lpstrInitialDir = nullptr;
 	ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR | OFN_NONETWORKBUTTON;
 
-	return GetOpenFileName(&ofn) == TRUE;
+	return GetOpenFileName(&ofn) != FALSE;
 }
 
 
@@ -292,13 +292,13 @@ bool shellExecuteOpen(const char* path)
 
 bool deleteFile(const char* path)
 {
-	return DeleteFile(path) == TRUE;
+	return DeleteFile(path) != FALSE;
 }
 
 
 bool moveFile(const char* from, const char* to)
 {
-	return MoveFile(from, to) == TRUE;
+	return MoveFile(from, to) != FALSE;
 }
 
 

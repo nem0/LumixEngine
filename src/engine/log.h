@@ -13,8 +13,7 @@ namespace Lumix
 
 	class LUMIX_ENGINE_API LogProxy
 	{
-		public:
-
+		friend class Log;
 		public:
 			LogProxy(Log& log, const char* system, IAllocator& allocator);
 			~LogProxy();
@@ -34,6 +33,7 @@ namespace Lumix
 			string m_message;
 			Log& m_log;
 
+			LogProxy(const LogProxy&);
 			void operator = (const LogProxy&);
 	};
 
