@@ -2319,14 +2319,14 @@ public:
 			auto mtx = m_universe->getMatrix(entity);
 			blob.write(mtx);
 
-			i32 count = 0;
+			i32 cmp_count = 0;
 			for (ComponentUID cmp = m_universe->getFirstComponent(entity); cmp.isValid();
 				 cmp = m_universe->getNextComponent(cmp))
 			{
-				++count;
+				++cmp_count;
 			}
 
-			blob.write(count);
+			blob.write(cmp_count);
 			for (ComponentUID cmp = m_universe->getFirstComponent(entity);
 				cmp.isValid();
 				cmp = m_universe->getNextComponent(cmp))

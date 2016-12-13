@@ -957,9 +957,13 @@ namespace Lumix
 		{
 			auto* script_cmp = m_scripts[{cmp.index}];
 			if (!script_cmp) return;
-			if(!script_cmp->m_scripts[scr_index].m_state) return;
-
 			Property& prop = getScriptProperty(cmp, scr_index, name);
+			if (!script_cmp->m_scripts[scr_index].m_state)
+			{
+				prop.stored_value = value;
+				return;
+			}
+
 			applyProperty(script_cmp->m_scripts[scr_index], prop, value);
 		}
 
