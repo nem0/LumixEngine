@@ -1514,8 +1514,6 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 
 	int task() override
 	{
-		static ConvertTask* that = nullptr;
-		that = this;
 		auto cmpMeshes = [](const void* a, const void* b) -> int {
 			auto a_mesh = static_cast<const ImportMesh*>(a);
 			auto b_mesh = static_cast<const ImportMesh*>(b);

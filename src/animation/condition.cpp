@@ -813,7 +813,6 @@ int ExpressionCompiler::tokenize(const char* src, Token* tokens, int max_size)
 			}
 			else if (*c == ')')
 			{
-				binary = false;
 				token.type = Token::RIGHT_PARENTHESIS;
 				binary = true;
 			}

@@ -27,6 +27,7 @@ public:
 	void dataSignal();
 
 private:
+	Scheduler(const Scheduler&);
 	Scheduler& operator=(const Scheduler& rhs);
 
 	MT::Event m_data_event;

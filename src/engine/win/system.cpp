@@ -8,7 +8,7 @@ namespace Lumix
 {
 	bool copyFile(const char* from, const char* to)
 	{
-		return CopyFile(from, to, FALSE) == TRUE;
+		return CopyFile(from, to, FALSE) != FALSE;
 	}
 
 

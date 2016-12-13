@@ -116,6 +116,24 @@ namespace Lumix
 	}
 
 
+	OutputBlob::OutputBlob(const OutputBlob& rhs)
+	{
+		m_allocator = rhs.m_allocator;
+		m_pos = rhs.m_pos;
+		if (rhs.m_size > 0)
+		{
+			m_data = m_allocator->allocate(rhs.m_size);
+			copyMemory(m_data, rhs.m_data, rhs.m_size);
+			m_size = rhs.m_size;
+		}
+		else
+		{
+			m_data = nullptr;
+			m_size = 0;
+		}
+	}
+
+
 	void OutputBlob::operator =(const OutputBlob& rhs)
 	{
 		ASSERT(rhs.m_allocator);
