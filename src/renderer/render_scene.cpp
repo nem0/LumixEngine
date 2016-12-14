@@ -763,7 +763,7 @@ public:
 
 	void deserializePointLight(IDeserializer& serializer, Entity entity)
 	{
-		m_light_influenced_geometry.push(Array<ComponentHandle>(m_allocator));
+		m_light_influenced_geometry.emplace(m_allocator);
 		PointLight& light = m_point_lights.emplace();
 		light.m_entity = entity;
 		serializer.read(&light.m_attenuation_param);
@@ -1564,7 +1564,7 @@ public:
 		m_point_lights.resize(size);
 		for (int i = 0; i < size; ++i)
 		{
-			m_light_influenced_geometry.push(Array<ComponentHandle>(m_allocator));
+			m_light_influenced_geometry.emplace(m_allocator);
 			PointLight& light = m_point_lights[i];
 			if (version > RenderSceneVersion::SPECULAR_INTENSITY)
 			{
@@ -4614,7 +4614,7 @@ public:
 		Frustum frustum = getPointLightFrustum(cmp);
 		m_culling_system->cullToFrustum(frustum, 0xffffFFFF);
 		const CullingSystem::Results& results = m_culling_system->getResult();
-		auto& influenced_geometry = m_light_influenced_geometry[cmp.index];
+		auto& influenced_geometry = m_light_influenced_geometry[m_point_lights_map[cmp]];
 		influenced_geometry.clear();
 		for (int i = 0; i < results.size(); ++i)
 		{
