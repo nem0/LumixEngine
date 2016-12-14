@@ -3088,6 +3088,8 @@ public:
 					return false;
 				}
 				command->deserialize(serializer);
+				while (m_engine->getFileSystem().hasWork())
+					m_engine->getFileSystem().updateAsyncTransactions();
 				executeCommand(command);
 				serializer.deserializeObjectEnd();
 			}
