@@ -55,7 +55,7 @@ struct IDeserializer
 };
 
 
-struct TextSerializer : public ISerializer
+struct LUMIX_ENGINE_API TextSerializer : public ISerializer
 {
 	TextSerializer(OutputBlob& _blob) : blob(_blob) {}
 
@@ -79,7 +79,7 @@ struct TextSerializer : public ISerializer
 };
 
 
-struct TextDeserializer : public IDeserializer
+struct LUMIX_ENGINE_API TextDeserializer : public IDeserializer
 {
 	TextDeserializer(InputBlob& _blob)
 		: blob(_blob)
