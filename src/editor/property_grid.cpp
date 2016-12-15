@@ -562,10 +562,11 @@ bool PropertyGrid::entityInput(const char* label, const char* str_id, Lumix::Ent
 				getEntityListDisplayName(m_editor, buf, Lumix::lengthOf(buf), i);
 				if (ImGui::Selectable(buf))
 				{
+					ImGui::ListBoxFooter();
 					entity = i;
 					ImGui::CloseCurrentPopup();
 					ImGui::EndPopup();
-					break;
+					return true;
 				}
 			}
 			ImGui::ListBoxFooter();
