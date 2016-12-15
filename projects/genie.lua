@@ -181,11 +181,11 @@ function defaultConfigurations()
 		flags { "Symbols", "Optimize", "WinMain" }
 
 	configuration "linux"
-		buildoptions { "-std=c++11" }
+		buildoptions { "-std=c++14" }
 		links { "pthread" }
 
 	configuration { "asmjs" }
-		buildoptions { "-std=c++11" }
+		buildoptions { "-std=c++14" }
 		
 	configuration {}
 		files { "lumix.natvis" }
@@ -316,7 +316,7 @@ solution "LumixEngine"
 				"-Wundef",
 			}
 			buildoptions_cpp {
-				"-std=c++11",
+				"-std=c++14",
 			}
 			linkoptions {
 				"-no-canonical-prefixes",
