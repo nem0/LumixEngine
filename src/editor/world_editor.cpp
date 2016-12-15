@@ -3065,8 +3065,8 @@ public:
 	{
 		destroyUndoStack();
 		m_undo_index = -1;
-		FS::IFile* file = m_engine->getFileSystem().open(
-			m_engine->getFileSystem().getDiskDevice(), path, FS::Mode::OPEN_AND_READ);
+		FS::FileSystem& fs = m_engine->getFileSystem();
+		FS::IFile* file = fs.open(fs.getDiskDevice(), path, FS::Mode::OPEN_AND_READ);
 		if (file)
 		{
 			JsonSerializer serializer(*file, JsonSerializer::READ, path, m_allocator);
@@ -3084,18 +3084,17 @@ public:
 					g_log_error.log("Editor") << "Unknown command " << type_name << " in " << path;
 					destroyUndoStack();
 					m_undo_index = -1;
-					m_engine->getFileSystem().close(*file);
+					fs.close(*file);
 					return false;
 				}
 				command->deserialize(serializer);
-				while (m_engine->getFileSystem().hasWork())
-					m_engine->getFileSystem().updateAsyncTransactions();
+				while (fs.hasWork()) fs.updateAsyncTransactions();
 				executeCommand(command);
 				serializer.deserializeObjectEnd();
 			}
 			serializer.deserializeArrayEnd();
 			serializer.deserializeObjectEnd();
-			m_engine->getFileSystem().close(*file);
+			fs.close(*file);
 		}
 		return file != nullptr;
 	}
@@ -3155,43 +3154,91 @@ public:
 	}
 
 
-	bool runTest(const Path& undo_stack_path, const Path& result_universe_path) override
+	bool runTest(const char* dir, const char* name) override
 	{
-		while (m_engine->getFileSystem().hasWork()) m_engine->getFileSystem().updateAsyncTransactions();
+		FS::FileSystem& fs = m_engine->getFileSystem();
+		while (fs.hasWork()) fs.updateAsyncTransactions();
+		
 		newUniverse();
+		Path undo_stack_path(dir, name, ".json");
 		executeUndoStack(undo_stack_path);
-		while (m_engine->getFileSystem().hasWork()) m_engine->getFileSystem().updateAsyncTransactions();
+		while (fs.hasWork()) fs.updateAsyncTransactions();
 
-		FS::IFile* file = m_engine->getFileSystem().open(
-			m_engine->getFileSystem().getMemoryDevice(), Path(""), FS::Mode::CREATE_AND_WRITE);
-		if (!file)
-		{
-			return false;
-		}
-		FS::IFile* result_file = m_engine->getFileSystem().open(
-			m_engine->getFileSystem().getDefaultDevice(), result_universe_path, FS::Mode::OPEN_AND_READ);
-		if (!result_file)
-		{
-			m_engine->getFileSystem().close(*file);
-			return false;
-		}
-		save(*file);
-		bool is_same = file->size() > 8 && result_file->size() > 8 &&
-					   *((const u32*)result_file->getBuffer() + 3) == *((const u32*)file->getBuffer() + 3);
+		StaticString<MAX_PATH_LENGTH> result_dir(m_engine->getDiskFileDevice()->getBasePath(), dir, "/results/");
+		PlatformInterface::makePath(result_dir);
+		result_dir << name << "/";
+		PlatformInterface::makePath(result_dir);
+		Path result_universe_path(result_dir, ".unv");
+		serialize(result_universe_path);
 
-		if (!is_same)
+		bool is_same = true;
+
+		PlatformInterface::FileIterator* iter = PlatformInterface::createFileIterator(result_dir, m_allocator);
+		PlatformInterface::FileInfo info;
+		Array<u8> src_data(m_allocator);
+		Array<u8> dst_data(m_allocator);
+		while (is_same && PlatformInterface::getNextFile(iter, &info))
 		{
-			FS::OsFile bad_file;
-			StaticString<MAX_PATH_LENGTH> tmp(result_universe_path.c_str(), "_bad.unv");
-			if (bad_file.open(tmp, FS::Mode::CREATE_AND_WRITE, m_engine->getAllocator()))
+			if (info.is_directory) continue;
+			if (info.filename[0] == '.') continue;
+
+			FS::OsFile dst_file;
+			FS::OsFile src_file;
+			StaticString<MAX_PATH_LENGTH> dst_path(result_dir, info.filename);
+			StaticString<MAX_PATH_LENGTH> src_path(dir, "/", name, "/", info.filename);
+			if (dst_file.open(dst_path, FS::Mode::OPEN_AND_READ, m_allocator))
 			{
-				bad_file.write(file->getBuffer(), file->size());
-				bad_file.close();
+				if (src_file.open(src_path, FS::Mode::OPEN_AND_READ, m_allocator))
+				{
+					int dst_size = (int)dst_file.size();
+					int src_size = (int)src_file.size();
+					if (src_size == dst_size)
+					{
+						dst_data.resize(dst_size);
+						dst_file.read(&dst_data[0], dst_data.size());
+						src_data.resize(src_size);
+						src_file.read(&src_data[0], src_data.size());
+
+						for (int i = 0; i < src_size; ++i)
+						{
+							if (src_data[i] != dst_data[i])
+							{
+								is_same = false;
+								break;
+							}
+						}
+					}
+					else
+					{
+						is_same = false;
+					}
+					src_file.close();
+				}
+				else
+				{
+					is_same = false;
+				}
+				dst_file.close();
+			}
+			else
+			{
+				is_same = false;
 			}
 		}
+		PlatformInterface::destroyFileIterator(iter);
 
-		m_engine->getFileSystem().close(*result_file);
-		m_engine->getFileSystem().close(*file);
+		StaticString<MAX_PATH_LENGTH> tmp(dir, "/", name);
+		iter = PlatformInterface::createFileIterator(tmp, m_allocator);
+		while (is_same && PlatformInterface::getNextFile(iter, &info))
+		{
+			StaticString<MAX_PATH_LENGTH> dst_path(result_dir, info.filename);
+			if (!PlatformInterface::fileExists(dst_path))
+			{
+				is_same = false;
+				break;
+			}
+		}
+		PlatformInterface::destroyFileIterator(iter);
 
 		return is_same;
 	}
