@@ -116,12 +116,15 @@ private:
 	struct EntityData
 	{
 		EntityData() {}
+
+		Vec3 position;
+		Quat rotation;
 		union
 		{
-			struct
+			struct 
 			{
-				Vec3 position;
-				Quat rotation;
+				float scale;
+				u64 components;
 			};
 			struct
 			{
@@ -129,8 +132,6 @@ private:
 				int next;
 			};
 		};
-		float scale;
-		u64 components;
 		bool valid;
 	};
 
