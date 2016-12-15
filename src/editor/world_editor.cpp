@@ -3231,6 +3231,8 @@ public:
 		iter = PlatformInterface::createFileIterator(tmp, m_allocator);
 		while (is_same && PlatformInterface::getNextFile(iter, &info))
 		{
+			if (info.is_directory) continue;
+			if (info.filename[0] == '.') continue;
 			StaticString<MAX_PATH_LENGTH> dst_path(result_dir, info.filename);
 			if (!PlatformInterface::fileExists(dst_path))
 			{
