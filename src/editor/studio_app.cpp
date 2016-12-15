@@ -1570,9 +1570,9 @@ public:
 	}
 
 
-	bool LUA_runTest(const char* undo_stack_path, const char* result_universe_path)
+	bool LUA_runTest(const char* dir, const char* name)
 	{
-		return m_editor->runTest(Lumix::Path(undo_stack_path), Lumix::Path(result_universe_path));
+		return m_editor->runTest(dir, name);
 	}
 
 	
