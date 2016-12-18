@@ -1,4 +1,3 @@
-#include "engine/lumix.h"
 #include "editor/asset_browser.h"
 #include "editor/ieditor_command.h"
 #include "editor/platform_interface.h"
@@ -8,6 +7,7 @@
 #include "editor/utils.h"
 #include "editor/world_editor.h"
 #include "engine/crc32.h"
+#include "engine/engine.h"
 #include "engine/fs/disk_file_device.h"
 #include "engine/fs/file_system.h"
 #include "engine/fs/os_file.h"
@@ -15,13 +15,13 @@
 #include "engine/json_serializer.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
+#include "engine/lumix.h"
 #include "engine/path_utils.h"
+#include "engine/plugin_manager.h"
+#include "engine/property_descriptor.h"
+#include "engine/property_register.h"
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
-#include "engine/engine.h"
-#include "engine/plugin_manager.h"
-#include "engine/property_register.h"
-#include "engine/property_descriptor.h"
 #include "game_view.h"
 #include "import_asset_dialog.h"
 #include "renderer/frame_buffer.h"
@@ -35,13 +35,13 @@
 #include "renderer/shader.h"
 #include "renderer/texture.h"
 #include "scene_view.h"
-#include "shader_editor.h"
 #include "shader_compiler.h"
+#include "shader_editor.h"
 #include "terrain_editor.h"
-#include <cmath>
-#include <crnlib.h>
 #include <SDL.h>
-
+#include <cmath>
+#include <cmft/cubemapfilter.h>
+#include <crnlib.h>
 
 using namespace Lumix;
 
@@ -789,7 +789,7 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 	}
 
 
-	bool saveCubemap(ComponentUID cmp, const Array<u8>& data, int texture_size)
+	bool saveCubemap(ComponentUID cmp, const u8* data, int texture_size, const char* postfix)
 	{
 		crn_uint32 size;
 		crn_comp_params comp_params;
@@ -832,7 +832,7 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		{
 			g_log_error.log("Editor") << "Failed to create " << path;
 		}
-		path << cmp.handle.index << ".dds";
+		path << cmp.handle.index << postfix << ".dds";
 		auto& allocator = m_app.getWorldEditor()->getAllocator();
 		if (!file.open(path, FS::Mode::CREATE_AND_WRITE, allocator))
 		{
@@ -955,7 +955,33 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 				flipX(tmp, TEXTURE_SIZE);
 			}
 		}
-		saveCubemap(cmp, data, TEXTURE_SIZE);
+		cmft::Image image;
+		cmft::Image irradiance;
+
+		cmft::imageCreate(image, TEXTURE_SIZE, TEXTURE_SIZE, 0x303030ff, 1, 6, cmft::TextureFormat::RGBA8);
+		cmft::imageFromRgba32f(image, cmft::TextureFormat::RGBA8);
+		copyMemory(image.m_data, &data[0], data.size());
+		cmft::imageToRgba32f(image);
+		
+		cmft::imageIrradianceFilterSh(irradiance, 32, image);
+
+		cmft::imageRadianceFilter(
+			image
+			, 128
+			, cmft::LightingModel::BlinnBrdf
+			, false
+			, 1
+			, 10
+			, 1
+			, cmft::EdgeFixup::None
+			, 0xff
+		);
+
+		cmft::imageFromRgba32f(image, cmft::TextureFormat::RGBA8);
+		cmft::imageFromRgba32f(irradiance, cmft::TextureFormat::RGBA8);
+		saveCubemap(cmp, (u8*)irradiance.m_data, 32, "_irradiance");
+		saveCubemap(cmp, (u8*)image.m_data, 128, "_radiance");
+		saveCubemap(cmp, &data[0], TEXTURE_SIZE, "");
 		bgfx::destroyTexture(texture);
 		
 		scene->reloadEnvironmentProbe(cmp.handle);
