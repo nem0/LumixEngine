@@ -407,8 +407,8 @@ void Terrain::generateGrassTypeQuad(GrassPatch& patch, const Matrix& terrain_mat
 			if (density < 0.25f) continue;
 
 			Matrix tmp = Matrix::IDENTITY;
-			float x = quad_x + dx + step * Math::randFloat(-0.5f, 0.5f);
-			float z = quad_z + dz + step * Math::randFloat(-0.5f, 0.5f);
+			float x = quad_x * m_scale.x + dx + step * Math::randFloat(-0.5f, 0.5f);
+			float z = quad_z * m_scale.z + dz + step * Math::randFloat(-0.5f, 0.5f);
 			tmp.setTranslation(Vec3(x, getHeight(x, z), z));
 			Quat q(Vec3(0, 1, 0), Math::randFloat(0, Math::PI * 2));
 			tmp = terrain_matrix * tmp * q.toMatrix();
@@ -490,7 +490,7 @@ void Terrain::updateGrass(ComponentHandle camera)
 				GrassPatch& patch = quad->m_patches.emplace(m_allocator);
 				patch.m_type = &grass_type;
 
-				generateGrassTypeQuad(patch, terrain_mtx, quad_x, quad_z);
+				generateGrassTypeQuad(patch, terrain_mtx, quad_x / m_scale.x, quad_z / m_scale.z);
 				for (auto instance_data : patch.instance_data)
 				{
 					min_y = Math::minimum(instance_data.matrix.getTranslation().y, min_y);

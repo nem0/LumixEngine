@@ -105,7 +105,7 @@ struct PaintTerrainCommand LUMIX_FINAL : public Lumix::IEditorCommand
 
 		Item& item = m_items.emplace();
 		item.m_local_pos = local_pos;
-		item.m_radius = radius;
+		item.m_radius = radius / xz_scale;
 		item.m_amount = rel_amount;
 		item.m_color = color;
 	}

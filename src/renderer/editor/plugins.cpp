@@ -54,7 +54,6 @@ static const ComponentType POINT_LIGHT_TYPE = PropertyRegister::getComponentType
 static const ComponentType GLOBAL_LIGHT_TYPE = PropertyRegister::getComponentType("global_light");
 static const ComponentType MODEL_INSTANCE_TYPE = PropertyRegister::getComponentType("renderable");
 static const ComponentType ENVIRONMENT_PROBE_TYPE = PropertyRegister::getComponentType("environment_probe");
-static const u32 RENDERER_HASH = crc32("renderer");
 static const ResourceType MATERIAL_TYPE("material");
 static const ResourceType SHADER_TYPE("shader");
 static const ResourceType TEXTURE_TYPE("texture");
@@ -389,7 +388,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		m_pipeline->load();
 
 		auto mesh_entity = m_universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
-		auto* render_scene = static_cast<RenderScene*>(m_universe->getScene(RENDERER_HASH));
+		auto* render_scene = static_cast<RenderScene*>(m_universe->getScene(MODEL_INSTANCE_TYPE));
 		m_mesh = render_scene->createComponent(MODEL_INSTANCE_TYPE, mesh_entity);
 		
 		auto light_entity = m_universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
@@ -407,7 +406,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 	void showPreview(Model& model)
 	{
 		auto& engine = m_app.getWorldEditor()->getEngine();
-		auto* render_scene = static_cast<RenderScene*>(m_universe->getScene(RENDERER_HASH));
+		auto* render_scene = static_cast<RenderScene*>(m_universe->getScene(MODEL_INSTANCE_TYPE));
 		if (!render_scene) return;
 		if (!model.isReady()) return;
 
@@ -894,7 +893,7 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		IAllocator& allocator = engine.getAllocator();
 
 		Vec3 probe_position = universe->getPosition(cmp.entity);
-		auto* scene = static_cast<RenderScene*>(universe->getScene(RENDERER_HASH));
+		auto* scene = static_cast<RenderScene*>(universe->getScene(CAMERA_TYPE));
 		ComponentHandle camera_cmp = scene->getCameraInSlot("probe");
 		if (!isValid(camera_cmp)) return;
 
@@ -1251,7 +1250,7 @@ struct SceneViewPlugin LUMIX_FINAL : public StudioApp::IPlugin
 
 		void onUniverseCreated()
 		{
-			m_render_scene = static_cast<RenderScene*>(m_editor.getUniverse()->getScene(RENDERER_HASH));
+			m_render_scene = static_cast<RenderScene*>(m_editor.getUniverse()->getScene(MODEL_INSTANCE_TYPE));
 		}
 
 
@@ -2041,7 +2040,7 @@ struct GameViewPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	void onUniverseCreated()
 	{
 		auto* universe = m_app.getWorldEditor()->getUniverse();
-		auto* scene = static_cast<RenderScene*>(universe->getScene(RENDERER_HASH));
+		auto* scene = static_cast<RenderScene*>(universe->getScene(MODEL_INSTANCE_TYPE));
 
 		m_gui_pipeline->setScene(scene);
 	}
