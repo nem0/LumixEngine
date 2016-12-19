@@ -42,7 +42,7 @@ public:
 	{
 		IScene* scene;
 		void (IScene::*serialize)(ISerializer&, ComponentHandle);
-		 void (IScene::*deserialize)(IDeserializer&, Entity);
+		void (IScene::*deserialize)(IDeserializer&, Entity);
 	};
 
 public:
