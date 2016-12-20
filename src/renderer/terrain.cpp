@@ -382,8 +382,8 @@ void Terrain::generateGrassTypeQuad(GrassPatch& patch, const Matrix& terrain_mat
 	Texture* splat_map = m_splatmap;
 	float step = GRASS_QUAD_SIZE / (float)patch.m_type->m_density;
 
-	float quad_width = Math::minimum(GRASS_QUAD_SIZE, splat_map->width - quad_x);
-	float quad_height = Math::minimum(GRASS_QUAD_SIZE, splat_map->height - quad_z);
+	float quad_width = Math::minimum(GRASS_QUAD_SIZE, splat_map->width - quad_x / m_scale.x);
+	float quad_height = Math::minimum(GRASS_QUAD_SIZE, splat_map->height - quad_z / m_scale.z);
 	float tx_step = splat_map->width / (m_width * m_scale.x);
 	float base_tx = tx_step * quad_x - tx_step * 0.5f;
 
@@ -403,16 +403,13 @@ void Terrain::generateGrassTypeQuad(GrassPatch& patch, const Matrix& terrain_mat
 			int ground_mask = (pixel_value >> 16) & 0xff;
 			if ((ground_mask & (1 << patch.m_type->m_idx)) == 0) continue;
 
-			float density = ((pixel_value >> 8) & 0xff) * DIV255;
-			if (density < 0.25f) continue;
-
 			Matrix tmp = Matrix::IDENTITY;
-			float x = quad_x * m_scale.x + dx + step * Math::randFloat(-0.5f, 0.5f);
-			float z = quad_z * m_scale.z + dz + step * Math::randFloat(-0.5f, 0.5f);
+			float x = quad_x + dx + step * Math::randFloat(-0.5f, 0.5f);
+			float z = quad_z + dz + step * Math::randFloat(-0.5f, 0.5f);
 			tmp.setTranslation(Vec3(x, getHeight(x, z), z));
 			Quat q(Vec3(0, 1, 0), Math::randFloat(0, Math::PI * 2));
 			tmp = terrain_matrix * tmp * q.toMatrix();
-			tmp.multiply3x3(density + Math::randFloat(-0.1f, 0.1f));
+			tmp.multiply3x3(Math::randFloat(0.9f, 1.1f));
 			GrassPatch::InstanceData& instance_data = patch.instance_data.emplace();
 			instance_data.matrix = tmp;
 			instance_data.normal = Vec4(getNormal(x, z), 0);
@@ -490,7 +487,7 @@ void Terrain::updateGrass(ComponentHandle camera)
 				GrassPatch& patch = quad->m_patches.emplace(m_allocator);
 				patch.m_type = &grass_type;
 
-				generateGrassTypeQuad(patch, terrain_mtx, quad_x / m_scale.x, quad_z / m_scale.z);
+				generateGrassTypeQuad(patch, terrain_mtx, quad_x, quad_z);
 				for (auto instance_data : patch.instance_data)
 				{
 					min_y = Math::minimum(instance_data.matrix.getTranslation().y, min_y);
