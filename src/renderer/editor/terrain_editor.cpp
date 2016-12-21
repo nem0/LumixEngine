@@ -920,7 +920,9 @@ Lumix::u16 TerrainEditor::getHeight(const Lumix::Vec3& world_pos)
 	if (!heightmap) return 0;
 
 	auto* data = (Lumix::u16*)heightmap->getData();
-	return data[int(rel_pos.x) + int(rel_pos.z) * heightmap->width];
+	auto* scene = (Lumix::RenderScene*)m_component.scene;
+	float scale = scene->getTerrainXZScale(m_component.handle);
+	return data[int(rel_pos.x / scale) + int(rel_pos.z / scale) * heightmap->width];
 }
 
 
