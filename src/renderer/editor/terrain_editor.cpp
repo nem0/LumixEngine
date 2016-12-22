@@ -1136,12 +1136,6 @@ void TerrainEditor::paintEntities(const Lumix::Vec3& hit_pos)
 		Lumix::Matrix inv_terrain_matrix = terrain_matrix;
 		inv_terrain_matrix.inverse();
 
-		struct Tpl
-		{
-			Lumix::ComponentHandle cmp;
-			Lumix::u32 prefab;
-		};
-
 		Lumix::Frustum frustum;
 		frustum.computeOrtho(hit_pos,
 			Lumix::Vec3(0, 0, 1),
@@ -1202,7 +1196,9 @@ void TerrainEditor::paintEntities(const Lumix::Vec3& hit_pos)
 				}
 
 				float size = Lumix::Math::randFloat(m_size_spread.x, m_size_spread.y);
-				auto* entities = prefab_system.instantiatePrefab(*m_selected_prefabs[0], pos, rot, size);
+				int random_idx = Lumix::Math::rand(0, m_selected_prefabs.size() - 1);
+				if (!m_selected_prefabs[random_idx]) continue;
+				auto* entities = prefab_system.instantiatePrefab(*m_selected_prefabs[random_idx], pos, rot, size);
 				if (entities && !entities->empty())
 				{
 					Lumix::ComponentHandle cmp = scene->getComponent((*entities)[0], MODEL_INSTANCE_TYPE);
@@ -1434,23 +1430,40 @@ void TerrainEditor::onGUI()
 		case ENTITY:
 		{
 			m_action_type = TerrainEditor::ENTITY;
-			Lumix::StaticString<Lumix::MAX_PATH_LENGTH> tmp;
-			if (!m_selected_prefabs.empty())
+			
+			ImGui::ListBoxHeader("Prefabs");
+
+			int resources_idx  = m_app.getAssetBrowser()->getTypeIndex(PREFAB_TYPE);
+			auto& all_prefabs = m_app.getAssetBrowser()->getResources(resources_idx);
+			ImGuiListClipper clipper(all_prefabs.size(), ImGui::GetTextLineHeightWithSpacing());
+			while (clipper.Step())
 			{
-				tmp = m_selected_prefabs[0]->getPath().c_str();
-			}
-			if (m_app.getAssetBrowser()->resourceInput("Prefab", "prefab", tmp.data, Lumix::lengthOf(tmp.data), PREFAB_TYPE))
-			{
-				if (!m_selected_prefabs.empty())
+				for (int j = clipper.DisplayStart; j < clipper.DisplayEnd; ++j)
 				{
-					m_selected_prefabs[0]->getResourceManager().unload(*m_selected_prefabs[0]);
+					int selected_idx = m_selected_prefabs.find([&](Lumix::PrefabResource* res) -> bool {
+						return res && res->getPath() == all_prefabs[j];
+					});
+					bool selected = selected_idx >= 0;
+					if (ImGui::Checkbox(all_prefabs[j].c_str(), &selected))
+					{
+						if (selected)
+						{
+							Lumix::ResourceManagerBase* prefab_manager = m_world_editor.getEngine().getResourceManager().get(PREFAB_TYPE);
+							Lumix::PrefabResource* prefab = (Lumix::PrefabResource*)prefab_manager->load(all_prefabs[j]);
+							m_selected_prefabs.push(prefab);
+						}
+						else
+						{
+							Lumix::PrefabResource* prefab = m_selected_prefabs[selected_idx];
+							m_selected_prefabs.eraseFast(selected_idx);
+							prefab->getResourceManager().unload(*prefab);
+						}
+					}
 				}
-				else
-				{
-					m_selected_prefabs.emplace();
-				}
-				m_selected_prefabs[0] = (Lumix::PrefabResource*)m_world_editor.getEngine().getResourceManager().get(PREFAB_TYPE)->load(Lumix::Path(tmp));
 			}
+
+			ImGui::ListBoxFooter();
+			
 			if(ImGui::Checkbox("Align with normal", &m_is_align_with_normal))
 			{
 				if(m_is_align_with_normal) m_is_rotate_x = m_is_rotate_y = m_is_rotate_z = false;
