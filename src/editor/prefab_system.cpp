@@ -363,6 +363,7 @@ public:
 	{
 		InstantiatePrefabCommand* cmd = LUMIX_NEW(m_editor.getAllocator(), InstantiatePrefabCommand)(m_editor);
 		cmd->position = pos;
+		prefab.getResourceManager().load(prefab);
 		cmd->prefab = &prefab;
 		cmd->rotation = rot;
 		cmd->scale = scale;

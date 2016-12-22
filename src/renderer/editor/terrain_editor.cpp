@@ -1432,7 +1432,6 @@ void TerrainEditor::onGUI()
 			m_action_type = TerrainEditor::ENTITY;
 			
 			ImGui::ListBoxHeader("Prefabs");
-
 			int resources_idx  = m_app.getAssetBrowser()->getTypeIndex(PREFAB_TYPE);
 			auto& all_prefabs = m_app.getAssetBrowser()->getResources(resources_idx);
 			ImGuiListClipper clipper(all_prefabs.size(), ImGui::GetTextLineHeightWithSpacing());
@@ -1461,7 +1460,6 @@ void TerrainEditor::onGUI()
 					}
 				}
 			}
-
 			ImGui::ListBoxFooter();
 			
 			if(ImGui::Checkbox("Align with normal", &m_is_align_with_normal))
