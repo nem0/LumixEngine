@@ -2167,6 +2167,15 @@ public:
 
 	void endCommandGroup() override
 	{
+		if (m_undo_index < m_undo_stack.size() - 1)
+		{
+			for (int i = m_undo_stack.size() - 1; i > m_undo_index; --i)
+			{
+				LUMIX_DELETE(m_allocator, m_undo_stack[i]);
+			}
+			m_undo_stack.resize(m_undo_index + 1);
+		}
+
 		auto* cmd = LUMIX_NEW(m_allocator, EndGroupCommand);
 		cmd->group_type = m_current_group_type;
 		m_undo_stack.push(cmd);
