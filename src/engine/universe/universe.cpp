@@ -293,10 +293,7 @@ Entity Universe::getFirstEntity()
 {
 	for (int i = 0; i < m_entities.size(); ++i)
 	{
-		if (m_entities[i].scale >= 0)
-		{
-			return {i};
-		}
+		if (m_entities[i].valid) return {i};
 	}
 	return INVALID_ENTITY;
 }
@@ -306,10 +303,7 @@ Entity Universe::getNextEntity(Entity entity)
 {
 	for (int i = entity.index + 1; i < m_entities.size(); ++i)
 	{
-		if (m_entities[i].scale >= 0)
-		{
-			return {i};
-		}
+		if (m_entities[i].valid) return {i};
 	}
 	return INVALID_ENTITY;
 }

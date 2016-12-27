@@ -1431,7 +1431,8 @@ void TerrainEditor::onGUI()
 		{
 			m_action_type = TerrainEditor::ENTITY;
 			
-			ImGui::ListBoxHeader("Prefabs");
+			static ImVec2 size(-1, 100);
+			ImGui::ListBoxHeader("Prefabs", size);
 			int resources_idx  = m_app.getAssetBrowser()->getTypeIndex(PREFAB_TYPE);
 			auto& all_prefabs = m_app.getAssetBrowser()->getResources(resources_idx);
 			ImGuiListClipper clipper(all_prefabs.size(), ImGui::GetTextLineHeightWithSpacing());
@@ -1461,7 +1462,8 @@ void TerrainEditor::onGUI()
 				}
 			}
 			ImGui::ListBoxFooter();
-			
+			ImGui::HSplitter("after_prefab", &size);
+
 			if(ImGui::Checkbox("Align with normal", &m_is_align_with_normal))
 			{
 				if(m_is_align_with_normal) m_is_rotate_x = m_is_rotate_y = m_is_rotate_z = false;
