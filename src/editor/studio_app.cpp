@@ -131,7 +131,6 @@ public:
 		, m_plugins(m_allocator)
 		, m_add_cmp_plugins(m_allocator)
 		, m_component_labels(m_allocator)
-		, m_current_group(0)
 		, m_confirm_load(false)
 		, m_confirm_new(false)
 		, m_confirm_exit(false)
@@ -1157,33 +1156,33 @@ public:
 		}
 		if (groups.getGroupCount() > 1 && getAction("removeGroup")->toolbarButton())
 		{
-			groups.deleteGroup(m_current_group);
-			m_current_group = m_current_group % groups.getGroupCount();
+			groups.deleteGroup(groups.current_group);
+			groups.current_group = groups.current_group % groups.getGroupCount();
 		}
 		if (getAction("selectAssigned")->toolbarButton())
 		{
 			m_editor->selectEntities(
-				groups.getGroupEntities(m_current_group), groups.getGroupEntitiesCount(m_current_group));
+				groups.getGroupEntities(groups.current_group), groups.getGroupEntitiesCount(groups.current_group));
 		}
 		if (getAction("assignSelected")->toolbarButton())
 		{
 			auto& selected = m_editor->getSelectedEntities();
 			for (auto e : selected)
 			{
-				groups.setGroup(e, m_current_group);
+				groups.setGroup(e, groups.current_group);
 			}
 		}
-		if (getAction("lock")->toolbarButton()) groups.freezeGroup(m_current_group, true);
-		if (getAction("unlock")->toolbarButton()) groups.freezeGroup(m_current_group, false);
+		if (getAction("lock")->toolbarButton()) groups.freezeGroup(groups.current_group, true);
+		if (getAction("unlock")->toolbarButton()) groups.freezeGroup(groups.current_group, false);
 		if (getAction("show")->toolbarButton())
 		{
 			m_editor->showEntities(
-				groups.getGroupEntities(m_current_group), groups.getGroupEntitiesCount(m_current_group));
+				groups.getGroupEntities(groups.current_group), groups.getGroupEntitiesCount(groups.current_group));
 		}
 		if (getAction("hide")->toolbarButton())
 		{
 			m_editor->hideEntities(
-				groups.getGroupEntities(m_current_group), groups.getGroupEntitiesCount(m_current_group));
+				groups.getGroupEntities(groups.current_group), groups.getGroupEntitiesCount(groups.current_group));
 		}
 
 		if (ImGui::BeginPopup("create_entity_group_popup"))
@@ -1222,13 +1221,13 @@ public:
 				auto* universe = m_editor->getUniverse();
 				auto& groups = m_editor->getEntityGroups();
 
-				m_current_group = m_current_group % groups.getGroupCount();
+				groups.current_group = groups.current_group % groups.getGroupCount();
 				for (int i = 0; i < groups.getGroupCount(); ++i)
 				{
 					auto* name = groups.getGroupName(i);
 					int entities_count = groups.getGroupEntitiesCount(i);
 					const char* locked_text = groups.isGroupFrozen(i) ? "locked" : "";
-					const char* current_text = m_current_group == i ? "<-" : "";
+					const char* current_text = groups.current_group == i ? "<-" : "";
 					if (ImGui::TreeNode(name, "%s (%d) %s %s", name, entities_count, locked_text, current_text))
 					{
 						ImGui::PushItemWidth(ImGui::GetContentRegionAvailWidth() - ImGui::GetStyle().FramePadding.x);
@@ -1258,7 +1257,7 @@ public:
 						ImGui::PopItemWidth();
 						ImGui::TreePop();
 					}
-					if (ImGui::IsItemClicked()) m_current_group = i;
+					if (ImGui::IsItemClicked()) groups.current_group = i;
 				}
 			}
 			ImGui::EndChild();
@@ -2180,7 +2179,6 @@ public:
 
 	bool m_finished;
 	int m_exit_code;
-	int m_current_group;
 
 	bool m_is_welcome_screen_opened;
 	bool m_is_entity_list_opened;

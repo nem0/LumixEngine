@@ -38,6 +38,9 @@ public:
 	void serialize(OutputBlob& blob);
 	void deserialize(InputBlob& blob);
 
+public:
+	int current_group;
+
 private:
 	struct GroupInfo
 	{
