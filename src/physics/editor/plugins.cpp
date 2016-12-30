@@ -560,6 +560,7 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 							*render_scene,
 							static_cast<physx::PxD6Joint*>(joint));
 						break;
+					default: ASSERT(false); break;
 				}
 
 				ImGui::PushID(i);

@@ -12,6 +12,7 @@
 #include "engine/profiler.h"
 #include "engine/property_descriptor.h"
 #include "engine/property_register.h"
+#include "engine/serializer.h"
 #include "engine/universe/universe.h"
 #include "engine/vec.h"
 #include "lua_script/lua_script_system.h"
@@ -144,7 +145,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	{
 		setGeneratorParams(0.3f, 0.1f, 0.3f, 2.0f, 60.0f, 1.5f);
 		m_universe.entityTransformed().bind<NavigationSceneImpl, &NavigationSceneImpl::onEntityMoved>(this);
-		universe.registerComponentTypeScene(NAVMESH_AGENT_TYPE, this);
+		universe.registerComponentType(NAVMESH_AGENT_TYPE, this, &NavigationSceneImpl::serializeAgent, &NavigationSceneImpl::deserializeAgent);
 	}
 
 
@@ -1327,6 +1328,28 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 		{
 			ASSERT(false);
 		}
+	}
+
+
+	void serializeAgent(ISerializer& serializer, ComponentHandle cmp)
+	{
+		Agent& agent = m_agents[{cmp.index}];
+		serializer.write("radius", agent.radius);
+		serializer.write("height", agent.height);
+	}
+
+
+	void deserializeAgent(IDeserializer& serializer, Entity entity)
+	{
+		Agent agent;
+		agent.entity = entity;
+		serializer.read(&agent.radius);
+		serializer.read(&agent.height);
+		agent.is_finished = true;
+		agent.agent = -1;
+		m_agents.insert(agent.entity, agent);
+		ComponentHandle cmp = {agent.entity.index};
+		m_universe.addComponent(agent.entity, NAVMESH_AGENT_TYPE, this, cmp);
 	}
 
 

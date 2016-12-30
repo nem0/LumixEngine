@@ -545,6 +545,7 @@ void AssetBrowser::addResource(const char* path, const char* filename)
 {
 	char ext[10];
 	Lumix::PathUtils::getExtension(ext, sizeof(ext), filename);
+	Lumix::makeLowercase(ext, Lumix::lengthOf(ext), ext);
 
 	char fullpath[Lumix::MAX_PATH_LENGTH];
 	Lumix::copyString(fullpath, path);

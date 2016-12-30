@@ -123,7 +123,7 @@ bool StackTree::getFunction(StackNode* node, char* out, int max_size, int* line)
 	}
 	if (success) Lumix::copyString(out, max_size, symbol->Name);
 
-	return success == TRUE;
+	return success != FALSE;
 }
 
 

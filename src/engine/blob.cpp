@@ -71,9 +71,27 @@ namespace Lumix
 	}
 
 
-	OutputBlob& OutputBlob::operator << (int value)
+	OutputBlob& OutputBlob::operator << (i32 value)
 	{
 		char tmp[20];
+		Lumix::toCString(value, tmp, Lumix::lengthOf(tmp));
+		write(tmp, stringLength(tmp));
+		return *this;
+	}
+
+
+	OutputBlob& OutputBlob::operator << (u64 value)
+	{
+		char tmp[40];
+		Lumix::toCString(value, tmp, Lumix::lengthOf(tmp));
+		write(tmp, stringLength(tmp));
+		return *this;
+	}
+
+
+	OutputBlob& OutputBlob::operator << (i64 value)
+	{
+		char tmp[40];
 		Lumix::toCString(value, tmp, Lumix::lengthOf(tmp));
 		write(tmp, stringLength(tmp));
 		return *this;
@@ -95,6 +113,24 @@ namespace Lumix
 		Lumix::toCString(value, tmp, Lumix::lengthOf(tmp), 6);
 		write(tmp, stringLength(tmp));
 		return *this;
+	}
+
+
+	OutputBlob::OutputBlob(const OutputBlob& rhs)
+	{
+		m_allocator = rhs.m_allocator;
+		m_pos = rhs.m_pos;
+		if (rhs.m_size > 0)
+		{
+			m_data = m_allocator->allocate(rhs.m_size);
+			copyMemory(m_data, rhs.m_data, rhs.m_size);
+			m_size = rhs.m_size;
+		}
+		else
+		{
+			m_data = nullptr;
+			m_size = 0;
+		}
 	}
 
 

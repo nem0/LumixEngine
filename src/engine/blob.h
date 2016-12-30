@@ -16,6 +16,7 @@ namespace Lumix
 		public:
 			explicit OutputBlob(IAllocator& allocator);
 			OutputBlob(void* data, int size);
+			OutputBlob(const OutputBlob& rhs);
 			OutputBlob(const OutputBlob& blob, IAllocator& allocator);
 			OutputBlob(const InputBlob& blob, IAllocator& allocator);
 			void operator =(const OutputBlob& rhs);
@@ -32,7 +33,9 @@ namespace Lumix
 			void clear();
 
 			OutputBlob& operator << (const char* str);
-			OutputBlob& operator << (int value);
+			OutputBlob& operator << (u64 value);
+			OutputBlob& operator << (i64 value);
+			OutputBlob& operator << (i32 value);
 			OutputBlob& operator << (u32 value);
 			OutputBlob& operator << (float value);
 
@@ -70,7 +73,7 @@ namespace Lumix
 			int getPosition() { return m_pos; }
 			void setPosition(int pos) { m_pos = pos; }
 			void rewind() { m_pos = 0; }
-
+			u8 readChar() { ++m_pos; return m_data[m_pos - 1]; }
 
 		private:
 			const u8* m_data;

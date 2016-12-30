@@ -250,8 +250,8 @@ struct AABB
 		if (min.y > aabb.max.y) return false;
 		if (min.z > aabb.max.z) return false;
 		if (aabb.min.x > max.x) return false;
-		if (aabb.min.x > max.x) return false;
-		if (aabb.min.x > max.x) return false;
+		if (aabb.min.y > max.y) return false;
+		if (aabb.min.z > max.z) return false;
 		return true;
 	}
 

@@ -688,7 +688,6 @@ public:
 	{
 		Universe* univ = LuaWrapper::checkArg<Universe*>(L, 1);
 		int entity_index = LuaWrapper::checkArg<int>(L, 2);
-		if (entity_index < 0 || entity_index > univ->getEntityCount()) return 0;
 
 		if (lua_gettop(L) > 3)
 		{
@@ -1462,58 +1461,6 @@ public:
 	}
 
 
-	void pasteEntities(const Vec3& position, Universe& universe, InputBlob& blob, Array<Entity>& entities) override
-	{
-		int entity_count;
-		blob.read(entity_count);
-		entities.reserve(entities.size() + entity_count);
-
-		Matrix base_matrix = Matrix::IDENTITY;
-		base_matrix.setTranslation(position);
-		for (int i = 0; i < entity_count; ++i)
-		{
-			Matrix mtx;
-			blob.read(mtx);
-			if (i == 0)
-			{
-				Matrix inv = mtx;
-				inv.inverse();
-				base_matrix.copy3x3(mtx);
-				base_matrix = base_matrix * inv;
-				mtx.setTranslation(position);
-			}
-			else
-			{
-				mtx = base_matrix * mtx;
-			}
-			Entity new_entity = universe.createEntity(Vec3(0, 0, 0), Quat(0, 0, 0, 1));
-			entities.push(new_entity);
-			universe.setMatrix(new_entity, mtx);
-			i32 count;
-			blob.read(count);
-			for (int i = 0; i < count; ++i)
-			{
-				u32 hash;
-				blob.read(hash);
-				ComponentType type = PropertyRegister::getComponentTypeFromHash(hash);
-				ComponentUID cmp = createComponent(universe, new_entity, type);
-				i32 prop_count;
-				blob.read(prop_count);
-				for (int j = 0; j < prop_count; ++j)
-				{
-					u32 prop_name_hash;
-					blob.read(prop_name_hash);
-					auto* desc = PropertyRegister::getDescriptor(type, prop_name_hash);
-					i32 size;
-					blob.read(size);
-					if(desc) desc->set(cmp, -1, blob);
-					else blob.skip(size);
-				}
-			}
-		}
-	}
-
-
 	static int LUA_instantiatePrefab(lua_State* L)
 	{
 		auto* engine = LuaWrapper::checkArg<EngineImpl*>(L, 1);
@@ -1527,9 +1474,8 @@ public:
 			g_log_error.log("Editor") << "Prefab " << prefab->getPath().c_str() << " is not ready, preload it.";
 			return 0;
 		}
-		InputBlob blob(prefab->blob.getData(), prefab->blob.getPos());
 		Array<Entity> entities(engine->m_lifo_allocator);
-		engine->pasteEntities(position, *universe, blob, entities);
+		universe->instantiatePrefab(*prefab, position, { 0, 0, 0, 1 }, 1, entities);
 
 		lua_createtable(L, entities.size(), 0);
 		for (int i = 0; i < entities.size(); ++i)

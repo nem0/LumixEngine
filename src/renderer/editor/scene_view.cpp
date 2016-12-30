@@ -1,9 +1,9 @@
 #include "scene_view.h"
-#include "editor/entity_template_system.h"
 #include "editor/gizmo.h"
 #include "editor/ieditor_command.h"
 #include "editor/log_ui.h"
 #include "editor/platform_interface.h"
+#include "editor/prefab_system.h"
 #include "editor/settings.h"
 #include "editor/studio_app.h"
 #include "engine/crc32.h"
@@ -288,7 +288,7 @@ void SceneView::handleDrop(float x, float y)
 	{
 		if (Lumix::PathUtils::hasExtension(path, "fab"))
 		{
-			m_editor->getEntityTemplateSystem().instantiatePrefab(hit.m_origin + hit.m_t * hit.m_dir, Lumix::Path(path));
+			
 		}
 		if (Lumix::PathUtils::hasExtension(path, "msh"))
 		{

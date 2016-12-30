@@ -1,32 +1,34 @@
 #include "terrain_editor.h"
-#include "engine/blob.h"
-#include "engine/crc32.h"
-#include "engine/geometry.h"
-#include "engine/json_serializer.h"
-#include "engine/profiler.h"
-#include "engine/resource_manager.h"
-#include "engine/resource_manager_base.h"
-#include "editor/entity_template_system.h"
+#include "editor/asset_browser.h"
 #include "editor/ieditor_command.h"
 #include "editor/platform_interface.h"
+#include "editor/prefab_system.h"
 #include "editor/studio_app.h"
-#define STB_IMAGE_IMPLEMENTATION
-#if defined _MSC_VER && _MSC_VER == 1900 
-#pragma warning(disable : 4312)
-#endif
-#include "stb/stb_image.h"
 #include "editor/utils.h"
+#include "engine/blob.h"
+#include "engine/crc32.h"
 #include "engine/engine.h"
+#include "engine/geometry.h"
 #include "engine/iproperty_descriptor.h"
+#include "engine/json_serializer.h"
+#include "engine/prefab.h"
+#include "engine/profiler.h"
 #include "engine/property_register.h"
+#include "engine/resource_manager.h"
+#include "engine/resource_manager_base.h"
+#include "engine/universe/universe.h"
 #include "imgui/imgui.h"
 #include "physics/physics_scene.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include "renderer/render_scene.h"
-#include "renderer/texture.h"
 #include "renderer/terrain.h"
-#include "engine/universe/universe.h"
+#include "renderer/texture.h"
+#define STB_IMAGE_IMPLEMENTATION
+#if defined _MSC_VER && _MSC_VER == 1900 
+#pragma warning(disable : 4312)
+#endif
+#include "stb/stb_image.h"
 #include <cmath>
 
 
@@ -35,6 +37,7 @@ static const Lumix::ComponentType TERRAIN_TYPE = Lumix::PropertyRegister::getCom
 static const Lumix::ComponentType HEIGHTFIELD_TYPE = Lumix::PropertyRegister::getComponentType("physical_heightfield");
 static const Lumix::ResourceType MATERIAL_TYPE("material");
 static const Lumix::ResourceType TEXTURE_TYPE("texture");
+static const Lumix::ResourceType PREFAB_TYPE("prefab");
 static const char* HEIGHTMAP_UNIFORM = "u_texHeightmap";
 static const char* SPLATMAP_UNIFORM = "u_texSplatmap";
 static const char* COLORMAP_UNIFORM = "u_texColormap";
@@ -102,7 +105,7 @@ struct PaintTerrainCommand LUMIX_FINAL : public Lumix::IEditorCommand
 
 		Item& item = m_items.emplace();
 		item.m_local_pos = local_pos;
-		item.m_radius = radius;
+		item.m_radius = radius / xz_scale;
 		item.m_amount = rel_amount;
 		item.m_color = color;
 	}
@@ -362,8 +365,6 @@ private:
 							data[offset + 1] = add;
 						}
 						data[offset] = m_texture_idx;
-						data[offset + 2] = 0;
-						data[offset + 3] = 255;
 					}
 				}
 			}
@@ -710,9 +711,10 @@ static Lumix::IEditorCommand* createPaintTerrainCommand(Lumix::WorldEditor& edit
 
 TerrainEditor::TerrainEditor(Lumix::WorldEditor& editor, StudioApp& app)
 	: m_world_editor(editor)
+	, m_app(app)
 	, m_color(1, 1, 1)
 	, m_current_brush(0)
-	, m_selected_entity_templates(editor.getAllocator())
+	, m_selected_prefabs(editor.getAllocator())
 	, m_brush_mask(editor.getAllocator())
 	, m_brush_texture(nullptr)
 	, m_flat_height(0)
@@ -916,7 +918,9 @@ Lumix::u16 TerrainEditor::getHeight(const Lumix::Vec3& world_pos)
 	if (!heightmap) return 0;
 
 	auto* data = (Lumix::u16*)heightmap->getData();
-	return data[int(rel_pos.x) + int(rel_pos.z) * heightmap->width];
+	auto* scene = (Lumix::RenderScene*)m_component.scene;
+	float scale = scene->getTerrainXZScale(m_component.handle);
+	return data[int(rel_pos.x / scale) + int(rel_pos.z / scale) * heightmap->width];
 }
 
 
@@ -965,9 +969,8 @@ bool TerrainEditor::onEntityMouseDown(const Lumix::WorldEditor::RayHit& hit, int
 
 void TerrainEditor::removeEntities(const Lumix::Vec3& hit_pos)
 {
-	if (m_selected_entity_templates.empty()) return;
-	auto& template_system = m_world_editor.getEntityTemplateSystem();
-	auto& template_names = template_system.getTemplateNames();
+	if (m_selected_prefabs.empty()) return;
+	auto& prefab_system = m_world_editor.getPrefabSystem();
 
 	PROFILE_FUNCTION();
 
@@ -976,12 +979,6 @@ void TerrainEditor::removeEntities(const Lumix::Vec3& hit_pos)
 
 	Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(m_component.scene);
 	Lumix::Frustum frustum;
-	Lumix::Array<Lumix::u32> hashes(m_world_editor.getAllocator());
-	hashes.reserve(m_selected_entity_templates.size());
-	for(int template_idx : m_selected_entity_templates)
-	{
-		hashes.push(Lumix::crc32(template_names[template_idx].c_str()));
-	}
 	frustum.computeOrtho(hit_pos,
 		Lumix::Vec3(0, 0, 1),
 		Lumix::Vec3(0, 1, 0),
@@ -992,18 +989,27 @@ void TerrainEditor::removeEntities(const Lumix::Vec3& hit_pos)
 
 	Lumix::Array<Lumix::Entity> entities(m_world_editor.getAllocator());
 	scene->getModelInstanceEntities(frustum, entities);
-	for(Lumix::Entity entity : entities)
+	if (m_selected_prefabs.empty())
 	{
-		for(auto hash : hashes)
+		for (Lumix::Entity entity : entities)
 		{
-			if(template_system.getTemplate(entity) == hash && template_system.getInstances(hash).size() > 1)
+			if (prefab_system.getPrefab(entity)) m_world_editor.destroyEntities(&entity, 1);
+		}
+	}
+	else
+	{
+		for (Lumix::Entity entity : entities)
+		{
+			for (auto* res : m_selected_prefabs)
 			{
-				m_world_editor.destroyEntities(&entity, 1);
-				break;
+				if ((prefab_system.getPrefab(entity) & 0xffffFFFF) == res->getPath().getHash())
+				{
+					m_world_editor.destroyEntities(&entity, 1);
+					break;
+				}
 			}
 		}
 	}
-
 	m_world_editor.endCommandGroup();
 }
 
@@ -1117,9 +1123,8 @@ static bool isOBBCollision(Lumix::RenderScene& scene,
 void TerrainEditor::paintEntities(const Lumix::Vec3& hit_pos)
 {
 	PROFILE_FUNCTION();
-	if (m_selected_entity_templates.empty()) return;
-	auto& template_system = m_world_editor.getEntityTemplateSystem();
-	auto& template_names = template_system.getTemplateNames();
+	if (m_selected_prefabs.empty()) return;
+	auto& prefab_system = m_world_editor.getPrefabSystem();
 
 	static const Lumix::u32 PAINT_ENTITIES_HASH = Lumix::crc32("paint_entities");
 	m_world_editor.beginCommandGroup(PAINT_ENTITIES_HASH);
@@ -1128,24 +1133,6 @@ void TerrainEditor::paintEntities(const Lumix::Vec3& hit_pos)
 		Lumix::Matrix terrain_matrix = m_world_editor.getUniverse()->getMatrix(m_component.entity);
 		Lumix::Matrix inv_terrain_matrix = terrain_matrix;
 		inv_terrain_matrix.inverse();
-
-		struct Tpl
-		{
-			Lumix::ComponentHandle cmp;
-			int template_idx;
-		};
-
-		Lumix::Array<Tpl> tpls(m_world_editor.getAllocator());
-		tpls.reserve(m_selected_entity_templates.size());
-		for(int idx : m_selected_entity_templates)
-		{
-			Lumix::u32 hash = Lumix::crc32(template_names[idx].c_str());
-			Lumix::Entity tpl = template_system.getInstances(hash)[0];
-			if(!isValid(tpl)) continue;
-			Lumix::ComponentUID model_instance = m_world_editor.getUniverse()->getComponent(tpl, MODEL_INSTANCE_TYPE);
-			if(!model_instance.isValid()) continue;
-			tpls.push({model_instance.handle, idx});
-		}
 
 		Lumix::Frustum frustum;
 		frustum.computeOrtho(hit_pos,
@@ -1161,10 +1148,6 @@ void TerrainEditor::paintEntities(const Lumix::Vec3& hit_pos)
 		float scale = 1.0f - Lumix::Math::maximum(0.01f, m_terrain_brush_strength);
 		for (int i = 0; i <= m_terrain_brush_size * m_terrain_brush_size / 1000.0f; ++i)
 		{
-			int model_instance_idx = Lumix::Math::rand() % tpls.size();
-			Lumix::Model* model = scene->getModelInstanceModel(tpls[model_instance_idx].cmp);
-			const auto* template_name = template_names[tpls[model_instance_idx].template_idx].c_str();
-
 			float angle = Lumix::Math::randFloat(0, Lumix::Math::PI * 2);
 			float dist = Lumix::Math::randFloat(0, 1.0f) * m_terrain_brush_size;
 			float y = Lumix::Math::randFloat(m_y_spread.x, m_y_spread.y);
@@ -1174,46 +1157,54 @@ void TerrainEditor::paintEntities(const Lumix::Vec3& hit_pos)
 			{
 				pos.y = scene->getTerrainHeightAt(m_component.handle, terrain_pos.x, terrain_pos.z) + y;
 				pos.y += terrain_matrix.getTranslation().y;
-				if(!isOBBCollision(*scene, meshes, pos, model, scale))
+				Lumix::Quat rot(0, 0, 0, 1);
+				if(m_is_align_with_normal)
 				{
-					Lumix::Quat rot(0, 0, 0, 1);
-					if(m_is_align_with_normal)
+					Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(m_component.scene);
+					Lumix::Vec3 normal = scene->getTerrainNormalAt(m_component.handle, pos.x, pos.z);
+					Lumix::Vec3 dir = Lumix::crossProduct(normal, Lumix::Vec3(1, 0, 0)).normalized();
+					Lumix::Matrix mtx = Lumix::Matrix::IDENTITY;
+					mtx.setXVector(Lumix::crossProduct(normal, dir));
+					mtx.setYVector(normal);
+					mtx.setXVector(dir);
+					rot = mtx.getRotation();
+				}
+				else
+				{
+					if (m_is_rotate_x)
 					{
-						Lumix::RenderScene* scene = static_cast<Lumix::RenderScene*>(m_component.scene);
-						Lumix::Vec3 normal = scene->getTerrainNormalAt(m_component.handle, pos.x, pos.z);
-						Lumix::Vec3 dir = Lumix::crossProduct(normal, Lumix::Vec3(1, 0, 0)).normalized();
-						Lumix::Matrix mtx = Lumix::Matrix::IDENTITY;
-						mtx.setXVector(Lumix::crossProduct(normal, dir));
-						mtx.setYVector(normal);
-						mtx.setXVector(dir);
-						rot = mtx.getRotation();
-					}
-					else
-					{
-						if (m_is_rotate_x)
-						{
-							float angle = Lumix::Math::randFloat(m_rotate_x_spread.x, m_rotate_x_spread.y);
-							Lumix::Quat q(Lumix::Vec3(1, 0, 0), angle);
-							rot = q * rot;
-						}
-
-						if (m_is_rotate_y)
-						{
-							float angle = Lumix::Math::randFloat(m_rotate_y_spread.x, m_rotate_y_spread.y);
-							Lumix::Quat q(Lumix::Vec3(0, 1, 0), angle);
-							rot = q * rot;
-						}
-
-						if (m_is_rotate_z)
-						{
-							float angle = Lumix::Math::randFloat(m_rotate_z_spread.x, m_rotate_z_spread.y);
-							Lumix::Quat q(rot.rotate(Lumix::Vec3(0, 0, 1)), angle);
-							rot = q * rot;
-						}
+						float angle = Lumix::Math::randFloat(m_rotate_x_spread.x, m_rotate_x_spread.y);
+						Lumix::Quat q(Lumix::Vec3(1, 0, 0), angle);
+						rot = q * rot;
 					}
 
-					float size = Lumix::Math::randFloat(m_size_spread.x, m_size_spread.y);
-					auto entity = template_system.createInstance(template_name, pos, rot, size);
+					if (m_is_rotate_y)
+					{
+						float angle = Lumix::Math::randFloat(m_rotate_y_spread.x, m_rotate_y_spread.y);
+						Lumix::Quat q(Lumix::Vec3(0, 1, 0), angle);
+						rot = q * rot;
+					}
+
+					if (m_is_rotate_z)
+					{
+						float angle = Lumix::Math::randFloat(m_rotate_z_spread.x, m_rotate_z_spread.y);
+						Lumix::Quat q(rot.rotate(Lumix::Vec3(0, 0, 1)), angle);
+						rot = q * rot;
+					}
+				}
+
+				float size = Lumix::Math::randFloat(m_size_spread.x, m_size_spread.y);
+				int random_idx = Lumix::Math::rand(0, m_selected_prefabs.size() - 1);
+				if (!m_selected_prefabs[random_idx]) continue;
+				auto* entities = prefab_system.instantiatePrefab(*m_selected_prefabs[random_idx], pos, rot, size);
+				if (entities && !entities->empty())
+				{
+					Lumix::ComponentHandle cmp = scene->getComponent((*entities)[0], MODEL_INSTANCE_TYPE);
+					Lumix::Model* model = scene->getModelInstanceModel(cmp);
+					if (isOBBCollision(*scene, meshes, pos, model, scale))
+					{
+						m_world_editor.undo();
+					}
 				}
 			}
 		}
@@ -1437,86 +1428,93 @@ void TerrainEditor::onGUI()
 		case ENTITY:
 		{
 			m_action_type = TerrainEditor::ENTITY;
-			auto& template_system = m_world_editor.getEntityTemplateSystem();
-			auto& template_names = template_system.getTemplateNames();
-			if (template_names.empty())
+			
+			static ImVec2 size(-1, 100);
+			ImGui::ListBoxHeader("Prefabs", size);
+			int resources_idx  = m_app.getAssetBrowser()->getTypeIndex(PREFAB_TYPE);
+			auto& all_prefabs = m_app.getAssetBrowser()->getResources(resources_idx);
+			ImGuiListClipper clipper(all_prefabs.size(), ImGui::GetTextLineHeightWithSpacing());
+			while (clipper.Step())
 			{
-				ImGui::Text("No templates, please create one.");
-			}
-			else
-			{
-				ImGui::BeginChild("entities", ImVec2(0, 150));
-				for(int i = 0; i < template_names.size(); ++i)
+				for (int j = clipper.DisplayStart; j < clipper.DisplayEnd; ++j)
 				{
-					int index_of = m_selected_entity_templates.indexOf(i);
-					bool b = index_of >= 0;
-					if(ImGui::Checkbox(template_names[i].c_str(), &b))
+					int selected_idx = m_selected_prefabs.find([&](Lumix::PrefabResource* res) -> bool {
+						return res && res->getPath() == all_prefabs[j];
+					});
+					bool selected = selected_idx >= 0;
+					if (ImGui::Checkbox(all_prefabs[j].c_str(), &selected))
 					{
-						if(b)
+						if (selected)
 						{
-							m_selected_entity_templates.push(i);
+							Lumix::ResourceManagerBase* prefab_manager = m_world_editor.getEngine().getResourceManager().get(PREFAB_TYPE);
+							Lumix::PrefabResource* prefab = (Lumix::PrefabResource*)prefab_manager->load(all_prefabs[j]);
+							m_selected_prefabs.push(prefab);
 						}
 						else
 						{
-							m_selected_entity_templates.eraseFast(index_of);
+							Lumix::PrefabResource* prefab = m_selected_prefabs[selected_idx];
+							m_selected_prefabs.eraseFast(selected_idx);
+							prefab->getResourceManager().unload(*prefab);
 						}
 					}
 				}
-				ImGui::EndChild();
-				if(ImGui::Checkbox("Align with normal", &m_is_align_with_normal))
-				{
-					if(m_is_align_with_normal) m_is_rotate_x = m_is_rotate_y = m_is_rotate_z = false;
-				}
-				if (ImGui::Checkbox("Rotate around X", &m_is_rotate_x))
-				{
-					if (m_is_rotate_x) m_is_align_with_normal = false;
-				}
-				if (m_is_rotate_x)
-				{
-					Lumix::Vec2 tmp = m_rotate_x_spread;
-					tmp.x = Lumix::Math::radiansToDegrees(tmp.x);
-					tmp.y = Lumix::Math::radiansToDegrees(tmp.y);
-					if (ImGui::DragFloat2("Rotate X spread", &tmp.x))
-					{
-						m_rotate_x_spread.x = Lumix::Math::degreesToRadians(tmp.x);
-						m_rotate_x_spread.y = Lumix::Math::degreesToRadians(tmp.y);
-					}
-				}
-				if (ImGui::Checkbox("Rotate around Y", &m_is_rotate_y))
-				{
-					if (m_is_rotate_y) m_is_align_with_normal = false;
-				}
-				if (m_is_rotate_y)
-				{
-					Lumix::Vec2 tmp = m_rotate_y_spread;
-					tmp.x = Lumix::Math::radiansToDegrees(tmp.x);
-					tmp.y = Lumix::Math::radiansToDegrees(tmp.y);
-					if (ImGui::DragFloat2("Rotate Y spread", &tmp.x))
-					{
-						m_rotate_y_spread.x = Lumix::Math::degreesToRadians(tmp.x);
-						m_rotate_y_spread.y = Lumix::Math::degreesToRadians(tmp.y);
-					}
-				}
-				if(ImGui::Checkbox("Rotate around Z", &m_is_rotate_z))
-				{
-					if(m_is_rotate_z) m_is_align_with_normal = false;
-				}
-				if (m_is_rotate_z)
-				{
-					Lumix::Vec2 tmp = m_rotate_z_spread;
-					tmp.x = Lumix::Math::radiansToDegrees(tmp.x);
-					tmp.y = Lumix::Math::radiansToDegrees(tmp.y);
-					if (ImGui::DragFloat2("Rotate Z spread", &tmp.x))
-					{
-						m_rotate_z_spread.x = Lumix::Math::degreesToRadians(tmp.x);
-						m_rotate_z_spread.y = Lumix::Math::degreesToRadians(tmp.y);
-					}
-				}
-				ImGui::DragFloat2("Size spread", &m_size_spread.x, 0.01f);
-				m_size_spread.x = Lumix::Math::minimum(m_size_spread.x, m_size_spread.y);
-				ImGui::DragFloat2("Y spread", &m_y_spread.x, 0.01f);
-				m_y_spread.x = Lumix::Math::minimum(m_y_spread.x, m_y_spread.y);
 			}
+			ImGui::ListBoxFooter();
+			ImGui::HSplitter("after_prefab", &size);
+
+			if(ImGui::Checkbox("Align with normal", &m_is_align_with_normal))
+			{
+				if(m_is_align_with_normal) m_is_rotate_x = m_is_rotate_y = m_is_rotate_z = false;
+			}
+			if (ImGui::Checkbox("Rotate around X", &m_is_rotate_x))
+			{
+				if (m_is_rotate_x) m_is_align_with_normal = false;
+			}
+			if (m_is_rotate_x)
+			{
+				Lumix::Vec2 tmp = m_rotate_x_spread;
+				tmp.x = Lumix::Math::radiansToDegrees(tmp.x);
+				tmp.y = Lumix::Math::radiansToDegrees(tmp.y);
+				if (ImGui::DragFloat2("Rotate X spread", &tmp.x))
+				{
+					m_rotate_x_spread.x = Lumix::Math::degreesToRadians(tmp.x);
+					m_rotate_x_spread.y = Lumix::Math::degreesToRadians(tmp.y);
+				}
+			}
+			if (ImGui::Checkbox("Rotate around Y", &m_is_rotate_y))
+			{
+				if (m_is_rotate_y) m_is_align_with_normal = false;
+			}
+			if (m_is_rotate_y)
+			{
+				Lumix::Vec2 tmp = m_rotate_y_spread;
+				tmp.x = Lumix::Math::radiansToDegrees(tmp.x);
+				tmp.y = Lumix::Math::radiansToDegrees(tmp.y);
+				if (ImGui::DragFloat2("Rotate Y spread", &tmp.x))
+				{
+					m_rotate_y_spread.x = Lumix::Math::degreesToRadians(tmp.x);
+					m_rotate_y_spread.y = Lumix::Math::degreesToRadians(tmp.y);
+				}
+			}
+			if(ImGui::Checkbox("Rotate around Z", &m_is_rotate_z))
+			{
+				if(m_is_rotate_z) m_is_align_with_normal = false;
+			}
+			if (m_is_rotate_z)
+			{
+				Lumix::Vec2 tmp = m_rotate_z_spread;
+				tmp.x = Lumix::Math::radiansToDegrees(tmp.x);
+				tmp.y = Lumix::Math::radiansToDegrees(tmp.y);
+				if (ImGui::DragFloat2("Rotate Z spread", &tmp.x))
+				{
+					m_rotate_z_spread.x = Lumix::Math::degreesToRadians(tmp.x);
+					m_rotate_z_spread.y = Lumix::Math::degreesToRadians(tmp.y);
+				}
+			}
+			ImGui::DragFloat2("Size spread", &m_size_spread.x, 0.01f);
+			m_size_spread.x = Lumix::Math::minimum(m_size_spread.x, m_size_spread.y);
+			ImGui::DragFloat2("Y spread", &m_y_spread.x, 0.01f);
+			m_y_spread.x = Lumix::Math::minimum(m_y_spread.x, m_y_spread.y);
 		}
 		break;
 		default: ASSERT(false); break;

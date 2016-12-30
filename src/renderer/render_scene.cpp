@@ -19,6 +19,7 @@
 #include "engine/property_register.h"
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
+#include "engine/serializer.h"
 #include "engine/timer.h"
 
 #include "engine/engine.h"
@@ -54,18 +55,18 @@ static const ComponentType POINT_LIGHT_TYPE = PropertyRegister::getComponentType
 static const ComponentType PARTICLE_EMITTER_TYPE = PropertyRegister::getComponentType("particle_emitter");
 static const ComponentType PARTICLE_EMITTER_ALPHA_TYPE = PropertyRegister::getComponentType("particle_emitter_alpha");
 static const ComponentType PARTICLE_EMITTER_FORCE_HASH = PropertyRegister::getComponentType("particle_emitter_force");
-static const ComponentType PARTICLE_EMITTER_ATTRACTOR_HASH =
+static const ComponentType PARTICLE_EMITTER_ATTRACTOR_TYPE =
 	PropertyRegister::getComponentType("particle_emitter_attractor");
-static const ComponentType PARTICLE_EMITTER_SUBIMAGE_HASH =
+static const ComponentType PARTICLE_EMITTER_SUBIMAGE_TYPE =
 	PropertyRegister::getComponentType("particle_emitter_subimage");
-static const ComponentType PARTICLE_EMITTER_LINEAR_MOVEMENT_HASH =
+static const ComponentType PARTICLE_EMITTER_LINEAR_MOVEMENT_TYPE =
 	PropertyRegister::getComponentType("particle_emitter_linear_movement");
-static const ComponentType PARTICLE_EMITTER_SPAWN_SHAPE_HASH =
+static const ComponentType PARTICLE_EMITTER_SPAWN_SHAPE_TYPE =
 	PropertyRegister::getComponentType("particle_emitter_spawn_shape");
-static const ComponentType PARTICLE_EMITTER_PLANE_HASH = PropertyRegister::getComponentType("particle_emitter_plane");
-static const ComponentType PARTICLE_EMITTER_RANDOM_ROTATION_HASH =
+static const ComponentType PARTICLE_EMITTER_PLANE_TYPE = PropertyRegister::getComponentType("particle_emitter_plane");
+static const ComponentType PARTICLE_EMITTER_RANDOM_ROTATION_TYPE =
 	PropertyRegister::getComponentType("particle_emitter_random_rotation");
-static const ComponentType PARTICLE_EMITTER_SIZE_HASH = PropertyRegister::getComponentType("particle_emitter_size");
+static const ComponentType PARTICLE_EMITTER_SIZE_TYPE = PropertyRegister::getComponentType("particle_emitter_size");
 static const ComponentType GLOBAL_LIGHT_TYPE = PropertyRegister::getComponentType("global_light");
 static const ComponentType CAMERA_TYPE = PropertyRegister::getComponentType("camera");
 static const ComponentType TERRAIN_TYPE = PropertyRegister::getComponentType("terrain");
@@ -649,6 +650,525 @@ public:
 	}
 
 
+	void serializeModelInstance(ISerializer& serialize, ComponentHandle cmp)
+	{
+		ModelInstance& r = m_model_instances[{cmp.index}];
+		ASSERT(r.entity != INVALID_ENTITY);
+
+		serialize.write("source", r.model ? r.model->getPath().c_str() : "");
+		bool has_changed_materials = r.model && r.model->isReady() && r.meshes != &r.model->getMesh(0);
+		serialize.write("custom_materials", has_changed_materials ? r.mesh_count : 0);
+		if (has_changed_materials)
+		{
+			for (int i = 0; i < r.mesh_count; ++i)
+			{
+				serialize.write("", r.meshes[i].material->getPath().c_str());
+			}
+		}
+	}
+
+	void deserializeModelInstance(IDeserializer& serializer, Entity entity)
+	{
+		while (entity.index >= m_model_instances.size())
+		{
+			auto& r = m_model_instances.emplace();
+			r.entity = INVALID_ENTITY;
+			r.pose = nullptr;
+			r.model = nullptr;
+			r.meshes = nullptr;
+			r.mesh_count = 0;
+		}
+		auto& r = m_model_instances[entity.index];
+		r.entity = entity;
+		r.model = nullptr;
+		r.pose = nullptr;
+		r.custom_meshes = false;
+		r.meshes = nullptr;
+		r.mesh_count = 0;
+
+		r.matrix = m_universe.getMatrix(r.entity);
+
+		char path[MAX_PATH_LENGTH];
+		serializer.read(path, lengthOf(path));
+
+		ComponentHandle cmp = {r.entity.index};
+		if (path[0] != 0)
+		{
+			auto* model = static_cast<Model*>(m_engine.getResourceManager().get(MODEL_TYPE)->load(Path(path)));
+			setModel(cmp, model);
+		}
+
+		int material_count;
+		serializer.read(&material_count);
+		if (material_count > 0)
+		{
+			allocateCustomMeshes(r, material_count);
+			for (int j = 0; j < material_count; ++j)
+			{
+				char path[MAX_PATH_LENGTH];
+				serializer.read(path, lengthOf(path));
+				setModelInstanceMaterial(cmp, j, Path(path));
+			}
+		}
+
+		m_universe.addComponent(r.entity, MODEL_INSTANCE_TYPE, this, cmp);
+	}
+
+
+	void serializeGlobalLight(ISerializer& serializer, ComponentHandle cmp)
+	{
+		GlobalLight& light = m_global_lights[getGlobalLightIndex(cmp)];
+		serializer.write("cascades", light.m_cascades);
+		serializer.write("component", light.m_component);
+		serializer.write("diffuse_color", light.m_diffuse_color);
+		serializer.write("diffuse_intensity", light.m_diffuse_intensity);
+		serializer.write("fog_bottom", light.m_fog_bottom);
+		serializer.write("fog_color", light.m_fog_color);
+		serializer.write("fog_density", light.m_fog_density);
+		serializer.write("fog_height", light.m_fog_height);
+	}
+
+
+	void deserializeGlobalLight(IDeserializer& serializer, Entity entity) 
+	{
+		GlobalLight& light = m_global_lights.emplace();
+		light.m_entity = entity;
+		serializer.read(&light.m_cascades);
+		serializer.read(&light.m_component);
+		serializer.read(&light.m_diffuse_color);
+		serializer.read(&light.m_diffuse_intensity);
+		serializer.read(&light.m_fog_bottom);
+		serializer.read(&light.m_fog_color);
+		serializer.read(&light.m_fog_density);
+		serializer.read(&light.m_fog_height);
+		m_universe.addComponent(light.m_entity, GLOBAL_LIGHT_TYPE, this, light.m_component);
+		m_active_global_light_cmp = light.m_component;
+	}
+	
+	
+	void serializePointLight(ISerializer& serializer, ComponentHandle cmp)
+	{
+		PointLight& light = m_point_lights[m_point_lights_map[cmp]];
+		serializer.write("attenuation", light.m_attenuation_param);
+		serializer.write("cast_shadow", light.m_cast_shadows);
+		serializer.write("component", light.m_component);
+		serializer.write("diffuse_color", light.m_diffuse_color);
+		serializer.write("diffuse_intensity", light.m_diffuse_intensity);
+		serializer.write("fov", light.m_fov);
+		serializer.write("range", light.m_range);
+		serializer.write("specular_color", light.m_specular_color);
+		serializer.write("specular_intensity", light.m_specular_intensity);
+	}
+
+
+	void deserializePointLight(IDeserializer& serializer, Entity entity)
+	{
+		m_light_influenced_geometry.emplace(m_allocator);
+		PointLight& light = m_point_lights.emplace();
+		light.m_entity = entity;
+		serializer.read(&light.m_attenuation_param);
+		serializer.read(&light.m_cast_shadows);
+		serializer.read(&light.m_component);
+		serializer.read(&light.m_diffuse_color);
+		serializer.read(&light.m_diffuse_intensity);
+		serializer.read(&light.m_fov);
+		serializer.read(&light.m_range);
+		serializer.read(&light.m_specular_color);
+		serializer.read(&light.m_specular_intensity);
+		m_point_lights_map.insert(light.m_component, m_point_lights.size() - 1);
+
+		m_universe.addComponent(light.m_entity, POINT_LIGHT_TYPE, this, light.m_component);
+	}
+
+
+	void serializeDecal(ISerializer& serializer, ComponentHandle cmp)
+	{
+	}
+
+
+	void deserializeDecal(IDeserializer& serializer, Entity entity)
+	{
+		ResourceManagerBase* material_manager = m_engine.getResourceManager().get(MATERIAL_TYPE);
+		Decal& decal = m_decals.insert(entity);
+		char tmp[MAX_PATH_LENGTH];
+		decal.entity = entity;
+		serializer.read(&decal.scale);
+		serializer.read(tmp, lengthOf(tmp));
+		decal.material = tmp[0] == '\0' ? nullptr : static_cast<Material*>(material_manager->load(Path(tmp)));
+		updateDecalInfo(decal);
+		m_universe.addComponent(decal.entity, DECAL_TYPE, this, {decal.entity.index});
+	}
+
+
+	void serializeCamera(ISerializer& serialize, ComponentHandle cmp)
+	{
+		Camera& camera = m_cameras[{cmp.index}];
+		serialize.write("far", camera.far);
+		serialize.write("fov", camera.fov);
+		serialize.write("is_ortho", camera.is_ortho);
+		serialize.write("ortho_size", camera.ortho_size);
+		serialize.write("near", camera.near);
+		serialize.write("slot", camera.slot);
+	}
+
+
+	void deserializeCamera(IDeserializer& serializer, Entity entity)
+	{
+		Camera camera;
+		camera.entity = entity;
+		serializer.read(&camera.far);
+		serializer.read(&camera.fov);
+		serializer.read(&camera.is_ortho);
+		serializer.read(&camera.ortho_size);
+		serializer.read(&camera.near);
+		serializer.read(camera.slot, lengthOf(camera.slot));
+		m_cameras.insert(camera.entity, camera);
+		m_universe.addComponent(camera.entity, CAMERA_TYPE, this, {camera.entity.index});
+	}
+
+
+	void serializeBoneAttachment(ISerializer& serializer, ComponentHandle cmp) 
+	{
+		int idx = getBoneAttachmentIdx(cmp);
+		BoneAttachment& attachment = m_bone_attachments[idx];
+		serializer.write("bone_index", attachment.bone_index);
+		serializer.write("parent", attachment.parent_entity);
+		serializer.write("relative_transform", attachment.relative_transform);
+	}
+
+
+	void deserializeBoneAttachment(IDeserializer& serializer, Entity entity)
+	{
+		BoneAttachment& bone_attachment = m_bone_attachments.emplace();
+		bone_attachment.entity = entity;
+		serializer.read(&bone_attachment.bone_index);
+		serializer.read(&bone_attachment.parent_entity);
+		serializer.read(&bone_attachment.relative_transform);
+		ComponentHandle cmp = {bone_attachment.entity.index};
+		m_universe.addComponent(bone_attachment.entity, BONE_ATTACHMENT_TYPE, this, cmp);
+	}
+
+
+	void serializeTerrain(ISerializer& serializer, ComponentHandle cmp)
+	{
+		Terrain* terrain = m_terrains[{cmp.index}];
+		serializer.write("layer_mask", terrain->m_layer_mask);
+		serializer.write("scale", terrain->m_scale);
+		serializer.write("material", terrain->m_material ? terrain->m_material->getPath().c_str() : "");
+		serializer.write("grass_count", terrain->m_grass_types.size());
+		for (Terrain::GrassType& type : terrain->m_grass_types)
+		{
+			serializer.write("density", type.m_density);
+			serializer.write("distance", type.m_distance);
+			serializer.write("model", type.m_grass_model ? type.m_grass_model->getPath().c_str() : "");
+		}
+	}
+
+	void deserializeTerrain(IDeserializer& serializer, Entity entity)
+	{
+		Terrain* terrain = LUMIX_NEW(m_allocator, Terrain)(m_renderer, entity, *this, m_allocator);
+		m_terrains.insert(entity, terrain);
+		terrain->m_entity = entity;
+		serializer.read(&terrain->m_layer_mask);
+		serializer.read(&terrain->m_scale);
+		char tmp[MAX_PATH_LENGTH];
+		serializer.read(tmp, lengthOf(tmp));
+		auto* material = tmp[0] ? m_engine.getResourceManager().get(MATERIAL_TYPE)->load(Path(tmp)) : nullptr;
+		terrain->setMaterial((Material*)material);
+
+		int count;
+		serializer.read(&count);
+		for(int i = 0; i < count; ++i)
+		{
+			Terrain::GrassType type(*terrain);
+			serializer.read(&type.m_density);
+			serializer.read(&type.m_distance);
+			type.m_idx = i;
+			serializer.read(tmp, lengthOf(tmp));
+			terrain->m_grass_types.push(type);
+			terrain->setGrassTypePath(terrain->m_grass_types.size() - 1, Path(tmp));
+		}
+
+		m_universe.addComponent(entity, TERRAIN_TYPE, this, { entity.index });
+	}
+
+	void serializeEnvironmentProbe(ISerializer& serialize, ComponentHandle cmp) {}
+
+
+	void deserializeEnvironmentProbe(IDeserializer& serialize, Entity entity)
+	{
+		auto* texture_manager = m_engine.getResourceManager().get(TEXTURE_TYPE);
+		char basename[64];
+		PathUtils::getBasename(basename, lengthOf(basename), m_universe.getPath().c_str());
+		StaticString<Lumix::MAX_PATH_LENGTH> probe_dir("universes/", basename, "/probes/");
+		EnvironmentProbe& probe = m_environment_probes.insert(entity);
+		StaticString<Lumix::MAX_PATH_LENGTH> path_str(probe_dir, entity.index, ".dds");
+		probe.texture = static_cast<Texture*>(texture_manager->load(Path(path_str)));
+		probe.texture->setFlag(BGFX_TEXTURE_SRGB, true);
+		StaticString<Lumix::MAX_PATH_LENGTH> irr_path_str(probe_dir, entity.index, "_irradiance.dds");
+		probe.irradiance = static_cast<Texture*>(texture_manager->load(Path(irr_path_str)));
+		probe.irradiance->setFlag(BGFX_TEXTURE_SRGB, true);
+		probe.irradiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
+		probe.irradiance->setFlag(BGFX_TEXTURE_MAG_ANISOTROPIC, true);
+		StaticString<Lumix::MAX_PATH_LENGTH> r_path_str(probe_dir, entity.index, "_radiance.dds");
+		probe.radiance = static_cast<Texture*>(texture_manager->load(Path(r_path_str)));
+		probe.radiance->setFlag(BGFX_TEXTURE_SRGB, true);
+		probe.radiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
+		probe.radiance->setFlag(BGFX_TEXTURE_MAG_ANISOTROPIC, true);
+
+		m_universe.addComponent(entity, ENVIRONMENT_PROBE_TYPE, this, {entity.index});
+	}
+
+
+	void serializeParticleEmitter(ISerializer& serializer, ComponentHandle cmp)
+	{
+		ParticleEmitter* emitter = m_particle_emitters[{cmp.index}];
+		serializer.write("autoemit", emitter->m_autoemit);
+		serializer.write("local_space", emitter->m_local_space);
+		serializer.write("spawn_period_from", emitter->m_spawn_period.from);
+		serializer.write("spawn_period_to", emitter->m_spawn_period.to);
+		serializer.write("initial_life_from", emitter->m_initial_life.from);
+		serializer.write("initial_life_to", emitter->m_initial_life.to);
+		serializer.write("initial_size_from", emitter->m_initial_size.from);
+		serializer.write("initial_size_to", emitter->m_initial_size.to);
+		serializer.write("spawn_count_from", emitter->m_spawn_count.from);
+		serializer.write("spawn_count_to", emitter->m_spawn_count.to);
+	}
+
+
+	void deserializeParticleEmitter(IDeserializer& serializer, Entity entity)
+	{
+		ParticleEmitter* emitter = LUMIX_NEW(m_allocator, ParticleEmitter)(entity, m_universe, m_allocator);
+		emitter->m_entity = entity;
+		serializer.read(&emitter->m_autoemit);
+		serializer.read(&emitter->m_local_space);
+		serializer.read(&emitter->m_spawn_period.from);
+		serializer.read(&emitter->m_spawn_period.to);
+		serializer.read(&emitter->m_initial_life.from);
+		serializer.read(&emitter->m_initial_life.to);
+		serializer.read(&emitter->m_initial_size.from);
+		serializer.read(&emitter->m_initial_size.to);
+		serializer.read(&emitter->m_spawn_count.from);
+		serializer.read(&emitter->m_spawn_count.to);
+		m_particle_emitters.insert(entity, emitter);
+		m_universe.addComponent(entity, PARTICLE_EMITTER_TYPE, this, {entity.index});
+	}
+
+	void serializeParticleEmitterAlpha(ISerializer& serializer, ComponentHandle cmp)
+	{
+		ParticleEmitter* emitter = m_particle_emitters[{cmp.index}];
+		auto* module = (ParticleEmitter::AlphaModule*)emitter->getModule(PARTICLE_EMITTER_ALPHA_TYPE);
+		serializer.write("count", module->m_values.size());
+		for (Vec2 v : module->m_values)
+		{
+			serializer.write("", v.x);
+			serializer.write("", v.y);
+		}
+	}
+	
+	
+	void deserializeParticleEmitterAlpha(IDeserializer& serializer, Entity entity)
+	{
+		ParticleEmitter* emitter = m_particle_emitters[entity];
+		auto* module = LUMIX_NEW(m_allocator, ParticleEmitter::AlphaModule)(*emitter);
+		int count;
+		serializer.read(&count);
+		module->m_values.clear();
+		for (int i = 0; i < count; ++i)
+		{
+			Vec2& v = module->m_values.emplace();
+			serializer.read(&v.x);
+			serializer.read(&v.y);
+		}
+		module->sample();
+		emitter->addModule(module);
+		m_universe.addComponent(entity, PARTICLE_EMITTER_ALPHA_TYPE, this, {entity.index});
+	}
+
+
+	void serializeParticleEmitterAttractor(ISerializer& serializer, ComponentHandle cmp)
+	{
+		ParticleEmitter* emitter = m_particle_emitters[{cmp.index}];
+		auto* module = (ParticleEmitter::AttractorModule*)emitter->getModule(PARTICLE_EMITTER_ATTRACTOR_TYPE);
+		serializer.write("force", module->m_force);
+		serializer.write("count", module->m_count);
+		for (int i = 0; i < module->m_count; ++i)
+		{
+			serializer.write("", module->m_entities[i]);
+		}
+	}
+
+
+	void deserializeParticleEmitterAttractor(IDeserializer& serializer, Entity entity)
+	{
+		ParticleEmitter* emitter = m_particle_emitters[entity];
+		auto* module = LUMIX_NEW(m_allocator, ParticleEmitter::AttractorModule)(*emitter);
+		serializer.read(&module->m_force);
+		serializer.read(&module->m_count);
+		for (int i = 0; i < module->m_count; ++i)
+		{
+			serializer.read(&module->m_entities[i]);
+		}
+		emitter->addModule(module);
+		m_universe.addComponent(entity, PARTICLE_EMITTER_ATTRACTOR_TYPE, this, {entity.index});
+	}
+
+	void serializeParticleEmitterForce(ISerializer& serializer, ComponentHandle cmp)
+	{
+		ParticleEmitter* emitter = m_particle_emitters[{cmp.index}];
+		auto* module = (ParticleEmitter::ForceModule*)emitter->getModule(PARTICLE_EMITTER_FORCE_HASH);
+		serializer.write("acceleration", module->m_acceleration);
+	}
+
+
+	void deserializeParticleEmitterForce(IDeserializer& serializer, Entity entity)
+	{
+		ParticleEmitter* emitter = m_particle_emitters[entity];
+		auto* module = LUMIX_NEW(m_allocator, ParticleEmitter::ForceModule)(*emitter);
+		serializer.read(&module->m_acceleration);
+		emitter->addModule(module);
+		m_universe.addComponent(entity, PARTICLE_EMITTER_FORCE_HASH, this, {entity.index});
+	}
+
+
+	void serializeParticleEmitterLinearMovement(ISerializer& serializer, ComponentHandle cmp)
+	{
+		ParticleEmitter* emitter = m_particle_emitters[{cmp.index}];
+		auto* module = (ParticleEmitter::LinearMovementModule*)emitter->getModule(PARTICLE_EMITTER_LINEAR_MOVEMENT_TYPE);
+		serializer.write("x_from", module->m_x.from);
+		serializer.write("x_to", module->m_x.to);
+		serializer.write("y_from", module->m_y.from);
+		serializer.write("y_to", module->m_y.to);
+		serializer.write("z_from", module->m_z.from);
+		serializer.write("z_to", module->m_z.to);
+	}
+
+
+	void deserializeParticleEmitterLinearMovement(IDeserializer& serializer, Entity entity)
+	{
+		ParticleEmitter* emitter = m_particle_emitters[entity];
+		auto* module = LUMIX_NEW(m_allocator, ParticleEmitter::LinearMovementModule)(*emitter);
+		serializer.read(&module->m_x.from);
+		serializer.read(&module->m_x.to);
+		serializer.read(&module->m_y.from);
+		serializer.read(&module->m_y.to);
+		serializer.read(&module->m_z.from);
+		serializer.read(&module->m_z.to);
+		emitter->addModule(module);
+		m_universe.addComponent(entity, PARTICLE_EMITTER_LINEAR_MOVEMENT_TYPE, this, {entity.index});
+	}
+
+
+	void serializeParticleEmitterPlane(ISerializer& serializer, ComponentHandle cmp)
+	{
+		ParticleEmitter* emitter = m_particle_emitters[{cmp.index}];
+		auto* module = (ParticleEmitter::PlaneModule*)emitter->getModule(PARTICLE_EMITTER_PLANE_TYPE);
+		serializer.write("bounce", module->m_bounce);
+		serializer.write("entities_count", module->m_count);
+		for (int i = 0; i < module->m_count; ++i)
+		{
+			serializer.write("", module->m_entities[i]);
+		}
+	}
+
+
+	void deserializeParticleEmitterPlane(IDeserializer& serializer, Entity entity)
+	{
+		ParticleEmitter* emitter = m_particle_emitters[entity];
+		auto* module = LUMIX_NEW(m_allocator, ParticleEmitter::PlaneModule)(*emitter);
+		serializer.read(&module->m_bounce);
+		serializer.read(&module->m_count);
+		for (int i = 0; i < module->m_count; ++i)
+		{
+			serializer.read(&module->m_entities[i]);
+		}
+		emitter->addModule(module);
+		m_universe.addComponent(entity, PARTICLE_EMITTER_PLANE_TYPE, this, {entity.index});
+	}
+
+	void serializeParticleEmitterSpawnShape(ISerializer& serializer, ComponentHandle cmp)
+	{
+		ParticleEmitter* emitter = m_particle_emitters[{cmp.index}];
+		auto* module = (ParticleEmitter::SpawnShapeModule*)emitter->getModule(PARTICLE_EMITTER_SPAWN_SHAPE_TYPE);
+		serializer.write("shape", (u8)module->m_shape);
+		serializer.write("radius", module->m_radius);
+	}
+
+
+	void deserializeParticleEmitterSpawnShape(IDeserializer& serializer, Entity entity)
+	{
+		ParticleEmitter* emitter = m_particle_emitters[entity];
+		auto* module = LUMIX_NEW(m_allocator, ParticleEmitter::SpawnShapeModule)(*emitter);
+		serializer.read((u8*)&module->m_shape);
+		serializer.read(&module->m_radius);
+		emitter->addModule(module);
+		m_universe.addComponent(entity, PARTICLE_EMITTER_SPAWN_SHAPE_TYPE, this, {entity.index});
+	}
+
+	void serializeParticleEmitterSize(ISerializer& serializer, ComponentHandle cmp)
+	{
+		ParticleEmitter* emitter = m_particle_emitters[{cmp.index}];
+		auto* module = (ParticleEmitter::SizeModule*)emitter->getModule(PARTICLE_EMITTER_SIZE_TYPE);
+		serializer.write("count", module->m_values.size());
+		for (Vec2 v : module->m_values)
+		{
+			serializer.write("", v.x);
+			serializer.write("", v.y);
+		}
+	}
+
+
+	void deserializeParticleEmitterSize(IDeserializer& serializer, Entity entity)
+	{
+		ParticleEmitter* emitter = m_particle_emitters[entity];
+		auto* module = LUMIX_NEW(m_allocator, ParticleEmitter::SizeModule)(*emitter);
+		int count;
+		serializer.read(&count);
+		module->m_values.clear();
+		for (int i = 0; i < count; ++i)
+		{
+			Vec2& v = module->m_values.emplace();
+			serializer.read(&v.x);
+			serializer.read(&v.y);
+		}
+		module->sample();
+		emitter->addModule(module);
+		m_universe.addComponent(entity, PARTICLE_EMITTER_SIZE_TYPE, this, {entity.index});
+	}
+
+
+	void serializeParticleEmitterRandomRotation(ISerializer& serialize, ComponentHandle cmp) {}
+
+
+	void deserializeParticleEmitterRandomRotation(IDeserializer& serialize, Entity entity)
+	{
+		ParticleEmitter* emitter = m_particle_emitters[entity];
+		auto* module = LUMIX_NEW(m_allocator, ParticleEmitter::RandomRotationModule)(*emitter);
+		emitter->addModule(module);
+		m_universe.addComponent(entity, PARTICLE_EMITTER_RANDOM_ROTATION_TYPE, this, {entity.index});
+	}
+
+
+	void serializeParticleEmitterSubimage(ISerializer& serializer, ComponentHandle cmp)
+	{
+		ParticleEmitter* emitter = m_particle_emitters[{cmp.index}];
+		auto* module = (ParticleEmitter::SubimageModule*)emitter->getModule(PARTICLE_EMITTER_SUBIMAGE_TYPE);
+		serializer.write("rows", module->rows);
+		serializer.write("cols", module->cols);
+	}
+
+
+	void deserializeParticleEmitterSubimage(IDeserializer& serializer, Entity entity)
+	{
+		ParticleEmitter* emitter = m_particle_emitters[entity];
+		auto* module = LUMIX_NEW(m_allocator, ParticleEmitter::SubimageModule)(*emitter);
+		serializer.read(&module->rows);
+		serializer.read(&module->cols);
+		emitter->addModule(module);
+		m_universe.addComponent(entity, PARTICLE_EMITTER_SUBIMAGE_TYPE, this, {entity.index});
+	}
+
+
 	void serializeBoneAttachments(OutputBlob& serializer)
 	{
 		serializer.write((i32)m_bone_attachments.size());
@@ -777,8 +1297,9 @@ public:
 		serializer.read(count);
 		m_environment_probes.reserve(count);
 		auto* texture_manager = m_engine.getResourceManager().get(TEXTURE_TYPE);
-		u64 universe_guid = m_universe.getPath().getHash();
-		StaticString<Lumix::MAX_PATH_LENGTH> probe_dir("universes/", universe_guid, "/probes/");
+		char basename[64];
+		PathUtils::getBasename(basename, lengthOf(basename), m_universe.getPath().c_str());
+		StaticString<Lumix::MAX_PATH_LENGTH> probe_dir("universes/", basename, "/probes/");
 		for (int i = 0; i < count; ++i)
 		{
 			Entity entity;
@@ -852,31 +1373,31 @@ public:
 					}
 					else if (module->getType() == ParticleEmitter::SubimageModule::s_type)
 					{
-						m_universe.addComponent(emitter->m_entity, PARTICLE_EMITTER_SUBIMAGE_HASH, this, cmp);
+						m_universe.addComponent(emitter->m_entity, PARTICLE_EMITTER_SUBIMAGE_TYPE, this, cmp);
 					}
 					else if (module->getType() == ParticleEmitter::SpawnShapeModule::s_type)
 					{
-						m_universe.addComponent(emitter->m_entity, PARTICLE_EMITTER_SPAWN_SHAPE_HASH, this, cmp);
+						m_universe.addComponent(emitter->m_entity, PARTICLE_EMITTER_SPAWN_SHAPE_TYPE, this, cmp);
 					}
 					else if (module->getType() == ParticleEmitter::AttractorModule::s_type)
 					{
-						m_universe.addComponent(emitter->m_entity, PARTICLE_EMITTER_ATTRACTOR_HASH, this, cmp);
+						m_universe.addComponent(emitter->m_entity, PARTICLE_EMITTER_ATTRACTOR_TYPE, this, cmp);
 					}
 					else if (module->getType() == ParticleEmitter::LinearMovementModule::s_type)
 					{
-						m_universe.addComponent(emitter->m_entity, PARTICLE_EMITTER_LINEAR_MOVEMENT_HASH, this, cmp);
+						m_universe.addComponent(emitter->m_entity, PARTICLE_EMITTER_LINEAR_MOVEMENT_TYPE, this, cmp);
 					}
 					else if (module->getType() == ParticleEmitter::PlaneModule::s_type)
 					{
-						m_universe.addComponent(emitter->m_entity, PARTICLE_EMITTER_PLANE_HASH, this, cmp);
+						m_universe.addComponent(emitter->m_entity, PARTICLE_EMITTER_PLANE_TYPE, this, cmp);
 					}
 					else if (module->getType() == ParticleEmitter::RandomRotationModule::s_type)
 					{
-						m_universe.addComponent(emitter->m_entity, PARTICLE_EMITTER_RANDOM_ROTATION_HASH, this, cmp);
+						m_universe.addComponent(emitter->m_entity, PARTICLE_EMITTER_RANDOM_ROTATION_TYPE, this, cmp);
 					}
 					else if (module->getType() == ParticleEmitter::SizeModule::s_type)
 					{
-						m_universe.addComponent(emitter->m_entity, PARTICLE_EMITTER_SIZE_HASH, this, cmp);
+						m_universe.addComponent(emitter->m_entity, PARTICLE_EMITTER_SIZE_TYPE, this, cmp);
 					}
 				}
 			}
@@ -1043,7 +1564,7 @@ public:
 		m_point_lights.resize(size);
 		for (int i = 0; i < size; ++i)
 		{
-			m_light_influenced_geometry.push(Array<ComponentHandle>(m_allocator));
+			m_light_influenced_geometry.emplace(m_allocator);
 			PointLight& light = m_point_lights[i];
 			if (version > RenderSceneVersion::SPECULAR_INTENSITY)
 			{
@@ -1298,14 +1819,14 @@ public:
 	void destroyParticleEmitterSubimage(ComponentHandle component)
 	{
 		auto* emitter = m_particle_emitters[{component.index}];
-		auto* module = emitter->getModule(PARTICLE_EMITTER_SUBIMAGE_HASH);
+		auto* module = emitter->getModule(PARTICLE_EMITTER_SUBIMAGE_TYPE);
 
 		ASSERT(module);
 
 		LUMIX_DELETE(m_allocator, module);
 		emitter->m_modules.eraseItem(module);
 		emitter->m_subimage_module = nullptr;
-		m_universe.destroyComponent(emitter->m_entity, PARTICLE_EMITTER_SUBIMAGE_HASH, this, component);
+		m_universe.destroyComponent(emitter->m_entity, PARTICLE_EMITTER_SUBIMAGE_TYPE, this, component);
 		cleanup(emitter);
 	}
 
@@ -1313,13 +1834,13 @@ public:
 	void destroyParticleEmitterAttractor(ComponentHandle component)
 	{
 		auto* emitter = m_particle_emitters[{component.index}];
-		auto* module = emitter->getModule(PARTICLE_EMITTER_ATTRACTOR_HASH);
+		auto* module = emitter->getModule(PARTICLE_EMITTER_ATTRACTOR_TYPE);
 
 		ASSERT(module);
 
 		LUMIX_DELETE(m_allocator, module);
 		emitter->m_modules.eraseItem(module);
-		m_universe.destroyComponent(emitter->m_entity, PARTICLE_EMITTER_ATTRACTOR_HASH, this, component);
+		m_universe.destroyComponent(emitter->m_entity, PARTICLE_EMITTER_ATTRACTOR_TYPE, this, component);
 		cleanup(emitter);
 	}
 
@@ -1327,13 +1848,13 @@ public:
 	void destroyParticleEmitterSize(ComponentHandle component)
 	{
 		auto* emitter = m_particle_emitters[{component.index}];
-		auto* module = emitter->getModule(PARTICLE_EMITTER_SIZE_HASH);
+		auto* module = emitter->getModule(PARTICLE_EMITTER_SIZE_TYPE);
 
 		ASSERT(module);
 
 		LUMIX_DELETE(m_allocator, module);
 		emitter->m_modules.eraseItem(module);
-		m_universe.destroyComponent(emitter->m_entity, PARTICLE_EMITTER_SIZE_HASH, this, component);
+		m_universe.destroyComponent(emitter->m_entity, PARTICLE_EMITTER_SIZE_TYPE, this, component);
 		cleanup(emitter);
 
 	}
@@ -1398,13 +1919,13 @@ public:
 	void destroyParticleEmitterPlane(ComponentHandle component)
 	{
 		auto* emitter = m_particle_emitters[{component.index}];
-		auto* module = emitter->getModule(PARTICLE_EMITTER_PLANE_HASH);
+		auto* module = emitter->getModule(PARTICLE_EMITTER_PLANE_TYPE);
 
 		ASSERT(module);
 
 		LUMIX_DELETE(m_allocator, module);
 		emitter->m_modules.eraseItem(module);
-		m_universe.destroyComponent(emitter->m_entity, PARTICLE_EMITTER_PLANE_HASH, this, component);
+		m_universe.destroyComponent(emitter->m_entity, PARTICLE_EMITTER_PLANE_TYPE, this, component);
 		cleanup(emitter);
 	}
 
@@ -1412,13 +1933,13 @@ public:
 	void destroyParticleEmitterLinearMovement(ComponentHandle component)
 	{
 		auto* emitter = m_particle_emitters[{component.index}];
-		auto* module = emitter->getModule(PARTICLE_EMITTER_LINEAR_MOVEMENT_HASH);
+		auto* module = emitter->getModule(PARTICLE_EMITTER_LINEAR_MOVEMENT_TYPE);
 
 		ASSERT(module);
 
 		LUMIX_DELETE(m_allocator, module);
 		emitter->m_modules.eraseItem(module);
-		m_universe.destroyComponent(emitter->m_entity, PARTICLE_EMITTER_LINEAR_MOVEMENT_HASH, this, component);
+		m_universe.destroyComponent(emitter->m_entity, PARTICLE_EMITTER_LINEAR_MOVEMENT_TYPE, this, component);
 		cleanup(emitter);
 	}
 
@@ -1426,13 +1947,13 @@ public:
 	void destroyParticleEmitterSpawnShape(ComponentHandle component)
 	{
 		auto* emitter = m_particle_emitters[{component.index}];
-		auto* module = emitter->getModule(PARTICLE_EMITTER_SPAWN_SHAPE_HASH);
+		auto* module = emitter->getModule(PARTICLE_EMITTER_SPAWN_SHAPE_TYPE);
 
 		ASSERT(module);
 
 		LUMIX_DELETE(m_allocator, module);
 		emitter->m_modules.eraseItem(module);
-		m_universe.destroyComponent(emitter->m_entity, PARTICLE_EMITTER_SPAWN_SHAPE_HASH, this, component);
+		m_universe.destroyComponent(emitter->m_entity, PARTICLE_EMITTER_SPAWN_SHAPE_TYPE, this, component);
 		cleanup(emitter);
 
 	}
@@ -1441,13 +1962,13 @@ public:
 	void destroyParticleEmitterRandomRotation(ComponentHandle component)
 	{
 		auto* emitter = m_particle_emitters[{component.index}];
-		auto* module = emitter->getModule(PARTICLE_EMITTER_RANDOM_ROTATION_HASH);
+		auto* module = emitter->getModule(PARTICLE_EMITTER_RANDOM_ROTATION_TYPE);
 
 		ASSERT(module);
 
 		LUMIX_DELETE(m_allocator, module);
 		emitter->m_modules.eraseItem(module);
-		m_universe.destroyComponent(emitter->m_entity, PARTICLE_EMITTER_RANDOM_ROTATION_HASH, this, component);
+		m_universe.destroyComponent(emitter->m_entity, PARTICLE_EMITTER_RANDOM_ROTATION_TYPE, this, component);
 		cleanup(emitter);
 
 	}
@@ -1734,7 +2255,7 @@ public:
 		auto* emitter = m_particle_emitters.at(index);
 		auto module = LUMIX_NEW(m_allocator, ParticleEmitter::RandomRotationModule)(*emitter);
 		emitter->addModule(module);
-		m_universe.addComponent(entity, PARTICLE_EMITTER_RANDOM_ROTATION_HASH, this, {entity.index});
+		m_universe.addComponent(entity, PARTICLE_EMITTER_RANDOM_ROTATION_TYPE, this, {entity.index});
 		return {entity.index};
 	}
 
@@ -1745,7 +2266,7 @@ public:
 		auto* emitter = m_particle_emitters.at(index);
 		auto module = LUMIX_NEW(m_allocator, ParticleEmitter::PlaneModule)(*emitter);
 		emitter->addModule(module);
-		m_universe.addComponent(entity, PARTICLE_EMITTER_PLANE_HASH, this, {entity.index});
+		m_universe.addComponent(entity, PARTICLE_EMITTER_PLANE_TYPE, this, {entity.index});
 		return {entity.index};
 	}
 
@@ -1756,7 +2277,7 @@ public:
 		auto* emitter = m_particle_emitters.at(index);
 		auto module = LUMIX_NEW(m_allocator, ParticleEmitter::LinearMovementModule)(*emitter);
 		emitter->addModule(module);
-		m_universe.addComponent(entity, PARTICLE_EMITTER_LINEAR_MOVEMENT_HASH, this, {entity.index});
+		m_universe.addComponent(entity, PARTICLE_EMITTER_LINEAR_MOVEMENT_TYPE, this, {entity.index});
 		return {entity.index};
 	}
 
@@ -1767,7 +2288,7 @@ public:
 		auto* emitter = m_particle_emitters.at(index);
 		auto module = LUMIX_NEW(m_allocator, ParticleEmitter::SpawnShapeModule)(*emitter);
 		emitter->addModule(module);
-		m_universe.addComponent(entity, PARTICLE_EMITTER_SPAWN_SHAPE_HASH, this, {entity.index});
+		m_universe.addComponent(entity, PARTICLE_EMITTER_SPAWN_SHAPE_TYPE, this, {entity.index});
 		return {entity.index};
 	}
 
@@ -1800,7 +2321,7 @@ public:
 		auto* emitter = m_particle_emitters.at(index);
 		auto module = LUMIX_NEW(m_allocator, ParticleEmitter::SubimageModule)(*emitter);
 		emitter->addModule(module);
-		m_universe.addComponent(entity, PARTICLE_EMITTER_SUBIMAGE_HASH, this, {entity.index});
+		m_universe.addComponent(entity, PARTICLE_EMITTER_SUBIMAGE_TYPE, this, {entity.index});
 		return {entity.index};
 	}
 
@@ -1811,7 +2332,7 @@ public:
 		auto* emitter = m_particle_emitters.at(index);
 		auto module = LUMIX_NEW(m_allocator, ParticleEmitter::AttractorModule)(*emitter);
 		emitter->addModule(module);
-		m_universe.addComponent(entity, PARTICLE_EMITTER_ATTRACTOR_HASH, this, { entity.index });
+		m_universe.addComponent(entity, PARTICLE_EMITTER_ATTRACTOR_TYPE, this, { entity.index });
 		return{ entity.index };
 	}
 
@@ -1823,7 +2344,7 @@ public:
 		auto* emitter = m_particle_emitters.at(index);
 		auto module = LUMIX_NEW(m_allocator, ParticleEmitter::SizeModule)(*emitter);
 		emitter->addModule(module);
-		m_universe.addComponent(entity, PARTICLE_EMITTER_SIZE_HASH, this, { entity.index });
+		m_universe.addComponent(entity, PARTICLE_EMITTER_SIZE_TYPE, this, { entity.index });
 		return{ entity.index };
 	}
 
@@ -3750,18 +4271,19 @@ public:
 		auto& probe = m_environment_probes[entity];
 		auto* texture_manager = m_engine.getResourceManager().get(TEXTURE_TYPE);
 		if (probe.texture) texture_manager->unload(*probe.texture);
-		u64 universe_guid = m_universe.getPath().getHash();
-		StaticString<Lumix::MAX_PATH_LENGTH> path("universes/", universe_guid, "/probes/", cmp.index, ".dds");
+		char basename[64];
+		PathUtils::getBasename(basename, lengthOf(basename), m_universe.getPath().c_str());
+		StaticString<Lumix::MAX_PATH_LENGTH> path("universes/", basename, "/probes/", cmp.index, ".dds");
 		probe.texture = static_cast<Texture*>(texture_manager->load(Path(path)));
 		probe.texture->setFlag(BGFX_TEXTURE_SRGB, true);
 		path = "universes/";
-		path << universe_guid << "/probes/" << cmp.index << "_irradiance.dds";
+		path << basename << "/probes/" << cmp.index << "_irradiance.dds";
 		probe.irradiance = static_cast<Texture*>(texture_manager->load(Path(path)));
 		probe.irradiance->setFlag(BGFX_TEXTURE_SRGB, true);
 		probe.irradiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
 		probe.irradiance->setFlag(BGFX_TEXTURE_MAG_ANISOTROPIC, true);
 		path = "universes/";
-		path << universe_guid << "/probes/" << cmp.index << "_radiance.dds";
+		path << basename << "/probes/" << cmp.index << "_radiance.dds";
 		probe.radiance = static_cast<Texture*>(texture_manager->load(Path(path)));
 		probe.radiance->setFlag(BGFX_TEXTURE_SRGB, true);
 		probe.radiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
@@ -4092,7 +4614,7 @@ public:
 		Frustum frustum = getPointLightFrustum(cmp);
 		m_culling_system->cullToFrustum(frustum, 0xffffFFFF);
 		const CullingSystem::Results& results = m_culling_system->getResult();
-		auto& influenced_geometry = m_light_influenced_geometry[cmp.index];
+		auto& influenced_geometry = m_light_influenced_geometry[m_point_lights_map[cmp]];
 		influenced_geometry.clear();
 		for (int i = 0; i < results.size(); ++i)
 		{
@@ -4459,49 +4981,44 @@ private:
 
 
 
+#define COMPONENT_TYPE(type, name) \
+	{ \
+		type \
+		, static_cast<Universe::Serialize>(&RenderSceneImpl::serialize##name) \
+		, static_cast<Universe::Deserialize>(&RenderSceneImpl::deserialize##name) \
+		, &RenderSceneImpl::create##name \
+		, &RenderSceneImpl::destroy##name \
+	}
+
 static struct
 {
 	ComponentType type;
+	Universe::Serialize serialize;
+	Universe::Deserialize deserialize;
 	ComponentHandle(RenderSceneImpl::*creator)(Entity);
 	void (RenderSceneImpl::*destroyer)(ComponentHandle);
 } COMPONENT_INFOS[] = {
-	{MODEL_INSTANCE_TYPE, &RenderSceneImpl::createModelInstance, &RenderSceneImpl::destroyModelInstance},
-	{GLOBAL_LIGHT_TYPE, &RenderSceneImpl::createGlobalLight, &RenderSceneImpl::destroyGlobalLight},
-	{POINT_LIGHT_TYPE, &RenderSceneImpl::createPointLight, &RenderSceneImpl::destroyPointLight},
-	{DECAL_TYPE, &RenderSceneImpl::createDecal, &RenderSceneImpl::destroyDecal},
-	{CAMERA_TYPE, &RenderSceneImpl::createCamera, &RenderSceneImpl::destroyCamera},
-	{TERRAIN_TYPE, &RenderSceneImpl::createTerrain, &RenderSceneImpl::destroyTerrain},
-	{PARTICLE_EMITTER_TYPE, &RenderSceneImpl::createParticleEmitter, &RenderSceneImpl::destroyParticleEmitter},
-	{PARTICLE_EMITTER_ALPHA_TYPE,
-		&RenderSceneImpl::createParticleEmitterAlpha,
-		&RenderSceneImpl::destroyParticleEmitterAlpha},
-	{PARTICLE_EMITTER_FORCE_HASH,
-		&RenderSceneImpl::createParticleEmitterForce,
-		&RenderSceneImpl::destroyParticleEmitterForce},
-	{PARTICLE_EMITTER_ATTRACTOR_HASH,
-		&RenderSceneImpl::createParticleEmitterAttractor,
-		&RenderSceneImpl::destroyParticleEmitterAttractor},
-	{PARTICLE_EMITTER_SUBIMAGE_HASH,
-		&RenderSceneImpl::createParticleEmitterSubimage,
-		&RenderSceneImpl::destroyParticleEmitterSubimage},
-	{PARTICLE_EMITTER_SIZE_HASH,
-		&RenderSceneImpl::createParticleEmitterSize,
-		&RenderSceneImpl::destroyParticleEmitterSize},
-	{PARTICLE_EMITTER_LINEAR_MOVEMENT_HASH,
-		&RenderSceneImpl::createParticleEmitterLinearMovement,
-		&RenderSceneImpl::destroyParticleEmitterLinearMovement},
-	{PARTICLE_EMITTER_SPAWN_SHAPE_HASH,
-		&RenderSceneImpl::createParticleEmitterSpawnShape,
-		&RenderSceneImpl::destroyParticleEmitterSpawnShape},
-	{PARTICLE_EMITTER_RANDOM_ROTATION_HASH,
-		&RenderSceneImpl::createParticleEmitterRandomRotation,
-		&RenderSceneImpl::destroyParticleEmitterRandomRotation},
-	{PARTICLE_EMITTER_PLANE_HASH,
-		&RenderSceneImpl::createParticleEmitterPlane,
-		&RenderSceneImpl::destroyParticleEmitterPlane},
-	{BONE_ATTACHMENT_TYPE, &RenderSceneImpl::createBoneAttachment, &RenderSceneImpl::destroyBoneAttachment},
-	{ENVIRONMENT_PROBE_TYPE, &RenderSceneImpl::createEnvironmentProbe, &RenderSceneImpl::destroyEnvironmentProbe}};
+	COMPONENT_TYPE(MODEL_INSTANCE_TYPE, ModelInstance),
+	COMPONENT_TYPE(GLOBAL_LIGHT_TYPE, GlobalLight),
+	COMPONENT_TYPE(POINT_LIGHT_TYPE, PointLight),
+	COMPONENT_TYPE(DECAL_TYPE, Decal),
+	COMPONENT_TYPE(CAMERA_TYPE, Camera),
+	COMPONENT_TYPE(TERRAIN_TYPE, Terrain),
+	COMPONENT_TYPE(BONE_ATTACHMENT_TYPE, BoneAttachment),
+	COMPONENT_TYPE(ENVIRONMENT_PROBE_TYPE, EnvironmentProbe),
+	COMPONENT_TYPE(PARTICLE_EMITTER_TYPE, ParticleEmitter),
+	COMPONENT_TYPE(PARTICLE_EMITTER_ALPHA_TYPE, ParticleEmitterAlpha),
+	COMPONENT_TYPE(PARTICLE_EMITTER_ATTRACTOR_TYPE, ParticleEmitterAttractor),
+	COMPONENT_TYPE(PARTICLE_EMITTER_FORCE_HASH, ParticleEmitterForce),
+	COMPONENT_TYPE(PARTICLE_EMITTER_LINEAR_MOVEMENT_TYPE, ParticleEmitterLinearMovement),
+	COMPONENT_TYPE(PARTICLE_EMITTER_PLANE_TYPE, ParticleEmitterPlane),
+	COMPONENT_TYPE(PARTICLE_EMITTER_RANDOM_ROTATION_TYPE, ParticleEmitterRandomRotation),
+	COMPONENT_TYPE(PARTICLE_EMITTER_SIZE_TYPE, ParticleEmitterSize),
+	COMPONENT_TYPE(PARTICLE_EMITTER_SPAWN_SHAPE_TYPE, ParticleEmitterSpawnShape),
+	COMPONENT_TYPE(PARTICLE_EMITTER_SUBIMAGE_TYPE, ParticleEmitterSubimage)
+};
 
+#undef COMPONENT_TYPE
 
 RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	Engine& engine,
@@ -4548,7 +5065,7 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 
 	for (auto& i : COMPONENT_INFOS)
 	{
-		universe.registerComponentTypeScene(i.type, this);
+		universe.registerComponentType(i.type, this, i.serialize, i.deserialize);
 	}
 }
 

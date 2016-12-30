@@ -12,6 +12,7 @@ EntityGroups::EntityGroups(IAllocator& allocator)
 	, m_entity_to_group_map(allocator)
 	, m_allocator(allocator)
 	, m_universe(nullptr)
+	, current_group(0)
 {
 	m_groups.emplace(allocator);
 	auto& info = m_group_infos.emplace();
@@ -47,9 +48,8 @@ void EntityGroups::allEntitiesToDefault()
 	ASSERT(m_groups[0].empty());
 	ASSERT(m_universe);
 
-	for (int i = 0, c = m_universe->getEntityCount(); i < c; ++i)
+	for (Entity entity = m_universe->getFirstEntity(); isValid(entity); m_universe->getNextEntity(entity))
 	{
-		Entity entity = m_universe->getEntityFromDenseIdx(i);
 		m_groups[0].push(entity);
 		m_entity_to_group_map[entity.index] = 0;
 	}
@@ -115,9 +115,9 @@ int EntityGroups::getGroupEntitiesCount(int idx) const
 
 void EntityGroups::onEntityCreated(Entity entity)
 {
-	m_groups[0].push(entity);
+	m_groups[current_group].push(entity);
 	if (entity.index >= m_entity_to_group_map.size()) m_entity_to_group_map.resize(entity.index + 1);
-	m_entity_to_group_map[entity.index] = 0;
+	m_entity_to_group_map[entity.index] = current_group;
 }
 
 

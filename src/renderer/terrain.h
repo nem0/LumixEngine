@@ -36,10 +36,8 @@ class Terrain
 	public:
 		struct GrassType
 		{
-			GrassType(Terrain& terrain, int idx);
+			GrassType(Terrain& terrain);
 			~GrassType();
-
-			void grassLoaded(Resource::State, Resource::State, Resource&);
 
 			Model* m_grass_model;
 			Terrain& m_terrain;
@@ -131,8 +129,9 @@ class Terrain
 								   float quad_z);
 		void generateGeometry();
 		void onMaterialLoaded(Resource::State, Resource::State new_state, Resource&);
+		void grassLoaded(Resource::State, Resource::State, Resource&);
 
-	private:
+	public:
 		IAllocator& m_allocator;
 		bgfx::VertexBufferHandle m_vertices_handle;
 		bgfx::IndexBufferHandle m_indices_handle;
@@ -149,7 +148,7 @@ class Terrain
 		Texture* m_splatmap;
 		Texture* m_detail_texture;
 		RenderScene& m_scene;
-		Array<GrassType*> m_grass_types;
+		Array<GrassType> m_grass_types;
 		AssociativeArray<ComponentHandle, Array<GrassQuad*> > m_grass_quads;
 		AssociativeArray<ComponentHandle, Vec3> m_last_camera_position;
 		bool m_force_grass_update;

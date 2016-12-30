@@ -92,6 +92,19 @@ public:
 		m_allocator.deallocate_aligned(m_data);
 	}
 
+	template <typename F>
+	int find(F predicate) const
+	{
+		for (int i = 0; i < m_size; ++i)
+		{
+			if (predicate(m_data[i]))
+			{
+				return i;
+			}
+		}
+		return -1;
+	}
+
 	template <typename R>
 	int indexOf(R item) const
 	{

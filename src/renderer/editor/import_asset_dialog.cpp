@@ -652,8 +652,8 @@ static void getRelativePath(WorldEditor& editor, char* relative_path, int max_le
 	}
 	else
 	{
-		auto* path_fd = editor.getEngine().getPatchFileDevice();
-		const char* base_path = path_fd ? path_fd->getBasePath() : nullptr;
+		auto* patch_fd = editor.getEngine().getPatchFileDevice();
+		const char* base_path = patch_fd ? patch_fd->getBasePath() : nullptr;
 		if (base_path && compareStringN(base_path, tmp, stringLength(base_path)) == 0)
 		{
 			int base_path_length = stringLength(base_path);
@@ -948,7 +948,7 @@ struct ImportTask LUMIX_FINAL : public MT::Task
 
 		unsigned int flags = aiProcess_JoinIdenticalVertices | aiProcess_RemoveComponent | aiProcess_GenUVCoords |
 							 aiProcess_RemoveRedundantMaterials | aiProcess_Triangulate | aiProcess_FindInvalidData |
-							 aiProcess_OptimizeGraph | aiProcess_ValidateDataStructure | aiProcess_CalcTangentSpace;
+							 aiProcess_ValidateDataStructure | aiProcess_CalcTangentSpace;
 		flags |= m_dialog.m_model.gen_smooth_normal ? aiProcess_GenSmoothNormals : aiProcess_GenNormals;
 		flags |= m_dialog.m_model.optimize_mesh_on_import ? aiProcess_OptimizeMeshes : 0;
 
@@ -1514,8 +1514,6 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 
 	int task() override
 	{
-		static ConvertTask* that = nullptr;
-		that = this;
 		auto cmpMeshes = [](const void* a, const void* b) -> int {
 			auto a_mesh = static_cast<const ImportMesh*>(a);
 			auto b_mesh = static_cast<const ImportMesh*>(b);
@@ -3367,7 +3365,7 @@ void ImportAssetDialog::onWindowGUI()
 				ImGui::Checkbox("Remove doubles", &m_model.remove_doubles);
 				ImGui::DragFloat("Scale", &m_model.mesh_scale, 0.01f, 0.001f, 0);
 				ImGui::Combo("Orientation", &(int&)m_model.orientation, "Y up\0Z up\0-Z up\0-X up\0");
-				ImGui::Combo("Root Orientation", &(int&)m_model.orientation, "Y up\0Z up\0-Z up\0-X up\0");
+				ImGui::Combo("Root Orientation", &(int&)m_model.root_orientation, "Y up\0Z up\0-Z up\0-X up\0");
 				ImGui::Checkbox("Make physics convex", &m_model.make_convex);
 			}
 

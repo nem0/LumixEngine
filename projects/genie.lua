@@ -181,11 +181,11 @@ function defaultConfigurations()
 		flags { "Symbols", "Optimize", "WinMain" }
 
 	configuration "linux"
-		buildoptions { "-std=c++11" }
+		buildoptions { "-std=c++14" }
 		links { "pthread" }
 
 	configuration { "asmjs" }
-		buildoptions { "-std=c++11" }
+		buildoptions { "-std=c++14" }
 		
 	configuration {}
 		files { "lumix.natvis" }
@@ -316,7 +316,7 @@ solution "LumixEngine"
 				"-Wundef",
 			}
 			buildoptions_cpp {
-				"-std=c++11",
+				"-std=c++14",
 			}
 			linkoptions {
 				"-no-canonical-prefixes",
@@ -509,7 +509,7 @@ project "renderer"
 	libType()
 
 	files { "../src/renderer/**.h", "../src/renderer/**.cpp" }
-	includedirs { "../src", "../external/bgfx/include", "../external/assimp/include", "../external/crnlib/include" }
+	includedirs { "../src", "../external/bgfx/include", "../external/assimp/include", "../external/cmft/include", "../external/crnlib/include" }
 	defines { "BUILDING_RENDERER" }
 	links { "engine" }
 
@@ -517,6 +517,7 @@ project "renderer"
 		links { "editor", "shaderc" }
 		linkLib "crnlib"
 		linkLib "assimp"
+		linkLib "cmft"
 	end
 	linkLib "bgfx"
 	configuration { "linux-*" }
@@ -720,6 +721,7 @@ if build_app then
 		if build_studio then
 			linkLib "crnlib"
 			linkLib "assimp"
+			linkLib "cmft"
 			links {"shaderc"}
 		end
 		
@@ -836,6 +838,7 @@ if build_studio then
 			links { "audio", "animation", "renderer", "lua_script", "navigation", "editor", "engine", "shaderc" }
 			linkLib "crnlib"
 			linkLib "assimp"
+			linkLib "cmft"
 			linkLib "bgfx"
 			linkLib "lua"
 			linkLib "recast"

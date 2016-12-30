@@ -13,6 +13,7 @@
 #include "engine/property_descriptor.h"
 #include "engine/property_register.h"
 #include "engine/resource_manager.h"
+#include "engine/serializer.h"
 #include "engine/universe/universe.h"
 #include "renderer/model.h"
 #include "renderer/pose.h"
@@ -102,40 +103,60 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	};
 
 
-	struct Mixer
-	{
-		struct Input
-		{
-			Animation* animation = nullptr;
-			float time = 0.0f;
-			float weight = 0.0f;
-		};
-
-		Input inputs[8];
-		Entity entity;
-	};
-
 	AnimationSceneImpl(AnimationSystemImpl& anim_system, Engine& engine, Universe& universe, IAllocator& allocator)
 		: m_universe(universe)
 		, m_engine(engine)
 		, m_anim_system(anim_system)
 		, m_animables(allocator)
 		, m_controllers(allocator)
-		, m_mixers(allocator)
 		, m_event_stream(allocator)
 	{
-		m_universe.entityDestroyed().bind<AnimationSceneImpl, &AnimationSceneImpl::onEntityDestroyed>(this);
 		m_is_game_running = false;
 		m_render_scene = static_cast<RenderScene*>(universe.getScene(crc32("renderer")));
-		universe.registerComponentTypeScene(ANIMABLE_TYPE, this);
-		universe.registerComponentTypeScene(CONTROLLER_TYPE, this);
+		universe.registerComponentType(ANIMABLE_TYPE, this, &AnimationSceneImpl::serializeAnimable, &AnimationSceneImpl::deserializeAnimable);
+		universe.registerComponentType(CONTROLLER_TYPE, this, &AnimationSceneImpl::serializeController, &AnimationSceneImpl::deserializeController);
 		ASSERT(m_render_scene);
 	}
 
 
-	~AnimationSceneImpl()
+	void serializeAnimable(ISerializer& serializer, ComponentHandle cmp)
 	{
-		m_universe.entityDestroyed().unbind<AnimationSceneImpl, &AnimationSceneImpl::onEntityDestroyed>(this);
+		Animable& animable = m_animables[{cmp.index}];
+		serializer.write("time_scale", animable.time_scale);
+		serializer.write("start_time", animable.start_time);
+		serializer.write("animation", animable.animation ? animable.animation->getPath().c_str() : "");
+	}
+
+	void deserializeAnimable(IDeserializer& serializer, Entity entity)
+	{
+		Animable& animable = m_animables.insert(entity);
+		animable.entity = entity;
+		serializer.read(&animable.time_scale);
+		serializer.read(&animable.start_time);
+		char tmp[MAX_PATH_LENGTH];
+		serializer.read(tmp, lengthOf(tmp));
+		auto* res = tmp[0] ? m_engine.getResourceManager().get(ANIMATION_TYPE)->load(Path(tmp)) : nullptr;
+		animable.animation = (Animation*)res;
+		m_universe.addComponent(entity, ANIMABLE_TYPE, this, {entity.index});
+	}
+
+
+	void serializeController(ISerializer& serializer, ComponentHandle cmp)
+	{
+		Controller& controller = m_controllers.get({cmp.index});
+		serializer.write("source", controller.resource ? controller.resource->getPath().c_str() : "");
+	}
+
+
+	void deserializeController(IDeserializer& serializer, Entity entity)
+	{
+		Controller& controller = m_controllers.emplace(entity, m_anim_system.m_allocator);
+		controller.entity = entity;
+		char tmp[MAX_PATH_LENGTH];
+		serializer.read(tmp, lengthOf(tmp));
+		auto* res = tmp[0] ? m_engine.getResourceManager().get(CONTROLLER_RESOURCE_TYPE)->load(Path(tmp)) : nullptr;
+		controller.resource = (Anim::ControllerResource*)res;
+		m_universe.addComponent(entity, CONTROLLER_TYPE, this, {entity.index});
 	}
 
 
@@ -145,23 +166,8 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
-	void onEntityDestroyed(Entity entity)
-	{
-		m_mixers.erase(entity);
-	}
-
-
 	void clear() override
 	{
-		for (Mixer& mixer : m_mixers)
-		{
-			for (auto& input : mixer.inputs)
-			{
-				unloadAnimation(input.animation);
-			}
-		}
-		m_mixers.clear();
-
 		for (Animable& animable : m_animables)
 		{
 			unloadAnimation(animable.animation);
@@ -240,24 +246,6 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		auto* animation = static_cast<Animation*>(animation_idx > 0 ? m_engine.getLuaResource(animation_idx) : nullptr);
 		if (animation) return animation->getLength();
 		return 0;
-	}
-
-
-	void mixAnimation(Entity entity, int animation_idx, int input_idx, float time, float weight)
-	{
-		auto* animation = static_cast<Animation*>(animation_idx > 0 ? m_engine.getLuaResource(animation_idx) : nullptr);
-		int mixer_idx = m_mixers.find(entity);
-		if (mixer_idx < 0)
-		{
-			Mixer& mixer = m_mixers.insert(entity);
-			mixer.entity = entity;
-			mixer_idx = m_mixers.find(entity);
-		}
-		Mixer& mixer = m_mixers.at(mixer_idx);
-		auto& input = mixer.inputs[input_idx];
-		input.animation = animation;
-		input.time = time;
-		input.weight = weight;
 	}
 
 
@@ -482,38 +470,6 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
-	void updateMixer(Mixer& mixer, float time_delta)
-	{
-		ComponentHandle model_instance = m_render_scene->getModelInstanceComponent(mixer.entity);
-		if (model_instance == INVALID_COMPONENT) return;
-
-		auto* pose = m_render_scene->getPose(model_instance);
-		auto* model = m_render_scene->getModelInstanceModel(model_instance);
-
-		if (!pose) return;
-		if (!model->isReady()) return;
-
-		model->getPose(*pose);
-		pose->computeRelative(*model);
-
-		for (int i = 0; i < lengthOf(mixer.inputs); ++i)
-		{
-			Mixer::Input& input = mixer.inputs[i];
-			if (!input.animation || !input.animation->isReady()) break;
-			if (i == 0)
-			{
-				input.animation->getRelativePose(input.time, *pose, *model);
-			}
-			else
-			{
-				input.animation->getRelativePose(input.time, *pose, *model, input.weight);
-			}
-			input.animation = nullptr;
-		}
-		pose->computeAbsolute(*model);
-	}
-
-
 	void updateAnimable(Animable& animable, float time_delta)
 	{
 		if (!animable.animation || !animable.animation->isReady()) return;
@@ -662,11 +618,6 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 
 		m_event_stream.clear();
 
-		for (Mixer& mixer : m_mixers)
-		{
-			AnimationSceneImpl::updateMixer(mixer, time_delta);
-		}
-
 		for (Animable& animable : m_animables)
 		{
 			AnimationSceneImpl::updateAnimable(animable, time_delta);
@@ -765,7 +716,6 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	Engine& m_engine;
 	AssociativeArray<Entity, Animable> m_animables;
 	AssociativeArray<Entity, Controller> m_controllers;
-	AssociativeArray<Entity, Mixer> m_mixers;
 	RenderScene* m_render_scene;
 	bool m_is_game_running;
 	OutputBlob m_event_stream;
@@ -821,7 +771,6 @@ void AnimationSystemImpl::registerLuaAPI()
 		LuaWrapper::createSystemFunction(L, "Animation", #name, f); \
 	} while(false) \
 
-	REGISTER_FUNCTION(mixAnimation);
 	REGISTER_FUNCTION(getAnimationLength);
 	REGISTER_FUNCTION(setControllerIntInput);
 	REGISTER_FUNCTION(setControllerBoolInput);

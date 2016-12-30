@@ -200,6 +200,7 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 						audio_scene->setClip(clip_id, Lumix::Path(path));
 					}
 					bool looped = audio_scene->getClipInfo(clip_id)->looped;
+					ImGui::InputFloat("Volume", &clip_info->volume);
 					if (ImGui::Checkbox("Looped", &looped))
 					{
 						clip_info->looped = looped;

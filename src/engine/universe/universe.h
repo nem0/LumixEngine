@@ -1,15 +1,16 @@
 #pragma once
 
 
-#include "engine/lumix.h"
 #include "engine/array.h"
 #include "engine/associative_array.h"
 #include "engine/delegate_list.h"
+#include "engine/iplugin.h"
+#include "engine/lumix.h"
 #include "engine/path.h"
 #include "engine/quat.h"
 #include "engine/string.h"
-#include "engine/vec.h"
 #include "engine/universe/component.h"
+#include "engine/vec.h"
 
 
 namespace Lumix
@@ -17,10 +18,13 @@ namespace Lumix
 
 
 class InputBlob;
+struct IDeserializer;
+struct ISerializer;
 struct Matrix;
 class OutputBlob;
 struct Transform;
 class Universe;
+struct PrefabResource;
 
 
 enum
@@ -31,6 +35,16 @@ enum
 
 class LUMIX_ENGINE_API Universe
 {
+public:
+	typedef void (IScene::*Serialize)(ISerializer&, ComponentHandle);
+	typedef void (IScene::*Deserialize)(IDeserializer&, Entity);
+	struct ComponentTypeEntry
+	{
+		IScene* scene;
+		void (IScene::*serialize)(ISerializer&, ComponentHandle);
+		void (IScene::*deserialize)(IDeserializer&, Entity);
+	};
+
 public:
 	explicit Universe(IAllocator& allocator);
 	~Universe();
@@ -45,11 +59,15 @@ public:
 	ComponentUID getComponent(Entity entity, ComponentType type) const;
 	ComponentUID getFirstComponent(Entity entity) const;
 	ComponentUID getNextComponent(const ComponentUID& cmp) const;
-	void registerComponentTypeScene(ComponentType type, IScene* scene);
-	int getEntityCount() const { return m_transformations.size(); }
+	ComponentTypeEntry& registerComponentType(ComponentType type) { return m_component_type_map[type.index]; }
+	template <typename T1, typename T2>
+	void registerComponentType(ComponentType type, IScene* scene, T1 serialize, T2 deserialize)
+	{
+		m_component_type_map[type.index].scene = scene;
+		m_component_type_map[type.index].serialize = static_cast<Serialize>(serialize);
+		m_component_type_map[type.index].deserialize = static_cast<Deserialize>(deserialize);
+	}
 
-	int getDenseIdx(Entity entity);
-	Entity getEntityFromDenseIdx(int idx);
 	Entity getFirstEntity();
 	Entity getNextEntity(Entity entity);
 	bool nameExists(const char* name) const;
@@ -67,6 +85,11 @@ public:
 	void setPosition(Entity entity, float x, float y, float z);
 	void setPosition(Entity entity, const Vec3& pos);
 	void setScale(Entity entity, float scale);
+	void instantiatePrefab(const PrefabResource& prefab,
+		const Vec3& pos,
+		const Quat& rot,
+		float scale,
+		Array<Entity>& entities);
 	float getScale(Entity entity);
 	const Vec3& getPosition(Entity entity) const;
 	const Quat& getRotation(Entity entity) const;
@@ -79,6 +102,8 @@ public:
 	DelegateList<void(const ComponentUID&)>& componentDestroyed() { return m_component_destroyed; }
 	DelegateList<void(const ComponentUID&)>& componentAdded() { return m_component_added; }
 
+	void serializeComponent(ISerializer& serializer, ComponentType type, ComponentHandle cmp);
+	void deserializeComponent(IDeserializer& serializer, Entity entity, ComponentType type);
 	void serialize(OutputBlob& serializer);
 	void deserialize(InputBlob& serializer);
 
@@ -88,21 +113,33 @@ public:
 	void addScene(IScene* scene);
 
 private:
-	struct Transformation
+	struct EntityData
 	{
-		Entity entity;
+		EntityData() {}
+
 		Vec3 position;
 		Quat rotation;
-		float scale;
+		union
+		{
+			struct 
+			{
+				float scale;
+				u64 components;
+			};
+			struct
+			{
+				int prev;
+				int next;
+			};
+		};
+		bool valid;
 	};
 
 private:
 	IAllocator& m_allocator;
+	ComponentTypeEntry m_component_type_map[MAX_COMPONENTS_TYPES_COUNT];
 	Array<IScene*> m_scenes;
-	IScene* m_component_type_scene_map[MAX_COMPONENTS_TYPES_COUNT];
-	Array<Transformation> m_transformations;
-	Array<u64> m_components;
-	Array<int> m_entity_map;
+	Array<EntityData> m_entities;
 	AssociativeArray<u32, u32> m_name_to_id_map;
 	AssociativeArray<u32, string> m_id_to_name_map;
 	DelegateList<void(Entity)> m_entity_moved;

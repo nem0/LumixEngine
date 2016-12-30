@@ -21,6 +21,7 @@ LUMIX_ENGINE_API bool toCString(u32 value, char* output, int length);
 LUMIX_ENGINE_API bool toCString(float value, char* output, int length, int after_point);
 LUMIX_ENGINE_API const char* reverseFind(const char* begin_haystack, const char* end_haystack, char c);
 LUMIX_ENGINE_API const char* fromCString(const char* input, int length, i32* value);
+LUMIX_ENGINE_API const char* fromCString(const char* input, int length, u64* value);
 LUMIX_ENGINE_API const char* fromCString(const char* input, int length, i64* value);
 LUMIX_ENGINE_API const char* fromCString(const char* input, int length, u32* value);
 LUMIX_ENGINE_API bool copyString(char* destination, int length, const char* source);
@@ -118,6 +119,11 @@ template <int size> struct StaticString
 
 	bool operator==(const char* str) const {
 		return Lumix::equalStrings(data, str);
+	}
+
+	StaticString<size> operator +(const char* rhs)
+	{
+		return StaticString<size>(*this, rhs);
 	}
 
 	operator const char*() const { return data; }

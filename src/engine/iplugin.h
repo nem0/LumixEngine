@@ -6,9 +6,11 @@
 
 namespace Lumix
 {
+	struct IDeserializer;
 	class Engine;
 	class InputBlob;
 	class IPlugin;
+	struct ISerializer;
 	class OutputBlob;
 	class Universe;
 	class Universe;
@@ -22,6 +24,8 @@ namespace Lumix
 			virtual ComponentHandle createComponent(ComponentType, Entity) = 0;
 			virtual void destroyComponent(ComponentHandle component, ComponentType type) = 0;
 			virtual void serialize(OutputBlob& serializer) = 0;
+			virtual void serialize(ISerializer& serializer) {}
+			virtual void deserialize(IDeserializer& serializer) {}
 			virtual void deserialize(InputBlob& serializer, int version) = 0;
 			virtual IPlugin& getPlugin() const = 0;
 			virtual void update(float time_delta, bool paused) = 0;

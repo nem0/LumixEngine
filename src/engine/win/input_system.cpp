@@ -160,6 +160,7 @@ struct InputSystemImpl LUMIX_FINAL : public InputSystem
 					return deadZone(m_xinput_states[value.controller_id].Gamepad.bRightTrigger / 255.0f, DEADZONE);
 				case InputType::LTRIGGER:
 					return deadZone(m_xinput_states[value.controller_id].Gamepad.bLeftTrigger / 255.0f, DEADZONE);
+				default: ASSERT(false); break;
 			}
 		}
 		return 0;

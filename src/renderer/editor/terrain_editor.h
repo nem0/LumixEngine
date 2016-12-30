@@ -11,6 +11,7 @@ namespace Lumix
 {
 class Material;
 class Model;
+struct PrefabResource;
 class RenderScene;
 class Texture;
 }
@@ -66,6 +67,7 @@ private:
 
 private:
 	Lumix::WorldEditor& m_world_editor;
+	StudioApp& m_app;
 	ActionType m_action_type;
 	Lumix::ComponentUID m_component;
 	float m_terrain_brush_strength;
@@ -75,7 +77,7 @@ private:
 	Lumix::u16 m_flat_height;
 	Lumix::Vec3 m_color;
 	int m_current_brush;
-	Lumix::Array<int> m_selected_entity_templates;
+	Lumix::Array<Lumix::PrefabResource*> m_selected_prefabs;
 	Action* m_increase_brush_size;
 	Action* m_decrease_brush_size;
 	Action* m_increase_texture_idx;

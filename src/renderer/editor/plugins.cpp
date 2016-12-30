@@ -1,4 +1,3 @@
-#include "engine/lumix.h"
 #include "editor/asset_browser.h"
 #include "editor/ieditor_command.h"
 #include "editor/platform_interface.h"
@@ -8,6 +7,7 @@
 #include "editor/utils.h"
 #include "editor/world_editor.h"
 #include "engine/crc32.h"
+#include "engine/engine.h"
 #include "engine/fs/disk_file_device.h"
 #include "engine/fs/file_system.h"
 #include "engine/fs/os_file.h"
@@ -15,13 +15,13 @@
 #include "engine/json_serializer.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
+#include "engine/lumix.h"
 #include "engine/path_utils.h"
+#include "engine/plugin_manager.h"
+#include "engine/property_descriptor.h"
+#include "engine/property_register.h"
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
-#include "engine/engine.h"
-#include "engine/plugin_manager.h"
-#include "engine/property_register.h"
-#include "engine/property_descriptor.h"
 #include "game_view.h"
 #include "import_asset_dialog.h"
 #include "renderer/frame_buffer.h"
@@ -35,13 +35,13 @@
 #include "renderer/shader.h"
 #include "renderer/texture.h"
 #include "scene_view.h"
-#include "shader_editor.h"
 #include "shader_compiler.h"
+#include "shader_editor.h"
 #include "terrain_editor.h"
-#include <cmath>
-#include <crnlib.h>
 #include <SDL.h>
-
+#include <cmath>
+#include <cmft/cubemapfilter.h>
+#include <crnlib.h>
 
 using namespace Lumix;
 
@@ -54,7 +54,6 @@ static const ComponentType POINT_LIGHT_TYPE = PropertyRegister::getComponentType
 static const ComponentType GLOBAL_LIGHT_TYPE = PropertyRegister::getComponentType("global_light");
 static const ComponentType MODEL_INSTANCE_TYPE = PropertyRegister::getComponentType("renderable");
 static const ComponentType ENVIRONMENT_PROBE_TYPE = PropertyRegister::getComponentType("environment_probe");
-static const u32 RENDERER_HASH = crc32("renderer");
 static const ResourceType MATERIAL_TYPE("material");
 static const ResourceType SHADER_TYPE("shader");
 static const ResourceType TEXTURE_TYPE("texture");
@@ -69,7 +68,7 @@ struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 	}
 
 
-	bool acceptExtension(const char* ext, Lumix::ResourceType type) const override
+	bool acceptExtension(const char* ext, ResourceType type) const override
 	{
 		return type == MATERIAL_TYPE && equalStrings(ext, "mat");
 	}
@@ -374,7 +373,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 	}
 
 
-	bool acceptExtension(const char* ext, Lumix::ResourceType type) const override
+	bool acceptExtension(const char* ext, ResourceType type) const override
 	{
 		return type == MODEL_TYPE && equalStrings(ext, "msh");
 	}
@@ -389,7 +388,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		m_pipeline->load();
 
 		auto mesh_entity = m_universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
-		auto* render_scene = static_cast<RenderScene*>(m_universe->getScene(RENDERER_HASH));
+		auto* render_scene = static_cast<RenderScene*>(m_universe->getScene(MODEL_INSTANCE_TYPE));
 		m_mesh = render_scene->createComponent(MODEL_INSTANCE_TYPE, mesh_entity);
 		
 		auto light_entity = m_universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
@@ -407,7 +406,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 	void showPreview(Model& model)
 	{
 		auto& engine = m_app.getWorldEditor()->getEngine();
-		auto* render_scene = static_cast<RenderScene*>(m_universe->getScene(RENDERER_HASH));
+		auto* render_scene = static_cast<RenderScene*>(m_universe->getScene(MODEL_INSTANCE_TYPE));
 		if (!render_scene) return;
 		if (!model.isReady()) return;
 
@@ -441,7 +440,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		if (ImGui::IsItemHovered() && mouse_down)
 		{
 			auto& input = engine.getInputSystem();
-			auto delta = Lumix::Vec2(input.getMouseXMove(), input.getMouseYMove());
+			auto delta = Vec2(input.getMouseXMove(), input.getMouseYMove());
 
 			if (!m_is_mouse_captured)
 			{
@@ -605,7 +604,7 @@ struct TexturePlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 	}
 
 
-	bool acceptExtension(const char* ext, Lumix::ResourceType type) const override { return false; }
+	bool acceptExtension(const char* ext, ResourceType type) const override { return false; }
 
 
 	bool onGUI(Resource* resource, ResourceType type) override
@@ -673,7 +672,7 @@ struct ShaderPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 	}
 
 
-	bool acceptExtension(const char* ext, Lumix::ResourceType type) const override
+	bool acceptExtension(const char* ext, ResourceType type) const override
 	{
 		return type == SHADER_TYPE && equalStrings("shd", ext);
 	}
@@ -686,7 +685,7 @@ struct ShaderPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		auto* shader = static_cast<Shader*>(resource);
 		char basename[MAX_PATH_LENGTH];
 		PathUtils::getBasename(basename, lengthOf(basename), resource->getPath().c_str());
-		StaticString<MAX_PATH_LENGTH> path("/pipelines/", basename);
+		StaticString<MAX_PATH_LENGTH> path("/pipelines/", basename, "/", basename);
 		if (ImGui::Button("Open vertex shader"))
 		{
 			path << "_vs.sc";
@@ -777,7 +776,7 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		auto& plugin_manager = world_editor->getEngine().getPluginManager();
 		Renderer*  renderer = static_cast<Renderer*>(plugin_manager.getPlugin("renderer"));
 		auto& allocator = world_editor->getAllocator();
-		Lumix::Path pipeline_path("pipelines/probe.lua");
+		Path pipeline_path("pipelines/probe.lua");
 		m_pipeline = Pipeline::create(*renderer, pipeline_path, allocator);
 		m_pipeline->load();
 	}
@@ -789,7 +788,7 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 	}
 
 
-	bool saveCubemap(ComponentUID cmp, const Array<u8>& data, int texture_size)
+	bool saveCubemap(ComponentUID cmp, const u8* data, int texture_size, const char* postfix)
 	{
 		crn_uint32 size;
 		crn_comp_params comp_params;
@@ -806,7 +805,7 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		comp_params.m_faces = 6;
 		for (int i = 0; i < 6; ++i)
 		{
-			comp_params.m_pImages[i][0] = (Lumix::u32*)&data[i * texture_size * texture_size * 4];
+			comp_params.m_pImages[i][0] = (u32*)&data[i * texture_size * texture_size * 4];
 		}
 		crn_mipmap_params mipmap_params;
 		mipmap_params.m_mode = cCRNMipModeGenerateMips;
@@ -818,10 +817,11 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 			return false;
 		}
 
-		Lumix::FS::OsFile file;
+		FS::OsFile file;
 		const char* base_path = m_app.getWorldEditor()->getEngine().getDiskFileDevice()->getBasePath();
-		u64 universe_guid = m_app.getWorldEditor()->getUniverse()->getPath().getHash();
-		Lumix::StaticString<Lumix::MAX_PATH_LENGTH> path(base_path, "universes/", universe_guid);
+		char basename[64];
+		PathUtils::getBasename(basename, lengthOf(basename), m_app.getWorldEditor()->getUniverse()->getPath().c_str());
+		StaticString<MAX_PATH_LENGTH> path(base_path, "universes/", basename);
 		if (!PlatformInterface::makePath(path) && !PlatformInterface::dirExists(path))
 		{
 			g_log_error.log("Editor") << "Failed to create " << path;
@@ -831,9 +831,9 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		{
 			g_log_error.log("Editor") << "Failed to create " << path;
 		}
-		path << cmp.handle.index << ".dds";
+		path << cmp.handle.index << postfix << ".dds";
 		auto& allocator = m_app.getWorldEditor()->getAllocator();
-		if (!file.open(path, Lumix::FS::Mode::CREATE_AND_WRITE, allocator))
+		if (!file.open(path, FS::Mode::CREATE_AND_WRITE, allocator))
 		{
 			g_log_error.log("Editor") << "Failed to create " << path;
 			crn_free_block(compressed_data);
@@ -893,7 +893,7 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		IAllocator& allocator = engine.getAllocator();
 
 		Vec3 probe_position = universe->getPosition(cmp.entity);
-		auto* scene = static_cast<RenderScene*>(universe->getScene(RENDERER_HASH));
+		auto* scene = static_cast<RenderScene*>(universe->getScene(CAMERA_TYPE));
 		ComponentHandle camera_cmp = scene->getCameraInSlot("probe");
 		if (!isValid(camera_cmp)) return;
 
@@ -909,7 +909,7 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		Vec3 ups[] = {{0, 1, 0}, {0, 1, 0}, {0, 0, 1}, {0, 0, -1}, {0, 1, 0}, {0, 1, 0}};
 		Vec3 ups_opengl[] = { { 0, -1, 0 },{ 0, -1, 0 },{ 0, 0, 1 },{ 0, 0, -1 },{ 0, -1, 0 },{ 0, -1, 0 } };
 
-		Lumix::Array<Lumix::u8> data(allocator);
+		Array<u8> data(allocator);
 		data.resize(6 * TEXTURE_SIZE * TEXTURE_SIZE * 4);
 		bgfx::TextureHandle texture =
 			bgfx::createTexture2D(TEXTURE_SIZE, TEXTURE_SIZE, false, 1, bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK);
@@ -954,7 +954,33 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 				flipX(tmp, TEXTURE_SIZE);
 			}
 		}
-		saveCubemap(cmp, data, TEXTURE_SIZE);
+		cmft::Image image;
+		cmft::Image irradiance;
+
+		cmft::imageCreate(image, TEXTURE_SIZE, TEXTURE_SIZE, 0x303030ff, 1, 6, cmft::TextureFormat::RGBA8);
+		cmft::imageFromRgba32f(image, cmft::TextureFormat::RGBA8);
+		copyMemory(image.m_data, &data[0], data.size());
+		cmft::imageToRgba32f(image);
+		
+		cmft::imageIrradianceFilterSh(irradiance, 32, image);
+
+		cmft::imageRadianceFilter(
+			image
+			, 128
+			, cmft::LightingModel::BlinnBrdf
+			, false
+			, 1
+			, 10
+			, 1
+			, cmft::EdgeFixup::None
+			, 0xff
+		);
+
+		cmft::imageFromRgba32f(image, cmft::TextureFormat::RGBA8);
+		cmft::imageFromRgba32f(irradiance, cmft::TextureFormat::RGBA8);
+		saveCubemap(cmp, (u8*)irradiance.m_data, 32, "_irradiance");
+		saveCubemap(cmp, (u8*)image.m_data, 128, "_radiance");
+		saveCubemap(cmp, &data[0], TEXTURE_SIZE, "");
 		bgfx::destroyTexture(texture);
 		
 		scene->reloadEnvironmentProbe(cmp.handle);
@@ -1058,7 +1084,7 @@ struct SceneViewPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		}
 
 
-		ImTextureID loadTexture(const Lumix::Path& path) override
+		ImTextureID loadTexture(const Path& path) override
 		{
 			auto& rm = m_editor.getEngine().getResourceManager();
 			auto* texture = static_cast<Texture*>(rm.get(TEXTURE_TYPE)->load(path));
@@ -1224,7 +1250,7 @@ struct SceneViewPlugin LUMIX_FINAL : public StudioApp::IPlugin
 
 		void onUniverseCreated()
 		{
-			m_render_scene = static_cast<RenderScene*>(m_editor.getUniverse()->getScene(RENDERER_HASH));
+			m_render_scene = static_cast<RenderScene*>(m_editor.getUniverse()->getScene(MODEL_INSTANCE_TYPE));
 		}
 
 
@@ -2014,7 +2040,7 @@ struct GameViewPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	void onUniverseCreated()
 	{
 		auto* universe = m_app.getWorldEditor()->getUniverse();
-		auto* scene = static_cast<RenderScene*>(universe->getScene(RENDERER_HASH));
+		auto* scene = static_cast<RenderScene*>(universe->getScene(MODEL_INSTANCE_TYPE));
 
 		m_gui_pipeline->setScene(scene);
 	}

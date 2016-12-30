@@ -11,7 +11,7 @@ namespace Lumix
 {
 
 class Engine;
-class EntityTemplateSystem;
+class PrefabSystem;
 class Hierarchy;
 class IArrayDescriptor;
 class InputBlob;
@@ -78,7 +78,7 @@ public:
 	virtual void updateEngine() = 0;
 	virtual void beginCommandGroup(u32 type) = 0;
 	virtual void endCommandGroup() = 0;
-	virtual void executeCommand(IEditorCommand* command) = 0;
+	virtual IEditorCommand* executeCommand(IEditorCommand* command) = 0;
 	virtual IEditorCommand* createEditorCommand(u32 command_type) = 0;
 	virtual Engine& getEngine() = 0;
 	virtual Universe* getUniverse() = 0;
@@ -152,7 +152,7 @@ public:
 
 	virtual void addPlugin(Plugin& plugin) = 0;
 	virtual void removePlugin(Plugin& plugin) = 0;
-	virtual EntityTemplateSystem& getEntityTemplateSystem() = 0;
+	virtual PrefabSystem& getPrefabSystem() = 0;
 	virtual Vec3 getCameraRaycastHit() = 0;
 	virtual bool isMeasureToolActive() const = 0;
 	virtual float getMeasuredDistance() const = 0;
@@ -164,7 +164,7 @@ public:
 
 	virtual void saveUndoStack(const Path& path) = 0;
 	virtual bool executeUndoStack(const Path& path) = 0;
-	virtual bool runTest(const Path& undo_stack_path, const Path& result_universe_path) = 0;
+	virtual bool runTest(const char* dir, const char* name) = 0;
 	virtual void registerEditorCommandCreator(const char* command_type, EditorCommandCreator) = 0;
 	virtual bool isGameMode() const = 0;
 	virtual class EntityGroups& getEntityGroups() = 0;

@@ -2701,7 +2701,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	u32 m_debug_flags;
 	int m_view_idx;
 	u64 m_layer_mask;
-	View m_views[32];
+	View m_views[64];
 	View* m_current_view;
 	int m_pass_idx;
 	IAllocator& m_allocator;
