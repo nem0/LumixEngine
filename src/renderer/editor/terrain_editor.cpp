@@ -365,8 +365,6 @@ private:
 							data[offset + 1] = add;
 						}
 						data[offset] = m_texture_idx;
-						data[offset + 2] = 0;
-						data[offset + 3] = 255;
 					}
 				}
 			}

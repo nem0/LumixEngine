@@ -1823,7 +1823,7 @@ public:
 		});
 	}
 
-
+	
 	void serialize(const Path& path)
 	{
 		PathUtils::FileInfo file_info(path.c_str());
