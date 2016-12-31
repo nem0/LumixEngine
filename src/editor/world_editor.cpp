@@ -1017,7 +1017,7 @@ private:
 		explicit DestroyEntitiesCommand(WorldEditor& editor)
 			: m_editor(static_cast<WorldEditorImpl&>(editor))
 			, m_entities(editor.getAllocator())
-			, m_positons_rotations(editor.getAllocator())
+			, m_transformations(editor.getAllocator())
 			, m_old_values(editor.getAllocator())
 			, m_resources(editor.getAllocator())
 		{
@@ -1027,12 +1027,12 @@ private:
 		DestroyEntitiesCommand(WorldEditorImpl& editor, const Entity* entities, int count)
 			: m_editor(editor)
 			, m_entities(editor.getAllocator())
-			, m_positons_rotations(editor.getAllocator())
+			, m_transformations(editor.getAllocator())
 			, m_old_values(editor.getAllocator())
 			, m_resources(editor.getAllocator())
 		{
 			m_entities.reserve(count);
-			m_positons_rotations.reserve(m_entities.size());
+			m_transformations.reserve(m_entities.size());
 			for (int i = 0; i < count; ++i)
 			{
 				m_entities.push(entities[i]);
@@ -1056,13 +1056,13 @@ private:
 			for (int i = 0; i < m_entities.size(); ++i)
 			{
 				serializer.serializeArrayItem(m_entities[i]);
-				serializer.serializeArrayItem(m_positons_rotations[i].m_position.x);
-				serializer.serializeArrayItem(m_positons_rotations[i].m_position.y);
-				serializer.serializeArrayItem(m_positons_rotations[i].m_position.z);
-				serializer.serializeArrayItem(m_positons_rotations[i].m_rotation.x);
-				serializer.serializeArrayItem(m_positons_rotations[i].m_rotation.y);
-				serializer.serializeArrayItem(m_positons_rotations[i].m_rotation.z);
-				serializer.serializeArrayItem(m_positons_rotations[i].m_rotation.w);
+				serializer.serializeArrayItem(m_transformations[i].pos.x);
+				serializer.serializeArrayItem(m_transformations[i].pos.y);
+				serializer.serializeArrayItem(m_transformations[i].pos.z);
+				serializer.serializeArrayItem(m_transformations[i].rot.x);
+				serializer.serializeArrayItem(m_transformations[i].rot.y);
+				serializer.serializeArrayItem(m_transformations[i].rot.z);
+				serializer.serializeArrayItem(m_transformations[i].rot.w);
 			}
 			serializer.endArray();
 		}
@@ -1074,17 +1074,17 @@ private:
 			serializer.deserialize("count", count, 0);
 			serializer.deserializeArrayBegin("entities");
 			m_entities.resize(count);
-			m_positons_rotations.resize(count);
+			m_transformations.resize(count);
 			for (int i = 0; i < count; ++i)
 			{
 				serializer.deserializeArrayItem(m_entities[i], INVALID_ENTITY);
-				serializer.deserializeArrayItem(m_positons_rotations[i].m_position.x, 0);
-				serializer.deserializeArrayItem(m_positons_rotations[i].m_position.y, 0);
-				serializer.deserializeArrayItem(m_positons_rotations[i].m_position.z, 0);
-				serializer.deserializeArrayItem(m_positons_rotations[i].m_rotation.x, 0);
-				serializer.deserializeArrayItem(m_positons_rotations[i].m_rotation.y, 0);
-				serializer.deserializeArrayItem(m_positons_rotations[i].m_rotation.z, 0);
-				serializer.deserializeArrayItem(m_positons_rotations[i].m_rotation.w, 0);
+				serializer.deserializeArrayItem(m_transformations[i].pos.x, 0);
+				serializer.deserializeArrayItem(m_transformations[i].pos.y, 0);
+				serializer.deserializeArrayItem(m_transformations[i].pos.z, 0);
+				serializer.deserializeArrayItem(m_transformations[i].pos.x, 0);
+				serializer.deserializeArrayItem(m_transformations[i].rot.y, 0);
+				serializer.deserializeArrayItem(m_transformations[i].rot.z, 0);
+				serializer.deserializeArrayItem(m_transformations[i].rot.w, 0);
 			}
 			serializer.deserializeArrayEnd();
 		}
@@ -1093,15 +1093,12 @@ private:
 		bool execute() override
 		{
 			Universe* universe = m_editor.getUniverse();
-			m_positons_rotations.clear();
+			m_transformations.clear();
 			m_old_values.clear();
 			ResourceManager& resource_manager = m_editor.getEngine().getResourceManager();
 			for (int i = 0; i < m_entities.size(); ++i)
 			{
-				PositionRotation pos_rot;
-				pos_rot.m_position = universe->getPosition(m_entities[i]);
-				pos_rot.m_rotation = universe->getRotation(m_entities[i]);
-				m_positons_rotations.push(pos_rot);
+				m_transformations.emplace(universe->getTransform(m_entities[i]));
 				int count = 0;
 				for (ComponentUID cmp = universe->getFirstComponent(m_entities[i]);
 					cmp.isValid();
@@ -1150,7 +1147,7 @@ private:
 			for (int i = 0; i < m_entities.size(); ++i)
 			{
 				Entity new_entity =
-					universe->createEntity(m_positons_rotations[i].m_position, m_positons_rotations[i].m_rotation);
+					universe->createEntity(m_transformations[i].pos, m_transformations[i].rot);
 				int cmps_count;
 				blob.read(cmps_count);
 				for (int j = 0; j < cmps_count; ++j)
@@ -1183,18 +1180,9 @@ private:
 
 
 	private:
-		class PositionRotation
-		{
-		public:
-			Vec3 m_position;
-			Quat m_rotation;
-		};
-
-
-	private:
 		WorldEditorImpl& m_editor;
 		Array<Entity> m_entities;
-		Array<PositionRotation> m_positons_rotations;
+		Array<Transform> m_transformations;
 		OutputBlob m_old_values;
 		Array<Resource*> m_resources;
 	};
