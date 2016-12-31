@@ -31,97 +31,12 @@
 static const Lumix::ComponentType MODEL_INSTANCE_TYPE = Lumix::PropertyRegister::getComponentType("renderable");
 
 
-struct InsertMeshCommand LUMIX_FINAL : public Lumix::IEditorCommand
-{
-	Lumix::Vec3 m_position;
-	Lumix::Path m_mesh_path;
-	Lumix::Entity m_entity;
-	Lumix::WorldEditor& m_editor;
-
-
-	InsertMeshCommand(Lumix::WorldEditor& editor)
-		: m_editor(editor)
-	{
-	}
-
-
-	InsertMeshCommand(Lumix::WorldEditor& editor, const Lumix::Vec3& position, const Lumix::Path& mesh_path)
-		: m_mesh_path(mesh_path)
-		, m_position(position)
-		, m_editor(editor)
-	{
-	}
-
-
-	void serialize(Lumix::JsonSerializer& serializer)
-	{
-		serializer.serialize("path", m_mesh_path.c_str());
-		serializer.beginArray("pos");
-		serializer.serializeArrayItem(m_position.x);
-		serializer.serializeArrayItem(m_position.y);
-		serializer.serializeArrayItem(m_position.z);
-		serializer.endArray();
-	}
-
-
-	void deserialize(Lumix::JsonSerializer& serializer)
-	{
-		char path[Lumix::MAX_PATH_LENGTH];
-		serializer.deserialize("path", path, sizeof(path), "");
-		m_mesh_path = path;
-		serializer.deserializeArrayBegin("pos");
-		serializer.deserializeArrayItem(m_position.x, 0);
-		serializer.deserializeArrayItem(m_position.y, 0);
-		serializer.deserializeArrayItem(m_position.z, 0);
-		serializer.deserializeArrayEnd();
-	}
-
-
-	bool execute()
-	{
-		auto* universe = m_editor.getUniverse();
-		m_entity = universe->createEntity({0, 0, 0}, {0, 0, 0, 1});
-		universe->setPosition(m_entity, m_position);
-		auto* scene = static_cast<Lumix::RenderScene*>(universe->getScene(MODEL_INSTANCE_TYPE));
-		if (!scene) return false;
-
-		Lumix::ComponentHandle cmp = scene->createComponent(MODEL_INSTANCE_TYPE, m_entity);
-
-		if (isValid(cmp)) scene->setModelInstancePath(cmp, m_mesh_path);
-		return true;
-	}
-
-
-	void undo()
-	{
-		m_editor.getUniverse()->destroyEntity(m_entity);
-		m_entity = Lumix::INVALID_ENTITY;
-	}
-
-
-	const char* getType() override
-	{
-		return "insert_mesh";
-	}
-
-
-	bool merge(Lumix::IEditorCommand&) { return false; }
-};
-
-
-static Lumix::IEditorCommand* createInsertMeshCommand(Lumix::WorldEditor& editor)
-{
-	return LUMIX_NEW(editor.getAllocator(), InsertMeshCommand)(editor);
-}
-
-
 SceneView::SceneView(StudioApp& app)
 	: m_app(app)
 {
 	m_camera_speed = 0.1f;
 	m_is_mouse_captured = false;
 	m_show_stats = false;
-	m_app.getWorldEditor()->registerEditorCommandCreator("insert_mesh", createInsertMeshCommand);
 
 	m_log_ui = m_app.getLogUI();
 	m_editor = m_app.getWorldEditor();
@@ -292,10 +207,15 @@ void SceneView::handleDrop(float x, float y)
 		}
 		if (Lumix::PathUtils::hasExtension(path, "msh"))
 		{
-			auto* command = LUMIX_NEW(m_editor->getAllocator(), InsertMeshCommand)(
-				*m_editor, hit.m_origin + hit.m_t * hit.m_dir, Lumix::Path(path));
-
-			m_editor->executeCommand(command);
+			m_editor->beginCommandGroup(Lumix::crc32("insert_mesh"));
+			Lumix::Entity entity = m_editor->addEntity();
+			Lumix::Vec3 pos = hit.m_origin + hit.m_t * hit.m_dir;
+			m_editor->setEntitiesPositions(&entity, &pos, 1);
+			m_editor->selectEntities(&entity, 1);
+			m_editor->addComponent(MODEL_INSTANCE_TYPE);
+			const auto* desc = Lumix::PropertyRegister::getDescriptor(MODEL_INSTANCE_TYPE, Lumix::crc32("Source"));
+			m_editor->setProperty(MODEL_INSTANCE_TYPE, -1, *desc, &entity, 1, path, Lumix::stringLength(path) + 1);
+			m_editor->endCommandGroup();
 		}
 		else if (Lumix::PathUtils::hasExtension(path, "mat") && hit.m_mesh)
 		{
