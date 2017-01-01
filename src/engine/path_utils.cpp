@@ -59,7 +59,7 @@ void getDir(char* dir, int max_length, const char* src)
 	dir[0] = '\0';
 }
 
-void getBasename(char* basename, int /*max_length*/, const char* src)
+void getBasename(char* basename, int max_length, const char* src)
 {
 	basename[0] = '\0';
 	for (int i = stringLength(src) - 1; i >= 0; --i)
@@ -70,7 +70,7 @@ void getBasename(char* basename, int /*max_length*/, const char* src)
 				++i;
 			int j = 0;
 			basename[j] = src[i];
-			while (src[i + j] && src[i + j] != '.')
+			while (j < max_length - 1 && src[i + j] && src[i + j] != '.')
 			{
 				++j;
 				basename[j] = src[j + i];
