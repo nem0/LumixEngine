@@ -4469,7 +4469,8 @@ public:
 
 		for (auto& attachment : m_bone_attachments)
 		{
-			if (isValid(m_model_instances[attachment.parent_entity.index].entity) &&
+			if (isValid(attachment.parent_entity) &&
+				isValid(m_model_instances[attachment.parent_entity.index].entity) &&
 				m_model_instances[attachment.parent_entity.index].model == model)
 			{
 				updateRelativeMatrix(attachment);
