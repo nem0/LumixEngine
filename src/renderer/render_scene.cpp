@@ -137,6 +137,7 @@ struct EnvironmentProbe
 	Texture* texture;
 	Texture* irradiance;
 	Texture* radiance;
+	u64 guid;
 };
 
 
@@ -892,25 +893,29 @@ public:
 		m_universe.addComponent(entity, TERRAIN_TYPE, this, { entity.index });
 	}
 
-	void serializeEnvironmentProbe(ISerializer& serialize, ComponentHandle cmp) {}
+	void serializeEnvironmentProbe(ISerializer& serializer, ComponentHandle cmp) 
+	{
+		serializer.write("guid", m_environment_probes[{cmp.index}].guid);
+	}
 
 
-	void deserializeEnvironmentProbe(IDeserializer& serialize, Entity entity)
+	void deserializeEnvironmentProbe(IDeserializer& serializer, Entity entity)
 	{
 		auto* texture_manager = m_engine.getResourceManager().get(TEXTURE_TYPE);
 		char basename[64];
 		PathUtils::getBasename(basename, lengthOf(basename), m_universe.getPath().c_str());
 		StaticString<Lumix::MAX_PATH_LENGTH> probe_dir("universes/", basename, "/probes/");
 		EnvironmentProbe& probe = m_environment_probes.insert(entity);
-		StaticString<Lumix::MAX_PATH_LENGTH> path_str(probe_dir, entity.index, ".dds");
+		serializer.read(&probe.guid);
+		StaticString<Lumix::MAX_PATH_LENGTH> path_str(probe_dir, probe.guid, ".dds");
 		probe.texture = static_cast<Texture*>(texture_manager->load(Path(path_str)));
 		probe.texture->setFlag(BGFX_TEXTURE_SRGB, true);
-		StaticString<Lumix::MAX_PATH_LENGTH> irr_path_str(probe_dir, entity.index, "_irradiance.dds");
+		StaticString<Lumix::MAX_PATH_LENGTH> irr_path_str(probe_dir, probe.guid, "_irradiance.dds");
 		probe.irradiance = static_cast<Texture*>(texture_manager->load(Path(irr_path_str)));
 		probe.irradiance->setFlag(BGFX_TEXTURE_SRGB, true);
 		probe.irradiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
 		probe.irradiance->setFlag(BGFX_TEXTURE_MAG_ANISOTROPIC, true);
-		StaticString<Lumix::MAX_PATH_LENGTH> r_path_str(probe_dir, entity.index, "_radiance.dds");
+		StaticString<Lumix::MAX_PATH_LENGTH> r_path_str(probe_dir, probe.guid, "_radiance.dds");
 		probe.radiance = static_cast<Texture*>(texture_manager->load(Path(r_path_str)));
 		probe.radiance->setFlag(BGFX_TEXTURE_SRGB, true);
 		probe.radiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
@@ -1287,6 +1292,7 @@ public:
 		{
 			Entity entity = m_environment_probes.getKey(i);
 			serializer.write(entity);
+			serializer.write(m_environment_probes.at(i).guid);
 		}
 	}
 
@@ -1305,15 +1311,16 @@ public:
 			Entity entity;
 			serializer.read(entity);
 			EnvironmentProbe& probe = m_environment_probes.insert(entity);
-			StaticString<Lumix::MAX_PATH_LENGTH> path_str(probe_dir, entity.index, ".dds");
+			serializer.read(probe.guid);
+			StaticString<Lumix::MAX_PATH_LENGTH> path_str(probe_dir, probe.guid, ".dds");
 			probe.texture = static_cast<Texture*>(texture_manager->load(Path(path_str)));
 			probe.texture->setFlag(BGFX_TEXTURE_SRGB, true);
-			StaticString<Lumix::MAX_PATH_LENGTH> irr_path_str(probe_dir, entity.index, "_irradiance.dds");
+			StaticString<Lumix::MAX_PATH_LENGTH> irr_path_str(probe_dir, probe.guid, "_irradiance.dds");
 			probe.irradiance = static_cast<Texture*>(texture_manager->load(Path(irr_path_str)));
 			probe.irradiance->setFlag(BGFX_TEXTURE_SRGB, true);
 			probe.irradiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
 			probe.irradiance->setFlag(BGFX_TEXTURE_MAG_ANISOTROPIC, true);
-			StaticString<Lumix::MAX_PATH_LENGTH> r_path_str(probe_dir, entity.index, "_radiance.dds");
+			StaticString<Lumix::MAX_PATH_LENGTH> r_path_str(probe_dir, probe.guid, "_radiance.dds");
 			probe.radiance = static_cast<Texture*>(texture_manager->load(Path(r_path_str)));
 			probe.radiance->setFlag(BGFX_TEXTURE_SRGB, true);
 			probe.radiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
@@ -1325,10 +1332,8 @@ public:
 	}
 
 
-	void deserializeBoneAttachments(InputBlob& serializer, int version)
+	void deserializeBoneAttachments(InputBlob& serializer)
 	{
-		if (version <= (int)RenderSceneVersion::BONE_ATTACHMENTS) return;
-
 		i32 count;
 		serializer.read(count);
 		m_bone_attachments.resize(count);
@@ -1345,7 +1350,7 @@ public:
 	}
 
 
-	void deserializeParticleEmitters(InputBlob& serializer, int version)
+	void deserializeParticleEmitters(InputBlob& serializer)
 	{
 		int count;
 		serializer.read(count);
@@ -1354,11 +1359,9 @@ public:
 		{
 			ParticleEmitter* emitter = LUMIX_NEW(m_allocator, ParticleEmitter)(INVALID_ENTITY, m_universe, m_allocator);
 			serializer.read(emitter->m_is_valid);
-			if (emitter->m_is_valid || version > (int) RenderSceneVersion::INDEPENDENT_PARTICLE_MODULES)
+			if (emitter->m_is_valid)
 			{
-				emitter->deserialize(serializer,
-					m_engine.getResourceManager(),
-					version > (int)RenderSceneVersion::PARTICLE_EMITTERS_SPAWN_COUNT);
+				emitter->deserialize(serializer, m_engine.getResourceManager());
 				ComponentHandle cmp = {emitter->m_entity.index};
 				if (emitter->m_is_valid) m_universe.addComponent(emitter->m_entity, PARTICLE_EMITTER_TYPE, this, cmp);
 				for (auto* module : emitter->m_modules)
@@ -1436,37 +1439,8 @@ public:
 		serializeDecals(serializer);
 	}
 
-	void deserializeRenderParams(InputBlob& serializer)
-	{
-		int dummy;
-		serializer.read(dummy);
-		int count;
-		serializer.read(count);
-		char tmp[32];
-		bool any = false;
-		for(int i = 0; i < count; ++i)
-		{
-			any = true;
-			serializer.readString(tmp, lengthOf(tmp));
-			float value;
-			serializer.read(value);
-		}
-		serializer.read(count);
-		for(int i = 0; i < count; ++i)
-		{
-			any = true;
-			serializer.readString(tmp, lengthOf(tmp));
-			Vec4 value;
-			serializer.read(value);
-		}
-		if(any)
-		{
-			g_log_warning.log("Renderer") << "Render params are deprecated";
-		}
-	}
 
-
-	void deserializeCameras(InputBlob& serializer, RenderSceneVersion version)
+	void deserializeCameras(InputBlob& serializer)
 	{
 		i32 size;
 		serializer.read(size);
@@ -1477,34 +1451,17 @@ public:
 			serializer.read(camera.entity);
 			serializer.read(camera.far);
 			serializer.read(camera.fov);
-			if (version <= RenderSceneVersion::FOV_RADIANS) camera.fov = Math::degreesToRadians(camera.fov);
 			serializer.read(camera.is_ortho);
-			if (version <= RenderSceneVersion::ORTHO_CAMERA)
-			{
-				camera.is_ortho = false;
-				camera.ortho_size = 10;
-			}
-			else
-			{
-				serializer.read(camera.ortho_size);
-			}
-			bool is_free = false;
-			if (version <= RenderSceneVersion::CAMERA_AND_TERRAIN_REFACTOR)
-			{
-				serializer.read(is_free);
-			}
+			serializer.read(camera.ortho_size);
 			serializer.read(camera.near);
 			serializer.readString(camera.slot, lengthOf(camera.slot));
 
-			if (!is_free)
-			{
-				m_cameras.insert(camera.entity, camera);
-				m_universe.addComponent(camera.entity, CAMERA_TYPE, this, {camera.entity.index});
-			}
+			m_cameras.insert(camera.entity, camera);
+			m_universe.addComponent(camera.entity, CAMERA_TYPE, this, {camera.entity.index});
 		}
 	}
 
-	void deserializeModelInstances(InputBlob& serializer, RenderSceneVersion version)
+	void deserializeModelInstances(InputBlob& serializer)
 	{
 		i32 size = 0;
 		serializer.read(size);
@@ -1522,8 +1479,6 @@ public:
 
 			if(r.entity != INVALID_ENTITY)
 			{
-				i64 layer_mask;
-				if(version <= RenderSceneVersion::LAYERS) serializer.read(layer_mask);
 				r.matrix = m_universe.getMatrix(r.entity);
 
 				u32 path;
@@ -1536,19 +1491,16 @@ public:
 					setModel(cmp, model);
 				}
 
-				if (version > RenderSceneVersion::MODEL_INSTANCE_MATERIALS)
+				int material_count;
+				serializer.read(material_count);
+				if (material_count > 0)
 				{
-					int material_count;
-					serializer.read(material_count);
-					if (material_count > 0)
+					allocateCustomMeshes(r, material_count);
+					for (int j = 0; j < material_count; ++j)
 					{
-						allocateCustomMeshes(r, material_count);
-						for (int j = 0; j < material_count; ++j)
-						{
-							char path[MAX_PATH_LENGTH];
-							serializer.readString(path, lengthOf(path));
-							setModelInstanceMaterial(cmp, j, Path(path));
-						}
+						char path[MAX_PATH_LENGTH];
+						serializer.readString(path, lengthOf(path));
+						setModelInstanceMaterial(cmp, j, Path(path));
 					}
 				}
 
@@ -1557,7 +1509,7 @@ public:
 		}
 	}
 
-	void deserializeLights(InputBlob& serializer, RenderSceneVersion version)
+	void deserializeLights(InputBlob& serializer)
 	{
 		i32 size = 0;
 		serializer.read(size);
@@ -1566,26 +1518,7 @@ public:
 		{
 			m_light_influenced_geometry.emplace(m_allocator);
 			PointLight& light = m_point_lights[i];
-			if (version > RenderSceneVersion::SPECULAR_INTENSITY)
-			{
-				serializer.read(light);
-			}
-			else
-			{
-				serializer.read(light.m_diffuse_color);
-				serializer.read(light.m_specular_color);
-				serializer.read(light.m_diffuse_intensity);
-				serializer.read(light.m_entity);
-				serializer.read(light.m_component);
-				serializer.read(light.m_fov);
-				if (version <= RenderSceneVersion::FOV_RADIANS) light.m_fov = Math::degreesToRadians(light.m_fov);
-				serializer.read(light.m_attenuation_param);
-				serializer.read(light.m_range);
-				serializer.read(light.m_cast_shadows);
-				u8 padding;
-				for(int j = 0; j < 3; ++j) serializer.read(padding);
-				light.m_specular_intensity = 1;
-			}
+			serializer.read(light);
 			m_point_lights_map.insert(light.m_component, i);
 
 			m_universe.addComponent(light.m_entity, POINT_LIGHT_TYPE, this, light.m_component);
@@ -1597,76 +1530,36 @@ public:
 		for (int i = 0; i < size; ++i)
 		{
 			GlobalLight& light = m_global_lights[i];
-			if (version > RenderSceneVersion::PBR)
-			{
-				serializer.read(light);
-			}
-			else
-			{
-				Vec3 vdummy;
-				float fdummy;
-				serializer.read(light.m_component);
-				serializer.read(light.m_diffuse_color);
-				if (version > RenderSceneVersion::SPECULAR_INTENSITY) serializer.read(fdummy);
-				serializer.read(vdummy);
-				serializer.read(light.m_diffuse_intensity);
-				serializer.read(vdummy);
-				serializer.read(fdummy);
-				serializer.read(light.m_fog_color);
-				serializer.read(light.m_fog_density);
-				serializer.read(light.m_fog_bottom);
-				serializer.read(light.m_fog_height);
-				serializer.read(light.m_entity);
-				serializer.read(light.m_cascades);
-			}
+			serializer.read(light);
 			m_universe.addComponent(light.m_entity, GLOBAL_LIGHT_TYPE, this, light.m_component);
 		}
 		serializer.read(m_global_light_last_cmp);
 		serializer.read(m_active_global_light_cmp);
 	}
 
-	void deserializeTerrains(InputBlob& serializer, RenderSceneVersion version)
+	void deserializeTerrains(InputBlob& serializer)
 	{
 		i32 size = 0;
 		serializer.read(size);
 		for (int i = 0; i < size; ++i)
 		{
-			bool exists = true;
-			if (version <= RenderSceneVersion::CAMERA_AND_TERRAIN_REFACTOR)
-			{
-				serializer.read(exists);
-			}
-			if (exists)
-			{
-				auto* terrain = LUMIX_NEW(m_allocator, Terrain)(m_renderer, INVALID_ENTITY, *this, m_allocator);
-				terrain->deserialize(serializer, m_universe, *this, (int)version);
-				m_terrains.insert(terrain->getEntity(), terrain);
-			}
+			auto* terrain = LUMIX_NEW(m_allocator, Terrain)(m_renderer, INVALID_ENTITY, *this, m_allocator);
+			terrain->deserialize(serializer, m_universe, *this);
+			m_terrains.insert(terrain->getEntity(), terrain);
 		}
 	}
 
 
-	int getVersion() const override
+	void deserialize(InputBlob& serializer) override
 	{
-		return (int)RenderSceneVersion::LATEST;
-	}
-
-
-	void deserialize(InputBlob& serializer, int version) override
-	{
-		deserializeCameras(serializer, (RenderSceneVersion)version);
-		deserializeModelInstances(serializer, (RenderSceneVersion)version);
-		deserializeLights(serializer, (RenderSceneVersion)version);
-		deserializeTerrains(serializer, (RenderSceneVersion)version);
-		if (version >= 0) deserializeParticleEmitters(serializer, version);
-		if (version >= (int)RenderSceneVersion::RENDER_PARAMS &&
-			version < (int)RenderSceneVersion::RENDER_PARAMS_REMOVED)
-		{
-			deserializeRenderParams(serializer);
-		}
-		deserializeBoneAttachments(serializer, version);
-		if (version > (int)RenderSceneVersion::ENVIRONMENT_PROBES) deserializeEnvironmentProbes(serializer);
-		if (version > (int)RenderSceneVersion::DECAL) deserializeDecals(serializer);
+		deserializeCameras(serializer);
+		deserializeModelInstances(serializer);
+		deserializeLights(serializer);
+		deserializeTerrains(serializer);
+		deserializeParticleEmitters(serializer);
+		deserializeBoneAttachments(serializer);
+		deserializeEnvironmentProbes(serializer);
+		deserializeDecals(serializer);
 	}
 
 
@@ -4273,17 +4166,17 @@ public:
 		if (probe.texture) texture_manager->unload(*probe.texture);
 		char basename[64];
 		PathUtils::getBasename(basename, lengthOf(basename), m_universe.getPath().c_str());
-		StaticString<Lumix::MAX_PATH_LENGTH> path("universes/", basename, "/probes/", cmp.index, ".dds");
+		StaticString<Lumix::MAX_PATH_LENGTH> path("universes/", basename, "/probes/", probe.guid, ".dds");
 		probe.texture = static_cast<Texture*>(texture_manager->load(Path(path)));
 		probe.texture->setFlag(BGFX_TEXTURE_SRGB, true);
 		path = "universes/";
-		path << basename << "/probes/" << cmp.index << "_irradiance.dds";
+		path << basename << "/probes/" << probe.guid << "_irradiance.dds";
 		probe.irradiance = static_cast<Texture*>(texture_manager->load(Path(path)));
 		probe.irradiance->setFlag(BGFX_TEXTURE_SRGB, true);
 		probe.irradiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
 		probe.irradiance->setFlag(BGFX_TEXTURE_MAG_ANISOTROPIC, true);
 		path = "universes/";
-		path << basename << "/probes/" << cmp.index << "_radiance.dds";
+		path << basename << "/probes/" << probe.guid << "_radiance.dds";
 		probe.radiance = static_cast<Texture*>(texture_manager->load(Path(path)));
 		probe.radiance->setFlag(BGFX_TEXTURE_SRGB, true);
 		probe.radiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
@@ -4329,6 +4222,13 @@ public:
 	{
 		Entity entity = {cmp.index};
 		return m_environment_probes[entity].radiance;
+	}
+
+
+	u64 getEnvironmentProbeGUID(ComponentHandle cmp) const override
+	{
+		Entity entity = { cmp.index };
+		return m_environment_probes[entity].guid;
 	}
 
 
@@ -4869,6 +4769,7 @@ public:
 		probe.irradiance->setFlag(BGFX_TEXTURE_SRGB, true);
 		probe.radiance = static_cast<Texture*>(texture_manager->load(Path("pipelines/pbr/default_probe.dds")));
 		probe.radiance->setFlag(BGFX_TEXTURE_SRGB, true);
+		probe.guid = Math::randGUID();
 
 		ComponentHandle cmp = {entity.index};
 		m_universe.addComponent(entity, ENVIRONMENT_PROBE_TYPE, this, cmp);

@@ -15,6 +15,22 @@ struct Vec3;
 struct Vec4;
 
 
+struct EntityGUID
+{
+	u64 value;
+};
+
+
+const EntityGUID INVALID_ENTITY_GUID = { 0xffffFFFFffffFFFF };
+inline bool isValid(EntityGUID guid) { return guid.value != INVALID_ENTITY_GUID.value; }
+
+struct IEntityGUIDMap
+{
+	virtual Entity get(EntityGUID guid) = 0;
+	virtual EntityGUID get(Entity entity) = 0;
+};
+
+
 struct ISerializer
 {
 	virtual void write(const char* label, Entity entity) = 0;
@@ -55,9 +71,13 @@ struct IDeserializer
 };
 
 
-struct LUMIX_ENGINE_API TextSerializer : public ISerializer
+struct LUMIX_ENGINE_API TextSerializer LUMIX_FINAL : public ISerializer
 {
-	TextSerializer(OutputBlob& _blob) : blob(_blob) {}
+	TextSerializer(OutputBlob& _blob, IEntityGUIDMap& _entity_map)
+		: blob(_blob)
+		, entity_map(_entity_map)
+	{
+	}
 
 	virtual void write(const char* label, Entity entity)  override;
 	virtual void write(const char* label, ComponentHandle value)  override;
@@ -76,13 +96,15 @@ struct LUMIX_ENGINE_API TextSerializer : public ISerializer
 	virtual void write(const char* label, const char* value)  override;
 
 	OutputBlob& blob;
+	IEntityGUIDMap& entity_map;
 };
 
 
-struct LUMIX_ENGINE_API TextDeserializer : public IDeserializer
+struct LUMIX_ENGINE_API TextDeserializer LUMIX_FINAL : public IDeserializer
 {
-	TextDeserializer(InputBlob& _blob)
+	TextDeserializer(InputBlob& _blob, IEntityGUIDMap& _entity_map)
 		: blob(_blob)
+		, entity_map(_entity_map)
 	{
 	}
 
@@ -106,6 +128,7 @@ struct LUMIX_ENGINE_API TextDeserializer : public IDeserializer
 	u32 readU32();
 
 	InputBlob& blob;
+	IEntityGUIDMap& entity_map;
 };
 
 

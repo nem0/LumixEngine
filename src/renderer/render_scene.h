@@ -33,37 +33,6 @@ template <typename T, typename T2> class AssociativeArray;
 template <typename T> class DelegateList;
 
 
-enum class RenderSceneVersion : i32
-{
-	PARTICLES,
-	WHOLE_LIGHTS,
-	PARTICLE_EMITTERS_SPAWN_COUNT,
-	PARTICLES_FORCE_MODULE,
-	PARTICLES_SAVE_SIZE_ALPHA,
-	MODEL_INSTANCE_MATERIALS,
-	GLOBAL_LIGHT_SPECULAR,
-	SPECULAR_INTENSITY,
-	RENDER_PARAMS,
-	RENDER_PARAMS_REMOVED,
-	GRASS_TYPE_DISTANCE,
-	ORTHO_CAMERA,
-	BONE_ATTACHMENTS,
-	ENVIRONMENT_PROBES,
-	FOV_RADIANS,
-	INDEPENDENT_PARTICLE_MODULES,
-	CAMERA_AND_TERRAIN_REFACTOR,
-	DECAL,
-	PARTICLE_EMITTER_SUBIMAGE_MODULE,
-	PARTICLE_EMITTER_LOCAL_SPACE,
-	NEW_GRASS,
-	LAYERS,
-	PBR,
-
-	LATEST,
-	INVALID = -1,
-};
-
-
 struct TerrainInfo
 {
 	Matrix m_world_matrix;
@@ -431,6 +400,7 @@ public:
 	virtual Texture* getEnvironmentProbeRadiance(ComponentHandle cmp) const = 0;
 	virtual void reloadEnvironmentProbe(ComponentHandle cmp) = 0;
 	virtual ComponentHandle getNearestEnvironmentProbe(const Vec3& pos) const = 0;
+	virtual u64 getEnvironmentProbeGUID(ComponentHandle cmp) const = 0;
 
 protected:
 	virtual ~RenderScene() {}

@@ -360,25 +360,11 @@ static FS::OsFile g_error_file;
 static bool g_is_error_file_opened = false;
 
 
-enum class SerializedEngineVersion : i32
-{
-	BASE,
-	SPARSE_TRANFORMATIONS,
-	FOG_PARAMS,
-	SCENE_VERSION,
-	HIERARCHY_COMPONENT,
-	SCENE_VERSION_CHECK,
-
-	LATEST // must be the last one
-};
-
-
 #pragma pack(1)
 class SerializedEngineHeader
 {
 public:
 	u32 m_magic;
-	SerializedEngineVersion m_version;
 	u32 m_reserved; // for crc
 };
 #pragma pack()
@@ -1345,9 +1331,9 @@ public:
 			auto* scene = ctx.getScene(hash);
 			int version;
 			serializer.read(version);
-			if (version > scene->getVersion())
+			if (version != scene->getVersion())
 			{
-				g_log_error.log("Core") << "Plugin " << scene->getPlugin().getName() << " is too old";
+				g_log_error.log("Core") << "Plugin " << scene->getPlugin().getName() << " has incompatible version";
 				return false;
 			}
 		}
@@ -1377,7 +1363,6 @@ public:
 	{
 		SerializedEngineHeader header;
 		header.m_magic = SERIALIZED_ENGINE_MAGIC; // == '_LEN'
-		header.m_version = SerializedEngineVersion::LATEST;
 		header.m_reserved = 0;
 		serializer.write(header);
 		serializePluginList(serializer);
@@ -1390,7 +1375,6 @@ public:
 		for (auto* scene : ctx.getScenes())
 		{
 			serializer.writeString(scene->getPlugin().getName());
-			serializer.write(scene->getVersion());
 			scene->serialize(serializer);
 		}
 		u32 crc = crc32((const u8*)serializer.getData() + pos, serializer.getPos() - pos);
@@ -1407,30 +1391,11 @@ public:
 			g_log_error.log("Core") << "Wrong or corrupted file";
 			return false;
 		}
-		if (header.m_version > SerializedEngineVersion::LATEST)
-		{
-			g_log_error.log("Core") << "Unsupported version";
-			return false;
-		}
-		if (!hasSerializedPlugins(serializer))
-		{
-			return false;
-		}
-		if (header.m_version > SerializedEngineVersion::SCENE_VERSION_CHECK &&
-			!hasSupportedSceneVersions(serializer, ctx))
-		{
-			return false;
-		}
+		if (!hasSerializedPlugins(serializer)) return false;
+		if (!hasSupportedSceneVersions(serializer, ctx)) return false;
 
 		m_path_manager.deserialize(serializer);
 		ctx.deserialize(serializer);
-
-		if (header.m_version <= SerializedEngineVersion::HIERARCHY_COMPONENT)
-		{
-			static const u32 HIERARCHY_HASH = crc32("hierarchy");
-			ctx.getScene(HIERARCHY_HASH)->deserialize(serializer, 0);
-		}
-
 		m_plugin_manager->deserialize(serializer);
 		i32 scene_count;
 		serializer.read(scene_count);
@@ -1439,12 +1404,7 @@ public:
 			char tmp[32];
 			serializer.readString(tmp, sizeof(tmp));
 			IScene* scene = ctx.getScene(crc32(tmp));
-			int scene_version = -1;
-			if (header.m_version > SerializedEngineVersion::SCENE_VERSION)
-			{
-				serializer.read(scene_version);
-			}
-			scene->deserialize(serializer, scene_version);
+			scene->deserialize(serializer);
 		}
 		m_path_manager.clear();
 		return true;

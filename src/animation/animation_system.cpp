@@ -376,7 +376,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	int getVersion() const override { return (int)AnimationSceneVersion::LATEST; }
 
 
-	void deserialize(InputBlob& serializer, int version) override
+	void deserialize(InputBlob& serializer) override
 	{
 		i32 count;
 		serializer.read(count);
@@ -385,50 +385,30 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		{
 			Animable animable;
 			serializer.read(animable.entity);
-			bool free = false;
-			if (version <= (int)AnimationSceneVersion::FIRST)
-			{
-				serializer.read(animable.time);
-				serializer.read(free);
-				animable.time_scale = 1;
-				animable.start_time = 0;
-			}
-			else
-			{
-				u32 flags = 0;
-				if(version <= (int)AnimationSceneVersion::REFACTOR) serializer.read(flags);
-				free = flags != 0;
-				serializer.read(animable.time_scale);
-				serializer.read(animable.start_time);
-				animable.time = animable.start_time;
-			}
+			serializer.read(animable.time_scale);
+			serializer.read(animable.start_time);
+			animable.time = animable.start_time;
 
 			char path[MAX_PATH_LENGTH];
 			serializer.readString(path, sizeof(path));
 			animable.animation = path[0] == '\0' ? nullptr : loadAnimation(Path(path));
-			if (!free)
-			{
-				m_animables.insert(animable.entity, animable);
-				ComponentHandle cmp = {animable.entity.index};
-				m_universe.addComponent(animable.entity, ANIMABLE_TYPE, this, cmp);
-			}
+			m_animables.insert(animable.entity, animable);
+			ComponentHandle cmp = {animable.entity.index};
+			m_universe.addComponent(animable.entity, ANIMABLE_TYPE, this, cmp);
 		}
 
-		if (version > (int)AnimationSceneVersion::CONTROLLERS)
+		serializer.read(count);
+		m_controllers.reserve(count);
+		for (int i = 0; i < count; ++i)
 		{
-			serializer.read(count);
-			m_controllers.reserve(count);
-			for (int i = 0; i < count; ++i)
-			{
-				Controller controller(m_anim_system.m_allocator);
-				serializer.read(controller.entity);
-				char tmp[MAX_PATH_LENGTH];
-				serializer.readString(tmp, lengthOf(tmp));
-				controller.resource = tmp[0] ? loadController(Path(tmp)) : nullptr;
-				m_controllers.insert(controller.entity, controller);
-				ComponentHandle cmp = { controller.entity.index };
-				m_universe.addComponent(controller.entity, CONTROLLER_TYPE, this, cmp);
-			}
+			Controller controller(m_anim_system.m_allocator);
+			serializer.read(controller.entity);
+			char tmp[MAX_PATH_LENGTH];
+			serializer.readString(tmp, lengthOf(tmp));
+			controller.resource = tmp[0] ? loadController(Path(tmp)) : nullptr;
+			m_controllers.insert(controller.entity, controller);
+			ComponentHandle cmp = { controller.entity.index };
+			m_universe.addComponent(controller.entity, CONTROLLER_TYPE, this, cmp);
 		}
 	}
 

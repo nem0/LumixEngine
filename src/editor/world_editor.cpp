@@ -184,64 +184,7 @@ public:
 	}
 
 
-	bool execute() override
-	{
-		InputBlob blob(m_blob.getData(), m_blob.getPos());
-
-		m_entities.clear();
-
-		int entity_count;
-		blob.read(entity_count);
-		m_entities.reserve(entity_count);
-
-		Universe& universe = *m_editor.getUniverse();
-		Matrix base_matrix = Matrix::IDENTITY;
-		base_matrix.setTranslation(m_position);
-		for (int i = 0; i < entity_count; ++i)
-		{
-			Matrix mtx;
-			blob.read(mtx);
-			if (i == 0)
-			{
-				Matrix inv = mtx;
-				inv.inverse();
-				base_matrix.copy3x3(mtx);
-				base_matrix = base_matrix * inv;
-				mtx.setTranslation(m_position);
-			}
-			else
-			{
-				mtx = base_matrix * mtx;
-			}
-			Entity new_entity = universe.createEntity(Vec3(0, 0, 0), Quat(0, 0, 0, 1));
-			m_entities.push(new_entity);
-			universe.setMatrix(new_entity, mtx);
-			i32 count;
-			blob.read(count);
-			for (int i = 0; i < count; ++i)
-			{
-				u32 hash;
-				blob.read(hash);
-				ComponentType type = PropertyRegister::getComponentTypeFromHash(hash);
-				ComponentUID cmp = m_editor.getEngine().createComponent(universe, new_entity, type);
-				i32 prop_count;
-				blob.read(prop_count);
-				for (int j = 0; j < prop_count; ++j)
-				{
-					u32 prop_name_hash;
-					blob.read(prop_name_hash);
-					auto* desc = PropertyRegister::getDescriptor(type, prop_name_hash);
-					i32 size;
-					blob.read(size);
-					if (desc) desc->set(cmp, -1, blob);
-					else blob.skip(size);
-				}
-			}
-		}
-
-		return true;
-	}
-
+	bool execute() override;
 
 
 	void serialize(JsonSerializer& serializer) override
@@ -279,14 +222,7 @@ public:
 	}
 
 
-	void undo() override
-	{
-		for (auto entity : m_entities)
-		{
-			m_editor.getUniverse()->destroyEntity(entity);
-		}
-		m_entities.clear();
-	}
+	void undo() override;
 
 
 	const char* getType() override { return "paste_entity"; }
@@ -843,10 +779,14 @@ public:
 
 	bool execute() override
 	{
-		// TODO do not change editor camera slot
 		InputBlob blob(m_new_value);
 		for (Entity entity : m_entities)
 		{
+			if (m_editor.getEditCamera().entity == entity && m_component_type == CAMERA_TYPE &&
+				m_property_descriptor->getNameHash() == crc32("Slot"))
+			{
+				continue;
+			}
 			ComponentUID component = m_editor.getUniverse()->getComponent(entity, m_component_type);
 			blob.rewind();
 			m_property_descriptor->set(component, m_index, blob);
@@ -902,6 +842,7 @@ private:
 
 struct WorldEditorImpl LUMIX_FINAL : public WorldEditor
 {
+	friend class PasteEntityCommand;
 private:
 	class AddComponentCommand LUMIX_FINAL : public IEditorCommand
 	{
@@ -1106,6 +1047,8 @@ private:
 				{
 					++count;
 				}
+				EntityGUID guid = m_editor.m_entity_map.get(m_entities[i]);
+				m_old_values.write(guid.value);
 				m_old_values.write(count);
 				for (ComponentUID cmp = universe->getFirstComponent(m_entities[i]);
 					cmp.isValid();
@@ -1132,6 +1075,7 @@ private:
 				m_old_values.write(prefab);
 
 				universe->destroyEntity(m_entities[i]);
+				m_editor.m_entity_map.erase(m_entities[i]);
 			}
 			return true;
 		}
@@ -1149,6 +1093,9 @@ private:
 				Entity new_entity =
 					universe->createEntity(m_transformations[i].pos, m_transformations[i].rot);
 				int cmps_count;
+				EntityGUID guid;
+				blob.read(guid.value);
+				m_editor.m_entity_map.insert(guid, new_entity);
 				blob.read(cmps_count);
 				for (int j = 0; j < cmps_count; ++j)
 				{
@@ -1365,6 +1312,7 @@ private:
 				m_editor.getUniverse()->createEntity(m_entity);
 				m_editor.getUniverse()->setPosition(m_entity, m_position);
 			}
+			((WorldEditorImpl&)m_editor).m_entity_map.create(m_entity);
 			m_editor.selectEntities(&m_entity, 1);
 			return true;
 		}
@@ -1389,6 +1337,7 @@ private:
 		void undo() override
 		{
 			m_editor.getUniverse()->destroyEntity(m_entity);
+			m_editor.m_entity_map.erase(m_entity);
 		}
 
 
@@ -1516,7 +1465,7 @@ public:
 
 		destroyUniverse();
 		EditorIcons::destroy(*m_editor_icons);
-		PrefabSystem::destroy(m_template_system);
+		PrefabSystem::destroy(m_prefab_system);
 
 		LUMIX_DELETE(m_allocator, m_render_interface);
 	}
@@ -1736,11 +1685,83 @@ public:
 	}
 
 
+	struct EntityGUIDMap : public IEntityGUIDMap
+	{
+		EntityGUIDMap(IAllocator& allocator)
+			: guid_to_entity(allocator)
+			, entity_to_guid(allocator)
+		{
+		}
+
+
+		void clear()
+		{
+			entity_to_guid.clear();
+			guid_to_entity.clear();
+		}
+
+
+		void create(Entity entity)
+		{
+			ASSERT(isValid(entity));
+			EntityGUID guid = { Math::randGUID() };
+			insert(guid, entity);
+		}
+
+
+		void erase(Entity entity)
+		{
+			EntityGUID guid = entity_to_guid[entity.index];
+			if (!isValid(guid)) return;
+			entity_to_guid[entity.index] = INVALID_ENTITY_GUID;
+			guid_to_entity.erase(guid.value);
+		}
+
+
+		void insert(EntityGUID guid, Entity entity)
+		{
+			guid_to_entity.insert(guid.value, entity);
+			while (entity.index >= entity_to_guid.size())
+			{
+				entity_to_guid.push(INVALID_ENTITY_GUID);
+			}
+			entity_to_guid[entity.index] = guid;
+		}
+
+
+		Entity get(EntityGUID guid) override
+		{
+			auto iter = guid_to_entity.find(guid.value);
+			if (iter.isValid()) return iter.value();
+			return INVALID_ENTITY;
+		}
+
+
+		EntityGUID get(Entity entity) override
+		{
+			if (!isValid(entity)) return INVALID_ENTITY_GUID;
+			return entity_to_guid[entity.index];
+		}
+
+
+		bool has(EntityGUID guid) const
+		{
+			auto iter = guid_to_entity.find(guid.value);
+			return iter.isValid();
+		}
+
+
+		HashMap<u64, Entity> guid_to_entity;
+		Array<EntityGUID> entity_to_guid;
+		u64 last_guid = 9999;
+	};
+
+
 	void deserialize(const Path& path)
 	{
 		PROFILE_FUNCTION();
 		if (isValid(m_camera)) m_universe->destroyEntity(m_camera);
-
+		m_entity_map.clear();
 		PathUtils::FileInfo file_info(path.c_str());
 		StaticString<MAX_PATH_LENGTH> scn_dir(file_info.m_dir, file_info.m_basename, "/scenes/");
 		auto scn_file_iter = PlatformInterface::createFileIterator(scn_dir, m_allocator);
@@ -1754,7 +1775,7 @@ public:
 					data.resize((int)file.size());
 					file.read(&data[0], data.size());
 					InputBlob blob(&data[0], data.size());
-					TextDeserializer deserializer(blob);
+					TextDeserializer deserializer(blob, m_entity_map);
 					x(deserializer);
 				}
 				file.close();
@@ -1767,8 +1788,15 @@ public:
 			loadFile(filepath, [&filepath, this](TextDeserializer& deserializer) {
 				char plugin_name[64];
 				PathUtils::getBasename(plugin_name, lengthOf(plugin_name), filepath);
-				IScene* scene = m_universe->getScene(crc32(plugin_name)); // todo if scene does not exist
-				scene->deserialize(deserializer);
+				IScene* scene = m_universe->getScene(crc32(plugin_name));
+				if (scene)
+				{
+					scene->deserialize(deserializer);
+				}
+				else
+				{
+					g_log_error.log("Editor") << "Could not open " << filepath << " since there is not plugin " << plugin_name;
+				}
 			});
 		}
 		PlatformInterface::destroyFileIterator(scn_file_iter);
@@ -1777,20 +1805,37 @@ public:
 		auto file_iter = PlatformInterface::createFileIterator(dir, m_allocator);
 		while (PlatformInterface::getNextFile(file_iter, &info))
 		{
+			if (info.filename[0] == '.') continue;
+			if (info.is_directory) continue;
 			FS::OsFile file;
 			StaticString<MAX_PATH_LENGTH> filepath(dir, info.filename);
 			char tmp[20];
 			PathUtils::getBasename(tmp, lengthOf(tmp), filepath);
-			Entity entity;
-			fromCString(tmp, lengthOf(tmp), &entity.index);
-			loadFile(filepath, [this, entity](TextDeserializer& deserializer) {
+			EntityGUID guid;
+			fromCString(tmp, lengthOf(tmp), &guid.value);
+			Entity entity = m_universe->createEntity({0, 0, 0}, {0, 0, 0, 1});
+			m_entity_map.insert(guid, entity);
+		}
+		PlatformInterface::destroyFileIterator(file_iter);
+		
+		file_iter = PlatformInterface::createFileIterator(dir, m_allocator);
+		while (PlatformInterface::getNextFile(file_iter, &info))
+		{
+			FS::OsFile file;
+			StaticString<MAX_PATH_LENGTH> filepath(dir, info.filename);
+			char tmp[20];
+			PathUtils::getBasename(tmp, lengthOf(tmp), filepath);
+			EntityGUID guid;
+			fromCString(tmp, lengthOf(tmp), &guid.value);
+			loadFile(filepath, [this, guid](TextDeserializer& deserializer) {
 				char name[64];
 				deserializer.read(name, lengthOf(name));
 				Transform tr;
 				deserializer.read(&tr);
 				float scale;
 				deserializer.read(&scale);
-				m_universe->createEntity(entity);
+				Entity entity = m_entity_map.get(guid);
+				m_universe->setTransform(entity, tr);
 				if(name[0]) m_universe->setEntityName(entity, name);
 				m_universe->setScale(entity, scale);
 				m_universe->setTransform(entity, tr);
@@ -1807,8 +1852,14 @@ public:
 
 		StaticString<MAX_PATH_LENGTH> filepath(file_info.m_dir, file_info.m_basename, "/systems/templates.sys");
 		loadFile(filepath, [this](TextDeserializer& deserializer) {
-			m_template_system->deserialize(deserializer);
+			m_prefab_system->deserialize(deserializer);
+			for (int i = 0, c = m_prefab_system->getMaxEntityIndex(); i < c; ++i)
+			{
+				u64 prefab = m_prefab_system->getPrefab({i});
+				if (prefab != 0) m_entity_map.create({i});
+			}
 		});
+		m_camera = m_render_interface->getCameraEntity(m_render_interface->getCameraInSlot("editor"));
 	}
 
 	
@@ -1823,7 +1874,7 @@ public:
 
 		FS::OsFile file;
 		OutputBlob blob(m_allocator);
-		TextSerializer serializer(blob);
+		TextSerializer serializer(blob, m_entity_map);
 		auto saveFile = [&file, this, &blob](const char* path) {
 			if (file.open(path, FS::Mode::CREATE_AND_WRITE, m_allocator))
 			{
@@ -1840,19 +1891,21 @@ public:
 		}
 
 		blob.clear();
-		m_template_system->serialize(serializer);
+		m_prefab_system->serialize(serializer);
 		StaticString<MAX_PATH_LENGTH> system_file_path(dir, "systems/templates.sys");
 		saveFile(system_file_path);
 
 		for (Entity entity = m_universe->getFirstEntity(); isValid(entity); entity = m_universe->getNextEntity(entity))
 		{
-			if (m_template_system->getPrefab(entity) != 0) continue;
+			if (m_prefab_system->getPrefab(entity) != 0) continue;
 			blob.clear();
 			serializer.write("name", m_universe->getEntityName(entity));
 			serializer.write("transform", m_universe->getTransform(entity));
 			serializer.write("scale", m_universe->getScale(entity));
-			StaticString<MAX_PATH_LENGTH> entity_file_path(dir, entity.index, ".ent");
-			for (ComponentUID cmp = m_universe->getFirstComponent(entity); isValid(cmp.handle); cmp = m_universe->getNextComponent(cmp))
+			EntityGUID guid = m_entity_map.get(entity);
+			StaticString<MAX_PATH_LENGTH> entity_file_path(dir, guid.value, ".ent");
+			for (ComponentUID cmp = m_universe->getFirstComponent(entity); isValid(cmp.handle);
+				 cmp = m_universe->getNextComponent(cmp))
 			{
 				const char* cmp_name = PropertyRegister::getComponentTypeID(cmp.type.index);
 				u32 type_hash = PropertyRegister::getComponentTypeHash(cmp.type);
@@ -1862,11 +1915,11 @@ public:
 			serializer.write("cmp_end", (u32)0);
 			saveFile(entity_file_path);
 		}
-		cleanUniverseDir(dir);
+		clearUniverseDir(dir);
 	}
 
 
-	void cleanUniverseDir(const char* dir)
+	void clearUniverseDir(const char* dir)
 	{
 		PlatformInterface::FileInfo file_info;
 		auto file_iter = PlatformInterface::createFileIterator(dir, m_allocator);
@@ -1874,9 +1927,9 @@ public:
 		{
 			char basename[64];
 			PathUtils::getBasename(basename, lengthOf(basename), file_info.filename);
-			Entity entity;
-			fromCString(basename, lengthOf(basename), &entity.index);
-			if (!m_universe->hasEntity(entity))
+			EntityGUID guid;
+			fromCString(basename, lengthOf(basename), &guid.value);
+			if (!m_entity_map.has(guid))
 			{
 				StaticString<MAX_PATH_LENGTH> filepath(dir, file_info.filename);
 				PlatformInterface::deleteFile(filepath);
@@ -1901,6 +1954,7 @@ public:
 
 		header.engine_hash = m_engine->serialize(*m_universe, blob);
 		m_entity_groups.serialize(blob);
+		m_prefab_system->serialize(blob);
 		header.hash = crc32((const u8*)blob.getData() + hashed_offset, blob.getPos() - hashed_offset);
 		*(Header*)blob.getData() = header;
 
@@ -1972,6 +2026,24 @@ public:
 		DestroyEntitiesCommand* command =
 			LUMIX_NEW(m_allocator, DestroyEntitiesCommand)(*this, entities, count);
 		executeCommand(command);
+	}
+
+
+	void createEntityGUID(Entity entity) override
+	{
+		m_entity_map.create(entity);
+	}
+
+
+	void destroyEntityGUID(Entity entity) override
+	{
+		m_entity_map.erase(entity);
+	}
+
+
+	EntityGUID getEntityGUID(Entity entity) override
+	{
+		return m_entity_map.get(entity);
 	}
 
 
@@ -2267,7 +2339,7 @@ public:
 
 	PrefabSystem& getPrefabSystem() override
 	{
-		return *m_template_system;
+		return *m_prefab_system;
 	}
 
 
@@ -2454,8 +2526,6 @@ public:
 			catString(path, sizeof(path), ".lst");
 			copyFile(m_universe->getPath().c_str(), path);
 			m_editor_icons->refresh();
-
-			
 		}
 	}
 
@@ -2470,8 +2540,6 @@ public:
 
 	enum class SerializedVersion : int
 	{
-		ENTITY_GROUPS,
-		PREFABS,
 
 		LATEST
 	};
@@ -2529,21 +2597,12 @@ public:
 			return;
 		}
 
-		if (isValid(m_camera))
-		{
-			m_universe->destroyEntity(m_camera);
-		}
+		if (isValid(m_camera)) m_universe->destroyEntity(m_camera);
 
 		if (m_engine->deserialize(*m_universe, blob))
 		{
-			if (header.version > (int)SerializedVersion::ENTITY_GROUPS)
-			{
-				m_entity_groups.deserialize(blob);
-			}
-			else
-			{
-				m_entity_groups.allEntitiesToDefault();
-			}
+			m_entity_groups.deserialize(blob);
+			m_prefab_system->deserialize(blob);
 			m_camera = m_render_interface->getCameraEntity(m_render_interface->getCameraInSlot("editor"));
 
 			g_log_info.log("Editor") << "Universe parsed in " << timer->getTimeSinceStart() << " seconds";
@@ -2606,6 +2665,7 @@ public:
 		, m_is_snap_mode(false)
 		, m_undo_index(-1)
 		, m_engine(&engine)
+		, m_entity_map(m_allocator)
 	{
 		for (auto& i : m_is_mouse_down) i = false;
 		for (auto& i : m_is_mouse_click) i = false;
@@ -2625,7 +2685,7 @@ public:
 			}
 		}
 
-		m_template_system = PrefabSystem::create(*this);
+		m_prefab_system = PrefabSystem::create(*this);
 
 		m_editor_command_creators.insert(
 			crc32("begin_group"), &WorldEditorImpl::constructEditorCommand<BeginGroupCommand>);
@@ -2916,6 +2976,8 @@ public:
 		m_entity_groups.setUniverse(universe);
 
 		m_camera = universe->createEntity(Vec3(0, 0, -5), Quat(Vec3(0, 1, 0), -Math::PI));
+		m_entity_map.create(m_camera);
+
 		universe->setEntityName(m_camera, "editor_camera");
 		ComponentUID cmp = m_engine->createComponent(*universe, m_camera, CAMERA_TYPE);
 		ASSERT(cmp.isValid());
@@ -3298,18 +3360,92 @@ private:
 	Array<Plugin*> m_plugins;
 	MeasureTool* m_measure_tool;
 	Plugin* m_mouse_handling_plugin;
-	PrefabSystem* m_template_system;
+	PrefabSystem* m_prefab_system;
 	Array<IEditorCommand*> m_undo_stack;
 	AssociativeArray<u32, EditorCommandCreator> m_editor_command_creators;
 	int m_undo_index;
 	OutputBlob m_copy_buffer;
 	bool m_is_loading;
 	Universe* m_universe;
+	EntityGUIDMap m_entity_map;
 	EntityGroups m_entity_groups;
 	RenderInterface* m_render_interface;
 	u32 m_current_group_type;
 	bool m_is_universe_changed;
 };
+
+
+bool PasteEntityCommand::execute()
+{
+	InputBlob blob(m_blob.getData(), m_blob.getPos());
+
+	m_entities.clear();
+
+	int entity_count;
+	blob.read(entity_count);
+	m_entities.reserve(entity_count);
+
+	Universe& universe = *m_editor.getUniverse();
+	Matrix base_matrix = Matrix::IDENTITY;
+	base_matrix.setTranslation(m_position);
+	for (int i = 0; i < entity_count; ++i)
+	{
+		Matrix mtx;
+		blob.read(mtx);
+		if (i == 0)
+		{
+			Matrix inv = mtx;
+			inv.inverse();
+			base_matrix.copy3x3(mtx);
+			base_matrix = base_matrix * inv;
+			mtx.setTranslation(m_position);
+		}
+		else
+		{
+			mtx = base_matrix * mtx;
+		}
+		Entity new_entity = universe.createEntity(Vec3(0, 0, 0), Quat(0, 0, 0, 1));
+		((WorldEditorImpl&)m_editor).m_entity_map.create(new_entity);
+		m_entities.push(new_entity);
+		universe.setMatrix(new_entity, mtx);
+		i32 count;
+		blob.read(count);
+		for (int i = 0; i < count; ++i)
+		{
+			u32 hash;
+			blob.read(hash);
+			ComponentType type = PropertyRegister::getComponentTypeFromHash(hash);
+			ComponentUID cmp = m_editor.getEngine().createComponent(universe, new_entity, type);
+			i32 prop_count;
+			blob.read(prop_count);
+			for (int j = 0; j < prop_count; ++j)
+			{
+				u32 prop_name_hash;
+				blob.read(prop_name_hash);
+				auto* desc = PropertyRegister::getDescriptor(type, prop_name_hash);
+				i32 size;
+				blob.read(size);
+				if (desc)
+					desc->set(cmp, -1, blob);
+				else
+					blob.skip(size);
+			}
+		}
+	}
+
+	return true;
+}
+
+
+void PasteEntityCommand::undo()
+{
+	for (auto entity : m_entities)
+	{
+		m_editor.getUniverse()->destroyEntity(entity);
+		((WorldEditorImpl&)m_editor).m_entity_map.erase(entity);
+	}
+	m_entities.clear();
+}
 
 
 WorldEditor* WorldEditor::create(const char* base_path, Engine& engine, IAllocator& allocator)
