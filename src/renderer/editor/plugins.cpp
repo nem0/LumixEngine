@@ -387,18 +387,18 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		m_pipeline = Pipeline::create(*renderer, Path("pipelines/main.lua"), engine.getAllocator());
 		m_pipeline->load();
 
-		auto mesh_entity = m_universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
+		auto mesh_entity = m_universe->createEntity({0, 0, 0}, {0, 0, 0, 1});
 		auto* render_scene = static_cast<RenderScene*>(m_universe->getScene(MODEL_INSTANCE_TYPE));
 		m_mesh = render_scene->createComponent(MODEL_INSTANCE_TYPE, mesh_entity);
-		
-		auto light_entity = m_universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
+
+		auto light_entity = m_universe->createEntity({0, 0, 0}, {0, 0, 0, 1});
 		auto light_cmp = render_scene->createComponent(GLOBAL_LIGHT_TYPE, light_entity);
 		render_scene->setGlobalLightIntensity(light_cmp, 1);
-		
-		m_camera_entity = m_universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
+
+		m_camera_entity = m_universe->createEntity({0, 0, 0}, {0, 0, 0, 1});
 		m_camera_cmp = render_scene->createComponent(CAMERA_TYPE, m_camera_entity);
 		render_scene->setCameraSlot(m_camera_cmp, "editor");
-		
+
 		m_pipeline->setScene(render_scene);
 	}
 
@@ -831,7 +831,8 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		{
 			g_log_error.log("Editor") << "Failed to create " << path;
 		}
-		path << cmp.handle.index << postfix << ".dds";
+		u64 probe_guid = ((RenderScene*)cmp.scene)->getEnvironmentProbeGUID(cmp.handle);
+		path << probe_guid << postfix << ".dds";
 		auto& allocator = m_app.getWorldEditor()->getAllocator();
 		if (!file.open(path, FS::Mode::CREATE_AND_WRITE, allocator))
 		{

@@ -669,8 +669,7 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 			}
 			else
 			{
-				g_log_error.log("Renderer") << "Unknown texture filter \"" << label
-											<< "\" in material " << getPath();
+				g_log_error.log("Renderer") << "Unknown texture filter \"" << label << "\" in material " << getPath();
 			}
 		}
 		else if (equalStrings(label, "mag_filter"))
@@ -686,36 +685,26 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 			}
 			else
 			{
-				g_log_error.log("Renderer") << "Unknown texture filter \"" << label
-											<< "\" in material " << getPath();
+				g_log_error.log("Renderer") << "Unknown texture filter \"" << label << "\" in material " << getPath();
 			}
 		}
 		else if (equalStrings(label, "u_clamp"))
 		{
 			bool b;
 			serializer.deserialize(b, false);
-			if (b)
-			{
-				flags |= BGFX_TEXTURE_U_CLAMP;
-			}
+			if (b) flags |= BGFX_TEXTURE_U_CLAMP;
 		}
 		else if (equalStrings(label, "v_clamp"))
 		{
 			bool b;
 			serializer.deserialize(b, false);
-			if (b)
-			{
-				flags |= BGFX_TEXTURE_V_CLAMP;
-			}
+			if (b) flags |= BGFX_TEXTURE_V_CLAMP;
 		}
 		else if (equalStrings(label, "w_clamp"))
 		{
 			bool b;
 			serializer.deserialize(b, false);
-			if (b)
-			{
-				flags |= BGFX_TEXTURE_W_CLAMP;
-			}
+			if (b) flags |= BGFX_TEXTURE_W_CLAMP;
 		}
 		else if (equalStrings(label, "keep_data"))
 		{
@@ -729,8 +718,7 @@ bool Material::deserializeTexture(JsonSerializer& serializer, const char* materi
 		}
 		else
 		{
-			g_log_warning.log("Renderer") << "Unknown data \"" << label << "\" in material "
-										  << getPath();
+			g_log_warning.log("Renderer") << "Unknown data \"" << label << "\" in material " << getPath();
 			return false;
 		}
 	}

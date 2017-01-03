@@ -474,7 +474,7 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 	}
 
 
-	void deserialize(InputBlob& serializer, int version) override
+	void deserialize(InputBlob& serializer) override
 	{
 		clear();
 
@@ -500,7 +500,7 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 			auto* clip = LUMIX_NEW(m_allocator, ClipInfo);
 			m_clips[i] = clip;
 			clip->volume = 1;
-			if (version > (int)AudioSceneVersion::CLIP_VOLUME) serializer.read(clip->volume);
+			serializer.read(clip->volume);
 			serializer.read(clip->looped);
 			serializer.readString(clip->name, lengthOf(clip->name));
 			clip->name_hash = crc32(clip->name);
@@ -510,8 +510,6 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 			clip->clip = static_cast<Clip*>(m_system.getClipManager().load(Path(path)));
 		}
 
-		ComponentHandle dummy_cmp;
-		if (version <= (int)AudioSceneVersion::REFACTOR) serializer.read(dummy_cmp);
 		serializer.read(count);
 		for (int i = 0; i < count; ++i)
 		{
@@ -519,28 +517,23 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 			int clip_idx;
 			serializer.read(clip_idx);
 			if (clip_idx >= 0) sound.clip = m_clips[clip_idx];
-			if (version <= (int)AudioSceneVersion::REFACTOR) serializer.read(dummy_cmp);
 			serializer.read(sound.entity);
-			if (version > (int)AudioSceneVersion::IS_3D) serializer.read(sound.is_3d);
+			serializer.read(sound.is_3d);
 
 			ComponentHandle cmp = {sound.entity.index};
 			m_ambient_sounds.insert(sound.entity, sound);
 			m_universe.addComponent(sound.entity, AMBIENT_SOUND_TYPE, this, cmp);
 		}
 
-		if (version > (int)AudioSceneVersion::ECHO_ZONES)
+		serializer.read(count);
+
+		for (int i = 0; i < count; ++i)
 		{
-			serializer.read(count);
+			EchoZone zone;
+			serializer.read(zone);
 
-			for (int i = 0; i < count; ++i)
-			{
-				EchoZone zone;
-				serializer.read(zone);
-				if (version <= (int)AudioSceneVersion::REFACTOR) serializer.read(dummy_cmp);
-
-				m_echo_zones.insert(zone.entity, zone);
-				m_universe.addComponent(zone.entity, ECHO_ZONE_TYPE, this, {zone.entity.index});
-			}
+			m_echo_zones.insert(zone.entity, zone);
+			m_universe.addComponent(zone.entity, ECHO_ZONE_TYPE, this, {zone.entity.index});
 		}
 	}
 

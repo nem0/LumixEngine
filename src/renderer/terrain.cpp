@@ -569,10 +569,7 @@ void Terrain::setMaterial(Material* material)
 	}
 }
 
-void Terrain::deserialize(InputBlob& serializer,
-	Universe& universe,
-	RenderScene& scene,
-	int version)
+void Terrain::deserialize(InputBlob& serializer, Universe& universe, RenderScene& scene)
 {
 	serializer.read(m_entity);
 	ComponentHandle cmp = {m_entity.index};
@@ -598,16 +595,8 @@ void Terrain::deserialize(InputBlob& serializer,
 	for(int i = 0; i < count; ++i)
 	{
 		serializer.readString(path, MAX_PATH_LENGTH);
-		if (version <= (int)RenderSceneVersion::NEW_GRASS)
-		{
-			int dummy;
-			serializer.read(dummy);
-		}
 		serializer.read(m_grass_types[i].m_density);
-		if (version > (int)RenderSceneVersion::GRASS_TYPE_DISTANCE)
-		{
-			serializer.read(m_grass_types[i].m_distance);
-		}
+		serializer.read(m_grass_types[i].m_distance);
 		setGrassTypePath(i, Path(path));
 	}
 	universe.addComponent(m_entity, TERRAIN_HASH, &scene, cmp);

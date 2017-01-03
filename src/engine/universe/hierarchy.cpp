@@ -368,7 +368,7 @@ public:
 	}
 
 
-	void deserialize(InputBlob& serializer, int /*version*/) override
+	void deserialize(InputBlob& serializer) override
 	{
 		i32 size;
 		serializer.read(size);

@@ -11,6 +11,7 @@ namespace Lumix
 {
 
 class Engine;
+struct EntityGUID;
 class PrefabSystem;
 class Hierarchy;
 class IArrayDescriptor;
@@ -104,6 +105,9 @@ public:
 	virtual void addComponent(ComponentType type) = 0;
 	virtual void cloneComponent(const ComponentUID& src, Entity entity) = 0;
 	virtual void destroyComponent(const Entity* entities, int count, ComponentType cmp_type) = 0;
+	virtual void createEntityGUID(Entity entity) = 0;
+	virtual void destroyEntityGUID(Entity entity) = 0;
+	virtual EntityGUID getEntityGUID(Entity entity) = 0;
 	virtual Entity addEntity() = 0;
 	virtual void destroyEntities(const Entity* entities, int count) = 0;
 	virtual void selectEntities(const Entity* entities, int count) = 0;

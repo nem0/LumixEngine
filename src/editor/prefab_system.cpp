@@ -103,6 +103,10 @@ class PrefabSystemImpl LUMIX_FINAL : public PrefabSystem
 			auto& system = (PrefabSystemImpl&)editor.getPrefabSystem();
 
 			system.instantiatePrefab(*prefab, position, rotation, scale, &entities);
+			for (Entity entity : entities)
+			{
+				editor.createEntityGUID(entity);
+			}
 			return true;
 		}
 
@@ -110,7 +114,11 @@ class PrefabSystemImpl LUMIX_FINAL : public PrefabSystem
 		void undo() override
 		{
 			Universe& universe = *editor.getUniverse();
-			for (auto entity : entities) universe.destroyEntity(entity);
+			for (auto entity : entities)
+			{
+				universe.destroyEntity(entity);
+				editor.destroyEntityGUID(entity);
+			}
 		}
 
 
@@ -300,6 +308,12 @@ public:
 	}
 
 
+	int getMaxEntityIndex() const override
+	{
+		return m_prefabs.size();
+	}
+
+
 	Entity getFirstInstance(u64 prefab) override
 	{
 		int instances_index = m_instances.find(prefab);
@@ -324,6 +338,21 @@ public:
 	}
 
 
+	struct EntityGUIDMap : public IEntityGUIDMap
+	{
+		Entity get(EntityGUID guid) override { return{ (int)guid.value }; }
+
+
+		EntityGUID get(Entity entity) override { return{ (u64)entity.index }; }
+
+
+		void insert(EntityGUID guid, Entity entity) {}
+
+
+
+	};
+
+
 	void instantiatePrefab(PrefabResource& prefab,
 		const Vec3& pos,
 		const Quat& rot,
@@ -336,7 +365,8 @@ public:
 			prefab.getResourceManager().load(prefab);
 		}
 		InputBlob blob(prefab.blob.getData(), prefab.blob.getPos());
-		TextDeserializer deserializer(blob);
+		EntityGUIDMap entity_map;
+		TextDeserializer deserializer(blob, entity_map);
 		while (blob.getPosition() < blob.getSize())
 		{
 			u64 prefab;
@@ -372,7 +402,11 @@ public:
 	}
 
 
-	static void serializePrefab(Universe* universe, const Entity* entities, int count,  const Path& path, TextSerializer& serializer)
+	static void serializePrefab(Universe* universe,
+		const Entity* entities,
+		int count,
+		const Path& path,
+		TextSerializer& serializer)
 	{
 		for (int i = 0; i < count; ++i)
 		{
@@ -405,7 +439,8 @@ public:
 		}
 
 		OutputBlob blob(m_editor.getAllocator());
-		TextSerializer serializer(blob);
+		EntityGUIDMap entity_map;
+		TextSerializer serializer(blob, entity_map);
 
 		auto& ents = m_editor.getSelectedEntities();
 		serializePrefab(m_universe, &ents[0], ents.size(), path, serializer);
@@ -413,6 +448,51 @@ public:
 		file.write(blob.getData(), blob.getPos());
 
 		file.close();
+	}
+
+
+	void serialize(OutputBlob& serializer) override
+	{
+		serializer.write(m_prefabs.size());
+		serializer.write(&m_prefabs[0], m_prefabs.size() * sizeof(m_prefabs[0]));
+		serializer.write(m_instances.size());
+		for (int i = 0, c = m_instances.size(); i < c; ++i)
+		{
+			serializer.write(m_instances.getKey(i));
+			serializer.write(m_instances.at(i));
+		}
+		serializer.write(m_resources.size());
+		for (PrefabResource* res : m_resources)
+		{
+			serializer.write(res->getPath().c_str());
+		}
+	}
+
+
+	void deserialize(InputBlob& serializer) override
+	{
+		int count;
+		serializer.read(count);
+		m_prefabs.resize(count);
+		serializer.read(&m_prefabs[0], m_prefabs.size() * sizeof(m_prefabs[0]));
+		serializer.read(count);
+		for (int i = 0; i < count; ++i)
+		{
+			u64 key;
+			Entity value;
+			serializer.read(key);
+			serializer.read(value);
+			m_instances.insert(key, value);
+		}
+		serializer.read(count);
+		auto* resource_manager = m_editor.getEngine().getResourceManager().get(PREFAB_TYPE);
+		for (int i = 0; i < count; ++i)
+		{
+			char tmp[MAX_PATH_LENGTH];
+			serializer.read(tmp, lengthOf(tmp));
+			auto* res = (PrefabResource*)resource_manager->load(Path(tmp));
+			m_resources.insert(res->getPath().getHash(), res);
+		}
 	}
 
 	

@@ -1366,10 +1366,8 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	}
 
 
-	void deserialize(InputBlob& serializer, int version) override
+	void deserialize(InputBlob& serializer) override
 	{
-		if (version <= (int)Version::AGENTS) return;
-
 		int count = 0;
 		serializer.read(count);
 		m_agents.rehash(count);

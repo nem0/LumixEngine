@@ -205,7 +205,7 @@ void SceneView::handleDrop(float x, float y)
 		{
 			
 		}
-		if (Lumix::PathUtils::hasExtension(path, "msh"))
+		else if (Lumix::PathUtils::hasExtension(path, "msh"))
 		{
 			m_editor->beginCommandGroup(Lumix::crc32("insert_mesh"));
 			Lumix::Entity entity = m_editor->addEntity();
