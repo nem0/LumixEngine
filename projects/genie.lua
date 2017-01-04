@@ -692,8 +692,8 @@ if build_app then
 			end
 				
 			if build_game then
-				forceLink("s_game_plugin_register")
-				links { "game" }
+				forceLink("s_" .. build_game .. "_plugin_register")
+				links { build_game }
 			end
 
 			if build_physics then
@@ -813,9 +813,9 @@ if build_studio then
 			end
 
 			if build_game then
-				forceLink("s_game_plugin_register")
-				forceLink("setStudioApp_game")
-				links { "game" }
+				forceLink("s_" .. build_game .. "_plugin_register")
+				forceLink("setStudioApp_" .. build_game)
+				links { build_game }
 			end
 			
 			forceLink("setStudioApp_animation")
