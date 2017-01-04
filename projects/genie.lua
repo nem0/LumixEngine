@@ -771,6 +771,10 @@ if build_studio then
 			"../src/editor",
 			"../external"
 		}
+		
+		if build_game then
+			defines { "GAME_PROJECT_NAME=\"" .. build_game .. "\"" }
+		end
 
 		configuration { "windows", "not asmjs" }
 			links { "winmm" }
