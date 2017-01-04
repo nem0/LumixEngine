@@ -255,7 +255,9 @@ public:
 		m_engine->getPluginManager().load("lua_script");
 		m_engine->getPluginManager().load("physics");
 		m_engine->getPluginManager().load("gui");
-		m_engine->getPluginManager().load("game");
+		#ifdef GAME_PROJECT_NAME
+		m_engine->getPluginManager().load(GAME_PROJECT_NAME);
+		#endif
 		m_engine->getInputSystem().enable(true);
 		Lumix::Renderer* renderer = static_cast<Lumix::Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
 		m_pipeline = Lumix::Pipeline::create(*renderer, Lumix::Path(m_pipeline_path), m_engine->getAllocator());
