@@ -9,6 +9,7 @@
 #include "engine/math_utils.h"
 #include "engine/property_register.h"
 #include "engine/resource.h"
+#include "engine/serializer.h"
 #include "engine/vec.h"
 #include "imgui/imgui.h"
 #include "utils.h"
@@ -586,6 +587,10 @@ void PropertyGrid::showCoreProperties(const Lumix::Array<Lumix::Entity>& entitie
 		const char* tmp = m_editor.getUniverse()->getEntityName(entities[0]);
 
 		ImGui::LabelText("ID", "%d", entities[0].index);
+		Lumix::EntityGUID guid = m_editor.getEntityGUID(entities[0]);
+		char guid_str[32];
+		Lumix::toCString(guid.value, guid_str, Lumix::lengthOf(guid_str));
+		ImGui::LabelText("GUID", "%s", guid_str);
 
 		Lumix::copyString(name, tmp);
 		if (ImGui::InputText("Name", name, sizeof(name))) m_editor.setEntityName(entities[0], name);

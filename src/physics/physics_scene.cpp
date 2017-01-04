@@ -48,27 +48,6 @@ static const ResourceType PHYSICS_TYPE("physics");
 static const u32 RENDERER_HASH = crc32("renderer");
 
 
-enum class PhysicsSceneVersion : int
-{
-	LAYERS,
-	JOINTS,
-	HINGE_JOINT,
-	SPHERICAL_JOINT,
-	CAPSULE_ACTOR,
-	SPHERE_ACTOR,
-	RAGDOLLS,
-	D6_JOINT,
-	JOINT_REFACTOR,
-	D6_RAGDOLL_JOINT,
-	KINEMATIC_BONES,
-	RAGDOLL_LAYER,
-	REFACTOR,
-	CONTROLLER_SHAPE,
-
-	LATEST
-};
-
-
 struct RagdollBone
 {
 	enum Type : int
@@ -1810,7 +1789,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	void setRagdollData(ComponentHandle cmp, InputBlob& blob) override
 	{
 		auto& ragdoll = m_ragdolls[{cmp.index}];
-		setRagdollRoot(ragdoll, deserializeRagdollBone(ragdoll, nullptr, blob, (int)PhysicsSceneVersion::LATEST));
+		setRagdollRoot(ragdoll, deserializeRagdollBone(ragdoll, nullptr, blob));
 	}
 
 
@@ -3347,11 +3326,11 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	void deserializeActor(InputBlob& serializer, RigidActor* actor, int version)
+	void deserializeActor(InputBlob& serializer, RigidActor* actor)
 	{
 		ComponentHandle cmp = {actor->entity.index};
 		actor->layer = 0;
-		if (version > (int)PhysicsSceneVersion::LAYERS) serializer.read(actor->layer);
+		serializer.read(actor->layer);
 
 		serializer.read((i32&)actor->type);
 
@@ -3782,7 +3761,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	RagdollBone* deserializeRagdollBone(Ragdoll& ragdoll, RagdollBone* parent, InputBlob& serializer, int version)
+	RagdollBone* deserializeRagdollBone(Ragdoll& ragdoll, RagdollBone* parent, InputBlob& serializer)
 	{
 		int pose_bone_idx;
 		serializer.read(pose_bone_idx);
@@ -3823,10 +3802,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			}
 			default: ASSERT(false); break;
 		}
-		if (version > (int)PhysicsSceneVersion::KINEMATIC_BONES)
-		{
-			serializer.read(bone->is_kinematic);
-		}
+		serializer.read(bone->is_kinematic);
 		bone->actor->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, bone->is_kinematic);
 		bone->actor->isRigidDynamic()->setSolverIterationCounts(8, 8);
 		bone->actor->isRigidDynamic()->setMass(0.0001f);
@@ -3838,8 +3814,8 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 		bone->parent = parent;
 
-		bone->child = deserializeRagdollBone(ragdoll, bone, serializer, version);
-		bone->next = deserializeRagdollBone(ragdoll, parent, serializer, version);
+		bone->child = deserializeRagdollBone(ragdoll, bone, serializer);
+		bone->next = deserializeRagdollBone(ragdoll, parent, serializer);
 		if(bone->next) bone->next->prev = bone;
 
 		deserializeRagdollJoint(bone, serializer);
@@ -3987,7 +3963,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 
 
-	void deserializeActors(InputBlob& serializer, int version)
+	void deserializeActors(InputBlob& serializer)
 	{
 		i32 count;
 		serializer.read(count);
@@ -4004,12 +3980,12 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			}
 			if (actor->is_dynamic) m_dynamic_actors.push(actor);
 			m_actors.insert(actor->entity, actor);
-			deserializeActor(serializer, actor, version);
+			deserializeActor(serializer, actor);
 		}
 	}
 
 
-	void deserializeControllers(InputBlob& serializer, int version)
+	void deserializeControllers(InputBlob& serializer)
 	{
 		i32 count;
 		serializer.read(count);
@@ -4017,32 +3993,12 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		{
 			Entity entity;
 			serializer.read(entity);
-			bool is_free = false;
-			if(version < (int)PhysicsSceneVersion::REFACTOR) serializer.read(is_free);
-
-			if (is_free) continue;
-
 			Controller& c = m_controllers.insert(entity);
 			c.m_frame_change.set(0, 0, 0);
 
-			if (version > (int)PhysicsSceneVersion::LAYERS)
-			{
-				serializer.read(c.m_layer);
-			}
-			else
-			{
-				c.m_layer = 0;
-			}
-			if (version > (int)PhysicsSceneVersion::CONTROLLER_SHAPE)
-			{
-				serializer.read(c.m_radius);
-				serializer.read(c.m_height);
-			}
-			else
-			{
-				c.m_radius = 0.25f;
-				c.m_height = 1.8f;
-			}
+			serializer.read(c.m_layer);
+			serializer.read(c.m_radius);
+			serializer.read(c.m_height);
 			PxCapsuleControllerDesc cDesc;
 			cDesc.material = m_default_material;
 			cDesc.height = c.m_height;
@@ -4073,10 +4029,8 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	void deserializeRagdolls(InputBlob& serializer, int version)
+	void deserializeRagdolls(InputBlob& serializer)
 	{
-		if (version <= int(PhysicsSceneVersion::RAGDOLLS)) return;
-			
 		int count;
 		serializer.read(count);
 		m_ragdolls.reserve(count);
@@ -4089,19 +4043,17 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			ragdoll.root_transform.pos.set(0, 0, 0);
 			ragdoll.root_transform.rot.set(0, 0, 0, 1);
 
-			if (version > (int)PhysicsSceneVersion::RAGDOLL_LAYER) serializer.read(ragdoll.layer);
+			serializer.read(ragdoll.layer);
 			ragdoll.entity = entity;
-			setRagdollRoot(ragdoll, deserializeRagdollBone(ragdoll, nullptr, serializer, version));
+			setRagdollRoot(ragdoll, deserializeRagdollBone(ragdoll, nullptr, serializer));
 			ComponentHandle cmp = {ragdoll.entity.index};
 			m_universe.addComponent(ragdoll.entity, RAGDOLL_TYPE, this, cmp);
 		}
 	}
 
 
-	void deserializeJoints(InputBlob& serializer, int version)
+	void deserializeJoints(InputBlob& serializer)
 	{
-		if (version <= int(PhysicsSceneVersion::JOINT_REFACTOR)) return;
-
 		int count;
 		serializer.read(count);
 		m_joints.reserve(count);
@@ -4214,58 +4166,43 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	void deserializeTerrains(InputBlob& serializer, int version)
+	void deserializeTerrains(InputBlob& serializer)
 	{
 		i32 count;
 		serializer.read(count);
 		for (int i = 0; i < count; ++i)
 		{
-			bool exists = true;
-			if(version <= (int)PhysicsSceneVersion::REFACTOR) serializer.read(exists);
-			if (exists)
-			{
-				Heightfield terrain;
-				terrain.m_scene = this;
-				serializer.read(terrain.m_entity);
-				char tmp[MAX_PATH_LENGTH];
-				serializer.readString(tmp, MAX_PATH_LENGTH);
-				serializer.read(terrain.m_xz_scale);
-				serializer.read(terrain.m_y_scale);
-				if (version > (int)PhysicsSceneVersion::LAYERS)
-				{
-					serializer.read(terrain.m_layer);
-				}
-				else
-				{
-					terrain.m_layer = 0;
-				}
+			Heightfield terrain;
+			terrain.m_scene = this;
+			serializer.read(terrain.m_entity);
+			char tmp[MAX_PATH_LENGTH];
+			serializer.readString(tmp, MAX_PATH_LENGTH);
+			serializer.read(terrain.m_xz_scale);
+			serializer.read(terrain.m_y_scale);
+				serializer.read(terrain.m_layer);
 
-				m_terrains.insert(terrain.m_entity, terrain);
-				ComponentHandle cmp = {terrain.m_entity.index};
-				if (terrain.m_heightmap == nullptr || !equalStrings(tmp, terrain.m_heightmap->getPath().c_str()))
-				{
-					setHeightmap(cmp, Path(tmp));
-				}
-				m_universe.addComponent(terrain.m_entity, HEIGHTFIELD_TYPE, this, cmp);
+			m_terrains.insert(terrain.m_entity, terrain);
+			ComponentHandle cmp = {terrain.m_entity.index};
+			if (terrain.m_heightmap == nullptr || !equalStrings(tmp, terrain.m_heightmap->getPath().c_str()))
+			{
+				setHeightmap(cmp, Path(tmp));
 			}
+			m_universe.addComponent(terrain.m_entity, HEIGHTFIELD_TYPE, this, cmp);
 		}
 	}
 
 
-	void deserialize(InputBlob& serializer, int version) override
+	void deserialize(InputBlob& serializer) override
 	{
-		if (version > (int)PhysicsSceneVersion::LAYERS)
-		{
-			serializer.read(m_layers_count);
-			serializer.read(m_layers_names);
-			serializer.read(m_collision_filter);
-		}
+		serializer.read(m_layers_count);
+		serializer.read(m_layers_names);
+		serializer.read(m_collision_filter);
 
-		deserializeActors(serializer, version);
-		deserializeControllers(serializer, version);
-		deserializeTerrains(serializer, version);
-		deserializeRagdolls(serializer, version);
-		deserializeJoints(serializer, version);
+		deserializeActors(serializer);
+		deserializeControllers(serializer);
+		deserializeTerrains(serializer);
+		deserializeRagdolls(serializer);
+		deserializeJoints(serializer);
 
 		updateFilterData();
 	}
@@ -4274,7 +4211,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	PhysicsSystem& getSystem() const override { return *m_system; }
 
 
-	int getVersion() const override { return (int)PhysicsSceneVersion::LATEST; }
+	int getVersion() const override { return 0; }
 
 
 	float getActorSpeed(ComponentHandle cmp) override

@@ -193,6 +193,14 @@ LUMIX_ENGINE_API bool getSphereTriangleIntersection(const Vec3& center,
 }
 
 
+static std::mt19937_64& getGUIDRandomGenerator()
+{
+	static std::random_device seed;
+	static std::mt19937_64 gen(seed());
+
+	return gen;
+}
+
 static std::mt19937& getRandomGenerator()
 {
 	static std::random_device seed;
@@ -205,6 +213,12 @@ static std::mt19937& getRandomGenerator()
 float pow(float base, float exponent)
 {
 	return ::pow(base, exponent);
+}
+
+
+u64 randGUID()
+{
+	return getGUIDRandomGenerator()();
 }
 
 

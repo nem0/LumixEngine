@@ -68,7 +68,7 @@ public:
 		virtual void destoryParticle(int /*index*/) {}
 		virtual void update(float /*time_delta*/) {}
 		virtual void serialize(OutputBlob& blob) = 0;
-		virtual void deserialize(InputBlob& blob, int version) = 0;
+		virtual void deserialize(InputBlob& blob) = 0;
 		virtual ComponentType getType() const = 0;
 		virtual void drawGizmo(WorldEditor& editor, RenderScene& scene) {}
 
@@ -80,7 +80,7 @@ public:
 	{
 		explicit SubimageModule(ParticleEmitter& emitter);
 		void serialize(OutputBlob& blob) override;
-		void deserialize(InputBlob& blob, int version) override;
+		void deserialize(InputBlob& blob) override;
 		ComponentType getType() const override { return s_type; }
 		static const ComponentType s_type;
 		
@@ -94,7 +94,7 @@ public:
 		explicit SpawnShapeModule(ParticleEmitter& emitter);
 		void spawnParticle(int index) override;
 		void serialize(OutputBlob& blob) override;
-		void deserialize(InputBlob& blob, int version) override;
+		void deserialize(InputBlob& blob) override;
 		ComponentType getType() const override { return s_type; }
 
 		static const ComponentType s_type;
@@ -112,7 +112,7 @@ public:
 		explicit LinearMovementModule(ParticleEmitter& emitter);
 		void spawnParticle(int index) override;
 		void serialize(OutputBlob& blob) override;
-		void deserialize(InputBlob& blob, int version) override;
+		void deserialize(InputBlob& blob) override;
 		ComponentType getType() const override { return s_type; }
 
 		static const ComponentType s_type;
@@ -126,7 +126,7 @@ public:
 	{
 		explicit PlaneModule(ParticleEmitter& emitter);
 		void serialize(OutputBlob& blob) override;
-		void deserialize(InputBlob& blob, int version) override;
+		void deserialize(InputBlob& blob) override;
 		void update(float time_delta) override;
 		ComponentType getType() const override { return s_type; }
 		void drawGizmo(WorldEditor& editor, RenderScene& scene) override;
@@ -142,7 +142,7 @@ public:
 	{
 		explicit AttractorModule(ParticleEmitter& emitter);
 		void serialize(OutputBlob& blob) override;
-		void deserialize(InputBlob& blob, int version) override;
+		void deserialize(InputBlob& blob) override;
 		void update(float time_delta) override;
 		ComponentType getType() const override { return s_type; }
 		void drawGizmo(WorldEditor& editor, RenderScene& scene) override;
@@ -158,7 +158,7 @@ public:
 	{
 		explicit ForceModule(ParticleEmitter& emitter);
 		void serialize(OutputBlob& blob) override;
-		void deserialize(InputBlob& blob, int version) override;
+		void deserialize(InputBlob& blob) override;
 		void update(float time_delta) override;
 		ComponentType getType() const override { return s_type; }
 
@@ -172,7 +172,7 @@ public:
 		explicit AlphaModule(ParticleEmitter& emitter);
 		void update(float time_delta) override;
 		void serialize(OutputBlob&) override;
-		void deserialize(InputBlob&, int) override;
+		void deserialize(InputBlob&) override;
 		ComponentType getType() const override { return s_type; }
 		void sample();
 
@@ -188,7 +188,7 @@ public:
 		explicit SizeModule(ParticleEmitter& emitter);
 		void update(float time_delta) override;
 		void serialize(OutputBlob&) override;
-		void deserialize(InputBlob&, int) override;
+		void deserialize(InputBlob&) override;
 		ComponentType getType() const override { return s_type; }
 		void sample();
 
@@ -204,7 +204,7 @@ public:
 		explicit RandomRotationModule(ParticleEmitter& emitter);
 		void spawnParticle(int index) override;
 		void serialize(OutputBlob&) override {}
-		void deserialize(InputBlob&, int) override {}
+		void deserialize(InputBlob&) override {}
 		ComponentType getType() const override { return s_type; }
 
 		static const ComponentType s_type;
@@ -219,7 +219,7 @@ public:
 	void init();
 	void drawGizmo(WorldEditor& editor, RenderScene& scene);
 	void serialize(OutputBlob& blob);
-	void deserialize(InputBlob& blob, ResourceManager& manager, bool has_version);
+	void deserialize(InputBlob& blob, ResourceManager& manager);
 	void update(float time_delta);
 	Material* getMaterial() const { return m_material; }
 	void setMaterial(Material* material);

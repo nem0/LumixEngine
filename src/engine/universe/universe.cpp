@@ -365,6 +365,21 @@ void Universe::deserialize(InputBlob& serializer)
 }
 
 
+struct PrefabEntityGUIDMap : public IEntityGUIDMap
+{
+	Entity get(EntityGUID guid) override { return{ (int)guid.value }; }
+
+
+	EntityGUID get(Entity entity) override { return{ (u64)entity.index }; }
+
+
+	void insert(EntityGUID guid, Entity entity) {}
+
+
+
+};
+
+
 void Universe::instantiatePrefab(const PrefabResource& prefab,
 	const Vec3& pos,
 	const Quat& rot,
@@ -372,7 +387,8 @@ void Universe::instantiatePrefab(const PrefabResource& prefab,
 	Array<Entity>& entities)
 {
 	InputBlob blob(prefab.blob.getData(), prefab.blob.getPos());
-	TextDeserializer deserializer(blob);
+	PrefabEntityGUIDMap entity_map;
+	TextDeserializer deserializer(blob, entity_map);
 	while (blob.getPosition() < blob.getSize())
 	{
 		u64 prefab;

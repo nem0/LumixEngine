@@ -1352,22 +1352,12 @@ namespace Lumix
 		}
 
 
-		void deserialize(InputBlob& serializer, int version) override
+		void deserialize(InputBlob& serializer) override
 		{
-			if (version <= (int)LuaScriptVersion::MULTIPLE_SCRIPTS)
-			{
-				deserializeOld(serializer);
-				return;
-			}
-
 			int len = serializer.read<int>();
 			m_scripts.rehash(len);
 			for (int i = 0; i < len; ++i)
 			{
-				bool is_valid = true;
-				if (version <= (int)LuaScriptVersion::REFACTOR) serializer.read(is_valid);
-				if (!is_valid) continue;
-
 				auto& allocator = m_system.m_allocator;
 				ScriptComponent* script = LUMIX_NEW(allocator, ScriptComponent)(*this, allocator);
 
@@ -1397,45 +1387,6 @@ namespace Lumix
 					}
 					setScriptPath(*script, scr, Path(tmp));
 				}
-				ComponentHandle cmp = {script->m_entity.index};
-				m_universe.addComponent(script->m_entity, LUA_SCRIPT_TYPE, this, cmp);
-			}
-		}
-
-
-		void deserializeOld(InputBlob& serializer)
-		{
-			int len = serializer.read<int>();
-			m_scripts.rehash(len);
-			for (int i = 0; i < len; ++i)
-			{
-				bool is_valid;
-				serializer.read(is_valid);
-				if (!is_valid) continue;
-
-				IAllocator& allocator = m_system.m_allocator;
-				ScriptComponent* script = LUMIX_NEW(allocator, ScriptComponent)(*this, allocator);
-				serializer.read(script->m_entity);
-				m_scripts.insert(script->m_entity, script);
-
-				char tmp[MAX_PATH_LENGTH];
-				serializer.readString(tmp, MAX_PATH_LENGTH);
-				auto& scr = script->m_scripts.emplace(m_system.m_allocator);
-				scr.m_state = nullptr;
-				int prop_count;
-				serializer.read(prop_count);
-				scr.m_properties.reserve(prop_count);
-				for (int j = 0; j < prop_count; ++j)
-				{
-					Property& prop = scr.m_properties.emplace(allocator);
-					prop.type = Property::ANY;
-					serializer.read(prop.name_hash);
-					char tmp[1024];
-					tmp[0] = 0;
-					serializer.readString(tmp, sizeof(tmp));
-					prop.stored_value = tmp;
-				}
-				setScriptPath(*script, scr, Path(tmp));
 				ComponentHandle cmp = {script->m_entity.index};
 				m_universe.addComponent(script->m_entity, LUA_SCRIPT_TYPE, this, cmp);
 			}

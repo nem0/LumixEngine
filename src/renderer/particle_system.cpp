@@ -21,19 +21,6 @@ namespace Lumix
 static const ResourceType MATERIAL_TYPE("material");
 
 
-enum class ParticleEmitterVersion : int
-{
-	SPAWN_COUNT,
-	SIZE_ALPHA_SAVE,
-	COMPONENT_TYPE,
-	AUTOEMIT,
-	LOCAL_SPACE,
-
-	LATEST,
-	INVALID = -1
-};
-
-
 template <typename T>
 static ParticleEmitter::ModuleBase* create(ParticleEmitter& emitter)
 {
@@ -89,7 +76,7 @@ void ParticleEmitter::SubimageModule::serialize(OutputBlob& blob)
 }
 
 
-void ParticleEmitter::SubimageModule::deserialize(InputBlob& blob, int)
+void ParticleEmitter::SubimageModule::deserialize(InputBlob& blob)
 {
 	blob.read(rows);
 	blob.read(cols);
@@ -112,7 +99,7 @@ void ParticleEmitter::ForceModule::serialize(OutputBlob& blob)
 }
 
 
-void ParticleEmitter::ForceModule::deserialize(InputBlob& blob, int)
+void ParticleEmitter::ForceModule::deserialize(InputBlob& blob)
 {
 	blob.read(m_acceleration);
 }
@@ -199,7 +186,7 @@ void ParticleEmitter::AttractorModule::serialize(OutputBlob& blob)
 }
 
 
-void ParticleEmitter::AttractorModule::deserialize(InputBlob& blob, int)
+void ParticleEmitter::AttractorModule::deserialize(InputBlob& blob)
 {
 	blob.read(m_force);
 	blob.read(m_count);
@@ -291,7 +278,7 @@ void ParticleEmitter::PlaneModule::serialize(OutputBlob& blob)
 }
 
 
-void ParticleEmitter::PlaneModule::deserialize(InputBlob& blob, int)
+void ParticleEmitter::PlaneModule::deserialize(InputBlob& blob)
 {
 	blob.read(m_bounce);
 	blob.read(m_count);
@@ -339,7 +326,7 @@ void ParticleEmitter::SpawnShapeModule::serialize(OutputBlob& blob)
 }
 
 
-void ParticleEmitter::SpawnShapeModule::deserialize(InputBlob& blob, int)
+void ParticleEmitter::SpawnShapeModule::deserialize(InputBlob& blob)
 {
 	blob.read(m_shape);
 	blob.read(m_radius);
@@ -375,7 +362,7 @@ void ParticleEmitter::LinearMovementModule::serialize(OutputBlob& blob)
 }
 
 
-void ParticleEmitter::LinearMovementModule::deserialize(InputBlob& blob, int)
+void ParticleEmitter::LinearMovementModule::deserialize(InputBlob& blob)
 {
 	blob.read(m_x);
 	blob.read(m_y);
@@ -448,10 +435,8 @@ void ParticleEmitter::AlphaModule::serialize(OutputBlob& blob)
 }
 
 
-void ParticleEmitter::AlphaModule::deserialize(InputBlob& blob, int version)
+void ParticleEmitter::AlphaModule::deserialize(InputBlob& blob)
 {
-	if (version <= (int)ParticleEmitterVersion::SIZE_ALPHA_SAVE) return;
-
 	int size;
 	blob.read(size);
 	m_values.resize(size);
@@ -514,10 +499,8 @@ void ParticleEmitter::SizeModule::serialize(OutputBlob& blob)
 }
 
 
-void ParticleEmitter::SizeModule::deserialize(InputBlob& blob, int version)
+void ParticleEmitter::SizeModule::deserialize(InputBlob& blob)
 {
-	if (version <= (int)ParticleEmitterVersion::SIZE_ALPHA_SAVE) return;
-
 	int size;
 	blob.read(size);
 	m_values.resize(size);
@@ -757,7 +740,6 @@ void ParticleEmitter::updateLives(float time_delta)
 
 void ParticleEmitter::serialize(OutputBlob& blob)
 {
-	blob.write((int)ParticleEmitterVersion::LATEST);
 	blob.write(m_spawn_count);
 	blob.write(m_spawn_period);
 	blob.write(m_initial_life);
@@ -775,26 +757,15 @@ void ParticleEmitter::serialize(OutputBlob& blob)
 }
 
 
-void ParticleEmitter::deserialize(InputBlob& blob, ResourceManager& manager, bool has_version)
+void ParticleEmitter::deserialize(InputBlob& blob, ResourceManager& manager)
 {
-	int version = (int)ParticleEmitterVersion::INVALID;
-	if (has_version)
-	{
-		blob.read(version);
-		if (version > (int)ParticleEmitterVersion::SPAWN_COUNT) blob.read(m_spawn_count);
-	}
+	blob.read(m_spawn_count);
 	blob.read(m_spawn_period);
 	blob.read(m_initial_life);
 	blob.read(m_initial_size);
 	blob.read(m_entity);
-	if (version > (int)ParticleEmitterVersion::AUTOEMIT)
-	{
-		blob.read(m_autoemit);
-	}
-	if (version > (int)ParticleEmitterVersion::LOCAL_SPACE)
-	{
-		blob.read(m_local_space);
-	}
+	blob.read(m_autoemit);
+	blob.read(m_local_space);
 	char path[MAX_PATH_LENGTH];
 	blob.readString(path, lengthOf(path));
 	auto material_manager = manager.get(MATERIAL_TYPE);
@@ -811,46 +782,13 @@ void ParticleEmitter::deserialize(InputBlob& blob, ResourceManager& manager, boo
 	for (int i = 0; i < size; ++i)
 	{
 		ParticleEmitter::ModuleBase* module = nullptr;
-		if (version > (int)ParticleEmitterVersion::COMPONENT_TYPE)
-		{
-			u32 hash;
-			blob.read(hash);
-			ComponentType type = PropertyRegister::getComponentTypeFromHash(hash);
-			module = createModule(type, *this);
-		}
-		else
-		{
-			u32 type;
-			blob.read(type);
-			static const char* OLD_MODULE_NAMES[] = {"force",
-				"attractor",
-				"plane",
-				"spawn_shape",
-				"linear_movement",
-				"alpha",
-				"size",
-				"random_rotation",
-				"subimage"};
-
-			for (const char* old_name : OLD_MODULE_NAMES)
-			{
-				if (type == crc32(old_name))
-				{
-					char tmp[50];
-					copyString(tmp, "particle_emitter_");
-					catString(tmp, old_name);
-					type = crc32(tmp);
-
-					module = createModule(PropertyRegister::getComponentTypeFromHash(type), *this);
-					break;
-				}
-			}
-			ASSERT(module);
-		}
+		u32 hash;
+		blob.read(hash);
+		ComponentType type = PropertyRegister::getComponentTypeFromHash(hash);
+		module = createModule(type, *this);
 		if (module)
 		{
 			m_modules.push(module);
-			module->deserialize(blob, version);
 		}
 	}
 }
