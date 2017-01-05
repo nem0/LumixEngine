@@ -819,9 +819,7 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 
 		FS::OsFile file;
 		const char* base_path = m_app.getWorldEditor()->getEngine().getDiskFileDevice()->getBasePath();
-		char basename[64];
-		PathUtils::getBasename(basename, lengthOf(basename), m_app.getWorldEditor()->getUniverse()->getPath().c_str());
-		StaticString<MAX_PATH_LENGTH> path(base_path, "universes/", basename);
+		StaticString<MAX_PATH_LENGTH> path(base_path, "universes/", m_app.getWorldEditor()->getUniverse()->getName());
 		if (!PlatformInterface::makePath(path) && !PlatformInterface::dirExists(path))
 		{
 			g_log_error.log("Editor") << "Failed to create " << path;
@@ -882,7 +880,7 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		static const int TEXTURE_SIZE = 1024;
 
 		Universe* universe = m_app.getWorldEditor()->getUniverse();
-		if (!universe->getPath().isValid())
+		if (universe->getName()[0] == '\0')
 		{
 			g_log_error.log("Editor") << "Universe must be saved before environment probe can be generated.";
 			return;

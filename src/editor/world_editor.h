@@ -91,8 +91,8 @@ public:
 	virtual bool canRedo() const = 0;
 	virtual void undo() = 0;
 	virtual void redo() = 0;
-	virtual void loadUniverse(const Path& path) = 0;
-	virtual void saveUniverse(const Path& path, bool save_path) = 0;
+	virtual void loadUniverse(const char* basename) = 0;
+	virtual void saveUniverse(const char* basename, bool save_path) = 0;
 	virtual void newUniverse() = 0;
 	virtual void showEntities(const Entity* entities, int count) = 0;
 	virtual void showSelectedEntities() = 0;

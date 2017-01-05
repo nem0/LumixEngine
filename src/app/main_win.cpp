@@ -352,7 +352,9 @@ public:
 		}
 		m_engine->destroyUniverse(*m_universe);
 		m_universe = &m_engine->createUniverse(true);
-		m_universe->setPath(Lumix::Path(m_universe_path));
+		char basename[Lumix::MAX_PATH_LENGTH];
+		Lumix::PathUtils::getBasename(basename, Lumix::lengthOf(basename), m_universe_path);
+		m_universe->setName(basename);
 		m_pipeline->setScene((Lumix::RenderScene*)m_universe->getScene(Lumix::crc32("renderer")));
 		Lumix::LuaWrapper::createSystemVariable(m_engine->getState(), "App", "universe", m_universe);
 		bool deserialize_succeeded = m_engine->deserialize(*m_universe, blob);

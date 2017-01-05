@@ -116,6 +116,7 @@ class StudioAppImpl LUMIX_FINAL : public StudioApp
 public:
 	StudioAppImpl()
 		: m_is_entity_list_opened(true)
+		, m_is_save_as_dialog_opened(false)
 		, m_finished(false)
 		, m_selected_template_name(m_allocator)
 		, m_profiler_ui(nullptr)
@@ -136,9 +137,10 @@ public:
 		, m_confirm_exit(false)
 		, m_exit_code(0)
 		, m_allocator(m_main_allocator)
+		, m_universes(m_allocator)
 	{
 		m_add_cmp_root.label[0] = '\0';
-		m_drag_data = { DragData::NONE, nullptr, 0 };
+		m_drag_data = {DragData::NONE, nullptr, 0};
 		m_template_name[0] = '\0';
 		m_open_filter[0] = '\0';
 		init();
@@ -411,20 +413,6 @@ public:
 	}
 
 
-	void autosave()
-	{
-		m_time_to_autosave = float(m_settings.m_autosave_time);
-		if (!m_editor->getUniverse()->getPath().isValid()) return;
-		if (m_editor->isGameMode()) return;
-
-		char filename[Lumix::MAX_PATH_LENGTH];
-		Lumix::copyString(filename, m_editor->getUniverse()->getPath().c_str());
-		Lumix::catString(filename, "_autosave.unv");
-
-		m_editor->saveUniverse(Lumix::Path(filename), false);
-	}
-
-
 	void guiBeginFrame()
 	{
 		PROFILE_FUNCTION();
@@ -505,7 +493,8 @@ public:
 			m_asset_browser->onGUI();
 			m_log_ui->onGUI();
 			m_property_grid->onGUI();
-			showEntityList();
+			onEntityListGUI();
+			onSaveAsDialogGUI();
 			for (auto* plugin : m_plugins)
 			{
 				plugin->onWindowGUI();
@@ -530,9 +519,6 @@ public:
 		guiBeginFrame();
 
 		float time_delta = m_editor->getEngine().getLastTimeDelta();
-
-		m_time_to_autosave -= time_delta;
-		if (m_time_to_autosave < 0) autosave();
 
 		m_editor->setMouseSensitivity(m_settings.m_mouse_sensitivity_x, m_settings.m_mouse_sensitivity_y);
 		m_editor->update();
@@ -572,14 +558,12 @@ public:
 				ImGui::Separator();
 				ImGui::Text("Open universe:");
 				ImGui::Indent();
-				auto& universes = m_asset_browser->getResources(0);
-				for (auto& univ : universes)
+				for (auto& univ : m_universes)
 				{
-					if (Lumix::endsWith(univ.c_str(), "_autosave.unv")) continue;
-					if (ImGui::MenuItem(univ.c_str()))
+					if (ImGui::MenuItem(univ.data))
 					{
-						m_editor->loadUniverse(univ);
-						setTitle(univ.c_str());
+						m_editor->loadUniverse(univ.data);
+						setTitle(univ.data);
 						m_is_welcome_screen_opened = false;
 					}
 				}
@@ -663,15 +647,33 @@ public:
 			return;
 		}
 
-		m_time_to_autosave = float(m_settings.m_autosave_time);
-		if (m_editor->getUniverse()->getPath().isValid())
+		if (m_editor->getUniverse()->getName()[0])
 		{
-			m_editor->saveUniverse(m_editor->getUniverse()->getPath(), true);
+			m_editor->saveUniverse(m_editor->getUniverse()->getName(), true);
 		}
 		else
 		{
 			saveAs();
 		}
+	}
+
+
+	void onSaveAsDialogGUI()
+	{
+		if (!m_is_save_as_dialog_opened) return;
+		
+		if (ImGui::Begin("Save Universe As"))
+		{
+			static char name[64] = "";
+			ImGui::InputText("Name", name, Lumix::lengthOf(name));
+			if (ImGui::Button("Save"))
+			{
+				m_is_save_as_dialog_opened = false;
+				setTitle(name);
+				m_editor->saveUniverse(name, true);
+			}
+		}
+		ImGui::End();
 	}
 
 
@@ -683,13 +685,7 @@ public:
 			return;
 		}
 
-		m_time_to_autosave = float(m_settings.m_autosave_time);
-		char filename[Lumix::MAX_PATH_LENGTH];
-		if (PlatformInterface::getSaveFilename(filename, sizeof(filename), "Universes\0*.unv\0", "unv"))
-		{
-			setTitle(filename);
-			m_editor->saveUniverse(Lumix::Path(filename), true);
-		}
+		m_is_save_as_dialog_opened = true;
 	}
 
 
@@ -715,7 +711,6 @@ public:
 		else
 		{
 			m_editor->newUniverse();
-			m_time_to_autosave = float(m_settings.m_autosave_time);
 		}
 	}
 
@@ -981,23 +976,20 @@ public:
 		if (ImGui::BeginMenu("Open"))
 		{
 			ImGui::FilterInput("Filter", m_open_filter, sizeof(m_open_filter));
-			auto& universes = m_asset_browser->getResources(0);
-			for (auto& univ : universes)
+			for (auto& univ : m_universes)
 			{
-				if (Lumix::endsWith(univ.c_str(), "_autosave.unv")) continue;
-				if ((m_open_filter[0] == '\0' || Lumix::stristr(univ.c_str(), m_open_filter)) &&
-					ImGui::MenuItem(univ.c_str()))
+				if ((m_open_filter[0] == '\0' || Lumix::stristr(univ.data, m_open_filter)) &&
+					ImGui::MenuItem(univ.data))
 				{
 					if (m_editor->isUniverseChanged())
 					{
-						Lumix::copyString(m_universe_to_load, univ.c_str());
+						Lumix::copyString(m_universe_to_load, univ.data);
 						m_confirm_load = true;
 					}
 					else
 					{
-						m_time_to_autosave = float(m_settings.m_autosave_time);
-						m_editor->loadUniverse(univ);
-						setTitle(univ.c_str());
+						m_editor->loadUniverse(univ.data);
+						setTitle(univ.data);
 					}
 				}
 			}
@@ -1077,7 +1069,6 @@ public:
 			if (ImGui::Button("Continue"))
 			{
 				m_editor->newUniverse();
-				m_time_to_autosave = float(m_settings.m_autosave_time);
 				ImGui::CloseCurrentPopup();
 			}
 			ImGui::SameLine();
@@ -1095,8 +1086,7 @@ public:
 			ImGui::Text("All unsaved changes will be lost, do you want to continue?");
 			if (ImGui::Button("Continue"))
 			{
-				m_time_to_autosave = float(m_settings.m_autosave_time);
-				m_editor->loadUniverse(Lumix::Path(m_universe_to_load));
+				m_editor->loadUniverse(m_universe_to_load);
 				setTitle(m_universe_to_load);
 				ImGui::CloseCurrentPopup();
 			}
@@ -1210,7 +1200,7 @@ public:
 	}
 
 
-	void showEntityList()
+	void onEntityListGUI()
 	{
 		PROFILE_FUNCTION();
 		if (ImGui::BeginDock("Entity List", &m_is_entity_list_opened))
@@ -1480,8 +1470,7 @@ public:
 			if (!parser.next()) break;
 
 			parser.getCurrent(path, Lumix::lengthOf(path));
-			Lumix::Path tmp(path);
-			m_editor->loadUniverse(tmp);
+			m_editor->loadUniverse(path);
 			setTitle(path);
 			m_is_welcome_screen_opened = false;
 			break;
@@ -1839,6 +1828,23 @@ public:
 	}
 
 
+	void scanUniverses()
+	{
+		auto* iter = PlatformInterface::createFileIterator("universes/", m_allocator);
+		PlatformInterface::FileInfo info;
+		while (PlatformInterface::getNextFile(iter, &info))
+		{
+			if (info.filename[0] == '.') continue;
+			if (!info.is_directory) continue;
+
+			char basename[Lumix::MAX_PATH_LENGTH];
+			Lumix::PathUtils::getBasename(basename, Lumix::lengthOf(basename), info.filename);
+			m_universes.emplace(basename);
+		}
+		PlatformInterface::destroyFileIterator(iter);
+	}
+
+
 	void findLuaPlugins(const char* dir)
 	{
 		auto* iter = PlatformInterface::createFileIterator(dir, m_allocator);
@@ -2055,8 +2061,8 @@ public:
 
 		m_editor = Lumix::WorldEditor::create(current_dir, *m_engine, m_allocator);
 		m_settings.m_editor = m_editor;
+		scanUniverses();
 		loadUserPlugins();
-
 		addActions();
 
 		m_asset_browser = LUMIX_NEW(m_allocator, AssetBrowser)(*this);
@@ -2153,12 +2159,12 @@ public:
 	Lumix::Engine* m_engine;
 	SDL_Window* m_window;
 
-	float m_time_to_autosave;
 	Lumix::Array<Action*> m_actions;
 	Lumix::Array<Action*> m_window_actions;
 	Lumix::Array<Action*> m_toolbar_actions;
 	Lumix::Array<IPlugin*> m_plugins;
 	Lumix::Array<IAddComponentPlugin*> m_add_cmp_plugins;
+	Lumix::Array<Lumix::StaticString<Lumix::MAX_PATH_LENGTH>> m_universes;
 	AddCmpTreeNode m_add_cmp_root;
 	Lumix::HashMap<Lumix::ComponentType, Lumix::string> m_component_labels;
 	Lumix::WorldEditor* m_editor;
@@ -2182,6 +2188,7 @@ public:
 
 	bool m_is_welcome_screen_opened;
 	bool m_is_entity_list_opened;
+	bool m_is_save_as_dialog_opened;
 	DragData m_drag_data;
 	ImFont* m_font;
 };
