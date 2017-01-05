@@ -1836,6 +1836,7 @@ public:
 		{
 			if (info.filename[0] == '.') continue;
 			if (!info.is_directory) continue;
+			if (Lumix::startsWith(info.filename, "__")) continue;
 
 			char basename[Lumix::MAX_PATH_LENGTH];
 			Lumix::PathUtils::getBasename(basename, Lumix::lengthOf(basename), info.filename);
