@@ -9,6 +9,7 @@
 #include "engine/array.h"
 #include "engine/associative_array.h"
 #include "engine/blob.h"
+#include "engine/command_line_parser.h"
 #include "engine/crc32.h"
 #include "engine/debug/debug.h"
 #include "engine/delegate_list.h"
@@ -2666,6 +2667,7 @@ public:
 		, m_undo_index(-1)
 		, m_engine(&engine)
 		, m_entity_map(m_allocator)
+		, m_is_guid_pseudorandom(false)
 	{
 		for (auto& i : m_is_mouse_down) i = false;
 		for (auto& i : m_is_mouse_click) i = false;
@@ -2720,6 +2722,18 @@ public:
 
 		m_gizmo = Gizmo::create(*this);
 		m_editor_icons = EditorIcons::create(*this);
+
+		char command_line[2048];
+		getCommandLine(command_line, lengthOf(command_line));
+		CommandLineParser parser(command_line);
+		while (parser.next())
+		{
+			if (parser.currentEquals("-pseudorandom_guid"))
+			{
+				m_is_guid_pseudorandom = true;
+				break;
+			}
+		}
 	}
 
 
@@ -2969,6 +2983,7 @@ public:
 
 		m_is_universe_changed = false;
 		destroyUndoStack();
+		if (m_is_guid_pseudorandom) Math::seedRandomGUID(0);
 		m_universe = &m_engine->createUniverse(true);
 		Universe* universe = m_universe;
 
@@ -3221,7 +3236,6 @@ public:
 	{
 		FS::FileSystem& fs = m_engine->getFileSystem();
 		while (fs.hasWork()) fs.updateAsyncTransactions();
-		
 		newUniverse();
 		Path undo_stack_path(dir, name, ".json");
 		executeUndoStack(undo_stack_path);
@@ -3376,6 +3390,7 @@ private:
 	RenderInterface* m_render_interface;
 	u32 m_current_group_type;
 	bool m_is_universe_changed;
+	bool m_is_guid_pseudorandom;
 };
 
 
