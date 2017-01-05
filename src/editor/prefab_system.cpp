@@ -454,7 +454,7 @@ public:
 	void serialize(OutputBlob& serializer) override
 	{
 		serializer.write(m_prefabs.size());
-		serializer.write(&m_prefabs[0], m_prefabs.size() * sizeof(m_prefabs[0]));
+		if(!m_prefabs.empty()) serializer.write(&m_prefabs[0], m_prefabs.size() * sizeof(m_prefabs[0]));
 		serializer.write(m_instances.size());
 		for (int i = 0, c = m_instances.size(); i < c; ++i)
 		{

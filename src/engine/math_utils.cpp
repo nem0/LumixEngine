@@ -222,6 +222,12 @@ u64 randGUID()
 }
 
 
+void seedRandomGUID(u32 seed)
+{
+	getGUIDRandomGenerator().seed(seed);
+}
+
+
 u32 rand()
 {
 	return getRandomGenerator()();

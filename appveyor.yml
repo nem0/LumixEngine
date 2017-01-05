@@ -25,7 +25,7 @@ test_script:
     & "..\projects\tmp\vs2015\bin\RelWithDebInfo\studio.exe" -run_script unit_tests/render_tests/compile_shaders.lua | Write-Output
 
 - ps: >-
-    & "..\projects\tmp\vs2015\bin\RelWithDebInfo\studio.exe" -run_script unit_tests/editor/main.lua | Write-Output
+    & "..\projects\tmp\vs2015\bin\RelWithDebInfo\studio.exe" -pseudorandom_guid -run_script unit_tests/editor/main.lua | Write-Output
 
 - ps: >-
     & "..\projects\tmp\vs2015\bin\RelWithDebInfo\app.exe" -window -pipeline pipelines/render_test.lua -script unit_tests/render_tests/main.lua | Write-Output
