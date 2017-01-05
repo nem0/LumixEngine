@@ -1666,6 +1666,12 @@ public:
 	{
 		g_log_info.log("Editor") << "Saving universe " << basename << "...";
 		
+		auto& fs = m_engine->getFileSystem();
+		StaticString<MAX_PATH_LENGTH> path("universes/", basename, ".unv");
+		FS::IFile* file = fs.open(fs.getDefaultDevice(), Path(path), FS::Mode::CREATE_AND_WRITE);
+		save(*file);
+		fs.close(*file);
+
 		serialize(basename);
 		m_is_universe_changed = false;
 
