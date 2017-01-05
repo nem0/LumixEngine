@@ -1662,27 +1662,14 @@ public:
 	bool isUniverseChanged() const override { return m_is_universe_changed; }
 
 
-	void saveUniverse(const Path& path, bool save_path) override
+	void saveUniverse(const char* basename, bool save_path) override
 	{
-		g_log_info.log("Editor") << "Saving universe " << path << "...";
-		FS::FileSystem& fs = m_engine->getFileSystem();
-		char bkp_path[MAX_PATH_LENGTH];
-		copyString(bkp_path, path.c_str());
-		catString(bkp_path, ".bkp");
-		copyFile(path.c_str(), bkp_path);
-		FS::IFile* file = fs.open(fs.getDefaultDevice(), path, FS::Mode::CREATE_AND_WRITE);
-		if (!file)
-		{
-			g_log_error.log("Editor") << "Could not create/open " << path.c_str();
-			return;
-		}
-		save(*file);
-		m_is_universe_changed = false;
-		fs.close(*file);
+		g_log_info.log("Editor") << "Saving universe " << basename << "...";
 		
-		serialize(path);
+		serialize(basename);
+		m_is_universe_changed = false;
 
-		if (save_path) m_universe->setPath(path);
+		if (save_path) m_universe->setName(basename);
 	}
 
 
@@ -1758,13 +1745,12 @@ public:
 	};
 
 
-	void deserialize(const Path& path)
+	void deserialize(const char* basename)
 	{
 		PROFILE_FUNCTION();
 		if (isValid(m_camera)) m_universe->destroyEntity(m_camera);
 		m_entity_map.clear();
-		PathUtils::FileInfo file_info(path.c_str());
-		StaticString<MAX_PATH_LENGTH> scn_dir(file_info.m_dir, file_info.m_basename, "/scenes/");
+		StaticString<MAX_PATH_LENGTH> scn_dir("universes/", basename, "/scenes/");
 		auto scn_file_iter = PlatformInterface::createFileIterator(scn_dir, m_allocator);
 		Array<u8> data(m_allocator);
 		FS::OsFile file;
@@ -1802,7 +1788,7 @@ public:
 		}
 		PlatformInterface::destroyFileIterator(scn_file_iter);
 		
-		StaticString<MAX_PATH_LENGTH> dir(file_info.m_dir, file_info.m_basename, "/");
+		StaticString<MAX_PATH_LENGTH> dir("universes/", basename, "/");
 		auto file_iter = PlatformInterface::createFileIterator(dir, m_allocator);
 		while (PlatformInterface::getNextFile(file_iter, &info))
 		{
@@ -1851,7 +1837,7 @@ public:
 		}
 		PlatformInterface::destroyFileIterator(file_iter);
 
-		StaticString<MAX_PATH_LENGTH> filepath(file_info.m_dir, file_info.m_basename, "/systems/templates.sys");
+		StaticString<MAX_PATH_LENGTH> filepath("universes/", basename, "/systems/templates.sys");
 		loadFile(filepath, [this](TextDeserializer& deserializer) {
 			m_prefab_system->deserialize(deserializer);
 			for (int i = 0, c = m_prefab_system->getMaxEntityIndex(); i < c; ++i)
@@ -1864,10 +1850,9 @@ public:
 	}
 
 	
-	void serialize(const Path& path)
+	void serialize(const char* basename)
 	{
-		PathUtils::FileInfo file_info(path.c_str());
-		StaticString<MAX_PATH_LENGTH> dir(file_info.m_dir, file_info.m_basename, "/");
+		StaticString<MAX_PATH_LENGTH> dir(m_engine->getDiskFileDevice()->getBasePath(), "universes/", basename, "/");
 		PlatformInterface::makePath(dir);
 		PlatformInterface::makePath(dir + "probes/");
 		PlatformInterface::makePath(dir + "scenes/");
@@ -2319,12 +2304,12 @@ public:
 			m_universe_destroyed.invoke();
 			m_game_mode_file->seek(FS::SeekMode::BEGIN, 0);
 			m_entity_groups.setUniverse(nullptr);
-			Path path = m_universe->getPath();
+			StaticString<64> name(m_universe->getName());
 			m_engine->destroyUniverse(*m_universe);
 			
 			m_universe = &m_engine->createUniverse(true);
 			m_universe_created.invoke();
-			m_universe->setPath(path);
+			m_universe->setName(name);
 			m_universe->entityDestroyed().bind<WorldEditorImpl, &WorldEditorImpl::onEntityDestroyed>(this);
 			m_selected_entities.clear();
 			m_entity_groups.setUniverse(m_universe);
@@ -2501,33 +2486,15 @@ public:
 	}
 
 
-	void loadUniverse(const Path& path) override
+	void loadUniverse(const char* basename) override
 	{
 		if (m_is_game_mode) stopGameMode(false);
 		destroyUniverse();
 		createUniverse();
-		m_universe->setPath(path);
-		g_log_info.log("Editor") << "Loading universe " << path << "...";
-		FS::FileSystem& fs = m_engine->getFileSystem();
-		FS::ReadCallback file_read_cb;
-		file_read_cb.bind<WorldEditorImpl, &WorldEditorImpl::loadMap>(this);
-		fs.openAsync(fs.getDefaultDevice(), path, FS::Mode::OPEN_AND_READ, file_read_cb);
-	}
-
-
-	void loadMap(FS::IFile& file, bool success)
-	{
-		PROFILE_FUNCTION();
-		ASSERT(success);
-		if (success)
-		{
-			deserialize(m_universe->getPath()); 
-			char path[MAX_PATH_LENGTH];
-			copyString(path, sizeof(path), m_universe->getPath().c_str());
-			catString(path, sizeof(path), ".lst");
-			copyFile(m_universe->getPath().c_str(), path);
-			m_editor_icons->refresh();
-		}
+		m_universe->setName(basename);
+		g_log_info.log("Editor") << "Loading universe " << basename << "...";
+		deserialize(basename);
+		m_editor_icons->refresh();
 	}
 
 
@@ -3241,12 +3208,9 @@ public:
 		executeUndoStack(undo_stack_path);
 		while (fs.hasWork()) fs.updateAsyncTransactions();
 
-		StaticString<MAX_PATH_LENGTH> result_dir(m_engine->getDiskFileDevice()->getBasePath(), dir, "/results/");
-		PlatformInterface::makePath(result_dir);
-		result_dir << name << "/";
-		PlatformInterface::makePath(result_dir);
-		Path result_universe_path(result_dir, ".unv");
-		serialize(result_universe_path);
+		StaticString<MAX_PATH_LENGTH> result_name("__test_result__", name);
+		serialize(result_name);
+		StaticString<MAX_PATH_LENGTH> result_dir(m_engine->getDiskFileDevice()->getBasePath(), "universes/", result_name, "/");
 
 		bool is_same = true;
 

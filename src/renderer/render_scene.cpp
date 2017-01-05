@@ -902,9 +902,7 @@ public:
 	void deserializeEnvironmentProbe(IDeserializer& serializer, Entity entity)
 	{
 		auto* texture_manager = m_engine.getResourceManager().get(TEXTURE_TYPE);
-		char basename[64];
-		PathUtils::getBasename(basename, lengthOf(basename), m_universe.getPath().c_str());
-		StaticString<Lumix::MAX_PATH_LENGTH> probe_dir("universes/", basename, "/probes/");
+		StaticString<Lumix::MAX_PATH_LENGTH> probe_dir("universes/", m_universe.getName(), "/probes/");
 		EnvironmentProbe& probe = m_environment_probes.insert(entity);
 		serializer.read(&probe.guid);
 		StaticString<Lumix::MAX_PATH_LENGTH> path_str(probe_dir, probe.guid, ".dds");
@@ -1303,9 +1301,7 @@ public:
 		serializer.read(count);
 		m_environment_probes.reserve(count);
 		auto* texture_manager = m_engine.getResourceManager().get(TEXTURE_TYPE);
-		char basename[64];
-		PathUtils::getBasename(basename, lengthOf(basename), m_universe.getPath().c_str());
-		StaticString<Lumix::MAX_PATH_LENGTH> probe_dir("universes/", basename, "/probes/");
+		StaticString<Lumix::MAX_PATH_LENGTH> probe_dir("universes/", m_universe.getName(), "/probes/");
 		for (int i = 0; i < count; ++i)
 		{
 			Entity entity;
@@ -4164,19 +4160,17 @@ public:
 		auto& probe = m_environment_probes[entity];
 		auto* texture_manager = m_engine.getResourceManager().get(TEXTURE_TYPE);
 		if (probe.texture) texture_manager->unload(*probe.texture);
-		char basename[64];
-		PathUtils::getBasename(basename, lengthOf(basename), m_universe.getPath().c_str());
-		StaticString<Lumix::MAX_PATH_LENGTH> path("universes/", basename, "/probes/", probe.guid, ".dds");
+		StaticString<Lumix::MAX_PATH_LENGTH> path("universes/", m_universe.getName(), "/probes/", probe.guid, ".dds");
 		probe.texture = static_cast<Texture*>(texture_manager->load(Path(path)));
 		probe.texture->setFlag(BGFX_TEXTURE_SRGB, true);
 		path = "universes/";
-		path << basename << "/probes/" << probe.guid << "_irradiance.dds";
+		path << m_universe.getName() << "/probes/" << probe.guid << "_irradiance.dds";
 		probe.irradiance = static_cast<Texture*>(texture_manager->load(Path(path)));
 		probe.irradiance->setFlag(BGFX_TEXTURE_SRGB, true);
 		probe.irradiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
 		probe.irradiance->setFlag(BGFX_TEXTURE_MAG_ANISOTROPIC, true);
 		path = "universes/";
-		path << basename << "/probes/" << probe.guid << "_radiance.dds";
+		path << m_universe.getName() << "/probes/" << probe.guid << "_radiance.dds";
 		probe.radiance = static_cast<Texture*>(texture_manager->load(Path(path)));
 		probe.radiance->setFlag(BGFX_TEXTURE_SRGB, true);
 		probe.radiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);

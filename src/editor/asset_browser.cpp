@@ -18,7 +18,6 @@
 #include "utils.h"
 
 
-static const Lumix::ResourceType UNIVERSE_TYPE("universe");
 static const Lumix::u32 SOURCE_HASH = Lumix::crc32("source");
 
 
@@ -32,7 +31,6 @@ Lumix::ResourceType AssetBrowser::getResourceType(const char* path) const
 		Lumix::ResourceType type = plugin->getResourceType(ext);
 		if (Lumix::isValid(type)) return type;
 	}
-	if (Lumix::equalStrings(ext, "unv")) return UNIVERSE_TYPE;
 
 	return Lumix::INVALID_RESOURCE_TYPE;
 }
@@ -342,7 +340,6 @@ void AssetBrowser::selectResource(const Lumix::Path& resource, bool record_histo
 	m_activate = true;
 	char ext[30];
 	Lumix::PathUtils::getExtension(ext, Lumix::lengthOf(ext), resource.c_str());
-	if (Lumix::equalStrings(ext, "unv")) return;
 
 	auto& manager = m_editor.getEngine().getResourceManager();
 	auto* resource_manager = manager.get(getResourceType(resource.c_str()));
@@ -436,13 +433,13 @@ bool AssetBrowser::resourceList(char* buf, int max_size, Lumix::ResourceType typ
 	ImGui::FilterInput("Filter", filter, sizeof(filter));
 
 	ImGui::BeginChild("Resources", ImVec2(0, height));
-	for (auto& unv : getResources(getTypeIndex(type)))
+	for (auto& res : getResources(getTypeIndex(type)))
 	{
-		if (filter[0] != '\0' && strstr(unv.c_str(), filter) == nullptr) continue;
+		if (filter[0] != '\0' && strstr(res.c_str(), filter) == nullptr) continue;
 
-		if (ImGui::Selectable(unv.c_str(), false))
+		if (ImGui::Selectable(res.c_str(), false))
 		{
-			Lumix::copyString(buf, max_size, unv.c_str());
+			Lumix::copyString(buf, max_size, res.c_str());
 			ImGui::EndChild();
 			return true;
 		}
@@ -518,7 +515,7 @@ void AssetBrowser::onGUIResource()
 	{
 		if (plugin->onGUI(m_selected_resource, resource_type)) return;
 	}
-	ASSERT(resource_type == UNIVERSE_TYPE); // unimplemented resource
+	ASSERT(false); // unimplemented resource
 }
 
 
@@ -535,8 +532,6 @@ int AssetBrowser::getResourceTypeIndex(const char* ext)
 		if (Lumix::isValid(m_plugins[i]->getResourceType(ext))) return 1 + i;
 	}
 
-
-	if (Lumix::equalStrings(ext, "unv")) return 0;
 	return -1;
 }
 

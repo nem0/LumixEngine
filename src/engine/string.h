@@ -79,7 +79,7 @@ template <int size> struct StaticString
 	template <typename... Args> StaticString(const char* str, Args... args)
 	{
 		Lumix::copyString(data, size, str);
-		int tmp[] = {(add(args), 0)...};
+		int tmp[] = { (add(args), 0)... };
 		(void)tmp;
 	}
 

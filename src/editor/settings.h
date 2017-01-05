@@ -45,8 +45,6 @@ struct LUMIX_EDITOR_API Settings
 	char m_data_dir[Lumix::MAX_PATH_LENGTH];
 	Lumix::WorldEditor* m_editor;
 
-	int m_autosave_time;
-
 	explicit Settings(StudioApp& app);
 	~Settings();
 

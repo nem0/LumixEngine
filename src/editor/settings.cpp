@@ -231,7 +231,6 @@ Settings::Settings(StudioApp& app)
 	, m_force_no_crash_report(false)
 	, m_mouse_sensitivity_x(1000.0f)
 	, m_mouse_sensitivity_y(1000.0f)
-	, m_autosave_time(300)
 {
 	m_data_dir[0] = '\0';
 	m_filter[0] = 0;
@@ -286,7 +285,6 @@ bool Settings::load()
 	m_is_properties_opened = getBoolean(L, "properties_opened", false);
 	m_is_crash_reporting_enabled = getBoolean(L, "error_reporting_enabled", true);
 	Lumix::enableCrashReporting(m_is_crash_reporting_enabled && !m_force_no_crash_report);
-	m_autosave_time = getInteger(L, "autosave_time", 300);
 	m_mouse_sensitivity_x = getFloat(L, "mouse_sensitivity_x", 200.0f);
 	m_mouse_sensitivity_y = getFloat(L, "mouse_sensitivity_y", 200.0f);
 
@@ -408,7 +406,6 @@ bool Settings::save()
 	writeBool("error_reporting_enabled", m_is_crash_reporting_enabled);
 	file << "mouse_sensitivity_x = " << m_mouse_sensitivity_x << "\n";
 	file << "mouse_sensitivity_y = " << m_mouse_sensitivity_y << "\n";
-	file << "autosave_time = " << m_autosave_time << "\n";
 	
 	saveStyle(file);
 
@@ -575,7 +572,6 @@ void Settings::onGUI()
 
 		if (ImGui::CollapsingHeader("General"))
 		{
-			ImGui::DragInt("Autosave time (seconds)", &m_autosave_time);
 			if (m_force_no_crash_report)
 			{
 				ImGui::Text("Crash reporting disabled from command line");
