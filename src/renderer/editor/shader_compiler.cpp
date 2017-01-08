@@ -1,26 +1,28 @@
 #include "shader_compiler.h"
-#include "engine/fs/disk_file_device.h"
-#include "engine/fs/file_system.h"
-#include "engine/fs/os_file.h"
-#include "engine/log.h"
-#include "engine/mt/thread.h"
-#include "engine/path.h"
-#include "engine/path_utils.h"
-#include "engine/profiler.h"
-#include "engine/resource_manager.h"
-#include "engine/resource_manager_base.h"
-#include "engine/system.h"
-#include "editor/world_editor.h"
-#include "engine/engine.h"
-#include "engine/plugin_manager.h"
-#include "renderer/renderer.h"
 #include "editor/asset_browser.h"
 #include "editor/file_system_watcher.h"
 #include "editor/log_ui.h"
 #include "editor/platform_interface.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
+#include "editor/world_editor.h"
+#include "engine/engine.h"
+#include "engine/fs/disk_file_device.h"
+#include "engine/fs/file_system.h"
+#include "engine/fs/os_file.h"
+#include "engine/fs/resource_file_device.h"
+#include "engine/log.h"
+#include "engine/mt/thread.h"
+#include "engine/path.h"
+#include "engine/path_utils.h"
+#include "engine/plugin_manager.h"
+#include "engine/profiler.h"
+#include "engine/resource_manager.h"
+#include "engine/resource_manager_base.h"
+#include "engine/system.h"
+#include "renderer/renderer.h"
 #include <cstdio>
+#include <stb/stb_resource.h>
 
 
 namespace bgfx
@@ -49,6 +51,7 @@ ShaderCompiler::ShaderCompiler(StudioApp& app, LogUI& log_ui)
 
 	m_watcher = FileSystemWatcher::create("pipelines", m_editor.getAllocator());
 	m_watcher->getCallback().bind<ShaderCompiler, &ShaderCompiler::onFileChanged>(this);
+	
 	findShaderFiles("pipelines/");
 	parseDependencies();
 	makeUpToDate(false);
@@ -184,10 +187,18 @@ void ShaderCompiler::makeUpToDate(bool wait)
 		if (wait) this->wait();
 		return;
 	}
+	if (m_shd_files.empty()) return;
 
-	Lumix::StaticString<Lumix::MAX_PATH_LENGTH> compiled_dir(
-		m_editor.getEngine().getDiskFileDevice()->getBasePath(), "/pipelines/compiled");
+	Lumix::StaticString<Lumix::MAX_PATH_LENGTH> pipelines_dir(
+		m_editor.getEngine().getDiskFileDevice()->getBasePath(), "/pipelines");
+	Lumix::StaticString<Lumix::MAX_PATH_LENGTH> compiled_dir(pipelines_dir, "/compiled");
 	if (getRenderer().isOpenGL()) compiled_dir << "_gl";
+	if (!PlatformInterface::dirExists(pipelines_dir) && !PlatformInterface::makePath(pipelines_dir))
+	{
+		Lumix::messageBox("Could not create directory pipelines. Please create it and "
+			"restart the editor");
+		return;
+	}
 	if (!PlatformInterface::dirExists(compiled_dir) && !PlatformInterface::makePath(compiled_dir))
 	{
 		Lumix::messageBox("Could not create directory pipelines/compiled. Please create it and "

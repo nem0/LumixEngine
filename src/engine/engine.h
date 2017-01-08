@@ -12,6 +12,7 @@ namespace Lumix
 namespace FS
 {
 class DiskFileDevice;
+class ResourceFileDevice;
 class FileSystem;
 }
 
@@ -61,6 +62,7 @@ public:
 	virtual FS::FileSystem& getFileSystem() = 0;
 	virtual FS::DiskFileDevice* getDiskFileDevice() = 0;
 	virtual FS::DiskFileDevice* getPatchFileDevice() = 0;
+	virtual FS::ResourceFileDevice* getResourceFileDevice() = 0;
 	virtual InputSystem& getInputSystem() = 0;
 	virtual PluginManager& getPluginManager() = 0;
 	virtual MTJD::Manager& getMTJDManager() = 0;
