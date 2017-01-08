@@ -1990,6 +1990,7 @@ public:
 
 	void checkWorkingDirector()
 	{
+		if (!PlatformInterface::fileExists("../LumixStudio.lnk")) return;
 		if (!PlatformInterface::dirExists("bin"))
 		{
 			Lumix::messageBox("Bin directory not found, please check working directory.");

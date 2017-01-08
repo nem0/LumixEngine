@@ -47,6 +47,12 @@ bool equalStrings(const char* lhs, const char* rhs)
 }
 
 
+bool equalIStrings(const char* lhs, const char* rhs)
+{
+	return stricmp(lhs, rhs) == 0;
+}
+
+
 int stringLength(const char* str)
 {
 	return (int)strlen(str);
