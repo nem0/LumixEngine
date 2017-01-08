@@ -16,10 +16,16 @@ local build_studio = true
 local build_gui = _ACTION == "vs2015"
 local build_steam = false
 local build_game = false
+local embed_resources = false
 
 newoption {
 	trigger = "static-plugins",
 	description = "Plugins are static libraries."
+}
+
+newoption {
+	trigger = "embed-resources",
+	description = "Embed resources (shaders, ...) in executable"
 }
 
 newoption {
@@ -59,6 +65,10 @@ newoption {
 
 if _OPTIONS["with-steam"] then
 	build_steam = true
+end
+
+if _OPTIONS["embed-resources"] then
+	embed_resources = true
 end
 
 if _OPTIONS["with-game"] then
@@ -474,6 +484,12 @@ project "engine"
 			"../external/imgui/**.cpp",
 			"../external/imgui/**.inl"
 	}
+
+	if embed_resources then
+		removefiles { "../src/engine/no_resources.cpp" }
+	else
+		removefiles { "../src/engine/resources.cpp" }
+	end
 
 	defines { "BUILDING_ENGINE" }
 	includedirs { "../external/lua/include" }
