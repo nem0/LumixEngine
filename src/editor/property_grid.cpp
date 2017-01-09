@@ -589,8 +589,15 @@ void PropertyGrid::showCoreProperties(const Lumix::Array<Lumix::Entity>& entitie
 		ImGui::LabelText("ID", "%d", entities[0].index);
 		Lumix::EntityGUID guid = m_editor.getEntityGUID(entities[0]);
 		char guid_str[32];
-		Lumix::toCString(guid.value, guid_str, Lumix::lengthOf(guid_str));
-		ImGui::LabelText("GUID", "%s", guid_str);
+		if (guid == Lumix::INVALID_ENTITY_GUID)
+		{
+			ImGui::LabelText("GUID", "%s", "runtime");
+		}
+		else
+		{
+			Lumix::toCString(guid.value, guid_str, Lumix::lengthOf(guid_str));
+			ImGui::LabelText("GUID", "%s", guid_str);
+		}
 
 		Lumix::copyString(name, tmp);
 		if (ImGui::InputText("Name", name, sizeof(name))) m_editor.setEntityName(entities[0], name);

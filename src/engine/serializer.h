@@ -18,6 +18,7 @@ struct Vec4;
 struct EntityGUID
 {
 	u64 value;
+	bool operator ==(const EntityGUID& rhs) const { return value == rhs.value; }
 };
 
 

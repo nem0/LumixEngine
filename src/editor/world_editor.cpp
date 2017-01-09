@@ -1734,6 +1734,7 @@ public:
 		EntityGUID get(Entity entity) override
 		{
 			if (!isValid(entity)) return INVALID_ENTITY_GUID;
+			if (entity.index >= entity_to_guid.size()) return INVALID_ENTITY_GUID;
 			return entity_to_guid[entity.index];
 		}
 

@@ -2961,9 +2961,7 @@ public:
 	}
 
 
-	void fillTemporaryInfos(const CullingSystem::Results& results,
-		const Frustum& frustum,
-		const Vec3& lod_ref_point)
+	void fillTemporaryInfos(const CullingSystem::Results& results, const Frustum& frustum, const Vec3& lod_ref_point)
 	{
 		PROFILE_FUNCTION();
 		m_jobs.clear();
@@ -2999,11 +2997,11 @@ public:
 					ModelInstance* LUMIX_RESTRICT model_instances = &m_model_instances[0];
 					for (int i = 0, c = results[subresult_index].size(); i < c; ++i)
 					{
-						ModelInstance* LUMIX_RESTRICT model_instance = &model_instances[raw_subresults[i].index];
+						const ModelInstance* LUMIX_RESTRICT model_instance = &model_instances[raw_subresults[i].index];
 						float squared_distance = (model_instance->matrix.getTranslation() - ref_point).squaredLength();
 						squared_distance *= lod_multiplier;
 
-						Model* LUMIX_RESTRICT model = model_instance->model;
+						const Model* LUMIX_RESTRICT model = model_instance->model;
 						LODMeshIndices lod = model->getLODMeshIndices(squared_distance);
 						for (int j = lod.from, c = lod.to; j <= c; ++j)
 						{
@@ -5042,7 +5040,7 @@ void RenderScene::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(hideModelInstance);
 	REGISTER_FUNCTION(showModelInstance);
 
-#undef REGISTER_FUNCTION
+	#undef REGISTER_FUNCTION
 
 	#define REGISTER_FUNCTION(F)\
 		do { \

@@ -70,7 +70,7 @@ typedef unsigned int u32;
 static_assert(sizeof(uintptr) == sizeof(void*), "Incorrect size of uintptr");
 static_assert(sizeof(i64) == 8, "Incorrect size of i64");
 static_assert(sizeof(i32) == 4, "Incorrect size of i32");
-static_assert(sizeof(i16) == 2, "Incorrect size of int16");
+static_assert(sizeof(i16) == 2, "Incorrect size of i16");
 static_assert(sizeof(i8) == 1, "Incorrect size of i8");
 
 const u32 MAX_PATH_LENGTH = 260;
@@ -93,6 +93,7 @@ struct Entity
 	bool operator!=(const Entity& rhs) const { return rhs.index != index; };
 };
 inline bool isValid(Entity entity) { return entity.index >= 0; }
+
 struct ComponentType
 {
 	int index;
