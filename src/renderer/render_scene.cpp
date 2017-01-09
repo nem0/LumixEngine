@@ -2120,6 +2120,7 @@ public:
 		camera.near = 0.1f;
 		camera.far = 10000.0f;
 		camera.slot[0] = '\0';
+		if (!isValid(getCameraInSlot("main"))) copyString(camera.slot, "main");
 		m_cameras.insert(entity, camera);
 		m_universe.addComponent(entity, CAMERA_TYPE, this, {entity.index});
 		return {entity.index};
