@@ -693,6 +693,10 @@ if build_app then
 			forceLink("s_lua_script_plugin_register")
 			forceLink("s_navigation_plugin_register")
 			forceLink("s_renderer_plugin_register")
+			if build_game then
+				forceLink("s_" .. build_game .. "_plugin_register")
+				links { build_game }
+			end
 			
 			if build_gui then
 				forceLink("s_gui_plugin_register")
@@ -705,12 +709,11 @@ if build_app then
 				forceLink("setStudioApp_navigation")
 				forceLink("setStudioApp_renderer")
 				--forceLink("setStudioApp_gui")
+				if build_game then
+					forceLink("setStudioApp_" .. build_game)
+				end
 			end
 				
-			if build_game then
-				forceLink("s_" .. build_game .. "_plugin_register")
-				links { build_game }
-			end
 
 			if build_physics then
 				forceLink("s_physics_plugin_register")
