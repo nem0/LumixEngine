@@ -1779,7 +1779,7 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 
 			if (m_dialog.m_model.create_billboard_lod)
 			{
-				u32 indices[] = { 0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 8, 9, 10, 8, 10, 11, 12, 13, 14, 12, 14, 15 };
+				u32 indices[] = {0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 8, 9, 10, 8, 10, 11, 12, 13, 14, 12, 14, 15};
 				file.write(indices, sizeof(indices));
 			}
 		}

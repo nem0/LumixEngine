@@ -274,7 +274,7 @@ public:
 		if (type == MODEL_INSTANCE_TYPE)
 		{
 			if (entity.index >= m_model_instances.size()) return INVALID_COMPONENT;
-			ComponentHandle cmp = { entity.index };
+			ComponentHandle cmp = {entity.index};
 			return isValid(m_model_instances[entity.index].entity) ? cmp : INVALID_COMPONENT;
 		}
 		if (type == ENVIRONMENT_PROBE_TYPE)
@@ -314,14 +314,14 @@ public:
 		if (type == TERRAIN_TYPE)
 		{
 			auto iter = m_terrains.find(entity);
-			if (!iter.isValid())return INVALID_COMPONENT;
+			if (!iter.isValid()) return INVALID_COMPONENT;
 			return {entity.index};
 		}
 		if (type == PARTICLE_EMITTER_TYPE)
 		{
 			int index = m_particle_emitters.find(entity);
 			if (index < 0) return INVALID_COMPONENT;
-			if (m_particle_emitters.at(index)->m_is_valid) return{ entity.index };
+			if (m_particle_emitters.at(index)->m_is_valid) return {entity.index};
 			return INVALID_COMPONENT;
 		}
 		if (type == BONE_ATTACHMENT_TYPE)

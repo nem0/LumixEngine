@@ -49,7 +49,11 @@ bool equalStrings(const char* lhs, const char* rhs)
 
 bool equalIStrings(const char* lhs, const char* rhs)
 {
+#ifdef _WIN32
 	return stricmp(lhs, rhs) == 0;
+#else
+	return strcasecmp(lhs, rhs) == 0;
+#endif
 }
 
 
