@@ -45,7 +45,8 @@ namespace Lumix
 					copyString(tmp, m_device.getBasePath());
 					catString(tmp, path.c_str());
 				}
-				if (!OsFile::fileExists(tmp) && m_fallthrough)
+				bool want_read = (mode & Mode::READ) != 0;
+				if (want_read && !OsFile::fileExists(tmp) && m_fallthrough)
 				{
 					m_use_fallthrough = true;
 					return m_fallthrough->open(path, mode);
