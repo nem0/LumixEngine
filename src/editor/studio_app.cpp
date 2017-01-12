@@ -1570,6 +1570,29 @@ public:
 	}
 
 
+	static int getResources(lua_State* L)
+	{
+		auto* studio = Lumix::LuaWrapper::checkArg<StudioAppImpl*>(L, 1);
+		auto* type = Lumix::LuaWrapper::checkArg<const char*>(L, 2);
+
+		AssetBrowser* browser = studio->getAssetBrowser();
+		int type_idx = browser->getTypeIndex(Lumix::ResourceType(type));
+		if (type_idx < 0) return 0;
+		auto& resources_paths = browser->getResources(type_idx);
+
+		lua_createtable(L, resources_paths.size(), 0);
+		int i = 0;
+		for (auto& path : resources_paths)
+		{
+			Lumix::LuaWrapper::push(L, path.c_str());
+			lua_rawseti(L, -2, i + 1);
+			++i;
+		}
+
+		return 1;
+	}
+
+
 	bool LUA_runTest(const char* dir, const char* name)
 	{
 		return m_editor->runTest(dir, name);
@@ -1593,6 +1616,8 @@ public:
 		REGISTER_FUNCTION(exitGameMode);
 
 		#undef REGISTER_FUNCTION
+
+		Lumix::LuaWrapper::createSystemFunction(L, "Editor", "getResources", &getResources);
 	}
 
 
