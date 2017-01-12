@@ -627,7 +627,7 @@ struct ConsolePlugin LUMIX_FINAL : public StudioApp::IPlugin
 
 	StudioApp& app;
 	bool opened;
-	char buf[4096];
+	char buf[10*1024];
 };
 
 

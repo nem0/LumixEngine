@@ -1102,7 +1102,7 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 		bool is_srgb) const
 	{
 		PathUtils::FileInfo texture_info(texture.src);
-		material_file << "\t, \"texture\" : {\n\t\t\"source\" : \"";
+		material_file << ",\n\t\"texture\" : {\n\t\t\"source\" : \"";
 		if (m_dialog.m_texture_output_dir[0])
 		{
 			char from_root_path[MAX_PATH_LENGTH];
@@ -1112,7 +1112,7 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 		}
 		material_file << texture_info.m_basename << ".";
 		material_file << (texture.to_dds ? "dds" : texture_info.m_extension);
-		material_file << (is_srgb ? "\", \"srgb\" : true\n }\n" : "\"\n }\n");
+		material_file << (is_srgb ? "\", \"srgb\" : true\n\t}\n" : "\"\n }\n");
 
 		if (!texture.import) return true;
 		bool is_already_saved = m_dialog.m_saved_textures.indexOf(crc32(texture.src)) >= 0;
@@ -1503,7 +1503,7 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 
 		for (int i = 0; i < material.texture_count; ++i)
 		{
-			saveTexture(material.textures[i], source_mesh_dir, file, true);
+			saveTexture(material.textures[i], source_mesh_dir, file, i == 0);
 		}
 
 		file.write("}", 1);
