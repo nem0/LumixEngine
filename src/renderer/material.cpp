@@ -164,6 +164,7 @@ bool Material::save(JsonSerializer& serializer)
 	serializer.serialize("render_layer", renderer.getLayerName(m_render_layer));
 	serializer.serialize("layers_count", m_layers_count);
 	serializer.serialize("shader", m_shader ? m_shader->getPath() : Path(""));
+	serializer.serialize("backface_culling", isBackfaceCulling());
 	for (int i = 0; i < m_texture_count; ++i)
 	{
 		char path[MAX_PATH_LENGTH];
