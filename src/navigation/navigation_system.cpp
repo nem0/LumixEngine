@@ -406,6 +406,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 			Vec3 diff = *(Vec3*)dt_agent->npos - pos;
 			*(Vec3*)dt_agent->npos = pos + rot.rotate(agent.root_motion);
 			agent.root_motion.set(0, 0, 0);
+			diff.y = 0;
 			agent.speed = diff.length() / time_delta;
 		}
 		
