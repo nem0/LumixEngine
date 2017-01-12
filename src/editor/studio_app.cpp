@@ -1456,6 +1456,19 @@ public:
 		}
 	}
 
+	bool shouldSleepWhenInactive()
+	{
+		char cmd_line[2048];
+		Lumix::getCommandLine(cmd_line, Lumix::lengthOf(cmd_line));
+
+		Lumix::CommandLineParser parser(cmd_line);
+		while (parser.next())
+		{
+			if (parser.currentEquals("-no_sleep_inactive")) return false;
+		}
+		return true;
+	}
+
 
 	void loadUniverseFromCommandLine()
 	{
@@ -1975,7 +1988,9 @@ public:
 					frame_time = timer->tick();
 				}
 
-				float wanted_fps = (SDL_GetWindowFlags(m_window) & SDL_WINDOW_INPUT_FOCUS) != 0 ? 60.0f : 5.0f;
+				float wanted_fps = (SDL_GetWindowFlags(m_window) & SDL_WINDOW_INPUT_FOCUS) != 0 || !m_sleep_when_inactive
+									   ? 60.0f
+									   : 5.0f;
 				if (frame_time < 1 / wanted_fps)
 				{
 					PROFILE_BLOCK("sleep");
@@ -2082,6 +2097,8 @@ public:
 		loadSettings();
 		loadUniverseFromCommandLine();
 		findLuaPlugins("plugins/lua/");
+
+		m_sleep_when_inactive = shouldSleepWhenInactive();
 	}
 
 
@@ -2188,6 +2205,7 @@ public:
 	bool m_finished;
 	int m_exit_code;
 
+	bool m_sleep_when_inactive;
 	bool m_is_welcome_screen_opened;
 	bool m_is_entity_list_opened;
 	bool m_is_save_as_dialog_opened;
