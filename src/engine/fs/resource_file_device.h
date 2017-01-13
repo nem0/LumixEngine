@@ -3,7 +3,7 @@
 #include "engine/lumix.h"
 #include "engine/fs/ifile_device.h"
 
-struct stb_resource;
+struct mf_resource;
 
 namespace Lumix
 {
@@ -24,7 +24,7 @@ public:
 	void destroyFile(IFile* file) override;
 	IFile* createFile(IFile* child) override;
 	int getResourceFilesCount() const;
-	const stb_resource* getResource(int index) const;
+	const mf_resource* getResource(int index) const;
 
 	const char* name() const override { return "resource"; }
 
