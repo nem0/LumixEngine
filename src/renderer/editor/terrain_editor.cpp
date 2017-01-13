@@ -49,10 +49,10 @@ struct PaintTerrainCommand LUMIX_FINAL : public Lumix::IEditorCommand
 {
 	struct Rectangle
 	{
-		int m_from_x;
-		int m_from_y;
-		int m_to_x;
-		int m_to_y;
+		int from_x;
+		int from_y;
+		int to_x;
+		int to_y;
 	};
 
 
@@ -99,13 +99,13 @@ struct PaintTerrainCommand LUMIX_FINAL : public Lumix::IEditorCommand
 		Lumix::Matrix entity_mtx = editor.getUniverse()->getMatrix(terrain.entity);
 		entity_mtx.fastInverse();
 		Lumix::Vec3 local_pos = entity_mtx.transform(hit_pos);
-		float xz_scale = static_cast<Lumix::RenderScene*>(terrain.scene)->getTerrainXZScale(terrain.handle);
-		local_pos = local_pos / xz_scale;
+		float terrain_size = static_cast<Lumix::RenderScene*>(terrain.scene)->getTerrainSize(terrain.handle).x;
+		local_pos = local_pos / terrain_size;
 		local_pos.y = -1;
 
 		Item& item = m_items.emplace();
 		item.m_local_pos = local_pos;
-		item.m_radius = radius / xz_scale;
+		item.m_radius = radius / terrain_size;
 		item.m_amount = rel_amount;
 		item.m_color = color;
 	}
@@ -215,13 +215,13 @@ struct PaintTerrainCommand LUMIX_FINAL : public Lumix::IEditorCommand
 private:
 	struct Item
 	{
-		Rectangle getBoundingRectangle(int max_x, int max_z) const
+		Rectangle getBoundingRectangle(int texture_size) const
 		{
 			Rectangle r;
-			r.m_from_x = Lumix::Math::maximum(0, int(m_local_pos.x - m_radius - 0.5f));
-			r.m_from_y = Lumix::Math::maximum(0, int(m_local_pos.z - m_radius - 0.5f));
-			r.m_to_x = Lumix::Math::minimum(max_x, int(m_local_pos.x + m_radius + 0.5f));
-			r.m_to_y = Lumix::Math::minimum(max_z, int(m_local_pos.z + m_radius + 0.5f));
+			r.from_x = Lumix::Math::maximum(0, int(texture_size * (m_local_pos.x - m_radius) - 0.5f));
+			r.from_y = Lumix::Math::maximum(0, int(texture_size * (m_local_pos.z - m_radius) - 0.5f));
+			r.to_x = Lumix::Math::minimum(texture_size, int(texture_size * (m_local_pos.x + m_radius) + 0.5f));
+			r.to_y = Lumix::Math::minimum(texture_size, int(texture_size * (m_local_pos.z + m_radius) + 0.5f));
 			return r;
 		}
 
@@ -277,18 +277,19 @@ private:
 	}
 
 
-	float getAttenuation(Item& item, int i, int j) const
+	float getAttenuation(Item& item, int i, int j, int texture_size) const
 	{
-		float dist = sqrt((item.m_local_pos.x - 0.5f - i) * (item.m_local_pos.x - 0.5f - i) +
-						  (item.m_local_pos.z - 0.5f - j) * (item.m_local_pos.z - 0.5f - j));
-		return 1.0f - Lumix::Math::minimum(dist / item.m_radius, 1.0f);
+		float dist =
+			sqrt((texture_size * item.m_local_pos.x - 0.5f - i) * (texture_size * item.m_local_pos.x - 0.5f - i) +
+				 (texture_size * item.m_local_pos.z - 0.5f - j) * (texture_size * item.m_local_pos.z - 0.5f - j));
+		return 1.0f - Lumix::Math::minimum(dist / (texture_size * item.m_radius), 1.0f);
 	}
 
 
 	void rasterColorItem(Lumix::Texture* texture, Lumix::Array<Lumix::u8>& data, Item& item)
 	{
-		int texture_width = texture->width;
-		Rectangle r = item.getBoundingRectangle(texture_width, texture->height);
+		int texutre_size = texture->width;
+		Rectangle r = item.getBoundingRectangle(texutre_size);
 
 		if (texture->bytes_per_pixel != 4)
 		{
@@ -296,16 +297,16 @@ private:
 			return;
 		}
 		float fx = 0;
-		float fstepx = 1.0f / (r.m_to_x - r.m_from_x);
-		float fstepy = 1.0f / (r.m_to_y - r.m_from_y);
-		for (int i = r.m_from_x, end = r.m_to_x; i < end; ++i, fx += fstepx)
+		float fstepx = 1.0f / (r.to_x - r.from_x);
+		float fstepy = 1.0f / (r.to_y - r.from_y);
+		for (int i = r.from_x, end = r.to_x; i < end; ++i, fx += fstepx)
 		{
 			float fy = 0;
-			for (int j = r.m_from_y, end2 = r.m_to_y; j < end2; ++j, fy += fstepy)
+			for (int j = r.from_y, end2 = r.to_y; j < end2; ++j, fy += fstepy)
 			{
 				if (isMasked(fx, fy))
 				{
-					float attenuation = getAttenuation(item, i, j);
+					float attenuation = getAttenuation(item, i, j, texutre_size);
 					int offset = 4 * (i - m_x + (j - m_y) * m_width);
 					Lumix::u8* d = &data[offset];
 					d[0] += Lumix::u8((item.m_color.x * 255 - d[0]) * attenuation);
@@ -332,8 +333,8 @@ private:
 
 	void rasterLayerItem(Lumix::Texture* texture, Lumix::Array<Lumix::u8>& data, Item& item)
 	{
-		int texture_width = texture->width;
-		Rectangle r = item.getBoundingRectangle(texture_width, texture->height);
+		int texture_size = texture->width;
+		Rectangle r = item.getBoundingRectangle(texture_size);
 
 		if (texture->bytes_per_pixel != 4)
 		{
@@ -342,17 +343,17 @@ private:
 		}
 
 		float fx = 0;
-		float fstepx = 1.0f / (r.m_to_x - r.m_from_x);
-		float fstepy = 1.0f / (r.m_to_y - r.m_from_y);
-		for (int i = r.m_from_x, end = r.m_to_x; i < end; ++i, fx += fstepx)
+		float fstepx = 1.0f / (r.to_x - r.from_x);
+		float fstepy = 1.0f / (r.to_y - r.from_y);
+		for (int i = r.from_x, end = r.to_x; i < end; ++i, fx += fstepx)
 		{
 			float fy = 0;
-			for (int j = r.m_from_y, end2 = r.m_to_y; j < end2; ++j, fy += fstepy)
+			for (int j = r.from_y, end2 = r.to_y; j < end2; ++j, fy += fstepy)
 			{
 				if (isMasked(fx, fy))
 				{
 					int offset = 4 * (i - m_x + (j - m_y) * m_width);
-					float attenuation = getAttenuation(item, i, j);
+					float attenuation = getAttenuation(item, i, j, texture_size);
 					int add = int(attenuation * item.m_amount * 255);
 					if (add > 0)
 					{
@@ -373,8 +374,8 @@ private:
 
 	void rasterGrassItem(Lumix::Texture* texture, Lumix::Array<Lumix::u8>& data, Item& item, TerrainEditor::ActionType action_type)
 	{
-		int texture_width = texture->width;
-		Rectangle r = item.getBoundingRectangle(texture_width, texture->height);
+		int texture_size = texture->width;
+		Rectangle r = item.getBoundingRectangle(texture_size);
 
 		if (texture->bytes_per_pixel != 4)
 		{
@@ -383,17 +384,17 @@ private:
 		}
 
 		float fx = 0;
-		float fstepx = 1.0f / (r.m_to_x - r.m_from_x);
-		float fstepy = 1.0f / (r.m_to_y - r.m_from_y);
-		for (int i = r.m_from_x, end = r.m_to_x; i < end; ++i, fx += fstepx)
+		float fstepx = 1.0f / (r.to_x - r.from_x);
+		float fstepy = 1.0f / (r.to_y - r.from_y);
+		for (int i = r.from_x, end = r.to_x; i < end; ++i, fx += fstepx)
 		{
 			float fy = 0;
-			for (int j = r.m_from_y, end2 = r.m_to_y; j < end2; ++j, fy += fstepy)
+			for (int j = r.from_y, end2 = r.to_y; j < end2; ++j, fy += fstepy)
 			{
 				if (isMasked(fx, fy))
 				{
 					int offset = 4 * (i - m_x + (j - m_y) * m_width) + 2;
-					float attenuation = getAttenuation(item, i, j);
+					float attenuation = getAttenuation(item, i, j, texture_size);
 					int add = int(attenuation * item.m_amount * 255);
 					if (add > 0)
 					{
@@ -416,18 +417,18 @@ private:
 	{
 		ASSERT(texture->bytes_per_pixel == 2);
 
-		int texture_width = texture->width;
+		int texture_size = texture->width;
 		Rectangle rect;
-		rect = item.getBoundingRectangle(texture_width, texture->height);
+		rect = item.getBoundingRectangle(texture_size);
 
-		float avg = computeAverage16(texture, rect.m_from_x, rect.m_to_x, rect.m_from_y, rect.m_to_y);
-		for (int i = rect.m_from_x, end = rect.m_to_x; i < end; ++i)
+		float avg = computeAverage16(texture, rect.from_x, rect.to_x, rect.from_y, rect.to_y);
+		for (int i = rect.from_x, end = rect.to_x; i < end; ++i)
 		{
-			for (int j = rect.m_from_y, end2 = rect.m_to_y; j < end2; ++j)
+			for (int j = rect.from_y, end2 = rect.to_y; j < end2; ++j)
 			{
-				float attenuation = getAttenuation(item, i, j);
+				float attenuation = getAttenuation(item, i, j, texture_size);
 				int offset = i - m_x + (j - m_y) * m_width;
-				Lumix::u16 x = ((Lumix::u16*)texture->getData())[(i + j * texture_width)];
+				Lumix::u16 x = ((Lumix::u16*)texture->getData())[(i + j * texture_size)];
 				x += Lumix::u16((avg - x) * item.m_amount * attenuation);
 				((Lumix::u16*)&data[0])[offset] = x;
 			}
@@ -439,18 +440,20 @@ private:
 	{
 		ASSERT(texture->bytes_per_pixel == 2);
 
-		int texture_width = texture->width;
+		int texture_size = texture->width;
 		Rectangle rect;
-		rect = item.getBoundingRectangle(texture_width, texture->height);
+		rect = item.getBoundingRectangle(texture_size);
 
-		for (int i = rect.m_from_x, end = rect.m_to_x; i < end; ++i)
+		for (int i = rect.from_x, end = rect.to_x; i < end; ++i)
 		{
-			for (int j = rect.m_from_y, end2 = rect.m_to_y; j < end2; ++j)
+			for (int j = rect.from_y, end2 = rect.to_y; j < end2; ++j)
 			{
 				int offset = i - m_x + (j - m_y) * m_width;
-				float dist = sqrt((item.m_local_pos.x - 0.5f - i) * (item.m_local_pos.x - 0.5f - i) +
-					(item.m_local_pos.z - 0.5f - j) * (item.m_local_pos.z - 0.5f - j));
-				float t = (dist - item.m_radius * item.m_amount) / (item.m_radius * (1 - item.m_amount));
+				float dist = sqrt(
+					(texture_size * item.m_local_pos.x - 0.5f - i) * (texture_size * item.m_local_pos.x - 0.5f - i) +
+					(texture_size * item.m_local_pos.z - 0.5f - j) * (texture_size * item.m_local_pos.z - 0.5f - j));
+				float t = (dist - texture_size * item.m_radius * item.m_amount) /
+						  (texture_size * item.m_radius * (1 - item.m_amount));
 				t = Lumix::Math::clamp(1 - t, 0.0f, 1.0f);
 				Lumix::u16 old_value = ((Lumix::u16*)&data[0])[offset];
 				((Lumix::u16*)&data[0])[offset] = (Lumix::u16)(m_flat_height * t + old_value * (1-t));
@@ -489,22 +492,22 @@ private:
 
 		ASSERT(texture->bytes_per_pixel == 2);
 
-		int texture_width = texture->width;
+		int texture_size = texture->width;
 		Rectangle rect;
-		rect = item.getBoundingRectangle(texture_width, texture->height);
+		rect = item.getBoundingRectangle(texture_size);
 
 		const float STRENGTH_MULTIPLICATOR = 256.0f;
 		float amount = Lumix::Math::maximum(item.m_amount * item.m_amount * STRENGTH_MULTIPLICATOR, 1.0f);
 
-		for (int i = rect.m_from_x, end = rect.m_to_x; i < end; ++i)
+		for (int i = rect.from_x, end = rect.to_x; i < end; ++i)
 		{
-			for (int j = rect.m_from_y, end2 = rect.m_to_y; j < end2; ++j)
+			for (int j = rect.from_y, end2 = rect.to_y; j < end2; ++j)
 			{
-				float attenuation = getAttenuation(item, i, j);
+				float attenuation = getAttenuation(item, i, j, texture_size);
 				int offset = i - m_x + (j - m_y) * m_width;
 
 				int add = int(attenuation * amount);
-				Lumix::u16 x = ((Lumix::u16*)texture->getData())[(i + j * texture_width)];
+				Lumix::u16 x = ((Lumix::u16*)texture->getData())[(i + j * texture_size)];
 				x += m_action_type == TerrainEditor::RAISE_HEIGHT ? Lumix::Math::minimum(add, 0xFFFF - x)
 														   : Lumix::Math::maximum(-add, -x);
 				((Lumix::u16*)&data[0])[offset] = x;
@@ -519,7 +522,7 @@ private:
 		int bpp = texture->bytes_per_pixel;
 		Rectangle rect;
 		getBoundingRectangle(texture, rect);
-		m_new_data.resize(bpp * Lumix::Math::maximum(1, (rect.m_to_x - rect.m_from_x) * (rect.m_to_y - rect.m_from_y)));
+		m_new_data.resize(bpp * Lumix::Math::maximum(1, (rect.to_x - rect.from_x) * (rect.to_y - rect.from_y)));
 		Lumix::copyMemory(&m_new_data[0], &m_old_data[0], m_new_data.size());
 
 		for (int item_index = 0; item_index < m_items.size(); ++item_index)
@@ -536,16 +539,16 @@ private:
 		int bpp = texture->bytes_per_pixel;
 		Rectangle rect;
 		getBoundingRectangle(texture, rect);
-		m_x = rect.m_from_x;
-		m_y = rect.m_from_y;
-		m_width = rect.m_to_x - rect.m_from_x;
-		m_height = rect.m_to_y - rect.m_from_y;
-		m_old_data.resize(bpp * (rect.m_to_x - rect.m_from_x) * (rect.m_to_y - rect.m_from_y));
+		m_x = rect.from_x;
+		m_y = rect.from_y;
+		m_width = rect.to_x - rect.from_x;
+		m_height = rect.to_y - rect.from_y;
+		m_old_data.resize(bpp * (rect.to_x - rect.from_x) * (rect.to_y - rect.from_y));
 
 		int index = 0;
-		for (int j = rect.m_from_y, end2 = rect.m_to_y; j < end2; ++j)
+		for (int j = rect.from_y, end2 = rect.to_y; j < end2; ++j)
 		{
-			for (int i = rect.m_from_x, end = rect.m_to_x; i < end; ++i)
+			for (int i = rect.from_x, end = rect.to_x; i < end; ++i)
 			{
 				for (int k = 0; k < bpp; ++k)
 				{
@@ -599,37 +602,37 @@ private:
 		Rectangle rect;
 		getBoundingRectangle(texture, rect);
 
-		int new_w = rect.m_to_x - rect.m_from_x;
+		int new_w = rect.to_x - rect.from_x;
 		int bpp = texture->bytes_per_pixel;
-		new_data.resize(bpp * new_w * (rect.m_to_y - rect.m_from_y));
-		old_data.resize(bpp * new_w * (rect.m_to_y - rect.m_from_y));
+		new_data.resize(bpp * new_w * (rect.to_y - rect.from_y));
+		old_data.resize(bpp * new_w * (rect.to_y - rect.from_y));
 
 		// original
-		for (int row = rect.m_from_y; row < rect.m_to_y; ++row)
+		for (int row = rect.from_y; row < rect.to_y; ++row)
 		{
-			Lumix::copyMemory(&new_data[(row - rect.m_from_y) * new_w * bpp],
-				&texture->getData()[row * bpp * texture->width + rect.m_from_x * bpp],
+			Lumix::copyMemory(&new_data[(row - rect.from_y) * new_w * bpp],
+				&texture->getData()[row * bpp * texture->width + rect.from_x * bpp],
 				bpp * new_w);
-			Lumix::copyMemory(&old_data[(row - rect.m_from_y) * new_w * bpp],
-				&texture->getData()[row * bpp * texture->width + rect.m_from_x * bpp],
+			Lumix::copyMemory(&old_data[(row - rect.from_y) * new_w * bpp],
+				&texture->getData()[row * bpp * texture->width + rect.from_x * bpp],
 				bpp * new_w);
 		}
 
 		// new
 		for (int row = 0; row < m_height; ++row)
 		{
-			Lumix::copyMemory(&new_data[((row + m_y - rect.m_from_y) * new_w + m_x - rect.m_from_x) * bpp],
+			Lumix::copyMemory(&new_data[((row + m_y - rect.from_y) * new_w + m_x - rect.from_x) * bpp],
 				&m_new_data[row * bpp * m_width],
 				bpp * m_width);
-			Lumix::copyMemory(&old_data[((row + m_y - rect.m_from_y) * new_w + m_x - rect.m_from_x) * bpp],
+			Lumix::copyMemory(&old_data[((row + m_y - rect.from_y) * new_w + m_x - rect.from_x) * bpp],
 				&m_old_data[row * bpp * m_width],
 				bpp * m_width);
 		}
 
-		m_x = rect.m_from_x;
-		m_y = rect.m_from_y;
-		m_height = rect.m_to_y - rect.m_from_y;
-		m_width = rect.m_to_x - rect.m_from_x;
+		m_x = rect.from_x;
+		m_y = rect.from_y;
+		m_height = rect.to_y - rect.from_y;
+		m_width = rect.to_x - rect.from_x;
 
 		m_new_data.swap(new_data);
 		m_old_data.swap(old_data);
@@ -638,29 +641,24 @@ private:
 
 	void getBoundingRectangle(Lumix::Texture* texture, Rectangle& rect)
 	{
+		int s = texture->width;
 		Item& item = m_items[0];
-		rect.m_from_x = Lumix::Math::maximum(int(item.m_local_pos.x - item.m_radius - 0.5f), 0);
-		rect.m_from_y = Lumix::Math::maximum(int(item.m_local_pos.z - item.m_radius - 0.5f), 0);
-		rect.m_to_x = Lumix::Math::minimum(int(item.m_local_pos.x + item.m_radius + 0.5f),
-						   texture->width);
-		rect.m_to_y = Lumix::Math::minimum(int(item.m_local_pos.z + item.m_radius + 0.5f),
-						   texture->height);
+		rect.from_x = Lumix::Math::maximum(int(s * (item.m_local_pos.x - item.m_radius) - 0.5f), 0);
+		rect.from_y = Lumix::Math::maximum(int(s * (item.m_local_pos.z - item.m_radius) - 0.5f), 0);
+		rect.to_x = Lumix::Math::minimum(int(s * (item.m_local_pos.x + item.m_radius) + 0.5f), texture->width);
+		rect.to_y = Lumix::Math::minimum(int(s * (item.m_local_pos.z + item.m_radius) + 0.5f), texture->height);
 		for (int i = 1; i < m_items.size(); ++i)
 		{
 			Item& item = m_items[i];
-			rect.m_from_x = Lumix::Math::minimum(int(item.m_local_pos.x - item.m_radius - 0.5f),
-								 rect.m_from_x);
-			rect.m_to_x = Lumix::Math::maximum(int(item.m_local_pos.x + item.m_radius + 0.5f),
-							   rect.m_to_x);
-			rect.m_from_y = Lumix::Math::minimum(int(item.m_local_pos.z - item.m_radius - 0.5f),
-								 rect.m_from_y);
-			rect.m_to_y = Lumix::Math::maximum(int(item.m_local_pos.z + item.m_radius + 0.5f),
-							   rect.m_to_y);
+			rect.from_x = Lumix::Math::minimum(int(s * (item.m_local_pos.x - item.m_radius) - 0.5f), rect.from_x);
+			rect.to_x = Lumix::Math::maximum(int(s * (item.m_local_pos.x + item.m_radius) + 0.5f), rect.to_x);
+			rect.from_y = Lumix::Math::minimum(int(s * (item.m_local_pos.z - item.m_radius) - 0.5f), rect.from_y);
+			rect.to_y = Lumix::Math::maximum(int(s * (item.m_local_pos.z + item.m_radius) + 0.5f), rect.to_y);
 		}
-		rect.m_from_x = Lumix::Math::maximum(rect.m_from_x, 0);
-		rect.m_to_x = Lumix::Math::minimum(rect.m_to_x, texture->width);
-		rect.m_from_y = Lumix::Math::maximum(rect.m_from_y, 0);
-		rect.m_to_y = Lumix::Math::minimum(rect.m_to_y, texture->height);
+		rect.from_x = Lumix::Math::maximum(rect.from_x, 0);
+		rect.to_x = Lumix::Math::minimum(rect.to_x, texture->width);
+		rect.from_y = Lumix::Math::maximum(rect.from_y, 0);
+		rect.to_y = Lumix::Math::minimum(rect.to_y, texture->height);
 	}
 
 
