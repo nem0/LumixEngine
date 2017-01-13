@@ -1450,8 +1450,7 @@ public:
 			bool loaded = plugin_manager.load(tmp) != nullptr;
 			if (!loaded)
 			{
-				Lumix::g_log_error.log("Editor") << "Could not load plugin " << tmp
-											   << " requested by command line";
+				Lumix::g_log_error.log("Editor") << "Could not load plugin " << tmp << " requested by command line";
 			}
 		}
 	}

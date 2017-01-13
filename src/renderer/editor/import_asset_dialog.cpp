@@ -2049,6 +2049,11 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 			lods[mesh.lod] = last_mesh_idx;
 		}
 
+		for (int i = 1; i < Lumix::lengthOf(lods); ++i)
+		{
+			if (lods[i] < lods[i - 1]) lods[i] = lods[i - 1];
+		}
+
 		if (m_dialog.m_model.create_billboard_lod)
 		{
 			lods[lod_count] = last_mesh_idx + 1;
@@ -2324,9 +2329,16 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 	{
 		int imported_meshes = 0;
 		int skinned_meshes = 0;
+		int vertex_size = -1;
 		for (auto& mesh : m_dialog.m_meshes)
 		{
 			if (!mesh.import) continue;
+			if(vertex_size == -1) vertex_size = getVertexSize(mesh.mesh);
+			if (vertex_size != getVertexSize(mesh.mesh))
+			{
+				m_dialog.setMessage("Model contains meshes with different vertex declarations");
+				return false;
+			}
 			++imported_meshes;
 			if (isSkinned(mesh.mesh)) ++skinned_meshes;
 			if (!mesh.mesh->HasNormals())
