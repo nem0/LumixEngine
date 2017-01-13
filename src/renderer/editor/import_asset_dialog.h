@@ -160,6 +160,7 @@ class ImportAssetDialog LUMIX_FINAL : public StudioApp::IPlugin
 			Orientation orientation;
 			Orientation root_orientation;
 			bool make_convex;
+			bool import_vertex_colors;
 			bool all_nodes;
 			float position_error;
 			float rotation_error;
