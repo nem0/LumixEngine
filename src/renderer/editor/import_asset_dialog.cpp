@@ -169,6 +169,11 @@ int setParams(lua_State* L)
 		dlg->m_model.remove_doubles = LuaWrapper::toType<bool>(L, -1);
 	}
 	lua_pop(L, 1);
+	if (lua_getfield(L, 2, "import_vertex_colors") == LUA_TBOOLEAN)
+	{
+		dlg->m_model.import_vertex_colors = LuaWrapper::toType<bool>(L, -1);
+	}
+	lua_pop(L, 1);
 	if (lua_getfield(L, 2, "scale") == LUA_TNUMBER)
 	{
 		dlg->m_model.mesh_scale = LuaWrapper::toType<float>(L, -1);
@@ -1825,7 +1830,7 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 
 				file.write((const char*)&position, sizeof(position));
 
-				if (mesh.mesh->mColors[0])
+				if (mesh.mesh->mColors[0] && m_dialog.m_model.import_vertex_colors)
 				{
 					auto assimp_color = mesh.mesh->mColors[0][j];
 					u8 color[4];
@@ -1927,18 +1932,18 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 	}
 
 
-	static int getAttributeCount(const aiMesh* mesh)
+	int getAttributeCount(const aiMesh* mesh) const
 	{
 		int count = 2; // position, normal
 		if (mesh->HasTextureCoords(0)) ++count;
 		if (isSkinned(mesh)) count += 2;
-		if (mesh->HasVertexColors(0)) ++count;
+		if (mesh->HasVertexColors(0) && m_dialog.m_model.import_vertex_colors) ++count;
 		if (mesh->mTangents) ++count;
 		return count;
 	}
 
 
-	static int getVertexSize(const aiMesh* mesh)
+	int getVertexSize(const aiMesh* mesh) const
 	{
 		static const int POSITION_SIZE = sizeof(float) * 3;
 		static const int NORMAL_SIZE = sizeof(u8) * 4;
@@ -1949,7 +1954,7 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 		int size = POSITION_SIZE + NORMAL_SIZE;
 		if (mesh->HasTextureCoords(0)) size += UV_SIZE;
 		if (mesh->mTangents) size += TANGENT_SIZE;
-		if (mesh->HasVertexColors(0)) size += COLOR_SIZE;
+		if (mesh->HasVertexColors(0) && m_dialog.m_model.import_vertex_colors) size += COLOR_SIZE;
 		if (isSkinned(mesh)) size += BONE_INDICES_WEIGHTS_SIZE;
 		return size;
 	}
@@ -2405,7 +2410,7 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 		}
 
 		writeAttribute(bgfx::Attrib::Position, file);
-		if (mesh->HasVertexColors(0)) writeAttribute(bgfx::Attrib::Color0, file);
+		if (mesh->HasVertexColors(0) && m_dialog.m_model.import_vertex_colors) writeAttribute(bgfx::Attrib::Color0, file);
 		writeAttribute(bgfx::Attrib::Normal, file);
 		if (mesh->mTangents) writeAttribute(bgfx::Attrib::Tangent, file);
 		if (mesh->HasTextureCoords(0)) writeAttribute(bgfx::Attrib::TexCoord0, file);
@@ -2466,7 +2471,6 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 	ImportAssetDialog& m_dialog;
 	Array<aiNode*> m_nodes;
 	float m_scale;
-
 }; // struct ConvertTask
 
 
@@ -2489,6 +2493,7 @@ ImportAssetDialog::ImportAssetDialog(StudioApp& app)
 	, m_animations(app.getWorldEditor()->getAllocator())
 {
 	m_model.make_convex = false;
+	m_model.import_vertex_colors = true;
 	m_model.all_nodes = false;
 	m_model.mesh_scale = 1;
 	m_model.remove_doubles = false;
@@ -3375,6 +3380,7 @@ void ImportAssetDialog::onWindowGUI()
 				ImGui::Checkbox("Create billboard LOD", &m_model.create_billboard_lod);
 				ImGui::Checkbox("Import all bones", &m_model.all_nodes);
 				ImGui::Checkbox("Remove doubles", &m_model.remove_doubles);
+				ImGui::Checkbox("Import Vertex Colors", &m_model.import_vertex_colors);
 				ImGui::DragFloat("Scale", &m_model.mesh_scale, 0.01f, 0.001f, 0);
 				ImGui::Combo("Orientation", &(int&)m_model.orientation, "Y up\0Z up\0-Z up\0-X up\0");
 				ImGui::Combo("Root Orientation", &(int&)m_model.root_orientation, "Y up\0Z up\0-Z up\0-X up\0");
