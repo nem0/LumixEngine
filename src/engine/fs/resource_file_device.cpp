@@ -4,7 +4,7 @@
 #include "engine/math_utils.h"
 #include "engine/path.h"
 #include "engine/string.h"
-#include "stb/stb_resource.h"
+#include "stb/mf_resource.h"
 
 
 namespace Lumix
@@ -37,12 +37,12 @@ public:
 		ASSERT(!m_resource); // reopen is not supported currently
 		ASSERT((mode & Mode::WRITE) == 0);
 		if ((mode & Mode::WRITE) != 0) return false;
-		int count = stb_get_all_resources_count();
-		const stb_resource* resources = stb_get_all_resources();
+		int count = mf_get_all_resources_count();
+		const mf_resource* resources = mf_get_all_resources();
 		m_resource = nullptr;
 		for (int i = 0; i < count; ++i)
 		{
-			const stb_resource* res = &resources[i];
+			const mf_resource* res = &resources[i];
 			if (Lumix::equalIStrings(path.c_str(), res->path))
 			{
 				m_resource = res;
@@ -106,7 +106,7 @@ public:
 private:
 	IAllocator& m_allocator;
 	ResourceFileDevice& m_device;
-	const stb_resource* m_resource;
+	const mf_resource* m_resource;
 	size_t m_pos;
 };
 
@@ -117,15 +117,15 @@ void ResourceFileDevice::destroyFile(IFile* file)
 }
 
 
-const stb_resource* ResourceFileDevice::getResource(int index) const
+const mf_resource* ResourceFileDevice::getResource(int index) const
 {
-	return &stb_get_all_resources()[index];
+	return &mf_get_all_resources()[index];
 }
 
 
 int ResourceFileDevice::getResourceFilesCount() const
 {
-	return stb_get_all_resources_count();
+	return mf_get_all_resources_count();
 }
 
 

@@ -22,7 +22,7 @@
 #include "engine/system.h"
 #include "renderer/renderer.h"
 #include <cstdio>
-#include <stb/stb_resource.h>
+#include <stb/mf_resource.h>
 
 
 namespace bgfx
