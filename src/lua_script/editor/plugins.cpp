@@ -751,7 +751,7 @@ LUMIX_STUDIO_ENTRY(lua_script)
 {
 	auto& editor = *app.getWorldEditor();
 	auto* cmp_plugin = LUMIX_NEW(editor.getAllocator(), AddComponentPlugin)(app);
-	app.registerComponent("lua_script", "Lua Script", *cmp_plugin);
+	app.registerComponent("lua_script", *cmp_plugin);
 
 	editor.registerEditorCommandCreator("add_script", createAddScriptCommand);
 	editor.registerEditorCommandCreator("remove_script", createRemoveScriptCommand);

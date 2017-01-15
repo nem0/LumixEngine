@@ -2350,11 +2350,135 @@ struct WorldEditorPlugin LUMIX_FINAL : public WorldEditor::Plugin
 };
 
 
+struct AddTerrainComponentPlugin LUMIX_FINAL : public StudioApp::IAddComponentPlugin
+{
+	AddTerrainComponentPlugin(StudioApp& _app)
+		: app(_app)
+	{
+	}
+
+
+	bool createHeightmap(const char* material_path, int size)
+	{
+		char normalized_material_path[MAX_PATH_LENGTH];
+		PathUtils::normalize(material_path, normalized_material_path, lengthOf(normalized_material_path));
+
+		PathUtils::FileInfo info(normalized_material_path);
+		StaticString<MAX_PATH_LENGTH> hm_path(info.m_dir, info.m_basename, ".raw");
+		FS::OsFile file;
+		auto& allocator = app.getWorldEditor()->getAllocator();
+		if (!file.open(hm_path, FS::Mode::CREATE_AND_WRITE, allocator))
+		{
+			g_log_error.log("Editor") << "Failed to create heightmap " << hm_path;
+			return false;
+		}
+		else
+		{
+			for (int i = 0; i < size * size; ++i)
+			{
+				u16 tmp = 0;
+				file.write(&tmp, sizeof(tmp));
+			}
+			file.close();
+		}
+
+		if (!file.open(normalized_material_path, FS::Mode::CREATE_AND_WRITE, allocator))
+		{
+			g_log_error.log("Editor") << "Failed to create material " << normalized_material_path;
+			PlatformInterface::deleteFile(hm_path);
+			return false;
+		}
+
+		file.writeText("{ \"shader\" : \"pipelines/terrain/terrain.shd\", \
+			\"texture\" : {\"source\" : \"");
+		file.writeText(info.m_basename);
+		file.writeText(".raw\", \"keep_data\" : true}, \
+			\"texture\" : {\"source\" : \"/models/utils/white.tga\", \
+			\"u_clamp\" : true, \"v_clamp\" : true, \
+			\"min_filter\" : \"point\", \"mag_filter\" : \"point\", \"keep_data\" : true}, \
+			\"texture\" : {\"source\" : \"\", \"srgb\" : true}, \
+			\"texture\" : {\"source\" : \"\", \"srgb\" : true, \"keep_data\" : true}, \
+			\"texture\" : {\"source\" : \"/models/utils/white.tga\", \"srgb\" : true}, \
+			\"texture\" : {\"source\" : \"\"}, \
+			\"uniforms\" : [\
+				{\"name\" : \"detail_texture_distance\", \"float_value\" : 80.0}, \
+				{ \"name\" : \"texture_scale\", \"float_value\" : 1.0 }], \
+			\"metallic\" : 0.06, \"roughness\" : 0.9, \"alpha_ref\" : 0.3 }"
+		);
+
+		file.close();
+		return true;
+	}
+
+
+	void onGUI(bool create_entity, bool from_filter) override
+	{
+		ImGui::SetNextWindowSize(ImVec2(300, 300));
+		if (!ImGui::BeginMenu("Terrain")) return;
+		char buf[MAX_PATH_LENGTH];
+		auto* asset_browser = app.getAssetBrowser();
+		bool new_created = false;
+		if (ImGui::BeginMenu("New"))
+		{
+			static int size = 1024;
+			ImGui::InputInt("Size", &size);
+			if (ImGui::Button("Create"))
+			{
+				if (PlatformInterface::getSaveFilename(buf, lengthOf(buf), "Material\0*.mat\0", "mat"))
+				{
+					new_created = createHeightmap(buf, size);
+				}
+			}
+			ImGui::EndMenu();
+		}
+		bool create_empty = ImGui::Selectable("Empty", false);
+		if (asset_browser->resourceList(buf, lengthOf(buf), MATERIAL_TYPE, 0) || create_empty || new_created)
+		{
+			auto& editor = *app.getWorldEditor();
+			if (create_entity)
+			{
+				Entity entity = editor.addEntity();
+				editor.selectEntities(&entity, 1);
+			}
+			if (editor.getSelectedEntities().empty()) return;
+			Entity entity = editor.getSelectedEntities()[0];
+
+			if (!editor.getUniverse()->hasComponent(entity, TERRAIN_TYPE))
+			{
+				editor.addComponent(TERRAIN_TYPE);
+			}
+
+			auto& allocator = editor.getAllocator();
+			auto* render_scene = static_cast<RenderScene*>(editor.getUniverse()->getScene(TERRAIN_TYPE));
+			ComponentHandle cmp = editor.getUniverse()->getComponent(entity, TERRAIN_TYPE).handle;
+
+			if (!create_empty)
+			{
+				auto* desc = PropertyRegister::getDescriptor(TERRAIN_TYPE, crc32("Material"));
+				editor.setProperty(TERRAIN_TYPE, -1, *desc, &entity, 1, buf, stringLength(buf));
+			}
+
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndMenu();
+	}
+
+
+	const char* getLabel() const override { return "Render/Terrain"; }
+
+
+	StudioApp& app;
+};
+
+
+
 extern "C" {
 
 
 LUMIX_STUDIO_ENTRY(renderer)
 {
+	auto& allocator = app.getWorldEditor()->getAllocator();
+
 	app.registerComponent("camera", "Render/Camera");
 	app.registerComponent("global_light", "Render/Global light");
 	app.registerComponentWithResource("renderable", "Render/Mesh", MODEL_TYPE, "Source");
@@ -2370,11 +2494,11 @@ LUMIX_STUDIO_ENTRY(renderer)
 	app.registerComponent("particle_emitter_size", "Render/Particle emitter/Size");
 	app.registerComponent("point_light", "Render/Point light");
 	app.registerComponent("decal", "Render/Decal");
-	app.registerComponentWithResource("terrain", "Render/Terrain", MATERIAL_TYPE, "Material");
 	app.registerComponent("bone_attachment", "Render/Bone attachment");
 	app.registerComponent("environment_probe", "Render/Environment probe");
 
-	auto& allocator = app.getWorldEditor()->getAllocator();
+	auto* add_terrain_plugin = LUMIX_NEW(allocator, AddTerrainComponentPlugin)(app);
+	app.registerComponent("terrain", *add_terrain_plugin);
 
 	auto& asset_browser = *app.getAssetBrowser();
 	asset_browser.addPlugin(*LUMIX_NEW(allocator, ModelPlugin)(app));
