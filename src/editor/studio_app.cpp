@@ -348,11 +348,11 @@ public:
 	}
 
 
-	void registerComponent(const char* id, const char* label, IAddComponentPlugin& plugin) override
+	void registerComponent(const char* id, IAddComponentPlugin& plugin) override
 	{
 		addPlugin(plugin);
 		auto& allocator = m_editor->getAllocator();
-		m_component_labels.insert(Lumix::PropertyRegister::getComponentType(id), Lumix::string(label, m_allocator));
+		m_component_labels.insert(Lumix::PropertyRegister::getComponentType(id), Lumix::string(plugin.getLabel(), m_allocator));
 	}
 
 

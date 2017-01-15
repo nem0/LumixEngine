@@ -97,7 +97,7 @@ public:
 	virtual void removePlugin(IPlugin& plugin) = 0;
 	virtual const char* getComponentTypeName(Lumix::ComponentType cmp_type) const = 0;
 	virtual void registerComponent(const char* id, const char* label) = 0;
-	virtual void registerComponent(const char* id, const char* label, IAddComponentPlugin& plugin) = 0;
+	virtual void registerComponent(const char* id, IAddComponentPlugin& plugin) = 0;
 	virtual void registerComponentWithResource(const char* id,
 		const char* label,
 		Lumix::ResourceType resource_type,
