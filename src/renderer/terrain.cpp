@@ -242,6 +242,7 @@ float Terrain::getRootSize() const
 
 void Terrain::addGrassType(int index)
 {
+	forceGrassUpdate();
 	if(index < 0)
 	{
 		int idx = m_grass_types.size();
