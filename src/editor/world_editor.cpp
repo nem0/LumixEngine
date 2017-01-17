@@ -1023,7 +1023,7 @@ private:
 				serializer.deserializeArrayItem(m_transformations[i].pos.x, 0);
 				serializer.deserializeArrayItem(m_transformations[i].pos.y, 0);
 				serializer.deserializeArrayItem(m_transformations[i].pos.z, 0);
-				serializer.deserializeArrayItem(m_transformations[i].pos.x, 0);
+				serializer.deserializeArrayItem(m_transformations[i].rot.x, 0);
 				serializer.deserializeArrayItem(m_transformations[i].rot.y, 0);
 				serializer.deserializeArrayItem(m_transformations[i].rot.z, 0);
 				serializer.deserializeArrayItem(m_transformations[i].rot.w, 0);
