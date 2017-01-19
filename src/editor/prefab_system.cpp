@@ -464,7 +464,7 @@ public:
 		serializer.write(m_resources.size());
 		for (PrefabResource* res : m_resources)
 		{
-			serializer.write(res->getPath().c_str());
+			serializer.writeString(res->getPath().c_str());
 		}
 	}
 
@@ -489,7 +489,7 @@ public:
 		for (int i = 0; i < count; ++i)
 		{
 			char tmp[MAX_PATH_LENGTH];
-			serializer.read(tmp, lengthOf(tmp));
+			serializer.readString(tmp, lengthOf(tmp));
 			auto* res = (PrefabResource*)resource_manager->load(Path(tmp));
 			m_resources.insert(res->getPath().getHash(), res);
 		}
