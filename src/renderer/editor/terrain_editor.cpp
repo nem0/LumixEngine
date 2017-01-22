@@ -386,6 +386,8 @@ private:
 		float fx = 0;
 		float fstepx = 1.0f / (r.to_x - r.from_x);
 		float fstepy = 1.0f / (r.to_y - r.from_y);
+		int byte_offset = m_grass_idx > 8 ? 1 : 0;
+		int grass_idx = m_grass_idx > 8 ? m_grass_idx - 8 : m_grass_idx;
 		for (int i = r.from_x, end = r.to_x; i < end; ++i, fx += fstepx)
 		{
 			float fy = 0;
@@ -393,18 +395,18 @@ private:
 			{
 				if (isMasked(fx, fy))
 				{
-					int offset = 4 * (i - m_x + (j - m_y) * m_width) + 2;
+					int offset = 4 * (i - m_x + (j - m_y) * m_width) + 2 + byte_offset;
 					float attenuation = getAttenuation(item, i, j, texture_size);
 					int add = int(attenuation * item.m_amount * 255);
 					if (add > 0)
 					{
 						if (m_action_type == TerrainEditor::REMOVE_GRASS)
 						{
-							data[offset] &= ~(1 << m_grass_idx);
+							data[offset] &= ~(1 << grass_idx);
 						}
 						else
 						{
-							data[offset] |= 1 << m_grass_idx;
+							data[offset] |= 1 << grass_idx;
 						}
 					}
 				}
