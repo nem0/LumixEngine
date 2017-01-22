@@ -686,6 +686,10 @@ if build_app then
 
 		kind "ConsoleApp"
 		
+		if build_game then
+			defines { "GAME_PROJECT_NAME=\"" .. build_game .. "\"" }
+		end
+		
 		includedirs { "../src", "../src/app", "../external/bgfx/include" }
 		if _OPTIONS["static-plugins"] then	
 			forceLink("s_animation_plugin_register")
