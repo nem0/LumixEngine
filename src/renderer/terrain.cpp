@@ -402,7 +402,7 @@ void Terrain::generateGrassTypeQuad(GrassPatch& patch, const Matrix& terrain_mat
 			int tx = int(base_tx + tx_step * dx);
 			u32 pixel_value = splat_data[tx];
 
-			int ground_mask = (pixel_value >> 16) & 0xff;
+			int ground_mask = (pixel_value >> 16) & 0xffff;
 			if ((ground_mask & (1 << patch.m_type->m_idx)) == 0) continue;
 
 			Matrix tmp = Matrix::IDENTITY;

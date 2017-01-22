@@ -1400,6 +1400,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 	void setHeightmapXZScale(ComponentHandle cmp, float scale) override
 	{
+		if (scale == 0) return;
 		auto& terrain = m_terrains[{cmp.index}];
 		if (scale != terrain.m_xz_scale)
 		{
@@ -1420,6 +1421,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 	void setHeightmapYScale(ComponentHandle cmp, float scale) override
 	{
+		if (scale == 0) return;
 		auto& terrain = m_terrains[{cmp.index}];
 		if (scale != terrain.m_y_scale)
 		{
@@ -2465,12 +2467,12 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 				{
 					shapes[i]->setSimulationFilterData(data);
 				}
+				terrain.m_actor->setActorFlag(PxActorFlag::eVISUALIZATION, true);
 			}
 			else
 			{
 				g_log_error.log("Physics") << "Could not create PhysX heightfield " << terrain.m_heightmap->getPath();
 			}
-			terrain.m_actor->setActorFlag(PxActorFlag::eVISUALIZATION, true);
 		}
 	}
 
