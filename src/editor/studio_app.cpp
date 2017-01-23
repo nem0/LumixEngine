@@ -41,6 +41,9 @@
 #include <SDL_syswm.h>
 
 
+using namespace Lumix;
+
+
 struct LuaPlugin : public StudioApp::IPlugin
 {
 	LuaPlugin(StudioApp& app, const char* src, const char* filename)
@@ -49,11 +52,11 @@ struct LuaPlugin : public StudioApp::IPlugin
 		L = lua_newthread(editor.getEngine().getState());
 		thread_ref = luaL_ref(editor.getEngine().getState(), LUA_REGISTRYINDEX);
 
-		bool errors = luaL_loadbuffer(L, src, Lumix::stringLength(src), filename) != LUA_OK;
+		bool errors = luaL_loadbuffer(L, src, stringLength(src), filename) != LUA_OK;
 		errors = errors || lua_pcall(L, 0, 0, 0) != LUA_OK;
 		if (errors)
 		{
-			Lumix::g_log_error.log("Editor") << filename << ": " << lua_tostring(L, -1);
+			g_log_error.log("Editor") << filename << ": " << lua_tostring(L, -1);
 			lua_pop(L, 1);
 		}
 
@@ -94,7 +97,7 @@ struct LuaPlugin : public StudioApp::IPlugin
 		{
 			if (lua_pcall(L, 0, 0, 0) != LUA_OK)
 			{
-				Lumix::g_log_error.log("Editor") << "LuaPlugin:" << lua_tostring(L, -1);
+				g_log_error.log("Editor") << "LuaPlugin:" << lua_tostring(L, -1);
 				lua_pop(L, 1);
 			}
 		}
@@ -104,7 +107,7 @@ struct LuaPlugin : public StudioApp::IPlugin
 		}
 	}
 
-	Lumix::WorldEditor& editor;
+	WorldEditor& editor;
 	lua_State* L;
 	int thread_ref;
 	bool m_is_opened;
@@ -118,7 +121,6 @@ public:
 		: m_is_entity_list_opened(true)
 		, m_is_save_as_dialog_opened(false)
 		, m_finished(false)
-		, m_selected_template_name(m_allocator)
 		, m_profiler_ui(nullptr)
 		, m_asset_browser(nullptr)
 		, m_property_grid(nullptr)
@@ -127,6 +129,7 @@ public:
 		, m_toolbar_actions(m_allocator)
 		, m_metadata(m_allocator)
 		, m_is_welcome_screen_opened(true)
+		, m_is_pack_data_dialog_opened(false)
 		, m_editor(nullptr)
 		, m_settings(*this)
 		, m_plugins(m_allocator)
@@ -185,8 +188,8 @@ public:
 		LUMIX_DELETE(m_allocator, m_asset_browser);
 		LUMIX_DELETE(m_allocator, m_property_grid);
 		LUMIX_DELETE(m_allocator, m_log_ui);
-		Lumix::WorldEditor::destroy(m_editor, m_allocator);
-		Lumix::Engine::destroy(m_engine, m_allocator);
+		WorldEditor::destroy(m_editor, m_allocator);
+		Engine::destroy(m_engine, m_allocator);
 		m_engine = nullptr;
 		m_editor = nullptr;
 
@@ -204,7 +207,7 @@ public:
 	}
 
 
-	const char* getComponentTypeName(Lumix::ComponentType cmp_type) const override
+	const char* getComponentTypeName(ComponentType cmp_type) const override
 	{
 		auto iter = m_component_labels.find(cmp_type);
 		if (iter == m_component_labels.end()) return "Unknown";
@@ -218,14 +221,14 @@ public:
 	void addPlugin(IAddComponentPlugin& plugin)
 	{
 		int i = 0;
-		while (i < m_add_cmp_plugins.size() && Lumix::compareString(plugin.getLabel(), m_add_cmp_plugins[i]->getLabel()) > 0)
+		while (i < m_add_cmp_plugins.size() && compareString(plugin.getLabel(), m_add_cmp_plugins[i]->getLabel()) > 0)
 		{
 			++i;
 		}
 		m_add_cmp_plugins.insert(i, &plugin);
 
 		auto* node = LUMIX_NEW(m_allocator, AddCmpTreeNode);
-		Lumix::copyString(node->label, plugin.getLabel());
+		copyString(node->label, plugin.getLabel());
 		node->plugin = &plugin;
 		insertAddCmpNode(m_add_cmp_root, node);
 	}
@@ -238,14 +241,14 @@ public:
 			parent.child = node;
 			return;
 		}
-		if (Lumix::compareString(parent.child->label, node->label) > 0)
+		if (compareString(parent.child->label, node->label) > 0)
 		{
 			node->next = parent.child;
 			parent.child = node;
 			return;
 		}
 		auto* i = parent.child;
-		while (i->next && Lumix::compareString(i->next->label, node->label) < 0)
+		while (i->next && compareString(i->next->label, node->label) < 0)
 		{
 			i = i->next;
 		}
@@ -258,22 +261,22 @@ public:
 	{
 		for (auto* i = parent.child; i; i = i->next)
 		{
-			if (!i->plugin && Lumix::startsWith(node->label, i->label))
+			if (!i->plugin && startsWith(node->label, i->label))
 			{
 				insertAddCmpNode(*i, node);
 				return;
 			}
 		}
-		const char* rest = node->label + Lumix::stringLength(parent.label);
+		const char* rest = node->label + stringLength(parent.label);
 		if (parent.label[0] != '\0') ++rest; // include '/'
-		const char* slash = Lumix::findSubstring(rest, "/");
+		const char* slash = findSubstring(rest, "/");
 		if (!slash)
 		{
 			insertAddCmpNodeOrdered(parent, node);
 			return;
 		}
 		auto* new_group = LUMIX_NEW(m_allocator, AddCmpTreeNode);
-		Lumix::copyNString(new_group->label, (int)sizeof(new_group->label), node->label, int(slash - node->label));
+		copyNString(new_group->label, (int)sizeof(new_group->label), node->label, int(slash - node->label));
 		insertAddCmpNodeOrdered(parent, new_group);
 		insertAddCmpNode(*new_group, node);
 	}
@@ -281,7 +284,7 @@ public:
 
 	void registerComponentWithResource(const char* type,
 		const char* label,
-		Lumix::ResourceType resource_type,
+		ResourceType resource_type,
 		const char* property_name) override
 	{
 		struct Plugin LUMIX_FINAL : public IAddComponentPlugin
@@ -289,16 +292,16 @@ public:
 			void onGUI(bool create_entity, bool from_filter) override
 			{
 				ImGui::SetNextWindowSize(ImVec2(300, 300));
-				const char* last = Lumix::reverseFind(label, nullptr, '/');
+				const char* last = reverseFind(label, nullptr, '/');
 				if (!ImGui::BeginMenu(last && !from_filter ? last + 1 : label)) return;
-				auto* desc = Lumix::PropertyRegister::getDescriptor(type, property_id);
-				char buf[Lumix::MAX_PATH_LENGTH];
+				auto* desc = PropertyRegister::getDescriptor(type, property_id);
+				char buf[MAX_PATH_LENGTH];
 				bool create_empty = ImGui::Selectable("Empty", false);
-				if (asset_browser->resourceList(buf, Lumix::lengthOf(buf), resource_type, 0) || create_empty)
+				if (asset_browser->resourceList(buf, lengthOf(buf), resource_type, 0) || create_empty)
 				{
 					if (create_entity)
 					{
-						Lumix::Entity entity = editor->addEntity();
+						Entity entity = editor->addEntity();
 						editor->selectEntities(&entity, 1);
 					}
 
@@ -311,7 +314,7 @@ public:
 							&editor->getSelectedEntities()[0],
 							editor->getSelectedEntities().size(),
 							buf,
-							Lumix::stringLength(buf) + 1);
+							stringLength(buf) + 1);
 					}
 					ImGui::CloseCurrentPopup();
 				}
@@ -326,10 +329,10 @@ public:
 
 			PropertyGrid* property_grid;
 			AssetBrowser* asset_browser;
-			Lumix::WorldEditor* editor;
-			Lumix::ComponentType type;
-			Lumix::ResourceType resource_type;
-			Lumix::u32 property_id;
+			WorldEditor* editor;
+			ComponentType type;
+			ResourceType resource_type;
+			u32 property_id;
 			char label[50];
 		};
 
@@ -337,14 +340,14 @@ public:
 		auto* plugin = LUMIX_NEW(allocator, Plugin);
 		plugin->property_grid = m_property_grid;
 		plugin->asset_browser = m_asset_browser;
-		plugin->type = Lumix::PropertyRegister::getComponentType(type);
+		plugin->type = PropertyRegister::getComponentType(type);
 		plugin->editor = m_editor;
-		plugin->property_id = Lumix::crc32(property_name);
+		plugin->property_id = crc32(property_name);
 		plugin->resource_type = resource_type;
-		Lumix::copyString(plugin->label, label);
+		copyString(plugin->label, label);
 		addPlugin(*plugin);
 
-		m_component_labels.insert(plugin->type, Lumix::string(label, m_allocator));
+		m_component_labels.insert(plugin->type, string(label, m_allocator));
 	}
 
 
@@ -352,7 +355,7 @@ public:
 	{
 		addPlugin(plugin);
 		auto& allocator = m_editor->getAllocator();
-		m_component_labels.insert(Lumix::PropertyRegister::getComponentType(id), Lumix::string(plugin.getLabel(), m_allocator));
+		m_component_labels.insert(PropertyRegister::getComponentType(id), string(plugin.getLabel(), m_allocator));
 	}
 
 
@@ -362,12 +365,12 @@ public:
 		{
 			void onGUI(bool create_entity, bool from_filter) override
 			{
-				const char* last = Lumix::reverseFind(label, nullptr, '/');
+				const char* last = reverseFind(label, nullptr, '/');
 				if (ImGui::Selectable(last && !from_filter ? last + 1 : label))
 				{
 					if (create_entity)
 					{
-						Lumix::Entity entity = editor->addEntity();
+						Entity entity = editor->addEntity();
 						editor->selectEntities(&entity, 1);
 					}
 
@@ -381,9 +384,9 @@ public:
 				return label;
 			}
 
-			Lumix::WorldEditor* editor;
+			WorldEditor* editor;
 			PropertyGrid* property_grid;
-			Lumix::ComponentType type;
+			ComponentType type;
 			char label[64];
 		};
 
@@ -391,23 +394,23 @@ public:
 		auto* plugin = LUMIX_NEW(allocator, Plugin);
 		plugin->property_grid = m_property_grid;
 		plugin->editor = m_editor;
-		plugin->type = Lumix::PropertyRegister::getComponentType(type);
-		Lumix::copyString(plugin->label, label);
+		plugin->type = PropertyRegister::getComponentType(type);
+		copyString(plugin->label, label);
 		addPlugin(*plugin);
 
-		m_component_labels.insert(plugin->type, Lumix::string(label, m_allocator));
+		m_component_labels.insert(plugin->type, string(label, m_allocator));
 	}
 
 
 
 
-	const Lumix::Array<Action*>& getActions() override
+	const Array<Action*>& getActions() override
 	{
 		return m_actions;
 	}
 
 
-	Lumix::Array<Action*>& getToolbarActions() override
+	Array<Action*>& getToolbarActions() override
 	{
 		return m_toolbar_actions;
 	}
@@ -432,8 +435,8 @@ public:
 		if (m_drag_data.type == DragData::PATH)
 		{
 			ImGui::BeginTooltip();
-			char tmp[Lumix::MAX_PATH_LENGTH];
-			Lumix::PathUtils::getFilename(tmp, Lumix::lengthOf(tmp), (const char*)m_drag_data.data);
+			char tmp[MAX_PATH_LENGTH];
+			PathUtils::getFilename(tmp, lengthOf(tmp), (const char*)m_drag_data.data);
 			ImGui::Text("%s", tmp);
 			ImGui::EndTooltip();
 		}
@@ -441,7 +444,7 @@ public:
 		{
 			ImGui::BeginTooltip();
 			char buf[1024];
-			getEntityListDisplayName(*m_editor, buf, Lumix::lengthOf(buf), *(Lumix::Entity*)m_drag_data.data);
+			getEntityListDisplayName(*m_editor, buf, lengthOf(buf), *(Entity*)m_drag_data.data);
 			ImGui::Text("%s", buf);
 			ImGui::EndTooltip();
 
@@ -500,6 +503,7 @@ public:
 				plugin->onWindowGUI();
 			}
 			m_settings.onGUI();
+			onPackDataGUI();
 		}
 		ImGui::PopFont();
 		ImGui::Render();
@@ -609,8 +613,8 @@ public:
 	void setTitle(const char* title)
 	{
 		char tmp[100];
-		Lumix::copyString(tmp, "Lumix Studio - ");
-		Lumix::catString(tmp, title);
+		copyString(tmp, "Lumix Studio - ");
+		catString(tmp, title);
 		SDL_SetWindowTitle(m_window, tmp);
 	}
 
@@ -618,12 +622,12 @@ public:
 	static void getShortcut(const Action& action, char* buf, int max_size)
 	{
 		buf[0] = 0;
-		for (int i = 0; i < Lumix::lengthOf(action.shortcut); ++i)
+		for (int i = 0; i < lengthOf(action.shortcut); ++i)
 		{
 			const char* str = SDL_GetKeyName(SDL_GetKeyFromScancode((SDL_Scancode)action.shortcut[i]));
 			if (str[0] == 0) return;
-			if (i > 0) Lumix::catString(buf, max_size, " - ");
-			Lumix::catString(buf, max_size, str);
+			if (i > 0) catString(buf, max_size, " - ");
+			catString(buf, max_size, str);
 		}
 	}
 
@@ -643,7 +647,7 @@ public:
 	{
 		if (m_editor->isGameMode())
 		{
-			Lumix::g_log_error.log("Editor") << "Could not save while the game is running";
+			g_log_error.log("Editor") << "Could not save while the game is running";
 			return;
 		}
 
@@ -665,7 +669,7 @@ public:
 		if (ImGui::Begin("Save Universe As"))
 		{
 			static char name[64] = "";
-			ImGui::InputText("Name", name, Lumix::lengthOf(name));
+			ImGui::InputText("Name", name, lengthOf(name));
 			if (ImGui::Button("Save"))
 			{
 				m_is_save_as_dialog_opened = false;
@@ -681,7 +685,7 @@ public:
 	{
 		if (m_editor->isGameMode())
 		{
-			Lumix::g_log_error.log("Editor") << "Could not save while the game is running";
+			g_log_error.log("Editor") << "Could not save while the game is running";
 			return;
 		}
 
@@ -762,26 +766,26 @@ public:
 
 	void savePrefab()
 	{
-		char filename[Lumix::MAX_PATH_LENGTH];
-		char tmp[Lumix::MAX_PATH_LENGTH];
-		if (PlatformInterface::getSaveFilename(tmp, Lumix::lengthOf(tmp), "Prefab files\0*.fab\0", "fab"))
+		char filename[MAX_PATH_LENGTH];
+		char tmp[MAX_PATH_LENGTH];
+		if (PlatformInterface::getSaveFilename(tmp, lengthOf(tmp), "Prefab files\0*.fab\0", "fab"))
 		{
-			Lumix::PathUtils::normalize(tmp, filename, Lumix::lengthOf(tmp));
+			PathUtils::normalize(tmp, filename, lengthOf(tmp));
 			const char* base_path = m_engine->getDiskFileDevice()->getBasePath();
-			if (Lumix::startsWith(filename, base_path))
+			if (startsWith(filename, base_path))
 			{
-				m_editor->getPrefabSystem().savePrefab(Lumix::Path(filename + Lumix::stringLength(base_path)));
+				m_editor->getPrefabSystem().savePrefab(Path(filename + stringLength(base_path)));
 			}
 			else
 			{
 				base_path = m_engine->getPatchFileDevice() ? m_engine->getPatchFileDevice()->getBasePath() : nullptr;
-				if (base_path && Lumix::startsWith(filename, base_path))
+				if (base_path && startsWith(filename, base_path))
 				{
-					m_editor->getPrefabSystem().savePrefab(Lumix::Path(filename + Lumix::stringLength(base_path)));
+					m_editor->getPrefabSystem().savePrefab(Path(filename + stringLength(base_path)));
 				}
 				else
 				{
-					m_editor->getPrefabSystem().savePrefab(Lumix::Path(filename));
+					m_editor->getPrefabSystem().savePrefab(Path(filename));
 				}
 			}
 		}
@@ -805,20 +809,20 @@ public:
 
 	void loadAndExecuteCommands()
 	{
-		char filename[Lumix::MAX_PATH_LENGTH];
-		if (PlatformInterface::getOpenFilename(filename, Lumix::lengthOf(filename), "JSON files\0*.json\0", nullptr))
+		char filename[MAX_PATH_LENGTH];
+		if (PlatformInterface::getOpenFilename(filename, lengthOf(filename), "JSON files\0*.json\0", nullptr))
 		{
-			m_editor->executeUndoStack(Lumix::Path(filename));
+			m_editor->executeUndoStack(Path(filename));
 		}
 	}
 
 
 	void saveUndoStack()
 	{
-		char filename[Lumix::MAX_PATH_LENGTH];
-		if (PlatformInterface::getSaveFilename(filename, Lumix::lengthOf(filename), "JSON files\0*.json\0", "json"))
+		char filename[MAX_PATH_LENGTH];
+		if (PlatformInterface::getSaveFilename(filename, lengthOf(filename), "JSON files\0*.json\0", "json"))
 		{
-			m_editor->saveUndoStack(Lumix::Path(filename));
+			m_editor->saveUndoStack(Path(filename));
 		}
 	}
 
@@ -828,7 +832,7 @@ public:
 		addAction(action);
 		for (int i = 0; i < m_window_actions.size(); ++i)
 		{
-			if (Lumix::compareString(m_window_actions[i]->label, action->label) > 0)
+			if (compareString(m_window_actions[i]->label, action->label) > 0)
 			{
 				m_window_actions.insert(i, action);
 				return;
@@ -842,7 +846,7 @@ public:
 	{
 		for (int i = 0; i < m_actions.size(); ++i)
 		{
-			if (Lumix::compareString(m_actions[i]->label, action->label) > 0)
+			if (compareString(m_actions[i]->label, action->label) > 0)
 			{
 				m_actions.insert(i, action);
 				return;
@@ -876,7 +880,7 @@ public:
 	{
 		for (auto* a : m_actions)
 		{
-			if (Lumix::equalStrings(a->name, name)) return a;
+			if (equalStrings(a->name, name)) return a;
 		}
 		return nullptr;
 	}
@@ -889,7 +893,7 @@ public:
 		if (filter[0])
 		{
 			if (!node->plugin) showAddComponentNode(node->child, filter);
-			else if (Lumix::stristr(node->plugin->getLabel(), filter)) node->plugin->onGUI(false, true);
+			else if (stristr(node->plugin->getLabel(), filter)) node->plugin->onGUI(false, true);
 			showAddComponentNode(node->next, filter);
 			return;
 		}
@@ -901,7 +905,7 @@ public:
 			return;
 		}
 
-		const char* last = Lumix::reverseFind(node->label, nullptr, '/');
+		const char* last = reverseFind(node->label, nullptr, '/');
 		if (ImGui::BeginMenu(last ? last + 1 : node->label))
 		{
 			showAddComponentNode(node->child, filter);
@@ -978,12 +982,12 @@ public:
 			ImGui::FilterInput("Filter", m_open_filter, sizeof(m_open_filter));
 			for (auto& univ : m_universes)
 			{
-				if ((m_open_filter[0] == '\0' || Lumix::stristr(univ.data, m_open_filter)) &&
+				if ((m_open_filter[0] == '\0' || stristr(univ.data, m_open_filter)) &&
 					ImGui::MenuItem(univ.data))
 				{
 					if (m_editor->isUniverseChanged())
 					{
-						Lumix::copyString(m_universe_to_load, univ.data);
+						copyString(m_universe_to_load, univ.data);
 						m_confirm_load = true;
 					}
 					else
@@ -1014,7 +1018,7 @@ public:
 		doMenuItem(*getAction("autosnapDown"), true);
 		if (ImGui::MenuItem("Save commands")) saveUndoStack();
 		if (ImGui::MenuItem("Load commands")) loadAndExecuteCommands();
-		if (ImGui::MenuItem("Pack data")) packData();
+		doMenuItem(*getAction("pack_data"), true);
 		ImGui::EndMenu();
 	}
 
@@ -1104,7 +1108,7 @@ public:
 			toolsMenu();
 			viewMenu();
 
-			Lumix::StaticString<200> stats("");
+			StaticString<200> stats("");
 			if (m_engine->getFileSystem().hasWork()) stats << "Loading... | ";
 			stats << "FPS: ";
 			stats << m_engine->getFPS();
@@ -1122,7 +1126,7 @@ public:
 			}
 			else if (m_log_ui->getUnreadErrorCount() > 1)
 			{
-				Lumix::StaticString<50> error_stats("", m_log_ui->getUnreadErrorCount(), " errors | ");
+				StaticString<50> error_stats("", m_log_ui->getUnreadErrorCount(), " errors | ");
 				ImGui::SameLine(ImGui::GetContentRegionMax().x - stats_size.x);
 				auto error_stats_size = ImGui::CalcTextSize(error_stats);
 				ImGui::SameLine(ImGui::GetContentRegionMax().x - stats_size.x - error_stats_size.x);
@@ -1178,7 +1182,7 @@ public:
 		if (ImGui::BeginPopup("create_entity_group_popup"))
 		{
 			static char group_name[20] = "";
-			ImGui::InputText("New group name", group_name, Lumix::lengthOf(group_name));
+			ImGui::InputText("New group name", group_name, lengthOf(group_name));
 			if (group_name[0] == 0)
 			{
 				ImGui::Text("Group name can not be empty");
@@ -1230,7 +1234,7 @@ public:
 						{
 							for (int j = clipper.DisplayStart; j < clipper.DisplayEnd; ++j)
 							{
-								Lumix::Entity entity = groups.getGroupEntities(i)[j];
+								Entity entity = groups.getGroupEntities(i)[j];
 								getEntityListDisplayName(*m_editor, buffer, sizeof(buffer), entity);
 								if (ImGui::Selectable(buffer))
 								{
@@ -1267,7 +1271,7 @@ public:
 		if (size > 0)
 		{
 			m_drag_data.data = m_allocator.allocate(size);
-			Lumix::copyMemory(m_drag_data.data, data, size);
+			copyMemory(m_drag_data.data, data, size);
 			m_drag_data.size = size;
 		}
 		else
@@ -1298,7 +1302,7 @@ public:
 
 		if (!m_metadata.save())
 		{
-			Lumix::g_log_warning.log("Editor") << "Could not save metadata";
+			g_log_warning.log("Editor") << "Could not save metadata";
 		}
 	}
 
@@ -1333,9 +1337,9 @@ public:
 	void loadSettings()
 	{
 		char cmd_line[2048];
-		Lumix::getCommandLine(cmd_line, Lumix::lengthOf(cmd_line));
+		getCommandLine(cmd_line, lengthOf(cmd_line));
 
-		Lumix::CommandLineParser parser(cmd_line);
+		CommandLineParser parser(cmd_line);
 		while (parser.next())
 		{
 			if (!parser.currentEquals("-no_crash_report")) continue;
@@ -1386,20 +1390,20 @@ public:
 		addAction<&StudioAppImpl::toggleOrbitCamera>("Orbit camera", "orbitCamera")
 			.is_selected.bind<StudioAppImpl, &StudioAppImpl::isOrbitCamera>(this);
 		addAction<&StudioAppImpl::setTranslateGizmoMode>("Translate", "setTranslateGizmoMode")
-			.is_selected.bind<Lumix::Gizmo, &Lumix::Gizmo::isTranslateMode>(&m_editor->getGizmo());
+			.is_selected.bind<Gizmo, &Gizmo::isTranslateMode>(&m_editor->getGizmo());
 		addAction<&StudioAppImpl::setRotateGizmoMode>("Rotate", "setRotateGizmoMode")
-			.is_selected.bind<Lumix::Gizmo, &Lumix::Gizmo::isRotateMode>(&m_editor->getGizmo());
+			.is_selected.bind<Gizmo, &Gizmo::isRotateMode>(&m_editor->getGizmo());
 		addAction<&StudioAppImpl::setTopView>("Top", "viewTop");
 		addAction<&StudioAppImpl::setFrontView>("Front", "viewFront");
 		addAction<&StudioAppImpl::setSideView>("Side", "viewSide");
 		addAction<&StudioAppImpl::setLocalCoordSystem>("Local", "setLocalCoordSystem")
-			.is_selected.bind<Lumix::Gizmo, &Lumix::Gizmo::isLocalCoordSystem>(&m_editor->getGizmo());
+			.is_selected.bind<Gizmo, &Gizmo::isLocalCoordSystem>(&m_editor->getGizmo());
 		addAction<&StudioAppImpl::setGlobalCoordSystem>("Global", "setGlobalCoordSystem")
-			.is_selected.bind<Lumix::Gizmo, &Lumix::Gizmo::isGlobalCoordSystem>(&m_editor->getGizmo());
+			.is_selected.bind<Gizmo, &Gizmo::isGlobalCoordSystem>(&m_editor->getGizmo());
 		addAction<&StudioAppImpl::setPivotCenter>("Center", "setPivotCenter")
-			.is_selected.bind<Lumix::Gizmo, &Lumix::Gizmo::isPivotCenter>(&m_editor->getGizmo());
+			.is_selected.bind<Gizmo, &Gizmo::isPivotCenter>(&m_editor->getGizmo());
 		addAction<&StudioAppImpl::setPivotOrigin>("Origin", "setPivotOrigin")
-			.is_selected.bind<Lumix::Gizmo, &Lumix::Gizmo::isPivotOrigin>(&m_editor->getGizmo());
+			.is_selected.bind<Gizmo, &Gizmo::isPivotOrigin>(&m_editor->getGizmo());
 
 		addAction<&StudioAppImpl::createEntity>("Create empty", "createEntity");
 		addAction<&StudioAppImpl::destroyEntity>("Destroy", "destroyEntity", SDLK_DELETE, -1, -1);
@@ -1408,11 +1412,11 @@ public:
 		addAction<&StudioAppImpl::savePrefab>("Save prefab", "savePrefab");
 
 		addAction<&StudioAppImpl::toggleGameMode>("Game Mode", "toggleGameMode")
-			.is_selected.bind<Lumix::WorldEditor, &Lumix::WorldEditor::isGameMode>(m_editor);
+			.is_selected.bind<WorldEditor, &WorldEditor::isGameMode>(m_editor);
 		addAction<&StudioAppImpl::toggleMeasure>("Toggle measure", "toggleMeasure")
-			.is_selected.bind<Lumix::WorldEditor, &Lumix::WorldEditor::isMeasureToolActive>(m_editor);
+			.is_selected.bind<WorldEditor, &WorldEditor::isMeasureToolActive>(m_editor);
 		addAction<&StudioAppImpl::autosnapDown>("Autosnap down", "autosnapDown")
-			.is_selected.bind<Lumix::Gizmo, &Lumix::Gizmo::isAutosnapDown>(&m_editor->getGizmo());
+			.is_selected.bind<Gizmo, &Gizmo::isAutosnapDown>(&m_editor->getGizmo());
 		addAction<&StudioAppImpl::snapDown>("Snap down", "snapDown");
 		addAction<&StudioAppImpl::lookAtSelected>("Look at selected", "lookAtSelected");
 		addAction<&StudioAppImpl::toggleAssetBrowser>("Asset Browser", "assetBrowser")
@@ -1421,6 +1425,7 @@ public:
 			.is_selected.bind<StudioAppImpl, &StudioAppImpl::isEntityListOpened>(this);
 		addAction<&StudioAppImpl::toggleSettings>("Settings", "settings")
 			.is_selected.bind<StudioAppImpl, &StudioAppImpl::areSettingsOpened>(this);
+		addAction<&StudioAppImpl::showPackDataDialog>("Pack data", "pack_data");
 
 		addAction<&StudioAppImpl::dummy>("Unhide entities from group", "show").is_global = false;
 		addAction<&StudioAppImpl::dummy>("Hide entities from group", "hide").is_global = false;
@@ -1436,21 +1441,21 @@ public:
 	void loadUserPlugins()
 	{
 		char cmd_line[2048];
-		Lumix::getCommandLine(cmd_line, Lumix::lengthOf(cmd_line));
+		getCommandLine(cmd_line, lengthOf(cmd_line));
 
-		Lumix::CommandLineParser parser(cmd_line);
+		CommandLineParser parser(cmd_line);
 		auto& plugin_manager = m_editor->getEngine().getPluginManager();
 		while (parser.next())
 		{
 			if (!parser.currentEquals("-plugin")) continue;
 			if (!parser.next()) break;
 
-			char tmp[Lumix::MAX_PATH_LENGTH];
-			parser.getCurrent(tmp, Lumix::lengthOf(tmp));
+			char tmp[MAX_PATH_LENGTH];
+			parser.getCurrent(tmp, lengthOf(tmp));
 			bool loaded = plugin_manager.load(tmp) != nullptr;
 			if (!loaded)
 			{
-				Lumix::g_log_error.log("Editor") << "Could not load plugin " << tmp << " requested by command line";
+				g_log_error.log("Editor") << "Could not load plugin " << tmp << " requested by command line";
 			}
 		}
 	}
@@ -1458,9 +1463,9 @@ public:
 	bool shouldSleepWhenInactive()
 	{
 		char cmd_line[2048];
-		Lumix::getCommandLine(cmd_line, Lumix::lengthOf(cmd_line));
+		getCommandLine(cmd_line, lengthOf(cmd_line));
 
-		Lumix::CommandLineParser parser(cmd_line);
+		CommandLineParser parser(cmd_line);
 		while (parser.next())
 		{
 			if (parser.currentEquals("-no_sleep_inactive")) return false;
@@ -1472,16 +1477,16 @@ public:
 	void loadUniverseFromCommandLine()
 	{
 		char cmd_line[2048];
-		char path[Lumix::MAX_PATH_LENGTH];
-		Lumix::getCommandLine(cmd_line, Lumix::lengthOf(cmd_line));
+		char path[MAX_PATH_LENGTH];
+		getCommandLine(cmd_line, lengthOf(cmd_line));
 
-		Lumix::CommandLineParser parser(cmd_line);
+		CommandLineParser parser(cmd_line);
 		while (parser.next())
 		{
 			if (!parser.currentEquals("-open")) continue;
 			if (!parser.next()) break;
 
-			parser.getCurrent(path, Lumix::lengthOf(path));
+			parser.getCurrent(path, lengthOf(path));
 			m_editor->loadUniverse(path);
 			setTitle(path);
 			m_is_welcome_screen_opened = false;
@@ -1493,9 +1498,9 @@ public:
 	static void checkDataDirCommandLine(char* dir, int max_size)
 	{
 		char cmd_line[2048];
-		Lumix::getCommandLine(cmd_line, Lumix::lengthOf(cmd_line));
+		getCommandLine(cmd_line, lengthOf(cmd_line));
 
-		Lumix::CommandLineParser parser(cmd_line);
+		CommandLineParser parser(cmd_line);
 		while (parser.next())
 		{
 			if (!parser.currentEquals("-data_dir")) continue;
@@ -1536,7 +1541,7 @@ public:
 		#else
 			for (auto* lib : plugin_manager.getLibraries())
 			{
-				auto* f = (void (*)(StudioApp&))Lumix::getLibrarySymbol(lib, "setStudioApp");
+				auto* f = (void (*)(StudioApp&))getLibrarySymbol(lib, "setStudioApp");
 				if (f) f(*this);
 			}
 		#endif
@@ -1547,11 +1552,11 @@ public:
 	{
 		lua_State* L = m_engine->getState();
 		bool errors =
-			luaL_loadbuffer(L, src, Lumix::stringLength(src), script_name) != LUA_OK;
+			luaL_loadbuffer(L, src, stringLength(src), script_name) != LUA_OK;
 		errors = errors || lua_pcall(L, 0, 0, 0) != LUA_OK;
 		if (errors)
 		{
-			Lumix::g_log_error.log("Editor") << script_name << ": " << lua_tostring(L, -1);
+			g_log_error.log("Editor") << script_name << ": " << lua_tostring(L, -1);
 			lua_pop(L, 1);
 		}
 	}
@@ -1572,11 +1577,11 @@ public:
 
 	static int getResources(lua_State* L)
 	{
-		auto* studio = Lumix::LuaWrapper::checkArg<StudioAppImpl*>(L, 1);
-		auto* type = Lumix::LuaWrapper::checkArg<const char*>(L, 2);
+		auto* studio = LuaWrapper::checkArg<StudioAppImpl*>(L, 1);
+		auto* type = LuaWrapper::checkArg<const char*>(L, 2);
 
 		AssetBrowser* browser = studio->getAssetBrowser();
-		int type_idx = browser->getTypeIndex(Lumix::ResourceType(type));
+		int type_idx = browser->getTypeIndex(ResourceType(type));
 		if (type_idx < 0) return 0;
 		auto& resources_paths = browser->getResources(type_idx);
 
@@ -1584,7 +1589,7 @@ public:
 		int i = 0;
 		for (auto& path : resources_paths)
 		{
-			Lumix::LuaWrapper::push(L, path.c_str());
+			LuaWrapper::push(L, path.c_str());
 			lua_rawseti(L, -2, i + 1);
 			++i;
 		}
@@ -1603,12 +1608,12 @@ public:
 	{
 		lua_State* L = m_engine->getState();
 
-		Lumix::LuaWrapper::createSystemVariable(L, "Editor", "editor", this);
+		LuaWrapper::createSystemVariable(L, "Editor", "editor", this);
 
 		#define REGISTER_FUNCTION(F) \
 			do { \
-				auto* f = &Lumix::LuaWrapper::wrapMethod<StudioAppImpl, decltype(&StudioAppImpl::LUA_##F), &StudioAppImpl::LUA_##F>; \
-				Lumix::LuaWrapper::createSystemFunction(L, "Editor", #F, f); \
+				auto* f = &LuaWrapper::wrapMethod<StudioAppImpl, decltype(&StudioAppImpl::LUA_##F), &StudioAppImpl::LUA_##F>; \
+				LuaWrapper::createSystemFunction(L, "Editor", #F, f); \
 			} while(false) \
 
 		REGISTER_FUNCTION(runTest);
@@ -1617,24 +1622,24 @@ public:
 
 		#undef REGISTER_FUNCTION
 
-		Lumix::LuaWrapper::createSystemFunction(L, "Editor", "getResources", &getResources);
+		LuaWrapper::createSystemFunction(L, "Editor", "getResources", &getResources);
 	}
 
 
 	void checkScriptCommandLine()
 	{
 		char command_line[1024];
-		Lumix::getCommandLine(command_line, Lumix::lengthOf(command_line));
-		Lumix::CommandLineParser parser(command_line);
+		getCommandLine(command_line, lengthOf(command_line));
+		CommandLineParser parser(command_line);
 		while (parser.next())
 		{
 			if (parser.currentEquals("-run_script"))
 			{
 				if (!parser.next()) break;
-				char tmp[Lumix::MAX_PATH_LENGTH];
-				parser.getCurrent(tmp, Lumix::lengthOf(tmp));
-				Lumix::FS::OsFile file;
-				if (file.open(tmp, Lumix::FS::Mode::OPEN_AND_READ, m_allocator))
+				char tmp[MAX_PATH_LENGTH];
+				parser.getCurrent(tmp, lengthOf(tmp));
+				FS::OsFile file;
+				if (file.open(tmp, FS::Mode::OPEN_AND_READ, m_allocator))
 				{
 					auto size = file.size();
 					auto* src = (char*)m_allocator.allocate(size + 1);
@@ -1646,7 +1651,7 @@ public:
 				}
 				else
 				{
-					Lumix::g_log_error.log("Editor") << "Could not open " << tmp;
+					g_log_error.log("Editor") << "Could not open " << tmp;
 				}
 				break;
 			}
@@ -1657,10 +1662,10 @@ public:
 	static bool includeFileInPack(const char* filename)
 	{
 		if (filename[0] == '.') return false;
-		if (Lumix::compareStringN("bin/", filename, 4) == 0) return false;
-		if (Lumix::compareStringN("bin32/", filename, 4) == 0) return false;
-		if (Lumix::equalStrings("data.pak", filename)) return false;
-		if (Lumix::equalStrings("error.log", filename)) return false;
+		if (compareStringN("bin/", filename, 4) == 0) return false;
+		if (compareStringN("bin32/", filename, 4) == 0) return false;
+		if (equalStrings("data.pak", filename)) return false;
+		if (equalStrings("error.log", filename)) return false;
 		return true;
 	}
 
@@ -1668,8 +1673,8 @@ public:
 	static bool includeDirInPack(const char* filename)
 	{
 		if (filename[0] == '.') return false;
-		if (Lumix::compareStringN("bin", filename, 4) == 0) return false;
-		if (Lumix::compareStringN("bin32", filename, 4) == 0) return false;
+		if (compareStringN("bin", filename, 4) == 0) return false;
+		if (compareStringN("bin32", filename, 4) == 0) return false;
 		return true;
 	}
 
@@ -1677,31 +1682,31 @@ public:
 	#pragma pack(1)
 	struct PackFileInfo
 	{
-		Lumix::u32 hash;
-		Lumix::u64 offset;
-		Lumix::u64 size;
+		u32 hash;
+		u64 offset;
+		u64 size;
 
-		using Path = Lumix::StaticString<Lumix::MAX_PATH_LENGTH>;
+		using Path = StaticString<MAX_PATH_LENGTH>;
 	};
 	#pragma pack()
 
 
-	void packDataScan(const char* dir_path, Lumix::Array<PackFileInfo>& infos, Lumix::Array<PackFileInfo::Path>& paths)
+	void packDataScan(const char* dir_path, Array<PackFileInfo>& infos, Array<PackFileInfo::Path>& paths)
 	{
 		auto* iter = PlatformInterface::createFileIterator(dir_path, m_allocator);
 		PlatformInterface::FileInfo info;
 		while (PlatformInterface::getNextFile(iter, &info))
 		{
-			char normalized_path[Lumix::MAX_PATH_LENGTH];
-			Lumix::PathUtils::normalize(info.filename, normalized_path, Lumix::lengthOf(normalized_path));
+			char normalized_path[MAX_PATH_LENGTH];
+			PathUtils::normalize(info.filename, normalized_path, lengthOf(normalized_path));
 			if (info.is_directory)
 			{
 				if (!includeDirInPack(normalized_path)) continue;
 
-				char dir[Lumix::MAX_PATH_LENGTH] = {0};
-				if (dir_path[0] != '.') Lumix::copyString(dir, dir_path);
-				Lumix::catString(dir, info.filename);
-				Lumix::catString(dir, "/");
+				char dir[MAX_PATH_LENGTH] = {0};
+				if (dir_path[0] != '.') copyString(dir, dir_path);
+				catString(dir, info.filename);
+				catString(dir, "/");
 				packDataScan(dir, infos, paths);
 				continue;
 			}
@@ -1711,15 +1716,15 @@ public:
 			auto& out_path = paths.emplace();
 			if(dir_path[0] == '.')
 			{
-				Lumix::copyString(out_path.data, Lumix::lengthOf(out_path.data), normalized_path);
+				copyString(out_path.data, lengthOf(out_path.data), normalized_path);
 			}
 			else
 			{
-				Lumix::copyString(out_path.data, Lumix::lengthOf(out_path.data), dir_path);
-				Lumix::catString(out_path.data, Lumix::lengthOf(out_path.data), normalized_path);
+				copyString(out_path.data, lengthOf(out_path.data), dir_path);
+				catString(out_path.data, lengthOf(out_path.data), normalized_path);
 			}
 			auto& out_info = infos.emplace();
-			out_info.hash = Lumix::crc32(out_path.data);
+			out_info.hash = crc32(out_path.data);
 			out_info.size = PlatformInterface::getFileSize(out_path.data);
 			out_info.offset = ~0UL;
 		}
@@ -1728,19 +1733,19 @@ public:
 
 
 
-	void packDataScanResources(Lumix::Array<PackFileInfo>& infos, Lumix::Array<PackFileInfo::Path>& paths)
+	void packDataScanResources(Array<PackFileInfo>& infos, Array<PackFileInfo::Path>& paths)
 	{
-		Lumix::ResourceManager& rm = m_editor->getEngine().getResourceManager();
+		ResourceManager& rm = m_editor->getEngine().getResourceManager();
 		for (auto iter = rm.getAll().begin(), end = rm.getAll().end(); iter != end; ++iter)
 		{
 			const auto& resources = iter.value()->getResourceTable();
 			for (auto res_iter = resources.begin(), res_iter_end = resources.end(); res_iter != res_iter_end;
 				 ++res_iter)
 			{
-				Lumix::Resource* res = res_iter.value();
-				Lumix::copyString(paths.emplace().data, Lumix::MAX_PATH_LENGTH, res->getPath().c_str());
+				Resource* res = res_iter.value();
+				copyString(paths.emplace().data, MAX_PATH_LENGTH, res->getPath().c_str());
 				auto& out_info = infos.emplace();
-				out_info.hash = Lumix::crc32(res->getPath().c_str());
+				out_info.hash = crc32(res->getPath().c_str());
 				out_info.size = PlatformInterface::getFileSize(res->getPath().c_str());
 				out_info.offset = ~0UL;
 			}
@@ -1748,37 +1753,72 @@ public:
 	}
 
 
+	void showPackDataDialog()
+	{
+		m_is_pack_data_dialog_opened = true;
+	}
+
+
+	void onPackDataGUI()
+	{
+		if (!m_is_pack_data_dialog_opened) return;
+		if (ImGui::BeginDock("Pack data", &m_is_pack_data_dialog_opened))
+		{
+			ImGui::LabelText("Destination dir", "%s", m_pack.dest_dir.data);
+			ImGui::SameLine();
+			if (ImGui::Button("Choose dir"))
+			{
+				if (PlatformInterface::getOpenDirectory(m_pack.dest_dir.data, lengthOf(m_pack.dest_dir.data), "."))
+				{
+					m_pack.dest_dir << "/";
+				}
+			}
+
+			ImGui::Combo("Mode", (int*)&m_pack.mode, "All files\0Loaded universe\0");
+
+			if (ImGui::Button("Pack")) packData();
+		}
+		ImGui::EndDock();
+	}
+
+
 	void packData()
 	{
-		char dest[Lumix::MAX_PATH_LENGTH];
-		char dest_dir[Lumix::MAX_PATH_LENGTH];
-		if (!PlatformInterface::getOpenDirectory(dest_dir, Lumix::lengthOf(dest_dir), ".")) return;
+		if (m_pack.dest_dir.data[0] == '\0') return;
+
+		char dest[MAX_PATH_LENGTH];
 
 		static const char* OUT_FILENAME = "data.pak";
-		Lumix::catString(dest_dir, "/");
-		Lumix::copyString(dest, dest_dir);
-		Lumix::catString(dest, OUT_FILENAME);
-		Lumix::Array<PackFileInfo> infos(m_allocator);
-		Lumix::Array<PackFileInfo::Path> paths(m_allocator);
+		copyString(dest, m_pack.dest_dir);
+		catString(dest, OUT_FILENAME);
+		Array<PackFileInfo> infos(m_allocator);
+		Array<PackFileInfo::Path> paths(m_allocator);
 		infos.reserve(10000);
 		paths.reserve(10000);
-		packDataScan("./", infos, paths);
+		
+		switch (m_pack.mode)
+		{
+			case PackConfig::Mode::ALL_FILES: packDataScan("./", infos, paths); break;
+			case PackConfig::Mode::CURRENT_UNIVERSE: packDataScanResources(infos, paths); break;
+			default: ASSERT(false); break;
+		}
+		
 		if (infos.empty())
 		{
-			Lumix::g_log_error.log("Editor") << "No files found while trying to create " << dest;
+			g_log_error.log("Editor") << "No files found while trying to create " << dest;
 			return;
 		}
 
-		Lumix::FS::OsFile file;
-		if (!file.open(dest, Lumix::FS::Mode::CREATE_AND_WRITE, m_allocator))
+		FS::OsFile file;
+		if (!file.open(dest, FS::Mode::CREATE_AND_WRITE, m_allocator))
 		{
-			Lumix::g_log_error.log("Editor") << "Could not create " << dest;
+			g_log_error.log("Editor") << "Could not create " << dest;
 			return;
 		}
 
 		int count = infos.size();
 		file.write(&count, sizeof(count));
-		Lumix::u64 offset = sizeof(count) + sizeof(infos[0]) * count;
+		u64 offset = sizeof(count) + sizeof(infos[0]) * count;
 		for (auto& info : infos)
 		{
 			info.offset = offset;
@@ -1788,22 +1828,22 @@ public:
 
 		for (auto& path : paths)
 		{
-			Lumix::FS::OsFile src;
+			FS::OsFile src;
 			size_t src_size = PlatformInterface::getFileSize(path.data);
-			if (!src.open(path.data, Lumix::FS::Mode::OPEN_AND_READ, m_allocator))
+			if (!src.open(path.data, FS::Mode::OPEN_AND_READ, m_allocator))
 			{
 				file.close();
-				Lumix::g_log_error.log("Editor") << "Could not open " << path.data;
+				g_log_error.log("Editor") << "Could not open " << path.data;
 				return;
 			}
-			Lumix::u8 buf[4096];
-			for (; src_size > 0; src_size -= Lumix::Math::minimum(sizeof(buf), src_size))
+			u8 buf[4096];
+			for (; src_size > 0; src_size -= Math::minimum(sizeof(buf), src_size))
 			{
-				size_t batch_size = Lumix::Math::minimum(sizeof(buf), src_size);
+				size_t batch_size = Math::minimum(sizeof(buf), src_size);
 				if (!src.read(buf, batch_size))
 				{
 					file.close();
-					Lumix::g_log_error.log("Editor") << "Could not read " << path.data;
+					g_log_error.log("Editor") << "Could not read " << path.data;
 					return;
 				}
 				file.write(buf, batch_size);
@@ -1824,28 +1864,28 @@ public:
 		};
 		for(auto& file : bin_files)
 		{
-			Lumix::StaticString<Lumix::MAX_PATH_LENGTH> tmp(dest_dir, file);
-			Lumix::StaticString<Lumix::MAX_PATH_LENGTH> src("bin/", file);
-			if (!Lumix::copyFile(src, tmp))
+			StaticString<MAX_PATH_LENGTH> tmp(m_pack.dest_dir, file);
+			StaticString<MAX_PATH_LENGTH> src("bin/", file);
+			if (!copyFile(src, tmp))
 			{
-				Lumix::g_log_error.log("Editor") << "Failed to copy " << src << " to " << tmp;
+				g_log_error.log("Editor") << "Failed to copy " << src << " to " << tmp;
 			}
 		}
-		Lumix::StaticString<Lumix::MAX_PATH_LENGTH> tmp(dest_dir);
+		StaticString<MAX_PATH_LENGTH> tmp(m_pack.dest_dir);
 		tmp << "startup.lua";
-		if (!Lumix::copyFile("startup.lua", tmp))
+		if (!copyFile("startup.lua", tmp))
 		{
-			Lumix::g_log_error.log("Editor") << "Failed to copy startup.lua to " << tmp;
+			g_log_error.log("Editor") << "Failed to copy startup.lua to " << tmp;
 		}
 	}
 
 
 	void loadLuaPlugin(const char* dir, const char* filename)
 	{
-		Lumix::StaticString<Lumix::MAX_PATH_LENGTH> path(dir, filename);
-		Lumix::FS::OsFile file;
+		StaticString<MAX_PATH_LENGTH> path(dir, filename);
+		FS::OsFile file;
 
-		if (file.open(path, Lumix::FS::Mode::OPEN_AND_READ, m_allocator))
+		if (file.open(path, FS::Mode::OPEN_AND_READ, m_allocator))
 		{
 			auto size = file.size();
 			auto* src = (char*)m_engine->getLIFOAllocator().allocate(size + 1);
@@ -1860,7 +1900,7 @@ public:
 		}
 		else
 		{
-			Lumix::g_log_warning.log("Editor") << "Failed to open " << path;
+			g_log_warning.log("Editor") << "Failed to open " << path;
 		}
 	}
 
@@ -1873,10 +1913,10 @@ public:
 		{
 			if (info.filename[0] == '.') continue;
 			if (!info.is_directory) continue;
-			if (Lumix::startsWith(info.filename, "__")) continue;
+			if (startsWith(info.filename, "__")) continue;
 
-			char basename[Lumix::MAX_PATH_LENGTH];
-			Lumix::PathUtils::getBasename(basename, Lumix::lengthOf(basename), info.filename);
+			char basename[MAX_PATH_LENGTH];
+			PathUtils::getBasename(basename, lengthOf(basename), info.filename);
 			m_universes.emplace(basename);
 		}
 		PlatformInterface::destroyFileIterator(iter);
@@ -1889,22 +1929,22 @@ public:
 		PlatformInterface::FileInfo info;
 		while (PlatformInterface::getNextFile(iter, &info))
 		{
-			char normalized_path[Lumix::MAX_PATH_LENGTH];
-			Lumix::PathUtils::normalize(info.filename, normalized_path, Lumix::lengthOf(normalized_path));
+			char normalized_path[MAX_PATH_LENGTH];
+			PathUtils::normalize(info.filename, normalized_path, lengthOf(normalized_path));
 			if (normalized_path[0] == '.') continue;
 			if (info.is_directory)
 			{
-				char dir_path[Lumix::MAX_PATH_LENGTH] = { 0 };
-				if (dir[0] != '.') Lumix::copyString(dir_path, dir);
-				Lumix::catString(dir_path, info.filename);
-				Lumix::catString(dir_path, "/");
+				char dir_path[MAX_PATH_LENGTH] = { 0 };
+				if (dir[0] != '.') copyString(dir_path, dir);
+				catString(dir_path, info.filename);
+				catString(dir_path, "/");
 				findLuaPlugins(dir_path);
 			}
 			else
 			{
 				char ext[5];
-				Lumix::PathUtils::getExtension(ext, Lumix::lengthOf(ext), info.filename);
-				if (Lumix::equalStrings(ext, "lua"))
+				PathUtils::getExtension(ext, lengthOf(ext), info.filename);
+				if (equalStrings(ext, "lua"))
 				{
 					loadLuaPlugin(dir, info.filename);
 				}
@@ -1998,7 +2038,7 @@ public:
 	{
 		checkScriptCommandLine();
 
-		Lumix::Timer* timer = Lumix::Timer::create(m_allocator);
+		Timer* timer = Timer::create(m_allocator);
 		while (!m_finished)
 		{
 			{
@@ -2018,12 +2058,12 @@ public:
 				if (frame_time < 1 / wanted_fps)
 				{
 					PROFILE_BLOCK("sleep");
-					Lumix::MT::sleep(Lumix::u32(1000 / wanted_fps - frame_time * 1000));
+					MT::sleep(u32(1000 / wanted_fps - frame_time * 1000));
 				}
 			}
-			Lumix::Profiler::frame();
+			Profiler::frame();
 		}
-		Lumix::Timer::destroy(timer);
+		Timer::destroy(timer);
 	}
 
 
@@ -2032,11 +2072,11 @@ public:
 		if (!PlatformInterface::fileExists("../LumixStudio.lnk")) return;
 		if (!PlatformInterface::dirExists("bin"))
 		{
-			Lumix::messageBox("Bin directory not found, please check working directory.");
+			messageBox("Bin directory not found, please check working directory.");
 		}
 		else if (!PlatformInterface::dirExists("pipelines"))
 		{
-			Lumix::messageBox("Pipelines directory not found, please check working directory.");
+			messageBox("Pipelines directory not found, please check working directory.");
 		}
 	}
 
@@ -2056,11 +2096,11 @@ public:
 		auto& render_interface = *m_editor->getRenderInterface();
 		for (auto* action : m_actions)
 		{
-			char tmp[Lumix::MAX_PATH_LENGTH];
-			action->getIconPath(tmp, Lumix::lengthOf(tmp));
+			char tmp[MAX_PATH_LENGTH];
+			action->getIconPath(tmp, lengthOf(tmp));
 			if (PlatformInterface::fileExists(tmp))
 			{
-				action->icon = render_interface.loadTexture(Lumix::Path(tmp));
+				action->icon = render_interface.loadTexture(Path(tmp));
 			}
 			else
 			{
@@ -2078,19 +2118,19 @@ public:
 		checkWorkingDirector();
 		m_window = SDL_CreateWindow("Lumix Studio", 0, 0, 800, 600, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
 		
-		char current_dir[Lumix::MAX_PATH_LENGTH];
-		PlatformInterface::getCurrentDirectory(current_dir, Lumix::lengthOf(current_dir));
+		char current_dir[MAX_PATH_LENGTH];
+		PlatformInterface::getCurrentDirectory(current_dir, lengthOf(current_dir));
 		PlatformInterface::setWindow(m_window);
 
-		char data_dir_path[Lumix::MAX_PATH_LENGTH] = {};
-		checkDataDirCommandLine(data_dir_path, Lumix::lengthOf(data_dir_path));
-		m_engine = Lumix::Engine::create(current_dir, data_dir_path, nullptr, m_allocator);
+		char data_dir_path[MAX_PATH_LENGTH] = {};
+		checkDataDirCommandLine(data_dir_path, lengthOf(data_dir_path));
+		m_engine = Engine::create(current_dir, data_dir_path, nullptr, m_allocator);
 		createLua();
 
 		SDL_SysWMinfo window_info;
 		SDL_VERSION(&window_info.version);
 		SDL_GetWindowWMInfo(m_window, &window_info);
-		Lumix::Engine::PlatformData platform_data = {};
+		Engine::PlatformData platform_data = {};
 		#ifdef _WIN32
 			platform_data.window_handle = window_info.info.win.window;
 			ImGui::GetIO().ImeWindowHandle = window_info.info.win.window;
@@ -2100,7 +2140,7 @@ public:
 		#endif
 		m_engine->setPlatformData(platform_data);
 
-		m_editor = Lumix::WorldEditor::create(current_dir, *m_engine, m_allocator);
+		m_editor = WorldEditor::create(current_dir, *m_engine, m_allocator);
 		m_settings.m_editor = m_editor;
 		scanUniverses();
 		loadUserPlugins();
@@ -2108,13 +2148,13 @@ public:
 
 		m_asset_browser = LUMIX_NEW(m_allocator, AssetBrowser)(*this);
 		m_property_grid = LUMIX_NEW(m_allocator, PropertyGrid)(*this);
-		auto engine_allocator = static_cast<Lumix::Debug::Allocator*>(&m_engine->getAllocator());
+		auto engine_allocator = static_cast<Debug::Allocator*>(&m_engine->getAllocator());
 		m_profiler_ui = ProfilerUI::create(*m_engine);
 		m_log_ui = LUMIX_NEW(m_allocator, LogUI)(m_editor->getAllocator());
 
 		initIMGUI();
 
-		if (!m_metadata.load()) Lumix::g_log_info.log("Editor") << "Could not load metadata";
+		if (!m_metadata.load()) g_log_info.log("Editor") << "Could not load metadata";
 
 		setStudioApp();
 		loadIcons();
@@ -2132,22 +2172,22 @@ public:
 
 		int key_count;
 		auto* state = SDL_GetKeyboardState(&key_count);
-		Lumix::u32 pressed_modifiers = SDL_GetModState() & (KMOD_CTRL | KMOD_ALT | KMOD_SHIFT);
+		u32 pressed_modifiers = SDL_GetModState() & (KMOD_CTRL | KMOD_ALT | KMOD_SHIFT);
 		for (auto* a : m_actions)
 		{
 			if (!a->is_global || a->shortcut[0] == -1) continue;
 
-			Lumix::u32 action_modifiers = 0;
-			for (int i = 0; i < Lumix::lengthOf(a->shortcut) + 1; ++i)
+			u32 action_modifiers = 0;
+			for (int i = 0; i < lengthOf(a->shortcut) + 1; ++i)
 			{
-				if ((i == Lumix::lengthOf(a->shortcut) || a->shortcut[i] == -1) &&
+				if ((i == lengthOf(a->shortcut) || a->shortcut[i] == -1) &&
 					action_modifiers == pressed_modifiers)
 				{
 					a->func.invoke();
 					return;
 				}
 
-				if (i == Lumix::lengthOf(a->shortcut)) break;
+				if (i == lengthOf(a->shortcut)) break;
 				if (a->shortcut[i] == -1) break;
 				if (a->shortcut[i] >= key_count) break;
 				if (!state[a->shortcut[i]]) break;
@@ -2191,46 +2231,59 @@ public:
 	}
 
 
-	Lumix::WorldEditor* getWorldEditor() override
+	WorldEditor* getWorldEditor() override
 	{
 		return m_editor;
 	}
 
 
-	Lumix::DefaultAllocator m_main_allocator;
-	Lumix::Debug::Allocator m_allocator;
-	Lumix::Engine* m_engine;
+	DefaultAllocator m_main_allocator;
+	Debug::Allocator m_allocator;
+	Engine* m_engine;
 	SDL_Window* m_window;
 
-	Lumix::Array<Action*> m_actions;
-	Lumix::Array<Action*> m_window_actions;
-	Lumix::Array<Action*> m_toolbar_actions;
-	Lumix::Array<IPlugin*> m_plugins;
-	Lumix::Array<IAddComponentPlugin*> m_add_cmp_plugins;
-	Lumix::Array<Lumix::StaticString<Lumix::MAX_PATH_LENGTH>> m_universes;
+	Array<Action*> m_actions;
+	Array<Action*> m_window_actions;
+	Array<Action*> m_toolbar_actions;
+	Array<IPlugin*> m_plugins;
+	Array<IAddComponentPlugin*> m_add_cmp_plugins;
+	Array<StaticString<MAX_PATH_LENGTH>> m_universes;
 	AddCmpTreeNode m_add_cmp_root;
-	Lumix::HashMap<Lumix::ComponentType, Lumix::string> m_component_labels;
-	Lumix::WorldEditor* m_editor;
+	HashMap<ComponentType, string> m_component_labels;
+	WorldEditor* m_editor;
 	bool m_confirm_exit;
 	bool m_confirm_load;
 	bool m_confirm_new;
-	char m_universe_to_load[Lumix::MAX_PATH_LENGTH];
+	char m_universe_to_load[MAX_PATH_LENGTH];
 	AssetBrowser* m_asset_browser;
 	PropertyGrid* m_property_grid;
 	LogUI* m_log_ui;
 	ProfilerUI* m_profiler_ui;
-	Lumix::string m_selected_template_name;
 	Settings m_settings;
 	Metadata m_metadata;
 	char m_template_name[100];
 	char m_open_filter[64];
 	char m_component_filter[32];
 
+	struct PackConfig
+	{
+		enum class Mode : int
+		{
+			ALL_FILES,
+			CURRENT_UNIVERSE
+		};
+
+		Mode mode;
+		StaticString<MAX_PATH_LENGTH> dest_dir;
+	};
+
+	PackConfig m_pack;
 	bool m_finished;
 	int m_exit_code;
 
 	bool m_sleep_when_inactive;
 	bool m_is_welcome_screen_opened;
+	bool m_is_pack_data_dialog_opened;
 	bool m_is_entity_list_opened;
 	bool m_is_save_as_dialog_opened;
 	DragData m_drag_data;
@@ -2258,7 +2311,7 @@ static void* alignPtr(void* _ptr, size_t _align)
 StudioApp* StudioApp::create()
 {
 	static char buf[sizeof(StudioAppImpl) * 2];
-	return new (Lumix::NewPlaceholder(), alignPtr(buf, ALIGN_OF(StudioAppImpl))) StudioAppImpl;
+	return new (NewPlaceholder(), alignPtr(buf, ALIGN_OF(StudioAppImpl))) StudioAppImpl;
 }
 
 
@@ -2285,7 +2338,7 @@ void StudioApp::StaticPluginRegister::create(const char* name, StudioApp& app)
 	auto* i = s_first_plugin;
 	while (i)
 	{
-		if (Lumix::equalStrings(name, i->name))
+		if (equalStrings(name, i->name))
 		{
 			i->creator(app);
 			return;
