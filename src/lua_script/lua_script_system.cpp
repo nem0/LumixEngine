@@ -28,15 +28,6 @@ namespace Lumix
 {
 
 
-	enum class LuaScriptVersion
-	{
-		MULTIPLE_SCRIPTS,
-		REFACTOR,
-
-		LATEST
-	};
-	
-	
 	static const ComponentType LUA_SCRIPT_TYPE = PropertyRegister::getComponentType("lua_script");
 	static const ResourceType LUA_SCRIPT_RESOURCE_TYPE("lua_script");
 
@@ -1271,7 +1262,7 @@ namespace Lumix
 		}
 
 
-		void deserializeLuaScript(IDeserializer& serializer, Entity entity)
+		void deserializeLuaScript(IDeserializer& serializer, Entity entity, int /*scene_version*/)
 		{
 			auto& allocator = m_system.m_allocator;
 			ScriptComponent* script = LUMIX_NEW(allocator, ScriptComponent)(*this, allocator);
@@ -1343,12 +1334,6 @@ namespace Lumix
 					}
 				}
 			}
-		}
-
-
-		int getVersion() const override
-		{
-			return (int)LuaScriptVersion::LATEST;
 		}
 
 

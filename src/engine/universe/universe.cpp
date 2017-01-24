@@ -317,11 +317,11 @@ void Universe::serializeComponent(ISerializer& serializer, ComponentType type, C
 }
 
 
-void Universe::deserializeComponent(IDeserializer& serializer, Entity entity, ComponentType type)
+void Universe::deserializeComponent(IDeserializer& serializer, Entity entity, ComponentType type, int scene_version)
 {
 	auto* scene = m_component_type_map[type.index].scene;
 	auto& method = m_component_type_map[type.index].deserialize;
-	(scene->*method)(serializer, entity);
+	(scene->*method)(serializer, entity, scene_version);
 }
 
 
@@ -396,12 +396,15 @@ void Universe::instantiatePrefab(const PrefabResource& prefab,
 		Entity entity = createEntity(pos, rot);
 		entities.push(entity);
 		setScale(entity, scale);
-		u32 cmp_type;
-		deserializer.read(&cmp_type);
-		while (cmp_type != 0)
+		u32 cmp_type_hash;
+		deserializer.read(&cmp_type_hash);
+		while (cmp_type_hash != 0)
 		{
-			deserializeComponent(deserializer, entity, PropertyRegister::getComponentTypeFromHash(cmp_type));
-			deserializer.read(&cmp_type);
+			ComponentType cmp_type = PropertyRegister::getComponentTypeFromHash(cmp_type_hash);
+			int scene_version;
+			deserializer.read(&scene_version);
+			deserializeComponent(deserializer, entity, cmp_type, scene_version);
+			deserializer.read(&cmp_type_hash);
 		}
 	}
 }

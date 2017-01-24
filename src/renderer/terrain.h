@@ -44,6 +44,13 @@ class Terrain
 			i32 m_density;
 			float m_distance;
 			int m_idx;
+			enum class RotationMode : int
+			{
+				Y_UP,
+				ALL_RANDOM,
+				ALIGN_WITH_NORMAL
+			};
+			RotationMode m_rotation_mode = RotationMode::Y_UP;
 		};
 
 		struct GrassPatch

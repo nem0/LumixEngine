@@ -377,13 +377,15 @@ public:
 			m_prefabs[entity.index].prefab = prefab;
 			link(entity, prefab);
 			m_universe->setScale(entity, scale);
-			u32 cmp_type;
-			deserializer.read(&cmp_type);
-			while (cmp_type != 0)
+			u32 cmp_type_hash;
+			deserializer.read(&cmp_type_hash);
+			while (cmp_type_hash != 0)
 			{
-				m_universe->deserializeComponent(
-					deserializer, entity, PropertyRegister::getComponentTypeFromHash(cmp_type));
-				deserializer.read(&cmp_type);
+				ComponentType cmp_type = PropertyRegister::getComponentTypeFromHash(cmp_type_hash);
+				int scene_version;
+				deserializer.read(&scene_version);
+				m_universe->deserializeComponent(deserializer, entity, cmp_type, scene_version);
+				deserializer.read(&cmp_type_hash);
 			}
 		}
 	}
@@ -419,6 +421,8 @@ public:
 				const char* cmp_name = PropertyRegister::getComponentTypeID(cmp.type.index);
 				u32 type_hash = PropertyRegister::getComponentTypeHash(cmp.type);
 				serializer.write(cmp_name, type_hash);
+				int scene_version = universe->getScene(cmp.type)->getVersion();
+				serializer.write("scene_version", scene_version);
 				universe->serializeComponent(serializer, cmp.type, cmp.handle);
 			}
 			serializer.write("cmp_end", 0);

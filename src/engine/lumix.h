@@ -96,6 +96,8 @@ inline bool isValid(Entity entity) { return entity.index >= 0; }
 
 struct ComponentType
 {
+	enum { MAX_TYPES_COUNT = 64 };
+
 	int index;
 	bool operator==(const ComponentType& rhs) const { return rhs.index == index; };
 	bool operator<(const ComponentType& rhs) const { return rhs.index < index; };

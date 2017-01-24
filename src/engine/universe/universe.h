@@ -37,12 +37,12 @@ class LUMIX_ENGINE_API Universe
 {
 public:
 	typedef void (IScene::*Serialize)(ISerializer&, ComponentHandle);
-	typedef void (IScene::*Deserialize)(IDeserializer&, Entity);
+	typedef void (IScene::*Deserialize)(IDeserializer&, Entity, int);
 	struct ComponentTypeEntry
 	{
 		IScene* scene;
 		void (IScene::*serialize)(ISerializer&, ComponentHandle);
-		void (IScene::*deserialize)(IDeserializer&, Entity);
+		void (IScene::*deserialize)(IDeserializer&, Entity, int);
 	};
 
 public:
@@ -106,7 +106,7 @@ public:
 	DelegateList<void(const ComponentUID&)>& componentAdded() { return m_component_added; }
 
 	void serializeComponent(ISerializer& serializer, ComponentType type, ComponentHandle cmp);
-	void deserializeComponent(IDeserializer& serializer, Entity entity, ComponentType type);
+	void deserializeComponent(IDeserializer& serializer, Entity entity, ComponentType type, int scene_version);
 	void serialize(OutputBlob& serializer);
 	void deserialize(InputBlob& serializer);
 

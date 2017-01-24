@@ -2757,7 +2757,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		serializer.write("layer", terrain.m_layer);
 	}
 
-	void deserializeHeightfield(IDeserializer& serializer, Entity entity)
+	void deserializeHeightfield(IDeserializer& serializer, Entity entity, int /*scene_version*/)
 	{
 		Heightfield terrain;
 		terrain.m_scene = this;
@@ -2787,7 +2787,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	void deserializeController(IDeserializer& serializer, Entity entity)
+	void deserializeController(IDeserializer& serializer, Entity entity, int /*scene_version*/)
 	{
 		Controller& c = m_controllers.insert(entity);
 		c.m_frame_change.set(0, 0, 0);
@@ -2823,7 +2823,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	void deserializeRagdoll(IDeserializer& serializer, Entity entity)
+	void deserializeRagdoll(IDeserializer& serializer, Entity entity, int /*scene_version*/)
 	{
 		Ragdoll& ragdoll = m_ragdolls.insert(entity);
 		
@@ -2880,7 +2880,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	void deserializeSphericalJoint(IDeserializer& serializer, Entity entity)
+	void deserializeSphericalJoint(IDeserializer& serializer, Entity entity, int /*scene_version*/)
 	{
 		Joint& joint = m_joints.insert(entity);
 		serializer.read(&joint.connected_body);
@@ -2939,7 +2939,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	void deserializeDistanceJoint(IDeserializer& serializer, Entity entity) 
+	void deserializeDistanceJoint(IDeserializer& serializer, Entity entity, int /*scene_version*/)
 	{
 		Joint& joint = m_joints.insert(entity);
 		serializer.read(&joint.connected_body);
@@ -3045,7 +3045,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	void deserializeD6Joint(IDeserializer& serializer, Entity entity)
+	void deserializeD6Joint(IDeserializer& serializer, Entity entity, int /*scene_version*/)
 	{
 		Joint& joint = m_joints.insert(entity);
 		serializer.read(&joint.connected_body);
@@ -3107,7 +3107,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	void deserializeHingeJoint(IDeserializer& serializer, Entity entity)
+	void deserializeHingeJoint(IDeserializer& serializer, Entity entity, int /*scene_version*/)
 	{
 		Joint& joint = m_joints.insert(entity);
 		serializer.read(&joint.connected_body);
@@ -3134,7 +3134,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	void deserializeMeshActor(IDeserializer& serializer, Entity entity)
+	void deserializeMeshActor(IDeserializer& serializer, Entity entity, int /*scene_version*/)
 	{
 		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, ActorType::MESH);
 		actor->entity = entity;
@@ -3169,7 +3169,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	void deserializeBoxActor(IDeserializer& serializer, Entity entity)
+	void deserializeBoxActor(IDeserializer& serializer, Entity entity, int /*scene_version*/)
 	{
 		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, ActorType::BOX);
 		actor->entity = entity;
@@ -3214,7 +3214,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	void deserializeCapsuleActor(IDeserializer& serializer, Entity entity)
+	void deserializeCapsuleActor(IDeserializer& serializer, Entity entity, int /*scene_version*/)
 	{
 		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, ActorType::CAPSULE);
 		actor->entity = entity;
@@ -3256,7 +3256,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	void deserializeSphereActor(IDeserializer& serializer, Entity entity)
+	void deserializeSphereActor(IDeserializer& serializer, Entity entity, int /*scene_version*/)
 	{
 		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, ActorType::SPHERE);
 		actor->entity = entity;
@@ -4211,9 +4211,6 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 
 	PhysicsSystem& getSystem() const override { return *m_system; }
-
-
-	int getVersion() const override { return 0; }
 
 
 	float getActorSpeed(ComponentHandle cmp) override

@@ -598,6 +598,7 @@ void Terrain::deserialize(InputBlob& serializer, Universe& universe, RenderScene
 		serializer.readString(path, MAX_PATH_LENGTH);
 		serializer.read(m_grass_types[i].m_density);
 		serializer.read(m_grass_types[i].m_distance);
+		serializer.read(m_grass_types[i].m_rotation_mode);
 		setGrassTypePath(i, Path(path));
 	}
 	universe.addComponent(m_entity, TERRAIN_HASH, &scene, cmp);
@@ -619,6 +620,7 @@ void Terrain::serialize(OutputBlob& serializer)
 		serializer.writeString(type.m_grass_model ? type.m_grass_model->getPath().c_str() : "");
 		serializer.write(type.m_density);
 		serializer.write(type.m_distance);
+		serializer.write(type.m_rotation_mode);
 	}
 }
 

@@ -21,17 +21,6 @@ namespace Lumix
 {
 
 
-enum class AudioSceneVersion : int
-{
-	ECHO_ZONES,
-	REFACTOR,
-	IS_3D,
-	CLIP_VOLUME,
-
-	LAST
-};
-
-
 static const ComponentType LISTENER_TYPE = PropertyRegister::getComponentType("audio_listener");
 static const ComponentType AMBIENT_SOUND_TYPE = PropertyRegister::getComponentType("ambient_sound");
 static const ComponentType ECHO_ZONE_TYPE = PropertyRegister::getComponentType("echo_zone");
@@ -144,7 +133,7 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 	}
 
 
-	void deserializeEchoZone(IDeserializer& serializer, Entity entity)
+	void deserializeEchoZone(IDeserializer& serializer, Entity entity, int /*scene_version*/)
 	{
 		EchoZone& zone = m_echo_zones.insert(entity);
 		zone.entity = entity;
@@ -162,7 +151,7 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 	}
 
 
-	void deserializeAmbientSound(IDeserializer& serializer, Entity entity)
+	void deserializeAmbientSound(IDeserializer& serializer, Entity entity, int /*scene_version*/)
 	{
 		AmbientSound& sound = m_ambient_sounds.insert(entity);
 		sound.playing_sound = -1;
@@ -178,7 +167,7 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 	void serializeListener(ISerializer&, ComponentHandle) {}
 
 
-	void deserializeListener(IDeserializer&, Entity entity)
+	void deserializeListener(IDeserializer&, Entity entity, int /*scene_version*/)
 	{
 		m_listener.entity = entity;
 		m_universe.addComponent(entity, LISTENER_TYPE, this, {0});
@@ -536,9 +525,6 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 			m_universe.addComponent(zone.entity, ECHO_ZONE_TYPE, this, {zone.entity.index});
 		}
 	}
-
-
-	int getVersion() const override { return (int)AudioSceneVersion::LAST; }
 
 
 	ComponentHandle getComponent(Entity entity, ComponentType type) override
