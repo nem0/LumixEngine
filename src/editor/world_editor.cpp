@@ -1761,7 +1761,7 @@ public:
 		auto scn_file_iter = PlatformInterface::createFileIterator(scn_dir, m_allocator);
 		Array<u8> data(m_allocator);
 		FS::OsFile file;
-		auto loadFile = [&file, &data, this](const char* filepath, auto x) {
+		auto loadFile = [&file, &data, this](const char* filepath, auto callback) {
 			if (file.open(filepath, FS::Mode::OPEN_AND_READ, m_allocator))
 			{
 				if (file.size() > 0)
@@ -1770,21 +1770,32 @@ public:
 					file.read(&data[0], data.size());
 					InputBlob blob(&data[0], data.size());
 					TextDeserializer deserializer(blob, m_entity_map);
-					x(deserializer);
+					callback(deserializer);
 				}
 				file.close();
 			}
 		};
 		PlatformInterface::FileInfo info;
+		int versions[ComponentType::MAX_TYPES_COUNT];
 		while (PlatformInterface::getNextFile(scn_file_iter, &info))
 		{
 			StaticString<MAX_PATH_LENGTH> filepath(scn_dir, info.filename);
-			loadFile(filepath, [&filepath, this](TextDeserializer& deserializer) {
+			loadFile(filepath, [&versions, &filepath, this](TextDeserializer& deserializer) {
 				char plugin_name[64];
 				PathUtils::getBasename(plugin_name, lengthOf(plugin_name), filepath);
 				IScene* scene = m_universe->getScene(crc32(plugin_name));
 				if (scene)
 				{
+					int version;
+					deserializer.read(&version);
+					for (int i = 0; i < ComponentType::MAX_TYPES_COUNT; ++i)
+					{
+						ComponentType cmp_type = {i};
+						if (m_universe->getScene(cmp_type) == scene)
+						{
+							versions[i] = version;
+						}
+					}
 					scene->deserialize(deserializer);
 				}
 				else
@@ -1821,7 +1832,7 @@ public:
 			PathUtils::getBasename(tmp, lengthOf(tmp), filepath);
 			EntityGUID guid;
 			fromCString(tmp, lengthOf(tmp), &guid.value);
-			loadFile(filepath, [this, guid](TextDeserializer& deserializer) {
+			loadFile(filepath, [&versions, this, guid](TextDeserializer& deserializer) {
 				char name[64];
 				deserializer.read(name, lengthOf(name));
 				Transform tr;
@@ -1833,12 +1844,13 @@ public:
 				if(name[0]) m_universe->setEntityName(entity, name);
 				m_universe->setScale(entity, scale);
 				m_universe->setTransform(entity, tr);
-				u32 cmp_type;
-				deserializer.read(&cmp_type);
-				while (cmp_type != 0)
+				u32 cmp_type_hash;
+				deserializer.read(&cmp_type_hash);
+				while (cmp_type_hash != 0)
 				{
-					m_universe->deserializeComponent(deserializer, entity, PropertyRegister::getComponentTypeFromHash(cmp_type));
-					deserializer.read(&cmp_type);
+					ComponentType cmp_type = PropertyRegister::getComponentTypeFromHash(cmp_type_hash);
+					m_universe->deserializeComponent(deserializer, entity, cmp_type, versions[cmp_type.index]);
+					deserializer.read(&cmp_type_hash);
 				}
 			});
 		}
@@ -1878,6 +1890,7 @@ public:
 		for (IScene* scene : m_universe->getScenes())
 		{
 			blob.clear();
+			serializer.write("version", scene->getVersion());
 			scene->serialize(serializer);
 			StaticString<MAX_PATH_LENGTH> scene_file_path(dir, "scenes/", scene->getPlugin().getName(), ".scn");
 			saveFile(scene_file_path);

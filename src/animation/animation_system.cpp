@@ -43,18 +43,6 @@ class JsonSerializer;
 class Universe;
 
 
-enum class AnimationSceneVersion : int
-{
-	FIRST,
-	REFACTOR,
-	CONTROLLERS,
-
-	LATEST
-};
-
-
-
-
 struct AnimationSystemImpl LUMIX_FINAL : public IPlugin
 {
 	explicit AnimationSystemImpl(Engine& engine);
@@ -127,7 +115,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		serializer.write("animation", animable.animation ? animable.animation->getPath().c_str() : "");
 	}
 
-	void deserializeAnimable(IDeserializer& serializer, Entity entity)
+	void deserializeAnimable(IDeserializer& serializer, Entity entity, int /*scene_version*/)
 	{
 		Animable& animable = m_animables.insert(entity);
 		animable.entity = entity;
@@ -148,7 +136,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
-	void deserializeController(IDeserializer& serializer, Entity entity)
+	void deserializeController(IDeserializer& serializer, Entity entity, int /*scene_version*/)
 	{
 		Controller& controller = m_controllers.emplace(entity, m_anim_system.m_allocator);
 		controller.entity = entity;
@@ -371,9 +359,6 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 			serializer.writeString(controller.resource ? controller.resource->getPath().c_str() : "");
 		}
 	}
-
-
-	int getVersion() const override { return (int)AnimationSceneVersion::LATEST; }
 
 
 	void deserialize(InputBlob& serializer) override

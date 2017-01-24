@@ -333,7 +333,7 @@ public:
 	}
 
 
-	void deserializeComponent(IDeserializer& serializer, Entity entity)
+	void deserializeComponent(IDeserializer& serializer, Entity entity, int /*scene_version*/)
 	{
 		Entity parent;
 		serializer.read(&parent);

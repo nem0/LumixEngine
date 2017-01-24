@@ -118,14 +118,6 @@ NavigationSystem* NavigationSystem::s_instance = nullptr;
 
 struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 {
-	enum class Version
-	{
-		AGENTS = 0,
-
-		LATEST,
-	};
-
-
 	NavigationSceneImpl(NavigationSystem& system, Universe& universe, IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_universe(universe)
@@ -175,9 +167,6 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 			addCrowdAgent(iter.value());
 		}
 	}
-
-
-	int getVersion() const override { return (int)Version::LATEST; }
 
 
 	void clearNavmesh()
@@ -1340,7 +1329,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	}
 
 
-	void deserializeAgent(IDeserializer& serializer, Entity entity)
+	void deserializeAgent(IDeserializer& serializer, Entity entity, int /*scene_version*/)
 	{
 		Agent agent;
 		agent.entity = entity;

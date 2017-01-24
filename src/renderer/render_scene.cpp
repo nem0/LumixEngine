@@ -49,6 +49,14 @@ namespace Lumix
 {
 
 
+enum class RenderSceneVersion : int
+{
+	GRASS_ROTATION_MODE,
+
+	LATEST
+};
+
+
 static const ComponentType MODEL_INSTANCE_TYPE = PropertyRegister::getComponentType("renderable");
 static const ComponentType DECAL_TYPE = PropertyRegister::getComponentType("decal");
 static const ComponentType POINT_LIGHT_TYPE = PropertyRegister::getComponentType("point_light");
@@ -668,7 +676,7 @@ public:
 		}
 	}
 
-	void deserializeModelInstance(IDeserializer& serializer, Entity entity)
+	void deserializeModelInstance(IDeserializer& serializer, Entity entity, int /*scene_version*/)
 	{
 		while (entity.index >= m_model_instances.size())
 		{
@@ -730,7 +738,7 @@ public:
 	}
 
 
-	void deserializeGlobalLight(IDeserializer& serializer, Entity entity) 
+	void deserializeGlobalLight(IDeserializer& serializer, Entity entity, int /*scene_version*/)
 	{
 		GlobalLight& light = m_global_lights.emplace();
 		light.m_entity = entity;
@@ -762,7 +770,7 @@ public:
 	}
 
 
-	void deserializePointLight(IDeserializer& serializer, Entity entity)
+	void deserializePointLight(IDeserializer& serializer, Entity entity, int /*scene_version*/)
 	{
 		m_light_influenced_geometry.emplace(m_allocator);
 		PointLight& light = m_point_lights.emplace();
@@ -787,7 +795,7 @@ public:
 	}
 
 
-	void deserializeDecal(IDeserializer& serializer, Entity entity)
+	void deserializeDecal(IDeserializer& serializer, Entity entity, int /*scene_version*/)
 	{
 		ResourceManagerBase* material_manager = m_engine.getResourceManager().get(MATERIAL_TYPE);
 		Decal& decal = m_decals.insert(entity);
@@ -813,7 +821,7 @@ public:
 	}
 
 
-	void deserializeCamera(IDeserializer& serializer, Entity entity)
+	void deserializeCamera(IDeserializer& serializer, Entity entity, int /*scene_version*/)
 	{
 		Camera camera;
 		camera.entity = entity;
@@ -838,7 +846,7 @@ public:
 	}
 
 
-	void deserializeBoneAttachment(IDeserializer& serializer, Entity entity)
+	void deserializeBoneAttachment(IDeserializer& serializer, Entity entity, int /*scene_version*/)
 	{
 		BoneAttachment& bone_attachment = m_bone_attachments.emplace();
 		bone_attachment.entity = entity;
@@ -861,11 +869,12 @@ public:
 		{
 			serializer.write("density", type.m_density);
 			serializer.write("distance", type.m_distance);
+			serializer.write("rotation_mode", (int)type.m_rotation_mode);
 			serializer.write("model", type.m_grass_model ? type.m_grass_model->getPath().c_str() : "");
 		}
 	}
 
-	void deserializeTerrain(IDeserializer& serializer, Entity entity)
+	void deserializeTerrain(IDeserializer& serializer, Entity entity, int version)
 	{
 		Terrain* terrain = LUMIX_NEW(m_allocator, Terrain)(m_renderer, entity, *this, m_allocator);
 		m_terrains.insert(entity, terrain);
@@ -884,6 +893,10 @@ public:
 			Terrain::GrassType type(*terrain);
 			serializer.read(&type.m_density);
 			serializer.read(&type.m_distance);
+			if (version >= (int)RenderSceneVersion::GRASS_ROTATION_MODE)
+			{
+				serializer.read((int*)&type.m_rotation_mode);
+			}
 			type.m_idx = i;
 			serializer.read(tmp, lengthOf(tmp));
 			terrain->m_grass_types.push(type);
@@ -899,7 +912,10 @@ public:
 	}
 
 
-	void deserializeEnvironmentProbe(IDeserializer& serializer, Entity entity)
+	int getVersion() const override { return (int)RenderSceneVersion::GRASS_ROTATION_MODE; }
+
+
+	void deserializeEnvironmentProbe(IDeserializer& serializer, Entity entity, int /*scene_version*/)
 	{
 		auto* texture_manager = m_engine.getResourceManager().get(TEXTURE_TYPE);
 		StaticString<Lumix::MAX_PATH_LENGTH> probe_dir("universes/", m_universe.getName(), "/probes/");
@@ -939,7 +955,7 @@ public:
 	}
 
 
-	void deserializeParticleEmitter(IDeserializer& serializer, Entity entity)
+	void deserializeParticleEmitter(IDeserializer& serializer, Entity entity, int /*scene_version*/)
 	{
 		ParticleEmitter* emitter = LUMIX_NEW(m_allocator, ParticleEmitter)(entity, m_universe, m_allocator);
 		emitter->m_entity = entity;
@@ -970,7 +986,7 @@ public:
 	}
 	
 	
-	void deserializeParticleEmitterAlpha(IDeserializer& serializer, Entity entity)
+	void deserializeParticleEmitterAlpha(IDeserializer& serializer, Entity entity, int /*scene_version*/)
 	{
 		ParticleEmitter* emitter = m_particle_emitters[entity];
 		auto* module = LUMIX_NEW(m_allocator, ParticleEmitter::AlphaModule)(*emitter);
@@ -1002,7 +1018,7 @@ public:
 	}
 
 
-	void deserializeParticleEmitterAttractor(IDeserializer& serializer, Entity entity)
+	void deserializeParticleEmitterAttractor(IDeserializer& serializer, Entity entity, int /*scene_version*/)
 	{
 		ParticleEmitter* emitter = m_particle_emitters[entity];
 		auto* module = LUMIX_NEW(m_allocator, ParticleEmitter::AttractorModule)(*emitter);
@@ -1024,7 +1040,7 @@ public:
 	}
 
 
-	void deserializeParticleEmitterForce(IDeserializer& serializer, Entity entity)
+	void deserializeParticleEmitterForce(IDeserializer& serializer, Entity entity, int /*scene_version*/)
 	{
 		ParticleEmitter* emitter = m_particle_emitters[entity];
 		auto* module = LUMIX_NEW(m_allocator, ParticleEmitter::ForceModule)(*emitter);
@@ -1047,7 +1063,7 @@ public:
 	}
 
 
-	void deserializeParticleEmitterLinearMovement(IDeserializer& serializer, Entity entity)
+	void deserializeParticleEmitterLinearMovement(IDeserializer& serializer, Entity entity, int /*scene_version*/)
 	{
 		ParticleEmitter* emitter = m_particle_emitters[entity];
 		auto* module = LUMIX_NEW(m_allocator, ParticleEmitter::LinearMovementModule)(*emitter);
@@ -1075,7 +1091,7 @@ public:
 	}
 
 
-	void deserializeParticleEmitterPlane(IDeserializer& serializer, Entity entity)
+	void deserializeParticleEmitterPlane(IDeserializer& serializer, Entity entity, int /*scene_version*/)
 	{
 		ParticleEmitter* emitter = m_particle_emitters[entity];
 		auto* module = LUMIX_NEW(m_allocator, ParticleEmitter::PlaneModule)(*emitter);
@@ -1098,7 +1114,7 @@ public:
 	}
 
 
-	void deserializeParticleEmitterSpawnShape(IDeserializer& serializer, Entity entity)
+	void deserializeParticleEmitterSpawnShape(IDeserializer& serializer, Entity entity, int /*scene_version*/)
 	{
 		ParticleEmitter* emitter = m_particle_emitters[entity];
 		auto* module = LUMIX_NEW(m_allocator, ParticleEmitter::SpawnShapeModule)(*emitter);
@@ -1121,7 +1137,7 @@ public:
 	}
 
 
-	void deserializeParticleEmitterSize(IDeserializer& serializer, Entity entity)
+	void deserializeParticleEmitterSize(IDeserializer& serializer, Entity entity, int /*scene_version*/)
 	{
 		ParticleEmitter* emitter = m_particle_emitters[entity];
 		auto* module = LUMIX_NEW(m_allocator, ParticleEmitter::SizeModule)(*emitter);
@@ -1143,7 +1159,7 @@ public:
 	void serializeParticleEmitterRandomRotation(ISerializer& serialize, ComponentHandle cmp) {}
 
 
-	void deserializeParticleEmitterRandomRotation(IDeserializer& serialize, Entity entity)
+	void deserializeParticleEmitterRandomRotation(IDeserializer& serialize, Entity entity, int /*scene_version*/)
 	{
 		ParticleEmitter* emitter = m_particle_emitters[entity];
 		auto* module = LUMIX_NEW(m_allocator, ParticleEmitter::RandomRotationModule)(*emitter);
@@ -1161,7 +1177,7 @@ public:
 	}
 
 
-	void deserializeParticleEmitterSubimage(IDeserializer& serializer, Entity entity)
+	void deserializeParticleEmitterSubimage(IDeserializer& serializer, Entity entity, int /*scene_version*/)
 	{
 		ParticleEmitter* emitter = m_particle_emitters[entity];
 		auto* module = LUMIX_NEW(m_allocator, ParticleEmitter::SubimageModule)(*emitter);
