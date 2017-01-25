@@ -2279,16 +2279,24 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 		{
 			if (mesh.import_physics)
 			{
+				auto mesh_matrix = getGlobalTransform(getNode(mesh.scene, mesh.mesh, mesh.scene->mRootNode));
 				auto* verts = mesh.mesh->mVertices;
+				
 				if (fabs(m_scale - 1.0f) < 0.001f)
 				{
-					file.write(verts, sizeof(verts[0]) * mesh.mesh->mNumVertices);
+					for (unsigned int i = 0; i < mesh.mesh->mNumVertices; ++i)
+					{
+						aiVector3D assimp_v = mesh_matrix * verts[i];
+						Vec3 v = fixOrientation(*(Vec3*)&assimp_v.x);
+						file.write(&v, sizeof(v));
+					}
 				}
 				else
 				{
 					for (unsigned int i = 0; i < mesh.mesh->mNumVertices; ++i)
 					{
-						Vec3 v = *(Vec3*)&verts[i].x;
+						aiVector3D assimp_v = mesh_matrix * verts[i];
+						Vec3 v = fixOrientation(*(Vec3*)&assimp_v.x);
 						v *= m_scale;
 						file.write(&v, sizeof(v));
 					}
