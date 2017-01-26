@@ -3,17 +3,18 @@
 #include "engine/array.h"
 #include "engine/command_line_parser.h"
 #include "engine/crc32.h"
+#include "engine/debug/debug.h"
+#include "engine/engine.h"
 #include "engine/fs/os_file.h"
 #include "engine/lifo_allocator.h"
 #include "engine/log.h"
 #include "engine/profiler.h"
-#include "engine/resource_manager.h"
-#include "engine/string.h"
-#include "engine/debug/debug.h"
-#include "engine/engine.h"
 #include "engine/property_descriptor.h"
 #include "engine/property_register.h"
+#include "engine/resource_manager.h"
+#include "engine/string.h"
 #include "engine/system.h"
+#include "engine/universe/universe.h"
 #include "renderer/material.h"
 #include "renderer/material_manager.h"
 #include "renderer/model.h"
@@ -21,9 +22,9 @@
 #include "renderer/render_scene.h"
 #include "renderer/shader.h"
 #include "renderer/shader_manager.h"
+#include "renderer/terrain.h"
 #include "renderer/texture.h"
 #include "renderer/texture_manager.h"
-#include "engine/universe/universe.h"
 #include <bgfx/bgfx.h>
 #include <cfloat>
 #include <cstdio>
@@ -80,6 +81,51 @@ static const ResourceType MODEL_TYPE("model");
 static const ResourceType SHADER_TYPE("shader");
 static const ResourceType TEXTURE_TYPE("texture");
 static const ResourceType SHADER_BINARY_TYPE("shader_binary");
+
+
+struct GrassRotationModePropertyDescriptor : public IEnumPropertyDescriptor
+{
+	GrassRotationModePropertyDescriptor(const char* name)
+	{
+		setName(name);
+		m_type = ENUM;
+	}
+
+	void set(ComponentUID cmp, int index, InputBlob& stream) const override
+	{
+		int value;
+		stream.read(&value, sizeof(value));
+		auto* render_scene = static_cast<RenderScene*>(cmp.scene);
+		render_scene->setGrassRotationMode(cmp.handle, index, value);
+	}
+
+
+	void get(ComponentUID cmp, int index, OutputBlob& stream) const override
+	{
+		auto* render_scene = static_cast<RenderScene*>(cmp.scene);
+		int value = (int)render_scene->getGrassRotationMode(cmp.handle, index);
+		int len = sizeof(value);
+		stream.write(&value, len);
+	}
+
+	
+	int getEnumCount(IScene* scene, ComponentHandle cmp) override
+	{
+		return (int)Terrain::GrassType::RotationMode::COUNT;
+	}
+
+
+	const char* getEnumItemName(IScene* scene, ComponentHandle cmp, int index) override
+	{
+		switch ((Terrain::GrassType::RotationMode)index)
+		{
+			case Terrain::GrassType::RotationMode::ALL_RANDOM: return "XYZ Random";
+			case Terrain::GrassType::RotationMode::Y_UP: return "Y Up";
+			case Terrain::GrassType::RotationMode::ALIGN_WITH_NORMAL: return "Align with normal";
+			default: ASSERT(false); return "Error";
+		}
+	}
+};
 
 
 struct BonePropertyDescriptor : public IEnumPropertyDescriptor
@@ -389,6 +435,7 @@ static void registerProperties(IAllocator& allocator)
 		"Distance", &RenderScene::getGrassDistance, &RenderScene::setGrassDistance, 1.0f, FLT_MAX, 1.0f));
 	grass->addChild(LUMIX_NEW(allocator, IntPropertyDescriptor<RenderScene>)(
 		"Density", &RenderScene::getGrassDensity, &RenderScene::setGrassDensity));
+	grass->addChild(LUMIX_NEW(allocator, GrassRotationModePropertyDescriptor)("Mode"));
 	PropertyRegister::add("terrain", grass);
 }
 

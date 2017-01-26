@@ -2880,6 +2880,18 @@ public:
 	}
 
 
+	int getGrassRotationMode(ComponentHandle cmp, int index) override
+	{
+		return (int)m_terrains[{cmp.index}]->getGrassTypeRotationMode(index);
+	}
+
+
+	void setGrassRotationMode(ComponentHandle cmp, int index, int value) override
+	{
+		m_terrains[{cmp.index}]->setGrassTypeRotationMode(index, (Terrain::GrassType::RotationMode)value);
+	}
+
+
 	float getGrassDistance(ComponentHandle cmp, int index) override
 	{
 		return m_terrains[{cmp.index}]->getGrassTypeDistance(index);
