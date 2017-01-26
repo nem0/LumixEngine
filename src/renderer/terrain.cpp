@@ -272,6 +272,20 @@ void Terrain::setGrassTypeDensity(int index, int density)
 }
 
 
+Terrain::GrassType::RotationMode Terrain::getGrassTypeRotationMode(int index) const
+{
+	const GrassType& type = m_grass_types[index];
+	return type.m_rotation_mode;
+}
+
+
+void Terrain::setGrassTypeRotationMode(int index, Terrain::GrassType::RotationMode mode)
+{
+	m_grass_types[index].m_rotation_mode = mode;;
+	forceGrassUpdate();
+}
+
+
 int Terrain::getGrassTypeDensity(int index) const
 {
 	const GrassType& type = m_grass_types[index];
@@ -409,8 +423,35 @@ void Terrain::generateGrassTypeQuad(GrassPatch& patch, const Matrix& terrain_mat
 			float x = quad_x + dx + step * Math::randFloat(-0.5f, 0.5f);
 			float z = quad_z + dz + step * Math::randFloat(-0.5f, 0.5f);
 			tmp.setTranslation(Vec3(x, getHeight(x, z), z));
-			Quat q(Vec3(0, 1, 0), Math::randFloat(0, Math::PI * 2));
-			tmp = terrain_matrix * tmp * q.toMatrix();
+			
+			switch (patch.m_type->m_rotation_mode)
+			{
+				case GrassType::RotationMode::Y_UP:
+				{
+					Quat q(Vec3(0, 1, 0), Math::randFloat(0, Math::PI * 2));
+					tmp = tmp * q.toMatrix();
+				}
+				break;
+				case GrassType::RotationMode::ALL_RANDOM:
+				{
+					Vec3 random_axis(Math::randFloat(-1, 1), Math::randFloat(-1, 1), Math::randFloat(-1, 1));
+					float random_angle = Math::randFloat(0, Math::PI * 2);
+					Quat q(random_axis.normalized(), random_angle);
+					tmp = tmp * q.toMatrix();
+				}
+				break;
+				case GrassType::RotationMode::ALIGN_WITH_NORMAL:
+				{
+					Vec3 normal = getNormal(x, z);
+					Quat random_base(Vec3(0, 1, 0), Math::randFloat(0, Math::PI * 2));
+					Quat to_normal = Quat::vec3ToVec3({0, 1, 0}, normal);
+					tmp = tmp * (to_normal * random_base).toMatrix();
+				}
+				break;
+				default: ASSERT(false); break;
+			}
+
+			tmp = terrain_matrix * tmp;
 			tmp.multiply3x3(Math::randFloat(0.9f, 1.1f));
 			GrassPatch::InstanceData& instance_data = patch.instance_data.emplace();
 			instance_data.matrix = tmp;

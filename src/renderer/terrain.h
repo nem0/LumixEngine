@@ -48,7 +48,9 @@ class Terrain
 			{
 				Y_UP,
 				ALL_RANDOM,
-				ALIGN_WITH_NORMAL
+				ALIGN_WITH_NORMAL,
+
+				COUNT,
 			};
 			RotationMode m_rotation_mode = RotationMode::Y_UP;
 		};
@@ -104,6 +106,7 @@ class Terrain
 		int getHeight() const { return m_height; }
 		int getGrassTypeDensity(int index) const;
 		float getGrassTypeDistance(int index) const;
+		GrassType::RotationMode getGrassTypeRotationMode(int index) const;
 		int getGrassTypeCount() const { return m_grass_types.size(); }
 
 		float getHeight(int x, int z) const;
@@ -113,6 +116,7 @@ class Terrain
 		void setGrassTypePath(int index, const Path& path);
 		void setGrassTypeDensity(int index, int density);
 		void setGrassTypeDistance(int index, float value);
+		void setGrassTypeRotationMode(int index, GrassType::RotationMode mode);
 		void setMaterial(Material* material);
 
 		void getInfos(Array<TerrainInfo>& infos, const Vec3& camera_pos);

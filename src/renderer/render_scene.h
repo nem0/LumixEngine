@@ -346,6 +346,8 @@ public:
 	virtual ComponentHandle getNextTerrain(ComponentHandle cmp) = 0;
 
 	virtual bool isGrassEnabled() const = 0;
+	virtual int getGrassRotationMode(ComponentHandle cmp, int index) = 0;
+	virtual void setGrassRotationMode(ComponentHandle cmp, int index, int value) = 0;
 	virtual float getGrassDistance(ComponentHandle cmp, int index) = 0;
 	virtual void setGrassDistance(ComponentHandle cmp, int index, float value) = 0;
 	virtual void enableGrass(bool enabled) = 0;
