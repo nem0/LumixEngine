@@ -1204,13 +1204,7 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 		if (channel->mNumPositionKeys == 0) return;
 
 		pos.push(channel->mPositionKeys[0]);
-		if (channel->mNumPositionKeys == 1)
-		{
-			auto end = channel->mPositionKeys[0];
-			end.mTime = end_time;
-			pos.push(end);
-			return;
-		}
+		if (channel->mNumPositionKeys == 1) return;
 
 		aiVectorKey last = channel->mPositionKeys[0];
 		float dt = float(channel->mPositionKeys[1].mTime - channel->mPositionKeys[0].mTime);
@@ -1245,13 +1239,7 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 		if (channel->mNumRotationKeys == 0) return;
 
 		rot.push(channel->mRotationKeys[0]);
-		if (channel->mNumRotationKeys == 1)
-		{
-			auto end = channel->mRotationKeys[0];
-			end.mTime = end_time;
-			rot.push(end);
-			return;
-		}
+		if (channel->mNumRotationKeys == 1) return;
 
 		aiQuatKey last = channel->mRotationKeys[0];
 		float dt = float(channel->mRotationKeys[1].mTime - channel->mRotationKeys[0].mTime);
