@@ -478,7 +478,8 @@ public:
 		int count;
 		serializer.read(count);
 		m_prefabs.resize(count);
-		serializer.read(&m_prefabs[0], m_prefabs.size() * sizeof(m_prefabs[0]));
+		if (count > 0)
+			serializer.read(&m_prefabs[0], m_prefabs.size() * sizeof(m_prefabs[0]));
 		serializer.read(count);
 		for (int i = 0; i < count; ++i)
 		{
