@@ -64,7 +64,7 @@ void Animation::getRelativePose(float time, Pose& pose, Model& model, float weig
 	Vec3* pos = pose.positions;
 	Quat* rot = pose.rotations;
 
-	if (frame < m_frame_count)
+	if (frame < m_frame_count - 1)
 	{
 		for (Bone& bone : m_bones)
 		{
@@ -176,7 +176,7 @@ void Animation::getRelativePose(float time, Pose& pose, Model& model) const
 	Vec3* pos = pose.positions;
 	Quat* rot = pose.rotations;
 
-	if (frame < m_frame_count)
+	if (frame < m_frame_count - 1)
 	{
 		for (Bone& bone : m_bones)
 		{
