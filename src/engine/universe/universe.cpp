@@ -346,7 +346,8 @@ void Universe::deserialize(InputBlob& serializer)
 	m_entities.resize(count);
 	for (auto& i : m_entities) i.components = 0;
 
-	serializer.read(&m_entities[0], sizeof(m_entities[0]) * m_entities.size());
+	if (count > 0)
+		serializer.read(&m_entities[0], sizeof(m_entities[0]) * m_entities.size());
 
 	serializer.read(count);
 	m_id_to_name_map.clear();
