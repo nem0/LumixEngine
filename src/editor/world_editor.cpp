@@ -2664,8 +2664,8 @@ public:
 		addPlugin(*m_measure_tool);
 
 		const char* plugins[] = { "steam", "renderer", "animation", "audio", "physics", "navigation", "lua_script", "gui"
-			#ifdef GAME_PROJECT_NAME
-			, GAME_PROJECT_NAME
+			#ifdef LUMIXENGINE_PLUGINS
+				, LUMIXENGINE_PLUGINS
 			#endif
 		};
 

@@ -255,8 +255,12 @@ public:
 		m_engine->getPluginManager().load("lua_script");
 		m_engine->getPluginManager().load("physics");
 		m_engine->getPluginManager().load("gui");
-		#ifdef GAME_PROJECT_NAME
-		m_engine->getPluginManager().load(GAME_PROJECT_NAME);
+		#ifdef LUMIXENGINE_PLUGINS
+			const char* plugins[] = { LUMIXENGINE_PLUGINS };
+			for (auto plugin : plugins)
+			{
+				m_engine->getPluginManager().load(plugin);
+			}
 		#endif
 		m_engine->getInputSystem().enable(true);
 		Lumix::Renderer* renderer = static_cast<Lumix::Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
