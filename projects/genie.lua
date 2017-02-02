@@ -16,7 +16,16 @@ local build_studio = true
 local build_gui = _ACTION == "vs2015"
 local build_steam = false
 local build_game = false
+local plugins = {}
 local embed_resources = false
+build_studio_callbacks = {}
+build_app_callbacks = {}
+
+
+newoption {
+	trigger = "plugins",
+	description = "Add plugins to project, can be a comma-separated list, e.g. --plugins=pluginA,pluginB"
+}
 
 newoption {
 	trigger = "static-plugins",
@@ -63,6 +72,10 @@ newoption {
 	description = "Do not build Studio."
 }
 
+if _OPTIONS["plugins"] then
+	plugins = string.explode( _OPTIONS["plugins"], ",")
+end
+	
 if _OPTIONS["with-steam"] then
 	build_steam = true
 end
@@ -73,6 +86,7 @@ end
 
 if _OPTIONS["with-game"] then
 	build_game = _OPTIONS["with-game"]
+	table.insert(plugins, build_game)
 end
 
 if _OPTIONS["no-physics"] then
@@ -562,8 +576,8 @@ project "animation"
 	useLua()
 	defaultConfigurations()
 
-if build_game then
-	dofile ("../../" .. build_game .. "/genie.lua")
+for _, plugin in ipairs(plugins) do
+	dofile("../../" .. plugin .. "/genie.lua")
 end
 	
 if build_steam then
@@ -686,8 +700,15 @@ if build_app then
 
 		kind "ConsoleApp"
 		
-		if build_game then
-			defines { "GAME_PROJECT_NAME=\"" .. build_game .. "\"" }
+		if #plugins > 0 then
+			local def = ""
+			for idx, plugin in ipairs(plugins) do
+				if idx > 1 then 
+					def = def .. ",";
+				end
+				def = def .. "\"" .. plugin .. "\""
+			end
+			defines { "LUMIXENGINE_PLUGINS=" .. def }
 		end
 		
 		includedirs { "../src", "../src/app", "../external/bgfx/include" }
@@ -697,9 +718,10 @@ if build_app then
 			forceLink("s_lua_script_plugin_register")
 			forceLink("s_navigation_plugin_register")
 			forceLink("s_renderer_plugin_register")
-			if build_game then
-				forceLink("s_" .. build_game .. "_plugin_register")
-				links { build_game }
+			
+			for _, plugin in ipairs(plugins) do
+				forceLink ("s_" .. plugin .. "_plugin_register")
+				links { plugin }
 			end
 			
 			if build_gui then
@@ -713,8 +735,8 @@ if build_app then
 				forceLink("setStudioApp_navigation")
 				forceLink("setStudioApp_renderer")
 				--forceLink("setStudioApp_gui")
-				if build_game then
-					forceLink("setStudioApp_" .. build_game)
+				for _, plugin in ipairs(plugins) do
+					forceLink("setStudioApp_" .. plugin)
 				end
 			end
 				
@@ -773,6 +795,10 @@ if build_app then
 			links { "winmm", "imm32", "version" }
 		configuration {}
 
+		for _, callback in ipairs(build_app_callbacks) do
+			callback()
+		end
+		
 		useLua()
 		defaultConfigurations()
 		strip()
@@ -795,8 +821,15 @@ if build_studio then
 			"../external"
 		}
 		
-		if build_game then
-			defines { "GAME_PROJECT_NAME=\"" .. build_game .. "\"" }
+		if #plugins > 0 then
+			local def = ""
+			for idx, plugin in ipairs(plugins) do
+				if idx > 1 then 
+					def = def .. ",";
+				end
+				def = def .. "\"" .. plugin .. "\""
+			end
+			defines { "LUMIXENGINE_PLUGINS=" .. def }
 		end
 
 		configuration { "windows", "not asmjs" }
@@ -839,10 +872,10 @@ if build_studio then
 				libdirs { "../../steamworks_sdk/redistributable_bin/win64" }
 			end
 
-			if build_game then
-				forceLink("s_" .. build_game .. "_plugin_register")
-				forceLink("setStudioApp_" .. build_game)
-				links { build_game }
+			for _, plugin in ipairs(plugins) do
+				forceLink("s_" .. plugin .. "_plugin_register")
+				forceLink("setStudioApp_" .. plugin)
+				links { plugin }
 			end
 			
 			forceLink("setStudioApp_animation")
@@ -884,6 +917,10 @@ if build_studio then
 			links { "renderer", "editor", "engine" }
 		end
 
+		for _, callback in ipairs(build_studio_callbacks) do
+			callback()
+		end
+		
 		linkLib "SDL"
 
 		configuration {"vs*"}
