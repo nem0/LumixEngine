@@ -77,7 +77,7 @@ public:
 		typedef void (*Creator)(StudioApp& app);
 		StaticPluginRegister(const char* name, Creator creator);
 
-		static void create(const char* name, StudioApp& app);
+		static void create(StudioApp& app);
 
 		StaticPluginRegister* next;
 		Creator creator;
