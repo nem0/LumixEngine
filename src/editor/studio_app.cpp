@@ -1534,10 +1534,7 @@ public:
 		m_editor->getPrefabSystem().setStudioApp(*this);
 		auto& plugin_manager = m_editor->getEngine().getPluginManager();
 		#ifdef STATIC_PLUGINS
-			for (auto* plugin : plugin_manager.getPlugins())
-			{
-				StudioApp::StaticPluginRegister::create(plugin->getName(), *this);
-			}
+			StudioApp::StaticPluginRegister::create(*this);
 		#else
 			for (auto* lib : plugin_manager.getLibraries())
 			{
@@ -2333,16 +2330,12 @@ StudioApp::StaticPluginRegister::StaticPluginRegister(const char* name, Creator 
 }
 
 
-void StudioApp::StaticPluginRegister::create(const char* name, StudioApp& app)
+void StudioApp::StaticPluginRegister::create(StudioApp& app)
 {
 	auto* i = s_first_plugin;
 	while (i)
 	{
-		if (equalStrings(name, i->name))
-		{
-			i->creator(app);
-			return;
-		}
+		i->creator(app);
 		i = i->next;
 	}
 }
