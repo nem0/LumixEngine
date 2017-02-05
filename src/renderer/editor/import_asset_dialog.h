@@ -157,6 +157,7 @@ class ImportAssetDialog LUMIX_FINAL : public StudioApp::IPlugin
 			bool optimize_mesh_on_import;
 			bool gen_smooth_normal;
 			bool remove_doubles;
+			bool center_meshes;
 			Orientation orientation;
 			Orientation root_orientation;
 			bool make_convex;
