@@ -75,6 +75,183 @@ struct BillboardVertex
 static const int TEXTURE_SIZE = 512;
 
 
+static bool isSkinned(const aiMesh* mesh) { return mesh->mNumBones > 0; }
+
+
+static u32 packuint32(u8 _x, u8 _y, u8 _z, u8 _w)
+{
+	union {
+		u32 ui32;
+		u8 arr[4];
+	} un;
+
+	un.arr[0] = _x;
+	un.arr[1] = _y;
+	un.arr[2] = _z;
+	un.arr[3] = _w;
+
+	return un.ui32;
+}
+
+
+static u32 packF4u(const Vec3& vec)
+{
+	const u8 xx = u8(vec.x * 127.0f + 128.0f);
+	const u8 yy = u8(vec.y * 127.0f + 128.0f);
+	const u8 zz = u8(vec.z * 127.0f + 128.0f);
+	const u8 ww = u8(0);
+	return packuint32(xx, yy, zz, ww);
+}
+
+
+static int ceilPowOf2(int value)
+{
+	ASSERT(value > 0);
+	int ret = value - 1;
+	ret |= ret >> 1;
+	ret |= ret >> 2;
+	ret |= ret >> 3;
+	ret |= ret >> 8;
+	ret |= ret >> 16;
+	return ret + 1;
+}
+
+
+struct BillboardSceneData
+{
+	int width;
+	int height;
+	float ortho_size;
+	Vec3 position;
+
+
+	BillboardSceneData(const AABB& aabb, int texture_size)
+	{
+		Vec3 size = aabb.max - aabb.min;
+		float right = aabb.max.x + size.z + size.x + size.z;
+		float left = aabb.min.x;
+		position.set((right + left) * 0.5f, (aabb.max.y + aabb.min.y) * 0.5f, aabb.max.z + 5);
+
+		if (2 * size.x + 2 * size.z > size.y)
+		{
+			width = texture_size;
+			int nonceiled_height = int(width / (2 * size.x + 2 * size.z) * size.y);
+			height = ceilPowOf2(nonceiled_height);
+			ortho_size = size.y * height / nonceiled_height * 0.5f;
+		}
+		else
+		{
+			height = texture_size;
+			width = ceilPowOf2(int(height * (2 * size.x + 2 * size.z) / size.y));
+			ortho_size = size.y * 0.5f;
+		}
+	}
+
+
+	Matrix computeMVPMatrix()
+	{
+		Matrix mvp = Matrix::IDENTITY;
+
+		float ratio = height > 0 ? (float)width / height : 1.0f;
+		Matrix proj;
+		proj.setOrtho(-ortho_size * ratio,
+			ortho_size * ratio,
+			-ortho_size,
+			ortho_size,
+			0.0001f,
+			10000.0f,
+			false /* we do not care for z value, so both true and false are correct*/);
+
+		mvp.setTranslation(position);
+		mvp.fastInverse();
+		mvp = proj * mvp;
+
+		return mvp;
+	}
+};
+
+static bool isSkinned(const aiScene* scene, const aiMaterial* material)
+{
+	for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
+	{
+		if (scene->mMaterials[scene->mMeshes[i]->mMaterialIndex] == material && isSkinned(scene->mMeshes[i]))
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+
+static const aiNode* getOwner(const aiNode* node, int mesh_index)
+{
+	for (unsigned int i = 0; i < (int)node->mNumMeshes; ++i)
+	{
+		if (node->mMeshes[i] == mesh_index) return node;
+	}
+
+	for (int i = 0; i < (int)node->mNumChildren; ++i)
+	{
+		auto* child = node->mChildren[i];
+		auto* owner = getOwner(child, mesh_index);
+		if (owner) return owner;
+	}
+
+	return nullptr;
+}
+
+
+static const aiNode* getOwner(const aiScene* scene, const aiMesh* mesh)
+{
+	for (int i = 0; i < int(scene->mNumMeshes); ++i)
+	{
+		if (scene->mMeshes[i] == mesh) return getOwner(scene->mRootNode, i);
+	}
+	return nullptr;
+}
+
+
+static const char* getMeshName(const aiScene* scene, const aiMesh* mesh)
+{
+	const auto* node = getOwner(scene, mesh);
+	if (node && node->mName.length > 0) return node->mName.C_Str();
+
+	return mesh->mName.C_Str();
+}
+
+
+static float getMeshLODFactor(const aiScene* scene, const aiMesh* mesh)
+{
+	const char* mesh_name = getMeshName(scene, mesh);
+	int len = stringLength(mesh_name);
+	if (len < 5) return FLT_MAX;
+
+	const char* last = mesh_name + len - 1;
+	while (last > mesh_name && *last >= '0' && *last <= '9')
+	{
+		--last;
+	}
+	++last;
+	if (last < mesh_name + 4) return FLT_MAX;
+	if (compareIStringN(last - 4, "_LOD", 4) != 0) return FLT_MAX;
+	const char* end_of_factor = last - 4;
+	const char* begin_factor = end_of_factor - 1;
+	if (begin_factor <= mesh_name) return FLT_MAX;
+
+	while (*begin_factor != '_' && begin_factor > mesh_name)
+	{
+		--begin_factor;
+	}
+	++begin_factor;
+
+	if (begin_factor == end_of_factor) return FLT_MAX;
+	int factor;
+	fromCString(begin_factor, int(end_of_factor - begin_factor), &factor);
+
+	return float(factor);
+}
+
+
 namespace LuaAPI
 {
 
@@ -167,6 +344,11 @@ int setParams(lua_State* L)
 	if (lua_getfield(L, 2, "remove_doubles") == LUA_TBOOLEAN)
 	{
 		dlg->m_model.remove_doubles = LuaWrapper::toType<bool>(L, -1);
+	}
+	lua_pop(L, 1);
+	if (lua_getfield(L, 2, "center_meshes") == LUA_TBOOLEAN)
+	{
+		dlg->m_model.center_meshes = LuaWrapper::toType<bool>(L, -1);
 	}
 	lua_pop(L, 1);
 	if (lua_getfield(L, 2, "import_vertex_colors") == LUA_TBOOLEAN)
@@ -334,7 +516,7 @@ int getTexturesCount(ImportAssetDialog* dlg, int material_idx)
 const char* getMeshName(ImportAssetDialog* dlg, int mesh_idx)
 {
 	if (mesh_idx < 0 || mesh_idx >= dlg->m_meshes.size()) return "";
-	return dlg->m_meshes[mesh_idx].mesh->mName.C_Str();
+	return getMeshName(dlg->m_meshes[mesh_idx].scene, dlg->m_meshes[mesh_idx].mesh);
 }
 
 
@@ -348,189 +530,6 @@ const char* getMaterialName(ImportAssetDialog* dlg, int material_idx)
 } // namespace LuaAPI
 
 
-static bool isSkinned(const aiMesh* mesh) { return mesh->mNumBones > 0; }
-
-
-static u32 packuint32(u8 _x, u8 _y, u8 _z, u8 _w)
-{
-	union {
-		u32 ui32;
-		u8 arr[4];
-	} un;
-
-	un.arr[0] = _x;
-	un.arr[1] = _y;
-	un.arr[2] = _z;
-	un.arr[3] = _w;
-
-	return un.ui32;
-}
-
-
-static u32 packF4u(const Vec3& vec)
-{
-	const u8 xx = u8(vec.x * 127.0f + 128.0f);
-	const u8 yy = u8(vec.y * 127.0f + 128.0f);
-	const u8 zz = u8(vec.z * 127.0f + 128.0f);
-	const u8 ww = u8(0);
-	return packuint32(xx, yy, zz, ww);
-}
-
-
-static int ceilPowOf2(int value)
-{
-	ASSERT(value > 0);
-	int ret = value - 1;
-	ret |= ret >> 1;
-	ret |= ret >> 2;
-	ret |= ret >> 3;
-	ret |= ret >> 8;
-	ret |= ret >> 16;
-	return ret + 1;
-}
-
-
-struct BillboardSceneData
-{
-	int width;
-	int height;
-	float ortho_size;
-	Vec3 position;
-
-
-	BillboardSceneData(const AABB& aabb, int texture_size)
-	{
-		Vec3 size = aabb.max - aabb.min;
-		float right = aabb.max.x + size.z + size.x + size.z;
-		float left = aabb.min.x;
-		position.set((right + left) * 0.5f, (aabb.max.y + aabb.min.y) * 0.5f, aabb.max.z + 5);
-
-		if (2 * size.x + 2 * size.z > size.y)
-		{
-			width = texture_size;
-			int nonceiled_height = int(width / (2 * size.x + 2 * size.z) * size.y);
-			height = ceilPowOf2(nonceiled_height);
-			ortho_size = size.y * height / nonceiled_height * 0.5f;
-		}
-		else
-		{
-			height = texture_size;
-			width = ceilPowOf2(int(height * (2 * size.x + 2 * size.z) / size.y));
-			ortho_size = size.y * 0.5f;
-		}
-	}
-
-
-	Matrix computeMVPMatrix()
-	{
-		Matrix mvp = Matrix::IDENTITY;
-
-		float ratio = height > 0 ? (float)width / height : 1.0f;
-		Matrix proj;
-		proj.setOrtho(-ortho_size * ratio,
-			ortho_size * ratio,
-			-ortho_size,
-			ortho_size,
-			0.0001f,
-			10000.0f,
-			false /* we do not care for z value, so both true and false are correct*/);
-
-		mvp.setTranslation(position);
-		mvp.fastInverse();
-		mvp = proj * mvp;
-
-		return mvp;
-	}
-};
-
-static bool isSkinned(const aiScene* scene, const aiMaterial* material)
-{
-	for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
-	{
-		if (scene->mMaterials[scene->mMeshes[i]->mMaterialIndex] == material && isSkinned(scene->mMeshes[i]))
-		{
-			return true;
-		}
-	}
-	return false;
-}
-
-
-static const aiNode* getOwner(const aiNode* node, int mesh_index)
-{
-	for (unsigned int i = 0; i < (int)node->mNumMeshes; ++i)
-	{
-		if (node->mMeshes[i] == mesh_index) return node;
-	}
-
-	for (int i = 0; i < (int)node->mNumChildren; ++i)
-	{
-		auto* child = node->mChildren[i];
-		auto* owner = getOwner(child, mesh_index);
-		if (owner) return owner;
-	}
-
-	return nullptr;
-}
-
-
-static const aiNode* getOwner(const aiScene* scene, const aiMesh* mesh)
-{
-	for (int i = 0; i < int(scene->mNumMeshes); ++i)
-	{
-		if (scene->mMeshes[i] == mesh) return getOwner(scene->mRootNode, i);
-	}
-	return nullptr;
-}
-
-
-static aiString getMeshName(const aiScene* scene, const aiMesh* mesh)
-{
-	aiString mesh_name = mesh->mName;
-	int length = stringLength(mesh_name.C_Str());
-	if (length == 0)
-	{
-		const auto* node = getOwner(scene, mesh);
-		if (node)
-		{
-			mesh_name = node->mName;
-		}
-	}
-	return mesh_name;
-}
-
-
-static float getMeshLODFactor(const aiScene* scene, const aiMesh* mesh)
-{
-	const char* mesh_name = getMeshName(scene, mesh).C_Str();
-	int len = stringLength(mesh_name);
-	if (len < 5) return FLT_MAX;
-
-	const char* last = mesh_name + len - 1;
-	while (last > mesh_name && *last >= '0' && *last <= '9')
-	{
-		--last;
-	}
-	++last;
-	if (last < mesh_name + 4) return FLT_MAX;
-	if (compareIStringN(last - 4, "_LOD", 4) != 0) return FLT_MAX;
-	const char* end_of_factor = last - 4;
-	const char* begin_factor = end_of_factor - 1;
-	if (begin_factor <= mesh_name) return FLT_MAX;
-
-	while (*begin_factor != '_' && begin_factor > mesh_name)
-	{
-		--begin_factor;
-	}
-	++begin_factor;
-
-	if (begin_factor == end_of_factor) return FLT_MAX;
-	int factor;
-	fromCString(begin_factor, int(end_of_factor - begin_factor), &factor);
-
-	return float(factor);
-}
-
 
 static int importAsset(lua_State* L)
 {
@@ -541,7 +540,7 @@ static int importAsset(lua_State* L)
 
 static int getMeshLOD(const aiScene* scene, const aiMesh* mesh)
 {
-	const char* mesh_name = getMeshName(scene, mesh).C_Str();
+	const char* mesh_name = getMeshName(scene, mesh);
 	int len = stringLength(mesh_name);
 	if (len < 5) return 0;
 
@@ -1787,9 +1786,20 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 		{
 			if (!mesh.import) continue;
 			auto mesh_matrix = getGlobalTransform(getNode(mesh.scene, mesh.mesh, mesh.scene->mRootNode));
+			bool is_skinned = isSkinned(mesh.mesh);
+			if (m_dialog.m_model.center_meshes)
+			{
+				if (is_skinned)
+				{
+					g_log_error.log("Editor") << "Centering skinned meshes is not supported. Mesh is not centered.";
+				}
+				else
+				{
+					mesh_matrix = aiMatrix4x4();
+				}
+			}
 			auto normal_matrix = mesh_matrix;
 			normal_matrix.a4 = normal_matrix.b4 = normal_matrix.c4 = 0;
-			bool is_skinned = isSkinned(mesh.mesh);
 
 			Array<SkinInfo> skin_infos(m_dialog.m_editor.getAllocator());
 			fillSkinInfo(mesh, skin_infos);
@@ -2009,11 +2019,11 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 			indices_offset += mesh.indices.size();
 			file.write((const char*)&mesh_tri_count, sizeof(mesh_tri_count));
 
-			aiString mesh_name = getMeshName(mesh.scene, mesh.mesh);
-			length = stringLength(mesh_name.C_Str());
+			const char* mesh_name = getMeshName(mesh.scene, mesh.mesh);
+			length = stringLength(mesh_name);
 
 			file.write((const char*)&length, sizeof(length));
-			file.write((const char*)mesh_name.C_Str(), length);
+			file.write((const char*)mesh_name, length);
 		}
 
 		writeBillboardMesh(file, attribute_array_offset, indices_offset);
@@ -2345,13 +2355,13 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 			if (!mesh.mesh->HasNormals())
 			{
 				m_dialog.setMessage(
-					StaticString<256>("Mesh ", getMeshName(mesh.scene, mesh.mesh).C_Str(), " has no normals."));
+					StaticString<256>("Mesh ", getMeshName(mesh.scene, mesh.mesh), " has no normals."));
 				return false;
 			}
 			if (!mesh.mesh->HasPositions())
 			{
 				m_dialog.setMessage(StaticString<256>(
-					"Mesh ", getMeshName(mesh.scene, mesh.mesh).C_Str(), " has no positions."));
+					"Mesh ", getMeshName(mesh.scene, mesh.mesh), " has no positions."));
 				return false;
 			}
 		}
@@ -2493,6 +2503,9 @@ ImportAssetDialog::ImportAssetDialog(StudioApp& app)
 	m_model.all_nodes = false;
 	m_model.mesh_scale = 1;
 	m_model.remove_doubles = false;
+	m_model.center_meshes = false;
+	m_model.optimize_mesh_on_import = true;
+	m_model.gen_smooth_normal = true;
 	m_model.create_billboard_lod = false;
 	m_model.lods[0] = -10;
 	m_model.lods[1] = -100;
@@ -2924,8 +2937,7 @@ void ImportAssetDialog::onMeshesGUI()
 
 	for (auto& mesh : m_meshes)
 	{
-		const char* name = mesh.mesh->mName.C_Str();
-		if (name[0] == 0) name = getMeshName(mesh.scene, mesh.mesh).C_Str();
+		const char* name = getMeshName(mesh.scene, mesh.mesh);
 		ImGui::Text("%s", name);
 		ImGui::NextColumn();
 
@@ -3376,6 +3388,7 @@ void ImportAssetDialog::onWindowGUI()
 				ImGui::Checkbox("Create billboard LOD", &m_model.create_billboard_lod);
 				ImGui::Checkbox("Import all bones", &m_model.all_nodes);
 				ImGui::Checkbox("Remove doubles", &m_model.remove_doubles);
+				ImGui::Checkbox("Center meshes", &m_model.center_meshes);
 				ImGui::Checkbox("Import Vertex Colors", &m_model.import_vertex_colors);
 				ImGui::DragFloat("Scale", &m_model.mesh_scale, 0.01f, 0.001f, 0);
 				ImGui::Combo("Orientation", &(int&)m_model.orientation, "Y up\0Z up\0-Z up\0-X up\0");
