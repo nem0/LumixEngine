@@ -334,8 +334,8 @@ void Model::computeRuntimeData(const u8* vertices)
 			int offset = mesh_attributes_array_offset + j * vertex_size;
 			m_vertices[index] = *(const Vec3*)&vertices[offset + position_attribute_offset];
 			m_uvs[index] = *(const Vec2*)&vertices[offset + uv_attribute_offset];
-			bounding_radius_squared = Math::maximum(bounding_radius_squared,
-				dotProduct(m_vertices[index], m_vertices[index]) > 0 ? m_vertices[index].squaredLength() : 0);
+			float sq_len = m_vertices[index].squaredLength();
+			bounding_radius_squared = Math::maximum(bounding_radius_squared, sq_len > 0 ? sq_len : 0);
 			min_vertex.x = Math::minimum(min_vertex.x, m_vertices[index].x);
 			min_vertex.y = Math::minimum(min_vertex.y, m_vertices[index].y);
 			min_vertex.z = Math::minimum(min_vertex.z, m_vertices[index].z);
