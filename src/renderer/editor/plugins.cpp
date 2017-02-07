@@ -360,6 +360,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		m_mesh = INVALID_COMPONENT;
 		m_pipeline = nullptr;
 		m_universe = nullptr;
+		m_is_mouse_captured = false;
 
 		createPreviewUniverse();
 	}
@@ -435,6 +436,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 			m_is_mouse_captured = false;
 			SDL_ShowCursor(1);
 			SDL_SetRelativeMouseMode(SDL_FALSE);
+			SDL_WarpMouseInWindow(nullptr, m_captured_mouse_x, m_captured_mouse_y);
 		}
 		
 		if (ImGui::IsItemHovered() && mouse_down)
@@ -446,9 +448,9 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 			{
 				m_is_mouse_captured = true;
 				SDL_ShowCursor(0);
+				SDL_SetRelativeMouseMode(SDL_TRUE);
+				SDL_GetMouseState(&m_captured_mouse_x, &m_captured_mouse_y);
 			}
-
-			SDL_SetRelativeMouseMode(SDL_TRUE);
 
 			if (delta.x != 0 || delta.y != 0)
 			{
@@ -593,6 +595,8 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 	Entity m_camera_entity;
 	ComponentHandle m_camera_cmp;
 	bool m_is_mouse_captured;
+	int m_captured_mouse_x;
+	int m_captured_mouse_y;
 };
 
 
