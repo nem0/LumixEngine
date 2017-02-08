@@ -206,9 +206,10 @@ bool Material::save(JsonSerializer& serializer)
 	serializer.beginArray("defines");
 	for (int i = 0; i < sizeof(m_define_mask) * 8; ++i)
 	{
+		if ((m_define_mask & (1 << i)) == 0) continue;
 		const char* def = renderer.getShaderDefine(i);
 		if (equalStrings("SKINNED", def)) continue;
-		if (m_define_mask & (1 << i)) serializer.serializeArrayItem(def);
+		serializer.serializeArrayItem(def);
 	}
 	serializer.endArray();
 
