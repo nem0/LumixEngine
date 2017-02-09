@@ -915,7 +915,7 @@ public:
 	}
 
 
-	int getVersion() const override { return (int)RenderSceneVersion::GRASS_ROTATION_MODE; }
+	int getVersion() const override { return (int)RenderSceneVersion::LATEST; }
 
 
 	void deserializeEnvironmentProbe(IDeserializer& serializer, Entity entity, int /*scene_version*/)
