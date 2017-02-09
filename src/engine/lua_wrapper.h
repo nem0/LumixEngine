@@ -412,6 +412,23 @@ inline void createSystemFunction(lua_State* L, const char* system, const char* v
 }
 
 
+inline void createSystemClosure(lua_State* L, const char* system, void* system_ptr, const char* var_name, lua_CFunction fn)
+{
+	if (lua_getglobal(L, system) == LUA_TNIL)
+	{
+		lua_pop(L, 1);
+		lua_newtable(L);
+		lua_setglobal(L, system);
+		lua_getglobal(L, system);
+	}
+	lua_pushlightuserdata(L, system_ptr);
+	lua_pushcclosure(L, fn, 1);
+	lua_setfield(L, -2, var_name);
+	lua_pop(L, 1);
+}
+
+
+
 inline const char* luaTypeToString(int type)
 {
 	switch (type)
@@ -543,45 +560,77 @@ template <int N> struct FunctionCaller
 	}
 
 	template <typename R, typename C, typename... ArgsF, typename... Args>
-	static LUMIX_FORCE_INLINE R callMethod(C* inst, R (C::*f)(ArgsF...), lua_State* L, Args && ... args)
+	static LUMIX_FORCE_INLINE R callMethod(C* inst, R(C::*f)(ArgsF...), lua_State* L, Args && ... args)
 	{
 		typedef typename Nth<sizeof...(ArgsF)-N, ArgsF...>::type T;
 		typedef typename remove_cv_reference<T>::type RealT;
-		checkArg<RealT>(L, sizeof...(ArgsF) - N + 2);
-
-		RealT a = toType<RealT>(L, sizeof...(ArgsF) - N + 2);
+		RealT a = checkArg<RealT>(L, sizeof...(ArgsF)-N + 2);
 		return FunctionCaller<N - 1>::callMethod(inst, f, L, args..., a);
 	}
 
 	template <typename R, typename C, typename... ArgsF, typename... Args>
-	static LUMIX_FORCE_INLINE R callMethod(C* inst, R (C::*f)(ArgsF...) const, lua_State* L, Args && ... args)
+	static LUMIX_FORCE_INLINE R callMethod(C* inst, R(C::*f)(ArgsF...) const, lua_State* L, Args && ... args)
 	{
 		typedef typename Nth<sizeof...(ArgsF)-N, ArgsF...>::type T;
 		typedef typename remove_cv_reference<T>::type RealT;
-		checkArg<RealT>(L, sizeof...(ArgsF) - N + 2);
-
-		RealT a = toType<RealT>(L, sizeof...(ArgsF) - N + 2);
+		RealT a = checkArg<RealT>(L, sizeof...(ArgsF)-N + 2);
 		return FunctionCaller<N - 1>::callMethod(inst, f, L, args..., a);
 	}
 
 	template <typename R, typename C, typename... ArgsF, typename... Args>
-	static LUMIX_FORCE_INLINE R callMethod(C* inst, R (C::*f)(lua_State*, ArgsF...), lua_State* L, Args && ... args)
+	static LUMIX_FORCE_INLINE R callMethod(C* inst, R(C::*f)(lua_State*, ArgsF...), lua_State* L, Args && ... args)
 	{
 		typedef typename Nth<sizeof...(ArgsF)-N, ArgsF...>::type T;
 		typedef typename remove_cv_reference<T>::type RealT;
-		checkArg<RealT>(L, sizeof...(ArgsF) - N + 2);
-		RealT a = toType<RealT>(L, sizeof...(ArgsF) - N + 2);
+		RealT a = checkArg<RealT>(L, sizeof...(ArgsF)-N + 2);
 		return FunctionCaller<N - 1>::callMethod(inst, f, L, args..., a);
 	}
 
 	template <typename R, typename C, typename... ArgsF, typename... Args>
-	static LUMIX_FORCE_INLINE R callMethod(C* inst, R (C::*f)(lua_State*, ArgsF...) const, lua_State* L, Args && ... args)
+	static LUMIX_FORCE_INLINE R callMethod(C* inst, R (C::*f)(lua_State*, ArgsF...) const, lua_State* L, Args&&... args)
 	{
-		typedef typename Nth<sizeof...(ArgsF)-N, ArgsF...>::type T;
+		typedef typename Nth<sizeof...(ArgsF) - N, ArgsF...>::type T;
 		typedef typename remove_cv_reference<T>::type RealT;
-		checkArg<RealT>(L, sizeof...(ArgsF) - N + 2);
-		RealT a = toType<RealT>(L, sizeof...(ArgsF) - N + 2);
+		RealT a = checkArg<RealT>(L, sizeof...(ArgsF) - N + 2);
 		return FunctionCaller<N - 1>::callMethod(inst, f, L, args..., a);
+	}
+
+	template <typename R, typename C, typename... ArgsF, typename... Args>
+	static LUMIX_FORCE_INLINE R callMethodClosure(C* inst, R (C::*f)(ArgsF...), lua_State* L, Args&&... args)
+	{
+		typedef typename Nth<sizeof...(ArgsF) - N, ArgsF...>::type T;
+		typedef typename remove_cv_reference<T>::type RealT;
+		RealT a = checkArg<RealT>(L, sizeof...(ArgsF) - N + 1);
+		return FunctionCaller<N - 1>::callMethodClosure(inst, f, L, args..., a);
+	}
+
+	template <typename R, typename C, typename... ArgsF, typename... Args>
+	static LUMIX_FORCE_INLINE R callMethodClosure(C* inst, R (C::*f)(ArgsF...) const, lua_State* L, Args&&... args)
+	{
+		typedef typename Nth<sizeof...(ArgsF) - N, ArgsF...>::type T;
+		typedef typename remove_cv_reference<T>::type RealT;
+		RealT a = checkArg<RealT>(L, sizeof...(ArgsF) - N + 1);
+		return FunctionCaller<N - 1>::callMethodClosure(inst, f, L, args..., a);
+	}
+
+	template <typename R, typename C, typename... ArgsF, typename... Args>
+	static LUMIX_FORCE_INLINE R
+	callMethodClosure(C* inst, R (C::*f)(lua_State*, ArgsF...), lua_State* L, Args&&... args)
+	{
+		typedef typename Nth<sizeof...(ArgsF) - N, ArgsF...>::type T;
+		typedef typename remove_cv_reference<T>::type RealT;
+		RealT a = checkArg<RealT>(L, sizeof...(ArgsF) - N + 1);
+		return FunctionCaller<N - 1>::callMethodClosure(inst, f, L, args..., a);
+	}
+
+	template <typename R, typename C, typename... ArgsF, typename... Args>
+	static LUMIX_FORCE_INLINE R
+	callMethodClosure(C* inst, R (C::*f)(lua_State*, ArgsF...) const, lua_State* L, Args&&... args)
+	{
+		typedef typename Nth<sizeof...(ArgsF) - N, ArgsF...>::type T;
+		typedef typename remove_cv_reference<T>::type RealT;
+		RealT a = checkArg<RealT>(L, sizeof...(ArgsF) - N + 1);
+		return FunctionCaller<N - 1>::callMethodClosure(inst, f, L, args..., a);
 	}
 };
 
@@ -625,6 +674,34 @@ template <> struct FunctionCaller<0>
 
 	template <typename R, typename C, typename... ArgsF, typename... Args>
 	static LUMIX_FORCE_INLINE R callMethod(C* inst, R (C::*f)(lua_State*, ArgsF...) const, lua_State* L, Args && ... args)
+	{
+		return (inst->*f)(L, args...);
+	}
+
+
+	template <typename R, typename C, typename... ArgsF, typename... Args>
+	static LUMIX_FORCE_INLINE R callMethodClosure(C* inst, R(C::*f)(ArgsF...), lua_State*, Args && ... args)
+	{
+		return (inst->*f)(args...);
+	}
+
+
+	template <typename R, typename C, typename... ArgsF, typename... Args>
+	static LUMIX_FORCE_INLINE R callMethodClosure(C* inst, R(C::*f)(lua_State*, ArgsF...), lua_State* L, Args && ... args)
+	{
+		return (inst->*f)(L, args...);
+	}
+
+
+	template <typename R, typename C, typename... ArgsF, typename... Args>
+	static LUMIX_FORCE_INLINE R callMethodClosure(C* inst, R(C::*f)(ArgsF...) const, lua_State*, Args && ... args)
+	{
+		return (inst->*f)(args...);
+	}
+
+
+	template <typename R, typename C, typename... ArgsF, typename... Args>
+	static LUMIX_FORCE_INLINE R callMethodClosure(C* inst, R(C::*f)(lua_State*, ArgsF...) const, lua_State* L, Args && ... args)
 	{
 		return (inst->*f)(L, args...);
 	}
@@ -675,6 +752,13 @@ template <typename C> int LUMIX_FORCE_INLINE callMethod(void (C::*f)(), lua_Stat
 }
 
 
+template <typename C> int LUMIX_FORCE_INLINE callMethodClosure(C* inst, void (C::*f)(), lua_State* L)
+{
+	(inst->*f)();
+	return 0;
+}
+
+
 template <typename C, typename R> int LUMIX_FORCE_INLINE callMethod(R (C::*f)(), lua_State* L)
 {
 	auto* inst = checkArg<C*>(L, 1);
@@ -689,6 +773,14 @@ template <typename C, typename... ArgsF> int LUMIX_FORCE_INLINE callMethod(void 
 	auto* inst = checkArg<C*>(L, 1);
 
 	FunctionCaller<sizeof...(ArgsF)>::callMethod(inst, f, L);
+	return 0;
+}
+
+
+template <typename C, typename... ArgsF>
+int LUMIX_FORCE_INLINE callMethodClosure(C* inst, void (C::*f)(ArgsF...), lua_State* L)
+{
+	FunctionCaller<sizeof...(ArgsF)>::callMethodClosure(inst, f, L);
 	return 0;
 }
 
@@ -715,9 +807,41 @@ int LUMIX_FORCE_INLINE callMethod(R (C::*f)(ArgsF...) const, lua_State* L)
 }
 
 
+template <typename C, typename R, typename... ArgsF>
+int LUMIX_FORCE_INLINE callMethodClosure(C* inst, R(C::*f)(ArgsF...), lua_State* L)
+{
+	R v = FunctionCaller<sizeof...(ArgsF)>::callMethodClosure(inst, f, L);
+	push(L, v);
+	return 1;
+}
+
+
+template <typename C, typename R, typename... ArgsF>
+int LUMIX_FORCE_INLINE callMethodClosure(C* inst, R(C::*f)(ArgsF...) const, lua_State* L)
+{
+	R v = FunctionCaller<sizeof...(ArgsF)>::callMethodClosure(inst, f, L);
+	push(L, v);
+	return 1;
+}
+
+
 template <typename C, typename T, T t> int wrapMethod(lua_State* L)
 {
 	return callMethod<C>(t, L);
+}
+
+
+template <typename C, typename T, T t> int wrapMethodClosure(lua_State* L)
+{
+	int index = lua_upvalueindex(1);
+	if (!isType<T>(L, index))
+	{
+		g_log_error.log("Lua") << "Invalid Lua closure";
+		ASSERT(false);
+		return 0;
+	}
+	auto* inst = checkArg<C*>(L, index);
+	return callMethodClosure(inst, t, L);
 }
 
 
