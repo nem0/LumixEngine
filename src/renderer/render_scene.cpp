@@ -52,6 +52,7 @@ namespace Lumix
 enum class RenderSceneVersion : int
 {
 	GRASS_ROTATION_MODE,
+	GLOBAL_LIGHT_REFACTOR,
 
 	LATEST
 };
@@ -111,7 +112,6 @@ struct PointLight
 
 struct GlobalLight
 {
-	ComponentHandle m_component;
 	Vec3 m_diffuse_color;
 	float m_diffuse_intensity;
 	Vec3 m_fog_color;
@@ -307,10 +307,8 @@ public:
 		}
 		if (type == GLOBAL_LIGHT_TYPE)
 		{
-			for (auto& i : m_global_lights)
-			{
-				if (i.m_entity == entity) return i.m_component;
-			}
+			auto iter = m_global_lights.find(entity);
+			if (iter.isValid()) return {entity.index};
 			return INVALID_COMPONENT;
 		}
 		if (type == CAMERA_TYPE)
@@ -726,9 +724,8 @@ public:
 
 	void serializeGlobalLight(ISerializer& serializer, ComponentHandle cmp)
 	{
-		GlobalLight& light = m_global_lights[getGlobalLightIndex(cmp)];
+		GlobalLight& light = m_global_lights[{cmp.index}];
 		serializer.write("cascades", light.m_cascades);
-		serializer.write("component", light.m_component);
 		serializer.write("diffuse_color", light.m_diffuse_color);
 		serializer.write("diffuse_intensity", light.m_diffuse_intensity);
 		serializer.write("fog_bottom", light.m_fog_bottom);
@@ -738,20 +735,26 @@ public:
 	}
 
 
-	void deserializeGlobalLight(IDeserializer& serializer, Entity entity, int /*scene_version*/)
+	void deserializeGlobalLight(IDeserializer& serializer, Entity entity, int scene_version)
 	{
-		GlobalLight& light = m_global_lights.emplace();
+		GlobalLight light;
 		light.m_entity = entity;
 		serializer.read(&light.m_cascades);
-		serializer.read(&light.m_component);
+		if (scene_version < (int)RenderSceneVersion::GLOBAL_LIGHT_REFACTOR)
+		{
+			ComponentHandle dummy;
+			serializer.read(&dummy);
+		}
 		serializer.read(&light.m_diffuse_color);
 		serializer.read(&light.m_diffuse_intensity);
 		serializer.read(&light.m_fog_bottom);
 		serializer.read(&light.m_fog_color);
 		serializer.read(&light.m_fog_density);
 		serializer.read(&light.m_fog_height);
-		m_universe.addComponent(light.m_entity, GLOBAL_LIGHT_TYPE, this, light.m_component);
-		m_active_global_light_cmp = light.m_component;
+		m_global_lights.insert(entity, light);
+		ComponentHandle cmp = {entity.index};
+		m_universe.addComponent(light.m_entity, GLOBAL_LIGHT_TYPE, this, cmp);
+		m_active_global_light_cmp = cmp;
 	}
 	
 	
@@ -1224,11 +1227,10 @@ public:
 		serializer.write(m_point_light_last_cmp);
 
 		serializer.write((i32)m_global_lights.size());
-		for (int i = 0, c = m_global_lights.size(); i < c; ++i)
+		for (const GlobalLight& light : m_global_lights)
 		{
-			serializer.write(m_global_lights[i]);
+			serializer.write(light);
 		}
-		serializer.write(m_global_light_last_cmp);
 		serializer.write(m_active_global_light_cmp);
 	}
 
@@ -1538,14 +1540,13 @@ public:
 		serializer.read(m_point_light_last_cmp);
 
 		serializer.read(size);
-		m_global_lights.resize(size);
 		for (int i = 0; i < size; ++i)
 		{
-			GlobalLight& light = m_global_lights[i];
+			GlobalLight light;
 			serializer.read(light);
-			m_universe.addComponent(light.m_entity, GLOBAL_LIGHT_TYPE, this, light.m_component);
+			m_global_lights.insert(light.m_entity, light);
+			m_universe.addComponent(light.m_entity, GLOBAL_LIGHT_TYPE, this, {light.m_entity.index});
 		}
-		serializer.read(m_global_light_last_cmp);
 		serializer.read(m_active_global_light_cmp);
 	}
 
@@ -1622,7 +1623,7 @@ public:
 
 	void destroyGlobalLight(ComponentHandle component)
 	{
-		Entity entity = m_global_lights[getGlobalLightIndex(component)].m_entity;
+		Entity entity = {component.index};
 
 		m_universe.destroyComponent(entity, GLOBAL_LIGHT_TYPE, this, component);
 
@@ -1630,7 +1631,7 @@ public:
 		{
 			m_active_global_light_cmp = INVALID_COMPONENT;
 		}
-		m_global_lights.eraseFast(getGlobalLightIndex(component));
+		m_global_lights.erase(entity);
 	}
 
 
@@ -3983,7 +3984,7 @@ public:
 	
 	Vec4 getShadowmapCascades(ComponentHandle cmp) override
 	{
-		return m_global_lights[getGlobalLightIndex(cmp)].m_cascades;
+		return m_global_lights[{cmp.index}].m_cascades;
 	}
 
 
@@ -3995,68 +3996,55 @@ public:
 		valid_value.z = Math::maximum(valid_value.y + 0.01f, valid_value.z);
 		valid_value.w = Math::maximum(valid_value.z + 0.01f, valid_value.w);
 
-		m_global_lights[getGlobalLightIndex(cmp)].m_cascades = valid_value;
-	}
-
-
-	int getGlobalLightIndex(ComponentHandle cmp) const
-	{
-		for (int i = 0, c = m_global_lights.size(); i < c; ++i)
-		{
-			if (m_global_lights[i].m_component == cmp)
-			{
-				return i;
-			}
-		}
-		return -1;
+		m_global_lights[{cmp.index}].m_cascades = valid_value;
 	}
 
 
 	void setFogDensity(ComponentHandle cmp, float density) override
 	{
-		m_global_lights[getGlobalLightIndex(cmp)].m_fog_density = density;
+		m_global_lights[{cmp.index}].m_fog_density = density;
 	}
 
 
 	void setFogColor(ComponentHandle cmp, const Vec3& color) override
 	{
-		m_global_lights[getGlobalLightIndex(cmp)].m_fog_color = color;
+		m_global_lights[{cmp.index}].m_fog_color = color;
 	}
 
 
 	float getFogDensity(ComponentHandle cmp) override
 	{
-		return m_global_lights[getGlobalLightIndex(cmp)].m_fog_density;
+		return m_global_lights[{cmp.index}].m_fog_density;
 	}
 
 
 	float getFogBottom(ComponentHandle cmp) override
 	{
-		return m_global_lights[getGlobalLightIndex(cmp)].m_fog_bottom;
+		return m_global_lights[{cmp.index}].m_fog_bottom;
 	}
 
 
 	void setFogBottom(ComponentHandle cmp, float bottom) override
 	{
-		m_global_lights[getGlobalLightIndex(cmp)].m_fog_bottom = bottom;
+		m_global_lights[{cmp.index}].m_fog_bottom = bottom;
 	}
 
 
 	float getFogHeight(ComponentHandle cmp) override
 	{
-		return m_global_lights[getGlobalLightIndex(cmp)].m_fog_height;
+		return m_global_lights[{cmp.index}].m_fog_height;
 	}
 
 
 	void setFogHeight(ComponentHandle cmp, float height) override
 	{
-		m_global_lights[getGlobalLightIndex(cmp)].m_fog_height = height;
+		m_global_lights[{cmp.index}].m_fog_height = height;
 	}
 
 
 	Vec3 getFogColor(ComponentHandle cmp) override
 	{
-		return m_global_lights[getGlobalLightIndex(cmp)].m_fog_color;
+		return m_global_lights[{cmp.index}].m_fog_color;
 	}
 
 
@@ -4093,7 +4081,7 @@ public:
 
 	void setGlobalLightIntensity(ComponentHandle cmp, float intensity) override
 	{
-		m_global_lights[getGlobalLightIndex(cmp)].m_diffuse_intensity = intensity;
+		m_global_lights[{cmp.index}].m_diffuse_intensity = intensity;
 	}
 
 
@@ -4105,7 +4093,7 @@ public:
 
 	void setGlobalLightColor(ComponentHandle cmp, const Vec3& color) override
 	{
-		m_global_lights[getGlobalLightIndex(cmp)].m_diffuse_color = color;
+		m_global_lights[{cmp.index}].m_diffuse_color = color;
 	}
 
 	
@@ -4117,7 +4105,7 @@ public:
 
 	float getGlobalLightIntensity(ComponentHandle cmp) override
 	{
-		return m_global_lights[getGlobalLightIndex(cmp)].m_diffuse_intensity;
+		return m_global_lights[{cmp.index}].m_diffuse_intensity;
 	}
 
 
@@ -4153,7 +4141,7 @@ public:
 
 	Vec3 getGlobalLightColor(ComponentHandle cmp) override
 	{
-		return m_global_lights[getGlobalLightIndex(cmp)].m_diffuse_color;
+		return m_global_lights[{cmp.index}].m_diffuse_color;
 	}
 
 
@@ -4177,7 +4165,7 @@ public:
 
 	Entity getGlobalLightEntity(ComponentHandle cmp) const override
 	{
-		return m_global_lights[getGlobalLightIndex(cmp)].m_entity;
+		return m_global_lights[{cmp.index}].m_entity;
 	}
 
 
@@ -4706,25 +4694,22 @@ public:
 
 	ComponentHandle createGlobalLight(Entity entity)
 	{
-		GlobalLight& light = m_global_lights.emplace();
+		GlobalLight light;
 		light.m_entity = entity;
 		light.m_diffuse_color.set(1, 1, 1);
 		light.m_diffuse_intensity = 0;
 		light.m_fog_color.set(1, 1, 1);
 		light.m_fog_density = 0;
-		++m_global_light_last_cmp.index;
-		light.m_component = m_global_light_last_cmp;
 		light.m_cascades.set(3, 8, 100, 300);
 		light.m_fog_bottom = 0.0f;
 		light.m_fog_height = 10.0f;
 
-		if (m_global_lights.size() == 1)
-		{
-			m_active_global_light_cmp = light.m_component;
-		}
+		ComponentHandle cmp = {entity.index};
+		if (m_global_lights.empty()) m_active_global_light_cmp = cmp;
 
-		m_universe.addComponent(entity, GLOBAL_LIGHT_TYPE, this, light.m_component);
-		return light.m_component;
+		m_global_lights.insert(entity, light);
+		m_universe.addComponent(entity, GLOBAL_LIGHT_TYPE, this, cmp);
+		return cmp;
 	}
 
 
@@ -4870,12 +4855,11 @@ private:
 	ComponentHandle m_point_light_last_cmp;
 	Array<Array<ComponentHandle>> m_light_influenced_geometry;
 	ComponentHandle m_active_global_light_cmp;
-	ComponentHandle m_global_light_last_cmp;
 	HashMap<ComponentHandle, int> m_point_lights_map;
 
 	AssociativeArray<Entity, Decal> m_decals;
 	Array<ModelInstance> m_model_instances;
-	Array<GlobalLight> m_global_lights;
+	HashMap<Entity, GlobalLight> m_global_lights;
 	Array<PointLight> m_point_lights;
 	HashMap<Entity, Camera> m_cameras;
 	Array<BoneAttachment> m_bone_attachments;
@@ -4966,7 +4950,6 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	, m_sync_point(true, m_allocator)
 	, m_jobs(m_allocator)
 	, m_active_global_light_cmp(INVALID_COMPONENT)
-	, m_global_light_last_cmp(INVALID_COMPONENT)
 	, m_point_light_last_cmp(INVALID_COMPONENT)
 	, m_model_instance_created(m_allocator)
 	, m_model_instance_destroyed(m_allocator)
