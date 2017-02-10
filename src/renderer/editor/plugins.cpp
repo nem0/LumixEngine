@@ -2156,10 +2156,9 @@ struct ShaderEditorPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		m_compiler = LUMIX_NEW(app.getWorldEditor()->getAllocator(), ShaderCompiler)(app, *app.getLogUI());
 
 		lua_State* L = app.getWorldEditor()->getEngine().getState();
-		LuaWrapper::createSystemVariable(L, "Editor", "shader_compiler", m_compiler);
 		auto* f =
-			&LuaWrapper::wrapMethod<ShaderCompiler, decltype(&ShaderCompiler::makeUpToDate), &ShaderCompiler::makeUpToDate>;
-		LuaWrapper::createSystemFunction(L, "Editor", "compileShaders", f);
+			&LuaWrapper::wrapMethodClosure<ShaderCompiler, decltype(&ShaderCompiler::makeUpToDate), &ShaderCompiler::makeUpToDate>;
+		LuaWrapper::createSystemClosure(L, "Editor", m_compiler, "compileShaders", f);
 	}
 
 
