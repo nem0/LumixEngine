@@ -177,6 +177,7 @@ class ImportAssetDialog LUMIX_FINAL : public StudioApp::IPlugin
 		char m_texture_output_dir[Lumix::MAX_PATH_LENGTH];
 		bool m_convert_to_dds;
 		bool m_convert_to_raw;
+		bool m_is_normal_map;
 		bool m_is_converting;
 		bool m_is_importing;
 		bool m_is_importing_texture;
