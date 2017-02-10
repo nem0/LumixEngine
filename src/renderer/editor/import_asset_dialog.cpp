@@ -2607,7 +2607,6 @@ bool ImportAssetDialog::isOpened() const
 
 ImportAssetDialog::~ImportAssetDialog()
 {
-	LuaWrapper::createSystemVariable(m_editor.getEngine().getState(), "Editor", "import_asset_dialog", nullptr);
 	if (m_task)
 	{
 		m_task->destroy();
