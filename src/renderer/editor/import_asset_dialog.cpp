@@ -73,6 +73,7 @@ struct BillboardVertex
 
 
 static const int TEXTURE_SIZE = 512;
+static crn_comp_params s_default_comp_params;
 
 
 static bool isSkinned(const aiMesh* mesh) { return mesh->mNumBones > 0; }
@@ -258,14 +259,15 @@ namespace LuaAPI
 
 int setMeshParams(lua_State* L)
 {
-	auto* dlg = LuaWrapper::checkArg<ImportAssetDialog*>(L, 1);
-	int mesh_idx = LuaWrapper::checkArg<int>(L, 2);
-	LuaWrapper::checkTableArg(L, 3);
+	auto* dlg = LuaWrapper::toType<ImportAssetDialog*>(L, lua_upvalueindex(1));
+	
+	int mesh_idx = LuaWrapper::checkArg<int>(L, 1);
+	LuaWrapper::checkTableArg(L, 2);
 	if (mesh_idx < 0 || mesh_idx >= dlg->m_meshes.size()) return 0;
 	
 	ImportMesh& mesh = dlg->m_meshes[mesh_idx];
 
-	lua_pushvalue(L, 3);
+	lua_pushvalue(L, 2);
 
 	if (lua_getfield(L, -1, "lod") == LUA_TNUMBER)
 	{
@@ -292,14 +294,15 @@ int setMeshParams(lua_State* L)
 
 int setAnimationParams(lua_State* L)
 {
-	auto* dlg = LuaWrapper::checkArg<ImportAssetDialog*>(L, 1);
-	int anim_idx = LuaWrapper::checkArg<int>(L, 2);
-	LuaWrapper::checkTableArg(L, 3);
+	auto* dlg = LuaWrapper::toType<ImportAssetDialog*>(L, lua_upvalueindex(1));
+
+	int anim_idx = LuaWrapper::checkArg<int>(L, 1);
+	LuaWrapper::checkTableArg(L, 2);
 	if (anim_idx < 0 || anim_idx >= dlg->m_animations.size()) return 0;
 
 	ImportAnimation& anim = dlg->m_animations[anim_idx];
 
-	lua_pushvalue(L, 3);
+	lua_pushvalue(L, 2);
 
 	if (lua_getfield(L, -1, "root_bone") == LUA_TSTRING)
 	{
@@ -328,50 +331,55 @@ int setAnimationParams(lua_State* L)
 
 int setParams(lua_State* L)
 {
-	auto* dlg = LuaWrapper::checkArg<ImportAssetDialog*>(L, 1);
-	LuaWrapper::checkTableArg(L, 2);
+	auto* dlg = LuaWrapper::toType<ImportAssetDialog*>(L, lua_upvalueindex(1));
+	LuaWrapper::checkTableArg(L, 1);
 
-	if (lua_getfield(L, 2, "output_dir") == LUA_TSTRING)
+	if (lua_getfield(L, 1, "output_dir") == LUA_TSTRING)
 	{
 		copyString(dlg->m_output_dir, LuaWrapper::toType<const char*>(L, -1));
 	}
 	lua_pop(L, 1);
-	if (lua_getfield(L, 2, "create_billboard") == LUA_TBOOLEAN)
+	if (lua_getfield(L, 1, "create_billboard") == LUA_TBOOLEAN)
 	{
 		dlg->m_model.create_billboard_lod = LuaWrapper::toType<bool>(L, -1);
 	}
 	lua_pop(L, 1);
-	if (lua_getfield(L, 2, "remove_doubles") == LUA_TBOOLEAN)
+	if (lua_getfield(L, 1, "remove_doubles") == LUA_TBOOLEAN)
 	{
 		dlg->m_model.remove_doubles = LuaWrapper::toType<bool>(L, -1);
 	}
 	lua_pop(L, 1);
-	if (lua_getfield(L, 2, "center_meshes") == LUA_TBOOLEAN)
+	if (lua_getfield(L, 1, "center_meshes") == LUA_TBOOLEAN)
 	{
 		dlg->m_model.center_meshes = LuaWrapper::toType<bool>(L, -1);
 	}
 	lua_pop(L, 1);
-	if (lua_getfield(L, 2, "import_vertex_colors") == LUA_TBOOLEAN)
+	if (lua_getfield(L, 1, "import_vertex_colors") == LUA_TBOOLEAN)
 	{
 		dlg->m_model.import_vertex_colors = LuaWrapper::toType<bool>(L, -1);
 	}
 	lua_pop(L, 1);
-	if (lua_getfield(L, 2, "scale") == LUA_TNUMBER)
+	if (lua_getfield(L, 1, "scale") == LUA_TNUMBER)
 	{
 		dlg->m_model.mesh_scale = LuaWrapper::toType<float>(L, -1);
 	}
 	lua_pop(L, 1);
-	if (lua_getfield(L, 2, "time_scale") == LUA_TNUMBER)
+	if (lua_getfield(L, 1, "time_scale") == LUA_TNUMBER)
 	{
 		dlg->m_model.time_scale = LuaWrapper::toType<float>(L, -1);
 	}
 	lua_pop(L, 1);
-	if (lua_getfield(L, 2, "to_dds") == LUA_TBOOLEAN)
+	if (lua_getfield(L, 1, "to_dds") == LUA_TBOOLEAN)
 	{
 		dlg->m_convert_to_dds = LuaWrapper::toType<bool>(L, -1);
 	}
 	lua_pop(L, 1);
-	if (lua_getfield(L, 2, "orientation") == LUA_TSTRING)
+	if (lua_getfield(L, 1, "normal_map") == LUA_TBOOLEAN)
+	{
+		dlg->m_is_normal_map = LuaWrapper::toType<bool>(L, -1);
+	}
+	lua_pop(L, 1);
+	if (lua_getfield(L, 1, "orientation") == LUA_TSTRING)
 	{
 		const char* tmp = LuaWrapper::toType<const char*>(L, -1);
 		if (equalStrings(tmp, "+y")) dlg->m_model.orientation = ImportAssetDialog::Orientation::Y_UP;
@@ -380,7 +388,7 @@ int setParams(lua_State* L)
 		else if (equalStrings(tmp, "-z")) dlg->m_model.orientation = ImportAssetDialog::Orientation::Z_MINUS_UP;
 	}
 	lua_pop(L, 1);
-	if (lua_getfield(L, 2, "root_orientation") == LUA_TSTRING)
+	if (lua_getfield(L, 1, "root_orientation") == LUA_TSTRING)
 	{
 		const char* tmp = LuaWrapper::toType<const char*>(L, -1);
 		if (equalStrings(tmp, "+y")) dlg->m_model.root_orientation = ImportAssetDialog::Orientation::Y_UP;
@@ -391,7 +399,7 @@ int setParams(lua_State* L)
 	lua_pop(L, 1);
 
 
-	if (lua_getfield(L, 2, "lods") == LUA_TTABLE)
+	if (lua_getfield(L, 1, "lods") == LUA_TTABLE)
 	{
 		lua_pushnil(L);
 		int lod_index = 0;
@@ -411,7 +419,7 @@ int setParams(lua_State* L)
 	}
 	lua_pop(L, 1);
 
-	if (lua_getfield(L, 2, "texture_output_dir") == LUA_TSTRING)
+	if (lua_getfield(L, 1, "texture_output_dir") == LUA_TSTRING)
 	{
 		copyString(dlg->m_texture_output_dir, LuaWrapper::toType<const char*>(L, -1));
 	}
@@ -423,10 +431,10 @@ int setParams(lua_State* L)
 
 int setTextureParams(lua_State* L)
 {
-	auto* dlg = LuaWrapper::checkArg<ImportAssetDialog*>(L, 1);
-	int material_idx = LuaWrapper::checkArg<int>(L, 2);
-	int texture_idx = LuaWrapper::checkArg<int>(L, 3);
-	LuaWrapper::checkTableArg(L, 4);
+	auto* dlg = LuaWrapper::toType<ImportAssetDialog*>(L, lua_upvalueindex(1));
+	int material_idx = LuaWrapper::checkArg<int>(L, 1);
+	int texture_idx = LuaWrapper::checkArg<int>(L, 2);
+	LuaWrapper::checkTableArg(L, 3);
 	
 	if (material_idx < 0 || material_idx >= dlg->m_materials.size()) return 0;
 	ImportMaterial& material = dlg->m_materials[material_idx];
@@ -434,7 +442,7 @@ int setTextureParams(lua_State* L)
 	if (texture_idx < 0 || texture_idx >= material.texture_count) return 0;
 	ImportTexture& texture = material.textures[texture_idx];
 
-	lua_pushvalue(L, 4);
+	lua_pushvalue(L, 3);
 
 	if (lua_getfield(L, -1, "import") == LUA_TBOOLEAN)
 	{
@@ -455,14 +463,14 @@ int setTextureParams(lua_State* L)
 
 int setMaterialParams(lua_State* L)
 {
-	auto* dlg = LuaWrapper::checkArg<ImportAssetDialog*>(L, 1);
-	int material_idx = LuaWrapper::checkArg<int>(L, 2);
-	LuaWrapper::checkTableArg(L, 3);
+	auto* dlg = LuaWrapper::toType<ImportAssetDialog*>(L, lua_upvalueindex(1));
+	int material_idx = LuaWrapper::checkArg<int>(L, 1);
+	LuaWrapper::checkTableArg(L, 2);
 	if (material_idx < 0 || material_idx >= dlg->m_materials.size()) return 0;
 
 	ImportMaterial& material = dlg->m_materials[material_idx];
 
-	lua_pushvalue(L, 3);
+	lua_pushvalue(L, 2);
 
 	if (lua_getfield(L, -1, "import") == LUA_TBOOLEAN)
 	{
@@ -481,47 +489,54 @@ int setMaterialParams(lua_State* L)
 }
 
 
-int getMeshesCount(ImportAssetDialog* dlg)
+int getMeshesCount(lua_State* L)
 {
+	auto* dlg = LuaWrapper::toType<ImportAssetDialog*>(L, lua_upvalueindex(1));
 	return dlg->m_meshes.size();
 }
 
 
-int getAnimationsCount(ImportAssetDialog* dlg)
+int getAnimationsCount(lua_State* L)
 {
+	auto* dlg = LuaWrapper::toType<ImportAssetDialog*>(L, lua_upvalueindex(1));
 	return dlg->m_animations.size();
 }
 
 
-const char* getMeshMaterialName(ImportAssetDialog* dlg, int mesh_idx)
+const char* getMeshMaterialName(lua_State* L, int mesh_idx)
 {
+	auto* dlg = LuaWrapper::toType<ImportAssetDialog*>(L, lua_upvalueindex(1));
 	if (mesh_idx < 0 || mesh_idx >= dlg->m_meshes.size()) return "";
 	return dlg->m_materials[dlg->m_meshes[mesh_idx].material].name;
 }
 
 
-int getMaterialsCount(ImportAssetDialog* dlg)
+int getMaterialsCount(lua_State* L)
 {
+	auto* dlg = LuaWrapper::toType<ImportAssetDialog*>(L, lua_upvalueindex(1));
 	return dlg->m_materials.size();
 }
 
 
-int getTexturesCount(ImportAssetDialog* dlg, int material_idx)
+int getTexturesCount(lua_State* L, int material_idx)
 {
+	auto* dlg = LuaWrapper::toType<ImportAssetDialog*>(L, lua_upvalueindex(1));
 	if (material_idx < 0 || material_idx >= dlg->m_materials.size()) return 0;
 	return dlg->m_materials[material_idx].texture_count;
 }
 
 
-const char* getMeshName(ImportAssetDialog* dlg, int mesh_idx)
+const char* getMeshName(lua_State* L, int mesh_idx)
 {
+	auto* dlg = LuaWrapper::toType<ImportAssetDialog*>(L, lua_upvalueindex(1));
 	if (mesh_idx < 0 || mesh_idx >= dlg->m_meshes.size()) return "";
 	return getMeshName(dlg->m_meshes[mesh_idx].scene, dlg->m_meshes[mesh_idx].mesh);
 }
 
 
-const char* getMaterialName(ImportAssetDialog* dlg, int material_idx)
+const char* getMaterialName(lua_State* L, int material_idx)
 {
+	auto* dlg = LuaWrapper::toType<ImportAssetDialog*>(L, lua_upvalueindex(1));
 	if (material_idx < 0 || material_idx >= dlg->m_meshes.size()) return "";
 	return dlg->m_materials[material_idx].name;
 }
@@ -735,6 +750,7 @@ static bool saveAsDDS(ImportAssetDialog& dialog,
 	int image_width,
 	int image_height,
 	bool alpha,
+	bool normal,
 	const char* dest_path)
 {
 	ASSERT(image_data);
@@ -746,17 +762,10 @@ static bool saveAsDDS(ImportAssetDialog& dialog,
 	dialog.getDDSConvertCallbackData().cancel_requested = false;
 
 	crn_uint32 size;
-	crn_comp_params comp_params;
+	crn_comp_params comp_params = s_default_comp_params;
 	comp_params.m_width = image_width;
 	comp_params.m_height = image_height;
-	comp_params.m_file_type = cCRNFileTypeDDS;
-	comp_params.m_format = alpha ? cCRNFmtDXT5 : cCRNFmtDXT1;
-	comp_params.m_quality_level = cCRNMinQualityLevel;
-	comp_params.m_dxt_quality = cCRNDXTQualitySuperFast;
-	comp_params.m_dxt_compressor_type = cCRNDXTCompressorRYG;
-	comp_params.m_pProgress_func = ddsConvertCallback;
-	comp_params.m_pProgress_func_data = &dialog.getDDSConvertCallbackData();
-	comp_params.m_num_helper_threads = 3;
+	comp_params.m_format = normal ? cCRNFmtDXN_YX : (alpha ? cCRNFmtDXT5 : cCRNFmtDXT1);
 	comp_params.m_pImages[0][0] = (u32*)image_data;
 	crn_mipmap_params mipmap_params;
 	mipmap_params.m_mode = cCRNMipModeGenerateMips;
@@ -860,6 +869,7 @@ struct ImportTextureTask LUMIX_FINAL : public MT::Task
 				image_width,
 				image_height,
 				image_comp == 4,
+				m_dialog.m_is_normal_map,
 				dest_path);
 		}
 		else if (m_dialog.m_convert_to_raw)
@@ -1103,6 +1113,7 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 	bool saveTexture(ImportTexture& texture,
 		const char* source_mesh_dir,
 		FS::OsFile& material_file,
+		bool is_normal_map,
 		bool is_srgb) const
 	{
 		PathUtils::FileInfo texture_info(texture.src);
@@ -1142,6 +1153,7 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 					image_width,
 					image_height,
 					image_comp == 4,
+					is_normal_map,
 					dest))
 			{
 				stbi_image_free(data);
@@ -1495,7 +1507,7 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 
 		for (int i = 0; i < material.texture_count; ++i)
 		{
-			saveTexture(material.textures[i], source_mesh_dir, file, i == 0);
+			saveTexture(material.textures[i], source_mesh_dir, file, i == 1, i == 0);
 		}
 
 		file.write("}", 1);
@@ -2491,6 +2503,7 @@ ImportAssetDialog::ImportAssetDialog(StudioApp& app)
 	, m_saved_textures(app.getWorldEditor()->getAllocator())
 	, m_convert_to_dds(false)
 	, m_convert_to_raw(false)
+	, m_is_normal_map(false)
 	, m_raw_texture_scale(1)
 	, m_meshes(app.getWorldEditor()->getAllocator())
 	, m_materials(app.getWorldEditor()->getAllocator())
@@ -2498,6 +2511,14 @@ ImportAssetDialog::ImportAssetDialog(StudioApp& app)
 	, m_sources(app.getWorldEditor()->getAllocator())
 	, m_animations(app.getWorldEditor()->getAllocator())
 {
+	s_default_comp_params.m_file_type = cCRNFileTypeDDS;
+	s_default_comp_params.m_quality_level = cCRNMinQualityLevel;
+	s_default_comp_params.m_dxt_quality = cCRNDXTQualityNormal;
+	s_default_comp_params.m_dxt_compressor_type = cCRNDXTCompressorCRN;
+	s_default_comp_params.m_pProgress_func = ddsConvertCallback;
+	s_default_comp_params.m_pProgress_func_data = &m_dds_convert_callback;
+	s_default_comp_params.m_num_helper_threads = 3;
+
 	m_model.make_convex = false;
 	m_model.import_vertex_colors = true;
 	m_model.all_nodes = false;
@@ -2532,25 +2553,25 @@ ImportAssetDialog::ImportAssetDialog(StudioApp& app)
 	app.addWindowAction(action);
 
 	lua_State* L = m_editor.getEngine().getState();
-	LuaWrapper::createSystemVariable(L, "ImportAsset", "instance", this);
 
 	#define REGISTER_FUNCTION(name) \
 		do {\
-			auto f = &LuaWrapper::wrapMethod<ImportAssetDialog, decltype(&ImportAssetDialog::name), &ImportAssetDialog::name>; \
-			LuaWrapper::createSystemFunction(L, "ImportAsset", #name, f); \
+			auto f = &LuaWrapper::wrapMethodClosure<ImportAssetDialog, decltype(&ImportAssetDialog::name), &ImportAssetDialog::name>; \
+			LuaWrapper::createSystemClosure(L, "ImportAsset", this, #name, f); \
 		} while(false) \
 
 	REGISTER_FUNCTION(clearSources);
 	REGISTER_FUNCTION(addSource);
 	REGISTER_FUNCTION(import);
 	REGISTER_FUNCTION(importTexture);
+	REGISTER_FUNCTION(checkTask);
 
 	#undef REGISTER_FUNCTION
 
 	#define REGISTER_FUNCTION(name) \
 		do {\
 			auto f = &LuaWrapper::wrap<decltype(&LuaAPI::name), &LuaAPI::name>; \
-			LuaWrapper::createSystemFunction(L, "ImportAsset", #name, f); \
+			LuaWrapper::createSystemClosure(L, "ImportAsset", this, #name, f); \
 		} while(false) \
 
 	REGISTER_FUNCTION(getMeshesCount);
@@ -2565,7 +2586,7 @@ ImportAssetDialog::ImportAssetDialog(StudioApp& app)
 
 	#define REGISTER_FUNCTION(name) \
 		do {\
-			LuaWrapper::createSystemFunction(L, "ImportAsset", #name, &LuaAPI::name); \
+			LuaWrapper::createSystemClosure(L, "ImportAsset", this, #name, &LuaAPI::name); \
 		} while(false) \
 
 	REGISTER_FUNCTION(setParams);
@@ -2993,6 +3014,22 @@ void ImportAssetDialog::onImageGUI()
 	{
 		if (m_convert_to_raw) m_convert_to_dds = false;
 	}
+	int dxt_quality = s_default_comp_params.m_dxt_quality;
+	if (ImGui::Combo("Quality", &dxt_quality, "Super Fast\0Fast\0Normal\0Better\0Uber\0"))
+	{
+		s_default_comp_params.m_dxt_quality = (crn_dxt_quality)dxt_quality;
+	}
+
+	int compressor_type = s_default_comp_params.m_dxt_compressor_type;
+	if (ImGui::Combo("Compressor type", &compressor_type, "CRN\0CRN fast\0RYG\0"))
+	{
+		s_default_comp_params.m_dxt_compressor_type = (crn_dxt_compressor_type)compressor_type;
+	}
+
+	if (ImGui::Checkbox("Normal map", &m_is_normal_map))
+	{
+		if (m_is_normal_map) m_convert_to_dds = true;
+	}
 	if (m_convert_to_raw)
 	{
 		ImGui::SameLine();
@@ -3219,8 +3256,8 @@ static bool createBillboard(ImportAssetDialog& dialog,
 
 	preprocessBillboard((u32*)&data[0], width, height, engine.getAllocator());
 	preprocessBillboardNormalmap((u32*)&data_normal[0], width, height, engine.getAllocator());
-	saveAsDDS(dialog, "billboard_generator", (u8*)&data[0], width, height, true, out_path.c_str());
-	saveAsDDS(dialog, "billboard_generator", (u8*)&data_normal[0], width, height, true, out_path_normal.c_str());
+	saveAsDDS(dialog, "billboard_generator", (u8*)&data[0], width, height, true, false, out_path.c_str());
+	saveAsDDS(dialog, "billboard_generator", (u8*)&data_normal[0], width, height, true, true, out_path_normal.c_str());
 	bgfx::destroyTexture(texture);
 	bgfx::destroyTexture(normal_texture);
 	Pipeline::destroy(pipeline);
