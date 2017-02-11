@@ -54,6 +54,23 @@ public:
 	}
 
 
+	template <typename Comparator>
+	void removeDuplicates(Comparator equals)
+	{
+		for (int i = 0; i < m_size - 1; ++i)
+		{
+			for (int j = i + 1; j < m_size; ++j)
+			{
+				if (equals(m_data[i], m_data[j]))
+				{
+					eraseFast(j);
+					--j;
+				}
+			}
+		}
+	}
+
+
 	void removeDuplicates()
 	{
 		for (int i = 0; i < m_size-1; ++i)
