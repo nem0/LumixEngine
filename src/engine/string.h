@@ -127,6 +127,8 @@ template <int size> struct StaticString
 		return StaticString<size>(*this, rhs);
 	}
 
+	bool empty() const { return data[0] == '\0'; }
+
 	operator const char*() const { return data; }
 	char data[size];
 };
