@@ -2512,7 +2512,7 @@ ImportAssetDialog::ImportAssetDialog(StudioApp& app)
 	, m_animations(app.getWorldEditor()->getAllocator())
 {
 	s_default_comp_params.m_file_type = cCRNFileTypeDDS;
-	s_default_comp_params.m_quality_level = cCRNMinQualityLevel;
+	s_default_comp_params.m_quality_level = cCRNMaxQualityLevel;
 	s_default_comp_params.m_dxt_quality = cCRNDXTQualityNormal;
 	s_default_comp_params.m_dxt_compressor_type = cCRNDXTCompressorCRN;
 	s_default_comp_params.m_pProgress_func = ddsConvertCallback;
@@ -3017,6 +3017,12 @@ void ImportAssetDialog::onImageGUI()
 	if (ImGui::Combo("Quality", &dxt_quality, "Super Fast\0Fast\0Normal\0Better\0Uber\0"))
 	{
 		s_default_comp_params.m_dxt_quality = (crn_dxt_quality)dxt_quality;
+	}
+	
+	int quality_lvl = s_default_comp_params.m_quality_level;
+	if (ImGui::DragInt("Quality level", &quality_lvl, 1, cCRNMinQualityLevel, cCRNMaxQualityLevel))
+	{
+		s_default_comp_params.m_quality_level = quality_lvl;
 	}
 
 	int compressor_type = s_default_comp_params.m_dxt_compressor_type;
