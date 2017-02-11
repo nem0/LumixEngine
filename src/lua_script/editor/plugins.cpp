@@ -355,7 +355,7 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 			copyString(buf, scene->getScriptPath(cmp.handle, j).c_str());
 			StaticString<MAX_PATH_LENGTH + 20> header;
 			PathUtils::getBasename(header.data, lengthOf(header.data), buf);
-			if (header.data[0] == 0) header << j;
+			if (header.empty()) header << j;
 			header << "###" << j;
 			if (ImGui::CollapsingHeader(header))
 			{

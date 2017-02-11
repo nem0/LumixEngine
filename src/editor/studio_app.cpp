@@ -1781,7 +1781,7 @@ public:
 
 	void packData()
 	{
-		if (m_pack.dest_dir.data[0] == '\0') return;
+		if (m_pack.dest_dir.empty()) return;
 
 		char dest[MAX_PATH_LENGTH];
 
