@@ -900,7 +900,7 @@ public:
 
 		if (node->plugin)
 		{
-			node->plugin->onGUI(false, false);
+			node->plugin->onGUI(true, false);
 			showAddComponentNode(node->next, filter);
 			return;
 		}
