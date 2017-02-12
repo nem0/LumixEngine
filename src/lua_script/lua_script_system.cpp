@@ -141,6 +141,7 @@ namespace Lumix
 									{
 										switch (lua_type(inst.m_state, -1))
 										{
+										case LUA_TSTRING: existing_prop.type = Property::STRING; break;
 										case LUA_TBOOLEAN: existing_prop.type = Property::BOOLEAN; break;
 										default: existing_prop.type = Property::FLOAT;
 										}
@@ -911,10 +912,9 @@ namespace Lumix
 				return;
 			}
 
-			char tmp[1024];
-			copyString(tmp, name);
-			catString(tmp, " = ");
-			catString(tmp, value);
+			StaticString<1024> tmp(name, " = ");
+			if (prop.type == Property::STRING) tmp << "\"" << value << "\"";
+			else tmp << value;
 
 			bool errors =
 				luaL_loadbuffer(state, tmp, stringLength(tmp), nullptr) != LUA_OK;
