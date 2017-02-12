@@ -666,10 +666,32 @@ struct AddComponentPlugin LUMIX_FINAL : public StudioApp::IAddComponentPlugin
 		if (!ImGui::BeginMenu(getLabel())) return;
 		char buf[MAX_PATH_LENGTH];
 		auto* asset_browser = app.getAssetBrowser();
-		bool create_empty = ImGui::Selectable("Empty", false);
-		if (asset_browser->resourceList(buf, lengthOf(buf), LUA_SCRIPT_RESOURCE_TYPE, 0) || create_empty)
+		bool new_created = false;
+		if (ImGui::Selectable("New"))
 		{
-			auto& editor = *app.getWorldEditor();
+			char full_path[MAX_PATH_LENGTH];
+			if (PlatformInterface::getSaveFilename(full_path, lengthOf(full_path), "Lua script\0*.lua\0", "lua"))
+			{
+				FS::OsFile file;
+				WorldEditor& editor = *app.getWorldEditor();
+				IAllocator& allocator = editor.getAllocator();
+				if (file.open(full_path, FS::Mode::CREATE_AND_WRITE, allocator))
+				{
+					new_created = true;
+					editor.makeRelative(buf, lengthOf(buf), full_path);
+					file.close();
+				}
+				else
+				{
+					g_log_error.log("Lua Script") << "Failed to create " << buf;
+				}
+			}
+		}
+		bool create_empty = ImGui::Selectable("Empty", false);
+
+		if (asset_browser->resourceList(buf, lengthOf(buf), LUA_SCRIPT_RESOURCE_TYPE, 0) || create_empty || new_created)
+		{
+			WorldEditor& editor = *app.getWorldEditor();
 			if (create_entity)
 			{
 				Entity entity = editor.addEntity();
@@ -683,7 +705,7 @@ struct AddComponentPlugin LUMIX_FINAL : public StudioApp::IAddComponentPlugin
 				editor.addComponent(LUA_SCRIPT_TYPE);
 			}
 
-			auto& allocator = editor.getAllocator();
+			IAllocator& allocator = editor.getAllocator();
 			auto* cmd = LUMIX_NEW(allocator, PropertyGridPlugin::AddScriptCommand);
 
 			auto* script_scene = static_cast<LuaScriptScene*>(editor.getUniverse()->getScene(LUA_SCRIPT_TYPE));

@@ -1,8 +1,8 @@
 #include "platform_interface.h"
 #include "engine/iallocator.h"
+#include "engine/path_utils.h"
 #include "engine/string.h"
 #include "imgui/imgui.h"
-
 
 #include <SDL.h>
 #include <ShlObj.h>
@@ -154,13 +154,14 @@ int getProcessOutput(Process& process, char* buf, int buf_size)
 
 bool getSaveFilename(char* out, int max_size, const char* filter, const char* default_extension)
 {
+	char tmp[Lumix::MAX_PATH_LENGTH];
 	OPENFILENAME ofn;
 	ZeroMemory(&ofn, sizeof(ofn));
 	ofn.lStructSize = sizeof(ofn);
 	ofn.hwndOwner = NULL;
-	ofn.lpstrFile = out;
+	ofn.lpstrFile = tmp;
 	ofn.lpstrFile[0] = '\0';
-	ofn.nMaxFile = max_size;
+	ofn.nMaxFile = Lumix::lengthOf(tmp);
 	ofn.lpstrFilter = filter;
 	ofn.nFilterIndex = 1;
 	ofn.lpstrDefExt = default_extension;
@@ -169,7 +170,9 @@ bool getSaveFilename(char* out, int max_size, const char* filter, const char* de
 	ofn.lpstrInitialDir = NULL;
 	ofn.Flags = OFN_OVERWRITEPROMPT | OFN_NOCHANGEDIR | OFN_NONETWORKBUTTON;
 
-	return GetSaveFileName(&ofn) != FALSE;
+	bool res = GetSaveFileName(&ofn) != FALSE;
+	if (res) Lumix::PathUtils::normalize(tmp, out, max_size);
+	return res;
 }
 
 

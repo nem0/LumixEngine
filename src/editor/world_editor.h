@@ -165,6 +165,7 @@ public:
 	virtual void setFrontView() = 0;
 	virtual void setSideView() = 0;
 	virtual class MeasureTool* getMeasureTool() const = 0;
+	virtual void makeRelative(char* relative, int max_size, const char* absolute) const = 0;
 
 	virtual void saveUndoStack(const Path& path) = 0;
 	virtual bool executeUndoStack(const Path& path) = 0;

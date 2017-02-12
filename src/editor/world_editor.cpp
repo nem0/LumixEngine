@@ -2053,6 +2053,30 @@ public:
 	}
 
 
+	void makeRelative(char* relative, int max_size, const char* absolute) const override
+	{
+		FS::DiskFileDevice* patch = m_engine->getPatchFileDevice();
+		if (patch)
+		{
+			if (startsWith(absolute, patch->getBasePath()))
+			{
+				copyString(relative, max_size, absolute + stringLength(patch->getBasePath()));
+				return;
+			}
+		}
+		FS::DiskFileDevice* disk = m_engine->getDiskFileDevice();
+		if (disk)
+		{
+			if (startsWith(absolute, disk->getBasePath()))
+			{
+				copyString(relative, max_size, absolute + stringLength(disk->getBasePath()));
+				return;
+			}
+		}
+		copyString(relative, max_size, absolute);
+	}
+
+
 	Entity addEntity() override
 	{
 		ComponentUID cmp = getUniverse()->getComponent(m_camera, CAMERA_TYPE);
