@@ -149,6 +149,15 @@ class ImportAssetDialog LUMIX_FINAL : public StudioApp::IPlugin
 		Lumix::Array<ImportMaterial> m_materials;
 		char m_import_message[1024];
 		
+		struct ImageData
+		{
+			Lumix::u8* data;
+			int width;
+			int height;
+			int comps;
+			int resize_size[2];
+		} m_image;
+		
 		struct ModelData
 		{
 			float mesh_scale;

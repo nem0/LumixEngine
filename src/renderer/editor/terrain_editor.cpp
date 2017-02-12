@@ -24,10 +24,6 @@
 #include "renderer/render_scene.h"
 #include "renderer/terrain.h"
 #include "renderer/texture.h"
-#define STB_IMAGE_IMPLEMENTATION
-#if defined _MSC_VER && _MSC_VER == 1900 
-#pragma warning(disable : 4312)
-#endif
 #include "stb/stb_image.h"
 #include <cmath>
 
