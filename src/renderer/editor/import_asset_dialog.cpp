@@ -12,6 +12,8 @@
 #include "editor/world_editor.h"
 #include "engine/blob.h"
 #include "engine/crc32.h"
+#include "engine/debug/floating_points.h"
+#include "engine/engine.h"
 #include "engine/fs/disk_file_device.h"
 #include "engine/fs/os_file.h"
 #include "engine/log.h"
@@ -20,11 +22,9 @@
 #include "engine/mt/task.h"
 #include "engine/mt/thread.h"
 #include "engine/path_utils.h"
+#include "engine/plugin_manager.h"
 #include "engine/property_register.h"
 #include "engine/system.h"
-#include "engine/debug/floating_points.h"
-#include "engine/engine.h"
-#include "engine/plugin_manager.h"
 #include "engine/universe/universe.h"
 #include "imgui/imgui.h"
 #include "physics/physics_geometry_manager.h"
@@ -34,7 +34,13 @@
 #include "renderer/render_scene.h"
 #include "renderer/renderer.h"
 #include "renderer/texture.h"
+#define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_RESIZE_IMPLEMENTATION
+#if defined _MSC_VER && _MSC_VER == 1900 
+#pragma warning(disable : 4312)
+#endif
 #include "stb/stb_image.h"
+#include "stb/stb_image_resize.h"
 
 
 using namespace Lumix;
@@ -250,6 +256,27 @@ static float getMeshLODFactor(const aiScene* scene, const aiMesh* mesh)
 	fromCString(begin_factor, int(end_of_factor - begin_factor), &factor);
 
 	return float(factor);
+}
+
+
+static void resizeImage(ImportAssetDialog* dlg, int new_w, int new_h)
+{
+	ImportAssetDialog::ImageData& img = dlg->m_image;
+	u8* mem = (u8*)stbi__malloc(new_w * new_h * 4);
+	stbir_resize_uint8(img.data,
+		img.width,
+		img.height,
+		0,
+		mem,
+		new_w,
+		new_h,
+		0,
+		4);
+
+	stbi_image_free(img.data);
+	img.data = mem;
+	img.width = new_w;
+	img.height = new_h;
 }
 
 
@@ -508,6 +535,27 @@ const char* getMeshMaterialName(lua_State* L, int mesh_idx)
 	auto* dlg = LuaWrapper::toType<ImportAssetDialog*>(L, lua_upvalueindex(1));
 	if (mesh_idx < 0 || mesh_idx >= dlg->m_meshes.size()) return "";
 	return dlg->m_materials[dlg->m_meshes[mesh_idx].material].name;
+}
+
+
+int getImageWidth(lua_State* L)
+{
+	auto* dlg = LuaWrapper::toType<ImportAssetDialog*>(L, lua_upvalueindex(1));
+	return dlg->m_image.width;
+}
+
+
+void resizeImage(lua_State* L, int new_w, int new_h)
+{
+	auto* dlg = LuaWrapper::toType<ImportAssetDialog*>(L, lua_upvalueindex(1));
+	resizeImage(dlg, new_w, new_h);
+}
+
+
+int getImageHeight(lua_State* L)
+{
+	auto* dlg = LuaWrapper::toType<ImportAssetDialog*>(L, lua_upvalueindex(1));
+	return dlg->m_image.height;
 }
 
 
@@ -838,16 +886,11 @@ struct ImportTextureTask LUMIX_FINAL : public MT::Task
 	int task() override
 	{
 		m_dialog.setImportMessage("Importing texture...", 0);
-		int image_width;
-		int image_height;
-		int image_comp;
-		auto* data = stbi_load(m_dialog.m_source, &image_width, &image_height, &image_comp, 4);
 
-		if (!data)
+		if (!m_dialog.m_image.data)
 		{
-			m_dialog.setMessage(
-				StaticString<MAX_PATH_LENGTH + 200>("Could not load ") << m_dialog.m_source << " : "
-																					 << stbi_failure_reason());
+			m_dialog.setMessage(StaticString<MAX_PATH_LENGTH + 200>("Could not load ") << m_dialog.m_source << " : "
+																					   << stbi_failure_reason());
 			return -1;
 		}
 
@@ -865,10 +908,10 @@ struct ImportTextureTask LUMIX_FINAL : public MT::Task
 
 			saveAsDDS(m_dialog,
 				m_dialog.m_source,
-				data,
-				image_width,
-				image_height,
-				image_comp == 4,
+				m_dialog.m_image.data,
+				m_dialog.m_image.width,
+				m_dialog.m_image.height,
+				m_dialog.m_image.comps == 4,
 				m_dialog.m_is_normal_map,
 				dest_path);
 		}
@@ -878,9 +921,9 @@ struct ImportTextureTask LUMIX_FINAL : public MT::Task
 
 			saveAsRaw(m_dialog,
 				m_dialog.m_editor.getEngine().getFileSystem(),
-				data,
-				image_width,
-				image_height,
+				m_dialog.m_image.data,
+				m_dialog.m_image.width,
+				m_dialog.m_image.height,
 				dest_path,
 				m_dialog.m_raw_texture_scale,
 				m_dialog.m_editor.getAllocator());
@@ -897,7 +940,8 @@ struct ImportTextureTask LUMIX_FINAL : public MT::Task
 									<< dest_path);
 			}
 		}
-		stbi_image_free(data);
+		stbi_image_free(m_dialog.m_image.data);
+		m_dialog.m_image.data = nullptr;
 
 		return 0;
 	}
@@ -2519,6 +2563,8 @@ ImportAssetDialog::ImportAssetDialog(StudioApp& app)
 	s_default_comp_params.m_pProgress_func_data = &m_dds_convert_callback;
 	s_default_comp_params.m_num_helper_threads = 3;
 
+	m_image.data = nullptr;
+
 	m_model.make_convex = false;
 	m_model.import_vertex_colors = true;
 	m_model.all_nodes = false;
@@ -2581,6 +2627,9 @@ ImportAssetDialog::ImportAssetDialog(StudioApp& app)
 	REGISTER_FUNCTION(getTexturesCount);
 	REGISTER_FUNCTION(getMeshName);
 	REGISTER_FUNCTION(getMaterialName);
+	REGISTER_FUNCTION(getImageWidth);
+	REGISTER_FUNCTION(getImageHeight);
+	REGISTER_FUNCTION(resizeImage);
 
 	#undef REGISTER_FUNCTION
 
@@ -2612,6 +2661,7 @@ ImportAssetDialog::~ImportAssetDialog()
 		m_task->destroy();
 		LUMIX_DELETE(m_editor.getAllocator(), m_task);
 	}
+	clearSources();
 }
 
 
@@ -2642,12 +2692,19 @@ bool ImportAssetDialog::checkSource()
 
 	if (isImage(m_source))
 	{
+		stbi_image_free(m_image.data);
+		m_image.data = stbi_load(m_source, &m_image.width, &m_image.height, &m_image.comps, 4);
+		m_image.resize_size[0] = m_image.width;
+		m_image.resize_size[1] = m_image.height;
 		m_animations.clear();
 		m_materials.clear();
 		m_meshes.clear();
 		m_importers.clear();
-		return true;
+		return m_image.data != nullptr;
 	}
+
+	stbi_image_free(m_image.data);
+	m_image.data = nullptr;
 
 	ASSERT(!m_task);
 	m_importers.emplace();
@@ -3052,6 +3109,14 @@ void ImportAssetDialog::onImageGUI()
 		PlatformInterface::getOpenDirectory(m_output_dir, sizeof(m_output_dir), base_path);
 	}
 
+	if (m_image.data)
+	{
+		ImGui::LabelText("Size", "%d x %d", m_image.width, m_image.height);
+
+		ImGui::InputInt2("Resize", m_image.resize_size);
+		if (ImGui::Button("Resize")) resizeImage(this, m_image.resize_size[0], m_image.resize_size[1]);
+	}
+
 	if (ImGui::Button("Import texture")) importTexture();
 }
 
@@ -3330,6 +3395,8 @@ void ImportAssetDialog::onAction()
 
 void ImportAssetDialog::clearSources()
 {
+	stbi_image_free(m_image.data);
+	m_image.data = nullptr;
 	m_importers.clear();
 	m_animations.clear();
 	m_materials.clear();
@@ -3348,153 +3415,156 @@ void ImportAssetDialog::addSource(const char* src)
 
 void ImportAssetDialog::onWindowGUI()
 {
-	if (ImGui::BeginDock("Import Asset", &m_is_opened))
+	if (!ImGui::BeginDock("Import Asset", &m_is_opened))
 	{
-		if (hasMessage())
+		ImGui::EndDock();
+		return;
+	}
+
+	if (hasMessage())
+	{
+		char msg[1024];
+		getMessage(msg, sizeof(msg));
+		ImGui::Text("%s", msg);
+		if (ImGui::Button("OK"))
 		{
-			char msg[1024];
-			getMessage(msg, sizeof(msg));
-			ImGui::Text("%s", msg);
+			setMessage("");
+		}
+		ImGui::EndDock();
+		return;
+	}
+
+	if (m_is_converting || m_is_importing || m_is_importing_texture)
+	{
+		if (ImGui::Button("Cancel"))
+		{
+			if (m_is_importing_texture)
+			{
+				m_dds_convert_callback.cancel_requested = true;
+			}
+			else if (m_is_importing)
+			{
+				static_cast<ImportTask*>(m_task)->m_progress_handler.cancel_requested = true;
+			}
+		}
+
+		checkTask(false);
+
+		{
+			MT::SpinLock lock(m_mutex);
+			ImGui::Text("%s", m_import_message);
+			if (m_progress_fraction >= 0) ImGui::ProgressBar(m_progress_fraction);
+		}
+		ImGui::EndDock();
+		return;
+	}
+
+	if (m_is_importing || m_is_converting)
+	{
+		ImGui::EndDock();
+		return;
+	}
+
+	if (ImGui::Button("Add source"))
+	{
+		if (PlatformInterface::getOpenFilename(m_source, sizeof(m_source), "All\0*.*\0", m_source))
+		{
+			checkSource();
+			if (m_is_importing || m_is_converting)
+			{
+				ImGui::EndDock();
+				return;
+			}
+		}
+	}
+	if (!m_importers.empty())
+	{
+		ImGui::SameLine();
+		if (ImGui::Button("Clear all sources")) clearSources();
+	}
+
+	onImageGUI();
+
+	ImGui::Checkbox("Optimize meshes", &m_model.optimize_mesh_on_import);
+	ImGui::SameLine();
+	ImGui::Checkbox("Smooth normals", &m_model.gen_smooth_normal);
+	if (!m_importers.empty())
+	{
+		if (ImGui::CollapsingHeader("Advanced"))
+		{
+			if (m_is_importing || m_is_converting)
+			{
+				ImGui::EndDock();
+				return;
+			}
+
+			ImGui::Checkbox("Create billboard LOD", &m_model.create_billboard_lod);
+			ImGui::Checkbox("Import all bones", &m_model.all_nodes);
+			ImGui::Checkbox("Remove doubles", &m_model.remove_doubles);
+			ImGui::Checkbox("Center meshes", &m_model.center_meshes);
+			ImGui::Checkbox("Import Vertex Colors", &m_model.import_vertex_colors);
+			ImGui::DragFloat("Scale", &m_model.mesh_scale, 0.01f, 0.001f, 0);
+			ImGui::Combo("Orientation", &(int&)m_model.orientation, "Y up\0Z up\0-Z up\0-X up\0");
+			ImGui::Combo("Root Orientation", &(int&)m_model.root_orientation, "Y up\0Z up\0-Z up\0-X up\0");
+			ImGui::Checkbox("Make physics convex", &m_model.make_convex);
+		}
+
+		onMeshesGUI();
+		onLODsGUI();
+		onMaterialsGUI();
+		onAnimationsGUI();
+
+		if (ImGui::CollapsingHeader("Output", ImGuiTreeNodeFlags_DefaultOpen))
+		{
+			ImGui::InputText("Output directory", m_output_dir, sizeof(m_output_dir));
+			ImGui::SameLine();
+			if (ImGui::Button("...###browseoutput"))
+			{
+				if (PlatformInterface::getOpenDirectory(m_output_dir, sizeof(m_output_dir), m_last_dir))
+				{
+					copyString(m_last_dir, m_output_dir);
+				}
+			}
+
+			ImGui::InputText("Texture output directory", m_texture_output_dir, sizeof(m_texture_output_dir));
+			ImGui::SameLine();
+			if (ImGui::Button("...###browsetextureoutput"))
+			{
+				if (PlatformInterface::getOpenDirectory(m_texture_output_dir, sizeof(m_texture_output_dir), m_last_dir))
+				{
+					copyString(m_last_dir, m_texture_output_dir);
+				}
+			}
+
+			if (m_output_dir[0] != '\0')
+			{
+				if (!isTextureDirValid())
+				{
+					ImGui::Text("Texture output directory must be an ancestor of the working "
+						"directory or empty.");
+				}
+				else if (ImGui::Button("Convert"))
+				{
+					convert(true);
+				}
+			}
+		}
+
+		if (ImGui::BeginPopupModal("Invalid texture"))
+		{
+			for (auto& mat : m_materials)
+			{
+				for (int i = 0; i < mat.texture_count; ++i)
+				{
+					if (mat.textures[i].is_valid || !mat.textures[i].import) continue;
+					ImGui::Text("Texture %s is not valid", mat.textures[i].path);
+				}
+			}
 			if (ImGui::Button("OK"))
 			{
-				setMessage("");
+				ImGui::CloseCurrentPopup();
 			}
-			ImGui::EndDock();
-			return;
-		}
-
-		if (m_is_converting || m_is_importing || m_is_importing_texture)
-		{
-			if (ImGui::Button("Cancel"))
-			{
-				if (m_is_importing_texture)
-				{
-					m_dds_convert_callback.cancel_requested = true;
-				}
-				else if (m_is_importing)
-				{
-					static_cast<ImportTask*>(m_task)->m_progress_handler.cancel_requested = true;
-				}
-			}
-
-			checkTask(false);
-
-			{
-				MT::SpinLock lock(m_mutex);
-				ImGui::Text("%s", m_import_message);
-				if (m_progress_fraction >= 0) ImGui::ProgressBar(m_progress_fraction);
-			}
-			ImGui::EndDock();
-			return;
-		}
-
-		if (m_is_importing || m_is_converting)
-		{
-			ImGui::EndDock();
-			return;
-		}
-
-		if (ImGui::Button("Add source"))
-		{
-			if (PlatformInterface::getOpenFilename(m_source, sizeof(m_source), "All\0*.*\0", m_source))
-			{
-				checkSource();
-				if (m_is_importing || m_is_converting)
-				{
-					ImGui::EndDock();
-					return;
-				}
-			}
-		}
-		if (!m_importers.empty())
-		{
-			ImGui::SameLine();
-			if (ImGui::Button("Clear all sources")) clearSources();
-		}
-
-		onImageGUI();
-
-		ImGui::Checkbox("Optimize meshes", &m_model.optimize_mesh_on_import);
-		ImGui::SameLine();
-		ImGui::Checkbox("Smooth normals", &m_model.gen_smooth_normal);
-		if (!m_importers.empty())
-		{
-			if (ImGui::CollapsingHeader("Advanced"))
-			{
-				if (m_is_importing || m_is_converting)
-				{
-					ImGui::EndDock();
-					return;
-				}
-
-				ImGui::Checkbox("Create billboard LOD", &m_model.create_billboard_lod);
-				ImGui::Checkbox("Import all bones", &m_model.all_nodes);
-				ImGui::Checkbox("Remove doubles", &m_model.remove_doubles);
-				ImGui::Checkbox("Center meshes", &m_model.center_meshes);
-				ImGui::Checkbox("Import Vertex Colors", &m_model.import_vertex_colors);
-				ImGui::DragFloat("Scale", &m_model.mesh_scale, 0.01f, 0.001f, 0);
-				ImGui::Combo("Orientation", &(int&)m_model.orientation, "Y up\0Z up\0-Z up\0-X up\0");
-				ImGui::Combo("Root Orientation", &(int&)m_model.root_orientation, "Y up\0Z up\0-Z up\0-X up\0");
-				ImGui::Checkbox("Make physics convex", &m_model.make_convex);
-			}
-
-			onMeshesGUI();
-			onLODsGUI();
-			onMaterialsGUI();
-			onAnimationsGUI();
-
-			if (ImGui::CollapsingHeader("Output", ImGuiTreeNodeFlags_DefaultOpen))
-			{
-				ImGui::InputText("Output directory", m_output_dir, sizeof(m_output_dir));
-				ImGui::SameLine();
-				if (ImGui::Button("...###browseoutput"))
-				{
-					if (PlatformInterface::getOpenDirectory(m_output_dir, sizeof(m_output_dir), m_last_dir))
-					{
-						copyString(m_last_dir, m_output_dir);
-					}
-				}
-
-				ImGui::InputText("Texture output directory", m_texture_output_dir, sizeof(m_texture_output_dir));
-				ImGui::SameLine();
-				if (ImGui::Button("...###browsetextureoutput"))
-				{
-					if (PlatformInterface::getOpenDirectory(m_texture_output_dir, sizeof(m_texture_output_dir), m_last_dir))
-					{
-						copyString(m_last_dir, m_texture_output_dir);
-					}
-				}
-
-				if (m_output_dir[0] != '\0')
-				{
-					if (!isTextureDirValid())
-					{
-						ImGui::Text("Texture output directory must be an ancestor of the working "
-							"directory or empty.");
-					}
-					else if (ImGui::Button("Convert"))
-					{
-						convert(true);
-					}
-				}
-			}
-
-			if (ImGui::BeginPopupModal("Invalid texture"))
-			{
-				for (auto& mat : m_materials)
-				{
-					for (int i = 0; i < mat.texture_count; ++i)
-					{
-						if (mat.textures[i].is_valid || !mat.textures[i].import) continue;
-						ImGui::Text("Texture %s is not valid", mat.textures[i].path);
-					}
-				}
-				if (ImGui::Button("OK"))
-				{
-					ImGui::CloseCurrentPopup();
-				}
-				ImGui::EndPopup();
-			}
+			ImGui::EndPopup();
 		}
 	}
 	ImGui::EndDock();
