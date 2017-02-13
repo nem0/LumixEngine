@@ -19,6 +19,12 @@ static float asFloat(u32 v)
 }
 
 
+EntityGUID TextSerializer::getGUID(Entity entity)
+{
+	return entity_map.get(entity);
+}
+
+
 void TextSerializer::write(const char* label, Entity entity)
 {
 	EntityGUID guid = entity_map.get(entity);
@@ -100,6 +106,12 @@ void TextSerializer::write(const char* label, i8 value)
 void TextSerializer::write(const char* label, u8 value)
 {
 	blob << "#" << label << "\n\t" << value << "\n";
+}
+
+
+Entity TextDeserializer::getEntity(EntityGUID guid)
+{
+	return entity_map.get(guid);
 }
 
 

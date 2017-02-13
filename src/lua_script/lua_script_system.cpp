@@ -32,6 +32,14 @@ namespace Lumix
 	static const ResourceType LUA_SCRIPT_RESOURCE_TYPE("lua_script");
 
 
+	enum class LuaSceneVersion : int
+	{
+		PROPERTY_TYPE,
+
+		LATEST
+	};
+
+
 	class LuaScriptSystemImpl LUMIX_FINAL : public IPlugin
 	{
 	public:
@@ -303,6 +311,9 @@ namespace Lumix
 			registerAPI();
 			ctx.registerComponentType(LUA_SCRIPT_TYPE, this, &LuaScriptSceneImpl::serializeLuaScript, &LuaScriptSceneImpl::deserializeLuaScript);
 		}
+
+
+		int getVersion() const override { return (int)LuaSceneVersion::LATEST; }
 
 
 		ComponentHandle getComponent(Entity entity) override
@@ -1249,12 +1260,33 @@ namespace Lumix
 					if (idx >= 0)
 					{
 						const char* name = m_property_names.at(idx).c_str();
-						char tmp[1024];
-						getProperty(prop, name, inst, tmp, lengthOf(tmp));
-						serializer.write("prop_value", tmp);
+						serializer.write("prop_type", (int)prop.type);
+						if (prop.type == Property::ENTITY)
+						{
+							lua_rawgeti(inst.m_state, LUA_REGISTRYINDEX, inst.m_environment);
+							if (lua_getfield(inst.m_state, -1, name) == LUA_TNIL)
+							{
+								serializer.write("prop_value", prop.stored_value.c_str());
+							}
+							else
+							{
+								Entity val = {(int)lua_tointeger(inst.m_state, -1)};
+								EntityGUID guid = serializer.getGUID(val);
+								char tmp[128];
+								toCString(guid.value, tmp, lengthOf(tmp));
+								serializer.write("prop_value", tmp);
+							}
+						}
+						else
+						{
+							char tmp[1024];
+							getProperty(prop, name, inst, tmp, lengthOf(tmp));
+							serializer.write("prop_value", tmp);
+						}
 					}
 					else
 					{
+						serializer.write("prop_type", (int)Property::ANY);
 						serializer.write("prop_value", "");
 					}
 				}
@@ -1262,7 +1294,7 @@ namespace Lumix
 		}
 
 
-		void deserializeLuaScript(IDeserializer& serializer, Entity entity, int /*scene_version*/)
+		void deserializeLuaScript(IDeserializer& serializer, Entity entity, int scene_version)
 		{
 			auto& allocator = m_system.m_allocator;
 			ScriptComponent* script = LUMIX_NEW(allocator, ScriptComponent)(*this, allocator);
@@ -1295,7 +1327,16 @@ namespace Lumix
 						m_property_names.emplace(prop.name_hash, tmp, allocator);
 					}
 					tmp[0] = 0;
+					if (scene_version > (int)LuaSceneVersion::PROPERTY_TYPE) serializer.read((int*)&prop.type);
 					serializer.read(tmp, lengthOf(tmp));
+					
+					if (prop.type == Property::ENTITY)
+					{
+						u64 guid;
+						fromCString(tmp, lengthOf(tmp), &guid);
+						Entity entity = serializer.getEntity({guid});
+						toCString(entity.index, tmp, lengthOf(tmp));
+					}
 					prop.stored_value = tmp;
 				}
 			}
