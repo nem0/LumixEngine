@@ -207,7 +207,7 @@ struct DockContext
 	~DockContext() {}
 
 
-	Dock& getDock(const char* label, bool opened)
+	Dock& getDock(const char* label, bool opened, const ImVec2& default_size)
 	{
 		ImU32 id = ImHash(label, 0);
 		for (int i = 0; i < m_docks.size(); ++i)
@@ -224,7 +224,8 @@ struct DockContext
 		new_dock->setActive();
 		new_dock->status = Status_Float;
 		new_dock->pos = ImVec2(0, 0);
-		new_dock->size = GetIO().DisplaySize;
+		new_dock->size.x = default_size.x < 0 ? GetIO().DisplaySize.x : default_size.x;
+		new_dock->size.y = default_size.y < 0 ? GetIO().DisplaySize.y : default_size.y;
 		new_dock->opened = opened;
 		new_dock->first = true;
 		new_dock->last_frame = 0;
@@ -881,9 +882,9 @@ struct DockContext
 	}
 
 
-	bool begin(const char* label, bool* opened, ImGuiWindowFlags extra_flags)
+	bool begin(const char* label, bool* opened, ImGuiWindowFlags extra_flags, const ImVec2& default_size)
 	{
-		Dock& dock = getDock(label, !opened || *opened);
+		Dock& dock = getDock(label, !opened || *opened, default_size);
 		if (!dock.opened && (!opened || *opened)) tryDockToStoredLocation(dock);
 		dock.last_frame = ImGui::GetFrameCount();
 		if (strcmp(dock.label, label) != 0)
@@ -1159,9 +1160,9 @@ void SetDockActive()
 }
 
 
-bool BeginDock(const char* label, bool* opened, ImGuiWindowFlags extra_flags)
+bool BeginDock(const char* label, bool* opened, ImGuiWindowFlags extra_flags, const ImVec2& default_size)
 {
-	return g_dock.begin(label, opened, extra_flags);
+	return g_dock.begin(label, opened, extra_flags, default_size);
 }
 
 
