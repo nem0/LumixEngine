@@ -927,12 +927,10 @@ namespace Lumix
 			if (prop.type == Property::STRING) tmp << "\"" << value << "\"";
 			else tmp << value;
 
-			bool errors =
-				luaL_loadbuffer(state, tmp, stringLength(tmp), nullptr) != LUA_OK;
+			bool errors = luaL_loadbuffer(state, tmp, stringLength(tmp), nullptr) != LUA_OK;
 			if (errors)
 			{
-				g_log_error.log("Lua Script") << script.m_script->getPath() << ": "
-					<< lua_tostring(state, -1);
+				g_log_error.log("Lua Script") << script.m_script->getPath() << ": " << lua_tostring(state, -1);
 				lua_pop(state, 1);
 				return;
 			}
@@ -945,8 +943,7 @@ namespace Lumix
 
 			if (errors)
 			{
-				g_log_error.log("Lua Script") << script.m_script->getPath() << ": "
-					<< lua_tostring(state, -1);
+				g_log_error.log("Lua Script") << script.m_script->getPath() << ": " << lua_tostring(state, -1);
 				lua_pop(state, 1);
 			}
 		}

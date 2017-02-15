@@ -311,6 +311,7 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 			auto& cmd = static_cast<SetPropertyCommand&>(command);
 			if (cmd.script_index == script_index && cmd.property_name == property_name)
 			{
+				//cmd.scene = scene;
 				cmd.value = value;
 				return true;
 			}

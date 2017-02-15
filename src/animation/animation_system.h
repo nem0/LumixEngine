@@ -31,6 +31,9 @@ struct AnimationScene : public IScene
 	virtual class Path getControllerSource(ComponentHandle cmp) = 0;
 	virtual Anim::ComponentInstance* getControllerRoot(ComponentHandle cmp) = 0;
 	virtual int getControllerInputIndex(ComponentHandle cmp, const char* name) const = 0;
+	virtual Entity getSharedControllerParent(ComponentHandle cmp) = 0;
+	virtual void setSharedControllerParent(ComponentHandle cmp, Entity parent) = 0;
+
 };
 
 
