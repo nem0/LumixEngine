@@ -206,6 +206,7 @@ LUMIX_STUDIO_ENTRY(animation)
 {
 	app.registerComponentWithResource("animable", "Animation/Animable", ANIMATION_TYPE, "Animation");
 	app.registerComponentWithResource("anim_controller", "Animation/Controller", CONTROLLER_RESOURCE_TYPE, "Source");
+	app.registerComponent("shared_anim_controller", "Animation/Shared controller");
 
 	auto& allocator = app.getWorldEditor()->getAllocator();
 	auto* ab_plugin = LUMIX_NEW(allocator, AssetBrowserPlugin)(app);

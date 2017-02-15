@@ -3,6 +3,7 @@
 #include "engine/engine.h"
 #include "engine/hash_map.h"
 #include "engine/json_serializer.h"
+#include "engine/log.h"
 #include "engine/property_register.h"
 #include "engine/serializer.h"
 #include "universe.h"
@@ -265,6 +266,11 @@ public:
 	void setParent(ComponentHandle child, Entity parent) override
 	{
 		Entity child_entity = {child.index};
+		if (child_entity == parent)
+		{
+			g_log_warning.log("Hierarchy") << "Can not set entity " << parent.index << " as its own parent.";
+			return;
+		}
 		Parents::iterator old_parent_iter = m_parents.find(child_entity);
 		if (old_parent_iter.isValid())
 		{

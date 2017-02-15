@@ -25,8 +25,17 @@ namespace Lumix
 {
 
 
+enum class AnimationSceneVersion
+{
+	SHARED_CONTROLLER,
+
+	LATEST
+};
+
+
 static const ComponentType ANIMABLE_TYPE = PropertyRegister::getComponentType("animable");
 static const ComponentType CONTROLLER_TYPE = PropertyRegister::getComponentType("anim_controller");
+static const ComponentType SHARED_CONTROLLER_TYPE = PropertyRegister::getComponentType("shared_anim_controller");
 static const ResourceType ANIMATION_TYPE("animation");
 static const ResourceType CONTROLLER_RESOURCE_TYPE("anim_controller");
 
@@ -70,6 +79,12 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 {
 	friend struct AnimationSystemImpl;
 
+	struct SharedController
+	{
+		Entity entity;
+		Entity parent;
+	};
+
 	struct Controller
 	{
 		Controller(IAllocator& allocator) : input(allocator) {}
@@ -97,13 +112,31 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		, m_anim_system(anim_system)
 		, m_animables(allocator)
 		, m_controllers(allocator)
+		, m_shared_controllers(allocator)
 		, m_event_stream(allocator)
 	{
 		m_is_game_running = false;
 		m_render_scene = static_cast<RenderScene*>(universe.getScene(crc32("renderer")));
 		universe.registerComponentType(ANIMABLE_TYPE, this, &AnimationSceneImpl::serializeAnimable, &AnimationSceneImpl::deserializeAnimable);
 		universe.registerComponentType(CONTROLLER_TYPE, this, &AnimationSceneImpl::serializeController, &AnimationSceneImpl::deserializeController);
+		universe.registerComponentType(SHARED_CONTROLLER_TYPE, this, &AnimationSceneImpl::serializeSharedController, &AnimationSceneImpl::deserializeSharedController);
 		ASSERT(m_render_scene);
+	}
+
+
+	void serializeSharedController(ISerializer& serializer, ComponentHandle cmp)
+	{
+		SharedController& ctrl = m_shared_controllers[{cmp.index}];
+		serializer.write("parent", ctrl.parent);
+	}
+
+
+	void deserializeSharedController(IDeserializer& serializer, Entity entity, int /*scene_version*/)
+	{
+		Entity parent;
+		serializer.read(&parent);
+		m_shared_controllers.insert(entity, {entity, parent});
+		m_universe.addComponent(entity, SHARED_CONTROLLER_TYPE, this, {entity.index});
 	}
 
 
@@ -114,6 +147,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		serializer.write("start_time", animable.start_time);
 		serializer.write("animation", animable.animation ? animable.animation->getPath().c_str() : "");
 	}
+
 
 	void deserializeAnimable(IDeserializer& serializer, Entity entity, int /*scene_version*/)
 	{
@@ -291,6 +325,11 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 			if (m_controllers.find(entity) < 0) return INVALID_COMPONENT;
 			return {entity.index};
 		}
+		else if (type == SHARED_CONTROLLER_TYPE)
+		{
+			if (m_shared_controllers.find(entity) < 0) return INVALID_COMPONENT;
+			return {entity.index};
+		}
 		return INVALID_COMPONENT;
 	}
 
@@ -299,6 +338,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	{
 		if (type == ANIMABLE_TYPE) return createAnimable(entity);
 		if (type == CONTROLLER_TYPE) return createController(entity);
+		if (type == SHARED_CONTROLLER_TYPE) return createSharedController(entity);
 		return INVALID_COMPONENT;
 	}
 
@@ -338,6 +378,12 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 			m_controllers.erase(entity);
 			m_universe.destroyComponent(entity, type, this, component);
 		}
+		else if (type == SHARED_CONTROLLER_TYPE)
+		{
+			Entity entity = {component.index};
+			m_shared_controllers.erase(entity);
+			m_universe.destroyComponent(entity, type, this, component);
+		}
 	}
 
 
@@ -357,6 +403,13 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		{
 			serializer.write(controller.entity);
 			serializer.writeString(controller.resource ? controller.resource->getPath().c_str() : "");
+		}
+
+		serializer.write(m_shared_controllers.size());
+		for (const SharedController& controller : m_shared_controllers)
+		{
+			serializer.write(controller.entity);
+			serializer.write(controller.parent);
 		}
 	}
 
@@ -395,7 +448,28 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 			ComponentHandle cmp = { controller.entity.index };
 			m_universe.addComponent(controller.entity, CONTROLLER_TYPE, this, cmp);
 		}
+
+		serializer.read(count);
+		m_shared_controllers.reserve(count);
+		for (int i = 0; i < count; ++i)
+		{
+			SharedController controller;
+			serializer.read(controller.entity);
+			serializer.read(controller.parent);
+			m_shared_controllers.insert(controller.entity, controller);
+			ComponentHandle cmp = {controller.entity.index};
+			m_universe.addComponent(controller.entity, SHARED_CONTROLLER_TYPE, this, cmp);
+		}
 	}
+
+
+	void setSharedControllerParent(ComponentHandle cmp, Entity parent) override
+	{
+		m_shared_controllers[{cmp.index}].parent = parent;
+	}
+
+
+	Entity getSharedControllerParent(ComponentHandle cmp) override { return m_shared_controllers[{cmp.index}].parent; }
 
 
 	float getTimeScale(ComponentHandle cmp) { return m_animables[{cmp.index}].time_scale; }
@@ -538,6 +612,33 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
+	void updateSharedController(SharedController& controller, float time_delta)
+	{
+		if (!isValid(controller.parent)) return;
+
+		int parent_controller_idx = m_controllers.find(controller.parent);
+		if (parent_controller_idx < 0) return;
+
+		Controller& parent_controller = m_controllers.at(parent_controller_idx);
+
+		ComponentHandle model_instance = m_render_scene->getModelInstanceComponent(controller.entity);
+		if (model_instance == INVALID_COMPONENT) return;
+
+		Pose* pose = m_render_scene->getPose(model_instance);
+		if (!pose) return;
+
+		Model* model = m_render_scene->getModelInstanceModel(model_instance);
+
+		model->getPose(*pose);
+		pose->computeRelative(*model);
+
+		parent_controller.root->fillPose(m_anim_system.m_engine, *pose, *model, 1);
+
+		pose->computeAbsolute(*model);
+
+	}
+
+
 	void updateController(Controller& controller, float time_delta)
 	{
 		if (!controller.resource->isReady())
@@ -591,6 +692,11 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		for (Controller& controller : m_controllers)
 		{
 			AnimationSceneImpl::updateController(controller, time_delta);
+		}
+
+		for (SharedController& controller : m_shared_controllers)
+		{
+			AnimationSceneImpl::updateSharedController(controller, time_delta);
 		}
 
 		processEventStream();
@@ -673,6 +779,16 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		return cmp;
 	}
 
+
+	ComponentHandle createSharedController(Entity entity)
+	{
+		m_shared_controllers.insert(entity, {entity, INVALID_ENTITY});
+		ComponentHandle cmp = {entity.index};
+		m_universe.addComponent(entity, SHARED_CONTROLLER_TYPE, this, cmp);
+		return cmp;
+	}
+
+
 	IPlugin& getPlugin() const override { return m_anim_system; }
 
 
@@ -681,6 +797,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	Engine& m_engine;
 	AssociativeArray<Entity, Animable> m_animables;
 	AssociativeArray<Entity, Controller> m_controllers;
+	AssociativeArray<Entity, SharedController> m_shared_controllers;
 	RenderScene* m_render_scene;
 	bool m_is_game_running;
 	OutputBlob m_event_stream;
@@ -715,6 +832,11 @@ AnimationSystemImpl::AnimationSystemImpl(Engine& engine)
 	PropertyRegister::add("animable",
 		LUMIX_NEW(m_allocator, DecimalPropertyDescriptor<AnimationSceneImpl>)(
 			"Time scale", &AnimationSceneImpl::getTimeScale, &AnimationSceneImpl::setTimeScale, 0, FLT_MAX, 0.1f));
+
+	PropertyRegister::add("shared_anim_controller",
+		LUMIX_NEW(m_allocator, EntityPropertyDescriptor<AnimationSceneImpl>)(
+			"Parent", &AnimationSceneImpl::getSharedControllerParent, &AnimationSceneImpl::setSharedControllerParent));
+
 
 	registerLuaAPI();
 }
