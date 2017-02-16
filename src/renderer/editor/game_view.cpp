@@ -43,6 +43,7 @@ struct GUIInterface : Lumix::GUISystem::Interface
 GameView::GameView(StudioApp& app)
 	: m_studio_app(app)
 	, m_is_opened(true)
+	, m_is_fullscreen(false)
 	, m_pipeline(nullptr)
 	, m_is_mouse_captured(false)
 	, m_is_ingame_cursor(false)
@@ -143,7 +144,60 @@ void GameView::captureMouse(bool capture)
 }
 
 
-void GameView::onGui()
+void GameView::onFullscreenGUI()
+{
+	ImGui::SetNextWindowPos(ImVec2(0, 0));
+	bool opened = true;
+	ImGuiIO& io = ImGui::GetIO();
+	ImVec2 size = io.DisplaySize;
+	if (!ImGui::Begin("game view fullscreen",
+		&opened,
+		size,
+		1.0f,
+		ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse |
+		ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
+		ImGuiWindowFlags_ShowBorders))
+	{
+		ImGui::End();
+		return;
+	}
+
+	m_pipeline->setViewport(0, 0, int(size.x), int(size.y));
+
+	auto* fb = m_pipeline->getFramebuffer("default");
+	m_texture_handle = fb->getRenderbufferHandle(0);
+	if (m_is_opengl)
+	{
+		ImGui::Image(&m_texture_handle, size, ImVec2(0, 1), ImVec2(1, 0));
+	}
+	else
+	{
+		ImGui::Image(&m_texture_handle, size);
+	}
+	m_pos.x = ImGui::GetItemRectMin().x;
+	m_pos.y = ImGui::GetItemRectMin().y;
+	m_size.x = ImGui::GetItemRectSize().x;
+	m_size.y = ImGui::GetItemRectSize().y;
+
+	m_pipeline->render();
+	ImGui::End();
+
+	if (m_is_fullscreen && (io.KeysDown[ImGui::GetKeyIndex(ImGuiKey_Escape)] || !m_editor->isGameMode()))
+	{
+		setFullscreen(false);
+	}
+}
+
+
+void GameView::setFullscreen(bool fullscreen)
+{
+	captureMouse(fullscreen);
+	m_studio_app.setFullscreen(fullscreen);
+	m_is_fullscreen = fullscreen;
+}
+
+
+void GameView::onGUI()
 {
 	PROFILE_FUNCTION();
 	if (!m_pipeline->isReady()) return;
@@ -159,6 +213,12 @@ void GameView::onGui()
 
 	const char* window_name = "Game View###game_view";
 	if (m_is_mouse_captured) window_name = "Game View (mouse captured)###game_view";
+	
+	if (m_is_fullscreen)
+	{
+		onFullscreenGUI();
+		return;
+	}
 	if (ImGui::BeginDock(window_name, &m_is_opened))
 	{
 		m_is_mouse_hovering_window = ImGui::IsMouseHoveringWindow();
@@ -208,6 +268,14 @@ void GameView::onGui()
 			if (ImGui::DragFloat("Time multiplier", &m_time_multiplier, 0.01f, 0.01f, 30.0f))
 			{
 				m_editor->getEngine().setTimeMultiplier(m_time_multiplier);
+			}
+			if(m_editor->isGameMode())
+			{
+				ImGui::SameLine();
+				if (ImGui::Button("Fullscreen"))
+				{
+					setFullscreen(true);
+				}
 			}
 			m_pipeline->render();
 		}

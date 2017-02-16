@@ -1282,6 +1282,12 @@ public:
 	}
 
 
+	void setFullscreen(bool fullscreen) override
+	{
+		SDL_SetWindowFullscreen(m_window, fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
+	}
+
+
 	DragData getDragData() override
 	{
 		return m_drag_data;
