@@ -1856,6 +1856,7 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 	{
 		Vec3 min(0, 0, 0);
 		Vec3 max(0, 0, 0);
+		float radius_squared = 0;
 		for (auto& mesh : m_dialog.m_meshes)
 		{
 			if (!mesh.import) continue;
@@ -1892,6 +1893,9 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 
 				Vec3 position = fixOrientation(v);
 				position *= m_scale;
+
+				float sq_len = position.squaredLength();
+				radius_squared = Math::maximum(radius_squared, sq_len > 0 ? sq_len : 0);
 
 				min.x = Math::minimum(min.x, position.x);
 				min.y = Math::minimum(min.y, position.y);
@@ -1976,6 +1980,11 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 			};
 			file.write(vertices, sizeof(vertices));
 		}
+
+		AABB aabb = {min, max};
+		float radius = sqrt(radius_squared);
+		file.write(&radius, sizeof(radius));
+		file.write(&aabb, sizeof(aabb));
 	}
 
 

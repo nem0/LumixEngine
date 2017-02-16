@@ -93,6 +93,7 @@ public:
 		FIRST,
 		WITH_FLAGS,
 		SINGLE_VERTEX_DECL,
+		BOUNDING_SHAPES_PRECOMPUTED,
 
 		LATEST // keep this last
 	};
@@ -179,12 +180,12 @@ private:
 
 	bool parseVertexDecl(FS::IFile& file, bgfx::VertexDecl* vertex_decl);
 	bool parseVertexDeclEx(FS::IFile& file, bgfx::VertexDecl* vertex_decl);
-	bool parseGeometry(FS::IFile& file);
+	bool parseGeometry(FS::IFile& file, FileVersion version);
 	bool parseBones(FS::IFile& file);
 	bool parseMeshes(FS::IFile& file, FileVersion version);
 	bool parseLODs(FS::IFile& file);
 	int getBoneIdx(const char* name);
-	void computeRuntimeData(const u8* vertices);
+	void computeRuntimeData(const u8* vertices, bool compute_bounding_shape);
 
 	void unload(void) override;
 	bool load(FS::IFile& file) override;
