@@ -230,6 +230,7 @@ struct SteamPlugin : public IPlugin
 		REGISTER_FUNCTION(SteamFriends, GetFriendCount);
 		REGISTER_FUNCTION(SteamFriends, GetFriendPersonaName);
 		REGISTER_FUNCTION(SteamFriends, GetFriendPersonaState);
+		REGISTER_FUNCTION(SteamFriends, GetFriendByIndex);
 		REGISTER_FUNCTION(SteamFriends, GetAvatar);
 		REGISTER_FUNCTION(SteamScreenshots, TriggerScreenshot);
 		REGISTER_FUNCTION(SteamUserStats, FindLeaderboard);
