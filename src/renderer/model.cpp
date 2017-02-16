@@ -309,13 +309,13 @@ void Model::create(const bgfx::VertexDecl& vertex_decl,
 
 	m_vertices.resize(attributes_size / vertex_decl.getStride());
 	m_uvs.resize(m_vertices.size());
-	computeRuntimeData((const u8*)attributes_data);
+	computeRuntimeData((const u8*)attributes_data, true);
 
 	onCreated(State::READY);
 }
 
 
-void Model::computeRuntimeData(const u8* vertices)
+void Model::computeRuntimeData(const u8* vertices, bool compute_bounding_shape)
 {
 	int index = 0;
 	float bounding_radius_squared = 0;
@@ -346,12 +346,15 @@ void Model::computeRuntimeData(const u8* vertices)
 		}
 	}
 
-	m_bounding_radius = sqrt(bounding_radius_squared);
-	m_aabb = AABB(min_vertex, max_vertex);
+	if (compute_bounding_shape)
+	{
+		m_bounding_radius = sqrt(bounding_radius_squared);
+		m_aabb = AABB(min_vertex, max_vertex);
+	}
 }
 
 
-bool Model::parseGeometry(FS::IFile& file)
+bool Model::parseGeometry(FS::IFile& file, FileVersion version)
 {
 	i32 indices_count = 0;
 	file.read(&indices_count, sizeof(indices_count));
@@ -383,7 +386,13 @@ bool Model::parseGeometry(FS::IFile& file)
 	m_vertices.resize(vertex_count);
 	m_uvs.resize(vertex_count);
 
-	computeRuntimeData(vertices_mem->data);
+	if (version > FileVersion::BOUNDING_SHAPES_PRECOMPUTED)
+	{
+		file.read(&m_bounding_radius, sizeof(m_bounding_radius));
+		file.read(&m_aabb, sizeof(m_aabb));
+	}
+
+	computeRuntimeData(vertices_mem->data, version <= FileVersion::BOUNDING_SHAPES_PRECOMPUTED);
 
 	return true;
 }
@@ -586,7 +595,10 @@ bool Model::load(FS::IFile& file)
 
 	if (header.version > (u32)FileVersion::SINGLE_VERTEX_DECL) parseVertexDeclEx(file, &m_vertex_decl);
 
-	if (parseMeshes(file, (FileVersion)header.version) && parseGeometry(file) && parseBones(file) && parseLODs(file))
+	if (parseMeshes(file, (FileVersion)header.version)
+		&& parseGeometry(file, (FileVersion)header.version)
+		&& parseBones(file)
+		&& parseLODs(file))
 	{
 		m_size = file.size();
 		return true;
