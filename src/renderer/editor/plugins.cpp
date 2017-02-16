@@ -2125,7 +2125,7 @@ struct GameViewPlugin LUMIX_FINAL : public StudioApp::IPlugin
 
 
 	void onAction() { m_game_view.m_is_opened = !m_game_view.m_is_opened; }
-	void onWindowGUI() override { m_game_view.onGui(); }
+	void onWindowGUI() override { m_game_view.onGUI(); }
 
 	int m_width;
 	int m_height;

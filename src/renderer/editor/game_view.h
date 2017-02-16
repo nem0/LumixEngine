@@ -25,7 +25,7 @@ public:
 
 	void init(Lumix::WorldEditor& editor);
 	void shutdown();
-	void onGui();
+	void onGUI();
 	void setScene(Lumix::RenderScene* scene);
 	bool isMouseCaptured() const { return m_is_mouse_captured; }
 	void captureMouse(bool capture);
@@ -37,6 +37,8 @@ public:
 private:
 	void onUniverseCreated();
 	void onUniverseDestroyed();
+	void onFullscreenGUI();
+	void setFullscreen(bool fullscreen);
 
 private:
 	Lumix::Pipeline* m_pipeline;
@@ -52,5 +54,6 @@ private:
 	bool m_is_ingame_cursor;
 	bool m_paused;
 	bool m_is_opengl;
+	bool m_is_fullscreen;
 	int m_captured_mouse_x, m_captured_mouse_y;
 };
