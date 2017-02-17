@@ -685,14 +685,14 @@ template <typename R, typename C, typename... Args> constexpr int arity(R (C::*f
 
 template <typename T, T t> int wrap(lua_State* L)
 {
-	using indices = details::build_indices<0, details::arity(t)>::result;
+	using indices = typename details::build_indices<0, details::arity(t)>::result;
 	return details::Caller<indices>::callFunction(t, L);
 }
 
 
 template <typename C, typename T, T t> int wrapMethod(lua_State* L)
 {
-	using indices = details::build_indices<1, details::arity(t)>::result;
+	using indices = typename details::build_indices<1, details::arity(t)>::result;
 	auto* inst = checkArg<C*>(L, 1);
 	return details::Caller<indices>::callMethod(inst, t, L);
 }
@@ -700,7 +700,7 @@ template <typename C, typename T, T t> int wrapMethod(lua_State* L)
 
 template <typename C, typename T, T t> int wrapMethodClosure(lua_State* L)
 {
-	using indices = details::build_indices<0, details::arity(t)>::result;
+	using indices = typename details::build_indices<0, details::arity(t)>::result;
 	int index = lua_upvalueindex(1);
 	if (!isType<T>(L, index))
 	{
