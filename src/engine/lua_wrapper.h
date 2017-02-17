@@ -481,6 +481,18 @@ inline void checkTableArg(lua_State* L, int index)
 	}
 }
 
+
+template <typename T>
+inline void getOptionalField(lua_State* L, int idx, const char* field_name, T* out)
+{
+	if (lua_getfield(L, idx, field_name) != LUA_TNIL && isType<T>(L, -1))
+	{
+		*out = toType<T>(L, -1);
+	}
+	lua_pop(L, 1);
+}
+
+
 namespace details
 {
 

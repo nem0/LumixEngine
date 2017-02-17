@@ -2813,11 +2813,7 @@ int addFramebuffer(lua_State* L)
 	FrameBuffer::Declaration decl;
 	copyString(decl.m_name, name);
 
-	if(lua_getfield(L, 3, "width") == LUA_TNUMBER)
-	{
-		decl.m_width = (int)lua_tointeger(L, -1);
-	}
-	lua_pop(L, 1);
+	LuaWrapper::getOptionalField(L, 3, "width", &decl.m_width);
 	decl.m_size_ratio = Vec2(-1, -1);
 	if(lua_getfield(L, 3, "size_ratio") == LUA_TTABLE)
 	{
@@ -2830,11 +2826,8 @@ int addFramebuffer(lua_State* L)
 		decl.m_size_ratio = is_screen_size ? Vec2(1, 1) : Vec2(-1, -1);
 	}
 	lua_pop(L, 1);
-	if(lua_getfield(L, 3, "height") == LUA_TNUMBER)
-	{
-		decl.m_height = (int)lua_tointeger(L, -1);
-	}
-	lua_pop(L, 1);
+	LuaWrapper::getOptionalField(L, 3, "height", &decl.m_height);
+
 	if(lua_getfield(L, 3, "renderbuffers") == LUA_TTABLE)
 	{
 		PipelineImpl::parseRenderbuffers(L, decl);

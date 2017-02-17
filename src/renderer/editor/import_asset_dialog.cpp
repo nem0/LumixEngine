@@ -294,27 +294,10 @@ int setMeshParams(lua_State* L)
 	
 	ImportMesh& mesh = dlg->m_meshes[mesh_idx];
 
-	lua_pushvalue(L, 2);
+	LuaWrapper::getOptionalField(L, 2, "lod", &mesh.lod);
+	LuaWrapper::getOptionalField(L, 2, "import", &mesh.import);
+	LuaWrapper::getOptionalField(L, 2, "import_physics", &mesh.import_physics);
 
-	if (lua_getfield(L, -1, "lod") == LUA_TNUMBER)
-	{
-		mesh.lod = LuaWrapper::toType<int>(L, -1);
-	}
-	lua_pop(L, 1); // "lod"
-
-	if (lua_getfield(L, -1, "import") == LUA_TBOOLEAN)
-	{
-		mesh.import = LuaWrapper::toType<bool>(L, -1);
-	}
-	lua_pop(L, 1); // "import"
-
-	if (lua_getfield(L, -1, "import_physics") == LUA_TBOOLEAN)
-	{
-		mesh.import_physics = LuaWrapper::toType<bool>(L, -1);
-	}
-	lua_pop(L, 1); // "import_physics"
-
-	lua_pop(L, 1); // table
 	return 0;
 }
 
@@ -329,9 +312,7 @@ int setAnimationParams(lua_State* L)
 
 	ImportAnimation& anim = dlg->m_animations[anim_idx];
 
-	lua_pushvalue(L, 2);
-
-	if (lua_getfield(L, -1, "root_bone") == LUA_TSTRING)
+	if (lua_getfield(L, 2, "root_bone") == LUA_TSTRING)
 	{
 		const char* name = lua_tostring(L, -1);
 		for (unsigned int i = 0; i < anim.animation->mNumChannels; ++i)
@@ -343,15 +324,10 @@ int setAnimationParams(lua_State* L)
 			}
 		}
 	}
-	lua_pop(L, 1); // "lod"
+	lua_pop(L, 1); // "root_bone"
 
-	if (lua_getfield(L, -1, "import") == LUA_TBOOLEAN)
-	{
-		anim.import = LuaWrapper::toType<bool>(L, -1);
-	}
-	lua_pop(L, 1); // "import"
+	LuaWrapper::getOptionalField(L, 2, "import", &anim.import);
 
-	lua_pop(L, 1); // table
 	return 0;
 }
 
@@ -366,46 +342,21 @@ int setParams(lua_State* L)
 		copyString(dlg->m_output_dir, LuaWrapper::toType<const char*>(L, -1));
 	}
 	lua_pop(L, 1);
-	if (lua_getfield(L, 1, "create_billboard") == LUA_TBOOLEAN)
+
+	if (lua_getfield(L, 1, "texture_output_dir") == LUA_TSTRING)
 	{
-		dlg->m_model.create_billboard_lod = LuaWrapper::toType<bool>(L, -1);
+		copyString(dlg->m_texture_output_dir, LuaWrapper::toType<const char*>(L, -1));
 	}
 	lua_pop(L, 1);
-	if (lua_getfield(L, 1, "remove_doubles") == LUA_TBOOLEAN)
-	{
-		dlg->m_model.remove_doubles = LuaWrapper::toType<bool>(L, -1);
-	}
-	lua_pop(L, 1);
-	if (lua_getfield(L, 1, "center_meshes") == LUA_TBOOLEAN)
-	{
-		dlg->m_model.center_meshes = LuaWrapper::toType<bool>(L, -1);
-	}
-	lua_pop(L, 1);
-	if (lua_getfield(L, 1, "import_vertex_colors") == LUA_TBOOLEAN)
-	{
-		dlg->m_model.import_vertex_colors = LuaWrapper::toType<bool>(L, -1);
-	}
-	lua_pop(L, 1);
-	if (lua_getfield(L, 1, "scale") == LUA_TNUMBER)
-	{
-		dlg->m_model.mesh_scale = LuaWrapper::toType<float>(L, -1);
-	}
-	lua_pop(L, 1);
-	if (lua_getfield(L, 1, "time_scale") == LUA_TNUMBER)
-	{
-		dlg->m_model.time_scale = LuaWrapper::toType<float>(L, -1);
-	}
-	lua_pop(L, 1);
-	if (lua_getfield(L, 1, "to_dds") == LUA_TBOOLEAN)
-	{
-		dlg->m_convert_to_dds = LuaWrapper::toType<bool>(L, -1);
-	}
-	lua_pop(L, 1);
-	if (lua_getfield(L, 1, "normal_map") == LUA_TBOOLEAN)
-	{
-		dlg->m_is_normal_map = LuaWrapper::toType<bool>(L, -1);
-	}
-	lua_pop(L, 1);
+
+	LuaWrapper::getOptionalField(L, 1, "create_billboard", &dlg->m_model.create_billboard_lod);
+	LuaWrapper::getOptionalField(L, 1, "remove_doubles", &dlg->m_model.remove_doubles);
+	LuaWrapper::getOptionalField(L, 1, "center_meshes", &dlg->m_model.center_meshes);
+	LuaWrapper::getOptionalField(L, 1, "import_vertex_colors", &dlg->m_model.import_vertex_colors);
+	LuaWrapper::getOptionalField(L, 1, "scale", &dlg->m_model.mesh_scale);
+	LuaWrapper::getOptionalField(L, 1, "time_scale", &dlg->m_model.time_scale);
+	LuaWrapper::getOptionalField(L, 1, "to_dds", &dlg->m_convert_to_dds);
+	LuaWrapper::getOptionalField(L, 1, "normal_map", &dlg->m_is_normal_map);
 	if (lua_getfield(L, 1, "orientation") == LUA_TSTRING)
 	{
 		const char* tmp = LuaWrapper::toType<const char*>(L, -1);
@@ -446,12 +397,6 @@ int setParams(lua_State* L)
 	}
 	lua_pop(L, 1);
 
-	if (lua_getfield(L, 1, "texture_output_dir") == LUA_TSTRING)
-	{
-		copyString(dlg->m_texture_output_dir, LuaWrapper::toType<const char*>(L, -1));
-	}
-	lua_pop(L, 1);
-
 	return 0;
 }
 
@@ -469,21 +414,9 @@ int setTextureParams(lua_State* L)
 	if (texture_idx < 0 || texture_idx >= material.texture_count) return 0;
 	ImportTexture& texture = material.textures[texture_idx];
 
-	lua_pushvalue(L, 3);
+	LuaWrapper::getOptionalField(L, 3, "import", &texture.import);
+	LuaWrapper::getOptionalField(L, 3, "to_dds", &texture.to_dds);
 
-	if (lua_getfield(L, -1, "import") == LUA_TBOOLEAN)
-	{
-		texture.import = LuaWrapper::toType<bool>(L, -1);
-	}
-	lua_pop(L, 1); // "import"
-
-	if (lua_getfield(L, -1, "to_dds") == LUA_TBOOLEAN)
-	{
-		texture.to_dds = LuaWrapper::toType<bool>(L, -1);
-	}
-	lua_pop(L, 1); // "to_dds"
-
-	lua_pop(L, 1); // table
 	return 0;
 }
 
@@ -497,21 +430,9 @@ int setMaterialParams(lua_State* L)
 
 	ImportMaterial& material = dlg->m_materials[material_idx];
 
-	lua_pushvalue(L, 2);
+	LuaWrapper::getOptionalField(L, 2, "import", &material.import);
+	LuaWrapper::getOptionalField(L, 2, "alpha_cutout", &material.alpha_cutout);
 
-	if (lua_getfield(L, -1, "import") == LUA_TBOOLEAN)
-	{
-		material.import = LuaWrapper::toType<bool>(L, -1);
-	}
-	lua_pop(L, 1); // "import"
-
-	if (lua_getfield(L, -1, "alpha_cutout") == LUA_TBOOLEAN)
-	{
-		material.alpha_cutout = LuaWrapper::toType<bool>(L, -1);
-	}
-	lua_pop(L, 1); // "alpha_cutout"
-
-	lua_pop(L, 1); // table
 	return 0;
 }
 
