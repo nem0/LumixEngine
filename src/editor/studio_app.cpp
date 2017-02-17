@@ -666,7 +666,7 @@ public:
 	{
 		if (!m_is_save_as_dialog_opened) return;
 		
-		if (ImGui::Begin("Save Universe As"))
+		if (ImGui::Begin("Save Universe As", &m_is_save_as_dialog_opened))
 		{
 			static char name[64] = "";
 			ImGui::InputText("Name", name, lengthOf(name));
@@ -676,6 +676,8 @@ public:
 				setTitle(name);
 				m_editor->saveUniverse(name, true);
 			}
+			ImGui::SameLine();
+			if (ImGui::Button("Close")) m_is_save_as_dialog_opened = false;
 		}
 		ImGui::End();
 	}
