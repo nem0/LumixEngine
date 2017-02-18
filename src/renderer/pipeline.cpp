@@ -1365,7 +1365,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		float camera_fov = m_scene->getCameraFOV(m_applied_camera);
 		float camera_ratio = m_scene->getCameraScreenWidth(m_applied_camera) / camera_height;
 		Vec4 cascades = m_scene->getShadowmapCascades(light_cmp);
-		float split_distances[] = {0.01f, cascades.x, cascades.y, cascades.z, cascades.w};
+		float split_distances[] = {0.1f, cascades.x, cascades.y, cascades.z, cascades.w};
 		m_is_rendering_in_shadowmap = true;
 		bgfx::setViewClear(m_current_view->bgfx_id, BGFX_CLEAR_DEPTH | BGFX_CLEAR_COLOR, 0xffffffff, 1.0f, 0);
 		bgfx::touch(m_current_view->bgfx_id);
@@ -1914,6 +1914,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			projection_matrix.setPerspective(fov, ratio, near_plane, far_plane, is_opengl);
 			Matrix inv_projection = projection_matrix;
 			inv_projection.inverse();
+
 			Matrix inv_view_proj = projection_matrix * view_matrix;
 			inv_view_proj.inverse();
 
