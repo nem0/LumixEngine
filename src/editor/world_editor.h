@@ -58,9 +58,8 @@ public:
 		Vec3 pos;
 	};
 
-	class LUMIX_EDITOR_API Plugin
+	struct LUMIX_EDITOR_API Plugin
 	{
-	public:
 		virtual ~Plugin() {}
 
 		virtual bool onEntityMouseDown(const RayHit& /*hit*/, int /*x*/, int /*y*/) { return false; }

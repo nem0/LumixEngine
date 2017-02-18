@@ -3235,7 +3235,7 @@ public:
 	const char* getCameraSlot(ComponentHandle camera) override { return m_cameras[{camera.index}].slot; }
 	float getCameraFOV(ComponentHandle camera) override { return m_cameras[{camera.index}].fov; }
 	void setCameraFOV(ComponentHandle camera, float fov) override { m_cameras[{camera.index}].fov = fov; }
-	void setCameraNearPlane(ComponentHandle camera, float near_plane) override { m_cameras[{camera.index}].near = near_plane; }
+	void setCameraNearPlane(ComponentHandle camera, float near_plane) override { m_cameras[{camera.index}].near = Math::maximum(near_plane, 0.00001f); }
 	float getCameraNearPlane(ComponentHandle camera) override { return m_cameras[{camera.index}].near; }
 	void setCameraFarPlane(ComponentHandle camera, float far_plane) override { m_cameras[{camera.index}].far = far_plane; }
 	float getCameraFarPlane(ComponentHandle camera) override { return m_cameras[{camera.index}].far; }
