@@ -554,6 +554,19 @@ public:
 		m_is_updating_attachments = false;
 	}
 
+
+	void setBoneAttachmentRotation(ComponentHandle cmp, const Quat& rot) override
+	{
+		int idx = getBoneAttachmentIdx(cmp);
+		if (idx < 0) return;
+		BoneAttachment& attachment = m_bone_attachments[idx];
+		attachment.relative_transform.rot = rot;
+		m_is_updating_attachments = true;
+		updateBoneAttachment(attachment);
+		m_is_updating_attachments = false;
+	}
+
+
 	int getBoneAttachmentBone(ComponentHandle cmp) override
 	{
 		int idx = getBoneAttachmentIdx(cmp);
@@ -4373,16 +4386,6 @@ public:
 			if (m_model_instances[i].entity != INVALID_ENTITY && m_model_instances[i].model == model)
 			{
 				modelLoaded(model, {i});
-			}
-		}
-
-		for (auto& attachment : m_bone_attachments)
-		{
-			if (isValid(attachment.parent_entity) &&
-				isValid(m_model_instances[attachment.parent_entity.index].entity) &&
-				m_model_instances[attachment.parent_entity.index].model == model)
-			{
-				updateRelativeMatrix(attachment);
 			}
 		}
 	}
