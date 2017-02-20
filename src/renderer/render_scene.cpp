@@ -4311,7 +4311,17 @@ public:
 
 		auto& r = m_model_instances[component.index];
 		
-		if (model->getMesh(0).material->getLayersCount() > 0) r.type = ModelInstance::MULTILAYER;
+		if (model->getMesh(0).material->getLayersCount() > 0)
+		{
+			if (model->getBoneCount() > 0)
+			{
+				r.type = ModelInstance::MULTILAYER_SKINNED;
+			}
+			else
+			{
+				r.type = ModelInstance::MULTILAYER_RIGID;
+			}
+		}
 		else if (model->getBoneCount() > 0) r.type = ModelInstance::SKINNED;
 		else r.type = ModelInstance::RIGID;
 		float bounding_radius = r.model->getBoundingRadius();

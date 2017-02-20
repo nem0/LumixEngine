@@ -55,7 +55,6 @@ struct View
 	u64 render_state;
 	u32 stencil;
 	int pass_idx;
-	bool is_multilayer;
 	CommandBufferGenerator command_buffer;
 };
 
@@ -888,7 +887,6 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		}
 		m_current_view = &m_views[m_view_idx];
 		m_renderer.viewCounterAdd();
-		m_current_view->is_multilayer = false;
 		m_current_view->layer_mask = layer_mask;
 		m_current_view->bgfx_id = (u8)m_renderer.getViewCounter();
 		m_current_view->stencil = BGFX_STENCIL_NONE;
@@ -1810,12 +1808,6 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
-	void setMultilayer(bool is_multilayer)
-	{
-		m_current_view->is_multilayer = is_multilayer;
-	}
-
-
 	void setViewSeq()
 	{
 		bgfx::setViewSeq(m_current_view->bgfx_id, true);
@@ -2076,7 +2068,58 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
-	void renderMultilayerMesh(const ModelInstance& model_instance, const ModelInstanceMesh& info)
+	void renderMultilayerRigidMesh(const ModelInstance& model_instance, const ModelInstanceMesh& info)
+	{
+		const Mesh& mesh = *info.mesh;
+		Material* material = mesh.material;
+
+		const Model& model = *model_instance.model;
+
+		int stride = model.getVertexDecl().getStride();
+		int layers_count = material->getLayersCount();
+		auto& shader_instance = mesh.material->getShaderInstance();
+
+		auto renderLayer = [&](View& view) {
+			executeCommandBuffer(material->getCommandBuffer(), material);
+			executeCommandBuffer(view.command_buffer.buffer, material);
+
+			bgfx::setTransform(&model_instance.matrix);
+			bgfx::setVertexBuffer(model_instance.model->getVerticesHandle(),
+				mesh.attribute_array_offset / stride,
+				mesh.attribute_array_size / stride);
+			bgfx::setIndexBuffer(model_instance.model->getIndicesHandle(), mesh.indices_offset, mesh.indices_count);
+			bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
+			bgfx::setState(view.render_state | material->getRenderStates());
+			++m_stats.draw_call_count;
+			++m_stats.instance_count;
+			m_stats.triangle_count += mesh.indices_count / 3;
+			bgfx::submit(view.bgfx_id, shader_instance.getProgramHandle(view.pass_idx));
+		};
+
+		int view_idx = m_layer_to_view_map[material->getRenderLayer()];
+		if (view_idx >= 0 && !m_is_rendering_in_shadowmap)
+		{
+			auto& view = m_views[view_idx];
+			if (bgfx::isValid(shader_instance.getProgramHandle(view.pass_idx)))
+			{
+				for (int i = 0; i < layers_count; ++i)
+				{
+					Vec4 layer((i + 1) / (float)layers_count, 0, 0, 0);
+					bgfx::setUniform(m_layer_uniform, &layer);
+					renderLayer(view);
+				}
+			}
+		}
+
+		static const int default_layer = m_renderer.getLayer("default");
+		int default_view_idx = m_layer_to_view_map[default_layer];
+		if (default_view_idx < 0) return;
+		View& default_view = m_views[default_view_idx];
+		renderLayer(default_view);
+	}
+
+
+	void renderMultilayerSkinnedMesh(const ModelInstance& model_instance, const ModelInstanceMesh& info)
 	{
 		const Mesh& mesh = *info.mesh;
 		Material* material = mesh.material;
@@ -2121,7 +2164,6 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		if (view_idx >= 0 && !m_is_rendering_in_shadowmap)
 		{
 			auto& view = m_views[view_idx];
-			if (!view.is_multilayer) layers_count = 1;
 			if (bgfx::isValid(shader_instance.getProgramHandle(view.pass_idx)))
 			{
 				for (int i = 0; i < layers_count; ++i)
@@ -2478,8 +2520,11 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 				case ModelInstance::SKINNED:
 					renderSkinnedMesh(model_instance, mesh);
 					break;
-				case ModelInstance::MULTILAYER:
-					renderMultilayerMesh(model_instance, mesh);
+				case ModelInstance::MULTILAYER_SKINNED:
+					renderMultilayerSkinnedMesh(model_instance, mesh);
+					break;
+				case ModelInstance::MULTILAYER_RIGID:
+					renderMultilayerRigidMesh(model_instance, mesh);
 					break;
 			}
 		}
@@ -2507,8 +2552,11 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 					case ModelInstance::SKINNED:
 						renderSkinnedMesh(model_instance, mesh);
 						break;
-					case ModelInstance::MULTILAYER:
-						renderMultilayerMesh(model_instance, mesh);
+					case ModelInstance::MULTILAYER_SKINNED:
+						renderMultilayerSkinnedMesh(model_instance, mesh);
+						break;
+					case ModelInstance::MULTILAYER_RIGID:
+						renderMultilayerRigidMesh(model_instance, mesh);
 						break;
 				}
 			}
@@ -2958,7 +3006,6 @@ void Pipeline::registerLuaAPI(lua_State* L)
 			registerCFunction(#name, f); \
 		} while(false) \
 
-	REGISTER_FUNCTION(setMultilayer);
 	REGISTER_FUNCTION(setViewSeq);
 	REGISTER_FUNCTION(drawQuad);
 	REGISTER_FUNCTION(setPass);

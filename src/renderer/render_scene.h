@@ -61,7 +61,8 @@ struct ModelInstance
 	{
 		RIGID,
 		SKINNED,
-		MULTILAYER
+		MULTILAYER_RIGID,
+		MULTILAYER_SKINNED
 	};
 	Type type;
 	Matrix matrix;
