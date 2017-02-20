@@ -55,6 +55,7 @@ struct View
 	u64 render_state;
 	u32 stencil;
 	int pass_idx;
+	bool is_multilayer;
 	CommandBufferGenerator command_buffer;
 };
 
@@ -887,6 +888,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		}
 		m_current_view = &m_views[m_view_idx];
 		m_renderer.viewCounterAdd();
+		m_current_view->is_multilayer = false;
 		m_current_view->layer_mask = layer_mask;
 		m_current_view->bgfx_id = (u8)m_renderer.getViewCounter();
 		m_current_view->stencil = BGFX_STENCIL_NONE;
@@ -1808,6 +1810,12 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
+	void setMultilayer(bool is_multilayer)
+	{
+		m_current_view->is_multilayer = is_multilayer;
+	}
+
+
 	void setViewSeq()
 	{
 		bgfx::setViewSeq(m_current_view->bgfx_id, true);
@@ -2113,6 +2121,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		if (view_idx >= 0 && !m_is_rendering_in_shadowmap)
 		{
 			auto& view = m_views[view_idx];
+			if (!view.is_multilayer) layers_count = 1;
 			if (bgfx::isValid(shader_instance.getProgramHandle(view.pass_idx)))
 			{
 				for (int i = 0; i < layers_count; ++i)
@@ -2949,6 +2958,7 @@ void Pipeline::registerLuaAPI(lua_State* L)
 			registerCFunction(#name, f); \
 		} while(false) \
 
+	REGISTER_FUNCTION(setMultilayer);
 	REGISTER_FUNCTION(setViewSeq);
 	REGISTER_FUNCTION(drawQuad);
 	REGISTER_FUNCTION(setPass);
