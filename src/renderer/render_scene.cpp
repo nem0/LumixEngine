@@ -53,6 +53,7 @@ enum class RenderSceneVersion : int
 {
 	GRASS_ROTATION_MODE,
 	GLOBAL_LIGHT_REFACTOR,
+	EMITTER_MATERIAL,
 
 	LATEST
 };
@@ -753,7 +754,7 @@ public:
 		GlobalLight light;
 		light.m_entity = entity;
 		serializer.read(&light.m_cascades);
-		if (scene_version < (int)RenderSceneVersion::GLOBAL_LIGHT_REFACTOR)
+		if (scene_version <= (int)RenderSceneVersion::GLOBAL_LIGHT_REFACTOR)
 		{
 			ComponentHandle dummy;
 			serializer.read(&dummy);
@@ -968,10 +969,12 @@ public:
 		serializer.write("initial_size_to", emitter->m_initial_size.to);
 		serializer.write("spawn_count_from", emitter->m_spawn_count.from);
 		serializer.write("spawn_count_to", emitter->m_spawn_count.to);
+		Material* material = emitter->getMaterial();
+		serializer.write("material", material ? material->getPath().c_str() : "");
 	}
 
 
-	void deserializeParticleEmitter(IDeserializer& serializer, Entity entity, int /*scene_version*/)
+	void deserializeParticleEmitter(IDeserializer& serializer, Entity entity, int scene_version)
 	{
 		ParticleEmitter* emitter = LUMIX_NEW(m_allocator, ParticleEmitter)(entity, m_universe, m_allocator);
 		emitter->m_entity = entity;
@@ -985,6 +988,15 @@ public:
 		serializer.read(&emitter->m_initial_size.to);
 		serializer.read(&emitter->m_spawn_count.from);
 		serializer.read(&emitter->m_spawn_count.to);
+		if (scene_version > (int)RenderSceneVersion::EMITTER_MATERIAL)
+		{
+			char tmp[MAX_PATH_LENGTH];
+			serializer.read(tmp, lengthOf(tmp));
+			ResourceManagerBase* material_manager = m_engine.getResourceManager().get(MATERIAL_TYPE);
+			Material* material = (Material*)material_manager->load(Path(tmp));
+			emitter->setMaterial(material);
+		}
+
 		m_particle_emitters.insert(entity, emitter);
 		m_universe.addComponent(entity, PARTICLE_EMITTER_TYPE, this, {entity.index});
 	}

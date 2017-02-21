@@ -1194,10 +1194,10 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		float viewports[] = {0, 0, 0.5, 0, 0, 0.5, 0.5, 0.5};
 
 		static const float YPR_gl[4][3] = {
-			{ Math::degreesToRadians(-90.0f), Math::degreesToRadians(-27.36780516f), Math::degreesToRadians(0.0f) },
-			{ Math::degreesToRadians(90.0f), Math::degreesToRadians(-27.36780516f), Math::degreesToRadians(0.0f) },
-			{ Math::degreesToRadians(0.0f), Math::degreesToRadians(27.36780516f), Math::degreesToRadians(0.0f) },
-			{ Math::degreesToRadians(180.0f), Math::degreesToRadians(27.36780516f), Math::degreesToRadians(0.0f) },
+			{Math::degreesToRadians(-90.0f), Math::degreesToRadians(-27.36780516f), Math::degreesToRadians(0.0f)},
+			{Math::degreesToRadians(90.0f), Math::degreesToRadians(-27.36780516f), Math::degreesToRadians(0.0f)},
+			{Math::degreesToRadians(0.0f), Math::degreesToRadians(27.36780516f), Math::degreesToRadians(0.0f)},
+			{Math::degreesToRadians(180.0f), Math::degreesToRadians(27.36780516f), Math::degreesToRadians(0.0f)},
 		};
 
 		static const float YPR[4][3] = {
