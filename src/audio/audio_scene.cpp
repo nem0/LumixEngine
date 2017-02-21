@@ -650,16 +650,13 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 				if (!clip->isReady()) return -1;
 
 				int flags = is_3d ? (int)AudioDevice::BufferFlags::IS3D : 0;
-				auto buffer = m_device.createBuffer(clip->getData(),
-					clip->getSize(),
-					clip->getChannels(),
-					clip->getSampleRate(),
-					flags);
+				auto buffer = m_device.createBuffer(
+					clip->getData(), clip->getSize(), clip->getChannels(), clip->getSampleRate(), flags);
 				if (buffer == AudioDevice::INVALID_BUFFER_HANDLE) return -1;
 				m_device.play(buffer, clip_info->looped);
 				m_device.setVolume(buffer, clip_info->volume);
 
-				auto pos = m_universe.getPosition(entity);
+				Vec3 pos = m_universe.getPosition(entity);
 				m_device.setSourcePosition(buffer, pos.x, pos.y, pos.z);
 
 				auto& sound = m_playing_sounds[i];
@@ -667,7 +664,7 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 				sound.buffer_id = buffer;
 				sound.entity = entity;
 				sound.clip = clip_info;
-				
+
 				for (const EchoZone& zone : m_echo_zones)
 				{
 					float dist2 = (pos - m_universe.getPosition(zone.entity)).squaredLength();
@@ -695,10 +692,7 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 	}
 
 
-	void setMasterVolume(float volume)
-	{
-		m_device.setMasterVolume(volume);
-	}
+	void setMasterVolume(float volume) { m_device.setMasterVolume(volume); }
 
 
 	void setVolume(SoundHandle sound_id, float volume) override
@@ -709,11 +703,7 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 	}
 
 
-	void setEcho(SoundHandle sound_id,
-		float wet_dry_mix,
-		float feedback,
-		float left_delay,
-		float right_delay) override
+	void setEcho(SoundHandle sound_id, float wet_dry_mix, float feedback, float left_delay, float right_delay) override
 	{
 		ASSERT(sound_id >= 0 && sound_id < lengthOf(m_playing_sounds));
 		m_device.setEcho(m_playing_sounds[sound_id].buffer_id, wet_dry_mix, feedback, left_delay, right_delay);

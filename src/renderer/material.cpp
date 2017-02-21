@@ -505,8 +505,6 @@ void Material::createCommandBuffer()
 	generator.setUniform(rm_uniform, roughness_metallic);
 	generator.end();
 
-	generator.end();
-
 	m_command_buffer = (u8*)m_allocator.allocate(generator.getSize());
 	generator.getData(m_command_buffer);
 }
