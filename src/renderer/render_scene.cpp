@@ -969,7 +969,7 @@ public:
 		serializer.write("initial_size_to", emitter->m_initial_size.to);
 		serializer.write("spawn_count_from", emitter->m_spawn_count.from);
 		serializer.write("spawn_count_to", emitter->m_spawn_count.to);
-		Material* material = emitter->getMaterial();
+		const Material* material = emitter->getMaterial();
 		serializer.write("material", material ? material->getPath().c_str() : "");
 	}
 
