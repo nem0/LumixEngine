@@ -5,6 +5,7 @@
 #include <bgfx/bgfx.h>
 
 
+struct ImVec2;
 struct PlatformData;
 class StudioApp;
 
@@ -39,6 +40,7 @@ private:
 	void onUniverseDestroyed();
 	void onFullscreenGUI();
 	void setFullscreen(bool fullscreen);
+	void onStatsGUI(const ImVec2& view_pos);
 
 private:
 	Lumix::Pipeline* m_pipeline;
@@ -55,5 +57,6 @@ private:
 	bool m_paused;
 	bool m_is_opengl;
 	bool m_is_fullscreen;
+	bool m_show_stats;
 	int m_captured_mouse_x, m_captured_mouse_y;
 };

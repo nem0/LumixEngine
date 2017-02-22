@@ -689,16 +689,8 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	}
 
 
-	int getLayersCount() const override
-	{
-		return m_layers.size();
-	}
-
-
-	const char* getLayerName(int idx) const override
-	{
-		return m_layers[idx];
-	}
+	int getLayersCount() const override { return m_layers.size(); }
+	const char* getLayerName(int idx) const override { return m_layers[idx]; }
 
 
 	bool isOpenGL() const override
@@ -708,34 +700,11 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	}
 
 
-	ModelManager& getModelManager() override
-	{
-		return m_model_manager;
-	}
-
-
-	MaterialManager& getMaterialManager() override
-	{
-		return m_material_manager;
-	}
-
-
-	TextureManager& getTextureManager() override
-	{
-		return m_texture_manager;
-	}
-
-
-	const bgfx::VertexDecl& getBasicVertexDecl() const override
-	{
-		return m_basic_vertex_decl;
-	}
-
-
-	const bgfx::VertexDecl& getBasic2DVertexDecl() const override
-	{
-		return m_basic_2d_vertex_decl;
-	}
+	ModelManager& getModelManager() override { return m_model_manager; }
+	MaterialManager& getMaterialManager() override { return m_material_manager; }
+	TextureManager& getTextureManager() override { return m_texture_manager; }
+	const bgfx::VertexDecl& getBasicVertexDecl() const override { return m_basic_vertex_decl; }
+	const bgfx::VertexDecl& getBasic2DVertexDecl() const override { return m_basic_2d_vertex_decl; }
 
 
 	void createScenes(Universe& ctx) override
@@ -745,28 +714,19 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	}
 
 
-	void destroyScene(IScene* scene) override
-	{
-		RenderScene::destroyInstance(static_cast<RenderScene*>(scene));
-	}
-
-
+	void destroyScene(IScene* scene) override { RenderScene::destroyInstance(static_cast<RenderScene*>(scene)); }
 	const char* getName() const override { return "renderer"; }
-
-
 	Engine& getEngine() override { return m_engine; }
-
-
-	int getShaderDefinesCount() const override
-	{
-		return m_shader_defines.size();
-	}
-
-
-	const char* getShaderDefine(int define_idx) override
-	{
-		return m_shader_defines[define_idx];
-	}
+	int getShaderDefinesCount() const override { return m_shader_defines.size(); }
+	const char* getShaderDefine(int define_idx) override { return m_shader_defines[define_idx]; }
+	const char* getPassName(int idx) override { return m_passes[idx]; }
+	const bgfx::UniformHandle& getMaterialColorUniform() const override { return m_mat_color_uniform; }
+	const bgfx::UniformHandle& getRoughnessMetallicUniform() const override { return m_roughness_metallic_uniform; }
+	void makeScreenshot(const Path& filename) override { bgfx::saveScreenShot(filename.c_str()); }
+	void resize(int w, int h) override { bgfx::reset(w, h); }
+	int getViewCounter() const override { return m_view_counter; }
+	void viewCounterAdd() override { ++m_view_counter; }
+	Shader* getDefaultShader() override { return m_default_shader; }
 
 
 	u8 getShaderDefineIdx(const char* define) override
@@ -785,12 +745,6 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	}
 
 
-	const char* getPassName(int idx) override
-	{
-		return m_passes[idx];
-	}
-
-
 	int getPassIdx(const char* pass) override
 	{
 		for (int i = 0; i < m_passes.size(); ++i)
@@ -806,53 +760,11 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	}
 
 
-	const bgfx::UniformHandle& getMaterialColorUniform() const override
-	{
-		return m_mat_color_uniform;
-	}
-
-
-	const bgfx::UniformHandle& getRoughnessMetallicUniform() const override
-	{
-		return m_roughness_metallic_uniform;
-	}
-
-
-	void makeScreenshot(const Path& filename) override
-	{
-		bgfx::saveScreenShot(filename.c_str());
-	}
-
-
-	void resize(int w, int h) override
-	{
-		bgfx::reset(w, h);
-	}
-
-
 	void frame(bool capture) override
 	{
 		PROFILE_FUNCTION();
 		bgfx::frame(capture);
 		m_view_counter = 0;
-	}
-
-
-	int getViewCounter() const override
-	{
-		return m_view_counter;
-	}
-
-
-	void viewCounterAdd() override
-	{
-		++m_view_counter;
-	}
-
-
-	Shader* getDefaultShader() override
-	{
-		return m_default_shader;
 	}
 
 

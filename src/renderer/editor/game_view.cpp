@@ -52,6 +52,7 @@ GameView::GameView(StudioApp& app)
 	, m_time_multiplier(1.0f)
 	, m_paused(false)
 	, m_is_opengl(false)
+	, m_show_stats(false)
 	, m_texture_handle(BGFX_INVALID_HANDLE)
 	, m_gui_interface(nullptr)
 {
@@ -197,6 +198,42 @@ void GameView::setFullscreen(bool fullscreen)
 }
 
 
+void GameView::onStatsGUI(const ImVec2& view_pos)
+{
+	if (!m_show_stats || !m_is_opened) return;
+	
+	float toolbar_height = 24 + ImGui::GetStyle().FramePadding.y * 2;
+	ImVec2 v = view_pos;
+	v.x += ImGui::GetStyle().FramePadding.x;
+	v.y += ImGui::GetStyle().FramePadding.y + toolbar_height;
+	ImGui::SetNextWindowPos(v);
+	auto col = ImGui::GetStyle().Colors[ImGuiCol_WindowBg];
+	col.w = 0.3f;
+	ImGui::PushStyleColor(ImGuiCol_WindowBg, col);
+	if (ImGui::Begin("###stats_overlay",
+		nullptr,
+		ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize |
+		ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
+		ImGuiWindowFlags_ShowBorders))
+	{
+		const auto& stats = m_pipeline->getStats();
+		ImGui::LabelText("Draw calls", "%d", stats.draw_call_count);
+		ImGui::LabelText("Instances", "%d", stats.instance_count);
+		char buf[30];
+		Lumix::toCStringPretty(stats.triangle_count, buf, Lumix::lengthOf(buf));
+		ImGui::LabelText("Triangles", "%s", buf);
+		ImGui::LabelText("Resolution", "%dx%d", m_pipeline->getWidth(), m_pipeline->getHeight());
+		ImGui::LabelText("FPS", "%.2f", m_editor->getEngine().getFPS());
+		ImGui::LabelText("CPU time", "%.2f", m_pipeline->getCPUTime() * 1000.0f);
+		ImGui::LabelText("GPU time", "%.2f", m_pipeline->getGPUTime() * 1000.0f);
+		ImGui::LabelText("Waiting for submit", "%.2f", m_pipeline->getWaitSubmitTime() * 1000.0f);
+		ImGui::LabelText("Waiting for render thread", "%.2f", m_pipeline->getGPUTime() * 1000.0f);
+	}
+	ImGui::End();
+	ImGui::PopStyleColor();
+}
+
+
 void GameView::onGUI()
 {
 	PROFILE_FUNCTION();
@@ -219,8 +256,11 @@ void GameView::onGUI()
 		onFullscreenGUI();
 		return;
 	}
+	ImVec2 view_pos;
+	bool is_game_view_visible = false;
 	if (ImGui::BeginDock(window_name, &m_is_opened))
 	{
+		is_game_view_visible = true;
 		m_is_mouse_hovering_window = ImGui::IsMouseHoveringWindow();
 
 		auto content_min = ImGui::GetCursorScreenPos();
@@ -233,6 +273,7 @@ void GameView::onGUI()
 
 			auto* fb = m_pipeline->getFramebuffer("default");
 			m_texture_handle = fb->getRenderbufferHandle(0);
+			view_pos = ImGui::GetCursorScreenPos();
 			if (m_is_opengl)
 			{
 				ImGui::Image(&m_texture_handle, size, ImVec2(0, 1), ImVec2(1, 0));
@@ -277,6 +318,8 @@ void GameView::onGUI()
 					setFullscreen(true);
 				}
 			}
+			ImGui::SameLine();
+			ImGui::Checkbox("Stats", &m_show_stats);
 			m_pipeline->render();
 		}
 
@@ -292,4 +335,5 @@ void GameView::onGUI()
 		}
 	}
 	ImGui::EndDock();
+	if(is_game_view_visible) onStatsGUI(view_pos);
 }
