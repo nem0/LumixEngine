@@ -1693,7 +1693,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	Transform getRagdollBoneTransform(RagdollBone* bone) override
 	{
 		auto px_pose = bone->actor->getGlobalPose();
-		return {fromPhysx(px_pose.p), fromPhysx(px_pose.q)};
+		return fromPhysx(px_pose);
 	}
 
 
@@ -2009,12 +2009,21 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		}
 
 		Matrix mtx = bone.transform.toMatrix();
-		Vec3 x = mtx.getXVector();
-		mtx.setXVector(-mtx.getYVector());
-		mtx.setYVector(x);
-		mtx.setTranslation(mtx.getTranslation() - mtx.getXVector() * length * 0.5f);
+		if (m_new_bone_orientation == BoneOrientation::X)
+		{
+			Vec3 x = mtx.getXVector();
+			mtx.setXVector(-mtx.getYVector());
+			mtx.setYVector(x);
+			mtx.setTranslation(mtx.getTranslation() - mtx.getXVector() * length * 0.5f);
+			return mtx.toTransform();
+		}
+		mtx.setTranslation(mtx.getTranslation() + mtx.getXVector() * length * 0.5f);
 		return mtx.toTransform();
 	}
+
+
+	BoneOrientation getNewBoneOrientation() const override { return m_new_bone_orientation; }
+	void setNewBoneOrientation(BoneOrientation orientation) override { m_new_bone_orientation = orientation; }
 
 
 	RagdollBone* createRagdollBone(ComponentHandle cmp, u32 bone_name_hash) override
@@ -4294,6 +4303,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	Universe& m_universe;
 	Engine* m_engine;
 	ContactCallback m_contact_callback;
+	BoneOrientation m_new_bone_orientation = BoneOrientation::X;
 	PxScene* m_scene;
 	LuaScriptScene* m_script_scene;
 	PhysicsSystem* m_system;

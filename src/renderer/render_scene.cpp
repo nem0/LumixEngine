@@ -3,6 +3,7 @@
 #include "engine/array.h"
 #include "engine/blob.h"
 #include "engine/crc32.h"
+#include "engine/engine.h"
 #include "engine/fs/file_system.h"
 #include "engine/geometry.h"
 #include "engine/json_serializer.h"
@@ -21,11 +22,8 @@
 #include "engine/resource_manager_base.h"
 #include "engine/serializer.h"
 #include "engine/timer.h"
-
-#include "engine/engine.h"
-
+#include "engine/universe/universe.h"
 #include "lua_script/lua_script_system.h"
-
 #include "renderer/culling_system.h"
 #include "renderer/frame_buffer.h"
 #include "renderer/material.h"
@@ -39,10 +37,8 @@
 #include "renderer/terrain.h"
 #include "renderer/texture.h"
 #include "renderer/texture_manager.h"
-
-#include "engine/universe/universe.h"
-#include <cmath>
 #include <cfloat>
+#include <cmath>
 
 
 namespace Lumix

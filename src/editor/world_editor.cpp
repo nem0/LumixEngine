@@ -1429,19 +1429,24 @@ public:
 	}
 
 
+	void inputFrame() override
+	{
+		m_mouse_rel_x = m_mouse_rel_y = 0;
+		for (auto& i : m_is_mouse_click) i = false;
+	}
+
+
 	void update() override
 	{
 		PROFILE_FUNCTION();
 		updateGoTo();
 
-		m_mouse_rel_x = m_mouse_rel_y = 0;
 		if (!m_selected_entities.empty())
 		{
 			m_gizmo->add(m_selected_entities[0]);
 		}
 
 		createEditorLines();
-		for (auto& i : m_is_mouse_click) i = false;
 	}
 
 

@@ -328,6 +328,8 @@ void SceneView::onGUI()
 		title = "Scene View | errors in log###Scene View";
 	}
 
+	m_editor->inputFrame();
+
 	if (ImGui::BeginDock(title, nullptr, ImGuiWindowFlags_NoScrollWithMouse))
 	{
 		m_is_opened = true;

@@ -810,6 +810,11 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		ImGui::SameLine();
 		auto* root = phy_scene->getRagdollRootBone(cmp);
 		if (ImGui::Button("All kinematic")) phy_scene->setRagdollBoneKinematicRecursive(root, true);
+		PhysicsScene::BoneOrientation new_bone_orientation = phy_scene->getNewBoneOrientation();
+		if (ImGui::Combo("New bone orientation", (int*)&new_bone_orientation, "X\0Y\0"))
+		{
+			phy_scene->setNewBoneOrientation(new_bone_orientation);
+		}
 
 		if (ImGui::BeginChild("bones", ImVec2(ImGui::GetContentRegionAvailWidth() * 0.5f, 0)))
 		{
