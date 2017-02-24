@@ -62,6 +62,11 @@ public:
 		CAPSULE,
 		SPHERE
 	};
+	enum class BoneOrientation : int
+	{
+		X,
+		Y
+	};
 
 	static PhysicsScene* create(PhysicsSystem& system, Universe& context, Engine& engine, IAllocator& allocator);
 	static void destroy(PhysicsScene* scene);
@@ -175,6 +180,8 @@ public:
 	virtual bool isControllerTouchingDown(ComponentHandle cmp) = 0;
 	virtual void resizeController(ComponentHandle cmp, float height) = 0;
 
+	virtual BoneOrientation getNewBoneOrientation() const = 0;
+	virtual void setNewBoneOrientation(BoneOrientation orientation) = 0;
 	virtual RagdollBone* createRagdollBone(ComponentHandle cmp, u32 bone_name_hash) = 0;
 	virtual void destroyRagdollBone(ComponentHandle cmp, RagdollBone* bone) = 0;
 	virtual physx::PxJoint* getRagdollBoneJoint(RagdollBone* bone) const = 0;
