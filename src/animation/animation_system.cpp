@@ -620,6 +620,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		if (parent_controller_idx < 0) return;
 
 		Controller& parent_controller = m_controllers.at(parent_controller_idx);
+		if (!parent_controller.root) return;
 
 		ComponentHandle model_instance = m_render_scene->getModelInstanceComponent(controller.entity);
 		if (model_instance == INVALID_COMPONENT) return;
