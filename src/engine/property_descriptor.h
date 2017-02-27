@@ -19,11 +19,11 @@ LUMIX_ENGINE_API int getIntPropertyMax();
 
 template <typename T> inline IPropertyDescriptor::Type toPropertyType();
 template <> inline IPropertyDescriptor::Type toPropertyType<int>() { return IPropertyDescriptor::INTEGER; }
+template <> inline IPropertyDescriptor::Type toPropertyType<unsigned int>() { return IPropertyDescriptor::UNSIGNED_INTEGER; }
 template <> inline IPropertyDescriptor::Type toPropertyType<Int2>() { return IPropertyDescriptor::INT2; }
 template <> inline IPropertyDescriptor::Type toPropertyType<Vec2>() { return IPropertyDescriptor::VEC2; }
 template <> inline IPropertyDescriptor::Type toPropertyType<Vec3>() { return IPropertyDescriptor::VEC3; }
 template <> inline IPropertyDescriptor::Type toPropertyType<Vec4>() { return IPropertyDescriptor::VEC4; }
-
 
 
 template <class S> class StringPropertyDescriptor : public IPropertyDescriptor
@@ -723,6 +723,85 @@ public:
 
 	Getter m_getter;
 	Setter m_setter;
+};
+
+
+template <typename T, class S> class NumericPropertyDescriptor : public IPropertyDescriptor
+{
+public:
+	typedef T(S::*Getter)(ComponentHandle);
+	typedef void (S::*Setter)(ComponentHandle, const T);
+	typedef T(S::*ArrayGetter)(ComponentHandle, T);
+	typedef void (S::*ArraySetter)(ComponentHandle, T, const T);
+
+public:
+	NumericPropertyDescriptor(const char* name,
+		Getter getter,
+		Setter setter)
+	{
+		setName(name);
+		m_single.getter = getter;
+		m_single.setter = setter;
+		m_type = toPropertyType<T>();
+	}
+
+
+	NumericPropertyDescriptor(const char* name,
+		ArrayGetter getter,
+		ArraySetter setter)
+	{
+		setName(name);
+		m_array.getter = getter;
+		m_array.setter = setter;
+		m_type = toPropertyType<T>();
+	}
+
+
+	void set(ComponentUID cmp, int index, InputBlob& stream) const override
+	{
+		T v;
+		stream.read(&v, sizeof(v));
+		if (index < 0)
+		{
+			(static_cast<S*>(cmp.scene)->*m_single.setter)(cmp.handle, v);
+		}
+		else
+		{
+			(static_cast<S*>(cmp.scene)->*m_array.setter)(cmp.handle, index, v);
+		}
+	};
+
+
+	void get(ComponentUID cmp, int index, OutputBlob& stream) const override
+	{
+		int len = sizeof(T);
+		if (index < 0)
+		{
+			T v = (static_cast<S*>(cmp.scene)->*m_single.getter)(cmp.handle);
+			stream.write(&v, len);
+		}
+		else
+		{
+			T v = (static_cast<S*>(cmp.scene)->*m_array.getter)(cmp.handle, index);
+			stream.write(&v, len);
+		}
+	};
+
+
+private:
+	union
+	{
+		struct
+		{
+			Getter getter;
+			Setter setter;
+		} m_single;
+		struct
+		{
+			ArrayGetter getter;
+			ArraySetter setter;
+		} m_array;
+	};
 };
 
 
