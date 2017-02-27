@@ -50,6 +50,7 @@ enum class RenderSceneVersion : int
 	GRASS_ROTATION_MODE,
 	GLOBAL_LIGHT_REFACTOR,
 	EMITTER_MATERIAL,
+	BONE_ATTACHMENT_TRANSFORM,
 
 	LATEST
 };
@@ -1220,6 +1221,7 @@ public:
 			serializer.write(attachment.bone_index);
 			serializer.write(attachment.entity);
 			serializer.write(attachment.parent_entity);
+			serializer.write(attachment.relative_transform);
 		}
 	}
 
@@ -1378,7 +1380,7 @@ public:
 			serializer.read(bone_attachment.bone_index);
 			serializer.read(bone_attachment.entity);
 			serializer.read(bone_attachment.parent_entity);
-			updateRelativeMatrix(bone_attachment);
+			serializer.read(bone_attachment.relative_transform);
 			ComponentHandle cmp = {bone_attachment.entity.index};
 			m_universe.addComponent(bone_attachment.entity, BONE_ATTACHMENT_TYPE, this, cmp);
 		}
