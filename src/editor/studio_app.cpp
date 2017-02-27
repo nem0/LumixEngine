@@ -1755,6 +1755,13 @@ public:
 				out_info.offset = ~0UL;
 			}
 		}
+		StaticString<MAX_PATH_LENGTH> unv_path;
+		unv_path << "universes/" << m_editor->getUniverse()->getName() << ".unv";
+		copyString(paths.emplace().data, MAX_PATH_LENGTH, unv_path);
+		auto& out_info = infos.emplace();
+		out_info.hash = crc32(unv_path);
+		out_info.size = PlatformInterface::getFileSize(unv_path);
+		out_info.offset = ~0UL;
 	}
 
 

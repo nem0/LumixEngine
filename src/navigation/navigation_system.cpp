@@ -159,12 +159,19 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 		auto iter = m_agents.find(entity);
 		if (!iter.isValid()) return;
 		if (iter.value().agent < 0) return;
+		const Agent& agent = iter.value();
 		Vec3 pos = m_universe.getPosition(iter.key());
-		const dtCrowdAgent* dt_agent = m_crowd->getAgent(iter.value().agent);
+		const dtCrowdAgent* dt_agent = m_crowd->getAgent(agent.agent);
 		if ((pos - *(Vec3*)dt_agent->npos).squaredLength() > 0.1f)
 		{
-			m_crowd->removeAgent(iter.value().agent);
+			Vec3 target_pos = *(Vec3*)dt_agent->targetPos;
+			float speed = dt_agent->params.maxSpeed;
+			m_crowd->removeAgent(agent.agent);
 			addCrowdAgent(iter.value());
+			if (!agent.is_finished)
+			{
+				navigate(entity, target_pos, speed);
+			}
 		}
 	}
 

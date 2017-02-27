@@ -86,8 +86,8 @@ bool OsFile::write(const void* data, size_t size)
 bool OsFile::read(void* data, size_t size)
 {
 	ASSERT(nullptr != m_impl);
-	size_t readed = 0;
-	::ReadFile(m_impl->m_file, data, (DWORD)size, (LPDWORD)&readed, nullptr);
+	DWORD readed = 0;
+	BOOL success = ::ReadFile(m_impl->m_file, data, (DWORD)size, (LPDWORD)&readed, nullptr);
 	return size == readed;
 }
 
@@ -127,7 +127,9 @@ bool OsFile::seek(SeekMode base, size_t pos)
 			break;
 	}
 
-	return ::SetFilePointer(m_impl->m_file, (LONG)pos, nullptr, dir) == (LONG)pos;
+	LARGE_INTEGER dist;
+	dist.QuadPart = pos;
+	return ::SetFilePointer(m_impl->m_file, dist.u.LowPart, &dist.u.HighPart, dir) != INVALID_SET_FILE_POINTER;
 }
 
 

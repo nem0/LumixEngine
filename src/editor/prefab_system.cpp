@@ -254,6 +254,7 @@ public:
 
 	void link(Entity entity, u64 prefab)
 	{
+		ASSERT(prefab != 0);
 		int idx = m_instances.find(prefab);
 		m_prefabs[entity.index].prev = INVALID_ENTITY;
 		if (idx >= 0)
