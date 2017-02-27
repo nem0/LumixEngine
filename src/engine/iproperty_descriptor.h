@@ -20,6 +20,7 @@ public:
 		BOOL,
 		VEC3,
 		INTEGER,
+		UNSIGNED_INTEGER,
 		STRING,
 		ARRAY,
 		COLOR,
