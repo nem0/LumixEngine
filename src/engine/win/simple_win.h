@@ -5,6 +5,7 @@
 #ifndef _W64 
 	#define _W64 __w64
 #endif
+#define INVALID_SET_FILE_POINTER ((DWORD)-1)
 #define CF_TEXT 1
 #define WSADESCRIPTION_LEN 256
 #define WSASYS_STATUS_LEN 128
