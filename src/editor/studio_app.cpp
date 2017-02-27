@@ -1691,12 +1691,12 @@ public:
 		u64 offset;
 		u64 size;
 
-		using Path = StaticString<MAX_PATH_LENGTH>;
+		char path[MAX_PATH_LENGTH];
 	};
 	#pragma pack()
 
 
-	void packDataScan(const char* dir_path, Array<PackFileInfo>& infos, Array<PackFileInfo::Path>& paths)
+	void packDataScan(const char* dir_path, AssociativeArray<u32, PackFileInfo>& infos)
 	{
 		auto* iter = PlatformInterface::createFileIterator(dir_path, m_allocator);
 		PlatformInterface::FileInfo info;
@@ -1712,24 +1712,28 @@ public:
 				if (dir_path[0] != '.') copyString(dir, dir_path);
 				catString(dir, info.filename);
 				catString(dir, "/");
-				packDataScan(dir, infos, paths);
+				packDataScan(dir, infos);
 				continue;
 			}
 
 			if(!includeFileInPack(normalized_path)) continue;
 
-			auto& out_path = paths.emplace();
+			StaticString<MAX_PATH_LENGTH> out_path;
 			if(dir_path[0] == '.')
 			{
-				copyString(out_path.data, lengthOf(out_path.data), normalized_path);
+				copyString(out_path.data, normalized_path);
 			}
 			else
 			{
-				copyString(out_path.data, lengthOf(out_path.data), dir_path);
-				catString(out_path.data, lengthOf(out_path.data), normalized_path);
+				copyString(out_path.data, dir_path);
+				catString(out_path.data, normalized_path);
 			}
-			auto& out_info = infos.emplace();
-			out_info.hash = crc32(out_path.data);
+			u32 hash = crc32(out_path.data);
+			if (infos.find(hash) >= 0) continue;
+
+			auto& out_info = infos.emplace(hash);
+			copyString(out_info.path, out_path);
+			out_info.hash = hash;
 			out_info.size = PlatformInterface::getFileSize(out_path.data);
 			out_info.offset = ~0UL;
 		}
@@ -1737,31 +1741,31 @@ public:
 	}
 
 
-
-	void packDataScanResources(Array<PackFileInfo>& infos, Array<PackFileInfo::Path>& paths)
+	void packDataScanResources(AssociativeArray<u32, PackFileInfo>& infos)
 	{
 		ResourceManager& rm = m_editor->getEngine().getResourceManager();
 		for (auto iter = rm.getAll().begin(), end = rm.getAll().end(); iter != end; ++iter)
 		{
 			const auto& resources = iter.value()->getResourceTable();
-			for (auto res_iter = resources.begin(), res_iter_end = resources.end(); res_iter != res_iter_end;
-				 ++res_iter)
+			for (Resource* res : resources)
 			{
-				Resource* res = res_iter.value();
-				copyString(paths.emplace().data, MAX_PATH_LENGTH, res->getPath().c_str());
-				auto& out_info = infos.emplace();
-				out_info.hash = crc32(res->getPath().c_str());
+				u32 hash = crc32(res->getPath().c_str());
+				auto& out_info = infos.emplace(hash);
+				copyString(out_info.path, MAX_PATH_LENGTH, res->getPath().c_str());
+				out_info.hash = hash;
 				out_info.size = PlatformInterface::getFileSize(res->getPath().c_str());
 				out_info.offset = ~0UL;
 			}
 		}
 		StaticString<MAX_PATH_LENGTH> unv_path;
 		unv_path << "universes/" << m_editor->getUniverse()->getName() << ".unv";
-		copyString(paths.emplace().data, MAX_PATH_LENGTH, unv_path);
-		auto& out_info = infos.emplace();
-		out_info.hash = crc32(unv_path);
+		u32 hash = crc32(unv_path);
+		auto& out_info = infos.emplace(hash);
+		copyString(out_info.path, MAX_PATH_LENGTH, unv_path);
+		out_info.hash = hash;
 		out_info.size = PlatformInterface::getFileSize(unv_path);
 		out_info.offset = ~0UL;
+		packDataScan("pipelines/", infos);
 	}
 
 
@@ -1803,19 +1807,17 @@ public:
 		static const char* OUT_FILENAME = "data.pak";
 		copyString(dest, m_pack.dest_dir);
 		catString(dest, OUT_FILENAME);
-		Array<PackFileInfo> infos(m_allocator);
-		Array<PackFileInfo::Path> paths(m_allocator);
+		AssociativeArray<u32, PackFileInfo> infos(m_allocator);
 		infos.reserve(10000);
-		paths.reserve(10000);
 		
 		switch (m_pack.mode)
 		{
-			case PackConfig::Mode::ALL_FILES: packDataScan("./", infos, paths); break;
-			case PackConfig::Mode::CURRENT_UNIVERSE: packDataScanResources(infos, paths); break;
+			case PackConfig::Mode::ALL_FILES: packDataScan("./", infos); break;
+			case PackConfig::Mode::CURRENT_UNIVERSE: packDataScanResources(infos); break;
 			default: ASSERT(false); break;
 		}
 		
-		if (infos.empty())
+		if (infos.size() == 0)
 		{
 			g_log_error.log("Editor") << "No files found while trying to create " << dest;
 			return;
@@ -1830,22 +1832,28 @@ public:
 
 		int count = infos.size();
 		file.write(&count, sizeof(count));
-		u64 offset = sizeof(count) + sizeof(infos[0]) * count;
+		u64 offset = sizeof(count) + (sizeof(u32) + sizeof(u64) * 2) * count;
 		for (auto& info : infos)
 		{
 			info.offset = offset;
 			offset += info.size;
 		}
-		file.write(&infos[0], sizeof(infos[0]) * count);
 
-		for (auto& path : paths)
+		for (auto& info : infos)
+		{
+			file.write(&info.hash, sizeof(info.hash));
+			file.write(&info.offset, sizeof(info.offset));
+			file.write(&info.size, sizeof(info.size));
+		}
+
+		for (auto& info : infos)
 		{
 			FS::OsFile src;
-			size_t src_size = PlatformInterface::getFileSize(path.data);
-			if (!src.open(path.data, FS::Mode::OPEN_AND_READ, m_allocator))
+			size_t src_size = PlatformInterface::getFileSize(info.path);
+			if (!src.open(info.path, FS::Mode::OPEN_AND_READ, m_allocator))
 			{
 				file.close();
-				g_log_error.log("Editor") << "Could not open " << path.data;
+				g_log_error.log("Editor") << "Could not open " << info.path;
 				return;
 			}
 			u8 buf[4096];
@@ -1855,7 +1863,7 @@ public:
 				if (!src.read(buf, batch_size))
 				{
 					file.close();
-					g_log_error.log("Editor") << "Could not read " << path.data;
+					g_log_error.log("Editor") << "Could not read " << info.path;
 					return;
 				}
 				file.write(buf, batch_size);
