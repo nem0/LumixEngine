@@ -92,6 +92,18 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc,
 		}
 		break;
 	}
+	case Lumix::IPropertyDescriptor::UNSIGNED_INTEGER:
+	{
+		unsigned int ui;
+		tmp.read(ui);
+		int i = (int)ui;
+		if (ImGui::DragInt(desc_name, &i))
+		{
+			ui = (unsigned int)i;
+			m_editor.setProperty(cmp_type, index, desc, &entities[0], entities.size(), &ui, sizeof(ui));
+		}
+		break;
+	}
 	case Lumix::IPropertyDescriptor::BOOL:
 	{
 		bool b;
