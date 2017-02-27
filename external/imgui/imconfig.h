@@ -8,7 +8,11 @@
 
 //---- Define assertion handler. Defaults to calling assert().
 #ifdef _WIN32
-    #define IM_ASSERT(_EXPR)  do { if(!(_EXPR)) __debugbreak(); } while(false)
+	#ifdef _DEBUG
+		#define IM_ASSERT(_EXPR)  do { if(!(_EXPR)) __debugbreak(); } while(false)
+	#else
+		#define IM_ASSERT(_EXPR)  
+	#endif
 #endif
 
 //---- Define attributes of all API symbols declarations, e.g. for DLL under Windows.

@@ -1757,7 +1757,11 @@ public:
 				out_info.offset = ~0UL;
 			}
 		}
+		packDataScan("pipelines/", infos);
 		StaticString<MAX_PATH_LENGTH> unv_path;
+		unv_path << "universes/" << m_editor->getUniverse()->getName() << "/";
+		packDataScan(unv_path, infos);
+		unv_path.data[0] = 0;
 		unv_path << "universes/" << m_editor->getUniverse()->getName() << ".unv";
 		u32 hash = crc32(unv_path);
 		auto& out_info = infos.emplace(hash);
@@ -1765,7 +1769,7 @@ public:
 		out_info.hash = hash;
 		out_info.size = PlatformInterface::getFileSize(unv_path);
 		out_info.offset = ~0UL;
-		packDataScan("pipelines/", infos);
+		
 	}
 
 
