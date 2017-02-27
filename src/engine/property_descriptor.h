@@ -227,8 +227,7 @@ public:
 public:
 	IntPropertyDescriptor() {}
 
-	IntPropertyDescriptor(const char* name, Getter _getter, Setter _setter, IAllocator& allocator)
-		: IPropertyDescriptor(allocator)
+	IntPropertyDescriptor(const char* name, Getter _getter, Setter _setter)
 	{
 		setName(name);
 		m_single.getter = _getter;
