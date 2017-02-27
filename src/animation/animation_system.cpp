@@ -220,6 +220,11 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	void setControllerFloatInput(ComponentHandle cmp, int input_idx, float value)
 	{
 		Controller& controller = m_controllers.get({ cmp.index });
+		if (!controller.root)
+		{
+			g_log_warning.log("Animation") << "Trying to set input " << input_idx << " before the controller is ready";
+			return;
+		}
 		Anim::InputDecl& decl = controller.resource->getInputDecl();
 		if (input_idx < 0 || input_idx >= decl.inputs_count) return;
 		if (decl.inputs[input_idx].type == Anim::InputDecl::FLOAT)
@@ -236,6 +241,11 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	void setControllerIntInput(ComponentHandle cmp, int input_idx, int value)
 	{
 		Controller& controller = m_controllers.get({ cmp.index });
+		if (!controller.root)
+		{
+			g_log_warning.log("Animation") << "Trying to set input " << input_idx << " before the controller is ready";
+			return;
+		}
 		Anim::InputDecl& decl = controller.resource->getInputDecl();
 		if (decl.inputs[input_idx].type == Anim::InputDecl::INT)
 		{
@@ -251,6 +261,11 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	void setControllerBoolInput(ComponentHandle cmp, int input_idx, bool value)
 	{
 		Controller& controller = m_controllers.get({ cmp.index });
+		if (!controller.root)
+		{
+			g_log_warning.log("Animation") << "Trying to set input " << input_idx << " before the controller is ready";
+			return;
+		}
 		Anim::InputDecl& decl = controller.resource->getInputDecl();
 		if (decl.inputs[input_idx].type == Anim::InputDecl::BOOL)
 		{
@@ -258,7 +273,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		}
 		else
 		{
-			g_log_warning.log("Animation") << "Trying to set float to " << decl.inputs[input_idx].name;
+			g_log_warning.log("Animation") << "Trying to set bool to " << decl.inputs[input_idx].name;
 		}
 	}
 
@@ -483,6 +498,10 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		auto& controller = m_controllers.get({cmp.index});
 		unloadController(controller.resource);
 		controller.resource = loadController(path);
+		if (controller.resource->isReady() && m_is_game_running)
+		{
+			initControllerRuntime(controller);
+		}
 	}
 
 
