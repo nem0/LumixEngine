@@ -788,6 +788,7 @@ void ParticleEmitter::deserialize(InputBlob& blob, ResourceManager& manager)
 		module = createModule(type, *this);
 		if (module)
 		{
+			module->deserialize(blob);
 			m_modules.push(module);
 		}
 	}
