@@ -216,7 +216,7 @@ private:
 };
 
 
-template <class S> class IntPropertyDescriptor : public IPropertyDescriptor
+template <class S> class IntPropertyDescriptor : public INumericPropertyDescriptor<int>
 {
 public:
 	typedef int (S::*Getter)(ComponentHandle);
@@ -235,6 +235,7 @@ public:
 		m_type = INTEGER;
 		m_min = getIntPropertyMin();
 		m_max = getIntPropertyMax();
+		m_step = 1;
 	}
 
 
@@ -246,6 +247,7 @@ public:
 		m_type = INTEGER;
 		m_min = getIntPropertyMin();
 		m_max = getIntPropertyMax();
+		m_step = 1;
 	}
 
 
@@ -286,10 +288,6 @@ public:
 	}
 
 
-	int getMin() const { return m_min; }
-	int getMax() const { return m_max; }
-
-
 private:
 	union
 	{
@@ -304,9 +302,6 @@ private:
 			ArraySetter setter;
 		} m_array;
 	};
-
-	int m_min;
-	int m_max;
 };
 
 
@@ -726,86 +721,7 @@ public:
 };
 
 
-template <typename T, class S> class NumericPropertyDescriptor : public IPropertyDescriptor
-{
-public:
-	typedef T(S::*Getter)(ComponentHandle);
-	typedef void (S::*Setter)(ComponentHandle, const T);
-	typedef T(S::*ArrayGetter)(ComponentHandle, T);
-	typedef void (S::*ArraySetter)(ComponentHandle, T, const T);
-
-public:
-	NumericPropertyDescriptor(const char* name,
-		Getter getter,
-		Setter setter)
-	{
-		setName(name);
-		m_single.getter = getter;
-		m_single.setter = setter;
-		m_type = toPropertyType<T>();
-	}
-
-
-	NumericPropertyDescriptor(const char* name,
-		ArrayGetter getter,
-		ArraySetter setter)
-	{
-		setName(name);
-		m_array.getter = getter;
-		m_array.setter = setter;
-		m_type = toPropertyType<T>();
-	}
-
-
-	void set(ComponentUID cmp, int index, InputBlob& stream) const override
-	{
-		T v;
-		stream.read(&v, sizeof(v));
-		if (index < 0)
-		{
-			(static_cast<S*>(cmp.scene)->*m_single.setter)(cmp.handle, v);
-		}
-		else
-		{
-			(static_cast<S*>(cmp.scene)->*m_array.setter)(cmp.handle, index, v);
-		}
-	};
-
-
-	void get(ComponentUID cmp, int index, OutputBlob& stream) const override
-	{
-		int len = sizeof(T);
-		if (index < 0)
-		{
-			T v = (static_cast<S*>(cmp.scene)->*m_single.getter)(cmp.handle);
-			stream.write(&v, len);
-		}
-		else
-		{
-			T v = (static_cast<S*>(cmp.scene)->*m_array.getter)(cmp.handle, index);
-			stream.write(&v, len);
-		}
-	};
-
-
-private:
-	union
-	{
-		struct
-		{
-			Getter getter;
-			Setter setter;
-		} m_single;
-		struct
-		{
-			ArrayGetter getter;
-			ArraySetter setter;
-		} m_array;
-	};
-};
-
-
-template <class S> class DecimalPropertyDescriptor : public IDecimalPropertyDescriptor
+template <class S> class DecimalPropertyDescriptor : public INumericPropertyDescriptor<float>
 {
 public:
 	typedef float (S::*Getter)(ComponentHandle);
