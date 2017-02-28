@@ -249,6 +249,8 @@ public:
 		for (auto& probe : m_environment_probes)
 		{
 			if (probe.texture) probe.texture->getResourceManager().unload(*probe.texture);
+			if (probe.radiance) probe.radiance->getResourceManager().unload(*probe.radiance);
+			if (probe.irradiance) probe.irradiance->getResourceManager().unload(*probe.irradiance);
 		}
 		m_environment_probes.clear();
 	}
