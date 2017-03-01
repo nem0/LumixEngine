@@ -1784,6 +1784,9 @@ public:
 		int versions[ComponentType::MAX_TYPES_COUNT];
 		while (PlatformInterface::getNextFile(scn_file_iter, &info))
 		{
+			if (info.is_directory) continue;
+			if (info.filename[0] == '.') continue;
+
 			StaticString<MAX_PATH_LENGTH> filepath(scn_dir, info.filename);
 			loadFile(filepath, [&versions, &filepath, this](TextDeserializer& deserializer) {
 				char plugin_name[64];
@@ -1815,8 +1818,9 @@ public:
 		auto file_iter = PlatformInterface::createFileIterator(dir, m_allocator);
 		while (PlatformInterface::getNextFile(file_iter, &info))
 		{
-			if (info.filename[0] == '.') continue;
 			if (info.is_directory) continue;
+			if (info.filename[0] == '.') continue;
+
 			FS::OsFile file;
 			StaticString<MAX_PATH_LENGTH> filepath(dir, info.filename);
 			char tmp[20];
@@ -1831,6 +1835,9 @@ public:
 		file_iter = PlatformInterface::createFileIterator(dir, m_allocator);
 		while (PlatformInterface::getNextFile(file_iter, &info))
 		{
+			if (info.is_directory) continue;
+			if (info.filename[0] == '.') continue;
+
 			FS::OsFile file;
 			StaticString<MAX_PATH_LENGTH> filepath(dir, info.filename);
 			char tmp[20];
@@ -1932,17 +1939,20 @@ public:
 
 	void clearUniverseDir(const char* dir)
 	{
-		PlatformInterface::FileInfo file_info;
+		PlatformInterface::FileInfo info;
 		auto file_iter = PlatformInterface::createFileIterator(dir, m_allocator);
-		while (PlatformInterface::getNextFile(file_iter, &file_info))
+		while (PlatformInterface::getNextFile(file_iter, &info))
 		{
+			if (info.is_directory) continue;
+			if (info.filename[0] == '.') continue;
+
 			char basename[64];
-			PathUtils::getBasename(basename, lengthOf(basename), file_info.filename);
+			PathUtils::getBasename(basename, lengthOf(basename), info.filename);
 			EntityGUID guid;
 			fromCString(basename, lengthOf(basename), &guid.value);
 			if (!m_entity_map.has(guid))
 			{
-				StaticString<MAX_PATH_LENGTH> filepath(dir, file_info.filename);
+				StaticString<MAX_PATH_LENGTH> filepath(dir, info.filename);
 				PlatformInterface::deleteFile(filepath);
 			}
 		}
@@ -3323,6 +3333,7 @@ public:
 		{
 			if (info.is_directory) continue;
 			if (info.filename[0] == '.') continue;
+
 			StaticString<MAX_PATH_LENGTH> dst_path(result_dir, info.filename);
 			if (!PlatformInterface::fileExists(dst_path))
 			{
