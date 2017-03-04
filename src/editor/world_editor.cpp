@@ -1689,12 +1689,14 @@ public:
 		EntityGUIDMap(IAllocator& allocator)
 			: guid_to_entity(allocator)
 			, entity_to_guid(allocator)
+			, is_random(true)
 		{
 		}
 
 
 		void clear()
 		{
+			nonrandom_guid = 0;
 			entity_to_guid.clear();
 			guid_to_entity.clear();
 		}
@@ -1703,7 +1705,7 @@ public:
 		void create(Entity entity)
 		{
 			ASSERT(isValid(entity));
-			EntityGUID guid = { Math::randGUID() };
+			EntityGUID guid = { is_random ? Math::randGUID() : ++nonrandom_guid };
 			insert(guid, entity);
 		}
 
@@ -1753,7 +1755,8 @@ public:
 
 		HashMap<u64, Entity> guid_to_entity;
 		Array<EntityGUID> entity_to_guid;
-		u64 last_guid = 9999;
+		u64 nonrandom_guid = 0;
+		bool is_random = true;
 	};
 
 
@@ -1823,7 +1826,7 @@ public:
 
 			FS::OsFile file;
 			StaticString<MAX_PATH_LENGTH> filepath(dir, info.filename);
-			char tmp[20];
+			char tmp[32];
 			PathUtils::getBasename(tmp, lengthOf(tmp), filepath);
 			EntityGUID guid;
 			fromCString(tmp, lengthOf(tmp), &guid.value);
@@ -1840,7 +1843,7 @@ public:
 
 			FS::OsFile file;
 			StaticString<MAX_PATH_LENGTH> filepath(dir, info.filename);
-			char tmp[20];
+			char tmp[32];
 			PathUtils::getBasename(tmp, lengthOf(tmp), filepath);
 			EntityGUID guid;
 			fromCString(tmp, lengthOf(tmp), &guid.value);
@@ -3009,7 +3012,6 @@ public:
 
 		m_is_universe_changed = false;
 		destroyUndoStack();
-		if (m_is_guid_pseudorandom) Math::seedRandomGUID(0);
 		m_universe = &m_engine->createUniverse(true);
 		Universe* universe = m_universe;
 
@@ -3021,6 +3023,8 @@ public:
 		m_entity_groups.setUniverse(universe);
 
 		m_camera = universe->createEntity(Vec3(0, 0, -5), Quat(Vec3(0, 1, 0), -Math::PI));
+		m_entity_map.is_random = !m_is_guid_pseudorandom;
+		m_entity_map.clear();
 		m_entity_map.create(m_camera);
 
 		universe->setEntityName(m_camera, "editor_camera");

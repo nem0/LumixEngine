@@ -169,7 +169,6 @@ inline float easeInOut(float t)
 
 LUMIX_ENGINE_API float pow(float base, float exponent);
 LUMIX_ENGINE_API u64 randGUID();
-LUMIX_ENGINE_API void seedRandomGUID(u32 seed);
 LUMIX_ENGINE_API u32 rand();
 LUMIX_ENGINE_API u32 rand(u32 from, u32 to);
 LUMIX_ENGINE_API void seedRandom(u32 seed);
