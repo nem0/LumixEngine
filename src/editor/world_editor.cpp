@@ -1689,12 +1689,14 @@ public:
 		EntityGUIDMap(IAllocator& allocator)
 			: guid_to_entity(allocator)
 			, entity_to_guid(allocator)
+			, is_random(true)
 		{
 		}
 
 
 		void clear()
 		{
+			nonrandom_guid = 0;
 			entity_to_guid.clear();
 			guid_to_entity.clear();
 		}
@@ -1703,7 +1705,7 @@ public:
 		void create(Entity entity)
 		{
 			ASSERT(isValid(entity));
-			EntityGUID guid = { Math::randGUID() };
+			EntityGUID guid = { is_random ? Math::randGUID() : ++nonrandom_guid };
 			insert(guid, entity);
 		}
 
@@ -1753,7 +1755,8 @@ public:
 
 		HashMap<u64, Entity> guid_to_entity;
 		Array<EntityGUID> entity_to_guid;
-		u64 last_guid = 9999;
+		u64 nonrandom_guid = 0;
+		bool is_random = true;
 	};
 
 
@@ -1784,6 +1787,9 @@ public:
 		int versions[ComponentType::MAX_TYPES_COUNT];
 		while (PlatformInterface::getNextFile(scn_file_iter, &info))
 		{
+			if (info.is_directory) continue;
+			if (info.filename[0] == '.') continue;
+
 			StaticString<MAX_PATH_LENGTH> filepath(scn_dir, info.filename);
 			loadFile(filepath, [&versions, &filepath, this](TextDeserializer& deserializer) {
 				char plugin_name[64];
@@ -1815,11 +1821,12 @@ public:
 		auto file_iter = PlatformInterface::createFileIterator(dir, m_allocator);
 		while (PlatformInterface::getNextFile(file_iter, &info))
 		{
-			if (info.filename[0] == '.') continue;
 			if (info.is_directory) continue;
+			if (info.filename[0] == '.') continue;
+
 			FS::OsFile file;
 			StaticString<MAX_PATH_LENGTH> filepath(dir, info.filename);
-			char tmp[20];
+			char tmp[32];
 			PathUtils::getBasename(tmp, lengthOf(tmp), filepath);
 			EntityGUID guid;
 			fromCString(tmp, lengthOf(tmp), &guid.value);
@@ -1831,9 +1838,12 @@ public:
 		file_iter = PlatformInterface::createFileIterator(dir, m_allocator);
 		while (PlatformInterface::getNextFile(file_iter, &info))
 		{
+			if (info.is_directory) continue;
+			if (info.filename[0] == '.') continue;
+
 			FS::OsFile file;
 			StaticString<MAX_PATH_LENGTH> filepath(dir, info.filename);
-			char tmp[20];
+			char tmp[32];
 			PathUtils::getBasename(tmp, lengthOf(tmp), filepath);
 			EntityGUID guid;
 			fromCString(tmp, lengthOf(tmp), &guid.value);
@@ -1932,17 +1942,20 @@ public:
 
 	void clearUniverseDir(const char* dir)
 	{
-		PlatformInterface::FileInfo file_info;
+		PlatformInterface::FileInfo info;
 		auto file_iter = PlatformInterface::createFileIterator(dir, m_allocator);
-		while (PlatformInterface::getNextFile(file_iter, &file_info))
+		while (PlatformInterface::getNextFile(file_iter, &info))
 		{
+			if (info.is_directory) continue;
+			if (info.filename[0] == '.') continue;
+
 			char basename[64];
-			PathUtils::getBasename(basename, lengthOf(basename), file_info.filename);
+			PathUtils::getBasename(basename, lengthOf(basename), info.filename);
 			EntityGUID guid;
 			fromCString(basename, lengthOf(basename), &guid.value);
 			if (!m_entity_map.has(guid))
 			{
-				StaticString<MAX_PATH_LENGTH> filepath(dir, file_info.filename);
+				StaticString<MAX_PATH_LENGTH> filepath(dir, info.filename);
 				PlatformInterface::deleteFile(filepath);
 			}
 		}
@@ -2999,7 +3012,6 @@ public:
 
 		m_is_universe_changed = false;
 		destroyUndoStack();
-		if (m_is_guid_pseudorandom) Math::seedRandomGUID(0);
 		m_universe = &m_engine->createUniverse(true);
 		Universe* universe = m_universe;
 
@@ -3011,6 +3023,8 @@ public:
 		m_entity_groups.setUniverse(universe);
 
 		m_camera = universe->createEntity(Vec3(0, 0, -5), Quat(Vec3(0, 1, 0), -Math::PI));
+		m_entity_map.is_random = !m_is_guid_pseudorandom;
+		m_entity_map.clear();
 		m_entity_map.create(m_camera);
 
 		universe->setEntityName(m_camera, "editor_camera");
@@ -3323,6 +3337,7 @@ public:
 		{
 			if (info.is_directory) continue;
 			if (info.filename[0] == '.') continue;
+
 			StaticString<MAX_PATH_LENGTH> dst_path(result_dir, info.filename);
 			if (!PlatformInterface::fileExists(dst_path))
 			{

@@ -34,6 +34,14 @@ namespace Lumix
 {
 
 
+enum class AnimationSceneVersion : int
+{
+	USE_ROOT_MOTION,
+
+	LATEST
+};
+
+
 static const ComponentType NAVMESH_AGENT_TYPE = PropertyRegister::getComponentType("navmesh_agent");
 static const int CELLS_PER_TILE_SIDE = 256;
 static const float CELL_SIZE = 0.3f;
@@ -42,11 +50,17 @@ static void registerLuaAPI(lua_State* L);
 
 struct Agent
 {
+	enum Flags : u32
+	{
+		USE_ROOT_MOTION = 1 << 0
+	};
+
 	Entity entity;
 	float radius;
 	float height;
 	int agent;
 	bool is_finished;
+	u32 flags = 0;
 	Vec3 root_motion = {0, 0, 0};
 	float speed = 0;
 };
@@ -400,10 +414,13 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 			Vec3 pos = m_universe.getPosition(agent.entity);
 			Quat rot = m_universe.getRotation(agent.entity);
 			Vec3 diff = *(Vec3*)dt_agent->npos - pos;
-			*(Vec3*)dt_agent->npos = pos + rot.rotate(agent.root_motion);
-			agent.root_motion.set(0, 0, 0);
-			diff.y = 0;
-			agent.speed = diff.length() / time_delta;
+			if (agent.flags & Agent::USE_ROOT_MOTION)
+			{
+				*(Vec3*)dt_agent->npos = pos + rot.rotate(agent.root_motion);
+				agent.root_motion.set(0, 0, 0);
+				diff.y = 0;
+				agent.speed = diff.length() / time_delta;
+			}
 		}
 		
 		m_crowd->doMove(time_delta);
@@ -414,8 +431,6 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 			if (dt_agent->paused) continue;
 
 			m_universe.setPosition(agent.entity, *(Vec3*)dt_agent->npos);
-			Vec3 velocity = *(Vec3*)dt_agent->vel;
-			float speed = velocity.length();
 
 			if (dt_agent->ncorners == 0)
 			{
@@ -1301,6 +1316,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 			agent.radius = 0.5f;
 			agent.height = 2.0f;
 			agent.agent = -1;
+			agent.flags = Agent::USE_ROOT_MOTION;
 			agent.is_finished = true;
 			if (m_crowd) addCrowdAgent(agent);
 			m_agents.insert(entity, agent);
@@ -1330,20 +1346,31 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	}
 
 
+	int getVersion() const override { return (int)AnimationSceneVersion::LATEST; }
+
+
 	void serializeAgent(ISerializer& serializer, ComponentHandle cmp)
 	{
 		Agent& agent = m_agents[{cmp.index}];
 		serializer.write("radius", agent.radius);
 		serializer.write("height", agent.height);
+		serializer.write("use_root_motion", (agent.flags & Agent::USE_ROOT_MOTION) != 0);
 	}
 
 
-	void deserializeAgent(IDeserializer& serializer, Entity entity, int /*scene_version*/)
+	void deserializeAgent(IDeserializer& serializer, Entity entity, int scene_version)
 	{
 		Agent agent;
 		agent.entity = entity;
 		serializer.read(&agent.radius);
 		serializer.read(&agent.height);
+		if (scene_version > (int)AnimationSceneVersion::USE_ROOT_MOTION)
+		{
+			agent.flags = 0;
+			bool b;
+			serializer.read(&b);
+			if (b) agent.flags = Agent::USE_ROOT_MOTION;
+		}
 		agent.is_finished = true;
 		agent.agent = -1;
 		m_agents.insert(agent.entity, agent);
@@ -1361,6 +1388,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 			serializer.write(iter.key());
 			serializer.write(iter.value().radius);
 			serializer.write(iter.value().height);
+			serializer.write(iter.value().flags);
 		}
 	}
 
@@ -1376,12 +1404,30 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 			serializer.read(agent.entity);
 			serializer.read(agent.radius);
 			serializer.read(agent.height);
+			serializer.read(agent.flags);
 			agent.is_finished = true;
 			agent.agent = -1;
 			m_agents.insert(agent.entity, agent);
 			ComponentHandle cmp = {agent.entity.index};
 			m_universe.addComponent(agent.entity, NAVMESH_AGENT_TYPE, this, cmp);
 		}
+	}
+
+
+	bool useAgentRootMotion(ComponentHandle cmp)
+	{
+		Entity entity = {cmp.index};
+		return (m_agents[entity].flags & Agent::USE_ROOT_MOTION) != 0;
+	}
+
+
+	void setUseAgentRootMotion(ComponentHandle cmp, bool use_root_motion)
+	{
+		Entity entity = {cmp.index};
+		if (use_root_motion)
+			m_agents[entity].flags |= Agent::USE_ROOT_MOTION;
+		else
+			m_agents[entity].flags &= ~Agent::USE_ROOT_MOTION;
 	}
 
 
@@ -1451,6 +1497,9 @@ void NavigationSystem::registerProperties()
 	PropertyRegister::add("navmesh_agent",
 		LUMIX_NEW(allocator, DecimalPropertyDescriptor<NavigationSceneImpl>)(
 			"height", &NavigationSceneImpl::getAgentHeight, &NavigationSceneImpl::setAgentHeight, 0, 999.0f, 0.1f));
+	PropertyRegister::add("navmesh_agent",
+		LUMIX_NEW(allocator, BoolPropertyDescriptor<NavigationSceneImpl>)(
+			"use root motion", &NavigationSceneImpl::useAgentRootMotion, &NavigationSceneImpl::setUseAgentRootMotion));
 }
 
 
