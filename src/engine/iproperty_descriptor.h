@@ -58,23 +58,22 @@ protected:
 };
 
 
-class LUMIX_ENGINE_API IDecimalPropertyDescriptor : public IPropertyDescriptor
+template<typename T>
+class LUMIX_ENGINE_API INumericPropertyDescriptor : public IPropertyDescriptor
 {
 public:
-	IDecimalPropertyDescriptor();
+	T getMin() const { return m_min; }
+	T getMax() const { return m_max; }
+	T getStep() const { return m_step; }
 
-	float getMin() const { return m_min; }
-	float getMax() const { return m_max; }
-	float getStep() const { return m_step; }
-
-	void setMin(float value) { m_min = value; }
-	void setMax(float value) { m_max = value; }
-	void setStep(float value) { m_step = value; }
+	void setMin(T value) { m_min = value; }
+	void setMax(T value) { m_max = value; }
+	void setStep(T value) { m_step = value; }
 
 protected:
-	float m_min;
-	float m_max;
-	float m_step;
+	T m_min;
+	T m_max;
+	T m_step;
 };
 
 
