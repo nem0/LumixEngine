@@ -27,13 +27,4 @@ LUMIX_ENGINE_API int getIntPropertyMax()
 }
 
 
-IDecimalPropertyDescriptor::IDecimalPropertyDescriptor()
-{
-	m_min = -FLT_MAX;
-	m_max = FLT_MAX;
-	m_step = 0.1f;
-}
-
-
-
 } // namespace Lumix

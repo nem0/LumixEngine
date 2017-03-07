@@ -62,7 +62,7 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc,
 	{
 		float f;
 		tmp.read(f);
-		auto& d = static_cast<Lumix::IDecimalPropertyDescriptor&>(desc);
+		auto& d = static_cast<Lumix::INumericPropertyDescriptor<float>&>(desc);
 		if (d.isInRadians()) f = Lumix::Math::radiansToDegrees(f);
 		if ((d.getMax() - d.getMin()) / d.getStep() <= 100)
 		{
@@ -86,7 +86,8 @@ void PropertyGrid::showProperty(Lumix::IPropertyDescriptor& desc,
 	{
 		int i;
 		tmp.read(i);
-		if (ImGui::DragInt(desc_name, &i))
+		auto& d = static_cast<Lumix::INumericPropertyDescriptor<int>&>(desc);
+		if (ImGui::DragInt(desc_name, &i, (float)d.getStep(), d.getMin(), d.getMax()))
 		{
 			m_editor.setProperty(cmp_type, index, desc, &entities[0], entities.size(), &i, sizeof(i));
 		}
