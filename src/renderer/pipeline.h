@@ -30,6 +30,7 @@ class Path;
 class Renderer;
 class RenderScene;
 struct Vec4;
+class Material;
 
 
 struct CommandBufferGenerator
@@ -53,6 +54,17 @@ struct CommandBufferGenerator
 
 	u8 buffer[1024];
 	u8* pointer;
+};
+
+
+struct View
+{
+	u8 bgfx_id;
+	u64 layer_mask;
+	u64 render_state;
+	u32 stencil;
+	int pass_idx;
+	CommandBufferGenerator command_buffer;
 };
 
 
@@ -126,6 +138,10 @@ class LUMIX_RENDERER_API Pipeline
 		virtual float getWaitSubmitTime() const = 0;
 		virtual float getWaitRenderTime() const = 0;
 		virtual void callLuaFunction(const char* func) = 0;
+
+
+		virtual void executeCommandBuffer(const u8* data, Material* material) const = 0;
+		virtual View* getCurrentView() = 0;
 };
 
 

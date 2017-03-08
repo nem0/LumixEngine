@@ -48,15 +48,7 @@ struct InstanceData
 };
 
 
-struct View
-{
-	u8 bgfx_id;
-	u64 layer_mask;
-	u64 render_state;
-	u32 stencil;
-	int pass_idx;
-	CommandBufferGenerator command_buffer;
-};
+
 
 
 enum class BufferCommands : u8
@@ -2291,7 +2283,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
-	void executeCommandBuffer(const u8* data, Material* material) const
+	void executeCommandBuffer(const u8* data, Material* material) const override
 	{
 		const u8* ip = data;
 		for (;;)
@@ -2719,6 +2711,9 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 
 	bool isReady() const override { return m_is_ready; }
+
+
+	View* getCurrentView() override { return m_current_view; }
 
 
 	RenderScene* getScene() override
