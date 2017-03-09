@@ -1781,7 +1781,6 @@ public:
 
 	void onPackDataGUI()
 	{
-		if (!m_is_pack_data_dialog_opened) return;
 		if (ImGui::BeginDock("Pack data", &m_is_pack_data_dialog_opened))
 		{
 			ImGui::LabelText("Destination dir", "%s", m_pack.dest_dir.data);
