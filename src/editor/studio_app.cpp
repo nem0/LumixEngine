@@ -121,6 +121,7 @@ public:
 		: m_is_entity_list_opened(true)
 		, m_is_save_as_dialog_opened(false)
 		, m_finished(false)
+		, m_exit_game_mode(false)
 		, m_profiler_ui(nullptr)
 		, m_asset_browser(nullptr)
 		, m_property_grid(nullptr)
@@ -527,6 +528,12 @@ public:
 		m_editor->setMouseSensitivity(m_settings.m_mouse_sensitivity_x, m_settings.m_mouse_sensitivity_y);
 		m_editor->update();
 		m_engine->update(*m_editor->getUniverse());
+
+		if (m_exit_game_mode)
+		{
+			m_exit_game_mode = false;
+			m_editor->toggleGameMode();
+		}
 
 		for (auto* plugin : m_plugins)
 		{
@@ -1569,7 +1576,7 @@ public:
 
 	void LUA_exitGameMode()
 	{
-		m_editor->toggleGameMode();
+		m_exit_game_mode = true;
 	}
 
 
@@ -2302,6 +2309,7 @@ public:
 
 	PackConfig m_pack;
 	bool m_finished;
+	bool m_exit_game_mode;
 	int m_exit_code;
 
 	bool m_sleep_when_inactive;
