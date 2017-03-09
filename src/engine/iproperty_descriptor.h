@@ -59,7 +59,7 @@ protected:
 
 
 template<typename T>
-class LUMIX_ENGINE_API INumericPropertyDescriptor : public IPropertyDescriptor
+class INumericPropertyDescriptor : public IPropertyDescriptor
 {
 public:
 	T getMin() const { return m_min; }
