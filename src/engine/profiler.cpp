@@ -260,13 +260,15 @@ void record(const char* name, int value)
 }
 
 
-void beginBlock(const char* name)
+void* beginBlock(const char* name)
 {
 	auto data = getBlock(name);
 
 	auto& hit = data.block->m_hits.emplace();
 	hit.m_start = g_instance.timer->getRawTimeSinceStart();
 	hit.m_length = 0;
+
+	return data.block;
 }
 
 
@@ -341,7 +343,7 @@ Block* getRootBlock(MT::ThreadID thread_id)
 }
 
 
-void endBlock()
+void* endBlock()
 {
 	auto thread_id = MT::getCurrentThreadID();
 
@@ -354,9 +356,11 @@ void endBlock()
 	}
 
 	ASSERT(thread_data->current_block);
+	auto* block = thread_data->current_block;
 	u64 now = g_instance.timer->getRawTimeSinceStart();
 	thread_data->current_block->m_hits.back().m_length = now - thread_data->current_block->m_hits.back().m_start;
 	thread_data->current_block = thread_data->current_block->m_parent;
+	return block;
 }
 
 
