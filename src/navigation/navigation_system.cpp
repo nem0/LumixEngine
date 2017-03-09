@@ -408,6 +408,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 		
 		for (auto& agent : m_agents)
 		{
+			if (agent.agent < 0) continue;
 			const dtCrowdAgent* dt_agent = m_crowd->getAgent(agent.agent);
 			if (dt_agent->paused) continue;
 
@@ -427,6 +428,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 
 		for (auto& agent : m_agents)
 		{
+			if (agent.agent < 0) continue;
 			const dtCrowdAgent* dt_agent = m_crowd->getAgent(agent.agent);
 			if (dt_agent->paused) continue;
 
@@ -515,6 +517,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 		if (iter == m_agents.end()) return nullptr;
 
 		const Agent& agent = iter.value();
+		if (agent.agent < 0) return nullptr;
 		return m_crowd->getAgent(agent.agent);
 	}
 
@@ -528,7 +531,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 		auto iter = m_agents.find(entity);
 		if (iter == m_agents.end()) return;
 		const Agent& agent = iter.value();
-
+		if (agent.agent < 0) return;
 		const dtCrowdAgent* dt_agent = m_crowd->getAgent(agent.agent);
 
 		const dtPolyRef* path = dt_agent->corridor.getPath();
@@ -947,6 +950,8 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 		if (iter == m_agents.end()) return;
 
 		Agent& agent = iter.value();
+		if (agent.agent < 0) return;
+
 		m_crowd->resetMoveTarget(agent.agent);
 	}
 
@@ -955,9 +960,13 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	{
 		if (!m_crowd) return;
 		if (entity == INVALID_ENTITY) return;
+
 		auto iter = m_agents.find(entity);
 		if (iter == m_agents.end()) return;
+
 		Agent& agent = iter.value();
+		if (agent.agent < 0) return;
+
 		dtCrowdAgent* dt_agent = m_crowd->getEditableAgent(agent.agent);
 		if (dt_agent) dt_agent->paused = !active;
 	}
@@ -971,6 +980,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 		auto iter = m_agents.find(entity);
 		if (iter == m_agents.end()) return false;
 		Agent& agent = iter.value();
+		if (agent.agent < 0) return false;
 		dtPolyRef end_poly_ref;
 		dtQueryFilter filter;
 		static const float ext[] = { 1.0f, 20.0f, 1.0f };
@@ -1304,6 +1314,10 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 		params.pathOptimizationRange = params.radius * 30.0f;
 		params.updateFlags = DT_CROWD_ANTICIPATE_TURNS | DT_CROWD_SEPARATION | DT_CROWD_OBSTACLE_AVOIDANCE | DT_CROWD_OPTIMIZE_TOPO | DT_CROWD_OPTIMIZE_VIS;
 		agent.agent = m_crowd->addAgent(&pos.x, &params);
+		if (agent.agent < 0)
+		{
+			g_log_error.log("Navigation") << "Failed to create navigation actor";
+		}
 	}
 
 
@@ -1373,6 +1387,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 		}
 		agent.is_finished = true;
 		agent.agent = -1;
+		if (m_crowd) addCrowdAgent(agent);
 		m_agents.insert(agent.entity, agent);
 		ComponentHandle cmp = {agent.entity.index};
 		m_universe.addComponent(agent.entity, NAVMESH_AGENT_TYPE, this, cmp);
