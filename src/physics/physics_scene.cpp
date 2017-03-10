@@ -48,6 +48,14 @@ static const ResourceType PHYSICS_TYPE("physics");
 static const u32 RENDERER_HASH = crc32("renderer");
 
 
+enum class PhysicsSceneVersion
+{
+	DYNAMIC_TYPE,
+
+	LATEST,
+};
+
+
 struct RagdollBone
 {
 	enum Type : int
@@ -229,10 +237,10 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			: resource(nullptr)
 			, physx_actor(nullptr)
 			, scene(_scene)
-			, is_dynamic(false)
 			, layer(0)
 			, entity(INVALID_ENTITY)
 			, type(_type)
+			, dynamic_type(DynamicType::STATIC)
 		{
 		}
 
@@ -248,11 +256,11 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 		Entity entity;
 		int layer;
-		bool is_dynamic;
 		PxRigidActor* physx_actor;
 		PhysicsGeometry* resource;
 		PhysicsSceneImpl& scene;
 		ActorType type;
+		DynamicType dynamic_type;
 
 	private:
 		void onStateChanged(Resource::State old_state, Resource::State new_state, Resource&);
@@ -316,6 +324,12 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		m_default_material->release();
 		m_dummy_actor->release();
 		m_scene->release();
+	}
+
+
+	int getVersion() const override
+	{
+		return (int)PhysicsSceneVersion::LATEST;
 	}
 
 
@@ -1469,12 +1483,13 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	void setShapeSource(ComponentHandle cmp, const Path& str) override
 	{
 		ASSERT(m_actors[{cmp.index}]);
-		bool is_dynamic = isDynamic(cmp);
 		auto& actor = *m_actors[{cmp.index}];
-		if (actor.resource && actor.resource->getPath() == str &&
-			(!actor.physx_actor || is_dynamic == !actor.physx_actor->isRigidStatic()))
+		if (actor.resource && actor.resource->getPath() == str)
 		{
-			return;
+			bool is_kinematic = actor.physx_actor->isRigidBody()->getRigidBodyFlags().isSet(PxRigidBodyFlag::eKINEMATIC);
+			if (actor.dynamic_type == DynamicType::KINEMATIC && is_kinematic) return;
+			if (actor.dynamic_type == DynamicType::DYNAMIC && actor.physx_actor->isRigidDynamic()) return;
+			if (actor.dynamic_type == DynamicType::STATIC && actor.physx_actor->isRigidStatic()) return;
 		}
 
 		ResourceManagerBase* manager = m_engine->getResourceManager().get(PHYSICS_TYPE);
@@ -1588,7 +1603,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		for (auto& i : m_queued_forces)
 		{
 			auto* actor = m_actors[{i.cmp.index}];
-			if (!actor->is_dynamic)
+			if (actor->dynamic_type != DynamicType::DYNAMIC)
 			{
 				g_log_warning.log("Physics") << "Trying to apply force to static object";
 				return;
@@ -2642,23 +2657,9 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	bool isDynamic(ComponentHandle cmp) override
+	DynamicType getDynamicType(ComponentHandle cmp) override
 	{
-		RigidActor* actor = m_actors[{cmp.index}];
-		return isDynamic(actor);
-	}
-
-
-	bool isDynamic(RigidActor* actor)
-	{
-		for (int i = 0, c = m_dynamic_actors.size(); i < c; ++i)
-		{
-			if (m_dynamic_actors[i] == actor)
-			{
-				return true;
-			}
-		}
-		return false;
+		return m_actors[{cmp.index}]->dynamic_type;
 	}
 
 
@@ -2696,15 +2697,27 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	void setIsDynamic(ComponentHandle cmp, bool new_value) override
+	void setDynamicType(ComponentHandle cmp, DynamicType new_value) override
 	{
 		RigidActor* actor = m_actors[{cmp.index}];
-		int dynamic_index = m_dynamic_actors.indexOf(actor);
-		bool is_dynamic = dynamic_index != -1;
-		if (is_dynamic == new_value) return;
+		if (actor->dynamic_type == new_value) return;
 
-		actor->is_dynamic = new_value;
-		if (new_value)
+		if (actor->type == ActorType::MESH && new_value != DynamicType::STATIC)
+		{
+			PxShape* shape;
+			if (actor->physx_actor->getShapes(&shape, 1, 0) == 1)
+			{
+				PxTriangleMeshGeometry geom;
+				if (shape->getTriangleMeshGeometry(geom))
+				{
+					g_log_error.log("Physics") << "Triangles mesh can only be static";
+					return;
+				}
+			}
+		}
+
+		actor->dynamic_type = new_value;
+		if (new_value == DynamicType::DYNAMIC)
 		{
 			m_dynamic_actors.push(actor);
 		}
@@ -2719,17 +2732,8 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			PxGeometryHolder geom = shapes->getGeometry();
 			PxTransform transform = toPhysx(m_universe.getTransform(actor->entity));
 
-			PxRigidActor* physx_actor;
-			if (new_value)
-			{
-				physx_actor = PxCreateDynamic(*m_system->getPhysics(), transform, geom.any(), *m_default_material, 1.0f);
-			}
-			else
-			{
-				physx_actor = PxCreateStatic(*m_system->getPhysics(), transform, geom.any(), *m_default_material);
-			}
-			ASSERT(actor);
-			physx_actor->userData = (void*)(intptr_t)actor->entity.index;
+			PxRigidActor* physx_actor = createPhysXActor(actor, transform, geom.any());
+			if (physx_actor) physx_actor->userData = (void*)(intptr_t)actor->entity.index;
 			actor->setPhysxActor(physx_actor);
 		}
 	}
@@ -3138,18 +3142,34 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	{
 		RigidActor* actor = m_actors[{cmp.index}];
 		serializer.write("layer", actor->layer);
-		serializer.write("is_dynamic", actor->is_dynamic);
+		serializer.write("dynamic_type", (int)actor->dynamic_type);
 		serializer.write("source", actor->resource ? actor->resource->getPath().c_str() : "");
 	}
 
 
-	void deserializeMeshActor(IDeserializer& serializer, Entity entity, int /*scene_version*/)
+	void deserializeDynamicType(IDeserializer& serializer, RigidActor* actor, int scene_version)
+	{
+		if (scene_version <= (int)PhysicsSceneVersion::DYNAMIC_TYPE)
+		{
+			bool is_dynamic;
+			serializer.read(&is_dynamic);
+			actor->dynamic_type = is_dynamic ? DynamicType::DYNAMIC : DynamicType::STATIC;
+		}
+		else
+		{
+			serializer.read((int*)&actor->dynamic_type);
+		}
+		if (actor->dynamic_type == DynamicType::DYNAMIC) m_dynamic_actors.push(actor);
+
+	}
+
+
+	void deserializeMeshActor(IDeserializer& serializer, Entity entity, int scene_version)
 	{
 		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, ActorType::MESH);
 		actor->entity = entity;
 		serializer.read(&actor->layer);
-		serializer.read(&actor->is_dynamic);
-		if (actor->is_dynamic) m_dynamic_actors.push(actor);
+		deserializeDynamicType(serializer, actor, scene_version);
 		m_actors.insert(actor->entity, actor);
 
 		char tmp[MAX_PATH_LENGTH];
@@ -3166,7 +3186,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	{
 		RigidActor* actor = m_actors[{cmp.index}];
 		serializer.write("layer", actor->layer);
-		serializer.write("is_dynamic", actor->is_dynamic);
+		serializer.write("dynamic_type", (int)actor->dynamic_type);
 		PxShape* shape;
 		ASSERT(actor->physx_actor->getNbShapes() == 1);
 		actor->physx_actor->getShapes(&shape, 1);
@@ -3178,13 +3198,12 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	void deserializeBoxActor(IDeserializer& serializer, Entity entity, int /*scene_version*/)
+	void deserializeBoxActor(IDeserializer& serializer, Entity entity, int scene_version)
 	{
 		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, ActorType::BOX);
 		actor->entity = entity;
 		serializer.read(&actor->layer);
-		serializer.read(&actor->is_dynamic);
-		if (actor->is_dynamic) m_dynamic_actors.push(actor);
+		deserializeDynamicType(serializer, actor, scene_version);
 		m_actors.insert(actor->entity, actor);
 
 		PxBoxGeometry box_geom;
@@ -3193,14 +3212,18 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		serializer.read(&box_geom.halfExtents.y);
 		serializer.read(&box_geom.halfExtents.z);
 		PxRigidActor* physx_actor;
-		if (actor->is_dynamic)
+		switch (actor->dynamic_type)
 		{
-			physx_actor =
-				PxCreateDynamic(*m_system->getPhysics(), transform, box_geom, *m_default_material, 1.0f);
-		}
-		else
-		{
+		case DynamicType::DYNAMIC:
+			physx_actor = PxCreateDynamic(*m_system->getPhysics(), transform, box_geom, *m_default_material, 1.0f);
+			break;
+		case DynamicType::KINEMATIC:
+			physx_actor = PxCreateDynamic(*m_system->getPhysics(), transform, box_geom, *m_default_material, 1.0f);
+			physx_actor->isRigidBody()->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, true);
+			break;
+		case DynamicType::STATIC:
 			physx_actor = PxCreateStatic(*m_system->getPhysics(), transform, box_geom, *m_default_material);
+			break;
 		}
 		actor->setPhysxActor(physx_actor);
 
@@ -3212,7 +3235,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	{
 		RigidActor* actor = m_actors[{cmp.index}];
 		serializer.write("layer", actor->layer);
-		serializer.write("is_dynamic", actor->is_dynamic);
+		serializer.write("dynamic_cast", (int)actor->dynamic_type);
 		PxShape* shape;
 		ASSERT(actor->physx_actor->getNbShapes() == 1);
 		actor->physx_actor->getShapes(&shape, 1);
@@ -3223,13 +3246,12 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	void deserializeCapsuleActor(IDeserializer& serializer, Entity entity, int /*scene_version*/)
+	void deserializeCapsuleActor(IDeserializer& serializer, Entity entity, int scene_version)
 	{
 		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, ActorType::CAPSULE);
 		actor->entity = entity;
 		serializer.read(&actor->layer);
-		serializer.read(&actor->is_dynamic);
-		if (actor->is_dynamic) m_dynamic_actors.push(actor);
+		deserializeDynamicType(serializer, actor, scene_version);
 		m_actors.insert(actor->entity, actor);
 
 		PxCapsuleGeometry capsule_geom;
@@ -3237,13 +3259,20 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		serializer.read(&capsule_geom.halfHeight);
 		serializer.read(&capsule_geom.radius);
 		PxRigidActor* physx_actor;
-		if (actor->is_dynamic)
+		switch (actor->dynamic_type)
 		{
-			physx_actor = PxCreateDynamic(*m_system->getPhysics(), transform, capsule_geom, *m_default_material, 1.0f);
-		}
-		else
-		{
-			physx_actor = PxCreateStatic(*m_system->getPhysics(), transform, capsule_geom, *m_default_material);
+			case DynamicType::DYNAMIC:
+				physx_actor =
+					PxCreateDynamic(*m_system->getPhysics(), transform, capsule_geom, *m_default_material, 1.0f);
+				break;
+			case DynamicType::KINEMATIC:
+				physx_actor =
+					PxCreateDynamic(*m_system->getPhysics(), transform, capsule_geom, *m_default_material, 1.0f);
+				physx_actor->isRigidBody()->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, true);
+				break;
+			case DynamicType::STATIC:
+				physx_actor = PxCreateStatic(*m_system->getPhysics(), transform, capsule_geom, *m_default_material);
+				break;
 		}
 		actor->setPhysxActor(physx_actor);
 
@@ -3255,7 +3284,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	{
 		RigidActor* actor = m_actors[{cmp.index}];
 		serializer.write("layer", actor->layer);
-		serializer.write("is_dynamic", actor->is_dynamic);
+		serializer.write("dynamic_type", (int)actor->dynamic_type);
 		PxShape* shape;
 		ASSERT(actor->physx_actor->getNbShapes() == 1);
 		actor->physx_actor->getShapes(&shape, 1);
@@ -3265,26 +3294,32 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	void deserializeSphereActor(IDeserializer& serializer, Entity entity, int /*scene_version*/)
+	void deserializeSphereActor(IDeserializer& serializer, Entity entity, int scene_version)
 	{
 		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, ActorType::SPHERE);
 		actor->entity = entity;
 		serializer.read(&actor->layer);
-		serializer.read(&actor->is_dynamic);
-		if (actor->is_dynamic) m_dynamic_actors.push(actor);
+		deserializeDynamicType(serializer, actor, scene_version);
 		m_actors.insert(actor->entity, actor);
 
 		PxSphereGeometry sphere_geom;
 		PxTransform transform = toPhysx(m_universe.getTransform(actor->entity));
 		serializer.read(&sphere_geom.radius);
 		PxRigidActor* physx_actor;
-		if (actor->is_dynamic)
+		switch (actor->dynamic_type)
 		{
-			physx_actor = PxCreateDynamic(*m_system->getPhysics(), transform, sphere_geom, *m_default_material, 1.0f);
-		}
-		else
-		{
-			physx_actor = PxCreateStatic(*m_system->getPhysics(), transform, sphere_geom, *m_default_material);
+			case DynamicType::DYNAMIC:
+				physx_actor =
+					PxCreateDynamic(*m_system->getPhysics(), transform, sphere_geom, *m_default_material, 1.0f);
+				break;
+			case DynamicType::KINEMATIC:
+				physx_actor =
+					PxCreateDynamic(*m_system->getPhysics(), transform, sphere_geom, *m_default_material, 1.0f);
+				physx_actor->isRigidBody()->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, true);
+				break;
+			case DynamicType::STATIC:
+				physx_actor = PxCreateStatic(*m_system->getPhysics(), transform, sphere_geom, *m_default_material);
+				break;
 		}
 		actor->setPhysxActor(physx_actor);
 
@@ -3336,6 +3371,25 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		}
 	}
 
+	PxRigidActor* createPhysXActor(RigidActor* actor, const PxTransform transform, const PxGeometry& geometry)
+	{
+		switch (actor->dynamic_type)
+		{
+			case DynamicType::DYNAMIC:
+				return PxCreateDynamic(*m_system->getPhysics(), transform, geometry, *m_default_material, 1.0f);
+			case DynamicType::KINEMATIC:
+			{
+				PxRigidDynamic* physx_actor =
+					PxCreateDynamic(*m_system->getPhysics(), transform, geometry, *m_default_material, 1.0f);
+				physx_actor->isRigidBody()->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, true);
+				return physx_actor;
+			}
+			case DynamicType::STATIC:
+				return PxCreateStatic(*m_system->getPhysics(), transform, geometry, *m_default_material);
+		}
+		return nullptr;
+	}
+
 
 	void deserializeActor(InputBlob& serializer, RigidActor* actor)
 	{
@@ -3352,16 +3406,8 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 				PxBoxGeometry box_geom;
 				PxTransform transform = toPhysx(m_universe.getTransform(actor->entity));
 				serializer.read(box_geom.halfExtents);
-				PxRigidActor* physx_actor;
-				if (isDynamic(cmp))
-				{
-					physx_actor =
-						PxCreateDynamic(*m_system->getPhysics(), transform, box_geom, *m_default_material, 1.0f);
-				}
-				else
-				{
-					physx_actor = PxCreateStatic(*m_system->getPhysics(), transform, box_geom, *m_default_material);
-				}
+				PxRigidActor* physx_actor = createPhysXActor(actor, transform, box_geom);
+				
 				actor->setPhysxActor(physx_actor);
 				m_universe.addComponent(actor->entity, BOX_ACTOR_TYPE, this, cmp);
 			}
@@ -3371,16 +3417,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 				PxSphereGeometry sphere_geom;
 				PxTransform transform = toPhysx(m_universe.getTransform(actor->entity));
 				serializer.read(sphere_geom.radius);
-				PxRigidActor* physx_actor;
-				if (isDynamic(cmp))
-				{
-					physx_actor =
-						PxCreateDynamic(*m_system->getPhysics(), transform, sphere_geom, *m_default_material, 1.0f);
-				}
-				else
-				{
-					physx_actor = PxCreateStatic(*m_system->getPhysics(), transform, sphere_geom, *m_default_material);
-				}
+				PxRigidActor* physx_actor = createPhysXActor(actor, transform, sphere_geom);
 				actor->setPhysxActor(physx_actor);
 				m_universe.addComponent(actor->entity, SPHERE_ACTOR_TYPE, this, cmp);
 			}
@@ -3391,16 +3428,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 				PxTransform transform = toPhysx(m_universe.getTransform(actor->entity));
 				serializer.read(capsule_geom.halfHeight);
 				serializer.read(capsule_geom.radius);
-				PxRigidActor* physx_actor;
-				if (isDynamic(cmp))
-				{
-					physx_actor =
-						PxCreateDynamic(*m_system->getPhysics(), transform, capsule_geom, *m_default_material, 1.0f);
-				}
-				else
-				{
-					physx_actor = PxCreateStatic(*m_system->getPhysics(), transform, capsule_geom, *m_default_material);
-				}
+				PxRigidActor* physx_actor = createPhysXActor(actor, transform, capsule_geom);
 				actor->setPhysxActor(physx_actor);
 				m_universe.addComponent(actor->entity, CAPSULE_ACTOR_TYPE, this, cmp);
 			}
@@ -3430,7 +3458,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		serializer.write((i32)m_actors.size());
 		for (auto* actor : m_actors)
 		{
-			serializer.write(isDynamic({actor->entity.index}));
+			serializer.write(actor->dynamic_type);
 			serializer.write(actor->entity);
 			serializeActor(serializer, actor);
 		}
@@ -3982,14 +4010,14 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		for (int i = 0; i < count; ++i)
 		{
 			RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, ActorType::BOX);
-			serializer.read(actor->is_dynamic);
+			serializer.read(actor->dynamic_type);
 			serializer.read(actor->entity);
 			if (!isValid(actor->entity))
 			{
 				LUMIX_DELETE(m_allocator, actor);
 				continue;
 			}
-			if (actor->is_dynamic) m_dynamic_actors.push(actor);
+			if (actor->dynamic_type == DynamicType::DYNAMIC) m_dynamic_actors.push(actor);
 			m_actors.insert(actor->entity, actor);
 			deserializeActor(serializer, actor);
 		}
@@ -4225,7 +4253,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	float getActorSpeed(ComponentHandle cmp) override
 	{
 		auto* actor = m_actors[{cmp.index}];
-		if (!actor->is_dynamic)
+		if (actor->dynamic_type != DynamicType::DYNAMIC)
 		{
 			g_log_warning.log("Physics") << "Trying to get speed of static object";
 			return 0;
@@ -4240,7 +4268,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	void putToSleep(ComponentHandle cmp) override
 	{
 		auto* actor = m_actors[{cmp.index}];
-		if (!actor->is_dynamic)
+		if (actor->dynamic_type != DynamicType::DYNAMIC)
 		{
 			g_log_warning.log("Physics") << "Trying to put static object to sleep";
 			return;
@@ -4383,7 +4411,6 @@ void PhysicsSceneImpl::RigidActor::onStateChanged(Resource::State, Resource::Sta
 		PxTransform transform = toPhysx(scene.getUniverse().getTransform(entity));
 
 		PxRigidActor* actor;
-		bool is_dynamic = scene.isDynamic(this);
 		auto& physics = *scene.m_system->getPhysics();
 
 		PxMeshScale scale(scene.getUniverse().getScale(entity));
@@ -4392,14 +4419,8 @@ void PhysicsSceneImpl::RigidActor::onStateChanged(Resource::State, Resource::Sta
 		const PxGeometry* geom = resource->convex_mesh ? static_cast<PxGeometry*>(&convex_geom)
 															  : static_cast<PxGeometry*>(&tri_geom);
 
-		if (is_dynamic)
-		{
-			actor = PxCreateDynamic(physics, transform, *geom, *scene.m_default_material, 1.0f);
-		}
-		else
-		{
-			actor = PxCreateStatic(physics, transform, *geom, *scene.m_default_material);
-		}
+		actor = scene.createPhysXActor(this, transform, *geom);
+
 		if (actor)
 		{
 			setPhysxActor(actor);
