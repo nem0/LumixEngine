@@ -28,7 +28,7 @@ namespace Lumix
 static void registerProperties(Lumix::IAllocator& allocator)
 {
 	PropertyRegister::add("ambient_sound",
-		LUMIX_NEW(allocator, EnumPropertyDescriptor<AudioScene>)("Sound",
+		LUMIX_NEW(allocator, DynamicEnumPropertyDescriptor<AudioScene>)("Sound",
 			&AudioScene::getAmbientSoundClipIndex,
 			&AudioScene::setAmbientSoundClipIndex,
 			&AudioScene::getClipCount,
