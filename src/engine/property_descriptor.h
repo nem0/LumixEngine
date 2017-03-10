@@ -823,7 +823,52 @@ public:
 };
 
 
-template <class S> class EnumPropertyDescriptor : public IEnumPropertyDescriptor
+template <typename Scene, typename Item, int COUNT, const char* (GetItemName)(int)> 
+class EnumPropertyDescriptor : public IEnumPropertyDescriptor
+{
+public:
+	typedef Item (Scene::*Getter)(ComponentHandle);
+	typedef void (Scene::*Setter)(ComponentHandle, Item);
+
+	EnumPropertyDescriptor(const char* name,
+		Getter _getter,
+		Setter _setter)
+	{
+		setName(name);
+		m_getter = _getter;
+		m_setter = _setter;
+		m_type = ENUM;
+	}
+
+
+	void set(ComponentUID cmp, int index, InputBlob& stream) const override
+	{
+		ASSERT(index == -1);
+		Item value;
+		stream.read(&value, sizeof(value));
+		(static_cast<Scene*>(cmp.scene)->*m_setter)(cmp.handle, value);
+	};
+
+
+	void get(ComponentUID cmp, int index, OutputBlob& stream) const override
+	{
+		ASSERT(index == -1);
+		Item value = (static_cast<Scene*>(cmp.scene)->*m_getter)(cmp.handle);
+		stream.write(&value, sizeof(value));
+	};
+
+
+	int getEnumCount(IScene* scene, ComponentHandle) override { return COUNT; }
+	const char* getEnumItemName(IScene* scene, ComponentHandle, int index) override { return GetItemName(index); }
+
+private:
+	Getter m_getter;
+	Setter m_setter;
+};
+
+
+
+template <class S> class DynamicEnumPropertyDescriptor : public IEnumPropertyDescriptor
 {
 public:
 	typedef int (S::*Getter)(ComponentHandle);
@@ -832,7 +877,7 @@ public:
 	typedef const char* (S::*EnumNameGetter)(int);
 
 public:
-	EnumPropertyDescriptor(const char* name,
+	DynamicEnumPropertyDescriptor(const char* name,
 		Getter _getter,
 		Setter _setter,
 		EnumCountGetter count_getter,

@@ -24,98 +24,19 @@ namespace Lumix
 	static const ResourceType PHYSICS_TYPE("physics");
 
 
-	class D6MotionDescriptor : public IEnumPropertyDescriptor
+	const char* getD6MotionName(int index)
 	{
-	public:
-		typedef PhysicsScene::D6Motion (PhysicsScene::*Getter)(ComponentHandle);
-		typedef void (PhysicsScene::*Setter)(ComponentHandle, PhysicsScene::D6Motion);
-		typedef PhysicsScene::D6Motion(PhysicsScene::*ArrayGetter)(ComponentHandle, int);
-		typedef void (PhysicsScene::*ArraySetter)(ComponentHandle, int, PhysicsScene::D6Motion);
-
-	public:
-		D6MotionDescriptor(const char* name, Getter _getter, Setter _setter)
+		switch ((PhysicsScene::D6Motion)index)
 		{
-			setName(name);
-			m_single.getter = _getter;
-			m_single.setter = _setter;
-			m_type = ENUM;
+			case PhysicsScene::D6Motion::LOCKED: return "locked";
+			case PhysicsScene::D6Motion::LIMITED: return "limited";
+			case PhysicsScene::D6Motion::FREE: return "free";
+			default: ASSERT(false); return "Unknown";
 		}
+	}
 
 
-		D6MotionDescriptor(const char* name, ArrayGetter _getter, ArraySetter _setter)
-		{
-			setName(name);
-			m_array.getter = _getter;
-			m_array.setter = _setter;
-			m_type = ENUM;
-		}
-
-
-		void set(ComponentUID cmp, int index, InputBlob& stream) const override
-		{
-			int value;
-			stream.read(&value, sizeof(value));
-			if (index == -1)
-			{
-				(static_cast<PhysicsScene*>(cmp.scene)->*m_single.setter)(cmp.handle, (PhysicsScene::D6Motion)value);
-			}
-			else
-			{
-				(static_cast<PhysicsScene*>(cmp.scene)->*m_array.setter)(cmp.handle, index, (PhysicsScene::D6Motion)value);
-			}
-		};
-
-
-		void get(ComponentUID cmp, int index, OutputBlob& stream) const override
-		{
-			PhysicsScene::D6Motion value;
-			if (index == -1)
-			{
-				value = (static_cast<PhysicsScene*>(cmp.scene)->*m_single.getter)(cmp.handle);
-			}
-			else
-			{
-				value = (static_cast<PhysicsScene*>(cmp.scene)->*m_array.getter)(cmp.handle, index);
-			}
-			stream.write(&value, sizeof(value));
-		};
-
-
-		int getEnumCount(IScene* scene, ComponentHandle) override
-		{
-			return 3;
-		}
-
-
-		const char* getEnumItemName(IScene* scene, ComponentHandle, int index) override
-		{
-			switch ((PhysicsScene::D6Motion)index)
-			{
-				case PhysicsScene::D6Motion::LOCKED: return "locked";
-				case PhysicsScene::D6Motion::LIMITED: return "limited";
-				case PhysicsScene::D6Motion::FREE: return "free";
-				default: ASSERT(false); return "Unknown";
-			}
-		}
-
-
-		void getEnumItemName(IScene* scene, ComponentHandle, int index, char* buf, int max_size) override {}
-
-	private:
-		union
-		{
-			struct
-			{
-				Getter getter;
-				Setter setter;
-			} m_single;
-			struct
-			{
-				ArrayGetter getter;
-				ArraySetter setter;
-			} m_array;
-		};
-	};
+	using D6MotionDescriptor = EnumPropertyDescriptor<PhysicsScene, PhysicsScene::D6Motion, 3, getD6MotionName>;
 
 
 	class PhysicsLayerPropertyDescriptor : public IEnumPropertyDescriptor
