@@ -36,7 +36,20 @@ namespace Lumix
 	}
 
 
+	const char* getDynamicTypeName(int index)
+	{
+		switch ((PhysicsScene::DynamicType)index)
+		{
+			case PhysicsScene::DynamicType::STATIC: return "static";
+			case PhysicsScene::DynamicType::DYNAMIC: return "dynamic";
+			case PhysicsScene::DynamicType::KINEMATIC: return "kinematic";
+			default: ASSERT(false); return "Unknown";
+		}
+	}
+
+
 	using D6MotionDescriptor = EnumPropertyDescriptor<PhysicsScene, PhysicsScene::D6Motion, 3, getD6MotionName>;
+	using DynamicTypePropertyDescriptor = EnumPropertyDescriptor<PhysicsScene, PhysicsScene::DynamicType, 3, getDynamicTypeName>;
 
 
 	class PhysicsLayerPropertyDescriptor : public IEnumPropertyDescriptor
@@ -141,8 +154,8 @@ namespace Lumix
 			LUMIX_NEW(allocator, DecimalPropertyDescriptor<PhysicsScene>)(
 				"Radius", &PhysicsScene::getSphereRadius, &PhysicsScene::setSphereRadius, 0.0f, FLT_MAX, 0.0f));
 		PropertyRegister::add("sphere_rigid_actor",
-			LUMIX_NEW(allocator, BoolPropertyDescriptor<PhysicsScene>)(
-				"Dynamic", &PhysicsScene::isDynamic, &PhysicsScene::setIsDynamic));
+			LUMIX_NEW(allocator, DynamicTypePropertyDescriptor)(
+				"Dynamic", &PhysicsScene::getDynamicType, &PhysicsScene::setDynamicType));
 
 		PropertyRegister::add("capsule_rigid_actor",
 			LUMIX_NEW(allocator, DecimalPropertyDescriptor<PhysicsScene>)(
@@ -151,8 +164,8 @@ namespace Lumix
 			LUMIX_NEW(allocator, DecimalPropertyDescriptor<PhysicsScene>)(
 				"Height", &PhysicsScene::getCapsuleHeight, &PhysicsScene::setCapsuleHeight, 0.0f, FLT_MAX, 0.0f));
 		PropertyRegister::add("capsule_rigid_actor",
-			LUMIX_NEW(allocator, BoolPropertyDescriptor<PhysicsScene>)(
-				"Dynamic", &PhysicsScene::isDynamic, &PhysicsScene::setIsDynamic));
+			LUMIX_NEW(allocator, DynamicTypePropertyDescriptor)(
+				"Dynamic", &PhysicsScene::getDynamicType, &PhysicsScene::setDynamicType));
 
 		PropertyRegister::add("d6_joint",
 			LUMIX_NEW(allocator, EntityPropertyDescriptor<PhysicsScene>)(
@@ -278,8 +291,8 @@ namespace Lumix
 				"Layer", &PhysicsScene::getControllerLayer, &PhysicsScene::setControllerLayer));
 
 		PropertyRegister::add("box_rigid_actor",
-			LUMIX_NEW(allocator, BoolPropertyDescriptor<PhysicsScene>)(
-				"Dynamic", &PhysicsScene::isDynamic, &PhysicsScene::setIsDynamic));
+			LUMIX_NEW(allocator, DynamicTypePropertyDescriptor)(
+				"Dynamic", &PhysicsScene::getDynamicType, &PhysicsScene::setDynamicType));
 		PropertyRegister::add("box_rigid_actor",
 			LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec3, PhysicsScene>)(
 				"Size", &PhysicsScene::getHalfExtents, &PhysicsScene::setHalfExtents));
@@ -293,8 +306,8 @@ namespace Lumix
 				"Physics (*.phy)",
 				PHYSICS_TYPE));
 		PropertyRegister::add("mesh_rigid_actor",
-			LUMIX_NEW(allocator, BoolPropertyDescriptor<PhysicsScene>)(
-				"Dynamic", &PhysicsScene::isDynamic, &PhysicsScene::setIsDynamic));
+			LUMIX_NEW(allocator, DynamicTypePropertyDescriptor)(
+				"Dynamic", &PhysicsScene::getDynamicType, &PhysicsScene::setDynamicType));
 		PropertyRegister::add("mesh_rigid_actor",
 			LUMIX_NEW(allocator, PhysicsLayerPropertyDescriptor)(
 				"Layer", &PhysicsScene::getActorLayer, &PhysicsScene::setActorLayer));

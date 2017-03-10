@@ -67,6 +67,12 @@ public:
 		X,
 		Y
 	};
+	enum class DynamicType : int
+	{
+		STATIC,
+		DYNAMIC,
+		KINEMATIC
+	};
 
 	static PhysicsScene* create(PhysicsSystem& system, Universe& context, Engine& engine, IAllocator& allocator);
 	static void destroy(PhysicsScene* scene);
@@ -81,8 +87,8 @@ public:
 	virtual ComponentHandle getActorComponent(Entity entity) = 0;
 	virtual void setActorLayer(ComponentHandle cmp, int layer) = 0;
 	virtual int getActorLayer(ComponentHandle cmp) = 0;
-	virtual bool isDynamic(ComponentHandle cmp) = 0;
-	virtual void setIsDynamic(ComponentHandle cmp, bool) = 0;
+	virtual DynamicType getDynamicType(ComponentHandle cmp) = 0;
+	virtual void setDynamicType(ComponentHandle cmp, DynamicType) = 0;
 	virtual Vec3 getHalfExtents(ComponentHandle cmp) = 0;
 	virtual void setHalfExtents(ComponentHandle cmp, const Vec3& size) = 0;
 	virtual Path getShapeSource(ComponentHandle cmp) = 0;
