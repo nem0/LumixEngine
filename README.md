@@ -40,6 +40,5 @@ Project generator
 Who is using it?
 
 * [On the Hunt](http://www.indiedb.com/games/on-the-hunt)
-* [FieldsGame](http://www.indiedb.com/games/fieldsgame)
 
 Contact: mikulas.florek@gamedev.sk
