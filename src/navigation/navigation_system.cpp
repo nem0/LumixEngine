@@ -438,6 +438,24 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 
 			m_universe.setPosition(agent.entity, *(Vec3*)dt_agent->npos);
 
+			
+			if ((agent.flags & Agent::USE_ROOT_MOTION) == 0)
+			{
+				Vec3 vel = *(Vec3*)dt_agent->nvel;
+				vel.y = 0;
+				float len = vel.length();
+				if (len > 0)
+				{
+					vel *= 1 / len;
+					float angle = atan2f(vel.x, vel.z);
+					Quat wanted_rot(Vec3(0, 1, 0), angle);
+					Quat old_rot = m_universe.getRotation(agent.entity);
+					Quat new_rot;
+					nlerp(wanted_rot, old_rot, &new_rot, 0.90f);
+					m_universe.setRotation(agent.entity, new_rot);
+				}
+			}
+
 			if (dt_agent->ncorners == 0)
 			{
 				if (!agent.is_finished)
