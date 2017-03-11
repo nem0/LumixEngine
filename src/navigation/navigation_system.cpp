@@ -422,6 +422,10 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 				diff.y = 0;
 				agent.speed = diff.length() / time_delta;
 			}
+			else
+			{
+				agent.speed = (*(Vec3*)dt_agent->nvel).length();
+			}
 		}
 		
 		m_crowd->doMove(time_delta);
@@ -1560,6 +1564,7 @@ static void registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(save);
 	REGISTER_FUNCTION(load);
 	REGISTER_FUNCTION(setGeneratorParams);
+	REGISTER_FUNCTION(getAgentSpeed);
 
 	#undef REGISTER_FUNCTION
 }
