@@ -1172,15 +1172,15 @@ namespace Lumix
 
 			u32 hash = crc32(property_name);
 			auto& inst = m_scripts[{cmp.index}]->m_scripts[scr_index];
-			if (inst.m_script->isReady())
+			for (auto& prop : inst.m_properties)
 			{
-				for (auto& prop : inst.m_properties)
+				if (prop.name_hash == hash)
 				{
-					if (prop.name_hash == hash)
-					{
+					if (inst.m_script->isReady())
 						getProperty(prop, property_name, inst, out, max_size);
-						return;
-					}
+					else
+						copyString(out, max_size, prop.stored_value.c_str());
+					return;
 				}
 			}
 			*out = '\0';
