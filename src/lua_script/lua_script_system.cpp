@@ -1201,6 +1201,7 @@ namespace Lumix
 			if (lua_getfield(scr.m_state, -1, prop_name) == LUA_TNIL)
 			{
 				copyString(out, max_size, prop.stored_value.c_str());
+				lua_pop(scr.m_state, 2);
 				return;
 			}
 			switch (prop.type)
