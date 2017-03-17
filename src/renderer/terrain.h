@@ -150,7 +150,6 @@ class Terrain
 		TerrainQuad* m_root;
 		i32 m_width;
 		i32 m_height;
-		i32 m_grass_distance;
 		i64 m_layer_mask;
 		Vec3 m_scale;
 		Entity m_entity;

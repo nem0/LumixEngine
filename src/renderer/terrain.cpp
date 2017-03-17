@@ -191,7 +191,6 @@ Terrain::Terrain(Renderer& renderer, Entity entity, RenderScene& scene, IAllocat
 	, m_renderer(renderer)
 	, m_vertices_handle(BGFX_INVALID_HANDLE)
 	, m_indices_handle(BGFX_INVALID_HANDLE)
-	, m_grass_distance(5)
 	, m_force_grass_update(false)
 {
 	generateGeometry();
@@ -298,11 +297,6 @@ void Terrain::setGrassTypeDistance(int index, float distance)
 	forceGrassUpdate();
 	GrassType& type = m_grass_types[index];
 	type.m_distance = Math::clamp(distance, 1.0f, FLT_MAX);
-	m_grass_distance = 0;
-	for (auto& type : m_grass_types)
-	{
-		m_grass_distance = Math::maximum(m_grass_distance, int(type.m_distance / GRASS_QUAD_RADIUS + 0.99f));
-	}
 }
 
 
@@ -480,10 +474,16 @@ void Terrain::updateGrass(ComponentHandle camera)
 	Vec3 local_camera_pos = inv_mtx.transform(camera_pos);
 	float cx = (int)(local_camera_pos.x / (GRASS_QUAD_SIZE)) * GRASS_QUAD_SIZE;
 	float cz = (int)(local_camera_pos.z / (GRASS_QUAD_SIZE)) * GRASS_QUAD_SIZE;
-	float from_quad_x = cx - m_grass_distance * GRASS_QUAD_SIZE;
-	float from_quad_z = cz - m_grass_distance * GRASS_QUAD_SIZE;
-	float to_quad_x = cx + m_grass_distance * GRASS_QUAD_SIZE;
-	float to_quad_z = cz + m_grass_distance * GRASS_QUAD_SIZE;
+	int grass_distance = 0;
+	for (auto& type : m_grass_types)
+	{
+		grass_distance = Math::maximum(grass_distance, int(type.m_distance / GRASS_QUAD_RADIUS + 0.99f));
+	}
+
+	float from_quad_x = cx - grass_distance * GRASS_QUAD_SIZE;
+	float from_quad_z = cz - grass_distance * GRASS_QUAD_SIZE;
+	float to_quad_x = cx + grass_distance * GRASS_QUAD_SIZE;
+	float to_quad_z = cz + grass_distance * GRASS_QUAD_SIZE;
 
 	float old_bounds[4] = {FLT_MAX, -FLT_MAX, FLT_MAX, -FLT_MAX};
 	Array<GrassQuad*>& quads = getQuads(camera);
@@ -623,7 +623,6 @@ void Terrain::deserialize(InputBlob& serializer, Universe& universe, RenderScene
 	serializer.read(m_scale.y);
 	m_scale.z = m_scale.x;
 	i32 count;
-	serializer.read(m_grass_distance);
 	serializer.read(count);
 	while(m_grass_types.size() > count)
 	{
@@ -653,7 +652,6 @@ void Terrain::serialize(OutputBlob& serializer)
 	serializer.writeString(m_material ? m_material->getPath().c_str() : "");
 	serializer.write(m_scale.x);
 	serializer.write(m_scale.y);
-	serializer.write(m_grass_distance);
 	serializer.write((i32)m_grass_types.size());
 	for(int i = 0; i < m_grass_types.size(); ++i)
 	{
