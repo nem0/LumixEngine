@@ -1420,33 +1420,31 @@ namespace Lumix
 		IPlugin& getPlugin() const override { return m_system; }
 
 
-		void update(float time_delta, bool paused) override
+		void initScripts()
 		{
-			PROFILE_FUNCTION();
-			if (paused) return;
+			ASSERT(!m_scripts_init_called && m_is_game_running);
+			// copy m_scripts to tmp, because scripts can create other scripts -> m_scripts is not const
+			Lumix::Array<ScriptComponent*> tmp(m_system.m_allocator);
+			tmp.reserve(m_scripts.size());
+			for (auto* scr : m_scripts) tmp.push(scr);
 
-			if (m_is_game_running && !m_scripts_init_called)
+			for (auto* scr : tmp)
 			{
-				// copy m_scripts to tmp, because scripts can create other scripts -> m_scripts is not const
-				Lumix::Array<ScriptComponent*> tmp(m_system.m_allocator);
-				tmp.reserve(m_scripts.size());
-				for (auto* scr : m_scripts) tmp.push(scr);
-
-				for (auto* scr : tmp)
+				for (int j = 0; j < scr->m_scripts.size(); ++j)
 				{
-					for (int j = 0; j < scr->m_scripts.size(); ++j)
-					{
-						auto& instance = scr->m_scripts[j];
-						if (!instance.m_script) continue;
-						if (!instance.m_script->isReady()) continue;
+					auto& instance = scr->m_scripts[j];
+					if (!instance.m_script) continue;
+					if (!instance.m_script->isReady()) continue;
 
-						startScript(instance, false);
-					}
+					startScript(instance, false);
 				}
-				m_scripts_init_called = true;
 			}
+			m_scripts_init_called = true;
+		}
 
 
+		void updateTimers(float time_delta)
+		{
 			int timers_to_remove[1024];
 			int timers_to_remove_count = 0;
 			for (int i = 0, c = m_timers.size(); i < c; ++i)
@@ -1480,6 +1478,18 @@ namespace Lumix
 				luaL_unref(timer.state, LUA_REGISTRYINDEX, timer.func);
 				m_timers.eraseFast(timers_to_remove[i]);
 			}
+		}
+
+
+		void update(float time_delta, bool paused) override
+		{
+			PROFILE_FUNCTION();
+
+			if (m_is_game_running && !m_scripts_init_called) initScripts();
+
+			if (paused) return;
+
+			updateTimers(time_delta);
 
 			for (int i = 0; i < m_updates.size(); ++i)
 			{
