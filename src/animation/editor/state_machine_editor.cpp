@@ -679,7 +679,7 @@ void Blend1DNode::drawInside(ImDrawList* draw, const ImVec2& canvas_screen_pos)
 		}
 
 		if (m_mouse_status == DOWN_RIGHT && ImGui::IsMouseDragging(1)) m_mouse_status = NEW_EDGE;
-		if (m_mouse_status == DOWN_LEFT && ImGui::IsMouseDragging(0)) m_mouse_status = DRAG_NODE;
+		if (m_mouse_status == DOWN_LEFT && ImGui::IsMouseDragging(0) && m_drag_source) m_mouse_status = DRAG_NODE;
 	}
 
 	if (ImGui::IsMouseReleased(1))
