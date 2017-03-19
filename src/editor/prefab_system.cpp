@@ -274,6 +274,7 @@ public:
 	void unlink(Entity entity)
 	{
 		EntityPrefab& p = m_prefabs[entity.index];
+		if (p.prefab == 0) return;
 		if (m_instances[p.prefab] == entity)
 		{
 			if (isValid(m_prefabs[entity.index].next))
