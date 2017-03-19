@@ -1434,6 +1434,11 @@ public:
 		Vec3 position = LuaWrapper::checkArg<Vec3>(L, 3);
 		int prefab_id = LuaWrapper::checkArg<int>(L, 4);
 		PrefabResource* prefab = static_cast<PrefabResource*>(engine->getLuaResource(prefab_id));
+		if (!prefab)
+		{
+			g_log_error.log("Editor") << "Cannot instantiate null prefab.";
+			return 0;
+		}
 		if (!prefab->isReady())
 		{
 			g_log_error.log("Editor") << "Prefab " << prefab->getPath().c_str() << " is not ready, preload it.";
