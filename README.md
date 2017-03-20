@@ -5,6 +5,7 @@
   <img alt="Coverity Scan Build Status"
        src="https://scan.coverity.com/projects/5919/badge.svg"/>
 </a>
+
 [![Build status](https://ci.appveyor.com/api/projects/status/7tcoign219kb5bny?svg=true)](https://ci.appveyor.com/project/nem0/lumixengine)
 [![Build Status](https://travis-ci.org/nem0/LumixEngine.svg?branch=master)](https://travis-ci.org/nem0/LumixEngine)
 [![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/nem0/LumixEngine?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
