@@ -217,15 +217,23 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	{
 		Controller& controller = m_controllers.get({cmp.index});
 		serializer.write("source", controller.resource ? controller.resource->getPath().c_str() : "");
+		serializer.write("default_set", controller.default_set);
 	}
 
 
-	void deserializeController(IDeserializer& serializer, Entity entity, int /*scene_version*/)
+	int getVersion() const override { return (int)AnimationSceneVersion::LATEST; }
+
+
+	void deserializeController(IDeserializer& serializer, Entity entity, int scene_version)
 	{
 		Controller& controller = m_controllers.emplace(entity, m_anim_system.m_allocator);
 		controller.entity = entity;
 		char tmp[MAX_PATH_LENGTH];
 		serializer.read(tmp, lengthOf(tmp));
+		if (scene_version > (int)AnimationSceneVersion::SHARED_CONTROLLER)
+		{
+			serializer.read(&controller.default_set);
+		}
 		auto* res = tmp[0] ? m_engine.getResourceManager().get(CONTROLLER_RESOURCE_TYPE)->load(Path(tmp)) : nullptr;
 		controller.resource = (Anim::ControllerResource*)res;
 		m_universe.addComponent(entity, CONTROLLER_TYPE, this, {entity.index});
@@ -691,9 +699,18 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		if (controller.resource->m_input_decl.getSize() == 0) return false;
 		controller.root = controller.resource->createInstance(m_anim_system.m_allocator);
 		controller.input.resize(controller.resource->m_input_decl.getSize());
+		int set_idx = 0;
+		for (int i = 0; i < controller.resource->m_sets_names.size(); ++i)
+		{
+			if (controller.default_set == crc32(controller.resource->m_sets_names[i]))
+			{
+				set_idx = i;
+				break;
+			}
+		}
 		for (auto& entry : controller.resource->m_animation_set)
 		{
-			if (entry.set != controller.default_set) continue;
+			if (entry.set != set_idx) continue;
 			controller.animations.insert(entry.hash, entry.animation);
 		}
 		setMemory(&controller.input[0], 0, controller.input.size());
