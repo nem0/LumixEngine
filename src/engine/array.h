@@ -147,6 +147,18 @@ public:
 		return -1;
 	}
 
+	template <typename F>
+	void eraseItems(F predicate)
+	{
+		for (int i = m_size - 1; i >= 0; --i)
+		{
+			if (predicate(m_data[i]))
+			{
+				erase(i);
+			}
+		}
+	}
+
 	void eraseItemFast(const T& item)
 	{
 		for (int i = 0; i < m_size; ++i)
