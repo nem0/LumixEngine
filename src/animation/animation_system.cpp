@@ -40,6 +40,54 @@ static const ResourceType ANIMATION_TYPE("animation");
 static const ResourceType CONTROLLER_RESOURCE_TYPE("anim_controller");
 
 
+struct AnimSetPropertyDescriptor : public IEnumPropertyDescriptor
+{
+	AnimSetPropertyDescriptor(const char* name)
+	{
+		setName(name);
+		m_type = ENUM;
+	}
+
+
+	void set(ComponentUID cmp, int index, InputBlob& stream) const override
+	{
+		int value;
+		stream.read(&value, sizeof(value));
+		(static_cast<AnimationScene*>(cmp.scene)->setControllerDefaultSet)(cmp.handle, value);
+	};
+
+
+	void get(ComponentUID cmp, int index, OutputBlob& stream) const override
+	{
+		int value;
+		ASSERT(index == -1);
+		value = (static_cast<AnimationScene*>(cmp.scene)->getControllerDefaultSet)(cmp.handle);
+		stream.write(&value, sizeof(value));
+	}
+
+
+	int getEnumCount(IScene* scene, ComponentHandle cmp) override
+	{
+		Anim::ControllerResource* res = static_cast<AnimationScene*>(scene)->getControllerResource(cmp);
+		return res->m_sets_names.size();
+	}
+
+
+	const char* getEnumItemName(IScene* scene, ComponentHandle cmp, int index) override
+	{
+		Anim::ControllerResource* res = static_cast<AnimationScene*>(scene)->getControllerResource(cmp);
+		return res->m_sets_names[index];
+	}
+
+
+	void getEnumItemName(IScene* scene, ComponentHandle cmp, int index, char* buf, int max_size) override
+	{
+		Anim::ControllerResource* res = static_cast<AnimationScene*>(scene)->getControllerResource(cmp);
+		copyString(buf, max_size, res->m_sets_names[index]);
+	}
+};
+
+
 namespace FS
 {
 class FileSystem;
@@ -87,12 +135,14 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 
 	struct Controller
 	{
-		Controller(IAllocator& allocator) : input(allocator) {}
+		Controller(IAllocator& allocator) : input(allocator), animations(allocator) {}
 
 		Entity entity;
 		Anim::ControllerResource* resource = nullptr;
 		Anim::ComponentInstance* root = nullptr;
+		u32 default_set = 0;
 		Lumix::Array<u8> input;
+		HashMap<u32, Animation*> animations;
 	};
 
 
@@ -208,7 +258,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	int getControllerInputIndex(ComponentHandle cmp, const char* name) const
 	{
 		const Controller& controller = m_controllers[{cmp.index}];
-		Anim::InputDecl& decl = controller.resource->getInputDecl();
+		Anim::InputDecl& decl = controller.resource->m_input_decl;
 		for (int i = 0; i < decl.inputs_count; ++i)
 		{
 			if (equalStrings(decl.inputs[i].name, name)) return i;
@@ -225,7 +275,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 			g_log_warning.log("Animation") << "Trying to set input " << input_idx << " before the controller is ready";
 			return;
 		}
-		Anim::InputDecl& decl = controller.resource->getInputDecl();
+		Anim::InputDecl& decl = controller.resource->m_input_decl;
 		if (input_idx < 0 || input_idx >= decl.inputs_count) return;
 		if (decl.inputs[input_idx].type == Anim::InputDecl::FLOAT)
 		{
@@ -246,7 +296,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 			g_log_warning.log("Animation") << "Trying to set input " << input_idx << " before the controller is ready";
 			return;
 		}
-		Anim::InputDecl& decl = controller.resource->getInputDecl();
+		Anim::InputDecl& decl = controller.resource->m_input_decl;
 		if (decl.inputs[input_idx].type == Anim::InputDecl::INT)
 		{
 			*(int*)&controller.input[decl.inputs[input_idx].offset] = value;
@@ -266,7 +316,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 			g_log_warning.log("Animation") << "Trying to set input " << input_idx << " before the controller is ready";
 			return;
 		}
-		Anim::InputDecl& decl = controller.resource->getInputDecl();
+		Anim::InputDecl& decl = controller.resource->m_input_decl;
 		if (decl.inputs[input_idx].type == Anim::InputDecl::BOOL)
 		{
 			*(bool*)&controller.input[decl.inputs[input_idx].offset] = value;
@@ -565,7 +615,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	void setControllerInput(ComponentHandle cmp, int input_idx, float value) override
 	{
 		Controller& ctrl = m_controllers.get({ cmp.index });
-		Anim::InputDecl& decl = ctrl.resource->getInputDecl();
+		Anim::InputDecl& decl = ctrl.resource->m_input_decl;
 		if (!ctrl.root) return;
 		if (input_idx >= decl.inputs_count) return;
 		if (decl.inputs[input_idx].type != Anim::InputDecl::FLOAT) return;
@@ -576,7 +626,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	void setControllerInput(ComponentHandle cmp, int input_idx, bool value) override
 	{
 		Controller& ctrl = m_controllers.get({ cmp.index });
-		Anim::InputDecl& decl = ctrl.resource->getInputDecl();
+		Anim::InputDecl& decl = ctrl.resource->m_input_decl;
 		if (!ctrl.root) return;
 		if (input_idx >= decl.inputs_count) return;
 		if (decl.inputs[input_idx].type != Anim::InputDecl::BOOL) return;
@@ -603,27 +653,56 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
-	
 	u8* getControllerInput(ComponentHandle cmp)
 	{
-		auto& input = m_controllers.get({ cmp.index }).input;
+		auto& input = m_controllers.get({cmp.index}).input;
 		return input.empty() ? nullptr : &input[0];
+	}
+
+
+	void setControllerDefaultSet(ComponentHandle cmp, int set) override
+	{
+		Controller& ctrl = m_controllers.get({cmp.index});
+		ctrl.default_set = ctrl.resource ? crc32(ctrl.resource->m_sets_names[set]) : 0;
+	}
+
+
+	int getControllerDefaultSet(ComponentHandle cmp) override
+	{
+		Controller& ctrl = m_controllers.get({ cmp.index });
+		auto is_default_set = [&ctrl](const StaticString<32>& val) {
+			return crc32(val) == ctrl.default_set;
+		};
+		int idx = 0;
+		if(ctrl.resource) idx = ctrl.resource->m_sets_names.find(is_default_set);
+		return idx < 0 ? 0 : idx;
+	}
+
+
+	Anim::ControllerResource* getControllerResource(ComponentHandle cmp) override
+	{
+		return m_controllers.get({cmp.index}).resource;
 	}
 
 
 	bool initControllerRuntime(Controller& controller)
 	{
 		if (!controller.resource->isReady()) return false;
-		if (controller.resource->getInputDecl().getSize() == 0) return false;
+		if (controller.resource->m_input_decl.getSize() == 0) return false;
 		controller.root = controller.resource->createInstance(m_anim_system.m_allocator);
-		controller.input.resize(controller.resource->getInputDecl().getSize());
+		controller.input.resize(controller.resource->m_input_decl.getSize());
+		for (auto& entry : controller.resource->m_animation_set)
+		{
+			if (entry.set != controller.default_set) continue;
+			controller.animations.insert(entry.hash, entry.animation);
+		}
 		setMemory(&controller.input[0], 0, controller.input.size());
 		Anim::RunningContext rc;
 		rc.time_delta = 0;
 		rc.allocator = &m_anim_system.m_allocator;
 		rc.input = &controller.input[0];
 		rc.current = nullptr;
-		rc.anim_set = &controller.resource->getAnimSet();
+		rc.anim_set = &controller.animations;
 		rc.event_stream = &m_event_stream;
 		rc.controller = {controller.entity.index};
 		controller.root->enter(rc, nullptr);
@@ -675,7 +754,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		rc.current = controller.root;
 		rc.allocator = &m_anim_system.m_allocator;
 		rc.input = &controller.input[0];
-		rc.anim_set = &controller.resource->getAnimSet();
+		rc.anim_set = &controller.animations;
 		rc.event_stream = &m_event_stream;
 		rc.controller = {controller.entity.index};
 		controller.root = controller.root->update(rc, true);
@@ -742,7 +821,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 				Controller& ctrl = m_controllers.get({cmp.index});
 				if (ctrl.resource->isReady())
 				{
-					Anim::InputDecl& decl = ctrl.resource->getInputDecl();
+					Anim::InputDecl& decl = ctrl.resource->m_input_decl;
 					Anim::InputDecl::Input& input = decl.inputs[event.input_idx];
 					switch (input.type)
 					{
@@ -839,6 +918,7 @@ AnimationSystemImpl::AnimationSystemImpl(Engine& engine)
 			&AnimationSceneImpl::setControllerSource,
 			"Animation controller (*.act)",
 			CONTROLLER_RESOURCE_TYPE));
+	PropertyRegister::add("anim_controller", LUMIX_NEW(m_allocator, AnimSetPropertyDescriptor)("Default set"));
 
 	PropertyRegister::add("animable",
 		LUMIX_NEW(m_allocator, ResourcePropertyDescriptor<AnimationSceneImpl>)("Animation",

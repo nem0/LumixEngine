@@ -68,9 +68,8 @@ private:
 	void editorGUI();
 	void inputsGUI();
 	void constantsGUI();
-	void animSetGUI();
+	void animationSlotsGUI();
 	void menuGUI();
-	void dropFile(const char* path, const ImVec2& canvas_screen_pos);
 	void onSetInputGUI(u8* data, Component& component);
 
 private:
@@ -138,7 +137,7 @@ AnimationEditor::EventType& AnimationEditor::getEventType(u32 type)
 void AnimationEditor::onSetInputGUI(u8* data, Component& component)
 {
 	auto event = (Anim::SetInputEvent*)data;
-	auto& input_decl = component.getController().getEngineResource()->getInputDecl();
+	auto& input_decl = component.getController().getEngineResource()->m_input_decl;
 	auto getter = [](void* data, int idx, const char** out) -> bool {
 		auto& input_decl = *(Anim::InputDecl*)data;
 		*out = input_decl.inputs[idx].name;
@@ -212,41 +211,7 @@ void AnimationEditor::drawGraph()
 	m_container->drawInside(draw, canvas_screen_pos);
 	if(runtime) m_resource->getRoot()->debugInside(draw, canvas_screen_pos, runtime, m_container);
 
-	if (ImGui::IsWindowHovered() && ImGui::IsMouseReleased(0) && m_app.getDragData().type == StudioApp::DragData::PATH)
-	{
-		dropFile((const char*)m_app.getDragData().data, canvas_screen_pos);
-	}
 	ImGui::EndChild();
-}
-
-
-void AnimationEditor::dropFile(const char* path, const ImVec2& canvas_screen_pos)
-{
-	if (!PathUtils::hasExtension(path, "ani")) return;
-
-	Anim::ControllerResource* ctrl_res = m_resource->getEngineResource();
-	auto& anim_set = ctrl_res->getAnimSet();
-	u32 anim_slot = 0;
-	char name[64];
-	for (auto iter = anim_set.begin(), end = anim_set.end(); iter != end; ++iter)
-	{
-		if (!iter.value()) continue;
-		if (equalStrings(iter.value()->getPath().c_str(), path))
-		{
-			anim_slot = iter.key();
-			copyString(name, m_resource->getAnimationSlot(anim_slot));
-			break;
-		}
-	}
-
-	if (anim_slot == 0)
-	{
-		PathUtils::getBasename(name, lengthOf(name), path);
-		m_resource->createAnimSlot(name, path);
-		anim_slot = crc32(name);
-	}
-
-	m_container->dropSlot(name, anim_slot, canvas_screen_pos);
 }
 
 
@@ -370,7 +335,7 @@ void AnimationEditor::inputsGUI()
 			auto* scene = (AnimationScene*)m_app.getWorldEditor()->getUniverse()->getScene(ANIMABLE_HASH);
 			ComponentHandle cmp = selected_entities.empty() ? INVALID_COMPONENT : scene->getComponent(selected_entities[0], CONTROLLER_TYPE);
 			u8* input_data = isValid(cmp) ? scene->getControllerInput(cmp) : nullptr;
-			Anim::InputDecl& input_decl = m_resource->getEngineResource()->getInputDecl();
+			Anim::InputDecl& input_decl = m_resource->getEngineResource()->m_input_decl;
 
 			for (int i = 0; i < input_decl.inputs_count; ++i)
 			{
@@ -409,7 +374,7 @@ void AnimationEditor::inputsGUI()
 		}
 
 		constantsGUI();
-		animSetGUI();
+		animationSlotsGUI();
 	}
 	ImGui::EndDock();
 }
@@ -419,7 +384,7 @@ void AnimationEditor::constantsGUI()
 {
 	if (!ImGui::CollapsingHeader("Constants")) return;
 
-	Anim::InputDecl& input_decl = m_resource->getEngineResource()->getInputDecl();
+	Anim::InputDecl& input_decl = m_resource->getEngineResource()->m_input_decl;
 	for (int i = 0; i < input_decl.constants_count; ++i)
 	{
 		auto& constant = input_decl.constants[i];
@@ -455,71 +420,128 @@ void AnimationEditor::constantsGUI()
 }
 
 
-void AnimationEditor::animSetGUI()
+void AnimationEditor::animationSlotsGUI()
 {
-	if (!ImGui::CollapsingHeader("Anim sets")) return;
-	ImGui::PushID("anim_set");
-	auto& engine_anim_set = m_resource->getEngineResource()->getAnimSet();
+	if (!ImGui::CollapsingHeader("Animation slots")) return;
+	ImGui::PushID("anim_slots");
+	auto& engine_anim_set = m_resource->getEngineResource()->m_animation_set;
 	auto& slots = m_resource->getAnimationSlots();
-	int i = 0;
-	ImGui::Columns(3);
-	for (auto& slot : slots)
+	auto& sets = m_resource->getEngineResource()->m_sets_names;
+	ImGui::PushItemWidth(-1);
+	ImGui::Columns(sets.size() + 1);
+	ImGui::NextColumn();
+	ImGui::PushID("header");
+	for (int j = 0; j < sets.size(); ++j)
 	{
+		ImGui::PushID(j);
+		ImGui::PushItemWidth(-1);
+		ImGui::InputText("", sets[j].data, lengthOf(sets[j].data));
+		ImGui::PopItemWidth();
+		ImGui::PopID();
+		ImGui::NextColumn();
+	}
+	ImGui::PopID();
+	ImGui::Separator();
+	for (int i = 0; i < slots.size(); ++i)
+	{
+		const string& slot = slots[i];
 		ImGui::PushID(i);
-		++i;
 		char slot_cstr[64];
 		copyString(slot_cstr, slot.c_str());
 
-		auto iter = engine_anim_set.find(crc32(slot.c_str()));
-		ASSERT(iter.isValid());
-		Animation* anim = iter.value();
-		ImGui::PushItemWidth(-1);
-		
+		ImGui::PushItemWidth(-20);
 		if (ImGui::InputText("##name", slot_cstr, lengthOf(slot_cstr), ImGuiInputTextFlags_EnterReturnsTrue))
 		{
-			if (engine_anim_set.find(crc32(slot_cstr)).isValid())
+			bool exists = slots.find([&slot_cstr](const string& val) { return val == slot_cstr; }) >= 0;
+
+			if (exists)
 			{
 				g_log_error.log("Animation") << "Slot " << slot_cstr << " already exists.";
 			}
 			else
 			{
-				engine_anim_set.erase(iter);
-				slot = slot_cstr;
-				engine_anim_set.insert(crc32(slot_cstr), anim);
+				u32 old_hash = crc32(slot.c_str());
+				u32 new_hash = crc32(slot_cstr);
+
+				for (auto& entry : engine_anim_set)
+				{
+					if (entry.hash == old_hash) entry.hash = new_hash;
+				}
+				slots[i] = slot_cstr;
 			}
 		}
 		ImGui::PopItemWidth();
-		ImGui::NextColumn();
-		char tmp[MAX_PATH_LENGTH];
-		copyString(tmp, anim ? anim->getPath().c_str() : "");
-		ImGui::PushItemWidth(ImGui::GetColumnWidth());
-		if (m_app.getAssetBrowser()->resourceInput("", "##res", tmp, lengthOf(tmp), ANIMATION_TYPE))
+		ImGui::SameLine();
+		u32 slot_hash = crc32(slot.c_str());
+		if (ImGui::Button("x"))
 		{
-			if (anim) anim->getResourceManager().unload(*anim);
-			auto* manager = m_app.getWorldEditor()->getEngine().getResourceManager().get(ANIMATION_TYPE);
-			anim = (Animation*)manager->load(Path(tmp));
-			engine_anim_set[crc32(slot_cstr)] = anim;
-		}
-		ImGui::PopItemWidth();
-		ImGui::NextColumn();
-		if (ImGui::Button("Remove"))
-		{
-			m_resource->getEngineResource()->getAnimSet().erase(crc32(slot.c_str()));
-			slots.eraseItemFast(slot);
+			slots.erase(i);
+			engine_anim_set.eraseItems([slot_hash](Anim::ControllerResource::AnimSetEntry& val) { return val.hash == slot_hash; });
+			--i;
 		}
 		ImGui::NextColumn();
+		for (int j = 0; j < sets.size(); ++j)
+		{
+			Anim::ControllerResource::AnimSetEntry* entry = nullptr;
+			for (auto& e : engine_anim_set)
+			{
+				if (e.set == j && e.hash == slot_hash) 
+				{
+					entry = &e;
+					break;
+				}
+			}
+
+			ImGui::PushItemWidth(ImGui::GetColumnWidth());
+			char tmp[MAX_PATH_LENGTH];
+			copyString(tmp, entry && entry->animation ? entry->animation->getPath().c_str() : "");
+			ImGui::PushID(j);
+			if (m_app.getAssetBrowser()->resourceInput("", "##res", tmp, lengthOf(tmp), ANIMATION_TYPE))
+			{
+				if (entry && entry->animation) entry->animation->getResourceManager().unload(*entry->animation);
+				auto* manager = m_app.getWorldEditor()->getEngine().getResourceManager().get(ANIMATION_TYPE);
+				if (entry)
+				{
+					entry->animation = (Animation*)manager->load(Path(tmp));
+				}
+				else
+				{
+					engine_anim_set.push({j, slot_hash, (Animation*)manager->load(Path(tmp))});
+				}
+			}
+			ImGui::PopID();
+			ImGui::PopItemWidth();
+
+
+			ImGui::NextColumn();
+		}
 		ImGui::PopID();
 	}
 	ImGui::Columns();
-	if (ImGui::Button("Add"))
+
+	if (ImGui::Button("Add slot (row)"))
 	{
-		if (!engine_anim_set.find(0).isValid())
+		bool exists = slots.find([](const string& val) { return val == ""; }) >= 0;
+
+		if (exists)
 		{
-			slots.emplace("", m_app.getWorldEditor()->getAllocator());
-			engine_anim_set.insert(0, nullptr);
+			g_log_error.log("Animation") << "Slot with empty name already exists. Please rename it and then you can create a new slot.";
+		}
+		else
+		{
+			IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
+			slots.emplace("", allocator);
 		}
 	}
+	if (ImGui::Button("Add set (column)"))
+	{
+		IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
+		m_resource->getEngineResource()->m_sets_names.emplace("new set");
+	}
+	ImGui::PopItemWidth();
 	ImGui::PopID();
+
+
 }
 
 

@@ -352,7 +352,7 @@ void Edge::debug(ImDrawList* draw, const ImVec2& canvas_screen_pos, Lumix::Anim:
 void Edge::compile()
 {
 	auto* engine_edge = (Anim::Edge*)engine_cmp;
-	engine_edge->condition.compile(m_expression, m_controller.getEngineResource()->getInputDecl());
+	engine_edge->condition.compile(m_expression, m_controller.getEngineResource()->m_input_decl);
 }
 
 
@@ -362,7 +362,7 @@ void Edge::onGUI()
 	ImGui::DragFloat("Length", &engine_edge->length);
 	if (ImGui::InputText("Expression", m_expression, lengthOf(m_expression), ImGuiInputTextFlags_EnterReturnsTrue))
 	{
-		engine_edge->condition.compile(m_expression, m_controller.getEngineResource()->getInputDecl());
+		engine_edge->condition.compile(m_expression, m_controller.getEngineResource()->m_input_decl);
 	}
 }
 
@@ -604,7 +604,7 @@ void Blend1DNode::deserialize(Lumix::InputBlob& blob)
 		m_editor_cmps.push(edge);
 	}
 
-	auto& input_decl = m_controller.getEngineResource()->getInputDecl();
+	auto& input_decl = m_controller.getEngineResource()->m_input_decl;
 	m_input = -1;
 	int offset = ((Anim::Blend1DNode*)engine_cmp)->input_offset;
 	for (int i = 0; i < input_decl.inputs_count; ++i)
@@ -765,7 +765,7 @@ void Blend1DNode::drawInside(ImDrawList* draw, const ImVec2& canvas_screen_pos)
 void Blend1DNode::compile()
 {
 	auto* engine_node = (Anim::Blend1DNode*)engine_cmp;
-	Anim::InputDecl& decl = m_controller.getEngineResource()->getInputDecl();
+	Anim::InputDecl& decl = m_controller.getEngineResource()->m_input_decl;
 	if (m_input >= 0)
 	{
 		engine_node->input_offset = decl.inputs[m_input].offset;
@@ -805,7 +805,7 @@ void Blend1DNode::onGUI()
 		return true;
 	};
 
-	Anim::InputDecl& decl = m_controller.getEngineResource()->getInputDecl();
+	Anim::InputDecl& decl = m_controller.getEngineResource()->m_input_decl;
 	auto input_getter = [](void* data, int idx, const char** out) -> bool {
 		auto& decl = *(Anim::InputDecl*)data;
 		*out = decl.inputs[idx].name;
@@ -824,7 +824,7 @@ AnimationNode::AnimationNode(Anim::Component* engine_cmp, Container* parent, Con
 void AnimationNode::deserialize(Lumix::InputBlob& blob)
 {
 	Node::deserialize(blob);
-	auto& input_decl = m_controller.getEngineResource()->getInputDecl();
+	auto& input_decl = m_controller.getEngineResource()->m_input_decl;
 	root_rotation_input = -1;
 	int offset = ((Anim::AnimationNode*)engine_cmp)->root_rotation_input_offset;
 	for (int i = 0; i < input_decl.inputs_count; ++i)
@@ -841,7 +841,7 @@ void AnimationNode::deserialize(Lumix::InputBlob& blob)
 void AnimationNode::compile()
 {
 	auto* engine_node = (Anim::AnimationNode*)engine_cmp;
-	Anim::InputDecl& decl = m_controller.getEngineResource()->getInputDecl();
+	Anim::InputDecl& decl = m_controller.getEngineResource()->m_input_decl;
 	if (root_rotation_input >= 0)
 	{
 		engine_node->root_rotation_input_offset = decl.inputs[root_rotation_input].offset;
@@ -902,7 +902,7 @@ void AnimationNode::onGUI()
 	ImGui::Checkbox("Looped", &node->looped);
 	ImGui::Checkbox("New selection on loop", &node->new_on_loop);
 
-	Anim::InputDecl& decl = m_controller.getEngineResource()->getInputDecl();
+	Anim::InputDecl& decl = m_controller.getEngineResource()->m_input_decl;
 	auto input_getter = [](void* data, int idx, const char** out) -> bool {
 		auto& decl = *(Anim::InputDecl*)data;
 		if (idx >= decl.inputs_count)
@@ -964,7 +964,33 @@ struct EntryEdge : public Component
 
 	void onGUI() override
 	{
-		ImGui::InputText("Condition", expression.data, lengthOf(expression.data));
+		auto autocomplete_callback = [](ImGuiTextEditCallbackData *data) -> int {
+			EntryEdge* that = (EntryEdge*)data->UserData;
+			char tmp[128];
+			int start_word = data->CursorPos;
+			while (start_word > 0 && data->Buf[start_word - 1] != ' ') --start_word;
+			copyNString(tmp, lengthOf(tmp), data->Buf + start_word, data->CursorPos - start_word);
+
+			const auto& input_decl = that->getController().getEngineResource()->m_input_decl;
+			for (int i = 0; i < input_decl.inputs_count; ++i)
+			{
+				if (startsWith(input_decl.inputs[i].name, tmp))
+				{
+					data->InsertChars(data->CursorPos, input_decl.inputs[i].name + stringLength(tmp));
+					return 0;
+				}
+			}
+			for (int i = 0; i < input_decl.constants_count; ++i)
+			{
+				if (startsWith(input_decl.constants[i].name, tmp))
+				{
+					data->InsertChars(data->CursorPos, input_decl.constants[i].name + stringLength(tmp));
+					return 0;
+				}
+			}
+			return 0;
+		};
+		ImGui::InputText("Condition", expression.data, lengthOf(expression.data), ImGuiInputTextFlags_CallbackCompletion, autocomplete_callback, this);
 	}
 
 
@@ -1050,7 +1076,7 @@ void StateMachine::compile()
 	for (auto* entry : m_entry_node->entries)
 	{
 		auto* sm = (Anim::StateMachine*)engine_cmp;
-		sm->entries[i].condition.compile(entry->expression, m_controller.getEngineResource()->getInputDecl());
+		sm->entries[i].condition.compile(entry->expression, m_controller.getEngineResource()->m_input_decl);
 		++i;
 	}
 }
@@ -1324,7 +1350,7 @@ ControllerResource::ControllerResource(Lumix::AnimationSystem& anim_system,
 {
 	m_engine_resource = LUMIX_NEW(allocator, Anim::ControllerResource)(Path("editor"), manager, allocator);
 	auto* engine_root = LUMIX_NEW(allocator, Anim::StateMachine)(allocator);
-	m_engine_resource->setRoot(engine_root);
+	m_engine_resource->m_root = engine_root;
 	m_root = LUMIX_NEW(allocator, StateMachine)(engine_root, nullptr, *this);
 }
 
@@ -1364,7 +1390,7 @@ bool ControllerResource::deserialize(InputBlob& blob, Engine& engine, IAllocator
 	if (!m_engine_resource->deserialize(blob)) return false;
 
 	blob.read(m_last_uid);
-	m_root = createComponent(m_engine_resource->getRoot(), nullptr, *this);
+	m_root = createComponent(m_engine_resource->m_root, nullptr, *this);
 	m_root->deserialize(blob);
 
 	int count;
@@ -1377,6 +1403,7 @@ bool ControllerResource::deserialize(InputBlob& blob, Engine& engine, IAllocator
 		blob.readString(tmp, lengthOf(tmp));
 		slot = tmp;
 	}
+
 	return true;
 }
 
@@ -1396,7 +1423,7 @@ void ControllerResource::createAnimSlot(const char* name, const char* path)
 	m_animation_slots.emplace(m_allocator) = name;
 	auto* manager = m_engine_resource->getResourceManager().getOwner().get(ANIMATION_TYPE);
 	auto* anim = (Animation*)manager->load(Path(path));
-	m_engine_resource->getAnimSet().insert(crc32(name), anim);
+	m_engine_resource->addAnimation(0, crc32(name), anim);
 }
 
 

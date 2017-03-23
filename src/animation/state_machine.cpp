@@ -424,11 +424,12 @@ struct AnimationNodeInstance : public NodeInstance
 
 
 	float getTime() const override { return time; }
-	float getLength() const override { return resource->getLength(); }
+	float getLength() const override { return resource ? resource->getLength() : 0; }
 
 
 	void fillPose(Engine& engine, Pose& pose, Model& model, float weight) override
 	{
+		if (!resource) return;
 		if (weight < 1)
 		{
 			resource->getRelativePose(time, pose, model, weight);
@@ -442,6 +443,8 @@ struct AnimationNodeInstance : public NodeInstance
 
 	ComponentInstance* update(RunningContext& rc, bool check_edges) override
 	{
+		if (!resource) return check_edges ? checkOutEdges(node, rc) : this;
+
 		float old_time = time;
 		time += rc.time_delta;
 		float length = resource->getLength();
@@ -496,7 +499,8 @@ struct AnimationNodeInstance : public NodeInstance
 		time = 0;
 		if (node.animations_hashes.empty()) return;
 		int idx = Math::rand() % node.animations_hashes.size();
-		resource = (*rc.anim_set)[node.animations_hashes[idx]];
+		auto iter = rc.anim_set->find(node.animations_hashes[idx]);
+		resource = iter.isValid() ? iter.value() : nullptr;
 	}
 
 

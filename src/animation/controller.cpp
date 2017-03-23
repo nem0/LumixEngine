@@ -17,17 +17,11 @@ namespace Anim
 {
 
 
-enum class Version : int
-{
-	LAST
-};
-
-
 struct Header
 {
 	static const u32 FILE_MAGIC = 0x5f4c4143; // == '_LAC'
 	u32 magic = FILE_MAGIC;
-	int version = (int)Version::LAST;
+	int version = (int)ControllerResource::Version::LAST;
 	u32 reserved[4] = {0};
 };
 
@@ -36,7 +30,8 @@ ControllerResource::ControllerResource(const Path& path, ResourceManagerBase& re
 	: Resource(path, resource_manager, allocator)
 	, m_root(nullptr)
 	, m_allocator(allocator)
-	, m_anim_set(allocator)
+	, m_animation_set(allocator)
+	, m_sets_names(allocator)
 {
 }
 
@@ -47,19 +42,24 @@ ControllerResource::~ControllerResource()
 }
 
 
+void ControllerResource::clearAnimationSets()
+{
+	for (AnimSetEntry& entry : m_animation_set)
+	{
+		if (!entry.animation) continue;
+
+		removeDependency(*entry.animation);
+		entry.animation->getResourceManager().unload(*entry.animation);
+	}
+	m_animation_set.clear();
+}
+
+
 void ControllerResource::unload()
 {
 	LUMIX_DELETE(m_allocator, m_root);
 	m_root = nullptr;
-	for (Animation* anim : m_anim_set)
-	{
-		if (anim)
-		{
-			removeDependency(*anim);
-			anim->getResourceManager().unload(*anim);
-		}
-	}
-	m_anim_set.clear();
+	clearAnimationSets();
 }
 
 
@@ -67,13 +67,6 @@ bool ControllerResource::load(FS::IFile& file)
 {
 	InputBlob blob(file.getBuffer(), (int)file.size());
 	return deserialize(blob);
-	return true;
-}
-
-
-void ControllerResource::setRoot(Component* component)
-{
-	m_root = component;
 }
 
 
@@ -86,11 +79,12 @@ bool ControllerResource::deserialize(InputBlob& blob)
 		g_log_error.log("Animation") << getPath().c_str() << " is not an animation controller file.";
 		return false;
 	}
-	if (header.version != (int)Version::LAST)
+	if (header.version > (int)Version::LAST)
 	{
 		g_log_error.log("Animation") << getPath().c_str() << " has unsupported version.";
 		return false;
 	}
+
 	Component::Type type;
 	blob.read(type);
 	m_root = createComponent(type, m_allocator);
@@ -119,20 +113,35 @@ bool ControllerResource::deserialize(InputBlob& blob)
 		}
 	}
 
-	m_anim_set.clear();
-	int count;
-	blob.read(count);
+	clearAnimationSets();
 	auto* manager = m_resource_manager.getOwner().get(ANIMATION_TYPE);
+
+	int count = blob.read<int>();
+	m_animation_set.reserve(count);
 	for (int i = 0; i < count; ++i)
 	{
-		u32 key;
+		int set = 0;
+		if (header.version > (int)Version::ANIMATION_SETS) set = blob.read<int>();
+		u32 key = blob.read<u32>();
 		char path[MAX_PATH_LENGTH];
-		blob.read(key);
 		blob.readString(path, lengthOf(path));
 		Animation* anim = path[0] ? (Animation*)manager->load(Path(path)) : nullptr;
-		if(anim) addDependency(*anim);
-		m_anim_set.insert(key, anim);
+		addAnimation(set, key, anim);
 	}
+	if (header.version > (int)Version::ANIMATION_SETS)
+	{
+		count = blob.read<int>();
+		m_sets_names.resize(count);
+		for (int i = 0; i < count; ++i)
+		{
+			blob.readString(m_sets_names[i].data, lengthOf(m_sets_names[i].data));
+		}
+	}
+	else
+	{
+		m_sets_names.emplace("default");
+	}
+
 	return true;
 }
 
@@ -164,14 +173,27 @@ void ControllerResource::serialize(OutputBlob& blob)
 			case InputDecl::FLOAT: blob.write(constant.f_value); break;
 			default: ASSERT(false); return;
 		}
-		
+
 	}
-	blob.write(m_anim_set.size());
-	for (auto iter = m_anim_set.begin(), end = m_anim_set.end(); iter != end; ++iter)
+	blob.write(m_animation_set.size());
+	for (AnimSetEntry& entry : m_animation_set)
 	{
-		blob.write(iter.key());
-		blob.writeString(iter.value() ? iter.value()->getPath().c_str() : "");
+		blob.write(entry.set);
+		blob.write(entry.hash);
+		blob.writeString(entry.animation ? entry.animation->getPath().c_str() : "");
 	}
+	blob.write(m_sets_names.size());
+	for (const StaticString<32>& name : m_sets_names)
+	{
+		blob.writeString(name);
+	}
+}
+
+
+void ControllerResource::addAnimation(int set, u32 hash, Animation* animation)
+{
+	m_animation_set.push({set, hash, animation});
+	if(animation) addDependency(*animation);
 }
 
 

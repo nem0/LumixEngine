@@ -37,6 +37,14 @@ private:
 class ControllerResource : public Resource
 {
 public:
+	enum class Version : int
+	{
+		ANIMATION_SETS,
+
+		LAST
+	};
+
+public:
 	ControllerResource(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
 	~ControllerResource();
 
@@ -44,18 +52,26 @@ public:
 	void unload(void) override;
 	bool load(FS::IFile& file) override;
 	ComponentInstance* createInstance(IAllocator& allocator);
-	InputDecl& getInputDecl() { return m_input_decl; }
-	HashMap<u32, Animation*>& getAnimSet() { return m_anim_set; }
-	void setRoot(Component* component);
-	Component* getRoot() const { return m_root; }
 	void serialize(OutputBlob& blob);
 	bool deserialize(InputBlob& blob);
 	IAllocator& getAllocator() { return m_allocator; }
+	void addAnimation(int set, u32 hash, Animation* animation);
+
+	struct AnimSetEntry
+	{
+		int set;
+		u32 hash;
+		Animation* animation;
+	};
+
+	Array<AnimSetEntry> m_animation_set;
+	Array<StaticString<32>> m_sets_names;
+	InputDecl m_input_decl;
+	Component* m_root;
 
 private:
-	InputDecl m_input_decl;
-	HashMap<u32, Animation*> m_anim_set;
-	Component* m_root;
+	void clearAnimationSets();
+
 	IAllocator& m_allocator;
 };
 
