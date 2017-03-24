@@ -306,10 +306,12 @@ void GameView::onGUI()
 				}
 			}
 			ImGui::SameLine();
+			ImGui::PushItemWidth(50);
 			if (ImGui::DragFloat("Time multiplier", &m_time_multiplier, 0.01f, 0.01f, 30.0f))
 			{
 				m_editor->getEngine().setTimeMultiplier(m_time_multiplier);
 			}
+			ImGui::PopItemWidth();
 			if(m_editor->isGameMode())
 			{
 				ImGui::SameLine();
@@ -320,6 +322,8 @@ void GameView::onGUI()
 			}
 			ImGui::SameLine();
 			ImGui::Checkbox("Stats", &m_show_stats);
+			ImGui::SameLine();
+			m_pipeline->callLuaFunction("onGUI");
 			m_pipeline->render();
 		}
 
