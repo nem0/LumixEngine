@@ -76,7 +76,7 @@ namespace ImGui
 
 	void ResetActiveID()
 	{
-		SetActiveID(0);
+		SetActiveID(0, nullptr);
 	}
 
 
