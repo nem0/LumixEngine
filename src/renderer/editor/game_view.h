@@ -31,6 +31,7 @@ public:
 	bool isMouseCaptured() const { return m_is_mouse_captured; }
 	void captureMouse(bool capture);
 	void enableIngameCursor(bool enable);
+	void forceViewport(bool enable, int w, int h);
 
 public:
 	bool m_is_opened;
@@ -41,6 +42,7 @@ private:
 	void onFullscreenGUI();
 	void setFullscreen(bool fullscreen);
 	void onStatsGUI(const ImVec2& view_pos);
+	
 
 private:
 	Lumix::Pipeline* m_pipeline;
@@ -58,5 +60,11 @@ private:
 	bool m_is_opengl;
 	bool m_is_fullscreen;
 	bool m_show_stats;
+	struct
+	{
+		bool enabled = false;
+		int width;
+		int height;
+	} m_forced_viewport;
 	int m_captured_mouse_x, m_captured_mouse_y;
 };

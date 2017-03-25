@@ -202,7 +202,7 @@ unsigned int Texture::compareTGA(IAllocator& allocator, FS::IFile* file1, FS::IF
 }
 
 
-static bool saveTGA(IAllocator& allocator,
+bool Texture::saveTGA(IAllocator& allocator,
 	FS::IFile* file,
 	int width,
 	int height,
@@ -261,7 +261,7 @@ static void saveTGA(Texture& texture)
 	FS::FileSystem& fs = texture.getResourceManager().getOwner().getFileSystem();
 	FS::IFile* file = fs.open(fs.getDefaultDevice(), texture.getPath(), FS::Mode::CREATE_AND_WRITE);
 
-	saveTGA(texture.allocator,
+	Texture::saveTGA(texture.allocator,
 		file,
 		texture.width,
 		texture.height,
