@@ -130,13 +130,12 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 
 	void setGUIProjection()
 	{
-		Vec2 size = m_interface->getSize();
+		Pipeline* pipeline = m_interface->getPipeline();
+		Vec2 size((float)pipeline->getWidth(), (float)pipeline->getHeight());
 		Matrix ortho;
 		bool is_opengl = bgfx::getRendererType() == bgfx::RendererType::OpenGL ||
 			bgfx::getRendererType() == bgfx::RendererType::OpenGLES;
 		ortho.setOrtho(0.0f, size.x, size.y, 0.0f, -1.0f, 1.0f, is_opengl);
-		Pipeline* pipeline = m_interface->getPipeline();
-		pipeline->setViewport(0, 0, (int)size.x, (int)size.y);
 		pipeline->setViewProjection(ortho, (int)size.x, (int)size.y);
 	}
 
@@ -199,16 +198,15 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 	void pipelineCallback()
 	{
 		if (!m_interface) return;
+
 		m_original_context = ImGui::GetCurrentContext();
 		ImGui::SetCurrentContext(m_context);
 		ImGui::Render();
 		ImDrawData* draw_data = ImGui::GetDrawData();
-		if (m_interface)
-		{
-			ImGui::GetIO().DisplaySize.x = m_interface->getSize().x;
-			ImGui::GetIO().DisplaySize.y = m_interface->getSize().y;
-		}
 		Pipeline* pipeline = m_interface->getPipeline();
+		ImGui::GetIO().DisplaySize.x = (float)pipeline->getWidth();
+		ImGui::GetIO().DisplaySize.y = (float)pipeline->getHeight();
+		
 		if (!pipeline->isReady()) return;
 
 		setGUIProjection();

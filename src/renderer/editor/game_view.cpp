@@ -4,6 +4,7 @@
 #include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/input_system.h"
+#include "engine/lua_wrapper.h"
 #include "engine/plugin_manager.h"
 #include "engine/profiler.h"
 #include "engine/resource_manager.h"
@@ -27,8 +28,7 @@ struct GUIInterface : Lumix::GUISystem::Interface
 
 	Lumix::Pipeline* getPipeline() override { return m_game_view.m_pipeline; }
 	Lumix::Vec2 getPos() const override { return m_game_view.m_pos; }
-	Lumix::Vec2 getSize() const override { return m_game_view.m_size; }
-	
+
 	
 	void enableCursor(bool enable) override
 	{ 
@@ -56,6 +56,9 @@ GameView::GameView(StudioApp& app)
 	, m_texture_handle(BGFX_INVALID_HANDLE)
 	, m_gui_interface(nullptr)
 {
+	Lumix::Engine& engine = app.getWorldEditor()->getEngine();
+	auto f = &Lumix::LuaWrapper::wrapMethodClosure<GameView, decltype(&GameView::forceViewport), &GameView::forceViewport>;
+	Lumix::LuaWrapper::createSystemClosure(engine.getState(), "GameView", this, "forceViewport", f);
 }
 
 
@@ -234,6 +237,14 @@ void GameView::onStatsGUI(const ImVec2& view_pos)
 }
 
 
+void GameView::forceViewport(bool enable, int w, int h)
+{
+	m_forced_viewport.enabled = enable;
+	m_forced_viewport.width = w;
+	m_forced_viewport.height = h;
+}
+
+
 void GameView::onGUI()
 {
 	PROFILE_FUNCTION();
@@ -267,12 +278,14 @@ void GameView::onGUI()
 		auto size = ImGui::GetContentRegionAvail();
 		size.y -= ImGui::GetTextLineHeightWithSpacing();
 		ImVec2 content_max(content_min.x + size.x, content_min.y + size.y);
+		if (m_forced_viewport.enabled) size = { (float)m_forced_viewport.width, (float)m_forced_viewport.height };
 		if (size.x > 0 && size.y > 0)
 		{
 			m_pipeline->setViewport(0, 0, int(size.x), int(size.y));
-
+			m_pipeline->render();
 			auto* fb = m_pipeline->getFramebuffer("default");
-			m_texture_handle = fb->getRenderbufferHandle(0);
+			if (fb) m_texture_handle = fb->getRenderbufferHandle(0);
+
 			view_pos = ImGui::GetCursorScreenPos();
 			if (m_is_opengl)
 			{
@@ -324,7 +337,6 @@ void GameView::onGUI()
 			ImGui::Checkbox("Stats", &m_show_stats);
 			ImGui::SameLine();
 			m_pipeline->callLuaFunction("onGUI");
-			m_pipeline->render();
 		}
 
 		if (m_is_mouse_captured && (io.KeysDown[ImGui::GetKeyIndex(ImGuiKey_Escape)] || !m_editor->isGameMode()))

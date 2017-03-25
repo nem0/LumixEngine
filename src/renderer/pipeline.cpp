@@ -915,6 +915,43 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
+	void saveRenderbuffer(const char* framebuffer, int render_buffer_index, const char* out_path)
+	{
+		FrameBuffer* fb = getFramebuffer(framebuffer);
+		if (!fb)
+		{
+			g_log_error.log("Renderer") << "saveRenderbuffer: Framebuffer " << framebuffer << " not found.";
+			return;
+		}
+
+		bgfx::TextureHandle texture = bgfx::createTexture2D(
+			fb->getWidth(), fb->getHeight(), false, 1, bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK);
+		m_renderer.viewCounterAdd();
+		bgfx::touch(m_renderer.getViewCounter());
+		bgfx::setViewName(m_renderer.getViewCounter(), "saveRenderbuffer_blit");
+		bgfx::TextureHandle rb = fb->getRenderbufferHandle(render_buffer_index);
+		bgfx::blit(m_renderer.getViewCounter(), texture, 0, 0, rb);
+		
+		m_renderer.viewCounterAdd();
+		bgfx::setViewName(m_renderer.getViewCounter(), "saveRenderbuffer_read");
+		Array<u8> data(m_renderer.getEngine().getAllocator());
+		data.resize(fb->getWidth() * fb->getHeight() * 4);
+		bgfx::readTexture(texture, &data[0]);
+		bgfx::touch(m_renderer.getViewCounter());
+
+		bgfx::frame(); // submit
+		bgfx::frame(); // wait for gpu
+
+		FS::FileSystem& fs = m_renderer.getEngine().getFileSystem();
+		FS::IFile* file = fs.open(fs.getDefaultDevice(), Path(out_path), FS::Mode::CREATE_AND_WRITE);
+		Texture::saveTGA(m_renderer.getEngine().getAllocator(), file, fb->getWidth(), fb->getHeight(), 4, &data[0], Path(out_path));
+
+		fs.close(*file);
+
+		bgfx::destroyTexture(texture);
+	}
+
+
 	void copyRenderbuffer(const char* src_fb_name, int src_rb_idx, const char* dest_fb_name, int dest_rb_idx)
 	{
 		auto* src_fb = getFramebuffer(src_fb_name);
@@ -3006,6 +3043,7 @@ void Pipeline::registerLuaAPI(lua_State* L)
 			registerCFunction(#name, f); \
 		} while(false) \
 
+	REGISTER_FUNCTION(setViewport);
 	REGISTER_FUNCTION(setViewSeq);
 	REGISTER_FUNCTION(drawQuad);
 	REGISTER_FUNCTION(setPass);
@@ -3044,6 +3082,7 @@ void Pipeline::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(removeFramebuffer);
 	REGISTER_FUNCTION(setMaterialDefine);
 	REGISTER_FUNCTION(getRenderbuffer);
+	REGISTER_FUNCTION(saveRenderbuffer);
 
 	#undef REGISTER_FUNCTION
 
