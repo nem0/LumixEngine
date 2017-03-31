@@ -48,7 +48,15 @@ struct InstanceData
 };
 
 
-
+struct View
+{
+	u8 bgfx_id;
+	u64 layer_mask;
+	u64 render_state;
+	u32 stencil;
+	int pass_idx;
+	CommandBufferGenerator command_buffer;
+};
 
 
 enum class BufferCommands : u8
