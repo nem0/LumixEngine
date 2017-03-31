@@ -2303,8 +2303,8 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		executeCommandBuffer(view.command_buffer.buffer, &material);
 
 		bgfx::setInstanceDataBuffer(&instance_buffer, count);
-		bgfx::setVertexBuffer(m_particle_vertex_buffer);
-		bgfx::setIndexBuffer(m_particle_index_buffer);
+		bgfx::setVertexBuffer(vertex_buffer);
+		bgfx::setIndexBuffer(index_buffer);
 		bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
 		bgfx::setState(view.render_state | material.getRenderStates());
 		++m_stats.draw_call_count;
