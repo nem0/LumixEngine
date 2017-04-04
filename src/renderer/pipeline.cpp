@@ -2483,7 +2483,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 	void renderGrass(const GrassInfo& grass)
 	{
-		if (!bgfx::checkAvailInstanceDataBuffer(grass.instance_count, sizeof(Matrix))) return;
+		if (!bgfx::checkAvailInstanceDataBuffer(grass.instance_count, sizeof(GrassInfo::InstanceData))) return;
 
 		const bgfx::InstanceDataBuffer* idb =
 			bgfx::allocInstanceDataBuffer(grass.instance_count, sizeof(GrassInfo::InstanceData));
