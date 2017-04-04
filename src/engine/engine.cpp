@@ -225,6 +225,12 @@ void Rect(float w, float h, u32 color)
 }
 
 
+void Dummy(float w, float h)
+{
+	ImGui::Dummy({w, h});
+}
+
+
 void Image(void* texture_id, float w, float h)
 {
 	ImGui::Image(texture_id, ImVec2(w, h));
@@ -952,6 +958,7 @@ public:
 		LuaImGui::registerCFunction(m_state, "Checkbox", &LuaImGui::Checkbox);
 		LuaImGui::registerCFunction(m_state, "CollapsingHeader", &LuaImGui::CollapsingHeader);
 		LuaImGui::registerCFunction(m_state, "DragFloat", &LuaImGui::DragFloat);
+		LuaImGui::registerCFunction(m_state, "Dummy", &LuaWrapper::wrap<decltype(&LuaImGui::Dummy), &LuaImGui::Dummy>);
 		LuaImGui::registerCFunction(m_state, "End", &LuaWrapper::wrap<decltype(&ImGui::End), &ImGui::End>);
 		LuaImGui::registerCFunction(m_state, "EndChildFrame", &LuaWrapper::wrap<decltype(&ImGui::EndChildFrame), &ImGui::EndChildFrame>);
 		LuaImGui::registerCFunction(m_state, "EndDock", &LuaWrapper::wrap<decltype(&ImGui::EndDock), &ImGui::EndDock>);
@@ -962,6 +969,7 @@ public:
 		LuaImGui::registerCFunction(m_state, "GetWindowHeight", &LuaImGui::GetWindowHeight);
 		LuaImGui::registerCFunction(m_state, "GetWindowPos", &LuaImGui::GetWindowPos);
 		LuaImGui::registerCFunction(m_state, "Image", &LuaWrapper::wrap<decltype(&LuaImGui::Image), &LuaImGui::Image>);
+		LuaImGui::registerCFunction(m_state, "Indent", &LuaWrapper::wrap<decltype(&ImGui::Indent), &ImGui::Indent>);
 		LuaImGui::registerCFunction(m_state, "InputTextMultiline", &LuaImGui::InputTextMultiline);
 		LuaImGui::registerCFunction(m_state, "IsItemHovered", &LuaWrapper::wrap<decltype(&LuaImGui::IsItemHovered), &LuaImGui::IsItemHovered>);
 		LuaImGui::registerCFunction(m_state, "IsMouseClicked", &LuaWrapper::wrap<decltype(&LuaImGui::IsMouseClicked), &LuaImGui::IsMouseClicked>);
@@ -982,6 +990,7 @@ public:
 		LuaImGui::registerCFunction(m_state, "SetStyleColor", &LuaImGui::SetStyleColor);
 		LuaImGui::registerCFunction(m_state, "SliderFloat", &LuaImGui::SliderFloat);
 		LuaImGui::registerCFunction(m_state, "Text", &LuaImGui::Text);
+		LuaImGui::registerCFunction(m_state, "Unindent", &LuaWrapper::wrap<decltype(&ImGui::Unindent), &ImGui::Unindent>);
 		LuaImGui::registerCFunction(m_state, "LabelText", &LuaImGui::LabelText);
 
 		lua_pop(m_state, 1);
