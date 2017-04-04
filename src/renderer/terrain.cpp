@@ -25,7 +25,7 @@ namespace Lumix
 {
 
 
-static const float  GRASS_QUAD_SIZE = 10.0f;
+static const float GRASS_QUAD_SIZE = 10.0f;
 static const float GRASS_QUAD_RADIUS = GRASS_QUAD_SIZE * 0.7072f;
 static const int GRID_SIZE = 16;
 static const int COPY_COUNT = 50;
@@ -379,43 +379,50 @@ Array<Terrain::GrassQuad*>& Terrain::getQuads(ComponentHandle camera)
 }
 
 
-void Terrain::generateGrassTypeQuad(GrassPatch& patch, const Matrix& terrain_matrix, float quad_x, float quad_z)
+void Terrain::generateGrassTypeQuad(GrassPatch& patch, const Matrix& terrain_matrix, const Vec2& quad_pos)
 {
-	ASSERT(quad_x >= 0);
-	ASSERT(quad_z >= 0);
+	ASSERT(quad_pos.x >= 0);
+	ASSERT(quad_pos.y >= 0);
 	ASSERT(!m_splatmap->data.empty());
 	ASSERT(m_splatmap->bytes_per_pixel == 4);
 
 	PROFILE_FUNCTION();
 	
 	const float DIV255 = 1 / 255.0f;
-	Texture* splat_map = m_splatmap;
-	float step = GRASS_QUAD_SIZE / (float)patch.m_type->m_density;
+	const Texture* splat_map = m_splatmap;
 
-	float quad_width = Math::minimum(GRASS_QUAD_SIZE, splat_map->width - quad_x / m_scale.x);
-	float quad_height = Math::minimum(GRASS_QUAD_SIZE, splat_map->height - quad_z / m_scale.z);
-	float tx_step = splat_map->width / (m_width * m_scale.x);
-	float base_tx = tx_step * quad_x - tx_step * 0.5f;
+	float grass_quad_size_hm_space = GRASS_QUAD_SIZE / m_scale.x;
+	Vec2 quad_size = {
+		Math::minimum(grass_quad_size_hm_space, m_heightmap->width - quad_pos.x),
+		Math::minimum(grass_quad_size_hm_space, m_heightmap->height - quad_pos.y)
+	};
 
-	struct { float x, y; void* type; } hashed_patch = { quad_x, quad_z, patch.m_type };
+	struct { float x, y; void* type; } hashed_patch = { quad_pos.x, quad_pos.y, patch.m_type };
 	u32 hash = crc32(&hashed_patch, sizeof(hashed_patch));
 	Math::seedRandom(hash);
+	int max_idx = splat_map->width * splat_map->height;
 
-	for (float dz = 0; dz < quad_height; dz += step)
+	Vec2 step = quad_size * (1 / (float)patch.m_type->m_density);
+	for (float dy = 0; dy < quad_size.y; dy += step.y)
 	{
-		int y_offset = int(splat_map->height * (quad_z + dz) / (m_height * m_scale.x)) * splat_map->width;
-		u32* splat_data = &((u32*)&splat_map->data[0])[y_offset];
-		for (float dx = 0; dx < quad_width; dx += step)
+		for (float dx = 0; dx < quad_size.x; dx += step.x)
 		{
-			int tx = int(base_tx + tx_step * dx);
-			u32 pixel_value = splat_data[tx];
+			Vec2 sm_pos(
+				(dx + quad_pos.x) / m_width * splat_map->width,
+				(dy + quad_pos.y) / m_height * splat_map->height
+			);
+
+			int tx = int(sm_pos.x) + int(sm_pos.y) * splat_map->width;
+			tx = Math::clamp(tx, 0, max_idx - 1);
+
+			u32 pixel_value = ((u32*)&splat_map->data[0])[tx];
 
 			int ground_mask = (pixel_value >> 16) & 0xffff;
 			if ((ground_mask & (1 << patch.m_type->m_idx)) == 0) continue;
 
 			Matrix tmp = Matrix::IDENTITY;
-			float x = quad_x + dx + step * Math::randFloat(-0.5f, 0.5f);
-			float z = quad_z + dz + step * Math::randFloat(-0.5f, 0.5f);
+			float x = (quad_pos.x + dx + step.x * Math::randFloat(-0.5f, 0.5f)) * m_scale.x;
+			float z = (quad_pos.y + dy + step.y * Math::randFloat(-0.5f, 0.5f)) * m_scale.z;
 			tmp.setTranslation(Vec3(x, getHeight(x, z), z));
 			
 			switch (patch.m_type->m_rotation_mode)
@@ -530,7 +537,7 @@ void Terrain::updateGrass(ComponentHandle camera)
 				GrassPatch& patch = quad->m_patches.emplace(m_allocator);
 				patch.m_type = &grass_type;
 
-				generateGrassTypeQuad(patch, terrain_mtx, quad_x, quad_z);
+				generateGrassTypeQuad(patch, terrain_mtx, {quad_x / m_scale.x, quad_z / m_scale.z});
 				for (auto instance_data : patch.instance_data)
 				{
 					min_y = Math::minimum(instance_data.matrix.getTranslation().y, min_y);

@@ -134,10 +134,7 @@ class Terrain
 		Array<Terrain::GrassQuad*>& getQuads(ComponentHandle camera);
 		TerrainQuad* generateQuadTree(float size);
 		void updateGrass(ComponentHandle camera);
-		void generateGrassTypeQuad(GrassPatch& patch,
-								   const Matrix& terrain_matrix,
-								   float quad_x,
-								   float quad_z);
+		void generateGrassTypeQuad(GrassPatch& patch, const Matrix& terrain_matrix, const Vec2& quad_pos_hm_space);
 		void generateGeometry();
 		void onMaterialLoaded(Resource::State, Resource::State new_state, Resource&);
 		void grassLoaded(Resource::State, Resource::State, Resource&);
