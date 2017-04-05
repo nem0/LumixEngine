@@ -757,6 +757,7 @@ public:
 	static void LUA_logError(const char* text) { g_log_error.log("Lua Script") << text; }
 	static void LUA_logInfo(const char* text) { g_log_info.log("Lua Script") << text; }
 	static void LUA_pause(Engine* engine, bool pause) { engine->pause(pause); }
+	static void LUA_nextFrame(Engine* engine) { engine->nextFrame(); }
 	static Entity LUA_getFirstEntity(Universe* universe) { return universe->getFirstEntity(); }
 	static Entity LUA_getNextEntity(Universe* universe, Entity entity) { return universe->getNextEntity(entity); }
 	static Vec4 LUA_multMatrixVec(const Matrix& m, const Vec4& v) { return m * v; }
@@ -852,6 +853,7 @@ public:
 		REGISTER_FUNCTION(logInfo);
 		REGISTER_FUNCTION(multMatrixVec);
 		REGISTER_FUNCTION(multQuat);
+		REGISTER_FUNCTION(nextFrame);
 		REGISTER_FUNCTION(pause);
 		REGISTER_FUNCTION(processFilesystemWork);
 		REGISTER_FUNCTION(setEntityLocalPosition);
