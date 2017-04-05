@@ -2303,10 +2303,10 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	Entity raycast(const Vec3& origin, const Vec3& dir) override
+	Entity raycast(const Vec3& origin, const Vec3& dir, Entity ignore_entity) override
 	{
 		RaycastHit hit;
-		if (raycastEx(origin, dir, FLT_MAX, hit, INVALID_ENTITY)) return hit.entity;
+		if (raycastEx(origin, dir, FLT_MAX, hit, ignore_entity)) return hit.entity;
 		return INVALID_ENTITY;
 	}
 

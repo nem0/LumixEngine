@@ -80,7 +80,7 @@ public:
 
 	virtual ~PhysicsScene() {}
 	virtual void render() = 0;
-	virtual Entity raycast(const Vec3& origin, const Vec3& dir) = 0;
+	virtual Entity raycast(const Vec3& origin, const Vec3& dir, Entity ignore_entity) = 0;
 	virtual bool raycastEx(const Vec3& origin, const Vec3& dir, float distance, RaycastHit& result, Entity ignored) = 0;
 	virtual PhysicsSystem& getSystem() const = 0;
 

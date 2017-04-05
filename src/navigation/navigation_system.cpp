@@ -465,6 +465,23 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 					onPathFinished(agent);
 				}
 			}
+/*			else if (dt_agent->ncorners == 1)
+			{
+				if (!agent.is_finished)
+				{
+					Vec3 pos = *(Vec3*)dt_agent->npos;
+					Vec3 target = *(Vec3*)dt_agent->targetPos;
+
+					float stop_dist_squared = agent.speed * time_delta;
+					stop_dist_squared *= stop_dist_squared * 2;
+					if ((pos - target).squaredLength() < stop_dist_squared)
+					{
+						m_crowd->resetMoveTarget(agent.agent);
+						agent.is_finished = true;
+						onPathFinished(agent);
+					}
+				}
+			}*/
 			else
 			{
 				agent.is_finished = false;
@@ -576,6 +593,9 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 			prev = tmp;
 		}
 		render_scene->addDebugCross(*(Vec3*)dt_agent->targetPos, 1.0f, 0xffffffff, 0);
+		Vec3 vel = *(Vec3*)dt_agent->vel;
+		Vec3 pos = m_universe.getPosition(entity);
+		render_scene->addDebugLine(pos, pos + vel, 0xff0000ff, 0);
 	}
 
 

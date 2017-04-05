@@ -93,6 +93,14 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 						if (debug_draw_path) scene->debugDrawPath(selected_entities[0]);
 						ImGui::LabelText("Desired speed", "%f", agent->desiredSpeed);
 						ImGui::LabelText("Corners", "%d", agent->ncorners);
+						if (agent->ncorners > 0)
+						{
+							Vec3 pos = *(Vec3*)agent->npos;
+							Vec3 corner = *(Vec3*)agent->targetPos;
+
+							ImGui::LabelText("Target distance", "%f", (pos - corner).length());
+						}
+
 						static const char* STATES[] = { "Invalid", "Walking", "Offmesh" };
 						if (agent->state < lengthOf(STATES)) ImGui::LabelText("State", "%s", STATES[agent->state]);
 						static const char* TARGET_STATES[] = { "None", "Failed", "Valid", "Requesting", "Waiting for queue", "Waiting for path", "Velocity" };
