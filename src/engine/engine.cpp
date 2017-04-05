@@ -674,12 +674,6 @@ public:
 	}
 
 
-	static void LUA_setEntityPosition(Universe* univ, Entity entity, Vec3 pos)
-	{
-		univ->setPosition(entity, pos);
-	}
-
-
 	static int LUA_setEntityRotation(lua_State* L)
 	{
 		Universe* univ = LuaWrapper::checkArg<Universe*>(L, 1);
@@ -697,29 +691,6 @@ public:
 			univ->setRotation({ entity_index }, rot);
 		}
 		return 0;
-	}
-
-	static void LUA_unloadResource(EngineImpl* engine, int resource_idx)
-	{
-		engine->unloadLuaResource(resource_idx);
-	}
-
-
-	static Universe* LUA_createUniverse(EngineImpl* engine)
-	{
-		return &engine->createUniverse(false);
-	}
-
-
-	static void LUA_destroyUniverse(EngineImpl* engine, Universe* universe)
-	{
-		engine->destroyUniverse(*universe);
-	}
-
-
-	static Universe* LUA_getSceneUniverse(IScene* scene)
-	{
-		return &scene->getUniverse();
 	}
 
 
@@ -765,18 +736,6 @@ public:
 	}
 
 
-	static void LUA_logError(const char* text)
-	{
-		g_log_error.log("Lua Script") << text;
-	}
-
-
-	static void LUA_logInfo(const char* text)
-	{
-		g_log_info.log("Lua Script") << text;
-	}
-
-
 	static float LUA_getInputActionValue(Engine* engine, u32 action)
 	{
 		auto v = engine->getInputSystem().getActionValue(action);
@@ -786,33 +745,22 @@ public:
 
 	static void LUA_addInputAction(Engine* engine, u32 action, int type, int key, int controller_id)
 	{
-		engine->getInputSystem().addAction(
-			action, Lumix::InputSystem::InputType(type), key, controller_id);
+		engine->getInputSystem().addAction(action, Lumix::InputSystem::InputType(type), key, controller_id);
 	}
 
 
-	static Entity LUA_getFirstEntity(Universe* universe)
-	{
-		return universe->getFirstEntity();
-	}
-
-
-	static Entity LUA_getNextEntity(Universe* universe, Entity entity)
-	{
-		return universe->getNextEntity(entity);
-	}
-
-
-	static Vec4 LUA_multMatrixVec(const Matrix& m, const Vec4& v)
-	{
-		return m * v;
-	}
-
-
-	static Quat LUA_multQuat(const Quat& a, const Quat& b)
-	{
-		return a * b;
-	}
+	static void LUA_setEntityPosition(Universe* univ, Entity entity, Vec3 pos) { univ->setPosition(entity, pos); }
+	static void LUA_unloadResource(EngineImpl* engine, int resource_idx) { engine->unloadLuaResource(resource_idx); }
+	static Universe* LUA_createUniverse(EngineImpl* engine) { return &engine->createUniverse(false); }
+	static void LUA_destroyUniverse(EngineImpl* engine, Universe* universe) { engine->destroyUniverse(*universe); }
+	static Universe* LUA_getSceneUniverse(IScene* scene) { return &scene->getUniverse(); }
+	static void LUA_logError(const char* text) { g_log_error.log("Lua Script") << text; }
+	static void LUA_logInfo(const char* text) { g_log_info.log("Lua Script") << text; }
+	static void LUA_pause(Engine* engine, bool pause) { engine->pause(pause); }
+	static Entity LUA_getFirstEntity(Universe* universe) { return universe->getFirstEntity(); }
+	static Entity LUA_getNextEntity(Universe* universe, Entity entity) { return universe->getNextEntity(entity); }
+	static Vec4 LUA_multMatrixVec(const Matrix& m, const Vec4& v) { return m * v; }
+	static Quat LUA_multQuat(const Quat& a, const Quat& b) { return a * b; }
 
 
 	static int LUA_multVecQuat(lua_State* L)
@@ -882,35 +830,36 @@ public:
 			LuaWrapper::createSystemFunction(m_state, "Engine", #name, \
 				&LuaWrapper::wrap<decltype(&LUA_##name), LUA_##name>); \
 
-		REGISTER_FUNCTION(createUniverse);
-		REGISTER_FUNCTION(destroyUniverse);
-		REGISTER_FUNCTION(getScene);
-		REGISTER_FUNCTION(getSceneUniverse);
-		REGISTER_FUNCTION(loadResource);
-		REGISTER_FUNCTION(unloadResource);
+		REGISTER_FUNCTION(addInputAction);
 		REGISTER_FUNCTION(createComponent);
 		REGISTER_FUNCTION(createEntity);
-		REGISTER_FUNCTION(setEntityPosition);
-		REGISTER_FUNCTION(getEntityPosition);
-		REGISTER_FUNCTION(getEntityDirection);
-		REGISTER_FUNCTION(setEntityRotation);
-		REGISTER_FUNCTION(getEntityRotation);
-		REGISTER_FUNCTION(setEntityLocalRotation);
-		REGISTER_FUNCTION(setEntityLocalPosition);
-		REGISTER_FUNCTION(getInputActionValue);
-		REGISTER_FUNCTION(addInputAction);
-		REGISTER_FUNCTION(logError);
-		REGISTER_FUNCTION(logInfo);
-		REGISTER_FUNCTION(startGame);
-		REGISTER_FUNCTION(hasFilesystemWork);
-		REGISTER_FUNCTION(processFilesystemWork);
+		REGISTER_FUNCTION(createUniverse);
 		REGISTER_FUNCTION(destroyEntity);
+		REGISTER_FUNCTION(destroyUniverse);
 		REGISTER_FUNCTION(getComponent);
 		REGISTER_FUNCTION(getComponentType);
+		REGISTER_FUNCTION(getEntityDirection);
+		REGISTER_FUNCTION(getEntityPosition);
+		REGISTER_FUNCTION(getEntityRotation);
+		REGISTER_FUNCTION(getFirstEntity);
+		REGISTER_FUNCTION(getInputActionValue);
+		REGISTER_FUNCTION(getNextEntity);
+		REGISTER_FUNCTION(getScene);
+		REGISTER_FUNCTION(getSceneUniverse);
+		REGISTER_FUNCTION(hasFilesystemWork);
+		REGISTER_FUNCTION(loadResource);
+		REGISTER_FUNCTION(logError);
+		REGISTER_FUNCTION(logInfo);
 		REGISTER_FUNCTION(multMatrixVec);
 		REGISTER_FUNCTION(multQuat);
-		REGISTER_FUNCTION(getFirstEntity);
-		REGISTER_FUNCTION(getNextEntity);
+		REGISTER_FUNCTION(pause);
+		REGISTER_FUNCTION(processFilesystemWork);
+		REGISTER_FUNCTION(setEntityLocalPosition);
+		REGISTER_FUNCTION(setEntityLocalRotation);
+		REGISTER_FUNCTION(setEntityPosition);
+		REGISTER_FUNCTION(setEntityRotation);
+		REGISTER_FUNCTION(startGame);
+		REGISTER_FUNCTION(unloadResource);
 
 		#undef REGISTER_FUNCTION
 
