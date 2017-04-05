@@ -797,6 +797,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	{
 		PROFILE_FUNCTION();
 		if (!m_is_game_running) return;
+		if (paused) return;
 
 		m_event_stream.clear();
 
