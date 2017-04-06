@@ -1,4 +1,5 @@
 #include "navigation_system.h"
+#include "animation/animation_system.h"
 #include "engine/array.h"
 #include "engine/base_proxy_allocator.h"
 #include "engine/blob.h"
@@ -37,12 +38,14 @@ namespace Lumix
 enum class NavigationSceneVersion : int
 {
 	USE_ROOT_MOTION,
+	ROOT_MOTION_FROM_ANIM,
 
 	LATEST
 };
 
 
 static const ComponentType NAVMESH_AGENT_TYPE = PropertyRegister::getComponentType("navmesh_agent");
+static const ComponentType ANIM_CONTROLLER_TYPE = PropertyRegister::getComponentType("anim_controller");
 static const int CELLS_PER_TILE_SIDE = 256;
 static const float CELL_SIZE = 0.3f;
 static void registerLuaAPI(lua_State* L);
@@ -52,7 +55,8 @@ struct Agent
 {
 	enum Flags : u32
 	{
-		USE_ROOT_MOTION = 1 << 0
+		USE_ROOT_MOTION = 1 << 0,
+		GET_ROOT_MOTION_FROM_ANIM_CONTROLLER = 1 << 1
 	};
 
 	Entity entity;
@@ -435,6 +439,9 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 		if (!m_crowd) return;
 		if (paused) return;
 
+		static const u32 ANIMATION_HASH = crc32("animation");
+		auto* anim_scene = (AnimationScene*)m_universe.getScene(ANIMATION_HASH);
+
 		for (auto& agent : m_agents)
 		{
 			if (agent.agent < 0) continue;
@@ -443,6 +450,13 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 
 			Vec3 pos = m_universe.getPosition(agent.entity);
 			Quat rot = m_universe.getRotation(agent.entity);
+			if (agent.flags & Agent::GET_ROOT_MOTION_FROM_ANIM_CONTROLLER && anim_scene)
+			{
+				ComponentHandle ctrl = anim_scene->getComponent(agent.entity, ANIM_CONTROLLER_TYPE);
+				Transform root_motion = anim_scene->getControllerRootMotion(ctrl);
+				agent.root_motion = root_motion.pos;
+				m_universe.setRotation(agent.entity, m_universe.getRotation(agent.entity) * root_motion.rot);
+			}
 			if (agent.flags & Agent::USE_ROOT_MOTION)
 			{
 				*(Vec3*)dt_agent->npos = pos + rot.rotate(agent.root_motion);
@@ -1421,6 +1435,8 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 		serializer.write("radius", agent.radius);
 		serializer.write("height", agent.height);
 		serializer.write("use_root_motion", (agent.flags & Agent::USE_ROOT_MOTION) != 0);
+		serializer.write("get_root_motion_from_animation_controller",
+			(agent.flags & Agent::GET_ROOT_MOTION_FROM_ANIM_CONTROLLER) != 0);
 	}
 
 
@@ -1436,6 +1452,12 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 			bool b;
 			serializer.read(&b);
 			if (b) agent.flags = Agent::USE_ROOT_MOTION;
+		}
+		if (scene_version > (int)NavigationSceneVersion::ROOT_MOTION_FROM_ANIM)
+		{
+			bool b;
+			serializer.read(&b);
+			if (b) agent.flags = Agent::GET_ROOT_MOTION_FROM_ANIM_CONTROLLER;
 		}
 		agent.is_finished = true;
 		agent.agent = -1;
@@ -1478,6 +1500,23 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 			ComponentHandle cmp = {agent.entity.index};
 			m_universe.addComponent(agent.entity, NAVMESH_AGENT_TYPE, this, cmp);
 		}
+	}
+
+
+	bool isGettingRootMotionFromAnim(ComponentHandle cmp)
+	{
+		Entity entity = {cmp.index};
+		return (m_agents[entity].flags & Agent::GET_ROOT_MOTION_FROM_ANIM_CONTROLLER) != 0;
+	}
+
+
+	void setIsGettingRootMotionFromAnim(ComponentHandle cmp, bool is)
+	{
+		Entity entity = {cmp.index};
+		if (is)
+			m_agents[entity].flags |= Agent::GET_ROOT_MOTION_FROM_ANIM_CONTROLLER;
+		else
+			m_agents[entity].flags &= ~Agent::GET_ROOT_MOTION_FROM_ANIM_CONTROLLER;
 	}
 
 
@@ -1568,6 +1607,10 @@ void NavigationSystem::registerProperties()
 	PropertyRegister::add("navmesh_agent",
 		LUMIX_NEW(allocator, BoolPropertyDescriptor<NavigationSceneImpl>)(
 			"use root motion", &NavigationSceneImpl::useAgentRootMotion, &NavigationSceneImpl::setUseAgentRootMotion));
+	PropertyRegister::add("navmesh_agent",
+		LUMIX_NEW(allocator, BoolPropertyDescriptor<NavigationSceneImpl>)("root motion from anim",
+			&NavigationSceneImpl::isGettingRootMotionFromAnim,
+			&NavigationSceneImpl::setIsGettingRootMotionFromAnim));
 }
 
 

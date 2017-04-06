@@ -349,7 +349,7 @@ int ExpressionCompiler::toPostfix(const Token* input, Token* output, int count)
 	for(int i = 0; i < count; ++i)
 	{
 		const Token& token = input[i];
-		if(token.type == Token::NUMBER)
+		if(token.type == Token::NUMBER || token.type == Token::IDENTIFIER)
 		{
 			*out = token;
 			++out;
@@ -476,7 +476,7 @@ static const struct
 		Types::FLOAT,
 		Instruction::UNARY_MINUS,
 		{Types::FLOAT, Types::NONE},
-		4},
+		5},
 	{ExpressionCompiler::Token::LESS_THAN,
 		Types::BOOL,
 		Instruction::FLOAT_LT,
@@ -517,7 +517,7 @@ static const struct
 
 int ExpressionCompiler::getOperatorPriority(const Token& token)
 {
-	if (token.type == Token::IDENTIFIER) return 3;
+	ASSERT(token.type != Token::IDENTIFIER);
 	if (token.type == Token::LEFT_PARENTHESIS) return -1;
 	if (token.type != Token::OPERATOR) ASSERT(false);
 	
