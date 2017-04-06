@@ -1241,6 +1241,13 @@ public:
 				scene->update(dt, m_paused);
 			}
 		}
+		{
+			PROFILE_BLOCK("late update scenes");
+			for (auto* scene : context.getScenes())
+			{
+				scene->lateUpdate(dt, m_paused);
+			}
+		}
 		m_plugin_manager->update(dt, m_paused);
 		m_input_system->update(dt);
 		getFileSystem().updateAsyncTransactions();

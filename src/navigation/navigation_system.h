@@ -10,6 +10,9 @@ namespace Lumix
 {
 
 
+template <typename T> class DelegateList;
+
+
 class NavigationScene : public IScene
 {
 public:
@@ -17,7 +20,7 @@ public:
 	virtual bool navigate(Entity entity, const struct Vec3& dest, float speed) = 0;
 	virtual void setActorActive(Entity entity, bool active) = 0;
 	virtual float getAgentSpeed(Entity entity) = 0;
-	virtual Vec3 getAgentVelocity(Entity entity) = 0;
+	virtual float getAgentYawDiff(Entity entity) = 0;
 	virtual void setAgentRootMotion(Entity, const Vec3& root_motion) = 0;
 	virtual bool generateNavmesh() = 0;
 	virtual bool generateTile(int x, int z, bool keep_data) = 0;
@@ -32,6 +35,7 @@ public:
 	virtual const dtCrowdAgent* getDetourAgent(Entity entity) = 0;
 	virtual bool isNavmeshReady() const = 0;
 	virtual bool hasDebugDrawData() const = 0;
+	virtual DelegateList<void(float)>& onUpdate() = 0;
 };
 
 

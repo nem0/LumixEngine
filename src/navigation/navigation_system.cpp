@@ -34,7 +34,7 @@ namespace Lumix
 {
 
 
-enum class AnimationSceneVersion : int
+enum class NavigationSceneVersion : int
 {
 	USE_ROOT_MOTION,
 
@@ -63,6 +63,7 @@ struct Agent
 	u32 flags = 0;
 	Vec3 root_motion = {0, 0, 0};
 	float speed = 0;
+	float yaw_diff = 0;
 };
 
 
@@ -148,6 +149,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 		, m_agents(m_allocator)
 		, m_crowd(nullptr)
 		, m_script_scene(nullptr)
+		, m_on_update(m_allocator)
 	{
 		setGeneratorParams(0.3f, 0.1f, 0.3f, 2.0f, 60.0f, 1.5f);
 		m_universe.entityTransformed().bind<NavigationSceneImpl, &NavigationSceneImpl::onEntityMoved>(this);
@@ -384,18 +386,15 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	}
 
 
-	void setAgentRootMotion(Entity entity, const Vec3& root_motion) override
+	float getAgentYawDiff(Entity entity) override
 	{
-		m_agents[entity].root_motion = root_motion;
+		return m_agents[entity].yaw_diff;
 	}
 
 
-	Vec3 getAgentVelocity(Entity entity) override
+	void setAgentRootMotion(Entity entity, const Vec3& root_motion) override
 	{
-		Agent& agent = m_agents[entity];
-		const dtCrowdAgent* dt_agent = m_crowd->getAgent(agent.agent);
-		if (!dt_agent) return {0, 0, 0};
-		return *(Vec3*)dt_agent->vel;
+		m_agents[entity].root_motion = root_motion;
 	}
 
 
@@ -405,7 +404,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 		if (!m_crowd) return;
 		if (paused) return;
 		m_crowd->update(time_delta, nullptr);
-		
+
 		for (auto& agent : m_agents)
 		{
 			if (agent.agent < 0) continue;
@@ -415,19 +414,42 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 			Vec3 pos = m_universe.getPosition(agent.entity);
 			Quat rot = m_universe.getRotation(agent.entity);
 			Vec3 diff = *(Vec3*)dt_agent->npos - pos;
+
+			Vec3 velocity = *(Vec3*)dt_agent->vel;
+			agent.speed = diff.length() / time_delta;
+			agent.yaw_diff = 0;
+			if (velocity.squaredLength() > 0)
+			{
+				float wanted_yaw = atan2(velocity.x, velocity.z);
+				float current_yaw = rot.toEuler().y;
+				agent.yaw_diff = Math::angleDiff(wanted_yaw, current_yaw);
+			}
+		}
+		m_on_update.invoke(time_delta);
+	}
+
+
+	void lateUpdate(float time_delta, bool paused) override
+	{
+		PROFILE_FUNCTION();
+		if (!m_crowd) return;
+		if (paused) return;
+
+		for (auto& agent : m_agents)
+		{
+			if (agent.agent < 0) continue;
+			const dtCrowdAgent* dt_agent = m_crowd->getAgent(agent.agent);
+			if (dt_agent->paused) continue;
+
+			Vec3 pos = m_universe.getPosition(agent.entity);
+			Quat rot = m_universe.getRotation(agent.entity);
 			if (agent.flags & Agent::USE_ROOT_MOTION)
 			{
 				*(Vec3*)dt_agent->npos = pos + rot.rotate(agent.root_motion);
 				agent.root_motion.set(0, 0, 0);
-				diff.y = 0;
-				agent.speed = diff.length() / time_delta;
-			}
-			else
-			{
-				agent.speed = (*(Vec3*)dt_agent->nvel).length();
 			}
 		}
-		
+
 		m_crowd->doMove(time_delta);
 
 		for (auto& agent : m_agents)
@@ -438,7 +460,6 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 
 			m_universe.setPosition(agent.entity, *(Vec3*)dt_agent->npos);
 
-			
 			if ((agent.flags & Agent::USE_ROOT_MOTION) == 0)
 			{
 				Vec3 vel = *(Vec3*)dt_agent->nvel;
@@ -456,7 +477,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 				}
 			}
 
-			if (dt_agent->ncorners == 0)
+			if (dt_agent->ncorners == 0 && dt_agent->targetState != DT_CROWDAGENT_TARGET_REQUESTING)
 			{
 				if (!agent.is_finished)
 				{
@@ -465,23 +486,6 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 					onPathFinished(agent);
 				}
 			}
-/*			else if (dt_agent->ncorners == 1)
-			{
-				if (!agent.is_finished)
-				{
-					Vec3 pos = *(Vec3*)dt_agent->npos;
-					Vec3 target = *(Vec3*)dt_agent->targetPos;
-
-					float stop_dist_squared = agent.speed * time_delta;
-					stop_dist_squared *= stop_dist_squared * 2;
-					if ((pos - target).squaredLength() < stop_dist_squared)
-					{
-						m_crowd->resetMoveTarget(agent.agent);
-						agent.is_finished = true;
-						onPathFinished(agent);
-					}
-				}
-			}*/
 			else
 			{
 				agent.is_finished = false;
@@ -596,6 +600,12 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 		Vec3 vel = *(Vec3*)dt_agent->vel;
 		Vec3 pos = m_universe.getPosition(entity);
 		render_scene->addDebugLine(pos, pos + vel, 0xff0000ff, 0);
+	}
+
+
+	DelegateList<void(float)>& onUpdate() override
+	{
+		return m_on_update;
 	}
 
 
@@ -1402,7 +1412,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	}
 
 
-	int getVersion() const override { return (int)AnimationSceneVersion::LATEST; }
+	int getVersion() const override { return (int)NavigationSceneVersion::LATEST; }
 
 
 	void serializeAgent(ISerializer& serializer, ComponentHandle cmp)
@@ -1420,7 +1430,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 		agent.entity = entity;
 		serializer.read(&agent.radius);
 		serializer.read(&agent.height);
-		if (scene_version > (int)AnimationSceneVersion::USE_ROOT_MOTION)
+		if (scene_version > (int)NavigationSceneVersion::USE_ROOT_MOTION)
 		{
 			agent.flags = 0;
 			bool b;
@@ -1542,6 +1552,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	int m_num_tiles_z;
 	LuaScriptScene* m_script_scene;
 	dtCrowd* m_crowd;
+	DelegateList<void(float)> m_on_update;
 };
 
 
