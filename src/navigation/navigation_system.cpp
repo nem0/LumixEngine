@@ -1457,7 +1457,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 		{
 			bool b;
 			serializer.read(&b);
-			if (b) agent.flags = Agent::GET_ROOT_MOTION_FROM_ANIM_CONTROLLER;
+			if (b) agent.flags |= Agent::GET_ROOT_MOTION_FROM_ANIM_CONTROLLER;
 		}
 		agent.is_finished = true;
 		agent.agent = -1;
