@@ -229,7 +229,7 @@ public:
 	void serialize(Lumix::OutputBlob& blob) override;
 	EntryNode* getEntryNode() const { return m_entry_node; }
 	void compile() override;
-	void removeChild(Component* component) override;
+	void removeEntry(EntryEdge& entry);
 	void dropSlot(const char* name, Lumix::u32 slot, const ImVec2& canvas_screen_pos) override;
 
 private:

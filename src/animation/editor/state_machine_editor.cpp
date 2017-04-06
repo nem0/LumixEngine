@@ -936,7 +936,7 @@ struct EntryEdge : public Component
 
 	~EntryEdge()
 	{
-		m_parent->removeChild(this);
+		m_parent->removeEntry(*this);
 	}
 
 	void serialize(Lumix::OutputBlob& blob) override {}
@@ -1043,16 +1043,15 @@ StateMachine::StateMachine(Anim::Component* engine_cmp, Container* parent, Contr
 }
 
 
-void StateMachine::removeChild(Component* component)
+void StateMachine::removeEntry(EntryEdge& entry)
 {
-	Container::removeChild(component);
 	auto* sm = (Anim::StateMachine*)engine_cmp;
 	for(int i = 0; i < sm->entries.size(); ++i)
 	{
-		if (sm->entries[i].node == component->engine_cmp)
+		if (sm->entries[i].node == entry.getTo()->engine_cmp)
 		{
 			sm->entries.erase(i);
-			LUMIX_DELETE(m_controller.getAllocator(), m_entry_node->entries[i]);
+			m_entry_node->entries.eraseItemFast(&entry);
 			break;
 		}
 	}
