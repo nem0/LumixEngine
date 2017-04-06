@@ -208,7 +208,8 @@ void Blend1DNodeInstance::fillPose(Engine& engine, Pose& pose, Model& model, flo
 
 Transform Blend1DNodeInstance::getRootMotion() const
 {
-	return Transform({0, 0, 0}, {0, 0, 0, 1});
+	if(!a0) return Transform({0, 0, 0}, {0, 0, 0, 1});
+	return a0->getRootMotion().interpolate(a1->getRootMotion(), current_weight);
 }
 
 
