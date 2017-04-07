@@ -40,6 +40,7 @@ public:
 	enum class Version : int
 	{
 		ANIMATION_SETS,
+		MAX_ROOT_ROTATION_SPEED,
 
 		LAST
 	};

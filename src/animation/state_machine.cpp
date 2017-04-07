@@ -1,6 +1,7 @@
 #include "state_machine.h"
 #include "animation/animation.h"
 #include "animation/animation_system.h"
+#include "animation/controller.h"
 #include "animation/events.h"
 #include "engine/blob.h"
 #include "engine/crc32.h"
@@ -28,7 +29,7 @@ void Component::serialize(OutputBlob& blob)
 }
 
 
-void Component::deserialize(InputBlob& blob, Container* parent)
+void Component::deserialize(InputBlob& blob, Container* parent, int version)
 {
 	blob.read(uid);
 }
@@ -130,9 +131,9 @@ void Edge::serialize(OutputBlob& blob)
 }
 
 
-void Edge::deserialize(InputBlob& blob, Container* parent)
+void Edge::deserialize(InputBlob& blob, Container* parent, int version)
 {
-	Component::deserialize(blob, parent);
+	Component::deserialize(blob, parent, version);
 	int uid;
 	blob.read(uid);
 	from = static_cast<Node*>(parent->getChildByUID(uid));
@@ -177,9 +178,9 @@ void Node::serialize(OutputBlob& blob)
 }
 
 
-void Node::deserialize(InputBlob& blob, Container* parent)
+void Node::deserialize(InputBlob& blob, Container* parent, int version)
 {
-	Component::deserialize(blob, parent);
+	Component::deserialize(blob, parent, version);
 	blob.read(events_count);
 	if (events_count > 0)
 	{
@@ -297,9 +298,9 @@ void Blend1DNode::serialize(OutputBlob& blob)
 }
 
 
-void Blend1DNode::deserialize(InputBlob& blob, Container* parent)
+void Blend1DNode::deserialize(InputBlob& blob, Container* parent, int version)
 {
-	Container::deserialize(blob, parent);
+	Container::deserialize(blob, parent, version);
 	int count;
 	blob.read(count);
 	items.resize(count);
@@ -332,12 +333,13 @@ void AnimationNode::serialize(OutputBlob& blob)
 	blob.write(looped);
 	blob.write(new_on_loop);
 	blob.write(root_rotation_input_offset);
+	blob.write(max_root_rotation_speed);
 }
 
 
-void AnimationNode::deserialize(InputBlob& blob, Container* parent)
+void AnimationNode::deserialize(InputBlob& blob, Container* parent, int version)
 {
-	Node::deserialize(blob, parent);
+	Node::deserialize(blob, parent, version);
 
 	int count;
 	blob.read(count);
@@ -349,6 +351,10 @@ void AnimationNode::deserialize(InputBlob& blob, Container* parent)
 	blob.read(looped);
 	blob.read(new_on_loop);
 	blob.read(root_rotation_input_offset);
+	if (version > (int)ControllerResource::Version::MAX_ROOT_ROTATION_SPEED)
+	{
+		blob.read(max_root_rotation_speed);
+	}
 }
 
 
@@ -484,10 +490,14 @@ struct AnimationNodeInstance : public NodeInstance
 		{
 			root_motion = {{0, 0, 0}, {0, 0, 0, 1}};
 		}
-		int root_rotation_input_offset = ((AnimationNode&)source).root_rotation_input_offset;
+		
+		auto& node = ((AnimationNode&)source);
+		int root_rotation_input_offset = node.root_rotation_input_offset;
 		if (root_rotation_input_offset >= 0)
 		{
 			float yaw = *(float*)&rc.input[root_rotation_input_offset];
+			float max_yaw_diff = rc.time_delta * node.max_root_rotation_speed;
+			yaw = Math::clamp(yaw, -max_yaw_diff, max_yaw_diff);
 			root_motion.rot = Quat({ 0, 1, 0 }, yaw);
 		}
 
@@ -598,9 +608,9 @@ void StateMachine::serialize(OutputBlob& blob)
 }
 
 
-void StateMachine::deserialize(InputBlob& blob, Container* parent)
+void StateMachine::deserialize(InputBlob& blob, Container* parent, int version)
 {
-	Container::deserialize(blob, parent);
+	Container::deserialize(blob, parent, version);
 	int count;
 	blob.read(count);
 	entries.reserve(count);
@@ -661,9 +671,9 @@ void Container::serialize(OutputBlob& blob)
 }
 
 
-void Container::deserialize(InputBlob& blob, Container* parent)
+void Container::deserialize(InputBlob& blob, Container* parent, int version)
 {
-	Node::deserialize(blob, parent);
+	Node::deserialize(blob, parent, version);
 	int size;
 	blob.read(size);
 	for (int i = 0; i < size; ++i)
@@ -671,7 +681,7 @@ void Container::deserialize(InputBlob& blob, Container* parent)
 		Component::Type type;
 		blob.read(type);
 		Component* item = createComponent(type, allocator);
-		item->deserialize(blob, this);
+		item->deserialize(blob, this, version);
 		children.push(item);
 	}
 }

@@ -915,9 +915,17 @@ void AnimationNode::onGUI()
 		}
 		return true;
 	};
-	if(ImGui::Combo("Root rotation input", &root_rotation_input, input_getter, &decl, decl.inputs_count + 1))
+	if (ImGui::Combo("Root rotation input", &root_rotation_input, input_getter, &decl, decl.inputs_count + 1))
 	{
 		if (root_rotation_input >= decl.inputs_count) root_rotation_input = -1;
+	}
+	if (root_rotation_input != -1)
+	{
+		float deg = Math::radiansToDegrees(node->max_root_rotation_speed);
+		if (ImGui::DragFloat("Max root rotation speed (deg/s)", &deg))
+		{
+			node->max_root_rotation_speed = Math::degreesToRadians(deg);
+		}
 	}
 }
 
