@@ -88,7 +88,7 @@ bool ControllerResource::deserialize(InputBlob& blob)
 	Component::Type type;
 	blob.read(type);
 	m_root = createComponent(type, m_allocator);
-	m_root->deserialize(blob, nullptr);
+	m_root->deserialize(blob, nullptr, header.version);
 	blob.read(m_input_decl.inputs_count);
 	for (int i = 0; i < m_input_decl.inputs_count; ++i)
 	{

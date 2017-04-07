@@ -63,7 +63,7 @@ struct Component
 	virtual ~Component() {}
 	virtual ComponentInstance* createInstance(IAllocator& allocator) = 0;
 	virtual void serialize(OutputBlob& blob);
-	virtual void deserialize(InputBlob& blob, Container* parent);
+	virtual void deserialize(InputBlob& blob, Container* parent, int version);
 
 	int uid;
 	const Type type;
@@ -76,7 +76,7 @@ struct Node : public Component
 	~Node();
 
 	void serialize(OutputBlob& blob) override;
-	void deserialize(InputBlob& blob, Container* parent) override;
+	void deserialize(InputBlob& blob, Container* parent, int version) override;
 
 	IAllocator& allocator;
 	Array<Edge*> out_edges;
@@ -91,7 +91,7 @@ struct Container : public Node
 	~Container();
 
 	void serialize(OutputBlob& blob) override;
-	void deserialize(InputBlob& blob, Container* parent) override;
+	void deserialize(InputBlob& blob, Container* parent, int version) override;
 	Component* getChildByUID(int uid);
 
 	IAllocator& allocator;
@@ -105,7 +105,7 @@ struct Edge : public Component
 	~Edge();
 	ComponentInstance* createInstance(IAllocator& allocator) override;
 	void serialize(OutputBlob& blob) override;
-	void deserialize(InputBlob& blob, Container* parent) override;
+	void deserialize(InputBlob& blob, Container* parent, int version) override;
 
 	Condition condition;
 	Node* from = nullptr;
@@ -128,12 +128,13 @@ struct AnimationNode : public Node
 	AnimationNode(IAllocator& allocator);
 	ComponentInstance* createInstance(IAllocator& allocator) override;
 	void serialize(OutputBlob& blob) override;
-	void deserialize(InputBlob& blob, Container* parent) override;
+	void deserialize(InputBlob& blob, Container* parent, int version) override;
 
 	Array<u32> animations_hashes;
 	bool looped = true;
 	bool new_on_loop = true;
 	int root_rotation_input_offset = -1;
+	float max_root_rotation_speed = Math::degreesToRadians(90);
 };
 
 
@@ -162,7 +163,7 @@ struct Blend1DNode : public Container
 	Blend1DNode(IAllocator& allocator);
 	ComponentInstance* createInstance(IAllocator& allocator) override;
 	void serialize(OutputBlob& blob) override;
-	void deserialize(InputBlob& blob, Container* parent) override;
+	void deserialize(InputBlob& blob, Container* parent, int version) override;
 
 	struct Item
 	{
@@ -199,7 +200,7 @@ struct StateMachine : public Container
 
 	ComponentInstance* createInstance(IAllocator& allocator) override;
 	void serialize(OutputBlob& blob) override;
-	void deserialize(InputBlob& blob, Container* parent) override;
+	void deserialize(InputBlob& blob, Container* parent, int version) override;
 
 	struct Entry
 	{
