@@ -303,6 +303,16 @@ public:
 	}
 
 
+	PrefabResource* getPrefabResource(Entity entity) override
+	{
+		if (entity.index >= m_prefabs.size()) return nullptr;
+		u32 hash = u32(m_prefabs[entity.index].prefab & 0xffffFFFF);
+		auto iter = m_resources.find(hash);
+		if (!iter.isValid()) return nullptr;
+		return iter.value();
+	}
+
+
 	u64 getPrefab(Entity entity) override
 	{
 		if (entity.index >= m_prefabs.size()) return 0;

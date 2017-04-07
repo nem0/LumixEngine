@@ -1,5 +1,6 @@
 #include "property_grid.h"
 #include "asset_browser.h"
+#include "editor/prefab_system.h"
 #include "editor/studio_app.h"
 #include "editor/world_editor.h"
 #include "engine/blob.h"
@@ -7,6 +8,7 @@
 #include "engine/iplugin.h"
 #include "engine/iproperty_descriptor.h"
 #include "engine/math_utils.h"
+#include "engine/prefab.h"
 #include "engine/property_register.h"
 #include "engine/resource.h"
 #include "engine/serializer.h"
@@ -596,6 +598,16 @@ void PropertyGrid::showCoreProperties(const Lumix::Array<Lumix::Entity>& entitie
 {
 	if (entities.size() == 1)
 	{
+		Lumix::PrefabSystem& prefab_system = m_editor.getPrefabSystem();
+		Lumix::PrefabResource* prefab = prefab_system.getPrefabResource(entities[0]);
+		if (prefab)
+		{
+			if (ImGui::Button("Save prefab"))
+			{
+				prefab_system.savePrefab(prefab->getPath());
+			}
+		}
+
 		char name[256];
 		const char* tmp = m_editor.getUniverse()->getEntityName(entities[0]);
 
@@ -620,6 +632,7 @@ void PropertyGrid::showCoreProperties(const Lumix::Array<Lumix::Entity>& entitie
 		ImGui::LabelText("ID", "%s", "Multiple objects");
 		ImGui::LabelText("Name", "%s", "Multi-object editing not supported.");
 	}
+
 
 	Lumix::Vec3 pos = m_editor.getUniverse()->getPosition(entities[0]);
 	Lumix::Vec3 old_pos = pos;
