@@ -60,11 +60,11 @@ void Animation::getRelativePose(float time, Pose& pose, Model& model, float weig
 
 	int frame = (int)(time * m_fps);
 	float rcp_fps = 1.0f / m_fps;
-	frame = Math::clamp(frame, 0, m_frame_count - 1);
+	frame = Math::clamp(frame, 0, m_frame_count);
 	Vec3* pos = pose.positions;
 	Quat* rot = pose.rotations;
 
-	if (frame < m_frame_count - 1)
+	if (frame < m_frame_count)
 	{
 		for (Bone& bone : m_bones)
 		{
@@ -119,10 +119,10 @@ Transform Animation::getBoneTransform(float time, int bone_idx) const
 	Transform ret;
 	int frame = (int)(time * m_fps);
 	float rcp_fps = 1.0f / m_fps;
-	frame = Math::clamp(frame, 0, m_frame_count - 1);
+	frame = Math::clamp(frame, 0, m_frame_count);
 
 	const Bone& bone = m_bones[bone_idx];
-	if (frame < m_frame_count - 1)
+	if (frame < m_frame_count)
 	{
 		int idx = 1;
 		for (int c = bone.pos_count; idx < c; ++idx)
@@ -172,11 +172,11 @@ void Animation::getRelativePose(float time, Pose& pose, Model& model) const
 
 	int frame = (int)(time * m_fps);
 	float rcp_fps = 1.0f / m_fps;
-	frame = Math::clamp(frame, 0, m_frame_count - 1);
+	frame = Math::clamp(frame, 0, m_frame_count);
 	Vec3* pos = pose.positions;
 	Quat* rot = pose.rotations;
 
-	if (frame < m_frame_count - 1)
+	if (frame < m_frame_count)
 	{
 		for (Bone& bone : m_bones)
 		{

@@ -455,7 +455,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 				ComponentHandle ctrl = anim_scene->getComponent(agent.entity, ANIM_CONTROLLER_TYPE);
 				Transform root_motion = anim_scene->getControllerRootMotion(ctrl);
 				agent.root_motion = root_motion.pos;
-				m_universe.setRotation(agent.entity, m_universe.getRotation(agent.entity) * root_motion.rot);
+				//m_universe.setRotation(agent.entity, m_universe.getRotation(agent.entity) * root_motion.rot);
 			}
 			if (agent.flags & Agent::USE_ROOT_MOTION)
 			{
@@ -489,6 +489,12 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 					nlerp(wanted_rot, old_rot, &new_rot, 0.90f);
 					m_universe.setRotation(agent.entity, new_rot);
 				}
+			}
+			else if (agent.flags & Agent::GET_ROOT_MOTION_FROM_ANIM_CONTROLLER && anim_scene)
+			{
+				ComponentHandle ctrl = anim_scene->getComponent(agent.entity, ANIM_CONTROLLER_TYPE);
+				Transform root_motion = anim_scene->getControllerRootMotion(ctrl);
+				m_universe.setRotation(agent.entity, m_universe.getRotation(agent.entity) * root_motion.rot);
 			}
 
 			if (dt_agent->ncorners == 0 && dt_agent->targetState != DT_CROWDAGENT_TARGET_REQUESTING)
