@@ -43,6 +43,7 @@ public:
 	virtual Entity getFirstInstance(u64 prefab) = 0;
 	virtual Entity getNextInstance(Entity entity) = 0;
 	virtual void savePrefab(const Lumix::Path& path) = 0;
+	virtual PrefabResource* getPrefabResource(Entity entity) = 0;
 };
 
 

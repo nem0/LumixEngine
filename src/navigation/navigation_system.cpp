@@ -419,7 +419,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 			Quat rot = m_universe.getRotation(agent.entity);
 			Vec3 diff = *(Vec3*)dt_agent->npos - pos;
 
-			Vec3 velocity = *(Vec3*)dt_agent->vel;
+			Vec3 velocity = *(Vec3*)dt_agent->nvel;
 			agent.speed = diff.length() / time_delta;
 			agent.yaw_diff = 0;
 			if (velocity.squaredLength() > 0)
