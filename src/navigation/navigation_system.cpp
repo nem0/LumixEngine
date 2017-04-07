@@ -68,6 +68,7 @@ struct Agent
 	Vec3 root_motion = {0, 0, 0};
 	float speed = 0;
 	float yaw_diff = 0;
+	float stop_distance = 0;
 };
 
 
@@ -190,7 +191,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 			addCrowdAgent(iter.value());
 			if (!agent.is_finished)
 			{
-				navigate(entity, target_pos, speed);
+				navigate(entity, target_pos, speed, agent.stop_distance);
 			}
 		}
 	}
@@ -500,6 +501,16 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 			if (dt_agent->ncorners == 0 && dt_agent->targetState != DT_CROWDAGENT_TARGET_REQUESTING)
 			{
 				if (!agent.is_finished)
+				{
+					m_crowd->resetMoveTarget(agent.agent);
+					agent.is_finished = true;
+					onPathFinished(agent);
+				}
+			}
+			else if (dt_agent->ncorners == 1 && agent.stop_distance > 0)
+			{
+				Vec3 diff = *(Vec3*)dt_agent->targetPos - *(Vec3*)dt_agent->npos;
+				if (diff.squaredLength() < agent.stop_distance * agent.stop_distance)
 				{
 					m_crowd->resetMoveTarget(agent.agent);
 					agent.is_finished = true;
@@ -1044,7 +1055,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	}
 
 
-	bool navigate(Entity entity, const Vec3& dest, float speed) override
+	bool navigate(Entity entity, const Vec3& dest, float speed, float stop_distance) override
 	{
 		if (!m_navquery) return false;
 		if (!m_crowd) return false;
@@ -1062,6 +1073,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 		m_crowd->updateAgentParameters(agent.agent, &params);
 		if (m_crowd->requestMoveTarget(agent.agent, end_poly_ref, &dest.x))
 		{
+			agent.stop_distance = stop_distance;
 			agent.is_finished = false;
 		}
 		else
