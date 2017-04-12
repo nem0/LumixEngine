@@ -868,9 +868,17 @@ bool Condition::compile(const char* expression, InputDecl& decl)
 	ExpressionCompiler::Token tokens[128];
 	ExpressionCompiler::Token postfix_tokens[128];
 	int tokens_count = compiler.tokenize(expression, tokens, lengthOf(tokens));
-	if (tokens_count < 0) return false;
+	if (tokens_count < 0)
+	{
+		compile("1 < 0", decl);
+		return false;
+	}
 	tokens_count = compiler.toPostfix(tokens, postfix_tokens, tokens_count);
-	if (tokens_count < 0) return false;
+	if (tokens_count < 0)
+	{
+		compile("1 < 0", decl);
+		return false;
+	}
 	bytecode.resize(128);
 	int size = compiler.compile(expression, postfix_tokens, tokens_count, &bytecode[0], bytecode.size(), decl);
 	if (size < 0)

@@ -443,7 +443,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 		static const u32 ANIMATION_HASH = crc32("animation");
 		auto* anim_scene = (AnimationScene*)m_universe.getScene(ANIMATION_HASH);
 
-		for (auto& agent : m_agents)
+		for (Agent& agent : m_agents)
 		{
 			if (agent.agent < 0) continue;
 			const dtCrowdAgent* dt_agent = m_crowd->getAgent(agent.agent);

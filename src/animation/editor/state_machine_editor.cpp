@@ -9,6 +9,7 @@
 #include "engine/blob.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
+#include "engine/log.h"
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
 #include <cmath>
@@ -362,7 +363,10 @@ void Edge::onGUI()
 	ImGui::DragFloat("Length", &engine_edge->length);
 	if (ImGui::InputText("Expression", m_expression, lengthOf(m_expression), ImGuiInputTextFlags_EnterReturnsTrue))
 	{
-		engine_edge->condition.compile(m_expression, m_controller.getEngineResource()->m_input_decl);
+		if (!engine_edge->condition.compile(m_expression, m_controller.getEngineResource()->m_input_decl))
+		{
+			g_log_error.log("Animation") << "Failed to compile condition " << m_expression;
+		}
 	}
 }
 
