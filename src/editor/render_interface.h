@@ -14,6 +14,9 @@ namespace Lumix
 {
 
 
+struct Pose;
+
+
 class RenderInterface
 {
 public:
@@ -38,7 +41,7 @@ public:
 	virtual void setCameraSlot(ComponentHandle cmp, const char* slot) = 0;
 	virtual Entity getCameraEntity(ComponentHandle cmp) = 0;
 	virtual void getRay(ComponentHandle camera_index, float x, float y, Vec3& origin, Vec3& dir) = 0;
-	virtual float castRay(ModelHandle model, const Vec3& origin, const Vec3& dir, const Matrix& mtx) = 0;
+	virtual float castRay(ModelHandle model, const Vec3& origin, const Vec3& dir, const Matrix& mtx, const Pose* pose) = 0;
 	virtual void renderModel(ModelHandle model, const Matrix& mtx) = 0;
 	virtual ModelHandle loadModel(Lumix::Path& path) = 0;
 	virtual void unloadModel(ModelHandle handle) = 0;

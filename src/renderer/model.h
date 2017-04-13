@@ -80,6 +80,12 @@ class LUMIX_RENDERER_API Model LUMIX_FINAL : public Resource
 public:
 	typedef HashMap<u32, int> BoneMap;
 
+	struct Skin
+	{
+		Vec4 weights;
+		i16 indices[4];
+	};
+
 #pragma pack(1)
 	struct FileHeader
 	{
@@ -96,6 +102,11 @@ public:
 		BOUNDING_SHAPES_PRECOMPUTED,
 
 		LATEST // keep this last
+	};
+
+	enum class LoadingFlags : u32
+	{
+		KEEP_SKIN = 1 << 0
 	};
 
 	enum class Flags : u32
@@ -157,7 +168,7 @@ public:
 	BoneMap::iterator getBoneIndex(u32 hash) { return m_bone_map.find(hash); }
 	void getPose(Pose& pose);
 	float getBoundingRadius() const { return m_bounding_radius; }
-	RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, const Matrix& model_transform);
+	RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, const Matrix& model_transform, const Pose* pose);
 	const AABB& getAABB() const { return m_aabb; }
 	LOD* getLODs() { return m_lods; }
 	const u16* getIndices16() const { return areIndices16() ? (u16*)&m_indices[0] : nullptr; }
@@ -167,6 +178,7 @@ public:
 	const Array<Vec3>& getVertices() const { return m_vertices; }
 	const Array<Vec2>& getUVs() const { return m_uvs; }
 	u32 getFlags() const { return m_flags;	}
+	void setKeepSkin();
 
 	static void registerLuaAPI(lua_State* L);
 
@@ -200,11 +212,13 @@ private:
 	Array<u8> m_indices;
 	Array<Vec3> m_vertices;
 	Array<Vec2> m_uvs;
+	Array<Skin> m_skin;
 	LOD m_lods[MAX_LOD_COUNT];
 	float m_bounding_radius;
 	BoneMap m_bone_map;
 	AABB m_aabb;
 	u32 m_flags;
+	u32 m_loading_flags;
 	int m_first_nonroot_bone_index;
 };
 

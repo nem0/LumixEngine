@@ -62,11 +62,13 @@ Model::Model(const Path& path, ResourceManagerBase& resource_manager, IAllocator
 	, m_bones(m_allocator)
 	, m_indices(m_allocator)
 	, m_vertices(m_allocator)
+	, m_skin(m_allocator)
 	, m_uvs(m_allocator)
 	, m_vertices_handle(BGFX_INVALID_HANDLE)
 	, m_indices_handle(BGFX_INVALID_HANDLE)
 	, m_first_nonroot_bone_index(0)
 	, m_flags(0)
+	, m_loading_flags(0)
 {
 	m_lods[0] = { 0, -1, FLT_MAX };
 	m_lods[1] = { 0, -1, FLT_MAX };
@@ -81,9 +83,27 @@ Model::~Model()
 }
 
 
-RayCastModelHit Model::castRay(const Vec3& origin,
-							   const Vec3& dir,
-							   const Matrix& model_transform)
+static inline Vec3 evaluateSkin(Vec3& p, Model::Skin s, const Matrix* matrices)
+{
+	Matrix m = matrices[s.indices[0]] * s.weights.x + matrices[s.indices[1]] * s.weights.y +
+			   matrices[s.indices[2]] * s.weights.z + matrices[s.indices[3]] * s.weights.w;
+
+	return m.transform(p);
+}
+
+
+static inline void computeSkinMatrices(const Pose& pose, const Model& model, Matrix* matrices)
+{
+	for (int i = 0; i < pose.count; ++i)
+	{
+		auto& bone = model.getBone(i);
+		Transform tmp = { pose.positions[i], pose.rotations[i] };
+		matrices[i] = (tmp * bone.inv_bind_transform).toMatrix();
+	}
+}
+
+
+RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Matrix& model_transform, const Pose* pose)
 {
 	RayCastModelHit hit;
 	hit.m_is_hit = false;
@@ -95,28 +115,51 @@ RayCastModelHit Model::castRay(const Vec3& origin,
 	Vec3 local_dir = static_cast<Vec3>(inv * Vec4(dir.x, dir.y, dir.z, 0));
 
 	const Array<Vec3>& vertices = m_vertices;
+	const Array<Skin>& skin = m_skin;
 	u16* indices16 = (u16*)&m_indices[0];
 	u32* indices32 = (u32*)&m_indices[0];
 	int vertex_offset = 0;
 	bool is16 = m_flags & (u32)Model::Flags::INDICES_16BIT;
+	Matrix matrices[256];
+	ASSERT(!pose || pose->count <= lengthOf(matrices));
+	bool is_skinned = pose && !m_skin.empty() && pose->count <= lengthOf(matrices);
+	if (is_skinned)
+	{
+		computeSkinMatrices(*pose, *this, matrices);
+	}
+
 	for (int mesh_index = m_lods[0].from_mesh; mesh_index <= m_lods[0].to_mesh; ++mesh_index)
 	{
 		int indices_end = m_meshes[mesh_index].indices_offset + m_meshes[mesh_index].indices_count;
 		for(int i = m_meshes[mesh_index].indices_offset; i < indices_end; i += 3)
 		{
 			Vec3 p0, p1, p2;
-			if(is16)
+			if (is16)
 			{
 				p0 = vertices[vertex_offset + indices16[i]];
 				p1 = vertices[vertex_offset + indices16[i + 1]];
 				p2 = vertices[vertex_offset + indices16[i + 2]];
+				if (is_skinned)
+				{
+					p0 = evaluateSkin(p0, skin[vertex_offset + indices16[i]], matrices);
+					p1 = evaluateSkin(p1, skin[vertex_offset + indices16[i + 1]], matrices);
+					p2 = evaluateSkin(p2, skin[vertex_offset + indices16[i + 2]], matrices);
+				}
 			}
 			else
 			{
 				p0 = vertices[vertex_offset + indices32[i]];
 				p1 = vertices[vertex_offset + indices32[i + 1]];
 				p2 = vertices[vertex_offset + indices32[i + 2]];
+				if (is_skinned)
+				{
+					p0 = evaluateSkin(p0, skin[vertex_offset + indices32[i]], matrices);
+					p1 = evaluateSkin(p1, skin[vertex_offset + indices32[i + 1]], matrices);
+					p2 = evaluateSkin(p2, skin[vertex_offset + indices32[i + 2]], matrices);
+				}
 			}
+
+
 			Vec3 normal = crossProduct(p1 - p0, p2 - p0);
 			float q = dotProduct(normal, local_dir);
 			if (q == 0)	continue;
@@ -309,9 +352,21 @@ void Model::create(const bgfx::VertexDecl& vertex_decl,
 
 	m_vertices.resize(attributes_size / vertex_decl.getStride());
 	m_uvs.resize(m_vertices.size());
+	if (m_loading_flags & (u32)LoadingFlags::KEEP_SKIN)
+	{
+		m_skin.resize(m_vertices.size());
+	}
 	computeRuntimeData((const u8*)attributes_data, true);
 
 	onCreated(State::READY);
+}
+
+
+void Model::setKeepSkin()
+{
+	if (m_loading_flags & (u32)LoadingFlags::KEEP_SKIN) return;
+	m_loading_flags = m_loading_flags | (u32)LoadingFlags::KEEP_SKIN;
+	if (isReady()) m_resource_manager.reload(*this);
 }
 
 
@@ -325,6 +380,10 @@ void Model::computeRuntimeData(const u8* vertices, bool compute_bounding_shape)
 	int vertex_size = m_vertex_decl.getStride();
 	int position_attribute_offset = m_vertex_decl.getOffset(bgfx::Attrib::Position);
 	int uv_attribute_offset = m_vertex_decl.getOffset(bgfx::Attrib::TexCoord0);
+	int weights_attribute_offset = m_vertex_decl.getOffset(bgfx::Attrib::Weight);
+	int bone_indices_attribute_offset = m_vertex_decl.getOffset(bgfx::Attrib::Indices);
+	bool keep_skin = m_loading_flags & (u32)LoadingFlags::KEEP_SKIN;
+	keep_skin = keep_skin && weights_attribute_offset >= 0 && bone_indices_attribute_offset >= 0;
 	for (int i = 0; i < m_meshes.size(); ++i)
 	{
 		int mesh_vertex_count = m_meshes[i].attribute_array_size / m_vertex_decl.getStride();
@@ -332,6 +391,13 @@ void Model::computeRuntimeData(const u8* vertices, bool compute_bounding_shape)
 		for (int j = 0; j < mesh_vertex_count; ++j)
 		{
 			int offset = mesh_attributes_array_offset + j * vertex_size;
+			if (keep_skin)
+			{
+				m_skin[index].weights = *(const Vec4*)&vertices[offset + weights_attribute_offset];
+				copyMemory(m_skin[index].indices,
+					&vertices[offset + bone_indices_attribute_offset],
+					sizeof(m_skin[index].indices));
+			}
 			m_vertices[index] = *(const Vec3*)&vertices[offset + position_attribute_offset];
 			m_uvs[index] = *(const Vec2*)&vertices[offset + uv_attribute_offset];
 			float sq_len = m_vertices[index].squaredLength();
@@ -385,6 +451,10 @@ bool Model::parseGeometry(FS::IFile& file, FileVersion version)
 	}
 	m_vertices.resize(vertex_count);
 	m_uvs.resize(vertex_count);
+	if (m_loading_flags & (u32)LoadingFlags::KEEP_SKIN)
+	{
+		m_skin.resize(m_vertices.size());
+	}
 
 	if (version > FileVersion::BOUNDING_SHAPES_PRECOMPUTED)
 	{

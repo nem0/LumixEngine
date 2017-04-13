@@ -209,7 +209,7 @@ struct EditorIconsImpl LUMIX_FINAL : public EditorIcons
 		{
 			Matrix icon_matrix = getIconMatrix(icon, camera_mtx, is_ortho, ortho_size);
 			
-			float t = m_editor.getRenderInterface()->castRay(m_models[(int)icon.type], origin, dir, icon_matrix);
+			float t = m_editor.getRenderInterface()->castRay(m_models[(int)icon.type], origin, dir, icon_matrix, nullptr);
 			if(t >= 0 && (t < hit.t || hit.t < 0))
 			{
 				hit.t = t;

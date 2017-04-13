@@ -68,6 +68,8 @@ LUMIX_ALIGN_BEGIN(16) struct LUMIX_ENGINE_API Matrix
 {
 	Matrix() {}
 
+	Matrix(const Vec3& pos, const Quat& rot);
+
 	Matrix(const float* m)
 	{
 		m11 = m[0]; m12 = m[1]; m13 = m[2]; m14 = m[3];
@@ -92,6 +94,10 @@ LUMIX_ALIGN_BEGIN(16) struct LUMIX_ENGINE_API Matrix
 	void decompose(Vec3& position, Quat& rotation, float& scale) const;
 
 	Matrix operator *(const Matrix& rhs) const;
+
+	Matrix operator +(const Matrix& rhs) const;
+
+	Matrix operator *(float rhs) const;
 
 	Vec4 operator *(const Vec4& rhs) const
 	{

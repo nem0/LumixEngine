@@ -57,6 +57,12 @@ struct DecalInfo
 
 struct ModelInstance
 {
+	enum Flags : u8
+	{
+		CUSTOM_MESHES,
+		KEEP_SKIN
+	};
+
 	enum Type
 	{
 		RIGID,
@@ -70,7 +76,7 @@ struct ModelInstance
 	Pose* pose;
 	Entity entity;
 	Mesh* meshes;
-	bool custom_meshes;
+	u8 flags;
 	i8 mesh_count;
 };
 
@@ -305,6 +311,8 @@ public:
 	virtual ComponentHandle getModelInstanceComponent(Entity entity) = 0;
 	virtual ModelInstance* getModelInstance(ComponentHandle cmp) = 0;
 	virtual ModelInstance* getModelInstances() = 0;
+	virtual bool getModelInstanceKeepSkin(ComponentHandle cmp) = 0;
+	virtual void setModelInstanceKeepSkin(ComponentHandle cmp, bool keep) = 0;
 	virtual Path getModelInstancePath(ComponentHandle cmp) = 0;
 	virtual void setModelInstanceMaterial(ComponentHandle cmp, int index, const Path& path) = 0;
 	virtual Path getModelInstanceMaterial(ComponentHandle cmp, int index) = 0;

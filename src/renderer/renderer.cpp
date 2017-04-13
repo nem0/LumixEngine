@@ -333,6 +333,9 @@ static void registerProperties(IAllocator& allocator)
 	PropertyRegister::add("renderable",
 		LUMIX_NEW(allocator, ResourcePropertyDescriptor<RenderScene>)(
 			"Source", &RenderScene::getModelInstancePath, &RenderScene::setModelInstancePath, "Mesh (*.msh)", MODEL_TYPE));
+	PropertyRegister::add("renderable",
+		LUMIX_NEW(allocator, BoolPropertyDescriptor<RenderScene>)(
+			"Keep skin", &RenderScene::getModelInstanceKeepSkin, &RenderScene::setModelInstanceKeepSkin));
 
 	auto model_instance_material = LUMIX_NEW(allocator, ArrayDescriptor<RenderScene>)(
 		"Materials", &RenderScene::getModelInstanceMaterialsCount, nullptr, nullptr, allocator);
