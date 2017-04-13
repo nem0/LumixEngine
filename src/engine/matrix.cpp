@@ -25,6 +25,13 @@ const Matrix Matrix::IDENTITY(
 );
 
 
+Matrix::Matrix(const Vec3& pos, const Quat& rot)
+{
+	*this = rot.toMatrix();
+	setTranslation(pos);
+}
+
+
 void Matrix::fromEuler(float yaw, float pitch, float roll)
 {
 	float sroll = sinf(roll);
@@ -76,6 +83,60 @@ void Matrix::decompose(Vec3& position, Quat& rotation, float& scale) const
 	rotation = tmp.getRotation();
 }
 
+
+Matrix Matrix::operator *(float rhs) const
+{
+	Matrix out;
+	out.m11 = m11 * rhs;
+	out.m12 = m12 * rhs;
+	out.m13 = m13 * rhs;
+	out.m14 = m14 * rhs;
+
+	out.m21 = m21 * rhs;
+	out.m22 = m22 * rhs;
+	out.m23 = m23 * rhs;
+	out.m24 = m24 * rhs;
+
+	out.m31 = m31 * rhs;
+	out.m32 = m32 * rhs;
+	out.m33 = m33 * rhs;
+	out.m34 = m34 * rhs;
+
+	out.m41 = m41 * rhs;
+	out.m42 = m42 * rhs;
+	out.m43 = m43 * rhs;
+	out.m44 = m44 * rhs;
+
+	return out;
+}
+
+
+Matrix Matrix::operator +(const Matrix& rhs) const
+{
+	Matrix out;
+
+	out.m11 = m11 + rhs.m11;
+	out.m12 = m12 + rhs.m12;
+	out.m13 = m13 + rhs.m13;
+	out.m14 = m14 + rhs.m14;
+
+	out.m21 = m21 + rhs.m21;
+	out.m22 = m22 + rhs.m22;
+	out.m23 = m23 + rhs.m23;
+	out.m24 = m24 + rhs.m24;
+
+	out.m31 = m31 + rhs.m31;
+	out.m32 = m32 + rhs.m32;
+	out.m33 = m33 + rhs.m33;
+	out.m34 = m34 + rhs.m34;
+
+	out.m41 = m41 + rhs.m41;
+	out.m42 = m42 + rhs.m42;
+	out.m43 = m43 + rhs.m43;
+	out.m44 = m44 + rhs.m44;
+
+	return out;
+}
 
 
 Matrix Matrix::operator *(const Matrix& rhs) const

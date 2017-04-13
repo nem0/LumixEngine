@@ -51,6 +51,7 @@ enum class RenderSceneVersion : int
 	GLOBAL_LIGHT_REFACTOR,
 	EMITTER_MATERIAL,
 	BONE_ATTACHMENT_TRANSFORM,
+	MODEL_INSTNACE_FLAGS,
 
 	LATEST
 };
@@ -676,6 +677,7 @@ public:
 		ASSERT(r.entity != INVALID_ENTITY);
 
 		serialize.write("source", r.model ? r.model->getPath().c_str() : "");
+		serialize.write("flags", r.flags);
 		bool has_changed_materials = r.model && r.model->isReady() && r.meshes != &r.model->getMesh(0);
 		serialize.write("custom_materials", has_changed_materials ? r.mesh_count : 0);
 		if (has_changed_materials)
@@ -687,7 +689,20 @@ public:
 		}
 	}
 
-	void deserializeModelInstance(IDeserializer& serializer, Entity entity, int /*scene_version*/)
+
+	static bool keepSkin(ModelInstance& r)
+	{
+		return (r.flags & (u8)ModelInstance::KEEP_SKIN) != 0;
+	}
+
+
+	static bool hasCustomMeshes(ModelInstance& r)
+	{
+		return (r.flags & (u8)ModelInstance::CUSTOM_MESHES) != 0;
+	}
+
+
+	void deserializeModelInstance(IDeserializer& serializer, Entity entity, int scene_version)
 	{
 		while (entity.index >= m_model_instances.size())
 		{
@@ -702,7 +717,7 @@ public:
 		r.entity = entity;
 		r.model = nullptr;
 		r.pose = nullptr;
-		r.custom_meshes = false;
+		r.flags = 0;
 		r.meshes = nullptr;
 		r.mesh_count = 0;
 
@@ -710,6 +725,10 @@ public:
 
 		char path[MAX_PATH_LENGTH];
 		serializer.read(path, lengthOf(path));
+		if (scene_version > (int)RenderSceneVersion::MODEL_INSTNACE_FLAGS)
+		{
+			serializer.read(&r.flags);
+		}
 
 		ComponentHandle cmp = {r.entity.index};
 		if (path[0] != 0)
@@ -1265,6 +1284,7 @@ public:
 		for (auto& r : m_model_instances)
 		{
 			serializer.write(r.entity);
+			serializer.write(r.flags);
 			if(r.entity != INVALID_ENTITY)
 			{
 				serializer.write(r.model ? r.model->getPath().getHash() : 0);
@@ -1509,10 +1529,11 @@ public:
 		{
 			auto& r = m_model_instances.emplace();
 			serializer.read(r.entity);
+			serializer.read(r.flags);
 			ASSERT(r.entity.index == i || !isValid(r.entity));
 			r.model = nullptr;
 			r.pose = nullptr;
-			r.custom_meshes = false;
+			r.flags = 0;
 			r.meshes = nullptr;
 			r.mesh_count = 0;
 
@@ -3978,7 +3999,7 @@ public:
 			if (dotProduct(pos - origin, pos - origin) < radius * radius ||
 				Math::getRaySphereIntersection(origin, dir, pos, radius * scale, intersection))
 			{
-				RayCastModelHit new_hit = r.model->castRay(origin, dir, r.matrix);
+				RayCastModelHit new_hit = r.model->castRay(origin, dir, r.matrix, r.pose);
 				if (new_hit.m_is_hit && (!hit.m_is_hit || new_hit.m_t < hit.m_t))
 				{
 					new_hit.m_component = {i};
@@ -4285,7 +4306,7 @@ public:
 	void modelUnloaded(Model*, ComponentHandle component)
 	{
 		auto& r = m_model_instances[component.index];
-		if (!r.custom_meshes)
+		if (!hasCustomMeshes(r))
 		{
 			r.meshes = nullptr;
 			r.mesh_count = 0;
@@ -4303,7 +4324,7 @@ public:
 
 	void freeCustomMeshes(ModelInstance& r, MaterialManager* manager)
 	{
-		if (!r.custom_meshes) return;
+		if (!hasCustomMeshes(r)) return;
 		for (int i = 0; i < r.mesh_count; ++i)
 		{
 			manager->unload(*r.meshes[i].material);
@@ -4311,7 +4332,7 @@ public:
 		}
 		m_allocator.deallocate(r.meshes);
 		r.meshes = nullptr;
-		r.custom_meshes = false;
+		r.flags = r.flags & ~(u8)ModelInstance::CUSTOM_MESHES;
 		r.mesh_count = 0;
 	}
 
@@ -4353,7 +4374,7 @@ public:
 			}
 		}
 		r.matrix = m_universe.getMatrix(r.entity);
-		ASSERT(!r.meshes || r.custom_meshes);
+		ASSERT(!r.meshes || hasCustomMeshes(r));
 		if (r.meshes)
 		{
 			allocateCustomMeshes(r, model->getMeshCount());
@@ -4423,7 +4444,7 @@ public:
 
 	void allocateCustomMeshes(ModelInstance& r, int count)
 	{
-		if (r.custom_meshes && r.mesh_count == count) return;
+		if (hasCustomMeshes(r) && r.mesh_count == count) return;
 
 		ASSERT(r.model);
 		auto& rm = r.model->getResourceManager();
@@ -4437,7 +4458,7 @@ public:
 				new (NewPlaceholder(), new_meshes + i) Mesh(r.meshes[i]);
 			}
 
-			if (r.custom_meshes)
+			if (hasCustomMeshes(r))
 			{
 				for (int i = count; i < r.mesh_count; ++i)
 				{
@@ -4464,7 +4485,28 @@ public:
 		}
 		r.meshes = new_meshes;
 		r.mesh_count = count;
-		r.custom_meshes = true;
+		r.flags |= (u8)ModelInstance::CUSTOM_MESHES;
+	}
+
+
+	bool getModelInstanceKeepSkin(ComponentHandle cmp) override
+	{
+		auto& r = m_model_instances[cmp.index];
+		return keepSkin(r);
+	}
+
+
+	void setModelInstanceKeepSkin(ComponentHandle cmp, bool keep) override
+	{
+		auto& r = m_model_instances[cmp.index];
+		if (keep)
+		{
+			r.flags |= (u8)ModelInstance::KEEP_SKIN;
+		}
+		else
+		{
+			r.flags &= ~(u8)ModelInstance::KEEP_SKIN;
+		}
 	}
 
 
@@ -4531,6 +4573,7 @@ public:
 		model_instance.pose = nullptr;
 		if (model)
 		{
+			if (keepSkin(model_instance)) model->setKeepSkin();
 			ModelLoadedCallback& callback = getModelLoadedCallback(model);
 			++callback.m_ref_count;
 
@@ -4835,7 +4878,7 @@ public:
 		r.model = nullptr;
 		r.meshes = nullptr;
 		r.pose = nullptr;
-		r.custom_meshes = false;
+		r.flags = 0;
 		r.mesh_count = 0;
 		r.matrix = m_universe.getMatrix(entity);
 		ComponentHandle cmp = {entity.index};

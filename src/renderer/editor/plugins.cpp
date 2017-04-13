@@ -1210,9 +1210,9 @@ struct SceneViewPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		}
 
 
-		float castRay(ModelHandle model, const Vec3& origin, const Vec3& dir, const Matrix& mtx) override
+		float castRay(ModelHandle model, const Vec3& origin, const Vec3& dir, const Matrix& mtx, const Pose* pose) override
 		{
-			RayCastModelHit hit = m_models[model]->castRay(origin, dir, mtx);
+			RayCastModelHit hit = m_models[model]->castRay(origin, dir, mtx, pose);
 			return hit.m_is_hit ? hit.m_t : -1;
 		}
 
@@ -1757,9 +1757,11 @@ struct FurPainter LUMIX_FINAL : public WorldEditor::Plugin
 		Texture* texture = model->getMesh(0).material->getTexture(0);
 		if (!texture || texture->data.empty()) return;
 
+		Pose* pose = scene->getPose(model_instance.handle);
+
 		Vec3 origin, dir;
 		scene->getRay(editor.getEditCamera().handle, (float)x, (float)y, origin, dir);
-		RayCastModelHit hit = model->castRay(origin, dir, universe->getMatrix(entities[0]));
+		RayCastModelHit hit = model->castRay(origin, dir, universe->getMatrix(entities[0]), pose);
 		if (!hit.m_is_hit) return;
 
 		Vec3 hit_pos = hit.m_origin + hit.m_t * hit.m_dir;
@@ -1900,9 +1902,11 @@ struct FurPainterPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		Texture* texture = model->getMesh(0).material->getTexture(0);
 		if (!texture || texture->data.empty()) return;
 
+		const Pose* pose = scene->getPose(model_instance.handle);
+
 		Vec3 origin, dir;
 		scene->getRay(editor.getEditCamera().handle, editor.getMouseX(), editor.getMouseY(), origin, dir);
-		RayCastModelHit hit = model->castRay(origin, dir, editor.getUniverse()->getMatrix(entities[0]));
+		RayCastModelHit hit = model->castRay(origin, dir, editor.getUniverse()->getMatrix(entities[0]), pose);
 		if (!hit.m_is_hit) return;
 
 		Vec3 hit_pos = hit.m_origin + hit.m_t * hit.m_dir;
