@@ -26,6 +26,9 @@ namespace Lumix
 static const ResourceType MATERIAL_TYPE("material");
 
 
+bool Model::force_keep_skin = false;
+
+
 Mesh::Mesh(Material* mat,
 	int attribute_array_offset,
 	int attribute_array_size,
@@ -70,6 +73,7 @@ Model::Model(const Path& path, ResourceManagerBase& resource_manager, IAllocator
 	, m_flags(0)
 	, m_loading_flags(0)
 {
+	if (force_keep_skin) m_loading_flags = (u32)LoadingFlags::KEEP_SKIN;
 	m_lods[0] = { 0, -1, FLT_MAX };
 	m_lods[1] = { 0, -1, FLT_MAX };
 	m_lods[2] = { 0, -1, FLT_MAX };
