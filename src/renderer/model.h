@@ -185,6 +185,7 @@ public:
 public:
 	static const u32 FILE_MAGIC = 0x5f4c4d4f; // == '_LMO'
 	static const int MAX_LOD_COUNT = 4;
+	static bool force_keep_skin;
 
 private:
 	Model(const Model&);

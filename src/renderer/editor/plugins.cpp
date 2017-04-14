@@ -2486,6 +2486,8 @@ LUMIX_STUDIO_ENTRY(renderer)
 {
 	auto& allocator = app.getWorldEditor()->getAllocator();
 
+	Model::force_keep_skin = true;
+
 	app.registerComponent("camera", "Render/Camera");
 	app.registerComponent("global_light", "Render/Global light");
 	app.registerComponentWithResource("renderable", "Render/Mesh", MODEL_TYPE, "Source");
