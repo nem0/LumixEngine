@@ -1643,7 +1643,6 @@ public:
 
 	void destroyModelInstance(ComponentHandle component)
 	{
-		m_model_instance_destroyed.invoke(component);
 		for (int i = 0; i < m_light_influenced_geometry.size(); ++i)
 		{
 			Array<ComponentHandle>& influenced_geometry = m_light_influenced_geometry[i];
@@ -4736,18 +4735,6 @@ public:
 	}
 
 
-	DelegateList<void(ComponentHandle)>& model_instanceCreated() override
-	{
-		return m_model_instance_created;
-	}
-
-
-	DelegateList<void(ComponentHandle)>& model_instanceDestroyed() override
-	{
-		return m_model_instance_destroyed;
-	}
-
-
 	float getLightFOV(ComponentHandle cmp) override
 	{
 		return m_point_lights[m_point_lights_map[cmp]].m_fov;
@@ -4883,7 +4870,6 @@ public:
 		r.matrix = m_universe.getMatrix(entity);
 		ComponentHandle cmp = {entity.index};
 		m_universe.addComponent(entity, MODEL_INSTANCE_TYPE, this, cmp);
-		m_model_instance_created.invoke(cmp);
 		return cmp;
 	}
 
@@ -4950,8 +4936,6 @@ private:
 	bool m_is_game_running;
 
 	AssociativeArray<Model*, ModelLoadedCallback> m_model_loaded_callbacks;
-	DelegateList<void(ComponentHandle)> m_model_instance_created;
-	DelegateList<void(ComponentHandle)> m_model_instance_destroyed;
 };
 
 
@@ -5019,8 +5003,6 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	, m_jobs(m_allocator)
 	, m_active_global_light_cmp(INVALID_COMPONENT)
 	, m_point_light_last_cmp(INVALID_COMPONENT)
-	, m_model_instance_created(m_allocator)
-	, m_model_instance_destroyed(m_allocator)
 	, m_is_grass_enabled(true)
 	, m_is_game_running(false)
 	, m_particle_emitters(m_allocator)
