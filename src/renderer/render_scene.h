@@ -304,8 +304,6 @@ public:
 	virtual float getParticleEmitterAttractorForce(ComponentHandle cmp) = 0;
 	virtual void setParticleEmitterAttractorForce(ComponentHandle cmp, float value) = 0;
 
-	virtual DelegateList<void(ComponentHandle)>& model_instanceCreated() = 0;
-	virtual DelegateList<void(ComponentHandle)>& model_instanceDestroyed() = 0;
 	virtual void showModelInstance(ComponentHandle cmp) = 0;
 	virtual void hideModelInstance(ComponentHandle cmp) = 0;
 	virtual ComponentHandle getModelInstanceComponent(Entity entity) = 0;
