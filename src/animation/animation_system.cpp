@@ -655,10 +655,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
-	Entity getControllerEntity(ComponentHandle cmp) override
-	{
-		return {cmp.index};
-	}
+	Entity getControllerEntity(ComponentHandle cmp) override { return {cmp.index}; }
 
 
 	u8* getControllerInput(ComponentHandle cmp)
@@ -670,9 +667,9 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 
 	void applyControllerSet(ComponentHandle cmp, const char* set_name) override
 	{
-		Controller& ctrl = m_controllers.get({ cmp.index });
+		Controller& ctrl = m_controllers.get({cmp.index});
 		u32 set_name_hash = crc32(set_name);
-		int set_idx = ctrl.resource->m_sets_names.find([set_name_hash](StaticString<32>& val) {
+		int set_idx = ctrl.resource->m_sets_names.find([set_name_hash](const StaticString<32>& val) {
 			return crc32(val) == set_name_hash;
 		});
 		if (set_idx < 0) return;
