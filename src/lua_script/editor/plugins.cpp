@@ -605,7 +605,7 @@ struct ConsolePlugin LUMIX_FINAL : public StudioApp::IPlugin
 						file.read(&data[0], size);
 						file.close();
 						lua_State* L = app.getWorldEditor()->getEngine().getState();
-						bool errors = luaL_loadbuffer(L, &data[0], data.size(), nullptr) != LUA_OK;
+						bool errors = luaL_loadbuffer(L, &data[0], data.size(), tmp) != LUA_OK;
 						errors = errors || lua_pcall(L, 0, 0, 0) != LUA_OK;
 
 						if (errors)
