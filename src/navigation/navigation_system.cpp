@@ -779,8 +779,9 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 				{
 					Vec3 mins(fx, orig.y + span->smin * cell_height, fz);
 					Vec3 maxs(fx + CELL_SIZE, orig.y + span->smax * cell_height, fz + CELL_SIZE);
-					render_scene->addDebugCubeSolid(mins, maxs, 0xffff00ff, 0);
-					render_scene->addDebugCube(mins, maxs, 0xff00aaff, 0);
+					u32 color = span->area == 0 ? 0xffff0000 : 0xff00aaff;
+					render_scene->addDebugCubeSolid(mins, maxs, color, 0);
+					render_scene->addDebugCube(mins, maxs, 0xffffFFFF, 0);
 					span = span->next;
 				}
 			}

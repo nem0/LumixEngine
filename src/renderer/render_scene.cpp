@@ -3692,10 +3692,10 @@ public:
 
 		b.x = max.x;
 		c.y = min.y;
-		addDebugTriangle(a, c, b, color, life);
+		addDebugTriangle(a, b, c, color, life);
 		b.x = min.x;
 		b.z = max.z;
-		addDebugTriangle(a, b, c, color, life);
+		addDebugTriangle(a, c, b, color, life);
 
 		b = max;
 		c = max;
