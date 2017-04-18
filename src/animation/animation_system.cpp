@@ -668,6 +668,23 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
+	void applyControllerSet(ComponentHandle cmp, const char* set_name) override
+	{
+		Controller& ctrl = m_controllers.get({ cmp.index });
+		u32 set_name_hash = crc32(set_name);
+		int set_idx = ctrl.resource->m_sets_names.find([set_name_hash](StaticString<32>& val) {
+			return crc32(val) == set_name_hash;
+		});
+		if (set_idx < 0) return;
+
+		for (auto& entry : ctrl.resource->m_animation_set)
+		{
+			if (entry.set != set_idx) continue;
+			ctrl.animations[entry.hash] = entry.animation;
+		}
+	}
+
+
 	void setControllerDefaultSet(ComponentHandle cmp, int set) override
 	{
 		Controller& ctrl = m_controllers.get({cmp.index});
