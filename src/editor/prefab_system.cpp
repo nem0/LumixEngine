@@ -458,8 +458,7 @@ public:
 		EntityGUIDMap entity_map;
 		TextSerializer serializer(blob, entity_map);
 
-		auto& ents = m_editor.getSelectedEntities();
-		serializePrefab(m_universe, &ents[0], ents.size(), path, serializer);
+		serializePrefab(m_universe, &entities[0], entities.size(), path, serializer);
 
 		file.write(blob.getData(), blob.getPos());
 

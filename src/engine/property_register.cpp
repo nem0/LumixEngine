@@ -14,9 +14,8 @@ namespace PropertyRegister
 
 struct ComponentTypeData
 {
-	char m_id[50];
-
-	u32 m_id_hash;
+	char id[50];
+	u32 id_hash;
 };
 
 
@@ -111,9 +110,10 @@ const IPropertyDescriptor* getDescriptor(const char* component_type, const char*
 
 ComponentType getComponentTypeFromHash(u32 hash)
 {
-	for (int i = 0; i < getComponentTypes().size(); ++i)
+	auto& types = getComponentTypes();
+	for (int i = 0, c = types.size(); i < c; ++i)
 	{
-		if (getComponentTypes()[i].m_id_hash == hash)
+		if (types[i].id_hash == hash)
 		{
 			return {i};
 		}
@@ -125,24 +125,25 @@ ComponentType getComponentTypeFromHash(u32 hash)
 
 u32 getComponentTypeHash(ComponentType type)
 {
-	return getComponentTypes()[type.index].m_id_hash;
+	return getComponentTypes()[type.index].id_hash;
 }
 
 
 ComponentType getComponentType(const char* id)
 {
 	u32 id_hash = crc32(id);
-	for (int i = 0; i < getComponentTypes().size(); ++i)
+	auto& types = getComponentTypes();
+	for (int i = 0, c = types.size(); i < c; ++i)
 	{
-		if (getComponentTypes()[i].m_id_hash == id_hash)
+		if (types[i].id_hash == id_hash)
 		{
 			return {i};
 		}
 	}
 
 	ComponentTypeData& type = getComponentTypes().emplace();
-	copyString(type.m_id, id);
-	type.m_id_hash = id_hash;
+	copyString(type.id, id);
+	type.id_hash = id_hash;
 	return {getComponentTypes().size() - 1};
 }
 
@@ -155,7 +156,7 @@ int getComponentTypesCount()
 
 const char* getComponentTypeID(int index)
 {
-	return getComponentTypes()[index].m_id;
+	return getComponentTypes()[index].id;
 }
 
 
