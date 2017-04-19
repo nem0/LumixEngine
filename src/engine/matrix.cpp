@@ -69,7 +69,7 @@ void Matrix::setPerspective(float fov, float ratio, float near_plane, float far_
 	m22 = f;
 	m33 = (is_opengl ? far_plane + near_plane : far_plane) / z_diff;
 	m44 = 0;
-	m43 = is_opengl ? 2 * far_plane * near_plane / z_diff : near_plane * m33;
+	m43 = is_opengl ? 2 * far_plane * near_plane / z_diff : near_plane * far_plane / z_diff;
 	m34 = -1.0f;
 }
 
