@@ -11,6 +11,14 @@ namespace Lumix
 {
 
 
+enum class PrefabVersion : u32
+{
+	FIRST,
+
+	LAST
+};
+
+
 struct PrefabResource LUMIX_FINAL : public Resource
 {
 	PrefabResource(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator)

@@ -1684,7 +1684,8 @@ public:
 	}
 
 
-	struct EntityGUIDMap : public IEntityGUIDMap
+	// TODO split
+	struct EntityGUIDMap : public ILoadEntityGUIDMap, public ISaveEntityGUIDMap
 	{
 		EntityGUIDMap(IAllocator& allocator)
 			: guid_to_entity(allocator)

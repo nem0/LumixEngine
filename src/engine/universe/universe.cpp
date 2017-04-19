@@ -3,6 +3,7 @@
 #include "engine/crc32.h"
 #include "engine/iplugin.h"
 #include "engine/json_serializer.h"
+#include "engine/log.h"
 #include "engine/matrix.h"
 #include "engine/prefab.h"
 #include "engine/property_register.h"
@@ -124,6 +125,15 @@ void Universe::setTransform(Entity entity, const Transform& transform)
 	auto& tmp = m_entities[entity.index];
 	tmp.position = transform.pos;
 	tmp.rotation = transform.rot;
+	entityTransformed().invoke(entity);
+}
+
+
+void Universe::setTransform(Entity entity, const Vec3& pos, const Quat& rot)
+{
+	auto& tmp = m_entities[entity.index];
+	tmp.position = pos;
+	tmp.rotation = rot;
 	entityTransformed().invoke(entity);
 }
 
@@ -366,18 +376,22 @@ void Universe::deserialize(InputBlob& serializer)
 }
 
 
-struct PrefabEntityGUIDMap : public IEntityGUIDMap
+struct PrefabEntityGUIDMap : public ILoadEntityGUIDMap
 {
-	Entity get(EntityGUID guid) override { return{ (int)guid.value }; }
+	PrefabEntityGUIDMap(const Array<Entity>& _entities)
+		: entities(_entities)
+	{
+	}
 
 
-	EntityGUID get(Entity entity) override { return{ (u64)entity.index }; }
+	Entity get(EntityGUID guid) override
+	{
+		if (guid.value >= entities.size()) return INVALID_ENTITY;
+		return entities[(int)guid.value];
+	}
 
 
-	void insert(EntityGUID guid, Entity entity) {}
-
-
-
+	const Array<Entity>& entities;
 };
 
 
@@ -387,15 +401,31 @@ void Universe::instantiatePrefab(const PrefabResource& prefab,
 	float scale,
 	Array<Entity>& entities)
 {
+	ASSERT(entities.empty());
 	InputBlob blob(prefab.blob.getData(), prefab.blob.getPos());
-	PrefabEntityGUIDMap entity_map;
+	PrefabEntityGUIDMap entity_map(entities);
 	TextDeserializer deserializer(blob, entity_map);
+	u32 version;
+	deserializer.read(&version);
+	if (version > (int)PrefabVersion::LAST)
+	{
+		g_log_error.log("Engine") << "Prefab " << prefab.getPath() << " has unsupported version.";
+		return;
+	}
+	int count;
+	deserializer.read(&count);
+	int entity_idx = 0;
+	entities.reserve(count);
+	for (int i = 0; i < count; ++i)
+	{
+		entities.push(createEntity({0, 0, 0}, {0, 0, 0, 1}));
+	}
 	while (blob.getPosition() < blob.getSize())
 	{
 		u64 prefab;
 		deserializer.read(&prefab);
-		Entity entity = createEntity(pos, rot);
-		entities.push(entity);
+		Entity entity = entities[entity_idx];
+		setTransform(entity, {pos, rot});
 		setScale(entity, scale);
 		u32 cmp_type_hash;
 		deserializer.read(&cmp_type_hash);
@@ -407,6 +437,7 @@ void Universe::instantiatePrefab(const PrefabResource& prefab,
 			deserializeComponent(deserializer, entity, cmp_type, scene_version);
 			deserializer.read(&cmp_type_hash);
 		}
+		++entity_idx;
 	}
 }
 

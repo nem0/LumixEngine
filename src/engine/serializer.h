@@ -25,10 +25,16 @@ struct EntityGUID
 const EntityGUID INVALID_ENTITY_GUID = { 0xffffFFFFffffFFFF };
 inline bool isValid(EntityGUID guid) { return guid.value != INVALID_ENTITY_GUID.value; }
 
-struct IEntityGUIDMap
+
+struct ISaveEntityGUIDMap
+{
+	virtual EntityGUID get(Entity entity) = 0;
+};
+
+
+struct ILoadEntityGUIDMap
 {
 	virtual Entity get(EntityGUID guid) = 0;
-	virtual EntityGUID get(Entity entity) = 0;
 };
 
 
@@ -76,7 +82,7 @@ struct IDeserializer
 
 struct LUMIX_ENGINE_API TextSerializer LUMIX_FINAL : public ISerializer
 {
-	TextSerializer(OutputBlob& _blob, IEntityGUIDMap& _entity_map)
+	TextSerializer(OutputBlob& _blob, ISaveEntityGUIDMap& _entity_map)
 		: blob(_blob)
 		, entity_map(_entity_map)
 	{
@@ -100,13 +106,13 @@ struct LUMIX_ENGINE_API TextSerializer LUMIX_FINAL : public ISerializer
 	EntityGUID getGUID(Entity entity) override;
 
 	OutputBlob& blob;
-	IEntityGUIDMap& entity_map;
+	ISaveEntityGUIDMap& entity_map;
 };
 
 
 struct LUMIX_ENGINE_API TextDeserializer LUMIX_FINAL : public IDeserializer
 {
-	TextDeserializer(InputBlob& _blob, IEntityGUIDMap& _entity_map)
+	TextDeserializer(InputBlob& _blob, ILoadEntityGUIDMap& _entity_map)
 		: blob(_blob)
 		, entity_map(_entity_map)
 	{
@@ -133,7 +139,7 @@ struct LUMIX_ENGINE_API TextDeserializer LUMIX_FINAL : public IDeserializer
 	u32 readU32();
 
 	InputBlob& blob;
-	IEntityGUIDMap& entity_map;
+	ILoadEntityGUIDMap& entity_map;
 };
 
 

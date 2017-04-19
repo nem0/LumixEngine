@@ -350,41 +350,83 @@ public:
 	}
 
 
-	struct EntityGUIDMap : public IEntityGUIDMap
+	struct LoadEntityGUIDMap : public ILoadEntityGUIDMap
 	{
-		Entity get(EntityGUID guid) override { return{ (int)guid.value }; }
+		LoadEntityGUIDMap(const Array<Entity>& _entities)
+			: entities(_entities)
+		{
+		}
 
 
-		EntityGUID get(Entity entity) override { return{ (u64)entity.index }; }
+		Entity get(EntityGUID guid) override
+		{
+			if (guid.value >= entities.size()) return INVALID_ENTITY;
+			return entities[(int)guid.value];
+		}
 
 
-		void insert(EntityGUID guid, Entity entity) {}
-
-
-
+		const Array<Entity>& entities;
 	};
 
 
-	void instantiatePrefab(PrefabResource& prefab,
+	struct SaveEntityGUIDMap : public ISaveEntityGUIDMap
+	{
+		SaveEntityGUIDMap(const Array<Entity>& _entities)
+			: entities(_entities)
+		{
+		}
+
+
+		EntityGUID get(Entity entity) override
+		{
+			int idx = entities.indexOf(entity);
+			if (idx < 0) return INVALID_ENTITY_GUID;
+			return {(u64)idx};
+		}
+
+
+		const Array<Entity>& entities;
+	};
+
+
+	void instantiatePrefab(PrefabResource& prefab_res,
 		const Vec3& pos,
 		const Quat& rot,
 		float scale,
-		Array<Entity>* entities)
+		Array<Entity>* out_entities)
 	{
-		if (!m_resources.find(prefab.getPath().getHash()).isValid())
+		if (!m_resources.find(prefab_res.getPath().getHash()).isValid())
 		{
-			m_resources.insert(prefab.getPath().getHash(), &prefab);
-			prefab.getResourceManager().load(prefab);
+			m_resources.insert(prefab_res.getPath().getHash(), &prefab_res);
+			prefab_res.getResourceManager().load(prefab_res);
 		}
-		InputBlob blob(prefab.blob.getData(), prefab.blob.getPos());
-		EntityGUIDMap entity_map;
+		InputBlob blob(prefab_res.blob.getData(), prefab_res.blob.getPos());
+		Array<Entity> local_entities(m_editor.getAllocator());
+		Array<Entity>* entities = out_entities ? out_entities : &local_entities;
+		LoadEntityGUIDMap entity_map(*entities);
 		TextDeserializer deserializer(blob, entity_map);
+		u32 version;
+		deserializer.read(&version);
+		if (version > (int)PrefabVersion::LAST)
+		{
+			g_log_error.log("Editor") << "Prefab " << prefab_res.getPath() << " has unsupported version.";
+			return;
+		}
+		int count;
+		deserializer.read(&count);
+		entities->reserve(count);
+		for (int i = 0; i < count; ++i)
+		{
+			entities->push(m_universe->createEntity({0, 0, 0}, {0, 0, 0, 1}));
+		}
+
+		int entity_idx = 0;
 		while (blob.getPosition() < blob.getSize())
 		{
 			u64 prefab;
 			deserializer.read(&prefab);
-			Entity entity = m_universe->createEntity(pos, rot);
-			if(entities) entities->push(entity);
+			Entity entity = (*entities)[entity_idx];
+			m_universe->setTransform(entity, {pos, rot});
 			reserve(entity);
 			m_prefabs[entity.index].prefab = prefab;
 			link(entity, prefab);
@@ -399,6 +441,7 @@ public:
 				m_universe->deserializeComponent(deserializer, entity, cmp_type, scene_version);
 				deserializer.read(&cmp_type_hash);
 			}
+			++entity_idx;
 		}
 	}
 
@@ -422,13 +465,16 @@ public:
 		const Path& path,
 		TextSerializer& serializer)
 	{
+		serializer.write("version", (u32)PrefabVersion::LAST);
+		serializer.write("entity_count", count);
 		for (int i = 0; i < count; ++i)
 		{
 			Entity entity = entities[i];
 			u64 prefab = path.getHash();
 			prefab |= ((u64)i) << 32;
 			serializer.write("prefab", prefab);
-			for (ComponentUID cmp = universe->getFirstComponent(entity); cmp.isValid(); cmp = universe->getNextComponent(cmp))
+			for (ComponentUID cmp = universe->getFirstComponent(entity); cmp.isValid();
+				 cmp = universe->getNextComponent(cmp))
 			{
 				const char* cmp_name = PropertyRegister::getComponentTypeID(cmp.type.index);
 				u32 type_hash = PropertyRegister::getComponentTypeHash(cmp.type);
@@ -455,7 +501,7 @@ public:
 		}
 
 		OutputBlob blob(m_editor.getAllocator());
-		EntityGUIDMap entity_map;
+		SaveEntityGUIDMap entity_map(entities);
 		TextSerializer serializer(blob, entity_map);
 
 		serializePrefab(m_universe, &entities[0], entities.size(), path, serializer);
