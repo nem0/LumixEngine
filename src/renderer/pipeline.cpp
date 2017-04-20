@@ -2328,6 +2328,30 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
+	virtual void render(const bgfx::VertexBufferHandle& vertex_buffer,
+		const bgfx::IndexBufferHandle& index_buffer,
+		const bgfx::InstanceDataBuffer& instance_buffer,
+		int count,
+		Material& material) override
+	{
+		View& view = *m_current_view;
+
+		executeCommandBuffer(material.getCommandBuffer(), &material);
+		executeCommandBuffer(view.command_buffer.buffer, &material);
+
+		bgfx::setInstanceDataBuffer(&instance_buffer, count);
+		bgfx::setVertexBuffer(vertex_buffer);
+		bgfx::setIndexBuffer(index_buffer);
+		bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
+		bgfx::setState(view.render_state | material.getRenderStates());
+		++m_stats.draw_call_count;
+		m_stats.instance_count += count;
+		m_stats.triangle_count += count * 2;
+
+		bgfx::submit(view.bgfx_id, material.getShaderInstance().getProgramHandle(view.pass_idx));
+	}
+
+
 	void executeCommandBuffer(const u8* data, Material* material) const
 	{
 		const u8* ip = data;
