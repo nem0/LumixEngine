@@ -15,6 +15,9 @@ namespace bgfx
 	struct TransientVertexBuffer;
 	struct TransientIndexBuffer;
 	struct VertexDecl;
+	struct VertexBufferHandle;
+	struct IndexBufferHandle;
+	struct InstanceDataBuffer;
 }
 
 
@@ -30,6 +33,7 @@ class Path;
 class Renderer;
 class RenderScene;
 struct Vec4;
+class Material;
 
 
 struct CommandBufferGenerator
@@ -126,6 +130,12 @@ class LUMIX_RENDERER_API Pipeline
 		virtual float getWaitSubmitTime() const = 0;
 		virtual float getWaitRenderTime() const = 0;
 		virtual void callLuaFunction(const char* func) = 0;
+
+		virtual void render(const bgfx::VertexBufferHandle& vertex_buffer,
+			const bgfx::IndexBufferHandle& index_buffer,
+			const bgfx::InstanceDataBuffer& instance_buffer,
+			int count,
+			Material& material) = 0;
 };
 
 
