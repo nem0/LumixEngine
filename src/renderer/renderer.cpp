@@ -357,6 +357,13 @@ static void registerProperties(IAllocator& allocator)
 			FLT_MAX,
 			0.05f));
 	PropertyRegister::add("global_light",
+		LUMIX_NEW(allocator, DecimalPropertyDescriptor<RenderScene>)("Indirect intensity",
+			&RenderScene::getGlobalLightIndirectIntensity,
+			&RenderScene::setGlobalLightIndirectIntensity,
+			0.0f,
+			FLT_MAX,
+			0.05f));
+	PropertyRegister::add("global_light",
 		LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec4, RenderScene>)(
 			"Shadow cascades", &RenderScene::getShadowmapCascades, &RenderScene::setShadowmapCascades));
 	PropertyRegister::add("global_light",

@@ -484,16 +484,14 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		m_rel_camera_pos_uniform = bgfx::createUniform("u_relCamPos", bgfx::UniformType::Vec4);
 		m_terrain_params_uniform = bgfx::createUniform("u_terrainParams", bgfx::UniformType::Vec4);
 		m_fog_params_uniform = bgfx::createUniform("u_fogParams", bgfx::UniformType::Vec4);
-		m_fog_color_density_uniform =
-			bgfx::createUniform("u_fogColorDensity", bgfx::UniformType::Vec4);
-		m_light_pos_radius_uniform =
-			bgfx::createUniform("u_lightPosRadius", bgfx::UniformType::Vec4);
+		m_fog_color_density_uniform = bgfx::createUniform("u_fogColorDensity", bgfx::UniformType::Vec4);
+		m_light_pos_radius_uniform = bgfx::createUniform("u_lightPosRadius", bgfx::UniformType::Vec4);
 		m_light_color_attenuation_uniform = bgfx::createUniform("u_lightRgbAttenuation", bgfx::UniformType::Vec4);
+		m_light_color_indirect_intensity_uniform =
+			bgfx::createUniform("u_lightRgbAndIndirectIntensity", bgfx::UniformType::Vec4);
 		m_light_dir_fov_uniform = bgfx::createUniform("u_lightDirFov", bgfx::UniformType::Vec4);
-		m_shadowmap_matrices_uniform =
-			bgfx::createUniform("u_shadowmapMatrices", bgfx::UniformType::Mat4, 4);
-		m_bone_matrices_uniform =
-			bgfx::createUniform("u_boneMatrices", bgfx::UniformType::Mat4, 64);
+		m_shadowmap_matrices_uniform = bgfx::createUniform("u_shadowmapMatrices", bgfx::UniformType::Mat4, 4);
+		m_bone_matrices_uniform = bgfx::createUniform("u_boneMatrices", bgfx::UniformType::Mat4, 64);
 		m_layer_uniform = bgfx::createUniform("u_layer", bgfx::UniformType::Vec4);
 		m_terrain_matrix_uniform = bgfx::createUniform("u_terrainMatrix", bgfx::UniformType::Mat4);
 		m_decal_matrix_uniform = bgfx::createUniform("u_decalMatrix", bgfx::UniformType::Mat4);
@@ -514,6 +512,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		bgfx::destroyUniform(m_fog_color_density_uniform);
 		bgfx::destroyUniform(m_light_pos_radius_uniform);
 		bgfx::destroyUniform(m_light_color_attenuation_uniform);
+		bgfx::destroyUniform(m_light_color_indirect_intensity_uniform);
 		bgfx::destroyUniform(m_light_dir_fov_uniform);
 		bgfx::destroyUniform(m_shadowmap_matrices_uniform);
 		bgfx::destroyUniform(m_cam_inv_proj_uniform);
@@ -1719,9 +1718,10 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 							 m_scene->getGlobalLightIntensity(current_light);
 		Vec3 fog_color = m_scene->getFogColor(current_light);
 		float fog_density = m_scene->getFogDensity(current_light);
-		
+		float indirect_intensity = m_scene->getGlobalLightIndirectIntensity(current_light);
+
 		m_current_view->command_buffer.beginAppend();
-		m_current_view->command_buffer.setUniform(m_light_color_attenuation_uniform, Vec4(diffuse_color, 1));
+		m_current_view->command_buffer.setUniform(m_light_color_indirect_intensity_uniform, Vec4(diffuse_color, indirect_intensity));
 		m_current_view->command_buffer.setUniform(m_light_dir_fov_uniform, Vec4(light_dir, 0));
 
 		fog_density *= fog_density * fog_density;
@@ -2861,6 +2861,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	bgfx::UniformHandle m_fog_params_uniform;
 	bgfx::UniformHandle m_light_pos_radius_uniform;
 	bgfx::UniformHandle m_light_color_attenuation_uniform;
+	bgfx::UniformHandle m_light_color_indirect_intensity_uniform;
 	bgfx::UniformHandle m_light_dir_fov_uniform;
 	bgfx::UniformHandle m_shadowmap_matrices_uniform;
 	bgfx::UniformHandle m_terrain_matrix_uniform;
