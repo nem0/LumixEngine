@@ -52,6 +52,7 @@ enum class RenderSceneVersion : int
 	EMITTER_MATERIAL,
 	BONE_ATTACHMENT_TRANSFORM,
 	MODEL_INSTNACE_FLAGS,
+	INDIRECT_INTENSITY,
 
 	LATEST
 };
@@ -113,6 +114,7 @@ struct GlobalLight
 {
 	Vec3 m_diffuse_color;
 	float m_diffuse_intensity;
+	float m_indirect_intensity;
 	Vec3 m_fog_color;
 	float m_fog_density;
 	float m_fog_bottom;
@@ -760,6 +762,7 @@ public:
 		serializer.write("cascades", light.m_cascades);
 		serializer.write("diffuse_color", light.m_diffuse_color);
 		serializer.write("diffuse_intensity", light.m_diffuse_intensity);
+		serializer.write("indirect_intensity", light.m_indirect_intensity);
 		serializer.write("fog_bottom", light.m_fog_bottom);
 		serializer.write("fog_color", light.m_fog_color);
 		serializer.write("fog_density", light.m_fog_density);
@@ -779,6 +782,14 @@ public:
 		}
 		serializer.read(&light.m_diffuse_color);
 		serializer.read(&light.m_diffuse_intensity);
+		if (scene_version > (int)RenderSceneVersion::INDIRECT_INTENSITY)
+		{
+			serializer.read(&light.m_indirect_intensity);
+		}
+		else
+		{
+			light.m_indirect_intensity = 1;
+		}
 		serializer.read(&light.m_fog_bottom);
 		serializer.read(&light.m_fog_color);
 		serializer.read(&light.m_fog_density);
@@ -4130,6 +4141,12 @@ public:
 	}
 
 
+	void setGlobalLightIndirectIntensity(ComponentHandle cmp, float intensity) override
+	{
+		m_global_lights[{cmp.index}].m_indirect_intensity = intensity;
+	}
+
+
 	void setPointLightColor(ComponentHandle cmp, const Vec3& color) override
 	{
 		m_point_lights[m_point_lights_map[cmp]].m_diffuse_color = color;
@@ -4151,6 +4168,12 @@ public:
 	float getGlobalLightIntensity(ComponentHandle cmp) override
 	{
 		return m_global_lights[{cmp.index}].m_diffuse_intensity;
+	}
+
+
+	float getGlobalLightIndirectIntensity(ComponentHandle cmp) override
+	{
+		return m_global_lights[{cmp.index}].m_indirect_intensity;
 	}
 
 
@@ -4753,6 +4776,7 @@ public:
 		light.m_entity = entity;
 		light.m_diffuse_color.set(1, 1, 1);
 		light.m_diffuse_intensity = 0;
+		light.m_indirect_intensity = 1;
 		light.m_fog_color.set(1, 1, 1);
 		light.m_fog_density = 0;
 		light.m_cascades.set(3, 8, 100, 300);

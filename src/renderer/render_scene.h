@@ -384,6 +384,7 @@ public:
 	virtual void setLightRange(ComponentHandle cmp, float value) = 0;
 	virtual void setPointLightIntensity(ComponentHandle cmp, float intensity) = 0;
 	virtual void setGlobalLightIntensity(ComponentHandle cmp, float intensity) = 0;
+	virtual void setGlobalLightIndirectIntensity(ComponentHandle cmp, float intensity) = 0;
 	virtual void setPointLightColor(ComponentHandle cmp, const Vec3& color) = 0;
 	virtual void setGlobalLightColor(ComponentHandle cmp, const Vec3& color) = 0;
 	virtual void setFogDensity(ComponentHandle cmp, float density) = 0;
@@ -392,6 +393,7 @@ public:
 	virtual Entity getPointLightEntity(ComponentHandle cmp) const = 0;
 	virtual Entity getGlobalLightEntity(ComponentHandle cmp) const = 0;
 	virtual float getGlobalLightIntensity(ComponentHandle cmp) = 0;
+	virtual float getGlobalLightIndirectIntensity(ComponentHandle cmp) = 0;
 	virtual Vec3 getPointLightColor(ComponentHandle cmp) = 0;
 	virtual Vec3 getGlobalLightColor(ComponentHandle cmp) = 0;
 	virtual float getFogDensity(ComponentHandle cmp) = 0;
