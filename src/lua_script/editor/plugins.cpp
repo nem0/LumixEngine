@@ -214,16 +214,16 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 
 	struct SetPropertyCommand LUMIX_FINAL : public IEditorCommand
 	{
-		explicit SetPropertyCommand(WorldEditor& editor)
-			: property_name(editor.getAllocator())
-			, value(editor.getAllocator())
-			, old_value(editor.getAllocator())
+		explicit SetPropertyCommand(WorldEditor& _editor)
+			: property_name(_editor.getAllocator())
+			, value(_editor.getAllocator())
+			, old_value(_editor.getAllocator())
+			, editor(_editor)
 		{
-			scene = static_cast<LuaScriptScene*>(editor.getUniverse()->getScene(crc32("lua_script")));
 		}
 
 
-		SetPropertyCommand(LuaScriptScene* scene,
+		SetPropertyCommand(WorldEditor& _editor,
 			ComponentHandle cmp,
 			int scr_index,
 			const char* property_name,
@@ -234,8 +234,9 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 			, old_value(allocator)
 			, component(cmp)
 			, script_index(scr_index)
+			, editor(_editor)
 		{
-			this->scene = scene;
+			auto* scene = static_cast<LuaScriptScene*>(editor.getUniverse()->getScene(crc32("lua_script")));
 			if (property_name[0] == '-')
 			{
 				old_value = scene->getScriptPath(component, script_index).c_str();
@@ -254,6 +255,7 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 
 		bool execute() override
 		{
+			auto* scene = static_cast<LuaScriptScene*>(editor.getUniverse()->getScene(crc32("lua_script")));
 			if (property_name.length() > 0 && property_name[0] == '-')
 			{
 				scene->setScriptPath(component, script_index, Path(value.c_str()));
@@ -268,6 +270,7 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 
 		void undo() override
 		{
+			auto* scene = static_cast<LuaScriptScene*>(editor.getUniverse()->getScene(crc32("lua_script")));
 			if (property_name.length() > 0 && property_name[0] == '-')
 			{
 				scene->setScriptPath(component, script_index, Path(old_value.c_str()));
@@ -319,7 +322,7 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		}
 
 
-		LuaScriptScene* scene;
+		WorldEditor& editor;
 		string property_name;
 		string value;
 		string old_value;
@@ -400,7 +403,7 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 						"Source", "src", buf, lengthOf(buf), LUA_SCRIPT_RESOURCE_TYPE))
 				{
 					auto* cmd =
-						LUMIX_NEW(allocator, SetPropertyCommand)(scene, cmp.handle, j, "-source", buf, allocator);
+						LUMIX_NEW(allocator, SetPropertyCommand)(editor, cmp.handle, j, "-source", buf, allocator);
 					editor.executeCommand(cmd);
 				}
 				for (int k = 0, kc = scene->getPropertyCount(cmp.handle, j); k < kc; ++k)
@@ -417,7 +420,7 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 							if (ImGui::Checkbox(property_name, &b))
 							{
 								auto* cmd = LUMIX_NEW(allocator, SetPropertyCommand)(
-									scene, cmp.handle, j, property_name, b ? "true" : "false", allocator);
+									editor, cmp.handle, j, property_name, b ? "true" : "false", allocator);
 								editor.executeCommand(cmd);
 							}
 						}
@@ -429,7 +432,7 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 							{
 								toCString(f, buf, sizeof(buf), 5);
 								auto* cmd = LUMIX_NEW(allocator, SetPropertyCommand)(
-									scene, cmp.handle, j, property_name, buf, allocator);
+									editor, cmp.handle, j, property_name, buf, allocator);
 								editor.executeCommand(cmd);
 							}
 						}
@@ -442,7 +445,7 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 							{
 								toCString(e.index, buf, sizeof(buf));
 								auto* cmd = LUMIX_NEW(allocator, SetPropertyCommand)(
-									scene, cmp.handle, j, property_name, buf, allocator);
+									editor, cmp.handle, j, property_name, buf, allocator);
 								editor.executeCommand(cmd);
 							}
 						}
@@ -452,7 +455,7 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 							if (ImGui::InputText(property_name, buf, sizeof(buf)))
 							{
 								auto* cmd = LUMIX_NEW(allocator, SetPropertyCommand)(
-									scene, cmp.handle, j, property_name, buf, allocator);
+									editor, cmp.handle, j, property_name, buf, allocator);
 								editor.executeCommand(cmd);
 							}
 							break;
@@ -463,7 +466,7 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 									property_name, property_name, buf, lengthOf(buf), res_type))
 							{
 								auto* cmd = LUMIX_NEW(allocator, SetPropertyCommand)(
-									scene, cmp.handle, j, property_name, buf, allocator);
+									editor, cmp.handle, j, property_name, buf, allocator);
 								editor.executeCommand(cmd);
 							}
 						}
@@ -719,7 +722,7 @@ struct AddComponentPlugin LUMIX_FINAL : public StudioApp::IAddComponentPlugin
 			{
 				int scr_count = script_scene->getScriptCount(cmp);
 				auto* set_source_cmd = LUMIX_NEW(allocator, PropertyGridPlugin::SetPropertyCommand)(
-					script_scene, cmp, scr_count - 1, "-source", buf, allocator);
+					editor, cmp, scr_count - 1, "-source", buf, allocator);
 				editor.executeCommand(set_source_cmd);
 			}
 
