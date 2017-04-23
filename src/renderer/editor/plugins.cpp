@@ -2420,6 +2420,8 @@ struct AddTerrainComponentPlugin LUMIX_FINAL : public StudioApp::IAddComponentPl
 
 	void onGUI(bool create_entity, bool from_filter) override
 	{
+		auto& editor = *app.getWorldEditor();
+
 		ImGui::SetNextWindowSize(ImVec2(300, 300));
 		if (!ImGui::BeginMenu("Terrain")) return;
 		char buf[MAX_PATH_LENGTH];
@@ -2431,8 +2433,10 @@ struct AddTerrainComponentPlugin LUMIX_FINAL : public StudioApp::IAddComponentPl
 			ImGui::InputInt("Size", &size);
 			if (ImGui::Button("Create"))
 			{
-				if (PlatformInterface::getSaveFilename(buf, lengthOf(buf), "Material\0*.mat\0", "mat"))
+				char save_filename[MAX_PATH_LENGTH];
+				if (PlatformInterface::getSaveFilename(save_filename, lengthOf(save_filename), "Material\0*.mat\0", "mat"))
 				{
+					editor.makeRelative(buf, lengthOf(buf), save_filename);
 					new_created = createHeightmap(buf, size);
 				}
 			}
@@ -2441,7 +2445,6 @@ struct AddTerrainComponentPlugin LUMIX_FINAL : public StudioApp::IAddComponentPl
 		bool create_empty = ImGui::Selectable("Empty", false);
 		if (asset_browser->resourceList(buf, lengthOf(buf), MATERIAL_TYPE, 0) || create_empty || new_created)
 		{
-			auto& editor = *app.getWorldEditor();
 			if (create_entity)
 			{
 				Entity entity = editor.addEntity();
