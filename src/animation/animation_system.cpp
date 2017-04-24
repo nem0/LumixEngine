@@ -679,6 +679,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 			if (entry.set != set_idx) continue;
 			ctrl.animations[entry.hash] = entry.animation;
 		}
+		if (ctrl.root) ctrl.root->onAnimationSetUpdated(ctrl.animations);
 	}
 
 

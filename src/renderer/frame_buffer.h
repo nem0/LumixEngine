@@ -25,23 +25,15 @@ class FrameBuffer
 			bgfx::TextureHandle m_handle;
 
 			void parse(lua_State* state);
-			bool isDepth() const;
 		};
 
 		struct Declaration
 		{
-			Declaration()
-				: m_renderbuffers_count(0)
-				, m_size_ratio(-1, -1)
-			{ }
-
-			static const int MAX_RENDERBUFFERS = 16;
-
 			i32 m_width;
 			i32 m_height;
-			Vec2 m_size_ratio;
-			RenderBuffer m_renderbuffers[MAX_RENDERBUFFERS];
-			i32 m_renderbuffers_count;
+			Vec2 m_size_ratio = Vec2(-1, -1);
+			RenderBuffer m_renderbuffers[16];
+			i32 m_renderbuffers_count = 0;
 			char m_name[64];
 		};
 

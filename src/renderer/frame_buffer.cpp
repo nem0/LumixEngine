@@ -100,23 +100,6 @@ void FrameBuffer::resize(int width, int height)
 }
 
 
-bool FrameBuffer::RenderBuffer::isDepth() const
-{
-	switch(m_format)
-	{
-		case bgfx::TextureFormat::D0S8:
-		case bgfx::TextureFormat::D16:
-		case bgfx::TextureFormat::D16F:
-		case bgfx::TextureFormat::D24:
-		case bgfx::TextureFormat::D24F:
-		case bgfx::TextureFormat::D24S8:
-		case bgfx::TextureFormat::D32:
-		case bgfx::TextureFormat::D32F: return true;
-		default: return false;
-	}
-}
-
-
 static bgfx::TextureFormat::Enum getFormat(const char* name) 
 {
 	static const struct { const char* name; bgfx::TextureFormat::Enum value; } FORMATS[] = {
@@ -151,4 +134,4 @@ void FrameBuffer::RenderBuffer::parse(lua_State* L)
 }
 
 
-} // ~namespace Lumix
+} // namespace Lumix

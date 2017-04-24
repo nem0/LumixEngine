@@ -55,6 +55,13 @@ struct EdgeInstance : public ComponentInstance
 	float getLength() const override { return edge.length; }
 
 
+	void onAnimationSetUpdated(AnimSet& anim_set) override
+	{
+		from->onAnimationSetUpdated(anim_set);
+		to->onAnimationSetUpdated(anim_set);
+	}
+
+
 	Transform getRootMotion() const override
 	{
 		return from->getRootMotion().interpolate(to->getRootMotion(), time / edge.length);
@@ -257,6 +264,13 @@ ComponentInstance* Blend1DNodeInstance::update(RunningContext& rc, bool check_ed
 }
 
 
+void Blend1DNodeInstance::onAnimationSetUpdated(AnimSet& anim_set)
+{
+	if (a0) a0->onAnimationSetUpdated(anim_set);
+	if (a1) a1->onAnimationSetUpdated(anim_set);
+}
+
+
 void Blend1DNodeInstance::enter(RunningContext& rc, ComponentInstance* from)
 {
 	time = 0;
@@ -430,6 +444,16 @@ struct AnimationNodeInstance : public NodeInstance
 	Transform getRootMotion() const override { return root_motion; }
 
 
+	void onAnimationSetUpdated(AnimSet& anim_set) override
+	{
+		time = 0;
+		if (node.animations_hashes.empty()) return;
+		int idx = Math::rand() % node.animations_hashes.size();
+		auto iter = anim_set.find(node.animations_hashes[idx]);
+		resource = iter.isValid() ? iter.value() : nullptr;
+	}
+
+
 	float getTime() const override { return time; }
 	float getLength() const override { return resource ? resource->getLength() : 0; }
 
@@ -548,6 +572,12 @@ StateMachineInstance::~StateMachineInstance()
 Transform StateMachineInstance::getRootMotion() const
 {
 	return current ? current->getRootMotion() : Transform({ 0, 0, 0 }, { 0, 0, 0, 1 });
+}
+
+
+void StateMachineInstance::onAnimationSetUpdated(AnimSet& anim_set)
+{
+	if (current) current->onAnimationSetUpdated(anim_set);
 }
 
 
