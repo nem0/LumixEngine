@@ -44,6 +44,7 @@ struct ComponentInstance
 	virtual void enter(RunningContext& rc, ComponentInstance* from) = 0;
 	virtual float getTime() const = 0;
 	virtual float getLength() const = 0;
+	virtual void onAnimationSetUpdated(AnimSet& anim_set) = 0;
 
 	Component& source;
 };
@@ -148,6 +149,8 @@ struct Blend1DNodeInstance : public NodeInstance
 	void fillPose(Engine& engine, Pose& pose, Model& model, float weight) override;
 	ComponentInstance* update(RunningContext& rc, bool check_edges) override;
 	void enter(RunningContext& rc, ComponentInstance* from) override;
+	void onAnimationSetUpdated(AnimSet& anim_set) override;
+
 
 	NodeInstance* a0 = nullptr;
 	NodeInstance* a1 = nullptr;
@@ -187,6 +190,7 @@ struct StateMachineInstance : public NodeInstance
 	float getTime() const override { return current ? current->getTime() : 0; }
 	float getLength() const override { return current ? current->getLength() : 0; }
 	Transform getRootMotion() const override;
+	void onAnimationSetUpdated(AnimSet& anim_set) override;
 
 	StateMachine& source;
 	ComponentInstance* current;
