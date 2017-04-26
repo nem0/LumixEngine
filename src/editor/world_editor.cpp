@@ -1113,6 +1113,16 @@ private:
 				}
 				EntityGUID guid = m_editor.m_entity_map.get(m_entities[i]);
 				m_old_values.write(guid.value);
+				Entity parent = universe->getParent(m_entities[i]);
+				m_old_values.write(parent);
+				if (isValid(parent))
+				{
+					Transform local_tr = universe->getLocalTransform(m_entities[i]);
+					m_old_values.write(local_tr);
+					float local_scale = universe->getLocalScale(m_entities[i]);
+					m_old_values.write(local_scale);
+
+				}
 				m_old_values.write(count);
 				for (ComponentUID cmp = universe->getFirstComponent(m_entities[i]);
 					cmp.isValid();
@@ -1154,12 +1164,27 @@ private:
 			InputBlob blob(m_old_values);
 			for (int i = 0; i < m_entities.size(); ++i)
 			{
-				Entity new_entity =
-					universe->createEntity(m_transformations[i].pos, m_transformations[i].rot);
+				universe->createEntity(m_entities[i]);
+			}
+			for (int i = 0; i < m_entities.size(); ++i)
+			{
+				Entity new_entity = m_entities[i];
+				universe->setTransform(new_entity, m_transformations[i].pos, m_transformations[i].rot);
 				int cmps_count;
 				EntityGUID guid;
 				blob.read(guid.value);
 				m_editor.m_entity_map.insert(guid, new_entity);
+				Entity parent;
+				blob.read(parent);
+				if (isValid(parent))
+				{
+					Transform local_tr;
+					float local_scale;
+					blob.read(local_tr);
+					blob.read(local_scale);
+					universe->setParent(parent, new_entity);
+					universe->setLocalTransform(new_entity, local_tr, local_scale);
+				}
 				blob.read(cmps_count);
 				for (int j = 0; j < cmps_count; ++j)
 				{
