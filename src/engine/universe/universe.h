@@ -6,11 +6,11 @@
 #include "engine/delegate_list.h"
 #include "engine/iplugin.h"
 #include "engine/lumix.h"
+#include "engine/matrix.h"
 #include "engine/path.h"
 #include "engine/quat.h"
 #include "engine/string.h"
 #include "engine/universe/component.h"
-#include "engine/vec.h"
 
 
 namespace Lumix
@@ -68,12 +68,21 @@ public:
 		m_component_type_map[type.index].deserialize = static_cast<Deserialize>(deserialize);
 	}
 
-	Entity getFirstEntity();
-	Entity getNextEntity(Entity entity);
+	Entity getFirstEntity() const;
+	Entity getNextEntity(Entity entity) const;
 	bool nameExists(const char* name) const;
 	const char* getEntityName(Entity entity) const;
 	void setEntityName(Entity entity, const char* name);
 	bool hasEntity(Entity entity) const;
+
+	Entity getParent(Entity entity) const;
+	Entity getFirstChild(Entity entity) const;
+	Entity getNextSibling(Entity entity) const;
+	Transform getLocalTransform(Entity entity) const;
+	float getLocalScale(Entity entity) const;
+	void setParent(Entity parent, Entity child);
+	void setLocalPosition(Entity entity, const Vec3& pos);
+	void setLocalRotation(Entity entity, const Quat& rot);
 
 	void setMatrix(Entity entity, const Matrix& mtx);
 	Matrix getPositionAndRotation(Entity entity) const;
@@ -117,6 +126,20 @@ public:
 	void addScene(IScene* scene);
 
 private:
+	void transformEntity(Entity entity, bool update_local);
+
+	struct Hierarchy
+	{
+		Entity entity;
+		Entity parent;
+		Entity first_child;
+		Entity next_sibling;
+
+		Transform local_transform;
+		float local_scale;
+	};
+
+
 	struct EntityData
 	{
 		EntityData() {}
@@ -124,6 +147,8 @@ private:
 		Vec3 position;
 		Quat rotation;
 		
+		int hierarchy;
+
 		union
 		{
 			struct 
@@ -145,6 +170,7 @@ private:
 	ComponentTypeEntry m_component_type_map[MAX_COMPONENTS_TYPES_COUNT];
 	Array<IScene*> m_scenes;
 	Array<EntityData> m_entities;
+	Array<Hierarchy> m_hierarchy;
 	AssociativeArray<u32, u32> m_name_to_id_map;
 	AssociativeArray<u32, string> m_id_to_name_map;
 	DelegateList<void(Entity)> m_entity_moved;

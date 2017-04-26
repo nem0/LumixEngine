@@ -149,6 +149,7 @@ public:
 	virtual void setOrbitCamera(bool enable) = 0;
 	virtual const Array<Entity>& getSelectedEntities() const = 0;
 	virtual bool isEntitySelected(Entity entity) const = 0;
+	virtual void makeParent(Entity parent, Entity child) = 0;
 
 	virtual DelegateList<void(const Array<Entity>&)>& entitySelected() = 0;
 	virtual DelegateList<void()>& universeCreated() = 0;

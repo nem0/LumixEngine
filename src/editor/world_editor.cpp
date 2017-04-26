@@ -952,6 +952,70 @@ private:
 	};
 
 
+	class MakeParentCommand LUMIX_FINAL : public IEditorCommand
+	{
+	public:
+		explicit MakeParentCommand(WorldEditor& editor)
+			: m_editor(static_cast<WorldEditorImpl&>(editor))
+		{
+		}
+
+
+		MakeParentCommand(WorldEditorImpl& editor, Entity parent, Entity child)
+			: m_editor(static_cast<WorldEditorImpl&>(editor))
+			, m_parent(parent)
+			, m_child(child)
+		{
+		}
+
+
+		void serialize(JsonSerializer& serializer) override
+		{
+			serializer.serialize("parent", m_parent);
+			serializer.serialize("child", m_child);
+		}
+
+
+		void deserialize(JsonSerializer& serializer) override
+		{
+			serializer.deserialize("parent", m_parent, INVALID_ENTITY);
+			serializer.deserialize("child", m_child, INVALID_ENTITY);
+		}
+
+
+		bool merge(IEditorCommand& cmd) override { 
+			
+			auto& c = (MakeParentCommand&)cmd;
+			if (c.m_child != m_child) return false;
+			c.m_parent = m_parent;
+			return true;
+		}
+
+
+		const char* getType() override { return "make_parent"; }
+
+
+		bool execute() override
+		{
+			m_old_parent = m_editor.getUniverse()->getParent(m_child);
+			m_editor.getUniverse()->setParent(m_parent, m_child);
+			return true;
+		}
+
+
+		void undo() override
+		{
+			m_editor.getUniverse()->setParent(m_old_parent, m_child);
+		}
+
+	private:
+		WorldEditor& m_editor;
+		Entity m_parent;
+		Entity m_old_parent;
+		Entity m_child;
+	};
+
+
 	class DestroyEntitiesCommand LUMIX_FINAL : public IEditorCommand
 	{
 	public:
@@ -1854,7 +1918,13 @@ public:
 				deserializer.read(&tr);
 				float scale;
 				deserializer.read(&scale);
+
 				Entity entity = m_entity_map.get(guid);
+
+				Entity parent;
+				deserializer.read(&parent);
+				if (isValid(parent)) m_universe->setParent(parent, entity);
+
 				m_universe->setTransform(entity, tr);
 				if(name[0]) m_universe->setEntityName(entity, name);
 				m_universe->setScale(entity, scale);
@@ -1923,6 +1993,8 @@ public:
 			serializer.write("name", m_universe->getEntityName(entity));
 			serializer.write("transform", m_universe->getTransform(entity));
 			serializer.write("scale", m_universe->getScale(entity));
+			Entity parent = m_universe->getParent(entity);
+			serializer.write("parent", parent);
 			EntityGUID guid = m_entity_map.get(entity);
 			StaticString<MAX_PATH_LENGTH> entity_file_path(dir, guid.value, ".ent");
 			for (ComponentUID cmp = m_universe->getFirstComponent(entity); isValid(cmp.handle);
@@ -2035,6 +2107,13 @@ public:
 	}
 
 
+	void makeParent(Entity parent, Entity child) override
+	{
+		MakeParentCommand* command = LUMIX_NEW(m_allocator, MakeParentCommand)(*this, parent, child);
+		executeCommand(command);
+	}
+
+
 	void destroyEntities(const Entity* entities, int count) override
 	{
 		for (int i = 0; i < count; ++i)
@@ -2046,8 +2125,7 @@ public:
 			}
 		}
 
-		DestroyEntitiesCommand* command =
-			LUMIX_NEW(m_allocator, DestroyEntitiesCommand)(*this, entities, count);
+		DestroyEntitiesCommand* command = LUMIX_NEW(m_allocator, DestroyEntitiesCommand)(*this, entities, count);
 		executeCommand(command);
 	}
 

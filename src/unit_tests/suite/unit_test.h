@@ -58,6 +58,17 @@ namespace Lumix
 			}
 
 
+			template<int C>
+			static void getOperand(char(&str)[C], Entity value)
+			{
+				char tmp[20];
+				Lumix::toCString(value.index, tmp, C);
+				Lumix::catString(str, "{");
+				Lumix::catString(str, tmp);
+				Lumix::catString(str, "}");
+			}
+
+
 			template <int C>
 			void getOperator(char(&str)[C])
 			{

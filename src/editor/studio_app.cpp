@@ -772,6 +772,22 @@ public:
 	void setRotateGizmoMode() { m_editor->getGizmo().setRotateMode(); }
 
 
+	void makeParent()
+	{
+		const auto& entities = m_editor->getSelectedEntities();
+		ASSERT(entities.size() == 2);
+		m_editor->makeParent(entities[0], entities[1]);
+	}
+
+
+	void unparent()
+	{
+		const auto& entities = m_editor->getSelectedEntities();
+		ASSERT(entities.size() == 1);
+		m_editor->makeParent(INVALID_ENTITY, entities[0]);
+	}
+
+
 	void savePrefab()
 	{
 		char filename[MAX_PATH_LENGTH];
@@ -936,7 +952,8 @@ public:
 	{
 		if (!ImGui::BeginMenu("Entity")) return;
 
-		bool is_any_entity_selected = !m_editor->getSelectedEntities().empty();
+		const auto& selected_entities = m_editor->getSelectedEntities();
+		bool is_any_entity_selected = !selected_entities.empty();
 		if (ImGui::BeginMenu("Create"))
 		{
 			onCreateEntityWithComponentGUI();
@@ -947,6 +964,9 @@ public:
 		doMenuItem(*getAction("savePrefab"), is_any_entity_selected);
 		doMenuItem(*getAction("showEntities"), is_any_entity_selected);
 		doMenuItem(*getAction("hideEntities"), is_any_entity_selected);
+		doMenuItem(*getAction("makeParent"), selected_entities.size() == 2);
+		bool can_unparent = selected_entities.size() == 1 && isValid(m_editor->getUniverse()->getParent(selected_entities[0]));
+		doMenuItem(*getAction("unparent"), can_unparent);
 		ImGui::EndMenu();
 	}
 
@@ -1147,6 +1167,22 @@ public:
 	}
 
 
+	void showHierarchy(Entity entity)
+	{
+		static char buffer[1024];
+		Universe* universe = m_editor->getUniverse();
+		getEntityListDisplayName(*m_editor, buffer, sizeof(buffer), entity);
+		if (ImGui::TreeNode(buffer))
+		{
+			for (Entity e = universe->getFirstChild(entity); isValid(e); e = universe->getNextSibling(e))
+			{
+				showHierarchy(e);
+			}
+			ImGui::TreePop();
+		}
+	}
+
+
 	void onEntityListGUI()
 	{
 		PROFILE_FUNCTION();
@@ -1159,14 +1195,24 @@ public:
 			char buffer[1024];
 			for (Entity e = universe->getFirstEntity(); isValid(e); e = universe->getNextEntity(e))
 			{
-				getEntityListDisplayName(*m_editor, buffer, sizeof(buffer), e);
-				if (ImGui::Selectable(buffer))
+				if (!isValid(universe->getParent(e)))
 				{
-					m_editor->selectEntities(&e, 1);
-				}
-				if (ImGui::IsMouseDragging() && ImGui::IsItemActive())
-				{
-					startDrag(StudioApp::DragData::ENTITY, &e, sizeof(e));
+					if(isValid(universe->getFirstChild(e)))
+					{
+						showHierarchy(e);
+					}
+					else
+					{
+						getEntityListDisplayName(*m_editor, buffer, sizeof(buffer), e);
+						if (ImGui::Selectable(buffer))
+						{
+							m_editor->selectEntities(&e, 1);
+						}
+						if (ImGui::IsMouseDragging() && ImGui::IsItemActive())
+						{
+							startDrag(StudioApp::DragData::ENTITY, &e, sizeof(e));
+						}
+					}
 				}
 			}
 			ImGui::PopItemWidth();
@@ -1331,6 +1377,8 @@ public:
 		addAction<&StudioAppImpl::showEntities>("Show", "showEntities");
 		addAction<&StudioAppImpl::hideEntities>("Hide", "hideEntities");
 		addAction<&StudioAppImpl::savePrefab>("Save prefab", "savePrefab");
+		addAction<&StudioAppImpl::makeParent>("Make parent", "makeParent");
+		addAction<&StudioAppImpl::unparent>("Unparent", "unparent");
 
 		addAction<&StudioAppImpl::toggleGameMode>("Game Mode", "toggleGameMode")
 			.is_selected.bind<WorldEditor, &WorldEditor::isGameMode>(m_editor);
@@ -1347,15 +1395,6 @@ public:
 		addAction<&StudioAppImpl::toggleSettings>("Settings", "settings")
 			.is_selected.bind<StudioAppImpl, &StudioAppImpl::areSettingsOpened>(this);
 		addAction<&StudioAppImpl::showPackDataDialog>("Pack data", "pack_data");
-
-		addAction<&StudioAppImpl::dummy>("Unhide entities from group", "show").is_global = false;
-		addAction<&StudioAppImpl::dummy>("Hide entities from group", "hide").is_global = false;
-		addAction<&StudioAppImpl::dummy>("Lock group", "lock").is_global = false;
-		addAction<&StudioAppImpl::dummy>("Unlock group", "unlock").is_global = false;
-		addAction<&StudioAppImpl::dummy>("Create group", "createGroup").is_global = false;
-		addAction<&StudioAppImpl::dummy>("Remove group", "removeGroup").is_global = false;
-		addAction<&StudioAppImpl::dummy>("Select assigned", "selectAssigned").is_global = false;
-		addAction<&StudioAppImpl::dummy>("Assigned selected", "assignSelected").is_global = false;
 	}
 
 
