@@ -23,7 +23,6 @@
 #include "engine/property_register.h"
 #include "engine/resource_manager.h"
 #include "engine/timer.h"
-#include "engine/universe/hierarchy.h"
 #include "engine/universe/universe.h"
 #include <imgui/imgui.h>
 
@@ -475,11 +474,7 @@ public:
 		PropertyRegister::init(m_allocator);
 
 		m_plugin_manager = PluginManager::create(*this);
-		HierarchyPlugin* hierarchy = LUMIX_NEW(m_allocator, HierarchyPlugin)(m_allocator);
-		m_plugin_manager->addPlugin(hierarchy);
 		m_input_system = InputSystem::create(m_allocator);
-
-		registerProperties();
 
 		g_log_info.log("Core") << "Engine created.";
 	}
@@ -712,27 +707,23 @@ public:
 	}
 
 
-	static void LUA_setEntityLocalRotation(IScene* scene,
+	static void LUA_setEntityLocalRotation(Universe* universe,
 		Entity entity,
 		const Quat& rotation)
 	{
 		if (!isValid(entity)) return;
 
-		auto* hierarchy = static_cast<Hierarchy*>(scene);
-		ComponentHandle cmp = hierarchy->getComponent(entity, HIERARCHY_TYPE);
-		if (isValid(cmp)) hierarchy->setLocalRotation(cmp, rotation);
+		universe->setLocalRotation(entity, rotation);
 	}
 
 
-	static void LUA_setEntityLocalPosition(IScene* scene,
+	static void LUA_setEntityLocalPosition(Universe* universe,
 		Entity entity,
 		const Vec3& position)
 	{
 		if (!isValid(entity)) return;
 
-		auto* hierarchy = static_cast<Hierarchy*>(scene);
-		ComponentHandle cmp = hierarchy->getComponent(entity, HIERARCHY_TYPE);
-		if (isValid(cmp)) hierarchy->setLocalPosition(cmp, position);
+		universe->setLocalPosition(entity, position);
 	}
 
 
@@ -1019,21 +1010,6 @@ public:
 		copyMemory(new_mem, ptr, Math::minimum(osize, nsize));
 		allocator.deallocate(ptr);
 		return new_mem;
-	}
-
-
-	void registerProperties()
-	{
-		PropertyRegister::add("hierarchy",
-			LUMIX_NEW(m_allocator, EntityPropertyDescriptor<Hierarchy>)(
-				"Parent", &Hierarchy::getParent, &Hierarchy::setParent));
-		PropertyRegister::add("hierarchy",
-			LUMIX_NEW(m_allocator, SimplePropertyDescriptor<Vec3, Hierarchy>)(
-				"Relative position", &Hierarchy::getLocalPosition, &Hierarchy::setLocalPosition));
-		auto relative_rot = LUMIX_NEW(m_allocator, SimplePropertyDescriptor<Vec3, Hierarchy>)(
-			"Relative rotation", &Hierarchy::getLocalRotationEuler, &Hierarchy::setLocalRotationEuler);
-		relative_rot->setIsInRadians(true);
-		PropertyRegister::add("hierarchy", relative_rot);
 	}
 
 

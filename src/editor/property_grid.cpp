@@ -624,6 +624,14 @@ void PropertyGrid::showCoreProperties(const Lumix::Array<Lumix::Entity>& entitie
 			ImGui::LabelText("GUID", "%s", guid_str);
 		}
 
+		Lumix::Entity parent = m_editor.getUniverse()->getParent(entities[0]);
+		if (isValid(parent))
+		{
+			Lumix::EntityGUID parent_guid = m_editor.getEntityGUID(parent);
+			Lumix::toCString(parent_guid.value, guid_str, Lumix::lengthOf(guid_str));
+			ImGui::LabelText("Parent", "%s", guid_str);
+		}
+
 		Lumix::copyString(name, tmp);
 		if (ImGui::InputText("Name", name, sizeof(name))) m_editor.setEntityName(entities[0], name);
 	}
