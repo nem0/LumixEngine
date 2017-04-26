@@ -515,7 +515,7 @@ void Universe::serialize(OutputBlob& serializer)
 	serializer.write(m_first_free_slot);
 
 	serializer.write(m_hierarchy.size());
-	serializer.write(&m_hierarchy[0], sizeof(m_hierarchy[0]) * m_hierarchy.size());
+	if(!m_hierarchy.empty()) serializer.write(&m_hierarchy[0], sizeof(m_hierarchy[0]) * m_hierarchy.size());
 }
 
 
