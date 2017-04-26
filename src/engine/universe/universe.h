@@ -123,6 +123,7 @@ private:
 
 		Vec3 position;
 		Quat rotation;
+		
 		union
 		{
 			struct 

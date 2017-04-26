@@ -2,7 +2,6 @@
 #include "asset_browser.h"
 #include "audio/audio_scene.h"
 #include "audio/clip_manager.h"
-#include "editor/entity_groups.h"
 #include "editor/gizmo.h"
 #include "editor/prefab_system.h"
 #include "editor/render_interface.h"
@@ -1148,122 +1147,29 @@ public:
 	}
 
 
-	void showEntityListToolbar()
-	{
-		auto pos = ImGui::GetCursorScreenPos();
-		ImGui::BeginToolbar("entity_list_toolbar", pos, ImVec2(0, 24));
-		auto& groups = m_editor->getEntityGroups();
-		if (getAction("createGroup")->toolbarButton())
-		{
-			ImGui::OpenPopup("create_entity_group_popup");
-		}
-		if (groups.getGroupCount() > 1 && getAction("removeGroup")->toolbarButton())
-		{
-			groups.deleteGroup(groups.current_group);
-			groups.current_group = groups.current_group % groups.getGroupCount();
-		}
-		if (getAction("selectAssigned")->toolbarButton())
-		{
-			m_editor->selectEntities(
-				groups.getGroupEntities(groups.current_group), groups.getGroupEntitiesCount(groups.current_group));
-		}
-		if (getAction("assignSelected")->toolbarButton())
-		{
-			auto& selected = m_editor->getSelectedEntities();
-			for (auto e : selected)
-			{
-				groups.setGroup(e, groups.current_group);
-			}
-		}
-		if (getAction("lock")->toolbarButton()) groups.freezeGroup(groups.current_group, true);
-		if (getAction("unlock")->toolbarButton()) groups.freezeGroup(groups.current_group, false);
-		if (getAction("show")->toolbarButton())
-		{
-			m_editor->showEntities(
-				groups.getGroupEntities(groups.current_group), groups.getGroupEntitiesCount(groups.current_group));
-		}
-		if (getAction("hide")->toolbarButton())
-		{
-			m_editor->hideEntities(
-				groups.getGroupEntities(groups.current_group), groups.getGroupEntitiesCount(groups.current_group));
-		}
-
-		if (ImGui::BeginPopup("create_entity_group_popup"))
-		{
-			static char group_name[20] = "";
-			ImGui::InputText("New group name", group_name, lengthOf(group_name));
-			if (group_name[0] == 0)
-			{
-				ImGui::Text("Group name can not be empty");
-			}
-			else if (groups.getGroup(group_name) != -1) 
-			{
-				ImGui::Text("Group with that name already exists");
-			}
-			else if (ImGui::Button("Create"))
-			{
-				groups.createGroup(group_name);
-				group_name[0] = 0;
-				ImGui::CloseCurrentPopup();
-			}
-			ImGui::EndPopup();
-		}
-
-		ImGui::EndToolbar();
-	}
-
-
 	void onEntityListGUI()
 	{
 		PROFILE_FUNCTION();
 		if (ImGui::BeginDock("Entity List", &m_is_entity_list_opened))
 		{
-			showEntityListToolbar();
-			if (ImGui::BeginChild(""))
+			auto* universe = m_editor->getUniverse();
+
+			ImGui::PushItemWidth(ImGui::GetContentRegionAvailWidth() - ImGui::GetStyle().FramePadding.x);
+			static ImVec2 size(0, 200);
+			char buffer[1024];
+			for (Entity e = universe->getFirstEntity(); isValid(e); e = universe->getNextEntity(e))
 			{
-				auto* universe = m_editor->getUniverse();
-				auto& groups = m_editor->getEntityGroups();
-
-				groups.current_group = groups.current_group % groups.getGroupCount();
-				for (int i = 0; i < groups.getGroupCount(); ++i)
+				getEntityListDisplayName(*m_editor, buffer, sizeof(buffer), e);
+				if (ImGui::Selectable(buffer))
 				{
-					auto* name = groups.getGroupName(i);
-					int entities_count = groups.getGroupEntitiesCount(i);
-					const char* locked_text = groups.isGroupFrozen(i) ? "locked" : "";
-					const char* current_text = groups.current_group == i ? "<-" : "";
-					if (ImGui::TreeNode(name, "%s (%d) %s %s", name, entities_count, locked_text, current_text))
-					{
-						ImGui::PushItemWidth(ImGui::GetContentRegionAvailWidth() - ImGui::GetStyle().FramePadding.x);
-						static ImVec2 size(0, 200);
-						char buffer[1024];
-						ImGui::ListBoxHeader("Resources", size);
-						
-						ImGuiListClipper clipper(groups.getGroupEntitiesCount(i), ImGui::GetTextLineHeightWithSpacing());
-						while (clipper.Step())
-						{
-							for (int j = clipper.DisplayStart; j < clipper.DisplayEnd; ++j)
-							{
-								Entity entity = groups.getGroupEntities(i)[j];
-								getEntityListDisplayName(*m_editor, buffer, sizeof(buffer), entity);
-								if (ImGui::Selectable(buffer))
-								{
-									m_editor->selectEntities(&entity, 1);
-								}
-								if (ImGui::IsMouseDragging() && ImGui::IsItemActive())
-								{
-									startDrag(StudioApp::DragData::ENTITY, &entity, sizeof(entity));
-								}
-							}
-						}
-
-						ImGui::ListBoxFooter();
-						ImGui::PopItemWidth();
-						ImGui::TreePop();
-					}
-					if (ImGui::IsItemClicked()) groups.current_group = i;
+					m_editor->selectEntities(&e, 1);
+				}
+				if (ImGui::IsMouseDragging() && ImGui::IsItemActive())
+				{
+					startDrag(StudioApp::DragData::ENTITY, &e, sizeof(e));
 				}
 			}
-			ImGui::EndChild();
+			ImGui::PopItemWidth();
 		}
 		ImGui::EndDock();
 	}
