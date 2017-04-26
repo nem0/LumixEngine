@@ -309,7 +309,10 @@ void Universe::destroyEntity(Entity entity)
 {
 	if (!isValid(entity) || entity.index < 0) return;
 
-	u64 mask = m_entities[entity.index].components;
+	EntityData& entity_data = m_entities[entity.index];
+	if (entity_data.hierarchy >= 0) setParent(INVALID_ENTITY, entity);
+
+	u64 mask = entity_data.components;
 	for (int i = 0; i < MAX_COMPONENTS_TYPES_COUNT; ++i)
 	{
 		if ((mask & ((u64)1 << i)) != 0)
@@ -318,15 +321,15 @@ void Universe::destroyEntity(Entity entity)
 			auto original_mask = mask;
 			IScene* scene = m_component_type_map[i].scene;
 			scene->destroyComponent(scene->getComponent(entity, type), type);
-			mask = m_entities[entity.index].components;
+			mask = entity_data.components;
 			ASSERT(original_mask != mask);
 		}
 	}
 
-	m_entities[entity.index].next = m_first_free_slot;
-	m_entities[entity.index].prev = -1;
-	m_entities[entity.index].hierarchy = -1;
-	m_entities[entity.index].valid = false;
+	entity_data.next = m_first_free_slot;
+	entity_data.prev = -1;
+	entity_data.hierarchy = -1;
+	entity_data.valid = false;
 	if (m_first_free_slot >= 0)
 	{
 		m_entities[m_first_free_slot].prev = entity.index;
