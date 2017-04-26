@@ -147,7 +147,6 @@ public:
 		m_template_name[0] = '\0';
 		m_open_filter[0] = '\0';
 		init();
-		registerComponent("hierarchy", "Hierarchy");
 	}
 
 

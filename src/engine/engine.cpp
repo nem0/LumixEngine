@@ -359,7 +359,6 @@ void registerCFunction(lua_State* L, const char* name, lua_CFunction f)
 
 static const u32 SERIALIZED_ENGINE_MAGIC = 0x5f4c454e; // == '_LEN'
 static const ResourceType PREFAB_TYPE("prefab");
-static const ComponentType HIERARCHY_TYPE = PropertyRegister::getComponentType("hierarchy");
 
 
 static FS::OsFile g_error_file;
