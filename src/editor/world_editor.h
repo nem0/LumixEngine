@@ -172,7 +172,6 @@ public:
 	virtual bool runTest(const char* dir, const char* name) = 0;
 	virtual void registerEditorCommandCreator(const char* command_type, EditorCommandCreator) = 0;
 	virtual bool isGameMode() const = 0;
-	virtual class EntityGroups& getEntityGroups() = 0;
 	virtual void setMouseSensitivity(float x, float y) = 0;
 	virtual Vec2 getMouseSensitivity() = 0;
 	virtual bool isUniverseChanged() const = 0;

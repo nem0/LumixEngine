@@ -1,7 +1,6 @@
 #include "world_editor.h"
 
 #include "editor/editor_icon.h"
-#include "editor/entity_groups.h"
 #include "editor/gizmo.h"
 #include "editor/measure_tool.h"
 #include "editor/platform_interface.h"
@@ -1978,7 +1977,6 @@ public:
 		int hashed_offset = sizeof(header);
 
 		header.engine_hash = m_engine->serialize(*m_universe, blob);
-		m_entity_groups.serialize(blob);
 		m_prefab_system->serialize(blob);
 		header.hash = crc32((const u8*)blob.getData() + hashed_offset, blob.getPos() - hashed_offset);
 		*(Header*)blob.getData() = header;
@@ -2366,7 +2364,6 @@ public:
 		{
 			m_universe_destroyed.invoke();
 			m_game_mode_file->seek(FS::SeekMode::BEGIN, 0);
-			m_entity_groups.setUniverse(nullptr);
 			StaticString<64> name(m_universe->getName());
 			m_engine->destroyUniverse(*m_universe);
 			
@@ -2375,7 +2372,6 @@ public:
 			m_universe->setName(name);
 			m_universe->entityDestroyed().bind<WorldEditorImpl, &WorldEditorImpl::onEntityDestroyed>(this);
 			m_selected_entities.clear();
-			m_entity_groups.setUniverse(m_universe);
 			m_camera = INVALID_ENTITY;
 			load(*m_game_mode_file);
 		}
@@ -2632,7 +2628,6 @@ public:
 
 		if (m_engine->deserialize(*m_universe, blob))
 		{
-			m_entity_groups.deserialize(blob);
 			m_prefab_system->deserialize(blob);
 			m_camera = m_render_interface->getCameraEntity(m_render_interface->getCameraInSlot("editor"));
 
@@ -2687,7 +2682,6 @@ public:
 		, m_is_orbit(false)
 		, m_gizmo_use_step(false)
 		, m_is_additive_selection(false)
-		, m_entity_groups(m_allocator)
 		, m_mouse_sensitivity(200, 200)
 		, m_render_interface(nullptr)
 		, m_selected_entity_on_game_mode(INVALID_ENTITY)
@@ -2791,12 +2785,6 @@ public:
 	const Array<Entity>& getSelectedEntities() const override
 	{
 		return m_selected_entities;
-	}
-
-
-	EntityGroups& getEntityGroups() override
-	{
-		return m_entity_groups;
 	}
 
 
@@ -2931,11 +2919,7 @@ public:
 	{
 		for (int i = 0; i < count; ++i)
 		{
-			int group = m_entity_groups.getEntityGroup(entities[i]);
-			if (!m_entity_groups.isGroupFrozen(group))
-			{
-				m_selected_entities.push(entities[i]);
-			}
+			m_selected_entities.push(entities[i]);
 		}
 		m_entity_selected.invoke(m_selected_entities);
 	}
@@ -2946,11 +2930,7 @@ public:
 		m_selected_entities.clear();
 		for (int i = 0; i < count; ++i)
 		{
-			int group = m_entity_groups.getEntityGroup(entities[i]);
-			if (!m_entity_groups.isGroupFrozen(group))
-			{
-				m_selected_entities.push(entities[i]);
-			}
+			m_selected_entities.push(entities[i]);
 		}
 		m_entity_selected.invoke(m_selected_entities);
 	}
@@ -2966,7 +2946,6 @@ public:
 	{
 		if (m_is_game_mode) stopGameMode(false);
 
-		m_entity_groups.setUniverse(nullptr);
 		ASSERT(m_universe);
 		destroyUndoStack();
 		m_universe_destroyed.invoke();
@@ -3021,7 +3000,6 @@ public:
 		m_is_orbit = false;
 		m_selected_entities.clear();
 		m_universe_created.invoke();
-		m_entity_groups.setUniverse(universe);
 
 		m_camera = universe->createEntity(Vec3(0, 0, -5), Quat(Vec3(0, 1, 0), -Math::PI));
 		m_entity_map.is_random = !m_is_guid_pseudorandom;
@@ -3415,7 +3393,6 @@ private:
 	bool m_is_loading;
 	Universe* m_universe;
 	EntityGUIDMap m_entity_map;
-	EntityGroups m_entity_groups;
 	RenderInterface* m_render_interface;
 	u32 m_current_group_type;
 	bool m_is_universe_changed;
