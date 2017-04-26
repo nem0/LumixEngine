@@ -83,11 +83,13 @@ public:
 	void setParent(Entity parent, Entity child);
 	void setLocalPosition(Entity entity, const Vec3& pos);
 	void setLocalRotation(Entity entity, const Quat& rot);
+	void setLocalTransform(Entity entity, const Transform& transform, float scale);
 
 	void setMatrix(Entity entity, const Matrix& mtx);
 	Matrix getPositionAndRotation(Entity entity) const;
 	Matrix getMatrix(Entity entity) const;
 	void setTransform(Entity entity, const Transform& transform);
+	void setTransform(Entity entity, const Transform& transform, float scale);
 	void setTransform(Entity entity, const Vec3& pos, const Quat& rot);
 	Transform getTransform(Entity entity) const;
 	void setRotation(Entity entity, float x, float y, float z, float w);
@@ -127,6 +129,7 @@ public:
 
 private:
 	void transformEntity(Entity entity, bool update_local);
+	void updateGlobalTransform(Entity entity);
 
 	struct Hierarchy
 	{
