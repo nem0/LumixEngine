@@ -161,6 +161,16 @@ void Universe::setTransform(Entity entity, const Transform& transform)
 }
 
 
+void Universe::setTransform(Entity entity, const Transform& transform, float scale)
+{
+	auto& tmp = m_entities[entity.index];
+	tmp.position = transform.pos;
+	tmp.rotation = transform.rot;
+	tmp.scale = scale;
+	transformEntity(entity, true);
+}
+
+
 void Universe::setTransform(Entity entity, const Vec3& pos, const Quat& rot)
 {
 	auto& tmp = m_entities[entity.index];
@@ -374,6 +384,7 @@ Entity Universe::getFirstChild(Entity entity) const
 Entity Universe::getNextSibling(Entity entity) const
 {
 	int idx = m_entities[entity.index].hierarchy;
+	if (idx < 0) return INVALID_ENTITY;
 	return m_hierarchy[idx].next_sibling;
 }
 
@@ -458,17 +469,36 @@ void Universe::setParent(Entity new_parent, Entity child)
 }
 
 
+void Universe::updateGlobalTransform(Entity entity)
+{
+	const Hierarchy& h = m_hierarchy[m_entities[entity.index].hierarchy];
+	Transform parent_tr = getTransform(h.parent);
+	float parent_scale = getScale(h.parent);
+	setTransform(entity, parent_tr * h.local_transform, parent_scale * h.local_scale);
+}
+
+
 void Universe::setLocalPosition(Entity entity, const Vec3& pos)
 {
 	m_hierarchy[m_entities[entity.index].hierarchy].local_transform.pos = pos;
+	updateGlobalTransform(entity);
 }
 
 
 void Universe::setLocalRotation(Entity entity, const Quat& rot)
 {
 	m_hierarchy[m_entities[entity.index].hierarchy].local_transform.rot = rot;
+	updateGlobalTransform(entity);
 }
 
+
+void Universe::setLocalTransform(Entity entity, const Transform& transform, float scale)
+{
+	Hierarchy& h = m_hierarchy[m_entities[entity.index].hierarchy];
+	h.local_transform = transform;
+	h.local_scale = scale;
+	updateGlobalTransform(entity);
+}
 
 
 Transform Universe::getLocalTransform(Entity entity) const
@@ -599,6 +629,21 @@ void Universe::instantiatePrefab(const PrefabResource& prefab,
 		Entity entity = entities[entity_idx];
 		setTransform(entity, {pos, rot});
 		setScale(entity, scale);
+		if (version > (int)PrefabVersion::WITH_HIERARCHY)
+		{
+			Entity parent;
+
+			deserializer.read(&parent);
+			if (isValid(parent))
+			{
+				Transform local_tr;
+				float local_scale;
+				deserializer.read(&local_tr);
+				deserializer.read(&local_scale);
+				setParent(parent, entity);
+				setLocalTransform(entity, local_tr, local_scale);
+			}
+		}
 		u32 cmp_type_hash;
 		deserializer.read(&cmp_type_hash);
 		while (cmp_type_hash != 0)

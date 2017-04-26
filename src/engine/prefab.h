@@ -14,6 +14,7 @@ namespace Lumix
 enum class PrefabVersion : u32
 {
 	FIRST,
+	WITH_HIERARCHY,
 
 	LAST
 };

@@ -313,7 +313,7 @@ public:
 	}
 
 
-	u64 getPrefab(Entity entity) override
+	u64 getPrefab(Entity entity) const override
 	{
 		if (entity.index >= m_prefabs.size()) return 0;
 		return m_prefabs[entity.index].prefab;
@@ -426,11 +426,26 @@ public:
 			u64 prefab;
 			deserializer.read(&prefab);
 			Entity entity = (*entities)[entity_idx];
-			m_universe->setTransform(entity, {pos, rot});
+			m_universe->setTransform(entity, { pos, rot });
 			reserve(entity);
 			m_prefabs[entity.index].prefab = prefab;
 			link(entity, prefab);
 			m_universe->setScale(entity, scale);
+			
+			if (version > (int)PrefabVersion::WITH_HIERARCHY)
+			{
+				Entity parent;
+				deserializer.read(&parent);
+				if (isValid(parent))
+				{
+					Transform local_tr;
+					float local_scale;
+					deserializer.read(&local_tr);
+					deserializer.read(&local_scale);
+					m_universe->setParent(parent, entity);
+					m_universe->setLocalTransform(entity, local_tr, local_scale);
+				}
+			}
 			u32 cmp_type_hash;
 			deserializer.read(&cmp_type_hash);
 			while (cmp_type_hash != 0)
@@ -459,39 +474,99 @@ public:
 	}
 
 
+	static int countHierarchy(Universe* universe, Entity entity)
+	{
+		if (!isValid(entity)) return 0;
+		int children_count = countHierarchy(universe, universe->getFirstChild(entity));
+		int siblings_count = countHierarchy(universe, universe->getNextSibling(entity));
+		return 1 + children_count + siblings_count;
+	}
+
+
+	static void serializePrefabEntity(u64 prefab,
+		int& index,
+		TextSerializer& serializer,
+		Universe* universe,
+		Entity entity,
+		bool is_root)
+	{
+		if (!isValid(entity)) return;
+
+		prefab |= ((u64)index) << 32;
+		++index;
+		serializer.write("prefab", prefab);
+		Entity parent = is_root ? INVALID_ENTITY : universe->getParent(entity);
+		serializer.write("parent", parent);
+		if (isValid(parent))
+		{
+			serializer.write("local_transform", universe->getLocalTransform(entity));
+			serializer.write("local_scale", universe->getLocalScale(entity));
+		}
+		for (ComponentUID cmp = universe->getFirstComponent(entity); cmp.isValid();
+			cmp = universe->getNextComponent(cmp))
+		{
+			const char* cmp_name = PropertyRegister::getComponentTypeID(cmp.type.index);
+			u32 type_hash = PropertyRegister::getComponentTypeHash(cmp.type);
+			serializer.write(cmp_name, type_hash);
+			int scene_version = universe->getScene(cmp.type)->getVersion();
+			serializer.write("scene_version", scene_version);
+			universe->serializeComponent(serializer, cmp.type, cmp.handle);
+		}
+		serializer.write("cmp_end", 0);
+
+		serializePrefabEntity(prefab, index, serializer, universe, universe->getFirstChild(entity), false);
+		if (!is_root)
+		{
+			serializePrefabEntity(prefab, index, serializer, universe, universe->getNextSibling(entity), false);
+		}
+	};
+
+
+
 	static void serializePrefab(Universe* universe,
-		const Entity* entities,
-		int count,
+		Entity root,
 		const Path& path,
 		TextSerializer& serializer)
 	{
 		serializer.write("version", (u32)PrefabVersion::LAST);
+		int count = 1 + countHierarchy(universe, universe->getFirstChild(root));
 		serializer.write("entity_count", count);
-		for (int i = 0; i < count; ++i)
+		int i = 0;
+		u64 prefab = path.getHash();
+		serializePrefabEntity(prefab, i, serializer, universe, root, true);
+	}
+
+
+	Entity getPrefabRoot(Entity entity) const
+	{
+		Entity root = entity;
+		Entity parent = m_universe->getParent(root);
+		while (isValid(parent) && getPrefab(parent) != 0)
 		{
-			Entity entity = entities[i];
-			u64 prefab = path.getHash();
-			prefab |= ((u64)i) << 32;
-			serializer.write("prefab", prefab);
-			for (ComponentUID cmp = universe->getFirstComponent(entity); cmp.isValid();
-				 cmp = universe->getNextComponent(cmp))
-			{
-				const char* cmp_name = PropertyRegister::getComponentTypeID(cmp.type.index);
-				u32 type_hash = PropertyRegister::getComponentTypeHash(cmp.type);
-				serializer.write(cmp_name, type_hash);
-				int scene_version = universe->getScene(cmp.type)->getVersion();
-				serializer.write("scene_version", scene_version);
-				universe->serializeComponent(serializer, cmp.type, cmp.handle);
-			}
-			serializer.write("cmp_end", 0);
+			root = parent;
+			parent = m_universe->getParent(root);
 		}
+		return root;
+	}
+
+
+	void gatherHierarchy(Entity entity, bool is_root, Array<Entity>& out)
+	{
+		if (!isValid(entity)) return;
+
+		out.push(entity);
+		gatherHierarchy(m_universe->getFirstChild(entity), false, out);
+		gatherHierarchy(m_universe->getNextSibling(entity), false, out);
 	}
 
 
 	void savePrefab(const Path& path) override
 	{
-		auto& entities = m_editor.getSelectedEntities();
-		if (entities.empty()) return;
+		auto& selected_entities = m_editor.getSelectedEntities();
+		if (selected_entities.size() != 1) return;
+
+		Entity entity = selected_entities[0];
+		if (getPrefab(entity) != 0) entity = getPrefabRoot(entity);
 
 		FS::OsFile file;
 		if (!file.open(path.c_str(), FS::Mode::CREATE_AND_WRITE, m_editor.getAllocator()))
@@ -500,11 +575,13 @@ public:
 			return;
 		}
 
+		Array<Entity> entities(m_editor.getAllocator());
+		gatherHierarchy(entity, true, entities);
 		OutputBlob blob(m_editor.getAllocator());
 		SaveEntityGUIDMap entity_map(entities);
 		TextSerializer serializer(blob, entity_map);
 
-		serializePrefab(m_universe, &entities[0], entities.size(), path, serializer);
+		serializePrefab(m_universe, entities[0], path, serializer);
 
 		file.write(blob.getData(), blob.getPos());
 
