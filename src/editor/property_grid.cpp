@@ -602,6 +602,7 @@ void PropertyGrid::showCoreProperties(const Lumix::Array<Lumix::Entity>& entitie
 		Lumix::PrefabResource* prefab = prefab_system.getPrefabResource(entities[0]);
 		if (prefab)
 		{
+			ImGui::SameLine();
 			if (ImGui::Button("Save prefab"))
 			{
 				prefab_system.savePrefab(prefab->getPath());
@@ -609,17 +610,16 @@ void PropertyGrid::showCoreProperties(const Lumix::Array<Lumix::Entity>& entitie
 		}
 
 		char name[256];
-		const char* tmp = m_editor.getUniverse()->getEntityName(entities[0]);
 
 		ImGui::LabelText("ID", "%d", entities[0].index);
 		Lumix::EntityGUID guid = m_editor.getEntityGUID(entities[0]);
-		char guid_str[32];
 		if (guid == Lumix::INVALID_ENTITY_GUID)
 		{
 			ImGui::LabelText("GUID", "%s", "runtime");
 		}
 		else
 		{
+			char guid_str[32];
 			Lumix::toCString(guid.value, guid_str, Lumix::lengthOf(guid_str));
 			ImGui::LabelText("GUID", "%s", guid_str);
 		}
@@ -627,11 +627,22 @@ void PropertyGrid::showCoreProperties(const Lumix::Array<Lumix::Entity>& entitie
 		Lumix::Entity parent = m_editor.getUniverse()->getParent(entities[0]);
 		if (isValid(parent))
 		{
-			Lumix::EntityGUID parent_guid = m_editor.getEntityGUID(parent);
-			Lumix::toCString(parent_guid.value, guid_str, Lumix::lengthOf(guid_str));
-			ImGui::LabelText("Parent", "%s", guid_str);
+			getEntityListDisplayName(m_editor, name, Lumix::lengthOf(name), parent);
+			ImGui::LabelText("Parent", "%s", name);
+
+			Lumix::Transform tr = m_editor.getUniverse()->getLocalTransform(entities[0]);
+			Lumix::Vec3 old_pos = tr.pos;
+			if (ImGui::DragFloat3("Local position", &tr.pos.x))
+			{
+				Lumix::WorldEditor::Coordinate coord;
+				if (tr.pos.x != old_pos.x) coord = Lumix::WorldEditor::Coordinate::X;
+				if (tr.pos.y != old_pos.y) coord = Lumix::WorldEditor::Coordinate::Y;
+				if (tr.pos.z != old_pos.z) coord = Lumix::WorldEditor::Coordinate::Z;
+				m_editor.setEntitiesLocalCoordinate(&entities[0], entities.size(), (&tr.pos.x)[(int)coord], coord);
+			}
 		}
 
+		const char* tmp = m_editor.getUniverse()->getEntityName(entities[0]);
 		Lumix::copyString(name, tmp);
 		if (ImGui::InputText("Name", name, sizeof(name))) m_editor.setEntityName(entities[0], name);
 	}

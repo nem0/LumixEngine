@@ -424,6 +424,154 @@ private:
 };
 
 
+class LocalMoveEntityCommand LUMIX_FINAL : public IEditorCommand
+{
+public:
+	explicit LocalMoveEntityCommand(WorldEditor& editor)
+		: m_new_positions(editor.getAllocator())
+		, m_old_positions(editor.getAllocator())
+		, m_entities(editor.getAllocator())
+		, m_editor(editor)
+	{
+	}
+
+
+	LocalMoveEntityCommand(WorldEditor& editor,
+		const Entity* entities,
+		const Vec3* new_positions,
+		int count,
+		IAllocator& allocator)
+		: m_new_positions(allocator)
+		, m_old_positions(allocator)
+		, m_entities(allocator)
+		, m_editor(editor)
+	{
+		ASSERT(count > 0);
+		Universe* universe = m_editor.getUniverse();
+		PrefabSystem& prefab_system = m_editor.getPrefabSystem();
+		m_entities.reserve(count);
+		m_new_positions.reserve(count);
+		m_old_positions.reserve(count);
+		for (int i = count - 1; i >= 0; --i)
+		{
+			u64 prefab = prefab_system.getPrefab(entities[i]);
+			Entity parent = universe->getParent(entities[i]);
+			if (prefab != 0 && isValid(parent) && (prefab_system.getPrefab(parent) & 0xffffFFFF) == (prefab & 0xffffFFFF))
+			{
+				Entity instance = prefab_system.getFirstInstance(prefab);
+				while (isValid(instance))
+				{
+					m_entities.push(instance);
+					m_new_positions.push(new_positions[i]);
+					m_old_positions.push(universe->getPosition(instance));
+					instance = prefab_system.getNextInstance(instance);
+				}
+			}
+			else
+			{
+				m_entities.push(entities[i]);
+				m_new_positions.push(new_positions[i]);
+				m_old_positions.push(universe->getPosition(entities[i]));
+			}
+		}
+	}
+
+
+	void serialize(JsonSerializer& serializer) override
+	{
+		serializer.serialize("count", m_entities.size());
+		serializer.beginArray("entities");
+		for (int i = 0; i < m_entities.size(); ++i)
+		{
+			serializer.serializeArrayItem(m_entities[i]);
+			serializer.serializeArrayItem(m_new_positions[i].x);
+			serializer.serializeArrayItem(m_new_positions[i].y);
+			serializer.serializeArrayItem(m_new_positions[i].z);
+		}
+		serializer.endArray();
+	}
+
+
+	void deserialize(JsonSerializer& serializer) override
+	{
+		Universe* universe = m_editor.getUniverse();
+		int count;
+		serializer.deserialize("count", count, 0);
+		m_entities.resize(count);
+		m_new_positions.resize(count);
+		m_old_positions.resize(count);
+		serializer.deserializeArrayBegin("entities");
+		for (int i = 0; i < m_entities.size(); ++i)
+		{
+			serializer.deserializeArrayItem(m_entities[i], INVALID_ENTITY);
+			serializer.deserializeArrayItem(m_new_positions[i].x, 0);
+			serializer.deserializeArrayItem(m_new_positions[i].y, 0);
+			serializer.deserializeArrayItem(m_new_positions[i].z, 0);
+			m_old_positions[i] = universe->getPosition(m_entities[i]);
+		}
+		serializer.deserializeArrayEnd();
+	}
+
+
+	bool execute() override
+	{
+		Universe* universe = m_editor.getUniverse();
+		for (int i = 0, c = m_entities.size(); i < c; ++i)
+		{
+			Entity entity = m_entities[i];
+			universe->setLocalPosition(entity, m_new_positions[i]);
+		}
+		return true;
+	}
+
+
+	void undo() override
+	{
+		Universe* universe = m_editor.getUniverse();
+		for (int i = 0, c = m_entities.size(); i < c; ++i)
+		{
+			Entity entity = m_entities[i];
+			universe->setLocalPosition(entity, m_old_positions[i]);
+		}
+	}
+
+
+	const char* getType() override { return "local_move_entity"; }
+
+
+	bool merge(IEditorCommand& command) override
+	{
+		ASSERT(command.getType() == getType());
+		LocalMoveEntityCommand& my_command = static_cast<LocalMoveEntityCommand&>(command);
+		if (my_command.m_entities.size() == m_entities.size())
+		{
+			for (int i = 0, c = m_entities.size(); i < c; ++i)
+			{
+				if (m_entities[i] != my_command.m_entities[i])
+				{
+					return false;
+				}
+			}
+			for (int i = 0, c = m_entities.size(); i < c; ++i)
+			{
+				my_command.m_new_positions[i] = m_new_positions[i];
+			}
+			return true;
+		}
+		else
+		{
+			return false;
+		}
+	}
+
+private:
+	WorldEditor& m_editor;
+	Array<Entity> m_entities;
+	Array<Vec3> m_new_positions;
+	Array<Vec3> m_old_positions;
+};
+
+
 class ScaleEntityCommand LUMIX_FINAL : public IEditorCommand
 {
 public:
@@ -2341,6 +2489,25 @@ public:
 		}
 		IEditorCommand* command =
 			LUMIX_NEW(m_allocator, MoveEntityCommand)(*this, entities, &poss[0], &rots[0], count, m_allocator);
+		executeCommand(command);
+	}
+
+
+	void setEntitiesLocalCoordinate(const Entity* entities, int count, float value, Coordinate coord) override
+	{
+		ASSERT(entities);
+		if (count <= 0) return;
+
+		Universe* universe = getUniverse();
+		Array<Vec3> poss(m_allocator);
+		poss.reserve(count);
+		for (int i = 0; i < count; ++i)
+		{
+			poss.push(universe->getLocalTransform(entities[i]).pos);
+			(&poss[i].x)[(int)coord] = value;
+		}
+		IEditorCommand* command =
+			LUMIX_NEW(m_allocator, LocalMoveEntityCommand)(*this, entities, &poss[0], count, m_allocator);
 		executeCommand(command);
 	}
 

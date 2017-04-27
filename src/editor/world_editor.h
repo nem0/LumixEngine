@@ -113,6 +113,7 @@ public:
 	virtual Entity addEntityAt(int camera_x, int camera_y) = 0;
 	virtual void setEntitiesPositions(const Entity* entities, const Vec3* positions, int count) = 0;
 	virtual void setEntitiesCoordinate(const Entity* entities, int count, float value, Coordinate coord) = 0;
+	virtual void setEntitiesLocalCoordinate(const Entity* entities, int count, float value, Coordinate coord) = 0;
 	virtual void setEntitiesScale(const Entity* entities, int count, float scale) = 0;
 	virtual void setEntitiesRotations(const Entity* entity, const Quat* rotations, int count) = 0;
 	virtual void setEntitiesPositionsAndRotations(const Entity* entity,
