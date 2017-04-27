@@ -84,6 +84,7 @@ public:
 	void setLocalPosition(Entity entity, const Vec3& pos);
 	void setLocalRotation(Entity entity, const Quat& rot);
 	void setLocalTransform(Entity entity, const Transform& transform, float scale);
+	Transform computeLocalTransform(Entity parent, const Transform& global_transform) const;
 
 	void setMatrix(Entity entity, const Matrix& mtx);
 	Matrix getPositionAndRotation(Entity entity) const;

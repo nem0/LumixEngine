@@ -275,13 +275,40 @@ public:
 	{
 		ASSERT(count > 0);
 		Universe* universe = m_editor.getUniverse();
+		PrefabSystem& prefab_system = m_editor.getPrefabSystem();
+		m_entities.reserve(count);
+		m_new_positions.reserve(count);
+		m_new_rotations.reserve(count);
+		m_old_positions.reserve(count);
+		m_old_rotations.reserve(count);
 		for (int i = count - 1; i >= 0; --i)
 		{
-			m_entities.push(entities[i]);
-			m_new_positions.push(new_positions[i]);
-			m_new_rotations.push(new_rotations[i]);
-			m_old_positions.push(universe->getPosition(entities[i]));
-			m_old_rotations.push(universe->getRotation(entities[i]));
+			u64 prefab = prefab_system.getPrefab(entities[i]);
+			Entity parent = universe->getParent(entities[i]);
+			if (prefab != 0 && isValid(parent) && (prefab_system.getPrefab(parent) & 0xffffFFFF) == (prefab & 0xffffFFFF))
+			{
+				Transform new_local_tr = universe->computeLocalTransform(parent, {new_positions[i], new_rotations[i]});
+				Entity instance = prefab_system.getFirstInstance(prefab);
+				while (isValid(instance))
+				{
+					m_entities.push(instance);
+					Transform new_tr = universe->getTransform(universe->getParent(instance));
+					new_tr = new_tr * new_local_tr;
+					m_new_positions.push(new_tr.pos);
+					m_new_rotations.push(new_tr.rot);
+					m_old_positions.push(universe->getPosition(instance));
+					m_old_rotations.push(universe->getRotation(instance));
+					instance = prefab_system.getNextInstance(instance);
+				}
+			}
+			else
+			{
+				m_entities.push(entities[i]);
+				m_new_positions.push(new_positions[i]);
+				m_new_rotations.push(new_rotations[i]);
+				m_old_positions.push(universe->getPosition(entities[i]));
+				m_old_rotations.push(universe->getRotation(entities[i]));
+			}
 		}
 	}
 

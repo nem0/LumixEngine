@@ -310,7 +310,16 @@ void Universe::destroyEntity(Entity entity)
 	if (!isValid(entity) || entity.index < 0) return;
 
 	EntityData& entity_data = m_entities[entity.index];
-	if (entity_data.hierarchy >= 0) setParent(INVALID_ENTITY, entity);
+	if (entity_data.hierarchy >= 0)
+	{
+		setParent(INVALID_ENTITY, entity);
+		Hierarchy& h = m_hierarchy[entity_data.hierarchy];
+		while (isValid(h.first_child))
+		{
+			setParent(INVALID_ENTITY, h.first_child);
+		}
+	}
+	
 
 	u64 mask = entity_data.components;
 	for (int i = 0; i < MAX_COMPONENTS_TYPES_COUNT; ++i)
@@ -492,6 +501,13 @@ void Universe::setLocalRotation(Entity entity, const Quat& rot)
 {
 	m_hierarchy[m_entities[entity.index].hierarchy].local_transform.rot = rot;
 	updateGlobalTransform(entity);
+}
+
+
+Transform Universe::computeLocalTransform(Entity parent, const Transform& global_transform) const
+{
+	Transform parent_tr = getTransform(parent);
+	return parent_tr.inverted() * global_transform;
 }
 
 

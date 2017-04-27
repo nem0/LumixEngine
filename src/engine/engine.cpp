@@ -706,21 +706,19 @@ public:
 	}
 
 
-	static void LUA_setEntityLocalRotation(Universe* universe,
-		Entity entity,
-		const Quat& rotation)
+	static void LUA_setEntityLocalRotation(Universe* universe, Entity entity, const Quat& rotation)
 	{
 		if (!isValid(entity)) return;
+		if (!isValid(universe->getParent(entity))) return;
 
 		universe->setLocalRotation(entity, rotation);
 	}
 
 
-	static void LUA_setEntityLocalPosition(Universe* universe,
-		Entity entity,
-		const Vec3& position)
+	static void LUA_setEntityLocalPosition(Universe* universe, Entity entity, const Vec3& position)
 	{
 		if (!isValid(entity)) return;
+		if (!isValid(universe->getParent(entity))) return;
 
 		universe->setLocalPosition(entity, position);
 	}
