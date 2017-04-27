@@ -9,10 +9,6 @@ namespace
 		Lumix::DefaultAllocator allocator;
 		Lumix::PathManager path_manager(allocator);
 		Lumix::Universe universe(allocator);
-		LUMIX_EXPECT(!universe.hasEntity(Lumix::INVALID_ENTITY));
-		LUMIX_EXPECT(!universe.hasEntity({ 0 }));
-		LUMIX_EXPECT(!universe.hasEntity({ 1 }));
-		LUMIX_EXPECT(!universe.hasEntity({ 100 }));
 
 		Lumix::Entity e0 = universe.createEntity({0, 0, 0}, {0, 0, 0, 1});
 		Lumix::Entity e1 = universe.createEntity({0, 0, 0}, {0, 0, 0, 1});
@@ -125,6 +121,28 @@ namespace
 	}
 
 
+	void UT_universe_hierarchy2(const char* params)
+	{
+		Lumix::DefaultAllocator allocator;
+		Lumix::PathManager path_manager(allocator);
+		Lumix::Universe universe(allocator);
+
+		Lumix::Entity e0 = universe.createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
+		Lumix::Entity e1 = universe.createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
+		Lumix::Entity e2 = universe.createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
+		Lumix::Entity e3 = universe.createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
+
+		universe.setParent(e0, e1);
+		universe.setParent(e0, e2);
+		universe.setParent(e2, e3);
+
+		universe.destroyEntity(e2);
+
+		LUMIX_EXPECT(!Lumix::isValid(universe.getNextSibling(e1)));
+		LUMIX_EXPECT(!Lumix::isValid(universe.getParent(e3)));
+	}
+
+
 	void UT_universe(const char* params)
 	{
 		Lumix::DefaultAllocator allocator;
@@ -196,3 +214,4 @@ namespace
 
 REGISTER_TEST("unit_tests/engine/universe", UT_universe, "");
 REGISTER_TEST("unit_tests/engine/universe/hierarchy", UT_universe_hierarchy, "");
+REGISTER_TEST("unit_tests/engine/universe/hierarchy2", UT_universe_hierarchy2, "");

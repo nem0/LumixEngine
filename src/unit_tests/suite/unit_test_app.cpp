@@ -43,7 +43,7 @@ namespace Lumix
 		void App::run(int argc, const char *argv[])
 		{
 			Manager::instance().dumpTests();
-			Manager::instance().runTests("unit_tests/engine/universe/hierarchy");
+			Manager::instance().runTests("*");
 			Manager::instance().dumpResults();
 		}
 
