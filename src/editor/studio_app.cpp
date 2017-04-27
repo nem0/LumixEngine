@@ -960,7 +960,7 @@ public:
 		}
 		doMenuItem(*getAction("destroyEntity"), is_any_entity_selected);
 
-		doMenuItem(*getAction("savePrefab"), is_any_entity_selected);
+		doMenuItem(*getAction("savePrefab"), selected_entities.size() == 1);
 		doMenuItem(*getAction("showEntities"), is_any_entity_selected);
 		doMenuItem(*getAction("hideEntities"), is_any_entity_selected);
 		doMenuItem(*getAction("makeParent"), selected_entities.size() == 2);
