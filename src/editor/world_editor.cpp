@@ -261,11 +261,11 @@ public:
 
 
 	MoveEntityCommand(WorldEditor& editor,
-					  const Entity* entities,
-					  const Vec3* new_positions,
-					  const Quat* new_rotations,
-					  int count,
-					  IAllocator& allocator)
+		const Entity* entities,
+		const Vec3* new_positions,
+		const Quat* new_rotations,
+		int count,
+		IAllocator& allocator)
 		: m_new_positions(allocator)
 		, m_new_rotations(allocator)
 		, m_old_positions(allocator)
@@ -1064,11 +1064,26 @@ private:
 			, m_resources(editor.getAllocator())
 		{
 			m_entities.reserve(count);
-			m_transformations.reserve(m_entities.size());
+			PrefabSystem& prefab_system = m_editor.getPrefabSystem();
+			Universe* universe = m_editor.getUniverse();
 			for (int i = 0; i < count; ++i)
 			{
-				m_entities.push(entities[i]);
+				u64 prefab = prefab_system.getPrefab(entities[i]);
+				if (prefab != 0)
+				{
+					Entity instance = prefab_system.getFirstInstance(prefab);
+					while (isValid(instance))
+					{
+						m_entities.push(instance);
+						instance = prefab_system.getNextInstance(instance);
+					}
+				}
+				else
+				{
+					m_entities.push(entities[i]);
+				}
 			}
+			m_transformations.reserve(m_entities.size());
 		}
 
 
