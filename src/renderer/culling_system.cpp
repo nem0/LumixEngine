@@ -298,6 +298,7 @@ public:
 
 	void removeStatic(ComponentHandle model_instance) override
 	{
+		if (model_instance.index >= m_model_instance_to_sphere_map.size()) return;
 		int index = m_model_instance_to_sphere_map[model_instance.index];
 		if (index < 0) return;
 		ASSERT(index < m_spheres.size());
