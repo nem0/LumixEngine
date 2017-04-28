@@ -160,6 +160,20 @@ void Node::removeEvent(int index)
 }
 
 
+static const char* getEventTypeName(const Anim::EventHeader& event, AnimEditor::IAnimationEditor& editor)
+{
+	int count = editor.getEventTypesCount();
+	for (int i = 0; i < count; ++i)
+	{
+		if (editor.getEventTypeByIdx(i).type == event.type)
+		{
+			return editor.getEventTypeByIdx(i).label;
+		}
+	}
+	return "Unknown";
+}
+
+
 void Node::onGUI()
 {
 	
@@ -171,9 +185,10 @@ void Node::onGUI()
 		auto& events = engine_node->events;
 		for(int i = 0; i < engine_node->events_count; ++i)
 		{
-			if (ImGui::TreeNode((void*)(uintptr)i, "%d", i))
+			Anim::EventHeader& header = *(Anim::EventHeader*)&events[sizeof(Anim::EventHeader) * i];
+			const char* event_type_name = getEventTypeName(header, m_controller.getEditor());
+			if (ImGui::TreeNode((void*)(uintptr)i, "%s - %fs", event_type_name, header.time))
 			{
-				Anim::EventHeader& header = *(Anim::EventHeader*)&events[sizeof(Anim::EventHeader) * i];
 				if (ImGui::Button("Remove"))
 				{
 					removeEvent(i);
