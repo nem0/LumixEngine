@@ -118,6 +118,7 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 			serializer.read(&clip->volume);
 			serializer.read(&clip->looped);
 			serializer.read(clip->name, lengthOf(clip->name));
+			clip->name_hash = crc32(clip->name);
 			char path[MAX_PATH_LENGTH];
 			serializer.read(path, lengthOf(path));
 			clip->clip = path[0] ? static_cast<Clip*>(m_system.getClipManager().load(Path(path))) : nullptr;
