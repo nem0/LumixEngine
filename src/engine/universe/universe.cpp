@@ -312,12 +312,12 @@ void Universe::destroyEntity(Entity entity)
 	EntityData& entity_data = m_entities[entity.index];
 	if (entity_data.hierarchy >= 0)
 	{
-		setParent(INVALID_ENTITY, entity);
 		Hierarchy& h = m_hierarchy[entity_data.hierarchy];
 		while (isValid(h.first_child))
 		{
 			setParent(INVALID_ENTITY, h.first_child);
 		}
+		setParent(INVALID_ENTITY, entity);
 	}
 	
 
