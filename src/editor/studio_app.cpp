@@ -1166,12 +1166,13 @@ public:
 	}
 
 
-	void showHierarchy(Entity entity)
+	void showHierarchy(Entity entity, const Array<Entity>& selected_entities)
 	{
 		static char buffer[1024];
 		Universe* universe = m_editor->getUniverse();
 		getEntityListDisplayName(*m_editor, buffer, sizeof(buffer), entity);
-		if (ImGui::Selectable(buffer))
+		bool selected = selected_entities.indexOf(entity) >= 0;
+		if (ImGui::Selectable(buffer, &selected))
 		{
 			m_editor->selectEntities(&entity, 1);
 		}
@@ -1179,10 +1180,19 @@ public:
 		{
 			startDrag(StudioApp::DragData::ENTITY, &entity, sizeof(entity));
 		}
+		if (ImGui::IsItemHoveredRect() && ImGui::IsMouseReleased(0) && m_drag_data.type == StudioApp::DragData::ENTITY)
+		{
+			Entity dropped_entity = *(Entity*)m_drag_data.data;
+			if (dropped_entity != entity)
+			{
+				universe->setParent(entity, dropped_entity);
+				return;
+			}
+		}
 		ImGui::Indent();
 		for (Entity e = universe->getFirstChild(entity); isValid(e); e = universe->getNextSibling(e))
 		{
-			showHierarchy(e);
+			showHierarchy(e, selected_entities);
 		}
 		ImGui::Unindent();
 	}
@@ -1191,6 +1201,7 @@ public:
 	void onEntityListGUI()
 	{
 		PROFILE_FUNCTION();
+		const Array<Entity>& entities = m_editor->getSelectedEntities();
 		if (ImGui::BeginDock("Entity List", &m_is_entity_list_opened))
 		{
 			auto* universe = m_editor->getUniverse();
@@ -1200,7 +1211,7 @@ public:
 			{
 				if (!isValid(universe->getParent(e)))
 				{
-					showHierarchy(e);
+					showHierarchy(e, entities);
 				}
 			}
 			ImGui::PopItemWidth();

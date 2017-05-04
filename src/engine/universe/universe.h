@@ -75,6 +75,7 @@ public:
 	void setEntityName(Entity entity, const char* name);
 	bool hasEntity(Entity entity) const;
 
+	bool isDescendant(Entity ancestor, Entity descendant) const;
 	Entity getParent(Entity entity) const;
 	Entity getFirstChild(Entity entity) const;
 	Entity getNextSibling(Entity entity) const;
