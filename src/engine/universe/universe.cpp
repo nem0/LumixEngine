@@ -401,8 +401,27 @@ Entity Universe::getNextSibling(Entity entity) const
 }
 
 
+bool Universe::isDescendant(Entity ancestor, Entity descendant) const
+{
+	for(Entity e = getFirstChild(ancestor); isValid(e); e = getNextSibling(e))
+	{
+		if (e == descendant) return true;
+		if (isDescendant(e, descendant)) return true;
+	}
+
+	return false;
+}
+
+
 void Universe::setParent(Entity new_parent, Entity child)
 {
+	bool would_create_cycle = isDescendant(child, new_parent);
+	if (would_create_cycle)
+	{
+		g_log_error.log("Engine") << "Hierarchy can not contains a cycle.";
+		return;
+	}
+
 	auto collectGarbage = [this](Entity entity) {
 		Hierarchy& h = m_hierarchy[m_entities[entity.index].hierarchy];
 		if (isValid(h.parent)) return;
