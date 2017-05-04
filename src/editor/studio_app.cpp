@@ -1171,14 +1171,20 @@ public:
 		static char buffer[1024];
 		Universe* universe = m_editor->getUniverse();
 		getEntityListDisplayName(*m_editor, buffer, sizeof(buffer), entity);
-		if (ImGui::TreeNode(buffer))
+		if (ImGui::Selectable(buffer))
 		{
-			for (Entity e = universe->getFirstChild(entity); isValid(e); e = universe->getNextSibling(e))
-			{
-				showHierarchy(e);
-			}
-			ImGui::TreePop();
+			m_editor->selectEntities(&entity, 1);
 		}
+		if (ImGui::IsMouseDragging() && ImGui::IsItemActive())
+		{
+			startDrag(StudioApp::DragData::ENTITY, &entity, sizeof(entity));
+		}
+		ImGui::Indent();
+		for (Entity e = universe->getFirstChild(entity); isValid(e); e = universe->getNextSibling(e))
+		{
+			showHierarchy(e);
+		}
+		ImGui::Unindent();
 	}
 
 
@@ -1190,28 +1196,11 @@ public:
 			auto* universe = m_editor->getUniverse();
 
 			ImGui::PushItemWidth(ImGui::GetContentRegionAvailWidth() - ImGui::GetStyle().FramePadding.x);
-			static ImVec2 size(0, 200);
-			char buffer[1024];
 			for (Entity e = universe->getFirstEntity(); isValid(e); e = universe->getNextEntity(e))
 			{
 				if (!isValid(universe->getParent(e)))
 				{
-					if(isValid(universe->getFirstChild(e)))
-					{
-						showHierarchy(e);
-					}
-					else
-					{
-						getEntityListDisplayName(*m_editor, buffer, sizeof(buffer), e);
-						if (ImGui::Selectable(buffer))
-						{
-							m_editor->selectEntities(&e, 1);
-						}
-						if (ImGui::IsMouseDragging() && ImGui::IsItemActive())
-						{
-							startDrag(StudioApp::DragData::ENTITY, &e, sizeof(e));
-						}
-					}
+					showHierarchy(e);
 				}
 			}
 			ImGui::PopItemWidth();
