@@ -1425,33 +1425,32 @@ void TerrainEditor::onGUI()
 		{
 			m_action_type = TerrainEditor::ENTITY;
 			
+			static char filter[100] = {0};
 			static ImVec2 size(-1, 100);
+			ImGui::FilterInput("Filter", filter, sizeof(filter));
 			ImGui::ListBoxHeader("Prefabs", size);
 			int resources_idx  = m_app.getAssetBrowser()->getTypeIndex(PREFAB_TYPE);
 			auto& all_prefabs = m_app.getAssetBrowser()->getResources(resources_idx);
-			ImGuiListClipper clipper(all_prefabs.size(), ImGui::GetTextLineHeightWithSpacing());
-			while (clipper.Step())
+			for(int i = 0; i < all_prefabs.size(); ++i)
 			{
-				for (int j = clipper.DisplayStart; j < clipper.DisplayEnd; ++j)
+				if (filter[0] != 0 && Lumix::stristr(all_prefabs[i].c_str(), filter) == nullptr) continue;
+				int selected_idx = m_selected_prefabs.find([&](Lumix::PrefabResource* res) -> bool {
+					return res && res->getPath() == all_prefabs[i];
+				});
+				bool selected = selected_idx >= 0;
+				if (ImGui::Checkbox(all_prefabs[i].c_str(), &selected))
 				{
-					int selected_idx = m_selected_prefabs.find([&](Lumix::PrefabResource* res) -> bool {
-						return res && res->getPath() == all_prefabs[j];
-					});
-					bool selected = selected_idx >= 0;
-					if (ImGui::Checkbox(all_prefabs[j].c_str(), &selected))
+					if (selected)
 					{
-						if (selected)
-						{
-							Lumix::ResourceManagerBase* prefab_manager = m_world_editor.getEngine().getResourceManager().get(PREFAB_TYPE);
-							Lumix::PrefabResource* prefab = (Lumix::PrefabResource*)prefab_manager->load(all_prefabs[j]);
-							m_selected_prefabs.push(prefab);
-						}
-						else
-						{
-							Lumix::PrefabResource* prefab = m_selected_prefabs[selected_idx];
-							m_selected_prefabs.eraseFast(selected_idx);
-							prefab->getResourceManager().unload(*prefab);
-						}
+						Lumix::ResourceManagerBase* prefab_manager = m_world_editor.getEngine().getResourceManager().get(PREFAB_TYPE);
+						Lumix::PrefabResource* prefab = (Lumix::PrefabResource*)prefab_manager->load(all_prefabs[i]);
+						m_selected_prefabs.push(prefab);
+					}
+					else
+					{
+						Lumix::PrefabResource* prefab = m_selected_prefabs[selected_idx];
+						m_selected_prefabs.eraseFast(selected_idx);
+						prefab->getResourceManager().unload(*prefab);
 					}
 				}
 			}
