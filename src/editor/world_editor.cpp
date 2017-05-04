@@ -1311,8 +1311,17 @@ private:
 					m_old_values.write(local_tr);
 					float local_scale = universe->getLocalScale(m_entities[i]);
 					m_old_values.write(local_scale);
-
 				}
+				for (Entity child = universe->getFirstChild(m_entities[i]); isValid(child); child = universe->getNextSibling(child))
+				{
+					m_old_values.write(child);
+					Transform local_tr = universe->getLocalTransform(child);
+					m_old_values.write(local_tr);
+					float local_scale = universe->getLocalScale(child);
+					m_old_values.write(local_scale);
+				}
+				m_old_values.write(INVALID_ENTITY);
+
 				m_old_values.write(count);
 				for (ComponentUID cmp = universe->getFirstComponent(m_entities[i]);
 					cmp.isValid();
@@ -1375,6 +1384,17 @@ private:
 					universe->setParent(parent, new_entity);
 					universe->setLocalTransform(new_entity, local_tr, local_scale);
 				}
+				Entity child;
+				for(blob.read(child); isValid(child); blob.read(child))
+				{
+					Transform local_tr;
+					float local_scale;
+					blob.read(local_tr);
+					blob.read(local_scale);
+					universe->setParent(new_entity, child);
+					universe->setLocalTransform(child, local_tr, local_scale);
+				}
+
 				blob.read(cmps_count);
 				for (int j = 0; j < cmps_count; ++j)
 				{
