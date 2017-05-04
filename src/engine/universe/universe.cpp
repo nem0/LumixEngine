@@ -403,6 +403,7 @@ Entity Universe::getNextSibling(Entity entity) const
 
 bool Universe::isDescendant(Entity ancestor, Entity descendant) const
 {
+	if (!isValid(ancestor)) return false;
 	for(Entity e = getFirstChild(ancestor); isValid(e); e = getNextSibling(e))
 	{
 		if (e == descendant) return true;
@@ -456,6 +457,7 @@ void Universe::setParent(Entity new_parent, Entity child)
 			m_hierarchy[child_idx].parent = INVALID_ENTITY;
 			m_hierarchy[child_idx].next_sibling = INVALID_ENTITY;
 			collectGarbage(old_parent);
+			child_idx = m_entities[child.index].hierarchy;
 		}
 	}
 	else if(isValid(new_parent))
@@ -495,7 +497,7 @@ void Universe::setParent(Entity new_parent, Entity child)
 	}
 	else
 	{
-		collectGarbage(child);
+		if (child_idx >= 0) collectGarbage(child);
 	}
 }
 
