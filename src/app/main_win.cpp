@@ -329,8 +329,11 @@ public:
 
 	void universeFileLoaded(Lumix::FS::IFile& file, bool success)
 	{
-		ASSERT(success);
-		if (!success) return;
+		if (!success)
+		{
+			Lumix::g_log_error.log("App") << "Failed to open universe.";
+			return;
+		}
 
 		ASSERT(file.getBuffer());
 		Lumix::InputBlob blob(file.getBuffer(), (int)file.size());
