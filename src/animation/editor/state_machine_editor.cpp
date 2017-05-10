@@ -51,6 +51,35 @@ namespace AnimEditor
 {
 
 
+static int autocompleteCallback(ImGuiTextEditCallbackData *data)
+{
+	auto* controller = (AnimEditor::ControllerResource*)data->UserData;
+	char tmp[128];
+	int start_word = data->CursorPos;
+	while (start_word > 0 && data->Buf[start_word - 1] != ' ') --start_word;
+	copyNString(tmp, lengthOf(tmp), data->Buf + start_word, data->CursorPos - start_word);
+
+	const auto& input_decl = controller->getEngineResource()->m_input_decl;
+	for (int i = 0; i < input_decl.inputs_count; ++i)
+	{
+		if (startsWith(input_decl.inputs[i].name, tmp))
+		{
+			data->InsertChars(data->CursorPos, input_decl.inputs[i].name + stringLength(tmp));
+			return 0;
+		}
+	}
+	for (int i = 0; i < input_decl.constants_count; ++i)
+	{
+		if (startsWith(input_decl.constants[i].name, tmp))
+		{
+			data->InsertChars(data->CursorPos, input_decl.constants[i].name + stringLength(tmp));
+			return 0;
+		}
+	}
+	return 0;
+};
+
+
 static ImVec2 getEdgeStartPoint(const ImVec2 a_pos, const ImVec2 a_size, const ImVec2 b_pos, const ImVec2 b_size, bool is_dir)
 {
 	ImVec2 center_a = a_pos + a_size * 0.5f;
@@ -376,7 +405,14 @@ void Edge::onGUI()
 {
 	auto* engine_edge = (Anim::Edge*)engine_cmp;
 	ImGui::DragFloat("Length", &engine_edge->length);
-	if (ImGui::InputText("Expression", m_expression, lengthOf(m_expression), ImGuiInputTextFlags_EnterReturnsTrue))
+	
+	
+	if (ImGui::InputText("Expression",
+			m_expression,
+			lengthOf(m_expression),
+			ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CallbackCompletion,
+			autocompleteCallback,
+			&getController()))
 	{
 		if (!engine_edge->condition.compile(m_expression, m_controller.getEngineResource()->m_input_decl))
 		{
@@ -991,33 +1027,12 @@ struct EntryEdge : public Component
 
 	void onGUI() override
 	{
-		auto autocomplete_callback = [](ImGuiTextEditCallbackData *data) -> int {
-			EntryEdge* that = (EntryEdge*)data->UserData;
-			char tmp[128];
-			int start_word = data->CursorPos;
-			while (start_word > 0 && data->Buf[start_word - 1] != ' ') --start_word;
-			copyNString(tmp, lengthOf(tmp), data->Buf + start_word, data->CursorPos - start_word);
-
-			const auto& input_decl = that->getController().getEngineResource()->m_input_decl;
-			for (int i = 0; i < input_decl.inputs_count; ++i)
-			{
-				if (startsWith(input_decl.inputs[i].name, tmp))
-				{
-					data->InsertChars(data->CursorPos, input_decl.inputs[i].name + stringLength(tmp));
-					return 0;
-				}
-			}
-			for (int i = 0; i < input_decl.constants_count; ++i)
-			{
-				if (startsWith(input_decl.constants[i].name, tmp))
-				{
-					data->InsertChars(data->CursorPos, input_decl.constants[i].name + stringLength(tmp));
-					return 0;
-				}
-			}
-			return 0;
-		};
-		ImGui::InputText("Condition", expression.data, lengthOf(expression.data), ImGuiInputTextFlags_CallbackCompletion, autocomplete_callback, this);
+		ImGui::InputText("Condition",
+			expression.data,
+			lengthOf(expression.data),
+			ImGuiInputTextFlags_CallbackCompletion,
+			autocompleteCallback,
+			&getController());
 	}
 
 
