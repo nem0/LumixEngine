@@ -1021,7 +1021,7 @@ struct EntryEdge : public Component
 
 	void compile() override
 	{
-		// TODO
+		// compiled in StateMachine::compile
 	}
 
 

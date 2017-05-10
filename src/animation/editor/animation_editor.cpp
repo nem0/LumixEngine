@@ -385,29 +385,40 @@ void AnimationEditor::constantsGUI()
 	if (!ImGui::CollapsingHeader("Constants")) return;
 
 	Anim::InputDecl& input_decl = m_resource->getEngineResource()->m_input_decl;
+	ImGui::PushID("consts");
 	for (int i = 0; i < input_decl.constants_count; ++i)
 	{
+		ImGui::PushID(i);
 		auto& constant = input_decl.constants[i];
-		StaticString<20> tmp("###", i);
 		ImGui::PushItemWidth(100);
-		ImGui::InputText(tmp, constant.name, lengthOf(constant.name));
+		ImGui::InputText("", constant.name, lengthOf(constant.name));
 		ImGui::SameLine();
-		tmp << "*";
-		if (ImGui::Combo(tmp, (int*)&constant.type, "float\0int\0bool\0"))
+		if (ImGui::Combo("##cmb", (int*)&constant.type, "float\0int\0bool\0"))
 		{
 			input_decl.recalculateOffsets();
 		}
 		ImGui::SameLine();
-		tmp << "*";
 		switch (constant.type)
 		{
-			case Anim::InputDecl::FLOAT: ImGui::DragFloat(tmp, &constant.f_value); break;
-			case Anim::InputDecl::BOOL: ImGui::Checkbox(tmp, &constant.b_value); break;
-			case Anim::InputDecl::INT: ImGui::InputInt(tmp, &constant.i_value); break;
+			case Anim::InputDecl::FLOAT: ImGui::DragFloat("##val", &constant.f_value); break;
+			case Anim::InputDecl::BOOL: ImGui::Checkbox("##val", &constant.b_value); break;
+			case Anim::InputDecl::INT: ImGui::InputInt("##val", &constant.i_value); break;
 			default: ASSERT(false); break;
 		}
+		ImGui::SameLine();
+		if (ImGui::Button("x"))
+		{
+			for (int j = i; j < input_decl.constants_count - 1; ++j)
+			{
+				input_decl.constants[j] = input_decl.constants[j + 1];
+			}
+			--input_decl.constants_count;
+			--i;
+		}
 		ImGui::PopItemWidth();
+		ImGui::PopID();
 	}
+	ImGui::PopID();
 
 	if (ImGui::Button("Add##add_const"))
 	{
