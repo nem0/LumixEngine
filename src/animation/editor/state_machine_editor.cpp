@@ -246,7 +246,7 @@ void Node::onGUI()
 			int old_payload_size = events.size() - sizeof(Anim::EventHeader) * engine_node->events_count;
 			events.resize(events.size() + size + sizeof(Anim::EventHeader));
 			u8* headers_end = &events[engine_node->events_count * sizeof(Anim::EventHeader)];
-			moveMemory(headers_end, headers_end + sizeof(Anim::EventHeader), old_payload_size);
+			moveMemory(headers_end + sizeof(Anim::EventHeader), headers_end, old_payload_size);
 			Anim::EventHeader& event_header =
 				*(Anim::EventHeader*)&events[sizeof(Anim::EventHeader) * engine_node->events_count];
 			event_header.type = type;
