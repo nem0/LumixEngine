@@ -180,11 +180,19 @@ void Node::removeEvent(int index)
 	u8* event_start = headers_end + header.offset;
 	u8* event_end = event_start + header.size;
 	
+	for (int i = index + 1; i < engine_node->events_count; ++i)
+	{
+		auto& h = *(Anim::EventHeader*)&events[sizeof(Anim::EventHeader) * i];
+		h.offset -= header.size;
+	}
+
 	u8* header_start = &events[sizeof(Anim::EventHeader) * index];
 	u8* header_end = header_start + sizeof(Anim::EventHeader);
 	moveMemory(header_start, header_end, event_start - header_end);
 	moveMemory(event_start - sizeof(Anim::EventHeader), event_end, end - event_end);
 	
+	events.resize(events.size() - sizeof(Anim::EventHeader) - header.size);
+
 	--engine_node->events_count;
 }
 
