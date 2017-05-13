@@ -620,6 +620,15 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
+	void updateController(ComponentHandle cmp, float time_delta) override
+	{
+		Controller& controller = m_controllers.get({cmp.index});
+		updateController(controller, time_delta);
+		processEventStream();
+		m_event_stream.clear();
+	}
+
+
 	void setControllerInput(ComponentHandle cmp, int input_idx, float value) override
 	{
 		Controller& ctrl = m_controllers.get({ cmp.index });

@@ -44,6 +44,7 @@ public:
 	AnimationEditor(StudioApp& app);
 	~AnimationEditor();
 
+	void update(float time_delta) override;
 	const char* getName() const override { return "animation_editor"; }
 	void setContainer(Container* container) override { m_container = container; }
 	bool isEditorOpened() override { return m_editor_opened; }
@@ -81,6 +82,7 @@ private:
 	Container* m_container;
 	StaticString<MAX_PATH_LENGTH> m_path;
 	Array<EventType> m_event_types;
+	bool m_is_playing = false;
 };
 
 
@@ -300,12 +302,28 @@ void AnimationEditor::menuGUI()
 			if (ImGui::MenuItem("Open from selected entity")) loadFromEntity();
 			ImGui::EndMenu();
 		}
+		ImGui::SameLine();
+		ImGui::Checkbox("Play", &m_is_playing);
+		ImGui::SameLine();
 		if (ImGui::MenuItem("Go up", nullptr, false, m_container->getParent() != nullptr))
 		{
 			m_container = m_container->getParent();
 		}
+
 		ImGui::EndMenuBar();
 	}
+}
+
+
+void AnimationEditor::update(float time_delta)
+{
+	if (!m_is_playing) return;
+	auto& entities = m_app.getWorldEditor()->getSelectedEntities();
+	if (entities.empty()) return;
+	auto* scene = (AnimationScene*)m_app.getWorldEditor()->getUniverse()->getScene(ANIMABLE_HASH);
+	ComponentHandle ctrl = scene->getComponent(entities[0], CONTROLLER_TYPE);
+	if (!isValid(ctrl)) return;
+	scene->updateController(ctrl, time_delta);
 }
 
 
