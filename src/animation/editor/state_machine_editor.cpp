@@ -1087,6 +1087,8 @@ EntryNode::EntryNode(Container* parent, ControllerResource& controller)
 
 StateMachine::StateMachine(Anim::Component* engine_cmp, Container* parent, ControllerResource& controller)
 	: Container(engine_cmp, parent, controller)
+	, m_drag_source(nullptr)
+	, m_context_cmp(nullptr)
 {
 	m_entry_node = LUMIX_NEW(controller.getAllocator(), EntryNode)(this, controller);
 	m_editor_cmps.push(m_entry_node);
