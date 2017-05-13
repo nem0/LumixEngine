@@ -290,7 +290,7 @@ inline float dotProduct(const Vec4& op1, const Vec4& op2)
 
 inline void lerp(const Vec4& op1, const Vec4& op2, Vec4* out, float t)
 {
-	float invt = 1.0f - t;
+	const float invt = 1.0f - t;
 	out->x = op1.x * invt + op2.x * t;
 	out->y = op1.y * invt + op2.y * t;
 	out->z = op1.z * invt + op2.z * t;
@@ -312,10 +312,18 @@ inline Vec3 crossProduct(const Vec3& op1, const Vec3& op2)
 
 inline void lerp(const Vec3& op1, const Vec3& op2, Vec3* out, float t)
 {
-	float invt = 1.0f - t;
+	const float invt = 1.0f - t;
 	out->x = op1.x * invt + op2.x * t;
 	out->y = op1.y * invt + op2.y * t;
 	out->z = op1.z * invt + op2.z * t;
+}
+
+
+inline void lerp(const Vec2& op1, const Vec2& op2, Vec2* out, float t)
+{
+	const float invt = 1.0f - t;
+	out->x = op1.x * invt + op2.x * t;
+	out->y = op1.y * invt + op2.y * t;
 }
 
 
