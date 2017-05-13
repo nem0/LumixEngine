@@ -76,6 +76,13 @@ static int autocompleteCallback(ImGuiTextEditCallbackData *data)
 			return 0;
 		}
 	}
+
+	if (startsWith("finishing()", tmp))
+	{
+		data->InsertChars(data->CursorPos, "finishing()" + stringLength(tmp));
+		return 0;
+	}
+
 	return 0;
 };
 
@@ -376,7 +383,7 @@ Edge::Edge(Anim::Edge* engine_cmp, Container* parent, ControllerResource& contro
 	ASSERT(m_to);
 	m_from->addEdge(this);
 	m_to->addInEdge(this);
-	m_expression[0] = 0;
+	m_expression = "finishing()";
 }
 
 
@@ -414,10 +421,9 @@ void Edge::onGUI()
 	auto* engine_edge = (Anim::Edge*)engine_cmp;
 	ImGui::DragFloat("Length", &engine_edge->length);
 	
-	
 	if (ImGui::InputText("Expression",
-			m_expression,
-			lengthOf(m_expression),
+			m_expression.data,
+			lengthOf(m_expression.data),
 			ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CallbackCompletion,
 			autocompleteCallback,
 			&getController()))
