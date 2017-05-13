@@ -139,7 +139,7 @@ public:
 private:
 	Node* m_from;
 	Node* m_to;
-	char m_expression[128];
+	Lumix::StaticString<128> m_expression;
 };
 
 
