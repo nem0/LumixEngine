@@ -584,6 +584,8 @@ public:
 
 			if (ImGui::BeginChild("right", half_size, true))
 			{
+				ImGui::Text("Using NVidia PhysX");
+
 				if (ImGui::Button("Wiki"))
 				{
 					PlatformInterface::shellExecuteOpen("https://github.com/nem0/LumixEngine/wiki");
@@ -1168,7 +1170,7 @@ public:
 
 	void showHierarchy(Entity entity, const Array<Entity>& selected_entities)
 	{
-		static char buffer[1024];
+		char buffer[1024];
 		Universe* universe = m_editor->getUniverse();
 		getEntityListDisplayName(*m_editor, buffer, sizeof(buffer), entity);
 		bool selected = selected_entities.indexOf(entity) >= 0;
@@ -1202,16 +1204,40 @@ public:
 	{
 		PROFILE_FUNCTION();
 		const Array<Entity>& entities = m_editor->getSelectedEntities();
+		static char filter[64] = "";
 		if (ImGui::BeginDock("Entity List", &m_is_entity_list_opened))
 		{
 			auto* universe = m_editor->getUniverse();
+			ImGui::FilterInput("Filter", filter, sizeof(filter));
 
 			ImGui::PushItemWidth(ImGui::GetContentRegionAvailWidth() - ImGui::GetStyle().FramePadding.x);
-			for (Entity e = universe->getFirstEntity(); isValid(e); e = universe->getNextEntity(e))
+			if (filter[0] == '\0')
 			{
-				if (!isValid(universe->getParent(e)))
+				for (Entity e = universe->getFirstEntity(); isValid(e); e = universe->getNextEntity(e))
 				{
-					showHierarchy(e, entities);
+					if (!isValid(universe->getParent(e)))
+					{
+						showHierarchy(e, entities);
+					}
+				}
+			}
+			else
+			{
+				for (Entity e = universe->getFirstEntity(); isValid(e); e = universe->getNextEntity(e))
+				{
+					char buffer[1024];
+					Universe* universe = m_editor->getUniverse();
+					getEntityListDisplayName(*m_editor, buffer, sizeof(buffer), e);
+					if (stristr(buffer, filter) == nullptr) continue;
+					bool selected = entities.indexOf(e) >= 0;
+					if (ImGui::Selectable(buffer, &selected))
+					{
+						m_editor->selectEntities(&e, 1);
+					}
+					if (ImGui::IsMouseDragging() && ImGui::IsItemActive())
+					{
+						startDrag(StudioApp::DragData::ENTITY, &e, sizeof(e));
+					}
 				}
 			}
 			ImGui::PopItemWidth();
