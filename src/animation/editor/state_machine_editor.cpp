@@ -60,19 +60,19 @@ static int autocompleteCallback(ImGuiTextEditCallbackData *data)
 	copyNString(tmp, lengthOf(tmp), data->Buf + start_word, data->CursorPos - start_word);
 
 	const auto& input_decl = controller->getEngineResource()->m_input_decl;
-	for (int i = 0; i < input_decl.inputs_count; ++i)
+	for (const auto& input : input_decl.inputs)
 	{
-		if (startsWith(input_decl.inputs[i].name, tmp))
+		if (input.type == Anim::InputDecl::EMPTY && startsWith(input.name, tmp))
 		{
-			data->InsertChars(data->CursorPos, input_decl.inputs[i].name + stringLength(tmp));
+			data->InsertChars(data->CursorPos, input.name + stringLength(tmp));
 			return 0;
 		}
 	}
-	for (int i = 0; i < input_decl.constants_count; ++i)
+	for (const auto& constant : input_decl.constants)
 	{
-		if (startsWith(input_decl.constants[i].name, tmp))
+		if (constant.type != Anim::InputDecl::EMPTY && startsWith(constant.name, tmp))
 		{
-			data->InsertChars(data->CursorPos, input_decl.constants[i].name + stringLength(tmp));
+			data->InsertChars(data->CursorPos, constant.name + stringLength(tmp));
 			return 0;
 		}
 	}
@@ -676,9 +676,9 @@ void Blend1DNode::deserialize(Lumix::InputBlob& blob)
 	auto& input_decl = m_controller.getEngineResource()->m_input_decl;
 	m_input = -1;
 	int offset = ((Anim::Blend1DNode*)engine_cmp)->input_offset;
-	for (int i = 0; i < input_decl.inputs_count; ++i)
+	for (int i = 0; i < lengthOf(input_decl.inputs); ++i)
 	{
-		if (input_decl.inputs[i].offset == offset)
+		if (input_decl.inputs[i].type != Anim::InputDecl::EMPTY && input_decl.inputs[i].offset == offset)
 		{
 			m_input = i;
 			break;
@@ -877,10 +877,14 @@ void Blend1DNode::onGUI()
 	Anim::InputDecl& decl = m_controller.getEngineResource()->m_input_decl;
 	auto input_getter = [](void* data, int idx, const char** out) -> bool {
 		auto& decl = *(Anim::InputDecl*)data;
-		*out = decl.inputs[idx].name;
+		int input_idx = decl.inputFromLinearIdx(idx);
+		const auto& input = decl.inputs[input_idx];
+		*out = input.name;
 		return true;
 	};
-	ImGui::Combo("Input", &m_input, input_getter, &decl, decl.inputs_count);
+	int linear = decl.inputToLinearIdx(m_input);
+	ImGui::Combo("Input", &linear, input_getter, &decl, decl.inputs_count);
+	m_input = decl.inputFromLinearIdx(linear);
 }
 
 
@@ -896,9 +900,9 @@ void AnimationNode::deserialize(Lumix::InputBlob& blob)
 	auto& input_decl = m_controller.getEngineResource()->m_input_decl;
 	root_rotation_input = -1;
 	int offset = ((Anim::AnimationNode*)engine_cmp)->root_rotation_input_offset;
-	for (int i = 0; i < input_decl.inputs_count; ++i)
+	for (int i = 0; i < lengthOf(input_decl.inputs); ++i)
 	{
-		if (input_decl.inputs[i].offset == offset)
+		if (input_decl.inputs[i].type != Anim::InputDecl::EMPTY && input_decl.inputs[i].offset == offset)
 		{
 			root_rotation_input = i;
 			break;
@@ -977,16 +981,24 @@ void AnimationNode::onGUI()
 		if (idx >= decl.inputs_count)
 		{
 			*out = "No root motion rotation";
+			return true;
+		}
+		int input_idx = decl.inputFromLinearIdx(idx);
+		const auto& input = decl.inputs[input_idx];
+		*out = input.name;
+		return true;
+	};
+	int linear = decl.inputToLinearIdx(root_rotation_input);
+	if (ImGui::Combo("Root rotation input", &linear, input_getter, &decl, decl.inputs_count + 1))
+	{
+		if (linear >= decl.inputs_count)
+		{
+			root_rotation_input = -1;
 		}
 		else
 		{
-			*out = decl.inputs[idx].name;
+			root_rotation_input = decl.inputFromLinearIdx(linear);
 		}
-		return true;
-	};
-	if (ImGui::Combo("Root rotation input", &root_rotation_input, input_getter, &decl, decl.inputs_count + 1))
-	{
-		if (root_rotation_input >= decl.inputs_count) root_rotation_input = -1;
 	}
 	if (root_rotation_input != -1)
 	{
@@ -1396,14 +1408,12 @@ void StateMachine::dropSlot(const char* name, u32 slot, const ImVec2& canvas_scr
 }
 
 
-ControllerResource::ControllerResource(Lumix::AnimationSystem& anim_system,
-	IAnimationEditor& editor,
+ControllerResource::ControllerResource(IAnimationEditor& editor,
 	ResourceManagerBase& manager,
 	IAllocator& allocator)
 	: m_animation_slots(allocator)
 	, m_allocator(allocator)
 	, m_editor(editor)
-	, m_animation_system(anim_system)
 {
 	m_engine_resource = LUMIX_NEW(allocator, Anim::ControllerResource)(Path("editor"), manager, allocator);
 	auto* engine_root = LUMIX_NEW(allocator, Anim::StateMachine)(allocator);

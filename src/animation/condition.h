@@ -40,14 +40,16 @@ struct InputDecl
 {
 	enum Type : int
 	{
+		// don't change order
 		FLOAT,
 		INT,
-		BOOL
+		BOOL,
+		EMPTY
 	};
 
 	struct Constant
 	{
-		Type type;
+		Type type = EMPTY;
 		union
 		{
 			float f_value;
@@ -59,7 +61,7 @@ struct InputDecl
 
 	struct Input
 	{
-		Type type;
+		Type type = EMPTY;
 		int offset;
 		char name[32];
 	};
@@ -69,10 +71,42 @@ struct InputDecl
 	Constant constants[32];
 	int constants_count = 0;
 
+
+	int inputFromLinearIdx(int idx) const
+	{
+		for (int i = 0; i < lengthOf(inputs); ++i)
+		{
+			if (inputs[i].type == EMPTY) continue;
+			if (idx == 0) return i;
+			--idx;
+		}
+		ASSERT(false);
+		return -1;
+	}
+
+
+	int inputToLinearIdx(int idx) const
+	{
+		int linear = 0;
+		for (int i = 0; i < lengthOf(inputs); ++i)
+		{
+			if (i == idx) return inputs[i].type == EMPTY ? -1 : linear;
+			if (inputs[i].type == EMPTY) continue;
+			++linear;
+		}
+		return -1;
+	}
+
+
 	int getSize() const
 	{
 		if (inputs_count == 0) return 0;
-		return inputs[inputs_count - 1].offset + getSize(inputs[inputs_count - 1].type);
+		int size = 0;
+		for (const auto& input : inputs)
+		{
+			if(input.type != EMPTY) size = Math::maximum(size, input.offset + getSize(input.type));
+		}
+		return size;
 	}
 
 	int getSize(Type type) const
@@ -82,17 +116,19 @@ struct InputDecl
 			case FLOAT: return sizeof(float);
 			case INT: return sizeof(int);
 			case BOOL: return sizeof(bool);
-			default: ASSERT(1); return 1;
+			default: ASSERT(false); return 1;
 		}
 	}
 
 	void recalculateOffsets()
 	{
 		if (inputs_count == 0) return;
-		inputs[0].offset = 0;
-		for(int i = 1; i < inputs_count; ++i)
+		int last_offset = 0;
+		for(auto& input : inputs)
 		{ 
-			inputs[i].offset = inputs[i - 1].offset + getSize(inputs[i - 1].type);
+			if (input.type == EMPTY) continue;
+			input.offset = last_offset;
+			last_offset += getSize(input.type);
 		}
 	}
 
@@ -108,9 +144,9 @@ struct InputDecl
 
 	int getConstantIdx(const char* name, int size) const
 	{
-		for (int i = 0; i < constants_count; ++i)
+		for (int i = 0; i < lengthOf(constants); ++i)
 		{
-			if (strncmp(constants[i].name, name, size) == 0) return i;
+			if (constants[i].type != Type::EMPTY && strncmp(constants[i].name, name, size) == 0) return i;
 		}
 		return -1;
 	}
