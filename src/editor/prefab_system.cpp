@@ -99,7 +99,7 @@ class PrefabSystemImpl LUMIX_FINAL : public PrefabSystem
 		bool execute() override
 		{
 			entities.clear();
-			if (!prefab->isReady()) return false;;
+			if (!prefab->isReady()) return false;
 			auto& system = (PrefabSystemImpl&)editor.getPrefabSystem();
 
 			system.instantiatePrefab(*prefab, position, rotation, scale, &entities);
@@ -566,7 +566,8 @@ public:
 		if (selected_entities.size() != 1) return;
 
 		Entity entity = selected_entities[0];
-		if (getPrefab(entity) != 0) entity = getPrefabRoot(entity);
+		u64 prefab = getPrefab(entity);
+		if (prefab != 0) entity = getPrefabRoot(entity);
 
 		FS::OsFile file;
 		if (!file.open(path.c_str(), FS::Mode::CREATE_AND_WRITE, m_editor.getAllocator()))
@@ -586,6 +587,22 @@ public:
 		file.write(blob.getData(), blob.getPos());
 
 		file.close();
+
+		if (prefab == 0)
+		{
+			m_editor.beginCommandGroup(Lumix::crc32("save_prefab"));
+
+			Transform tr = m_universe->getTransform(entity);
+			float scale = m_universe->getScale(entity);
+			m_editor.destroyEntities(&entities[0], entities.size());
+			auto* resource_manager = m_editor.getEngine().getResourceManager().get(PREFAB_TYPE);
+			auto* res = (PrefabResource*)resource_manager->load(path);
+			FS::FileSystem& fs = m_editor.getEngine().getFileSystem();
+			while (fs.hasWork()) fs.updateAsyncTransactions();
+			instantiatePrefab(*res, tr.pos, tr.rot, scale);
+
+			m_editor.endCommandGroup();
+		}
 	}
 
 
