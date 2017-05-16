@@ -65,6 +65,7 @@ struct Component
 	virtual ComponentInstance* createInstance(IAllocator& allocator) = 0;
 	virtual void serialize(OutputBlob& blob);
 	virtual void deserialize(InputBlob& blob, Container* parent, int version);
+	virtual Component* getByUID(int _uid) { return (uid == _uid) ? this : nullptr; }
 
 	int uid;
 	const Type type;
@@ -94,6 +95,7 @@ struct Container : public Node
 	void serialize(OutputBlob& blob) override;
 	void deserialize(InputBlob& blob, Container* parent, int version) override;
 	Component* getChildByUID(int uid);
+	Component* getByUID(int _uid) override;
 
 	IAllocator& allocator;
 	Array<Component*> children;

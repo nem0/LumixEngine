@@ -689,6 +689,18 @@ Component* Container::getChildByUID(int uid)
 }
 
 
+Component* Container::getByUID(int _uid)
+{
+	if (uid == _uid) return this;
+	for (auto* child : children)
+	{
+		Component* cmp = child->getByUID(_uid);
+		if (cmp) return cmp;
+	}
+	return nullptr;
+}
+
+
 void Container::serialize(OutputBlob& blob)
 {
 	Node::serialize(blob);
