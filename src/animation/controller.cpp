@@ -90,8 +90,10 @@ bool ControllerResource::deserialize(InputBlob& blob)
 	m_root = createComponent(type, m_allocator);
 	m_root->deserialize(blob, nullptr, header.version);
 	blob.read(m_input_decl.inputs_count);
-	for (int i = 0; i < m_input_decl.inputs_count; ++i)
+	for (int j = 0; j < m_input_decl.inputs_count; ++j)
 	{
+		int i = j;
+		if (header.version >(int)Version::INPUT_REFACTOR) blob.read(i);
 		auto& input = m_input_decl.inputs[i];
 		blob.readString(input.name, lengthOf(input.name));
 		blob.read(input.type);
@@ -99,8 +101,10 @@ bool ControllerResource::deserialize(InputBlob& blob)
 	}
 
 	blob.read(m_input_decl.constants_count);
-	for (int i = 0; i < m_input_decl.constants_count; ++i)
+	for (int j = 0; j < m_input_decl.constants_count; ++j)
 	{
+		int i = j;
+		if (header.version >(int)Version::INPUT_REFACTOR) blob.read(i);
 		auto& constant = m_input_decl.constants[i];
 		blob.readString(constant.name, lengthOf(constant.name));
 		blob.read(constant.type);
@@ -153,17 +157,21 @@ void ControllerResource::serialize(OutputBlob& blob)
 	blob.write(m_root->type);
 	m_root->serialize(blob);
 	blob.write(m_input_decl.inputs_count);
-	for (int i = 0; i < m_input_decl.inputs_count; ++i)
+	for (int i = 0; i < lengthOf(m_input_decl.inputs); ++i)
 	{
 		auto& input = m_input_decl.inputs[i];
+		if (input.type == InputDecl::EMPTY) continue;
+		blob.write(i);
 		blob.writeString(input.name);
 		blob.write(input.type);
 		blob.write(input.offset);
 	}
 	blob.write(m_input_decl.constants_count);
-	for (int i = 0; i < m_input_decl.constants_count; ++i)
+	for (int i = 0; i < lengthOf(m_input_decl.constants); ++i)
 	{
 		auto& constant = m_input_decl.constants[i];
+		if (constant.type == InputDecl::EMPTY) continue;
+		blob.write(i);
 		blob.writeString(constant.name);
 		blob.write(constant.type);
 		switch (constant.type)

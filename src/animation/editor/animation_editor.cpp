@@ -108,8 +108,7 @@ AnimationEditor::AnimationEditor(StudioApp& app)
 
 	Engine& engine = m_app.getWorldEditor()->getEngine();
 	auto* manager = engine.getResourceManager().get(CONTROLLER_RESOURCE_TYPE);
-	auto* anim_sys = (AnimationSystem*)engine.getPluginManager().getPlugin("animation");
-	m_resource = LUMIX_NEW(allocator, ControllerResource)(*anim_sys, *this, *manager, allocator);
+	m_resource = LUMIX_NEW(allocator, ControllerResource)(*this, *manager, allocator);
 	m_container = (Container*)m_resource->getRoot();
 
 	EventType& event_type = createEventType("set_input");
@@ -141,12 +140,16 @@ void AnimationEditor::onSetInputGUI(u8* data, Component& component)
 	auto event = (Anim::SetInputEvent*)data;
 	auto& input_decl = component.getController().getEngineResource()->m_input_decl;
 	auto getter = [](void* data, int idx, const char** out) -> bool {
-		auto& input_decl = *(Anim::InputDecl*)data;
-		*out = input_decl.inputs[idx].name;
+		const auto& input_decl = *(Anim::InputDecl*)data;
+		int i = input_decl.inputFromLinearIdx(idx);
+		*out = input_decl.inputs[i].name;
 		return true;
 	};
-	ImGui::Combo("Input", &event->input_idx, getter, &input_decl, input_decl.inputs_count);
-	if (event->input_idx >= 0 && event->input_idx < input_decl.inputs_count)
+	int idx = input_decl.inputToLinearIdx(event->input_idx);
+	ImGui::Combo("Input", &idx, getter, &input_decl, input_decl.inputs_count);
+	event->input_idx = input_decl.inputFromLinearIdx(idx);
+
+	if (event->input_idx >= 0 && event->input_idx < lengthOf(input_decl.inputs))
 	{
 		switch (input_decl.inputs[event->input_idx].type)
 		{
@@ -247,8 +250,7 @@ void AnimationEditor::load()
 		LUMIX_DELETE(allocator, m_resource);
 		Engine& engine = m_app.getWorldEditor()->getEngine();
 		auto* manager = engine.getResourceManager().get(CONTROLLER_RESOURCE_TYPE);
-		auto* anim_sys = (AnimationSystem*)engine.getPluginManager().getPlugin("animation");
-		m_resource = LUMIX_NEW(allocator, ControllerResource)(*anim_sys, *this, *manager, allocator);
+		m_resource = LUMIX_NEW(allocator, ControllerResource)(*this, *manager, allocator);
 		m_container = (Container*)m_resource->getRoot();
 	}
 	file.close();
@@ -268,8 +270,7 @@ void AnimationEditor::newController()
 	LUMIX_DELETE(allocator, m_resource);
 	Engine& engine = m_app.getWorldEditor()->getEngine();
 	auto* manager = engine.getResourceManager().get(CONTROLLER_RESOURCE_TYPE);
-	auto* anim_sys = (AnimationSystem*)engine.getPluginManager().getPlugin("animation");
-	m_resource = LUMIX_NEW(allocator, ControllerResource)(*anim_sys, *this, *manager, allocator);
+	m_resource = LUMIX_NEW(allocator, ControllerResource)(*this, *manager, allocator);
 	m_container = (Container*)m_resource->getRoot();
 	m_path = "";
 }
@@ -355,10 +356,10 @@ void AnimationEditor::inputsGUI()
 			u8* input_data = isValid(cmp) ? scene->getControllerInput(cmp) : nullptr;
 			Anim::InputDecl& input_decl = m_resource->getEngineResource()->m_input_decl;
 
-			for (int i = 0; i < input_decl.inputs_count; ++i)
+			for (auto& input : input_decl.inputs)
 			{
-				ImGui::PushID(i);
-				auto& input = input_decl.inputs[i];
+				if (input.type == Anim::InputDecl::EMPTY) continue;
+				ImGui::PushID(&input);
 				ImGui::PushItemWidth(100);
 				ImGui::InputText("##name", input.name, lengthOf(input.name));
 				ImGui::SameLine();
@@ -377,17 +378,30 @@ void AnimationEditor::inputsGUI()
 						default: ASSERT(false); break;
 					}
 				}
+				ImGui::SameLine();
+				if (ImGui::Button("x"))
+				{
+					input.type = Anim::InputDecl::EMPTY;
+					--input_decl.inputs_count;
+				}
+
 				ImGui::PopItemWidth();
 				ImGui::PopID();
 			}
 
-			if (ImGui::Button("Add"))
+			if (input_decl.inputs_count < lengthOf(input_decl.inputs) && ImGui::Button("Add"))
 			{
-				auto& input = input_decl.inputs[input_decl.inputs_count];
-				input.name[0] = 0;
-				input.type = Anim::InputDecl::BOOL;
-				input.offset = input_decl.getSize();
-				++input_decl.inputs_count;
+				for (auto& input : input_decl.inputs)
+				{
+					if (input.type == Anim::InputDecl::EMPTY)
+					{
+						input.name[0] = 0;
+						input.type = Anim::InputDecl::BOOL;
+						input.offset = input_decl.getSize();
+						++input_decl.inputs_count;
+						break;
+					}
+				}
 			}
 		}
 
@@ -404,10 +418,10 @@ void AnimationEditor::constantsGUI()
 
 	Anim::InputDecl& input_decl = m_resource->getEngineResource()->m_input_decl;
 	ImGui::PushID("consts");
-	for (int i = 0; i < input_decl.constants_count; ++i)
+	for (auto& constant : input_decl.constants)
 	{
-		ImGui::PushID(i);
-		auto& constant = input_decl.constants[i];
+		if (constant.type == Anim::InputDecl::EMPTY) continue;
+		ImGui::PushID(&constant);
 		ImGui::PushItemWidth(100);
 		ImGui::InputText("", constant.name, lengthOf(constant.name));
 		ImGui::SameLine();
@@ -426,25 +440,27 @@ void AnimationEditor::constantsGUI()
 		ImGui::SameLine();
 		if (ImGui::Button("x"))
 		{
-			for (int j = i; j < input_decl.constants_count - 1; ++j)
-			{
-				input_decl.constants[j] = input_decl.constants[j + 1];
-			}
+			constant.type = Anim::InputDecl::EMPTY;
 			--input_decl.constants_count;
-			--i;
 		}
 		ImGui::PopItemWidth();
 		ImGui::PopID();
 	}
 	ImGui::PopID();
 
-	if (ImGui::Button("Add##add_const"))
+	if (input_decl.constants_count < lengthOf(input_decl.constants) && ImGui::Button("Add##add_const"))
 	{
-		auto& constant = input_decl.constants[input_decl.constants_count];
-		constant.name[0] = 0;
-		constant.type = Anim::InputDecl::BOOL;
-		constant.b_value = true;
-		++input_decl.constants_count;
+		for (auto& constant : input_decl.constants)
+		{
+			if (constant.type == Anim::InputDecl::EMPTY)
+			{
+				constant.name[0] = 0;
+				constant.type = Anim::InputDecl::BOOL;
+				constant.b_value = true;
+				++input_decl.constants_count;
+				break;
+			}
+		}
 	}
 }
 

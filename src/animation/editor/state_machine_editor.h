@@ -254,8 +254,7 @@ private:
 class ControllerResource
 {
 public:
-	ControllerResource(Lumix::AnimationSystem& anim_system,
-		IAnimationEditor& editor,
+	ControllerResource(IAnimationEditor& editor,
 		Lumix::ResourceManagerBase& manager,
 		Lumix::IAllocator& allocator);
 	~ControllerResource();
@@ -270,7 +269,6 @@ public:
 	int createUID() { ++m_last_uid; return m_last_uid; }
 	const char* getAnimationSlot(Lumix::u32 slot_hash) const;
 	void createAnimSlot(const char* name, const char* path);
-	Lumix::AnimationSystem& getAnimationSystem() { return m_animation_system; }
 
 private:
 	int m_last_uid = 0;
@@ -279,7 +277,6 @@ private:
 	Component* m_root;
 	Lumix::Anim::ControllerResource* m_engine_resource;
 	Lumix::Array<Lumix::string> m_animation_slots;
-	Lumix::AnimationSystem& m_animation_system;
 };
 
 
