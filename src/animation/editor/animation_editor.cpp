@@ -174,6 +174,7 @@ public:
 	void executeCommand(IEditorCommand& command);
 	void createEdge(ControllerResource& ctrl, Container* container, Node* from, Node* to) override;
 	void moveNode(ControllerResource& ctrl, Node* node, float x, float y) override;
+	bool hasFocus() override { return m_is_focused; }
 
 private:
 	void newController();
@@ -204,6 +205,7 @@ private:
 	Array<IEditorCommand*> m_undo_stack;
 	int m_undo_index = -1;
 	bool m_is_playing = false;
+	bool m_is_focused = false;
 };
 
 
@@ -525,6 +527,7 @@ void AnimationEditor::editorGUI()
 {
 	if (ImGui::BeginDock("Animation Editor", &m_editor_opened, ImGuiWindowFlags_MenuBar))
 	{
+		m_is_focused = ImGui::IsRootWindowOrAnyChildFocused();
 		menuGUI();
 		ImGui::Columns(2);
 		drawGraph();
@@ -532,6 +535,10 @@ void AnimationEditor::editorGUI()
 		ImGui::Text("Properties");
 		if(m_container->getSelectedComponent()) m_container->getSelectedComponent()->onGUI();
 		ImGui::Columns();
+	}
+	else
+	{
+		m_is_focused = false;
 	}
 	ImGui::EndDock();
 }

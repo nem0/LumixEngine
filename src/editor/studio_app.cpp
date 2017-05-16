@@ -2169,6 +2169,7 @@ public:
 	void checkShortcuts()
 	{
 		if (ImGui::IsAnyItemActive()) return;
+		if (hasPluginFocus()) return;
 
 		int key_count;
 		auto* state = SDL_GetKeyboardState(&key_count);
