@@ -1,6 +1,7 @@
 #pragma once
 
 
+#include "animation/state_machine.h"
 #include "editor/studio_app.h"
 #include "engine/delegate.h"
 #include "engine/lumix.h"
@@ -52,7 +53,11 @@ public:
 	virtual EventType& getEventTypeByIdx(int idx) = 0;
 	virtual EventType& getEventType(Lumix::u32 type) = 0;
 	virtual void createEdge(ControllerResource& ctrl, Container* container, Node* from, Node* to) = 0;
-	virtual void moveNode(ControllerResource& ctrl, Node* node, float x, float y) = 0;
+	virtual void moveNode(ControllerResource& ctrl, Node* node, const ImVec2& pos) = 0;
+	virtual void createNode(ControllerResource& ctrl,
+		Container* container,
+		Lumix::Anim::Node::Type type,
+		const ImVec2& pos) = 0;
 };
 
 

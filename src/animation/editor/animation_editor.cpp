@@ -42,10 +42,10 @@ namespace AnimEditor
 
 struct MoveAnimNodeCommand : public IEditorCommand
 {
-	MoveAnimNodeCommand(ControllerResource& controller, Node* node, float x, float y)
+	MoveAnimNodeCommand(ControllerResource& controller, Node* node, const ImVec2& pos)
 		: m_controller(controller)
 		, m_node_uid(node->engine_cmp->uid)
-		, m_new_pos(x, y)
+		, m_new_pos(pos)
 		, m_old_pos(node->pos)
 	{
 	}
@@ -98,6 +98,64 @@ struct MoveAnimNodeCommand : public IEditorCommand
 };
 
 
+struct CreateAnimNodeCommand : public IEditorCommand
+{
+	CreateAnimNodeCommand(ControllerResource& controller,
+		Container* container,
+		Anim::Component::Type type,
+		const ImVec2& pos)
+		: m_controller(controller)
+		, m_node_uid(-1)
+		, m_container_uid(container->engine_cmp->uid)
+		, m_type(type)
+		, m_pos(pos)
+	{
+	}
+
+
+	bool execute() override
+	{
+		auto* container = (Container*)m_controller.getByUID(m_container_uid);
+		if (m_node_uid < 0) m_node_uid = m_controller.createUID();
+		container->createNode(m_type, m_node_uid, m_pos);
+		return true;
+	}
+
+
+	void undo() override
+	{
+		auto* container = (Container*)m_controller.getByUID(m_container_uid);
+		container->destroyChild(m_node_uid);
+	}
+
+
+	const char* getType() override { return "create_anim_node"; }
+
+
+	bool merge(IEditorCommand& command) override { return false; }
+
+
+	void serialize(JsonSerializer& serializer) override
+	{
+		// TODO
+		ASSERT(false);
+	}
+
+
+	void deserialize(JsonSerializer& serializer) override
+	{
+		// TODO
+		ASSERT(false);
+	}
+
+	ControllerResource& m_controller;
+	int m_container_uid;
+	int m_node_uid;
+	ImVec2 m_pos;
+	Anim::Component::Type m_type;
+};
+
+
 struct CreateAnimEdgeCommand : public IEditorCommand
 {
 	CreateAnimEdgeCommand(ControllerResource& controller, Container* container, Node* from, Node* to)
@@ -121,7 +179,7 @@ struct CreateAnimEdgeCommand : public IEditorCommand
 	void undo() override
 	{
 		auto* container = (Container*)m_controller.getByUID(m_container_uid);
-		container->destroyEdge(m_edge_uid);
+		container->destroyChild(m_edge_uid);
 	}
 
 
@@ -173,7 +231,11 @@ public:
 	EventType& getEventType(u32 type) override;
 	void executeCommand(IEditorCommand& command);
 	void createEdge(ControllerResource& ctrl, Container* container, Node* from, Node* to) override;
-	void moveNode(ControllerResource& ctrl, Node* node, float x, float y) override;
+	void moveNode(ControllerResource& ctrl, Node* node, const ImVec2& pos) override;
+	void createNode(ControllerResource& ctrl,
+		Container* container,
+		Lumix::Anim::Node::Type type,
+		const ImVec2& pos) override;
 	bool hasFocus() override { return m_is_focused; }
 
 private:
@@ -249,10 +311,21 @@ AnimationEditor::~AnimationEditor()
 }
 
 
-void AnimationEditor::moveNode(ControllerResource& ctrl, Node* node, float x, float y)
+void AnimationEditor::moveNode(ControllerResource& ctrl, Node* node, const ImVec2& pos)
 {
 	IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
-	auto* cmd = LUMIX_NEW(allocator, MoveAnimNodeCommand)(ctrl, node, x, y);
+	auto* cmd = LUMIX_NEW(allocator, MoveAnimNodeCommand)(ctrl, node, pos);
+	executeCommand(*cmd);
+}
+
+
+void AnimationEditor::createNode(ControllerResource& ctrl,
+	Container* container,
+	Lumix::Anim::Node::Type type,
+	const ImVec2& pos)
+{
+	IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
+	auto* cmd = LUMIX_NEW(allocator, CreateAnimNodeCommand)(ctrl, container, type, pos);
 	executeCommand(*cmd);
 }
 
