@@ -474,6 +474,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		serializer.write(m_controllers.size());
 		for (const Controller& controller : m_controllers)
 		{
+			serializer.write(controller.default_set);
 			serializer.write(controller.entity);
 			serializer.writeString(controller.resource ? controller.resource->getPath().c_str() : "");
 		}
@@ -513,6 +514,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		for (int i = 0; i < count; ++i)
 		{
 			Controller controller(m_anim_system.m_allocator);
+			serializer.read(controller.default_set);
 			serializer.read(controller.entity);
 			char tmp[MAX_PATH_LENGTH];
 			serializer.readString(tmp, lengthOf(tmp));

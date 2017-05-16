@@ -2381,9 +2381,9 @@ struct AddTerrainComponentPlugin LUMIX_FINAL : public StudioApp::IAddComponentPl
 		}
 		else
 		{
+			u16 tmp = 0xffff >> 1;
 			for (int i = 0; i < size * size; ++i)
 			{
-				u16 tmp = 0;
 				file.write(&tmp, sizeof(tmp));
 			}
 			file.close();
