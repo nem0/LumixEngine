@@ -113,7 +113,8 @@ public:
 	virtual void removeChild(Component* component);
 	bool isContainer() const override { return true; }
 	void createEdge(int from_uid, int to_uid, int edge_uid);
-	void destroyEdge(int edge_uid);
+	void destroyChild(int child_uid);
+	virtual void createNode(Lumix::Anim::Node::Type type, int uid, const ImVec2& pos) = 0;
 
 protected:
 	Lumix::Array<Component*> m_editor_cmps;
@@ -189,7 +190,7 @@ public:
 		Container* current) override;
 
 private:
-	void createState(Lumix::Anim::Component::Type type, const ImVec2& pos);
+	void createNode(Lumix::Anim::Component::Type type, int uid, const ImVec2& pos) override;
 	RootEdge* createRootEdge(Node* node);
 
 private:
@@ -236,7 +237,7 @@ public:
 	void dropSlot(const char* name, Lumix::u32 slot, const ImVec2& canvas_screen_pos) override;
 
 private:
-	void createState(Lumix::Anim::Component::Type type, const ImVec2& pos);
+	void createNode(Lumix::Anim::Component::Type type, int uid, const ImVec2& pos) override;
 	EntryEdge* createEntryEdge(Node* node);
 
 private:
