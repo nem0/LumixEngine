@@ -50,6 +50,7 @@ public:
 	Container* getParent() { return m_parent; }
 	virtual void compile() {}
 	virtual void debug(ImDrawList* draw, const ImVec2& canvas_screen_pos, Lumix::Anim::ComponentInstance* runtime) {}
+	virtual Component* getByUID(int uid) { return engine_cmp && uid == engine_cmp->uid ? this : nullptr; }
 	virtual void debugInside(ImDrawList* draw,
 		const ImVec2& canvas_screen_pos,
 		Lumix::Anim::ComponentInstance* runtime,
@@ -107,11 +108,13 @@ public:
 	void deserialize(Lumix::InputBlob& blob) override;
 	void serialize(Lumix::OutputBlob& blob) override;
 	void compile() override;
-
+	virtual Component* getByUID(int uid) override;
 	virtual void dropSlot(const char* name, Lumix::u32 slot, const ImVec2& canvas_screen_pos) {}
 	virtual void removeChild(Component* component);
 	bool isContainer() const override { return true; }
-	
+	void createEdge(int from_uid, int to_uid, int edge_uid);
+	void destroyEdge(int edge_uid);
+
 protected:
 	Lumix::Array<Component*> m_editor_cmps;
 	Component* m_selected_component;
@@ -269,6 +272,7 @@ public:
 	int createUID() { ++m_last_uid; return m_last_uid; }
 	const char* getAnimationSlot(Lumix::u32 slot_hash) const;
 	void createAnimSlot(const char* name, const char* path);
+	Component* getByUID(int uid);
 
 private:
 	int m_last_uid = 0;

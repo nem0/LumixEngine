@@ -354,6 +354,29 @@ void Container::removeChild(Component* component)
 }
 
 
+void Container::createEdge(int from_uid, int to_uid, int edge_uid)
+{
+	auto* engine_parent = ((Anim::Container*)engine_cmp);
+	// TODO different kind of edges
+	auto* engine_edge = LUMIX_NEW(m_allocator, Anim::Edge)(m_allocator);
+	engine_edge->uid = edge_uid;
+	engine_edge->from = (Anim::Node*)getByUID(from_uid)->engine_cmp;
+	engine_edge->to = (Anim::Node*)getByUID(to_uid)->engine_cmp;
+	engine_parent->children.push(engine_edge);
+
+	auto* edge = LUMIX_NEW(m_allocator, Edge)(engine_edge, this, m_controller);
+	m_editor_cmps.push(edge);
+	m_selected_component = edge;
+}
+
+
+void Container::destroyEdge(int edge_uid)
+{
+	auto* edge = getByUID(edge_uid);
+	LUMIX_DELETE(m_allocator, edge);
+}
+
+
 Component* Container::childrenHitTest(const ImVec2& pos)
 {
 	for (auto* i : m_editor_cmps)
@@ -1171,6 +1194,18 @@ void Container::deserialize(InputBlob& blob)
 }
 
 
+Component* Container::getByUID(int uid)
+{
+	if (uid == engine_cmp->uid) return this;
+	for (Component* cmp : m_editor_cmps)
+	{
+		Component* x = cmp->getByUID(uid);
+		if (x) return x;
+	}
+	return nullptr;
+}
+
+
 void Container::compile()
 {
 	Node::compile();
@@ -1338,16 +1373,7 @@ void StateMachine::drawInside(ImDrawList* draw, const ImVec2& canvas_screen_pos)
 					}
 					else
 					{
-						auto* engine_parent = ((Anim::Container*)engine_cmp);
-						auto* engine_edge = LUMIX_NEW(m_allocator, Anim::Edge)(m_allocator);
-						engine_edge->uid = m_controller.createUID();
-						engine_edge->from = (Anim::Node*)m_drag_source->engine_cmp;
-						engine_edge->to = (Anim::Node*)hit_cmp->engine_cmp;
-						engine_parent->children.push(engine_edge);
-
-						auto* edge = LUMIX_NEW(m_allocator, Edge)(engine_edge, this, m_controller);
-						m_editor_cmps.push(edge);
-						m_selected_component = edge;
+						m_controller.getEditor().createEdge(m_controller, this, m_drag_source, (Node*)hit_cmp);
 					}
 				}
 			}
@@ -1363,7 +1389,8 @@ void StateMachine::drawInside(ImDrawList* draw, const ImVec2& canvas_screen_pos)
 
 	if (m_mouse_status == DRAG_NODE)
 	{
-		m_drag_source->pos = m_drag_source->pos + ImGui::GetIO().MouseDelta;
+		ImVec2 new_pos = m_drag_source->pos + ImGui::GetIO().MouseDelta;
+		m_controller.getEditor().moveNode(m_controller, m_drag_source, new_pos.x, new_pos.y);
 	}
 
 	if (ImGui::IsMouseReleased(0) || ImGui::IsMouseReleased(1)) m_mouse_status = NONE;
@@ -1491,6 +1518,14 @@ void ControllerResource::createAnimSlot(const char* name, const char* path)
 	auto* manager = m_engine_resource->getResourceManager().getOwner().get(ANIMATION_TYPE);
 	auto* anim = (Animation*)manager->load(Path(path));
 	m_engine_resource->addAnimation(0, crc32(name), anim);
+}
+
+
+
+Component* ControllerResource::getByUID(int uid)
+{
+	if (m_root->engine_cmp->uid == uid) return m_root;
+	return m_root->getByUID(uid);
 }
 
 

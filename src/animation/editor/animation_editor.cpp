@@ -6,6 +6,7 @@
 #include "animation/events.h"
 #include "animation/state_machine.h"
 #include "editor/asset_browser.h"
+#include "editor/ieditor_command.h"
 #include "editor/platform_interface.h"
 #include "editor/property_grid.h"
 #include "editor/utils.h"
@@ -28,6 +29,7 @@ static ImVec2 operator+(const ImVec2& lhs, const ImVec2& rhs) { return ImVec2(lh
 
 using namespace Lumix;
 
+
 static const ComponentType ANIMABLE_HASH = PropertyRegister::getComponentType("animable");
 static const ComponentType CONTROLLER_TYPE = PropertyRegister::getComponentType("anim_controller");
 static const ResourceType ANIMATION_TYPE("animation");
@@ -36,6 +38,118 @@ static const ResourceType CONTROLLER_RESOURCE_TYPE("anim_controller");
 
 namespace AnimEditor
 {
+
+
+struct MoveAnimNodeCommand : public IEditorCommand
+{
+	MoveAnimNodeCommand(ControllerResource& controller, Node* node, float x, float y)
+		: m_controller(controller)
+		, m_node_uid(node->engine_cmp->uid)
+		, m_new_pos(x, y)
+		, m_old_pos(node->pos)
+	{
+	}
+
+
+	bool execute() override
+	{
+		auto* node = (Node*)m_controller.getByUID(m_node_uid);
+		node->pos = m_new_pos;
+		return true;
+	}
+
+
+	void undo() override
+	{
+		auto* node = (Node*)m_controller.getByUID(m_node_uid);
+		node->pos = m_old_pos;
+	}
+
+
+	const char* getType() override { return "move_anim_node"; }
+
+
+	bool merge(IEditorCommand& command) override
+	{ 
+		auto& cmd = (MoveAnimNodeCommand&)command;
+		if (m_node_uid != cmd.m_node_uid || &cmd.m_controller != &m_controller) return false;
+		cmd.m_new_pos = m_new_pos;
+		return true;
+	}
+
+
+	void serialize(JsonSerializer& serializer) override
+	{
+		// TODO
+		ASSERT(false);
+	}
+
+
+	void deserialize(JsonSerializer& serializer) override
+	{
+		// TODO
+		ASSERT(false);
+	}
+
+	ControllerResource& m_controller;
+	int m_node_uid;
+	ImVec2 m_new_pos;
+	ImVec2 m_old_pos;
+};
+
+
+struct CreateAnimEdgeCommand : public IEditorCommand
+{
+	CreateAnimEdgeCommand(ControllerResource& controller, Container* container, Node* from, Node* to)
+		: m_controller(controller)
+		, m_from_uid(from->engine_cmp->uid)
+		, m_to_uid(to->engine_cmp->uid)
+		, m_edge_uid(-1)
+		, m_container_uid(container->engine_cmp->uid)
+	{
+	}
+
+	bool execute() override
+	{
+		auto* container = (Container*)m_controller.getByUID(m_container_uid);
+		if (m_edge_uid < 0) m_edge_uid = m_controller.createUID();
+		container->createEdge(m_from_uid, m_to_uid, m_edge_uid);
+		return true;
+	}
+
+
+	void undo() override
+	{
+		auto* container = (Container*)m_controller.getByUID(m_container_uid);
+		container->destroyEdge(m_edge_uid);
+	}
+
+
+	const char* getType() override { return "create_anim_edge"; }
+
+
+	bool merge(IEditorCommand& command) override { return false; }
+
+
+	void serialize(JsonSerializer& serializer) override
+	{
+		// TODO
+		ASSERT(false);
+	}
+
+
+	void deserialize(JsonSerializer& serializer) override
+	{
+		// TODO
+		ASSERT(false);
+	}
+
+	ControllerResource& m_controller;
+	int m_from_uid;
+	int m_to_uid;
+	int m_container_uid;
+	int m_edge_uid;
+};
 
 
 class AnimationEditor : public IAnimationEditor
@@ -57,6 +171,9 @@ public:
 	EventType& createEventType(const char* type) override;
 	EventType& getEventTypeByIdx(int idx) override  { return m_event_types[idx]; }
 	EventType& getEventType(u32 type) override;
+	void executeCommand(IEditorCommand& command);
+	void createEdge(ControllerResource& ctrl, Container* container, Node* from, Node* to) override;
+	void moveNode(ControllerResource& ctrl, Node* node, float x, float y) override;
 
 private:
 	void newController();
@@ -72,6 +189,8 @@ private:
 	void animationSlotsGUI();
 	void menuGUI();
 	void onSetInputGUI(u8* data, Component& component);
+	void undo();
+	void redo();
 
 private:
 	StudioApp& m_app;
@@ -82,6 +201,8 @@ private:
 	Container* m_container;
 	StaticString<MAX_PATH_LENGTH> m_path;
 	Array<EventType> m_event_types;
+	Array<IEditorCommand*> m_undo_stack;
+	int m_undo_index = -1;
 	bool m_is_playing = false;
 };
 
@@ -92,6 +213,7 @@ AnimationEditor::AnimationEditor(StudioApp& app)
 	, m_inputs_opened(false)
 	, m_offset(0, 0)
 	, m_event_types(app.getWorldEditor()->getAllocator())
+	, m_undo_stack(app.getWorldEditor()->getAllocator())
 {
 	m_path = "";
 	IAllocator& allocator = app.getWorldEditor()->getAllocator();
@@ -122,6 +244,52 @@ AnimationEditor::~AnimationEditor()
 {
 	IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
 	LUMIX_DELETE(allocator, m_resource);
+}
+
+
+void AnimationEditor::moveNode(ControllerResource& ctrl, Node* node, float x, float y)
+{
+	IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
+	auto* cmd = LUMIX_NEW(allocator, MoveAnimNodeCommand)(ctrl, node, x, y);
+	executeCommand(*cmd);
+}
+
+
+void AnimationEditor::createEdge(ControllerResource& ctrl, Container* container, Node* from, Node* to)
+{
+	IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
+	auto* cmd = LUMIX_NEW(allocator, CreateAnimEdgeCommand)(ctrl, container, from, to);
+	executeCommand(*cmd);
+}
+
+
+void AnimationEditor::executeCommand(IEditorCommand& command)
+{
+	// TODO clean memory in destructor
+	IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
+	while (m_undo_stack.size() > m_undo_index + 1)
+	{
+		LUMIX_DELETE(allocator, m_undo_stack.back());
+		m_undo_stack.pop();
+	}
+
+	if (!m_undo_stack.empty())
+	{
+		auto* back = m_undo_stack.back();
+		if (back->getType() == command.getType())
+		{
+			if (command.merge(*back))
+			{
+				back->execute();
+				LUMIX_DELETE(allocator, &command);
+				return;
+			}
+		}
+	}
+
+	m_undo_stack.push(&command);
+	++m_undo_index;
+	command.execute();
 }
 
 
@@ -303,6 +471,13 @@ void AnimationEditor::menuGUI()
 			if (ImGui::MenuItem("Open from selected entity")) loadFromEntity();
 			ImGui::EndMenu();
 		}
+		if (ImGui::BeginMenu("Edit"))
+		{
+			if (ImGui::MenuItem("Undo")) undo();
+			if (ImGui::MenuItem("Redo")) redo();
+			ImGui::EndMenu();
+		}
+
 		ImGui::SameLine();
 		ImGui::Checkbox("Play", &m_is_playing);
 		ImGui::SameLine();
@@ -313,6 +488,24 @@ void AnimationEditor::menuGUI()
 
 		ImGui::EndMenuBar();
 	}
+}
+
+
+void AnimationEditor::redo()
+{
+	if (m_undo_index == m_undo_stack.size() - 1) return;
+
+	++m_undo_index;
+	m_undo_stack[m_undo_index]->execute();
+}
+
+
+void AnimationEditor::undo()
+{
+	if (m_undo_index < 0) return;
+
+	m_undo_stack[m_undo_index]->undo();
+	--m_undo_index;
 }
 
 
