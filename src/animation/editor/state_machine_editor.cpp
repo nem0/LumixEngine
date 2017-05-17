@@ -1386,7 +1386,6 @@ void StateMachine::drawInside(ImDrawList* draw, const ImVec2& canvas_screen_pos)
 		}
 	}
 
-
 	if (m_mouse_status == DRAG_NODE)
 	{
 		ImVec2 new_pos = m_drag_source->pos + ImGui::GetIO().MouseDelta;
