@@ -197,6 +197,7 @@ struct StateMachineInstance : public NodeInstance
 	StateMachine& source;
 	ComponentInstance* current;
 	IAllocator& allocator;
+	float time;
 };
 
 
