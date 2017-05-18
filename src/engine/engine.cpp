@@ -1396,15 +1396,9 @@ public:
 			g_log_error.log("Editor") << "Prefab " << prefab->getPath().c_str() << " is not ready, preload it.";
 			return 0;
 		}
-		Array<Entity> entities(engine->m_lifo_allocator);
-		universe->instantiatePrefab(*prefab, position, { 0, 0, 0, 1 }, 1, entities);
+		Entity entity = universe->instantiatePrefab(*prefab, position, {0, 0, 0, 1}, 1);
 
-		lua_createtable(L, entities.size(), 0);
-		for (int i = 0; i < entities.size(); ++i)
-		{
-			LuaWrapper::push(L, entities[i]);
-			lua_rawseti(L, -2, i + 1);
-		}
+		LuaWrapper::push(L, entity);
 		return 1;
 	}
 

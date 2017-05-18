@@ -452,7 +452,7 @@ void Universe::setParent(Entity new_parent, Entity child)
 					*x = getNextSibling(child);
 					break;
 				}
-				x = &m_hierarchy[x->index].next_sibling;
+				x = &m_hierarchy[m_entities[x->index].hierarchy].next_sibling;
 			}
 			m_hierarchy[child_idx].parent = INVALID_ENTITY;
 			m_hierarchy[child_idx].next_sibling = INVALID_ENTITY;
@@ -637,14 +637,13 @@ struct PrefabEntityGUIDMap : public ILoadEntityGUIDMap
 };
 
 
-void Universe::instantiatePrefab(const PrefabResource& prefab,
+Entity Universe::instantiatePrefab(const PrefabResource& prefab,
 	const Vec3& pos,
 	const Quat& rot,
-	float scale,
-	Array<Entity>& entities)
+	float scale)
 {
-	ASSERT(entities.empty());
 	InputBlob blob(prefab.blob.getData(), prefab.blob.getPos());
+	Array<Entity> entities(m_allocator);
 	PrefabEntityGUIDMap entity_map(entities);
 	TextDeserializer deserializer(blob, entity_map);
 	u32 version;
@@ -652,7 +651,7 @@ void Universe::instantiatePrefab(const PrefabResource& prefab,
 	if (version > (int)PrefabVersion::LAST)
 	{
 		g_log_error.log("Engine") << "Prefab " << prefab.getPath() << " has unsupported version.";
-		return;
+		return INVALID_ENTITY;
 	}
 	int count;
 	deserializer.read(&count);
@@ -696,6 +695,7 @@ void Universe::instantiatePrefab(const PrefabResource& prefab,
 		}
 		++entity_idx;
 	}
+	return entities[0];
 }
 
 
