@@ -838,6 +838,9 @@ public:
 
 	void serializeDecal(ISerializer& serializer, ComponentHandle cmp)
 	{
+		const Decal& decal = m_decals[{cmp.index}];
+		serializer.write("scale", decal.scale);
+		serializer.write("material", decal.material ? decal.material->getPath().c_str() : "");
 	}
 
 
