@@ -11,4 +11,26 @@
 			</ArrayItems>
 		</Expand>
 	</Type>
+
+  <Type Name="Lumix::HashMap&lt;*,*&gt;">
+    <DisplayString>{{ size={m_size} }}</DisplayString>
+    <Expand>
+      <Item Name="[size]" ExcludeView="simple">m_size</Item>
+      <CustomListItems MaxItemsPerView="5000" ExcludeView="Test">
+        <Variable Name="i" InitialValue="0" />
+        <Variable Name="j" InitialValue="m_table" />
+        <Loop>
+          <Break Condition="i == m_max_id" />
+          <Exec>j = &amp;m_table[i]</Exec>
+          <Loop>
+            <Break Condition="j == m_sentinel" />
+            <Break Condition="j->m_next == m_sentinel" />
+            <Item Name="[{j-&gt;m_key}]">j->m_value</Item>
+            <Exec>j = j-&gt;m_next</Exec>
+          </Loop>
+          <Exec>++i</Exec>
+        </Loop>
+      </CustomListItems>
+    </Expand>
+  </Type>
 </AutoVisualizer>
