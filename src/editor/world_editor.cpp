@@ -2160,10 +2160,8 @@ public:
 				deserializer.read(&parent);
 				if (isValid(parent)) m_universe->setParent(parent, entity);
 
-				m_universe->setTransform(entity, tr);
 				if(name[0]) m_universe->setEntityName(entity, name);
-				m_universe->setScale(entity, scale);
-				m_universe->setTransform(entity, tr);
+				m_universe->setTransformKeepChildren(entity, tr, scale);
 				u32 cmp_type_hash;
 				deserializer.read(&cmp_type_hash);
 				while (cmp_type_hash != 0)

@@ -152,6 +152,40 @@ Matrix Universe::getPositionAndRotation(Entity entity) const
 }
 
 
+void Universe::setTransformKeepChildren(Entity entity, const Transform& transform, float scale)
+{
+	auto& tmp = m_entities[entity.index];
+	tmp.position = transform.pos;
+	tmp.rotation = transform.rot;
+	tmp.scale = scale;
+	
+	int hierarchy_idx = m_entities[entity.index].hierarchy;
+	entityTransformed().invoke(entity);
+	if (hierarchy_idx >= 0)
+	{
+		Hierarchy& h = m_hierarchy[hierarchy_idx];
+		Transform my_transform = getTransform(entity);
+		if (isValid(h.parent))
+		{
+			Transform parent_tr = getTransform(h.parent);
+			h.local_transform = parent_tr.inverted() * my_transform;
+			h.local_scale = getScale(h.parent) * getScale(entity);
+		}
+
+		Entity child = h.first_child;
+		while (isValid(child))
+		{
+			Hierarchy& child_h = m_hierarchy[m_entities[child.index].hierarchy];
+
+			child_h.local_transform = my_transform.inverted() * getTransform(child);
+			child_h.local_scale = scale * getScale(child);
+			child = child_h.next_sibling;
+		}
+	}
+
+}
+
+
 void Universe::setTransform(Entity entity, const Transform& transform)
 {
 	auto& tmp = m_entities[entity.index];
