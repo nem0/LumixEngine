@@ -23,9 +23,10 @@
           <Break Condition="i == m_max_id" />
           <Exec>j = &amp;m_table[i]</Exec>
           <Loop>
+            <Break Condition="j == 0" />
             <Break Condition="j == m_sentinel" />
-            <Break Condition="j->m_next == m_sentinel" />
-            <Item Name="[{j-&gt;m_key}]">j->m_value</Item>
+            <Break Condition="j-&gt;m_next == m_sentinel" />
+            <Item Name="[{j-&gt;m_key}]">j-&gt;m_value</Item>
             <Exec>j = j-&gt;m_next</Exec>
           </Loop>
           <Exec>++i</Exec>
