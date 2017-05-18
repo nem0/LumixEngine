@@ -1192,10 +1192,10 @@ void TerrainEditor::paintEntities(const Lumix::Vec3& hit_pos)
 				float size = Lumix::Math::randFloat(m_size_spread.x, m_size_spread.y);
 				int random_idx = Lumix::Math::rand(0, m_selected_prefabs.size() - 1);
 				if (!m_selected_prefabs[random_idx]) continue;
-				auto* entities = prefab_system.instantiatePrefab(*m_selected_prefabs[random_idx], pos, rot, size);
-				if (entities && !entities->empty())
+				Lumix::Entity entity = prefab_system.instantiatePrefab(*m_selected_prefabs[random_idx], pos, rot, size);
+				if (Lumix::isValid(entity))
 				{
-					Lumix::ComponentHandle cmp = scene->getComponent((*entities)[0], MODEL_INSTANCE_TYPE);
+					Lumix::ComponentHandle cmp = scene->getComponent(entity, MODEL_INSTANCE_TYPE);
 					Lumix::Model* model = scene->getModelInstanceModel(cmp);
 					if (isOBBCollision(*scene, meshes, pos, model, scale))
 					{

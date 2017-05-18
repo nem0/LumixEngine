@@ -85,7 +85,6 @@ class PrefabSystemImpl LUMIX_FINAL : public PrefabSystem
 	{
 		InstantiatePrefabCommand(WorldEditor& _editor)
 			: editor(_editor)
-			, entities(_editor.getAllocator())
 		{
 		}
 
@@ -96,17 +95,41 @@ class PrefabSystemImpl LUMIX_FINAL : public PrefabSystem
 		}
 
 
+		void createEntityGUIDRecursive(Entity entity)
+		{
+			if (!isValid(entity)) return;
+
+			editor.createEntityGUID(entity);
+			
+			Universe& universe = *editor.getUniverse();
+			createEntityGUIDRecursive(universe.getFirstChild(entity));
+			createEntityGUIDRecursive(universe.getNextSibling(entity));
+		}
+
+
+		void destroyEntityRecursive(Entity entity)
+		{
+			if (!isValid(entity)) return;
+
+			Universe& universe = *editor.getUniverse();
+			destroyEntityRecursive(universe.getFirstChild(entity));
+			destroyEntityRecursive(universe.getNextSibling(entity));
+
+			universe.destroyEntity(entity);
+			editor.destroyEntityGUID(entity);
+
+		}
+
+
 		bool execute() override
 		{
-			entities.clear();
+			entity = INVALID_ENTITY;
 			if (!prefab->isReady()) return false;
 			auto& system = (PrefabSystemImpl&)editor.getPrefabSystem();
 
-			system.instantiatePrefab(*prefab, position, rotation, scale, &entities);
-			for (Entity entity : entities)
-			{
-				editor.createEntityGUID(entity);
-			}
+			entity = system.doInstantiatePrefab(*prefab, position, rotation, scale);
+			editor.createEntityGUID(entity);
+			createEntityGUIDRecursive(editor.getUniverse()->getFirstChild(entity));
 			return true;
 		}
 
@@ -114,11 +137,10 @@ class PrefabSystemImpl LUMIX_FINAL : public PrefabSystem
 		void undo() override
 		{
 			Universe& universe = *editor.getUniverse();
-			for (auto entity : entities)
-			{
-				universe.destroyEntity(entity);
-				editor.destroyEntityGUID(entity);
-			}
+
+			destroyEntityRecursive(universe.getFirstChild(entity));
+			universe.destroyEntity(entity);
+			editor.destroyEntityGUID(entity);
 		}
 
 
@@ -165,7 +187,7 @@ class PrefabSystemImpl LUMIX_FINAL : public PrefabSystem
 		Quat rotation;
 		float scale;
 		WorldEditor& editor;
-		Array<Entity> entities;
+		Entity entity;
 	};
 
 public:
@@ -389,11 +411,7 @@ public:
 	};
 
 
-	void instantiatePrefab(PrefabResource& prefab_res,
-		const Vec3& pos,
-		const Quat& rot,
-		float scale,
-		Array<Entity>* out_entities)
+	Entity doInstantiatePrefab(PrefabResource& prefab_res, const Vec3& pos, const Quat& rot, float scale)
 	{
 		if (!m_resources.find(prefab_res.getPath().getHash()).isValid())
 		{
@@ -401,23 +419,22 @@ public:
 			prefab_res.getResourceManager().load(prefab_res);
 		}
 		InputBlob blob(prefab_res.blob.getData(), prefab_res.blob.getPos());
-		Array<Entity> local_entities(m_editor.getAllocator());
-		Array<Entity>* entities = out_entities ? out_entities : &local_entities;
-		LoadEntityGUIDMap entity_map(*entities);
+		Array<Entity> entities(m_editor.getAllocator());
+		LoadEntityGUIDMap entity_map(entities);
 		TextDeserializer deserializer(blob, entity_map);
 		u32 version;
 		deserializer.read(&version);
 		if (version > (int)PrefabVersion::LAST)
 		{
 			g_log_error.log("Editor") << "Prefab " << prefab_res.getPath() << " has unsupported version.";
-			return;
+			return INVALID_ENTITY;
 		}
 		int count;
 		deserializer.read(&count);
-		entities->reserve(count);
+		entities.reserve(count);
 		for (int i = 0; i < count; ++i)
 		{
-			entities->push(m_universe->createEntity({0, 0, 0}, {0, 0, 0, 1}));
+			entities.push(m_universe->createEntity({0, 0, 0}, {0, 0, 0, 1}));
 		}
 
 		int entity_idx = 0;
@@ -425,7 +442,7 @@ public:
 		{
 			u64 prefab;
 			deserializer.read(&prefab);
-			Entity entity = (*entities)[entity_idx];
+			Entity entity = entities[entity_idx];
 			m_universe->setTransform(entity, { pos, rot });
 			reserve(entity);
 			m_prefabs[entity.index].prefab = prefab;
@@ -458,10 +475,11 @@ public:
 			}
 			++entity_idx;
 		}
+		return entities[0];
 	}
 
 
-	Array<Entity>* instantiatePrefab(PrefabResource& prefab, const Vec3& pos, const Quat& rot, float scale) override
+	Entity instantiatePrefab(PrefabResource& prefab, const Vec3& pos, const Quat& rot, float scale) override
 	{
 		InstantiatePrefabCommand* cmd = LUMIX_NEW(m_editor.getAllocator(), InstantiatePrefabCommand)(m_editor);
 		cmd->position = pos;
@@ -470,7 +488,7 @@ public:
 		cmd->rotation = rot;
 		cmd->scale = scale;
 		cmd = (InstantiatePrefabCommand*)m_editor.executeCommand(cmd);
-		return cmd ? &cmd->entities : nullptr;
+		return cmd ? cmd->entity : INVALID_ENTITY;
 	}
 
 
@@ -711,7 +729,7 @@ public:
 			serializer.read(&rot);
 			float scale;
 			serializer.read(&scale);
-			instantiatePrefab(*m_resources[res_hash], pos, rot, scale, nullptr);
+			doInstantiatePrefab(*m_resources[res_hash], pos, rot, scale);
 		}
 	}
 
