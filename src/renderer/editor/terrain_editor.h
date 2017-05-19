@@ -45,6 +45,8 @@ public:
 	void setComponent(Lumix::ComponentUID cmp) { m_component = cmp; }
 
 private:
+	void splitSplatmap(const char* dir);
+	void mergeSplatmap(const char* dir);
 	void onUniverseDestroyed();
 	void detectModifiers();
 	void drawCursor(Lumix::RenderScene& scene, Lumix::ComponentHandle cmp, const Lumix::Vec3& center);

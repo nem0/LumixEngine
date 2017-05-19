@@ -943,7 +943,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 		FS::FileSystem& fs = m_renderer.getEngine().getFileSystem();
 		FS::IFile* file = fs.open(fs.getDefaultDevice(), Path(out_path), FS::Mode::CREATE_AND_WRITE);
-		Texture::saveTGA(m_renderer.getEngine().getAllocator(), file, fb->getWidth(), fb->getHeight(), 4, &data[0], Path(out_path));
+		Texture::saveTGA(file, fb->getWidth(), fb->getHeight(), 4, &data[0], Path(out_path), m_renderer.getEngine().getAllocator());
 
 		fs.close(*file);
 

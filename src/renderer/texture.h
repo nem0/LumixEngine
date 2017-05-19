@@ -13,6 +13,25 @@ namespace FS
 }
 
 
+#pragma pack(1)
+struct TGAHeader
+{
+	u8 idLength;
+	u8 colourMapType;
+	u8 dataType;
+	u16 colourMapOrigin;
+	u16 colourMapLength;
+	u8 colourMapDepth;
+	u16 xOrigin;
+	u16 yOrigin;
+	u16 width;
+	u16 height;
+	u8 bitsPerPixel;
+	u8 imageDescriptor;
+};
+#pragma pack()
+
+
 class LUMIX_RENDERER_API Texture LUMIX_FINAL : public Resource
 {
 	public:
@@ -33,14 +52,15 @@ class LUMIX_RENDERER_API Texture LUMIX_FINAL : public Resource
 		u32 getPixelNearest(int x, int y) const;
 		u32 getPixel(float x, float y) const;
 
-		static unsigned int compareTGA(IAllocator& allocator, FS::IFile* file1, FS::IFile* file2, int difference);
-		static bool saveTGA(IAllocator& allocator,
-			FS::IFile* file,
+		static unsigned int compareTGA(FS::IFile* file1, FS::IFile* file2, int difference, IAllocator& allocator);
+		static bool saveTGA(FS::IFile* file,
 			int width,
 			int height,
 			int bytes_per_pixel,
 			const u8* image_dest,
-			const Path& path);
+			const Path& path,
+			IAllocator& allocator);
+		static bool loadTGA(FS::IFile& file, TGAHeader& header, Array<u8>& data, const char* path);
 
 	public:
 		int width;
@@ -59,6 +79,7 @@ class LUMIX_RENDERER_API Texture LUMIX_FINAL : public Resource
 	private:
 		void unload(void) override;
 		bool load(FS::IFile& file) override;
+		bool loadTGA(FS::IFile& file);
 };
 
 
