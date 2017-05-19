@@ -17,25 +17,6 @@ namespace Lumix
 static const ResourceType TEXTURE_TYPE("texture");
 
 
-#pragma pack(1)
-struct TGAHeader
-{
-	char idLength;
-	char colourMapType;
-	char dataType;
-	short int colourMapOrigin;
-	short int colourMapLength;
-	char colourMapDepth;
-	short int xOrigin;
-	short int yOrigin;
-	short int width;
-	short int height;
-	char bitsPerPixel;
-	char imageDescriptor;
-};
-#pragma pack()
-
-
 Texture::Texture(const Path& path, ResourceManagerBase& resource_manager, IAllocator& _allocator)
 	: Resource(path, resource_manager, _allocator)
 	, data_reference(0)
@@ -153,7 +134,7 @@ u32 Texture::getPixel(float x, float y) const
 }
 
 
-unsigned int Texture::compareTGA(IAllocator& allocator, FS::IFile* file1, FS::IFile* file2, int difference)
+unsigned int Texture::compareTGA(FS::IFile* file1, FS::IFile* file2, int difference, IAllocator& allocator)
 {
 	TGAHeader header1, header2;
 	file1->read(&header1, sizeof(header1));
@@ -202,13 +183,13 @@ unsigned int Texture::compareTGA(IAllocator& allocator, FS::IFile* file1, FS::IF
 }
 
 
-bool Texture::saveTGA(IAllocator& allocator,
-	FS::IFile* file,
+bool Texture::saveTGA(FS::IFile* file,
 	int width,
 	int height,
 	int bytes_per_pixel,
 	const u8* image_dest,
-	const Path& path)
+	const Path& path,
+	IAllocator& allocator)
 {
 	if (bytes_per_pixel != 4)
 	{
@@ -261,13 +242,13 @@ static void saveTGA(Texture& texture)
 	FS::FileSystem& fs = texture.getResourceManager().getOwner().getFileSystem();
 	FS::IFile* file = fs.open(fs.getDefaultDevice(), texture.getPath(), FS::Mode::CREATE_AND_WRITE);
 
-	Texture::saveTGA(texture.allocator,
-		file,
+	Texture::saveTGA(file,
 		texture.width,
 		texture.height,
 		texture.bytes_per_pixel,
 		&texture.data[0],
-		texture.getPath());
+		texture.getPath(),
+		texture.allocator);
 
 	fs.close(*file);
 }
@@ -376,36 +357,28 @@ bool loadRaw(Texture& texture, FS::IFile& file)
 }
 
 
-static bool loadTGA(Texture& texture, FS::IFile& file)
+bool Texture::loadTGA(FS::IFile& file, TGAHeader& header, Array<u8>& data, const char* path)
 {
 	PROFILE_FUNCTION();
-	TGAHeader header;
 	file.read(&header, sizeof(header));
 
 	int bytes_per_pixel = header.bitsPerPixel / 8;
 	int image_size = header.width * header.height * 4;
 	if (header.dataType != 2 && header.dataType != 10)
 	{
-		g_log_error.log("Renderer") << "Unsupported texture format " << texture.getPath().c_str();
+		g_log_error.log("Renderer") << "Unsupported texture format " << path;
 		return false;
 	}
 
 	if (bytes_per_pixel < 3)
 	{
-		g_log_error.log("Renderer") << "Unsupported color mode " << texture.getPath().c_str();
+		g_log_error.log("Renderer") << "Unsupported color mode " << path;
 		return false;
 	}
 
-	texture.width = header.width;
-	texture.height = header.height;
-	int pixel_count = texture.width * texture.height;
-	texture.is_cubemap = false;
-	TextureManager& manager = static_cast<TextureManager&>(texture.getResourceManager());
-	if (texture.data_reference)
-	{
-		texture.data.resize(image_size);
-	}
-	u8* image_dest = texture.data_reference ? &texture.data[0] : (u8*)manager.getBuffer(image_size);
+	int pixel_count = header.width * header.height;
+	data.resize(image_size);
+	u8* image_dest = &data[0];
 
 	bool is_rle = header.dataType == 10;
 	if (is_rle)
@@ -466,18 +439,112 @@ static bool loadTGA(Texture& texture, FS::IFile& file)
 			}
 		}
 	}
-	texture.bytes_per_pixel = 4;
-	texture.mips = 1;
-	texture.handle = bgfx::createTexture2D(
+	return true;
+}
+
+
+bool Texture::loadTGA(FS::IFile& file)
+{
+	PROFILE_FUNCTION();
+	TGAHeader header;
+	file.read(&header, sizeof(header));
+
+	bytes_per_pixel = header.bitsPerPixel / 8;
+	int image_size = header.width * header.height * 4;
+	if (header.dataType != 2 && header.dataType != 10)
+	{
+		g_log_error.log("Renderer") << "Unsupported texture format " << getPath().c_str();
+		return false;
+	}
+
+	if (bytes_per_pixel < 3)
+	{
+		g_log_error.log("Renderer") << "Unsupported color mode " << getPath().c_str();
+		return false;
+	}
+
+	width = header.width;
+	height = header.height;
+	int pixel_count = width * height;
+	is_cubemap = false;
+	TextureManager& manager = static_cast<TextureManager&>(getResourceManager());
+	if (data_reference)
+	{
+		data.resize(image_size);
+	}
+	u8* image_dest = data_reference ? &data[0] : (u8*)manager.getBuffer(image_size);
+
+	bool is_rle = header.dataType == 10;
+	if (is_rle)
+	{
+		u8* out = image_dest;
+		u8 byte;
+		struct Pixel {
+			u8 uint8[4];
+		} pixel;
+		do
+		{
+			file.read(&byte, sizeof(byte));
+			if (byte < 128)
+			{
+				u8 count = byte + 1;
+				for (u8 i = 0; i < count; ++i)
+				{
+					file.read(&pixel, bytes_per_pixel);
+					out[0] = pixel.uint8[2];
+					out[1] = pixel.uint8[1];
+					out[2] = pixel.uint8[0];
+					if (bytes_per_pixel == 4) out[3] = pixel.uint8[3];
+					else out[3] = 255;
+					out += 4;
+				}
+			}
+			else
+			{
+				byte -= 127;
+				file.read(&pixel, bytes_per_pixel);
+				for (int i = 0; i < byte; ++i)
+				{
+					out[0] = pixel.uint8[2];
+					out[1] = pixel.uint8[1];
+					out[2] = pixel.uint8[0];
+					if (bytes_per_pixel == 4) out[3] = pixel.uint8[3];
+					else out[3] = 255;
+					out += 4;
+				}
+			}
+		} while (out - image_dest < pixel_count * 4);
+	}
+	else
+	{
+		for (long y = 0; y < header.height; y++)
+		{
+			long idx = y * header.width * 4;
+			for (long x = 0; x < header.width; x++)
+			{
+				file.read(&image_dest[idx + 2], sizeof(u8));
+				file.read(&image_dest[idx + 1], sizeof(u8));
+				file.read(&image_dest[idx + 0], sizeof(u8));
+				if (bytes_per_pixel == 4)
+					file.read(&image_dest[idx + 3], sizeof(u8));
+				else
+					image_dest[idx + 3] = 255;
+				idx += 4;
+			}
+		}
+	}
+	bytes_per_pixel = 4;
+	mips = 1;
+	handle = bgfx::createTexture2D(
 		header.width,
 		header.height,
 		false,
 		0,
 		bgfx::TextureFormat::RGBA8,
-		texture.bgfx_flags,
+		bgfx_flags,
 		nullptr);
 	// update must be here because texture is immutable otherwise 
-	bgfx::updateTexture2D(texture.handle,
+	bgfx::updateTexture2D(handle,
 		0,
 		0,
 		0,
@@ -485,9 +552,9 @@ static bool loadTGA(Texture& texture, FS::IFile& file)
 		header.width,
 		header.height,
 		bgfx::copy(image_dest, header.width * header.height * 4));
-	texture.depth = 1;
-	texture.layers = 1;
-	return bgfx::isValid(texture.handle);
+	depth = 1;
+	layers = 1;
+	return bgfx::isValid(handle);
 }
 
 
@@ -543,7 +610,7 @@ bool Texture::load(FS::IFile& file)
 	}
 	else
 	{
-		loaded = loadTGA(*this, file);
+		loaded = loadTGA(file);
 	}
 	if (!loaded)
 	{

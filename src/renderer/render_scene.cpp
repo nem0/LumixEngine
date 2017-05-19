@@ -2912,7 +2912,7 @@ public:
 			Lumix::g_log_error.log("render_test") << "Failed to open " << path_preimage;
 			return 0xffffFFFF;
 		}
-		unsigned int result = Lumix::Texture::compareTGA(scene->m_allocator, file1, file2, min_diff);
+		unsigned int result = Lumix::Texture::compareTGA(file1, file2, min_diff, scene->m_allocator);
 		fs.close(*file1);
 		fs.close(*file2);
 		return result;
