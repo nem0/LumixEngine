@@ -67,6 +67,8 @@ private:
 	Lumix::Array<IPlugin*> m_plugins;
 	
 	char m_component_filter[32];
+	char m_entity_filter[32];
+	Lumix::Entity m_deferred_select = Lumix::INVALID_ENTITY;
 
 	float m_particle_emitter_timescale;
 	bool m_particle_emitter_updating;
