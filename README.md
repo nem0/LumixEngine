@@ -17,7 +17,7 @@
 * [Videos](https://www.youtube.com/channel/UCtjtIy0ldsq-9siM1Gm_rXg)
 * [Roadmap](https://github.com/nem0/LumixEngine/milestones)
 
-![Editor screenshot](https://cloud.githubusercontent.com/assets/153526/15267669/27cf899c-19c8-11e6-941c-179ab5c1770f.png)
+![Editor screenshot](https://cloud.githubusercontent.com/assets/153526/26275242/6e9f7f90-3d5c-11e7-8548-f6ae82d4ba52.jpg)
 
 [3rd party libraries](https://github.com/nem0/lumixengine_3rdparty)
 
