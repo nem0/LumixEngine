@@ -28,6 +28,7 @@ PropertyGrid::PropertyGrid(StudioApp& app)
 	m_particle_emitter_updating = true;
 	m_particle_emitter_timescale = 1.0f;
 	m_component_filter[0] = '\0';
+	m_entity_filter[0] = '\0';
 }
 
 
@@ -255,10 +256,14 @@ void PropertyGrid::showEntityProperty(const Lumix::Array<Lumix::Entity>& entitie
 	Lumix::Universe& universe = *m_editor.getUniverse();
 	if (ImGui::BeginPopup(desc.getName()))
 	{
+		if (isValid(entity) && ImGui::Button("Select")) m_deferred_select = entity;
+
+		ImGui::FilterInput("Filter", m_entity_filter, sizeof(m_entity_filter));
 		for (auto i = universe.getFirstEntity(); isValid(i); i = universe.getNextEntity(i))
 		{
 			getEntityListDisplayName(m_editor, buf, Lumix::lengthOf(buf), i);
-			if (ImGui::Selectable(buf))
+			bool show = m_entity_filter[0] == '\0' || Lumix::stristr(buf, m_entity_filter) != 0;
+			if (show && ImGui::Selectable(buf))
 			{
 				m_editor.setProperty(cmp_type, index, desc, &entities[0], entities.size(), &i, sizeof(i));
 			}
@@ -476,6 +481,12 @@ void PropertyGrid::showArrayProperty(const Lumix::Array<Lumix::Entity>& entities
 			if (desc.canRemove()) ImGui::TreePop();
 		}
 		ImGui::PopID();
+	}
+
+	if (Lumix::isValid(m_deferred_select))
+	{
+		m_editor.selectEntities(&m_deferred_select, 1);
+		m_deferred_select = Lumix::INVALID_ENTITY;
 	}
 }
 
