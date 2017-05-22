@@ -28,6 +28,7 @@
 #include "imgui/imgui.h"
 #include "lua_script/lua_script_manager.h"
 #include "lua_script/lua_script_system.h"
+#include <cstdlib>
 
 
 using namespace Lumix;
@@ -555,11 +556,15 @@ struct AssetBrowserPlugin : AssetBrowser::IPlugin
 };
 
 
+
+
+
 struct ConsolePlugin LUMIX_FINAL : public StudioApp::IPlugin
 {
 	ConsolePlugin(StudioApp& _app)
 		: app(_app)
 		, opened(false)
+		, autocomplete(_app.getWorldEditor()->getAllocator())
 	{
 		Action* action = LUMIX_NEW(app.getWorldEditor()->getAllocator(), Action)("Script Console", "script_console");
 		action->func.bind<ConsolePlugin, &ConsolePlugin::toggleOpened>(this);
@@ -574,6 +579,97 @@ struct ConsolePlugin LUMIX_FINAL : public StudioApp::IPlugin
 
 	bool isOpened() const { return opened; }
 	void toggleOpened() { opened = !opened; }
+
+
+	void autocompleteSubstep(lua_State* L, const char* str, ImGuiTextEditCallbackData *data)
+	{
+		char item[128];
+		const char* next = str;
+		char* c = item;
+		while (*next != '.' && *next != '\0')
+		{
+			*c = *next;
+			++next;
+			++c;
+		}
+		*c = '\0';
+
+		lua_pushnil(L);
+		while (lua_next(L, -2) != 0)
+		{
+			const char* name = lua_tostring(L, -2);
+			if (startsWith(name, item))
+			{
+				if (*next == '.' && next[1] == '\0')
+				{
+					autocompleteSubstep(L, "", data);
+				}
+				else if (*next == '\0')
+				{
+					autocomplete.push(string(name, app.getWorldEditor()->getAllocator()));
+				}
+				else
+				{
+					autocompleteSubstep(L, next + 1, data);
+				}
+			}
+			lua_pop(L, 1);
+		}
+	}
+
+
+	static bool isWordChar(char c)
+	{
+		return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_';
+	}
+
+
+	static int autocompleteCallback(ImGuiTextEditCallbackData *data)
+	{
+		auto* that = (ConsolePlugin*)data->UserData;
+		if (data->EventFlag == ImGuiInputTextFlags_CallbackCompletion)
+		{
+			lua_State* L = that->app.getWorldEditor()->getEngine().getState();
+
+			int start_word = data->CursorPos;
+			char c = data->Buf[start_word - 1];
+			while (start_word > 0 && (isWordChar(c) || c == '.'))
+			{
+				--start_word;
+				c = data->Buf[start_word - 1];
+			}
+			char tmp[128];
+			copyNString(tmp, lengthOf(tmp), data->Buf + start_word, data->CursorPos - start_word);
+
+			that->autocomplete.clear();
+			lua_pushglobaltable(L);
+			that->autocompleteSubstep(L, tmp, data);
+			lua_pop(L, 1);
+			if (!that->autocomplete.empty())
+			{
+				that->open_autocomplete = true;
+				qsort(&that->autocomplete[0],
+					that->autocomplete.size(),
+					sizeof(that->autocomplete[0]),
+					[](const void* a, const void* b) {
+					return ((const string*)a)->compareString(((const string*)b)->c_str());
+				});
+			}
+		}
+		else if (that->insert_value)
+		{
+			int start_word = data->CursorPos;
+			char c = data->Buf[start_word - 1];
+			while (start_word > 0 && (isWordChar(c)))
+			{
+				--start_word;
+				c = data->Buf[start_word - 1];
+			}
+			data->InsertChars(data->CursorPos, that->insert_value + data->CursorPos - start_word);
+			that->insert_value = nullptr;
+		}
+		return 0;
+	}
 
 
 	void onWindowGUI() override
@@ -623,16 +719,53 @@ struct ConsolePlugin LUMIX_FINAL : public StudioApp::IPlugin
 					}
 				}
 			}
-			ImGui::InputTextMultiline("", buf, lengthOf(buf), ImVec2(-1, -1));
+			if(insert_value) ImGui::SetKeyboardFocusHere();
+			ImGui::InputTextMultiline("",
+				buf,
+				lengthOf(buf),
+				ImVec2(-1, -1),
+				ImGuiInputTextFlags_CallbackAlways | ImGuiInputTextFlags_CallbackCompletion,
+				autocompleteCallback,
+				this);
+
+			if (open_autocomplete) ImGui::OpenPopup("autocomplete");
+			open_autocomplete = false;
+			if (ImGui::BeginPopup("autocomplete"))
+			{
+				if (autocomplete.size() == 1)
+				{
+					insert_value = autocomplete[0].c_str();
+				}
+				if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_DownArrow))) ++autocomplete_selected;
+				if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_UpArrow))) --autocomplete_selected;
+				if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Enter))) insert_value = autocomplete[autocomplete_selected].c_str();
+				if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Escape))) ImGui::CloseCurrentPopup();
+				autocomplete_selected = Math::clamp(autocomplete_selected, 0, autocomplete.size() - 1);
+				for (int i = 0, c = autocomplete.size(); i < c; ++i)
+				{
+					const char* value = autocomplete[i].c_str();
+					if (ImGui::Selectable(value, autocomplete_selected == i))
+					{
+						insert_value = value;
+					}
+				}
+				ImGui::EndPopup();
+			}
 		}
 		ImGui::EndDock();
 	}
 
 
 	StudioApp& app;
+	Array<string> autocomplete;
 	bool opened;
-	char buf[10*1024];
+	bool open_autocomplete = false;
+	int autocomplete_selected = 1;
+	const char* insert_value = nullptr;
+	char buf[10 * 1024];
 };
+
+
 
 
 } // anonoymous namespace
