@@ -422,20 +422,6 @@ public:
 		}
 	}
 
-public:
-	static const int npos = 0xffFFffFF;
-
-private:
-	static i32 stringLength(const T* rhs)
-	{
-		const T* c = rhs;
-		while (*c)
-		{
-			++c;
-		}
-		return (i32)(c - rhs);
-	}
-
 	int compareString(const T* rhs) const
 	{
 		if (!m_cstr)
@@ -453,6 +439,19 @@ private:
 		return *left < *right ? -1 : (*left == *right ? 0 : 1);
 	}
 
+public:
+	static const int npos = 0xffFFffFF;
+
+private:
+	static i32 stringLength(const T* rhs)
+	{
+		const T* c = rhs;
+		while (*c)
+		{
+			++c;
+		}
+		return (i32)(c - rhs);
+	}
 
 private:
 	i32 m_size;
