@@ -74,6 +74,12 @@ namespace ImGui
 	}
 
 
+	ImVec2 GetOsImePosRequest()
+	{
+		return ImGui::GetCurrentContext()->OsImePosRequest;
+	}
+
+
 	void ResetActiveID()
 	{
 		SetActiveID(0, nullptr);

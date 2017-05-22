@@ -728,7 +728,11 @@ struct ConsolePlugin LUMIX_FINAL : public StudioApp::IPlugin
 				autocompleteCallback,
 				this);
 
-			if (open_autocomplete) ImGui::OpenPopup("autocomplete");
+			if (open_autocomplete)
+			{
+				ImGui::OpenPopup("autocomplete");
+				ImGui::SetNextWindowPos(ImGui::GetOsImePosRequest());
+			}
 			open_autocomplete = false;
 			if (ImGui::BeginPopup("autocomplete"))
 			{
