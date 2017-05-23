@@ -3,6 +3,7 @@
 #include "engine/array.h"
 #include "engine/base_proxy_allocator.h"
 #include "engine/blob.h"
+#include "engine/delegate_list.h"
 #include "engine/fs/disk_file_device.h"
 #include "engine/fs/file_system.h"
 #include "engine/mt/lock_free_fixed_queue.h"

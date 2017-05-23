@@ -12,7 +12,7 @@ namespace Lumix
 
 
 class Animation;
-class IAllocator;
+struct IAllocator;
 class OutputBlob;
 
 

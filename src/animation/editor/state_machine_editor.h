@@ -18,7 +18,7 @@ namespace AnimEditor
 {
 
 
-class IAnimationEditor;
+struct IAnimationEditor;
 class Container;
 class ControllerResource;
 class Edge;

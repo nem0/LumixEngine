@@ -12,7 +12,7 @@ namespace Lumix
 {
 
 
-class IEditorCommand;
+struct IEditorCommand;
 namespace Anim
 {
 struct EventHeader;
@@ -29,7 +29,7 @@ class ControllerResource;
 class Node;
 
 
-class IAnimationEditor : public StudioApp::IPlugin
+struct IAnimationEditor : public StudioApp::IPlugin
 {
 public:
 	struct EventType

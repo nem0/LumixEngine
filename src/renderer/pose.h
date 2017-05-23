@@ -8,7 +8,7 @@ namespace Lumix
 {
 
 
-class IAllocator;
+struct IAllocator;
 struct Matrix;
 class Model;
 struct Quat;

@@ -2,14 +2,14 @@
 
 
 #include "engine/lumix.h"
-#include "engine/delegate_list.h"
-#include "engine/default_allocator.h"
-#include "engine/hash_map.h"
 #include "engine/mt/thread.h"
 
 
 namespace Lumix
 {
+
+
+template <typename T> class DelegateList;
 
 
 namespace Profiler

@@ -23,7 +23,7 @@ class Manager;
 
 struct ComponentUID;
 class InputBlob;
-class IAllocator;
+struct IAllocator;
 class InputSystem;
 class OutputBlob;
 class Path;

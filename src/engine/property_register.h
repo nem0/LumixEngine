@@ -9,8 +9,8 @@ namespace Lumix
 
 
 template <typename T> class Array;
-class IAllocator;
-class IPropertyDescriptor;
+struct IAllocator;
+class PropertyDescriptorBase;
 
 
 namespace PropertyRegister
@@ -19,10 +19,10 @@ namespace PropertyRegister
 
 LUMIX_ENGINE_API void init(IAllocator& allocator);
 LUMIX_ENGINE_API void shutdown();
-LUMIX_ENGINE_API void add(const char* component_type, IPropertyDescriptor* desc);
-LUMIX_ENGINE_API const IPropertyDescriptor* getDescriptor(ComponentType type, u32 name_hash);
-LUMIX_ENGINE_API const IPropertyDescriptor* getDescriptor(const char* component_type, const char* property_name);
-LUMIX_ENGINE_API Array<IPropertyDescriptor*>& getDescriptors(ComponentType type);
+LUMIX_ENGINE_API void add(const char* component_type, PropertyDescriptorBase* desc);
+LUMIX_ENGINE_API const PropertyDescriptorBase* getDescriptor(ComponentType type, u32 name_hash);
+LUMIX_ENGINE_API const PropertyDescriptorBase* getDescriptor(const char* component_type, const char* property_name);
+LUMIX_ENGINE_API Array<PropertyDescriptorBase*>& getDescriptors(ComponentType type);
 
 
 LUMIX_ENGINE_API ComponentType getComponentType(const char* id);

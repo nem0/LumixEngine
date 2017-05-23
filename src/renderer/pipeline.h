@@ -26,7 +26,7 @@ namespace Lumix
 
 
 class FrameBuffer;
-class IAllocator;
+struct IAllocator;
 struct Matrix;
 class Model;
 class Path;

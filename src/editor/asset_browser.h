@@ -24,9 +24,8 @@ class StudioApp;
 class LUMIX_EDITOR_API AssetBrowser
 {
 public:
-	class IPlugin
+	struct IPlugin
 	{
-	public:
 		virtual ~IPlugin() {}
 
 		virtual bool onGUI(Resource* resource, ResourceType type) = 0;

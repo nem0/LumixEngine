@@ -8,7 +8,7 @@ namespace Lumix
 {
 
 
-class IScene;
+struct IScene;
 
 
 struct LUMIX_ENGINE_API ComponentUID final

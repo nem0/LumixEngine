@@ -9,7 +9,7 @@ namespace Lumix
 
 	class Engine;
 	class InputBlob;
-	class IPlugin;
+	struct IPlugin;
 	class JsonSerializer;
 	class OutputBlob;
 	class Universe;

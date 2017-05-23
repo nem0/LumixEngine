@@ -19,7 +19,7 @@ namespace Lumix
 
 class Clip;
 class Engine;
-class IAllocator;
+struct IAllocator;
 class Path;
 
 

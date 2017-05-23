@@ -8,11 +8,11 @@
 
 namespace Lumix
 {
-class IAllocator;
+struct IAllocator;
 
 namespace FS
 {
-class IFile;
+struct IFile;
 
 
 class LUMIX_ENGINE_API PackFileDevice LUMIX_FINAL : public IFileDevice

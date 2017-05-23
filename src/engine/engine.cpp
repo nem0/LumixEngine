@@ -528,15 +528,15 @@ public:
 
 
 	static void setProperty(const ComponentUID& cmp,
-		const IPropertyDescriptor& desc,
+		const PropertyDescriptorBase& desc,
 		lua_State* L,
 		IAllocator& allocator)
 	{
 		switch (desc.getType())
 		{
-		case IPropertyDescriptor::STRING:
-		case IPropertyDescriptor::FILE:
-		case IPropertyDescriptor::RESOURCE:
+		case PropertyDescriptorBase::STRING:
+		case PropertyDescriptorBase::FILE:
+		case PropertyDescriptorBase::RESOURCE:
 			if (lua_isstring(L, -1))
 			{
 				const char* str = lua_tostring(L, -1);
@@ -544,7 +544,7 @@ public:
 				desc.set(cmp, -1, input_blob);
 			}
 			break;
-		case IPropertyDescriptor::DECIMAL:
+		case PropertyDescriptorBase::DECIMAL:
 			if (lua_isnumber(L, -1))
 			{
 				float f = (float)lua_tonumber(L, -1);
@@ -552,7 +552,7 @@ public:
 				desc.set(cmp, -1, input_blob);
 			}
 			break;
-		case IPropertyDescriptor::ENTITY:
+		case PropertyDescriptorBase::ENTITY:
 			if (lua_isinteger(L, -1))
 			{
 				int i = (int)lua_tointeger(L, -1);
@@ -560,7 +560,7 @@ public:
 				desc.set(cmp, -1, input_blob);
 			}
 			break;
-		case IPropertyDescriptor::BOOL:
+		case PropertyDescriptorBase::BOOL:
 			if (lua_isboolean(L, -1))
 			{
 				bool b = lua_toboolean(L, -1) != 0;
@@ -568,8 +568,8 @@ public:
 				desc.set(cmp, -1, input_blob);
 			}
 			break;
-		case IPropertyDescriptor::VEC3:
-		case IPropertyDescriptor::COLOR:
+		case PropertyDescriptorBase::VEC3:
+		case PropertyDescriptorBase::COLOR:
 			if (lua_istable(L, -1))
 			{
 				auto v = LuaWrapper::toType<Vec3>(L, -1);
@@ -577,7 +577,7 @@ public:
 				desc.set(cmp, -1, input_blob);
 			}
 			break;
-		case IPropertyDescriptor::VEC2:
+		case PropertyDescriptorBase::VEC2:
 			if (lua_istable(L, -1))
 			{
 				auto v = LuaWrapper::toType<Vec2>(L, -1);
@@ -585,7 +585,7 @@ public:
 				desc.set(cmp, -1, input_blob);
 			}
 			break;
-		case IPropertyDescriptor::INT2:
+		case PropertyDescriptorBase::INT2:
 			if (lua_istable(L, -1))
 			{
 				auto v = LuaWrapper::toType<Int2>(L, -1);

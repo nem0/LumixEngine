@@ -5,7 +5,7 @@
 
 namespace Lumix
 {
-	class IAllocator;
+	struct IAllocator;
 
 	namespace FS
 	{

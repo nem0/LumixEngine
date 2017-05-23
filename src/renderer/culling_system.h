@@ -7,7 +7,7 @@
 namespace Lumix
 {
 	template <typename T> class Array;
-	class IAllocator;
+	struct IAllocator;
 	struct Sphere;
 	struct Vec3;
 

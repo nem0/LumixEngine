@@ -8,7 +8,7 @@ namespace Lumix
 {
 
 
-class IAllocator;
+struct IAllocator;
 
 
 LUMIX_ENGINE_API const char* stristr(const char* haystack, const char* needle);

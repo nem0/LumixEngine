@@ -1,21 +1,21 @@
 #pragma once
 
 #include "engine/lumix.h"
-#include "engine/delegate.h"
 
 namespace Lumix
 {
 
-class IAllocator;
+struct IAllocator;
 class OutputBlob;
 class Path;
+template <typename T> class Delegate;
 
 
 namespace FS
 {
 
 
-class IFileDevice;
+struct IFileDevice;
 
 
 struct Mode
@@ -55,9 +55,8 @@ struct SeekMode
 };
 
 
-class LUMIX_ENGINE_API IFile
+struct LUMIX_ENGINE_API IFile
 {
-public:
 	IFile() {}
 	virtual ~IFile() {}
 

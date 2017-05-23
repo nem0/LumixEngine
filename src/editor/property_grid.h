@@ -9,10 +9,10 @@ namespace Lumix
 {
 
 
-class IArrayDescriptor;
-class IEnumPropertyDescriptor;
-class IPropertyDescriptor;
-class ISampledFunctionDescriptor;
+class ArrayDescriptorBase;
+struct IEnumPropertyDescriptor;
+class PropertyDescriptorBase;
+struct ISampledFunctionDescriptor;
 class WorldEditor;
 class StudioApp;
 
@@ -39,13 +39,13 @@ public:
 	bool m_is_opened;
 
 private:
-	void showProperty(IPropertyDescriptor& desc,
+	void showProperty(PropertyDescriptorBase& desc,
 		int index,
 		const Array<Entity>& entities,
 		ComponentType cmp_type);
 	void showArrayProperty(const Array<Entity>& entities,
 		ComponentType cmp_type,
-		IArrayDescriptor& desc);
+		ArrayDescriptorBase& desc);
 	void showSampledFunctionProperty(const Array<Entity>& entities,
 		ComponentType cmp_type,
 		ISampledFunctionDescriptor& desc);
@@ -56,7 +56,7 @@ private:
 	void showEntityProperty(const Array<Entity>& entities,
 		ComponentType cmp_type,
 		int index,
-		IPropertyDescriptor& desc);
+		PropertyDescriptorBase& desc);
 	void showComponentProperties(const Array<Entity>& entities, ComponentType cmp_type);
 	void showCoreProperties(const Array<Entity>& entities);
 

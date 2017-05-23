@@ -45,12 +45,12 @@ PropertyGrid::~PropertyGrid()
 }
 
 
-void PropertyGrid::showProperty(IPropertyDescriptor& desc,
+void PropertyGrid::showProperty(PropertyDescriptorBase& desc,
 	int index,
 	const Array<Entity>& entities,
 	ComponentType cmp_type)
 {
-	if (desc.getType() == IPropertyDescriptor::BLOB) return;
+	if (desc.getType() == PropertyDescriptorBase::BLOB) return;
 
 	OutputBlob stream(m_editor.getAllocator());
 	ComponentUID first_entity_cmp;
@@ -65,11 +65,11 @@ void PropertyGrid::showProperty(IPropertyDescriptor& desc,
 
 	switch (desc.getType())
 	{
-	case IPropertyDescriptor::DECIMAL:
+	case PropertyDescriptorBase::DECIMAL:
 	{
 		float f;
 		tmp.read(f);
-		auto& d = static_cast<INumericPropertyDescriptor<float>&>(desc);
+		auto& d = static_cast<NumericPropertyDescriptorBase<float>&>(desc);
 		if (d.isInRadians()) f = Math::radiansToDegrees(f);
 		if ((d.getMax() - d.getMin()) / d.getStep() <= 100)
 		{
@@ -89,18 +89,18 @@ void PropertyGrid::showProperty(IPropertyDescriptor& desc,
 		}
 		break;
 	}
-	case IPropertyDescriptor::INTEGER:
+	case PropertyDescriptorBase::INTEGER:
 	{
 		int i;
 		tmp.read(i);
-		auto& d = static_cast<INumericPropertyDescriptor<int>&>(desc);
+		auto& d = static_cast<NumericPropertyDescriptorBase<int>&>(desc);
 		if (ImGui::DragInt(desc_name, &i, (float)d.getStep(), d.getMin(), d.getMax()))
 		{
 			m_editor.setProperty(cmp_type, index, desc, &entities[0], entities.size(), &i, sizeof(i));
 		}
 		break;
 	}
-	case IPropertyDescriptor::UNSIGNED_INTEGER:
+	case PropertyDescriptorBase::UNSIGNED_INTEGER:
 	{
 		unsigned int ui;
 		tmp.read(ui);
@@ -112,7 +112,7 @@ void PropertyGrid::showProperty(IPropertyDescriptor& desc,
 		}
 		break;
 	}
-	case IPropertyDescriptor::BOOL:
+	case PropertyDescriptorBase::BOOL:
 	{
 		bool b;
 		tmp.read(b);
@@ -122,7 +122,7 @@ void PropertyGrid::showProperty(IPropertyDescriptor& desc,
 		}
 		break;
 	}
-	case IPropertyDescriptor::COLOR:
+	case PropertyDescriptorBase::COLOR:
 	{
 		Vec3 v;
 		tmp.read(v);
@@ -140,7 +140,7 @@ void PropertyGrid::showProperty(IPropertyDescriptor& desc,
 		}
 		break;
 	}
-	case IPropertyDescriptor::VEC2:
+	case PropertyDescriptorBase::VEC2:
 	{
 		Vec2 v;
 		tmp.read(v);
@@ -160,7 +160,7 @@ void PropertyGrid::showProperty(IPropertyDescriptor& desc,
 		}
 		break;
 	}
-	case IPropertyDescriptor::INT2:
+	case PropertyDescriptorBase::INT2:
 	{
 		Int2 v;
 		tmp.read(v);
@@ -170,7 +170,7 @@ void PropertyGrid::showProperty(IPropertyDescriptor& desc,
 		}
 		break;
 	}
-	case IPropertyDescriptor::VEC3:
+	case PropertyDescriptorBase::VEC3:
 	{
 		Vec3 v;
 		tmp.read(v);
@@ -182,7 +182,7 @@ void PropertyGrid::showProperty(IPropertyDescriptor& desc,
 		}
 		break;
 	}
-	case IPropertyDescriptor::VEC4:
+	case PropertyDescriptorBase::VEC4:
 	{
 		Vec4 v;
 		tmp.read(v);
@@ -192,7 +192,7 @@ void PropertyGrid::showProperty(IPropertyDescriptor& desc,
 		}
 		break;
 	}
-	case IPropertyDescriptor::RESOURCE:
+	case PropertyDescriptorBase::RESOURCE:
 	{
 		char buf[1024];
 		copyString(buf, (const char*)stream.getData());
@@ -205,8 +205,8 @@ void PropertyGrid::showProperty(IPropertyDescriptor& desc,
 		}
 		break;
 	}
-	case IPropertyDescriptor::STRING:
-	case IPropertyDescriptor::FILE:
+	case PropertyDescriptorBase::STRING:
+	case PropertyDescriptorBase::FILE:
 	{
 		char buf[1024];
 		copyString(buf, (const char*)stream.getData());
@@ -216,19 +216,19 @@ void PropertyGrid::showProperty(IPropertyDescriptor& desc,
 		}
 		break;
 	}
-	case IPropertyDescriptor::ARRAY:
-		showArrayProperty(entities, cmp_type, static_cast<IArrayDescriptor&>(desc));
+	case PropertyDescriptorBase::ARRAY:
+		showArrayProperty(entities, cmp_type, static_cast<ArrayDescriptorBase&>(desc));
 		break;
-	case IPropertyDescriptor::SAMPLED_FUNCTION:
+	case PropertyDescriptorBase::SAMPLED_FUNCTION:
 		showSampledFunctionProperty(entities, cmp_type, static_cast<ISampledFunctionDescriptor&>(desc));
 		break;
-	case IPropertyDescriptor::ENTITY:
+	case PropertyDescriptorBase::ENTITY:
 		showEntityProperty(entities, cmp_type, index, static_cast<IEnumPropertyDescriptor&>(desc));
 		break;
-	case IPropertyDescriptor::ENUM:
+	case PropertyDescriptorBase::ENUM:
 		showEnumProperty(entities, cmp_type, index, static_cast<IEnumPropertyDescriptor&>(desc));
 		break;
-	case IPropertyDescriptor::BLOB:
+	case PropertyDescriptorBase::BLOB:
 	default:
 		ASSERT(false);
 		break;
@@ -239,7 +239,7 @@ void PropertyGrid::showProperty(IPropertyDescriptor& desc,
 void PropertyGrid::showEntityProperty(const Array<Entity>& entities,
 	ComponentType cmp_type,
 	int index,
-	IPropertyDescriptor& desc)
+	PropertyDescriptorBase& desc)
 {
 	OutputBlob blob(m_editor.getAllocator());
 	
@@ -437,7 +437,7 @@ void PropertyGrid::showSampledFunctionProperty(const Array<Entity>& entities,
 
 void PropertyGrid::showArrayProperty(const Array<Entity>& entities,
 	ComponentType cmp_type,
-	IArrayDescriptor& desc)
+	ArrayDescriptorBase& desc)
 {
 	ComponentUID cmp;
 	cmp.type = cmp_type;
