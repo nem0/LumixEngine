@@ -92,7 +92,7 @@ void Universe::transformEntity(Entity entity, bool update_local)
 	{
 		Hierarchy& h = m_hierarchy[hierarchy_idx];
 		Transform my_transform = getTransform(entity);
-		if (update_local && isValid(h.parent))
+		if (update_local && h.parent.isValid())
 		{
 			Transform parent_tr = getTransform(h.parent);
 			h.local_transform = parent_tr.inverted() * my_transform;
@@ -100,7 +100,7 @@ void Universe::transformEntity(Entity entity, bool update_local)
 		}
 
 		Entity child = h.first_child;
-		while (isValid(child))
+		while (child.isValid())
 		{
 			Hierarchy& child_h = m_hierarchy[m_entities[child.index].hierarchy];
 			Transform abs_tr = my_transform * child_h.local_transform;
@@ -165,7 +165,7 @@ void Universe::setTransformKeepChildren(Entity entity, const Transform& transfor
 	{
 		Hierarchy& h = m_hierarchy[hierarchy_idx];
 		Transform my_transform = getTransform(entity);
-		if (isValid(h.parent))
+		if (h.parent.isValid())
 		{
 			Transform parent_tr = getTransform(h.parent);
 			h.local_transform = parent_tr.inverted() * my_transform;
@@ -173,7 +173,7 @@ void Universe::setTransformKeepChildren(Entity entity, const Transform& transfor
 		}
 
 		Entity child = h.first_child;
-		while (isValid(child))
+		while (child.isValid())
 		{
 			Hierarchy& child_h = m_hierarchy[m_entities[child.index].hierarchy];
 
@@ -341,13 +341,13 @@ Entity Universe::createEntity(const Vec3& position, const Quat& rotation)
 
 void Universe::destroyEntity(Entity entity)
 {
-	if (!isValid(entity) || entity.index < 0) return;
+	if (!entity.isValid()) return;
 
 	EntityData& entity_data = m_entities[entity.index];
 	if (entity_data.hierarchy >= 0)
 	{
 		Hierarchy& h = m_hierarchy[entity_data.hierarchy];
-		while (isValid(h.first_child))
+		while (h.first_child.isValid())
 		{
 			setParent(INVALID_ENTITY, h.first_child);
 		}
@@ -437,8 +437,8 @@ Entity Universe::getNextSibling(Entity entity) const
 
 bool Universe::isDescendant(Entity ancestor, Entity descendant) const
 {
-	if (!isValid(ancestor)) return false;
-	for(Entity e = getFirstChild(ancestor); isValid(e); e = getNextSibling(e))
+	if (!ancestor.isValid()) return false;
+	for(Entity e = getFirstChild(ancestor); e.isValid(); e = getNextSibling(e))
 	{
 		if (e == descendant) return true;
 		if (isDescendant(e, descendant)) return true;
@@ -459,8 +459,8 @@ void Universe::setParent(Entity new_parent, Entity child)
 
 	auto collectGarbage = [this](Entity entity) {
 		Hierarchy& h = m_hierarchy[m_entities[entity.index].hierarchy];
-		if (isValid(h.parent)) return;
-		if (isValid(h.first_child)) return;
+		if (h.parent.isValid()) return;
+		if (h.first_child.isValid()) return;
 
 		const Hierarchy& last = m_hierarchy.back();
 		m_entities[last.entity.index].hierarchy = m_entities[entity.index].hierarchy;
@@ -475,11 +475,11 @@ void Universe::setParent(Entity new_parent, Entity child)
 	{
 		Entity old_parent = m_hierarchy[child_idx].parent;
 
-		if (isValid(old_parent))
+		if (old_parent.isValid())
 		{
 			Hierarchy& old_parent_h = m_hierarchy[m_entities[old_parent.index].hierarchy];
 			Entity* x = &old_parent_h.first_child;
-			while (isValid(*x))
+			while (x->isValid())
 			{
 				if (*x == child)
 				{
@@ -494,7 +494,7 @@ void Universe::setParent(Entity new_parent, Entity child)
 			child_idx = m_entities[child.index].hierarchy;
 		}
 	}
-	else if(isValid(new_parent))
+	else if(new_parent.isValid())
 	{
 		child_idx = m_hierarchy.size();
 		m_entities[child.index].hierarchy = child_idx;
@@ -505,7 +505,7 @@ void Universe::setParent(Entity new_parent, Entity child)
 		h.next_sibling = INVALID_ENTITY;
 	}
 
-	if (isValid(new_parent))
+	if (new_parent.isValid())
 	{
 		int new_parent_idx = m_entities[new_parent.index].hierarchy;
 		if (new_parent_idx < 0)
@@ -707,7 +707,7 @@ Entity Universe::instantiatePrefab(const PrefabResource& prefab,
 			Entity parent;
 
 			deserializer.read(&parent);
-			if (isValid(parent))
+			if (parent.isValid())
 			{
 				Transform local_tr;
 				float local_scale;

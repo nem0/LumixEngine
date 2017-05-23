@@ -97,7 +97,7 @@ class PrefabSystemImpl LUMIX_FINAL : public PrefabSystem
 
 		void createEntityGUIDRecursive(Entity entity)
 		{
-			if (!isValid(entity)) return;
+			if (!entity.isValid()) return;
 
 			editor.createEntityGUID(entity);
 			
@@ -109,7 +109,7 @@ class PrefabSystemImpl LUMIX_FINAL : public PrefabSystem
 
 		void destroyEntityRecursive(Entity entity)
 		{
-			if (!isValid(entity)) return;
+			if (!entity.isValid()) return;
 
 			Universe& universe = *editor.getUniverse();
 			destroyEntityRecursive(universe.getFirstChild(entity));
@@ -299,13 +299,13 @@ public:
 		if (p.prefab == 0) return;
 		if (m_instances[p.prefab] == entity)
 		{
-			if (isValid(m_prefabs[entity.index].next))
+			if (m_prefabs[entity.index].next.isValid())
 				m_instances[p.prefab] = m_prefabs[entity.index].next;
 			else
 				m_instances.erase(p.prefab);
 		}
-		if (isValid(p.prev)) m_prefabs[p.prev.index].next = p.next;
-		if (isValid(p.next)) m_prefabs[p.next.index].prev = p.prev;
+		if (p.prev.isValid()) m_prefabs[p.prev.index].next = p.next;
+		if (p.next.isValid()) m_prefabs[p.next.index].prev = p.prev;
 	}
 
 
@@ -453,7 +453,7 @@ public:
 			{
 				Entity parent;
 				deserializer.read(&parent);
-				if (isValid(parent))
+				if (parent.isValid())
 				{
 					Transform local_tr;
 					float local_scale;
@@ -494,7 +494,7 @@ public:
 
 	static int countHierarchy(Universe* universe, Entity entity)
 	{
-		if (!isValid(entity)) return 0;
+		if (!entity.isValid()) return 0;
 		int children_count = countHierarchy(universe, universe->getFirstChild(entity));
 		int siblings_count = countHierarchy(universe, universe->getNextSibling(entity));
 		return 1 + children_count + siblings_count;
@@ -508,14 +508,14 @@ public:
 		Entity entity,
 		bool is_root)
 	{
-		if (!isValid(entity)) return;
+		if (!entity.isValid()) return;
 
 		prefab |= ((u64)index) << 32;
 		++index;
 		serializer.write("prefab", prefab);
 		Entity parent = is_root ? INVALID_ENTITY : universe->getParent(entity);
 		serializer.write("parent", parent);
-		if (isValid(parent))
+		if (parent.isValid())
 		{
 			serializer.write("local_transform", universe->getLocalTransform(entity));
 			serializer.write("local_scale", universe->getLocalScale(entity));
@@ -559,7 +559,7 @@ public:
 	{
 		Entity root = entity;
 		Entity parent = m_universe->getParent(root);
-		while (isValid(parent) && getPrefab(parent) != 0)
+		while (parent.isValid() && getPrefab(parent) != 0)
 		{
 			root = parent;
 			parent = m_universe->getParent(root);
@@ -570,7 +570,7 @@ public:
 
 	void gatherHierarchy(Entity entity, bool is_root, Array<Entity>& out)
 	{
-		if (!isValid(entity)) return;
+		if (!entity.isValid()) return;
 
 		out.push(entity);
 		gatherHierarchy(m_universe->getFirstChild(entity), false, out);
@@ -685,7 +685,7 @@ public:
 			u64 prefab = m_instances.getKey(i);
 			if ((prefab & 0xffffFFFF) != prefab) continue;
 			Entity entity = m_instances.at(i);
-			while(isValid(entity))
+			while(entity.isValid())
 			{
 				serializer.write("prefab", (u32)prefab);
 				serializer.write("pos", m_universe->getPosition(entity));

@@ -755,7 +755,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 
 	void updateSharedController(SharedController& controller, float time_delta)
 	{
-		if (!isValid(controller.parent)) return;
+		if (!controller.parent.isValid()) return;
 
 		int parent_controller_idx = m_controllers.find(controller.parent);
 		if (parent_controller_idx < 0) return;

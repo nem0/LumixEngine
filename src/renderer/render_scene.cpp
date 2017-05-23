@@ -286,7 +286,7 @@ public:
 		{
 			if (entity.index >= m_model_instances.size()) return INVALID_COMPONENT;
 			ComponentHandle cmp = {entity.index};
-			return isValid(m_model_instances[entity.index].entity) ? cmp : INVALID_COMPONENT;
+			return m_model_instances[entity.index].entity.isValid() ? cmp : INVALID_COMPONENT;
 		}
 		if (type == ENVIRONMENT_PROBE_TYPE)
 		{
@@ -475,7 +475,7 @@ public:
 
 	void updateBoneAttachment(const BoneAttachment& bone_attachment)
 	{
-		if (!isValid(bone_attachment.parent_entity)) return;
+		if (!bone_attachment.parent_entity.isValid()) return;
 		ComponentHandle model_instance = getModelInstanceComponent(bone_attachment.parent_entity);
 		if (model_instance == INVALID_COMPONENT) return;
 		auto* parent_pose = getPose(model_instance);
@@ -1544,7 +1544,7 @@ public:
 			auto& r = m_model_instances.emplace();
 			serializer.read(r.entity);
 			serializer.read(r.flags);
-			ASSERT(r.entity.index == i || !isValid(r.entity));
+			ASSERT(r.entity.index == i || !r.entity.isValid());
 			r.model = nullptr;
 			r.pose = nullptr;
 			r.flags = 0;
@@ -2196,7 +2196,7 @@ public:
 		camera.near = 0.1f;
 		camera.far = 10000.0f;
 		camera.slot[0] = '\0';
-		if (!isValid(getCameraInSlot("main"))) copyString(camera.slot, "main");
+		if (!getCameraInSlot("main").isValid()) copyString(camera.slot, "main");
 		m_cameras.insert(entity, camera);
 		m_universe.addComponent(entity, CAMERA_TYPE, this, {entity.index});
 		return {entity.index};
@@ -2350,7 +2350,7 @@ public:
 	{
 		ComponentHandle cmp = {entity.index};
 		if (cmp.index >= m_model_instances.size()) return INVALID_COMPONENT;
-		if (!isValid(m_model_instances[cmp.index].entity)) return INVALID_COMPONENT;
+		if (!m_model_instances[cmp.index].entity.isValid()) return INVALID_COMPONENT;
 		return cmp;
 	}
 
@@ -2389,7 +2389,7 @@ public:
 		int index = entity.index;
 		ComponentHandle cmp = {index};
 
-		if (index < m_model_instances.size() && isValid(m_model_instances[index].entity) &&
+		if (index < m_model_instances.size() && m_model_instances[index].entity.isValid() &&
 			m_model_instances[index].model && m_model_instances[index].model->isReady())
 		{
 			ModelInstance& r = m_model_instances[index];
@@ -2725,7 +2725,7 @@ public:
 		const char* slot = LuaWrapper::checkArg<const char*>(L, 2);
 		float x, y;
 		ComponentHandle camera_cmp = scene->getCameraInSlot(slot);
-		if (!isValid(camera_cmp)) return 0;
+		if (!camera_cmp.isValid()) return 0;
 		if (lua_gettop(L) > 3)
 		{
 			x = LuaWrapper::checkArg<float>(L, 3);
@@ -4279,7 +4279,7 @@ public:
 				nearest_dist_squared = dist_squared;
 			}
 		}
-		if (!isValid(nearest)) return INVALID_COMPONENT;
+		if (!nearest.isValid()) return INVALID_COMPONENT;
 		return {nearest.index};
 	}
 
@@ -4565,7 +4565,7 @@ public:
 	void setModel(ComponentHandle component, Model* model)
 	{
 		auto& model_instance = m_model_instances[component.index];
-		ASSERT(isValid(model_instance.entity));
+		ASSERT(model_instance.entity.isValid());
 		Model* old_model = model_instance.model;
 		bool no_change = model == old_model && old_model;
 		if (no_change)

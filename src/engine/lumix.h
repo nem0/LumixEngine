@@ -81,8 +81,8 @@ struct ComponentHandle
 	bool operator<(const ComponentHandle& rhs) const { return rhs.index < index; };
 	bool operator>(const ComponentHandle& rhs) const { return rhs.index > index; };
 	bool operator!=(const ComponentHandle& rhs) const { return rhs.index != index; };
+	bool isValid() const { return index >= 0; }
 };
-inline bool isValid(ComponentHandle cmp) { return cmp.index >= 0; }
 
 struct Entity
 {
@@ -91,8 +91,8 @@ struct Entity
 	bool operator<(const Entity& rhs) const { return rhs.index < index; };
 	bool operator>(const Entity& rhs) const { return rhs.index > index; };
 	bool operator!=(const Entity& rhs) const { return rhs.index != index; };
+	bool isValid() const { return index >= 0; }
 };
-inline bool isValid(Entity entity) { return entity.index >= 0; }
 
 struct ComponentType
 {

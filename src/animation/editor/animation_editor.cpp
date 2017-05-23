@@ -448,7 +448,7 @@ void AnimationEditor::drawGraph()
 	if (!entities.empty())
 	{
 		ComponentHandle ctrl = scene->getComponent(entities[0], CONTROLLER_TYPE);
-		if (isValid(ctrl))
+		if (ctrl.isValid())
 		{
 			runtime = scene->getControllerRoot(ctrl);
 		}
@@ -469,7 +469,7 @@ void AnimationEditor::loadFromEntity()
 	if (entities.empty()) return;
 	auto* scene = (AnimationScene*)m_app.getWorldEditor()->getUniverse()->getScene(ANIMABLE_HASH);
 	ComponentHandle ctrl = scene->getComponent(entities[0], CONTROLLER_TYPE);
-	if (!isValid(ctrl)) return;
+	if (!ctrl.isValid()) return;
 	m_path = scene->getControllerSource(ctrl).c_str();
 	load();
 }
@@ -591,7 +591,7 @@ void AnimationEditor::update(float time_delta)
 	if (entities.empty()) return;
 	auto* scene = (AnimationScene*)m_app.getWorldEditor()->getUniverse()->getScene(ANIMABLE_HASH);
 	ComponentHandle ctrl = scene->getComponent(entities[0], CONTROLLER_TYPE);
-	if (!isValid(ctrl)) return;
+	if (!ctrl.isValid()) return;
 	scene->updateController(ctrl, time_delta);
 }
 
@@ -626,7 +626,7 @@ void AnimationEditor::inputsGUI()
 			const auto& selected_entities = m_app.getWorldEditor()->getSelectedEntities();
 			auto* scene = (AnimationScene*)m_app.getWorldEditor()->getUniverse()->getScene(ANIMABLE_HASH);
 			ComponentHandle cmp = selected_entities.empty() ? INVALID_COMPONENT : scene->getComponent(selected_entities[0], CONTROLLER_TYPE);
-			u8* input_data = isValid(cmp) ? scene->getControllerInput(cmp) : nullptr;
+			u8* input_data = cmp.isValid() ? scene->getControllerInput(cmp) : nullptr;
 			Anim::InputDecl& input_decl = m_resource->getEngineResource()->m_input_decl;
 
 			for (auto& input : input_decl.inputs)

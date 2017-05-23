@@ -41,7 +41,7 @@ struct LUMIX_ENGINE_API ComponentUID final
 	{
 		return type == rhs.type && scene == rhs.scene && handle == rhs.handle;
 	}
-	bool isValid() const { return Lumix::isValid(handle); }
+	bool isValid() const { return handle.isValid(); }
 };
 
 
