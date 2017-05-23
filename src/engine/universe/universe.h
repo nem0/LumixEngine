@@ -17,20 +17,7 @@ namespace Lumix
 {
 
 
-class InputBlob;
-struct IDeserializer;
-struct ISerializer;
-struct Matrix;
-class OutputBlob;
-struct Transform;
-class Universe;
 struct PrefabResource;
-
-
-enum
-{
-	MAX_COMPONENTS_TYPES_COUNT = 64
-};
 
 
 class LUMIX_ENGINE_API Universe
@@ -172,7 +159,7 @@ private:
 
 private:
 	IAllocator& m_allocator;
-	ComponentTypeEntry m_component_type_map[MAX_COMPONENTS_TYPES_COUNT];
+	ComponentTypeEntry m_component_type_map[ComponentType::MAX_TYPES_COUNT];
 	Array<IScene*> m_scenes;
 	Array<EntityData> m_entities;
 	Array<Hierarchy> m_hierarchy;

@@ -1,7 +1,9 @@
 #pragma once 
 
-#include <cstring>
 
+#ifndef _WIN32
+	#include <new>
+#endif
 #include "engine/lumix.h"
 
 
