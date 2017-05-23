@@ -8,13 +8,13 @@
 #include "engine/matrix.h"
 #include "engine/quat.h"
 #include "engine/string.h"
-#include "engine/universe/component.h"
 
 
 namespace Lumix
 {
 
 
+struct ComponentUID;
 struct IDeserializer;
 class InputBlob;
 struct IScene;

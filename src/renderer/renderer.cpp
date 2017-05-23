@@ -14,6 +14,7 @@
 #include "engine/resource_manager.h"
 #include "engine/string.h"
 #include "engine/system.h"
+#include "engine/universe/component.h"
 #include "engine/universe/universe.h"
 #include "renderer/material.h"
 #include "renderer/material_manager.h"

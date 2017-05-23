@@ -1,6 +1,6 @@
 #include "engine/default_allocator.h"
 #include <cstdlib>
-#include <string>
+#include <cstring>
 #ifndef _WIN32
 	#include <malloc.h>
 #endif
