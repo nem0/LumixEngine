@@ -3,6 +3,7 @@
 #include "engine/string.h"
 #include "engine/system.h"
 #include <cstdlib>
+#include <cstring>
 #include <cstdio>
 
 

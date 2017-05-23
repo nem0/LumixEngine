@@ -10,7 +10,7 @@ namespace Lumix
 {
 
 
-struct Action
+struct LUMIX_EDITOR_API Action
 {
 	Action(const char* label, const char* name);
 	Action(const char* label, const char* name, int shortcut0, int shortcut1, int shortcut2);
