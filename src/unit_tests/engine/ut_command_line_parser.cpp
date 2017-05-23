@@ -2,10 +2,13 @@
 #include "engine/command_line_parser.h"
 
 
+using namespace Lumix;
+
+
 void UT_command_line_parser(const char* params)
 {
 	char tmp[100];
-	Lumix::CommandLineParser parser("-x 10 -y 20\t-plugin  custom.dll -str \"test\" -str2 \"test with spaces\"");
+	CommandLineParser parser("-x 10 -y 20\t-plugin  custom.dll -str \"test\" -str2 \"test with spaces\"");
 
 	LUMIX_EXPECT(parser.next());
 	LUMIX_EXPECT(parser.currentEquals("-x"));
@@ -28,46 +31,46 @@ void UT_command_line_parser(const char* params)
 
 	LUMIX_EXPECT(parser.next());
 	LUMIX_EXPECT(parser.currentEquals("custom.dll"));
-	parser.getCurrent(tmp, Lumix::lengthOf(tmp));
-	LUMIX_EXPECT(Lumix::equalStrings(tmp, "custom.dll"));
+	parser.getCurrent(tmp, lengthOf(tmp));
+	LUMIX_EXPECT(equalStrings(tmp, "custom.dll"));
 
 	LUMIX_EXPECT(parser.next());
 	LUMIX_EXPECT(parser.currentEquals("-str"));
 
 	LUMIX_EXPECT(parser.next());
 	LUMIX_EXPECT(parser.currentEquals("\"test\""));
-	parser.getCurrent(tmp, Lumix::lengthOf(tmp));
-	LUMIX_EXPECT(Lumix::equalStrings(tmp, "test"));
+	parser.getCurrent(tmp, lengthOf(tmp));
+	LUMIX_EXPECT(equalStrings(tmp, "test"));
 
 	LUMIX_EXPECT(parser.next());
 	LUMIX_EXPECT(parser.currentEquals("-str2"));
 
 	LUMIX_EXPECT(parser.next());
 	LUMIX_EXPECT(parser.currentEquals("\"test with spaces\""));
-	parser.getCurrent(tmp, Lumix::lengthOf(tmp));
-	LUMIX_EXPECT(Lumix::equalStrings(tmp, "test with spaces"));
+	parser.getCurrent(tmp, lengthOf(tmp));
+	LUMIX_EXPECT(equalStrings(tmp, "test with spaces"));
 
 
 	LUMIX_EXPECT(!parser.next());
 
-	Lumix::CommandLineParser parser2("");
+	CommandLineParser parser2("");
 	LUMIX_EXPECT(!parser2.next());
 
-	Lumix::CommandLineParser parser3("  ");
+	CommandLineParser parser3("  ");
 	LUMIX_EXPECT(!parser3.next());
 
-	Lumix::CommandLineParser parser4("\t");
+	CommandLineParser parser4("\t");
 	LUMIX_EXPECT(!parser4.next());
 
-	Lumix::CommandLineParser parser5("\"\"");
+	CommandLineParser parser5("\"\"");
 	LUMIX_EXPECT(parser5.next());
 	LUMIX_EXPECT(parser5.currentEquals("\"\""));
 	LUMIX_EXPECT(!parser5.next());
 
-	Lumix::CommandLineParser parser6(" \" \" ");
+	CommandLineParser parser6(" \" \" ");
 	LUMIX_EXPECT(parser6.next());
-	parser6.getCurrent(tmp, Lumix::lengthOf(tmp));
-	LUMIX_EXPECT(Lumix::equalStrings(tmp, " "));
+	parser6.getCurrent(tmp, lengthOf(tmp));
+	LUMIX_EXPECT(equalStrings(tmp, " "));
 	LUMIX_EXPECT(parser6.currentEquals("\" \""));
 	LUMIX_EXPECT(!parser6.next());
 }

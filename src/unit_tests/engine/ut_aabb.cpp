@@ -2,10 +2,13 @@
 #include "engine/geometry.h"
 
 
+using namespace Lumix;
+
+
 void UT_aabb(const char* params)
 {
-	Lumix::AABB aabb1;
-	Lumix::AABB aabb2(Lumix::Vec3(0, 0, 0), Lumix::Vec3(1, 1, 1));
+	AABB aabb1;
+	AABB aabb2(Vec3(0, 0, 0), Vec3(1, 1, 1));
 
 	LUMIX_EXPECT(aabb2.min.x == 0);
 	LUMIX_EXPECT(aabb2.min.y == 0);
@@ -24,8 +27,8 @@ void UT_aabb(const char* params)
 	LUMIX_EXPECT(aabb1.max.y == aabb2.max.y);
 	LUMIX_EXPECT(aabb1.max.z == aabb2.max.z);
 
-	Lumix::Vec3 points[8];
-	aabb2.getCorners(Lumix::Matrix::IDENTITY, points);
+	Vec3 points[8];
+	aabb2.getCorners(Matrix::IDENTITY, points);
 	LUMIX_EXPECT(points[0].x == 0);
 	LUMIX_EXPECT(points[0].y == 0);
 	LUMIX_EXPECT(points[0].z == 0);
@@ -58,10 +61,10 @@ void UT_aabb(const char* params)
 	LUMIX_EXPECT(points[7].y == 1);
 	LUMIX_EXPECT(points[7].z == 1);
 
-	Lumix::AABB aabb3(Lumix::Vec3(0, 0, 0), Lumix::Vec3(1, 1, 1));
-	Lumix::AABB aabb4(Lumix::Vec3(1, 2, 3), Lumix::Vec3(2, 3, 4));
-	Lumix::Matrix mtx = Lumix::Matrix::IDENTITY;
-	mtx.setTranslation(Lumix::Vec3(1, 2, 3));
+	AABB aabb3(Vec3(0, 0, 0), Vec3(1, 1, 1));
+	AABB aabb4(Vec3(1, 2, 3), Vec3(2, 3, 4));
+	Matrix mtx = Matrix::IDENTITY;
+	mtx.setTranslation(Vec3(1, 2, 3));
 	aabb3.transform(mtx);
 
 	LUMIX_EXPECT(aabb3.min.x == aabb4.min.x);

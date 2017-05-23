@@ -558,9 +558,9 @@ public:
 template <class S> class SampledFunctionDescriptor : public ISampledFunctionDescriptor
 {
 public:
-	typedef const Lumix::Vec2* (S::*Getter)(ComponentHandle);
+	typedef const Vec2* (S::*Getter)(ComponentHandle);
 	typedef int (S::*CountGetter)(ComponentHandle);
-	typedef void (S::*Setter)(ComponentHandle, const Lumix::Vec2*, int);
+	typedef void (S::*Setter)(ComponentHandle, const Vec2*, int);
 
 public:
 	SampledFunctionDescriptor(const char* name,
@@ -585,7 +585,7 @@ public:
 		ASSERT(index == -1);
 		int count;
 		stream.read(count);
-		auto* buf = (const Lumix::Vec2*)stream.skip(sizeof(Lumix::Vec2) * count);
+		auto* buf = (const Vec2*)stream.skip(sizeof(Vec2) * count);
 		(static_cast<S*>(cmp.scene)->*m_setter)(cmp.handle, buf, count);
 	};
 
@@ -595,7 +595,7 @@ public:
 		ASSERT(index == -1);
 		int count = (static_cast<S*>(cmp.scene)->*m_count_getter)(cmp.handle);
 		stream.write(count);
-		const Lumix::Vec2* values = (static_cast<S*>(cmp.scene)->*m_getter)(cmp.handle);
+		const Vec2* values = (static_cast<S*>(cmp.scene)->*m_getter)(cmp.handle);
 		stream.write(values, sizeof(values[0]) * count);
 	};
 

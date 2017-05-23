@@ -5,13 +5,14 @@
 #include "engine/engine.h"
 
 
+struct SDL_Window;
+
+
 namespace Lumix
 {
-	class IAllocator;
-}
 
-
-struct SDL_Window;
+	
+class IAllocator;
 
 
 namespace PlatformInterface
@@ -19,12 +20,12 @@ namespace PlatformInterface
 	struct FileInfo
 	{
 		bool is_directory;
-		char filename[Lumix::MAX_PATH_LENGTH];
+		char filename[MAX_PATH_LENGTH];
 	};
 
 	struct FileIterator;
 
-	LUMIX_EDITOR_API FileIterator* createFileIterator(const char* path, Lumix::IAllocator& allocator);
+	LUMIX_EDITOR_API FileIterator* createFileIterator(const char* path, IAllocator& allocator);
 	LUMIX_EDITOR_API void destroyFileIterator(FileIterator* iterator);
 	LUMIX_EDITOR_API bool getNextFile(FileIterator* iterator, FileInfo* info);
 
@@ -40,7 +41,7 @@ namespace PlatformInterface
 	LUMIX_EDITOR_API size_t getFileSize(const char* path);
 	LUMIX_EDITOR_API bool fileExists(const char* path);
 	LUMIX_EDITOR_API bool dirExists(const char* path);
-	LUMIX_EDITOR_API Lumix::u64 getLastModified(const char* file);
+	LUMIX_EDITOR_API u64 getLastModified(const char* file);
 	LUMIX_EDITOR_API bool makePath(const char* path);
 
 	LUMIX_EDITOR_API void setWindow(SDL_Window* window);
@@ -49,10 +50,13 @@ namespace PlatformInterface
 
 	struct Process;
 
-	LUMIX_EDITOR_API Process* createProcess(const char* cmd, const char* args, Lumix::IAllocator& allocator);
+	LUMIX_EDITOR_API Process* createProcess(const char* cmd, const char* args, IAllocator& allocator);
 	LUMIX_EDITOR_API void destroyProcess(Process& process);
 	LUMIX_EDITOR_API bool isProcessFinished(Process& process);
 	LUMIX_EDITOR_API int getProcessExitCode(Process& process);
 	LUMIX_EDITOR_API int getProcessOutput(Process& process, char* buf, int buf_size);
 
 } // namespace PlatformInterface
+
+
+} // namespace Lumix

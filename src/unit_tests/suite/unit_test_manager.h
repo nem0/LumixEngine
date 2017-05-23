@@ -71,6 +71,6 @@ namespace Lumix
 #define JOIN_STRINGS(A, B) JOIN_STRINGS_2(A, B)
 
 #define REGISTER_TEST(name, method, params) \
-namespace { extern "C" { Lumix::UnitTest::Helper JOIN_STRINGS(JOIN_STRINGS(test_register_, method), __LINE__)(name, method, params); } } \
+namespace { extern "C" { UnitTest::Helper JOIN_STRINGS(JOIN_STRINGS(test_register_, method), __LINE__)(name, method, params); } } \
 	LUMIX_FORCE_SYMBOL(JOIN_STRINGS(test_register_ ,JOIN_STRINGS(method, __LINE__)))
 

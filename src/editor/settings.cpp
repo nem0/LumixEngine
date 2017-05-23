@@ -13,6 +13,10 @@
 #include <SDL.h>
 
 
+namespace Lumix
+{
+
+
 static const char DEFAULT_SETTINGS_PATH[] = "studio_default.ini";
 static const char SETTINGS_PATH[] = "studio.ini";
 
@@ -82,7 +86,7 @@ static void loadStyle(lua_State* L)
 }
 
 
-static void saveStyle(Lumix::FS::OsFile& file)
+static void saveStyle(FS::OsFile& file)
 {
 	auto& style = ImGui::GetStyle();
 	file << "style = {";
@@ -143,11 +147,11 @@ static void saveStyle(Lumix::FS::OsFile& file)
 
 static void shortcutInput(int& shortcut)
 {
-	Lumix::StaticString<50> popup_name("");
-	popup_name << (Lumix::i64)&shortcut;
+	StaticString<50> popup_name("");
+	popup_name << (i64)&shortcut;
 
-	Lumix::StaticString<50> button_label(SDL_GetKeyName(SDL_GetKeyFromScancode((SDL_Scancode)shortcut)));
-	button_label << "###" << (Lumix::i64)&shortcut;
+	StaticString<50> button_label(SDL_GetKeyName(SDL_GetKeyFromScancode((SDL_Scancode)shortcut)));
+	button_label << "###" << (i64)&shortcut;
 
 	if (ImGui::Button(button_label, ImVec2(65, 0))) shortcut = -1;
 
@@ -258,7 +262,7 @@ bool Settings::load()
 	errors = errors || lua_pcall(L, 0, 0, 0) != LUA_OK;
 	if (errors)
 	{
-		Lumix::g_log_error.log("Editor") << SETTINGS_PATH << ": " << lua_tostring(L, -1);
+		g_log_error.log("Editor") << SETTINGS_PATH << ": " << lua_tostring(L, -1);
 		lua_pop(L, 1);
 		return false;
 	}
@@ -284,13 +288,13 @@ bool Settings::load()
 	m_is_profiler_opened = getBoolean(L, "profiler_opened", false);
 	m_is_properties_opened = getBoolean(L, "properties_opened", false);
 	m_is_crash_reporting_enabled = getBoolean(L, "error_reporting_enabled", true);
-	Lumix::enableCrashReporting(m_is_crash_reporting_enabled && !m_force_no_crash_report);
+	enableCrashReporting(m_is_crash_reporting_enabled && !m_force_no_crash_report);
 	m_mouse_sensitivity_x = getFloat(L, "mouse_sensitivity_x", 200.0f);
 	m_mouse_sensitivity_y = getFloat(L, "mouse_sensitivity_y", 200.0f);
 
 	if (!m_editor->getEngine().getPatchFileDevice())
 	{
-		if (lua_getglobal(L, "data_dir") == LUA_TSTRING) Lumix::copyString(m_data_dir, lua_tostring(L, -1));
+		if (lua_getglobal(L, "data_dir") == LUA_TSTRING) copyString(m_data_dir, lua_tostring(L, -1));
 		lua_pop(L, 1);
 		m_editor->getEngine().setPatchPath(m_data_dir);
 	}
@@ -302,7 +306,7 @@ bool Settings::load()
 		{
 			if (lua_getfield(L, -1, actions[i]->name) == LUA_TTABLE)
 			{
-				for (int j = 0; j < Lumix::lengthOf(actions[i]->shortcut); ++j)
+				for (int j = 0; j < lengthOf(actions[i]->shortcut); ++j)
 				{
 					if (lua_rawgeti(L, -1, 1 + j) == LUA_TNUMBER)
 					{
@@ -381,9 +385,9 @@ bool Settings::getValue(const char* name, bool default_value) const
 bool Settings::save()
 {
 	auto& actions = m_app.getActions();
-	Lumix::FS::OsFile file;
+	FS::OsFile file;
 	auto& allocator = m_app.getWorldEditor()->getAllocator();
-	if (!file.open(SETTINGS_PATH, Lumix::FS::Mode::CREATE_AND_WRITE, allocator)) return false;
+	if (!file.open(SETTINGS_PATH, FS::Mode::CREATE_AND_WRITE, allocator)) return false;
 
 	file << "window = { x = " << m_window.x 
 		<< ", y = " << m_window.y 
@@ -527,7 +531,7 @@ void Settings::showToolbarSettings()
 void Settings::showShortcutSettings()
 {
 	auto& actions = m_app.getActions();
-	ImGui::FilterInput("Filter", m_filter, Lumix::lengthOf(m_filter));
+	ImGui::FilterInput("Filter", m_filter, lengthOf(m_filter));
 	ImGui::Columns(4);
 	ImGui::Text("Label");
 	ImGui::NextColumn();
@@ -542,7 +546,7 @@ void Settings::showShortcutSettings()
 	for (int i = 0; i < actions.size(); ++i)
 	{
 		Action& a = *actions[i];
-		if (m_filter[0] == 0 || Lumix::stristr(a.label, m_filter) != 0)
+		if (m_filter[0] == 0 || stristr(a.label, m_filter) != 0)
 		{
 			ImGui::AlignFirstTextHeightToWidgets();
 			ImGui::Text("%s", a.label);
@@ -580,7 +584,7 @@ void Settings::onGUI()
 			{
 				if (ImGui::Checkbox("Crash reporting", &m_is_crash_reporting_enabled))
 				{
-					Lumix::enableCrashReporting(m_is_crash_reporting_enabled);
+					enableCrashReporting(m_is_crash_reporting_enabled);
 				}
 			}
 			ImGui::DragFloat2("Mouse sensitivity", &m_mouse_sensitivity_x, 0.1f, 500.0f);
@@ -716,3 +720,6 @@ void Settings::onGUI()
 	}
 	ImGui::EndDock();
 }
+
+
+} // namespace Lumix

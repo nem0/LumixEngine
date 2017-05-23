@@ -83,4 +83,4 @@ class LUMIX_RENDERER_API Texture LUMIX_FINAL : public Resource
 };
 
 
-} // ~namespace Lumix
+} // namespace Lumix

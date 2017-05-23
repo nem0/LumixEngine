@@ -10,11 +10,12 @@
 
 namespace Lumix
 {
+
+
 class IEditorCommand;
 namespace Anim
 {
 struct EventHeader;
-}
 }
 
 
@@ -33,14 +34,14 @@ class IAnimationEditor : public StudioApp::IPlugin
 public:
 	struct EventType
 	{
-		Lumix::u32 type;
-		Lumix::StaticString<32> label;
+		u32 type;
+		StaticString<32> label;
 		int size;
-		Lumix::Delegate<void(Lumix::u8*, Component&)> editor;
+		Delegate<void(u8*, Component&)> editor;
 	};
 
 public:
-	static IAnimationEditor* create(Lumix::IAllocator& allocator, StudioApp& app);
+	static IAnimationEditor* create(IAllocator& allocator, StudioApp& app);
 
 	virtual void setContainer(Container* container) = 0;
 	virtual bool isEditorOpened() = 0;
@@ -51,14 +52,15 @@ public:
 	virtual int getEventTypesCount() const = 0;
 	virtual EventType& createEventType(const char* type) = 0;
 	virtual EventType& getEventTypeByIdx(int idx) = 0;
-	virtual EventType& getEventType(Lumix::u32 type) = 0;
+	virtual EventType& getEventType(u32 type) = 0;
 	virtual void createEdge(ControllerResource& ctrl, Container* container, Node* from, Node* to) = 0;
 	virtual void moveNode(ControllerResource& ctrl, Node* node, const ImVec2& pos) = 0;
 	virtual void createNode(ControllerResource& ctrl,
 		Container* container,
-		Lumix::Anim::Node::Type type,
+		Anim::Node::Type type,
 		const ImVec2& pos) = 0;
 };
 
 
-}
+} // namespace AnimEditor
+} // namespace Lumix

@@ -18,14 +18,14 @@
 #include "renderer/render_scene.h"
 
 
-static const Lumix::ResourceType CLIP_TYPE("clip");
-
-
 namespace Lumix
 {
 
 
-static void registerProperties(Lumix::IAllocator& allocator)
+static const ResourceType CLIP_TYPE("clip");
+
+
+static void registerProperties(IAllocator& allocator)
 {
 	PropertyRegister::add("ambient_sound",
 		LUMIX_NEW(allocator, DynamicEnumPropertyDescriptor<AudioScene>)("Sound",
@@ -102,7 +102,7 @@ struct AudioSystemImpl LUMIX_FINAL : public AudioSystem
 
 LUMIX_PLUGIN_ENTRY(audio)
 {
-	return LUMIX_NEW(engine.getAllocator(), Lumix::AudioSystemImpl)(engine);
+	return LUMIX_NEW(engine.getAllocator(), AudioSystemImpl)(engine);
 }
 
 

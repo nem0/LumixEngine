@@ -3,11 +3,14 @@
 #include "engine/string.h"
 
 
+using namespace Lumix;
+
+
 void UT_blob(const char* params)
 {
-	Lumix::DefaultAllocator allocator;
+	DefaultAllocator allocator;
 	
-	Lumix::OutputBlob blob(allocator);
+	OutputBlob blob(allocator);
 	
 	LUMIX_EXPECT(blob.getPos() == 0);
 	bool b = false;
@@ -32,7 +35,7 @@ void UT_blob(const char* params)
 	u32 ui = 0xABCDEF01;
 	blob.write(ui);
 
-	float f = Lumix::Math::PI;
+	float f = Math::PI;
 	blob.write(f);
 
 	blob.writeString("test string");
@@ -49,7 +52,7 @@ void UT_blob(const char* params)
 	s.c = 'Q';
 	blob.write(s);
 
-	Lumix::InputBlob input(blob);
+	InputBlob input(blob);
 	bool b2;
 	input.read(b2);
 
@@ -75,8 +78,8 @@ void UT_blob(const char* params)
 	LUMIX_EXPECT(i == i2);
 	LUMIX_EXPECT(ui == ui2);
 	LUMIX_EXPECT(f == f2);
-	LUMIX_EXPECT(Lumix::equalStrings(tmp, "test string"));
-	LUMIX_EXPECT(Lumix::compareMemory(&s, &s2, sizeof(s)) == 0);
+	LUMIX_EXPECT(equalStrings(tmp, "test string"));
+	LUMIX_EXPECT(compareMemory(&s, &s2, sizeof(s)) == 0);
 
 	input.rewind();
 	input.read(b2);
@@ -92,8 +95,8 @@ void UT_blob(const char* params)
 	LUMIX_EXPECT(i == i2);
 	LUMIX_EXPECT(ui == ui2);
 	LUMIX_EXPECT(f == f2);
-	LUMIX_EXPECT(Lumix::equalStrings(tmp, "test string"));
-	LUMIX_EXPECT(Lumix::compareMemory(&s, &s2, sizeof(s)) == 0);
+	LUMIX_EXPECT(equalStrings(tmp, "test string"));
+	LUMIX_EXPECT(compareMemory(&s, &s2, sizeof(s)) == 0);
 
 	LUMIX_EXPECT(input.getSize() == blob.getPos());
 	input.setPosition(sizeof(b2) + sizeof(c2) + sizeof(i2));

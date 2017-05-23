@@ -16,7 +16,8 @@
 #include <cstdlib>
 
 
-using namespace Lumix;
+namespace Lumix
+{
 
 
 static const ResourceType CONTROLLER_RESOURCE_TYPE("anim_controller");
@@ -423,7 +424,7 @@ Edge::~Edge()
 }
 
 
-void Edge::debug(ImDrawList* draw, const ImVec2& canvas_screen_pos, Lumix::Anim::ComponentInstance* runtime)
+void Edge::debug(ImDrawList* draw, const ImVec2& canvas_screen_pos, Anim::ComponentInstance* runtime)
 {
 	if (runtime->source.type != engine_cmp->type) return;
 	
@@ -535,8 +536,8 @@ struct Blend1DNode::RootEdge : public Component
 		m_parent->removeChild(this);
 	}
 
-	void serialize(Lumix::OutputBlob& blob) override {}
-	void deserialize(Lumix::InputBlob& blob) override {}
+	void serialize(OutputBlob& blob) override {}
+	void deserialize(InputBlob& blob) override {}
 	bool hitTest(const ImVec2& on_canvas_pos) const
 	{
 		ImVec2 a = getEdgeStartPoint(m_parent->getRootNode(), m_to, true);
@@ -674,7 +675,7 @@ void Blend1DNode::removeChild(Component* component)
 }
 
 
-void Blend1DNode::serialize(Lumix::OutputBlob& blob)
+void Blend1DNode::serialize(OutputBlob& blob)
 {
 	Container::serialize(blob);
 	m_root_node->serialize(blob);
@@ -686,7 +687,7 @@ void Blend1DNode::serialize(Lumix::OutputBlob& blob)
 }
 
 
-void Blend1DNode::deserialize(Lumix::InputBlob& blob)
+void Blend1DNode::deserialize(InputBlob& blob)
 {
 	Container::deserialize(blob);
 
@@ -716,7 +717,7 @@ void Blend1DNode::deserialize(Lumix::InputBlob& blob)
 }
 
 
-void Blend1DNode::createNode(Lumix::Anim::Component::Type type, int uid, const ImVec2& pos)
+void Blend1DNode::createNode(Anim::Component::Type type, int uid, const ImVec2& pos)
 {
 	auto* cmp = (Node*)createComponent(Anim::createComponent(type, m_allocator), this, m_controller);
 	cmp->pos = pos;
@@ -924,7 +925,7 @@ AnimationNode::AnimationNode(Anim::Component* engine_cmp, Container* parent, Con
 }
 
 
-void AnimationNode::deserialize(Lumix::InputBlob& blob)
+void AnimationNode::deserialize(InputBlob& blob)
 {
 	Node::deserialize(blob);
 	auto& input_decl = m_controller.getEngineResource()->m_input_decl;
@@ -1058,8 +1059,8 @@ struct EntryEdge : public Component
 		m_parent->removeEntry(*this);
 	}
 
-	void serialize(Lumix::OutputBlob& blob) override {}
-	void deserialize(Lumix::InputBlob& blob) override {}
+	void serialize(OutputBlob& blob) override {}
+	void deserialize(InputBlob& blob) override {}
 	bool hitTest(const ImVec2& on_canvas_pos) const
 	{
 		ImVec2 a = getEdgeStartPoint(m_parent->getEntryNode(), m_to, true);
@@ -1248,7 +1249,7 @@ void StateMachine::createNode(Anim::Component::Type type, int uid, const ImVec2&
 }
 
 
-void StateMachine::deserialize(Lumix::InputBlob& blob)
+void StateMachine::deserialize(InputBlob& blob)
 {
 	Container::deserialize(blob);
 	m_entry_node->deserialize(blob);
@@ -1266,7 +1267,7 @@ void StateMachine::deserialize(Lumix::InputBlob& blob)
 }
 
 
-void StateMachine::serialize(Lumix::OutputBlob& blob)
+void StateMachine::serialize(OutputBlob& blob)
 {
 	Container::serialize(blob);
 	m_entry_node->serialize(blob);
@@ -1299,7 +1300,7 @@ void StateMachine::debugInside(ImDrawList* draw,
 }
 
 
-void StateMachine::debug(ImDrawList* draw, const ImVec2& canvas_screen_pos, Lumix::Anim::ComponentInstance* runtime)
+void StateMachine::debug(ImDrawList* draw, const ImVec2& canvas_screen_pos, Anim::ComponentInstance* runtime)
 {
 	if (runtime->source.type != engine_cmp->type) return;
 
@@ -1509,7 +1510,7 @@ bool ControllerResource::deserialize(InputBlob& blob, Engine& engine, IAllocator
 }
 
 
-const char* ControllerResource::getAnimationSlot(Lumix::u32 slot_hash) const
+const char* ControllerResource::getAnimationSlot(u32 slot_hash) const
 {
 	for (auto& slot : m_animation_slots)
 	{
@@ -1537,3 +1538,6 @@ Component* ControllerResource::getByUID(int uid)
 
 
 } // namespace AnimEditor
+
+
+} // namespace Lumix

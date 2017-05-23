@@ -47,13 +47,13 @@ struct AssetBrowserPlugin : AssetBrowser::IPlugin
 	}
 
 
-	bool acceptExtension(const char* ext, Lumix::ResourceType type) const override
+	bool acceptExtension(const char* ext, ResourceType type) const override
 	{
 		return type == ANIMATION_TYPE && equalStrings(ext, "anm");
 	}
 
 
-	bool onGUI(Lumix::Resource* resource, Lumix::ResourceType type) override
+	bool onGUI(Resource* resource, ResourceType type) override
 	{
 		if (type == ANIMATION_TYPE)
 		{
@@ -97,13 +97,13 @@ struct AnimControllerAssetBrowserPlugin : AssetBrowser::IPlugin
 	}
 
 
-	bool acceptExtension(const char* ext, Lumix::ResourceType type) const override
+	bool acceptExtension(const char* ext, ResourceType type) const override
 	{
 		return type == CONTROLLER_RESOURCE_TYPE && equalStrings(ext, "act");
 	}
 
 
-	bool onGUI(Lumix::Resource* resource, Lumix::ResourceType type) override
+	bool onGUI(Resource* resource, ResourceType type) override
 	{
 		if (type == CONTROLLER_RESOURCE_TYPE)
 		{
@@ -144,7 +144,7 @@ struct PropertyGridPlugin : PropertyGrid::IPlugin
 	}
 
 
-	void onGUI(PropertyGrid& grid, Lumix::ComponentUID cmp) override
+	void onGUI(PropertyGrid& grid, ComponentUID cmp) override
 	{
 		if (cmp.type != ANIMABLE_HASH) return;
 

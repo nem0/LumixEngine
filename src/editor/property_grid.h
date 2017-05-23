@@ -7,14 +7,13 @@
 
 namespace Lumix
 {
-	class IArrayDescriptor;
-	class IEnumPropertyDescriptor;
-	class IPropertyDescriptor;
-	class ISampledFunctionDescriptor;
-	class WorldEditor;
-}
 
 
+class IArrayDescriptor;
+class IEnumPropertyDescriptor;
+class IPropertyDescriptor;
+class ISampledFunctionDescriptor;
+class WorldEditor;
 class StudioApp;
 
 
@@ -24,7 +23,7 @@ public:
 	struct IPlugin
 	{
 		virtual ~IPlugin() {}
-		virtual void onGUI(PropertyGrid& grid, Lumix::ComponentUID cmp) = 0;
+		virtual void onGUI(PropertyGrid& grid, ComponentUID cmp) = 0;
 	};
 
 public:
@@ -34,42 +33,45 @@ public:
 	void addPlugin(IPlugin& plugin) { m_plugins.push(&plugin); }
 	void removePlugin(IPlugin& plugin) { m_plugins.eraseItem(&plugin); }
 	void onGUI();
-	bool entityInput(const char* label, const char* str_id, Lumix::Entity& entity) const;
+	bool entityInput(const char* label, const char* str_id, Entity& entity) const;
 
 public:
 	bool m_is_opened;
 
 private:
-	void showProperty(Lumix::IPropertyDescriptor& desc,
+	void showProperty(IPropertyDescriptor& desc,
 		int index,
-		const Lumix::Array<Lumix::Entity>& entities,
-		Lumix::ComponentType cmp_type);
-	void showArrayProperty(const Lumix::Array<Lumix::Entity>& entities,
-		Lumix::ComponentType cmp_type,
-		Lumix::IArrayDescriptor& desc);
-	void showSampledFunctionProperty(const Lumix::Array<Lumix::Entity>& entities,
-		Lumix::ComponentType cmp_type,
-		Lumix::ISampledFunctionDescriptor& desc);
-	void showEnumProperty(const Lumix::Array<Lumix::Entity>& entities,
-		Lumix::ComponentType cmp_type,
+		const Array<Entity>& entities,
+		ComponentType cmp_type);
+	void showArrayProperty(const Array<Entity>& entities,
+		ComponentType cmp_type,
+		IArrayDescriptor& desc);
+	void showSampledFunctionProperty(const Array<Entity>& entities,
+		ComponentType cmp_type,
+		ISampledFunctionDescriptor& desc);
+	void showEnumProperty(const Array<Entity>& entities,
+		ComponentType cmp_type,
 		int index,
-		Lumix::IEnumPropertyDescriptor& desc);
-	void showEntityProperty(const Lumix::Array<Lumix::Entity>& entities,
-		Lumix::ComponentType cmp_type,
+		IEnumPropertyDescriptor& desc);
+	void showEntityProperty(const Array<Entity>& entities,
+		ComponentType cmp_type,
 		int index,
-		Lumix::IPropertyDescriptor& desc);
-	void showComponentProperties(const Lumix::Array<Lumix::Entity>& entities, Lumix::ComponentType cmp_type);
-	void showCoreProperties(const Lumix::Array<Lumix::Entity>& entities);
+		IPropertyDescriptor& desc);
+	void showComponentProperties(const Array<Entity>& entities, ComponentType cmp_type);
+	void showCoreProperties(const Array<Entity>& entities);
 
 private:
 	StudioApp& m_app;
-	Lumix::WorldEditor& m_editor;
-	Lumix::Array<IPlugin*> m_plugins;
+	WorldEditor& m_editor;
+	Array<IPlugin*> m_plugins;
 	
 	char m_component_filter[32];
 	char m_entity_filter[32];
-	Lumix::Entity m_deferred_select = Lumix::INVALID_ENTITY;
+	Entity m_deferred_select = INVALID_ENTITY;
 
 	float m_particle_emitter_timescale;
 	bool m_particle_emitter_updating;
 };
+
+
+} // namespace Lumix

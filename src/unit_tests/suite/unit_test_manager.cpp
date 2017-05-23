@@ -134,7 +134,7 @@ namespace Lumix
 						else
 						{
 							++i;
-							Lumix::MT::yield();
+							MT::yield();
 						}
 					}
 
@@ -150,7 +150,7 @@ namespace Lumix
 						spawnWorkerTask();
 					}
 
-					Lumix::MT::yield();
+					MT::yield();
 				}
 
 				m_trans_queue.abort();
@@ -192,7 +192,7 @@ namespace Lumix
 			void handleFail(const char* msg, const char* file_name, u32 line)
 			{	
 				FailInfo& fi = m_failed_tests.emplace();
-				Lumix::copyString(fi.m_message, msg);
+				copyString(fi.m_message, msg);
 				fi.m_file_name = file_name;
 				fi.m_line = line;
 				m_fails++;

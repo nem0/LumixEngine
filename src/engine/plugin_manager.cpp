@@ -134,7 +134,7 @@ class PluginManagerImpl LUMIX_FINAL : public PluginManager
 						m_libraries.push(lib);
 						m_library_loaded.invoke(lib);
 						g_log_info.log("Core") << "Plugin loaded.";
-						Lumix::Debug::StackTree::refreshModuleList();
+						Debug::StackTree::refreshModuleList();
 						return plugin;
 					}
 				}

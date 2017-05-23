@@ -121,7 +121,7 @@ bool StackTree::getFunction(StackNode* node, char* out, int max_size, int* line)
 	{
 		*line = -1;
 	}
-	if (success) Lumix::copyString(out, max_size, symbol->Name);
+	if (success) copyString(out, max_size, symbol->Name);
 
 	return success != FALSE;
 }
@@ -732,9 +732,9 @@ static LONG WINAPI unhandledExceptionHandler(LPEXCEPTION_POINTERS info)
 			message[0] = '\0';
 		}
 
-		char minidump_path[Lumix::MAX_PATH_LENGTH];
+		char minidump_path[MAX_PATH_LENGTH];
 		GetCurrentDirectory(sizeof(minidump_path), minidump_path);
-		Lumix::catString(minidump_path, "\\minidump.dmp");
+		catString(minidump_path, "\\minidump.dmp");
 
 		HANDLE process = GetCurrentProcess();
 		DWORD process_id = GetProcessId(process);

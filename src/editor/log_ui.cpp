@@ -4,7 +4,11 @@
 #include "imgui/imgui.h"
 
 
-LogUI::LogUI(Lumix::IAllocator& allocator)
+namespace Lumix
+{
+
+
+LogUI::LogUI(IAllocator& allocator)
 	: m_allocator(allocator)
 	, m_messages(allocator)
 	, m_current_tab(Error)
@@ -15,9 +19,9 @@ LogUI::LogUI(Lumix::IAllocator& allocator)
 	, m_are_notifications_hovered(false)
 	, m_move_notifications_to_front(false)
 {
-	Lumix::g_log_info.getCallback().bind<LogUI, &LogUI::onInfo>(this);
-	Lumix::g_log_error.getCallback().bind<LogUI, &LogUI::onError>(this);
-	Lumix::g_log_warning.getCallback().bind<LogUI, &LogUI::onWarning>(this);
+	g_log_info.getCallback().bind<LogUI, &LogUI::onInfo>(this);
+	g_log_error.getCallback().bind<LogUI, &LogUI::onError>(this);
+	g_log_warning.getCallback().bind<LogUI, &LogUI::onWarning>(this);
 
 	for (int i = 0; i < Count; ++i)
 	{
@@ -29,9 +33,9 @@ LogUI::LogUI(Lumix::IAllocator& allocator)
 
 LogUI::~LogUI()
 {
-	Lumix::g_log_info.getCallback().unbind<LogUI, &LogUI::onInfo>(this);
-	Lumix::g_log_error.getCallback().unbind<LogUI, &LogUI::onError>(this);
-	Lumix::g_log_warning.getCallback().unbind<LogUI, &LogUI::onWarning>(this);
+	g_log_info.getCallback().unbind<LogUI, &LogUI::onInfo>(this);
+	g_log_error.getCallback().unbind<LogUI, &LogUI::onError>(this);
+	g_log_warning.getCallback().unbind<LogUI, &LogUI::onWarning>(this);
 }
 
 
@@ -61,9 +65,9 @@ int LogUI::addNotification(const char* text)
 
 void LogUI::push(Type type, const char* message)
 {
-	Lumix::MT::SpinLock lock(m_guard);
+	MT::SpinLock lock(m_guard);
 	++m_new_message_count[type];
-	m_messages[type].push(Lumix::string(message, m_allocator));
+	m_messages[type].push(string(message, m_allocator));
 
 	if (type == Error)
 	{
@@ -92,12 +96,12 @@ void LogUI::onError(const char* system, const char* message)
 
 void fillLabel(char* output, int max_size, const char* label, int count)
 {
-	Lumix::copyString(output, max_size, label);
-	Lumix::catString(output, max_size, "(");
-	int len = Lumix::stringLength(output);
-	Lumix::toCString(count, output + len, max_size - len);
-	Lumix::catString(output, max_size, ")###");
-	Lumix::catString(output, max_size, label);
+	copyString(output, max_size, label);
+	catString(output, max_size, "(");
+	int len = stringLength(output);
+	toCString(count, output + len, max_size - len);
+	catString(output, max_size, ")###");
+	catString(output, max_size, label);
 }
 
 
@@ -160,13 +164,13 @@ int LogUI::getUnreadErrorCount() const
 
 void LogUI::onGUI()
 {
-	Lumix::MT::SpinLock lock(m_guard);
+	MT::SpinLock lock(m_guard);
 	showNotifications();
 
 	if (ImGui::BeginDock("Log", &m_is_opened))
 	{
 		const char* labels[] = { "Info", "Warning", "Error" };
-		for (int i = 0; i < Lumix::lengthOf(labels); ++i)
+		for (int i = 0; i < lengthOf(labels); ++i)
 		{
 			char label[40];
 			fillLabel(label, sizeof(label), labels[i], m_new_message_count[i]);
@@ -200,7 +204,7 @@ void LogUI::onGUI()
 				const char* msg = (*messages)[i].c_str();
 				if (filter[0] == '\0' || strstr(msg, filter) != nullptr)
 				{
-					len += Lumix::stringLength(msg);
+					len += stringLength(msg);
 				}
 			}
 
@@ -213,8 +217,8 @@ void LogUI::onGUI()
 					const char* msg = (*messages)[i].c_str();
 					if (filter[0] == '\0' || strstr(msg, filter) != nullptr)
 					{
-						Lumix::catString(mem, len, msg);
-						Lumix::catString(mem, len, "\n");
+						catString(mem, len, msg);
+						catString(mem, len, "\n");
 					}
 				}
 
@@ -238,3 +242,6 @@ void LogUI::onGUI()
 	}
 	ImGui::EndDock();
 }
+
+
+} // namespace Lumix

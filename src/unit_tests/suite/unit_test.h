@@ -36,7 +36,7 @@ namespace Lumix
 			template <int C, typename T>
 			static void getOperand(char(&str)[C], T value)
 			{
-				Lumix::catString(str, "Unknown type");
+				catString(str, "Unknown type");
 			}
 
 
@@ -44,8 +44,8 @@ namespace Lumix
 			static void getOperand(char(&str)[C], int value)
 			{
 				char tmp[20];
-				Lumix::toCString(value, tmp, C);
-				Lumix::catString(str, tmp);
+				toCString(value, tmp, C);
+				catString(str, tmp);
 			}
 
 
@@ -53,8 +53,8 @@ namespace Lumix
 			static void getOperand(char(&str)[C], float value)
 			{
 				char tmp[20];
-				Lumix::toCString(value, tmp, C, 5);
-				Lumix::catString(str, tmp);
+				toCString(value, tmp, C, 5);
+				catString(str, tmp);
 			}
 
 
@@ -62,10 +62,10 @@ namespace Lumix
 			static void getOperand(char(&str)[C], Entity value)
 			{
 				char tmp[20];
-				Lumix::toCString(value.index, tmp, C);
-				Lumix::catString(str, "{");
-				Lumix::catString(str, tmp);
-				Lumix::catString(str, "}");
+				toCString(value.index, tmp, C);
+				catString(str, "{");
+				catString(str, tmp);
+				catString(str, "}");
 			}
 
 
@@ -74,12 +74,12 @@ namespace Lumix
 			{
 				switch (oper)
 				{
-					case EQ: Lumix::catString(str, " == "); break;
-					case NE: Lumix::catString(str, " != "); break;
-					case LT: Lumix::catString(str, " < "); break;
-					case GT: Lumix::catString(str, " > "); break;
-					case GE: Lumix::catString(str, " >= "); break;
-					case LE: Lumix::catString(str, " <= "); break;
+					case EQ: catString(str, " == "); break;
+					case NE: catString(str, " != "); break;
+					case LT: catString(str, " < "); break;
+					case GT: catString(str, " > "); break;
+					case GE: catString(str, " >= "); break;
+					case LE: catString(str, " <= "); break;
 					default: ASSERT(false); break;
 				}
 			}
@@ -183,9 +183,9 @@ namespace Lumix
 			if(!expr.result)
 			{
 				char tmp[1024];
-				Lumix::copyString(tmp, "\"");
-				Lumix::catString(tmp, expr.expression);
-				Lumix::catString(tmp, "\" evaluated to ");
+				copyString(tmp, "\"");
+				catString(tmp, expr.expression);
+				catString(tmp, "\" evaluated to ");
 				expr.getOperand(tmp, expr.lhs);
 				expr.getOperator(tmp);
 				expr.getOperand(tmp, expr.rhs);
@@ -195,5 +195,5 @@ namespace Lumix
 	} // ~UnitTest
 } // ~Lumix
 
-#define LUMIX_EXPECT(b)	Lumix::UnitTest::expect(Lumix::UnitTest::Result(#b) <= b, __FILE__, __LINE__)
-#define LUMIX_EXPECT_CLOSE_EQ(a, b, e)	Lumix::UnitTest::expect(Lumix::UnitTest::Result(#a " close equals " #b) <= (((a) - (e)) < (b) && ((a) + (e)) > (b)), __FILE__, __LINE__)
+#define LUMIX_EXPECT(b)	UnitTest::expect(UnitTest::Result(#b) <= b, __FILE__, __LINE__)
+#define LUMIX_EXPECT_CLOSE_EQ(a, b, e)	UnitTest::expect(UnitTest::Result(#a " close equals " #b) <= (((a) - (e)) < (b) && ((a) + (e)) > (b)), __FILE__, __LINE__)

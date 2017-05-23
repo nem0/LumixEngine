@@ -423,9 +423,9 @@ namespace Lumix
 			{
 				int idx = addScript(cmp);
 				auto& inst = scr->m_scripts[idx];
-				char tmp[Lumix::MAX_PATH_LENGTH];
+				char tmp[MAX_PATH_LENGTH];
 				blob.readString(tmp, lengthOf(tmp));
-				setScriptPath(cmp, idx, Lumix::Path(tmp));
+				setScriptPath(cmp, idx, Path(tmp));
 				
 				int prop_count;
 				blob.read(prop_count);
@@ -844,7 +844,7 @@ namespace Lumix
 
 		void setScriptSource(ComponentHandle cmp, int scr_index, const char* path)
 		{
-			setScriptPath(cmp, scr_index, Lumix::Path(path));
+			setScriptPath(cmp, scr_index, Path(path));
 		}
 
 
@@ -949,7 +949,7 @@ namespace Lumix
 		}
 
 
-		void setPropertyValue(Lumix::ComponentHandle cmp,
+		void setPropertyValue(ComponentHandle cmp,
 			int scr_index,
 			const char* name,
 			const char* value) override
@@ -967,7 +967,7 @@ namespace Lumix
 		}
 
 
-		const char* getPropertyName(Lumix::ComponentHandle cmp, int scr_index, int index) const
+		const char* getPropertyName(ComponentHandle cmp, int scr_index, int index) const
 		{
 			auto& script = m_scripts[{cmp.index}]->m_scripts[scr_index];
 
@@ -975,7 +975,7 @@ namespace Lumix
 		}
 
 
-		int getPropertyCount(Lumix::ComponentHandle cmp, int scr_index) const
+		int getPropertyCount(ComponentHandle cmp, int scr_index) const
 		{
 			auto& script = m_scripts[{cmp.index}]->m_scripts[scr_index];
 
@@ -1424,7 +1424,7 @@ namespace Lumix
 		{
 			ASSERT(!m_scripts_init_called && m_is_game_running);
 			// copy m_scripts to tmp, because scripts can create other scripts -> m_scripts is not const
-			Lumix::Array<ScriptComponent*> tmp(m_system.m_allocator);
+			Array<ScriptComponent*> tmp(m_system.m_allocator);
 			tmp.reserve(m_scripts.size());
 			for (auto* scr : m_scripts) tmp.push(scr);
 

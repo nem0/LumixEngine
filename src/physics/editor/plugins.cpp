@@ -565,13 +565,13 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 
 				ImGui::PushID(i);
 				char tmp[256];
-				getEntityListDisplayName(m_editor, tmp, Lumix::lengthOf(tmp), cmp.entity);
+				getEntityListDisplayName(m_editor, tmp, lengthOf(tmp), cmp.entity);
 				bool b = false;
 				if (ImGui::Selectable(tmp, &b)) m_editor.selectEntities(&cmp.entity, 1);
 				ImGui::NextColumn();
 
 				Entity other_entity = scene->getJointConnectedBody(cmp.handle);
-				getEntityListDisplayName(m_editor, tmp, Lumix::lengthOf(tmp), other_entity);
+				getEntityListDisplayName(m_editor, tmp, lengthOf(tmp), other_entity);
 				if (other_entity.isValid() && ImGui::Selectable(tmp, &b)) m_editor.selectEntities(&other_entity, 1);
 				ImGui::NextColumn();
 				ImGui::PopID();
@@ -1003,7 +1003,7 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 
 	bool m_is_window_opened;
 	int m_selected_bone;
-	Lumix::WorldEditor& m_editor;
+	WorldEditor& m_editor;
 };
 
 
@@ -1016,7 +1016,7 @@ struct PhysicsGeometryPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 	}
 
 
-	bool acceptExtension(const char* ext, Lumix::ResourceType type) const override { return false; }
+	bool acceptExtension(const char* ext, ResourceType type) const override { return false; }
 
 
 	bool onGUI(Resource* resource, ResourceType type) override

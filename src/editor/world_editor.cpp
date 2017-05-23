@@ -1007,7 +1007,7 @@ public:
 private:
 	WorldEditor& m_editor;
 	ComponentType m_component_type;
-	Lumix::Array<Entity> m_entities;
+	Array<Entity> m_entities;
 	OutputBlob m_new_value;
 	OutputBlob m_old_value;
 	int m_index;

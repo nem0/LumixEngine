@@ -30,14 +30,18 @@
 #endif
 
 
-struct GUIInterface : Lumix::GUISystem::Interface
+namespace Lumix
+{
+
+
+struct GUIInterface : GUISystem::Interface
 {
 	GUIInterface()
 	{
 	}
 
-	Lumix::Pipeline* getPipeline() override { return pipeline; }
-	Lumix::Vec2 getPos() const override { return Lumix::Vec2(0, 0); }
+	Pipeline* getPipeline() override { return pipeline; }
+	Vec2 getPos() const override { return Vec2(0, 0); }
 
 	void enableCursor(bool enable) override
 	{
@@ -52,7 +56,7 @@ struct GUIInterface : Lumix::GUISystem::Interface
 	}
 
 
-	Lumix::Pipeline* pipeline;
+	Pipeline* pipeline;
 };
 
 
@@ -66,7 +70,7 @@ public:
 		, m_exit_code(0)
 		, m_pipeline(nullptr)
 	{
-		m_frame_timer = Lumix::Timer::create(m_allocator);
+		m_frame_timer = Timer::create(m_allocator);
 		ASSERT(!s_instance);
 		s_instance = this;
 	}
@@ -74,7 +78,7 @@ public:
 
 	~App()
 	{
-		Lumix::Timer::destroy(m_frame_timer);
+		Timer::destroy(m_frame_timer);
 		ASSERT(!m_universe);
 		s_instance = nullptr;
 	}
@@ -117,8 +121,8 @@ public:
 		{
 			ClipCursor(&screen_rect);
 			m_pipeline->setViewport(0, 0, w, h);
-			Lumix::Renderer* renderer =
-				static_cast<Lumix::Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
+			Renderer* renderer =
+				static_cast<Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
 			renderer->resize(w, h);
 		}
 	}
@@ -188,11 +192,11 @@ public:
 
 	void init()
 	{
-		Lumix::copyString(m_pipeline_path, "pipelines/app.lua");
-		Lumix::copyString(m_startup_script_path, "startup.lua");
+		copyString(m_pipeline_path, "pipelines/app.lua");
+		copyString(m_startup_script_path, "startup.lua");
 		char cmd_line[1024];
-		Lumix::getCommandLine(cmd_line, Lumix::lengthOf(cmd_line));
-		Lumix::CommandLineParser parser(cmd_line);
+		getCommandLine(cmd_line, lengthOf(cmd_line));
+		CommandLineParser parser(cmd_line);
 		while (parser.next())
 		{
 			if (parser.currentEquals("-window"))
@@ -203,35 +207,35 @@ public:
 			{
 				if (!parser.next()) break;
 
-				parser.getCurrent(m_pipeline_path, Lumix::lengthOf(m_pipeline_path));
+				parser.getCurrent(m_pipeline_path, lengthOf(m_pipeline_path));
 			}
 			else if(parser.currentEquals("-script"))
 			{
 				if (!parser.next()) break;
 
-				parser.getCurrent(m_startup_script_path, Lumix::lengthOf(m_startup_script_path));
+				parser.getCurrent(m_startup_script_path, lengthOf(m_startup_script_path));
 			}
 		}
 
 		createWindow();
 
-		Lumix::g_log_info.getCallback().bind<outputToVS>();
-		Lumix::g_log_warning.getCallback().bind<outputToVS>();
-		Lumix::g_log_error.getCallback().bind<outputToVS>();
+		g_log_info.getCallback().bind<outputToVS>();
+		g_log_warning.getCallback().bind<outputToVS>();
+		g_log_error.getCallback().bind<outputToVS>();
 
-		Lumix::g_log_info.getCallback().bind<outputToConsole>();
-		Lumix::g_log_warning.getCallback().bind<outputToConsole>();
-		Lumix::g_log_error.getCallback().bind<outputToConsole>();
+		g_log_info.getCallback().bind<outputToConsole>();
+		g_log_warning.getCallback().bind<outputToConsole>();
+		g_log_error.getCallback().bind<outputToConsole>();
 
-		Lumix::enableCrashReporting(false);
+		enableCrashReporting(false);
 
-		m_file_system = Lumix::FS::FileSystem::create(m_allocator);
+		m_file_system = FS::FileSystem::create(m_allocator);
 
-		m_mem_file_device = LUMIX_NEW(m_allocator, Lumix::FS::MemoryFileDevice)(m_allocator);
-		char current_dir[Lumix::MAX_PATH_LENGTH];
+		m_mem_file_device = LUMIX_NEW(m_allocator, FS::MemoryFileDevice)(m_allocator);
+		char current_dir[MAX_PATH_LENGTH];
 		GetCurrentDirectory(sizeof(current_dir), current_dir);
-		m_disk_file_device = LUMIX_NEW(m_allocator, Lumix::FS::DiskFileDevice)("disk", current_dir, m_allocator);
-		m_pack_file_device = LUMIX_NEW(m_allocator, Lumix::FS::PackFileDevice)(m_allocator);
+		m_disk_file_device = LUMIX_NEW(m_allocator, FS::DiskFileDevice)("disk", current_dir, m_allocator);
+		m_pack_file_device = LUMIX_NEW(m_allocator, FS::PackFileDevice)(m_allocator);
 
 		m_file_system->mount(m_mem_file_device);
 		m_file_system->mount(m_disk_file_device);
@@ -240,8 +244,8 @@ public:
 		m_file_system->setDefaultDevice("memory:disk:pack");
 		m_file_system->setSaveGameDevice("memory:disk");
 
-		m_engine = Lumix::Engine::create(current_dir, "", m_file_system, m_allocator);
-		Lumix::Engine::PlatformData platform_data;
+		m_engine = Engine::create(current_dir, "", m_file_system, m_allocator);
+		Engine::PlatformData platform_data;
 		platform_data.window_handle = m_hwnd;
 		m_engine->setPlatformData(platform_data);
 
@@ -260,25 +264,25 @@ public:
 			}
 		#endif
 		m_engine->getInputSystem().enable(true);
-		Lumix::Renderer* renderer = static_cast<Lumix::Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
-		m_pipeline = Lumix::Pipeline::create(*renderer, Lumix::Path(m_pipeline_path), m_engine->getAllocator());
+		Renderer* renderer = static_cast<Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
+		m_pipeline = Pipeline::create(*renderer, Path(m_pipeline_path), m_engine->getAllocator());
 		m_pipeline->load();
 
 		while (m_engine->getFileSystem().hasWork())
 		{
-			Lumix::MT::sleep(100);
+			MT::sleep(100);
 			m_engine->getFileSystem().updateAsyncTransactions();
 		}
 
 		m_universe = &m_engine->createUniverse(true);
-		m_pipeline->setScene((Lumix::RenderScene*)m_universe->getScene(Lumix::crc32("renderer")));
+		m_pipeline->setScene((RenderScene*)m_universe->getScene(crc32("renderer")));
 		m_pipeline->setViewport(0, 0, 600, 400);
 		renderer->resize(600, 400);
 
 		registerLuaAPI();
 
 		m_gui_interface = LUMIX_NEW(m_allocator, GUIInterface);
-		auto* gui_system = static_cast<Lumix::GUISystem*>(m_engine->getPluginManager().getPlugin("gui"));
+		auto* gui_system = static_cast<GUISystem*>(m_engine->getPluginManager().getPlugin("gui"));
 		m_gui_interface->pipeline = m_pipeline;
 
 		gui_system->setInterface(m_gui_interface);
@@ -288,11 +292,11 @@ public:
 	}
 
 
-	void startupScriptLoaded(Lumix::FS::IFile& file, bool success)
+	void startupScriptLoaded(FS::IFile& file, bool success)
 	{
 		if (!success)
 		{
-			Lumix::g_log_error.log("App") << "Could not open " << m_startup_script_path;
+			g_log_error.log("App") << "Could not open " << m_startup_script_path;
 			return;
 		}
 
@@ -307,8 +311,8 @@ public:
 
 		#define REGISTER_FUNCTION(F, name) \
 			do { \
-				auto* f = &Lumix::LuaWrapper::wrapMethod<App, decltype(&App::F), &App::F>; \
-				Lumix::LuaWrapper::createSystemFunction(L, "App", name, f); \
+				auto* f = &LuaWrapper::wrapMethod<App, decltype(&App::F), &App::F>; \
+				LuaWrapper::createSystemFunction(L, "App", name, f); \
 			} while(false) \
 
 		REGISTER_FUNCTION(loadUniverse, "loadUniverse");
@@ -317,81 +321,81 @@ public:
 
 		#undef REGISTER_FUNCTION
 
-		Lumix::LuaWrapper::createSystemVariable(L, "App", "instance", this);
-		Lumix::LuaWrapper::createSystemVariable(L, "App", "universe", m_universe);
+		LuaWrapper::createSystemVariable(L, "App", "instance", this);
+		LuaWrapper::createSystemVariable(L, "App", "universe", m_universe);
 
 		auto& fs = m_engine->getFileSystem();
-		Lumix::FS::ReadCallback cb;
+		FS::ReadCallback cb;
 		cb.bind<App, &App::startupScriptLoaded>(this);
-		fs.openAsync(fs.getDefaultDevice(), Lumix::Path(m_startup_script_path), Lumix::FS::Mode::OPEN_AND_READ, cb);
+		fs.openAsync(fs.getDefaultDevice(), Path(m_startup_script_path), FS::Mode::OPEN_AND_READ, cb);
 	}
 
 
-	void universeFileLoaded(Lumix::FS::IFile& file, bool success)
+	void universeFileLoaded(FS::IFile& file, bool success)
 	{
 		if (!success)
 		{
-			Lumix::g_log_error.log("App") << "Failed to open universe.";
+			g_log_error.log("App") << "Failed to open universe.";
 			return;
 		}
 
 		ASSERT(file.getBuffer());
-		Lumix::InputBlob blob(file.getBuffer(), (int)file.size());
+		InputBlob blob(file.getBuffer(), (int)file.size());
 		#pragma pack(1)
 			struct Header
 			{
-				Lumix::u32 magic;
+				u32 magic;
 				int version;
-				Lumix::u32 hash;
-				Lumix::u32 engine_hash;
+				u32 hash;
+				u32 engine_hash;
 			};
 		#pragma pack()
 		Header header;
 		blob.read(header);
-		if (Lumix::crc32((const Lumix::u8*)blob.getData() + sizeof(header), blob.getSize() - sizeof(header)) !=
+		if (crc32((const u8*)blob.getData() + sizeof(header), blob.getSize() - sizeof(header)) !=
 			header.hash)
 		{
-			Lumix::g_log_error.log("App") << "Universe corrupted";
+			g_log_error.log("App") << "Universe corrupted";
 			return;
 		}
 		m_engine->destroyUniverse(*m_universe);
 		m_universe = &m_engine->createUniverse(true);
-		char basename[Lumix::MAX_PATH_LENGTH];
-		Lumix::PathUtils::getBasename(basename, Lumix::lengthOf(basename), m_universe_path);
+		char basename[MAX_PATH_LENGTH];
+		PathUtils::getBasename(basename, lengthOf(basename), m_universe_path);
 		m_universe->setName(basename);
-		m_pipeline->setScene((Lumix::RenderScene*)m_universe->getScene(Lumix::crc32("renderer")));
-		Lumix::LuaWrapper::createSystemVariable(m_engine->getState(), "App", "universe", m_universe);
+		m_pipeline->setScene((RenderScene*)m_universe->getScene(crc32("renderer")));
+		LuaWrapper::createSystemVariable(m_engine->getState(), "App", "universe", m_universe);
 		bool deserialize_succeeded = m_engine->deserialize(*m_universe, blob);
 		if (!deserialize_succeeded)
 		{
-			Lumix::g_log_error.log("App") << "Failed to deserialize universe";
+			g_log_error.log("App") << "Failed to deserialize universe";
 		}
 	}
 
 
 	void loadUniverse(const char* path)
 	{
-		Lumix::copyString(m_universe_path, path);
+		copyString(m_universe_path, path);
 		auto& fs = m_engine->getFileSystem();
-		Lumix::FS::ReadCallback file_read_cb;
+		FS::ReadCallback file_read_cb;
 		file_read_cb.bind<App, &App::universeFileLoaded>(this);
-		fs.openAsync(fs.getDefaultDevice(), Lumix::Path(m_universe_path), Lumix::FS::Mode::OPEN_AND_READ, file_read_cb);
+		fs.openAsync(fs.getDefaultDevice(), Path(m_universe_path), FS::Mode::OPEN_AND_READ, file_read_cb);
 	}
 
 
 	void shutdown()
 	{
-		auto* gui_system = static_cast<Lumix::GUISystem*>(m_engine->getPluginManager().getPlugin("gui"));
+		auto* gui_system = static_cast<GUISystem*>(m_engine->getPluginManager().getPlugin("gui"));
 		gui_system->setInterface(nullptr);
 		LUMIX_DELETE(m_allocator, m_gui_interface);
 
 		m_engine->destroyUniverse(*m_universe);
-		Lumix::FS::FileSystem::destroy(m_file_system);
+		FS::FileSystem::destroy(m_file_system);
 		LUMIX_DELETE(m_allocator, m_disk_file_device);
 		LUMIX_DELETE(m_allocator, m_mem_file_device);
 		LUMIX_DELETE(m_allocator, m_pack_file_device);
-		Lumix::Pipeline::destroy(m_pipeline);
-		Lumix::Engine::destroy(m_engine, m_allocator);
+		Pipeline::destroy(m_pipeline);
+		Engine::destroy(m_engine, m_allocator);
 		m_engine = nullptr;
 		m_pipeline = nullptr;
 		m_universe = nullptr;
@@ -442,10 +446,10 @@ public:
 	static void outputToVS(const char* system, const char* message)
 	{
 		char tmp[2048];
-		Lumix::copyString(tmp, system);
-		Lumix::catString(tmp, " : ");
-		Lumix::catString(tmp, message);
-		Lumix::catString(tmp, "\r");
+		copyString(tmp, system);
+		catString(tmp, " : ");
+		catString(tmp, message);
+		catString(tmp, "\r");
 
 		OutputDebugString(tmp);
 	}
@@ -470,12 +474,12 @@ public:
 		m_engine->update(*m_universe);
 		m_pipeline->render();
 		auto* renderer = m_engine->getPluginManager().getPlugin("renderer");
-		static_cast<Lumix::Renderer*>(renderer)->frame(false);
+		static_cast<Renderer*>(renderer)->frame(false);
 		m_engine->getFileSystem().updateAsyncTransactions();
 		if (frame_time < 1 / 60.0f)
 		{
 			PROFILE_BLOCK("sleep");
-			Lumix::MT::sleep(Lumix::u32(1000 / 60.0f - frame_time * 1000));
+			MT::sleep(u32(1000 / 60.0f - frame_time * 1000));
 		}
 		handleEvents();
 	}
@@ -492,23 +496,23 @@ public:
 
 
 private:
-	Lumix::DefaultAllocator m_main_allocator;
-	Lumix::Debug::Allocator m_allocator;
-	Lumix::Engine* m_engine;
-	char m_universe_path[Lumix::MAX_PATH_LENGTH];
-	Lumix::Universe* m_universe;
-	Lumix::Pipeline* m_pipeline;
-	Lumix::FS::FileSystem* m_file_system;
-	Lumix::FS::MemoryFileDevice* m_mem_file_device;
-	Lumix::FS::DiskFileDevice* m_disk_file_device;
-	Lumix::FS::PackFileDevice* m_pack_file_device;
-	Lumix::Timer* m_frame_timer;
+	DefaultAllocator m_main_allocator;
+	Debug::Allocator m_allocator;
+	Engine* m_engine;
+	char m_universe_path[MAX_PATH_LENGTH];
+	Universe* m_universe;
+	Pipeline* m_pipeline;
+	FS::FileSystem* m_file_system;
+	FS::MemoryFileDevice* m_mem_file_device;
+	FS::DiskFileDevice* m_disk_file_device;
+	FS::PackFileDevice* m_pack_file_device;
+	Timer* m_frame_timer;
 	GUIInterface* m_gui_interface;
 	bool m_finished;
 	bool m_window_mode;
 	int m_exit_code;
-	char m_startup_script_path[Lumix::MAX_PATH_LENGTH];
-	char m_pipeline_path[Lumix::MAX_PATH_LENGTH];
+	char m_startup_script_path[MAX_PATH_LENGTH];
+	char m_pipeline_path[MAX_PATH_LENGTH];
 	HWND m_hwnd;
 
 	static App* s_instance;
@@ -518,11 +522,15 @@ private:
 App* App::s_instance = nullptr;
 
 
+}
+
+
 INT WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, INT)
 {
-	App app;
+	Lumix::App app;
 	app.init();
 	app.run();
 	app.shutdown();
 	return app.getExitCode();
 }
+

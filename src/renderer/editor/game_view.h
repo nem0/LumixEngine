@@ -6,15 +6,16 @@
 
 
 struct ImVec2;
-struct PlatformData;
-class StudioApp;
 
 
 namespace Lumix
 {
-	class Pipeline;
-	class RenderScene;
-}
+
+
+struct PlatformData;
+class StudioApp;
+class Pipeline;
+class RenderScene;
 
 
 class GameView
@@ -24,10 +25,10 @@ public:
 	GameView(StudioApp& app);
 	~GameView();
 
-	void init(Lumix::WorldEditor& editor);
+	void init(WorldEditor& editor);
 	void shutdown();
 	void onGUI();
-	void setScene(Lumix::RenderScene* scene);
+	void setScene(RenderScene* scene);
 	bool isMouseCaptured() const { return m_is_mouse_captured; }
 	void captureMouse(bool capture);
 	void enableIngameCursor(bool enable);
@@ -45,12 +46,12 @@ private:
 	
 
 private:
-	Lumix::Pipeline* m_pipeline;
-	Lumix::WorldEditor* m_editor;
+	Pipeline* m_pipeline;
+	WorldEditor* m_editor;
 	float m_time_multiplier;
 	StudioApp& m_studio_app;
-	Lumix::Vec2 m_pos;
-	Lumix::Vec2 m_size;
+	Vec2 m_pos;
+	Vec2 m_size;
 	bgfx::TextureHandle m_texture_handle;
 	struct GUIInterface* m_gui_interface;
 	bool m_is_mouse_captured;
@@ -68,3 +69,6 @@ private:
 	} m_forced_viewport;
 	int m_captured_mouse_x, m_captured_mouse_y;
 };
+
+
+} // namespace Lumix

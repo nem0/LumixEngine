@@ -8,14 +8,18 @@
 
 #include "renderer/culling_system.h"
 
+
+using namespace Lumix;
+
+
 namespace
 {
 
 	struct TestFrustum
 	{
-		Lumix::Vec3 pos;
-		Lumix::Vec3 dir;
-		Lumix::Vec3 up;
+		Vec3 pos;
+		Vec3 dir;
+		Vec3 up;
 		float fov;
 		float ratio;
 		float near;
@@ -35,103 +39,103 @@ namespace
 
 	void UT_culling_system(const char* params)
 	{
-		Lumix::DefaultAllocator allocator;
-		Lumix::Array<Lumix::Sphere> spheres(allocator);
-		Lumix::Array<Lumix::ComponentHandle> model_instances(allocator);
+		DefaultAllocator allocator;
+		Array<Sphere> spheres(allocator);
+		Array<ComponentHandle> model_instances(allocator);
 		int model_instance = 0;
 		for (float i = 0.f; i < 30000000.0f; i += 15.f)
 		{
-			spheres.push(Lumix::Sphere(i, 0.f, 50.f, 5.f));
+			spheres.push(Sphere(i, 0.f, 50.f, 5.f));
 			model_instances.push({model_instance});
 			++model_instance;
 		}
 
-		Lumix::Frustum clipping_frustum;
+		Frustum clipping_frustum;
 		clipping_frustum.computePerspective(
 			test_frustum.pos,
 			test_frustum.dir,
 			test_frustum.up,
-			Lumix::Math::degreesToRadians(test_frustum.fov),
+			Math::degreesToRadians(test_frustum.fov),
 			test_frustum.ratio,
 			test_frustum.near,
 			test_frustum.far);
 
-		Lumix::CullingSystem* culling_system;
+		CullingSystem* culling_system;
 		{
-			Lumix::MTJD::Manager* mtjd_manager = Lumix::MTJD::Manager::create(allocator);
+			MTJD::Manager* mtjd_manager = MTJD::Manager::create(allocator);
 
-			culling_system = Lumix::CullingSystem::create(*mtjd_manager, allocator);
+			culling_system = CullingSystem::create(*mtjd_manager, allocator);
 			culling_system->insert(spheres, model_instances);
 
-			Lumix::ScopedTimer timer("Culling System", allocator);
+			ScopedTimer timer("Culling System", allocator);
 
 			culling_system->cullToFrustum(clipping_frustum, 1);
-			const Lumix::CullingSystem::Results& result = culling_system->getResult();
+			const CullingSystem::Results& result = culling_system->getResult();
 
 			for (int i = 0; i < result.size(); i++)
 			{
-				const Lumix::CullingSystem::Subresults& subresult = result[i];
+				const CullingSystem::Subresults& subresult = result[i];
 				for (int j = 0; j < subresult.size(); ++j)
 				{
 					LUMIX_EXPECT(subresult[i].index < 6);
 				}
 			}
 
-			Lumix::MTJD::Manager::destroy(*mtjd_manager);
+			MTJD::Manager::destroy(*mtjd_manager);
 		}
 
-		Lumix::CullingSystem::destroy(*culling_system);
+		CullingSystem::destroy(*culling_system);
 	}
 
 	void UT_culling_system_async(const char* params)
 	{
-		Lumix::DefaultAllocator allocator;
-		Lumix::Array<Lumix::Sphere> spheres(allocator);
-		Lumix::Array<Lumix::ComponentHandle> model_instances(allocator);
+		DefaultAllocator allocator;
+		Array<Sphere> spheres(allocator);
+		Array<ComponentHandle> model_instances(allocator);
 		int model_instance = 0;
 		for(float i = 0.f; i < 30000000.0f; i += 15.f)
 		{
-			spheres.push(Lumix::Sphere(i, 0.f, 50.f, 5.f));
+			spheres.push(Sphere(i, 0.f, 50.f, 5.f));
 			model_instances.push({model_instance});
 			++model_instance;
 		}
 
-		Lumix::Frustum clipping_frustum;
+		Frustum clipping_frustum;
 		clipping_frustum.computePerspective(
 			test_frustum.pos,
 			test_frustum.dir,
 			test_frustum.up,
-			Lumix::Math::degreesToRadians(test_frustum.fov),
+			Math::degreesToRadians(test_frustum.fov),
 			test_frustum.ratio,
 			test_frustum.near,
 			test_frustum.far);
 
-		Lumix::CullingSystem* culling_system;
+		CullingSystem* culling_system;
 		{
-			Lumix::MTJD::Manager* mtjd_manager = Lumix::MTJD::Manager::create(allocator);
+			MTJD::Manager* mtjd_manager = MTJD::Manager::create(allocator);
 
-			culling_system = Lumix::CullingSystem::create(*mtjd_manager, allocator);
+			culling_system = CullingSystem::create(*mtjd_manager, allocator);
 			culling_system->insert(spheres, model_instances);
 
-			Lumix::ScopedTimer timer("Culling System Async", allocator);
+			ScopedTimer timer("Culling System Async", allocator);
 
 			culling_system->cullToFrustumAsync(clipping_frustum, 1);
 
-			const Lumix::CullingSystem::Results& result = culling_system->getResult();
+			const CullingSystem::Results& result = culling_system->getResult();
 
 			for (int i = 0; i < result.size(); i++)
 			{
-				const Lumix::CullingSystem::Subresults& subresult = result[i];
+				const CullingSystem::Subresults& subresult = result[i];
 				for (int j = 0; j < subresult.size(); ++j)
 				{
 					LUMIX_EXPECT(subresult[i].index < 6);
 				}
 			}
 
-			Lumix::MTJD::Manager::destroy(*mtjd_manager);
+			MTJD::Manager::destroy(*mtjd_manager);
 		}
 
-		Lumix::CullingSystem::destroy(*culling_system);
+		CullingSystem::destroy(*culling_system);
 	}
 }
 

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
 
-	<Type Name="Lumix::Array&lt;*&gt;">
+	<Type Name="Array&lt;*&gt;">
 		<DisplayString Condition="m_data == nullptr">size={m_size}</DisplayString>
 		<DisplayString Condition="m_data != nullptr">size={m_size} [0]=>{m_data[0]}</DisplayString>
 		<Expand>
@@ -12,7 +12,7 @@
 		</Expand>
 	</Type>
 
-  <Type Name="Lumix::HashMap&lt;*,*&gt;">
+  <Type Name="HashMap&lt;*,*&gt;">
     <DisplayString>{{ size={m_size} }}</DisplayString>
     <Expand>
       <Item Name="[size]" ExcludeView="simple">m_size</Item>

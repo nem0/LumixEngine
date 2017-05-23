@@ -3175,7 +3175,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		char tmp[MAX_PATH_LENGTH];
 		serializer.read(tmp, sizeof(tmp));
 		ResourceManagerBase* manager = m_engine->getResourceManager().get(PHYSICS_TYPE);
-		auto* geometry = manager->load(Lumix::Path(tmp));
+		auto* geometry = manager->load(Path(tmp));
 		actor->setResource(static_cast<PhysicsGeometry*>(geometry));
 		
 		m_universe.addComponent(actor->entity, MESH_ACTOR_TYPE, this, {entity.index});
@@ -3438,7 +3438,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 				char tmp[MAX_PATH_LENGTH];
 				serializer.readString(tmp, sizeof(tmp));
 				ResourceManagerBase* manager = m_engine->getResourceManager().get(PHYSICS_TYPE);
-				auto* geometry = manager->load(Lumix::Path(tmp));
+				auto* geometry = manager->load(Path(tmp));
 				actor->setResource(static_cast<PhysicsGeometry*>(geometry));
 				m_universe.addComponent(actor->entity, MESH_ACTOR_TYPE, this, cmp);
 			}

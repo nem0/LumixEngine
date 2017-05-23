@@ -25,7 +25,7 @@ namespace
 {
 
 
-static const Lumix::ResourceType CLIP_TYPE("clip");
+static const ResourceType CLIP_TYPE("clip");
 
 
 struct AssetBrowserPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
@@ -38,14 +38,14 @@ struct AssetBrowserPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 	}
 
 
-	Lumix::AudioDevice& getAudioDevice(Lumix::Engine& engine)
+	AudioDevice& getAudioDevice(Engine& engine)
 	{
-		auto* audio = static_cast<Lumix::AudioSystem*>(engine.getPluginManager().getPlugin("audio"));
+		auto* audio = static_cast<AudioSystem*>(engine.getPluginManager().getPlugin("audio"));
 		return audio->getDevice();
 	}
 
 
-	bool acceptExtension(const char* ext, Lumix::ResourceType type) const override { return false; }
+	bool acceptExtension(const char* ext, ResourceType type) const override { return false; }
 
 
 	void stopAudio()
@@ -60,10 +60,10 @@ struct AssetBrowserPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 	const char* getName() const override { return "Audio"; }
 
 
-	bool onGUI(Lumix::Resource* resource, Lumix::ResourceType type) override
+	bool onGUI(Resource* resource, ResourceType type) override
 	{
 		if (type != CLIP_TYPE) return false;
-		auto* clip = static_cast<Lumix::Clip*>(resource);
+		auto* clip = static_cast<Clip*>(resource);
 		ImGui::LabelText("Length", "%f", clip->getLengthSeconds());
 		auto& device = getAudioDevice(m_app.getWorldEditor()->getEngine());
 
@@ -94,15 +94,15 @@ struct AssetBrowserPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 	}
 
 
-	void onResourceUnloaded(Lumix::Resource*) override { stopAudio(); }
+	void onResourceUnloaded(Resource*) override { stopAudio(); }
 
 
-	bool hasResourceManager(Lumix::ResourceType type) const override { return type == CLIP_TYPE; }
+	bool hasResourceManager(ResourceType type) const override { return type == CLIP_TYPE; }
 
 
-	Lumix::ResourceType getResourceType(const char* ext) override
+	ResourceType getResourceType(const char* ext) override
 	{
-		if (Lumix::equalStrings(ext, "ogg")) return CLIP_TYPE;
+		if (equalStrings(ext, "ogg")) return CLIP_TYPE;
 		return INVALID_RESOURCE_TYPE;
 	}
 
@@ -169,16 +169,16 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	{
 		if (ImGui::BeginDock("Clip Manager", &m_is_opened))
 		{
-			ImGui::InputText("Filter", m_filter, Lumix::lengthOf(m_filter));
+			ImGui::InputText("Filter", m_filter, lengthOf(m_filter));
 
 			auto universe = m_app.getWorldEditor()->getUniverse();
-			auto* audio_scene = static_cast<Lumix::AudioScene*>(universe->getScene(Lumix::crc32("audio")));
+			auto* audio_scene = static_cast<AudioScene*>(universe->getScene(crc32("audio")));
 			int clip_count = audio_scene->getClipCount();
 			for (int clip_id = 0; clip_id < clip_count; ++clip_id)
 			{
 				auto* clip_info = audio_scene->getClipInfo(clip_id);
 
-				if (m_filter[0] != 0 && Lumix::stristr(clip_info->name, m_filter) == 0)
+				if (m_filter[0] != 0 && stristr(clip_info->name, m_filter) == 0)
 				{
 					continue;
 				}
@@ -186,18 +186,18 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 				if (ImGui::TreeNode((const void*)(uintptr)clip_id, "%s", clip_info->name))
 				{
 					char buf[30];
-					Lumix::copyString(buf, Lumix::lengthOf(buf), clip_info->name);
+					copyString(buf, lengthOf(buf), clip_info->name);
 					if (ImGui::InputText("Name", buf, sizeof(buf)))
 					{
-						Lumix::copyString(clip_info->name, buf);
-						clip_info->name_hash = Lumix::crc32(buf);
+						copyString(clip_info->name, buf);
+						clip_info->name_hash = crc32(buf);
 					}
 					auto* clip = audio_scene->getClipInfo(clip_id)->clip;
-					char path[Lumix::MAX_PATH_LENGTH];
-					Lumix::copyString(path, clip ? clip->getPath().c_str() : "");
-					if (m_app.getAssetBrowser()->resourceInput("Clip", "", path, Lumix::lengthOf(path), CLIP_TYPE))
+					char path[MAX_PATH_LENGTH];
+					copyString(path, clip ? clip->getPath().c_str() : "");
+					if (m_app.getAssetBrowser()->resourceInput("Clip", "", path, lengthOf(path), CLIP_TYPE))
 					{
-						audio_scene->setClip(clip_id, Lumix::Path(path));
+						audio_scene->setClip(clip_id, Path(path));
 					}
 					bool looped = audio_scene->getClipInfo(clip_id)->looped;
 					ImGui::InputFloat("Volume", &clip_info->volume);
@@ -216,7 +216,7 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 
 			if (ImGui::Button("Add"))
 			{
-				audio_scene->addClip("test", Lumix::Path("test.ogg"));
+				audio_scene->addClip("test", Path("test.ogg"));
 			}
 		}
 		ImGui::EndDock();

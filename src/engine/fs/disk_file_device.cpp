@@ -109,13 +109,13 @@ namespace Lumix
 			: m_allocator(allocator)
 		{
 			copyString(m_name, name);
-			PathUtils::normalize(base_path, m_base_path, Lumix::lengthOf(m_base_path));
+			PathUtils::normalize(base_path, m_base_path, lengthOf(m_base_path));
 			if (m_base_path[0] != '\0') catString(m_base_path, "/");
 		}
 
 		void DiskFileDevice::setBasePath(const char* path)
 		{
-			PathUtils::normalize(path, m_base_path, Lumix::lengthOf(m_base_path));
+			PathUtils::normalize(path, m_base_path, lengthOf(m_base_path));
 			if (m_base_path[0] != '\0') catString(m_base_path, "/");
 		}
 

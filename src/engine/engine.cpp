@@ -741,7 +741,7 @@ public:
 
 	static void LUA_addInputAction(Engine* engine, u32 action, int type, int key, int controller_id)
 	{
-		engine->getInputSystem().addAction(action, Lumix::InputSystem::InputType(type), key, controller_id);
+		engine->getInputSystem().addAction(action, InputSystem::InputType(type), key, controller_id);
 	}
 
 

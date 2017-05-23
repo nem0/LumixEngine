@@ -75,11 +75,11 @@ template <int size> struct StaticString
 {
 	StaticString() { data[0] = '\0'; }
 
-	explicit StaticString(const char* str) { Lumix::copyString(data, size, str); }
+	explicit StaticString(const char* str) { copyString(data, size, str); }
 
 	template <typename... Args> StaticString(const char* str, Args... args)
 	{
-		Lumix::copyString(data, size, str);
+		copyString(data, size, str);
 		int tmp[] = { (add(args), 0)... };
 		(void)tmp;
 	}
@@ -96,30 +96,30 @@ template <int size> struct StaticString
 		return *this;
 	}
 
-	template <int value_size> void add(StaticString<value_size>& value) { Lumix::catString(data, size, value.data); }
-	void add(const char* value) { Lumix::catString(data, size, value); }
-	void add(char* value) { Lumix::catString(data, size, value); }
+	template <int value_size> void add(StaticString<value_size>& value) { catString(data, size, value.data); }
+	void add(const char* value) { catString(data, size, value); }
+	void add(char* value) { catString(data, size, value); }
 
 	void operator=(const char* str) { copyString(data, str); }
 
 	void add(float value)
 	{
-		int len = Lumix::stringLength(data);
-		Lumix::toCString(value, data + len, size - len, 3);
+		int len = stringLength(data);
+		toCString(value, data + len, size - len, 3);
 	}
 
 	template <typename T> void add(T value)
 	{
-		int len = Lumix::stringLength(data);
-		Lumix::toCString(value, data + len, size - len);
+		int len = stringLength(data);
+		toCString(value, data + len, size - len);
 	}
 
 	bool operator<(const char* str) const {
-		return Lumix::compareString(data, str) < 0;
+		return compareString(data, str) < 0;
 	}
 
 	bool operator==(const char* str) const {
-		return Lumix::equalStrings(data, str);
+		return equalStrings(data, str);
 	}
 
 	StaticString<size> operator +(const char* rhs)

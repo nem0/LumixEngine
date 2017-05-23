@@ -14,7 +14,7 @@ namespace Lumix
 	static PathManager* g_path_manager = nullptr;
 
 
-	PathManager::PathManager(Lumix::IAllocator& allocator)
+	PathManager::PathManager(IAllocator& allocator)
 		: m_paths(allocator)
 		, m_mutex(false)
 		, m_allocator(allocator)

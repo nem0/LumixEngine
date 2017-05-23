@@ -634,4 +634,4 @@ void Texture::unload(void)
 }
 
 
-} // ~namespace Lumix
+} // namespace Lumix

@@ -10,23 +10,27 @@
 #include <SDL_syswm.h>
 
 
+namespace Lumix
+{
+
+
 namespace PlatformInterface
 {
 
 struct FileIterator
 {
 	HANDLE handle;
-	Lumix::IAllocator* allocator;
+	IAllocator* allocator;
 	WIN32_FIND_DATAA ffd;
 	bool is_valid;
 };
 
 
-FileIterator* createFileIterator(const char* path, Lumix::IAllocator& allocator)
+FileIterator* createFileIterator(const char* path, IAllocator& allocator)
 {
-	char tmp[Lumix::MAX_PATH_LENGTH];
-	Lumix::copyString(tmp, path);
-	Lumix::catString(tmp, "/*");
+	char tmp[MAX_PATH_LENGTH];
+	copyString(tmp, path);
+	catString(tmp, "/*");
 	auto* iter = LUMIX_NEW(allocator, FileIterator);
 	iter->allocator = &allocator;
 	iter->handle = FindFirstFile(tmp, &iter->ffd);
@@ -47,7 +51,7 @@ bool getNextFile(FileIterator* iterator, FileInfo* info)
 	if (!iterator->is_valid) return false;
 
 	info->is_directory = (iterator->ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
-	Lumix::copyString(info->filename, iterator->ffd.cFileName);
+	copyString(info->filename, iterator->ffd.cFileName);
 
 	iterator->is_valid = FindNextFile(iterator->handle, &iterator->ffd) != FALSE;
 	return true;
@@ -62,7 +66,7 @@ void getCurrentDirectory(char* buffer, int buffer_size)
 
 struct Process
 {
-	explicit Process(Lumix::IAllocator& allocator)
+	explicit Process(IAllocator& allocator)
 		: allocator(allocator)
 	{
 	}
@@ -70,7 +74,7 @@ struct Process
 	PROCESS_INFORMATION process_info;
 	HANDLE output_read_pipe;
 	HANDLE output_write_pipe;
-	Lumix::IAllocator& allocator;
+	IAllocator& allocator;
 };
 
 
@@ -99,7 +103,7 @@ void destroyProcess(Process& process)
 }
 
 
-Process* createProcess(const char* cmd, const char* args, Lumix::IAllocator& allocator)
+Process* createProcess(const char* cmd, const char* args, IAllocator& allocator)
 {
 	auto* process = LUMIX_NEW(allocator, Process)(allocator);
 
@@ -128,7 +132,7 @@ Process* createProcess(const char* cmd, const char* args, Lumix::IAllocator& all
 	suinfo.hStdInput = INVALID_HANDLE_VALUE;
 
 	char rw_args[1024];
-	Lumix::copyString(rw_args, args);
+	copyString(rw_args, args);
 	auto create_process_ret = CreateProcess(
 		cmd, rw_args, NULL, NULL, TRUE, NORMAL_PRIORITY_CLASS, NULL, NULL, &suinfo, &process->process_info);
 
@@ -154,14 +158,14 @@ int getProcessOutput(Process& process, char* buf, int buf_size)
 
 bool getSaveFilename(char* out, int max_size, const char* filter, const char* default_extension)
 {
-	char tmp[Lumix::MAX_PATH_LENGTH];
+	char tmp[MAX_PATH_LENGTH];
 	OPENFILENAME ofn;
 	ZeroMemory(&ofn, sizeof(ofn));
 	ofn.lStructSize = sizeof(ofn);
 	ofn.hwndOwner = NULL;
 	ofn.lpstrFile = tmp;
 	ofn.lpstrFile[0] = '\0';
-	ofn.nMaxFile = Lumix::lengthOf(tmp);
+	ofn.nMaxFile = lengthOf(tmp);
 	ofn.lpstrFilter = filter;
 	ofn.nFilterIndex = 1;
 	ofn.lpstrDefExt = default_extension;
@@ -171,7 +175,7 @@ bool getSaveFilename(char* out, int max_size, const char* filter, const char* de
 	ofn.Flags = OFN_OVERWRITEPROMPT | OFN_NOCHANGEDIR | OFN_NONETWORKBUTTON;
 
 	bool res = GetSaveFileName(&ofn) != FALSE;
-	if (res) Lumix::PathUtils::normalize(tmp, out, max_size);
+	if (res) PathUtils::normalize(tmp, out, max_size);
 	return res;
 }
 
@@ -274,12 +278,12 @@ bool getOpenDirectory(char* out, int max_size, const char* starting_dir)
 void copyToClipboard(const char* text)
 {
 	if (!OpenClipboard(NULL)) return;
-	int len = Lumix::stringLength(text);
+	int len = stringLength(text);
 	HGLOBAL mem_handle = GlobalAlloc(GMEM_MOVEABLE, len * sizeof(char));
 	if (!mem_handle) return;
 
 	char* mem = (char*)GlobalLock(mem_handle);
-	Lumix::copyString(mem, len, text);
+	copyString(mem, len, text);
 	GlobalUnlock(mem_handle);
 	EmptyClipboard();
 	SetClipboardData(CF_TEXT, mem_handle);
@@ -330,7 +334,7 @@ bool dirExists(const char* path)
 }
 
 
-Lumix::u64 getLastModified(const char* file)
+u64 getLastModified(const char* file)
 {
 	FILETIME ft;
 	HANDLE handle = CreateFile(file, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
@@ -361,7 +365,7 @@ void setWindow(SDL_Window* window)
 	SDL_SysWMinfo window_info;
 	SDL_VERSION(&window_info.version);
 	SDL_GetWindowWMInfo(window, &window_info);
-	Lumix::Engine::PlatformData platform_data = {};
+	Engine::PlatformData platform_data = {};
 	g_window = window_info.info.win.window;
 }
 
@@ -394,3 +398,5 @@ void unclipCursor()
 
 } // namespace PlatformInterface
 
+
+} // namespace Lumix

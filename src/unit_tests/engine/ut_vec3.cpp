@@ -3,11 +3,14 @@
 #include <cmath>
 
 
+using namespace Lumix;
+
+
 void UT_vec3(const char* params)
 {
-	Lumix::DefaultAllocator allocator;
+	DefaultAllocator allocator;
 
-	Lumix::Vec3 v(0, 0, 0);
+	Vec3 v(0, 0, 0);
 	LUMIX_EXPECT(v.x == 0);
 	LUMIX_EXPECT(v.y == 0);
 	LUMIX_EXPECT(v.z == 0);
@@ -15,7 +18,7 @@ void UT_vec3(const char* params)
 	LUMIX_EXPECT_CLOSE_EQ(v.length(), 0, 0.001f);
 	LUMIX_EXPECT_CLOSE_EQ(v.squaredLength(), 0, 0.001f);
 
-	Lumix::Vec3 v2(1, 0, 0);
+	Vec3 v2(1, 0, 0);
 	LUMIX_EXPECT(v2.x == 1);
 	LUMIX_EXPECT(v2.y == 0);
 	LUMIX_EXPECT(v2.z == 0);
@@ -41,12 +44,12 @@ void UT_vec3(const char* params)
 	LUMIX_EXPECT_CLOSE_EQ(v2.y, 2 * v2.x, 0.001f);
 	LUMIX_EXPECT_CLOSE_EQ(v2.z, 3 * v2.x, 0.001f);
 
-	v = -Lumix::Vec3(1, 2, 3);
+	v = -Vec3(1, 2, 3);
 	LUMIX_EXPECT_CLOSE_EQ(v.x, -1, 0.001f);
 	LUMIX_EXPECT_CLOSE_EQ(v.y, -2, 0.001f);
 	LUMIX_EXPECT_CLOSE_EQ(v.z, -3, 0.001f);
 
-	v = v + Lumix::Vec3(4, 5, 6);
+	v = v + Vec3(4, 5, 6);
 	LUMIX_EXPECT_CLOSE_EQ(v.x, 3, 0.001f);
 	LUMIX_EXPECT_CLOSE_EQ(v.y, 3, 0.001f);
 	LUMIX_EXPECT_CLOSE_EQ(v.z, 3, 0.001f);
@@ -56,25 +59,25 @@ void UT_vec3(const char* params)
 	LUMIX_EXPECT_CLOSE_EQ(v.y, 6, 0.001f);
 	LUMIX_EXPECT_CLOSE_EQ(v.z, 6, 0.001f);
 
-	LUMIX_EXPECT_CLOSE_EQ(Lumix::dotProduct(Lumix::Vec3(1, 0, 0), Lumix::Vec3(0, 1, 0)), 0, 0.001f);
-	LUMIX_EXPECT_CLOSE_EQ(Lumix::dotProduct(Lumix::Vec3(1, 0, 0), Lumix::Vec3(1, 0, 0)), 1, 0.001f);
+	LUMIX_EXPECT_CLOSE_EQ(dotProduct(Vec3(1, 0, 0), Vec3(0, 1, 0)), 0, 0.001f);
+	LUMIX_EXPECT_CLOSE_EQ(dotProduct(Vec3(1, 0, 0), Vec3(1, 0, 0)), 1, 0.001f);
 
-	v = Lumix::crossProduct(Lumix::Vec3(1, 0, 0), Lumix::Vec3(0, 1, 0));
+	v = crossProduct(Vec3(1, 0, 0), Vec3(0, 1, 0));
 	LUMIX_EXPECT_CLOSE_EQ(v.x, 0, 0.001f);
 	LUMIX_EXPECT_CLOSE_EQ(v.y, 0, 0.001f);
 	LUMIX_EXPECT_CLOSE_EQ(v.z, 1, 0.001f);
 
-	Lumix::lerp(Lumix::Vec3(1, 0, 0), Lumix::Vec3(0, 1, 0), &v, 0);
+	lerp(Vec3(1, 0, 0), Vec3(0, 1, 0), &v, 0);
 	LUMIX_EXPECT_CLOSE_EQ(v.x, 1, 0.001f);
 	LUMIX_EXPECT_CLOSE_EQ(v.y, 0, 0.001f);
 	LUMIX_EXPECT_CLOSE_EQ(v.z, 0, 0.001f);
 
-	Lumix::lerp(Lumix::Vec3(1, 0, 0), Lumix::Vec3(0, 1, 0), &v, 1);
+	lerp(Vec3(1, 0, 0), Vec3(0, 1, 0), &v, 1);
 	LUMIX_EXPECT_CLOSE_EQ(v.x, 0, 0.001f);
 	LUMIX_EXPECT_CLOSE_EQ(v.y, 1, 0.001f);
 	LUMIX_EXPECT_CLOSE_EQ(v.z, 0, 0.001f);
 
-	Lumix::lerp(Lumix::Vec3(1, 0, 0), Lumix::Vec3(0, 1, 0), &v, 0.5f);
+	lerp(Vec3(1, 0, 0), Vec3(0, 1, 0), &v, 0.5f);
 	LUMIX_EXPECT_CLOSE_EQ(v.x, 0.5f, 0.001f);
 	LUMIX_EXPECT_CLOSE_EQ(v.y, 0.5f, 0.001f);
 	LUMIX_EXPECT_CLOSE_EQ(v.z, 0, 0.001f);

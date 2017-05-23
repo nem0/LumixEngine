@@ -2,11 +2,14 @@
 #include "engine/array.h"
 
 
+using namespace Lumix;
+
+
 void UT_array(const char* params)
 {
-	Lumix::DefaultAllocator allocator;
+	DefaultAllocator allocator;
 
-	Lumix::Array<int> array1(allocator);
+	Array<int> array1(allocator);
 	LUMIX_EXPECT(array1.empty());
 	LUMIX_EXPECT(array1.size() == 0);
 	array1.reserve(128);
@@ -43,7 +46,7 @@ void UT_array(const char* params)
 	LUMIX_EXPECT(array1.size() == 11);
 	LUMIX_EXPECT(array1[0] == 123);
 
-	Lumix::Array<int> array2(allocator);
+	Array<int> array2(allocator);
 	array1.swap(array2);
 	LUMIX_EXPECT(array2.size() == 11);
 	LUMIX_EXPECT(array1.size() == 0);
@@ -51,8 +54,8 @@ void UT_array(const char* params)
 
 void UT_array_erase(const char* params)
 {
-	Lumix::DefaultAllocator allocator;
-	Lumix::Array<int> array1(allocator);
+	DefaultAllocator allocator;
+	Array<int> array1(allocator);
 
 	for (int i = 0; i < 20; ++i)
 	{

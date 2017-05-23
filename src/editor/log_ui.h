@@ -6,10 +6,14 @@
 #include "engine/string.h"
 
 
+namespace Lumix
+{
+
+
 class LUMIX_EDITOR_API LogUI
 {
 	public:
-		explicit LogUI(Lumix::IAllocator& allocator);
+		explicit LogUI(IAllocator& allocator);
 		~LogUI();
 
 		void onGUI();
@@ -33,13 +37,13 @@ class LUMIX_EDITOR_API LogUI
 
 		struct Notification
 		{
-			explicit Notification(Lumix::IAllocator& alloc)
+			explicit Notification(IAllocator& alloc)
 				: message(alloc)
 			{
 			}
 			float time;
 			int uid;
-			Lumix::string message;
+			string message;
 		};
 
 	private:
@@ -50,13 +54,16 @@ class LUMIX_EDITOR_API LogUI
 		void showNotifications();
 
 	private:
-		Lumix::IAllocator& m_allocator;
-		Lumix::Array<Lumix::Array<Lumix::string> > m_messages;
-		Lumix::Array<Notification> m_notifications;
+		IAllocator& m_allocator;
+		Array<Array<string> > m_messages;
+		Array<Notification> m_notifications;
 		int m_new_message_count[Count];
 		int m_current_tab;
 		int m_last_uid;
 		bool m_move_notifications_to_front;
 		bool m_are_notifications_hovered;
-		Lumix::MT::SpinMutex m_guard;
+		MT::SpinMutex m_guard;
 };
+
+
+} // namespace Lumix

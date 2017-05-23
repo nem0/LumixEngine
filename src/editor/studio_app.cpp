@@ -40,7 +40,8 @@
 #include <SDL_syswm.h>
 
 
-using namespace Lumix;
+namespace Lumix
+{
 
 
 struct LuaPlugin : public StudioApp::IPlugin
@@ -2344,3 +2345,6 @@ void StudioApp::StaticPluginRegister::create(StudioApp& app)
 		i = i->next;
 	}
 }
+
+
+} // namespace Lumix

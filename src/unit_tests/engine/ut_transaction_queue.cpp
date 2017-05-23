@@ -5,6 +5,10 @@
 #include "engine/mt/task.h"
 #include "engine/mt/thread.h"
 
+
+using namespace Lumix;
+
+
 namespace
 {
 	struct Test
@@ -14,14 +18,14 @@ namespace
 		u32 thread_id;
 	};
 
-	typedef Lumix::MT::Transaction<Test> AsynTrans;
-	typedef Lumix::MT::LockFreeFixedQueue<AsynTrans, 16> TransQueue;
+	typedef MT::Transaction<Test> AsynTrans;
+	typedef MT::LockFreeFixedQueue<AsynTrans, 16> TransQueue;
 
-	class TestTaskConsumer : public Lumix::MT::Task
+	class TestTaskConsumer : public MT::Task
 	{
 	public:
-		TestTaskConsumer(TransQueue* queue, Test* array, Lumix::IAllocator& allocator)
-			: Lumix::MT::Task(allocator)
+		TestTaskConsumer(TransQueue* queue, Test* array, IAllocator& allocator)
+			: MT::Task(allocator)
 			, m_trans_queue(queue)
 			, m_array(array)
 		{}
@@ -38,7 +42,7 @@ namespace
 					break;
 
 				tr->data.proc_count++;
-				tr->data.thread_id = Lumix::MT::getCurrentThreadID();
+				tr->data.thread_id = MT::getCurrentThreadID();
 				tr->setCompleted();
 
 				m_array[tr->data.idx].proc_count = tr->data.proc_count;
@@ -52,11 +56,11 @@ namespace
 		Test* m_array;
 	};
 
-	class TestTaskProducer : public Lumix::MT::Task
+	class TestTaskProducer : public MT::Task
 	{
 	public:
-		TestTaskProducer(TransQueue* queue, Test* array, size_t size, Lumix::IAllocator& allocator)
-			: Lumix::MT::Task(allocator)
+		TestTaskProducer(TransQueue* queue, Test* array, size_t size, IAllocator& allocator)
+			: MT::Task(allocator)
 			, m_trans_queue(queue)
 			, m_array(array)
 			, m_size(size)
@@ -86,14 +90,14 @@ namespace
 
 	void UT_tq_heavy_usage(const char* params)
 	{
-		Lumix::DefaultAllocator allocator;
+		DefaultAllocator allocator;
 		const u32 itemsCount = 1200000;
 		Test* testItems = (Test*)allocator.allocate(sizeof(Test) * itemsCount);
 		for (u32 i = 0; i < itemsCount; i++)
 		{
 			testItems[i].idx = i;
 			testItems[i].proc_count = 0;
-			testItems[i].thread_id = Lumix::MT::getCurrentThreadID();
+			testItems[i].thread_id = MT::getCurrentThreadID();
 		}
 
 		TransQueue trans_queue;
@@ -123,7 +127,7 @@ namespace
 			|| !prod3.isFinished()
 			|| !prod4.isFinished()
 			|| !trans_queue.isEmpty())
-			Lumix::MT::yield();
+			MT::yield();
 
 		trans_queue.abort();
 		trans_queue.abort();
@@ -140,31 +144,31 @@ namespace
 		cons3.destroy();
 		cons4.destroy();
 
-		Lumix::g_log_info.log("unit") << "UT_tq_heavy_usage is finishing ...";
-		Lumix::g_log_info.log("unit") << "UT_tq_heavy_usage is checking results ...";
+		g_log_info.log("unit") << "UT_tq_heavy_usage is finishing ...";
+		g_log_info.log("unit") << "UT_tq_heavy_usage is checking results ...";
 
 		for (size_t i = 0; i < itemsCount; i++)
 		{
 			LUMIX_EXPECT(testItems[i].idx == i);
 			LUMIX_EXPECT(testItems[i].proc_count == 1);
-			LUMIX_EXPECT(testItems[i].thread_id != Lumix::MT::getCurrentThreadID());
+			LUMIX_EXPECT(testItems[i].thread_id != MT::getCurrentThreadID());
 		}
 
 		allocator.deallocate(testItems);
 
-		Lumix::g_log_info.log("unit") << "UT_tq_heavy_usage finished ...";
+		g_log_info.log("unit") << "UT_tq_heavy_usage finished ...";
 	};
 
 	void UT_tq_push(const char* params)
 	{
-		Lumix::DefaultAllocator allocator;
+		DefaultAllocator allocator;
 		const u32 itemsCount = 1200000;
 		Test* testItems = (Test*)allocator.allocate(sizeof(Test) * itemsCount);
 		for (u32 i = 0; i < itemsCount; i++)
 		{
 			testItems[i].idx = i;
 			testItems[i].proc_count = 0;
-			testItems[i].thread_id = Lumix::MT::getCurrentThreadID();
+			testItems[i].thread_id = MT::getCurrentThreadID();
 		}
 
 		TransQueue trans_queue;
@@ -173,31 +177,31 @@ namespace
 		TestTaskConsumer cons(&trans_queue, testItems, allocator);
 
 		prod.create("producer");
-		Lumix::MT::sleep(1000);
+		MT::sleep(1000);
 
 		cons.create("consumer");
 
 		while (!prod.isFinished() || !trans_queue.isEmpty())
-			Lumix::MT::yield();
+			MT::yield();
 
 		trans_queue.abort();
 
 		prod.destroy();
 		cons.destroy();
 
-		Lumix::g_log_info.log("unit") << "UT_tq_push is finishing ...";
-		Lumix::g_log_info.log("unit") << "UT_tq_push is checking results ...";
+		g_log_info.log("unit") << "UT_tq_push is finishing ...";
+		g_log_info.log("unit") << "UT_tq_push is checking results ...";
 
 		for (size_t i = 0; i < itemsCount; i++)
 		{
 			LUMIX_EXPECT(testItems[i].idx == i);
 			LUMIX_EXPECT(testItems[i].proc_count == 1);
-			LUMIX_EXPECT(testItems[i].thread_id != Lumix::MT::getCurrentThreadID());
+			LUMIX_EXPECT(testItems[i].thread_id != MT::getCurrentThreadID());
 		}
 
 		allocator.deallocate(testItems);
 
-		Lumix::g_log_info.log("unit") << "UT_tq_heavy_usage finished ...";
+		g_log_info.log("unit") << "UT_tq_heavy_usage finished ...";
 	}
 }
 

@@ -11,6 +11,9 @@
 #include "editor/studio_app.h"
 
 
+struct aiAnimation;
+struct aiMaterial;
+struct aiMesh;
 struct lua_State;
 class Metadata;
 
@@ -18,21 +21,17 @@ class Metadata;
 namespace Lumix
 {
 
+
 class WorldEditor;
+namespace MT { class Task; }
 
-namespace MT
-{
-class Task;
-}
-
-}
 
 
 struct ImportTexture
 {
 	struct aiTexture* texture;
-	char path[Lumix::MAX_PATH_LENGTH];
-	char src[Lumix::MAX_PATH_LENGTH];
+	char path[MAX_PATH_LENGTH];
+	char src[MAX_PATH_LENGTH];
 	bool import;
 	bool to_dds;
 	bool is_valid;
@@ -42,7 +41,7 @@ struct ImportTexture
 struct ImportMaterial
 {
 	const struct aiScene* scene;
-	struct aiMaterial* material;
+	aiMaterial* material;
 	bool import;
 	bool alpha_cutout;
 	int texture_count;
@@ -55,16 +54,16 @@ struct ImportMaterial
 struct ImportAnimation
 {
 	bool import;
-	struct aiAnimation* animation;
+	aiAnimation* animation;
 	int root_motion_bone_idx = -1;
 	const aiScene* scene;
-	char output_filename[Lumix::MAX_PATH_LENGTH];
+	char output_filename[MAX_PATH_LENGTH];
 };
 
 
 struct ImportMesh
 {
-	ImportMesh(Lumix::IAllocator& allocator)
+	ImportMesh(IAllocator& allocator)
 		: map_to_input(allocator)
 		, map_from_input(allocator)
 		, indices(allocator)
@@ -74,12 +73,12 @@ struct ImportMesh
 	int lod;
 	bool import;
 	bool import_physics;
-	struct aiMesh* mesh;
+	aiMesh* mesh;
 	const aiScene* scene;
 	int material;
-	Lumix::Array<unsigned int> map_to_input;
-	Lumix::Array<unsigned int> map_from_input;
-	Lumix::Array<Lumix::i32> indices;
+	Array<unsigned int> map_to_input;
+	Array<unsigned int> map_from_input;
+	Array<i32> indices;
 };
 
 
@@ -110,7 +109,7 @@ class ImportAssetDialog LUMIX_FINAL : public StudioApp::IPlugin
 		~ImportAssetDialog();
 		void setMessage(const char* message);
 		void setImportMessage(const char* message, float progress_fraction);
-		Lumix::WorldEditor& getEditor() { return m_editor; }
+		WorldEditor& getEditor() { return m_editor; }
 		void onWindowGUI() override;
 		DDSConvertCallbackData& getDDSConvertCallbackData() { return m_dds_convert_callback; }
 		int importAsset(lua_State* L);
@@ -140,18 +139,18 @@ class ImportAssetDialog LUMIX_FINAL : public StudioApp::IPlugin
 		void addSource(const char* src);
 
 	public:
-		Lumix::WorldEditor& m_editor;
-		Lumix::Array<Lumix::u32> m_saved_textures;
-		Lumix::Array<Assimp::Importer> m_importers;
-		Lumix::Array<Lumix::StaticString<Lumix::MAX_PATH_LENGTH> > m_sources;
-		Lumix::Array<ImportAnimation> m_animations;
-		Lumix::Array<ImportMesh> m_meshes;
-		Lumix::Array<ImportMaterial> m_materials;
+		WorldEditor& m_editor;
+		Array<u32> m_saved_textures;
+		Array<Assimp::Importer> m_importers;
+		Array<StaticString<MAX_PATH_LENGTH> > m_sources;
+		Array<ImportAnimation> m_animations;
+		Array<ImportMesh> m_meshes;
+		Array<ImportMaterial> m_materials;
 		char m_import_message[1024];
 		
 		struct ImageData
 		{
-			Lumix::u8* data;
+			u8* data;
 			int width;
 			int height;
 			int comps;
@@ -179,11 +178,11 @@ class ImportAssetDialog LUMIX_FINAL : public StudioApp::IPlugin
 
 		float m_progress_fraction;
 		char m_message[1024];
-		char m_last_dir[Lumix::MAX_PATH_LENGTH];
-		char m_source[Lumix::MAX_PATH_LENGTH];
-		char m_mesh_output_filename[Lumix::MAX_PATH_LENGTH];
-		char m_output_dir[Lumix::MAX_PATH_LENGTH];
-		char m_texture_output_dir[Lumix::MAX_PATH_LENGTH];
+		char m_last_dir[MAX_PATH_LENGTH];
+		char m_source[MAX_PATH_LENGTH];
+		char m_mesh_output_filename[MAX_PATH_LENGTH];
+		char m_output_dir[MAX_PATH_LENGTH];
+		char m_texture_output_dir[MAX_PATH_LENGTH];
 		bool m_convert_to_dds;
 		bool m_convert_to_raw;
 		bool m_is_normal_map;
@@ -191,8 +190,11 @@ class ImportAssetDialog LUMIX_FINAL : public StudioApp::IPlugin
 		bool m_is_importing;
 		bool m_is_importing_texture;
 		float m_raw_texture_scale;
-		Lumix::MT::Task* m_task;
-		Lumix::MT::SpinMutex m_mutex;
+		MT::Task* m_task;
+		MT::SpinMutex m_mutex;
 		Metadata& m_metadata;
 		DDSConvertCallbackData m_dds_convert_callback;
 };
+
+
+} // namespace Lumix

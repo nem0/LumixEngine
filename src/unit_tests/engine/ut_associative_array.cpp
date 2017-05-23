@@ -2,11 +2,14 @@
 #include "engine/associative_array.h"
 
 
+using namespace Lumix;
+
+
 void UT_associative_array(const char* params)
 {
-	Lumix::DefaultAllocator allocator;
+	DefaultAllocator allocator;
 
-	Lumix::AssociativeArray<int, int> array1(allocator);
+	AssociativeArray<int, int> array1(allocator);
 	LUMIX_EXPECT(array1.size() == 0);
 	array1.reserve(128);
 	LUMIX_EXPECT(array1.size() == 0);
