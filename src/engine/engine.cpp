@@ -12,7 +12,6 @@
 #include "engine/lifo_allocator.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
-#include "engine/lua_wrapper.h"
 #include "engine/math_utils.h"
 #include "engine/mtjd/manager.h"
 #include "engine/path.h"
@@ -23,6 +22,7 @@
 #include "engine/property_register.h"
 #include "engine/resource_manager.h"
 #include "engine/timer.h"
+#include "engine/universe/component.h"
 #include "engine/universe/universe.h"
 #include <imgui/imgui.h>
 

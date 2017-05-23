@@ -6,6 +6,7 @@
 #include "engine/path.h"
 #include "engine/resource.h"
 #include "engine/string.h"
+#include "engine/universe/component.h"
 #include "engine/universe/universe.h"
 
 
