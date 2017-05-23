@@ -1,5 +1,4 @@
 #include "physics/physics_scene.h"
-#include "cooking/PxCooking.h"
 #include "engine/blob.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
@@ -23,6 +22,7 @@
 #include "renderer/render_scene.h"
 #include "renderer/texture.h"
 #include <PxPhysicsAPI.h>
+#include <cooking/PxCooking.h>
 
 
 using namespace physx;
