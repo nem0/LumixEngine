@@ -356,7 +356,7 @@ void Universe::destroyEntity(Entity entity)
 	
 
 	u64 mask = entity_data.components;
-	for (int i = 0; i < MAX_COMPONENTS_TYPES_COUNT; ++i)
+	for (int i = 0; i < ComponentType::MAX_TYPES_COUNT; ++i)
 	{
 		if ((mask & ((u64)1 << i)) != 0)
 		{
@@ -751,7 +751,7 @@ float Universe::getScale(Entity entity)
 ComponentUID Universe::getFirstComponent(Entity entity) const
 {
 	u64 mask = m_entities[entity.index].components;
-	for (int i = 0; i < MAX_COMPONENTS_TYPES_COUNT; ++i)
+	for (int i = 0; i < ComponentType::MAX_TYPES_COUNT; ++i)
 	{
 		if ((mask & (u64(1) << i)) != 0)
 		{
@@ -766,7 +766,7 @@ ComponentUID Universe::getFirstComponent(Entity entity) const
 ComponentUID Universe::getNextComponent(const ComponentUID& cmp) const
 {
 	u64 mask = m_entities[cmp.entity.index].components;
-	for (int i = cmp.type.index + 1; i < MAX_COMPONENTS_TYPES_COUNT; ++i)
+	for (int i = cmp.type.index + 1; i < ComponentType::MAX_TYPES_COUNT; ++i)
 	{
 		if ((mask & (u64(1) << i)) != 0)
 		{

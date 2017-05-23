@@ -17,6 +17,10 @@
 #include <X11/Xlib.h>
 
 
+namespace Lumix
+{
+
+
 namespace PlatformInterface
 {
 
@@ -375,3 +379,5 @@ void unclipCursor()
 
 } // namespace PlatformInterface
 
+
+} // namespace Lumix

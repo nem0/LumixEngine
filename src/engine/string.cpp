@@ -1,10 +1,228 @@
 #include "string.h"
-#include <cstring>
+#include "engine/iallocator.h"
 #include <cmath>
+#include <cstring>
 
 
 namespace Lumix
 {
+
+
+string::string(IAllocator& allocator)
+	: m_allocator(allocator)
+{
+	m_cstr = nullptr;
+	m_size = 0;
+}
+
+
+string::string(const string& rhs, int start, i32 length)
+	: m_allocator(rhs.m_allocator)
+{
+	m_size = length - start <= rhs.m_size ? length : rhs.m_size - start;
+	m_cstr = (char*)m_allocator.allocate((m_size + 1) * sizeof(char));
+	copyMemory(m_cstr, rhs.m_cstr + start, m_size * sizeof(char));
+	m_cstr[m_size] = 0;
+}
+
+
+string::string(const char* rhs, i32 length, IAllocator& allocator)
+	: m_allocator(allocator)
+{
+	m_size = length;
+	m_cstr = (char*)m_allocator.allocate((m_size + 1) * sizeof(char));
+	copyMemory(m_cstr, rhs, m_size * sizeof(char));
+	m_cstr[m_size] = 0;
+}
+
+
+string::string(const string& rhs)
+	: m_allocator(rhs.m_allocator)
+{
+	m_cstr = (char*)m_allocator.allocate((rhs.m_size + 1) * sizeof(char));
+	m_size = rhs.m_size;
+	copyMemory(m_cstr, rhs.m_cstr, m_size * sizeof(char));
+	m_cstr[m_size] = 0;
+}
+
+
+string::string(const char* rhs, IAllocator& allocator)
+	: m_allocator(allocator)
+{
+	m_size = stringLength(rhs);
+	m_cstr = (char*)m_allocator.allocate((m_size + 1) * sizeof(char));
+	copyMemory(m_cstr, rhs, sizeof(char) * (m_size + 1));
+}
+
+
+string::~string() { m_allocator.deallocate(m_cstr); }
+
+
+char string::operator[](int index)
+{
+	ASSERT(index >= 0 && index < m_size);
+	return m_cstr[index];
+}
+
+
+const char string::operator[](int index) const
+{
+	ASSERT(index >= 0 && index < m_size);
+	return m_cstr[index];
+}
+
+
+void string::set(const char* rhs, int size)
+{
+	if (rhs < m_cstr || rhs >= m_cstr + m_size)
+	{
+		m_allocator.deallocate(m_cstr);
+		m_size = size;
+		m_cstr = (char*)m_allocator.allocate(m_size + 1);
+		copyMemory(m_cstr, rhs, size);
+		m_cstr[size] = '\0';
+	}
+}
+
+
+void string::operator=(const string& rhs)
+{
+	if (&rhs != this)
+	{
+		m_allocator.deallocate(m_cstr);
+		m_cstr = (char*)m_allocator.allocate((rhs.m_size + 1) * sizeof(char));
+		m_size = rhs.m_size;
+		copyMemory(m_cstr, rhs.m_cstr, sizeof(char) * (m_size + 1));
+	}
+}
+
+
+void string::operator=(const char* rhs)
+{
+	if (rhs < m_cstr || rhs >= m_cstr + m_size)
+	{
+		m_allocator.deallocate(m_cstr);
+		if (rhs)
+		{
+			m_size = stringLength(rhs);
+			m_cstr = (char*)m_allocator.allocate((m_size + 1) * sizeof(char));
+			copyMemory(m_cstr, rhs, sizeof(char) * (m_size + 1));
+		}
+		else
+		{
+			m_size = 0;
+			m_cstr = nullptr;
+		}
+	}
+}
+
+
+bool string::operator!=(const string& rhs) const
+{
+	return compareString(m_cstr, rhs.m_cstr) != 0;
+}
+
+
+bool string::operator!=(const char* rhs) const
+{
+	return compareString(m_cstr, rhs) != 0;
+}
+
+
+bool string::operator==(const string& rhs) const
+{
+	return compareString(m_cstr, rhs.m_cstr) == 0;
+}
+
+
+bool string::operator==(const char* rhs) const
+{
+	return compareString(m_cstr, rhs) == 0;
+}
+
+
+bool string::operator<(const string& rhs) const
+{
+	return compareString(m_cstr, rhs.m_cstr) < 0;
+}
+
+
+bool string::operator>(const string& rhs) const
+{
+	return compareString(m_cstr, rhs.m_cstr) > 0;
+}
+
+
+string string::substr(int start, int length) const
+{
+	return string(*this, start, length);
+}
+
+
+string& string::cat(const char* value, int length)
+{
+	if (value < m_cstr || value >= m_cstr + m_size)
+	{
+		if (m_cstr)
+		{
+			i32 new_size = m_size + length;
+			char* new_cstr = (char*)m_allocator.allocate(new_size + 1);
+			copyMemory(new_cstr, m_cstr, sizeof(char) * m_size + 1);
+			m_allocator.deallocate(m_cstr);
+			m_cstr = new_cstr;
+			m_size = new_size;
+			catNString(m_cstr, m_size + 1, value, length);
+		}
+		else
+		{
+			m_size = length;
+			m_cstr = (char*)m_allocator.allocate(m_size + 1);
+			copyNString(m_cstr, m_size + 1, value, length);
+		}
+	}
+	return *this;
+}
+
+
+string& string::cat(float value)
+{
+	char tmp[40];
+	toCString(value, tmp, 30, 10);
+	cat(tmp);
+	return *this;
+}
+
+
+string& string::cat(char* value)
+{
+	cat((const char*)value);
+	return *this;
+}
+
+
+string& string::cat(const char* rhs)
+{
+	if (rhs < m_cstr || rhs >= m_cstr + m_size)
+	{
+		if (m_cstr)
+		{
+			i32 new_size = m_size + stringLength(rhs);
+			char* new_cstr = (char*)m_allocator.allocate(new_size + 1);
+			copyMemory(new_cstr, m_cstr, sizeof(char) * m_size + 1);
+			m_allocator.deallocate(m_cstr);
+			m_cstr = new_cstr;
+			m_size = new_size;
+			catString(m_cstr, m_size + 1, rhs);
+		}
+		else
+		{
+			m_size = stringLength(rhs);
+			m_cstr = (char*)m_allocator.allocate(m_size + 1);
+			copyString(m_cstr, m_size + 1, rhs);
+		}
+	}
+	return *this;
+}
 
 
 static char makeLowercase(char c)

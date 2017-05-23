@@ -31,7 +31,6 @@ class PathManager;
 class PluginManager;
 class ResourceManager;
 class Universe;
-struct Vec3;
 template <typename T> class Array;
 
 

@@ -4,6 +4,7 @@
 #include "engine/array.h"
 #include "engine/hash_map.h"
 #include "engine/lumix.h"
+#include <cstring>
 
 
 namespace Lumix

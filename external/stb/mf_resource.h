@@ -39,6 +39,7 @@
 
 
 #include <cstdio>
+#include <cstring>
 
 
 struct mf_resource

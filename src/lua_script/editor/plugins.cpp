@@ -652,7 +652,9 @@ struct ConsolePlugin LUMIX_FINAL : public StudioApp::IPlugin
 					that->autocomplete.size(),
 					sizeof(that->autocomplete[0]),
 					[](const void* a, const void* b) {
-					return ((const string*)a)->compareString(((const string*)b)->c_str());
+					const char* a_str = ((const string*)a)->c_str();
+					const char* b_str = ((const string*)b)->c_str();
+					return compareString(a_str, b_str);
 				});
 			}
 		}
