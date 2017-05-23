@@ -4,6 +4,10 @@
 #include "engine/mt/task.h"
 #include "engine/mt/thread.h"
 
+
+using namespace Lumix;
+
+
 namespace
 {
 	struct Test
@@ -20,13 +24,13 @@ namespace
 		i32 value;
 	};
 
-	typedef Lumix::MT::LockFreeFixedQueue<Test, 16> Queue;
+	typedef MT::LockFreeFixedQueue<Test, 16> Queue;
 
-	class TestTaskConsumer : public Lumix::MT::Task
+	class TestTaskConsumer : public MT::Task
 	{
 	public:
-		TestTaskConsumer(Queue* queue, Lumix::IAllocator& allocator)
-			: Lumix::MT::Task(allocator)
+		TestTaskConsumer(Queue* queue, IAllocator& allocator)
+			: MT::Task(allocator)
 			, m_queue(queue)
 			, m_sum(0)
 		{}
@@ -59,7 +63,7 @@ namespace
 
 	void UT_fixed_lock_queue(const char* params)
 	{
-		Lumix::DefaultAllocator allocator;
+		DefaultAllocator allocator;
 		Queue queue;
 		TestTaskConsumer testTaskConsumer(&queue, allocator);
 		testTaskConsumer.create("TestTaskConsumer_Task");
@@ -74,7 +78,7 @@ namespace
 
 		while (!queue.isEmpty())
 		{
-			Lumix::MT::yield();
+			MT::yield();
 		}
 
 		queue.abort();

@@ -1,6 +1,10 @@
 #include "unit_tests/suite/lumix_unit_tests.h"
 #include "engine/delegate.h"
 
+
+using namespace Lumix;
+
+
 static int x = 0;
 
 void test()
@@ -32,16 +36,16 @@ struct S
 
 void UT_delegate(const char* params)
 {
-	Lumix::DefaultAllocator allocator;
+	DefaultAllocator allocator;
 
-	Lumix::Delegate<void> d1;
+	Delegate<void> d1;
 
 	d1.bind<&test>();
 	d1.invoke();
 
 	LUMIX_EXPECT(x == 10);
 
-	Lumix::Delegate<void (int)> d2;
+	Delegate<void (int)> d2;
 	d2.bind<&test2>();
 	d2.invoke(20);
 	LUMIX_EXPECT(x == 20);

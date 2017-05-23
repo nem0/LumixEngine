@@ -6,16 +6,14 @@
 #include <bgfx/bgfx.h>
 
 
-class LogUI;
-class StudioApp;
-
-
 namespace Lumix
 {
-	class Pipeline;
-	class Pipeline;
-	class RenderScene;
-}
+
+
+class LogUI;
+class StudioApp;
+class Pipeline;
+class RenderScene;
 
 
 class SceneView
@@ -25,10 +23,10 @@ class SceneView
 		~SceneView();
 
 		void update();
-		void setScene(Lumix::RenderScene* scene);
+		void setScene(RenderScene* scene);
 		void shutdown();
 		void onGUI();
-		Lumix::Pipeline* getPipeline() { return m_pipeline; }
+		Pipeline* getPipeline() { return m_pipeline; }
 		const bgfx::TextureHandle& getTextureHandle() const { return m_texture_handle; }
 
 	private:
@@ -37,7 +35,7 @@ class SceneView
 		void onUniverseCreated();
 		void onUniverseDestroyed();
 		void captureMouse(bool capture);
-		Lumix::RayCastModelHit castRay(float x, float y);
+		RayCastModelHit castRay(float x, float y);
 		void handleDrop(float x, float y);
 		void onToolbar();
 		void resetCameraSpeed();
@@ -62,10 +60,13 @@ class SceneView
 		int m_captured_mouse_x;
 		int m_captured_mouse_y;
 		float m_camera_speed;
-		Lumix::WorldEditor* m_editor;
-		Lumix::Pipeline* m_pipeline;
+		WorldEditor* m_editor;
+		Pipeline* m_pipeline;
 		bgfx::TextureHandle m_texture_handle;
 		bool m_show_stats;
 		bool m_is_opengl;
 		LogUI* m_log_ui;
 };
+
+
+} // namespace Lumix

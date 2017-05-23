@@ -9,12 +9,9 @@
 
 namespace Lumix
 {
+
 class ResourceManagerBase;
-namespace Anim
-{
-	class ControllerResource;
-}
-}
+namespace Anim { class ControllerResource; } 
 
 
 namespace AnimEditor
@@ -31,7 +28,7 @@ struct EntryNode;
 class Component
 {
 public:
-	Component(Lumix::Anim::Component* _engine_cmp, Container* parent, ControllerResource& controller)
+	Component(Anim::Component* _engine_cmp, Container* parent, ControllerResource& controller)
 		: engine_cmp(_engine_cmp)
 		, m_parent(parent)
 		, m_controller(controller)
@@ -41,25 +38,25 @@ public:
 	virtual ~Component();
 	virtual bool draw(ImDrawList* draw, const ImVec2& canvas_screen_pos, bool selected) = 0;
 	virtual void onGUI() {}
-	virtual void serialize(Lumix::OutputBlob& blob) = 0;
-	virtual void deserialize(Lumix::InputBlob& blob) = 0;
+	virtual void serialize(OutputBlob& blob) = 0;
+	virtual void deserialize(InputBlob& blob) = 0;
 	virtual bool hitTest(const ImVec2& on_canvas_pos) const { return false; }
 	virtual bool isNode() const = 0;
 	virtual bool isContainer() const { return false; }
 	virtual void drawInside(ImDrawList* draw, const ImVec2& canvas_screen_pos) {}
 	Container* getParent() { return m_parent; }
 	virtual void compile() {}
-	virtual void debug(ImDrawList* draw, const ImVec2& canvas_screen_pos, Lumix::Anim::ComponentInstance* runtime) {}
+	virtual void debug(ImDrawList* draw, const ImVec2& canvas_screen_pos, Anim::ComponentInstance* runtime) {}
 	virtual Component* getByUID(int uid) { return engine_cmp && uid == engine_cmp->uid ? this : nullptr; }
 	virtual void debugInside(ImDrawList* draw,
 		const ImVec2& canvas_screen_pos,
-		Lumix::Anim::ComponentInstance* runtime,
+		Anim::ComponentInstance* runtime,
 		Container* current)
 	{
 	}
 	ControllerResource& getController() { return m_controller; }
 
-	Lumix::Anim::Component* engine_cmp;
+	Anim::Component* engine_cmp;
 
 protected:
 	Container* m_parent;
@@ -70,14 +67,14 @@ protected:
 class Node : public Component
 {
 public:
-	Node(Lumix::Anim::Component* engine_cmp, Container* parent, ControllerResource& controller);
+	Node(Anim::Component* engine_cmp, Container* parent, ControllerResource& controller);
 	~Node();
 
 	bool isNode() const override { return true; }
 	bool hitTest(const ImVec2& on_canvas_pos) const override;
 	void onGUI() override;
-	void serialize(Lumix::OutputBlob& blob) override;
-	void deserialize(Lumix::InputBlob& blob) override;
+	void serialize(OutputBlob& blob) override;
+	void deserialize(InputBlob& blob) override;
 	bool draw(ImDrawList* draw, const ImVec2& canvas_screen_pos, bool selected) override;
 	void addEdge(Edge* edge) { m_edges.push(edge); }
 	void addInEdge(Edge* edge) { m_in_edges.push(edge); }
@@ -88,36 +85,36 @@ public:
 public:
 	ImVec2 pos;
 	ImVec2 size;
-	Lumix::StaticString<64> name;
+	StaticString<64> name;
 
 protected:
-	Lumix::Array<Edge*> m_edges;
-	Lumix::Array<Edge*> m_in_edges;
-	Lumix::IAllocator& m_allocator;
+	Array<Edge*> m_edges;
+	Array<Edge*> m_in_edges;
+	IAllocator& m_allocator;
 };
 
 
 class Container : public Node
 {
 public:
-	Container(Lumix::Anim::Component* engine_cmp, Container* parent, ControllerResource& controller);
+	Container(Anim::Component* engine_cmp, Container* parent, ControllerResource& controller);
 	~Container();
 	Component* childrenHitTest(const ImVec2& pos);
 	Component* getChildByUID(int uid);
 	Component* getSelectedComponent() const { return m_selected_component; }
-	void deserialize(Lumix::InputBlob& blob) override;
-	void serialize(Lumix::OutputBlob& blob) override;
+	void deserialize(InputBlob& blob) override;
+	void serialize(OutputBlob& blob) override;
 	void compile() override;
 	virtual Component* getByUID(int uid) override;
-	virtual void dropSlot(const char* name, Lumix::u32 slot, const ImVec2& canvas_screen_pos) {}
+	virtual void dropSlot(const char* name, u32 slot, const ImVec2& canvas_screen_pos) {}
 	virtual void removeChild(Component* component);
 	bool isContainer() const override { return true; }
 	void createEdge(int from_uid, int to_uid, int edge_uid);
 	void destroyChild(int child_uid);
-	virtual void createNode(Lumix::Anim::Node::Type type, int uid, const ImVec2& pos) = 0;
+	virtual void createNode(Anim::Node::Type type, int uid, const ImVec2& pos) = 0;
 
 protected:
-	Lumix::Array<Component*> m_editor_cmps;
+	Array<Component*> m_editor_cmps;
 	Component* m_selected_component;
 };
 
@@ -126,36 +123,36 @@ protected:
 class Edge : public Component
 {
 public:
-	Edge(Lumix::Anim::Edge* engine_cmp, Container* parent, ControllerResource& controller);
+	Edge(Anim::Edge* engine_cmp, Container* parent, ControllerResource& controller);
 	~Edge();
 
 	bool isNode() const override { return false; }
 
 	void onGUI() override;
 	bool draw(ImDrawList* draw, const ImVec2& canvas_screen_pos, bool selected) override;
-	void serialize(Lumix::OutputBlob& blob) override;
-	void deserialize(Lumix::InputBlob& blob) override;
+	void serialize(OutputBlob& blob) override;
+	void deserialize(InputBlob& blob) override;
 	void compile() override;
 	bool hitTest(const ImVec2& on_canvas_pos) const override;
 	const char* getExpression() const { return m_expression; }
-	void debug(ImDrawList* draw, const ImVec2& canvas_screen_pos, Lumix::Anim::ComponentInstance* runtime) override;
+	void debug(ImDrawList* draw, const ImVec2& canvas_screen_pos, Anim::ComponentInstance* runtime) override;
 
 private:
 	Node* m_from;
 	Node* m_to;
-	Lumix::StaticString<128> m_expression;
+	StaticString<128> m_expression;
 };
 
 
 class AnimationNode : public Node
 {
 public:
-	AnimationNode(Lumix::Anim::Component* engine_cmp, Container* parent, ControllerResource& controller);
+	AnimationNode(Anim::Component* engine_cmp, Container* parent, ControllerResource& controller);
 
 	void compile() override;
 	void onGUI() override;
-	void debug(ImDrawList* draw, const ImVec2& canvas_screen_pos, Lumix::Anim::ComponentInstance* runtime) override;
-	void deserialize(Lumix::InputBlob& blob) override;
+	void debug(ImDrawList* draw, const ImVec2& canvas_screen_pos, Anim::ComponentInstance* runtime) override;
+	void deserialize(InputBlob& blob) override;
 
 	int root_rotation_input = -1;
 };
@@ -169,28 +166,28 @@ public:
 	{
 		RootNode(Container* parent, ControllerResource& controller);
 
-		Lumix::Array<RootEdge*> edges;
+		Array<RootEdge*> edges;
 	};
 
 public:
-	Blend1DNode(Lumix::Anim::Component* engine_cmp, Container* parent, ControllerResource& controller);
+	Blend1DNode(Anim::Component* engine_cmp, Container* parent, ControllerResource& controller);
 
 	void compile() override;
 	void onGUI() override;
-	void debug(ImDrawList* draw, const ImVec2& canvas_screen_pos, Lumix::Anim::ComponentInstance* runtime) override;
-	void serialize(Lumix::OutputBlob& blob) override;
-	void deserialize(Lumix::InputBlob& blob) override;
+	void debug(ImDrawList* draw, const ImVec2& canvas_screen_pos, Anim::ComponentInstance* runtime) override;
+	void serialize(OutputBlob& blob) override;
+	void deserialize(InputBlob& blob) override;
 	void drawInside(ImDrawList* draw, const ImVec2& canvas_screen_pos) override;
 	RootNode* getRootNode() const { return m_root_node; }
 	void removeChild(Component* component) override;
-	void dropSlot(const char* name, Lumix::u32 slot, const ImVec2& canvas_screen_pos) override;
+	void dropSlot(const char* name, u32 slot, const ImVec2& canvas_screen_pos) override;
 	void debugInside(ImDrawList* draw,
 		const ImVec2& canvas_screen_pos,
-		Lumix::Anim::ComponentInstance* runtime,
+		Anim::ComponentInstance* runtime,
 		Container* current) override;
 
 private:
-	void createNode(Lumix::Anim::Component::Type type, int uid, const ImVec2& pos) override;
+	void createNode(Anim::Component::Type type, int uid, const ImVec2& pos) override;
 	RootEdge* createRootEdge(Node* node);
 
 private:
@@ -213,31 +210,31 @@ struct EntryNode : public Node
 {
 	EntryNode(Container* parent, ControllerResource& controller);
 
-	Lumix::Array<struct EntryEdge*> entries;
+	Array<struct EntryEdge*> entries;
 };
 
 
 class StateMachine : public Container
 {
 public:
-	StateMachine(Lumix::Anim::Component* engine_cmp, Container* parent, ControllerResource& controller);
+	StateMachine(Anim::Component* engine_cmp, Container* parent, ControllerResource& controller);
 
 	void drawInside(ImDrawList* draw, const ImVec2& canvas_screen_pos) override;
 	void onGUI() override;
 	void debugInside(ImDrawList* draw,
 		const ImVec2& canvas_screen_pos,
-		Lumix::Anim::ComponentInstance* runtime,
+		Anim::ComponentInstance* runtime,
 		Container* current) override;
-	void debug(ImDrawList* draw, const ImVec2& canvas_screen_pos, Lumix::Anim::ComponentInstance* runtime) override;
-	void deserialize(Lumix::InputBlob& blob) override;
-	void serialize(Lumix::OutputBlob& blob) override;
+	void debug(ImDrawList* draw, const ImVec2& canvas_screen_pos, Anim::ComponentInstance* runtime) override;
+	void deserialize(InputBlob& blob) override;
+	void serialize(OutputBlob& blob) override;
 	EntryNode* getEntryNode() const { return m_entry_node; }
 	void compile() override;
 	void removeEntry(EntryEdge& entry);
-	void dropSlot(const char* name, Lumix::u32 slot, const ImVec2& canvas_screen_pos) override;
+	void dropSlot(const char* name, u32 slot, const ImVec2& canvas_screen_pos) override;
 
 private:
-	void createNode(Lumix::Anim::Component::Type type, int uid, const ImVec2& pos) override;
+	void createNode(Anim::Component::Type type, int uid, const ImVec2& pos) override;
 	EntryEdge* createEntryEdge(Node* node);
 
 private:
@@ -259,30 +256,32 @@ class ControllerResource
 {
 public:
 	ControllerResource(IAnimationEditor& editor,
-		Lumix::ResourceManagerBase& manager,
-		Lumix::IAllocator& allocator);
+		ResourceManagerBase& manager,
+		IAllocator& allocator);
 	~ControllerResource();
 
-	void serialize(Lumix::OutputBlob& blob);
-	bool deserialize(Lumix::InputBlob& blob, Lumix::Engine& engine, Lumix::IAllocator& allocator);
+	void serialize(OutputBlob& blob);
+	bool deserialize(InputBlob& blob, Engine& engine, IAllocator& allocator);
 	Component* getRoot() { return m_root; }
-	Lumix::Array<Lumix::string>& getAnimationSlots() { return m_animation_slots; }
-	Lumix::IAllocator& getAllocator() { return m_allocator; }
-	Lumix::Anim::ControllerResource* getEngineResource() { return m_engine_resource; }
+	Array<string>& getAnimationSlots() { return m_animation_slots; }
+	IAllocator& getAllocator() { return m_allocator; }
+	Anim::ControllerResource* getEngineResource() { return m_engine_resource; }
 	IAnimationEditor& getEditor() { return m_editor; }
 	int createUID() { ++m_last_uid; return m_last_uid; }
-	const char* getAnimationSlot(Lumix::u32 slot_hash) const;
+	const char* getAnimationSlot(u32 slot_hash) const;
 	void createAnimSlot(const char* name, const char* path);
 	Component* getByUID(int uid);
 
 private:
 	int m_last_uid = 0;
 	IAnimationEditor& m_editor;
-	Lumix::IAllocator& m_allocator;
+	IAllocator& m_allocator;
 	Component* m_root;
-	Lumix::Anim::ControllerResource* m_engine_resource;
-	Lumix::Array<Lumix::string> m_animation_slots;
+	Anim::ControllerResource* m_engine_resource;
+	Array<string> m_animation_slots;
 };
 
 
 } // namespace AnimEditor
+
+} // namespace Lumix

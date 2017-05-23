@@ -24,7 +24,7 @@ public:
 
 	struct Vertex
 	{
-		Lumix::Vec3 position;
+		Vec3 position;
 		u32 color;
 		float u, v;
 	};
@@ -43,10 +43,10 @@ public:
 	virtual void getRay(ComponentHandle camera_index, float x, float y, Vec3& origin, Vec3& dir) = 0;
 	virtual float castRay(ModelHandle model, const Vec3& origin, const Vec3& dir, const Matrix& mtx, const Pose* pose) = 0;
 	virtual void renderModel(ModelHandle model, const Matrix& mtx) = 0;
-	virtual ModelHandle loadModel(Lumix::Path& path) = 0;
+	virtual ModelHandle loadModel(Path& path) = 0;
 	virtual void unloadModel(ModelHandle handle) = 0;
 	virtual Vec3 getModelCenter(Entity entity) = 0;
-	virtual ImTextureID loadTexture(const Lumix::Path& path) = 0;
+	virtual ImTextureID loadTexture(const Path& path) = 0;
 	virtual void unloadTexture(ImTextureID handle) = 0;
 	virtual void addDebugCube(const Vec3& minimum, const Vec3& maximum, u32 color, float life) = 0;
 	virtual void addDebugCross(const Vec3& pos, float size, u32 color, float life) = 0;

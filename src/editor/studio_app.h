@@ -21,12 +21,11 @@ struct SDL_Window;
 
 namespace Lumix
 {
+
+
 struct ComponentUID;
 struct ResourceType;
 class WorldEditor;
-}
-
-
 struct Action;
 
 
@@ -92,21 +91,21 @@ public:
 	virtual class PropertyGrid* getPropertyGrid() = 0;
 	virtual class LogUI* getLogUI() = 0;
 	virtual class AssetBrowser* getAssetBrowser() = 0;
-	virtual Lumix::WorldEditor* getWorldEditor() = 0;
+	virtual WorldEditor* getWorldEditor() = 0;
 	virtual void addPlugin(IPlugin& plugin) = 0;
 	virtual void removePlugin(IPlugin& plugin) = 0;
-	virtual const char* getComponentTypeName(Lumix::ComponentType cmp_type) const = 0;
+	virtual const char* getComponentTypeName(ComponentType cmp_type) const = 0;
 	virtual void registerComponent(const char* id, const char* label) = 0;
 	virtual void registerComponent(const char* id, IAddComponentPlugin& plugin) = 0;
 	virtual void registerComponentWithResource(const char* id,
 		const char* label,
-		Lumix::ResourceType resource_type,
+		ResourceType resource_type,
 		const char* property_name) = 0;
 	virtual const AddCmpTreeNode& getAddComponentTreeRoot() const = 0;
 	virtual int getExitCode() const = 0;
 	virtual void runScript(const char* src, const char* script_name) = 0;
-	virtual const Lumix::Array<Action*>& getActions() = 0;
-	virtual Lumix::Array<Action*>& getToolbarActions() = 0;
+	virtual const Array<Action*>& getActions() = 0;
+	virtual Array<Action*>& getToolbarActions() = 0;
 	virtual void addAction(Action* action) = 0;
 	virtual void addWindowAction(Action* action) = 0;
 	virtual Action* getAction(const char* name) = 0;
@@ -120,3 +119,4 @@ public:
 };
 
 
+} // namespace Lumix

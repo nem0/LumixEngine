@@ -76,9 +76,6 @@ public:
 };
 
 
-
-
-
 class PrefabSystemImpl LUMIX_FINAL : public PrefabSystem
 {
 	struct InstantiatePrefabCommand LUMIX_FINAL : public IEditorCommand
@@ -608,7 +605,7 @@ public:
 
 		if (prefab == 0)
 		{
-			m_editor.beginCommandGroup(Lumix::crc32("save_prefab"));
+			m_editor.beginCommandGroup(crc32("save_prefab"));
 
 			Transform tr = m_universe->getTransform(entity);
 			float scale = m_universe->getScale(entity);

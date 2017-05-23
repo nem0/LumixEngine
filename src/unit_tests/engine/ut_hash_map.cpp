@@ -4,13 +4,17 @@
 #include "engine/hash_map.h"
 #include "engine/debug/debug.h"
 
+
+using namespace Lumix;
+
+
 namespace
 {
 	void UT_insert(const char* params)
 	{
-		Lumix::DefaultAllocator main_allocator;
-		Lumix::Debug::Allocator allocator(main_allocator);
-		Lumix::HashMap<i32, i32> hash_table(allocator);
+		DefaultAllocator main_allocator;
+		Debug::Allocator allocator(main_allocator);
+		HashMap<i32, i32> hash_table(allocator);
 
 		LUMIX_EXPECT(hash_table.empty());
 
@@ -31,18 +35,18 @@ namespace
 
 	void UT_array(const char* params)
 	{
-		Lumix::DefaultAllocator main_allocator;
-		Lumix::Debug::Allocator allocator(main_allocator);
-		Lumix::HashMap<i32, Lumix::Array<int> > hash_table(allocator);
+		DefaultAllocator main_allocator;
+		Debug::Allocator allocator(main_allocator);
+		HashMap<i32, Array<int> > hash_table(allocator);
 
 		LUMIX_EXPECT(hash_table.empty());
 	};
 
 	void UT_clear(const char* params)
 	{
-		Lumix::DefaultAllocator main_allocator;
-		Lumix::Debug::Allocator allocator(main_allocator);
-		Lumix::HashMap<i32, i32> hash_table(allocator);
+		DefaultAllocator main_allocator;
+		Debug::Allocator allocator(main_allocator);
+		HashMap<i32, i32> hash_table(allocator);
 
 		LUMIX_EXPECT(hash_table.empty());
 
@@ -74,10 +78,10 @@ namespace
 
 	void UT_constIterator(const char* params)
 	{
-		typedef Lumix::HashMap<i32, i32> HashTableType;
+		typedef HashMap<i32, i32> HashTableType;
 
-		Lumix::DefaultAllocator main_allocator;
-		Lumix::Debug::Allocator allocator(main_allocator);
+		DefaultAllocator main_allocator;
+		Debug::Allocator allocator(main_allocator);
 		HashTableType hash_table(allocator);
 
 		LUMIX_EXPECT(hash_table.empty());

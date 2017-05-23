@@ -39,7 +39,7 @@ struct PrefabResource LUMIX_FINAL : public Resource
 	}
 
 
-	Lumix::OutputBlob blob;
+	OutputBlob blob;
 };
 
 

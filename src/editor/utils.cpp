@@ -9,7 +9,11 @@
 #include "engine/universe/universe.h"
 
 
-void getEntityListDisplayName(Lumix::WorldEditor& editor, char* buf, int max_size, Lumix::Entity entity)
+namespace Lumix
+{
+
+
+void getEntityListDisplayName(WorldEditor& editor, char* buf, int max_size, Entity entity)
 {
 	if (!entity.isValid())
 	{
@@ -17,35 +21,37 @@ void getEntityListDisplayName(Lumix::WorldEditor& editor, char* buf, int max_siz
 		return;
 	}
 	const char* name = editor.getUniverse()->getEntityName(entity);
-	static const auto MODEL_INSTANCE_TYPE = Lumix::PropertyRegister::getComponentType("renderable");
-	Lumix::ComponentHandle model_instance = editor.getUniverse()->getComponent(entity, MODEL_INSTANCE_TYPE).handle;
+	static const auto MODEL_INSTANCE_TYPE = PropertyRegister::getComponentType("renderable");
+	ComponentHandle model_instance = editor.getUniverse()->getComponent(entity, MODEL_INSTANCE_TYPE).handle;
 	if (model_instance.isValid())
 	{
 		auto* render_interface = editor.getRenderInterface();
 		auto path = render_interface->getModelInstancePath(model_instance);
 		if (path.isValid())
 		{
-			char basename[Lumix::MAX_PATH_LENGTH];
-			Lumix::copyString(buf, max_size, path.c_str());
-			Lumix::PathUtils::getBasename(basename, Lumix::MAX_PATH_LENGTH, path.c_str());
+			char basename[MAX_PATH_LENGTH];
+			copyString(buf, max_size, path.c_str());
+			PathUtils::getBasename(basename, MAX_PATH_LENGTH, path.c_str());
 			if (name && name[0] != '\0')
-				Lumix::copyString(buf, max_size, name);
+				copyString(buf, max_size, name);
 			else
-				Lumix::toCString(entity.index, buf, max_size);
+				toCString(entity.index, buf, max_size);
 
-			Lumix::catString(buf, max_size, " - ");
-			Lumix::catString(buf, max_size, basename);
+			catString(buf, max_size, " - ");
+			catString(buf, max_size, basename);
 			return;
 		}
 	}
 
 	if (name && name[0] != '\0')
 	{
-		Lumix::copyString(buf, max_size, name);
+		copyString(buf, max_size, name);
 	}
 	else
 	{
-		Lumix::toCString(entity.index, buf, max_size);
+		toCString(entity.index, buf, max_size);
 	}
 }
 
+
+} // namespace Lumix

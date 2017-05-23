@@ -28,7 +28,11 @@
 #include <SDL.h>
 
 
-static const Lumix::ComponentType MODEL_INSTANCE_TYPE = Lumix::PropertyRegister::getComponentType("renderable");
+namespace Lumix
+{
+
+
+static const ComponentType MODEL_INSTANCE_TYPE = PropertyRegister::getComponentType("renderable");
 
 
 SceneView::SceneView(StudioApp& app)
@@ -42,10 +46,10 @@ SceneView::SceneView(StudioApp& app)
 	m_editor = m_app.getWorldEditor();
 	auto& engine = m_editor->getEngine();
 	auto& allocator = engine.getAllocator();
-	auto* renderer = static_cast<Lumix::Renderer*>(engine.getPluginManager().getPlugin("renderer"));
+	auto* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
 	m_is_opengl = renderer->isOpenGL();
-	Lumix::Path path("pipelines/main.lua");
-	m_pipeline = Lumix::Pipeline::create(*renderer, path, engine.getAllocator());
+	Path path("pipelines/main.lua");
+	m_pipeline = Pipeline::create(*renderer, path, engine.getAllocator());
 	m_pipeline->load();
 	m_pipeline->addCustomCommandHandler("renderGizmos").callback.bind<SceneView, &SceneView::renderGizmos>(this);
 	m_pipeline->addCustomCommandHandler("renderIcons").callback.bind<SceneView, &SceneView::renderIcons>(this);
@@ -100,7 +104,7 @@ SceneView::~SceneView()
 }
 
 
-void SceneView::setScene(Lumix::RenderScene* scene)
+void SceneView::setScene(RenderScene* scene)
 {
 	m_pipeline->setScene(scene);
 }
@@ -110,15 +114,15 @@ void SceneView::shutdown()
 {
 	m_editor->universeCreated().unbind<SceneView, &SceneView::onUniverseCreated>(this);
 	m_editor->universeDestroyed().unbind<SceneView, &SceneView::onUniverseDestroyed>(this);
-	Lumix::Pipeline::destroy(m_pipeline);
+	Pipeline::destroy(m_pipeline);
 	m_pipeline = nullptr;
 }
 
 
 void SceneView::onUniverseCreated()
 {
-	auto* scene = m_editor->getUniverse()->getScene(Lumix::crc32("renderer"));
-	m_pipeline->setScene(static_cast<Lumix::RenderScene*>(scene));
+	auto* scene = m_editor->getUniverse()->getScene(crc32("renderer"));
+	m_pipeline->setScene(static_cast<RenderScene*>(scene));
 }
 
 
@@ -141,7 +145,7 @@ void SceneView::update()
 					 screen_y <= m_screen_y + m_height;
 	if (!is_inside) return;
 
-	m_camera_speed = Lumix::Math::maximum(0.01f, m_camera_speed + ImGui::GetIO().MouseWheel / 20.0f);
+	m_camera_speed = Math::maximum(0.01f, m_camera_speed + ImGui::GetIO().MouseWheel / 20.0f);
 
 	float speed = m_camera_speed;
 	if (ImGui::GetIO().KeyShift) speed *= 10;
@@ -177,20 +181,20 @@ void SceneView::captureMouse(bool capture)
 }
 
 
-Lumix::RayCastModelHit SceneView::castRay(float x, float y)
+RayCastModelHit SceneView::castRay(float x, float y)
 {
 	auto* scene =  m_pipeline->getScene();
 	ASSERT(scene);
 	
-	Lumix::ComponentUID camera_cmp = m_editor->getEditCamera();
-	Lumix::Vec2 screen_size = scene->getCameraScreenSize(camera_cmp.handle);
+	ComponentUID camera_cmp = m_editor->getEditCamera();
+	Vec2 screen_size = scene->getCameraScreenSize(camera_cmp.handle);
 	screen_size.x *= x;
 	screen_size.y *= y;
 
-	Lumix::Vec3 origin;
-	Lumix::Vec3 dir;
+	Vec3 origin;
+	Vec3 dir;
 	scene->getRay(camera_cmp.handle, (float)screen_size.x, (float)screen_size.y, origin, dir);
-	return scene->castRay(origin, dir, Lumix::INVALID_COMPONENT);
+	return scene->castRay(origin, dir, INVALID_COMPONENT);
 }
 
 
@@ -201,25 +205,25 @@ void SceneView::handleDrop(float x, float y)
 
 	if (hit.m_is_hit)
 	{
-		if (Lumix::PathUtils::hasExtension(path, "fab"))
+		if (PathUtils::hasExtension(path, "fab"))
 		{
 			
 		}
-		else if (Lumix::PathUtils::hasExtension(path, "msh"))
+		else if (PathUtils::hasExtension(path, "msh"))
 		{
-			m_editor->beginCommandGroup(Lumix::crc32("insert_mesh"));
-			Lumix::Entity entity = m_editor->addEntity();
-			Lumix::Vec3 pos = hit.m_origin + hit.m_t * hit.m_dir;
+			m_editor->beginCommandGroup(crc32("insert_mesh"));
+			Entity entity = m_editor->addEntity();
+			Vec3 pos = hit.m_origin + hit.m_t * hit.m_dir;
 			m_editor->setEntitiesPositions(&entity, &pos, 1);
 			m_editor->selectEntities(&entity, 1);
 			m_editor->addComponent(MODEL_INSTANCE_TYPE);
-			const auto* desc = Lumix::PropertyRegister::getDescriptor(MODEL_INSTANCE_TYPE, Lumix::crc32("Source"));
-			m_editor->setProperty(MODEL_INSTANCE_TYPE, -1, *desc, &entity, 1, path, Lumix::stringLength(path) + 1);
+			const auto* desc = PropertyRegister::getDescriptor(MODEL_INSTANCE_TYPE, crc32("Source"));
+			m_editor->setProperty(MODEL_INSTANCE_TYPE, -1, *desc, &entity, 1, path, stringLength(path) + 1);
 			m_editor->endCommandGroup();
 		}
-		else if (Lumix::PathUtils::hasExtension(path, "mat") && hit.m_mesh)
+		else if (PathUtils::hasExtension(path, "mat") && hit.m_mesh)
 		{
-			auto* desc = Lumix::PropertyRegister::getDescriptor(MODEL_INSTANCE_TYPE, Lumix::crc32("Material"));
+			auto* desc = PropertyRegister::getDescriptor(MODEL_INSTANCE_TYPE, crc32("Material"));
 			auto drag_data = m_app.getDragData();
 			m_editor->selectEntities(&hit.m_entity, 1);
 			auto* model = m_pipeline->getScene()->getModelInstanceModel(hit.m_component);
@@ -378,7 +382,7 @@ void SceneView::onGUI()
 					{
 						ImGui::ResetActiveID();
 						if(i == 1) captureMouse(true);
-						m_editor->onMouseDown((int)rel_mp.x, (int)rel_mp.y, (Lumix::MouseButton::Value)i);
+						m_editor->onMouseDown((int)rel_mp.x, (int)rel_mp.y, (MouseButton::Value)i);
 						break;
 					}
 				}
@@ -386,7 +390,7 @@ void SceneView::onGUI()
 			if (m_is_mouse_captured || ImGui::IsItemHovered())
 			{
 				auto& input = m_editor->getEngine().getInputSystem();
-				auto delta = Lumix::Vec2(input.getMouseXMove(), input.getMouseYMove());
+				auto delta = Vec2(input.getMouseXMove(), input.getMouseYMove());
 				if (delta.x != 0 || delta.y != 0)
 				{
 					m_editor->onMouseMove((int)rel_mp.x, (int)rel_mp.y, (int)delta.x, (int)delta.y);
@@ -400,7 +404,7 @@ void SceneView::onGUI()
 				if (ImGui::IsMouseReleased(i))
 				{
 					if (i == 1) captureMouse(false);
-					m_editor->onMouseUp((int)rel_mp.x, (int)rel_mp.y, (Lumix::MouseButton::Value)i);
+					m_editor->onMouseUp((int)rel_mp.x, (int)rel_mp.y, (MouseButton::Value)i);
 				}
 			}
 			m_pipeline->render();
@@ -428,7 +432,7 @@ void SceneView::onGUI()
 			ImGui::LabelText("Draw calls", "%d", stats.draw_call_count);
 			ImGui::LabelText("Instances", "%d", stats.instance_count);
 			char buf[30];
-			Lumix::toCStringPretty(stats.triangle_count, buf, Lumix::lengthOf(buf));
+			toCStringPretty(stats.triangle_count, buf, lengthOf(buf));
 			ImGui::LabelText("Triangles", "%s", buf);
 			ImGui::LabelText("Resolution", "%dx%d", m_pipeline->getWidth(), m_pipeline->getHeight());
 			ImGui::LabelText("FPS", "%.2f", m_editor->getEngine().getFPS());
@@ -441,3 +445,6 @@ void SceneView::onGUI()
 		ImGui::PopStyleColor();
 	}
 }
+
+
+} // namespace Lumix

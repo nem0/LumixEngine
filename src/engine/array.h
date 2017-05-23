@@ -98,7 +98,7 @@ public:
 			m_size = rhs.m_size;
 			for (int i = 0; i < m_size; ++i)
 			{
-				new (Lumix::NewPlaceholder(), (char*)(m_data + i)) T(rhs.m_data[i]);
+				new (NewPlaceholder(), (char*)(m_data + i)) T(rhs.m_data[i]);
 			}
 		}
 	}

@@ -27,7 +27,9 @@
 
 static ImVec2 operator+(const ImVec2& lhs, const ImVec2& rhs) { return ImVec2(lhs.x + rhs.x, lhs.y + rhs.y); }
 
-using namespace Lumix;
+
+namespace Lumix
+{
 
 
 static const ComponentType ANIMABLE_HASH = PropertyRegister::getComponentType("animable");
@@ -234,7 +236,7 @@ public:
 	void moveNode(ControllerResource& ctrl, Node* node, const ImVec2& pos) override;
 	void createNode(ControllerResource& ctrl,
 		Container* container,
-		Lumix::Anim::Node::Type type,
+		Anim::Node::Type type,
 		const ImVec2& pos) override;
 	bool hasFocus() override { return m_is_focused; }
 
@@ -321,7 +323,7 @@ void AnimationEditor::moveNode(ControllerResource& ctrl, Node* node, const ImVec
 
 void AnimationEditor::createNode(ControllerResource& ctrl,
 	Container* container,
-	Lumix::Anim::Node::Type type,
+	Anim::Node::Type type,
 	const ImVec2& pos)
 {
 	IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
@@ -870,3 +872,6 @@ IAnimationEditor* IAnimationEditor::create(IAllocator& allocator, StudioApp& app
 
 
 } // namespace AnimEditor
+
+
+} // namespace Lumix

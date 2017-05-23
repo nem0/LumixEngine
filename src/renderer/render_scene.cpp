@@ -967,18 +967,18 @@ public:
 	void deserializeEnvironmentProbe(IDeserializer& serializer, Entity entity, int /*scene_version*/)
 	{
 		auto* texture_manager = m_engine.getResourceManager().get(TEXTURE_TYPE);
-		StaticString<Lumix::MAX_PATH_LENGTH> probe_dir("universes/", m_universe.getName(), "/probes/");
+		StaticString<MAX_PATH_LENGTH> probe_dir("universes/", m_universe.getName(), "/probes/");
 		EnvironmentProbe& probe = m_environment_probes.insert(entity);
 		serializer.read(&probe.guid);
-		StaticString<Lumix::MAX_PATH_LENGTH> path_str(probe_dir, probe.guid, ".dds");
+		StaticString<MAX_PATH_LENGTH> path_str(probe_dir, probe.guid, ".dds");
 		probe.texture = static_cast<Texture*>(texture_manager->load(Path(path_str)));
 		probe.texture->setFlag(BGFX_TEXTURE_SRGB, true);
-		StaticString<Lumix::MAX_PATH_LENGTH> irr_path_str(probe_dir, probe.guid, "_irradiance.dds");
+		StaticString<MAX_PATH_LENGTH> irr_path_str(probe_dir, probe.guid, "_irradiance.dds");
 		probe.irradiance = static_cast<Texture*>(texture_manager->load(Path(irr_path_str)));
 		probe.irradiance->setFlag(BGFX_TEXTURE_SRGB, true);
 		probe.irradiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
 		probe.irradiance->setFlag(BGFX_TEXTURE_MAG_ANISOTROPIC, true);
-		StaticString<Lumix::MAX_PATH_LENGTH> r_path_str(probe_dir, probe.guid, "_radiance.dds");
+		StaticString<MAX_PATH_LENGTH> r_path_str(probe_dir, probe.guid, "_radiance.dds");
 		probe.radiance = static_cast<Texture*>(texture_manager->load(Path(r_path_str)));
 		probe.radiance->setFlag(BGFX_TEXTURE_SRGB, true);
 		probe.radiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
@@ -1378,22 +1378,22 @@ public:
 		serializer.read(count);
 		m_environment_probes.reserve(count);
 		auto* texture_manager = m_engine.getResourceManager().get(TEXTURE_TYPE);
-		StaticString<Lumix::MAX_PATH_LENGTH> probe_dir("universes/", m_universe.getName(), "/probes/");
+		StaticString<MAX_PATH_LENGTH> probe_dir("universes/", m_universe.getName(), "/probes/");
 		for (int i = 0; i < count; ++i)
 		{
 			Entity entity;
 			serializer.read(entity);
 			EnvironmentProbe& probe = m_environment_probes.insert(entity);
 			serializer.read(probe.guid);
-			StaticString<Lumix::MAX_PATH_LENGTH> path_str(probe_dir, probe.guid, ".dds");
+			StaticString<MAX_PATH_LENGTH> path_str(probe_dir, probe.guid, ".dds");
 			probe.texture = static_cast<Texture*>(texture_manager->load(Path(path_str)));
 			probe.texture->setFlag(BGFX_TEXTURE_SRGB, true);
-			StaticString<Lumix::MAX_PATH_LENGTH> irr_path_str(probe_dir, probe.guid, "_irradiance.dds");
+			StaticString<MAX_PATH_LENGTH> irr_path_str(probe_dir, probe.guid, "_irradiance.dds");
 			probe.irradiance = static_cast<Texture*>(texture_manager->load(Path(irr_path_str)));
 			probe.irradiance->setFlag(BGFX_TEXTURE_SRGB, true);
 			probe.irradiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
 			probe.irradiance->setFlag(BGFX_TEXTURE_MAG_ANISOTROPIC, true);
-			StaticString<Lumix::MAX_PATH_LENGTH> r_path_str(probe_dir, probe.guid, "_radiance.dds");
+			StaticString<MAX_PATH_LENGTH> r_path_str(probe_dir, probe.guid, "_radiance.dds");
 			probe.radiance = static_cast<Texture*>(texture_manager->load(Path(r_path_str)));
 			probe.radiance->setFlag(BGFX_TEXTURE_SRGB, true);
 			probe.radiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
@@ -2898,21 +2898,21 @@ public:
 	static unsigned int LUA_compareTGA(RenderSceneImpl* scene, const char* path, const char* path_preimage, int min_diff)
 	{
 		auto& fs = scene->m_engine.getFileSystem();
-		auto file1 = fs.open(fs.getDefaultDevice(), Lumix::Path(path), Lumix::FS::Mode::OPEN_AND_READ);
-		auto file2 = fs.open(fs.getDefaultDevice(), Lumix::Path(path_preimage), Lumix::FS::Mode::OPEN_AND_READ);
+		auto file1 = fs.open(fs.getDefaultDevice(), Path(path), FS::Mode::OPEN_AND_READ);
+		auto file2 = fs.open(fs.getDefaultDevice(), Path(path_preimage), FS::Mode::OPEN_AND_READ);
 		if (!file1)
 		{
 			if (file2) fs.close(*file2);
-			Lumix::g_log_error.log("render_test") << "Failed to open " << path;
+			g_log_error.log("render_test") << "Failed to open " << path;
 			return 0xffffFFFF;
 		}
 		else if (!file2)
 		{
 			fs.close(*file1);
-			Lumix::g_log_error.log("render_test") << "Failed to open " << path_preimage;
+			g_log_error.log("render_test") << "Failed to open " << path_preimage;
 			return 0xffffFFFF;
 		}
-		unsigned int result = Lumix::Texture::compareTGA(file1, file2, min_diff, scene->m_allocator);
+		unsigned int result = Texture::compareTGA(file1, file2, min_diff, scene->m_allocator);
 		fs.close(*file1);
 		fs.close(*file2);
 		return result;
@@ -4246,7 +4246,7 @@ public:
 		auto& probe = m_environment_probes[entity];
 		auto* texture_manager = m_engine.getResourceManager().get(TEXTURE_TYPE);
 		if (probe.texture) texture_manager->unload(*probe.texture);
-		StaticString<Lumix::MAX_PATH_LENGTH> path("universes/", m_universe.getName(), "/probes/", probe.guid, ".dds");
+		StaticString<MAX_PATH_LENGTH> path("universes/", m_universe.getName(), "/probes/", probe.guid, ".dds");
 		probe.texture = static_cast<Texture*>(texture_manager->load(Path(path)));
 		probe.texture->setFlag(BGFX_TEXTURE_SRGB, true);
 		path = "universes/";

@@ -5,25 +5,29 @@
 #include "engine/string.h"
 
 
+namespace Lumix
+{
+
+
 class LUMIX_EDITOR_API Metadata
 {
 public:
-	explicit Metadata(Lumix::IAllocator& allocator);
+	explicit Metadata(IAllocator& allocator);
 	~Metadata();
 
 	bool load();
 	bool save();
 
-	bool setRawMemory(Lumix::u32 file, Lumix::u32 key, const void* data, size_t size);
-	bool setInt(Lumix::u32 file, Lumix::u32 key, int value);
-	bool setString(Lumix::u32 file, Lumix::u32 key, const char* value);
+	bool setRawMemory(u32 file, u32 key, const void* data, size_t size);
+	bool setInt(u32 file, u32 key, int value);
+	bool setString(u32 file, u32 key, const char* value);
 
-	int getInt(Lumix::u32 file, Lumix::u32 key) const;
-	bool getString(Lumix::u32 file, Lumix::u32 key, char* out, int max_size) const;
-	const void* getRawMemory(Lumix::u32 file, Lumix::u32 key) const;
-	size_t getRawMemorySize(Lumix::u32 file, Lumix::u32 key) const;
+	int getInt(u32 file, u32 key) const;
+	bool getString(u32 file, u32 key, char* out, int max_size) const;
+	const void* getRawMemory(u32 file, u32 key) const;
+	size_t getRawMemorySize(u32 file, u32 key) const;
 
-	bool hasKey(Lumix::u32 file, Lumix::u32 key) const;
+	bool hasKey(u32 file, u32 key) const;
 
 private:
 	struct DataItem
@@ -40,7 +44,7 @@ private:
 		union
 		{
 			int m_int;
-			char m_string[Lumix::MAX_PATH_LENGTH];
+			char m_string[MAX_PATH_LENGTH];
 			
 			struct
 			{
@@ -50,9 +54,12 @@ private:
 		};
 	};
 
-	const DataItem* getData(Lumix::u32 file, Lumix::u32 key) const;
-	DataItem* getOrCreateData(Lumix::u32 file, Lumix::u32 key);
+	const DataItem* getData(u32 file, u32 key) const;
+	DataItem* getOrCreateData(u32 file, u32 key);
 
-	Lumix::AssociativeArray<Lumix::u32, Lumix::AssociativeArray<Lumix::u32, DataItem> > m_data;
-	Lumix::IAllocator& m_allocator;
+	AssociativeArray<u32, AssociativeArray<u32, DataItem> > m_data;
+	IAllocator& m_allocator;
 };
+
+
+} // namespace Lumix

@@ -141,7 +141,7 @@ namespace Lumix
 	};
 
 
-	static void registerProperties(Lumix::IAllocator& allocator)
+	static void registerProperties(IAllocator& allocator)
 	{
 		PropertyRegister::add("ragdoll",
 			LUMIX_NEW(allocator, BlobPropertyDescriptor<PhysicsScene>)(

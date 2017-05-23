@@ -453,7 +453,7 @@ static void registerProperties(IAllocator& allocator)
 struct BGFXAllocator LUMIX_FINAL : public bx::AllocatorI
 {
 
-	explicit BGFXAllocator(Lumix::IAllocator& source)
+	explicit BGFXAllocator(IAllocator& source)
 		: m_source(source)
 	{
 	}
@@ -492,7 +492,7 @@ struct BGFXAllocator LUMIX_FINAL : public bx::AllocatorI
 	}
 
 
-	Lumix::IAllocator& m_source;
+	IAllocator& m_source;
 };
 
 
@@ -507,10 +507,10 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 
 		void fatal(bgfx::Fatal::Enum _code, const char* _str) override
 		{
-			Lumix::g_log_error.log("Renderer") << _str;
+			g_log_error.log("Renderer") << _str;
 			if (bgfx::Fatal::DebugCheck == _code || bgfx::Fatal::InvalidShader == _code)
 			{
-				Lumix::Debug::debugBreak();
+				Debug::debugBreak();
 			}
 			else
 			{
@@ -561,8 +561,8 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 			header.width = (short)width;
 			header.dataType = 2;
 
-			Lumix::FS::OsFile file;
-			if(!file.open(filePath, Lumix::FS::Mode::CREATE_AND_WRITE, m_renderer.m_allocator))
+			FS::OsFile file;
+			if(!file.open(filePath, FS::Mode::CREATE_AND_WRITE, m_renderer.m_allocator))
 			{
 				g_log_error.log("Renderer") << "Failed to save screenshot to " << filePath;
 				return;
@@ -621,8 +621,8 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 		}
 		char cmd_line[4096];
 		bgfx::RendererType::Enum renderer_type = bgfx::RendererType::Count;
-		Lumix::getCommandLine(cmd_line, Lumix::lengthOf(cmd_line));
-		Lumix::CommandLineParser cmd_line_parser(cmd_line);
+		getCommandLine(cmd_line, lengthOf(cmd_line));
+		CommandLineParser cmd_line_parser(cmd_line);
 		while (cmd_line_parser.next())
 		{
 			if (cmd_line_parser.currentEquals("-opengl"))

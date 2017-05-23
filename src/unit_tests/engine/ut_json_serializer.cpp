@@ -6,15 +6,18 @@
 #include <cstdio>
 
 
+using namespace Lumix;
+
+
 void UT_json_serializer(const char* params)
 {
-	Lumix::DefaultAllocator allocator;
-	Lumix::PathManager path_manager(allocator);
+	DefaultAllocator allocator;
+	PathManager path_manager(allocator);
 
-	Lumix::FS::MemoryFileDevice device(allocator);
-	Lumix::FS::IFile* file = device.createFile(NULL);
+	FS::MemoryFileDevice device(allocator);
+	FS::IFile* file = device.createFile(NULL);
 	{
-		Lumix::JsonSerializer serializer(*file, Lumix::JsonSerializer::WRITE, Lumix::Path(""), allocator);
+		JsonSerializer serializer(*file, JsonSerializer::WRITE, Path(""), allocator);
 		serializer.beginObject();
 
 		serializer.beginArray("array");
@@ -33,10 +36,10 @@ void UT_json_serializer(const char* params)
 		serializer.endObject();
 	}
 	
-	file->seek(Lumix::FS::SeekMode::BEGIN, 0);
+	file->seek(FS::SeekMode::BEGIN, 0);
 
 	{
-		Lumix::JsonSerializer serializer(*file, Lumix::JsonSerializer::READ, Lumix::Path(""), allocator);
+		JsonSerializer serializer(*file, JsonSerializer::READ, Path(""), allocator);
 		serializer.deserializeObjectBegin();
 
 		LUMIX_EXPECT(!serializer.isObjectEnd());
@@ -76,7 +79,7 @@ void UT_json_serializer(const char* params)
 
 		char str[100];
 		serializer.deserialize("const_char", str, sizeof(str), "");
-		LUMIX_EXPECT(Lumix::equalStrings(str , "some string"));
+		LUMIX_EXPECT(equalStrings(str , "some string"));
 		LUMIX_EXPECT(serializer.isObjectEnd());
 
 		serializer.deserializeObjectEnd();

@@ -6,9 +6,6 @@
 #include "engine/string.h"
 
 
-class StudioApp;
-
-
 namespace Lumix
 {
 
@@ -22,6 +19,7 @@ struct PrefabResource;
 struct Quat;
 struct Vec3;
 class WorldEditor;
+class StudioApp;
 
 
 class LUMIX_EDITOR_API PrefabSystem
@@ -42,7 +40,7 @@ public:
 	virtual void setPrefab(Entity entity, u64 prefab) = 0;
 	virtual Entity getFirstInstance(u64 prefab) = 0;
 	virtual Entity getNextInstance(Entity entity) = 0;
-	virtual void savePrefab(const Lumix::Path& path) = 0;
+	virtual void savePrefab(const Path& path) = 0;
 	virtual PrefabResource* getPrefabResource(Entity entity) = 0;
 };
 

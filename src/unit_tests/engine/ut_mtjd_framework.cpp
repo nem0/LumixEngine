@@ -3,6 +3,9 @@
 #include "engine/mtjd/manager.h"
 
 
+using namespace Lumix;
+
+
 namespace
 {
 const i32 BUFFER_SIZE = 10000;
@@ -19,7 +22,7 @@ static_assert(TESTS_COUNT % 2 == 0, "");
 }
 
 
-class TestJob : public Lumix::MTJD::Job
+class TestJob : public MTJD::Job
 {
 public:
 	TestJob(float* buffer_in1,
@@ -27,10 +30,10 @@ public:
 		float* buffer_out,
 		i32 size,
 		bool auto_destroy,
-		Lumix::MTJD::Manager& manager,
-		Lumix::IAllocator& allocator)
+		MTJD::Manager& manager,
+		IAllocator& allocator)
 		: Job((auto_destroy ? Job::AUTO_DESTROY : 0) | Job::SYNC_EVENT,
-			  Lumix::MTJD::Priority::Default,
+			  MTJD::Priority::Default,
 			  manager,
 			  allocator,
 			  allocator)
@@ -67,8 +70,8 @@ private:
 
 void UT_MTJDFrameworkTest(const char* params)
 {
-	Lumix::DefaultAllocator allocator;
-	Lumix::MTJD::Manager* manager = Lumix::MTJD::Manager::create(allocator);
+	DefaultAllocator allocator;
+	MTJD::Manager* manager = MTJD::Manager::create(allocator);
 
 	for (size_t x = 0; x < TEST_RUNS; x++)
 	{
@@ -124,12 +127,12 @@ void UT_MTJDFrameworkTest(const char* params)
 		}
 		allocator.deallocate(jobs);
 	}
-	Lumix::MTJD::Manager::destroy(*manager);
+	MTJD::Manager::destroy(*manager);
 }
 
 void UT_MTJDFrameworkDependencyTest(const char* params)
 {
-	Lumix::DefaultAllocator allocator;
+	DefaultAllocator allocator;
 	for (i32 i = 0; i < TESTS_COUNT; i++)
 	{
 		for (i32 j = 0; j < BUFFER_SIZE; j++)
@@ -140,7 +143,7 @@ void UT_MTJDFrameworkDependencyTest(const char* params)
 		}
 	}
 
-	Lumix::MTJD::Manager* manager = Lumix::MTJD::Manager::create(allocator);
+	MTJD::Manager* manager = MTJD::Manager::create(allocator);
 
 	TestJob** jobs = (TestJob**)allocator.allocate(sizeof(TestJob*) * TESTS_COUNT);
 
@@ -188,7 +191,7 @@ void UT_MTJDFrameworkDependencyTest(const char* params)
 		LUMIX_DELETE(allocator, jobs[i]);
 	}
 
-	Lumix::MTJD::Manager::destroy(*manager);
+	MTJD::Manager::destroy(*manager);
 	allocator.deallocate(jobs);
 }
 

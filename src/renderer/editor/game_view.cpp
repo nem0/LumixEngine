@@ -19,15 +19,19 @@
 #include <SDL.h>
 
 
-struct GUIInterface : Lumix::GUISystem::Interface
+namespace Lumix
+{
+
+
+struct GUIInterface : GUISystem::Interface
 {
 	GUIInterface(GameView& game_view)
 		: m_game_view(game_view)
 	{
 	}
 
-	Lumix::Pipeline* getPipeline() override { return m_game_view.m_pipeline; }
-	Lumix::Vec2 getPos() const override { return m_game_view.m_pos; }
+	Pipeline* getPipeline() override { return m_game_view.m_pipeline; }
+	Vec2 getPos() const override { return m_game_view.m_pos; }
 
 	
 	void enableCursor(bool enable) override
@@ -56,9 +60,9 @@ GameView::GameView(StudioApp& app)
 	, m_texture_handle(BGFX_INVALID_HANDLE)
 	, m_gui_interface(nullptr)
 {
-	Lumix::Engine& engine = app.getWorldEditor()->getEngine();
-	auto f = &Lumix::LuaWrapper::wrapMethodClosure<GameView, decltype(&GameView::forceViewport), &GameView::forceViewport>;
-	Lumix::LuaWrapper::createSystemClosure(engine.getState(), "GameView", this, "forceViewport", f);
+	Engine& engine = app.getWorldEditor()->getEngine();
+	auto f = &LuaWrapper::wrapMethodClosure<GameView, decltype(&GameView::forceViewport), &GameView::forceViewport>;
+	LuaWrapper::createSystemClosure(engine.getState(), "GameView", this, "forceViewport", f);
 }
 
 
@@ -79,8 +83,8 @@ void GameView::enableIngameCursor(bool enable)
 
 void GameView::onUniverseCreated()
 {
-	auto* scene = m_editor->getUniverse()->getScene(Lumix::crc32("renderer"));
-	m_pipeline->setScene(static_cast<Lumix::RenderScene*>(scene));
+	auto* scene = m_editor->getUniverse()->getScene(crc32("renderer"));
+	m_pipeline->setScene(static_cast<RenderScene*>(scene));
 }
 
 
@@ -90,21 +94,21 @@ void GameView::onUniverseDestroyed()
 }
 
 
-void GameView::init(Lumix::WorldEditor& editor)
+void GameView::init(WorldEditor& editor)
 {
 	m_editor = &editor;
 	auto& engine = editor.getEngine();
-	auto* renderer = static_cast<Lumix::Renderer*>(engine.getPluginManager().getPlugin("renderer"));
+	auto* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
 	m_is_opengl = renderer->isOpenGL();
-	Lumix::Path path("pipelines/game_view.lua");
-	m_pipeline = Lumix::Pipeline::create(*renderer, path, engine.getAllocator());
+	Path path("pipelines/game_view.lua");
+	m_pipeline = Pipeline::create(*renderer, path, engine.getAllocator());
 	m_pipeline->load();
 
 	editor.universeCreated().bind<GameView, &GameView::onUniverseCreated>(this);
 	editor.universeDestroyed().bind<GameView, &GameView::onUniverseDestroyed>(this);
 	onUniverseCreated();
 
-	auto* gui = static_cast<Lumix::GUISystem*>(m_editor->getEngine().getPluginManager().getPlugin("gui"));
+	auto* gui = static_cast<GUISystem*>(m_editor->getEngine().getPluginManager().getPlugin("gui"));
 	if (gui)
 	{
 		m_gui_interface = LUMIX_NEW(m_editor->getEngine().getAllocator(), GUIInterface)(*this);
@@ -117,18 +121,18 @@ void GameView::shutdown()
 {
 	m_editor->universeCreated().unbind<GameView, &GameView::onUniverseCreated>(this);
 	m_editor->universeDestroyed().unbind<GameView, &GameView::onUniverseDestroyed>(this);
-	auto* gui = static_cast<Lumix::GUISystem*>(m_editor->getEngine().getPluginManager().getPlugin("gui"));
+	auto* gui = static_cast<GUISystem*>(m_editor->getEngine().getPluginManager().getPlugin("gui"));
 	if (gui)
 	{
 		gui->setInterface(nullptr);
 		LUMIX_DELETE(m_editor->getEngine().getAllocator(), m_gui_interface);
 	}
-	Lumix::Pipeline::destroy(m_pipeline);
+	Pipeline::destroy(m_pipeline);
 	m_pipeline = nullptr;
 }
 
 
-void GameView::setScene(Lumix::RenderScene* scene)
+void GameView::setScene(RenderScene* scene)
 {
 	m_pipeline->setScene(scene);
 }
@@ -223,7 +227,7 @@ void GameView::onStatsGUI(const ImVec2& view_pos)
 		ImGui::LabelText("Draw calls", "%d", stats.draw_call_count);
 		ImGui::LabelText("Instances", "%d", stats.instance_count);
 		char buf[30];
-		Lumix::toCStringPretty(stats.triangle_count, buf, Lumix::lengthOf(buf));
+		toCStringPretty(stats.triangle_count, buf, lengthOf(buf));
 		ImGui::LabelText("Triangles", "%s", buf);
 		ImGui::LabelText("Resolution", "%dx%d", m_pipeline->getWidth(), m_pipeline->getHeight());
 		ImGui::LabelText("FPS", "%.2f", m_editor->getEngine().getFPS());
@@ -353,3 +357,6 @@ void GameView::onGUI()
 	ImGui::EndDock();
 	if(is_game_view_visible) onStatsGUI(view_pos);
 }
+
+
+} // namespace Lumix

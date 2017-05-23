@@ -3,11 +3,14 @@
 #include <cstdio>
 
 
+using namespace Lumix;
+
+
 void UT_binary_array(const char* params)
 {
-	Lumix::DefaultAllocator allocator;
+	DefaultAllocator allocator;
 
-	Lumix::BinaryArray array(allocator);
+	BinaryArray array(allocator);
 	LUMIX_EXPECT(array.size() == 0);
 	for (int i = 0; i < 100; ++i)
 	{
@@ -47,7 +50,7 @@ void UT_binary_array(const char* params)
 	LUMIX_EXPECT(array.getRaw()[1] == 0);
 
 
-	Lumix::BinaryArray array2(allocator);
+	BinaryArray array2(allocator);
 	for (int i = 0; i < 128; ++i)
 	{
 		array2.push(true);

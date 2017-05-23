@@ -8,9 +8,10 @@
 
 namespace Lumix
 {
-	class InputBlob;
-	class OutputBlob;
-}
+
+
+class InputBlob;
+class OutputBlob;
 
 
 class ShaderEditor
@@ -46,11 +47,11 @@ public:
 	{
 		Node(int type, ShaderEditor& editor);
 
-		virtual void save(Lumix::OutputBlob& /*blob*/) {}
-		virtual void load(Lumix::InputBlob& /*blob*/) {}
-		virtual void generate(Lumix::OutputBlob& blob) = 0;
-		virtual void printReference(Lumix::OutputBlob& blob);
-		virtual void generateBeforeMain(Lumix::OutputBlob& /*blob*/) {}
+		virtual void save(OutputBlob& /*blob*/) {}
+		virtual void load(InputBlob& /*blob*/) {}
+		virtual void generate(OutputBlob& blob) = 0;
+		virtual void printReference(OutputBlob& blob);
+		virtual void generateBeforeMain(OutputBlob& /*blob*/) {}
 		virtual ValueType getOutputType(int /*index*/) const { return ValueType::FLOAT; }
 		virtual ~Node();
 
@@ -60,8 +61,8 @@ public:
 		ImGuiID m_id;
 		ImVec2 m_pos;
 
-		Lumix::Array<Node*> m_inputs;
-		Lumix::Array<Node*> m_outputs;
+		Array<Node*> m_inputs;
+		Array<Node*> m_outputs;
 		int m_type;
 		ShaderEditor& m_editor;
 
@@ -70,20 +71,20 @@ public:
 	};
 
 public:
-	explicit ShaderEditor(Lumix::IAllocator& allocator);
+	explicit ShaderEditor(IAllocator& allocator);
 	~ShaderEditor();
 
 	void onGUI();
 	const char* getTextureName(int index) const { return m_textures[index]; }
-	Lumix::IAllocator& getAllocator() { return m_allocator; }
+	IAllocator& getAllocator() { return m_allocator; }
 	Node* createNode(int type);
 	void addNode(Node* node, const ImVec2& pos, ShaderType type);
 	void destroyNode(Node* node);
 	Node* getNodeByID(int id);
-	Node& loadNode(Lumix::InputBlob& blob, ShaderType type);
-	void loadNodeConnections(Lumix::InputBlob& blob, Node& node);
-	void saveNode(Lumix::OutputBlob& blob, Node& node);
-	void saveNodeConnections(Lumix::OutputBlob& blob, Node& node);
+	Node& loadNode(InputBlob& blob, ShaderType type);
+	void loadNodeConnections(InputBlob& blob, Node& node);
+	void saveNode(OutputBlob& blob, Node& node);
+	void saveNodeConnections(OutputBlob& blob, Node& node);
 	bool isFocused() const { return m_is_focused; }
 	void undo();
 	void redo();
@@ -95,7 +96,7 @@ public:
 
 private:
 	void generateMain(const char* path);
-	void generatePasses(Lumix::OutputBlob& blob);
+	void generatePasses(OutputBlob& blob);
 	void generate(const char* path, ShaderType shader_type);
 	void newGraph();
 	void save(const char* path);
@@ -124,15 +125,18 @@ private:
 
 private:
 	char m_textures[MAX_TEXTURES_COUNT][50];
-	Lumix::Path m_path;
+	Path m_path;
 	int m_last_node_id;
 	int m_undo_stack_idx;
-	Lumix::Array<ICommand*> m_undo_stack;
-	Lumix::Array<Node*> m_fragment_nodes;
-	Lumix::Array<Node*> m_vertex_nodes;
-	Lumix::IAllocator& m_allocator;
+	Array<ICommand*> m_undo_stack;
+	Array<Node*> m_fragment_nodes;
+	Array<Node*> m_vertex_nodes;
+	IAllocator& m_allocator;
 	int m_current_node_id;
 	ShaderType m_current_shader_type;
 	bool m_is_focused;
 	ImVec2 m_canvas_pos;
 };
+
+
+} // namespace Lumix

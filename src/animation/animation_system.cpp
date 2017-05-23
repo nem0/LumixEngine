@@ -111,7 +111,7 @@ struct AnimationSystemImpl LUMIX_FINAL : public IPlugin
 	void destroyScene(IScene* scene) override;
 	const char* getName() const override { return "animation"; }
 
-	Lumix::IAllocator& m_allocator;
+	IAllocator& m_allocator;
 	Engine& m_engine;
 	AnimationManager m_animation_manager;
 	Anim::ControllerManager m_controller_manager;
@@ -141,7 +141,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		Anim::ControllerResource* resource = nullptr;
 		Anim::ComponentInstance* root = nullptr;
 		u32 default_set = 0;
-		Lumix::Array<u8> input;
+		Array<u8> input;
 		HashMap<u32, Animation*> animations;
 	};
 

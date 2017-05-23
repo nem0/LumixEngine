@@ -11,6 +11,10 @@
 #include <cstdio>
 
 
+namespace Lumix
+{
+
+
 enum class NodeType
 {
 	VERTEX_INPUT,
@@ -35,7 +39,7 @@ enum class NodeType
 };
 
 
-enum class VertexOutput : Lumix::i32
+enum class VertexOutput : i32
 {
 	TEXCOORD0,
 	TEXCOORD1,
@@ -243,19 +247,19 @@ struct VertexOutputNode : public ShaderEditor::Node
 	}
 
 
-	void save(Lumix::OutputBlob& blob) override
+	void save(OutputBlob& blob) override
 	{
 		blob.write(m_output);
 	}
 
 
-	void load(Lumix::InputBlob& blob) override
+	void load(InputBlob& blob) override
 	{
 		blob.read(m_output);
 	}
 
 
-	void generate(Lumix::OutputBlob& blob) override
+	void generate(OutputBlob& blob) override
 	{
 		if (!m_inputs[0])
 		{
@@ -299,10 +303,10 @@ struct VertexInputNode : public ShaderEditor::Node
 	}
 
 
-	void save(Lumix::OutputBlob& blob) override { blob.write((int)m_input); }
+	void save(OutputBlob& blob) override { blob.write((int)m_input); }
 
 
-	void load(Lumix::InputBlob& blob) override
+	void load(InputBlob& blob) override
 	{
 		int tmp;
 		blob.read(tmp);
@@ -310,7 +314,7 @@ struct VertexInputNode : public ShaderEditor::Node
 	}
 
 
-	void printReference(Lumix::OutputBlob& blob) override
+	void printReference(OutputBlob& blob) override
 	{
 		for (auto& i : VERTEX_INPUTS)
 		{
@@ -337,7 +341,7 @@ struct VertexInputNode : public ShaderEditor::Node
 	}
 
 
-	void generate(Lumix::OutputBlob&) override {}
+	void generate(OutputBlob&) override {}
 
 
 	void onGUI() override
@@ -356,8 +360,8 @@ struct VertexInputNode : public ShaderEditor::Node
 };
 
 
-static void writeVertexShaderHeader(Lumix::OutputBlob& blob,
-	const Lumix::Array<ShaderEditor::Node*>& vertex_nodes)
+static void writeVertexShaderHeader(OutputBlob& blob,
+	const Array<ShaderEditor::Node*>& vertex_nodes)
 {
 	blob << "$input ";
 	bool first = true;
@@ -445,13 +449,13 @@ struct ShaderEditor::ICommand
 	virtual void execute() = 0;
 	virtual void undo() = 0;
 	virtual bool merge(ICommand& /*command*/) { return false; }
-	virtual Lumix::u32 getType() const = 0;
+	virtual u32 getType() const = 0;
 
 	ShaderEditor& m_editor;
 };
 
 
-void ShaderEditor::Node::printReference(Lumix::OutputBlob& blob)
+void ShaderEditor::Node::printReference(OutputBlob& blob)
 {
 	blob << "v" << m_id;
 }
@@ -504,8 +508,8 @@ struct OperatorNode : public ShaderEditor::Node
 	}
 
 
-	void save(Lumix::OutputBlob& blob) override { int o = m_operation; blob.write(o); }
-	void load(Lumix::InputBlob& blob) override { int o; blob.read(o); m_operation = (Operation)o; }
+	void save(OutputBlob& blob) override { int o = m_operation; blob.write(o); }
+	void load(InputBlob& blob) override { int o; blob.read(o); m_operation = (Operation)o; }
 
 
 	ShaderEditor::ValueType getOutputType(int) const override
@@ -514,7 +518,7 @@ struct OperatorNode : public ShaderEditor::Node
 	}
 
 
-	void generate(Lumix::OutputBlob& blob) override
+	void generate(OutputBlob& blob) override
 	{
 		if(!m_inputs[0]) return;
 		if(!m_inputs[1]) return;
@@ -583,12 +587,12 @@ struct Vec4MergeNode : public ShaderEditor::Node
 	}
 
 
-	void save(Lumix::OutputBlob&) override {}
-	void load(Lumix::InputBlob&) override {}
+	void save(OutputBlob&) override {}
+	void load(InputBlob&) override {}
 	ShaderEditor::ValueType getOutputType(int) const override { return ShaderEditor::ValueType::VEC4; }
 
 
-	void generate(Lumix::OutputBlob& blob) override 
+	void generate(OutputBlob& blob) override 
 	{
 		blob << "\tvec4 v" << m_id << ";\n";
 
@@ -657,8 +661,8 @@ struct FunctionNode : public ShaderEditor::Node
 	}
 
 
-	void save(Lumix::OutputBlob& blob) override { blob.write(m_function); }
-	void load(Lumix::InputBlob& blob) override { blob.read(m_function); }
+	void save(OutputBlob& blob) override { blob.write(m_function); }
+	void load(InputBlob& blob) override { blob.read(m_function); }
 	ShaderEditor::ValueType getOutputType(int) const override
 	{
 		if (m_inputs[0]) return getInputType(0);
@@ -666,7 +670,7 @@ struct FunctionNode : public ShaderEditor::Node
 	}
 
 
-	void generate(Lumix::OutputBlob& blob) override
+	void generate(OutputBlob& blob) override
 	{
 		if(m_inputs[0])
 		{
@@ -695,7 +699,7 @@ struct FunctionNode : public ShaderEditor::Node
 			*out_text = FUNCTIONS[idx].gui_name;
 			return true;
 		};
-		ImGui::Combo("Function", &m_function, getter, nullptr, Lumix::lengthOf(FUNCTIONS));
+		ImGui::Combo("Function", &m_function, getter, nullptr, lengthOf(FUNCTIONS));
 	}
 
 	int m_function;
@@ -714,15 +718,15 @@ struct BinaryFunctionNode : public ShaderEditor::Node
 	}
 
 
-	void save(Lumix::OutputBlob& blob) override { blob.write(m_function); }
-	void load(Lumix::InputBlob& blob) override { blob.read(m_function); }
+	void save(OutputBlob& blob) override { blob.write(m_function); }
+	void load(InputBlob& blob) override { blob.read(m_function); }
 	ShaderEditor::ValueType getOutputType(int) const override
 	{
 		return BINARY_FUNCTIONS[m_function].output_type(*this);
 	}
 
 
-	void generate(Lumix::OutputBlob& blob) override
+	void generate(OutputBlob& blob) override
 	{
 		m_inputs[0]->generate(blob);
 		m_inputs[1]->generate(blob);
@@ -759,7 +763,7 @@ struct BinaryFunctionNode : public ShaderEditor::Node
 			*out_text = BINARY_FUNCTIONS[idx].gui_name;
 			return true;
 		};
-		ImGui::Combo("Function", &m_function, getter, nullptr, Lumix::lengthOf(BINARY_FUNCTIONS));
+		ImGui::Combo("Function", &m_function, getter, nullptr, lengthOf(BINARY_FUNCTIONS));
 	}
 
 	int m_function;
@@ -775,12 +779,12 @@ struct InstanceMatrixNode : public ShaderEditor::Node
 	}
 
 
-	void save(Lumix::OutputBlob&) override {}
-	void load(Lumix::InputBlob&) override {}
+	void save(OutputBlob&) override {}
+	void load(InputBlob&) override {}
 	ShaderEditor::ValueType getOutputType(int) const override { return ShaderEditor::ValueType::MATRIX4; }
 
 
-	void generate(Lumix::OutputBlob& blob) override
+	void generate(OutputBlob& blob) override
 	{
 		blob << "\tmat4 v" << m_id << ";\n";
 
@@ -809,13 +813,13 @@ struct FloatConstNode : public ShaderEditor::Node
 		m_outputs.push(nullptr);
 	}
 
-	void save(Lumix::OutputBlob& blob) override { blob.write(m_value); }
-	void load(Lumix::InputBlob& blob) override { blob.read(m_value); }
+	void save(OutputBlob& blob) override { blob.write(m_value); }
+	void load(InputBlob& blob) override { blob.read(m_value); }
 	ShaderEditor::ValueType getOutputType(int) const override { return ShaderEditor::ValueType::FLOAT; }
 
-	void generate(Lumix::OutputBlob&) override	{}
+	void generate(OutputBlob&) override	{}
 
-	void printReference(Lumix::OutputBlob& blob) override
+	void printReference(OutputBlob& blob) override
 	{
 		blob << m_value;
 	}
@@ -835,11 +839,11 @@ struct ColorConstNode : public ShaderEditor::Node
 		m_outputs.push(nullptr);
 	}
 
-	void save(Lumix::OutputBlob& blob) override { blob.write(m_color); }
-	void load(Lumix::InputBlob& blob) override { blob.read(m_color); }
+	void save(OutputBlob& blob) override { blob.write(m_color); }
+	void load(InputBlob& blob) override { blob.read(m_color); }
 	ShaderEditor::ValueType getOutputType(int) const override { return ShaderEditor::ValueType::VEC4; }
 
-	void generate(Lumix::OutputBlob& blob) override
+	void generate(OutputBlob& blob) override
 	{
 		blob << "\tconst vec4 v" << m_id << " = vec4(" << m_color[0] << ", " << m_color[1] << ", "
 			 << m_color[2] << ", " << m_color[3] << ");\n";
@@ -861,11 +865,11 @@ struct SampleNode : public ShaderEditor::Node
 		m_texture = 0;
 	}
 
-	void save(Lumix::OutputBlob& blob) override { blob.write(m_texture); }
-	void load(Lumix::InputBlob& blob) override { blob.read(m_texture); }
+	void save(OutputBlob& blob) override { blob.write(m_texture); }
+	void load(InputBlob& blob) override { blob.read(m_texture); }
 	ShaderEditor::ValueType getOutputType(int) const override { return ShaderEditor::ValueType::VEC4; }
 
-	void generate(Lumix::OutputBlob& blob) override
+	void generate(OutputBlob& blob) override
 	{
 		if (!m_inputs[0])
 		{
@@ -904,9 +908,9 @@ struct FragmentInputNode : public ShaderEditor::Node
 		m_vertex_output = VertexOutput::WPOS;
 	}
 
-	void save(Lumix::OutputBlob& blob) override { blob.write(m_vertex_output); }
-	void load(Lumix::InputBlob& blob) override { blob.read(m_vertex_output); }
-	void generate(Lumix::OutputBlob&) override {}
+	void save(OutputBlob& blob) override { blob.write(m_vertex_output); }
+	void load(InputBlob& blob) override { blob.read(m_vertex_output); }
+	void generate(OutputBlob&) override {}
 
 
 	ShaderEditor::ValueType getOutputType(int index) const override
@@ -915,7 +919,7 @@ struct FragmentInputNode : public ShaderEditor::Node
 	}
 
 
-	void printReference(Lumix::OutputBlob& blob) override
+	void printReference(OutputBlob& blob) override
 	{
 		blob << getVertexOutputBGFXName(m_vertex_output);
 	}
@@ -948,7 +952,7 @@ struct PositionOutputNode : public ShaderEditor::Node
 	}
 
 
-	void generate(Lumix::OutputBlob& blob) override
+	void generate(OutputBlob& blob) override
 	{
 		if(!m_inputs[0])
 		{
@@ -977,7 +981,7 @@ struct FragmentOutputNode : public ShaderEditor::Node
 	}
 
 
-	void generate(Lumix::OutputBlob& blob) override
+	void generate(OutputBlob& blob) override
 	{
 		if (!m_inputs[0])
 		{
@@ -1012,7 +1016,7 @@ struct MixNode : public ShaderEditor::Node
 		return getInputType(1);
 	}
 
-	void generate(Lumix::OutputBlob& blob) override
+	void generate(OutputBlob& blob) override
 	{
 		if (!m_inputs[0] || !m_inputs[1] || !m_inputs[2])
 		{
@@ -1054,8 +1058,8 @@ struct PassNode : public ShaderEditor::Node
 	}
 
 
-	void save(Lumix::OutputBlob& blob) override { blob.writeString(m_pass); }
-	void load(Lumix::InputBlob& blob) override { blob.readString(m_pass, Lumix::lengthOf(m_pass)); }
+	void save(OutputBlob& blob) override { blob.writeString(m_pass); }
+	void load(InputBlob& blob) override { blob.readString(m_pass, lengthOf(m_pass)); }
 
 
 	ShaderEditor::ValueType getOutputType(int) const override
@@ -1069,9 +1073,9 @@ struct PassNode : public ShaderEditor::Node
 	}
 
 
-	void generateBeforeMain(Lumix::OutputBlob&) override {}
+	void generateBeforeMain(OutputBlob&) override {}
 
-	void generate(Lumix::OutputBlob& blob) override 
+	void generate(OutputBlob& blob) override 
 	{
 		const char* defs[] = { "#ifdef ", "#ifndef " };
 		for (int i = 0; i < 2; ++i)
@@ -1108,11 +1112,11 @@ struct BuiltinUniformNode : public ShaderEditor::Node
 	}
 
 
-	void save(Lumix::OutputBlob& blob) override { blob.write(m_uniform); }
-	void load(Lumix::InputBlob& blob) override { blob.read(m_uniform); }
+	void save(OutputBlob& blob) override { blob.write(m_uniform); }
+	void load(InputBlob& blob) override { blob.read(m_uniform); }
 
 
-	void printReference(Lumix::OutputBlob& blob) override
+	void printReference(OutputBlob& blob) override
 	{
 		blob << BUILTIN_UNIFORMS[m_uniform].bgfx_name;
 	}
@@ -1124,9 +1128,9 @@ struct BuiltinUniformNode : public ShaderEditor::Node
 	}
 
 
-	void generateBeforeMain(Lumix::OutputBlob&) override {}
+	void generateBeforeMain(OutputBlob&) override {}
 
-	void generate(Lumix::OutputBlob&) override {}
+	void generate(OutputBlob&) override {}
 
 	void onGUI() override
 	{
@@ -1134,7 +1138,7 @@ struct BuiltinUniformNode : public ShaderEditor::Node
 			*out_text = BUILTIN_UNIFORMS[index].gui_name;
 			return true;
 		};
-		ImGui::Combo("Uniform", (int*)&m_uniform, getter, nullptr, Lumix::lengthOf(BUILTIN_UNIFORMS));
+		ImGui::Combo("Uniform", (int*)&m_uniform, getter, nullptr, lengthOf(BUILTIN_UNIFORMS));
 	}
 
 	int m_uniform;
@@ -1152,24 +1156,24 @@ struct UniformNode : public ShaderEditor::Node
 		m_name[0] = 0;
 	}
 
-	void save(Lumix::OutputBlob& blob) override { blob.write(m_type); }
-	void load(Lumix::InputBlob& blob) override { blob.read(m_type); }
+	void save(OutputBlob& blob) override { blob.write(m_type); }
+	void load(InputBlob& blob) override { blob.read(m_type); }
 	ShaderEditor::ValueType getOutputType(int) const override { return m_value_type; }
 
 
-	void printReference(Lumix::OutputBlob& blob) override
+	void printReference(OutputBlob& blob) override
 	{
 		blob << m_name;
 	}
 
 
-	void generateBeforeMain(Lumix::OutputBlob& blob) override
+	void generateBeforeMain(OutputBlob& blob) override
 	{
 		blob << "uniform " << getValueTypeName(m_value_type) << " " << m_name << ";\n";
 	}
 
 
-	void generate(Lumix::OutputBlob&) override {}
+	void generate(OutputBlob&) override {}
 
 
 	void onGUI() override
@@ -1215,9 +1219,9 @@ struct MoveNodeCommand : public ShaderEditor::ICommand
 	}
 
 
-	Lumix::u32 getType() const override
+	u32 getType() const override
 	{
-		static const Lumix::u32 crc = Lumix::crc32("move_node");
+		static const u32 crc = crc32("move_node");
 		return crc;
 	}
 
@@ -1291,9 +1295,9 @@ struct CreateConnectionCommand : public ShaderEditor::ICommand
 	}
 
 
-	Lumix::u32 getType() const override
+	u32 getType() const override
 	{
-		static const Lumix::u32 crc = Lumix::crc32("create_connection");
+		static const u32 crc = crc32("create_connection");
 		return crc;
 	}
 
@@ -1357,9 +1361,9 @@ struct RemoveNodeCommand : public ShaderEditor::ICommand
 	}
 
 
-	Lumix::u32 getType() const override
+	u32 getType() const override
 	{
-		static const Lumix::u32 crc = Lumix::crc32("remove_node");
+		static const u32 crc = crc32("remove_node");
 		return crc;
 	}
 
@@ -1375,14 +1379,14 @@ struct RemoveNodeCommand : public ShaderEditor::ICommand
 
 	void undo() override
 	{
-		Lumix::InputBlob blob(m_blob);
+		InputBlob blob(m_blob);
 		auto& node = m_editor.loadNode(blob, m_shader_type);
 		m_editor.loadNodeConnections(blob, node);
 	}
 
 
 	ShaderEditor::ShaderType m_shader_type;
-	Lumix::OutputBlob m_blob;
+	OutputBlob m_blob;
 	int m_node_id;
 };
 
@@ -1400,9 +1404,9 @@ struct CreateNodeCommand : public ShaderEditor::ICommand
 	}
 
 
-	Lumix::u32 getType() const override
+	u32 getType() const override
 	{
-		static const Lumix::u32 crc = Lumix::crc32("create_node");
+		static const u32 crc = crc32("create_node");
 		return crc;
 	}
 
@@ -1430,7 +1434,7 @@ struct CreateNodeCommand : public ShaderEditor::ICommand
 };
 
 
-ShaderEditor::ShaderEditor(Lumix::IAllocator& allocator)
+ShaderEditor::ShaderEditor(IAllocator& allocator)
 	: m_fragment_nodes(allocator)
 	, m_vertex_nodes(allocator)
 	, m_allocator(allocator)
@@ -1469,27 +1473,27 @@ ShaderEditor::Node* ShaderEditor::getNodeByID(int id)
 
 void ShaderEditor::generate(const char* path, ShaderType shader_type)
 {
-	char sc_path[Lumix::MAX_PATH_LENGTH];
-	Lumix::PathUtils::FileInfo info(path);
-	Lumix::copyString(sc_path, info.m_dir);
-	Lumix::catString(sc_path, info.m_basename);
+	char sc_path[MAX_PATH_LENGTH];
+	PathUtils::FileInfo info(path);
+	copyString(sc_path, info.m_dir);
+	catString(sc_path, info.m_basename);
 	if(shader_type == ShaderType::FRAGMENT)
 	{
-		Lumix::catString(sc_path, "_fs.sc");
+		catString(sc_path, "_fs.sc");
 	}
 	else
 	{
-		Lumix::catString(sc_path, "_vs.sc");
+		catString(sc_path, "_vs.sc");
 	}
 
-	Lumix::FS::OsFile file;
-	if(!file.open(sc_path, Lumix::FS::Mode::CREATE_AND_WRITE, m_allocator))
+	FS::OsFile file;
+	if(!file.open(sc_path, FS::Mode::CREATE_AND_WRITE, m_allocator))
 	{
-		Lumix::g_log_error.log("Editor") << "Could not create file " << sc_path;
+		g_log_error.log("Editor") << "Could not create file " << sc_path;
 		return;
 	}
 
-	Lumix::OutputBlob blob(m_allocator);
+	OutputBlob blob(m_allocator);
 	blob.reserve(4096);
 
 	if(shader_type == ShaderType::FRAGMENT)
@@ -1523,7 +1527,7 @@ void ShaderEditor::generate(const char* path, ShaderType shader_type)
 
 	blob << "#include \"common.sh\"\n";
 
-	for (int i = 0; i < Lumix::lengthOf(m_textures); ++i)
+	for (int i = 0; i < lengthOf(m_textures); ++i)
 	{
 		if (!m_textures[i][0]) continue;
 
@@ -1596,7 +1600,7 @@ void ShaderEditor::createConnection(Node* node, int pin_index, bool is_input)
 }
 
 
-void ShaderEditor::saveNode(Lumix::OutputBlob& blob, Node& node)
+void ShaderEditor::saveNode(OutputBlob& blob, Node& node)
 {
 	int type = (int)node.m_type;
 	blob.write(node.m_id);
@@ -1607,7 +1611,7 @@ void ShaderEditor::saveNode(Lumix::OutputBlob& blob, Node& node)
 }
 
 
-void ShaderEditor::saveNodeConnections(Lumix::OutputBlob& blob, Node& node)
+void ShaderEditor::saveNodeConnections(OutputBlob& blob, Node& node)
 {
 	int inputs_count = node.m_inputs.size();
 	blob.write(inputs_count);
@@ -1636,13 +1640,13 @@ void ShaderEditor::save(const char* path)
 	FILE* fp = fopen(path, "wb");
 	if (!fp)
 	{
-		Lumix::g_log_error.log("Editor") << "Could not save shader " << path;
+		g_log_error.log("Editor") << "Could not save shader " << path;
 		return;
 	}
 
-	Lumix::OutputBlob blob(m_allocator);
+	OutputBlob blob(m_allocator);
 	blob.reserve(4096);
-	for (int i = 0; i < Lumix::lengthOf(m_textures); ++i)
+	for (int i = 0; i < lengthOf(m_textures); ++i)
 	{
 		blob.writeString(m_textures[i]);
 	}
@@ -1729,7 +1733,7 @@ ShaderEditor::Node* ShaderEditor::createNode(int type)
 }
 
 
-ShaderEditor::Node& ShaderEditor::loadNode(Lumix::InputBlob& blob, ShaderType shader_type)
+ShaderEditor::Node& ShaderEditor::loadNode(InputBlob& blob, ShaderType shader_type)
 {
 	int type;
 	int id;
@@ -1752,7 +1756,7 @@ ShaderEditor::Node& ShaderEditor::loadNode(Lumix::InputBlob& blob, ShaderType sh
 }
 
 
-void ShaderEditor::loadNodeConnections(Lumix::InputBlob& blob, Node& node)
+void ShaderEditor::loadNodeConnections(InputBlob& blob, Node& node)
 {
 	int size;
 	blob.read(size);
@@ -1779,8 +1783,8 @@ void ShaderEditor::loadNodeConnections(Lumix::InputBlob& blob, Node& node)
 
 void ShaderEditor::load()
 {
-	char path[Lumix::MAX_PATH_LENGTH];
-	if (!PlatformInterface::getOpenFilename(path, Lumix::lengthOf(path), "Shader edit data\0*.sed\0", nullptr))
+	char path[MAX_PATH_LENGTH];
+	if (!PlatformInterface::getOpenFilename(path, lengthOf(path), "Shader edit data\0*.sed\0", nullptr))
 	{
 		return;
 	}
@@ -1791,22 +1795,22 @@ void ShaderEditor::load()
 	FILE* fp = fopen(path, "rb");
 	if (!fp)
 	{
-		Lumix::g_log_error.log("Editor") << "Failed to load shader " << path;
+		g_log_error.log("Editor") << "Failed to load shader " << path;
 		return;
 	}
 
 	fseek(fp, 0, SEEK_END);
 	int data_size = (int)ftell(fp);
-	Lumix::Array<Lumix::u8> data(m_allocator);
+	Array<u8> data(m_allocator);
 	data.resize(data_size);
 	fseek(fp, 0, SEEK_SET);
 	size_t read = fread(&data[0], 1, data_size, fp);
 	(void)read;
 
-	Lumix::InputBlob blob(&data[0], data_size);
-	for (int i = 0; i < Lumix::lengthOf(m_textures); ++i)
+	InputBlob blob(&data[0], data_size);
+	for (int i = 0; i < lengthOf(m_textures); ++i)
 	{
-		blob.readString(m_textures[i], Lumix::lengthOf(m_textures[i]));
+		blob.readString(m_textures[i], lengthOf(m_textures[i]));
 	}
 
 	int size;
@@ -1819,7 +1823,7 @@ void ShaderEditor::load()
 	for(auto* node : m_vertex_nodes)
 	{
 		loadNodeConnections(blob, *node);
-		m_last_node_id = Lumix::Math::maximum(int(node->m_id + 1), int(m_last_node_id));
+		m_last_node_id = Math::maximum(int(node->m_id + 1), int(m_last_node_id));
 	}
 
 	blob.read(size);
@@ -1831,7 +1835,7 @@ void ShaderEditor::load()
 	for (auto* node : m_fragment_nodes)
 	{
 		loadNodeConnections(blob, *node);
-		m_last_node_id = Lumix::Math::maximum(int(node->m_id + 1), int(m_last_node_id));
+		m_last_node_id = Math::maximum(int(node->m_id + 1), int(m_last_node_id));
 	}
 
 	fclose(fp);
@@ -1840,8 +1844,8 @@ void ShaderEditor::load()
 
 bool ShaderEditor::getSavePath()
 {
-	char path[Lumix::MAX_PATH_LENGTH];
-	if (PlatformInterface::getSaveFilename(path, Lumix::lengthOf(path), "Shader edit data\0*.sed\0", "sed"))
+	char path[MAX_PATH_LENGTH];
+	if (PlatformInterface::getSaveFilename(path, lengthOf(path), "Shader edit data\0*.sed\0", "sed"))
 	{
 		m_path = path;
 		return true;
@@ -2004,9 +2008,9 @@ void ShaderEditor::onGUILeftColumn()
 	ImGui::Separator();
 	ImGui::Text("Textures");
 	ImGui::Separator();
-	for (int i = 0; i < Lumix::lengthOf(m_textures); ++i)
+	for (int i = 0; i < lengthOf(m_textures); ++i)
 	{
-		ImGui::InputText(Lumix::StaticString<10>("###tex", i), m_textures[i], sizeof(m_textures[i]));
+		ImGui::InputText(StaticString<10>("###tex", i), m_textures[i], sizeof(m_textures[i]));
 	}
 
 	ImGui::PopItemWidth();
@@ -2093,7 +2097,7 @@ void ShaderEditor::newGraph()
 {
 	clear();
 
-	for (int i = 0; i < Lumix::lengthOf(m_textures); ++i)
+	for (int i = 0; i < lengthOf(m_textures); ++i)
 	{
 		m_textures[i][0] = 0;
 	}
@@ -2113,12 +2117,12 @@ void ShaderEditor::newGraph()
 }
 
 
-void ShaderEditor::generatePasses(Lumix::OutputBlob& blob)
+void ShaderEditor::generatePasses(OutputBlob& blob)
 {
 	const char* passes[32];
 	int pass = 0;
 
-	auto process = [&](Lumix::Array<Node*>& nodes){
+	auto process = [&](Array<Node*>& nodes){
 		for (auto* node : nodes)
 		{
 			if (node->m_type != (int)NodeType::PASS) continue;
@@ -2147,20 +2151,20 @@ void ShaderEditor::generatePasses(Lumix::OutputBlob& blob)
 
 void ShaderEditor::generateMain(const char* path)
 {
-	char shd_path[Lumix::MAX_PATH_LENGTH];
-	Lumix::PathUtils::FileInfo info(path);
-	Lumix::copyString(shd_path, info.m_dir);
-	Lumix::catString(shd_path, info.m_basename);
-	Lumix::catString(shd_path, ".shd");
+	char shd_path[MAX_PATH_LENGTH];
+	PathUtils::FileInfo info(path);
+	copyString(shd_path, info.m_dir);
+	catString(shd_path, info.m_basename);
+	catString(shd_path, ".shd");
 
 	FILE* fp = fopen(shd_path, "wb");
 	if (!fp)
 	{
-		Lumix::g_log_error.log("Editor") << "Could not generate " << shd_path;
+		g_log_error.log("Editor") << "Could not generate " << shd_path;
 		return;
 	}
 
-	Lumix::OutputBlob blob(m_allocator);
+	OutputBlob blob(m_allocator);
 	generatePasses(blob);
 	fwrite(blob.getData(), 1, blob.getPos(), fp);
 
@@ -2211,7 +2215,7 @@ void ShaderEditor::onGUIMenu()
 
 void ShaderEditor::onGUI()
 {
-	Lumix::StaticString<Lumix::MAX_PATH_LENGTH + 25> title("Shader Editor");
+	StaticString<MAX_PATH_LENGTH + 25> title("Shader Editor");
 	if (m_path.isValid()) title << " - " << m_path.c_str();
 	title << "###Shader Editor";
 	if (ImGui::BeginDock(title, &m_is_opened, ImGuiWindowFlags_MenuBar))
@@ -2225,3 +2229,6 @@ void ShaderEditor::onGUI()
 	}
 	ImGui::EndDock();
 }
+
+
+} // namespace Lumix

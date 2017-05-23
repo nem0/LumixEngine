@@ -173,7 +173,7 @@ bool Material::save(JsonSerializer& serializer)
 		{
 			flags = m_textures[i]->bgfx_flags;
 			path[0] = '/';
-			Lumix::copyString(path + 1, MAX_PATH_LENGTH - 1, m_textures[i]->getPath().c_str());
+			copyString(path + 1, MAX_PATH_LENGTH - 1, m_textures[i]->getPath().c_str());
 		}
 		else
 		{

@@ -43,7 +43,8 @@
 #include "stb/stb_image_resize.h"
 
 
-using namespace Lumix;
+namespace Lumix
+{
 
 
 typedef StaticString<MAX_PATH_LENGTH> PathBuilder;
@@ -176,6 +177,7 @@ struct BillboardSceneData
 		return mvp;
 	}
 };
+
 
 static bool isSkinned(const aiScene* scene, const aiMaterial* material)
 {
@@ -499,7 +501,7 @@ const char* getMeshName(lua_State* L, int mesh_idx)
 {
 	auto* dlg = LuaWrapper::toType<ImportAssetDialog*>(L, lua_upvalueindex(1));
 	if (mesh_idx < 0 || mesh_idx >= dlg->m_meshes.size()) return "";
-	return getMeshName(dlg->m_meshes[mesh_idx].scene, dlg->m_meshes[mesh_idx].mesh);
+	return Lumix::getMeshName(dlg->m_meshes[mesh_idx].scene, dlg->m_meshes[mesh_idx].mesh);
 }
 
 
@@ -957,7 +959,7 @@ struct ImportTask LUMIX_FINAL : public MT::Task
 				material.material = scene->mMaterials[i];
 				aiString material_name;
 				material.material->Get(AI_MATKEY_NAME, material_name);
-				Lumix::copyString(material.name, material_name.C_Str());
+				copyString(material.name, material_name.C_Str());
 				material.texture_count = 0;
 				copyString(material.shader, "rigid/rigid");
 				auto types = {aiTextureType_DIFFUSE, aiTextureType_NORMALS, aiTextureType_HEIGHT};
@@ -2056,7 +2058,7 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 			lods[mesh.lod] = last_mesh_idx;
 		}
 
-		for (int i = 1; i < Lumix::lengthOf(lods); ++i)
+		for (int i = 1; i < lengthOf(lods); ++i)
 		{
 			if (lods[i] < lods[i - 1]) lods[i] = lods[i - 1];
 		}
@@ -3517,3 +3519,6 @@ void ImportAssetDialog::onWindowGUI()
 	}
 	ImGui::EndDock();
 }
+
+
+} // namespace Lumix

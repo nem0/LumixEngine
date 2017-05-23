@@ -216,7 +216,7 @@ struct StateMachine : public Container
 		Condition condition;
 		Node* node = nullptr;
 	};
-	Lumix::Array<Entry> entries;
+	Array<Entry> entries;
 };
 
 

@@ -9,19 +9,13 @@
 
 namespace Lumix
 {
+
 struct ShaderCombinations;
 class WorldEditor;
-}
-
-namespace PlatformInterface
-{
-struct Process;
-}
-
-
 class FileSystemWatcher;
 class LogUI;
 class StudioApp;
+namespace PlatformInterface { struct Process; }
 
 
 class ShaderCompiler
@@ -43,45 +37,48 @@ private:
 	void compileAllPasses(const char* path,
 						  bool is_vertex_shader,
 						  const int* define_masks,
-						  const Lumix::ShaderCombinations& combinations);
+						  const ShaderCombinations& combinations);
 	void compilePass(const char* path,
 					 bool is_vertex_shader,
 					 const char* pass,
 					 int define_mask,
-					 const Lumix::ShaderCombinations::Defines& all_defines);
-	bool isChanged(const Lumix::ShaderCombinations& combinations,
+					 const ShaderCombinations::Defines& all_defines);
+	bool isChanged(const ShaderCombinations& combinations,
 				   const char* bin_base_path,
 				   const char* shd_path) const;
 
 	void onFileChanged(const char* path);
 	void parseDependencies();
 	void compile(const char* path);
-	Lumix::Renderer& getRenderer();
+	Renderer& getRenderer();
 	void addDependency(const char* key, const char* value);
 	void processChangedFiles();
 
 private:
 	struct ProcessInfo
 	{
-		ProcessInfo(Lumix::IAllocator& allocator)
+		ProcessInfo(IAllocator& allocator)
 			: output(allocator)
 		{
 		}
 		PlatformInterface::Process* process;
-		char path[Lumix::MAX_PATH_LENGTH];
-		Lumix::string output;
+		char path[MAX_PATH_LENGTH];
+		string output;
 	};
 
 private:
 	StudioApp& m_app;
-	Lumix::WorldEditor& m_editor;
+	WorldEditor& m_editor;
 	FileSystemWatcher* m_watcher;
 	int m_notifications_id;
-	Lumix::AssociativeArray<Lumix::string, Lumix::Array<Lumix::string>> m_dependencies;
-	Lumix::Array<Lumix::string> m_to_compile;
-	Lumix::Array<Lumix::string> m_to_reload;
-	Lumix::Array<Lumix::string> m_shd_files;
-	Lumix::Array<Lumix::string> m_changed_files;
-	Lumix::MT::SpinMutex m_mutex;
+	AssociativeArray<string, Array<string>> m_dependencies;
+	Array<string> m_to_compile;
+	Array<string> m_to_reload;
+	Array<string> m_shd_files;
+	Array<string> m_changed_files;
+	MT::SpinMutex m_mutex;
 	LogUI& m_log_ui;
 };
+
+
+} // namespace Lumix

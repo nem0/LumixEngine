@@ -2,18 +2,21 @@
 #include "engine/universe/universe.h"
 
 
+using namespace Lumix;
+
+
 namespace
 {
 	void UT_universe_hierarchy(const char* params)
 	{
-		Lumix::DefaultAllocator allocator;
-		Lumix::PathManager path_manager(allocator);
-		Lumix::Universe universe(allocator);
+		DefaultAllocator allocator;
+		PathManager path_manager(allocator);
+		Universe universe(allocator);
 
-		Lumix::Entity e0 = universe.createEntity({0, 0, 0}, {0, 0, 0, 1});
-		Lumix::Entity e1 = universe.createEntity({0, 0, 0}, {0, 0, 0, 1});
-		Lumix::Entity e2 = universe.createEntity({0, 0, 0}, {0, 0, 0, 1});
-		Lumix::Entity e3 = universe.createEntity({0, 0, 0}, {0, 0, 0, 1});
+		Entity e0 = universe.createEntity({0, 0, 0}, {0, 0, 0, 1});
+		Entity e1 = universe.createEntity({0, 0, 0}, {0, 0, 0, 1});
+		Entity e2 = universe.createEntity({0, 0, 0}, {0, 0, 0, 1});
+		Entity e3 = universe.createEntity({0, 0, 0}, {0, 0, 0, 1});
 
 		LUMIX_EXPECT(!universe.getParent(e0).isValid());
 		LUMIX_EXPECT(!universe.getParent(e1).isValid());
@@ -71,7 +74,7 @@ namespace
 		LUMIX_EXPECT(!universe.getNextSibling(e3).isValid());
 		LUMIX_EXPECT(universe.getNextSibling(e1).isValid() != universe.getNextSibling(e2).isValid());
 
-		universe.setParent(Lumix::INVALID_ENTITY, e2);
+		universe.setParent(INVALID_ENTITY, e2);
 
 		LUMIX_EXPECT(!universe.getFirstChild(e1).isValid());
 		LUMIX_EXPECT(universe.getFirstChild(e2) == e3);
@@ -88,7 +91,7 @@ namespace
 		LUMIX_EXPECT(!universe.getNextSibling(e2).isValid());
 		LUMIX_EXPECT(!universe.getNextSibling(e3).isValid());
 
-		universe.setParent(Lumix::INVALID_ENTITY, e1);
+		universe.setParent(INVALID_ENTITY, e1);
 
 		LUMIX_EXPECT(!universe.getFirstChild(e1).isValid());
 		LUMIX_EXPECT(universe.getFirstChild(e2) == e3);
@@ -123,14 +126,14 @@ namespace
 
 	void UT_universe_hierarchy2(const char* params)
 	{
-		Lumix::DefaultAllocator allocator;
-		Lumix::PathManager path_manager(allocator);
-		Lumix::Universe universe(allocator);
+		DefaultAllocator allocator;
+		PathManager path_manager(allocator);
+		Universe universe(allocator);
 
-		Lumix::Entity e0 = universe.createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
-		Lumix::Entity e1 = universe.createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
-		Lumix::Entity e2 = universe.createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
-		Lumix::Entity e3 = universe.createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
+		Entity e0 = universe.createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
+		Entity e1 = universe.createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
+		Entity e2 = universe.createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
+		Entity e3 = universe.createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
 
 		universe.setParent(e0, e1);
 		universe.setParent(e0, e2);
@@ -145,14 +148,14 @@ namespace
 
 	void UT_universe_hierarchy3(const char* params)
 	{
-		Lumix::DefaultAllocator allocator;
-		Lumix::PathManager path_manager(allocator);
-		Lumix::Universe universe(allocator);
+		DefaultAllocator allocator;
+		PathManager path_manager(allocator);
+		Universe universe(allocator);
 
-		Lumix::Entity e0 = universe.createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
-		Lumix::Entity e1 = universe.createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
-		Lumix::Entity e2 = universe.createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
-		Lumix::Entity e3 = universe.createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
+		Entity e0 = universe.createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
+		Entity e1 = universe.createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
+		Entity e2 = universe.createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
+		Entity e3 = universe.createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
 
 		universe.setParent(e0, e1);
 		universe.setParent(e0, e2);
@@ -170,19 +173,19 @@ namespace
 
 	void UT_universe(const char* params)
 	{
-		Lumix::DefaultAllocator allocator;
-		Lumix::PathManager path_manager(allocator);
-		Lumix::Universe universe(allocator);
-		LUMIX_EXPECT(!universe.hasEntity(Lumix::INVALID_ENTITY));
+		DefaultAllocator allocator;
+		PathManager path_manager(allocator);
+		Universe universe(allocator);
+		LUMIX_EXPECT(!universe.hasEntity(INVALID_ENTITY));
 		LUMIX_EXPECT(!universe.hasEntity({0}));
 		LUMIX_EXPECT(!universe.hasEntity({1}));
 		LUMIX_EXPECT(!universe.hasEntity({100}));
 
 		static const int ENTITY_COUNT = 5;
 
-		Lumix::Vec3 p(0, 0, 0);
-		Lumix::Quat r(0, 0, 0, 1);
-		Lumix::Entity entities[ENTITY_COUNT];
+		Vec3 p(0, 0, 0);
+		Quat r(0, 0, 0, 1);
+		Entity entities[ENTITY_COUNT];
 		for (int i = 0; i < ENTITY_COUNT; ++i)
 		{
 			entities[i] = universe.createEntity(p, r);
@@ -210,7 +213,7 @@ namespace
 		for (int i = 0; i < ENTITY_COUNT; ++i)
 		{
 			universe.setPosition(entities[i], float(i), float(i), float(i));
-			Lumix::Vec3 pos = universe.getPosition(entities[i]);
+			Vec3 pos = universe.getPosition(entities[i]);
 			LUMIX_EXPECT_CLOSE_EQ(pos.x, float(i), 0.00001f);
 			LUMIX_EXPECT_CLOSE_EQ(pos.y, float(i), 0.00001f);
 			LUMIX_EXPECT_CLOSE_EQ(pos.z, float(i), 0.00001f);
@@ -220,7 +223,7 @@ namespace
 		{
 			if (i == 1) continue;
 			universe.setPosition(entities[i], float(i), float(i), float(i));
-			Lumix::Vec3 pos = universe.getPosition(entities[i]);
+			Vec3 pos = universe.getPosition(entities[i]);
 			LUMIX_EXPECT_CLOSE_EQ(pos.x, float(i), 0.00001f);
 			LUMIX_EXPECT_CLOSE_EQ(pos.y, float(i), 0.00001f);
 			LUMIX_EXPECT_CLOSE_EQ(pos.z, float(i), 0.00001f);
@@ -229,7 +232,7 @@ namespace
 		for (int i = 0; i < ENTITY_COUNT; ++i)
 		{
 			universe.setPosition(entities[i], float(i), float(i), float(i));
-			Lumix::Vec3 pos = universe.getPosition(entities[i]);
+			Vec3 pos = universe.getPosition(entities[i]);
 			LUMIX_EXPECT_CLOSE_EQ(pos.x, float(i), 0.00001f);
 			LUMIX_EXPECT_CLOSE_EQ(pos.y, float(i), 0.00001f);
 			LUMIX_EXPECT_CLOSE_EQ(pos.z, float(i), 0.00001f);

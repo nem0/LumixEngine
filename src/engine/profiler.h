@@ -73,9 +73,9 @@ LUMIX_ENGINE_API DelegateList<void ()>& getFrameListeners();
 } // namespace Profiler
 
 
-#define PROFILE_INT(name, x) Lumix::Profiler::record((name), (x));
-#define PROFILE_FUNCTION() Lumix::Profiler::Scope profile_scope(__FUNCTION__);
-#define PROFILE_BLOCK(name) Lumix::Profiler::Scope profile_scope(name);
+#define PROFILE_INT(name, x) Profiler::record((name), (x));
+#define PROFILE_FUNCTION() Profiler::Scope profile_scope(__FUNCTION__);
+#define PROFILE_BLOCK(name) Profiler::Scope profile_scope(name);
 
 
 } // namespace Lumix

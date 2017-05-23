@@ -8,6 +8,10 @@
 #include <SDL.h>
 
 
+namespace Lumix
+{
+
+
 struct Action
 {
 	Action(const char* label, const char* name)
@@ -64,9 +68,9 @@ struct Action
 		int key_count;
 		auto* state = SDL_GetKeyboardState(&key_count);
 
-		for (int i = 0; i < Lumix::lengthOf(shortcut) + 1; ++i)
+		for (int i = 0; i < lengthOf(shortcut) + 1; ++i)
 		{
-			if (i == Lumix::lengthOf(shortcut) || shortcut[i] == -1)
+			if (i == lengthOf(shortcut) || shortcut[i] == -1)
 			{
 				return true;
 			}
@@ -79,7 +83,7 @@ struct Action
 
 	void getIconPath(char* path, int max_size)
 	{
-		Lumix::copyString(path, max_size, "models/editor/icon_"); 
+		copyString(path, max_size, "models/editor/icon_"); 
 		
 		char tmp[1024];
 		const char* c = name;
@@ -94,8 +98,8 @@ struct Action
 		}
 		*out = 0;
 
-		Lumix::catString(path, max_size, tmp);
-		Lumix::catString(path, max_size, ".dds");
+		catString(path, max_size, tmp);
+		catString(path, max_size, ".dds");
 	}
 
 
@@ -108,9 +112,9 @@ struct Action
 		float* keysDownDuration = ImGui::GetIO().KeysDownDuration;
 		if (shortcut[0] == -1) return false;
 
-		for (int i = 0; i < Lumix::lengthOf(shortcut) + 1; ++i)
+		for (int i = 0; i < lengthOf(shortcut) + 1; ++i)
 		{
-			if (i == Lumix::lengthOf(shortcut) || shortcut[i] == -1)
+			if (i == lengthOf(shortcut) || shortcut[i] == -1)
 			{
 				return true;
 			}
@@ -126,17 +130,18 @@ struct Action
 	const char* label;
 	bool is_global;
 	ImTextureID icon;
-	Lumix::Delegate<void> func;
-	Lumix::Delegate<bool> is_selected;
+	Delegate<void> func;
+	Delegate<bool> is_selected;
 };
 
 
-namespace Lumix
-{
-	class WorldEditor;
-}
+class WorldEditor;
 
-LUMIX_EDITOR_API void getEntityListDisplayName(Lumix::WorldEditor& editor,
+
+LUMIX_EDITOR_API void getEntityListDisplayName(WorldEditor& editor,
 	char* buf,
 	int max_size,
-	Lumix::Entity entity);
+	Entity entity);
+
+
+} // namespace Lumix

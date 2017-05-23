@@ -30,7 +30,8 @@
 #include <cmath>
 
 
-using namespace Lumix;
+namespace Lumix
+{
 
 
 static const ComponentType MODEL_INSTANCE_TYPE = PropertyRegister::getComponentType("renderable");
@@ -1771,3 +1772,6 @@ void TerrainEditor::paint(const Vec3& hit_pos, ActionType action_type, bool old_
 		old_stroke);
 	m_world_editor.executeCommand(command);
 }
+
+
+} // namespace Lumix

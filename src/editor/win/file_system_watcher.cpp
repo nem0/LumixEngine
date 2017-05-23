@@ -6,6 +6,10 @@
 #include "engine/win/simple_win.h"
 
 
+namespace Lumix
+{
+
+
 class FileSystemWatcherPC;
 
 
@@ -15,15 +19,15 @@ static const DWORD READ_DIR_CHANGE_FILTER =
 	FILE_NOTIFY_CHANGE_DIR_NAME | FILE_NOTIFY_CHANGE_FILE_NAME;
 
 
-struct FileSystemWatcherTask LUMIX_FINAL : public Lumix::MT::Task
+struct FileSystemWatcherTask LUMIX_FINAL : public MT::Task
 {
 	FileSystemWatcherTask(const char* path,
 		FileSystemWatcherPC& watcher,
-		Lumix::IAllocator& allocator)
+		IAllocator& allocator)
 		: Task(allocator)
 		, m_watcher(watcher)
 	{
-		Lumix::copyString(m_path, path);
+		copyString(m_path, path);
 	}
 
 
@@ -34,7 +38,7 @@ struct FileSystemWatcherTask LUMIX_FINAL : public Lumix::MT::Task
 	HANDLE m_handle;
 	DWORD m_received;
 	OVERLAPPED m_overlapped;
-	char m_path[Lumix::MAX_PATH_LENGTH];
+	char m_path[MAX_PATH_LENGTH];
 	FileSystemWatcherPC& m_watcher;
 };
 
@@ -42,7 +46,7 @@ struct FileSystemWatcherTask LUMIX_FINAL : public Lumix::MT::Task
 class FileSystemWatcherPC LUMIX_FINAL : public FileSystemWatcher
 {
 public:
-	explicit FileSystemWatcherPC(Lumix::IAllocator& allocator)
+	explicit FileSystemWatcherPC(IAllocator& allocator)
 		: m_allocator(allocator)
 	{
 		m_task = nullptr;
@@ -75,16 +79,16 @@ public:
 	}
 
 
-	virtual Lumix::Delegate<void(const char*)>& getCallback() { return m_callback; }
+	virtual Delegate<void(const char*)>& getCallback() { return m_callback; }
 
 
-	Lumix::Delegate<void(const char*)> m_callback;
-	Lumix::IAllocator& m_allocator;
+	Delegate<void(const char*)> m_callback;
+	IAllocator& m_allocator;
 	FileSystemWatcherTask* m_task;
 };
 
 
-FileSystemWatcher* FileSystemWatcher::create(const char* path, Lumix::IAllocator& allocator)
+FileSystemWatcher* FileSystemWatcher::create(const char* path, IAllocator& allocator)
 {
 	FileSystemWatcherPC* watcher = LUMIX_NEW(allocator, FileSystemWatcherPC)(allocator);
 	if (!watcher->start(path))
@@ -160,7 +164,7 @@ int FileSystemWatcherTask::task()
 		nullptr);
 	if (m_handle == INVALID_HANDLE_VALUE) return -1;
 
-	Lumix::setMemory(&m_overlapped, 0, sizeof(m_overlapped));
+	setMemory(&m_overlapped, 0, sizeof(m_overlapped));
 	m_overlapped.hEvent = this;
 	m_finished = false;
 	while (!m_finished)
@@ -179,3 +183,6 @@ int FileSystemWatcherTask::task()
 	}
 	return 0;
 }
+
+
+} // namespace Lumix

@@ -43,7 +43,7 @@ public:
 		for (int i = 0; i < count; ++i)
 		{
 			const mf_resource* res = &resources[i];
-			if (Lumix::equalIStrings(path.c_str(), res->path))
+			if (equalIStrings(path.c_str(), res->path))
 			{
 				m_resource = res;
 				break;

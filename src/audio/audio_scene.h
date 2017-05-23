@@ -51,9 +51,9 @@ public:
 	virtual ClipInfo* getClipInfo(u32 hash) = 0;
 	virtual ClipInfo* getClipInfo(const char* name) = 0;
 	virtual int getClipInfoIndex(ClipInfo* info) = 0;
-	virtual void addClip(const char* name, const Lumix::Path& path) = 0;
+	virtual void addClip(const char* name, const Path& path) = 0;
 	virtual void removeClip(ClipInfo* clip) = 0;
-	virtual void setClip(int clip_id, const Lumix::Path& path) = 0;
+	virtual void setClip(int clip_id, const Path& path) = 0;
 
 	virtual float getEchoZoneRadius(ComponentHandle cmp) = 0;
 	virtual void setEchoZoneRadius(ComponentHandle cmp, float radius) = 0;

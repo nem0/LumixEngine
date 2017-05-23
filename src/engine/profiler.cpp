@@ -290,7 +290,7 @@ void setThreadName(const char* name)
 		g_instance.threads.insert(thread_id, LUMIX_NEW(g_instance.allocator, ThreadData));
 		iter = g_instance.threads.find(thread_id);
 	}
-	Lumix::copyString(iter.value()->name, name);
+	copyString(iter.value()->name, name);
 }
 
 

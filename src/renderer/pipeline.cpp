@@ -306,9 +306,9 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		createUniforms();
 
 		m_debug_line_material = static_cast<Material*>(
-			renderer.getMaterialManager().load(Lumix::Path("pipelines/editor/debugline.mat")));
+			renderer.getMaterialManager().load(Path("pipelines/editor/debugline.mat")));
 		m_default_cubemap = static_cast<Texture*>(
-			renderer.getTextureManager().load(Lumix::Path("pipelines/pbr/default_probe.dds")));
+			renderer.getTextureManager().load(Path("pipelines/pbr/default_probe.dds")));
 
 		createParticleBuffers();
 		createCubeBuffers();
@@ -2824,7 +2824,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	View* m_current_view;
 	int m_pass_idx;
 	IAllocator& m_allocator;
-	Lumix::Path m_path;
+	Path m_path;
 	Renderer& m_renderer;
 	RenderScene* m_scene;
 	FrameBuffer* m_current_framebuffer;

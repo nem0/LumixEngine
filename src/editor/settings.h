@@ -4,15 +4,14 @@
 #include "engine/lumix.h"
 
 
+struct lua_State;
+
+
 namespace Lumix
 {
-	class IAllocator;
-	class WorldEditor;
-}
 
 
-struct Action;
-struct lua_State;
+class WorldEditor;
 class StudioApp;
 
 
@@ -42,8 +41,8 @@ struct LUMIX_EDITOR_API Settings
 	bool m_force_no_crash_report;
 	float m_mouse_sensitivity_x;
 	float m_mouse_sensitivity_y;
-	char m_data_dir[Lumix::MAX_PATH_LENGTH];
-	Lumix::WorldEditor* m_editor;
+	char m_data_dir[MAX_PATH_LENGTH];
+	WorldEditor* m_editor;
 
 	explicit Settings(StudioApp& app);
 	~Settings();
@@ -64,3 +63,6 @@ private:
 	void showShortcutSettings();
 	void showToolbarSettings();
 };
+
+
+} // namespace Lumix

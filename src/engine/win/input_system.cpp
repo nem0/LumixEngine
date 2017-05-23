@@ -31,7 +31,7 @@ struct InputSystemImpl LUMIX_FINAL : public InputSystem
 		, m_xinput_get_state(nullptr)
 	{
 		m_last_checked_controller = 0;
-		for (int i = 0; i < Lumix::lengthOf(m_xinput_connected); ++i)
+		for (int i = 0; i < lengthOf(m_xinput_connected); ++i)
 		{
 			m_xinput_connected[i] = false;
 		}
