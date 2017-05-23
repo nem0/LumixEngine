@@ -182,7 +182,7 @@ LUMIX_ALIGN_BEGIN(16) struct LUMIX_ENGINE_API Frustum
 } LUMIX_ALIGN_END(16);
 
 
-struct AABB
+struct LUMIX_ENGINE_API AABB
 {
 	AABB() {}
 	AABB(const Vec3& _min, const Vec3& _max)
