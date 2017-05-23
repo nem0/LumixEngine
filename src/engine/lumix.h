@@ -172,8 +172,6 @@ template <typename T, int count> int lengthOf(const T (&)[count])
 
 #ifdef _MSC_VER
 	#pragma warning(disable : 4251)
-	#pragma warning(disable : 4365)
-	#pragma warning(disable : 4512)
 	#pragma warning(disable : 4996)
 	#if _MSC_VER == 1900 
 		#pragma warning(disable : 4091)
