@@ -1,14 +1,14 @@
 #pragma once
 
 #include "engine/lumix.h"
-#include "engine/math_utils.h"
-#include "engine/matrix.h"
-#include "engine/simd.h"
 #include "engine/vec.h"
 
 
 namespace Lumix
 {
+
+
+struct Matrix;
 
 
 struct Plane
@@ -138,38 +138,7 @@ LUMIX_ALIGN_BEGIN(16) struct LUMIX_ENGINE_API Frustum
 	}
 
 
-	bool isSphereInside(const Vec3& center, float radius) const
-	{
-		float4 px = f4Load(xs);
-		float4 py = f4Load(ys);
-		float4 pz = f4Load(zs);
-		float4 pd = f4Load(ds);
-
-		float4 cx = f4Splat(center.x);
-		float4 cy = f4Splat(center.y);
-		float4 cz = f4Splat(center.z);
-
-		float4 t = f4Mul(cx, px);
-		t = f4Add(t, f4Mul(cy, py));
-		t = f4Add(t, f4Mul(cz, pz));
-		t = f4Add(t, pd);
-		t = f4Sub(t, f4Splat(-radius));
-		if(f4MoveMask(t)) return false;
-
-		px = f4Load(&xs[4]);
-		py = f4Load(&ys[4]);
-		pz = f4Load(&zs[4]);
-		pd = f4Load(&ds[4]);
-
-		t = f4Mul(cx, px);
-		t = f4Add(t, f4Mul(cy, py));
-		t = f4Add(t, f4Mul(cz, pz));
-		t = f4Add(t, pd);
-		t = f4Sub(t, f4Splat(-radius));
-		if (f4MoveMask(t)) return false;
-
-		return true;
-	}
+	bool isSphereInside(const Vec3& center, float radius) const;
 
 
 	enum class Planes : u32
@@ -256,66 +225,11 @@ struct AABB
 	}
 
 
-	void transform(const Matrix& matrix)
-	{
-		Vec3 points[8];
-		points[0] = min;
-		points[7] = max;
-		points[1].set(points[0].x, points[0].y, points[7].z);
-		points[2].set(points[0].x, points[7].y, points[0].z);
-		points[3].set(points[0].x, points[7].y, points[7].z);
-		points[4].set(points[7].x, points[0].y, points[0].z);
-		points[5].set(points[7].x, points[0].y, points[7].z);
-		points[6].set(points[7].x, points[7].y, points[0].z);
+	void transform(const Matrix& matrix);
+	void getCorners(const Matrix& matrix, Vec3* points) const;
+	Vec3 minCoords(const Vec3& a, const Vec3& b);
+	Vec3 maxCoords(const Vec3& a, const Vec3& b);
 
-		for (int j = 0; j < 8; ++j)
-		{
-			points[j] = matrix.transform(points[j]);
-		}
-
-		Vec3 new_min = points[0];
-		Vec3 new_max = points[0];
-
-		for (int j = 0; j < 8; ++j)
-		{
-			new_min = minCoords(points[j], new_min);
-			new_max = maxCoords(points[j], new_max);
-		}
-
-		min = new_min;
-		max = new_max;
-	}
-
-	void getCorners(const Matrix& matrix, Vec3* points) const
-	{
-		Vec3 p(min.x, min.y, min.z);
-		points[0] = matrix.transform(p);
-		p.set(min.x, min.y, max.z);
-		points[1] = matrix.transform(p);
-		p.set(min.x, max.y, min.z);
-		points[2] = matrix.transform(p);
-		p.set(min.x, max.y, max.z);
-		points[3] = matrix.transform(p);
-		p.set(max.x, min.y, min.z);
-		points[4] = matrix.transform(p);
-		p.set(max.x, min.y, max.z);
-		points[5] = matrix.transform(p);
-		p.set(max.x, max.y, min.z);
-		points[6] = matrix.transform(p);
-		p.set(max.x, max.y, max.z);
-		points[7] = matrix.transform(p);
-	}
-
-	Vec3 minCoords(const Vec3& a, const Vec3& b)
-	{
-		return Vec3(Math::minimum(a.x, b.x), Math::minimum(a.y, b.y), Math::minimum(a.z, b.z));
-	}
-
-
-	Vec3 maxCoords(const Vec3& a, const Vec3& b)
-	{
-		return Vec3(Math::maximum(a.x, b.x), Math::maximum(a.y, b.y), Math::maximum(a.z, b.z));
-	}
 
 	Vec3 min;
 	Vec3 max;

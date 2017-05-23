@@ -7,7 +7,7 @@
 namespace Lumix
 {
 
-	class IAllocator;
+	struct IAllocator;
 	struct Vec2;
 	template <typename T> class DelegateList;
 

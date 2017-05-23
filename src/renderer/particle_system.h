@@ -11,7 +11,7 @@ namespace Lumix
 
 
 class ParticleEmitter;
-class IAllocator;
+struct IAllocator;
 class InputBlob;
 class Material;
 class OutputBlob;

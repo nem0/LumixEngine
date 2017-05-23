@@ -3,10 +3,14 @@
 #include "engine/win/simple_win.h"
 
 
+
+
 namespace Lumix
 {
 	namespace MT
 	{
+		static_assert(sizeof(ThreadID) == sizeof(::GetCurrentThreadId()), "Not matching");
+
 		void sleep(u32 milliseconds) { ::Sleep(milliseconds); }
 		void yield() { sleep(0); }
 		

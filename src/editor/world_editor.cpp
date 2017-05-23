@@ -701,7 +701,7 @@ public:
 	RemoveArrayPropertyItemCommand(WorldEditor& editor,
 		const ComponentUID& component,
 		int index,
-		IArrayDescriptor& descriptor)
+		ArrayDescriptorBase& descriptor)
 		: m_component(component)
 		, m_index(index)
 		, m_descriptor(&descriptor)
@@ -737,7 +737,7 @@ public:
 		u32 property_name_hash;
 		serializer.deserialize("property_name_hash", property_name_hash, 0);
 		m_descriptor =
-			static_cast<const IArrayDescriptor*>(PropertyRegister::getDescriptor(m_component.type, property_name_hash));
+			static_cast<const ArrayDescriptorBase*>(PropertyRegister::getDescriptor(m_component.type, property_name_hash));
 	}
 
 
@@ -768,7 +768,7 @@ private:
 	WorldEditor& m_editor;
 	ComponentUID m_component;
 	int m_index;
-	const IArrayDescriptor* m_descriptor;
+	const ArrayDescriptorBase* m_descriptor;
 	OutputBlob m_old_values;
 };
 
@@ -784,7 +784,7 @@ public:
 
 	AddArrayPropertyItemCommand(WorldEditor& editor,
 								const ComponentUID& component,
-								IArrayDescriptor& descriptor)
+								ArrayDescriptorBase& descriptor)
 		: m_component(component)
 		, m_index(-1)
 		, m_descriptor(&descriptor)
@@ -814,7 +814,7 @@ public:
 		m_component.scene = m_editor.getUniverse()->getScene(m_component.type);
 		u32 property_name_hash;
 		serializer.deserialize("property_name_hash", property_name_hash, 0);
-		m_descriptor = static_cast<const IArrayDescriptor*>(
+		m_descriptor = static_cast<const ArrayDescriptorBase*>(
 			PropertyRegister::getDescriptor(m_component.type, property_name_hash));
 	}
 
@@ -841,7 +841,7 @@ public:
 private:
 	ComponentUID m_component;
 	int m_index;
-	const IArrayDescriptor* m_descriptor;
+	const ArrayDescriptorBase* m_descriptor;
 	WorldEditor& m_editor;
 };
 
@@ -863,7 +863,7 @@ public:
 		int count,
 		ComponentType component_type,
 		int index,
-		const IPropertyDescriptor& property_descriptor,
+		const PropertyDescriptorBase& property_descriptor,
 		const void* data,
 		int size)
 		: m_component_type(component_type)
@@ -1011,7 +1011,7 @@ private:
 	OutputBlob m_new_value;
 	OutputBlob m_old_value;
 	int m_index;
-	const IPropertyDescriptor* m_property_descriptor;
+	const PropertyDescriptorBase* m_property_descriptor;
 };
 
 
@@ -1328,11 +1328,11 @@ private:
 					cmp = universe->getNextComponent(cmp))
 				{
 					m_old_values.write(cmp.type);
-					Array<IPropertyDescriptor*>& props = PropertyRegister::getDescriptors(cmp.type);
+					Array<PropertyDescriptorBase*>& props = PropertyRegister::getDescriptors(cmp.type);
 					for (int k = 0; k < props.size(); ++k)
 					{
 						props[k]->get(cmp, -1, m_old_values);
-						if (props[k]->getType() == IPropertyDescriptor::RESOURCE)
+						if (props[k]->getType() == PropertyDescriptorBase::RESOURCE)
 						{
 							auto* resource_prop = static_cast<IResourcePropertyDescriptor*>(props[k]);
 							ResourceType resource_type = resource_prop->getResourceType();
@@ -1408,7 +1408,7 @@ private:
 					new_component.scene = scene;
 					new_component.type = cmp_type;
 
-					Array<IPropertyDescriptor*>& props = PropertyRegister::getDescriptors(cmp_type);
+					Array<PropertyDescriptorBase*>& props = PropertyRegister::getDescriptors(cmp_type);
 
 					for (int k = 0; k < props.size(); ++k)
 					{
@@ -1521,7 +1521,7 @@ private:
 			cmp.type = m_cmp_type;
 			ASSERT(cmp.scene);
 			InputBlob blob(m_old_values);
-			const Array<IPropertyDescriptor*>& props = PropertyRegister::getDescriptors(cmp.type);
+			const Array<PropertyDescriptorBase*>& props = PropertyRegister::getDescriptors(cmp.type);
 			for (Entity entity : m_entities)
 			{
 				cmp.entity = entity;
@@ -1542,7 +1542,7 @@ private:
 
 		bool execute() override
 		{
-			Array<IPropertyDescriptor*>& props = PropertyRegister::getDescriptors(m_cmp_type);
+			Array<PropertyDescriptorBase*>& props = PropertyRegister::getDescriptors(m_cmp_type);
 			ComponentUID cmp;
 			cmp.type = m_cmp_type;
 			cmp.scene = m_editor.getUniverse()->getScene(m_cmp_type);
@@ -1557,7 +1557,7 @@ private:
 				for (int i = 0; i < props.size(); ++i)
 				{
 					props[i]->get(cmp, -1, m_old_values);
-					if (props[i]->getType() == IPropertyDescriptor::RESOURCE)
+					if (props[i]->getType() == PropertyDescriptorBase::RESOURCE)
 					{
 						auto* res_prop = static_cast<IResourcePropertyDescriptor*>(props[i]);
 						OutputBlob tmp(m_editor.getAllocator());
@@ -2777,7 +2777,7 @@ public:
 			{
 				u32 cmp_type = PropertyRegister::getComponentTypeHash(cmp.type);
 				blob.write(cmp_type);
-				Array<IPropertyDescriptor*>& props = PropertyRegister::getDescriptors(cmp.type);
+				Array<PropertyDescriptorBase*>& props = PropertyRegister::getDescriptors(cmp.type);
 				i32 prop_count = props.size();
 				blob.write(prop_count);
 				for (int j = 0; j < prop_count; ++j)
@@ -3127,7 +3127,7 @@ public:
 	void setAdditiveSelection(bool additive) override { m_is_additive_selection = additive; }
 
 
-	void addArrayPropertyItem(const ComponentUID& cmp, IArrayDescriptor& property) override
+	void addArrayPropertyItem(const ComponentUID& cmp, ArrayDescriptorBase& property) override
 	{
 		if (cmp.isValid())
 		{
@@ -3138,7 +3138,7 @@ public:
 	}
 
 
-	void removeArrayPropertyItem(const ComponentUID& cmp, int index, IArrayDescriptor& property) override
+	void removeArrayPropertyItem(const ComponentUID& cmp, int index, ArrayDescriptorBase& property) override
 	{
 		if (cmp.isValid())
 		{
@@ -3151,7 +3151,7 @@ public:
 
 	void setProperty(ComponentType component_type,
 		int index,
-		const IPropertyDescriptor& property,
+		const PropertyDescriptorBase& property,
 		const Entity* entities,
 		int count,
 		const void* data,

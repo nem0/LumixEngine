@@ -29,7 +29,7 @@ namespace Lumix
 
 
 class Engine;
-class IAllocator;
+struct IAllocator;
 struct Matrix;
 class Path;
 class PhysicsSystem;

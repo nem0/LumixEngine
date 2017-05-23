@@ -32,9 +32,8 @@ namespace Lumix
 #define LUMIX_DELETE(allocator, var) (allocator).deleteObject(var);
 
 
-class LUMIX_ENGINE_API IAllocator
+struct LUMIX_ENGINE_API IAllocator
 {
-public:
 	virtual ~IAllocator() {}
 
 	virtual void* allocate(size_t size) = 0;

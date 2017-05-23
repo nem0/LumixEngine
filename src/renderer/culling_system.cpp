@@ -1,14 +1,13 @@
 #include "culling_system.h"
-#include "engine/lumix.h"
-
 #include "engine/binary_array.h"
 #include "engine/free_list.h"
 #include "engine/geometry.h"
-#include "engine/profiler.h"
-
+#include "engine/lumix.h"
 #include "engine/mtjd/group.h"
-#include "engine/mtjd/manager.h"
 #include "engine/mtjd/job.h"
+#include "engine/mtjd/manager.h"
+#include "engine/profiler.h"
+#include "engine/simd.h"
 
 namespace Lumix
 {

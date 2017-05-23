@@ -14,10 +14,10 @@ class Engine;
 struct EntityGUID;
 class PrefabSystem;
 class Hierarchy;
-class IArrayDescriptor;
+class ArrayDescriptorBase;
 class InputBlob;
-class IPlugin;
-class IPropertyDescriptor;
+struct IPlugin;
+class PropertyDescriptorBase;
 class OutputBlob;
 class Path;
 class Pipeline;
@@ -41,7 +41,7 @@ class LUMIX_EDITOR_API WorldEditor
 {
 public:
 	typedef Array<ComponentUID> ComponentList;
-	typedef class IEditorCommand* (*EditorCommandCreator)(WorldEditor&);
+	typedef struct IEditorCommand* (*EditorCommandCreator)(WorldEditor&);
 
 	enum class Coordinate : int
 	{
@@ -126,15 +126,15 @@ public:
 	virtual void navigate(float forward, float right, float up, float speed) = 0;
 	virtual void setProperty(ComponentType component,
 		int index,
-		const IPropertyDescriptor& property,
+		const PropertyDescriptorBase& property,
 		const Entity* entities,
 		int count,
 		const void* data,
 		int size) = 0;
 	virtual void setSnapMode(bool enable) = 0;
 	virtual void setAdditiveSelection(bool additive) = 0;
-	virtual void addArrayPropertyItem(const ComponentUID& cmp, IArrayDescriptor& property) = 0;
-	virtual void removeArrayPropertyItem(const ComponentUID& cmp, int index, IArrayDescriptor& property) = 0;
+	virtual void addArrayPropertyItem(const ComponentUID& cmp, ArrayDescriptorBase& property) = 0;
+	virtual void removeArrayPropertyItem(const ComponentUID& cmp, int index, ArrayDescriptorBase& property) = 0;
 	virtual bool isMouseDown(MouseButton::Value button) const = 0;
 	virtual bool isMouseClick(MouseButton::Value button) const = 0;
 	virtual void inputFrame() = 0;

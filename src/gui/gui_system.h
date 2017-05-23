@@ -14,9 +14,8 @@ struct Vec2;
 class GUISystem : public IPlugin
 {
 public:
-	class Interface
+	struct Interface
 	{
-	public:
 		virtual class Pipeline* getPipeline() = 0;
 		virtual Vec2 getPos() const = 0;
 		virtual void enableCursor(bool enable) = 0;

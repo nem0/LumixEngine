@@ -20,7 +20,7 @@ struct ComponentTypeData
 };
 
 
-typedef AssociativeArray<ComponentType, Array<IPropertyDescriptor*>> PropertyMap;
+typedef AssociativeArray<ComponentType, Array<PropertyDescriptorBase*>> PropertyMap;
 
 
 static PropertyMap* g_properties = nullptr;
@@ -47,7 +47,7 @@ void shutdown()
 {
 	for (int j = 0; j < g_properties->size(); ++j)
 	{
-		Array<IPropertyDescriptor*>& props = g_properties->at(j);
+		Array<PropertyDescriptorBase*>& props = g_properties->at(j);
 		for (auto* prop : props)
 		{
 			LUMIX_DELETE(*g_allocator, prop);
@@ -60,13 +60,13 @@ void shutdown()
 }
 
 
-void add(const char* component_type, IPropertyDescriptor* descriptor)
+void add(const char* component_type, PropertyDescriptorBase* descriptor)
 {
 	getDescriptors(getComponentType(component_type)).push(descriptor);
 }
 
 
-Array<IPropertyDescriptor*>& getDescriptors(ComponentType type)
+Array<PropertyDescriptorBase*>& getDescriptors(ComponentType type)
 {
 	int props_index = g_properties->find(type);
 	if (props_index < 0)
@@ -78,18 +78,18 @@ Array<IPropertyDescriptor*>& getDescriptors(ComponentType type)
 }
 
 
-const IPropertyDescriptor* getDescriptor(ComponentType type, u32 name_hash)
+const PropertyDescriptorBase* getDescriptor(ComponentType type, u32 name_hash)
 {
-	Array<IPropertyDescriptor*>& props = getDescriptors(type);
+	Array<PropertyDescriptorBase*>& props = getDescriptors(type);
 	for (int i = 0; i < props.size(); ++i)
 	{
 		if (props[i]->getNameHash() == name_hash)
 		{
 			return props[i];
 		}
-		if (props[i]->getType() == IPropertyDescriptor::ARRAY)
+		if (props[i]->getType() == PropertyDescriptorBase::ARRAY)
 		{
-			auto* array_desc = static_cast<IArrayDescriptor*>(props[i]);
+			auto* array_desc = static_cast<ArrayDescriptorBase*>(props[i]);
 			for (auto* child : array_desc->getChildren())
 			{
 				if (child->getNameHash() == name_hash)
@@ -103,7 +103,7 @@ const IPropertyDescriptor* getDescriptor(ComponentType type, u32 name_hash)
 }
 
 
-const IPropertyDescriptor* getDescriptor(const char* component_type, const char* property_name)
+const PropertyDescriptorBase* getDescriptor(const char* component_type, const char* property_name)
 {
 	return getDescriptor(getComponentType(component_type), crc32(property_name));
 }

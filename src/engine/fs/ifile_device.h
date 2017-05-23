@@ -8,12 +8,11 @@ namespace FS
 {
 
 
-class IFile;
+struct IFile;
 
 
-class LUMIX_ENGINE_API IFileDevice
+struct LUMIX_ENGINE_API IFileDevice
 {
-public:
 	IFileDevice() {}
 	virtual ~IFileDevice() {}
 
@@ -24,5 +23,5 @@ public:
 };
 
 
-} // ~namespace FS
-} // ~namespace Lumix
+} // namespace FS
+} // namespace Lumix

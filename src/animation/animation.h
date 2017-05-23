@@ -10,7 +10,7 @@ namespace Lumix
 namespace FS
 {
 	class FileSystem;
-	class IFile;
+	struct IFile;
 }
 
 class Model;

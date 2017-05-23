@@ -17,16 +17,16 @@ LUMIX_ENGINE_API int getIntPropertyMin();
 LUMIX_ENGINE_API int getIntPropertyMax();
 
 
-template <typename T> inline IPropertyDescriptor::Type toPropertyType();
-template <> inline IPropertyDescriptor::Type toPropertyType<int>() { return IPropertyDescriptor::INTEGER; }
-template <> inline IPropertyDescriptor::Type toPropertyType<unsigned int>() { return IPropertyDescriptor::UNSIGNED_INTEGER; }
-template <> inline IPropertyDescriptor::Type toPropertyType<Int2>() { return IPropertyDescriptor::INT2; }
-template <> inline IPropertyDescriptor::Type toPropertyType<Vec2>() { return IPropertyDescriptor::VEC2; }
-template <> inline IPropertyDescriptor::Type toPropertyType<Vec3>() { return IPropertyDescriptor::VEC3; }
-template <> inline IPropertyDescriptor::Type toPropertyType<Vec4>() { return IPropertyDescriptor::VEC4; }
+template <typename T> inline PropertyDescriptorBase::Type toPropertyType();
+template <> inline PropertyDescriptorBase::Type toPropertyType<int>() { return PropertyDescriptorBase::INTEGER; }
+template <> inline PropertyDescriptorBase::Type toPropertyType<unsigned int>() { return PropertyDescriptorBase::UNSIGNED_INTEGER; }
+template <> inline PropertyDescriptorBase::Type toPropertyType<Int2>() { return PropertyDescriptorBase::INT2; }
+template <> inline PropertyDescriptorBase::Type toPropertyType<Vec2>() { return PropertyDescriptorBase::VEC2; }
+template <> inline PropertyDescriptorBase::Type toPropertyType<Vec3>() { return PropertyDescriptorBase::VEC3; }
+template <> inline PropertyDescriptorBase::Type toPropertyType<Vec4>() { return PropertyDescriptorBase::VEC4; }
 
 
-template <class S> class StringPropertyDescriptor : public IPropertyDescriptor
+template <class S> class StringPropertyDescriptor : public PropertyDescriptorBase
 {
 private:
 	static const int MAX_STRING_SIZE = 300;
@@ -43,17 +43,17 @@ public:
 		setName(name);
 		m_single.getter = getter;
 		m_single.setter = setter;
-		m_type = IPropertyDescriptor::STRING;
+		m_type = PropertyDescriptorBase::STRING;
 	}
 
 
 	StringPropertyDescriptor(const char* name, ArrayGetter getter, ArraySetter setter, IAllocator& allocator)
-		: IPropertyDescriptor(allocator)
+		: PropertyDescriptorBase(allocator)
 	{
 		setName(name);
 		m_array.getter = getter;
 		m_array.setter = setter;
-		m_type = IPropertyDescriptor::STRING;
+		m_type = PropertyDescriptorBase::STRING;
 	}
 
 
@@ -111,7 +111,7 @@ private:
 };
 
 
-template <class S> class ArrayDescriptor : public IArrayDescriptor
+template <class S> class ArrayDescriptor : public ArrayDescriptorBase
 {
 public:
 	typedef int (S::*Counter)(ComponentHandle);
@@ -124,7 +124,7 @@ public:
 		Adder adder,
 		Remover remover,
 		IAllocator& allocator)
-		: IArrayDescriptor(allocator)
+		: ArrayDescriptorBase(allocator)
 	{
 		setName(name);
 		m_type = ARRAY;
@@ -216,7 +216,7 @@ private:
 };
 
 
-template <class S> class IntPropertyDescriptor : public INumericPropertyDescriptor<int>
+template <class S> class IntPropertyDescriptor : public NumericPropertyDescriptorBase<int>
 {
 public:
 	typedef int (S::*Getter)(ComponentHandle);
@@ -305,7 +305,7 @@ private:
 };
 
 
-template <class S> class BoolPropertyDescriptor : public IPropertyDescriptor
+template <class S> class BoolPropertyDescriptor : public PropertyDescriptorBase
 {
 public:
 	typedef bool (S::*Getter)(ComponentHandle);
@@ -317,7 +317,7 @@ public:
 		setName(name);
 		m_getter = getter;
 		m_setter = setter;
-		m_type = IPropertyDescriptor::BOOL;
+		m_type = PropertyDescriptorBase::BOOL;
 	}
 
 
@@ -344,7 +344,7 @@ private:
 };
 
 
-template <typename T, class S> class SimplePropertyDescriptor : public IPropertyDescriptor
+template <typename T, class S> class SimplePropertyDescriptor : public PropertyDescriptorBase
 {
 public:
 	typedef T (S::*Getter)(ComponentHandle);
@@ -363,7 +363,7 @@ public:
 
 
 	SimplePropertyDescriptor(const char* name, ArrayGetter getter, ArraySetter setter, IAllocator& allocator)
-		: IPropertyDescriptor(allocator)
+		: PropertyDescriptorBase(allocator)
 	{
 		setName(name);
 		m_array.getter = getter;
@@ -421,7 +421,7 @@ private:
 
 
 template <class S>
-class FilePropertyDescriptor : public IPropertyDescriptor
+class FilePropertyDescriptor : public PropertyDescriptorBase
 {
 public:
 	typedef Path (S::*Getter)(ComponentHandle);
@@ -435,7 +435,7 @@ public:
 		setName(name);
 		m_single.getter = getter;
 		m_single.setter = setter;
-		m_type = IPropertyDescriptor::FILE;
+		m_type = PropertyDescriptorBase::FILE;
 		copyString(m_file_type, file_type);
 	}
 
@@ -445,7 +445,7 @@ public:
 		setName(name);
 		m_array.getter = getter;
 		m_array.setter = setter;
-		m_type = IPropertyDescriptor::FILE;
+		m_type = PropertyDescriptorBase::FILE;
 		copyString(m_file_type, file_type);
 	}
 
@@ -613,7 +613,7 @@ private:
 
 
 
-template <class S> class EntityPropertyDescriptor : public IPropertyDescriptor
+template <class S> class EntityPropertyDescriptor : public PropertyDescriptorBase
 {
 public:
 	typedef Entity (S::*Getter)(ComponentHandle);
@@ -687,7 +687,7 @@ private:
 
 
 template <typename S>
-class BlobPropertyDescriptor : public IPropertyDescriptor
+class BlobPropertyDescriptor : public PropertyDescriptorBase
 {
 public:
 	typedef void (S::*Getter)(ComponentHandle, OutputBlob&);
@@ -699,7 +699,7 @@ public:
 		m_getter = _getter;
 		m_setter = _setter;
 		setName(name);
-		IPropertyDescriptor::m_type = IPropertyDescriptor::BLOB;
+		PropertyDescriptorBase::m_type = PropertyDescriptorBase::BLOB;
 	}
 
 
@@ -721,7 +721,7 @@ public:
 };
 
 
-template <class S> class DecimalPropertyDescriptor : public INumericPropertyDescriptor<float>
+template <class S> class DecimalPropertyDescriptor : public NumericPropertyDescriptorBase<float>
 {
 public:
 	typedef float (S::*Getter)(ComponentHandle);
@@ -818,7 +818,7 @@ public:
 	ColorPropertyDescriptor(const char* name, Getter _getter, Setter _setter)
 		: SimplePropertyDescriptor<Vec3, S>(name, _getter, _setter)
 	{
-		IPropertyDescriptor::m_type = IPropertyDescriptor::COLOR;
+		PropertyDescriptorBase::m_type = PropertyDescriptorBase::COLOR;
 	}
 };
 

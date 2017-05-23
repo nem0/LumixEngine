@@ -10,11 +10,11 @@ namespace Lumix
 		class TCPStream;
 	}
 
-	class IAllocator;
+	struct IAllocator;
 
 	namespace FS
 	{
-		class IFile;
+		struct IFile;
 		class TCPFileSystemTask;
 		struct TCPImpl;
 

@@ -8,7 +8,7 @@ namespace Lumix
 {
 
 
-class IAllocator;
+struct IAllocator;
 class InputBlob;
 class OutputBlob;
 

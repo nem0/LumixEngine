@@ -29,7 +29,7 @@ class ResourceManager;
 namespace FS
 {
 class FileSystem;
-class IFile;
+struct IFile;
 }
 
 

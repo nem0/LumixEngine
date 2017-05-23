@@ -8,13 +8,13 @@ namespace Lumix
 {
 
 
-	class IAllocator;
+	struct IAllocator;
 	class Path;
 
 
 	namespace FS
 	{
-		class IFile;
+		struct IFile;
 	}
 
 

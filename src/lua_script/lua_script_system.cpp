@@ -560,7 +560,7 @@ namespace Lumix
 
 		static int LUA_getProperty(lua_State* L)
 		{
-			auto* desc = LuaWrapper::toType<IPropertyDescriptor*>(L, lua_upvalueindex(1));
+			auto* desc = LuaWrapper::toType<PropertyDescriptorBase*>(L, lua_upvalueindex(1));
 			ComponentType type = { LuaWrapper::toType<int>(L, lua_upvalueindex(2)) };
 			ComponentUID cmp;
 			cmp.scene = LuaWrapper::checkArg<IScene*>(L, 1);
@@ -569,7 +569,7 @@ namespace Lumix
 			cmp.entity = INVALID_ENTITY;
 			switch (desc->getType())
 			{
-				case IPropertyDescriptor::DECIMAL:
+				case PropertyDescriptorBase::DECIMAL:
 				{
 					float v;
 					OutputBlob blob(&v, sizeof(v));
@@ -577,7 +577,7 @@ namespace Lumix
 					LuaWrapper::push(L, v);
 				}
 				break;
-				case IPropertyDescriptor::BOOL:
+				case PropertyDescriptorBase::BOOL:
 				{
 					bool v;
 					OutputBlob blob(&v, sizeof(v));
@@ -585,7 +585,7 @@ namespace Lumix
 					LuaWrapper::push(L, v);
 				}
 				break;
-				case IPropertyDescriptor::INTEGER:
+				case PropertyDescriptorBase::INTEGER:
 				{
 					int v;
 					OutputBlob blob(&v, sizeof(v));
@@ -593,9 +593,9 @@ namespace Lumix
 					LuaWrapper::push(L, v);
 				}
 				break;
-				case IPropertyDescriptor::RESOURCE:
-				case IPropertyDescriptor::FILE:
-				case IPropertyDescriptor::STRING:
+				case PropertyDescriptorBase::RESOURCE:
+				case PropertyDescriptorBase::FILE:
+				case PropertyDescriptorBase::STRING:
 				{
 					char buf[1024];
 					OutputBlob blob(buf, sizeof(buf));
@@ -603,8 +603,8 @@ namespace Lumix
 					LuaWrapper::push(L, buf);
 				}
 				break;
-				case IPropertyDescriptor::COLOR:
-				case IPropertyDescriptor::VEC3:
+				case PropertyDescriptorBase::COLOR:
+				case PropertyDescriptorBase::VEC3:
 				{
 					Vec3 v;
 					OutputBlob blob(&v, sizeof(v));
@@ -612,7 +612,7 @@ namespace Lumix
 					LuaWrapper::push(L, v);
 				}
 				break;
-				case IPropertyDescriptor::VEC2:
+				case PropertyDescriptorBase::VEC2:
 				{
 					Vec2 v;
 					OutputBlob blob(&v, sizeof(v));
@@ -620,7 +620,7 @@ namespace Lumix
 					LuaWrapper::push(L, v);
 				}
 				break;
-				case IPropertyDescriptor::INT2:
+				case PropertyDescriptorBase::INT2:
 				{
 					Int2 v;
 					OutputBlob blob(&v, sizeof(v));
@@ -628,7 +628,7 @@ namespace Lumix
 					LuaWrapper::push(L, v);
 				}
 				break;
-				case IPropertyDescriptor::ENTITY:
+				case PropertyDescriptorBase::ENTITY:
 				{
 					Entity v;
 					OutputBlob blob(&v, sizeof(v));
@@ -636,7 +636,7 @@ namespace Lumix
 					LuaWrapper::push(L, v);
 				}
 				break;
-				case IPropertyDescriptor::ENUM:
+				case PropertyDescriptorBase::ENUM:
 				{
 					int v;
 					OutputBlob blob(&v, sizeof(v));
@@ -652,7 +652,7 @@ namespace Lumix
 
 		static int LUA_setProperty(lua_State* L)
 		{
-			auto* desc = LuaWrapper::toType<IPropertyDescriptor*>(L, lua_upvalueindex(1));
+			auto* desc = LuaWrapper::toType<PropertyDescriptorBase*>(L, lua_upvalueindex(1));
 			ComponentType type = { LuaWrapper::toType<int>(L, lua_upvalueindex(2)) };
 			ComponentUID cmp;
 			cmp.scene = LuaWrapper::checkArg<IScene*>(L, 1);
@@ -661,66 +661,66 @@ namespace Lumix
 			cmp.entity = INVALID_ENTITY;
 			switch(desc->getType())
 			{
-				case IPropertyDescriptor::DECIMAL:
+				case PropertyDescriptorBase::DECIMAL:
 				{
 					auto v = LuaWrapper::checkArg<float>(L, 3);
 					InputBlob blob(&v, sizeof(v));
 					desc->set(cmp, -1, blob);
 				}
 				break;
-				case IPropertyDescriptor::INTEGER:
+				case PropertyDescriptorBase::INTEGER:
 				{
 					auto v = LuaWrapper::checkArg<int>(L, 3);
 					InputBlob blob(&v, sizeof(v));
 					desc->set(cmp, -1, blob);
 				}
 				break;
-				case IPropertyDescriptor::BOOL:
+				case PropertyDescriptorBase::BOOL:
 				{
 					auto v = LuaWrapper::checkArg<bool>(L, 3);
 					InputBlob blob(&v, sizeof(v));
 					desc->set(cmp, -1, blob);
 				}
 				break;
-				case IPropertyDescriptor::RESOURCE:
-				case IPropertyDescriptor::FILE:
-				case IPropertyDescriptor::STRING:
+				case PropertyDescriptorBase::RESOURCE:
+				case PropertyDescriptorBase::FILE:
+				case PropertyDescriptorBase::STRING:
 				{
 					auto* v = LuaWrapper::checkArg<const char*>(L, 3);
 					InputBlob blob(v, stringLength(v) + 1);
 					desc->set(cmp, -1, blob);
 				}
 				break;
-				case IPropertyDescriptor::COLOR:
-				case IPropertyDescriptor::VEC3:
+				case PropertyDescriptorBase::COLOR:
+				case PropertyDescriptorBase::VEC3:
 				{
 					auto v = LuaWrapper::checkArg<Vec3>(L, 3);
 					InputBlob blob(&v, sizeof(v));
 					desc->set(cmp, -1, blob);
 				}
 				break;
-				case IPropertyDescriptor::VEC2:
+				case PropertyDescriptorBase::VEC2:
 				{
 					auto v = LuaWrapper::checkArg<Vec2>(L, 3);
 					InputBlob blob(&v, sizeof(v));
 					desc->set(cmp, -1, blob);
 				}
 				break;
-				case IPropertyDescriptor::INT2:
+				case PropertyDescriptorBase::INT2:
 				{
 					auto v = LuaWrapper::checkArg<Int2>(L, 3);
 					InputBlob blob(&v, sizeof(v));
 					desc->set(cmp, -1, blob);
 				}
 				break;
-				case IPropertyDescriptor::ENTITY:
+				case PropertyDescriptorBase::ENTITY:
 				{
 					auto v = LuaWrapper::checkArg<Entity>(L, 3);
 					InputBlob blob(&v, sizeof(v));
 					desc->set(cmp, -1, blob);
 				}
 				break;
-				case IPropertyDescriptor::ENUM:
+				case PropertyDescriptorBase::ENUM:
 				{
 					auto v = LuaWrapper::checkArg<int>(L, 3);
 					InputBlob blob(&v, sizeof(v));
@@ -777,18 +777,18 @@ namespace Lumix
 				{
 					switch (desc->getType())
 					{
-						case IPropertyDescriptor::ENTITY:
-						case IPropertyDescriptor::ENUM:
-						case IPropertyDescriptor::DECIMAL:
-						case IPropertyDescriptor::INTEGER:
-						case IPropertyDescriptor::BOOL:
-						case IPropertyDescriptor::VEC3:
-						case IPropertyDescriptor::VEC2:
-						case IPropertyDescriptor::INT2:
-						case IPropertyDescriptor::COLOR:
-						case IPropertyDescriptor::RESOURCE:
-						case IPropertyDescriptor::FILE:
-						case IPropertyDescriptor::STRING:
+						case PropertyDescriptorBase::ENTITY:
+						case PropertyDescriptorBase::ENUM:
+						case PropertyDescriptorBase::DECIMAL:
+						case PropertyDescriptorBase::INTEGER:
+						case PropertyDescriptorBase::BOOL:
+						case PropertyDescriptorBase::VEC3:
+						case PropertyDescriptorBase::VEC2:
+						case PropertyDescriptorBase::INT2:
+						case PropertyDescriptorBase::COLOR:
+						case PropertyDescriptorBase::RESOURCE:
+						case PropertyDescriptorBase::FILE:
+						case PropertyDescriptorBase::STRING:
 							convertPropertyToLuaName(desc->getName(), tmp, lengthOf(tmp));
 							copyString(setter, "set");
 							copyString(getter, "get");

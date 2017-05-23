@@ -1,5 +1,6 @@
-#include "unit_tests/suite/lumix_unit_tests.h"
 #include "engine/geometry.h"
+#include "engine/matrix.h"
+#include "unit_tests/suite/lumix_unit_tests.h"
 
 
 using namespace Lumix;

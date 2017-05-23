@@ -12,7 +12,7 @@ namespace Lumix
 
 namespace FS
 {
-	class IFile;
+	struct IFile;
 }
 
 class JsonSerializer;

@@ -8,7 +8,7 @@ namespace Lumix
 {
 
 
-	class IAllocator;
+	struct IAllocator;
 
 
 	class LUMIX_ENGINE_API BinaryArray

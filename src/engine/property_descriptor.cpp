@@ -8,7 +8,7 @@ namespace Lumix
 {
 
 
-void IPropertyDescriptor::setName(const char* name)
+void PropertyDescriptorBase::setName(const char* name)
 {
 	m_name = name;
 	m_name_hash = crc32(name);

@@ -7,11 +7,11 @@ struct mf_resource;
 
 namespace Lumix
 {
-class IAllocator;
+struct IAllocator;
 
 namespace FS
 {
-class IFile;
+struct IFile;
 
 class LUMIX_ENGINE_API ResourceFileDevice LUMIX_FINAL : public IFileDevice
 {

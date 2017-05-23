@@ -4,10 +4,8 @@
 #include "engine/array.h"
 #include "engine/associative_array.h"
 #include "engine/delegate_list.h"
-#include "engine/iplugin.h"
 #include "engine/lumix.h"
 #include "engine/matrix.h"
-#include "engine/path.h"
 #include "engine/quat.h"
 #include "engine/string.h"
 #include "engine/universe/component.h"
@@ -17,6 +15,11 @@ namespace Lumix
 {
 
 
+struct IDeserializer;
+class InputBlob;
+struct IScene;
+struct ISerializer;
+class OutputBlob;
 struct PrefabResource;
 
 
