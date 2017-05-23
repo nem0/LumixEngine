@@ -682,7 +682,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		Vec3 pos = m_scene->getUniverse().getPosition(cam);
 		ComponentHandle probe = m_scene->getNearestEnvironmentProbe(pos);
 		m_current_view->command_buffer.beginAppend();
-		if (isValid(probe))
+		if (probe.isValid())
 		{
 			Texture* irradiance = m_scene->getEnvironmentProbeIrradiance(probe);
 			Texture* radiance = m_scene->getEnvironmentProbeRadiance(probe);
@@ -768,7 +768,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	void applyCamera(const char* slot)
 	{
 		ComponentHandle cmp = m_scene->getCameraInSlot(slot);
-		if (!isValid(cmp)) return;
+		if (!cmp.isValid()) return;
 
 		m_scene->setCameraScreenSize(cmp, m_width, m_height);
 		m_applied_camera = cmp;
@@ -1306,7 +1306,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 	void renderLocalLightShadowmaps(ComponentHandle camera, FrameBuffer** fbs, int framebuffers_count)
 	{
-		if (!isValid(camera)) return;
+		if (!camera.isValid()) return;
 
 		Universe& universe = m_scene->getUniverse();
 		Entity camera_entity = m_scene->getCameraEntity(camera);
@@ -1388,7 +1388,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	{
 		Universe& universe = m_scene->getUniverse();
 		ComponentHandle light_cmp = m_scene->getActiveGlobalLight();
-		if (!isValid(light_cmp) || !isValid(m_applied_camera)) return;
+		if (!light_cmp.isValid() || !m_applied_camera.isValid()) return;
 		float camera_height = m_scene->getCameraScreenHeight(m_applied_camera);
 		if (!camera_height) return;
 
@@ -1638,7 +1638,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 	void setPointLightUniforms(ComponentHandle light_cmp)
 	{
-		if (!isValid(light_cmp)) return;
+		if (!light_cmp.isValid()) return;
 
 		Universe& universe = m_scene->getUniverse();
 		Entity light_entity = m_scene->getPointLightEntity(light_cmp);
@@ -1709,7 +1709,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	void setActiveGlobalLightUniforms()
 	{
 		auto current_light = m_scene->getActiveGlobalLight();
-		if (!isValid(current_light)) return;
+		if (!current_light.isValid()) return;
 
 		Universe& universe = m_scene->getUniverse();
 		Entity light_entity = m_scene->getGlobalLightEntity(current_light);
@@ -1936,7 +1936,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		executeCommandBuffer(material->getCommandBuffer(), material);
 		executeCommandBuffer(view.command_buffer.buffer, material);
 
-		if (isValid(m_applied_camera))
+		if (m_applied_camera.isValid())
 		{
 			Matrix projection_matrix;
 			Universe& universe = m_scene->getUniverse();
@@ -1978,7 +1978,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	{
 		PROFILE_FUNCTION();
 
-		if (!isValid(m_applied_camera)) return;
+		if (!m_applied_camera.isValid()) return;
 
 		IAllocator& frame_allocator = m_renderer.getEngine().getLIFOAllocator();
 		m_is_current_light_global = true;

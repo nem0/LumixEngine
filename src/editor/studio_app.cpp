@@ -966,7 +966,7 @@ public:
 		doMenuItem(*getAction("showEntities"), is_any_entity_selected);
 		doMenuItem(*getAction("hideEntities"), is_any_entity_selected);
 		doMenuItem(*getAction("makeParent"), selected_entities.size() == 2);
-		bool can_unparent = selected_entities.size() == 1 && isValid(m_editor->getUniverse()->getParent(selected_entities[0]));
+		bool can_unparent = selected_entities.size() == 1 && m_editor->getUniverse()->getParent(selected_entities[0]).isValid();
 		doMenuItem(*getAction("unparent"), can_unparent);
 		ImGui::EndMenu();
 	}
@@ -1192,7 +1192,7 @@ public:
 			}
 		}
 		ImGui::Indent();
-		for (Entity e = universe->getFirstChild(entity); isValid(e); e = universe->getNextSibling(e))
+		for (Entity e = universe->getFirstChild(entity); e.isValid(); e = universe->getNextSibling(e))
 		{
 			showHierarchy(e, selected_entities);
 		}
@@ -1213,9 +1213,9 @@ public:
 			ImGui::PushItemWidth(ImGui::GetContentRegionAvailWidth() - ImGui::GetStyle().FramePadding.x);
 			if (filter[0] == '\0')
 			{
-				for (Entity e = universe->getFirstEntity(); isValid(e); e = universe->getNextEntity(e))
+				for (Entity e = universe->getFirstEntity(); e.isValid(); e = universe->getNextEntity(e))
 				{
-					if (!isValid(universe->getParent(e)))
+					if (!universe->getParent(e).isValid())
 					{
 						showHierarchy(e, entities);
 					}
@@ -1223,7 +1223,7 @@ public:
 			}
 			else
 			{
-				for (Entity e = universe->getFirstEntity(); isValid(e); e = universe->getNextEntity(e))
+				for (Entity e = universe->getFirstEntity(); e.isValid(); e = universe->getNextEntity(e))
 				{
 					char buffer[1024];
 					Universe* universe = m_editor->getUniverse();

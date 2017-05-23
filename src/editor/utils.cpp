@@ -11,7 +11,7 @@
 
 void getEntityListDisplayName(Lumix::WorldEditor& editor, char* buf, int max_size, Lumix::Entity entity)
 {
-	if (!Lumix::isValid(entity))
+	if (!entity.isValid())
 	{
 		*buf = '\0';
 		return;
@@ -19,7 +19,7 @@ void getEntityListDisplayName(Lumix::WorldEditor& editor, char* buf, int max_siz
 	const char* name = editor.getUniverse()->getEntityName(entity);
 	static const auto MODEL_INSTANCE_TYPE = Lumix::PropertyRegister::getComponentType("renderable");
 	Lumix::ComponentHandle model_instance = editor.getUniverse()->getComponent(entity, MODEL_INSTANCE_TYPE).handle;
-	if (Lumix::isValid(model_instance))
+	if (model_instance.isValid())
 	{
 		auto* render_interface = editor.getRenderInterface();
 		auto path = render_interface->getModelInstancePath(model_instance);

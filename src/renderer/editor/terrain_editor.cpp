@@ -590,7 +590,7 @@ private:
 
 			auto* phy_scene = static_cast<PhysicsScene*>(scene);
 			ComponentHandle cmp = scene->getComponent(m_terrain.entity, HEIGHTFIELD_TYPE);
-			if (!isValid(cmp)) return;
+			if (!cmp.isValid()) return;
 
 			phy_scene->updateHeighfieldData(cmp, m_x, m_y, m_width, m_height, &data[0], bpp);
 		}
@@ -1394,7 +1394,7 @@ void TerrainEditor::paintEntities(const Vec3& hit_pos)
 				int random_idx = Math::rand(0, m_selected_prefabs.size() - 1);
 				if (!m_selected_prefabs[random_idx]) continue;
 				Entity entity = prefab_system.instantiatePrefab(*m_selected_prefabs[random_idx], pos, rot, size);
-				if (isValid(entity))
+				if (entity.isValid())
 				{
 					ComponentHandle cmp = scene->getComponent(entity, MODEL_INSTANCE_TYPE);
 					Model* model = scene->getModelInstanceModel(cmp);
@@ -1738,7 +1738,7 @@ void TerrainEditor::onGUI()
 	for(auto entity : m_world_editor.getSelectedEntities())
 	{
 		ComponentHandle terrain = m_world_editor.getUniverse()->getComponent(entity, TERRAIN_TYPE).handle;
-		if(!isValid(terrain)) continue;
+		if(!terrain.isValid()) continue;
 
 		ComponentUID camera_cmp = m_world_editor.getEditCamera();
 		RenderScene* scene = static_cast<RenderScene*>(camera_cmp.scene);

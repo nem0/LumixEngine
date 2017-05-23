@@ -15,109 +15,109 @@ namespace
 		Lumix::Entity e2 = universe.createEntity({0, 0, 0}, {0, 0, 0, 1});
 		Lumix::Entity e3 = universe.createEntity({0, 0, 0}, {0, 0, 0, 1});
 
-		LUMIX_EXPECT(!Lumix::isValid(universe.getParent(e0)));
-		LUMIX_EXPECT(!Lumix::isValid(universe.getParent(e1)));
-		LUMIX_EXPECT(!Lumix::isValid(universe.getParent(e2)));
-		LUMIX_EXPECT(!Lumix::isValid(universe.getParent(e3)));
+		LUMIX_EXPECT(!universe.getParent(e0).isValid());
+		LUMIX_EXPECT(!universe.getParent(e1).isValid());
+		LUMIX_EXPECT(!universe.getParent(e2).isValid());
+		LUMIX_EXPECT(!universe.getParent(e3).isValid());
 
-		LUMIX_EXPECT(!Lumix::isValid(universe.getFirstChild(e0)));
-		LUMIX_EXPECT(!Lumix::isValid(universe.getFirstChild(e1)));
-		LUMIX_EXPECT(!Lumix::isValid(universe.getFirstChild(e2)));
-		LUMIX_EXPECT(!Lumix::isValid(universe.getFirstChild(e3)));
+		LUMIX_EXPECT(!universe.getFirstChild(e0).isValid());
+		LUMIX_EXPECT(!universe.getFirstChild(e1).isValid());
+		LUMIX_EXPECT(!universe.getFirstChild(e2).isValid());
+		LUMIX_EXPECT(!universe.getFirstChild(e3).isValid());
 
 		universe.setParent(e0, e1);
 
-		LUMIX_EXPECT(!Lumix::isValid(universe.getNextSibling(e0)));
-		LUMIX_EXPECT(!Lumix::isValid(universe.getNextSibling(e1)));
+		LUMIX_EXPECT(!universe.getNextSibling(e0).isValid());
+		LUMIX_EXPECT(!universe.getNextSibling(e1).isValid());
 
-		LUMIX_EXPECT(!Lumix::isValid(universe.getFirstChild(e1)));
-		LUMIX_EXPECT(!Lumix::isValid(universe.getFirstChild(e2)));
-		LUMIX_EXPECT(!Lumix::isValid(universe.getFirstChild(e3)));
-		LUMIX_EXPECT(!Lumix::isValid(universe.getParent(e0)));
-		LUMIX_EXPECT(!Lumix::isValid(universe.getParent(e2)));
-		LUMIX_EXPECT(!Lumix::isValid(universe.getParent(e3)));
+		LUMIX_EXPECT(!universe.getFirstChild(e1).isValid());
+		LUMIX_EXPECT(!universe.getFirstChild(e2).isValid());
+		LUMIX_EXPECT(!universe.getFirstChild(e3).isValid());
+		LUMIX_EXPECT(!universe.getParent(e0).isValid());
+		LUMIX_EXPECT(!universe.getParent(e2).isValid());
+		LUMIX_EXPECT(!universe.getParent(e3).isValid());
 
-		LUMIX_EXPECT(Lumix::isValid(universe.getFirstChild(e0)));
+		LUMIX_EXPECT(universe.getFirstChild(e0).isValid());
 		LUMIX_EXPECT(universe.getParent(e1) == e0);
 
 		universe.setParent(e0, e2);
 
-		LUMIX_EXPECT(!Lumix::isValid(universe.getFirstChild(e1)));
-		LUMIX_EXPECT(!Lumix::isValid(universe.getFirstChild(e2)));
-		LUMIX_EXPECT(!Lumix::isValid(universe.getFirstChild(e3)));
-		LUMIX_EXPECT(!Lumix::isValid(universe.getParent(e0)));
-		LUMIX_EXPECT(!Lumix::isValid(universe.getParent(e3)));
+		LUMIX_EXPECT(!universe.getFirstChild(e1).isValid());
+		LUMIX_EXPECT(!universe.getFirstChild(e2).isValid());
+		LUMIX_EXPECT(!universe.getFirstChild(e3).isValid());
+		LUMIX_EXPECT(!universe.getParent(e0).isValid());
+		LUMIX_EXPECT(!universe.getParent(e3).isValid());
 
-		LUMIX_EXPECT(Lumix::isValid(universe.getFirstChild(e0)));
+		LUMIX_EXPECT(universe.getFirstChild(e0).isValid());
 		LUMIX_EXPECT(universe.getParent(e1) == e0);
 		LUMIX_EXPECT(universe.getParent(e2) == e0);
 
-		LUMIX_EXPECT(!Lumix::isValid(universe.getNextSibling(e0)));
-		LUMIX_EXPECT(Lumix::isValid(universe.getNextSibling(e1)) != Lumix::isValid(universe.getNextSibling(e2)));
+		LUMIX_EXPECT(!universe.getNextSibling(e0).isValid());
+		LUMIX_EXPECT(universe.getNextSibling(e1).isValid() != universe.getNextSibling(e2).isValid());
 
 		universe.setParent(e2, e3);
 
-		LUMIX_EXPECT(!Lumix::isValid(universe.getFirstChild(e1)));
+		LUMIX_EXPECT(!universe.getFirstChild(e1).isValid());
 		LUMIX_EXPECT(universe.getFirstChild(e2) == e3);
-		LUMIX_EXPECT(!Lumix::isValid(universe.getFirstChild(e3)));
-		LUMIX_EXPECT(!Lumix::isValid(universe.getParent(e0)));
+		LUMIX_EXPECT(!universe.getFirstChild(e3).isValid());
+		LUMIX_EXPECT(!universe.getParent(e0).isValid());
 		LUMIX_EXPECT(universe.getParent(e3) == e2);
 
-		LUMIX_EXPECT(Lumix::isValid(universe.getFirstChild(e0)));
+		LUMIX_EXPECT(universe.getFirstChild(e0).isValid());
 		LUMIX_EXPECT(universe.getParent(e1) == e0);
 		LUMIX_EXPECT(universe.getParent(e2) == e0);
 
-		LUMIX_EXPECT(!Lumix::isValid(universe.getNextSibling(e0)));
-		LUMIX_EXPECT(!Lumix::isValid(universe.getNextSibling(e3)));
-		LUMIX_EXPECT(Lumix::isValid(universe.getNextSibling(e1)) != Lumix::isValid(universe.getNextSibling(e2)));
+		LUMIX_EXPECT(!universe.getNextSibling(e0).isValid());
+		LUMIX_EXPECT(!universe.getNextSibling(e3).isValid());
+		LUMIX_EXPECT(universe.getNextSibling(e1).isValid() != universe.getNextSibling(e2).isValid());
 
 		universe.setParent(Lumix::INVALID_ENTITY, e2);
 
-		LUMIX_EXPECT(!Lumix::isValid(universe.getFirstChild(e1)));
+		LUMIX_EXPECT(!universe.getFirstChild(e1).isValid());
 		LUMIX_EXPECT(universe.getFirstChild(e2) == e3);
-		LUMIX_EXPECT(!Lumix::isValid(universe.getFirstChild(e3)));
-		LUMIX_EXPECT(!Lumix::isValid(universe.getParent(e0)));
+		LUMIX_EXPECT(!universe.getFirstChild(e3).isValid());
+		LUMIX_EXPECT(!universe.getParent(e0).isValid());
 		LUMIX_EXPECT(universe.getParent(e3) == e2);
 
 		LUMIX_EXPECT(universe.getFirstChild(e0) == e1);
 		LUMIX_EXPECT(universe.getParent(e1) == e0);
-		LUMIX_EXPECT(!Lumix::isValid(universe.getParent(e2)));
+		LUMIX_EXPECT(!universe.getParent(e2).isValid());
 
-		LUMIX_EXPECT(!Lumix::isValid(universe.getNextSibling(e0)));
-		LUMIX_EXPECT(!Lumix::isValid(universe.getNextSibling(e1)));
-		LUMIX_EXPECT(!Lumix::isValid(universe.getNextSibling(e2)));
-		LUMIX_EXPECT(!Lumix::isValid(universe.getNextSibling(e3)));
+		LUMIX_EXPECT(!universe.getNextSibling(e0).isValid());
+		LUMIX_EXPECT(!universe.getNextSibling(e1).isValid());
+		LUMIX_EXPECT(!universe.getNextSibling(e2).isValid());
+		LUMIX_EXPECT(!universe.getNextSibling(e3).isValid());
 
 		universe.setParent(Lumix::INVALID_ENTITY, e1);
 
-		LUMIX_EXPECT(!Lumix::isValid(universe.getFirstChild(e1)));
+		LUMIX_EXPECT(!universe.getFirstChild(e1).isValid());
 		LUMIX_EXPECT(universe.getFirstChild(e2) == e3);
-		LUMIX_EXPECT(!Lumix::isValid(universe.getFirstChild(e3)));
-		LUMIX_EXPECT(!Lumix::isValid(universe.getParent(e0)));
+		LUMIX_EXPECT(!universe.getFirstChild(e3).isValid());
+		LUMIX_EXPECT(!universe.getParent(e0).isValid());
 		LUMIX_EXPECT(universe.getParent(e3) == e2);
 
-		LUMIX_EXPECT(!Lumix::isValid(universe.getFirstChild(e0)));
-		LUMIX_EXPECT(!Lumix::isValid(universe.getParent(e1)));
-		LUMIX_EXPECT(!Lumix::isValid(universe.getParent(e2)));
+		LUMIX_EXPECT(!universe.getFirstChild(e0).isValid());
+		LUMIX_EXPECT(!universe.getParent(e1).isValid());
+		LUMIX_EXPECT(!universe.getParent(e2).isValid());
 
-		LUMIX_EXPECT(!Lumix::isValid(universe.getNextSibling(e2)));
-		LUMIX_EXPECT(!Lumix::isValid(universe.getNextSibling(e3)));
+		LUMIX_EXPECT(!universe.getNextSibling(e2).isValid());
+		LUMIX_EXPECT(!universe.getNextSibling(e3).isValid());
 
 		universe.setParent(e1, e2);
 
-		LUMIX_EXPECT(!Lumix::isValid(universe.getFirstChild(e0)));
+		LUMIX_EXPECT(!universe.getFirstChild(e0).isValid());
 		LUMIX_EXPECT(universe.getFirstChild(e1) == e2);
 		LUMIX_EXPECT(universe.getFirstChild(e2) == e3);
-		LUMIX_EXPECT(!Lumix::isValid(universe.getFirstChild(e3)));
+		LUMIX_EXPECT(!universe.getFirstChild(e3).isValid());
 
-		LUMIX_EXPECT(!Lumix::isValid(universe.getParent(e0)));
-		LUMIX_EXPECT(!Lumix::isValid(universe.getParent(e1)));
+		LUMIX_EXPECT(!universe.getParent(e0).isValid());
+		LUMIX_EXPECT(!universe.getParent(e1).isValid());
 		LUMIX_EXPECT(universe.getParent(e2) == e1);
 		LUMIX_EXPECT(universe.getParent(e3) == e2);
 
-		LUMIX_EXPECT(!Lumix::isValid(universe.getNextSibling(e1)));
-		LUMIX_EXPECT(!Lumix::isValid(universe.getNextSibling(e2)));
-		LUMIX_EXPECT(!Lumix::isValid(universe.getNextSibling(e3)));
+		LUMIX_EXPECT(!universe.getNextSibling(e1).isValid());
+		LUMIX_EXPECT(!universe.getNextSibling(e2).isValid());
+		LUMIX_EXPECT(!universe.getNextSibling(e3).isValid());
 	}
 
 
@@ -138,8 +138,8 @@ namespace
 
 		universe.destroyEntity(e2);
 
-		LUMIX_EXPECT(!Lumix::isValid(universe.getNextSibling(e1)));
-		LUMIX_EXPECT(!Lumix::isValid(universe.getParent(e3)));
+		LUMIX_EXPECT(!universe.getNextSibling(e1).isValid());
+		LUMIX_EXPECT(!universe.getParent(e3).isValid());
 	}
 
 
@@ -162,9 +162,9 @@ namespace
 		universe.destroyEntity(e2);
 		universe.destroyEntity(e3);
 
-		LUMIX_EXPECT(!Lumix::isValid(universe.getParent(e1)));
-		LUMIX_EXPECT(!Lumix::isValid(universe.getParent(e2)));
-		LUMIX_EXPECT(!Lumix::isValid(universe.getParent(e3)));
+		LUMIX_EXPECT(!universe.getParent(e1).isValid());
+		LUMIX_EXPECT(!universe.getParent(e2).isValid());
+		LUMIX_EXPECT(!universe.getParent(e3).isValid());
 	}
 
 

@@ -716,8 +716,8 @@ public:
 
 	static void LUA_setEntityLocalRotation(Universe* universe, Entity entity, const Quat& rotation)
 	{
-		if (!isValid(entity)) return;
-		if (!isValid(universe->getParent(entity))) return;
+		if (!entity.isValid()) return;
+		if (!universe->getParent(entity).isValid()) return;
 
 		universe->setLocalRotation(entity, rotation);
 	}
@@ -725,8 +725,8 @@ public:
 
 	static void LUA_setEntityLocalPosition(Universe* universe, Entity entity, const Vec3& position)
 	{
-		if (!isValid(entity)) return;
-		if (!isValid(universe->getParent(entity))) return;
+		if (!entity.isValid()) return;
+		if (!universe->getParent(entity).isValid()) return;
 
 		universe->setLocalPosition(entity, position);
 	}
@@ -786,7 +786,7 @@ public:
 
 	static Vec3 LUA_getEntityPosition(Universe* universe, Entity entity)
 	{
-		if (!isValid(entity))
+		if (!entity.isValid())
 		{
 			g_log_warning.log("Engine") << "Requesting position on invalid entity";
 			return Vec3(0, 0, 0);
@@ -797,7 +797,7 @@ public:
 
 	static Quat LUA_getEntityRotation(Universe* universe, Entity entity)
 	{
-		if (!isValid(entity))
+		if (!entity.isValid())
 		{
 			g_log_warning.log("Engine") << "Requesting rotation on invalid entity";
 			return Quat(0, 0, 0, 1);

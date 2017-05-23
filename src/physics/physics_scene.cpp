@@ -992,7 +992,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	Transform getJointConnectedBodyLocalFrame(ComponentHandle cmp) override
 	{
 		auto& joint = m_joints[{cmp.index}];
-		if (!isValid(joint.connected_body)) return {Vec3(0, 0, 0), Quat(0, 0, 0, 1)};
+		if (!joint.connected_body.isValid()) return {Vec3(0, 0, 0), Quat(0, 0, 0, 1)};
 		
 		PxRigidActor* a0, *a1;
 		joint.physx->getActors(a0, a1);
@@ -1720,7 +1720,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		if (!render_scene) return;
 
 		ComponentHandle model_instance = render_scene->getModelInstanceComponent(entity);
-		if (!isValid(model_instance)) return;
+		if (!model_instance.isValid()) return;
 
 		Model* model = render_scene->getModelInstanceModel(model_instance);
 		Transform entity_transform = m_universe.getTransform(entity);
@@ -1753,7 +1753,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		ASSERT(render_scene);
 
 		ComponentHandle model_instance = render_scene->getModelInstanceComponent(entity);
-		ASSERT(isValid(model_instance));
+		ASSERT(model_instance.isValid());
 		Model* model = render_scene->getModelInstanceModel(model_instance);
 		ASSERT(model && model->isReady());
 
@@ -2048,7 +2048,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		
 		Entity entity = { cmp.index };
 		ComponentHandle model_instance = render_scene->getModelInstanceComponent(entity);
-		ASSERT(isValid(model_instance));
+		ASSERT(model_instance.isValid());
 		Model* model = render_scene->getModelInstanceModel(model_instance);
 		ASSERT(model && model->isReady());
 		auto iter = model->getBoneIndex(bone_name_hash);
@@ -2136,7 +2136,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		for (auto& ragdoll : m_ragdolls)
 		{
 			ComponentHandle model_instance = render_scene->getModelInstanceComponent(ragdoll.entity);
-			if (!isValid(model_instance)) continue;
+			if (!model_instance.isValid()) continue;
 
 			Pose* pose = render_scene->getPose(model_instance);
 			if (!pose) continue;
@@ -2382,7 +2382,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			auto* render_scene = static_cast<RenderScene*>(m_universe.getScene(RENDERER_HASH));
 			if (!render_scene) return;
 			ComponentHandle model_instance = render_scene->getModelInstanceComponent(entity);
-			if (!isValid(model_instance)) return;
+			if (!model_instance.isValid()) return;
 			Pose* pose = render_scene->getPose(model_instance);
 			if (!pose) return;
 			setSkeletonPose(m_universe.getTransform(entity), m_ragdolls.at(ragdoll_idx).root, pose);
@@ -4012,7 +4012,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, ActorType::BOX);
 			serializer.read(actor->dynamic_type);
 			serializer.read(actor->entity);
-			if (!isValid(actor->entity))
+			if (!actor->entity.isValid())
 			{
 				LUMIX_DELETE(m_allocator, actor);
 				continue;

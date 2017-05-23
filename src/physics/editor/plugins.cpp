@@ -160,7 +160,7 @@ struct EditorPlugin LUMIX_FINAL : public WorldEditor::Plugin
 		if (!render_scene) return;
 
 		Entity other_entity = phy_scene->getJointConnectedBody(cmp.handle);
-		if (!isValid(other_entity)) return;
+		if (!other_entity.isValid()) return;
 
 
 		Transform local_frame0 = phy_scene->getJointLocalFrame(cmp.handle);
@@ -209,7 +209,7 @@ struct EditorPlugin LUMIX_FINAL : public WorldEditor::Plugin
 		if (!render_scene) return;
 
 		Entity other_entity = phy_scene->getJointConnectedBody(cmp.handle);
-		if (!isValid(other_entity)) return;
+		if (!other_entity.isValid()) return;
 		
 		Vec3 pos = universe.getPosition(cmp.entity);
 		Vec3 other_pos = universe.getPosition(other_entity);
@@ -255,7 +255,7 @@ struct EditorPlugin LUMIX_FINAL : public WorldEditor::Plugin
 		Entity connected_body = phy_scene->getJointConnectedBody(cmp.handle);
 		Vec2 limit = phy_scene->getHingeJointLimit(cmp.handle);
 		bool use_limit = phy_scene->getHingeJointUseLimit(cmp.handle);
-		if (!isValid(connected_body)) return;
+		if (!connected_body.isValid()) return;
 		Transform global_frame1 = phy_scene->getJointConnectedBodyLocalFrame(cmp.handle);
 		global_frame1 = phy_scene->getUniverse().getTransform(connected_body) * global_frame1;
 		showHingeJointGizmo(*phy_scene, limit, use_limit, global_frame1.toMatrix());
@@ -572,7 +572,7 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 
 				Entity other_entity = scene->getJointConnectedBody(cmp.handle);
 				getEntityListDisplayName(m_editor, tmp, Lumix::lengthOf(tmp), other_entity);
-				if (isValid(other_entity) && ImGui::Selectable(tmp, &b)) m_editor.selectEntities(&other_entity, 1);
+				if (other_entity.isValid() && ImGui::Selectable(tmp, &b)) m_editor.selectEntities(&other_entity, 1);
 				ImGui::NextColumn();
 				ImGui::PopID();
 			}
@@ -637,7 +637,7 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		{
 			ComponentUID cmp;
 			cmp.entity = scene->getActorEntity(i);
-			if (!isValid(cmp.entity)) continue;
+			if (!cmp.entity.isValid()) continue;
 			ImGui::PushID(i);
 			char tmp[255];
 			getEntityListDisplayName(m_editor, tmp, lengthOf(tmp), cmp.entity);
@@ -783,7 +783,7 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		auto* phy_scene = static_cast<PhysicsScene*>(m_editor.getUniverse()->getScene(crc32("physics")));
 
 		ComponentHandle cmp = phy_scene->getComponent(entity, RAGDOLL_TYPE);
-		if (!isValid(cmp) || !isValid(model_instance))
+		if (!cmp.isValid() || !model_instance.isValid())
 		{
 			ImGui::Text("%s", "Please select an entity with ragdoll and mesh components.");
 			return;

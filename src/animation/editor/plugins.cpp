@@ -171,7 +171,7 @@ struct PropertyGridPlugin : PropertyGrid::IPlugin
 		{
 			auto* render_scene = (RenderScene*)scene->getUniverse().getScene(RENDERABLE_TYPE);
 			ComponentHandle renderable = render_scene->getComponent(cmp.entity, RENDERABLE_TYPE);
-			if (isValid(renderable))
+			if (renderable.isValid())
 			{
 				auto* pose = render_scene->getPose(renderable);
 				auto* model = render_scene->getModelInstanceModel(renderable);

@@ -285,11 +285,11 @@ public:
 		{
 			u64 prefab = prefab_system.getPrefab(entities[i]);
 			Entity parent = universe->getParent(entities[i]);
-			if (prefab != 0 && isValid(parent) && (prefab_system.getPrefab(parent) & 0xffffFFFF) == (prefab & 0xffffFFFF))
+			if (prefab != 0 && parent.isValid() && (prefab_system.getPrefab(parent) & 0xffffFFFF) == (prefab & 0xffffFFFF))
 			{
 				Transform new_local_tr = universe->computeLocalTransform(parent, {new_positions[i], new_rotations[i]});
 				Entity instance = prefab_system.getFirstInstance(prefab);
-				while (isValid(instance))
+				while (instance.isValid())
 				{
 					m_entities.push(instance);
 					Transform new_tr = universe->getTransform(universe->getParent(instance));
@@ -456,10 +456,10 @@ public:
 		{
 			u64 prefab = prefab_system.getPrefab(entities[i]);
 			Entity parent = universe->getParent(entities[i]);
-			if (prefab != 0 && isValid(parent) && (prefab_system.getPrefab(parent) & 0xffffFFFF) == (prefab & 0xffffFFFF))
+			if (prefab != 0 && parent.isValid() && (prefab_system.getPrefab(parent) & 0xffffFFFF) == (prefab & 0xffffFFFF))
 			{
 				Entity instance = prefab_system.getFirstInstance(prefab);
-				while (isValid(instance))
+				while (instance.isValid())
 				{
 					m_entities.push(instance);
 					m_new_positions.push(new_positions[i]);
@@ -888,7 +888,7 @@ public:
 			else
 			{
 				Entity instance = prefab_system.getFirstInstance(prefab);
-				while(isValid(instance))
+				while(instance.isValid())
 				{
 					ComponentUID component = m_editor.getUniverse()->getComponent(instance, component_type);
 					m_property_descriptor->get(component, index, m_old_value);
@@ -1048,7 +1048,7 @@ private:
 					else
 					{
 						Entity instance = editor.getPrefabSystem().getFirstInstance(prefab);
-						while(isValid(instance))
+						while(instance.isValid())
 						{
 							m_entities.push(instance);
 							instance = editor.getPrefabSystem().getNextInstance(instance);
@@ -1101,7 +1101,7 @@ private:
 			for (int j = 0; j < m_entities.size(); ++j)
 			{
 				ComponentHandle cmp = scene->createComponent(m_type, m_entities[j]);
-				if (isValid(cmp))
+				if (cmp.isValid())
 				{
 					ret = true;
 				}
@@ -1220,7 +1220,7 @@ private:
 				if (prefab != 0)
 				{
 					Entity instance = prefab_system.getFirstInstance(prefab);
-					while (isValid(instance))
+					while (instance.isValid())
 					{
 						m_entities.push(instance);
 						instance = prefab_system.getNextInstance(instance);
@@ -1305,14 +1305,14 @@ private:
 				m_old_values.write(guid.value);
 				Entity parent = universe->getParent(m_entities[i]);
 				m_old_values.write(parent);
-				if (isValid(parent))
+				if (parent.isValid())
 				{
 					Transform local_tr = universe->getLocalTransform(m_entities[i]);
 					m_old_values.write(local_tr);
 					float local_scale = universe->getLocalScale(m_entities[i]);
 					m_old_values.write(local_scale);
 				}
-				for (Entity child = universe->getFirstChild(m_entities[i]); isValid(child); child = universe->getNextSibling(child))
+				for (Entity child = universe->getFirstChild(m_entities[i]); child.isValid(); child = universe->getNextSibling(child))
 				{
 					m_old_values.write(child);
 					Transform local_tr = universe->getLocalTransform(child);
@@ -1375,7 +1375,7 @@ private:
 				m_editor.m_entity_map.insert(guid, new_entity);
 				Entity parent;
 				blob.read(parent);
-				if (isValid(parent))
+				if (parent.isValid())
 				{
 					Transform local_tr;
 					float local_scale;
@@ -1385,7 +1385,7 @@ private:
 					universe->setLocalTransform(new_entity, local_tr, local_scale);
 				}
 				Entity child;
-				for(blob.read(child); isValid(child); blob.read(child))
+				for(blob.read(child); child.isValid(); blob.read(child))
 				{
 					Transform local_tr;
 					float local_scale;
@@ -1466,7 +1466,7 @@ private:
 				else
 				{
 					Entity instance = editor.getPrefabSystem().getFirstInstance(prefab);
-					while(isValid(instance))
+					while(instance.isValid())
 					{
 						m_entities.push(instance);
 						instance = editor.getPrefabSystem().getNextInstance(instance);
@@ -1602,7 +1602,7 @@ private:
 
 		bool execute() override
 		{
-			if (!isValid(m_entity))
+			if (!m_entity.isValid())
 			{
 				m_entity = m_editor.getUniverse()->createEntity(m_position, Quat(0, 0, 0, 1));
 			}
@@ -1710,7 +1710,7 @@ public:
 
 	void updateGoTo()
 	{
-		if (!isValid(m_camera) || !m_go_to_parameters.m_is_active) return;
+		if (!m_camera.isValid() || !m_go_to_parameters.m_is_active) return;
 
 		float t = Math::easeInOut(m_go_to_parameters.m_t);
 		m_go_to_parameters.m_t += m_engine->getLastTimeDelta() * m_go_to_parameters.m_speed;
@@ -2003,7 +2003,7 @@ public:
 
 		void create(Entity entity)
 		{
-			ASSERT(isValid(entity));
+			ASSERT(entity.isValid());
 			EntityGUID guid = { is_random ? Math::randGUID() : ++nonrandom_guid };
 			insert(guid, entity);
 		}
@@ -2039,7 +2039,7 @@ public:
 
 		EntityGUID get(Entity entity) override
 		{
-			if (!isValid(entity)) return INVALID_ENTITY_GUID;
+			if (!entity.isValid()) return INVALID_ENTITY_GUID;
 			if (entity.index >= entity_to_guid.size()) return INVALID_ENTITY_GUID;
 			return entity_to_guid[entity.index];
 		}
@@ -2062,7 +2062,7 @@ public:
 	void deserialize(const char* basename)
 	{
 		PROFILE_FUNCTION();
-		if (isValid(m_camera)) m_universe->destroyEntity(m_camera);
+		if (m_camera.isValid()) m_universe->destroyEntity(m_camera);
 		m_entity_map.clear();
 		StaticString<MAX_PATH_LENGTH> scn_dir("universes/", basename, "/scenes/");
 		auto scn_file_iter = PlatformInterface::createFileIterator(scn_dir, m_allocator);
@@ -2158,7 +2158,7 @@ public:
 
 				Entity parent;
 				deserializer.read(&parent);
-				if (isValid(parent)) m_universe->setParent(parent, entity);
+				if (parent.isValid()) m_universe->setParent(parent, entity);
 
 				if(name[0]) m_universe->setEntityName(entity, name);
 				m_universe->setTransformKeepChildren(entity, tr, scale);
@@ -2219,7 +2219,7 @@ public:
 		StaticString<MAX_PATH_LENGTH> system_file_path(dir, "systems/templates.sys");
 		saveFile(system_file_path);
 
-		for (Entity entity = m_universe->getFirstEntity(); isValid(entity); entity = m_universe->getNextEntity(entity))
+		for (Entity entity = m_universe->getFirstEntity(); entity.isValid(); entity = m_universe->getNextEntity(entity))
 		{
 			if (m_prefab_system->getPrefab(entity) != 0) continue;
 			blob.clear();
@@ -2230,7 +2230,7 @@ public:
 			serializer.write("parent", parent);
 			EntityGUID guid = m_entity_map.get(entity);
 			StaticString<MAX_PATH_LENGTH> entity_file_path(dir, guid.value, ".ent");
-			for (ComponentUID cmp = m_universe->getFirstComponent(entity); isValid(cmp.handle);
+			for (ComponentUID cmp = m_universe->getFirstComponent(entity); cmp.handle.isValid();
 				 cmp = m_universe->getNextComponent(cmp))
 			{
 				const char* cmp_name = PropertyRegister::getComponentTypeID(cmp.type.index);
@@ -2561,7 +2561,7 @@ public:
 
 	void setEntityName(Entity entity, const char* name) override
 	{
-		if (isValid(entity))
+		if (entity.isValid())
 		{
 			IEditorCommand* command = LUMIX_NEW(m_allocator, SetEntityNameCommand)(*this, entity, name);
 			executeCommand(command);
@@ -2707,7 +2707,7 @@ public:
 		}
 		m_engine->getFileSystem().close(*m_game_mode_file);
 		m_game_mode_file = nullptr;
-		if(isValid(m_selected_entity_on_game_mode)) selectEntities(&m_selected_entity_on_game_mode, 1);
+		if(m_selected_entity_on_game_mode.isValid()) selectEntities(&m_selected_entity_on_game_mode, 1);
 		m_engine->getResourceManager().enableUnload(true);
 	}
 
@@ -2954,7 +2954,7 @@ public:
 			return;
 		}
 
-		if (isValid(m_camera)) m_universe->destroyEntity(m_camera);
+		if (m_camera.isValid()) m_universe->destroyEntity(m_camera);
 
 		if (m_engine->deserialize(*m_universe, blob))
 		{
@@ -2990,7 +2990,7 @@ public:
 
 	ComponentUID getEditCamera() override
 	{
-		if (!isValid(m_camera)) return ComponentUID::INVALID;
+		if (!m_camera.isValid()) return ComponentUID::INVALID;
 		return getUniverse()->getComponent(m_camera, CAMERA_TYPE);
 	}
 

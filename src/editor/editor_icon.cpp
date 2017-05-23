@@ -129,7 +129,7 @@ struct EditorIconsImpl LUMIX_FINAL : public EditorIcons
 
 	void createIcon(Entity entity)
 	{
-		if (!isValid(entity)) return;
+		if (!entity.isValid()) return;
 		if (m_editor.getEditCamera().entity == entity) return;
 
 		Universe& universe = *m_editor.getUniverse();
@@ -175,7 +175,7 @@ struct EditorIconsImpl LUMIX_FINAL : public EditorIcons
 	{
 		clear();
 		auto& universe = *m_editor.getUniverse();
-		for (Entity entity = universe.getFirstEntity(); isValid(entity); entity = universe.getNextEntity(entity))
+		for (Entity entity = universe.getFirstEntity(); entity.isValid(); entity = universe.getNextEntity(entity))
 		{
 			createIcon(entity);
 		}
@@ -199,7 +199,7 @@ struct EditorIconsImpl LUMIX_FINAL : public EditorIcons
 
 		const auto& universe = *m_editor.getUniverse();
 		ComponentHandle camera = m_editor.getEditCamera().handle;
-		if (!isValid(camera)) return hit;
+		if (!camera.isValid()) return hit;
 		Matrix camera_mtx = universe.getMatrix(m_editor.getEditCamera().entity);
 		Vec3 camera_pos = camera_mtx.getTranslation();
 		bool is_ortho = render_interface->isCameraOrtho(camera);
@@ -288,7 +288,7 @@ struct EditorIconsImpl LUMIX_FINAL : public EditorIcons
 
 		const auto& universe = *m_editor.getUniverse();
 		ComponentHandle camera = m_editor.getEditCamera().handle;
-		if (!isValid(camera)) return;
+		if (!camera.isValid()) return;
 		Matrix camera_mtx = universe.getMatrix(m_editor.getEditCamera().entity);
 		Vec3 camera_pos = camera_mtx.getTranslation();
 		float fov = m_editor.getRenderInterface()->getCameraFOV(camera);
