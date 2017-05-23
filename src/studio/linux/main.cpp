@@ -3,9 +3,9 @@
 
 int main(int argc, char* argv[])
 {
-	auto* app = StudioApp::create();
+	auto* app = Lumix::StudioApp::create();
 	app->run();
 	int exit_code = app->getExitCode();
-	StudioApp::destroy(*app);
+	Lumix::StudioApp::destroy(*app);
 	return exit_code;
 }
