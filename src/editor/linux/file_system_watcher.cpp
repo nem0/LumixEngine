@@ -8,6 +8,10 @@
 #include <unistd.h>
 
 
+namespace Lumix
+{
+
+
 struct FileSystemWatcherImpl;
 
 
@@ -167,3 +171,5 @@ int FileSystemWatcherTask::task()
     return close(fd) != -1;
 }
 
+
+} // namespace Lumix
