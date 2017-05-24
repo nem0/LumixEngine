@@ -54,7 +54,6 @@ protected:
 
 private:
 	IAllocator& m_allocator;
-	u32 m_size;
 	ResourceTable m_resources;
 	ResourceManager* m_owner;
 	bool m_is_unload_enabled;
