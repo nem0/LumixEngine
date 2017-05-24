@@ -131,8 +131,7 @@ namespace Lumix
 	}
 
 	ResourceManagerBase::ResourceManagerBase(IAllocator& allocator)
-		: m_size(0)
-		, m_resources(allocator)
+		: m_resources(allocator)
 		, m_allocator(allocator)
 		, m_owner(nullptr)
 		, m_is_unload_enabled(true)

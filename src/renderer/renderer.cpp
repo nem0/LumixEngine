@@ -536,24 +536,6 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 			uint32_t size,
 			bool yflip) override
 		{
-			#pragma pack(1)
-				struct TGAHeader
-				{
-					char idLength;
-					char colourMapType;
-					char dataType;
-					short int colourMapOrigin;
-					short int colourMapLength;
-					char colourMapDepth;
-					short int xOrigin;
-					short int yOrigin;
-					short int width;
-					short int height;
-					char bitsPerPixel;
-					char imageDescriptor;
-				};
-			#pragma pack()
-
 			TGAHeader header;
 			setMemory(&header, 0, sizeof(header));
 			int bytes_per_pixel = 4;

@@ -8,6 +8,7 @@
 #include "engine/matrix.h"
 #include "engine/quat.h"
 #include "engine/string.h"
+#include "engine/iplugin.h"
 
 
 namespace Lumix
