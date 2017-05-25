@@ -345,15 +345,11 @@ void Universe::destroyEntity(Entity entity)
 	if (!entity.isValid()) return;
 
 	EntityData& entity_data = m_entities[entity.index];
-	if (entity_data.hierarchy >= 0)
+	for (Entity first_child = getFirstChild(entity); first_child.isValid(); first_child = getFirstChild(entity))
 	{
-		Hierarchy& h = m_hierarchy[entity_data.hierarchy];
-		while (h.first_child.isValid())
-		{
-			setParent(INVALID_ENTITY, h.first_child);
-		}
-		setParent(INVALID_ENTITY, entity);
+		setParent(INVALID_ENTITY, first_child);
 	}
+	setParent(INVALID_ENTITY, entity);
 	
 
 	u64 mask = entity_data.components;
