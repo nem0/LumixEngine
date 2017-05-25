@@ -63,7 +63,7 @@ static int autocompleteCallback(ImGuiTextEditCallbackData *data)
 	const auto& input_decl = controller->getEngineResource()->m_input_decl;
 	for (const auto& input : input_decl.inputs)
 	{
-		if (input.type == Anim::InputDecl::EMPTY && startsWith(input.name, tmp))
+		if (input.type != Anim::InputDecl::EMPTY && startsWith(input.name, tmp))
 		{
 			data->InsertChars(data->CursorPos, input.name + stringLength(tmp));
 			return 0;
