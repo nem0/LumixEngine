@@ -65,6 +65,19 @@ int DragFloat(lua_State* L)
 }
 
 
+int PushStyleColor(lua_State* L)
+{
+	int var = LuaWrapper::checkArg<int>(L, 1);
+	ImVec4 v;
+	v.x = LuaWrapper::checkArg<float>(L, 2);
+	v.y = LuaWrapper::checkArg<float>(L, 3);
+	v.z = LuaWrapper::checkArg<float>(L, 4);
+	v.w = LuaWrapper::checkArg<float>(L, 5);
+	ImGui::PushStyleColor(var, v);
+	return 0;
+}
+
+
 int PushStyleVar(lua_State* L)
 {
 	int var = LuaWrapper::checkArg<int>(L, 1);
@@ -954,9 +967,11 @@ public:
 		LuaImGui::registerCFunction(m_state, "OpenPopup", &LuaWrapper::wrap<decltype(&ImGui::OpenPopup), &ImGui::OpenPopup>);
 		LuaImGui::registerCFunction(m_state, "PopItemWidth", &LuaWrapper::wrap<decltype(&ImGui::PopItemWidth), &ImGui::PopItemWidth>);
 		LuaImGui::registerCFunction(m_state, "PopID", &LuaWrapper::wrap<decltype(&ImGui::PopID), &ImGui::PopID>);
+		LuaImGui::registerCFunction(m_state, "PopStyleColor", &LuaWrapper::wrap<decltype(&ImGui::PopStyleColor), &ImGui::PopStyleColor>);
 		LuaImGui::registerCFunction(m_state, "PopStyleVar", &LuaWrapper::wrap<decltype(&ImGui::PopStyleVar), &ImGui::PopStyleVar>);
 		LuaImGui::registerCFunction(m_state, "PushItemWidth", &LuaWrapper::wrap<decltype(&ImGui::PushItemWidth), &ImGui::PushItemWidth>);
 		LuaImGui::registerCFunction(m_state, "PushID", &LuaImGui::PushID);
+		LuaImGui::registerCFunction(m_state, "PushStyleColor", &LuaImGui::PushStyleColor);
 		LuaImGui::registerCFunction(m_state, "PushStyleVar", &LuaImGui::PushStyleVar);
 		LuaImGui::registerCFunction(m_state, "Rect", &LuaWrapper::wrap<decltype(&LuaImGui::Rect), &LuaImGui::Rect>);
 		LuaImGui::registerCFunction(m_state, "SameLine", &LuaImGui::SameLine);
