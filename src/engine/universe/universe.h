@@ -31,7 +31,7 @@ public:
 	typedef void (IScene::*Deserialize)(IDeserializer&, Entity, int);
 	struct ComponentTypeEntry
 	{
-		IScene* scene;
+		IScene* scene = nullptr;
 		void (IScene::*serialize)(ISerializer&, ComponentHandle);
 		void (IScene::*deserialize)(IDeserializer&, Entity, int);
 	};

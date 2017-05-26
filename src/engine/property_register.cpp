@@ -3,6 +3,7 @@
 #include "engine/crc32.h"
 #include "engine/default_allocator.h"
 #include "engine/iproperty_descriptor.h"
+#include "engine/log.h"
 
 
 namespace Lumix
@@ -142,7 +143,14 @@ ComponentType getComponentType(const char* id)
 		}
 	}
 
-	ComponentTypeData& type = getComponentTypes().emplace();
+	auto& cmp_types = getComponentTypes();
+	if (types.size() == ComponentType::MAX_TYPES_COUNT)
+	{
+		g_log_error.log("Engine") << "Too many component types";
+		return INVALID_COMPONENT_TYPE;
+	}
+
+	ComponentTypeData& type = cmp_types.emplace();
 	copyString(type.id, id);
 	type.id_hash = id_hash;
 	return {getComponentTypes().size() - 1};
