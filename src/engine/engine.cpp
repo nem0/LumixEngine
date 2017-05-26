@@ -637,6 +637,11 @@ public:
 				auto pos = LuaWrapper::toType<Vec3>(L, -1);
 				ctx->setPosition(e, pos);
 			}
+			else if (equalStrings(parameter_name, "rotation"))
+			{
+				auto rot = LuaWrapper::toType<Quat>(L, -1);
+				ctx->setRotation(e, rot);
+			}
 			else
 			{
 				ComponentType cmp_type = PropertyRegister::getComponentType(parameter_name);
