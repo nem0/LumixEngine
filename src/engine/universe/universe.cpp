@@ -273,6 +273,16 @@ const char* Universe::getEntityName(Entity entity) const
 }
 
 
+Entity Universe::getEntityByName(const char* name)
+{
+	for (const EntityName& name_data : m_names)
+	{
+		if (equalStrings(name_data.name, name)) return name_data.entity;
+	}
+	return INVALID_ENTITY;
+}
+
+
 void Universe::createEntity(Entity entity)
 {
 	while (m_entities.size() <= entity.index)
