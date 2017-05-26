@@ -36,6 +36,8 @@ public:
 		void (IScene::*deserialize)(IDeserializer&, Entity, int);
 	};
 
+	enum { ENTITY_NAME_MAX_LENGTH = 32 };
+
 public:
 	explicit Universe(IAllocator& allocator);
 	~Universe();
@@ -61,7 +63,6 @@ public:
 
 	Entity getFirstEntity() const;
 	Entity getNextEntity(Entity entity) const;
-	bool nameExists(const char* name) const;
 	const char* getEntityName(Entity entity) const;
 	void setEntityName(Entity entity, const char* name);
 	bool hasEntity(Entity entity) const;
@@ -144,6 +145,7 @@ private:
 		Quat rotation;
 		
 		int hierarchy;
+		int name;
 
 		union
 		{
@@ -161,14 +163,19 @@ private:
 		bool valid;
 	};
 
+	struct EntityName
+	{
+		Entity entity;
+		char name[ENTITY_NAME_MAX_LENGTH];
+	};
+
 private:
 	IAllocator& m_allocator;
 	ComponentTypeEntry m_component_type_map[ComponentType::MAX_TYPES_COUNT];
 	Array<IScene*> m_scenes;
 	Array<EntityData> m_entities;
 	Array<Hierarchy> m_hierarchy;
-	AssociativeArray<u32, u32> m_name_to_id_map;
-	AssociativeArray<u32, string> m_id_to_name_map;
+	Array<EntityName> m_names;
 	DelegateList<void(Entity)> m_entity_moved;
 	DelegateList<void(Entity)> m_entity_created;
 	DelegateList<void(Entity)> m_entity_destroyed;

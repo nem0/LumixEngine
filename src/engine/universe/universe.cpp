@@ -26,8 +26,7 @@ Universe::~Universe()
 
 Universe::Universe(IAllocator& allocator)
 	: m_allocator(allocator)
-	, m_name_to_id_map(m_allocator)
-	, m_id_to_name_map(m_allocator)
+	, m_names(m_allocator)
 	, m_entities(m_allocator)
 	, m_component_added(m_allocator)
 	, m_component_destroyed(m_allocator)
@@ -250,26 +249,27 @@ void Universe::setPosition(Entity entity, const Vec3& pos)
 
 void Universe::setEntityName(Entity entity, const char* name)
 {
-	int name_index = m_id_to_name_map.find(entity.index);
-	if (name_index >= 0)
+	int name_idx = m_entities[entity.index].name;
+	if (name_idx < 0)
 	{
-		u32 hash = crc32(m_id_to_name_map.at(name_index).c_str());
-		m_name_to_id_map.erase(hash);
-		m_id_to_name_map.eraseAt(name_index);
+		if (name[0] == '\0') return;
+		m_entities[entity.index].name = m_names.size();
+		EntityName& name_data = m_names.emplace();
+		name_data.entity = entity;
+		copyString(name_data.name, name);
 	}
-
-	if (name && name[0] != '\0')
+	else
 	{
-		m_name_to_id_map.insert(crc32(name), entity.index);
-		m_id_to_name_map.insert(entity.index, string(name, getAllocator()));
+		copyString(m_names[name_idx].name, name);
 	}
 }
 
 
 const char* Universe::getEntityName(Entity entity) const
 {
-	int name_index = m_id_to_name_map.find(entity.index);
-	return name_index < 0 ? "" : m_id_to_name_map.at(name_index).c_str();
+	int name_idx = m_entities[entity.index].name;
+	if (name_idx < 0) return "";
+	return m_names[name_idx].name;
 }
 
 
@@ -280,6 +280,7 @@ void Universe::createEntity(Entity entity)
 		EntityData& data = m_entities.emplace();
 		data.valid = false;
 		data.prev = -1;
+		data.name = -1;
 		data.hierarchy = -1;
 		data.next = m_first_free_slot;
 		data.scale = -1;
@@ -305,6 +306,7 @@ void Universe::createEntity(Entity entity)
 	data.position.set(0, 0, 0);
 	data.rotation.set(0, 0, 0, 1);
 	data.scale = 1;
+	data.name = -1;
 	data.hierarchy = -1;
 	data.components = 0;
 	data.valid = true;
@@ -331,6 +333,7 @@ Entity Universe::createEntity(const Vec3& position, const Quat& rotation)
 	data->position = position;
 	data->rotation = rotation;
 	data->scale = 1;
+	data->name = -1;
 	data->hierarchy = -1;
 	data->components = 0;
 	data->valid = true;
@@ -343,7 +346,7 @@ Entity Universe::createEntity(const Vec3& position, const Quat& rotation)
 void Universe::destroyEntity(Entity entity)
 {
 	if (!entity.isValid()) return;
-
+	
 	EntityData& entity_data = m_entities[entity.index];
 	for (Entity first_child = getFirstChild(entity); first_child.isValid(); first_child = getFirstChild(entity))
 	{
@@ -369,18 +372,18 @@ void Universe::destroyEntity(Entity entity)
 	entity_data.next = m_first_free_slot;
 	entity_data.prev = -1;
 	entity_data.hierarchy = -1;
+	
 	entity_data.valid = false;
 	if (m_first_free_slot >= 0)
 	{
 		m_entities[m_first_free_slot].prev = entity.index;
 	}
 
-	int name_index = m_id_to_name_map.find(entity.index);
-	if (name_index >= 0)
+	if (entity_data.name >= 0)
 	{
-		u32 name_hash = crc32(m_id_to_name_map.at(name_index).c_str());
-		m_name_to_id_map.erase(name_hash);
-		m_id_to_name_map.eraseAt(name_index);
+		m_entities[m_names.back().entity.index].name = entity_data.name;
+		m_names.eraseFast(entity_data.name);
+		entity_data.name = -1;
 	}
 
 	m_first_free_slot = entity.index;
@@ -607,11 +610,11 @@ void Universe::serialize(OutputBlob& serializer)
 {
 	serializer.write((i32)m_entities.size());
 	serializer.write(&m_entities[0], sizeof(m_entities[0]) * m_entities.size());
-	serializer.write((i32)m_id_to_name_map.size());
-	for (int i = 0, c = m_id_to_name_map.size(); i < c; ++i)
+	serializer.write((i32)m_names.size());
+	for (const EntityName& name : m_names)
 	{
-		serializer.write(m_id_to_name_map.getKey(i));
-		serializer.writeString(m_id_to_name_map.at(i).c_str());
+		serializer.write(name.entity);
+		serializer.writeString(name.name);
 	}
 	serializer.write(m_first_free_slot);
 
@@ -629,16 +632,12 @@ void Universe::deserialize(InputBlob& serializer)
 	if (count > 0) serializer.read(&m_entities[0], sizeof(m_entities[0]) * m_entities.size());
 
 	serializer.read(count);
-	m_id_to_name_map.clear();
-	m_name_to_id_map.clear();
 	for (int i = 0; i < count; ++i)
 	{
-		u32 key;
-		char name[50];
-		serializer.read(key);
-		serializer.readString(name, sizeof(name));
-		m_id_to_name_map.insert(key, string(name, m_allocator));
-		m_name_to_id_map.insert(crc32(name), key);
+		EntityName& name = m_names.emplace();
+		serializer.read(name.entity);
+		serializer.readString(name.name, lengthOf(name.name));
+		m_entities[name.entity.index].name = m_names.size() - 1;
 	}
 
 	serializer.read(m_first_free_slot);
@@ -808,12 +807,6 @@ void Universe::addComponent(Entity entity, ComponentType component_type, IScene*
 	ComponentUID cmp(entity, component_type, scene, index);
 	m_entities[entity.index].components |= (u64)1 << component_type.index;
 	m_component_added.invoke(cmp);
-}
-
-
-bool Universe::nameExists(const char* name) const
-{
-	return m_name_to_id_map.find(crc32(name)) != -1;
 }
 
 
