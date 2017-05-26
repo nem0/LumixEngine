@@ -1303,6 +1303,7 @@ private:
 				}
 				EntityGUID guid = m_editor.m_entity_map.get(m_entities[i]);
 				m_old_values.write(guid.value);
+				m_old_values.writeString(universe->getEntityName(m_entities[i]));
 				Entity parent = universe->getParent(m_entities[i]);
 				m_old_values.write(parent);
 				if (parent.isValid())
@@ -1373,6 +1374,9 @@ private:
 				EntityGUID guid;
 				blob.read(guid.value);
 				m_editor.m_entity_map.insert(guid, new_entity);
+				char name[Universe::ENTITY_NAME_MAX_LENGTH];
+				blob.readString(name, lengthOf(name));
+				universe->setEntityName(new_entity, name);
 				Entity parent;
 				blob.read(parent);
 				if (parent.isValid())
