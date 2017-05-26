@@ -106,6 +106,13 @@ int SetStyleColor(lua_State* L)
 }
 
 
+int ShowTestWindow(lua_State* L)
+{
+	ImGui::ShowTestWindow();
+	return 0;
+}
+
+
 int SliderFloat(lua_State* L)
 {
 	auto* name = LuaWrapper::checkArg<const char*>(L, 1);
@@ -156,6 +163,17 @@ int CollapsingHeader(lua_State* L)
 	auto* label = LuaWrapper::checkArg<const char*>(L, 1);
 	lua_pushboolean(L, ImGui::CollapsingHeader(label));
 	return 1;
+}
+
+
+int CalcTextSize(lua_State* L)
+{
+	auto* text = LuaWrapper::checkArg<const char*>(L, 1);
+	ImVec2 size = ImGui::CalcTextSize(text);
+
+	LuaWrapper::push(L, size.x);
+	LuaWrapper::push(L, size.y);
+	return 2;
 }
 
 
@@ -909,14 +927,17 @@ public:
 		LuaImGui::registerCFunction(m_state, "BeginDock", LuaImGui::BeginDock);
 		LuaImGui::registerCFunction(m_state, "BeginPopup", &LuaWrapper::wrap<decltype(&ImGui::BeginPopup), &ImGui::BeginPopup>);
 		LuaImGui::registerCFunction(m_state, "Button", &LuaImGui::Button);
+		LuaImGui::registerCFunction(m_state, "CalcTextSize", &LuaImGui::CalcTextSize);
 		LuaImGui::registerCFunction(m_state, "Checkbox", &LuaImGui::Checkbox);
 		LuaImGui::registerCFunction(m_state, "CollapsingHeader", &LuaImGui::CollapsingHeader);
+		LuaImGui::registerCFunction(m_state, "Columns", &LuaWrapper::wrap<decltype(&ImGui::Columns), &ImGui::Columns>);
 		LuaImGui::registerCFunction(m_state, "DragFloat", &LuaImGui::DragFloat);
 		LuaImGui::registerCFunction(m_state, "Dummy", &LuaWrapper::wrap<decltype(&LuaImGui::Dummy), &LuaImGui::Dummy>);
 		LuaImGui::registerCFunction(m_state, "End", &LuaWrapper::wrap<decltype(&ImGui::End), &ImGui::End>);
 		LuaImGui::registerCFunction(m_state, "EndChildFrame", &LuaWrapper::wrap<decltype(&ImGui::EndChildFrame), &ImGui::EndChildFrame>);
 		LuaImGui::registerCFunction(m_state, "EndDock", &LuaWrapper::wrap<decltype(&ImGui::EndDock), &ImGui::EndDock>);
 		LuaImGui::registerCFunction(m_state, "EndPopup", &LuaWrapper::wrap<decltype(&ImGui::EndPopup), &ImGui::EndPopup>);
+		LuaImGui::registerCFunction(m_state, "GetColumnWidth", &LuaWrapper::wrap<decltype(&ImGui::GetColumnWidth), &ImGui::GetColumnWidth>);
 		LuaImGui::registerCFunction(m_state, "GetDisplayWidth", &LuaImGui::GetDisplayWidth);
 		LuaImGui::registerCFunction(m_state, "GetDisplayHeight", &LuaImGui::GetDisplayHeight);
 		LuaImGui::registerCFunction(m_state, "GetWindowWidth", &LuaImGui::GetWindowWidth);
@@ -928,6 +949,8 @@ public:
 		LuaImGui::registerCFunction(m_state, "IsItemHovered", &LuaWrapper::wrap<decltype(&LuaImGui::IsItemHovered), &LuaImGui::IsItemHovered>);
 		LuaImGui::registerCFunction(m_state, "IsMouseClicked", &LuaWrapper::wrap<decltype(&LuaImGui::IsMouseClicked), &LuaImGui::IsMouseClicked>);
 		LuaImGui::registerCFunction(m_state, "IsMouseDown", &LuaWrapper::wrap<decltype(&LuaImGui::IsMouseDown), &LuaImGui::IsMouseDown>);
+		LuaImGui::registerCFunction(m_state, "NewLine", &LuaWrapper::wrap<decltype(&ImGui::NewLine), &ImGui::NewLine>);
+		LuaImGui::registerCFunction(m_state, "NextColumn", &LuaWrapper::wrap<decltype(&ImGui::NextColumn), &ImGui::NextColumn>);
 		LuaImGui::registerCFunction(m_state, "OpenPopup", &LuaWrapper::wrap<decltype(&ImGui::OpenPopup), &ImGui::OpenPopup>);
 		LuaImGui::registerCFunction(m_state, "PopItemWidth", &LuaWrapper::wrap<decltype(&ImGui::PopItemWidth), &ImGui::PopItemWidth>);
 		LuaImGui::registerCFunction(m_state, "PopID", &LuaWrapper::wrap<decltype(&ImGui::PopID), &ImGui::PopID>);
@@ -944,6 +967,7 @@ public:
 		LuaImGui::registerCFunction(m_state, "SetNextWindowPosCenter", &LuaImGui::SetNextWindowPosCenter);
 		LuaImGui::registerCFunction(m_state, "SetNextWindowSize", &LuaWrapper::wrap<decltype(&LuaImGui::SetNextWindowSize), &LuaImGui::SetNextWindowSize>);
 		LuaImGui::registerCFunction(m_state, "SetStyleColor", &LuaImGui::SetStyleColor);
+		LuaImGui::registerCFunction(m_state, "ShowTestWindow", &LuaImGui::ShowTestWindow);
 		LuaImGui::registerCFunction(m_state, "SliderFloat", &LuaImGui::SliderFloat);
 		LuaImGui::registerCFunction(m_state, "Text", &LuaImGui::Text);
 		LuaImGui::registerCFunction(m_state, "Unindent", &LuaWrapper::wrap<decltype(&ImGui::Unindent), &ImGui::Unindent>);
