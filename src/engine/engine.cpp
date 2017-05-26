@@ -797,6 +797,81 @@ public:
 	static Quat LUA_multQuat(const Quat& a, const Quat& b) { return a * b; }
 
 
+	static int LUA_loadUniverse(lua_State* L)
+	{
+		auto* engine = LuaWrapper::checkArg<Engine*>(L, 1);
+		auto* universe = LuaWrapper::checkArg<Universe*>(L, 2);
+		auto* path = LuaWrapper::checkArg<const char*>(L, 3);
+		if (!lua_isfunction(L, 4)) LuaWrapper::argError(L, 4, "function");
+		FS::FileSystem& fs = engine->getFileSystem();
+		FS::ReadCallback cb;
+		struct Callback
+		{
+			~Callback()
+			{
+				luaL_unref(L, LUA_REGISTRYINDEX, lua_func);
+			}
+
+			void invoke(FS::IFile& file, bool success)
+			{
+				if (!success)
+				{
+					g_log_error.log("Engine") << "Failed to open universe " << path;
+				}
+				else
+				{
+					InputBlob blob(file.getBuffer(), (int)file.size());
+					#pragma pack(1)
+						struct Header
+						{
+							u32 magic;
+							int version;
+							u32 hash;
+							u32 engine_hash;
+						};
+					#pragma pack()
+					Header header;
+					blob.read(&header, sizeof(header));
+
+					if (!engine->deserialize(*universe, blob))
+					{
+						g_log_error.log("Engine") << "Failed to deserialize universe " << path;
+					}
+					else
+					{
+						if (lua_rawgeti(L, LUA_REGISTRYINDEX, lua_func) != LUA_TFUNCTION)
+						{
+							ASSERT(false);
+						}
+
+						if (lua_pcall(L, 0, 0, 0) != LUA_OK)
+						{
+							g_log_error.log("Engine") << lua_tostring(L, -1);
+							lua_pop(L, 1);
+						}
+					}
+				}
+				LUMIX_DELETE(engine->getAllocator(), this);
+			}
+
+			Engine* engine;
+			Universe* universe;
+			Path path;
+			lua_State* L;
+			int lua_func;
+		};
+		Callback* inst = LUMIX_NEW(engine->getAllocator(), Callback);
+		inst->engine = engine;
+		inst->universe = universe;
+		inst->path = path;
+		inst->L = L;
+		inst->lua_func = luaL_ref(L, LUA_REGISTRYINDEX);
+		cb.bind<Callback, &Callback::invoke>(inst);
+		fs.openAsync(fs.getDefaultDevice(), inst->path, FS::Mode::OPEN_AND_READ, cb);
+		return 0;
+	}
+
+
 	static int LUA_multVecQuat(lua_State* L)
 	{
 		Vec3 v = LuaWrapper::checkArg<Vec3>(L, 1);
@@ -828,6 +903,12 @@ public:
 			return Vec3(0, 0, 0);
 		}
 		return universe->getPosition(entity);
+	}
+
+
+	static Entity LUA_getEntityByName(Universe* universe, const char* name)
+	{
+		return universe->getEntityByName(name);
 	}
 
 
@@ -875,6 +956,7 @@ public:
 		REGISTER_FUNCTION(getEntityDirection);
 		REGISTER_FUNCTION(getEntityPosition);
 		REGISTER_FUNCTION(getEntityRotation);
+		REGISTER_FUNCTION(getEntityByName);
 		REGISTER_FUNCTION(getFirstEntity);
 		REGISTER_FUNCTION(getInputActionValue);
 		REGISTER_FUNCTION(getNextEntity);
@@ -896,6 +978,8 @@ public:
 		REGISTER_FUNCTION(setTimeMultiplier);
 		REGISTER_FUNCTION(startGame);
 		REGISTER_FUNCTION(unloadResource);
+
+		LuaWrapper::createSystemFunction(m_state, "Engine", "loadUniverse", LUA_loadUniverse);
 
 		#undef REGISTER_FUNCTION
 
