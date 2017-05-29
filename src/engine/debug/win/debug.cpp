@@ -666,15 +666,28 @@ static void getStack(CONTEXT& context, char* out, int max_size)
 	thread = GetCurrentThread();
 	displacement = 0;
 	DWORD machineType;
-#ifdef _WIN64
-	machineType = IMAGE_FILE_MACHINE_IA64;
+
+#ifdef _M_X64
+	machineType = IMAGE_FILE_MACHINE_AMD64;
 	stack.AddrPC.Offset = context.Rip;
 	stack.AddrPC.Mode = AddrModeFlat;
 	stack.AddrStack.Offset = context.Rsp;
 	stack.AddrStack.Mode = AddrModeFlat;
 	stack.AddrFrame.Offset = context.Rbp;
 	stack.AddrFrame.Mode = AddrModeFlat;
+#elif defined _M_IA64
+	#error not supported
+	machineType = IMAGE_FILE_MACHINE_IA64;
+	stack.AddrPC.Offset = context.StIIP;
+	stack.AddrPC.Mode = AddrModeFlat;
+	stack.AddrFrame.Offset = context.IntSp;
+	stack.AddrFrame.Mode = AddrModeFlat;
+	stack.AddrBStore.Offset = context.RsBSP;
+	stack.AddrBStore.Mode = AddrModeFlat;
+	stack.AddrStack.Offset = context.IntSp;
+	stack.AddrStack.Mode = AddrModeFlat;
 #else
+	#error not supported
 	machineType = IMAGE_FILE_MACHINE_I386;
 	stack.AddrPC.Offset = context.Eip;
 	stack.AddrPC.Mode = AddrModeFlat;
@@ -702,8 +715,8 @@ static void getStack(CONTEXT& context, char* out, int max_size)
 		SymGetSymFromAddr64(process, (ULONG64)stack.AddrPC.Offset, &displacement, symbol);
 		UnDecorateSymbolName(symbol->Name, (PSTR)name, 256, UNDNAME_COMPLETE);
 
-		catString(out, max_size, symbol->Name);
-		catString(out, max_size, "\n");
+		if (!catString(out, max_size, symbol->Name)) return;
+		if (!catString(out, max_size, "\n")) return;
 
 	} while (result);
 }
