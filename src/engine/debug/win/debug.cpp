@@ -734,15 +734,19 @@ static LONG WINAPI unhandledExceptionHandler(LPEXCEPTION_POINTERS info)
 
 	auto dumper = [](void* data) -> DWORD {
 		auto info = ((CrashInfo*)data)->info;
-		char message[4096];
+		uintptr base = (uintptr)GetModuleHandle(NULL);
+		StaticString<4096> message;
 		if(info)
 		{
-			getStack(*info->ContextRecord, message, sizeof(message));
+			getStack(*info->ContextRecord, message.data, sizeof(message.data));
+			message << "\nCode: " << (u32)info->ExceptionRecord->ExceptionCode;
+			message << "\nAddress: " << (uintptr)info->ExceptionRecord->ExceptionAddress;
+			message << "\nBase: " << (uintptr)base;
 			messageBox(message);
 		}
 		else
 		{
-			message[0] = '\0';
+			message.data[0] = '\0';
 		}
 
 		char minidump_path[MAX_PATH_LENGTH];
