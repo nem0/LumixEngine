@@ -69,6 +69,7 @@ public:
 		, m_universe(nullptr)
 		, m_exit_code(0)
 		, m_pipeline(nullptr)
+		, m_finished(false)
 	{
 		m_frame_timer = Timer::create(m_allocator);
 		ASSERT(!s_instance);
@@ -289,18 +290,20 @@ public:
 		
 		while (ShowCursor(false) >= 0);
 		onResize();
+
+		runStartupScript();
 	}
 
 
-	void startupScriptLoaded(FS::IFile& file, bool success)
+	void runStartupScript()
 	{
-		if (!success)
+		FS::FileSystem& fs = m_engine->getFileSystem();
+		FS::IFile* file = fs.open(fs.getDefaultDevice(), Path(m_startup_script_path), FS::Mode::OPEN_AND_READ);
+		if (file)
 		{
-			g_log_error.log("App") << "Could not open " << m_startup_script_path;
-			return;
+			m_engine->runScript((const char*)file->getBuffer(), (int)file->size(), m_startup_script_path);
 		}
-
-		m_engine->runScript((const char*)file.getBuffer(), (int)file.size(), m_startup_script_path);
+		fs.close(*file);
 	}
 
 
@@ -311,23 +314,18 @@ public:
 
 		#define REGISTER_FUNCTION(F, name) \
 			do { \
-				auto* f = &LuaWrapper::wrapMethod<App, decltype(&App::F), &App::F>; \
-				LuaWrapper::createSystemFunction(L, "App", name, f); \
+				auto* f = &LuaWrapper::wrapMethodClosure<App, decltype(&App::F), &App::F>; \
+				LuaWrapper::createSystemClosure(L, "App", this, name, f); \
 			} while(false) \
 
 		REGISTER_FUNCTION(loadUniverse, "loadUniverse");
 		REGISTER_FUNCTION(frame, "frame");
 		REGISTER_FUNCTION(exit, "exit");
+		REGISTER_FUNCTION(isFinished, "isFinished");
 
 		#undef REGISTER_FUNCTION
 
-		LuaWrapper::createSystemVariable(L, "App", "instance", this);
 		LuaWrapper::createSystemVariable(L, "App", "universe", m_universe);
-
-		auto& fs = m_engine->getFileSystem();
-		FS::ReadCallback cb;
-		cb.bind<App, &App::startupScriptLoaded>(this);
-		fs.openAsync(fs.getDefaultDevice(), Path(m_startup_script_path), FS::Mode::OPEN_AND_READ, cb);
 	}
 
 
@@ -468,6 +466,9 @@ public:
 	}
 
 
+	bool isFinished() const { return m_finished; }
+
+
 	void frame()
 	{
 		float frame_time = m_frame_timer->tick();
@@ -487,7 +488,6 @@ public:
 
 	void run()
 	{
-		m_finished = false;
 		while (!m_finished)
 		{
 			frame();
