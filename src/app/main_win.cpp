@@ -319,6 +319,7 @@ public:
 			} while(false) \
 
 		REGISTER_FUNCTION(loadUniverse, "loadUniverse");
+		REGISTER_FUNCTION(setUniverse, "setUniverse");
 		REGISTER_FUNCTION(frame, "frame");
 		REGISTER_FUNCTION(exit, "exit");
 		REGISTER_FUNCTION(isFinished, "isFinished");
@@ -350,8 +351,7 @@ public:
 		#pragma pack()
 		Header header;
 		blob.read(header);
-		if (crc32((const u8*)blob.getData() + sizeof(header), blob.getSize() - sizeof(header)) !=
-			header.hash)
+		if (crc32((const u8*)blob.getData() + sizeof(header), blob.getSize() - sizeof(header)) != header.hash)
 		{
 			g_log_error.log("App") << "Universe corrupted";
 			return;
@@ -368,6 +368,16 @@ public:
 		{
 			g_log_error.log("App") << "Failed to deserialize universe";
 		}
+	}
+
+
+	void setUniverse(Universe* universe)
+	{
+		m_engine->destroyUniverse(*m_universe);
+		m_universe = universe;
+		m_universe->setName("runtime");
+		m_pipeline->setScene((RenderScene*)m_universe->getScene(crc32("renderer")));
+		LuaWrapper::createSystemVariable(m_engine->getState(), "App", "universe", m_universe);
 	}
 
 
