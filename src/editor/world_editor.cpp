@@ -1364,7 +1364,7 @@ private:
 			InputBlob blob(m_old_values);
 			for (int i = 0; i < m_entities.size(); ++i)
 			{
-				universe->createEntity(m_entities[i]);
+				universe->emplaceEntity(m_entities[i]);
 			}
 			for (int i = 0; i < m_entities.size(); ++i)
 			{
@@ -1612,7 +1612,7 @@ private:
 			}
 			else
 			{
-				m_editor.getUniverse()->createEntity(m_entity);
+				m_editor.getUniverse()->emplaceEntity(m_entity);
 				m_editor.getUniverse()->setPosition(m_entity, m_position);
 			}
 			((WorldEditorImpl&)m_editor).m_entity_map.create(m_entity);

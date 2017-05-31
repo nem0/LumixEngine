@@ -43,7 +43,7 @@ public:
 	~Universe();
 
 	IAllocator& getAllocator() { return m_allocator; }
-	void createEntity(Entity entity);
+	void emplaceEntity(Entity entity);
 	Entity createEntity(const Vec3& position, const Quat& rotation);
 	void destroyEntity(Entity entity);
 	void addComponent(Entity entity, ComponentType component_type, IScene* scene, ComponentHandle index);

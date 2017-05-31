@@ -283,7 +283,7 @@ Entity Universe::getEntityByName(const char* name)
 }
 
 
-void Universe::createEntity(Entity entity)
+void Universe::emplaceEntity(Entity entity)
 {
 	while (m_entities.size() <= entity.index)
 	{
