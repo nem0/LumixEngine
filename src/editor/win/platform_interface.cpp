@@ -58,6 +58,12 @@ bool getNextFile(FileIterator* iterator, FileInfo* info)
 }
 
 
+void setCurrentDirectory(const char* path)
+{
+	SetCurrentDirectory(path);
+}
+
+
 void getCurrentDirectory(char* buffer, int buffer_size)
 {
 	GetCurrentDirectory(buffer_size, buffer);

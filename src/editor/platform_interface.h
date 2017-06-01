@@ -29,6 +29,7 @@ namespace PlatformInterface
 	LUMIX_EDITOR_API void destroyFileIterator(FileIterator* iterator);
 	LUMIX_EDITOR_API bool getNextFile(FileIterator* iterator, FileInfo* info);
 
+	LUMIX_EDITOR_API void setCurrentDirectory(const char* path);
 	LUMIX_EDITOR_API void getCurrentDirectory(char* buffer, int buffer_size);
 	LUMIX_EDITOR_API bool getOpenFilename(char* out, int max_size, const char* filter, const char* starting_file);
 	LUMIX_EDITOR_API bool getSaveFilename(char* out, int max_size, const char* filter, const char* default_extension);
