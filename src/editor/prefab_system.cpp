@@ -435,7 +435,7 @@ public:
 		}
 
 		int entity_idx = 0;
-		while (blob.getPosition() < blob.getSize())
+		while (blob.getPosition() < blob.getSize() && entity_idx < count)
 		{
 			u64 prefab;
 			deserializer.read(&prefab);
