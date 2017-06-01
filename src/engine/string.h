@@ -58,6 +58,12 @@ inline bool isLetter(char c)
 }
 
 
+inline bool isNumeric(char c)
+{
+	return c >= '0' && c <= '9';
+}
+
+
 inline bool isUpperCase(char c)
 {
 	return c >= 'A' && c <= 'Z';
