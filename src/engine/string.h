@@ -34,6 +34,8 @@ LUMIX_ENGINE_API bool copyNString(char* destination,
 LUMIX_ENGINE_API bool catString(char* destination, int length, const char* source);
 LUMIX_ENGINE_API bool catNString(char* destination, int length, const char* source, int source_len);
 LUMIX_ENGINE_API bool makeLowercase(char* destination, int length, const char* source);
+LUMIX_ENGINE_API char makeUppercase(char c);
+LUMIX_ENGINE_API bool makeUppercase(char* destination, int length, const char* source);
 LUMIX_ENGINE_API char* trimmed(char* str);
 LUMIX_ENGINE_API bool startsWith(const char* str, const char* prefix);
 LUMIX_ENGINE_API int stringLength(const char* str);

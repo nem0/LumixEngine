@@ -231,6 +231,12 @@ static char makeLowercase(char c)
 }
 
 
+char makeUppercase(char c)
+{
+	return c >= 'a' && c <= 'z' ? c - ('a' - 'A') : c;
+}
+
+
 int compareMemory(const void* lhs, const void* rhs, size_t size)
 {
 	return memcmp(lhs, rhs, size);
@@ -341,6 +347,29 @@ bool makeLowercase(char* destination, int length, const char* source)
 	while (*source && length)
 	{
 		*destination = makeLowercase(*source);
+		--length;
+		++destination;
+		++source;
+	}
+	if (length > 0)
+	{
+		*destination = 0;
+		return true;
+	}
+	return false;
+}
+
+
+bool makeUppercase(char* destination, int length, const char* source)
+{
+	if (!source)
+	{
+		return false;
+	}
+
+	while (*source && length)
+	{
+		*destination = makeUppercase(*source);
 		--length;
 		++destination;
 		++source;
