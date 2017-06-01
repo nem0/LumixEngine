@@ -701,7 +701,7 @@ Entity Universe::instantiatePrefab(const PrefabResource& prefab,
 	{
 		entities.push(createEntity({0, 0, 0}, {0, 0, 0, 1}));
 	}
-	while (blob.getPosition() < blob.getSize())
+	while (blob.getPosition() < blob.getSize() && entity_idx < count)
 	{
 		u64 prefab;
 		deserializer.read(&prefab);
