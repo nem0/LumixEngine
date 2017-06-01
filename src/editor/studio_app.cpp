@@ -2071,6 +2071,13 @@ public:
 	void checkWorkingDirector()
 	{
 		if (!PlatformInterface::fileExists("../LumixStudio.lnk")) return;
+
+		if (!PlatformInterface::dirExists("bin") && PlatformInterface::dirExists("../bin") &&
+			PlatformInterface::dirExists("../pipelines"))
+		{
+			PlatformInterface::setCurrentDirectory("../");
+		}
+
 		if (!PlatformInterface::dirExists("bin"))
 		{
 			messageBox("Bin directory not found, please check working directory.");
