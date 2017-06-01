@@ -746,6 +746,11 @@ namespace Lumix
 					to_upper = false;
 					++dest;
 				}
+				else if (isNumeric(*src))
+				{
+					*dest = *src;
+					++dest;
+				}
 				else
 				{
 					to_upper = true;
