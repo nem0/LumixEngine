@@ -2869,7 +2869,9 @@ public:
 		const char* framebuffer_name,
 		int renderbuffer_idx)
 	{
-		FrameBuffer::RenderBuffer& rb = pipeline->getFramebuffer(framebuffer_name)->getRenderbuffer(renderbuffer_idx);
+		FrameBuffer* fb = pipeline->getFramebuffer(framebuffer_name);
+		if (!fb) return nullptr;
+		FrameBuffer::RenderBuffer& rb = fb->getRenderbuffer(renderbuffer_idx);
 		return &rb.m_handle;
 	}
 

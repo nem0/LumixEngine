@@ -702,6 +702,23 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
+	void bindRenderbuffer(bgfx::TextureHandle* rb, int width, int height, int uniform_idx)
+	{
+		if (!rb) return;
+
+		Vec4 size;
+		size.x = (float)width;
+		size.y = (float)height;
+		m_current_view->command_buffer.beginAppend();
+		if (m_global_textures_count == 0) m_current_view->command_buffer.setUniform(m_texture_size_uniform, size);
+		m_current_view->command_buffer.setTexture(15 - m_global_textures_count,
+			m_uniforms[uniform_idx],
+			*rb);
+		++m_global_textures_count;
+		m_current_view->command_buffer.end();
+	}
+
+
 	void bindFramebufferTexture(const char* framebuffer_name, int renderbuffer_idx, int uniform_idx)
 	{
 		FrameBuffer* fb = getFramebuffer(framebuffer_name);
@@ -3072,10 +3089,13 @@ void Pipeline::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(setViewSeq);
 	REGISTER_FUNCTION(drawQuad);
 	REGISTER_FUNCTION(setPass);
+	REGISTER_FUNCTION(bindRenderbuffer);
 	REGISTER_FUNCTION(bindFramebufferTexture);
 	REGISTER_FUNCTION(bindTexture);
 	REGISTER_FUNCTION(bindEnvironmentMaps);
 	REGISTER_FUNCTION(applyCamera);
+	REGISTER_FUNCTION(getWidth);
+	REGISTER_FUNCTION(getHeight);
 
 	REGISTER_FUNCTION(disableBlending);
 	REGISTER_FUNCTION(enableAlphaWrite);
