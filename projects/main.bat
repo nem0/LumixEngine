@@ -25,6 +25,14 @@ function archive()
 	app.ShellExecute("archive.bat")
 }
 
+function symstore()
+{
+	app.ShellExecute("C:/Program Files (x86)/Windows Kits/10/Debuggers/x64/symstore.exe", "add /s \"../../lumixengine_pdb/\" /compress /r /f ../../lumixengine_data/bin/*.pdb /t LumixEngine", "../../lumixengine_data/bin/")
+	setTimeout(function() {
+		app.ShellExecute("C:/Program Files (x86)/Windows Kits/10/Debuggers/x64/symstore.exe", "add /s \"../../lumixengine_pdb/\" /compress /r /f ../../lumixengine_data/bin/*.exe /t LumixEngine", "../../lumixengine_data/bin/")	
+	}, 2000)
+}
+
 function publishToItchIO()
 {
 	app.ShellExecute("C:/Users/Miki/AppData/Roaming/itch/bin/butler.exe", "login")
@@ -73,6 +81,7 @@ function cleanAll()
    <button style="width:200" onclick="archive();">Archive</button>
    <button style="width:200" onclick="publishToItchIO();">Publish to itch.io</button>
    <button style="width:200" onclick="openInVS();">Open in VS</button>
+   <button style="width:200" onclick="symstore();">Symstore</button>
    <button style="width:200" onclick="cleanAll();">Clean all</button>
 </BODY>
 </HTML>
