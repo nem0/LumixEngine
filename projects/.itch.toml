@@ -1,0 +1,18 @@
+[[prereqs]]
+name = "vcredist-2015-x64"
+
+[[actions]]
+name = "play"
+path = "LumixStudio.lnk"
+
+[[actions]]
+name = "Documentation"
+path = "https://github.com/nem0/lumixengine/wiki"
+
+[[actions]]
+name = "Source code"
+path = "https://github.com/nem0/lumixengine"
+
+[[actions]]
+name = "Video tutorials"
+path = "https://www.youtube.com/watch?v=5ljk2myprno&list=PLmpj2nDGsFkQfPBC12XYGAyCL8IJ4WbQO"
