@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2016 Branimir Karadzic. All rights reserved.
+ * Copyright 2011-2017 Branimir Karadzic. All rights reserved.
  * License: https://github.com/bkaradzic/bgfx/blob/master/LICENSE
  */
 
@@ -11,7 +11,7 @@
 // necessary to use this header in conjunction with creating windows.
 
 #include <bx/platform.h>
-#include <bgfx/bgfx.h>
+#include "bgfx.h"
 
 namespace bgfx
 {
@@ -25,6 +25,7 @@ namespace bgfx
 		{
 			NoContext,
 			Render,
+			Timeout,
 			Exiting,
 
 			Count
@@ -51,6 +52,7 @@ namespace bgfx
 		void* context;      //!< GL context, or D3D device.
 		void* backBuffer;   //!< GL backbuffer, or D3D render target view.
 		void* backBufferDS; //!< Backbuffer depth/stencil.
+		void* session;      //!< ovrSession, for Oculus SDK
 	};
 
 	/// Set platform data.
@@ -128,20 +130,5 @@ namespace bgfx
 	uintptr_t overrideInternal(TextureHandle _handle, uint16_t _width, uint16_t _height, uint8_t _numMips, TextureFormat::Enum _format, uint32_t _flags = BGFX_TEXTURE_NONE);
 
 } // namespace bgfx
-
-#if BX_PLATFORM_NACL
-#	include <ppapi/c/ppb_graphics_3d.h>
-#	include <ppapi/c/ppb_instance.h>
-
-namespace bgfx
-{
-	typedef void (*PostSwapBuffersFn)(uint32_t _width, uint32_t _height);
-
-	///
-	bool naclSetInterfaces(::PP_Instance, const ::PPB_Instance*, const ::PPB_Graphics3D*, PostSwapBuffersFn);
-
-} // namespace bgfx
-
-#endif // BX_PLATFORM_
 
 #endif // BGFX_PLATFORM_H_HEADER_GUARD

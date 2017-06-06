@@ -1305,10 +1305,8 @@ struct SceneViewPlugin LUMIX_FINAL : public StudioApp::IPlugin
 			if (!m_shader->isReady()) return;
 
 			auto& renderer = static_cast<Renderer&>(m_render_scene->getPlugin());
-			if (!bgfx::checkAvailTransientBuffers(vertices_count, renderer.getBasicVertexDecl(), indices_count))
-			{
-				return;
-			}
+			if (bgfx::getAvailTransientIndexBuffer(indices_count) < (u32)indices_count) return;
+			if (bgfx::getAvailTransientVertexBuffer(vertices_count, renderer.getBasicVertexDecl()) < (u32)vertices_count) return;
 			bgfx::TransientVertexBuffer vertex_buffer;
 			bgfx::TransientIndexBuffer index_buffer;
 			bgfx::allocTransientVertexBuffer(&vertex_buffer, vertices_count, renderer.getBasicVertexDecl());
@@ -2079,7 +2077,8 @@ struct GameViewPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		auto& decl = renderer->getBasic2DVertexDecl();
 		bgfx::TransientVertexBuffer vertex_buffer;
 		bgfx::TransientIndexBuffer index_buffer;
-		if (!bgfx::checkAvailTransientBuffers(num_vertices, decl, num_indices)) return;
+		if (bgfx::getAvailTransientIndexBuffer(num_indices) < (u32)num_indices) return;
+		if (bgfx::getAvailTransientVertexBuffer(num_vertices, decl) < (u32)num_vertices) return;
 		bgfx::allocTransientVertexBuffer(&vertex_buffer, num_vertices, decl);
 		bgfx::allocTransientIndexBuffer(&index_buffer, num_indices);
 

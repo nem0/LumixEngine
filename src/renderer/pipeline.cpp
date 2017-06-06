@@ -586,7 +586,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			executeCommandBuffer(view.command_buffer.buffer, material);
 
 			bgfx::setInstanceDataBuffer(instance_buffer, count);
-			bgfx::setVertexBuffer(m_particle_vertex_buffer);
+			bgfx::setVertexBuffer(0, m_particle_vertex_buffer);
 			bgfx::setIndexBuffer(m_particle_index_buffer);
 			bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
 			bgfx::setState(view.render_state | material->getRenderStates());
@@ -761,7 +761,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		executeCommandBuffer(material->getCommandBuffer(), material);
 		executeCommandBuffer(view.command_buffer.buffer, material);
 
-		bgfx::setVertexBuffer(model.getVerticesHandle(),
+		bgfx::setVertexBuffer(0, model.getVerticesHandle(),
 							  mesh.attribute_array_offset / stride,
 							  mesh.attribute_array_size / stride);
 		bgfx::setIndexBuffer(model.getIndicesHandle(),
@@ -1030,7 +1030,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 				&shadowmap->matrices[0],
 				m_scene->getLightFOV(shadowmap->light) > Math::PI ? 4 : 1);
 		}
-		bgfx::setVertexBuffer(m_cube_vb);
+		bgfx::setVertexBuffer(0, m_cube_vb);
 		bgfx::setIndexBuffer(m_cube_ib);
 		++m_stats.draw_call_count;
 		m_stats.instance_count += instance_count;
@@ -1190,7 +1190,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			executeCommandBuffer(view.command_buffer.buffer, decal.material);
 			bgfx::setUniform(m_decal_matrix_uniform, &decal.inv_mtx.m11);
 			bgfx::setTransform(&decal.mtx.m11);
-			bgfx::setVertexBuffer(m_cube_vb);
+			bgfx::setVertexBuffer(0, m_cube_vb);
 			bgfx::setIndexBuffer(m_cube_ib);
 			bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
 			
@@ -1517,7 +1517,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 			bgfx::updateDynamicVertexBuffer(m_debug_vertex_buffers[m_debug_buffer_idx], 0, mem);
 
-			bgfx::setVertexBuffer(m_debug_vertex_buffers[m_debug_buffer_idx]);
+			bgfx::setVertexBuffer(0, m_debug_vertex_buffers[m_debug_buffer_idx]);
 			bgfx::setIndexBuffer(m_debug_index_buffer, 0, point_count);
 			bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
 			bgfx::setState(view.render_state | m_debug_line_material->getRenderStates() | BGFX_STATE_PT_POINTS);
@@ -1567,7 +1567,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 			bgfx::updateDynamicVertexBuffer(m_debug_vertex_buffers[m_debug_buffer_idx], 0, mem);
 
-			bgfx::setVertexBuffer(m_debug_vertex_buffers[m_debug_buffer_idx]);
+			bgfx::setVertexBuffer(0, m_debug_vertex_buffers[m_debug_buffer_idx]);
 			bgfx::setIndexBuffer(m_debug_index_buffer, 0, line_count * 2);
 			bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
 			bgfx::setState(view.render_state | m_debug_line_material->getRenderStates() | BGFX_STATE_PT_LINES);
@@ -1623,7 +1623,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 			bgfx::updateDynamicVertexBuffer(m_debug_vertex_buffers[m_debug_buffer_idx], 0, mem);
 
-			bgfx::setVertexBuffer(m_debug_vertex_buffers[m_debug_buffer_idx]);
+			bgfx::setVertexBuffer(0, m_debug_vertex_buffers[m_debug_buffer_idx]);
 			bgfx::setIndexBuffer(m_debug_index_buffer, 0, tri_count * 3);
 			bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
 			bgfx::setState(view.render_state | m_debug_line_material->getRenderStates());
@@ -1872,7 +1872,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	{
 		Resource* res = m_scene->getEngine().getLuaResource(material_index);
 		Material* material = static_cast<Material*>(res);
-		if (!material->isReady() || !bgfx::checkAvailTransientVertexBuffer(3, m_base_vertex_decl))
+		if (!material->isReady() || bgfx::getAvailTransientVertexBuffer(3, m_base_vertex_decl) < 3)
 		{
 			bgfx::touch(m_current_view->bgfx_id);
 			return;
@@ -1983,7 +1983,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 		bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
 		bgfx::setState((view.render_state | material->getRenderStates()) & ~BGFX_STATE_CULL_MASK);
-		bgfx::setVertexBuffer(&vb);
+		bgfx::setVertexBuffer(0, &vb);
 		++m_stats.draw_call_count;
 		++m_stats.instance_count;
 		m_stats.triangle_count += 2;
@@ -2053,7 +2053,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			InstanceData& data = m_instances_data[instance_idx];
 			if (!data.buffer)
 			{
-				if (!bgfx::checkAvailInstanceDataBuffer(InstanceData::MAX_INSTANCE_COUNT, sizeof(Matrix)))
+				if (bgfx::getAvailInstanceDataBuffer(InstanceData::MAX_INSTANCE_COUNT, sizeof(Matrix)) < InstanceData::MAX_INSTANCE_COUNT)
 				{
 					return;
 				}
@@ -2109,7 +2109,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		executeCommandBuffer(view.command_buffer.buffer, material);
 
 		bgfx::setTransform(&model_instance.matrix);
-		bgfx::setVertexBuffer(model_instance.model->getVerticesHandle(),
+		bgfx::setVertexBuffer(0, model_instance.model->getVerticesHandle(),
 			mesh.attribute_array_offset / stride,
 			mesh.attribute_array_size / stride);
 		bgfx::setIndexBuffer(model_instance.model->getIndicesHandle(), mesh.indices_offset, mesh.indices_count);
@@ -2138,7 +2138,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			executeCommandBuffer(view.command_buffer.buffer, material);
 
 			bgfx::setTransform(&model_instance.matrix);
-			bgfx::setVertexBuffer(model_instance.model->getVerticesHandle(),
+			bgfx::setVertexBuffer(0, model_instance.model->getVerticesHandle(),
 				mesh.attribute_array_offset / stride,
 				mesh.attribute_array_size / stride);
 			bgfx::setIndexBuffer(model_instance.model->getIndicesHandle(), mesh.indices_offset, mesh.indices_count);
@@ -2202,7 +2202,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			executeCommandBuffer(view.command_buffer.buffer, material);
 
 			bgfx::setTransform(&model_instance.matrix);
-			bgfx::setVertexBuffer(model_instance.model->getVerticesHandle(),
+			bgfx::setVertexBuffer(0, model_instance.model->getVerticesHandle(),
 				mesh.attribute_array_offset / stride,
 				mesh.attribute_array_size / stride);
 			bgfx::setIndexBuffer(model_instance.model->getIndicesHandle(), mesh.indices_offset, mesh.indices_count);
@@ -2245,7 +2245,8 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 	bool checkAvailTransientBuffers(u32 num_vertices, const bgfx::VertexDecl& decl, u32 num_indices) override
 	{
-		return bgfx::checkAvailTransientBuffers(num_vertices, decl, num_indices);
+		return bgfx::getAvailTransientIndexBuffer(num_indices) >= num_indices &&
+			bgfx::getAvailTransientVertexBuffer(num_vertices, decl) >= num_vertices;
 	}
 
 
@@ -2300,7 +2301,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
 		bgfx::setState(view.render_state | render_states);
 		bgfx::setTransform(&mtx.m11);
-		bgfx::setVertexBuffer(&vertex_buffer);
+		bgfx::setVertexBuffer(0, &vertex_buffer);
 		bgfx::setIndexBuffer(&index_buffer, first_index, num_indices);
 		++m_stats.draw_call_count;
 		++m_stats.instance_count;
@@ -2321,7 +2322,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 				finishInstances(instance_idx);
 			}
 			InstanceData& data = m_instances_data[instance_idx];
-			if (!bgfx::checkAvailInstanceDataBuffer(InstanceData::MAX_INSTANCE_COUNT, sizeof(Matrix)))
+			if (bgfx::getAvailInstanceDataBuffer(InstanceData::MAX_INSTANCE_COUNT, sizeof(Matrix)) < InstanceData::MAX_INSTANCE_COUNT)
 			{
 				g_log_warning.log("Renderer") << "Could not allocate instance data buffer";
 				return;
@@ -2357,7 +2358,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		executeCommandBuffer(view.command_buffer.buffer, &material);
 
 		bgfx::setInstanceDataBuffer(&instance_buffer, count);
-		bgfx::setVertexBuffer(vertex_buffer);
+		bgfx::setVertexBuffer(0, vertex_buffer);
 		bgfx::setIndexBuffer(index_buffer);
 		bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
 		bgfx::setState(view.render_state | material.getRenderStates());
@@ -2504,7 +2505,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 				info.m_morph_const.x, info.m_morph_const.y, info.m_morph_const.z, 0);
 		}
 
-		bgfx::setVertexBuffer(info.m_terrain->getVerticesHandle());
+		bgfx::setVertexBuffer(0, info.m_terrain->getVerticesHandle());
 		int mesh_part_indices_count = mesh.indices_count / 4;
 		bgfx::setIndexBuffer(info.m_terrain->getIndicesHandle(),
 			info.m_index * mesh_part_indices_count,
@@ -2524,7 +2525,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 	void renderGrass(const GrassInfo& grass)
 	{
-		if (!bgfx::checkAvailInstanceDataBuffer(grass.instance_count, sizeof(GrassInfo::InstanceData))) return;
+		if (bgfx::getAvailInstanceDataBuffer(grass.instance_count, sizeof(GrassInfo::InstanceData)) < (u32)grass.instance_count) return;
 
 		const bgfx::InstanceDataBuffer* idb =
 			bgfx::allocInstanceDataBuffer(grass.instance_count, sizeof(GrassInfo::InstanceData));
@@ -2542,7 +2543,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		auto max_grass_distance = Vec4(grass.type_distance, 0, 0, 0);
 		bgfx::setUniform(m_grass_max_dist_uniform, &max_grass_distance);
 
-		bgfx::setVertexBuffer(
+		bgfx::setVertexBuffer(0, 
 			grass.model->getVerticesHandle(), mesh.attribute_array_offset / stride, mesh.attribute_array_size / stride);
 		bgfx::setIndexBuffer(grass.model->getIndicesHandle(), mesh.indices_offset, mesh.indices_count);
 		bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);

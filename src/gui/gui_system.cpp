@@ -151,7 +151,8 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 		auto& decl = renderer->getBasic2DVertexDecl();
 		bgfx::TransientVertexBuffer vertex_buffer;
 		bgfx::TransientIndexBuffer index_buffer;
-		if (!bgfx::checkAvailTransientBuffers(num_vertices, decl, num_indices)) return;
+		if (bgfx::getAvailTransientIndexBuffer(num_indices) < (u32)num_indices) return;
+		if (bgfx::getAvailTransientVertexBuffer(num_vertices, decl) < (u32)num_vertices) return;
 		bgfx::allocTransientVertexBuffer(&vertex_buffer, num_vertices, decl);
 		bgfx::allocTransientIndexBuffer(&index_buffer, num_indices);
 
