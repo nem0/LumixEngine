@@ -715,7 +715,7 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	const char* getPassName(int idx) override { return m_passes[idx]; }
 	const bgfx::UniformHandle& getMaterialColorUniform() const override { return m_mat_color_uniform; }
 	const bgfx::UniformHandle& getRoughnessMetallicUniform() const override { return m_roughness_metallic_uniform; }
-	void makeScreenshot(const Path& filename) override { bgfx::saveScreenShot(filename.c_str()); }
+	void makeScreenshot(const Path& filename) override { bgfx::requestScreenShot(BGFX_INVALID_HANDLE, filename.c_str()); }
 	void resize(int w, int h) override { bgfx::reset(w, h); }
 	int getViewCounter() const override { return m_view_counter; }
 	void viewCounterAdd() override { ++m_view_counter; }
