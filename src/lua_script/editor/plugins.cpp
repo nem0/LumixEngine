@@ -44,25 +44,27 @@ namespace
 
 struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 {
-	struct AddScriptCommand LUMIX_FINAL : public IEditorCommand
+	struct AddLuaScriptCommand LUMIX_FINAL : public IEditorCommand
 	{
-		AddScriptCommand() {}
-
-
-		explicit AddScriptCommand(WorldEditor& editor)
+		explicit AddLuaScriptCommand(WorldEditor& _editor)
+			: editor(_editor)
 		{
-			scene = static_cast<LuaScriptScene*>(editor.getUniverse()->getScene(crc32("lua_script")));
 		}
 
 
 		bool execute() override
 		{
+			auto* scene = static_cast<LuaScriptScene*>(editor.getUniverse()->getScene(crc32("lua_script")));
 			scr_index = scene->addScript(cmp);
 			return true;
 		}
 
 
-		void undo() override { scene->removeScript(cmp, scr_index); }
+		void undo() override
+		{
+			auto* scene = static_cast<LuaScriptScene*>(editor.getUniverse()->getScene(crc32("lua_script")));
+			scene->removeScript(cmp, scr_index);
+		}
 
 
 		void serialize(JsonSerializer& serializer) override { serializer.serialize("component", cmp); }
@@ -80,7 +82,7 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		bool merge(IEditorCommand& command) override { return false; }
 
 
-		LuaScriptScene* scene;
+		WorldEditor& editor;
 		ComponentHandle cmp;
 		int scr_index;
 	};
@@ -348,8 +350,7 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 
 		if (ImGui::Button("Add script"))
 		{
-			auto* cmd = LUMIX_NEW(allocator, AddScriptCommand);
-			cmd->scene = scene;
+			auto* cmd = LUMIX_NEW(allocator, AddLuaScriptCommand)(editor);
 			cmd->cmp = cmp.handle;
 			editor.executeCommand(cmd);
 		}
@@ -777,9 +778,9 @@ struct ConsolePlugin LUMIX_FINAL : public StudioApp::IPlugin
 } // anonoymous namespace
 
 
-IEditorCommand* createAddScriptCommand(WorldEditor& editor)
+IEditorCommand* createAddLuaScriptCommand(WorldEditor& editor)
 {
-	return LUMIX_NEW(editor.getAllocator(), PropertyGridPlugin::AddScriptCommand)(editor);
+	return LUMIX_NEW(editor.getAllocator(), PropertyGridPlugin::AddLuaScriptCommand)(editor);
 }
 
 
@@ -849,11 +850,10 @@ struct AddComponentPlugin LUMIX_FINAL : public StudioApp::IAddComponentPlugin
 			}
 
 			IAllocator& allocator = editor.getAllocator();
-			auto* cmd = LUMIX_NEW(allocator, PropertyGridPlugin::AddScriptCommand);
+			auto* cmd = LUMIX_NEW(allocator, PropertyGridPlugin::AddLuaScriptCommand)(editor);
 
 			auto* script_scene = static_cast<LuaScriptScene*>(editor.getUniverse()->getScene(LUA_SCRIPT_TYPE));
 			ComponentHandle cmp = editor.getUniverse()->getComponent(entity, LUA_SCRIPT_TYPE).handle;
-			cmd->scene = script_scene;
 			cmd->cmp = cmp;
 			editor.executeCommand(cmd);
 
@@ -918,7 +918,7 @@ LUMIX_STUDIO_ENTRY(lua_script)
 	auto* cmp_plugin = LUMIX_NEW(editor.getAllocator(), AddComponentPlugin)(app);
 	app.registerComponent("lua_script", *cmp_plugin);
 
-	editor.registerEditorCommandCreator("add_script", createAddScriptCommand);
+	editor.registerEditorCommandCreator("add_script", createAddLuaScriptCommand);
 	editor.registerEditorCommandCreator("remove_script", createRemoveScriptCommand);
 	editor.registerEditorCommandCreator("set_script_property", createSetPropertyCommand);
 	auto* editor_plugin = LUMIX_NEW(editor.getAllocator(), EditorPlugin)(editor);
