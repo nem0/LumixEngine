@@ -51,6 +51,7 @@ static const u32 RENDERER_HASH = crc32("renderer");
 enum class PhysicsSceneVersion
 {
 	DYNAMIC_TYPE,
+	TRIGGERS,
 
 	LATEST,
 };
@@ -213,14 +214,28 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 				auto contact_count = cp.extractContacts(&contact, 1);
 
 				auto pos = fromPhysx(contact.position);
-				Entity e1 = { (int)(intptr_t)(pairHeader.actors[0]->userData) };
-				Entity e2 = { (int)(intptr_t)(pairHeader.actors[1]->userData) };
+				Entity e1 = {(int)(intptr_t)(pairHeader.actors[0]->userData)};
+				Entity e2 = {(int)(intptr_t)(pairHeader.actors[1]->userData)};
 				m_scene.onContact(e1, e2, pos);
 			}
 		}
 
 
-		void onTrigger(PxTriggerPair* pairs, PxU32 count) override {}
+		void onTrigger(PxTriggerPair* pairs, PxU32 count) override
+		{
+			for (PxU32 i = 0; i < count; i++)
+			{
+				const auto REMOVED_FLAGS = PxTriggerPairFlag::eREMOVED_SHAPE_TRIGGER | PxTriggerPairFlag::eREMOVED_SHAPE_OTHER;
+				if (pairs[i].flags & REMOVED_FLAGS) continue;
+
+				Entity e1 = {(int)(intptr_t)(pairs[i].triggerActor->userData)};
+				Entity e2 = {(int)(intptr_t)(pairs[i].otherActor->userData)};
+
+				m_scene.onTrigger(e1, e2);
+			}
+		}
+
+
 		void onConstraintBreak(PxConstraintInfo*, PxU32) override {}
 		void onWake(PxActor**, PxU32) override {}
 		void onSleep(PxActor**, PxU32) override {}
@@ -241,6 +256,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			, entity(INVALID_ENTITY)
 			, type(_type)
 			, dynamic_type(DynamicType::STATIC)
+			, is_trigger(false)
 		{
 		}
 
@@ -261,6 +277,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		PhysicsSceneImpl& scene;
 		ActorType type;
 		DynamicType dynamic_type;
+		bool is_trigger;
 
 	private:
 		void onStateChanged(Resource::State old_state, Resource::State new_state, Resource&);
@@ -361,6 +378,30 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		m_dynamic_actors.clear();
 
 		m_terrains.clear();
+	}
+
+
+	void onTrigger(Entity e1, Entity e2)
+	{
+		if (!m_script_scene) return;
+
+		auto send = [this](Entity e1, Entity e2)
+		{
+			auto cmp = m_script_scene->getComponent(e1);
+			if (cmp == INVALID_COMPONENT) return;
+
+			for (int i = 0, c = m_script_scene->getScriptCount(cmp); i < c; ++i)
+			{
+				auto* call = m_script_scene->beginFunctionCall(cmp, i, "onTrigger");
+				if (!call) continue;
+
+				call->add(e2.index);
+				m_script_scene->endFunctionCall();
+			}
+		};
+
+		send(e1, e2);
+		send(e2, e1);
 	}
 
 
@@ -2657,6 +2698,36 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
+	bool isTrigger(ComponentHandle cmp) override
+	{
+		return m_actors[{cmp.index}]->is_trigger;
+	}
+
+
+	void setIsTrigger(ComponentHandle cmp, bool is_trigger) override
+	{
+		RigidActor* actor = m_actors[{cmp.index}];
+		actor->is_trigger = is_trigger;
+		if (actor->physx_actor)
+		{
+			PxShape* shape;
+			if (actor->physx_actor->getShapes(&shape, 1) == 1)
+			{
+				if (is_trigger)
+				{
+					shape->setFlag(PxShapeFlag::eSIMULATION_SHAPE, false); // must set false first
+					shape->setFlag(PxShapeFlag::eTRIGGER_SHAPE, true);
+				}
+				else
+				{
+					shape->setFlag(PxShapeFlag::eTRIGGER_SHAPE, false);
+					shape->setFlag(PxShapeFlag::eSIMULATION_SHAPE, true);
+				}
+			}
+		}
+	}
+
+
 	DynamicType getDynamicType(ComponentHandle cmp) override
 	{
 		return m_actors[{cmp.index}]->dynamic_type;
@@ -3143,11 +3214,12 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		RigidActor* actor = m_actors[{cmp.index}];
 		serializer.write("layer", actor->layer);
 		serializer.write("dynamic_type", (int)actor->dynamic_type);
+		serializer.write("trigger", actor->is_trigger);
 		serializer.write("source", actor->resource ? actor->resource->getPath().c_str() : "");
 	}
 
 
-	void deserializeDynamicType(IDeserializer& serializer, RigidActor* actor, int scene_version)
+	void deserializeCommonRigidActorProperties(IDeserializer& serializer, RigidActor* actor, int scene_version)
 	{
 		if (scene_version <= (int)PhysicsSceneVersion::DYNAMIC_TYPE)
 		{
@@ -3160,7 +3232,14 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			serializer.read((int*)&actor->dynamic_type);
 		}
 		if (actor->dynamic_type == DynamicType::DYNAMIC) m_dynamic_actors.push(actor);
-
+		if (scene_version > (int)PhysicsSceneVersion::TRIGGERS)
+		{
+			serializer.read(&actor->is_trigger);
+		}
+		else
+		{
+			actor->is_trigger = false;
+		}
 	}
 
 
@@ -3169,7 +3248,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, ActorType::MESH);
 		actor->entity = entity;
 		serializer.read(&actor->layer);
-		deserializeDynamicType(serializer, actor, scene_version);
+		deserializeCommonRigidActorProperties(serializer, actor, scene_version);
 		m_actors.insert(actor->entity, actor);
 
 		char tmp[MAX_PATH_LENGTH];
@@ -3187,6 +3266,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		RigidActor* actor = m_actors[{cmp.index}];
 		serializer.write("layer", actor->layer);
 		serializer.write("dynamic_type", (int)actor->dynamic_type);
+		serializer.write("trigger", actor->is_trigger);
 		PxShape* shape;
 		ASSERT(actor->physx_actor->getNbShapes() == 1);
 		actor->physx_actor->getShapes(&shape, 1);
@@ -3203,7 +3283,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, ActorType::BOX);
 		actor->entity = entity;
 		serializer.read(&actor->layer);
-		deserializeDynamicType(serializer, actor, scene_version);
+		deserializeCommonRigidActorProperties(serializer, actor, scene_version);
 		m_actors.insert(actor->entity, actor);
 
 		PxBoxGeometry box_geom;
@@ -3235,7 +3315,8 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	{
 		RigidActor* actor = m_actors[{cmp.index}];
 		serializer.write("layer", actor->layer);
-		serializer.write("dynamic_cast", (int)actor->dynamic_type);
+		serializer.write("dynamic_type", (int)actor->dynamic_type);
+		serializer.write("trigger", actor->is_trigger);
 		PxShape* shape;
 		ASSERT(actor->physx_actor->getNbShapes() == 1);
 		actor->physx_actor->getShapes(&shape, 1);
@@ -3251,7 +3332,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, ActorType::CAPSULE);
 		actor->entity = entity;
 		serializer.read(&actor->layer);
-		deserializeDynamicType(serializer, actor, scene_version);
+		deserializeCommonRigidActorProperties(serializer, actor, scene_version);
 		m_actors.insert(actor->entity, actor);
 
 		PxCapsuleGeometry capsule_geom;
@@ -3285,6 +3366,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		RigidActor* actor = m_actors[{cmp.index}];
 		serializer.write("layer", actor->layer);
 		serializer.write("dynamic_type", (int)actor->dynamic_type);
+		serializer.write("trigger", actor->is_trigger);
 		PxShape* shape;
 		ASSERT(actor->physx_actor->getNbShapes() == 1);
 		actor->physx_actor->getShapes(&shape, 1);
@@ -3299,7 +3381,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, ActorType::SPHERE);
 		actor->entity = entity;
 		serializer.read(&actor->layer);
-		deserializeDynamicType(serializer, actor, scene_version);
+		deserializeCommonRigidActorProperties(serializer, actor, scene_version);
 		m_actors.insert(actor->entity, actor);
 
 		PxSphereGeometry sphere_geom;
@@ -3459,6 +3541,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		for (auto* actor : m_actors)
 		{
 			serializer.write(actor->dynamic_type);
+			serializer.write(actor->is_trigger);
 			serializer.write(actor->entity);
 			serializeActor(serializer, actor);
 		}
@@ -4011,6 +4094,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		{
 			RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, ActorType::BOX);
 			serializer.read(actor->dynamic_type);
+			serializer.read(actor->is_trigger);
 			serializer.read(actor->entity);
 			if (!actor->entity.isValid())
 			{
@@ -4454,6 +4538,7 @@ void PhysicsSceneImpl::RigidActor::setPhysxActor(PxRigidActor* actor)
 		scene.m_scene->addActor(*actor);
 		actor->userData = (void*)(intptr_t)entity.index;
 		scene.updateFilterData(actor, layer);
+		scene.setIsTrigger({entity.index}, is_trigger);
 	}
 }
 
