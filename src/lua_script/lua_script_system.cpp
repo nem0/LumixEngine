@@ -124,7 +124,7 @@ namespace Lumix
 				auto& allocator = m_scene.m_system.m_allocator;
 				BinaryArray valid_properties(m_scene.m_system.m_engine.getLIFOAllocator());
 				valid_properties.resize(inst.m_properties.size());
-				setMemory(valid_properties.getRaw(), 0, valid_properties.size() >> 3);
+				valid_properties.setAllZeros();
 
 				while (lua_next(L, -2))
 				{
@@ -1320,27 +1320,37 @@ namespace Lumix
 				serializer.read(&prop_count);
 				for (int j = 0; j < prop_count; ++j)
 				{
-					Property& prop = inst.m_properties.emplace(allocator);
-					prop.type = Property::ANY;
 					char tmp[1024];
 					serializer.read(tmp, lengthOf(tmp));
-					prop.name_hash = crc32(tmp);
-					if (m_property_names.find(prop.name_hash) < 0)
+					u32 hash = crc32(tmp);
+					int prop_idx = ScriptComponent::getProperty(inst, hash);
+					Property* prop;
+					if (prop_idx < 0)
 					{
-						m_property_names.emplace(prop.name_hash, tmp, allocator);
+						prop = &inst.m_properties.emplace(allocator);
+						prop->type = Property::ANY;
+						prop->name_hash = hash;
+						if (m_property_names.find(hash) < 0)
+						{
+							m_property_names.emplace(hash, tmp, allocator);
+						}
+					}
+					else
+					{
+						prop = &inst.m_properties[prop_idx];
 					}
 					tmp[0] = 0;
-					if (scene_version > (int)LuaSceneVersion::PROPERTY_TYPE) serializer.read((int*)&prop.type);
+					if (scene_version > (int)LuaSceneVersion::PROPERTY_TYPE) serializer.read((int*)&prop->type);
 					serializer.read(tmp, lengthOf(tmp));
 					
-					if (prop.type == Property::ENTITY)
+					if (prop->type == Property::ENTITY)
 					{
 						u64 guid;
 						fromCString(tmp, lengthOf(tmp), &guid);
 						Entity entity = serializer.getEntity({guid});
 						toCString(entity.index, tmp, lengthOf(tmp));
 					}
-					prop.stored_value = tmp;
+					prop->stored_value = tmp;
 				}
 			}
 
