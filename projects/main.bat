@@ -35,7 +35,7 @@ function publishToItchIO()
 {
 	app.ShellExecute("C:/Users/Miki/AppData/Roaming/itch/bin/butler.exe", "login")
 	setTimeout(function() {
-		app.ShellExecute("C:/Users/Miki/AppData/Roaming/itch/bin/butler.exe", "push ..\..\lumixengine_data_exported mikulasflorek/lumix-engine:win-64")
+		app.ShellExecute("C:/Users/Miki/AppData/Roaming/itch/bin/butler.exe", "push ../../lumixengine_data_exported mikulasflorek/lumix-engine:win-64")
 	}, 2000)
 }
 
