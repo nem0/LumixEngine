@@ -206,6 +206,7 @@ function defaultConfigurations()
 
 	configuration "linux"
 		buildoptions { "-std=c++14" }
+		defines { "_GLIBCXX_USE_CXX11_ABI=0" }
 		links { "pthread" }
 
 	configuration { "asmjs" }
