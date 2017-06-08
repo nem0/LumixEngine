@@ -80,6 +80,12 @@ void BinaryArray::erase(int index)
 }
 
 
+void BinaryArray::setAllZeros()
+{
+	setMemory(m_data, 0, m_capacity >> 3);
+}
+
+
 void BinaryArray::clear()
 {
 	m_size = 0;
