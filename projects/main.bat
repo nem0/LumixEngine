@@ -2,9 +2,7 @@
 @echo off
 setlocal
 
-echo Select an option:
-for /F "delims=" %%a in ('mshta.exe "%~F0"') do set "HTAreply=%%a"
-echo End of HTA window, reply: "%HTAreply%"
+start mshta.exe %0
 goto :EOF
 -->
 
