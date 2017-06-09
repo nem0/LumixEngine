@@ -919,6 +919,7 @@ namespace Lumix
 		{
 			if (!value) return;
 			lua_State* state = script.m_state;
+			if (!state) return;
 			const char* name = getPropertyName(prop.name_hash);
 			if (!name) return;
 
@@ -1351,6 +1352,7 @@ namespace Lumix
 						toCString(entity.index, tmp, lengthOf(tmp));
 					}
 					prop->stored_value = tmp;
+					applyProperty(inst, *prop, tmp);
 				}
 			}
 
