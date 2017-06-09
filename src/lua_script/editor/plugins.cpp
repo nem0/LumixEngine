@@ -595,6 +595,8 @@ struct ConsolePlugin LUMIX_FINAL : public StudioApp::IPlugin
 		}
 		*c = '\0';
 
+		if (!lua_istable(L, -1)) return;
+
 		lua_pushnil(L);
 		while (lua_next(L, -2) != 0)
 		{
