@@ -1395,7 +1395,7 @@ void StateMachine::drawInside(ImDrawList* draw, const ImVec2& canvas_screen_pos)
 		}
 	}
 
-	if (m_mouse_status == DRAG_NODE)
+	if (m_mouse_status == DRAG_NODE && m_drag_source->engine_cmp)
 	{
 		ImVec2 new_pos = m_drag_source->pos + ImGui::GetIO().MouseDelta;
 		editor.moveNode(m_controller, m_drag_source, new_pos);
