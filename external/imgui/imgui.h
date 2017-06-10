@@ -658,7 +658,8 @@ enum ImGuiColorEditMode_
     ImGuiColorEditMode_UserSelectShowButton = -1,
     ImGuiColorEditMode_RGB = 0,
     ImGuiColorEditMode_HSV = 1,
-    ImGuiColorEditMode_HEX = 2
+    ImGuiColorEditMode_HEX = 2,
+	ImGuiColorEditMode_Float= 3
 };
 
 // Enumeration for GetMouseCursor()

@@ -9008,7 +9008,7 @@ bool ImGui::ColorEdit4(const char* label, float col[4], bool alpha)
 
     ImGuiColorEditMode edit_mode = window->DC.ColorEditMode;
     if (edit_mode == ImGuiColorEditMode_UserSelect || edit_mode == ImGuiColorEditMode_UserSelectShowButton)
-        edit_mode = g.ColorEditModeStorage.GetInt(id, 0) % 3;
+        edit_mode = g.ColorEditModeStorage.GetInt(id, 0) % 4;
 
     float f[4] = { col[0], col[1], col[2], col[3] };
     if (edit_mode == ImGuiColorEditMode_HSV)
@@ -9056,7 +9056,39 @@ bool ImGui::ColorEdit4(const char* label, float col[4], bool alpha)
             PopItemWidth();
         }
         break;
-    case ImGuiColorEditMode_HEX:
+	case ImGuiColorEditMode_Float:
+		{
+			const float w_items_all = w_full - (square_sz + style.ItemInnerSpacing.x);
+			const float w_item_one = ImMax(1.0f, (float)(int)((w_items_all - (style.ItemInnerSpacing.x) * (components - 1)) / (float)components));
+			const float w_item_last = ImMax(1.0f, (float)(int)(w_items_all - (w_item_one + style.ItemInnerSpacing.x) * (components - 1)));
+
+			const bool hide_prefix = (w_item_one <= CalcTextSize("M:1.00000").x);
+			const char* ids[4] = { "##X", "##Y", "##Z", "##W" };
+			const char* fmt_table[2][4] =
+			{
+				{ "%1.5f",   "%1.5f",   "%1.5f",   "%1.5f" },
+				{ "R:%1.5f", "G:%1.5f", "B:%1.5f", "A:%1.5f" }
+			};
+			const char** fmt = hide_prefix ? fmt_table[0] : fmt_table[1];
+
+			PushItemWidth(w_item_one);
+			for (int n = 0; n < components; n++)
+			{
+				if (n > 0)
+					SameLine(0, style.ItemInnerSpacing.x);
+				if (n + 1 == components)
+					PushItemWidth(w_item_last);
+				float ftmp[] = { i[0] / 255.0f, i[1] / 255.0f, i[2] / 255.0f, i[3] / 255.0f };
+				value_changed |= DragFloat(ids[n], &ftmp[n], 1/256.0f, 0, 1.0f, fmt[n]);
+				for (int n = 0; n < 4; n++)
+					i[n] = int(ftmp[n] * 255.0f);
+
+			}
+			PopItemWidth();
+			PopItemWidth();
+		}
+		break;
+	case ImGuiColorEditMode_HEX:
         {
             // RGB Hexadecimal Input
             const float w_slider_all = w_full - square_sz;
@@ -9087,7 +9119,7 @@ bool ImGui::ColorEdit4(const char* label, float col[4], bool alpha)
 
     const ImVec4 col_display(col[0], col[1], col[2], 1.0f);
     if (ColorButton(col_display))
-        g.ColorEditModeStorage.SetInt(id, (edit_mode + 1) % 3); // Don't set local copy of 'edit_mode' right away!
+        g.ColorEditModeStorage.SetInt(id, (edit_mode + 1) % 4); // Don't set local copy of 'edit_mode' right away!
 
     // Recreate our own tooltip over's ColorButton() one because we want to display correct alpha here
     if (IsItemHovered())
@@ -9096,9 +9128,9 @@ bool ImGui::ColorEdit4(const char* label, float col[4], bool alpha)
     if (window->DC.ColorEditMode == ImGuiColorEditMode_UserSelectShowButton)
     {
         SameLine(0, style.ItemInnerSpacing.x);
-        const char* button_titles[3] = { "RGB", "HSV", "HEX" };
+        const char* button_titles[4] = { "RGB", "HSV", "HEX", "Float" };
         if (ButtonEx(button_titles[edit_mode], ImVec2(0,0), ImGuiButtonFlags_DontClosePopups))
-            g.ColorEditModeStorage.SetInt(id, (edit_mode + 1) % 3); // Don't set local copy of 'edit_mode' right away!
+            g.ColorEditModeStorage.SetInt(id, (edit_mode + 1) % 4); // Don't set local copy of 'edit_mode' right away!
     }
 
     const char* label_display_end = FindRenderedTextEnd(label);

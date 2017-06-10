@@ -1695,9 +1695,11 @@ void ImGui::ShowStyleEditor(ImGuiStyle* ref)
         ImGui::RadioButton("RGB", &edit_mode, ImGuiColorEditMode_RGB);
         ImGui::SameLine();
         ImGui::RadioButton("HSV", &edit_mode, ImGuiColorEditMode_HSV);
-        ImGui::SameLine();
-        ImGui::RadioButton("HEX", &edit_mode, ImGuiColorEditMode_HEX);
-        //ImGui::Text("Tip: Click on colored square to change edit mode.");
+		ImGui::SameLine();
+		ImGui::RadioButton("HEX", &edit_mode, ImGuiColorEditMode_HEX);
+		ImGui::SameLine();
+		ImGui::RadioButton("Float", &edit_mode, ImGuiColorEditMode_Float);
+		//ImGui::Text("Tip: Click on colored square to change edit mode.");
 
         static ImGuiTextFilter filter;
         filter.Draw("Filter colors", 200);
