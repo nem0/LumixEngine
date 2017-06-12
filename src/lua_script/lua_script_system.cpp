@@ -265,6 +265,13 @@ namespace Lumix
 			}
 
 
+			void add(bool parameter) override
+			{
+				lua_pushboolean(state, parameter);
+				++parameter_count;
+			}
+
+
 			void add(float parameter) override
 			{
 				lua_pushnumber(state, parameter);

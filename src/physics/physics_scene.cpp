@@ -231,7 +231,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 				Entity e1 = {(int)(intptr_t)(pairs[i].triggerActor->userData)};
 				Entity e2 = {(int)(intptr_t)(pairs[i].otherActor->userData)};
 
-				m_scene.onTrigger(e1, e2);
+				m_scene.onTrigger(e1, e2, pairs[i].status == PxPairFlag::eNOTIFY_TOUCH_LOST);
 			}
 		}
 
@@ -381,11 +381,11 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	void onTrigger(Entity e1, Entity e2)
+	void onTrigger(Entity e1, Entity e2, bool touch_lost)
 	{
 		if (!m_script_scene) return;
 
-		auto send = [this](Entity e1, Entity e2)
+		auto send = [this, touch_lost](Entity e1, Entity e2)
 		{
 			auto cmp = m_script_scene->getComponent(e1);
 			if (cmp == INVALID_COMPONENT) return;
@@ -396,6 +396,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 				if (!call) continue;
 
 				call->add(e2.index);
+				call->add(touch_lost);
 				m_script_scene->endFunctionCall();
 			}
 		};
