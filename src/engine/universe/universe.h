@@ -97,7 +97,7 @@ public:
 		const Vec3& pos,
 		const Quat& rot,
 		float scale);
-	float getScale(Entity entity);
+	float getScale(Entity entity) const;
 	const Vec3& getPosition(Entity entity) const;
 	const Quat& getRotation(Entity entity) const;
 	const char* getName() const { return m_name; }
