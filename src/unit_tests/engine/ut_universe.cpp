@@ -172,6 +172,42 @@ namespace
 	}
 
 
+	void UT_universe_hierarchy4(const char* params)
+	{
+		DefaultAllocator allocator;
+		PathManager path_manager(allocator);
+		Universe universe(allocator);
+
+		Entity e0 = universe.createEntity({0, 0, 0}, {0, 0, 0, 1});
+
+		universe.setLocalPosition(e0, {1, 2, 3});
+		LUMIX_EXPECT_CLOSE_EQ(universe.getPosition(e0).x, 1, 0.001f);
+		LUMIX_EXPECT_CLOSE_EQ(universe.getLocalTransform(e0).pos.x, 1, 0.001f);
+		LUMIX_EXPECT_CLOSE_EQ(universe.getPosition(e0).y, 2, 0.001f);
+		LUMIX_EXPECT_CLOSE_EQ(universe.getLocalTransform(e0).pos.y, 2, 0.001f);
+		LUMIX_EXPECT_CLOSE_EQ(universe.getPosition(e0).z, 3, 0.001f);
+		LUMIX_EXPECT_CLOSE_EQ(universe.getLocalTransform(e0).pos.z, 3, 0.001f);
+
+		universe.setLocalRotation(e0, {1, 0, 0, 0});
+		LUMIX_EXPECT_CLOSE_EQ(universe.getRotation(e0).x, 1, 0.001f);
+		LUMIX_EXPECT_CLOSE_EQ(universe.getLocalTransform(e0).rot.x, 1, 0.001f);
+		LUMIX_EXPECT_CLOSE_EQ(universe.getRotation(e0).y, 0, 0.001f);
+		LUMIX_EXPECT_CLOSE_EQ(universe.getLocalTransform(e0).rot.y, 0, 0.001f);
+		LUMIX_EXPECT_CLOSE_EQ(universe.getRotation(e0).z, 0, 0.001f);
+		LUMIX_EXPECT_CLOSE_EQ(universe.getLocalTransform(e0).rot.z, 0, 0.001f);
+		LUMIX_EXPECT_CLOSE_EQ(universe.getRotation(e0).w, 0, 0.001f);
+		LUMIX_EXPECT_CLOSE_EQ(universe.getLocalTransform(e0).rot.w, 0, 0.001f);
+
+		LUMIX_EXPECT_CLOSE_EQ(universe.getScale(e0), 1, 0.001f);
+		LUMIX_EXPECT_CLOSE_EQ(universe.getLocalScale(e0), 1, 0.001f);
+
+		universe.setLocalTransform(e0, universe.getLocalTransform(e0), 2);
+		LUMIX_EXPECT_CLOSE_EQ(universe.getScale(e0), 2, 0.001f);
+		LUMIX_EXPECT_CLOSE_EQ(universe.getLocalScale(e0), 2, 0.001f);
+	}
+
+
+
 	void UT_universe(const char* params)
 	{
 		DefaultAllocator allocator;
@@ -245,3 +281,4 @@ REGISTER_TEST("unit_tests/engine/universe", UT_universe, "");
 REGISTER_TEST("unit_tests/engine/universe/hierarchy", UT_universe_hierarchy, "");
 REGISTER_TEST("unit_tests/engine/universe/hierarchy2", UT_universe_hierarchy2, "");
 REGISTER_TEST("unit_tests/engine/universe/hierarchy3", UT_universe_hierarchy3, "");
+REGISTER_TEST("unit_tests/engine/universe/hierarchy4", UT_universe_hierarchy4, "");

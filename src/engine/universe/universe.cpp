@@ -557,14 +557,27 @@ void Universe::updateGlobalTransform(Entity entity)
 
 void Universe::setLocalPosition(Entity entity, const Vec3& pos)
 {
-	m_hierarchy[m_entities[entity.index].hierarchy].local_transform.pos = pos;
+	int hierarchy_idx = m_entities[entity.index].hierarchy;
+	if (hierarchy_idx < 0)
+	{
+		setPosition(entity, pos);
+		return;
+	}
+
+	m_hierarchy[hierarchy_idx].local_transform.pos = pos;
 	updateGlobalTransform(entity);
 }
 
 
 void Universe::setLocalRotation(Entity entity, const Quat& rot)
 {
-	m_hierarchy[m_entities[entity.index].hierarchy].local_transform.rot = rot;
+	int hierarchy_idx = m_entities[entity.index].hierarchy;
+	if (hierarchy_idx < 0)
+	{
+		setRotation(entity, rot);
+		return;
+	}
+	m_hierarchy[hierarchy_idx].local_transform.rot = rot;
 	updateGlobalTransform(entity);
 }
 
@@ -578,7 +591,14 @@ Transform Universe::computeLocalTransform(Entity parent, const Transform& global
 
 void Universe::setLocalTransform(Entity entity, const Transform& transform, float scale)
 {
-	Hierarchy& h = m_hierarchy[m_entities[entity.index].hierarchy];
+	int hierarchy_idx = m_entities[entity.index].hierarchy;
+	if (hierarchy_idx < 0)
+	{
+		setTransform(entity, transform, scale);
+		return;
+	}
+
+	Hierarchy& h = m_hierarchy[hierarchy_idx];
 	h.local_transform = transform;
 	h.local_scale = scale;
 	updateGlobalTransform(entity);
@@ -587,15 +607,25 @@ void Universe::setLocalTransform(Entity entity, const Transform& transform, floa
 
 Transform Universe::getLocalTransform(Entity entity) const
 {
-	int idx = m_entities[entity.index].hierarchy;
-	return m_hierarchy[idx].local_transform;
+	int hierarchy_idx = m_entities[entity.index].hierarchy;
+	if (hierarchy_idx < 0)
+	{
+		return getTransform(entity);
+	}
+
+	return m_hierarchy[hierarchy_idx].local_transform;
 }
 
 
 float Universe::getLocalScale(Entity entity) const
 {
-	int idx = m_entities[entity.index].hierarchy;
-	return m_hierarchy[idx].local_scale;
+	int hierarchy_idx = m_entities[entity.index].hierarchy;
+	if (hierarchy_idx < 0)
+	{
+		return getScale(entity);
+	}
+
+	return m_hierarchy[hierarchy_idx].local_scale;
 }
 
 
@@ -747,7 +777,7 @@ void Universe::setScale(Entity entity, float scale)
 }
 
 
-float Universe::getScale(Entity entity)
+float Universe::getScale(Entity entity) const
 {
 	auto& transform = m_entities[entity.index];
 	return transform.scale;

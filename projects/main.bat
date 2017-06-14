@@ -74,7 +74,7 @@ function cleanAll()
 </HEAD>
 <BODY>
    <button style="width:200" onclick="generateProject();">Generate VS project</button>
-   <button style="width:200" onclick="build('debug');">Build</button>
+   <button style="width:200" onclick="build('relwithdebinfo');">Build</button>
    <button style="width:200" onclick="install();">Install</button>
    <button style="width:200" onclick="archive();">Archive</button>
    <button style="width:200" onclick="publishToItchIO();">Publish to itch.io</button>
