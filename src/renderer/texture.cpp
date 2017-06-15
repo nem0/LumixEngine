@@ -66,7 +66,7 @@ void Texture::destroy()
 }
 
 
-bool Texture::create(int w, int h, void* data)
+bool Texture::create(int w, int h, const void* data)
 {
 	if (data)
 	{
