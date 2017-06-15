@@ -46,6 +46,9 @@ public:
 	virtual ModelHandle loadModel(Path& path) = 0;
 	virtual void unloadModel(ModelHandle handle) = 0;
 	virtual Vec3 getModelCenter(Entity entity) = 0;
+	virtual bool saveTexture(Engine& engine, const char* path, const void* pixels, int w, int h) = 0;
+	virtual ImTextureID createTexture(const char* name, const void* pixels, int w, int h) = 0;
+	virtual void destroyTexture(ImTextureID handle) = 0;
 	virtual ImTextureID loadTexture(const Path& path) = 0;
 	virtual void unloadTexture(ImTextureID handle) = 0;
 	virtual void addDebugCube(const Vec3& minimum, const Vec3& maximum, u32 color, float life) = 0;

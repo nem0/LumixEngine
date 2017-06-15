@@ -1087,6 +1087,47 @@ struct SceneViewPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		}
 
 
+		bool saveTexture(Engine& engine, const char* path_cstr, const void* pixels, int w, int h) override
+		{
+			FS::FileSystem& fs = engine.getFileSystem();
+			Path path(path_cstr);
+			FS::IFile* file = fs.open(fs.getDefaultDevice(), path, FS::Mode::CREATE_AND_WRITE);
+			if (!file) return false;
+
+			if (!Texture::saveTGA(file, w, h, 4, (const u8*)pixels, path, engine.getAllocator()))
+			{
+				fs.close(*file);
+				return false;
+			}
+
+			fs.close(*file);
+			return true;
+		}
+
+
+		ImTextureID createTexture(const char* name, const void* pixels, int w, int h) override
+		{
+			auto& rm = m_editor.getEngine().getResourceManager();
+			auto& allocator = m_editor.getAllocator();
+			Texture* texture = LUMIX_NEW(allocator, Texture)(Path(name), *rm.get(TEXTURE_TYPE), allocator);
+			texture->create(w, h, pixels);
+			m_textures.insert(&texture->handle, texture);
+			return &texture->handle;
+		}
+
+
+		void destroyTexture(ImTextureID handle) override
+		{
+			auto& allocator = m_editor.getAllocator();
+			auto iter = m_textures.find(handle);
+			if (iter == m_textures.end()) return;
+			auto* texture = iter.value();
+			m_textures.erase(iter);
+			texture->destroy();
+			LUMIX_DELETE(allocator, texture);
+		}
+
+
 		ImTextureID loadTexture(const Path& path) override
 		{
 			auto& rm = m_editor.getEngine().getResourceManager();

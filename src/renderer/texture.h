@@ -38,7 +38,7 @@ class LUMIX_RENDERER_API Texture LUMIX_FINAL : public Resource
 		Texture(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
 		~Texture();
 
-		bool create(int w, int h, void* data);
+		bool create(int w, int h, const void* data);
 		void destroy();
 
 		const u8* getData() const { return data.empty() ? nullptr : &data[0]; }
