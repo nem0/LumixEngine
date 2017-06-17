@@ -36,6 +36,7 @@ namespace Lumix
 			void serialize(const char* label, Entity value);
 			void serialize(const char* label, ComponentHandle value);
 			void serialize(const char* label, u32 value);
+			void serialize(const char* label, u16 value);
 			void serialize(const char* label, float value);
 			void serialize(const char* label, i32 value);
 			void serialize(const char* label, const char* value);
@@ -59,6 +60,7 @@ namespace Lumix
 			void deserialize(const char* label, Entity& value, Entity default_value);
 			void deserialize(const char* label, ComponentHandle& value, ComponentHandle default_value);
 			void deserialize(const char* label, u32& value, u32 default_value);
+			void deserialize(const char* label, u16& value, u16 default_value);
 			void deserialize(const char* label, float& value, float default_value);
 			void deserialize(const char* label, i32& value, i32 default_value);
 			void deserialize(const char* label, char* value, int max_length, const char* default_value);

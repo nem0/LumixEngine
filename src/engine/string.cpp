@@ -532,6 +532,14 @@ const char* fromCString(const char* input, int length, i64* value)
 	return nullptr;
 }
 
+const char* fromCString(const char* input, int length, u16* value)
+{
+	u32 tmp;
+	const char* ret = fromCString(input, length, &tmp);
+	*value = u16(tmp);
+	return ret;
+}
+
 const char* fromCString(const char* input, int length, u32* value)
 {
 	if (length > 0)
