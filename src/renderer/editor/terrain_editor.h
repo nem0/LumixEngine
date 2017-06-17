@@ -76,7 +76,7 @@ private:
 	float m_terrain_brush_strength;
 	float m_terrain_brush_size;
 	int m_texture_idx;
-	int m_grass_idx;
+	u16 m_grass_mask;
 	u16 m_flat_height;
 	Vec3 m_color;
 	int m_current_brush;

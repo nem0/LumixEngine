@@ -87,7 +87,7 @@ struct PaintTerrainCommand LUMIX_FINAL : public IEditorCommand
 		, m_items(editor.getAllocator())
 		, m_action_type(action_type)
 		, m_texture_idx(texture_idx)
-		, m_grass_idx(texture_idx)
+		, m_grass_mask((u16)texture_idx)
 		, m_mask(editor.getAllocator())
 		, m_flat_height(flat_height)
 	{
@@ -117,7 +117,7 @@ struct PaintTerrainCommand LUMIX_FINAL : public IEditorCommand
 	{
 		serializer.serialize("type", (int)m_action_type);
 		serializer.serialize("texture_idx", m_texture_idx);
-		serializer.serialize("grass_idx", m_grass_idx);
+		serializer.serialize("grass_mask", m_grass_mask);
 		serializer.beginArray("items");
 		for (int i = 0; i < m_items.size(); ++i)
 		{
@@ -146,7 +146,7 @@ struct PaintTerrainCommand LUMIX_FINAL : public IEditorCommand
 		serializer.deserialize("type", action_type, 0);
 		m_action_type = (TerrainEditor::ActionType)action_type;
 		serializer.deserialize("texture_idx", m_texture_idx, 0);
-		serializer.deserialize("grass_idx", m_grass_idx, 0);
+		serializer.deserialize("grass_mask", m_grass_mask, 0);
 		serializer.deserializeArrayBegin("items");
 		while (!serializer.isArrayEnd())
 		{
@@ -388,8 +388,6 @@ private:
 		float fx = 0;
 		float fstepx = 1.0f / (r.to_x - r.from_x);
 		float fstepy = 1.0f / (r.to_y - r.from_y);
-		int byte_offset = m_grass_idx > 8 ? 1 : 0;
-		int grass_idx = m_grass_idx > 8 ? m_grass_idx - 8 : m_grass_idx;
 		for (int i = r.from_x, end = r.to_x; i < end; ++i, fx += fstepx)
 		{
 			float fy = 0;
@@ -397,18 +395,19 @@ private:
 			{
 				if (isMasked(fx, fy))
 				{
-					int offset = 4 * (i - m_x + (j - m_y) * m_width) + 2 + byte_offset;
+					int offset = 4 * (i - m_x + (j - m_y) * m_width) + 2;
 					float attenuation = getAttenuation(item, i, j, texture_size);
 					int add = int(attenuation * item.m_amount * 255);
 					if (add > 0)
 					{
+						u16* tmp = ((u16*)&data[offset]);
 						if (m_action_type == TerrainEditor::REMOVE_GRASS)
 						{
-							data[offset] &= ~(1 << grass_idx);
+							*tmp &= ~m_grass_mask;
 						}
 						else
 						{
-							data[offset] |= 1 << grass_idx;
+							*tmp |= m_grass_mask;
 						}
 					}
 				}
@@ -670,7 +669,7 @@ private:
 	Array<u8> m_new_data;
 	Array<u8> m_old_data;
 	int m_texture_idx;
-	int m_grass_idx;
+	u16 m_grass_mask;
 	int m_width;
 	int m_height;
 	int m_x;
@@ -765,7 +764,7 @@ TerrainEditor::TerrainEditor(WorldEditor& editor, StudioApp& app)
 	m_terrain_brush_strength = 0.1f;
 	m_action_type = RAISE_HEIGHT;
 	m_texture_idx = 0;
-	m_grass_idx = 0;
+	m_grass_mask = 1;
 	m_is_align_with_normal = false;
 	m_is_rotate_x = false;
 	m_is_rotate_y = false;
@@ -1593,9 +1592,17 @@ void TerrainEditor::onGUI()
 			for (int i = 0; i < type_count; ++i)
 			{
 				if (i % 4 != 0) ImGui::SameLine();
-				if (ImGui::RadioButton(StaticString<20>("", i, "###rb", i), m_grass_idx == i))
+				bool b = (m_grass_mask & (1 << i)) != 0;
+				if (ImGui::Checkbox(StaticString<20>("", i, "###rb", i), &b))
 				{
-					m_grass_idx = i;
+					if (b)
+					{
+						m_grass_mask |= 1 << i;
+					}
+					else
+					{
+						m_grass_mask &= ~(1 << i);
+					}
 				}
 			}
 			break;
@@ -1761,7 +1768,7 @@ void TerrainEditor::paint(const Vec3& hit_pos, ActionType action_type, bool old_
 {
 	PaintTerrainCommand* command = LUMIX_NEW(m_world_editor.getAllocator(), PaintTerrainCommand)(m_world_editor,
 		action_type,
-		action_type == ADD_GRASS || action_type == REMOVE_GRASS ? m_grass_idx : m_texture_idx,
+		action_type == ADD_GRASS || action_type == REMOVE_GRASS ? (int)m_grass_mask : m_texture_idx,
 		hit_pos,
 		m_brush_mask,
 		m_terrain_brush_size,
