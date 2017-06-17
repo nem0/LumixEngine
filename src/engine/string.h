@@ -26,6 +26,7 @@ LUMIX_ENGINE_API const char* fromCString(const char* input, int length, i32* val
 LUMIX_ENGINE_API const char* fromCString(const char* input, int length, u64* value);
 LUMIX_ENGINE_API const char* fromCString(const char* input, int length, i64* value);
 LUMIX_ENGINE_API const char* fromCString(const char* input, int length, u32* value);
+LUMIX_ENGINE_API const char* fromCString(const char* input, int length, u16* value);
 LUMIX_ENGINE_API bool copyString(char* destination, int length, const char* source);
 LUMIX_ENGINE_API bool copyNString(char* destination,
 	int length,

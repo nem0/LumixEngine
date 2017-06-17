@@ -113,6 +113,18 @@ void JsonSerializer::serialize(const char* label, unsigned int value)
 }
 
 
+void JsonSerializer::serialize(const char* label, u16 value)
+{
+	writeBlockComma();
+	char tmp[20];
+	writeString(label);
+	toCString(value, tmp, 20);
+	m_file.write(" : ", stringLength(" : "));
+	m_file.write(tmp, stringLength(tmp));
+	m_is_first_in_block = false;
+}
+
+
 void JsonSerializer::serialize(const char* label, float value)
 {
 	writeBlockComma();
@@ -416,6 +428,20 @@ void JsonSerializer::deserialize(const char* label, float& value, float default_
 
 
 void JsonSerializer::deserialize(const char* label, u32& value, u32 default_value)
+{
+	deserializeLabel(label);
+	if (m_is_string_token || !fromCString(m_token, m_token_size, &value))
+	{
+		value = default_value;
+	}
+	else
+	{
+		deserializeToken();
+	}
+}
+
+
+void JsonSerializer::deserialize(const char* label, u16& value, u16 default_value)
 {
 	deserializeLabel(label);
 	if (m_is_string_token || !fromCString(m_token, m_token_size, &value))
