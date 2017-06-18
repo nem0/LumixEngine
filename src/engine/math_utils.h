@@ -138,6 +138,16 @@ LUMIX_FORCE_INLINE float degreesToRadians(float angle)
 	return angle * PI / 180.0f;
 }
 
+LUMIX_FORCE_INLINE double degreesToRadians(double angle)
+{
+	return angle * PI / 180.0;
+}
+
+LUMIX_FORCE_INLINE float degreesToRadians(int angle)
+{
+	return angle * PI / 180.0f;
+}
+
 LUMIX_ENGINE_API Vec3 degreesToRadians(const Vec3& v);
 
 LUMIX_FORCE_INLINE float radiansToDegrees(float angle)
