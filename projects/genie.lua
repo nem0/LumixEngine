@@ -10,7 +10,7 @@ end
 local LOCATION = "tmp/" .. ide_dir
 local BINARY_DIR = LOCATION .. "/bin/"
 local build_physics = true
-local build_unit_tests = true
+local build_unit_tests = false
 local build_app = true
 local build_studio = true
 local build_gui = _ACTION == "vs2015"
@@ -53,8 +53,8 @@ newoption {
 }
 
 newoption {
-	trigger = "no-unit-tests",
-	description = "Do not build unit tests."
+	trigger = "with-unit-tests",
+	description = "Build unit tests."
 }
 
 newoption {
@@ -103,8 +103,8 @@ if _OPTIONS["no-studio"] then
 	build_studio = false
 end
 
-if _OPTIONS["no-unit-tests"] then
-	build_unit_tests = false
+if _OPTIONS["with-unit-tests"] then
+	build_unit_tests = true
 end
 
 if _OPTIONS["no-app"] then
