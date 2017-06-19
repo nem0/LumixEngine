@@ -1,1 +1,1 @@
-genie.exe vs2015
+genie.exe --with-unit-tests vs2015
