@@ -15,6 +15,7 @@
 * [Features](https://github.com/nem0/LumixEngine/wiki/Features)
 * [Data repository](https://github.com/nem0/lumixengine_data)
 * [Videos](https://www.youtube.com/channel/UCtjtIy0ldsq-9siM1Gm_rXg)
+* [Plugins](https://github.com/nem0/LumixEngine/wiki/available-plugins)
 * [Roadmap](https://github.com/nem0/LumixEngine/milestones)
 
 ![Editor screenshot](https://cloud.githubusercontent.com/assets/153526/26275242/6e9f7f90-3d5c-11e7-8548-f6ae82d4ba52.jpg)
