@@ -26,6 +26,8 @@ public:
 
 	void makeUpToDate(bool wait);
 	void update();
+	void compile(const char* path, bool debug);
+	const Array<string>& getSHDFiles() const { return m_shd_files; }
 
 private:
 	void findShaderFiles(const char* src_dir);
@@ -35,21 +37,20 @@ private:
 	void onCompiled(int value);
 	void updateNotifications();
 	void compileAllPasses(const char* path,
-						  bool is_vertex_shader,
-						  const int* define_masks,
-						  const ShaderCombinations& combinations);
+		bool is_vertex_shader,
+		const int* define_masks,
+		const ShaderCombinations& combinations,
+		bool debug);
 	void compilePass(const char* path,
-					 bool is_vertex_shader,
-					 const char* pass,
-					 int define_mask,
-					 const ShaderCombinations::Defines& all_defines);
-	bool isChanged(const ShaderCombinations& combinations,
-				   const char* bin_base_path,
-				   const char* shd_path) const;
+		bool is_vertex_shader,
+		const char* pass,
+		int define_mask,
+		const ShaderCombinations::Defines& all_defines,
+		bool debug);
+	bool isChanged(const ShaderCombinations& combinations, const char* bin_base_path, const char* shd_path) const;
 
 	void onFileChanged(const char* path);
 	void parseDependencies();
-	void compile(const char* path);
 	Renderer& getRenderer();
 	void addDependency(const char* key, const char* value);
 	void processChangedFiles();

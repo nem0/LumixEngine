@@ -427,7 +427,8 @@ void ShaderCompiler::compilePass(const char* shd_path,
 	bool is_vertex_shader,
 	const char* pass,
 	int define_mask,
-	const ShaderCombinations::Defines& all_defines)
+	const ShaderCombinations::Defines& all_defines,
+	bool debug)
 {
 	const char* base_path = m_editor.getEngine().getDiskFileDevice()->getBasePath();
 	bool is_opengl = getRenderer().isOpenGL();
@@ -445,7 +446,7 @@ void ShaderCompiler::compilePass(const char* shd_path,
 			out_path << shd_file_info.m_basename << "_" << pass;
 			out_path << mask << (is_vertex_shader ? "_vs.shb" : "_fs.shb");
 
-			const char* args_array[18];
+			const char* args_array[21];
 			args_array[0] = "-f";
 			args_array[1] = source_path;
 			args_array[2] = "-o";
@@ -472,8 +473,9 @@ void ShaderCompiler::compilePass(const char* shd_path,
 			}
 			args_array[13] = "--type";
 			args_array[14] = is_vertex_shader ? "vertex" : "fragment";
-			args_array[15] = "-O3";
-			args_array[16] = "--define";
+			args_array[15] = "-O";
+			args_array[16] = "3";
+			args_array[17] = "--define";
 			StaticString<256> defines(pass, ";");
 			for (int i = 0; i < lengthOf(all_defines); ++i)
 			{
@@ -482,9 +484,14 @@ void ShaderCompiler::compilePass(const char* shd_path,
 					defines << getRenderer().getShaderDefine(all_defines[i]) << ";";
 				}
 			}
-			args_array[17] = defines;
+			args_array[18] = defines;
+			if (debug)
+			{
+				args_array[19] = "--debug";
+				args_array[20] = "--disasm";
+			}
 			bgfx::setShaderCErrorFunction(errorCallback, nullptr);
-			if (bgfx::compileShader(18, args_array) == EXIT_FAILURE)
+			if (bgfx::compileShader(debug ? 21 : 19, args_array) == EXIT_FAILURE)
 			{
 				g_log_error.log("Renderer") << "Failed to compile " << source_path << "(" << out_path << "), defines = \"" << defines << "\"";
 			}
@@ -574,7 +581,7 @@ void ShaderCompiler::update()
 	if (!m_to_compile.empty())
 	{
 		m_app.getAssetBrowser()->enableUpdate(false);
-		compile(m_to_compile.back().c_str());
+		compile(m_to_compile.back().c_str(), false);
 		m_to_compile.pop();
 
 		if (m_to_compile.empty())
@@ -590,20 +597,17 @@ void ShaderCompiler::update()
 void ShaderCompiler::compileAllPasses(const char* path,
 	bool is_vertex_shader,
 	const int* define_masks,
-	const ShaderCombinations& combinations)
+	const ShaderCombinations& combinations,
+	bool debug)
 {
 	for (int i = 0; i < combinations.pass_count; ++i)
 	{
-		compilePass(path,
-			is_vertex_shader,
-			combinations.passes[i],
-			define_masks[i],
-			combinations.defines);
+		compilePass(path, is_vertex_shader, combinations.passes[i], define_masks[i], combinations.defines, debug);
 	}
 }
 
 
-void ShaderCompiler::compile(const char* path)
+void ShaderCompiler::compile(const char* path, bool debug)
 {
 	char basename[MAX_PATH_LENGTH];
 	PathUtils::getBasename(basename, lengthOf(basename), path);
@@ -642,8 +646,8 @@ void ShaderCompiler::compile(const char* path)
 		ShaderCombinations combinations;
 		Shader::getShaderCombinations(path, getRenderer(), &data[0], &combinations);
 
-		compileAllPasses(path, false, combinations.fs_local_mask, combinations);
-		compileAllPasses(path, true, combinations.vs_local_mask, combinations);
+		compileAllPasses(path, false, combinations.fs_local_mask, combinations, debug);
+		compileAllPasses(path, true, combinations.vs_local_mask, combinations, debug);
 	}
 	else
 	{

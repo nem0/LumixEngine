@@ -55,6 +55,7 @@ static const ComponentType GLOBAL_LIGHT_TYPE = PropertyRegister::getComponentTyp
 static const ComponentType MODEL_INSTANCE_TYPE = PropertyRegister::getComponentType("renderable");
 static const ComponentType ENVIRONMENT_PROBE_TYPE = PropertyRegister::getComponentType("environment_probe");
 static const ResourceType MATERIAL_TYPE("material");
+static const ResourceType SHADER_BINARY_TYPE("shader_binary");
 static const ResourceType SHADER_TYPE("shader");
 static const ResourceType TEXTURE_TYPE("texture");
 static const ResourceType MODEL_TYPE("model");
@@ -763,6 +764,7 @@ struct ShaderPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 	
 	ResourceType getResourceType(const char* ext) override
 	{
+		if (equalStrings(ext, "shb")) return SHADER_BINARY_TYPE;
 		return equalStrings(ext, "shd") ? SHADER_TYPE : INVALID_RESOURCE_TYPE;
 	}
 
@@ -2212,7 +2214,7 @@ struct ShaderEditorPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	const char* getName() const override { return "shader_editor"; }
 	void update(float) override { m_compiler->update(); }
 	void onAction() { m_shader_editor.m_is_opened = !m_shader_editor.m_is_opened; }
-	void onWindowGUI() override { m_shader_editor.onGUI(); }
+	void onWindowGUI() override { m_shader_editor.onGUI(*m_compiler); }
 	bool hasFocus() override { return m_shader_editor.isFocused(); }
 	bool isOpened() const { return m_shader_editor.m_is_opened; }
 
