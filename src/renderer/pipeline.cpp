@@ -1864,7 +1864,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 	void setViewSeq()
 	{
-		bgfx::setViewSeq(m_current_view->bgfx_id, true);
+		bgfx::setViewMode(m_current_view->bgfx_id, bgfx::ViewMode::Sequential);
 	}
 
 
