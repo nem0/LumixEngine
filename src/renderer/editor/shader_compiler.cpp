@@ -446,7 +446,7 @@ void ShaderCompiler::compilePass(const char* shd_path,
 			out_path << shd_file_info.m_basename << "_" << pass;
 			out_path << mask << (is_vertex_shader ? "_vs.shb" : "_fs.shb");
 
-			const char* args_array[21];
+			const char* args_array[19];
 			args_array[0] = "-f";
 			args_array[1] = source_path;
 			args_array[2] = "-o";
@@ -473,8 +473,16 @@ void ShaderCompiler::compilePass(const char* shd_path,
 			}
 			args_array[13] = "--type";
 			args_array[14] = is_vertex_shader ? "vertex" : "fragment";
-			args_array[15] = "-O";
-			args_array[16] = "3";
+			if (debug)
+			{
+				args_array[15] = "--debug";
+				args_array[16] = "--disasm";
+			}
+			else
+			{
+				args_array[15] = "-O";
+				args_array[16] = "3";
+			}
 			args_array[17] = "--define";
 			StaticString<256> defines(pass, ";");
 			for (int i = 0; i < lengthOf(all_defines); ++i)
@@ -485,13 +493,8 @@ void ShaderCompiler::compilePass(const char* shd_path,
 				}
 			}
 			args_array[18] = defines;
-			if (debug)
-			{
-				args_array[19] = "--debug";
-				args_array[20] = "--disasm";
-			}
 			bgfx::setShaderCErrorFunction(errorCallback, nullptr);
-			if (bgfx::compileShader(debug ? 21 : 19, args_array) == EXIT_FAILURE)
+			if (bgfx::compileShader(19, args_array) == EXIT_FAILURE)
 			{
 				g_log_error.log("Renderer") << "Failed to compile " << source_path << "(" << out_path << "), defines = \"" << defines << "\"";
 			}
