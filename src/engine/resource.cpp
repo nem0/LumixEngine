@@ -61,6 +61,7 @@ void Resource::checkState()
 
 		if (m_empty_dep_count > 0 && m_current_state != State::EMPTY)
 		{
+			onBeforeEmpty();
 			m_current_state = State::EMPTY;
 			m_cb.invoke(old_state, m_current_state, *this);
 		}
