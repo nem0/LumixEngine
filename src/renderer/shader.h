@@ -134,6 +134,8 @@ public:
 		const char* shader_content,
 		ShaderCombinations* output);
 
+	void onBeforeEmpty() override;
+
 	IAllocator& m_allocator;
 	Array<ShaderInstance> m_instances;
 	u32 m_all_defines_mask;

@@ -66,6 +66,7 @@ protected:
 	virtual ~Resource();
 
 	virtual void onBeforeReady() {}
+	virtual void onBeforeEmpty() {}
 	virtual void unload(void) = 0;
 	virtual bool load(FS::IFile& file) = 0;
 

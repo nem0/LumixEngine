@@ -481,6 +481,22 @@ ShaderInstance::~ShaderInstance()
 }
 
 
+void Shader::onBeforeEmpty()
+{
+	for (ShaderInstance& inst : m_instances)
+	{
+		for (int i = 0; i < lengthOf(inst.program_handles); ++i)
+		{
+			if (bgfx::isValid(inst.program_handles[i]))
+			{
+				bgfx::destroyProgram(inst.program_handles[i]);
+				inst.program_handles[i] = BGFX_INVALID_HANDLE;
+			}
+		}
+	}
+}
+
+
 bool Shader::getShaderCombinations(const char* shd_path,
 	Renderer& renderer,
 	const char* shader_content,
