@@ -32,6 +32,7 @@ IMGUI_API bool ListBox(const char* label,
 IMGUI_API bool ColorPicker(float* col, bool alphabar);
 
 IMGUI_API void BringToFront();
+IMGUI_API bool IsWindowOrChildWindowFocused();
 
 IMGUI_API bool BeginToolbar(const char* str_id, ImVec2 screen_pos, ImVec2 size);
 IMGUI_API void EndToolbar();

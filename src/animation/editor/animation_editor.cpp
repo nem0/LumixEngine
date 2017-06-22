@@ -602,7 +602,7 @@ void AnimationEditor::editorGUI()
 {
 	if (ImGui::BeginDock("Animation Editor", &m_editor_opened, ImGuiWindowFlags_MenuBar))
 	{
-		m_is_focused = ImGui::IsRootWindowOrAnyChildFocused();
+		m_is_focused = ImGui::IsWindowOrChildWindowFocused();
 		menuGUI();
 		ImGui::Columns(2);
 		drawGraph();

@@ -428,6 +428,21 @@ namespace ImGui
 	}
 
 
+	static bool isThisOrParentFocused(ImGuiWindow* win)
+	{
+		if (!win) return false;
+		ImGuiContext& g = *GImGui;
+		return g.FocusedWindow && g.FocusedWindow == win || isThisOrParentFocused(win->ParentWindow);
+	}
+
+
+	bool IsWindowOrChildWindowFocused()
+	{
+		ImGuiContext& g = *GImGui;
+		return isThisOrParentFocused(g.CurrentWindow);
+	}
+
+
 	void BringToFront()
 	{
 		ImGuiContext& g = *GImGui;
