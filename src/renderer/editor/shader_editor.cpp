@@ -2221,7 +2221,7 @@ void ShaderEditor::onGUI(ShaderCompiler& compiler)
 	title << "###Shader Editor";
 	if (ImGui::BeginDock(title, &m_is_opened, ImGuiWindowFlags_MenuBar))
 	{
-		m_is_focused = ImGui::IsRootWindowOrAnyChildFocused();
+		m_is_focused = ImGui::IsWindowOrChildWindowFocused();
 
 		onGUIMenu();
 		onGUILeftColumn();
@@ -2240,6 +2240,10 @@ void ShaderEditor::onGUI(ShaderCompiler& compiler)
 				ImGui::PopID();
 			}
 		}
+	}
+	else
+	{
+		m_is_focused = false;
 	}
 	ImGui::EndDock();
 }
