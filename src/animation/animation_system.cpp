@@ -19,6 +19,7 @@
 #include "renderer/pose.h"
 #include "renderer/render_scene.h"
 #include <cfloat>
+#include <cmath>
 
 
 namespace Lumix
@@ -143,6 +144,16 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		u32 default_set = 0;
 		Array<u8> input;
 		HashMap<u32, Animation*> animations;
+
+		struct IK
+		{
+			enum { MAX_BONES_COUNT = 8 };
+			float weight = 0;
+			i16 max_iterations = 1;
+			i16 bones_count = 4;
+			u32 bones[MAX_BONES_COUNT];
+			Vec3 target;
+		} inverse_kinematics[4];
 	};
 
 
@@ -260,6 +271,28 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 			LUMIX_DELETE(m_anim_system.m_allocator, controller.root);
 		}
 		m_controllers.clear();
+	}
+
+
+	static int setIK(lua_State* L)
+	{
+		AnimationSceneImpl* scene = LuaWrapper::checkArg<AnimationSceneImpl*>(L, 1);
+		ComponentHandle cmp = LuaWrapper::checkArg<ComponentHandle>(L, 2);
+		Controller& controller = scene->m_controllers.get({ cmp.index });
+		int index = LuaWrapper::checkArg<int>(L, 3);
+		Controller::IK& ik = controller.inverse_kinematics[index];
+		ik.weight = LuaWrapper::checkArg<float>(L, 4);
+		ik.target = LuaWrapper::checkArg<Vec3>(L, 5);
+		Transform tr = scene->m_universe.getTransform(controller.entity);
+		ik.target = tr.inverted().transform(ik.target);
+
+		ik.bones_count = lua_gettop(L) - 5;
+		for (int i = 0; i < ik.bones_count; ++i)
+		{
+			const char* bone = LuaWrapper::checkArg<const char*>(L, i + 6);
+			ik.bones[i] = crc32(bone);
+		}
+		return 0;
 	}
 
 
@@ -816,6 +849,80 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		controller.root->fillPose(m_anim_system.m_engine, *pose, *model, 1);
 
 		pose->computeAbsolute(*model);
+
+		for (Controller::IK& ik : controller.inverse_kinematics)
+		{
+			if (ik.weight == 0) break;
+
+			updateIK(ik, *pose, *model, controller.entity);
+		}
+	}
+
+
+	void updateIK(Controller::IK& ik, Pose& pose, Model& model, Entity& entity)
+	{
+		decltype(model.getBoneIndex(0)) bones_iters[Controller::IK::MAX_BONES_COUNT];
+		for (int i = 0; i < ik.bones_count; ++i)
+		{
+			bones_iters[i] = model.getBoneIndex(ik.bones[i]);
+			if (!bones_iters[i].isValid()) return;
+		}
+		
+		int indices[Controller::IK::MAX_BONES_COUNT];
+		Vec3 pos[Controller::IK::MAX_BONES_COUNT];
+		float len[Controller::IK::MAX_BONES_COUNT - 1];
+		float len_sum = 0;
+		for (int i = 0; i < ik.bones_count; ++i)
+		{
+			indices[i] = bones_iters[i].value();
+			pos[i] = pose.positions[indices[i]];
+			if (i > 0)
+			{
+				len[i - 1] = (pos[i] - pos[i - 1]).length();
+				len_sum += len[i - 1];
+			}
+		}
+
+		Vec3 target = ik.target;
+		Vec3 to_target = target - pos[0];
+		if (len_sum * len_sum < to_target.squaredLength()) {
+			to_target.normalize();
+			target = pos[0] + to_target * len_sum;
+		}
+
+		for (int iteration = 0; iteration < ik.max_iterations; ++iteration)
+		{
+			pos[ik.bones_count - 1] = target;
+			
+			// backward
+			for (int i = ik.bones_count - 1; i > 0; --i)
+			{
+				Vec3 dir = (pos[i - 1] - pos[i]).normalized();
+				pos[i - 1] = pos[i] + dir * len[i - 1];
+			}
+
+			// backward
+			for (int i = 1; i < ik.bones_count; ++i)
+			{
+				Vec3 dir = (pos[i] - pos[i - 1]).normalized();
+				pos[i] = pos[i - 1] + dir * len[i - 1];
+			}
+		}
+
+		for (int i = 0; i < ik.bones_count; ++i)
+		{
+			if (i < ik.bones_count - 1)
+			{
+				Vec3 old_d = pose.positions[indices[i + 1]] - pose.positions[indices[i]];
+				Vec3 new_d = pos[i + 1] - pos[i];
+				old_d.normalize();
+				new_d.normalize();
+
+				Quat rel_rot = Quat::vec3ToVec3(old_d, new_d);
+				pose.rotations[indices[i]] = rel_rot * pose.rotations[indices[i]];
+			}
+			pose.positions[indices[i]] = pos[i];
+		}
 	}
 
 
@@ -1009,6 +1116,8 @@ void AnimationSystemImpl::registerLuaAPI()
 	REGISTER_FUNCTION(getControllerInputIndex);
 
 	#undef REGISTER_FUNCTION
+
+	LuaWrapper::createSystemFunction(L, "Animation", "setIK", &AnimationSceneImpl::setIK); \
 }
 
 
