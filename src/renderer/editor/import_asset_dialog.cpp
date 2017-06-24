@@ -1045,6 +1045,16 @@ struct ImportTask LUMIX_FINAL : public MT::Task
 			if (m_dialog.m_model.lods[i - 1] < 0) m_dialog.m_model.lods[i] = -1;
 		}
 
+		auto cmpMeshes = [](const void* a, const void* b) -> int {
+			auto a_mesh = static_cast<const ImportMesh*>(a);
+			auto b_mesh = static_cast<const ImportMesh*>(b);
+			return a_mesh->lod - b_mesh->lod;
+		};
+
+		if (!m_dialog.m_meshes.empty())
+		{
+			qsort(&m_dialog.m_meshes[0], m_dialog.m_meshes.size(), sizeof(m_dialog.m_meshes[0]), cmpMeshes);
+		}
 
 		enableFloatingPointTraps(true);
 
@@ -1509,17 +1519,6 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 
 	int task() override
 	{
-		auto cmpMeshes = [](const void* a, const void* b) -> int {
-			auto a_mesh = static_cast<const ImportMesh*>(a);
-			auto b_mesh = static_cast<const ImportMesh*>(b);
-			return a_mesh->lod - b_mesh->lod;
-		};
-
-		if (!m_dialog.m_meshes.empty())
-		{
-			qsort(&m_dialog.m_meshes[0], m_dialog.m_meshes.size(), sizeof(m_dialog.m_meshes[0]), cmpMeshes);
-		}
-
 		if (saveLumixPhysics() && saveLumixModel() && saveLumixMaterials() && saveLumixAnimations())
 		{
 			m_dialog.setMessage("Success.");
