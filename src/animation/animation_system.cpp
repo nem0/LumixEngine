@@ -149,7 +149,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		{
 			enum { MAX_BONES_COUNT = 8 };
 			float weight = 0;
-			i16 max_iterations = 1;
+			i16 max_iterations = 5;
 			i16 bones_count = 4;
 			u32 bones[MAX_BONES_COUNT];
 			Vec3 target;
@@ -287,6 +287,10 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		ik.target = tr.inverted().transform(ik.target);
 
 		ik.bones_count = lua_gettop(L) - 5;
+		if (ik.bones_count > lengthOf(ik.bones))
+		{
+			luaL_argerror(L, ik.bones_count, "Too many arguments");
+		}
 		for (int i = 0; i < ik.bones_count; ++i)
 		{
 			const char* bone = LuaWrapper::checkArg<const char*>(L, i + 6);
