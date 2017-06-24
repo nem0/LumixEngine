@@ -345,6 +345,12 @@ int setParams(lua_State* L)
 	}
 	lua_pop(L, 1);
 
+	if (lua_getfield(L, 1, "mesh_output_filename") == LUA_TSTRING)
+	{
+		copyString(dlg->m_mesh_output_filename, LuaWrapper::toType<const char*>(L, -1));
+	}
+	lua_pop(L, 1);
+
 	if (lua_getfield(L, 1, "texture_output_dir") == LUA_TSTRING)
 	{
 		copyString(dlg->m_texture_output_dir, LuaWrapper::toType<const char*>(L, -1));
