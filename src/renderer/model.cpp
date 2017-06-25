@@ -289,51 +289,31 @@ bool Model::parseVertexDeclEx(FS::IFile& file, bgfx::VertexDecl* vertex_decl)
 		i32 attr;
 		file.read(&attr, sizeof(attr));
 
-		enum Attrs
-		{
-			Position,
-			Normal,
-			Tangent,
-			Bitangent,
-			Color0,
-			Color1,
-			Indices,
-			Weight,
-			TexCoord0,
-			TexCoord1,
-			TexCoord2,
-			TexCoord3,
-			TexCoord4,
-			TexCoord5,
-			TexCoord6,
-			TexCoord7,
-		};
-
-		if (attr == Attrs::Position)
+		if (attr == (i32)Attrs::Position)
 		{
 			vertex_decl->add(bgfx::Attrib::Position, 3, bgfx::AttribType::Float);
 		}
-		else if (attr == Attrs::Color0)
+		else if (attr == (i32)Attrs::Color0)
 		{
 			vertex_decl->add(bgfx::Attrib::Color0, 4, bgfx::AttribType::Uint8, true, false);
 		}
-		else if (attr == Attrs::TexCoord0)
+		else if (attr == (i32)Attrs::TexCoord0)
 		{
 			vertex_decl->add(bgfx::Attrib::TexCoord0, 2, bgfx::AttribType::Float);
 		}
-		else if (attr == Attrs::Normal)
+		else if (attr == (i32)Attrs::Normal)
 		{
 			vertex_decl->add(bgfx::Attrib::Normal, 4, bgfx::AttribType::Uint8, true, true);
 		}
-		else if (attr == Attrs::Tangent)
+		else if (attr == (i32)Attrs::Tangent)
 		{
 			vertex_decl->add(bgfx::Attrib::Tangent, 4, bgfx::AttribType::Uint8, true, true);
 		}
-		else if (attr == Attrs::Weight)
+		else if (attr == (i32)Attrs::Weight)
 		{
 			vertex_decl->add(bgfx::Attrib::Weight, 4, bgfx::AttribType::Float);
 		}
-		else if (attr == Attrs::Indices)
+		else if (attr == (i32)Attrs::Indices)
 		{
 			vertex_decl->add(bgfx::Attrib::Indices, 4, bgfx::AttribType::Int16, false, true);
 		}
