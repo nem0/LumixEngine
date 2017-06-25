@@ -2041,9 +2041,9 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 	}
 
 
-	static void writeAttribute(bgfx::Attrib::Enum attrib, FS::OsFile& file)
+	static void writeAttribute(Model::Attrs attrib, FS::OsFile& file)
 	{
-		i32 tmp = attrib;
+		i32 tmp = (i32)attrib;
 		file.write(&tmp, sizeof(tmp));
 	}
 
@@ -2422,15 +2422,15 @@ struct ConvertTask LUMIX_FINAL : public MT::Task
 
 		if (isSkinned(mesh))
 		{
-			writeAttribute(bgfx::Attrib::Weight, file);
-			writeAttribute(bgfx::Attrib::Indices, file);
+			writeAttribute(Model::Attrs::Weight, file);
+			writeAttribute(Model::Attrs::Indices, file);
 		}
 
-		writeAttribute(bgfx::Attrib::Position, file);
-		if (mesh->HasVertexColors(0) && m_dialog.m_model.import_vertex_colors) writeAttribute(bgfx::Attrib::Color0, file);
-		writeAttribute(bgfx::Attrib::Normal, file);
-		if (mesh->mTangents) writeAttribute(bgfx::Attrib::Tangent, file);
-		if (mesh->HasTextureCoords(0)) writeAttribute(bgfx::Attrib::TexCoord0, file);
+		writeAttribute(Model::Attrs::Position, file);
+		if (mesh->HasVertexColors(0) && m_dialog.m_model.import_vertex_colors) writeAttribute(Model::Attrs::Color0, file);
+		writeAttribute(Model::Attrs::Normal, file);
+		if (mesh->mTangents) writeAttribute(Model::Attrs::Tangent, file);
+		if (mesh->HasTextureCoords(0)) writeAttribute(Model::Attrs::TexCoord0, file);
 	}
 
 
