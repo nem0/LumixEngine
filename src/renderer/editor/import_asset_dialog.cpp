@@ -3350,6 +3350,7 @@ void ImportAssetDialog::onAction()
 
 void ImportAssetDialog::clearSources()
 {
+	checkTask(true);
 	stbi_image_free(m_image.data);
 	m_image.data = nullptr;
 	m_importers.clear();
