@@ -2236,7 +2236,7 @@ void ShaderEditor::onGUI(ShaderCompiler& compiler)
 				ImGui::SameLine();
 				if (ImGui::Button("Compile")) compiler.compile(shd_path.c_str(), false);
 				ImGui::SameLine();
-				ImGui::Text(shd_path.c_str());
+				ImGui::Text("%s", shd_path.c_str());
 				ImGui::PopID();
 			}
 		}
