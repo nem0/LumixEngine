@@ -518,6 +518,11 @@ bool Model::parseBones(FS::IFile& file)
 		Model::Bone& b = m_bones[i];
 		if (b.parent.length() == 0)
 		{
+			if (m_first_nonroot_bone_index != -1)
+			{
+				g_log_error.log("Renderer") << "Invalid skeleton in " << getPath().c_str();
+				return false;
+			}
 			b.parent_idx = -1;
 		}
 		else
