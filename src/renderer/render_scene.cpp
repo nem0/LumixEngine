@@ -2355,6 +2355,13 @@ public:
 	}
 
 
+	Vec3 getPoseBonePosition(ComponentHandle model_instance, int bone_index)
+	{
+		Pose* pose = m_model_instances[model_instance.index].pose;
+		return pose->positions[bone_index];
+	}
+
+
 	Frustum getPointLightFrustum(ComponentHandle cmp) const
 	{
 		const PointLight& light = m_point_lights[m_point_lights_map[cmp]];
@@ -5129,6 +5136,7 @@ void RenderScene::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(setTerrainHeightAt);
 	REGISTER_FUNCTION(hideModelInstance);
 	REGISTER_FUNCTION(showModelInstance);
+	REGISTER_FUNCTION(getPoseBonePosition);
 
 	#undef REGISTER_FUNCTION
 
