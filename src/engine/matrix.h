@@ -66,6 +66,10 @@ struct LUMIX_ENGINE_API Transform
 
 LUMIX_ALIGN_BEGIN(16) struct LUMIX_ENGINE_API Matrix
 {
+	static Matrix rotationX(float angle);
+	static Matrix rotationY(float angle);
+	static Matrix rotationZ(float angle);
+
 	Matrix() {}
 
 	Matrix(const Vec3& pos, const Quat& rot);

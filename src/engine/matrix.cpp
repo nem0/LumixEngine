@@ -60,6 +60,47 @@ void Matrix::fromEuler(float yaw, float pitch, float roll)
 }
 
 
+Matrix Matrix::rotationX(float angle)
+{
+	Matrix m = IDENTITY;
+	float c = cosf(angle);
+	float s = sinf(angle);
+
+	m.m22 = m.m33 = c;
+	m.m32 = -s;
+	m.m23 = s;
+
+	return m;
+}
+
+
+Matrix Matrix::rotationY(float angle)
+{
+	Matrix m = IDENTITY;
+	float c = cosf(angle);
+	float s = sinf(angle);
+
+	m.m11 = m.m33 = c;
+	m.m31 = s;
+	m.m13 = -s;
+
+	return m;
+}
+
+Matrix Matrix::rotationZ(float angle)
+{
+	Matrix m = IDENTITY;
+	float c = cosf(angle);
+	float s = sinf(angle);
+
+	m.m11 = m.m22 = c;
+	m.m21 = -s;
+	m.m12 = s;
+	
+	return m;
+}
+
+
 void Matrix::setPerspective(float fov, float ratio, float near_plane, float far_plane, bool is_opengl)
 {
 	*this = Matrix::IDENTITY;
