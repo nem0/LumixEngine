@@ -47,6 +47,7 @@ public:
 	int getTypeIndex(ResourceType type) const;
 	void selectResource(const Path& resource, bool record_history);
 	bool resourceInput(const char* label, const char* str_id, char* buf, int max_size, ResourceType type);
+	void onInitFinished();
 	void addPlugin(IPlugin& plugin);
 	void openInExternalEditor(Resource* resource);
 	void openInExternalEditor(const char* path);
@@ -96,6 +97,7 @@ private:
 	bool m_is_focus_requested;
 	bool m_activate;
 	bool m_is_update_enabled;
+	bool m_is_init_finished;
 	Action* m_auto_reload_action;
 	Action* m_back_action;
 	Action* m_forward_action;

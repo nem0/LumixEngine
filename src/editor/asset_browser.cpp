@@ -57,14 +57,13 @@ AssetBrowser::AssetBrowser(StudioApp& app)
 	, m_current_type(0)
 	, m_is_opened(false)
 	, m_activate(false)
+	, m_is_init_finished(false)
 	, m_history_index(-1)
 {
 	auto& editor = *app.getWorldEditor();
 	auto& allocator = editor.getAllocator();
 	m_filter[0] = '\0';
 	m_resources.emplace(allocator);
-
-	findResources();
 
 	const char* base_path = editor.getEngine().getDiskFileDevice()->getBasePath();
 	m_watchers[0] = FileSystemWatcher::create(base_path, allocator);
@@ -331,11 +330,18 @@ void AssetBrowser::selectResource(Resource* resource, bool record_history)
 }
 
 
+void AssetBrowser::onInitFinished()
+{
+	m_is_init_finished = true;
+	findResources();
+}
+
+
 void AssetBrowser::addPlugin(IPlugin& plugin)
 {
 	m_plugins.push(&plugin);
 	m_resources.emplace(m_editor.getAllocator());
-	findResources();
+	if(m_is_init_finished) findResources();
 }
 
 
