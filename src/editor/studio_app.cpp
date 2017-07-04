@@ -2170,6 +2170,7 @@ public:
 		loadUniverseFromCommandLine();
 		findLuaPlugins("plugins/lua/");
 
+		m_asset_browser->onInitFinished();
 		m_sleep_when_inactive = shouldSleepWhenInactive();
 	}
 
