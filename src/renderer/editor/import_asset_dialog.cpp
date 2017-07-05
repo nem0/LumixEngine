@@ -66,6 +66,33 @@ static u32 packF4u(const Vec3& vec)
 }
 
 
+template <typename T>
+struct GenericTask LUMIX_FINAL : public MT::Task
+{
+	GenericTask(T _function, IAllocator& allocator)
+		: Task(allocator)
+		, function(_function)
+	{
+	}
+
+
+	int task() override
+	{
+		function();
+		return 0;
+	}
+
+
+	T function;
+};
+
+
+template <class T> GenericTask<T>* makeTask(T function, IAllocator& allocator)
+{
+	return LUMIX_NEW(allocator, GenericTask<T>)(function, allocator);
+}
+
+
 struct FBXImporter
 {
 	enum class Orientation
@@ -493,21 +520,20 @@ struct FBXImporter
 
 	bool addSource(const char* filename)
 	{
-		FILE* fp = fopen(filename, "rb");
-		if (!fp) return false;
-
 		IAllocator& allocator = app.getWorldEditor()->getAllocator();
-		Array<u8> data(allocator);
-		fseek(fp, 0, SEEK_END);
-		data.resize(ftell(fp));
-		fseek(fp, 0, SEEK_SET);
 
-		if (fread(&data[0], 1, data.size(), fp) != data.size())
+		FS::OsFile file;
+		if (!file.open(filename, FS::Mode::OPEN_AND_READ, allocator)) return false;
+
+		Array<u8> data(allocator);
+		data.resize((int)file.size());
+
+		if (!file.read(&data[0], data.size()))
 		{
-			fclose(fp);
+			file.close();
 			return false;
 		}
-		fclose(fp);
+		file.close();
 
 		ofbx::IScene* scene = ofbx::load(&data[0], data.size());
 		if (!scene)
@@ -2026,10 +2052,13 @@ bool ImportAssetDialog::checkSource()
 	stbi_image_free(m_image.data);
 	m_image.data = nullptr;
 
+	IAllocator& allocator = m_editor.getAllocator();
+
 	ASSERT(!m_task);
 	m_sources.emplace(m_source);
 	setImportMessage("Importing...", -1);
-	m_fbx_importer->addSource(m_source);
+	m_task = makeTask([this]() { m_fbx_importer->addSource(m_source); }, allocator);
+	m_task->create("Import mesh");
 	return true;
 }
 
@@ -2665,70 +2694,74 @@ void ImportAssetDialog::convert(bool use_ui)
 
 	saveModelMetadata();
 
-	if (m_fbx_importer->save(m_output_dir, m_mesh_output_filename, m_texture_output_dir))
-	{
-		for (auto& mat : m_fbx_importer->materials)
+	IAllocator& allocator = m_editor.getAllocator();
+	m_task = makeTask([this]() {
+		if (m_fbx_importer->save(m_output_dir, m_mesh_output_filename, m_texture_output_dir))
 		{
-			for (int i = 0; i < lengthOf(mat.textures); ++i)
+			for (auto& mat : m_fbx_importer->materials)
 			{
-				auto& tex = mat.textures[i];
-
-				if (!tex.fbx) continue;
-				if (!tex.import) continue;
-
-				PathUtils::FileInfo texture_info(tex.src);
-				PathBuilder dest(m_texture_output_dir[0] ? m_texture_output_dir : m_output_dir);
-				dest << "/" << texture_info.m_basename << (tex.to_dds ? ".dds" : texture_info.m_extension);
-
-				bool is_src_dds = equalStrings(texture_info.m_extension, "dds");
-				if (tex.to_dds && !is_src_dds)
+				for (int i = 0; i < lengthOf(mat.textures); ++i)
 				{
-					int image_width, image_height, image_comp;
-					auto data = stbi_load(tex.src, &image_width, &image_height, &image_comp, 4);
-					if (!data)
-					{
-						StaticString<MAX_PATH_LENGTH + 20> error_msg("Could not load image ", tex.src);
-						setMessage(error_msg);
-						return;
-					}
+					auto& tex = mat.textures[i];
 
-					bool is_normal_map = i == FBXImporter::ImportTexture::NORMAL;
-					if (!saveAsDDS(*this,
-						tex.src,
-						data,
-						image_width,
-						image_height,
-						image_comp == 4,
-						is_normal_map,
-						dest))
+					if (!tex.fbx) continue;
+					if (!tex.import) continue;
+
+					PathUtils::FileInfo texture_info(tex.src);
+					PathBuilder dest(m_texture_output_dir[0] ? m_texture_output_dir : m_output_dir);
+					dest << "/" << texture_info.m_basename << (tex.to_dds ? ".dds" : texture_info.m_extension);
+
+					bool is_src_dds = equalStrings(texture_info.m_extension, "dds");
+					if (tex.to_dds && !is_src_dds)
 					{
-						stbi_image_free(data);
-						setMessage(StaticString<MAX_PATH_LENGTH * 2 + 20>("Error converting ", tex.src, " to ", dest));
-						return;
-					}
-					stbi_image_free(data);
-				}
-				else
-				{
-					if (equalStrings(tex.src, dest))
-					{
-						if (!PlatformInterface::fileExists(tex.src))
+						int image_width, image_height, image_comp;
+						auto data = stbi_load(tex.src, &image_width, &image_height, &image_comp, 4);
+						if (!data)
 						{
-							setMessage(StaticString<MAX_PATH_LENGTH + 20>(tex.src, " not found"));
+							StaticString<MAX_PATH_LENGTH + 20> error_msg("Could not load image ", tex.src);
+							setMessage(error_msg);
+							return;
+						}
+
+						bool is_normal_map = i == FBXImporter::ImportTexture::NORMAL;
+						if (!saveAsDDS(*this,
+							tex.src,
+							data,
+							image_width,
+							image_height,
+							image_comp == 4,
+							is_normal_map,
+							dest))
+						{
+							stbi_image_free(data);
+							setMessage(StaticString<MAX_PATH_LENGTH * 2 + 20>("Error converting ", tex.src, " to ", dest));
+							return;
+						}
+						stbi_image_free(data);
+					}
+					else
+					{
+						if (equalStrings(tex.src, dest))
+						{
+							if (!PlatformInterface::fileExists(tex.src))
+							{
+								setMessage(StaticString<MAX_PATH_LENGTH + 20>(tex.src, " not found"));
+								return;
+							}
+						}
+						else if (!copyFile(tex.src, dest))
+						{
+							setMessage(StaticString<MAX_PATH_LENGTH * 2 + 20>("Error copying ", tex.src, " to ", dest));
 							return;
 						}
 					}
-					else if (!copyFile(tex.src, dest))
-					{
-						setMessage(StaticString<MAX_PATH_LENGTH * 2 + 20>("Error copying ", tex.src, " to ", dest));
-						return;
-					}
 				}
 			}
-		}
 
-		setMessage("Success.");
-	}
+			setMessage("Success.");
+		}
+	}, allocator);
+	m_task->create("ConvertTask");
 }
 
 
@@ -2775,6 +2808,7 @@ void ImportAssetDialog::addSource(const char* src)
 {
 	copyString(m_source, src);
 	checkSource();
+	checkTask(true);
 }
 
 
@@ -2795,6 +2829,14 @@ void ImportAssetDialog::onWindowGUI()
 		{
 			setMessage("");
 		}
+		ImGui::EndDock();
+		return;
+	}
+
+	if (m_task)
+	{
+		ImGui::Text("Working...");
+		checkTask(false);
 		ImGui::EndDock();
 		return;
 	}
