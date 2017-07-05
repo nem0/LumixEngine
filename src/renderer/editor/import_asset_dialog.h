@@ -26,63 +26,6 @@ class WorldEditor;
 namespace MT { class Task; }
 
 
-
-struct ImportTexture
-{
-	struct aiTexture* texture;
-	char path[MAX_PATH_LENGTH];
-	char src[MAX_PATH_LENGTH];
-	bool import;
-	bool to_dds;
-	bool is_valid;
-};
-
-
-struct ImportMaterial
-{
-	const struct aiScene* scene;
-	aiMaterial* material;
-	bool import;
-	bool alpha_cutout;
-	int texture_count;
-	char shader[20];
-	char name[128];
-	ImportTexture textures[16];
-};
-
-
-struct ImportAnimation
-{
-	bool import;
-	aiAnimation* animation;
-	int root_motion_bone_idx = -1;
-	const aiScene* scene;
-	char output_filename[MAX_PATH_LENGTH];
-};
-
-
-struct ImportMesh
-{
-	ImportMesh(IAllocator& allocator)
-		: map_to_input(allocator)
-		, map_from_input(allocator)
-		, indices(allocator)
-	{
-	}
-
-	int lod;
-	bool import;
-	bool import_physics;
-	aiMesh* mesh;
-	const aiScene* scene;
-	int material;
-	Array<unsigned int> map_to_input;
-	Array<unsigned int> map_from_input;
-	Array<i32> indices;
-};
-
-
-
 class ImportAssetDialog LUMIX_FINAL : public StudioApp::IPlugin
 {
 	friend struct ImportTask;
@@ -141,11 +84,7 @@ class ImportAssetDialog LUMIX_FINAL : public StudioApp::IPlugin
 	public:
 		WorldEditor& m_editor;
 		Array<u32> m_saved_textures;
-		Array<Assimp::Importer> m_importers;
 		Array<StaticString<MAX_PATH_LENGTH> > m_sources;
-		Array<ImportAnimation> m_animations;
-		Array<ImportMesh> m_meshes;
-		Array<ImportMaterial> m_materials;
 		char m_import_message[1024];
 		
 		struct ImageData
@@ -186,14 +125,13 @@ class ImportAssetDialog LUMIX_FINAL : public StudioApp::IPlugin
 		bool m_convert_to_dds;
 		bool m_convert_to_raw;
 		bool m_is_normal_map;
-		bool m_is_converting;
-		bool m_is_importing;
 		bool m_is_importing_texture;
 		float m_raw_texture_scale;
 		MT::Task* m_task;
 		MT::SpinMutex m_mutex;
 		Metadata& m_metadata;
 		DDSConvertCallbackData m_dds_convert_callback;
+		struct FBXImporter* m_fbx_importer;
 };
 
 
