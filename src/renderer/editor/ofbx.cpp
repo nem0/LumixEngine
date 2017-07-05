@@ -41,7 +41,7 @@ static void setTranslation(const Vec3& t, Matrix* mtx)
 
 static Vec3 operator-(const Vec3& v)
 {
-	return{ -v.x, -v.y, -v.z };
+	return {-v.x, -v.y, -v.z};
 }
 
 
@@ -66,14 +66,9 @@ static Matrix operator*(const Matrix& lhs, const Matrix& rhs)
 
 static Matrix makeIdentity()
 {
-	return
-	{
-		1, 0, 0, 0,
-		0, 1, 0, 0,
-		0, 0, 1, 0,
-		0, 0, 0, 1
-	};
+	return {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
 }
+
 
 static Matrix rotationX(double angle)
 {
@@ -117,7 +112,6 @@ static Matrix rotationZ(double angle)
 }
 
 
-// TODO order
 static Matrix getRotationMatrix(const ofbx::Vec3& euler)
 {
 	const double TO_RAD = 3.1415926535897932384626433832795028 / 180.0;
@@ -128,21 +122,40 @@ static Matrix getRotationMatrix(const ofbx::Vec3& euler)
 }
 
 
-double fbxTimeToSeconds(u64 value)
+static double fbxTimeToSeconds(u64 value)
 {
 	return double(value) / 46186158000L;
 }
 
 
-Vec3 operator*(const Vec3& v, float f)
+static Vec3 operator*(const Vec3& v, float f)
 {
-	return{ v.x * f, v.y * f, v.z * f };
+	return {v.x * f, v.y * f, v.z * f};
 }
 
 
-Vec3 operator + (const Vec3& a, const Vec3& b)
+static Vec3 operator+(const Vec3& a, const Vec3& b)
 {
 	return {a.x + b.x, a.y + b.y, a.z + b.z};
+}
+
+
+template <int SIZE> static bool copyString(char (&destination)[SIZE], const char* source)
+{
+	const char* src = source;
+	char* dest = destination;
+	int length = SIZE;
+	if (!src) return false;
+
+	while (*src && length > 1)
+	{
+		*dest = *src;
+		--length;
+		++dest;
+		++src;
+	}
+	*dest = 0;
+	return *src == '\0';
 }
 
 
@@ -185,31 +198,19 @@ struct Property : IElementProperty
 	Type getType() const override { return (Type)type; }
 	IElementProperty* getNext() const override { return next; }
 	DataView getValue() const override { return value; }
-	int getCount() const override 
+	int getCount() const override
 	{
 		assert(type == ARRAY_DOUBLE || type == ARRAY_INT || type == ARRAY_FLOAT || type == ARRAY_LONG);
 		return int(*(u32*)value.begin);
 	}
 
-	void getValues(double* values, int max_size) const override
-	{
-		parseBinaryArrayRaw(*this, values, max_size);
-	}
+	void getValues(double* values, int max_size) const override { parseBinaryArrayRaw(*this, values, max_size); }
 
-	void getValues(float* values, int max_size) const override
-	{
-		parseBinaryArrayRaw(*this, values, max_size);
-	}
+	void getValues(float* values, int max_size) const override { parseBinaryArrayRaw(*this, values, max_size); }
 
-	void getValues(u64* values, int max_size) const override
-	{
-		parseBinaryArrayRaw(*this, values, max_size);
-	}
+	void getValues(u64* values, int max_size) const override { parseBinaryArrayRaw(*this, values, max_size); }
 
-	void getValues(int* values, int max_size) const override
-	{
-		parseBinaryArrayRaw(*this, values, max_size);
-	}
+	void getValues(int* values, int max_size) const override { parseBinaryArrayRaw(*this, values, max_size); }
 
 	u8 type;
 	DataView value;
@@ -238,7 +239,7 @@ struct Element : IElement
 			if (prop == nullptr) return nullptr;
 			prop = prop->getNext();
 		}
-		return prop; 
+		return prop;
 	}
 
 	DataView id;
@@ -248,7 +249,7 @@ struct Element : IElement
 };
 
 
-Vec3 resolveVec3Property(const Object& object, const char* name, const Vec3& default_value)
+static Vec3 resolveVec3Property(const Object& object, const char* name, const Vec3& default_value)
 {
 	Element* element = (Element*)object.resolveProperty(name);
 	if (!element) return default_value;
@@ -276,7 +277,7 @@ Object::Object(const Scene& _scene, const IElement& _element)
 }
 
 
-void decompress(const u8* in, size_t in_size, u8* out, size_t out_size)
+static void decompress(const u8* in, size_t in_size, u8* out, size_t out_size)
 {
 	mz_stream stream = {};
 	mz_inflateInit(&stream);
@@ -298,7 +299,7 @@ void decompress(const u8* in, size_t in_size, u8* out, size_t out_size)
 }
 
 
-u32 readWord(Cursor* cursor)
+static u32 readWord(Cursor* cursor)
 {
 	u32 word = *(const u32*)cursor->current;
 	cursor->current += 4;
@@ -306,7 +307,7 @@ u32 readWord(Cursor* cursor)
 }
 
 
-u8 readByte(Cursor* cursor)
+static u8 readByte(Cursor* cursor)
 {
 	u8 byte = *(const u8*)cursor->current;
 	cursor->current += 1;
@@ -314,7 +315,7 @@ u8 readByte(Cursor* cursor)
 }
 
 
-DataView readShortString(Cursor* cursor)
+static DataView readShortString(Cursor* cursor)
 {
 	DataView value;
 	const u8 length = readByte(cursor);
@@ -328,7 +329,7 @@ DataView readShortString(Cursor* cursor)
 }
 
 
-DataView readLongString(Cursor* cursor)
+static DataView readLongString(Cursor* cursor)
 {
 	DataView value;
 	const u32 length = readWord(cursor);
@@ -342,7 +343,7 @@ DataView readLongString(Cursor* cursor)
 }
 
 
-Property* readProperty(Cursor* cursor)
+static Property* readProperty(Cursor* cursor)
 {
 	Property* prop = new Property;
 	prop->next = nullptr;
@@ -384,7 +385,7 @@ Property* readProperty(Cursor* cursor)
 }
 
 
-Element* readElement(Cursor* cursor)
+static Element* readElement(Cursor* cursor)
 {
 	u32 end_offset = readWord(cursor);
 	if (end_offset == 0) return nullptr;
@@ -427,7 +428,7 @@ Element* readElement(Cursor* cursor)
 }
 
 
-Element* tokenize(const u8* data, size_t size)
+static Element* tokenize(const u8* data, size_t size)
 {
 	Cursor cursor;
 	cursor.begin = data;
@@ -455,7 +456,7 @@ Element* tokenize(const u8* data, size_t size)
 }
 
 
-const Element* findChild(const Element& element, const char* id)
+static const Element* findChild(const Element& element, const char* id)
 {
 	Element* const* iter = &element.child;
 	while (*iter)
@@ -467,7 +468,7 @@ const Element* findChild(const Element& element, const char* id)
 }
 
 
-void parseTemplates(const Element& root)
+static void parseTemplates(const Element& root)
 {
 	const Element* defs = findChild(root, "Definitions");
 	if (!defs) return;
@@ -498,20 +499,13 @@ void parseTemplates(const Element& root)
 }
 
 
-u64 getElementUUID(const Element& element)
-{
-	assert(element.first_property);
-	assert(element.first_property->type == 'L');
-	return *(u64*)element.first_property->value.begin;
-}
-
-
 struct Scene;
 
 
 Mesh::Mesh(const Scene& _scene, const IElement& _element)
 	: Object(_scene, _element)
-{}
+{
+}
 
 
 struct MeshImpl : Mesh
@@ -544,10 +538,7 @@ struct MeshImpl : Mesh
 	Type getType() const override { return Type::MESH; }
 
 
-	const Geometry* getGeometry() const override
-	{
-		return geometry;
-	}
+	const Geometry* getGeometry() const override { return geometry; }
 
 
 	Skin* getSkin() const override
@@ -558,10 +549,7 @@ struct MeshImpl : Mesh
 	}
 
 
-	void postprocess()
-	{
-		geometry = resolveObjectLink<ofbx::Geometry>(0);
-	}
+	void postprocess() { geometry = resolveObjectLink<ofbx::Geometry>(0); }
 
 
 	const Geometry* geometry;
@@ -571,7 +559,8 @@ struct MeshImpl : Mesh
 
 Material::Material(const Scene& _scene, const IElement& _element)
 	: Object(_scene, _element)
-{}
+{
+}
 
 
 struct MaterialImpl : Material
@@ -609,7 +598,8 @@ struct NullImpl : Object
 
 NodeAttribute::NodeAttribute(const Scene& _scene, const IElement& _element)
 	: Object(_scene, _element)
-{}
+{
+}
 
 
 struct NodeAttributeImpl : NodeAttribute
@@ -621,14 +611,15 @@ struct NodeAttributeImpl : NodeAttribute
 	Type getType() const override { return Type::NOTE_ATTRIBUTE; }
 	DataView getAttributeType() const override { return attribute_type; }
 
-	
+
 	DataView attribute_type;
 };
 
 
 Geometry::Geometry(const Scene& _scene, const IElement& _element)
 	: Object(_scene, _element)
-{}
+{
+}
 
 
 struct GeometryImpl : Geometry
@@ -721,10 +712,10 @@ struct ClusterImpl : Cluster
 	Matrix getTransformMatrix() const { return transform_matrix; }
 	Matrix getTransformLinkMatrix() const { return transform_link_matrix; }
 	Object* getLink() const override { return resolveObjectLink(Object::Type::LIMB_NODE, nullptr, 0); }
-	
+
 
 	void postprocess()
-	{ 
+	{
 		Object* skin = resolveObjectLinkReverse(Object::Type::SKIN);
 		if (!skin) return;
 
@@ -746,13 +737,13 @@ struct ClusterImpl : Cluster
 		}
 
 		assert(old_indices.size() == old_weights.size());
-		
+
 		struct NewNode
 		{
 			int value = -1;
 			NewNode* next = nullptr;
 		};
-		
+
 		struct Pool
 		{
 			NewNode* pool = nullptr;
@@ -779,9 +770,9 @@ struct ClusterImpl : Cluster
 				}
 			}
 		} pool(geom->to_old_vertices.size());
-		
+
 		std::vector<NewNode> to_new;
-		
+
 		to_new.resize(geom->to_old_vertices.size());
 		for (int i = 0, c = (int)geom->to_old_vertices.size(); i < c; ++i)
 		{
@@ -814,22 +805,26 @@ struct ClusterImpl : Cluster
 
 AnimationStack::AnimationStack(const Scene& _scene, const IElement& _element)
 	: Object(_scene, _element)
-{}
+{
+}
 
 
 AnimationLayer::AnimationLayer(const Scene& _scene, const IElement& _element)
 	: Object(_scene, _element)
-{}
+{
+}
 
 
 AnimationCurve::AnimationCurve(const Scene& _scene, const IElement& _element)
 	: Object(_scene, _element)
-{}
+{
+}
 
 
 AnimationCurveNode::AnimationCurveNode(const Scene& _scene, const IElement& _element)
 	: Object(_scene, _element)
-{}
+{
+}
 
 
 struct AnimationStackImpl : AnimationStack
@@ -881,7 +876,8 @@ struct AnimationCurveImpl : AnimationCurve
 
 Skin::Skin(const Scene& _scene, const IElement& _element)
 	: Object(_scene, _element)
-{}
+{
+}
 
 
 struct SkinImpl : Skin
@@ -900,7 +896,8 @@ struct SkinImpl : Skin
 
 Texture::Texture(const Scene& _scene, const IElement& _element)
 	: Object(_scene, _element)
-{}
+{
+}
 
 
 struct TextureImpl : Texture
@@ -924,7 +921,7 @@ struct Root : Object
 	Root(const Scene& _scene, const IElement& _element)
 		: Object(_scene, _element)
 	{
-		strcpy_s(name, "RootNode");
+		copyString(name, "RootNode");
 		is_node = true;
 	}
 	Type getType() const override { return Type::ROOT; }
@@ -935,7 +932,8 @@ struct Scene : IScene
 {
 	struct Connection
 	{
-		enum Type {
+		enum Type
+		{
 			OBJECT_OBJECT,
 			OBJECT_PROPERTY
 		};
@@ -1018,7 +1016,6 @@ struct Scene : IScene
 };
 
 
-
 struct AnimationCurveNodeImpl : AnimationCurveNode
 {
 	AnimationCurveNodeImpl(const Scene& _scene, const IElement& _element)
@@ -1041,7 +1038,7 @@ struct AnimationCurveNodeImpl : AnimationCurveNode
 				return values[i - 1] * (1 - t) + values[i] * t;
 			}
 		}
-		
+
 		assert(false);
 		return {0, 0, 0};
 	}
@@ -1111,16 +1108,7 @@ struct AnimationCurveNodeImpl : AnimationCurveNode
 };
 
 
-Property* getLastProperty(const Element* element)
-{
-	Property* prop = element->first_property;
-	if (!prop) return nullptr;
-	while (prop->next) prop = prop->next;
-	return prop;
-}
-
-
-Texture* parseTexture(const Scene& scene, const Element& element)
+struct Texture* parseTexture(const Scene& scene, const Element& element)
 {
 	TextureImpl* texture = new TextureImpl(scene, element);
 	const Element* texture_filename = findChild(element, "FileName");
@@ -1137,22 +1125,22 @@ Texture* parseTexture(const Scene& scene, const Element& element)
 }
 
 
-template <typename T>
-T* parse(const Scene& scene, const Element& element)
+template <typename T> static T* parse(const Scene& scene, const Element& element)
 {
 	T* obj = new T(scene, element);
 	return obj;
 }
 
 
-Object* parseCluster(const Scene& scene, const Element& element)
+static Object* parseCluster(const Scene& scene, const Element& element)
 {
 	ClusterImpl* obj = new ClusterImpl(scene, element);
-	
+
 	const Element* transform_link = findChild(element, "TransformLink");
 	if (transform_link && transform_link->first_property)
 	{
-		parseBinaryArrayRaw(*transform_link->first_property, &obj->transform_link_matrix, sizeof(obj->transform_link_matrix));
+		parseBinaryArrayRaw(
+			*transform_link->first_property, &obj->transform_link_matrix, sizeof(obj->transform_link_matrix));
 	}
 	const Element* transform = findChild(element, "Transform");
 	if (transform && transform->first_property)
@@ -1163,7 +1151,7 @@ Object* parseCluster(const Scene& scene, const Element& element)
 }
 
 
-Object* parseNodeAttribute(const Scene& scene, const Element& element)
+static Object* parseNodeAttribute(const Scene& scene, const Element& element)
 {
 	NodeAttributeImpl* obj = new NodeAttributeImpl(scene, element);
 	const Element* type_flags = findChild(element, "TypeFlags");
@@ -1175,7 +1163,7 @@ Object* parseNodeAttribute(const Scene& scene, const Element& element)
 }
 
 
-Object* parseLimbNode(const Scene& scene, const Element& element)
+static Object* parseLimbNode(const Scene& scene, const Element& element)
 {
 
 	assert(element.first_property);
@@ -1188,24 +1176,24 @@ Object* parseLimbNode(const Scene& scene, const Element& element)
 }
 
 
-Mesh* parseMesh(const Scene& scene, const Element& element)
+static Mesh* parseMesh(const Scene& scene, const Element& element)
 {
 	assert(element.first_property);
 	assert(element.first_property->next);
 	assert(element.first_property->next->next);
 	assert(element.first_property->next->next->value == "Mesh");
-	
+
 	return new MeshImpl(scene, element);
 }
 
 
-Material* parseMaterial(const Scene& scene, const Element& element)
+static Material* parseMaterial(const Scene& scene, const Element& element)
 {
 	assert(element.first_property);
 	MaterialImpl* material = new MaterialImpl(scene, element);
 	const Element* prop = findChild(element, "Properties70");
 	if (prop) prop = prop->child;
-	while(prop)
+	while (prop)
 	{
 		if (prop->id == "P" && prop->first_property)
 		{
@@ -1220,13 +1208,13 @@ Material* parseMaterial(const Scene& scene, const Element& element)
 }
 
 
-u32 getArrayCount(const Property& property)
+static u32 getArrayCount(const Property& property)
 {
 	return *(const u32*)property.value.begin;
 }
 
 
-template <typename T> void parseBinaryArrayRaw(const Property& property, T* out, int max_size)
+template <typename T> static void parseBinaryArrayRaw(const Property& property, T* out, int max_size)
 {
 	assert(out);
 	u32 count = getArrayCount(property);
@@ -1236,11 +1224,11 @@ template <typename T> void parseBinaryArrayRaw(const Property& property, T* out,
 	int elem_size = 1;
 	switch (property.type)
 	{
-	case 'l': elem_size = 8; break;
-	case 'd': elem_size = 8; break;
-	case 'f': elem_size = 4; break;
-	case 'i': elem_size = 4; break;
-	default: assert(false);
+		case 'l': elem_size = 8; break;
+		case 'd': elem_size = 8; break;
+		case 'f': elem_size = 4; break;
+		case 'i': elem_size = 4; break;
+		default: assert(false);
 	}
 
 	const u8* data = property.value.begin + sizeof(u32) * 3;
@@ -1261,17 +1249,17 @@ template <typename T> void parseBinaryArrayRaw(const Property& property, T* out,
 }
 
 
-template <typename T> void parseBinaryArray(Property& property, std::vector<T>* out)
+template <typename T> static void parseBinaryArray(Property& property, std::vector<T>* out)
 {
 	assert(out);
 	u32 count = getArrayCount(property);
 	int elem_size = 1;
 	switch (property.type)
 	{
-	case 'd': elem_size = 8; break;
-	case 'f': elem_size = 4; break;
-	case 'i': elem_size = 4; break;
-	default: assert(false);
+		case 'd': elem_size = 8; break;
+		case 'f': elem_size = 4; break;
+		case 'i': elem_size = 4; break;
+		default: assert(false);
 	}
 	int elem_count = sizeof(T) / elem_size;
 	out->resize(count / elem_count);
@@ -1280,8 +1268,7 @@ template <typename T> void parseBinaryArray(Property& property, std::vector<T>* 
 }
 
 
-template <typename T>
-void parseDoubleVecData(Property& property, std::vector<T>* out_vec)
+template <typename T> static void parseDoubleVecData(Property& property, std::vector<T>* out_vec)
 {
 	assert(out_vec);
 	if (property.type == 'd')
@@ -1306,7 +1293,12 @@ void parseDoubleVecData(Property& property, std::vector<T>* out_vec)
 
 
 template <typename T>
-static void parseVertexData(const Element& element, const char* name, const char* index_name, std::vector<T>* out, std::vector<int>* out_indices, GeometryImpl::VertexDataMapping* mapping)
+static void parseVertexData(const Element& element,
+	const char* name,
+	const char* index_name,
+	std::vector<T>* out,
+	std::vector<int>* out_indices,
+	GeometryImpl::VertexDataMapping* mapping)
 {
 	assert(out);
 	assert(mapping);
@@ -1352,13 +1344,12 @@ static void parseVertexData(const Element& element, const char* name, const char
 			}
 		}
 		parseDoubleVecData(*data_element->first_property, out);
-
 	}
 }
 
 
 template <typename T>
-void splat(std::vector<T>* out,
+static void splat(std::vector<T>* out,
 	GeometryImpl::VertexDataMapping mapping,
 	const std::vector<T>& data,
 	const std::vector<int>& indices,
@@ -1366,7 +1357,7 @@ void splat(std::vector<T>* out,
 {
 	assert(out);
 	assert(!data.empty());
-	
+
 	if (mapping == GeometryImpl::BY_POLYGON_VERTEX)
 	{
 		if (indices.empty())
@@ -1383,12 +1374,12 @@ void splat(std::vector<T>* out,
 			}
 		}
 	}
-	else if(mapping == GeometryImpl::BY_VERTEX)
+	else if (mapping == GeometryImpl::BY_VERTEX)
 	{
 		//  v0  v1 ...
 		// uv0 uv1 ...
 		assert(indices.empty());
-		
+
 		out->resize(to_old_vertices.size());
 
 		for (int i = 0, c = (int)to_old_vertices.size(); i < c; ++i)
@@ -1400,12 +1391,10 @@ void splat(std::vector<T>* out,
 	{
 		assert(false);
 	}
-
 }
 
 
-template <typename T>
-static void remap(std::vector<T>* out, std::vector<int> map)
+template <typename T> static void remap(std::vector<T>* out, std::vector<int> map)
 {
 	if (out->empty()) return;
 
@@ -1418,7 +1407,7 @@ static void remap(std::vector<T>* out, std::vector<int> map)
 }
 
 
-AnimationCurve* parseAnimationCurve(const Scene& scene, const Element& element)
+static AnimationCurve* parseAnimationCurve(const Scene& scene, const Element& element)
 {
 	AnimationCurveImpl* curve = new AnimationCurveImpl(scene, element);
 
@@ -1441,7 +1430,7 @@ AnimationCurve* parseAnimationCurve(const Scene& scene, const Element& element)
 }
 
 
-Geometry* parseGeometry(const Scene& scene, const Element& element)
+static Geometry* parseGeometry(const Scene& scene, const Element& element)
 {
 	assert(element.first_property);
 
@@ -1456,7 +1445,7 @@ Geometry* parseGeometry(const Scene& scene, const Element& element)
 	std::vector<Vec3> vertices;
 	parseDoubleVecData(*vertices_element->first_property, &vertices);
 	parseBinaryArray(*polys_element->first_property, &geom->to_old_vertices);
-	
+
 	std::vector<int> to_old_indices;
 	geom->triangulate(&geom->to_old_vertices, &to_old_indices);
 	geom->vertices.resize(geom->to_old_vertices.size());
@@ -1522,7 +1511,7 @@ Geometry* parseGeometry(const Scene& scene, const Element& element)
 }
 
 
-void parseConnections(const Element& root, Scene* scene)
+static void parseConnections(const Element& root, Scene* scene)
 {
 	assert(scene);
 
@@ -1560,7 +1549,7 @@ void parseConnections(const Element& root, Scene* scene)
 }
 
 
-void parseTakes(Scene* scene)
+static void parseTakes(Scene* scene)
 {
 	const Element* takes = findChild((const Element&)*scene->getRootElement(), "Takes");
 	if (!takes) return;
@@ -1589,14 +1578,13 @@ void parseTakes(Scene* scene)
 
 			scene->m_take_infos.push_back(take);
 		}
-		
+
 		object = object->sibling;
 	}
-
 }
 
 
-void parseObjects(const Element& root, Scene* scene)
+static void parseObjects(const Element& root, Scene* scene)
 {
 	const Element* objs = findChild(root, "Objects");
 	if (!objs) return;
@@ -1608,8 +1596,11 @@ void parseObjects(const Element& root, Scene* scene)
 	const Element* object = objs->child;
 	while (object)
 	{
-		u64 uuid = getElementUUID(*object);
-		scene->m_object_map[uuid] = {object, nullptr};
+		assert(object->first_property);
+		assert(object->first_property->type == 'L');
+		u64 id = *(u64*)object->first_property->value.begin;
+
+		scene->m_object_map[id] = {object, nullptr};
 		object = object->sibling;
 	}
 
@@ -1621,7 +1612,8 @@ void parseObjects(const Element& root, Scene* scene)
 
 		if (iter.second.element->id == "Geometry")
 		{
-			Property* last_prop = getLastProperty(iter.second.element);
+			Property* last_prop = iter.second.element->first_property;
+			while (last_prop->next) last_prop = last_prop->next;
 			if (last_prop && last_prop->value == "Mesh")
 			{
 				obj = parseGeometry(*scene, *iter.second.element);
@@ -1683,7 +1675,7 @@ void parseObjects(const Element& root, Scene* scene)
 		}
 
 		scene->m_object_map[iter.first].object = obj;
-		if(obj) obj->id = iter.first;
+		if (obj) obj->id = iter.first;
 	}
 
 	for (auto iter : scene->m_object_map)
@@ -1694,14 +1686,16 @@ void parseObjects(const Element& root, Scene* scene)
 		{
 			case Object::Type::CLUSTER: ((ClusterImpl*)iter.second.object)->postprocess(); break;
 			case Object::Type::MESH: ((MeshImpl*)iter.second.object)->postprocess(); break;
-			case Object::Type::ANIMATION_CURVE_NODE: ((AnimationCurveNodeImpl*)iter.second.object)->postprocess(); break;
+			case Object::Type::ANIMATION_CURVE_NODE:
+				((AnimationCurveNodeImpl*)iter.second.object)->postprocess();
+				break;
 		}
 	}
 }
 
 
 template <typename T>
-int getVertexDataCount(GeometryImpl::VertexDataMapping mapping,
+static int getVertexDataCount(GeometryImpl::VertexDataMapping mapping,
 	const std::vector<T>& data,
 	const std::vector<int>& indices)
 {
@@ -1752,7 +1746,9 @@ Vec3 Object::getScalingPivot() const
 const AnimationCurveNode* Object::getCurveNode(const char* prop, const AnimationLayer& layer) const
 {
 	const AnimationCurveNode* curve_node = nullptr;
-	for (int i = 0; curve_node = (const AnimationCurveNode*)resolveObjectLink(Object::Type::ANIMATION_CURVE_NODE, prop, i); ++i)
+	for (int i = 0;
+		 curve_node = (const AnimationCurveNode*)resolveObjectLink(Object::Type::ANIMATION_CURVE_NODE, prop, i);
+		 ++i)
 	{
 		Object* curve_node_layer = curve_node->resolveObjectLinkReverse(Object::Type::ANIMATION_LAYER);
 		if (curve_node_layer == &layer) return curve_node;
@@ -1804,13 +1800,13 @@ Matrix Object::evalLocal(const ofbx::Vec3& translation, const ofbx::Vec3& rotati
 
 Vec3 Object::getLocalTranslation() const
 {
-	return resolveVec3Property(*this, "Lcl Translation", { 0, 0, 0 });
+	return resolveVec3Property(*this, "Lcl Translation", {0, 0, 0});
 }
 
 
 Vec3 Object::getPreRotation() const
 {
-	return resolveVec3Property(*this, "PreRotation", { 0, 0, 0 });
+	return resolveVec3Property(*this, "PreRotation", {0, 0, 0});
 }
 
 
@@ -1830,7 +1826,7 @@ Matrix Object::getGlobalTransform() const
 {
 	const Object* parent = getParent();
 	if (!parent) return evalLocal(getLocalTranslation(), getLocalRotation());
-	
+
 	return parent->getGlobalTransform() * evalLocal(getLocalTranslation(), getLocalRotation());
 }
 
@@ -1884,7 +1880,7 @@ int Object::resolveObjectLinkCount(Object::Type type) const
 }
 
 
-const IScene& Object::getScene() const 
+const IScene& Object::getScene() const
 {
 	return scene;
 }
@@ -1970,7 +1966,7 @@ Object* Object::getParent() const
 }
 
 
-IScene* load(const u8* data, size_t size)
+IScene* load(const u8* data, int size)
 {
 	Scene* scene = new Scene;
 	scene->m_data.resize(size);
