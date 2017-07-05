@@ -319,7 +319,7 @@ struct IScene
 };
 
 
-IScene* load(const u8* data, size_t size);
+IScene* load(const u8* data, int size);
 
 
 } // namespace ofbx
