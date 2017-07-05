@@ -251,6 +251,7 @@ bool Animation::load(FS::IFile& file)
 	int bone_count;
 	file.read(&bone_count, sizeof(bone_count));
 	m_bones.resize(bone_count);
+	if (bone_count == 0) return true;
 
 	int size = int(file.size() - file.pos());
 	m_mem.resize(size);
