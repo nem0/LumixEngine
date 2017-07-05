@@ -41,7 +41,9 @@
 #include <SDL.h>
 #include <cmath>
 #include <cmft/cubemapfilter.h>
+#include <cstddef>
 #include <crnlib.h>
+
 
 using namespace Lumix;
 

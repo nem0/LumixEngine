@@ -147,7 +147,6 @@ newaction {
 		--installDllWithPdb "lua_script"
 		--installDllWithPdb "physics"
 		--installDllWithPdb "renderer"
-		installDllWithPdb "assimp"
 		
 		installDll "PhysX3CommonCHECKED_x64"
 		installDll "PhysX3CookingCHECKED_x64"
@@ -251,7 +250,6 @@ function copyDlls(src_dir, platform_dir, dest_dir)
 	physx_suffix = "x64"
 
 	postbuildcommands {
-		"xcopy /Y \"$(SolutionDir)../../../external/assimp/dll/" .. platform_dir .. "_" .. ide_dir .. "/" .. src_dir .. "\\assimp.dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
 		"xcopy /Y \"$(SolutionDir)../../../external/physx/dll/" .. ide_dir .. "/" .. platform_dir .. "\\nvToolsExt64_1.dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
 		"xcopy /Y \"$(SolutionDir)../../../external/physx/dll/" .. ide_dir .. "/" .. platform_dir .. "\\PhysX3CommonCHECKED_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
 		"xcopy /Y \"$(SolutionDir)../../../external/physx/dll/" .. ide_dir .. "/" .. platform_dir .. "\\PhysX3CookingCHECKED_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
@@ -261,7 +259,6 @@ function copyDlls(src_dir, platform_dir, dest_dir)
 
 	configuration { "linux-*" }
 		postbuildcommands {
-			"cp ../../../external/assimp/dll/" .. platform_dir .. "_" .. ide_dir .. "/" .. src_dir .. "/libassimp.so bin/" .. dest_dir,
 			"cp ../../../external/physx/dll/linux64_gcc5/libPhysX3CommonCHECKED_".. physx_suffix .. ".so bin/" .. dest_dir,
 			"cp ../../../external/physx/dll/linux64_gcc5/libPhysX3CookingCHECKED_".. physx_suffix .. ".so  bin/" .. dest_dir,
 			"cp ../../../external/physx/dll/linux64_gcc5/libPhysX3CharacterKinematicCHECKED_".. physx_suffix .. ".so  bin/" .. dest_dir,
@@ -540,14 +537,13 @@ project "renderer"
 	libType()
 
 	files { "../src/renderer/**.h", "../src/renderer/**.cpp" }
-	includedirs { "../src", "../external/bgfx/include", "../external/assimp/include", "../external/cmft/include", "../external/crnlib/include" }
+	includedirs { "../src", "../external/bgfx/include", "../external/cmft/include", "../external/crnlib/include" }
 	defines { "BUILDING_RENDERER" }
 	links { "engine" }
 
 	if build_studio then
 		links { "editor", "shaderc" }
 		linkLib "crnlib"
-		linkLib "assimp"
 		linkLib "cmft"
 	end
 	linkLib "bgfx"
@@ -766,7 +762,6 @@ if build_app then
 		end
 		if build_studio then
 			linkLib "crnlib"
-			linkLib "assimp"
 			linkLib "cmft"
 			links {"shaderc"}
 		end
@@ -898,7 +893,6 @@ if build_studio then
 
 			links { "audio", "animation", "renderer", "lua_script", "navigation", "editor", "engine", "shaderc" }
 			linkLib "crnlib"
-			linkLib "assimp"
 			linkLib "cmft"
 			linkLib "bgfx"
 			linkLib "lua"
