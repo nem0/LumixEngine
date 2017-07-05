@@ -45,8 +45,58 @@ namespace Lumix
 {
 
 
+static u32 packF4u(const Vec3& vec)
+{
+	const u8 xx = u8(vec.x * 127.0f + 128.0f);
+	const u8 yy = u8(vec.y * 127.0f + 128.0f);
+	const u8 zz = u8(vec.z * 127.0f + 128.0f);
+	const u8 ww = u8(0);
+
+	union {
+		u32 ui32;
+		u8 arr[4];
+	} un;
+
+	un.arr[0] = xx;
+	un.arr[1] = yy;
+	un.arr[2] = zz;
+	un.arr[3] = ww;
+
+	return un.ui32;
+}
+
+
 struct FBXImporter
 {
+	enum class Orientation
+	{
+		Y_UP,
+		Z_UP,
+		Z_MINUS_UP,
+		X_MINUS_UP
+	};
+
+	struct RotationKey
+	{
+		Quat rot;
+		float time;
+		u16 frame;
+	};
+
+	struct TranslationKey
+	{
+		Vec3 pos;
+		float time;
+		u16 frame;
+	};
+
+	struct Skin
+	{
+		float weights[4];
+		i16 joints[4];
+		int count = 0;
+	};
+
 	struct ImportAnimation
 	{
 		const ofbx::AnimationStack* fbx = nullptr;
@@ -100,31 +150,6 @@ struct FBXImporter
 		AABB aabb;
 		float radius_squared;
 	};
-
-	static u32 packu32(u8 _x, u8 _y, u8 _z, u8 _w)
-	{
-		union {
-			u32 ui32;
-			u8 arr[4];
-		} un;
-
-		un.arr[0] = _x;
-		un.arr[1] = _y;
-		un.arr[2] = _z;
-		un.arr[3] = _w;
-
-		return un.ui32;
-	}
-
-
-	static u32 packF4u(const Vec3& vec)
-	{
-		const u8 xx = u8(vec.x * 127.0f + 128.0f);
-		const u8 yy = u8(vec.y * 127.0f + 128.0f);
-		const u8 zz = u8(vec.z * 127.0f + 128.0f);
-		const u8 ww = u8(0);
-		return packu32(xx, yy, zz, ww);
-	}
 
 
 	const ofbx::Mesh* getAnyMeshFromBone(const ofbx::Object* node) const
@@ -305,14 +330,6 @@ struct FBXImporter
 	}
 
 
-	struct Skin
-	{
-		float weights[4];
-		i16 joints[4];
-		int count = 0;
-	};
-
-
 	static void writeSkin(const Skin& skin, OutputBlob* blob)
 	{
 		blob->write(skin.joints);
@@ -452,6 +469,7 @@ struct FBXImporter
 	static Vec3 toLumixVec3(const ofbx::Vec3& v) { return {(float)v.x, (float)v.y, (float)v.z}; }
 	static Quat toLumix(const ofbx::Quat& q) { return {(float)q.x, (float)q.y, (float)q.z, (float)q.w}; }
 
+
 	static Matrix toLumix(const ofbx::Matrix& mtx)
 	{
 		Matrix res;
@@ -471,13 +489,6 @@ struct FBXImporter
 		, bones(_app.getWorldEditor()->getAllocator())
 	{
 	}
-
-
-	int getAnimationsCount() { return animations.size(); }
-	int getMaterialsCount() { return materials.size(); }
-	int getMeshesCount() { return meshes.size(); }
-	const char* getMeshName(int mesh_idx) { return getImportMeshName(meshes[mesh_idx]); }
-	int getMeshLOD(int mesh_idx) { return meshes[mesh_idx].lod; }
 
 
 	bool addSource(const char* filename)
@@ -577,14 +588,6 @@ struct FBXImporter
 	}
 
 
-	struct TranslationKey
-	{
-		Vec3 pos;
-		float time;
-		u16 frame;
-	};
-
-
 	static Vec3 getTranslation(const ofbx::Matrix& mtx)
 	{
 		return {(float)mtx.m[12], (float)mtx.m[13], (float)mtx.m[14]};
@@ -645,14 +648,6 @@ struct FBXImporter
 			(u16)frames};
 		out.push(last_written);
 	}
-
-
-	struct RotationKey
-	{
-		Quat rot;
-		float time;
-		u16 frame;
-	};
 
 
 	static void compressRotations(Array<RotationKey>& out,
@@ -1244,15 +1239,6 @@ struct FBXImporter
 	}
 
 
-	enum class Orientation
-	{
-		Y_UP,
-		Z_UP,
-		Z_MINUS_UP,
-		X_MINUS_UP
-	};
-
-
 	StudioApp& app;
 	bool opened = false;
 	Array<ImportMaterial> materials;
@@ -1306,32 +1292,6 @@ struct BillboardVertex
 
 static const int TEXTURE_SIZE = 512;
 static crn_comp_params s_default_comp_params;
-
-
-static u32 packuint32(u8 _x, u8 _y, u8 _z, u8 _w)
-{
-	union {
-		u32 ui32;
-		u8 arr[4];
-	} un;
-
-	un.arr[0] = _x;
-	un.arr[1] = _y;
-	un.arr[2] = _z;
-	un.arr[3] = _w;
-
-	return un.ui32;
-}
-
-
-static u32 packF4u(const Vec3& vec)
-{
-	const u8 xx = u8(vec.x * 127.0f + 128.0f);
-	const u8 yy = u8(vec.y * 127.0f + 128.0f);
-	const u8 zz = u8(vec.z * 127.0f + 128.0f);
-	const u8 ww = u8(0);
-	return packuint32(xx, yy, zz, ww);
-}
 
 
 static int ceilPowOf2(int value)
@@ -1651,22 +1611,7 @@ const char* getMaterialName(lua_State* L, int material_idx)
 	return dlg->m_fbx_importer->materials[material_idx].fbx->name;
 }
 
-
 } // namespace LuaAPI
-
-
-
-static int importAsset(lua_State* L)
-{
-	auto* dlg = LuaWrapper::checkArg<ImportAssetDialog*>(L, 1);
-	return dlg->importAsset(L);
-}
-
-
-enum class Preprocesses
-{
-	REMOVE_DOUBLES = 1
-};
 
 
 static void getRelativePath(WorldEditor& editor, char* relative_path, int max_length, const char* source)
