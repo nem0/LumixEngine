@@ -1,10 +1,5 @@
 #include "import_asset_dialog.h"
 #include "animation/animation.h"
-#include "assimp/DefaultLogger.hpp"
-#include "assimp/ProgressHandler.hpp"
-#include "assimp/postprocess.h"
-#include "assimp/scene.h"
-#include "crnlib.h"
 #include "editor/metadata.h"
 #include "editor/platform_interface.h"
 #include "editor/studio_app.h"
@@ -42,6 +37,8 @@
 #endif
 #include "stb/stb_image.h"
 #include "stb/stb_image_resize.h"
+#include <cstddef>
+#include <crnlib.h>
 
 
 namespace Lumix
@@ -1311,9 +1308,6 @@ static const int TEXTURE_SIZE = 512;
 static crn_comp_params s_default_comp_params;
 
 
-static bool isSkinned(const aiMesh* mesh) { return mesh->mNumBones > 0; }
-
-
 static u32 packuint32(u8 _x, u8 _y, u8 _z, u8 _w)
 {
 	union {
@@ -1405,88 +1399,6 @@ struct BillboardSceneData
 		return mvp;
 	}
 };
-
-
-static bool isSkinned(const aiScene* scene, const aiMaterial* material)
-{
-	for (unsigned int i = 0; i < scene->mNumMeshes; ++i)
-	{
-		if (scene->mMaterials[scene->mMeshes[i]->mMaterialIndex] == material && isSkinned(scene->mMeshes[i]))
-		{
-			return true;
-		}
-	}
-	return false;
-}
-
-
-static const aiNode* getOwner(const aiNode* node, int mesh_index)
-{
-	for (unsigned int i = 0; i < (int)node->mNumMeshes; ++i)
-	{
-		if (node->mMeshes[i] == mesh_index) return node;
-	}
-
-	for (int i = 0; i < (int)node->mNumChildren; ++i)
-	{
-		auto* child = node->mChildren[i];
-		auto* owner = getOwner(child, mesh_index);
-		if (owner) return owner;
-	}
-
-	return nullptr;
-}
-
-
-static const aiNode* getOwner(const aiScene* scene, const aiMesh* mesh)
-{
-	for (int i = 0; i < int(scene->mNumMeshes); ++i)
-	{
-		if (scene->mMeshes[i] == mesh) return getOwner(scene->mRootNode, i);
-	}
-	return nullptr;
-}
-
-
-static const char* getMeshName(const aiScene* scene, const aiMesh* mesh)
-{
-	const auto* node = getOwner(scene, mesh);
-	if (node && node->mName.length > 0) return node->mName.C_Str();
-
-	return mesh->mName.C_Str();
-}
-
-
-static float getMeshLODFactor(const aiScene* scene, const aiMesh* mesh)
-{
-	const char* mesh_name = getMeshName(scene, mesh);
-	int len = stringLength(mesh_name);
-	if (len < 5) return FLT_MAX;
-
-	const char* last = mesh_name + len - 1;
-	while (last > mesh_name && *last >= '0' && *last <= '9')
-	{
-		--last;
-	}
-	++last;
-	if (last < mesh_name + 4) return FLT_MAX;
-	if (compareIStringN(last - 4, "_LOD", 4) != 0) return FLT_MAX;
-	const char* end_of_factor = last - 4;
-	const char* begin_factor = end_of_factor - 1;
-	if (begin_factor <= mesh_name) return FLT_MAX;
-
-	while (*begin_factor != '_' && begin_factor > mesh_name)
-	{
-		--begin_factor;
-	}
-	++begin_factor;
-
-	if (begin_factor == end_of_factor) return FLT_MAX;
-	int factor;
-	fromCString(begin_factor, int(end_of_factor - begin_factor), &factor);
-
-	return float(factor);
-}
 
 
 static void resizeImage(ImportAssetDialog* dlg, int new_w, int new_h)
@@ -1588,7 +1500,6 @@ int setParams(lua_State* L)
 	lua_pop(L, 1);
 
 	LuaWrapper::getOptionalField(L, 1, "create_billboard", &dlg->m_model.create_billboard_lod);
-	LuaWrapper::getOptionalField(L, 1, "remove_doubles", &dlg->m_model.remove_doubles);
 	LuaWrapper::getOptionalField(L, 1, "center_meshes", &dlg->m_model.center_meshes);
 	LuaWrapper::getOptionalField(L, 1, "import_vertex_colors", &dlg->m_model.import_vertex_colors);
 	LuaWrapper::getOptionalField(L, 1, "scale", &dlg->m_model.mesh_scale);
@@ -1749,65 +1660,6 @@ static int importAsset(lua_State* L)
 {
 	auto* dlg = LuaWrapper::checkArg<ImportAssetDialog*>(L, 1);
 	return dlg->importAsset(L);
-}
-
-
-static int getMeshLOD(const aiScene* scene, const aiMesh* mesh)
-{
-	const char* mesh_name = getMeshName(scene, mesh);
-	int len = stringLength(mesh_name);
-	if (len < 5) return 0;
-
-	const char* last = mesh_name + len - 1;
-	while (last > mesh_name && *last >= '0' && *last <= '9')
-	{
-		--last;
-	}
-	++last;
-	if (last < mesh_name + 4) return 0;
-	if (compareIStringN(last - 4, "_LOD", 4) != 0) return 0;
-
-	int lod;
-	fromCString(last, len - int(last - mesh_name), &lod);
-
-	return lod;
-}
-
-
-static bool hasSimilarFace(const aiMesh& mesh, Array<aiFace*>& faces, const aiFace& face)
-{
-	static const float MAX_ERROR = 0.001f;
-	auto isSame = [](const aiVector3D& a, const aiVector3D& b) {
-		return fabs(a.x - b.x) < MAX_ERROR && fabs(a.y - b.y) < MAX_ERROR && fabs(a.z - b.z) < MAX_ERROR;
-	};
-	auto f0 = mesh.mVertices[face.mIndices[0]];
-	auto f1 = mesh.mVertices[face.mIndices[1]];
-	auto f2 = mesh.mVertices[face.mIndices[2]];
-	for (auto* tmp : faces)
-	{
-		auto v0 = mesh.mVertices[tmp->mIndices[0]];
-		auto v1 = mesh.mVertices[tmp->mIndices[1]];
-		auto v2 = mesh.mVertices[tmp->mIndices[2]];
-		if (fabs(v0.x - f0.x) < MAX_ERROR || fabs(v1.x - f0.x) < MAX_ERROR || fabs(v2.x - f0.x) < MAX_ERROR)
-		{
-			if (isSame(v0, f0))
-			{
-				if (isSame(v1, f1) && isSame(v2, f2)) return true;
-				if (isSame(v1, f2) && isSame(v2, f1)) return true;
-			}
-			if (isSame(v0, f1))
-			{
-				if (isSame(v1, f2) && isSame(v2, f0)) return true;
-				if (isSame(v1, f0) && isSame(v2, f2)) return true;
-			}
-			if (isSame(v0, f2))
-			{
-				if (isSame(v1, f1) && isSame(v2, f0)) return true;
-				if (isSame(v1, f0) && isSame(v2, f1)) return true;
-			}
-		}
-	}
-	return false;
 }
 
 
@@ -2099,10 +1951,7 @@ ImportAssetDialog::ImportAssetDialog(StudioApp& app)
 	m_model.import_vertex_colors = true;
 	m_model.all_nodes = false;
 	m_model.mesh_scale = 1;
-	m_model.remove_doubles = false;
 	m_model.center_meshes = false;
-	m_model.optimize_mesh_on_import = true;
-	m_model.gen_smooth_normal = true;
 	m_model.create_billboard_lod = false;
 	m_model.lods[0] = -10;
 	m_model.lods[1] = -100;
@@ -3038,16 +2887,12 @@ void ImportAssetDialog::onWindowGUI()
 
 	onImageGUI();
 
-	ImGui::Checkbox("Optimize meshes", &m_model.optimize_mesh_on_import);
-	ImGui::SameLine();
-	ImGui::Checkbox("Smooth normals", &m_model.gen_smooth_normal);
 	if (!m_fbx_importer->scenes.empty())
 	{
 		if (ImGui::CollapsingHeader("Advanced"))
 		{
 			ImGui::Checkbox("Create billboard LOD", &m_model.create_billboard_lod);
 			ImGui::Checkbox("Import all bones", &m_model.all_nodes);
-			ImGui::Checkbox("Remove doubles", &m_model.remove_doubles);
 			ImGui::Checkbox("Center meshes", &m_model.center_meshes);
 			ImGui::Checkbox("Import Vertex Colors", &m_model.import_vertex_colors);
 			ImGui::DragFloat("Scale", &m_model.mesh_scale, 0.01f, 0.001f, 0);

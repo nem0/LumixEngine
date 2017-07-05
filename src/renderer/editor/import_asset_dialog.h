@@ -1,7 +1,6 @@
 #pragma once
 
 
-#include "assimp/Importer.hpp"
 #include "engine/array.h"
 #include "engine/associative_array.h"
 #include "engine/binary_array.h"
@@ -101,9 +100,6 @@ class ImportAssetDialog LUMIX_FINAL : public StudioApp::IPlugin
 			float mesh_scale;
 			float lods[4];
 			bool create_billboard_lod;
-			bool optimize_mesh_on_import;
-			bool gen_smooth_normal;
-			bool remove_doubles;
 			bool center_meshes;
 			Orientation orientation;
 			Orientation root_orientation;
