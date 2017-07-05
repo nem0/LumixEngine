@@ -2394,7 +2394,7 @@ void ImportAssetDialog::onMaterialsGUI()
 			for (int i = 0; i < lengthOf(mat.textures); ++i)
 			{
 				if (!mat.textures[i].fbx) continue;
-				ImGui::Text("%s", mat.textures[i].path);
+				ImGui::Text("%s", mat.textures[i].path.data);
 				ImGui::NextColumn();
 				ImGui::Checkbox(StaticString<20>("###imp", i), &mat.textures[i].import);
 				ImGui::NextColumn();
@@ -2409,7 +2409,7 @@ void ImportAssetDialog::onMaterialsGUI()
 					}
 				}
 				ImGui::SameLine();
-				ImGui::Text("%s", mat.textures[i].src);
+				ImGui::Text("%s", mat.textures[i].src.data);
 				ImGui::NextColumn();
 			}
 			ImGui::Columns();
@@ -3105,7 +3105,7 @@ void ImportAssetDialog::onWindowGUI()
 				for (auto& tex : mat.textures)
 				{
 					if (!tex.fbx || tex.is_valid || !tex.import) continue;
-					ImGui::Text("Texture %s is not valid", tex.path);
+					ImGui::Text("Texture %s is not valid", tex.path.data);
 				}
 			}
 			if (ImGui::Button("OK"))
