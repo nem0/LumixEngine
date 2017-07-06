@@ -185,7 +185,7 @@ struct FBXImporter
 		{
 			const ofbx::Mesh* mesh = meshes[i].fbx;
 
-			auto* skin = mesh->getSkin();
+			auto* skin = mesh->getGeometry()->getSkin();
 			if (!skin) continue;
 
 			for (int j = 0, c = skin->getClusterCount(); j < c; ++j)
@@ -213,7 +213,7 @@ struct FBXImporter
 	{
 		if (!mesh) return makeOFBXIdentity();
 
-		auto* skin = mesh->getSkin();
+		auto* skin = mesh->getGeometry()->getSkin();
 
 		for (int i = 0, c = skin->getClusterCount(); i < c; ++i)
 		{
@@ -230,37 +230,32 @@ struct FBXImporter
 
 	void gatherMaterials(ofbx::Object* node, const char* src_dir)
 	{
-		for (int i = 0, c = node->resolveObjectLinkCount(ofbx::Object::Type::MATERIAL); i < c; ++i)
+		for (ImportMesh& mesh : meshes)
 		{
+			const ofbx::Material* fbx_mat = mesh.fbx->getMaterial();
+			if (!fbx_mat) continue;
+			
 			ImportMaterial& mat = materials.emplace();
-			mat.fbx = node->resolveObjectLink<ofbx::Material>(i);
+			mat.fbx = fbx_mat;
 
-			auto gatherTexture = [&mat, src_dir](const char* prop, int type) {
-				const ofbx::Texture* texture =
-					(const ofbx::Texture*)mat.fbx->resolveObjectLink(ofbx::Object::Type::TEXTURE, prop, 0);
-				if (texture)
-				{
-					ImportTexture& tex = mat.textures[type];
-					tex.fbx = texture;
-					ofbx::DataView filename = tex.fbx->getRelativeFileName();
-					if (filename == "") filename = tex.fbx->getFileName();
-					filename.toString(tex.path.data);
-					tex.src = src_dir;
-					tex.src << tex.path;
-					tex.import = true;
-					tex.to_dds = true;
-					tex.is_valid = PlatformInterface::fileExists(tex.src);
-				}
+			auto gatherTexture = [&mat, src_dir](ofbx::Texture::TextureType type) {
+				const ofbx::Texture* texture = mat.fbx->getTexture(type);
+				if (!texture) return;
+
+				ImportTexture& tex = mat.textures[type];
+				tex.fbx = texture;
+				ofbx::DataView filename = tex.fbx->getRelativeFileName();
+				if (filename == "") filename = tex.fbx->getFileName();
+				filename.toString(tex.path.data);
+				tex.src = src_dir;
+				tex.src << tex.path;
+				tex.import = true;
+				tex.to_dds = true;
+				tex.is_valid = PlatformInterface::fileExists(tex.src);
 			};
 
-			gatherTexture("DiffuseColor", ImportTexture::DIFFUSE);
-			gatherTexture("NormalMap", ImportTexture::NORMAL);
-		}
-
-
-		for (int i = 0, c = node->resolveObjectLinkCount(); i < c; ++i)
-		{
-			gatherMaterials(node->resolveObjectLink(i), src_dir);
+			gatherTexture(ofbx::Texture::DIFFUSE);
+			gatherTexture(ofbx::Texture::NORMAL);
 		}
 	}
 
@@ -459,7 +454,7 @@ struct FBXImporter
 			mesh.fbx_geom = mesh.fbx->getGeometry();
 			mesh.lod = detectMeshLOD(mesh);
 
-			mesh.fbx_mat = mesh.fbx->resolveObjectLink<ofbx::Material>(0);
+			mesh.fbx_mat = mesh.fbx->getMaterial();
 		}
 	}
 
@@ -499,7 +494,6 @@ struct FBXImporter
 		{
 			const ofbx::Mesh* mesh = scene.getMesh(i);
 			if (vertex_size != getVertexSize(*mesh)) return false;
-			if (mesh->resolveObjectLinkCount(ofbx::Object::Type::GEOMETRY) > 1) return false;
 		}
 		return true;
 	}
@@ -564,9 +558,9 @@ struct FBXImporter
 		ofbx::Object* root = scene->getRoot();
 		char src_dir[MAX_PATH_LENGTH];
 		PathUtils::getDir(src_dir, lengthOf(src_dir), filename);
+		gatherMeshes(scene);
 		gatherMaterials(root, src_dir);
 		materials.removeDuplicates([](const ImportMaterial& a, const ImportMaterial& b) { return a.fbx == b.fbx; });
-		gatherMeshes(scene);
 		gatherBones(root);
 		gatherAnimations(scene);
 
@@ -853,7 +847,7 @@ struct FBXImporter
 	}
 
 
-	bool isSkinned(const ofbx::Mesh& mesh) const { return !ignore_skeleton && mesh.getSkin() != nullptr; }
+	bool isSkinned(const ofbx::Mesh& mesh) const { return !ignore_skeleton && mesh.getGeometry()->getSkin() != nullptr; }
 
 
 	int getVertexSize(const ofbx::Mesh& mesh) const
@@ -881,7 +875,7 @@ struct FBXImporter
 		const ofbx::Geometry* geom = mesh->getGeometry();
 		skinning.resize(geom->getVertexCount());
 
-		auto* skin = mesh->getSkin();
+		auto* skin = mesh->getGeometry()->getSkin();
 		for (int i = 0, c = skin->getClusterCount(); i < c; ++i)
 		{
 			ofbx::Cluster* cluster = skin->getCluster(i);

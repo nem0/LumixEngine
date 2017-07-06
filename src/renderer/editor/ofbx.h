@@ -174,11 +174,31 @@ protected:
 };
 
 
+struct Texture : Object
+{
+	enum TextureType
+	{
+		DIFFUSE,
+		NORMAL,
+
+		COUNT
+	};
+
+	static const Type s_type = Type::TEXTURE;
+
+	Texture(const Scene& _scene, const IElement& _element);
+	virtual DataView getFileName() const = 0;
+	virtual DataView getRelativeFileName() const = 0;
+};
+
+
 struct Material : Object
 {
 	static const Type s_type = Type::MATERIAL;
 
 	Material(const Scene& _scene, const IElement& _element);
+
+	virtual const Texture* getTexture(Texture::TextureType type) const = 0;
 };
 
 
@@ -219,16 +239,6 @@ struct NodeAttribute : Object
 };
 
 
-struct Texture : Object
-{
-	static const Type s_type = Type::TEXTURE;
-
-	Texture(const Scene& _scene, const IElement& _element);
-	virtual DataView getFileName() const = 0;
-	virtual DataView getRelativeFileName() const = 0;
-};
-
-
 struct Geometry : Object
 {
 	static const Type s_type = Type::GEOMETRY;
@@ -242,6 +252,7 @@ struct Geometry : Object
 	virtual const Vec2* getUVs() const = 0;
 	virtual const Vec4* getColors() const = 0;
 	virtual const Vec3* getTangents() const = 0;
+	virtual const Skin* getSkin() const = 0;
 };
 
 
@@ -253,7 +264,7 @@ struct Mesh : Object
 
 	virtual const Geometry* getGeometry() const = 0;
 	virtual Matrix getGeometricMatrix() const = 0;
-	virtual Skin* getSkin() const = 0;
+	virtual const Material* getMaterial() const = 0;
 };
 
 
