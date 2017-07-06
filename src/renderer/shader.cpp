@@ -541,7 +541,12 @@ bool ShaderBinary::load(FS::IFile& file)
 	mem->data[file.size()] = '\0';
 	m_handle = bgfx::createShader(mem);
 	m_size = file.size();
-	return bgfx::isValid(m_handle);
+	if (!bgfx::isValid(m_handle))
+	{
+		g_log_error.log("Renderer") << getPath().c_str() << ": Failed to create bgfx shader";
+		return false;
+	}
+	return true;
 }
 
 
