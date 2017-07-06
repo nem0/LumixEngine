@@ -2,8 +2,6 @@
 #include "miniz.h"
 #include <cassert>
 #include <cmath>
-#include <cstdio>
-#include <cstdlib>
 #include <memory>
 #include <unordered_map>
 #include <vector>
