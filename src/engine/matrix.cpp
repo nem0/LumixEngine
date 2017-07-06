@@ -239,6 +239,28 @@ Matrix Matrix::operator *(const Matrix& rhs) const
 }
 
 
+void Matrix::normalizeScale()
+{
+	Vec3 scale = {
+		1 / Vec3(m11, m21, m31).length(),
+		1 / Vec3(m12, m22, m32).length(),
+		1 / Vec3(m13, m23, m33).length()
+	};
+
+	m11 *= scale.x;
+	m21 *= scale.x;
+	m31 *= scale.x;
+
+	m12 *= scale.z;
+	m22 *= scale.z;
+	m32 *= scale.z;
+
+	m13 *= scale.z;
+	m23 *= scale.z;
+	m33 *= scale.z;
+}
+
+
 Quat Matrix::getRotation() const
 {
 	Quat rot;

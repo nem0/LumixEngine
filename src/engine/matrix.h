@@ -277,6 +277,9 @@ LUMIX_ALIGN_BEGIN(16) struct LUMIX_ENGINE_API Matrix
 	}
 
 
+	void normalizeScale();
+
+
 	void getTranslation(Vec3& pos) const
 	{
 		pos.set(m41, m42, m43);
