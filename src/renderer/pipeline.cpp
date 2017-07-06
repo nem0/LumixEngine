@@ -491,7 +491,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			bgfx::createUniform("u_lightRgbAndIndirectIntensity", bgfx::UniformType::Vec4);
 		m_light_dir_fov_uniform = bgfx::createUniform("u_lightDirFov", bgfx::UniformType::Vec4);
 		m_shadowmap_matrices_uniform = bgfx::createUniform("u_shadowmapMatrices", bgfx::UniformType::Mat4, 4);
-		m_bone_matrices_uniform = bgfx::createUniform("u_boneMatrices", bgfx::UniformType::Mat4, 128);
+		m_bone_matrices_uniform = bgfx::createUniform("u_boneMatrices", bgfx::UniformType::Mat4, 196);
 		m_layer_uniform = bgfx::createUniform("u_layer", bgfx::UniformType::Vec4);
 		m_terrain_matrix_uniform = bgfx::createUniform("u_terrainMatrix", bgfx::UniformType::Mat4);
 		m_decal_matrix_uniform = bgfx::createUniform("u_decalMatrix", bgfx::UniformType::Mat4);
@@ -2081,7 +2081,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		Material* material = mesh.material;
 		auto& shader_instance = mesh.material->getShaderInstance();
 
-		Matrix bone_mtx[128];
+		Matrix bone_mtx[196];
 
 		const Pose& pose = *model_instance.pose;
 		const Model& model = *model_instance.model;
@@ -2178,7 +2178,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		const Mesh& mesh = *info.mesh;
 		Material* material = mesh.material;
 
-		Matrix bone_mtx[128];
+		Matrix bone_mtx[196];
 		const Pose& pose = *model_instance.pose;
 		const Model& model = *model_instance.model;
 		Vec3* poss = pose.positions;

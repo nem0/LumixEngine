@@ -197,6 +197,15 @@ struct FBXImporter
 	}
 
 
+	void splitMeshes()
+	{
+		for (ImportMesh& mesh : meshes)
+		{
+
+		}
+	}
+
+
 	static ofbx::Matrix makeOFBXIdentity() { return {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}; }
 
 
@@ -477,15 +486,19 @@ struct FBXImporter
 	}
 
 
-	static bool isValid(ofbx::Mesh** meshes, int mesh_count)
+	bool isValid(const ofbx::IScene& scene) const
 	{
-		// TODO call this function
+		int mesh_count = scene.getMeshCount();
+		if (mesh_count == 0) return true;
+
 		// TODO error message
-		// TODO check is there are not the same bones in multiple scenes
 		// TODO check if all meshes have the same vertex decls
+		
+		int vertex_size = getVertexSize(*scene.getMesh(0));
 		for (int i = 0; i < mesh_count; ++i)
 		{
-			ofbx::Mesh* mesh = meshes[i];
+			const ofbx::Mesh* mesh = scene.getMesh(i);
+			if (vertex_size != getVertexSize(*mesh)) return false;
 			if (mesh->resolveObjectLinkCount(ofbx::Object::Type::GEOMETRY) > 1) return false;
 		}
 		return true;
@@ -539,6 +552,12 @@ struct FBXImporter
 		if (!scene)
 		{
 			g_log_error.log("FBX") << "Failed to import \"" << filename;
+			return false;
+		}
+
+		if (!isValid(*scene))
+		{
+			scene->destroy();
 			return false;
 		}
 
@@ -1065,8 +1084,8 @@ struct FBXImporter
 
 			const ofbx::Mesh* mesh = getAnyMeshFromBone(node);
 			Matrix tr = toLumix(getBindPoseMatrix(mesh, node));
+			tr.normalizeScale();
 
-			// TODO check/handle scale in tr
 			Quat q = fixOrientation(tr.getRotation());
 			Vec3 t = fixOrientation(tr.getTranslation());
 			write(t * mesh_scale);
