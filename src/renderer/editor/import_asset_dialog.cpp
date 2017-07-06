@@ -866,6 +866,7 @@ struct FBXImporter
 		for (int i = 0, c = skin->getClusterCount(); i < c; ++i)
 		{
 			ofbx::Cluster* cluster = skin->getCluster(i);
+			if (cluster->getIndicesCount() == 0) continue;
 			int joint = bones.indexOf(cluster->getLink());
 			ASSERT(joint >= 0);
 			const int* cp_indices = cluster->getIndices();
@@ -2690,6 +2691,12 @@ static bool createBillboard(ImportAssetDialog& dialog,
 void ImportAssetDialog::convert(bool use_ui)
 {
 	ASSERT(!m_task);
+	
+	if (m_sources.empty())
+	{
+		setMessage("Nothing to import.");
+		return;
+	}
 
 	if (m_model.create_billboard_lod)
 	{
