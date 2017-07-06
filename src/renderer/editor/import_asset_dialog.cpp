@@ -2037,6 +2037,7 @@ ImportAssetDialog::~ImportAssetDialog()
 	{
 		m_task->destroy();
 		LUMIX_DELETE(m_editor.getAllocator(), m_task);
+		m_task = nullptr;
 	}
 	clearSources();
 	LUMIX_DELETE(m_editor.getAllocator(), m_fbx_importer);
