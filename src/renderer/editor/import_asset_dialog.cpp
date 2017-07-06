@@ -285,12 +285,12 @@ struct FBXImporter
 
 	void gatherAnimations(ofbx::IScene* scene)
 	{
-		int anim_count = scene->resolveObjectCount(ofbx::Object::Type::ANIMATION_STACK);
+		int anim_count = scene->getAnimationStackCount();
 		for (int i = 0; i < anim_count; ++i)
 		{
 			ImportAnimation& anim = animations.emplace();
 			anim.scene = scene;
-			anim.fbx = (ofbx::AnimationStack*)scene->resolveObject(ofbx::Object::Type::ANIMATION_STACK, i);
+			anim.fbx = (const ofbx::AnimationStack*)scene->getAnimationStack(i);
 			anim.import = true;
 			const ofbx::TakeInfo* take_info = scene->getTakeInfo(anim.fbx->name);
 			if (take_info)
@@ -442,11 +442,11 @@ struct FBXImporter
 	void gatherMeshes(ofbx::IScene* scene)
 	{
 		IAllocator& allocator = app.getWorldEditor()->getAllocator();
-		int c = scene->resolveObjectCount(ofbx::Object::Type::MESH);
+		int c = scene->getMeshCount();
 		for (int i = 0; i < c; ++i)
 		{
 			ImportMesh& mesh = meshes.emplace(allocator);
-			mesh.fbx = (ofbx::Mesh*)scene->resolveObject(ofbx::Object::Type::MESH, i);
+			mesh.fbx = (const ofbx::Mesh*)scene->getMesh(i);
 			mesh.fbx_geom = mesh.fbx->getGeometry();
 			mesh.lod = detectMeshLOD(mesh);
 

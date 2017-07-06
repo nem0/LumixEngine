@@ -312,10 +312,12 @@ struct IScene
 	virtual void destroy() = 0;
 	virtual IElement* getRootElement() const = 0;
 	virtual Object* getRoot() const = 0;
-	virtual int resolveObjectCount(Object::Type type) const = 0;
-	virtual Object* resolveObject(Object::Type type, int idx) const = 0;
 	virtual const TakeInfo* getTakeInfo(const char* name) const = 0;
 	virtual ~IScene() {}
+	virtual int getMeshCount() const = 0;
+	virtual const Mesh* getMesh(int index) const = 0;
+	virtual int getAnimationStackCount() const = 0;
+	virtual const AnimationStack* getAnimationStack(int index) const = 0;
 };
 
 
