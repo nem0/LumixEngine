@@ -110,7 +110,7 @@ static Matrix rotationZ(double angle)
 }
 
 
-static Matrix getRotationMatrix(const ofbx::Vec3& euler)
+static Matrix getRotationMatrix(const Vec3& euler)
 {
 	const double TO_RAD = 3.1415926535897932384626433832795028 / 180.0;
 	Matrix rx = rotationX(euler.x * TO_RAD);
@@ -537,21 +537,23 @@ struct MeshImpl : Mesh
 
 
 	const Geometry* getGeometry() const override { return geometry; }
+	const Material* getMaterial() const override { return material; }
 
 
-	Skin* getSkin() const override
+	void postprocess()
 	{
-		Geometry* geom = resolveObjectLink<ofbx::Geometry>(0);
-		if (!geom) return nullptr;
-		return geom->resolveObjectLink<ofbx::Skin>(0);
+		material = resolveObjectLink<Material>(0);
+		geometry = resolveObjectLink<Geometry>(0);
+		
+		assert(!resolveObjectLink<Material>(1));
+		assert(!resolveObjectLink<Geometry>(1));
 	}
-
-
-	void postprocess() { geometry = resolveObjectLink<ofbx::Geometry>(0); }
 
 
 	const Geometry* geometry;
 	const Scene& scene;
+	const Material* material = nullptr;
+
 };
 
 
@@ -566,9 +568,28 @@ struct MaterialImpl : Material
 	MaterialImpl(const Scene& _scene, const IElement& _element)
 		: Material(_scene, _element)
 	{
+		for (const Texture*& tex : textures) tex = nullptr;
 	}
 
 	Type getType() const override { return Type::MATERIAL; }
+
+
+	const Texture* getTexture(Texture::TextureType type) const override
+	{
+		return textures[type];
+	}
+
+
+	void postprocess()
+	{
+		textures[Texture::DIFFUSE] = (const Texture*)resolveObjectLink(Object::Type::TEXTURE, "DiffuseColor", 0);
+		textures[Texture::NORMAL] = (const Texture*)resolveObjectLink(Object::Type::TEXTURE, "NormalMap", 0);
+
+		assert(!resolveObjectLink(Object::Type::TEXTURE, "DiffuseColor", 1));
+		assert(!resolveObjectLink(Object::Type::TEXTURE, "NormalMap", 1));
+	}
+
+	const Texture* textures[Texture::TextureType::COUNT];
 };
 
 
@@ -635,12 +656,16 @@ struct GeometryImpl : Geometry
 	std::vector<Vec4> colors;
 	std::vector<Vec3> tangents;
 
+	const Skin* skin = nullptr;
+
 	std::vector<int> to_old_vertices;
 
 	GeometryImpl(const Scene& _scene, const IElement& _element)
 		: Geometry(_scene, _element)
 	{
 	}
+
+
 	Type getType() const override { return Type::GEOMETRY; }
 	int getVertexCount() const override { return (int)vertices.size(); }
 	const Vec3* getVertices() const override { return &vertices[0]; }
@@ -648,6 +673,14 @@ struct GeometryImpl : Geometry
 	const Vec2* getUVs() const override { return uvs.empty() ? nullptr : &uvs[0]; }
 	const Vec4* getColors() const override { return colors.empty() ? nullptr : &colors[0]; }
 	const Vec3* getTangents() const override { return tangents.empty() ? nullptr : &tangents[0]; }
+	const Skin* getSkin() const override { return skin; }
+
+
+	void postprocess()
+	{
+		skin = resolveObjectLink<Skin>(0);
+		assert(resolveObjectLink<Skin>(1) == nullptr);
+	}
 
 
 	void triangulate(std::vector<int>* indices, std::vector<int>* to_old)
@@ -836,7 +869,7 @@ struct AnimationStackImpl : AnimationStack
 	const AnimationLayer* getLayer(int index) const
 	{
 		assert(index == 0);
-		return resolveObjectLink<ofbx::AnimationLayer>(index);
+		return resolveObjectLink<AnimationLayer>(index);
 	}
 
 
@@ -886,7 +919,7 @@ struct SkinImpl : Skin
 	}
 
 	int getClusterCount() const override { return resolveObjectLinkCount(Type::CLUSTER); }
-	Cluster* getCluster(int idx) const override { return resolveObjectLink<ofbx::Cluster>(idx); }
+	Cluster* getCluster(int idx) const override { return resolveObjectLink<Cluster>(idx); }
 
 	Type getType() const override { return Type::SKIN; }
 };
@@ -1681,6 +1714,8 @@ static void parseObjects(const Element& root, Scene* scene)
 		if (!obj) continue;
 		switch (obj->getType())
 		{
+			case Object::Type::MATERIAL: ((MaterialImpl*)iter.second.object)->postprocess(); break;
+			case Object::Type::GEOMETRY: ((GeometryImpl*)iter.second.object)->postprocess(); break;
 			case Object::Type::CLUSTER: ((ClusterImpl*)iter.second.object)->postprocess(); break;
 			case Object::Type::MESH: ((MeshImpl*)iter.second.object)->postprocess(); break;
 			case Object::Type::ANIMATION_CURVE_NODE:
@@ -1754,7 +1789,7 @@ const AnimationCurveNode* Object::getCurveNode(const char* prop, const Animation
 }
 
 
-Matrix Object::evalLocal(const ofbx::Vec3& translation, const ofbx::Vec3& rotation) const
+Matrix Object::evalLocal(const Vec3& translation, const Vec3& rotation) const
 {
 	Vec3 scaling = getLocalScaling();
 	Vec3 rotation_pivot = getRotationPivot();
