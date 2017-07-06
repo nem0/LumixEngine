@@ -2005,13 +2005,13 @@ bool ImportAssetDialog::isOpened() const
 
 ImportAssetDialog::~ImportAssetDialog()
 {
-	LUMIX_DELETE(m_editor.getAllocator(), m_fbx_importer);
 	if (m_task)
 	{
 		m_task->destroy();
 		LUMIX_DELETE(m_editor.getAllocator(), m_task);
 	}
 	clearSources();
+	LUMIX_DELETE(m_editor.getAllocator(), m_fbx_importer);
 }
 
 
