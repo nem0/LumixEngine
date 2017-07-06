@@ -949,6 +949,26 @@ struct Scene : IScene
 	};
 
 
+	int getAnimationStackCount() const { return (int)m_animation_stacks.size(); }
+	int getMeshCount() const override { return (int)m_meshes.size(); }
+
+
+	const AnimationStack* getAnimationStack(int index) const override
+	{
+		assert(index >= 0);
+		assert(index < m_animation_stacks.size());
+		return m_animation_stacks[index];
+	}
+
+
+	const Mesh* getMesh(int index) const override
+	{
+		assert(index >= 0);
+		assert(index < m_meshes.size());
+		return m_meshes[index];
+	}
+
+
 	const TakeInfo* getTakeInfo(const char* name) const override
 	{
 		for (const TakeInfo& info : m_take_infos)
@@ -961,35 +981,6 @@ struct Scene : IScene
 
 	IElement* getRootElement() const override { return m_root_element; }
 	Object* getRoot() const override { return m_root; }
-
-
-	int resolveObjectCount(Object::Type type) const override
-	{
-		int count = 0;
-		for (const auto& iter : m_object_map)
-		{
-			if (iter.second.object && iter.second.object->getType() == type)
-			{
-				++count;
-			}
-		}
-		return count;
-	}
-
-
-	Object* resolveObject(Object::Type type, int idx) const override
-	{
-		int counter = idx;
-		for (const auto& iter : m_object_map)
-		{
-			if (iter.second.object && iter.second.object->getType() == type)
-			{
-				if (counter == 0) return iter.second.object;
-				--counter;
-			}
-		}
-		return nullptr;
-	}
 
 
 	void destroy() override { delete this; }
@@ -1008,6 +999,8 @@ struct Scene : IScene
 	Element* m_root_element;
 	Root* m_root;
 	std::unordered_map<u64, ObjectPair> m_object_map;
+	std::vector<Mesh*> m_meshes;
+	std::vector<AnimationStack*> m_animation_stacks;
 	std::vector<Connection> m_connections;
 	std::vector<u8> m_data;
 	std::vector<TakeInfo> m_take_infos;
@@ -1623,7 +1616,9 @@ static void parseObjects(const Element& root, Scene* scene)
 		}
 		else if (iter.second.element->id == "AnimationStack")
 		{
-			obj = parse<AnimationStackImpl>(*scene, *iter.second.element);
+			AnimationStack* stack = parse<AnimationStackImpl>(*scene, *iter.second.element);
+			obj = stack;
+			scene->m_animation_stacks.push_back(stack);
 		}
 		else if (iter.second.element->id == "AnimationLayer")
 		{
@@ -1660,7 +1655,11 @@ static void parseObjects(const Element& root, Scene* scene)
 			if (class_prop)
 			{
 				if (class_prop->getValue() == "Mesh")
-					obj = parseMesh(*scene, *iter.second.element);
+				{
+					Mesh* mesh = parseMesh(*scene, *iter.second.element);
+					scene->m_meshes.push_back(mesh);
+					obj = mesh;
+				}
 				else if (class_prop->getValue() == "LimbNode")
 					obj = parseLimbNode(*scene, *iter.second.element);
 				else if (class_prop->getValue() == "Null")
