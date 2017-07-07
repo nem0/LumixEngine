@@ -402,7 +402,9 @@ static OptionalError<DataView> readLongString(Cursor* cursor)
 
 static OptionalError<Property*> readProperty(Cursor* cursor)
 {
-	Property* prop = new Property;
+	if (cursor->current == cursor->end) return Error("Reading past the end");
+
+	std::unique_ptr<Property> prop = std::make_unique<Property>();
 	prop->next = nullptr;
 	prop->type = *cursor->current;
 	++cursor->current;
@@ -410,14 +412,10 @@ static OptionalError<Property*> readProperty(Cursor* cursor)
 
 	switch (prop->type)
 	{
-		case 'S': 
+		case 'S':
 		{
 			OptionalError<DataView> val = readLongString(cursor);
-			if (val.isError())
-			{
-				delete prop;
-				return Error();
-			}
+			if (val.isError()) return Error();
 			prop->value = val.getValue();
 			break;
 		}
@@ -430,11 +428,8 @@ static OptionalError<Property*> readProperty(Cursor* cursor)
 		case 'R':
 		{
 			OptionalError<u32> len = read<u32>(cursor);
-			if (len.isError())
-			{
-				delete prop;
-				return Error();
-			}
+			if (len.isError()) return Error();
+			if (cursor->current + len.getValue() > cursor->end) return Error("Reading past the end");
 			cursor->current += len.getValue();
 			break;
 		}
@@ -447,20 +442,16 @@ static OptionalError<Property*> readProperty(Cursor* cursor)
 			OptionalError<u32> length = read<u32>(cursor);
 			OptionalError<u32> encoding = read<u32>(cursor);
 			OptionalError<u32> comp_len = read<u32>(cursor);
-			if (length.isError() | encoding.isError() | comp_len.isError())
-			{
-				delete prop;
-				return Error();
-			}
+			if (length.isError() | encoding.isError() | comp_len.isError()) return Error();
+			if (cursor->current + comp_len.getValue() > cursor->end) return Error("Reading past the end");
 			cursor->current += comp_len.getValue();
 			break;
 		}
 		default: 
-			delete prop;
 			return Error("Unknown property type");
 	}
 	prop->value.end = cursor->current;
-	return prop;
+	return prop.release();
 }
 
 
@@ -479,7 +470,7 @@ static OptionalError<Element*> readElement(Cursor* cursor)
 	OptionalError<DataView> id = readShortString(cursor);
 	if (id.isError()) return Error();
 
-	Element* element = new Element;
+	std::unique_ptr<Element> element = std::make_unique<Element>();
 	element->first_property = nullptr;
 	element->id = id.getValue();
 
@@ -490,17 +481,13 @@ static OptionalError<Element*> readElement(Cursor* cursor)
 	for (u32 i = 0; i < prop_count.getValue(); ++i)
 	{
 		OptionalError<Property*> prop = readProperty(cursor);
-		if (prop.isError())
-		{
-			delete element;
-			return Error();
-		}
+		if (prop.isError()) return Error();
 		
 		*prop_link = prop.getValue();
 		prop_link = &(*prop_link)->next;
 	}
 
-	if (cursor->current - cursor->begin >= end_offset.getValue()) return element;
+	if (cursor->current - cursor->begin >= end_offset.getValue()) return element.release();
 
 	constexpr int BLOCK_SENTINEL_LENGTH = 13;
 
@@ -508,24 +495,16 @@ static OptionalError<Element*> readElement(Cursor* cursor)
 	while (cursor->current - cursor->begin < (end_offset.getValue() - BLOCK_SENTINEL_LENGTH))
 	{
 		OptionalError<Element*> child = readElement(cursor);
-		if (child.isError())
-		{
-			delete element;
-			return Error();
-		}
+		if (child.isError()) return Error();
 
 		*link = child.getValue();
 		link = &(*link)->sibling;
 	}
 
-	if (cursor->current + BLOCK_SENTINEL_LENGTH > cursor->end)
-	{
-		delete element;
-		return Error("Reading past the end");
-	}
+	if (cursor->current + BLOCK_SENTINEL_LENGTH > cursor->end) return Error("Reading past the end");
 	
 	cursor->current += BLOCK_SENTINEL_LENGTH;
-	return element;
+	return element.release();
 }
 
 
@@ -539,7 +518,7 @@ static OptionalError<Element*> tokenize(const u8* data, size_t size)
 	const Header* header = (const Header*)cursor.current;
 	cursor.current += sizeof(*header);
 
-	Element* root = new Element;
+	std::unique_ptr<Element> root = std::make_unique<Element>();
 	root->first_property = nullptr;
 	root->id.begin = nullptr;
 	root->id.end = nullptr;
@@ -550,16 +529,12 @@ static OptionalError<Element*> tokenize(const u8* data, size_t size)
 	for (;;)
 	{
 		OptionalError<Element*> child = readElement(&cursor);
-		if (child.isError())
-		{
-			delete root;
-			return Error();
-		}
+		if (child.isError()) return Error();
 		*element = child.getValue();
-		if (!*element) return root;
+		if (!*element) return root.release();
 		element = &(*element)->sibling;
 	}
-	return root;
+	return root.release();
 }
 
 
