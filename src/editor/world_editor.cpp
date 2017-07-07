@@ -2385,6 +2385,23 @@ public:
 	}
 
 
+	void makeAbsolute(char* absolute, int max_size, const char* relative) const override
+	{
+		FS::DiskFileDevice* disk = m_engine->getDiskFileDevice();
+		bool is_absolute = relative[0] == '/' || relative[0] == '/';
+		is_absolute = is_absolute || (relative[0] != 0 && relative[1] == ':');
+
+		if (is_absolute || !disk)
+		{
+			copyString(absolute, max_size, relative);
+			return;
+		}
+
+		copyString(absolute, max_size, disk->getBasePath());
+		catString(absolute, max_size, relative);
+	}
+
+
 	void makeRelative(char* relative, int max_size, const char* absolute) const override
 	{
 		FS::DiskFileDevice* patch = m_engine->getPatchFileDevice();

@@ -2334,7 +2334,7 @@ void ImportAssetDialog::onAnimationsGUI()
 	{
 		auto& animation = m_fbx_importer->animations[i];
 		ImGui::PushID(i);
-		ImGui::InputText("", animation.output_filename.data, lengthOf(animation.output_filename.data));
+		ImGui::InputText("###name", animation.output_filename.data, lengthOf(animation.output_filename.data));
 		ImGui::NextColumn();
 		ImGui::Checkbox("", &animation.import);
 		ImGui::NextColumn();
@@ -2747,7 +2747,11 @@ void ImportAssetDialog::convert(bool use_ui)
 
 	IAllocator& allocator = m_editor.getAllocator();
 	m_task = makeTask([this]() {
-		if (m_fbx_importer->save(m_output_dir, m_mesh_output_filename, m_texture_output_dir))
+		char output_dir[MAX_PATH_LENGTH];
+		char texture_output_dir[MAX_PATH_LENGTH];
+		m_editor.makeAbsolute(output_dir, lengthOf(output_dir), m_output_dir);
+		m_editor.makeAbsolute(texture_output_dir, lengthOf(texture_output_dir), m_texture_output_dir);
+		if (m_fbx_importer->save(output_dir, m_mesh_output_filename, texture_output_dir))
 		{
 			for (auto& mat : m_fbx_importer->materials)
 			{
