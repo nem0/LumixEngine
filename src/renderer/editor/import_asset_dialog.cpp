@@ -545,7 +545,7 @@ struct FBXImporter
 		ofbx::IScene* scene = ofbx::load(&data[0], data.size());
 		if (!scene)
 		{
-			g_log_error.log("FBX") << "Failed to import \"" << filename;
+			g_log_error.log("FBX") << "Failed to import \"" << filename << ": " << ofbx::getError();
 			return false;
 		}
 
