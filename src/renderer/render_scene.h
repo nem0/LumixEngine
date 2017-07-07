@@ -59,8 +59,8 @@ struct ModelInstance
 {
 	enum Flags : u8
 	{
-		CUSTOM_MESHES,
-		KEEP_SKIN
+		CUSTOM_MESHES = 1 << 0,
+		KEEP_SKIN = 1 << 1
 	};
 
 	enum Type
