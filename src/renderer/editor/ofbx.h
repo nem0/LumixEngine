@@ -333,6 +333,7 @@ struct IScene
 
 
 IScene* load(const u8* data, int size);
+const char* getError();
 
 
 } // namespace ofbx
