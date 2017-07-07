@@ -238,7 +238,7 @@ struct FBXImporter
 			ImportMaterial& mat = materials.emplace();
 			mat.fbx = fbx_mat;
 
-			auto gatherTexture = [&mat, src_dir](ofbx::Texture::TextureType type) {
+			auto gatherTexture = [&mat, src_dir, this](ofbx::Texture::TextureType type) {
 				const ofbx::Texture* texture = mat.fbx->getTexture(type);
 				if (!texture) return;
 
@@ -247,11 +247,19 @@ struct FBXImporter
 				ofbx::DataView filename = tex.fbx->getRelativeFileName();
 				if (filename == "") filename = tex.fbx->getFileName();
 				filename.toString(tex.path.data);
-				tex.src = src_dir;
-				tex.src << tex.path;
+				tex.src = tex.path;
+				tex.is_valid = PlatformInterface::fileExists(tex.src);
+
+				if (!tex.is_valid)
+				{
+					PathUtils::FileInfo file_info(tex.path);
+					tex.src = src_dir;
+					tex.src << file_info.m_basename << "." << file_info.m_extension;
+					tex.is_valid = PlatformInterface::fileExists(tex.src);
+				}
+
 				tex.import = true;
 				tex.to_dds = true;
-				tex.is_valid = PlatformInterface::fileExists(tex.src);
 			};
 
 			gatherTexture(ofbx::Texture::DIFFUSE);
@@ -287,6 +295,18 @@ struct FBXImporter
 	}
 
 
+	static void makeValidFilename(char* filename)
+	{
+		char* c = filename;
+		while (*c)
+		{
+			bool is_valid = *c >= 'A' && *c <= 'Z' || *c >= 'a' && *c <= 'z' || *c >= '0' && *c <= '9' || *c == '-' || *c == '_';
+			if (!is_valid) *c = '_';
+			++c;
+		}
+	}
+
+
 	void gatherAnimations(ofbx::IScene* scene)
 	{
 		int anim_count = scene->getAnimationStackCount();
@@ -313,6 +333,8 @@ struct FBXImporter
 			{
 				anim.output_filename = "anim";
 			}
+
+			makeValidFilename(anim.output_filename.data);
 		}
 	}
 
@@ -374,6 +396,9 @@ struct FBXImporter
 	{
 		for (ImportMesh& import_mesh : meshes)
 		{
+			import_mesh.vertex_data.clear();
+			import_mesh.indices.clear();
+
 			const ofbx::Mesh& mesh = *import_mesh.fbx;
 			const ofbx::Geometry* geom = import_mesh.fbx_geom;
 			int vertex_count = geom->getVertexCount();
@@ -564,8 +589,6 @@ struct FBXImporter
 		gatherBones(root);
 		gatherAnimations(scene);
 
-		postprocessMeshes();
-
 		scenes.push(scene);
 		return true;
 	}
@@ -596,9 +619,7 @@ struct FBXImporter
 				if (texture.fbx)
 				{
 					writeString(",\n\t\"texture\" : { \"source\" : \"");
-					char filename[MAX_PATH_LENGTH];
-					texture.fbx->getRelativeFileName().toString(filename);
-					PathUtils::FileInfo info(filename);
+					PathUtils::FileInfo info(texture.src);
 					writeString(texture_output_dir);
 					writeString(info.m_basename);
 					writeString(".");
@@ -1204,6 +1225,8 @@ struct FBXImporter
 
 	void writeModel(const char* output_dir, const char* output_mesh_filename)
 	{
+		postprocessMeshes();
+
 		auto cmpMeshes = [](const void* a, const void* b) -> int {
 			auto a_mesh = static_cast<const ImportMesh*>(a);
 			auto b_mesh = static_cast<const ImportMesh*>(b);
@@ -1500,6 +1523,12 @@ int setAnimationParams(lua_State* L)
 
 	LuaWrapper::getOptionalField(L, 2, "import", &anim.import);
 
+	if (lua_getfield(L, 2, "output_filename") == LUA_TSTRING)
+	{
+		copyString(anim.output_filename.data, LuaWrapper::toType<const char*>(L, -1));
+	}
+	lua_pop(L, 1);
+
 	return 0;
 }
 
@@ -1530,7 +1559,7 @@ int setParams(lua_State* L)
 	LuaWrapper::getOptionalField(L, 1, "create_billboard", &dlg->m_model.create_billboard_lod);
 	LuaWrapper::getOptionalField(L, 1, "center_meshes", &dlg->m_model.center_meshes);
 	LuaWrapper::getOptionalField(L, 1, "import_vertex_colors", &dlg->m_model.import_vertex_colors);
-	LuaWrapper::getOptionalField(L, 1, "scale", &dlg->m_model.mesh_scale);
+	LuaWrapper::getOptionalField(L, 1, "scale", &dlg->m_fbx_importer->mesh_scale);
 	LuaWrapper::getOptionalField(L, 1, "time_scale", &dlg->m_model.time_scale);
 	LuaWrapper::getOptionalField(L, 1, "to_dds", &dlg->m_convert_to_dds);
 	LuaWrapper::getOptionalField(L, 1, "normal_map", &dlg->m_is_normal_map);
@@ -1963,7 +1992,6 @@ ImportAssetDialog::ImportAssetDialog(StudioApp& app)
 	m_model.make_convex = false;
 	m_model.import_vertex_colors = true;
 	m_model.all_nodes = false;
-	m_model.mesh_scale = 1;
 	m_model.center_meshes = false;
 	m_model.create_billboard_lod = false;
 	m_model.lods[0] = -10;
@@ -2748,10 +2776,8 @@ void ImportAssetDialog::convert(bool use_ui)
 	IAllocator& allocator = m_editor.getAllocator();
 	m_task = makeTask([this]() {
 		char output_dir[MAX_PATH_LENGTH];
-		char texture_output_dir[MAX_PATH_LENGTH];
 		m_editor.makeAbsolute(output_dir, lengthOf(output_dir), m_output_dir);
-		m_editor.makeAbsolute(texture_output_dir, lengthOf(texture_output_dir), m_texture_output_dir);
-		if (m_fbx_importer->save(output_dir, m_mesh_output_filename, texture_output_dir))
+		if (m_fbx_importer->save(output_dir, m_mesh_output_filename, m_texture_output_dir))
 		{
 			for (auto& mat : m_fbx_importer->materials)
 			{
@@ -2937,7 +2963,7 @@ void ImportAssetDialog::onWindowGUI()
 			ImGui::Checkbox("Import all bones", &m_model.all_nodes);
 			ImGui::Checkbox("Center meshes", &m_model.center_meshes);
 			ImGui::Checkbox("Import Vertex Colors", &m_model.import_vertex_colors);
-			ImGui::DragFloat("Scale", &m_model.mesh_scale, 0.01f, 0.001f, 0);
+			ImGui::DragFloat("Scale", &m_fbx_importer->mesh_scale, 0.01f, 0.001f, 0);
 			ImGui::Combo("Orientation", &(int&)m_model.orientation, "Y up\0Z up\0-Z up\0-X up\0");
 			ImGui::Combo("Root Orientation", &(int&)m_model.root_orientation, "Y up\0Z up\0-Z up\0-X up\0");
 			ImGui::Checkbox("Make physics convex", &m_model.make_convex);
