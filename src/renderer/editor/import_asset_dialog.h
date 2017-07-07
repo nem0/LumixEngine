@@ -97,7 +97,6 @@ class ImportAssetDialog LUMIX_FINAL : public StudioApp::IPlugin
 		
 		struct ModelData
 		{
-			float mesh_scale;
 			float lods[4];
 			bool create_billboard_lod;
 			bool center_meshes;
