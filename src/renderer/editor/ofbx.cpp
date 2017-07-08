@@ -621,22 +621,26 @@ struct MeshImpl : Mesh
 
 
 	const Geometry* getGeometry() const override { return geometry; }
-	const Material* getMaterial() const override { return material; }
+	const Material* getMaterial(int index) const override { return materials[index]; }
+	int getMaterialCount() const override { return (int)materials.size(); }
 
 
 	void postprocess()
 	{
-		material = resolveObjectLink<Material>(0);
+		const Material* material = nullptr;
+		for (int i = 0; material = resolveObjectLink<Material>(i); ++i)
+		{
+			materials.push_back(material);
+		}
 		geometry = resolveObjectLink<Geometry>(0);
 		
-		assert(!resolveObjectLink<Material>(1));
 		assert(!resolveObjectLink<Geometry>(1));
 	}
 
 
 	const Geometry* geometry;
 	const Scene& scene;
-	const Material* material = nullptr;
+	std::vector<const Material*> materials;
 
 };
 
@@ -739,6 +743,7 @@ struct GeometryImpl : Geometry
 	std::vector<Vec2> uvs;
 	std::vector<Vec4> colors;
 	std::vector<Vec3> tangents;
+	std::vector<int> materials;
 
 	const Skin* skin = nullptr;
 
@@ -767,12 +772,10 @@ struct GeometryImpl : Geometry
 	}
 
 
-	void triangulate(std::vector<int>* indices, std::vector<int>* to_old)
+	void triangulate(const std::vector<int>& old_indices, std::vector<int>* indices, std::vector<int>* to_old)
 	{
 		assert(indices);
 		assert(to_old);
-		std::vector<int> old_indices;
-		indices->swap(old_indices);
 
 		auto getIdx = [&old_indices](int i) -> int {
 			int idx = old_indices[i];
@@ -1538,6 +1541,19 @@ static AnimationCurve* parseAnimationCurve(const Scene& scene, const Element& el
 }
 
 
+static int getTriCountFromPoly(const std::vector<int>& indices, int* idx)
+{
+	int count = 1;
+	while (indices[*idx + 1 + count] >= 0)
+	{
+		++count;
+	};
+
+	*idx = *idx + 2 + count;
+	return count;
+}
+
+
 static Geometry* parseGeometry(const Scene& scene, const Element& element)
 {
 	assert(element.first_property);
@@ -1552,16 +1568,60 @@ static Geometry* parseGeometry(const Scene& scene, const Element& element)
 
 	std::vector<Vec3> vertices;
 	parseDoubleVecData(*vertices_element->first_property, &vertices);
-	parseBinaryArray(*polys_element->first_property, &geom->to_old_vertices);
+	std::vector<int> original_indices;
+	parseBinaryArray(*polys_element->first_property, &original_indices);
 
 	std::vector<int> to_old_indices;
-	geom->triangulate(&geom->to_old_vertices, &to_old_indices);
+	geom->triangulate(original_indices, &geom->to_old_vertices, &to_old_indices);
 	geom->vertices.resize(geom->to_old_vertices.size());
 
 	for (int i = 0, c = (int)geom->to_old_vertices.size(); i < c; ++i)
 	{
 		geom->vertices[i] = vertices[geom->to_old_vertices[i]];
 	}
+
+
+	const Element* layer_material_element = findChild(element, "LayerElementMaterial");
+	if (layer_material_element)
+	{
+		const Element* mapping_element = findChild(*layer_material_element, "MappingInformationType");
+		const Element* reference_element = findChild(*layer_material_element, "ReferenceInformationType");
+
+		std::vector<int> tmp;
+
+		assert(mapping_element);
+		assert(reference_element);
+		if (mapping_element->first_property->value == "ByPolygon" && reference_element->first_property->value == "IndexToDirect")
+		{
+			geom->materials.reserve(geom->vertices.size() / 3);
+			for (int& i : geom->materials) i = -1;
+
+			const Element* indices_element = findChild(*layer_material_element, "Materials");
+			if (indices_element && indices_element->first_property)
+			{
+				parseBinaryArray(*indices_element->first_property, &tmp);
+
+				int tmp_i = 0;
+				for (int poly = 0, c = (int)tmp.size(); poly < c; ++poly)
+				{
+					int tri_count = getTriCountFromPoly(original_indices, &tmp_i);
+					for (int i = 0; i < tri_count; ++i)
+					{
+						geom->materials.push_back(tmp[poly]);
+					}
+				}
+			}
+		}
+		else
+		{
+			assert(mapping_element->first_property->value == "AllSame");
+		}
+		/*
+		parseVertexData(*layer_material_element, "UV", "Materials", &tmp, &tmp_indices, &mapping);
+		geom->uvs.resize(tmp_indices.empty() ? tmp.size() : tmp_indices.size());
+		splat(&geom->uvs, mapping, tmp, tmp_indices, geom->to_old_vertices);
+		remap(&geom->uvs, to_old_indices);*/
+}
 
 	const Element* layer_uv_element = findChild(element, "LayerElementUV");
 	if (layer_uv_element)

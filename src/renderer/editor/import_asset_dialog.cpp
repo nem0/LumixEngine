@@ -168,7 +168,6 @@ struct FBXImporter
 
 		const ofbx::Mesh* fbx = nullptr;
 		const ofbx::Geometry* fbx_geom = nullptr;
-		const ofbx::Material* fbx_mat = nullptr;
 		bool import = true;
 		bool import_physics = false;
 		int lod = 0;
@@ -232,38 +231,41 @@ struct FBXImporter
 	{
 		for (ImportMesh& mesh : meshes)
 		{
-			const ofbx::Material* fbx_mat = mesh.fbx->getMaterial();
-			if (!fbx_mat) continue;
-			
-			ImportMaterial& mat = materials.emplace();
-			mat.fbx = fbx_mat;
+			for (int i = 0, c = mesh.fbx->getMaterialCount(); i < c; ++i)
+			{
+				const ofbx::Material* fbx_mat = mesh.fbx->getMaterial(i);
+				if (!fbx_mat) continue;
 
-			auto gatherTexture = [&mat, src_dir, this](ofbx::Texture::TextureType type) {
-				const ofbx::Texture* texture = mat.fbx->getTexture(type);
-				if (!texture) return;
+				ImportMaterial& mat = materials.emplace();
+				mat.fbx = fbx_mat;
 
-				ImportTexture& tex = mat.textures[type];
-				tex.fbx = texture;
-				ofbx::DataView filename = tex.fbx->getRelativeFileName();
-				if (filename == "") filename = tex.fbx->getFileName();
-				filename.toString(tex.path.data);
-				tex.src = tex.path;
-				tex.is_valid = PlatformInterface::fileExists(tex.src);
+				auto gatherTexture = [&mat, src_dir, this](ofbx::Texture::TextureType type) {
+					const ofbx::Texture* texture = mat.fbx->getTexture(type);
+					if (!texture) return;
 
-				if (!tex.is_valid)
-				{
-					PathUtils::FileInfo file_info(tex.path);
-					tex.src = src_dir;
-					tex.src << file_info.m_basename << "." << file_info.m_extension;
+					ImportTexture& tex = mat.textures[type];
+					tex.fbx = texture;
+					ofbx::DataView filename = tex.fbx->getRelativeFileName();
+					if (filename == "") filename = tex.fbx->getFileName();
+					filename.toString(tex.path.data);
+					tex.src = tex.path;
 					tex.is_valid = PlatformInterface::fileExists(tex.src);
-				}
 
-				tex.import = true;
-				tex.to_dds = true;
-			};
+					if (!tex.is_valid)
+					{
+						PathUtils::FileInfo file_info(tex.path);
+						tex.src = src_dir;
+						tex.src << file_info.m_basename << "." << file_info.m_extension;
+						tex.is_valid = PlatformInterface::fileExists(tex.src);
+					}
 
-			gatherTexture(ofbx::Texture::DIFFUSE);
-			gatherTexture(ofbx::Texture::NORMAL);
+					tex.import = true;
+					tex.to_dds = true;
+				};
+
+				gatherTexture(ofbx::Texture::DIFFUSE);
+				gatherTexture(ofbx::Texture::NORMAL);
+			}
 		}
 	}
 
@@ -478,8 +480,6 @@ struct FBXImporter
 			mesh.fbx = (const ofbx::Mesh*)scene->getMesh(i);
 			mesh.fbx_geom = mesh.fbx->getGeometry();
 			mesh.lod = detectMeshLOD(mesh);
-
-			mesh.fbx_mat = mesh.fbx->getMaterial();
 		}
 	}
 
@@ -1040,7 +1040,7 @@ struct FBXImporter
 
 			const ofbx::Mesh& mesh = *import_mesh.fbx;
 			const ofbx::Geometry* geom = import_mesh.fbx_geom;
-			const ofbx::Material* material = import_mesh.fbx_mat;
+			const ofbx::Material* material = import_mesh.fbx->getMaterial(0);
 			const char* mat = material ? material->name : "default";
 			i32 mat_len = (i32)strlen(mat);
 			write(mat_len);
@@ -1322,7 +1322,7 @@ struct FBXImporter
 	static const char* getImportMeshName(const ImportMesh& mesh)
 	{
 		const char* name = mesh.fbx->name;
-		const ofbx::Material* material = mesh.fbx_mat;
+		const ofbx::Material* material = mesh.fbx->getMaterial(0);
 
 		if (name[0] == '\0' && mesh.fbx->getParent()) name = mesh.fbx->getParent()->name;
 		if (name[0] == '\0' && material) name = material->name;
@@ -1661,7 +1661,7 @@ const char* getMeshMaterialName(lua_State* L, int mesh_idx)
 {
 	auto* dlg = LuaWrapper::toType<ImportAssetDialog*>(L, lua_upvalueindex(1));
 	if (mesh_idx < 0 || mesh_idx >= dlg->m_fbx_importer->meshes.size()) return "";
-	return dlg->m_fbx_importer->meshes[mesh_idx].fbx_mat->name;
+	return dlg->m_fbx_importer->meshes[mesh_idx].fbx->getMaterial(0)->name;
 }
 
 
@@ -2413,7 +2413,7 @@ void ImportAssetDialog::onMeshesGUI()
 		ImGui::Text("%s", name);
 		ImGui::NextColumn();
 
-		auto* material = mesh.fbx_mat;
+		auto* material = mesh.fbx->getMaterial(0);
 		ImGui::Text("%s", material->name);
 		ImGui::NextColumn();
 
