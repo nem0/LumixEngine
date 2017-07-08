@@ -167,7 +167,7 @@ struct FBXImporter
 		}
 
 		const ofbx::Mesh* fbx = nullptr;
-		const ofbx::Geometry* fbx_geom = nullptr;
+		const ofbx::Material* fbx_mat = nullptr;
 		bool import = true;
 		bool import_physics = false;
 		int lod = 0;
@@ -231,41 +231,38 @@ struct FBXImporter
 	{
 		for (ImportMesh& mesh : meshes)
 		{
-			for (int i = 0, c = mesh.fbx->getMaterialCount(); i < c; ++i)
-			{
-				const ofbx::Material* fbx_mat = mesh.fbx->getMaterial(i);
-				if (!fbx_mat) continue;
+			const ofbx::Material* fbx_mat = mesh.fbx_mat;
+			if (!fbx_mat) continue;
 
-				ImportMaterial& mat = materials.emplace();
-				mat.fbx = fbx_mat;
+			ImportMaterial& mat = materials.emplace();
+			mat.fbx = fbx_mat;
 
-				auto gatherTexture = [&mat, src_dir, this](ofbx::Texture::TextureType type) {
-					const ofbx::Texture* texture = mat.fbx->getTexture(type);
-					if (!texture) return;
+			auto gatherTexture = [&mat, src_dir, this](ofbx::Texture::TextureType type) {
+				const ofbx::Texture* texture = mat.fbx->getTexture(type);
+				if (!texture) return;
 
-					ImportTexture& tex = mat.textures[type];
-					tex.fbx = texture;
-					ofbx::DataView filename = tex.fbx->getRelativeFileName();
-					if (filename == "") filename = tex.fbx->getFileName();
-					filename.toString(tex.path.data);
-					tex.src = tex.path;
+				ImportTexture& tex = mat.textures[type];
+				tex.fbx = texture;
+				ofbx::DataView filename = tex.fbx->getRelativeFileName();
+				if (filename == "") filename = tex.fbx->getFileName();
+				filename.toString(tex.path.data);
+				tex.src = tex.path;
+				tex.is_valid = PlatformInterface::fileExists(tex.src);
+
+				if (!tex.is_valid)
+				{
+					PathUtils::FileInfo file_info(tex.path);
+					tex.src = src_dir;
+					tex.src << file_info.m_basename << "." << file_info.m_extension;
 					tex.is_valid = PlatformInterface::fileExists(tex.src);
+				}
 
-					if (!tex.is_valid)
-					{
-						PathUtils::FileInfo file_info(tex.path);
-						tex.src = src_dir;
-						tex.src << file_info.m_basename << "." << file_info.m_extension;
-						tex.is_valid = PlatformInterface::fileExists(tex.src);
-					}
+				tex.import = true;
+				tex.to_dds = true;
+			};
 
-					tex.import = true;
-					tex.to_dds = true;
-				};
-
-				gatherTexture(ofbx::Texture::DIFFUSE);
-				gatherTexture(ofbx::Texture::NORMAL);
-			}
+			gatherTexture(ofbx::Texture::DIFFUSE);
+			gatherTexture(ofbx::Texture::NORMAL);
 		}
 	}
 
@@ -394,6 +391,16 @@ struct FBXImporter
 	}
 
 
+	static int getMaterialIndex(const ofbx::Mesh& mesh, const ofbx::Material& material)
+	{
+		for (int i = 0, c = mesh.getMaterialCount(); i < c; ++i)
+		{
+			if (mesh.getMaterial(i) == &material) return i;
+		}
+		return -1;
+	}
+
+
 	void postprocessMeshes() const
 	{
 		for (ImportMesh& import_mesh : meshes)
@@ -402,7 +409,7 @@ struct FBXImporter
 			import_mesh.indices.clear();
 
 			const ofbx::Mesh& mesh = *import_mesh.fbx;
-			const ofbx::Geometry* geom = import_mesh.fbx_geom;
+			const ofbx::Geometry* geom = import_mesh.fbx->getGeometry();
 			int vertex_count = geom->getVertexCount();
 			const ofbx::Vec3* vertices = geom->getVertices();
 			const ofbx::Vec3* normals = geom->getNormals();
@@ -427,8 +434,16 @@ struct FBXImporter
 			AABB aabb = {{0, 0, 0}, {0, 0, 0}};
 			float radius_squared = 0;
 
+			int material_idx = getMaterialIndex(mesh, *import_mesh.fbx_mat);
+			assert(material_idx >= 0);
+
+			int default_mat = 0;
+			const int* materials = geom->getMaterials();
+			if (!materials) materials = &default_mat;
 			for (int i = 0; i < vertex_count; ++i)
 			{
+				if (materials[i / 3] != material_idx) continue;
+
 				blob.clear();
 				ofbx::Vec3 cp = vertices[i];
 				// premultiply control points here, so we can have constantly-scaled meshes without scale in bones
@@ -476,10 +491,15 @@ struct FBXImporter
 		int c = scene->getMeshCount();
 		for (int i = 0; i < c; ++i)
 		{
-			ImportMesh& mesh = meshes.emplace(allocator);
-			mesh.fbx = (const ofbx::Mesh*)scene->getMesh(i);
-			mesh.fbx_geom = mesh.fbx->getGeometry();
-			mesh.lod = detectMeshLOD(mesh);
+			const ofbx::Mesh* fbx_mesh = (const ofbx::Mesh*)scene->getMesh(i);
+			
+			for (int j = 0; j < fbx_mesh->getMaterialCount(); ++j)
+			{
+				ImportMesh& mesh = meshes.emplace(allocator);
+				mesh.fbx = fbx_mesh;
+				mesh.fbx_mat = fbx_mesh->getMaterial(j);
+				mesh.lod = detectMeshLOD(mesh);
+			}
 		}
 	}
 
@@ -1039,8 +1059,7 @@ struct FBXImporter
 			if (!import_mesh.import) continue;
 
 			const ofbx::Mesh& mesh = *import_mesh.fbx;
-			const ofbx::Geometry* geom = import_mesh.fbx_geom;
-			const ofbx::Material* material = import_mesh.fbx->getMaterial(0);
+			const ofbx::Material* material = import_mesh.fbx_mat;
 			const char* mat = material ? material->name : "default";
 			i32 mat_len = (i32)strlen(mat);
 			write(mat_len);
@@ -1322,7 +1341,7 @@ struct FBXImporter
 	static const char* getImportMeshName(const ImportMesh& mesh)
 	{
 		const char* name = mesh.fbx->name;
-		const ofbx::Material* material = mesh.fbx->getMaterial(0);
+		const ofbx::Material* material = mesh.fbx_mat;
 
 		if (name[0] == '\0' && mesh.fbx->getParent()) name = mesh.fbx->getParent()->name;
 		if (name[0] == '\0' && material) name = material->name;
@@ -1661,7 +1680,7 @@ const char* getMeshMaterialName(lua_State* L, int mesh_idx)
 {
 	auto* dlg = LuaWrapper::toType<ImportAssetDialog*>(L, lua_upvalueindex(1));
 	if (mesh_idx < 0 || mesh_idx >= dlg->m_fbx_importer->meshes.size()) return "";
-	return dlg->m_fbx_importer->meshes[mesh_idx].fbx->getMaterial(0)->name;
+	return dlg->m_fbx_importer->meshes[mesh_idx].fbx_mat->name;
 }
 
 
@@ -2413,7 +2432,7 @@ void ImportAssetDialog::onMeshesGUI()
 		ImGui::Text("%s", name);
 		ImGui::NextColumn();
 
-		auto* material = mesh.fbx->getMaterial(0);
+		auto* material = mesh.fbx_mat;
 		ImGui::Text("%s", material->name);
 		ImGui::NextColumn();
 

@@ -763,6 +763,7 @@ struct GeometryImpl : Geometry
 	const Vec4* getColors() const override { return colors.empty() ? nullptr : &colors[0]; }
 	const Vec3* getTangents() const override { return tangents.empty() ? nullptr : &tangents[0]; }
 	const Skin* getSkin() const override { return skin; }
+	const int* getMaterials() const override { return materials.empty() ? nullptr : &materials[0]; }
 
 
 	void postprocess()

@@ -253,6 +253,7 @@ struct Geometry : Object
 	virtual const Vec4* getColors() const = 0;
 	virtual const Vec3* getTangents() const = 0;
 	virtual const Skin* getSkin() const = 0;
+	virtual const int* getMaterials() const = 0;
 };
 
 
