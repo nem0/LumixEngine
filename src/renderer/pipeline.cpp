@@ -2094,7 +2094,6 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			auto& bone = model.getBone(bone_index);
 			Transform tmp = {poss[bone_index], rots[bone_index]};
 			bone_mtx[bone_index] = (tmp * bone.inv_bind_transform).toMatrix();
-			bone_mtx[bone_index] = Matrix::IDENTITY;
 		}
 
 		int stride = model.getVertexDecl().getStride();
