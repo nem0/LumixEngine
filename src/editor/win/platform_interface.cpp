@@ -270,6 +270,12 @@ bool getOpenDirectory(char* out, int max_size, const char* starting_dir)
 						++tmp;
 					}
 					*c = '\0';
+					if (!endsWith(out, "/") && !endsWith(out, "\\") && c - out < max_size - 1)
+					{
+						*c = '/';
+						++c;
+						*c = '\0';
+					}
 					ret = true;
 				}
 				psi->Release();
