@@ -2777,7 +2777,13 @@ void ImportAssetDialog::convert(bool use_ui)
 	m_task = makeTask([this]() {
 		char output_dir[MAX_PATH_LENGTH];
 		m_editor.makeAbsolute(output_dir, lengthOf(output_dir), m_output_dir);
-		if (m_fbx_importer->save(output_dir, m_mesh_output_filename, m_texture_output_dir))
+		char tmp[MAX_PATH_LENGTH];
+		char texture_output_dir[MAX_PATH_LENGTH];
+		PathUtils::normalize(m_texture_output_dir, texture_output_dir, lengthOf(texture_output_dir));
+		m_editor.makeRelative(tmp, lengthOf(tmp), texture_output_dir);
+		copyString(texture_output_dir, tmp[0] ? "/" : "");
+		catString(texture_output_dir, tmp);
+		if (m_fbx_importer->save(output_dir, m_mesh_output_filename, texture_output_dir))
 		{
 			for (auto& mat : m_fbx_importer->materials)
 			{
