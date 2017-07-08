@@ -439,10 +439,9 @@ struct FBXImporter
 
 			int default_mat = 0;
 			const int* materials = geom->getMaterials();
-			if (!materials) materials = &default_mat;
 			for (int i = 0; i < vertex_count; ++i)
 			{
-				if (materials[i / 3] != material_idx) continue;
+				if (materials && materials[i / 3] != material_idx) continue;
 
 				blob.clear();
 				ofbx::Vec3 cp = vertices[i];
