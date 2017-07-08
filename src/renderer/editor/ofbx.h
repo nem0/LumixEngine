@@ -264,7 +264,8 @@ struct Mesh : Object
 
 	virtual const Geometry* getGeometry() const = 0;
 	virtual Matrix getGeometricMatrix() const = 0;
-	virtual const Material* getMaterial() const = 0;
+	virtual const Material* getMaterial(int idx) const = 0;
+	virtual int getMaterialCount() const = 0;
 };
 
 
