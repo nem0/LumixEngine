@@ -227,7 +227,7 @@ struct FBXImporter
 	}
 
 
-	void gatherMaterials(ofbx::Object* node, const char* src_dir)
+	void gatherMaterials(const ofbx::Object* node, const char* src_dir)
 	{
 		for (ImportMesh& mesh : meshes)
 		{
@@ -267,7 +267,7 @@ struct FBXImporter
 	}
 
 
-	static void insertHierarchy(Array<ofbx::Object*>& bones, ofbx::Object* node)
+	static void insertHierarchy(Array<const ofbx::Object*>& bones, const ofbx::Object* node)
 	{
 		if (!node) return;
 		if (bones.indexOf(node) >= 0) return;
@@ -277,20 +277,22 @@ struct FBXImporter
 	}
 
 
-	void gatherBones(ofbx::Object* node)
+	void gatherBones(const ofbx::IScene& scene)
 	{
-		bool in_hierarchy = false;
-		const ofbx::NodeAttribute* node_attr = node->resolveObjectLink<ofbx::NodeAttribute>(0);
-		bool is_bone = node_attr && node_attr->getAttributeType() == "Skeleton";
+		const ofbx::Object *const * objects = scene.getAllObjects();
+		int count = scene.getAllObjectCount();
 
-		if (is_bone) insertHierarchy(bones, node);
-
-		for (int i = 0, c = node->resolveObjectLinkCount(); i < c; ++i)
+		for (int i = 0; i < count; ++i)
 		{
-			ofbx::Object* child = node->resolveObjectLink(i);
-			gatherBones(child);
-			child = child;
+			const ofbx::Object* node = objects[i];
+			bool in_hierarchy = false;
+			const ofbx::NodeAttribute* node_attr = node->resolveObjectLink<ofbx::NodeAttribute>(0);
+			bool is_bone = node_attr && node_attr->getAttributeType() == "Skeleton";
+
+			if (is_bone) insertHierarchy(bones, node);
 		}
+
+
 	}
 
 
@@ -306,16 +308,16 @@ struct FBXImporter
 	}
 
 
-	void gatherAnimations(ofbx::IScene* scene)
+	void gatherAnimations(const ofbx::IScene& scene)
 	{
-		int anim_count = scene->getAnimationStackCount();
+		int anim_count = scene.getAnimationStackCount();
 		for (int i = 0; i < anim_count; ++i)
 		{
 			ImportAnimation& anim = animations.emplace();
-			anim.scene = scene;
-			anim.fbx = (const ofbx::AnimationStack*)scene->getAnimationStack(i);
+			anim.scene = &scene;
+			anim.fbx = (const ofbx::AnimationStack*)scene.getAnimationStack(i);
 			anim.import = true;
-			const ofbx::TakeInfo* take_info = scene->getTakeInfo(anim.fbx->name);
+			const ofbx::TakeInfo* take_info = scene.getTakeInfo(anim.fbx->name);
 			if (take_info)
 			{
 				if (take_info->name.begin != take_info->name.end)
@@ -599,14 +601,14 @@ struct FBXImporter
 			return false;
 		}
 
-		ofbx::Object* root = scene->getRoot();
+		const ofbx::Object* root = scene->getRoot();
 		char src_dir[MAX_PATH_LENGTH];
 		PathUtils::getDir(src_dir, lengthOf(src_dir), filename);
 		gatherMeshes(scene);
 		gatherMaterials(root, src_dir);
 		materials.removeDuplicates([](const ImportMaterial& a, const ImportMaterial& b) { return a.fbx == b.fbx; });
-		gatherBones(root);
-		gatherAnimations(scene);
+		gatherBones(*scene);
+		gatherAnimations(*scene);
 
 		scenes.push(scene);
 		return true;
@@ -836,7 +838,7 @@ struct FBXImporter
 			write(int(duration / sampling_period));
 			int used_bone_count = 0;
 
-			for (ofbx::Object* bone : bones)
+			for (const ofbx::Object* bone : bones)
 			{
 				if (&bone->getScene() != &scene) continue;
 
@@ -851,7 +853,7 @@ struct FBXImporter
 			write(used_bone_count);
 			Array<TranslationKey> positions(allocator);
 			Array<RotationKey> rotations(allocator);
-			for (ofbx::Object* bone : bones)
+			for (const ofbx::Object* bone : bones)
 			{
 				if (&bone->getScene() != &scene) continue;
 
@@ -1095,7 +1097,7 @@ struct FBXImporter
 
 		write(bones.size());
 
-		for (ofbx::Object* node : bones)
+		for (const ofbx::Object* node : bones)
 		{
 			const char* name = node->name;
 			int len = (int)strlen(name);
@@ -1353,7 +1355,7 @@ struct FBXImporter
 	Array<ImportMaterial> materials;
 	Array<ImportMesh> meshes;
 	Array<ImportAnimation> animations;
-	Array<ofbx::Object*> bones;
+	Array<const ofbx::Object*> bones;
 	Array<ofbx::IScene*> scenes;
 	float lods_distances[4] = {-10, -100, -1000, -10000};
 	FS::OsFile out_file;
