@@ -739,10 +739,12 @@ public:
 			setModel(cmp, model);
 		}
 
+
 		int material_count;
 		serializer.read(&material_count);
 		if (material_count > 0)
 		{
+			ASSERT(r.flags & (u8)ModelInstance::CUSTOM_MESHES);
 			allocateCustomMeshes(r, material_count);
 			for (int j = 0; j < material_count; ++j)
 			{
