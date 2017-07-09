@@ -675,7 +675,12 @@ struct FBXImporter
 	}
 
 
-	static Quat getRotation(const ofbx::Matrix& mtx) { return toLumix(mtx).getRotation(); }
+	static Quat getRotation(const ofbx::Matrix& mtx)
+	{
+		Matrix m = toLumix(mtx);
+		m.normalizeScale();
+		return m.getRotation();
+	}
 
 
 	// arg parent_scale - animated scale is not supported, but we can get rid of static scale if we ignore
