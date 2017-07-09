@@ -187,6 +187,12 @@ static double fbxTimeToSeconds(u64 value)
 }
 
 
+static u64 secondsToFbxTime(double value)
+{
+	return u64(value * 46186158000L);
+}
+
+
 static Vec3 operator*(const Vec3& v, float f)
 {
 	return {v.x * f, v.y * f, v.z * f};
@@ -1138,21 +1144,33 @@ struct AnimationCurveNodeImpl : AnimationCurveNode
 
 	Vec3 getNodeLocalTransform(double time) const override
 	{
-		if (time < key_times[0]) time = key_times[0];
-		if (time > key_times.back()) time = key_times.back();
+		u64 fbx_time = secondsToFbxTime(time);
 
-		const Vec3* values = (const Vec3*)&key_values[0];
-		for (int i = 1, c = (int)key_times.size(); i < c; ++i)
-		{
-			if (key_times[i] >= time)
+		auto getCoord = [](const Curve& curve, u64 fbx_time) {
+			if (!curve.curve) return 0.0f;
+			
+			const u64* times = curve.curve->getKeyTime();
+			const float* values = curve.curve->getKeyValue();
+			int count = curve.curve->getKeyCount();
+
+			if (fbx_time < times[0]) fbx_time = times[0];
+			if (fbx_time > times[count - 1]) fbx_time = times[count - 1];
+			for (int i = 1; i < count; ++i)
 			{
-				float t = float((time - key_times[i - 1]) / (key_times[i] - key_times[i - 1]));
-				return values[i - 1] * (1 - t) + values[i] * t;
+				if (times[i] >= fbx_time)
+				{
+					float t = float(double(fbx_time - times[i - 1]) / double(times[i] - times[i - 1]));
+					return values[i - 1] * (1 - t) + values[i] * t;
+				}
 			}
-		}
+			return values[0];
+		};
 
-		assert(false);
-		return {0, 0, 0};
+		return{
+			getCoord(curves[0], fbx_time),
+			getCoord(curves[1], fbx_time),
+			getCoord(curves[2], fbx_time)
+		};
 	}
 
 
@@ -1187,13 +1205,14 @@ struct AnimationCurveNodeImpl : AnimationCurveNode
 
 	void postprocess()
 	{
-		Curve curves[3];
 		curves[0] = getConnection(*this, 0);
 		curves[1] = getConnection(*this, 1);
 		curves[2] = getConnection(*this, 2);
 		assert(getConnection(*this, 3).curve == nullptr);
 
-		int count = curves[0].curve->getKeyCount();
+		/*int count = curves[0].curve->getKeyCount();
+		int count2 = curves[1].curve->getKeyCount();
+		int count3 = curves[2].curve->getKeyCount();
 		const u64* times = curves[0].curve->getKeyTime();
 		const float* values_x = curves[0].curve ? curves[0].curve->getKeyValue() : nullptr;
 		const float* values_y = curves[1].curve ? curves[1].curve->getKeyValue() : nullptr;
@@ -1204,13 +1223,11 @@ struct AnimationCurveNodeImpl : AnimationCurveNode
 			key_values.push_back(values_x[i]);
 			if (values_y) key_values.push_back(values_y[i]);
 			if (values_z) key_values.push_back(values_z[i]);
-		}
+		}*/
 	}
 
-
+	Curve curves[3];
 	Type getType() const override { return Type::ANIMATION_CURVE_NODE; }
-	std::vector<double> key_values;
-	std::vector<double> key_times;
 	enum Mode
 	{
 		TRANSLATION,
