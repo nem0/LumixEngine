@@ -323,13 +323,15 @@ struct TakeInfo
 struct IScene
 {
 	virtual void destroy() = 0;
-	virtual IElement* getRootElement() const = 0;
-	virtual Object* getRoot() const = 0;
+	virtual const IElement* getRootElement() const = 0;
+	virtual const Object* getRoot() const = 0;
 	virtual const TakeInfo* getTakeInfo(const char* name) const = 0;
 	virtual int getMeshCount() const = 0;
 	virtual const Mesh* getMesh(int index) const = 0;
 	virtual int getAnimationStackCount() const = 0;
 	virtual const AnimationStack* getAnimationStack(int index) const = 0;
+	virtual const Object *const * getAllObjects() const = 0;
+	virtual int getAllObjectCount() const = 0;
 
 protected:
 	virtual ~IScene() {}

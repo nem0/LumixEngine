@@ -1080,6 +1080,18 @@ struct Scene : IScene
 	int getMeshCount() const override { return (int)m_meshes.size(); }
 
 
+	const Object *const * getAllObjects() const override
+	{
+		return m_all_objects.empty() ? nullptr : &m_all_objects[0];
+	}
+
+
+	int getAllObjectCount() const override
+	{
+		return (int)m_all_objects.size();
+	}
+
+
 	const AnimationStack* getAnimationStack(int index) const override
 	{
 		assert(index >= 0);
@@ -1106,8 +1118,8 @@ struct Scene : IScene
 	}
 
 
-	IElement* getRootElement() const override { return m_root_element; }
-	Object* getRoot() const override { return m_root; }
+	const IElement* getRootElement() const override { return m_root_element; }
+	const Object* getRoot() const override { return m_root; }
 
 
 	void destroy() override { delete this; }
@@ -1126,6 +1138,7 @@ struct Scene : IScene
 	Element* m_root_element = nullptr;
 	Root* m_root = nullptr;
 	std::unordered_map<u64, ObjectPair> m_object_map;
+	std::vector<Object*> m_all_objects;
 	std::vector<Mesh*> m_meshes;
 	std::vector<AnimationStack*> m_animation_stacks;
 	std::vector<Connection> m_connections;
@@ -1867,7 +1880,11 @@ static void parseObjects(const Element& root, Scene* scene)
 		}
 
 		scene->m_object_map[iter.first].object = obj;
-		if (obj) obj->id = iter.first;
+		if (obj)
+		{
+			scene->m_all_objects.push_back(obj);
+			obj->id = iter.first;
+		}
 	}
 
 	for (auto iter : scene->m_object_map)
