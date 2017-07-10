@@ -286,7 +286,7 @@ struct FBXImporter
 		{
 			const ofbx::Object* node = objects[i];
 			bool in_hierarchy = false;
-			const ofbx::NodeAttribute* node_attr = node->resolveObjectLink<ofbx::NodeAttribute>(0);
+			const ofbx::NodeAttribute* node_attr = (const ofbx::NodeAttribute*)node->node_attribute;
 			bool is_bone = node_attr && node_attr->getAttributeType() == "Skeleton";
 
 			if (is_bone) insertHierarchy(bones, node);

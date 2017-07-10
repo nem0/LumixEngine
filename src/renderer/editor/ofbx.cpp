@@ -329,6 +329,7 @@ Object::Object(const Scene& _scene, const IElement& _element)
 	: scene(_scene)
 	, element(_element)
 	, is_node(false)
+	, node_attribute(nullptr)
 {
 	auto& e = (Element&)_element;
 	if (e.first_property && e.first_property->next)
@@ -698,7 +699,7 @@ struct NodeAttributeImpl : NodeAttribute
 		: NodeAttribute(_scene, _element)
 	{
 	}
-	Type getType() const override { return Type::NOTE_ATTRIBUTE; }
+	Type getType() const override { return Type::NODE_ATTRIBUTE; }
 	DataView getAttributeType() const override { return attribute_type; }
 
 
@@ -1811,6 +1812,13 @@ static void parseObjects(const Element& root, Scene* scene)
 		Object* parent = scene->m_object_map[con.to].object;
 		Object* child = scene->m_object_map[con.from].object;
 		if (!child) continue;
+
+		if (child->getType() == Object::Type::NODE_ATTRIBUTE)
+		{
+			assert(!parent->node_attribute);
+			parent->node_attribute = (NodeAttribute*)child;
+		}
+
 		switch (parent->getType())
 		{
 			case Object::Type::MESH:

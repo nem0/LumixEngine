@@ -123,7 +123,7 @@ struct Object
 		TEXTURE,
 		LIMB_NODE,
 		NULL_NODE,
-		NOTE_ATTRIBUTE,
+		NODE_ATTRIBUTE,
 		CLUSTER,
 		SKIN,
 		ANIMATION_STACK,
@@ -167,6 +167,7 @@ struct Object
 	u64 id;
 	char name[128];
 	const IElement& element;
+	const Object* node_attribute;
 
 protected:
 	const Scene& scene;
@@ -231,7 +232,7 @@ struct Skin : Object
 
 struct NodeAttribute : Object
 {
-	static const Type s_type = Type::NOTE_ATTRIBUTE;
+	static const Type s_type = Type::NODE_ATTRIBUTE;
 
 	NodeAttribute(const Scene& _scene, const IElement& _element);
 
