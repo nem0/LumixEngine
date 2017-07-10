@@ -39,7 +39,6 @@
 #include "stb/stb_image_resize.h"
 #include <cstddef>
 #include <crnlib.h>
-#include <Windows.h>
 
 
 namespace Lumix
