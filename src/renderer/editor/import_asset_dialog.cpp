@@ -39,6 +39,7 @@
 #include "stb/stb_image_resize.h"
 #include <cstddef>
 #include <crnlib.h>
+#include <Windows.h>
 
 
 namespace Lumix
@@ -340,15 +341,17 @@ struct FBXImporter
 	}
 
 
-	static int findSubblobIndex(const OutputBlob& haystack, const OutputBlob& needle)
+	static int findSubblobIndex(const OutputBlob& haystack, const OutputBlob& needle, const Array<int>& subblobs, int first_subblob)
 	{
 		const u8* data = (const u8*)haystack.getData();
 		const u8* needle_data = (const u8*)needle.getData();
 		int step_size = needle.getPos();
 		int step_count = haystack.getPos() / step_size;
-		for (int i = 0; i < step_count; ++i)
+		int idx = first_subblob;
+		while(idx != -1)
 		{
-			if (compareMemory(data + i * step_size, needle_data, step_size) == 0) return i;
+			if (compareMemory(data + idx * step_size, needle_data, step_size) == 0) return idx;
+			idx = subblobs[idx];
 		}
 		return -1;
 	}
@@ -441,6 +444,11 @@ struct FBXImporter
 			int material_idx = getMaterialIndex(mesh, *import_mesh.fbx_mat);
 			assert(material_idx >= 0);
 
+			int first_subblob[256];
+			for (int& subblob : first_subblob) subblob = -1;
+			Array<int> subblobs(allocator);
+			subblobs.reserve(vertex_count);
+
 			int default_mat = 0;
 			const int* materials = geom->getMaterials();
 			for (int i = 0; i < vertex_count; ++i)
@@ -470,9 +478,13 @@ struct FBXImporter
 				if (tangents) writePackedVec3(tangents[i], transform_matrix, &blob);
 				if (is_skinned) writeSkin(skinning[i], &blob);
 
-				int idx = findSubblobIndex(import_mesh.vertex_data, blob);
+				u8 first_byte = ((const u8*)blob.getData())[0];
+
+				int idx = findSubblobIndex(import_mesh.vertex_data, blob, subblobs, first_subblob[first_byte]);
 				if (idx == -1)
 				{
+					subblobs.push(first_subblob[first_byte]);
+					first_subblob[first_byte] = subblobs.size() - 1;
 					import_mesh.indices.push(import_mesh.vertex_data.getPos() / vertex_size);
 					import_mesh.vertex_data.write(blob.getData(), vertex_size);
 				}
@@ -1257,7 +1269,9 @@ struct FBXImporter
 
 	void writeModel(const char* output_dir, const char* output_mesh_filename)
 	{
+		auto x = GetTickCount();
 		postprocessMeshes();
+		auto y = GetTickCount() - x;
 
 		auto cmpMeshes = [](const void* a, const void* b) -> int {
 			auto a_mesh = static_cast<const ImportMesh*>(a);
