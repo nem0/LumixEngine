@@ -403,10 +403,12 @@ struct FBXImporter
 	}
 
 
-	void postprocessMeshes() const
+	void postprocessMeshes()
 	{
-		for (ImportMesh& import_mesh : meshes)
+		for (int mesh_idx = 0; mesh_idx < meshes.size(); ++mesh_idx)
 		{
+			ImportMesh& import_mesh = meshes[mesh_idx];
+			dialog.setImportMessage("Processing meshes...", (mesh_idx / (float)meshes.size()) * 0.4f);
 			import_mesh.vertex_data.clear();
 			import_mesh.indices.clear();
 
@@ -560,8 +562,9 @@ struct FBXImporter
 	}
 
 
-	FBXImporter(StudioApp& _app)
+	FBXImporter(StudioApp& _app, ImportAssetDialog& _dialog)
 		: app(_app)
+		, dialog(_dialog)
 		, scenes(_app.getWorldEditor()->getAllocator())
 		, materials(_app.getWorldEditor()->getAllocator())
 		, meshes(_app.getWorldEditor()->getAllocator())
@@ -622,6 +625,8 @@ struct FBXImporter
 
 	void writeMaterials(const char* output_dir, const char* texture_output_dir)
 	{
+		dialog.setImportMessage("Writing materials...", 0.9f);
+
 		for (const ImportMaterial& material : materials)
 		{
 			if (!material.import) continue;
@@ -791,8 +796,10 @@ struct FBXImporter
 
 	void writeAnimations(const char* output_dir)
 	{
-		for (ImportAnimation& anim : animations)
+		for (int anim_idx = 0; anim_idx < animations.size(); ++anim_idx)
 		{
+			ImportAnimation& anim = animations[anim_idx];
+			dialog.setImportMessage("Writing animation...", 0.6f + 0.2f * (anim_idx / (float)animations.size()));
 			if (!anim.import) continue;
 
 			const ofbx::AnimationStack* stack = anim.fbx;
@@ -1272,6 +1279,7 @@ struct FBXImporter
 			return;
 		}
 
+		dialog.setImportMessage("Writing model...", 0.5f);
 		writeModelHeader();
 		writeMeshes();
 		writeGeometry();
@@ -1356,6 +1364,7 @@ struct FBXImporter
 
 
 	StudioApp& app;
+	ImportAssetDialog& dialog;
 	bool opened = false;
 	Array<ImportMaterial> materials;
 	Array<ImportMesh> meshes;
@@ -2002,7 +2011,7 @@ ImportAssetDialog::ImportAssetDialog(StudioApp& app)
 	, m_sources(app.getWorldEditor()->getAllocator())
 {
 	IAllocator& allocator = app.getWorldEditor()->getAllocator();
-	m_fbx_importer = LUMIX_NEW(allocator, FBXImporter)(app);
+	m_fbx_importer = LUMIX_NEW(allocator, FBXImporter)(app, *this);
 
 	s_default_comp_params.m_file_type = cCRNFileTypeDDS;
 	s_default_comp_params.m_quality_level = cCRNMaxQualityLevel;
@@ -2945,14 +2954,6 @@ void ImportAssetDialog::onWindowGUI()
 		return;
 	}
 
-	if (m_task)
-	{
-		ImGui::Text("Working...");
-		checkTask(false);
-		ImGui::EndDock();
-		return;
-	}
-
 	if (m_is_importing_texture)
 	{
 		if (ImGui::Button("Cancel"))
@@ -2962,6 +2963,18 @@ void ImportAssetDialog::onWindowGUI()
 
 		checkTask(false);
 
+		{
+			MT::SpinLock lock(m_mutex);
+			ImGui::Text("%s", m_import_message);
+			if (m_progress_fraction >= 0) ImGui::ProgressBar(m_progress_fraction);
+		}
+		ImGui::EndDock();
+		return;
+	}
+
+	if (m_task)
+	{
+		checkTask(false);
 		{
 			MT::SpinLock lock(m_mutex);
 			ImGui::Text("%s", m_import_message);
