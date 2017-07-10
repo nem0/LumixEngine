@@ -631,20 +631,7 @@ struct MeshImpl : Mesh
 	int getMaterialCount() const override { return (int)materials.size(); }
 
 
-	void postprocess()
-	{
-		const Material* material = nullptr;
-		for (int i = 0; material = resolveObjectLink<Material>(i); ++i)
-		{
-			materials.push_back(material);
-		}
-		geometry = resolveObjectLink<Geometry>(0);
-		
-		assert(!resolveObjectLink<Geometry>(1));
-	}
-
-
-	const Geometry* geometry;
+	const Geometry* geometry = nullptr;
 	const Scene& scene;
 	std::vector<const Material*> materials;
 
@@ -671,16 +658,6 @@ struct MaterialImpl : Material
 	const Texture* getTexture(Texture::TextureType type) const override
 	{
 		return textures[type];
-	}
-
-
-	void postprocess()
-	{
-		textures[Texture::DIFFUSE] = (const Texture*)resolveObjectLink(Object::Type::TEXTURE, "DiffuseColor", 0);
-		textures[Texture::NORMAL] = (const Texture*)resolveObjectLink(Object::Type::TEXTURE, "NormalMap", 0);
-
-		assert(!resolveObjectLink(Object::Type::TEXTURE, "DiffuseColor", 1));
-		assert(!resolveObjectLink(Object::Type::TEXTURE, "NormalMap", 1));
 	}
 
 	const Texture* textures[Texture::TextureType::COUNT];
@@ -772,13 +749,6 @@ struct GeometryImpl : Geometry
 	const int* getMaterials() const override { return materials.empty() ? nullptr : &materials[0]; }
 
 
-	void postprocess()
-	{
-		skin = resolveObjectLink<Skin>(0);
-		assert(resolveObjectLink<Skin>(1) == nullptr);
-	}
-
-
 	void triangulate(const std::vector<int>& old_indices, std::vector<int>* indices, std::vector<int>* to_old)
 	{
 		assert(indices);
@@ -836,13 +806,12 @@ struct ClusterImpl : Cluster
 	int getWeightsCount() const override { return (int)weights.size(); }
 	Matrix getTransformMatrix() const { return transform_matrix; }
 	Matrix getTransformLinkMatrix() const { return transform_link_matrix; }
-	Object* getLink() const override { return resolveObjectLink(Object::Type::LIMB_NODE, nullptr, 0); }
+	Object* getLink() const override { return link; }
 
 
 	void postprocess()
 	{
-		Object* skin = resolveObjectLinkReverse(Object::Type::SKIN);
-		if (!skin) return;
+		assert(skin);
 
 		GeometryImpl* geom = (GeometryImpl*)skin->resolveObjectLinkReverse(Object::Type::GEOMETRY);
 		if (!geom) return;
@@ -920,6 +889,8 @@ struct ClusterImpl : Cluster
 	}
 
 
+	Object* link = nullptr;
+	Skin* skin = nullptr;
 	std::vector<int> indices;
 	std::vector<double> weights;
 	Matrix transform_matrix;
@@ -1012,10 +983,12 @@ struct SkinImpl : Skin
 	{
 	}
 
-	int getClusterCount() const override { return resolveObjectLinkCount(Type::CLUSTER); }
-	Cluster* getCluster(int idx) const override { return resolveObjectLink<Cluster>(idx); }
+	int getClusterCount() const override { return (int)clusters.size(); }
+	const Cluster* getCluster(int idx) const override { return clusters[idx]; }
 
 	Type getType() const override { return Type::SKIN; }
+
+	std::vector<Cluster*> clusters;
 };
 
 
@@ -1189,55 +1162,10 @@ struct AnimationCurveNodeImpl : AnimationCurveNode
 
 	struct Curve
 	{
-		const AnimationCurve* curve;
-		const Scene::Connection* connection;
+		const AnimationCurve* curve = nullptr;
+		const Scene::Connection* connection = nullptr;
 	};
 
-
-	Curve getConnection(const Object& obj, int idx) const
-	{
-		u64 id = element.getFirstProperty() ? element.getFirstProperty()->getValue().toLong() : 0;
-		for (auto& connection : scene.m_connections)
-		{
-			if (connection.to == id && connection.from != 0)
-			{
-				Object* obj = scene.m_object_map.find(connection.from)->second.object;
-				if (obj)
-				{
-					if (idx == 0)
-					{
-						return {(const AnimationCurve*)obj, &connection};
-					}
-					--idx;
-				}
-			}
-		}
-		return {nullptr, nullptr};
-	}
-
-
-	void postprocess()
-	{
-		curves[0] = getConnection(*this, 0);
-		curves[1] = getConnection(*this, 1);
-		curves[2] = getConnection(*this, 2);
-		assert(getConnection(*this, 3).curve == nullptr);
-
-		/*int count = curves[0].curve->getKeyCount();
-		int count2 = curves[1].curve->getKeyCount();
-		int count3 = curves[2].curve->getKeyCount();
-		const u64* times = curves[0].curve->getKeyTime();
-		const float* values_x = curves[0].curve ? curves[0].curve->getKeyValue() : nullptr;
-		const float* values_y = curves[1].curve ? curves[1].curve->getKeyValue() : nullptr;
-		const float* values_z = curves[2].curve ? curves[2].curve->getKeyValue() : nullptr;
-		for (int i = 0; i < count; ++i)
-		{
-			key_times.push_back(fbxTimeToSeconds(times[i]));
-			key_values.push_back(values_x[i]);
-			if (values_y) key_values.push_back(values_y[i]);
-			if (values_z) key_values.push_back(values_z[i]);
-		}*/
-	}
 
 	Curve curves[3];
 	Type getType() const override { return Type::ANIMATION_CURVE_NODE; }
@@ -1887,21 +1815,111 @@ static void parseObjects(const Element& root, Scene* scene)
 		}
 	}
 
+	for (const Scene::Connection& con : scene->m_connections)
+	{
+		Object* parent = scene->m_object_map[con.to].object;
+		Object* child = scene->m_object_map[con.from].object;
+		if (!child) continue;
+		switch (parent->getType())
+		{
+			case Object::Type::MESH:
+			{
+				MeshImpl* mesh = (MeshImpl*)parent;
+				switch (child->getType())
+				{
+					case Object::Type::GEOMETRY:
+						assert(!mesh->geometry);
+						mesh->geometry = (Geometry*)child;
+						break;
+					case Object::Type::MATERIAL:
+						mesh->materials.push_back((Material*)child);
+						break;
+				}
+				break;
+			}
+			case Object::Type::SKIN:
+			{
+				SkinImpl* skin = (SkinImpl*)parent;
+				if (child->getType() == Object::Type::CLUSTER)
+				{
+					ClusterImpl* cluster = (ClusterImpl*)child;
+					skin->clusters.push_back(cluster);
+					assert(!cluster->skin);
+					cluster->skin = skin;
+				}
+				break;
+			}
+			case Object::Type::MATERIAL:
+			{
+				MaterialImpl* mat = (MaterialImpl*)parent;
+				if (child->getType() == Object::Type::TEXTURE)
+				{
+					Texture::TextureType type = Texture::COUNT;
+					if (con.property == "NormalMap") type = Texture::NORMAL;
+					else if (con.property == "DiffuseColor") type = Texture::DIFFUSE;
+					if (type == Texture::COUNT) break;
+
+					assert(!mat->textures[type]);
+					mat->textures[type] = (Texture*)child;
+				}
+				break;
+			}
+			case Object::Type::GEOMETRY:
+			{
+				GeometryImpl* geom = (GeometryImpl*)parent;
+				if (child->getType() == Object::Type::SKIN) geom->skin = (Skin*)child;
+				break;
+			}
+			case Object::Type::CLUSTER:
+			{
+				ClusterImpl* cluster = (ClusterImpl*)parent;
+				if (child->getType() == Object::Type::LIMB_NODE)
+				{
+					assert(!cluster->link);
+					cluster->link = child;
+				}
+				break;
+			}
+			case Object::Type::ANIMATION_CURVE_NODE:
+			{
+				AnimationCurveNodeImpl* node = (AnimationCurveNodeImpl*)parent;
+				if (child->getType() == Object::Type::ANIMATION_CURVE)
+				{
+					if (!node->curves[0].curve)
+					{
+						node->curves[0].connection = &con;
+						node->curves[0].curve = (AnimationCurve*)child;
+					}
+					else if (!node->curves[1].curve)
+					{
+						node->curves[1].connection = &con;
+						node->curves[1].curve = (AnimationCurve*)child;
+					}
+					else if (!node->curves[2].curve)
+					{
+						node->curves[2].connection = &con;
+						node->curves[2].curve = (AnimationCurve*)child;
+					}
+					else
+					{
+						assert(false);
+					}
+				}
+				break;
+			}
+		}
+	}
+
 	for (auto iter : scene->m_object_map)
 	{
 		Object* obj = iter.second.object;
 		if (!obj) continue;
 		switch (obj->getType())
 		{
-			case Object::Type::MATERIAL: ((MaterialImpl*)iter.second.object)->postprocess(); break;
-			case Object::Type::GEOMETRY: ((GeometryImpl*)iter.second.object)->postprocess(); break;
 			case Object::Type::CLUSTER: ((ClusterImpl*)iter.second.object)->postprocess(); break;
-			case Object::Type::MESH: ((MeshImpl*)iter.second.object)->postprocess(); break;
-			case Object::Type::ANIMATION_CURVE_NODE:
-				((AnimationCurveNodeImpl*)iter.second.object)->postprocess();
-				break;
 		}
 	}
+
 }
 
 
