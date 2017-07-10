@@ -138,12 +138,9 @@ struct Object
 	virtual Type getType() const = 0;
 	
 	const IScene& getScene() const;
-	int resolveObjectLinkCount() const;
-	int resolveObjectLinkCount(Type type) const;
 	Object* resolveObjectLink(int idx) const;
 	Object* resolveObjectLink(Type type, const char* property, int idx) const;
 	Object* resolveObjectLinkReverse(Type type) const;
-	IElement* resolveProperty(const char* name) const;
 	Object* getParent() const;
 
 	Vec3 getRotationOffset() const;
