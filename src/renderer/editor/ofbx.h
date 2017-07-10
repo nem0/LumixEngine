@@ -214,7 +214,7 @@ struct Cluster : Object
 	virtual int getWeightsCount() const = 0;
 	virtual Matrix getTransformMatrix() const = 0;
 	virtual Matrix getTransformLinkMatrix() const = 0;
-	virtual Object* getLink() const = 0;
+	virtual const Object* getLink() const = 0;
 };
 
 
@@ -225,7 +225,7 @@ struct Skin : Object
 	Skin(const Scene& _scene, const IElement& _element);
 
 	virtual int getClusterCount() const = 0;
-	virtual Cluster* getCluster(int idx) const = 0;
+	virtual const Cluster* getCluster(int idx) const = 0;
 };
 
 

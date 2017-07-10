@@ -39,6 +39,7 @@
 #include "stb/stb_image_resize.h"
 #include <cstddef>
 #include <crnlib.h>
+#include <Windows.h>
 
 
 namespace Lumix
@@ -216,7 +217,7 @@ struct FBXImporter
 
 		for (int i = 0, c = skin->getClusterCount(); i < c; ++i)
 		{
-			ofbx::Cluster* cluster = skin->getCluster(i);
+			const ofbx::Cluster* cluster = skin->getCluster(i);
 			if (cluster->getLink() == node)
 			{
 				return cluster->getTransformLinkMatrix();
@@ -943,7 +944,7 @@ struct FBXImporter
 		auto* skin = mesh->getGeometry()->getSkin();
 		for (int i = 0, c = skin->getClusterCount(); i < c; ++i)
 		{
-			ofbx::Cluster* cluster = skin->getCluster(i);
+			const ofbx::Cluster* cluster = skin->getCluster(i);
 			if (cluster->getIndicesCount() == 0) continue;
 			int joint = bones.indexOf(cluster->getLink());
 			ASSERT(joint >= 0);
@@ -1278,7 +1279,9 @@ struct FBXImporter
 
 		bool import_any_mesh = false;
 		for (const ImportMesh& m : meshes)
+		{
 			if (m.import) import_any_mesh = true;
+		}
 		if (!import_any_mesh) return;
 
 		qsort(&meshes[0], meshes.size(), sizeof(meshes[0]), cmpMeshes);
