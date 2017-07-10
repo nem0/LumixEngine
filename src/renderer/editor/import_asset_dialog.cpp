@@ -39,7 +39,6 @@
 #include "stb/stb_image_resize.h"
 #include <cstddef>
 #include <crnlib.h>
-#include <Windows.h>
 
 
 namespace Lumix
@@ -1269,9 +1268,7 @@ struct FBXImporter
 
 	void writeModel(const char* output_dir, const char* output_mesh_filename)
 	{
-		auto x = GetTickCount();
 		postprocessMeshes();
-		auto y = GetTickCount() - x;
 
 		auto cmpMeshes = [](const void* a, const void* b) -> int {
 			auto a_mesh = static_cast<const ImportMesh*>(a);
