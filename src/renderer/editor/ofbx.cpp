@@ -10,7 +10,7 @@
 namespace ofbx
 {
 
-
+	
 struct Error
 {
 	Error() {}
@@ -721,6 +721,14 @@ struct GeometryImpl : Geometry
 		BY_VERTEX
 	};
 
+	struct NewVertex
+	{
+		~NewVertex() { delete next; }
+		
+		int index = -1;
+		NewVertex* next = nullptr;
+	};
+
 	std::vector<Vec3> vertices;
 	std::vector<Vec3> normals;
 	std::vector<Vec2> uvs;
@@ -731,6 +739,7 @@ struct GeometryImpl : Geometry
 	const Skin* skin = nullptr;
 
 	std::vector<int> to_old_vertices;
+	std::vector<NewVertex> to_new_vertices;
 
 	GeometryImpl(const Scene& _scene, const IElement& _element)
 		: Geometry(_scene, _element)
@@ -832,56 +841,18 @@ struct ClusterImpl : Cluster
 
 		assert(old_indices.size() == old_weights.size());
 
-		struct NewNode
-		{
-			int value = -1;
-			NewNode* next = nullptr;
-		};
-
-		struct Pool
-		{
-			NewNode* pool = nullptr;
-			int pool_index = 0;
-
-			Pool(size_t count) { pool = new NewNode[count]; }
-			~Pool() { delete[] pool; }
-
-			void add(NewNode& node, int i)
-			{
-				if (node.value == -1)
-				{
-					node.value = i;
-				}
-				else if (node.next)
-				{
-					add(*node.next, i);
-				}
-				else
-				{
-					node.next = &pool[pool_index];
-					++pool_index;
-					node.next->value = i;
-				}
-			}
-		} pool(geom->to_old_vertices.size());
-
-		std::vector<NewNode> to_new;
-
-		to_new.resize(geom->to_old_vertices.size());
-		for (int i = 0, c = (int)geom->to_old_vertices.size(); i < c; ++i)
-		{
-			int old = geom->to_old_vertices[i];
-			pool.add(to_new[old], i);
-		}
-
+		indices.reserve(old_indices.size());
+		weights.reserve(old_indices.size());
+		int* ir = old_indices.empty() ? nullptr : &old_indices[0];
+		double* wr = old_weights.empty() ? nullptr : &old_weights[0];
 		for (int i = 0, c = (int)old_indices.size(); i < c; ++i)
 		{
-			int old_idx = old_indices[i];
-			double w = old_weights[i];
-			NewNode* n = &to_new[old_idx];
+			int old_idx = ir[i];
+			double w = wr[i];
+			GeometryImpl::NewVertex* n = &geom->to_new_vertices[old_idx];
 			while (n)
 			{
-				indices.push_back(n->value);
+				indices.push_back(n->index);
 				weights.push_back(w);
 				n = n->next;
 			}
@@ -1464,7 +1435,7 @@ static void splat(std::vector<T>* out,
 }
 
 
-template <typename T> static void remap(std::vector<T>* out, std::vector<int> map)
+template <typename T> static void remap(std::vector<T>* out, const std::vector<int>& map)
 {
 	if (out->empty()) return;
 
@@ -1513,6 +1484,24 @@ static int getTriCountFromPoly(const std::vector<int>& indices, int* idx)
 }
 
 
+static void add(GeometryImpl::NewVertex& vtx, int index)
+{
+	if (vtx.index == -1)
+	{
+		vtx.index = index;
+	}
+	else if (vtx.next)
+	{
+		add(*vtx.next, index);
+	}
+	else
+	{
+		vtx.next = new GeometryImpl::NewVertex;
+		vtx.next->index = index;
+	}
+}
+
+
 static Geometry* parseGeometry(const Scene& scene, const Element& element)
 {
 	assert(element.first_property);
@@ -1539,6 +1528,13 @@ static Geometry* parseGeometry(const Scene& scene, const Element& element)
 		geom->vertices[i] = vertices[geom->to_old_vertices[i]];
 	}
 
+	geom->to_new_vertices.resize(geom->to_old_vertices.size());
+	const int* to_old_vertices = geom->to_old_vertices.empty() ? nullptr : &geom->to_old_vertices[0];
+	for (int i = 0, c = (int)geom->to_old_vertices.size(); i < c; ++i)
+	{
+		int old = to_old_vertices[i];
+		add(geom->to_new_vertices[old], i);
+	}
 
 	const Element* layer_material_element = findChild(element, "LayerElementMaterial");
 	if (layer_material_element)
@@ -1575,12 +1571,7 @@ static Geometry* parseGeometry(const Scene& scene, const Element& element)
 		{
 			assert(mapping_element->first_property->value == "AllSame");
 		}
-		/*
-		parseVertexData(*layer_material_element, "UV", "Materials", &tmp, &tmp_indices, &mapping);
-		geom->uvs.resize(tmp_indices.empty() ? tmp.size() : tmp_indices.size());
-		splat(&geom->uvs, mapping, tmp, tmp_indices, geom->to_old_vertices);
-		remap(&geom->uvs, to_old_indices);*/
-}
+	}
 
 	const Element* layer_uv_element = findChild(element, "LayerElementUV");
 	if (layer_uv_element)
