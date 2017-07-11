@@ -918,17 +918,6 @@ struct AnimationStackImpl : AnimationStack
 };
 
 
-struct AnimationLayerImpl : AnimationLayer
-{
-	AnimationLayerImpl(const Scene& _scene, const IElement& _element)
-		: AnimationLayer(_scene, _element)
-	{
-	}
-
-	Type getType() const override { return Type::ANIMATION_LAYER; }
-};
-
-
 struct AnimationCurveImpl : AnimationCurve
 {
 	AnimationCurveImpl(const Scene& _scene, const IElement& _element)
@@ -1134,6 +1123,8 @@ struct AnimationCurveNodeImpl : AnimationCurveNode
 
 
 	Curve curves[3];
+	Object* bone = nullptr;
+	DataView bone_link_property;
 	Type getType() const override { return Type::ANIMATION_CURVE_NODE; }
 	enum Mode
 	{
@@ -1141,6 +1132,32 @@ struct AnimationCurveNodeImpl : AnimationCurveNode
 		ROTATION,
 		SCALE
 	} mode = TRANSLATION;
+};
+
+
+struct AnimationLayerImpl : AnimationLayer
+{
+	AnimationLayerImpl(const Scene& _scene, const IElement& _element)
+		: AnimationLayer(_scene, _element)
+	{
+	}
+
+
+	Type getType() const override { return Type::ANIMATION_LAYER; }
+
+
+
+	const AnimationCurveNode* AnimationLayerImpl::getCurveNode(const Object& bone, const char* prop) const override
+	{
+		for (const AnimationCurveNodeImpl* node : curve_nodes)
+		{
+			if (node->bone_link_property == prop && node->bone == &bone) return node;
+		}
+		return nullptr;
+	}
+
+
+	std::vector<AnimationCurveNodeImpl*> curve_nodes;
 };
 
 
@@ -1893,14 +1910,24 @@ static bool parseObjects(const Element& root, Scene* scene)
 		Object* child = scene->m_object_map[con.from].object;
 		if (!child) continue;
 
-		if (child->getType() == Object::Type::NODE_ATTRIBUTE)
+		switch (child->getType())
 		{
-			if (parent->node_attribute)
-			{
-				Error::s_message = "Invalid node attribute";
-				return false;
-			}
-			parent->node_attribute = (NodeAttribute*)child;
+			case Object::Type::NODE_ATTRIBUTE:
+				if (parent->node_attribute)
+				{
+					Error::s_message = "Invalid node attribute";
+					return false;
+				}
+				parent->node_attribute = (NodeAttribute*)child;
+				break;
+			case Object::Type::ANIMATION_CURVE_NODE:
+				if (parent->isNode())
+				{
+					AnimationCurveNodeImpl* node = (AnimationCurveNodeImpl*)child;
+					node->bone = parent;
+					node->bone_link_property = con.property;
+				}
+				break;
 		}
 
 		switch (parent->getType())
@@ -1981,6 +2008,14 @@ static bool parseObjects(const Element& root, Scene* scene)
 				}
 				break;
 			}
+			case Object::Type::ANIMATION_LAYER:
+			{
+				if (child->getType() == Object::Type::ANIMATION_CURVE_NODE)
+				{
+					((AnimationLayerImpl*)parent)->curve_nodes.push_back((AnimationCurveNodeImpl*)child);
+				}
+			}
+			break;
 			case Object::Type::ANIMATION_CURVE_NODE:
 			{
 				AnimationCurveNodeImpl* node = (AnimationCurveNodeImpl*)parent;
@@ -2057,20 +2092,6 @@ Vec3 Object::getScalingOffset() const
 Vec3 Object::getScalingPivot() const
 {
 	return resolveVec3Property(*this, "ScalingPivot", {0, 0, 0});
-}
-
-
-const AnimationCurveNode* Object::getCurveNode(const char* prop, const AnimationLayer& layer) const
-{
-	const AnimationCurveNode* curve_node = nullptr;
-	for (int i = 0;
-		 curve_node = (const AnimationCurveNode*)resolveObjectLink(Object::Type::ANIMATION_CURVE_NODE, prop, i);
-		 ++i)
-	{
-		Object* curve_node_layer = curve_node->resolveObjectLinkReverse(Object::Type::ANIMATION_LAYER);
-		if (curve_node_layer == &layer) return curve_node;
-	}
-	return nullptr;
 }
 
 

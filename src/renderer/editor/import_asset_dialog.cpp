@@ -866,9 +866,8 @@ struct FBXImporter
 				if (&bone->getScene() != &scene) continue;
 
 				const ofbx::AnimationLayer* layer = stack->getLayer(0);
-				layer = layer;
-				const ofbx::AnimationCurveNode* translation_curve_node = bone->getCurveNode("Lcl Translation", *layer);
-				const ofbx::AnimationCurveNode* rotation_curve_node = bone->getCurveNode("Lcl Rotation", *layer);
+				const ofbx::AnimationCurveNode* translation_curve_node = layer->getCurveNode(*bone, "Lcl Translation");
+				const ofbx::AnimationCurveNode* rotation_curve_node = layer->getCurveNode(*bone, "Lcl Rotation");
 				if (translation_curve_node || rotation_curve_node) ++used_bone_count;
 			}
 
@@ -881,8 +880,8 @@ struct FBXImporter
 				if (&bone->getScene() != &scene) continue;
 
 				const ofbx::AnimationLayer* layer = stack->getLayer(0);
-				const ofbx::AnimationCurveNode* translation_node = bone->getCurveNode("Lcl Translation", *layer);
-				const ofbx::AnimationCurveNode* rotation_node = bone->getCurveNode("Lcl Rotation", *layer);
+				const ofbx::AnimationCurveNode* translation_node = layer->getCurveNode(*bone, "Lcl Translation");
+				const ofbx::AnimationCurveNode* rotation_node = layer->getCurveNode(*bone, "Lcl Rotation");
 				if (!translation_node && !rotation_node) continue;
 
 				u32 name_hash = crc32(bone->name);
