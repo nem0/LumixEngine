@@ -473,6 +473,23 @@ static OptionalError<Property*> readProperty(Cursor* cursor)
 }
 
 
+static void deleteElement(Element* el)
+{
+	if (!el) return;
+
+	delete el->first_property;
+	deleteElement(el->child);
+	Element* iter = el;
+	// do not use recursion to avoid stack overflow
+	do
+	{
+		Element* next = iter->sibling;
+		delete iter;
+		iter = next;
+	} while (iter);
+}
+
+
 static OptionalError<Element*> readElement(Cursor* cursor)
 {
 	OptionalError<u32> end_offset = read<u32>(cursor);
@@ -488,7 +505,7 @@ static OptionalError<Element*> readElement(Cursor* cursor)
 	OptionalError<DataView> id = readShortString(cursor);
 	if (id.isError()) return Error();
 
-	std::unique_ptr<Element> element = std::make_unique<Element>();
+	Element* element = new Element();
 	element->first_property = nullptr;
 	element->id = id.getValue();
 
@@ -499,13 +516,17 @@ static OptionalError<Element*> readElement(Cursor* cursor)
 	for (u32 i = 0; i < prop_count.getValue(); ++i)
 	{
 		OptionalError<Property*> prop = readProperty(cursor);
-		if (prop.isError()) return Error();
+		if (prop.isError())
+		{
+			deleteElement(element);
+			return Error();
+		}
 
 		*prop_link = prop.getValue();
 		prop_link = &(*prop_link)->next;
 	}
 
-	if (cursor->current - cursor->begin >= end_offset.getValue()) return element.release();
+	if (cursor->current - cursor->begin >= end_offset.getValue()) return element;
 
 	constexpr int BLOCK_SENTINEL_LENGTH = 13;
 
@@ -513,16 +534,24 @@ static OptionalError<Element*> readElement(Cursor* cursor)
 	while (cursor->current - cursor->begin < (end_offset.getValue() - BLOCK_SENTINEL_LENGTH))
 	{
 		OptionalError<Element*> child = readElement(cursor);
-		if (child.isError()) return Error();
+		if (child.isError())
+		{
+			deleteElement(element);
+			return Error();
+		}
 
 		*link = child.getValue();
 		link = &(*link)->sibling;
 	}
 
-	if (cursor->current + BLOCK_SENTINEL_LENGTH > cursor->end) return Error("Reading past the end");
+	if (cursor->current + BLOCK_SENTINEL_LENGTH > cursor->end)
+	{
+		deleteElement(element); 
+		return Error("Reading past the end");
+	}
 
 	cursor->current += BLOCK_SENTINEL_LENGTH;
-	return element.release();
+	return element;
 }
 
 
@@ -536,7 +565,7 @@ static OptionalError<Element*> tokenize(const u8* data, size_t size)
 	const Header* header = (const Header*)cursor.current;
 	cursor.current += sizeof(*header);
 
-	std::unique_ptr<Element> root = std::make_unique<Element>();
+	Element* root = new Element();
 	root->first_property = nullptr;
 	root->id.begin = nullptr;
 	root->id.end = nullptr;
@@ -547,12 +576,16 @@ static OptionalError<Element*> tokenize(const u8* data, size_t size)
 	for (;;)
 	{
 		OptionalError<Element*> child = readElement(&cursor);
-		if (child.isError()) return Error();
+		if (child.isError())
+		{
+			deleteElement(root);
+			return Error();
+		}
 		*element = child.getValue();
-		if (!*element) return root.release();
+		if (!*element) return root;
 		element = &(*element)->sibling;
 	}
-	return root.release();
+	return root;
 }
 
 
@@ -1048,23 +1081,6 @@ struct Scene : IScene
 
 
 	void destroy() override { delete this; }
-
-
-	static void deleteElement(Element* el)
-	{
-		if (!el) return;
-		
-		delete el->first_property;
-		deleteElement(el->child);
-		Element* iter = el;
-		// do not use recursion to avoid stack overflow
-		do
-		{
-			Element* next = iter->sibling;
-			delete iter;
-			iter = next;
-		} while (iter);
-	}
 
 
 	~Scene()
