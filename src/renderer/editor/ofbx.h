@@ -154,7 +154,8 @@ struct Object
 	Vec3 getLocalScaling() const;
 	Matrix getGlobalTransform() const;
 	Matrix evalLocal(const Vec3& translation, const Vec3& rotation) const;
-	const AnimationCurveNode* getCurveNode(const char* prop, const AnimationLayer& layer) const;
+	bool isNode() const { return is_node; }
+
 
 	template <typename T> T* resolveObjectLink(int idx) const
 	{
@@ -167,8 +168,8 @@ struct Object
 	const Object* node_attribute;
 
 protected:
-	const Scene& scene;
 	bool is_node;
+	const Scene& scene;
 };
 
 
@@ -282,6 +283,8 @@ struct AnimationLayer : Object
 	static const Type s_type = Type::ANIMATION_LAYER;
 
 	AnimationLayer(const Scene& _scene, const IElement& _element);
+
+	virtual const AnimationCurveNode* getCurveNode(const Object& bone, const char* property) const = 0;
 };
 
 
