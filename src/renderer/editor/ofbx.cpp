@@ -278,13 +278,6 @@ struct Property : IElementProperty
 
 struct Element : IElement
 {
-	~Element()
-	{
-		delete child;
-		delete sibling;
-		delete first_property;
-	}
-
 	IElement* getFirstChild() const override { return child; }
 	IElement* getSibling() const override { return sibling; }
 	DataView getID() const override { return id; }
@@ -1057,13 +1050,31 @@ struct Scene : IScene
 	void destroy() override { delete this; }
 
 
+	static void deleteElement(Element* el)
+	{
+		if (!el) return;
+		
+		delete el->first_property;
+		deleteElement(el->child);
+		Element* iter = el;
+		// do not use recursion to avoid stack overflow
+		do
+		{
+			Element* next = iter->sibling;
+			delete iter;
+			iter = next;
+		} while (iter);
+	}
+
+
 	~Scene()
 	{
 		for (auto iter : m_object_map)
 		{
 			delete iter.second.object;
 		}
-		delete m_root_element;
+		
+		deleteElement(m_root_element);
 	}
 
 
