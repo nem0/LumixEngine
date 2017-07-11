@@ -1147,7 +1147,7 @@ struct AnimationLayerImpl : AnimationLayer
 
 
 
-	const AnimationCurveNode* AnimationLayerImpl::getCurveNode(const Object& bone, const char* prop) const override
+	const AnimationCurveNode* getCurveNode(const Object& bone, const char* prop) const override
 	{
 		for (const AnimationCurveNodeImpl* node : curve_nodes)
 		{
