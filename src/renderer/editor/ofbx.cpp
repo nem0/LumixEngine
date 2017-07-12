@@ -490,14 +490,29 @@ static void deleteElement(Element* el)
 }
 
 
-static OptionalError<Element*> readElement(Cursor* cursor)
+static OptionalError<u64> readElementOffset(Cursor* cursor, u16 version)
 {
-	OptionalError<u32> end_offset = read<u32>(cursor);
+	if (version >= 7500)
+	{
+		OptionalError<u64> tmp = read<u64>(cursor);
+		if (tmp.isError()) return Error();
+		return tmp.getValue();
+	}
+
+	OptionalError<u32> tmp = read<u32>(cursor);
+	if (tmp.isError()) return Error();
+	return tmp.getValue();
+}
+
+
+static OptionalError<Element*> readElement(Cursor* cursor, u32 version)
+{
+	OptionalError<u64> end_offset = readElementOffset(cursor, version);
 	if (end_offset.isError()) return Error();
 	if (end_offset.getValue() == 0) return nullptr;
 
-	OptionalError<u32> prop_count = read<u32>(cursor);
-	OptionalError<u32> prop_length = read<u32>(cursor);
+	OptionalError<u64> prop_count = readElementOffset(cursor, version);
+	OptionalError<u64> prop_length = readElementOffset(cursor, version);
 	if (prop_count.isError() || prop_length.isError()) return Error();
 
 	const char* sbeg = 0;
@@ -526,14 +541,14 @@ static OptionalError<Element*> readElement(Cursor* cursor)
 		prop_link = &(*prop_link)->next;
 	}
 
-	if (cursor->current - cursor->begin >= end_offset.getValue()) return element;
+	if (cursor->current - cursor->begin >= (ptrdiff_t)end_offset.getValue()) return element;
 
-	constexpr int BLOCK_SENTINEL_LENGTH = 13;
+	int BLOCK_SENTINEL_LENGTH = version >= 7500 ? 25 : 13;
 
 	Element** link = &element->child;
-	while (cursor->current - cursor->begin < (end_offset.getValue() - BLOCK_SENTINEL_LENGTH))
+	while (cursor->current - cursor->begin < ((ptrdiff_t)end_offset.getValue() - BLOCK_SENTINEL_LENGTH))
 	{
-		OptionalError<Element*> child = readElement(cursor);
+		OptionalError<Element*> child = readElement(cursor, version);
 		if (child.isError())
 		{
 			deleteElement(element);
@@ -575,7 +590,7 @@ static OptionalError<Element*> tokenize(const u8* data, size_t size)
 	Element** element = &root->child;
 	for (;;)
 	{
-		OptionalError<Element*> child = readElement(&cursor);
+		OptionalError<Element*> child = readElement(&cursor, header->version);
 		if (child.isError())
 		{
 			deleteElement(root);
