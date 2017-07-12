@@ -1498,6 +1498,16 @@ public:
 	}
 
 
+	IPlugin* getPlugin(const char* name) override
+	{
+		for (auto* i : m_plugins)
+		{
+			if (equalStrings(i->getName(), name)) return i;
+		}
+		return nullptr;
+	}
+
+
 	void addPlugin(IPlugin& plugin) override
 	{
 		m_plugins.push(&plugin);

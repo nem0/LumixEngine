@@ -1,8 +1,9 @@
 #pragma once
 
 
-#include "editor/world_editor.h"
+#include "editor/studio_app.h"
 #include "editor/utils.h"
+#include "editor/world_editor.h"
 #include <bgfx/bgfx.h>
 
 
@@ -16,18 +17,24 @@ class Pipeline;
 class RenderScene;
 
 
-class SceneView
+class SceneView : public StudioApp::IPlugin
 {
+	public:
+		typedef Delegate<bool(StudioApp&, float, float, const RayCastModelHit&)> DropHandler;
+
 	public:
 		SceneView(StudioApp& app);
 		~SceneView();
 
-		void update();
+		void update(float time_delta) override;
 		void setScene(RenderScene* scene);
 		void shutdown();
-		void onGUI();
+		void onWindowGUI() override;
 		Pipeline* getPipeline() { return m_pipeline; }
 		const bgfx::TextureHandle& getTextureHandle() const { return m_texture_handle; }
+		void addDropHandler(DropHandler handler);
+		void removeDropHandler(DropHandler handler);
+		const char* getName() const override { return "scene_view"; }
 
 	private:
 		void renderGizmos();
@@ -39,6 +46,7 @@ class SceneView
 		void handleDrop(float x, float y);
 		void onToolbar();
 		void resetCameraSpeed();
+		void onResourceChanged(const Path& path, const char* /*ext*/);
 
 	private:
 		StudioApp& m_app;
@@ -66,6 +74,8 @@ class SceneView
 		bool m_show_stats;
 		bool m_is_opengl;
 		LogUI* m_log_ui;
+		Array<DropHandler> m_drop_handlers;
+		struct RenderInterfaceImpl* m_render_interface;
 };
 
 
