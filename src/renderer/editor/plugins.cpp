@@ -1610,10 +1610,10 @@ struct GameViewPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	static GameViewPlugin* s_instance;
 
 
-	explicit GameViewPlugin(StudioApp& app, SceneView& scene_view_plugin)
+	explicit GameViewPlugin(StudioApp& app, SceneView& scene_view)
 		: m_app(app)
 		, m_game_view(app)
-		, m_scene_view(m_scene_view)
+		, m_scene_view(scene_view)
 		, m_width(-1)
 		, m_height(-1)
 	{
