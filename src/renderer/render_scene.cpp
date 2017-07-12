@@ -4006,6 +4006,8 @@ public:
 		PROFILE_FUNCTION();
 		RayCastModelHit hit;
 		hit.m_is_hit = false;
+		hit.m_origin = origin;
+		hit.m_dir = dir;
 		float cur_dist = FLT_MAX;
 		Universe& universe = getUniverse();
 		for (int i = 0; i < m_model_instances.size(); ++i)
