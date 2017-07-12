@@ -94,6 +94,7 @@ public:
 	virtual WorldEditor* getWorldEditor() = 0;
 	virtual void addPlugin(IPlugin& plugin) = 0;
 	virtual void removePlugin(IPlugin& plugin) = 0;
+	virtual IPlugin* getPlugin(const char* name) = 0;
 	virtual const char* getComponentTypeName(ComponentType cmp_type) const = 0;
 	virtual void registerComponent(const char* id, const char* label) = 0;
 	virtual void registerComponent(const char* id, IAddComponentPlugin& plugin) = 0;
