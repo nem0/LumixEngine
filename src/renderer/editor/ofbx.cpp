@@ -1936,6 +1936,7 @@ static bool parseObjects(const Element& root, Scene* scene)
 		Object* parent = scene->m_object_map[con.to].object;
 		Object* child = scene->m_object_map[con.from].object;
 		if (!child) continue;
+		if (!parent) continue;
 
 		switch (child->getType())
 		{
