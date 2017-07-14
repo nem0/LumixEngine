@@ -130,6 +130,7 @@ struct FBXImporter
 		const ofbx::IScene* scene = nullptr;
 		StaticString<MAX_PATH_LENGTH> output_filename;
 		bool import = true;
+		int root_motion_bone_idx = -1;
 	};
 
 	struct ImportTexture
@@ -856,8 +857,7 @@ struct FBXImporter
 			header.fps = (u32)(scene_frame_rate + 0.5f);
 			write(header);
 
-			int root_motion_bone_idx = -1;
-			write(root_motion_bone_idx);
+			write(anim.root_motion_bone_idx);
 			write(int(duration / sampling_period));
 			int used_bone_count = 0;
 
@@ -878,6 +878,7 @@ struct FBXImporter
 			for (const ofbx::Object* bone : bones)
 			{
 				if (&bone->getScene() != &scene) continue;
+				const ofbx::Object* root_bone = anim.root_motion_bone_idx >= 0 ? bones[anim.root_motion_bone_idx] : nullptr;
 
 				const ofbx::AnimationLayer* layer = stack->getLayer(0);
 				const ofbx::AnimationCurveNode* translation_node = layer->getCurveNode(*bone, "Lcl Translation");
@@ -895,16 +896,31 @@ struct FBXImporter
 				for (TranslationKey& key : positions) write(key.frame);
 				for (TranslationKey& key : positions)
 				{
-					// TODO check this in isValid function
-					// assert(scale > 0.99f && scale < 1.01f);
-					write(fixOrientation(key.pos * mesh_scale));
+					if (bone == root_bone)
+					{
+						write(fixRootOrientation(key.pos * mesh_scale));
+					}
+					else
+					{
+						write(fixOrientation(key.pos * mesh_scale));
+					}
 				}
 
 				compressRotations(rotations, frames, sampling_period, rotation_node, *bone, 0.0001f);
 
 				write(rotations.size());
 				for (RotationKey& key : rotations) write(key.frame);
-				for (RotationKey& key : rotations) write(fixOrientation(key.rot));
+				for (RotationKey& key : rotations)
+				{
+					if (bone == root_bone)
+					{
+						write(fixRootOrientation(key.rot));
+					}
+					else
+					{
+						write(fixOrientation(key.rot));
+					}
+				}
 			}
 			out_file.close();
 		}
@@ -985,9 +1001,37 @@ struct FBXImporter
 	}
 
 
+	Vec3 fixRootOrientation(const Vec3& v) const
+	{
+		switch (root_orientation)
+		{
+			case FBXImporter::Orientation::Y_UP: return Vec3(v.x, v.y, v.z);
+			case FBXImporter::Orientation::Z_UP: return Vec3(v.x, v.z, -v.y);
+			case FBXImporter::Orientation::Z_MINUS_UP: return Vec3(v.x, -v.z, v.y);
+			case FBXImporter::Orientation::X_MINUS_UP: return Vec3(v.y, -v.x, v.z);
+		}
+		ASSERT(false);
+		return Vec3(v.x, v.y, v.z);
+	}
+
+
+	Quat fixRootOrientation(const Quat& v) const
+	{
+		switch (root_orientation)
+		{
+			case FBXImporter::Orientation::Y_UP: return Quat(v.x, v.y, v.z, v.w);
+			case FBXImporter::Orientation::Z_UP: return Quat(v.x, v.z, -v.y, v.w);
+			case FBXImporter::Orientation::Z_MINUS_UP: return Quat(v.x, -v.z, v.y, v.w);
+			case FBXImporter::Orientation::X_MINUS_UP: return Quat(v.y, -v.x, v.z, v.w);
+		}
+		ASSERT(false);
+		return Quat(v.x, v.y, v.z, v.w);
+	}
+
+
 	Vec3 fixOrientation(const Vec3& v) const
 	{
-		switch (orientation)
+		switch (root_orientation)
 		{
 			case Orientation::Y_UP: return Vec3(v.x, v.y, v.z);
 			case Orientation::Z_UP: return Vec3(v.x, v.z, -v.y);
@@ -1315,55 +1359,7 @@ struct FBXImporter
 	void toggleOpened() { opened = !opened; }
 	bool isOpened() const { return opened; }
 
-
-	void onAnimationsGUI()
-	{
-		StaticString<30> label("Animations (");
-		label << animations.size() << ")###Animations";
-		if (!ImGui::CollapsingHeader(label)) return;
-
-		/*ImGui::DragFloat("Time scale", &m_model.time_scale, 1.0f, 0, FLT_MAX, "%.5f");
-		ImGui::DragFloat("Max position error", &m_model.position_error, 0, FLT_MAX);
-		ImGui::DragFloat("Max rotation error", &m_model.rotation_error, 0, FLT_MAX);
-		*/
-		ImGui::Indent();
-		ImGui::Columns(3);
-
-		ImGui::Text("Name");
-		ImGui::NextColumn();
-		ImGui::Text("Import");
-		ImGui::NextColumn();
-		ImGui::Text("Root motion bone");
-		ImGui::NextColumn();
-		ImGui::Separator();
-
-		ImGui::PushID("anims");
-		for (int i = 0; i < animations.size(); ++i)
-		{
-			ImportAnimation& animation = animations[i];
-			ImGui::PushID(i);
-			ImGui::InputText(
-				"##anim_filename", animation.output_filename.data, lengthOf(animation.output_filename.data));
-			ImGui::NextColumn();
-			ImGui::Checkbox("##anim_import", &animation.import);
-			ImGui::NextColumn();
-			/*auto getter = [](void* data, int idx, const char** out) -> bool {
-			auto* animation = (ImportAnimation*)data;
-			*out = animation->animation->mChannels[idx]->mNodeName.C_Str();
-			return true;
-			};
-			ImGui::Combo("##rb", &animation.root_motion_bone_idx, getter, &animation,
-			animation.animation->mNumChannels);*/
-			ImGui::NextColumn();
-			ImGui::PopID();
-		}
-
-		ImGui::PopID();
-		ImGui::Columns();
-		ImGui::Unindent();
-	}
-
-
+	
 	static const char* getImportMeshName(const ImportMesh& mesh)
 	{
 		const char* name = mesh.fbx->name;
@@ -1392,6 +1388,7 @@ struct FBXImporter
 	bool ignore_skeleton = false;
 	bool ignore_vertex_colors = true;
 	Orientation orientation = Orientation::Y_UP;
+	Orientation root_orientation = Orientation::Y_UP;
 };
 
 
@@ -1553,17 +1550,16 @@ int setAnimationParams(lua_State* L)
 
 	if (lua_getfield(L, 2, "root_bone") == LUA_TSTRING)
 	{
-		/*
 		const char* name = lua_tostring(L, -1);
-		for (unsigned int i = 0; i < anim.animation->mNumChannels; ++i)
+		auto* layer = anim.fbx->getLayer(0);
+		for (int i = 0; i < dlg->m_fbx_importer->bones.size(); ++i)
 		{
-			if (equalStrings(anim.animation->mChannels[i]->mNodeName.C_Str(), name))
+			if (equalStrings(dlg->m_fbx_importer->bones[i]->name, name))
 			{
 				anim.root_motion_bone_idx = i;
 				break;
 			}
-		}*/
-		// TODO
+		}
 	}
 	lua_pop(L, 1); // "root_bone"
 
@@ -1612,19 +1608,19 @@ int setParams(lua_State* L)
 	if (lua_getfield(L, 1, "orientation") == LUA_TSTRING)
 	{
 		const char* tmp = LuaWrapper::toType<const char*>(L, -1);
-		if (equalStrings(tmp, "+y")) dlg->m_model.orientation = ImportAssetDialog::Orientation::Y_UP;
-		else if (equalStrings(tmp, "+z")) dlg->m_model.orientation = ImportAssetDialog::Orientation::Z_UP;
-		else if (equalStrings(tmp, "-y")) dlg->m_model.orientation = ImportAssetDialog::Orientation::X_MINUS_UP;
-		else if (equalStrings(tmp, "-z")) dlg->m_model.orientation = ImportAssetDialog::Orientation::Z_MINUS_UP;
+		if (equalStrings(tmp, "+y")) dlg->m_fbx_importer->orientation = FBXImporter::Orientation::Y_UP;
+		else if (equalStrings(tmp, "+z")) dlg->m_fbx_importer->orientation = FBXImporter::Orientation::Z_UP;
+		else if (equalStrings(tmp, "-y")) dlg->m_fbx_importer->orientation = FBXImporter::Orientation::X_MINUS_UP;
+		else if (equalStrings(tmp, "-z")) dlg->m_fbx_importer->orientation = FBXImporter::Orientation::Z_MINUS_UP;
 	}
 	lua_pop(L, 1);
 	if (lua_getfield(L, 1, "root_orientation") == LUA_TSTRING)
 	{
 		const char* tmp = LuaWrapper::toType<const char*>(L, -1);
-		if (equalStrings(tmp, "+y")) dlg->m_model.root_orientation = ImportAssetDialog::Orientation::Y_UP;
-		else if (equalStrings(tmp, "+z")) dlg->m_model.root_orientation = ImportAssetDialog::Orientation::Z_UP;
-		else if (equalStrings(tmp, "-y")) dlg->m_model.root_orientation = ImportAssetDialog::Orientation::X_MINUS_UP;
-		else if (equalStrings(tmp, "-z")) dlg->m_model.root_orientation = ImportAssetDialog::Orientation::Z_MINUS_UP;
+		if (equalStrings(tmp, "+y")) dlg->m_fbx_importer->root_orientation = FBXImporter::Orientation::Y_UP;
+		else if (equalStrings(tmp, "+z")) dlg->m_fbx_importer->root_orientation = FBXImporter::Orientation::Z_UP;
+		else if (equalStrings(tmp, "-y")) dlg->m_fbx_importer->root_orientation = FBXImporter::Orientation::X_MINUS_UP;
+		else if (equalStrings(tmp, "-z")) dlg->m_fbx_importer->root_orientation = FBXImporter::Orientation::Z_MINUS_UP;
 	}
 	lua_pop(L, 1);
 
@@ -2044,8 +2040,6 @@ ImportAssetDialog::ImportAssetDialog(StudioApp& app)
 	m_model.lods[1] = -100;
 	m_model.lods[2] = -1000;
 	m_model.lods[3] = -10000;
-	m_model.orientation = Y_UP;
-	m_model.root_orientation = Y_UP;
 	m_model.position_error = 100.0f;
 	m_model.rotation_error = 10.0f;
 	m_model.time_scale = 1.0f;
@@ -2412,14 +2406,12 @@ void ImportAssetDialog::onAnimationsGUI()
 		ImGui::NextColumn();
 		ImGui::Checkbox("", &animation.import);
 		ImGui::NextColumn();
-		// TODO
-		/*auto getter = [](void* data, int idx, const char** out) -> bool {
-			auto* animation = (ImportAnimation*)data;
-			*out = animation->animation->mChannels[idx]->mNodeName.C_Str();
+		auto getter = [](void* data, int idx, const char** out) -> bool {
+			auto* that = (ImportAssetDialog*)data;
+			*out = that->m_fbx_importer->bones[idx]->name;
 			return true;
 		};
-		ImGui::Combo("##rb", &animation.root_motion_bone_idx, getter, &animation, animation.animation->mNumChannels);
-		*/
+		ImGui::Combo("##rb", &animation.root_motion_bone_idx, getter, this, m_fbx_importer->bones.size());
 		ImGui::NextColumn();
 		ImGui::PopID();
 	}
@@ -3020,8 +3012,8 @@ void ImportAssetDialog::onWindowGUI()
 			ImGui::Checkbox("Center meshes", &m_model.center_meshes);
 			ImGui::Checkbox("Import Vertex Colors", &m_model.import_vertex_colors);
 			ImGui::DragFloat("Scale", &m_fbx_importer->mesh_scale, 0.01f, 0.001f, 0);
-			ImGui::Combo("Orientation", &(int&)m_model.orientation, "Y up\0Z up\0-Z up\0-X up\0");
-			ImGui::Combo("Root Orientation", &(int&)m_model.root_orientation, "Y up\0Z up\0-Z up\0-X up\0");
+			ImGui::Combo("Orientation", &(int&)m_fbx_importer->orientation, "Y up\0Z up\0-Z up\0-X up\0");
+			ImGui::Combo("Root Orientation", &(int&)m_fbx_importer->root_orientation, "Y up\0Z up\0-Z up\0-X up\0");
 			ImGui::Checkbox("Make physics convex", &m_model.make_convex);
 		}
 
