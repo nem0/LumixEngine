@@ -31,14 +31,6 @@ class ImportAssetDialog LUMIX_FINAL : public StudioApp::IPlugin
 	friend struct ConvertTask;
 	friend struct ImportTextureTask;
 	public:
-		enum Orientation : int
-		{
-			Y_UP,
-			Z_UP,
-			Z_MINUS_UP,
-			X_MINUS_UP
-		};
-
 		struct DDSConvertCallbackData
 		{
 			ImportAssetDialog* dialog;
@@ -100,8 +92,6 @@ class ImportAssetDialog LUMIX_FINAL : public StudioApp::IPlugin
 			float lods[4];
 			bool create_billboard_lod;
 			bool center_meshes;
-			Orientation orientation;
-			Orientation root_orientation;
 			bool make_convex;
 			bool import_vertex_colors;
 			bool all_nodes;
