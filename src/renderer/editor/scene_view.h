@@ -28,7 +28,6 @@ class SceneView : public StudioApp::IPlugin
 
 		void update(float time_delta) override;
 		void setScene(RenderScene* scene);
-		void shutdown();
 		void onWindowGUI() override;
 		Pipeline* getPipeline() { return m_pipeline; }
 		const bgfx::TextureHandle& getTextureHandle() const { return m_texture_handle; }

@@ -422,21 +422,17 @@ void SceneView::resetCameraSpeed()
 
 SceneView::~SceneView()
 {
+	m_app.getAssetBrowser()->resourceChanged().bind<SceneView, &SceneView::onResourceChanged>(this);
+	m_editor->universeCreated().unbind<SceneView, &SceneView::onUniverseCreated>(this);
+	m_editor->universeDestroyed().unbind<SceneView, &SceneView::onUniverseDestroyed>(this);
+	Pipeline::destroy(m_pipeline);
+	m_pipeline = nullptr;
 }
 
 
 void SceneView::setScene(RenderScene* scene)
 {
 	m_pipeline->setScene(scene);
-}
-
-
-void SceneView::shutdown()
-{
-	m_editor->universeCreated().unbind<SceneView, &SceneView::onUniverseCreated>(this);
-	m_editor->universeDestroyed().unbind<SceneView, &SceneView::onUniverseDestroyed>(this);
-	Pipeline::destroy(m_pipeline);
-	m_pipeline = nullptr;
 }
 
 
