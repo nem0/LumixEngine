@@ -90,7 +90,6 @@ class ImportAssetDialog LUMIX_FINAL : public StudioApp::IPlugin
 		struct ModelData
 		{
 			bool create_billboard_lod;
-			bool make_convex;
 		} m_model;
 
 		float m_progress_fraction;
