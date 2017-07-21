@@ -89,15 +89,8 @@ class ImportAssetDialog LUMIX_FINAL : public StudioApp::IPlugin
 		
 		struct ModelData
 		{
-			float lods[4];
 			bool create_billboard_lod;
-			bool center_meshes;
 			bool make_convex;
-			bool import_vertex_colors;
-			bool all_nodes;
-			float position_error;
-			float rotation_error;
-			float time_scale;
 		} m_model;
 
 		float m_progress_fraction;

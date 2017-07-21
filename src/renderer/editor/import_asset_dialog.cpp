@@ -421,7 +421,7 @@ struct FBXImporter
 			const ofbx::Vec3* vertices = geom->getVertices();
 			const ofbx::Vec3* normals = geom->getNormals();
 			const ofbx::Vec3* tangents = geom->getTangents();
-			const ofbx::Vec4* colors = ignore_vertex_colors ? nullptr : geom->getColors();
+			const ofbx::Vec4* colors = import_vertex_colors ? geom->getColors() : nullptr;
 			const ofbx::Vec2* uvs = geom->getUVs();
 
 			Matrix transform_matrix = Matrix::IDENTITY;
@@ -839,10 +839,10 @@ struct FBXImporter
 			(float)((mode == FbxTime::eCustom) ? scene->GetGlobalSettings().GetCustomFrameRate()
 			: FbxTime::GetFrameRate(mode));
 			*/
-			float scene_frame_rate = 24.0f;
+			float scene_frame_rate = 24.0f / time_scale;
 			float sampling_period = 1.0f / scene_frame_rate;
 
-			float duration = end > begin ? end - begin : 1.0f;
+			float duration = (end > begin ? end - begin : 1.0f) * time_scale;
 
 			StaticString<MAX_PATH_LENGTH> tmp(output_dir, anim.output_filename, ".ani");
 			IAllocator& allocator = app.getWorldEditor()->getAllocator();
@@ -890,7 +890,7 @@ struct FBXImporter
 				int frames = int((duration / sampling_period) + 0.5f);
 
 				float parent_scale = bone->getParent() ? (float)getScaleX(bone->getParent()->getGlobalTransform()) : 1;
-				compressPositions(positions, frames, sampling_period, translation_node, *bone, 0.001f, parent_scale);
+				compressPositions(positions, frames, sampling_period, translation_node, *bone, position_error, parent_scale);
 				write(positions.size());
 
 				for (TranslationKey& key : positions) write(key.frame);
@@ -906,7 +906,7 @@ struct FBXImporter
 					}
 				}
 
-				compressRotations(rotations, frames, sampling_period, rotation_node, *bone, 0.0001f);
+				compressRotations(rotations, frames, sampling_period, rotation_node, *bone, rotation_error);
 
 				write(rotations.size());
 				for (RotationKey& key : rotations) write(key.frame);
@@ -942,7 +942,7 @@ struct FBXImporter
 
 		if (mesh.getGeometry()->getNormals()) size += NORMAL_SIZE;
 		if (mesh.getGeometry()->getUVs()) size += UV_SIZE;
-		if (mesh.getGeometry()->getColors() && !ignore_vertex_colors) size += COLOR_SIZE;
+		if (mesh.getGeometry()->getColors() && import_vertex_colors) size += COLOR_SIZE;
 		if (mesh.getGeometry()->getTangents()) size += TANGENT_SIZE;
 		if (isSkinned(mesh)) size += BONE_INDICES_WEIGHTS_SIZE;
 
@@ -1232,7 +1232,7 @@ struct FBXImporter
 		int count = 1; // position
 		if (mesh.getGeometry()->getNormals()) ++count;
 		if (mesh.getGeometry()->getUVs()) ++count;
-		if (mesh.getGeometry()->getColors() && !ignore_vertex_colors) ++count;
+		if (mesh.getGeometry()->getColors() && import_vertex_colors) ++count;
 		if (mesh.getGeometry()->getTangents()) ++count;
 		if (isSkinned(mesh)) count += 2;
 		return count;
@@ -1279,7 +1279,7 @@ struct FBXImporter
 			i32 uv0_attr = 8;
 			write(uv0_attr);
 		}
-		if (geom->getColors() && !ignore_vertex_colors)
+		if (geom->getColors() && import_vertex_colors)
 		{
 			i32 color_attr = 4;
 			write(color_attr);
@@ -1382,11 +1382,14 @@ struct FBXImporter
 	float lods_distances[4] = {-10, -100, -1000, -10000};
 	FS::OsFile out_file;
 	float mesh_scale = 1.0f;
+	float time_scale = 1.0f;
+	float position_error = 100.0f;
+	float rotation_error = 10.0f;
 	float bounding_shape_scale = 1.0f;
 	bool to_dds = false;
 	bool center_mesh = false;
 	bool ignore_skeleton = false;
-	bool ignore_vertex_colors = true;
+	bool import_vertex_colors = true;
 	Orientation orientation = Orientation::Y_UP;
 	Orientation root_orientation = Orientation::Y_UP;
 };
@@ -1599,10 +1602,10 @@ int setParams(lua_State* L)
 	lua_pop(L, 1);
 
 	LuaWrapper::getOptionalField(L, 1, "create_billboard", &dlg->m_model.create_billboard_lod);
-	LuaWrapper::getOptionalField(L, 1, "center_meshes", &dlg->m_model.center_meshes);
-	LuaWrapper::getOptionalField(L, 1, "import_vertex_colors", &dlg->m_model.import_vertex_colors);
+	LuaWrapper::getOptionalField(L, 1, "center_meshes", &dlg->m_fbx_importer->center_mesh);
+	LuaWrapper::getOptionalField(L, 1, "import_vertex_colors", &dlg->m_fbx_importer->import_vertex_colors);
 	LuaWrapper::getOptionalField(L, 1, "scale", &dlg->m_fbx_importer->mesh_scale);
-	LuaWrapper::getOptionalField(L, 1, "time_scale", &dlg->m_model.time_scale);
+	LuaWrapper::getOptionalField(L, 1, "time_scale", &dlg->m_fbx_importer->time_scale);
 	LuaWrapper::getOptionalField(L, 1, "to_dds", &dlg->m_convert_to_dds);
 	LuaWrapper::getOptionalField(L, 1, "normal_map", &dlg->m_is_normal_map);
 	if (lua_getfield(L, 1, "orientation") == LUA_TSTRING)
@@ -1631,14 +1634,14 @@ int setParams(lua_State* L)
 		int lod_index = 0;
 		while (lua_next(L, -2) != 0)
 		{
-			if (lod_index >= lengthOf(dlg->m_model.lods))
+			if (lod_index >= lengthOf(dlg->m_fbx_importer->lods_distances))
 			{
-				g_log_error.log("Editor") << "Only " << lengthOf(dlg->m_model.lods) << " supported";
+				g_log_error.log("Editor") << "Only " << lengthOf(dlg->m_fbx_importer->lods_distances) << " supported";
 				lua_pop(L, 1);
 				break;
 			}
 
-			dlg->m_model.lods[lod_index] = LuaWrapper::toType<float>(L, -1);
+			dlg->m_fbx_importer->lods_distances[lod_index] = LuaWrapper::toType<float>(L, -1);
 			++lod_index;
 			lua_pop(L, 1);
 		}
@@ -2032,17 +2035,7 @@ ImportAssetDialog::ImportAssetDialog(StudioApp& app)
 	m_image.data = nullptr;
 
 	m_model.make_convex = false;
-	m_model.import_vertex_colors = true;
-	m_model.all_nodes = false;
-	m_model.center_meshes = false;
 	m_model.create_billboard_lod = false;
-	m_model.lods[0] = -10;
-	m_model.lods[1] = -100;
-	m_model.lods[2] = -1000;
-	m_model.lods[3] = -10000;
-	m_model.position_error = 100.0f;
-	m_model.rotation_error = 10.0f;
-	m_model.time_scale = 1.0f;
 	m_is_opened = false;
 	m_message[0] = '\0';
 	m_import_message[0] = '\0';
@@ -2360,17 +2353,17 @@ void ImportAssetDialog::onMaterialsGUI()
 void ImportAssetDialog::onLODsGUI()
 {
 	if (!ImGui::CollapsingHeader("LODs")) return;
-	for (int i = 0; i < lengthOf(m_model.lods); ++i)
+	for (int i = 0; i < lengthOf(m_fbx_importer->lods_distances); ++i)
 	{
-		bool b = m_model.lods[i] < 0;
+		bool b = m_fbx_importer->lods_distances[i] < 0;
 		if (ImGui::Checkbox(StaticString<20>("Infinite###lod_inf", i), &b))
 		{
-			m_model.lods[i] *= -1;
+			m_fbx_importer->lods_distances[i] *= -1;
 		}
-		if (m_model.lods[i] >= 0)
+		if (m_fbx_importer->lods_distances[i] >= 0)
 		{
 			ImGui::SameLine();
-			ImGui::DragFloat(StaticString<10>("LOD ", i), &m_model.lods[i], 1.0f, 1.0f, FLT_MAX);
+			ImGui::DragFloat(StaticString<10>("LOD ", i), &m_fbx_importer->lods_distances[i], 1.0f, 1.0f, FLT_MAX);
 		}
 	}
 }
@@ -2382,9 +2375,9 @@ void ImportAssetDialog::onAnimationsGUI()
 	label << m_fbx_importer->animations.size() << ")###Animations";
 	if (!ImGui::CollapsingHeader(label)) return;
 
-	ImGui::DragFloat("Time scale", &m_model.time_scale, 1.0f, 0, FLT_MAX, "%.5f");
-	ImGui::DragFloat("Max position error", &m_model.position_error, 0, FLT_MAX);
-	ImGui::DragFloat("Max rotation error", &m_model.rotation_error, 0, FLT_MAX);
+	ImGui::DragFloat("Time scale", &m_fbx_importer->time_scale, 1.0f, 0, FLT_MAX, "%.5f");
+	ImGui::DragFloat("Max position error", &m_fbx_importer->position_error, 0, FLT_MAX);
+	ImGui::DragFloat("Max rotation error", &m_fbx_importer->rotation_error, 0, FLT_MAX);
 
 	ImGui::Indent();
 	ImGui::Columns(3);
@@ -3008,9 +3001,8 @@ void ImportAssetDialog::onWindowGUI()
 		if (ImGui::CollapsingHeader("Advanced"))
 		{
 			ImGui::Checkbox("Create billboard LOD", &m_model.create_billboard_lod);
-			ImGui::Checkbox("Import all bones", &m_model.all_nodes);
-			ImGui::Checkbox("Center meshes", &m_model.center_meshes);
-			ImGui::Checkbox("Import Vertex Colors", &m_model.import_vertex_colors);
+			ImGui::Checkbox("Center meshes", &m_fbx_importer->center_mesh);
+			ImGui::Checkbox("Import Vertex Colors", &m_fbx_importer->import_vertex_colors);
 			ImGui::DragFloat("Scale", &m_fbx_importer->mesh_scale, 0.01f, 0.001f, 0);
 			ImGui::Combo("Orientation", &(int&)m_fbx_importer->orientation, "Y up\0Z up\0-Z up\0-X up\0");
 			ImGui::Combo("Root Orientation", &(int&)m_fbx_importer->root_orientation, "Y up\0Z up\0-Z up\0-X up\0");
