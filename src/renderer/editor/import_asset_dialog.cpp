@@ -45,6 +45,9 @@ namespace Lumix
 {
 
 
+typedef StaticString<MAX_PATH_LENGTH> PathBuilder;
+
+
 static u32 packF4u(const Vec3& vec)
 {
 	const u8 xx = u8(vec.x * 127.0f + 128.0f);
@@ -100,7 +103,8 @@ struct FBXImporter
 		Y_UP,
 		Z_UP,
 		Z_MINUS_UP,
-		X_MINUS_UP
+		X_MINUS_UP,
+		X_UP
 	};
 
 	struct RotationKey
@@ -1005,10 +1009,11 @@ struct FBXImporter
 	{
 		switch (root_orientation)
 		{
-			case FBXImporter::Orientation::Y_UP: return Vec3(v.x, v.y, v.z);
-			case FBXImporter::Orientation::Z_UP: return Vec3(v.x, v.z, -v.y);
-			case FBXImporter::Orientation::Z_MINUS_UP: return Vec3(v.x, -v.z, v.y);
-			case FBXImporter::Orientation::X_MINUS_UP: return Vec3(v.y, -v.x, v.z);
+			case Orientation::Y_UP: return Vec3(v.x, v.y, v.z);
+			case Orientation::Z_UP: return Vec3(v.x, v.z, -v.y);
+			case Orientation::Z_MINUS_UP: return Vec3(v.x, -v.z, v.y);
+			case Orientation::X_MINUS_UP: return Vec3(v.y, -v.x, v.z);
+			case Orientation::X_UP: return Vec3(-v.y, v.x, v.z);
 		}
 		ASSERT(false);
 		return Vec3(v.x, v.y, v.z);
@@ -1019,10 +1024,11 @@ struct FBXImporter
 	{
 		switch (root_orientation)
 		{
-			case FBXImporter::Orientation::Y_UP: return Quat(v.x, v.y, v.z, v.w);
-			case FBXImporter::Orientation::Z_UP: return Quat(v.x, v.z, -v.y, v.w);
-			case FBXImporter::Orientation::Z_MINUS_UP: return Quat(v.x, -v.z, v.y, v.w);
-			case FBXImporter::Orientation::X_MINUS_UP: return Quat(v.y, -v.x, v.z, v.w);
+			case Orientation::Y_UP: return Quat(v.x, v.y, v.z, v.w);
+			case Orientation::Z_UP: return Quat(v.x, v.z, -v.y, v.w);
+			case Orientation::Z_MINUS_UP: return Quat(v.x, -v.z, v.y, v.w);
+			case Orientation::X_MINUS_UP: return Quat(v.y, -v.x, v.z, v.w);
+			case Orientation::X_UP: return Quat(-v.y, v.x, v.z, v.w);
 		}
 		ASSERT(false);
 		return Quat(v.x, v.y, v.z, v.w);
@@ -1031,12 +1037,13 @@ struct FBXImporter
 
 	Vec3 fixOrientation(const Vec3& v) const
 	{
-		switch (root_orientation)
+		switch (orientation)
 		{
 			case Orientation::Y_UP: return Vec3(v.x, v.y, v.z);
 			case Orientation::Z_UP: return Vec3(v.x, v.z, -v.y);
 			case Orientation::Z_MINUS_UP: return Vec3(v.x, -v.z, v.y);
 			case Orientation::X_MINUS_UP: return Vec3(v.y, -v.x, v.z);
+			case Orientation::X_UP: return Vec3(-v.y, v.x, v.z);
 		}
 		ASSERT(false);
 		return Vec3(v.x, v.y, v.z);
@@ -1051,6 +1058,7 @@ struct FBXImporter
 			case Orientation::Z_UP: return Quat(v.x, v.z, -v.y, v.w);
 			case Orientation::Z_MINUS_UP: return Quat(v.x, -v.z, v.y, v.w);
 			case Orientation::X_MINUS_UP: return Quat(v.y, -v.x, v.z, v.w);
+			case Orientation::X_UP: return Quat(-v.y, v.x, v.z, v.w);
 		}
 		ASSERT(false);
 		return Quat(v.x, v.y, v.z, v.w);
@@ -1299,11 +1307,105 @@ struct FBXImporter
 	}
 
 
+	void writePhysicsHeader(FS::OsFile& file) const
+	{
+		PhysicsGeometry::Header header;
+		header.m_magic = PhysicsGeometry::HEADER_MAGIC;
+		header.m_version = (u32)PhysicsGeometry::Versions::LAST;
+		header.m_convex = (u32)make_convex;
+		file.write((const char*)&header, sizeof(header));
+	}
+
+
+	void writePhysicsTriMesh(FS::OsFile& file)
+	{
+		i32 count = 0;
+		for (auto& mesh : meshes)
+		{
+			if (mesh.import_physics) count += mesh.indices.size();
+		}
+		file.write((const char*)&count, sizeof(count));
+		int offset = 0;
+		for (auto& mesh : meshes)
+		{
+			if (!mesh.import_physics) continue;
+			for (unsigned int j = 0, c = mesh.indices.size(); j < c; ++j)
+			{
+				u32 index = mesh.indices[j] + offset;
+				file.write((const char*)&index, sizeof(index));
+			}
+			int vertex_size = getVertexSize(*mesh.fbx);
+			int vertex_count = (i32)(mesh.vertex_data.getPos() / vertex_size);
+			offset += vertex_count;
+		}
+	}
+
+
+	bool writePhysics()
+	{
+		bool any = false;
+		for (const ImportMesh& m : meshes)
+		{
+			if (m.import_physics)
+			{
+				any = true;
+				break;
+			}
+		}
+
+		if (!any) return true;
+
+		dialog.setImportMessage("Importing physics...", -1);
+		char filename[MAX_PATH_LENGTH];
+		PathUtils::getBasename(filename, sizeof(filename), dialog.m_source);
+		catString(filename, ".phy");
+		PathBuilder phy_path(dialog.m_output_dir);
+		PlatformInterface::makePath(phy_path);
+		phy_path << "/" << filename;
+		FS::OsFile file;
+		if (!file.open(phy_path, FS::Mode::CREATE_AND_WRITE, dialog.m_editor.getAllocator()))
+		{
+			g_log_error.log("Editor") << "Could not create file " << phy_path;
+			return false;
+		}
+
+		writePhysicsHeader(file);
+		i32 count = 0;
+		for (auto& mesh : meshes)
+		{
+			if (mesh.import_physics) count += (i32)(mesh.vertex_data.getPos() / getVertexSize(*mesh.fbx));
+		}
+		file.write((const char*)&count, sizeof(count));
+		for (auto& mesh : meshes)
+		{
+			if (mesh.import_physics)
+			{
+				int vertex_size = getVertexSize(*mesh.fbx);
+				int vertex_count = (i32)(mesh.vertex_data.getPos() / vertex_size);
+
+				const u8* verts = (const u8*)mesh.vertex_data.getData();
+
+				for (int i = 0; i < vertex_count; ++i)
+				{
+					Vec3 v = *(Vec3*)(verts + i * vertex_size);
+					file.write(&v, sizeof(v));
+				}
+			}
+		}
+
+		if (!make_convex) writePhysicsTriMesh(file);
+		file.close();
+
+		return true;
+	}
+
+
 	bool save(const char* output_dir, const char* output_mesh_filename, const char* texture_output_dir)
 	{
 		writeModel(output_dir, output_mesh_filename);
 		writeAnimations(output_dir);
 		writeMaterials(output_dir, texture_output_dir);
+		writePhysics();
 
 		return true;
 	}
@@ -1390,12 +1492,10 @@ struct FBXImporter
 	bool center_mesh = false;
 	bool ignore_skeleton = false;
 	bool import_vertex_colors = true;
+	bool make_convex = false;
 	Orientation orientation = Orientation::Y_UP;
 	Orientation root_orientation = Orientation::Y_UP;
 };
-
-
-typedef StaticString<MAX_PATH_LENGTH> PathBuilder;
 
 
 enum class VertexAttributeDef : u32
@@ -2034,7 +2134,6 @@ ImportAssetDialog::ImportAssetDialog(StudioApp& app)
 
 	m_image.data = nullptr;
 
-	m_model.make_convex = false;
 	m_model.create_billboard_lod = false;
 	m_is_opened = false;
 	m_message[0] = '\0';
@@ -3004,9 +3103,9 @@ void ImportAssetDialog::onWindowGUI()
 			ImGui::Checkbox("Center meshes", &m_fbx_importer->center_mesh);
 			ImGui::Checkbox("Import Vertex Colors", &m_fbx_importer->import_vertex_colors);
 			ImGui::DragFloat("Scale", &m_fbx_importer->mesh_scale, 0.01f, 0.001f, 0);
-			ImGui::Combo("Orientation", &(int&)m_fbx_importer->orientation, "Y up\0Z up\0-Z up\0-X up\0");
-			ImGui::Combo("Root Orientation", &(int&)m_fbx_importer->root_orientation, "Y up\0Z up\0-Z up\0-X up\0");
-			ImGui::Checkbox("Make physics convex", &m_model.make_convex);
+			ImGui::Combo("Orientation", &(int&)m_fbx_importer->orientation, "Y up\0Z up\0-Z up\0-X up\0X up\0");
+			ImGui::Combo("Root Orientation", &(int&)m_fbx_importer->root_orientation, "Y up\0Z up\0-Z up\0-X up\0X up\0");
+			ImGui::Checkbox("Make physics convex", &m_fbx_importer->make_convex);
 		}
 
 		onMeshesGUI();
