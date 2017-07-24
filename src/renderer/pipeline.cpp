@@ -1868,7 +1868,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
-	void drawQuad(float left, float top, float w, float h, int material_index)
+	void drawQuadEx(float left, float top, float w, float h, float u0, float v0, float u1, float v1, int material_index)
 	{
 		Resource* res = m_scene->getEngine().getLuaResource(material_index);
 		Material* material = static_cast<Material*>(res);
@@ -1902,51 +1902,51 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		float bottom = top + h;
 		if (!is_opengl)
 		{
-			top = 1-top;
-			bottom = 1-bottom;
+			top = 1 - top;
+			bottom = 1 - bottom;
 		}
 
 		vertex[0].x = left;
 		vertex[0].y = top;
 		vertex[0].z = 0;
 		vertex[0].rgba = 0xffffffff;
-		vertex[0].u = 0;
-		vertex[0].v = 0;
+		vertex[0].u = u0;
+		vertex[0].v = v0;
 
 		vertex[1].x = right;
 		vertex[1].y = top;
 		vertex[1].z = 0;
 		vertex[1].rgba = 0xffffffff;
-		vertex[1].u = 1;
-		vertex[1].v = 0;
+		vertex[1].u = u1;
+		vertex[1].v = v0;
 
 		vertex[2].x = right;
 		vertex[2].y = bottom;
 		vertex[2].z = 0;
 		vertex[2].rgba = 0xffffffff;
-		vertex[2].u = 1;
-		vertex[2].v = 1;
+		vertex[2].u = u1;
+		vertex[2].v = v1;
 
 		vertex[3].x = left;
 		vertex[3].y = top;
 		vertex[3].z = 0;
 		vertex[3].rgba = 0xffffffff;
-		vertex[3].u = 0;
-		vertex[3].v = 0;
+		vertex[3].u = u0;
+		vertex[3].v = v0;
 
 		vertex[4].x = right;
 		vertex[4].y = bottom;
 		vertex[4].z = 0;
 		vertex[4].rgba = 0xffffffff;
-		vertex[4].u = 1;
-		vertex[4].v = 1;
+		vertex[4].u = u1;
+		vertex[4].v = v1;
 
 		vertex[5].x = left;
 		vertex[5].y = bottom;
 		vertex[5].z = 0;
 		vertex[5].rgba = 0xffffffff;
-		vertex[5].u = 0;
-		vertex[5].v = 1;
+		vertex[5].u = u0;
+		vertex[5].v = v1;
 
 		View& view = *m_current_view;
 
@@ -1988,6 +1988,12 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		++m_stats.instance_count;
 		m_stats.triangle_count += 2;
 		bgfx::submit(m_current_view->bgfx_id, material->getShaderInstance().getProgramHandle(m_pass_idx));
+	}
+
+
+	void drawQuad(float left, float top, float w, float h, int material_index)
+	{
+		drawQuadEx(left, top, w, h, 0, 0, 1, 1, material_index);
 	}
 
 
@@ -3089,6 +3095,7 @@ void Pipeline::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(setViewport);
 	REGISTER_FUNCTION(setViewSeq);
 	REGISTER_FUNCTION(drawQuad);
+	REGISTER_FUNCTION(drawQuadEx);
 	REGISTER_FUNCTION(setPass);
 	REGISTER_FUNCTION(bindRenderbuffer);
 	REGISTER_FUNCTION(bindFramebufferTexture);
