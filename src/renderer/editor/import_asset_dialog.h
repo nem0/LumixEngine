@@ -87,11 +87,6 @@ class ImportAssetDialog LUMIX_FINAL : public StudioApp::IPlugin
 			int resize_size[2];
 		} m_image;
 		
-		struct ModelData
-		{
-			bool create_billboard_lod;
-		} m_model;
-
 		float m_progress_fraction;
 		char m_message[1024];
 		char m_last_dir[MAX_PATH_LENGTH];
