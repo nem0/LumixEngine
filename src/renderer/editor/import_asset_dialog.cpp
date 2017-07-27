@@ -69,13 +69,20 @@ static u32 packF4u(const Vec3& vec)
 }
 
 
-template <typename T>
+template <typename T, typename T2>
 struct GenericTask LUMIX_FINAL : public MT::Task
 {
-	GenericTask(T _function, IAllocator& allocator)
+	GenericTask(T _function, T2 _on_destroy, IAllocator& allocator)
 		: Task(allocator)
 		, function(_function)
+		, on_destroy(_on_destroy)
 	{
+	}
+
+
+	~GenericTask()
+	{
+		on_destroy();
 	}
 
 
@@ -86,14 +93,97 @@ struct GenericTask LUMIX_FINAL : public MT::Task
 	}
 
 
+	T2 on_destroy;
 	T function;
 };
 
 
-template <class T> GenericTask<T>* makeTask(T function, IAllocator& allocator)
+template <typename T, typename T2> GenericTask<T, T2>* makeTask(T function, T2 on_destroy, IAllocator& allocator)
 {
-	return LUMIX_NEW(allocator, GenericTask<T>)(function, allocator);
+	return LUMIX_NEW(allocator, GenericTask<T, T2>)(function, on_destroy, allocator);
 }
+
+
+static crn_comp_params s_default_comp_params;
+
+
+struct BillboardSceneData
+{
+	#pragma pack(1)
+		struct Vertex
+		{
+			Vec3 pos;
+			u8 normal[4];
+			u8 tangent[4];
+			Vec2 uv;
+		};
+	#pragma pack()
+
+	static const int TEXTURE_SIZE = 512;
+
+	int width;
+	int height;
+	float ortho_size;
+	Vec3 position;
+
+
+	static int ceilPowOf2(int value)
+	{
+		ASSERT(value > 0);
+		int ret = value - 1;
+		ret |= ret >> 1;
+		ret |= ret >> 2;
+		ret |= ret >> 3;
+		ret |= ret >> 8;
+		ret |= ret >> 16;
+		return ret + 1;
+	}
+
+
+	BillboardSceneData(const AABB& aabb, int texture_size)
+	{
+		Vec3 size = aabb.max - aabb.min;
+		float right = aabb.max.x + size.z + size.x + size.z;
+		float left = aabb.min.x;
+		position.set((right + left) * 0.5f, (aabb.max.y + aabb.min.y) * 0.5f, aabb.max.z + 5);
+
+		if (2 * size.x + 2 * size.z > size.y)
+		{
+			width = texture_size;
+			int nonceiled_height = int(width / (2 * size.x + 2 * size.z) * size.y);
+			height = ceilPowOf2(nonceiled_height);
+			ortho_size = size.y * height / nonceiled_height * 0.5f;
+		}
+		else
+		{
+			height = texture_size;
+			width = ceilPowOf2(int(height * (2 * size.x + 2 * size.z) / size.y));
+			ortho_size = size.y * 0.5f;
+		}
+	}
+
+
+	Matrix computeMVPMatrix()
+	{
+		Matrix mvp = Matrix::IDENTITY;
+
+		float ratio = height > 0 ? (float)width / height : 1.0f;
+		Matrix proj;
+		proj.setOrtho(-ortho_size * ratio,
+			ortho_size * ratio,
+			-ortho_size,
+			ortho_size,
+			0.0001f,
+			10000.0f,
+			false /* we do not care for z value, so both true and false are correct*/);
+
+		mvp.setTranslation(position);
+		mvp.fastInverse();
+		mvp = proj * mvp;
+
+		return mvp;
+	}
+};
 
 
 struct FBXImporter
@@ -557,7 +647,11 @@ struct FBXImporter
 		for (int i = 0; i < mesh_count; ++i)
 		{
 			const ofbx::Mesh* mesh = scene.getMesh(i);
-			if (vertex_size != getVertexSize(*mesh)) return false;
+			if (vertex_size != getVertexSize(*mesh))
+			{
+				dialog.setMessage("Meshes have different vertex sizes.");
+				return false;
+			}
 		}
 		return true;
 	}
@@ -614,12 +708,6 @@ struct FBXImporter
 			return false;
 		}
 
-		if (!isValid(*scene))
-		{
-			scene->destroy();
-			return false;
-		}
-
 		const ofbx::Object* root = scene->getRoot();
 		char src_dir[MAX_PATH_LENGTH];
 		PathUtils::getDir(src_dir, lengthOf(src_dir), filename);
@@ -639,7 +727,94 @@ struct FBXImporter
 	void writeString(const char* str) { out_file.write(str, strlen(str)); }
 
 
-	void writeMaterials(const char* output_dir, const char* texture_output_dir)
+	static void getRelativePath(WorldEditor& editor, char* relative_path, int max_length, const char* source)
+	{
+		char tmp[MAX_PATH_LENGTH];
+		PathUtils::normalize(source, tmp, sizeof(tmp));
+
+		const char* base_path = editor.getEngine().getDiskFileDevice()->getBasePath();
+		if (compareStringN(base_path, tmp, stringLength(base_path)) == 0)
+		{
+			int base_path_length = stringLength(base_path);
+			const char* rel_path_start = tmp + base_path_length;
+			if (rel_path_start[0] == '/')
+			{
+				++rel_path_start;
+			}
+			copyString(relative_path, max_length, rel_path_start);
+		}
+		else
+		{
+			auto* patch_fd = editor.getEngine().getPatchFileDevice();
+			const char* base_path = patch_fd ? patch_fd->getBasePath() : nullptr;
+			if (base_path && compareStringN(base_path, tmp, stringLength(base_path)) == 0)
+			{
+				int base_path_length = stringLength(base_path);
+				const char* rel_path_start = tmp + base_path_length;
+				if (rel_path_start[0] == '/')
+				{
+					++rel_path_start;
+				}
+				copyString(relative_path, max_length, rel_path_start);
+			}
+			else
+			{
+				copyString(relative_path, max_length, tmp);
+			}
+		}
+	}
+
+
+	bool writeBillboardMaterial(const char* output_dir, const char* texture_output_dir, const char* mesh_output_filename)
+	{
+		if (!create_billboard_lod) return true;
+
+		FS::OsFile file;
+		PathBuilder output_material_name(output_dir, "/", mesh_output_filename, "_billboard.mat");
+		IAllocator& allocator = app.getWorldEditor()->getAllocator();
+		if (!file.open(output_material_name, FS::Mode::CREATE_AND_WRITE, allocator))
+		{
+			g_log_error.log("FBX") << "Failed to create " << output_material_name;
+			return false;
+		}
+		file << "{\n\t\"shader\" : \"pipelines/rigid/rigid.shd\"\n";
+		file << "\t, \"defines\" : [\"ALPHA_CUTOUT\"]\n";
+		file << "\t, \"texture\" : {\n\t\t\"source\" : \"";
+
+		WorldEditor& editor = *app.getWorldEditor();
+		if (texture_output_dir[0])
+		{
+			char from_root_path[MAX_PATH_LENGTH];
+			getRelativePath(editor, from_root_path, lengthOf(from_root_path), texture_output_dir);
+			PathBuilder relative_texture_path(from_root_path, mesh_output_filename, "_billboard.dds");
+			PathBuilder texture_path(texture_output_dir, mesh_output_filename, "_billboard.dds");
+			copyFile("models/utils/cube/default.dds", texture_path);
+			file << "/" << relative_texture_path << "\"}\n\t, \"texture\" : {\n\t\t\"source\" : \"";
+
+			PathBuilder relative_normal_path_n(from_root_path, mesh_output_filename, "_billboard_normal.dds");
+			PathBuilder normal_path(texture_output_dir, mesh_output_filename, "_billboard_normal.dds");
+			copyFile("models/utils/cube/default.dds", normal_path);
+			file << "/" << relative_normal_path_n;
+
+		}
+		else
+		{
+			file << mesh_output_filename << "_billboard.dds\"}\n\t, \"texture\" : {\n\t\t\"source\" : \"";
+			PathBuilder texture_path(output_dir, "/", mesh_output_filename, "_billboard.dds");
+			copyFile("models/utils/cube/default.dds", texture_path);
+
+			file << mesh_output_filename << "_billboard_normal.dds";
+			PathBuilder normal_path(output_dir, "/", mesh_output_filename, "_billboard_normal.dds");
+			copyFile("models/utils/cube/default.dds", normal_path);
+		}
+
+		file << "\"}\n}";
+		file.close();
+		return true;
+	}
+
+
+	void writeMaterials(const char* output_dir, const char* texture_output_dir, const char* mesh_output_filename)
 	{
 		dialog.setImportMessage("Writing materials...", 0.9f);
 
@@ -687,6 +862,7 @@ struct FBXImporter
 
 			out_file.close();
 		}
+		writeBillboardMaterial(output_dir, texture_output_dir,  mesh_output_filename);
 	}
 
 
@@ -1065,6 +1241,64 @@ struct FBXImporter
 	}
 
 
+	void writeBillboardVertices(const AABB& aabb)
+	{
+		if (!create_billboard_lod) return;
+
+		bool has_tangents = false;
+		for (auto& mesh : meshes)
+		{
+			if (mesh.import)
+			{
+				has_tangents = mesh.fbx->getGeometry()->getTangents() != nullptr;
+				break;
+			}
+		}
+
+		Vec3 max = aabb.max;
+		Vec3 min = aabb.min;
+		Vec3 size = max - min;
+		BillboardSceneData data({min, max}, BillboardSceneData::TEXTURE_SIZE);
+		Matrix mtx = data.computeMVPMatrix();
+		Vec3 uv0_min = mtx.transform(min);
+		Vec3 uv0_max = mtx.transform(max);
+		float x1_max = 0.0f;
+		float x2_max = mtx.transform(Vec3(max.x + size.z + size.x, 0, 0)).x;
+		float x3_max = mtx.transform(Vec3(max.x + size.z + size.x + size.z, 0, 0)).x;
+
+		auto fixUV = [](float x, float y) -> Vec2 { return Vec2(x * 0.5f + 0.5f, y * 0.5f + 0.5f); };
+
+		BillboardSceneData::Vertex vertices[] = {
+			{{min.x, min.y, 0}, {128, 255, 128, 0}, {255, 128, 128, 0}, fixUV(uv0_min.x, uv0_max.y)},
+			{{max.x, min.y, 0}, {128, 255, 128, 0}, {255, 128, 128, 0}, fixUV(uv0_max.x, uv0_max.y)},
+			{{max.x, max.y, 0}, {128, 255, 128, 0}, {255, 128, 128, 0}, fixUV(uv0_max.x, uv0_min.y)},
+			{{min.x, max.y, 0}, {128, 255, 128, 0}, {255, 128, 128, 0}, fixUV(uv0_min.x, uv0_min.y)},
+
+			{{0, min.y, min.z}, {128, 255, 128, 0}, {128, 128, 255, 0}, fixUV(uv0_max.x, uv0_max.y)},
+			{{0, min.y, max.z}, {128, 255, 128, 0}, {128, 128, 255, 0}, fixUV(x1_max, uv0_max.y)},
+			{{0, max.y, max.z}, {128, 255, 128, 0}, {128, 128, 255, 0}, fixUV(x1_max, uv0_min.y)},
+			{{0, max.y, min.z}, {128, 255, 128, 0}, {128, 128, 255, 0}, fixUV(uv0_max.x, uv0_min.y)},
+
+			{{max.x, min.y, 0}, {128, 255, 128, 0}, {0, 128, 128, 0}, fixUV(x1_max, uv0_max.y)},
+			{{min.x, min.y, 0}, {128, 255, 128, 0}, {0, 128, 128, 0}, fixUV(x2_max, uv0_max.y)},
+			{{min.x, max.y, 0}, {128, 255, 128, 0}, {0, 128, 128, 0}, fixUV(x2_max, uv0_min.y)},
+			{{max.x, max.y, 0}, {128, 255, 128, 0}, {0, 128, 128, 0}, fixUV(x1_max, uv0_min.y)},
+
+			{{0, min.y, max.z}, {128, 255, 128, 0}, {128, 128, 0, 0}, fixUV(x2_max, uv0_max.y)},
+			{{0, min.y, min.z}, {128, 255, 128, 0}, {128, 128, 0, 0}, fixUV(x3_max, uv0_max.y)},
+			{{0, max.y, min.z}, {128, 255, 128, 0}, {128, 128, 0, 0}, fixUV(x3_max, uv0_min.y)},
+			{{0, max.y, max.z}, {128, 255, 128, 0}, {128, 128, 0, 0}, fixUV(x2_max, uv0_min.y)}};
+
+		for (const BillboardSceneData::Vertex& vertex : vertices)
+		{
+			write(vertex.pos);
+			write(vertex.normal);
+			if(has_tangents) write(vertex.tangent);
+			write(vertex.uv);
+		}
+	}
+
+
 	void writeGeometry()
 	{
 		AABB aabb = {{0, 0, 0}, {0, 0, 0}};
@@ -1073,13 +1307,21 @@ struct FBXImporter
 		i32 vertex_data_size = 0;
 		IAllocator& allocator = app.getWorldEditor()->getAllocator();
 
+		int vertex_size = 0;
 		for (const ImportMesh& mesh : meshes)
 		{
 			if (!mesh.import) continue;
 
+			vertex_size = getVertexSize(*mesh.fbx);
 			indices_count += mesh.indices.size();
 			vertex_data_size += mesh.vertex_data.getPos();
 		}
+		if (create_billboard_lod)
+		{
+			indices_count += 8 * 3;
+			vertex_data_size += 16 * vertex_size;
+		}
+
 		write(indices_count);
 
 		bool are_indices_16_bit = areIndices16Bit();
@@ -1105,12 +1347,28 @@ struct FBXImporter
 			radius_squared = Math::maximum(radius_squared, import_mesh.radius_squared);
 		}
 
+		if (create_billboard_lod)
+		{
+			if (are_indices_16_bit)
+			{
+				u16 indices[] = { 0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 8, 9, 10, 8, 10, 11, 12, 13, 14, 12, 14, 15 };
+				write(indices, sizeof(indices));
+			}
+			else
+			{
+				u32 indices[] = { 0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 8, 9, 10, 8, 10, 11, 12, 13, 14, 12, 14, 15 };
+				write(indices, sizeof(indices));
+			}
+		}
+
+
 		write(vertex_data_size);
 		for (const ImportMesh& import_mesh : meshes)
 		{
 			if (!import_mesh.import) continue;
 			write(import_mesh.vertex_data.getData(), import_mesh.vertex_data.getPos());
 		}
+		writeBillboardVertices(aabb);
 
 		write(sqrtf(radius_squared) * bounding_shape_scale);
 		aabb.min *= bounding_shape_scale;
@@ -1119,11 +1377,48 @@ struct FBXImporter
 	}
 
 
-	void writeMeshes()
+	void writeBillboardMesh(i32 attribute_array_offset, i32 indices_offset, const char* mesh_output_filename)
+	{
+		if (!create_billboard_lod) return;
+
+		int vertex_size = 0;
+		for (auto& mesh : meshes)
+		{
+			if (mesh.import)
+			{
+				vertex_size = getVertexSize(*mesh.fbx);
+				break;
+			}
+		}
+		StaticString<MAX_PATH_LENGTH + 10> material_name(mesh_output_filename, "_billboard");
+		i32 length = stringLength(material_name);
+		write((const char*)&length, sizeof(length));
+		write(material_name, length);
+
+		write((const char*)&attribute_array_offset, sizeof(attribute_array_offset));
+		i32 attribute_array_size = 16 * vertex_size;
+		attribute_array_offset += attribute_array_size;
+		write((const char*)&attribute_array_size, sizeof(attribute_array_size));
+
+		write((const char*)&indices_offset, sizeof(indices_offset));
+		i32 mesh_tri_count = 8;
+		indices_offset += mesh_tri_count * 3;
+		write((const char*)&mesh_tri_count, sizeof(mesh_tri_count));
+
+		const char* mesh_name = "billboard";
+		length = stringLength(mesh_name);
+
+		write((const char*)&length, sizeof(length));
+		write(mesh_name, length);
+	}
+
+
+	void writeMeshes(const char* mesh_output_filename)
 	{
 		i32 mesh_count = 0;
 		for (ImportMesh& mesh : meshes)
 			if (mesh.import) ++mesh_count;
+		if (create_billboard_lod) ++mesh_count;
 		write(mesh_count);
 
 		i32 attr_offset = 0;
@@ -1158,6 +1453,8 @@ struct FBXImporter
 			write(name_len);
 			write(name, strlen(name));
 		}
+
+		writeBillboardMesh(attr_offset, indices_offset, mesh_output_filename);
 	}
 
 
@@ -1221,6 +1518,12 @@ struct FBXImporter
 		for (int i = 1; i < Lumix::lengthOf(lods); ++i)
 		{
 			if (lods[i] < lods[i - 1]) lods[i] = lods[i - 1];
+		}
+
+		if (create_billboard_lod)
+		{
+			lods[lod_count] = last_mesh_idx + 1;
+			++lod_count;
 		}
 
 		write((const char*)&lod_count, sizeof(lod_count));
@@ -1404,7 +1707,7 @@ struct FBXImporter
 	{
 		writeModel(output_dir, output_mesh_filename);
 		writeAnimations(output_dir);
-		writeMaterials(output_dir, texture_output_dir);
+		writeMaterials(output_dir, texture_output_dir, output_mesh_filename);
 		writePhysics();
 
 		return true;
@@ -1439,7 +1742,7 @@ struct FBXImporter
 
 		dialog.setImportMessage("Writing model...", 0.5f);
 		writeModelHeader();
-		writeMeshes();
+		writeMeshes(output_mesh_filename);
 		writeGeometry();
 		writeSkeleton();
 		writeLODs();
@@ -1493,6 +1796,7 @@ struct FBXImporter
 	bool ignore_skeleton = false;
 	bool import_vertex_colors = true;
 	bool make_convex = false;
+	bool create_billboard_lod = false;
 	Orientation orientation = Orientation::Y_UP;
 	Orientation root_orientation = Orientation::Y_UP;
 };
@@ -1513,88 +1817,6 @@ enum class VertexAttributeDef : u32
 	SHORT4,
 	BYTE4,
 	NONE
-};
-
-
-#pragma pack(1)
-struct BillboardVertex
-{
-	Vec3 pos;
-	u8 normal[4];
-	u8 tangent[4];
-	Vec2 uv;
-};
-#pragma pack()
-
-
-static const int TEXTURE_SIZE = 512;
-static crn_comp_params s_default_comp_params;
-
-
-static int ceilPowOf2(int value)
-{
-	ASSERT(value > 0);
-	int ret = value - 1;
-	ret |= ret >> 1;
-	ret |= ret >> 2;
-	ret |= ret >> 3;
-	ret |= ret >> 8;
-	ret |= ret >> 16;
-	return ret + 1;
-}
-
-
-struct BillboardSceneData
-{
-	int width;
-	int height;
-	float ortho_size;
-	Vec3 position;
-
-
-	BillboardSceneData(const AABB& aabb, int texture_size)
-	{
-		Vec3 size = aabb.max - aabb.min;
-		float right = aabb.max.x + size.z + size.x + size.z;
-		float left = aabb.min.x;
-		position.set((right + left) * 0.5f, (aabb.max.y + aabb.min.y) * 0.5f, aabb.max.z + 5);
-
-		if (2 * size.x + 2 * size.z > size.y)
-		{
-			width = texture_size;
-			int nonceiled_height = int(width / (2 * size.x + 2 * size.z) * size.y);
-			height = ceilPowOf2(nonceiled_height);
-			ortho_size = size.y * height / nonceiled_height * 0.5f;
-		}
-		else
-		{
-			height = texture_size;
-			width = ceilPowOf2(int(height * (2 * size.x + 2 * size.z) / size.y));
-			ortho_size = size.y * 0.5f;
-		}
-	}
-
-
-	Matrix computeMVPMatrix()
-	{
-		Matrix mvp = Matrix::IDENTITY;
-
-		float ratio = height > 0 ? (float)width / height : 1.0f;
-		Matrix proj;
-		proj.setOrtho(-ortho_size * ratio,
-			ortho_size * ratio,
-			-ortho_size,
-			ortho_size,
-			0.0001f,
-			10000.0f,
-			false /* we do not care for z value, so both true and false are correct*/);
-
-		mvp.setTranslation(position);
-		mvp.fastInverse();
-		mvp = proj * mvp;
-
-		return mvp;
-	}
 };
 
 
@@ -1701,7 +1923,7 @@ int setParams(lua_State* L)
 	}
 	lua_pop(L, 1);
 
-	LuaWrapper::getOptionalField(L, 1, "create_billboard", &dlg->m_model.create_billboard_lod);
+	LuaWrapper::getOptionalField(L, 1, "create_billboard", &dlg->m_fbx_importer->create_billboard_lod);
 	LuaWrapper::getOptionalField(L, 1, "center_meshes", &dlg->m_fbx_importer->center_mesh);
 	LuaWrapper::getOptionalField(L, 1, "import_vertex_colors", &dlg->m_fbx_importer->import_vertex_colors);
 	LuaWrapper::getOptionalField(L, 1, "scale", &dlg->m_fbx_importer->mesh_scale);
@@ -2134,7 +2356,6 @@ ImportAssetDialog::ImportAssetDialog(StudioApp& app)
 
 	m_image.data = nullptr;
 
-	m_model.create_billboard_lod = false;
 	m_is_opened = false;
 	m_message[0] = '\0';
 	m_import_message[0] = '\0';
@@ -2260,7 +2481,7 @@ bool ImportAssetDialog::checkSource()
 	ASSERT(!m_task);
 	m_sources.emplace(m_source);
 	setImportMessage("Importing...", -1);
-	m_task = makeTask([this]() { m_fbx_importer->addSource(m_source); }, allocator);
+	m_task = makeTask([this]() { m_fbx_importer->addSource(m_source); }, [](){}, allocator);
 	m_task->create("Import mesh");
 	return true;
 }
@@ -2306,7 +2527,6 @@ void ImportAssetDialog::saveModelMetadata()
 
 	OutputBlob blob(m_editor.getAllocator());
 	blob.reserve(1024);
-	blob.write(&m_model, sizeof(m_model));
 	blob.write(m_fbx_importer->meshes.size());
 	for (auto& i : m_fbx_importer->meshes)
 	{
@@ -2789,9 +3009,11 @@ static bool createBillboard(ImportAssetDialog& dialog,
 
 	auto* model = render_scene->getModelInstanceModel(mesh_cmp);
 	int width = 640, height = 480;
+	float original_lod_0 = FLT_MAX;
 	if (model->isReady())
 	{
 		auto* lods = model->getLODs();
+		original_lod_0 = lods[0].distance;
 		lods[0].distance = FLT_MAX;
 		AABB aabb = model->getAABB();
 		Vec3 size = aabb.max - aabb.min;
@@ -2847,6 +3069,12 @@ static bool createBillboard(ImportAssetDialog& dialog,
 	bgfx::frame(); // submit
 	bgfx::frame(); // wait for gpu
 
+	if (model->isReady())
+	{
+		auto* lods = model->getLODs();
+		lods[0].distance = original_lod_0;
+	}
+
 	preprocessBillboard((u32*)&data[0], width, height, engine.getAllocator());
 	preprocessBillboardNormalmap((u32*)&data_normal[0], width, height, engine.getAllocator());
 	saveAsDDS(dialog, "billboard_generator", (u8*)&data[0], width, height, true, false, out_path.c_str());
@@ -2855,6 +3083,7 @@ static bool createBillboard(ImportAssetDialog& dialog,
 	bgfx::destroyTexture(normal_texture);
 	Pipeline::destroy(pipeline);
 	engine.destroyUniverse(universe);
+	
 	return true;
 }
 
@@ -2869,23 +3098,9 @@ void ImportAssetDialog::convert(bool use_ui)
 		return;
 	}
 
-	if (m_model.create_billboard_lod)
+	for (ofbx::IScene* scene : m_fbx_importer->scenes)
 	{
-		PathBuilder mesh_path(m_output_dir, "/");
-		mesh_path << m_mesh_output_filename << ".msh";
-
-		if (m_texture_output_dir[0])
-		{
-			PathBuilder texture_path(m_texture_output_dir, m_mesh_output_filename, "_billboard.dds");
-			PathBuilder normal_texture_path(m_texture_output_dir, m_mesh_output_filename, "_billboard_normal.dds");
-			createBillboard(*this, Path(mesh_path), Path(texture_path), Path(normal_texture_path), TEXTURE_SIZE);
-		}
-		else
-		{
-			PathBuilder texture_path(m_output_dir, "/", m_mesh_output_filename, "_billboard.dds");
-			PathBuilder normal_texture_path(m_output_dir, "/", m_mesh_output_filename, "_billboard_normal.dds");
-			createBillboard(*this, Path(mesh_path), Path(texture_path), Path(normal_texture_path), TEXTURE_SIZE);
-		}
+		if (!m_fbx_importer->isValid(*scene)) return;
 	}
 
 	for (auto& material : m_fbx_importer->materials)
@@ -2904,81 +3119,115 @@ void ImportAssetDialog::convert(bool use_ui)
 	saveModelMetadata();
 
 	IAllocator& allocator = m_editor.getAllocator();
-	m_task = makeTask([this]() {
-		char output_dir[MAX_PATH_LENGTH];
-		m_editor.makeAbsolute(output_dir, lengthOf(output_dir), m_output_dir);
-		char tmp[MAX_PATH_LENGTH];
-		char texture_output_dir[MAX_PATH_LENGTH];
-		PathUtils::normalize(m_texture_output_dir, texture_output_dir, lengthOf(texture_output_dir));
-		m_editor.makeRelative(tmp, lengthOf(tmp), texture_output_dir);
-		copyString(texture_output_dir, tmp[0] ? "/" : "");
-		catString(texture_output_dir, tmp);
-		if (m_fbx_importer->save(output_dir, m_mesh_output_filename, texture_output_dir))
-		{
-			for (auto& mat : m_fbx_importer->materials)
+	m_task = makeTask(
+		[this]() {
+			char output_dir[MAX_PATH_LENGTH];
+			m_editor.makeAbsolute(output_dir, lengthOf(output_dir), m_output_dir);
+			char tmp[MAX_PATH_LENGTH];
+			char texture_output_dir[MAX_PATH_LENGTH];
+			PathUtils::normalize(m_texture_output_dir, texture_output_dir, lengthOf(texture_output_dir));
+			m_editor.makeRelative(tmp, lengthOf(tmp), texture_output_dir);
+			copyString(texture_output_dir, tmp[0] ? "/" : "");
+			catString(texture_output_dir, tmp);
+			if (m_fbx_importer->save(output_dir, m_mesh_output_filename, texture_output_dir))
 			{
-				for (int i = 0; i < lengthOf(mat.textures); ++i)
+				for (auto& mat : m_fbx_importer->materials)
 				{
-					auto& tex = mat.textures[i];
-
-					if (!tex.fbx) continue;
-					if (!tex.import) continue;
-
-					PathUtils::FileInfo texture_info(tex.src);
-					PathBuilder dest(m_texture_output_dir[0] ? m_texture_output_dir : m_output_dir);
-					dest << "/" << texture_info.m_basename << (tex.to_dds ? ".dds" : texture_info.m_extension);
-
-					bool is_src_dds = equalStrings(texture_info.m_extension, "dds");
-					if (tex.to_dds && !is_src_dds)
+					for (int i = 0; i < lengthOf(mat.textures); ++i)
 					{
-						int image_width, image_height, image_comp;
-						auto data = stbi_load(tex.src, &image_width, &image_height, &image_comp, 4);
-						if (!data)
-						{
-							StaticString<MAX_PATH_LENGTH + 20> error_msg("Could not load image ", tex.src);
-							setMessage(error_msg);
-							return;
-						}
+						auto& tex = mat.textures[i];
 
-						bool is_normal_map = i == FBXImporter::ImportTexture::NORMAL;
-						if (!saveAsDDS(*this,
-							tex.src,
-							data,
-							image_width,
-							image_height,
-							image_comp == 4,
-							is_normal_map,
-							dest))
+						if (!tex.fbx) continue;
+						if (!tex.import) continue;
+
+						PathUtils::FileInfo texture_info(tex.src);
+						PathBuilder dest(m_texture_output_dir[0] ? m_texture_output_dir : m_output_dir);
+						dest << "/" << texture_info.m_basename << (tex.to_dds ? ".dds" : texture_info.m_extension);
+
+						bool is_src_dds = equalStrings(texture_info.m_extension, "dds");
+						if (tex.to_dds && !is_src_dds)
 						{
-							stbi_image_free(data);
-							setMessage(StaticString<MAX_PATH_LENGTH * 2 + 20>("Error converting ", tex.src, " to ", dest));
-							return;
-						}
-						stbi_image_free(data);
-					}
-					else
-					{
-						if (equalStrings(tex.src, dest))
-						{
-							if (!PlatformInterface::fileExists(tex.src))
+							int image_width, image_height, image_comp;
+							auto data = stbi_load(tex.src, &image_width, &image_height, &image_comp, 4);
+							if (!data)
 							{
-								setMessage(StaticString<MAX_PATH_LENGTH + 20>(tex.src, " not found"));
+								StaticString<MAX_PATH_LENGTH + 20> error_msg("Could not load image ", tex.src);
+								setMessage(error_msg);
+								return;
+							}
+
+							bool is_normal_map = i == FBXImporter::ImportTexture::NORMAL;
+							if (!saveAsDDS(*this,
+									tex.src,
+									data,
+									image_width,
+									image_height,
+									image_comp == 4,
+									is_normal_map,
+									dest))
+							{
+								stbi_image_free(data);
+								setMessage(
+									StaticString<MAX_PATH_LENGTH * 2 + 20>("Error converting ", tex.src, " to ", dest));
+								return;
+							}
+							stbi_image_free(data);
+						}
+						else
+						{
+							if (equalStrings(tex.src, dest))
+							{
+								if (!PlatformInterface::fileExists(tex.src))
+								{
+									setMessage(StaticString<MAX_PATH_LENGTH + 20>(tex.src, " not found"));
+									return;
+								}
+							}
+							else if (!copyFile(tex.src, dest))
+							{
+								setMessage(
+									StaticString<MAX_PATH_LENGTH * 2 + 20>("Error copying ", tex.src, " to ", dest));
 								return;
 							}
 						}
-						else if (!copyFile(tex.src, dest))
-						{
-							setMessage(StaticString<MAX_PATH_LENGTH * 2 + 20>("Error copying ", tex.src, " to ", dest));
-							return;
-						}
 					}
 				}
-			}
 
-			setMessage("Success.");
-		}
-	}, allocator);
+				setMessage("Success.");
+			}
+		},
+		[this]() {
+			if (m_fbx_importer->create_billboard_lod)
+			{
+				PathBuilder mesh_path(m_output_dir, "/");
+				mesh_path << m_mesh_output_filename << ".msh";
+
+				if (m_texture_output_dir[0])
+				{
+					PathBuilder texture_path(m_texture_output_dir, m_mesh_output_filename, "_billboard.dds");
+					PathBuilder normal_texture_path(
+						m_texture_output_dir, m_mesh_output_filename, "_billboard_normal.dds");
+					createBillboard(*this,
+						Path(mesh_path),
+						Path(texture_path),
+						Path(normal_texture_path),
+						BillboardSceneData::TEXTURE_SIZE);
+				}
+				else
+				{
+					PathBuilder texture_path(m_output_dir, "/", m_mesh_output_filename, "_billboard.dds");
+					PathBuilder normal_texture_path(m_output_dir, "/", m_mesh_output_filename, "_billboard_normal.dds");
+					createBillboard(*this,
+						Path(mesh_path),
+						Path(texture_path),
+						Path(normal_texture_path),
+						BillboardSceneData::TEXTURE_SIZE);
+				}
+			}
+		},
+		allocator);
 	m_task->create("ConvertTask");
+
 }
 
 
@@ -3037,6 +3286,18 @@ void ImportAssetDialog::onWindowGUI()
 		return;
 	}
 
+	if (m_task)
+	{
+		checkTask(false);
+		{
+			MT::SpinLock lock(m_mutex);
+			ImGui::Text("%s", m_import_message);
+			if (m_progress_fraction >= 0) ImGui::ProgressBar(m_progress_fraction);
+		}
+		ImGui::EndDock();
+		return;
+	}
+
 	if (hasMessage())
 	{
 		char msg[1024];
@@ -3068,17 +3329,6 @@ void ImportAssetDialog::onWindowGUI()
 		return;
 	}
 
-	if (m_task)
-	{
-		checkTask(false);
-		{
-			MT::SpinLock lock(m_mutex);
-			ImGui::Text("%s", m_import_message);
-			if (m_progress_fraction >= 0) ImGui::ProgressBar(m_progress_fraction);
-		}
-		ImGui::EndDock();
-		return;
-	}
 
 	if (ImGui::Button("Add source"))
 	{
@@ -3099,7 +3349,7 @@ void ImportAssetDialog::onWindowGUI()
 	{
 		if (ImGui::CollapsingHeader("Advanced"))
 		{
-			ImGui::Checkbox("Create billboard LOD", &m_model.create_billboard_lod);
+			ImGui::Checkbox("Create billboard LOD", &m_fbx_importer->create_billboard_lod);
 			ImGui::Checkbox("Center meshes", &m_fbx_importer->center_mesh);
 			ImGui::Checkbox("Import Vertex Colors", &m_fbx_importer->import_vertex_colors);
 			ImGui::DragFloat("Scale", &m_fbx_importer->mesh_scale, 0.01f, 0.001f, 0);
