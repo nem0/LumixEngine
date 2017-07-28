@@ -26,8 +26,6 @@ public:
 	GameView(StudioApp& app);
 	~GameView();
 
-	void init(WorldEditor& editor);
-	void shutdown();
 	void setScene(RenderScene* scene);
 	bool isMouseCaptured() const { return m_is_mouse_captured; }
 	void captureMouse(bool capture);
@@ -51,7 +49,7 @@ private:
 
 private:
 	Pipeline* m_pipeline;
-	WorldEditor* m_editor;
+	WorldEditor& m_editor;
 	float m_time_multiplier;
 	StudioApp& m_studio_app;
 	Vec2 m_pos;
