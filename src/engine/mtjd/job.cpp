@@ -7,6 +7,8 @@ namespace Lumix
 {
 namespace MTJD
 {
+
+
 Job::Job(int flags,
 	Priority priority,
 	Manager& manager,
@@ -29,25 +31,17 @@ Job::~Job()
 
 void Job::incrementDependency()
 {
-#if !LUMIX_SINGLE_THREAD()
-
 	MT::atomicIncrement(&m_dependency_count);
 	ASSERT(!m_scheduled);
-
-#endif
 }
 
 void Job::decrementDependency()
 {
-#if !LUMIX_SINGLE_THREAD()
-
 	u32 count = MT::atomicDecrement(&m_dependency_count);
 	if (1 == count)
 	{
 		m_manager.schedule(this);
 	}
-
-#endif
 }
 
 void Job::onExecuted()
@@ -62,5 +56,7 @@ void Job::onExecuted()
 		LUMIX_DELETE(m_job_allocator, this);
 	}
 }
+
+
 } // namepsace MTJD
 } // namepsace Lumix

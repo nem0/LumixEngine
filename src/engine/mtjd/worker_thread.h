@@ -7,9 +7,6 @@
 #include "engine/mtjd/manager.h"
 
 
-#if !LUMIX_SINGLE_THREAD()
-
-
 namespace Lumix
 {
 
@@ -38,6 +35,3 @@ private:
 
 } // namepsace MTJD
 } // namepsace Lumix
-
-
-#endif

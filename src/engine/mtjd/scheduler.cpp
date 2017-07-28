@@ -4,9 +4,6 @@
 #include "engine/profiler.h"
 
 
-#if !LUMIX_SINGLE_THREAD()
-
-
 namespace Lumix
 {
 namespace MTJD
@@ -48,4 +45,3 @@ void Scheduler::dataSignal()
 } // namepsace Lumix
 
 
-#endif
