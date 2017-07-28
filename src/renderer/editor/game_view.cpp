@@ -53,7 +53,6 @@ GameView::GameView(StudioApp& app)
 	, m_pipeline(nullptr)
 	, m_is_mouse_captured(false)
 	, m_is_ingame_cursor(false)
-	, m_editor(nullptr)
 	, m_is_mouse_hovering_window(false)
 	, m_time_multiplier(1.0f)
 	, m_paused(false)
@@ -61,6 +60,7 @@ GameView::GameView(StudioApp& app)
 	, m_show_stats(false)
 	, m_texture_handle(BGFX_INVALID_HANDLE)
 	, m_gui_interface(nullptr)
+	, m_editor(*app.getWorldEditor())
 {
 	Engine& engine = app.getWorldEditor()->getEngine();
 	auto f = &LuaWrapper::wrapMethodClosure<GameView, decltype(&GameView::forceViewport), &GameView::forceViewport>;
@@ -71,13 +71,39 @@ GameView::GameView(StudioApp& app)
 	action->func.bind<GameView, &GameView::onAction>(this);
 	action->is_selected.bind<GameView, &GameView::isOpened>(this);
 	app.addWindowAction(action);
-	init(editor); // TODO move content of init here
+
+	auto* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
+	m_is_opengl = renderer->isOpenGL();
+	Path path("pipelines/game_view.lua");
+	m_pipeline = Pipeline::create(*renderer, path, engine.getAllocator());
+	m_pipeline->load();
+
+	editor.universeCreated().bind<GameView, &GameView::onUniverseCreated>(this);
+	editor.universeDestroyed().bind<GameView, &GameView::onUniverseDestroyed>(this);
+	if (editor.getUniverse()) onUniverseCreated();
+
+	auto* gui = static_cast<GUISystem*>(engine.getPluginManager().getPlugin("gui"));
+	if (gui)
+	{
+		m_gui_interface = LUMIX_NEW(engine.getAllocator(), GUIInterface)(*this);
+		gui->setInterface(m_gui_interface);
+	}
 }
 
 
 GameView::~GameView()
 {
-	shutdown();
+	m_editor.universeCreated().unbind<GameView, &GameView::onUniverseCreated>(this);
+	m_editor.universeDestroyed().unbind<GameView, &GameView::onUniverseDestroyed>(this);
+	auto* gui = static_cast<GUISystem*>(m_editor.getEngine().getPluginManager().getPlugin("gui"));
+	if (gui)
+	{
+		gui->setInterface(nullptr);
+		LUMIX_DELETE(m_editor.getEngine().getAllocator(), m_gui_interface);
+	}
+	Pipeline::destroy(m_pipeline);
+	m_pipeline = nullptr;
+
 }
 
 
@@ -93,7 +119,7 @@ void GameView::enableIngameCursor(bool enable)
 
 void GameView::onUniverseCreated()
 {
-	auto* scene = m_editor->getUniverse()->getScene(crc32("renderer"));
+	auto* scene = m_editor.getUniverse()->getScene(crc32("renderer"));
 	m_pipeline->setScene(static_cast<RenderScene*>(scene));
 }
 
@@ -103,43 +129,6 @@ void GameView::onUniverseDestroyed()
 	m_pipeline->setScene(nullptr);
 }
 
-
-void GameView::init(WorldEditor& editor)
-{
-	m_editor = &editor;
-	auto& engine = editor.getEngine();
-	auto* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
-	m_is_opengl = renderer->isOpenGL();
-	Path path("pipelines/game_view.lua");
-	m_pipeline = Pipeline::create(*renderer, path, engine.getAllocator());
-	m_pipeline->load();
-
-	editor.universeCreated().bind<GameView, &GameView::onUniverseCreated>(this);
-	editor.universeDestroyed().bind<GameView, &GameView::onUniverseDestroyed>(this);
-	if(editor.getUniverse()) onUniverseCreated();
-
-	auto* gui = static_cast<GUISystem*>(m_editor->getEngine().getPluginManager().getPlugin("gui"));
-	if (gui)
-	{
-		m_gui_interface = LUMIX_NEW(m_editor->getEngine().getAllocator(), GUIInterface)(*this);
-		gui->setInterface(m_gui_interface);
-	}
-}
-
-
-void GameView::shutdown()
-{
-	m_editor->universeCreated().unbind<GameView, &GameView::onUniverseCreated>(this);
-	m_editor->universeDestroyed().unbind<GameView, &GameView::onUniverseDestroyed>(this);
-	auto* gui = static_cast<GUISystem*>(m_editor->getEngine().getPluginManager().getPlugin("gui"));
-	if (gui)
-	{
-		gui->setInterface(nullptr);
-		LUMIX_DELETE(m_editor->getEngine().getAllocator(), m_gui_interface);
-	}
-	Pipeline::destroy(m_pipeline);
-	m_pipeline = nullptr;
-}
 
 
 void GameView::setScene(RenderScene* scene)
@@ -153,7 +142,7 @@ void GameView::captureMouse(bool capture)
 	if (m_is_mouse_captured == capture) return;
 
 	m_is_mouse_captured = capture;
-	m_editor->getEngine().getInputSystem().enable(m_is_mouse_captured);
+	m_editor.getEngine().getInputSystem().enable(m_is_mouse_captured);
 	SDL_ShowCursor(capture && !m_is_ingame_cursor ? 0 : 1);
 	SDL_SetRelativeMouseMode(capture && !m_is_ingame_cursor ? SDL_TRUE : SDL_FALSE);
 	if (capture) SDL_GetMouseState(&m_captured_mouse_x, &m_captured_mouse_y);
@@ -200,7 +189,7 @@ void GameView::onFullscreenGUI()
 	m_pipeline->render();
 	ImGui::End();
 
-	if (m_is_fullscreen && (io.KeysDown[ImGui::GetKeyIndex(ImGuiKey_Escape)] || !m_editor->isGameMode()))
+	if (m_is_fullscreen && (io.KeysDown[ImGui::GetKeyIndex(ImGuiKey_Escape)] || !m_editor.isGameMode()))
 	{
 		setFullscreen(false);
 	}
@@ -240,7 +229,7 @@ void GameView::onStatsGUI(const ImVec2& view_pos)
 		toCStringPretty(stats.triangle_count, buf, lengthOf(buf));
 		ImGui::LabelText("Triangles", "%s", buf);
 		ImGui::LabelText("Resolution", "%dx%d", m_pipeline->getWidth(), m_pipeline->getHeight());
-		ImGui::LabelText("FPS", "%.2f", m_editor->getEngine().getFPS());
+		ImGui::LabelText("FPS", "%.2f", m_editor.getEngine().getFPS());
 		ImGui::LabelText("CPU time", "%.2f", m_pipeline->getCPUTime() * 1000.0f);
 		ImGui::LabelText("GPU time", "%.2f", m_pipeline->getGPUTime() * 1000.0f);
 		ImGui::LabelText("Waiting for submit", "%.2f", m_pipeline->getWaitSubmitTime() * 1000.0f);
@@ -268,7 +257,7 @@ void GameView::onWindowGUI()
 
 	bool is_focus = (SDL_GetWindowFlags(m_studio_app.getWindow()) & SDL_WINDOW_INPUT_FOCUS) != 0;
 	if (m_is_mouse_captured &&
-		(io.KeysDown[ImGui::GetKeyIndex(ImGuiKey_Escape)] || !m_editor->isGameMode() || !is_focus))
+		(io.KeysDown[ImGui::GetKeyIndex(ImGuiKey_Escape)] || !m_editor.isGameMode() || !is_focus))
 	{
 		captureMouse(false);
 	}
@@ -322,24 +311,24 @@ void GameView::onWindowGUI()
 
 			if (ImGui::Checkbox("Pause", &m_paused))
 			{
-				m_editor->getEngine().pause(m_paused);
+				m_editor.getEngine().pause(m_paused);
 			}
 			if (m_paused)
 			{
 				ImGui::SameLine();
 				if (ImGui::Button("Next frame"))
 				{
-					m_editor->getEngine().nextFrame();
+					m_editor.getEngine().nextFrame();
 				}
 			}
 			ImGui::SameLine();
 			ImGui::PushItemWidth(50);
 			if (ImGui::DragFloat("Time multiplier", &m_time_multiplier, 0.01f, 0.01f, 30.0f))
 			{
-				m_editor->getEngine().setTimeMultiplier(m_time_multiplier);
+				m_editor.getEngine().setTimeMultiplier(m_time_multiplier);
 			}
 			ImGui::PopItemWidth();
-			if(m_editor->isGameMode())
+			if(m_editor.isGameMode())
 			{
 				ImGui::SameLine();
 				if (ImGui::Button("Fullscreen"))
@@ -353,13 +342,13 @@ void GameView::onWindowGUI()
 			m_pipeline->callLuaFunction("onGUI");
 		}
 
-		if (m_is_mouse_captured && (io.KeysDown[ImGui::GetKeyIndex(ImGuiKey_Escape)] || !m_editor->isGameMode()))
+		if (m_is_mouse_captured && (io.KeysDown[ImGui::GetKeyIndex(ImGuiKey_Escape)] || !m_editor.isGameMode()))
 		{
 			captureMouse(false);
 		}
 
 		if (ImGui::IsMouseHoveringRect(content_min, content_max) && m_is_mouse_hovering_window &&
-			ImGui::IsMouseClicked(0) && m_editor->isGameMode())
+			ImGui::IsMouseClicked(0) && m_editor.isGameMode())
 		{
 			captureMouse(true);
 		}

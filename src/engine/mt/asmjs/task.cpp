@@ -5,9 +5,6 @@
 #include "engine/profiler.h"
 
 
-#if !LUMIX_SINGLE_THREAD()
-
-
 namespace Lumix
 {
 namespace MT
@@ -78,6 +75,3 @@ void Task::forceExit(bool wait)
 
 } // namespace MT
 } // namespace Lumix
-
-
-#endif
