@@ -15,20 +15,17 @@ namespace MTJD
 
 struct ManagerImpl LUMIX_FINAL : public Manager
 {
-	typedef MT::LockFreeFixedQueue<Job*, 512>	JobsTable;
-	typedef Array<JobTrans*>					TransTable;
+	typedef MT::LockFreeFixedQueue<Job*, 512> JobsTable;
+	typedef Array<JobTrans*> TransTable;
 
 
 	ManagerImpl(IAllocator& allocator)
 		: m_scheduling_counter(0)
-		#if !LUMIX_SINGLE_THREAD()
-			, m_scheduler(*this, allocator)
-		#endif
+		, m_scheduler(*this, allocator)
 		, m_worker_tasks(allocator)
 		, m_allocator(allocator)
 		, m_pending_trans(allocator)
 	{
-#if !LUMIX_SINGLE_THREAD()
 		u32 threads_num = getCpuThreadsCount();
 
 		m_scheduler.create("MTJD::Scheduler");
@@ -40,14 +37,10 @@ struct ManagerImpl LUMIX_FINAL : public Manager
 			task.create("MTJD::WorkerTask", this, &m_trans_queue);
 			task.setAffinityMask(getAffinityMask(i));
 		}
-
-#endif
 	}
 
 	~ManagerImpl()
 	{
-#if !LUMIX_SINGLE_THREAD()
-
 		u32 threads_num = getCpuThreadsCount();
 		for (u32 i = 0; i < threads_num; ++i)
 		{
@@ -62,21 +55,11 @@ struct ManagerImpl LUMIX_FINAL : public Manager
 		m_scheduler.forceExit(false);
 		m_scheduler.dataSignal();
 		m_scheduler.destroy();
-
-#endif
 	}
 
 	u32 getCpuThreadsCount() const override
 	{
-#if !LUMIX_SINGLE_THREAD()
-
 		return MT::getCPUsCount() <= 1 ? 1 : MT::getCPUsCount() - 1; // -1 for bgfx thread
-
-#else
-
-		return 1;
-
-#endif
 	}
 
 
@@ -85,9 +68,6 @@ struct ManagerImpl LUMIX_FINAL : public Manager
 		ASSERT(job);
 		ASSERT(false == job->m_scheduled);
 		ASSERT(job->m_dependency_count > 0);
-
-#if !LUMIX_SINGLE_THREAD()
-
 		if (1 == job->getDependenceCount())
 		{
 			job->m_scheduled = true;
@@ -96,13 +76,6 @@ struct ManagerImpl LUMIX_FINAL : public Manager
 
 			m_scheduler.dataSignal();
 		}
-
-#else
-
-		job->execute();
-		job->onExecuted();
-
-#endif
 	}
 
 	void scheduleCpu(Job* job)
@@ -125,8 +98,6 @@ struct ManagerImpl LUMIX_FINAL : public Manager
 
 	void doScheduling() override
 	{
-#if !LUMIX_SINGLE_THREAD()
-
 		u32 count = MT::atomicIncrement(&m_scheduling_counter);
 		if (1 == count)
 		{
@@ -156,14 +127,10 @@ struct ManagerImpl LUMIX_FINAL : public Manager
 				count = MT::atomicDecrement(&m_scheduling_counter);
 			} while (0 < count);
 		}
-
-#endif
 	}
 
 	Job* getNextReadyJob()
 	{
-#if !LUMIX_SINGLE_THREAD()
-
 		for (i32 i = 0; i < (i32)Priority::Count; ++i)
 		{
 			if (!m_ready_to_execute[i].isEmpty())
@@ -175,9 +142,6 @@ struct ManagerImpl LUMIX_FINAL : public Manager
 				return ret;
 			}
 		}
-
-#endif
-
 		return nullptr;
 	}
 
@@ -185,16 +149,12 @@ struct ManagerImpl LUMIX_FINAL : public Manager
 	{
 		ASSERT(job);
 
-#if !LUMIX_SINGLE_THREAD()
-
 		Job** jobEntry = m_ready_to_execute[(i32)job->getPriority()].alloc(true);
 		if (jobEntry)
 		{
 			*jobEntry = job;
 			m_ready_to_execute[(i32)job->getPriority()].push(jobEntry, true);
 		}
-
-#endif
 	}
 
 	u32 getAffinityMask(u32) const
@@ -207,9 +167,7 @@ struct ManagerImpl LUMIX_FINAL : public Manager
 	JobTransQueue		m_trans_queue;
 	TransTable			m_pending_trans;
 	Array<WorkerTask>	m_worker_tasks;
-	#if !LUMIX_SINGLE_THREAD()
-		Scheduler			m_scheduler;
-	#endif
+	Scheduler			m_scheduler;
 
 	volatile i32 m_scheduling_counter;
 

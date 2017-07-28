@@ -77,6 +77,7 @@ GameView::GameView(StudioApp& app)
 
 GameView::~GameView()
 {
+	shutdown();
 }
 
 

@@ -1,97 +1,88 @@
-#include "engine/lumix.h"
 #include "engine/mtjd/group.h"
+#include "engine/lumix.h"
 #include "engine/mt/atomic.h"
 #include "engine/mt/sync.h"
 
+
 namespace Lumix
 {
-	namespace MTJD
+namespace MTJD
+{
+
+
+Group::Group(bool sync_event, IAllocator& allocator)
+	: BaseEntry(0, sync_event, allocator)
+	, m_static_dependency_table(allocator)
+{
+}
+
+
+Group::~Group()
+{
+}
+
+
+void Group::addStaticDependency(BaseEntry* entry)
+{
+	m_static_dependency_table.push(entry);
+	if (m_dependency_count > 0)
 	{
-		Group::Group(bool sync_event, IAllocator& allocator)
-			: BaseEntry(0, sync_event, allocator)
-			, m_static_dependency_table(allocator)
-		{
-		}
+		entry->incrementDependency();
+	}
+}
 
-		Group::~Group()
-		{
-		}
 
-		void Group::addStaticDependency(BaseEntry* entry)
-		{
-#if !LUMIX_SINGLE_THREAD()
+void Group::incrementDependency()
+{
+	i32 count = MT::atomicIncrement(&m_dependency_count);
+	if (1 == count)
+	{
+		dependencyNotReady();
+	}
+}
 
-			m_static_dependency_table.push(entry);
-			if (m_dependency_count > 0)
-			{
-				entry->incrementDependency();
-			}
 
-#endif
-		}
+void Group::decrementDependency()
+{
+	i32 count = MT::atomicDecrement(&m_dependency_count);
+	if (0 == count)
+	{
+		dependencyReady();
+	}
 
-		void Group::incrementDependency()
-		{
-#if !LUMIX_SINGLE_THREAD()
+	ASSERT(0 <= count);
+}
 
-			i32 count = MT::atomicIncrement(&m_dependency_count);
-			if (1 == count)
-			{
-				dependencyNotReady();
-			}
 
-#endif
-		}
+void Group::dependencyNotReady()
+{
+	for (u32 i = 0, c = m_static_dependency_table.size(); c > i; ++i)
+	{
+		m_static_dependency_table[i]->incrementDependency();
+	}
 
-		void Group::decrementDependency()
-		{
-#if !LUMIX_SINGLE_THREAD()
+	for (u32 i = 0, c = m_dependency_table.size(); c > i; ++i)
+	{
+		m_dependency_table[i]->incrementDependency();
+	}
 
-			i32 count = MT::atomicDecrement(&m_dependency_count);
-			if (0 == count)
-			{
-				dependencyReady();
-			}
+	if (m_sync_event)
+	{
+		m_sync_event->reset();
+	}
+}
 
-			ASSERT(0 <= count);
 
-#endif
-		}
+void Group::dependencyReady()
+{
+	BaseEntry::dependencyReady();
 
-		void Group::dependencyNotReady()
-		{
-#if !LUMIX_SINGLE_THREAD()
+	for (u32 i = 0, c = m_static_dependency_table.size(); c > i; ++i)
+	{
+		m_static_dependency_table[i]->decrementDependency();
+	}
+}
 
-			for (u32 i = 0, c = m_static_dependency_table.size(); c > i; ++i)
-			{
-				m_static_dependency_table[i]->incrementDependency();
-			}
 
-			for (u32 i = 0, c = m_dependency_table.size(); c > i; ++i)
-			{
-				m_dependency_table[i]->incrementDependency();
-			}
-
-			if (m_sync_event)
-			{
-				m_sync_event->reset();
-			}
-
-#endif
-		}
-
-		void Group::dependencyReady()
-		{
-#if !LUMIX_SINGLE_THREAD()
-
-			BaseEntry::dependencyReady();
-
-			for (u32 i = 0, c = m_static_dependency_table.size(); c > i; ++i)
-			{
-				m_static_dependency_table[i]->decrementDependency();
-			}
-
-#endif
-		}
-	} // namepsace MTJD
+} // namepsace MTJD
 } // namepsace Lumix

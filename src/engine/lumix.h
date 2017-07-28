@@ -1,7 +1,5 @@
 #pragma once
 
-#define LUMIX_SINGLE_THREAD() 0
-
 #ifndef _WIN32
 	#include <signal.h> // SIGTRAP
 #endif

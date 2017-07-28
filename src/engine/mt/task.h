@@ -3,9 +3,6 @@
 #include "engine/lumix.h"
 
 
-#if !LUMIX_SINGLE_THREAD()
-
-
 namespace Lumix
 {
 
@@ -46,6 +43,3 @@ private:
 
 } // namespace MT
 } // namespace Lumix
-
-
-#endif

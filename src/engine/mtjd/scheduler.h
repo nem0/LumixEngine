@@ -4,9 +4,6 @@
 #include "engine/mt/sync.h"
 
 
-#if !LUMIX_SINGLE_THREAD()
-
-
 namespace Lumix
 {
 namespace MTJD
@@ -38,6 +35,3 @@ private:
 
 } // namepsace MTJD
 } // namepsace Lumix
-
-
-#endif
