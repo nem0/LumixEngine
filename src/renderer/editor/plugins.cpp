@@ -1605,26 +1605,19 @@ struct FurPainterPlugin LUMIX_FINAL : public StudioApp::IPlugin
 };
 
 
-struct GameViewPlugin LUMIX_FINAL : public StudioApp::IPlugin
+struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 {
-	static GameViewPlugin* s_instance;
+	static EditorUIRenderPlugin* s_instance;
 
 
-	explicit GameViewPlugin(StudioApp& app, SceneView& scene_view)
+	EditorUIRenderPlugin(StudioApp& app, SceneView& scene_view)
 		: m_app(app)
-		, m_game_view(app)
 		, m_scene_view(scene_view)
 		, m_width(-1)
 		, m_height(-1)
 	{
 		auto& editor = *app.getWorldEditor();
 		m_engine = &editor.getEngine();
-		Action* action = LUMIX_NEW(editor.getAllocator(), Action)("Game View", "game_view");
-		action->func.bind<GameViewPlugin, &GameViewPlugin::onAction>(this);
-		action->is_selected.bind<GameViewPlugin, &GameViewPlugin::isOpened>(this);
-		app.addWindowAction(action);
-		m_game_view.m_is_opened = false;
-		m_game_view.init(editor);
 
 		auto& plugin_manager = editor.getEngine().getPluginManager();
 		auto* renderer = static_cast<Renderer*>(plugin_manager.getPlugin("renderer"));
@@ -1661,26 +1654,23 @@ struct GameViewPlugin LUMIX_FINAL : public StudioApp::IPlugin
 
 		ImGui::GetIO().RenderDrawListsFn = imGuiCallback;
 
-		editor.universeCreated().bind<GameViewPlugin, &GameViewPlugin::onUniverseCreated>(this);
-		editor.universeDestroyed().bind<GameViewPlugin, &GameViewPlugin::onUniverseDestroyed>(this);
+		editor.universeCreated().bind<EditorUIRenderPlugin, &EditorUIRenderPlugin::onUniverseCreated>(this);
+		editor.universeDestroyed().bind<EditorUIRenderPlugin, &EditorUIRenderPlugin::onUniverseDestroyed>(this);
 	}
 
 
-	~GameViewPlugin()
+	~EditorUIRenderPlugin()
 	{
 		Pipeline::destroy(m_gui_pipeline);
 		auto& editor = *m_app.getWorldEditor();
-		editor.universeCreated().unbind<GameViewPlugin, &GameViewPlugin::onUniverseCreated>(this);
-		editor.universeDestroyed().unbind<GameViewPlugin, &GameViewPlugin::onUniverseDestroyed>(this);
+		editor.universeCreated().unbind<EditorUIRenderPlugin, &EditorUIRenderPlugin::onUniverseCreated>(this);
+		editor.universeDestroyed().unbind<EditorUIRenderPlugin, &EditorUIRenderPlugin::onUniverseDestroyed>(this);
 		shutdownImGui();
-		m_game_view.shutdown();
 	}
 
 
-	const char* getName() const override { return "game_view"; }
-
-
-	bool isOpened() const { return m_game_view.m_is_opened; }
+	void onWindowGUI() override {}
+	const char* getName() const override { return "editor_ui_render"; }
 
 
 	void shutdownImGui()
@@ -1814,21 +1804,17 @@ struct GameViewPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	}
 
 
-	void onAction() { m_game_view.m_is_opened = !m_game_view.m_is_opened; }
-	void onWindowGUI() override { m_game_view.onGUI(); }
-
 	int m_width;
 	int m_height;
 	StudioApp& m_app;
 	Engine* m_engine;
 	Material* m_material;
 	Pipeline* m_gui_pipeline;
-	GameView m_game_view;
 	SceneView& m_scene_view;
 };
 
 
-GameViewPlugin* GameViewPlugin::s_instance = nullptr;
+EditorUIRenderPlugin* EditorUIRenderPlugin::s_instance = nullptr;
 
 
 struct ShaderEditorPlugin LUMIX_FINAL : public StudioApp::IPlugin
@@ -2212,7 +2198,8 @@ LUMIX_STUDIO_ENTRY(renderer)
 	auto* scene_view_plugin = LUMIX_NEW(allocator, SceneView)(app);
 	app.addPlugin(*scene_view_plugin);
 	app.addPlugin(*LUMIX_NEW(allocator, ImportAssetDialog)(app));
-	app.addPlugin(*LUMIX_NEW(allocator, GameViewPlugin)(app, *scene_view_plugin));
+	app.addPlugin(*LUMIX_NEW(allocator, GameView)(app));
+	app.addPlugin(*LUMIX_NEW(allocator, EditorUIRenderPlugin)(app, *scene_view_plugin));
 	app.addPlugin(*LUMIX_NEW(allocator, FurPainterPlugin)(app));
 	app.addPlugin(*LUMIX_NEW(allocator, ShaderEditorPlugin)(app));
 
