@@ -1,7 +1,8 @@
 #pragma once
 
 
-#include "editor/world_editor.h"
+#include "editor/studio_app.h"
+#include "engine/vec.h"
 #include <bgfx/bgfx.h>
 
 
@@ -18,7 +19,7 @@ class Pipeline;
 class RenderScene;
 
 
-class GameView
+class GameView : public StudioApp::IPlugin
 {
 friend struct GUIInterface;
 public:
@@ -27,15 +28,18 @@ public:
 
 	void init(WorldEditor& editor);
 	void shutdown();
-	void onGUI();
 	void setScene(RenderScene* scene);
 	bool isMouseCaptured() const { return m_is_mouse_captured; }
 	void captureMouse(bool capture);
 	void enableIngameCursor(bool enable);
 	void forceViewport(bool enable, int w, int h);
+	const char* getName() const override { return "game_view"; }
+	bool isOpened() const { return m_is_open; }
+	void onAction() { m_is_open = !m_is_open; }
+	void onWindowGUI() override;
 
 public:
-	bool m_is_opened;
+	bool m_is_open;
 
 private:
 	void onUniverseCreated();

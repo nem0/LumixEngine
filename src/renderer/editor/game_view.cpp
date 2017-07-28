@@ -1,6 +1,8 @@
 #include "game_view.h"
 #include "editor/platform_interface.h"
 #include "editor/studio_app.h"
+#include "editor/utils.h"
+#include "editor/world_editor.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/input_system.h"
@@ -46,7 +48,7 @@ struct GUIInterface : GUISystem::Interface
 
 GameView::GameView(StudioApp& app)
 	: m_studio_app(app)
-	, m_is_opened(true)
+	, m_is_open(false)
 	, m_is_fullscreen(false)
 	, m_pipeline(nullptr)
 	, m_is_mouse_captured(false)
@@ -63,6 +65,13 @@ GameView::GameView(StudioApp& app)
 	Engine& engine = app.getWorldEditor()->getEngine();
 	auto f = &LuaWrapper::wrapMethodClosure<GameView, decltype(&GameView::forceViewport), &GameView::forceViewport>;
 	LuaWrapper::createSystemClosure(engine.getState(), "GameView", this, "forceViewport", f);
+
+	WorldEditor& editor = *app.getWorldEditor();
+	Action* action = LUMIX_NEW(editor.getAllocator(), Action)("Game View", "game_view");
+	action->func.bind<GameView, &GameView::onAction>(this);
+	action->is_selected.bind<GameView, &GameView::isOpened>(this);
+	app.addWindowAction(action);
+	init(editor); // TODO move content of init here
 }
 
 
@@ -207,7 +216,7 @@ void GameView::setFullscreen(bool fullscreen)
 
 void GameView::onStatsGUI(const ImVec2& view_pos)
 {
-	if (!m_show_stats || !m_is_opened) return;
+	if (!m_show_stats || !m_is_open) return;
 	
 	float toolbar_height = 24 + ImGui::GetStyle().FramePadding.y * 2;
 	ImVec2 v = view_pos;
@@ -249,7 +258,7 @@ void GameView::forceViewport(bool enable, int w, int h)
 }
 
 
-void GameView::onGUI()
+void GameView::onWindowGUI()
 {
 	PROFILE_FUNCTION();
 	if (!m_pipeline->isReady()) return;
@@ -273,7 +282,7 @@ void GameView::onGUI()
 	}
 	ImVec2 view_pos;
 	bool is_game_view_visible = false;
-	if (ImGui::BeginDock(window_name, &m_is_opened))
+	if (ImGui::BeginDock(window_name, &m_is_open))
 	{
 		is_game_view_visible = true;
 		m_is_mouse_hovering_window = ImGui::IsMouseHoveringWindow();
