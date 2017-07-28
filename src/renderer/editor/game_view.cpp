@@ -115,7 +115,7 @@ void GameView::init(WorldEditor& editor)
 
 	editor.universeCreated().bind<GameView, &GameView::onUniverseCreated>(this);
 	editor.universeDestroyed().bind<GameView, &GameView::onUniverseDestroyed>(this);
-	onUniverseCreated();
+	if(editor.getUniverse()) onUniverseCreated();
 
 	auto* gui = static_cast<GUISystem*>(m_editor->getEngine().getPluginManager().getPlugin("gui"));
 	if (gui)

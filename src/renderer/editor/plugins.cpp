@@ -1605,6 +1605,337 @@ struct FurPainterPlugin LUMIX_FINAL : public StudioApp::IPlugin
 };
 
 
+struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
+{
+	RenderInterfaceImpl(WorldEditor& editor, Pipeline& pipeline)
+		: m_pipeline(pipeline)
+		, m_editor(editor)
+		, m_models(editor.getAllocator())
+		, m_textures(editor.getAllocator())
+	{
+		m_model_index = -1;
+		auto& rm = m_editor.getEngine().getResourceManager();
+		Path shader_path("pipelines/editor/debugline.shd");
+		m_shader = static_cast<Shader*>(rm.get(SHADER_TYPE)->load(shader_path));
+
+		editor.universeCreated().bind<RenderInterfaceImpl, &RenderInterfaceImpl::onUniverseCreated>(this);
+		editor.universeDestroyed().bind<RenderInterfaceImpl, &RenderInterfaceImpl::onUniverseDestroyed>(this);
+	}
+
+
+	~RenderInterfaceImpl()
+	{
+		auto& rm = m_editor.getEngine().getResourceManager();
+		rm.get(SHADER_TYPE)->unload(*m_shader);
+
+		m_editor.universeCreated().unbind<RenderInterfaceImpl, &RenderInterfaceImpl::onUniverseCreated>(this);
+		m_editor.universeDestroyed().unbind<RenderInterfaceImpl, &RenderInterfaceImpl::onUniverseDestroyed>(this);
+	}
+
+
+	ImFont* addFont(const char* filename, int size) override
+	{
+		ImGuiIO& io = ImGui::GetIO();
+		ImFont* font = io.Fonts->AddFontFromFileTTF(filename, (float)size);
+
+		Engine& engine = m_editor.getEngine();
+		unsigned char* pixels;
+		int width, height;
+		ImGui::GetIO().Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
+		auto* material_manager = engine.getResourceManager().get(MATERIAL_TYPE);
+		Resource* resource = material_manager->load(Path("pipelines/imgui/imgui.mat"));
+		Material* material = (Material*)resource;
+
+		Texture* old_texture = material->getTexture(0);
+		Texture* texture = LUMIX_NEW(engine.getAllocator(), Texture)(
+			Path("font"), *engine.getResourceManager().get(TEXTURE_TYPE), engine.getAllocator());
+
+		texture->create(width, height, pixels);
+		material->setTexture(0, texture);
+		if (old_texture)
+		{
+			old_texture->destroy();
+			LUMIX_DELETE(engine.getAllocator(), old_texture);
+		}
+
+		return font;
+	}
+
+
+	ModelHandle loadModel(Path& path) override
+	{
+		auto& rm = m_editor.getEngine().getResourceManager();
+		m_models.insert(m_model_index, static_cast<Model*>(rm.get(MODEL_TYPE)->load(path)));
+		++m_model_index;
+		return m_model_index - 1;
+	}
+
+
+	bool saveTexture(Engine& engine, const char* path_cstr, const void* pixels, int w, int h) override
+	{
+		FS::FileSystem& fs = engine.getFileSystem();
+		Path path(path_cstr);
+		FS::IFile* file = fs.open(fs.getDefaultDevice(), path, FS::Mode::CREATE_AND_WRITE);
+		if (!file) return false;
+
+		if (!Texture::saveTGA(file, w, h, 4, (const u8*)pixels, path, engine.getAllocator()))
+		{
+			fs.close(*file);
+			return false;
+		}
+
+		fs.close(*file);
+		return true;
+	}
+
+
+	ImTextureID createTexture(const char* name, const void* pixels, int w, int h) override
+	{
+		auto& rm = m_editor.getEngine().getResourceManager();
+		auto& allocator = m_editor.getAllocator();
+		Texture* texture = LUMIX_NEW(allocator, Texture)(Path(name), *rm.get(TEXTURE_TYPE), allocator);
+		texture->create(w, h, pixels);
+		m_textures.insert(&texture->handle, texture);
+		return &texture->handle;
+	}
+
+
+	void destroyTexture(ImTextureID handle) override
+	{
+		auto& allocator = m_editor.getAllocator();
+		auto iter = m_textures.find(handle);
+		if (iter == m_textures.end()) return;
+		auto* texture = iter.value();
+		m_textures.erase(iter);
+		texture->destroy();
+		LUMIX_DELETE(allocator, texture);
+	}
+
+
+	ImTextureID loadTexture(const Path& path) override
+	{
+		auto& rm = m_editor.getEngine().getResourceManager();
+		auto* texture = static_cast<Texture*>(rm.get(TEXTURE_TYPE)->load(path));
+		m_textures.insert(&texture->handle, texture);
+		return &texture->handle;
+	}
+
+
+	void unloadTexture(ImTextureID handle) override
+	{
+		auto iter = m_textures.find(handle);
+		if (iter == m_textures.end()) return;
+		auto* texture = iter.value();
+		texture->getResourceManager().unload(*texture);
+		m_textures.erase(iter);
+	}
+
+
+	void addDebugCross(const Vec3& pos, float size, u32 color, float life) override
+	{
+		m_render_scene->addDebugCross(pos, size, color, life);
+	}
+
+
+	WorldEditor::RayHit castRay(const Vec3& origin, const Vec3& dir, ComponentHandle ignored) override
+	{
+		auto hit = m_render_scene->castRay(origin, dir, ignored);
+
+		return{ hit.m_is_hit, hit.m_t, hit.m_entity, hit.m_origin + hit.m_dir * hit.m_t };
+	}
+
+
+	void getRay(ComponentHandle camera_index, float x, float y, Vec3& origin, Vec3& dir) override
+	{
+		m_render_scene->getRay(camera_index, x, y, origin, dir);
+	}
+
+
+	void addDebugLine(const Vec3& from, const Vec3& to, u32 color, float life) override
+	{
+		m_render_scene->addDebugLine(from, to, color, life);
+	}
+
+
+	void addDebugCube(const Vec3& minimum, const Vec3& maximum, u32 color, float life) override
+	{
+		m_render_scene->addDebugCube(minimum, maximum, color, life);
+	}
+
+
+	AABB getEntityAABB(Universe& universe, Entity entity) override
+	{
+		AABB aabb;
+		auto cmp = m_render_scene->getModelInstanceComponent(entity);
+		if (cmp != INVALID_COMPONENT)
+		{
+			Model* model = m_render_scene->getModelInstanceModel(cmp);
+			if (!model) return aabb;
+
+			aabb = model->getAABB();
+			aabb.transform(universe.getMatrix(entity));
+
+			return aabb;
+		}
+
+		Vec3 pos = universe.getPosition(entity);
+		aabb.set(pos, pos);
+
+		return aabb;
+	}
+
+
+	void unloadModel(ModelHandle handle) override
+	{
+		auto* model = m_models[handle];
+		model->getResourceManager().unload(*model);
+		m_models.erase(handle);
+	}
+
+
+	void setCameraSlot(ComponentHandle cmp, const char* slot) override
+	{
+		m_render_scene->setCameraSlot(cmp, slot);
+	}
+
+
+	ComponentHandle getCameraInSlot(const char* slot) override
+	{
+		return m_render_scene->getCameraInSlot(slot);
+	}
+
+
+	Entity getCameraEntity(ComponentHandle cmp) override
+	{
+		return m_render_scene->getCameraEntity(cmp);
+	}
+
+
+	Vec2 getCameraScreenSize(ComponentHandle cmp) override
+	{
+		return m_render_scene->getCameraScreenSize(cmp);
+	}
+
+
+	float getCameraOrthoSize(ComponentHandle cmp) override
+	{
+		return m_render_scene->getCameraOrthoSize(cmp);
+	}
+
+
+	bool isCameraOrtho(ComponentHandle cmp) override
+	{
+		return m_render_scene->isCameraOrtho(cmp);
+	}
+
+
+	float getCameraFOV(ComponentHandle cmp) override
+	{
+		return m_render_scene->getCameraFOV(cmp);
+	}
+
+
+	float castRay(ModelHandle model, const Vec3& origin, const Vec3& dir, const Matrix& mtx, const Pose* pose) override
+	{
+		RayCastModelHit hit = m_models[model]->castRay(origin, dir, mtx, pose);
+		return hit.m_is_hit ? hit.m_t : -1;
+	}
+
+
+	void renderModel(ModelHandle model, const Matrix& mtx) override
+	{
+		if (!m_pipeline.isReady() || !m_models[model]->isReady()) return;
+
+		m_pipeline.renderModel(*m_models[model], mtx);
+	}
+
+
+	void onUniverseCreated()
+	{
+		m_render_scene = static_cast<RenderScene*>(m_editor.getUniverse()->getScene(MODEL_INSTANCE_TYPE));
+	}
+
+
+	void onUniverseDestroyed()
+	{
+		m_render_scene = nullptr;
+	}
+
+
+	Vec3 getModelCenter(Entity entity) override
+	{
+		auto cmp = m_render_scene->getModelInstanceComponent(entity);
+		if (cmp == INVALID_COMPONENT) return Vec3(0, 0, 0);
+		Model* model = m_render_scene->getModelInstanceModel(cmp);
+		if (!model) return Vec3(0, 0, 0);
+		return (model->getAABB().min + model->getAABB().max) * 0.5f;
+	}
+
+
+	void showEntity(Entity entity) override
+	{
+		ComponentHandle cmp = m_render_scene->getModelInstanceComponent(entity);
+		if (cmp == INVALID_COMPONENT) return;
+		m_render_scene->showModelInstance(cmp);
+	}
+
+
+	void hideEntity(Entity entity) override
+	{
+		ComponentHandle cmp = m_render_scene->getModelInstanceComponent(entity);
+		if (cmp == INVALID_COMPONENT) return;
+		m_render_scene->hideModelInstance(cmp);
+	}
+
+
+	Path getModelInstancePath(ComponentHandle cmp) override
+	{
+		return m_render_scene->getModelInstancePath(cmp);
+	}
+
+
+	void render(const Matrix& mtx,
+		u16* indices,
+		int indices_count,
+		Vertex* vertices,
+		int vertices_count,
+		bool lines) override
+	{
+		if (!m_shader->isReady()) return;
+
+		auto& renderer = static_cast<Renderer&>(m_render_scene->getPlugin());
+		if (bgfx::getAvailTransientIndexBuffer(indices_count) < (u32)indices_count) return;
+		if (bgfx::getAvailTransientVertexBuffer(vertices_count, renderer.getBasicVertexDecl()) < (u32)vertices_count) return;
+		bgfx::TransientVertexBuffer vertex_buffer;
+		bgfx::TransientIndexBuffer index_buffer;
+		bgfx::allocTransientVertexBuffer(&vertex_buffer, vertices_count, renderer.getBasicVertexDecl());
+		bgfx::allocTransientIndexBuffer(&index_buffer, indices_count);
+
+		copyMemory(vertex_buffer.data, vertices, vertices_count * renderer.getBasicVertexDecl().getStride());
+		copyMemory(index_buffer.data, indices, indices_count * sizeof(u16));
+
+		u64 flags = BGFX_STATE_DEPTH_TEST_LEQUAL;
+		if (lines) flags |= BGFX_STATE_PT_LINES;
+		m_pipeline.render(vertex_buffer,
+			index_buffer,
+			mtx,
+			0,
+			indices_count,
+			flags,
+			m_shader->getInstance(0));
+	}
+
+
+	WorldEditor& m_editor;
+	Shader* m_shader;
+	RenderScene* m_render_scene;
+	Pipeline& m_pipeline;
+	HashMap<int, Model*> m_models;
+	HashMap<void*, Texture*> m_textures;
+	int m_model_index;
+};
+
+
 struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 {
 	static EditorUIRenderPlugin* s_instance;
@@ -1615,47 +1946,50 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		, m_scene_view(scene_view)
 		, m_width(-1)
 		, m_height(-1)
+		, m_engine(app.getWorldEditor()->getEngine())
 	{
-		auto& editor = *app.getWorldEditor();
-		m_engine = &editor.getEngine();
+		s_instance = this;
 
-		auto& plugin_manager = editor.getEngine().getPluginManager();
-		auto* renderer = static_cast<Renderer*>(plugin_manager.getPlugin("renderer"));
+		WorldEditor& editor = *app.getWorldEditor();
+
+		PluginManager& plugin_manager = m_engine.getPluginManager();
+		Renderer* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
 		Path path("pipelines/imgui/imgui.lua");
-		m_gui_pipeline = Pipeline::create(*renderer, path, m_engine->getAllocator());
+		m_gui_pipeline = Pipeline::create(*renderer, path, m_engine.getAllocator());
 		m_gui_pipeline->load();
 
 		int w, h;
 		SDL_GetWindowSize(m_app.getWindow(), &w, &h);
 		m_gui_pipeline->setViewport(0, 0, w, h);
 		renderer->resize(w, h);
-		onUniverseCreated();
-
-		s_instance = this;
+		editor.universeCreated().bind<EditorUIRenderPlugin, &EditorUIRenderPlugin::onUniverseCreated>(this);
+		editor.universeDestroyed().bind<EditorUIRenderPlugin, &EditorUIRenderPlugin::onUniverseDestroyed>(this);
+		if (editor.getUniverse()) onUniverseCreated();
 
 		unsigned char* pixels;
 		int width, height;
 		ImGui::GetIO().Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
-		auto* material_manager = m_engine->getResourceManager().get(MATERIAL_TYPE);
-		auto* resource = material_manager->load(Path("pipelines/imgui/imgui.mat"));
+		auto* material_manager = m_engine.getResourceManager().get(MATERIAL_TYPE);
+		Resource* resource = material_manager->load(Path("pipelines/imgui/imgui.mat"));
 		m_material = static_cast<Material*>(resource);
 
 		Texture* old_texture = m_material->getTexture(0);
 		Texture* texture = LUMIX_NEW(editor.getAllocator(), Texture)(
-			Path("font"), *m_engine->getResourceManager().get(TEXTURE_TYPE), editor.getAllocator());
+			Path("font"), *m_engine.getResourceManager().get(TEXTURE_TYPE), editor.getAllocator());
 
 		texture->create(width, height, pixels);
 		m_material->setTexture(0, texture);
 		if (old_texture)
 		{
 			old_texture->destroy();
-			LUMIX_DELETE(m_engine->getAllocator(), old_texture);
+			LUMIX_DELETE(m_engine.getAllocator(), old_texture);
 		}
 
 		ImGui::GetIO().RenderDrawListsFn = imGuiCallback;
 
-		editor.universeCreated().bind<EditorUIRenderPlugin, &EditorUIRenderPlugin::onUniverseCreated>(this);
-		editor.universeDestroyed().bind<EditorUIRenderPlugin, &EditorUIRenderPlugin::onUniverseDestroyed>(this);
+		IAllocator& allocator = editor.getAllocator();
+		RenderInterface* render_interface = LUMIX_NEW(allocator, RenderInterfaceImpl)(editor, *scene_view.getPipeline());
+		editor.setRenderInterface(render_interface);
 	}
 
 
@@ -1713,7 +2047,7 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 			drawGUICmdList(cmd_list);
 		}
 
-		Renderer* renderer = static_cast<Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
+		Renderer* renderer = static_cast<Renderer*>(m_engine.getPluginManager().getPlugin("renderer"));
 
 		renderer->frame(false);
 	}
@@ -1738,7 +2072,7 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		float height = ImGui::GetIO().DisplaySize.y;
 		Matrix ortho;
 		bool is_opengl = bgfx::getRendererType() == bgfx::RendererType::OpenGL ||
-						 bgfx::getRendererType() == bgfx::RendererType::OpenGLES;
+			bgfx::getRendererType() == bgfx::RendererType::OpenGLES;
 		ortho.setOrtho(0.0f, width, height, 0.0f, -1.0f, 1.0f, is_opengl);
 		m_gui_pipeline->setViewport(0, 0, (int)width, (int)height);
 		m_gui_pipeline->setViewProjection(ortho, (int)width, (int)height);
@@ -1747,7 +2081,7 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 
 	void drawGUICmdList(ImDrawList* cmd_list)
 	{
-		Renderer* renderer = static_cast<Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
+		Renderer* renderer = static_cast<Renderer*>(m_engine.getPluginManager().getPlugin("renderer"));
 
 		int num_indices = cmd_list->IdxBuffer.size();
 		int num_vertices = cmd_list->VtxBuffer.size();
@@ -1807,7 +2141,7 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	int m_width;
 	int m_height;
 	StudioApp& m_app;
-	Engine* m_engine;
+	Engine& m_engine;
 	Material* m_material;
 	Pipeline* m_gui_pipeline;
 	SceneView& m_scene_view;
