@@ -64,6 +64,7 @@ public:
 		bool lines) = 0;
 	virtual void showEntity(Entity entity) = 0;
 	virtual void hideEntity(Entity entity) = 0;
+	virtual ImFont* addFont(const char* filename, int size) = 0;
 };
 
 

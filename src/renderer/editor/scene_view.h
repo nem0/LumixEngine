@@ -74,7 +74,6 @@ class SceneView : public StudioApp::IPlugin
 		bool m_is_opengl;
 		LogUI* m_log_ui;
 		Array<DropHandler> m_drop_handlers;
-		struct RenderInterfaceImpl* m_render_interface;
 };
 
 
