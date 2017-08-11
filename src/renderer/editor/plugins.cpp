@@ -712,9 +712,11 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		u32 dds_size;
 		u8* dds_data = saveAsDDS(&data[0], 128, 128, &dds_size);
 
-		static const u32 TILE_HASH = crc32("TILE");
-
-		m_app.getMetadata()->setRawMemory(model->getPath().getHash(), TILE_HASH, dds_data, dds_size);
+		if (dds_data)
+		{
+			static const u32 TILE_HASH = crc32("TILE");
+			m_app.getMetadata()->setRawMemory(model->getPath().getHash(), TILE_HASH, dds_data, dds_size);
+		}
 
 		bgfx::destroyTexture(texture);
 	}
