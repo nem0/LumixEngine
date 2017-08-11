@@ -34,6 +34,8 @@ public:
 		virtual const char* getName() const = 0;
 		virtual bool hasResourceManager(ResourceType type) const = 0;
 		virtual bool acceptExtension(const char* ext, ResourceType type) const = 0;
+		virtual bool createTile(const char* path, ResourceType type);
+		virtual void update() {}
 	};
 
 	typedef DelegateList<void(const Path&, const char*)> OnResourceChanged;

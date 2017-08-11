@@ -25,6 +25,12 @@ namespace Lumix
 static const u32 SOURCE_HASH = crc32("source");
 
 
+bool AssetBrowser::IPlugin::createTile(const char* path, ResourceType type)
+{
+	return false;
+}
+
+
 ResourceType AssetBrowser::getResourceType(const char* path) const
 {
 	char ext[10];
@@ -158,6 +164,8 @@ int AssetBrowser::getTypeIndex(ResourceType type) const
 void AssetBrowser::update()
 {
 	PROFILE_FUNCTION();
+
+	for (auto* plugin : m_plugins) plugin->update();
 
 	auto* patch = m_editor.getEngine().getPatchFileDevice();
 	if ((patch && !equalStrings(patch->getBasePath(), m_patch_base_path)) ||
