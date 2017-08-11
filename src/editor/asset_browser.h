@@ -24,7 +24,7 @@ class StudioApp;
 class LUMIX_EDITOR_API AssetBrowser
 {
 public:
-	struct IPlugin
+	struct LUMIX_EDITOR_API IPlugin
 	{
 		virtual ~IPlugin() {}
 
