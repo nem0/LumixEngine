@@ -642,7 +642,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		mipmap_params.m_mode = cCRNMipModeGenerateMips;
 
 		void* data = crn_compress(comp_params, mipmap_params, size);
-		if (!data) return false;
+		if (!data) return nullptr;
 
 		IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
 		u8* out_data = (u8*)allocator.allocate(size);
