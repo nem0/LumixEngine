@@ -1788,8 +1788,8 @@ struct FBXImporter
 	FS::OsFile out_file;
 	float mesh_scale = 1.0f;
 	float time_scale = 1.0f;
-	float position_error = 100.0f;
-	float rotation_error = 10.0f;
+	float position_error = 0.1f;
+	float rotation_error = 0.01f;
 	float bounding_shape_scale = 1.0f;
 	bool to_dds = false;
 	bool center_mesh = false;
