@@ -65,6 +65,10 @@ public:
 	{
 		return m_data->m_id == rhs.m_data->m_id;
 	}
+	bool operator!=(const Path& rhs) const
+	{
+		return m_data->m_id != rhs.m_data->m_id;
+	}
 
 	~Path();
 
