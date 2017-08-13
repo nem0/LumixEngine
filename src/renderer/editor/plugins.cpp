@@ -1,6 +1,5 @@
 #include "editor/asset_browser.h"
 #include "editor/ieditor_command.h"
-#include "editor/metadata.h"
 #include "editor/platform_interface.h"
 #include "editor/property_grid.h"
 #include "editor/render_interface.h"
@@ -362,13 +361,10 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		, m_camera_cmp(INVALID_COMPONENT)
 		, m_camera_entity(INVALID_ENTITY)
 		, m_mesh(INVALID_COMPONENT)
-		, m_tile_camera_cmp(INVALID_COMPONENT)
-		, m_tile_camera_entity(INVALID_ENTITY)
 		, m_pipeline(nullptr)
 		, m_universe(nullptr)
-		, m_tile_pipeline(nullptr)
-		, m_tile_universe(nullptr)
 		, m_is_mouse_captured(false)
+		, m_tile(app.getWorldEditor()->getAllocator())
 	{
 		createPreviewUniverse();
 		createTileUniverse();
@@ -380,8 +376,8 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		auto& engine = m_app.getWorldEditor()->getEngine();
 		engine.destroyUniverse(*m_universe);
 		Pipeline::destroy(m_pipeline);
-		engine.destroyUniverse(*m_tile_universe);
-		Pipeline::destroy(m_tile_pipeline);
+		engine.destroyUniverse(*m_tile.universe);
+		Pipeline::destroy(m_tile.pipeline);
 	}
 
 
@@ -393,22 +389,23 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 
 	void createTileUniverse()
 	{
-		auto& engine = m_app.getWorldEditor()->getEngine();
-		m_tile_universe = &engine.createUniverse(false);
-		auto* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
-		m_tile_pipeline = Pipeline::create(*renderer, Path("pipelines/main.lua"), engine.getAllocator());
-		m_tile_pipeline->load();
+		Engine& engine = m_app.getWorldEditor()->getEngine();
+		m_tile.universe = &engine.createUniverse(false);
+		Renderer* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
+		m_tile.pipeline = Pipeline::create(*renderer, Path("pipelines/main.lua"), engine.getAllocator());
+		m_tile.pipeline->load();
 
-		auto light_entity = m_tile_universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
-		auto* render_scene = static_cast<RenderScene*>(m_tile_universe->getScene(MODEL_INSTANCE_TYPE));
-		auto light_cmp = render_scene->createComponent(GLOBAL_LIGHT_TYPE, light_entity);
+		Entity light_entity = m_tile.universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
+		RenderScene* render_scene = (RenderScene*)m_tile.universe->getScene(MODEL_INSTANCE_TYPE);
+		ComponentHandle light_cmp = render_scene->createComponent(GLOBAL_LIGHT_TYPE, light_entity);
 		render_scene->setGlobalLightIntensity(light_cmp, 1);
+		render_scene->setGlobalLightIndirectIntensity(light_cmp, 1);
 
-		m_tile_camera_entity = m_tile_universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
-		m_tile_camera_cmp = render_scene->createComponent(CAMERA_TYPE, m_tile_camera_entity);
-		render_scene->setCameraSlot(m_tile_camera_cmp, "editor");
+		m_tile.camera_entity = m_tile.universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
+		m_tile.camera_cmp = render_scene->createComponent(CAMERA_TYPE, m_tile.camera_entity);
+		render_scene->setCameraSlot(m_tile.camera_cmp, "editor");
 
-		m_tile_pipeline->setScene(render_scene);
+		m_tile.pipeline->setScene(render_scene);
 	}
 
 
@@ -620,10 +617,9 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 	}
 
 
-	u8* saveAsDDS(const u8* image_data, int image_width, int image_height, u32* out_size) const
+	bool saveAsDDS(const char* path, const u8* image_data, int image_width, int image_height) const
 	{
 		ASSERT(image_data);
-		ASSERT(out_size);
 
 		crn_uint32 size;
 		crn_comp_params comp_params;
@@ -642,21 +638,38 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		mipmap_params.m_mode = cCRNMipModeGenerateMips;
 
 		void* data = crn_compress(comp_params, mipmap_params, size);
-		if (!data) return nullptr;
+		if (!data) return false;
 
+		FS::OsFile file;
 		IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
-		u8* out_data = (u8*)allocator.allocate(size);
-		copyMemory(out_data, data, size);
-
-		*out_size = size;
+		if (file.open(path, FS::Mode::CREATE_AND_WRITE, allocator))
+		{
+			file.write(data, size);
+			file.close();
+			crn_free_block(data);
+			return true;
+		}
 
 		crn_free_block(data);
-		return out_data;
+		return false;
 	}
 
 
 	void update() override
 	{
+		if(m_tile.frame_countdown >= 0)
+		{
+			--m_tile.frame_countdown;
+			if (m_tile.frame_countdown == -1)
+			{
+				StaticString<MAX_PATH_LENGTH> path(".lumix/asset_tiles/", m_tile.path_hash, ".dds");
+				saveAsDDS(path, &m_tile.data[0], AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE);
+
+				bgfx::destroyTexture(m_tile.texture);
+			}
+			return;
+		}
+
 		if (m_tiles.empty()) return;
 		Model* model = m_tiles.back();
 		if(model->isFailure())
@@ -669,89 +682,95 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 
 		m_tiles.pop();
 
-		auto& engine = m_app.getWorldEditor()->getEngine();
-		auto* render_scene = static_cast<RenderScene*>(m_tile_universe->getScene(MODEL_INSTANCE_TYPE));
+		IAllocator& editor_allocator = m_app.getWorldEditor()->getAllocator();
+		Engine& engine = m_app.getWorldEditor()->getEngine();
+		RenderScene* render_scene = (RenderScene*)m_tile.universe->getScene(MODEL_INSTANCE_TYPE);
 		if (!render_scene) return;
 
-		auto* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
+		Renderer* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
 		if (!renderer) return;
 
-		auto mesh_entity = m_tile_universe->createEntity({0, 0, 0}, {0, 0, 0, 1});
+		Entity mesh_entity = m_tile.universe->createEntity({0, 0, 0}, {0, 0, 0, 1});
 		ComponentHandle tile_mesh = render_scene->createComponent(MODEL_INSTANCE_TYPE, mesh_entity);
 
-		render_scene->setModelInstancePath(m_mesh, model->getPath());
+		render_scene->setModelInstancePath(tile_mesh, model->getPath());
 		AABB aabb = model->getAABB();
 
-		m_tile_universe->setRotation(m_tile_camera_entity, { 0, 0, 0, 1 });
-		m_tile_universe->setPosition(m_tile_camera_entity,
+		m_tile.universe->setRotation(m_tile.camera_entity, { 0, 0, 0, 1 });
+		m_tile.universe->setPosition(m_tile.camera_entity,
 		{ (aabb.max.x + aabb.min.x) * 0.5f,
 			(aabb.max.y + aabb.min.y) * 0.5f,
 			aabb.max.z + aabb.max.x - aabb.min.x });
 
-		m_tile_pipeline->setViewport(0, 0, 128, 128);
-		m_tile_pipeline->render();
+		m_tile.pipeline->setViewport(0, 0, AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE);
+		m_tile.pipeline->render();
 
-		bgfx::TextureHandle texture =
-			bgfx::createTexture2D(128, 128, false, 1, bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK);
+		m_tile.texture =
+			bgfx::createTexture2D(AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, false, 1, bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK);
 		renderer->viewCounterAdd();
 		bgfx::touch(renderer->getViewCounter());
 		bgfx::setViewName(renderer->getViewCounter(), "billboard_blit");
-		bgfx::TextureHandle color_renderbuffer = m_tile_pipeline->getFramebuffer("g_buffer")->getRenderbufferHandle(0);
-		bgfx::blit(renderer->getViewCounter(), texture, 0, 0, color_renderbuffer);
+		bgfx::TextureHandle color_renderbuffer = m_tile.pipeline->getFramebuffer("default")->getRenderbufferHandle(0);
+		bgfx::blit(renderer->getViewCounter(), m_tile.texture, 0, 0, color_renderbuffer);
 
 		renderer->viewCounterAdd();
 		bgfx::setViewName(renderer->getViewCounter(), "billboard_read");
-		Array<u8> data(engine.getAllocator());
-		data.resize(128 * 128 * 4);
-		bgfx::readTexture(texture, &data[0]);
+		m_tile.data.resize(AssetBrowser::TILE_SIZE * AssetBrowser::TILE_SIZE * 4);
+		bgfx::readTexture(m_tile.texture, &m_tile.data[0]);
 		bgfx::touch(renderer->getViewCounter());
+		m_tile.universe->destroyEntity(mesh_entity);
 
-		bgfx::frame(); // submit
-		bgfx::frame(); // wait for gpu
-
-		u32 dds_size;
-		u8* dds_data = saveAsDDS(&data[0], 128, 128, &dds_size);
-
-		if (dds_data)
-		{
-			static const u32 TILE_HASH = crc32("TILE");
-			m_app.getMetadata()->setRawMemory(model->getPath().getHash(), TILE_HASH, dds_data, dds_size);
-		}
-
-		bgfx::destroyTexture(texture);
+		m_tile.frame_countdown = 2;
+		m_tile.path_hash = model->getPath().getHash();
+		model->getResourceManager().unload(*model);
 	}
 
 
-	bool createTile(const char* path, ResourceType type) override
+	bool createTile(const char* path_c_str, ResourceType type) override
 	{
 		if (type != MODEL_TYPE) return false;
 
-		RenderScene* render_scene = (RenderScene*)m_tile_universe->getScene(MODEL_INSTANCE_TYPE);
-		if (!render_scene) return false;
+		Path path(path_c_str);
+		StaticString<MAX_PATH_LENGTH> fullpath(".lumix/asset_tiles/", path.getHash(), ".dds");
+		if (PlatformInterface::fileExists(fullpath) && PlatformInterface::getLastModified(fullpath) > PlatformInterface::getLastModified(path.c_str()))
+		{
+			return true;
+		}
 
 		WorldEditor* editor = m_app.getWorldEditor(); 
 		Engine& engine = editor->getEngine();
 		ResourceManager& resource_manager = engine.getResourceManager();
 		ResourceManagerBase* model_manager = resource_manager.get(MODEL_TYPE);
 
-		Model* model = (Model*)model_manager->load(Path(path));
+		Model* model = (Model*)model_manager->load(path);
 		m_tiles.push(model);
 
 		return true;
 	}
 
 
+	struct TileData
+	{
+		TileData(IAllocator& allocator) : data(allocator) {}
+
+		Universe* universe = nullptr;
+		Pipeline* pipeline = nullptr;
+		Entity camera_entity = INVALID_ENTITY;
+		ComponentHandle camera_cmp = INVALID_COMPONENT;
+		int frame_countdown = -1;
+		u32 path_hash;
+		Array<u8> data;
+		bgfx::TextureHandle texture = BGFX_INVALID_HANDLE;
+	} m_tile;
+
+
 	Array<Model*> m_tiles;
 	StudioApp& m_app;
-	Universe* m_tile_universe;
-	Pipeline* m_tile_pipeline;
 	Universe* m_universe;
 	Pipeline* m_pipeline;
 	ComponentHandle m_mesh;
 	Entity m_camera_entity;
 	ComponentHandle m_camera_cmp;
-	Entity m_tile_camera_entity;
-	ComponentHandle m_tile_camera_cmp;
 	bool m_is_mouse_captured;
 	int m_captured_mouse_x;
 	int m_captured_mouse_y;
