@@ -364,7 +364,7 @@ void AssetBrowser::onTilesGUI()
 	ImGui::SameLine();
 
 	ImGui::BeginChild("right_col");
-	ImGui::Text("%s", m_dir);
+	ImGui::Text("%s", m_dir.data);
 	ImGui::Separator();
 
 	IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
@@ -394,10 +394,10 @@ void AssetBrowser::onTilesGUI()
 		ImVec2 pos = ImGui::GetCursorPos();
 		pos.x += (TILE_SIZE - size.x) * 0.5f;
 		ImGui::SetCursorPos(pos);
-		ImGui::Text("%s", tile.clamped_filename);
+		ImGui::Text("%s", tile.clamped_filename.data);
 		ImGui::EndGroup();
 		if (ImGui::IsItemClicked()) selectResource(Path(tile.filepath), true);
-		if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tile.filepath);
+		if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tile.filepath.data);
 		if (ImGui::IsMouseDragging() && ImGui::IsItemHoveredRect())
 		{
 			m_app.startDrag(StudioApp::DragData::PATH, tile.filepath, stringLength(tile.filepath) + 1);
