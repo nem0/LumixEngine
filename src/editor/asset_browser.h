@@ -59,8 +59,20 @@ public:
 
 public:
 	bool m_is_opened;
+	static const int TILE_SIZE = 128;
 
 private:
+	struct FileInfo
+	{
+		StaticString<MAX_PATH_LENGTH> clamped_filename;
+		StaticString<MAX_PATH_LENGTH> filepath;
+		u32 file_path_hash;
+		void* tex = nullptr;
+	};
+
+private:
+	void onTilesGUI();
+	void changeDir(const char* path);
 	void onFileChanged(const char* path);
 	void findResources();
 	void processDir(const char* path, int base_length);
@@ -82,6 +94,9 @@ private:
 	StudioApp& m_app;
 	Metadata& m_metadata;
 	Array<Path> m_changed_files;
+	StaticString<MAX_PATH_LENGTH> m_dir;
+	Array<StaticString<MAX_PATH_LENGTH> > m_subdirs;
+	Array<FileInfo> m_file_infos;
 	OnResourceChanged m_on_resource_changed;
 	Array<Path> m_history;
 	int m_history_index;

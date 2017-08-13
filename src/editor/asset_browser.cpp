@@ -1,7 +1,9 @@
 #include "asset_browser.h"
+#include "editor/render_interface.h"
 #include "editor/studio_app.h"
 #include "editor/world_editor.h"
 #include "engine/crc32.h"
+#include "engine/engine.h"
 #include "engine/fs/disk_file_device.h"
 #include "engine/log.h"
 #include "engine/path_utils.h"
@@ -10,10 +12,9 @@
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
 #include "engine/string.h"
-#include "engine/engine.h"
 #include "file_system_watcher.h"
-#include "metadata.h"
 #include "imgui/imgui.h"
+#include "metadata.h"
 #include "platform_interface.h"
 #include "utils.h"
 
@@ -65,6 +66,8 @@ AssetBrowser::AssetBrowser(StudioApp& app)
 	, m_activate(false)
 	, m_is_init_finished(false)
 	, m_history_index(-1)
+	, m_file_infos(app.getWorldEditor()->getAllocator())
+	, m_subdirs(app.getWorldEditor()->getAllocator())
 {
 	auto& editor = *app.getWorldEditor();
 	auto& allocator = editor.getAllocator();
@@ -72,6 +75,12 @@ AssetBrowser::AssetBrowser(StudioApp& app)
 	m_resources.emplace(allocator);
 
 	const char* base_path = editor.getEngine().getDiskFileDevice()->getBasePath();
+
+	StaticString<MAX_PATH_LENGTH> path(base_path, ".lumix");
+	PlatformInterface::makePath(path);
+	path << "/asset_tiles";
+	PlatformInterface::makePath(path);
+
 	m_watchers[0] = FileSystemWatcher::create(base_path, allocator);
 	m_watchers[0]->getCallback().bind<AssetBrowser, &AssetBrowser::onFileChanged>(this);
 	if (editor.getEngine().getPatchFileDevice())
@@ -244,8 +253,170 @@ void AssetBrowser::onToolbar()
 }
 
 
+static void clampText(char* text, int width)
+{
+	char* end = text + stringLength(text);
+	ImVec2 size = ImGui::CalcTextSize(text);
+	if (size.x <= width) return;
+
+	do
+	{
+		*(end - 1) = '\0';
+		*(end - 2) = '.';
+		*(end - 3) = '.';
+		*(end - 4) = '.';
+		--end;
+
+		size = ImGui::CalcTextSize(text);
+	} while (size.x > width && end - text > 4);
+}
+
+
+void AssetBrowser::changeDir(const char* path)
+{
+	RenderInterface* ri = m_app.getWorldEditor()->getRenderInterface();
+	for (FileInfo& info : m_file_infos)
+	{
+		ri->unloadTexture(info.tex);
+	}
+	m_file_infos.clear();
+
+	m_dir = path;
+	int len = stringLength(m_dir);
+	if (len > 0 && (m_dir[len - 1] == '/' || m_dir[len - 1] == '\\'))
+	{
+		m_dir.data[len - 1] = '\0';
+	}
+
+
+	IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
+	PlatformInterface::FileIterator* iter = PlatformInterface::createFileIterator(m_dir, allocator);
+	PlatformInterface::FileInfo info;
+
+	m_subdirs.clear();
+	while (PlatformInterface::getNextFile(iter, &info))
+	{
+		if (info.is_directory)
+		{
+			if(info.filename[0] != '.') m_subdirs.emplace(info.filename);
+			continue;
+		}
+
+		StaticString<MAX_PATH_LENGTH> file_path_str(m_dir, "/", info.filename);
+		Path filepath(file_path_str);
+		ResourceType type = getResourceType(filepath.c_str());
+		for (IPlugin* plugin : m_plugins)
+		{
+			if (plugin->createTile(filepath.c_str(), type))
+			{
+				FileInfo tile;
+				tile.file_path_hash = filepath.getHash();
+				char filename[MAX_PATH_LENGTH];
+				PathUtils::getBasename(filename, lengthOf(filename), filepath.c_str());
+				tile.filepath = filepath.c_str();
+				clampText(filename, TILE_SIZE);
+				tile.clamped_filename = filename;
+				m_file_infos.push(tile);
+				break;
+			}
+		}
+	}
+
+	PlatformInterface::destroyFileIterator(iter);
+}
+
+
+void AssetBrowser::onTilesGUI()
+{
+	if (m_dir.data[0] == '\0') changeDir(".");
+
+	if (!ImGui::BeginDock("Assets"))
+	{
+		ImGui::EndDock();
+		return;
+	}
+
+	ImGui::BeginChild("left_col", ImVec2(120, 0));
+	ImGui::PushItemWidth(120);
+
+	ImGui::Text("Directories");
+	ImGui::Separator();
+	bool b = false;
+	if (ImGui::Selectable("..", &b))
+	{
+		char dir[MAX_PATH_LENGTH];
+		PathUtils::getDir(dir, lengthOf(dir), m_dir);
+		changeDir(dir);
+	}
+
+	for (auto& subdir : m_subdirs)
+	{
+		if (ImGui::Selectable(subdir, &b))
+		{
+			StaticString<MAX_PATH_LENGTH> new_dir(m_dir, "/", subdir);
+			changeDir(new_dir);
+		}
+	}
+
+	ImGui::PopItemWidth();
+	ImGui::EndChild();
+
+	ImGui::SameLine();
+
+	ImGui::BeginChild("right_col");
+	ImGui::Text(m_dir);
+	ImGui::Separator();
+
+	IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
+
+	RenderInterface* ri = m_app.getWorldEditor()->getRenderInterface();
+	float w = ImGui::GetContentRegionAvailWidth();
+	for (FileInfo& tile : m_file_infos)
+	{
+		if (w < TILE_SIZE)
+		{
+			ImGui::NewLine();
+			w = ImGui::GetContentRegionAvailWidth();
+		}
+		ImGui::BeginGroup();
+		ImVec2 img_size((float)TILE_SIZE, (float)TILE_SIZE);
+		if (tile.tex)
+		{
+			ImGui::Image(tile.tex, img_size);
+		}
+		else
+		{
+			ImGui::Dummy(img_size);
+			StaticString<MAX_PATH_LENGTH> path(".lumix/asset_tiles/", tile.file_path_hash, ".dds");
+			if (PlatformInterface::fileExists(path)) tile.tex = ri->loadTexture(Path(path));
+		}
+		ImVec2 size = ImGui::CalcTextSize(tile.clamped_filename);
+		ImVec2 pos = ImGui::GetCursorPos();
+		pos.x += (TILE_SIZE - size.x) * 0.5f;
+		ImGui::SetCursorPos(pos);
+		ImGui::Text(tile.clamped_filename);
+		ImGui::EndGroup();
+		if (ImGui::IsItemClicked()) selectResource(Path(tile.filepath), true);
+		if (ImGui::IsItemHovered()) ImGui::SetTooltip(tile.filepath);
+		if (ImGui::IsMouseDragging() && ImGui::IsItemHoveredRect())
+		{
+			m_app.startDrag(StudioApp::DragData::PATH, tile.filepath, stringLength(tile.filepath) + 1);
+		}
+		ImGui::SameLine();
+		w -= TILE_SIZE;
+	}
+	ImGui::NewLine();
+	ImGui::EndChild();
+
+	ImGui::EndDock();
+
+}
+
+
 void AssetBrowser::onGUI()
 {
+	onTilesGUI();
+
 	if (m_wanted_resource.isValid())
 	{
 		selectResource(m_wanted_resource, true);
