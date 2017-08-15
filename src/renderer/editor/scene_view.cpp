@@ -118,7 +118,7 @@ void SceneView::resetCameraSpeed()
 
 SceneView::~SceneView()
 {
-	m_app.getAssetBrowser()->resourceChanged().bind<SceneView, &SceneView::onResourceChanged>(this);
+	m_app.getAssetBrowser()->resourceChanged().unbind<SceneView, &SceneView::onResourceChanged>(this);
 	m_editor->universeCreated().unbind<SceneView, &SceneView::onUniverseCreated>(this);
 	m_editor->universeDestroyed().unbind<SceneView, &SceneView::onUniverseDestroyed>(this);
 	Pipeline::destroy(m_pipeline);
