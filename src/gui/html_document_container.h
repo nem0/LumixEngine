@@ -6,6 +6,7 @@
 #include "engine/engine.h"
 #include "imgui/imgui.h"
 #include "litehtml.h"
+#include "litehtml/src/el_script.h"
 #include "stb/stb_image.h"
 
 
@@ -259,9 +260,9 @@ struct HTMLDocumentContainer : litehtml::document_container
 	void transform_text(litehtml::tstring& text, litehtml::text_transform tt) override {}
 	void import_css(litehtml::tstring& text, const litehtml::tstring& url, litehtml::tstring& baseurl) override
 	{
-		//Array<u8> data(m_app.getWorldEditor()->getAllocator());
-		//download(m_host, url.c_str(), &data);
-		//text = (const char*)&data[0];
+		Array<u8> data(m_engine.getAllocator());
+		if (!loadFile(url.c_str(), &data)) return;
+		text = (const char*)&data[0];
 	}
 	void set_clip(const litehtml::position& pos,
 		const litehtml::border_radiuses& bdr_radius,

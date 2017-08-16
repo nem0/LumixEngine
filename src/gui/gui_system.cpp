@@ -36,37 +36,8 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 		, m_interface(nullptr)
 		, m_html_container(engine)
 	{
-		/*m_context = ImGui::CreateContext();
-		m_original_context = ImGui::GetCurrentContext();
-		ImGui::SetCurrentContext(m_context);
-		ImGuiIO& io = ImGui::GetIO();
-		
-		m_font = io.Fonts->AddFontFromFileTTF("bin/VeraMono.ttf", 20);
-		u8* pixels;
-		int w, h;
-		io.Fonts->GetTexDataAsRGBA32(&pixels, &w, &h);
-		auto* material_manager = m_engine.getResourceManager().get(MATERIAL_TYPE);
-		auto* resource = material_manager->load(Path("pipelines/gui/gui.mat"));
-		m_material = static_cast<Material*>(resource);
-
-		auto* old_texture = m_material->getTexture(0);
-		Texture* texture = LUMIX_NEW(m_engine.getAllocator(), Texture)(
-			Path("font"), *m_engine.getResourceManager().get(TEXTURE_TYPE), m_engine.getAllocator());
-
-		texture->create(w, h, pixels);
-		m_material->setTexture(0, texture);
-		if (old_texture)
-		{
-			old_texture->destroy();
-			LUMIX_DELETE(m_engine.getAllocator(), old_texture);
-		}
-
-		io.DisplaySize.x = 640;
-		io.DisplaySize.y = 480;
-		ImGui::NewFrame();
-		ImGui::SetCurrentContext(m_original_context);
-		*/
 		registerLuaAPI();
+		m_engine.getInputSystem().addAction(crc32("ui_mouse_down"), InputSystem::InputType::PRESSED, 1, -1);
 	}
 
 
@@ -100,6 +71,18 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 	}
 
 
+	std::shared_ptr<litehtml::element> findChild(std::shared_ptr<litehtml::element> parent, const char* tag)
+	{
+		int count = (int)parent->get_children_count();
+		for (int i = 0; i < count; ++i)
+		{
+			std::shared_ptr<litehtml::element> child = parent->get_child(i);
+			if (equalStrings(child->get_tagName(), tag)) return child;
+		}
+		return nullptr;
+	}
+
+
 	bool openDocument(const char* path)
 	{
 		Array<u8> page(m_engine.getLIFOAllocator());
@@ -110,12 +93,50 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 		if (!m_document) return false;
 		
 		m_document->render(1024);
+
+		auto head = findChild(m_document->root(), "head");
+		if (head)
+		{
+			auto script_el = findChild(head, "script");
+
+			if (script_el)
+			{
+				auto script = std::static_pointer_cast<litehtml::el_script>(script_el);
+				lua_rawgeti(m_state, LUA_REGISTRYINDEX, m_environment);
+				const auto& code = script->get_scriptSource();
+				bool errors = luaL_loadbuffer(m_state,
+					code.c_str(),
+					code.length(),
+					"gui script") != LUA_OK;
+
+				if (errors)
+				{
+					g_log_error.log("Lua Script") << "gui script: " << lua_tostring(m_state, -1);
+					lua_pop(m_state, 1);
+					return false;
+				}
+
+				lua_pushvalue(m_state, -2);
+				lua_setupvalue(m_state, -2, 1); // function's environment
+
+				errors = errors || lua_pcall(m_state, 0, 0, 0) != LUA_OK;
+				if (errors)
+				{
+					g_log_error.log("Lua Script") << "gui script: " << lua_tostring(m_state, -1);
+					lua_pop(m_state, 1);
+				}
+				lua_pop(m_state, 1);
+			}
+		}
 		return true;
 	}
 
 
 	~GUISystemImpl()
 	{
+		luaL_unref(m_state, LUA_REGISTRYINDEX, m_thread_ref);
+		luaL_unref(m_state, LUA_REGISTRYINDEX, m_environment);
+
 		Texture* texture = m_material->getTexture(0);
 		if (texture)
 		{
@@ -146,6 +167,43 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 		LuaWrapper::createSystemVariable(L, "Gui", "instance", this);
 
 		#undef REGISTER_FUNCTION
+
+		m_state = lua_newthread(L);
+		lua_pushvalue(L, -1);
+		m_thread_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+		lua_pop(L, 1);
+		lua_newtable(m_state);
+		// reference environment
+		lua_pushvalue(m_state, -1);
+		m_environment = luaL_ref(m_state, LUA_REGISTRYINDEX);
+
+		// environment's metatable & __index
+		lua_pushvalue(m_state, -1);
+		lua_setmetatable(m_state, -2);
+		lua_pushglobaltable(m_state);
+		lua_setfield(m_state, -2, "__index");
+	}
+
+
+	bool call(const char* function)
+	{
+		if (!m_state) return false;
+
+		bool is_env_valid = lua_rawgeti(m_state, LUA_REGISTRYINDEX, m_environment) == LUA_TTABLE;
+		ASSERT(is_env_valid);
+		if (lua_getfield(m_state, -1, function) != LUA_TFUNCTION)
+		{
+			lua_pop(m_state, 2);
+			return false;
+		}
+
+		if (lua_pcall(m_state, 0, 0, 0) != LUA_OK)
+		{
+			g_log_warning.log("GUI") << lua_tostring(m_state, -1);
+			lua_pop(m_state, 1);
+		}
+		lua_pop(m_state, 1);
+		return true;
 	}
 
 
@@ -232,19 +290,18 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 	void pipelineCallback()
 	{
 		if (!m_interface) return;
+		Pipeline* pipeline = m_interface->getPipeline();
+		if (!pipeline->isReady()) return;
 
 		if (m_document)
 		{
-			m_html_container.m_pos.x = 0; // ImGui::GetWindowPos().x;
-			m_html_container.m_pos.y = 0; // ImGui::GetWindowPos().y;
+			m_html_container.m_pos.x = 0;
+			m_html_container.m_pos.y = 0;
 			m_html_container.m_draw_list.Clear();
 			m_html_container.m_draw_list.PushClipRectFullScreen();
-			litehtml::position clip(0, 0, 1024, 1024);
+			litehtml::position clip(0, 0, pipeline->getWidth(), pipeline->getHeight());
 			m_document->draw((litehtml::uint_ptr)this, 0, 0, &clip);
 		}
-
-		Pipeline* pipeline = m_interface->getPipeline();;
-		if (!pipeline->isReady()) return;
 
 		setGUIProjection();
 
@@ -252,7 +309,38 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 	}
 
 
-	void update(float time_delta) override {}
+	void update(float time_delta) override 
+	{
+		if (!m_document) return;
+
+		InputSystem& input = m_engine.getInputSystem();
+		static const u32 UI_MOUSE_DOWN_HASH = crc32("ui_mouse_down");
+		Vec2 mpos = input.getMousePos();
+		mpos = mpos - m_interface->getPos();
+		std::vector<litehtml::position> boxes;
+		bool is_down = input.getActionValue(UI_MOUSE_DOWN_HASH) > 0;
+		if (is_down && !m_was_lbutton_down)
+		{
+			std::shared_ptr<litehtml::element> el = m_document->root()->get_element_by_point((int)mpos.x, (int)mpos.y, (int)mpos.x, (int)mpos.y);
+			if (el)
+			{
+				const char* attr = el->get_attr("onclick");
+				if (attr)
+				{
+					call(attr);
+				}
+			}
+			
+			m_was_lbutton_down = true;
+			m_document->on_lbutton_down((int)mpos.x, (int)mpos.y, (int)mpos.x, (int)mpos.y, boxes);
+		}
+		else if (m_was_lbutton_down && !is_down)
+		{
+			m_was_lbutton_down = false;
+			m_document->on_lbutton_up((int)mpos.x, (int)mpos.y, (int)mpos.x, (int)mpos.y, boxes);
+		}
+		m_document->on_mouse_over((int)mpos.x, (int)mpos.y, (int)mpos.x, (int)mpos.y, boxes);
+	}
 
 
 	void stopGame() override {}
@@ -264,7 +352,11 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 	Engine& m_engine;
 	Interface* m_interface;
 	Material* m_material;
+	lua_State* m_state;
+	int m_thread_ref;
+	int m_environment;
 
+	bool m_was_lbutton_down = false;
 	litehtml::context m_html_context;
 	HTMLDocumentContainer m_html_container;
 	std::shared_ptr<litehtml::document> m_document;
