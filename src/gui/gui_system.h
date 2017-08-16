@@ -22,8 +22,6 @@ public:
 	};
 
 	virtual void setInterface(Interface* interface) = 0;
-	virtual void beginGUI() = 0;
-	virtual void endGUI() = 0;
 };
 
 

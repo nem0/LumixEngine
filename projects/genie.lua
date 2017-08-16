@@ -635,10 +635,24 @@ if build_gui then
 	project "gui"
 		libType()
 
-		files { "../src/gui/**.h", "../src/gui/**.cpp" }
-		includedirs { "../src", "../src/gui", "../external/bgfx/include" }
+		files {
+			"../src/gui/**.h",
+			"../src/gui/**.cpp",
+			"../src/gui/**.c",
+			"../external/litehtml/**.h",
+			"../external/litehtml/**.cpp",
+			"../external/litehtml/**.c"
+		}
+		includedirs { "../src", "../src/gui", "../external/bgfx/include", "../external/litehtml/include", "../external/litehtml/src/gumbo" }
 		links { "engine", "renderer" }
 		linkLib "bgfx"
+		defines { 
+			"WIN32", 
+			"LITEHTML_UTF8",
+			"_SCL_SECURE_NO_WARNINGS",
+			"_CRT_SECURE_NO_WARNINGS",
+			"_CRT_SECURE_NO_DEPRECATE"
+		}
 		
 		configuration { "vs*" }
 			links { "winmm", "psapi" }

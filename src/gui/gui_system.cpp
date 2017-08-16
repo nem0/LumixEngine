@@ -2,6 +2,7 @@
 #include "engine/delegate.h"
 #include "engine/delegate_list.h"
 #include "engine/engine.h"
+#include "engine/fs/os_file.h"
 #include "engine/iallocator.h"
 #include "engine/input_system.h"
 #include "engine/lua_wrapper.h"
@@ -17,6 +18,7 @@
 #include "renderer/texture.h"
 #include <bgfx/bgfx.h>
 #include <imgui/imgui.h>
+#include "html_document_container.h"
 
 
 namespace Lumix
@@ -26,17 +28,15 @@ namespace Lumix
 struct GUISystemImpl;
 
 
-static const ResourceType MATERIAL_TYPE("material");
-static const ResourceType TEXTURE_TYPE("texture");
-
 
 struct GUISystemImpl LUMIX_FINAL : public GUISystem
 {
 	GUISystemImpl(Engine& engine)
 		: m_engine(engine)
 		, m_interface(nullptr)
+		, m_html_container(engine)
 	{
-		m_context = ImGui::CreateContext();
+		/*m_context = ImGui::CreateContext();
 		m_original_context = ImGui::GetCurrentContext();
 		ImGui::SetCurrentContext(m_context);
 		ImGuiIO& io = ImGui::GetIO();
@@ -46,7 +46,7 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 		int w, h;
 		io.Fonts->GetTexDataAsRGBA32(&pixels, &w, &h);
 		auto* material_manager = m_engine.getResourceManager().get(MATERIAL_TYPE);
-		auto* resource = material_manager->load(Path("pipelines/imgui/imgui.mat"));
+		auto* resource = material_manager->load(Path("pipelines/gui/gui.mat"));
 		m_material = static_cast<Material*>(resource);
 
 		auto* old_texture = m_material->getTexture(0);
@@ -65,8 +65,52 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 		io.DisplaySize.y = 480;
 		ImGui::NewFrame();
 		ImGui::SetCurrentContext(m_original_context);
-
+		*/
 		registerLuaAPI();
+	}
+
+
+	bool loadFile(const char* path, Array<u8>* out_data)
+	{
+		ASSERT(out_data);
+
+		FS::OsFile file;
+		if (!file.open(path, FS::Mode::OPEN_AND_READ, m_engine.getAllocator())) return false;
+
+		out_data->resize((int)file.size());
+		bool success = file.read(&(*out_data)[0], out_data->size());
+		file.close();
+		
+		return success;
+	}
+
+
+	bool init()
+	{
+		Array<u8> css(m_engine.getLIFOAllocator());
+		if (!loadFile("master.css", &css)) return false;
+		
+		m_html_context.load_master_stylesheet((litehtml::tchar_t*)&css[0]);
+
+		ResourceManagerBase* material_manager = m_engine.getResourceManager().get(MATERIAL_TYPE);
+		Resource* resource = material_manager->load(Path("pipelines/gui/gui.mat"));
+		m_material = (Material*)resource;
+
+		return true;
+	}
+
+
+	bool openDocument(const char* path)
+	{
+		Array<u8> page(m_engine.getLIFOAllocator());
+
+		if (!loadFile(path, &page)) return false;
+		
+		m_document = litehtml::document::createFromUTF8((const char*)&page[0], &m_html_container, &m_html_context);
+		if (!m_document) return false;
+		
+		m_document->render(1024);
+		return true;
 	}
 
 
@@ -81,8 +125,6 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 		}
 
 		m_material->getResourceManager().unload(*m_material);
-
-		ImGui::DestroyContext(m_context);
 	}
 
 
@@ -97,12 +139,9 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 				LuaWrapper::createSystemFunction(L, "Gui", #name, f); \
 			} while(false) \
 
-		REGISTER_FUNCTION(beginGUI);
-		REGISTER_FUNCTION(endGUI);
+		REGISTER_FUNCTION(init);
+		REGISTER_FUNCTION(openDocument);
 		REGISTER_FUNCTION(enableCursor);
-		REGISTER_FUNCTION(getMouseX);
-		REGISTER_FUNCTION(getMouseY);
-		REGISTER_FUNCTION(isMouseClicked);
 
 		LuaWrapper::createSystemVariable(L, "Gui", "instance", this);
 
@@ -140,15 +179,17 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 	}
 
 
-	void drawGUICmdList(ImDrawList* cmd_list)
+	void renderUI()
 	{
 		Renderer* renderer = static_cast<Renderer*>(m_engine.getPluginManager().getPlugin("renderer"));
 		if (!renderer) return;
 
 		Pipeline* pipeline = m_interface->getPipeline();
-		int num_indices = cmd_list->IdxBuffer.size();
-		int num_vertices = cmd_list->VtxBuffer.size();
-		auto& decl = renderer->getBasic2DVertexDecl();
+		int num_indices = m_html_container.m_draw_list.IdxBuffer.size();
+		int num_vertices = m_html_container.m_draw_list.VtxBuffer.size();
+		if (num_indices == 0) return;
+
+		const bgfx::VertexDecl& decl = renderer->getBasic2DVertexDecl();
 		bgfx::TransientVertexBuffer vertex_buffer;
 		bgfx::TransientIndexBuffer index_buffer;
 		if (bgfx::getAvailTransientIndexBuffer(num_indices) < (u32)num_indices) return;
@@ -156,21 +197,14 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 		bgfx::allocTransientVertexBuffer(&vertex_buffer, num_vertices, decl);
 		bgfx::allocTransientIndexBuffer(&index_buffer, num_indices);
 
-		copyMemory(vertex_buffer.data, &cmd_list->VtxBuffer[0], num_vertices * decl.getStride());
-		copyMemory(index_buffer.data, &cmd_list->IdxBuffer[0], num_indices * sizeof(u16));
+		copyMemory(vertex_buffer.data, &m_html_container.m_draw_list.VtxBuffer[0], num_vertices * decl.getStride());
+		copyMemory(index_buffer.data, &m_html_container.m_draw_list.IdxBuffer[0], num_indices * sizeof(u16));
 
 		u32 elem_offset = 0;
-		const ImDrawCmd* pcmd_begin = cmd_list->CmdBuffer.begin();
-		const ImDrawCmd* pcmd_end = cmd_list->CmdBuffer.end();
-		for (const ImDrawCmd* pcmd = pcmd_begin; pcmd != pcmd_end; pcmd++)
+		const DrawList::DrawCmd* pcmd_begin = m_html_container.m_draw_list.CmdBuffer.begin();
+		const DrawList::DrawCmd* pcmd_end = m_html_container.m_draw_list.CmdBuffer.end();
+		for (const DrawList::DrawCmd* pcmd = pcmd_begin; pcmd != pcmd_end; pcmd++)
 		{
-			if (pcmd->UserCallback)
-			{
-				pcmd->UserCallback(cmd_list, pcmd);
-				elem_offset += pcmd->ElemCount;
-				continue;
-			}
-
 			if (0 == pcmd->ElemCount) continue;
 
 			pipeline->setScissor(u16(Math::maximum(pcmd->ClipRect.x, 0.0f)),
@@ -178,18 +212,17 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 				u16(Math::minimum(pcmd->ClipRect.z, 65535.0f) - Math::maximum(pcmd->ClipRect.x, 0.0f)),
 				u16(Math::minimum(pcmd->ClipRect.w, 65535.0f) - Math::maximum(pcmd->ClipRect.y, 0.0f)));
 
-			auto material = m_material;
-			const auto& texture_id =
-				pcmd->TextureId ? *(bgfx::TextureHandle*)pcmd->TextureId : material->getTexture(0)->handle;
-			auto texture_uniform = material->getShader()->m_texture_slots[0].uniform_handle;
+			const bgfx::TextureHandle& texture_id =
+				pcmd->TextureId ? *(bgfx::TextureHandle*)pcmd->TextureId : m_material->getTexture(0)->handle;
+			auto texture_uniform = m_material->getShader()->m_texture_slots[0].uniform_handle;
 			pipeline->setTexture(0, texture_id, texture_uniform);
 			pipeline->render(vertex_buffer,
 				index_buffer,
 				Matrix::IDENTITY,
 				elem_offset,
 				pcmd->ElemCount,
-				material->getRenderStates(),
-				material->getShaderInstance());
+				m_material->getRenderStates(),
+				m_material->getShaderInstance());
 
 			elem_offset += pcmd->ElemCount;
 		}
@@ -200,73 +233,26 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 	{
 		if (!m_interface) return;
 
-		m_original_context = ImGui::GetCurrentContext();
-		ImGui::SetCurrentContext(m_context);
-		ImGui::Render();
-		ImDrawData* draw_data = ImGui::GetDrawData();
-		Pipeline* pipeline = m_interface->getPipeline();
-		ImGui::GetIO().DisplaySize.x = (float)pipeline->getWidth();
-		ImGui::GetIO().DisplaySize.y = (float)pipeline->getHeight();
-		
+		if (m_document)
+		{
+			m_html_container.m_pos.x = 0; // ImGui::GetWindowPos().x;
+			m_html_container.m_pos.y = 0; // ImGui::GetWindowPos().y;
+			m_html_container.m_draw_list.Clear();
+			m_html_container.m_draw_list.PushClipRectFullScreen();
+			litehtml::position clip(0, 0, 1024, 1024);
+			m_document->draw((litehtml::uint_ptr)this, 0, 0, &clip);
+		}
+
+		Pipeline* pipeline = m_interface->getPipeline();;
 		if (!pipeline->isReady()) return;
 
 		setGUIProjection();
 
-		for (int i = 0; i < draw_data->CmdListsCount; ++i)
-		{
-			ImDrawList* cmd_list = draw_data->CmdLists[i];
-			drawGUICmdList(cmd_list);
-		}
-
-		ImGui::NewFrame();
-		ImGui::SetCurrentContext(m_original_context);
+		renderUI();
 	}
 
 
-	void beginGUI() override
-	{
-		m_original_context = ImGui::GetCurrentContext();
-		ImGui::SetCurrentContext(m_context);
-		ImGui::PushFont(m_font);
-	}
-
-
-	void endGUI() override
-	{
-		ImGui::PopFont();
-		ImGui::SetCurrentContext(m_original_context);
-	}
-
-
-	float getMouseX() const
-	{
-		Vec2 mouse_pos = m_engine.getInputSystem().getMousePos() - m_interface->getPos();
-		return mouse_pos.x;
-	}
-
-
-	bool isMouseClicked(int button)
-	{
-		return ImGui::IsMouseClicked(button);
-	}
-
-
-	float getMouseY() const
-	{
-		Vec2 mouse_pos = m_engine.getInputSystem().getMousePos() - m_interface->getPos();
-		return mouse_pos.y;
-	}
-
-
-	void update(float time_delta) override
-	{
-		beginGUI();
-		Vec2 mouse_pos = m_engine.getInputSystem().getMousePos() - m_interface->getPos();
-		auto& io = ImGui::GetIO();
-		io.MousePos = ImVec2(mouse_pos.x, mouse_pos.y);
-		io.MouseDown[0] = m_engine.getInputSystem().isMouseDown(InputSystem::LEFT);
-		endGUI();
-	}
+	void update(float time_delta) override {}
 
 
 	void stopGame() override {}
@@ -277,10 +263,11 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 
 	Engine& m_engine;
 	Interface* m_interface;
-	ImGuiContext* m_context;
-	ImGuiContext* m_original_context;
-	ImFont* m_font;
 	Material* m_material;
+
+	litehtml::context m_html_context;
+	HTMLDocumentContainer m_html_container;
+	std::shared_ptr<litehtml::document> m_document;
 };
 
 
