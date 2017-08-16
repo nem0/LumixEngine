@@ -135,7 +135,7 @@ Process* createProcess(const char* cmd, const char* args, IAllocator& allocator)
 	suinfo.wShowWindow = SW_HIDE;
 	suinfo.hStdOutput = process->output_write_pipe;
 	suinfo.hStdError = process->output_write_pipe;
-	suinfo.hStdInput = INVALID_HANDLE_VALUE;
+	suinfo.hStdInput = process->output_read_pipe;
 
 	char rw_args[1024];
 	copyString(rw_args, args);
