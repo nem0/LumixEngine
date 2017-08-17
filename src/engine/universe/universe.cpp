@@ -100,13 +100,15 @@ void Universe::transformEntity(Entity entity, bool update_local)
 		}
 
 		Entity child = h.first_child;
+		float my_scale = m_entities[entity.index].scale;
 		while (child.isValid())
 		{
 			Hierarchy& child_h = m_hierarchy[m_entities[child.index].hierarchy];
 			Transform abs_tr = my_transform * child_h.local_transform;
-			m_entities[child.index].position = abs_tr.pos;
-			m_entities[child.index].rotation = abs_tr.rot;
-			m_entities[child.index].scale = child_h.local_scale / m_entities[entity.index].scale;
+			EntityData& child_data = m_entities[child.index];
+			child_data.position = my_scale * my_transform.rot.rotate(child_h.local_transform.pos) + my_transform.pos;
+			child_data.rotation = my_transform.rot * child_h.local_transform.rot;
+			child_data.scale = child_h.local_scale * my_scale;
 			transformEntity(child, false);
 
 			child = child_h.next_sibling;
