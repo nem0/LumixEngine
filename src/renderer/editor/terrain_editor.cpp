@@ -1610,7 +1610,7 @@ void TerrainEditor::onGUI()
 		case COLOR:
 		{
 			m_action_type = TerrainEditor::COLOR;
-			ImGui::ColorPicker(&m_color.x, false);
+			ImGui::ColorPicker3("", &m_color.x);
 			break;
 		}
 		case LAYER:

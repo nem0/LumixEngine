@@ -850,7 +850,7 @@ struct ColorConstNode : public ShaderEditor::Node
 			 << m_color[2] << ", " << m_color[3] << ");\n";
 	}
 
-	void onGUI() override { ImGui::ColorPicker(m_color, true); }
+	void onGUI() override { ImGui::ColorPicker4("", m_color); }
 
 	float m_color[4];
 };
