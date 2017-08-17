@@ -173,14 +173,6 @@ struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		{
 			material->setColor(color);
 		}
-		if (ImGui::BeginPopupContextItem("color_pu"))
-		{
-			if(ImGui::ColorPicker(&color.x, false))
-			{
-				material->setColor(color);
-			}
-			ImGui::EndPopup();
-		}
 
 		float roughness = material->getRoughness();
 		if (ImGui::DragFloat("Roughness", &roughness, 0.01f, 0.0f, 1.0f))
@@ -278,11 +270,6 @@ struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 						if (ImGui::ColorEdit3(shader_uniform.name, uniform.vec3))
 						{
 							material->createCommandBuffer();
-						}
-						if (ImGui::BeginPopupContextItem(StaticString<40>(shader_uniform.name, "pu")))
-						{
-							if (ImGui::ColorPicker(uniform.vec3, false)) material->createCommandBuffer();
-							ImGui::EndPopup();
 						}
 						break;
 					case Shader::Uniform::TIME: break;

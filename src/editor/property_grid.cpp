@@ -130,14 +130,6 @@ void PropertyGrid::showProperty(PropertyDescriptorBase& desc,
 		{
 			m_editor.setProperty(cmp_type, index, desc, &entities[0], entities.size(), &v, sizeof(v));
 		}
-		if (ImGui::BeginPopupContextItem(StaticString<50>(desc_name, "pu")))
-		{
-			if (ImGui::ColorPicker(&v.x, false))
-			{
-				m_editor.setProperty(cmp_type, index, desc, &entities[0], entities.size(), &v, sizeof(v));
-			}
-			ImGui::EndPopup();
-		}
 		break;
 	}
 	case PropertyDescriptorBase::VEC2:

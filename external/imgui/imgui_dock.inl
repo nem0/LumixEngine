@@ -689,7 +689,7 @@ struct DockContext
 					pos + ImVec2(size.x + 10, size.y),
 					pos + ImVec2(size.x + 15, size.y),
 					10);
-				draw_list->PathFill(
+				draw_list->PathFillConvex(
 					hovered ? color_hovered : (dock_tab->active ? color_active : color));
 				draw_list->AddText(pos, text_color, dock_tab->label, text_end);
 
