@@ -96,7 +96,7 @@ void Universe::transformEntity(Entity entity, bool update_local)
 		{
 			Transform parent_tr = getTransform(h.parent);
 			h.local_transform = parent_tr.inverted() * my_transform;
-			h.local_scale = getScale(h.parent) * getScale(entity);
+			h.local_scale = getScale(entity) / getScale(h.parent);
 		}
 
 		Entity child = h.first_child;
