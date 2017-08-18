@@ -201,7 +201,9 @@ namespace
 		LUMIX_EXPECT_CLOSE_EQ(universe.getScale(e0), 1, 0.001f);
 		LUMIX_EXPECT_CLOSE_EQ(universe.getLocalScale(e0), 1, 0.001f);
 
-		universe.setLocalTransform(e0, universe.getLocalTransform(e0), 2);
+		auto tmp = universe.getLocalTransform(e0);
+		tmp.scale = 2;
+		universe.setLocalTransform(e0, tmp);
 		LUMIX_EXPECT_CLOSE_EQ(universe.getScale(e0), 2, 0.001f);
 		LUMIX_EXPECT_CLOSE_EQ(universe.getLocalScale(e0), 2, 0.001f);
 	}
