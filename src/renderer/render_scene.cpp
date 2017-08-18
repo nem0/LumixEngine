@@ -4018,14 +4018,13 @@ public:
 			if (ignored_model_instance.index == i || !r.model) continue;
 
 			const Vec3& pos = r.matrix.getTranslation();
-			float radius = r.model->getBoundingRadius();
 			float scale = universe.getScale(r.entity);
+			float radius = r.model->getBoundingRadius() * scale;
 			float dist = (pos - origin).length();
-			if (dist - radius * scale > cur_dist) continue;
+			if (dist - radius > cur_dist) continue;
 			
 			Vec3 intersection;
-			if (dotProduct(pos - origin, pos - origin) < radius * radius ||
-				Math::getRaySphereIntersection(origin, dir, pos, radius * scale, intersection))
+			if (Math::getRaySphereIntersection(origin, dir, pos, radius, intersection))
 			{
 				RayCastModelHit new_hit = r.model->castRay(origin, dir, r.matrix, r.pose);
 				if (new_hit.m_is_hit && (!hit.m_is_hit || new_hit.m_t < hit.m_t))
