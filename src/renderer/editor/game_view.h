@@ -35,6 +35,7 @@ public:
 	bool isOpened() const { return m_is_open; }
 	void onAction() { m_is_open = !m_is_open; }
 	void onWindowGUI() override;
+	const bgfx::TextureHandle& getTextureHandle() const { return m_texture_handle; }
 
 public:
 	bool m_is_open;
