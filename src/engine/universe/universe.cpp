@@ -171,9 +171,11 @@ void Universe::setTransformKeepChildren(Entity entity, const Transform& transfor
 		Transform my_transform = getTransform(entity);
 		if (h.parent.isValid())
 		{
+			float parent_inv_scale = 1.0f / getScale(h.parent);
 			Transform parent_tr = getTransform(h.parent);
 			h.local_transform = parent_tr.inverted() * my_transform;
-			h.local_scale = getScale(entity) / getScale(h.parent);
+			h.local_transform.pos *= parent_inv_scale;
+			h.local_scale = getScale(entity) * parent_inv_scale;
 		}
 
 		Entity child = h.first_child;
@@ -181,8 +183,10 @@ void Universe::setTransformKeepChildren(Entity entity, const Transform& transfor
 		{
 			Hierarchy& child_h = m_hierarchy[m_entities[child.index].hierarchy];
 
+			float my_inv_scale = 1.0f / scale;
 			child_h.local_transform = my_transform.inverted() * getTransform(child);
-			child_h.local_scale = scale * getScale(child);
+			child_h.local_transform.pos *= my_inv_scale;
+			child_h.local_scale = getScale(child) * my_inv_scale;
 			child = child_h.next_sibling;
 		}
 	}
