@@ -42,8 +42,8 @@ static Vec3 fromPhysx(const physx::PxVec3& v) { return Vec3(v.x, v.y, v.z); }
 static physx::PxVec3 toPhysx(const Vec3& v) { return physx::PxVec3(v.x, v.y, v.z); }
 static Quat fromPhysx(const physx::PxQuat& v) { return Quat(v.x, v.y, v.z, v.w); }
 static physx::PxQuat toPhysx(const Quat& v) { return physx::PxQuat(v.x, v.y, v.z, v.w); }
-static Transform fromPhysx(const physx::PxTransform& v) { return{ fromPhysx(v.p), fromPhysx(v.q) }; }
-static physx::PxTransform toPhysx(const Transform& v) { return{ toPhysx(v.pos), toPhysx(v.rot) }; }
+static RigidTransform fromPhysx(const physx::PxTransform& v) { return{ fromPhysx(v.p), fromPhysx(v.q) }; }
+static physx::PxTransform toPhysx(const RigidTransform& v) { return{ toPhysx(v.pos), toPhysx(v.rot) }; }
 
 
 struct EditorPlugin LUMIX_FINAL : public WorldEditor::Plugin
@@ -54,13 +54,13 @@ struct EditorPlugin LUMIX_FINAL : public WorldEditor::Plugin
 	}
 
 
-	static void showD6JointGizmo(const Transform& global_frame, RenderScene& render_scene, physx::PxD6Joint* joint)
+	static void showD6JointGizmo(const RigidTransform& global_frame, RenderScene& render_scene, physx::PxD6Joint* joint)
 	{
 		physx::PxRigidActor* actors[2];
 		joint->getActors(actors[0], actors[1]);
 
 		physx::PxTransform local_frame0 = joint->getLocalPose(physx::PxJointActorIndex::eACTOR0);
-		Transform global_frame0 = global_frame * fromPhysx(local_frame0);
+		RigidTransform global_frame0 = global_frame * fromPhysx(local_frame0);
 		Vec3 joint_pos = global_frame0.pos;
 		Matrix mtx0 = global_frame0.toMatrix();
 
@@ -72,7 +72,7 @@ struct EditorPlugin LUMIX_FINAL : public WorldEditor::Plugin
 		if (actors[1])
 		{
 			physx::PxTransform local_frame1 = joint->getLocalPose(physx::PxJointActorIndex::eACTOR1);
-			Transform global_frame1 = fromPhysx(actors[1]->getGlobalPose() * local_frame1);
+			RigidTransform global_frame1 = fromPhysx(actors[1]->getGlobalPose() * local_frame1);
 			mtx1 = global_frame1.toMatrix();
 
 			render_scene.addDebugLine(joint_pos, joint_pos + mtx1.getXVector(), 0xffff0000, 0);
@@ -163,8 +163,8 @@ struct EditorPlugin LUMIX_FINAL : public WorldEditor::Plugin
 		if (!other_entity.isValid()) return;
 
 
-		Transform local_frame0 = phy_scene->getJointLocalFrame(cmp.handle);
-		Transform global_frame0 = universe.getTransform(cmp.entity) * local_frame0;
+		RigidTransform local_frame0 = phy_scene->getJointLocalFrame(cmp.handle);
+		RigidTransform global_frame0 = universe.getTransform(cmp.entity).getRigidPart() * local_frame0;
 		Vec3 joint_pos = global_frame0.pos;
 		Matrix mtx0 = global_frame0.toMatrix();
 
@@ -172,8 +172,8 @@ struct EditorPlugin LUMIX_FINAL : public WorldEditor::Plugin
 		render_scene->addDebugLine(joint_pos, joint_pos + mtx0.getYVector(), 0xff00ff00, 0);
 		render_scene->addDebugLine(joint_pos, joint_pos + mtx0.getZVector(), 0xff0000ff, 0);
 
-		Transform local_frame1 = phy_scene->getJointConnectedBodyLocalFrame(cmp.handle);
-		Transform global_frame1 = universe.getTransform(other_entity) * local_frame1;
+		RigidTransform local_frame1 = phy_scene->getJointConnectedBodyLocalFrame(cmp.handle);
+		RigidTransform global_frame1 = universe.getTransform(other_entity).getRigidPart() * local_frame1;
 		Matrix mtx1 = global_frame1.toMatrix();
 
 		bool use_limit = phy_scene->getSphericalJointUseLimit(cmp.handle);
@@ -256,8 +256,8 @@ struct EditorPlugin LUMIX_FINAL : public WorldEditor::Plugin
 		Vec2 limit = phy_scene->getHingeJointLimit(cmp.handle);
 		bool use_limit = phy_scene->getHingeJointUseLimit(cmp.handle);
 		if (!connected_body.isValid()) return;
-		Transform global_frame1 = phy_scene->getJointConnectedBodyLocalFrame(cmp.handle);
-		global_frame1 = phy_scene->getUniverse().getTransform(connected_body) * global_frame1;
+		RigidTransform global_frame1 = phy_scene->getJointConnectedBodyLocalFrame(cmp.handle);
+		global_frame1 = phy_scene->getUniverse().getTransform(connected_body).getRigidPart() * global_frame1;
 		showHingeJointGizmo(*phy_scene, limit, use_limit, global_frame1.toMatrix());
 	}
 
@@ -384,7 +384,7 @@ struct EditorPlugin LUMIX_FINAL : public WorldEditor::Plugin
 		if (cmp.type == D6_JOINT_TYPE)
 		{
 			physx::PxD6Joint* joint = static_cast<physx::PxD6Joint*>(phy_scene->getJoint(cmp.handle));
-			showD6JointGizmo(universe.getTransform(cmp.entity), *render_scene, joint);
+			showD6JointGizmo(universe.getTransform(cmp.entity).getRigidPart(), *render_scene, joint);
 			return true;
 		}
 
@@ -556,7 +556,7 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 						break;
 					case physx::PxJointConcreteType::eD6:
 						cmp.type = D6_JOINT_TYPE;
-						EditorPlugin::showD6JointGizmo(m_editor.getUniverse()->getTransform(cmp.entity),
+						EditorPlugin::showD6JointGizmo(m_editor.getUniverse()->getTransform(cmp.entity).getRigidPart(),
 							*render_scene,
 							static_cast<physx::PxD6Joint*>(joint));
 						break;
@@ -870,8 +870,8 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		if (ImGui::DragFloat("Height", &height)) scene.setRagdollBoneHeight(bone_handle, height);
 		if (ImGui::DragFloat("Radius", &radius)) scene.setRagdollBoneRadius(bone_handle, radius);
 
-		Transform transform = scene.getRagdollBoneTransform(bone_handle);
-		bool changed_by_gizmo = m_editor.getGizmo().immediate(transform);
+		RigidTransform transform = scene.getRagdollBoneTransform(bone_handle);
+		bool changed_by_gizmo = m_editor.getGizmo().immediate(transform.toScaled(1));
 		if (ImGui::DragFloat3("Position", &transform.pos.x) || changed_by_gizmo)
 		{
 			scene.setRagdollBoneTransform(bone_handle, transform);

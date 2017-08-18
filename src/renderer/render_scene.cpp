@@ -155,7 +155,7 @@ struct BoneAttachment
 	Entity entity;
 	Entity parent_entity;
 	int bone_index;
-	Transform relative_transform;
+	RigidTransform relative_transform;
 };
 
 
@@ -484,9 +484,10 @@ public:
 		Transform parent_entity_transform = m_universe.getTransform(bone_attachment.parent_entity);
 		int idx = bone_attachment.bone_index;
 		if (idx < 0 || idx > parent_pose->count) return;
-		Transform bone_transform = {parent_pose->positions[idx], parent_pose->rotations[idx]};
+		Transform bone_transform = {parent_pose->positions[idx], parent_pose->rotations[idx], 1.0f};
+		Transform relative_transform = { bone_attachment.relative_transform.pos, bone_attachment.relative_transform.rot, 1.0f};
 		m_universe.setTransform(
-			bone_attachment.entity, parent_entity_transform * bone_transform * bone_attachment.relative_transform);
+			bone_attachment.entity, parent_entity_transform * bone_transform * relative_transform);
 	}
 
 
@@ -507,12 +508,13 @@ public:
 		if (!pose) return;
 		ASSERT(pose->is_absolute);
 		if (attachment.bone_index >= pose->count) return;
-		Transform bone_transform = {pose->positions[attachment.bone_index], pose->rotations[attachment.bone_index]};
+		Transform bone_transform = {pose->positions[attachment.bone_index], pose->rotations[attachment.bone_index], 1.0f};
 
 		Transform inv_parent_transform = m_universe.getTransform(attachment.parent_entity) * bone_transform;
 		inv_parent_transform = inv_parent_transform.inverted();
 		Transform child_transform = m_universe.getTransform(attachment.entity);
-		attachment.relative_transform = inv_parent_transform * child_transform;
+		Transform res = inv_parent_transform * child_transform;
+		attachment.relative_transform = {res.pos, res.rot};
 	}
 
 

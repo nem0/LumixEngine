@@ -287,7 +287,8 @@ public:
 			Entity parent = universe->getParent(entities[i]);
 			if (prefab != 0 && parent.isValid() && (prefab_system.getPrefab(parent) & 0xffffFFFF) == (prefab & 0xffffFFFF))
 			{
-				Transform new_local_tr = universe->computeLocalTransform(parent, {new_positions[i], new_rotations[i]});
+				float scale = universe->getScale(entities[i]);
+				Transform new_local_tr = universe->computeLocalTransform(parent, {new_positions[i], new_rotations[i], scale});
 				Entity instance = prefab_system.getFirstInstance(prefab);
 				while (instance.isValid())
 				{
@@ -1258,6 +1259,7 @@ private:
 				serializer.serializeArrayItem(m_transformations[i].rot.y);
 				serializer.serializeArrayItem(m_transformations[i].rot.z);
 				serializer.serializeArrayItem(m_transformations[i].rot.w);
+				serializer.serializeArrayItem(m_transformations[i].scale);
 			}
 			serializer.endArray();
 		}
@@ -1279,7 +1281,8 @@ private:
 				serializer.deserializeArrayItem(m_transformations[i].rot.x, 0);
 				serializer.deserializeArrayItem(m_transformations[i].rot.y, 0);
 				serializer.deserializeArrayItem(m_transformations[i].rot.z, 0);
-				serializer.deserializeArrayItem(m_transformations[i].rot.w, 0);
+				serializer.deserializeArrayItem(m_transformations[i].rot.w, 1);
+				serializer.deserializeArrayItem(m_transformations[i].scale, 1);
 			}
 			serializer.deserializeArrayEnd();
 		}
@@ -1369,7 +1372,7 @@ private:
 			for (int i = 0; i < m_entities.size(); ++i)
 			{
 				Entity new_entity = m_entities[i];
-				universe->setTransform(new_entity, m_transformations[i].pos, m_transformations[i].rot);
+				universe->setTransform(new_entity, m_transformations[i]);
 				int cmps_count;
 				EntityGUID guid;
 				blob.read(guid.value);
@@ -1382,21 +1385,17 @@ private:
 				if (parent.isValid())
 				{
 					Transform local_tr;
-					float local_scale;
 					blob.read(local_tr);
-					blob.read(local_scale);
 					universe->setParent(parent, new_entity);
-					universe->setLocalTransform(new_entity, local_tr, local_scale);
+					universe->setLocalTransform(new_entity, local_tr);
 				}
 				Entity child;
 				for(blob.read(child); child.isValid(); blob.read(child))
 				{
 					Transform local_tr;
-					float local_scale;
 					blob.read(local_tr);
-					blob.read(local_scale);
 					universe->setParent(new_entity, child);
-					universe->setLocalTransform(child, local_tr, local_scale);
+					universe->setLocalTransform(child, local_tr);
 				}
 
 				blob.read(cmps_count);
@@ -2153,7 +2152,7 @@ public:
 			loadFile(filepath, [&versions, this, guid](TextDeserializer& deserializer) {
 				char name[64];
 				deserializer.read(name, lengthOf(name));
-				Transform tr;
+				RigidTransform tr;
 				deserializer.read(&tr);
 				float scale;
 				deserializer.read(&scale);
@@ -2165,7 +2164,7 @@ public:
 				if (parent.isValid()) m_universe->setParent(parent, entity);
 
 				if(name[0]) m_universe->setEntityName(entity, name);
-				m_universe->setTransformKeepChildren(entity, tr, scale);
+				m_universe->setTransformKeepChildren(entity, {tr.pos, tr.rot, scale});
 				u32 cmp_type_hash;
 				deserializer.read(&cmp_type_hash);
 				while (cmp_type_hash != 0)
@@ -2228,7 +2227,7 @@ public:
 			if (m_prefab_system->getPrefab(entity) != 0) continue;
 			blob.clear();
 			serializer.write("name", m_universe->getEntityName(entity));
-			serializer.write("transform", m_universe->getTransform(entity));
+			serializer.write("transform", m_universe->getTransform(entity).getRigidPart());
 			serializer.write("scale", m_universe->getScale(entity));
 			Entity parent = m_universe->getParent(entity);
 			serializer.write("parent", parent);

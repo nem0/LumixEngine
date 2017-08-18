@@ -34,7 +34,7 @@ struct Matrix;
 class Path;
 class PhysicsSystem;
 struct RagdollBone;
-struct Transform;
+struct RigidTransform;
 class Universe;
 
 
@@ -166,8 +166,8 @@ public:
 	virtual void setJointAxisPosition(ComponentHandle cmp, const Vec3& value) = 0;
 	virtual Vec3 getJointAxisDirection(ComponentHandle cmp) = 0;
 	virtual void setJointAxisDirection(ComponentHandle cmp, const Vec3& value) = 0;
-	virtual Transform getJointLocalFrame(ComponentHandle cmp) = 0;
-	virtual Transform getJointConnectedBodyLocalFrame(ComponentHandle cmp) = 0;
+	virtual RigidTransform getJointLocalFrame(ComponentHandle cmp) = 0;
+	virtual RigidTransform getJointConnectedBodyLocalFrame(ComponentHandle cmp) = 0;
 	virtual physx::PxJoint* getJoint(ComponentHandle cmp) = 0;
 
 	virtual bool getSphericalJointUseLimit(ComponentHandle cmp) = 0;
@@ -201,8 +201,8 @@ public:
 	virtual float getRagdollBoneRadius(RagdollBone* bone) = 0;
 	virtual void setRagdollBoneHeight(RagdollBone* bone, float value) = 0;
 	virtual void setRagdollBoneRadius(RagdollBone* bone, float value) = 0;
-	virtual Transform getRagdollBoneTransform(RagdollBone* bone) = 0;
-	virtual void setRagdollBoneTransform(RagdollBone* bone, const Transform& matrix) = 0;
+	virtual RigidTransform getRagdollBoneTransform(RagdollBone* bone) = 0;
+	virtual void setRagdollBoneTransform(RagdollBone* bone, const RigidTransform& matrix) = 0;
 	virtual void changeRagdollBoneJoint(RagdollBone* child, int type) = 0;
 	virtual void getRagdollData(ComponentHandle cmp, OutputBlob& blob) = 0;
 	virtual void setRagdollData(ComponentHandle cmp, InputBlob& blob) = 0;

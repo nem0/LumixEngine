@@ -55,7 +55,7 @@ class Animation LUMIX_FINAL : public Resource
 		Animation(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
 
 		int getRootMotionBoneIdx() const { return m_root_motion_bone_idx; }
-		Transform getBoneTransform(float time, int bone_idx) const;
+		RigidTransform getBoneTransform(float time, int bone_idx) const;
 		void getRelativePose(float time, Pose& pose, Model& model) const;
 		void getRelativePose(float time, Pose& pose, Model& model, float weight) const;
 		int getFrameCount() const { return m_frame_count; }

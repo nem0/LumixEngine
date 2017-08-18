@@ -2098,7 +2098,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		for (int bone_index = 0, bone_count = pose.count; bone_index < bone_count; ++bone_index)
 		{
 			auto& bone = model.getBone(bone_index);
-			Transform tmp = {poss[bone_index], rots[bone_index]};
+			RigidTransform tmp = {poss[bone_index], rots[bone_index]};
 			bone_mtx[bone_index] = (tmp * bone.inv_bind_transform).toMatrix();
 		}
 
@@ -2194,7 +2194,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		for (int bone_index = 0, bone_count = pose.count; bone_index < bone_count; ++bone_index)
 		{
 			auto& bone = model.getBone(bone_index);
-			Transform tmp = { poss[bone_index], rots[bone_index] };
+			RigidTransform tmp = { poss[bone_index], rots[bone_index] };
 			bone_mtx[bone_index] = (tmp * bone.inv_bind_transform).toMatrix();
 		}
 
