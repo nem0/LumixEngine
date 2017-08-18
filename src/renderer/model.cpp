@@ -101,7 +101,7 @@ static inline void computeSkinMatrices(const Pose& pose, const Model& model, Mat
 	for (int i = 0; i < pose.count; ++i)
 	{
 		auto& bone = model.getBone(i);
-		Transform tmp = { pose.positions[i], pose.rotations[i] };
+		RigidTransform tmp = { pose.positions[i], pose.rotations[i] };
 		matrices[i] = (tmp * bone.inv_bind_transform).toMatrix();
 	}
 }

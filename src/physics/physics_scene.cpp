@@ -72,8 +72,8 @@ struct RagdollBone
 	RagdollBone* next;
 	RagdollBone* prev;
 	RagdollBone* parent;
-	Transform bind_transform;
-	Transform inv_bind_transform;
+	RigidTransform bind_transform;
+	RigidTransform inv_bind_transform;
 	bool is_kinematic;
 };
 
@@ -82,7 +82,7 @@ struct Ragdoll
 {
 	Entity entity;
 	RagdollBone* root = nullptr;
-	Transform root_transform;
+	RigidTransform root_transform;
 	int layer;
 };
 
@@ -162,8 +162,8 @@ static Vec3 fromPhysx(const PxVec3& v) { return Vec3(v.x, v.y, v.z); }
 static PxVec3 toPhysx(const Vec3& v) { return PxVec3(v.x, v.y, v.z); }
 static Quat fromPhysx(const PxQuat& v) { return Quat(v.x, v.y, v.z, v.w); }
 static PxQuat toPhysx(const Quat& v) { return PxQuat(v.x, v.y, v.z, v.w); }
-static Transform fromPhysx(const PxTransform& v) { return{ fromPhysx(v.p), fromPhysx(v.q) }; }
-static PxTransform toPhysx(const Transform& v) { return {toPhysx(v.pos), toPhysx(v.rot)}; }
+static RigidTransform fromPhysx(const PxTransform& v) { return{ fromPhysx(v.p), fromPhysx(v.q) }; }
+static PxTransform toPhysx(const RigidTransform& v) { return {toPhysx(v.pos), toPhysx(v.rot)}; }
 
 
 struct Joint
@@ -1019,7 +1019,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	Transform getJointLocalFrame(ComponentHandle cmp) override
+	RigidTransform getJointLocalFrame(ComponentHandle cmp) override
 	{
 		return fromPhysx(m_joints[{cmp.index}].local_frame0);
 	}
@@ -1031,7 +1031,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	Transform getJointConnectedBodyLocalFrame(ComponentHandle cmp) override
+	RigidTransform getJointConnectedBodyLocalFrame(ComponentHandle cmp) override
 	{
 		auto& joint = m_joints[{cmp.index}];
 		if (!joint.connected_body.isValid()) return {Vec3(0, 0, 0), Quat(0, 0, 0, 1)};
@@ -1040,8 +1040,12 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		joint.physx->getActors(a0, a1);
 		if (a1) return fromPhysx(joint.physx->getLocalPose(PxJointActorIndex::eACTOR1));
 
-		Transform tr = m_universe.getTransform(joint.connected_body);
-		return tr.inverted() * m_universe.getTransform({cmp.index}) * fromPhysx(joint.local_frame0);
+		Transform connected_body_tr = m_universe.getTransform(joint.connected_body);
+		RigidTransform unscaled_connected_body_tr = {connected_body_tr.pos, connected_body_tr.rot};
+		Transform tr = m_universe.getTransform({cmp.index});
+		RigidTransform unscaled_tr = {tr.pos, tr.rot};
+
+		return unscaled_connected_body_tr.inverted() * unscaled_tr * fromPhysx(joint.local_frame0);
 	}
 
 
@@ -1359,7 +1363,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		geom.radius = 0.5f;
 		geom.halfHeight = 1;
 		Transform transform = m_universe.getTransform(entity);
-		PxTransform px_transform = toPhysx(transform);
+		PxTransform px_transform = toPhysx({transform.pos, transform.rot});
 
 		PxRigidStatic* physx_actor =
 			PxCreateStatic(*m_system->getPhysics(), px_transform, geom, *m_default_material);
@@ -1398,7 +1402,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		geom.halfExtents.y = 1;
 		geom.halfExtents.z = 1;
 		Transform transform = m_universe.getTransform(entity);
-		PxTransform px_transform = toPhysx(transform);
+		PxTransform px_transform = toPhysx({transform.pos, transform.rot});
 
 		PxRigidStatic* physx_actor =
 			PxCreateStatic(*m_system->getPhysics(), px_transform, geom, *m_default_material);
@@ -1419,7 +1423,8 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 		PxSphereGeometry geom;
 		geom.radius = 1;
-		PxTransform transform = toPhysx(m_universe.getTransform(entity));
+		Transform tr = m_universe.getTransform(entity);
+		PxTransform transform = toPhysx({tr.pos, tr.rot});
 
 		PxRigidStatic* physx_actor =
 			PxCreateStatic(*m_system->getPhysics(), transform, geom, *m_default_material);
@@ -1747,14 +1752,14 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	Transform getRagdollBoneTransform(RagdollBone* bone) override
+	RigidTransform getRagdollBoneTransform(RagdollBone* bone) override
 	{
 		auto px_pose = bone->actor->getGlobalPose();
 		return fromPhysx(px_pose);
 	}
 
 
-	void setRagdollBoneTransform(RagdollBone* bone, const Transform& transform) override
+	void setRagdollBoneTransform(RagdollBone* bone, const RigidTransform& transform) override
 	{
 		Entity entity = {(int)(intptr_t)bone->actor->userData};
 		
@@ -1765,7 +1770,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		if (!model_instance.isValid()) return;
 
 		Model* model = render_scene->getModelInstanceModel(model_instance);
-		Transform entity_transform = m_universe.getTransform(entity);
+		RigidTransform entity_transform = m_universe.getTransform(entity).getRigidPart();
 
 		bone->bind_transform =
 			(entity_transform.inverted() * transform).inverted() * model->getBone(bone->pose_bone_idx).transform;
@@ -1839,8 +1844,8 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	{
 		ragdoll.root = bone;
 		if (!bone) return;
-		Transform root_transform = fromPhysx(ragdoll.root->actor->getGlobalPose());
-		Transform entity_transform = m_universe.getTransform(ragdoll.entity);
+		RigidTransform root_transform = fromPhysx(ragdoll.root->actor->getGlobalPose());
+		RigidTransform entity_transform = m_universe.getTransform(ragdoll.entity).getRigidPart();
 		ragdoll.root_transform = root_transform.inverted() * entity_transform;
 	}
 
@@ -2051,7 +2056,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		}
 	}
 
-	Transform getNewBoneTransform(const Model* model, int bone_idx, float& length)
+	RigidTransform getNewBoneTransform(const Model* model, int bone_idx, float& length)
 	{
 		auto& bone = model->getBone(bone_idx);
 
@@ -2103,11 +2108,11 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		new_bone->pose_bone_idx = iter.value();
 		
 		float bone_height;
-		Transform transform = getNewBoneTransform(model, iter.value(), bone_height);
+		RigidTransform transform = getNewBoneTransform(model, iter.value(), bone_height);
 		
 		new_bone->bind_transform = transform.inverted() * model->getBone(iter.value()).transform;
 		new_bone->inv_bind_transform = new_bone->bind_transform.inverted();
-		transform = m_universe.getTransform(entity) * transform;
+		transform = m_universe.getTransform(entity).getRigidPart() * transform;
 
 		PxCapsuleGeometry geom;
 		geom.halfHeight = bone_height * 0.3f;
@@ -2136,11 +2141,11 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	void setSkeletonPose(const Transform& root_transform, RagdollBone* bone, Pose* pose)
+	void setSkeletonPose(const RigidTransform& root_transform, RagdollBone* bone, Pose* pose)
 	{
 		if (!bone) return;
 		
-		Transform bone_transform(Transform(pose->positions[bone->pose_bone_idx], pose->rotations[bone->pose_bone_idx]));
+		RigidTransform bone_transform(RigidTransform(pose->positions[bone->pose_bone_idx], pose->rotations[bone->pose_bone_idx]));
 		bone->actor->setGlobalPose(toPhysx(root_transform * bone_transform * bone->inv_bind_transform));
 
 		setSkeletonPose(root_transform, bone->next, pose);
@@ -2148,19 +2153,19 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	void updateBone(const Transform& root_transform, const Transform& inv_root, RagdollBone* bone, Pose* pose)
+	void updateBone(const RigidTransform& root_transform, const RigidTransform& inv_root, RagdollBone* bone, Pose* pose)
 	{
 		if (!bone) return;
 			
 		if (bone->is_kinematic)
 		{
-			Transform bone_transform(Transform(pose->positions[bone->pose_bone_idx], pose->rotations[bone->pose_bone_idx]));
+			RigidTransform bone_transform(RigidTransform(pose->positions[bone->pose_bone_idx], pose->rotations[bone->pose_bone_idx]));
 			bone->actor->setKinematicTarget(toPhysx(root_transform * bone_transform * bone->inv_bind_transform));
 		}
 		else
 		{
 			PxTransform bone_pose = bone->actor->getGlobalPose();
-			auto tr = inv_root * Transform(fromPhysx(bone_pose.p), fromPhysx(bone_pose.q)) * bone->bind_transform;
+			auto tr = inv_root * RigidTransform(fromPhysx(bone_pose.p), fromPhysx(bone_pose.q)) * bone->bind_transform;
 			pose->rotations[bone->pose_bone_idx] = tr.rot;
 			pose->positions[bone->pose_bone_idx] = tr.pos;
 		}
@@ -2183,7 +2188,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			Pose* pose = render_scene->getPose(model_instance);
 			if (!pose) continue;
 
-			Transform root_transform;
+			RigidTransform root_transform;
 			root_transform.rot = m_universe.getRotation(ragdoll.entity);
 			root_transform.pos = m_universe.getPosition(ragdoll.entity);
 
@@ -2192,7 +2197,8 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 				PxTransform bone_pose = ragdoll.root->actor->getGlobalPose();
 				m_is_updating_ragdoll = true;
 
-				m_universe.setTransform(ragdoll.entity, fromPhysx(bone_pose) * ragdoll.root_transform);
+				RigidTransform rigid_tr = fromPhysx(bone_pose) * ragdoll.root_transform;
+				m_universe.setTransform(ragdoll.entity, {rigid_tr.pos, rigid_tr.rot, 1.0f});
 
 				m_is_updating_ragdoll = false;
 			}
@@ -2427,7 +2433,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			if (!model_instance.isValid()) return;
 			Pose* pose = render_scene->getPose(model_instance);
 			if (!pose) return;
-			setSkeletonPose(m_universe.getTransform(entity), m_ragdolls.at(ragdoll_idx).root, pose);
+			setSkeletonPose(m_universe.getTransform(entity).getRigidPart(), m_ragdolls.at(ragdoll_idx).root, pose);
 		}
 
 		int idx = m_actors.find(entity);
@@ -2436,7 +2442,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			RigidActor* actor = m_actors.at(idx);
 			if (actor->physx_actor)
 			{
-				Transform trans = m_universe.getTransform(entity);
+				RigidTransform trans = m_universe.getTransform(entity).getRigidPart();
 				actor->physx_actor->setGlobalPose(toPhysx(trans), false);
 				if (actor->resource) actor->rescale();
 			}
@@ -2512,7 +2518,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 				terrain.m_actor = nullptr;
 			}
 
-			PxTransform transform = toPhysx(m_universe.getTransform(terrain.m_entity));
+			PxTransform transform = toPhysx(m_universe.getTransform(terrain.m_entity).getRigidPart());
 			transform.p.y += terrain.m_y_scale * 0.5f;
 
 			PxRigidActor* actor;
@@ -2802,7 +2808,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			actor->physx_actor->getShapes(&shapes, 1, 0))
 		{
 			PxGeometryHolder geom = shapes->getGeometry();
-			PxTransform transform = toPhysx(m_universe.getTransform(actor->entity));
+			PxTransform transform = toPhysx(m_universe.getTransform(actor->entity).getRigidPart());
 
 			PxRigidActor* physx_actor = createPhysXActor(actor, transform, geom.any());
 			if (physx_actor) physx_actor->userData = (void*)(intptr_t)actor->entity.index;
@@ -2942,7 +2948,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	{
 		Joint& joint = m_joints[{cmp.index}];
 		serializer.write("connected_body", joint.connected_body);
-		Transform tr = fromPhysx(joint.local_frame0);
+		RigidTransform tr = fromPhysx(joint.local_frame0);
 		serializer.write("local_frame", tr);
 		serializeJoint(serializer, static_cast<PxSphericalJoint*>(joint.physx));
 	}
@@ -2969,7 +2975,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	{
 		Joint& joint = m_joints.insert(entity);
 		serializer.read(&joint.connected_body);
-		Transform tr;
+		RigidTransform tr;
 		serializer.read(&tr);
 		joint.local_frame0 = toPhysx(tr);
 		auto* px_joint = PxSphericalJointCreate(m_scene->getPhysics(),
@@ -2999,7 +3005,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	{
 		Joint& joint = m_joints[{cmp.index}];
 		serializer.write("connected_body", joint.connected_body);
-		Transform tr = fromPhysx(joint.local_frame0);
+		RigidTransform tr = fromPhysx(joint.local_frame0);
 		serializer.write("local_frame", tr);
 		serializeJoint(serializer, static_cast<PxDistanceJoint*>(joint.physx));
 	}
@@ -3028,7 +3034,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	{
 		Joint& joint = m_joints.insert(entity);
 		serializer.read(&joint.connected_body);
-		Transform tr;
+		RigidTransform tr;
 		serializer.read(&tr);
 		joint.local_frame0 = toPhysx(tr);
 		auto* px_joint = PxDistanceJointCreate(m_scene->getPhysics(),
@@ -3083,7 +3089,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	{
 		Joint& joint = m_joints[{cmp.index}];
 		serializer.write("connected_body", joint.connected_body);
-		Transform tr = fromPhysx(joint.local_frame0);
+		RigidTransform tr = fromPhysx(joint.local_frame0);
 		serializer.write("local_frame", tr);
 		serializeJoint(serializer, static_cast<PxD6Joint*>(joint.physx));
 	}
@@ -3134,7 +3140,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	{
 		Joint& joint = m_joints.insert(entity);
 		serializer.read(&joint.connected_body);
-		Transform tr;
+		RigidTransform tr;
 		serializer.read(&tr);
 		joint.local_frame0 = toPhysx(tr);
 		auto* px_joint = PxD6JointCreate(m_scene->getPhysics(),
@@ -3169,7 +3175,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	{
 		Joint& joint = m_joints[{cmp.index}];
 		serializer.write("connected_body", joint.connected_body);
-		Transform tr = fromPhysx(joint.local_frame0);
+		RigidTransform tr = fromPhysx(joint.local_frame0);
 		serializer.write("local_frame", tr);
 		serializeJoint(serializer, static_cast<PxRevoluteJoint*>(joint.physx));
 	}
@@ -3196,7 +3202,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	{
 		Joint& joint = m_joints.insert(entity);
 		serializer.read(&joint.connected_body);
-		Transform tr;
+		RigidTransform tr;
 		serializer.read(&tr);
 		joint.local_frame0 = toPhysx(tr);
 		auto* px_joint = PxRevoluteJointCreate(m_scene->getPhysics(),
@@ -3288,7 +3294,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		m_actors.insert(actor->entity, actor);
 
 		PxBoxGeometry box_geom;
-		PxTransform transform = toPhysx(m_universe.getTransform(actor->entity));
+		PxTransform transform = toPhysx(m_universe.getTransform(actor->entity).getRigidPart());
 		serializer.read(&box_geom.halfExtents.x);
 		serializer.read(&box_geom.halfExtents.y);
 		serializer.read(&box_geom.halfExtents.z);
@@ -3337,7 +3343,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		m_actors.insert(actor->entity, actor);
 
 		PxCapsuleGeometry capsule_geom;
-		PxTransform transform = toPhysx(m_universe.getTransform(actor->entity));
+		PxTransform transform = toPhysx(m_universe.getTransform(actor->entity).getRigidPart());
 		serializer.read(&capsule_geom.halfHeight);
 		serializer.read(&capsule_geom.radius);
 		PxRigidActor* physx_actor;
@@ -3386,7 +3392,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		m_actors.insert(actor->entity, actor);
 
 		PxSphereGeometry sphere_geom;
-		PxTransform transform = toPhysx(m_universe.getTransform(actor->entity));
+		PxTransform transform = toPhysx(m_universe.getTransform(actor->entity).getRigidPart());
 		serializer.read(&sphere_geom.radius);
 		PxRigidActor* physx_actor;
 		switch (actor->dynamic_type)
@@ -3487,7 +3493,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			case ActorType::BOX:
 			{
 				PxBoxGeometry box_geom;
-				PxTransform transform = toPhysx(m_universe.getTransform(actor->entity));
+				PxTransform transform = toPhysx(m_universe.getTransform(actor->entity).getRigidPart());
 				serializer.read(box_geom.halfExtents);
 				PxRigidActor* physx_actor = createPhysXActor(actor, transform, box_geom);
 				
@@ -3498,7 +3504,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			case ActorType::SPHERE:
 			{
 				PxSphereGeometry sphere_geom;
-				PxTransform transform = toPhysx(m_universe.getTransform(actor->entity));
+				PxTransform transform = toPhysx(m_universe.getTransform(actor->entity).getRigidPart());
 				serializer.read(sphere_geom.radius);
 				PxRigidActor* physx_actor = createPhysXActor(actor, transform, sphere_geom);
 				actor->setPhysxActor(physx_actor);
@@ -3508,7 +3514,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			case ActorType::CAPSULE:
 			{
 				PxCapsuleGeometry capsule_geom;
-				PxTransform transform = toPhysx(m_universe.getTransform(actor->entity));
+				PxTransform transform = toPhysx(m_universe.getTransform(actor->entity).getRigidPart());
 				serializer.read(capsule_geom.halfHeight);
 				serializer.read(capsule_geom.radius);
 				PxRigidActor* physx_actor = createPhysXActor(actor, transform, capsule_geom);
@@ -3676,7 +3682,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		}
 		serializer.write("bone", bone->pose_bone_idx);
 		PxTransform pose = bone->actor->getGlobalPose();
-		pose = toPhysx(m_universe.getTransform(ragdoll.entity)).getInverse() * pose;
+		pose = toPhysx(m_universe.getTransform(ragdoll.entity).getRigidPart()).getInverse() * pose;
 		serializer.write("pose", fromPhysx(pose));
 		serializer.write("bind_transform", bone->bind_transform);
 
@@ -3715,7 +3721,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		}
 		serializer.write(bone->pose_bone_idx);
 		PxTransform pose = bone->actor->getGlobalPose();
-		pose = toPhysx(m_universe.getTransform(ragdoll.entity)).getInverse() * pose;
+		pose = toPhysx(m_universe.getTransform(ragdoll.entity).getRigidPart()).getInverse() * pose;
 		serializer.write(fromPhysx(pose));
 		serializer.write(bone->bind_transform);
 
@@ -3846,7 +3852,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		serializer.read(&type);
 		changeRagdollBoneJoint(bone, type);
 
-		Transform local_poses[2];
+		RigidTransform local_poses[2];
 		serializer.read(&local_poses[0]);
 		serializer.read(&local_poses[1]);
 		bone->parent_joint->setLocalPose(PxJointActorIndex::eACTOR0, toPhysx(local_poses[0]));
@@ -3894,12 +3900,12 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		bone->parent_joint = nullptr;
 		bone->is_kinematic = false;
 		bone->prev = nullptr;
-		Transform transform;
+		RigidTransform transform;
 		serializer.read(transform);
 		serializer.read(bone->bind_transform);
 		bone->inv_bind_transform = bone->bind_transform.inverted();
 
-		PxTransform px_transform = toPhysx(m_universe.getTransform(ragdoll.entity)) * toPhysx(transform);
+		PxTransform px_transform = toPhysx(m_universe.getTransform(ragdoll.entity).getRigidPart()) * toPhysx(transform);
 
 		RagdollBone::Type type;
 		serializer.read(type);
@@ -3957,12 +3963,12 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		bone->parent_joint = nullptr;
 		bone->is_kinematic = false;
 		bone->prev = nullptr;
-		Transform transform;
+		RigidTransform transform;
 		serializer.read(&transform);
 		serializer.read(&bone->bind_transform);
 		bone->inv_bind_transform = bone->bind_transform.inverted();
 
-		PxTransform px_transform = toPhysx(m_universe.getTransform(ragdoll.entity)) * toPhysx(transform);
+		PxTransform px_transform = toPhysx(m_universe.getTransform(ragdoll.entity).getRigidPart()) * toPhysx(transform);
 
 		RagdollBone::Type type;
 		serializer.read((int*)&type);
@@ -4493,7 +4499,7 @@ void PhysicsSceneImpl::RigidActor::onStateChanged(Resource::State, Resource::Sta
 	{
 		setPhysxActor(nullptr);
 
-		PxTransform transform = toPhysx(scene.getUniverse().getTransform(entity));
+		PxTransform transform = toPhysx(scene.getUniverse().getTransform(entity).getRigidPart());
 
 		PxRigidActor* actor;
 		auto& physics = *scene.m_system->getPhysics();

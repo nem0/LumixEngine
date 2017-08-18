@@ -696,10 +696,10 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
-	Transform getControllerRootMotion(ComponentHandle cmp) override
+	RigidTransform getControllerRootMotion(ComponentHandle cmp) override
 	{
 		Controller& ctrl = m_controllers.get({cmp.index});
-		return ctrl.root ? ctrl.root->getRootMotion() : Transform({0, 0, 0}, {0, 0, 0, 1});
+		return ctrl.root ? ctrl.root->getRootMotion() : RigidTransform({0, 0, 0}, {0, 0, 0, 1});
 	}
 
 

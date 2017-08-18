@@ -114,9 +114,9 @@ void Animation::getRelativePose(float time, Pose& pose, Model& model, float weig
 }
 
 
-Transform Animation::getBoneTransform(float time, int bone_idx) const
+RigidTransform Animation::getBoneTransform(float time, int bone_idx) const
 {
-	Transform ret;
+	RigidTransform ret;
 	int frame = (int)(time * m_fps);
 	float rcp_fps = 1.0f / m_fps;
 	frame = Math::clamp(frame, 0, m_frame_count);

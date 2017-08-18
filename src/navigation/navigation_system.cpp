@@ -454,7 +454,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 			if (agent.flags & Agent::GET_ROOT_MOTION_FROM_ANIM_CONTROLLER && anim_scene)
 			{
 				ComponentHandle ctrl = anim_scene->getComponent(agent.entity, ANIM_CONTROLLER_TYPE);
-				Transform root_motion = anim_scene->getControllerRootMotion(ctrl);
+				RigidTransform root_motion = anim_scene->getControllerRootMotion(ctrl);
 				agent.root_motion = root_motion.pos;
 				//m_universe.setRotation(agent.entity, m_universe.getRotation(agent.entity) * root_motion.rot);
 			}
@@ -494,7 +494,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 			else if (agent.flags & Agent::GET_ROOT_MOTION_FROM_ANIM_CONTROLLER && anim_scene)
 			{
 				ComponentHandle ctrl = anim_scene->getComponent(agent.entity, ANIM_CONTROLLER_TYPE);
-				Transform root_motion = anim_scene->getControllerRootMotion(ctrl);
+				RigidTransform root_motion = anim_scene->getControllerRootMotion(ctrl);
 				m_universe.setRotation(agent.entity, m_universe.getRotation(agent.entity) * root_motion.rot);
 			}
 

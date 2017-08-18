@@ -152,8 +152,8 @@ public:
 
 		string name;
 		string parent;
-		Transform transform;
-		Transform inv_bind_transform;
+		RigidTransform transform;
+		RigidTransform inv_bind_transform;
 		int parent_idx;
 	};
 

@@ -9,10 +9,19 @@ namespace Lumix
 {
 
 
+Matrix RigidTransform::toMatrix() const
+{
+	Matrix mtx = rot.toMatrix();
+	mtx.setTranslation(pos);
+	return mtx;
+}
+
+
 Matrix Transform::toMatrix() const
 {
 	Matrix mtx = rot.toMatrix();
 	mtx.setTranslation(pos);
+	mtx.multiply3x3(scale);
 	return mtx;
 }
 

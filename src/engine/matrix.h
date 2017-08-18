@@ -11,32 +11,33 @@ namespace Lumix
 
 
 struct Quat;
+struct Transform;
 
 
-struct LUMIX_ENGINE_API Transform
+struct LUMIX_ENGINE_API RigidTransform
 {
-	Transform() {}
+	RigidTransform() {}
 
 
-	Transform(const Vec3& _pos, const Quat& _rot)
+	RigidTransform(const Vec3& _pos, const Quat& _rot)
 		: pos(_pos)
 		, rot(_rot)
 	{
 	}
 
 
-	Transform inverted() const
+	RigidTransform inverted() const
 	{
-		Transform result;
+		RigidTransform result;
 		result.rot = rot.conjugated();
 		result.pos = result.rot.rotate(-pos);
 		return result;
 	}
 
 
-	Transform operator*(const Transform& rhs) const
+	RigidTransform operator*(const RigidTransform& rhs) const
 	{
-		return {rot.rotate(rhs.pos) + pos, rot * rhs.rot};
+		return{ rot.rotate(rhs.pos) + pos, rot * rhs.rot };
 	}
 
 
@@ -46,14 +47,16 @@ struct LUMIX_ENGINE_API Transform
 	}
 
 
-	Transform interpolate(const Transform& rhs, float t)
+	RigidTransform interpolate(const RigidTransform& rhs, float t)
 	{
-		Transform ret;
+		RigidTransform ret;
 		lerp(pos, rhs.pos, &ret.pos, t);
 		nlerp(rot, rhs.rot, &ret.rot, t);
 		return ret;
 	}
 
+
+	inline Transform toScaled(float scale) const;
 
 
 	Matrix toMatrix() const;
@@ -62,6 +65,62 @@ struct LUMIX_ENGINE_API Transform
 	Quat rot;
 	Vec3 pos;
 };
+
+
+struct LUMIX_ENGINE_API Transform
+{
+	Transform() {}
+
+
+	Transform(const Vec3& _pos, const Quat& _rot, float _scale)
+		: pos(_pos)
+		, rot(_rot)
+		, scale(_scale)
+	{
+	}
+
+
+	Transform inverted() const
+	{
+		Transform result;
+		result.rot = rot.conjugated();
+		result.pos = result.rot.rotate(-pos / scale);
+		result.scale = 1.0f / scale;
+		return result;
+	}
+
+
+	Transform operator*(const Transform& rhs) const
+	{
+		return {rot.rotate(rhs.pos * scale) + pos, rot * rhs.rot, scale * rhs.scale};
+	}
+
+
+	Vec3 transform(const Vec3& value) const
+	{
+		return pos + rot.rotate(value) * scale;
+	}
+
+
+	RigidTransform getRigidPart() const
+	{
+		return {pos, rot};
+	}
+
+
+	Matrix toMatrix() const;
+
+
+	Quat rot;
+	Vec3 pos;
+	float scale;
+};
+
+
+Transform RigidTransform::toScaled(float scale) const
+{
+	return {pos, rot, scale};
+}
 
 
 LUMIX_ALIGN_BEGIN(16) struct LUMIX_ENGINE_API Matrix
@@ -290,7 +349,7 @@ LUMIX_ALIGN_BEGIN(16) struct LUMIX_ENGINE_API Matrix
 		return Vec3(m41, m42, m43);
 	}
 
-	Transform toTransform() { return {getTranslation(), getRotation()}; }
+	RigidTransform toTransform() { return {getTranslation(), getRotation()}; }
 	Quat getRotation() const;
 	void transpose();
 	Vec3 transform(const Vec3& pos) const;

@@ -95,10 +95,7 @@ void Universe::transformEntity(Entity entity, bool update_local)
 		if (update_local && h.parent.isValid())
 		{
 			Transform parent_tr = getTransform(h.parent);
-			float inv_parent_scale = 1.0f / getScale(h.parent);
 			h.local_transform = (parent_tr.inverted() * my_transform);
-			h.local_transform.pos *= inv_parent_scale;
-			h.local_scale = getScale(entity) * inv_parent_scale;
 		}
 
 		Entity child = h.first_child;
@@ -108,9 +105,9 @@ void Universe::transformEntity(Entity entity, bool update_local)
 			Hierarchy& child_h = m_hierarchy[m_entities[child.index].hierarchy];
 			Transform abs_tr = my_transform * child_h.local_transform;
 			EntityData& child_data = m_entities[child.index];
-			child_data.position = my_scale * my_transform.rot.rotate(child_h.local_transform.pos) + my_transform.pos;
-			child_data.rotation = my_transform.rot * child_h.local_transform.rot;
-			child_data.scale = child_h.local_scale * my_scale;
+			child_data.position = abs_tr.pos;
+			child_data.rotation = abs_tr.rot;
+			child_data.scale = abs_tr.scale;
 			transformEntity(child, false);
 
 			child = child_h.next_sibling;
@@ -156,12 +153,12 @@ Matrix Universe::getPositionAndRotation(Entity entity) const
 }
 
 
-void Universe::setTransformKeepChildren(Entity entity, const Transform& transform, float scale)
+void Universe::setTransformKeepChildren(Entity entity, const Transform& transform)
 {
 	auto& tmp = m_entities[entity.index];
 	tmp.position = transform.pos;
 	tmp.rotation = transform.rot;
-	tmp.scale = scale;
+	tmp.scale = transform.scale;
 	
 	int hierarchy_idx = m_entities[entity.index].hierarchy;
 	entityTransformed().invoke(entity);
@@ -171,11 +168,8 @@ void Universe::setTransformKeepChildren(Entity entity, const Transform& transfor
 		Transform my_transform = getTransform(entity);
 		if (h.parent.isValid())
 		{
-			float parent_inv_scale = 1.0f / getScale(h.parent);
 			Transform parent_tr = getTransform(h.parent);
 			h.local_transform = parent_tr.inverted() * my_transform;
-			h.local_transform.pos *= parent_inv_scale;
-			h.local_scale = getScale(entity) * parent_inv_scale;
 		}
 
 		Entity child = h.first_child;
@@ -183,10 +177,7 @@ void Universe::setTransformKeepChildren(Entity entity, const Transform& transfor
 		{
 			Hierarchy& child_h = m_hierarchy[m_entities[child.index].hierarchy];
 
-			float my_inv_scale = 1.0f / scale;
 			child_h.local_transform = my_transform.inverted() * getTransform(child);
-			child_h.local_transform.pos *= my_inv_scale;
-			child_h.local_scale = getScale(child) * my_inv_scale;
 			child = child_h.next_sibling;
 		}
 	}
@@ -199,25 +190,17 @@ void Universe::setTransform(Entity entity, const Transform& transform)
 	auto& tmp = m_entities[entity.index];
 	tmp.position = transform.pos;
 	tmp.rotation = transform.rot;
+	tmp.scale = transform.scale;
 	transformEntity(entity, true);
 }
 
 
-void Universe::setTransform(Entity entity, const Transform& transform, float scale)
-{
-	auto& tmp = m_entities[entity.index];
-	tmp.position = transform.pos;
-	tmp.rotation = transform.rot;
-	tmp.scale = scale;
-	transformEntity(entity, true);
-}
-
-
-void Universe::setTransform(Entity entity, const Vec3& pos, const Quat& rot)
+void Universe::setTransform(Entity entity, const Vec3& pos, const Quat& rot, float scale)
 {
 	auto& tmp = m_entities[entity.index];
 	tmp.position = pos;
 	tmp.rotation = rot;
+	tmp.scale = scale;
 	transformEntity(entity, true);
 }
 
@@ -225,7 +208,7 @@ void Universe::setTransform(Entity entity, const Vec3& pos, const Quat& rot)
 Transform Universe::getTransform(Entity entity) const
 {
 	auto& transform = m_entities[entity.index];
-	return Transform(transform.position, transform.rotation);
+	return {transform.position, transform.rotation, transform.scale};
 }
 
 
@@ -542,7 +525,6 @@ void Universe::setParent(Entity new_parent, Entity child)
 		m_hierarchy[child_idx].parent = new_parent;
 		Transform parent_tr = getTransform(new_parent);
 		Transform child_tr = getTransform(child);
-		m_hierarchy[child_idx].local_scale = m_entities[child.index].scale / m_entities[new_parent.index].scale;
 		m_hierarchy[child_idx].local_transform = parent_tr.inverted() * child_tr;
 		m_hierarchy[child_idx].next_sibling = m_hierarchy[new_parent_idx].first_child;
 		m_hierarchy[new_parent_idx].first_child = child;
@@ -558,12 +540,9 @@ void Universe::updateGlobalTransform(Entity entity)
 {
 	const Hierarchy& h = m_hierarchy[m_entities[entity.index].hierarchy];
 	Transform parent_tr = getTransform(h.parent);
-	float parent_scale = getScale(h.parent);
 	
-	Transform new_tr;
-	new_tr.pos = parent_scale * parent_tr.rot.rotate(h.local_transform.pos) + parent_tr.pos;
-	new_tr.rot = parent_tr.rot * h.local_transform.rot;
-	setTransform(entity, new_tr, parent_scale * h.local_scale);
+	Transform new_tr = parent_tr * h.local_transform;
+	setTransform(entity, new_tr);
 }
 
 
@@ -601,18 +580,17 @@ Transform Universe::computeLocalTransform(Entity parent, const Transform& global
 }
 
 
-void Universe::setLocalTransform(Entity entity, const Transform& transform, float scale)
+void Universe::setLocalTransform(Entity entity, const Transform& transform)
 {
 	int hierarchy_idx = m_entities[entity.index].hierarchy;
 	if (hierarchy_idx < 0)
 	{
-		setTransform(entity, transform, scale);
+		setTransform(entity, transform);
 		return;
 	}
 
 	Hierarchy& h = m_hierarchy[hierarchy_idx];
 	h.local_transform = transform;
-	h.local_scale = scale;
 	updateGlobalTransform(entity);
 }
 
@@ -637,7 +615,7 @@ float Universe::getLocalScale(Entity entity) const
 		return getScale(entity);
 	}
 
-	return m_hierarchy[hierarchy_idx].local_scale;
+	return m_hierarchy[hierarchy_idx].local_transform.scale;
 }
 
 
@@ -748,8 +726,7 @@ Entity Universe::instantiatePrefab(const PrefabResource& prefab,
 		u64 prefab;
 		deserializer.read(&prefab);
 		Entity entity = entities[entity_idx];
-		setTransform(entity, {pos, rot});
-		setScale(entity, scale);
+		setTransform(entity, {pos, rot, scale});
 		if (version > (int)PrefabVersion::WITH_HIERARCHY)
 		{
 			Entity parent;
@@ -757,12 +734,12 @@ Entity Universe::instantiatePrefab(const PrefabResource& prefab,
 			deserializer.read(&parent);
 			if (parent.isValid())
 			{
-				Transform local_tr;
-				float local_scale;
+				RigidTransform local_tr;
 				deserializer.read(&local_tr);
-				deserializer.read(&local_scale);
+				float scale;
+				deserializer.read(&scale);
 				setParent(parent, entity);
-				setLocalTransform(entity, local_tr, local_scale);
+				setLocalTransform(entity, {local_tr.pos, local_tr.rot, scale});
 			}
 		}
 		u32 cmp_type_hash;

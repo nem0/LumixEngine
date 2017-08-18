@@ -440,11 +440,10 @@ public:
 			u64 prefab;
 			deserializer.read(&prefab);
 			Entity entity = entities[entity_idx];
-			m_universe->setTransform(entity, { pos, rot });
+			m_universe->setTransform(entity, {pos, rot, scale});
 			reserve(entity);
 			m_prefabs[entity.index].prefab = prefab;
 			link(entity, prefab);
-			m_universe->setScale(entity, scale);
 			
 			if (version > (int)PrefabVersion::WITH_HIERARCHY)
 			{
@@ -452,12 +451,12 @@ public:
 				deserializer.read(&parent);
 				if (parent.isValid())
 				{
-					Transform local_tr;
-					float local_scale;
+					RigidTransform local_tr;
 					deserializer.read(&local_tr);
-					deserializer.read(&local_scale);
+					float scale;
+					deserializer.read(&scale);
 					m_universe->setParent(parent, entity);
-					m_universe->setLocalTransform(entity, local_tr, local_scale);
+					m_universe->setLocalTransform(entity, {local_tr.pos, local_tr.rot, scale});
 				}
 			}
 			u32 cmp_type_hash;
@@ -514,7 +513,7 @@ public:
 		serializer.write("parent", parent);
 		if (parent.isValid())
 		{
-			serializer.write("local_transform", universe->getLocalTransform(entity));
+			serializer.write("local_transform", universe->getLocalTransform(entity).getRigidPart());
 			serializer.write("local_scale", universe->getLocalScale(entity));
 		}
 		for (ComponentUID cmp = universe->getFirstComponent(entity); cmp.isValid();
@@ -608,13 +607,12 @@ public:
 			m_editor.beginCommandGroup(crc32("save_prefab"));
 
 			Transform tr = m_universe->getTransform(entity);
-			float scale = m_universe->getScale(entity);
 			m_editor.destroyEntities(&entities[0], entities.size());
 			auto* resource_manager = m_editor.getEngine().getResourceManager().get(PREFAB_TYPE);
 			auto* res = (PrefabResource*)resource_manager->load(path);
 			FS::FileSystem& fs = m_editor.getEngine().getFileSystem();
 			while (fs.hasWork()) fs.updateAsyncTransactions();
-			instantiatePrefab(*res, tr.pos, tr.rot, scale);
+			instantiatePrefab(*res, tr.pos, tr.rot, tr.scale);
 
 			m_editor.endCommandGroup();
 		}

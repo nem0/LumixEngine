@@ -77,16 +77,15 @@ public:
 	void setParent(Entity parent, Entity child);
 	void setLocalPosition(Entity entity, const Vec3& pos);
 	void setLocalRotation(Entity entity, const Quat& rot);
-	void setLocalTransform(Entity entity, const Transform& transform, float scale);
+	void setLocalTransform(Entity entity, const Transform& transform);
 	Transform computeLocalTransform(Entity parent, const Transform& global_transform) const;
 
 	void setMatrix(Entity entity, const Matrix& mtx);
 	Matrix getPositionAndRotation(Entity entity) const;
 	Matrix getMatrix(Entity entity) const;
 	void setTransform(Entity entity, const Transform& transform);
-	void setTransformKeepChildren(Entity entity, const Transform& transform, float scale);
-	void setTransform(Entity entity, const Transform& transform, float scale);
-	void setTransform(Entity entity, const Vec3& pos, const Quat& rot);
+	void setTransformKeepChildren(Entity entity, const Transform& transform);
+	void setTransform(Entity entity, const Vec3& pos, const Quat& rot, float scale);
 	Transform getTransform(Entity entity) const;
 	void setRotation(Entity entity, float x, float y, float z, float w);
 	void setRotation(Entity entity, const Quat& rot);
@@ -134,7 +133,6 @@ private:
 		Entity next_sibling;
 
 		Transform local_transform;
-		float local_scale;
 	};
 
 
