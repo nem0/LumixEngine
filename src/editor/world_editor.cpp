@@ -1282,7 +1282,14 @@ private:
 				serializer.deserializeArrayItem(m_transformations[i].rot.y, 0);
 				serializer.deserializeArrayItem(m_transformations[i].rot.z, 0);
 				serializer.deserializeArrayItem(m_transformations[i].rot.w, 1);
-				serializer.deserializeArrayItem(m_transformations[i].scale, 1);
+				if (serializer.isArrayEnd())
+				{
+					m_transformations[i].scale = 1;
+				}
+				else
+				{
+					serializer.deserializeArrayItem(m_transformations[i].scale, 1);
+				}
 			}
 			serializer.deserializeArrayEnd();
 		}
