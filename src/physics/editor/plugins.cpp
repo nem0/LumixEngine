@@ -870,17 +870,17 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		if (ImGui::DragFloat("Height", &height)) scene.setRagdollBoneHeight(bone_handle, height);
 		if (ImGui::DragFloat("Radius", &radius)) scene.setRagdollBoneRadius(bone_handle, radius);
 
-		RigidTransform transform = scene.getRagdollBoneTransform(bone_handle);
-		bool changed_by_gizmo = m_editor.getGizmo().immediate(transform.toScaled(1));
+		Transform transform = scene.getRagdollBoneTransform(bone_handle).toScaled(1);
+		bool changed_by_gizmo = m_editor.getGizmo().immediate(transform);
 		if (ImGui::DragFloat3("Position", &transform.pos.x) || changed_by_gizmo)
 		{
-			scene.setRagdollBoneTransform(bone_handle, transform);
+			scene.setRagdollBoneTransform(bone_handle, transform.getRigidPart());
 		}
 		Vec3 euler_angles = Math::radiansToDegrees(transform.rot.toEuler());
 		if (ImGui::DragFloat3("Rotation", &euler_angles.x))
 		{
 			transform.rot.fromEuler(Math::degreesToRadians(euler_angles));
-			scene.setRagdollBoneTransform(bone_handle, transform);
+			scene.setRagdollBoneTransform(bone_handle, transform.getRigidPart());
 		}
 
 		physx::PxJoint* joint = scene.getRagdollBoneJoint(bone_handle);
