@@ -2102,9 +2102,10 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	static EditorUIRenderPlugin* s_instance;
 
 
-	EditorUIRenderPlugin(StudioApp& app, SceneView& scene_view)
+	EditorUIRenderPlugin(StudioApp& app, SceneView& scene_view, GameView& game_view)
 		: m_app(app)
 		, m_scene_view(scene_view)
+		, m_game_view(game_view)
 		, m_width(-1)
 		, m_height(-1)
 		, m_engine(app.getWorldEditor()->getEngine())
@@ -2281,7 +2282,7 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 				pcmd->TextureId ? *(bgfx::TextureHandle*)pcmd->TextureId : material->getTexture(0)->handle;
 			auto texture_uniform = material->getShader()->m_texture_slots[0].uniform_handle;
 			u64 render_states = material->getRenderStates();
-			if (&m_scene_view.getTextureHandle() == &texture_id)
+			if (&m_scene_view.getTextureHandle() == &texture_id || &m_game_view.getTextureHandle() == &texture_id)
 			{
 				render_states &= ~BGFX_STATE_BLEND_MASK;
 			}
@@ -2306,6 +2307,7 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	Material* m_material;
 	Pipeline* m_gui_pipeline;
 	SceneView& m_scene_view;
+	GameView& m_game_view;
 };
 
 
@@ -2693,8 +2695,9 @@ LUMIX_STUDIO_ENTRY(renderer)
 	auto* scene_view_plugin = LUMIX_NEW(allocator, SceneView)(app);
 	app.addPlugin(*scene_view_plugin);
 	app.addPlugin(*LUMIX_NEW(allocator, ImportAssetDialog)(app));
-	app.addPlugin(*LUMIX_NEW(allocator, GameView)(app));
-	app.addPlugin(*LUMIX_NEW(allocator, EditorUIRenderPlugin)(app, *scene_view_plugin));
+	auto* game_view_plugin = LUMIX_NEW(allocator, GameView)(app);
+	app.addPlugin(*game_view_plugin);
+	app.addPlugin(*LUMIX_NEW(allocator, EditorUIRenderPlugin)(app, *scene_view_plugin, *game_view_plugin));
 	app.addPlugin(*LUMIX_NEW(allocator, FurPainterPlugin)(app));
 	app.addPlugin(*LUMIX_NEW(allocator, ShaderEditorPlugin)(app));
 
