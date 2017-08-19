@@ -58,7 +58,9 @@ public:
 	bool resourceList(char* buf, int max_size, ResourceType type, float height);
 
 public:
-	bool m_is_opened;
+	bool m_is_open;
+	float m_left_column_width = 120;
+	float m_middle_column_width = 300;
 	static const int TILE_SIZE = 128;
 
 private:
@@ -71,6 +73,10 @@ private:
 	};
 
 private:
+	void leftColumn();
+	void middleColumn();
+	void rightColumn();
+
 	void breadcrumbs();
 	void onTilesGUI();
 	void changeDir(const char* path);
@@ -78,12 +84,10 @@ private:
 	void findResources();
 	void processDir(const char* path, int base_length);
 	void addResource(const char* path, const char* filename);
-	void onGUIResource();
 	void unloadResource();
 	void selectResource(Resource* resource, bool record_history);
 	int getResourceTypeIndex(const char* ext);
 	bool acceptExtension(const char* ext, ResourceType type);
-	void onToolbar();
 	void goBack();
 	void goForward();
 	void toggleAutoreload();

@@ -18,7 +18,7 @@ class StudioApp;
 struct LUMIX_EDITOR_API Settings
 {
 	// gui - not saved
-	bool m_is_opened;
+	bool m_is_open;
 	char m_filter[100];
 
 	// actual settings
@@ -39,6 +39,8 @@ struct LUMIX_EDITOR_API Settings
 	bool m_is_properties_opened;
 	bool m_is_crash_reporting_enabled;
 	bool m_force_no_crash_report;
+	float m_asset_browser_left_column_width;
+	float m_asset_browser_middle_column_width;
 	float m_mouse_sensitivity_x;
 	float m_mouse_sensitivity_y;
 	char m_data_dir[MAX_PATH_LENGTH];

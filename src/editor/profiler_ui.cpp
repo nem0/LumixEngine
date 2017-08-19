@@ -56,7 +56,7 @@ struct ProfilerUIImpl LUMIX_FINAL : public ProfilerUI
 		m_allocation_size_from = 0;
 		m_allocation_size_to = 1024 * 1024;
 		m_current_frame = -1;
-		m_is_opened = false;
+		m_is_open = false;
 		m_is_paused = true;
 		m_current_block = nullptr;
 		m_frame_start = m_frame_end = 0;
@@ -320,7 +320,7 @@ struct ProfilerUIImpl LUMIX_FINAL : public ProfilerUI
 			m_bytes_read = 0;
 		}
 
-		if (ImGui::BeginDock("Profiler", &m_is_opened))
+		if (ImGui::BeginDock("Profiler", &m_is_open))
 		{
 			onGUICPUProfiler();
 			onGUIMemoryProfiler();
@@ -367,7 +367,7 @@ struct ProfilerUIImpl LUMIX_FINAL : public ProfilerUI
 		Block* m_parent;
 		Block* m_first_child;
 		Block* m_next;
-		bool m_is_opened;
+		bool m_is_open;
 		Profiler::BlockType m_type;
 		Array<float> m_frames;
 		struct Hit
@@ -555,7 +555,7 @@ void ProfilerUIImpl::cloneBlock(Block* my_block, Profiler::Block* remote_block)
 
 void ProfilerUIImpl::onFrame()
 {
-	if (!m_is_opened) return;
+	if (!m_is_open) return;
 	if (m_is_paused) return;
 
 	m_frame_start = m_frame_end;
@@ -612,13 +612,13 @@ void ProfilerUIImpl::showProfileBlock(Block* block, int column)
 			{
 				if (ImGui::TreeNode(block->m_name))
 				{
-					block->m_is_opened = true;
+					block->m_is_open = true;
 					showProfileBlock(block->m_first_child, column);
 					ImGui::TreePop();
 				}
 				else
 				{
-					block->m_is_opened = false;
+					block->m_is_open = false;
 				}
 
 				block = block->m_next;
@@ -637,7 +637,7 @@ void ProfilerUIImpl::showProfileBlock(Block* block, int column)
 						{
 							m_current_block = block;
 						}
-						if (block->m_is_opened)
+						if (block->m_is_open)
 						{
 							showProfileBlock(block->m_first_child, column);
 						}
@@ -685,7 +685,7 @@ void ProfilerUIImpl::showProfileBlock(Block* block, int column)
 						{
 							m_current_block = block;
 						}
-						if (block->m_is_opened)
+						if (block->m_is_open)
 						{
 							showProfileBlock(block->m_first_child, column);
 						}
@@ -707,7 +707,7 @@ void ProfilerUIImpl::showProfileBlock(Block* block, int column)
 						m_current_frame < 0 ? block->m_int_values.back() : block->m_int_values[m_current_frame];
 
 					ImGui::Text("%d", hit_count);
-					if (block->m_is_opened)
+					if (block->m_is_open)
 					{
 						showProfileBlock(block->m_first_child, column);
 					}
@@ -727,7 +727,7 @@ void ProfilerUIImpl::showProfileBlock(Block* block, int column)
 				{
 					ImGui::IntervalGraph(&block->m_hits[0].start, block->m_hits.size(), m_frame_start, m_frame_end);
 				}
-				if(block->m_is_opened)
+				if(block->m_is_open)
 				{
 					showProfileBlock(block->m_first_child, column);
 				}
@@ -1119,7 +1119,7 @@ ProfilerUIImpl::Block::Block(IAllocator& allocator)
 	: m_frames(allocator)
 	, m_hits(allocator)
 	, m_int_values(allocator)
-	, m_is_opened(false)
+	, m_is_open(false)
 {
 }
 

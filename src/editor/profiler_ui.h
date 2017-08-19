@@ -20,7 +20,7 @@ public:
 	static ProfilerUI* create(Engine& engine);
 	static void destroy(ProfilerUI& ui);
 
-	bool m_is_opened;
+	bool m_is_open;
 	u64 m_frame_start;
 	u64 m_frame_end;
 };

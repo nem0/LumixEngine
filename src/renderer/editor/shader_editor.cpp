@@ -1443,7 +1443,7 @@ ShaderEditor::ShaderEditor(IAllocator& allocator)
 	, m_undo_stack_idx(-1)
 	, m_current_node_id(-1)
 	, m_is_focused(false)
-	, m_is_opened(false)
+	, m_is_open(false)
 	, m_current_shader_type(ShaderType::VERTEX)
 {
 	newGraph();
@@ -2219,7 +2219,7 @@ void ShaderEditor::onGUI(ShaderCompiler& compiler)
 	StaticString<MAX_PATH_LENGTH + 25> title("Shader Editor");
 	if (m_path.isValid()) title << " - " << m_path.c_str();
 	title << "###Shader Editor";
-	if (ImGui::BeginDock(title, &m_is_opened, ImGuiWindowFlags_MenuBar))
+	if (ImGui::BeginDock(title, &m_is_open, ImGuiWindowFlags_MenuBar))
 	{
 		m_is_focused = ImGui::IsWindowOrChildWindowFocused();
 

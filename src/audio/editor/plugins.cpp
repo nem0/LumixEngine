@@ -118,7 +118,7 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		: m_app(app)
 	{
 		m_filter[0] = 0;
-		m_is_opened = false;
+		m_is_open = false;
 		Action* action = LUMIX_NEW(app.getWorldEditor()->getAllocator(), Action)("Clip manager", "clip_manager");
 		action->func.bind<StudioAppPlugin, &StudioAppPlugin::onAction>(this);
 		action->is_selected.bind<StudioAppPlugin, &StudioAppPlugin::isOpened>(this);
@@ -161,13 +161,13 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	const char* getName() const override { return "audio"; }
 
 
-	bool isOpened() const { return m_is_opened; }
-	void onAction() { m_is_opened = !m_is_opened; }
+	bool isOpened() const { return m_is_open; }
+	void onAction() { m_is_open = !m_is_open; }
 
 
 	void onWindowGUI() override
 	{
-		if (ImGui::BeginDock("Clip Manager", &m_is_opened))
+		if (ImGui::BeginDock("Clip Manager", &m_is_open))
 		{
 			ImGui::InputText("Filter", m_filter, lengthOf(m_filter));
 
@@ -225,7 +225,7 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 
 	StudioApp& m_app;
 	char m_filter[256];
-	bool m_is_opened;
+	bool m_is_open;
 };
 
 

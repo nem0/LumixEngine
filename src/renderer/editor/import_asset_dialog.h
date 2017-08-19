@@ -50,7 +50,7 @@ class ImportAssetDialog LUMIX_FINAL : public StudioApp::IPlugin
 		const char* getName() const override { return "import_asset"; }
 
 	public:
-		bool m_is_opened;
+		bool m_is_open;
 
 	private:
 		bool checkSource();

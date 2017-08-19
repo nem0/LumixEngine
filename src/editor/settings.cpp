@@ -222,7 +222,7 @@ static int getInteger(lua_State* L, const char* name, int default_value)
 
 Settings::Settings(StudioApp& app)
 	: m_app(app)
-	, m_is_opened(false)
+	, m_is_open(false)
 	, m_editor(nullptr)
 	, m_is_maximized(true)
 	, m_is_entity_list_opened(false)
@@ -280,8 +280,10 @@ bool Settings::load()
 
 	m_is_maximized = getBoolean(L, "maximized", true);
 	
-	m_is_opened = getBoolean(L, "settings_opened", false);
+	m_is_open = getBoolean(L, "settings_opened", false);
 	m_is_asset_browser_opened = getBoolean(L, "asset_browser_opened", false);
+	m_asset_browser_left_column_width = getFloat(L, "asset_browser_left_column_width", false);
+	m_asset_browser_middle_column_width = getFloat(L, "asset_browser_middle_column_width", false);
 	m_is_entity_list_opened = getBoolean(L, "entity_list_opened", false);
 	m_is_entity_template_list_opened = getBoolean(L, "entity_template_list_opened", false);
 	m_is_log_opened = getBoolean(L, "log_opened", false);
@@ -400,7 +402,7 @@ bool Settings::save()
 		file << name << " = " << (value ? "true\n" : "false\n");
 	};
 
-	writeBool("settings_opened", m_is_opened);
+	writeBool("settings_opened", m_is_open);
 	writeBool("asset_browser_opened", m_is_asset_browser_opened);
 	writeBool("entity_list_opened", m_is_entity_list_opened);
 	writeBool("entity_template_list_opened", m_is_entity_template_list_opened);
@@ -410,6 +412,8 @@ bool Settings::save()
 	writeBool("error_reporting_enabled", m_is_crash_reporting_enabled);
 	file << "mouse_sensitivity_x = " << m_mouse_sensitivity_x << "\n";
 	file << "mouse_sensitivity_y = " << m_mouse_sensitivity_y << "\n";
+	file << "asset_browser_middle_column_width = " << m_asset_browser_middle_column_width << "\n";
+	file << "asset_browser_left_column_width = " << m_asset_browser_left_column_width << "\n";
 	
 	saveStyle(file);
 
@@ -566,7 +570,7 @@ void Settings::showShortcutSettings()
 
 void Settings::onGUI()
 {
-	if (ImGui::BeginDock("Settings", &m_is_opened))
+	if (ImGui::BeginDock("Settings", &m_is_open))
 	{
 		if (ImGui::Button("Save")) save();
 		ImGui::SameLine();
