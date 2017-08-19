@@ -65,6 +65,7 @@ AssetBrowser::AssetBrowser(StudioApp& app)
 	, m_is_open(false)
 	, m_activate(false)
 	, m_is_init_finished(false)
+	, m_show_thumbnails(true)
 	, m_history_index(-1)
 	, m_file_infos(app.getWorldEditor()->getAllocator())
 	, m_subdirs(app.getWorldEditor()->getAllocator())
@@ -385,36 +386,44 @@ void AssetBrowser::middleColumn()
 		if (m_filter[0] && stristr(tile.filepath, m_filter) == nullptr) continue;
 
 
-		if (w < TILE_SIZE)
+		if (w < TILE_SIZE && m_show_thumbnails)
 		{
 			ImGui::NewLine();
 			w = ImGui::GetContentRegionAvailWidth();
 		}
-		ImGui::BeginGroup();
-		ImVec2 img_size((float)TILE_SIZE, (float)TILE_SIZE);
-		if (tile.tex)
+		if (m_show_thumbnails)
 		{
-			ImGui::Image(tile.tex, img_size);
+			ImGui::BeginGroup();
+			ImVec2 img_size((float)TILE_SIZE, (float)TILE_SIZE);
+			if (tile.tex)
+			{
+				ImGui::Image(tile.tex, img_size);
+			}
+			else
+			{
+				ImGui::Rect(img_size.x, img_size.y, 0xffffFFFF);
+				StaticString<MAX_PATH_LENGTH> path(".lumix/asset_tiles/", tile.file_path_hash, ".dds");
+				if (PlatformInterface::fileExists(path)) tile.tex = ri->loadTexture(Path(path));
+			}
+			ImVec2 size = ImGui::CalcTextSize(tile.clamped_filename);
+			ImVec2 pos = ImGui::GetCursorPos();
+			pos.x += (TILE_SIZE - size.x) * 0.5f;
+			ImGui::SetCursorPos(pos);
+			ImGui::Text("%s", tile.clamped_filename.data);
+			ImGui::EndGroup();
 		}
 		else
 		{
-			ImGui::Rect(img_size.x, img_size.y, 0xffffFFFF);
-			StaticString<MAX_PATH_LENGTH> path(".lumix/asset_tiles/", tile.file_path_hash, ".dds");
-			if (PlatformInterface::fileExists(path)) tile.tex = ri->loadTexture(Path(path));
+			bool b = m_selected_resource && m_selected_resource->getPath().getHash() == tile.file_path_hash;
+			ImGui::Selectable(tile.filepath, b);
 		}
-		ImVec2 size = ImGui::CalcTextSize(tile.clamped_filename);
-		ImVec2 pos = ImGui::GetCursorPos();
-		pos.x += (TILE_SIZE - size.x) * 0.5f;
-		ImGui::SetCursorPos(pos);
-		ImGui::Text("%s", tile.clamped_filename.data);
-		ImGui::EndGroup();
 		if (ImGui::IsItemClicked()) selectResource(Path(tile.filepath), true);
 		if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tile.filepath.data);
 		if (ImGui::IsMouseDragging() && ImGui::IsItemHoveredRect())
 		{
 			m_app.startDrag(StudioApp::DragData::PATH, tile.filepath, stringLength(tile.filepath) + 1);
 		}
-		ImGui::SameLine();
+		if(m_show_thumbnails) ImGui::SameLine();
 		w -= TILE_SIZE;
 	}
 	ImGui::NewLine();
@@ -494,8 +503,12 @@ void AssetBrowser::onGUI()
 	}
 	if (m_activate) ImGui::SetDockActive();
 
+	float checkbox_w = ImGui::GetCursorPosX();
+	ImGui::Checkbox("Thumbnails", &m_show_thumbnails);
+	ImGui::SameLine();
+	checkbox_w = ImGui::GetCursorPosX() - checkbox_w;
 	ImGui::FilterInput("filter", m_filter, sizeof(m_filter), 100);
-	ImGui::SameLine(130);
+	ImGui::SameLine(130 + checkbox_w);
 	breadcrumbs();
 	ImGui::Separator();
 

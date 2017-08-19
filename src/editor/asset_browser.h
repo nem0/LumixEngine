@@ -120,6 +120,7 @@ private:
 	bool m_activate;
 	bool m_is_update_enabled;
 	bool m_is_init_finished;
+	bool m_show_thumbnails;
 	Action* m_auto_reload_action;
 	Action* m_back_action;
 	Action* m_forward_action;
