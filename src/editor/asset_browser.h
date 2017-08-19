@@ -71,6 +71,7 @@ private:
 	};
 
 private:
+	void breadcrumbs();
 	void onTilesGUI();
 	void changeDir(const char* path);
 	void onFileChanged(const char* path);

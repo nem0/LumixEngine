@@ -326,6 +326,35 @@ void AssetBrowser::changeDir(const char* path)
 }
 
 
+void AssetBrowser::breadcrumbs()
+{
+	const char* c = m_dir.data;
+	char tmp[MAX_PATH_LENGTH];
+	while (*c)
+	{
+		char* c_out = tmp;
+		while (*c && *c != '/')
+		{
+			*c_out = *c;
+			++c_out;
+			++c;
+		}
+		*c_out = '\0';
+		if (*c == '/') ++c;
+		if (ImGui::Button(tmp))
+		{
+			char new_dir[MAX_PATH_LENGTH];
+			copyNString(new_dir, lengthOf(new_dir), m_dir, int(c - m_dir.data));
+			changeDir(new_dir);
+		}
+		ImGui::SameLine();
+		ImGui::Text("%s", "/");
+		ImGui::SameLine();
+	}
+	ImGui::NewLine();
+}
+
+
 void AssetBrowser::onTilesGUI()
 {
 	if (m_dir.data[0] == '\0') changeDir(".");
@@ -336,11 +365,11 @@ void AssetBrowser::onTilesGUI()
 		return;
 	}
 
+	breadcrumbs();
+	ImGui::Separator();
+
 	ImGui::BeginChild("left_col", ImVec2(120, 0));
 	ImGui::PushItemWidth(120);
-
-	ImGui::Text("Directories");
-	ImGui::Separator();
 	bool b = false;
 	if (ImGui::Selectable("..", &b))
 	{
@@ -364,8 +393,6 @@ void AssetBrowser::onTilesGUI()
 	ImGui::SameLine();
 
 	ImGui::BeginChild("right_col");
-	ImGui::Text("%s", m_dir.data);
-	ImGui::Separator();
 
 	IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
 
