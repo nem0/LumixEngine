@@ -347,9 +347,9 @@ void AssetBrowser::breadcrumbs()
 			copyNString(new_dir, lengthOf(new_dir), m_dir, int(c - m_dir.data));
 			changeDir(new_dir);
 		}
-		ImGui::SameLine();
+		ImGui::SameLine(0, 1);
 		ImGui::Text("%s", "/");
-		ImGui::SameLine();
+		ImGui::SameLine(0, 1);
 	}
 	ImGui::NewLine();
 }
@@ -365,6 +365,9 @@ void AssetBrowser::onTilesGUI()
 		return;
 	}
 
+	ImGui::FilterInput("filter", m_filter, sizeof(m_filter), 100);
+
+	ImGui::SameLine(130);
 	breadcrumbs();
 	ImGui::Separator();
 
@@ -400,6 +403,9 @@ void AssetBrowser::onTilesGUI()
 	float w = ImGui::GetContentRegionAvailWidth();
 	for (FileInfo& tile : m_file_infos)
 	{
+		if (m_filter[0] && stristr(tile.filepath, m_filter) == nullptr) continue;
+
+
 		if (w < TILE_SIZE)
 		{
 			ImGui::NewLine();
