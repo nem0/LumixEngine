@@ -391,6 +391,8 @@ const char* findSubstring(const char* haystack, const char* needle)
 
 bool copyNString(char* destination, int length, const char* source, int source_len)
 {
+	ASSERT(length >= 0);
+	ASSERT(source_len >= 0);
 	if (!source)
 	{
 		return false;
