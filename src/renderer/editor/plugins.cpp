@@ -506,26 +506,6 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		if (type != MODEL_TYPE) return false;
 
 		auto* model = static_cast<Model*>(resource);
-
-		showPreview(*model);
-
-		ImGui::LabelText("Bone count", "%d", model->getBoneCount());
-		if (model->getBoneCount() > 0 && ImGui::CollapsingHeader("Bones"))
-		{
-			ImGui::Columns(3);
-			for (int i = 0; i < model->getBoneCount(); ++i)
-			{
-				ImGui::Text("%s", model->getBone(i).name.c_str());
-				ImGui::NextColumn();
-				auto pos = model->getBone(i).transform.pos;
-				ImGui::Text("%f; %f; %f", pos.x, pos.y, pos.z);
-				ImGui::NextColumn();
-				auto rot = model->getBone(i).transform.rot;
-				ImGui::Text("%f; %f; %f; %f", rot.x, rot.y, rot.z, rot.w);
-				ImGui::NextColumn();
-			}
-		}
-
 		ImGui::LabelText("Bounding radius", "%f", model->getBoundingRadius());
 
 		auto* lods = model->getLODs();
@@ -588,6 +568,25 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 				ImGui::TreePop();
 			}
 		}
+
+		ImGui::LabelText("Bone count", "%d", model->getBoneCount());
+		if (model->getBoneCount() > 0 && ImGui::CollapsingHeader("Bones"))
+		{
+			ImGui::Columns(3);
+			for (int i = 0; i < model->getBoneCount(); ++i)
+			{
+				ImGui::Text("%s", model->getBone(i).name.c_str());
+				ImGui::NextColumn();
+				Vec3 pos = model->getBone(i).transform.pos;
+				ImGui::Text("%f; %f; %f", pos.x, pos.y, pos.z);
+				ImGui::NextColumn();
+				Quat rot = model->getBone(i).transform.rot;
+				ImGui::Text("%f; %f; %f; %f", rot.x, rot.y, rot.z, rot.w);
+				ImGui::NextColumn();
+			}
+		}
+
+		showPreview(*model);
 
 		return true;
 	}
@@ -2324,7 +2323,7 @@ struct ShaderEditorPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		action->func.bind<ShaderEditorPlugin, &ShaderEditorPlugin::onAction>(this);
 		action->is_selected.bind<ShaderEditorPlugin, &ShaderEditorPlugin::isOpened>(this);
 		app.addWindowAction(action);
-		m_shader_editor.m_is_opened = false;
+		m_shader_editor.m_is_open = false;
 
 		m_compiler = LUMIX_NEW(app.getWorldEditor()->getAllocator(), ShaderCompiler)(app, *app.getLogUI());
 
@@ -2340,10 +2339,10 @@ struct ShaderEditorPlugin LUMIX_FINAL : public StudioApp::IPlugin
 
 	const char* getName() const override { return "shader_editor"; }
 	void update(float) override { m_compiler->update(); }
-	void onAction() { m_shader_editor.m_is_opened = !m_shader_editor.m_is_opened; }
+	void onAction() { m_shader_editor.m_is_open = !m_shader_editor.m_is_open; }
 	void onWindowGUI() override { m_shader_editor.onGUI(*m_compiler); }
 	bool hasFocus() override { return m_shader_editor.isFocused(); }
-	bool isOpened() const { return m_shader_editor.m_is_opened; }
+	bool isOpened() const { return m_shader_editor.m_is_open; }
 
 	StudioApp& m_app;
 	ShaderCompiler* m_compiler;

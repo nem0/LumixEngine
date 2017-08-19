@@ -15,7 +15,7 @@ LogUI::LogUI(IAllocator& allocator)
 	, m_notifications(allocator)
 	, m_last_uid(1)
 	, m_guard(false)
-	, m_is_opened(false)
+	, m_is_open(false)
 	, m_are_notifications_hovered(false)
 	, m_move_notifications_to_front(false)
 {
@@ -168,7 +168,7 @@ void LogUI::onGUI()
 	MT::SpinLock lock(m_guard);
 	showNotifications();
 
-	if (ImGui::BeginDock("Log", &m_is_opened))
+	if (ImGui::BeginDock("Log", &m_is_open))
 	{
 		const char* labels[] = { "Info", "Warning", "Error" };
 		for (int i = 0; i < lengthOf(labels); ++i)

@@ -93,7 +93,7 @@ public:
 public:
 	static const int MAX_TEXTURES_COUNT = 16;
 
-	bool m_is_opened;
+	bool m_is_open;
 
 private:
 	void generateMain(const char* path);

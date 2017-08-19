@@ -25,7 +25,7 @@ namespace Lumix
 
 PropertyGrid::PropertyGrid(StudioApp& app)
 	: m_app(app)
-	, m_is_opened(true)
+	, m_is_open(true)
 	, m_editor(*app.getWorldEditor())
 	, m_plugins(app.getWorldEditor()->getAllocator())
 {
@@ -736,7 +736,7 @@ static void showAddComponentNode(const StudioApp::AddCmpTreeNode* node, const ch
 void PropertyGrid::onGUI()
 {
 	auto& ents = m_editor.getSelectedEntities();
-	if (ImGui::BeginDock("Properties", &m_is_opened) && !ents.empty())
+	if (ImGui::BeginDock("Properties", &m_is_open) && !ents.empty())
 	{
 		if (ImGui::Button("Add component"))
 		{

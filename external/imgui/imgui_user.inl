@@ -730,6 +730,22 @@ namespace ImGui
 		}
 	}
 
+
+	void VSplitter(const char* str_id, ImVec2* size)
+	{
+		ImVec2 screen_pos = GetCursorScreenPos();
+		InvisibleButton(str_id, ImVec2(3, -1));
+		ImVec2 end_pos = screen_pos + GetItemRectSize();
+		ImGuiWindow* win = GetCurrentWindow();
+		ImVec4* colors = GetStyle().Colors;
+		ImU32 color = GetColorU32(IsItemActive() || IsItemHovered() ? colors[ImGuiCol_ButtonActive] : colors[ImGuiCol_Button]);
+		win->DrawList->AddRectFilled(screen_pos, end_pos, color);
+		if (ImGui::IsItemActive())
+		{
+			size->x = ImMax(1.0f, ImGui::GetIO().MouseDelta.x + size->x);
+		}
+	}
+
 	static float s_max_timeline_value;
 
 

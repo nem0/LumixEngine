@@ -150,7 +150,7 @@ void SceneView::update(float)
 	PROFILE_FUNCTION();
 
 	if (ImGui::IsAnyItemActive()) return;
-	if (!m_is_opened) return;
+	if (!m_is_open) return;
 	if (ImGui::GetIO().KeyCtrl) return;
 
 	int screen_x = int(ImGui::GetIO().MousePos.x);
@@ -356,7 +356,7 @@ void SceneView::onToolbar()
 void SceneView::onWindowGUI()
 {
 	PROFILE_FUNCTION();
-	m_is_opened = false;
+	m_is_open = false;
 	ImVec2 view_pos;
 	const char* title = "Scene View###Scene View";
 	if (m_log_ui && m_log_ui->getUnreadErrorCount() > 0)
@@ -368,7 +368,7 @@ void SceneView::onWindowGUI()
 
 	if (ImGui::BeginDock(title, nullptr, ImGuiWindowFlags_NoScrollWithMouse))
 	{
-		m_is_opened = true;
+		m_is_open = true;
 		onToolbar();
 		auto size = ImGui::GetContentRegionAvail();
 		auto* fb = m_pipeline->getFramebuffer("default");
@@ -445,7 +445,7 @@ void SceneView::onWindowGUI()
 
 	ImGui::EndDock();
 
-	if(m_show_stats && m_is_opened)
+	if(m_show_stats && m_is_open)
 	{
 		float toolbar_height = 24 + ImGui::GetStyle().FramePadding.y * 2;
 		view_pos.x += ImGui::GetStyle().FramePadding.x;

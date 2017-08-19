@@ -36,7 +36,7 @@ public:
 	bool entityInput(const char* label, const char* str_id, Entity& entity) const;
 
 public:
-	bool m_is_opened;
+	bool m_is_open;
 
 private:
 	void showProperty(PropertyDescriptorBase& desc,

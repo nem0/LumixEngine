@@ -23,7 +23,7 @@ class LUMIX_EDITOR_API LogUI
 		int getUnreadErrorCount() const;
 
 	public:
-		bool m_is_opened;
+		bool m_is_open;
 
 	private:
 		enum Type

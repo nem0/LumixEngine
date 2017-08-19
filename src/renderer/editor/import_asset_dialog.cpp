@@ -2356,7 +2356,7 @@ ImportAssetDialog::ImportAssetDialog(StudioApp& app)
 
 	m_image.data = nullptr;
 
-	m_is_opened = false;
+	m_is_open = false;
 	m_message[0] = '\0';
 	m_import_message[0] = '\0';
 	m_task = nullptr;
@@ -2422,7 +2422,7 @@ ImportAssetDialog::ImportAssetDialog(StudioApp& app)
 
 bool ImportAssetDialog::isOpened() const
 {
-	return m_is_opened;
+	return m_is_open;
 }
 
 
@@ -3256,7 +3256,7 @@ void ImportAssetDialog::checkTask(bool wait)
 
 void ImportAssetDialog::onAction()
 {
-	m_is_opened = !m_is_opened;
+	m_is_open = !m_is_open;
 }
 
 
@@ -3280,7 +3280,7 @@ void ImportAssetDialog::addSource(const char* src)
 
 void ImportAssetDialog::onWindowGUI()
 {
-	if (!ImGui::BeginDock("Import Asset", &m_is_opened))
+	if (!ImGui::BeginDock("Import Asset", &m_is_open))
 	{
 		ImGui::EndDock();
 		return;

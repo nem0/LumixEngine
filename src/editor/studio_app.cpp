@@ -69,7 +69,7 @@ struct LuaPlugin : public StudioApp::IPlugin
 		Action* action = LUMIX_NEW(editor.getAllocator(), Action)(name, name);
 		action->func.bind<LuaPlugin, &LuaPlugin::onAction>(this);
 		app.addWindowAction(action);
-		m_is_opened = false;
+		m_is_open = false;
 
 		lua_pop(L, 1); // plugin_name
 	}
@@ -86,13 +86,13 @@ struct LuaPlugin : public StudioApp::IPlugin
 
 	void onAction()
 	{
-		m_is_opened = !m_is_opened;
+		m_is_open = !m_is_open;
 	}
 
 
 	void onWindowGUI() override
 	{
-		if (!m_is_opened) return;
+		if (!m_is_open) return;
 		if (lua_getglobal(L, "onGUI") == LUA_TFUNCTION)
 		{
 			if (lua_pcall(L, 0, 0, 0) != LUA_OK)
@@ -110,7 +110,7 @@ struct LuaPlugin : public StudioApp::IPlugin
 	WorldEditor& editor;
 	lua_State* L;
 	int thread_ref;
-	bool m_is_opened;
+	bool m_is_open;
 };
 
 
@@ -758,12 +758,12 @@ public:
 	void toggleMeasure() { m_editor->toggleMeasure(); }
 	void snapDown() { m_editor->snapDown(); }
 	void lookAtSelected() { m_editor->lookAtSelected(); }
-	void toggleSettings() { m_settings.m_is_opened = !m_settings.m_is_opened; }
-	bool areSettingsOpened() const { return m_settings.m_is_opened; }
+	void toggleSettings() { m_settings.m_is_open = !m_settings.m_is_open; }
+	bool areSettingsOpened() const { return m_settings.m_is_open; }
 	void toggleEntityList() { m_is_entity_list_opened = !m_is_entity_list_opened; }
 	bool isEntityListOpened() const { return m_is_entity_list_opened; }
-	void toggleAssetBrowser() { m_asset_browser->m_is_opened = !m_asset_browser->m_is_opened; }
-	bool isAssetBrowserOpened() const { return m_asset_browser->m_is_opened; }
+	void toggleAssetBrowser() { m_asset_browser->m_is_open = !m_asset_browser->m_is_open; }
+	bool isAssetBrowserOpened() const { return m_asset_browser->m_is_open; }
 	int getExitCode() const override { return m_exit_code; }
 	AssetBrowser* getAssetBrowser() override { return m_asset_browser; }
 	PropertyGrid* getPropertyGrid() override { return m_property_grid; }
@@ -1057,11 +1057,11 @@ public:
 	{
 		if (!ImGui::BeginMenu("View")) return;
 
-		ImGui::MenuItem("Asset browser", nullptr, &m_asset_browser->m_is_opened);
+		ImGui::MenuItem("Asset browser", nullptr, &m_asset_browser->m_is_open);
 		doMenuItem(*getAction("entityList"), true);
-		ImGui::MenuItem("Log", nullptr, &m_log_ui->m_is_opened);
-		ImGui::MenuItem("Profiler", nullptr, &m_profiler_ui->m_is_opened);
-		ImGui::MenuItem("Properties", nullptr, &m_property_grid->m_is_opened);
+		ImGui::MenuItem("Log", nullptr, &m_log_ui->m_is_open);
+		ImGui::MenuItem("Profiler", nullptr, &m_profiler_ui->m_is_open);
+		ImGui::MenuItem("Properties", nullptr, &m_property_grid->m_is_open);
 		doMenuItem(*getAction("settings"), true);
 		ImGui::Separator();
 		for (Action* action : m_window_actions)
@@ -1283,11 +1283,13 @@ public:
 
 	void saveSettings()
 	{
-		m_settings.m_is_asset_browser_opened = m_asset_browser->m_is_opened;
+		m_settings.m_is_asset_browser_opened = m_asset_browser->m_is_open;
+		m_settings.m_asset_browser_left_column_width = m_asset_browser->m_left_column_width;
+		m_settings.m_asset_browser_middle_column_width = m_asset_browser->m_middle_column_width;
 		m_settings.m_is_entity_list_opened = m_is_entity_list_opened;
-		m_settings.m_is_log_opened = m_log_ui->m_is_opened;
-		m_settings.m_is_profiler_opened = m_profiler_ui->m_is_opened;
-		m_settings.m_is_properties_opened = m_property_grid->m_is_opened;
+		m_settings.m_is_log_opened = m_log_ui->m_is_open;
+		m_settings.m_is_profiler_opened = m_profiler_ui->m_is_open;
+		m_settings.m_is_properties_opened = m_property_grid->m_is_open;
 		m_settings.m_mouse_sensitivity_x = m_editor->getMouseSensitivity().x;
 		m_settings.m_mouse_sensitivity_y = m_editor->getMouseSensitivity().y;
 
@@ -1343,11 +1345,13 @@ public:
 
 		m_settings.load();
 
-		m_asset_browser->m_is_opened = m_settings.m_is_asset_browser_opened;
+		m_asset_browser->m_is_open = m_settings.m_is_asset_browser_opened;
+		m_asset_browser->m_left_column_width = m_settings.m_asset_browser_left_column_width;
+		m_asset_browser->m_middle_column_width = m_settings.m_asset_browser_middle_column_width;
 		m_is_entity_list_opened = m_settings.m_is_entity_list_opened;
-		m_log_ui->m_is_opened = m_settings.m_is_log_opened;
-		m_profiler_ui->m_is_opened = m_settings.m_is_profiler_opened;
-		m_property_grid->m_is_opened = m_settings.m_is_properties_opened;
+		m_log_ui->m_is_open = m_settings.m_is_log_opened;
+		m_profiler_ui->m_is_open = m_settings.m_is_profiler_opened;
+		m_property_grid->m_is_open = m_settings.m_is_properties_opened;
 
 		if (m_settings.m_is_maximized)
 		{
