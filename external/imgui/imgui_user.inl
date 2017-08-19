@@ -683,10 +683,10 @@ namespace ImGui
 	}
 
 
-	bool FilterInput(const char* label, char* buf, size_t buf_size)
+	bool FilterInput(const char* label, char* buf, size_t buf_size, float width)
 	{
 		auto pos = GetCursorPos();
-		PushItemWidth(GetContentRegionAvail().x);
+		PushItemWidth(width < 0 ? GetContentRegionAvail().x : width);
 		char tmp[32];
 		strcpy(tmp, "##");
 		strcat(tmp, label);
