@@ -9,6 +9,7 @@ namespace Lumix
 {
 
 class OutputBlob;
+class Path;
 
 namespace Anim
 {
@@ -21,6 +22,8 @@ struct AnimationScene : public IScene
 {
 	virtual const OutputBlob& getEventStream() const = 0;
 	virtual class Animation* getAnimableAnimation(ComponentHandle cmp) = 0;
+	virtual Path getAnimation(ComponentHandle cmp) = 0;
+	virtual void setAnimation(ComponentHandle cmp, const Path& path) = 0;
 	virtual float getAnimableTime(ComponentHandle cmp) = 0;
 	virtual void setAnimableTime(ComponentHandle cmp, float time) = 0;
 	virtual void updateAnimable(ComponentHandle cmp, float time_delta) = 0;

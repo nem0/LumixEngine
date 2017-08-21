@@ -609,14 +609,14 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
-	Path getAnimation(ComponentHandle cmp)
+	Path getAnimation(ComponentHandle cmp) override
 	{
 		const auto& animable = m_animables[{cmp.index}];
 		return animable.animation ? animable.animation->getPath() : Path("");
 	}
 
 
-	void setAnimation(ComponentHandle cmp, const Path& path)
+	void setAnimation(ComponentHandle cmp, const Path& path) override
 	{
 		auto& animable = m_animables[{cmp.index}];
 		unloadAnimation(animable.animation);
