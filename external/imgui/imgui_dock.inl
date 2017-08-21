@@ -55,6 +55,7 @@ struct DockContext
 			, label(nullptr)
 			, opened(false)
 			, first(true)
+			, last_frame(0)
 		{
 			location[0] = 0;
 			children[0] = children[1] = nullptr;
@@ -189,11 +190,10 @@ struct DockContext
 		ImVec2 pos;
 		ImVec2 size;
 		Status_ status;
-		int last_frame;
-		int invalid_frames;
 		char location[16];
 		bool opened;
 		bool first;
+		int last_frame;
 	};
 
 
@@ -228,8 +228,6 @@ struct DockContext
 		new_dock->size.y = default_size.y < 0 ? GetIO().DisplaySize.y : default_size.y;
 		new_dock->opened = opened;
 		new_dock->first = true;
-		new_dock->last_frame = 0;
-		new_dock->invalid_frames = 0;
 		new_dock->location[0] = 0;
 		return *new_dock;
 	}
@@ -634,6 +632,7 @@ struct DockContext
 		SetCursorScreenPos(dock.pos);
 		char tmp[20];
 		ImFormatString(tmp, IM_ARRAYSIZE(tmp), "tabs%d", (int)dock.id);
+		
 		if (BeginChild(tmp, size, true))
 		{
 			Dock* dock_tab = &dock;
@@ -882,11 +881,32 @@ struct DockContext
 	}
 
 
+	void cleanDocks()
+	{
+		restart:
+			for (int i = 0, c = m_docks.size(); i < c; ++i)
+			{
+				Dock& dock = *m_docks[i];
+				if (dock.last_frame == 0 && dock.status != Status_Float && !dock.children[0])
+				{
+					fillLocation(*m_docks[i]);
+					doUndock(*m_docks[i]);
+					m_docks[i]->status = Status_Float;
+					goto restart;
+				}
+			}
+	}
+
+
 	bool begin(const char* label, bool* opened, ImGuiWindowFlags extra_flags, const ImVec2& default_size)
 	{
 		Dock& dock = getDock(label, !opened || *opened, default_size);
-		if (!dock.opened && (!opened || *opened)) tryDockToStoredLocation(dock);
+		if (dock.last_frame != 0 && m_last_frame != ImGui::GetFrameCount())
+		{
+			cleanDocks();
+		}
 		dock.last_frame = ImGui::GetFrameCount();
+		if (!dock.opened && (!opened || *opened)) tryDockToStoredLocation(dock);
 		if (strcmp(dock.label, label) != 0)
 		{
 			MemFree(dock.label);
@@ -1073,8 +1093,6 @@ struct DockContext
 					if (lua_getfield(L, -1, "index") == LUA_TNUMBER)
 						idx = (int)lua_tointeger(L, -1);
 					Dock& dock = *m_docks[idx];
-					dock.last_frame = 0;
-					dock.invalid_frames = 0;
 					lua_pop(L, 1);
 
 					if (lua_getfield(L, -1, "label") == LUA_TSTRING)
