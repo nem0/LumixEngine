@@ -2766,6 +2766,20 @@ public:
 		return &static_cast<Texture*>(res)->handle;
 	}
 
+
+	static Texture* LUA_getTexturePtr(RenderScene* scene, int resource_idx)
+	{
+		Resource* res = scene->getEngine().getLuaResource(resource_idx);
+		if (!res) return nullptr;
+		return static_cast<Texture*>(res);
+	}
+
+
+	static void LUA_setTextureFlag(Texture* texture, u32 flag, bool value)
+	{
+		texture->setFlag(flag, value);
+	}
+
 	
 	static void LUA_setTexturePixel(Texture* texture, int x, int y, u32 value)
 	{
@@ -5162,7 +5176,9 @@ void RenderScene::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(getTextureHeight);
 	REGISTER_FUNCTION(getTexturePixel);
 	REGISTER_FUNCTION(setTexturePixel);
+	REGISTER_FUNCTION(setTextureFlag);
 	REGISTER_FUNCTION(getTextureHandle);
+	REGISTER_FUNCTION(getTexturePtr);
 	REGISTER_FUNCTION(updateTextureData);
 	REGISTER_FUNCTION(setModelInstanceMaterial);
 	REGISTER_FUNCTION(setModelInstancePath);
