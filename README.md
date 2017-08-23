@@ -14,7 +14,7 @@
 * [Getting started](https://github.com/nem0/LumixEngine/wiki/Getting-started)
 * [Features](https://github.com/nem0/LumixEngine/wiki/Features)
 * [Data repository](https://github.com/nem0/lumixengine_data)
-* [Videos](https://www.youtube.com/channel/UCtjtIy0ldsq-9siM1Gm_rXg)
+* [Videos](https://www.youtube.com/channel/UCtjtIy0ldsq-9siM1Gm_rXg/videos)
 * [Plugins](https://github.com/nem0/LumixEngine/wiki/available-plugins)
 * [Roadmap](https://github.com/nem0/LumixEngine/milestones)
 
