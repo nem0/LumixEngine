@@ -25,6 +25,7 @@ namespace
 {
 
 
+static const ComponentType CLOTH_TYPE = PropertyRegister::getComponentType("cloth");
 static const ComponentType RAGDOLL_TYPE = PropertyRegister::getComponentType("ragdoll");
 static const ComponentType BOX_ACTOR_TYPE = PropertyRegister::getComponentType("box_rigid_actor");
 static const ComponentType SPHERE_ACTOR_TYPE = PropertyRegister::getComponentType("sphere_rigid_actor");
@@ -1064,6 +1065,7 @@ LUMIX_STUDIO_ENTRY(physics)
 	app.registerComponent("mesh_rigid_actor", "Physics/Mesh");
 	app.registerComponent("physical_heightfield", "Physics/Heightfield");
 	app.registerComponent("ragdoll", "Physics/Ragdoll");
+	app.registerComponent("cloth", "Physics/Cloth");
 
 	auto& editor = *app.getWorldEditor();
 	auto& allocator = editor.getAllocator();

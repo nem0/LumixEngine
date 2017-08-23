@@ -32,6 +32,7 @@ namespace Lumix
 {
 
 
+static const ComponentType CLOTH_TYPE = PropertyRegister::getComponentType("cloth");
 static const ComponentType BOX_ACTOR_TYPE = PropertyRegister::getComponentType("box_rigid_actor");
 static const ComponentType RAGDOLL_TYPE = PropertyRegister::getComponentType("ragdoll");
 static const ComponentType SPHERE_ACTOR_TYPE = PropertyRegister::getComponentType("sphere_rigid_actor");
@@ -84,6 +85,14 @@ struct Ragdoll
 	RagdollBone* root = nullptr;
 	RigidTransform root_transform;
 	int layer;
+};
+
+
+struct Cloth
+{
+	Entity entity = INVALID_ENTITY;
+	PxCloth* physx_cloth = nullptr;
+	float dampening_coef = 0.1f;
 };
 
 
@@ -289,6 +298,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		, m_controllers(m_allocator)
 		, m_actors(m_allocator)
 		, m_ragdolls(m_allocator)
+		, m_cloths(m_allocator)
 		, m_terrains(m_allocator)
 		, m_dynamic_actors(m_allocator)
 		, m_universe(context)
@@ -319,6 +329,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 				, &PhysicsSceneImpl::serialize##name \
 				, &PhysicsSceneImpl::deserialize##name)
 
+		COMPONENT_TYPE(CLOTH_TYPE, Cloth);
 		COMPONENT_TYPE(BOX_ACTOR_TYPE, BoxActor);
 		COMPONENT_TYPE(MESH_ACTOR_TYPE, MeshActor);
 		COMPONENT_TYPE(HEIGHTFIELD_TYPE, Heightfield);
@@ -486,6 +497,12 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			int idx = m_actors.find(entity);
 			if (idx < 0) return INVALID_COMPONENT;
 			return {entity.index};
+		}
+		if (type == CLOTH_TYPE)
+		{
+			int idx = m_cloths.find(entity);
+			if (idx >= 0) return{ entity.index };
+			return INVALID_COMPONENT;
 		}
 		if (type == RAGDOLL_TYPE)
 		{
@@ -1144,6 +1161,10 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		{
 			return createBoxRigidActor(entity);
 		}
+		else if (component_type == CLOTH_TYPE)
+		{
+			return createCloth(entity);
+		}
 		else if (component_type == RAGDOLL_TYPE)
 		{
 			return createRagdoll(entity);
@@ -1192,10 +1213,18 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		}
 		else if (type == RAGDOLL_TYPE)
 		{
-			int idx = m_ragdolls.find({cmp.index});
+			int idx = m_ragdolls.find({ cmp.index });
 			Entity entity = m_ragdolls.at(idx).entity;
 			destroySkeleton(m_ragdolls.at(idx).root);
 			m_ragdolls.eraseAt(idx);
+			m_universe.destroyComponent(entity, type, this, cmp);
+		}
+		else if (type == CLOTH_TYPE)
+		{
+			int idx = m_cloths.find({cmp.index});
+			Entity entity = m_cloths.at(idx).entity;
+			destroyCloth(m_cloths.at(idx));
+			m_cloths.eraseAt(idx);
 			m_universe.destroyComponent(entity, type, this, cmp);
 		}
 		else if (type == SPHERICAL_JOINT_TYPE || type == HINGE_JOINT_TYPE || type == DISTANCE_JOINT_TYPE ||
@@ -1386,6 +1415,24 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 		ComponentHandle cmp = {entity.index};
 		m_universe.addComponent(entity, RAGDOLL_TYPE, this, cmp);
+		return cmp;
+	}
+
+
+	ComponentHandle createCloth(Entity entity)
+	{
+		Cloth& cloth = m_cloths.insert(entity);
+		cloth.entity = entity;
+		ComponentHandle cmp = {entity.index};
+		m_universe.addComponent(entity, CLOTH_TYPE, this, cmp);
+		if (!m_is_game_running)
+		{
+			cloth.physx_cloth = nullptr;
+		}
+		else
+		{
+			initCloth(cloth);
+		}
 		return cmp;
 	}
 
@@ -2174,6 +2221,33 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		updateBone(root_transform, inv_root, bone->child, pose);
 	}
 
+	
+	void updateCloths()
+	{
+		IAllocator& allocator = m_engine->getAllocator();
+		auto* render_scene = static_cast<RenderScene*>(m_universe.getScene(RENDERER_HASH));
+		if (!render_scene) return;
+		
+		for (Cloth& cloth : m_cloths)
+		{
+			if (!cloth.physx_cloth) continue;
+
+			ComponentHandle model_instance = render_scene->getModelInstanceComponent(cloth.entity);
+			if (!model_instance.isValid()) continue;
+
+			PxClothParticleData* data = cloth.physx_cloth->lockParticleData(PxDataAccessFlag::eREADABLE);
+			Array<Vec3> pos(allocator);
+			u32 particles_count = cloth.physx_cloth->getNbParticles();
+			pos.resize(particles_count);
+			for (PxU32 i = 0; i < particles_count; ++i) 
+			{
+				pos[i] = fromPhysx(data->particles[i].pos);
+			}
+			data->unlock();
+			render_scene->setModelInstanceVertices(model_instance, &pos[0], pos.size() * sizeof(pos[0]));
+		}
+	}
+
 
 	void updateRagdolls()
 	{
@@ -2219,6 +2293,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		updateRagdolls();
 		updateDynamicActors();
 		updateControllers(time_delta);
+		updateCloths();
 		
 		render();
 	}
@@ -2229,6 +2304,136 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		int idx = m_actors.find(entity);
 		if (idx < 0) return INVALID_COMPONENT;
 		return {entity.index};
+	}
+
+
+	bool getClothMesh(Entity entity, Array<PxClothParticle>* out_vertices, Array<PxU32>* out_indices)
+	{
+		ASSERT(out_vertices);
+		ASSERT(out_indices);
+
+		auto* render_scene = static_cast<RenderScene*>(m_universe.getScene(RENDERER_HASH));
+		if (!render_scene)
+		{
+			g_log_error.log("Physics") << "No model instance found, cloth won't work. Entity " << entity.index;
+			return false;
+		}
+		
+		ComponentHandle model_instance = render_scene->getModelInstanceComponent(entity);
+		if (!model_instance.isValid())
+		{
+			g_log_error.log("Physics") << "No model instance found, cloth won't work. Entity " << entity.index;
+			return false;
+		}
+
+		Model* model = render_scene->getModelInstanceModel(model_instance);
+		if (!model->isReady())
+		{
+			g_log_error.log("Physics") << "Model is not loaded, cloth won't work. Entity " << entity.index;
+			return false;
+		}
+
+
+		const u16* indices = model->getIndices16();
+		int indices_count = model->getIndicesCount();
+		if (indices)
+		{
+			out_indices->resize(indices_count);
+			for (int i = 0; i < indices_count; ++i)
+			{
+				(*out_indices)[i] = indices[i];
+			}
+		}
+		else
+		{
+			const u32* indices = model->getIndices32();
+			if (!indices) return false;
+
+			out_indices->resize(indices_count);
+			for (int i = 0; i < indices_count; ++i)
+			{
+				(*out_indices)[i] = indices[i];
+			}
+		}
+
+		const Array<Vec3>& vertices = model->getVertices();
+		out_vertices->resize(vertices.size());
+		for (int i = 0, c = vertices.size(); i < c; ++i)
+		{
+			(*out_vertices)[i].pos = toPhysx(vertices[i]);
+			(*out_vertices)[i].invWeight = (*out_vertices)[i].pos.y > 0.99 ? 0.0f : 1.0f;
+		}
+
+		return true;
+	}
+
+
+	void initCloth(Cloth& cloth)
+	{
+		IAllocator& allocator = m_engine->getAllocator();
+		Array<PxClothParticle> vertices(allocator);
+		Array<PxU32> indices(allocator);
+
+		if (!getClothMesh(cloth.entity, &vertices, &indices)) return;
+
+		PxClothMeshDesc meshDesc;
+		meshDesc.points.data = &vertices[0];
+		meshDesc.points.count = vertices.size();
+		meshDesc.points.stride = sizeof(PxClothParticle);
+
+		meshDesc.invMasses.data = &vertices[0].invWeight;
+		meshDesc.invMasses.count = vertices.size();
+		meshDesc.invMasses.stride = sizeof(PxClothParticle);
+
+		meshDesc.triangles.data = &indices[0];
+		meshDesc.triangles.count = indices.size() / 3;
+		meshDesc.triangles.stride = sizeof(PxU32) * 3;
+
+		PxClothMeshQuadifier quadifier(meshDesc);
+
+		PxPhysics& physics = *m_system->getPhysics();
+		PxClothMeshDesc quad_mesh = quadifier.getDescriptor();
+		PxClothFabric* fabric = PxClothFabricCreate(physics, quad_mesh, PxVec3(0, -1, 0));
+
+		PxTransform pose = toPhysx(m_universe.getTransform(cloth.entity).getRigidPart());
+		PxCloth* px_cloth = physics.createCloth(pose, *fabric, &vertices[0], PxClothFlags());
+		px_cloth->setStretchConfig(PxClothFabricPhaseType::eVERTICAL, PxClothStretchConfig(1.0f));
+		px_cloth->setStretchConfig(PxClothFabricPhaseType::eHORIZONTAL, PxClothStretchConfig(0.9f));
+		px_cloth->setStretchConfig(PxClothFabricPhaseType::eSHEARING, PxClothStretchConfig(0.75f));
+		px_cloth->setStretchConfig(PxClothFabricPhaseType::eBENDING, PxClothStretchConfig(0.5f));
+		px_cloth->setSolverFrequency(240.0f);
+
+		px_cloth->setDampingCoefficient(physx::PxVec3(cloth.dampening_coef));
+
+		m_scene->addActor(*px_cloth);
+		cloth.physx_cloth = px_cloth;
+	}
+
+
+	void setClothDampeningCoef(ComponentHandle cmp, float coef) override
+	{
+		Cloth& cloth = m_cloths[{cmp.index}];
+		cloth.dampening_coef = coef;
+		if (cloth.physx_cloth)
+		{
+			cloth.physx_cloth->setDampingCoefficient(PxVec3(coef));
+		}
+	}
+
+
+	float getClothDampeningCoef(ComponentHandle cmp) override
+	{
+		Cloth& cloth = m_cloths[{cmp.index}];
+		return cloth.dampening_coef;
+	}
+
+
+	void initCloths()
+	{
+		for (Cloth& cloth : m_cloths)
+		{
+			initCloth(cloth);
+		}
 	}
 
 
@@ -2271,6 +2476,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		m_is_game_running = true;
 
 		initJoints();
+		initCloths();
 	}
 
 
@@ -2422,6 +2628,21 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			pos.y += controller.m_radius;
 			PxExtendedVec3 pvec(pos.x, pos.y, pos.z);
 			controller.m_controller->setPosition(pvec);
+		}
+
+		int cloth_idx = m_cloths.find(entity);
+		if (cloth_idx >= 0)
+		{
+			PxCloth* cloth = m_cloths.at(cloth_idx).physx_cloth;
+			if (cloth)
+			{
+				Vec3 pos = m_universe.getPosition(entity);
+				Quat rot = m_universe.getRotation(entity);
+				PxTransform tr;
+				tr.p = toPhysx(pos);
+				tr.q = toPhysx(rot);
+				cloth->setTargetPose(tr);
+			}
 		}
 
 		int ragdoll_idx = m_ragdolls.find(entity);
@@ -3268,6 +3489,19 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
+	void serializeCloth(ISerializer& serializer, ComponentHandle cmp)
+	{
+		Cloth& cloth = m_cloths[{cmp.index}];
+	}
+
+
+	void deserializeCloth(IDeserializer& serializer, Entity entity, int /*scene_version*/)
+	{
+		Cloth& cloth = m_cloths.insert(entity);
+		cloth.entity = entity;
+	}
+
+
 	void serializeBoxActor(ISerializer& serializer, ComponentHandle cmp)
 	{
 		RigidActor* actor = m_actors[{cmp.index}];
@@ -3570,6 +3804,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			serializer.write(terrain.m_layer);
 		}
 		serializeRagdolls(serializer);
+		serializeCloths(serializer);
 		serializeJoints(serializer);
 	}
 
@@ -4016,6 +4251,16 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
+	void serializeCloths(OutputBlob& serializer)
+	{
+		serializer.write(m_cloths.size());
+		for (int i = 0, c = m_cloths.size(); i < c; ++i)
+		{
+			serializer.write(m_cloths.getKey(i));
+		}
+	}
+
+
 	void serializeRagdolls(OutputBlob& serializer)
 	{
 		serializer.write(m_ragdolls.size());
@@ -4148,6 +4393,14 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
+	void destroyCloth(Cloth& cloth)
+	{
+		if (!cloth.physx_cloth) return;
+		m_scene->removeActor(*cloth.physx_cloth);
+		cloth.physx_cloth->release();
+	}
+
+
 	void destroySkeleton(RagdollBone* bone)
 	{
 		if (!bone) return;
@@ -4158,6 +4411,24 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		LUMIX_DELETE(m_allocator, bone);
 	}
 
+
+	void deserializeCloths(InputBlob& serializer)
+	{
+		int count;
+		serializer.read(count);
+		m_cloths.reserve(count);
+		for (int i = 0; i < count; ++i)
+		{
+			Entity entity;
+			serializer.read(entity);
+			Cloth& cloth = m_cloths.insert(entity);
+			cloth.entity = entity;
+			cloth.physx_cloth = nullptr;
+
+			ComponentHandle cmp = {cloth.entity.index};
+			m_universe.addComponent(cloth.entity, CLOTH_TYPE, this, cmp);
+		}
+	}
 
 	void deserializeRagdolls(InputBlob& serializer)
 	{
@@ -4332,6 +4603,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		deserializeControllers(serializer);
 		deserializeTerrains(serializer);
 		deserializeRagdolls(serializer);
+		deserializeCloths(serializer);
 		deserializeJoints(serializer);
 
 		updateFilterData();
@@ -4432,6 +4704,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 	AssociativeArray<Entity, RigidActor*> m_actors;
 	AssociativeArray<Entity, Ragdoll> m_ragdolls;
+	AssociativeArray<Entity, Cloth> m_cloths;
 	AssociativeArray<Entity, Joint> m_joints;
 	AssociativeArray<Entity, Controller> m_controllers;
 	AssociativeArray<Entity, Heightfield> m_terrains;

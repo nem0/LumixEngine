@@ -711,6 +711,7 @@ public:
 		while (entity.index >= m_model_instances.size())
 		{
 			auto& r = m_model_instances.emplace();
+			r.morph_vertex_buffer = BGFX_INVALID_HANDLE;
 			r.entity = INVALID_ENTITY;
 			r.pose = nullptr;
 			r.model = nullptr;
@@ -718,6 +719,7 @@ public:
 			r.mesh_count = 0;
 		}
 		auto& r = m_model_instances[entity.index];
+		r.morph_vertex_buffer = BGFX_INVALID_HANDLE;
 		r.entity = entity;
 		r.model = nullptr;
 		r.pose = nullptr;
@@ -1549,6 +1551,7 @@ public:
 			serializer.read(r.entity);
 			serializer.read(r.flags);
 			ASSERT(r.entity.index == i || !r.entity.isValid());
+			r.morph_vertex_buffer = BGFX_INVALID_HANDLE;
 			r.model = nullptr;
 			r.pose = nullptr;
 			r.flags = 0;
@@ -1678,6 +1681,8 @@ public:
 		auto& model_instance = m_model_instances[component.index];
 		Entity entity = model_instance.entity;
 		LUMIX_DELETE(m_allocator, model_instance.pose);
+		bgfx::DynamicVertexBufferHandle vb {model_instance.morph_vertex_buffer};
+		if(bgfx::isValid(vb)) bgfx::destroyDynamicVertexBuffer(vb);
 		model_instance.pose = nullptr;
 		model_instance.entity = INVALID_ENTITY;
 		m_universe.destroyComponent(entity, MODEL_INSTANCE_TYPE, this, component);
@@ -4528,6 +4533,22 @@ public:
 	}
 
 
+	void setModelInstanceVertices(ComponentHandle cmp, const Vec3* data, int size_bytes)
+	{
+		auto& r = m_model_instances[cmp.index];
+		r.type = ModelInstance::MORPHED;
+		bgfx::DynamicVertexBufferHandle vb {r.morph_vertex_buffer};
+		if (!bgfx::isValid(vb))
+		{
+			r.morph_vertex_buffer = bgfx::createDynamicVertexBuffer(bgfx::copy(data, size_bytes), m_pos_vertex_decl).idx;
+		}
+		else
+		{
+			bgfx::updateDynamicVertexBuffer(vb, 0, bgfx::copy(data, size_bytes));
+		}
+	}
+
+
 	bool getModelInstanceKeepSkin(ComponentHandle cmp) override
 	{
 		auto& r = m_model_instances[cmp.index];
@@ -4897,11 +4918,13 @@ public:
 		while(entity.index >= m_model_instances.size())
 		{
 			auto& r = m_model_instances.emplace();
+			r.morph_vertex_buffer = BGFX_INVALID_HANDLE;
 			r.entity = INVALID_ENTITY;
 			r.model = nullptr;
 			r.pose = nullptr;
 		}
 		auto& r = m_model_instances[entity.index];
+		r.morph_vertex_buffer = BGFX_INVALID_HANDLE;
 		r.entity = entity;
 		r.model = nullptr;
 		r.meshes = nullptr;
@@ -4977,6 +5000,7 @@ private:
 	bool m_is_game_running;
 
 	AssociativeArray<Model*, ModelLoadedCallback> m_model_loaded_callbacks;
+	bgfx::VertexDecl m_pos_vertex_decl;
 };
 
 
@@ -5054,6 +5078,7 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	, m_time(0)
 	, m_is_updating_attachments(false)
 {
+	m_pos_vertex_decl.begin().add(bgfx::Attrib::Position, 3, bgfx::AttribType::Float).end();
 	is_opengl = renderer.isOpenGL();
 	m_universe.entityTransformed().bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
 	m_universe.entityDestroyed().bind<RenderSceneImpl, &RenderSceneImpl::onEntityDestroyed>(this);

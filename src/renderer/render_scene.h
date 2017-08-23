@@ -68,7 +68,8 @@ struct ModelInstance
 		RIGID,
 		SKINNED,
 		MULTILAYER_RIGID,
-		MULTILAYER_SKINNED
+		MULTILAYER_SKINNED,
+		MORPHED
 	};
 	Type type;
 	Matrix matrix;
@@ -78,6 +79,7 @@ struct ModelInstance
 	Mesh* meshes;
 	u8 flags;
 	i8 mesh_count;
+	u16 morph_vertex_buffer;
 };
 
 
@@ -311,6 +313,7 @@ public:
 	virtual ModelInstance* getModelInstances() = 0;
 	virtual bool getModelInstanceKeepSkin(ComponentHandle cmp) = 0;
 	virtual void setModelInstanceKeepSkin(ComponentHandle cmp, bool keep) = 0;
+	virtual void setModelInstanceVertices(ComponentHandle cmp, const Vec3* data, int size_bytes) = 0;
 	virtual Path getModelInstancePath(ComponentHandle cmp) = 0;
 	virtual void setModelInstanceMaterial(ComponentHandle cmp, int index, const Path& path) = 0;
 	virtual Path getModelInstanceMaterial(ComponentHandle cmp, int index) = 0;

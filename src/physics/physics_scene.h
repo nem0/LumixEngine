@@ -212,6 +212,9 @@ public:
 	virtual void setRagdollLayer(ComponentHandle cmp, int layer) = 0;
 	virtual int getRagdollLayer(ComponentHandle cmp) = 0;
 
+	virtual void setClothDampeningCoef(ComponentHandle cmp, float coef) = 0;
+	virtual float getClothDampeningCoef(ComponentHandle cmp) = 0;
+
 	virtual const char* getCollisionLayerName(int index) = 0;
 	virtual void setCollisionLayerName(int index, const char* name) = 0;
 	virtual bool canLayersCollide(int layer1, int layer2) = 0;

@@ -2081,6 +2081,48 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
+	void renderMorphedMesh(const ModelInstance& model_instance, const ModelInstanceMesh& info)
+	{
+		const Mesh& mesh = *info.mesh;
+		Material* material = mesh.material;
+		ShaderInstance& shader_instance = mesh.material->getShaderInstance();
+
+		const Model& model = *model_instance.model;
+
+		int stride = model.getVertexDecl().getStride();
+
+		int view_idx = m_layer_to_view_map[material->getRenderLayer()];
+		ASSERT(view_idx >= 0);
+		View& view = m_views[view_idx >= 0 ? view_idx : 0];
+
+		if (!bgfx::isValid(shader_instance.getProgramHandle(view.pass_idx))) return;
+
+		executeCommandBuffer(material->getCommandBuffer(), material);
+		executeCommandBuffer(view.command_buffer.buffer, material);
+
+		bgfx::setTransform(&model_instance.matrix);
+
+		auto ib = bgfx::allocInstanceDataBuffer(1, sizeof(Matrix));
+		copyMemory(ib->data, &model_instance.matrix, sizeof(Matrix));
+		bgfx::setInstanceDataBuffer(ib);
+
+		static_assert(sizeof(model_instance.morph_vertex_buffer) == sizeof(bgfx::DynamicVertexBufferHandle), "incorrect size");
+		bgfx::DynamicVertexBufferHandle vb {model_instance.morph_vertex_buffer};
+		bgfx::setVertexBuffer(0, vb,
+			mesh.attribute_array_offset / stride,
+			mesh.attribute_array_size / stride);
+		bgfx::setVertexBuffer(1, model_instance.model->getVerticesHandle(),
+			mesh.attribute_array_offset / stride,
+			mesh.attribute_array_size / stride);
+		bgfx::setIndexBuffer(model_instance.model->getIndicesHandle(), mesh.indices_offset, mesh.indices_count);
+		bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
+		bgfx::setState(view.render_state | material->getRenderStates());
+		++m_stats.draw_call_count;
+		++m_stats.instance_count;
+		m_stats.triangle_count += mesh.indices_count / 3;
+		bgfx::submit(view.bgfx_id, shader_instance.getProgramHandle(view.pass_idx));
+	}
+
 	void renderSkinnedMesh(const ModelInstance& model_instance, const ModelInstanceMesh& info)
 	{
 		const Mesh& mesh = *info.mesh;
@@ -2599,6 +2641,9 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			ModelInstance& model_instance = model_instances[mesh.model_instance.index];
 			switch (model_instance.type)
 			{
+				case ModelInstance::MORPHED:
+					renderMorphedMesh(model_instance, mesh);
+					break;
 				case ModelInstance::RIGID:
 					renderRigidMesh(model_instance, mesh);
 					break;
@@ -2631,6 +2676,9 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 				ModelInstance& model_instance = model_instances[mesh.model_instance.index];
 				switch (model_instance.type)
 				{
+					case ModelInstance::MORPHED:
+						renderMorphedMesh(model_instance, mesh);
+						break;
 					case ModelInstance::RIGID:
 						renderRigidMesh(model_instance, mesh);
 						break;

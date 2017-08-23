@@ -143,6 +143,10 @@ namespace Lumix
 
 	static void registerProperties(IAllocator& allocator)
 	{
+		PropertyRegister::add("cloth",
+			LUMIX_NEW(allocator, DecimalPropertyDescriptor<PhysicsScene>)(
+				"Dampening Coef", &PhysicsScene::getClothDampeningCoef, &PhysicsScene::setClothDampeningCoef, 0.0f, 1.0f, 0.1f));
+
 		PropertyRegister::add("ragdoll",
 			LUMIX_NEW(allocator, BlobPropertyDescriptor<PhysicsScene>)(
 				"data", &PhysicsScene::getRagdollData, &PhysicsScene::setRagdollData));
