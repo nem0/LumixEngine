@@ -146,6 +146,16 @@ namespace Lumix
 		PropertyRegister::add("cloth",
 			LUMIX_NEW(allocator, DecimalPropertyDescriptor<PhysicsScene>)(
 				"Dampening Coef", &PhysicsScene::getClothDampeningCoef, &PhysicsScene::setClothDampeningCoef, 0.0f, 1.0f, 0.1f));
+		auto cloth_spheres = LUMIX_NEW(allocator, ArrayDescriptor<PhysicsScene>)("Spheres",
+			&PhysicsScene::getClothSphereCount,
+			&PhysicsScene::addClothSphere,
+			&PhysicsScene::removeClothSphere,
+			allocator);
+		cloth_spheres->addChild(LUMIX_NEW(allocator, EntityPropertyDescriptor<PhysicsScene>)(
+			"Entity", &PhysicsScene::getClothSphereEntity, &PhysicsScene::setClothSphereEntity));
+		cloth_spheres->addChild(LUMIX_NEW(allocator, DecimalPropertyDescriptor<PhysicsScene>)(
+			"Radius", &PhysicsScene::getClothSphereRadius, &PhysicsScene::setClothSphereRadius, 0.0f, FLT_MAX, 0.0f));
+		PropertyRegister::add("cloth", cloth_spheres);
 
 		PropertyRegister::add("ragdoll",
 			LUMIX_NEW(allocator, BlobPropertyDescriptor<PhysicsScene>)(

@@ -214,6 +214,13 @@ public:
 
 	virtual void setClothDampeningCoef(ComponentHandle cmp, float coef) = 0;
 	virtual float getClothDampeningCoef(ComponentHandle cmp) = 0;
+	virtual void addClothSphere(ComponentHandle cmp, int index) = 0;
+	virtual int getClothSphereCount(ComponentHandle cmp) = 0;
+	virtual void removeClothSphere(ComponentHandle cmp, int index) = 0;
+	virtual void setClothSphereEntity(ComponentHandle cmp, int index, Entity entity) = 0;
+	virtual Entity getClothSphereEntity(ComponentHandle cmp, int index) = 0;
+	virtual void setClothSphereRadius(ComponentHandle cmp, int index, float radius) = 0;
+	virtual float getClothSphereRadius(ComponentHandle cmp, int index) = 0;
 
 	virtual const char* getCollisionLayerName(int index) = 0;
 	virtual void setCollisionLayerName(int index, const char* name) = 0;

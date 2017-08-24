@@ -90,9 +90,17 @@ struct Ragdoll
 
 struct Cloth
 {
+	struct Sphere
+	{
+		Entity entity;
+		float radius;
+	};
+
 	Entity entity = INVALID_ENTITY;
 	PxCloth* physx_cloth = nullptr;
 	float dampening_coef = 0.1f;
+	Sphere spheres[8];
+	int spheres_count = 0;
 };
 
 
@@ -2232,6 +2240,20 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		{
 			if (!cloth.physx_cloth) continue;
 
+			Matrix mtx = m_universe.getMatrix(cloth.entity);
+			mtx.fastInverse();
+
+			PxClothCollisionSphere px_spheres[8];
+			for (int i = 0; i < cloth.spheres_count; ++i)
+			{
+				Cloth::Sphere& sphere = cloth.spheres[i];
+				if (!sphere.entity.isValid()) continue;
+
+				px_spheres[i].pos = toPhysx(mtx.transform(m_universe.getPosition(sphere.entity)));
+				px_spheres[i].radius = sphere.radius;
+			}
+			cloth.physx_cloth->setCollisionSpheres(px_spheres, cloth.spheres_count);
+
 			ComponentHandle model_instance = render_scene->getModelInstanceComponent(cloth.entity);
 			if (!model_instance.isValid()) continue;
 
@@ -2405,9 +2427,84 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 		px_cloth->setDampingCoefficient(physx::PxVec3(cloth.dampening_coef));
 
+		for (int i = 0; i < cloth.spheres_count; ++i)
+		{
+			Cloth::Sphere& sphere = cloth.spheres[i];
+			if (!sphere.entity.isValid()) continue;
+			PxClothCollisionSphere px_sphere;
+			px_sphere.pos = toPhysx(m_universe.getPosition(sphere.entity));
+			px_sphere.radius = sphere.radius;
+			px_cloth->addCollisionSphere(px_sphere);
+		}
+
 		m_scene->addActor(*px_cloth);
 		cloth.physx_cloth = px_cloth;
 	}
+
+
+	void setClothSphereEntity(ComponentHandle cmp, int index, Entity entity) override
+	{
+		m_cloths[{cmp.index}].spheres[index].entity = entity;
+	}
+
+
+	Entity getClothSphereEntity(ComponentHandle cmp, int index) override
+	{
+		return m_cloths[{cmp.index}].spheres[index].entity;
+	}
+
+
+	void setClothSphereRadius(ComponentHandle cmp, int index, float radius) override
+	{
+		m_cloths[{cmp.index}].spheres[index].radius = radius;
+	}
+
+
+	float getClothSphereRadius(ComponentHandle cmp, int index) override
+	{
+		return m_cloths[{cmp.index}].spheres[index].radius;
+	}
+
+
+	void addClothSphere(ComponentHandle cmp, int index) override
+	{
+		Cloth& cloth = m_cloths[{cmp.index}];
+		if(index < 0) index = cloth.spheres_count;
+		const int MAX_SPHERES_COUNT = lengthOf(cloth.spheres);
+		if (cloth.spheres_count == MAX_SPHERES_COUNT || index >= MAX_SPHERES_COUNT)
+		{
+			g_log_error.log("Physics") << "Too many collision spheres. Entity " << cloth.entity.index;
+			return;
+		}
+		int spheres_to_move = cloth.spheres_count - index;
+		if (spheres_to_move > 0)
+		{
+			moveMemory(&cloth.spheres[index + 1], &cloth.spheres[index], spheres_to_move * sizeof(Cloth::Sphere));
+		}
+
+		cloth.spheres[index].entity = INVALID_ENTITY;
+		cloth.spheres[index].radius = 0;
+		++cloth.spheres_count;
+	}
+
+
+	int getClothSphereCount(ComponentHandle cmp) override
+	{
+		return m_cloths[{cmp.index}].spheres_count;
+	}
+
+
+	void removeClothSphere(ComponentHandle cmp, int index) override
+	{
+		Cloth& cloth = m_cloths[{cmp.index}];
+		int spheres_to_move = cloth.spheres_count - index - 1;
+		if (spheres_to_move > 0)
+		{
+			moveMemory(&cloth.spheres[index], &cloth.spheres[index + 1], spheres_to_move * sizeof(Cloth::Sphere));
+		}
+		--cloth.spheres_count;
+	}
+
 
 
 	void setClothDampeningCoef(ComponentHandle cmp, float coef) override
@@ -3499,6 +3596,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	{
 		Cloth& cloth = m_cloths.insert(entity);
 		cloth.entity = entity;
+		m_universe.addComponent(entity, CLOTH_TYPE, this, {entity.index});
 	}
 
 
