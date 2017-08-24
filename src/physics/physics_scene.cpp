@@ -2244,15 +2244,17 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			mtx.fastInverse();
 
 			PxClothCollisionSphere px_spheres[8];
+			int valid_count = 0;
 			for (int i = 0; i < cloth.spheres_count; ++i)
 			{
 				Cloth::Sphere& sphere = cloth.spheres[i];
 				if (!sphere.entity.isValid()) continue;
 
-				px_spheres[i].pos = toPhysx(mtx.transform(m_universe.getPosition(sphere.entity)));
-				px_spheres[i].radius = sphere.radius;
+				px_spheres[valid_count].pos = toPhysx(mtx.transform(m_universe.getPosition(sphere.entity)));
+				px_spheres[valid_count].radius = sphere.radius;
+				++valid_count;
 			}
-			cloth.physx_cloth->setCollisionSpheres(px_spheres, cloth.spheres_count);
+			cloth.physx_cloth->setCollisionSpheres(px_spheres, valid_count);
 
 			ComponentHandle model_instance = render_scene->getModelInstanceComponent(cloth.entity);
 			if (!model_instance.isValid()) continue;
