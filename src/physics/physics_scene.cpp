@@ -2141,7 +2141,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	void setSkeletonPose(const RigidTransform& root_transform, RagdollBone* bone, Pose* pose)
+	void setSkeletonPose(const RigidTransform& root_transform, RagdollBone* bone, const Pose* pose)
 	{
 		if (!bone) return;
 		
@@ -2185,7 +2185,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			ComponentHandle model_instance = render_scene->getModelInstanceComponent(ragdoll.entity);
 			if (!model_instance.isValid()) continue;
 
-			Pose* pose = render_scene->getPose(model_instance);
+			Pose* pose = render_scene->lockPose(model_instance);
 			if (!pose) continue;
 
 			RigidTransform root_transform;
@@ -2203,6 +2203,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 				m_is_updating_ragdoll = false;
 			}
 			updateBone(root_transform, root_transform.inverted(), ragdoll.root, pose);
+			render_scene->unlockPose(model_instance, true);
 		}
 	}
 
@@ -2431,9 +2432,10 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			if (!render_scene) return;
 			ComponentHandle model_instance = render_scene->getModelInstanceComponent(entity);
 			if (!model_instance.isValid()) return;
-			Pose* pose = render_scene->getPose(model_instance);
+			const Pose* pose = render_scene->lockPose(model_instance);
 			if (!pose) return;
 			setSkeletonPose(m_universe.getTransform(entity).getRigidPart(), m_ragdolls.at(ragdoll_idx).root, pose);
+			render_scene->unlockPose(model_instance, false);
 		}
 
 		int idx = m_actors.find(entity);
