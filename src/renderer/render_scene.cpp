@@ -608,6 +608,20 @@ public:
 	}
 
 
+	void lateUpdate(float dt, bool paused) override
+	{
+		PROFILE_FUNCTION();
+		if (!m_is_game_running) return;
+
+		m_is_updating_attachments = true;
+		for (auto& bone_attachment : m_bone_attachments)
+		{
+			updateBoneAttachment(bone_attachment);
+		}
+		m_is_updating_attachments = false;
+	}
+
+
 	void update(float dt, bool paused) override
 	{
 		PROFILE_FUNCTION();
