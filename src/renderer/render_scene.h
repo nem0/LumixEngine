@@ -60,7 +60,8 @@ struct ModelInstance
 	enum Flags : u8
 	{
 		CUSTOM_MESHES = 1 << 0,
-		KEEP_SKIN = 1 << 1
+		KEEP_SKIN = 1 << 1,
+		IS_BONE_ATTACHMENT_PARENT = 1 << 2
 	};
 
 	enum Type
@@ -148,7 +149,8 @@ public:
 	virtual Engine& getEngine() const = 0;
 	virtual IAllocator& getAllocator() = 0;
 
-	virtual Pose* getPose(ComponentHandle cmp) = 0;
+	virtual Pose* lockPose(ComponentHandle cmp) = 0;
+	virtual void unlockPose(ComponentHandle cmp, bool changed) = 0;
 	virtual ComponentHandle getActiveGlobalLight() = 0;
 	virtual void setActiveGlobalLight(ComponentHandle cmp) = 0;
 	virtual Vec4 getShadowmapCascades(ComponentHandle cmp) = 0;

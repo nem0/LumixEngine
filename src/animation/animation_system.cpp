@@ -631,11 +631,11 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		ComponentHandle model_instance = m_render_scene->getModelInstanceComponent(animable.entity);
 		if (model_instance == INVALID_COMPONENT) return;
 
-		auto* pose = m_render_scene->getPose(model_instance);
-		auto* model = m_render_scene->getModelInstanceModel(model_instance);
-
-		if (!pose) return;
+		Model* model = m_render_scene->getModelInstanceModel(model_instance);
 		if (!model->isReady()) return;
+
+		Pose* pose = m_render_scene->lockPose(model_instance);
+		if (!pose) return;
 
 		model->getPose(*pose);
 		pose->computeRelative(*model);
@@ -644,11 +644,10 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 
 		float t = animable.time + time_delta * animable.time_scale;
 		float l = animable.animation->getLength();
-		while (t > l)
-		{
-			t -= l;
-		}
+		while (t > l) t -= l;
 		animable.time = t;
+
+		m_render_scene->unlockPose(model_instance, true);
 	}
 
 
@@ -803,7 +802,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		ComponentHandle model_instance = m_render_scene->getModelInstanceComponent(controller.entity);
 		if (model_instance == INVALID_COMPONENT) return;
 
-		Pose* pose = m_render_scene->getPose(model_instance);
+		Pose* pose = m_render_scene->lockPose(model_instance);
 		if (!pose) return;
 
 		Model* model = m_render_scene->getModelInstanceModel(model_instance);
@@ -814,7 +813,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		parent_controller.root->fillPose(m_anim_system.m_engine, *pose, *model, 1);
 
 		pose->computeAbsolute(*model);
-
+		m_render_scene->unlockPose(model_instance, true);
 	}
 
 
@@ -842,7 +841,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		ComponentHandle model_instance = m_render_scene->getModelInstanceComponent(controller.entity);
 		if (model_instance == INVALID_COMPONENT) return;
 
-		Pose* pose = m_render_scene->getPose(model_instance);
+		Pose* pose = m_render_scene->lockPose(model_instance);
 		if (!pose) return;
 
 		Model* model = m_render_scene->getModelInstanceModel(model_instance);
@@ -860,6 +859,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 
 			updateIK(ik, *pose, *model, controller.entity);
 		}
+		m_render_scene->unlockPose(model_instance, true);
 	}
 
 

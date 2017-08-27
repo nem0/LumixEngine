@@ -173,8 +173,8 @@ struct PropertyGridPlugin : PropertyGrid::IPlugin
 			ComponentHandle renderable = render_scene->getComponent(cmp.entity, RENDERABLE_TYPE);
 			if (renderable.isValid())
 			{
-				auto* pose = render_scene->getPose(renderable);
-				auto* model = render_scene->getModelInstanceModel(renderable);
+				const Pose* pose = render_scene->lockPose(renderable);
+				Model* model = render_scene->getModelInstanceModel(renderable);
 				if (pose && model)
 				{
 					ImGui::Columns(3);
@@ -189,6 +189,7 @@ struct PropertyGridPlugin : PropertyGrid::IPlugin
 					}
 					ImGui::Columns();
 				}
+				if (pose) render_scene->unlockPose(renderable, false);
 			}
 		}
 	}

@@ -1602,17 +1602,23 @@ struct FurPainter LUMIX_FINAL : public WorldEditor::Plugin
 		Texture* texture = model->getMesh(0).material->getTexture(0);
 		if (!texture || texture->data.empty()) return;
 
-		Pose* pose = scene->getPose(model_instance.handle);
+		const Pose* pose = scene->lockPose(model_instance.handle);
+		if (!pose) return;
 
 		Vec3 origin, dir;
 		scene->getRay(editor.getEditCamera().handle, (float)x, (float)y, origin, dir);
 		RayCastModelHit hit = model->castRay(origin, dir, universe->getMatrix(entities[0]), pose);
-		if (!hit.m_is_hit) return;
+		if (!hit.m_is_hit)
+		{
+			scene->unlockPose(model_instance.handle, false);
+			return;
+		}
 
 		Vec3 hit_pos = hit.m_origin + hit.m_t * hit.m_dir;
 		hit_pos = universe->getTransform(entities[0]).inverted().transform(hit_pos);
 
 		paint(texture, model, hit_pos);
+		scene->unlockPose(model_instance.handle, false);
 	}
 
 
@@ -1747,15 +1753,21 @@ struct FurPainterPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		Texture* texture = model->getMesh(0).material->getTexture(0);
 		if (!texture || texture->data.empty()) return;
 
-		const Pose* pose = scene->getPose(model_instance.handle);
+		const Pose* pose = scene->lockPose(model_instance.handle);
+		if (!pose) return;
 
 		Vec3 origin, dir;
 		scene->getRay(editor.getEditCamera().handle, editor.getMouseX(), editor.getMouseY(), origin, dir);
 		RayCastModelHit hit = model->castRay(origin, dir, editor.getUniverse()->getMatrix(entities[0]), pose);
-		if (!hit.m_is_hit) return;
+		if (!hit.m_is_hit)
+		{
+			scene->unlockPose(model_instance.handle, false);
+			return;
+		}
 
 		Vec3 hit_pos = hit.m_origin + hit.m_t * hit.m_dir;
 		scene->addDebugSphere(hit_pos, fur_painter->brush_radius, 0xffffFFFF, 0);
+		scene->unlockPose(model_instance.handle, false);
 	}
 
 

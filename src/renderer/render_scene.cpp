@@ -463,40 +463,34 @@ public:
 	}
 
 
-	int getBoneAttachmentIdx(ComponentHandle cmp) const
-	{
-		for (int i = 0; i < m_bone_attachments.size(); ++i)
-		{
-			if (m_bone_attachments[i].entity.index == cmp.index) return i;
-		}
-		return -1;
-	}
-
-
 	void updateBoneAttachment(const BoneAttachment& bone_attachment)
 	{
 		if (!bone_attachment.parent_entity.isValid()) return;
 		ComponentHandle model_instance = getModelInstanceComponent(bone_attachment.parent_entity);
 		if (model_instance == INVALID_COMPONENT) return;
-		auto* parent_pose = getPose(model_instance);
+		const Pose* parent_pose = lockPose(model_instance);
 		if (!parent_pose) return;
 
 		Transform parent_entity_transform = m_universe.getTransform(bone_attachment.parent_entity);
 		int idx = bone_attachment.bone_index;
-		if (idx < 0 || idx > parent_pose->count) return;
+		if (idx < 0 || idx > parent_pose->count)
+		{
+			unlockPose(model_instance, false);
+			return;
+		}
 		float original_scale = m_universe.getScale(bone_attachment.entity);
 		Transform bone_transform = {parent_pose->positions[idx], parent_pose->rotations[idx], 1.0f};
 		Transform relative_transform = { bone_attachment.relative_transform.pos, bone_attachment.relative_transform.rot, 1.0f};
 		Transform result = parent_entity_transform * bone_transform * relative_transform;
 		result.scale = original_scale;
 		m_universe.setTransform(bone_attachment.entity, result);
+		unlockPose(model_instance, false);
 	}
 
 
 	Entity getBoneAttachmentParent(ComponentHandle cmp) override
 	{
-		int idx = getBoneAttachmentIdx(cmp);
-		return m_bone_attachments[idx].parent_entity;
+		return m_bone_attachments[{cmp.index}].parent_entity;
 	}
 
 
@@ -506,10 +500,14 @@ public:
 		if (attachment.bone_index < 0) return;
 		ComponentHandle model_instance = getModelInstanceComponent(attachment.parent_entity);
 		if (model_instance == INVALID_COMPONENT) return;
-		Pose* pose = getPose(model_instance);
+		const Pose* pose = lockPose(model_instance);
 		if (!pose) return;
 		ASSERT(pose->is_absolute);
-		if (attachment.bone_index >= pose->count) return;
+		if (attachment.bone_index >= pose->count)
+		{
+			unlockPose(model_instance, false);
+			return;
+		}
 		Transform bone_transform = {pose->positions[attachment.bone_index], pose->rotations[attachment.bone_index], 1.0f};
 
 		Transform inv_parent_transform = m_universe.getTransform(attachment.parent_entity) * bone_transform;
@@ -517,22 +515,19 @@ public:
 		Transform child_transform = m_universe.getTransform(attachment.entity);
 		Transform res = inv_parent_transform * child_transform;
 		attachment.relative_transform = {res.pos, res.rot};
+		unlockPose(model_instance, false);
 	}
 
 
 	Vec3 getBoneAttachmentPosition(ComponentHandle cmp) override
 	{
-		int idx = getBoneAttachmentIdx(cmp);
-		if (idx < 0) return {0, 0, 0};
-		return m_bone_attachments[idx].relative_transform.pos;
+		return m_bone_attachments[{cmp.index}].relative_transform.pos;
 	}
 
 
 	void setBoneAttachmentPosition(ComponentHandle cmp, const Vec3& pos) override
 	{
-		int idx = getBoneAttachmentIdx(cmp);
-		if (idx < 0) return;
-		BoneAttachment& attachment = m_bone_attachments[idx];
+		BoneAttachment& attachment = m_bone_attachments[{cmp.index}];
 		attachment.relative_transform.pos = pos;
 		m_is_updating_attachments = true;
 		updateBoneAttachment(attachment);
@@ -542,17 +537,13 @@ public:
 
 	Vec3 getBoneAttachmentRotation(ComponentHandle cmp) override
 	{
-		int idx = getBoneAttachmentIdx(cmp);
-		if (idx < 0) return {0, 0, 0};
-		return m_bone_attachments[idx].relative_transform.rot.toEuler();
+		return m_bone_attachments[{cmp.index}].relative_transform.rot.toEuler();
 	}
 
 
 	void setBoneAttachmentRotation(ComponentHandle cmp, const Vec3& rot) override
 	{
-		int idx = getBoneAttachmentIdx(cmp);
-		if (idx < 0) return;
-		BoneAttachment& attachment = m_bone_attachments[idx];
+		BoneAttachment& attachment = m_bone_attachments[{cmp.index}];
 		Vec3 euler = rot;
 		euler.x = Math::clamp(euler.x, -Math::PI * 0.5f, Math::PI * 0.5f);
 		attachment.relative_transform.rot.fromEuler(euler);
@@ -564,9 +555,7 @@ public:
 
 	void setBoneAttachmentRotation(ComponentHandle cmp, const Quat& rot) override
 	{
-		int idx = getBoneAttachmentIdx(cmp);
-		if (idx < 0) return;
-		BoneAttachment& attachment = m_bone_attachments[idx];
+		BoneAttachment& attachment = m_bone_attachments[{cmp.index}];
 		attachment.relative_transform.rot = rot;
 		m_is_updating_attachments = true;
 		updateBoneAttachment(attachment);
@@ -576,26 +565,28 @@ public:
 
 	int getBoneAttachmentBone(ComponentHandle cmp) override
 	{
-		int idx = getBoneAttachmentIdx(cmp);
-		if (idx < 0) return -1;
-		return m_bone_attachments[idx].bone_index;
+		return m_bone_attachments[{cmp.index}].bone_index;
 	}
 
 
 	void setBoneAttachmentBone(ComponentHandle cmp, int value) override
 	{
-		int idx = getBoneAttachmentIdx(cmp);
-		if (idx < 0) return;
-		m_bone_attachments[idx].bone_index = value;
-		updateRelativeMatrix(m_bone_attachments[idx]);
+		BoneAttachment& ba = m_bone_attachments[{cmp.index}];
+		ba.bone_index = value;
+		updateRelativeMatrix(ba);
 	}
 
 
 	void setBoneAttachmentParent(ComponentHandle cmp, Entity entity) override
 	{
-		int idx = getBoneAttachmentIdx(cmp);
-		m_bone_attachments[idx].parent_entity = entity;
-		updateRelativeMatrix(m_bone_attachments[idx]);
+		BoneAttachment& ba = m_bone_attachments[{cmp.index}];
+		ba.parent_entity = entity;
+		if (entity.isValid() && entity.index < m_model_instances.size())
+		{
+			ModelInstance& mi = m_model_instances[entity.index];
+			mi.flags = mi.flags | ModelInstance::IS_BONE_ATTACHMENT_PARENT;
+		}
+		updateRelativeMatrix(ba);
 	}
 
 	void startGame() override
@@ -610,32 +601,9 @@ public:
 	}
 
 
-	void lateUpdate(float dt, bool paused) override
-	{
-		PROFILE_FUNCTION();
-		if (!m_is_game_running) return;
-
-		m_is_updating_attachments = true;
-		for (auto& bone_attachment : m_bone_attachments)
-		{
-			updateBoneAttachment(bone_attachment);
-		}
-		m_is_updating_attachments = false;
-	}
-
-
 	void update(float dt, bool paused) override
 	{
 		PROFILE_FUNCTION();
-		if (m_is_game_running)
-		{
-			m_is_updating_attachments = true;
-			for (auto& bone_attachment : m_bone_attachments)
-			{
-				updateBoneAttachment(bone_attachment);
-			}
-			m_is_updating_attachments = false;
-		}
 
 		m_time += dt;
 		for (int i = m_debug_triangles.size() - 1; i >= 0; --i)
@@ -907,8 +875,7 @@ public:
 
 	void serializeBoneAttachment(ISerializer& serializer, ComponentHandle cmp) 
 	{
-		int idx = getBoneAttachmentIdx(cmp);
-		BoneAttachment& attachment = m_bone_attachments[idx];
+		BoneAttachment& attachment = m_bone_attachments[{cmp.index}];
 		serializer.write("bone_index", attachment.bone_index);
 		serializer.write("parent", attachment.parent_entity);
 		serializer.write("relative_transform", attachment.relative_transform);
@@ -917,13 +884,19 @@ public:
 
 	void deserializeBoneAttachment(IDeserializer& serializer, Entity entity, int /*scene_version*/)
 	{
-		BoneAttachment& bone_attachment = m_bone_attachments.emplace();
+		BoneAttachment& bone_attachment = m_bone_attachments.emplace(entity);
 		bone_attachment.entity = entity;
 		serializer.read(&bone_attachment.bone_index);
 		serializer.read(&bone_attachment.parent_entity);
 		serializer.read(&bone_attachment.relative_transform);
 		ComponentHandle cmp = {bone_attachment.entity.index};
 		m_universe.addComponent(bone_attachment.entity, BONE_ATTACHMENT_TYPE, this, cmp);
+		Entity parent_entity = bone_attachment.parent_entity;
+		if (parent_entity.isValid() && parent_entity.index < m_model_instances.size())
+		{
+			ModelInstance& mi = m_model_instances[parent_entity.index];
+			mi.flags = mi.flags | ModelInstance::IS_BONE_ATTACHMENT_PARENT;
+		}
 	}
 
 
@@ -1429,14 +1402,16 @@ public:
 	{
 		i32 count;
 		serializer.read(count);
-		m_bone_attachments.resize(count);
+		m_bone_attachments.clear();
+		m_bone_attachments.reserve(count);
 		for (int i = 0; i < count; ++i)
 		{
-			auto& bone_attachment = m_bone_attachments[i];
+			BoneAttachment bone_attachment;
 			serializer.read(bone_attachment.bone_index);
 			serializer.read(bone_attachment.entity);
 			serializer.read(bone_attachment.parent_entity);
 			serializer.read(bone_attachment.relative_transform);
+			m_bone_attachments.insert(bone_attachment.entity, bone_attachment);
 			ComponentHandle cmp = {bone_attachment.entity.index};
 			m_universe.addComponent(bone_attachment.entity, BONE_ATTACHMENT_TYPE, this, cmp);
 		}
@@ -1658,9 +1633,15 @@ public:
 
 	void destroyBoneAttachment(ComponentHandle component)
 	{
-		int idx = getBoneAttachmentIdx(component);
-		Entity entity = m_bone_attachments[idx].entity;
-		m_bone_attachments.eraseFast(idx);
+		Entity entity = {component.index};
+		const BoneAttachment& bone_attachment = m_bone_attachments[entity];
+		Entity parent_entity = bone_attachment.parent_entity;
+		if (parent_entity.isValid() && parent_entity.index < m_model_instances.size())
+		{
+			ModelInstance& mi = m_model_instances[bone_attachment.parent_entity.index];
+			mi.flags = mi.flags & ~ModelInstance::IS_BONE_ATTACHMENT_PARENT;
+		}
+		m_bone_attachments.erase(entity);
 		m_universe.destroyComponent(entity, BONE_ATTACHMENT_TYPE, this, component);
 	}
 
@@ -2650,7 +2631,25 @@ public:
 	float getTerrainYScale(ComponentHandle cmp) override { return m_terrains[{cmp.index}]->getYScale(); }
 
 
-	Pose* getPose(ComponentHandle cmp) override { return m_model_instances[cmp.index].pose; }
+	Pose* lockPose(ComponentHandle cmp) override { return m_model_instances[cmp.index].pose; }
+	void unlockPose(ComponentHandle cmp, bool changed) override
+	{
+		if (!changed) return;
+		if (cmp.index < m_model_instances.size()
+			&& (m_model_instances[cmp.index].flags & ModelInstance::IS_BONE_ATTACHMENT_PARENT) == 0)
+		{
+			return;
+		}
+
+		Entity parent = {cmp.index};
+		for (BoneAttachment& ba : m_bone_attachments)
+		{
+			if (ba.parent_entity != parent) continue;
+			m_is_updating_attachments = true;
+			updateBoneAttachment(ba);
+			m_is_updating_attachments = false;
+		}
+	}
 
 
 	Entity getModelInstanceEntity(ComponentHandle cmp) override { return m_model_instances[cmp.index].entity; }
@@ -4451,6 +4450,11 @@ public:
 			r.mesh_count = r.model->getMeshCount();
 		}
 
+		if ((r.flags & ModelInstance::IS_BONE_ATTACHMENT_PARENT) != 0)
+		{
+			updateBoneAttachment(m_bone_attachments[r.entity]);
+		}
+
 		for (int i = 0; i < m_point_lights.size(); ++i)
 		{
 			PointLight& light = m_point_lights[i];
@@ -4897,7 +4901,7 @@ public:
 
 	ComponentHandle createBoneAttachment(Entity entity)
 	{
-		BoneAttachment& attachment = m_bone_attachments.emplace();
+		BoneAttachment& attachment = m_bone_attachments.emplace(entity);
 		attachment.entity = entity;
 		attachment.parent_entity = INVALID_ENTITY;
 		attachment.bone_index = -1;
@@ -4973,7 +4977,7 @@ private:
 	HashMap<Entity, GlobalLight> m_global_lights;
 	Array<PointLight> m_point_lights;
 	HashMap<Entity, Camera> m_cameras;
-	Array<BoneAttachment> m_bone_attachments;
+	AssociativeArray<Entity, BoneAttachment> m_bone_attachments;
 	AssociativeArray<Entity, EnvironmentProbe> m_environment_probes;
 	HashMap<Entity, Terrain*> m_terrains;
 	AssociativeArray<Entity, ParticleEmitter*> m_particle_emitters;
