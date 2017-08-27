@@ -484,10 +484,12 @@ public:
 		Transform parent_entity_transform = m_universe.getTransform(bone_attachment.parent_entity);
 		int idx = bone_attachment.bone_index;
 		if (idx < 0 || idx > parent_pose->count) return;
+		float original_scale = m_universe.getScale(bone_attachment.entity);
 		Transform bone_transform = {parent_pose->positions[idx], parent_pose->rotations[idx], 1.0f};
 		Transform relative_transform = { bone_attachment.relative_transform.pos, bone_attachment.relative_transform.rot, 1.0f};
-		m_universe.setTransform(
-			bone_attachment.entity, parent_entity_transform * bone_transform * relative_transform);
+		Transform result = parent_entity_transform * bone_transform * relative_transform;
+		result.scale = original_scale;
+		m_universe.setTransform(bone_attachment.entity, result);
 	}
 
 
