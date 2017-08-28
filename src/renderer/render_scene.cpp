@@ -1414,6 +1414,12 @@ public:
 			m_bone_attachments.insert(bone_attachment.entity, bone_attachment);
 			ComponentHandle cmp = {bone_attachment.entity.index};
 			m_universe.addComponent(bone_attachment.entity, BONE_ATTACHMENT_TYPE, this, cmp);
+			Entity parent_entity = bone_attachment.parent_entity;
+			if (parent_entity.isValid() && parent_entity.index < m_model_instances.size())
+			{
+				ModelInstance& mi = m_model_instances[parent_entity.index];
+				mi.flags = mi.flags | ModelInstance::IS_BONE_ATTACHMENT_PARENT;
+			}
 		}
 	}
 
