@@ -665,7 +665,7 @@ public:
 		ASSERT(r.entity != INVALID_ENTITY);
 
 		serialize.write("source", r.model ? r.model->getPath().c_str() : "");
-		serialize.write("flags", r.flags);
+		serialize.write("flags", u8(r.flags & ModelInstance::PERSISTENT_FLAGS));
 		bool has_changed_materials = r.model && r.model->isReady() && r.meshes != &r.model->getMesh(0);
 		serialize.write("custom_materials", has_changed_materials ? r.mesh_count : 0);
 		if (has_changed_materials)
@@ -716,6 +716,7 @@ public:
 		if (scene_version > (int)RenderSceneVersion::MODEL_INSTNACE_FLAGS)
 		{
 			serializer.read(&r.flags);
+			r.flags &= ModelInstance::PERSISTENT_FLAGS;
 		}
 
 		ComponentHandle cmp = {r.entity.index};
@@ -725,12 +726,10 @@ public:
 			setModel(cmp, model);
 		}
 
-
 		int material_count;
 		serializer.read(&material_count);
 		if (material_count > 0)
 		{
-			ASSERT(r.flags & (u8)ModelInstance::CUSTOM_MESHES);
 			allocateCustomMeshes(r, material_count);
 			for (int j = 0; j < material_count; ++j)
 			{
@@ -1291,7 +1290,7 @@ public:
 		for (auto& r : m_model_instances)
 		{
 			serializer.write(r.entity);
-			serializer.write(r.flags);
+			serializer.write(u8(r.flags & ModelInstance::PERSISTENT_FLAGS));
 			if(r.entity != INVALID_ENTITY)
 			{
 				serializer.write(r.model ? r.model->getPath().getHash() : 0);
@@ -1539,10 +1538,10 @@ public:
 			auto& r = m_model_instances.emplace();
 			serializer.read(r.entity);
 			serializer.read(r.flags);
+			r.flags &= ModelInstance::PERSISTENT_FLAGS;
 			ASSERT(r.entity.index == i || !r.entity.isValid());
 			r.model = nullptr;
 			r.pose = nullptr;
-			r.flags = 0;
 			r.meshes = nullptr;
 			r.mesh_count = 0;
 
