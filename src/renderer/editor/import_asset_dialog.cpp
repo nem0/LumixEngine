@@ -986,6 +986,18 @@ struct FBXImporter
 	}
 
 
+	static int getDepth(const ofbx::Object* bone)
+	{
+		int depth = 0;
+		while (bone)
+		{
+			++depth;
+			bone = bone->getParent();
+		}
+		return depth;
+	}
+
+
 	void writeAnimations(const char* output_dir)
 	{
 		for (int anim_idx = 0; anim_idx < animations.size(); ++anim_idx)
@@ -1069,8 +1081,9 @@ struct FBXImporter
 				write(name_hash);
 				int frames = int((duration / sampling_period) + 0.5f);
 
+				int depth = getDepth(bone);
 				float parent_scale = bone->getParent() ? (float)getScaleX(bone->getParent()->getGlobalTransform()) : 1;
-				compressPositions(positions, frames, sampling_period, translation_node, *bone, position_error, parent_scale);
+				compressPositions(positions, frames, sampling_period, translation_node, *bone, position_error / depth, parent_scale);
 				write(positions.size());
 
 				for (TranslationKey& key : positions) write(key.frame);
@@ -1086,7 +1099,7 @@ struct FBXImporter
 					}
 				}
 
-				compressRotations(rotations, frames, sampling_period, rotation_node, *bone, rotation_error);
+				compressRotations(rotations, frames, sampling_period, rotation_node, *bone, rotation_error / depth);
 
 				write(rotations.size());
 				for (RotationKey& key : rotations) write(key.frame);
