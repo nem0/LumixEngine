@@ -3229,8 +3229,8 @@ public:
 
 	void setMouseSensitivity(float x, float y) override
 	{
-		m_mouse_sensitivity.x = x;
-		m_mouse_sensitivity.y = y;
+		m_mouse_sensitivity.x = 10000 / x;
+		m_mouse_sensitivity.y = 10000 / y;
 	}
 
 
