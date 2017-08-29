@@ -822,7 +822,9 @@ struct FBXImporter
 		{
 			if (!material.import) continue;
 
-			StaticString<MAX_PATH_LENGTH> path(output_dir, material.fbx->name, ".mat");
+			char mat_name[128];
+			getMaterialName(material.fbx, mat_name);
+			StaticString<MAX_PATH_LENGTH> path(output_dir, mat_name, ".mat");
 			IAllocator& allocator = app.getWorldEditor()->getAllocator();
 			if (!out_file.open(path, FS::Mode::CREATE_AND_WRITE, allocator))
 			{
@@ -1426,6 +1428,22 @@ struct FBXImporter
 	}
 
 
+	static void getMaterialName(const ofbx::Material* material, char (&out)[128])
+	{
+		copyString(out, material ? material->name : "default");
+		char* iter = out;
+		while (*iter)
+		{
+			char c = *iter;
+			if (!(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9'))
+			{
+				*iter = '_';
+			}
+			++iter;
+		}
+	}
+
+
 	void writeMeshes(const char* mesh_output_filename)
 	{
 		i32 mesh_count = 0;
@@ -1443,7 +1461,8 @@ struct FBXImporter
 
 			const ofbx::Mesh& mesh = *import_mesh.fbx;
 			const ofbx::Material* material = import_mesh.fbx_mat;
-			const char* mat = material ? material->name : "default";
+			char mat[128];
+			getMaterialName(material, mat);
 			i32 mat_len = (i32)strlen(mat);
 			write(mat_len);
 			write(mat, strlen(mat));
