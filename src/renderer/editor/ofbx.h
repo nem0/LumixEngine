@@ -49,12 +49,16 @@ struct DataView
 {
 	const u8* begin = nullptr;
 	const u8* end = nullptr;
+	bool is_binary = true;
 
 	bool operator!=(const char* rhs) const { return !(*this == rhs); }
 	bool operator==(const char* rhs) const;
 
 	u64 toLong() const;
+	int toInt() const;
+	u32 toU32() const;
 	double toDouble() const;
+	float toFloat() const;
 	
 	template <int N>
 	void toString(char(&out)[N]) const

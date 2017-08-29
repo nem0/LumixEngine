@@ -2,6 +2,7 @@
 #include "miniz.h"
 #include <cassert>
 #include <cmath>
+#include <ctype.h>
 #include <memory>
 #include <unordered_map>
 #include <vector>
@@ -219,15 +220,56 @@ template <int SIZE> static bool copyString(char (&destination)[SIZE], const char
 
 u64 DataView::toLong() const
 {
-	assert(end - begin == sizeof(u64));
-	return *(u64*)begin;
+	if (is_binary)
+	{
+		assert(end - begin == sizeof(u64));
+		return *(u64*)begin;
+	}
+	return atol((const char*)begin);
+}
+
+
+int DataView::toInt() const
+{
+	if (is_binary)
+	{
+		assert(end - begin == sizeof(int));
+		return *(int*)begin;
+	}
+	return atoi((const char*)begin);
+}
+
+
+u32 DataView::toU32() const
+{
+	if (is_binary)
+	{
+		assert(end - begin == sizeof(u32));
+		return *(u32*)begin;
+	}
+	return (u32)atoll((const char*)begin);
 }
 
 
 double DataView::toDouble() const
 {
-	assert(end - begin == sizeof(double));
-	return *(double*)begin;
+	if (is_binary)
+	{
+		assert(end - begin == sizeof(double));
+		return *(double*)begin;
+	}
+	return atof((const char*)begin);
+}
+
+
+float DataView::toFloat() const
+{
+	if (is_binary)
+	{
+		assert(end - begin == sizeof(float));
+		return *(float*)begin;
+	}
+	return (float)atof((const char*)begin);
 }
 
 
@@ -246,8 +288,8 @@ bool DataView::operator==(const char* rhs) const
 
 
 struct Property;
-template <typename T> bool parseBinaryArrayRaw(const Property& property, T* out, int max_size);
-template <typename T> bool parseBinaryArray(Property& property, std::vector<T>* out);
+template <typename T> bool parseArrayRaw(const Property& property, T* out, int max_size);
+template <typename T> bool parseBinaryArray(const Property& property, std::vector<T>* out);
 
 
 struct Property : IElementProperty
@@ -259,17 +301,22 @@ struct Property : IElementProperty
 	int getCount() const override
 	{
 		assert(type == ARRAY_DOUBLE || type == ARRAY_INT || type == ARRAY_FLOAT || type == ARRAY_LONG);
-		return int(*(u32*)value.begin);
+		if (value.is_binary)
+		{
+			return int(*(u32*)value.begin);
+		}
+		return count;
 	}
 
-	bool getValues(double* values, int max_size) const override { return parseBinaryArrayRaw(*this, values, max_size); }
+	bool getValues(double* values, int max_size) const override { return parseArrayRaw(*this, values, max_size); }
 
-	bool getValues(float* values, int max_size) const override { return parseBinaryArrayRaw(*this, values, max_size); }
+	bool getValues(float* values, int max_size) const override { return parseArrayRaw(*this, values, max_size); }
 
-	bool getValues(u64* values, int max_size) const override { return parseBinaryArrayRaw(*this, values, max_size); }
+	bool getValues(u64* values, int max_size) const override { return parseArrayRaw(*this, values, max_size); }
 
-	bool getValues(int* values, int max_size) const override { return parseBinaryArrayRaw(*this, values, max_size); }
+	bool getValues(int* values, int max_size) const override { return parseArrayRaw(*this, values, max_size); }
 
+	int count;
 	u8 type;
 	DataView value;
 	Property* next = nullptr;
@@ -570,6 +617,248 @@ static OptionalError<Element*> readElement(Cursor* cursor, u32 version)
 }
 
 
+static bool isEndLine(const Cursor& cursor)
+{
+	return *cursor.current == '\n';
+}
+
+
+static void skipInsignificantWhitespaces(Cursor* cursor)
+{
+	while (cursor->current < cursor->end && isspace(*cursor->current) && *cursor->current != '\n')
+	{
+		++cursor->current;
+	}
+}
+
+
+static void skipLine(Cursor* cursor)
+{
+	while (cursor->current < cursor->end && !isEndLine(*cursor))
+	{
+		++cursor->current;
+	}
+	if (cursor->current < cursor->end) ++cursor->current;
+	skipInsignificantWhitespaces(cursor);
+}
+
+
+static void skipWhitespaces(Cursor* cursor)
+{
+	while (cursor->current < cursor->end && isspace(*cursor->current))
+	{
+		++cursor->current;
+	}
+	while (cursor->current < cursor->end && *cursor->current == ';') skipLine(cursor);
+}
+
+
+static bool isTextTokenChar(char c)
+{
+	return isalnum(c) || c == '_';
+}
+
+
+static DataView readTextToken(Cursor* cursor)
+{
+	DataView ret;
+	ret.begin = cursor->current;
+	while (cursor->current < cursor->end && isTextTokenChar(*cursor->current))
+	{
+		++cursor->current;
+	}
+	ret.end = cursor->current;
+	return ret;
+}
+
+
+static OptionalError<Property*> readTextProperty(Cursor* cursor)
+{
+	std::unique_ptr<Property> prop = std::make_unique<Property>();
+	prop->value.is_binary = false;
+	prop->next = nullptr;
+	if (*cursor->current == '"')
+	{
+		prop->type = 'S';
+		++cursor->current;
+		prop->value.begin = cursor->current;
+		while (cursor->current < cursor->end && *cursor->current != '"')
+		{
+			++cursor->current;
+		}
+		prop->value.end = cursor->current;
+		if (cursor->current < cursor->end) ++cursor->current; // skip '"'
+		return prop.release();
+	}
+	
+	if (isdigit(*cursor->current) || *cursor->current == '-')
+	{
+		prop->type = 'L';
+		prop->value.begin = cursor->current;
+		if (*cursor->current == '-') ++cursor->current;
+		while (cursor->current < cursor->end && isdigit(*cursor->current))
+		{
+			++cursor->current;
+		}
+		prop->value.end = cursor->current;
+
+		if (cursor->current < cursor->end && *cursor->current == '.')
+		{
+			prop->type = 'D';
+			++cursor->current;
+			while (cursor->current < cursor->end && isdigit(*cursor->current))
+			{
+				++cursor->current;
+			}
+			if (cursor->current < cursor->end && *cursor->current == 'e')
+			{
+				// 10.5e-013
+				++cursor->current;
+				if (cursor->current < cursor->end && *cursor->current == '-') ++cursor->current;
+				while (cursor->current < cursor->end && isdigit(*cursor->current)) ++cursor->current;
+			}
+
+
+			prop->value.end = cursor->current;
+		}
+		return prop.release();
+	}
+	
+	if (*cursor->current == 'T' || *cursor->current == 'Y')
+	{
+		// WTF is this
+		prop->type = *cursor->current;
+		prop->value.begin = cursor->current;
+		++cursor->current;
+		prop->value.end = cursor->current;
+		return prop.release();
+	}
+
+	if (*cursor->current == '*')
+	{
+		prop->type = 'l';
+		++cursor->current;
+		// Vertices: *10740 { a: 14.2760353088379,... }
+		while (cursor->current < cursor->end && *cursor->current != ':')
+		{
+			++cursor->current;
+		}
+		if (cursor->current < cursor->end) ++cursor->current; // skip ':'
+		skipInsignificantWhitespaces(cursor);
+		prop->value.begin = cursor->current;
+		prop->count = 1;
+		while (cursor->current < cursor->end && *cursor->current != '}')
+		{
+			if (*cursor->current == ',') ++prop->count;
+			if (*cursor->current == '.') prop->type = 'd';
+			++cursor->current;
+		}
+		prop->value.end = cursor->current;
+		if (cursor->current < cursor->end) ++cursor->current; // skip '}'
+		return prop.release();
+	}
+
+	assert(false);
+	return Error("TODO");
+}
+
+
+static OptionalError<Element*> readTextElement(Cursor* cursor)
+{
+	DataView id = readTextToken(cursor);
+	if (cursor->current == cursor->end) return Error("Unexpected end of file");
+	if(*cursor->current != ':') return Error("Unexpected end of file");
+	++cursor->current;
+
+	skipWhitespaces(cursor);
+	if (cursor->current == cursor->end) return Error("Unexpected end of file");
+
+	Element* element = new Element;
+	element->id = id;
+
+	Property** prop_link = &element->first_property;
+	while (cursor->current < cursor->end && *cursor->current != '\n' && *cursor->current != '{')
+	{
+		OptionalError<Property*> prop = readTextProperty(cursor);
+		if (prop.isError())
+		{
+			deleteElement(element);
+			return Error();
+		}
+		if (cursor->current < cursor->end && *cursor->current == ',')
+		{
+			++cursor->current;
+			skipWhitespaces(cursor);
+		}
+		skipInsignificantWhitespaces(cursor);
+
+		*prop_link = prop.getValue();
+		prop_link = &(*prop_link)->next;
+	}
+	
+	Element** link = &element->child;
+	if (*cursor->current == '{')
+	{
+		++cursor->current;
+		skipWhitespaces(cursor);
+		while (cursor->current < cursor->end && *cursor->current != '}')
+		{
+			OptionalError<Element*> child = readTextElement(cursor);
+			if (child.isError())
+			{
+				deleteElement(element);
+				return Error();
+			}
+			skipWhitespaces(cursor);
+
+			*link = child.getValue();
+			link = &(*link)->sibling;
+		}
+		if (cursor->current < cursor->end) ++cursor->current; // skip '}'
+	}
+	return element;
+}
+
+
+static OptionalError<Element*> tokenizeText(const u8* data, size_t size)
+{
+	Cursor cursor;
+	cursor.begin = data;
+	cursor.current = data;
+	cursor.end = data + size;
+
+	Element* root = new Element();
+	root->first_property = nullptr;
+	root->id.begin = nullptr;
+	root->id.end = nullptr;
+	root->child = nullptr;
+	root->sibling = nullptr;
+
+	Element** element = &root->child;
+	while (cursor.current < cursor.end)
+	{
+		if (*cursor.current == ';' || *cursor.current == '\r' || *cursor.current == '\n')
+		{
+			skipLine(&cursor);
+		}
+		else
+		{
+			OptionalError<Element*> child = readTextElement(&cursor);
+			if (child.isError())
+			{
+				deleteElement(root);
+				return Error();
+			}
+			*element = child.getValue();
+			if (!*element) return root;
+			element = &(*element)->sibling;
+		}
+	}
+
+	return root;
+}
+
+
 static OptionalError<Element*> tokenize(const u8* data, size_t size)
 {
 	Cursor cursor;
@@ -854,7 +1143,7 @@ struct ClusterImpl : Cluster
 	}
 
 	const int* getIndices() const override { return &indices[0]; }
-	virtual int getIndicesCount() const override { return (int)indices.size(); }
+	int getIndicesCount() const override { return (int)indices.size(); }
 	const double* getWeights() const override { return &weights[0]; }
 	int getWeightsCount() const override { return (int)weights.size(); }
 	Matrix getTransformMatrix() const { return transform_matrix; }
@@ -1234,7 +1523,7 @@ static OptionalError<Object*> parseCluster(const Scene& scene, const Element& el
 	const Element* transform_link = findChild(element, "TransformLink");
 	if (transform_link && transform_link->first_property)
 	{
-		if (!parseBinaryArrayRaw(
+		if (!parseArrayRaw(
 				*transform_link->first_property, &obj->transform_link_matrix, sizeof(obj->transform_link_matrix)))
 		{
 			return Error("Failed to parse TransformLink");
@@ -1243,7 +1532,7 @@ static OptionalError<Object*> parseCluster(const Scene& scene, const Element& el
 	const Element* transform = findChild(element, "Transform");
 	if (transform && transform->first_property)
 	{
-		if (!parseBinaryArrayRaw(*transform->first_property, &obj->transform_matrix, sizeof(obj->transform_matrix)))
+		if (!parseArrayRaw(*transform->first_property, &obj->transform_matrix, sizeof(obj->transform_matrix)))
 		{
 			return Error("Failed to parse Transform");
 
@@ -1315,72 +1604,196 @@ static OptionalError<Object*> parseMaterial(const Scene& scene, const Element& e
 }
 
 
-static u32 getArrayCount(const Property& property)
+template<typename T> static bool parseTextArrayRaw(const Property& property, T* out, int max_size);
+
+template <typename T> static bool parseArrayRaw(const Property& property, T* out, int max_size)
 {
-	return *(const u32*)property.value.begin;
+	if (property.value.is_binary)
+	{
+		assert(out);
+
+		int elem_size = 1;
+		switch (property.type)
+		{
+			case 'l': elem_size = 8; break;
+			case 'd': elem_size = 8; break;
+			case 'f': elem_size = 4; break;
+			case 'i': elem_size = 4; break;
+			default: return false;
+		}
+
+		const u8* data = property.value.begin + sizeof(u32) * 3;
+		if (data > property.value.end) return false;
+
+		u32 count = property.getCount();
+		u32 enc = *(const u32*)(property.value.begin + 4);
+		u32 len = *(const u32*)(property.value.begin + 8);
+
+		if (enc == 0)
+		{
+			if ((int)len > max_size) return false;
+			if (data + len > property.value.end) return false;
+			memcpy(out, data, len);
+			return true;
+		}
+		else if (enc == 1)
+		{
+			if (int(elem_size * count) > max_size) return false;
+			return decompress(data, len, (u8*)out, elem_size * count);
+		}
+
+		return false;
+	}
+
+	return parseTextArrayRaw(property, out, max_size);
 }
 
 
-template <typename T> static bool parseBinaryArrayRaw(const Property& property, T* out, int max_size)
+template <typename T> const char* fromString(const char* str, const char* end, T* val);
+template <> const char* fromString<int>(const char* str, const char* end, int* val)
+{
+	*val = atoi(str);
+	const char* iter = str;
+	while (iter < end && *iter != ',') ++iter;
+	if (iter < end) ++iter; // skip ','
+	return (const char*)iter;
+}
+
+
+template <> const char* fromString<u64>(const char* str, const char* end, u64* val)
+{
+	*val = atol(str);
+	const char* iter = str;
+	while (iter < end && *iter != ',') ++iter;
+	if (iter < end) ++iter; // skip ','
+	return (const char*)iter;
+}
+
+
+template <> const char* fromString<double>(const char* str, const char* end, double* val)
+{
+	*val = atof(str);
+	const char* iter = str;
+	while (iter < end && *iter != ',') ++iter;
+	if (iter < end) ++iter; // skip ','
+	return (const char*)iter;
+}
+
+
+template <> const char* fromString<float>(const char* str, const char* end, float* val)
+{
+	*val = (float)atof(str);
+	const char* iter = str;
+	while (iter < end && *iter != ',') ++iter;
+	if (iter < end) ++iter; // skip ','
+	return (const char*)iter;
+}
+
+
+const char* fromString(const char* str, const char* end, double* val, int count)
+{
+	const char* iter = str;
+	for (int i = 0; i < count; ++i)
+	{
+		*val = atof(iter);
+		++val;
+		while (iter < end && *iter != ',') ++iter;
+		if (iter < end) ++iter; // skip ','
+
+		if (iter == end) return iter;
+
+	}
+	return (const char*)iter;
+}
+
+
+template <> const char* fromString<Vec2>(const char* str, const char* end, Vec2* val)
+{
+	return fromString(str, end, &val->x, 2);
+}
+
+
+template <> const char* fromString<Vec3>(const char* str, const char* end, Vec3* val)
+{
+	return fromString(str, end, &val->x, 3);
+}
+
+
+template <> const char* fromString<Vec4>(const char* str, const char* end, Vec4* val)
+{
+	return fromString(str, end, &val->x, 4);
+}
+
+
+template <> const char* fromString<Matrix>(const char* str, const char* end, Matrix* val)
+{
+	return fromString(str, end, &val->m[0], 16);
+}
+
+
+template<typename T> static void parseTextArray(const Property& property, std::vector<T>* out)
+{
+	const u8* iter = property.value.begin;
+	while (iter < property.value.end)
+	{
+		T val;
+		iter = (const u8*)fromString<T>((const char*)iter, (const char*)property.value.end, &val);
+		out->push_back(val);
+	}
+}
+
+
+template<typename T> static bool parseTextArrayRaw(const Property& property, T* out_raw, int max_size)
+{
+	const u8* iter = property.value.begin;
+	
+	T* out = out_raw;
+	while (iter < property.value.end)
+	{
+		iter = (const u8*)fromString<T>((const char*)iter, (const char*)property.value.end, out);
+		++out;
+		if (out - out_raw == max_size / sizeof(T)) return true;
+	}
+	return out - out_raw == max_size / sizeof(T);
+}
+
+
+template <typename T> static bool parseBinaryArray(const Property& property, std::vector<T>* out)
 {
 	assert(out);
-
-	int elem_size = 1;
-	switch (property.type)
+	if (property.value.is_binary)
 	{
-		case 'l': elem_size = 8; break;
-		case 'd': elem_size = 8; break;
-		case 'f': elem_size = 4; break;
-		case 'i': elem_size = 4; break;
-		default: return false;
+		u32 count = property.getCount();
+		int elem_size = 1;
+		switch (property.type)
+		{
+			case 'd': elem_size = 8; break;
+			case 'f': elem_size = 4; break;
+			case 'i': elem_size = 4; break;
+			default: return false;
+		}
+		int elem_count = sizeof(T) / elem_size;
+		out->resize(count / elem_count);
+
+		return parseArrayRaw(property, &(*out)[0], int(sizeof((*out)[0]) * out->size()));
 	}
-
-	const u8* data = property.value.begin + sizeof(u32) * 3;
-	if (data > property.value.end) return false;
-	
-	u32 count = getArrayCount(property);
-	u32 enc = *(const u32*)(property.value.begin + 4);
-	u32 len = *(const u32*)(property.value.begin + 8);
-
-	if (enc == 0)
+	else
 	{
-		if ((int)len > max_size) return false;
-		if (data + len > property.value.end) return false;
-		memcpy(out, data, len);
+		parseTextArray(property, out);
 		return true;
 	}
-	else if (enc == 1)
-	{
-		if (int(elem_size * count) > max_size) return false;
-		return decompress(data, len, (u8*)out, elem_size * count);
-	}
-
-	return false;
-}
-
-
-template <typename T> static bool parseBinaryArray(Property& property, std::vector<T>* out)
-{
-	assert(out);
-	u32 count = getArrayCount(property);
-	int elem_size = 1;
-	switch (property.type)
-	{
-		case 'd': elem_size = 8; break;
-		case 'f': elem_size = 4; break;
-		case 'i': elem_size = 4; break;
-		default: return false;
-	}
-	int elem_count = sizeof(T) / elem_size;
-	out->resize(count / elem_count);
-
-	return parseBinaryArrayRaw(property, &(*out)[0], int(sizeof((*out)[0]) * out->size()));
 }
 
 
 template <typename T> static bool parseDoubleVecData(Property& property, std::vector<T>* out_vec)
 {
 	assert(out_vec);
+	if (!property.value.is_binary)
+	{
+		parseTextArray(property, out_vec);
+		return true;
+	}
+
 	if (property.type == 'd')
 	{
 		return parseBinaryArray(property, out_vec);
@@ -1476,9 +1889,11 @@ static void splat(std::vector<T>* out,
 		else
 		{
 			out->resize(indices.size());
+			int data_size = (int)data.size();
 			for (int i = 0, c = (int)indices.size(); i < c; ++i)
 			{
-				(*out)[i] = data[indices[i]];
+				if(indices[i] < data_size) (*out)[i] = data[indices[i]];
+				else (*out)[i] = T();
 			}
 		}
 	}
@@ -1490,9 +1905,11 @@ static void splat(std::vector<T>* out,
 
 		out->resize(to_old_vertices.size());
 
+		int data_size = (int)data.size();
 		for (int i = 0, c = (int)to_old_vertices.size(); i < c; ++i)
 		{
-			(*out)[i] = data[to_old_vertices[i]];
+			if(to_old_vertices[i] < data_size) (*out)[i] = data[to_old_vertices[i]];
+			else (*out)[i] = T();
 		}
 	}
 	else
@@ -1508,9 +1925,11 @@ template <typename T> static void remap(std::vector<T>* out, const std::vector<i
 
 	std::vector<T> old;
 	old.swap(*out);
+	int old_size = (int)old.size();
 	for (int i = 0, c = (int)map.size(); i < c; ++i)
 	{
-		out->push_back(old[map[i]]);
+		if(map[i] < old_size) out->push_back(old[map[i]]);
+		else out->push_back(T());
 	}
 }
 
@@ -1848,7 +2267,7 @@ static bool parseObjects(const Element& root, Scene* scene)
 			return false;
 		}
 
-		u64 id = *(u64*)object->first_property->value.begin;
+		u64 id = object->first_property->value.toLong();
 		scene->m_object_map[id] = {object, nullptr};
 		object = object->sibling;
 	}
@@ -2299,7 +2718,12 @@ IScene* load(const u8* data, int size)
 	scene->m_data.resize(size);
 	memcpy(&scene->m_data[0], data, size);
 	OptionalError<Element*> root = tokenize(&scene->m_data[0], size);
-	if (root.isError()) return nullptr;
+	if (root.isError())
+	{
+		Error::s_message = "";
+		root = tokenizeText(&scene->m_data[0], size);
+		if (root.isError()) return nullptr;
+	}
 
 	scene->m_root_element = root.getValue();
 	assert(scene->m_root_element);
