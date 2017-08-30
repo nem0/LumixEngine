@@ -1449,7 +1449,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	Path getHeightmap(ComponentHandle cmp) override
+	Path getHeightmapSource(ComponentHandle cmp) override
 	{
 		auto& terrain = m_terrains[{cmp.index}];
 		return terrain.m_heightmap ? terrain.m_heightmap->getPath() : Path("");
@@ -1495,7 +1495,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	void setHeightmap(ComponentHandle cmp, const Path& str) override
+	void setHeightmapSource(ComponentHandle cmp, const Path& str) override
 	{
 		auto& resource_manager = m_engine->getResourceManager();
 		auto& terrain = m_terrains[{cmp.index}];
@@ -2865,7 +2865,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		ComponentHandle cmp = {terrain.m_entity.index};
 		if (terrain.m_heightmap == nullptr || !equalStrings(tmp, terrain.m_heightmap->getPath().c_str()))
 		{
-			setHeightmap(cmp, Path(tmp));
+			setHeightmapSource(cmp, Path(tmp));
 		}
 		m_universe.addComponent(terrain.m_entity, HEIGHTFIELD_TYPE, this, cmp);
 	}
@@ -4317,7 +4317,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			ComponentHandle cmp = {terrain.m_entity.index};
 			if (terrain.m_heightmap == nullptr || !equalStrings(tmp, terrain.m_heightmap->getPath().c_str()))
 			{
-				setHeightmap(cmp, Path(tmp));
+				setHeightmapSource(cmp, Path(tmp));
 			}
 			m_universe.addComponent(terrain.m_entity, HEIGHTFIELD_TYPE, this, cmp);
 		}
