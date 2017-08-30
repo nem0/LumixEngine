@@ -322,7 +322,7 @@ namespace Lumix
 				"Layer", &PhysicsScene::getActorLayer, &PhysicsScene::setActorLayer));
 		PropertyRegister::add("physical_heightfield",
 			LUMIX_NEW(allocator, ResourcePropertyDescriptor<PhysicsScene>)(
-				"Heightmap", &PhysicsScene::getHeightmap, &PhysicsScene::setHeightmap, "Image (*.raw)", TEXTURE_TYPE));
+				"Heightmap", &PhysicsScene::getHeightmapSource, &PhysicsScene::setHeightmapSource, "Image (*.raw)", TEXTURE_TYPE));
 		PropertyRegister::add("physical_heightfield",
 			LUMIX_NEW(allocator, DecimalPropertyDescriptor<PhysicsScene>)("XZ scale",
 				&PhysicsScene::getHeightmapXZScale,

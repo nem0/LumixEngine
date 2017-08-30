@@ -95,8 +95,8 @@ public:
 	virtual void setHalfExtents(ComponentHandle cmp, const Vec3& size) = 0;
 	virtual Path getShapeSource(ComponentHandle cmp) = 0;
 	virtual void setShapeSource(ComponentHandle cmp, const Path& str) = 0;
-	virtual Path getHeightmap(ComponentHandle cmp) = 0;
-	virtual void setHeightmap(ComponentHandle cmp, const Path& path) = 0;
+	virtual Path getHeightmapSource(ComponentHandle cmp) = 0;
+	virtual void setHeightmapSource(ComponentHandle cmp, const Path& path) = 0;
 	virtual float getHeightmapXZScale(ComponentHandle cmp) = 0;
 	virtual void setHeightmapXZScale(ComponentHandle cmp, float scale) = 0;
 	virtual float getHeightmapYScale(ComponentHandle cmp) = 0;
