@@ -94,6 +94,10 @@ struct ManagerImpl LUMIX_FINAL : public Manager
 				m_pending_trans.push(tr);
 			}
 		}
+		else
+		{
+			pushReadyJob(job);
+		}
 	}
 
 	void doScheduling() override

@@ -153,6 +153,7 @@ public:
 		string name;
 		string parent;
 		RigidTransform transform;
+		RigidTransform relative_transform;
 		RigidTransform inv_bind_transform;
 		int parent_idx;
 	};
@@ -187,6 +188,7 @@ public:
 	int getFirstNonrootBoneIndex() const { return m_first_nonroot_bone_index; }
 	BoneMap::iterator getBoneIndex(u32 hash) { return m_bone_map.find(hash); }
 	void getPose(Pose& pose);
+	void getRelativePose(Pose& pose);
 	float getBoundingRadius() const { return m_bounding_radius; }
 	RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, const Matrix& model_transform, const Pose* pose);
 	const AABB& getAABB() const { return m_aabb; }
