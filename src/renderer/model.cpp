@@ -201,6 +201,20 @@ RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Matrix
 }
 
 
+void Model::getRelativePose(Pose& pose)
+{
+	ASSERT(pose.count == getBoneCount());
+	Vec3* pos = pose.positions;
+	Quat* rot = pose.rotations;
+	for (int i = 0, c = getBoneCount(); i < c; ++i)
+	{
+		pos[i] = m_bones[i].relative_transform.pos;
+		rot[i] = m_bones[i].relative_transform.rot;
+	}
+	pose.is_absolute = false;
+}
+
+
 void Model::getPose(Pose& pose)
 {
 	ASSERT(pose.count == getBoneCount());
@@ -539,9 +553,23 @@ bool Model::parseBones(FS::IFile& file)
 			}
 		}
 	}
+
 	for (int i = 0; i < m_bones.size(); ++i)
 	{
 		m_bones[i].inv_bind_transform = m_bones[i].transform.inverted();
+	}
+
+	for (int i = 0; i < m_bones.size(); ++i)
+	{
+		int p = m_bones[i].parent_idx;
+		if (p >= 0)
+		{
+			m_bones[i].relative_transform = m_bones[p].inv_bind_transform * m_bones[i].transform;
+		}
+		else
+		{
+			m_bones[i].relative_transform = m_bones[i].transform;
+		}
 	}
 	return true;
 }

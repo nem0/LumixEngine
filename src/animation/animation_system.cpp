@@ -9,6 +9,10 @@
 #include "engine/engine.h"
 #include "engine/json_serializer.h"
 #include "engine/lua_wrapper.h"
+#include "engine/mtjd/generic_job.h"
+#include "engine/mtjd/group.h"
+#include "engine/mtjd/job.h"
+#include "engine/mtjd/manager.h"
 #include "engine/profiler.h"
 #include "engine/property_descriptor.h"
 #include "engine/property_register.h"
@@ -175,6 +179,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		, m_controllers(allocator)
 		, m_shared_controllers(allocator)
 		, m_event_stream(allocator)
+		, m_sync_point(true, allocator)
 	{
 		m_is_game_running = false;
 		m_render_scene = static_cast<RenderScene*>(universe.getScene(crc32("renderer")));
@@ -625,7 +630,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
-	void updateAnimable(Animable& animable, float time_delta)
+	void updateAnimable(Animable& animable, float time_delta) const
 	{
 		if (!animable.animation || !animable.animation->isReady()) return;
 		ComponentHandle model_instance = m_render_scene->getModelInstanceComponent(animable.entity);
@@ -637,8 +642,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		Pose* pose = m_render_scene->lockPose(model_instance);
 		if (!pose) return;
 
-		model->getPose(*pose);
-		pose->computeRelative(*model);
+		model->getRelativePose(*pose);
 		animable.animation->getRelativePose(animable.time, *pose, *model);
 		pose->computeAbsolute(*model);
 
@@ -930,6 +934,39 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
+	void updateAnimables(float time_delta)
+	{
+		MTJD::Manager& mtjd = m_engine.getMTJDManager();
+		IAllocator& allocator = m_engine.getAllocator();
+		MTJD::Job* jobs[16];
+
+		int job_count = Math::minimum((int)mtjd.getCpuThreadsCount(), lengthOf(jobs));
+		ASSERT(job_count > 0);
+		for (int i = 0; i < job_count; ++i)
+		{
+			MTJD::Job* job = MTJD::makeJob(mtjd,
+				[time_delta, this, i, job_count]()
+			{
+				PROFILE_BLOCK("Animate Job");
+				int all_count = m_animables.size();
+				int batch_count = all_count / job_count;
+				if (i == job_count - 1) batch_count += all_count - 1 - (job_count * batch_count);
+				for (int j = 0; j < batch_count; ++j)
+				{
+					Animable& animable = m_animables.at(j + i * all_count / job_count);
+					AnimationSceneImpl::updateAnimable(animable, time_delta);
+				}
+			},
+				allocator);
+			job->addDependency(&m_sync_point);
+			jobs[i] = job;
+		}
+
+		for (int i = 0; i < job_count; ++i) mtjd.schedule(jobs[i]);
+		m_sync_point.sync();
+	}
+
+
 	void update(float time_delta, bool paused) override
 	{
 		PROFILE_FUNCTION();
@@ -938,10 +975,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 
 		m_event_stream.clear();
 
-		for (Animable& animable : m_animables)
-		{
-			AnimationSceneImpl::updateAnimable(animable, time_delta);
-		}
+		updateAnimables(time_delta);
 
 		for (Controller& controller : m_controllers)
 		{
@@ -1055,6 +1089,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	RenderScene* m_render_scene;
 	bool m_is_game_running;
 	OutputBlob m_event_stream;
+	MTJD::Group m_sync_point;
 };
 
 
