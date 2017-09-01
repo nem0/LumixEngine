@@ -202,6 +202,7 @@ struct DockContext
 	Dock* m_current = nullptr;
 	int m_last_frame = 0;
 	EndAction_ m_end_action;
+	bool m_is_begin_open = false;
 
 
 	~DockContext() {}
@@ -900,6 +901,8 @@ struct DockContext
 
 	bool begin(const char* label, bool* opened, ImGuiWindowFlags extra_flags, const ImVec2& default_size)
 	{
+		IM_ASSERT(!m_is_begin_open);
+		m_is_begin_open = true;
 		Dock& dock = getDock(label, !opened || *opened, default_size);
 		if (dock.last_frame != 0 && m_last_frame != ImGui::GetFrameCount())
 		{
@@ -1010,6 +1013,7 @@ struct DockContext
 		}
 		m_current = nullptr;
 		if (m_end_action > EndAction_None) endPanel();
+		m_is_begin_open = false;
 	}
 
 
