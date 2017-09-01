@@ -502,6 +502,7 @@ void AssetBrowser::onGUI()
 		ImGui::SetWindowFocus();
 	}
 	if (m_activate) ImGui::SetDockActive();
+	m_activate = false;
 
 	float checkbox_w = ImGui::GetCursorPosX();
 	ImGui::Checkbox("Thumbnails", &m_show_thumbnails);
