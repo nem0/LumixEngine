@@ -18,7 +18,7 @@
 * [Plugins](https://github.com/nem0/LumixEngine/wiki/available-plugins)
 * [Roadmap](https://github.com/nem0/LumixEngine/milestones)
 
-![Editor screenshot](https://cloud.githubusercontent.com/assets/153526/26275242/6e9f7f90-3d5c-11e7-8548-f6ae82d4ba52.jpg)
+![Editor screenshot](https://user-images.githubusercontent.com/153526/29975939-9c3db48e-8f38-11e7-80f1-2a777e7a43c8.png)
 
 [3rd party libraries](https://github.com/nem0/lumixengine_3rdparty)
 
