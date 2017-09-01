@@ -21,6 +21,10 @@ template <> inline int toType(lua_State* L, int index)
 {
 	return (int)lua_tointeger(L, index);
 }
+template <> inline u16 toType(lua_State* L, int index)
+{
+	return (u16)lua_tointeger(L, index);
+}
 template <> inline Entity toType(lua_State* L, int index)
 {
 	return {(int)lua_tointeger(L, index)};
@@ -148,6 +152,10 @@ template <> inline const char* typeToString<int>()
 {
 	return "number|integer";
 }
+template <> inline const char* typeToString<u16>()
+{
+	return "number|u16";
+}
 template <> inline const char* typeToString<Entity>()
 {
 	return "entity";
@@ -180,6 +188,10 @@ template <typename T> inline bool isType(lua_State* L, int index)
 	return lua_islightuserdata(L, index) != 0;
 }
 template <> inline bool isType<int>(lua_State* L, int index)
+{
+	return lua_isinteger(L, index) != 0;
+}
+template <> inline bool isType<u16>(lua_State* L, int index)
 {
 	return lua_isinteger(L, index) != 0;
 }
@@ -349,6 +361,10 @@ template <> inline void push(lua_State* L, char* value)
 	lua_pushstring(L, value);
 }
 template <> inline void push(lua_State* L, int value)
+{
+	lua_pushinteger(L, value);
+}
+template <> inline void push(lua_State* L, u16 value)
 {
 	lua_pushinteger(L, value);
 }
