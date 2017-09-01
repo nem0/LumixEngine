@@ -49,16 +49,32 @@ struct LuaPlugin : public StudioApp::IPlugin
 	LuaPlugin(StudioApp& app, const char* src, const char* filename)
 		: editor(*app.getWorldEditor())
 	{
-		L = lua_newthread(editor.getEngine().getState());
-		thread_ref = luaL_ref(editor.getEngine().getState(), LUA_REGISTRYINDEX);
+		L = lua_newthread(editor.getEngine().getState()); // [thread]
+		thread_ref = luaL_ref(editor.getEngine().getState(), LUA_REGISTRYINDEX); // []
 
-		bool errors = luaL_loadbuffer(L, src, stringLength(src), filename) != LUA_OK;
-		errors = errors || lua_pcall(L, 0, 0, 0) != LUA_OK;
+		lua_newtable(L); // [env]
+		 // reference environment
+		lua_pushvalue(L, -1); // [env, env]
+		env_ref = luaL_ref(L, LUA_REGISTRYINDEX); // [env]
+
+		// environment's metatable & __index
+		lua_pushvalue(L, -1); // [env, env]
+		lua_setmetatable(L, -2); // [env]
+		lua_pushglobaltable(L); // [evn, _G]
+		lua_setfield(L, -2, "__index");  // [env]
+
+		bool errors = luaL_loadbuffer(L, src, stringLength(src), filename) != LUA_OK; // [env, func]
+
+		lua_pushvalue(L, -2); // [env, func, env]
+		lua_setupvalue(L, -2, 1); // function's environment [env, func]
+
+		errors = errors || lua_pcall(L, 0, 0, 0) != LUA_OK; // [env]
 		if (errors)
 		{
 			g_log_error.log("Editor") << filename << ": " << lua_tostring(L, -1);
 			lua_pop(L, 1);
 		}
+		lua_pop(L, 1); // []
 
 		const char* name = "LuaPlugin";
 		if (lua_getglobal(L, "plugin_name") == LUA_TSTRING)
@@ -77,7 +93,9 @@ struct LuaPlugin : public StudioApp::IPlugin
 
 	~LuaPlugin()
 	{
-		luaL_unref(editor.getEngine().getState(), LUA_REGISTRYINDEX, thread_ref);
+		lua_State* L = editor.getEngine().getState();
+		luaL_unref(L, LUA_REGISTRYINDEX, env_ref);
+		luaL_unref(L, LUA_REGISTRYINDEX, thread_ref);
 	}
 
 
@@ -110,6 +128,7 @@ struct LuaPlugin : public StudioApp::IPlugin
 	WorldEditor& editor;
 	lua_State* L;
 	int thread_ref;
+	int env_ref;
 	bool m_is_open;
 };
 
