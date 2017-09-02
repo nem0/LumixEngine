@@ -266,7 +266,12 @@ namespace Lumix
 		i32 size;
 		read(size);
 		ASSERT(size <= max_size);
-		return read(data, size < max_size ? size : max_size);
+		bool res = read(data, size < max_size ? size : max_size);
+		for (int i = max_size; i < size; ++i)
+		{
+			readChar();
+		}
+		return res && size <= max_size;
 	}
 
 

@@ -215,6 +215,11 @@ namespace Lumix
 						lua_pushinteger(script.m_state, m_entity.index); // [env, index]
 						lua_setfield(script.m_state, -2, "this"); // [env]
 					}
+					else
+					{
+						bool is_env_valid = lua_rawgeti(script.m_state, LUA_REGISTRYINDEX, script.m_environment) == LUA_TTABLE; // [env]
+						ASSERT(is_env_valid);
+					}
 
 					bool errors = luaL_loadbuffer(script.m_state,
 						script.m_script->getSourceCode(),
