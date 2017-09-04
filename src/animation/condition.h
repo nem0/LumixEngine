@@ -135,8 +135,9 @@ struct InputDecl
 
 	int getInputIdx(const char* name, int size) const
 	{
-		for (int i = 0; i < inputs_count; ++i)
+		for (int i = 0; i < lengthOf(inputs); ++i)
 		{
+			if (inputs[i].type == Type::EMPTY) continue;
 			if (strncmp(inputs[i].name, name, size) == 0) return i;
 		}
 		return -1;
