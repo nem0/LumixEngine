@@ -433,6 +433,8 @@ void Shader::unload(void)
 	m_texture_slot_count = 0;
 
 	m_instances.clear();
+
+	m_all_defines_mask = 0;
 }
 
 
