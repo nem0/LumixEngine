@@ -150,6 +150,8 @@ void Material::unload(void)
 	}
 	m_texture_count = 0;
 	m_define_mask = 0;
+	m_render_layer = 0;
+	m_render_layer_mask = 1;
 }
 
 
@@ -800,7 +802,7 @@ bool Material::load(FS::IFile& file)
 		{
 			char tmp[32];
 			auto& renderer = static_cast<MaterialManager&>(m_resource_manager).getRenderer();
-			serializer.deserialize(tmp, lengthOf(tmp), "Default");
+			serializer.deserialize(tmp, lengthOf(tmp), "default");
 			m_render_layer = renderer.getLayer(tmp);
 			m_render_layer_mask = 1ULL << (u64)m_render_layer;
 		}
