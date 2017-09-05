@@ -165,13 +165,29 @@ static Matrix rotationZ(double angle)
 }
 
 
-static Matrix getRotationMatrix(const Vec3& euler)
+static Matrix getRotationMatrix(const Vec3& euler, RotationOrder order)
 {
 	const double TO_RAD = 3.1415926535897932384626433832795028 / 180.0;
 	Matrix rx = rotationX(euler.x * TO_RAD);
 	Matrix ry = rotationY(euler.y * TO_RAD);
 	Matrix rz = rotationZ(euler.z * TO_RAD);
-	return rz * ry * rx;
+	switch (order) {
+		default:
+		case RotationOrder::SPHERIC_XYZ:
+			printf("Warning: Unsupported rotation order: %d\n", order);
+		case RotationOrder::EULER_XYZ:
+			return rz * ry * rx;
+		case RotationOrder::EULER_XZY:
+			return ry * rz * rx;
+		case RotationOrder::EULER_YXZ:
+			return rz * rx * ry;
+		case RotationOrder::EULER_YZX:
+			return rx * rz * ry;
+		case RotationOrder::EULER_ZXY:
+			return ry * rx * rz;
+		case RotationOrder::EULER_ZYX:
+			return rx * ry * rz;
+	}
 }
 
 
@@ -374,6 +390,17 @@ static IElement* resolveProperty(const Object& obj, const char* name)
 		prop = prop->sibling;
 	}
 	return nullptr;
+}
+
+
+static int resolveEnumProperty(const Object& object, const char* name, int default_value)
+{
+	Element* element = (Element*)resolveProperty(object, name);
+	if (!element) return default_value;
+	Property* x = (Property*)element->getProperty(4);
+	if (!x) return default_value;
+
+	return x->value.toInt();
 }
 
 
@@ -953,7 +980,7 @@ struct MeshImpl : Mesh
 		scale_mtx.m[0] = (float)scale.x;
 		scale_mtx.m[5] = (float)scale.y;
 		scale_mtx.m[10] = (float)scale.z;
-		Matrix mtx = getRotationMatrix(rotation);
+		Matrix mtx = getRotationMatrix(rotation, RotationOrder::EULER_XYZ);
 		setTranslation(translation, &mtx);
 
 		return scale_mtx * mtx;
@@ -2527,6 +2554,13 @@ static bool parseObjects(const Element& root, Scene* scene)
 }
 
 
+RotationOrder Object::getRotationOrder() const
+{
+	// This assumes that the default rotation order is EULER_XYZ.
+	return (RotationOrder) resolveEnumProperty(*this, "RotationOrder", (int) RotationOrder::EULER_XYZ);
+}
+
+
 Vec3 Object::getRotationOffset() const
 {
 	return resolveVec3Property(*this, "RotationOffset", {0, 0, 0});
@@ -2562,6 +2596,7 @@ Matrix Object::evalLocal(const Vec3& translation, const Vec3& rotation) const
 	Vec3 scaling = getLocalScaling();
 	Vec3 rotation_pivot = getRotationPivot();
 	Vec3 scaling_pivot = getScalingPivot();
+	RotationOrder rotation_order = getRotationOrder();
 
 	Matrix s = makeIdentity();
 	s.m[0] = scaling.x;
@@ -2571,9 +2606,9 @@ Matrix Object::evalLocal(const Vec3& translation, const Vec3& rotation) const
 	Matrix t = makeIdentity();
 	setTranslation(translation, &t);
 
-	Matrix r = getRotationMatrix(rotation);
-	Matrix r_pre = getRotationMatrix(getPreRotation());
-	Matrix r_post_inv = getRotationMatrix(getPostRotation());
+	Matrix r = getRotationMatrix(rotation, rotation_order);
+	Matrix r_pre = getRotationMatrix(getPreRotation(), RotationOrder::EULER_XYZ);
+	Matrix r_post_inv = getRotationMatrix(getPostRotation(), RotationOrder::EULER_XYZ);
 
 	Matrix r_off = makeIdentity();
 	setTranslation(getRotationOffset(), &r_off);
