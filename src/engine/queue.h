@@ -32,6 +32,7 @@ namespace Lumix
 			m_allocator.deallocate(m_buffer);
 		}
 
+		bool full() const { return size() == count; }
 		bool empty() const { return m_rd == m_wr; } 
 		u32 size() const { return m_wr - m_rd; }
 		Iterator begin() { return {this, m_rd}; }
