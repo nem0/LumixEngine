@@ -111,6 +111,17 @@ struct IElement
 };
 
 
+enum class RotationOrder {
+	EULER_XYZ,
+	EULER_XZY,
+	EULER_YZX,
+	EULER_YXZ,
+	EULER_ZXY,
+	EULER_ZYX,
+    SPHERIC_XYZ // Currently unsupported. Treated as EULER_XYZ.
+};
+
+
 struct AnimationCurveNode;
 struct AnimationLayer;
 struct Scene;
@@ -148,6 +159,7 @@ struct Object
 	Object* resolveObjectLinkReverse(Type type) const;
 	Object* getParent() const;
 
+    RotationOrder getRotationOrder() const;
 	Vec3 getRotationOffset() const;
 	Vec3 getRotationPivot() const;
 	Vec3 getPostRotation() const;
