@@ -775,7 +775,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		u32 path_hash;
 		Array<u8> data;
 		bgfx::TextureHandle texture = BGFX_INVALID_HANDLE;
-		Queue<Model*, 16> queue;
+		Queue<Model*, 8> queue;
 		Array<Path> paths;
 	} m_tile;
 

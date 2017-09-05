@@ -70,6 +70,7 @@ private:
 		StaticString<MAX_PATH_LENGTH> filepath;
 		u32 file_path_hash;
 		void* tex = nullptr;
+		bool create_called = false;
 	};
 
 private:
@@ -77,6 +78,9 @@ private:
 	void middleColumn();
 	void rightColumn();
 
+	void thumbnail(FileInfo& tile);
+	int getThumbnailIndex(int i, int j, int columns) const;
+	void doFilter();
 	void breadcrumbs();
 	void onTilesGUI();
 	void changeDir(const char* path);
@@ -102,6 +106,7 @@ private:
 	StaticString<MAX_PATH_LENGTH> m_dir;
 	Array<StaticString<MAX_PATH_LENGTH> > m_subdirs;
 	Array<FileInfo> m_file_infos;
+	Array<int> m_filtered_file_infos;
 	OnResourceChanged m_on_resource_changed;
 	Array<Path> m_history;
 	int m_history_index;
