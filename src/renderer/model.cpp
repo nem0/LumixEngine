@@ -456,11 +456,17 @@ bool Model::parseGeometry(FS::IFile& file, FileVersion version)
 	const bgfx::Memory* vertices_mem = bgfx::alloc(vertices_size);
 	file.read(vertices_mem->data, vertices_size);
 	m_vertices_handle = bgfx::createVertexBuffer(vertices_mem, m_vertex_decl);
+	if (!bgfx::isValid(m_vertices_handle)) return false;
 
 	ASSERT(!bgfx::isValid(m_indices_handle));
 	int indices_size = index_size * indices_count;
 	const bgfx::Memory* mem = bgfx::copy(&m_indices[0], indices_size);
 	m_indices_handle = bgfx::createIndexBuffer(mem, index_size == 4 ? BGFX_BUFFER_INDEX32 : 0);
+	if (!bgfx::isValid(m_indices_handle))
+	{
+		bgfx::destroyVertexBuffer(m_vertices_handle);
+		return false;
+	}
 
 	int vertex_count = 0;
 	for (int i = 0; i < m_meshes.size(); ++i)
