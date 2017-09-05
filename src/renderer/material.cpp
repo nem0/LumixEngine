@@ -148,10 +148,16 @@ void Material::unload(void)
 			texture_manager->unload(*m_textures[i]);
 		}
 	}
-	m_texture_count = 0;
+	m_alpha_ref = 0.3f;
+	m_color.set(1, 1, 1);
+	m_custom_flags = 0;
 	m_define_mask = 0;
+	m_layers_count = 0;
+	m_metallic = 0.0f;
 	m_render_layer = 0;
 	m_render_layer_mask = 1;
+	m_roughness = 1.0f;
+	m_texture_count = 0;
 }
 
 

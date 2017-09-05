@@ -435,6 +435,7 @@ void Shader::unload(void)
 	m_instances.clear();
 
 	m_all_defines_mask = 0;
+	m_render_states = 0;
 }
 
 
