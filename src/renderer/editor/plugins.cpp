@@ -20,6 +20,7 @@
 #include "engine/plugin_manager.h"
 #include "engine/property_descriptor.h"
 #include "engine/property_register.h"
+#include "engine/queue.h"
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
 #include "game_view.h"
@@ -344,7 +345,6 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 {
 	explicit ModelPlugin(StudioApp& app)
 		: m_app(app)
-		, m_tiles(app.getWorldEditor()->getAllocator())
 		, m_camera_cmp(INVALID_COMPONENT)
 		, m_camera_entity(INVALID_ENTITY)
 		, m_mesh(INVALID_COMPONENT)
@@ -641,6 +641,30 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 	}
 
 
+	void pushTileQueue(const Path& path)
+	{
+		ASSERT(!m_tile.queue.full());
+		WorldEditor* editor = m_app.getWorldEditor();
+		Engine& engine = editor->getEngine();
+		ResourceManager& resource_manager = engine.getResourceManager();
+		ResourceManagerBase* model_manager = resource_manager.get(MODEL_TYPE);
+
+		Model* model = (Model*)model_manager->load(path);
+		m_tile.queue.push(model);
+	}
+	
+
+	void popTileQueue()
+	{
+		m_tile.queue.pop();
+		if (m_tile.paths.empty()) return;
+
+		Path path = m_tile.paths.back();
+		m_tile.paths.pop();
+		pushTileQueue(path);
+	}
+
+
 	void update() override
 	{
 		if(m_tile.frame_countdown >= 0)
@@ -656,17 +680,18 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 			return;
 		}
 
-		if (m_tiles.empty()) return;
-		Model* model = m_tiles.back();
+		if (m_tile.queue.empty()) return;
+
+		Model* model = m_tile.queue.front();
 		if(model->isFailure())
 		{
 			g_log_error.log("Renderer") << "Failed to load " << model->getPath();
-			m_tiles.pop();
+			popTileQueue();
 			return;
 		}
 		if (!model->isReady()) return;
 
-		m_tiles.pop();
+		popTileQueue();
 
 		IAllocator& editor_allocator = m_app.getWorldEditor()->getAllocator();
 		Engine& engine = m_app.getWorldEditor()->getEngine();
@@ -723,21 +748,24 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 			return true;
 		}
 
-		WorldEditor* editor = m_app.getWorldEditor(); 
-		Engine& engine = editor->getEngine();
-		ResourceManager& resource_manager = engine.getResourceManager();
-		ResourceManagerBase* model_manager = resource_manager.get(MODEL_TYPE);
-
-		Model* model = (Model*)model_manager->load(path);
-		m_tiles.push(model);
-
+		if (!m_tile.queue.full())
+		{
+			pushTileQueue(path);
+			return true;
+		}
+		
+		m_tile.paths.push(path);
 		return true;
 	}
 
 
 	struct TileData
 	{
-		TileData(IAllocator& allocator) : data(allocator) {}
+		TileData(IAllocator& allocator) 
+			: data(allocator)
+			, queue(allocator)
+			, paths(allocator)
+		{}
 
 		Universe* universe = nullptr;
 		Pipeline* pipeline = nullptr;
@@ -747,10 +775,11 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		u32 path_hash;
 		Array<u8> data;
 		bgfx::TextureHandle texture = BGFX_INVALID_HANDLE;
+		Queue<Model*, 16> queue;
+		Array<Path> paths;
 	} m_tile;
 
 
-	Array<Model*> m_tiles;
 	StudioApp& m_app;
 	Universe* m_universe;
 	Pipeline* m_pipeline;
