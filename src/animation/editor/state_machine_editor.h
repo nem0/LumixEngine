@@ -229,6 +229,7 @@ public:
 	void deserialize(InputBlob& blob) override;
 	void serialize(OutputBlob& blob) override;
 	EntryNode* getEntryNode() const { return m_entry_node; }
+	void removeChild(Component* component) override;
 	void compile() override;
 	void removeEntry(EntryEdge& entry);
 	void dropSlot(const char* name, u32 slot, const ImVec2& canvas_screen_pos) override;
