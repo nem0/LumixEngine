@@ -251,7 +251,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 			serializer.read(&controller.default_set);
 		}
 		auto* res = tmp[0] ? m_engine.getResourceManager().get(CONTROLLER_RESOURCE_TYPE)->load(Path(tmp)) : nullptr;
-		controller.resource = (Anim::ControllerResource*)res;
+		setControllerResource(controller, (Anim::ControllerResource*)res);
 		m_universe.addComponent(entity, CONTROLLER_TYPE, this, {entity.index});
 	}
 
@@ -273,7 +273,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		for (Controller& controller : m_controllers)
 		{
 			unloadController(controller.resource);
-			LUMIX_DELETE(m_anim_system.m_allocator, controller.root);
+			setControllerResource(controller, nullptr);
 		}
 		m_controllers.clear();
 	}
@@ -474,6 +474,45 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
+	void setControllerResource(Controller& controller, Anim::ControllerResource* res)
+	{
+		if (controller.resource == res) return;
+		if (controller.resource != nullptr)
+		{
+			controller.resource->getObserverCb().unbind<AnimationSceneImpl, &AnimationSceneImpl::onControllerResourceChanged>(this);
+		}
+		if (controller.root != nullptr)
+		{
+			LUMIX_DELETE(m_engine.getAllocator(), controller.root);
+			controller.root = nullptr;
+			controller.default_set = 0;
+			controller.animations.clear();
+			controller.input.clear();
+		}
+		controller.resource = res;
+		if (controller.resource != nullptr)
+		{
+			controller.resource->onLoaded<AnimationSceneImpl, &AnimationSceneImpl::onControllerResourceChanged>(this);
+		}
+	}
+
+
+	void onControllerResourceChanged(Resource::State, Resource::State new_state, Resource& resource)
+	{
+		for (auto& controller : m_controllers)
+		{
+			if ((controller.resource == &resource) && (controller.root != nullptr) && (new_state != Resource::State::READY))
+			{
+				LUMIX_DELETE(m_engine.getAllocator(), controller.root);
+				controller.root = nullptr;
+				controller.default_set = 0;
+				controller.animations.clear();
+				controller.input.clear();
+			}
+		}
+	}
+
+
 	void destroyComponent(ComponentHandle component, ComponentType type) override
 	{
 		if (type == ANIMABLE_TYPE)
@@ -489,7 +528,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 			Entity entity = {component.index};
 			auto& controller = m_controllers.get(entity);
 			unloadController(controller.resource);
-			LUMIX_DELETE(m_anim_system.m_allocator, controller.root);
+			setControllerResource(controller, nullptr);
 			m_controllers.erase(entity);
 			m_universe.destroyComponent(entity, type, this, component);
 		}
@@ -560,7 +599,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 			serializer.read(controller.entity);
 			char tmp[MAX_PATH_LENGTH];
 			serializer.readString(tmp, lengthOf(tmp));
-			controller.resource = tmp[0] ? loadController(Path(tmp)) : nullptr;
+			setControllerResource(controller, tmp[0] ? loadController(Path(tmp)) : nullptr);
 			m_controllers.insert(controller.entity, controller);
 			ComponentHandle cmp = { controller.entity.index };
 			m_universe.addComponent(controller.entity, CONTROLLER_TYPE, this, cmp);
@@ -599,7 +638,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	{
 		auto& controller = m_controllers.get({cmp.index});
 		unloadController(controller.resource);
-		controller.resource = loadController(path);
+		setControllerResource(controller, loadController(path));
 		if (controller.resource->isReady() && m_is_game_running)
 		{
 			initControllerRuntime(controller);

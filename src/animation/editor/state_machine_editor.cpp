@@ -1159,6 +1159,21 @@ void StateMachine::removeEntry(EntryEdge& entry)
 }
 
 
+void StateMachine::removeChild(Component* component)
+{
+	Container::removeChild(component);
+	auto* sm = (Anim::StateMachine*)engine_cmp;
+	for (int i = 0; i < m_entry_node->entries.size(); ++i)
+	{
+		auto entry = m_entry_node->entries[i];
+		if (entry->getTo()->engine_cmp == component->engine_cmp)
+		{
+			LUMIX_DELETE(m_allocator, entry);
+			break;
+		}
+	}
+}
+
 void StateMachine::onGUI()
 {
 	Container::onGUI();
