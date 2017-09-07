@@ -256,6 +256,7 @@ private:
 	void onSetInputGUI(u8* data, Component& component);
 	void undo();
 	void redo();
+	void clearUndoStack();
 
 private:
 	StudioApp& m_app;
@@ -310,6 +311,9 @@ AnimationEditor::~AnimationEditor()
 {
 	IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
 	LUMIX_DELETE(allocator, m_resource);
+	for (auto& cmd : m_undo_stack) {
+		LUMIX_DELETE(allocator, cmd);
+	}
 }
 
 
@@ -473,6 +477,7 @@ void AnimationEditor::loadFromEntity()
 	ComponentHandle ctrl = scene->getComponent(entities[0], CONTROLLER_TYPE);
 	if (!ctrl.isValid()) return;
 	m_path = scene->getControllerSource(ctrl).c_str();
+	clearUndoStack();
 	load();
 }
 
@@ -505,6 +510,7 @@ void AnimationEditor::load()
 void AnimationEditor::loadFromFile()
 {
 	if (!PlatformInterface::getOpenFilename(m_path.data, lengthOf(m_path.data), "Animation controllers\0*.act\0", "")) return;
+	clearUndoStack();
 	load();
 }
 
@@ -518,6 +524,7 @@ void AnimationEditor::newController()
 	m_resource = LUMIX_NEW(allocator, ControllerResource)(*this, *manager, allocator);
 	m_container = (Container*)m_resource->getRoot();
 	m_path = "";
+	clearUndoStack();
 }
 
 
@@ -583,6 +590,17 @@ void AnimationEditor::undo()
 
 	m_undo_stack[m_undo_index]->undo();
 	--m_undo_index;
+}
+
+
+void AnimationEditor::clearUndoStack()
+{
+	IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
+	for (auto& cmd : m_undo_stack) {
+		LUMIX_DELETE(allocator, cmd);
+	}
+	m_undo_stack.clear();
+	m_undo_index = -1;
 }
 
 
