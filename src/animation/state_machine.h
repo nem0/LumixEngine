@@ -2,6 +2,7 @@
 
 
 #include "condition.h"
+#include "events.h"
 #include "engine/array.h"
 #include "engine/lumix.h"
 
@@ -84,6 +85,8 @@ struct Node : public Component
 	Array<Edge*> out_edges;
 	Array<u8> events;
 	int events_count = 0;
+	EventArray enter_events;
+	EventArray exit_events;
 };
 
 
@@ -123,6 +126,10 @@ struct NodeInstance : public ComponentInstance
 
 	ComponentInstance* checkOutEdges(Node& node, RunningContext& rc);
 	void queueEvents(RunningContext& rc, float old_time, float time, float length);
+	void queueEnterEvents(RunningContext& rc);
+	void queueExitEvents(RunningContext& rc);
+protected:
+	void queueEventArray(RunningContext& rc, const EventArray& events);
 };
 
 

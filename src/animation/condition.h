@@ -81,7 +81,6 @@ struct InputDecl
 			if (idx == 0) return i;
 			--idx;
 		}
-		ASSERT(false);
 		return -1;
 	}
 
