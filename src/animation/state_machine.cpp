@@ -169,6 +169,8 @@ Node::Node(Component::Type type, IAllocator& _allocator)
 	, out_edges(_allocator)
 	, allocator(_allocator)
 	, events(allocator)
+	, enter_events(allocator)
+	, exit_events(allocator)
 {
 }
 
@@ -181,6 +183,18 @@ void Node::serialize(OutputBlob& blob)
 	{
 		blob.write(events.size());
 		blob.write(&events[0], events.size());
+	}
+	blob.write(enter_events.count);
+	if (enter_events.count > 0)
+	{
+		blob.write(enter_events.data.size());
+		blob.write(&enter_events.data[0], enter_events.data.size());
+	}
+	blob.write(exit_events.count);
+	if (exit_events.count > 0)
+	{
+		blob.write(exit_events.data.size());
+		blob.write(&exit_events.data[0], exit_events.data.size());
 	}
 }
 
@@ -195,6 +209,25 @@ void Node::deserialize(InputBlob& blob, Container* parent, int version)
 		blob.read(size);
 		events.resize(size);
 		blob.read(&events[0], size);
+	}
+	if (version > (int)ControllerResource::Version::ENTER_EXIT_EVENTS)
+	{
+		blob.read(enter_events.count);
+		if (enter_events.count > 0)
+		{
+			int size;
+			blob.read(size);
+			enter_events.data.resize(size);
+			blob.read(&enter_events.data[0], size);
+		}
+		blob.read(exit_events.count);
+		if (exit_events.count > 0)
+		{
+			int size;
+			blob.read(size);
+			exit_events.data.resize(size);
+			blob.read(&exit_events.data[0], size);
+		}
 	}
 }
 
@@ -273,6 +306,7 @@ void Blend1DNodeInstance::onAnimationSetUpdated(AnimSet& anim_set)
 
 void Blend1DNodeInstance::enter(RunningContext& rc, ComponentInstance* from)
 {
+	queueEnterEvents(rc);
 	time = 0;
 	if (node.items.size() > lengthOf(instances))
 	{
@@ -412,6 +446,37 @@ void NodeInstance::queueEvents(RunningContext& rc, float old_time, float time, f
 }
 
 
+void NodeInstance::queueEnterEvents(RunningContext& rc)
+{
+	Node& node = (Node&)source;
+	queueEventArray(rc, node.enter_events);
+}
+
+
+void NodeInstance::queueExitEvents(RunningContext& rc)
+{
+	Node& node = (Node&)source;
+	queueEventArray(rc, node.exit_events);
+}
+
+
+void NodeInstance::queueEventArray(RunningContext& rc, const EventArray& events)
+{
+	if (events.count <= 0) return;
+
+	auto headers = (EnterExitEventHeader*)&events.data[0];
+	for (int i = 0; i < events.count; ++i)
+	{
+		auto& header = headers[i];
+		rc.event_stream->write(header.type);
+		rc.event_stream->write(rc.controller);
+		rc.event_stream->write(header.size);
+		rc.event_stream->write(
+			&events.data[0] + header.offset + sizeof(EnterExitEventHeader) * events.count, header.size);
+	}
+}
+
+
 ComponentInstance* NodeInstance::checkOutEdges(Node& node, RunningContext& rc)
 {
 	rc.current = this;
@@ -421,6 +486,7 @@ ComponentInstance* NodeInstance::checkOutEdges(Node& node, RunningContext& rc)
 		if (edge->condition(rc))
 		{
 			ComponentInstance* new_item = edge->createInstance(*rc.allocator);
+			queueExitEvents(rc);
 			new_item->enter(rc, this);
 			return new_item;
 		}
@@ -532,7 +598,8 @@ struct AnimationNodeInstance : public NodeInstance
 
 
 	void enter(RunningContext& rc, ComponentInstance* from) override
-	{ 
+	{
+		queueEnterEvents(rc);
 		time = 0;
 		if (node.animations_hashes.empty()) return;
 		int idx = Math::rand() % node.animations_hashes.size();
@@ -743,6 +810,46 @@ Component* createComponent(Component::Type type, IAllocator& allocator)
 		case Component::SIMPLE_ANIMATION: return LUMIX_NEW(allocator, AnimationNode)(allocator);
 		default: ASSERT(false); return nullptr;
 	}
+}
+
+
+void EventArray::remove(int index)
+{
+	auto headers = (Anim::EnterExitEventHeader*)&data[0];
+	auto header = headers[index];
+	u8* headers_end = (u8*)(headers + count);
+	u8* end = &data.back() + 1;
+	u8* event_start = headers_end + header.offset;
+	u8* event_end = event_start + header.size;
+
+	for (int i = index + 1; i < count; ++i)
+	{
+		auto& h = headers[i];
+		h.offset -= header.size;
+	}
+
+	u8* header_start = (u8*)&headers[index];
+	u8* header_end = header_start + sizeof(Anim::EnterExitEventHeader);
+	moveMemory(header_start, header_end, event_start - header_end);
+	moveMemory(event_start - sizeof(Anim::EnterExitEventHeader), event_end, end - event_end);
+
+	data.resize(data.size() - sizeof(Anim::EnterExitEventHeader) - header.size);
+
+	--count;
+}
+
+
+void EventArray::append(int size, u32 type)
+{
+	int old_payload_size = data.size() - sizeof(Anim::EnterExitEventHeader) * count;
+	data.resize(data.size() + size + sizeof(Anim::EnterExitEventHeader));
+	u8* headers_end = &data[count * sizeof(Anim::EnterExitEventHeader)];
+	moveMemory(headers_end + sizeof(Anim::EnterExitEventHeader), headers_end, old_payload_size);
+	auto& event_header = *(Anim::EnterExitEventHeader*)&data[sizeof(Anim::EnterExitEventHeader) * count];
+	event_header.type = type;
+	event_header.size = size;
+	event_header.offset = old_payload_size;
+	++count;
 }
 
 

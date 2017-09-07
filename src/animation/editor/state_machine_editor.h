@@ -11,7 +11,11 @@ namespace Lumix
 {
 
 class ResourceManagerBase;
-namespace Anim { class ControllerResource; } 
+namespace Anim
+{
+	class ControllerResource;
+	struct EventArray;
+}
 
 
 namespace AnimEditor
@@ -81,6 +85,9 @@ public:
 	void removeEdge(Edge* edge) { m_edges.eraseItemFast(edge); }
 	void removeInEdge(Edge* edge) { m_in_edges.eraseItemFast(edge); }
 	void removeEvent(int index);
+
+protected:
+	void onGuiEvents(Anim::EventArray& events, const char* label);
 
 public:
 	ImVec2 pos;

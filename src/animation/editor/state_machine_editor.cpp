@@ -205,12 +205,12 @@ void Node::removeEvent(int index)
 }
 
 
-static const char* getEventTypeName(const Anim::EventHeader& event, AnimEditor::IAnimationEditor& editor)
+static const char* getEventTypeName(u32 type, AnimEditor::IAnimationEditor& editor)
 {
 	int count = editor.getEventTypesCount();
 	for (int i = 0; i < count; ++i)
 	{
-		if (editor.getEventTypeByIdx(i).type == event.type)
+		if (editor.getEventTypeByIdx(i).type == type)
 		{
 			return editor.getEventTypeByIdx(i).label;
 		}
@@ -224,15 +224,19 @@ void Node::onGUI()
 	u32 set_input_type = crc32("set_input");
 	ImGui::InputText("Name", name.data, lengthOf(name.data));
 	if (!engine_cmp) return;
+	auto* engine_node = ((Anim::Node*)engine_cmp);
+
+	onGuiEvents(engine_node->enter_events, "Enter Events");
+	onGuiEvents(engine_node->exit_events, "Exit Events");
+
 	if (!ImGui::CollapsingHeader("Events")) return;
 
-	auto* engine_node = ((Anim::Node*)engine_cmp);
 	auto& events = engine_node->events;
 	auto& editor = m_controller.getEditor();
 	for(int i = 0; i < engine_node->events_count; ++i)
 	{
 		Anim::EventHeader& header = *(Anim::EventHeader*)&events[sizeof(Anim::EventHeader) * i];
-		const char* event_type_name = getEventTypeName(header, editor);
+		const char* event_type_name = getEventTypeName(header.type, editor);
 		if (ImGui::TreeNode((void*)(uintptr)i, "%s - %fs", event_type_name, header.time))
 		{
 			if (ImGui::Button("Remove"))
@@ -276,6 +280,49 @@ void Node::onGUI()
 		newEvent(event_type.size, event_type.type);
 		++engine_node->events_count;
 	}
+}
+
+
+void  Node::onGuiEvents(Anim::EventArray& events, const char* label)
+{
+	if (!ImGui::CollapsingHeader(label)) return;
+	ImGui::PushID(label);
+
+	auto* engine_node = ((Anim::Node*)engine_cmp);
+	auto& editor = m_controller.getEditor();
+	for (int i = 0; i < events.count; ++i)
+	{
+		auto& header = *(Anim::EnterExitEventHeader*)&events.data[sizeof(Anim::EnterExitEventHeader) * i];
+		const char* event_type_name = getEventTypeName(header.type, editor);
+		if (ImGui::TreeNode((void*)(uintptr)i, "%s", event_type_name))
+		{
+			if (ImGui::Button("Remove"))
+			{
+				events.remove(i);
+				ImGui::TreePop();
+				break;
+			}
+			int event_offset = header.offset + sizeof(Anim::EnterExitEventHeader) * events.count;
+			editor.getEventType(header.type).editor.invoke(&events.data[event_offset], *this);
+			ImGui::TreePop();
+		}
+	}
+
+	auto getter = [](void* data, int idx, const char** out) -> bool {
+		auto* node = (Node*)data;
+		*out = node->m_controller.getEditor().getEventTypeByIdx(idx).label;
+		return true;
+	};
+	static int current = 0;
+	ImGui::Combo("", &current, getter, this, editor.getEventTypesCount());
+	ImGui::SameLine();
+	if (ImGui::Button("Add event"))
+	{
+		auto& event_type = editor.getEventTypeByIdx(current);
+		events.append(event_type.size, event_type.type);
+	}
+
+	ImGui::PopID();
 }
 
 
