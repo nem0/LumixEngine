@@ -2100,28 +2100,28 @@ public:
 			if (info.filename[0] == '.') continue;
 
 			StaticString<MAX_PATH_LENGTH> filepath(scn_dir, info.filename);
-			loadFile(filepath, [&versions, &filepath, this](TextDeserializer& deserializer) {
-				char plugin_name[64];
-				PathUtils::getBasename(plugin_name, lengthOf(plugin_name), filepath);
-				IScene* scene = m_universe->getScene(crc32(plugin_name));
-				if (scene)
+			char plugin_name[64];
+			PathUtils::getBasename(plugin_name, lengthOf(plugin_name), filepath);
+			IScene* scene = m_universe->getScene(crc32(plugin_name));
+			if (!scene)
+			{
+				g_log_error.log("Editor") << "Could not open " << filepath << " since there is not plugin " << plugin_name;
+				newUniverse();
+				return;
+			}
+
+			loadFile(filepath, [scene, &versions, &filepath, this](TextDeserializer& deserializer) {
+				int version;
+				deserializer.read(&version);
+				for (int i = 0; i < ComponentType::MAX_TYPES_COUNT; ++i)
 				{
-					int version;
-					deserializer.read(&version);
-					for (int i = 0; i < ComponentType::MAX_TYPES_COUNT; ++i)
+					ComponentType cmp_type = {i};
+					if (m_universe->getScene(cmp_type) == scene)
 					{
-						ComponentType cmp_type = {i};
-						if (m_universe->getScene(cmp_type) == scene)
-						{
-							versions[i] = version;
-						}
+						versions[i] = version;
 					}
-					scene->deserialize(deserializer);
 				}
-				else
-				{
-					g_log_error.log("Editor") << "Could not open " << filepath << " since there is not plugin " << plugin_name;
-				}
+				scene->deserialize(deserializer);
 			});
 		}
 		PlatformInterface::destroyFileIterator(scn_file_iter);
