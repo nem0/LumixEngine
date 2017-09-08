@@ -262,9 +262,9 @@ void record(const char* name, int value)
 
 void* beginBlock(const char* name)
 {
-	auto data = getBlock(name);
+	BlockInfo data = getBlock(name);
 
-	auto& hit = data.block->m_hits.emplace();
+	Block::Hit& hit = data.block->m_hits.emplace();
 	hit.m_start = g_instance.timer->getRawTimeSinceStart();
 	hit.m_length = 0;
 
