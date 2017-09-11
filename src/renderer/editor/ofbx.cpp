@@ -174,7 +174,7 @@ static Matrix getRotationMatrix(const Vec3& euler, RotationOrder order)
 	switch (order) {
 		default:
 		case RotationOrder::SPHERIC_XYZ:
-			printf("Warning: Unsupported rotation order: %d\n", order);
+			assert(false);
 		case RotationOrder::EULER_XYZ:
 			return rz * ry * rx;
 		case RotationOrder::EULER_XZY:
