@@ -174,7 +174,7 @@ static Matrix getRotationMatrix(const Vec3& euler, RotationOrder order)
 	switch (order) {
 		default:
 		case RotationOrder::SPHERIC_XYZ:
-			assert(false); // not supported
+			printf("Warning: Unsupported rotation order: %d\n", order);
 		case RotationOrder::EULER_XYZ:
 			return rz * ry * rx;
 		case RotationOrder::EULER_XZY:
@@ -1210,6 +1210,7 @@ struct ClusterImpl : Cluster
 			int old_idx = ir[i];
 			double w = wr[i];
 			GeometryImpl::NewVertex* n = &geom->to_new_vertices[old_idx];
+			if (n->index == -1) continue; // skip vertices which aren't indexed.
 			while (n)
 			{
 				indices.push_back(n->index);
@@ -2049,7 +2050,7 @@ static OptionalError<Object*> parseGeometry(const Scene& scene, const Element& e
 		geom->vertices[i] = vertices[geom->to_old_vertices[i]];
 	}
 
-	geom->to_new_vertices.resize(geom->to_old_vertices.size());
+	geom->to_new_vertices.resize(vertices.size()); // some vertices can be unused, so this isn't necessarily the same size as to_old_vertices.
 	const int* to_old_vertices = geom->to_old_vertices.empty() ? nullptr : &geom->to_old_vertices[0];
 	for (int i = 0, c = (int)geom->to_old_vertices.size(); i < c; ++i)
 	{
@@ -2608,7 +2609,7 @@ Matrix Object::evalLocal(const Vec3& translation, const Vec3& rotation) const
 
 	Matrix r = getRotationMatrix(rotation, rotation_order);
 	Matrix r_pre = getRotationMatrix(getPreRotation(), RotationOrder::EULER_XYZ);
-	Matrix r_post_inv = getRotationMatrix(getPostRotation(), RotationOrder::EULER_XYZ);
+	Matrix r_post_inv = getRotationMatrix(-getPostRotation(), RotationOrder::EULER_ZYX);
 
 	Matrix r_off = makeIdentity();
 	setTranslation(getRotationOffset(), &r_off);
