@@ -13,6 +13,7 @@
 #include "engine/engine.h"
 #include "engine/plugin_manager.h"
 #include "engine/property_register.h"
+#include "engine/system.h"
 #include "engine/universe/universe.h"
 #include "imgui/imgui.h"
 #include "renderer/render_scene.h"
@@ -98,6 +99,13 @@ struct AssetBrowserPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 
 
 	bool hasResourceManager(ResourceType type) const override { return type == CLIP_TYPE; }
+
+
+	bool createTile(const char* in_path, const char* out_path, ResourceType type) override
+	{
+		if (type == CLIP_TYPE) return copyFile("models/editor/tile_audio.dds", out_path);
+		return false;
+	}
 
 
 	ResourceType getResourceType(const char* ext) override

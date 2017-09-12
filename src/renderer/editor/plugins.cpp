@@ -23,6 +23,7 @@
 #include "engine/queue.h"
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
+#include "engine/system.h"
 #include "game_view.h"
 #include "import_asset_dialog.h"
 #include "renderer/frame_buffer.h"
@@ -737,16 +738,15 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 	}
 
 
-	bool createTile(const char* path_c_str, ResourceType type) override
+	bool createTile(const char* in_path, const char* out_path, ResourceType type) override
 	{
+		if (type == TEXTURE_TYPE) return copyFile("models/editor/tile_texture.dds", out_path);
+		if (type == MATERIAL_TYPE) return copyFile("models/editor/tile_material.dds", out_path);
+		if (type == SHADER_TYPE) return copyFile("models/editor/tile_shader.dds", out_path);
+
 		if (type != MODEL_TYPE) return false;
 
-		Path path(path_c_str);
-		StaticString<MAX_PATH_LENGTH> fullpath(".lumix/asset_tiles/", path.getHash(), ".dds");
-		if (PlatformInterface::fileExists(fullpath) && PlatformInterface::getLastModified(fullpath) > PlatformInterface::getLastModified(path.c_str()))
-		{
-			return true;
-		}
+		Path path(in_path);
 
 		if (!m_tile.queue.full())
 		{
