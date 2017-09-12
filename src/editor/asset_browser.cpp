@@ -26,7 +26,7 @@ namespace Lumix
 static const u32 SOURCE_HASH = crc32("source");
 
 
-bool AssetBrowser::IPlugin::createTile(const char* path, ResourceType type)
+bool AssetBrowser::IPlugin::createTile(const char* in_path, const char* out_path, ResourceType type)
 {
 	return false;
 }
@@ -398,6 +398,18 @@ int AssetBrowser::getThumbnailIndex(int i, int j, int columns) const
 }
 
 
+void AssetBrowser::createTile(FileInfo& tile, const char* out_path)
+{
+	if (tile.create_called) return;
+	tile.create_called = true;
+	for (IPlugin* plugin : m_plugins)
+	{
+		ResourceType type = getResourceType(tile.filepath);
+		if (plugin->createTile(tile.filepath, out_path, type)) break;
+	}
+}
+
+
 void AssetBrowser::thumbnail(FileInfo& tile)
 {
 	ImGui::BeginGroup();
@@ -410,18 +422,13 @@ void AssetBrowser::thumbnail(FileInfo& tile)
 	{
 		ImGui::Rect(img_size.x, img_size.y, 0xffffFFFF);
 		StaticString<MAX_PATH_LENGTH> path(".lumix/asset_tiles/", tile.file_path_hash, ".dds");
+		createTile(tile, path);
 		if (PlatformInterface::fileExists(path))
 		{
 			RenderInterface* ri = m_app.getWorldEditor()->getRenderInterface();
-			tile.tex = ri->loadTexture(Path(path));
-		}
-		if (!tile.create_called)
-		{
-			tile.create_called = true;
-			for (IPlugin* plugin : m_plugins)
+			if (PlatformInterface::getLastModified(path) >= PlatformInterface::getLastModified(tile.filepath))
 			{
-				ResourceType type = getResourceType(tile.filepath);
-				if (plugin->createTile(tile.filepath, type)) break;
+				tile.tex = ri->loadTexture(Path(path));
 			}
 		}
 	}

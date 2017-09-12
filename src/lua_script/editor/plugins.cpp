@@ -24,6 +24,7 @@
 #include "engine/property_descriptor.h"
 #include "engine/property_register.h"
 #include "engine/resource_manager.h"
+#include "engine/system.h"
 #include "engine/universe/universe.h"
 #include "imgui/imgui.h"
 #include "lua_script/lua_script_manager.h"
@@ -552,12 +553,19 @@ struct AssetBrowserPlugin : AssetBrowser::IPlugin
 	bool hasResourceManager(ResourceType type) const override { return type == LUA_SCRIPT_RESOURCE_TYPE; }
 
 
+	bool createTile(const char* in_path, const char* out_path, ResourceType type) override
+	{
+		if (type == LUA_SCRIPT_RESOURCE_TYPE)
+		{
+			return copyFile("models/editor/tile_lua_script.dds", out_path);
+		}
+		return false;
+	}
+
+
 	StudioApp& m_app;
 	char m_text_buffer[8192];
 };
-
-
-
 
 
 struct ConsolePlugin LUMIX_FINAL : public StudioApp::IPlugin

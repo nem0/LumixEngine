@@ -17,6 +17,7 @@
 #include "engine/path.h"
 #include "engine/property_register.h"
 #include "engine/resource_manager.h"
+#include "engine/system.h"
 #include "engine/universe/universe.h"
 #include "imgui/imgui.h"
 #include "renderer/model.h"
@@ -76,6 +77,12 @@ struct AssetBrowserPlugin : AssetBrowser::IPlugin
 	bool hasResourceManager(ResourceType type) const override { return type == ANIMATION_TYPE; }
 
 
+	bool createTile(const char* in_path, const char* out_path, ResourceType type) override
+	{
+		if (type == ANIMATION_TYPE) return copyFile("models/editor/tile_animation.dds", out_path);
+		return false;
+	}
+
 	ResourceType getResourceType(const char* ext) override
 	{
 		if (equalStrings(ext, "ani")) return ANIMATION_TYPE;
@@ -128,6 +135,13 @@ struct AnimControllerAssetBrowserPlugin : AssetBrowser::IPlugin
 	{
 		if (equalStrings(ext, "act")) return CONTROLLER_RESOURCE_TYPE;
 		return INVALID_RESOURCE_TYPE;
+	}
+
+
+	bool createTile(const char* in_path, const char* out_path, ResourceType type) override
+	{
+		if (type == CONTROLLER_RESOURCE_TYPE) return copyFile("models/editor/tile_animation_graph.dds", out_path);
+		return false;
 	}
 
 

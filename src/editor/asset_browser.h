@@ -34,7 +34,7 @@ public:
 		virtual const char* getName() const = 0;
 		virtual bool hasResourceManager(ResourceType type) const = 0;
 		virtual bool acceptExtension(const char* ext, ResourceType type) const = 0;
-		virtual bool createTile(const char* path, ResourceType type);
+		virtual bool createTile(const char* in_path, const char* out_path, ResourceType type);
 		virtual void update() {}
 	};
 
@@ -78,6 +78,7 @@ private:
 	void middleColumn();
 	void rightColumn();
 
+	void createTile(FileInfo& tile, const char* out_path);
 	void thumbnail(FileInfo& tile);
 	int getThumbnailIndex(int i, int j, int columns) const;
 	void doFilter();
