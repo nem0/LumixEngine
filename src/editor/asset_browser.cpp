@@ -443,6 +443,7 @@ void AssetBrowser::middleColumn()
 
 	float w = ImGui::GetContentRegionAvailWidth();
 	int columns = m_show_thumbnails ? (int)w / TILE_SIZE : 1;
+	columns = Math::maximum(columns, 1);
 	int tile_count = m_filtered_file_infos.empty() ? m_file_infos.size() : m_filtered_file_infos.size();
 	int row_count = m_show_thumbnails ? (tile_count + columns - 1) / columns : tile_count;
 	ImGuiListClipper clipper(row_count);
