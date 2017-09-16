@@ -2376,6 +2376,8 @@ static bool parseObjects(const Element& root, Scene* scene)
 					obj = parseLimbNode(*scene, *iter.second.element);
 				else if (class_prop->getValue() == "Null")
 					obj = parse<NullImpl>(*scene, *iter.second.element);
+				else if (class_prop->getValue() == "Root")
+					obj = parse<NullImpl>(*scene, *iter.second.element);
 			}
 		}
 		else if (iter.second.element->id == "Texture")
@@ -2486,7 +2488,7 @@ static bool parseObjects(const Element& root, Scene* scene)
 			case Object::Type::CLUSTER:
 			{
 				ClusterImpl* cluster = (ClusterImpl*)parent;
-				if (child->getType() == Object::Type::LIMB_NODE)
+				if (child->getType() == Object::Type::LIMB_NODE || child->getType() == Object::Type::MESH || child->getType() == Object::Type::NULL_NODE)
 				{
 					if (cluster->link)
 					{
