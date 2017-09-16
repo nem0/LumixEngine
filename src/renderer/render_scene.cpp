@@ -6,14 +6,12 @@
 #include "engine/engine.h"
 #include "engine/fs/file_system.h"
 #include "engine/geometry.h"
+#include "engine/job_system.h"
 #include "engine/json_serializer.h"
 #include "engine/lifo_allocator.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
 #include "engine/math_utils.h"
-#include "engine/mtjd/generic_job.h"
-#include "engine/mtjd/job.h"
-#include "engine/mtjd/manager.h"
 #include "engine/path_utils.h"
 #include "engine/plugin_manager.h"
 #include "engine/profiler.h"
@@ -3061,25 +3059,10 @@ public:
 		return &m_culling_system->getResult();
 	}
 
-	
-	void runJobs(Array<MTJD::Job*>& jobs, MTJD::Group& sync_point)
-	{
-		PROFILE_FUNCTION();
-		for (int i = 0; i < jobs.size(); ++i)
-		{
-			m_engine.getMTJDManager().schedule(jobs[i]);
-		}
-		if (!jobs.empty())
-		{
-			sync_point.sync();
-		}
-	}
-
 
 	void fillTemporaryInfos(const CullingSystem::Results& results, const Frustum& frustum, const Vec3& lod_ref_point)
 	{
 		PROFILE_FUNCTION();
-		m_jobs.clear();
 
 		while (m_temporary_infos.size() < results.size())
 		{
@@ -3090,47 +3073,46 @@ public:
 			m_temporary_infos.pop();
 		}
 
+		JobSystem::LambdaJob jobs[64];
+		ASSERT(results.size() <= lengthOf(jobs));
+
 		for (int subresult_index = 0; subresult_index < results.size(); ++subresult_index)
 		{
 			Array<ModelInstanceMesh>& subinfos = m_temporary_infos[subresult_index];
 			subinfos.clear();
 			if (results[subresult_index].empty()) continue;
 
-			MTJD::Job* job = MTJD::makeJob(m_engine.getMTJDManager(),
-				[&subinfos, this, &results, subresult_index, &frustum, lod_ref_point]()
+			JobSystem::fromLambda([&subinfos, this, &results, subresult_index, &frustum, lod_ref_point]() {
+				PROFILE_BLOCK("Temporary Info Job");
+				PROFILE_INT("ModelInstance count", results[subresult_index].size());
+				Vec3 ref_point = lod_ref_point;
+				float lod_multiplier = m_lod_multiplier;
+				if (frustum.fov > 0)
 				{
-					PROFILE_BLOCK("Temporary Info Job");
-					PROFILE_INT("ModelInstance count", results[subresult_index].size());
-					Vec3 ref_point = lod_ref_point;
-					float lod_multiplier = m_lod_multiplier;
-					if (frustum.fov > 0)
-					{
-						float t = frustum.fov / Math::degreesToRadians(60.0f);
-						lod_multiplier *= t * t;
-					}
-					const ComponentHandle* LUMIX_RESTRICT raw_subresults = &results[subresult_index][0];
-					ModelInstance* LUMIX_RESTRICT model_instances = &m_model_instances[0];
-					for (int i = 0, c = results[subresult_index].size(); i < c; ++i)
-					{
-						const ModelInstance* LUMIX_RESTRICT model_instance = &model_instances[raw_subresults[i].index];
-						float squared_distance = (model_instance->matrix.getTranslation() - ref_point).squaredLength();
-						squared_distance *= lod_multiplier;
+					float t = frustum.fov / Math::degreesToRadians(60.0f);
+					lod_multiplier *= t * t;
+				}
+				const ComponentHandle* LUMIX_RESTRICT raw_subresults = &results[subresult_index][0];
+				ModelInstance* LUMIX_RESTRICT model_instances = &m_model_instances[0];
+				for (int i = 0, c = results[subresult_index].size(); i < c; ++i)
+				{
+					const ModelInstance* LUMIX_RESTRICT model_instance = &model_instances[raw_subresults[i].index];
+					float squared_distance = (model_instance->matrix.getTranslation() - ref_point).squaredLength();
+					squared_distance *= lod_multiplier;
 
-						const Model* LUMIX_RESTRICT model = model_instance->model;
-						LODMeshIndices lod = model->getLODMeshIndices(squared_distance);
-						for (int j = lod.from, c = lod.to; j <= c; ++j)
-						{
-							auto& info = subinfos.emplace();
-							info.model_instance = raw_subresults[i];
-							info.mesh = &model_instance->meshes[j];
-						}
+					const Model* LUMIX_RESTRICT model = model_instance->model;
+					LODMeshIndices lod = model->getLODMeshIndices(squared_distance);
+					for (int j = lod.from, c = lod.to; j <= c; ++j)
+					{
+						auto& info = subinfos.emplace();
+						info.model_instance = raw_subresults[i];
+						info.mesh = &model_instance->meshes[j];
 					}
-				},
-				m_allocator);
-			job->addDependency(&m_sync_point);
-			m_jobs.push(job);
+				}
+			}, &jobs[subresult_index], nullptr);
+			JobSystem::runJobs(&jobs[subresult_index], 1, nullptr);
 		}
-		runJobs(m_jobs, m_sync_point);
+		JobSystem::waitOutsideJob();
 	}
 
 
@@ -4986,8 +4968,6 @@ private:
 	Array<DebugPoint> m_debug_points;
 
 	Array<Array<ModelInstanceMesh>> m_temporary_infos;
-	MTJD::Group m_sync_point;
-	Array<MTJD::Job*> m_jobs;
 
 	float m_time;
 	float m_lod_multiplier;
@@ -5059,8 +5039,6 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	, m_debug_lines(m_allocator)
 	, m_debug_points(m_allocator)
 	, m_temporary_infos(m_allocator)
-	, m_sync_point(true, m_allocator)
-	, m_jobs(m_allocator)
 	, m_active_global_light_cmp(INVALID_COMPONENT)
 	, m_point_light_last_cmp(INVALID_COMPONENT)
 	, m_is_grass_enabled(true)
@@ -5076,7 +5054,7 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	is_opengl = renderer.isOpenGL();
 	m_universe.entityTransformed().bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
 	m_universe.entityDestroyed().bind<RenderSceneImpl, &RenderSceneImpl::onEntityDestroyed>(this);
-	m_culling_system = CullingSystem::create(m_engine.getMTJDManager(), m_allocator);
+	m_culling_system = CullingSystem::create(m_allocator);
 	m_model_instances.reserve(5000);
 
 	for (auto& i : COMPONENT_INFOS)

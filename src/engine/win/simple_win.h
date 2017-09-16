@@ -521,6 +521,7 @@ WINBASEAPI HANDLE WINAPI CreateThread(LPSECURITY_ATTRIBUTES lpThreadAttributes,
 	LPDWORD lpThreadId);
 WINBASEAPI DWORD WINAPI ResumeThread(HANDLE hThread);
 WINBASEAPI DWORD WINAPI SetThreadIdealProcessor(HANDLE hThread, DWORD dwIdealProcessor);
+WINBASEAPI DWORD_PTR WINAPI SetThreadAffinityMask(HANDLE hThread, DWORD_PTR dwThreadAffinityMask);
 WINBASEAPI BOOL WINAPI SetThreadPriority(HANDLE hThread, int nPriority);
 WINBASEAPI BOOL WINAPI GetExitCodeThread(HANDLE hThread, LPDWORD lpExitCode);
 WINBASEAPI VOID WINAPI ExitThread(DWORD dwExitCode);

@@ -22,7 +22,7 @@ LUMIX_ENGINE_API void sleep(u32 milliseconds);
 LUMIX_ENGINE_API void yield();
 LUMIX_ENGINE_API u32 getCPUsCount();
 LUMIX_ENGINE_API ThreadID getCurrentThreadID();
-LUMIX_ENGINE_API u32 getThreadAffinityMask();
+LUMIX_ENGINE_API u64 getThreadAffinityMask();
 
 
 } // namespace MT

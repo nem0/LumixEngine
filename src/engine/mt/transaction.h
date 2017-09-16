@@ -14,7 +14,7 @@ namespace Lumix
 			void waitForCompletion() { return m_event.wait();	}
 			void reset()	{ m_event.reset(); }
 
-			Transaction() : m_event() { }
+			Transaction() : m_event(false) { }
 
 			MT::Event	m_event;
 			T			data;

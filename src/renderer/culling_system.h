@@ -12,10 +12,6 @@ namespace Lumix
 	struct Vec3;
 
 
-	namespace MTJD
-	{
-		class Manager;
-	}
 	struct Frustum;
 
 	class LUMIX_RENDERER_API CullingSystem
@@ -28,7 +24,7 @@ namespace Lumix
 		CullingSystem() { }
 		virtual ~CullingSystem() { }
 
-		static CullingSystem* create(MTJD::Manager& mtjd_manager, IAllocator& allocator);
+		static CullingSystem* create(IAllocator& allocator);
 		static void destroy(CullingSystem& culling_system);
 
 		virtual void clear() = 0;

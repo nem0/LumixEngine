@@ -3,8 +3,6 @@
 #include "engine/win/simple_win.h"
 
 
-
-
 namespace Lumix
 {
 	namespace MT
@@ -27,12 +25,11 @@ namespace Lumix
 
 		ThreadID getCurrentThreadID() { return ::GetCurrentThreadId(); }
 
-		u32 getThreadAffinityMask()
+		u64 getThreadAffinityMask()
 		{
-			PROCESSOR_NUMBER proc_number;
-			BOOL ret = ::GetThreadIdealProcessorEx(::GetCurrentThread(), &proc_number);
-			ASSERT(ret);
-			return proc_number.Number;
+			DWORD_PTR affinity_mask = ::SetThreadAffinityMask(::GetCurrentThread(), ~(u64)0);
+			::SetThreadAffinityMask(::GetCurrentThread(), affinity_mask);
+			return affinity_mask;
 		}
 
 		static const DWORD MS_VC_EXCEPTION = 0x406D1388;

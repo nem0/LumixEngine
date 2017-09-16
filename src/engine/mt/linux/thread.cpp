@@ -33,17 +33,19 @@ ThreadID getCurrentThreadID()
 	return pthread_self();
 }
 
-u32 getThreadAffinityMask()
+u64 getThreadAffinityMask()
 {
-	cpu_set_t affinity;
-	int r = pthread_getaffinity_np(pthread_self(), sizeof(affinity), &affinity);
+	cpu_set_t cpu_set;
+	int r = pthread_getaffinity_np(pthread_self(), sizeof(cpu_set), &cpu_set);
 	ASSERT(r == 0);
 	if(CPU_COUNT(&affinity) == 0) return 0;
-	for(int i = 0; i < 1024; ++i)
+	
+	int affinity = 0;
+	for(u64 i = 0; i < sizeof(u64) * 8; ++i)
 	{
-		if (CPU_ISSET(i, &affinity)) return i;
+		if (CPU_ISSET(i, &cpu_set)) affinity = affinity | (1 << i);
 	}
-	return 0;
+	return affinity;
 }
 
 

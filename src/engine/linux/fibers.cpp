@@ -1,5 +1,4 @@
 #include "engine/fibers.h"
-#include <Windows.h>
 
 
 namespace Lumix
@@ -10,7 +9,19 @@ namespace Fiber
 {
 
 
-Handle init(void* parameter)
+bool init(Engine& engine)
+{
+	ASSERT(false);
+}
+
+
+void shutdown()
+{
+	ASSERT(false);
+}
+
+
+Handle createFromThread(void* parameter)
 {
 	ASSERT(false);
 	return nullptr;
@@ -21,6 +32,12 @@ Handle create(int stack_size, FiberProc proc, void* parameter)
 {
 	ASSERT(false);
 	return nullptr;
+}
+
+
+void destroy(Handle fiber)
+{
+	ASSERT(false);
 }
 
 

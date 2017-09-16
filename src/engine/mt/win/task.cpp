@@ -24,7 +24,7 @@ struct TaskImpl
 	IAllocator& m_allocator;
 	HANDLE m_handle;
 	DWORD m_thread_id;
-	u32 m_affinity_mask;
+	u64 m_affinity_mask;
 	u32 m_priority;
 	volatile bool m_is_running;
 	volatile bool m_force_exit;
@@ -105,16 +105,16 @@ bool Task::destroy()
 	return true;
 }
 
-void Task::setAffinityMask(u32 affinity_mask)
+void Task::setAffinityMask(u64 affinity_mask)
 {
 	m_implementation->m_affinity_mask = affinity_mask;
 	if (m_implementation->m_handle)
 	{
-		::SetThreadIdealProcessor(m_implementation->m_handle, affinity_mask);
+		::SetThreadAffinityMask(m_implementation->m_handle, affinity_mask);
 	}
 }
 
-u32 Task::getAffinityMask() const
+u64 Task::getAffinityMask() const
 {
 	return m_implementation->m_affinity_mask;
 }

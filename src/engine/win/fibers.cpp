@@ -10,7 +10,7 @@ namespace Fiber
 {
 
 
-Handle init(void* parameter)
+Handle createFromThread(void* parameter)
 {
 	return ConvertThreadToFiber(parameter);
 }
@@ -19,6 +19,12 @@ Handle init(void* parameter)
 Handle create(int stack_size, FiberProc proc, void* parameter)
 {
 	return CreateFiber(stack_size, proc, parameter);
+}
+
+
+void destroy(Handle fiber)
+{
+	DeleteFiber(fiber);
 }
 
 
