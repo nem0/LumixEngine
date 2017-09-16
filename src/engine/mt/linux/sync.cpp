@@ -73,9 +73,10 @@ bool Semaphore::poll()
 }
 
 
-Event::Event()
+Event::Event(bool manual_reset)
 {
 	m_id.signaled = false;
+	m_id.manual_reset = manual_reset;
 	int res = pthread_mutex_init(&m_id.mutex, nullptr);
 	ASSERT(res == 0);
 	res = pthread_cond_init(&m_id.cond, nullptr);
@@ -123,7 +124,7 @@ void Event::wait()
 		ASSERT(res == 0);
 	}
 	
-	m_id.signaled = false;
+	if (!m_id.manual_reset) m_id.signaled = false;
 	
 	res = pthread_mutex_unlock(&m_id.mutex);
 	ASSERT(res == 0);

@@ -28,6 +28,7 @@ namespace MT
 		pthread_mutex_t mutex;
 		pthread_cond_t cond;
 		bool signaled;
+		bool manual_reset;
 	};
 	typedef volatile i32 SpinMutexHandle;
 #endif
