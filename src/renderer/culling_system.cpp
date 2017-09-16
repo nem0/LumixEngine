@@ -1,11 +1,10 @@
 #include "culling_system.h"
+#include "engine/array.h"
 #include "engine/binary_array.h"
 #include "engine/free_list.h"
 #include "engine/geometry.h"
+#include "engine/job_system.h"
 #include "engine/lumix.h"
-#include "engine/mtjd/group.h"
-#include "engine/mtjd/job.h"
-#include "engine/mtjd/manager.h"
 #include "engine/profiler.h"
 #include "engine/simd.h"
 
@@ -64,74 +63,26 @@ static void doCulling(int start_index,
 	}
 }
 
-class CullingJob LUMIX_FINAL : public MTJD::Job
+struct CullingJobData
 {
-public:
-	CullingJob(const CullingSystem::InputSpheres& spheres,
-		const LayerMasks& layer_masks,
-		const SphereToModelInstanceMap& sphere_to_model_instance_map,
-		u64 layer_mask,
-		CullingSystem::Subresults& results,
-		int start,
-		int end,
-		const Frustum& frustum,
-		MTJD::Manager& manager,
-		IAllocator& allocator,
-		IAllocator& job_allocator)
-		: Job(Job::AUTO_DESTROY, MTJD::Priority::Default, manager, allocator, job_allocator)
-		, m_spheres(spheres)
-		, m_results(results)
-		, m_start(start)
-		, m_end(end)
-		, m_frustum(frustum)
-		, m_layer_masks(layer_masks)
-		, m_layer_mask(layer_mask)
-		, m_sphere_to_model_instance_map(sphere_to_model_instance_map)
-	{
-		setJobName("CullingJob");
-		m_results.reserve(end - start);
-		ASSERT(m_results.empty());
-		m_is_executed = false;
-	}
-
-	~CullingJob() {}
-
-	void execute() override
-	{
-		ASSERT(m_results.empty() && !m_is_executed);
-		doCulling(m_start,
-			&m_spheres[m_start],
-			&m_spheres[m_end],
-			&m_frustum,
-			&m_layer_masks[0],
-			&m_sphere_to_model_instance_map[0],
-			m_layer_mask,
-			m_results);
-		m_is_executed = true;
-	}
-
-private:
-	const CullingSystem::InputSpheres& m_spheres;
-	CullingSystem::Subresults& m_results;
-	const LayerMasks& m_layer_masks;
-	const SphereToModelInstanceMap& m_sphere_to_model_instance_map;
+	const CullingSystem::InputSpheres* spheres;
+	CullingSystem::Subresults* results;
+	const LayerMasks* layer_masks;
+	const SphereToModelInstanceMap* sphere_to_model_instance_map;
 	u64 m_layer_mask;
 	int m_start;
 	int m_end;
-	const Frustum& m_frustum;
-	bool m_is_executed;
+	const Frustum* frustum;
 };
 
 class CullingSystemImpl LUMIX_FINAL : public CullingSystem
 {
 public:
-	CullingSystemImpl(MTJD::Manager& mtjd_manager, IAllocator& allocator)
+	CullingSystemImpl(IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_job_allocator(allocator)
 		, m_spheres(allocator)
 		, m_result(allocator)
-		, m_sync_point(true, allocator)
-		, m_mtjd_manager(mtjd_manager)
 		, m_layer_masks(m_allocator)
 		, m_sphere_to_model_instance_map(m_allocator)
 		, m_model_instance_to_sphere_map(m_allocator)
@@ -140,7 +91,7 @@ public:
 		m_model_instance_to_sphere_map.reserve(5000);
 		m_sphere_to_model_instance_map.reserve(5000);
 		m_spheres.reserve(5000);
-		int cpu_count = (int)m_mtjd_manager.getCpuThreadsCount();
+		int cpu_count = (int)MT::getCPUsCount();
 		while (m_result.size() < cpu_count)
 		{
 			m_result.emplace(m_allocator);
@@ -162,10 +113,6 @@ public:
 
 	const Results& getResult() override
 	{
-		if (m_is_async_result)
-		{
-			m_sync_point.sync();
-		}
 		return m_result;
 	}
 
@@ -191,19 +138,16 @@ public:
 	}
 
 
+	static void cullTask(void* data)
+	{
+
+	}
+
+
 	void cullToFrustumAsync(const Frustum& frustum, u64 layer_mask) override
 	{
 		int count = m_spheres.size();
-		for(auto& i : m_result)
-		{
-			i.clear();
-		}
-
-		if (count == 0)
-		{
-			m_is_async_result = false;
-			return;
-		}
+		for(auto& i : m_result) i.clear();
 
 		if (count < m_result.size() * MIN_ENTITIES_PER_THREAD)
 		{
@@ -212,48 +156,28 @@ public:
 		}
 		m_is_async_result = true;
 
-		int cpu_count = m_mtjd_manager.getCpuThreadsCount();
-		int step = count / cpu_count;
-		int i = 0;
-		CullingJob* jobs[16];
-		ASSERT(lengthOf(jobs) >= cpu_count);
-		for (; i < cpu_count - 1; i++)
+		int step = count / m_result.size();
+		CullingJobData job_data[16];
+		JobSystem::JobDecl jobs[16];
+		ASSERT(lengthOf(jobs) >= m_result.size());
+		for (int i = 0; i < m_result.size(); i++)
 		{
 			m_result[i].clear();
-			CullingJob* cj = LUMIX_NEW(m_job_allocator, CullingJob)(m_spheres,
-				m_layer_masks,
-				m_sphere_to_model_instance_map,
+			job_data[i] = {
+				&m_spheres,
+				&m_result[i],
+				&m_layer_masks,
+				&m_sphere_to_model_instance_map,
 				layer_mask,
-				m_result[i],
 				i * step,
-				(i + 1) * step - 1,
-				frustum,
-				m_mtjd_manager,
-				m_allocator,
-				m_job_allocator);
-			cj->addDependency(&m_sync_point);
-			jobs[i] = cj;
+				i == m_result.size() - 1 ? count - 1 : (i + 1) * step - 1,
+				&frustum
+			};
+			jobs[i].data = &job_data[i];
+			jobs[i].task = &cullTask;
 		}
-
-		m_result[i].clear();
-		CullingJob* cj = LUMIX_NEW(m_job_allocator, CullingJob)(m_spheres,
-			m_layer_masks,
-			m_sphere_to_model_instance_map,
-			layer_mask,
-			m_result[i],
-			i * step,
-			count - 1,
-			frustum,
-			m_mtjd_manager,
-			m_allocator,
-			m_job_allocator);
-		cj->addDependency(&m_sync_point);
-		jobs[i] = cj;
-
-		for (i = 0; i < cpu_count; ++i)
-		{
-			m_mtjd_manager.schedule(jobs[i]);
-		}
+		JobSystem::runJobs(jobs, m_result.size(), nullptr);
+		JobSystem::waitOutsideJob();
 	}
 
 
@@ -345,22 +269,20 @@ public:
 
 private:
 	IAllocator& m_allocator;
-	FreeList<CullingJob, 16> m_job_allocator;
+	FreeList<CullingJobData, 16> m_job_allocator;
 	InputSpheres m_spheres;
 	Results m_result;
 	LayerMasks m_layer_masks;
 	ModelInstancetoSphereMap m_model_instance_to_sphere_map;
 	SphereToModelInstanceMap m_sphere_to_model_instance_map;
 
-	MTJD::Manager& m_mtjd_manager;
-	MTJD::Group m_sync_point;
 	bool m_is_async_result;
 };
 
 
-CullingSystem* CullingSystem::create(MTJD::Manager& mtjd_manager, IAllocator& allocator)
+CullingSystem* CullingSystem::create(IAllocator& allocator)
 {
-	return LUMIX_NEW(allocator, CullingSystemImpl)(mtjd_manager, allocator);
+	return LUMIX_NEW(allocator, CullingSystemImpl)(allocator);
 }
 
 

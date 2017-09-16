@@ -4,9 +4,12 @@
 namespace Lumix
 {
 
+
+class Engine;
+
+
 namespace Fiber
 {
-
 
 #ifdef _WIN32
 	typedef void(__stdcall *FiberProc)(void*);
@@ -14,10 +17,12 @@ namespace Fiber
 	typedef void (*FiberProc)(void*);
 #endif
 typedef void* Handle;
+constexpr void* INVALID_FIBER = nullptr;
 
 
-Handle init(void* parameter);
+Handle createFromThread(void* parameter);
 Handle create(int stack_size, FiberProc proc, void* parameter);
+void destroy(Handle fiber);
 void switchTo(Handle fiber);
 void* getParameter();
 

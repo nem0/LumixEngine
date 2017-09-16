@@ -16,11 +16,6 @@ class ResourceFileDevice;
 class FileSystem;
 }
 
-namespace MTJD
-{
-class Manager;
-}
-
 struct ComponentUID;
 class InputBlob;
 struct IAllocator;
@@ -64,7 +59,6 @@ public:
 	virtual FS::ResourceFileDevice* getResourceFileDevice() = 0;
 	virtual InputSystem& getInputSystem() = 0;
 	virtual PluginManager& getPluginManager() = 0;
-	virtual MTJD::Manager& getMTJDManager() = 0;
 	virtual ResourceManager& getResourceManager() = 0;
 	virtual IAllocator& getAllocator() = 0;
 

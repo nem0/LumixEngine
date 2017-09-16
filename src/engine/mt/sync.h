@@ -52,7 +52,7 @@ private:
 class LUMIX_ENGINE_API Event
 {
 public:
-	explicit Event();
+	explicit Event(bool manual_reset);
 	~Event();
 
 	void reset();

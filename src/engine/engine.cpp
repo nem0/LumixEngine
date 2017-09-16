@@ -9,11 +9,11 @@
 #include "engine/fs/resource_file_device.h"
 #include "engine/input_system.h"
 #include "engine/iplugin.h"
+#include "engine/job_system.h"
 #include "engine/lifo_allocator.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
 #include "engine/math_utils.h"
-#include "engine/mtjd/manager.h"
 #include "engine/path.h"
 #include "engine/plugin_manager.h"
 #include "engine/prefab.h"
@@ -440,7 +440,6 @@ public:
 		, m_resource_manager(m_allocator)
 		, m_lua_resources(m_allocator)
 		, m_last_lua_resource_idx(-1)
-		, m_mtjd_manager(nullptr)
 		, m_fps(0)
 		, m_is_game_running(false)
 		, m_last_time_delta(0)
@@ -467,7 +466,7 @@ public:
 		luaL_openlibs(m_state);
 		registerLuaAPI();
 
-		m_mtjd_manager = MTJD::Manager::create(m_allocator);
+		JobSystem::init(*this);
 		if (!fs)
 		{
 			m_file_system = FS::FileSystem::create(m_allocator);
@@ -1171,7 +1170,7 @@ public:
 
 		m_prefab_resource_manager.destroy();
 		m_resource_manager.destroy();
-		MTJD::Manager::destroy(*m_mtjd_manager);
+		JobSystem::shutdown();
 		lua_close(m_state);
 
 		g_error_file.close();
@@ -1250,9 +1249,6 @@ public:
 
 		return *universe;
 	}
-
-
-	MTJD::Manager& getMTJDManager() override { return *m_mtjd_manager; }
 
 
 	void destroyUniverse(Universe& universe) override
@@ -1599,8 +1595,6 @@ private:
 
 	ResourceManager m_resource_manager;
 	
-	MTJD::Manager* m_mtjd_manager;
-
 	PluginManager* m_plugin_manager;
 	PrefabResourceManager m_prefab_resource_manager;
 	InputSystem* m_input_system;
