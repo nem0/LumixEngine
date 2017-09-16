@@ -1,6 +1,7 @@
 #include "unit_tests/suite/lumix_unit_tests.h"
 
 #include "engine/geometry.h"
+#include "engine/job_system.h"
 #include "engine/timer.h"
 #include "engine/log.h"
 
@@ -38,6 +39,7 @@ namespace
 	void UT_culling_system(const char* params)
 	{
 		DefaultAllocator allocator;
+		JobSystem::init(allocator);
 		Array<Sphere> spheres(allocator);
 		Array<ComponentHandle> model_instances(allocator);
 		int model_instance = 0;
@@ -79,11 +81,13 @@ namespace
 		}
 
 		CullingSystem::destroy(*culling_system);
+		JobSystem::shutdown();
 	}
 
 	void UT_culling_system_async(const char* params)
 	{
 		DefaultAllocator allocator;
+		JobSystem::init(allocator);
 		Array<Sphere> spheres(allocator);
 		Array<ComponentHandle> model_instances(allocator);
 		int model_instance = 0;
@@ -126,6 +130,7 @@ namespace
 		}
 
 		CullingSystem::destroy(*culling_system);
+		JobSystem::shutdown();
 	}
 }
 

@@ -45,11 +45,11 @@ struct SleepingFiber
 
 struct System
 {
-	System(Engine& engine) 
-		: m_engine(engine)
-		, m_workers(engine.getAllocator())
-		, m_job_queue(engine.getAllocator())
-		, m_sleeping_fibers(engine.getAllocator())
+	System(IAllocator& allocator) 
+		: m_allocator(allocator)
+		, m_workers(allocator)
+		, m_job_queue(allocator)
+		, m_sleeping_fibers(allocator)
 		, m_sync(false)
 		, m_job_count(0)
 		, m_work_signal(true)
@@ -67,7 +67,7 @@ struct System
 	int m_num_free_fibers;
 	volatile int m_job_count;
 	Array<SleepingFiber> m_sleeping_fibers;
-	Engine& m_engine;
+	IAllocator& m_allocator;
 };
 
 
@@ -110,7 +110,7 @@ static bool getReadyJob(System& system, Job* out)
 struct WorkerTask : MT::Task
 {
 	WorkerTask(System& system) 
-		: Task(system.m_engine.getAllocator())
+		: Task(system.m_allocator)
 		, m_system(system) 
 	{}
 
@@ -215,12 +215,11 @@ static void fiberProc(void* data)
 }
 
 
-bool init(Engine& engine)
+bool init(IAllocator& allocator)
 {
 	ASSERT(!g_system);
 
-	IAllocator& allocator = engine.getAllocator();
-	g_system = LUMIX_NEW(allocator, System)(engine);
+	g_system = LUMIX_NEW(allocator, System)(allocator);
 	g_system->m_work_signal.reset();
 	g_system->m_all_done_signal.trigger();
 
@@ -259,7 +258,7 @@ void shutdown()
 {
 	if (!g_system) return;
 
-	IAllocator& allocator = g_system->m_engine.getAllocator();
+	IAllocator& allocator = g_system->m_allocator;
 	for (MT::Task* task : g_system->m_workers)
 	{
 		WorkerTask* wt = (WorkerTask*)task;

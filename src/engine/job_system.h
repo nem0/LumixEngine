@@ -8,9 +8,6 @@ namespace Lumix
 {
 
 
-class Engine;
-
-
 namespace JobSystem
 {
 
@@ -22,7 +19,7 @@ struct LUMIX_ENGINE_API JobDecl
 };
 
 
-LUMIX_ENGINE_API bool init(Engine& engine);
+LUMIX_ENGINE_API bool init(IAllocator& allocator);
 LUMIX_ENGINE_API void shutdown();
 LUMIX_ENGINE_API void runJobs(const JobDecl* jobs, int count, int volatile* counter);
 LUMIX_ENGINE_API void wait(int volatile* counter);
