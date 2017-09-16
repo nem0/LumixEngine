@@ -1,5 +1,5 @@
 #include "engine/fibers.h"
-
+#include "engine/lumix.h"
 
 namespace Lumix
 {
