@@ -38,7 +38,7 @@ u64 getThreadAffinityMask()
 	cpu_set_t cpu_set;
 	int r = pthread_getaffinity_np(pthread_self(), sizeof(cpu_set), &cpu_set);
 	ASSERT(r == 0);
-	if(CPU_COUNT(&affinity) == 0) return 0;
+	if(CPU_COUNT(&cpu_set) == 0) return 0;
 	
 	int affinity = 0;
 	for(u64 i = 0; i < sizeof(u64) * 8; ++i)
