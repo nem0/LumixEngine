@@ -15,21 +15,21 @@ namespace JobSystem
 {
 
 
-struct JobDecl
+struct LUMIX_ENGINE_API JobDecl
 {
 	void (*task)(void*);
 	void* data;
 };
 
 
-bool init(Engine& engine);
-void shutdown();
-void runJobs(const JobDecl* jobs, int count, int volatile* counter);
-void wait(int volatile* counter);
-void waitOutsideJob();
+LUMIX_ENGINE_API bool init(Engine& engine);
+LUMIX_ENGINE_API void shutdown();
+LUMIX_ENGINE_API void runJobs(const JobDecl* jobs, int count, int volatile* counter);
+LUMIX_ENGINE_API void wait(int volatile* counter);
+LUMIX_ENGINE_API void waitOutsideJob();
 
 
-struct LambdaJob : JobDecl
+struct LUMIX_ENGINE_API LambdaJob : JobDecl
 {
 	LambdaJob() { data = pool; }
 	~LambdaJob() { if (data != pool) allocator->deallocate(data); }

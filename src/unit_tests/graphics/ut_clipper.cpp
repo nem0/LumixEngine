@@ -4,8 +4,6 @@
 #include "engine/timer.h"
 #include "engine/log.h"
 
-#include "engine/mtjd/manager.h"
-
 #include "renderer/culling_system.h"
 
 
@@ -62,9 +60,7 @@ namespace
 
 		CullingSystem* culling_system;
 		{
-			MTJD::Manager* mtjd_manager = MTJD::Manager::create(allocator);
-
-			culling_system = CullingSystem::create(*mtjd_manager, allocator);
+			culling_system = CullingSystem::create(allocator);
 			culling_system->insert(spheres, model_instances);
 
 			ScopedTimer timer("Culling System", allocator);
@@ -80,8 +76,6 @@ namespace
 					LUMIX_EXPECT(subresult[i].index < 6);
 				}
 			}
-
-			MTJD::Manager::destroy(*mtjd_manager);
 		}
 
 		CullingSystem::destroy(*culling_system);
@@ -112,9 +106,7 @@ namespace
 
 		CullingSystem* culling_system;
 		{
-			MTJD::Manager* mtjd_manager = MTJD::Manager::create(allocator);
-
-			culling_system = CullingSystem::create(*mtjd_manager, allocator);
+			culling_system = CullingSystem::create(allocator);
 			culling_system->insert(spheres, model_instances);
 
 			ScopedTimer timer("Culling System Async", allocator);
@@ -131,8 +123,6 @@ namespace
 					LUMIX_EXPECT(subresult[i].index < 6);
 				}
 			}
-
-			MTJD::Manager::destroy(*mtjd_manager);
 		}
 
 		CullingSystem::destroy(*culling_system);
