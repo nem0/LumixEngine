@@ -3,6 +3,7 @@
 #include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/fs/file_system.h"
+#include "engine/job_system.h"
 #include "engine/json_serializer.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
@@ -192,6 +193,26 @@ struct Heightfield
 
 struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 {
+	struct CPUDispatcher : physx::PxCpuDispatcher
+	{
+		void submitTask(PxBaseTask& task) override 
+		{
+			JobSystem::JobDecl job;
+			job.data = &task;
+			job.task = [](void* data) {
+				PxBaseTask* task = (PxBaseTask*)data;
+				task->run();
+				task->release();
+			};
+			JobSystem::runJobs(&job, 1, nullptr);
+		}
+		PxU32 getWorkerCount() const override 
+		{
+			return MT::getCPUsCount();
+		}
+	};
+
+
 	struct ContactCallback LUMIX_FINAL : public PxSimulationEventCallback
 	{
 		explicit ContactCallback(PhysicsSceneImpl& scene)
@@ -4446,7 +4467,10 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	u32 m_collision_filter[32];
 	char m_layers_names[32][30];
 	int m_layers_count;
+	CPUDispatcher m_cpu_dispatcher;
 };
+
+
 
 
 PhysicsScene* PhysicsScene::create(PhysicsSystem& system, Universe& context, Engine& engine, IAllocator& allocator)
@@ -4456,15 +4480,7 @@ PhysicsScene* PhysicsScene::create(PhysicsSystem& system, Universe& context, Eng
 	impl->m_engine = &engine;
 	PxSceneDesc sceneDesc(system.getPhysics()->getTolerancesScale());
 	sceneDesc.gravity = PxVec3(0.0f, -9.8f, 0.0f);
-	if (!sceneDesc.cpuDispatcher)
-	{
-		PxDefaultCpuDispatcher* cpu_dispatcher = PxDefaultCpuDispatcherCreate(1);
-		if (!cpu_dispatcher)
-		{
-			g_log_error.log("Physics") << "PxDefaultCpuDispatcherCreate failed!";
-		}
-		sceneDesc.cpuDispatcher = cpu_dispatcher;
-	}
+	sceneDesc.cpuDispatcher = &impl->m_cpu_dispatcher;
 
 	sceneDesc.filterShader = impl->filterShader;
 	sceneDesc.simulationEventCallback = &impl->m_contact_callback;
