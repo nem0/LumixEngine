@@ -201,6 +201,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			job.data = &task;
 			job.task = [](void* data) {
 				PxBaseTask* task = (PxBaseTask*)data;
+				PROFILE_FUNCTION();
 				task->run();
 				task->release();
 			};

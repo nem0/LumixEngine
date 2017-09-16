@@ -466,7 +466,7 @@ public:
 		luaL_openlibs(m_state);
 		registerLuaAPI();
 
-		JobSystem::init(*this);
+		JobSystem::init(m_allocator);
 		if (!fs)
 		{
 			m_file_system = FS::FileSystem::create(m_allocator);
