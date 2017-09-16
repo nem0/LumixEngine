@@ -19,7 +19,7 @@ struct TaskImpl
 	bool is_running;
 	pthread_t handle;
 	const char* thread_name;
-	u32 affinity_mask;
+	u64 affinity_mask;
 	Task* owner;
 };
 
@@ -72,13 +72,13 @@ bool Task::destroy()
 	return pthread_join(m_implementation->handle, nullptr) == 0;
 }
 
-void Task::setAffinityMask(u32 affinity_mask)
+void Task::setAffinityMask(u64 affinity_mask)
 {
 	cpu_set_t set;
 	CPU_ZERO(&set);
-	for (int i = 0; i < 32; ++i)
+	for (int i = 0; i < 64; ++i)
 	{
-		if (affinity_mask & (1 << i))
+		if (affinity_mask & ((u64)1 << i))
 		{
 			CPU_SET(i, &set);
 		}
@@ -87,7 +87,7 @@ void Task::setAffinityMask(u32 affinity_mask)
 	pthread_setaffinity_np(m_implementation->handle, sizeof(set), &set);
 }
 
-u32 Task::getAffinityMask() const
+u64 Task::getAffinityMask() const
 {
 	return m_implementation->affinity_mask;
 }
