@@ -2647,15 +2647,8 @@ public:
 	}
 
 
-	IEditorCommand* executeCommand(IEditorCommand* command) override
+	void executeCommand(IEditorCommand* command) override
 	{
-		if (m_is_game_mode)
-		{
-			command->execute();
-			LUMIX_DELETE(m_allocator, command);
-			return nullptr;
-		}
-
 		m_is_universe_changed = true;
 		if (m_undo_index >= 0 && command->getType() == m_undo_stack[m_undo_index]->getType())
 		{
@@ -2663,7 +2656,7 @@ public:
 			{
 				m_undo_stack[m_undo_index]->execute();
 				LUMIX_DELETE(m_allocator, command);
-				return nullptr;
+				return;
 			}
 		}
 
@@ -2678,11 +2671,12 @@ public:
 				m_undo_stack.resize(m_undo_index + 1);
 			}
 			m_undo_stack.push(command);
+			if (m_is_game_mode) ++m_game_mode_commands;
 			++m_undo_index;
-			return command;
+			return;
 		}
+		ASSERT(false);
 		LUMIX_DELETE(m_allocator, command);
-		return nullptr;
 	}
 
 
@@ -2703,6 +2697,9 @@ public:
 			m_game_mode_file = fs.open(fs.getMemoryDevice(), Path(""), FS::Mode::WRITE);
 			save(*m_game_mode_file);
 			m_is_game_mode = true;
+			beginCommandGroup(0);
+			endCommandGroup();
+			m_game_mode_commands = 2;
 			m_engine->startGame(*m_universe);
 		}
 	}
@@ -2710,6 +2707,13 @@ public:
 
 	void stopGameMode(bool reload)
 	{
+		for (int i = 0; i < m_game_mode_commands; ++i)
+		{
+			LUMIX_DELETE(m_allocator, m_undo_stack.back());
+			m_undo_stack.pop();
+			--m_undo_index;
+		}
+
 		ASSERT(m_universe);
 		m_engine->getResourceManager().enableUnload(false);
 		m_engine->stopGame(*m_universe);
@@ -3726,6 +3730,7 @@ private:
 	Vec2 m_mouse_sensitivity;
 	bool m_gizmo_use_step;
 	bool m_is_game_mode;
+	int m_game_mode_commands;
 	bool m_is_orbit;
 	bool m_is_additive_selection;
 	bool m_is_snap_mode;
