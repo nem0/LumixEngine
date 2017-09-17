@@ -12,10 +12,12 @@
 #include "engine/fs/file_system.h"
 #include "engine/fs/os_file.h"
 #include "engine/input_system.h"
+#include "engine/job_system.h"
 #include "engine/json_serializer.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
 #include "engine/lumix.h"
+#include "engine/mt/atomic.h"
 #include "engine/path_utils.h"
 #include "engine/plugin_manager.h"
 #include "engine/property_descriptor.h"
@@ -39,6 +41,8 @@
 #include "scene_view.h"
 #include "shader_compiler.h"
 #include "shader_editor.h"
+#include "stb/stb_image.h"
+#include "stb/stb_image_resize.h"
 #include "terrain_editor.h"
 #include <SDL.h>
 #include <cmath>
@@ -353,7 +357,12 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		, m_universe(nullptr)
 		, m_is_mouse_captured(false)
 		, m_tile(app.getWorldEditor()->getAllocator())
+		, m_texture_tile_creator(app.getWorldEditor()->getAllocator())
 	{
+		JobSystem::JobDecl job;
+		job.data = this;
+		job.task = [](void* data) { ((ModelPlugin*)data)->createTextureTileTask(); };
+		JobSystem::runJobs(&job, 1, nullptr);
 		createPreviewUniverse();
 		createTileUniverse();
 	}
@@ -361,11 +370,71 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 
 	~ModelPlugin()
 	{
+		m_texture_tile_creator.shutdown = true;
+		m_texture_tile_creator.count = 0;
+		m_texture_tile_creator.shutdown_event.wait();
 		auto& engine = m_app.getWorldEditor()->getEngine();
 		engine.destroyUniverse(*m_universe);
 		Pipeline::destroy(m_pipeline);
 		engine.destroyUniverse(*m_tile.universe);
 		Pipeline::destroy(m_tile.pipeline);
+	}
+
+
+	static crn_bool ddsConvertCallback(crn_uint32 phase_index,
+		crn_uint32 total_phases,
+		crn_uint32 subphase_index,
+		crn_uint32 total_subphases,
+		void* pUser_data_ptr)
+	{
+		float fraction = phase_index / float(total_phases) + (subphase_index / float(total_subphases)) / total_phases;
+		return true;
+	}
+
+
+	void createTextureTileTask()
+	{
+		while (!m_texture_tile_creator.shutdown)
+		{
+			JobSystem::wait(&m_texture_tile_creator.count);
+			if (m_texture_tile_creator.shutdown) break;
+			MT::SpinLock lock(m_texture_tile_creator.lock);
+			
+			StaticString<MAX_PATH_LENGTH> tile = m_texture_tile_creator.tiles.back();
+			m_texture_tile_creator.tiles.pop();
+			MT::atomicIncrement(&m_texture_tile_creator.count);
+
+			IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
+
+			int image_width, image_height, image_comp;
+			auto data = stbi_load(tile, &image_width, &image_height, &image_comp, 4);
+			if (!data)
+			{
+				g_log_error.log("Editor") << "Failed to load " << tile;
+				continue;
+			}
+
+			Array<u8> resized_data(allocator);
+			resized_data.resize(AssetBrowser::TILE_SIZE * AssetBrowser::TILE_SIZE * 4);
+			stbir_resize_uint8(data,
+				image_width,
+				image_height,
+				0,
+				&resized_data[0],
+				AssetBrowser::TILE_SIZE,
+				AssetBrowser::TILE_SIZE,
+				0,
+				4);
+			stbi_image_free(data);
+
+			u32 hash = crc32(tile);
+			StaticString<MAX_PATH_LENGTH> path(".lumix/asset_tiles/", hash, ".dds");
+			if (!saveAsDDS(path, &resized_data[0], AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE))
+			{
+				g_log_error.log("Editor") << "Failed to save " << path;
+			}
+		}
+		m_texture_tile_creator.shutdown_event.trigger();
 	}
 
 
@@ -686,7 +755,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		Model* model = m_tile.queue.front();
 		if(model->isFailure())
 		{
-			g_log_error.log("Renderer") << "Failed to load " << model->getPath();
+			g_log_error.log("Editor") << "Failed to load " << model->getPath();
 			popTileQueue();
 			return;
 		}
@@ -740,7 +809,20 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 
 	bool createTile(const char* in_path, const char* out_path, ResourceType type) override
 	{
-		if (type == TEXTURE_TYPE) return copyFile("models/editor/tile_texture.dds", out_path);
+		if (type == TEXTURE_TYPE)
+		{
+			if (!PathUtils::hasExtension(in_path, "dds"))
+			{
+				MT::SpinLock lock(m_texture_tile_creator.lock);
+				m_texture_tile_creator.tiles.emplace(in_path);
+				MT::atomicDecrement(&m_texture_tile_creator.count);
+				return true;
+			}
+			else
+			{
+				return copyFile("models/editor/tile_texture.dds", out_path);
+			}
+		}
 		if (type == MATERIAL_TYPE) return copyFile("models/editor/tile_material.dds", out_path);
 		if (type == SHADER_TYPE) return copyFile("models/editor/tile_shader.dds", out_path);
 
@@ -789,6 +871,23 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 	bool m_is_mouse_captured;
 	int m_captured_mouse_x;
 	int m_captured_mouse_y;
+	
+	struct TextureTileCreator
+	{
+		TextureTileCreator(IAllocator& allocator)
+			: tiles(allocator)
+			, lock(false)
+			, shutdown_event(true)
+		{
+			shutdown_event.reset();
+		}
+
+		volatile int count = 1;
+		volatile bool shutdown = false;
+		MT::Event shutdown_event;
+		MT::SpinMutex lock;
+		Array<StaticString<MAX_PATH_LENGTH>> tiles;
+	} m_texture_tile_creator;
 };
 
 

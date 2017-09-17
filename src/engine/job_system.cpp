@@ -82,7 +82,7 @@ static bool getReadySleepingFiber(System& system, SleepingFiber* out)
 	for (int i = 0; i < count; ++i)
 	{
 		SleepingFiber job = system.m_sleeping_fibers[i];
-		if (*job.waiting_condition == 0)
+		if (*job.waiting_condition <= 0)
 		{
 			system.m_sleeping_fibers.eraseFast(i);
 			*out = job;

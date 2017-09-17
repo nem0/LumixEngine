@@ -149,6 +149,13 @@ void AssetBrowser::onFileChanged(const char* path)
 
 void AssetBrowser::unloadResource()
 {
+	RenderInterface* ri = m_app.getWorldEditor()->getRenderInterface();
+	for (FileInfo& info : m_file_infos)
+	{
+		ri->unloadTexture(info.tex);
+	}
+	m_file_infos.clear();
+
 	if (!m_selected_resource) return;
 
 	for (auto* plugin : m_plugins)
