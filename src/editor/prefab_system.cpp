@@ -483,7 +483,7 @@ public:
 		cmd->prefab = &prefab;
 		cmd->rotation = rot;
 		cmd->scale = scale;
-		cmd = (InstantiatePrefabCommand*)m_editor.executeCommand(cmd);
+		m_editor.executeCommand(cmd);
 		return cmd ? cmd->entity : INVALID_ENTITY;
 	}
 
