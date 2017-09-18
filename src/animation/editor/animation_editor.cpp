@@ -42,7 +42,37 @@ namespace AnimEditor
 {
 
 
-struct MoveAnimNodeCommand : public IEditorCommand
+struct BeginGroupCommand LUMIX_FINAL : IEditorCommand
+{
+	BeginGroupCommand() {}
+	BeginGroupCommand(WorldEditor&) {}
+
+	bool execute() override { return true; }
+	void undo() override { ASSERT(false); }
+	void serialize(JsonSerializer& serializer) override {}
+	void deserialize(JsonSerializer& serializer) override {}
+	bool merge(IEditorCommand& command) override { ASSERT(false); return false; }
+	const char* getType() override { return "begin_group"; }
+};
+
+
+struct EndGroupCommand LUMIX_FINAL : IEditorCommand
+{
+	EndGroupCommand() {}
+	EndGroupCommand(WorldEditor&) {}
+
+	bool execute() override { return true; }
+	void undo() override { ASSERT(false); }
+	void serialize(JsonSerializer& serializer) override {}
+	void deserialize(JsonSerializer& serializer) override {}
+	bool merge(IEditorCommand& command) override { ASSERT(false); return false; }
+	const char* getType() override { return "end_group"; }
+
+	u32 group_type;
+};
+
+
+struct MoveAnimNodeCommand : IEditorCommand
 {
 	MoveAnimNodeCommand(ControllerResource& controller, Node* node, const ImVec2& pos)
 		: m_controller(controller)
@@ -100,7 +130,7 @@ struct MoveAnimNodeCommand : public IEditorCommand
 };
 
 
-struct CreateAnimNodeCommand : public IEditorCommand
+struct CreateAnimNodeCommand : IEditorCommand
 {
 	CreateAnimNodeCommand(ControllerResource& controller,
 		Container* container,
@@ -158,7 +188,139 @@ struct CreateAnimNodeCommand : public IEditorCommand
 };
 
 
-struct CreateAnimEdgeCommand : public IEditorCommand
+struct DestroyAnimEdgeCommand : IEditorCommand
+{
+	DestroyAnimEdgeCommand(ControllerResource& controller, int edge_uid)
+		: m_controller(controller)
+		, m_edge_uid(edge_uid)
+		, m_original_values(controller.getAllocator())
+	{
+		Edge* edge = (Edge*)m_controller.getByUID(edge_uid);
+		ASSERT(!edge->isNode());
+		Container* parent = edge->getParent();
+		ASSERT(parent);
+		m_original_container_uid = parent->engine_cmp->uid;
+		m_from_uid = edge->getFrom()->engine_cmp->uid;
+		m_to_uid = edge->getTo()->engine_cmp->uid;
+	}
+
+
+	bool execute() override
+	{
+		m_original_values.clear();
+		Edge* edge = (Edge*)m_controller.getByUID(m_edge_uid);
+		edge->serialize(m_original_values);
+		LUMIX_DELETE(m_controller.getAllocator(), edge);
+		return true;
+	}
+
+
+	void undo() override
+	{
+		
+		Container* container = (Container*)m_controller.getByUID(m_original_container_uid);
+		container->createEdge(m_from_uid, m_to_uid, m_edge_uid);
+		Edge* edge = (Edge*)container->getByUID(m_edge_uid);
+		InputBlob input(m_original_values);
+		edge->deserialize(input);
+	}
+
+
+	const char* getType() override { return "destroy_anim_edge"; }
+
+
+	bool merge(IEditorCommand& command) override { return false; }
+
+
+	void serialize(JsonSerializer& serializer) override
+	{
+		ASSERT(false);
+	}
+
+
+	void deserialize(JsonSerializer& serializer) override
+	{
+		ASSERT(false);
+	}
+
+	ControllerResource& m_controller;
+	int m_edge_uid;
+	int m_from_uid;
+	int m_to_uid;
+	OutputBlob m_original_values;
+	int m_original_container_uid;
+};
+
+
+struct DestroyNodeCommand : IEditorCommand
+{
+	DestroyNodeCommand(ControllerResource& controller, int node_uid)
+		: m_controller(controller)
+		, m_node_uid(node_uid)
+		, m_original_values(controller.getAllocator())
+	{
+		Component* cmp = m_controller.getByUID(m_node_uid);
+		ASSERT(cmp->isNode());
+		Container* parent = cmp->getParent();
+		ASSERT(parent);
+		m_original_container = parent->engine_cmp->uid;
+	}
+
+
+	bool execute() override
+	{
+		m_original_values.clear();
+		Node* node = (Node*)m_controller.getByUID(m_node_uid);
+		node->serialize(m_original_values);
+		m_cmp_type = node->engine_cmp->type;
+		ASSERT(node->getEdges().empty());
+		ASSERT(node->getInEdges().empty());
+		LUMIX_DELETE(m_controller.getAllocator(), node);
+		return true;
+	}
+
+
+	void undo() override
+	{
+		auto* container = (Container*)m_controller.getByUID(m_original_container);
+		container->createNode(m_cmp_type, m_node_uid, ImVec2(0, 0));
+		Component* cmp = m_controller.getByUID(m_node_uid);
+		ASSERT(cmp->isNode());
+		Node* node = (Node*)cmp;
+		InputBlob input(m_original_values);
+		cmp->deserialize(input);
+	}
+
+
+	const char* getType() override { return "destroy_anim_node"; }
+
+
+	bool merge(IEditorCommand& command) override { return false; }
+
+
+	void serialize(JsonSerializer& serializer) override
+	{
+		// TODO
+		ASSERT(false);
+	}
+
+
+	void deserialize(JsonSerializer& serializer) override
+	{
+		// TODO
+		ASSERT(false);
+	}
+
+	ControllerResource& m_controller;
+	int m_node_uid;
+	OutputBlob m_original_values;
+	int m_original_container;
+	Anim::Component::Type m_cmp_type;
+};
+
+
+
+struct CreateAnimEdgeCommand : IEditorCommand
 {
 	CreateAnimEdgeCommand(ControllerResource& controller, Container* container, Node* from, Node* to)
 		: m_controller(controller)
@@ -238,9 +400,13 @@ public:
 		Container* container,
 		Anim::Node::Type type,
 		const ImVec2& pos) override;
+	void destroyNode(ControllerResource& ctrl, Node* node) override;
+	void destroyEdge(ControllerResource& ctrl, Edge* edge) override;
 	bool hasFocus() override { return m_is_focused; }
 
 private:
+	void beginCommandGroup(u32 type);
+	void endCommandGroup();
 	void newController();
 	void save();
 	void saveAs();
@@ -271,6 +437,7 @@ private:
 	int m_undo_index = -1;
 	bool m_is_playing = false;
 	bool m_is_focused = false;
+	u32 m_current_group_type;
 };
 
 
@@ -336,11 +503,95 @@ void AnimationEditor::createNode(ControllerResource& ctrl,
 }
 
 
+void AnimationEditor::destroyEdge(ControllerResource& ctrl, Edge* edge)
+{
+	IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
+	auto* cmd = LUMIX_NEW(allocator, DestroyAnimEdgeCommand)(ctrl, edge->engine_cmp->uid);
+	executeCommand(*cmd);
+}
+
+
+void AnimationEditor::destroyNode(ControllerResource& ctrl, Node* node)
+{
+	beginCommandGroup(crc32("destroy_node_group"));
+	
+	while (!node->getEdges().empty())
+	{
+		destroyEdge(ctrl, node->getEdges().back());
+	}
+
+	while (!node->getInEdges().empty())
+	{
+		destroyEdge(ctrl, node->getInEdges().back());
+	}
+
+	IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
+	auto* cmd = LUMIX_NEW(allocator, DestroyNodeCommand)(ctrl, node->engine_cmp->uid);
+	executeCommand(*cmd);
+	endCommandGroup();
+}
+
+
 void AnimationEditor::createEdge(ControllerResource& ctrl, Container* container, Node* from, Node* to)
 {
 	IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
 	auto* cmd = LUMIX_NEW(allocator, CreateAnimEdgeCommand)(ctrl, container, from, to);
 	executeCommand(*cmd);
+}
+
+
+void AnimationEditor::beginCommandGroup(u32 type)
+{
+	IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
+
+	if (m_undo_index < m_undo_stack.size() - 1)
+	{
+		for (int i = m_undo_stack.size() - 1; i > m_undo_index; --i)
+		{
+			LUMIX_DELETE(allocator, m_undo_stack[i]);
+		}
+		m_undo_stack.resize(m_undo_index + 1);
+	}
+
+	if (m_undo_index >= 0)
+	{
+		static const u32 end_group_hash = crc32("end_group");
+		if (crc32(m_undo_stack[m_undo_index]->getType()) == end_group_hash)
+		{
+			if (static_cast<EndGroupCommand*>(m_undo_stack[m_undo_index])->group_type == type)
+			{
+				LUMIX_DELETE(allocator, m_undo_stack[m_undo_index]);
+				--m_undo_index;
+				m_undo_stack.pop();
+				return;
+			}
+		}
+	}
+
+	m_current_group_type = type;
+	auto* cmd = LUMIX_NEW(allocator, BeginGroupCommand);
+	m_undo_stack.push(cmd);
+	++m_undo_index;
+}
+
+
+void AnimationEditor::endCommandGroup()
+{
+	IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
+
+	if (m_undo_index < m_undo_stack.size() - 1)
+	{
+		for (int i = m_undo_stack.size() - 1; i > m_undo_index; --i)
+		{
+			LUMIX_DELETE(allocator, m_undo_stack[i]);
+		}
+		m_undo_stack.resize(m_undo_index + 1);
+	}
+
+	auto* cmd = LUMIX_NEW(allocator, EndGroupCommand);
+	cmd->group_type = m_current_group_type;
+	m_undo_stack.push(cmd);
+	++m_undo_index;
 }
 
 
@@ -579,17 +830,48 @@ void AnimationEditor::redo()
 {
 	if (m_undo_index == m_undo_stack.size() - 1) return;
 
+	static const u32 end_group_hash = crc32("end_group");
+	static const u32 begin_group_hash = crc32("begin_group");
+
 	++m_undo_index;
-	m_undo_stack[m_undo_index]->execute();
+	if (crc32(m_undo_stack[m_undo_index]->getType()) == begin_group_hash)
+	{
+		++m_undo_index;
+		while (crc32(m_undo_stack[m_undo_index]->getType()) != end_group_hash)
+		{
+			m_undo_stack[m_undo_index]->execute();
+			++m_undo_index;
+		}
+	}
+	else
+	{
+		m_undo_stack[m_undo_index]->execute();
+	}
 }
 
 
 void AnimationEditor::undo()
 {
-	if (m_undo_index < 0) return;
+	if (m_undo_index >= m_undo_stack.size() || m_undo_index < 0) return;
 
-	m_undo_stack[m_undo_index]->undo();
-	--m_undo_index;
+	static const u32 end_group_hash = crc32("end_group");
+	static const u32 begin_group_hash = crc32("begin_group");
+
+	if (crc32(m_undo_stack[m_undo_index]->getType()) == end_group_hash)
+	{
+		--m_undo_index;
+		while (crc32(m_undo_stack[m_undo_index]->getType()) != begin_group_hash)
+		{
+			m_undo_stack[m_undo_index]->undo();
+			--m_undo_index;
+		}
+		--m_undo_index;
+	}
+	else
+	{
+		m_undo_stack[m_undo_index]->undo();
+		--m_undo_index;
+	}
 }
 
 

@@ -40,6 +40,7 @@ public:
 	}
 
 	virtual ~Component();
+	virtual void destroy(IAnimationEditor& editor) {};
 	virtual bool draw(ImDrawList* draw, const ImVec2& canvas_screen_pos, bool selected) = 0;
 	virtual void onGUI() {}
 	virtual void serialize(OutputBlob& blob) = 0;
@@ -75,6 +76,7 @@ public:
 	~Node();
 
 	bool isNode() const override { return true; }
+	void destroy(IAnimationEditor& editor) override;
 	bool hitTest(const ImVec2& on_canvas_pos) const override;
 	void onGUI() override;
 	void serialize(OutputBlob& blob) override;
@@ -85,6 +87,8 @@ public:
 	void removeEdge(Edge* edge) { m_edges.eraseItemFast(edge); }
 	void removeInEdge(Edge* edge) { m_in_edges.eraseItemFast(edge); }
 	void removeEvent(int index);
+	const Array<Edge*>& getEdges() { return m_edges; }
+	const Array<Edge*>& getInEdges() { return m_in_edges; }
 
 protected:
 	void onGuiEvents(Anim::EventArray& events, const char* label);
@@ -134,7 +138,7 @@ public:
 	~Edge();
 
 	bool isNode() const override { return false; }
-
+	void destroy(IAnimationEditor& editor) override;
 	void onGUI() override;
 	bool draw(ImDrawList* draw, const ImVec2& canvas_screen_pos, bool selected) override;
 	void serialize(OutputBlob& blob) override;
@@ -143,6 +147,8 @@ public:
 	bool hitTest(const ImVec2& on_canvas_pos) const override;
 	const char* getExpression() const { return m_expression; }
 	void debug(ImDrawList* draw, const ImVec2& canvas_screen_pos, Anim::ComponentInstance* runtime) override;
+	Node* getFrom() const { return m_from; }
+	Node* getTo() const { return m_to; }
 
 private:
 	Node* m_from;

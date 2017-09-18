@@ -26,6 +26,7 @@ namespace AnimEditor
 class Component;
 class Container;
 class ControllerResource;
+class Edge;
 class Node;
 
 
@@ -55,6 +56,8 @@ public:
 	virtual EventType& getEventType(u32 type) = 0;
 	virtual void createEdge(ControllerResource& ctrl, Container* container, Node* from, Node* to) = 0;
 	virtual void moveNode(ControllerResource& ctrl, Node* node, const ImVec2& pos) = 0;
+	virtual void destroyNode(ControllerResource& ctrl, Node* node) = 0;
+	virtual void destroyEdge(ControllerResource& ctrl, Edge* edge) = 0;
 	virtual void createNode(ControllerResource& ctrl,
 		Container* container,
 		Anim::Node::Type type,
