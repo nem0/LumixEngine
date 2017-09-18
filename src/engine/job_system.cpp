@@ -53,12 +53,10 @@ struct System
 		, m_sync(false)
 		, m_job_count(0)
 		, m_work_signal(true)
-		, m_all_done_signal(true)
 	{}
 
 
 	MT::SpinMutex m_sync;
-	MT::Event m_all_done_signal;
 	MT::Event m_work_signal;
 	Array<MT::Task*> m_workers;
 	Array<Job> m_job_queue;
@@ -138,7 +136,6 @@ struct WorkerTask : MT::Task
 			--g_system->m_job_count;
 			if (g_system->m_job_count == 0)
 			{
-				g_system->m_all_done_signal.trigger();
 				g_system->m_work_signal.reset();
 			}
 			return;
@@ -221,7 +218,6 @@ bool init(IAllocator& allocator)
 
 	g_system = LUMIX_NEW(allocator, System)(allocator);
 	g_system->m_work_signal.reset();
-	g_system->m_all_done_signal.trigger();
 
 	int count = Math::maximum(1, int(MT::getCPUsCount() - 1));
 	for (int i = 0; i < count; ++i)
@@ -289,7 +285,6 @@ void runJobs(const JobDecl* jobs, int count, int volatile* counter)
 
 	MT::SpinLock lock(g_system->m_sync);
 	g_system->m_job_count += count;
-	g_system->m_all_done_signal.reset();
 	g_system->m_work_signal.trigger();
 	if(counter) MT::atomicAdd(counter, count);
 	for (int i = 0; i < count; ++i)
@@ -311,9 +306,9 @@ void wait(int volatile* counter)
 
 
 
-void waitOutsideJob()
+void waitOutsideJob(volatile int* counter)
 {
-	g_system->m_all_done_signal.wait();
+	while (*counter != 0) MT::yield();
 }
 
 
