@@ -219,6 +219,12 @@ static const char* getEventTypeName(u32 type, AnimEditor::IAnimationEditor& edit
 }
 
 
+void Node::destroy(IAnimationEditor& editor)
+{
+	editor.destroyNode(m_controller, this);
+}
+
+
 void Node::onGUI()
 {
 	u32 set_input_type = crc32("set_input");
@@ -490,6 +496,12 @@ void Edge::compile()
 {
 	auto* engine_edge = (Anim::Edge*)engine_cmp;
 	engine_edge->condition.compile(m_expression, m_controller.getEngineResource()->m_input_decl);
+}
+
+
+void Edge::destroy(IAnimationEditor& editor)
+{
+	editor.destroyEdge(m_controller, this);
 }
 
 
@@ -894,11 +906,11 @@ void Blend1DNode::drawInside(ImDrawList* draw, const ImVec2& canvas_screen_pos)
 			if (ImGui::MenuItem("Blend 1D")) editor.createNode(m_controller, this, Anim::Component::BLEND1D, pos_on_canvas);
 			ImGui::EndMenu();
 		}
-		if (m_context_cmp && m_context_cmp != m_root_node)
+		if (m_context_cmp && m_context_cmp != m_root_node && m_context_cmp->isNode())
 		{
 			if (ImGui::MenuItem("Remove"))
 			{
-				LUMIX_DELETE(m_controller.getAllocator(), m_context_cmp);
+				m_context_cmp->destroy(editor);
 				if (m_selected_component == m_context_cmp) m_selected_component = nullptr;
 				if (m_drag_source == m_context_cmp) m_drag_source = nullptr;
 				m_context_cmp = nullptr;
@@ -1484,7 +1496,7 @@ void StateMachine::drawInside(ImDrawList* draw, const ImVec2& canvas_screen_pos)
 		{
 			if (ImGui::MenuItem("Remove"))
 			{
-				LUMIX_DELETE(m_controller.getAllocator(), m_context_cmp);
+				m_context_cmp->destroy(editor);
 				if (m_selected_component == m_context_cmp) m_selected_component = nullptr;
 				if (m_drag_source == m_context_cmp) m_drag_source = nullptr;
 				m_context_cmp = nullptr;
