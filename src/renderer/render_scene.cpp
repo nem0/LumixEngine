@@ -3076,6 +3076,7 @@ public:
 		JobSystem::LambdaJob jobs[64];
 		ASSERT(results.size() <= lengthOf(jobs));
 
+		volatile int counter = 0;
 		for (int subresult_index = 0; subresult_index < results.size(); ++subresult_index)
 		{
 			Array<ModelInstanceMesh>& subinfos = m_temporary_infos[subresult_index];
@@ -3110,9 +3111,9 @@ public:
 					}
 				}
 			}, &jobs[subresult_index], nullptr);
-			JobSystem::runJobs(&jobs[subresult_index], 1, nullptr);
+			JobSystem::runJobs(&jobs[subresult_index], 1, &counter);
 		}
-		JobSystem::waitOutsideJob();
+		JobSystem::waitOutsideJob(&counter);
 	}
 
 

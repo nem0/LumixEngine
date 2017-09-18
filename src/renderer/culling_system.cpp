@@ -176,8 +176,9 @@ public:
 			jobs[i].data = &job_data[i];
 			jobs[i].task = &cullTask;
 		}
-		JobSystem::runJobs(jobs, m_result.size(), nullptr);
-		JobSystem::waitOutsideJob();
+		volatile int counter = 0;
+		JobSystem::runJobs(jobs, m_result.size(), &counter);
+		JobSystem::waitOutsideJob(&counter);
 	}
 
 

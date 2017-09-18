@@ -978,6 +978,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 
 		int job_count = Math::minimum(lengthOf(jobs), m_animables.size());
 		ASSERT(job_count > 0);
+		volatile int counter = 0;
 		for (int i = 0; i < job_count; ++i)
 		{
 			JobSystem::fromLambda([time_delta, this, i, job_count]() {
@@ -991,9 +992,9 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 					AnimationSceneImpl::updateAnimable(animable, time_delta);
 				}
 			}, &jobs[i], nullptr);
-			JobSystem::runJobs(&jobs[i], 1, nullptr);
 		}
-		JobSystem::waitOutsideJob();
+		JobSystem::runJobs(jobs, job_count, &counter);
+		JobSystem::waitOutsideJob(&counter);
 	}
 
 
