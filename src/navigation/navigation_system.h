@@ -21,7 +21,15 @@ public:
 	virtual void setActorActive(Entity entity, bool active) = 0;
 	virtual float getAgentSpeed(Entity entity) = 0;
 	virtual float getAgentYawDiff(Entity entity) = 0;
+	virtual void setAgentRadius(ComponentHandle cmp, float radius) = 0;
+	virtual float getAgentRadius(ComponentHandle cmp) = 0;
+	virtual void setAgentHeight(ComponentHandle cmp, float height) = 0;
+	virtual float getAgentHeight(ComponentHandle cmp) = 0;
 	virtual void setAgentRootMotion(Entity, const Vec3& root_motion) = 0;
+	virtual bool useAgentRootMotion(ComponentHandle cmp) = 0;
+	virtual void setUseAgentRootMotion(ComponentHandle cmp, bool use_root_motion) = 0;
+	virtual bool isGettingRootMotionFromAnim(ComponentHandle cmp) = 0;
+	virtual void setIsGettingRootMotionFromAnim(ComponentHandle cmp, bool is) = 0;
 	virtual bool generateNavmesh() = 0;
 	virtual bool generateTile(int x, int z, bool keep_data) = 0;
 	virtual bool generateTileAt(const Vec3& pos, bool keep_data) = 0;

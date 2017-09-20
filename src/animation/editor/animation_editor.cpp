@@ -405,6 +405,7 @@ public:
 	bool hasFocus() override { return m_is_focused; }
 
 private:
+	void checkShortcuts();
 	void beginCommandGroup(u32 type);
 	void endCommandGroup();
 	void newController();
@@ -886,8 +887,15 @@ void AnimationEditor::clearUndoStack()
 }
 
 
+void AnimationEditor::checkShortcuts()
+{
+
+}
+
+
 void AnimationEditor::update(float time_delta)
 {
+	checkShortcuts();
 	if (!m_is_playing) return;
 	auto& entities = m_app.getWorldEditor()->getSelectedEntities();
 	if (entities.empty()) return;

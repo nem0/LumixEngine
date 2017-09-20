@@ -2481,7 +2481,7 @@ struct ShaderEditorPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	void update(float) override { m_compiler->update(); }
 	void onAction() { m_shader_editor.m_is_open = !m_shader_editor.m_is_open; }
 	void onWindowGUI() override { m_shader_editor.onGUI(*m_compiler); }
-	bool hasFocus() override { return m_shader_editor.isFocused(); }
+	bool hasFocus() override { return m_shader_editor.hasFocus(); }
 	bool isOpened() const { return m_shader_editor.m_is_open; }
 
 	StudioApp& m_app;

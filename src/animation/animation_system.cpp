@@ -624,13 +624,13 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	Entity getSharedControllerParent(ComponentHandle cmp) override { return m_shared_controllers[{cmp.index}].parent; }
 
 
-	float getTimeScale(ComponentHandle cmp) { return m_animables[{cmp.index}].time_scale; }
-	void setTimeScale(ComponentHandle cmp, float time_scale) { m_animables[{cmp.index}].time_scale = time_scale; }
-	float getStartTime(ComponentHandle cmp) { return m_animables[{cmp.index}].start_time; }
-	void setStartTime(ComponentHandle cmp, float time) { m_animables[{cmp.index}].start_time = time; }
+	float getAnimableTimeScale(ComponentHandle cmp) { return m_animables[{cmp.index}].time_scale; }
+	void setAnimableTimeScale(ComponentHandle cmp, float time_scale) { m_animables[{cmp.index}].time_scale = time_scale; }
+	float getAnimableStartTime(ComponentHandle cmp) { return m_animables[{cmp.index}].start_time; }
+	void setAnimableStartTime(ComponentHandle cmp, float time) { m_animables[{cmp.index}].start_time = time; }
 
 
-	void setControllerSource(ComponentHandle cmp, const Path& path)
+	void setControllerSource(ComponentHandle cmp, const Path& path) override
 	{
 		auto& controller = m_controllers.get({cmp.index});
 		unloadController(controller.resource);
@@ -1148,10 +1148,10 @@ AnimationSystemImpl::AnimationSystemImpl(Engine& engine)
 			ANIMATION_TYPE));
 	PropertyRegister::add("animable",
 		LUMIX_NEW(m_allocator, DecimalPropertyDescriptor<AnimationSceneImpl>)(
-			"Start time", &AnimationSceneImpl::getStartTime, &AnimationSceneImpl::setStartTime, 0, FLT_MAX, 0.1f));
+			"Start time", &AnimationSceneImpl::getAnimableStartTime, &AnimationSceneImpl::setAnimableStartTime, 0, FLT_MAX, 0.1f));
 	PropertyRegister::add("animable",
 		LUMIX_NEW(m_allocator, DecimalPropertyDescriptor<AnimationSceneImpl>)(
-			"Time scale", &AnimationSceneImpl::getTimeScale, &AnimationSceneImpl::setTimeScale, 0, FLT_MAX, 0.1f));
+			"Time scale", &AnimationSceneImpl::getAnimableTimeScale, &AnimationSceneImpl::setAnimableTimeScale, 0, FLT_MAX, 0.1f));
 
 	PropertyRegister::add("shared_anim_controller",
 		LUMIX_NEW(m_allocator, EntityPropertyDescriptor<AnimationSceneImpl>)(

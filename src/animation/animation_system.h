@@ -29,10 +29,15 @@ struct AnimationScene : public IScene
 	virtual void updateAnimable(ComponentHandle cmp, float time_delta) = 0;
 	virtual void updateController(ComponentHandle cmp, float time_delta) = 0;
 	virtual Entity getControllerEntity(ComponentHandle cmp) = 0;
+	virtual float getAnimableTimeScale(ComponentHandle cmp) = 0;
+	virtual void setAnimableTimeScale(ComponentHandle cmp, float time_scale) = 0;
+	virtual float getAnimableStartTime(ComponentHandle cmp) = 0;
+	virtual void setAnimableStartTime(ComponentHandle cmp, float time) = 0;
 	virtual u8* getControllerInput(ComponentHandle cmp) = 0;
 	virtual void setControllerInput(ComponentHandle cmp, int input_idx, float value) = 0;
 	virtual void setControllerInput(ComponentHandle cmp, int input_idx, bool value) = 0;
 	virtual struct RigidTransform getControllerRootMotion(ComponentHandle cmp) = 0;
+	virtual void setControllerSource(ComponentHandle cmp, const Path& path) = 0;
 	virtual class Path getControllerSource(ComponentHandle cmp) = 0;
 	virtual Anim::ComponentInstance* getControllerRoot(ComponentHandle cmp) = 0;
 	virtual int getControllerInputIndex(ComponentHandle cmp, const char* name) const = 0;
