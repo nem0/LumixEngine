@@ -1522,14 +1522,14 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	}
 
 
-	bool isGettingRootMotionFromAnim(ComponentHandle cmp)
+	bool isGettingRootMotionFromAnim(ComponentHandle cmp) override
 	{
 		Entity entity = {cmp.index};
 		return (m_agents[entity].flags & Agent::GET_ROOT_MOTION_FROM_ANIM_CONTROLLER) != 0;
 	}
 
 
-	void setIsGettingRootMotionFromAnim(ComponentHandle cmp, bool is)
+	void setIsGettingRootMotionFromAnim(ComponentHandle cmp, bool is) override 
 	{
 		Entity entity = {cmp.index};
 		if (is)
@@ -1539,14 +1539,14 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	}
 
 
-	bool useAgentRootMotion(ComponentHandle cmp)
+	bool useAgentRootMotion(ComponentHandle cmp) override
 	{
 		Entity entity = {cmp.index};
 		return (m_agents[entity].flags & Agent::USE_ROOT_MOTION) != 0;
 	}
 
 
-	void setUseAgentRootMotion(ComponentHandle cmp, bool use_root_motion)
+	void setUseAgentRootMotion(ComponentHandle cmp, bool use_root_motion) override
 	{
 		Entity entity = {cmp.index};
 		if (use_root_motion)
@@ -1556,28 +1556,28 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	}
 
 
-	void setAgentRadius(ComponentHandle cmp, float radius)
+	void setAgentRadius(ComponentHandle cmp, float radius) override
 	{
 		Entity entity = {cmp.index};
 		m_agents[entity].radius = radius;
 	}
 
 
-	float getAgentRadius(ComponentHandle cmp)
+	float getAgentRadius(ComponentHandle cmp) override
 	{
 		Entity entity = { cmp.index };
 		return m_agents[entity].radius;
 	}
 
 
-	void setAgentHeight(ComponentHandle cmp, float height)
+	void setAgentHeight(ComponentHandle cmp, float height) override
 	{
 		Entity entity = { cmp.index };
 		m_agents[entity].height = height;
 	}
 
 
-	float getAgentHeight(ComponentHandle cmp)
+	float getAgentHeight(ComponentHandle cmp) override
 	{
 		Entity entity = {cmp.index};
 		return m_agents[entity].height;

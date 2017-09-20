@@ -86,7 +86,7 @@ public:
 	void loadNodeConnections(InputBlob& blob, Node& node);
 	void saveNode(OutputBlob& blob, Node& node);
 	void saveNodeConnections(OutputBlob& blob, Node& node);
-	bool isFocused() const { return m_is_focused; }
+	bool hasFocus() const { return m_is_focused; }
 	void undo();
 	void redo();
 
