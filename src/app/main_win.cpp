@@ -312,17 +312,17 @@ public:
 	{
 		lua_State* L = m_engine->getState();
 
-		#define REGISTER_FUNCTION(F, name) \
+		#define REGISTER_FUNCTION(F) \
 			do { \
 				auto* f = &LuaWrapper::wrapMethodClosure<App, decltype(&App::F), &App::F>; \
-				LuaWrapper::createSystemClosure(L, "App", this, name, f); \
+				LuaWrapper::createSystemClosure(L, "App", this, #F, f); \
 			} while(false) \
 
-		REGISTER_FUNCTION(loadUniverse, "loadUniverse");
-		REGISTER_FUNCTION(setUniverse, "setUniverse");
-		REGISTER_FUNCTION(frame, "frame");
-		REGISTER_FUNCTION(exit, "exit");
-		REGISTER_FUNCTION(isFinished, "isFinished");
+		REGISTER_FUNCTION(loadUniverse);
+		REGISTER_FUNCTION(setUniverse);
+		REGISTER_FUNCTION(frame);
+		REGISTER_FUNCTION(exit);
+		REGISTER_FUNCTION(isFinished);
 
 		#undef REGISTER_FUNCTION
 
