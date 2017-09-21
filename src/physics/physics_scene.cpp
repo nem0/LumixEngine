@@ -4622,13 +4622,13 @@ void PhysicsScene::registerLuaAPI(lua_State* L)
 			LuaWrapper::createSystemFunction(L, "Physics", #name, f); \
 		} while(false) \
 
-	REGISTER_FUNCTION(getActorComponent, BoxRigidActor, SphereRigidActor, CapsuleRigidActor, MeshRigidActor);
-	REGISTER_FUNCTION(putToSleep, BoxRigidActor, SphereRigidActor, CapsuleRigidActor, MeshRigidActor);
-	REGISTER_FUNCTION(getActorSpeed, BoxRigidActor, SphereRigidActor, CapsuleRigidActor, MeshRigidActor);
-	REGISTER_FUNCTION(applyForceToActor, BoxRigidActor, SphereRigidActor, CapsuleRigidActor, MeshRigidActor);
+	REGISTER_FUNCTION(getActorComponent, (BoxRigidActor, SphereRigidActor, CapsuleRigidActor, MeshRigidActor));
+	REGISTER_FUNCTION(putToSleep, (BoxRigidActor, SphereRigidActor, CapsuleRigidActor, MeshRigidActor));
+	REGISTER_FUNCTION(getActorSpeed, (BoxRigidActor, SphereRigidActor, CapsuleRigidActor, MeshRigidActor));
+	REGISTER_FUNCTION(applyForceToActor, (BoxRigidActor, SphereRigidActor, CapsuleRigidActor, MeshRigidActor));
 	REGISTER_FUNCTION(moveController, PhysicalController);
 	REGISTER_FUNCTION(setRagdollKinematic, Ragdoll);
-	REGISTER_FUNCTION(addForceAtPos, BoxRigidActor, SphereRigidActor, CapsuleRigidActor, MeshRigidActor);
+	REGISTER_FUNCTION(addForceAtPos, (BoxRigidActor, SphereRigidActor, CapsuleRigidActor, MeshRigidActor));
 	
 	LuaWrapper::createSystemFunction(L, "Physics", "raycast", &PhysicsSceneImpl::LUA_raycast);
 
