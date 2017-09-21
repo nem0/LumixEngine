@@ -4616,7 +4616,7 @@ void Heightfield::heightmapLoaded(Resource::State, Resource::State new_state, Re
 
 void PhysicsScene::registerLuaAPI(lua_State* L)
 {
-	#define REGISTER_FUNCTION(name) \
+	#define REGISTER_FUNCTION(name, ...) \
 		do {\
 			auto f = &LuaWrapper::wrapMethod<PhysicsSceneImpl, decltype(&PhysicsSceneImpl::name), &PhysicsSceneImpl::name>; \
 			LuaWrapper::createSystemFunction(L, "Physics", #name, f); \
@@ -4626,7 +4626,7 @@ void PhysicsScene::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(putToSleep);
 	REGISTER_FUNCTION(getActorSpeed);
 	REGISTER_FUNCTION(applyForceToActor);
-	REGISTER_FUNCTION(moveController);
+	REGISTER_FUNCTION(moveController, "physical_controller");
 	REGISTER_FUNCTION(setRagdollKinematic);
 	REGISTER_FUNCTION(addForceAtPos);
 	
