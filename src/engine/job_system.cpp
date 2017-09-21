@@ -286,7 +286,7 @@ void runJobs(const JobDecl* jobs, int count, int volatile* counter)
 	MT::SpinLock lock(g_system->m_sync);
 	g_system->m_job_count += count;
 	g_system->m_work_signal.trigger();
-	if(counter) MT::atomicAdd(counter, count);
+	if (counter) MT::atomicAdd(counter, count);
 	for (int i = 0; i < count; ++i)
 	{
 		Job job;
