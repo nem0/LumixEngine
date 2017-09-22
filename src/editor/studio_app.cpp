@@ -1304,7 +1304,6 @@ public:
 	{
 		m_settings.m_is_asset_browser_opened = m_asset_browser->m_is_open;
 		m_settings.m_asset_browser_left_column_width = m_asset_browser->m_left_column_width;
-		m_settings.m_asset_browser_middle_column_width = m_asset_browser->m_middle_column_width;
 		m_settings.m_is_entity_list_opened = m_is_entity_list_opened;
 		m_settings.m_is_log_opened = m_log_ui->m_is_open;
 		m_settings.m_is_profiler_opened = m_profiler_ui->m_is_open;
@@ -1366,7 +1365,6 @@ public:
 
 		m_asset_browser->m_is_open = m_settings.m_is_asset_browser_opened;
 		m_asset_browser->m_left_column_width = m_settings.m_asset_browser_left_column_width;
-		m_asset_browser->m_middle_column_width = m_settings.m_asset_browser_middle_column_width;
 		m_is_entity_list_opened = m_settings.m_is_entity_list_opened;
 		m_log_ui->m_is_open = m_settings.m_is_log_opened;
 		m_profiler_ui->m_is_open = m_settings.m_is_profiler_opened;
