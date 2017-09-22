@@ -748,18 +748,18 @@ public:
 	}
 
 
-	bool hasPluginFocus()
+	IPlugin* getFocusedPlugin()
 	{
-		for(auto* plugin : m_plugins)
+		for(IPlugin* plugin : m_plugins)
 		{
-			if(plugin->hasFocus()) return true;
+			if(plugin->hasFocus()) return plugin;
 		}
-		return false;
+		return nullptr;
 	}
 
 
-	void undo() { if (!hasPluginFocus()) m_editor->undo(); }
-	void redo() { if (!hasPluginFocus()) m_editor->redo(); }
+	void undo() { m_editor->undo(); }
+	void redo() { m_editor->redo(); }
 	void copy() { m_editor->copyEntities(); }
 	void paste() { m_editor->pasteEntities(); }
 	bool isOrbitCamera() { return m_editor->isOrbitCamera(); }
@@ -1387,22 +1387,22 @@ public:
 	void addActions()
 	{
 		addAction<&StudioAppImpl::newUniverse>("New", "newUniverse");
-		addAction<&StudioAppImpl::save>("Save", "save", KMOD_CTRL, 'S', -1);
+		addAction<&StudioAppImpl::save>("Save", "save", SDL_SCANCODE_LCTRL, 'S', -1);
 		addAction<&StudioAppImpl::saveAs>("Save As",
 			"saveAs",
 			KMOD_CTRL,
 			KMOD_SHIFT,
 			'S');
-		addAction<&StudioAppImpl::exit>("Exit", "exit", KMOD_CTRL, 'X', -1);
+		addAction<&StudioAppImpl::exit>("Exit", "exit", SDL_SCANCODE_LCTRL, 'X', -1);
 
 		addAction<&StudioAppImpl::redo>("Redo",
 			"redo",
 			KMOD_CTRL,
 			KMOD_SHIFT,
 			'Z');
-		addAction<&StudioAppImpl::undo>("Undo", "undo", KMOD_CTRL, 'Z', -1);
-		addAction<&StudioAppImpl::copy>("Copy", "copy", KMOD_CTRL, 'C', -1);
-		addAction<&StudioAppImpl::paste>("Paste", "paste", KMOD_CTRL, 'V', -1);
+		addAction<&StudioAppImpl::undo>("Undo", "undo", SDL_SCANCODE_LCTRL, 'Z', -1);
+		addAction<&StudioAppImpl::copy>("Copy", "copy", SDL_SCANCODE_LCTRL, 'C', -1);
+		addAction<&StudioAppImpl::paste>("Paste", "paste", SDL_SCANCODE_LCTRL, 'V', -1);
 		addAction<&StudioAppImpl::toggleOrbitCamera>("Orbit camera", "orbitCamera")
 			.is_selected.bind<StudioAppImpl, &StudioAppImpl::isOrbitCamera>(this);
 		addAction<&StudioAppImpl::setTranslateGizmoMode>("Translate", "setTranslateGizmoMode")
@@ -2211,7 +2211,7 @@ public:
 	void checkShortcuts()
 	{
 		if (ImGui::IsAnyItemActive()) return;
-		if (hasPluginFocus()) return;
+		IPlugin* plugin = getFocusedPlugin();
 
 		int key_count;
 		auto* state = SDL_GetKeyboardState(&key_count);
@@ -2219,6 +2219,7 @@ public:
 		for (auto* a : m_actions)
 		{
 			if (!a->is_global || a->shortcut[0] == -1) continue;
+			if (a->plugin != plugin) continue; 
 
 			u32 action_modifiers = 0;
 			for (int i = 0; i < lengthOf(a->shortcut) + 1; ++i)

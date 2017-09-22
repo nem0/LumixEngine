@@ -2221,7 +2221,7 @@ void ShaderEditor::onGUI(ShaderCompiler& compiler)
 	title << "###Shader Editor";
 	if (ImGui::BeginDock(title, &m_is_open, ImGuiWindowFlags_MenuBar))
 	{
-		m_is_focused = ImGui::IsWindowOrChildWindowFocused();
+		m_is_focused = ImGui::IsFocusedHierarchy();
 
 		onGUIMenu();
 		onGUILeftColumn();

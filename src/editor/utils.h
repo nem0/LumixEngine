@@ -25,6 +25,7 @@ struct LUMIX_EDITOR_API Action
 	const char* name;
 	const char* label;
 	bool is_global;
+	void* plugin;
 	ImTextureID icon;
 	Delegate<void> func;
 	Delegate<bool> is_selected;
