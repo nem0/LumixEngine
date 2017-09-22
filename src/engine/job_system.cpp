@@ -52,7 +52,6 @@ struct System
 		, m_job_queue(allocator)
 		, m_sleeping_fibers(allocator)
 		, m_sync(false)
-		, m_job_count(0)
 		, m_work_signal(true)
 	{}
 
@@ -100,6 +99,7 @@ static bool getReadyJob(System& system, Job* out)
 
 	Job job = system.m_job_queue.back();
 	system.m_job_queue.pop();
+	if (system.m_job_queue.empty()) system.m_work_signal.reset();
 	*out = job;
 
 	return true;
@@ -134,11 +134,6 @@ struct WorkerTask : MT::Task
 		{
 			g_system->m_free_fibers_indices[g_system->m_num_free_fibers] = fiber.idx;
 			++g_system->m_num_free_fibers;
-			--g_system->m_job_count;
-			if (g_system->m_job_count == 0)
-			{
-				g_system->m_work_signal.reset();
-			}
 			return;
 		}
 
@@ -163,6 +158,7 @@ struct WorkerTask : MT::Task
 			{
 				ready_sleeping_fiber.fiber->worker_task = this;
 				ready_sleeping_fiber.fiber->switch_state = nullptr;
+				PROFILE_BLOCK("work");
 				Fiber::switchTo(ready_sleeping_fiber.fiber->fiber);
 				handleSwitch(*ready_sleeping_fiber.fiber);
 				continue;
@@ -175,11 +171,13 @@ struct WorkerTask : MT::Task
 				fiber_decl.worker_task = this;
 				fiber_decl.current_job = job;
 				fiber_decl.switch_state = nullptr;
+				PROFILE_BLOCK("work");
 				Fiber::switchTo(fiber_decl.fiber);
 				handleSwitch(fiber_decl);
 			}
 			else 
 			{
+				PROFILE_BLOCK("wait");
 				g_system->m_work_signal.waitTimeout(1);
 			}
 		}
@@ -285,7 +283,6 @@ void runJobs(const JobDecl* jobs, int count, int volatile* counter)
 	ASSERT(count > 0);
 
 	MT::SpinLock lock(g_system->m_sync);
-	g_system->m_job_count += count;
 	g_system->m_work_signal.trigger();
 	if (counter) MT::atomicAdd(counter, count);
 	for (int i = 0; i < count; ++i)
