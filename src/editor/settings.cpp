@@ -197,7 +197,6 @@ bool Settings::load()
 	m_is_open = getBoolean(L, "settings_opened", false);
 	m_is_asset_browser_opened = getBoolean(L, "asset_browser_opened", false);
 	m_asset_browser_left_column_width = getFloat(L, "asset_browser_left_column_width", false);
-	m_asset_browser_middle_column_width = getFloat(L, "asset_browser_middle_column_width", false);
 	m_is_entity_list_opened = getBoolean(L, "entity_list_opened", false);
 	m_is_entity_template_list_opened = getBoolean(L, "entity_template_list_opened", false);
 	m_is_log_opened = getBoolean(L, "log_opened", false);
@@ -326,7 +325,6 @@ bool Settings::save()
 	writeBool("error_reporting_enabled", m_is_crash_reporting_enabled);
 	file << "mouse_sensitivity_x = " << m_mouse_sensitivity_x << "\n";
 	file << "mouse_sensitivity_y = " << m_mouse_sensitivity_y << "\n";
-	file << "asset_browser_middle_column_width = " << m_asset_browser_middle_column_width << "\n";
 	file << "asset_browser_left_column_width = " << m_asset_browser_left_column_width << "\n";
 	
 	saveStyle(file);

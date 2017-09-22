@@ -60,7 +60,6 @@ public:
 public:
 	bool m_is_open;
 	float m_left_column_width = 120;
-	float m_middle_column_width = 300;
 	static const int TILE_SIZE = 128;
 
 private:
@@ -74,10 +73,9 @@ private:
 	};
 
 private:
-	void leftColumn();
-	void middleColumn();
-	void rightColumn();
-
+	void dirColumn();
+	void fileColumn();
+	void detailsGUI();
 	void createTile(FileInfo& tile, const char* out_path);
 	void thumbnail(FileInfo& tile);
 	int getThumbnailIndex(int i, int j, int columns) const;

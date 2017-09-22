@@ -125,6 +125,12 @@ void AssetBrowser::toggleAutoreload()
 AssetBrowser::~AssetBrowser()
 {
 	unloadResource();
+	RenderInterface* ri = m_app.getWorldEditor()->getRenderInterface();
+	for (FileInfo& info : m_file_infos)
+	{
+		ri->unloadTexture(info.tex);
+	}
+	m_file_infos.clear();
 
 	for (auto* plugin : m_plugins)
 	{
@@ -149,13 +155,6 @@ void AssetBrowser::onFileChanged(const char* path)
 
 void AssetBrowser::unloadResource()
 {
-	RenderInterface* ri = m_app.getWorldEditor()->getRenderInterface();
-	for (FileInfo& info : m_file_infos)
-	{
-		ri->unloadTexture(info.tex);
-	}
-	m_file_infos.clear();
-
 	if (!m_selected_resource) return;
 
 	for (auto* plugin : m_plugins)
@@ -350,7 +349,7 @@ void AssetBrowser::breadcrumbs()
 }
 
 
-void AssetBrowser::leftColumn()
+void AssetBrowser::dirColumn()
 {
 	ImVec2 size(m_left_column_width, 0);
 	ImGui::BeginChild("left_col", size);
@@ -448,10 +447,9 @@ void AssetBrowser::thumbnail(FileInfo& tile)
 }
 
 
-void AssetBrowser::middleColumn()
+void AssetBrowser::fileColumn()
 {
-	ImVec2 size(m_middle_column_width, 0);
-	ImGui::BeginChild("main_col", size);
+	ImGui::BeginChild("main_col");
 
 	IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
 
@@ -463,11 +461,17 @@ void AssetBrowser::middleColumn()
 	ImGuiListClipper clipper(row_count);
 	
 	auto callbacks = [this](FileInfo& tile) {
-		if (ImGui::IsItemClicked()) selectResource(Path(tile.filepath), true);
 		if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tile.filepath.data);
 		if (ImGui::IsMouseDragging() && ImGui::IsItemHoveredRect())
 		{
-			m_app.startDrag(StudioApp::DragData::PATH, tile.filepath, stringLength(tile.filepath) + 1);
+			if (m_app.getDragData().type == StudioApp::DragData::NONE)
+			{
+				m_app.startDrag(StudioApp::DragData::PATH, tile.filepath, stringLength(tile.filepath) + 1);
+			}
+		}
+		else if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(0))
+		{
+			selectResource(Path(tile.filepath), true);
 		}
 	};
 
@@ -503,9 +507,9 @@ void AssetBrowser::middleColumn()
 }
 
 
-void AssetBrowser::rightColumn()
+void AssetBrowser::detailsGUI()
 {
-	if (ImGui::BeginChild("right_col"))
+	if (ImGui::BeginDock("Asset properties", &m_is_open))
 	{
 		ImVec2 pos = ImGui::GetCursorScreenPos();
 		if (ImGui::BeginToolbar("asset_browser_toolbar", pos, ImVec2(0, 24)))
@@ -545,7 +549,7 @@ void AssetBrowser::rightColumn()
 	}
 
 	end:
-		ImGui::EndChild();
+		ImGui::EndDock();
 }
 
 
@@ -586,32 +590,25 @@ void AssetBrowser::onGUI()
 	ImGui::Separator();
 
 	float content_w = ImGui::GetContentRegionAvailWidth();
-	if (m_middle_column_width < 0) m_middle_column_width = content_w - m_left_column_width - 120;
-	ImVec2 main_size(m_middle_column_width, 0);
+	ImVec2 main_size(content_w - m_left_column_width, 0);
 	ImVec2 left_size(m_left_column_width, 0);
 	if (left_size.x < 10) left_size.x = 10;
-	if (left_size.x > content_w - 70) left_size.x = content_w - 70;
+	if (left_size.x > content_w - 10) left_size.x = content_w - 10;
 	if (main_size.x < 10) main_size.x = 10;
 	if (content_w - left_size.x - main_size.x < 60) main_size.x = content_w - 60 - left_size.x;
 	
-	leftColumn();
+	dirColumn();
 
 	ImGui::SameLine();
 	ImGui::VSplitter("vsplit1", &left_size);
 	m_left_column_width = left_size.x;
 	ImGui::SameLine();
 
-	middleColumn();
-
-	ImGui::SameLine();
-	ImGui::VSplitter("vsplit2", &main_size);
-	m_middle_column_width = main_size.x;
-
-	ImGui::SameLine();
-
-	rightColumn();
+	fileColumn();
 
 	ImGui::EndDock();
+	
+	detailsGUI();
 }
 
 

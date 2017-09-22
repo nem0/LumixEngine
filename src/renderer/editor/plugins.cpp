@@ -207,8 +207,9 @@ struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 			ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0, 0, 0, 0));
 			ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0, 0, 0, 0));
 			ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0, 0, 0, 0));
-			bool is_node_open = ImGui::TreeNodeEx((const void*)(intptr_t)i, ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_AllowOverlapMode | ImGuiTreeNodeFlags_Framed, "");
-			ImGui::PopStyleColor(3);
+			ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0, 0, 0, 0));
+			bool is_node_open = ImGui::TreeNodeEx((const void*)(intptr_t)i, ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_AllowOverlapMode | ImGuiTreeNodeFlags_Framed, "%s", "");
+			ImGui::PopStyleColor(4);
 			ImGui::SameLine();
 			if (m_app.getAssetBrowser()->resourceInput(slot.name, StaticString<30>("", (u64)&slot), buf, sizeof(buf), TEXTURE_TYPE))
 			{
@@ -904,7 +905,10 @@ struct TexturePlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 	}
 
 
-	bool acceptExtension(const char* ext, ResourceType type) const override { return false; }
+	bool acceptExtension(const char* ext, ResourceType type) const override 
+	{ 
+		return type == TEXTURE_TYPE && (equalStrings(ext, "tga") || equalStrings(ext, "dds"));
+	}
 
 
 	bool onGUI(Resource* resource, ResourceType type) override
