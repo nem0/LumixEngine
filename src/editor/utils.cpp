@@ -18,6 +18,7 @@ Action::Action(const char* label, const char* name)
 {
 	this->label = label;
 	this->name = name;
+	plugin = nullptr;
 	shortcut[0] = shortcut[1] = shortcut[2] = -1;
 	is_global = true;
 	icon = nullptr;
@@ -33,6 +34,7 @@ Action::Action(const char* label,
 {
 	this->label = label;
 	this->name = name;
+	plugin = nullptr;
 	shortcut[0] = shortcut0;
 	shortcut[1] = shortcut1;
 	shortcut[2] = shortcut2;

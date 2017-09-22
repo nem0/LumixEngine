@@ -234,18 +234,18 @@ namespace ImGui
 	}
 
 
-	static bool isThisOrParentFocused(ImGuiWindow* win)
+	static bool isPredecessor(ImGuiWindow* win, ImGuiWindow* predecessor)
 	{
 		if (!win) return false;
-		ImGuiContext& g = *GImGui;
-		return g.FocusedWindow && g.FocusedWindow == win || isThisOrParentFocused(win->ParentWindow);
+		if (win == predecessor) return true;
+		return isPredecessor(win->ParentWindow, predecessor);
 	}
 
 
-	bool IsWindowOrChildWindowFocused()
+	bool IsFocusedHierarchy()
 	{
 		ImGuiContext& g = *GImGui;
-		return isThisOrParentFocused(g.CurrentWindow);
+		return isPredecessor(g.CurrentWindow, g.FocusedWindow) || isPredecessor(g.FocusedWindow, g.CurrentWindow);
 	}
 
 
