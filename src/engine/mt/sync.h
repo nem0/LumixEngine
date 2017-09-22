@@ -61,6 +61,7 @@ public:
 	void trigger();
 
 	void wait();
+	void waitTimeout(u32 timeout_ms);
 	bool poll();
 
 private:

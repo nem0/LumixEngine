@@ -113,6 +113,25 @@ void Event::trigger()
 	ASSERT(res == 0);
 }
 
+void Event::waitTimeout(u32 timeout_ms)
+{
+	int res = pthread_mutex_lock(&m_id.mutex);
+	ASSERT(res == 0);
+
+	timespec ts;
+	clock_gettime(CLOCK_REALTIME, &ts);
+	ts.tv_nsec += (long)timeout_ms * 1000 * 1000;
+	while (!m_id.signaled)
+	{
+		res = pthread_cond_timedwait(&m_id.cond, &m_id.mutex, &ts);
+		ASSERT(res == 0);
+	}
+
+	if (!m_id.manual_reset) m_id.signaled = false;
+
+	res = pthread_mutex_unlock(&m_id.mutex);
+	ASSERT(res == 0);
+}
 void Event::wait()
 {
 	int res = pthread_mutex_lock(&m_id.mutex);
