@@ -9,6 +9,7 @@
 #include "engine/mt/sync.h"
 #include "engine/mt/task.h"
 #include "engine/mt/thread.h"
+#include "engine/profiler.h"
 
 namespace Lumix
 {
@@ -177,9 +178,9 @@ struct WorkerTask : MT::Task
 				Fiber::switchTo(fiber_decl.fiber);
 				handleSwitch(fiber_decl);
 			}
-			else if(g_system->m_job_count == 0)
+			else 
 			{
-				g_system->m_work_signal.wait();
+				g_system->m_work_signal.waitTimeout(1);
 			}
 		}
 
@@ -308,6 +309,7 @@ void wait(int volatile* counter)
 
 void waitOutsideJob(volatile int* counter)
 {
+	PROFILE_FUNCTION();
 	while (*counter != 0) MT::yield();
 }
 

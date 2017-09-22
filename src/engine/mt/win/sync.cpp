@@ -57,6 +57,11 @@ void Event::trigger()
 	::SetEvent(m_id);
 }
 
+void Event::waitTimeout(u32 timeout_ms)
+{
+	::WaitForSingleObject(m_id, timeout_ms);
+}
+
 void Event::wait()
 {
 	::WaitForSingleObject(m_id, INFINITE);
