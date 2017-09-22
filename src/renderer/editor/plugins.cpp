@@ -202,46 +202,51 @@ struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		for (int i = 0; i < material->getShader()->m_texture_slot_count; ++i)
 		{
 			auto& slot = material->getShader()->m_texture_slots[i];
-			auto* texture = material->getTexture(i);
+			Texture* texture = material->getTexture(i);
 			copyString(buf, texture ? texture->getPath().c_str() : "");
-			if (m_app.getAssetBrowser()->resourceInput(
-					slot.name, StaticString<30>("", (u64)&slot), buf, sizeof(buf), TEXTURE_TYPE))
+			ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0, 0, 0, 0));
+			ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0, 0, 0, 0));
+			ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0, 0, 0, 0));
+			bool is_node_open = ImGui::TreeNodeEx((const void*)(intptr_t)i, ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_AllowOverlapMode | ImGuiTreeNodeFlags_Framed, "");
+			ImGui::PopStyleColor(3);
+			ImGui::SameLine();
+			if (m_app.getAssetBrowser()->resourceInput(slot.name, StaticString<30>("", (u64)&slot), buf, sizeof(buf), TEXTURE_TYPE))
 			{
 				material->setTexturePath(i, Path(buf));
 			}
-			if (!texture) continue;
-
-			ImGui::SameLine();
-			StaticString<50> popup_name("pu", (u64)texture, slot.name);
-			StaticString<50> label("Advanced###adv", (u64)texture, slot.name);
-			if (ImGui::Button(label)) ImGui::OpenPopup(popup_name);
-
-			if (ImGui::BeginPopup(popup_name))
+			if (!texture && is_node_open)
 			{
-				static const struct { const char* name; u32 value; u32 unset_flag; } FLAGS[] = {
-					{"SRGB", BGFX_TEXTURE_SRGB, 0},
-					{"u clamp", BGFX_TEXTURE_U_CLAMP, 0},
-					{"v clamp", BGFX_TEXTURE_V_CLAMP, 0},
-					{"Min point", BGFX_TEXTURE_MIN_POINT, BGFX_TEXTURE_MIN_ANISOTROPIC},
-					{"Mag point", BGFX_TEXTURE_MAG_POINT, BGFX_TEXTURE_MAG_ANISOTROPIC},
-					{"Min anisotropic", BGFX_TEXTURE_MIN_ANISOTROPIC, BGFX_TEXTURE_MIN_POINT},
-					{"Mag anisotropic", BGFX_TEXTURE_MAG_ANISOTROPIC, BGFX_TEXTURE_MAG_POINT}};
+				ImGui::TreePop();
+				continue;
+			}
 
-				for (auto& flag : FLAGS)
+			if(is_node_open)
+			{
+				ImGui::Image(&texture->handle, ImVec2(96, 96));
+
+				if (ImGui::CollapsingHeader("Advanced"))
 				{
-					bool b = (texture->bgfx_flags & flag.value) != 0;
-					if (ImGui::Checkbox(flag.name, &b))
+					static const struct { const char* name; u32 value; u32 unset_flag; } FLAGS[] = {
+						{"SRGB", BGFX_TEXTURE_SRGB, 0},
+						{"u clamp", BGFX_TEXTURE_U_CLAMP, 0},
+						{"v clamp", BGFX_TEXTURE_V_CLAMP, 0},
+						{"Min point", BGFX_TEXTURE_MIN_POINT, BGFX_TEXTURE_MIN_ANISOTROPIC},
+						{"Mag point", BGFX_TEXTURE_MAG_POINT, BGFX_TEXTURE_MAG_ANISOTROPIC},
+						{"Min anisotropic", BGFX_TEXTURE_MIN_ANISOTROPIC, BGFX_TEXTURE_MIN_POINT},
+						{"Mag anisotropic", BGFX_TEXTURE_MAG_ANISOTROPIC, BGFX_TEXTURE_MAG_POINT} };
+
+					for (int i = 0; i < lengthOf(FLAGS); ++i)
 					{
-						ImGui::CloseCurrentPopup();
-						if (flag.unset_flag)
+						auto& flag = FLAGS[i];
+						bool b = (texture->bgfx_flags & flag.value) != 0;
+						if (ImGui::Checkbox(flag.name, &b))
 						{
-							texture->setFlag(flag.unset_flag, false);
+							if (flag.unset_flag) texture->setFlag(flag.unset_flag, false);
+							texture->setFlag(flag.value, b);
 						}
-						texture->setFlag(flag.value, b);
 					}
 				}
-
-				ImGui::EndPopup();
+				ImGui::TreePop();
 			}
 		}
 
