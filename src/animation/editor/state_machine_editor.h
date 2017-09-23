@@ -1,7 +1,7 @@
 #pragma once
 
 
-#include "animation/animation_system.h"
+#include "animation/animation_scene.h"
 #include "animation/state_machine.h"
 #include "engine/array.h"
 #include "imgui/imgui.h"

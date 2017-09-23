@@ -1,4 +1,4 @@
-#include "animation/animation_system.h"
+#include "animation/animation_scene.h"
 #include "animation/editor/animation_editor.h"
 #include "audio_device.h"
 #include "audio_scene.h"
