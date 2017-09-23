@@ -23,7 +23,7 @@ namespace Lumix
 			Resource* resource = iter.value();
 			if (!resource->isEmpty())
 			{
-				g_log_error.log("Engine") << "Leaking resource " << resource->getPath().c_str();
+				g_log_error.log("Engine") << "Leaking resource " << resource->getPath().c_str() << "\n";
 			}
 			destroyResource(*resource);
 		}
