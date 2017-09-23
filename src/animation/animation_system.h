@@ -34,6 +34,7 @@ struct AnimationScene : public IScene
 	virtual float getAnimableStartTime(ComponentHandle cmp) = 0;
 	virtual void setAnimableStartTime(ComponentHandle cmp, float time) = 0;
 	virtual u8* getControllerInput(ComponentHandle cmp) = 0;
+	virtual void setControllerInput(ComponentHandle cmp, int input_idx, int value) = 0;
 	virtual void setControllerInput(ComponentHandle cmp, int input_idx, float value) = 0;
 	virtual void setControllerInput(ComponentHandle cmp, int input_idx, bool value) = 0;
 	virtual struct RigidTransform getControllerRootMotion(ComponentHandle cmp) = 0;
