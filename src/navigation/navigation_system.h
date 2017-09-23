@@ -17,8 +17,8 @@ class NavigationScene : public IScene
 {
 public:
 	virtual bool isFinished(Entity entity) = 0;
-	virtual bool navigate(Entity entity, const struct Vec3& dest, float speed, float stop_distance) = 0;
-	virtual void cancelNavigation(Entity entity) = 0;
+	virtual bool navigate(ComponentHandle cmp, const struct Vec3& dest, float speed, float stop_distance) = 0;
+	virtual void cancelNavigation(ComponentHandle cmp) = 0;
 	virtual void setActorActive(Entity entity, bool active) = 0;
 	virtual float getAgentSpeed(Entity entity) = 0;
 	virtual float getAgentYawDiff(Entity entity) = 0;
