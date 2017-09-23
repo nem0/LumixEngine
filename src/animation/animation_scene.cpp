@@ -1139,7 +1139,6 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 AnimationScene* AnimationScene::create(Engine& engine, IPlugin& plugin, Universe& universe, IAllocator& allocator)
 {
 	AnimationScene* scene = LUMIX_NEW(allocator, AnimationSceneImpl)(engine, plugin, universe, allocator);
-	universe.addScene(scene);
 	return scene;
 }
 
