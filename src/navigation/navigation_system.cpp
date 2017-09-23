@@ -1028,7 +1028,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	}
 
 
-	void cancelNavigation(Entity entity)
+	void cancelNavigation(Entity entity) override
 	{
 		auto iter = m_agents.find(entity);
 		if (iter == m_agents.end()) return;
