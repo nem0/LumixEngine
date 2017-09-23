@@ -2675,7 +2675,6 @@ public:
 			++m_undo_index;
 			return;
 		}
-		ASSERT(false);
 		LUMIX_DELETE(m_allocator, command);
 	}
 
