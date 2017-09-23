@@ -543,7 +543,7 @@ public:
 
 		float time_delta = m_editor->getEngine().getLastTimeDelta();
 
-		m_editor->setMouseSensitivity(m_settings.m_mouse_sensitivity_x, m_settings.m_mouse_sensitivity_y);
+		m_editor->setMouseSensitivity(m_settings.m_mouse_sensitivity.x, m_settings.m_mouse_sensitivity.y);
 		m_editor->update();
 		m_engine->update(*m_editor->getUniverse());
 
@@ -1308,8 +1308,8 @@ public:
 		m_settings.m_is_log_opened = m_log_ui->m_is_open;
 		m_settings.m_is_profiler_opened = m_profiler_ui->m_is_open;
 		m_settings.m_is_properties_opened = m_property_grid->m_is_open;
-		m_settings.m_mouse_sensitivity_x = m_editor->getMouseSensitivity().x;
-		m_settings.m_mouse_sensitivity_y = m_editor->getMouseSensitivity().y;
+		m_settings.m_mouse_sensitivity.x = m_editor->getMouseSensitivity().x;
+		m_settings.m_mouse_sensitivity.y = m_editor->getMouseSensitivity().y;
 
 		m_settings.save();
 
@@ -1323,7 +1323,7 @@ public:
 	void initIMGUI()
 	{
 		ImGuiIO& io = ImGui::GetIO();
-		m_font = io.Fonts->AddFontFromFileTTF("bin/VeraMono.ttf", 13);
+		m_font = io.Fonts->AddFontFromFileTTF("bin/VeraMono.ttf", (float)m_settings.m_font_size);
 
 		io.KeyMap[ImGuiKey_Tab] = SDLK_TAB;
 		io.KeyMap[ImGuiKey_LeftArrow] = SDL_SCANCODE_LEFT;
@@ -2191,13 +2191,13 @@ public:
 		m_profiler_ui = ProfilerUI::create(*m_engine);
 		m_log_ui = LUMIX_NEW(m_allocator, LogUI)(m_editor->getAllocator());
 
+		loadSettings();
 		initIMGUI();
 
 		if (!m_metadata.load()) g_log_info.log("Editor") << "Could not load metadata";
 
 		setStudioApp();
 		loadIcons();
-		loadSettings();
 		loadUniverseFromCommandLine();
 		findLuaPlugins("plugins/lua/");
 

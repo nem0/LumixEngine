@@ -147,8 +147,8 @@ Settings::Settings(StudioApp& app)
 	, m_is_properties_opened(false)
 	, m_is_crash_reporting_enabled(true)
 	, m_force_no_crash_report(false)
-	, m_mouse_sensitivity_x(1000.0f)
-	, m_mouse_sensitivity_y(1000.0f)
+	, m_mouse_sensitivity(80.0f, 80.0f)
+	, m_font_size(13)
 {
 	m_data_dir[0] = '\0';
 	m_filter[0] = 0;
@@ -204,8 +204,9 @@ bool Settings::load()
 	m_is_properties_opened = getBoolean(L, "properties_opened", false);
 	m_is_crash_reporting_enabled = getBoolean(L, "error_reporting_enabled", true);
 	enableCrashReporting(m_is_crash_reporting_enabled && !m_force_no_crash_report);
-	m_mouse_sensitivity_x = getFloat(L, "mouse_sensitivity_x", 200.0f);
-	m_mouse_sensitivity_y = getFloat(L, "mouse_sensitivity_y", 200.0f);
+	m_mouse_sensitivity.x = getFloat(L, "mouse_sensitivity_x", 200.0f);
+	m_mouse_sensitivity.y = getFloat(L, "mouse_sensitivity_y", 200.0f);
+	m_font_size = getInteger(L, "font_size", 13);
 
 	if (!m_editor->getEngine().getPatchFileDevice())
 	{
@@ -323,8 +324,9 @@ bool Settings::save()
 	writeBool("profiler_opened", m_is_profiler_opened);
 	writeBool("properties_opened", m_is_properties_opened);
 	writeBool("error_reporting_enabled", m_is_crash_reporting_enabled);
-	file << "mouse_sensitivity_x = " << m_mouse_sensitivity_x << "\n";
-	file << "mouse_sensitivity_y = " << m_mouse_sensitivity_y << "\n";
+	file << "mouse_sensitivity_x = " << m_mouse_sensitivity.x << "\n";
+	file << "mouse_sensitivity_y = " << m_mouse_sensitivity.y << "\n";
+	file << "font_size = " << m_font_size << "\n";
 	file << "asset_browser_left_column_width = " << m_asset_browser_left_column_width << "\n";
 	
 	saveStyle(file);
@@ -503,7 +505,8 @@ void Settings::onGUI()
 					enableCrashReporting(m_is_crash_reporting_enabled);
 				}
 			}
-			ImGui::DragFloat2("Mouse sensitivity", &m_mouse_sensitivity_x, 0.1f, 500.0f);
+			ImGui::InputInt("Font size (needs restart)", &m_font_size);
+			ImGui::DragFloat2("Mouse sensitivity", &m_mouse_sensitivity.x, 0.1f, 500.0f);
 
 			ImGui::AlignFirstTextHeightToWidgets();
 			ImGui::Text("%s", m_data_dir[0] != '\0' ? m_data_dir : "Not set");
