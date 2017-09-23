@@ -6,7 +6,7 @@
 #include "engine/crc32.h"
 #include "engine/math_utils.h"
 #include "engine/universe/universe.h"
-#include "navigation/navigation_system.h"
+#include "navigation/navigation_scene.h"
 #include <DetourCrowd.h>
 
 
