@@ -191,7 +191,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 			addCrowdAgent(iter.value());
 			if (!agent.is_finished)
 			{
-				navigate(entity, target_pos, speed, agent.stop_distance);
+				navigate({entity.index}, target_pos, speed, agent.stop_distance);
 			}
 		}
 	}
@@ -1028,8 +1028,9 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	}
 
 
-	void cancelNavigation(Entity entity) override
+	void cancelNavigation(ComponentHandle cmp) override
 	{
+		Entity entity = {cmp.index};
 		auto iter = m_agents.find(entity);
 		if (iter == m_agents.end()) return;
 
@@ -1056,8 +1057,9 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	}
 
 
-	bool navigate(Entity entity, const Vec3& dest, float speed, float stop_distance) override
+	bool navigate(ComponentHandle cmp, const Vec3& dest, float speed, float stop_distance) override
 	{
+		Entity entity = {cmp.index};
 		if (!m_navquery) return false;
 		if (!m_crowd) return false;
 		if (entity == INVALID_ENTITY) return false;
