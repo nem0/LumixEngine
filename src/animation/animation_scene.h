@@ -5,9 +5,13 @@
 #include "engine/iplugin.h"
 
 
+struct lua_State;
+
+
 namespace Lumix
 {
 
+struct IAllocator;
 class OutputBlob;
 class Path;
 
@@ -20,6 +24,10 @@ class ControllerResource;
 
 struct AnimationScene : public IScene
 {
+	static AnimationScene* create(Engine& engine, IPlugin& plugin, Universe& universe, IAllocator& allocator);
+	static void destroy(AnimationScene& scene);
+	static void registerLuaAPI(lua_State* L);
+
 	virtual const OutputBlob& getEventStream() const = 0;
 	virtual class Animation* getAnimableAnimation(ComponentHandle cmp) = 0;
 	virtual Path getAnimation(ComponentHandle cmp) = 0;
@@ -48,6 +56,7 @@ struct AnimationScene : public IScene
 	virtual void setControllerDefaultSet(ComponentHandle cmp, int set) = 0;
 	virtual int getControllerDefaultSet(ComponentHandle cmp) = 0;
 	virtual Anim::ControllerResource* getControllerResource(ComponentHandle cmp) = 0;
+	virtual float getAnimationLength(int animation_idx) = 0;
 };
 
 
