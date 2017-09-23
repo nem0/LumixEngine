@@ -735,7 +735,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		if (!ctrl.root) return;
 		if (input_idx >= lengthOf(decl.inputs)) return;
 		if (decl.inputs[input_idx].type != Anim::InputDecl::INT) return;
-		*(bool*)&ctrl.input[decl.inputs[input_idx].offset] = value;
+		*(int*)&ctrl.input[decl.inputs[input_idx].offset] = value;
 	}
 
 
