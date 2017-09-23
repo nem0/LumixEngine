@@ -1,6 +1,6 @@
 #include "animation_editor.h"
 #include "animation/animation.h"
-#include "animation/animation_system.h"
+#include "animation/animation_scene.h"
 #include "animation/controller.h"
 #include "animation/editor/state_machine_editor.h"
 #include "animation/events.h"

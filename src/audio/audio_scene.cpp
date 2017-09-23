@@ -1,5 +1,5 @@
 #include "audio_scene.h"
-#include "animation/animation_system.h"
+#include "animation/animation_scene.h"
 #include "audio_device.h"
 #include "audio_system.h"
 #include "clip_manager.h"

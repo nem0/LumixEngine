@@ -1,6 +1,6 @@
 #include "state_machine.h"
 #include "animation/animation.h"
-#include "animation/animation_system.h"
+#include "animation/animation_scene.h"
 #include "animation/controller.h"
 #include "animation/events.h"
 #include "engine/blob.h"

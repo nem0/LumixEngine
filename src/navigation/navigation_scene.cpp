@@ -1,5 +1,5 @@
 #include "navigation_scene.h"
-#include "animation/animation_system.h"
+#include "animation/animation_scene.h"
 #include "engine/array.h"
 #include "engine/base_proxy_allocator.h"
 #include "engine/blob.h"
