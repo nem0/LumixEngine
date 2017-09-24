@@ -69,9 +69,9 @@ struct CullingJobData
 	CullingSystem::Subresults* results;
 	const LayerMasks* layer_masks;
 	const SphereToModelInstanceMap* sphere_to_model_instance_map;
-	u64 m_layer_mask;
-	int m_start;
-	int m_end;
+	u64 layer_mask;
+	int start;
+	int end;
 	const Frustum* frustum;
 };
 
@@ -140,7 +140,15 @@ public:
 
 	static void cullTask(void* data)
 	{
-
+		CullingJobData* cull_data = (CullingJobData*)data;
+		doCulling(cull_data->start
+			, &(*cull_data->spheres)[cull_data->start]
+			, &(*cull_data->spheres)[cull_data->end]
+			, cull_data->frustum
+			, &(*cull_data->layer_masks)[0]
+			, &(*cull_data->sphere_to_model_instance_map)[0]
+			, cull_data->layer_mask
+			, *cull_data->results);
 	}
 
 
