@@ -2198,6 +2198,7 @@ public:
 
 		setStudioApp();
 		loadIcons();
+		loadSettings();
 		loadUniverseFromCommandLine();
 		findLuaPlugins("plugins/lua/");
 
