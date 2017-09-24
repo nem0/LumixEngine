@@ -20,17 +20,17 @@ public:
 	static NavigationScene* create(Engine& engine, IPlugin& system, Universe& universe, IAllocator& allocator);
 	static void destroy(NavigationScene& scene);
 
-	virtual bool isFinished(Entity entity) = 0;
+	virtual bool isFinished(ComponentHandle cmp) = 0;
 	virtual bool navigate(ComponentHandle cmp, const struct Vec3& dest, float speed, float stop_distance) = 0;
 	virtual void cancelNavigation(ComponentHandle cmp) = 0;
-	virtual void setActorActive(Entity entity, bool active) = 0;
-	virtual float getAgentSpeed(Entity entity) = 0;
-	virtual float getAgentYawDiff(Entity entity) = 0;
+	virtual void setActorActive(ComponentHandle cmp, bool active) = 0;
+	virtual float getAgentSpeed(ComponentHandle cmp) = 0;
+	virtual float getAgentYawDiff(ComponentHandle cmp) = 0;
 	virtual void setAgentRadius(ComponentHandle cmp, float radius) = 0;
 	virtual float getAgentRadius(ComponentHandle cmp) = 0;
 	virtual void setAgentHeight(ComponentHandle cmp, float height) = 0;
 	virtual float getAgentHeight(ComponentHandle cmp) = 0;
-	virtual void setAgentRootMotion(Entity, const Vec3& root_motion) = 0;
+	virtual void setAgentRootMotion(ComponentHandle cmp, const Vec3& root_motion) = 0;
 	virtual bool useAgentRootMotion(ComponentHandle cmp) = 0;
 	virtual void setUseAgentRootMotion(ComponentHandle cmp, bool use_root_motion) = 0;
 	virtual bool isGettingRootMotionFromAnim(ComponentHandle cmp) = 0;
@@ -45,8 +45,8 @@ public:
 	virtual void debugDrawCompactHeightfield() = 0;
 	virtual void debugDrawHeightfield() = 0;
 	virtual void debugDrawContours() = 0;
-	virtual void debugDrawPath(Entity entity) = 0;
-	virtual const dtCrowdAgent* getDetourAgent(Entity entity) = 0;
+	virtual void debugDrawPath(ComponentHandle cmp) = 0;
+	virtual const dtCrowdAgent* getDetourAgent(ComponentHandle cmp) = 0;
 	virtual bool isNavmeshReady() const = 0;
 	virtual bool hasDebugDrawData() const = 0;
 	virtual DelegateList<void(float)>& onUpdate() = 0;
