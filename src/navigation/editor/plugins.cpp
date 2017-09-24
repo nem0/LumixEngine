@@ -85,12 +85,12 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 				const auto& selected_entities = app.getWorldEditor()->getSelectedEntities();
 				if (!selected_entities.empty())
 				{
-					const dtCrowdAgent* agent = scene->getDetourAgent(selected_entities[0]);
+					const dtCrowdAgent* agent = scene->getDetourAgent({selected_entities[0].index});
 					if (agent)
 					{
 						ImGui::Text("Agent");
 						ImGui::Checkbox("Draw path", &debug_draw_path);
-						if (debug_draw_path) scene->debugDrawPath(selected_entities[0]);
+						if (debug_draw_path) scene->debugDrawPath({selected_entities[0].index});
 						ImGui::LabelText("Desired speed", "%f", agent->desiredSpeed);
 						ImGui::LabelText("Corners", "%d", agent->ncorners);
 						if (agent->ncorners > 0)
@@ -141,7 +141,7 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 					{
 						static bool debug_draw_path = false;
 						ImGui::Checkbox("Draw path", &debug_draw_path);
-						if (debug_draw_path) scene->debugDrawPath(entities[0]);
+						if (debug_draw_path) scene->debugDrawPath({entities[0].index});
 					}
 				}
 				else

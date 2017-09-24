@@ -316,27 +316,27 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	}
 
 
-	bool isFinished(Entity entity) override
+	bool isFinished(ComponentHandle cmp) override
 	{
-		return m_agents[entity].is_finished;
+		return m_agents[{cmp.index}].is_finished;
 	}
 
 
-	float getAgentSpeed(Entity entity) override
+	float getAgentSpeed(ComponentHandle cmp) override
 	{
-		return m_agents[entity].speed;
+		return m_agents[{cmp.index}].speed;
 	}
 
 
-	float getAgentYawDiff(Entity entity) override
+	float getAgentYawDiff(ComponentHandle cmp) override
 	{
-		return m_agents[entity].yaw_diff;
+		return m_agents[{cmp.index}].yaw_diff;
 	}
 
 
-	void setAgentRootMotion(Entity entity, const Vec3& root_motion) override
+	void setAgentRootMotion(ComponentHandle cmp, const Vec3& root_motion) override
 	{
-		m_agents[entity].root_motion = root_motion;
+		m_agents[{cmp.index}].root_motion = root_motion;
 	}
 
 
@@ -520,11 +520,11 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	}
 
 
-	const dtCrowdAgent* getDetourAgent(Entity entity) override
+	const dtCrowdAgent* getDetourAgent(ComponentHandle cmp) override
 	{
 		if (!m_crowd) return nullptr;
 
-		auto iter = m_agents.find(entity);
+		auto iter = m_agents.find({cmp.index});
 		if (iter == m_agents.end()) return nullptr;
 
 		const Agent& agent = iter.value();
@@ -533,13 +533,13 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	}
 
 
-	void debugDrawPath(Entity entity) override
+	void debugDrawPath(ComponentHandle cmp) override
 	{
 		auto render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
 		if (!render_scene) return;
 		if (!m_crowd) return;
 
-		auto iter = m_agents.find(entity);
+		auto iter = m_agents.find({cmp.index});
 		if (iter == m_agents.end()) return;
 		const Agent& agent = iter.value();
 		if (agent.agent < 0) return;
@@ -566,7 +566,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 		}
 		render_scene->addDebugCross(*(Vec3*)dt_agent->targetPos, 1.0f, 0xffffffff, 0);
 		Vec3 vel = *(Vec3*)dt_agent->vel;
-		Vec3 pos = m_universe.getPosition(entity);
+		Vec3 pos = m_universe.getPosition({cmp.index});
 		render_scene->addDebugLine(pos, pos + vel, 0xff0000ff, 0);
 	}
 
@@ -978,12 +978,12 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	}
 
 
-	void setActorActive(Entity entity, bool active) override
+	void setActorActive(ComponentHandle cmp, bool active) override
 	{
 		if (!m_crowd) return;
-		if (entity == INVALID_ENTITY) return;
+		if (!cmp.isValid()) return;
 
-		auto iter = m_agents.find(entity);
+		auto iter = m_agents.find({cmp.index});
 		if (iter == m_agents.end()) return;
 
 		Agent& agent = iter.value();
