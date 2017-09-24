@@ -89,9 +89,10 @@ void getFilename(char* filename, int max_length, const char* src)
 		{
 			++i;
 			copyString(filename, max_length, src + i);
-			break;
+			return;
 		}
 	}
+	copyString(filename, max_length, src);
 }
 
 
