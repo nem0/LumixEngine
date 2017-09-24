@@ -906,7 +906,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		m_current_view->layer_mask = layer_mask;
 		m_current_view->bgfx_id = (u8)m_renderer.getViewCounter();
 		m_current_view->stencil = BGFX_STENCIL_NONE;
-		m_current_view->render_state = BGFX_STATE_RGB_WRITE | BGFX_STATE_ALPHA_WRITE | BGFX_STATE_DEPTH_WRITE | BGFX_STATE_MSAA;
+		m_current_view->render_state = BGFX_STATE_RGB_WRITE | BGFX_STATE_ALPHA_WRITE | BGFX_STATE_DEPTH_WRITE;
 		m_current_view->pass_idx = m_pass_idx;
 		m_current_view->command_buffer.clear();
 		m_global_textures_count = 0;
