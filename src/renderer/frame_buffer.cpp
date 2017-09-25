@@ -108,6 +108,8 @@ static bgfx::TextureFormat::Enum getFormat(const char* name)
 		{ "depth24stencil8", bgfx::TextureFormat::D24S8 },
 		{ "rgba8", bgfx::TextureFormat::RGBA8 },
 		{ "rgba16f", bgfx::TextureFormat::RGBA16F },
+		{ "r16f", bgfx::TextureFormat::R16F },
+		{ "r16", bgfx::TextureFormat::R16 },
 		{ "r32f", bgfx::TextureFormat::R32F },
 	};
 
