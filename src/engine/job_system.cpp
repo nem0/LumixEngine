@@ -148,8 +148,15 @@ struct WorkerTask : MT::Task
 
 	int task() override
 	{
-		m_primary_fiber = Fiber::createFromThread(this);
-		
+		Fiber::createFromThread(this);
+		m_primary_fiber = Fiber::create(64 * 1024, [](void* data) { ((WorkerTask*)data)->manage(); }, this);
+		Fiber::switchTo(m_primary_fiber);
+		return 0;
+	}
+
+
+	void manage()
+	{
 		m_finished = false;
 		while (!m_finished)
 		{
@@ -181,8 +188,6 @@ struct WorkerTask : MT::Task
 				g_system->m_work_signal.waitTimeout(1);
 			}
 		}
-
-		return 0;
 	}
 
 
