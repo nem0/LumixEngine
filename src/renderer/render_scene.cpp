@@ -2718,13 +2718,13 @@ public:
 	void forceGrassUpdate(ComponentHandle cmp) override { m_terrains[{cmp.index}]->forceGrassUpdate(); }
 
 
-	void getTerrainInfos(Array<TerrainInfo>& infos, const Vec3& camera_pos) override
+	void getTerrainInfos(Array<TerrainInfo>& infos, const Frustum& frustum, const Vec3& lod_ref_point) override
 	{
 		PROFILE_FUNCTION();
 		infos.reserve(m_terrains.size());
 		for (auto* terrain : m_terrains)
 		{
-			terrain->getInfos(infos, camera_pos);
+			terrain->getInfos(infos, frustum, lod_ref_point);
 		}
 	}
 

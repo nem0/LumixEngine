@@ -1823,9 +1823,11 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			}
 
 			{
-				Entity camera_entity = m_scene->getCameraEntity(m_applied_camera);
 				Array<TerrainInfo> tmp_terrains(frame_allocator);
-				m_scene->getTerrainInfos(tmp_terrains, m_scene->getUniverse().getPosition(camera_entity));
+				Entity camera_entity = m_scene->getCameraEntity(m_applied_camera);
+				Vec3 lod_ref_point = m_scene->getUniverse().getPosition(camera_entity);
+				Frustum frustum = m_scene->getCameraFrustum(m_applied_camera);
+				m_scene->getTerrainInfos(tmp_terrains, frustum, lod_ref_point);
 				renderTerrains(tmp_terrains);
 			}
 
@@ -2022,9 +2024,9 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 		{
 			Entity camera_entity = m_scene->getCameraEntity(m_applied_camera);
-			Vec3 camera_pos = m_scene->getUniverse().getPosition(camera_entity);
+			Vec3 lod_ref_point = m_scene->getUniverse().getPosition(camera_entity);
 			Array<TerrainInfo> tmp_terrains(frame_allocator);
-			m_scene->getTerrainInfos(tmp_terrains, camera_pos);
+			m_scene->getTerrainInfos(tmp_terrains, frustum, lod_ref_point);
 			renderTerrains(tmp_terrains);
 		}
 	}
