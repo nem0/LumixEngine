@@ -709,6 +709,8 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		Vec4 size;
 		size.x = (float)width;
 		size.y = (float)height;
+		size.z = 1.0f / (float)width;
+		size.w = 1.0f / (float)height;
 		m_current_view->command_buffer.beginAppend();
 		if (m_global_textures_count == 0) m_current_view->command_buffer.setUniform(m_texture_size_uniform, size);
 		m_current_view->command_buffer.setTexture(15 - m_global_textures_count,
@@ -727,6 +729,8 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		Vec4 size;
 		size.x = (float)fb->getWidth();
 		size.y = (float)fb->getHeight();
+		size.z = 1.0f / (float)fb->getWidth();
+		size.w = 1.0f / (float)fb->getHeight();
 		m_current_view->command_buffer.beginAppend();
 		if (m_global_textures_count == 0) m_current_view->command_buffer.setUniform(m_texture_size_uniform, size);
 		m_current_view->command_buffer.setTexture(15 - m_global_textures_count,
