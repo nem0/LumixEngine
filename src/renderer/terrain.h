@@ -119,7 +119,7 @@ class Terrain
 		void setGrassTypeRotationMode(int index, GrassType::RotationMode mode);
 		void setMaterial(Material* material);
 
-		void getInfos(Array<TerrainInfo>& infos, const Vec3& camera_pos);
+		void getInfos(Array<TerrainInfo>& infos, const Frustum& frustum, const Vec3& lod_ref_point);
 		void getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, ComponentHandle camera);
 
 		RayCastModelHit castRay(const Vec3& origin, const Vec3& dir);

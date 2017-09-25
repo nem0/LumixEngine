@@ -1068,6 +1068,7 @@ public:
 		if (ImGui::MenuItem("Save commands")) saveUndoStack();
 		if (ImGui::MenuItem("Load commands")) loadAndExecuteCommands();
 		doMenuItem(*getAction("pack_data"), true);
+		ImGui::Checkbox("Limit FPS", &m_fps_limit);
 		ImGui::EndMenu();
 	}
 

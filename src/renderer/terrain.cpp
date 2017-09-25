@@ -137,9 +137,9 @@ struct TerrainQuad
 		return (size > 17 ? 2.25f : 1.25f) * Math::SQRT2 * size;
 	}
 
-	bool getInfos(Array<TerrainInfo>& infos, const Vec3& camera_pos, Terrain* terrain, const Matrix& world_matrix)
+	bool getInfos(Array<TerrainInfo>& infos, const Vec3& lod_ref_point, Terrain* terrain, const Matrix& world_matrix)
 	{
-		float squared_dist = getSquaredDistance(camera_pos);
+		float squared_dist = getSquaredDistance(lod_ref_point);
 		float r = getRadiusOuter(m_size);
 		if (squared_dist > r * r && m_lod > 1) return false;
 
@@ -147,7 +147,7 @@ struct TerrainQuad
 		Shader& shader = *terrain->getMesh()->material->getShader();
 		for (int i = 0; i < CHILD_COUNT; ++i)
 		{
-			if (!m_children[i] || !m_children[i]->getInfos(infos, camera_pos, terrain, world_matrix))
+			if (!m_children[i] || !m_children[i]->getInfos(infos, lod_ref_point, terrain, world_matrix))
 			{
 				TerrainInfo& data = infos.emplace();
 				data.m_morph_const = morph_const;
@@ -671,7 +671,7 @@ void Terrain::serialize(OutputBlob& serializer)
 }
 
 
-void Terrain::getInfos(Array<TerrainInfo>& infos, const Vec3& camera_pos)
+void Terrain::getInfos(Array<TerrainInfo>& infos, const Frustum& frustum, const Vec3& lod_ref_point)
 {
 	if (!m_root) return;
 	if (!m_material || !m_material->isReady()) return;
@@ -679,10 +679,12 @@ void Terrain::getInfos(Array<TerrainInfo>& infos, const Vec3& camera_pos)
 	Matrix matrix = m_scene.getUniverse().getMatrix(m_entity);
 	Matrix inv_matrix = matrix;
 	inv_matrix.fastInverse();
-	Vec3 local_camera_pos = inv_matrix.transform(camera_pos);
-	local_camera_pos.x /= m_scale.x;
-	local_camera_pos.z /= m_scale.z;
-	m_root->getInfos(infos, local_camera_pos, this, matrix);
+	
+	Vec3 local_lod_ref_point = inv_matrix.transform(lod_ref_point);
+	local_lod_ref_point.x /= m_scale.x;
+	local_lod_ref_point.z /= m_scale.z;
+
+	m_root->getInfos(infos, local_lod_ref_point, this, matrix);
 }
 
 
