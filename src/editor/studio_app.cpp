@@ -1481,6 +1481,20 @@ public:
 	}
 
 
+	bool FPSLimit()
+	{
+		char cmd_line[2048];
+		getCommandLine(cmd_line, lengthOf(cmd_line));
+
+		CommandLineParser parser(cmd_line);
+		while (parser.next())
+		{
+			if (parser.currentEquals("-no_fps_limit")) return false;
+		}
+		return true;
+	}
+
+
 	void loadUniverseFromCommandLine()
 	{
 		char cmd_line[2048];
@@ -2087,7 +2101,7 @@ public:
 				float wanted_fps = (SDL_GetWindowFlags(m_window) & SDL_WINDOW_INPUT_FOCUS) != 0 || !m_sleep_when_inactive
 									   ? 60.0f
 									   : 5.0f;
-				if (frame_time < 1 / wanted_fps)
+				if (m_fps_limit && frame_time < 1 / wanted_fps)
 				{
 					PROFILE_BLOCK("sleep");
 					MT::sleep(u32(1000 / wanted_fps - frame_time * 1000));
@@ -2204,6 +2218,7 @@ public:
 
 		m_asset_browser->onInitFinished();
 		m_sleep_when_inactive = shouldSleepWhenInactive();
+		m_fps_limit = FPSLimit();
 	}
 
 
@@ -2326,6 +2341,7 @@ public:
 	int m_exit_code;
 
 	bool m_sleep_when_inactive;
+	bool m_fps_limit;
 	bool m_is_welcome_screen_opened;
 	bool m_is_pack_data_dialog_opened;
 	bool m_is_entity_list_opened;
