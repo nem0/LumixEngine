@@ -81,6 +81,7 @@ struct SetTextureCommand
 	u8 stage;
 	bgfx::UniformHandle uniform;
 	bgfx::TextureHandle texture;
+	u32 flags;
 };
 
 
@@ -130,12 +131,14 @@ CommandBufferGenerator::CommandBufferGenerator()
 
 void CommandBufferGenerator::setTexture(u8 stage,
 	const bgfx::UniformHandle& uniform,
-	const bgfx::TextureHandle& texture)
+	const bgfx::TextureHandle& texture,
+	u32 flags)
 {
 	SetTextureCommand cmd;
 	cmd.stage = stage;
 	cmd.uniform = uniform;
 	cmd.texture = texture;
+	cmd.flags = flags;
 	ASSERT(pointer + sizeof(cmd) - buffer <= sizeof(buffer));
 	copyMemory(pointer, &cmd, sizeof(cmd));
 	pointer += sizeof(cmd);
@@ -716,26 +719,6 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		m_current_view->command_buffer.setTexture(15 - m_global_textures_count,
 			m_uniforms[uniform_idx],
 			*rb);
-		++m_global_textures_count;
-		m_current_view->command_buffer.end();
-	}
-
-
-	void bindFramebufferTexture(const char* framebuffer_name, int renderbuffer_idx, int uniform_idx)
-	{
-		FrameBuffer* fb = getFramebuffer(framebuffer_name);
-		if (!fb) return;
-
-		Vec4 size;
-		size.x = (float)fb->getWidth();
-		size.y = (float)fb->getHeight();
-		size.z = 1.0f / (float)fb->getWidth();
-		size.w = 1.0f / (float)fb->getHeight();
-		m_current_view->command_buffer.beginAppend();
-		if (m_global_textures_count == 0) m_current_view->command_buffer.setUniform(m_texture_size_uniform, size);
-		m_current_view->command_buffer.setTexture(15 - m_global_textures_count,
-			m_uniforms[uniform_idx],
-			fb->getRenderbufferHandle(renderbuffer_idx));
 		++m_global_textures_count;
 		m_current_view->command_buffer.end();
 	}
@@ -2394,7 +2377,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 				case BufferCommands::SET_TEXTURE:
 				{
 					auto cmd = (SetTextureCommand*)ip;
-					bgfx::setTexture(cmd->stage, cmd->uniform, cmd->texture);
+					bgfx::setTexture(cmd->stage, cmd->uniform, cmd->texture, cmd->flags);
 					ip += sizeof(*cmd);
 					break;
 				}
@@ -2934,6 +2917,38 @@ namespace LuaAPI
 {
 
 
+int bindFramebufferTexture(lua_State* L)
+{
+	PipelineImpl* that = LuaWrapper::checkArg<PipelineImpl*>(L, 1);
+	const char* framebuffer_name = LuaWrapper::checkArg<const char*>(L, 2);
+	int renderbuffer_idx = LuaWrapper::checkArg<int>(L, 3);
+	int uniform_idx = LuaWrapper::checkArg<int>(L, 4);
+	u32 flags = lua_gettop(L) > 4 ? LuaWrapper::checkArg<u32>(L, 5) : 0xffffFFFF;
+
+	FrameBuffer* fb = that->getFramebuffer(framebuffer_name);
+	if (!fb) return 0;
+
+	Vec4 size;
+	size.x = (float)fb->getWidth();
+	size.y = (float)fb->getHeight();
+	size.z = 1.0f / (float)fb->getWidth();
+	size.w = 1.0f / (float)fb->getHeight();
+	that->m_current_view->command_buffer.beginAppend();
+	if (that->m_global_textures_count == 0)
+	{
+		that->m_current_view->command_buffer.setUniform(that->m_texture_size_uniform, size);
+	}
+	that->m_current_view->command_buffer.setTexture(15 - that->m_global_textures_count,
+		that->m_uniforms[uniform_idx],
+		fb->getRenderbufferHandle(renderbuffer_idx),
+		flags);
+	++that->m_global_textures_count;
+	that->m_current_view->command_buffer.end();
+	return 0;
+}
+
+
+
 int newView(lua_State* L)
 {
 	auto* pipeline = LuaWrapper::checkArg<PipelineImpl*>(L, 1);
@@ -3091,7 +3106,8 @@ void Pipeline::registerLuaAPI(lua_State* L)
 	};
 
 	registerCFunction("newView", &LuaAPI::newView);
-
+	registerCFunction("bindFramebufferTexture", &LuaAPI::bindFramebufferTexture);
+	
 	#define REGISTER_FUNCTION(name) \
 		do {\
 			auto f = &LuaWrapper::wrapMethod<PipelineImpl, decltype(&PipelineImpl::name), &PipelineImpl::name>; \
@@ -3104,7 +3120,6 @@ void Pipeline::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(drawQuadEx);
 	REGISTER_FUNCTION(setPass);
 	REGISTER_FUNCTION(bindRenderbuffer);
-	REGISTER_FUNCTION(bindFramebufferTexture);
 	REGISTER_FUNCTION(bindTexture);
 	REGISTER_FUNCTION(bindEnvironmentMaps);
 	REGISTER_FUNCTION(applyCamera);
@@ -3204,6 +3219,8 @@ void Pipeline::registerLuaAPI(lua_State* L)
 	REGISTER_STENCIL_CONST(OP_PASS_Z_SHIFT);
 	REGISTER_STENCIL_CONST(OP_PASS_Z_MASK);
 
+	registerConst("TEXTURE_MAG_ANISOTROPIC", BGFX_TEXTURE_MAG_ANISOTROPIC);
+	registerConst("TEXTURE_MIN_ANISOTROPIC", BGFX_TEXTURE_MIN_ANISOTROPIC);
 	registerConst("CLEAR_DEPTH", BGFX_CLEAR_DEPTH);
 	registerConst("CLEAR_COLOR", BGFX_CLEAR_COLOR);
 	registerConst("CLEAR_STENCIL", BGFX_CLEAR_STENCIL);

@@ -26,7 +26,7 @@ FrameBuffer::FrameBuffer(const Declaration& decl)
 			false, 
 			1,
 			renderbuffer.m_format,
-			BGFX_TEXTURE_RT | renderbuffer.m_flags);
+			BGFX_TEXTURE_RT);
 		m_declaration.m_renderbuffers[i].m_handle = texture_handles[i];
 	}
 
@@ -90,7 +90,7 @@ void FrameBuffer::resize(int width, int height)
 		{
 			const RenderBuffer& renderbuffer = m_declaration.m_renderbuffers[i];
 			texture_handles[i] = bgfx::createTexture2D(
-				(uint16_t)width, (uint16_t)height, false, 1, renderbuffer.m_format, BGFX_TEXTURE_RT | renderbuffer.m_flags);
+				(uint16_t)width, (uint16_t)height, false, 1, renderbuffer.m_format, BGFX_TEXTURE_RT);
 			m_declaration.m_renderbuffers[i].m_handle = texture_handles[i];
 		}
 
@@ -132,19 +132,7 @@ void FrameBuffer::RenderBuffer::parse(lua_State* L)
 	{
 		m_format = bgfx::TextureFormat::RGBA8;
 	}
-	if (lua_getfield(L, -2, "min_filter") == LUA_TSTRING)
-	{
-		const char* filter = lua_tostring(L, -1);
-		m_flags &= ~BGFX_TEXTURE_MIN_MASK;
-		m_flags |= equalIStrings(filter, "point") ? BGFX_TEXTURE_MIN_POINT : BGFX_TEXTURE_MIN_ANISOTROPIC;
-	}
-	if (lua_getfield(L, -3, "mag_filter") == LUA_TSTRING)
-	{
-		const char* filter = lua_tostring(L, -1);
-		m_flags &= ~BGFX_TEXTURE_MAG_MASK;
-		m_flags |= equalIStrings(filter, "point") ? BGFX_TEXTURE_MAG_POINT : BGFX_TEXTURE_MAG_ANISOTROPIC;
-	}
-	lua_pop(L, 3);
+	lua_pop(L, 1);
 }
 
 
