@@ -148,9 +148,8 @@ struct WorkerTask : MT::Task
 
 	int task() override
 	{
-		Fiber::createFromThread(this);
-		m_primary_fiber = Fiber::create(64 * 1024, [](void* data) { ((WorkerTask*)data)->manage(); }, this);
-		Fiber::switchTo(m_primary_fiber);
+		m_primary_fiber = Fiber::createFromThread(this);
+		manage();
 		return 0;
 	}
 
