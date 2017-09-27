@@ -335,12 +335,6 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 		m_queued_forces.reserve(64);
 
-		#define COMPONENT_TYPE(type, name) \
-			context.registerComponentType(type \
-				, this \
-				, &PhysicsSceneImpl::serialize##name \
-				, &PhysicsSceneImpl::deserialize##name)
-
 		context.registerComponentType(BOX_ACTOR_TYPE, this, &PhysicsSceneImpl::serializeBoxActor, &PhysicsSceneImpl::deserializeBoxActor);
 		context.registerComponentType(MESH_ACTOR_TYPE, this, &PhysicsSceneImpl::serializeMeshActor, &PhysicsSceneImpl::deserializeMeshActor);
 		context.registerComponentType(HEIGHTFIELD_TYPE, this, &PhysicsSceneImpl::serializeHeightfield, &PhysicsSceneImpl::deserializeHeightfield);
@@ -352,8 +346,6 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		context.registerComponentType(SPHERICAL_JOINT_TYPE, this, &PhysicsSceneImpl::serializeSphericalJoint, &PhysicsSceneImpl::deserializeSphericalJoint);
 		context.registerComponentType(D6_JOINT_TYPE, this, &PhysicsSceneImpl::serializeD6Joint, &PhysicsSceneImpl::deserializeD6Joint);
 		context.registerComponentType(RAGDOLL_TYPE, this, &PhysicsSceneImpl::serializeRagdoll, &PhysicsSceneImpl::deserializeRagdoll);
-
-		#undef COMPONENT_TYPE
 	}
 
 

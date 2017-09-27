@@ -23,6 +23,7 @@ class FrameBuffer
 		{
 			bgfx::TextureFormat::Enum m_format;
 			bgfx::TextureHandle m_handle;
+			u32 m_flags = BGFX_TEXTURE_MAG_POINT | BGFX_TEXTURE_MIN_POINT;
 
 			void parse(lua_State* state);
 		};
