@@ -341,17 +341,17 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 				, &PhysicsSceneImpl::serialize##name \
 				, &PhysicsSceneImpl::deserialize##name)
 
-		COMPONENT_TYPE(BOX_ACTOR_TYPE, BoxActor);
-		COMPONENT_TYPE(MESH_ACTOR_TYPE, MeshActor);
-		COMPONENT_TYPE(HEIGHTFIELD_TYPE, Heightfield);
-		COMPONENT_TYPE(CONTROLLER_TYPE, Controller);
-		COMPONENT_TYPE(DISTANCE_JOINT_TYPE, DistanceJoint);
-		COMPONENT_TYPE(HINGE_JOINT_TYPE, HingeJoint);
-		COMPONENT_TYPE(CAPSULE_ACTOR_TYPE, CapsuleActor);
-		COMPONENT_TYPE(SPHERE_ACTOR_TYPE, SphereActor);
-		COMPONENT_TYPE(SPHERICAL_JOINT_TYPE, SphericalJoint);
-		COMPONENT_TYPE(D6_JOINT_TYPE, D6Joint);
-		COMPONENT_TYPE(RAGDOLL_TYPE, Ragdoll);
+		context.registerComponentType(BOX_ACTOR_TYPE, this, &PhysicsSceneImpl::serializeBoxActor, &PhysicsSceneImpl::deserializeBoxActor);
+		context.registerComponentType(MESH_ACTOR_TYPE, this, &PhysicsSceneImpl::serializeMeshActor, &PhysicsSceneImpl::deserializeMeshActor);
+		context.registerComponentType(HEIGHTFIELD_TYPE, this, &PhysicsSceneImpl::serializeHeightfield, &PhysicsSceneImpl::deserializeHeightfield);
+		context.registerComponentType(CONTROLLER_TYPE, this, &PhysicsSceneImpl::serializeController, &PhysicsSceneImpl::deserializeController);
+		context.registerComponentType(DISTANCE_JOINT_TYPE, this, &PhysicsSceneImpl::serializeDistanceJoint, &PhysicsSceneImpl::deserializeDistanceJoint);
+		context.registerComponentType(HINGE_JOINT_TYPE, this, &PhysicsSceneImpl::serializeHingeJoint, &PhysicsSceneImpl::deserializeHingeJoint);
+		context.registerComponentType(CAPSULE_ACTOR_TYPE, this, &PhysicsSceneImpl::serializeCapsuleActor, &PhysicsSceneImpl::deserializeCapsuleActor);
+		context.registerComponentType(SPHERE_ACTOR_TYPE, this, &PhysicsSceneImpl::serializeSphereActor, &PhysicsSceneImpl::deserializeSphereActor);
+		context.registerComponentType(SPHERICAL_JOINT_TYPE, this, &PhysicsSceneImpl::serializeSphericalJoint, &PhysicsSceneImpl::deserializeSphericalJoint);
+		context.registerComponentType(D6_JOINT_TYPE, this, &PhysicsSceneImpl::serializeD6Joint, &PhysicsSceneImpl::deserializeD6Joint);
+		context.registerComponentType(RAGDOLL_TYPE, this, &PhysicsSceneImpl::serializeRagdoll, &PhysicsSceneImpl::deserializeRagdoll);
 
 		#undef COMPONENT_TYPE
 	}
