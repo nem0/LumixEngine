@@ -102,29 +102,6 @@ class JsonSerializer;
 class Universe;
 
 
-struct AnimationSystemImpl LUMIX_FINAL : public IPlugin
-{
-	explicit AnimationSystemImpl(Engine& engine);
-	~AnimationSystemImpl();
-
-
-	void registerLuaAPI();
-	void createScenes(Universe& ctx) override;
-	void destroyScene(IScene* scene) override;
-	const char* getName() const override { return "animation"; }
-
-	IAllocator& m_allocator;
-	Engine& m_engine;
-	AnimationManager m_animation_manager;
-	Anim::ControllerManager m_controller_manager;
-
-private:
-	void operator=(const AnimationSystemImpl&);
-	AnimationSystemImpl(const AnimationSystemImpl&);
-};
-
-
-
 struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 {
 	friend struct AnimationSystemImpl;
