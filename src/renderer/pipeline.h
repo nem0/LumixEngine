@@ -42,7 +42,8 @@ struct CommandBufferGenerator
 
 	void setTexture(u8 stage,
 		const bgfx::UniformHandle& uniform,
-		const bgfx::TextureHandle& texture);
+		const bgfx::TextureHandle& texture,
+		u32 flags = 0xffffFFFF);
 	void setUniform(const bgfx::UniformHandle& uniform, const Vec4& value);
 	void setUniform(const bgfx::UniformHandle& uniform, const Vec4* values, int count);
 	void setUniform(const bgfx::UniformHandle& uniform, const Matrix* values, int count);
