@@ -65,6 +65,7 @@ public:
 	virtual void showEntity(Entity entity) = 0;
 	virtual void hideEntity(Entity entity) = 0;
 	virtual ImFont* addFont(const char* filename, int size) = 0;
+	virtual Vec3 getClosestVertex(Universe* universe, Entity entity, const Vec3& pos) = 0;
 };
 
 

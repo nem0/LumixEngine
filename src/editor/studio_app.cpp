@@ -543,6 +543,16 @@ public:
 
 		float time_delta = m_editor->getEngine().getLastTimeDelta();
 
+		ImGuiIO& io = ImGui::GetIO();
+		if (!io.KeyShift)
+		{
+			m_editor->setSnapMode(false, false, false);
+		}
+		else if (io.KeyCtrl)
+		{
+			m_editor->setSnapMode(io.KeyShift, io.KeyCtrl, !io.MouseDown[0]);
+		}
+
 		m_editor->setMouseSensitivity(m_settings.m_mouse_sensitivity.x, m_settings.m_mouse_sensitivity.y);
 		m_editor->update();
 		m_engine->update(*m_editor->getUniverse());
@@ -2027,7 +2037,7 @@ public:
 				case SDL_QUIT: exit(); break;
 				case SDL_MOUSEBUTTONDOWN:
 					m_editor->setAdditiveSelection(io.KeyCtrl);
-					m_editor->setSnapMode(io.KeyShift);
+					m_editor->setSnapMode(io.KeyShift, io.KeyCtrl, false);
 					switch (event.button.button)
 					{
 						case SDL_BUTTON_LEFT: io.MouseDown[0] = true; break;

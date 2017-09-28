@@ -1744,10 +1744,31 @@ public:
 	}
 
 
+	void previewSnapVertex()
+	{
+		if (m_snap_mode != SnapMode::VERTEX_PREVIEW) return;
+
+		Vec3 origin, dir;
+		ComponentUID camera_cmp = getUniverse()->getComponent(m_camera, CAMERA_TYPE);
+		if (!camera_cmp.isValid()) return;
+
+		InputSystem& input = m_engine->getInputSystem();
+		m_render_interface->getRay(camera_cmp.handle, m_mouse_x, m_mouse_y, origin, dir);
+		auto hit = m_render_interface->castRay(origin, dir, INVALID_COMPONENT);
+		//if (m_gizmo->isActive()) return;
+		if (!hit.is_hit) return;
+
+		Vec3 snap_pos = getClosestVertex(hit);
+		m_render_interface->addDebugCross(snap_pos, 1, 0xfff00fff, 0);
+		// TODO
+	}
+
+
 	void update() override
 	{
 		PROFILE_FUNCTION();
 		updateGoTo();
+		previewSnapVertex();
 
 		if (!m_selected_entities.empty())
 		{
@@ -1844,6 +1865,13 @@ public:
 	}
 
 
+	Vec3 getClosestVertex(const RayHit& hit)
+	{
+		ASSERT(hit.is_hit);
+		return m_render_interface->getClosestVertex(m_universe, hit.entity, hit.pos);
+	}
+
+
 	void onMouseDown(int x, int y, MouseButton::Value button) override
 	{
 		m_is_mouse_click[button] = true;
@@ -1866,9 +1894,11 @@ public:
 			auto hit = m_render_interface->castRay(origin, dir, INVALID_COMPONENT);
 			if (m_gizmo->isActive()) return;
 
-			if(m_is_snap_mode && !m_selected_entities.empty() && hit.is_hit)
+			if(m_snap_mode != SnapMode::NONE && !m_selected_entities.empty() && hit.is_hit)
 			{
-				snapEntities(origin + dir * hit.t);
+				Vec3 snap_pos = origin + dir * hit.t;
+				if (m_snap_mode == SnapMode::VERTEX) snap_pos = getClosestVertex(hit);
+				snapEntities(snap_pos);
 				return;
 			}
 
@@ -3047,7 +3077,7 @@ public:
 		, m_selected_entity_on_game_mode(INVALID_ENTITY)
 		, m_mouse_handling_plugin(nullptr)
 		, m_is_game_mode(false)
-		, m_is_snap_mode(false)
+		, m_snap_mode(SnapMode::NONE)
 		, m_undo_index(-1)
 		, m_engine(&engine)
 		, m_entity_map(m_allocator)
@@ -3148,9 +3178,9 @@ public:
 	}
 
 
-	void setSnapMode(bool enable) override
+	void setSnapMode(bool enable, bool vertex_snap, bool preview) override
 	{
-		m_is_snap_mode = enable;
+		m_snap_mode = enable ? (vertex_snap ? (preview ? SnapMode::VERTEX_PREVIEW : SnapMode::VERTEX) : SnapMode::FREE) : SnapMode::NONE;
 	}
 
 
@@ -3691,17 +3721,22 @@ public:
 
 
 private:
-	struct MouseMode
+	enum class MouseMode
 	{
-		enum Value
-		{
-			NONE,
-			SELECT,
-			NAVIGATE,
-			PAN,
+		NONE,
+		SELECT,
+		NAVIGATE,
+		PAN,
 
-			CUSTOM
-		};
+		CUSTOM
+	};
+
+	enum class SnapMode
+	{
+		NONE,
+		FREE,
+		VERTEX,
+		VERTEX_PREVIEW
 	};
 
 	struct GoToParameters
@@ -3719,7 +3754,7 @@ private:
 	GoToParameters m_go_to_parameters;
 	Gizmo* m_gizmo;
 	Array<Entity> m_selected_entities;
-	MouseMode::Value m_mouse_mode;
+	MouseMode m_mouse_mode;
 	EditorIcons* m_editor_icons;
 	float m_mouse_x;
 	float m_mouse_y;
@@ -3732,7 +3767,7 @@ private:
 	int m_game_mode_commands;
 	bool m_is_orbit;
 	bool m_is_additive_selection;
-	bool m_is_snap_mode;
+	SnapMode m_snap_mode;
 	FS::IFile* m_game_mode_file;
 	Engine* m_engine;
 	Entity m_camera;

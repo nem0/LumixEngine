@@ -131,7 +131,7 @@ public:
 		int count,
 		const void* data,
 		int size) = 0;
-	virtual void setSnapMode(bool enable) = 0;
+	virtual void setSnapMode(bool enable, bool vertex_snap, bool preview) = 0;
 	virtual void setAdditiveSelection(bool additive) = 0;
 	virtual void addArrayPropertyItem(const ComponentUID& cmp, ArrayDescriptorBase& property) = 0;
 	virtual void removeArrayPropertyItem(const ComponentUID& cmp, int index, ArrayDescriptorBase& property) = 0;

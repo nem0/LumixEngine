@@ -1942,6 +1942,51 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 	}
 
 
+	Vec3 getClosestVertex(Universe* universe, Entity entity, const Vec3& wpos)
+	{
+		Matrix mtx = universe->getMatrix(entity);
+		Matrix inv_mtx = mtx;
+		inv_mtx.inverse();
+		Vec3 lpos = inv_mtx.transform(wpos);
+		auto* scene = (RenderScene*)universe->getScene(MODEL_INSTANCE_TYPE);
+		ComponentHandle model_instance = scene->getModelInstanceComponent(entity);
+		if (!model_instance.isValid()) return wpos;
+		Model* model = scene->getModelInstanceModel(model_instance);
+		const Array<Vec3>& vertices = model->getVertices();
+		float min_dist_squared = FLT_MAX;
+		Vec3 closest_vertex = lpos;
+
+		auto processVertex = [&](const Vec3& vertex) {
+			float dist_squared = (vertex - lpos).squaredLength();
+			if (dist_squared < min_dist_squared)
+			{
+				min_dist_squared = dist_squared;
+				closest_vertex = vertex;
+			}
+		};
+
+		if (model->areIndices16())
+		{
+			const u16* indices = model->getIndices16();
+			for (int i = 0, c = model->getIndicesCount(); i < c; ++i)
+			{
+				Vec3 vertex = vertices[indices[i]];
+				processVertex(vertex);
+			}
+		}
+		else
+		{
+			const u32* indices = model->getIndices32();
+			for (int i = 0, c = model->getIndicesCount(); i < c; ++i)
+			{
+				Vec3 vertex = vertices[indices[i]];
+				processVertex(vertex);
+			}
+		}
+		return mtx.transform(closest_vertex);
+	}
+
+
 	ImFont* addFont(const char* filename, int size) override
 	{
 		ImGuiIO& io = ImGui::GetIO();
