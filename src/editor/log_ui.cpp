@@ -112,9 +112,9 @@ void LogUI::showNotifications()
 	if (m_notifications.empty()) return;
 
 	ImGui::SetNextWindowPos(ImVec2(10, 30));
-	bool opened;
+	bool open;
 	if (!ImGui::Begin("Notifications",
-			&opened,
+			&open,
 			ImVec2(200, 0),
 			1.0f,
 			ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize |

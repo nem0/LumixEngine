@@ -68,7 +68,7 @@ class ImportAssetDialog LUMIX_FINAL : public StudioApp::IPlugin
 		void onLODsGUI();
 		void onAction();
 		void saveModelMetadata();
-		bool isOpened() const;
+		bool isOpen() const;
 		void clearSources();
 		void addSource(const char* src);
 

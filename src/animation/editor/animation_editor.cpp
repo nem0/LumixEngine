@@ -384,10 +384,10 @@ public:
 	void update(float time_delta) override;
 	const char* getName() const override { return "animation_editor"; }
 	void setContainer(Container* container) override { m_container = container; }
-	bool isEditorOpened() override { return m_editor_opened; }
-	void toggleEditorOpened() override { m_editor_opened = !m_editor_opened; }
-	bool isInputsOpened() override { return m_inputs_opened; }
-	void toggleInputsOpened() override { m_inputs_opened = !m_inputs_opened; }
+	bool isEditorOpen() override { return m_editor_open; }
+	void toggleEditorOpen() override { m_editor_open = !m_editor_open; }
+	bool isInputsOpen() override { return m_inputs_open; }
+	void toggleInputsOpen() override { m_inputs_open = !m_inputs_open; }
 	void onWindowGUI() override;
 	StudioApp& getApp() override { return m_app; }
 	int getEventTypesCount() const override;
@@ -428,8 +428,8 @@ private:
 
 private:
 	StudioApp& m_app;
-	bool m_editor_opened;
-	bool m_inputs_opened;
+	bool m_editor_open;
+	bool m_inputs_open;
 	ImVec2 m_offset;
 	ControllerResource* m_resource;
 	Container* m_container;
@@ -445,8 +445,8 @@ private:
 
 AnimationEditor::AnimationEditor(StudioApp& app)
 	: m_app(app)
-	, m_editor_opened(false)
-	, m_inputs_opened(false)
+	, m_editor_open(false)
+	, m_inputs_open(false)
 	, m_offset(0, 0)
 	, m_event_types(app.getWorldEditor().getAllocator())
 	, m_undo_stack(app.getWorldEditor().getAllocator())
@@ -455,13 +455,13 @@ AnimationEditor::AnimationEditor(StudioApp& app)
 	IAllocator& allocator = app.getWorldEditor().getAllocator();
 
 	auto* action = LUMIX_NEW(allocator, Action)("Animation Editor", "animation_editor");
-	action->func.bind<AnimationEditor, &AnimationEditor::toggleEditorOpened>(this);
-	action->is_selected.bind<AnimationEditor, &AnimationEditor::isEditorOpened>(this);
+	action->func.bind<AnimationEditor, &AnimationEditor::toggleEditorOpen>(this);
+	action->is_selected.bind<AnimationEditor, &AnimationEditor::isEditorOpen>(this);
 	app.addWindowAction(action);
 
 	action = LUMIX_NEW(allocator, Action)("Animation Inputs", "animation_inputs");
-	action->func.bind<AnimationEditor, &AnimationEditor::toggleInputsOpened>(this);
-	action->is_selected.bind<AnimationEditor, &AnimationEditor::isInputsOpened>(this);
+	action->func.bind<AnimationEditor, &AnimationEditor::toggleInputsOpen>(this);
+	action->is_selected.bind<AnimationEditor, &AnimationEditor::isInputsOpen>(this);
 	app.addWindowAction(action);
 
 	Engine& engine = m_app.getWorldEditor().getEngine();
@@ -921,7 +921,7 @@ void AnimationEditor::update(float time_delta)
 
 void AnimationEditor::editorGUI()
 {
-	if (ImGui::BeginDock("Animation Editor", &m_editor_opened, ImGuiWindowFlags_MenuBar))
+	if (ImGui::BeginDock("Animation Editor", &m_editor_open, ImGuiWindowFlags_MenuBar))
 	{
 		m_is_focused = ImGui::IsFocusedHierarchy();
 		menuGUI();
@@ -942,7 +942,7 @@ void AnimationEditor::editorGUI()
 
 void AnimationEditor::inputsGUI()
 {
-	if (ImGui::BeginDock("Animation inputs", &m_inputs_opened))
+	if (ImGui::BeginDock("Animation inputs", &m_inputs_open))
 	{
 		if (ImGui::CollapsingHeader("Inputs"))
 		{

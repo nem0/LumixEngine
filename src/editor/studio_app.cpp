@@ -137,10 +137,10 @@ class StudioAppImpl LUMIX_FINAL : public StudioApp
 {
 public:
 	StudioAppImpl()
-		: m_is_entity_list_opened(true)
-		, m_is_save_as_dialog_opened(false)
+		: m_is_entity_list_open(true)
+		, m_is_save_as_dialog_open(false)
 		, m_finished(false)
-		, m_exit_game_mode(false)
+		, m_deferred_game_mode_exit(false)
 		, m_profiler_ui(nullptr)
 		, m_asset_browser(nullptr)
 		, m_property_grid(nullptr)
@@ -148,8 +148,8 @@ public:
 		, m_window_actions(m_allocator)
 		, m_toolbar_actions(m_allocator)
 		, m_metadata(m_allocator)
-		, m_is_welcome_screen_opened(true)
-		, m_is_pack_data_dialog_opened(false)
+		, m_is_welcome_screen_open(true)
+		, m_is_pack_data_dialog_open(false)
 		, m_editor(nullptr)
 		, m_settings(*this)
 		, m_plugins(m_allocator)
@@ -549,7 +549,7 @@ public:
 
 	void guiEndFrame()
 	{
-		if (m_is_welcome_screen_opened)
+		if (m_is_welcome_screen_open)
 		{
 			showWelcomeScreen();
 		}
@@ -610,9 +610,9 @@ public:
 		m_editor->update();
 		m_engine->update(*m_editor->getUniverse());
 
-		if (m_exit_game_mode)
+		if (m_deferred_game_mode_exit)
 		{
-			m_exit_game_mode = false;
+			m_deferred_game_mode_exit = false;
 			m_editor->toggleGameMode();
 		}
 
@@ -645,7 +645,7 @@ public:
 			right_pos.x += half_size.x + ImGui::GetStyle().FramePadding.x;
 			if (ImGui::BeginChild("left", half_size, true))
 			{
-				if (ImGui::Button("New Universe")) m_is_welcome_screen_opened = false;
+				if (ImGui::Button("New Universe")) m_is_welcome_screen_open = false;
 
 				ImGui::Separator();
 				ImGui::Text("Open universe:");
@@ -656,7 +656,7 @@ public:
 					{
 						m_editor->loadUniverse(univ.data);
 						setTitle(univ.data);
-						m_is_welcome_screen_opened = false;
+						m_is_welcome_screen_open = false;
 					}
 				}
 				ImGui::Unindent();
@@ -754,20 +754,20 @@ public:
 
 	void onSaveAsDialogGUI()
 	{
-		if (!m_is_save_as_dialog_opened) return;
+		if (!m_is_save_as_dialog_open) return;
 		
-		if (ImGui::Begin("Save Universe As", &m_is_save_as_dialog_opened))
+		if (ImGui::Begin("Save Universe As", &m_is_save_as_dialog_open))
 		{
 			static char name[64] = "";
 			ImGui::InputText("Name", name, lengthOf(name));
 			if (ImGui::Button("Save"))
 			{
-				m_is_save_as_dialog_opened = false;
+				m_is_save_as_dialog_open = false;
 				setTitle(name);
 				m_editor->saveUniverse(name, true);
 			}
 			ImGui::SameLine();
-			if (ImGui::Button("Close")) m_is_save_as_dialog_opened = false;
+			if (ImGui::Button("Close")) m_is_save_as_dialog_open = false;
 		}
 		ImGui::End();
 	}
@@ -781,7 +781,7 @@ public:
 			return;
 		}
 
-		m_is_save_as_dialog_opened = true;
+		m_is_save_as_dialog_open = true;
 	}
 
 
@@ -841,11 +841,11 @@ public:
 	void snapDown() { m_editor->snapDown(); }
 	void lookAtSelected() { m_editor->lookAtSelected(); }
 	void toggleSettings() { m_settings.m_is_open = !m_settings.m_is_open; }
-	bool areSettingsOpened() const { return m_settings.m_is_open; }
-	void toggleEntityList() { m_is_entity_list_opened = !m_is_entity_list_opened; }
-	bool isEntityListOpened() const { return m_is_entity_list_opened; }
+	bool areSettingsOpen() const { return m_settings.m_is_open; }
+	void toggleEntityList() { m_is_entity_list_open = !m_is_entity_list_open; }
+	bool isEntityListOpen() const { return m_is_entity_list_open; }
 	void toggleAssetBrowser() { m_asset_browser->m_is_open = !m_asset_browser->m_is_open; }
-	bool isAssetBrowserOpened() const { return m_asset_browser->m_is_open; }
+	bool isAssetBrowserOpen() const { return m_asset_browser->m_is_open; }
 	int getExitCode() const override { return m_exit_code; }
 	AssetBrowser& getAssetBrowser() override { ASSERT(m_asset_browser); return *m_asset_browser; }
 	PropertyGrid& getPropertyGrid() override { ASSERT(m_property_grid); return *m_property_grid; }
@@ -1289,7 +1289,7 @@ public:
 		PROFILE_FUNCTION();
 		const Array<Entity>& entities = m_editor->getSelectedEntities();
 		static char filter[64] = "";
-		if (ImGui::BeginDock("Entity List", &m_is_entity_list_opened))
+		if (ImGui::BeginDock("Entity List", &m_is_entity_list_open))
 		{
 			auto* universe = m_editor->getUniverse();
 			ImGui::FilterInput("Filter", filter, sizeof(filter));
@@ -1366,12 +1366,12 @@ public:
 
 	void saveSettings()
 	{
-		m_settings.m_is_asset_browser_opened = m_asset_browser->m_is_open;
+		m_settings.m_is_asset_browser_open = m_asset_browser->m_is_open;
 		m_settings.m_asset_browser_left_column_width = m_asset_browser->m_left_column_width;
-		m_settings.m_is_entity_list_opened = m_is_entity_list_opened;
-		m_settings.m_is_log_opened = m_log_ui->m_is_open;
-		m_settings.m_is_profiler_opened = m_profiler_ui->m_is_open;
-		m_settings.m_is_properties_opened = m_property_grid->m_is_open;
+		m_settings.m_is_entity_list_open = m_is_entity_list_open;
+		m_settings.m_is_log_open = m_log_ui->m_is_open;
+		m_settings.m_is_profiler_open = m_profiler_ui->m_is_open;
+		m_settings.m_is_properties_open = m_property_grid->m_is_open;
 		m_settings.m_mouse_sensitivity.x = m_editor->getMouseSensitivity().x;
 		m_settings.m_mouse_sensitivity.y = m_editor->getMouseSensitivity().y;
 
@@ -1427,12 +1427,12 @@ public:
 
 		m_settings.load();
 
-		m_asset_browser->m_is_open = m_settings.m_is_asset_browser_opened;
+		m_asset_browser->m_is_open = m_settings.m_is_asset_browser_open;
 		m_asset_browser->m_left_column_width = m_settings.m_asset_browser_left_column_width;
-		m_is_entity_list_opened = m_settings.m_is_entity_list_opened;
-		m_log_ui->m_is_open = m_settings.m_is_log_opened;
-		m_profiler_ui->m_is_open = m_settings.m_is_profiler_opened;
-		m_property_grid->m_is_open = m_settings.m_is_properties_opened;
+		m_is_entity_list_open = m_settings.m_is_entity_list_open;
+		m_log_ui->m_is_open = m_settings.m_is_log_open;
+		m_profiler_ui->m_is_open = m_settings.m_is_profiler_open;
+		m_property_grid->m_is_open = m_settings.m_is_properties_open;
 
 		if (m_settings.m_is_maximized)
 		{
@@ -1500,11 +1500,11 @@ public:
 		addAction<&StudioAppImpl::snapDown>("Snap down", "snapDown");
 		addAction<&StudioAppImpl::lookAtSelected>("Look at selected", "lookAtSelected");
 		addAction<&StudioAppImpl::toggleAssetBrowser>("Asset Browser", "assetBrowser")
-			.is_selected.bind<StudioAppImpl, &StudioAppImpl::isAssetBrowserOpened>(this);
+			.is_selected.bind<StudioAppImpl, &StudioAppImpl::isAssetBrowserOpen>(this);
 		addAction<&StudioAppImpl::toggleEntityList>("Entity List", "entityList")
-			.is_selected.bind<StudioAppImpl, &StudioAppImpl::isEntityListOpened>(this);
+			.is_selected.bind<StudioAppImpl, &StudioAppImpl::isEntityListOpen>(this);
 		addAction<&StudioAppImpl::toggleSettings>("Settings", "settings")
-			.is_selected.bind<StudioAppImpl, &StudioAppImpl::areSettingsOpened>(this);
+			.is_selected.bind<StudioAppImpl, &StudioAppImpl::areSettingsOpen>(this);
 		addAction<&StudioAppImpl::showPackDataDialog>("Pack data", "pack_data");
 	}
 
@@ -1574,7 +1574,7 @@ public:
 			parser.getCurrent(path, lengthOf(path));
 			m_editor->loadUniverse(path);
 			setTitle(path);
-			m_is_welcome_screen_opened = false;
+			m_is_welcome_screen_open = false;
 			break;
 		}
 	}
@@ -1656,7 +1656,7 @@ public:
 
 	void LUA_exitGameMode()
 	{
-		m_exit_game_mode = true;
+		m_deferred_game_mode_exit = true;
 	}
 
 
@@ -1862,13 +1862,13 @@ public:
 
 	void showPackDataDialog()
 	{
-		m_is_pack_data_dialog_opened = true;
+		m_is_pack_data_dialog_open = true;
 	}
 
 
 	void onPackDataGUI()
 	{
-		if (ImGui::BeginDock("Pack data", &m_is_pack_data_dialog_opened))
+		if (ImGui::BeginDock("Pack data", &m_is_pack_data_dialog_open))
 		{
 			ImGui::LabelText("Destination dir", "%s", m_pack.dest_dir.data);
 			ImGui::SameLine();
@@ -2343,15 +2343,15 @@ public:
 
 	PackConfig m_pack;
 	bool m_finished;
-	bool m_exit_game_mode;
+	bool m_deferred_game_mode_exit;
 	int m_exit_code;
 
 	bool m_sleep_when_inactive;
 	bool m_fps_limit;
-	bool m_is_welcome_screen_opened;
-	bool m_is_pack_data_dialog_opened;
-	bool m_is_entity_list_opened;
-	bool m_is_save_as_dialog_opened;
+	bool m_is_welcome_screen_open;
+	bool m_is_pack_data_dialog_open;
+	bool m_is_entity_list_open;
+	bool m_is_save_as_dialog_open;
 	DragData m_drag_data;
 	ImFont* m_font;
 };

@@ -1793,8 +1793,8 @@ struct FBXImporter
 	}
 
 
-	void toggleOpened() { opened = !opened; }
-	bool isOpened() const { return opened; }
+	void toggleOpen() { open = !open; }
+	bool isOpen() const { return open; }
 
 	
 	static const char* getImportMeshName(const ImportMesh& mesh)
@@ -1810,7 +1810,7 @@ struct FBXImporter
 
 	StudioApp& app;
 	ImportAssetDialog& dialog;
-	bool opened = false;
+	bool open = false;
 	Array<ImportMaterial> materials;
 	Array<ImportMesh> meshes;
 	Array<ImportAnimation> animations;
@@ -2400,7 +2400,7 @@ ImportAssetDialog::ImportAssetDialog(StudioApp& app)
 
 	Action* action = LUMIX_NEW(m_editor.getAllocator(), Action)("Import Asset", "import_asset");
 	action->func.bind<ImportAssetDialog, &ImportAssetDialog::onAction>(this);
-	action->is_selected.bind<ImportAssetDialog, &ImportAssetDialog::isOpened>(this);
+	action->is_selected.bind<ImportAssetDialog, &ImportAssetDialog::isOpen>(this);
 	app.addWindowAction(action);
 
 	lua_State* L = m_editor.getEngine().getState();
@@ -2452,7 +2452,7 @@ ImportAssetDialog::ImportAssetDialog(StudioApp& app)
 }
 
 
-bool ImportAssetDialog::isOpened() const
+bool ImportAssetDialog::isOpen() const
 {
 	return m_is_open;
 }

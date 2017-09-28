@@ -418,22 +418,18 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	explicit StudioAppPlugin(StudioApp& app)
 		: m_editor(app.getWorldEditor())
 		, m_selected_bone(-1)
-		, m_is_window_opened(false)
+		, m_is_window_open(false)
 	{
 		Action* action = LUMIX_NEW(m_editor.getAllocator(), Action)("Physics", "physics");
 		action->func.bind<StudioAppPlugin, &StudioAppPlugin::onAction>(this);
-		action->is_selected.bind<StudioAppPlugin, &StudioAppPlugin::isOpened>(this);
+		action->is_selected.bind<StudioAppPlugin, &StudioAppPlugin::isOpen>(this);
 		app.addWindowAction(action);
 	}
 
 
 	const char* getName() const override { return "physics"; }
-
-
-	bool isOpened() const { return m_is_window_opened; }
-
-
-	void onAction() { m_is_window_opened = !m_is_window_opened; }
+	bool isOpen() const { return m_is_window_open; }
+	void onAction() { m_is_window_open = !m_is_window_open; }
 
 
 	void onLayersGUI()
@@ -989,7 +985,7 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 
 	void onWindowGUI() override
 	{
-		if (ImGui::BeginDock("Physics", &m_is_window_opened))
+		if (ImGui::BeginDock("Physics", &m_is_window_open))
 		{
 			onLayersGUI();
 			onCollisionMatrixGUI();
@@ -1001,7 +997,7 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	}
 
 
-	bool m_is_window_opened;
+	bool m_is_window_open;
 	int m_selected_bone;
 	WorldEditor& m_editor;
 };

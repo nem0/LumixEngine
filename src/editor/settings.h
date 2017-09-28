@@ -32,12 +32,12 @@ struct LUMIX_EDITOR_API Settings
 	Rect m_window;
 	bool m_is_maximized;
 
-	bool m_is_asset_browser_opened;
-	bool m_is_entity_list_opened;
-	bool m_is_entity_template_list_opened;
-	bool m_is_log_opened;
-	bool m_is_profiler_opened;
-	bool m_is_properties_opened;
+	bool m_is_asset_browser_open;
+	bool m_is_entity_list_open;
+	bool m_is_entity_template_list_open;
+	bool m_is_log_open;
+	bool m_is_profiler_open;
+	bool m_is_properties_open;
 	bool m_is_crash_reporting_enabled;
 	bool m_force_no_crash_report;
 	float m_asset_browser_left_column_width;

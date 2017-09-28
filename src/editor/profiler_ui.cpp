@@ -48,7 +48,7 @@ struct ProfilerUIImpl LUMIX_FINAL : public ProfilerUI
 		: m_main_allocator(allocator)
 		, m_resource_manager(engine.getResourceManager())
 		, m_logs(allocator)
-		, m_opened_files(allocator)
+		, m_open_files(allocator)
 		, m_device(allocator)
 		, m_engine(engine)
 		, m_threads(allocator)
@@ -123,7 +123,7 @@ struct ProfilerUIImpl LUMIX_FINAL : public ProfilerUI
 	{
 		if (event.type == FS::EventType::OPEN_BEGIN)
 		{
-			auto& file = m_opened_files.emplace();
+			auto& file = m_open_files.emplace();
 			file.start = m_timer->getTimeSinceStart();
 			file.last_read = file.start;
 			file.bytes = 0;
@@ -132,24 +132,24 @@ struct ProfilerUIImpl LUMIX_FINAL : public ProfilerUI
 		}
 		else if (event.type == FS::EventType::OPEN_FINISHED && event.ret == 0)
 		{
-			for (int i = 0; i < m_opened_files.size(); ++i)
+			for (int i = 0; i < m_open_files.size(); ++i)
 			{
-				if (m_opened_files[i].handle == event.handle)
+				if (m_open_files[i].handle == event.handle)
 				{
-					m_opened_files.eraseFast(i);
+					m_open_files.eraseFast(i);
 					break;
 				}
 			}
 		}
 		else if (event.type == FS::EventType::READ_FINISHED)
 		{
-			for (int i = 0; i < m_opened_files.size(); ++i)
+			for (int i = 0; i < m_open_files.size(); ++i)
 			{
-				if (m_opened_files[i].handle == event.handle)
+				if (m_open_files[i].handle == event.handle)
 				{
-					m_opened_files[i].bytes += event.param;
+					m_open_files[i].bytes += event.param;
 					MT::atomicAdd(&m_bytes_read, event.param);
-					m_opened_files[i].last_read = m_timer->getTimeSinceStart();
+					m_open_files[i].last_read = m_timer->getTimeSinceStart();
 					return;
 				}
 			}
@@ -157,20 +157,20 @@ struct ProfilerUIImpl LUMIX_FINAL : public ProfilerUI
 		}
 		else if (event.type == FS::EventType::CLOSE_FINISHED)
 		{
-			for (int i = 0; i < m_opened_files.size(); ++i)
+			for (int i = 0; i < m_open_files.size(); ++i)
 			{
-				if (m_opened_files[i].handle == event.handle)
+				if (m_open_files[i].handle == event.handle)
 				{
 					auto* log = m_queue.alloc(false);
 					if (!log)
 					{
-						m_opened_files.eraseFast(i);
+						m_open_files.eraseFast(i);
 						break;
 					}
-					log->bytes = m_opened_files[i].bytes;
-					log->time = m_opened_files[i].last_read - m_opened_files[i].start;
-					copyString(log->path, m_opened_files[i].path);
-					m_opened_files.eraseFast(i);
+					log->bytes = m_open_files[i].bytes;
+					log->time = m_open_files[i].last_read - m_open_files[i].start;
+					copyString(log->path, m_open_files[i].path);
+					m_open_files.eraseFast(i);
 					m_queue.push(log, true);
 					break;
 				}
@@ -389,7 +389,7 @@ struct ProfilerUIImpl LUMIX_FINAL : public ProfilerUI
 			, m_allocations(allocator)
 			, m_stack_node(stack_node)
 			, m_inclusive_size(inclusive_size)
-			, m_opened(false)
+			, m_open(false)
 		{
 		}
 
@@ -412,7 +412,7 @@ struct ProfilerUIImpl LUMIX_FINAL : public ProfilerUI
 
 
 		size_t m_inclusive_size;
-		bool m_opened;
+		bool m_open;
 		Debug::StackNode* m_stack_node;
 		Array<AllocationStackNode*> m_children;
 		Array<Debug::Allocator::AllocationInfo*> m_allocations;
@@ -435,7 +435,7 @@ struct ProfilerUIImpl LUMIX_FINAL : public ProfilerUI
 	struct Thread
 	{
 		Block* root;
-		bool opened;
+		bool open;
 	};
 
 	DefaultAllocator m_allocator;
@@ -450,7 +450,7 @@ struct ProfilerUIImpl LUMIX_FINAL : public ProfilerUI
 	bool m_is_paused;
 	char m_filter[100];
 	char m_resource_filter[100];
-	Array<OpenedFile> m_opened_files;
+	Array<OpenedFile> m_open_files;
 	MT::LockFreeFixedQueue<Log, 512> m_queue;
 	Array<Log> m_logs;
 	FS::FileEventsDevice m_device;
@@ -571,7 +571,7 @@ void ProfilerUIImpl::onFrame()
 			{
 				auto& thread = m_threads.emplace();
 				thread.root = nullptr;
-				thread.opened = false;
+				thread.open = false;
 			}
 			else
 			{
@@ -582,7 +582,7 @@ void ProfilerUIImpl::onFrame()
 				my_root->m_first_child = nullptr;
 				auto& thread = m_threads.emplace();
 				thread.root = my_root;
-				thread.opened = false;
+				thread.open = false;
 			}
 		}
 		if (!m_threads[i].root && root)
@@ -951,7 +951,7 @@ void ProfilerUIImpl::showAllocationTree(AllocationStackNode* node, int column)
 
 		if (ImGui::TreeNode(node, "%s", fn_name))
 		{
-			node->m_opened = true;
+			node->m_open = true;
 			for (auto* child : node->m_children)
 			{
 				showAllocationTree(child, column);
@@ -960,7 +960,7 @@ void ProfilerUIImpl::showAllocationTree(AllocationStackNode* node, int column)
 		}
 		else
 		{
-			node->m_opened = false;
+			node->m_open = false;
 		}
 		return;
 	}
@@ -970,7 +970,7 @@ void ProfilerUIImpl::showAllocationTree(AllocationStackNode* node, int column)
 		char size[50];
 		toCStringPretty(node->m_inclusive_size, size, sizeof(size));
 		ImGui::Text(size);
-		if (node->m_opened)
+		if (node->m_open)
 		{
 			for (auto* child : node->m_children)
 			{
@@ -1021,7 +1021,7 @@ static void showThreadColumn(ProfilerUIImpl& profiler, Column column)
 		if (column != NAME)
 		{
 			ImGui::Dummy(ImVec2(10, ImGui::GetTextLineHeight()));
-			if (profiler.m_threads[i].opened)
+			if (profiler.m_threads[i].open)
 			{
 				profiler.showProfileBlock(root, column);
 			}
@@ -1030,13 +1030,13 @@ static void showThreadColumn(ProfilerUIImpl& profiler, Column column)
 		{
 			if (ImGui::TreeNode(root, "%s", thread_name))
 			{
-				profiler.m_threads[i].opened = true;
+				profiler.m_threads[i].open = true;
 				profiler.showProfileBlock(root, column);
 				ImGui::TreePop();
 			}
 			else
 			{
-				profiler.m_threads[i].opened = false;
+				profiler.m_threads[i].open = false;
 			}
 		}
 	}

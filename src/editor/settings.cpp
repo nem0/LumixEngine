@@ -139,12 +139,12 @@ Settings::Settings(StudioApp& app)
 	, m_is_open(false)
 	, m_editor(nullptr)
 	, m_is_maximized(true)
-	, m_is_entity_list_opened(false)
-	, m_is_entity_template_list_opened(false)
-	, m_is_asset_browser_opened(false)
-	, m_is_log_opened(false)
-	, m_is_profiler_opened(false)
-	, m_is_properties_opened(false)
+	, m_is_entity_list_open(false)
+	, m_is_entity_template_list_open(false)
+	, m_is_asset_browser_open(false)
+	, m_is_log_open(false)
+	, m_is_profiler_open(false)
+	, m_is_properties_open(false)
 	, m_is_crash_reporting_enabled(true)
 	, m_force_no_crash_report(false)
 	, m_mouse_sensitivity(80.0f, 80.0f)
@@ -195,13 +195,13 @@ bool Settings::load()
 	m_is_maximized = getBoolean(L, "maximized", true);
 	
 	m_is_open = getBoolean(L, "settings_opened", false);
-	m_is_asset_browser_opened = getBoolean(L, "asset_browser_opened", false);
+	m_is_asset_browser_open = getBoolean(L, "asset_browser_opened", false);
 	m_asset_browser_left_column_width = getFloat(L, "asset_browser_left_column_width", false);
-	m_is_entity_list_opened = getBoolean(L, "entity_list_opened", false);
-	m_is_entity_template_list_opened = getBoolean(L, "entity_template_list_opened", false);
-	m_is_log_opened = getBoolean(L, "log_opened", false);
-	m_is_profiler_opened = getBoolean(L, "profiler_opened", false);
-	m_is_properties_opened = getBoolean(L, "properties_opened", false);
+	m_is_entity_list_open = getBoolean(L, "entity_list_opened", false);
+	m_is_entity_template_list_open = getBoolean(L, "entity_template_list_opened", false);
+	m_is_log_open = getBoolean(L, "log_opened", false);
+	m_is_profiler_open = getBoolean(L, "profiler_opened", false);
+	m_is_properties_open = getBoolean(L, "properties_opened", false);
 	m_is_crash_reporting_enabled = getBoolean(L, "error_reporting_enabled", true);
 	enableCrashReporting(m_is_crash_reporting_enabled && !m_force_no_crash_report);
 	m_mouse_sensitivity.x = getFloat(L, "mouse_sensitivity_x", 200.0f);
@@ -317,12 +317,12 @@ bool Settings::save()
 	};
 
 	writeBool("settings_opened", m_is_open);
-	writeBool("asset_browser_opened", m_is_asset_browser_opened);
-	writeBool("entity_list_opened", m_is_entity_list_opened);
-	writeBool("entity_template_list_opened", m_is_entity_template_list_opened);
-	writeBool("log_opened", m_is_log_opened);
-	writeBool("profiler_opened", m_is_profiler_opened);
-	writeBool("properties_opened", m_is_properties_opened);
+	writeBool("asset_browser_opened", m_is_asset_browser_open);
+	writeBool("entity_list_opened", m_is_entity_list_open);
+	writeBool("entity_template_list_opened", m_is_entity_template_list_open);
+	writeBool("log_opened", m_is_log_open);
+	writeBool("profiler_opened", m_is_profiler_open);
+	writeBool("properties_opened", m_is_properties_open);
 	writeBool("error_reporting_enabled", m_is_crash_reporting_enabled);
 	file << "mouse_sensitivity_x = " << m_mouse_sensitivity.x << "\n";
 	file << "mouse_sensitivity_y = " << m_mouse_sensitivity.y << "\n";
