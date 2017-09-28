@@ -45,10 +45,10 @@ public:
 	static IAnimationEditor* create(IAllocator& allocator, StudioApp& app);
 
 	virtual void setContainer(Container* container) = 0;
-	virtual bool isEditorOpened() = 0;
-	virtual void toggleEditorOpened() = 0;
-	virtual bool isInputsOpened() = 0;
-	virtual void toggleInputsOpened() = 0;
+	virtual bool isEditorOpen() = 0;
+	virtual void toggleEditorOpen() = 0;
+	virtual bool isInputsOpen() = 0;
+	virtual void toggleInputsOpen() = 0;
 	virtual StudioApp& getApp() = 0;
 	virtual int getEventTypesCount() const = 0;
 	virtual EventType& createEventType(const char* type) = 0;

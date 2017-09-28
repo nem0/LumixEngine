@@ -1770,12 +1770,12 @@ struct FurPainterPlugin LUMIX_FINAL : public StudioApp::IPlugin
 {
 	explicit FurPainterPlugin(StudioApp& _app)
 		: app(_app)
-		, is_opened(false)
+		, is_open(false)
 	{
 		fur_painter = LUMIX_NEW(app.getWorldEditor().getAllocator(), FurPainter)(_app);
 		Action* action = LUMIX_NEW(app.getWorldEditor().getAllocator(), Action)("Fur Painter", "fur_painter");
 		action->func.bind<FurPainterPlugin, &FurPainterPlugin::onAction>(this);
-		action->is_selected.bind<FurPainterPlugin, &FurPainterPlugin::isOpened>(this);
+		action->is_selected.bind<FurPainterPlugin, &FurPainterPlugin::isOpen>(this);
 		app.addWindowAction(action);
 	}
 
@@ -1783,13 +1783,13 @@ struct FurPainterPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	const char* getName() const override { return "fur_painter"; }
 
 
-	bool isOpened() const { return is_opened; }
-	void onAction() { is_opened = !is_opened; }
+	bool isOpen() const { return is_open; }
+	void onAction() { is_open = !is_open; }
 
 
 	void onWindowGUI() override
 	{
-		if (ImGui::BeginDock("Fur painter", &is_opened))
+		if (ImGui::BeginDock("Fur painter", &is_open))
 		{
 			ImGui::Checkbox("Enabled", &fur_painter->enabled);
 			if (!fur_painter->enabled) goto end;
@@ -1909,7 +1909,7 @@ struct FurPainterPlugin LUMIX_FINAL : public StudioApp::IPlugin
 
 
 	FurPainter* fur_painter;
-	bool is_opened;
+	bool is_open;
 	StudioApp& app;
 };
 
@@ -2515,7 +2515,7 @@ struct ShaderEditorPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	{
 		Action* action = LUMIX_NEW(app.getWorldEditor().getAllocator(), Action)("Shader Editor", "shaderEditor");
 		action->func.bind<ShaderEditorPlugin, &ShaderEditorPlugin::onAction>(this);
-		action->is_selected.bind<ShaderEditorPlugin, &ShaderEditorPlugin::isOpened>(this);
+		action->is_selected.bind<ShaderEditorPlugin, &ShaderEditorPlugin::isOpen>(this);
 		app.addWindowAction(action);
 		m_shader_editor.m_is_open = false;
 
@@ -2536,7 +2536,7 @@ struct ShaderEditorPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	void onAction() { m_shader_editor.m_is_open = !m_shader_editor.m_is_open; }
 	void onWindowGUI() override { m_shader_editor.onGUI(*m_compiler); }
 	bool hasFocus() override { return m_shader_editor.hasFocus(); }
-	bool isOpened() const { return m_shader_editor.m_is_open; }
+	bool isOpen() const { return m_shader_editor.m_is_open; }
 
 	StudioApp& m_app;
 	ShaderCompiler* m_compiler;

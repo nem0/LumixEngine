@@ -401,7 +401,7 @@ static const ResourceType PREFAB_TYPE("prefab");
 
 
 static FS::OsFile g_error_file;
-static bool g_is_error_file_opened = false;
+static bool g_is_error_file_open = false;
 
 
 #pragma pack(1)
@@ -425,7 +425,7 @@ static void showLogInVS(const char* system, const char* message)
 
 static void logErrorToFile(const char*, const char* message)
 {
-	if (!g_is_error_file_opened) return;
+	if (!g_is_error_file_open) return;
 	g_error_file.write(message, stringLength(message));
 	g_error_file.flush();
 }
@@ -454,7 +454,7 @@ public:
 		Profiler::setThreadName("Main");
 		installUnhandledExceptionHandler();
 
-		g_is_error_file_opened = g_error_file.open("error.log", FS::Mode::CREATE_AND_WRITE, allocator);
+		g_is_error_file_open = g_error_file.open("error.log", FS::Mode::CREATE_AND_WRITE, allocator);
 
 		g_log_error.getCallback().bind<logErrorToFile>();
 		g_log_info.getCallback().bind<showLogInVS>();

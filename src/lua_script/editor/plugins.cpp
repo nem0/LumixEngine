@@ -572,12 +572,12 @@ struct ConsolePlugin LUMIX_FINAL : public StudioApp::IPlugin
 {
 	ConsolePlugin(StudioApp& _app)
 		: app(_app)
-		, opened(false)
+		, open(false)
 		, autocomplete(_app.getWorldEditor().getAllocator())
 	{
 		Action* action = LUMIX_NEW(app.getWorldEditor().getAllocator(), Action)("Script Console", "script_console");
-		action->func.bind<ConsolePlugin, &ConsolePlugin::toggleOpened>(this);
-		action->is_selected.bind<ConsolePlugin, &ConsolePlugin::isOpened>(this);
+		action->func.bind<ConsolePlugin, &ConsolePlugin::toggleOpen>(this);
+		action->is_selected.bind<ConsolePlugin, &ConsolePlugin::isOpen>(this);
 		app.addWindowAction(action);
 		buf[0] = '\0';
 	}
@@ -586,8 +586,8 @@ struct ConsolePlugin LUMIX_FINAL : public StudioApp::IPlugin
 	const char* getName() const override { return "script_console"; }
 
 
-	bool isOpened() const { return opened; }
-	void toggleOpened() { opened = !opened; }
+	bool isOpen() const { return open; }
+	void toggleOpen() { open = !open; }
 
 
 	void autocompleteSubstep(lua_State* L, const char* str, ImGuiTextEditCallbackData *data)
@@ -687,7 +687,7 @@ struct ConsolePlugin LUMIX_FINAL : public StudioApp::IPlugin
 
 	void onWindowGUI() override
 	{
-		if (ImGui::BeginDock("Script console", &opened))
+		if (ImGui::BeginDock("Script console", &open))
 		{
 			if (ImGui::Button("Execute"))
 			{
@@ -775,7 +775,7 @@ struct ConsolePlugin LUMIX_FINAL : public StudioApp::IPlugin
 
 	StudioApp& app;
 	Array<string> autocomplete;
-	bool opened;
+	bool open;
 	bool open_autocomplete = false;
 	int autocomplete_selected = 1;
 	const char* insert_value = nullptr;

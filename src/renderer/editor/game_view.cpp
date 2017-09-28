@@ -69,7 +69,7 @@ GameView::GameView(StudioApp& app)
 	WorldEditor& editor = app.getWorldEditor();
 	Action* action = LUMIX_NEW(editor.getAllocator(), Action)("Game View", "game_view");
 	action->func.bind<GameView, &GameView::onAction>(this);
-	action->is_selected.bind<GameView, &GameView::isOpened>(this);
+	action->is_selected.bind<GameView, &GameView::isOpen>(this);
 	app.addWindowAction(action);
 
 	auto* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
@@ -154,11 +154,11 @@ void GameView::captureMouse(bool capture)
 void GameView::onFullscreenGUI()
 {
 	ImGui::SetNextWindowPos(ImVec2(0, 0));
-	bool opened = true;
+	bool open = true;
 	ImGuiIO& io = ImGui::GetIO();
 	ImVec2 size = io.DisplaySize;
 	if (!ImGui::Begin("game view fullscreen",
-		&opened,
+		&open,
 		size,
 		1.0f,
 		ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse |

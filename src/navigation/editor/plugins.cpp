@@ -21,12 +21,12 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 {
 	StudioAppPlugin(StudioApp& _app)
 		: app(_app)
-		, is_opened(false)
+		, is_open(false)
 	{
-		auto& allocator = app.getWorldEditor().getAllocator();
+		IAllocator& allocator = app.getWorldEditor().getAllocator();
 		Action* action = LUMIX_NEW(allocator, Action)("Navigation", "toggleNavigationWindow");
 		action->func.bind<StudioAppPlugin, &StudioAppPlugin::onAction>(this);
-		action->is_selected.bind<StudioAppPlugin, &StudioAppPlugin::isOpened>(this);
+		action->is_selected.bind<StudioAppPlugin, &StudioAppPlugin::isOpen>(this);
 		app.addWindowAction(action);
 	}
 
@@ -36,13 +36,13 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 
 	void onAction()
 	{
-		is_opened = !is_opened;
+		is_open = !is_open;
 	}
 
 
-	bool isOpened() const
+	bool isOpen() const
 	{
-		return is_opened;
+		return is_open;
 	}
 
 
@@ -51,7 +51,7 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		auto* scene = static_cast<NavigationScene*>(app.getWorldEditor().getUniverse()->getScene(crc32("navigation")));
 		if (!scene) return;
 
-		if (ImGui::BeginDock("Navigation", &is_opened, ImGuiWindowFlags_NoScrollWithMouse))
+		if (ImGui::BeginDock("Navigation", &is_open, ImGuiWindowFlags_NoScrollWithMouse))
 		{
 			if (ImGui::Button("Generate")) scene->generateNavmesh();
 			ImGui::SameLine();
@@ -154,7 +154,7 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	}
 
 
-	bool is_opened;
+	bool is_open;
 	StudioApp& app;
 };
 
