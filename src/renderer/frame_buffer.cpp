@@ -12,6 +12,14 @@ namespace Lumix
 {
 
 
+static const u32 DEFAULT_FLAGS = BGFX_TEXTURE_RT 
+	| BGFX_TEXTURE_U_CLAMP 
+	| BGFX_TEXTURE_V_CLAMP 
+	| BGFX_TEXTURE_MIP_POINT
+	| BGFX_TEXTURE_MIN_POINT
+	| BGFX_TEXTURE_MAG_POINT;
+
+
 FrameBuffer::FrameBuffer(const Declaration& decl)
 	: m_declaration(decl)
 {
@@ -26,7 +34,7 @@ FrameBuffer::FrameBuffer(const Declaration& decl)
 			false, 
 			1,
 			renderbuffer.m_format,
-			BGFX_TEXTURE_RT);
+			DEFAULT_FLAGS);
 		m_declaration.m_renderbuffers[i].m_handle = texture_handles[i];
 	}
 
@@ -90,7 +98,7 @@ void FrameBuffer::resize(int width, int height)
 		{
 			const RenderBuffer& renderbuffer = m_declaration.m_renderbuffers[i];
 			texture_handles[i] = bgfx::createTexture2D(
-				(uint16_t)width, (uint16_t)height, false, 1, renderbuffer.m_format, BGFX_TEXTURE_RT);
+				(uint16_t)width, (uint16_t)height, false, 1, renderbuffer.m_format, DEFAULT_FLAGS);
 			m_declaration.m_renderbuffers[i].m_handle = texture_handles[i];
 		}
 

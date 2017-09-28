@@ -2409,7 +2409,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 					auto handle = m_global_light_shadowmap->getRenderbufferHandle(0);
 					bgfx::setTexture(15 - m_global_textures_count,
 						m_tex_shadowmap_uniform,
-						handle);
+						handle, BGFX_TEXTURE_MIN_ANISOTROPIC | BGFX_TEXTURE_MAG_ANISOTROPIC);
 					ip += 1;
 					break;
 				}
