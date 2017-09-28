@@ -416,7 +416,7 @@ struct EditorPlugin LUMIX_FINAL : public WorldEditor::Plugin
 struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 {
 	explicit StudioAppPlugin(StudioApp& app)
-		: m_editor(*app.getWorldEditor())
+		: m_editor(app.getWorldEditor())
 		, m_selected_bone(-1)
 		, m_is_window_opened(false)
 	{
@@ -1065,11 +1065,11 @@ LUMIX_STUDIO_ENTRY(physics)
 	app.registerComponent("physical_heightfield", "Physics/Heightfield");
 	app.registerComponent("ragdoll", "Physics/Ragdoll");
 
-	auto& editor = *app.getWorldEditor();
-	auto& allocator = editor.getAllocator();
+	WorldEditor& editor = app.getWorldEditor();
+	IAllocator& allocator = editor.getAllocator();
 
 	app.addPlugin(*LUMIX_NEW(allocator, StudioAppPlugin)(app));
 	editor.addPlugin(*LUMIX_NEW(allocator, EditorPlugin)(editor));
-	app.getAssetBrowser()->addPlugin(*LUMIX_NEW(allocator, PhysicsGeometryPlugin)(app));
+	app.getAssetBrowser().addPlugin(*LUMIX_NEW(allocator, PhysicsGeometryPlugin)(app));
 }
 

@@ -85,7 +85,7 @@ struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 
 	void saveMaterial(Material* material)
 	{
-		FS::FileSystem& fs = m_app.getWorldEditor()->getEngine().getFileSystem();
+		FS::FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
 		// use temporary because otherwise the material is reloaded during saving
 		StaticString<MAX_PATH_LENGTH> tmp_path(material->getPath().c_str(), ".tmp");
 		FS::IFile* file = fs.open(fs.getDefaultDevice(), Path(tmp_path), FS::Mode::CREATE_AND_WRITE);
@@ -95,7 +95,7 @@ struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 			return;
 		}
 
-		auto& allocator = m_app.getWorldEditor()->getAllocator();
+		auto& allocator = m_app.getWorldEditor().getAllocator();
 		JsonSerializer serializer(*file, JsonSerializer::AccessMode::WRITE, material->getPath(), allocator);
 		if (!material->save(serializer))
 		{
@@ -105,7 +105,7 @@ struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		}
 		fs.close(*file);
 
-		auto& engine = m_app.getWorldEditor()->getEngine();
+		auto& engine = m_app.getWorldEditor().getEngine();
 		StaticString<MAX_PATH_LENGTH> src_full_path;
 		StaticString<MAX_PATH_LENGTH> dest_full_path;
 		if (engine.getPatchFileDevice())
@@ -138,10 +138,10 @@ struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 
 		if (ImGui::Button("Save")) saveMaterial(material);
 		ImGui::SameLine();
-		if (ImGui::Button("Open in external editor")) m_app.getAssetBrowser()->openInExternalEditor(material);
+		if (ImGui::Button("Open in external editor")) m_app.getAssetBrowser().openInExternalEditor(material);
 
 		bool b;
-		auto* plugin = m_app.getWorldEditor()->getEngine().getPluginManager().getPlugin("renderer");
+		auto* plugin = m_app.getWorldEditor().getEngine().getPluginManager().getPlugin("renderer");
 		auto* renderer = static_cast<Renderer*>(plugin);
 
 		int alpha_cutout_define = renderer->getShaderDefineIdx("ALPHA_CUTOUT");
@@ -194,7 +194,7 @@ struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 
 		char buf[MAX_PATH_LENGTH];
 		copyString(buf, material->getShader() ? material->getShader()->getPath().c_str() : "");
-		if (m_app.getAssetBrowser()->resourceInput("Shader", "shader", buf, sizeof(buf), SHADER_TYPE))
+		if (m_app.getAssetBrowser().resourceInput("Shader", "shader", buf, sizeof(buf), SHADER_TYPE))
 		{
 			material->setShader(Path(buf));
 		}
@@ -211,7 +211,7 @@ struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 			bool is_node_open = ImGui::TreeNodeEx((const void*)(intptr_t)i, ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_AllowOverlapMode | ImGuiTreeNodeFlags_Framed, "%s", "");
 			ImGui::PopStyleColor(4);
 			ImGui::SameLine();
-			if (m_app.getAssetBrowser()->resourceInput(slot.name, StaticString<30>("", (u64)&slot), buf, sizeof(buf), TEXTURE_TYPE))
+			if (m_app.getAssetBrowser().resourceInput(slot.name, StaticString<30>("", (u64)&slot), buf, sizeof(buf), TEXTURE_TYPE))
 			{
 				material->setTexturePath(i, Path(buf));
 			}
@@ -362,8 +362,8 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		, m_pipeline(nullptr)
 		, m_universe(nullptr)
 		, m_is_mouse_captured(false)
-		, m_tile(app.getWorldEditor()->getAllocator())
-		, m_texture_tile_creator(app.getWorldEditor()->getAllocator())
+		, m_tile(app.getWorldEditor().getAllocator())
+		, m_texture_tile_creator(app.getWorldEditor().getAllocator())
 	{
 		JobSystem::JobDecl job;
 		job.data = this;
@@ -379,7 +379,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		m_texture_tile_creator.shutdown = true;
 		m_texture_tile_creator.count = 0;
 		m_texture_tile_creator.shutdown_event.wait();
-		auto& engine = m_app.getWorldEditor()->getEngine();
+		auto& engine = m_app.getWorldEditor().getEngine();
 		engine.destroyUniverse(*m_universe);
 		Pipeline::destroy(m_pipeline);
 		engine.destroyUniverse(*m_tile.universe);
@@ -410,7 +410,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 			m_texture_tile_creator.tiles.pop();
 			MT::atomicIncrement(&m_texture_tile_creator.count);
 
-			IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
+			IAllocator& allocator = m_app.getWorldEditor().getAllocator();
 
 			int image_width, image_height, image_comp;
 			auto data = stbi_load(tile, &image_width, &image_height, &image_comp, 4);
@@ -452,7 +452,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 
 	void createTileUniverse()
 	{
-		Engine& engine = m_app.getWorldEditor()->getEngine();
+		Engine& engine = m_app.getWorldEditor().getEngine();
 		m_tile.universe = &engine.createUniverse(false);
 		Renderer* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
 		m_tile.pipeline = Pipeline::create(*renderer, Path("pipelines/main.lua"), engine.getAllocator());
@@ -474,7 +474,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 
 	void createPreviewUniverse()
 	{
-		auto& engine = m_app.getWorldEditor()->getEngine();
+		auto& engine = m_app.getWorldEditor().getEngine();
 		m_universe = &engine.createUniverse(false);
 		auto* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
 		m_pipeline = Pipeline::create(*renderer, Path("pipelines/main.lua"), engine.getAllocator());
@@ -498,7 +498,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 
 	void showPreview(Model& model)
 	{
-		auto& engine = m_app.getWorldEditor()->getEngine();
+		auto& engine = m_app.getWorldEditor().getEngine();
 		auto* render_scene = static_cast<RenderScene*>(m_universe->getScene(MODEL_INSTANCE_TYPE));
 		if (!render_scene) return;
 		if (!model.isReady()) return;
@@ -639,7 +639,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 				ImGui::SameLine();
 				if (ImGui::Button("->"))
 				{
-					m_app.getAssetBrowser()->selectResource(mesh.material->getPath(), true);
+					m_app.getAssetBrowser().selectResource(mesh.material->getPath(), true);
 				}
 				ImGui::TreePop();
 			}
@@ -703,7 +703,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		if (!data) return false;
 
 		FS::OsFile file;
-		IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
+		IAllocator& allocator = m_app.getWorldEditor().getAllocator();
 		if (file.open(path, FS::Mode::CREATE_AND_WRITE, allocator))
 		{
 			file.write(data, size);
@@ -720,8 +720,8 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 	void pushTileQueue(const Path& path)
 	{
 		ASSERT(!m_tile.queue.full());
-		WorldEditor* editor = m_app.getWorldEditor();
-		Engine& engine = editor->getEngine();
+		WorldEditor& editor = m_app.getWorldEditor();
+		Engine& engine = editor.getEngine();
 		ResourceManager& resource_manager = engine.getResourceManager();
 		ResourceManagerBase* model_manager = resource_manager.get(MODEL_TYPE);
 
@@ -769,8 +769,8 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 
 		popTileQueue();
 
-		IAllocator& editor_allocator = m_app.getWorldEditor()->getAllocator();
-		Engine& engine = m_app.getWorldEditor()->getEngine();
+		IAllocator& editor_allocator = m_app.getWorldEditor().getAllocator();
+		Engine& engine = m_app.getWorldEditor().getEngine();
 		RenderScene* render_scene = (RenderScene*)m_tile.universe->getScene(MODEL_INSTANCE_TYPE);
 		if (!render_scene) return;
 
@@ -945,7 +945,7 @@ struct TexturePlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 
 			ImGui::Image(&texture->handle, texture_size);
 		
-			if (ImGui::Button("Open")) m_app.getAssetBrowser()->openInExternalEditor(resource);
+			if (ImGui::Button("Open")) m_app.getAssetBrowser().openInExternalEditor(resource);
 		}
 		return true;
 	}
@@ -993,13 +993,13 @@ struct ShaderPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		if (ImGui::Button("Open vertex shader"))
 		{
 			path << "_vs.sc";
-			m_app.getAssetBrowser()->openInExternalEditor(path);
+			m_app.getAssetBrowser().openInExternalEditor(path);
 		}
 		ImGui::SameLine();
 		if (ImGui::Button("Open fragment shader"))
 		{
 			path << "_fs.sc";
-			m_app.getAssetBrowser()->openInExternalEditor(path);
+			m_app.getAssetBrowser().openInExternalEditor(path);
 		}
 
 		if (shader->m_texture_slot_count > 0 &&
@@ -1077,10 +1077,10 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 	explicit EnvironmentProbePlugin(StudioApp& app)
 		: m_app(app)
 	{
-		auto* world_editor = app.getWorldEditor();
-		auto& plugin_manager = world_editor->getEngine().getPluginManager();
+		WorldEditor& world_editor = app.getWorldEditor();
+		PluginManager& plugin_manager = world_editor.getEngine().getPluginManager();
 		Renderer*  renderer = static_cast<Renderer*>(plugin_manager.getPlugin("renderer"));
-		auto& allocator = world_editor->getAllocator();
+		IAllocator& allocator = world_editor.getAllocator();
 		Path pipeline_path("pipelines/probe.lua");
 		m_pipeline = Pipeline::create(*renderer, pipeline_path, allocator);
 		m_pipeline->load();
@@ -1123,8 +1123,8 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		}
 
 		FS::OsFile file;
-		const char* base_path = m_app.getWorldEditor()->getEngine().getDiskFileDevice()->getBasePath();
-		StaticString<MAX_PATH_LENGTH> path(base_path, "universes/", m_app.getWorldEditor()->getUniverse()->getName());
+		const char* base_path = m_app.getWorldEditor().getEngine().getDiskFileDevice()->getBasePath();
+		StaticString<MAX_PATH_LENGTH> path(base_path, "universes/", m_app.getWorldEditor().getUniverse()->getName());
 		if (!PlatformInterface::makePath(path) && !PlatformInterface::dirExists(path))
 		{
 			g_log_error.log("Editor") << "Failed to create " << path;
@@ -1136,7 +1136,7 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		}
 		u64 probe_guid = ((RenderScene*)cmp.scene)->getEnvironmentProbeGUID(cmp.handle);
 		path << probe_guid << postfix << ".dds";
-		auto& allocator = m_app.getWorldEditor()->getAllocator();
+		auto& allocator = m_app.getWorldEditor().getAllocator();
 		if (!file.open(path, FS::Mode::CREATE_AND_WRITE, allocator))
 		{
 			g_log_error.log("Editor") << "Failed to create " << path;
@@ -1184,15 +1184,15 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 	{
 		static const int TEXTURE_SIZE = 1024;
 
-		Universe* universe = m_app.getWorldEditor()->getUniverse();
+		Universe* universe = m_app.getWorldEditor().getUniverse();
 		if (universe->getName()[0] == '\0')
 		{
 			g_log_error.log("Editor") << "Universe must be saved before environment probe can be generated.";
 			return;
 		}
 
-		WorldEditor* world_editor = m_app.getWorldEditor();
-		Engine& engine = world_editor->getEngine();
+		WorldEditor& world_editor = m_app.getWorldEditor();
+		Engine& engine = world_editor.getEngine();
 		auto& plugin_manager = engine.getPluginManager();
 		IAllocator& allocator = engine.getAllocator();
 
@@ -1298,7 +1298,7 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		auto* scene = static_cast<RenderScene*>(cmp.scene);
 		auto* texture = scene->getEnvironmentProbeTexture(cmp.handle);
 		ImGui::LabelText("Path", "%s", texture->getPath().c_str());
-		if (ImGui::Button("View")) m_app.getAssetBrowser()->selectResource(texture->getPath(), true);
+		if (ImGui::Button("View")) m_app.getAssetBrowser().selectResource(texture->getPath(), true);
 		ImGui::SameLine();
 		if (ImGui::Button("Generate")) generateCubemap(cmp);
 	}
@@ -1332,9 +1332,9 @@ struct EmitterPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		if (m_particle_emitter_updating)
 		{
 			ImGui::DragFloat("Timescale", &m_particle_emitter_timescale, 0.01f, 0.01f, 10000.0f);
-			float time_delta = m_app.getWorldEditor()->getEngine().getLastTimeDelta();
+			float time_delta = m_app.getWorldEditor().getEngine().getLastTimeDelta();
 			scene->updateEmitter(cmp.handle, time_delta * m_particle_emitter_timescale);
-			scene->getParticleEmitter(cmp.handle)->drawGizmo(*m_app.getWorldEditor(), *scene);
+			scene->getParticleEmitter(cmp.handle)->drawGizmo(m_app.getWorldEditor(), *scene);
 		}
 	}
 
@@ -1350,14 +1350,14 @@ struct TerrainPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 	explicit TerrainPlugin(StudioApp& app)
 		: m_app(app)
 	{
-		auto& editor = *app.getWorldEditor();
+		WorldEditor& editor = app.getWorldEditor();
 		m_terrain_editor = LUMIX_NEW(editor.getAllocator(), TerrainEditor)(editor, app);
 	}
 
 
 	~TerrainPlugin()
 	{
-		LUMIX_DELETE(m_app.getWorldEditor()->getAllocator(), m_terrain_editor);
+		LUMIX_DELETE(m_app.getWorldEditor().getAllocator(), m_terrain_editor);
 	}
 
 
@@ -1383,13 +1383,13 @@ struct FurPainter LUMIX_FINAL : public WorldEditor::Plugin
 		, brush_strength(1.0f)
 		, enabled(false)
 	{
-		app.getWorldEditor()->addPlugin(*this);
+		app.getWorldEditor().addPlugin(*this);
 	}
 
 
 	void saveTexture()
 	{
-		WorldEditor& editor = *app.getWorldEditor();
+		WorldEditor& editor = app.getWorldEditor();
 		auto& entities = editor.getSelectedEntities();
 		if (entities.empty()) return;
 
@@ -1434,7 +1434,7 @@ struct FurPainter LUMIX_FINAL : public WorldEditor::Plugin
 
 	void postprocess()
 	{
-		WorldEditor& editor = *app.getWorldEditor();
+		WorldEditor& editor = app.getWorldEditor();
 		Universe* universe = editor.getUniverse();
 		auto& entities = editor.getSelectedEntities();
 		if (entities.empty()) return;
@@ -1451,7 +1451,7 @@ struct FurPainter LUMIX_FINAL : public WorldEditor::Plugin
 		Texture* texture = model->getMesh(0).material->getTexture(0);
 		if (!texture || texture->data.empty()) return;
 
-		u8* mem = (u8*)app.getWorldEditor()->getAllocator().allocate(texture->width * texture->height);
+		u8* mem = (u8*)app.getWorldEditor().getAllocator().allocate(texture->width * texture->height);
 
 		ASSERT(!texture->data.empty());
 
@@ -1496,7 +1496,7 @@ struct FurPainter LUMIX_FINAL : public WorldEditor::Plugin
 			u32 color;
 		};
 
-		Array<DistanceFieldCell> distance_field(app.getWorldEditor()->getAllocator());
+		Array<DistanceFieldCell> distance_field(app.getWorldEditor().getAllocator());
 		int width = texture->width;
 		int height = texture->height;
 		distance_field.resize(width * height);
@@ -1563,7 +1563,7 @@ struct FurPainter LUMIX_FINAL : public WorldEditor::Plugin
 		}
 
 		texture->onDataUpdated(0, 0, texture->width, texture->height);
-		app.getWorldEditor()->getAllocator().deallocate(mem);
+		app.getWorldEditor().getAllocator().deallocate(mem);
 	}
 
 
@@ -1708,7 +1708,7 @@ struct FurPainter LUMIX_FINAL : public WorldEditor::Plugin
 
 	bool onEntityMouseDown(const WorldEditor::RayHit& hit, int x, int y) override
 	{
-		auto& ents = app.getWorldEditor()->getSelectedEntities();
+		auto& ents = app.getWorldEditor().getSelectedEntities();
 		
 		if (enabled && ents.size() == 1 && ents[0] == hit.entity)
 		{
@@ -1721,7 +1721,7 @@ struct FurPainter LUMIX_FINAL : public WorldEditor::Plugin
 
 	void onMouseMove(int x, int y, int, int) override
 	{
-		WorldEditor& editor = *app.getWorldEditor();
+		WorldEditor& editor = app.getWorldEditor();
 		Universe* universe = editor.getUniverse();
 		auto& entities = editor.getSelectedEntities();
 		if (entities.empty()) return;
@@ -1772,8 +1772,8 @@ struct FurPainterPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		: app(_app)
 		, is_opened(false)
 	{
-		fur_painter = LUMIX_NEW(app.getWorldEditor()->getAllocator(), FurPainter)(_app);
-		Action* action = LUMIX_NEW(app.getWorldEditor()->getAllocator(), Action)("Fur Painter", "fur_painter");
+		fur_painter = LUMIX_NEW(app.getWorldEditor().getAllocator(), FurPainter)(_app);
+		Action* action = LUMIX_NEW(app.getWorldEditor().getAllocator(), Action)("Fur Painter", "fur_painter");
 		action->func.bind<FurPainterPlugin, &FurPainterPlugin::onAction>(this);
 		action->is_selected.bind<FurPainterPlugin, &FurPainterPlugin::isOpened>(this);
 		app.addWindowAction(action);
@@ -1795,7 +1795,7 @@ struct FurPainterPlugin LUMIX_FINAL : public StudioApp::IPlugin
 			if (!fur_painter->enabled) goto end;
 
 
-			WorldEditor& editor = *app.getWorldEditor();
+			WorldEditor& editor = app.getWorldEditor();
 			const auto& entities = editor.getSelectedEntities();
 			if (entities.empty())
 			{
@@ -1874,7 +1874,7 @@ struct FurPainterPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	{
 		if (!fur_painter->enabled) return;
 
-		WorldEditor& editor = *app.getWorldEditor();
+		WorldEditor& editor = app.getWorldEditor();
 		auto& entities = editor.getSelectedEntities();
 		if (entities.empty()) return;
 
@@ -2301,11 +2301,11 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		, m_game_view(game_view)
 		, m_width(-1)
 		, m_height(-1)
-		, m_engine(app.getWorldEditor()->getEngine())
+		, m_engine(app.getWorldEditor().getEngine())
 	{
 		s_instance = this;
 
-		WorldEditor& editor = *app.getWorldEditor();
+		WorldEditor& editor = app.getWorldEditor();
 
 		PluginManager& plugin_manager = m_engine.getPluginManager();
 		Renderer* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
@@ -2351,7 +2351,7 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	~EditorUIRenderPlugin()
 	{
 		Pipeline::destroy(m_gui_pipeline);
-		auto& editor = *m_app.getWorldEditor();
+		WorldEditor& editor = m_app.getWorldEditor();
 		editor.universeCreated().unbind<EditorUIRenderPlugin, &EditorUIRenderPlugin::onUniverseCreated>(this);
 		editor.universeDestroyed().unbind<EditorUIRenderPlugin, &EditorUIRenderPlugin::onUniverseDestroyed>(this);
 		shutdownImGui();
@@ -2370,7 +2370,7 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		Texture* texture = m_material->getTexture(0);
 		m_material->setTexture(0, nullptr);
 		texture->destroy();
-		LUMIX_DELETE(m_app.getWorldEditor()->getAllocator(), texture);
+		LUMIX_DELETE(m_app.getWorldEditor().getAllocator(), texture);
 
 		m_material->getResourceManager().unload(*m_material);
 	}
@@ -2388,7 +2388,7 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		{
 			m_width = w;
 			m_height = h;
-			auto& plugin_manager = m_app.getWorldEditor()->getEngine().getPluginManager();
+			auto& plugin_manager = m_app.getWorldEditor().getEngine().getPluginManager();
 			auto* renderer = static_cast<Renderer*>(plugin_manager.getPlugin("renderer"));
 			if (renderer) renderer->resize(m_width, m_height);
 		}
@@ -2410,7 +2410,7 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 
 	void onUniverseCreated()
 	{
-		auto* universe = m_app.getWorldEditor()->getUniverse();
+		auto* universe = m_app.getWorldEditor().getUniverse();
 		auto* scene = static_cast<RenderScene*>(universe->getScene(MODEL_INSTANCE_TYPE));
 
 		m_gui_pipeline->setScene(scene);
@@ -2510,25 +2510,25 @@ EditorUIRenderPlugin* EditorUIRenderPlugin::s_instance = nullptr;
 struct ShaderEditorPlugin LUMIX_FINAL : public StudioApp::IPlugin
 {
 	explicit ShaderEditorPlugin(StudioApp& app)
-		: m_shader_editor(app.getWorldEditor()->getAllocator())
+		: m_shader_editor(app.getWorldEditor().getAllocator())
 		, m_app(app)
 	{
-		Action* action = LUMIX_NEW(app.getWorldEditor()->getAllocator(), Action)("Shader Editor", "shaderEditor");
+		Action* action = LUMIX_NEW(app.getWorldEditor().getAllocator(), Action)("Shader Editor", "shaderEditor");
 		action->func.bind<ShaderEditorPlugin, &ShaderEditorPlugin::onAction>(this);
 		action->is_selected.bind<ShaderEditorPlugin, &ShaderEditorPlugin::isOpened>(this);
 		app.addWindowAction(action);
 		m_shader_editor.m_is_open = false;
 
-		m_compiler = LUMIX_NEW(app.getWorldEditor()->getAllocator(), ShaderCompiler)(app, *app.getLogUI());
+		m_compiler = LUMIX_NEW(app.getWorldEditor().getAllocator(), ShaderCompiler)(app, app.getLogUI());
 
-		lua_State* L = app.getWorldEditor()->getEngine().getState();
+		lua_State* L = app.getWorldEditor().getEngine().getState();
 		auto* f =
 			&LuaWrapper::wrapMethodClosure<ShaderCompiler, decltype(&ShaderCompiler::makeUpToDate), &ShaderCompiler::makeUpToDate>;
 		LuaWrapper::createSystemClosure(L, "Editor", m_compiler, "compileShaders", f);
 	}
 
 
-	~ShaderEditorPlugin() { LUMIX_DELETE(m_app.getWorldEditor()->getAllocator(), m_compiler); }
+	~ShaderEditorPlugin() { LUMIX_DELETE(m_app.getWorldEditor().getAllocator(), m_compiler); }
 
 
 	const char* getName() const override { return "shader_editor"; }
@@ -2735,7 +2735,7 @@ struct AddTerrainComponentPlugin LUMIX_FINAL : public StudioApp::IAddComponentPl
 		PathUtils::FileInfo info(normalized_material_path);
 		StaticString<MAX_PATH_LENGTH> hm_path(info.m_dir, info.m_basename, ".raw");
 		FS::OsFile file;
-		auto& allocator = app.getWorldEditor()->getAllocator();
+		auto& allocator = app.getWorldEditor().getAllocator();
 		if (!file.open(hm_path, FS::Mode::CREATE_AND_WRITE, allocator))
 		{
 			g_log_error.log("Editor") << "Failed to create heightmap " << hm_path;
@@ -2782,12 +2782,12 @@ struct AddTerrainComponentPlugin LUMIX_FINAL : public StudioApp::IAddComponentPl
 
 	void onGUI(bool create_entity, bool from_filter) override
 	{
-		auto& editor = *app.getWorldEditor();
+		WorldEditor& editor = app.getWorldEditor();
 
 		ImGui::SetNextWindowSize(ImVec2(300, 300));
 		if (!ImGui::BeginMenu("Terrain")) return;
 		char buf[MAX_PATH_LENGTH];
-		auto* asset_browser = app.getAssetBrowser();
+		AssetBrowser& asset_browser = app.getAssetBrowser();
 		bool new_created = false;
 		if (ImGui::BeginMenu("New"))
 		{
@@ -2805,7 +2805,7 @@ struct AddTerrainComponentPlugin LUMIX_FINAL : public StudioApp::IAddComponentPl
 			ImGui::EndMenu();
 		}
 		bool create_empty = ImGui::Selectable("Empty", false);
-		if (asset_browser->resourceList(buf, lengthOf(buf), MATERIAL_TYPE, 0) || create_empty || new_created)
+		if (asset_browser.resourceList(buf, lengthOf(buf), MATERIAL_TYPE, 0) || create_empty || new_created)
 		{
 			if (create_entity)
 			{
@@ -2849,7 +2849,7 @@ extern "C" {
 
 LUMIX_STUDIO_ENTRY(renderer)
 {
-	auto& allocator = app.getWorldEditor()->getAllocator();
+	auto& allocator = app.getWorldEditor().getAllocator();
 
 	Model::force_keep_skin = true;
 
@@ -2874,13 +2874,13 @@ LUMIX_STUDIO_ENTRY(renderer)
 	auto* add_terrain_plugin = LUMIX_NEW(allocator, AddTerrainComponentPlugin)(app);
 	app.registerComponent("terrain", *add_terrain_plugin);
 
-	auto& asset_browser = *app.getAssetBrowser();
+	auto& asset_browser = app.getAssetBrowser();
 	asset_browser.addPlugin(*LUMIX_NEW(allocator, ModelPlugin)(app));
 	asset_browser.addPlugin(*LUMIX_NEW(allocator, MaterialPlugin)(app));
 	asset_browser.addPlugin(*LUMIX_NEW(allocator, TexturePlugin)(app));
 	asset_browser.addPlugin(*LUMIX_NEW(allocator, ShaderPlugin)(app));
 
-	auto& property_grid = *app.getPropertyGrid();
+	auto& property_grid = app.getPropertyGrid();
 	property_grid.addPlugin(*LUMIX_NEW(allocator, EmitterPlugin)(app));
 	property_grid.addPlugin(*LUMIX_NEW(allocator, EnvironmentProbePlugin)(app));
 	property_grid.addPlugin(*LUMIX_NEW(allocator, TerrainPlugin)(app));
@@ -2894,7 +2894,7 @@ LUMIX_STUDIO_ENTRY(renderer)
 	app.addPlugin(*LUMIX_NEW(allocator, FurPainterPlugin)(app));
 	app.addPlugin(*LUMIX_NEW(allocator, ShaderEditorPlugin)(app));
 
-	app.getWorldEditor()->addPlugin(*LUMIX_NEW(allocator, WorldEditorPlugin)());
+	app.getWorldEditor().addPlugin(*LUMIX_NEW(allocator, WorldEditorPlugin)());
 }
 
 

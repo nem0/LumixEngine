@@ -33,7 +33,7 @@ struct AssetBrowserPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 {
 	explicit AssetBrowserPlugin(StudioApp& app)
 		: m_app(app)
-		, m_browser(*app.getAssetBrowser())
+		, m_browser(app.getAssetBrowser())
 		, m_playing_clip(-1)
 	{
 	}
@@ -53,7 +53,7 @@ struct AssetBrowserPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 	{
 		if (m_playing_clip < 0) return;
 
-		getAudioDevice(m_app.getWorldEditor()->getEngine()).stop(m_playing_clip);
+		getAudioDevice(m_app.getWorldEditor().getEngine()).stop(m_playing_clip);
 		m_playing_clip = -1;
 	}
 
@@ -66,7 +66,7 @@ struct AssetBrowserPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		if (type != CLIP_TYPE) return false;
 		auto* clip = static_cast<Clip*>(resource);
 		ImGui::LabelText("Length", "%f", clip->getLengthSeconds());
-		auto& device = getAudioDevice(m_app.getWorldEditor()->getEngine());
+		auto& device = getAudioDevice(m_app.getWorldEditor().getEngine());
 
 		if (m_playing_clip >= 0)
 		{
@@ -127,7 +127,7 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	{
 		m_filter[0] = 0;
 		m_is_open = false;
-		Action* action = LUMIX_NEW(app.getWorldEditor()->getAllocator(), Action)("Clip manager", "clip_manager");
+		Action* action = LUMIX_NEW(app.getWorldEditor().getAllocator(), Action)("Clip manager", "clip_manager");
 		action->func.bind<StudioAppPlugin, &StudioAppPlugin::onAction>(this);
 		action->is_selected.bind<StudioAppPlugin, &StudioAppPlugin::isOpened>(this);
 		app.addWindowAction(action);
@@ -149,7 +149,7 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	void onSoundEventGUI(u8* data, AnimEditor::Component& component)
 	{
 		auto* ev = (SoundAnimationEvent*)data;
-		AudioScene* scene = (AudioScene*)m_app.getWorldEditor()->getUniverse()->getScene(crc32("audio"));
+		AudioScene* scene = (AudioScene*)m_app.getWorldEditor().getUniverse()->getScene(crc32("audio"));
 		auto getter = [](void* data, int idx, const char** out) -> bool {
 			auto* scene = (AudioScene*)data;
 			*out = scene->getClipName(idx);
@@ -179,7 +179,7 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		{
 			ImGui::InputText("Filter", m_filter, lengthOf(m_filter));
 
-			auto universe = m_app.getWorldEditor()->getUniverse();
+			auto universe = m_app.getWorldEditor().getUniverse();
 			auto* audio_scene = static_cast<AudioScene*>(universe->getScene(crc32("audio")));
 			int clip_count = audio_scene->getClipCount();
 			for (int clip_id = 0; clip_id < clip_count; ++clip_id)
@@ -203,7 +203,7 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 					auto* clip = audio_scene->getClipInfo(clip_id)->clip;
 					char path[MAX_PATH_LENGTH];
 					copyString(path, clip ? clip->getPath().c_str() : "");
-					if (m_app.getAssetBrowser()->resourceInput("Clip", "", path, lengthOf(path), CLIP_TYPE))
+					if (m_app.getAssetBrowser().resourceInput("Clip", "", path, lengthOf(path), CLIP_TYPE))
 					{
 						audio_scene->setClip(clip_id, Path(path));
 					}
@@ -276,11 +276,11 @@ LUMIX_STUDIO_ENTRY(audio)
 	app.registerComponent("audio_listener", "Audio/Listener");
 	app.registerComponent("echo_zone", "Audio/Echo zone");
 
-	auto& editor = *app.getWorldEditor();
+	auto& editor = app.getWorldEditor();
 	auto& allocator = editor.getAllocator();
 
 	auto* asset_browser_plugin = LUMIX_NEW(allocator, AssetBrowserPlugin)(app);
-	app.getAssetBrowser()->addPlugin(*asset_browser_plugin);
+	app.getAssetBrowser().addPlugin(*asset_browser_plugin);
 
 	auto* app_plugin = LUMIX_NEW(allocator, StudioAppPlugin)(app);
 	app.addPlugin(*app_plugin);

@@ -42,7 +42,7 @@ static const ResourceType SHADER_TYPE("shader");
 
 ShaderCompiler::ShaderCompiler(StudioApp& app, LogUI& log_ui)
 	: m_app(app)
-	, m_editor(*app.getWorldEditor())
+	, m_editor(app.getWorldEditor())
 	, m_log_ui(log_ui)
 	, m_dependencies(m_editor.getAllocator())
 	, m_to_compile(m_editor.getAllocator())
@@ -583,7 +583,7 @@ void ShaderCompiler::update()
 
 	if (!m_to_compile.empty())
 	{
-		m_app.getAssetBrowser()->enableUpdate(false);
+		m_app.getAssetBrowser().enableUpdate(false);
 		compile(m_to_compile.back().c_str(), false);
 		m_to_compile.pop();
 
@@ -591,7 +591,7 @@ void ShaderCompiler::update()
 		{
 			reloadShaders();
 			parseDependencies();
-			m_app.getAssetBrowser()->enableUpdate(true);
+			m_app.getAssetBrowser().enableUpdate(true);
 		}
 	}
 }

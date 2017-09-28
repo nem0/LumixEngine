@@ -177,7 +177,7 @@ struct PropertyGridPlugin : PropertyGrid::IPlugin
 
 		if (m_is_playing)
 		{
-			float time_delta = m_app.getWorldEditor()->getEngine().getLastTimeDelta();
+			float time_delta = m_app.getWorldEditor().getEngine().getLastTimeDelta();
 			scene->updateAnimable(cmp.handle, time_delta);
 		}
 
@@ -223,15 +223,15 @@ LUMIX_STUDIO_ENTRY(animation)
 	app.registerComponentWithResource("anim_controller", "Animation/Controller", CONTROLLER_RESOURCE_TYPE, "Source");
 	app.registerComponent("shared_anim_controller", "Animation/Shared controller");
 
-	auto& allocator = app.getWorldEditor()->getAllocator();
+	auto& allocator = app.getWorldEditor().getAllocator();
 	auto* ab_plugin = LUMIX_NEW(allocator, AssetBrowserPlugin)(app);
-	app.getAssetBrowser()->addPlugin(*ab_plugin);
+	app.getAssetBrowser().addPlugin(*ab_plugin);
 
 	auto* anim_controller_ab_plugin = LUMIX_NEW(allocator, AnimControllerAssetBrowserPlugin)(app);
-	app.getAssetBrowser()->addPlugin(*anim_controller_ab_plugin);
+	app.getAssetBrowser().addPlugin(*anim_controller_ab_plugin);
 
 	auto* pg_plugin = LUMIX_NEW(allocator, PropertyGridPlugin)(app);
-	app.getPropertyGrid()->addPlugin(*pg_plugin);
+	app.getPropertyGrid().addPlugin(*pg_plugin);
 
 	app.addPlugin(*AnimEditor::IAnimationEditor::create(allocator, app));
 }

@@ -345,9 +345,9 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 	{
 		if (cmp.type != LUA_SCRIPT_TYPE) return;
 
-		auto* scene = static_cast<LuaScriptScene*>(cmp.scene);
-		auto& editor = *m_app.getWorldEditor();
-		auto& allocator = editor.getAllocator();
+		auto* scene = (LuaScriptScene*)cmp.scene;
+		WorldEditor& editor = m_app.getWorldEditor();
+		IAllocator& allocator = editor.getAllocator();
 
 		if (ImGui::Button("Add script"))
 		{
@@ -402,7 +402,7 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 					break;
 				}
 
-				if (m_app.getAssetBrowser()->resourceInput(
+				if (m_app.getAssetBrowser().resourceInput(
 						"Source", "src", buf, lengthOf(buf), LUA_SCRIPT_RESOURCE_TYPE))
 				{
 					auto* cmd =
@@ -465,7 +465,7 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 						case LuaScriptScene::Property::RESOURCE:
 						{
 							ResourceType res_type = scene->getPropertyResourceType(cmp.handle, j, k);
-							if (m_app.getAssetBrowser()->resourceInput(
+							if (m_app.getAssetBrowser().resourceInput(
 									property_name, property_name, buf, lengthOf(buf), res_type))
 							{
 								auto* cmd = LUMIX_NEW(allocator, SetPropertyCommand)(
@@ -518,7 +518,7 @@ struct AssetBrowserPlugin : AssetBrowser::IPlugin
 		ImGui::InputTextMultiline("Code", m_text_buffer, sizeof(m_text_buffer), ImVec2(0, 300));
 		if (ImGui::Button("Save"))
 		{
-			auto& fs = m_app.getWorldEditor()->getEngine().getFileSystem();
+			auto& fs = m_app.getWorldEditor().getEngine().getFileSystem();
 			auto* file = fs.open(fs.getDefaultDevice(), resource->getPath(), FS::Mode::CREATE_AND_WRITE);
 
 			if (!file)
@@ -533,7 +533,7 @@ struct AssetBrowserPlugin : AssetBrowser::IPlugin
 		ImGui::SameLine();
 		if (ImGui::Button("Open in external editor"))
 		{
-			m_app.getAssetBrowser()->openInExternalEditor(resource);
+			m_app.getAssetBrowser().openInExternalEditor(resource);
 		}
 		return true;
 	}
@@ -573,9 +573,9 @@ struct ConsolePlugin LUMIX_FINAL : public StudioApp::IPlugin
 	ConsolePlugin(StudioApp& _app)
 		: app(_app)
 		, opened(false)
-		, autocomplete(_app.getWorldEditor()->getAllocator())
+		, autocomplete(_app.getWorldEditor().getAllocator())
 	{
-		Action* action = LUMIX_NEW(app.getWorldEditor()->getAllocator(), Action)("Script Console", "script_console");
+		Action* action = LUMIX_NEW(app.getWorldEditor().getAllocator(), Action)("Script Console", "script_console");
 		action->func.bind<ConsolePlugin, &ConsolePlugin::toggleOpened>(this);
 		action->is_selected.bind<ConsolePlugin, &ConsolePlugin::isOpened>(this);
 		app.addWindowAction(action);
@@ -617,7 +617,7 @@ struct ConsolePlugin LUMIX_FINAL : public StudioApp::IPlugin
 				}
 				else if (*next == '\0')
 				{
-					autocomplete.push(string(name, app.getWorldEditor()->getAllocator()));
+					autocomplete.push(string(name, app.getWorldEditor().getAllocator()));
 				}
 				else
 				{
@@ -640,7 +640,7 @@ struct ConsolePlugin LUMIX_FINAL : public StudioApp::IPlugin
 		auto* that = (ConsolePlugin*)data->UserData;
 		if (data->EventFlag == ImGuiInputTextFlags_CallbackCompletion)
 		{
-			lua_State* L = that->app.getWorldEditor()->getEngine().getState();
+			lua_State* L = that->app.getWorldEditor().getEngine().getState();
 
 			int start_word = data->CursorPos;
 			char c = data->Buf[start_word - 1];
@@ -691,7 +691,7 @@ struct ConsolePlugin LUMIX_FINAL : public StudioApp::IPlugin
 		{
 			if (ImGui::Button("Execute"))
 			{
-				lua_State* L = app.getWorldEditor()->getEngine().getState();
+				lua_State* L = app.getWorldEditor().getEngine().getState();
 				bool errors = luaL_loadbuffer(L, buf, stringLength(buf), nullptr) != LUA_OK;
 				errors = errors || lua_pcall(L, 0, 0, 0) != LUA_OK;
 
@@ -708,7 +708,7 @@ struct ConsolePlugin LUMIX_FINAL : public StudioApp::IPlugin
 				if (PlatformInterface::getOpenFilename(tmp, MAX_PATH_LENGTH, "Scripts\0*.lua\0", nullptr))
 				{
 					FS::OsFile file;
-					IAllocator& allocator = app.getWorldEditor()->getAllocator();
+					IAllocator& allocator = app.getWorldEditor().getAllocator();
 					if (file.open(tmp, FS::Mode::OPEN_AND_READ, allocator))
 					{
 						size_t size = file.size();
@@ -716,7 +716,7 @@ struct ConsolePlugin LUMIX_FINAL : public StudioApp::IPlugin
 						data.resize((int)size);
 						file.read(&data[0], size);
 						file.close();
-						lua_State* L = app.getWorldEditor()->getEngine().getState();
+						lua_State* L = app.getWorldEditor().getEngine().getState();
 						bool errors = luaL_loadbuffer(L, &data[0], data.size(), tmp) != LUA_OK;
 						errors = errors || lua_pcall(L, 0, 0, 0) != LUA_OK;
 
@@ -819,7 +819,7 @@ struct AddComponentPlugin LUMIX_FINAL : public StudioApp::IAddComponentPlugin
 		ImGui::SetNextWindowSize(ImVec2(300, 300));
 		if (!ImGui::BeginMenu(getLabel())) return;
 		char buf[MAX_PATH_LENGTH];
-		auto* asset_browser = app.getAssetBrowser();
+		AssetBrowser& asset_browser = app.getAssetBrowser();
 		bool new_created = false;
 		if (ImGui::Selectable("New"))
 		{
@@ -827,7 +827,7 @@ struct AddComponentPlugin LUMIX_FINAL : public StudioApp::IAddComponentPlugin
 			if (PlatformInterface::getSaveFilename(full_path, lengthOf(full_path), "Lua script\0*.lua\0", "lua"))
 			{
 				FS::OsFile file;
-				WorldEditor& editor = *app.getWorldEditor();
+				WorldEditor& editor = app.getWorldEditor();
 				IAllocator& allocator = editor.getAllocator();
 				if (file.open(full_path, FS::Mode::CREATE_AND_WRITE, allocator))
 				{
@@ -843,9 +843,9 @@ struct AddComponentPlugin LUMIX_FINAL : public StudioApp::IAddComponentPlugin
 		}
 		bool create_empty = ImGui::Selectable("Empty", false);
 
-		if (asset_browser->resourceList(buf, lengthOf(buf), LUA_SCRIPT_RESOURCE_TYPE, 0) || create_empty || new_created)
+		if (asset_browser.resourceList(buf, lengthOf(buf), LUA_SCRIPT_RESOURCE_TYPE, 0) || create_empty || new_created)
 		{
-			WorldEditor& editor = *app.getWorldEditor();
+			WorldEditor& editor = app.getWorldEditor();
 			if (create_entity)
 			{
 				Entity entity = editor.addEntity();
@@ -924,7 +924,7 @@ struct EditorPlugin : public WorldEditor::Plugin
 
 LUMIX_STUDIO_ENTRY(lua_script)
 {
-	auto& editor = *app.getWorldEditor();
+	WorldEditor& editor = app.getWorldEditor();
 	auto* cmp_plugin = LUMIX_NEW(editor.getAllocator(), AddComponentPlugin)(app);
 	app.registerComponent("lua_script", *cmp_plugin);
 
@@ -935,10 +935,10 @@ LUMIX_STUDIO_ENTRY(lua_script)
 	editor.addPlugin(*editor_plugin);
 
 	auto* plugin = LUMIX_NEW(editor.getAllocator(), PropertyGridPlugin)(app);
-	app.getPropertyGrid()->addPlugin(*plugin);
+	app.getPropertyGrid().addPlugin(*plugin);
 
 	auto* asset_browser_plugin = LUMIX_NEW(editor.getAllocator(), AssetBrowserPlugin)(app);
-	app.getAssetBrowser()->addPlugin(*asset_browser_plugin);
+	app.getAssetBrowser().addPlugin(*asset_browser_plugin);
 
 	auto* console_plugin = LUMIX_NEW(editor.getAllocator(), ConsolePlugin)(app);
 	app.addPlugin(*console_plugin);

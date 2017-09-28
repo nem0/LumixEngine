@@ -45,16 +45,16 @@ static const ResourceType TEXTURE_TYPE("texture");
 
 SceneView::SceneView(StudioApp& app)
 	: m_app(app)
-	, m_drop_handlers(app.getWorldEditor()->getAllocator())
+	, m_drop_handlers(app.getWorldEditor().getAllocator())
+	, m_log_ui(app.getLogUI())
+	, m_editor(m_app.getWorldEditor())
 {
 	m_camera_speed = 0.1f;
 	m_is_mouse_captured = false;
 	m_show_stats = false;
 
-	m_log_ui = m_app.getLogUI();
-	m_editor = m_app.getWorldEditor();
-	auto& engine = m_editor->getEngine();
-	auto& allocator = engine.getAllocator();
+	Engine& engine = m_editor.getEngine();
+	IAllocator& allocator = engine.getAllocator();
 	auto* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
 	m_is_opengl = renderer->isOpenGL();
 	Path path("pipelines/main.lua");
@@ -63,8 +63,8 @@ SceneView::SceneView(StudioApp& app)
 	m_pipeline->addCustomCommandHandler("renderGizmos").callback.bind<SceneView, &SceneView::renderGizmos>(this);
 	m_pipeline->addCustomCommandHandler("renderIcons").callback.bind<SceneView, &SceneView::renderIcons>(this);
 
-	m_editor->universeCreated().bind<SceneView, &SceneView::onUniverseCreated>(this);
-	m_editor->universeDestroyed().bind<SceneView, &SceneView::onUniverseDestroyed>(this);
+	m_editor.universeCreated().bind<SceneView, &SceneView::onUniverseCreated>(this);
+	m_editor.universeDestroyed().bind<SceneView, &SceneView::onUniverseDestroyed>(this);
 
 	m_toggle_gizmo_step_action =
 		LUMIX_NEW(allocator, Action)("Enable/disable gizmo step", "toggleGizmoStep");
@@ -100,7 +100,7 @@ SceneView::SceneView(StudioApp& app)
 	m_camera_speed_action->func.bind<SceneView, &SceneView::resetCameraSpeed>(this);
 	m_app.addAction(m_camera_speed_action);
 
-	m_app.getAssetBrowser()->resourceChanged().bind<SceneView, &SceneView::onResourceChanged>(this);
+	m_app.getAssetBrowser().resourceChanged().bind<SceneView, &SceneView::onResourceChanged>(this);
 }
 
 
@@ -118,9 +118,9 @@ void SceneView::resetCameraSpeed()
 
 SceneView::~SceneView()
 {
-	m_app.getAssetBrowser()->resourceChanged().unbind<SceneView, &SceneView::onResourceChanged>(this);
-	m_editor->universeCreated().unbind<SceneView, &SceneView::onUniverseCreated>(this);
-	m_editor->universeDestroyed().unbind<SceneView, &SceneView::onUniverseDestroyed>(this);
+	m_app.getAssetBrowser().resourceChanged().unbind<SceneView, &SceneView::onResourceChanged>(this);
+	m_editor.universeCreated().unbind<SceneView, &SceneView::onUniverseCreated>(this);
+	m_editor.universeDestroyed().unbind<SceneView, &SceneView::onUniverseDestroyed>(this);
 	Pipeline::destroy(m_pipeline);
 	m_pipeline = nullptr;
 }
@@ -134,8 +134,8 @@ void SceneView::setScene(RenderScene* scene)
 
 void SceneView::onUniverseCreated()
 {
-	auto* scene = m_editor->getUniverse()->getScene(crc32("renderer"));
-	m_pipeline->setScene(static_cast<RenderScene*>(scene));
+	IScene* scene = m_editor.getUniverse()->getScene(crc32("renderer"));
+	m_pipeline->setScene((RenderScene*)scene);
 }
 
 
@@ -163,24 +163,24 @@ void SceneView::update(float)
 
 	float speed = m_camera_speed;
 	if (ImGui::GetIO().KeyShift) speed *= 10;
-	if (m_move_forward_action->isActive()) m_editor->navigate(1.0f, 0, 0, speed);
-	if (m_move_back_action->isActive()) m_editor->navigate(-1.0f, 0, 0, speed);
-	if (m_move_left_action->isActive()) m_editor->navigate(0.0f, -1.0f, 0, speed);
-	if (m_move_right_action->isActive()) m_editor->navigate(0.0f, 1.0f, 0, speed);
-	if (m_move_down_action->isActive()) m_editor->navigate(0, 0, -1.0f, speed);
-	if (m_move_up_action->isActive()) m_editor->navigate(0, 0, 1.0f, speed);
+	if (m_move_forward_action->isActive()) m_editor.navigate(1.0f, 0, 0, speed);
+	if (m_move_back_action->isActive()) m_editor.navigate(-1.0f, 0, 0, speed);
+	if (m_move_left_action->isActive()) m_editor.navigate(0.0f, -1.0f, 0, speed);
+	if (m_move_right_action->isActive()) m_editor.navigate(0.0f, 1.0f, 0, speed);
+	if (m_move_down_action->isActive()) m_editor.navigate(0, 0, -1.0f, speed);
+	if (m_move_up_action->isActive()) m_editor.navigate(0, 0, 1.0f, speed);
 }
 
 
 void SceneView::renderIcons()
 {
-	m_editor->renderIcons();
+	m_editor.renderIcons();
 }
 
 
 void SceneView::renderGizmos()
 {
-	m_editor->getGizmo().render();
+	m_editor.getGizmo().render();
 }
 
 
@@ -200,7 +200,7 @@ RayCastModelHit SceneView::castRay(float x, float y)
 	auto* scene =  m_pipeline->getScene();
 	ASSERT(scene);
 	
-	ComponentUID camera_cmp = m_editor->getEditCamera();
+	ComponentUID camera_cmp = m_editor.getEditCamera();
 	Vec2 screen_size = scene->getCameraScreenSize(camera_cmp.handle);
 	screen_size.x *= x;
 	screen_size.y *= y;
@@ -243,21 +243,21 @@ void SceneView::handleDrop(float x, float y)
 		}
 		else if (PathUtils::hasExtension(path, "msh"))
 		{
-			m_editor->beginCommandGroup(crc32("insert_mesh"));
-			Entity entity = m_editor->addEntity();
+			m_editor.beginCommandGroup(crc32("insert_mesh"));
+			Entity entity = m_editor.addEntity();
 			Vec3 pos = hit.m_origin + hit.m_t * hit.m_dir;
-			m_editor->setEntitiesPositions(&entity, &pos, 1);
-			m_editor->selectEntities(&entity, 1);
-			m_editor->addComponent(MODEL_INSTANCE_TYPE);
+			m_editor.setEntitiesPositions(&entity, &pos, 1);
+			m_editor.selectEntities(&entity, 1);
+			m_editor.addComponent(MODEL_INSTANCE_TYPE);
 			const auto* desc = PropertyRegister::getDescriptor(MODEL_INSTANCE_TYPE, crc32("Source"));
-			m_editor->setProperty(MODEL_INSTANCE_TYPE, -1, *desc, &entity, 1, path, stringLength(path) + 1);
-			m_editor->endCommandGroup();
+			m_editor.setProperty(MODEL_INSTANCE_TYPE, -1, *desc, &entity, 1, path, stringLength(path) + 1);
+			m_editor.endCommandGroup();
 		}
 		else if (PathUtils::hasExtension(path, "mat") && hit.m_mesh)
 		{
 			auto* desc = PropertyRegister::getDescriptor(MODEL_INSTANCE_TYPE, crc32("Material"));
 			auto drag_data = m_app.getDragData();
-			m_editor->selectEntities(&hit.m_entity, 1);
+			m_editor.selectEntities(&hit.m_entity, 1);
 			auto* model = m_pipeline->getScene()->getModelInstanceModel(hit.m_component);
 			int mesh_index = 0;
 			for (int i = 0; i < model->getMeshCount(); ++i)
@@ -269,7 +269,7 @@ void SceneView::handleDrop(float x, float y)
 				}
 			}
 			
-			m_editor->setProperty(MODEL_INSTANCE_TYPE, mesh_index, *desc, &hit.m_entity, 1, drag_data.data, drag_data.size);
+			m_editor.setProperty(MODEL_INSTANCE_TYPE, mesh_index, *desc, &hit.m_entity, 1, drag_data.data, drag_data.size);
 		}
 	}
 }
@@ -307,9 +307,9 @@ void SceneView::onToolbar()
 	ImGui::SetCursorPos(pos);
 	ImGui::DragFloat("##camera_speed", &m_camera_speed, 0.1f, 0.01f, 999.0f, "%.2f");
 	
-	int step = m_editor->getGizmo().getStep();
+	int step = m_editor.getGizmo().getStep();
 	Action* mode_action;
-	if (m_editor->getGizmo().isTranslateMode())
+	if (m_editor.getGizmo().isTranslateMode())
 	{
 		mode_action = m_app.getAction("setTranslateGizmoMode");
 	}
@@ -332,7 +332,7 @@ void SceneView::onToolbar()
 	ImGui::SetCursorPos(pos);
 	if (ImGui::DragInt("##gizmoStep", &step, 1.0f, 0, 200))
 	{
-		m_editor->getGizmo().setStep(step);
+		m_editor.getGizmo().setStep(step);
 	}
 
 	ImGui::SameLine(0, 20);
@@ -341,10 +341,10 @@ void SceneView::onToolbar()
 	ImGui::SameLine(0, 20);
 	m_pipeline->callLuaFunction("onGUI");
 
-	if (m_editor->isMeasureToolActive())
+	if (m_editor.isMeasureToolActive())
 	{
 		ImGui::SameLine(0, 20);
-		ImGui::Text(" | Measured distance: %f", m_editor->getMeasuredDistance());
+		ImGui::Text(" | Measured distance: %f", m_editor.getMeasuredDistance());
 	}
 
 	ImGui::PopItemWidth();
@@ -359,12 +359,12 @@ void SceneView::onWindowGUI()
 	m_is_open = false;
 	ImVec2 view_pos;
 	const char* title = "Scene View###Scene View";
-	if (m_log_ui && m_log_ui->getUnreadErrorCount() > 0)
+	if (m_log_ui.getUnreadErrorCount() > 0)
 	{
 		title = "Scene View | errors in log###Scene View";
 	}
 
-	m_editor->inputFrame();
+	m_editor.inputFrame();
 
 	if (ImGui::BeginDock(title, nullptr, ImGuiWindowFlags_NoScrollWithMouse))
 	{
@@ -407,25 +407,25 @@ void SceneView::onWindowGUI()
 			rel_mp.y -= m_screen_y;
 			if (ImGui::IsItemHovered())
 			{
-				m_editor->getGizmo().enableStep(m_toggle_gizmo_step_action->isActive());
+				m_editor.getGizmo().enableStep(m_toggle_gizmo_step_action->isActive());
 				for (int i = 0; i < 3; ++i)
 				{
 					if (ImGui::IsMouseClicked(i))
 					{
 						ImGui::ResetActiveID();
 						if(i == 1) captureMouse(true);
-						m_editor->onMouseDown((int)rel_mp.x, (int)rel_mp.y, (MouseButton::Value)i);
+						m_editor.onMouseDown((int)rel_mp.x, (int)rel_mp.y, (MouseButton::Value)i);
 						break;
 					}
 				}
 			}
 			if (m_is_mouse_captured || ImGui::IsItemHovered())
 			{
-				auto& input = m_editor->getEngine().getInputSystem();
+				auto& input = m_editor.getEngine().getInputSystem();
 				auto delta = Vec2(input.getMouseXMove(), input.getMouseYMove());
 				if (delta.x != 0 || delta.y != 0)
 				{
-					m_editor->onMouseMove((int)rel_mp.x, (int)rel_mp.y, (int)delta.x, (int)delta.y);
+					m_editor.onMouseMove((int)rel_mp.x, (int)rel_mp.y, (int)delta.x, (int)delta.y);
 				}
 			}
 			for (int i = 0; i < 3; ++i)
@@ -436,7 +436,7 @@ void SceneView::onWindowGUI()
 				if (ImGui::IsMouseReleased(i))
 				{
 					if (i == 1) captureMouse(false);
-					m_editor->onMouseUp((int)rel_mp.x, (int)rel_mp.y, (MouseButton::Value)i);
+					m_editor.onMouseUp((int)rel_mp.x, (int)rel_mp.y, (MouseButton::Value)i);
 				}
 			}
 			m_pipeline->render();
@@ -467,7 +467,7 @@ void SceneView::onWindowGUI()
 			toCStringPretty(stats.triangle_count, buf, lengthOf(buf));
 			ImGui::LabelText("Triangles", "%s", buf);
 			ImGui::LabelText("Resolution", "%dx%d", m_pipeline->getWidth(), m_pipeline->getHeight());
-			ImGui::LabelText("FPS", "%.2f", m_editor->getEngine().getFPS());
+			ImGui::LabelText("FPS", "%.2f", m_editor.getEngine().getFPS());
 			ImGui::LabelText("CPU time", "%.2f", m_pipeline->getCPUTime() * 1000.0f);
 			ImGui::LabelText("GPU time", "%.2f", m_pipeline->getGPUTime() * 1000.0f);
 			ImGui::LabelText("Waiting for submit", "%.2f", m_pipeline->getWaitSubmitTime() * 1000.0f);

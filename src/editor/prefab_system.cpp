@@ -215,7 +215,7 @@ public:
 
 	void setStudioApp(StudioApp& app) override
 	{
-		app.getAssetBrowser()->addPlugin(*LUMIX_NEW(m_editor.getAllocator(), AssetBrowserPlugin)(m_editor, *this));
+		app.getAssetBrowser().addPlugin(*LUMIX_NEW(m_editor.getAllocator(), AssetBrowserPlugin)(m_editor, *this));
 	}
 	
 

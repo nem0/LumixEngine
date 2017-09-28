@@ -23,7 +23,7 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		: app(_app)
 		, is_opened(false)
 	{
-		auto& allocator = app.getWorldEditor()->getAllocator();
+		auto& allocator = app.getWorldEditor().getAllocator();
 		Action* action = LUMIX_NEW(allocator, Action)("Navigation", "toggleNavigationWindow");
 		action->func.bind<StudioAppPlugin, &StudioAppPlugin::onAction>(this);
 		action->is_selected.bind<StudioAppPlugin, &StudioAppPlugin::isOpened>(this);
@@ -48,7 +48,7 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 
 	void onWindowGUI() override
 	{
-		auto* scene = static_cast<NavigationScene*>(app.getWorldEditor()->getUniverse()->getScene(crc32("navigation")));
+		auto* scene = static_cast<NavigationScene*>(app.getWorldEditor().getUniverse()->getScene(crc32("navigation")));
 		if (!scene) return;
 
 		if (ImGui::BeginDock("Navigation", &is_opened, ImGuiWindowFlags_NoScrollWithMouse))
@@ -77,12 +77,12 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 				ImGui::SameLine();
 				if (ImGui::Button("Debug tile"))
 				{
-					Vec3 camera_hit = app.getWorldEditor()->getCameraRaycastHit();
+					Vec3 camera_hit = app.getWorldEditor().getCameraRaycastHit();
 					scene->generateTileAt(camera_hit, true);
 				}
 
 				static bool debug_draw_path = false;
-				const auto& selected_entities = app.getWorldEditor()->getSelectedEntities();
+				const auto& selected_entities = app.getWorldEditor().getSelectedEntities();
 				if (!selected_entities.empty())
 				{
 					const dtCrowdAgent* agent = scene->getDetourAgent({selected_entities[0].index});
@@ -119,7 +119,7 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 					ImGui::Checkbox("Inner boundaries", &inner_boundaries);
 					ImGui::Checkbox("Outer boundaries", &outer_boundaries);
 					ImGui::Checkbox("Portals", &portals);
-					scene->debugDrawNavmesh(app.getWorldEditor()->getCameraRaycastHit(), inner_boundaries, outer_boundaries, portals);
+					scene->debugDrawNavmesh(app.getWorldEditor().getCameraRaycastHit(), inner_boundaries, outer_boundaries, portals);
 				}
 
 				if (scene->hasDebugDrawData())
@@ -136,7 +136,7 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 					ImGui::Checkbox("Draw contours", &debug_draw_contours);
 					if (debug_draw_contours) scene->debugDrawContours();
 
-					auto& entities = app.getWorldEditor()->getSelectedEntities();
+					auto& entities = app.getWorldEditor().getSelectedEntities();
 					if (!entities.empty())
 					{
 						static bool debug_draw_path = false;
@@ -165,7 +165,7 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 
 LUMIX_STUDIO_ENTRY(navigation)
 {
-	auto& allocator = app.getWorldEditor()->getAllocator();
+	auto& allocator = app.getWorldEditor().getAllocator();
 	auto* studio_app_plugin = LUMIX_NEW(allocator, StudioAppPlugin)(app);
 	app.addPlugin(*studio_app_plugin);
 
