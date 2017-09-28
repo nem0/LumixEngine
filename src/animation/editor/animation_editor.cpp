@@ -448,11 +448,11 @@ AnimationEditor::AnimationEditor(StudioApp& app)
 	, m_editor_opened(false)
 	, m_inputs_opened(false)
 	, m_offset(0, 0)
-	, m_event_types(app.getWorldEditor()->getAllocator())
-	, m_undo_stack(app.getWorldEditor()->getAllocator())
+	, m_event_types(app.getWorldEditor().getAllocator())
+	, m_undo_stack(app.getWorldEditor().getAllocator())
 {
 	m_path = "";
-	IAllocator& allocator = app.getWorldEditor()->getAllocator();
+	IAllocator& allocator = app.getWorldEditor().getAllocator();
 
 	auto* action = LUMIX_NEW(allocator, Action)("Animation Editor", "animation_editor");
 	action->func.bind<AnimationEditor, &AnimationEditor::toggleEditorOpened>(this);
@@ -464,7 +464,7 @@ AnimationEditor::AnimationEditor(StudioApp& app)
 	action->is_selected.bind<AnimationEditor, &AnimationEditor::isInputsOpened>(this);
 	app.addWindowAction(action);
 
-	Engine& engine = m_app.getWorldEditor()->getEngine();
+	Engine& engine = m_app.getWorldEditor().getEngine();
 	auto* manager = engine.getResourceManager().get(CONTROLLER_RESOURCE_TYPE);
 	m_resource = LUMIX_NEW(allocator, ControllerResource)(*this, *manager, allocator);
 	m_container = (Container*)m_resource->getRoot();
@@ -490,7 +490,7 @@ AnimationEditor::AnimationEditor(StudioApp& app)
 
 AnimationEditor::~AnimationEditor()
 {
-	IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
+	IAllocator& allocator = m_app.getWorldEditor().getAllocator();
 	LUMIX_DELETE(allocator, m_resource);
 	for (auto& cmd : m_undo_stack) {
 		LUMIX_DELETE(allocator, cmd);
@@ -500,7 +500,7 @@ AnimationEditor::~AnimationEditor()
 
 void AnimationEditor::moveNode(ControllerResource& ctrl, Node* node, const ImVec2& pos)
 {
-	IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
+	IAllocator& allocator = m_app.getWorldEditor().getAllocator();
 	auto* cmd = LUMIX_NEW(allocator, MoveAnimNodeCommand)(ctrl, node, pos);
 	executeCommand(*cmd);
 }
@@ -511,7 +511,7 @@ void AnimationEditor::createNode(ControllerResource& ctrl,
 	Anim::Node::Type type,
 	const ImVec2& pos)
 {
-	IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
+	IAllocator& allocator = m_app.getWorldEditor().getAllocator();
 	auto* cmd = LUMIX_NEW(allocator, CreateAnimNodeCommand)(ctrl, container, type, pos);
 	executeCommand(*cmd);
 }
@@ -519,7 +519,7 @@ void AnimationEditor::createNode(ControllerResource& ctrl,
 
 void AnimationEditor::destroyEdge(ControllerResource& ctrl, Edge* edge)
 {
-	IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
+	IAllocator& allocator = m_app.getWorldEditor().getAllocator();
 	auto* cmd = LUMIX_NEW(allocator, DestroyAnimEdgeCommand)(ctrl, edge->engine_cmp->uid);
 	executeCommand(*cmd);
 }
@@ -539,7 +539,7 @@ void AnimationEditor::destroyNode(ControllerResource& ctrl, Node* node)
 		destroyEdge(ctrl, node->getInEdges().back());
 	}
 
-	IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
+	IAllocator& allocator = m_app.getWorldEditor().getAllocator();
 	auto* cmd = LUMIX_NEW(allocator, DestroyNodeCommand)(ctrl, node->engine_cmp->uid);
 	executeCommand(*cmd);
 	endCommandGroup();
@@ -548,7 +548,7 @@ void AnimationEditor::destroyNode(ControllerResource& ctrl, Node* node)
 
 void AnimationEditor::createEdge(ControllerResource& ctrl, Container* container, Node* from, Node* to)
 {
-	IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
+	IAllocator& allocator = m_app.getWorldEditor().getAllocator();
 	auto* cmd = LUMIX_NEW(allocator, CreateAnimEdgeCommand)(ctrl, container, from, to);
 	executeCommand(*cmd);
 }
@@ -556,7 +556,7 @@ void AnimationEditor::createEdge(ControllerResource& ctrl, Container* container,
 
 void AnimationEditor::beginCommandGroup(u32 type)
 {
-	IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
+	IAllocator& allocator = m_app.getWorldEditor().getAllocator();
 
 	if (m_undo_index < m_undo_stack.size() - 1)
 	{
@@ -591,7 +591,7 @@ void AnimationEditor::beginCommandGroup(u32 type)
 
 void AnimationEditor::endCommandGroup()
 {
-	IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
+	IAllocator& allocator = m_app.getWorldEditor().getAllocator();
 
 	if (m_undo_index < m_undo_stack.size() - 1)
 	{
@@ -612,7 +612,7 @@ void AnimationEditor::endCommandGroup()
 void AnimationEditor::executeCommand(IEditorCommand& command)
 {
 	// TODO clean memory in destructor
-	IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
+	IAllocator& allocator = m_app.getWorldEditor().getAllocator();
 	while (m_undo_stack.size() > m_undo_index + 1)
 	{
 		LUMIX_DELETE(allocator, m_undo_stack.back());
@@ -695,7 +695,7 @@ void AnimationEditor::save()
 	if (m_path[0] == 0 &&
 		!PlatformInterface::getSaveFilename(m_path.data, lengthOf(m_path.data), "Animation controllers\0*.act\0", ""))
 		return;
-	IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
+	IAllocator& allocator = m_app.getWorldEditor().getAllocator();
 	OutputBlob blob(allocator);
 	m_resource->serialize(blob);
 	FS::OsFile file;
@@ -713,8 +713,8 @@ void AnimationEditor::drawGraph()
 		m_offset = m_offset + ImGui::GetIO().MouseDelta;
 	}
 
-	auto* scene = (AnimationScene*)m_app.getWorldEditor()->getUniverse()->getScene(ANIMABLE_HASH);
-	auto& entities = m_app.getWorldEditor()->getSelectedEntities();
+	auto* scene = (AnimationScene*)m_app.getWorldEditor().getUniverse()->getScene(ANIMABLE_HASH);
+	auto& entities = m_app.getWorldEditor().getSelectedEntities();
 	Anim::ComponentInstance* runtime = nullptr;
 	if (!entities.empty())
 	{
@@ -736,9 +736,9 @@ void AnimationEditor::drawGraph()
 
 void AnimationEditor::loadFromEntity()
 {
-	auto& entities = m_app.getWorldEditor()->getSelectedEntities();
+	auto& entities = m_app.getWorldEditor().getSelectedEntities();
 	if (entities.empty()) return;
-	auto* scene = (AnimationScene*)m_app.getWorldEditor()->getUniverse()->getScene(ANIMABLE_HASH);
+	auto* scene = (AnimationScene*)m_app.getWorldEditor().getUniverse()->getScene(ANIMABLE_HASH);
 	ComponentHandle ctrl = scene->getComponent(entities[0], CONTROLLER_TYPE);
 	if (!ctrl.isValid()) return;
 	m_path = scene->getControllerSource(ctrl).c_str();
@@ -749,21 +749,21 @@ void AnimationEditor::loadFromEntity()
 
 void AnimationEditor::load()
 {
-	IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
+	IAllocator& allocator = m_app.getWorldEditor().getAllocator();
 	FS::OsFile file;
 	file.open(m_path, FS::Mode::OPEN_AND_READ, allocator);
 	Array<u8> data(allocator);
 	data.resize((int)file.size());
 	file.read(&data[0], data.size());
 	InputBlob blob(&data[0], data.size());
-	if (m_resource->deserialize(blob, m_app.getWorldEditor()->getEngine(), allocator))
+	if (m_resource->deserialize(blob, m_app.getWorldEditor().getEngine(), allocator))
 	{
 		m_container = (Container*)m_resource->getRoot();
 	}
 	else
 	{
 		LUMIX_DELETE(allocator, m_resource);
-		Engine& engine = m_app.getWorldEditor()->getEngine();
+		Engine& engine = m_app.getWorldEditor().getEngine();
 		auto* manager = engine.getResourceManager().get(CONTROLLER_RESOURCE_TYPE);
 		m_resource = LUMIX_NEW(allocator, ControllerResource)(*this, *manager, allocator);
 		m_container = (Container*)m_resource->getRoot();
@@ -782,9 +782,9 @@ void AnimationEditor::loadFromFile()
 
 void AnimationEditor::newController()
 {
-	IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
+	IAllocator& allocator = m_app.getWorldEditor().getAllocator();
 	LUMIX_DELETE(allocator, m_resource);
-	Engine& engine = m_app.getWorldEditor()->getEngine();
+	Engine& engine = m_app.getWorldEditor().getEngine();
 	auto* manager = engine.getResourceManager().get(CONTROLLER_RESOURCE_TYPE);
 	m_resource = LUMIX_NEW(allocator, ControllerResource)(*this, *manager, allocator);
 	m_container = (Container*)m_resource->getRoot();
@@ -891,7 +891,7 @@ void AnimationEditor::undo()
 
 void AnimationEditor::clearUndoStack()
 {
-	IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
+	IAllocator& allocator = m_app.getWorldEditor().getAllocator();
 	for (auto& cmd : m_undo_stack) {
 		LUMIX_DELETE(allocator, cmd);
 	}
@@ -910,9 +910,9 @@ void AnimationEditor::update(float time_delta)
 {
 	checkShortcuts();
 	if (!m_is_playing) return;
-	auto& entities = m_app.getWorldEditor()->getSelectedEntities();
+	auto& entities = m_app.getWorldEditor().getSelectedEntities();
 	if (entities.empty()) return;
-	auto* scene = (AnimationScene*)m_app.getWorldEditor()->getUniverse()->getScene(ANIMABLE_HASH);
+	auto* scene = (AnimationScene*)m_app.getWorldEditor().getUniverse()->getScene(ANIMABLE_HASH);
 	ComponentHandle ctrl = scene->getComponent(entities[0], CONTROLLER_TYPE);
 	if (!ctrl.isValid()) return;
 	scene->updateController(ctrl, time_delta);
@@ -946,8 +946,8 @@ void AnimationEditor::inputsGUI()
 	{
 		if (ImGui::CollapsingHeader("Inputs"))
 		{
-			const auto& selected_entities = m_app.getWorldEditor()->getSelectedEntities();
-			auto* scene = (AnimationScene*)m_app.getWorldEditor()->getUniverse()->getScene(ANIMABLE_HASH);
+			const auto& selected_entities = m_app.getWorldEditor().getSelectedEntities();
+			auto* scene = (AnimationScene*)m_app.getWorldEditor().getUniverse()->getScene(ANIMABLE_HASH);
 			ComponentHandle cmp = selected_entities.empty() ? INVALID_COMPONENT : scene->getComponent(selected_entities[0], CONTROLLER_TYPE);
 			u8* input_data = cmp.isValid() ? scene->getControllerInput(cmp) : nullptr;
 			Anim::InputDecl& input_decl = m_resource->getEngineResource()->m_input_decl;
@@ -1137,10 +1137,10 @@ void AnimationEditor::animationSlotsGUI()
 			char tmp[MAX_PATH_LENGTH];
 			copyString(tmp, entry && entry->animation ? entry->animation->getPath().c_str() : "");
 			ImGui::PushID(j);
-			if (m_app.getAssetBrowser()->resourceInput("", "##res", tmp, lengthOf(tmp), ANIMATION_TYPE))
+			if (m_app.getAssetBrowser().resourceInput("", "##res", tmp, lengthOf(tmp), ANIMATION_TYPE))
 			{
 				if (entry && entry->animation) entry->animation->getResourceManager().unload(*entry->animation);
-				auto* manager = m_app.getWorldEditor()->getEngine().getResourceManager().get(ANIMATION_TYPE);
+				auto* manager = m_app.getWorldEditor().getEngine().getResourceManager().get(ANIMATION_TYPE);
 				if (entry)
 				{
 					entry->animation = (Animation*)manager->load(Path(tmp));
@@ -1170,13 +1170,13 @@ void AnimationEditor::animationSlotsGUI()
 		}
 		else
 		{
-			IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
+			IAllocator& allocator = m_app.getWorldEditor().getAllocator();
 			slots.emplace("", allocator);
 		}
 	}
 	if (ImGui::Button("Add set (column)"))
 	{
-		IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
+		IAllocator& allocator = m_app.getWorldEditor().getAllocator();
 		m_resource->getEngineResource()->m_sets_names.emplace("new set");
 	}
 	ImGui::PopItemWidth();

@@ -60,13 +60,13 @@ GameView::GameView(StudioApp& app)
 	, m_show_stats(false)
 	, m_texture_handle(BGFX_INVALID_HANDLE)
 	, m_gui_interface(nullptr)
-	, m_editor(*app.getWorldEditor())
+	, m_editor(app.getWorldEditor())
 {
-	Engine& engine = app.getWorldEditor()->getEngine();
+	Engine& engine = app.getWorldEditor().getEngine();
 	auto f = &LuaWrapper::wrapMethodClosure<GameView, decltype(&GameView::forceViewport), &GameView::forceViewport>;
 	LuaWrapper::createSystemClosure(engine.getState(), "GameView", this, "forceViewport", f);
 
-	WorldEditor& editor = *app.getWorldEditor();
+	WorldEditor& editor = app.getWorldEditor();
 	Action* action = LUMIX_NEW(editor.getAllocator(), Action)("Game View", "game_view");
 	action->func.bind<GameView, &GameView::onAction>(this);
 	action->is_selected.bind<GameView, &GameView::isOpened>(this);

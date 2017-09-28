@@ -47,7 +47,7 @@ namespace Lumix
 struct LuaPlugin : public StudioApp::IPlugin
 {
 	LuaPlugin(StudioApp& app, const char* src, const char* filename)
-		: editor(*app.getWorldEditor())
+		: editor(app.getWorldEditor())
 	{
 		L = lua_newthread(editor.getEngine().getState()); // [thread]
 		thread_ref = luaL_ref(editor.getEngine().getState(), LUA_REGISTRYINDEX); // []
@@ -166,7 +166,60 @@ public:
 		m_drag_data = {DragData::NONE, nullptr, 0};
 		m_template_name[0] = '\0';
 		m_open_filter[0] = '\0';
-		init();
+		SDL_SetMainReady();
+		SDL_Init(SDL_INIT_VIDEO);
+
+		checkWorkingDirector();
+		m_window = SDL_CreateWindow("Lumix Studio", 0, 0, 800, 600, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+		
+		char current_dir[MAX_PATH_LENGTH];
+		PlatformInterface::getCurrentDirectory(current_dir, lengthOf(current_dir));
+		PlatformInterface::setWindow(m_window);
+
+		char data_dir_path[MAX_PATH_LENGTH] = {};
+		checkDataDirCommandLine(data_dir_path, lengthOf(data_dir_path));
+		m_engine = Engine::create(current_dir, data_dir_path, nullptr, m_allocator);
+		createLua();
+
+		SDL_SysWMinfo window_info;
+		SDL_VERSION(&window_info.version);
+		SDL_GetWindowWMInfo(m_window, &window_info);
+		Engine::PlatformData platform_data = {};
+		#ifdef _WIN32
+			platform_data.window_handle = window_info.info.win.window;
+			ImGui::GetIO().ImeWindowHandle = window_info.info.win.window;
+		#elif defined(__linux__)
+			platform_data.window_handle = (void*)(uintptr_t)window_info.info.x11.window;
+			platform_data.display = window_info.info.x11.display;
+		#endif
+		m_engine->setPlatformData(platform_data);
+
+		m_editor = WorldEditor::create(current_dir, *m_engine, m_allocator);
+		m_settings.m_editor = m_editor;
+		scanUniverses();
+		loadUserPlugins();
+		addActions();
+
+		m_asset_browser = LUMIX_NEW(m_allocator, AssetBrowser)(*this);
+		m_property_grid = LUMIX_NEW(m_allocator, PropertyGrid)(*this);
+		auto engine_allocator = static_cast<Debug::Allocator*>(&m_engine->getAllocator());
+		m_profiler_ui = ProfilerUI::create(*m_engine);
+		m_log_ui = LUMIX_NEW(m_allocator, LogUI)(m_editor->getAllocator());
+
+		loadSettings();
+		initIMGUI();
+
+		if (!m_metadata.load()) g_log_info.log("Editor") << "Could not load metadata";
+
+		setStudioApp();
+		loadIcons();
+		loadSettings();
+		loadUniverseFromCommandLine();
+		findLuaPlugins("plugins/lua/");
+
+		m_asset_browser->onInitFinished();
+		m_sleep_when_inactive = shouldSleepWhenInactive();
+		m_fps_limit = FPSLimit();
 	}
 
 
@@ -794,10 +847,10 @@ public:
 	void toggleAssetBrowser() { m_asset_browser->m_is_open = !m_asset_browser->m_is_open; }
 	bool isAssetBrowserOpened() const { return m_asset_browser->m_is_open; }
 	int getExitCode() const override { return m_exit_code; }
-	AssetBrowser* getAssetBrowser() override { return m_asset_browser; }
-	PropertyGrid* getPropertyGrid() override { return m_property_grid; }
-	Metadata* getMetadata() override { return &m_metadata; }
-	LogUI* getLogUI() override { return m_log_ui; }
+	AssetBrowser& getAssetBrowser() override { ASSERT(m_asset_browser); return *m_asset_browser; }
+	PropertyGrid& getPropertyGrid() override { ASSERT(m_property_grid); return *m_property_grid; }
+	Metadata& getMetadata() override { return m_metadata; }
+	LogUI& getLogUI() override { ASSERT(m_log_ui); return *m_log_ui; }
 	void toggleGameMode() { m_editor->toggleGameMode(); }
 	void setTranslateGizmoMode() { m_editor->getGizmo().setTranslateMode(); }
 	void setRotateGizmoMode() { m_editor->getGizmo().setRotateMode(); }
@@ -1619,10 +1672,10 @@ public:
 		auto* studio = LuaWrapper::checkArg<StudioAppImpl*>(L, 1);
 		auto* type = LuaWrapper::checkArg<const char*>(L, 2);
 
-		AssetBrowser* browser = studio->getAssetBrowser();
-		int type_idx = browser->getTypeIndex(ResourceType(type));
+		AssetBrowser& browser = studio->getAssetBrowser();
+		int type_idx = browser.getTypeIndex(ResourceType(type));
 		if (type_idx < 0) return 0;
-		auto& resources_paths = browser->getResources(type_idx);
+		auto& resources_paths = browser.getResources(type_idx);
 
 		lua_createtable(L, resources_paths.size(), 0);
 		int i = 0;
@@ -2174,65 +2227,6 @@ public:
 	}
 
 
-	void init()
-	{
-		SDL_SetMainReady();
-		SDL_Init(SDL_INIT_VIDEO);
-
-		checkWorkingDirector();
-		m_window = SDL_CreateWindow("Lumix Studio", 0, 0, 800, 600, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
-		
-		char current_dir[MAX_PATH_LENGTH];
-		PlatformInterface::getCurrentDirectory(current_dir, lengthOf(current_dir));
-		PlatformInterface::setWindow(m_window);
-
-		char data_dir_path[MAX_PATH_LENGTH] = {};
-		checkDataDirCommandLine(data_dir_path, lengthOf(data_dir_path));
-		m_engine = Engine::create(current_dir, data_dir_path, nullptr, m_allocator);
-		createLua();
-
-		SDL_SysWMinfo window_info;
-		SDL_VERSION(&window_info.version);
-		SDL_GetWindowWMInfo(m_window, &window_info);
-		Engine::PlatformData platform_data = {};
-		#ifdef _WIN32
-			platform_data.window_handle = window_info.info.win.window;
-			ImGui::GetIO().ImeWindowHandle = window_info.info.win.window;
-		#elif defined(__linux__)
-			platform_data.window_handle = (void*)(uintptr_t)window_info.info.x11.window;
-			platform_data.display = window_info.info.x11.display;
-		#endif
-		m_engine->setPlatformData(platform_data);
-
-		m_editor = WorldEditor::create(current_dir, *m_engine, m_allocator);
-		m_settings.m_editor = m_editor;
-		scanUniverses();
-		loadUserPlugins();
-		addActions();
-
-		m_asset_browser = LUMIX_NEW(m_allocator, AssetBrowser)(*this);
-		m_property_grid = LUMIX_NEW(m_allocator, PropertyGrid)(*this);
-		auto engine_allocator = static_cast<Debug::Allocator*>(&m_engine->getAllocator());
-		m_profiler_ui = ProfilerUI::create(*m_engine);
-		m_log_ui = LUMIX_NEW(m_allocator, LogUI)(m_editor->getAllocator());
-
-		loadSettings();
-		initIMGUI();
-
-		if (!m_metadata.load()) g_log_info.log("Editor") << "Could not load metadata";
-
-		setStudioApp();
-		loadIcons();
-		loadSettings();
-		loadUniverseFromCommandLine();
-		findLuaPlugins("plugins/lua/");
-
-		m_asset_browser->onInitFinished();
-		m_sleep_when_inactive = shouldSleepWhenInactive();
-		m_fps_limit = FPSLimit();
-	}
-
-
 	void checkShortcuts()
 	{
 		if (ImGui::IsAnyItemActive()) return;
@@ -2300,9 +2294,10 @@ public:
 	}
 
 
-	WorldEditor* getWorldEditor() override
+	WorldEditor& getWorldEditor() override
 	{
-		return m_editor;
+		ASSERT(m_editor);
+		return *m_editor;
 	}
 
 

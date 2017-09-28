@@ -48,17 +48,17 @@ ResourceType AssetBrowser::getResourceType(const char* path) const
 
 
 AssetBrowser::AssetBrowser(StudioApp& app)
-	: m_editor(*app.getWorldEditor())
-	, m_metadata(*app.getMetadata())
-	, m_resources(app.getWorldEditor()->getAllocator())
+	: m_editor(app.getWorldEditor())
+	, m_metadata(app.getMetadata())
+	, m_resources(app.getWorldEditor().getAllocator())
 	, m_selected_resource(nullptr)
 	, m_autoreload_changed_resource(true)
-	, m_changed_files(app.getWorldEditor()->getAllocator())
+	, m_changed_files(app.getWorldEditor().getAllocator())
 	, m_is_focus_requested(false)
 	, m_changed_files_mutex(false)
-	, m_history(app.getWorldEditor()->getAllocator())
-	, m_plugins(app.getWorldEditor()->getAllocator())
-	, m_on_resource_changed(app.getWorldEditor()->getAllocator())
+	, m_history(app.getWorldEditor().getAllocator())
+	, m_plugins(app.getWorldEditor().getAllocator())
+	, m_on_resource_changed(app.getWorldEditor().getAllocator())
 	, m_app(app)
 	, m_is_update_enabled(true)
 	, m_current_type(0)
@@ -67,16 +67,15 @@ AssetBrowser::AssetBrowser(StudioApp& app)
 	, m_is_init_finished(false)
 	, m_show_thumbnails(true)
 	, m_history_index(-1)
-	, m_file_infos(app.getWorldEditor()->getAllocator())
-	, m_filtered_file_infos(app.getWorldEditor()->getAllocator())
-	, m_subdirs(app.getWorldEditor()->getAllocator())
+	, m_file_infos(app.getWorldEditor().getAllocator())
+	, m_filtered_file_infos(app.getWorldEditor().getAllocator())
+	, m_subdirs(app.getWorldEditor().getAllocator())
 {
-	auto& editor = *app.getWorldEditor();
-	auto& allocator = editor.getAllocator();
+	IAllocator& allocator = m_editor.getAllocator();
 	m_filter[0] = '\0';
 	m_resources.emplace(allocator);
 
-	const char* base_path = editor.getEngine().getDiskFileDevice()->getBasePath();
+	const char* base_path = m_editor.getEngine().getDiskFileDevice()->getBasePath();
 
 	StaticString<MAX_PATH_LENGTH> path(base_path, ".lumix");
 	PlatformInterface::makePath(path);
@@ -85,9 +84,9 @@ AssetBrowser::AssetBrowser(StudioApp& app)
 
 	m_watchers[0] = FileSystemWatcher::create(base_path, allocator);
 	m_watchers[0]->getCallback().bind<AssetBrowser, &AssetBrowser::onFileChanged>(this);
-	if (editor.getEngine().getPatchFileDevice())
+	if (m_editor.getEngine().getPatchFileDevice())
 	{
-		base_path = editor.getEngine().getPatchFileDevice()->getBasePath();
+		base_path = m_editor.getEngine().getPatchFileDevice()->getBasePath();
 		m_watchers[1] = FileSystemWatcher::create(base_path, allocator);
 		m_watchers[1]->getCallback().bind<AssetBrowser, &AssetBrowser::onFileChanged>(this);
 	}
@@ -125,7 +124,7 @@ void AssetBrowser::toggleAutoreload()
 AssetBrowser::~AssetBrowser()
 {
 	unloadResource();
-	RenderInterface* ri = m_app.getWorldEditor()->getRenderInterface();
+	RenderInterface* ri = m_app.getWorldEditor().getRenderInterface();
 	for (FileInfo& info : m_file_infos)
 	{
 		ri->unloadTexture(info.tex);
@@ -268,7 +267,7 @@ static void clampText(char* text, int width)
 
 void AssetBrowser::changeDir(const char* path)
 {
-	RenderInterface* ri = m_app.getWorldEditor()->getRenderInterface();
+	RenderInterface* ri = m_app.getWorldEditor().getRenderInterface();
 	for (FileInfo& info : m_file_infos)
 	{
 		ri->unloadTexture(info.tex);
@@ -283,7 +282,7 @@ void AssetBrowser::changeDir(const char* path)
 	}
 
 
-	IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
+	IAllocator& allocator = m_app.getWorldEditor().getAllocator();
 	PlatformInterface::FileIterator* iter = PlatformInterface::createFileIterator(m_dir, allocator);
 	PlatformInterface::FileInfo info;
 
@@ -431,7 +430,7 @@ void AssetBrowser::thumbnail(FileInfo& tile)
 		createTile(tile, path);
 		if (PlatformInterface::fileExists(path))
 		{
-			RenderInterface* ri = m_app.getWorldEditor()->getRenderInterface();
+			RenderInterface* ri = m_app.getWorldEditor().getRenderInterface();
 			if (PlatformInterface::getLastModified(path) >= PlatformInterface::getLastModified(tile.filepath))
 			{
 				tile.tex = ri->loadTexture(Path(path));
@@ -451,7 +450,7 @@ void AssetBrowser::fileColumn()
 {
 	ImGui::BeginChild("main_col");
 
-	IAllocator& allocator = m_app.getWorldEditor()->getAllocator();
+	IAllocator& allocator = m_app.getWorldEditor().getAllocator();
 
 	float w = ImGui::GetContentRegionAvailWidth();
 	int columns = m_show_thumbnails ? (int)w / TILE_SIZE : 1;

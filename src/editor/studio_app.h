@@ -87,11 +87,11 @@ public:
 	static StudioApp* create();
 	static void destroy(StudioApp& app);
 
-	virtual class Metadata* getMetadata() = 0;
-	virtual class PropertyGrid* getPropertyGrid() = 0;
-	virtual class LogUI* getLogUI() = 0;
-	virtual class AssetBrowser* getAssetBrowser() = 0;
-	virtual WorldEditor* getWorldEditor() = 0;
+	virtual class Metadata& getMetadata() = 0;
+	virtual class PropertyGrid& getPropertyGrid() = 0;
+	virtual class LogUI& getLogUI() = 0;
+	virtual class AssetBrowser& getAssetBrowser() = 0;
+	virtual WorldEditor& getWorldEditor() = 0;
 	virtual void addPlugin(IPlugin& plugin) = 0;
 	virtual void removePlugin(IPlugin& plugin) = 0;
 	virtual IPlugin* getPlugin(const char* name) = 0;

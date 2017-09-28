@@ -801,7 +801,7 @@ void TerrainEditor::splitSplatmap(const char* dir)
 	const u32* data = (const u32*)splatmap->getData();
 	ASSERT(data);
 
-	WorldEditor& editor = *m_app.getWorldEditor();
+	WorldEditor& editor = m_app.getWorldEditor();
 	IAllocator& allocator = editor.getAllocator();
 	FS::FileSystem& fs = editor.getEngine().getFileSystem();
 	Array<u32> out_data(allocator);
@@ -865,7 +865,7 @@ void TerrainEditor::mergeSplatmap(const char* dir)
 		return;
 	}
 
-	WorldEditor& editor = *m_app.getWorldEditor();
+	WorldEditor& editor = m_app.getWorldEditor();
 	IAllocator& allocator = editor.getAllocator();
 	FS::FileSystem& fs = editor.getEngine().getFileSystem();
 	Path out_path = splatmap->getPath();
@@ -1638,8 +1638,8 @@ void TerrainEditor::onGUI()
 			static ImVec2 size(-1, 100);
 			ImGui::FilterInput("Filter", filter, sizeof(filter));
 			ImGui::ListBoxHeader("Prefabs", size);
-			int resources_idx  = m_app.getAssetBrowser()->getTypeIndex(PREFAB_TYPE);
-			auto& all_prefabs = m_app.getAssetBrowser()->getResources(resources_idx);
+			int resources_idx  = m_app.getAssetBrowser().getTypeIndex(PREFAB_TYPE);
+			auto& all_prefabs = m_app.getAssetBrowser().getResources(resources_idx);
 			for(int i = 0; i < all_prefabs.size(); ++i)
 			{
 				if (filter[0] != 0 && stristr(all_prefabs[i].c_str(), filter) == nullptr) continue;

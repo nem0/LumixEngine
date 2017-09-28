@@ -26,8 +26,8 @@ namespace Lumix
 PropertyGrid::PropertyGrid(StudioApp& app)
 	: m_app(app)
 	, m_is_open(true)
-	, m_editor(*app.getWorldEditor())
-	, m_plugins(app.getWorldEditor()->getAllocator())
+	, m_editor(app.getWorldEditor())
+	, m_plugins(app.getWorldEditor().getAllocator())
 {
 	m_particle_emitter_updating = true;
 	m_particle_emitter_timescale = 1.0f;
@@ -190,7 +190,7 @@ void PropertyGrid::showProperty(PropertyDescriptorBase& desc,
 		copyString(buf, (const char*)stream.getData());
 		auto& resource_descriptor = static_cast<IResourcePropertyDescriptor&>(desc);
 		ResourceType rm_type = resource_descriptor.getResourceType();
-		if (m_app.getAssetBrowser()->resourceInput(
+		if (m_app.getAssetBrowser().resourceInput(
 				desc.getName(), StaticString<20>("", (u64)&desc), buf, sizeof(buf), rm_type))
 		{
 			m_editor.setProperty(cmp_type, index, desc, &entities[0], entities.size(), buf, stringLength(buf) + 1);

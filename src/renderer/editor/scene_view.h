@@ -67,12 +67,12 @@ class SceneView : public StudioApp::IPlugin
 		int m_captured_mouse_x;
 		int m_captured_mouse_y;
 		float m_camera_speed;
-		WorldEditor* m_editor;
+		WorldEditor& m_editor;
 		Pipeline* m_pipeline;
 		bgfx::TextureHandle m_texture_handle;
 		bool m_show_stats;
 		bool m_is_opengl;
-		LogUI* m_log_ui;
+		LogUI& m_log_ui;
 		Array<DropHandler> m_drop_handlers;
 };
 

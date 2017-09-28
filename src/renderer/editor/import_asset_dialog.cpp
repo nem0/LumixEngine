@@ -523,7 +523,7 @@ struct FBXImporter
 			transform_matrix = toLumix(mesh.getGlobalTransform()) * geometry_matrix;
 			if (center_mesh) transform_matrix.setTranslation({0, 0, 0});
 
-			IAllocator& allocator = app.getWorldEditor()->getAllocator();
+			IAllocator& allocator = app.getWorldEditor().getAllocator();
 			OutputBlob blob(allocator);
 			int vertex_size = getVertexSize(mesh);
 			import_mesh.vertex_data.reserve(vertex_count * vertex_size);
@@ -596,7 +596,7 @@ struct FBXImporter
 
 	void gatherMeshes(ofbx::IScene* scene)
 	{
-		IAllocator& allocator = app.getWorldEditor()->getAllocator();
+		IAllocator& allocator = app.getWorldEditor().getAllocator();
 		int c = scene->getMeshCount();
 		for (int i = 0; i < c; ++i)
 		{
@@ -675,18 +675,18 @@ struct FBXImporter
 	FBXImporter(StudioApp& _app, ImportAssetDialog& _dialog)
 		: app(_app)
 		, dialog(_dialog)
-		, scenes(_app.getWorldEditor()->getAllocator())
-		, materials(_app.getWorldEditor()->getAllocator())
-		, meshes(_app.getWorldEditor()->getAllocator())
-		, animations(_app.getWorldEditor()->getAllocator())
-		, bones(_app.getWorldEditor()->getAllocator())
+		, scenes(_app.getWorldEditor().getAllocator())
+		, materials(_app.getWorldEditor().getAllocator())
+		, meshes(_app.getWorldEditor().getAllocator())
+		, animations(_app.getWorldEditor().getAllocator())
+		, bones(_app.getWorldEditor().getAllocator())
 	{
 	}
 
 
 	bool addSource(const char* filename)
 	{
-		IAllocator& allocator = app.getWorldEditor()->getAllocator();
+		IAllocator& allocator = app.getWorldEditor().getAllocator();
 
 		FS::OsFile file;
 		if (!file.open(filename, FS::Mode::OPEN_AND_READ, allocator)) return false;
@@ -771,7 +771,7 @@ struct FBXImporter
 
 		FS::OsFile file;
 		PathBuilder output_material_name(output_dir, "/", mesh_output_filename, "_billboard.mat");
-		IAllocator& allocator = app.getWorldEditor()->getAllocator();
+		IAllocator& allocator = app.getWorldEditor().getAllocator();
 		if (!file.open(output_material_name, FS::Mode::CREATE_AND_WRITE, allocator))
 		{
 			g_log_error.log("FBX") << "Failed to create " << output_material_name;
@@ -781,7 +781,7 @@ struct FBXImporter
 		file << "\t, \"defines\" : [\"ALPHA_CUTOUT\"]\n";
 		file << "\t, \"texture\" : {\n\t\t\"source\" : \"";
 
-		WorldEditor& editor = *app.getWorldEditor();
+		WorldEditor& editor = app.getWorldEditor();
 		if (texture_output_dir[0])
 		{
 			char from_root_path[MAX_PATH_LENGTH];
@@ -825,7 +825,7 @@ struct FBXImporter
 			char mat_name[128];
 			getMaterialName(material.fbx, mat_name);
 			StaticString<MAX_PATH_LENGTH> path(output_dir, mat_name, ".mat");
-			IAllocator& allocator = app.getWorldEditor()->getAllocator();
+			IAllocator& allocator = app.getWorldEditor().getAllocator();
 			if (!out_file.open(path, FS::Mode::CREATE_AND_WRITE, allocator))
 			{
 				g_log_error.log("FBX") << "Failed to create " << path;
@@ -1039,7 +1039,7 @@ struct FBXImporter
 			float duration = (end > begin ? end - begin : 1.0f) * time_scale;
 
 			StaticString<MAX_PATH_LENGTH> tmp(output_dir, anim.output_filename, ".ani");
-			IAllocator& allocator = app.getWorldEditor()->getAllocator();
+			IAllocator& allocator = app.getWorldEditor().getAllocator();
 			if (!out_file.open(tmp, FS::Mode::CREATE_AND_WRITE, allocator))
 			{
 				g_log_error.log("FBX") << "Failed to create " << tmp;
@@ -1320,7 +1320,7 @@ struct FBXImporter
 		float radius_squared = 0;
 		i32 indices_count = 0;
 		i32 vertex_data_size = 0;
-		IAllocator& allocator = app.getWorldEditor()->getAllocator();
+		IAllocator& allocator = app.getWorldEditor().getAllocator();
 
 		int vertex_size = 0;
 		for (const ImportMesh& mesh : meshes)
@@ -1766,7 +1766,7 @@ struct FBXImporter
 		qsort(&meshes[0], meshes.size(), sizeof(meshes[0]), cmpMeshes);
 		StaticString<MAX_PATH_LENGTH> out_path(output_dir, output_mesh_filename, ".msh");
 		PlatformInterface::makePath(output_dir);
-		if (!out_file.open(out_path, FS::Mode::CREATE_AND_WRITE, app.getWorldEditor()->getAllocator()))
+		if (!out_file.open(out_path, FS::Mode::CREATE_AND_WRITE, app.getWorldEditor().getAllocator()))
 		{
 			g_log_error.log("FBX") << "Failed to create " << out_path;
 			return;
@@ -2363,19 +2363,19 @@ struct ImportTextureTask LUMIX_FINAL : public MT::Task
 
 
 ImportAssetDialog::ImportAssetDialog(StudioApp& app)
-	: m_metadata(*app.getMetadata())
+	: m_metadata(app.getMetadata())
 	, m_task(nullptr)
-	, m_editor(*app.getWorldEditor())
+	, m_editor(app.getWorldEditor())
 	, m_is_importing_texture(false)
 	, m_mutex(false)
-	, m_saved_textures(app.getWorldEditor()->getAllocator())
+	, m_saved_textures(app.getWorldEditor().getAllocator())
 	, m_convert_to_dds(false)
 	, m_convert_to_raw(false)
 	, m_is_normal_map(false)
 	, m_raw_texture_scale(1)
-	, m_sources(app.getWorldEditor()->getAllocator())
+	, m_sources(app.getWorldEditor().getAllocator())
 {
-	IAllocator& allocator = app.getWorldEditor()->getAllocator();
+	IAllocator& allocator = app.getWorldEditor().getAllocator();
 	m_fbx_importer = LUMIX_NEW(allocator, FBXImporter)(app, *this);
 
 	s_default_comp_params.m_file_type = cCRNFileTypeDDS;
