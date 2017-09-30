@@ -87,7 +87,7 @@ public:
 	virtual ComponentHandle getActorComponent(Entity entity) = 0;
 	virtual void setActorLayer(ComponentHandle cmp, int layer) = 0;
 	virtual int getActorLayer(ComponentHandle cmp) = 0;
-	virtual bool isTrigger(ComponentHandle cmp) = 0;
+	virtual bool getIsTrigger(ComponentHandle cmp) = 0;
 	virtual void setIsTrigger(ComponentHandle cmp, bool is_trigger) = 0;
 	virtual DynamicType getDynamicType(ComponentHandle cmp) = 0;
 	virtual void setDynamicType(ComponentHandle cmp, DynamicType) = 0;

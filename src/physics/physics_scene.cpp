@@ -2721,7 +2721,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	bool isTrigger(ComponentHandle cmp) override
+	bool getIsTrigger(ComponentHandle cmp) override
 	{
 		return m_actors[{cmp.index}]->is_trigger;
 	}
