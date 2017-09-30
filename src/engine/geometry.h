@@ -8,6 +8,7 @@ namespace Lumix
 {
 
 
+struct AABB;
 struct Matrix;
 
 
@@ -138,6 +139,7 @@ LUMIX_ALIGN_BEGIN(16) struct LUMIX_ENGINE_API Frustum
 	}
 
 
+	bool intersectAABB(const AABB& aabb) const;
 	bool isSphereInside(const Vec3& center, float radius) const;
 
 
@@ -179,6 +181,7 @@ LUMIX_ALIGN_BEGIN(16) struct LUMIX_ENGINE_API Frustum
 	float near_distance;
 	float far_distance;
 	float radius;
+	float width;
 } LUMIX_ALIGN_END(16);
 
 

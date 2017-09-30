@@ -18,6 +18,28 @@ Frustum::Frustum()
 }
 
 
+bool Frustum::intersectAABB(const AABB& aabb) const
+{
+	Vec3 box[] = { aabb.min, aabb.max };
+
+	for (int i = 0; i < 6; ++i)
+	{
+		int px = (int)(xs[i] > 0.0f);
+		int py = (int)(ys[i] > 0.0f);
+		int pz = (int)(zs[i] > 0.0f);
+
+		float dp =
+			(xs[i] * box[px].x) +
+			(ys[i] * box[py].y) +
+			(zs[i] * box[pz].z);
+
+		if (dp < -ds[i]) { return false; }
+	}
+	return true;
+}
+
+
+
 bool Frustum::isSphereInside(const Vec3& center, float radius) const
 {
 	float4 px = f4Load(xs);
@@ -89,6 +111,8 @@ void Frustum::computeOrtho(const Vec3& position,
 	this->up = up;
 	this->near_distance = near_distance;
 	this->far_distance = far_distance;
+	this->width = width;
+	this->ratio = width / height;
 }
 
 

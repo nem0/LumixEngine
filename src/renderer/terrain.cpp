@@ -76,6 +76,18 @@ struct TerrainQuad
 		}
 	}
 
+	void computeAABB(float scale)
+	{
+		m_aabb.min = m_min;
+		m_aabb.max = m_min + Vec3(m_size * scale, 0, m_size * scale);
+		m_aabb.max.y = FLT_MAX;
+		m_aabb.min.y = -FLT_MAX;
+		for (int i = 0; i < CHILD_COUNT; ++i)
+		{
+			if (m_children[i]) m_children[i]->computeAABB(scale);
+		}
+	}
+
 	void createChildren()
 	{
 		if (m_lod < 16 && m_size > 16)
@@ -90,6 +102,7 @@ struct TerrainQuad
 			m_children[TOP_RIGHT]->m_min.set(m_min.x + m_size / 2, 0, m_min.z);
 			m_children[BOTTOM_LEFT]->m_min.set(m_min.x, 0, m_min.z + m_size / 2);
 			m_children[BOTTOM_RIGHT]->m_min.set(m_min.x + m_size / 2, 0, m_min.z + m_size / 2);
+			
 			for (int i = 0; i < CHILD_COUNT; ++i)
 			{
 				m_children[i]->createChildren();
@@ -137,17 +150,18 @@ struct TerrainQuad
 		return (size > 17 ? 2.25f : 1.25f) * Math::SQRT2 * size;
 	}
 
-	bool getInfos(Array<TerrainInfo>& infos, const Vec3& lod_ref_point, Terrain* terrain, const Matrix& world_matrix)
+	bool getInfos(Array<TerrainInfo>& infos, const Vec3& lod_ref_point, Terrain* terrain, const Matrix& world_matrix, const Frustum& rel_frustum)
 	{
 		float squared_dist = getSquaredDistance(lod_ref_point);
 		float r = getRadiusOuter(m_size);
 		if (squared_dist > r * r && m_lod > 1) return false;
+		if (!rel_frustum.intersectAABB(m_aabb)) return false;
 
 		Vec3 morph_const(r, getRadiusInner(m_size), 0);
 		Shader& shader = *terrain->getMesh()->material->getShader();
 		for (int i = 0; i < CHILD_COUNT; ++i)
 		{
-			if (!m_children[i] || !m_children[i]->getInfos(infos, lod_ref_point, terrain, world_matrix))
+			if (!m_children[i] || !m_children[i]->getInfos(infos, lod_ref_point, terrain, world_matrix, rel_frustum))
 			{
 				TerrainInfo& data = infos.emplace();
 				data.m_morph_const = morph_const;
@@ -166,6 +180,7 @@ struct TerrainQuad
 	IAllocator& m_allocator;
 	TerrainQuad* m_children[CHILD_COUNT];
 	Vec3 m_min;
+	AABB m_aabb;
 	float m_size;
 	int m_lod;
 };
@@ -569,26 +584,24 @@ void Terrain::getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, Com
 	Universe& universe = m_scene.getUniverse();
 	Matrix mtx = universe.getMatrix(m_entity);
 	Vec3 frustum_position = frustum.position;
-	for (auto* quad : quads)
+	for (GrassQuad* quad : quads)
 	{
 		Vec3 quad_center(quad->pos.x + GRASS_QUAD_SIZE * 0.5f, quad->pos.y, quad->pos.z + GRASS_QUAD_SIZE * 0.5f);
 		quad_center = mtx.transform(quad_center);
-		if (frustum.isSphereInside(quad_center, quad->radius))
+		if (!frustum.isSphereInside(quad_center, quad->radius)) continue;
+
+		float dist2 = (quad_center - frustum_position).squaredLength();
+		for (int patch_idx = 0; patch_idx < quad->m_patches.size(); ++patch_idx)
 		{
-			float dist2 = (quad_center - frustum_position).squaredLength();
-			for (int patch_idx = 0; patch_idx < quad->m_patches.size(); ++patch_idx)
-			{
-				const GrassPatch& patch = quad->m_patches[patch_idx];
-				if (patch.m_type->m_distance * patch.m_type->m_distance < dist2) continue;
-				if (!patch.instance_data.empty())
-				{
-					GrassInfo& info = infos.emplace();
-					info.instance_data = (GrassInfo::InstanceData*)&patch.instance_data[0];
-					info.instance_count = patch.instance_data.size();
-					info.model = patch.m_type->m_grass_model;
-					info.type_distance = patch.m_type->m_distance;
-				}
-			}
+			const GrassPatch& patch = quad->m_patches[patch_idx];
+			if (patch.m_type->m_distance * patch.m_type->m_distance < dist2) continue;
+			if (patch.instance_data.empty()) continue;
+
+			GrassInfo& info = infos.emplace();
+			info.instance_data = (GrassInfo::InstanceData*)&patch.instance_data[0];
+			info.instance_count = patch.instance_data.size();
+			info.model = patch.m_type->m_grass_model;
+			info.type_distance = patch.m_type->m_distance;
 		}
 	}
 }
@@ -684,7 +697,21 @@ void Terrain::getInfos(Array<TerrainInfo>& infos, const Frustum& frustum, const 
 	local_lod_ref_point.x /= m_scale.x;
 	local_lod_ref_point.z /= m_scale.z;
 
-	m_root->getInfos(infos, local_lod_ref_point, this, matrix);
+	Frustum rel_frustum;
+	Vec3 pos = inv_matrix.transform(frustum.position);
+	Vec3 dir = inv_matrix * Vec4(frustum.direction, 0);
+	Vec3 up = inv_matrix * Vec4(frustum.up, 0);
+	if (frustum.fov < 0)
+	{
+		float height = frustum.width / frustum.ratio;
+		rel_frustum.computeOrtho(pos, dir, up, frustum.width, height, frustum.near_distance, frustum.far_distance);
+	}
+	else
+	{
+		rel_frustum.computePerspective(pos, dir, up, frustum.fov, frustum.ratio, frustum.near_distance, frustum.far_distance);
+	}
+
+	m_root->getInfos(infos, local_lod_ref_point, this, matrix, rel_frustum);
 }
 
 
@@ -750,6 +777,15 @@ float Terrain::getHeight(int x, int z) const
 	int idx = Math::clamp(x, 0, m_width) + Math::clamp(z, 0, m_height) * m_width;
 	return m_scale.y * DIV64K * ((u16*)t->getData())[idx];
 }
+
+
+void Terrain::setXZScale(float scale) 
+{
+	m_scale.x = scale;
+	m_scale.z = scale;
+	if (m_root) m_root->computeAABB(scale);
+}
+
 
 
 void Terrain::setHeight(int x, int z, float h)
@@ -942,6 +978,7 @@ TerrainQuad* Terrain::generateQuadTree(float size)
 	root->m_min.set(0, 0, 0);
 	root->m_size = size;
 	root->createChildren();
+	root->computeAABB(m_scale.x);
 	return root;
 }
 
