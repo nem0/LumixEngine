@@ -158,7 +158,7 @@ namespace Lumix
 				"Dynamic", &PhysicsScene::getDynamicType, &PhysicsScene::setDynamicType));
 		PropertyRegister::add("sphere_rigid_actor",
 			LUMIX_NEW(allocator, BoolPropertyDescriptor<PhysicsScene>)(
-				"Trigger", &PhysicsScene::isTrigger, &PhysicsScene::setIsTrigger));
+				"Trigger", &PhysicsScene::getIsTrigger, &PhysicsScene::setIsTrigger));
 
 		PropertyRegister::add("capsule_rigid_actor",
 			LUMIX_NEW(allocator, DecimalPropertyDescriptor<PhysicsScene>)(
@@ -171,7 +171,7 @@ namespace Lumix
 				"Dynamic", &PhysicsScene::getDynamicType, &PhysicsScene::setDynamicType));
 		PropertyRegister::add("capsule_rigid_actor",
 			LUMIX_NEW(allocator, BoolPropertyDescriptor<PhysicsScene>)(
-				"Trigger", &PhysicsScene::isTrigger, &PhysicsScene::setIsTrigger));
+				"Trigger", &PhysicsScene::getIsTrigger, &PhysicsScene::setIsTrigger));
 
 		PropertyRegister::add("d6_joint",
 			LUMIX_NEW(allocator, EntityPropertyDescriptor<PhysicsScene>)(
@@ -301,7 +301,7 @@ namespace Lumix
 				"Dynamic", &PhysicsScene::getDynamicType, &PhysicsScene::setDynamicType));
 		PropertyRegister::add("box_rigid_actor",
 			LUMIX_NEW(allocator, BoolPropertyDescriptor<PhysicsScene>)(
-				"Trigger", &PhysicsScene::isTrigger, &PhysicsScene::setIsTrigger));
+				"Trigger", &PhysicsScene::getIsTrigger, &PhysicsScene::setIsTrigger));
 		PropertyRegister::add("box_rigid_actor",
 			LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec3, PhysicsScene>)(
 				"Size", &PhysicsScene::getHalfExtents, &PhysicsScene::setHalfExtents));
