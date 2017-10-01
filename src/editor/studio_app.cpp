@@ -170,17 +170,17 @@ public:
 		SDL_Init(SDL_INIT_VIDEO);
 
 		checkWorkingDirector();
-		m_window = SDL_CreateWindow("Lumix Studio", 0, 0, 800, 600, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
 		
 		char current_dir[MAX_PATH_LENGTH];
 		PlatformInterface::getCurrentDirectory(current_dir, lengthOf(current_dir));
-		PlatformInterface::setWindow(m_window);
 
 		char data_dir_path[MAX_PATH_LENGTH] = {};
 		checkDataDirCommandLine(data_dir_path, lengthOf(data_dir_path));
 		m_engine = Engine::create(current_dir, data_dir_path, nullptr, m_allocator);
 		createLua();
 
+		m_window = SDL_CreateWindow("Lumix Studio", 0, 0, 800, 600, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+		PlatformInterface::setWindow(m_window);
 		SDL_SysWMinfo window_info;
 		SDL_VERSION(&window_info.version);
 		SDL_GetWindowWMInfo(m_window, &window_info);
@@ -202,7 +202,6 @@ public:
 
 		m_asset_browser = LUMIX_NEW(m_allocator, AssetBrowser)(*this);
 		m_property_grid = LUMIX_NEW(m_allocator, PropertyGrid)(*this);
-		auto engine_allocator = static_cast<Debug::Allocator*>(&m_engine->getAllocator());
 		m_profiler_ui = ProfilerUI::create(*m_engine);
 		m_log_ui = LUMIX_NEW(m_allocator, LogUI)(m_editor->getAllocator());
 
