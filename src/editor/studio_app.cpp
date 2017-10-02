@@ -218,7 +218,6 @@ public:
 
 		m_asset_browser->onInitFinished();
 		m_sleep_when_inactive = shouldSleepWhenInactive();
-		m_fps_limit = FPSLimit();
 	}
 
 
@@ -1130,7 +1129,6 @@ public:
 		if (ImGui::MenuItem("Save commands")) saveUndoStack();
 		if (ImGui::MenuItem("Load commands")) loadAndExecuteCommands();
 		doMenuItem(*getAction("pack_data"), true);
-		ImGui::Checkbox("Limit FPS", &m_fps_limit);
 		ImGui::EndMenu();
 	}
 
@@ -1544,7 +1542,7 @@ public:
 	}
 
 
-	bool FPSLimit()
+	bool vSync()
 	{
 		char cmd_line[2048];
 		getCommandLine(cmd_line, lengthOf(cmd_line));
@@ -1552,7 +1550,7 @@ public:
 		CommandLineParser parser(cmd_line);
 		while (parser.next())
 		{
-			if (parser.currentEquals("-no_fps_limit")) return false;
+			if (parser.currentEquals("-no_vsync")) return false;
 		}
 		return true;
 	}
@@ -2161,13 +2159,15 @@ public:
 					frame_time = timer->tick();
 				}
 
-				float wanted_fps = (SDL_GetWindowFlags(m_window) & SDL_WINDOW_INPUT_FOCUS) != 0 || !m_sleep_when_inactive
-									   ? 60.0f
-									   : 5.0f;
-				if (m_fps_limit && frame_time < 1 / wanted_fps)
+				if (m_sleep_when_inactive && (SDL_GetWindowFlags(m_window) & SDL_WINDOW_INPUT_FOCUS) == 0)
 				{
-					PROFILE_BLOCK("sleep");
-					MT::sleep(u32(1000 / wanted_fps - frame_time * 1000));
+					float wanted_fps = 5.0f;
+					if (frame_time < 1 / wanted_fps)
+					{
+						PROFILE_BLOCK("sleep");
+						MT::sleep(u32(1000 / wanted_fps - frame_time * 1000));
+					}
+
 				}
 			}
 			Profiler::frame();
@@ -2346,7 +2346,6 @@ public:
 	int m_exit_code;
 
 	bool m_sleep_when_inactive;
-	bool m_fps_limit;
 	bool m_is_welcome_screen_open;
 	bool m_is_pack_data_dialog_open;
 	bool m_is_entity_list_open;

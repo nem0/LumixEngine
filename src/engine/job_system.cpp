@@ -328,7 +328,7 @@ void wait(int volatile* counter)
 	{
 		PROFILE_BLOCK("not a job waiting");
 
-		ASSERT(g_system->m_event_outside_job.poll());
+		//ASSERT(g_system->m_event_outside_job.poll());
 		g_system->m_event_outside_job.reset();
 
 		JobDecl job;

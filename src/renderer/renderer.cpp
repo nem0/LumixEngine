@@ -590,6 +590,7 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 		, m_layers(m_allocator)
 		, m_bgfx_allocator(m_allocator)
 		, m_callback_stub(*this)
+		, m_vsync(true)
 	{
 		registerProperties(engine.getAllocator());
 		bgfx::PlatformData d;
@@ -606,6 +607,7 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 		bgfx::RendererType::Enum renderer_type = bgfx::RendererType::Count;
 		getCommandLine(cmd_line, lengthOf(cmd_line));
 		CommandLineParser cmd_line_parser(cmd_line);
+		m_vsync = true;
 		while (cmd_line_parser.next())
 		{
 			if (cmd_line_parser.currentEquals("-opengl"))
@@ -613,11 +615,16 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 				renderer_type = bgfx::RendererType::OpenGL;
 				break;
 			}
+			else if (cmd_line_parser.currentEquals("-no_vsync"))
+			{
+				m_vsync = false;
+				break;
+			}
 		}
 
 		bool res = bgfx::init(renderer_type, 0, 0, &m_callback_stub, &m_bgfx_allocator);
 		ASSERT(res);
-		bgfx::reset(800, 600);
+		bgfx::reset(800, 600, m_vsync ? BGFX_RESET_VSYNC : 0);
 		bgfx::setDebug(BGFX_DEBUG_TEXT);
 
 		ResourceManager& manager = engine.getResourceManager();
@@ -716,7 +723,7 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	const bgfx::UniformHandle& getMaterialColorUniform() const override { return m_mat_color_uniform; }
 	const bgfx::UniformHandle& getRoughnessMetallicUniform() const override { return m_roughness_metallic_uniform; }
 	void makeScreenshot(const Path& filename) override { bgfx::requestScreenShot(BGFX_INVALID_HANDLE, filename.c_str()); }
-	void resize(int w, int h) override { bgfx::reset(w, h); }
+	void resize(int w, int h) override { bgfx::reset(w, h, m_vsync ? BGFX_RESET_VSYNC : 0); }
 	int getViewCounter() const override { return m_view_counter; }
 	void viewCounterAdd() override { ++m_view_counter; }
 	Shader* getDefaultShader() override { return m_default_shader; }
@@ -778,6 +785,7 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	ModelManager m_model_manager;
 	u32 m_current_pass_hash;
 	int m_view_counter;
+	bool m_vsync;
 	Shader* m_default_shader;
 	BGFXAllocator m_bgfx_allocator;
 	bgfx::VertexDecl m_basic_vertex_decl;
