@@ -337,10 +337,10 @@ public:
 	virtual void getDecals(const Frustum& frustum, Array<DecalInfo>& decals) = 0;
 
 	virtual void getGrassInfos(const Frustum& frustum,
-		Array<GrassInfo>& infos,
-		ComponentHandle camera) = 0;
+		ComponentHandle camera,
+		Array<GrassInfo>& infos) = 0;
 	virtual void forceGrassUpdate(ComponentHandle cmp) = 0;
-	virtual void getTerrainInfos(Array<TerrainInfo>& infos, const Frustum& frustum, const Vec3& lod_ref_point) = 0;
+	virtual void getTerrainInfos(const Frustum& frustum, const Vec3& lod_ref_point, Array<TerrainInfo>& infos) = 0;
 	virtual float getTerrainHeightAt(ComponentHandle cmp, float x, float z) = 0;
 	virtual Vec3 getTerrainNormalAt(ComponentHandle cmp, float x, float z) = 0;
 	virtual void setTerrainMaterialPath(ComponentHandle cmp, const Path& path) = 0;

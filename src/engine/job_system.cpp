@@ -311,7 +311,13 @@ void wait(int volatile* counter)
 void waitOutsideJob(volatile int* counter)
 {
 	PROFILE_FUNCTION();
-	while (*counter != 0) MT::yield();
+	int count = 0;
+	while (*counter != 0)
+	{
+		++count;
+		MT::yield();
+	}
+	PROFILE_INT("count", count);
 }
 
 

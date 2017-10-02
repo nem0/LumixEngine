@@ -42,7 +42,7 @@ template <typename T> void lambdaInvoker(void* data)
 
 
 template<typename T>
-void fromLambda(T lambda, LambdaJob* job, IAllocator* allocator)
+void fromLambda(T lambda, LambdaJob* job, JobDecl* job_decl, IAllocator* allocator)
 {
 	job->allocator = allocator;
 	if (sizeof(lambda) <= sizeof(job->pool))
@@ -56,6 +56,7 @@ void fromLambda(T lambda, LambdaJob* job, IAllocator* allocator)
 	}
 	new (NewPlaceholder(), job->data) T(lambda);
 	job->task = &lambdaInvoker<T>;
+	*job_decl = *job;
 }
 
 
