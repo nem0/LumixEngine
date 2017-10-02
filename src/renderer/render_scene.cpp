@@ -2718,7 +2718,7 @@ public:
 	void forceGrassUpdate(ComponentHandle cmp) override { m_terrains[{cmp.index}]->forceGrassUpdate(); }
 
 
-	void getTerrainInfos(Array<TerrainInfo>& infos, const Frustum& frustum, const Vec3& lod_ref_point) override
+	void getTerrainInfos(const Frustum& frustum, const Vec3& lod_ref_point, Array<TerrainInfo>& infos) override
 	{
 		PROFILE_FUNCTION();
 		infos.reserve(m_terrains.size());
@@ -2729,7 +2729,7 @@ public:
 	}
 
 
-	void getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, ComponentHandle camera) override
+	void getGrassInfos(const Frustum& frustum, ComponentHandle camera, Array<GrassInfo>& infos) override
 	{
 		PROFILE_FUNCTION();
 
@@ -3073,7 +3073,8 @@ public:
 			m_temporary_infos.pop();
 		}
 
-		JobSystem::LambdaJob jobs[64];
+		JobSystem::JobDecl jobs[64];
+		JobSystem::LambdaJob job_storage[64];
 		ASSERT(results.size() <= lengthOf(jobs));
 
 		volatile int counter = 0;
@@ -3110,7 +3111,7 @@ public:
 						info.mesh = &model_instance->meshes[j];
 					}
 				}
-			}, &jobs[subresult_index], nullptr);
+			}, &job_storage[subresult_index], &jobs[subresult_index], nullptr);
 			JobSystem::runJobs(&jobs[subresult_index], 1, &counter);
 		}
 		JobSystem::waitOutsideJob(&counter);

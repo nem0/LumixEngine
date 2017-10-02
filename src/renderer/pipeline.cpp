@@ -7,6 +7,7 @@
 #include "engine/lifo_allocator.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
+#include "engine/job_system.h"
 #include "engine/profiler.h"
 #include "engine/engine.h"
 #include "imgui/imgui.h"
@@ -1810,13 +1811,13 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 				Entity camera_entity = m_scene->getCameraEntity(m_applied_camera);
 				Vec3 lod_ref_point = m_scene->getUniverse().getPosition(camera_entity);
 				Frustum frustum = m_scene->getCameraFrustum(m_applied_camera);
-				m_scene->getTerrainInfos(tmp_terrains, frustum, lod_ref_point);
+				m_scene->getTerrainInfos(frustum, lod_ref_point, tmp_terrains);
 				renderTerrains(tmp_terrains);
 			}
 
 			{
 				Array<GrassInfo> tmp_grasses(frame_allocator);
-				m_scene->getGrassInfos(frustum, tmp_grasses, m_applied_camera);
+				m_scene->getGrassInfos(frustum, m_applied_camera, tmp_grasses);
 				renderGrasses(tmp_grasses);
 			}
 		}
@@ -1992,26 +1993,41 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 		if (!m_applied_camera.isValid()) return;
 
-		IAllocator& frame_allocator = m_renderer.getEngine().getLIFOAllocator();
+		Engine& engine = m_renderer.getEngine();
+		IAllocator& allocator = engine.getAllocator();
 		m_is_current_light_global = true;
 
-		auto& meshes = m_scene->getModelInstanceInfos(frustum, lod_ref_point, layer_mask);
-		renderMeshes(meshes);
+		Array<Array<ModelInstanceMesh>>* meshes;
+		Array<TerrainInfo> terrains(allocator);
+		Array<GrassInfo> grasses(allocator);
+
+		JobSystem::JobDecl jobs[3];
+		JobSystem::LambdaJob job_storage[3];
+		JobSystem::fromLambda([this, &frustum, &lod_ref_point, layer_mask, &meshes]() {
+			meshes = &m_scene->getModelInstanceInfos(frustum, lod_ref_point, layer_mask);
+		}, &job_storage[0], &jobs[0], nullptr);
+
+		JobSystem::fromLambda([this, &frustum, &lod_ref_point, &terrains]() {
+			Entity camera_entity = m_scene->getCameraEntity(m_applied_camera);
+			Vec3 lod_ref_point = m_scene->getUniverse().getPosition(camera_entity);
+			m_scene->getTerrainInfos(frustum, lod_ref_point, terrains);
+
+		}, &job_storage[1], &jobs[1], nullptr);
 
 		if (render_grass)
 		{
-			Array<GrassInfo> tmp_grasses(frame_allocator);
-			m_scene->getGrassInfos(frustum, tmp_grasses, m_applied_camera);
-			renderGrasses(tmp_grasses);
+			JobSystem::fromLambda([this, &frustum, &lod_ref_point, &grasses]() {
+				m_scene->getGrassInfos(frustum, m_applied_camera, grasses);
+			}, &job_storage[2], &jobs[2], nullptr);
 		}
 
-		{
-			Entity camera_entity = m_scene->getCameraEntity(m_applied_camera);
-			Vec3 lod_ref_point = m_scene->getUniverse().getPosition(camera_entity);
-			Array<TerrainInfo> tmp_terrains(frame_allocator);
-			m_scene->getTerrainInfos(tmp_terrains, frustum, lod_ref_point);
-			renderTerrains(tmp_terrains);
-		}
+		volatile int counter = 0;
+		JobSystem::runJobs(jobs, render_grass ? 3 : 2, &counter);
+		JobSystem::waitOutsideJob(&counter);
+		
+		renderMeshes(*meshes);
+		if(render_grass) renderGrasses(grasses);
+		renderTerrains(terrains);
 	}
 
 

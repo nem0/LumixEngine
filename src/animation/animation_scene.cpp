@@ -963,7 +963,8 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		if (m_animables.size() == 0) return;
 
 		IAllocator& allocator = m_engine.getAllocator();
-		JobSystem::LambdaJob jobs[16];
+		JobSystem::JobDecl jobs[16];
+		JobSystem::LambdaJob job_storage[16];
 
 		int job_count = Math::minimum(lengthOf(jobs), m_animables.size());
 		ASSERT(job_count > 0);
@@ -980,7 +981,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 					Animable& animable = m_animables.at(j + i * all_count / job_count);
 					AnimationSceneImpl::updateAnimable(animable, time_delta);
 				}
-			}, &jobs[i], nullptr);
+			}, &job_storage[i], &jobs[i], nullptr);
 		}
 		JobSystem::runJobs(jobs, job_count, &counter);
 		JobSystem::waitOutsideJob(&counter);
