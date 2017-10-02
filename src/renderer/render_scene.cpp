@@ -3049,75 +3049,7 @@ public:
 		return INVALID_COMPONENT;
 	}
 
-
-	const CullingSystem::Results* cull(const Frustum& frustum, u64 layer_mask)
-	{
-		PROFILE_FUNCTION();
-		if (m_model_instances.empty()) return nullptr;
-
-		m_culling_system->cullToFrustumAsync(frustum, layer_mask);
-		return &m_culling_system->getResult();
-	}
-
-
-	void fillTemporaryInfos(const CullingSystem::Results& results, const Frustum& frustum, const Vec3& lod_ref_point)
-	{
-		PROFILE_FUNCTION();
-
-		while (m_temporary_infos.size() < results.size())
-		{
-			m_temporary_infos.emplace(m_allocator);
-		}
-		while (m_temporary_infos.size() > results.size())
-		{
-			m_temporary_infos.pop();
-		}
-
-		JobSystem::JobDecl jobs[64];
-		JobSystem::LambdaJob job_storage[64];
-		ASSERT(results.size() <= lengthOf(jobs));
-
-		volatile int counter = 0;
-		for (int subresult_index = 0; subresult_index < results.size(); ++subresult_index)
-		{
-			Array<ModelInstanceMesh>& subinfos = m_temporary_infos[subresult_index];
-			subinfos.clear();
-			if (results[subresult_index].empty()) continue;
-
-			JobSystem::fromLambda([&subinfos, this, &results, subresult_index, &frustum, lod_ref_point]() {
-				PROFILE_BLOCK("Temporary Info Job");
-				PROFILE_INT("ModelInstance count", results[subresult_index].size());
-				Vec3 ref_point = lod_ref_point;
-				float lod_multiplier = m_lod_multiplier;
-				if (frustum.fov > 0)
-				{
-					float t = frustum.fov / Math::degreesToRadians(60.0f);
-					lod_multiplier *= t * t;
-				}
-				const ComponentHandle* LUMIX_RESTRICT raw_subresults = &results[subresult_index][0];
-				ModelInstance* LUMIX_RESTRICT model_instances = &m_model_instances[0];
-				for (int i = 0, c = results[subresult_index].size(); i < c; ++i)
-				{
-					const ModelInstance* LUMIX_RESTRICT model_instance = &model_instances[raw_subresults[i].index];
-					float squared_distance = (model_instance->matrix.getTranslation() - ref_point).squaredLength();
-					squared_distance *= lod_multiplier;
-
-					const Model* LUMIX_RESTRICT model = model_instance->model;
-					LODMeshIndices lod = model->getLODMeshIndices(squared_distance);
-					for (int j = lod.from, c = lod.to; j <= c; ++j)
-					{
-						auto& info = subinfos.emplace();
-						info.model_instance = raw_subresults[i];
-						info.mesh = &model_instance->meshes[j];
-					}
-				}
-			}, &job_storage[subresult_index], &jobs[subresult_index], nullptr);
-			JobSystem::runJobs(&jobs[subresult_index], 1, &counter);
-		}
-		JobSystem::waitOutsideJob(&counter);
-	}
-
-
+	
 	int getClosestPointLights(const Vec3& reference_pos,
 									   ComponentHandle* lights,
 									   int max_lights) override
@@ -3260,10 +3192,9 @@ public:
 	{
 		PROFILE_FUNCTION();
 
-		const CullingSystem::Results* results = cull(frustum, ~0ULL);
-		if (!results) return;
+		auto& results = m_culling_system->cull(frustum, ~0ULL);
 
-		for (auto& subresults : *results)
+		for (auto& subresults : results)
 		{
 			for (ComponentHandle model_instance_cmp : subresults)
 			{
@@ -3277,13 +3208,62 @@ public:
 		const Vec3& lod_ref_point,
 		u64 layer_mask) override
 	{
-		PROFILE_FUNCTION();
+		for (auto& i : m_temporary_infos) i.clear();
+		const CullingSystem::Results& results = m_culling_system->cull(frustum, layer_mask);
 
-		for(auto& i : m_temporary_infos) i.clear();
-		const CullingSystem::Results* results = cull(frustum, layer_mask);
-		if (!results) return m_temporary_infos;
+		while (m_temporary_infos.size() < results.size())
+		{
+			m_temporary_infos.emplace(m_allocator);
+		}
+		while (m_temporary_infos.size() > results.size())
+		{
+			m_temporary_infos.pop();
+		}
 
-		fillTemporaryInfos(*results, frustum, lod_ref_point);
+		JobSystem::JobDecl jobs[64];
+		JobSystem::LambdaJob job_storage[64];
+		ASSERT(results.size() <= lengthOf(jobs));
+
+		volatile int counter = 0;
+		for (int subresult_index = 0; subresult_index < results.size(); ++subresult_index)
+		{
+			Array<ModelInstanceMesh>& subinfos = m_temporary_infos[subresult_index];
+			subinfos.clear();
+
+			JobSystem::fromLambda([&subinfos, this, &results, subresult_index, &frustum, lod_ref_point]() {
+				PROFILE_BLOCK("Temporary Info Job");
+				PROFILE_INT("ModelInstance count", results[subresult_index].size());
+				if (results[subresult_index].empty()) return;
+
+				Vec3 ref_point = lod_ref_point;
+				float lod_multiplier = m_lod_multiplier;
+				if (frustum.fov > 0)
+				{
+					float t = frustum.fov / Math::degreesToRadians(60.0f);
+					lod_multiplier *= t * t;
+				}
+				const ComponentHandle* LUMIX_RESTRICT raw_subresults = &results[subresult_index][0];
+				ModelInstance* LUMIX_RESTRICT model_instances = &m_model_instances[0];
+				for (int i = 0, c = results[subresult_index].size(); i < c; ++i)
+				{
+					const ModelInstance* LUMIX_RESTRICT model_instance = &model_instances[raw_subresults[i].index];
+					float squared_distance = (model_instance->matrix.getTranslation() - ref_point).squaredLength();
+					squared_distance *= lod_multiplier;
+
+					const Model* LUMIX_RESTRICT model = model_instance->model;
+					LODMeshIndices lod = model->getLODMeshIndices(squared_distance);
+					for (int j = lod.from, c = lod.to; j <= c; ++j)
+					{
+						auto& info = subinfos.emplace();
+						info.model_instance = raw_subresults[i];
+						info.mesh = &model_instance->meshes[j];
+					}
+				}
+			}, &job_storage[subresult_index], &jobs[subresult_index], nullptr);
+		}
+		JobSystem::runJobs(jobs, results.size(), &counter);
+		JobSystem::wait(&counter);
+
 		return m_temporary_infos;
 	}
 
@@ -4632,8 +4612,7 @@ public:
 	void detectLightInfluencedGeometry(ComponentHandle cmp)
 	{
 		Frustum frustum = getPointLightFrustum(cmp);
-		m_culling_system->cullToFrustum(frustum, 0xffffFFFF);
-		const CullingSystem::Results& results = m_culling_system->getResult();
+		const CullingSystem::Results& results = m_culling_system->cull(frustum, ~0ULL);
 		auto& influenced_geometry = m_light_influenced_geometry[m_point_lights_map[cmp]];
 		influenced_geometry.clear();
 		for (int i = 0; i < results.size(); ++i)

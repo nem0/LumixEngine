@@ -2011,7 +2011,6 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			Entity camera_entity = m_scene->getCameraEntity(m_applied_camera);
 			Vec3 lod_ref_point = m_scene->getUniverse().getPosition(camera_entity);
 			m_scene->getTerrainInfos(frustum, lod_ref_point, terrains);
-
 		}, &job_storage[1], &jobs[1], nullptr);
 
 		if (render_grass)
@@ -2023,7 +2022,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 		volatile int counter = 0;
 		JobSystem::runJobs(jobs, render_grass ? 3 : 2, &counter);
-		JobSystem::waitOutsideJob(&counter);
+		JobSystem::wait(&counter);
 		
 		renderMeshes(*meshes);
 		if(render_grass) renderGrasses(grasses);
