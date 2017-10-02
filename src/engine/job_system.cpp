@@ -53,17 +53,21 @@ struct System
 		, m_sleeping_fibers(allocator)
 		, m_sync(false)
 		, m_work_signal(true)
-	{}
+		, m_event_outside_job(true)
+	{
+		m_event_outside_job.trigger();
+		m_work_signal.reset();
+	}
 
 
 	MT::SpinMutex m_sync;
+	MT::Event m_event_outside_job;
 	MT::Event m_work_signal;
 	Array<MT::Task*> m_workers;
 	Array<Job> m_job_queue;
 	FiberDecl m_fiber_pool[256];
 	int m_free_fibers_indices[256];
 	int m_num_free_fibers;
-	volatile int m_job_count;
 	Array<SleepingFiber> m_sleeping_fibers;
 	IAllocator& m_allocator;
 };
@@ -106,8 +110,12 @@ static bool getReadyJob(System& system, Job* out)
 }
 
 
+static thread_local MT::Task* g_worker = nullptr;
+
+
 struct WorkerTask : MT::Task
 {
+
 	WorkerTask(System& system) 
 		: Task(system.m_allocator)
 		, m_system(system) 
@@ -148,6 +156,7 @@ struct WorkerTask : MT::Task
 
 	int task() override
 	{
+		g_worker = this;
 		m_primary_fiber = Fiber::createFromThread(this);
 		manage();
 		return 0;
@@ -165,7 +174,10 @@ struct WorkerTask : MT::Task
 				ready_sleeping_fiber.fiber->worker_task = this;
 				ready_sleeping_fiber.fiber->switch_state = nullptr;
 				PROFILE_BLOCK("work");
+				m_current_fiber = ready_sleeping_fiber.fiber;
 				Fiber::switchTo(ready_sleeping_fiber.fiber->fiber);
+				m_current_fiber = nullptr;
+				ASSERT(Profiler::getCurrentBlock() == Profiler::getRootBlock(MT::getCurrentThreadID()));
 				handleSwitch(*ready_sleeping_fiber.fiber);
 				continue;
 			}
@@ -178,7 +190,10 @@ struct WorkerTask : MT::Task
 				fiber_decl.current_job = job;
 				fiber_decl.switch_state = nullptr;
 				PROFILE_BLOCK("work");
+				m_current_fiber = &fiber_decl;
 				Fiber::switchTo(fiber_decl.fiber);
+				m_current_fiber = nullptr;
+				ASSERT(Profiler::getCurrentBlock() == Profiler::getRootBlock(MT::getCurrentThreadID()));
 				handleSwitch(fiber_decl);
 			}
 			else 
@@ -190,7 +205,8 @@ struct WorkerTask : MT::Task
 	}
 
 
-	bool m_finished;
+	bool m_finished = false;
+	const FiberDecl* m_current_fiber = nullptr;
 	Fiber::Handle m_primary_fiber;
 	System& m_system;
 };
@@ -301,23 +317,33 @@ void runJobs(const JobDecl* jobs, int count, int volatile* counter)
 
 void wait(int volatile* counter)
 {
-	FiberDecl* fiber_decl = (FiberDecl*)Fiber::getParameter();
-	fiber_decl->switch_state = (void*)counter;
-	Fiber::switchTo(fiber_decl->worker_task->m_primary_fiber);
-}
-
-
-
-void waitOutsideJob(volatile int* counter)
-{
-	PROFILE_FUNCTION();
-	int count = 0;
-	while (*counter != 0)
+	if (g_worker)
 	{
-		++count;
-		MT::yield();
+		ASSERT(Profiler::getCurrentBlock() == Profiler::getRootBlock(MT::getCurrentThreadID()));
+		FiberDecl* fiber_decl = (FiberDecl*)Fiber::getParameter();
+		fiber_decl->switch_state = (void*)counter;
+		Fiber::switchTo(fiber_decl->worker_task->m_primary_fiber);
 	}
-	PROFILE_INT("count", count);
+	else
+	{
+		PROFILE_BLOCK("not a job waiting");
+
+		ASSERT(g_system->m_event_outside_job.poll());
+		g_system->m_event_outside_job.reset();
+
+		JobDecl job;
+		job.data = (void*)counter;
+		job.task = [](void* data) {
+			JobSystem::wait((volatile int*)data);
+			g_system->m_event_outside_job.trigger();
+		};
+		runJobs(&job, 1, nullptr);
+		MT::yield();
+		while (*counter > 0)
+		{
+			g_system->m_event_outside_job.waitTimeout(1);
+		}
+	}
 }
 
 

@@ -32,6 +32,7 @@ LUMIX_ENGINE_API int getThreadCount();
 
 LUMIX_ENGINE_API u64 now();
 LUMIX_ENGINE_API Block* getRootBlock(MT::ThreadID thread_id);
+LUMIX_ENGINE_API Block* getCurrentBlock();
 LUMIX_ENGINE_API int getBlockInt(Block* block);
 LUMIX_ENGINE_API BlockType getBlockType(Block* block);
 LUMIX_ENGINE_API Block* getBlockFirstChild(Block* block);

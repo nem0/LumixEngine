@@ -984,7 +984,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 			}, &job_storage[i], &jobs[i], nullptr);
 		}
 		JobSystem::runJobs(jobs, job_count, &counter);
-		JobSystem::waitOutsideJob(&counter);
+		JobSystem::wait(&counter);
 	}
 
 

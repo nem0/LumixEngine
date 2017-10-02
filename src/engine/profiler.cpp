@@ -343,6 +343,22 @@ Block* getRootBlock(MT::ThreadID thread_id)
 }
 
 
+Block* getCurrentBlock()
+{
+	auto thread_id = MT::getCurrentThreadID();
+
+	ThreadData* thread_data = nullptr;
+	{
+		MT::SpinLock lock(g_instance.m_mutex);
+		auto iter = g_instance.threads.find(thread_id);
+		ASSERT(iter.isValid());
+		thread_data = iter.value();
+	}
+
+	return thread_data->current_block;
+}
+
+
 void* endBlock()
 {
 	auto thread_id = MT::getCurrentThreadID();

@@ -117,30 +117,10 @@ public:
 	}
 
 
-	void cullToFrustum(const Frustum& frustum, u64 layer_mask) override
-	{
-		for (int i = 0; i < m_result.size(); ++i)
-		{
-			m_result[i].clear();
-		}
-		if (!m_spheres.empty())
-		{
-			doCulling(0,
-				&m_spheres[0],
-				&m_spheres.back(),
-				&frustum,
-				&m_layer_masks[0],
-				&m_sphere_to_model_instance_map[0],
-				layer_mask,
-				m_result[0]);
-		}
-		m_is_async_result = false;
-	}
-
-
 	static void cullTask(void* data)
 	{
 		CullingJobData* cull_data = (CullingJobData*)data;
+		if (cull_data->end < cull_data->start) return;
 		doCulling(cull_data->start
 			, &(*cull_data->spheres)[cull_data->start]
 			, &(*cull_data->spheres)[cull_data->end]
@@ -152,21 +132,12 @@ public:
 	}
 
 
-	void cullToFrustumAsync(const Frustum& frustum, u64 layer_mask) override
+	Results& cull(const Frustum& frustum, u64 layer_mask) override
 	{
 		int count = m_spheres.size();
 		for(auto& i : m_result) i.clear();
 
-		if (count < m_result.size() * MIN_ENTITIES_PER_THREAD)
-		{
-			cullToFrustum(frustum, layer_mask);
-			return;
-		}
-		m_is_async_result = true;
-
 		int step = count / m_result.size();
-		CullingJobData job_data[16];
-		JobSystem::JobDecl jobs[16];
 		ASSERT(lengthOf(jobs) >= m_result.size());
 		for (int i = 0; i < m_result.size(); i++)
 		{
@@ -184,9 +155,10 @@ public:
 			jobs[i].data = &job_data[i];
 			jobs[i].task = &cullTask;
 		}
-		volatile int counter = 0;
-		JobSystem::runJobs(jobs, m_result.size(), &counter);
-		JobSystem::waitOutsideJob(&counter);
+		volatile int job_counter = 0;
+		JobSystem::runJobs(jobs, m_result.size(), &job_counter);
+		JobSystem::wait(&job_counter);
+		return m_result;
 	}
 
 
@@ -284,8 +256,8 @@ private:
 	LayerMasks m_layer_masks;
 	ModelInstancetoSphereMap m_model_instance_to_sphere_map;
 	SphereToModelInstanceMap m_sphere_to_model_instance_map;
-
-	bool m_is_async_result;
+	CullingJobData job_data[16];
+	JobSystem::JobDecl jobs[16];
 };
 
 

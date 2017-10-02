@@ -23,7 +23,6 @@ LUMIX_ENGINE_API bool init(IAllocator& allocator);
 LUMIX_ENGINE_API void shutdown();
 LUMIX_ENGINE_API void runJobs(const JobDecl* jobs, int count, int volatile* counter);
 LUMIX_ENGINE_API void wait(int volatile* counter);
-LUMIX_ENGINE_API void waitOutsideJob(int volatile* counter);
 
 
 struct LUMIX_ENGINE_API LambdaJob : JobDecl
