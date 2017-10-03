@@ -36,6 +36,7 @@ class PhysicsSystem;
 struct RagdollBone;
 struct RigidTransform;
 class Universe;
+template <typename T> class Delegate;
 
 
 struct RaycastHit
@@ -73,6 +74,15 @@ public:
 		DYNAMIC,
 		KINEMATIC
 	};
+	
+	struct ContactData
+	{
+		Vec3 position;
+		Entity e1;
+		Entity e2;
+	};
+
+	typedef int ContactCallbackHandle;
 
 	static PhysicsScene* create(PhysicsSystem& system, Universe& context, Engine& engine, IAllocator& allocator);
 	static void destroy(PhysicsScene* scene);
@@ -84,6 +94,8 @@ public:
 	virtual bool raycastEx(const Vec3& origin, const Vec3& dir, float distance, RaycastHit& result, Entity ignored) = 0;
 	virtual PhysicsSystem& getSystem() const = 0;
 
+	virtual ContactCallbackHandle addOnContactCallback(Delegate<void(const ContactData&)> callback) = 0;
+	virtual void removeOnContactCallback(ContactCallbackHandle idx) = 0;
 	virtual ComponentHandle getActorComponent(Entity entity) = 0;
 	virtual void setActorLayer(ComponentHandle cmp, int layer) = 0;
 	virtual int getActorLayer(ComponentHandle cmp) = 0;

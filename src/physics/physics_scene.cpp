@@ -214,9 +214,16 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	};
 
 
-	struct ContactCallback LUMIX_FINAL : public PxSimulationEventCallback
+	struct ContactCallback
 	{
-		explicit ContactCallback(PhysicsSceneImpl& scene)
+		ContactCallbackHandle handle;
+		Delegate<void(const ContactData&)> callback;
+	};
+
+
+	struct PhysxContactCallback LUMIX_FINAL : public PxSimulationEventCallback
+	{
+		explicit PhysxContactCallback(PhysicsSceneImpl& scene)
 			: m_scene(scene)
 		{
 		}
@@ -235,10 +242,12 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 				PxContactPairPoint contact;
 				auto contact_count = cp.extractContacts(&contact, 1);
 
-				auto pos = fromPhysx(contact.position);
-				Entity e1 = {(int)(intptr_t)(pairHeader.actors[0]->userData)};
-				Entity e2 = {(int)(intptr_t)(pairHeader.actors[1]->userData)};
-				m_scene.onContact(e1, e2, pos);
+				ContactData contact_data;
+				contact_data.position = fromPhysx(contact.position);
+				contact_data.e1 = {(int)(intptr_t)(pairHeader.actors[0]->userData)};
+				contact_data.e2 = {(int)(intptr_t)(pairHeader.actors[1]->userData)};
+				
+				m_scene.onContact(contact_data);
 			}
 		}
 
@@ -316,6 +325,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		, m_universe(context)
 		, m_is_game_running(false)
 		, m_contact_callback(*this)
+		, m_contact_callbacks(m_allocator)
 		, m_queued_forces(m_allocator)
 		, m_layers_count(2)
 		, m_joints(m_allocator)
@@ -420,7 +430,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	void onContact(Entity e1, Entity e2, const Vec3& position)
+	void onContact(const ContactData& contact_data)
 	{
 		if (!m_script_scene) return;
 
@@ -442,8 +452,12 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			}
 		};
 
-		send(e1, e2, position);
-		send(e2, e1, position);
+		send(contact_data.e1, contact_data.e2, contact_data.position);
+		send(contact_data.e2, contact_data.e1, contact_data.position);
+		for (auto& cb : m_contact_callbacks)
+		{
+			cb.callback.invoke(contact_data);
+		}
 	}
 
 
@@ -2237,6 +2251,23 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		
 		render();
 	}
+
+
+	ContactCallbackHandle addOnContactCallback(Delegate<void(const ContactData&)> callback) override
+	{
+		ContactCallback cb;
+		cb.handle = m_contact_callbacks.empty() ? 0 : m_contact_callbacks.back().handle + 1;
+		cb.callback = callback;
+		m_contact_callbacks.push(cb);
+		return cb.handle;
+	}
+
+
+	void removeOnContactCallback(ContactCallbackHandle handle) override
+	{
+		m_contact_callbacks.eraseItems([handle](const ContactCallback& cb) { return cb.handle == handle; });
+	}
+
 
 
 	ComponentHandle getActorComponent(Entity entity) override
@@ -4437,7 +4468,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 	Universe& m_universe;
 	Engine* m_engine;
-	ContactCallback m_contact_callback;
+	PhysxContactCallback m_contact_callback;
 	BoneOrientation m_new_bone_orientation = BoneOrientation::X;
 	PxScene* m_scene;
 	LuaScriptScene* m_script_scene;
@@ -4453,6 +4484,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	AssociativeArray<Entity, Heightfield> m_terrains;
 
 	Array<RigidActor*> m_dynamic_actors;
+	Array<ContactCallback> m_contact_callbacks;
 	bool m_is_game_running;
 	bool m_is_updating_ragdoll;
 	u32 m_debug_visualization_flags;
