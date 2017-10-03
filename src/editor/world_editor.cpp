@@ -1894,31 +1894,16 @@ public:
 			auto hit = m_render_interface->castRay(origin, dir, INVALID_COMPONENT);
 			if (m_gizmo->isActive()) return;
 
-			if(m_snap_mode != SnapMode::NONE && !m_selected_entities.empty() && hit.is_hit)
+			for (int i = 0; i < m_plugins.size(); ++i)
 			{
-				Vec3 snap_pos = origin + dir * hit.t;
-				if (m_snap_mode == SnapMode::VERTEX) snap_pos = getClosestVertex(hit);
-				snapEntities(snap_pos);
-				return;
-			}
-
-			auto icon_hit = m_editor_icons->raycast(origin, dir);
-			if (icon_hit.entity != INVALID_ENTITY)
-			{
-				Entity e = icon_hit.entity;
-				if (m_is_additive_selection)
+				if (m_plugins[i]->onMouseDown(hit, x, y))
 				{
-					addEntitiesToSelection(&e, 1);
-				}
-				else
-				{
-					selectEntities(&e, 1);
+					m_mouse_handling_plugin = m_plugins[i];
+					m_mouse_mode = MouseMode::CUSTOM;
+					return;
 				}
 			}
-			else if (hit.is_hit)
-			{
-				onEntityMouseDown(hit, x, y);
-			}
+			m_mouse_mode = MouseMode::SELECT;
 		}
 	}
 
@@ -1931,28 +1916,6 @@ public:
 		m_plugins.eraseItemFast(&plugin);
 	}
 
-
-	void onEntityMouseDown(const RayHit& hit, int x, int y)
-	{
-		Entity entity = hit.entity;
-		for (int i = 0; i < m_plugins.size(); ++i)
-		{
-			if (m_plugins[i]->onEntityMouseDown(hit, x, y))
-			{
-				m_mouse_handling_plugin = m_plugins[i];
-				m_mouse_mode = MouseMode::CUSTOM;
-				return;
-			}
-		}
-		if (m_is_additive_selection)
-		{
-			addEntitiesToSelection(&entity, 1);
-		}
-		else
-		{
-			selectEntities(&entity, 1);
-		}
-	}
 
 
 	void onMouseMove(int x, int y, int relx, int rely) override
@@ -1986,6 +1949,51 @@ public:
 
 	void onMouseUp(int x, int y, MouseButton::Value button) override
 	{
+		if (m_mouse_mode == MouseMode::SELECT)
+		{
+			Vec3 origin, dir;
+			ComponentUID camera_cmp = getUniverse()->getComponent(m_camera, CAMERA_TYPE);
+			if (!camera_cmp.isValid()) return;
+
+			m_render_interface->getRay(camera_cmp.handle, (float)x, (float)y, origin, dir);
+			auto hit = m_render_interface->castRay(origin, dir, INVALID_COMPONENT);
+
+			if (m_snap_mode != SnapMode::NONE && !m_selected_entities.empty() && hit.is_hit)
+			{
+				Vec3 snap_pos = origin + dir * hit.t;
+				if (m_snap_mode == SnapMode::VERTEX) snap_pos = getClosestVertex(hit);
+				snapEntities(snap_pos);
+			}
+			else
+			{
+				auto icon_hit = m_editor_icons->raycast(origin, dir);
+				if (icon_hit.entity != INVALID_ENTITY)
+				{
+					Entity e = icon_hit.entity;
+					if (m_is_additive_selection)
+					{
+						addEntitiesToSelection(&e, 1);
+					}
+					else
+					{
+						selectEntities(&e, 1);
+					}
+				}
+				else if (hit.is_hit)
+				{
+					Entity entity = hit.entity;
+					if (m_is_additive_selection)
+					{
+						addEntitiesToSelection(&entity, 1);
+					}
+					else
+					{
+						selectEntities(&entity, 1);
+					}
+				}
+			}
+		}
+
 		m_is_mouse_down[button] = false;
 		if (m_mouse_handling_plugin)
 		{

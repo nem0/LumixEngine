@@ -12,7 +12,7 @@ namespace Lumix
 		public:
 			MeasureTool();
 
-			bool onEntityMouseDown(const WorldEditor::RayHit& hit, int x, int y) override;
+			bool onMouseDown(const WorldEditor::RayHit& hit, int x, int y) override;
 			void onMouseMove(int, int, int, int) override {}
 			void onMouseUp(int, int, MouseButton::Value) override {}
 			void enable(bool is_enabled) { m_is_enabled = is_enabled; m_is_from_set = false; }

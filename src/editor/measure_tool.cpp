@@ -12,9 +12,10 @@ namespace Lumix
 	{ }
 
 
-	bool MeasureTool::onEntityMouseDown(const WorldEditor::RayHit& hit, int, int)
+	bool MeasureTool::onMouseDown(const WorldEditor::RayHit& hit, int, int)
 	{
 		if (!m_is_enabled) return false;
+		if (!hit.is_hit) return false;
 
 		if (!m_is_from_set)
 		{

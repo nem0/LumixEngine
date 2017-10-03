@@ -39,7 +39,7 @@ public:
 	TerrainEditor(WorldEditor& editor, class StudioApp& app);
 	~TerrainEditor();
 
-	bool onEntityMouseDown(const WorldEditor::RayHit& hit, int, int) override;
+	bool onMouseDown(const WorldEditor::RayHit& hit, int, int) override;
 	void onMouseMove(int x, int y, int /*rel_x*/, int /*rel_y*/) override;
 	void onMouseUp(int, int, MouseButton::Value) override;
 	void onGUI();
