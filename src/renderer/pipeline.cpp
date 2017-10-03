@@ -268,7 +268,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	};
 
 
-	PipelineImpl(Renderer& renderer, const Path& path, IAllocator& allocator)
+	PipelineImpl(Renderer& renderer, const Path& path, const char* define, IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_path(path)
 		, m_framebuffers(allocator)
@@ -289,6 +289,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		, m_scene(nullptr)
 		, m_width(-1)
 		, m_height(-1)
+		, m_define(define, allocator)
 	{
 		for (auto& handle : m_debug_vertex_buffers)
 		{
@@ -386,6 +387,32 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
+	void setDefine()
+	{
+		if (m_define.length() == 0) return;
+		StaticString<256> tmp(m_define.c_str(), " = true");
+
+		bool errors =
+			luaL_loadbuffer(m_lua_state, tmp, stringLength(tmp.data), m_path.c_str()) != LUA_OK;
+		if (errors)
+		{
+			g_log_error.log("Renderer") << m_path.c_str() << ": " << lua_tostring(m_lua_state, -1);
+			lua_pop(m_lua_state, 1);
+			return;
+		}
+
+		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
+		lua_setupvalue(m_lua_state, -2, 1);
+		errors = lua_pcall(m_lua_state, 0, 0, 0) != LUA_OK;
+		if (errors)
+		{
+			g_log_error.log("Renderer") << m_path.c_str() << ": " << lua_tostring(m_lua_state, -1);
+			lua_pop(m_lua_state, 1);
+			return;
+		}
+	}
+
+
 	void onFileLoaded(FS::IFile& file, bool success)
 	{
 		if (!success)
@@ -423,6 +450,8 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		{
 			exposeCustomCommandToLua(handler);
 		}
+
+		setDefine();
 
 		bool errors =
 			luaL_loadbuffer(m_lua_state, (const char*)file.getBuffer(), file.size(), m_path.c_str()) != LUA_OK;
@@ -2876,6 +2905,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	int m_view_y;
 	int m_width;
 	int m_height;
+	string m_define;
 	bgfx::VertexBufferHandle m_particle_vertex_buffer;
 	bgfx::IndexBufferHandle m_particle_index_buffer;
 	Array<CustomCommandHandler> m_custom_commands_handlers;
@@ -2916,9 +2946,9 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 };
 
 
-Pipeline* Pipeline::create(Renderer& renderer, const Path& path, IAllocator& allocator)
+Pipeline* Pipeline::create(Renderer& renderer, const Path& path, const char* defines, IAllocator& allocator)
 {
-	return LUMIX_NEW(allocator, PipelineImpl)(renderer, path, allocator);
+	return LUMIX_NEW(allocator, PipelineImpl)(renderer, path, defines, allocator);
 }
 
 

@@ -58,7 +58,7 @@ SceneView::SceneView(StudioApp& app)
 	auto* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
 	m_is_opengl = renderer->isOpenGL();
 	Path path("pipelines/main.lua");
-	m_pipeline = Pipeline::create(*renderer, path, engine.getAllocator());
+	m_pipeline = Pipeline::create(*renderer, path, "scene_view", engine.getAllocator());
 	m_pipeline->load();
 	m_pipeline->addCustomCommandHandler("renderGizmos").callback.bind<SceneView, &SceneView::renderGizmos>(this);
 	m_pipeline->addCustomCommandHandler("renderIcons").callback.bind<SceneView, &SceneView::renderIcons>(this);

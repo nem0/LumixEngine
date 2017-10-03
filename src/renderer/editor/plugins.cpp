@@ -455,7 +455,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		Engine& engine = m_app.getWorldEditor().getEngine();
 		m_tile.universe = &engine.createUniverse(false);
 		Renderer* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
-		m_tile.pipeline = Pipeline::create(*renderer, Path("pipelines/main.lua"), engine.getAllocator());
+		m_tile.pipeline = Pipeline::create(*renderer, Path("pipelines/main.lua"), "", engine.getAllocator());
 		m_tile.pipeline->load();
 
 		Entity light_entity = m_tile.universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
@@ -477,7 +477,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		auto& engine = m_app.getWorldEditor().getEngine();
 		m_universe = &engine.createUniverse(false);
 		auto* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
-		m_pipeline = Pipeline::create(*renderer, Path("pipelines/main.lua"), engine.getAllocator());
+		m_pipeline = Pipeline::create(*renderer, Path("pipelines/main.lua"), "", engine.getAllocator());
 		m_pipeline->load();
 
 		auto mesh_entity = m_universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
@@ -1082,7 +1082,7 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		Renderer*  renderer = static_cast<Renderer*>(plugin_manager.getPlugin("renderer"));
 		IAllocator& allocator = world_editor.getAllocator();
 		Path pipeline_path("pipelines/probe.lua");
-		m_pipeline = Pipeline::create(*renderer, pipeline_path, allocator);
+		m_pipeline = Pipeline::create(*renderer, pipeline_path, "", allocator);
 		m_pipeline->load();
 	}
 
@@ -2311,7 +2311,7 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		PluginManager& plugin_manager = m_engine.getPluginManager();
 		Renderer* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
 		Path path("pipelines/imgui/imgui.lua");
-		m_gui_pipeline = Pipeline::create(*renderer, path, m_engine.getAllocator());
+		m_gui_pipeline = Pipeline::create(*renderer, path, "", m_engine.getAllocator());
 		m_gui_pipeline->load();
 
 		int w, h;

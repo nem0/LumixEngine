@@ -87,7 +87,7 @@ class LUMIX_RENDERER_API Pipeline
 		virtual void render() = 0;
 		virtual void setViewport(int x, int y, int width, int height) = 0;
 
-		static Pipeline* create(Renderer& renderer, const Path& path, IAllocator& allocator);
+		static Pipeline* create(Renderer& renderer, const Path& path, const char* define, IAllocator& allocator);
 		static void destroy(Pipeline* pipeline);
 
 		virtual FrameBuffer* getFramebuffer(const char* framebuffer_name) = 0;
