@@ -13,10 +13,11 @@ namespace Lumix
 {
 
 
-struct PlatformData;
-class StudioApp;
+class Path;
 class Pipeline;
+struct PlatformData;
 class RenderScene;
+class StudioApp;
 
 
 class GameView : public StudioApp::IPlugin
@@ -41,6 +42,7 @@ public:
 	bool m_is_open;
 
 private:
+	void onResourceChanged(const Path& path, const char* /*ext*/);
 	void onUniverseCreated();
 	void onUniverseDestroyed();
 	void onFullscreenGUI();

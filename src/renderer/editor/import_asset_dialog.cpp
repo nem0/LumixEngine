@@ -3012,7 +3012,7 @@ static bool createBillboard(ImportAssetDialog& dialog,
 	auto* render_scene = static_cast<RenderScene*>(universe.getScene(crc32("renderer")));
 	if (!render_scene) return false;
 
-	auto* pipeline = Pipeline::create(*renderer, Path("pipelines/billboard.lua"), engine.getAllocator());
+	auto* pipeline = Pipeline::create(*renderer, Path("pipelines/billboard.lua"), "", engine.getAllocator());
 	pipeline->load();
 
 	auto mesh_entity = universe.createEntity({0, 0, 0}, {0, 0, 0, 0});
