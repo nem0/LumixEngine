@@ -1121,9 +1121,11 @@ u16 TerrainEditor::getHeight(const Vec3& world_pos)
 }
 
 
-bool TerrainEditor::onEntityMouseDown(const WorldEditor::RayHit& hit, int, int)
+bool TerrainEditor::onMouseDown(const WorldEditor::RayHit& hit, int, int)
 {
 	if (!m_is_enabled) return false;
+	if (!hit.is_hit) return false;
+	if (!hit.entity.isValid()) return false;
 	const auto& selected_entities = m_world_editor.getSelectedEntities();
 	if (selected_entities.size() != 1) return false;
 	bool is_terrain = m_world_editor.getUniverse()->hasComponent(selected_entities[0], TERRAIN_TYPE);

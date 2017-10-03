@@ -62,7 +62,7 @@ public:
 	{
 		virtual ~Plugin() {}
 
-		virtual bool onEntityMouseDown(const RayHit& /*hit*/, int /*x*/, int /*y*/) { return false; }
+		virtual bool onMouseDown(const RayHit& /*hit*/, int /*x*/, int /*y*/) { return false; }
 		virtual void onMouseUp(int /*x*/, int /*y*/, MouseButton::Value /*button*/) {}
 		virtual void onMouseMove(int /*x*/, int /*y*/, int /*rel_x*/, int /*rel_y*/) {}
 		virtual bool showGizmo(ComponentUID /*cmp*/) { return false; }

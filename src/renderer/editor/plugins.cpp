@@ -1706,8 +1706,9 @@ struct FurPainter LUMIX_FINAL : public WorldEditor::Plugin
 	}
 
 
-	bool onEntityMouseDown(const WorldEditor::RayHit& hit, int x, int y) override
+	bool onMouseDown(const WorldEditor::RayHit& hit, int x, int y) override
 	{
+		if (!hit.entity.isValid()) return false;
 		auto& ents = app.getWorldEditor().getSelectedEntities();
 		
 		if (enabled && ents.size() == 1 && ents[0] == hit.entity)
