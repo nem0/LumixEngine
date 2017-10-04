@@ -33,6 +33,8 @@ namespace Lumix
 {
 
 
+
+static const ComponentType RIGID_ACTOR_TYPE = PropertyRegister::getComponentType("rigid_actor");
 static const ComponentType BOX_ACTOR_TYPE = PropertyRegister::getComponentType("box_rigid_actor");
 static const ComponentType RAGDOLL_TYPE = PropertyRegister::getComponentType("ragdoll");
 static const ComponentType SPHERE_ACTOR_TYPE = PropertyRegister::getComponentType("sphere_rigid_actor");
@@ -53,6 +55,7 @@ enum class PhysicsSceneVersion
 {
 	DYNAMIC_TYPE,
 	TRIGGERS,
+	RIGID_ACTOR,
 
 	LATEST,
 };
@@ -345,6 +348,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 		m_queued_forces.reserve(64);
 
+		context.registerComponentType(RIGID_ACTOR_TYPE, this, &PhysicsSceneImpl::serializeRigidActor, &PhysicsSceneImpl::deserializeRigidActor);
 		context.registerComponentType(BOX_ACTOR_TYPE, this, &PhysicsSceneImpl::serializeBoxActor, &PhysicsSceneImpl::deserializeBoxActor);
 		context.registerComponentType(MESH_ACTOR_TYPE, this, &PhysicsSceneImpl::serializeMeshActor, &PhysicsSceneImpl::deserializeMeshActor);
 		context.registerComponentType(HEIGHTFIELD_TYPE, this, &PhysicsSceneImpl::serializeHeightfield, &PhysicsSceneImpl::deserializeHeightfield);
@@ -508,7 +512,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 	ComponentHandle getComponent(Entity entity, ComponentType type) override
 	{
-		if (type == BOX_ACTOR_TYPE || type == MESH_ACTOR_TYPE || type == CAPSULE_ACTOR_TYPE ||
+		if (type == RIGID_ACTOR_TYPE || type == BOX_ACTOR_TYPE || type == MESH_ACTOR_TYPE || type == CAPSULE_ACTOR_TYPE ||
 			type == SPHERE_ACTOR_TYPE)
 		{
 			int idx = m_actors.find(entity);
@@ -1172,6 +1176,10 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		{
 			return createBoxRigidActor(entity);
 		}
+		else if (component_type == RIGID_ACTOR_TYPE)
+		{
+			return createRigidActor(entity);
+		}
 		else if (component_type == RAGDOLL_TYPE)
 		{
 			return createRagdoll(entity);
@@ -1207,7 +1215,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			m_controllers.erase(entity);
 			m_universe.destroyComponent(entity, type, this, cmp);
 		}
-		else if (type == MESH_ACTOR_TYPE || type == BOX_ACTOR_TYPE || type == CAPSULE_ACTOR_TYPE ||
+		else if (type == RIGID_ACTOR_TYPE || type == MESH_ACTOR_TYPE || type == BOX_ACTOR_TYPE || type == CAPSULE_ACTOR_TYPE ||
 				 type == SPHERE_ACTOR_TYPE)
 		{
 			Entity entity = {cmp.index};
@@ -1414,6 +1422,25 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 		ComponentHandle cmp = {entity.index};
 		m_universe.addComponent(entity, RAGDOLL_TYPE, this, cmp);
+		return cmp;
+	}
+
+
+	ComponentHandle createRigidActor(Entity entity)
+	{
+		if (m_actors.find(entity) >= 0) return INVALID_COMPONENT;
+		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, ActorType::RIGID);
+		m_actors.insert(entity, actor);
+		actor->entity = entity;
+
+		Transform transform = m_universe.getTransform(entity);
+		PxTransform px_transform = toPhysx(transform.getRigidPart());
+
+		PxRigidStatic* physx_actor = m_system->getPhysics()->createRigidStatic(px_transform);
+		actor->setPhysxActor(physx_actor);
+
+		ComponentHandle cmp = {entity.index};
+		m_universe.addComponent(entity, RIGID_ACTOR_TYPE, this, cmp);
 		return cmp;
 	}
 
@@ -2804,6 +2831,237 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
+	void moveShapeIndices(ComponentHandle cmp, int index, PxGeometryType::Enum type)
+	{
+		int count = getGeometryCount(cmp, type);
+		for (int i = index; i < count; ++i)
+		{
+			PxShape* shape = getShape(cmp, i, type);
+			shape->userData = (void*)(intptr_t)(i + 1);
+		}
+	}
+
+
+	void addBoxGeometry(ComponentHandle cmp, int index) override
+	{
+		if (index == -1) index = getBoxGeometryCount(cmp);
+		moveShapeIndices(cmp, index, PxGeometryType::eBOX);
+		PxRigidActor* actor = m_actors[{cmp.index}]->physx_actor;
+		PxBoxGeometry geom;
+		geom.halfExtents.x = 1;
+		geom.halfExtents.y = 1;
+		geom.halfExtents.z = 1;
+		PxShape* shape = actor->createShape(geom, *m_default_material);
+		shape->userData = (void*)(intptr_t)index;
+	}
+
+
+	void removeGeometry(ComponentHandle cmp, int index, PxGeometryType::Enum type)
+	{
+		int count = getGeometryCount(cmp, type);
+		PxShape* shape = getShape(cmp, index, type);
+		shape->getActor()->detachShape(*shape);
+
+		//0, 1, 2
+
+		for (int i = index + 1; i < count; ++i)
+		{
+			PxShape* shape = getShape(cmp, i, type);
+			shape->userData = (void*)(intptr_t)(i - 1);
+		}
+	}
+
+
+	void removeBoxGeometry(ComponentHandle cmp, int index) override
+	{
+		removeGeometry(cmp, index, PxGeometryType::eBOX);
+	}
+
+
+	Vec3 getBoxGeomHalfExtents(ComponentHandle cmp, int index) override
+	{
+		PxShape* shape = getShape(cmp, index, PxGeometryType::eBOX);
+		PxBoxGeometry box = shape->getGeometry().box();
+		return fromPhysx(box.halfExtents);
+	}
+
+
+	PxShape* getShape(ComponentHandle cmp, int index, PxGeometryType::Enum type)
+	{
+		PxRigidActor* actor = m_actors[{cmp.index}]->physx_actor;
+		int shape_count = actor->getNbShapes();
+		PxShape* shape;
+		for (int i = 0; i < shape_count; ++i)
+		{
+			actor->getShapes(&shape, 1, i);
+			if (shape->getGeometryType() == type)
+			{
+				if (shape->userData == (void*)(intptr_t)index)
+				{
+					return shape;
+				}
+			}
+		}
+		ASSERT(false);
+		return nullptr;
+	}
+
+
+	void setBoxGeomHalfExtents(ComponentHandle cmp, int index, const Vec3& size) override
+	{
+		PxShape* shape = getShape(cmp, index, PxGeometryType::eBOX);
+		PxBoxGeometry box = shape->getGeometry().box();
+		box.halfExtents = toPhysx(size);
+		shape->setGeometry(box);
+	}
+
+
+	Vec3 getGeomOffsetPosition(ComponentHandle cmp, int index, PxGeometryType::Enum type)
+	{
+		PxShape* shape = getShape(cmp, index, type);
+		PxTransform tr = shape->getLocalPose();
+		return fromPhysx(tr.p);
+	}
+
+
+	Vec3 getGeomOffsetRotation(ComponentHandle cmp, int index, PxGeometryType::Enum type)
+	{
+		PxShape* shape = getShape(cmp, index, type);
+		PxTransform tr = shape->getLocalPose();
+		return fromPhysx(tr.q).toEuler();
+	}
+
+
+	Vec3 getBoxGeomOffsetRotation(ComponentHandle cmp, int index) override
+	{
+		return getGeomOffsetRotation(cmp, index, PxGeometryType::eBOX);
+	}
+
+
+	Vec3 getBoxGeomOffsetPosition(ComponentHandle cmp, int index) override
+	{
+		return getGeomOffsetPosition(cmp, index, PxGeometryType::eBOX);
+	}
+
+
+	void setGeomOffsetPosition(ComponentHandle cmp, int index, const Vec3& pos, PxGeometryType::Enum type)
+	{
+		PxShape* shape = getShape(cmp, index, type);
+		PxTransform tr = shape->getLocalPose();
+		tr.p = toPhysx(pos);
+		shape->setLocalPose(tr);
+	}
+
+
+	void setGeomOffsetRotation(ComponentHandle cmp, int index, const Vec3& rot, PxGeometryType::Enum type)
+	{
+		PxShape* shape = getShape(cmp, index, type);
+		PxTransform tr = shape->getLocalPose();
+		Quat q;
+		q.fromEuler(rot);
+		tr.q = toPhysx(q);
+		shape->setLocalPose(tr);
+	}
+
+
+	void setBoxGeomOffsetPosition(ComponentHandle cmp, int index, const Vec3& pos) override
+	{
+		setGeomOffsetPosition(cmp, index, pos, PxGeometryType::eBOX);
+	}
+
+
+	void setBoxGeomOffsetRotation(ComponentHandle cmp, int index, const Vec3& rot) override
+	{
+		setGeomOffsetRotation(cmp, index, rot, PxGeometryType::eBOX);
+	}
+
+
+	int getGeometryCount(ComponentHandle cmp, PxGeometryType::Enum type)
+	{
+		PxRigidActor* actor = m_actors[{cmp.index}]->physx_actor;
+		int shape_count = actor->getNbShapes();
+		PxShape* shape;
+		int count = 0;
+		for (int i = 0; i < shape_count; ++i)
+		{
+			actor->getShapes(&shape, 1, i);
+			if (shape->getGeometryType() == type) ++count;
+		}
+		return count;
+	}
+
+
+	int getBoxGeometryCount(ComponentHandle cmp) override
+	{
+		return getGeometryCount(cmp, PxGeometryType::eBOX);
+	}
+
+
+	void addSphereGeometry(ComponentHandle cmp, int index) override 
+	{
+		if (index == -1) index = getSphereGeometryCount(cmp);
+		moveShapeIndices(cmp, index, PxGeometryType::eSPHERE);
+		PxRigidActor* actor = m_actors[{cmp.index}]->physx_actor;
+		PxSphereGeometry geom;
+		geom.radius = 1;
+		PxShape* shape = actor->createShape(geom, *m_default_material);
+		shape->userData = (void*)(intptr_t)index;
+	}
+
+
+	void removeSphereGeometry(ComponentHandle cmp, int index) override 
+	{
+		removeGeometry(cmp, index, PxGeometryType::eSPHERE);
+	}
+	
+	
+	int getSphereGeometryCount(ComponentHandle cmp) override 
+	{
+		return getGeometryCount(cmp, PxGeometryType::eSPHERE);
+	}
+
+
+	float getSphereGeomRadius(ComponentHandle cmp, int index) override
+	{
+		PxShape* shape = getShape(cmp, index, PxGeometryType::eSPHERE);
+		PxSphereGeometry geom = shape->getGeometry().sphere();
+		return geom.radius;
+	}
+
+
+	void setSphereGeomRadius(ComponentHandle cmp, int index, float radius) override
+	{
+		PxShape* shape = getShape(cmp, index, PxGeometryType::eSPHERE);
+		PxSphereGeometry geom = shape->getGeometry().sphere();
+		geom.radius = radius;
+		shape->setGeometry(geom);
+	}
+
+
+	Vec3 getSphereGeomOffsetPosition(ComponentHandle cmp, int index) override
+	{
+		return getGeomOffsetPosition(cmp, index, PxGeometryType::eSPHERE);
+	}
+
+
+	void setSphereGeomOffsetPosition(ComponentHandle cmp, int index, const Vec3& pos) override
+	{
+		setGeomOffsetPosition(cmp, index, pos, PxGeometryType::eSPHERE);
+	}
+
+
+	Vec3 getSphereGeomOffsetRotation(ComponentHandle cmp, int index) override
+	{
+		return getGeomOffsetRotation(cmp, index, PxGeometryType::eSPHERE);
+	}
+
+
+	void setSphereGeomOffsetRotation(ComponentHandle cmp, int index, const Vec3& euler_angles) override
+	{
+		setGeomOffsetRotation(cmp, index, euler_angles, PxGeometryType::eSPHERE);
+	}
+
+
 	void setHalfExtents(ComponentHandle cmp, const Vec3& size) override
 	{
 		PxRigidActor* actor = m_actors[{cmp.index}]->physx_actor;
@@ -2850,17 +3108,57 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		{
 			m_dynamic_actors.eraseItemFast(actor);
 		}
-		PxShape* shapes;
-		if (actor->physx_actor && actor->physx_actor->getNbShapes() == 1 &&
-			actor->physx_actor->getShapes(&shapes, 1, 0))
+		if (!actor->physx_actor) return;
+		
+		PxTransform transform = toPhysx(m_universe.getTransform(actor->entity).getRigidPart());
+		PxRigidActor* new_physx_actor;
+		switch (actor->dynamic_type)
 		{
-			PxGeometryHolder geom = shapes->getGeometry();
-			PxTransform transform = toPhysx(m_universe.getTransform(actor->entity).getRigidPart());
-
-			PxRigidActor* physx_actor = createPhysXActor(actor, transform, geom.any());
-			if (physx_actor) physx_actor->userData = (void*)(intptr_t)actor->entity.index;
-			actor->setPhysxActor(physx_actor);
+			case DynamicType::DYNAMIC:
+				new_physx_actor = m_system->getPhysics()->createRigidDynamic(transform);
+				break;
+			case DynamicType::KINEMATIC:
+				new_physx_actor = m_system->getPhysics()->createRigidDynamic(transform);
+				new_physx_actor->isRigidBody()->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, true);
+				break;
+			case DynamicType::STATIC:
+				new_physx_actor = m_system->getPhysics()->createRigidStatic(transform);
+				break;
 		}
+		for(int i = 0, c = actor->physx_actor->getNbShapes(); i < c; ++i)
+		{
+			PxShape* shape;
+			actor->physx_actor->getShapes(&shape, 1, i);
+			duplicateShape(shape, new_physx_actor);
+		}
+		actor->setPhysxActor(new_physx_actor);
+	}
+
+
+	void duplicateShape(PxShape* shape, PxRigidActor* actor)
+	{
+		PxShape* new_shape;
+		switch (shape->getGeometryType())
+		{
+			case PxGeometryType::eBOX:
+				{
+					PxBoxGeometry geom;
+					shape->getBoxGeometry(geom);
+					new_shape = actor->createShape(geom, *m_default_material, shape->getLocalPose());
+					break;
+				}
+			case PxGeometryType::eSPHERE:
+				{
+					PxSphereGeometry geom;
+					shape->getSphereGeometry(geom);
+					new_shape = actor->createShape(geom, *m_default_material, shape->getLocalPose());
+					break;
+				}
+			default:
+				ASSERT(false);
+				break;
+		}
+		new_shape->userData = shape->userData;
 	}
 
 
@@ -3315,6 +3613,51 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
+	void serializeRigidActor(ISerializer& serializer, ComponentHandle cmp)
+	{
+		RigidActor* actor = m_actors[{cmp.index}];
+		serializer.write("layer", actor->layer);
+		serializer.write("dynamic_type", (int)actor->dynamic_type);
+		serializer.write("trigger", actor->is_trigger);
+		PxShape* shape;
+		int shape_count = actor->physx_actor->getNbShapes();
+
+		serializer.write("count", shape_count);
+		for (int i = 0; i < shape_count; ++i)
+		{
+			actor->physx_actor->getShapes(&shape, 1, i);
+			int type = shape->getGeometryType();
+			int index = (int)(intptr_t)shape->userData;
+			serializer.write("type", type);
+			serializer.write("index", index);
+			RigidTransform tr = fromPhysx(shape->getLocalPose());
+			serializer.write("tr", tr);
+			switch (shape->getGeometryType())
+			{
+				case PxGeometryType::eBOX:
+					{
+						PxBoxGeometry geom;
+						shape->getBoxGeometry(geom);
+						serializer.write("x", geom.halfExtents.x);
+						serializer.write("y", geom.halfExtents.y);
+						serializer.write("z", geom.halfExtents.z);
+					}
+					break;
+				case PxGeometryType::eSPHERE:
+					{
+						PxSphereGeometry geom;
+						shape->getSphereGeometry(geom);
+						serializer.write("radius", geom.radius);
+					}
+					break;
+				default:
+					ASSERT(false);
+					break;
+			}
+		}
+	}
+
+
 	void serializeBoxActor(ISerializer& serializer, ComponentHandle cmp)
 	{
 		RigidActor* actor = m_actors[{cmp.index}];
@@ -3329,6 +3672,73 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		serializer.write("x", geom.halfExtents.x);
 		serializer.write("y", geom.halfExtents.y);
 		serializer.write("z", geom.halfExtents.z);
+	}
+
+
+	void deserializeRigidActor(IDeserializer& serializer, Entity entity, int scene_version)
+	{
+		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, ActorType::RIGID);
+		actor->entity = entity;
+		serializer.read(&actor->layer);
+		deserializeCommonRigidActorProperties(serializer, actor, scene_version);
+		m_actors.insert(actor->entity, actor);
+
+		PxTransform transform = toPhysx(m_universe.getTransform(actor->entity).getRigidPart());
+		PxRigidActor* physx_actor;
+		switch (actor->dynamic_type)
+		{
+			case DynamicType::DYNAMIC:
+				physx_actor = m_system->getPhysics()->createRigidDynamic(transform);
+				break;
+			case DynamicType::KINEMATIC:
+				physx_actor = m_system->getPhysics()->createRigidDynamic(transform);
+				physx_actor->isRigidBody()->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, true);
+				break;
+			case DynamicType::STATIC:
+				physx_actor = m_system->getPhysics()->createRigidStatic(transform);
+				break;
+		}
+
+		int count;
+		serializer.read(&count);
+		for (int i = 0; i < count; ++i)
+		{
+			int type;
+			serializer.read(&type);
+			int index;
+			serializer.read(&index);
+			PxShape* shape;
+			RigidTransform tr;
+			serializer.read(&tr);
+			PxTransform local_pos = toPhysx(tr);
+			switch (type)
+			{
+				case PxGeometryType::eBOX:
+					{
+						PxBoxGeometry geom;
+						serializer.read(&geom.halfExtents.x);
+						serializer.read(&geom.halfExtents.y);
+						serializer.read(&geom.halfExtents.z);
+						shape = physx_actor->createShape(geom, *m_default_material, local_pos);
+					}
+					break;
+				case PxGeometryType::eSPHERE:
+					{
+						PxSphereGeometry geom;
+						serializer.read(&geom.radius);
+						shape = physx_actor->createShape(geom, *m_default_material, local_pos);
+					}
+					break;
+				default:
+					ASSERT(false);
+					break;
+			}
+			shape->userData = (void*)(intptr_t)index;
+		}
+		actor->setPhysxActor(physx_actor);
+
+		m_universe.addComponent(entity, RIGID_ACTOR_TYPE, this, { entity.index });
+
 	}
 
 
@@ -3472,6 +3882,44 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		serializer.write((i32)actor->type);
 		switch (actor->type)
 		{
+			case ActorType::RIGID:
+			{
+				PxShape* shape;
+				int shape_count = px_actor->getNbShapes();
+				serializer.write(shape_count);
+				for (int i = 0; i < shape_count; ++i)
+				{
+					px_actor->getShapes(&shape, 1, i);
+					int type = shape->getGeometryType();
+					serializer.write(type);
+					serializer.write((int)(intptr_t)shape->userData);
+					RigidTransform tr = fromPhysx(shape->getLocalPose());
+					serializer.write(tr);
+					switch(type)
+					{
+						case PxGeometryType::eBOX:
+							{
+								PxBoxGeometry geom;
+								shape->getBoxGeometry(geom);
+								serializer.write(geom.halfExtents.x);
+								serializer.write(geom.halfExtents.y);
+								serializer.write(geom.halfExtents.z);
+							}
+							break;
+						case PxGeometryType::eSPHERE:
+							{
+								PxSphereGeometry geom;
+								shape->getSphereGeometry(geom);
+								serializer.write(geom.radius);
+							}
+							break;
+						default:
+							ASSERT(false);
+							break;
+					}
+				}
+				break;
+			}
 			case ActorType::BOX:
 			{
 				ASSERT(px_actor->getNbShapes() == 1);
@@ -3535,15 +3983,56 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 		serializer.read((i32&)actor->type);
 
+		PxTransform transform = toPhysx(m_universe.getTransform(actor->entity).getRigidPart());
 		switch (actor->type)
 		{
+			case ActorType::RIGID:
+			{
+				PxRigidActor* physx_actor = actor->dynamic_type == DynamicType::STATIC 
+					? (PxRigidActor*)m_system->getPhysics()->createRigidStatic(transform) 
+					: (PxRigidActor*)m_system->getPhysics()->createRigidDynamic(transform);
+				int count = serializer.read<int>();
+				for (int i = 0; i < count; ++i)
+				{
+					int type = serializer.read<int>();
+					int index = serializer.read<int>();
+					PxTransform tr = toPhysx(serializer.read<RigidTransform>());
+					PxShape* shape;
+					switch (type)
+					{
+						case PxGeometryType::eBOX:
+							{
+								PxBoxGeometry box_geom;
+								serializer.read(box_geom.halfExtents.x);
+								serializer.read(box_geom.halfExtents.y);
+								serializer.read(box_geom.halfExtents.z);
+								shape = physx_actor->createShape(box_geom, *m_default_material, tr);
+							}
+							break;
+						case PxGeometryType::eSPHERE:
+							{
+								PxSphereGeometry geom;
+								serializer.read(geom.radius);
+								shape = physx_actor->createShape(geom, *m_default_material, tr);
+							}
+							break;
+						default:
+							ASSERT(false);
+							break;
+					}
+					shape->userData = (void*)(intptr_t)index;
+				}
+				actor->setPhysxActor(physx_actor);
+				m_universe.addComponent(actor->entity, RIGID_ACTOR_TYPE, this, cmp);
+			}
+			break;
 			case ActorType::BOX:
 			{
 				PxBoxGeometry box_geom;
 				PxTransform transform = toPhysx(m_universe.getTransform(actor->entity).getRigidPart());
 				serializer.read(box_geom.halfExtents);
 				PxRigidActor* physx_actor = createPhysXActor(actor, transform, box_geom);
-				
+
 				actor->setPhysxActor(physx_actor);
 				m_universe.addComponent(actor->entity, BOX_ACTOR_TYPE, this, cmp);
 			}

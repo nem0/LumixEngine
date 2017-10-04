@@ -363,8 +363,7 @@ public:
 	}
 
 
-	SimplePropertyDescriptor(const char* name, ArrayGetter getter, ArraySetter setter, IAllocator& allocator)
-		: PropertyDescriptorBase(allocator)
+	SimplePropertyDescriptor(const char* name, ArrayGetter getter, ArraySetter setter)
 	{
 		setName(name);
 		m_array.getter = getter;

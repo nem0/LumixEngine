@@ -1060,6 +1060,7 @@ LUMIX_STUDIO_ENTRY(physics)
 	app.registerComponent("mesh_rigid_actor", "Physics/Mesh");
 	app.registerComponent("physical_heightfield", "Physics/Heightfield");
 	app.registerComponent("ragdoll", "Physics/Ragdoll");
+	app.registerComponent("rigid_actor", "Physics/Rigid actor");
 
 	WorldEditor& editor = app.getWorldEditor();
 	IAllocator& allocator = editor.getAllocator();
