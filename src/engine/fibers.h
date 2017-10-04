@@ -1,6 +1,11 @@
 #pragma once
 
 
+#ifdef __linux__
+	#include <ucontext.h>
+#endif
+
+
 namespace Lumix
 {
 
@@ -12,11 +17,12 @@ namespace Fiber
 {
 
 #ifdef _WIN32
+	typedef void* Handle;
 	typedef void(__stdcall *FiberProc)(void*);
 #else 
+	typedef ucontext_t Handle;
 	typedef void (*FiberProc)(void*);
 #endif
-typedef void* Handle;
 constexpr void* INVALID_FIBER = nullptr;
 
 

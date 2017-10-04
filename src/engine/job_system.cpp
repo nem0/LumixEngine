@@ -206,7 +206,7 @@ struct WorkerTask : MT::Task
 
 
 	bool m_finished = false;
-	const FiberDecl* m_current_fiber = nullptr;
+	FiberDecl* m_current_fiber = nullptr;
 	Fiber::Handle m_primary_fiber;
 	System& m_system;
 };
@@ -321,7 +321,7 @@ void wait(int volatile* counter)
 	if (g_worker)
 	{
 		ASSERT(Profiler::getCurrentBlock() == Profiler::getRootBlock(MT::getCurrentThreadID()));
-		FiberDecl* fiber_decl = (FiberDecl*)Fiber::getParameter();
+		FiberDecl* fiber_decl = ((WorkerTask*)g_worker)->m_current_fiber;
 		fiber_decl->switch_state = (void*)counter;
 		Fiber::switchTo(fiber_decl->worker_task->m_primary_fiber);
 	}

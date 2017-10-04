@@ -1,5 +1,7 @@
 #include "engine/fibers.h"
 #include "engine/lumix.h"
+#include <ucontext.h>
+#include <stdlib.h>
 
 namespace Lumix
 {
@@ -9,29 +11,23 @@ namespace Fiber
 {
 
 
-bool init(Engine& engine)
-{
-	ASSERT(false);
-}
-
-
-void shutdown()
-{
-	ASSERT(false);
-}
-
-
 Handle createFromThread(void* parameter)
 {
-	ASSERT(false);
-	return nullptr;
+	ucontext_t fib;
+	getcontext(&fib);
+	return fib;
 }
 
 
 Handle create(int stack_size, FiberProc proc, void* parameter)
 {
-	ASSERT(false);
-	return nullptr;
+	ucontext_t fib;
+	getcontext(&fib);
+    fib.uc_stack.ss_sp = (::malloc)(stack_size);
+    fib.uc_stack.ss_size = stack_size;
+    fib.uc_link = 0;
+    makecontext(&fib, (void(*)())proc, 1, parameter); 
+	return fib;
 }
 
 
@@ -43,7 +39,8 @@ void destroy(Handle fiber)
 
 void switchTo(Handle fiber)
 {
-	ASSERT(false);
+	ucontext_t prev;
+	swapcontext(&prev, &fiber); 
 }
 
 
