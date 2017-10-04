@@ -141,8 +141,7 @@ public:
 	virtual void onMouseDown(int x, int y, MouseButton::Value button) = 0;
 	virtual void onMouseMove(int x, int y, int relx, int rely) = 0;
 	virtual void onMouseUp(int x, int y, MouseButton::Value button) = 0;
-	virtual float getMouseX() const = 0;
-	virtual float getMouseY() const = 0;
+	virtual Vec2 getMousePos() const = 0;
 	virtual float getMouseRelX() const = 0;
 	virtual float getMouseRelY() const = 0;
 	virtual void lookAtSelected() = 0;

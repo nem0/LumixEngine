@@ -145,7 +145,7 @@ public:
 
 	virtual RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, ComponentHandle ignore) = 0;
 	virtual RayCastModelHit castRayTerrain(ComponentHandle terrain, const Vec3& origin, const Vec3& dir) = 0;
-	virtual void getRay(ComponentHandle camera, float x, float y, Vec3& origin, Vec3& dir) = 0;
+	virtual void getRay(ComponentHandle camera, const Vec2& screen_pos, Vec3& origin, Vec3& dir) = 0;
 
 	virtual Frustum getCameraFrustum(ComponentHandle camera) const = 0;
 	virtual float getTime() const = 0;

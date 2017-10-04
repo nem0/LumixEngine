@@ -390,8 +390,7 @@ public:
 
 
 	void getRay(ComponentHandle camera_index,
-		float x,
-		float y,
+		const Vec2& screen_pos,
 		Vec3& origin,
 		Vec3& dir) override
 	{
@@ -406,8 +405,8 @@ public:
 			return;
 		}
 
-		float nx = 2 * (x / width) - 1;
-		float ny = 2 * ((height - y) / height) - 1;
+		float nx = 2 * (screen_pos.x / width) - 1;
+		float ny = 2 * ((height - screen_pos.y) / height) - 1;
 
 		Matrix projection_matrix = getCameraProjection(camera_index);
 		Matrix view_matrix = m_universe.getMatrix(camera.entity);
@@ -2761,7 +2760,7 @@ public:
 		}
 
 		Vec3 origin, dir;
-		scene->getRay(camera_cmp, x, y, origin, dir);
+		scene->getRay(camera_cmp, {x, y}, origin, dir);
 
 		RayCastModelHit hit = scene->castRay(origin, dir, INVALID_COMPONENT);
 		LuaWrapper::push(L, hit.m_is_hit);
