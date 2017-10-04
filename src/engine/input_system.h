@@ -9,7 +9,6 @@ namespace Lumix
 
 	struct IAllocator;
 	struct Vec2;
-	template <typename T> class DelegateList;
 
 	class LUMIX_ENGINE_API InputSystem
 	{
@@ -36,7 +35,6 @@ namespace Lumix
 			};
 
 		public:
-
 			static InputSystem* create(IAllocator& allocator);
 			static void destroy(InputSystem& system);
 
