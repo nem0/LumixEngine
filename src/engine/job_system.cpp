@@ -317,6 +317,7 @@ void runJobs(const JobDecl* jobs, int count, int volatile* counter)
 
 void wait(int volatile* counter)
 {
+	if (*counter <= 0) return;
 	if (g_worker)
 	{
 		ASSERT(Profiler::getCurrentBlock() == Profiler::getRootBlock(MT::getCurrentThreadID()));
