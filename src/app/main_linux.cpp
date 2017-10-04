@@ -165,7 +165,7 @@ struct App
 		m_engine->getPluginManager().load("physics");
 		m_engine->getInputSystem().enable(true);
 		Renderer* renderer = static_cast<Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
-		m_pipeline = Pipeline::create(*renderer, Path(m_pipeline_path), m_engine->getAllocator());
+		m_pipeline = Pipeline::create(*renderer, Path(m_pipeline_path), "", m_engine->getAllocator());
 		m_pipeline->load();
 
 		while (m_engine->getFileSystem().hasWork())
