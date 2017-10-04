@@ -281,6 +281,8 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		, m_default_cubemap(nullptr)
 		, m_debug_flags(BGFX_DEBUG_TEXT)
 		, m_point_light_shadowmaps(allocator)
+		, m_terrains_buffer(allocator)
+		, m_grasses_buffer(allocator)
 		, m_is_rendering_in_shadowmap(false)
 		, m_is_ready(false)
 		, m_debug_index_buffer(BGFX_INVALID_HANDLE)
@@ -2026,26 +2028,25 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		IAllocator& allocator = engine.getAllocator();
 		m_is_current_light_global = true;
 
-		Array<Array<ModelInstanceMesh>>* meshes;
-		Array<TerrainInfo> terrains(allocator);
-		Array<GrassInfo> grasses(allocator);
+		m_grasses_buffer.clear();
+		m_terrains_buffer.clear();
 
 		JobSystem::JobDecl jobs[3];
 		JobSystem::LambdaJob job_storage[3];
-		JobSystem::fromLambda([this, &frustum, &lod_ref_point, layer_mask, &meshes]() {
-			meshes = &m_scene->getModelInstanceInfos(frustum, lod_ref_point, layer_mask);
+		JobSystem::fromLambda([this, &frustum, &lod_ref_point, layer_mask]() {
+			m_mesh_buffer = &m_scene->getModelInstanceInfos(frustum, lod_ref_point, layer_mask);
 		}, &job_storage[0], &jobs[0], nullptr);
 
-		JobSystem::fromLambda([this, &frustum, &lod_ref_point, &terrains]() {
+		JobSystem::fromLambda([this, &frustum, &lod_ref_point]() {
 			Entity camera_entity = m_scene->getCameraEntity(m_applied_camera);
 			Vec3 lod_ref_point = m_scene->getUniverse().getPosition(camera_entity);
-			m_scene->getTerrainInfos(frustum, lod_ref_point, terrains);
+			m_scene->getTerrainInfos(frustum, lod_ref_point, m_terrains_buffer);
 		}, &job_storage[1], &jobs[1], nullptr);
 
 		if (render_grass)
 		{
-			JobSystem::fromLambda([this, &frustum, &lod_ref_point, &grasses]() {
-				m_scene->getGrassInfos(frustum, m_applied_camera, grasses);
+			JobSystem::fromLambda([this, &frustum, &lod_ref_point]() {
+				m_scene->getGrassInfos(frustum, m_applied_camera, m_grasses_buffer);
 			}, &job_storage[2], &jobs[2], nullptr);
 		}
 
@@ -2053,9 +2054,9 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		JobSystem::runJobs(jobs, render_grass ? 3 : 2, &counter);
 		JobSystem::wait(&counter);
 		
-		renderMeshes(*meshes);
-		if(render_grass) renderGrasses(grasses);
-		renderTerrains(terrains);
+		renderMeshes(*m_mesh_buffer);
+		if(render_grass) renderGrasses(m_grasses_buffer);
+		renderTerrains(m_terrains_buffer);
 	}
 
 
@@ -2899,6 +2900,10 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	bool m_is_rendering_in_shadowmap;
 	bool m_is_ready;
 	Frustum m_camera_frustum;
+
+	Array<Array<ModelInstanceMesh>>* m_mesh_buffer;
+	Array<TerrainInfo> m_terrains_buffer;
+	Array<GrassInfo> m_grasses_buffer;
 
 	Matrix m_shadow_viewprojection[4];
 	int m_view_x;
