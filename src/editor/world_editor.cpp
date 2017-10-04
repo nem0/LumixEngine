@@ -1753,7 +1753,7 @@ public:
 		if (!camera_cmp.isValid()) return;
 
 		InputSystem& input = m_engine->getInputSystem();
-		m_render_interface->getRay(camera_cmp.handle, m_mouse_x, m_mouse_y, origin, dir);
+		m_render_interface->getRay(camera_cmp.handle, m_mouse_pos, origin, dir);
 		auto hit = m_render_interface->castRay(origin, dir, INVALID_COMPONENT);
 		//if (m_gizmo->isActive()) return;
 		if (!hit.is_hit) return;
@@ -1890,7 +1890,7 @@ public:
 			ComponentUID camera_cmp = getUniverse()->getComponent(m_camera, CAMERA_TYPE);
 			if (!camera_cmp.isValid()) return;
 
-			m_render_interface->getRay(camera_cmp.handle, (float)x, (float)y, origin, dir);
+			m_render_interface->getRay(camera_cmp.handle, {(float)x, (float)y}, origin, dir);
 			auto hit = m_render_interface->castRay(origin, dir, INVALID_COMPONENT);
 			if (m_gizmo->isActive()) return;
 
@@ -1921,8 +1921,7 @@ public:
 	void onMouseMove(int x, int y, int relx, int rely) override
 	{
 		PROFILE_FUNCTION();
-		m_mouse_x = (float)x;
-		m_mouse_y = (float)y;
+		m_mouse_pos.set((float)x, (float)y);
 		m_mouse_rel_x = (float)relx;
 		m_mouse_rel_y = (float)rely;
 
@@ -1955,7 +1954,7 @@ public:
 			ComponentUID camera_cmp = getUniverse()->getComponent(m_camera, CAMERA_TYPE);
 			if (!camera_cmp.isValid()) return;
 
-			m_render_interface->getRay(camera_cmp.handle, (float)x, (float)y, origin, dir);
+			m_render_interface->getRay(camera_cmp.handle, {(float)x, (float)y}, origin, dir);
 			auto hit = m_render_interface->castRay(origin, dir, INVALID_COMPONENT);
 
 			if (m_snap_mode != SnapMode::NONE && !m_selected_entities.empty() && hit.is_hit)
@@ -2004,8 +2003,7 @@ public:
 	}
 
 
-	float getMouseX() const override { return m_mouse_x; }
-	float getMouseY() const override { return m_mouse_y; }
+	Vec2 getMousePos() const override { return m_mouse_pos; }
 	float getMouseRelX() const override { return m_mouse_rel_x; }
 	float getMouseRelY() const override { return m_mouse_rel_y; }
 
@@ -2485,7 +2483,7 @@ public:
 		Vec3 origin;
 		Vec3 dir;
 
-		m_render_interface->getRay(camera_cmp.handle, (float)camera_x, (float)camera_y, origin, dir);
+		m_render_interface->getRay(camera_cmp.handle, {(float)camera_x, (float)camera_y}, origin, dir);
 		auto hit = m_render_interface->castRay(origin, dir, INVALID_COMPONENT);
 		Vec3 pos;
 		if (hit.is_hit)
@@ -2512,7 +2510,7 @@ public:
 
 		Vec3 origin;
 		Vec3 dir;
-		m_render_interface->getRay(camera_cmp.handle, (float)screen_size.x, (float)screen_size.y, origin, dir);
+		m_render_interface->getRay(camera_cmp.handle, {(float)screen_size.x, (float)screen_size.y}, origin, dir);
 		auto hit = m_render_interface->castRay(origin, dir, INVALID_COMPONENT);
 		Vec3 pos;
 		if (hit.is_hit)
@@ -3764,8 +3762,7 @@ private:
 	Array<Entity> m_selected_entities;
 	MouseMode m_mouse_mode;
 	EditorIcons* m_editor_icons;
-	float m_mouse_x;
-	float m_mouse_y;
+	Vec2 m_mouse_pos;
 	float m_mouse_rel_x;
 	float m_mouse_rel_y;
 	Vec2 m_orbit_delta;

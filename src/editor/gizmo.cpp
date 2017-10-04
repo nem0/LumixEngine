@@ -501,8 +501,8 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 		float fov = render_interface->getCameraFOV(edit_camera.handle);
 
 		Vec3 origin, cursor_dir;
-		m_editor.getRenderInterface()->getRay(
-			edit_camera.handle, m_editor.getMouseX(), m_editor.getMouseY(), origin, cursor_dir);
+		Vec2 mouse_pos = m_editor.getMousePos();
+		m_editor.getRenderInterface()->getRay(edit_camera.handle, mouse_pos, origin, cursor_dir);
 		Axis axis = m_mode == Mode::TRANSLATE
 							   ? collideTranslate(gizmo_mtx, camera_pos, camera_dir, fov, is_ortho, origin, cursor_dir)
 							   : collideRotate(gizmo_mtx, camera_pos, camera_dir, fov, is_ortho, origin, cursor_dir);
@@ -520,8 +520,8 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 
 		auto edit_camera = m_editor.getEditCamera();
 		Vec3 origin, cursor_dir;
-		m_editor.getRenderInterface()->getRay(
-			edit_camera.handle, m_editor.getMouseX(), m_editor.getMouseY(), origin, cursor_dir);
+		Vec2 mouse_pos = m_editor.getMousePos();
+		m_editor.getRenderInterface()->getRay(edit_camera.handle, mouse_pos, origin, cursor_dir);
 
 		m_transform_axis = Axis::NONE;
 		m_active = -1;
@@ -542,12 +542,12 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 	}
 
 
-	Vec3 getMousePlaneIntersection(float mouse_x, float mouse_y, const Transform& frame, Axis transform_axis) const
+	Vec3 getMousePlaneIntersection(const Vec2& mouse_pos, const Transform& frame, Axis transform_axis) const
 	{
 		auto gizmo_mtx = frame.toMatrix();
 		auto camera = m_editor.getEditCamera();
 		Vec3 origin, dir;
-		m_editor.getRenderInterface()->getRay(camera.handle, mouse_x, mouse_y, origin, dir);
+		m_editor.getRenderInterface()->getRay(camera.handle, mouse_pos, origin, dir);
 		dir.normalize();
 		bool is_two_axed = transform_axis == Axis::XZ || transform_axis == Axis::XY || transform_axis == Axis::YZ;
 		if (is_two_axed)
@@ -614,8 +614,7 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 		if (m_editor.isMouseClick(MouseButton::LEFT))
 		{
 			m_is_dragging = true;
-			m_transform_point =
-				getMousePlaneIntersection(m_editor.getMouseX(), m_editor.getMouseY(), frame, m_transform_axis);
+			m_transform_point = getMousePlaneIntersection(m_editor.getMousePos(), frame, m_transform_axis);
 			m_active = -1;
 		}
 
@@ -628,12 +627,10 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 
 	bool translate(Transform& frame)
 	{
-		Vec3 intersection =
-			getMousePlaneIntersection(m_editor.getMouseX(), m_editor.getMouseY(), frame, m_transform_axis);
-		Vec3 old_intersection = getMousePlaneIntersection(m_editor.getMouseX() - m_editor.getMouseRelX(),
-			m_editor.getMouseY() - m_editor.getMouseRelY(),
-			frame,
-			m_transform_axis);
+		Vec2 mouse_pos = m_editor.getMousePos();
+		Vec3 intersection = getMousePlaneIntersection(mouse_pos, frame, m_transform_axis);
+		Vec2 old_mouse_pos = {mouse_pos.x - m_editor.getMouseRelX(),mouse_pos.y - m_editor.getMouseRelY()};
+		Vec3 old_intersection = getMousePlaneIntersection(old_mouse_pos, frame, m_transform_axis);
 		Vec3 delta = intersection - old_intersection;
 		if (!m_is_step || delta.length() > float(getStep()))
 		{
@@ -675,8 +672,8 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 	{
 		if (m_active < 0) return;
 
-		float relx = m_editor.getMouseX() - m_mouse_x;
-		float rely = m_editor.getMouseY() - m_mouse_y;
+		float relx = m_editor.getMousePos().x - m_mouse_x;
+		float rely = m_editor.getMousePos().y - m_mouse_y;
 
 		Universe* universe = m_editor.getUniverse();
 		Array<Vec3> new_positions(m_editor.getAllocator());
@@ -729,8 +726,7 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 	void translate()
 	{
 		Transform entity_frame = m_editor.getUniverse()->getTransform(m_entities[m_active]);
-		Vec3 intersection =
-			getMousePlaneIntersection(m_editor.getMouseX(), m_editor.getMouseY(), entity_frame, m_transform_axis);
+		Vec3 intersection = getMousePlaneIntersection(m_editor.getMousePos(), entity_frame, m_transform_axis);
 		Vec3 delta = intersection - m_transform_point;
 		if (!m_is_step || delta.length() > float(getStep()))
 		{
@@ -767,8 +763,7 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 		if (m_active >= 0 && m_editor.isMouseClick(MouseButton::LEFT))
 		{
 			Transform entity_frame = m_editor.getUniverse()->getTransform(m_entities[m_active]);
-			m_transform_point =
-				getMousePlaneIntersection(m_editor.getMouseX(), m_editor.getMouseY(), entity_frame, m_transform_axis);
+			m_transform_point = getMousePlaneIntersection(m_editor.getMousePos(), entity_frame, m_transform_axis);
 			m_is_dragging = true;
 		}
 		else if (!m_editor.isMouseDown(MouseButton::LEFT))
@@ -827,8 +822,8 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 			render(gizmo_mtx, m_active == i);
 		}
 
-		m_mouse_x = m_editor.getMouseX();
-		m_mouse_y = m_editor.getMouseY();
+		m_mouse_x = m_editor.getMousePos().x;
+		m_mouse_y = m_editor.getMousePos().y;
 		m_count = 0;
 	}
 

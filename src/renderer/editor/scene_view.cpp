@@ -207,7 +207,7 @@ RayCastModelHit SceneView::castRay(float x, float y)
 
 	Vec3 origin;
 	Vec3 dir;
-	scene->getRay(camera_cmp.handle, (float)screen_size.x, (float)screen_size.y, origin, dir);
+	scene->getRay(camera_cmp.handle, screen_size, origin, dir);
 	return scene->castRay(origin, dir, INVALID_COMPONENT);
 }
 

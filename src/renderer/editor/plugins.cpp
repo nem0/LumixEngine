@@ -1744,7 +1744,7 @@ struct FurPainter LUMIX_FINAL : public WorldEditor::Plugin
 		if (!pose) return;
 
 		Vec3 origin, dir;
-		scene->getRay(editor.getEditCamera().handle, (float)x, (float)y, origin, dir);
+		scene->getRay(editor.getEditCamera().handle, {(float)x, (float)y}, origin, dir);
 		RayCastModelHit hit = model->castRay(origin, dir, universe->getMatrix(entities[0]), pose);
 		if (!hit.m_is_hit)
 		{
@@ -1895,7 +1895,7 @@ struct FurPainterPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		if (!pose) return;
 
 		Vec3 origin, dir;
-		scene->getRay(editor.getEditCamera().handle, editor.getMouseX(), editor.getMouseY(), origin, dir);
+		scene->getRay(editor.getEditCamera().handle, editor.getMousePos(), origin, dir);
 		RayCastModelHit hit = model->castRay(origin, dir, editor.getUniverse()->getMatrix(entities[0]), pose);
 		if (!hit.m_is_hit)
 		{
@@ -2100,9 +2100,9 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 	}
 
 
-	void getRay(ComponentHandle camera_index, float x, float y, Vec3& origin, Vec3& dir) override
+	void getRay(ComponentHandle camera_index, const Vec2& screen_pos, Vec3& origin, Vec3& dir) override
 	{
-		m_render_scene->getRay(camera_index, x, y, origin, dir);
+		m_render_scene->getRay(camera_index, screen_pos, origin, dir);
 	}
 
 

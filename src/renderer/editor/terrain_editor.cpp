@@ -1421,7 +1421,7 @@ void TerrainEditor::onMouseMove(int x, int y, int, int)
 	ComponentUID camera_cmp = m_world_editor.getEditCamera();
 	RenderScene* scene = static_cast<RenderScene*>(camera_cmp.scene);
 	Vec3 origin, dir;
-	scene->getRay(camera_cmp.handle, (float)x, (float)y, origin, dir);
+	scene->getRay(camera_cmp.handle, {(float)x, (float)y}, origin, dir);
 	RayCastModelHit hit = scene->castRayTerrain(m_component.handle, origin, dir);
 	if (hit.m_is_hit)
 	{
@@ -1742,8 +1742,8 @@ void TerrainEditor::onGUI()
 	if(m_action_type == NOT_SET) return;
 	if(!m_is_enabled) return;
 
-	float mouse_x = m_world_editor.getMouseX();
-	float mouse_y = m_world_editor.getMouseY();
+	float mouse_x = m_world_editor.getMousePos().x;
+	float mouse_y = m_world_editor.getMousePos().y;
 
 	for(auto entity : m_world_editor.getSelectedEntities())
 	{
@@ -1753,7 +1753,7 @@ void TerrainEditor::onGUI()
 		ComponentUID camera_cmp = m_world_editor.getEditCamera();
 		RenderScene* scene = static_cast<RenderScene*>(camera_cmp.scene);
 		Vec3 origin, dir;
-		scene->getRay(camera_cmp.handle, (float)mouse_x, (float)mouse_y, origin, dir);
+		scene->getRay(camera_cmp.handle, {(float)mouse_x, (float)mouse_y}, origin, dir);
 		RayCastModelHit hit = scene->castRayTerrain(terrain, origin, dir);
 
 		if(hit.m_is_hit)
