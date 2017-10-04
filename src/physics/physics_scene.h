@@ -33,6 +33,7 @@ struct IAllocator;
 struct Matrix;
 class Path;
 class PhysicsSystem;
+struct Quat;
 struct RagdollBone;
 struct RigidTransform;
 class Universe;
@@ -61,7 +62,8 @@ public:
 		BOX,
 		MESH,
 		CAPSULE,
-		SPHERE
+		SPHERE,
+		RIGID
 	};
 	enum class BoneOrientation : int
 	{
@@ -199,6 +201,26 @@ public:
 	virtual float getControllerHeight(ComponentHandle cmp) = 0;
 	virtual bool isControllerTouchingDown(ComponentHandle cmp) = 0;
 	virtual void resizeController(ComponentHandle cmp, float height) = 0;
+
+	virtual void addBoxGeometry(ComponentHandle cmp, int index) = 0;
+	virtual void removeBoxGeometry(ComponentHandle cmp, int index) = 0;
+	virtual int getBoxGeometryCount(ComponentHandle cmp) = 0;
+	virtual Vec3 getBoxGeomHalfExtents(ComponentHandle cmp, int index) = 0;
+	virtual void setBoxGeomHalfExtents(ComponentHandle cmp, int index, const Vec3& size) = 0;
+	virtual Vec3 getBoxGeomOffsetPosition(ComponentHandle cmp, int index) = 0;
+	virtual void setBoxGeomOffsetPosition(ComponentHandle cmp, int index, const Vec3& pos) = 0;
+	virtual Vec3 getBoxGeomOffsetRotation(ComponentHandle cmp, int index) = 0;
+	virtual void setBoxGeomOffsetRotation(ComponentHandle cmp, int index, const Vec3& euler_angles) = 0;
+
+	virtual void addSphereGeometry(ComponentHandle cmp, int index) = 0;
+	virtual void removeSphereGeometry(ComponentHandle cmp, int index) = 0;
+	virtual int getSphereGeometryCount(ComponentHandle cmp) = 0;
+	virtual float getSphereGeomRadius(ComponentHandle cmp, int index) = 0;
+	virtual void setSphereGeomRadius(ComponentHandle cmp, int index, float size) = 0;
+	virtual Vec3 getSphereGeomOffsetPosition(ComponentHandle cmp, int index) = 0;
+	virtual void setSphereGeomOffsetPosition(ComponentHandle cmp, int index, const Vec3& pos) = 0;
+	virtual Vec3 getSphereGeomOffsetRotation(ComponentHandle cmp, int index) = 0;
+	virtual void setSphereGeomOffsetRotation(ComponentHandle cmp, int index, const Vec3& euler_angles) = 0;
 
 	virtual BoneOrientation getNewBoneOrientation() const = 0;
 	virtual void setNewBoneOrientation(BoneOrientation orientation) = 0;

@@ -296,6 +296,44 @@ namespace Lumix
 			LUMIX_NEW(allocator, PhysicsLayerPropertyDescriptor)(
 				"Layer", &PhysicsScene::getControllerLayer, &PhysicsScene::setControllerLayer));
 
+		PropertyRegister::add("rigid_actor",
+			LUMIX_NEW(allocator, DynamicTypePropertyDescriptor)(
+				"Dynamic", &PhysicsScene::getDynamicType, &PhysicsScene::setDynamicType));
+		PropertyRegister::add("rigid_actor",
+			LUMIX_NEW(allocator, BoolPropertyDescriptor<PhysicsScene>)(
+				"Trigger", &PhysicsScene::getIsTrigger, &PhysicsScene::setIsTrigger));
+		PropertyRegister::add("rigid_actor",
+			LUMIX_NEW(allocator, PhysicsLayerPropertyDescriptor)(
+				"Layer", &PhysicsScene::getActorLayer, &PhysicsScene::setActorLayer));
+		
+		auto box_geom = LUMIX_NEW(allocator, ArrayDescriptor<PhysicsScene>)(
+			"Box geometry", &PhysicsScene::getBoxGeometryCount, &PhysicsScene::addBoxGeometry, &PhysicsScene::removeBoxGeometry, allocator);
+		auto box_geom_size = LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec3, PhysicsScene>)(
+			"Size", &PhysicsScene::getBoxGeomHalfExtents, &PhysicsScene::setBoxGeomHalfExtents);
+		auto box_geom_pos_offset = LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec3, PhysicsScene>)(
+			"Position offset", &PhysicsScene::getBoxGeomOffsetPosition, &PhysicsScene::setBoxGeomOffsetPosition);
+		auto box_geom_rot_offset = LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec3, PhysicsScene>)(
+			"Rotation offset", &PhysicsScene::getBoxGeomOffsetRotation, &PhysicsScene::setBoxGeomOffsetRotation);
+		box_geom_rot_offset->setIsInRadians(true);
+		box_geom->addChild(box_geom_size);
+		box_geom->addChild(box_geom_pos_offset);
+		box_geom->addChild(box_geom_rot_offset);
+		PropertyRegister::add("rigid_actor", box_geom);
+		
+		auto sphere_geom = LUMIX_NEW(allocator, ArrayDescriptor<PhysicsScene>)(
+			"Sphere geometry", &PhysicsScene::getSphereGeometryCount, &PhysicsScene::addSphereGeometry, &PhysicsScene::removeSphereGeometry, allocator);
+		auto sphere_geom_radius = LUMIX_NEW(allocator, DecimalPropertyDescriptor<PhysicsScene>)(
+			"Radius", &PhysicsScene::getSphereGeomRadius, &PhysicsScene::setSphereGeomRadius, 0.01f, FLT_MAX, 0.0f);
+		auto sphere_geom_pos_offset = LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec3, PhysicsScene>)(
+			"Position offset", &PhysicsScene::getSphereGeomOffsetPosition, &PhysicsScene::setSphereGeomOffsetPosition);
+		auto sphere_geom_rot_offset = LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec3, PhysicsScene>)(
+			"Rotation offset", &PhysicsScene::getSphereGeomOffsetRotation, &PhysicsScene::setSphereGeomOffsetRotation);
+		sphere_geom_rot_offset->setIsInRadians(true);
+		sphere_geom->addChild(sphere_geom_radius);
+		sphere_geom->addChild(sphere_geom_pos_offset);
+		sphere_geom->addChild(sphere_geom_rot_offset);
+		PropertyRegister::add("rigid_actor", sphere_geom);
+
 		PropertyRegister::add("box_rigid_actor",
 			LUMIX_NEW(allocator, DynamicTypePropertyDescriptor)(
 				"Dynamic", &PhysicsScene::getDynamicType, &PhysicsScene::setDynamicType));

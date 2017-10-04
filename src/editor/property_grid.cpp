@@ -446,6 +446,7 @@ void PropertyGrid::showArrayProperty(const Array<Entity>& entities,
 	}
 
 	int count = desc.getCount(cmp);
+	ImGui::PushID(&desc);
 	if (desc.canAdd() && ImGui::Button("Add"))
 	{
 		m_editor.addArrayPropertyItem(cmp, desc);
@@ -478,6 +479,7 @@ void PropertyGrid::showArrayProperty(const Array<Entity>& entities,
 		}
 		ImGui::PopID();
 	}
+	ImGui::PopID();
 
 	if (m_deferred_select.isValid())
 	{
