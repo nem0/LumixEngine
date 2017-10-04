@@ -53,13 +53,18 @@ template <typename T> LUMIX_FORCE_INLINE void swap(T& a, T& b)
 	b = tmp;
 }
 
+template <typename T> LUMIX_FORCE_INLINE T minimum(T a)
+{
+	return a;
+}
+
 template <typename T1, typename... T2> LUMIX_FORCE_INLINE T1 minimum(T1 a, T2... b)
 {
 	T1 min_b = minimum(b...);
 	return a < min_b ? a : min_b;
 }
 
-template <typename T> LUMIX_FORCE_INLINE T minimum(T a)
+template <typename T> LUMIX_FORCE_INLINE T maximum(T a)
 {
 	return a;
 }
@@ -68,11 +73,6 @@ template <typename T1, typename... T2> LUMIX_FORCE_INLINE T1 maximum(T1 a, T2...
 {
 	T1 min_b = maximum(b...);
 	return a > min_b ? a : min_b;
-}
-
-template <typename T> LUMIX_FORCE_INLINE T maximum(T a)
-{
-	return a;
 }
 
 LUMIX_FORCE_INLINE float floor(float f)
