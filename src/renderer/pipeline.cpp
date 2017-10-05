@@ -868,6 +868,9 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			if (m_current_framebuffer)
 			{
 				bgfx::setViewFrameBuffer(m_current_view->bgfx_id, m_current_framebuffer->getHandle());
+				u16 w = m_current_framebuffer->getWidth();
+				u16 h = m_current_framebuffer->getHeight();
+				bgfx::setViewRect(m_current_view->bgfx_id, 0, 0, w, h);
 			}
 			else
 			{
@@ -879,6 +882,9 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		if (m_current_framebuffer)
 		{
 			bgfx::setViewFrameBuffer(m_current_view->bgfx_id, m_current_framebuffer->getHandle());
+			u16 w = m_current_framebuffer->getWidth();
+			u16 h = m_current_framebuffer->getHeight();
+			bgfx::setViewRect(m_current_view->bgfx_id, 0, 0, w, h);
 		}
 		else
 		{
