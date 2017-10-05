@@ -157,10 +157,7 @@ struct WorkerTask : MT::Task
 	int task() override
 	{
 		g_worker = this;
-		Fiber::initThread();
-		m_primary_fiber = Fiber::create(64*1024, manage, this);
-		Fiber::Handle prev;
-		Fiber::switchTo(&prev, m_primary_fiber);
+		Fiber::initThread(manage, &m_primary_fiber);
 		return 0;
 	}
 
@@ -171,7 +168,7 @@ struct WorkerTask : MT::Task
 		static void manage(void* data)
 	#endif
 	{
-		WorkerTask* that = (WorkerTask*)data;
+		WorkerTask* that = (WorkerTask*)g_worker;
 		that->m_finished = false;
 		while (!that->m_finished)
 		{
