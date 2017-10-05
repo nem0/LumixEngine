@@ -165,7 +165,11 @@ struct WorkerTask : MT::Task
 	}
 
 
-	static void manage(void* data)
+	#ifdef _WIN32
+		static void __stdcall manage(void* data)
+	#else
+		static void manage(void* data)
+	#endif
 	{
 		WorkerTask* that = (WorkerTask*)data;
 		that->m_finished = false;
