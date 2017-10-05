@@ -26,7 +26,7 @@ namespace Fiber
 constexpr void* INVALID_FIBER = nullptr;
 
 
-void initThread();
+void initThread(FiberProc proc, Handle* handle);
 Handle create(int stack_size, FiberProc proc, void* parameter);
 void destroy(Handle fiber);
 void switchTo(Handle* from, Handle fiber);

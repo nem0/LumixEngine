@@ -10,9 +10,10 @@ namespace Fiber
 {
 
 
-void initThread()
+void initThread(FiberProc proc, Handle* out)
 {
-	ConvertThreadToFiber(nullptr);
+	*out = ConvertThreadToFiber(nullptr);
+	proc(nullptr);
 }
 
 
