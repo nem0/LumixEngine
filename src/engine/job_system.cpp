@@ -157,26 +157,29 @@ struct WorkerTask : MT::Task
 	int task() override
 	{
 		g_worker = this;
-		m_primary_fiber = Fiber::createFromThread(this);
-		manage();
+		Fiber::initThread();
+		m_primary_fiber = Fiber::create(64*1024, manage, this);
+		Fiber::Handle prev;
+		Fiber::switchTo(&prev, m_primary_fiber);
 		return 0;
 	}
 
 
-	void manage()
+	static void manage(void* data)
 	{
-		m_finished = false;
-		while (!m_finished)
+		WorkerTask* that = (WorkerTask*)data;
+		that->m_finished = false;
+		while (!that->m_finished)
 		{
 			SleepingFiber ready_sleeping_fiber;
 			if (getReadySleepingFiber(*g_system, &ready_sleeping_fiber))
 			{
-				ready_sleeping_fiber.fiber->worker_task = this;
+				ready_sleeping_fiber.fiber->worker_task = that;
 				ready_sleeping_fiber.fiber->switch_state = nullptr;
 				PROFILE_BLOCK("work");
-				m_current_fiber = ready_sleeping_fiber.fiber;
-				Fiber::switchTo(ready_sleeping_fiber.fiber->fiber);
-				m_current_fiber = nullptr;
+				that->m_current_fiber = ready_sleeping_fiber.fiber;
+				Fiber::switchTo(&that->m_primary_fiber, ready_sleeping_fiber.fiber->fiber);
+				that->m_current_fiber = nullptr;
 				ASSERT(Profiler::getCurrentBlock() == Profiler::getRootBlock(MT::getCurrentThreadID()));
 				handleSwitch(*ready_sleeping_fiber.fiber);
 				continue;
@@ -186,13 +189,13 @@ struct WorkerTask : MT::Task
 			if (getReadyJob(*g_system, &job))
 			{
 				FiberDecl& fiber_decl = getFreeFiber();
-				fiber_decl.worker_task = this;
+				fiber_decl.worker_task = that;
 				fiber_decl.current_job = job;
 				fiber_decl.switch_state = nullptr;
 				PROFILE_BLOCK("work");
-				m_current_fiber = &fiber_decl;
-				Fiber::switchTo(fiber_decl.fiber);
-				m_current_fiber = nullptr;
+				that->m_current_fiber = &fiber_decl;
+				Fiber::switchTo(&that->m_primary_fiber, fiber_decl.fiber);
+				that->m_current_fiber = nullptr;
 				ASSERT(Profiler::getCurrentBlock() == Profiler::getRootBlock(MT::getCurrentThreadID()));
 				handleSwitch(fiber_decl);
 			}
@@ -226,7 +229,7 @@ static void fiberProc(void* data)
 		if(job.counter) MT::atomicDecrement(job.counter);
 
 		fiber_decl->switch_state = nullptr;
-		Fiber::switchTo(fiber_decl->worker_task->m_primary_fiber);
+		Fiber::switchTo(&fiber_decl->fiber, fiber_decl->worker_task->m_primary_fiber);
 	}
 }
 
@@ -320,10 +323,10 @@ void wait(int volatile* counter)
 	if (*counter <= 0) return;
 	if (g_worker)
 	{
-		ASSERT(Profiler::getCurrentBlock() == Profiler::getRootBlock(MT::getCurrentThreadID()));
+		//ASSERT(Profiler::getCurrentBlock() == Profiler::getRootBlock(MT::getCurrentThreadID()));
 		FiberDecl* fiber_decl = ((WorkerTask*)g_worker)->m_current_fiber;
 		fiber_decl->switch_state = (void*)counter;
-		Fiber::switchTo(fiber_decl->worker_task->m_primary_fiber);
+		Fiber::switchTo(&fiber_decl->fiber, fiber_decl->worker_task->m_primary_fiber);
 	}
 	else
 	{

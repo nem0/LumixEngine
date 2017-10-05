@@ -11,11 +11,8 @@ namespace Fiber
 {
 
 
-Handle createFromThread(void* parameter)
+void  initThread()
 {
-	ucontext_t fib;
-	getcontext(&fib);
-	return fib;
 }
 
 
@@ -37,10 +34,9 @@ void destroy(Handle fiber)
 }
 
 
-void switchTo(Handle fiber)
+void switchTo(Handle* prev, Handle fiber)
 {
-	ucontext_t prev;
-	swapcontext(&prev, &fiber); 
+	swapcontext(prev, &fiber); 
 }
 
 
