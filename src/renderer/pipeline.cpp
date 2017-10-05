@@ -997,6 +997,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		auto dest_rb = dest_fb->getRenderbufferHandle(dest_rb_idx);
 
 		bgfx::blit(m_current_view->bgfx_id, dest_rb, 0, 0, src_rb);
+		bgfx::touch(m_current_view->bgfx_id);
 	}
 
 
