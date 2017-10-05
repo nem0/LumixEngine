@@ -10,9 +10,9 @@ namespace Fiber
 {
 
 
-Handle createFromThread(void* parameter)
+void initThread()
 {
-	return ConvertThreadToFiber(parameter);
+	ConvertThreadToFiber(nullptr);
 }
 
 
@@ -28,7 +28,7 @@ void destroy(Handle fiber)
 }
 
 
-void switchTo(Handle fiber)
+void switchTo(Handle* from, Handle fiber)
 {
 	SwitchToFiber(fiber);
 }
