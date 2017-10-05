@@ -2394,17 +2394,18 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 			if (renderer) renderer->resize(m_width, m_height);
 		}
 
-		m_gui_pipeline->render();
-		setGUIProjection();
-
-		for (int i = 0; i < draw_data->CmdListsCount; ++i)
+		if (m_gui_pipeline->render())
 		{
-			ImDrawList* cmd_list = draw_data->CmdLists[i];
-			drawGUICmdList(cmd_list);
+			setGUIProjection();
+
+			for (int i = 0; i < draw_data->CmdListsCount; ++i)
+			{
+				ImDrawList* cmd_list = draw_data->CmdLists[i];
+				drawGUICmdList(cmd_list);
+			}
+
 		}
-
 		Renderer* renderer = static_cast<Renderer*>(m_engine.getPluginManager().getPlugin("renderer"));
-
 		renderer->frame(false);
 	}
 

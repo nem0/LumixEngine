@@ -2724,12 +2724,12 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
-	void render() override
+	bool render() override
 	{
 		PROFILE_FUNCTION();
 
-		if (!isReady()) return;
-		if (!m_scene) return;
+		if (!isReady()) return false;
+		if (!m_scene) return false;
 
 		m_stats = {};
 		m_applied_camera = INVALID_COMPONENT;
@@ -2753,11 +2753,13 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		}
 
 		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
+		bool success = true;
 		if (lua_getfield(m_lua_state, -1, "render") == LUA_TFUNCTION)
 		{
 			lua_pushlightuserdata(m_lua_state, this);
 			if (lua_pcall(m_lua_state, 1, 0, 0) != LUA_OK)
 			{
+				success = false;
 				g_log_warning.log("Renderer") << lua_tostring(m_lua_state, -1);
 				lua_pop(m_lua_state, 1);
 			}
@@ -2767,6 +2769,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			lua_pop(m_lua_state, 1);
 		}
 		finishInstances();
+		return success;
 	}
 
 
@@ -3010,12 +3013,14 @@ int newView(lua_State* L)
 {
 	auto* pipeline = LuaWrapper::checkArg<PipelineImpl*>(L, 1);
 	const char* debug_name = LuaWrapper::checkArg<const char*>(L, 2);
+	const char* framebuffer_name = LuaWrapper::checkArg<const char*>(L, 3);
 	u64 layer_mask = 0;
-	if (lua_gettop(L) > 2) layer_mask = LuaWrapper::checkArg<u64>(L, 3);
+	if (lua_gettop(L) > 3) layer_mask = LuaWrapper::checkArg<u64>(L, 4);
 
 	pipeline->m_layer_mask |= layer_mask;
 
 	LuaWrapper::push(L, pipeline->newView(debug_name, layer_mask));
+	pipeline->setFramebuffer(framebuffer_name);
 	return 1;
 }
 
@@ -3191,7 +3196,6 @@ void Pipeline::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(enableDepthWrite);
 	REGISTER_FUNCTION(disableDepthWrite);
 	REGISTER_FUNCTION(renderDebugShapes);
-	REGISTER_FUNCTION(setFramebuffer);
 	REGISTER_FUNCTION(renderParticles);
 	REGISTER_FUNCTION(executeCustomCommand);
 	REGISTER_FUNCTION(getFPS);
