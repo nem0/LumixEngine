@@ -11,8 +11,15 @@ namespace Fiber
 {
 
 
-void  initThread()
+thread_local Handle g_finisher;
+
+
+void initThread(FiberProc proc, Handle* out)
 {
+	*out = create(64*1024, proc, nullptr);
+	getcontext(&g_finisher);
+	out->uc_link = &g_finisher;
+	switchTo(&g_finisher, *out);
 }
 
 
