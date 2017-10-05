@@ -1,6 +1,7 @@
 #include "engine/mt/sync.h"
 #include "engine/mt/atomic.h"
 #include "engine/mt/thread.h"
+#include <errno.h>
 
 
 namespace Lumix
@@ -121,15 +122,16 @@ void Event::waitTimeout(u32 timeout_ms)
 	timespec ts;
 	clock_gettime(CLOCK_REALTIME, &ts);
 	ts.tv_nsec += (long)timeout_ms * 1000 * 1000;
-	if(ts.tv_nsec > 1000000)
+	if(ts.tv_nsec > 1000000000)
 	{
-		ts.tv_nsec -= 1000000;
+		ts.tv_nsec -= 1000000000;
 		ts.tv_sec += 1;
 	}
 	while (!m_id.signaled)
 	{
 		res = pthread_cond_timedwait(&m_id.cond, &m_id.mutex, &ts);
-		ASSERT(res == 0 || res == 110);
+		if(res == ETIMEDOUT) break;
+		ASSERT(res == 0);
 	}
 
 	if (!m_id.manual_reset) m_id.signaled = false;
