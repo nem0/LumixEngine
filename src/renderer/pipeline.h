@@ -84,7 +84,7 @@ class LUMIX_RENDERER_API Pipeline
 		virtual ~Pipeline() {}
 
 		virtual void load() = 0;
-		virtual void render() = 0;
+		virtual bool render() = 0;
 		virtual void setViewport(int x, int y, int width, int height) = 0;
 
 		static Pipeline* create(Renderer& renderer, const Path& path, const char* define, IAllocator& allocator);
