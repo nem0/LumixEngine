@@ -37,7 +37,7 @@ struct Quat;
 struct RagdollBone;
 struct RigidTransform;
 class Universe;
-template <typename T> class Delegate;
+template <typename T> class DelegateList;
 
 
 struct RaycastHit
@@ -96,8 +96,7 @@ public:
 	virtual bool raycastEx(const Vec3& origin, const Vec3& dir, float distance, RaycastHit& result, Entity ignored) = 0;
 	virtual PhysicsSystem& getSystem() const = 0;
 
-	virtual ContactCallbackHandle addOnContactCallback(Delegate<void(const ContactData&)> callback) = 0;
-	virtual void removeOnContactCallback(ContactCallbackHandle idx) = 0;
+	virtual DelegateList<void(const ContactData&)>& onContact() = 0;
 	virtual ComponentHandle getActorComponent(Entity entity) = 0;
 	virtual void setActorLayer(ComponentHandle cmp, int layer) = 0;
 	virtual int getActorLayer(ComponentHandle cmp) = 0;

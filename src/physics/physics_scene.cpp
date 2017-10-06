@@ -217,13 +217,6 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	};
 
 
-	struct ContactCallback
-	{
-		ContactCallbackHandle handle;
-		Delegate<void(const ContactData&)> callback;
-	};
-
-
 	struct PhysxContactCallback LUMIX_FINAL : public PxSimulationEventCallback
 	{
 		explicit PhysxContactCallback(PhysicsSceneImpl& scene)
@@ -458,10 +451,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 		send(contact_data.e1, contact_data.e2, contact_data.position);
 		send(contact_data.e2, contact_data.e1, contact_data.position);
-		for (auto& cb : m_contact_callbacks)
-		{
-			cb.callback.invoke(contact_data);
-		}
+		m_contact_callbacks.invoke(contact_data);
 	}
 
 
@@ -2280,22 +2270,11 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	ContactCallbackHandle addOnContactCallback(Delegate<void(const ContactData&)> callback) override
+	DelegateList<void(const ContactData&)>& onContact() override
 	{
-		ContactCallback cb;
-		cb.handle = m_contact_callbacks.empty() ? 0 : m_contact_callbacks.back().handle + 1;
-		cb.callback = callback;
-		m_contact_callbacks.push(cb);
-		return cb.handle;
+		return m_contact_callbacks;
 	}
-
-
-	void removeOnContactCallback(ContactCallbackHandle handle) override
-	{
-		m_contact_callbacks.eraseItems([handle](const ContactCallback& cb) { return cb.handle == handle; });
-	}
-
-
+	
 
 	ComponentHandle getActorComponent(Entity entity) override
 	{
@@ -4973,7 +4952,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	AssociativeArray<Entity, Heightfield> m_terrains;
 
 	Array<RigidActor*> m_dynamic_actors;
-	Array<ContactCallback> m_contact_callbacks;
+	DelegateList<void(const ContactData&)> m_contact_callbacks;
 	bool m_is_game_running;
 	bool m_is_updating_ragdoll;
 	u32 m_debug_visualization_flags;
