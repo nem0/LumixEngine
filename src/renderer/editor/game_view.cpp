@@ -76,7 +76,7 @@ GameView::GameView(StudioApp& app)
 	auto* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
 	m_is_opengl = renderer->isOpenGL();
 	Path path("pipelines/main.lua");
-	m_pipeline = Pipeline::create(*renderer, path, "game_view", engine.getAllocator());
+	m_pipeline = Pipeline::create(*renderer, path, "GAME_VIEW", engine.getAllocator());
 	m_pipeline->load();
 
 	editor.universeCreated().bind<GameView, &GameView::onUniverseCreated>(this);
