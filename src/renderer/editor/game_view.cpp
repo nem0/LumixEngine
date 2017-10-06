@@ -179,10 +179,9 @@ void GameView::onFullscreenGUI()
 		return;
 	}
 
-	m_pipeline->setViewport(0, 0, int(size.x), int(size.y));
+	m_pipeline->resize(int(size.x), int(size.y));
 
-	auto* fb = m_pipeline->getFramebuffer("default");
-	m_texture_handle = fb->getRenderbufferHandle(0);
+	m_texture_handle = m_pipeline->getRenderbuffer("default", 0);
 	if (m_is_opengl)
 	{
 		ImGui::Image(&m_texture_handle, size, ImVec2(0, 1), ImVec2(1, 0));
@@ -294,10 +293,9 @@ void GameView::onWindowGUI()
 		if (m_forced_viewport.enabled) size = { (float)m_forced_viewport.width, (float)m_forced_viewport.height };
 		if (size.x > 0 && size.y > 0)
 		{
-			m_pipeline->setViewport(0, 0, int(size.x), int(size.y));
+			m_pipeline->resize(int(size.x), int(size.y));
 			m_pipeline->render();
-			auto* fb = m_pipeline->getFramebuffer("default");
-			if (fb) m_texture_handle = fb->getRenderbufferHandle(0);
+			m_texture_handle = m_pipeline->getRenderbuffer("default", 0);
 
 			view_pos = ImGui::GetCursorScreenPos();
 			if (m_is_opengl)

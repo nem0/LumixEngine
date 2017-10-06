@@ -278,6 +278,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		, m_renderer(renderer)
 		, m_default_framebuffer(nullptr)
 		, m_debug_line_material(nullptr)
+		, m_copy_material(nullptr)
 		, m_default_cubemap(nullptr)
 		, m_debug_flags(BGFX_DEBUG_TEXT)
 		, m_point_light_shadowmaps(allocator)
@@ -286,8 +287,6 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		, m_is_rendering_in_shadowmap(false)
 		, m_is_ready(false)
 		, m_debug_index_buffer(BGFX_INVALID_HANDLE)
-		, m_view_x(0)
-		, m_view_y(0)
 		, m_scene(nullptr)
 		, m_width(-1)
 		, m_height(-1)
@@ -314,6 +313,8 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 		m_debug_line_material = static_cast<Material*>(
 			renderer.getMaterialManager().load(Path("pipelines/editor/debugline.mat")));
+		m_copy_material = static_cast<Material*>(
+			renderer.getMaterialManager().load(Path("pipelines/common/copy.mat")));
 		m_default_cubemap = static_cast<Texture*>(
 			renderer.getTextureManager().load(Path("pipelines/pbr/default_probe.dds")));
 
@@ -329,7 +330,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
-	static void parseRenderbuffers(lua_State* L, FrameBuffer::Declaration& decl)
+	static void parseRenderbuffers(lua_State* L, FrameBuffer::Declaration& decl, PipelineImpl* pipeline)
 	{
 		decl.m_renderbuffers_count = 0;
 		int len = (int)lua_rawlen(L, -1);
@@ -337,9 +338,35 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		{
 			if (lua_rawgeti(L, -1, 1 + i) == LUA_TTABLE)
 			{
-				FrameBuffer::RenderBuffer& buf =
-					decl.m_renderbuffers[decl.m_renderbuffers_count];
-				buf.parse(L);
+				FrameBuffer::RenderBuffer& buf = decl.m_renderbuffers[decl.m_renderbuffers_count];
+				bool is_shared = lua_getfield(L, -1, "shared") == LUA_TTABLE;
+				if (is_shared)
+				{
+					StaticString<64> fb_name;
+					int rb_idx;
+					if (lua_getfield(L, -1, "fb") == LUA_TSTRING)
+					{
+						fb_name = lua_tostring(L, -1);
+					}
+					lua_pop(L, 1);
+					if (lua_getfield(L, -1, "rb") == LUA_TNUMBER)
+					{
+						rb_idx = (int)lua_tonumber(L, -1);
+					}
+					lua_pop(L, 1);
+					FrameBuffer* shared_fb = pipeline->getFramebuffer(fb_name);
+					if (!shared_fb || rb_idx >= shared_fb->getRenderbuffersCounts())
+					{
+						buf.m_format = bgfx::TextureFormat::RGBA8;
+						g_log_error.log("Renderer") << "Can not share render buffer from " << fb_name << ", it does not exist.";
+					}
+					else
+					{
+						buf.m_shared = &shared_fb->getRenderbuffer(rb_idx);
+					}
+				}
+				lua_pop(L, 1);
+				if(!is_shared) buf.parse(L);
 				++decl.m_renderbuffers_count;
 			}
 			lua_pop(L, 1);
@@ -514,6 +541,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		m_cam_inv_view_uniform = bgfx::createUniform("u_camInvView", bgfx::UniformType::Mat4);
 		m_cam_inv_viewproj_uniform = bgfx::createUniform("u_camInvViewProj", bgfx::UniformType::Mat4);
 		m_cam_inv_proj_uniform = bgfx::createUniform("u_camInvProj", bgfx::UniformType::Mat4);
+		m_texture_uniform = bgfx::createUniform("u_texture", bgfx::UniformType::Int1);
 		m_tex_shadowmap_uniform = bgfx::createUniform("u_texShadowmap", bgfx::UniformType::Int1);
 		m_terrain_scale_uniform = bgfx::createUniform("u_terrainScale", bgfx::UniformType::Vec4);
 		m_rel_camera_pos_uniform = bgfx::createUniform("u_relCamPos", bgfx::UniformType::Vec4);
@@ -537,6 +565,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	void destroyUniforms()
 	{
 		bgfx::destroyUniform(m_tex_shadowmap_uniform);
+		bgfx::destroyUniform(m_texture_uniform);
 		bgfx::destroyUniform(m_terrain_matrix_uniform);
 		bgfx::destroyUniform(m_bone_matrices_uniform);
 		bgfx::destroyUniform(m_layer_uniform);
@@ -572,6 +601,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		}
 
 		m_debug_line_material->getResourceManager().unload(*m_debug_line_material);
+		m_copy_material->getResourceManager().unload(*m_copy_material);
 		m_default_cubemap->getResourceManager().unload(*m_default_cubemap);
 
 		destroyUniforms();
@@ -816,7 +846,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		Matrix view = universe.getMatrix(m_scene->getCameraEntity(cmp));
 		view.fastInverse();
 		bgfx::setViewTransform(m_current_view->bgfx_id, &view.m11, &projection_matrix.m11);
-		bgfx::setViewRect(m_current_view->bgfx_id, (uint16_t)m_view_x, (uint16_t)m_view_y, (u16)m_width, (u16)m_height);
+		bgfx::setViewRect(m_current_view->bgfx_id, 0, 0, (u16)m_width, (u16)m_height);
 	}
 
 
@@ -847,7 +877,16 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
-	FrameBuffer* getFramebuffer(const char* framebuffer_name) override
+	bgfx::TextureHandle& getRenderbuffer(const char* framebuffer_name, int renderbuffer_idx)
+	{
+		static bgfx::TextureHandle invalid = BGFX_INVALID_HANDLE;
+		FrameBuffer* fb = getFramebuffer(framebuffer_name);
+		if (!fb) return invalid;
+		return fb->getRenderbufferHandle(renderbuffer_idx);
+	}
+
+
+	FrameBuffer* getFramebuffer(const char* framebuffer_name)
 	{
 		for (auto* framebuffer : m_framebuffers)
 		{
@@ -995,15 +1034,33 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 	void copyRenderbuffer(const char* src_fb_name, int src_rb_idx, const char* dest_fb_name, int dest_rb_idx)
 	{
-		auto* src_fb = getFramebuffer(src_fb_name);
-		auto* dest_fb = getFramebuffer(dest_fb_name);
-		if (!src_fb || !dest_fb) return;
+		FrameBuffer* src_fb = getFramebuffer(src_fb_name);
+		if (!src_fb) return;
+		FrameBuffer* dest_fb = getFramebuffer(dest_fb_name);
+		if (!dest_fb) return;
 
-		auto src_rb = src_fb->getRenderbufferHandle(src_rb_idx);
-		auto dest_rb = dest_fb->getRenderbufferHandle(dest_rb_idx);
+		// TODO
+		if (true && bgfx::getCaps()->supported & BGFX_CAPS_TEXTURE_BLIT)
+		{
+			auto src_rb = src_fb->getRenderbufferHandle(src_rb_idx);
+			auto dest_rb = dest_fb->getRenderbufferHandle(dest_rb_idx);
 
-		bgfx::blit(m_current_view->bgfx_id, dest_rb, 0, 0, src_rb);
-		bgfx::touch(m_current_view->bgfx_id);
+			bgfx::blit(m_current_view->bgfx_id, dest_rb, 0, 0, src_rb);
+			bgfx::touch(m_current_view->bgfx_id);
+			return;
+		}
+
+		if (!m_copy_material->isReady()) return;
+
+		bgfx::FrameBufferHandle tmp_fb = bgfx::createFrameBuffer(1, &dest_fb->getRenderbufferHandle(dest_rb_idx));
+		bgfx::setViewFrameBuffer(m_current_view->bgfx_id, tmp_fb);
+		bgfx::setViewRect(m_current_view->bgfx_id, 0, 0, dest_fb->getWidth(), dest_fb->getHeight());
+		
+		bgfx::TextureHandle src_tex = src_fb->getRenderbufferHandle(src_rb_idx);
+		bgfx::setTexture(0, m_texture_uniform, src_tex);
+		drawQuadExMaterial(0, 0, 1, 1, 0, 0, 1, 1, m_copy_material);
+		
+		bgfx::destroyFrameBuffer(tmp_fb);
 	}
 
 
@@ -1072,18 +1129,10 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			if (equalStrings(m_framebuffers[i]->getName(), framebuffer_name))
 			{
 				LUMIX_DELETE(m_allocator, m_framebuffers[i]);
-				m_framebuffers.eraseFast(i);
+				m_framebuffers.erase(i);
 				break;
 			}
 		}
-	}
-
-
-	void* getRenderbuffer(const char* framebuffer_name, int renderbuffer_index)
-	{
-		auto* fb = getFramebuffer(framebuffer_name);
-		if (!fb) return nullptr;
-		return &fb->getRenderbuffer(renderbuffer_index).m_handle;
 	}
 
 
@@ -1900,6 +1949,12 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	{
 		Resource* res = m_scene->getEngine().getLuaResource(material_index);
 		Material* material = static_cast<Material*>(res);
+		drawQuadExMaterial(left, top, w, h, u0, v0, u1, v1, material);
+	}
+
+
+	void drawQuadExMaterial(float left, float top, float w, float h, float u0, float v0, float u1, float v1, Material* material)
+	{
 		if (!material->isReady() || bgfx::getAvailTransientVertexBuffer(3, m_base_vertex_decl) < 3)
 		{
 			bgfx::touch(m_current_view->bgfx_id);
@@ -1913,14 +1968,14 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		if (m_current_framebuffer)
 		{
 			bgfx::setViewRect(m_current_view->bgfx_id,
-				m_view_x,
-				m_view_y,
+				0,
+				0,
 				(u16)m_current_framebuffer->getWidth(),
 				(u16)m_current_framebuffer->getHeight());
 		}
 		else
 		{
-			bgfx::setViewRect(m_current_view->bgfx_id, m_view_x, m_view_y, (u16)m_width, (u16)m_height);
+			bgfx::setViewRect(m_current_view->bgfx_id, 0, 0, (u16)m_width, (u16)m_height);
 		}
 
 		bgfx::TransientVertexBuffer vb;
@@ -2692,10 +2747,8 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
-	void setViewport(int x, int y, int w, int h) override
+	void resize(int w, int h) override
 	{
-		m_view_x = x;
-		m_view_y = y;
 		if (m_width == w && m_height == h) return;
 
 		if (m_default_framebuffer)
@@ -2916,8 +2969,6 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	Array<GrassInfo> m_grasses_buffer;
 
 	Matrix m_shadow_viewprojection[4];
-	int m_view_x;
-	int m_view_y;
 	int m_width;
 	int m_height;
 	string m_define;
@@ -2941,6 +2992,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	bgfx::UniformHandle m_decal_matrix_uniform;
 	bgfx::UniformHandle m_emitter_matrix_uniform;
 	bgfx::UniformHandle m_tex_shadowmap_uniform;
+	bgfx::UniformHandle m_texture_uniform;
 	bgfx::UniformHandle m_cam_view_uniform;
 	bgfx::UniformHandle m_cam_proj_uniform;
 	bgfx::UniformHandle m_cam_params;
@@ -2953,6 +3005,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	int m_layer_to_view_map[64];
 
 	Material* m_debug_line_material;
+	Material* m_copy_material;
 	Texture* m_default_cubemap;
 	bgfx::DynamicVertexBufferHandle m_debug_vertex_buffers[32];
 	bgfx::DynamicIndexBufferHandle m_debug_index_buffer;
@@ -3057,7 +3110,7 @@ int addFramebuffer(lua_State* L)
 
 	if(lua_getfield(L, 3, "renderbuffers") == LUA_TTABLE)
 	{
-		PipelineImpl::parseRenderbuffers(L, decl);
+		PipelineImpl::parseRenderbuffers(L, decl, pipeline);
 	}
 	lua_pop(L, 1);
 	if ((decl.m_size_ratio.x > 0 || decl.m_size_ratio.y > 0) && pipeline->m_height > 0)
@@ -3119,6 +3172,18 @@ int setUniform(lua_State* L)
 }
 
 
+int getRenderbuffer(lua_State* L)
+{
+	auto* pipeline = LuaWrapper::checkArg<PipelineImpl*>(L, 1);
+	const char* fb_name = LuaWrapper::checkArg<const char*>(L, 2);
+	int rb_idx = LuaWrapper::checkArg<int>(L, 3);
+
+	void* rb = &pipeline->getRenderbuffer(fb_name, rb_idx);
+	LuaWrapper::push(L, rb);
+	return 1;
+}
+
+
 int renderLocalLightsShadowmaps(lua_State* L)
 {
 	auto* pipeline = LuaWrapper::checkArg<PipelineImpl*>(L, 1);
@@ -3176,7 +3241,6 @@ void Pipeline::registerLuaAPI(lua_State* L)
 			registerCFunction(#name, f); \
 		} while(false) \
 
-	REGISTER_FUNCTION(setViewport);
 	REGISTER_FUNCTION(setViewSeq);
 	REGISTER_FUNCTION(drawQuad);
 	REGISTER_FUNCTION(drawQuadEx);
@@ -3216,7 +3280,6 @@ void Pipeline::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(renderDecalsVolumes);
 	REGISTER_FUNCTION(removeFramebuffer);
 	REGISTER_FUNCTION(setMaterialDefine);
-	REGISTER_FUNCTION(getRenderbuffer);
 	REGISTER_FUNCTION(saveRenderbuffer);
 
 	#undef REGISTER_FUNCTION
@@ -3226,6 +3289,7 @@ void Pipeline::registerLuaAPI(lua_State* L)
 
 	REGISTER_FUNCTION(print);
 	REGISTER_FUNCTION(logError);
+	REGISTER_FUNCTION(getRenderbuffer);
 	REGISTER_FUNCTION(renderLocalLightsShadowmaps);
 	REGISTER_FUNCTION(setUniform);
 	REGISTER_FUNCTION(addFramebuffer);

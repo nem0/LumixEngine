@@ -516,12 +516,12 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		}
 		ImVec2 image_size(ImGui::GetContentRegionAvailWidth(), ImGui::GetContentRegionAvailWidth());
 
-		m_pipeline->setViewport(0, 0, (int)image_size.x, (int)image_size.y);
+		m_pipeline->resize((int)image_size.x, (int)image_size.y);
 		m_pipeline->render();
 
 		auto content_min = ImGui::GetCursorScreenPos();
 		ImVec2 content_max(content_min.x + image_size.x, content_min.y + image_size.y);
-		ImGui::Image(&m_pipeline->getFramebuffer("default")->getRenderbuffer(0).m_handle, image_size);
+		ImGui::Image(&m_pipeline->getRenderbuffer("default", 0), image_size);
 		bool mouse_down = ImGui::IsMouseDown(0) || ImGui::IsMouseDown(1);
 		if (m_is_mouse_captured && !mouse_down)
 		{
@@ -789,7 +789,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 			(aabb.max.y + aabb.min.y) * 0.5f,
 			aabb.max.z + aabb.max.x - aabb.min.x });
 
-		m_tile.pipeline->setViewport(0, 0, AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE);
+		m_tile.pipeline->resize(AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE);
 		m_tile.pipeline->render();
 
 		m_tile.texture =
@@ -797,7 +797,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		renderer->viewCounterAdd();
 		bgfx::touch(renderer->getViewCounter());
 		bgfx::setViewName(renderer->getViewCounter(), "billboard_blit");
-		bgfx::TextureHandle color_renderbuffer = m_tile.pipeline->getFramebuffer("default")->getRenderbufferHandle(0);
+		bgfx::TextureHandle color_renderbuffer = m_tile.pipeline->getRenderbuffer("default", 0);
 		bgfx::blit(renderer->getViewCounter(), m_tile.texture, 0, 0, color_renderbuffer);
 
 		renderer->viewCounterAdd();
@@ -1205,7 +1205,7 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		scene->setCameraFOV(camera_cmp, Math::degreesToRadians(90));
 
 		m_pipeline->setScene(scene);
-		m_pipeline->setViewport(0, 0, TEXTURE_SIZE, TEXTURE_SIZE);
+		m_pipeline->resize(TEXTURE_SIZE, TEXTURE_SIZE);
 
 		Renderer* renderer = static_cast<Renderer*>(plugin_manager.getPlugin("renderer"));
 
@@ -1235,8 +1235,7 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 			renderer->viewCounterAdd();
 			bgfx::touch(renderer->getViewCounter());
 			bgfx::setViewName(renderer->getViewCounter(), "probe_blit");
-			auto* default_framebuffer = m_pipeline->getFramebuffer("default");
-			bgfx::TextureHandle color_renderbuffer = default_framebuffer->getRenderbufferHandle(0);
+			bgfx::TextureHandle color_renderbuffer = m_pipeline->getRenderbuffer("default", 0);
 			bgfx::blit(renderer->getViewCounter(), texture, 0, 0, color_renderbuffer);
 
 			renderer->viewCounterAdd();
@@ -2316,7 +2315,7 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 
 		int w, h;
 		SDL_GetWindowSize(m_app.getWindow(), &w, &h);
-		m_gui_pipeline->setViewport(0, 0, w, h);
+		m_gui_pipeline->resize(w, h);
 		renderer->resize(w, h);
 		editor.universeCreated().bind<EditorUIRenderPlugin, &EditorUIRenderPlugin::onUniverseCreated>(this);
 		editor.universeDestroyed().bind<EditorUIRenderPlugin, &EditorUIRenderPlugin::onUniverseDestroyed>(this);
@@ -2403,7 +2402,6 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 				ImDrawList* cmd_list = draw_data->CmdLists[i];
 				drawGUICmdList(cmd_list);
 			}
-
 		}
 		Renderer* renderer = static_cast<Renderer*>(m_engine.getPluginManager().getPlugin("renderer"));
 		renderer->frame(false);
@@ -2431,7 +2429,7 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		bool is_opengl = bgfx::getRendererType() == bgfx::RendererType::OpenGL ||
 			bgfx::getRendererType() == bgfx::RendererType::OpenGLES;
 		ortho.setOrtho(0.0f, width, height, 0.0f, -1.0f, 1.0f, is_opengl);
-		m_gui_pipeline->setViewport(0, 0, (int)width, (int)height);
+		m_gui_pipeline->resize((int)width, (int)height);
 		m_gui_pipeline->setViewProjection(ortho, (int)width, (int)height);
 	}
 

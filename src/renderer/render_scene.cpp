@@ -2882,7 +2882,7 @@ public:
 
 	static void LUA_pipelineRender(Pipeline* pipeline, int w, int h)
 	{
-		pipeline->setViewport(0, 0, w, h);
+		pipeline->resize(w, h);
 		pipeline->render();
 	}
 
@@ -2891,10 +2891,8 @@ public:
 		const char* framebuffer_name,
 		int renderbuffer_idx)
 	{
-		FrameBuffer* fb = pipeline->getFramebuffer(framebuffer_name);
-		if (!fb) return nullptr;
-		FrameBuffer::RenderBuffer& rb = fb->getRenderbuffer(renderbuffer_idx);
-		return &rb.m_handle;
+		bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, renderbuffer_idx);
+		return &handle;
 	}
 
 

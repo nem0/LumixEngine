@@ -121,7 +121,7 @@ public:
 		if (w > 0)
 		{
 			ClipCursor(&screen_rect);
-			m_pipeline->setViewport(0, 0, w, h);
+			m_pipeline->resize(w, h);
 			Renderer* renderer =
 				static_cast<Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
 			renderer->resize(w, h);
@@ -277,7 +277,7 @@ public:
 
 		m_universe = &m_engine->createUniverse(true);
 		m_pipeline->setScene((RenderScene*)m_universe->getScene(crc32("renderer")));
-		m_pipeline->setViewport(0, 0, 600, 400);
+		m_pipeline->resize(600, 400);
 		renderer->resize(600, 400);
 
 		registerLuaAPI();

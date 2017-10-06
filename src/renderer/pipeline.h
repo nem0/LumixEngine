@@ -83,14 +83,13 @@ class LUMIX_RENDERER_API Pipeline
 
 		virtual ~Pipeline() {}
 
-		virtual void load() = 0;
-		virtual bool render() = 0;
-		virtual void setViewport(int x, int y, int width, int height) = 0;
-
 		static Pipeline* create(Renderer& renderer, const Path& path, const char* define, IAllocator& allocator);
 		static void destroy(Pipeline* pipeline);
 
-		virtual FrameBuffer* getFramebuffer(const char* framebuffer_name) = 0;
+		virtual void load() = 0;
+		virtual bool render() = 0;
+		virtual void resize(int width, int height) = 0;
+		virtual bgfx::TextureHandle& getRenderbuffer(const char* framebuffer_name, int renderbuffer_idx) = 0;
 		virtual void setScene(RenderScene* scene) = 0;
 		virtual RenderScene* getScene() = 0;
 		virtual int getWidth() = 0;
