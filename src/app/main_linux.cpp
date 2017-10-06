@@ -165,7 +165,7 @@ struct App
 		m_engine->getPluginManager().load("physics");
 		m_engine->getInputSystem().enable(true);
 		Renderer* renderer = static_cast<Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
-		m_pipeline = Pipeline::create(*renderer, Path(m_pipeline_path), "", m_engine->getAllocator());
+		m_pipeline = Pipeline::create(*renderer, Path(m_pipeline_path), "APP", m_engine->getAllocator());
 		m_pipeline->load();
 
 		while (m_engine->getFileSystem().hasWork())
@@ -176,7 +176,7 @@ struct App
 
 		m_universe = &m_engine->createUniverse(true);
 		m_pipeline->setScene((RenderScene*)m_universe->getScene(crc32("renderer")));
-		m_pipeline->setViewport(0, 0, 600, 400);
+		m_pipeline->resize(600, 400);
 		renderer->resize(600, 400);
 
 		registerLuaAPI();
