@@ -469,7 +469,7 @@ void ShaderCompiler::compilePass(const char* shd_path,
 			{
 				args_array[10] = "windows";
 				args_array[11] = "--profile";
-				args_array[12] = is_vertex_shader ? "vs_5_0" : "ps_5_0";
+				args_array[12] = is_vertex_shader ? "vs_4_0" : "ps_4_0";
 			}
 			args_array[13] = "--type";
 			args_array[14] = is_vertex_shader ? "vertex" : "fragment";
