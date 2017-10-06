@@ -3065,7 +3065,7 @@ static bool createBillboard(ImportAssetDialog& dialog,
 	}
 
 	pipeline->setScene(render_scene);
-	pipeline->setViewport(0, 0, width, height);
+	pipeline->resize(width, height);
 	pipeline->render();
 
 	bgfx::TextureHandle texture =
@@ -3073,7 +3073,7 @@ static bool createBillboard(ImportAssetDialog& dialog,
 	renderer->viewCounterAdd();
 	bgfx::touch(renderer->getViewCounter());
 	bgfx::setViewName(renderer->getViewCounter(), "billboard_blit");
-	bgfx::TextureHandle color_renderbuffer = pipeline->getFramebuffer("g_buffer")->getRenderbufferHandle(0);
+	bgfx::TextureHandle color_renderbuffer = pipeline->getRenderbuffer("g_buffer", 0);
 	bgfx::blit(renderer->getViewCounter(), texture, 0, 0, color_renderbuffer);
 
 	bgfx::TextureHandle normal_texture =
@@ -3081,7 +3081,7 @@ static bool createBillboard(ImportAssetDialog& dialog,
 	renderer->viewCounterAdd();
 	bgfx::touch(renderer->getViewCounter());
 	bgfx::setViewName(renderer->getViewCounter(), "billboard_blit_normal");
-	bgfx::TextureHandle normal_renderbuffer = pipeline->getFramebuffer("g_buffer")->getRenderbufferHandle(1);
+	bgfx::TextureHandle normal_renderbuffer = pipeline->getRenderbuffer("g_buffer", 1);
 	bgfx::blit(renderer->getViewCounter(), normal_texture, 0, 0, normal_renderbuffer);
 
 	renderer->viewCounterAdd();

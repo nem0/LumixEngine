@@ -29,12 +29,19 @@ FrameBuffer::FrameBuffer(const Declaration& decl)
 	for (int i = 0; i < decl.m_renderbuffers_count; ++i)
 	{
 		const RenderBuffer& renderbuffer = decl.m_renderbuffers[i];
-		texture_handles[i] = bgfx::createTexture2D((uint16_t)decl.m_width,
-			(uint16_t)decl.m_height,
-			false, 
-			1,
-			renderbuffer.m_format,
-			DEFAULT_FLAGS);
+		if (renderbuffer.m_shared)
+		{
+			texture_handles[i] = renderbuffer.m_shared->m_handle;
+		}
+		else
+		{
+			texture_handles[i] = bgfx::createTexture2D((uint16_t)decl.m_width,
+				(uint16_t)decl.m_height,
+				false,
+				1,
+				renderbuffer.m_format,
+				DEFAULT_FLAGS);
+		}
 		m_declaration.m_renderbuffers[i].m_handle = texture_handles[i];
 	}
 
@@ -71,7 +78,8 @@ void FrameBuffer::destroyRenderbuffers()
 {
 	for (int i = 0; i < m_declaration.m_renderbuffers_count; ++i)
 	{
-		bgfx::destroyTexture(m_declaration.m_renderbuffers[i].m_handle);
+		RenderBuffer& rb = m_declaration.m_renderbuffers[i];
+		if(!rb.m_shared) bgfx::destroyTexture(rb.m_handle);
 	}
 }
 
@@ -97,8 +105,15 @@ void FrameBuffer::resize(int width, int height)
 		for (int i = 0; i < m_declaration.m_renderbuffers_count; ++i)
 		{
 			const RenderBuffer& renderbuffer = m_declaration.m_renderbuffers[i];
-			texture_handles[i] = bgfx::createTexture2D(
-				(uint16_t)width, (uint16_t)height, false, 1, renderbuffer.m_format, DEFAULT_FLAGS);
+			if (renderbuffer.m_shared)
+			{
+				texture_handles[i] = renderbuffer.m_shared->m_handle;
+			}
+			else
+			{
+				texture_handles[i] = bgfx::createTexture2D(
+					(uint16_t)width, (uint16_t)height, false, 1, renderbuffer.m_format, DEFAULT_FLAGS);
+			}
 			m_declaration.m_renderbuffers[i].m_handle = texture_handles[i];
 		}
 

@@ -23,6 +23,7 @@ class FrameBuffer
 		{
 			bgfx::TextureFormat::Enum m_format;
 			bgfx::TextureHandle m_handle;
+			RenderBuffer* m_shared = nullptr;
 
 			void parse(lua_State* state);
 		};
@@ -48,8 +49,9 @@ class FrameBuffer
 		void resize(int width, int height);
 		Vec2 getSizeRatio() const { return m_declaration.m_size_ratio; }
 		const char* getName() const { return m_declaration.m_name; }
-		
-		
+		int getRenderbuffersCounts() const { return m_declaration.m_renderbuffers_count;  }
+
+
 		RenderBuffer& getRenderbuffer(int idx)
 		{
 			ASSERT(idx < m_declaration.m_renderbuffers_count);
@@ -57,9 +59,10 @@ class FrameBuffer
 		}
 		
 		
-		bgfx::TextureHandle getRenderbufferHandle(int idx) const 
+		bgfx::TextureHandle& getRenderbufferHandle(int idx) 
 		{
-			if (idx >= m_declaration.m_renderbuffers_count ) return BGFX_INVALID_HANDLE;
+			static bgfx::TextureHandle invalid = BGFX_INVALID_HANDLE;
+			if (idx >= m_declaration.m_renderbuffers_count ) return invalid;
 			return m_declaration.m_renderbuffers[idx].m_handle;
 		}
 
