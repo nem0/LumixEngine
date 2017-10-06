@@ -193,7 +193,7 @@ public:
 
 	void init()
 	{
-		copyString(m_pipeline_path, "pipelines/app.lua");
+		copyString(m_pipeline_path, "pipelines/main.lua");
 		copyString(m_startup_script_path, "startup.lua");
 		char cmd_line[1024];
 		getCommandLine(cmd_line, lengthOf(cmd_line));
@@ -266,7 +266,7 @@ public:
 		#endif
 		m_engine->getInputSystem().enable(true);
 		Renderer* renderer = static_cast<Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
-		m_pipeline = Pipeline::create(*renderer, Path(m_pipeline_path), "", m_engine->getAllocator());
+		m_pipeline = Pipeline::create(*renderer, Path(m_pipeline_path), "APP", m_engine->getAllocator());
 		m_pipeline->load();
 
 		while (m_engine->getFileSystem().hasWork())
