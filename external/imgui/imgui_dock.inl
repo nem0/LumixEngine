@@ -666,19 +666,10 @@ struct DockContext
 					dock_tab->status = Status_Dragged;
 				}
 
+				if (dock_tab->active && close_button) size.x += 16 + GetStyle().ItemSpacing.x;
+
 				bool hovered = IsItemHovered();
 				ImVec2 pos = GetItemRectMin();
-				if (dock_tab->active && close_button)
-				{
-					size.x += 16 + GetStyle().ItemSpacing.x;
-					SameLine();
-					tab_closed = InvisibleButton("close", ImVec2(16, 16));
-					ImVec2 center = (GetItemRectMin() + GetItemRectMax()) * 0.5f;
-					draw_list->AddLine(
-						center + ImVec2(-3.5f, -3.5f), center + ImVec2(3.5f, 3.5f), text_color);
-					draw_list->AddLine(
-						center + ImVec2(3.5f, -3.5f), center + ImVec2(-3.5f, 3.5f), text_color);
-				}
 				tab_base = pos.y;
 				draw_list->PathClear();
 				draw_list->PathLineTo(pos + ImVec2(-15, size.y));
@@ -692,6 +683,18 @@ struct DockContext
 				draw_list->PathFillConvex(
 					hovered ? color_hovered : (dock_tab->active ? color_active : color));
 				draw_list->AddText(pos, text_color, dock_tab->label, text_end);
+
+				if (dock_tab->active && close_button)
+				{
+					size.x += 16 + GetStyle().ItemSpacing.x;
+					SameLine();
+					tab_closed = InvisibleButton("close", ImVec2(16, 16));
+					ImVec2 center = (GetItemRectMin() + GetItemRectMax()) * 0.5f;
+					draw_list->AddLine(
+						center + ImVec2(-3.5f, -3.5f), center + ImVec2(3.5f, 3.5f), text_color);
+					draw_list->AddLine(
+						center + ImVec2(3.5f, -3.5f), center + ImVec2(-3.5f, 3.5f), text_color);
+				}
 
 				dock_tab = dock_tab->next_tab;
 			}
