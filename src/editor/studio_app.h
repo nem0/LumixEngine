@@ -114,6 +114,7 @@ public:
 	virtual void startDrag(DragData::Type type, const void* data, int size) = 0;
 	virtual DragData getDragData() = 0;
 	virtual void setFullscreen(bool fullscreen) = 0;
+	virtual bool makeFile(const char* path, const char* content) = 0;
 
 	virtual ~StudioApp() {}
 	virtual void run() = 0;
