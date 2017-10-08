@@ -642,6 +642,7 @@ struct DockContext
 			ImU32 color = GetColorU32(ImGuiCol_FrameBg);
 			ImU32 color_active = GetColorU32(ImGuiCol_FrameBgActive);
 			ImU32 color_hovered = GetColorU32(ImGuiCol_FrameBgHovered);
+			ImU32 button_hovered = GetColorU32(ImGuiCol_ButtonHovered);
 			ImU32 text_color = GetColorU32(ImGuiCol_Text);
 			float line_height = GetTextLineHeightWithSpacing();
 			float tab_base;
@@ -686,10 +687,13 @@ struct DockContext
 
 				if (dock_tab->active && close_button)
 				{
-					size.x += 16 + GetStyle().ItemSpacing.x;
 					SameLine();
 					tab_closed = InvisibleButton("close", ImVec2(16, 16));
 					ImVec2 center = (GetItemRectMin() + GetItemRectMax()) * 0.5f;
+					if (IsItemHovered())
+					{
+						draw_list->AddRectFilled(center + ImVec2(-6.0f, -6.0f), center + ImVec2(7.0f, 7.0f), button_hovered);
+					}					
 					draw_list->AddLine(
 						center + ImVec2(-3.5f, -3.5f), center + ImVec2(3.5f, 3.5f), text_color);
 					draw_list->AddLine(
