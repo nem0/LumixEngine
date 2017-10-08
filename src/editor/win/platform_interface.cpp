@@ -303,9 +303,9 @@ void copyToClipboard(const char* text)
 }
 
 
-bool shellExecuteOpen(const char* path)
+bool shellExecuteOpen(const char* path, const char* parameters)
 {
-	return (uintptr_t)ShellExecute(NULL, NULL, path, NULL, NULL, SW_SHOW) > 32;
+	return (uintptr_t)ShellExecute(NULL, NULL, path, parameters, NULL, SW_SHOW) > 32;
 }
 
 
