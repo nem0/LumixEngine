@@ -268,6 +268,16 @@ public:
 	}
 
 
+	bool makeFile(const char* path, const char* content) override
+	{
+		FS::OsFile file;
+		if (!file.open(path, FS::Mode::CREATE_AND_WRITE, m_allocator)) return false;
+		bool success = file.writeText(content);
+		file.close();
+		return success;
+	}
+
+
 	void destroyAddCmpTreeNode(AddCmpTreeNode* node)
 	{
 		if (!node) return;
