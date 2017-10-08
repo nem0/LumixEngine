@@ -304,9 +304,10 @@ bool getOpenDirectory(char* out, int max_size, const char* starting_dir)
 }
 
 
-bool shellExecuteOpen(const char* path)
+bool shellExecuteOpen(const char* path, const char* parameters)
 {
-	return system(path) == 0;
+	StaticString<MAX_PATH_LENGTH * 2> tmp(path, " ",  parameters ? parameters : "");
+	return system(tmp) == 0;
 }
 
 

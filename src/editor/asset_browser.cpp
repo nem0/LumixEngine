@@ -779,14 +779,14 @@ void AssetBrowser::openInExternalEditor(const char* path)
 		full_path << path;
 		if (PlatformInterface::fileExists(full_path))
 		{
-			PlatformInterface::shellExecuteOpen(full_path);
+			PlatformInterface::shellExecuteOpen(full_path, nullptr);
 			return;
 		}
 	}
 
 	StaticString<MAX_PATH_LENGTH> full_path(m_editor.getEngine().getDiskFileDevice()->getBasePath());
 	full_path << path;
-	PlatformInterface::shellExecuteOpen(full_path);
+	PlatformInterface::shellExecuteOpen(full_path, nullptr);
 }
 
 

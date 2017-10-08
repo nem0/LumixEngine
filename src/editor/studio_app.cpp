@@ -669,27 +669,27 @@ public:
 
 				if (ImGui::Button("Wiki"))
 				{
-					PlatformInterface::shellExecuteOpen("https://github.com/nem0/LumixEngine/wiki");
+					PlatformInterface::shellExecuteOpen("https://github.com/nem0/LumixEngine/wiki", nullptr);
 				}
 
 				if (ImGui::Button("Download new version"))
 				{
-					PlatformInterface::shellExecuteOpen("https://github.com/nem0/lumixengine_data/archive/master.zip");
+					PlatformInterface::shellExecuteOpen("https://github.com/nem0/lumixengine_data/archive/master.zip", nullptr);
 				}
 
 				if (ImGui::Button("Show major releases"))
 				{
-					PlatformInterface::shellExecuteOpen("https://github.com/nem0/LumixEngine/releases");
+					PlatformInterface::shellExecuteOpen("https://github.com/nem0/LumixEngine/releases", nullptr);
 				}
 
 				if (ImGui::Button("Show latest commits"))
 				{
-					PlatformInterface::shellExecuteOpen("https://github.com/nem0/LumixEngine/commits/master");
+					PlatformInterface::shellExecuteOpen("https://github.com/nem0/LumixEngine/commits/master", nullptr);
 				}
 
 				if (ImGui::Button("Show issues"))
 				{
-					PlatformInterface::shellExecuteOpen("https://github.com/nem0/lumixengine/issues");
+					PlatformInterface::shellExecuteOpen("https://github.com/nem0/lumixengine/issues", nullptr);
 				}
 			}
 			ImGui::EndChild();
