@@ -875,10 +875,19 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 	void render2D()
 	{
+		auto resetDraw2D =  [this](){
+			m_draw2d.Clear();
+			m_draw2d.PushClipRectFullScreen();
+		};
+
 		Vec2 size((float)getWidth(), (float)getHeight());
 		Matrix ortho;
 
-		if (!m_draw2d_material->isReady()) goto end;
+		if (!m_draw2d_material->isReady())
+		{
+			resetDraw2D();
+			return;
+		}
 
 		bool is_opengl = bgfx::getRendererType() == bgfx::RendererType::OpenGL ||
 			bgfx::getRendererType() == bgfx::RendererType::OpenGLES;
@@ -887,13 +896,17 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 		int num_indices = m_draw2d.IdxBuffer.size();
 		int num_vertices = m_draw2d.VtxBuffer.size();
-		if (num_indices == 0) goto end;
 		
 		const bgfx::VertexDecl& decl = m_renderer.getBasic2DVertexDecl();
 		bgfx::TransientVertexBuffer vertex_buffer;
 		bgfx::TransientIndexBuffer index_buffer;
-		if (bgfx::getAvailTransientIndexBuffer(num_indices) < (u32)num_indices) goto end;
-		if (bgfx::getAvailTransientVertexBuffer(num_vertices, decl) < (u32)num_vertices) goto end;
+		if (num_indices == 0
+			|| bgfx::getAvailTransientIndexBuffer(num_indices) < (u32)num_indices
+			|| bgfx::getAvailTransientVertexBuffer(num_vertices, decl) < (u32)num_vertices)
+		{
+			resetDraw2D();
+			return;
+		}
 
 		bgfx::allocTransientVertexBuffer(&vertex_buffer, num_vertices, decl);
 		bgfx::allocTransientIndexBuffer(&index_buffer, num_indices);
@@ -927,10 +940,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 				
 			elem_offset += pcmd->ElemCount;
 		}
-		
-		end:
-			m_draw2d.Clear();
-			m_draw2d.PushClipRectFullScreen();
+		resetDraw2D();
 	}
 
 

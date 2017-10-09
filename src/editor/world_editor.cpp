@@ -1775,7 +1775,6 @@ public:
 			m_gizmo->add(m_selected_entities[0]);
 		}
 
-		// TODO
 		/*if (m_is_mouse_down[0] && m_mouse_mode == MouseMode::SELECT)
 		{
 			m_render_interface->addRect2D(m_rect_selection_start, m_mouse_pos, 0xfffffFFF);
