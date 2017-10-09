@@ -1,6 +1,3 @@
-#pragma once
-
-
 #include "draw2d.h"
 
 #include "engine/math_utils.h"
