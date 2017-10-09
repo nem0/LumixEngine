@@ -28,6 +28,7 @@
 #include "engine/system.h"
 #include "game_view.h"
 #include "import_asset_dialog.h"
+#include "renderer/draw2D.h"
 #include "renderer/frame_buffer.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
@@ -1942,6 +1943,12 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 	}
 
 
+	void addRect2D(const Vec2& a, const Vec2& b, u32 color) override
+	{
+		m_pipeline.getDraw2D().AddRect(a, b, color);
+	}
+
+
 	Vec3 getClosestVertex(Universe* universe, Entity entity, const Vec3& wpos)
 	{
 		Matrix mtx = universe->getMatrix(entity);
@@ -2277,6 +2284,25 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 			indices_count,
 			flags,
 			m_shader->getInstance(0));
+	}
+
+
+	Frustum getFrustum(ComponentHandle camera_cmp, const Vec2& a, const Vec2& b) override
+	{
+		return m_render_scene->getCameraFrustum(camera_cmp, a, b);
+	}
+
+
+	void getModelInstaces(Array<Entity>& entities, const Frustum& frustum) override
+	{
+		Array<Array<ModelInstanceMesh>>& res = m_render_scene->getModelInstanceInfos(frustum, frustum.position, ~0ULL);
+		for (auto& sub : res)
+		{
+			for (ModelInstanceMesh m : sub)
+			{
+				entities.push({m.model_instance.index});
+			}
+		}
 	}
 
 
