@@ -11,7 +11,7 @@
 	#ifdef _DEBUG
 		#define IM_ASSERT(_EXPR)  do { if(!(_EXPR)) __debugbreak(); } while(false)
 	#else
-		#define IM_ASSERT(_EXPR)  
+		#define IM_ASSERT(_EXPR)  do {} while(false)
 	#endif
 #endif
 
