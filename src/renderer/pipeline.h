@@ -25,6 +25,7 @@ namespace Lumix
 {
 
 
+struct Draw2D;
 class FrameBuffer;
 struct IAllocator;
 struct Matrix;
@@ -136,6 +137,8 @@ class LUMIX_RENDERER_API Pipeline
 			const bgfx::InstanceDataBuffer& instance_buffer,
 			int count,
 			Material& material) = 0;
+
+		virtual Draw2D& getDraw2D() = 0;
 };
 
 

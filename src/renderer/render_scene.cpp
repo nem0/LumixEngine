@@ -460,6 +460,36 @@ public:
 	}
 
 
+	Frustum getCameraFrustum(ComponentHandle cmp, const Vec2& a, const Vec2& b) const override
+	{
+		const Camera& camera = m_cameras[{cmp.index}];
+		Matrix mtx = m_universe.getMatrix(camera.entity);
+		Frustum ret;
+		float ratio = camera.screen_height > 0 ? camera.screen_width / camera.screen_height : 1;
+		// TODO
+		if (camera.is_ortho)
+		{
+			ret.computeOrtho(mtx.getTranslation(),
+				mtx.getZVector(),
+				mtx.getYVector(),
+				camera.ortho_size * ratio,
+				camera.ortho_size,
+				camera.near,
+				camera.far);
+			return ret;
+		}
+		ret.computePerspective(mtx.getTranslation(),
+			-mtx.getZVector(),
+			mtx.getYVector(),
+			camera.fov,
+			ratio,
+			camera.near,
+			camera.far);
+
+		return ret;
+	}
+
+
 	void updateBoneAttachment(const BoneAttachment& bone_attachment)
 	{
 		if (!bone_attachment.parent_entity.isValid()) return;

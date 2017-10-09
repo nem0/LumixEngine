@@ -12,6 +12,7 @@
 #include "engine/engine.h"
 #include "imgui/imgui.h"
 #include "lua_script/lua_script_system.h"
+#include "renderer/draw2D.h"
 #include "renderer/frame_buffer.h"
 #include "renderer/material.h"
 #include "renderer/material_manager.h"
@@ -278,6 +279,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		, m_renderer(renderer)
 		, m_default_framebuffer(nullptr)
 		, m_debug_line_material(nullptr)
+		, m_draw2d_material(nullptr)
 		, m_copy_material(nullptr)
 		, m_default_cubemap(nullptr)
 		, m_debug_flags(BGFX_DEBUG_TEXT)
@@ -291,6 +293,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		, m_width(-1)
 		, m_height(-1)
 		, m_define(define, allocator)
+		, m_draw2d(allocator)
 	{
 		for (auto& handle : m_debug_vertex_buffers)
 		{
@@ -311,16 +314,18 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 		createUniforms();
 
-		m_debug_line_material = static_cast<Material*>(
-			renderer.getMaterialManager().load(Path("pipelines/editor/debugline.mat")));
-		m_copy_material = static_cast<Material*>(
-			renderer.getMaterialManager().load(Path("pipelines/common/copy.mat")));
-		m_default_cubemap = static_cast<Texture*>(
-			renderer.getTextureManager().load(Path("pipelines/pbr/default_probe.dds")));
-
+		MaterialManager& material_manager = renderer.getMaterialManager();
+		m_debug_line_material = (Material*)material_manager.load(Path("pipelines/editor/debugline.mat"));
+		m_draw2d_material = (Material*)material_manager.load(Path("pipelines/common/draw2d.mat"));
+		//m_copy_material = (Material*)material_manager.load(Path("pipelines/common/copy.mat"));
+		m_default_cubemap = (Texture*)renderer.getTextureManager().load(Path("pipelines/pbr/default_probe.dds"));
 		createParticleBuffers();
 		createCubeBuffers();
 		m_stats = {};
+
+		m_draw2d.FontTexUvWhitePixel = m_renderer.getFontAtlas().TexUvWhitePixel;
+		m_draw2d.Clear();
+		m_draw2d.PushClipRectFullScreen();
 	}
 
 
@@ -601,7 +606,8 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		}
 
 		m_debug_line_material->getResourceManager().unload(*m_debug_line_material);
-		m_copy_material->getResourceManager().unload(*m_copy_material);
+		m_draw2d_material->getResourceManager().unload(*m_draw2d_material);
+		//m_copy_material->getResourceManager().unload(*m_copy_material);
 		m_default_cubemap->getResourceManager().unload(*m_default_cubemap);
 
 		destroyUniforms();
@@ -867,6 +873,67 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
+	void render2D()
+	{
+		Vec2 size((float)getWidth(), (float)getHeight());
+		Matrix ortho;
+
+		if (!m_draw2d_material->isReady()) goto end;
+
+		bool is_opengl = bgfx::getRendererType() == bgfx::RendererType::OpenGL ||
+			bgfx::getRendererType() == bgfx::RendererType::OpenGLES;
+		ortho.setOrtho(0.0f, size.x, size.y, 0.0f, -1.0f, 1.0f, is_opengl);
+		setViewProjection(ortho, (int)size.x, (int)size.y);
+
+		int num_indices = m_draw2d.IdxBuffer.size();
+		int num_vertices = m_draw2d.VtxBuffer.size();
+		if (num_indices == 0) goto end;
+		
+		const bgfx::VertexDecl& decl = m_renderer.getBasic2DVertexDecl();
+		bgfx::TransientVertexBuffer vertex_buffer;
+		bgfx::TransientIndexBuffer index_buffer;
+		if (bgfx::getAvailTransientIndexBuffer(num_indices) < (u32)num_indices) goto end;
+		if (bgfx::getAvailTransientVertexBuffer(num_vertices, decl) < (u32)num_vertices) goto end;
+
+		bgfx::allocTransientVertexBuffer(&vertex_buffer, num_vertices, decl);
+		bgfx::allocTransientIndexBuffer(&index_buffer, num_indices);
+
+		copyMemory(vertex_buffer.data, &m_draw2d.VtxBuffer[0], num_vertices * decl.getStride());
+		copyMemory(index_buffer.data, &m_draw2d.IdxBuffer[0], num_indices * sizeof(u16));
+		
+		u32 elem_offset = 0;
+		const Draw2D::DrawCmd* pcmd_begin = m_draw2d.CmdBuffer.begin();
+		const Draw2D::DrawCmd* pcmd_end = m_draw2d.CmdBuffer.end();
+		for (const Draw2D::DrawCmd* pcmd = pcmd_begin; pcmd != pcmd_end; pcmd++)
+		{
+			if (0 == pcmd->ElemCount) continue;
+			
+			setScissor(u16(Math::maximum(pcmd->ClipRect.x, 0.0f)),
+				u16(Math::maximum(pcmd->ClipRect.y, 0.0f)),
+				u16(Math::minimum(pcmd->ClipRect.z, 65535.0f) - Math::maximum(pcmd->ClipRect.x, 0.0f)),
+				u16(Math::minimum(pcmd->ClipRect.w, 65535.0f) - Math::maximum(pcmd->ClipRect.y, 0.0f)));
+			
+			const bgfx::TextureHandle& texture_id =
+			pcmd->TextureId ? *(bgfx::TextureHandle*)pcmd->TextureId : m_draw2d_material->getTexture(0)->handle;
+			auto texture_uniform = m_draw2d_material->getShader()->m_texture_slots[0].uniform_handle;
+			setTexture(0, texture_id, texture_uniform);
+			render(vertex_buffer,
+				index_buffer,
+				Matrix::IDENTITY,
+				elem_offset,
+				pcmd->ElemCount,
+				m_draw2d_material->getRenderStates(),
+				m_draw2d_material->getShaderInstance());
+				
+			elem_offset += pcmd->ElemCount;
+		}
+		
+		end:
+			m_draw2d.Clear();
+			m_draw2d.PushClipRectFullScreen();
+	}
+
+
 	CustomCommandHandler& addCustomCommandHandler(const char* name) override
 	{
 		auto& handler = m_custom_commands_handlers.emplace();
@@ -1050,6 +1117,8 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			return;
 		}
 
+		// TODO
+		/*
 		if (!m_copy_material->isReady()) return;
 
 		bgfx::FrameBufferHandle tmp_fb = bgfx::createFrameBuffer(1, &dest_fb->getRenderbufferHandle(dest_rb_idx));
@@ -1060,7 +1129,8 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		bgfx::setTexture(0, m_texture_uniform, src_tex);
 		drawQuadExMaterial(0, 0, 1, 1, 0, 0, 1, 1, m_copy_material);
 		
-		bgfx::destroyFrameBuffer(tmp_fb);
+		bgfx::destroyFrameBuffer(tmp_fb);*/
+
 	}
 
 
@@ -2935,6 +3005,10 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
+	Draw2D& getDraw2D() { return m_draw2d; }
+
+
+	IAllocator& m_allocator;
 	bgfx::VertexDecl m_deferred_point_light_vertex_decl;
 	bgfx::VertexDecl m_base_vertex_decl;
 	TerrainInstance m_terrain_instances[4];
@@ -2944,7 +3018,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	View m_views[64];
 	View* m_current_view;
 	int m_pass_idx;
-	IAllocator& m_allocator;
+	Draw2D m_draw2d;
 	Path m_path;
 	Renderer& m_renderer;
 	RenderScene* m_scene;
@@ -3006,6 +3080,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 	Material* m_debug_line_material;
 	Material* m_copy_material;
+	Material* m_draw2d_material;
 	Texture* m_default_cubemap;
 	bgfx::DynamicVertexBufferHandle m_debug_vertex_buffers[32];
 	bgfx::DynamicIndexBufferHandle m_debug_index_buffer;
@@ -3241,6 +3316,7 @@ void Pipeline::registerLuaAPI(lua_State* L)
 			registerCFunction(#name, f); \
 		} while(false) \
 
+	REGISTER_FUNCTION(render2D);
 	REGISTER_FUNCTION(setViewSeq);
 	REGISTER_FUNCTION(drawQuad);
 	REGISTER_FUNCTION(drawQuadEx);

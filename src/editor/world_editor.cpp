@@ -1775,6 +1775,13 @@ public:
 			m_gizmo->add(m_selected_entities[0]);
 		}
 
+		// TODO
+		/*if (m_is_mouse_down[0] && m_mouse_mode == MouseMode::SELECT)
+		{
+			m_render_interface->addRect2D(m_rect_selection_start, m_mouse_pos, 0xfffffFFF);
+			m_render_interface->addRect2D(m_rect_selection_start - Vec2(1, 1), m_mouse_pos + Vec2(1, 1), 0xff000000);
+		}*/
+
 		createEditorLines();
 	}
 
@@ -1904,6 +1911,7 @@ public:
 				}
 			}
 			m_mouse_mode = MouseMode::SELECT;
+			m_rect_selection_start = {(float)x, (float)y};
 		}
 	}
 
@@ -1946,48 +1954,71 @@ public:
 	}
 
 
+	void rectSelect()
+	{
+		Array<Entity> entities(m_allocator);
+		
+		Frustum frustum;
+		ComponentUID camera_cmp = getUniverse()->getComponent(m_camera, CAMERA_TYPE);
+		if (!camera_cmp.isValid()) return;
+
+		frustum = m_render_interface->getFrustum(camera_cmp.handle, m_rect_selection_start, m_mouse_pos);
+		m_render_interface->getModelInstaces(entities, frustum);
+		selectEntities(entities.empty() ? nullptr : &entities[0], entities.size());
+	}
+
+
 	void onMouseUp(int x, int y, MouseButton::Value button) override
 	{
+		m_mouse_pos = {(float)x, (float)y};
 		if (m_mouse_mode == MouseMode::SELECT)
 		{
-			Vec3 origin, dir;
-			ComponentUID camera_cmp = getUniverse()->getComponent(m_camera, CAMERA_TYPE);
-			if (!camera_cmp.isValid()) return;
-
-			m_render_interface->getRay(camera_cmp.handle, {(float)x, (float)y}, origin, dir);
-			auto hit = m_render_interface->castRay(origin, dir, INVALID_COMPONENT);
-
-			if (m_snap_mode != SnapMode::NONE && !m_selected_entities.empty() && hit.is_hit)
+			/*if (m_rect_selection_start.x != m_mouse_pos.x || m_rect_selection_start.y != m_mouse_pos.y)
 			{
-				Vec3 snap_pos = origin + dir * hit.t;
-				if (m_snap_mode == SnapMode::VERTEX) snap_pos = getClosestVertex(hit);
-				snapEntities(snap_pos);
+				rectSelect();
 			}
-			else
+			else*/
+			//TODO
 			{
-				auto icon_hit = m_editor_icons->raycast(origin, dir);
-				if (icon_hit.entity != INVALID_ENTITY)
+				Vec3 origin, dir;
+				ComponentUID camera_cmp = getUniverse()->getComponent(m_camera, CAMERA_TYPE);
+				if (!camera_cmp.isValid()) return;
+
+				m_render_interface->getRay(camera_cmp.handle, m_mouse_pos, origin, dir);
+				auto hit = m_render_interface->castRay(origin, dir, INVALID_COMPONENT);
+
+				if (m_snap_mode != SnapMode::NONE && !m_selected_entities.empty() && hit.is_hit)
 				{
-					Entity e = icon_hit.entity;
-					if (m_is_additive_selection)
-					{
-						addEntitiesToSelection(&e, 1);
-					}
-					else
-					{
-						selectEntities(&e, 1);
-					}
+					Vec3 snap_pos = origin + dir * hit.t;
+					if (m_snap_mode == SnapMode::VERTEX) snap_pos = getClosestVertex(hit);
+					snapEntities(snap_pos);
 				}
-				else if (hit.is_hit)
+				else
 				{
-					Entity entity = hit.entity;
-					if (m_is_additive_selection)
+					auto icon_hit = m_editor_icons->raycast(origin, dir);
+					if (icon_hit.entity != INVALID_ENTITY)
 					{
-						addEntitiesToSelection(&entity, 1);
+						Entity e = icon_hit.entity;
+						if (m_is_additive_selection)
+						{
+							addEntitiesToSelection(&e, 1);
+						}
+						else
+						{
+							selectEntities(&e, 1);
+						}
 					}
-					else
+					else if (hit.is_hit)
 					{
-						selectEntities(&entity, 1);
+						Entity entity = hit.entity;
+						if (m_is_additive_selection)
+						{
+							addEntitiesToSelection(&entity, 1);
+						}
+						else
+						{
+							selectEntities(&entity, 1);
+						}
 					}
 				}
 			}
@@ -3761,6 +3792,7 @@ private:
 	Gizmo* m_gizmo;
 	Array<Entity> m_selected_entities;
 	MouseMode m_mouse_mode;
+	Vec2 m_rect_selection_start;
 	EditorIcons* m_editor_icons;
 	Vec2 m_mouse_pos;
 	float m_mouse_rel_x;

@@ -148,6 +148,7 @@ public:
 	virtual void getRay(ComponentHandle camera, const Vec2& screen_pos, Vec3& origin, Vec3& dir) = 0;
 
 	virtual Frustum getCameraFrustum(ComponentHandle camera) const = 0;
+	virtual Frustum getCameraFrustum(ComponentHandle camera, const Vec2& a, const Vec2& b) const = 0;
 	virtual float getTime() const = 0;
 	virtual Engine& getEngine() const = 0;
 	virtual IAllocator& getAllocator() = 0;

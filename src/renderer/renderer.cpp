@@ -16,6 +16,7 @@
 #include "engine/system.h"
 #include "engine/universe/component.h"
 #include "engine/universe/universe.h"
+#include "renderer/draw2D.h"
 #include "renderer/material.h"
 #include "renderer/material_manager.h"
 #include "renderer/model.h"
@@ -591,6 +592,7 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 		, m_bgfx_allocator(m_allocator)
 		, m_callback_stub(*this)
 		, m_vsync(true)
+		, m_font_atlas(m_allocator)
 	{
 		registerProperties(engine.getAllocator());
 		bgfx::PlatformData d;
@@ -658,10 +660,13 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 		m_layers.emplace("transparent");
 		m_layers.emplace("water");
 		m_layers.emplace("fur");
+		initDraw2DFont();
 	}
 
 	~RendererImpl()
 	{
+		m_draw2d_material->getResourceManager().unload(*m_draw2d_material);
+
 		m_shader_manager.unload(*m_default_shader);
 		m_texture_manager.destroy();
 		m_model_manager.destroy();
@@ -674,6 +679,38 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 		bgfx::frame();
 		bgfx::frame();
 		bgfx::shutdown();
+	}
+
+
+	void initDraw2DFont()
+	{
+		m_font_atlas.AddFontDefault();
+		u8* pixels;
+		int w, h;
+		m_font_atlas.GetTexDataAsRGBA32(&pixels, &w, &h);
+		auto* material_manager = m_engine.getResourceManager().get(MATERIAL_TYPE);
+		Resource* resource = material_manager->load(Path("pipelines/common/draw2d.mat"));
+		m_draw2d_material = (Material*)resource;
+		
+		Texture* old_texture = m_draw2d_material->getTexture(0);
+		Texture* texture = LUMIX_NEW(m_engine.getAllocator(), Texture)(
+			Path("draw2d_font"), *m_engine.getResourceManager().get(TEXTURE_TYPE), m_engine.getAllocator());
+		
+		texture->create(w, h, pixels);
+		m_draw2d_material->setTexture(0, texture);
+		if (old_texture)
+		{
+			old_texture->destroy();
+			LUMIX_DELETE(m_engine.getAllocator(), old_texture);
+		}
+
+		m_font_atlas.TexID = &texture->handle;
+	}
+
+
+	FontAtlas& getFontAtlas() override
+	{
+		return m_font_atlas;
 	}
 
 
@@ -792,6 +829,8 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	bgfx::VertexDecl m_basic_2d_vertex_decl;
 	bgfx::UniformHandle m_mat_color_uniform;
 	bgfx::UniformHandle m_roughness_metallic_uniform;
+	FontAtlas m_font_atlas;
+	Material* m_draw2d_material;
 };
 
 

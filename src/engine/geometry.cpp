@@ -102,7 +102,7 @@ void Frustum::computeOrtho(const Vec3& position,
 	setPlane(Planes::LEFT, x, near_center - x * width);
 	setPlane(Planes::RIGHT, -x, near_center + x * width);
 
-	center = (near_center + far_center) * 0.5f;
+/*	center = (near_center + far_center) * 0.5f;
 	float z_diff = far_distance - near_distance;
 	radius = std::sqrt(4 * width * width + 4 * height * height + z_diff * z_diff) * 0.5f;
 	this->position = position;
@@ -112,7 +112,7 @@ void Frustum::computeOrtho(const Vec3& position,
 	this->near_distance = near_distance;
 	this->far_distance = far_distance;
 	this->width = width;
-	this->ratio = width / height;
+	this->ratio = width / height;*/
 }
 
 
