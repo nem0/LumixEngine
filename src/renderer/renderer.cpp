@@ -665,6 +665,14 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 
 	~RendererImpl()
 	{
+		Texture* draw2d_texture = m_draw2d_material->getTexture(0);
+		m_draw2d_material->setTexture(0, nullptr);
+		if (draw2d_texture)
+		{
+			draw2d_texture->destroy();
+			LUMIX_DELETE(m_engine.getAllocator(), draw2d_texture);
+		}
+
 		m_draw2d_material->getResourceManager().unload(*m_draw2d_material);
 
 		m_shader_manager.unload(*m_default_shader);
