@@ -280,7 +280,6 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		, m_default_framebuffer(nullptr)
 		, m_debug_line_material(nullptr)
 		, m_draw2d_material(nullptr)
-		, m_copy_material(nullptr)
 		, m_default_cubemap(nullptr)
 		, m_debug_flags(BGFX_DEBUG_TEXT)
 		, m_point_light_shadowmaps(allocator)
@@ -317,7 +316,6 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		MaterialManager& material_manager = renderer.getMaterialManager();
 		m_debug_line_material = (Material*)material_manager.load(Path("pipelines/editor/debugline.mat"));
 		m_draw2d_material = (Material*)material_manager.load(Path("pipelines/common/draw2d.mat"));
-		//m_copy_material = (Material*)material_manager.load(Path("pipelines/common/copy.mat"));
 		m_default_cubemap = (Texture*)renderer.getTextureManager().load(Path("pipelines/pbr/default_probe.dds"));
 		createParticleBuffers();
 		createCubeBuffers();
@@ -607,7 +605,6 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 		m_debug_line_material->getResourceManager().unload(*m_debug_line_material);
 		m_draw2d_material->getResourceManager().unload(*m_draw2d_material);
-		//m_copy_material->getResourceManager().unload(*m_copy_material);
 		m_default_cubemap->getResourceManager().unload(*m_default_cubemap);
 
 		destroyUniforms();
@@ -1116,8 +1113,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		FrameBuffer* dest_fb = getFramebuffer(dest_fb_name);
 		if (!dest_fb) return;
 
-		// TODO
-		if (true && bgfx::getCaps()->supported & BGFX_CAPS_TEXTURE_BLIT)
+		if (bgfx::getCaps()->supported & BGFX_CAPS_TEXTURE_BLIT)
 		{
 			auto src_rb = src_fb->getRenderbufferHandle(src_rb_idx);
 			auto dest_rb = dest_fb->getRenderbufferHandle(dest_rb_idx);
@@ -1127,20 +1123,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			return;
 		}
 
-		// TODO
-		/*
-		if (!m_copy_material->isReady()) return;
-
-		bgfx::FrameBufferHandle tmp_fb = bgfx::createFrameBuffer(1, &dest_fb->getRenderbufferHandle(dest_rb_idx));
-		bgfx::setViewFrameBuffer(m_current_view->bgfx_id, tmp_fb);
-		bgfx::setViewRect(m_current_view->bgfx_id, 0, 0, dest_fb->getWidth(), dest_fb->getHeight());
-		
-		bgfx::TextureHandle src_tex = src_fb->getRenderbufferHandle(src_rb_idx);
-		bgfx::setTexture(0, m_texture_uniform, src_tex);
-		drawQuadExMaterial(0, 0, 1, 1, 0, 0, 1, 1, m_copy_material);
-		
-		bgfx::destroyFrameBuffer(tmp_fb);*/
-
+		g_log_error.log("Renderer") << "Texture blit is not supported.";
 	}
 
 
@@ -3089,7 +3072,6 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	int m_layer_to_view_map[64];
 
 	Material* m_debug_line_material;
-	Material* m_copy_material;
 	Material* m_draw2d_material;
 	Texture* m_default_cubemap;
 	bgfx::DynamicVertexBufferHandle m_debug_vertex_buffers[32];
