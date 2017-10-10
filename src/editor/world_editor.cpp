@@ -1775,11 +1775,11 @@ public:
 			m_gizmo->add(m_selected_entities[0]);
 		}
 
-		/*if (m_is_mouse_down[0] && m_mouse_mode == MouseMode::SELECT)
+		if (m_is_mouse_down[0] && m_mouse_mode == MouseMode::SELECT)
 		{
 			m_render_interface->addRect2D(m_rect_selection_start, m_mouse_pos, 0xfffffFFF);
 			m_render_interface->addRect2D(m_rect_selection_start - Vec2(1, 1), m_mouse_pos + Vec2(1, 1), 0xff000000);
-		}*/
+		}
 
 		createEditorLines();
 	}
@@ -1963,7 +1963,11 @@ public:
 
 		Entity camera_entity = m_render_interface->getCameraEntity(camera_cmp.handle);
 		Vec3 camera_pos = m_universe->getPosition(camera_entity);
-		frustum = m_render_interface->getFrustum(camera_cmp.handle, m_rect_selection_start, m_mouse_pos);
+		Vec2 min = m_rect_selection_start;
+		Vec2 max = m_mouse_pos;
+		if (min.x > max.x) Math::swap(min.x, max.x);
+		if (min.y > max.y) Math::swap(min.y, max.y);
+		frustum = m_render_interface->getFrustum(camera_cmp.handle, min, max);
 		m_render_interface->getModelInstaces(entities, frustum, camera_pos, camera_cmp.handle);
 		selectEntities(entities.empty() ? nullptr : &entities[0], entities.size());
 	}
@@ -1974,12 +1978,11 @@ public:
 		m_mouse_pos = {(float)x, (float)y};
 		if (m_mouse_mode == MouseMode::SELECT)
 		{
-			/*if (m_rect_selection_start.x != m_mouse_pos.x || m_rect_selection_start.y != m_mouse_pos.y)
+			if (m_rect_selection_start.x != m_mouse_pos.x || m_rect_selection_start.y != m_mouse_pos.y)
 			{
 				rectSelect();
 			}
-			else*/
-			//TODO
+			else
 			{
 				Vec3 origin, dir;
 				ComponentUID camera_cmp = getUniverse()->getComponent(m_camera, CAMERA_TYPE);

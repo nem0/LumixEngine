@@ -61,6 +61,17 @@ LUMIX_ALIGN_BEGIN(16) struct LUMIX_ENGINE_API Frustum
 		float far_distance);
 
 
+	void computePerspective(const Vec3& position,
+		const Vec3& direction,
+		const Vec3& up,
+		float fov,
+		float ratio,
+		float near_distance,
+		float far_distance,
+		const Vec2& left_top,
+		const Vec2& right_bottom);
+
+
 	bool intersectNearPlane(const Vec3& center, float radius) const
 	{
 		float x = center.x;
