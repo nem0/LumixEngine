@@ -1961,8 +1961,10 @@ public:
 		ComponentUID camera_cmp = getUniverse()->getComponent(m_camera, CAMERA_TYPE);
 		if (!camera_cmp.isValid()) return;
 
+		Entity camera_entity = m_render_interface->getCameraEntity(camera_cmp.handle);
+		Vec3 camera_pos = m_universe->getPosition(camera_entity);
 		frustum = m_render_interface->getFrustum(camera_cmp.handle, m_rect_selection_start, m_mouse_pos);
-		m_render_interface->getModelInstaces(entities, frustum);
+		m_render_interface->getModelInstaces(entities, frustum, camera_pos, camera_cmp.handle);
 		selectEntities(entities.empty() ? nullptr : &entities[0], entities.size());
 	}
 

@@ -466,7 +466,6 @@ public:
 		Matrix mtx = m_universe.getMatrix(camera.entity);
 		Frustum ret;
 		float ratio = camera.screen_height > 0 ? camera.screen_width / camera.screen_height : 1;
-		// TODO
 		if (camera.is_ortho)
 		{
 			ret.computeOrtho(mtx.getTranslation(),
@@ -3231,8 +3230,25 @@ public:
 	}
 
 
+	float getCameraLODMultiplier(ComponentHandle camera)
+	{
+		float lod_multiplier;
+		if (isCameraOrtho(camera))
+		{
+			lod_multiplier = 1;
+		}
+		else
+		{
+			lod_multiplier = getCameraFOV(camera) / Math::degreesToRadians(60);
+			lod_multiplier *= lod_multiplier;
+		}
+		return lod_multiplier;
+	}
+
+
 	Array<Array<ModelInstanceMesh>>& getModelInstanceInfos(const Frustum& frustum,
 		const Vec3& lod_ref_point,
+		ComponentHandle camera,
 		u64 layer_mask) override
 	{
 		for (auto& i : m_temporary_infos) i.clear();
@@ -3257,25 +3273,21 @@ public:
 			Array<ModelInstanceMesh>& subinfos = m_temporary_infos[subresult_index];
 			subinfos.clear();
 
-			JobSystem::fromLambda([&subinfos, this, &results, subresult_index, &frustum, lod_ref_point]() {
+			JobSystem::fromLambda([&subinfos, this, &results, subresult_index, &frustum, lod_ref_point, camera]() {
 				PROFILE_BLOCK("Temporary Info Job");
 				PROFILE_INT("ModelInstance count", results[subresult_index].size());
 				if (results[subresult_index].empty()) return;
 
+				float lod_multiplier = getCameraLODMultiplier(camera);
 				Vec3 ref_point = lod_ref_point;
-				float lod_multiplier = m_lod_multiplier;
-				if (frustum.fov > 0)
-				{
-					float t = frustum.fov / Math::degreesToRadians(60.0f);
-					lod_multiplier *= t * t;
-				}
+				float final_lod_multiplier = m_lod_multiplier * lod_multiplier;
 				const ComponentHandle* LUMIX_RESTRICT raw_subresults = &results[subresult_index][0];
 				ModelInstance* LUMIX_RESTRICT model_instances = &m_model_instances[0];
 				for (int i = 0, c = results[subresult_index].size(); i < c; ++i)
 				{
 					const ModelInstance* LUMIX_RESTRICT model_instance = &model_instances[raw_subresults[i].index];
 					float squared_distance = (model_instance->matrix.getTranslation() - ref_point).squaredLength();
-					squared_distance *= lod_multiplier;
+					squared_distance *= final_lod_multiplier;
 
 					const Model* LUMIX_RESTRICT model = model_instance->model;
 					LODMeshIndices lod = model->getLODMeshIndices(squared_distance);
@@ -3474,32 +3486,6 @@ public:
 					center + radius * (x_vec * ci * cy1 + z_vec * si * cy1 + y_offset1),
 					color,
 					life);
-
-/*				addDebugLine(Vec3(center.x + radius * ci * cy,
-					center.y + radius * sy,
-					center.z + radius * si * cy),
-					Vec3(center.x + radius * ci * cy1,
-						center.y + radius * sy1,
-						center.z + radius * si * cy1),
-					color,
-					life);
-
-				addDebugLine(Vec3(center.x + radius * ci * cy,
-					center.y + radius * sy,
-					center.z + radius * si * cy),
-					Vec3(center.x + radius * prev_ci * cy,
-						center.y + radius * sy,
-						center.z + radius * prev_si * cy),
-					color,
-					life);
-				addDebugLine(Vec3(center.x + radius * prev_ci * cy1,
-					center.y + radius * sy1,
-					center.z + radius * prev_si * cy1),
-					Vec3(center.x + radius * ci * cy1,
-						center.y + radius * sy1,
-						center.z + radius * si * cy1),
-					color,
-					life);*/
 				prev_ci = ci;
 				prev_si = si;
 			}
@@ -3805,115 +3791,24 @@ public:
 	}
 
 
-	void addDebugOrthoFrustum(const Frustum& frustum, u32 color, float life)
-	{
-		Vec3 near_center = frustum.position - frustum.direction * frustum.near_distance;
-		Vec3 far_center = frustum.position - frustum.direction * frustum.far_distance;
-
-		float width =
-			Math::abs(frustum.ds[(int)Frustum::Planes::LEFT] + frustum.ds[(int)Frustum::Planes::RIGHT]);
-		float height =
-			Math::abs(frustum.ds[(int)Frustum::Planes::TOP] + frustum.ds[(int)Frustum::Planes::BOTTOM]);
-
-		Vec3 up = frustum.up.normalized() * height * 0.5f;
-		Vec3 right = crossProduct(frustum.direction, frustum.up) * width * 0.5f;
-
-		Vec3 points[8];
-
-		points[0] = near_center + up + right;
-		points[1] = near_center + up - right;
-		points[2] = near_center - up - right;
-		points[3] = near_center - up + right;
-
-		points[4] = far_center + up + right;
-		points[5] = far_center + up - right;
-		points[6] = far_center - up - right;
-		points[7] = far_center - up + right;
-
-		addDebugLine(points[0], points[1], color, life);
-		addDebugLine(points[1], points[2], color, life);
-		addDebugLine(points[2], points[3], color, life);
-		addDebugLine(points[3], points[0], color, life);
-
-		addDebugLine(points[4], points[5], color, life);
-		addDebugLine(points[5], points[6], color, life);
-		addDebugLine(points[6], points[7], color, life);
-		addDebugLine(points[7], points[4], color, life);
-
-		addDebugLine(points[0], points[4], color, life);
-		addDebugLine(points[1], points[5], color, life);
-		addDebugLine(points[2], points[6], color, life);
-		addDebugLine(points[3], points[7], color, life);
-	}
-
-
 	void addDebugFrustum(const Frustum& frustum, u32 color, float life) override
 	{
-		if (frustum.fov < 0)
-		{
-			addDebugOrthoFrustum(frustum, color, life);
-		}
-		else
-		{
-			addDebugFrustum(frustum.position,
-				frustum.direction,
-				frustum.up,
-				frustum.fov,
-				frustum.ratio,
-				frustum.near_distance,
-				frustum.far_distance,
-				color,
-				life);
-		}
+		addDebugLine(frustum.points[0], frustum.points[1], color, life);
+		addDebugLine(frustum.points[1], frustum.points[2], color, life);
+		addDebugLine(frustum.points[2], frustum.points[3], color, life);
+		addDebugLine(frustum.points[3], frustum.points[0], color, life);
+
+		addDebugLine(frustum.points[4], frustum.points[5], color, life);
+		addDebugLine(frustum.points[5], frustum.points[6], color, life);
+		addDebugLine(frustum.points[6], frustum.points[7], color, life);
+		addDebugLine(frustum.points[7], frustum.points[4], color, life);
+
+		addDebugLine(frustum.points[0], frustum.points[4], color, life);
+		addDebugLine(frustum.points[1], frustum.points[5], color, life);
+		addDebugLine(frustum.points[2], frustum.points[6], color, life);
+		addDebugLine(frustum.points[3], frustum.points[7], color, life);
 	}
 
-
-	void addDebugFrustum(const Vec3& position,
-		const Vec3& direction,
-		const Vec3& up,
-		float fov,
-		float ratio,
-		float near_distance,
-		float far_distance,
-		u32 color,
-		float life) override
-	{
-		Vec3 points[8];
-		Vec3 near_center = position + direction * near_distance;
-		Vec3 far_center = position + direction * far_distance;
-		Vec3 right = crossProduct(direction, up);
-		float scale = (float)tan(fov * 0.5f);
-		Vec3 up_near = up * near_distance * scale;
-		Vec3 right_near = right * (near_distance * scale * ratio);
-
-		points[0] = near_center + up_near + right_near;
-		points[1] = near_center + up_near - right_near;
-		points[2] = near_center - up_near - right_near;
-		points[3] = near_center - up_near + right_near;
-
-		Vec3 up_far = up * far_distance * scale;
-		Vec3 right_far = right * (far_distance * scale * ratio);
-
-		points[4] = far_center + up_far + right_far;
-		points[5] = far_center + up_far - right_far;
-		points[6] = far_center - up_far - right_far;
-		points[7] = far_center - up_far + right_far;
-
-		addDebugLine(points[0], points[1], color, life);
-		addDebugLine(points[1], points[2], color, life);
-		addDebugLine(points[2], points[3], color, life);
-		addDebugLine(points[3], points[0], color, life);
-
-		addDebugLine(points[4], points[5], color, life);
-		addDebugLine(points[5], points[6], color, life);
-		addDebugLine(points[6], points[7], color, life);
-		addDebugLine(points[7], points[4], color, life);
-
-		addDebugLine(points[0], points[4], color, life);
-		addDebugLine(points[1], points[5], color, life);
-		addDebugLine(points[2], points[6], color, life);
-		addDebugLine(points[3], points[7], color, life);
-	}
 
 	void addDebugCircle(const Vec3& center, const Vec3& up, float radius, u32 color, float life) override
 	{
@@ -3933,6 +3828,7 @@ public:
 			prevz = z;
 		}
 	}
+
 
 	void addDebugCross(const Vec3& center, float size, u32 color, float life) override
 	{

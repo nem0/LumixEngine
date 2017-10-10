@@ -552,7 +552,7 @@ struct FBXImporter
 				blob.clear();
 				ofbx::Vec3 cp = vertices[i];
 				// premultiply control points here, so we can have constantly-scaled meshes without scale in bones
-				Vec3 pos = transform_matrix.transform(toLumixVec3(cp)) * mesh_scale;
+				Vec3 pos = transform_matrix.transformPoint(toLumixVec3(cp)) * mesh_scale;
 				pos = fixOrientation(pos);
 				blob.write(pos);
 
@@ -1275,11 +1275,11 @@ struct FBXImporter
 		Vec3 size = max - min;
 		BillboardSceneData data({min, max}, BillboardSceneData::TEXTURE_SIZE);
 		Matrix mtx = data.computeMVPMatrix();
-		Vec3 uv0_min = mtx.transform(min);
-		Vec3 uv0_max = mtx.transform(max);
+		Vec3 uv0_min = mtx.transformPoint(min);
+		Vec3 uv0_max = mtx.transformPoint(max);
 		float x1_max = 0.0f;
-		float x2_max = mtx.transform(Vec3(max.x + size.z + size.x, 0, 0)).x;
-		float x3_max = mtx.transform(Vec3(max.x + size.z + size.x + size.z, 0, 0)).x;
+		float x2_max = mtx.transformPoint(Vec3(max.x + size.z + size.x, 0, 0)).x;
+		float x3_max = mtx.transformPoint(Vec3(max.x + size.z + size.x + size.z, 0, 0)).x;
 
 		auto fixUV = [](float x, float y) -> Vec2 { return Vec2(x * 0.5f + 0.5f, y * 0.5f + 0.5f); };
 

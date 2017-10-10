@@ -114,7 +114,7 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 			Matrix scale_mtx = Matrix::IDENTITY;
 			scale_mtx.m11 = scale_mtx.m22 = scale_mtx.m33 = scale;
 			Vec3 center = m_editor.getRenderInterface()->getModelCenter(entity);
-			mtx.setTranslation((mtx * scale_mtx).transform(center));
+			mtx.setTranslation((mtx * scale_mtx).transformPoint(center));
 		}
 		else
 		{

@@ -358,12 +358,22 @@ void Matrix::multiply3x3(float scale)
 }
 
 
-Vec3 Matrix::transform(const Vec3& rhs) const
+Vec3 Matrix::transformPoint(const Vec3& rhs) const
 {
 	return Vec3(
-		m11 * rhs.x + m21 * rhs.y + m31 * rhs.z + m41,	
-		m12 * rhs.x + m22 * rhs.y + m32 * rhs.z + m42,	
+		m11 * rhs.x + m21 * rhs.y + m31 * rhs.z + m41,
+		m12 * rhs.x + m22 * rhs.y + m32 * rhs.z + m42,
 		m13 * rhs.x + m23 * rhs.y + m33 * rhs.z + m43
+	);
+}
+
+
+Vec3 Matrix::transformVector(const Vec3& rhs) const
+{
+	return Vec3(
+		m11 * rhs.x + m21 * rhs.y + m31 * rhs.z,
+		m12 * rhs.x + m22 * rhs.y + m32 * rhs.z,
+		m13 * rhs.x + m23 * rhs.y + m33 * rhs.z
 	);
 }
 

@@ -75,6 +75,8 @@ LUMIX_ALIGN_BEGIN(16) struct LUMIX_ENGINE_API Frustum
 
 	bool intersectAABB(const AABB& aabb) const;
 	bool isSphereInside(const Vec3& center, float radius) const;
+	Sphere computeBoundingSphere();
+	void transform(const Matrix& mtx);
 
 
 	enum class Planes : u32
@@ -106,16 +108,7 @@ LUMIX_ALIGN_BEGIN(16) struct LUMIX_ENGINE_API Frustum
 	float zs[(int)Planes::COUNT];
 	float ds[(int)Planes::COUNT];
 
-	Vec3 center;
-	Vec3 position;
-	Vec3 direction;
-	Vec3 up;
-	float fov;
-	float ratio;
-	float near_distance;
-	float far_distance;
-	float radius;
-	float width;
+	Vec3 points[8];
 } LUMIX_ALIGN_END(16);
 
 

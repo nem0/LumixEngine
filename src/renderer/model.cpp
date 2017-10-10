@@ -92,7 +92,7 @@ static inline Vec3 evaluateSkin(Vec3& p, Model::Skin s, const Matrix* matrices)
 	Matrix m = matrices[s.indices[0]] * s.weights.x + matrices[s.indices[1]] * s.weights.y +
 			   matrices[s.indices[2]] * s.weights.z + matrices[s.indices[3]] * s.weights.w;
 
-	return m.transform(p);
+	return m.transformPoint(p);
 }
 
 
@@ -115,7 +115,7 @@ RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Matrix
 
 	Matrix inv = model_transform;
 	inv.inverse();
-	Vec3 local_origin = inv.transform(origin);
+	Vec3 local_origin = inv.transformPoint(origin);
 	Vec3 local_dir = static_cast<Vec3>(inv * Vec4(dir.x, dir.y, dir.z, 0));
 
 	const Array<Vec3>& vertices = m_vertices;

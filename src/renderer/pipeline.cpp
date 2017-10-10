@@ -1516,18 +1516,18 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	{
 		Matrix inv = light_mtx;
 		inv.fastInverse();
-		Vec3 out = inv.transform(shadow_cam_pos);
+		Vec3 out = inv.transformPoint(shadow_cam_pos);
 		float align = 2 * frustum_radius / (shadowmap_width * 0.5f - 2);
 		out.x -= fmodf(out.x, align);
 		out.y -= fmodf(out.y, align);
-		out = light_mtx.transform(out);
+		out = light_mtx.transformPoint(out);
 		return out;
 	}
 
 
 	void findExtraShadowcasterPlanes(const Vec3& light_forward, const Frustum& camera_frustum, Frustum* shadow_camera_frustum)
 	{
-		static const Frustum::Planes planes[] = {
+		/*static const Frustum::Planes planes[] = {
 			Frustum::Planes::LEFT, Frustum::Planes::TOP, Frustum::Planes::RIGHT, Frustum::Planes::BOTTOM };
 		bool prev_side = dotProduct(light_forward, camera_frustum.getNormal(planes[lengthOf(planes) - 1])) < 0;
 		int out_plane = (int)Frustum::Planes::EXTRA0;
@@ -1551,8 +1551,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 				if (out_plane >(int)Frustum::Planes::EXTRA1) break;
 			}
 			prev_side = side;
-		}
-
+		}*/
 	}
 
 
@@ -1594,8 +1593,9 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			split_distances[split_index],
 			split_distances[split_index + 1]);
 
-		Vec3 shadow_cam_pos = camera_frustum.center;
-		float bb_size = camera_frustum.radius;
+		Sphere frustum_bounding_sphere = camera_frustum.computeBoundingSphere();
+		Vec3 shadow_cam_pos = frustum_bounding_sphere.position;
+		float bb_size = frustum_bounding_sphere.radius;
 		shadow_cam_pos = shadowmapTexelAlign(shadow_cam_pos, 0.5f * shadowmap_width - 2, bb_size, light_mtx);
 
 		Matrix projection_matrix;
@@ -1615,7 +1615,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 		findExtraShadowcasterPlanes(light_forward, camera_frustum, &shadow_camera_frustum);
 
-		renderAll(shadow_camera_frustum, false, camera_matrix.getTranslation(), m_current_view->layer_mask);
+		renderAll(shadow_camera_frustum, false, m_applied_camera, m_current_view->layer_mask);
 
 		m_is_rendering_in_shadowmap = false;
 	}
@@ -2160,7 +2160,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
-	void renderAll(const Frustum& frustum, bool render_grass, const Vec3& lod_ref_point, u64 layer_mask)
+	void renderAll(const Frustum& frustum, bool render_grass, ComponentHandle camera, u64 layer_mask)
 	{
 		PROFILE_FUNCTION();
 
@@ -2168,6 +2168,8 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 		Engine& engine = m_renderer.getEngine();
 		IAllocator& allocator = engine.getAllocator();
+		Entity camera_entity = m_scene->getCameraEntity(camera);
+		Vec3 lod_ref_point = m_scene->getUniverse().getPosition(camera_entity);
 		m_is_current_light_global = true;
 
 		m_grasses_buffer.clear();
@@ -2175,13 +2177,11 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 		JobSystem::JobDecl jobs[3];
 		JobSystem::LambdaJob job_storage[3];
-		JobSystem::fromLambda([this, &frustum, &lod_ref_point, layer_mask]() {
-			m_mesh_buffer = &m_scene->getModelInstanceInfos(frustum, lod_ref_point, layer_mask);
+		JobSystem::fromLambda([this, &frustum, &lod_ref_point, layer_mask, camera]() {
+			m_mesh_buffer = &m_scene->getModelInstanceInfos(frustum, lod_ref_point, camera, layer_mask);
 		}, &job_storage[0], &jobs[0], nullptr);
 
 		JobSystem::fromLambda([this, &frustum, &lod_ref_point]() {
-			Entity camera_entity = m_scene->getCameraEntity(m_applied_camera);
-			Vec3 lod_ref_point = m_scene->getUniverse().getPosition(camera_entity);
 			m_scene->getTerrainInfos(frustum, lod_ref_point, m_terrains_buffer);
 		}, &job_storage[1], &jobs[1], nullptr);
 
@@ -2651,7 +2651,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			m_scene->getUniverse().getPosition(m_scene->getCameraEntity(m_applied_camera));
 
 		Vec4 rel_cam_pos(
-			inv_world_matrix.transform(camera_pos) / info.m_terrain->getXZScale(), 1);
+			inv_world_matrix.transformPoint(camera_pos) / info.m_terrain->getXZScale(), 1);
 		Vec4 terrain_scale(info.m_terrain->getScale(), 0);
 		const Mesh& mesh = *info.m_terrain->getMesh();
 
@@ -3215,7 +3215,9 @@ int renderModels(lua_State* L)
 {
 	auto* pipeline = LuaWrapper::checkArg<PipelineImpl*>(L, 1);
 
-	pipeline->renderAll(pipeline->m_camera_frustum, true, pipeline->m_camera_frustum.position, pipeline->m_layer_mask);
+	ComponentHandle cam = pipeline->m_applied_camera;
+
+	pipeline->renderAll(pipeline->m_camera_frustum, true, cam, pipeline->m_layer_mask);
 	pipeline->m_layer_mask = 0;
 	return 0;
 }
