@@ -61,7 +61,7 @@ void UT_matrix(const char* params)
 	mtx.multiply3x3(1.0f);
 	expectSameMatrices(mtx, Matrix::IDENTITY);
 
-	Vec3 v = mtx.transform(Vec3(1, 2, 3));
+	Vec3 v = mtx.transformPoint(Vec3(1, 2, 3));
 	LUMIX_EXPECT_CLOSE_EQ(v.x, 1, 0.001f);
 	LUMIX_EXPECT_CLOSE_EQ(v.y, 2, 0.001f);
 	LUMIX_EXPECT_CLOSE_EQ(v.z, 3, 0.001f);
