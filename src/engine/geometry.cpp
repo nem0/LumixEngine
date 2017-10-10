@@ -128,35 +128,76 @@ void Frustum::computeOrtho(const Vec3& position,
 	float near_distance,
 	float far_distance)
 {
+	computeOrtho(position, direction, up, width, height, near_distance, far_distance, {-1, -1}, {1, 1});
+}
+
+
+static void setPlanesFromPoints(Frustum& frustum)
+{
+	Vec3* points = frustum.points;
+
+	Vec3 normal_near = -crossProduct(points[0] - points[1], points[0] - points[2]).normalized();
+	Vec3 normal_far = crossProduct(points[4] - points[5], points[4] - points[6]).normalized();
+	frustum.setPlane(Frustum::Planes::EXTRA0, normal_near, points[0]);
+	frustum.setPlane(Frustum::Planes::EXTRA1, normal_near, points[0]);
+	frustum.setPlane(Frustum::Planes::NEAR, normal_near, points[0]);
+	frustum.setPlane(Frustum::Planes::FAR, normal_far, points[4]);
+
+	frustum.setPlane(Frustum::Planes::LEFT, crossProduct(points[1] - points[2], points[1] - points[5]).normalized(), points[1]);
+	frustum.setPlane(Frustum::Planes::RIGHT, -crossProduct(points[0] - points[3], points[0] - points[4]).normalized(), points[0]);
+	frustum.setPlane(Frustum::Planes::TOP, crossProduct(points[0] - points[1], points[0] - points[4]).normalized(), points[0]);
+	frustum.setPlane(Frustum::Planes::BOTTOM, crossProduct(points[2] - points[3], points[2] - points[6]).normalized(), points[2]);
+}
+
+
+static void setPoints(Frustum& frustum
+	, const Vec3& near_center
+	, const Vec3& far_center
+	, const Vec3& right_near
+	, const Vec3& up_near
+	, const Vec3& right_far
+	, const Vec3& up_far
+	, const Vec2& viewport_min
+	, const Vec2& viewport_max)
+{
+	ASSERT(viewport_max.x >= viewport_min.x);
+	ASSERT(viewport_max.y >= viewport_min.y);
+
+	Vec3* points = frustum.points;
+
+	points[0] = near_center + right_near * viewport_max.x + up_near * viewport_max.y;
+	points[1] = near_center + right_near * viewport_min.x + up_near * viewport_max.y;
+	points[2] = near_center + right_near * viewport_min.x + up_near * viewport_min.y;
+	points[3] = near_center + right_near * viewport_max.x + up_near * viewport_min.y;
+
+	points[4] = far_center + right_far * viewport_max.x + up_far * viewport_max.y;
+	points[5] = far_center + right_far * viewport_min.x + up_far * viewport_max.y;
+	points[6] = far_center + right_far * viewport_min.x + up_far * viewport_min.y;
+	points[7] = far_center + right_far * viewport_max.x + up_far * viewport_min.y;
+
+	setPlanesFromPoints(frustum);
+}
+
+
+void Frustum::computeOrtho(const Vec3& position,
+	const Vec3& direction,
+	const Vec3& up,
+	float width,
+	float height,
+	float near_distance,
+	float far_distance,
+	const Vec2& viewport_min,
+	const Vec2& viewport_max)
+{
 	Vec3 z = direction;
 	z.normalize();
 	Vec3 near_center = position - z * near_distance;
 	Vec3 far_center = position - z * far_distance;
 
-	Vec3 x = crossProduct(up, z);
-	x.normalize();
-	Vec3 y = crossProduct(z, x);
+	Vec3 x = crossProduct(up, z).normalized() * width;
+	Vec3 y = crossProduct(z, x).normalized() * height;
 
-	setPlane(Planes::NEAR, -z, near_center);
-	setPlane(Planes::FAR, z, far_center);
-	setPlane(Planes::EXTRA0, -z, near_center);
-	setPlane(Planes::EXTRA1, z, far_center);
-
-	setPlane(Planes::TOP, -y, near_center + y * height);
-	setPlane(Planes::BOTTOM, y, near_center - y * height);
-
-	setPlane(Planes::LEFT, x, near_center - x * width);
-	setPlane(Planes::RIGHT, -x, near_center + x * width);
-
-	points[0] = near_center + x * width + y * height;
-	points[1] = near_center + x * width - y * height;
-	points[2] = near_center - x * width - y * height;
-	points[3] = near_center - x * width + y * height;
-
-	points[4] = far_center + x * width + y * height;
-	points[5] = far_center + x * width - y * height;
-	points[6] = far_center - x * width - y * height;
-	points[7] = far_center - x * width + y * height;
+	setPoints(*this, near_center, far_center, x, y, x, y, viewport_min, viewport_max);
 }
 
 
@@ -208,35 +249,7 @@ void Frustum::computePerspective(const Vec3& position,
 	Vec3 near_center = position + z * near_distance;
 	Vec3 far_center = position + z * far_distance;
 
-	points[0] = near_center + right_near * viewport_max.x + up_near * viewport_max.y;
-	points[1] = near_center + right_near * viewport_min.x + up_near * viewport_max.y;
-	points[2] = near_center + right_near * viewport_min.x + up_near * viewport_min.y;
-	points[3] = near_center + right_near * viewport_max.x + up_near * viewport_min.y;
-
-	points[4] = far_center + right_far * viewport_max.x + up_far * viewport_max.y;
-	points[5] = far_center + right_far * viewport_min.x + up_far * viewport_max.y;
-	points[6] = far_center + right_far * viewport_min.x + up_far * viewport_min.y;
-	points[7] = far_center + right_far * viewport_max.x + up_far * viewport_min.y;
-
-	Vec3 normal_near = -crossProduct(points[0] - points[1], points[0] - points[2]).normalized();
-	Vec3 normal_far = crossProduct(points[4] - points[5], points[4] - points[6]).normalized();
-	setPlane(Planes::EXTRA0, normal_near, points[0]);
-	setPlane(Planes::EXTRA1, normal_near, points[0]);
-	setPlane(Planes::NEAR, normal_near, points[0]);
-	setPlane(Planes::FAR, normal_far, points[4]);
-
-	setPlane(Planes::LEFT, crossProduct(points[1] - points[2], points[1] - points[5]).normalized(), points[1]);
-	setPlane(Planes::RIGHT, -crossProduct(points[0] - points[3], points[0] - points[4]).normalized(), points[0]);
-	setPlane(Planes::TOP, crossProduct(points[0] - points[1], points[0] - points[4]).normalized(), points[0]);
-	setPlane(Planes::BOTTOM, crossProduct(points[2] - points[3], points[2] - points[6]).normalized(), points[2]);
-
-	Sphere sp = computeBoundingSphere();
-
-	for (int i = 0; i < 8; ++i)
-	{
-		bool is = dotProduct(getNormal((Planes)i), sp.position) + ds[i] < 0;
-		is = is;
-	}
+	setPoints(*this, near_center, far_center, right_near, up_near, right_far, up_far, viewport_min, viewport_max);
 }
 
 

@@ -470,14 +470,15 @@ public:
 		Vec2 viewport_max = { viewport_max_px.x / camera.screen_width * 2 - 1, (1 - viewport_min_px.y / camera.screen_height) * 2 - 1 };
 		if (camera.is_ortho)
 		{
-			// TODO
 			ret.computeOrtho(mtx.getTranslation(),
 				mtx.getZVector(),
 				mtx.getYVector(),
 				camera.ortho_size * ratio,
 				camera.ortho_size,
 				camera.near,
-				camera.far);
+				camera.far,
+				viewport_min,
+				viewport_max);
 			return ret;
 		}
 		ret.computePerspective(mtx.getTranslation(),
