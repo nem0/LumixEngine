@@ -2287,9 +2287,9 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 	}
 
 
-	Frustum getFrustum(ComponentHandle camera_cmp, const Vec2& a, const Vec2& b) override
+	Frustum getFrustum(ComponentHandle camera_cmp, const Vec2& viewport_min, const Vec2& viewport_max) override
 	{
-		return m_render_scene->getCameraFrustum(camera_cmp, a, b);
+		return m_render_scene->getCameraFrustum(camera_cmp, viewport_min, viewport_max);
 	}
 
 

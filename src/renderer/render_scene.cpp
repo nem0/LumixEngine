@@ -460,14 +460,17 @@ public:
 	}
 
 
-	Frustum getCameraFrustum(ComponentHandle cmp, const Vec2& a, const Vec2& b) const override
+	Frustum getCameraFrustum(ComponentHandle cmp, const Vec2& viewport_min_px, const Vec2& viewport_max_px) const override
 	{
 		const Camera& camera = m_cameras[{cmp.index}];
 		Matrix mtx = m_universe.getMatrix(camera.entity);
 		Frustum ret;
 		float ratio = camera.screen_height > 0 ? camera.screen_width / camera.screen_height : 1;
+		Vec2 viewport_min = { viewport_min_px.x / camera.screen_width * 2 - 1, (1 - viewport_max_px.y / camera.screen_height) * 2 - 1 };
+		Vec2 viewport_max = { viewport_max_px.x / camera.screen_width * 2 - 1, (1 - viewport_min_px.y / camera.screen_height) * 2 - 1 };
 		if (camera.is_ortho)
 		{
+			// TODO
 			ret.computeOrtho(mtx.getTranslation(),
 				mtx.getZVector(),
 				mtx.getYVector(),
@@ -483,7 +486,9 @@ public:
 			camera.fov,
 			ratio,
 			camera.near,
-			camera.far);
+			camera.far,
+			viewport_min,
+			viewport_max);
 
 		return ret;
 	}

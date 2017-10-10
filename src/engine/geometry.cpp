@@ -184,7 +184,9 @@ void Frustum::computePerspective(const Vec3& position,
 	float fov,
 	float ratio,
 	float near_distance,
-	float far_distance)
+	float far_distance,
+	const Vec2& viewport_min,
+	const Vec2& viewport_max)
 {
 	ASSERT(near_distance > 0);
 	ASSERT(far_distance > 0);
@@ -194,66 +196,59 @@ void Frustum::computePerspective(const Vec3& position,
 	float tang = (float)tan(fov * 0.5f);
 	float near_height = near_distance * tang;
 	float near_width = near_height * ratio;
+	float scale = (float)tan(fov * 0.5f);
+	Vec3 right = crossProduct(direction, up);
+	Vec3 up_near = up * near_distance * scale;
+	Vec3 right_near = right * (near_distance * scale * ratio);
+	Vec3 up_far = up * far_distance * scale;
+	Vec3 right_far = right * (far_distance * scale * ratio);
 
-	Vec3 z = direction;
-	z.normalize();
-
-	Vec3 x = crossProduct(z, up);
-	x.normalize();
-
-	Vec3 y = crossProduct(x, z);
+	Vec3 z = direction.normalized();
 
 	Vec3 near_center = position + z * near_distance;
 	Vec3 far_center = position + z * far_distance;
 
-	setPlane(Planes::NEAR, z, near_center);
-	setPlane(Planes::FAR, -z, far_center);
-	setPlane(Planes::EXTRA0, z, near_center);
-	setPlane(Planes::EXTRA1, -z, far_center);
+	points[0] = near_center + right_near * viewport_max.x + up_near * viewport_max.y;
+	points[1] = near_center + right_near * viewport_min.x + up_near * viewport_max.y;
+	points[2] = near_center + right_near * viewport_min.x + up_near * viewport_min.y;
+	points[3] = near_center + right_near * viewport_max.x + up_near * viewport_min.y;
 
-	Vec3 aux = (near_center + y * near_height) - position;
-	aux.normalize();
-	Vec3 normal = crossProduct(aux, x);
-	setPlane(Planes::TOP, normal, near_center + y * near_height);
+	points[4] = far_center + right_far * viewport_max.x + up_far * viewport_max.y;
+	points[5] = far_center + right_far * viewport_min.x + up_far * viewport_max.y;
+	points[6] = far_center + right_far * viewport_min.x + up_far * viewport_min.y;
+	points[7] = far_center + right_far * viewport_max.x + up_far * viewport_min.y;
 
-	aux = (near_center - y * near_height) - position;
-	aux.normalize();
-	normal = crossProduct(x, aux);
-	setPlane(Planes::BOTTOM, normal, near_center - y * near_height);
+	Vec3 normal_near = -crossProduct(points[0] - points[1], points[0] - points[2]).normalized();
+	Vec3 normal_far = crossProduct(points[4] - points[5], points[4] - points[6]).normalized();
+	setPlane(Planes::EXTRA0, normal_near, points[0]);
+	setPlane(Planes::EXTRA1, normal_near, points[0]);
+	setPlane(Planes::NEAR, normal_near, points[0]);
+	setPlane(Planes::FAR, normal_far, points[4]);
 
-	aux = (near_center - x * near_width) - position;
-	aux.normalize();
-	normal = crossProduct(aux, y);
-	setPlane(Planes::LEFT, normal, near_center - x * near_width);
+	setPlane(Planes::LEFT, crossProduct(points[1] - points[2], points[1] - points[5]).normalized(), points[1]);
+	setPlane(Planes::RIGHT, -crossProduct(points[0] - points[3], points[0] - points[4]).normalized(), points[0]);
+	setPlane(Planes::TOP, crossProduct(points[0] - points[1], points[0] - points[4]).normalized(), points[0]);
+	setPlane(Planes::BOTTOM, crossProduct(points[2] - points[3], points[2] - points[6]).normalized(), points[2]);
 
-	aux = (near_center + x * near_width) - position;
-	aux.normalize();
-	normal = crossProduct(y, aux);
-	setPlane(Planes::RIGHT, normal, near_center + x * near_width);
+	Sphere sp = computeBoundingSphere();
 
-	Vec3 right = crossProduct(direction, up);
-	float scale = (float)tan(fov * 0.5f);
-	Vec3 up_near = up * near_distance * scale;
-	Vec3 right_near = right * (near_distance * scale * ratio);
+	for (int i = 0; i < 8; ++i)
+	{
+		bool is = dotProduct(getNormal((Planes)i), sp.position) + ds[i] < 0;
+		is = is;
+	}
+}
 
-	points[0] = near_center + up_near + right_near;
-	points[1] = near_center + up_near - right_near;
-	points[2] = near_center - up_near - right_near;
-	points[3] = near_center - up_near + right_near;
 
-	Vec3 up_far = up * far_distance * scale;
-	Vec3 right_far = right * (far_distance * scale * ratio);
-
-	points[4] = far_center + up_far + right_far;
-	points[5] = far_center + up_far - right_far;
-	points[6] = far_center - up_far - right_far;
-	points[7] = far_center - up_far + right_far;
-
-	float far_height = far_distance * tang;
-	float far_width = far_height * ratio;
-
-	Vec3 corner1 = near_center + x * near_width + y * near_height;
-	Vec3 corner2 = far_center - x * far_width - y * far_height;
+void Frustum::computePerspective(const Vec3& position,
+	const Vec3& direction,
+	const Vec3& up,
+	float fov,
+	float ratio,
+	float near_distance,
+	float far_distance)
+{
+	computePerspective(position, direction, up, fov, ratio, near_distance, far_distance, {-1, -1}, {1, 1});
 }
 
 
