@@ -352,7 +352,8 @@ LUMIX_ALIGN_BEGIN(16) struct LUMIX_ENGINE_API Matrix
 	RigidTransform toTransform() { return {getTranslation(), getRotation()}; }
 	Quat getRotation() const;
 	void transpose();
-	Vec3 transform(const Vec3& pos) const;
+	Vec3 transformPoint(const Vec3& pos) const;
+	Vec3 transformVector(const Vec3& pos) const;
 	void multiply3x3(float scale);
 	void setIdentity();
 

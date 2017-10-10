@@ -39,6 +39,52 @@ bool Frustum::intersectAABB(const AABB& aabb) const
 }
 
 
+void Frustum::transform(const Matrix& mtx)
+{
+	for (Vec3& p : points)
+	{
+		p = mtx.transformPoint(p);
+	}
+
+	for (int i = 0; i < lengthOf(xs); ++i)
+	{
+		Vec3 p;
+		if (xs[i] != 0) p.set(-ds[i] / xs[i], 0, 0);
+		else if (ys[i] != 0) p.set(0, -ds[i] / ys[i], 0);
+		else p.set(0, 0, -ds[i] / zs[i]);
+
+		Vec3 n = {xs[i], ys[i], zs[i]};
+		n = mtx.transformVector(n);
+		p = mtx.transformPoint(p);
+
+		xs[i] = n.x;
+		ys[i] = n.y;
+		zs[i] = n.z;
+		ds[i] = -dotProduct(p, n);
+	}
+}
+
+
+Sphere Frustum::computeBoundingSphere()
+{
+	Sphere sphere;
+	sphere.position = points[0];
+	for (int i = 1; i < lengthOf(points); ++i)
+	{
+		sphere.position += points[i];
+	}
+	sphere.position *= 1.0f / lengthOf(points);
+
+	sphere.radius = 0;
+	for (int i = 0; i < lengthOf(points); ++i)
+	{
+		float len_sq = (points[i] - sphere.position).squaredLength();
+		if (len_sq > sphere.radius) sphere.radius = len_sq;
+	}
+	sphere.radius = sqrtf(sphere.radius);
+	return sphere;
+}
+
 
 bool Frustum::isSphereInside(const Vec3& center, float radius) const
 {
@@ -102,17 +148,15 @@ void Frustum::computeOrtho(const Vec3& position,
 	setPlane(Planes::LEFT, x, near_center - x * width);
 	setPlane(Planes::RIGHT, -x, near_center + x * width);
 
-/*	center = (near_center + far_center) * 0.5f;
-	float z_diff = far_distance - near_distance;
-	radius = std::sqrt(4 * width * width + 4 * height * height + z_diff * z_diff) * 0.5f;
-	this->position = position;
-	this->fov = -1;
-	this->direction = direction;
-	this->up = up;
-	this->near_distance = near_distance;
-	this->far_distance = far_distance;
-	this->width = width;
-	this->ratio = width / height;*/
+	points[0] = near_center + x * width + y * height;
+	points[1] = near_center + x * width - y * height;
+	points[2] = near_center - x * width - y * height;
+	points[3] = near_center - x * width + y * height;
+
+	points[4] = far_center + x * width + y * height;
+	points[5] = far_center + x * width - y * height;
+	points[6] = far_center - x * width - y * height;
+	points[7] = far_center - x * width + y * height;
 }
 
 
@@ -161,7 +205,6 @@ void Frustum::computePerspective(const Vec3& position,
 
 	Vec3 near_center = position + z * near_distance;
 	Vec3 far_center = position + z * far_distance;
-	center = position + z * ((near_distance + far_distance)* 0.5f);
 
 	setPlane(Planes::NEAR, z, near_center);
 	setPlane(Planes::FAR, -z, far_center);
@@ -188,22 +231,29 @@ void Frustum::computePerspective(const Vec3& position,
 	normal = crossProduct(y, aux);
 	setPlane(Planes::RIGHT, normal, near_center + x * near_width);
 
+	Vec3 right = crossProduct(direction, up);
+	float scale = (float)tan(fov * 0.5f);
+	Vec3 up_near = up * near_distance * scale;
+	Vec3 right_near = right * (near_distance * scale * ratio);
+
+	points[0] = near_center + up_near + right_near;
+	points[1] = near_center + up_near - right_near;
+	points[2] = near_center - up_near - right_near;
+	points[3] = near_center - up_near + right_near;
+
+	Vec3 up_far = up * far_distance * scale;
+	Vec3 right_far = right * (far_distance * scale * ratio);
+
+	points[4] = far_center + up_far + right_far;
+	points[5] = far_center + up_far - right_far;
+	points[6] = far_center - up_far - right_far;
+	points[7] = far_center - up_far + right_far;
+
 	float far_height = far_distance * tang;
 	float far_width = far_height * ratio;
 
 	Vec3 corner1 = near_center + x * near_width + y * near_height;
 	Vec3 corner2 = far_center - x * far_width - y * far_height;
-
-	float size = (corner1 - corner2).length();
-	size = Math::maximum(std::sqrt(far_width * far_width * 4 + far_height * far_height * 4), size);
-	this->radius = size * 0.5f;
-	this->position = position;
-	this->direction = direction;
-	this->up = up;
-	this->fov = fov;
-	this->ratio = ratio;
-	this->near_distance = near_distance;
-	this->far_distance = far_distance;
 }
 
 
@@ -221,7 +271,7 @@ void AABB::transform(const Matrix& matrix)
 
 	for (int j = 0; j < 8; ++j)
 	{
-		points[j] = matrix.transform(points[j]);
+		points[j] = matrix.transformPoint(points[j]);
 	}
 
 	Vec3 new_min = points[0];
@@ -240,21 +290,21 @@ void AABB::transform(const Matrix& matrix)
 void AABB::getCorners(const Matrix& matrix, Vec3* points) const
 {
 	Vec3 p(min.x, min.y, min.z);
-	points[0] = matrix.transform(p);
+	points[0] = matrix.transformPoint(p);
 	p.set(min.x, min.y, max.z);
-	points[1] = matrix.transform(p);
+	points[1] = matrix.transformPoint(p);
 	p.set(min.x, max.y, min.z);
-	points[2] = matrix.transform(p);
+	points[2] = matrix.transformPoint(p);
 	p.set(min.x, max.y, max.z);
-	points[3] = matrix.transform(p);
+	points[3] = matrix.transformPoint(p);
 	p.set(max.x, min.y, min.z);
-	points[4] = matrix.transform(p);
+	points[4] = matrix.transformPoint(p);
 	p.set(max.x, min.y, max.z);
-	points[5] = matrix.transform(p);
+	points[5] = matrix.transformPoint(p);
 	p.set(max.x, max.y, min.z);
-	points[6] = matrix.transform(p);
+	points[6] = matrix.transformPoint(p);
 	p.set(max.x, max.y, max.z);
-	points[7] = matrix.transform(p);
+	points[7] = matrix.transformPoint(p);
 }
 
 

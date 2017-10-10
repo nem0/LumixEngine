@@ -704,7 +704,7 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 			{
 				u32 color = m_selected_bone == i ? 0xffff0000 : 0xff0000ff;
 				render_scene.addDebugLine(
-					mtx.transform(bone.transform.pos), mtx.transform(child_bone.transform.pos), color, 0);
+					mtx.transformPoint(bone.transform.pos), mtx.transformPoint(child_bone.transform.pos), color, 0);
 			}
 			showBoneListItem(render_scene, mtx, model, i, visualize);
 		}

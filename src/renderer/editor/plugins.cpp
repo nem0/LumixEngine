@@ -1954,7 +1954,7 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 		Matrix mtx = universe->getMatrix(entity);
 		Matrix inv_mtx = mtx;
 		inv_mtx.inverse();
-		Vec3 lpos = inv_mtx.transform(wpos);
+		Vec3 lpos = inv_mtx.transformPoint(wpos);
 		auto* scene = (RenderScene*)universe->getScene(MODEL_INSTANCE_TYPE);
 		ComponentHandle model_instance = scene->getModelInstanceComponent(entity);
 		if (!model_instance.isValid()) return wpos;
@@ -1990,7 +1990,7 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 				processVertex(vertex);
 			}
 		}
-		return mtx.transform(closest_vertex);
+		return mtx.transformPoint(closest_vertex);
 	}
 
 
@@ -2293,9 +2293,9 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 	}
 
 
-	void getModelInstaces(Array<Entity>& entities, const Frustum& frustum) override
+	void getModelInstaces(Array<Entity>& entities, const Frustum& frustum, const Vec3& lod_ref_point, ComponentHandle camera) override
 	{
-		Array<Array<ModelInstanceMesh>>& res = m_render_scene->getModelInstanceInfos(frustum, frustum.position, ~0ULL);
+		Array<Array<ModelInstanceMesh>>& res = m_render_scene->getModelInstanceInfos(frustum, lod_ref_point, camera, ~0ULL);
 		for (auto& sub : res)
 		{
 			for (ModelInstanceMesh m : sub)
@@ -2621,7 +2621,7 @@ struct WorldEditorPlugin LUMIX_FINAL : public WorldEditor::Plugin
 
 		for (int j = 0; j < 8; ++j)
 		{
-			points[j] = mtx.transform(points[j]);
+			points[j] = mtx.transformPoint(points[j]);
 		}
 
 		Vec3 this_min = points[0];
@@ -2693,23 +2693,7 @@ struct WorldEditorPlugin LUMIX_FINAL : public WorldEditor::Plugin
 		float h = scene->getCameraScreenHeight(cmp.handle);
 		float ratio = h < 1.0f ? 1 : w / h;
 
-		if (is_ortho)
-		{
-			float ortho_size = scene->getCameraOrthoSize(cmp.handle);
-			Vec3 center = pos;
-			center += (far_distance - near_distance) * dir * 0.5f;
-			scene->addDebugCube(center,
-				(far_distance - near_distance) * dir * 0.5f,
-				ortho_size * up,
-				ortho_size * ratio * right,
-				0xffff0000,
-				0);
-		}
-		else
-		{
-			float fov = scene->getCameraFOV(cmp.handle);
-			scene->addDebugFrustum(pos, dir, up, fov, ratio, near_distance, far_distance, 0xffff0000, 0);
-		}
+		scene->addDebugFrustum(scene->getCameraFrustum(cmp.handle), 0xffff0000, 0);
 	}
 
 

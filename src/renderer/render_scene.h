@@ -189,16 +189,6 @@ public:
 		u32 color,
 		float life) = 0;
 	virtual void addDebugSphere(const Vec3& center, float radius, u32 color, float life) = 0;
-	virtual void addDebugFrustum(const Vec3& position,
-		const Vec3& direction,
-		const Vec3& up,
-		float fov,
-		float ratio,
-		float near_distance,
-		float far_distance,
-		u32 color,
-		float life) = 0;
-
 	virtual void addDebugFrustum(const Frustum& frustum, u32 color, float life) = 0;
 
 	virtual void addDebugCapsule(const Vec3& position,
@@ -324,6 +314,7 @@ public:
 	virtual void setModelInstancePath(ComponentHandle cmp, const Path& path) = 0;
 	virtual Array<Array<ModelInstanceMesh>>& getModelInstanceInfos(const Frustum& frustum,
 		const Vec3& lod_ref_point,
+		ComponentHandle camera,
 		u64 layer_mask) = 0;
 	virtual void getModelInstanceEntities(const Frustum& frustum, Array<Entity>& entities) = 0;
 	virtual Entity getModelInstanceEntity(ComponentHandle cmp) = 0;

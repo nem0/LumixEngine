@@ -493,7 +493,7 @@ void Terrain::updateGrass(ComponentHandle camera)
 	Matrix terrain_mtx = universe.getMatrix(m_entity);
 	Matrix inv_mtx = terrain_mtx;
 	inv_mtx.fastInverse();
-	Vec3 local_camera_pos = inv_mtx.transform(camera_pos);
+	Vec3 local_camera_pos = inv_mtx.transformPoint(camera_pos);
 	float cx = (int)(local_camera_pos.x / (GRASS_QUAD_SIZE)) * GRASS_QUAD_SIZE;
 	float cz = (int)(local_camera_pos.z / (GRASS_QUAD_SIZE)) * GRASS_QUAD_SIZE;
 	int grass_distance = 0;
@@ -578,19 +578,20 @@ void Terrain::getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, Com
 {
 	if (!m_material || !m_material->isReady()) return;
 
+	Universe& universe = m_scene.getUniverse();
+	Entity camera_entity = m_scene.getCameraEntity(camera);
+	Vec3 camera_pos = universe.getPosition(camera_entity);
 	updateGrass(camera);
 	Array<GrassQuad*>& quads = getQuads(camera);
 	
-	Universe& universe = m_scene.getUniverse();
 	Matrix mtx = universe.getMatrix(m_entity);
-	Vec3 frustum_position = frustum.position;
 	for (GrassQuad* quad : quads)
 	{
 		Vec3 quad_center(quad->pos.x + GRASS_QUAD_SIZE * 0.5f, quad->pos.y, quad->pos.z + GRASS_QUAD_SIZE * 0.5f);
-		quad_center = mtx.transform(quad_center);
+		quad_center = mtx.transformPoint(quad_center);
 		if (!frustum.isSphereInside(quad_center, quad->radius)) continue;
 
-		float dist2 = (quad_center - frustum_position).squaredLength();
+		float dist2 = (quad_center - camera_pos).squaredLength();
 		for (int patch_idx = 0; patch_idx < quad->m_patches.size(); ++patch_idx)
 		{
 			const GrassPatch& patch = quad->m_patches[patch_idx];
@@ -693,24 +694,12 @@ void Terrain::getInfos(Array<TerrainInfo>& infos, const Frustum& frustum, const 
 	Matrix inv_matrix = matrix;
 	inv_matrix.fastInverse();
 	
-	Vec3 local_lod_ref_point = inv_matrix.transform(lod_ref_point);
+	Vec3 local_lod_ref_point = inv_matrix.transformPoint(lod_ref_point);
 	local_lod_ref_point.x /= m_scale.x;
 	local_lod_ref_point.z /= m_scale.z;
 
-	Frustum rel_frustum;
-	Vec3 pos = inv_matrix.transform(frustum.position);
-	Vec3 dir = inv_matrix * Vec4(frustum.direction, 0);
-	Vec3 up = inv_matrix * Vec4(frustum.up, 0);
-	if (frustum.fov < 0)
-	{
-		float height = frustum.width / frustum.ratio;
-		rel_frustum.computeOrtho(pos, dir, up, frustum.width, height, frustum.near_distance, frustum.far_distance);
-	}
-	else
-	{
-		rel_frustum.computePerspective(pos, dir, up, frustum.fov, frustum.ratio, frustum.near_distance, frustum.far_distance);
-	}
-
+	Frustum rel_frustum = frustum;
+	rel_frustum.transform(inv_matrix);
 	m_root->getInfos(infos, local_lod_ref_point, this, matrix, rel_frustum);
 }
 
@@ -851,7 +840,7 @@ RayCastModelHit Terrain::castRay(const Vec3& origin, const Vec3& dir)
 	{
 		Matrix mtx = m_scene.getUniverse().getMatrix(m_entity);
 		mtx.fastInverse();
-		Vec3 rel_origin = mtx.transform(origin);
+		Vec3 rel_origin = mtx.transformPoint(origin);
 		Vec3 rel_dir = mtx * Vec4(dir, 0);
 		Vec3 start;
 		Vec3 size(m_root->m_size * m_scale.x, m_scale.y * 65535.0f, m_root->m_size * m_scale.x);

@@ -100,7 +100,7 @@ struct PaintTerrainCommand LUMIX_FINAL : public IEditorCommand
 		m_width = m_height = m_x = m_y = -1;
 		Matrix entity_mtx = editor.getUniverse()->getMatrix(terrain.entity);
 		entity_mtx.fastInverse();
-		Vec3 local_pos = entity_mtx.transform(hit_pos);
+		Vec3 local_pos = entity_mtx.transformPoint(hit_pos);
 		float terrain_size = static_cast<RenderScene*>(terrain.scene)->getTerrainSize(terrain.handle).x;
 		local_pos = local_pos / terrain_size;
 		local_pos.y = -1;
@@ -1038,8 +1038,8 @@ void TerrainEditor::drawCursor(RenderScene& scene, ComponentHandle terrain, cons
 		local_to.y = scene.getTerrainHeightAt(terrain, local_to.x, local_to.z);
 		local_to.y += 0.25f;
 
-		Vec3 from = terrain_matrix.transform(local_from);
-		Vec3 to = terrain_matrix.transform(local_to);
+		Vec3 from = terrain_matrix.transformPoint(local_from);
+		Vec3 to = terrain_matrix.transformPoint(local_to);
 		scene.addDebugLine(from, to, 0xffff0000, 0);
 	}
 }
@@ -1098,7 +1098,7 @@ Vec3 TerrainEditor::getRelativePosition(const Vec3& world_pos) const
 	Matrix inv_terrain_matrix = terrain_matrix;
 	inv_terrain_matrix.inverse();
 
-	return inv_terrain_matrix.transform(world_pos);
+	return inv_terrain_matrix.transformPoint(world_pos);
 }
 
 
@@ -1341,7 +1341,11 @@ void TerrainEditor::paintEntities(const Vec3& hit_pos)
 			m_terrain_brush_size,
 			-m_terrain_brush_size,
 			m_terrain_brush_size);
-		auto& meshes = scene->getModelInstanceInfos(frustum, frustum.position, ~0ULL);
+		ComponentUID camera = m_world_editor.getEditCamera();
+		Entity camera_entity = scene->getCameraEntity(camera.handle);
+		Vec3 camera_pos = scene->getUniverse().getPosition(camera_entity);
+		
+		auto& meshes = scene->getModelInstanceInfos(frustum, camera_pos, camera.handle, ~0ULL);
 
 		Vec2 size = scene->getTerrainSize(m_component.handle);
 		float scale = 1.0f - Math::maximum(0.01f, m_terrain_brush_strength);
@@ -1351,7 +1355,7 @@ void TerrainEditor::paintEntities(const Vec3& hit_pos)
 			float dist = Math::randFloat(0, 1.0f) * m_terrain_brush_size;
 			float y = Math::randFloat(m_y_spread.x, m_y_spread.y);
 			Vec3 pos(hit_pos.x + cos(angle) * dist, 0, hit_pos.z + sin(angle) * dist);
-			Vec3 terrain_pos = inv_terrain_matrix.transform(pos);
+			Vec3 terrain_pos = inv_terrain_matrix.transformPoint(pos);
 			if (terrain_pos.x >= 0 && terrain_pos.z >= 0 && terrain_pos.x <= size.x && terrain_pos.z <= size.y)
 			{
 				pos.y = scene->getTerrainHeightAt(m_component.handle, terrain_pos.x, terrain_pos.z) + y;

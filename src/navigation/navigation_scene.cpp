@@ -271,9 +271,9 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 					const u16* indices16 = model->getIndices16();
 					for (int i = 0; i < mesh.indices_count; i += 3)
 					{
-						Vec3 a = mtx.transform(vertices[indices16[mesh.indices_offset + i]]);
-						Vec3 b = mtx.transform(vertices[indices16[mesh.indices_offset + i + 1]]);
-						Vec3 c = mtx.transform(vertices[indices16[mesh.indices_offset + i + 2]]);
+						Vec3 a = mtx.transformPoint(vertices[indices16[mesh.indices_offset + i]]);
+						Vec3 b = mtx.transformPoint(vertices[indices16[mesh.indices_offset + i + 1]]);
+						Vec3 c = mtx.transformPoint(vertices[indices16[mesh.indices_offset + i + 2]]);
 
 						Vec3 n = crossProduct(a - b, a - c).normalized();
 						u8 area = n.y > walkable_threshold && is_walkable ? RC_WALKABLE_AREA : 0;
@@ -285,9 +285,9 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 					const u32* indices32 = model->getIndices32();
 					for (int i = 0; i < mesh.indices_count; i += 3)
 					{
-						Vec3 a = mtx.transform(vertices[indices32[mesh.indices_offset + i]]);
-						Vec3 b = mtx.transform(vertices[indices32[mesh.indices_offset + i + 1]]);
-						Vec3 c = mtx.transform(vertices[indices32[mesh.indices_offset + i + 2]]);
+						Vec3 a = mtx.transformPoint(vertices[indices32[mesh.indices_offset + i]]);
+						Vec3 b = mtx.transformPoint(vertices[indices32[mesh.indices_offset + i + 1]]);
+						Vec3 c = mtx.transformPoint(vertices[indices32[mesh.indices_offset + i + 2]]);
 
 						Vec3 n = crossProduct(a - b, a - c).normalized();
 						u8 area = n.y > walkable_threshold && is_walkable ? RC_WALKABLE_AREA : 0;
