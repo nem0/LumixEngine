@@ -459,11 +459,12 @@ void SceneView::onWindowGUI()
 					ImGuiWindowFlags_ShowBorders))
 		{
 			const auto& stats = m_pipeline->getStats();
-			ImGui::LabelText("Draw calls", "%d", stats.draw_call_count);
-			ImGui::LabelText("Instances", "%d", stats.instance_count);
+			ImGui::LabelText("Draw calls (scene view only)", "%d", stats.draw_call_count);
+			ImGui::LabelText("Instances (scene view only)", "%d", stats.instance_count);
 			char buf[30];
 			toCStringPretty(stats.triangle_count, buf, lengthOf(buf));
-			ImGui::LabelText("Triangles", "%s", buf);
+			ImGui::LabelText("Triangles (scene view only)", "%s", buf);
+			ImGui::LabelText("GPU memory used", "%dMB", bgfx::getStats()->gpuMemoryUsed / (1024 * 1024));
 			ImGui::LabelText("Resolution", "%dx%d", m_pipeline->getWidth(), m_pipeline->getHeight());
 			ImGui::LabelText("FPS", "%.2f", m_editor.getEngine().getFPS());
 			ImGui::LabelText("CPU time", "%.2f", m_pipeline->getCPUTime() * 1000.0f);

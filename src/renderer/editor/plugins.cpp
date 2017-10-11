@@ -2316,6 +2316,74 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 };
 
 
+
+struct RenderStatsPlugin LUMIX_FINAL : public StudioApp::IPlugin
+{
+	RenderStatsPlugin(StudioApp& app)
+	{
+		Action* action = LUMIX_NEW(app.getWorldEditor().getAllocator(), Action)("Render Stats", "render_stats");
+		action->func.bind<RenderStatsPlugin, &RenderStatsPlugin::onAction>(this);
+		action->is_selected.bind<RenderStatsPlugin, &RenderStatsPlugin::isOpen>(this);
+		app.addWindowAction(action);
+	}
+
+
+	const char* getName() const override
+	{
+		return "render_stats";
+	}
+
+
+	void onWindowGUI() override
+	{
+		double total_cpu = 0;
+		double total_gpu = 0;
+		if (ImGui::BeginDock("Renderer Stats", &m_is_open))
+		{
+			ImGui::Columns(3);
+			ImGui::Text("%s", "View name");
+			ImGui::NextColumn();
+			ImGui::Text("%s", "GPU time (ms)");
+			ImGui::NextColumn();
+			ImGui::Text("%s", "CPU time (ms)");
+			ImGui::NextColumn();
+			ImGui::Separator();
+			const bgfx::Stats* stats = bgfx::getStats();
+			for (int i = 0; i < stats->numViews; ++i)
+			{
+				auto& view_stat = stats->viewStats[i];
+				ImGui::Text("%s", view_stat.name);
+				ImGui::NextColumn();
+				double gpu_time = 1000.0f * view_stat.gpuTimeElapsed / (double)stats->gpuTimerFreq;
+				ImGui::Text("%f", gpu_time);
+				ImGui::NextColumn();
+				double cpu_time = 1000.0f * view_stat.cpuTimeElapsed / (double)stats->cpuTimerFreq;
+				ImGui::Text("%f", cpu_time);
+				ImGui::NextColumn();
+				total_cpu += cpu_time;
+				total_gpu += gpu_time;
+			}
+			ImGui::Separator();
+			ImGui::Text("%s", "Total");
+			ImGui::NextColumn();
+			ImGui::Text("%f", total_gpu);
+			ImGui::NextColumn();
+			ImGui::Text("%f", total_cpu);
+			ImGui::NextColumn();
+			ImGui::Columns();
+		}
+		ImGui::EndDock();
+	}
+
+	
+	bool isOpen() const { return m_is_open; }
+	void onAction() { m_is_open = !m_is_open; }
+
+
+	bool m_is_open = false;
+};
+
+
 struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 {
 	static EditorUIRenderPlugin* s_instance;
@@ -2384,7 +2452,9 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	}
 
 
-	void onWindowGUI() override {}
+	void onWindowGUI() override { }
+
+
 	const char* getName() const override { return "editor_ui_render"; }
 
 
@@ -2900,6 +2970,7 @@ LUMIX_STUDIO_ENTRY(renderer)
 	app.addPlugin(*game_view_plugin);
 	app.addPlugin(*LUMIX_NEW(allocator, EditorUIRenderPlugin)(app, *scene_view_plugin, *game_view_plugin));
 	app.addPlugin(*LUMIX_NEW(allocator, FurPainterPlugin)(app));
+	app.addPlugin(*LUMIX_NEW(allocator, RenderStatsPlugin)(app));
 	app.addPlugin(*LUMIX_NEW(allocator, ShaderEditorPlugin)(app));
 
 	app.getWorldEditor().addPlugin(*LUMIX_NEW(allocator, WorldEditorPlugin)());
