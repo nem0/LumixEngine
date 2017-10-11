@@ -57,7 +57,6 @@ GameView::GameView(StudioApp& app)
 	, m_is_mouse_hovering_window(false)
 	, m_time_multiplier(1.0f)
 	, m_paused(false)
-	, m_is_opengl(false)
 	, m_show_stats(false)
 	, m_texture_handle(BGFX_INVALID_HANDLE)
 	, m_gui_interface(nullptr)
@@ -74,7 +73,6 @@ GameView::GameView(StudioApp& app)
 	app.addWindowAction(action);
 
 	auto* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
-	m_is_opengl = renderer->isOpenGL();
 	Path path("pipelines/main.lua");
 	m_pipeline = Pipeline::create(*renderer, path, "GAME_VIEW", engine.getAllocator());
 	m_pipeline->load();
@@ -182,7 +180,7 @@ void GameView::onFullscreenGUI()
 	m_pipeline->resize(int(size.x), int(size.y));
 
 	m_texture_handle = m_pipeline->getRenderbuffer("default", 0);
-	if (m_is_opengl)
+	if (bgfx::getCaps()->originBottomLeft)
 	{
 		ImGui::Image(&m_texture_handle, size, ImVec2(0, 1), ImVec2(1, 0));
 	}
@@ -298,7 +296,7 @@ void GameView::onWindowGUI()
 			m_texture_handle = m_pipeline->getRenderbuffer("default", 0);
 
 			view_pos = ImGui::GetCursorScreenPos();
-			if (m_is_opengl)
+			if (bgfx::getCaps()->originBottomLeft)
 			{
 				ImGui::Image(&m_texture_handle, size, ImVec2(0, 1), ImVec2(1, 0));
 			}

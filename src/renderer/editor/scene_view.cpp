@@ -56,7 +56,6 @@ SceneView::SceneView(StudioApp& app)
 	Engine& engine = m_editor.getEngine();
 	IAllocator& allocator = engine.getAllocator();
 	auto* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
-	m_is_opengl = renderer->isOpenGL();
 	Path path("pipelines/main.lua");
 	m_pipeline = Pipeline::create(*renderer, path, "SCENE_VIEW", engine.getAllocator());
 	m_pipeline->load();
@@ -383,7 +382,7 @@ void SceneView::onWindowGUI()
 			m_height = int(size.y);
 			auto content_min = ImGui::GetCursorScreenPos();
 			ImVec2 content_max(content_min.x + size.x, content_min.y + size.y);
-			if (m_is_opengl)
+			if (bgfx::getCaps()->originBottomLeft)
 			{
 				ImGui::Image(&m_texture_handle, size, ImVec2(0, 1), ImVec2(1, 0));
 			}

@@ -302,19 +302,19 @@ LUMIX_ALIGN_BEGIN(16) struct LUMIX_ENGINE_API Matrix
 	}
 
 
-	void setOrtho(float left, float right, float bottom, float top, float z_near, float z_far, bool is_opengl)
+	void setOrtho(float left, float right, float bottom, float top, float z_near, float z_far, bool is_homogenous_depth)
 	{
 		*this = IDENTITY;
 		m11 = 2 / (right - left);
 		m22 = 2 / (top - bottom);
-		m33 = (is_opengl ? -2 : -1) / (z_far - z_near);
+		m33 = (is_homogenous_depth ? -2 : -1) / (z_far - z_near);
 		m41 = (right + left) / (left - right);
 		m42 = (top + bottom) / (bottom - top);
-		m43 = is_opengl ? (z_near + z_far) / (z_near - z_far) : z_near / (z_near - z_far);
+		m43 = is_homogenous_depth ? (z_near + z_far) / (z_near - z_far) : z_near / (z_near - z_far);
 	}
 
 
-	void setPerspective(float fov, float ratio, float near_plane, float far_plane, bool is_opengl);
+	void setPerspective(float fov, float ratio, float near_plane, float far_plane, bool is_homogenous_depth);
 
 
 	void fromEuler(float yaw, float pitch, float roll);

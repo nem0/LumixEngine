@@ -83,7 +83,6 @@ static const ComponentType ENVIRONMENT_PROBE_TYPE = PropertyRegister::getCompone
 static const ResourceType MATERIAL_TYPE("material");
 static const ResourceType TEXTURE_TYPE("texture");
 static const ResourceType MODEL_TYPE("model");
-static bool is_opengl = false;
 
 
 struct Decal : public DecalInfo
@@ -3355,6 +3354,7 @@ public:
 		Camera& camera = m_cameras[{cmp.index}];
 		Matrix mtx;
 		float ratio = camera.screen_height > 0 ? camera.screen_width / camera.screen_height : 1;
+		bool is_homogenous_depth = bgfx::getCaps()->homogeneousDepth;
 		if (camera.is_ortho)
 		{
 			mtx.setOrtho(-camera.ortho_size * ratio,
@@ -3363,11 +3363,11 @@ public:
 				camera.ortho_size,
 				camera.near,
 				camera.far,
-				is_opengl);
+				is_homogenous_depth);
 		}
 		else
 		{
-			mtx.setPerspective(camera.fov, ratio, camera.near, camera.far, is_opengl);
+			mtx.setPerspective(camera.fov, ratio, camera.near, camera.far, is_homogenous_depth);
 		}
 		return mtx;
 	}
@@ -4961,7 +4961,6 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	, m_time(0)
 	, m_is_updating_attachments(false)
 {
-	is_opengl = renderer.isOpenGL();
 	m_universe.entityTransformed().bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
 	m_universe.entityDestroyed().bind<RenderSceneImpl, &RenderSceneImpl::onEntityDestroyed>(this);
 	m_culling_system = CullingSystem::create(m_allocator);

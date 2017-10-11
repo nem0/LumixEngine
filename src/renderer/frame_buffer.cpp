@@ -69,7 +69,7 @@ FrameBuffer::~FrameBuffer()
 	if (m_autodestroy_handle)
 	{
 		destroyRenderbuffers();
-		bgfx::destroyFrameBuffer(m_handle);
+		bgfx::destroy(m_handle);
 	}
 }
 
@@ -79,7 +79,7 @@ void FrameBuffer::destroyRenderbuffers()
 	for (int i = 0; i < m_declaration.m_renderbuffers_count; ++i)
 	{
 		RenderBuffer& rb = m_declaration.m_renderbuffers[i];
-		if(!rb.m_shared) bgfx::destroyTexture(rb.m_handle);
+		if(!rb.m_shared) bgfx::destroy(rb.m_handle);
 	}
 }
 
@@ -89,7 +89,7 @@ void FrameBuffer::resize(int width, int height)
 	if (bgfx::isValid(m_handle))
 	{
 		destroyRenderbuffers();
-		bgfx::destroyFrameBuffer(m_handle);
+		bgfx::destroy(m_handle);
 	}
 
 	m_declaration.m_width = width;

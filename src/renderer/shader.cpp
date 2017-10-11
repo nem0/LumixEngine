@@ -91,7 +91,8 @@ static u32 getDefineMaskFromDense(const Shader& shader, u32 dense)
 
 bool Shader::generateInstances()
 {
-	bool is_opengl = getRenderer().isOpenGL();
+	bool is_opengl = bgfx::getRendererType() == bgfx::RendererType::OpenGL ||
+		bgfx::getRendererType() == bgfx::RendererType::OpenGLES;
 	m_instances.clear();
 
 	u32 count = 1 << m_combintions.define_count;
@@ -418,7 +419,7 @@ void Shader::unload(void)
 
 	for (auto& uniform : m_uniforms)
 	{
-		bgfx::destroyUniform(uniform.handle);
+		bgfx::destroy(uniform.handle);
 	}
 	m_uniforms.clear();
 
@@ -426,7 +427,7 @@ void Shader::unload(void)
 	{
 		if (bgfx::isValid(m_texture_slots[i].uniform_handle))
 		{
-			bgfx::destroyUniform(m_texture_slots[i].uniform_handle);
+			bgfx::destroy(m_texture_slots[i].uniform_handle);
 		}
 		m_texture_slots[i].uniform_handle = BGFX_INVALID_HANDLE;
 	}
@@ -470,7 +471,7 @@ ShaderInstance::~ShaderInstance()
 	{
 		if (bgfx::isValid(program_handles[i]))
 		{
-			bgfx::destroyProgram(program_handles[i]);
+			bgfx::destroy(program_handles[i]);
 		}
 	}
 
@@ -492,7 +493,7 @@ void Shader::onBeforeEmpty()
 		{
 			if (bgfx::isValid(inst.program_handles[i]))
 			{
-				bgfx::destroyProgram(inst.program_handles[i]);
+				bgfx::destroy(inst.program_handles[i]);
 				inst.program_handles[i] = BGFX_INVALID_HANDLE;
 			}
 		}
@@ -532,7 +533,7 @@ ShaderBinary::ShaderBinary(const Path& path, ResourceManagerBase& resource_manag
 
 void ShaderBinary::unload()
 {
-	if (bgfx::isValid(m_handle)) bgfx::destroyShader(m_handle);
+	if (bgfx::isValid(m_handle)) bgfx::destroy(m_handle);
 	m_handle = BGFX_INVALID_HANDLE;
 }
 

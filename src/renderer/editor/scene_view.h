@@ -71,7 +71,6 @@ class SceneView : public StudioApp::IPlugin
 		Pipeline* m_pipeline;
 		bgfx::TextureHandle m_texture_handle;
 		bool m_show_stats;
-		bool m_is_opengl;
 		LogUI& m_log_ui;
 		Array<DropHandler> m_drop_handlers;
 };

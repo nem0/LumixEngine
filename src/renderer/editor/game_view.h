@@ -63,7 +63,6 @@ private:
 	bool m_is_mouse_hovering_window;
 	bool m_is_ingame_cursor;
 	bool m_paused;
-	bool m_is_opengl;
 	bool m_is_fullscreen;
 	bool m_show_stats;
 	struct

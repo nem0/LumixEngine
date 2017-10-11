@@ -752,7 +752,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 				StaticString<MAX_PATH_LENGTH> path(".lumix/asset_tiles/", m_tile.path_hash, ".dds");
 				saveAsDDS(path, &m_tile.data[0], AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE);
 
-				bgfx::destroyTexture(m_tile.texture);
+				bgfx::destroy(m_tile.texture);
 			}
 			return;
 		}
@@ -1221,14 +1221,14 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		renderer->frame(false); // submit
 		renderer->frame(false); // wait for gpu
 
-		bool is_opengl = renderer->isOpenGL();
 		for (int i = 0; i < 6; ++i)
 		{
 			Matrix mtx = Matrix::IDENTITY;
 			mtx.setTranslation(probe_position);
-			Vec3 side = crossProduct(is_opengl ? ups_opengl[i] : ups[i], dirs[i]);
+			bool ndc_bottom_left = bgfx::getCaps()->originBottomLeft;
+			Vec3 side = crossProduct(ndc_bottom_left ? ups_opengl[i] : ups[i], dirs[i]);
 			mtx.setZVector(dirs[i]);
-			mtx.setYVector(is_opengl ? ups_opengl[i] : ups[i]);
+			mtx.setYVector(ndc_bottom_left ? ups_opengl[i] : ups[i]);
 			mtx.setXVector(side);
 			universe->setMatrix(camera_entity, mtx);
 			m_pipeline->render();
@@ -1246,7 +1246,7 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 			renderer->frame(false); // submit
 			renderer->frame(false); // wait for gpu
 
-			if (is_opengl) continue;
+			if (ndc_bottom_left) continue;
 
 			u32* tmp = (u32*)&data[i * TEXTURE_SIZE * TEXTURE_SIZE * 4];
 			if (i == 2 || i == 3)
@@ -1285,7 +1285,7 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		saveCubemap(cmp, (u8*)irradiance.m_data, 32, "_irradiance");
 		saveCubemap(cmp, (u8*)image.m_data, 128, "_radiance");
 		saveCubemap(cmp, &data[0], TEXTURE_SIZE, "");
-		bgfx::destroyTexture(texture);
+		bgfx::destroy(texture);
 		
 		scene->reloadEnvironmentProbe(cmp.handle);
 	}
@@ -2452,9 +2452,7 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		float width = ImGui::GetIO().DisplaySize.x;
 		float height = ImGui::GetIO().DisplaySize.y;
 		Matrix ortho;
-		bool is_opengl = bgfx::getRendererType() == bgfx::RendererType::OpenGL ||
-			bgfx::getRendererType() == bgfx::RendererType::OpenGLES;
-		ortho.setOrtho(0.0f, width, height, 0.0f, -1.0f, 1.0f, is_opengl);
+		ortho.setOrtho(0.0f, width, height, 0.0f, -1.0f, 1.0f, bgfx::getCaps()->homogeneousDepth);
 		m_gui_pipeline->resize((int)width, (int)height);
 		m_gui_pipeline->setViewProjection(ortho, (int)width, (int)height);
 	}

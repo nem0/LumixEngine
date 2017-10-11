@@ -464,7 +464,7 @@ bool Model::parseGeometry(FS::IFile& file, FileVersion version)
 	m_indices_handle = bgfx::createIndexBuffer(mem, index_size == 4 ? BGFX_BUFFER_INDEX32 : 0);
 	if (!bgfx::isValid(m_indices_handle))
 	{
-		bgfx::destroyVertexBuffer(m_vertices_handle);
+		bgfx::destroy(m_vertices_handle);
 		return false;
 	}
 
@@ -773,8 +773,8 @@ void Model::unload(void)
 	m_uvs.clear();
 	m_vertices.clear();
 
-	if(bgfx::isValid(m_vertices_handle)) bgfx::destroyVertexBuffer(m_vertices_handle);
-	if(bgfx::isValid(m_indices_handle)) bgfx::destroyIndexBuffer(m_indices_handle);
+	if(bgfx::isValid(m_vertices_handle)) bgfx::destroy(m_vertices_handle);
+	if(bgfx::isValid(m_indices_handle)) bgfx::destroy(m_indices_handle);
 	m_indices_handle = BGFX_INVALID_HANDLE;
 	m_vertices_handle = BGFX_INVALID_HANDLE;
 }
