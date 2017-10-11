@@ -133,9 +133,7 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 		Pipeline* pipeline = m_interface->getPipeline();
 		Vec2 size((float)pipeline->getWidth(), (float)pipeline->getHeight());
 		Matrix ortho;
-		bool is_opengl = bgfx::getRendererType() == bgfx::RendererType::OpenGL ||
-			bgfx::getRendererType() == bgfx::RendererType::OpenGLES;
-		ortho.setOrtho(0.0f, size.x, size.y, 0.0f, -1.0f, 1.0f, is_opengl);
+		ortho.setOrtho(0.0f, size.x, size.y, 0.0f, -1.0f, 1.0f, bgfx::getCaps()->homogeneousDepth);
 		pipeline->setViewProjection(ortho, (int)size.x, (int)size.y);
 	}
 

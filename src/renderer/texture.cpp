@@ -627,7 +627,7 @@ void Texture::unload(void)
 {
 	if (bgfx::isValid(handle))
 	{
-		bgfx::destroyTexture(handle);
+		bgfx::destroy(handle);
 		handle = BGFX_INVALID_HANDLE;
 	}
 	data.clear();

@@ -36,14 +36,13 @@ namespace Lumix
 
 static const float SHADOW_CAM_NEAR = 50.0f;
 static const float SHADOW_CAM_FAR = 5000.0f;
-static bool is_opengl = false;
 
 
 struct InstanceData
 {
 	static const int MAX_INSTANCE_COUNT = 128;
 
-	const bgfx::InstanceDataBuffer* buffer;
+	bgfx::InstanceDataBuffer buffer;
 	int instance_count;
 	Mesh* mesh;
 	Model* model;
@@ -298,7 +297,6 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		{
 			handle = BGFX_INVALID_HANDLE;
 		}
-		is_opengl = renderer.isOpenGL();
 		m_deferred_point_light_vertex_decl.begin()
 			.add(bgfx::Attrib::Position, 3, bgfx::AttribType::Float)
 			.end();
@@ -403,7 +401,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 		for (int i = 0; i < m_uniforms.size(); ++i)
 		{
-			bgfx::destroyUniform(m_uniforms[i]);
+			bgfx::destroy(m_uniforms[i]);
 		}
 		m_uniforms.clear();
 
@@ -567,31 +565,31 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 	void destroyUniforms()
 	{
-		bgfx::destroyUniform(m_tex_shadowmap_uniform);
-		bgfx::destroyUniform(m_texture_uniform);
-		bgfx::destroyUniform(m_terrain_matrix_uniform);
-		bgfx::destroyUniform(m_bone_matrices_uniform);
-		bgfx::destroyUniform(m_layer_uniform);
-		bgfx::destroyUniform(m_terrain_scale_uniform);
-		bgfx::destroyUniform(m_rel_camera_pos_uniform);
-		bgfx::destroyUniform(m_terrain_params_uniform);
-		bgfx::destroyUniform(m_fog_params_uniform);
-		bgfx::destroyUniform(m_fog_color_density_uniform);
-		bgfx::destroyUniform(m_light_pos_radius_uniform);
-		bgfx::destroyUniform(m_light_color_attenuation_uniform);
-		bgfx::destroyUniform(m_light_color_indirect_intensity_uniform);
-		bgfx::destroyUniform(m_light_dir_fov_uniform);
-		bgfx::destroyUniform(m_shadowmap_matrices_uniform);
-		bgfx::destroyUniform(m_cam_inv_proj_uniform);
-		bgfx::destroyUniform(m_cam_inv_viewproj_uniform);
-		bgfx::destroyUniform(m_cam_view_uniform);
-		bgfx::destroyUniform(m_cam_proj_uniform);
-		bgfx::destroyUniform(m_cam_params);
-		bgfx::destroyUniform(m_grass_max_dist_uniform);
-		bgfx::destroyUniform(m_cam_inv_view_uniform);
-		bgfx::destroyUniform(m_texture_size_uniform);
-		bgfx::destroyUniform(m_decal_matrix_uniform);
-		bgfx::destroyUniform(m_emitter_matrix_uniform);
+		bgfx::destroy(m_tex_shadowmap_uniform);
+		bgfx::destroy(m_texture_uniform);
+		bgfx::destroy(m_terrain_matrix_uniform);
+		bgfx::destroy(m_bone_matrices_uniform);
+		bgfx::destroy(m_layer_uniform);
+		bgfx::destroy(m_terrain_scale_uniform);
+		bgfx::destroy(m_rel_camera_pos_uniform);
+		bgfx::destroy(m_terrain_params_uniform);
+		bgfx::destroy(m_fog_params_uniform);
+		bgfx::destroy(m_fog_color_density_uniform);
+		bgfx::destroy(m_light_pos_radius_uniform);
+		bgfx::destroy(m_light_color_attenuation_uniform);
+		bgfx::destroy(m_light_color_indirect_intensity_uniform);
+		bgfx::destroy(m_light_dir_fov_uniform);
+		bgfx::destroy(m_shadowmap_matrices_uniform);
+		bgfx::destroy(m_cam_inv_proj_uniform);
+		bgfx::destroy(m_cam_inv_viewproj_uniform);
+		bgfx::destroy(m_cam_view_uniform);
+		bgfx::destroy(m_cam_proj_uniform);
+		bgfx::destroy(m_cam_params);
+		bgfx::destroy(m_grass_max_dist_uniform);
+		bgfx::destroy(m_cam_inv_view_uniform);
+		bgfx::destroy(m_texture_size_uniform);
+		bgfx::destroy(m_decal_matrix_uniform);
+		bgfx::destroy(m_emitter_matrix_uniform);
 	}
 
 
@@ -611,7 +609,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 		for (int i = 0; i < m_uniforms.size(); ++i)
 		{
-			bgfx::destroyUniform(m_uniforms[i]);
+			bgfx::destroy(m_uniforms[i]);
 		}
 
 		for (int i = 0; i < m_framebuffers.size(); ++i)
@@ -621,14 +619,14 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		}
 		LUMIX_DELETE(m_allocator, m_default_framebuffer);
 
-		bgfx::destroyVertexBuffer(m_cube_vb);
-		bgfx::destroyIndexBuffer(m_cube_ib);
-		bgfx::destroyIndexBuffer(m_particle_index_buffer);
-		bgfx::destroyVertexBuffer(m_particle_vertex_buffer);
-		if (bgfx::isValid(m_debug_index_buffer)) bgfx::destroyDynamicIndexBuffer(m_debug_index_buffer);
+		bgfx::destroy(m_cube_vb);
+		bgfx::destroy(m_cube_ib);
+		bgfx::destroy(m_particle_index_buffer);
+		bgfx::destroy(m_particle_vertex_buffer);
+		if (bgfx::isValid(m_debug_index_buffer)) bgfx::destroy(m_debug_index_buffer);
 		for (auto& handle : m_debug_vertex_buffers)
 		{
-			if (bgfx::isValid(handle)) bgfx::destroyDynamicVertexBuffer(handle);
+			if (bgfx::isValid(handle)) bgfx::destroy(handle);
 		}
 	}
 
@@ -644,16 +642,16 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		Material* material = emitter.getMaterial();
 		static const int local_space_define_idx = m_renderer.getShaderDefineIdx("LOCAL_SPACE");
 		material->setDefine(local_space_define_idx, emitter.m_local_space);
-		const bgfx::InstanceDataBuffer* instance_buffer = nullptr;
+		bgfx::InstanceDataBuffer instance_buffer;
 
 		auto& view = *m_current_view;
 		Matrix mtx = m_scene->getUniverse().getMatrix(emitter.m_entity);
 		static const int subimage_define_idx = m_renderer.getShaderDefineIdx("SUBIMAGE");
-		auto draw = [this, material, &view, mtx](const bgfx::InstanceDataBuffer* instance_buffer, int count) {
+		auto draw = [this, material, &view, mtx](const bgfx::InstanceDataBuffer& instance_buffer, int count) {
 			executeCommandBuffer(material->getCommandBuffer(), material);
 			executeCommandBuffer(view.command_buffer.buffer, material);
 
-			bgfx::setInstanceDataBuffer(instance_buffer, count);
+			bgfx::setInstanceDataBuffer(&instance_buffer, count);
 			bgfx::setVertexBuffer(0, m_particle_vertex_buffer);
 			bgfx::setIndexBuffer(m_particle_index_buffer);
 			bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
@@ -679,8 +677,8 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			float h = 1.0f / rows;
 			material->setDefine(subimage_define_idx, true);
 			int size = emitter.m_subimage_module->rows * emitter.m_subimage_module->cols;
-			instance_buffer = bgfx::allocInstanceDataBuffer(emitter.m_life.size(), sizeof(Instance));
-			Instance* instance = (Instance*)instance_buffer->data;
+			bgfx::allocInstanceDataBuffer(&instance_buffer, emitter.m_life.size(), sizeof(Instance));
+			Instance* instance = (Instance*)instance_buffer.data;
 			for (int i = 0, c = emitter.m_life.size(); i < c; ++i)
 			{
 				instance->pos.set(emitter.m_position[i], emitter.m_size[i]);
@@ -706,8 +704,8 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 				Vec4 alpha_and_rotation;
 			};
 			material->setDefine(subimage_define_idx, false);
-			instance_buffer = bgfx::allocInstanceDataBuffer(emitter.m_life.size(), sizeof(Instance));
-			Instance* instance = (Instance*)instance_buffer->data;
+			bgfx::allocInstanceDataBuffer(&instance_buffer, emitter.m_life.size(), sizeof(Instance));
+			Instance* instance = (Instance*)instance_buffer.data;
 			for (int i = 0, c = emitter.m_life.size(); i < c; ++i)
 			{
 				instance->pos = Vec4(emitter.m_position[i], emitter.m_size[i]);
@@ -799,7 +797,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	void finishInstances(int idx)
 	{
 		InstanceData& data = m_instances_data[idx];
-		if (!data.buffer) return;
+		if (!data.buffer.data) return;
 
 		Mesh& mesh = *data.mesh;
 		const Model& model = *data.model;
@@ -821,14 +819,14 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 							 mesh.indices_count);
 		bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
 		bgfx::setState(view.render_state | material->getRenderStates());
-		bgfx::setInstanceDataBuffer(data.buffer, data.instance_count);
+		bgfx::setInstanceDataBuffer(&data.buffer, data.instance_count);
 		ShaderInstance& shader_instance = mesh.material->getShaderInstance();
 		++m_stats.draw_call_count;
 		m_stats.instance_count += data.instance_count;
 		m_stats.triangle_count += data.instance_count * mesh.indices_count / 3;
 		bgfx::submit(view.bgfx_id, shader_instance.getProgramHandle(view.pass_idx));
 
-		data.buffer = nullptr;
+		data.buffer.data = nullptr;
 		data.instance_count = 0;
 		mesh.instance_idx = -1;
 	}
@@ -886,9 +884,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			return;
 		}
 
-		bool is_opengl = bgfx::getRendererType() == bgfx::RendererType::OpenGL ||
-			bgfx::getRendererType() == bgfx::RendererType::OpenGLES;
-		ortho.setOrtho(0.0f, size.x, size.y, 0.0f, -1.0f, 1.0f, is_opengl);
+		ortho.setOrtho(0.0f, size.x, size.y, 0.0f, -1.0f, 1.0f, bgfx::getCaps()->homogeneousDepth);
 		setViewProjection(ortho, (int)size.x, (int)size.y);
 
 		int num_indices = m_draw2d.IdxBuffer.size();
@@ -1102,7 +1098,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 		fs.close(*file);
 
-		bgfx::destroyTexture(texture);
+		bgfx::destroy(texture);
 	}
 
 
@@ -1229,7 +1225,9 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			Vec4 dir_fov;
 			Vec4 specular;
 		};
-		const bgfx::InstanceDataBuffer* instance_buffer[2] = {nullptr, nullptr};
+		bgfx::InstanceDataBuffer instance_buffer[2];
+		instance_buffer[0].data = nullptr;
+		instance_buffer[1].data = nullptr;
 		Data* instance_data[2] = { nullptr, nullptr };
 		Universe& universe = m_scene->getUniverse();
 		for(auto light_cmp : local_lights)
@@ -1260,10 +1258,10 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			Vec3 pos = universe.getPosition(entity);
 			bool is_intersecting = m_camera_frustum.intersectNearPlane(pos, range * Math::SQRT3);
 			int buffer_idx = is_intersecting ? 0 : 1;
-			if(!instance_buffer[buffer_idx])
+			if(!instance_buffer[buffer_idx].data)
 			{
-				instance_buffer[buffer_idx] = bgfx::allocInstanceDataBuffer(128, sizeof(Data));
-				instance_data[buffer_idx] = (Data*)instance_buffer[buffer_idx]->data;
+				bgfx::allocInstanceDataBuffer(&instance_buffer[buffer_idx], 128, sizeof(Data));
+				instance_data[buffer_idx] = (Data*)instance_buffer[buffer_idx].data;
 			}
 
 			auto* id = instance_data[buffer_idx];
@@ -1277,15 +1275,15 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 				* specular_intensity * specular_intensity, 1);
 			++instance_data[buffer_idx];
 
-			int instance_count = int(instance_data[buffer_idx] - (Data*)instance_buffer[buffer_idx]->data);
+			int instance_count = int(instance_data[buffer_idx] - (Data*)instance_buffer[buffer_idx].data);
 			if(instance_count == max_instance_count)
 			{
 				finishDeferredPointLightInstances(material,
-					instance_buffer[buffer_idx],
+					&instance_buffer[buffer_idx],
 					instance_count,
 					is_intersecting,
 					shadowmap);
-				instance_buffer[buffer_idx] = nullptr;
+				instance_buffer[buffer_idx].data = nullptr;
 				instance_data[buffer_idx] = nullptr;
 			}
 		}
@@ -1295,8 +1293,8 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			if(instance_data[buffer_idx])
 			{
 				finishDeferredPointLightInstances(material,
-					instance_buffer[buffer_idx],
-					int(instance_data[buffer_idx] - (Data*)instance_buffer[buffer_idx]->data),
+					&instance_buffer[buffer_idx],
+					int(instance_data[buffer_idx] - (Data*)instance_buffer[buffer_idx].data),
 					buffer_idx == 0,
 					nullptr);
 			}
@@ -1354,7 +1352,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		bgfx::setViewRect(m_current_view->bgfx_id, 0, 0, shadowmap_width, shadowmap_height);
 
 		Matrix projection_matrix;
-		projection_matrix.setPerspective(fov, 1, 0.01f, range, is_opengl);
+		projection_matrix.setPerspective(fov, 1, 0.01f, range, bgfx::getCaps()->homogeneousDepth);
 		Matrix view_matrix;
 		view_matrix.lookAt(pos, pos - mtx.getZVector(), mtx.getYVector());
 		bgfx::setViewTransform(m_current_view->bgfx_id, &view_matrix.m11, &projection_matrix.m11);
@@ -1362,7 +1360,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		PointLightShadowmap& s = m_point_light_shadowmaps.emplace();
 		s.framebuffer = m_current_framebuffer;
 		s.light = light;
-		float ymul = is_opengl ? 0.5f : -0.5f;
+		float ymul = bgfx::getCaps()->originBottomLeft ? 0.5f : -0.5f;
 		static const Matrix biasMatrix(
 			0.5,  0.0, 0.0, 0.0,
 			0.0, ymul, 0.0, 0.0,
@@ -1420,10 +1418,10 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			float aspect = tanf(fovx * 0.5f) / tanf(fovy * 0.5f);
 
 			Matrix projection_matrix;
-			projection_matrix.setPerspective(fovx, aspect, 0.01f, range, is_opengl);
+			projection_matrix.setPerspective(fovx, aspect, 0.01f, range, bgfx::getCaps()->homogeneousDepth);
 
 			Matrix view_matrix;
-			if (is_opengl)
+			if (bgfx::getCaps()->originBottomLeft)
 			{
 				view_matrix.fromEuler(YPR_gl[i][0], YPR_gl[i][1], YPR_gl[i][2]);
 			}
@@ -1445,7 +1443,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 			bgfx::setViewTransform(m_current_view->bgfx_id, &view_matrix.m11, &projection_matrix.m11);
 
-			float ymul = is_opengl ? 0.5f : -0.5f;
+			float ymul = bgfx::getCaps()->originBottomLeft ? 0.5f : -0.5f;
 			static const Matrix biasMatrix(
 				0.5, 0.0, 0.0, 0.0, 0.0, ymul, 0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.5, 0.5, 0.5, 1.0);
 			shadowmap_info.matrices[i] = biasMatrix * (projection_matrix * view_matrix);
@@ -1559,7 +1557,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		m_is_rendering_in_shadowmap = true;
 		bgfx::setViewClear(m_current_view->bgfx_id, BGFX_CLEAR_DEPTH | BGFX_CLEAR_COLOR, 0xffffffff, 1.0f, 0);
 		bgfx::touch(m_current_view->bgfx_id);
-		float* viewport = (is_opengl ? viewports_gl : viewports) + split_index * 2;
+		float* viewport = (bgfx::getCaps()->originBottomLeft ? viewports_gl : viewports) + split_index * 2;
 		bgfx::setViewRect(m_current_view->bgfx_id,
 			(u16)(1 + shadowmap_width * viewport[0]),
 			(u16)(1 + shadowmap_height * viewport[1]),
@@ -1582,13 +1580,13 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		shadow_cam_pos = shadowmapTexelAlign(shadow_cam_pos, 0.5f * shadowmap_width - 2, bb_size, light_mtx);
 
 		Matrix projection_matrix;
-		projection_matrix.setOrtho(-bb_size, bb_size, -bb_size, bb_size, SHADOW_CAM_NEAR, SHADOW_CAM_FAR, is_opengl);
+		projection_matrix.setOrtho(-bb_size, bb_size, -bb_size, bb_size, SHADOW_CAM_NEAR, SHADOW_CAM_FAR, bgfx::getCaps()->homogeneousDepth);
 		Vec3 light_forward = light_mtx.getZVector();
 		shadow_cam_pos -= light_forward * SHADOW_CAM_FAR * 0.5f;
 		Matrix view_matrix;
 		view_matrix.lookAt(shadow_cam_pos, shadow_cam_pos + light_forward, light_mtx.getYVector());
 		bgfx::setViewTransform(m_current_view->bgfx_id, &view_matrix.m11, &projection_matrix.m11);
-		float ymul = is_opengl ? 0.5f : -0.5f;
+		float ymul = bgfx::getCaps()->originBottomLeft ? 0.5f : -0.5f;
 		static const Matrix biasMatrix(0.5, 0.0, 0.0, 0.0, 0.0, ymul, 0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.5, 0.5, 0.5, 1.0);
 		m_shadow_viewprojection[split_index] = biasMatrix * (projection_matrix * view_matrix);
 
@@ -2025,7 +2023,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		}
 
 		Matrix projection_mtx;
-		projection_mtx.setOrtho(0, 1, 0, 1, 0, 30, is_opengl);
+		projection_mtx.setOrtho(0, 1, 0, 1, 0, 30, bgfx::getCaps()->homogeneousDepth);
 
 		bgfx::setViewTransform(m_current_view->bgfx_id, &Matrix::IDENTITY.m11, &projection_mtx.m11);
 		if (m_current_framebuffer)
@@ -2046,7 +2044,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		BaseVertex* vertex = (BaseVertex*)vb.data;
 		float right = left + w;
 		float bottom = top + h;
-		if (!is_opengl)
+		if (!bgfx::getCaps()->originBottomLeft)
 		{
 			top = 1 - top;
 			bottom = 1 - bottom;
@@ -2111,7 +2109,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			Matrix inv_view_matrix = universe.getPositionAndRotation(camera_entity);
 			Matrix view_matrix = inv_view_matrix;
 			view_matrix.fastInverse();
-			projection_matrix.setPerspective(fov, ratio, near_plane, far_plane, is_opengl);
+			projection_matrix.setPerspective(fov, ratio, near_plane, far_plane, bgfx::getCaps()->homogeneousDepth);
 			Matrix inv_projection = projection_matrix;
 			inv_projection.inverse();
 
@@ -2209,26 +2207,25 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			{
 				instance_idx = m_instance_data_idx;
 				m_instance_data_idx = (m_instance_data_idx + 1) % lengthOf(m_instances_data);
-				if (m_instances_data[instance_idx].buffer)
+				if (m_instances_data[instance_idx].buffer.data)
 				{
 					finishInstances(instance_idx);
 				}
 				mesh.instance_idx = instance_idx;
 			}
 			InstanceData& data = m_instances_data[instance_idx];
-			if (!data.buffer)
+			if (!data.buffer.data)
 			{
 				if (bgfx::getAvailInstanceDataBuffer(InstanceData::MAX_INSTANCE_COUNT, sizeof(Matrix)) < InstanceData::MAX_INSTANCE_COUNT)
 				{
 					return;
 				}
-				data.buffer =
-					bgfx::allocInstanceDataBuffer(InstanceData::MAX_INSTANCE_COUNT, sizeof(Matrix));
+				bgfx::allocInstanceDataBuffer(&data.buffer, InstanceData::MAX_INSTANCE_COUNT, sizeof(Matrix));
 				data.instance_count = 0;
 				data.mesh = &mesh;
 				data.model = &model;
 			}
-			float* mtcs = (float*)data.buffer->data;
+			float* mtcs = (float*)data.buffer.data;
 			copyMemory(&mtcs[data.instance_count * 16], &mtx, sizeof(mtx));
 			++data.instance_count;
 
@@ -2426,7 +2423,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
-	void destroyUniform(bgfx::UniformHandle uniform) override { bgfx::destroyUniform(uniform); }
+	void destroyUniform(bgfx::UniformHandle uniform) override { bgfx::destroy(uniform); }
 	
 	
 	bgfx::UniformHandle createTextureUniform(const char* name) override
@@ -2444,7 +2441,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 	void destroyTexture(bgfx::TextureHandle texture) override
 	{
-		bgfx::destroyTexture(texture);
+		bgfx::destroy(texture);
 	}
 
 
@@ -2482,7 +2479,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		{
 			instance_idx = m_instance_data_idx;
 			m_instance_data_idx = (m_instance_data_idx + 1) % lengthOf(m_instances_data);
-			if (m_instances_data[instance_idx].buffer)
+			if (m_instances_data[instance_idx].buffer.data)
 			{
 				finishInstances(instance_idx);
 			}
@@ -2492,15 +2489,14 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 				g_log_warning.log("Renderer") << "Could not allocate instance data buffer";
 				return;
 			}
-			data.buffer =
-				bgfx::allocInstanceDataBuffer(InstanceData::MAX_INSTANCE_COUNT, sizeof(Matrix));
+			bgfx::allocInstanceDataBuffer(&data.buffer, InstanceData::MAX_INSTANCE_COUNT, sizeof(Matrix));
 			data.instance_count = 0;
 			data.mesh = info.mesh;
 			data.model = model_instance.model;
 			info.mesh->instance_idx = instance_idx;
 		}
 		InstanceData& data = m_instances_data[instance_idx];
-		float* mtcs = (float*)data.buffer->data;
+		float* mtcs = (float*)data.buffer.data;
 		copyMemory(&mtcs[data.instance_count * 16], &model_instance.matrix, sizeof(model_instance.matrix));
 		++data.instance_count;
 
@@ -2657,9 +2653,9 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			Vec4 m_quad_min_and_size;
 			Vec4 m_morph_const;
 		};
-		const bgfx::InstanceDataBuffer* instance_buffer = bgfx::allocInstanceDataBuffer(
-			m_terrain_instances[index].m_count, sizeof(TerrainInstanceData));
-		TerrainInstanceData* instance_data = (TerrainInstanceData*)instance_buffer->data;
+		bgfx::InstanceDataBuffer instance_buffer;
+		bgfx::allocInstanceDataBuffer(&instance_buffer, m_terrain_instances[index].m_count, sizeof(TerrainInstanceData));
+		TerrainInstanceData* instance_data = (TerrainInstanceData*)instance_buffer.data;
 
 		for (int i = 0; i < m_terrain_instances[index].m_count; ++i)
 		{
@@ -2677,7 +2673,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			mesh_part_indices_count);
 		bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
 		bgfx::setState(view.render_state | mesh.material->getRenderStates());
-		bgfx::setInstanceDataBuffer(instance_buffer, m_terrain_instances[index].m_count);
+		bgfx::setInstanceDataBuffer(&instance_buffer, m_terrain_instances[index].m_count);
 		auto shader_instance = material->getShaderInstance().getProgramHandle(view.pass_idx);
 		++m_stats.draw_call_count;
 		m_stats.instance_count += m_terrain_instances[index].m_count;
@@ -2692,9 +2688,9 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	{
 		if (bgfx::getAvailInstanceDataBuffer(grass.instance_count, sizeof(GrassInfo::InstanceData)) < (u32)grass.instance_count) return;
 
-		const bgfx::InstanceDataBuffer* idb =
-			bgfx::allocInstanceDataBuffer(grass.instance_count, sizeof(GrassInfo::InstanceData));
-		copyMemory(idb->data, grass.instance_data, sizeof(GrassInfo::InstanceData) * grass.instance_count);
+		bgfx::InstanceDataBuffer idb;
+		bgfx::allocInstanceDataBuffer(&idb, grass.instance_count, sizeof(GrassInfo::InstanceData));
+		copyMemory(idb.data, grass.instance_data, sizeof(GrassInfo::InstanceData) * grass.instance_count);
 		const Mesh& mesh = grass.model->getMesh(0);
 		Material* material = mesh.material;
 		int stride = grass.model->getVertexDecl().getStride();
@@ -2713,7 +2709,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		bgfx::setIndexBuffer(grass.model->getIndicesHandle(), mesh.indices_offset, mesh.indices_count);
 		bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
 		bgfx::setState(view.render_state | material->getRenderStates());
-		bgfx::setInstanceDataBuffer(idb, grass.instance_count);
+		bgfx::setInstanceDataBuffer(&idb, grass.instance_count);
 		++m_stats.draw_call_count;
 		m_stats.instance_count += grass.instance_count;
 		m_stats.triangle_count += grass.instance_count * mesh.indices_count;
@@ -2864,7 +2860,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		}
 		for (int i = 0; i < lengthOf(m_instances_data); ++i)
 		{
-			m_instances_data[i].buffer = nullptr;
+			m_instances_data[i].buffer.data = nullptr;
 			m_instances_data[i].instance_count = 0;
 		}
 

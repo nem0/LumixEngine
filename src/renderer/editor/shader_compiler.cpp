@@ -51,6 +51,8 @@ ShaderCompiler::ShaderCompiler(StudioApp& app, LogUI& log_ui)
 	, m_changed_files(m_editor.getAllocator())
 	, m_mutex(false)
 {
+	m_is_opengl = bgfx::getRendererType() == bgfx::RendererType::OpenGL || bgfx::getRendererType() == bgfx::RendererType::OpenGLES;
+
 	m_notifications_id = -1;
 
 	m_watcher = FileSystemWatcher::create("pipelines", m_editor.getAllocator());
@@ -196,7 +198,7 @@ void ShaderCompiler::makeUpToDate(bool wait)
 	StaticString<MAX_PATH_LENGTH> pipelines_dir(
 		m_editor.getEngine().getDiskFileDevice()->getBasePath(), "/pipelines");
 	StaticString<MAX_PATH_LENGTH> compiled_dir(pipelines_dir, "/compiled");
-	if (getRenderer().isOpenGL()) compiled_dir << "_gl";
+	if (m_is_opengl) compiled_dir << "_gl";
 	if (!PlatformInterface::dirExists(pipelines_dir) && !PlatformInterface::makePath(pipelines_dir))
 	{
 		messageBox("Could not create directory pipelines. Please create it and "
@@ -305,8 +307,7 @@ static bool readLine(FS::IFile* file, char* out, int max_size)
 void ShaderCompiler::parseDependencies()
 {
 	m_dependencies.clear();
-	bool is_opengl = getRenderer().isOpenGL();
-	StaticString<30> compiled_dir("pipelines/compiled", is_opengl ? "_gl" : "");
+	StaticString<30> compiled_dir("pipelines/compiled", m_is_opengl ? "_gl" : "");
 	auto* iter = PlatformInterface::createFileIterator(compiled_dir, m_editor.getAllocator());
 
 	auto& fs = m_editor.getEngine().getFileSystem();
@@ -431,7 +432,6 @@ void ShaderCompiler::compilePass(const char* shd_path,
 	bool debug)
 {
 	const char* base_path = m_editor.getEngine().getDiskFileDevice()->getBasePath();
-	bool is_opengl = getRenderer().isOpenGL();
 
 	for (int mask = 0; mask < 1 << lengthOf(all_defines); ++mask)
 	{
@@ -442,7 +442,7 @@ void ShaderCompiler::compilePass(const char* shd_path,
 			StaticString<MAX_PATH_LENGTH> source_path(
 				"", shd_file_info.m_dir, shd_file_info.m_basename, is_vertex_shader ? "_vs.sc" : "_fs.sc");
 			StaticString<MAX_PATH_LENGTH> out_path(base_path);
-			out_path << "/pipelines/compiled" << (is_opengl ? "_gl/" : "/");
+			out_path << "/pipelines/compiled" << (m_is_opengl ? "_gl/" : "/");
 			out_path << shd_file_info.m_basename << "_" << pass;
 			out_path << mask << (is_vertex_shader ? "_vs.shb" : "_fs.shb");
 
@@ -459,7 +459,7 @@ void ShaderCompiler::compilePass(const char* shd_path,
 			StaticString<MAX_PATH_LENGTH> varying(base_path, "/pipelines/varying.def.sc");
 			args_array[8] = varying;
 			args_array[9] = "--platform";
-			if (getRenderer().isOpenGL())
+			if (m_is_opengl)
 			{
 				args_array[10] = "linux";
 				args_array[11] = "--profile";
@@ -623,7 +623,7 @@ void ShaderCompiler::compile(const char* path, bool debug)
 
 	StaticString<MAX_PATH_LENGTH> compiled_dir(
 		m_editor.getEngine().getDiskFileDevice()->getBasePath(), "/pipelines/compiled");
-	if (getRenderer().isOpenGL()) compiled_dir << "_gl";
+	if (m_is_opengl) compiled_dir << "_gl";
 	if (!PlatformInterface::makePath(compiled_dir))
 	{
 		if (!PlatformInterface::dirExists(compiled_dir))

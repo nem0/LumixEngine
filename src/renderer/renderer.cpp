@@ -574,6 +574,23 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 		void captureEnd() override { ASSERT(false); }
 		void captureFrame(const void*, u32) override { ASSERT(false); }
 
+		void profilerBegin(
+			const char* _name
+			, uint32_t _abgr
+			, const char* _filePath
+			, uint16_t _line
+		) override {}
+
+		void profilerBeginLiteral(
+			const char* _name
+			, uint32_t _abgr
+			, const char* _filePath
+			, uint16_t _line
+		) override {}
+
+
+		void profilerEnd() override {}
+
 		RendererImpl& m_renderer;
 	};
 
@@ -663,6 +680,7 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 		initDraw2DFont();
 	}
 
+
 	~RendererImpl()
 	{
 		Texture* draw2d_texture = m_draw2d_material->getTexture(0);
@@ -682,8 +700,8 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 		m_shader_manager.destroy();
 		m_shader_binary_manager.destroy();
 
-		bgfx::destroyUniform(m_mat_color_uniform);
-		bgfx::destroyUniform(m_roughness_metallic_uniform);
+		bgfx::destroy(m_mat_color_uniform);
+		bgfx::destroy(m_roughness_metallic_uniform);
 		bgfx::frame();
 		bgfx::frame();
 		bgfx::shutdown();
@@ -736,13 +754,6 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 
 	int getLayersCount() const override { return m_layers.size(); }
 	const char* getLayerName(int idx) const override { return m_layers[idx]; }
-
-
-	bool isOpenGL() const override
-	{
-		return bgfx::getRendererType() == bgfx::RendererType::OpenGL ||
-			   bgfx::getRendererType() == bgfx::RendererType::OpenGLES;
-	}
 
 
 	ModelManager& getModelManager() override { return m_model_manager; }

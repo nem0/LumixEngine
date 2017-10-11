@@ -79,6 +79,7 @@ private:
 	Array<string> m_changed_files;
 	MT::SpinMutex m_mutex;
 	LogUI& m_log_ui;
+	bool m_is_opengl;
 };
 
 

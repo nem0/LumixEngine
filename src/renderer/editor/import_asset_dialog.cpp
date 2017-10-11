@@ -3111,8 +3111,8 @@ static bool createBillboard(ImportAssetDialog& dialog,
 	preprocessBillboardNormalmap((u32*)&data_normal[0], width, height, engine.getAllocator());
 	saveAsDDS(dialog, "billboard_generator", (u8*)&data[0], width, height, true, false, out_path.c_str());
 	saveAsDDS(dialog, "billboard_generator", (u8*)&data_normal[0], width, height, true, true, out_path_normal.c_str());
-	bgfx::destroyTexture(texture);
-	bgfx::destroyTexture(normal_texture);
+	bgfx::destroy(texture);
+	bgfx::destroy(normal_texture);
 	Pipeline::destroy(pipeline);
 	engine.destroyUniverse(universe);
 	
