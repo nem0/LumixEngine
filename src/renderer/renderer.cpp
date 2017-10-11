@@ -579,17 +579,26 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 			, uint32_t _abgr
 			, const char* _filePath
 			, uint16_t _line
-		) override {}
+		) override
+		{
+			Profiler::beginBlock("bgfx_dynamic");
+		}
 
 		void profilerBeginLiteral(
 			const char* _name
 			, uint32_t _abgr
 			, const char* _filePath
 			, uint16_t _line
-		) override {}
+		) override
+		{
+			Profiler::beginBlock(_name);
+		}
 
 
-		void profilerEnd() override {}
+		void profilerEnd() override
+		{
+			Profiler::endBlock();
+		}
 
 		RendererImpl& m_renderer;
 	};
@@ -644,7 +653,7 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 		bool res = bgfx::init(renderer_type, 0, 0, &m_callback_stub, &m_bgfx_allocator);
 		ASSERT(res);
 		bgfx::reset(800, 600, m_vsync ? BGFX_RESET_VSYNC : 0);
-		bgfx::setDebug(BGFX_DEBUG_TEXT);
+		bgfx::setDebug(BGFX_DEBUG_TEXT | BGFX_DEBUG_PROFILER);
 
 		ResourceManager& manager = engine.getResourceManager();
 		m_texture_manager.create(TEXTURE_TYPE, manager);
