@@ -458,19 +458,24 @@ void SceneView::onWindowGUI()
 					ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
 					ImGuiWindowFlags_ShowBorders))
 		{
+			const bgfx::Stats* bgfx_stats = bgfx::getStats();
 			const auto& stats = m_pipeline->getStats();
 			ImGui::LabelText("Draw calls (scene view only)", "%d", stats.draw_call_count);
 			ImGui::LabelText("Instances (scene view only)", "%d", stats.instance_count);
 			char buf[30];
 			toCStringPretty(stats.triangle_count, buf, lengthOf(buf));
 			ImGui::LabelText("Triangles (scene view only)", "%s", buf);
-			ImGui::LabelText("GPU memory used", "%dMB", int(bgfx::getStats()->gpuMemoryUsed / (1024 * 1024)));
+			ImGui::LabelText("GPU memory used", "%dMB", int(bgfx_stats->gpuMemoryUsed / (1024 * 1024)));
 			ImGui::LabelText("Resolution", "%dx%d", m_pipeline->getWidth(), m_pipeline->getHeight());
 			ImGui::LabelText("FPS", "%.2f", m_editor.getEngine().getFPS());
-			ImGui::LabelText("CPU time", "%.2f", m_pipeline->getCPUTime() * 1000.0f);
-			ImGui::LabelText("GPU time", "%.2f", m_pipeline->getGPUTime() * 1000.0f);
-			ImGui::LabelText("Waiting for submit", "%.2f", m_pipeline->getWaitSubmitTime() * 1000.0f);
-			ImGui::LabelText("Waiting for render thread", "%.2f", m_pipeline->getGPUTime() * 1000.0f);
+			double cpu_time = 1000 * bgfx_stats->cpuTimeFrame / (double)bgfx_stats->cpuTimerFreq;
+			double gpu_time = 1000 * (bgfx_stats->gpuTimeEnd - bgfx_stats->gpuTimeBegin) / (double)bgfx_stats->gpuTimerFreq;
+			double wait_submit_time = 1000 * bgfx_stats->waitSubmit / (double)bgfx_stats->cpuTimerFreq;
+			double wait_render_time = 1000 * bgfx_stats->waitRender / (double)bgfx_stats->cpuTimerFreq;
+			ImGui::LabelText("CPU time", "%.2f", cpu_time);
+			ImGui::LabelText("GPU time", "%.2f", gpu_time);
+			ImGui::LabelText("Waiting for submit", "%.2f", wait_submit_time);
+			ImGui::LabelText("Waiting for render thread", "%.2f", wait_render_time);
 		}
 		ImGui::End();
 		ImGui::PopStyleColor();
