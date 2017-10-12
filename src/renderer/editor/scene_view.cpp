@@ -464,7 +464,7 @@ void SceneView::onWindowGUI()
 			char buf[30];
 			toCStringPretty(stats.triangle_count, buf, lengthOf(buf));
 			ImGui::LabelText("Triangles (scene view only)", "%s", buf);
-			ImGui::LabelText("GPU memory used", "%dMB", bgfx::getStats()->gpuMemoryUsed / (1024 * 1024));
+			ImGui::LabelText("GPU memory used", "%dMB", int(bgfx::getStats()->gpuMemoryUsed / (1024 * 1024)));
 			ImGui::LabelText("Resolution", "%dx%d", m_pipeline->getWidth(), m_pipeline->getHeight());
 			ImGui::LabelText("FPS", "%.2f", m_editor.getEngine().getFPS());
 			ImGui::LabelText("CPU time", "%.2f", m_pipeline->getCPUTime() * 1000.0f);
