@@ -400,40 +400,42 @@ void SceneView::onWindowGUI()
 				}
 			}
 			view_pos = content_min;
-			auto rel_mp = ImGui::GetMousePos();
-			rel_mp.x -= m_screen_x;
-			rel_mp.y -= m_screen_y;
-			if (ImGui::IsItemHovered())
+
+
+			bool handle_input = ImGui::IsItemHovered();
+			const SDL_Event* events = m_app.getEvents();
+			for (int i = 0, c = m_app.getEventsCount(); i < c; ++i)
 			{
-				m_editor.getGizmo().enableStep(m_toggle_gizmo_step_action->isActive());
-				for (int i = 0; i < 3; ++i)
+				SDL_Event event = events[i];
+				switch (event.type)
 				{
-					if (ImGui::IsMouseClicked(i))
-					{
-						ImGui::ResetActiveID();
-						if(i == 1) captureMouse(true);
-						m_editor.onMouseDown((int)rel_mp.x, (int)rel_mp.y, (MouseButton::Value)i);
+					case SDL_MOUSEBUTTONDOWN:
+						{
+							if (handle_input) ImGui::ResetActiveID();
+							if (event.button.button == SDL_BUTTON_RIGHT) captureMouse(true);
+							Vec2 rel_mp = { (float)event.button.x, (float)event.button.y };
+							rel_mp.x -= m_screen_x;
+							rel_mp.y -= m_screen_y;
+							if(handle_input) m_editor.onMouseDown((int)rel_mp.x, (int)rel_mp.y, (MouseButton::Value)event.button.button);
+						}
 						break;
-					}
-				}
-			}
-			if (m_is_mouse_captured || ImGui::IsItemHovered())
-			{
-				auto delta = m_app.getMouseMove();
-				if (delta.x != 0 || delta.y != 0)
-				{
-					m_editor.onMouseMove((int)rel_mp.x, (int)rel_mp.y, (int)delta.x, (int)delta.y);
-				}
-			}
-			for (int i = 0; i < 3; ++i)
-			{
-				auto rel_mp = ImGui::GetMousePos();
-				rel_mp.x -= m_screen_x;
-				rel_mp.y -= m_screen_y;
-				if (ImGui::IsMouseReleased(i))
-				{
-					if (i == 1) captureMouse(false);
-					m_editor.onMouseUp((int)rel_mp.x, (int)rel_mp.y, (MouseButton::Value)i);
+					case SDL_MOUSEBUTTONUP:
+						{
+							if (event.button.button == SDL_BUTTON_RIGHT) captureMouse(false);
+							Vec2 rel_mp = { (float)event.button.x, (float)event.button.y };
+							rel_mp.x -= m_screen_x;
+							rel_mp.y -= m_screen_y;
+							if (handle_input) m_editor.onMouseUp((int)rel_mp.x, (int)rel_mp.y, (MouseButton::Value)event.button.button);
+						}
+						break;
+					case SDL_MOUSEMOTION:
+						{
+							Vec2 rel_mp = {(float)event.motion.x, (float)event.motion.y};
+							rel_mp.x -= m_screen_x;
+							rel_mp.y -= m_screen_y;
+							if (handle_input) m_editor.onMouseMove((int)rel_mp.x, (int)rel_mp.y, (int)event.motion.xrel, (int)event.motion.yrel);
+						}
+						break;
 				}
 			}
 			m_pipeline->render();

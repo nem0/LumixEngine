@@ -321,48 +321,81 @@ void GameView::onWindowGUI()
 				PlatformInterface::clipCursor((int)pos.x, (int)pos.y, (int)m_size.x, (int)m_size.y);
 			}
 
-			if (m_is_mouse_captured && ImGui::IsItemHovered())
+			if (m_is_mouse_captured)
 			{
-				Vec2 delta = m_studio_app.getMouseMove();
 				InputSystem& input = m_editor.getEngine().getInputSystem();
-				ImVec2 rel_mp = ImGui::GetMousePos();
-				rel_mp.x -= m_pos.x;
-				rel_mp.y -= m_pos.y;
-				for (int i = 0; i < 3; ++i)
+				const SDL_Event* events = m_studio_app.getEvents();
+				for (int i = 0, c = m_studio_app.getEventsCount(); i < c; ++i)
 				{
-					if (ImGui::IsMouseClicked(i))
+					SDL_Event sdl_event = events[i];
+					switch (sdl_event.type)
 					{
-						InputSystem::Event event;
-						event.type = InputSystem::Event::BUTTON;
-						event.device = input.getMouseDevice();
-						event.data.button.key_id = i;
-						event.data.button.state = InputSystem::ButtonEvent::DOWN;
-						event.data.button.x_abs = rel_mp.x;
-						event.data.button.y_abs = rel_mp.y;
-						input.injectEvent(event);
+						case SDL_MOUSEBUTTONDOWN:
+							{
+								ImVec2 rel_mp = {(float)sdl_event.button.x, (float)sdl_event.button.y};
+								rel_mp.x -= m_pos.x;
+								rel_mp.y -= m_pos.y;
+								InputSystem::Event event;
+								event.type = InputSystem::Event::BUTTON;
+								event.device = input.getMouseDevice();
+								event.data.button.key_id = sdl_event.button.button;
+								event.data.button.state = InputSystem::ButtonEvent::DOWN;
+								event.data.button.x_abs = rel_mp.x;
+								event.data.button.y_abs = rel_mp.y;
+								input.injectEvent(event);
+							}
+							break;
+						case SDL_MOUSEBUTTONUP:
+							{
+								ImVec2 rel_mp = {(float)sdl_event.button.x, (float)sdl_event.button.y};
+								rel_mp.x -= m_pos.x;
+								rel_mp.y -= m_pos.y;
+								InputSystem::Event event;
+								event.type = InputSystem::Event::BUTTON;
+								event.device = input.getMouseDevice();
+								event.data.button.key_id = sdl_event.button.button;
+								event.data.button.state = InputSystem::ButtonEvent::UP;
+								event.data.button.x_abs = rel_mp.x;
+								event.data.button.y_abs = rel_mp.y;
+								input.injectEvent(event);
+							}
+							break;
+						case SDL_MOUSEMOTION:
+							{
+								ImVec2 rel_mp = { (float)sdl_event.motion.x, (float)sdl_event.motion.y };
+								rel_mp.x -= m_pos.x;
+								rel_mp.y -= m_pos.y;
+								InputSystem::Event event;
+								event.type = InputSystem::Event::AXIS;
+								event.device = input.getMouseDevice();
+								event.data.axis.x_abs = rel_mp.x;
+								event.data.axis.y_abs = rel_mp.y;
+								event.data.axis.x = (float)sdl_event.motion.xrel;
+								event.data.axis.y = (float)sdl_event.motion.yrel;
+								input.injectEvent(event);
+							}
+							break;
+						case SDL_KEYDOWN:
+							{
+								InputSystem::Event event;
+								event.type = InputSystem::Event::BUTTON;
+								event.device = input.getKeyboardDevice();
+								event.data.button.state = InputSystem::ButtonEvent::DOWN;
+								event.data.button.key_id = sdl_event.key.keysym.sym;
+								input.injectEvent(event);
+							}
+							break;
+						case SDL_KEYUP:
+							{
+								InputSystem::Event event;
+								event.type = InputSystem::Event::BUTTON;
+								event.device = input.getKeyboardDevice();
+								event.data.button.state = InputSystem::ButtonEvent::UP;
+								event.data.button.key_id = sdl_event.key.keysym.sym;
+								input.injectEvent(event);
+							}
+							break;
 					}
-					else if (ImGui::IsMouseReleased(i))
-					{
-						InputSystem::Event event;
-						event.type = InputSystem::Event::BUTTON;
-						event.device = input.getMouseDevice();
-						event.data.button.key_id = i;
-						event.data.button.state = InputSystem::ButtonEvent::UP;
-						event.data.button.x_abs = rel_mp.x;
-						event.data.button.y_abs = rel_mp.y;
-						input.injectEvent(event);
-					}
-				}
-				if (delta.x != 0 || delta.y != 0)
-				{
-					InputSystem::Event event;
-					event.type = InputSystem::Event::AXIS;
-					event.device = input.getMouseDevice();
-					event.data.axis.x_abs = rel_mp.x;
-					event.data.axis.y_abs = rel_mp.y;
-					event.data.axis.x = delta.x;
-					event.data.axis.y = delta.y;
-					input.injectEvent(event);
 				}
 			}
 

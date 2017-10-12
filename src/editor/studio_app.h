@@ -5,6 +5,9 @@
 #include "engine/array.h"
 
 
+union SDL_Event;
+
+
 #ifdef STATIC_PLUGINS
 	#define LUMIX_STUDIO_ENTRY(plugin_name) \
 		extern "C" void setStudioApp_##plugin_name(StudioApp& app); \
@@ -118,6 +121,8 @@ public:
 	virtual bool makeFile(const char* path, const char* content) = 0;
 	virtual Vec2 getMouseMove() const = 0;
 
+	virtual const SDL_Event* getEvents() const = 0;
+	virtual int getEventsCount() const = 0;
 	virtual ~StudioApp() {}
 	virtual void run() = 0;
 };

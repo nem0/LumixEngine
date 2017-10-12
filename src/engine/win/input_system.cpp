@@ -29,6 +29,7 @@ struct InputSystemImpl LUMIX_FINAL : public InputSystem
 		, m_xinput_get_state(nullptr)
 	{
 		m_mouse_device.type = Device::MOUSE;
+		m_keyboard_device.type = Device::KEYBOARD;
 		m_last_checked_controller = 0;
 		for (int i = 0; i < lengthOf(m_xinput_connected); ++i)
 		{
@@ -101,7 +102,14 @@ struct InputSystemImpl LUMIX_FINAL : public InputSystem
 	}
 
 
+	Device* getKeyboardDevice() override
+	{
+		return &m_keyboard_device;
+	}
+
+
 	Device m_mouse_device;
+	Device m_keyboard_device;
 	IAllocator& m_allocator;
 	Array<Event> m_events;
 	bool m_is_enabled;
