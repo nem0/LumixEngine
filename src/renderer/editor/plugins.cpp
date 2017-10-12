@@ -535,7 +535,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		if (ImGui::IsItemHovered() && mouse_down)
 		{
 			auto& input = engine.getInputSystem();
-			auto delta = Vec2(input.getMouseXMove(), input.getMouseYMove());
+			auto delta = m_app.getMouseMove();
 
 			if (!m_is_mouse_captured)
 			{

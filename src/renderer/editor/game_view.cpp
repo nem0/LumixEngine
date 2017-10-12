@@ -321,6 +321,52 @@ void GameView::onWindowGUI()
 				PlatformInterface::clipCursor((int)pos.x, (int)pos.y, (int)m_size.x, (int)m_size.y);
 			}
 
+			if (m_is_mouse_captured && ImGui::IsItemHovered())
+			{
+				Vec2 delta = m_studio_app.getMouseMove();
+				InputSystem& input = m_editor.getEngine().getInputSystem();
+				ImVec2 rel_mp = ImGui::GetMousePos();
+				rel_mp.x -= m_pos.x;
+				rel_mp.y -= m_pos.y;
+				for (int i = 0; i < 3; ++i)
+				{
+					if (ImGui::IsMouseClicked(i))
+					{
+						InputSystem::Event event;
+						event.type = InputSystem::Event::BUTTON;
+						event.device = input.getMouseDevice();
+						event.data.button.key_id = i;
+						event.data.button.state = InputSystem::ButtonEvent::DOWN;
+						event.data.button.x_abs = rel_mp.x;
+						event.data.button.y_abs = rel_mp.y;
+						input.injectEvent(event);
+					}
+					else if (ImGui::IsMouseReleased(i))
+					{
+						InputSystem::Event event;
+						event.type = InputSystem::Event::BUTTON;
+						event.device = input.getMouseDevice();
+						event.data.button.key_id = i;
+						event.data.button.state = InputSystem::ButtonEvent::UP;
+						event.data.button.x_abs = rel_mp.x;
+						event.data.button.y_abs = rel_mp.y;
+						input.injectEvent(event);
+					}
+				}
+				if (delta.x != 0 || delta.y != 0)
+				{
+					InputSystem::Event event;
+					event.type = InputSystem::Event::AXIS;
+					event.device = input.getMouseDevice();
+					event.data.axis.x_abs = rel_mp.x;
+					event.data.axis.y_abs = rel_mp.y;
+					event.data.axis.x = delta.x;
+					event.data.axis.y = delta.y;
+					input.injectEvent(event);
+				}
+			}
+
+
 			if (ImGui::Checkbox("Pause", &m_paused))
 			{
 				m_editor.getEngine().pause(m_paused);
@@ -354,6 +400,7 @@ void GameView::onWindowGUI()
 			m_pipeline->callLuaFunction("onGUI");
 		}
 
+		
 		if (m_is_mouse_captured && (io.KeysDown[ImGui::GetKeyIndex(ImGuiKey_Escape)] || !m_editor.isGameMode()))
 		{
 			captureMouse(false);

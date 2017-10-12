@@ -23,10 +23,11 @@ namespace Lumix
 {
 
 
+struct Action;
 struct ComponentUID;
 struct ResourceType;
+struct Vec2;
 class WorldEditor;
-struct Action;
 
 
 class LUMIX_EDITOR_API StudioApp
@@ -115,6 +116,7 @@ public:
 	virtual DragData getDragData() = 0;
 	virtual void setFullscreen(bool fullscreen) = 0;
 	virtual bool makeFile(const char* path, const char* content) = 0;
+	virtual Vec2 getMouseMove() const = 0;
 
 	virtual ~StudioApp() {}
 	virtual void run() = 0;
