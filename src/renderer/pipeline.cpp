@@ -1972,34 +1972,6 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
-	float getCPUTime() const override
-	{
-		auto* stats = bgfx::getStats();
-		return float(double(stats->cpuTimeEnd - stats->cpuTimeBegin) / (double)stats->cpuTimerFreq);
-	}
-
-
-	float getWaitSubmitTime() const override
-	{
-		auto* stats = bgfx::getStats();
-		return float(double(stats->waitSubmit) / (double)stats->cpuTimerFreq);
-	}
-
-
-	float getWaitRenderTime() const override
-	{
-		auto* stats = bgfx::getStats();
-		return float(double(stats->waitRender) / (double)stats->cpuTimerFreq);
-	}
-
-
-	float getGPUTime() const override
-	{
-		auto* stats = bgfx::getStats();
-		return float(double(stats->gpuTimeEnd - stats->gpuTimeBegin) / (double)stats->gpuTimerFreq);
-	}
-
-
 	void setViewSeq()
 	{
 		bgfx::setViewMode(m_current_view->bgfx_id, bgfx::ViewMode::Sequential);
