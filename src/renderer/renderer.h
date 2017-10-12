@@ -21,6 +21,7 @@ class LIFOAllocator;
 class MaterialManager;
 class ModelManager;
 class Path;
+class Pipeline;
 class Shader;
 class TextureManager;
 
@@ -51,6 +52,8 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 		virtual int getLayer(const char* name) = 0;
 		virtual const char* getLayerName(int idx) const = 0;
 		virtual FontAtlas& getFontAtlas() = 0;
+		virtual void setMainPipeline(Pipeline* pipeline) = 0;
+		virtual Pipeline* getMainPipeline() = 0;
 
 		virtual Engine& getEngine() = 0;
 }; 
