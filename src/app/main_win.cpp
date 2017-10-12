@@ -268,6 +268,7 @@ public:
 		Renderer* renderer = static_cast<Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
 		m_pipeline = Pipeline::create(*renderer, Path(m_pipeline_path), "APP", m_engine->getAllocator());
 		m_pipeline->load();
+		renderer->setMainPipeline(m_pipeline);
 
 		while (m_engine->getFileSystem().hasWork())
 		{

@@ -76,6 +76,7 @@ GameView::GameView(StudioApp& app)
 	Path path("pipelines/main.lua");
 	m_pipeline = Pipeline::create(*renderer, path, "GAME_VIEW", engine.getAllocator());
 	m_pipeline->load();
+	renderer->setMainPipeline(m_pipeline);
 
 	editor.universeCreated().bind<GameView, &GameView::onUniverseCreated>(this);
 	editor.universeDestroyed().bind<GameView, &GameView::onUniverseDestroyed>(this);

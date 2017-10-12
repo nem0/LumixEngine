@@ -619,6 +619,7 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 		, m_callback_stub(*this)
 		, m_vsync(true)
 		, m_font_atlas(m_allocator)
+		, m_main_pipeline(nullptr)
 	{
 		registerProperties(engine.getAllocator());
 		bgfx::PlatformData d;
@@ -743,6 +744,18 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	}
 
 
+	void setMainPipeline(Pipeline* pipeline) override
+	{
+		m_main_pipeline = pipeline;
+	}
+
+
+	Pipeline* getMainPipeline() override
+	{
+		return m_main_pipeline;
+	}
+
+
 	FontAtlas& getFontAtlas() override
 	{
 		return m_font_atlas;
@@ -859,6 +872,7 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	bgfx::UniformHandle m_roughness_metallic_uniform;
 	FontAtlas m_font_atlas;
 	Material* m_draw2d_material;
+	Pipeline* m_main_pipeline;
 };
 
 
