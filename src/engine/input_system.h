@@ -7,50 +7,79 @@
 namespace Lumix
 {
 
-	struct IAllocator;
-	struct Vec2;
+struct IAllocator;
+struct Vec2;
 
-	class LUMIX_ENGINE_API InputSystem
-	{
-		public:
-			enum InputType 
+class LUMIX_ENGINE_API InputSystem
+{
+	public:
+		struct Device
+		{
+			enum Type
 			{
-				PRESSED,
-				DOWN,
-				MOUSE_X,
-				MOUSE_Y,
-				LTHUMB_X,
-				LTHUMB_Y,
-				RTHUMB_X,
-				RTHUMB_Y,
-				RTRIGGER,
-				LTRIGGER
+				MOUSE,
+				KEYBOARD,
+				CONTROLLER
 			};
 
-			enum MouseButton
+			Type type;
+		};
+
+		struct ButtonEvent
+		{
+			u32 key_id;
+			float x_abs;
+			float y_abs;
+			enum
 			{
-				LEFT,
-				MIDDLE,
-				RIGHT
+				UP,
+				DOWN
+			} state;
+		};
+
+		struct AxisEvent
+		{
+			float x;
+			float y;
+			float x_abs;
+			float y_abs;
+		};
+
+		struct Event
+		{
+			enum Type : u32
+			{
+				BUTTON,
+				AXIS
 			};
 
-		public:
-			static InputSystem* create(IAllocator& allocator);
-			static void destroy(InputSystem& system);
+			Type type;
+			Device* device;
+			union EventData
+			{
+				ButtonEvent button;
+				AxisEvent axis;
+			} data;
+		};
 
-			virtual ~InputSystem() {}
-			virtual void enable(bool enabled) = 0;
-			virtual void update(float dt) = 0;
-			virtual float getActionValue(u32 action) = 0;
-			virtual void injectMouseXMove(float rel, float abs) = 0;
-			virtual void injectMouseYMove(float rel, float abs) = 0;
-			virtual float getMouseXMove() const = 0;
-			virtual float getMouseYMove() const = 0;
-			virtual bool  isMouseDown(MouseButton button) = 0;
-			virtual Vec2 getMousePos() const = 0;
-			virtual void addAction(u32 action, InputType type, int key, int controller_id) = 0;
-	};
+	public:
+		static InputSystem* create(IAllocator& allocator);
+		static void destroy(InputSystem& system);
+
+		virtual ~InputSystem() {}
+		virtual void enable(bool enabled) = 0;
+		virtual void update(float dt) = 0;
+
+		virtual void injectEvent(const Event& event) = 0;
+		virtual int getEventsCount() const = 0;
+		virtual const Event* getEvents() const = 0;
+
+		virtual Device* getMouseDevice() = 0;
+
+		virtual Vec2 getCursorPosition() const = 0;
+		virtual void setCursorPosition(const Vec2& pos) = 0;
+};
 
 
 
-} // ~namespace Lumix
+} // namespace Lumix

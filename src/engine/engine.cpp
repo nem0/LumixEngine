@@ -767,19 +767,6 @@ public:
 	}
 
 
-	static float LUA_getInputActionValue(Engine* engine, u32 action)
-	{
-		auto v = engine->getInputSystem().getActionValue(action);
-		return v;
-	}
-
-
-	static void LUA_addInputAction(Engine* engine, u32 action, int type, int key, int controller_id)
-	{
-		engine->getInputSystem().addAction(action, InputSystem::InputType(type), key, controller_id);
-	}
-
-
 	static void LUA_setEntityPosition(Universe* univ, Entity entity, Vec3 pos) { univ->setPosition(entity, pos); }
 	static void LUA_unloadResource(EngineImpl* engine, int resource_idx) { engine->unloadLuaResource(resource_idx); }
 	static Universe* LUA_createUniverse(EngineImpl* engine) { return &engine->createUniverse(false); }
@@ -944,7 +931,6 @@ public:
 			LuaWrapper::createSystemFunction(m_state, "Engine", #name, \
 				&LuaWrapper::wrap<decltype(&LUA_##name), LUA_##name>); \
 
-		REGISTER_FUNCTION(addInputAction);
 		REGISTER_FUNCTION(createComponent);
 		REGISTER_FUNCTION(createEntity);
 		REGISTER_FUNCTION(createUniverse);
@@ -957,7 +943,6 @@ public:
 		REGISTER_FUNCTION(getEntityRotation);
 		REGISTER_FUNCTION(getEntityByName);
 		REGISTER_FUNCTION(getFirstEntity);
-		REGISTER_FUNCTION(getInputActionValue);
 		REGISTER_FUNCTION(getNextEntity);
 		REGISTER_FUNCTION(getScene);
 		REGISTER_FUNCTION(getSceneUniverse);
@@ -985,16 +970,6 @@ public:
 		LuaWrapper::createSystemFunction(m_state, "Engine", "instantiatePrefab", &LUA_instantiatePrefab);
 		LuaWrapper::createSystemFunction(m_state, "Engine", "createEntityEx", &LUA_createEntityEx);
 		LuaWrapper::createSystemFunction(m_state, "Engine", "multVecQuat", &LUA_multVecQuat);
-		LuaWrapper::createSystemVariable(m_state, "Engine", "INPUT_TYPE_DOWN", InputSystem::DOWN);
-		LuaWrapper::createSystemVariable(m_state, "Engine", "INPUT_TYPE_PRESSED", InputSystem::PRESSED);
-		LuaWrapper::createSystemVariable(m_state, "Engine", "INPUT_TYPE_MOUSE_X", InputSystem::MOUSE_X);
-		LuaWrapper::createSystemVariable(m_state, "Engine", "INPUT_TYPE_MOUSE_Y", InputSystem::MOUSE_Y);
-		LuaWrapper::createSystemVariable(m_state, "Engine", "INPUT_TYPE_LTHUMB_X", InputSystem::LTHUMB_X);
-		LuaWrapper::createSystemVariable(m_state, "Engine", "INPUT_TYPE_LTHUMB_Y", InputSystem::LTHUMB_Y);
-		LuaWrapper::createSystemVariable(m_state, "Engine", "INPUT_TYPE_RTHUMB_X", InputSystem::RTHUMB_X);
-		LuaWrapper::createSystemVariable(m_state, "Engine", "INPUT_TYPE_RTHUMB_Y", InputSystem::RTHUMB_Y);
-		LuaWrapper::createSystemVariable(m_state, "Engine", "INPUT_TYPE_RTRIGGER", InputSystem::RTRIGGER);
-		LuaWrapper::createSystemVariable(m_state, "Engine", "INPUT_TYPE_LTRIGGER", InputSystem::LTRIGGER);
 
 		lua_newtable(m_state);
 		lua_pushvalue(m_state, -1);

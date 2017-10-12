@@ -2071,8 +2071,15 @@ public:
 	}
 
 
+	Vec2 getMouseMove() const override
+	{
+		return m_mouse_move;
+	}
+
+
 	void processSystemEvents()
 	{
+		m_mouse_move.set(0, 0);
 		SDL_Event event;
 		auto& io = ImGui::GetIO();
 		while (SDL_PollEvent(&event))
@@ -2116,8 +2123,8 @@ public:
 				case SDL_MOUSEMOTION:
 				{
 					auto& input_system = m_editor->getEngine().getInputSystem();
-					input_system.injectMouseXMove(float(event.motion.xrel), float(event.motion.x));
-					input_system.injectMouseYMove(float(event.motion.yrel), float(event.motion.y));
+					input_system.setCursorPosition({(float)event.motion.x, (float)event.motion.y});
+					m_mouse_move += Vec2((float)event.motion.xrel, (float)event.motion.yrel);
 					if (SDL_GetRelativeMouseMode() == SDL_FALSE)
 					{
 						io.MousePos.x = (float)event.motion.x;
@@ -2334,6 +2341,7 @@ public:
 	ProfilerUI* m_profiler_ui;
 	Settings m_settings;
 	Metadata m_metadata;
+	Vec2 m_mouse_move;
 	char m_template_name[100];
 	char m_open_filter[64];
 	char m_component_filter[32];

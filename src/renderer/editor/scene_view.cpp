@@ -419,8 +419,7 @@ void SceneView::onWindowGUI()
 			}
 			if (m_is_mouse_captured || ImGui::IsItemHovered())
 			{
-				auto& input = m_editor.getEngine().getInputSystem();
-				auto delta = Vec2(input.getMouseXMove(), input.getMouseYMove());
+				auto delta = m_app.getMouseMove();
 				if (delta.x != 0 || delta.y != 0)
 				{
 					m_editor.onMouseMove((int)rel_mp.x, (int)rel_mp.y, (int)delta.x, (int)delta.y);

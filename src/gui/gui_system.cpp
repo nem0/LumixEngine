@@ -238,8 +238,7 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 
 	float getMouseX() const
 	{
-		Vec2 mouse_pos = m_engine.getInputSystem().getMousePos() - m_interface->getPos();
-		return mouse_pos.x;
+		return ImGui::GetIO().MousePos.x - m_interface->getPos().x;
 	}
 
 
@@ -251,18 +250,26 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 
 	float getMouseY() const
 	{
-		Vec2 mouse_pos = m_engine.getInputSystem().getMousePos() - m_interface->getPos();
-		return mouse_pos.y;
+		return ImGui::GetIO().MousePos.x - m_interface->getPos().x;
 	}
 
 
 	void update(float time_delta) override
 	{
 		beginGUI();
-		Vec2 mouse_pos = m_engine.getInputSystem().getMousePos() - m_interface->getPos();
+		InputSystem& input_system = m_engine.getInputSystem();
+		Vec2 mouse_pos = input_system.getCursorPosition() - m_interface->getPos();
 		auto& io = ImGui::GetIO();
 		io.MousePos = ImVec2(mouse_pos.x, mouse_pos.y);
-		io.MouseDown[0] = m_engine.getInputSystem().isMouseDown(InputSystem::LEFT);
+		
+		const InputSystem::Event* events = input_system.getEvents();
+		for (int i = 0, c = input_system.getEventsCount(); i < c; ++i)
+		{
+			if (events[i].type == InputSystem::Event::BUTTON && events[i].device->type == InputSystem::Device::MOUSE && events[i].data.button.key_id == 0)
+			{
+				io.MouseDown[0] = events[i].data.button.state == InputSystem::ButtonEvent::DOWN;
+			}
+		}
 		endGUI();
 	}
 
