@@ -75,6 +75,7 @@ class LUMIX_ENGINE_API InputSystem
 		virtual const Event* getEvents() const = 0;
 
 		virtual Device* getMouseDevice() = 0;
+		virtual Device* getKeyboardDevice() = 0;
 
 		virtual Vec2 getCursorPosition() const = 0;
 		virtual void setCursorPosition(const Vec2& pos) = 0;

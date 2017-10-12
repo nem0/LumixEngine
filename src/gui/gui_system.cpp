@@ -265,7 +265,7 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 		const InputSystem::Event* events = input_system.getEvents();
 		for (int i = 0, c = input_system.getEventsCount(); i < c; ++i)
 		{
-			if (events[i].type == InputSystem::Event::BUTTON && events[i].device->type == InputSystem::Device::MOUSE && events[i].data.button.key_id == 0)
+			if (events[i].type == InputSystem::Event::BUTTON && events[i].device->type == InputSystem::Device::MOUSE && events[i].data.button.key_id == 1)
 			{
 				io.MouseDown[0] = events[i].data.button.state == InputSystem::ButtonEvent::DOWN;
 			}
