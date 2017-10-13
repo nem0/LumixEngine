@@ -67,7 +67,14 @@ struct InputSystemImpl LUMIX_FINAL : public InputSystem
 
 	void removeDevice(Device* device) override 
 	{ 
+		ASSERT(device != m_keyboard_device);
+		ASSERT(device != m_mouse_device);
 		m_devices.eraseItemFast(device); LUMIX_DELETE(m_allocator, device); 
+
+		for (int i = m_events.size() - 1; i >= 0; --i)
+		{
+			if (m_events[i].device == device) m_events.erase(i);
+		}
 	}
 
 
