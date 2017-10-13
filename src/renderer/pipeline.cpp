@@ -633,6 +633,8 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 	void renderParticlesFromEmitter(const ParticleEmitter& emitter)
 	{
+		if (!m_current_view) return;
+
 		static const int PARTICLE_BATCH_SIZE = 256;
 
 		if (emitter.m_life.empty()) return;
@@ -733,6 +735,8 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 	void bindTexture(int uniform_idx, int texture_idx)
 	{
+		if (!m_current_view) return;
+
 		auto* tex = (Texture*)m_renderer.getEngine().getLuaResource(texture_idx);
 		m_current_view->command_buffer.beginAppend();
 		m_current_view->command_buffer.setTexture(15 - m_global_textures_count, m_uniforms[uniform_idx], tex->handle);
@@ -743,6 +747,8 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 	void bindEnvironmentMaps(int irradiance_uniform_idx, int radiance_uniform_idx)
 	{
+		if (!m_current_view) return;
+
 		if (m_applied_camera == INVALID_COMPONENT) return;
 		Entity cam = m_scene->getCameraEntity(m_applied_camera);
 		Vec3 pos = m_scene->getUniverse().getPosition(cam);
@@ -771,6 +777,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	void bindRenderbuffer(bgfx::TextureHandle* rb, int width, int height, int uniform_idx)
 	{
 		if (!rb) return;
+		if (!m_current_view) return;
 
 		Vec4 size;
 		size.x = (float)width;
@@ -789,6 +796,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 	void setViewProjection(const Matrix& mtx, int width, int height) override
 	{
+		if (!m_current_view) return;
 		bgfx::setViewRect(m_current_view->bgfx_id, 0, 0, (uint16_t)width, (uint16_t)height);
 		bgfx::setViewTransform(m_current_view->bgfx_id, nullptr, &mtx.m11);
 	}
@@ -863,6 +871,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 	void setPass(const char* name)
 	{
+		if (!m_current_view) return;
 		m_pass_idx = m_renderer.getPassIdx(name);
 		m_current_view->pass_idx = m_pass_idx;
 	}
@@ -971,6 +980,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 	void setFramebuffer(const char* framebuffer_name)
 	{
+		if (!m_current_view) return;
 		if (equalStrings(framebuffer_name, "default"))
 		{
 			m_current_framebuffer = m_default_framebuffer;
@@ -1306,6 +1316,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	{
 		PROFILE_FUNCTION();
 		if (m_applied_camera == INVALID_COMPONENT) return;
+		if (!m_current_view) return;
 
 		IAllocator& frame_allocator = m_renderer.getEngine().getLIFOAllocator();
 		Array<DecalInfo> decals(frame_allocator);
@@ -1337,7 +1348,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 	void renderSpotLightShadowmap(ComponentHandle light)
 	{
-		newView("point_light", 0xff);
+		newView("point_light", ~0ULL);
 
 		Entity light_entity = m_scene->getPointLightEntity(light);
 		Matrix mtx = m_scene->getUniverse().getMatrix(light_entity);
@@ -1538,6 +1549,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 	void renderShadowmap(int split_index)
 	{
+		if (!m_current_view) return;
 		Universe& universe = m_scene->getUniverse();
 		ComponentHandle light_cmp = m_scene->getActiveGlobalLight();
 		if (!light_cmp.isValid() || !m_applied_camera.isValid()) return;
@@ -1621,6 +1633,8 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 	void renderDebugPoints()
 	{
+		if (!m_current_view) return;
+
 		const Array<DebugPoint>& points = m_scene->getDebugPoints();
 		if (points.empty() || !m_debug_line_material->isReady()) return;
 
@@ -1665,6 +1679,8 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 	void renderDebugLines()
 	{
+		if (!m_current_view) return;
+
 		const Array<DebugLine>& lines = m_scene->getDebugLines();
 		if (lines.empty() || !m_debug_line_material->isReady()) return;
 
@@ -1715,6 +1731,8 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 	void renderDebugTriangles()
 	{
+		if (!m_current_view) return;
+
 		const auto& tris = m_scene->getDebugTriangles();
 		if(tris.empty() || !m_debug_line_material->isReady()) return;
 
@@ -1792,6 +1810,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	void setPointLightUniforms(ComponentHandle light_cmp)
 	{
 		if (!light_cmp.isValid()) return;
+		if (!m_current_view) return;
 
 		Universe& universe = m_scene->getUniverse();
 		Entity light_entity = m_scene->getPointLightEntity(light_cmp);
@@ -1843,24 +1862,29 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 	void setStencilRef(u32 ref)
 	{
+		if (!m_current_view) return;
 		m_current_view->stencil |= BGFX_STENCIL_FUNC_REF(ref);
 	}
 
 
 	void setStencilRMask(u32 rmask)
 	{
+		if (!m_current_view) return;
 		m_current_view->stencil |= BGFX_STENCIL_FUNC_RMASK(rmask);
 	}
 
 
 	void setStencil(u32 flags)
 	{
+		if (!m_current_view) return;
 		m_current_view->stencil |= flags;
 	}
 
 
 	void setActiveGlobalLightUniforms()
 	{
+		if (!m_current_view) return;
+
 		auto current_light = m_scene->getActiveGlobalLight();
 		if (!current_light.isValid()) return;
 
@@ -1894,33 +1918,40 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 	void disableBlending()
 	{
+		if (!m_current_view) return;
 		m_current_view->render_state &= ~BGFX_STATE_BLEND_MASK;
 	}
 
 	void enableDepthWrite()
 	{
+		if (!m_current_view) return;
 		m_current_view->render_state |= BGFX_STATE_DEPTH_WRITE;
 	}
 	void disableDepthWrite()
 	{
+		if (!m_current_view) return;
 		m_current_view->render_state &= ~BGFX_STATE_DEPTH_WRITE;
 	}
 
 	void enableAlphaWrite()
 	{
+		if (!m_current_view) return;
 		m_current_view->render_state |= BGFX_STATE_ALPHA_WRITE;
 	}
 	void disableAlphaWrite()
 	{
+		if (!m_current_view) return;
 		m_current_view->render_state &= ~BGFX_STATE_ALPHA_WRITE;
 	}
 
 	void enableRGBWrite()
 	{
+		if (!m_current_view) return;
 		m_current_view->render_state |= BGFX_STATE_RGB_WRITE;
 	}
 	void disableRGBWrite()
 	{
+		if (!m_current_view) return;
 		m_current_view->render_state &= ~BGFX_STATE_RGB_WRITE;
 	}
 
@@ -1974,6 +2005,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 	void setViewSeq()
 	{
+		if (!m_current_view) return;
 		bgfx::setViewMode(m_current_view->bgfx_id, bgfx::ViewMode::Sequential);
 	}
 
@@ -1988,6 +2020,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 	void drawQuadExMaterial(float left, float top, float w, float h, float u0, float v0, float u1, float v1, Material* material)
 	{
+		if (!m_current_view) return;
 		if (!material->isReady() || bgfx::getAvailTransientVertexBuffer(3, m_base_vertex_decl) < 3)
 		{
 			bgfx::touch(m_current_view->bgfx_id);
@@ -2431,6 +2464,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		u64 render_states,
 		ShaderInstance& shader_instance) override
 	{
+		ASSERT(m_current_view);
 		View& view = *m_current_view;
 		bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
 		bgfx::setState(view.render_state | render_states);
@@ -2485,6 +2519,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		int count,
 		Material& material) override
 	{
+		if (!m_current_view) return;
 		View& view = *m_current_view;
 
 		executeCommandBuffer(material.getCommandBuffer(), &material);
@@ -2909,6 +2944,8 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 	void enableBlending(const char* mode)
 	{
+		if (!m_current_view) return;
+
 		u64 mode_value = 0;
 		if (equalStrings(mode, "alpha")) mode_value = BGFX_STATE_BLEND_ALPHA;
 		else if (equalStrings(mode, "add")) mode_value = BGFX_STATE_BLEND_ADD;
@@ -2920,6 +2957,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 	void clear(u32 flags, u32 color)
 	{
+		if (!m_current_view) return;
 		bgfx::setViewClear(m_current_view->bgfx_id, (u16)flags, color, 1.0f, 0);
 		bgfx::touch(m_current_view->bgfx_id);
 	}
@@ -3068,6 +3106,7 @@ namespace LuaAPI
 int bindFramebufferTexture(lua_State* L)
 {
 	PipelineImpl* that = LuaWrapper::checkArg<PipelineImpl*>(L, 1);
+	if (!that->m_current_view) return 0;
 	const char* framebuffer_name = LuaWrapper::checkArg<const char*>(L, 2);
 	int renderbuffer_idx = LuaWrapper::checkArg<int>(L, 3);
 	int uniform_idx = LuaWrapper::checkArg<int>(L, 4);
@@ -3182,6 +3221,8 @@ void logError(const char* message)
 int setUniform(lua_State* L)
 {
 	auto* pipeline = LuaWrapper::checkArg<PipelineImpl*>(L, 1);
+	if (!pipeline->m_current_view) return 0;
+
 	int uniform_idx = LuaWrapper::checkArg<int>(L, 2);
 	LuaWrapper::checkTableArg(L, 3);
 
