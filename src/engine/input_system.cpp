@@ -79,7 +79,7 @@ struct InputSystemImpl LUMIX_FINAL : public InputSystem
 
 		m_events.clear();
 
-		ControllerDevice::update(dt);
+		ControllerDevice::frame(dt);
 		for (Device* device : m_devices) device->update(dt);
 	}
 
