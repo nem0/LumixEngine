@@ -65,7 +65,7 @@ void Frustum::transform(const Matrix& mtx)
 }
 
 
-Sphere Frustum::computeBoundingSphere()
+Sphere Frustum::computeBoundingSphere() const 
 {
 	Sphere sphere;
 	sphere.position = points[0];

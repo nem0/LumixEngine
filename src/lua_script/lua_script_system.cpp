@@ -8,6 +8,7 @@
 #include "engine/engine.h"
 #include "engine/fs/file_system.h"
 #include "engine/iallocator.h"
+#include "engine/input_system.h"
 #include "engine/iplugin.h"
 #include "engine/json_serializer.h"
 #include "engine/log.h"
@@ -66,7 +67,7 @@ namespace Lumix
 			int func;
 		};
 
-		struct UpdateData
+		struct CallbackData
 		{
 			LuaScript* script;
 			lua_State* state;
@@ -312,6 +313,7 @@ namespace Lumix
 			, m_universe(ctx)
 			, m_scripts(system.m_allocator)
 			, m_updates(system.m_allocator)
+			, m_input_handlers(system.m_allocator)
 			, m_timers(system.m_allocator)
 			, m_property_names(system.m_allocator)
 			, m_is_game_running(false)
@@ -1045,11 +1047,20 @@ namespace Lumix
 				}
 			}
 
-			for(int i = 0; i < m_updates.size(); ++i)
+			for (int i = 0; i < m_updates.size(); ++i)
 			{
-				if(m_updates[i].state == inst.m_state)
+				if (m_updates[i].state == inst.m_state)
 				{
 					m_updates.eraseFast(i);
+					break;
+				}
+			}
+			
+			for (int i = 0; i < m_input_handlers.size(); ++i)
+			{
+				if (m_input_handlers[i].state == inst.m_state)
+				{
+					m_input_handlers.eraseFast(i);
 					break;
 				}
 			}
@@ -1092,6 +1103,14 @@ namespace Lumix
 						break;
 					}
 				}
+				for (int i = 0; i < m_input_handlers.size(); ++i)
+				{
+					if (m_input_handlers[i].state == instance.m_state)
+					{
+						m_input_handlers.eraseFast(i);
+						break;
+					}
+				}
 			}
 
 			if (lua_rawgeti(instance.m_state, LUA_REGISTRYINDEX, instance.m_environment) != LUA_TTABLE)
@@ -1106,6 +1125,14 @@ namespace Lumix
 				update_data.script = instance.m_script;
 				update_data.state = instance.m_state;
 				update_data.environment = instance.m_environment;
+			}
+			lua_pop(instance.m_state, 1);
+			if (lua_getfield(instance.m_state, -1, "onInputEvent") == LUA_TFUNCTION)
+			{
+				auto& callback = m_input_handlers.emplace();
+				callback.script = instance.m_script;
+				callback.state = instance.m_state;
+				callback.environment = instance.m_environment;
 			}
 			lua_pop(instance.m_state, 1);
 
@@ -1138,6 +1165,7 @@ namespace Lumix
 			m_scripts_init_called = false;
 			m_is_game_running = false;
 			m_updates.clear();
+			m_input_handlers.clear();
 			m_timers.clear();
 		}
 
@@ -1509,6 +1537,85 @@ namespace Lumix
 		}
 
 
+		void processInputEvent(const CallbackData& callback, const InputSystem::Event& event)
+		{
+			lua_State* L = callback.state;
+			lua_newtable(L); // [lua_event]
+			LuaWrapper::push(L, (u32)event.type); // [lua_event, event.type]
+			lua_setfield(L, -2, "type"); // [lua_event]
+
+			lua_newtable(L); // [lua_event, lua_device]
+			LuaWrapper::push(L, (u32)event.device->type); // [lua_event, lua_device, device.type]
+			lua_setfield(L, -2, "type"); // [lua_event, lua_device]
+			LuaWrapper::push(L, event.device->index); // [lua_event, lua_device, device.index]
+			lua_setfield(L, -2, "index"); // [lua_event, lua_device]
+
+			lua_setfield(L, -2, "device"); // [lua_event]
+
+			switch(event.type)
+			{
+				case InputSystem::Event::BUTTON:
+					LuaWrapper::push(L, (u32)event.data.button.state); // [lua_event, button.state]
+					lua_setfield(L, -2, "state"); // [lua_event]
+					LuaWrapper::push(L, event.data.button.key_id); // [lua_event, button.key_id]
+					lua_setfield(L, -2, "key_id"); // [lua_event]
+					LuaWrapper::push(L, event.data.button.x_abs); // [lua_event, button.x_abs]
+					lua_setfield(L, -2, "x_abs"); // [lua_event]
+					LuaWrapper::push(L, event.data.button.y_abs); // [lua_event, button.y_abs]
+					lua_setfield(L, -2, "y_abs"); // [lua_event]
+					break;
+				case InputSystem::Event::AXIS:
+					LuaWrapper::push(L, event.data.axis.x); // [lua_event, axis.x]
+					lua_setfield(L, -2, "x"); // [lua_event]
+					LuaWrapper::push(L, event.data.axis.y); // [lua_event, axis.y]
+					lua_setfield(L, -2, "y"); // [lua_event]
+					LuaWrapper::push(L, event.data.axis.x_abs); // [lua_event, axis.x_abs]
+					lua_setfield(L, -2, "x_abs"); // [lua_event]
+					LuaWrapper::push(L, event.data.axis.y_abs); // [lua_event, axis.y_abs]
+					lua_setfield(L, -2, "y_abs"); // [lua_event]
+					break;
+				default:
+					ASSERT(false);
+					break;
+			}
+
+
+			if (lua_rawgeti(L, LUA_REGISTRYINDEX, callback.environment) != LUA_TTABLE) // [lua_event, environment]
+			{
+				ASSERT(false);
+			}
+			if (lua_getfield(L, -1, "onInputEvent") != LUA_TFUNCTION)  // [lua_event, environment, func]
+			{
+				lua_pop(L, 3); // []
+				return;
+			}
+
+			lua_pushvalue(L, -3); // [lua_event, environment, func, lua_event]
+			
+			if (lua_pcall(L, 1, 0, 0) != LUA_OK)// [lua_event, environment]
+			{
+				g_log_error.log("Lua Script") << lua_tostring(L, -1);
+				lua_pop(L, 3); // []
+			}
+			lua_pop(L, 2); // []
+		}
+
+
+		void processInputEvents()
+		{
+			if (m_input_handlers.empty()) return;
+			InputSystem& input_system = m_system.m_engine.getInputSystem();
+			const InputSystem::Event* events = input_system.getEvents();
+			for (int i = 0, c = input_system.getEventsCount(); i < c; ++i)
+			{
+				for (const CallbackData& cb : m_input_handlers)
+				{
+					processInputEvent(cb, events[i]);
+				}
+			}
+		}
+
+
 		void update(float time_delta, bool paused) override
 		{
 			PROFILE_FUNCTION();
@@ -1517,11 +1624,12 @@ namespace Lumix
 
 			if (paused) return;
 
+			processInputEvents();
 			updateTimers(time_delta);
 
 			for (int i = 0; i < m_updates.size(); ++i)
 			{
-				UpdateData update_item = m_updates[i];
+				CallbackData update_item = m_updates[i];
 				if (lua_rawgeti(update_item.state, LUA_REGISTRYINDEX, update_item.environment) != LUA_TTABLE)
 				{
 					ASSERT(false);
@@ -1671,8 +1779,9 @@ namespace Lumix
 		LuaScriptSystemImpl& m_system;
 		HashMap<Entity, ScriptComponent*> m_scripts;
 		AssociativeArray<u32, string> m_property_names;
+		Array<CallbackData> m_input_handlers;
 		Universe& m_universe;
-		Array<UpdateData> m_updates;
+		Array<CallbackData> m_updates;
 		Array<TimerData> m_timers;
 		FunctionCall m_function_call;
 		ScriptInstance* m_current_script_instance;

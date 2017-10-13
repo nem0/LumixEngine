@@ -15,7 +15,7 @@ class LUMIX_ENGINE_API InputSystem
 	public:
 		struct Device
 		{
-			enum Type
+			enum Type : u32
 			{
 				MOUSE,
 				KEYBOARD,
@@ -35,7 +35,7 @@ class LUMIX_ENGINE_API InputSystem
 			u32 key_id;
 			float x_abs;
 			float y_abs;
-			enum
+			enum : u32
 			{
 				UP,
 				DOWN
