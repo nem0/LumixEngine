@@ -1829,7 +1829,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			bone->parent_joint->setLocalPose(PxJointActorIndex::eACTOR1, delta * local_pose1);
 		}
 		auto* child = bone->child;
-		while (child)
+		while (child && child->parent_joint)
 		{
 			PxTransform local_pose0 = child->parent_joint->getLocalPose(PxJointActorIndex::eACTOR0);
 			child->parent_joint->setLocalPose(PxJointActorIndex::eACTOR0, delta * local_pose0);
