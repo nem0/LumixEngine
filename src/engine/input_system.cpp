@@ -7,9 +7,6 @@
 #include "engine/string.h"
 #include "engine/vec.h"
 
-#include <windows.h>
-#include <Xinput.h>
-
 
 namespace Lumix
 {
@@ -32,8 +29,6 @@ struct KeyboardDevice : InputSystem::Device
 
 struct InputSystemImpl LUMIX_FINAL : public InputSystem
 {
-	typedef decltype(XInputGetState)* XInputGetState_fn_ptr;
-
 	explicit InputSystemImpl(IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_events(m_allocator)
