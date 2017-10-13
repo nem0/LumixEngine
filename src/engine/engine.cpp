@@ -1046,6 +1046,13 @@ public:
 		LuaImGui::registerCFunction(m_state, "Unindent", &LuaWrapper::wrap<decltype(&ImGui::Unindent), &ImGui::Unindent>);
 		LuaImGui::registerCFunction(m_state, "LabelText", &LuaImGui::LabelText);
 
+		LuaWrapper::createSystemVariable(m_state, "Engine", "INPUT_DEVICE_KEYBOARD", InputSystem::Device::KEYBOARD);
+		LuaWrapper::createSystemVariable(m_state, "Engine", "INPUT_DEVICE_MOUSE", InputSystem::Device::MOUSE);
+		LuaWrapper::createSystemVariable(m_state, "Engine", "INPUT_DEVICE_CONTROLLER", InputSystem::Device::CONTROLLER);
+
+		LuaWrapper::createSystemVariable(m_state, "Engine", "INPUT_EVENT_BUTTON", InputSystem::Event::BUTTON);
+		LuaWrapper::createSystemVariable(m_state, "Engine", "INPUT_EVENT_AXIS", InputSystem::Event::AXIS);
+
 		lua_pop(m_state, 1);
 
 		installLuaPackageLoader();

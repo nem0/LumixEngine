@@ -95,7 +95,7 @@ LUMIX_ALIGN_BEGIN(16) struct LUMIX_ENGINE_API Frustum
 
 	bool intersectAABB(const AABB& aabb) const;
 	bool isSphereInside(const Vec3& center, float radius) const;
-	Sphere computeBoundingSphere();
+	Sphere computeBoundingSphere() const;
 	void transform(const Matrix& mtx);
 
 
