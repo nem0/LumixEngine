@@ -347,6 +347,7 @@ bool loadRaw(Texture& texture, FS::IFile& file)
 		bgfx::TextureFormat::R32F,
 		texture.bgfx_flags,
 		nullptr);
+	bgfx::setName(texture.handle, texture.getPath().c_str());
 	// update must be here because texture is immutable otherwise 
 	bgfx::updateTexture2D(texture.handle, 0, 0, 0, 0, (uint16_t)texture.width, (uint16_t)texture.height, mem);
 	texture.depth = 1;
@@ -543,6 +544,7 @@ bool Texture::loadTGA(FS::IFile& file)
 		bgfx::TextureFormat::RGBA8,
 		bgfx_flags,
 		nullptr);
+	bgfx::setName(handle, getPath().c_str());
 	// update must be here because texture is immutable otherwise 
 	bgfx::updateTexture2D(handle,
 		0,
@@ -583,6 +585,7 @@ static bool loadDDSorKTX(Texture& texture, FS::IFile& file)
 	bgfx::TextureInfo info;
 	const auto* mem = bgfx::copy(file.getBuffer(), (u32)file.size());
 	texture.handle = bgfx::createTexture(mem, texture.bgfx_flags, 0, &info);
+	bgfx::setName(texture.handle, texture.getPath().c_str());
 	texture.width = info.width;
 	texture.mips = info.numMips;
 	texture.height = info.height;
