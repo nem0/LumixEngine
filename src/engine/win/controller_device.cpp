@@ -50,7 +50,7 @@ void ControllerDevice::init(InputSystem& input_system)
 }
 
 
-void ControllerDevice::update(float dt)
+void ControllerDevice::frame(float dt)
 {
 	if (!g_controllers.get_state) return;
 
