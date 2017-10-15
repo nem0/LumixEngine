@@ -249,7 +249,8 @@ void SceneView::handleDrop(float x, float y)
 			m_editor.setEntitiesPositions(&entity, &pos, 1);
 			m_editor.selectEntities(&entity, 1);
 			m_editor.addComponent(MODEL_INSTANCE_TYPE);
-			m_editor.setProperty(MODEL_INSTANCE_TYPE, -1, "Source", &entity, 1, path, stringLength(path) + 1);
+			auto* prop = PropertyRegister::getProperty(MODEL_INSTANCE_TYPE, "Source");
+			m_editor.setProperty(MODEL_INSTANCE_TYPE, -1, *prop, &entity, 1, path, stringLength(path) + 1);
 			m_editor.endCommandGroup();
 		}
 		else if (PathUtils::hasExtension(path, "mat") && hit.m_mesh)
@@ -266,8 +267,8 @@ void SceneView::handleDrop(float x, float y)
 					break;
 				}
 			}
-			
-			m_editor.setProperty(MODEL_INSTANCE_TYPE, mesh_index, "Material", &hit.m_entity, 1, drag_data.data, drag_data.size);
+			auto* prop= PropertyRegister::getProperty(MODEL_INSTANCE_TYPE, "Materials", "Source");
+			m_editor.setProperty(MODEL_INSTANCE_TYPE, mesh_index, *prop, &hit.m_entity, 1, drag_data.data, drag_data.size);
 		}
 	}
 }

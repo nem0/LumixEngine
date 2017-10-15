@@ -119,49 +119,51 @@ const IProperty* getProperty(ComponentType cmp_type, u32 property_name_hash)
 }
 
 
+
+const IProperty* getProperty(ComponentType cmp_type, const char* property, const char* subproperty)
+{
+	auto* cmp = getComponent(cmp_type);
+	if (!cmp) return nullptr;
+	struct Visitor : ISimpleComponentVisitor
+	{
+		void visitProperty(const IProperty& prop) override {}
+
+		void visit(const IArrayProperty& prop) override {
+			if (equalStrings(prop.getName(), property))
+			{
+				struct Subvisitor : ISimpleComponentVisitor
+				{
+					void visitProperty(const IProperty& prop) override {
+						if (equalStrings(prop.getName(), property)) result = &prop;
+					}
+					const char* property;
+					const IProperty* result = nullptr;
+				} subvisitor;
+				subvisitor.property = subproperty;
+				prop.visit(subvisitor);
+				result = subvisitor.result;
+			}
+		}
+
+		const char* subproperty;
+		const char* property;
+		const IProperty* result = nullptr;
+	} visitor;
+	visitor.subproperty = subproperty;
+	visitor.property = property;
+	cmp->visit(visitor);
+	return visitor.result;
+}
+
+
+
 const IProperty* getProperty(ComponentType cmp_type, const char* property)
 {
 	auto* cmp = getComponent(cmp_type);
 	if (!cmp) return nullptr;
-	struct Visitor : IComponentVisitor
+	struct Visitor : ISimpleComponentVisitor
 	{
-		void visit(const Property<float>& prop) override {
-			if (equalStrings(prop.name, property)) result = &prop;
-		}
-		void visit(const Property<int>& prop) override {
-			if (equalStrings(prop.name, property)) result = &prop;
-		}
-		void visit(const Property<Entity>& prop) override {
-			if (equalStrings(prop.name, property)) result = &prop;
-		}
-		void visit(const Property<Int2>& prop) override {
-			if (equalStrings(prop.name, property)) result = &prop;
-		}
-		void visit(const Property<Vec2>& prop) override {
-			if (equalStrings(prop.name, property)) result = &prop;
-		}
-		void visit(const Property<Vec3>& prop) override {
-			if (equalStrings(prop.name, property)) result = &prop;
-		}
-		void visit(const Property<Vec4>& prop) override {
-			if (equalStrings(prop.name, property)) result = &prop;
-		}
-		void visit(const Property<bool>& prop) override {
-			if (equalStrings(prop.name, property)) result = &prop;
-		}
-		void visit(const Property<Path>& prop) override {
-			if (equalStrings(prop.name, property)) result = &prop;
-		}
-		void visit(const Property<const char*>& prop) override {
-			if (equalStrings(prop.name, property)) result = &prop;
-		}
-		void visit(const IArrayProperty& prop) override {
-			prop.visit(*this);
-		}
-		void visit(const IEnumProperty& prop) override {
-			if (equalStrings(prop.getName(), property)) result = &prop;
-		}
-		void visit(const IBlobProperty& prop) override {
+		void visitProperty(const IProperty& prop) override {
 			if (equalStrings(prop.getName(), property)) result = &prop;
 		}
 

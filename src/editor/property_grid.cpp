@@ -32,7 +32,6 @@ PropertyGrid::PropertyGrid(StudioApp& app)
 	m_particle_emitter_updating = true;
 	m_particle_emitter_timescale = 1.0f;
 	m_component_filter[0] = '\0';
-	m_entity_filter[0] = '\0';
 }
 
 
@@ -44,47 +43,8 @@ PropertyGrid::~PropertyGrid()
 	}
 }
 
-
-void PropertyGrid::showProperty(PropertyDescriptorBase& desc,
-	int index,
-	const Array<Entity>& entities,
-	ComponentType cmp_type)
-{
-	if (desc.getType() == PropertyDescriptorBase::BLOB) return;
-
-	OutputBlob stream(m_editor.getAllocator());
-	ComponentUID first_entity_cmp;
-	first_entity_cmp.type = cmp_type;
-	first_entity_cmp.scene = m_editor.getUniverse()->getScene(cmp_type);
-	first_entity_cmp.entity = entities[0];
-	first_entity_cmp.handle = first_entity_cmp.scene->getComponent(entities[0], cmp_type);
-	desc.get(first_entity_cmp, index, stream);
-	InputBlob tmp(stream);
-
-	StaticString<100> desc_name(desc.getName(), "###", (u64)&desc);
-
-	switch (desc.getType())
-	{
-	case PropertyDescriptorBase::RESOURCE:
-	{
-		char buf[1024];
-		copyString(buf, (const char*)stream.getData());
-		auto& resource_descriptor = static_cast<IResourcePropertyDescriptor&>(desc);
-		ResourceType rm_type = resource_descriptor.getResourceType();
-		if (m_app.getAssetBrowser().resourceInput(
-				desc.getName(), StaticString<20>("", (u64)&desc), buf, sizeof(buf), rm_type))
-		{
-			m_editor.setProperty(cmp_type, index, desc.getName(), &entities[0], entities.size(), buf, stringLength(buf) + 1);
-		}
-		break;
-	}
-	case PropertyDescriptorBase::SAMPLED_FUNCTION:
-		showSampledFunctionProperty(entities, cmp_type, static_cast<ISampledFunctionDescriptor&>(desc));
-		break;
-	}
-}
-
-
+// TODO
+/*
 void PropertyGrid::showSampledFunctionProperty(const Array<Entity>& entities,
 	ComponentType cmp_type,
 	ISampledFunctionDescriptor& desc)
@@ -185,81 +145,18 @@ void PropertyGrid::showSampledFunctionProperty(const Array<Entity>& entities,
 			m_editor.setProperty(cmp_type, -1, desc.getName(), &entities[0], entities.size(), blob.getData(), blob.getPos());
 		}
 	}
-}
-
-
-/*void PropertyGrid::showArrayProperty(const Array<Entity>& entities,
-	ComponentType cmp_type,
-	ArrayDescriptorBase& desc)
-{
-	ComponentUID cmp;
-	cmp.type = cmp_type;
-	cmp.scene = m_editor.getUniverse()->getScene(cmp_type);
-	cmp.entity = entities[0];
-	cmp.handle = cmp.scene->getComponent(cmp.entity, cmp.type);
-	StaticString<100> desc_name(desc.getName(), "###", (u64)&desc);
-
-	if (!ImGui::CollapsingHeader(desc_name, nullptr, ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_DefaultOpen)) return;
-	if (entities.size() > 1)
-	{
-		ImGui::Text("Multi-object editing not supported.");
-		return;
-	}
-
-	int count = desc.getCount(cmp);
-	ImGui::PushID(&desc);
-	if (desc.canAdd() && ImGui::Button("Add"))
-	{
-		// TODO
-		//m_editor.addArrayPropertyItem(cmp, desc);
-	}
-	count = desc.getCount(cmp);
-
-	for (int i = 0; i < count; ++i)
-	{
-		char tmp[10];
-		toCString(i, tmp, sizeof(tmp));
-		ImGui::PushID(i);
-		if (!desc.canRemove() || ImGui::TreeNode(tmp))
-		{
-			if (desc.canRemove() && ImGui::Button("Remove"))
-			{
-				// TODO
-				//m_editor.removeArrayPropertyItem(cmp, i, desc);
-				--i;
-				count = desc.getCount(cmp);
-				ImGui::TreePop();
-				ImGui::PopID();
-				continue;
-			}
-
-			for (int j = 0; j < desc.getChildren().size(); ++j)
-			{
-				auto* child = desc.getChildren()[j];
-				showProperty(*child, i, entities, cmp_type);
-			}
-			if (desc.canRemove()) ImGui::TreePop();
-		}
-		ImGui::PopID();
-	}
-	ImGui::PopID();
-
-	if (m_deferred_select.isValid())
-	{
-		m_editor.selectEntities(&m_deferred_select, 1);
-		m_deferred_select = INVALID_ENTITY;
-	}
 }*/
-// TODO
+	
 
-
-struct Visitor : PropertyRegister::IComponentVisitor
+struct GridUIVisitor : PropertyRegister::IComponentVisitor
 {
-	Visitor(int index, const Array<Entity>& entities, ComponentType cmp_type, WorldEditor& editor)
+	GridUIVisitor(StudioApp& app, int index, const Array<Entity>& entities, ComponentType cmp_type, WorldEditor& editor)
 		: m_entities(entities)
 		, m_cmp_type(cmp_type)
 		, m_editor(editor)
 		, m_index(index)
+		, m_grid(app.getPropertyGrid())
+		, m_app(app)
 	{}
 
 
@@ -274,15 +171,60 @@ struct Visitor : PropertyRegister::IComponentVisitor
 	}
 
 
+	struct Attributes : PropertyRegister::IAttributeVisitor
+	{
+		void visit(const PropertyRegister::IAttribute& attr) override
+		{
+			switch (attr.getType())
+			{
+				case PropertyRegister::IAttribute::RADIANS:
+					is_radians = true;
+					break;
+				case PropertyRegister::IAttribute::COLOR:
+					is_color = true;
+					break;
+				case PropertyRegister::IAttribute::MIN:
+					min = ((PropertyRegister::MinAttribute&)attr).min;
+					break;
+				case PropertyRegister::IAttribute::CLAMP:
+					min = ((PropertyRegister::ClampAttribute&)attr).min;
+					max = ((PropertyRegister::ClampAttribute&)attr).max;
+					break;
+				case PropertyRegister::IAttribute::RESOURCE:
+					resource_type = ((PropertyRegister::ResourceAttribute&)attr).type;
+					break;
+			}
+		}
+
+		float max = FLT_MAX;
+		float min = -FLT_MAX;
+		bool is_color = false;
+		bool is_radians = false;
+		ResourceType resource_type;
+	};
+
+
+	static Attributes getAttributes(const PropertyRegister::IProperty& prop)
+	{
+		Attributes attrs;
+		prop.visit(attrs);
+		return attrs;
+	}
+
+
 	void visit(const PropertyRegister::Property<float>& prop) override
 	{
+		Attributes attrs = getAttributes(prop);
 		ComponentUID cmp = getComponent();
 		float f;
 		prop.getValue(cmp, m_index, OutputBlob(&f, sizeof(f)));
 
-		if (ImGui::InputFloat(prop.name, &f))
+		if (attrs.is_radians) f = Math::radiansToDegrees(f);
+		if (ImGui::DragFloat(prop.name, &f, 1, attrs.min, attrs.max))
 		{
-			m_editor.setProperty(m_cmp_type, m_index, prop.getName(), &m_entities[0], m_entities.size(), &f, sizeof(f));
+			f = Math::clamp(f, attrs.min, attrs.max);
+			if (attrs.is_radians) f = Math::degreesToRadians(f);
+			m_editor.setProperty(m_cmp_type, m_index, prop, &m_entities[0], m_entities.size(), &f, sizeof(f));
 		}
 	}
 
@@ -295,7 +237,7 @@ struct Visitor : PropertyRegister::IComponentVisitor
 
 		if (ImGui::InputInt(prop.name, &value))
 		{
-			m_editor.setProperty(m_cmp_type, m_index, prop.getName(), &m_entities[0], m_entities.size(), &value, sizeof(value));
+			m_editor.setProperty(m_cmp_type, m_index, prop, &m_entities[0], m_entities.size(), &value, sizeof(value));
 		}
 	}
 
@@ -317,17 +259,17 @@ struct Visitor : PropertyRegister::IComponentVisitor
 		Universe& universe = *m_editor.getUniverse();
 		if (ImGui::BeginPopup(prop.getName()))
 		{
-			// TODO
-			//if (entity.isValid() && ImGui::Button("Select")) m_deferred_select = entity;
+			if (entity.isValid() && ImGui::Button("Select")) m_deferred_select = entity;
 
-			//ImGui::FilterInput("Filter", m_entity_filter, sizeof(m_entity_filter));
+			static char entity_filter[32] = {};
+			ImGui::FilterInput("Filter", entity_filter, sizeof(entity_filter));
 			for (auto i = universe.getFirstEntity(); i.isValid(); i = universe.getNextEntity(i))
 			{
 				getEntityListDisplayName(m_editor, buf, lengthOf(buf), i);
-				//bool show = m_entity_filter[0] == '\0' || stristr(buf, m_entity_filter) != 0;
-				if (/*show && */ImGui::Selectable(buf))
+				bool show = entity_filter[0] == '\0' || stristr(buf, entity_filter) != 0;
+				if (show && ImGui::Selectable(buf))
 				{
-					m_editor.setProperty(m_cmp_type, m_index, prop.getName(), &m_entities[0], m_entities.size(), &i, sizeof(i));
+					m_editor.setProperty(m_cmp_type, m_index, prop, &m_entities[0], m_entities.size(), &i, sizeof(i));
 				}
 			}
 			ImGui::EndPopup();
@@ -343,7 +285,7 @@ struct Visitor : PropertyRegister::IComponentVisitor
 		prop.getValue(cmp, m_index, OutputBlob(&value, sizeof(value)));
 		if (ImGui::DragInt2(prop.getName(), &value.x))
 		{
-			m_editor.setProperty(m_cmp_type, m_index, prop.getName(), &m_entities[0], m_entities.size(), &value, sizeof(value));
+			m_editor.setProperty(m_cmp_type, m_index, prop, &m_entities[0], m_entities.size(), &value, sizeof(value));
 		}
 	}
 
@@ -355,30 +297,32 @@ struct Visitor : PropertyRegister::IComponentVisitor
 		prop.getValue(cmp, m_index, OutputBlob(&value, sizeof(value)));
 		if (ImGui::DragFloat2(prop.getName(), &value.x))
 		{
-			m_editor.setProperty(m_cmp_type, m_index, prop.getName(), &m_entities[0], m_entities.size(), &value, sizeof(value));
+			m_editor.setProperty(m_cmp_type, m_index, prop, &m_entities[0], m_entities.size(), &value, sizeof(value));
 		}
 	}
 
 
 	void visit(const PropertyRegister::Property<Vec3>& prop) override
 	{
-		bool is_color = PropertyRegister::getAttribute(prop, PropertyRegister::IAttribute::COLOR) != nullptr;
+		Attributes attrs = getAttributes(prop);
 		ComponentUID cmp = getComponent();
 		Vec3 value;
 		prop.getValue(cmp, m_index, OutputBlob(&value, sizeof(value)));
 
-		if (is_color)
+		if (attrs.is_color)
 		{
 			if (ImGui::ColorEdit3(prop.name, &value.x))
 			{
-				m_editor.setProperty(m_cmp_type, m_index, prop.getName(), &m_entities[0], m_entities.size(), &value, sizeof(value));
+				m_editor.setProperty(m_cmp_type, m_index, prop, &m_entities[0], m_entities.size(), &value, sizeof(value));
 			}
 		}
 		else
 		{
-			if (ImGui::DragFloat3(prop.name, &value.x))
+			if (attrs.is_radians) value = Math::radiansToDegrees(value);
+			if (ImGui::DragFloat3(prop.name, &value.x, 1, attrs.min, attrs.max))
 			{
-				m_editor.setProperty(m_cmp_type, m_index, prop.getName(), &m_entities[0], m_entities.size(), &value, sizeof(value));
+				if (attrs.is_radians) value = Math::degreesToRadians(value);
+				m_editor.setProperty(m_cmp_type, m_index, prop, &m_entities[0], m_entities.size(), &value, sizeof(value));
 			}
 		}
 	}
@@ -392,7 +336,7 @@ struct Visitor : PropertyRegister::IComponentVisitor
 
 		if (ImGui::DragFloat4(prop.name, &value.x))
 		{
-			m_editor.setProperty(m_cmp_type, m_index, prop.getName(), &m_entities[0], m_entities.size(), &value, sizeof(value));
+			m_editor.setProperty(m_cmp_type, m_index, prop, &m_entities[0], m_entities.size(), &value, sizeof(value));
 		}
 	}
 
@@ -405,7 +349,7 @@ struct Visitor : PropertyRegister::IComponentVisitor
 
 		if (ImGui::Checkbox(prop.name, &value))
 		{
-			m_editor.setProperty(m_cmp_type, m_index, prop.getName(), &m_entities[0], m_entities.size(), &value, sizeof(value));
+			m_editor.setProperty(m_cmp_type, m_index, prop, &m_entities[0], m_entities.size(), &value, sizeof(value));
 		}
 	}
 
@@ -416,17 +360,37 @@ struct Visitor : PropertyRegister::IComponentVisitor
 		char tmp[1024];
 		prop.getValue(cmp, m_index, OutputBlob(&tmp, sizeof(tmp)));
 
-		if (ImGui::InputText(prop.name, tmp, sizeof(tmp)))
+		Attributes attrs = getAttributes(prop);
+
+		if (attrs.resource_type != INVALID_RESOURCE_TYPE)
 		{
-			m_editor.setProperty(m_cmp_type, m_index, prop.getName(), &m_entities[0], m_entities.size(), tmp, stringLength(tmp) + 1);
+			if (m_app.getAssetBrowser().resourceInput(prop.name, StaticString<20>("", (u64)&prop), tmp, sizeof(tmp), attrs.resource_type))
+			{
+				m_editor.setProperty(m_cmp_type, m_index, prop, &m_entities[0], m_entities.size(), tmp, stringLength(tmp) + 1);
+			}
+		}
+		else
+		{
+			if (ImGui::InputText(prop.name, tmp, sizeof(tmp)))
+			{
+				m_editor.setProperty(m_cmp_type, m_index, prop, &m_entities[0], m_entities.size(), tmp, stringLength(tmp) + 1);
+			}
 		}
 	}
 
 
 	void visit(const PropertyRegister::Property<const char*>& prop) override
 	{
+		ComponentUID cmp = getComponent();
+		char tmp[1024];
+		prop.getValue(cmp, m_index, OutputBlob(&tmp, sizeof(tmp)));
 
+		if (ImGui::InputText(prop.name, tmp, sizeof(tmp)))
+		{
+			m_editor.setProperty(m_cmp_type, m_index, prop, &m_entities[0], m_entities.size(), tmp, stringLength(tmp) + 1);
+		}
 	}
+
 
 	void visit(const PropertyRegister::IBlobProperty& prop) override
 	{
@@ -435,56 +399,60 @@ struct Visitor : PropertyRegister::IComponentVisitor
 
 	void visit(const PropertyRegister::IArrayProperty& prop) override
 	{
-		if (!ImGui::CollapsingHeader(prop.name, nullptr, ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_DefaultOpen)) return;
+		bool is_open = ImGui::TreeNodeEx(prop.name, ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowOverlapMode);
 		if (m_entities.size() > 1)
 		{
 			ImGui::Text("Multi-object editing not supported.");
+			if (is_open) ImGui::TreePop();
 			return;
 		}
 
-		/*****/
-
 		ComponentUID cmp = getComponent();
 		int count = prop.getCount(cmp);
-		if (prop.canAddRemove() && ImGui::Button("Add"))
+		if (prop.canAddRemove())
 		{
-			m_editor.addArrayPropertyItem(cmp, prop);
+			float w = ImGui::GetContentRegionAvailWidth();
+			ImGui::SameLine(w - 45);
+			if (ImGui::SmallButton("Add"))
+			{
+				m_editor.addArrayPropertyItem(cmp, prop);
+				count = prop.getCount(cmp);
+			}
 		}
-		ImGui::PushID(&prop);
-		count = prop.getCount(cmp);
+		if (!is_open) return;
 
 		for (int i = 0; i < count; ++i)
 		{
 			char tmp[10];
 			toCString(i, tmp, sizeof(tmp));
 			ImGui::PushID(i);
-			if (!prop.canAddRemove() || ImGui::TreeNode(tmp))
+			ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowOverlapMode;
+			bool is_open = !prop.canAddRemove() || ImGui::TreeNodeEx(tmp, flags);
+			if (prop.canAddRemove())
 			{
-				if (prop.canAddRemove() && ImGui::Button("Remove"))
+				float w = ImGui::GetContentRegionAvailWidth();
+				ImGui::SameLine(w - 45);
+				if (ImGui::SmallButton("Remove"))
 				{
 					m_editor.removeArrayPropertyItem(cmp, i, prop);
 					--i;
 					count = prop.getCount(cmp);
-					ImGui::TreePop();
+					if(is_open) ImGui::TreePop();
 					ImGui::PopID();
 					continue;
 				}
+			}
 
-				Visitor v(i, m_entities, m_cmp_type, m_editor);
+			if (is_open)
+			{
+				GridUIVisitor v(m_app, i, m_entities, m_cmp_type, m_editor);
 				prop.visit(v);
 				if (prop.canAddRemove()) ImGui::TreePop();
 			}
+
 			ImGui::PopID();
 		}
-		ImGui::PopID();
-		/*
-		if (m_deferred_select.isValid())
-		{
-			m_editor.selectEntities(&m_deferred_select, 1);
-			m_deferred_select = INVALID_ENTITY;
-		}
-		*/
-		// TODO
+		ImGui::TreePop();
 	}
 
 
@@ -519,44 +487,48 @@ struct Visitor : PropertyRegister::IComponentVisitor
 
 		if (ImGui::Combo(prop.getName(), &value, getter, &data, count))
 		{
-			m_editor.setProperty(cmp.type, m_index, prop.getName(), &cmp.entity, 1, &value, sizeof(value));
+			m_editor.setProperty(cmp.type, m_index, prop, &cmp.entity, 1, &value, sizeof(value));
 		}
 	}
 
 
+	StudioApp& m_app;
 	WorldEditor& m_editor;
 	ComponentType m_cmp_type;
 	const Array<Entity>& m_entities;
 	int m_index;
+	PropertyGrid& m_grid;
+	Entity m_deferred_select = INVALID_ENTITY;
 };
 
 
 void PropertyGrid::showComponentProperties(const Array<Entity>& entities, ComponentType cmp_type)
 {
-	ImGuiTreeNodeFlags flags =
-		ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowOverlapMode;
-	bool is_opened = ImGui::CollapsingHeader(m_app.getComponentTypeName(cmp_type), nullptr, flags);
+	ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowOverlapMode;
+	ImGui::Separator();
+	const char* cmp_type_name = m_app.getComponentTypeName(cmp_type);
+	bool is_open = ImGui::TreeNodeEx((void*)(intptr_t)cmp_type.index, flags, "%s", cmp_type_name);
 
-	ImGui::PushID(cmp_type.index);
 	float w = ImGui::GetContentRegionAvailWidth();
 	ImGui::SameLine(w - 45);
-	if (ImGui::Button("Remove"))
+	if (ImGui::SmallButton("Remove"))
 	{
 		m_editor.destroyComponent(&entities[0], entities.size(), cmp_type);
-		ImGui::PopID();
 		return;
 	}
 
-	if (!is_opened)
-	{
-		ImGui::PopID();
-		return;
-	}
+	if (!is_open) return;
 
-	ImGui::Indent(10);
 	PropertyRegister::IComponentDescriptor* component = PropertyRegister::getComponent(cmp_type);
-	Visitor visitor(-1, entities, cmp_type, m_editor);
+	GridUIVisitor visitor(m_app, -1, entities, cmp_type, m_editor);
 	if (component) component->visit(visitor);
+
+	if (visitor.m_deferred_select.isValid())
+	{
+		m_editor.selectEntities(&visitor.m_deferred_select, 1);
+		visitor.m_deferred_select = INVALID_ENTITY;
+	}
+
 
 	if (entities.size() == 1)
 	{
@@ -570,9 +542,7 @@ void PropertyGrid::showComponentProperties(const Array<Entity>& entities, Compon
 			i->onGUI(*this, cmp);
 		}
 	}
-	ImGui::Unindent(10);
-
-	ImGui::PopID();
+	ImGui::TreePop();
 }
 
 

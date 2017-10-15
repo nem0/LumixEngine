@@ -419,7 +419,10 @@ struct PropertyX<Path, Getter, Setter, Attributes...> : PropertyWithAttributes<P
 		using C = typename ClassOf<Getter>::type;
 		C* x = static_cast<C*>(cmp.scene);
 
-		(x->*setter)(cmp.handle, Path((const char*)stream.getData()));
+		const char* str = (const char*)stream.getData();
+		int len = stringLength(str);
+		(x->*setter)(cmp.handle, Path(str));
+		stream.skip(len + 1);
 	}
 
 
@@ -427,6 +430,32 @@ struct PropertyX<Path, Getter, Setter, Attributes...> : PropertyWithAttributes<P
 	Setter setter;
 };
 
+template <typename Getter, typename Setter, typename... Attributes>
+struct PropertyX<const char*, Getter, Setter, Attributes...> : PropertyWithAttributes<const char*, Attributes...>
+{
+	void getValue(ComponentUID cmp, int index, OutputBlob& stream) const override
+	{
+		using C = typename ClassOf<Getter>::type;
+		C* x = static_cast<C*>(cmp.scene);
+		const char* value = (x->*getter)(cmp.handle);
+		stream.write(value, stringLength(value) + 1);
+	}
+
+	void setValue(ComponentUID cmp, int index, InputBlob& stream) const override
+	{
+		using C = typename ClassOf<Getter>::type;
+		C* x = static_cast<C*>(cmp.scene);
+
+		const char* str = (const char*)stream.getData();
+		int len = stringLength(str);
+		(x->*setter)(cmp.handle, str);
+		stream.skip(len + 1);
+	}
+
+
+	Getter getter;
+	Setter setter;
+};
 
 
 template <typename Getter, typename Setter, typename... Attributes>
@@ -446,7 +475,10 @@ struct PropertyY<Path, Getter, Setter, Attributes...> : PropertyWithAttributes<P
 		using C = typename ClassOf<Getter>::type;
 		C* x = static_cast<C*>(cmp.scene);
 
-		(x->*setter)(cmp.handle, index, Path((const char*)stream.getData()));
+		const char* str = (const char*)stream.getData();
+		int len = stringLength(str);
+		(x->*setter)(cmp.handle, index, Path(str));
+		stream.skip(len + 1);
 	}
 
 
@@ -455,6 +487,32 @@ struct PropertyY<Path, Getter, Setter, Attributes...> : PropertyWithAttributes<P
 };
 
 
+template <typename Getter, typename Setter, typename... Attributes>
+struct PropertyY<const char*, Getter, Setter, Attributes...> : PropertyWithAttributes<const char*, Attributes...>
+{
+	void getValue(ComponentUID cmp, int index, OutputBlob& stream) const override
+	{
+		using C = typename ClassOf<Getter>::type;
+		C* x = static_cast<C*>(cmp.scene);
+		const char* value = (x->*getter)(cmp.handle, index);
+		stream.write(value, stringLength(value) + 1);
+	}
+
+	void setValue(ComponentUID cmp, int index, InputBlob& stream) const override
+	{
+		using C = typename ClassOf<Getter>::type;
+		C* x = static_cast<C*>(cmp.scene);
+
+		const char* str = (const char*)stream.getData();
+		int len = stringLength(str);
+		(x->*setter)(cmp.handle, index, str);
+		stream.skip(len + 1);
+	}
+
+
+	Getter getter;
+	Setter setter;
+};
 
 
 namespace detail {
@@ -845,6 +903,7 @@ LUMIX_ENGINE_API void registerComponent(IComponentDescriptor* desc);
 LUMIX_ENGINE_API IComponentDescriptor* getComponent(ComponentType cmp_type);
 LUMIX_ENGINE_API const IProperty* getProperty(ComponentType cmp_type, const char* property);
 LUMIX_ENGINE_API const IProperty* getProperty(ComponentType cmp_type, u32 property_name_hash);
+LUMIX_ENGINE_API const IProperty* getProperty(ComponentType cmp_type, const char* property, const char* subproperty);
 
 
 LUMIX_ENGINE_API ComponentType getComponentType(const char* id);

@@ -2904,7 +2904,8 @@ struct AddTerrainComponentPlugin LUMIX_FINAL : public StudioApp::IAddComponentPl
 
 			if (!create_empty)
 			{
-				editor.setProperty(TERRAIN_TYPE, -1, "Material", &entity, 1, buf, stringLength(buf));
+				auto* prop = PropertyRegister::getProperty(TERRAIN_TYPE, "Material");
+				editor.setProperty(TERRAIN_TYPE, -1, *prop, &entity, 1, buf, stringLength(buf));
 			}
 
 			ImGui::CloseCurrentPopup();
@@ -2932,8 +2933,9 @@ LUMIX_STUDIO_ENTRY(renderer)
 
 	app.registerComponent("camera", "Render/Camera");
 	app.registerComponent("global_light", "Render/Global light");
-	app.registerComponentWithResource("renderable", "Render/Mesh", MODEL_TYPE, "Source");
-	app.registerComponentWithResource("particle_emitter", "Render/Particle emitter/Emitter", MATERIAL_TYPE, "Material");
+
+	app.registerComponentWithResource("renderable", "Render/Mesh", MODEL_TYPE, *PropertyRegister::getProperty(MODEL_INSTANCE_TYPE, "Source"));
+	app.registerComponentWithResource("particle_emitter", "Render/Particle emitter/Emitter", MATERIAL_TYPE, *PropertyRegister::getProperty(PARTICLE_EMITTER_TYPE, "Material"));
 	app.registerComponent("particle_emitter_spawn_shape", "Render/Particle emitter/Spawn shape");
 	app.registerComponent("particle_emitter_alpha", "Render/Particle emitter/Alpha");
 	app.registerComponent("particle_emitter_plane", "Render/Particle emitter/Plane");

@@ -13,6 +13,7 @@ namespace Lumix
 
 namespace PropertyRegister
 {
+struct IProperty;
 struct IArrayProperty;
 }
 
@@ -131,7 +132,7 @@ public:
 	virtual void navigate(float forward, float right, float up, float speed) = 0;
 	virtual void setProperty(ComponentType component,
 		int index,
-		const char* property,
+		const PropertyRegister::IProperty& property,
 		const Entity* entities,
 		int count,
 		const void* data,

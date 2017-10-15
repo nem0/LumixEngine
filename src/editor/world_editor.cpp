@@ -928,12 +928,12 @@ public:
 		int count,
 		ComponentType component_type,
 		int index,
-		const char* property,
+		const PropertyRegister::IProperty& property,
 		const void* data,
 		int size)
 		: m_component_type(component_type)
 		, m_entities(editor.getAllocator())
-		, m_property(PropertyRegister::getProperty(component_type, property))
+		, m_property(&property)
 		, m_editor(editor)
 		, m_new_value(editor.getAllocator())
 		, m_old_value(editor.getAllocator())
@@ -949,7 +949,6 @@ public:
 			{
 				ComponentUID component = m_editor.getUniverse()->getComponent(entities[i], component_type);
 				m_property->getValue(component, index, m_old_value);
-				//m_property_descriptor->get(component, index, m_old_value);
 				m_entities.push(entities[i]);
 			}
 			else
@@ -959,7 +958,6 @@ public:
 				{
 					ComponentUID component = m_editor.getUniverse()->getComponent(instance, component_type);
 					m_property->getValue(component, index, m_old_value);
-					//m_property_descriptor->get(component, index, m_old_value);
 					m_entities.push(instance);
 					instance = prefab_system.getNextInstance(instance);
 				}
@@ -3314,7 +3312,7 @@ public:
 
 	void setProperty(ComponentType component_type,
 		int index,
-		const char* property,
+		const PropertyRegister::IProperty& property,
 		const Entity* entities,
 		int count,
 		const void* data,

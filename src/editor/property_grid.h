@@ -39,10 +39,6 @@ public:
 	bool m_is_open;
 
 private:
-	void showProperty(PropertyDescriptorBase& desc,
-		int index,
-		const Array<Entity>& entities,
-		ComponentType cmp_type);
 	void showSampledFunctionProperty(const Array<Entity>& entities,
 		ComponentType cmp_type,
 		ISampledFunctionDescriptor& desc);
@@ -55,8 +51,6 @@ private:
 	Array<IPlugin*> m_plugins;
 	
 	char m_component_filter[32];
-	char m_entity_filter[32];
-	Entity m_deferred_select = INVALID_ENTITY;
 
 	float m_particle_emitter_timescale;
 	bool m_particle_emitter_updating;

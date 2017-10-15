@@ -316,7 +316,7 @@ static void registerProperties(IAllocator& allocator)
 			MinAttribute(0)),
 		property("Specular intensity", &RenderScene::getPointLightSpecularIntensity, &RenderScene::setPointLightSpecularIntensity, MinAttribute(0)),
 		property("FOV", &RenderScene::getLightFOV, &RenderScene::setLightFOV, 
-			ClampAttribute(0, Math::PI * 2),
+			ClampAttribute(0, 360),
 			RadiansAttribute()),
 		property("Attenuation", &RenderScene::getLightAttenuation, &RenderScene::setLightAttenuation,
 			ClampAttribute(0, 1000)),
