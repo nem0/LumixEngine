@@ -143,237 +143,138 @@ namespace Lumix
 
 	static void registerProperties(IAllocator& allocator)
 	{
-		PropertyRegister::add("ragdoll",
-			LUMIX_NEW(allocator, BlobPropertyDescriptor<PhysicsScene>)(
-				"data", &PhysicsScene::getRagdollData, &PhysicsScene::setRagdollData));
-		PropertyRegister::add("ragdoll",
-			LUMIX_NEW(allocator, PhysicsLayerPropertyDescriptor)(
-				"Layer", &PhysicsScene::getRagdollLayer, &PhysicsScene::setRagdollLayer));
+		using namespace PropertyRegister;
 
-		PropertyRegister::add("sphere_rigid_actor",
-			LUMIX_NEW(allocator, DecimalPropertyDescriptor<PhysicsScene>)(
-				"Radius", &PhysicsScene::getSphereRadius, &PhysicsScene::setSphereRadius, 0.0f, FLT_MAX, 0.0f));
-		PropertyRegister::add("sphere_rigid_actor",
-			LUMIX_NEW(allocator, DynamicTypePropertyDescriptor)(
-				"Dynamic", &PhysicsScene::getDynamicType, &PhysicsScene::setDynamicType));
-		PropertyRegister::add("sphere_rigid_actor",
-			LUMIX_NEW(allocator, BoolPropertyDescriptor<PhysicsScene>)(
-				"Trigger", &PhysicsScene::getIsTrigger, &PhysicsScene::setIsTrigger));
+		static auto ragdoll = component("ragdoll",
+			blob_property("data", &PhysicsScene::getRagdollData, &PhysicsScene::setRagdollData),
+			property("Layer", &PhysicsScene::getRagdollLayer, &PhysicsScene::setRagdollLayer)
+		);
+		PropertyRegister::registerComponent(&ragdoll);
 
-		PropertyRegister::add("capsule_rigid_actor",
-			LUMIX_NEW(allocator, DecimalPropertyDescriptor<PhysicsScene>)(
-				"Radius", &PhysicsScene::getCapsuleRadius, &PhysicsScene::setCapsuleRadius, 0.0f, FLT_MAX, 0.0f));
-		PropertyRegister::add("capsule_rigid_actor",
-			LUMIX_NEW(allocator, DecimalPropertyDescriptor<PhysicsScene>)(
-				"Height", &PhysicsScene::getCapsuleHeight, &PhysicsScene::setCapsuleHeight, 0.0f, FLT_MAX, 0.0f));
-		PropertyRegister::add("capsule_rigid_actor",
-			LUMIX_NEW(allocator, DynamicTypePropertyDescriptor)(
-				"Dynamic", &PhysicsScene::getDynamicType, &PhysicsScene::setDynamicType));
-		PropertyRegister::add("capsule_rigid_actor",
-			LUMIX_NEW(allocator, BoolPropertyDescriptor<PhysicsScene>)(
-				"Trigger", &PhysicsScene::getIsTrigger, &PhysicsScene::setIsTrigger));
+		static auto sphere_rigid_actor = component("sphere_rigid_actor",
+			property("Radius", &PhysicsScene::getSphereRadius, &PhysicsScene::setSphereRadius,
+				MinAttribute(0)),
+			property("Layer", &PhysicsScene::getRagdollLayer, &PhysicsScene::setRagdollLayer),
+			enum_property("Dynamic", &PhysicsScene::getDynamicType, &PhysicsScene::setDynamicType, 3, getDynamicTypeName),
+			property("Trigger", &PhysicsScene::getIsTrigger, &PhysicsScene::setIsTrigger) 
+		);
+		PropertyRegister::registerComponent(&sphere_rigid_actor);
 
-		PropertyRegister::add("d6_joint",
-			LUMIX_NEW(allocator, EntityPropertyDescriptor<PhysicsScene>)(
-				"Connected body", &PhysicsScene::getJointConnectedBody, &PhysicsScene::setJointConnectedBody));
-		PropertyRegister::add("d6_joint",
-			LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec3, PhysicsScene>)(
-				"Axis position", &PhysicsScene::getJointAxisPosition, &PhysicsScene::setJointAxisPosition));
-		PropertyRegister::add("d6_joint",
-			LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec3, PhysicsScene>)(
-				"Axis direction", &PhysicsScene::getJointAxisDirection, &PhysicsScene::setJointAxisDirection));
-		PropertyRegister::add("d6_joint",
-			LUMIX_NEW(allocator, D6MotionDescriptor)(
-				"X motion", &PhysicsScene::getD6JointXMotion, &PhysicsScene::setD6JointXMotion));
-		PropertyRegister::add("d6_joint",
-			LUMIX_NEW(allocator, D6MotionDescriptor)(
-				"Y motion", &PhysicsScene::getD6JointYMotion, &PhysicsScene::setD6JointYMotion));
-		PropertyRegister::add("d6_joint",
-			LUMIX_NEW(allocator, D6MotionDescriptor)(
-				"Z motion", &PhysicsScene::getD6JointZMotion, &PhysicsScene::setD6JointZMotion));
-		PropertyRegister::add("d6_joint",
-			LUMIX_NEW(allocator, D6MotionDescriptor)(
-				"Swing 1", &PhysicsScene::getD6JointSwing1Motion, &PhysicsScene::setD6JointSwing1Motion));
-		PropertyRegister::add("d6_joint",
-			LUMIX_NEW(allocator, D6MotionDescriptor)(
-				"Swing 2", &PhysicsScene::getD6JointSwing2Motion, &PhysicsScene::setD6JointSwing2Motion));
-		PropertyRegister::add("d6_joint",
-			LUMIX_NEW(allocator, D6MotionDescriptor)(
-				"Twist", &PhysicsScene::getD6JointTwistMotion, &PhysicsScene::setD6JointTwistMotion));
-		PropertyRegister::add("d6_joint",
-			LUMIX_NEW(allocator, DecimalPropertyDescriptor<PhysicsScene>)("Linear limit",
-				&PhysicsScene::getD6JointLinearLimit,
-				&PhysicsScene::setD6JointLinearLimit,
-				0.0f,
-				FLT_MAX,
-				0.0f));
-		auto* d6_swing_limit_prop = LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec2, PhysicsScene>)(
-			"Swing limit", &PhysicsScene::getD6JointSwingLimit, &PhysicsScene::setD6JointSwingLimit);
-		d6_swing_limit_prop->setIsInRadians(true);
-		PropertyRegister::add("d6_joint", d6_swing_limit_prop);
-		auto* d6_twist_limit_prop = LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec2, PhysicsScene>)(
-			"Twist limit", &PhysicsScene::getD6JointTwistLimit, &PhysicsScene::setD6JointTwistLimit);
-		d6_twist_limit_prop->setIsInRadians(true);
-		PropertyRegister::add("d6_joint", d6_twist_limit_prop);
+		static auto capsule_rigid_actor = component("capsule_rigid_actor",
+			property("Radius", &PhysicsScene::getCapsuleRadius, &PhysicsScene::setCapsuleRadius,
+				MinAttribute(0)),
+			property("Height", &PhysicsScene::getCapsuleHeight, &PhysicsScene::setCapsuleHeight),
+			enum_property("Dynamic", &PhysicsScene::getDynamicType, &PhysicsScene::setDynamicType, 3, getDynamicTypeName),
+			property("Trigger", &PhysicsScene::getIsTrigger, &PhysicsScene::setIsTrigger)
+		);
+		PropertyRegister::registerComponent(&capsule_rigid_actor);
 
-		PropertyRegister::add("spherical_joint",
-			LUMIX_NEW(allocator, EntityPropertyDescriptor<PhysicsScene>)(
-				"Connected body", &PhysicsScene::getJointConnectedBody, &PhysicsScene::setJointConnectedBody));
-		PropertyRegister::add("spherical_joint",
-			LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec3, PhysicsScene>)(
-				"Axis position", &PhysicsScene::getJointAxisPosition, &PhysicsScene::setJointAxisPosition));
-		PropertyRegister::add("spherical_joint",
-			LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec3, PhysicsScene>)(
-				"Axis direction", &PhysicsScene::getJointAxisDirection, &PhysicsScene::setJointAxisDirection));
-		PropertyRegister::add("spherical_joint",
-			LUMIX_NEW(allocator, BoolPropertyDescriptor<PhysicsScene>)(
-				"Use limit", &PhysicsScene::getSphericalJointUseLimit, &PhysicsScene::setSphericalJointUseLimit));
-		PropertyRegister::add("spherical_joint",
-			&(LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec2, PhysicsScene>)(
-				  "Limit", &PhysicsScene::getSphericalJointLimit, &PhysicsScene::setSphericalJointLimit))
-				 ->setIsInRadians(true));
+		static auto d6_joint = component("d6_joint",
+			property("Connected body", &PhysicsScene::getJointConnectedBody, &PhysicsScene::setJointConnectedBody),
+			property("Axis position", &PhysicsScene::getJointAxisPosition, &PhysicsScene::setJointAxisPosition),
+			property("Axis direction", &PhysicsScene::getJointAxisDirection, &PhysicsScene::setJointAxisDirection),
+			enum_property("X motion", &PhysicsScene::getD6JointXMotion, &PhysicsScene::setD6JointXMotion, 3, getD6MotionName),
+			enum_property("Y motion", &PhysicsScene::getD6JointYMotion, &PhysicsScene::setD6JointYMotion, 3, getD6MotionName),
+			enum_property("Z motion", &PhysicsScene::getD6JointZMotion, &PhysicsScene::setD6JointZMotion, 3, getD6MotionName),
+			enum_property("Swing 1", &PhysicsScene::getD6JointSwing1Motion, &PhysicsScene::setD6JointSwing1Motion, 3, getD6MotionName),
+			enum_property("Swing 2", &PhysicsScene::getD6JointSwing2Motion, &PhysicsScene::setD6JointSwing2Motion, 3, getD6MotionName),
+			enum_property("Twist", &PhysicsScene::getD6JointTwistMotion, &PhysicsScene::setD6JointTwistMotion, 3, getD6MotionName),
+			property("Linear limit", &PhysicsScene::getD6JointLinearLimit, &PhysicsScene::setD6JointLinearLimit,
+				MinAttribute(0)),
+			property("Swing limit", &PhysicsScene::getD6JointSwingLimit, &PhysicsScene::setD6JointSwingLimit,
+				RadiansAttribute()),
+			property("Twist limit", &PhysicsScene::getD6JointTwistLimit, &PhysicsScene::setD6JointTwistLimit,
+				RadiansAttribute())
+		);
+		PropertyRegister::registerComponent(&d6_joint);
 
-		PropertyRegister::add("distance_joint",
-			LUMIX_NEW(allocator, DecimalPropertyDescriptor<PhysicsScene>)("Damping",
-				&PhysicsScene::getDistanceJointDamping,
-				&PhysicsScene::setDistanceJointDamping,
-				0.0f,
-				FLT_MAX,
-				0.0f));
-		PropertyRegister::add("distance_joint",
-			LUMIX_NEW(allocator, DecimalPropertyDescriptor<PhysicsScene>)("Stiffness",
-				&PhysicsScene::getDistanceJointStiffness,
-				&PhysicsScene::setDistanceJointStiffness,
-				0.0f,
-				FLT_MAX,
-				0.0f));
-		PropertyRegister::add("distance_joint",
-			LUMIX_NEW(allocator, DecimalPropertyDescriptor<PhysicsScene>)("Tolerance",
-				&PhysicsScene::getDistanceJointTolerance,
-				&PhysicsScene::setDistanceJointTolerance,
-				0.0f,
-				FLT_MAX,
-				0.0f));
-		PropertyRegister::add("distance_joint",
-			LUMIX_NEW(allocator, EntityPropertyDescriptor<PhysicsScene>)(
-				"Connected body", &PhysicsScene::getJointConnectedBody, &PhysicsScene::setJointConnectedBody));
-		PropertyRegister::add("distance_joint",
-			LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec2, PhysicsScene>)(
-				"Limits", &PhysicsScene::getDistanceJointLimits, &PhysicsScene::setDistanceJointLimits));
+		static auto spherical_joint = component("spherical_joint",
+			property("Connected body", &PhysicsScene::getJointConnectedBody, &PhysicsScene::setJointConnectedBody),
+			property("Axis position", &PhysicsScene::getJointAxisPosition, &PhysicsScene::setJointAxisPosition),
+			property("Axis direction", &PhysicsScene::getJointAxisDirection, &PhysicsScene::setJointAxisDirection),
+			property("Use limit", &PhysicsScene::getSphericalJointUseLimit, &PhysicsScene::setSphericalJointUseLimit),
+			property("Limit", &PhysicsScene::getSphericalJointLimit, &PhysicsScene::setSphericalJointLimit,
+				RadiansAttribute())
+		);
+		PropertyRegister::registerComponent(&spherical_joint);
 
-		PropertyRegister::add("hinge_joint",
-			LUMIX_NEW(allocator, EntityPropertyDescriptor<PhysicsScene>)(
-				"Connected body", &PhysicsScene::getJointConnectedBody, &PhysicsScene::setJointConnectedBody));
-		PropertyRegister::add("hinge_joint",
-			LUMIX_NEW(allocator, DecimalPropertyDescriptor<PhysicsScene>)("Damping",
-				&PhysicsScene::getHingeJointDamping,
-				&PhysicsScene::setHingeJointDamping,
-				0.0f,
-				FLT_MAX,
-				0.0f));
-		PropertyRegister::add("hinge_joint",
-			LUMIX_NEW(allocator, DecimalPropertyDescriptor<PhysicsScene>)("Stiffness",
-				&PhysicsScene::getHingeJointStiffness,
-				&PhysicsScene::setHingeJointStiffness,
-				0.0f,
-				FLT_MAX,
-				0.0f));
-		PropertyRegister::add("hinge_joint",
-			LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec3, PhysicsScene>)(
-				"Axis position", &PhysicsScene::getJointAxisPosition, &PhysicsScene::setJointAxisPosition));
-		PropertyRegister::add("hinge_joint",
-			LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec3, PhysicsScene>)(
-				"Axis direction", &PhysicsScene::getJointAxisDirection, &PhysicsScene::setJointAxisDirection));
-		PropertyRegister::add("hinge_joint",
-			LUMIX_NEW(allocator, BoolPropertyDescriptor<PhysicsScene>)(
-				"Use limit", &PhysicsScene::getHingeJointUseLimit, &PhysicsScene::setHingeJointUseLimit));
-		PropertyRegister::add("hinge_joint",
-			&(LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec2, PhysicsScene>)(
-				  "Limit", &PhysicsScene::getHingeJointLimit, &PhysicsScene::setHingeJointLimit))
-				 ->setIsInRadians(true));
+		static auto distance_joint = component("distance_joint",
+			property("Connected body", &PhysicsScene::getJointConnectedBody, &PhysicsScene::setJointConnectedBody),
+			property("Damping", &PhysicsScene::getDistanceJointDamping, &PhysicsScene::setDistanceJointDamping,
+				MinAttribute(0)),
+			property("Stiffness", &PhysicsScene::getDistanceJointStiffness, &PhysicsScene::setDistanceJointStiffness,
+				MinAttribute(0)),
+			property("Tolerance", &PhysicsScene::getDistanceJointTolerance, &PhysicsScene::setDistanceJointTolerance,
+				MinAttribute(0)),
+			property("Limits", &PhysicsScene::getDistanceJointLimits, &PhysicsScene::setDistanceJointLimits)
+		);
+		PropertyRegister::registerComponent(&distance_joint);
 
-		PropertyRegister::add("physical_controller",
-			LUMIX_NEW(allocator, PhysicsLayerPropertyDescriptor)(
-				"Layer", &PhysicsScene::getControllerLayer, &PhysicsScene::setControllerLayer));
+		static auto hinge_joint = component("hinge_joint",
+			property("Connected body", &PhysicsScene::getJointConnectedBody, &PhysicsScene::setJointConnectedBody),
+			property("Damping", &PhysicsScene::getHingeJointDamping, &PhysicsScene::setHingeJointDamping,
+				MinAttribute(0)),
+			property("Stiffness", &PhysicsScene::getHingeJointStiffness, &PhysicsScene::setHingeJointStiffness,
+				MinAttribute(0)),
+			property("Axis position", &PhysicsScene::getJointAxisPosition, &PhysicsScene::setJointAxisPosition), 
+			property("Axis direction", &PhysicsScene::getJointAxisDirection, &PhysicsScene::setJointAxisDirection),
+			property("Use limit", &PhysicsScene::getHingeJointUseLimit, &PhysicsScene::setHingeJointUseLimit),
+			property("Limit", &PhysicsScene::getHingeJointLimit, &PhysicsScene::setHingeJointLimit,
+				RadiansAttribute())
+		);
+		PropertyRegister::registerComponent(&hinge_joint);
 
-		PropertyRegister::add("rigid_actor",
-			LUMIX_NEW(allocator, DynamicTypePropertyDescriptor)(
-				"Dynamic", &PhysicsScene::getDynamicType, &PhysicsScene::setDynamicType));
-		PropertyRegister::add("rigid_actor",
-			LUMIX_NEW(allocator, BoolPropertyDescriptor<PhysicsScene>)(
-				"Trigger", &PhysicsScene::getIsTrigger, &PhysicsScene::setIsTrigger));
-		PropertyRegister::add("rigid_actor",
-			LUMIX_NEW(allocator, PhysicsLayerPropertyDescriptor)(
-				"Layer", &PhysicsScene::getActorLayer, &PhysicsScene::setActorLayer));
-		
-		auto box_geom = LUMIX_NEW(allocator, ArrayDescriptor<PhysicsScene>)(
-			"Box geometry", &PhysicsScene::getBoxGeometryCount, &PhysicsScene::addBoxGeometry, &PhysicsScene::removeBoxGeometry, allocator);
-		auto box_geom_size = LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec3, PhysicsScene>)(
-			"Size", &PhysicsScene::getBoxGeomHalfExtents, &PhysicsScene::setBoxGeomHalfExtents);
-		auto box_geom_pos_offset = LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec3, PhysicsScene>)(
-			"Position offset", &PhysicsScene::getBoxGeomOffsetPosition, &PhysicsScene::setBoxGeomOffsetPosition);
-		auto box_geom_rot_offset = LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec3, PhysicsScene>)(
-			"Rotation offset", &PhysicsScene::getBoxGeomOffsetRotation, &PhysicsScene::setBoxGeomOffsetRotation);
-		box_geom_rot_offset->setIsInRadians(true);
-		box_geom->addChild(box_geom_size);
-		box_geom->addChild(box_geom_pos_offset);
-		box_geom->addChild(box_geom_rot_offset);
-		PropertyRegister::add("rigid_actor", box_geom);
-		
-		auto sphere_geom = LUMIX_NEW(allocator, ArrayDescriptor<PhysicsScene>)(
-			"Sphere geometry", &PhysicsScene::getSphereGeometryCount, &PhysicsScene::addSphereGeometry, &PhysicsScene::removeSphereGeometry, allocator);
-		auto sphere_geom_radius = LUMIX_NEW(allocator, DecimalPropertyDescriptor<PhysicsScene>)(
-			"Radius", &PhysicsScene::getSphereGeomRadius, &PhysicsScene::setSphereGeomRadius, 0.01f, FLT_MAX, 0.0f);
-		auto sphere_geom_pos_offset = LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec3, PhysicsScene>)(
-			"Position offset", &PhysicsScene::getSphereGeomOffsetPosition, &PhysicsScene::setSphereGeomOffsetPosition);
-		auto sphere_geom_rot_offset = LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec3, PhysicsScene>)(
-			"Rotation offset", &PhysicsScene::getSphereGeomOffsetRotation, &PhysicsScene::setSphereGeomOffsetRotation);
-		sphere_geom_rot_offset->setIsInRadians(true);
-		sphere_geom->addChild(sphere_geom_radius);
-		sphere_geom->addChild(sphere_geom_pos_offset);
-		sphere_geom->addChild(sphere_geom_rot_offset);
-		PropertyRegister::add("rigid_actor", sphere_geom);
+		static auto physical_controller = component("physical_controller",
+			property("Layer", &PhysicsScene::getControllerLayer, &PhysicsScene::setControllerLayer)
+		);
+		PropertyRegister::registerComponent(&physical_controller);
 
-		PropertyRegister::add("box_rigid_actor",
-			LUMIX_NEW(allocator, DynamicTypePropertyDescriptor)(
-				"Dynamic", &PhysicsScene::getDynamicType, &PhysicsScene::setDynamicType));
-		PropertyRegister::add("box_rigid_actor",
-			LUMIX_NEW(allocator, BoolPropertyDescriptor<PhysicsScene>)(
-				"Trigger", &PhysicsScene::getIsTrigger, &PhysicsScene::setIsTrigger));
-		PropertyRegister::add("box_rigid_actor",
-			LUMIX_NEW(allocator, SimplePropertyDescriptor<Vec3, PhysicsScene>)(
-				"Size", &PhysicsScene::getHalfExtents, &PhysicsScene::setHalfExtents));
-		PropertyRegister::add("box_rigid_actor",
-			LUMIX_NEW(allocator, PhysicsLayerPropertyDescriptor)(
-				"Layer", &PhysicsScene::getActorLayer, &PhysicsScene::setActorLayer));
-		PropertyRegister::add("mesh_rigid_actor",
-			LUMIX_NEW(allocator, ResourcePropertyDescriptor<PhysicsScene>)("Source",
-				&PhysicsScene::getShapeSource,
-				&PhysicsScene::setShapeSource,
-				"Physics (*.phy)",
-				PHYSICS_TYPE));
-		PropertyRegister::add("mesh_rigid_actor",
-			LUMIX_NEW(allocator, DynamicTypePropertyDescriptor)(
-				"Dynamic", &PhysicsScene::getDynamicType, &PhysicsScene::setDynamicType));
-		PropertyRegister::add("mesh_rigid_actor",
-			LUMIX_NEW(allocator, PhysicsLayerPropertyDescriptor)(
-				"Layer", &PhysicsScene::getActorLayer, &PhysicsScene::setActorLayer));
-		PropertyRegister::add("physical_heightfield",
-			LUMIX_NEW(allocator, ResourcePropertyDescriptor<PhysicsScene>)(
-				"Heightmap", &PhysicsScene::getHeightmapSource, &PhysicsScene::setHeightmapSource, "Image (*.raw)", TEXTURE_TYPE));
-		PropertyRegister::add("physical_heightfield",
-			LUMIX_NEW(allocator, DecimalPropertyDescriptor<PhysicsScene>)("XZ scale",
-				&PhysicsScene::getHeightmapXZScale,
-				&PhysicsScene::setHeightmapXZScale,
-				0.0f,
-				FLT_MAX,
-				0.0f));
-		PropertyRegister::add("physical_heightfield",
-			LUMIX_NEW(allocator, DecimalPropertyDescriptor<PhysicsScene>)(
-				"Y scale", &PhysicsScene::getHeightmapYScale, &PhysicsScene::setHeightmapYScale, 0.0f, FLT_MAX, 0.0f));
-		PropertyRegister::add("physical_heightfield",
-			LUMIX_NEW(allocator, PhysicsLayerPropertyDescriptor)(
-				"Layer", &PhysicsScene::getHeightfieldLayer, &PhysicsScene::setHeightfieldLayer));
+		static auto rigid_actor = component("rigid_actor",
+			property("Layer", &PhysicsScene::getActorLayer, &PhysicsScene::setActorLayer),
+			enum_property("Dynamic", &PhysicsScene::getDynamicType, &PhysicsScene::setDynamicType, 3, getDynamicTypeName),
+			property("Trigger", &PhysicsScene::getIsTrigger, &PhysicsScene::setIsTrigger),
+			array("Box geometry", &PhysicsScene::getBoxGeometryCount, &PhysicsScene::addBoxGeometry, &PhysicsScene::removeBoxGeometry,
+				property("Size", &PhysicsScene::getBoxGeomHalfExtents, &PhysicsScene::setBoxGeomHalfExtents),
+				property("Position offset", &PhysicsScene::getBoxGeomOffsetPosition, &PhysicsScene::setBoxGeomOffsetPosition),
+				property("Rotation offset", &PhysicsScene::getBoxGeomOffsetRotation, &PhysicsScene::setBoxGeomOffsetRotation,
+					RadiansAttribute())
+			),
+			array("Sphere geometry", &PhysicsScene::getBoxGeometryCount, &PhysicsScene::addBoxGeometry, &PhysicsScene::removeBoxGeometry,
+				property("Radius", &PhysicsScene::getSphereGeomRadius, &PhysicsScene::setSphereGeomRadius,
+					MinAttribute(0)),
+				property("Position offset", &PhysicsScene::getSphereGeomOffsetPosition, &PhysicsScene::setSphereGeomOffsetPosition),
+				property("Rotation offset", &PhysicsScene::getSphereGeomOffsetRotation, &PhysicsScene::setSphereGeomOffsetRotation,
+					RadiansAttribute())
+			)
+		);
+		PropertyRegister::registerComponent(&rigid_actor);
+
+		static auto box_rigid_actor = component("box_rigid_actor",
+			property("Layer", &PhysicsScene::getRagdollLayer, &PhysicsScene::setRagdollLayer),
+			enum_property("Dynamic", &PhysicsScene::getDynamicType, &PhysicsScene::setDynamicType, 3, getDynamicTypeName),
+			property("Trigger", &PhysicsScene::getIsTrigger, &PhysicsScene::setIsTrigger),
+			property("Size", &PhysicsScene::getHalfExtents, &PhysicsScene::setHalfExtents)
+		);
+		PropertyRegister::registerComponent(&box_rigid_actor);
+
+		static auto mesh_rigid_actor = component("mesh_rigid_actor",
+			property("Layer", &PhysicsScene::getRagdollLayer, &PhysicsScene::setRagdollLayer),
+			enum_property("Dynamic", &PhysicsScene::getDynamicType, &PhysicsScene::setDynamicType, 3, getDynamicTypeName),
+			property("Source", &PhysicsScene::getShapeSource, &PhysicsScene::setShapeSource,
+				ResourceAttribute("Physics (*.phy)", PHYSICS_TYPE))
+		);
+		PropertyRegister::registerComponent(&mesh_rigid_actor);
+
+		static auto physical_heightfield = component("physical_heightfield",
+			property("Layer", &PhysicsScene::getRagdollLayer, &PhysicsScene::setRagdollLayer),
+			property("Heightmap", &PhysicsScene::getHeightmapSource, &PhysicsScene::setHeightmapSource,
+				ResourceAttribute("Image (*.raw)", TEXTURE_TYPE)),
+			property("Y scale", &PhysicsScene::getHeightmapYScale, &PhysicsScene::setHeightmapYScale,
+				MinAttribute(0)),
+			property("XZ scale", &PhysicsScene::getHeightmapXZScale, &PhysicsScene::setHeightmapXZScale,
+				MinAttribute(0))
+		);
+		PropertyRegister::registerComponent(&physical_heightfield);
 	}
 
 

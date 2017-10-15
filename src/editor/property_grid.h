@@ -43,20 +43,9 @@ private:
 		int index,
 		const Array<Entity>& entities,
 		ComponentType cmp_type);
-	void showArrayProperty(const Array<Entity>& entities,
-		ComponentType cmp_type,
-		ArrayDescriptorBase& desc);
 	void showSampledFunctionProperty(const Array<Entity>& entities,
 		ComponentType cmp_type,
 		ISampledFunctionDescriptor& desc);
-	void showEnumProperty(const Array<Entity>& entities,
-		ComponentType cmp_type,
-		int index,
-		IEnumPropertyDescriptor& desc);
-	void showEntityProperty(const Array<Entity>& entities,
-		ComponentType cmp_type,
-		int index,
-		PropertyDescriptorBase& desc);
 	void showComponentProperties(const Array<Entity>& entities, ComponentType cmp_type);
 	void showCoreProperties(const Array<Entity>& entities);
 

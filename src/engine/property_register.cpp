@@ -21,11 +21,166 @@ struct ComponentTypeData
 };
 
 
-typedef AssociativeArray<ComponentType, Array<PropertyDescriptorBase*>> PropertyMap;
-
-
-static PropertyMap* g_properties = nullptr;
 static IAllocator* g_allocator = nullptr;
+
+
+struct ComponentLink
+{
+	IComponentDescriptor* desc;
+	ComponentLink* next;
+};
+
+
+static ComponentLink* g_first_component = nullptr;
+
+
+const IAttribute* getAttribute(const IProperty& prop, IAttribute::Type type)
+{
+	struct AttrVisitor : IAttributeVisitor
+	{
+		void visit(const IAttribute& attr) override
+		{
+			if (attr.getType() == type) result = &attr;
+		}
+		const IAttribute* result = nullptr;
+		IAttribute::Type type;
+	} attr_visitor;
+	attr_visitor.type = type;
+	prop.visit(attr_visitor);
+	return attr_visitor.result;
+}
+
+
+IComponentDescriptor* getComponent(ComponentType cmp_type)
+{
+	ComponentLink* link = g_first_component;
+	while (link)
+	{
+		if (link->desc->getComponentType() == cmp_type) return link->desc;
+		link = link->next;
+	}
+
+	return nullptr;
+}
+
+
+const IProperty* getProperty(ComponentType cmp_type, u32 property_name_hash)
+{
+	auto* cmp = getComponent(cmp_type);
+	if (!cmp) return nullptr;
+	struct Visitor : IComponentVisitor
+	{
+		void visit(const Property<float>& prop) override {
+			if (crc32(prop.name) == property_name_hash) result = &prop;
+		}
+		void visit(const Property<int>& prop) override {
+			if (crc32(prop.name) == property_name_hash) result = &prop;
+		}
+		void visit(const Property<Entity>& prop) override {
+			if (crc32(prop.name) == property_name_hash) result = &prop;
+		}
+		void visit(const Property<Int2>& prop) override {
+			if (crc32(prop.name) == property_name_hash) result = &prop;
+		}
+		void visit(const Property<Vec2>& prop) override {
+			if (crc32(prop.name) == property_name_hash) result = &prop;
+		}
+		void visit(const Property<Vec3>& prop) override {
+			if (crc32(prop.name) == property_name_hash) result = &prop;
+		}
+		void visit(const Property<Vec4>& prop) override {
+			if (crc32(prop.name) == property_name_hash) result = &prop;
+		}
+		void visit(const Property<bool>& prop) override {
+			if (crc32(prop.name) == property_name_hash) result = &prop;
+		}
+		void visit(const Property<Path>& prop) override {
+			if (crc32(prop.name) == property_name_hash) result = &prop;
+		}
+		void visit(const Property<const char*>& prop) override {
+			if (crc32(prop.name) == property_name_hash) result = &prop;
+		}
+		void visit(const IArrayProperty& prop) override {
+			prop.visit(*this);
+		}
+		void visit(const IEnumProperty& prop) override {
+			if (crc32(prop.getName()) == property_name_hash) result = &prop;
+		}
+		void visit(const IBlobProperty& prop) override {
+			if (crc32(prop.getName()) == property_name_hash) result = &prop;
+		}
+
+		u32 property_name_hash;
+		const IProperty* result = nullptr;
+	} visitor;
+	visitor.property_name_hash = property_name_hash;
+	cmp->visit(visitor);
+	return visitor.result;
+}
+
+
+const IProperty* getProperty(ComponentType cmp_type, const char* property)
+{
+	auto* cmp = getComponent(cmp_type);
+	if (!cmp) return nullptr;
+	struct Visitor : IComponentVisitor
+	{
+		void visit(const Property<float>& prop) override {
+			if (equalStrings(prop.name, property)) result = &prop;
+		}
+		void visit(const Property<int>& prop) override {
+			if (equalStrings(prop.name, property)) result = &prop;
+		}
+		void visit(const Property<Entity>& prop) override {
+			if (equalStrings(prop.name, property)) result = &prop;
+		}
+		void visit(const Property<Int2>& prop) override {
+			if (equalStrings(prop.name, property)) result = &prop;
+		}
+		void visit(const Property<Vec2>& prop) override {
+			if (equalStrings(prop.name, property)) result = &prop;
+		}
+		void visit(const Property<Vec3>& prop) override {
+			if (equalStrings(prop.name, property)) result = &prop;
+		}
+		void visit(const Property<Vec4>& prop) override {
+			if (equalStrings(prop.name, property)) result = &prop;
+		}
+		void visit(const Property<bool>& prop) override {
+			if (equalStrings(prop.name, property)) result = &prop;
+		}
+		void visit(const Property<Path>& prop) override {
+			if (equalStrings(prop.name, property)) result = &prop;
+		}
+		void visit(const Property<const char*>& prop) override {
+			if (equalStrings(prop.name, property)) result = &prop;
+		}
+		void visit(const IArrayProperty& prop) override {
+			prop.visit(*this);
+		}
+		void visit(const IEnumProperty& prop) override {
+			if (equalStrings(prop.getName(), property)) result = &prop;
+		}
+		void visit(const IBlobProperty& prop) override {
+			if (equalStrings(prop.getName(), property)) result = &prop;
+		}
+
+		const char* property;
+		const IProperty* result = nullptr;
+	} visitor;
+	visitor.property = property;
+	cmp->visit(visitor);
+	return visitor.result;
+}
+
+
+void registerComponent(IComponentDescriptor* desc)
+{
+	ComponentLink* link = LUMIX_NEW(*g_allocator, ComponentLink);
+	link->next = g_first_component;
+	link->desc = desc;
+	g_first_component = link;
+}
 
 
 static Array<ComponentTypeData>& getComponentTypes()
@@ -38,75 +193,13 @@ static Array<ComponentTypeData>& getComponentTypes()
 
 void init(IAllocator& allocator)
 {
-	ASSERT(!g_properties);
-	g_properties = LUMIX_NEW(allocator, PropertyMap)(allocator);
 	g_allocator = &allocator;
 }
 
 
 void shutdown()
 {
-	for (int j = 0; j < g_properties->size(); ++j)
-	{
-		Array<PropertyDescriptorBase*>& props = g_properties->at(j);
-		for (auto* prop : props)
-		{
-			LUMIX_DELETE(*g_allocator, prop);
-		}
-	}
-
-	LUMIX_DELETE(*g_allocator, g_properties);
-	g_properties = nullptr;
 	g_allocator = nullptr;
-}
-
-
-void add(const char* component_type, PropertyDescriptorBase* descriptor)
-{
-	getDescriptors(getComponentType(component_type)).push(descriptor);
-}
-
-
-Array<PropertyDescriptorBase*>& getDescriptors(ComponentType type)
-{
-	int props_index = g_properties->find(type);
-	if (props_index < 0)
-	{
-		g_properties->emplace(type, *g_allocator);
-		props_index = g_properties->find(type);
-	}
-	return g_properties->at(props_index);
-}
-
-
-const PropertyDescriptorBase* getDescriptor(ComponentType type, u32 name_hash)
-{
-	Array<PropertyDescriptorBase*>& props = getDescriptors(type);
-	for (int i = 0; i < props.size(); ++i)
-	{
-		if (props[i]->getNameHash() == name_hash)
-		{
-			return props[i];
-		}
-		if (props[i]->getType() == PropertyDescriptorBase::ARRAY)
-		{
-			auto* array_desc = static_cast<ArrayDescriptorBase*>(props[i]);
-			for (auto* child : array_desc->getChildren())
-			{
-				if (child->getNameHash() == name_hash)
-				{
-					return child;
-				}
-			}
-		}
-	}
-	return nullptr;
-}
-
-
-const PropertyDescriptorBase* getDescriptor(const char* component_type, const char* property_name)
-{
-	return getDescriptor(getComponentType(component_type), crc32(property_name));
 }
 
 

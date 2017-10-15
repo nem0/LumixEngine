@@ -42,50 +42,38 @@ static const ResourceType ANIMATION_TYPE("animation");
 static const ResourceType CONTROLLER_RESOURCE_TYPE("anim_controller");
 
 
-struct AnimSetPropertyDescriptor : public IEnumPropertyDescriptor
+struct AnimSetProperty : public PropertyRegister::IEnumProperty
 {
-	AnimSetPropertyDescriptor(const char* name)
+	const char* getName() const override { return "Default set"; }
+
+	void getValue(ComponentUID cmp, int index, OutputBlob& stream) const override
 	{
-		setName(name);
-		m_type = ENUM;
+		AnimationScene* scene = static_cast<AnimationScene*>(cmp.scene);
+		int value = scene->getControllerDefaultSet(cmp.handle);
+		stream.write(value);
 	}
 
 
-	void set(ComponentUID cmp, int index, InputBlob& stream) const override
+	void setValue(ComponentUID cmp, int index, InputBlob& stream) const override
 	{
-		int value;
-		stream.read(&value, sizeof(value));
-		(static_cast<AnimationScene*>(cmp.scene)->setControllerDefaultSet)(cmp.handle, value);
-	};
-
-
-	void get(ComponentUID cmp, int index, OutputBlob& stream) const override
-	{
-		int value;
-		ASSERT(index == -1);
-		value = (static_cast<AnimationScene*>(cmp.scene)->getControllerDefaultSet)(cmp.handle);
-		stream.write(&value, sizeof(value));
+		AnimationScene* scene = static_cast<AnimationScene*>(cmp.scene);
+		int value = stream.read<int>();
+		scene->setControllerDefaultSet(cmp.handle, value);
 	}
 
 
-	int getEnumCount(IScene* scene, ComponentHandle cmp) override
+
+	int getEnumCount(ComponentUID cmp) const override
 	{
-		Anim::ControllerResource* res = static_cast<AnimationScene*>(scene)->getControllerResource(cmp);
+		Anim::ControllerResource* res = static_cast<AnimationScene*>(cmp.scene)->getControllerResource(cmp.handle);
 		return res->m_sets_names.size();
 	}
 
 
-	const char* getEnumItemName(IScene* scene, ComponentHandle cmp, int index) override
+	const char* getEnumName(ComponentUID cmp, int index) const override
 	{
-		Anim::ControllerResource* res = static_cast<AnimationScene*>(scene)->getControllerResource(cmp);
+		Anim::ControllerResource* res = static_cast<AnimationScene*>(cmp.scene)->getControllerResource(cmp.handle);
 		return res->m_sets_names[index];
-	}
-
-
-	void getEnumItemName(IScene* scene, ComponentHandle cmp, int index, char* buf, int max_size) override
-	{
-		Anim::ControllerResource* res = static_cast<AnimationScene*>(scene)->getControllerResource(cmp);
-		copyString(buf, max_size, res->m_sets_names[index]);
 	}
 };
 
@@ -133,31 +121,28 @@ AnimationSystemImpl::AnimationSystemImpl(Engine& engine)
 	m_animation_manager.create(ANIMATION_TYPE, m_engine.getResourceManager());
 	m_controller_manager.create(CONTROLLER_RESOURCE_TYPE, m_engine.getResourceManager());
 
-	PropertyRegister::add("anim_controller",
-		LUMIX_NEW(m_allocator, ResourcePropertyDescriptor<AnimationScene>)("Source",
-			&AnimationScene::getControllerSource,
-			&AnimationScene::setControllerSource,
-			"Animation controller (*.act)",
-			CONTROLLER_RESOURCE_TYPE));
-	PropertyRegister::add("anim_controller", LUMIX_NEW(m_allocator, AnimSetPropertyDescriptor)("Default set"));
+	using namespace PropertyRegister;
+	static auto anim_controller = component("anim_controller",
+		property("Source", &AnimationScene::getControllerSource, &AnimationScene::setControllerSource,
+			ResourceAttribute("Animation controller (*.act)", CONTROLLER_RESOURCE_TYPE)),
+		AnimSetProperty()
+	);
+	PropertyRegister::registerComponent(&anim_controller);
 
-	PropertyRegister::add("animable",
-		LUMIX_NEW(m_allocator, ResourcePropertyDescriptor<AnimationScene>)("Animation",
-			&AnimationScene::getAnimation,
-			&AnimationScene::setAnimation,
-			"Animation (*.ani)",
-			ANIMATION_TYPE));
-	PropertyRegister::add("animable",
-		LUMIX_NEW(m_allocator, DecimalPropertyDescriptor<AnimationScene>)(
-			"Start time", &AnimationScene::getAnimableStartTime, &AnimationScene::setAnimableStartTime, 0, FLT_MAX, 0.1f));
-	PropertyRegister::add("animable",
-		LUMIX_NEW(m_allocator, DecimalPropertyDescriptor<AnimationScene>)(
-			"Time scale", &AnimationScene::getAnimableTimeScale, &AnimationScene::setAnimableTimeScale, 0, FLT_MAX, 0.1f));
+	static auto animable = component("animable",
+		property("Animation", &AnimationScene::getAnimation, &AnimationScene::setAnimation,
+			ResourceAttribute("Animation (*.ani)", ANIMATION_TYPE)),
+		property("Start time", &AnimationScene::getAnimableStartTime, &AnimationScene::setAnimableStartTime,
+			MinAttribute(0)),
+		property("Time scale", &AnimationScene::getAnimableTimeScale, &AnimationScene::setAnimableTimeScale,
+			MinAttribute(0))
+	);
+	PropertyRegister::registerComponent(&animable);
 
-	PropertyRegister::add("shared_anim_controller",
-		LUMIX_NEW(m_allocator, EntityPropertyDescriptor<AnimationScene>)(
-			"Parent", &AnimationScene::getSharedControllerParent, &AnimationScene::setSharedControllerParent));
-
+	static auto shared_anim_controller = component("shared_anim_controller",
+		property("Parent", &AnimationScene::getSharedControllerParent, &AnimationScene::setSharedControllerParent)
+	);
+	PropertyRegister::registerComponent(&shared_anim_controller);
 
 	registerLuaAPI();
 }

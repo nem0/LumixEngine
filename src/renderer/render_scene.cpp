@@ -584,16 +584,6 @@ public:
 	}
 
 
-	void setBoneAttachmentRotation(ComponentHandle cmp, const Quat& rot) override
-	{
-		BoneAttachment& attachment = m_bone_attachments[{cmp.index}];
-		attachment.relative_transform.rot = rot;
-		m_is_updating_attachments = true;
-		updateBoneAttachment(attachment);
-		m_is_updating_attachments = false;
-	}
-
-
 	int getBoneAttachmentBone(ComponentHandle cmp) override
 	{
 		return m_bone_attachments[{cmp.index}].bone_index;

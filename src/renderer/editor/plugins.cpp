@@ -2904,8 +2904,7 @@ struct AddTerrainComponentPlugin LUMIX_FINAL : public StudioApp::IAddComponentPl
 
 			if (!create_empty)
 			{
-				auto* desc = PropertyRegister::getDescriptor(TERRAIN_TYPE, crc32("Material"));
-				editor.setProperty(TERRAIN_TYPE, -1, *desc, &entity, 1, buf, stringLength(buf));
+				editor.setProperty(TERRAIN_TYPE, -1, "Material", &entity, 1, buf, stringLength(buf));
 			}
 
 			ImGui::CloseCurrentPopup();

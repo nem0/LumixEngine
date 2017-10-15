@@ -776,7 +776,7 @@ namespace Lumix
 
 		void registerProperties()
 		{
-			int cmps_count = PropertyRegister::getComponentTypesCount();
+			/*int cmps_count = PropertyRegister::getComponentTypesCount();
 			lua_State* L = m_system.m_engine.getState();
 			for (int i = 0; i < cmps_count; ++i)
 			{
@@ -826,7 +826,8 @@ namespace Lumix
 					}
 				}
 				lua_pop(L, 1);
-			}
+			}*/
+			//TODO
 		}
 
 
@@ -1798,10 +1799,11 @@ namespace Lumix
 	{
 		m_script_manager.create(LUA_SCRIPT_RESOURCE_TYPE, engine.getResourceManager());
 
-		auto& allocator = engine.getAllocator();
-		PropertyRegister::add("lua_script",
-			LUMIX_NEW(allocator, BlobPropertyDescriptor<LuaScriptScene>)(
-				"data", &LuaScriptScene::getScriptData, &LuaScriptScene::setScriptData));
+		using namespace PropertyRegister;
+		static auto lua_script = component("lua_script",
+			blob_property("data", &LuaScriptScene::getScriptData, &LuaScriptScene::setScriptData)
+		);
+		PropertyRegister::registerComponent(&lua_script);
 	}
 
 

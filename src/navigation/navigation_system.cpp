@@ -139,20 +139,16 @@ NavigationSystem* NavigationSystem::s_instance = nullptr;
 
 void NavigationSystem::registerProperties()
 {
-	auto& allocator = m_engine.getAllocator();
-	PropertyRegister::add("navmesh_agent",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<NavigationScene>)(
-			"radius", &NavigationScene::getAgentRadius, &NavigationScene::setAgentRadius, 0, 999.0f, 0.1f));
-	PropertyRegister::add("navmesh_agent",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<NavigationScene>)(
-			"height", &NavigationScene::getAgentHeight, &NavigationScene::setAgentHeight, 0, 999.0f, 0.1f));
-	PropertyRegister::add("navmesh_agent",
-		LUMIX_NEW(allocator, BoolPropertyDescriptor<NavigationScene>)(
-			"use root motion", &NavigationScene::useAgentRootMotion, &NavigationScene::setUseAgentRootMotion));
-	PropertyRegister::add("navmesh_agent",
-		LUMIX_NEW(allocator, BoolPropertyDescriptor<NavigationScene>)("root motion from anim",
-			&NavigationScene::isGettingRootMotionFromAnim,
-			&NavigationScene::setIsGettingRootMotionFromAnim));
+	using namespace PropertyRegister;
+	static auto navmesh_agent = component("navmesh_agent",
+		property("Radius", &NavigationScene::getAgentRadius, &NavigationScene::setAgentRadius,
+			MinAttribute(0)),
+		property("Height", &NavigationScene::getAgentHeight, &NavigationScene::setAgentHeight,
+			MinAttribute(0)),
+		property("Use root motion", &NavigationScene::useAgentRootMotion, &NavigationScene::setUseAgentRootMotion),
+		property("Get root motion from animation", &NavigationScene::isGettingRootMotionFromAnim, &NavigationScene::setIsGettingRootMotionFromAnim)
+	);
+	PropertyRegister::registerComponent(&navmesh_agent);
 }
 
 

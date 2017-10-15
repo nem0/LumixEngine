@@ -16,6 +16,7 @@
 #include "engine/path_utils.h"
 #include "engine/plugin_manager.h"
 #include "engine/profiler.h"
+#include "engine/property_descriptor.h"
 #include "engine/property_register.h"
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
@@ -248,13 +249,11 @@ void SceneView::handleDrop(float x, float y)
 			m_editor.setEntitiesPositions(&entity, &pos, 1);
 			m_editor.selectEntities(&entity, 1);
 			m_editor.addComponent(MODEL_INSTANCE_TYPE);
-			const auto* desc = PropertyRegister::getDescriptor(MODEL_INSTANCE_TYPE, crc32("Source"));
-			m_editor.setProperty(MODEL_INSTANCE_TYPE, -1, *desc, &entity, 1, path, stringLength(path) + 1);
+			m_editor.setProperty(MODEL_INSTANCE_TYPE, -1, "Source", &entity, 1, path, stringLength(path) + 1);
 			m_editor.endCommandGroup();
 		}
 		else if (PathUtils::hasExtension(path, "mat") && hit.m_mesh)
 		{
-			auto* desc = PropertyRegister::getDescriptor(MODEL_INSTANCE_TYPE, crc32("Material"));
 			auto drag_data = m_app.getDragData();
 			m_editor.selectEntities(&hit.m_entity, 1);
 			auto* model = m_pipeline->getScene()->getModelInstanceModel(hit.m_component);
@@ -268,7 +267,7 @@ void SceneView::handleDrop(float x, float y)
 				}
 			}
 			
-			m_editor.setProperty(MODEL_INSTANCE_TYPE, mesh_index, *desc, &hit.m_entity, 1, drag_data.data, drag_data.size);
+			m_editor.setProperty(MODEL_INSTANCE_TYPE, mesh_index, "Material", &hit.m_entity, 1, drag_data.data, drag_data.size);
 		}
 	}
 }

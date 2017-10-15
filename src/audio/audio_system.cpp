@@ -27,31 +27,27 @@ static const ResourceType CLIP_TYPE("clip");
 
 static void registerProperties(IAllocator& allocator)
 {
-	PropertyRegister::add("ambient_sound",
-		LUMIX_NEW(allocator, DynamicEnumPropertyDescriptor<AudioScene>)("Sound",
-			&AudioScene::getAmbientSoundClipIndex,
-			&AudioScene::setAmbientSoundClipIndex,
-			&AudioScene::getClipCount,
-			&AudioScene::getClipName));
+	using namespace PropertyRegister;
+	static auto ambient_sound = component("ambient_sound",
+		property("Parent", &AnimationScene::getSharedControllerParent, &AnimationScene::setSharedControllerParent),
+		property("3D", &AudioScene::isAmbientSound3D, &AudioScene::setAmbientSound3D)
+	);
+	PropertyRegister::registerComponent(&ambient_sound);
+	// TODO
+	/*PropertyRegister::add("ambient_sound",
+	LUMIX_NEW(allocator, DynamicEnumPropertyDescriptor<AudioScene>)("Sound",
+	&AudioScene::getAmbientSoundClipIndex,
+	&AudioScene::setAmbientSoundClipIndex,
+	&AudioScene::getClipCount,
+	&AudioScene::getClipName));*/
 
-	PropertyRegister::add("ambient_sound",
-		LUMIX_NEW(allocator, BoolPropertyDescriptor<AudioScene>)(
-			"3D", &AudioScene::isAmbientSound3D, &AudioScene::setAmbientSound3D));
-
-	PropertyRegister::add("echo_zone",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<AudioScene>)("Radius",
-			&AudioScene::getEchoZoneRadius,
-			&AudioScene::setEchoZoneRadius,
-			0.01f,
-			FLT_MAX,
-			0.1f));
-	PropertyRegister::add("echo_zone",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<AudioScene>)("Delay (ms)",
-			&AudioScene::getEchoZoneDelay,
-			&AudioScene::setEchoZoneDelay,
-			0.01f,
-			FLT_MAX,
-			100.0f));
+	static auto echo_zone = component("echo_zone",
+		property("Radius", &AudioScene::getEchoZoneRadius, &AudioScene::setEchoZoneRadius,
+			MinAttribute(0)),
+		property("Delay (ms)", &AudioScene::getEchoZoneDelay, &AudioScene::setEchoZoneDelay,
+			MinAttribute(0))
+	);
+	PropertyRegister::registerComponent(&echo_zone);
 }
 
 

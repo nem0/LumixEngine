@@ -557,78 +557,151 @@ public:
 	}
 
 
-	static void setProperty(const ComponentUID& cmp,
-		const PropertyDescriptorBase& desc,
-		lua_State* L,
-		IAllocator& allocator)
+	struct SetPropertyVisitor : public PropertyRegister::IComponentVisitor
 	{
-		switch (desc.getType())
+		void visit(const PropertyRegister::Property<float>& prop) override
 		{
-		case PropertyDescriptorBase::STRING:
-		case PropertyDescriptorBase::FILE:
-		case PropertyDescriptorBase::RESOURCE:
-			if (lua_isstring(L, -1))
-			{
-				const char* str = lua_tostring(L, -1);
-				InputBlob input_blob(str, stringLength(str));
-				desc.set(cmp, -1, input_blob);
-			}
-			break;
-		case PropertyDescriptorBase::DECIMAL:
+			if (!equalStrings(property_name, prop.name)) return;
 			if (lua_isnumber(L, -1))
 			{
 				float f = (float)lua_tonumber(L, -1);
 				InputBlob input_blob(&f, sizeof(f));
-				desc.set(cmp, -1, input_blob);
+				prop.setValue(cmp, -1, input_blob);
 			}
-			break;
-		case PropertyDescriptorBase::ENTITY:
+		}
+
+
+		void visit(const PropertyRegister::Property<int>& prop) override
+		{
+			if (!equalStrings(property_name, prop.name)) return;
 			if (lua_isinteger(L, -1))
 			{
 				int i = (int)lua_tointeger(L, -1);
 				InputBlob input_blob(&i, sizeof(i));
-				desc.set(cmp, -1, input_blob);
+				prop.setValue(cmp, -1, input_blob);
 			}
-			break;
-		case PropertyDescriptorBase::BOOL:
-			if (lua_isboolean(L, -1))
+
+		}
+
+
+		void visit(const PropertyRegister::Property<Entity>& prop) override
+		{
+			if (!equalStrings(property_name, prop.name)) return;
+			if (lua_isinteger(L, -1))
 			{
-				bool b = lua_toboolean(L, -1) != 0;
-				InputBlob input_blob(&b, sizeof(b));
-				desc.set(cmp, -1, input_blob);
+				int i = (int)lua_tointeger(L, -1);
+				InputBlob input_blob(&i, sizeof(i));
+				prop.setValue(cmp, -1, input_blob);
 			}
-			break;
-		case PropertyDescriptorBase::VEC3:
-		case PropertyDescriptorBase::COLOR:
-			if (lua_istable(L, -1))
-			{
-				auto v = LuaWrapper::toType<Vec3>(L, -1);
-				InputBlob input_blob(&v, sizeof(v));
-				desc.set(cmp, -1, input_blob);
-			}
-			break;
-		case PropertyDescriptorBase::VEC2:
-			if (lua_istable(L, -1))
-			{
-				auto v = LuaWrapper::toType<Vec2>(L, -1);
-				InputBlob input_blob(&v, sizeof(v));
-				desc.set(cmp, -1, input_blob);
-			}
-			break;
-		case PropertyDescriptorBase::INT2:
+
+		}
+
+
+		void visit(const PropertyRegister::Property<Int2>& prop) override
+		{
+			if (!equalStrings(property_name, prop.name)) return;
 			if (lua_istable(L, -1))
 			{
 				auto v = LuaWrapper::toType<Int2>(L, -1);
 				InputBlob input_blob(&v, sizeof(v));
-				desc.set(cmp, -1, input_blob);
+				prop.setValue(cmp, -1, input_blob);
 			}
-			break;
-		default:
-			g_log_error.log("Lua Script") << "Property " << desc.getName() << " has unsupported type";
-			break;
 		}
-	}
 
+
+		void visit(const PropertyRegister::Property<Vec2>& prop) override
+		{
+			if (!equalStrings(property_name, prop.name)) return;
+			if (lua_istable(L, -1))
+			{
+				auto v = LuaWrapper::toType<Vec2>(L, -1);
+				InputBlob input_blob(&v, sizeof(v));
+				prop.setValue(cmp, -1, input_blob);
+			}
+		}
+
+
+		void visit(const PropertyRegister::Property<Vec3>& prop) override
+		{
+			if (!equalStrings(property_name, prop.name)) return;
+			if (lua_istable(L, -1))
+			{
+				auto v = LuaWrapper::toType<Vec3>(L, -1);
+				InputBlob input_blob(&v, sizeof(v));
+				prop.setValue(cmp, -1, input_blob);
+			}
+		}
+
+
+		void visit(const PropertyRegister::Property<Vec4>& prop) override
+		{
+			if (!equalStrings(property_name, prop.name)) return;
+			if (lua_istable(L, -1))
+			{
+				auto v = LuaWrapper::toType<Vec4>(L, -1);
+				InputBlob input_blob(&v, sizeof(v));
+				prop.setValue(cmp, -1, input_blob);
+			}
+		}
+
+
+		void visit(const PropertyRegister::Property<Path>& prop) override
+		{
+			if (!equalStrings(property_name, prop.name)) return;
+			if (lua_isstring(L, -1))
+			{
+				const char* str = lua_tostring(L, -1);
+				InputBlob input_blob(str, stringLength(str) + 1);
+				prop.setValue(cmp, -1, input_blob);
+			}
+		}
+
+
+		void visit(const PropertyRegister::Property<bool>& prop) override
+		{
+			if (!equalStrings(property_name, prop.name)) return;
+			if (lua_isboolean(L, -1))
+			{
+				bool b = lua_toboolean(L, -1) != 0;
+				InputBlob input_blob(&b, sizeof(b));
+				prop.setValue(cmp, -1, input_blob);
+			}
+		}
+
+
+		void visit(const PropertyRegister::Property<const char*>& prop) override
+		{
+			if (!equalStrings(property_name, prop.name)) return;
+			if (lua_isstring(L, -1))
+			{
+				const char* str = lua_tostring(L, -1);
+				InputBlob input_blob(str, stringLength(str) + 1);
+				prop.setValue(cmp, -1, input_blob);
+			}
+		}
+
+
+		void visit(const PropertyRegister::IArrayProperty& prop) override
+		{
+			if (!equalStrings(property_name, prop.name)) return;
+			g_log_error.log("Lua Script") << "Property " << prop.name << " has unsupported type";
+		}
+
+		void visit(const PropertyRegister::IEnumProperty& prop) override { notSupported(prop); }
+		void visit(const PropertyRegister::IBlobProperty& prop) override { notSupported(prop); }
+
+
+		void notSupported(const PropertyRegister::IProperty& prop)
+		{
+			if (!equalStrings(property_name, prop.getName())) return;
+			g_log_error.log("Lua Script") << "Property " << prop.getName() << " has unsupported type";
+		}
+
+
+		lua_State* L;
+		ComponentUID cmp;
+		const char* property_name;
+	};
 
 
 	static int LUA_getComponentType(const char* component_type)
@@ -679,6 +752,7 @@ public:
 				if (scene)
 				{
 					ComponentUID cmp(e, cmp_type, scene, scene->createComponent(cmp_type, e));
+					PropertyRegister::IComponentDescriptor* cmp_des = PropertyRegister::getComponent(cmp_type);
 					if (cmp.isValid())
 					{
 						lua_pushvalue(L, -1);
@@ -686,15 +760,11 @@ public:
 						while (lua_next(L, -2) != 0)
 						{
 							const char* property_name = luaL_checkstring(L, -2);
-							auto* desc = PropertyRegister::getDescriptor(cmp_type, crc32(property_name));
-							if (!desc)
-							{
-								g_log_error.log("Lua Script") << "Unknown property " << property_name;
-							}
-							else
-							{
-								setProperty(cmp, *desc, L, engine->getAllocator());
-							}
+							SetPropertyVisitor v;
+							v.property_name = property_name;
+							v.cmp = cmp;
+							v.L = L;
+							cmp_des->visit(v);
 
 							lua_pop(L, 1);
 						}

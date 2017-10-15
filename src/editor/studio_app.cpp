@@ -22,6 +22,7 @@
 #include "engine/path_utils.h"
 #include "engine/plugin_manager.h"
 #include "engine/profiler.h"
+#include "engine/property_descriptor.h"
 #include "engine/property_register.h"
 #include "engine/quat.h"
 #include "engine/resource_manager.h"
@@ -375,7 +376,6 @@ public:
 				ImGui::SetNextWindowSize(ImVec2(300, 300));
 				const char* last = reverseFind(label, nullptr, '/');
 				if (!ImGui::BeginMenu(last && !from_filter ? last + 1 : label)) return;
-				auto* desc = PropertyRegister::getDescriptor(type, property_id);
 				char buf[MAX_PATH_LENGTH];
 				bool create_empty = ImGui::Selectable("Empty", false);
 				if (asset_browser->resourceList(buf, lengthOf(buf), resource_type, 0) || create_empty)
@@ -391,7 +391,7 @@ public:
 					{
 						editor->setProperty(type,
 							-1,
-							*desc,
+							property_id,
 							&editor->getSelectedEntities()[0],
 							editor->getSelectedEntities().size(),
 							buf,
@@ -413,7 +413,7 @@ public:
 			WorldEditor* editor;
 			ComponentType type;
 			ResourceType resource_type;
-			u32 property_id;
+			StaticString<64> property_id;
 			char label[50];
 		};
 
@@ -423,7 +423,7 @@ public:
 		plugin->asset_browser = m_asset_browser;
 		plugin->type = PropertyRegister::getComponentType(type);
 		plugin->editor = m_editor;
-		plugin->property_id = crc32(property_name);
+		plugin->property_id = property_name;
 		plugin->resource_type = resource_type;
 		copyString(plugin->label, label);
 		addPlugin(*plugin);

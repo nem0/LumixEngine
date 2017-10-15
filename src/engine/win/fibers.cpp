@@ -35,12 +35,6 @@ void switchTo(Handle* from, Handle fiber)
 }
 
 
-void* getParameter()
-{
-	return GetFiberData();
-}
-
-
 } // namespace Fibers
 
 
