@@ -2,7 +2,7 @@
 #include "engine/math_utils.h"
 #include "engine/path.h"
 #include "engine/path_utils.h"
-#include "engine/property_register.h"
+#include "engine/properties.h"
 #include "editor/render_interface.h"
 #include "editor/world_editor.h"
 #include "imgui/imgui.h"

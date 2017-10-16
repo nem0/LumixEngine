@@ -9,7 +9,7 @@
 #include "engine/iallocator.h"
 #include "engine/lua_wrapper.h"
 #include "engine/matrix.h"
-#include "engine/property_register.h"
+#include "engine/properties.h"
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
 #include "engine/serializer.h"

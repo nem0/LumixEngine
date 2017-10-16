@@ -15,7 +15,7 @@
 #include "engine/math_utils.h"
 #include "engine/matrix.h"
 #include "engine/prefab.h"
-#include "engine/property_register.h"
+#include "engine/properties.h"
 #include "engine/resource.h"
 #include "engine/serializer.h"
 #include "engine/string.h"

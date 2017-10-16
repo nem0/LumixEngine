@@ -15,7 +15,7 @@
 #include "engine/fs/os_file.h"
 #include "engine/hash_map.h"
 #include "engine/path.h"
-#include "engine/property_register.h"
+#include "engine/properties.h"
 #include "engine/resource_manager.h"
 #include "engine/system.h"
 #include "engine/universe/universe.h"

@@ -18,7 +18,7 @@
 #include "engine/mt/thread.h"
 #include "engine/path_utils.h"
 #include "engine/plugin_manager.h"
-#include "engine/property_register.h"
+#include "engine/properties.h"
 #include "engine/system.h"
 #include "engine/universe/universe.h"
 #include "imgui/imgui.h"

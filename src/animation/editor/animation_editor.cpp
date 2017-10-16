@@ -20,7 +20,7 @@
 #include "engine/path.h"
 #include "engine/path_utils.h"
 #include "engine/plugin_manager.h"
-#include "engine/property_register.h"
+#include "engine/properties.h"
 #include "engine/resource_manager.h"
 #include "engine/universe/universe.h"
 #include <SDL.h>

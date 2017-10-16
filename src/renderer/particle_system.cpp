@@ -3,7 +3,7 @@
 #include "engine/crc32.h"
 #include "engine/math_utils.h"
 #include "engine/profiler.h"
-#include "engine/property_register.h"
+#include "engine/properties.h"
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
 #include "editor/gizmo.h"
