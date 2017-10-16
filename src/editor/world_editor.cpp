@@ -46,8 +46,8 @@ namespace Lumix
 {
 
 
-static const ComponentType MODEL_INSTANCE_TYPE = PropertyRegister::getComponentType("renderable");
-static const ComponentType CAMERA_TYPE = PropertyRegister::getComponentType("camera");
+static const ComponentType MODEL_INSTANCE_TYPE = Properties::getComponentType("renderable");
+static const ComponentType CAMERA_TYPE = Properties::getComponentType("camera");
 
 
 struct BeginGroupCommand LUMIX_FINAL : public IEditorCommand
@@ -689,11 +689,11 @@ private:
 };
 
 
-struct GatherResourcesVisitor : PropertyRegister::ISimpleComponentVisitor
+struct GatherResourcesVisitor : Properties::ISimpleComponentVisitor
 {
-	void visitProperty(const PropertyRegister::IProperty& prop) override {}
+	void visitProperty(const Properties::PropertyBase& prop) override {}
 
-	void visit(const PropertyRegister::IArrayProperty& prop) override
+	void visit(const Properties::IArrayProperty& prop) override
 	{
 		int count = prop.getCount(cmp);
 		for (int i = 0; i < count; ++i)
@@ -704,12 +704,12 @@ struct GatherResourcesVisitor : PropertyRegister::ISimpleComponentVisitor
 		index = -1;
 	}
 
-	void visit(const PropertyRegister::Property<Path>& prop) override
+	void visit(const Properties::Property<Path>& prop) override
 	{
 		visitProperty(prop);
-		auto* attr = PropertyRegister::getAttribute(prop, PropertyRegister::IAttribute::RESOURCE);
+		auto* attr = Properties::getAttribute(prop, Properties::IAttribute::RESOURCE);
 		if (!attr) return;
-		auto* resource_attr = (PropertyRegister::ResourceAttribute*)attr;
+		auto* resource_attr = (Properties::ResourceAttribute*)attr;
 
 		OutputBlob tmp(editor->getAllocator());
 		prop.getValue(cmp, index, tmp);
@@ -726,9 +726,9 @@ struct GatherResourcesVisitor : PropertyRegister::ISimpleComponentVisitor
 };
 
 
-struct SaveVisitor : PropertyRegister::ISimpleComponentVisitor
+struct SaveVisitor : Properties::ISimpleComponentVisitor
 {
-	void visitProperty(const PropertyRegister::IProperty& prop) override
+	void visitProperty(const Properties::PropertyBase& prop) override
 	{
 		prop.getValue(cmp, index, *stream);
 	}
@@ -739,9 +739,9 @@ struct SaveVisitor : PropertyRegister::ISimpleComponentVisitor
 };
 
 
-struct LoadVisitor : PropertyRegister::ISimpleComponentVisitor
+struct LoadVisitor : Properties::ISimpleComponentVisitor
 {
-	void visitProperty(const PropertyRegister::IProperty& prop) override
+	void visitProperty(const Properties::PropertyBase& prop) override
 	{
 		prop.setValue(cmp, index, *stream);
 	}
@@ -765,7 +765,7 @@ public:
 	RemoveArrayPropertyItemCommand(WorldEditor& editor,
 		const ComponentUID& component,
 		int index,
-		const PropertyRegister::IArrayProperty& property)
+		const Properties::IArrayProperty& property)
 		: m_component(component)
 		, m_index(index)
 		, m_property(&property)
@@ -785,7 +785,7 @@ public:
 		serializer.serialize("inedx", m_index);
 		serializer.serialize("entity_index", m_component.entity);
 		serializer.serialize("component_index", m_component.handle);
-		serializer.serialize("component_type", PropertyRegister::getComponentTypeHash(m_component.type));
+		serializer.serialize("component_type", Properties::getComponentTypeHash(m_component.type));
 		serializer.serialize("property_name_hash", crc32(m_property->name));
 	}
 
@@ -797,12 +797,12 @@ public:
 		serializer.deserialize("component_index", m_component.handle, INVALID_COMPONENT);
 		u32 hash;
 		serializer.deserialize("component_type", hash, 0);
-		m_component.type = PropertyRegister::getComponentTypeFromHash(hash);
+		m_component.type = Properties::getComponentTypeFromHash(hash);
 		m_component.scene = m_editor.getUniverse()->getScene(m_component.type);
 		u32 property_name_hash;
 		serializer.deserialize("property_name_hash", property_name_hash, 0);
 		m_property =
-			static_cast<const PropertyRegister::IArrayProperty*>(PropertyRegister::getProperty(m_component.type, property_name_hash));
+			static_cast<const Properties::IArrayProperty*>(Properties::getProperty(m_component.type, property_name_hash));
 	}
 
 
@@ -834,7 +834,7 @@ private:
 	WorldEditor& m_editor;
 	ComponentUID m_component;
 	int m_index;
-	const PropertyRegister::IArrayProperty *m_property;
+	const Properties::IArrayProperty *m_property;
 	OutputBlob m_old_values;
 };
 
@@ -850,7 +850,7 @@ public:
 
 	AddArrayPropertyItemCommand(WorldEditor& editor,
 		const ComponentUID& component,
-		const PropertyRegister::IArrayProperty& property)
+		const Properties::IArrayProperty& property)
 		: m_component(component)
 		, m_index(-1)
 		, m_property(&property)
@@ -864,7 +864,7 @@ public:
 		serializer.serialize("inedx", m_index);
 		serializer.serialize("entity_index", m_component.entity);
 		serializer.serialize("component_index", m_component.handle);
-		serializer.serialize("component_type", PropertyRegister::getComponentTypeHash(m_component.type));
+		serializer.serialize("component_type", Properties::getComponentTypeHash(m_component.type));
 		serializer.serialize("property_name_hash", crc32(m_property->name));
 	}
 
@@ -876,11 +876,11 @@ public:
 		serializer.deserialize("component_index", m_component.handle, INVALID_COMPONENT);
 		u32 hash;
 		serializer.deserialize("component_type", hash, 0);
-		m_component.type = PropertyRegister::getComponentTypeFromHash(hash);
+		m_component.type = Properties::getComponentTypeFromHash(hash);
 		m_component.scene = m_editor.getUniverse()->getScene(m_component.type);
 		u32 property_name_hash;
 		serializer.deserialize("property_name_hash", property_name_hash, 0);
-		m_property = (const PropertyRegister::IArrayProperty*)PropertyRegister::getProperty(m_component.type, property_name_hash);
+		m_property = (const Properties::IArrayProperty*)Properties::getProperty(m_component.type, property_name_hash);
 	}
 
 
@@ -906,7 +906,7 @@ public:
 private:
 	ComponentUID m_component;
 	int m_index;
-	const PropertyRegister::IArrayProperty *m_property;
+	const Properties::IArrayProperty *m_property;
 	WorldEditor& m_editor;
 };
 
@@ -928,7 +928,7 @@ public:
 		int count,
 		ComponentType component_type,
 		int index,
-		const PropertyRegister::IProperty& property,
+		const Properties::PropertyBase& property,
 		const void* data,
 		int size)
 		: m_component_type(component_type)
@@ -978,14 +978,14 @@ public:
 			serializer.serializeArrayItem(entity);
 		}
 		serializer.endArray();
-		serializer.serialize("component_type", PropertyRegister::getComponentTypeHash(m_component_type));
+		serializer.serialize("component_type", Properties::getComponentTypeHash(m_component_type));
 		serializer.beginArray("data");
 		for (int i = 0; i < m_new_value.getPos(); ++i)
 		{
 			serializer.serializeArrayItem((int)((const u8*)m_new_value.getData())[i]);
 		}
 		serializer.endArray();
-		serializer.serialize("property_name_hash", crc32(m_property->getName()));
+		serializer.serialize("property_name_hash", crc32(m_property->name));
 	}
 
 
@@ -1002,7 +1002,7 @@ public:
 		serializer.deserializeArrayEnd();
 		u32 hash;
 		serializer.deserialize("component_type", hash, 0);
-		m_component_type = PropertyRegister::getComponentTypeFromHash(hash);
+		m_component_type = Properties::getComponentTypeFromHash(hash);
 		serializer.deserializeArrayBegin("data");
 		m_new_value.clear();
 		while (!serializer.isArrayEnd())
@@ -1014,7 +1014,7 @@ public:
 		serializer.deserializeArrayEnd();
 		u32 property_name_hash;
 		serializer.deserialize("property_name_hash", property_name_hash, 0);
-		m_property = PropertyRegister::getProperty(m_component_type, property_name_hash);
+		m_property = Properties::getProperty(m_component_type, property_name_hash);
 	}
 
 
@@ -1024,7 +1024,7 @@ public:
 		for (Entity entity : m_entities)
 		{
 			if (m_editor.getEditCamera().entity == entity && m_component_type == CAMERA_TYPE &&
-				equalStrings(m_property->getName(), "Slot"))
+				equalStrings(m_property->name, "Slot"))
 			{
 				continue;
 			}
@@ -1079,7 +1079,7 @@ private:
 	OutputBlob m_new_value;
 	OutputBlob m_old_value;
 	int m_index;
-	const PropertyRegister::IProperty* m_property;
+	const Properties::PropertyBase* m_property;
 };
 
 
@@ -1129,7 +1129,7 @@ private:
 
 		void serialize(JsonSerializer& serializer) override
 		{
-			serializer.serialize("component_type", PropertyRegister::getComponentTypeHash(m_type));
+			serializer.serialize("component_type", Properties::getComponentTypeHash(m_type));
 			serializer.beginArray("entities");
 			for (int i = 0; i < m_entities.size(); ++i)
 			{
@@ -1143,7 +1143,7 @@ private:
 		{
 			u32 hash;
 			serializer.deserialize("component_type", hash, 0);
-			m_type = PropertyRegister::getComponentTypeFromHash(hash);
+			m_type = Properties::getComponentTypeFromHash(hash);
 			m_entities.clear();
 			serializer.deserializeArrayBegin("entities");
 			while (!serializer.isArrayEnd())
@@ -1406,7 +1406,7 @@ private:
 					cmp = universe->getNextComponent(cmp))
 				{
 					m_old_values.write(cmp.type);
-					const PropertyRegister::IComponentDescriptor* cmp_desc = PropertyRegister::getComponent(cmp.type);
+					const Properties::IComponentDescriptor* cmp_desc = Properties::getComponent(cmp.type);
 
 					GatherResourcesVisitor gather;
 					gather.cmp = cmp;
@@ -1483,7 +1483,7 @@ private:
 					new_component.scene = scene;
 					new_component.type = cmp_type;
 					
-					const PropertyRegister::IComponentDescriptor* cmp_desc = PropertyRegister::getComponent(cmp_type);
+					const Properties::IComponentDescriptor* cmp_desc = Properties::getComponent(cmp_type);
 
 					LoadVisitor v;
 					v.cmp = new_component;
@@ -1568,7 +1568,7 @@ private:
 				serializer.serializeArrayItem(entity);
 			}
 			serializer.endArray();
-			serializer.serialize("component_type", PropertyRegister::getComponentTypeHash(m_cmp_type));
+			serializer.serialize("component_type", Properties::getComponentTypeHash(m_cmp_type));
 		}
 
 
@@ -1585,7 +1585,7 @@ private:
 
 			u32 hash;
 			serializer.deserialize("component_type", hash, 0);
-			m_cmp_type = PropertyRegister::getComponentTypeFromHash(hash);
+			m_cmp_type = Properties::getComponentTypeFromHash(hash);
 		}
 
 
@@ -1596,7 +1596,7 @@ private:
 			cmp.type = m_cmp_type;
 			ASSERT(cmp.scene);
 			InputBlob blob(m_old_values);
-			const PropertyRegister::IComponentDescriptor* cmp_desc = PropertyRegister::getComponent(cmp.type);
+			const Properties::IComponentDescriptor* cmp_desc = Properties::getComponent(cmp.type);
 			for (Entity entity : m_entities)
 			{
 				cmp.entity = entity;
@@ -1617,7 +1617,7 @@ private:
 
 		bool execute() override
 		{
-			const PropertyRegister::IComponentDescriptor* cmp_desc = PropertyRegister::getComponent(m_cmp_type);
+			const Properties::IComponentDescriptor* cmp_desc = Properties::getComponent(m_cmp_type);
 			ComponentUID cmp;
 			cmp.type = m_cmp_type;
 			cmp.scene = m_editor.getUniverse()->getScene(m_cmp_type);
@@ -2310,7 +2310,7 @@ public:
 				deserializer.read(&cmp_type_hash);
 				while (cmp_type_hash != 0)
 				{
-					ComponentType cmp_type = PropertyRegister::getComponentTypeFromHash(cmp_type_hash);
+					ComponentType cmp_type = Properties::getComponentTypeFromHash(cmp_type_hash);
 					m_universe->deserializeComponent(deserializer, entity, cmp_type, versions[cmp_type.index]);
 					deserializer.read(&cmp_type_hash);
 				}
@@ -2377,8 +2377,8 @@ public:
 			for (ComponentUID cmp = m_universe->getFirstComponent(entity); cmp.handle.isValid();
 				 cmp = m_universe->getNextComponent(cmp))
 			{
-				const char* cmp_name = PropertyRegister::getComponentTypeID(cmp.type.index);
-				u32 type_hash = PropertyRegister::getComponentTypeHash(cmp.type);
+				const char* cmp_name = Properties::getComponentTypeID(cmp.type.index);
+				u32 type_hash = Properties::getComponentTypeHash(cmp.type);
 				serializer.write(cmp_name, type_hash);
 				m_universe->serializeComponent(serializer, cmp.type, cmp.handle);
 			}
@@ -2939,9 +2939,9 @@ public:
 				cmp.isValid();
 				cmp = m_universe->getNextComponent(cmp))
 			{
-				u32 cmp_type = PropertyRegister::getComponentTypeHash(cmp.type);
+				u32 cmp_type = Properties::getComponentTypeHash(cmp.type);
 				blob.write(cmp_type);
-				const PropertyRegister::IComponentDescriptor* cmp_desc = PropertyRegister::getComponent(cmp.type);
+				const Properties::IComponentDescriptor* cmp_desc = Properties::getComponent(cmp.type);
 				
 				SaveVisitor v;
 				v.stream = &blob;
@@ -2979,7 +2979,7 @@ public:
 		IScene* scene = m_universe->getScene(src.type);
 		ComponentUID clone(entity, src.type, scene, scene->createComponent(src.type, entity));
 
-		const PropertyRegister::IComponentDescriptor* cmp_desc = PropertyRegister::getComponent(src.type);
+		const Properties::IComponentDescriptor* cmp_desc = Properties::getComponent(src.type);
 		OutputBlob stream(m_allocator);
 		
 		SaveVisitor save;
@@ -3288,7 +3288,7 @@ public:
 	void setAdditiveSelection(bool additive) override { m_is_additive_selection = additive; }
 
 
-	void addArrayPropertyItem(const ComponentUID& cmp, const PropertyRegister::IArrayProperty& property) override
+	void addArrayPropertyItem(const ComponentUID& cmp, const Properties::IArrayProperty& property) override
 	{
 		if (cmp.isValid())
 		{
@@ -3299,7 +3299,7 @@ public:
 	}
 
 
-	void removeArrayPropertyItem(const ComponentUID& cmp, int index, const PropertyRegister::IArrayProperty& property) override
+	void removeArrayPropertyItem(const ComponentUID& cmp, int index, const Properties::IArrayProperty& property) override
 	{
 		if (cmp.isValid())
 		{
@@ -3312,7 +3312,7 @@ public:
 
 	void setProperty(ComponentType component_type,
 		int index,
-		const PropertyRegister::IProperty& property,
+		const Properties::PropertyBase& property,
 		const Entity* entities,
 		int count,
 		const void* data,
@@ -3936,9 +3936,9 @@ bool PasteEntityCommand::execute()
 		{
 			u32 hash;
 			blob.read(hash);
-			ComponentType type = PropertyRegister::getComponentTypeFromHash(hash);
+			ComponentType type = Properties::getComponentTypeFromHash(hash);
 			ComponentUID cmp = m_editor.getEngine().createComponent(universe, new_entity, type);
-			const PropertyRegister::IComponentDescriptor* cmp_desc = PropertyRegister::getComponent(cmp.type);
+			const Properties::IComponentDescriptor* cmp_desc = Properties::getComponent(cmp.type);
 			
 			LoadVisitor load;
 			load.cmp = cmp;

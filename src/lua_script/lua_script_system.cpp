@@ -29,7 +29,7 @@ namespace Lumix
 {
 
 
-	static const ComponentType LUA_SCRIPT_TYPE = PropertyRegister::getComponentType("lua_script");
+	static const ComponentType LUA_SCRIPT_TYPE = Properties::getComponentType("lua_script");
 	static const ResourceType LUA_SCRIPT_RESOURCE_TYPE("lua_script");
 
 
@@ -776,19 +776,19 @@ namespace Lumix
 
 		void registerProperties()
 		{
-			/*int cmps_count = PropertyRegister::getComponentTypesCount();
+			/*int cmps_count = Properties::getComponentTypesCount();
 			lua_State* L = m_system.m_engine.getState();
 			for (int i = 0; i < cmps_count; ++i)
 			{
-				const char* cmp_name = PropertyRegister::getComponentTypeID(i);
+				const char* cmp_name = Properties::getComponentTypeID(i);
 				lua_newtable(L);
 				lua_pushvalue(L, -1);
 				char tmp[50];
 				convertPropertyToLuaName(cmp_name, tmp, lengthOf(tmp));
 				lua_setglobal(L, tmp);
 
-				ComponentType cmp_type = PropertyRegister::getComponentType(cmp_name);
-				auto& descs = PropertyRegister::getDescriptors(cmp_type);
+				ComponentType cmp_type = Properties::getComponentType(cmp_name);
+				auto& descs = Properties::getDescriptors(cmp_type);
 				char setter[50];
 				char getter[50];
 				for (auto* desc : descs)
@@ -1799,11 +1799,11 @@ namespace Lumix
 	{
 		m_script_manager.create(LUA_SCRIPT_RESOURCE_TYPE, engine.getResourceManager());
 
-		using namespace PropertyRegister;
+		using namespace Properties;
 		static auto lua_script = component("lua_script",
 			blob_property("data", &LuaScriptScene::getScriptData, &LuaScriptScene::setScriptData)
 		);
-		PropertyRegister::registerComponent(&lua_script);
+		Properties::registerComponent(&lua_script);
 	}
 
 

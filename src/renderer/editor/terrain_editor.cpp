@@ -34,9 +34,9 @@ namespace Lumix
 {
 
 
-static const ComponentType MODEL_INSTANCE_TYPE = PropertyRegister::getComponentType("renderable");
-static const ComponentType TERRAIN_TYPE = PropertyRegister::getComponentType("terrain");
-static const ComponentType HEIGHTFIELD_TYPE = PropertyRegister::getComponentType("physical_heightfield");
+static const ComponentType MODEL_INSTANCE_TYPE = Properties::getComponentType("renderable");
+static const ComponentType TERRAIN_TYPE = Properties::getComponentType("terrain");
+static const ComponentType HEIGHTFIELD_TYPE = Properties::getComponentType("physical_heightfield");
 static const ResourceType MATERIAL_TYPE("material");
 static const ResourceType TEXTURE_TYPE("texture");
 static const ResourceType PREFAB_TYPE("prefab");

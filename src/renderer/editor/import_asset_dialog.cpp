@@ -3016,7 +3016,7 @@ static bool createBillboard(ImportAssetDialog& dialog,
 	pipeline->load();
 
 	auto mesh_entity = universe.createEntity({0, 0, 0}, {0, 0, 0, 0});
-	static const auto MODEL_INSTANCE_TYPE = PropertyRegister::getComponentType("renderable");
+	static const auto MODEL_INSTANCE_TYPE = Properties::getComponentType("renderable");
 	auto mesh_cmp = render_scene->createComponent(MODEL_INSTANCE_TYPE, mesh_entity);
 	render_scene->setModelInstancePath(mesh_cmp, mesh_path);
 
@@ -3033,7 +3033,7 @@ static bool createBillboard(ImportAssetDialog& dialog,
 	render_scene->setModelInstancePath(mesh_right_cmp, mesh_path);
 
 	auto light_entity = universe.createEntity({0, 0, 0}, {0, 0, 0, 0});
-	static const auto GLOBAL_LIGHT_TYPE = PropertyRegister::getComponentType("global_light");
+	static const auto GLOBAL_LIGHT_TYPE = Properties::getComponentType("global_light");
 	auto light_cmp = render_scene->createComponent(GLOBAL_LIGHT_TYPE, light_entity);
 	render_scene->setGlobalLightIntensity(light_cmp, 0);
 
@@ -3055,7 +3055,7 @@ static bool createBillboard(ImportAssetDialog& dialog,
 		
 		BillboardSceneData data(aabb, texture_size);
 		auto camera_entity = universe.createEntity(data.position, { 0, 0, 0, 1 });
-		static const auto CAMERA_TYPE = PropertyRegister::getComponentType("camera");
+		static const auto CAMERA_TYPE = Properties::getComponentType("camera");
 		auto camera_cmp = render_scene->createComponent(CAMERA_TYPE, camera_entity);
 		render_scene->setCameraOrtho(camera_cmp, true);
 		render_scene->setCameraSlot(camera_cmp, "main");

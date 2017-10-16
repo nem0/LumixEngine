@@ -17,7 +17,7 @@ namespace Lumix
 {
 
 
-static const ComponentType MODEL_INSTANCE_TYPE = PropertyRegister::getComponentType("renderable");
+static const ComponentType MODEL_INSTANCE_TYPE = Properties::getComponentType("renderable");
 static const float INFLUENCE_DISTANCE = 0.3f;
 static const u32 X_COLOR = 0xff6363cf;
 static const u32 Y_COLOR = 0xff63cf63;

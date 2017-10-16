@@ -76,10 +76,10 @@ namespace Lumix
 {
 
 
-static const ComponentType GLOBAL_LIGHT_TYPE = PropertyRegister::getComponentType("global_light");
-static const ComponentType POINT_LIGHT_TYPE = PropertyRegister::getComponentType("point_light");
-static const ComponentType MODEL_INSTANCE_TYPE = PropertyRegister::getComponentType("renderable");
-static const ComponentType CAMERA_TYPE = PropertyRegister::getComponentType("camera");
+static const ComponentType GLOBAL_LIGHT_TYPE = Properties::getComponentType("global_light");
+static const ComponentType POINT_LIGHT_TYPE = Properties::getComponentType("point_light");
+static const ComponentType MODEL_INSTANCE_TYPE = Properties::getComponentType("renderable");
+static const ComponentType CAMERA_TYPE = Properties::getComponentType("camera");
 static const ResourceType MATERIAL_TYPE("material");
 static const ResourceType MODEL_TYPE("model");
 static const ResourceType SHADER_TYPE("shader");
@@ -87,9 +87,9 @@ static const ResourceType TEXTURE_TYPE("texture");
 static const ResourceType SHADER_BINARY_TYPE("shader_binary");
 
 
-struct GrassRotationModeProperty : public PropertyRegister::IEnumProperty
+struct GrassRotationModeProperty : public Properties::IEnumProperty
 {
-	const char* getName() const override { return "Mode"; }
+	GrassRotationModeProperty() { name = "Mode"; }
 
 
 	void getValue(ComponentUID cmp, int index, OutputBlob& stream) const override
@@ -128,9 +128,10 @@ struct GrassRotationModeProperty : public PropertyRegister::IEnumProperty
 };
 
 
-struct BoneProperty : PropertyRegister::IEnumProperty
+struct BoneProperty : Properties::IEnumProperty
 {
-	const char* getName() const override { return "Bone"; }
+	BoneProperty() { name = "Bone"; }
+
 
 	void getValue(ComponentUID cmp, int index, OutputBlob& stream) const override
 	{
@@ -182,7 +183,7 @@ struct BoneProperty : PropertyRegister::IEnumProperty
 
 static void registerProperties(IAllocator& allocator)
 {
-	using namespace PropertyRegister;
+	using namespace Properties;
 
 	static auto bone_attachment = component("bone_attachment",
 		property("Parent", &RenderScene::getBoneAttachmentParent, &RenderScene::setBoneAttachmentParent),
@@ -191,12 +192,12 @@ static void registerProperties(IAllocator& allocator)
 			RadiansAttribute()),
 		BoneProperty()
 	);
-	PropertyRegister::registerComponent(&bone_attachment);
+	Properties::registerComponent(&bone_attachment);
 
 	static auto particle_emitter_spawn_shape = component("particle_emitter_spawn_shape",
 		property("Radius", &RenderScene::getParticleEmitterShapeRadius, &RenderScene::setParticleEmitterShapeRadius)
 	);
-	PropertyRegister::registerComponent(&particle_emitter_spawn_shape);
+	Properties::registerComponent(&particle_emitter_spawn_shape);
 
 	static auto particle_emitter_plane = component("particle_emitter_plane",
 		property("Bounce", &RenderScene::getParticleEmitterPlaneBounce, &RenderScene::setParticleEmitterPlaneBounce,
@@ -205,7 +206,7 @@ static void registerProperties(IAllocator& allocator)
 			property("Entity", &RenderScene::getParticleEmitterPlaneEntity, &RenderScene::setParticleEmitterPlaneEntity)
 		)
 	);
-	PropertyRegister::registerComponent(&particle_emitter_plane);
+	Properties::registerComponent(&particle_emitter_plane);
 
 	static auto particle_emitter_attractor = component("particle_emitter_attractor",
 		property("Force", &RenderScene::getParticleEmitterAttractorForce, &RenderScene::setParticleEmitterAttractorForce),
@@ -213,10 +214,10 @@ static void registerProperties(IAllocator& allocator)
 			property("Entity", &RenderScene::getParticleEmitterAttractorEntity, &RenderScene::setParticleEmitterAttractorEntity)
 		)
 	);
-	PropertyRegister::registerComponent(&particle_emitter_attractor);
+	Properties::registerComponent(&particle_emitter_attractor);
 
 	// TODO
-	/*	PropertyRegister::add("particle_emitter_alpha",
+	/*	Properties::add("particle_emitter_alpha",
 		LUMIX_NEW(allocator, SampledFunctionDescriptor<RenderScene>)("Alpha",
 			&RenderScene::getParticleEmitterAlpha,
 			&RenderScene::setParticleEmitterAlpha,
@@ -228,16 +229,16 @@ static void registerProperties(IAllocator& allocator)
 	static auto particle_emitter_force = component("particle_emitter_force",
 		property("Acceleration", &RenderScene::getParticleEmitterAcceleration, &RenderScene::setParticleEmitterAcceleration)
 	);
-	PropertyRegister::registerComponent(&particle_emitter_force);
+	Properties::registerComponent(&particle_emitter_force);
 
 	static auto particle_emitter_subimage = component("particle_emitter_subimage",
 		property("Rows", &RenderScene::getParticleEmitterSubimageRows, &RenderScene::setParticleEmitterSubimageRows),
 		property("Columns", &RenderScene::getParticleEmitterSubimageCols, &RenderScene::setParticleEmitterSubimageCols)
 	);
-	PropertyRegister::registerComponent(&particle_emitter_subimage);
+	Properties::registerComponent(&particle_emitter_subimage);
 
 	// TODO
-/*	PropertyRegister::add("particle_emitter_size",
+/*	Properties::add("particle_emitter_size",
 		LUMIX_NEW(allocator, SampledFunctionDescriptor<RenderScene>)("Size",
 			&RenderScene::getParticleEmitterSize,
 			&RenderScene::setParticleEmitterSize,
@@ -256,14 +257,14 @@ static void registerProperties(IAllocator& allocator)
 			ResourceAttribute("Material (*.mat)", MATERIAL_TYPE)),
 		property("Spawn count", &RenderScene::getParticleEmitterSpawnCount, &RenderScene::setParticleEmitterSpawnCount)
 	);
-	PropertyRegister::registerComponent(&particle_emitter);
+	Properties::registerComponent(&particle_emitter);
 
 	static auto particle_emitter_linear_movement = component("particle_emitter_linear_movement",
 		property("x", &RenderScene::getParticleEmitterLinearMovementX, &RenderScene::setParticleEmitterLinearMovementX),
 		property("y", &RenderScene::getParticleEmitterLinearMovementY, &RenderScene::setParticleEmitterLinearMovementY),
 		property("z", &RenderScene::getParticleEmitterLinearMovementZ, &RenderScene::setParticleEmitterLinearMovementZ)
 	);
-	PropertyRegister::registerComponent(&particle_emitter_linear_movement);
+	Properties::registerComponent(&particle_emitter_linear_movement);
 
 	static auto camera = component("camera",
 		property("Slot", &RenderScene::getCameraSlot, &RenderScene::setCameraSlot),
@@ -277,7 +278,7 @@ static void registerProperties(IAllocator& allocator)
 		property("Far", &RenderScene::getCameraFarPlane, &RenderScene::setCameraFarPlane, 
 			MinAttribute(0))
 	);
-	PropertyRegister::registerComponent(&camera);
+	Properties::registerComponent(&camera);
 
 	static auto renderable = component("renderable",
 		property("Source", &RenderScene::getModelInstancePath, &RenderScene::setModelInstancePath,
@@ -288,7 +289,7 @@ static void registerProperties(IAllocator& allocator)
 				ResourceAttribute("Material (*.mat)", MATERIAL_TYPE))
 		)
 	);
-	PropertyRegister::registerComponent(&renderable);
+	Properties::registerComponent(&renderable);
 
 	static auto global_light = component("global_light",
 		property("Color", &RenderScene::getGlobalLightColor, &RenderScene::setGlobalLightColor,
@@ -305,7 +306,7 @@ static void registerProperties(IAllocator& allocator)
 			ColorAttribute()),
 		property("Shadow cascades", &RenderScene::getShadowmapCascades, &RenderScene::setShadowmapCascades)
 	);
-	PropertyRegister::registerComponent(&global_light);
+	Properties::registerComponent(&global_light);
 
 	static auto point_light = component("point_light",
 		property("Diffuse color", &RenderScene::getPointLightColor, &RenderScene::setPointLightColor,
@@ -325,7 +326,7 @@ static void registerProperties(IAllocator& allocator)
 		property("Cast shadows", &RenderScene::getLightCastShadows, &RenderScene::setLightCastShadows, 
 			MinAttribute(0))
 	);
-	PropertyRegister::registerComponent(&point_light);
+	Properties::registerComponent(&point_light);
 
 	static auto decal = component("decal",
 		property("Material", &RenderScene::getDecalMaterialPath, &RenderScene::setDecalMaterialPath,
@@ -333,7 +334,7 @@ static void registerProperties(IAllocator& allocator)
 		property("Scale", &RenderScene::getDecalScale, &RenderScene::setDecalScale, 
 			MinAttribute(0))
 	);
-	PropertyRegister::registerComponent(&decal);
+	Properties::registerComponent(&decal);
 
 	static auto terrain = component("terrain",
 		property("Material", &RenderScene::getTerrainMaterialPath, &RenderScene::setTerrainMaterialPath,
@@ -351,7 +352,7 @@ static void registerProperties(IAllocator& allocator)
 			GrassRotationModeProperty()
 		)
 	);
-	PropertyRegister::registerComponent(&terrain);
+	Properties::registerComponent(&terrain);
 }
 
 

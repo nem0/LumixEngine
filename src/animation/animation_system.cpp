@@ -35,16 +35,17 @@ enum class AnimationSceneVersion
 };
 
 
-static const ComponentType ANIMABLE_TYPE = PropertyRegister::getComponentType("animable");
-static const ComponentType CONTROLLER_TYPE = PropertyRegister::getComponentType("anim_controller");
-static const ComponentType SHARED_CONTROLLER_TYPE = PropertyRegister::getComponentType("shared_anim_controller");
+static const ComponentType ANIMABLE_TYPE = Properties::getComponentType("animable");
+static const ComponentType CONTROLLER_TYPE = Properties::getComponentType("anim_controller");
+static const ComponentType SHARED_CONTROLLER_TYPE = Properties::getComponentType("shared_anim_controller");
 static const ResourceType ANIMATION_TYPE("animation");
 static const ResourceType CONTROLLER_RESOURCE_TYPE("anim_controller");
 
 
-struct AnimSetProperty : public PropertyRegister::IEnumProperty
+struct AnimSetProperty : public Properties::IEnumProperty
 {
-	const char* getName() const override { return "Default set"; }
+	AnimSetProperty() { name = "Default set"; }
+
 
 	void getValue(ComponentUID cmp, int index, OutputBlob& stream) const override
 	{
@@ -121,13 +122,13 @@ AnimationSystemImpl::AnimationSystemImpl(Engine& engine)
 	m_animation_manager.create(ANIMATION_TYPE, m_engine.getResourceManager());
 	m_controller_manager.create(CONTROLLER_RESOURCE_TYPE, m_engine.getResourceManager());
 
-	using namespace PropertyRegister;
+	using namespace Properties;
 	static auto anim_controller = component("anim_controller",
 		property("Source", &AnimationScene::getControllerSource, &AnimationScene::setControllerSource,
 			ResourceAttribute("Animation controller (*.act)", CONTROLLER_RESOURCE_TYPE)),
 		AnimSetProperty()
 	);
-	PropertyRegister::registerComponent(&anim_controller);
+	Properties::registerComponent(&anim_controller);
 
 	static auto animable = component("animable",
 		property("Animation", &AnimationScene::getAnimation, &AnimationScene::setAnimation,
@@ -137,12 +138,12 @@ AnimationSystemImpl::AnimationSystemImpl(Engine& engine)
 		property("Time scale", &AnimationScene::getAnimableTimeScale, &AnimationScene::setAnimableTimeScale,
 			MinAttribute(0))
 	);
-	PropertyRegister::registerComponent(&animable);
+	Properties::registerComponent(&animable);
 
 	static auto shared_anim_controller = component("shared_anim_controller",
 		property("Parent", &AnimationScene::getSharedControllerParent, &AnimationScene::setSharedControllerParent)
 	);
-	PropertyRegister::registerComponent(&shared_anim_controller);
+	Properties::registerComponent(&shared_anim_controller);
 
 	registerLuaAPI();
 }

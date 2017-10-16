@@ -2,7 +2,7 @@
 #include "engine/associative_array.h"
 #include "engine/crc32.h"
 #include "engine/default_allocator.h"
-#include "engine/iproperty_descriptor.h"
+#include "engine/property_register.h"
 #include "engine/log.h"
 
 
@@ -10,9 +10,52 @@ namespace Lumix
 {
 
 
-namespace PropertyRegister
+namespace Properties
 {
 
+
+namespace detail
+{
+
+
+template <> Path readFromStream<Path>(InputBlob& stream)
+{
+	const char* c_str = (const char*)stream.getData() + stream.getPosition();
+	Path path(c_str);
+	stream.skip(stringLength(c_str) + 1);
+	return path;
+};
+
+
+template <> void writeToStream<const Path&>(OutputBlob& stream, const Path& path)
+{
+	const char* str = path.c_str();
+	stream.write(str, stringLength(str) + 1);
+};
+
+
+template <> void writeToStream<Path>(OutputBlob& stream, Path path)
+{
+	const char* str = path.c_str();
+	stream.write(str, stringLength(str) + 1);
+};
+
+
+template <> const char* readFromStream<const char*>(InputBlob& stream)
+{
+	const char* c_str = (const char*)stream.getData() + stream.getPosition();
+	stream.skip(stringLength(c_str) + 1);
+	return c_str;
+};
+
+
+template <> void writeToStream<const char*>(OutputBlob& stream, const char* value)
+{
+	stream.write(value, stringLength(value) + 1);
+};
+
+
+}
 
 struct ComponentTypeData
 {
@@ -34,7 +77,7 @@ struct ComponentLink
 static ComponentLink* g_first_component = nullptr;
 
 
-const IAttribute* getAttribute(const IProperty& prop, IAttribute::Type type)
+const IAttribute* getAttribute(const PropertyBase& prop, IAttribute::Type type)
 {
 	struct AttrVisitor : IAttributeVisitor
 	{
@@ -64,7 +107,7 @@ IComponentDescriptor* getComponent(ComponentType cmp_type)
 }
 
 
-const IProperty* getProperty(ComponentType cmp_type, u32 property_name_hash)
+const PropertyBase* getProperty(ComponentType cmp_type, u32 property_name_hash)
 {
 	auto* cmp = getComponent(cmp_type);
 	if (!cmp) return nullptr;
@@ -104,14 +147,14 @@ const IProperty* getProperty(ComponentType cmp_type, u32 property_name_hash)
 			prop.visit(*this);
 		}
 		void visit(const IEnumProperty& prop) override {
-			if (crc32(prop.getName()) == property_name_hash) result = &prop;
+			if (crc32(prop.name) == property_name_hash) result = &prop;
 		}
 		void visit(const IBlobProperty& prop) override {
-			if (crc32(prop.getName()) == property_name_hash) result = &prop;
+			if (crc32(prop.name) == property_name_hash) result = &prop;
 		}
 
 		u32 property_name_hash;
-		const IProperty* result = nullptr;
+		const PropertyBase* result = nullptr;
 	} visitor;
 	visitor.property_name_hash = property_name_hash;
 	cmp->visit(visitor);
@@ -120,24 +163,24 @@ const IProperty* getProperty(ComponentType cmp_type, u32 property_name_hash)
 
 
 
-const IProperty* getProperty(ComponentType cmp_type, const char* property, const char* subproperty)
+const PropertyBase* getProperty(ComponentType cmp_type, const char* property, const char* subproperty)
 {
 	auto* cmp = getComponent(cmp_type);
 	if (!cmp) return nullptr;
 	struct Visitor : ISimpleComponentVisitor
 	{
-		void visitProperty(const IProperty& prop) override {}
+		void visitProperty(const PropertyBase& prop) override {}
 
 		void visit(const IArrayProperty& prop) override {
-			if (equalStrings(prop.getName(), property))
+			if (equalStrings(prop.name, property))
 			{
 				struct Subvisitor : ISimpleComponentVisitor
 				{
-					void visitProperty(const IProperty& prop) override {
-						if (equalStrings(prop.getName(), property)) result = &prop;
+					void visitProperty(const PropertyBase& prop) override {
+						if (equalStrings(prop.name, property)) result = &prop;
 					}
 					const char* property;
-					const IProperty* result = nullptr;
+					const PropertyBase* result = nullptr;
 				} subvisitor;
 				subvisitor.property = subproperty;
 				prop.visit(subvisitor);
@@ -147,7 +190,7 @@ const IProperty* getProperty(ComponentType cmp_type, const char* property, const
 
 		const char* subproperty;
 		const char* property;
-		const IProperty* result = nullptr;
+		const PropertyBase* result = nullptr;
 	} visitor;
 	visitor.subproperty = subproperty;
 	visitor.property = property;
@@ -157,18 +200,18 @@ const IProperty* getProperty(ComponentType cmp_type, const char* property, const
 
 
 
-const IProperty* getProperty(ComponentType cmp_type, const char* property)
+const PropertyBase* getProperty(ComponentType cmp_type, const char* property)
 {
 	auto* cmp = getComponent(cmp_type);
 	if (!cmp) return nullptr;
 	struct Visitor : ISimpleComponentVisitor
 	{
-		void visitProperty(const IProperty& prop) override {
-			if (equalStrings(prop.getName(), property)) result = &prop;
+		void visitProperty(const PropertyBase& prop) override {
+			if (equalStrings(prop.name, property)) result = &prop;
 		}
 
 		const char* property;
-		const IProperty* result = nullptr;
+		const PropertyBase* result = nullptr;
 	} visitor;
 	visitor.property = property;
 	cmp->visit(visitor);
@@ -264,7 +307,7 @@ const char* getComponentTypeID(int index)
 }
 
 
-} // namespace PropertyRegister
+} // namespace Properties
 
 
 } // namespace Lumix

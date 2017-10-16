@@ -27,14 +27,14 @@ static const ResourceType CLIP_TYPE("clip");
 
 static void registerProperties(IAllocator& allocator)
 {
-	using namespace PropertyRegister;
+	using namespace Properties;
 	static auto ambient_sound = component("ambient_sound",
 		property("Parent", &AnimationScene::getSharedControllerParent, &AnimationScene::setSharedControllerParent),
 		property("3D", &AudioScene::isAmbientSound3D, &AudioScene::setAmbientSound3D)
 	);
-	PropertyRegister::registerComponent(&ambient_sound);
+	Properties::registerComponent(&ambient_sound);
 	// TODO
-	/*PropertyRegister::add("ambient_sound",
+	/*Properties::add("ambient_sound",
 	LUMIX_NEW(allocator, DynamicEnumPropertyDescriptor<AudioScene>)("Sound",
 	&AudioScene::getAmbientSoundClipIndex,
 	&AudioScene::setAmbientSoundClipIndex,
@@ -47,7 +47,7 @@ static void registerProperties(IAllocator& allocator)
 		property("Delay (ms)", &AudioScene::getEchoZoneDelay, &AudioScene::setEchoZoneDelay,
 			MinAttribute(0))
 	);
-	PropertyRegister::registerComponent(&echo_zone);
+	Properties::registerComponent(&echo_zone);
 }
 
 

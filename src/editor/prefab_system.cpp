@@ -463,7 +463,7 @@ public:
 			deserializer.read(&cmp_type_hash);
 			while (cmp_type_hash != 0)
 			{
-				ComponentType cmp_type = PropertyRegister::getComponentTypeFromHash(cmp_type_hash);
+				ComponentType cmp_type = Properties::getComponentTypeFromHash(cmp_type_hash);
 				int scene_version;
 				deserializer.read(&scene_version);
 				m_universe->deserializeComponent(deserializer, entity, cmp_type, scene_version);
@@ -519,8 +519,8 @@ public:
 		for (ComponentUID cmp = universe->getFirstComponent(entity); cmp.isValid();
 			cmp = universe->getNextComponent(cmp))
 		{
-			const char* cmp_name = PropertyRegister::getComponentTypeID(cmp.type.index);
-			u32 type_hash = PropertyRegister::getComponentTypeHash(cmp.type);
+			const char* cmp_name = Properties::getComponentTypeID(cmp.type.index);
+			u32 type_hash = Properties::getComponentTypeHash(cmp.type);
 			serializer.write(cmp_name, type_hash);
 			int scene_version = universe->getScene(cmp.type)->getVersion();
 			serializer.write("scene_version", scene_version);

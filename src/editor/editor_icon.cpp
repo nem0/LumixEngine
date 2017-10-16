@@ -16,13 +16,13 @@ namespace Lumix
 {
 
 
-static const ComponentType MODEL_INSTANCE_TYPE = PropertyRegister::getComponentType("renderable");
-static const ComponentType PHYSICAL_CONTROLLER_TYPE = PropertyRegister::getComponentType("physical_controller");
-static const ComponentType BOX_RIGID_ACTOR_TYPE = PropertyRegister::getComponentType("box_rigid_actor");
-static const ComponentType CAMERA_TYPE = PropertyRegister::getComponentType("camera");
-static const ComponentType GLOBAL_LIGHT_TYPE = PropertyRegister::getComponentType("global_light");
-static const ComponentType POINT_LIGHT_TYPE = PropertyRegister::getComponentType("point_light");
-static const ComponentType TERRAIN_TYPE = PropertyRegister::getComponentType("terrain");
+static const ComponentType MODEL_INSTANCE_TYPE = Properties::getComponentType("renderable");
+static const ComponentType PHYSICAL_CONTROLLER_TYPE = Properties::getComponentType("physical_controller");
+static const ComponentType BOX_RIGID_ACTOR_TYPE = Properties::getComponentType("box_rigid_actor");
+static const ComponentType CAMERA_TYPE = Properties::getComponentType("camera");
+static const ComponentType GLOBAL_LIGHT_TYPE = Properties::getComponentType("global_light");
+static const ComponentType POINT_LIGHT_TYPE = Properties::getComponentType("point_light");
+static const ComponentType TERRAIN_TYPE = Properties::getComponentType("terrain");
 
 
 enum class IconType

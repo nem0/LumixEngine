@@ -28,9 +28,9 @@
 using namespace Lumix;
 
 
-static const ComponentType ANIMABLE_TYPE = PropertyRegister::getComponentType("animable");
-static const ComponentType CONTROLLER_TYPE = PropertyRegister::getComponentType("anim_controller");
-static const ComponentType RENDERABLE_TYPE = PropertyRegister::getComponentType("renderable");
+static const ComponentType ANIMABLE_TYPE = Properties::getComponentType("animable");
+static const ComponentType CONTROLLER_TYPE = Properties::getComponentType("anim_controller");
+static const ComponentType RENDERABLE_TYPE = Properties::getComponentType("renderable");
 static const ResourceType ANIMATION_TYPE("animation");
 static const ResourceType CONTROLLER_RESOURCE_TYPE("anim_controller");
 
@@ -219,8 +219,8 @@ struct PropertyGridPlugin : PropertyGrid::IPlugin
 
 LUMIX_STUDIO_ENTRY(animation)
 {
-	app.registerComponentWithResource("animable", "Animation/Animable", ANIMATION_TYPE, *PropertyRegister::getProperty(ANIMABLE_TYPE, "Animation"));
-	app.registerComponentWithResource("anim_controller", "Animation/Controller", CONTROLLER_RESOURCE_TYPE, *PropertyRegister::getProperty(CONTROLLER_TYPE, "Source"));
+	app.registerComponentWithResource("animable", "Animation/Animable", ANIMATION_TYPE, *Properties::getProperty(ANIMABLE_TYPE, "Animation"));
+	app.registerComponentWithResource("anim_controller", "Animation/Controller", CONTROLLER_RESOURCE_TYPE, *Properties::getProperty(CONTROLLER_TYPE, "Source"));
 	app.registerComponent("shared_anim_controller", "Animation/Shared controller");
 
 	auto& allocator = app.getWorldEditor().getAllocator();

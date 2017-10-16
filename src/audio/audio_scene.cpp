@@ -21,9 +21,9 @@ namespace Lumix
 {
 
 
-static const ComponentType LISTENER_TYPE = PropertyRegister::getComponentType("audio_listener");
-static const ComponentType AMBIENT_SOUND_TYPE = PropertyRegister::getComponentType("ambient_sound");
-static const ComponentType ECHO_ZONE_TYPE = PropertyRegister::getComponentType("echo_zone");
+static const ComponentType LISTENER_TYPE = Properties::getComponentType("audio_listener");
+static const ComponentType AMBIENT_SOUND_TYPE = Properties::getComponentType("ambient_sound");
+static const ComponentType ECHO_ZONE_TYPE = Properties::getComponentType("echo_zone");
 static const ResourceType CLIP_RESOURCE_TYPE("clip");
 
 

@@ -44,8 +44,8 @@ enum class NavigationSceneVersion : int
 };
 
 
-static const ComponentType NAVMESH_AGENT_TYPE = PropertyRegister::getComponentType("navmesh_agent");
-static const ComponentType ANIM_CONTROLLER_TYPE = PropertyRegister::getComponentType("anim_controller");
+static const ComponentType NAVMESH_AGENT_TYPE = Properties::getComponentType("navmesh_agent");
+static const ComponentType ANIM_CONTROLLER_TYPE = Properties::getComponentType("anim_controller");
 static const int CELLS_PER_TILE_SIDE = 256;
 static const float CELL_SIZE = 0.3f;
 static void registerLuaAPI(lua_State* L);

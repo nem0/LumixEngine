@@ -55,14 +55,14 @@
 using namespace Lumix;
 
 
-static const ComponentType PARTICLE_EMITTER_TYPE = PropertyRegister::getComponentType("particle_emitter");
-static const ComponentType TERRAIN_TYPE = PropertyRegister::getComponentType("terrain");
-static const ComponentType CAMERA_TYPE = PropertyRegister::getComponentType("camera");
-static const ComponentType DECAL_TYPE = PropertyRegister::getComponentType("decal");
-static const ComponentType POINT_LIGHT_TYPE = PropertyRegister::getComponentType("point_light");
-static const ComponentType GLOBAL_LIGHT_TYPE = PropertyRegister::getComponentType("global_light");
-static const ComponentType MODEL_INSTANCE_TYPE = PropertyRegister::getComponentType("renderable");
-static const ComponentType ENVIRONMENT_PROBE_TYPE = PropertyRegister::getComponentType("environment_probe");
+static const ComponentType PARTICLE_EMITTER_TYPE = Properties::getComponentType("particle_emitter");
+static const ComponentType TERRAIN_TYPE = Properties::getComponentType("terrain");
+static const ComponentType CAMERA_TYPE = Properties::getComponentType("camera");
+static const ComponentType DECAL_TYPE = Properties::getComponentType("decal");
+static const ComponentType POINT_LIGHT_TYPE = Properties::getComponentType("point_light");
+static const ComponentType GLOBAL_LIGHT_TYPE = Properties::getComponentType("global_light");
+static const ComponentType MODEL_INSTANCE_TYPE = Properties::getComponentType("renderable");
+static const ComponentType ENVIRONMENT_PROBE_TYPE = Properties::getComponentType("environment_probe");
 static const ResourceType MATERIAL_TYPE("material");
 static const ResourceType MODEL_TYPE("model");
 static const ResourceType SHADER_BINARY_TYPE("shader_binary");
@@ -2904,7 +2904,7 @@ struct AddTerrainComponentPlugin LUMIX_FINAL : public StudioApp::IAddComponentPl
 
 			if (!create_empty)
 			{
-				auto* prop = PropertyRegister::getProperty(TERRAIN_TYPE, "Material");
+				auto* prop = Properties::getProperty(TERRAIN_TYPE, "Material");
 				editor.setProperty(TERRAIN_TYPE, -1, *prop, &entity, 1, buf, stringLength(buf));
 			}
 
@@ -2934,8 +2934,8 @@ LUMIX_STUDIO_ENTRY(renderer)
 	app.registerComponent("camera", "Render/Camera");
 	app.registerComponent("global_light", "Render/Global light");
 
-	app.registerComponentWithResource("renderable", "Render/Mesh", MODEL_TYPE, *PropertyRegister::getProperty(MODEL_INSTANCE_TYPE, "Source"));
-	app.registerComponentWithResource("particle_emitter", "Render/Particle emitter/Emitter", MATERIAL_TYPE, *PropertyRegister::getProperty(PARTICLE_EMITTER_TYPE, "Material"));
+	app.registerComponentWithResource("renderable", "Render/Mesh", MODEL_TYPE, *Properties::getProperty(MODEL_INSTANCE_TYPE, "Source"));
+	app.registerComponentWithResource("particle_emitter", "Render/Particle emitter/Emitter", MATERIAL_TYPE, *Properties::getProperty(PARTICLE_EMITTER_TYPE, "Material"));
 	app.registerComponent("particle_emitter_spawn_shape", "Render/Particle emitter/Spawn shape");
 	app.registerComponent("particle_emitter_alpha", "Render/Particle emitter/Alpha");
 	app.registerComponent("particle_emitter_plane", "Render/Particle emitter/Plane");

@@ -143,13 +143,13 @@ namespace Lumix
 
 	static void registerProperties(IAllocator& allocator)
 	{
-		using namespace PropertyRegister;
+		using namespace Properties;
 
 		static auto ragdoll = component("ragdoll",
 			blob_property("data", &PhysicsScene::getRagdollData, &PhysicsScene::setRagdollData),
 			property("Layer", &PhysicsScene::getRagdollLayer, &PhysicsScene::setRagdollLayer)
 		);
-		PropertyRegister::registerComponent(&ragdoll);
+		Properties::registerComponent(&ragdoll);
 
 		static auto sphere_rigid_actor = component("sphere_rigid_actor",
 			property("Radius", &PhysicsScene::getSphereRadius, &PhysicsScene::setSphereRadius,
@@ -158,7 +158,7 @@ namespace Lumix
 			enum_property("Dynamic", &PhysicsScene::getDynamicType, &PhysicsScene::setDynamicType, 3, getDynamicTypeName),
 			property("Trigger", &PhysicsScene::getIsTrigger, &PhysicsScene::setIsTrigger) 
 		);
-		PropertyRegister::registerComponent(&sphere_rigid_actor);
+		Properties::registerComponent(&sphere_rigid_actor);
 
 		static auto capsule_rigid_actor = component("capsule_rigid_actor",
 			property("Radius", &PhysicsScene::getCapsuleRadius, &PhysicsScene::setCapsuleRadius,
@@ -167,7 +167,7 @@ namespace Lumix
 			enum_property("Dynamic", &PhysicsScene::getDynamicType, &PhysicsScene::setDynamicType, 3, getDynamicTypeName),
 			property("Trigger", &PhysicsScene::getIsTrigger, &PhysicsScene::setIsTrigger)
 		);
-		PropertyRegister::registerComponent(&capsule_rigid_actor);
+		Properties::registerComponent(&capsule_rigid_actor);
 
 		static auto d6_joint = component("d6_joint",
 			property("Connected body", &PhysicsScene::getJointConnectedBody, &PhysicsScene::setJointConnectedBody),
@@ -186,7 +186,7 @@ namespace Lumix
 			property("Twist limit", &PhysicsScene::getD6JointTwistLimit, &PhysicsScene::setD6JointTwistLimit,
 				RadiansAttribute())
 		);
-		PropertyRegister::registerComponent(&d6_joint);
+		Properties::registerComponent(&d6_joint);
 
 		static auto spherical_joint = component("spherical_joint",
 			property("Connected body", &PhysicsScene::getJointConnectedBody, &PhysicsScene::setJointConnectedBody),
@@ -196,7 +196,7 @@ namespace Lumix
 			property("Limit", &PhysicsScene::getSphericalJointLimit, &PhysicsScene::setSphericalJointLimit,
 				RadiansAttribute())
 		);
-		PropertyRegister::registerComponent(&spherical_joint);
+		Properties::registerComponent(&spherical_joint);
 
 		static auto distance_joint = component("distance_joint",
 			property("Connected body", &PhysicsScene::getJointConnectedBody, &PhysicsScene::setJointConnectedBody),
@@ -208,7 +208,7 @@ namespace Lumix
 				MinAttribute(0)),
 			property("Limits", &PhysicsScene::getDistanceJointLimits, &PhysicsScene::setDistanceJointLimits)
 		);
-		PropertyRegister::registerComponent(&distance_joint);
+		Properties::registerComponent(&distance_joint);
 
 		static auto hinge_joint = component("hinge_joint",
 			property("Connected body", &PhysicsScene::getJointConnectedBody, &PhysicsScene::setJointConnectedBody),
@@ -222,12 +222,12 @@ namespace Lumix
 			property("Limit", &PhysicsScene::getHingeJointLimit, &PhysicsScene::setHingeJointLimit,
 				RadiansAttribute())
 		);
-		PropertyRegister::registerComponent(&hinge_joint);
+		Properties::registerComponent(&hinge_joint);
 
 		static auto physical_controller = component("physical_controller",
 			property("Layer", &PhysicsScene::getControllerLayer, &PhysicsScene::setControllerLayer)
 		);
-		PropertyRegister::registerComponent(&physical_controller);
+		Properties::registerComponent(&physical_controller);
 
 		static auto rigid_actor = component("rigid_actor",
 			property("Layer", &PhysicsScene::getActorLayer, &PhysicsScene::setActorLayer),
@@ -247,7 +247,7 @@ namespace Lumix
 					RadiansAttribute())
 			)
 		);
-		PropertyRegister::registerComponent(&rigid_actor);
+		Properties::registerComponent(&rigid_actor);
 
 		static auto box_rigid_actor = component("box_rigid_actor",
 			property("Layer", &PhysicsScene::getRagdollLayer, &PhysicsScene::setRagdollLayer),
@@ -255,7 +255,7 @@ namespace Lumix
 			property("Trigger", &PhysicsScene::getIsTrigger, &PhysicsScene::setIsTrigger),
 			property("Size", &PhysicsScene::getHalfExtents, &PhysicsScene::setHalfExtents)
 		);
-		PropertyRegister::registerComponent(&box_rigid_actor);
+		Properties::registerComponent(&box_rigid_actor);
 
 		static auto mesh_rigid_actor = component("mesh_rigid_actor",
 			property("Layer", &PhysicsScene::getRagdollLayer, &PhysicsScene::setRagdollLayer),
@@ -263,7 +263,7 @@ namespace Lumix
 			property("Source", &PhysicsScene::getShapeSource, &PhysicsScene::setShapeSource,
 				ResourceAttribute("Physics (*.phy)", PHYSICS_TYPE))
 		);
-		PropertyRegister::registerComponent(&mesh_rigid_actor);
+		Properties::registerComponent(&mesh_rigid_actor);
 
 		static auto physical_heightfield = component("physical_heightfield",
 			property("Layer", &PhysicsScene::getRagdollLayer, &PhysicsScene::setRagdollLayer),
@@ -274,7 +274,7 @@ namespace Lumix
 			property("XZ scale", &PhysicsScene::getHeightmapXZScale, &PhysicsScene::setHeightmapXZScale,
 				MinAttribute(0))
 		);
-		PropertyRegister::registerComponent(&physical_heightfield);
+		Properties::registerComponent(&physical_heightfield);
 	}
 
 

@@ -34,18 +34,18 @@ namespace Lumix
 
 
 
-static const ComponentType RIGID_ACTOR_TYPE = PropertyRegister::getComponentType("rigid_actor");
-static const ComponentType BOX_ACTOR_TYPE = PropertyRegister::getComponentType("box_rigid_actor");
-static const ComponentType RAGDOLL_TYPE = PropertyRegister::getComponentType("ragdoll");
-static const ComponentType SPHERE_ACTOR_TYPE = PropertyRegister::getComponentType("sphere_rigid_actor");
-static const ComponentType CAPSULE_ACTOR_TYPE = PropertyRegister::getComponentType("capsule_rigid_actor");
-static const ComponentType MESH_ACTOR_TYPE = PropertyRegister::getComponentType("mesh_rigid_actor");
-static const ComponentType CONTROLLER_TYPE = PropertyRegister::getComponentType("physical_controller");
-static const ComponentType HEIGHTFIELD_TYPE = PropertyRegister::getComponentType("physical_heightfield");
-static const ComponentType DISTANCE_JOINT_TYPE = PropertyRegister::getComponentType("distance_joint");
-static const ComponentType HINGE_JOINT_TYPE = PropertyRegister::getComponentType("hinge_joint");
-static const ComponentType SPHERICAL_JOINT_TYPE = PropertyRegister::getComponentType("spherical_joint");
-static const ComponentType D6_JOINT_TYPE = PropertyRegister::getComponentType("d6_joint");
+static const ComponentType RIGID_ACTOR_TYPE = Properties::getComponentType("rigid_actor");
+static const ComponentType BOX_ACTOR_TYPE = Properties::getComponentType("box_rigid_actor");
+static const ComponentType RAGDOLL_TYPE = Properties::getComponentType("ragdoll");
+static const ComponentType SPHERE_ACTOR_TYPE = Properties::getComponentType("sphere_rigid_actor");
+static const ComponentType CAPSULE_ACTOR_TYPE = Properties::getComponentType("capsule_rigid_actor");
+static const ComponentType MESH_ACTOR_TYPE = Properties::getComponentType("mesh_rigid_actor");
+static const ComponentType CONTROLLER_TYPE = Properties::getComponentType("physical_controller");
+static const ComponentType HEIGHTFIELD_TYPE = Properties::getComponentType("physical_heightfield");
+static const ComponentType DISTANCE_JOINT_TYPE = Properties::getComponentType("distance_joint");
+static const ComponentType HINGE_JOINT_TYPE = Properties::getComponentType("hinge_joint");
+static const ComponentType SPHERICAL_JOINT_TYPE = Properties::getComponentType("spherical_joint");
+static const ComponentType D6_JOINT_TYPE = Properties::getComponentType("d6_joint");
 static const ResourceType TEXTURE_TYPE("texture");
 static const ResourceType PHYSICS_TYPE("physics");
 static const u32 RENDERER_HASH = crc32("renderer");

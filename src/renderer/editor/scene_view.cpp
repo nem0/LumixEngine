@@ -38,7 +38,7 @@ namespace Lumix
 {
 
 
-static const ComponentType MODEL_INSTANCE_TYPE = PropertyRegister::getComponentType("renderable");
+static const ComponentType MODEL_INSTANCE_TYPE = Properties::getComponentType("renderable");
 static const ResourceType MODEL_TYPE("model");
 static const ResourceType SHADER_TYPE("shader");
 static const ResourceType TEXTURE_TYPE("texture");
@@ -249,7 +249,7 @@ void SceneView::handleDrop(float x, float y)
 			m_editor.setEntitiesPositions(&entity, &pos, 1);
 			m_editor.selectEntities(&entity, 1);
 			m_editor.addComponent(MODEL_INSTANCE_TYPE);
-			auto* prop = PropertyRegister::getProperty(MODEL_INSTANCE_TYPE, "Source");
+			auto* prop = Properties::getProperty(MODEL_INSTANCE_TYPE, "Source");
 			m_editor.setProperty(MODEL_INSTANCE_TYPE, -1, *prop, &entity, 1, path, stringLength(path) + 1);
 			m_editor.endCommandGroup();
 		}
@@ -267,7 +267,7 @@ void SceneView::handleDrop(float x, float y)
 					break;
 				}
 			}
-			auto* prop= PropertyRegister::getProperty(MODEL_INSTANCE_TYPE, "Materials", "Source");
+			auto* prop= Properties::getProperty(MODEL_INSTANCE_TYPE, "Materials", "Source");
 			m_editor.setProperty(MODEL_INSTANCE_TYPE, mesh_index, *prop, &hit.m_entity, 1, drag_data.data, drag_data.size);
 		}
 	}

@@ -148,7 +148,7 @@ void PropertyGrid::showSampledFunctionProperty(const Array<Entity>& entities,
 }*/
 	
 
-struct GridUIVisitor : PropertyRegister::IComponentVisitor
+struct GridUIVisitor : Properties::IComponentVisitor
 {
 	GridUIVisitor(StudioApp& app, int index, const Array<Entity>& entities, ComponentType cmp_type, WorldEditor& editor)
 		: m_entities(entities)
@@ -171,27 +171,27 @@ struct GridUIVisitor : PropertyRegister::IComponentVisitor
 	}
 
 
-	struct Attributes : PropertyRegister::IAttributeVisitor
+	struct Attributes : Properties::IAttributeVisitor
 	{
-		void visit(const PropertyRegister::IAttribute& attr) override
+		void visit(const Properties::IAttribute& attr) override
 		{
 			switch (attr.getType())
 			{
-				case PropertyRegister::IAttribute::RADIANS:
+				case Properties::IAttribute::RADIANS:
 					is_radians = true;
 					break;
-				case PropertyRegister::IAttribute::COLOR:
+				case Properties::IAttribute::COLOR:
 					is_color = true;
 					break;
-				case PropertyRegister::IAttribute::MIN:
-					min = ((PropertyRegister::MinAttribute&)attr).min;
+				case Properties::IAttribute::MIN:
+					min = ((Properties::MinAttribute&)attr).min;
 					break;
-				case PropertyRegister::IAttribute::CLAMP:
-					min = ((PropertyRegister::ClampAttribute&)attr).min;
-					max = ((PropertyRegister::ClampAttribute&)attr).max;
+				case Properties::IAttribute::CLAMP:
+					min = ((Properties::ClampAttribute&)attr).min;
+					max = ((Properties::ClampAttribute&)attr).max;
 					break;
-				case PropertyRegister::IAttribute::RESOURCE:
-					resource_type = ((PropertyRegister::ResourceAttribute&)attr).type;
+				case Properties::IAttribute::RESOURCE:
+					resource_type = ((Properties::ResourceAttribute&)attr).type;
 					break;
 			}
 		}
@@ -204,7 +204,7 @@ struct GridUIVisitor : PropertyRegister::IComponentVisitor
 	};
 
 
-	static Attributes getAttributes(const PropertyRegister::IProperty& prop)
+	static Attributes getAttributes(const Properties::PropertyBase& prop)
 	{
 		Attributes attrs;
 		prop.visit(attrs);
@@ -212,7 +212,7 @@ struct GridUIVisitor : PropertyRegister::IComponentVisitor
 	}
 
 
-	void visit(const PropertyRegister::Property<float>& prop) override
+	void visit(const Properties::Property<float>& prop) override
 	{
 		Attributes attrs = getAttributes(prop);
 		ComponentUID cmp = getComponent();
@@ -229,7 +229,7 @@ struct GridUIVisitor : PropertyRegister::IComponentVisitor
 	}
 
 
-	void visit(const PropertyRegister::Property<int>& prop) override
+	void visit(const Properties::Property<int>& prop) override
 	{
 		ComponentUID cmp = getComponent();
 		int value;
@@ -242,7 +242,7 @@ struct GridUIVisitor : PropertyRegister::IComponentVisitor
 	}
 
 
-	void visit(const PropertyRegister::Property<Entity>& prop) override
+	void visit(const Properties::Property<Entity>& prop) override
 	{
 		OutputBlob blob(m_editor.getAllocator());
 
@@ -252,12 +252,12 @@ struct GridUIVisitor : PropertyRegister::IComponentVisitor
 
 		char buf[128];
 		getEntityListDisplayName(m_editor, buf, lengthOf(buf), entity);
-		ImGui::LabelText(prop.getName(), "%s", buf);
+		ImGui::LabelText(prop.name, "%s", buf);
 		ImGui::SameLine();
-		ImGui::PushID(prop.getName());
-		if (ImGui::Button("...")) ImGui::OpenPopup(prop.getName());
+		ImGui::PushID(prop.name);
+		if (ImGui::Button("...")) ImGui::OpenPopup(prop.name);
 		Universe& universe = *m_editor.getUniverse();
-		if (ImGui::BeginPopup(prop.getName()))
+		if (ImGui::BeginPopup(prop.name))
 		{
 			if (entity.isValid() && ImGui::Button("Select")) m_deferred_select = entity;
 
@@ -278,31 +278,31 @@ struct GridUIVisitor : PropertyRegister::IComponentVisitor
 	}
 
 
-	void visit(const PropertyRegister::Property<Int2>& prop) override
+	void visit(const Properties::Property<Int2>& prop) override
 	{
 		ComponentUID cmp = getComponent();
 		Int2 value;
 		prop.getValue(cmp, m_index, OutputBlob(&value, sizeof(value)));
-		if (ImGui::DragInt2(prop.getName(), &value.x))
+		if (ImGui::DragInt2(prop.name, &value.x))
 		{
 			m_editor.setProperty(m_cmp_type, m_index, prop, &m_entities[0], m_entities.size(), &value, sizeof(value));
 		}
 	}
 
 
-	void visit(const PropertyRegister::Property<Vec2>& prop) override
+	void visit(const Properties::Property<Vec2>& prop) override
 	{
 		ComponentUID cmp = getComponent();
 		Vec2 value;
 		prop.getValue(cmp, m_index, OutputBlob(&value, sizeof(value)));
-		if (ImGui::DragFloat2(prop.getName(), &value.x))
+		if (ImGui::DragFloat2(prop.name, &value.x))
 		{
 			m_editor.setProperty(m_cmp_type, m_index, prop, &m_entities[0], m_entities.size(), &value, sizeof(value));
 		}
 	}
 
 
-	void visit(const PropertyRegister::Property<Vec3>& prop) override
+	void visit(const Properties::Property<Vec3>& prop) override
 	{
 		Attributes attrs = getAttributes(prop);
 		ComponentUID cmp = getComponent();
@@ -328,7 +328,7 @@ struct GridUIVisitor : PropertyRegister::IComponentVisitor
 	}
 
 
-	void visit(const PropertyRegister::Property<Vec4>& prop) override
+	void visit(const Properties::Property<Vec4>& prop) override
 	{
 		ComponentUID cmp = getComponent();
 		Vec4 value;
@@ -341,7 +341,7 @@ struct GridUIVisitor : PropertyRegister::IComponentVisitor
 	}
 
 
-	void visit(const PropertyRegister::Property<bool>& prop) override
+	void visit(const Properties::Property<bool>& prop) override
 	{
 		ComponentUID cmp = getComponent();
 		bool value;
@@ -354,7 +354,7 @@ struct GridUIVisitor : PropertyRegister::IComponentVisitor
 	}
 
 
-	void visit(const PropertyRegister::Property<Path>& prop) override
+	void visit(const Properties::Property<Path>& prop) override
 	{
 		ComponentUID cmp = getComponent();
 		char tmp[1024];
@@ -379,7 +379,7 @@ struct GridUIVisitor : PropertyRegister::IComponentVisitor
 	}
 
 
-	void visit(const PropertyRegister::Property<const char*>& prop) override
+	void visit(const Properties::Property<const char*>& prop) override
 	{
 		ComponentUID cmp = getComponent();
 		char tmp[1024];
@@ -392,12 +392,12 @@ struct GridUIVisitor : PropertyRegister::IComponentVisitor
 	}
 
 
-	void visit(const PropertyRegister::IBlobProperty& prop) override
+	void visit(const Properties::IBlobProperty& prop) override
 	{
 
 	}
 
-	void visit(const PropertyRegister::IArrayProperty& prop) override
+	void visit(const Properties::IArrayProperty& prop) override
 	{
 		bool is_open = ImGui::TreeNodeEx(prop.name, ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowOverlapMode);
 		if (m_entities.size() > 1)
@@ -456,11 +456,11 @@ struct GridUIVisitor : PropertyRegister::IComponentVisitor
 	}
 
 
-	void visit(const PropertyRegister::IEnumProperty& prop) override
+	void visit(const Properties::IEnumProperty& prop) override
 	{
 		if (m_entities.size() > 1)
 		{
-			ImGui::LabelText(prop.getName(), "Multi-object editing not supported.");
+			ImGui::LabelText(prop.name, "Multi-object editing not supported.");
 			return;
 		}
 
@@ -471,7 +471,7 @@ struct GridUIVisitor : PropertyRegister::IComponentVisitor
 
 		struct Data
 		{
-			const PropertyRegister::IEnumProperty* prop;
+			const Properties::IEnumProperty* prop;
 			ComponentUID cmp;
 		};
 
@@ -485,7 +485,7 @@ struct GridUIVisitor : PropertyRegister::IComponentVisitor
 		data.cmp = cmp;
 		data.prop = &prop;
 
-		if (ImGui::Combo(prop.getName(), &value, getter, &data, count))
+		if (ImGui::Combo(prop.name, &value, getter, &data, count))
 		{
 			m_editor.setProperty(cmp.type, m_index, prop, &cmp.entity, 1, &value, sizeof(value));
 		}
@@ -519,7 +519,7 @@ void PropertyGrid::showComponentProperties(const Array<Entity>& entities, Compon
 
 	if (!is_open) return;
 
-	PropertyRegister::IComponentDescriptor* component = PropertyRegister::getComponent(cmp_type);
+	Properties::IComponentDescriptor* component = Properties::getComponent(cmp_type);
 	GridUIVisitor visitor(m_app, -1, entities, cmp_type, m_editor);
 	if (component) component->visit(visitor);
 

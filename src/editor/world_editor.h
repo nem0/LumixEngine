@@ -11,9 +11,9 @@ namespace Lumix
 {
 
 
-namespace PropertyRegister
+namespace Properties
 {
-struct IProperty;
+struct PropertyBase;
 struct IArrayProperty;
 }
 
@@ -132,15 +132,15 @@ public:
 	virtual void navigate(float forward, float right, float up, float speed) = 0;
 	virtual void setProperty(ComponentType component,
 		int index,
-		const PropertyRegister::IProperty& property,
+		const Properties::PropertyBase& property,
 		const Entity* entities,
 		int count,
 		const void* data,
 		int size) = 0;
 	virtual void setSnapMode(bool enable, bool vertex_snap, bool preview) = 0;
 	virtual void setAdditiveSelection(bool additive) = 0;
-	virtual void addArrayPropertyItem(const ComponentUID& cmp, const PropertyRegister::IArrayProperty& property) = 0;
-	virtual void removeArrayPropertyItem(const ComponentUID& cmp, int index, const PropertyRegister::IArrayProperty& property) = 0;
+	virtual void addArrayPropertyItem(const ComponentUID& cmp, const Properties::IArrayProperty& property) = 0;
+	virtual void removeArrayPropertyItem(const ComponentUID& cmp, int index, const Properties::IArrayProperty& property) = 0;
 	virtual bool isMouseDown(MouseButton::Value button) const = 0;
 	virtual bool isMouseClick(MouseButton::Value button) const = 0;
 	virtual void inputFrame() = 0;

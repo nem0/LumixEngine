@@ -367,7 +367,7 @@ public:
 	void registerComponentWithResource(const char* type,
 		const char* label,
 		ResourceType resource_type,
-		const PropertyRegister::IProperty& property) override
+		const Properties::PropertyBase& property) override
 	{
 		struct Plugin LUMIX_FINAL : public IAddComponentPlugin
 		{
@@ -413,7 +413,7 @@ public:
 			WorldEditor* editor;
 			ComponentType type;
 			ResourceType resource_type;
-			const PropertyRegister::IProperty* property;
+			const Properties::PropertyBase* property;
 			char label[50];
 		};
 
@@ -421,7 +421,7 @@ public:
 		auto* plugin = LUMIX_NEW(allocator, Plugin);
 		plugin->property_grid = m_property_grid;
 		plugin->asset_browser = m_asset_browser;
-		plugin->type = PropertyRegister::getComponentType(type);
+		plugin->type = Properties::getComponentType(type);
 		plugin->editor = m_editor;
 		plugin->property = &property;
 		plugin->resource_type = resource_type;
@@ -436,7 +436,7 @@ public:
 	{
 		addPlugin(plugin);
 		auto& allocator = m_editor->getAllocator();
-		m_component_labels.insert(PropertyRegister::getComponentType(id), string(plugin.getLabel(), m_allocator));
+		m_component_labels.insert(Properties::getComponentType(id), string(plugin.getLabel(), m_allocator));
 	}
 
 
@@ -475,7 +475,7 @@ public:
 		auto* plugin = LUMIX_NEW(allocator, Plugin);
 		plugin->property_grid = m_property_grid;
 		plugin->editor = m_editor;
-		plugin->type = PropertyRegister::getComponentType(type);
+		plugin->type = Properties::getComponentType(type);
 		copyString(plugin->label, label);
 		addPlugin(*plugin);
 

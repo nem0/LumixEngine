@@ -33,8 +33,8 @@ namespace Lumix
 {
 
 
-static const ComponentType ANIMABLE_HASH = PropertyRegister::getComponentType("animable");
-static const ComponentType CONTROLLER_TYPE = PropertyRegister::getComponentType("anim_controller");
+static const ComponentType ANIMABLE_HASH = Properties::getComponentType("animable");
+static const ComponentType CONTROLLER_TYPE = Properties::getComponentType("anim_controller");
 static const ResourceType ANIMATION_TYPE("animation");
 static const ResourceType CONTROLLER_RESOURCE_TYPE("anim_controller");
 

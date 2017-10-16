@@ -35,7 +35,7 @@
 using namespace Lumix;
 
 
-static const ComponentType LUA_SCRIPT_TYPE = PropertyRegister::getComponentType("lua_script");
+static const ComponentType LUA_SCRIPT_TYPE = Properties::getComponentType("lua_script");
 static const ResourceType LUA_SCRIPT_RESOURCE_TYPE("lua_script");
 
 
