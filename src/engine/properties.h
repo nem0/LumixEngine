@@ -27,7 +27,8 @@ namespace Properties
 {
 
 
-namespace detail {
+namespace detail 
+{
 	template <class T> struct RemoveReference { typedef T type; };
 	template <class T> struct RemoveReference<T&> { typedef T type; };
 	template <class T> struct RemoveReference<T&&> { typedef T type; };
@@ -249,27 +250,14 @@ struct IEnumProperty : public PropertyBase
 };
 
 
-
-
-template <typename T, typename... Attributes> struct PropertyWithAttributes;
-
-
 template <typename T, typename... Attributes>
-struct PropertyWithAttributes<T, Attributes...> : Property<T>
+struct PropertyWithAttributes : Property<T>
 {
 	void visit(IAttributeVisitor& visitor) const override
 	{
 		apply([&](auto& x) { visitor.visit(x); }, attributes);
 	}
 	std::tuple<Attributes...> attributes;
-};
-
-template <typename T>
-struct PropertyWithAttributes<T> : Property<T>
-{
-	void visit(IAttributeVisitor& visitor) const override {}
-
-	std::tuple<> attributes;
 };
 
 
@@ -771,8 +759,6 @@ auto property(const char* name, Getter getter, Setter setter, Attributes... attr
 }
 
 
-
-
 template <typename Getter, typename Setter, typename Namer, typename... Attributes>
 auto enum_property(const char* name, Getter getter, Setter setter, int count, Namer namer, Attributes... attributes)
 {
@@ -802,11 +788,11 @@ auto const_array(const char* name, Counter counter, Properties... properties)
 }
 
 
-LUMIX_ENGINE_API const IAttribute* getAttribute(const PropertyBase& prop, IAttribute::Type type);
 LUMIX_ENGINE_API void init(IAllocator& allocator);
 LUMIX_ENGINE_API void shutdown();
 
 
+LUMIX_ENGINE_API const IAttribute* getAttribute(const PropertyBase& prop, IAttribute::Type type);
 LUMIX_ENGINE_API void registerComponent(IComponentDescriptor* desc);
 LUMIX_ENGINE_API IComponentDescriptor* getComponent(ComponentType cmp_type);
 LUMIX_ENGINE_API const PropertyBase* getProperty(ComponentType cmp_type, const char* property);
