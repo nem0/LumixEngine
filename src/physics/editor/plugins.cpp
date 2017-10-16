@@ -10,7 +10,7 @@
 #include "editor/world_editor.h"
 #include "engine/crc32.h"
 #include "engine/math_utils.h"
-#include "engine/property_register.h"
+#include "engine/properties.h"
 #include "engine/universe/universe.h"
 #include "physics/physics_geometry_manager.h"
 #include "physics/physics_scene.h"

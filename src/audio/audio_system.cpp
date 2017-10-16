@@ -12,9 +12,9 @@
 #include "engine/iplugin.h"
 #include "engine/path.h"
 #include "engine/plugin_manager.h"
-#include "engine/property_descriptor.h"
-#include "engine/property_register.h"
+#include "engine/properties.h"
 #include "engine/resource_manager.h"
+#include "engine/universe/universe.h"
 #include "renderer/render_scene.h"
 
 

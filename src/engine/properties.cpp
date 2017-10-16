@@ -1,8 +1,7 @@
-#include "engine/property_register.h"
+#include "engine/properties.h"
 #include "engine/associative_array.h"
 #include "engine/crc32.h"
 #include "engine/default_allocator.h"
-#include "engine/property_register.h"
 #include "engine/log.h"
 
 

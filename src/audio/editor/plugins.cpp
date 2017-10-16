@@ -12,7 +12,7 @@
 #include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/plugin_manager.h"
-#include "engine/property_register.h"
+#include "engine/properties.h"
 #include "engine/system.h"
 #include "engine/universe/universe.h"
 #include "imgui/imgui.h"

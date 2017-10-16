@@ -6,7 +6,7 @@
 #include "engine/log.h"
 #include "engine/matrix.h"
 #include "engine/prefab.h"
-#include "engine/property_register.h"
+#include "engine/properties.h"
 #include "engine/serializer.h"
 #include "engine/universe/component.h"
 #include <cstdint>

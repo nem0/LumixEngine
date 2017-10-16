@@ -7,8 +7,7 @@
 #include "engine/log.h"
 #include "engine/resource_manager.h"
 #include "engine/engine.h"
-#include "engine/property_descriptor.h"
-#include "engine/property_register.h"
+#include "engine/properties.h"
 #include "physics/physics_geometry_manager.h"
 #include "physics/physics_scene.h"
 #include "renderer/render_scene.h"
@@ -46,99 +45,6 @@ namespace Lumix
 			default: ASSERT(false); return "Unknown";
 		}
 	}
-
-
-	using D6MotionDescriptor = EnumPropertyDescriptor<PhysicsScene, PhysicsScene::D6Motion, 3, getD6MotionName>;
-	using DynamicTypePropertyDescriptor = EnumPropertyDescriptor<PhysicsScene, PhysicsScene::DynamicType, 3, getDynamicTypeName>;
-
-
-	class PhysicsLayerPropertyDescriptor : public IEnumPropertyDescriptor
-	{
-	public:
-		typedef int (PhysicsScene::*Getter)(ComponentHandle);
-		typedef void (PhysicsScene::*Setter)(ComponentHandle, int);
-		typedef int (PhysicsScene::*ArrayGetter)(ComponentHandle, int);
-		typedef void (PhysicsScene::*ArraySetter)(ComponentHandle, int, int);
-
-	public:
-		PhysicsLayerPropertyDescriptor(const char* name, Getter _getter, Setter _setter)
-		{
-			setName(name);
-			m_single.getter = _getter;
-			m_single.setter = _setter;
-			m_type = ENUM;
-		}
-
-
-		PhysicsLayerPropertyDescriptor(const char* name, ArrayGetter _getter, ArraySetter _setter)
-		{
-			setName(name);
-			m_array.getter = _getter;
-			m_array.setter = _setter;
-			m_type = ENUM;
-		}
-
-
-		void set(ComponentUID cmp, int index, InputBlob& stream) const override
-		{
-			int value;
-			stream.read(&value, sizeof(value));
-			if (index == -1)
-			{
-				(static_cast<PhysicsScene*>(cmp.scene)->*m_single.setter)(cmp.handle, value);
-			}
-			else
-			{
-				(static_cast<PhysicsScene*>(cmp.scene)->*m_array.setter)(cmp.handle, index, value);
-			}
-		};
-
-
-		void get(ComponentUID cmp, int index, OutputBlob& stream) const override
-		{
-			int value;
-			if (index == -1)
-			{
-				value = (static_cast<PhysicsScene*>(cmp.scene)->*m_single.getter)(cmp.handle);
-			}
-			else
-			{
-				value = (static_cast<PhysicsScene*>(cmp.scene)->*m_array.getter)(cmp.handle, index);
-			}
-			stream.write(&value, sizeof(value));
-		};
-
-
-		int getEnumCount(IScene* scene, ComponentHandle) override
-		{
-			return static_cast<PhysicsScene*>(scene)->getCollisionsLayersCount();
-		}
-
-
-		const char* getEnumItemName(IScene* scene, ComponentHandle, int index) override
-		{
-			auto* phy_scene = static_cast<PhysicsScene*>(scene);
-			return phy_scene->getCollisionLayerName(index);
-		}
-
-
-		void getEnumItemName(IScene* scene, ComponentHandle, int index, char* buf, int max_size) override {}
-
-	private:
-		union
-		{
-			struct
-			{
-				Getter getter;
-				Setter setter;
-			} m_single;
-			struct
-			{
-				ArrayGetter getter;
-				ArraySetter setter;
-			} m_array;
-		};
-	};
 
 
 	static void registerProperties(IAllocator& allocator)

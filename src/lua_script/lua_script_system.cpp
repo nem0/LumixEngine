@@ -16,8 +16,7 @@
 #include "engine/path_utils.h"
 #include "engine/plugin_manager.h"
 #include "engine/profiler.h"
-#include "engine/property_descriptor.h"
-#include "engine/property_register.h"
+#include "engine/properties.h"
 #include "engine/resource_manager.h"
 #include "engine/serializer.h"
 #include "engine/string.h"
@@ -573,7 +572,7 @@ namespace Lumix
 
 		static int LUA_getProperty(lua_State* L)
 		{
-			auto* desc = LuaWrapper::toType<PropertyDescriptorBase*>(L, lua_upvalueindex(1));
+			/*auto* desc = LuaWrapper::toType<PropertyDescriptorBase*>(L, lua_upvalueindex(1));
 			ComponentType type = { LuaWrapper::toType<int>(L, lua_upvalueindex(2)) };
 			ComponentUID cmp;
 			cmp.scene = LuaWrapper::checkArg<IScene*>(L, 1);
@@ -659,13 +658,14 @@ namespace Lumix
 				break;
 				default: luaL_argerror(L, 1, "Unsupported property type"); break;
 			}
-			return 1;
+			return 1;*/
+			// TODO
 		}
 
 
 		static int LUA_setProperty(lua_State* L)
 		{
-			auto* desc = LuaWrapper::toType<PropertyDescriptorBase*>(L, lua_upvalueindex(1));
+			/*auto* desc = LuaWrapper::toType<PropertyDescriptorBase*>(L, lua_upvalueindex(1));
 			ComponentType type = { LuaWrapper::toType<int>(L, lua_upvalueindex(2)) };
 			ComponentUID cmp;
 			cmp.scene = LuaWrapper::checkArg<IScene*>(L, 1);
@@ -741,7 +741,9 @@ namespace Lumix
 				}
 				break;
 				default: luaL_argerror(L, 1, "Unsupported property type"); break;
-			}
+			}*/
+
+			// TODO
 			return 0;
 		}
 
