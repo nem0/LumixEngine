@@ -5,8 +5,7 @@
 #include "engine/blob.h"
 #include "engine/resource.h"
 #include "engine/universe/component.h"
-#include <tuple>
-
+#include "engine/metaprogramming.h"
 
 
 namespace Lumix
@@ -29,132 +28,87 @@ namespace Properties
 
 namespace detail 
 {
-	template <class T> struct RemoveReference { typedef T type; };
-	template <class T> struct RemoveReference<T&> { typedef T type; };
-	template <class T> struct RemoveReference<T&&> { typedef T type; };
-	template <class T> struct RemoveConst { typedef T type; };
-	template <class T> struct RemoveConst<const T> { typedef T type; };
-
-	template <class T> using RemoveCR = typename RemoveConst<typename RemoveReference<T>::type>::type;
 
 
-	template<bool B, class T = void> struct EnableIf {};
-	template<class T> struct EnableIf<true, T> { typedef T type; };
-	template< bool B, class T = void> using EnableIf_t = typename EnableIf<B, T>::type;
+template <typename T> struct ResultOf;
+template <typename R, typename C, typename... Args> struct ResultOf<R(C::*)(Args...)> { using type = R; };
 
-	template <class F, class Tuple, std::size_t... I>
-	constexpr void apply_impl(F& f, Tuple& t, std::index_sequence<I...>)
-	{
-		using expand = bool[];
-		(void)expand
-		{
-			(
-				f(std::get<I>(t)),
-				true
-				)...
-		};
-	}
+template <typename T> struct ClassOf;
+template <typename R, typename C, typename... Args>
+struct ClassOf<R(C::*)(Args...)>
+{
+	using type = C;
+};
 
-	template <class F, class Tuple>
-	constexpr void apply_impl(F& f, Tuple& t, std::index_sequence<>) {}
-
-	template <typename T> struct ArgCount;
-	template <typename R, typename C, typename... Args> struct ArgCount<R(C::*)(Args...)>
-	{
-		enum { value = sizeof...(Args) };
-	};
-
-	template <typename T> struct ResultOf;
-	template <typename R, typename C, typename... Args> struct ResultOf<R(C::*)(Args...)> { using type = R; };
-
-	template <typename T> struct ClassOf;
-	template <typename R, typename C, typename... Args>
-	struct ClassOf<R(C::*)(Args...)>
-	{
-		using type = C;
-	};
-
-	template <typename T> struct ArgOf2;
-	template <typename R, typename C, typename A0, typename A1, typename A2, typename... Args>
-	struct ArgOf2<R(C::*)(A0, A1, A2, Args...)>
-	{
-		using type = A2;
-	};
-
-	template <typename T> struct ArgOf1;
-	template <typename R, typename C, typename A0, typename A1, typename... Args>
-	struct ArgOf1<R(C::*)(A0, A1, Args...)>
-	{
-		using type = A1;
-	};
-
-	template <typename T> void writeToStream(OutputBlob& stream, T value)
-	{
-		stream.write(value);
-	};
+template <typename T> void writeToStream(OutputBlob& stream, T value)
+{
+	stream.write(value);
+};
 	
-	template <typename T> T readFromStream(InputBlob& stream)
+template <typename T> T readFromStream(InputBlob& stream)
+{
+	return stream.read<T>();
+};
+
+template <> Path readFromStream<Path>(InputBlob& stream);
+template <> void writeToStream<Path>(OutputBlob& stream, Path);
+template <> void writeToStream<const Path&>(OutputBlob& stream, const Path& path);
+template <> const char* readFromStream<const char*>(InputBlob& stream);
+template <> void writeToStream<const char*>(OutputBlob& stream, const char* path);
+
+
+template <typename Getter> struct GetterProxy;
+
+template <typename R, typename C>
+struct GetterProxy<R(C::*)(ComponentHandle, int)>
+{
+	using Getter = R(C::*)(ComponentHandle, int);
+	static void invoke(OutputBlob& stream, C* inst, Getter getter, ComponentHandle cmp, int index)
 	{
-		return stream.read<T>();
-	};
+		R value = (inst->*getter)(cmp, index);
+		writeToStream(stream, value);
+	}
+};
 
-	template <> Path readFromStream<Path>(InputBlob& stream);
-	template <> void writeToStream<Path>(OutputBlob& stream, Path);
-	template <> void writeToStream<const Path&>(OutputBlob& stream, const Path& path);
-	template <> const char* readFromStream<const char*>(InputBlob& stream);
-	template <> void writeToStream<const char*>(OutputBlob& stream, const char* path);
-
-
-	template <typename Getter, typename Enabled = void> struct GetterProxy;
-
-	template <typename Getter>
-	struct GetterProxy<Getter, EnableIf_t<ArgCount<Getter>::value == 2>>
+template <typename R, typename C>
+struct GetterProxy<R(C::*)(ComponentHandle)>
+{
+	using Getter = R(C::*)(ComponentHandle);
+	static void invoke(OutputBlob& stream, C* inst, Getter getter, ComponentHandle cmp, int index)
 	{
-		using C = typename ClassOf<Getter>::type;
-		static auto invoke(OutputBlob& stream, C* inst, Getter getter, ComponentHandle cmp, int index)
-		{
-			auto value = (inst->*getter)(cmp, index);
-			writeToStream(stream, value);
-		}
-	};
+		R value = (inst->*getter)(cmp);
+		writeToStream(stream, value);
+	}
+};
 
-	template <typename Getter>
-	struct GetterProxy<Getter, EnableIf_t<ArgCount<Getter>::value == 1>>
+
+template <typename Setter> struct SetterProxy;
+
+template <typename C, typename A>
+struct SetterProxy<void (C::*)(ComponentHandle, int, A)>
+{
+	using Setter = void (C::*)(ComponentHandle, int, A);
+	static void invoke(InputBlob& stream, C* inst, Setter setter, ComponentHandle cmp, int index)
 	{
-		using C = typename ClassOf<Getter>::type;
-		static void invoke(OutputBlob& stream, C* inst, Getter getter, ComponentHandle cmp, int index)
-		{
-			auto value = (inst->*getter)(cmp);
-			writeToStream(stream, value);
-		}
-	};
+		using Value = RemoveCR<A>;
+		auto value = readFromStream<Value>(stream);
+		(inst->*setter)(cmp, index, value);
+	}
+};
 
-
-	template <typename Setter, typename Enabled = void> struct SetterProxy;
-
-	template <typename Setter>
-	struct SetterProxy<Setter, EnableIf_t<ArgCount<Setter>::value == 3>>
+template <typename C, typename A>
+struct SetterProxy<void (C::*)(ComponentHandle, A)>
+{
+	using Setter = void (C::*)(ComponentHandle, A);
+	static void invoke(InputBlob& stream, C* inst, Setter setter, ComponentHandle cmp, int index)
 	{
-		using C = typename ClassOf<Setter>::type;
-		static void invoke(InputBlob& stream, C* inst, Setter setter, ComponentHandle cmp, int index)
-		{
-			using Value = RemoveCR<typename ArgOf2<Setter>::type>;
-			auto value = readFromStream<Value>(stream);
-			(inst->*setter)(cmp, index, value);
-		}
-	};
+		using Value = RemoveCR<A>;
+		auto value = readFromStream<Value>(stream);
+		(inst->*setter)(cmp, value);
+	}
+};
 
-	template <typename Setter>
-	struct SetterProxy<Setter, EnableIf_t<ArgCount<Setter>::value == 2>>
-	{
-		using C = typename ClassOf<Setter>::type;
-		static void invoke(InputBlob& stream, C* inst, Setter setter, ComponentHandle cmp, int index)
-		{
-			using Value = RemoveCR<typename ArgOf1<Setter>::type>;
-			auto value = readFromStream<Value>(stream);
-			(inst->*setter)(cmp, value);
-		}
-	};
+
 } // namespace detail
 
 
@@ -250,17 +204,6 @@ struct IEnumProperty : public PropertyBase
 };
 
 
-template <typename T, typename... Attributes>
-struct PropertyWithAttributes : Property<T>
-{
-	void visit(IAttributeVisitor& visitor) const override
-	{
-		apply([&](auto& x) { visitor.visit(x); }, attributes);
-	}
-	std::tuple<Attributes...> attributes;
-};
-
-
 struct IComponentVisitor;
 
 
@@ -319,29 +262,24 @@ struct IComponentDescriptor
 };
 
 
-template <typename Getter, typename Setter, typename Namer, typename Enabled = void>
-struct EnumProperty;
-
-
 template <typename Getter, typename Setter, typename Namer>
-struct EnumProperty<Getter, Setter, Namer, detail::EnableIf_t<detail::ArgCount<Getter>::value == 2>> : IEnumProperty
+struct EnumProperty : IEnumProperty
 {
 	void getValue(ComponentUID cmp, int index, OutputBlob& stream) const override
 	{
 		using C = typename detail::ClassOf<Getter>::type;
-		C* x = static_cast<C*>(cmp.scene);
-		int value = static_cast<int>((x->*getter)(cmp.handle, index));
-		stream.write(value);
+		C* inst = static_cast<C*>(cmp.scene);
+		static_assert(4 == sizeof(detail::ResultOf<Getter>::type), "enum must have 4 bytes");
+		detail::GetterProxy<Getter>::invoke(stream, inst, getter, cmp.handle, index);
 	}
 
 	void setValue(ComponentUID cmp, int index, InputBlob& stream) const override
 	{
 		using C = typename detail::ClassOf<Getter>::type;
-		C* x = static_cast<C*>(cmp.scene);
+		C* inst = static_cast<C*>(cmp.scene);
 
-		using T = typename detail::ResultOf<Getter>::type;
-		int value = stream.read<int>();
-		(x->*setter)(cmp.handle, index, static_cast<T>(value));
+		static_assert(4 == sizeof(detail::ResultOf<Getter>::type), "enum must have 4 bytes");
+		detail::SetterProxy<Setter>::invoke(stream, inst, setter, cmp.handle, index);
 	}
 
 
@@ -355,51 +293,8 @@ struct EnumProperty<Getter, Setter, Namer, detail::EnableIf_t<detail::ArgCount<G
 	{
 		return namer(index);
 	}
-
-	const char* getName() override { return name; }
 
 	const char* name;
-	Getter getter;
-	Setter setter;
-	int count;
-	Namer namer;
-};
-
-
-template <typename Getter, typename Setter, typename Namer>
-struct EnumProperty<Getter, Setter, Namer, detail::EnableIf_t<detail::ArgCount<Getter>::value == 1>> : IEnumProperty
-{
-	void getValue(ComponentUID cmp, int index, OutputBlob& stream) const override
-	{
-		using C = typename detail::ClassOf<Getter>::type;
-		C* x = static_cast<C*>(cmp.scene);
-		int value = static_cast<int>((x->*getter)(cmp.handle));
-		stream.write(value);
-	}
-
-	void setValue(ComponentUID cmp, int index, InputBlob& stream) const override
-	{
-		using C = typename detail::ClassOf<Getter>::type;
-		C* x = static_cast<C*>(cmp.scene);
-
-		using T = typename detail::ResultOf<Getter>::type;
-		int value = stream.read<int>();
-		(x->*setter)(cmp.handle, static_cast<T>(value));
-	}
-
-
-	int getEnumCount(ComponentUID cmp) const override
-	{
-		return count;
-	}
-
-
-	const char* getEnumName(ComponentUID cmp, int index) const override
-	{
-		return namer(index);
-	}
-
-
 	Getter getter;
 	Setter setter;
 	int count;
@@ -424,21 +319,24 @@ struct BlobProperty : IBlobProperty
 		(x->*setter)(cmp.handle, stream);
 	}
 
-
 	void visit(IAttributeVisitor& visitor) const override {
 		apply([&](auto& x) { visitor.visit(x); }, attributes);
 	}
 
-
-	std::tuple<Attributes...> attributes;
+	Lumix::tuple<Attributes...> attributes;
 	Getter getter;
 	Setter setter;
 };
 
 
 template <typename T, typename Getter, typename Setter, typename... Attributes>
-struct PropertyX : PropertyWithAttributes<T, Attributes...>
+struct CommonProperty : Property<T>
 {
+	void visit(IAttributeVisitor& visitor) const override
+	{
+		apply([&](auto& x) { visitor.visit(x); }, attributes);
+	}
+
 	void getValue(ComponentUID cmp, int index, OutputBlob& stream) const override
 	{
 		using C = typename detail::ClassOf<Getter>::type;
@@ -453,37 +351,20 @@ struct PropertyX : PropertyWithAttributes<T, Attributes...>
 		detail::SetterProxy<Setter>::invoke(stream, x, setter, cmp.handle, index);
 	}
 
+
+	Lumix::tuple<Attributes...> attributes;
 	Getter getter;
 	Setter setter;
 };
 
-template <class F, class Tuple>
-constexpr void apply(F& f, Tuple& t)
-{
-	detail::apply_impl(f, t, std::make_index_sequence<std::tuple_size_v<std::decay_t<Tuple>>>{});
-}
 
 template <typename Counter, typename Adder, typename Remover, typename... Properties>
 struct ArrayProperty : IArrayProperty
 {
-	std::tuple<Properties...> properties;
-
-
-	ArrayProperty() {
-	}
+	ArrayProperty() {}
 
 
 	bool canAddRemove() const override { return true; }
-
-
-	ArrayProperty(const char* name, Counter counter, Adder adder, Remover remover, Properties... properties)
-	{
-		this->properties = std::make_tuple(properties...);
-		this->name = name;
-		this->counter = counter;
-		this->remover = remover;
-		this->adder = adder;
-	}
 
 
 	void setValue(ComponentUID cmp, int index, InputBlob& stream) const override
@@ -549,14 +430,12 @@ struct ArrayProperty : IArrayProperty
 	}
 
 
-
 	void addItem(ComponentUID cmp, int index) const override
 	{
 		using C = typename detail::ClassOf<Counter>::type;
 		C* x = static_cast<C*>(cmp.scene);
 
 		(x->*adder)(cmp.handle, index);
-
 	}
 
 
@@ -584,11 +463,10 @@ struct ArrayProperty : IArrayProperty
 	}
 
 
-	void visit(IAttributeVisitor& visitor) const override {
-	
-	}
+	void visit(IAttributeVisitor& visitor) const override {}
 
 
+	Lumix::tuple<Properties...> properties;
 	Counter counter;
 	Adder adder;
 	Remover remover;
@@ -597,21 +475,10 @@ struct ArrayProperty : IArrayProperty
 template <typename Counter, typename... Properties>
 struct ConstArrayProperty : IArrayProperty
 {
-	std::tuple<Properties...> properties;
-
-
-	ConstArrayProperty() {
-	}
+	ConstArrayProperty() {}
 
 
 	bool canAddRemove() const override { return false; }
-
-	ConstArrayProperty(const char* name, Counter counter, Properties... properties)
-	{
-		this->properties = std::make_tuple(properties...);
-		this->name = name;
-		this->counter = counter;
-	}
 
 
 	void setValue(ComponentUID cmp, int index, InputBlob& stream) const override
@@ -675,7 +542,6 @@ struct ConstArrayProperty : IArrayProperty
 	void removeItem(ComponentUID cmp, int index) const override { ASSERT(false); }
 
 
-
 	int getCount(ComponentUID cmp) const override
 	{
 		using C = typename detail::ClassOf<Counter>::type;
@@ -696,6 +562,7 @@ struct ConstArrayProperty : IArrayProperty
 	}
 
 
+	Lumix::tuple<Properties...> properties;
 	Counter counter;
 };
 
@@ -703,7 +570,7 @@ struct ConstArrayProperty : IArrayProperty
 template <typename... Properties>
 struct ComponentDesciptor : IComponentDescriptor
 {
-	std::tuple<Properties...> properties;
+	Lumix::tuple<Properties...> properties;
 	const char* name;
 	ComponentType cmp_type;
 
@@ -711,9 +578,9 @@ struct ComponentDesciptor : IComponentDescriptor
 	ComponentType getComponentType() const override { return cmp_type; }
 
 
-	ComponentDesciptor(const char* name, Properties... properties)
+	ComponentDesciptor(const char* name, Properties... props)
 	{
-		this->properties = std::make_tuple(properties...);
+		this->properties = Lumix::make_tuple(props...);
 		this->name = name;
 		this->cmp_type = Properties::getComponentType(name);
 	}
@@ -734,11 +601,10 @@ ComponentDesciptor<Properties...> component(const char* name, Properties... prop
 
 
 template <typename Getter, typename Setter, typename... Attributes>
-BlobProperty<Getter, Setter, Attributes...>
-blob_property(const char* name, Getter getter, Setter setter, Attributes... attributes)
+auto blob_property(const char* name, Getter getter, Setter setter, Attributes... attributes)
 {
 	BlobProperty<Getter, Setter, Attributes...> p;
-	p.attributes = std::make_tuple(attributes...);
+	p.attributes = Lumix::make_tuple(attributes...);
 	p.getter = getter;
 	p.setter = setter;
 	p.name = name;
@@ -750,8 +616,8 @@ template <typename Getter, typename Setter, typename... Attributes>
 auto property(const char* name, Getter getter, Setter setter, Attributes... attributes)
 {
 	using R = typename detail::ResultOf<Getter>::type;
-	PropertyX<R, Getter, Setter, Attributes...> p;
-	p.attributes = std::make_tuple(attributes...);
+	CommonProperty<R, Getter, Setter, Attributes...> p;
+	p.attributes = Lumix::make_tuple(attributes...);
 	p.getter = getter;
 	p.setter = setter;
 	p.name = name;
@@ -775,7 +641,12 @@ auto enum_property(const char* name, Getter getter, Setter setter, int count, Na
 template <typename Counter, typename Adder, typename Remover, typename... Properties>
 auto array(const char* name, Counter counter, Adder adder, Remover remover, Properties... properties)
 {
-	ArrayProperty<Counter, Adder, Remover, Properties...> p(name, counter, adder, remover, properties...);
+	ArrayProperty<Counter, Adder, Remover, Properties...> p;
+	p.name = name;
+	p.counter = counter;
+	p.adder = adder;
+	p.remover = remover;
+	p.properties = Lumix::make_tuple(properties...);
 	return p;
 }
 
@@ -783,7 +654,10 @@ auto array(const char* name, Counter counter, Adder adder, Remover remover, Prop
 template <typename Counter, typename... Properties>
 auto const_array(const char* name, Counter counter, Properties... properties)
 {
-	ConstArrayProperty<Counter, Properties...> p(name, counter, properties...);
+	ConstArrayProperty<Counter, Properties...> p;
+	p.name = name;
+	p.counter = counter;
+	p.properties = Lumix::make_tuple(properties...);
 	return p;
 }
 
