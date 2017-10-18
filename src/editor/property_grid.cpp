@@ -392,9 +392,103 @@ struct GridUIVisitor : Properties::IComponentVisitor
 	}
 
 
-	void visit(const Properties::IBlobProperty& prop) override
-	{
+	void visit(const Properties::IBlobProperty& prop) override {}
 
+
+	void visit(const Properties::ISampledFuncProperty& prop) override
+	{
+		static const int MIN_COUNT = 6;
+		ComponentUID cmp = getComponent();
+
+		OutputBlob blob(m_editor.getAllocator());
+		prop.getValue(cmp, -1, blob);
+		int count;
+		InputBlob input(blob);
+		input.read(count);
+		Vec2* f = (Vec2*)input.skip(sizeof(Vec2) * count);
+
+		auto editor = ImGui::BeginCurveEditor(prop.name);
+		if (editor.valid)
+		{
+			bool changed = false;
+
+			changed |= ImGui::CurveSegment((ImVec2*)(f + 1), editor);
+
+			for (int i = 1; i < count - 3; i += 3)
+			{
+				changed |= ImGui::CurveSegment((ImVec2*)(f + i), editor);
+
+				if (changed)
+				{
+					f[i + 3].x = Math::maximum(f[i].x + 0.001f, f[i + 3].x);
+
+					if (i + 3 < count)
+					{
+						f[i + 3].x = Math::minimum(f[i + 6].x - 0.001f, f[i + 3].x);
+					}
+				}
+
+				if (ImGui::IsItemActive() && ImGui::IsMouseDoubleClicked(0)
+					&& count > MIN_COUNT && i + 3 < count - 2)
+				{
+					for (int j = i + 2; j < count - 3; ++j)
+					{
+						f[j] = f[j + 3];
+					}
+					count -= 3;
+					*(int*)blob.getData() = count;
+					changed = true;
+				}
+			}
+
+			f[count - 2].x = 1;
+			f[1].x = 0;
+			ImGui::EndCurveEditor(editor);
+
+			if (ImGui::IsItemActive() && ImGui::IsMouseDoubleClicked(0))
+			{
+				auto mp = ImGui::GetMousePos();
+				mp.x -= editor.inner_bb_min.x - 1;
+				mp.y -= editor.inner_bb_min.y - 1;
+				mp.x /= (editor.inner_bb_max.x - editor.inner_bb_min.x);
+				mp.y /= (editor.inner_bb_max.y - editor.inner_bb_min.y);
+				mp.y = 1 - mp.y;
+				blob.write(ImVec2(-0.2f, 0));
+				blob.write(mp);
+				blob.write(ImVec2(0.2f, 0));
+				count += 3;
+				*(int*)blob.getData() = count;
+				f = (Vec2*)((int*)blob.getData() + 1);
+				changed = true;
+
+				auto compare = [](const void* a, const void* b) -> int
+				{
+					float fa = ((const float*)a)[2];
+					float fb = ((const float*)b)[2];
+					return fa < fb ? -1 : (fa > fb) ? 1 : 0;
+				};
+
+				qsort(f, count / 3, 3 * sizeof(f[0]), compare);
+			}
+
+			if (changed)
+			{
+				for (int i = 2; i < count - 3; i += 3)
+				{
+					auto prev_p = ((Vec2*)f)[i - 1];
+					auto next_p = ((Vec2*)f)[i + 2];
+					auto& tangent = ((Vec2*)f)[i];
+					auto& tangent2 = ((Vec2*)f)[i + 1];
+					float half = 0.5f * (next_p.x - prev_p.x);
+					tangent = tangent.normalized() * half;
+					tangent2 = tangent2.normalized() * half;
+				}
+
+				f[0].x = 0;
+				f[count - 1].x = prop.getMaxX();
+				m_editor.setProperty(cmp.type, -1, prop, &m_entities[0], m_entities.size(), blob.getData(), blob.getPos());
+			}
+		}
 	}
 
 	void visit(const Properties::IArrayProperty& prop) override

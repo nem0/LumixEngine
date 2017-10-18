@@ -110,46 +110,14 @@ const PropertyBase* getProperty(ComponentType cmp_type, u32 property_name_hash)
 {
 	auto* cmp = getComponent(cmp_type);
 	if (!cmp) return nullptr;
-	struct Visitor : IComponentVisitor
+	struct Visitor : ISimpleComponentVisitor
 	{
-		void visit(const Property<float>& prop) override {
-			if (crc32(prop.name) == property_name_hash) result = &prop;
-		}
-		void visit(const Property<int>& prop) override {
-			if (crc32(prop.name) == property_name_hash) result = &prop;
-		}
-		void visit(const Property<Entity>& prop) override {
-			if (crc32(prop.name) == property_name_hash) result = &prop;
-		}
-		void visit(const Property<Int2>& prop) override {
-			if (crc32(prop.name) == property_name_hash) result = &prop;
-		}
-		void visit(const Property<Vec2>& prop) override {
-			if (crc32(prop.name) == property_name_hash) result = &prop;
-		}
-		void visit(const Property<Vec3>& prop) override {
-			if (crc32(prop.name) == property_name_hash) result = &prop;
-		}
-		void visit(const Property<Vec4>& prop) override {
-			if (crc32(prop.name) == property_name_hash) result = &prop;
-		}
-		void visit(const Property<bool>& prop) override {
-			if (crc32(prop.name) == property_name_hash) result = &prop;
-		}
-		void visit(const Property<Path>& prop) override {
-			if (crc32(prop.name) == property_name_hash) result = &prop;
-		}
-		void visit(const Property<const char*>& prop) override {
+		void visitProperty(const PropertyBase& prop) override {
 			if (crc32(prop.name) == property_name_hash) result = &prop;
 		}
 		void visit(const IArrayProperty& prop) override {
+			visitProperty(prop);
 			prop.visit(*this);
-		}
-		void visit(const IEnumProperty& prop) override {
-			if (crc32(prop.name) == property_name_hash) result = &prop;
-		}
-		void visit(const IBlobProperty& prop) override {
-			if (crc32(prop.name) == property_name_hash) result = &prop;
 		}
 
 		u32 property_name_hash;

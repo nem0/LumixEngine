@@ -214,16 +214,11 @@ static void registerProperties(IAllocator& allocator)
 		)
 	);
 	Properties::registerComponent(&particle_emitter_attractor);
-
-	// TODO
-	/*	Properties::add("particle_emitter_alpha",
-		LUMIX_NEW(allocator, SampledFunctionDescriptor<RenderScene>)("Alpha",
-			&RenderScene::getParticleEmitterAlpha,
-			&RenderScene::setParticleEmitterAlpha,
-			&RenderScene::getParticleEmitterAlphaCount,
-			1,
-			1));
-	*/
+	
+	static auto particle_emitter_alpha = component("particle_emitter_alpha",
+		sampled_func_property("Alpha", &RenderScene::getParticleEmitterAlpha, &RenderScene::setParticleEmitterAlpha, &RenderScene::getParticleEmitterAlphaCount, 1)
+	);
+	Properties::registerComponent(&particle_emitter_alpha);
 
 	static auto particle_emitter_force = component("particle_emitter_force",
 		property("Acceleration", &RenderScene::getParticleEmitterAcceleration, &RenderScene::setParticleEmitterAcceleration)
@@ -236,15 +231,10 @@ static void registerProperties(IAllocator& allocator)
 	);
 	Properties::registerComponent(&particle_emitter_subimage);
 
-	// TODO
-/*	Properties::add("particle_emitter_size",
-		LUMIX_NEW(allocator, SampledFunctionDescriptor<RenderScene>)("Size",
-			&RenderScene::getParticleEmitterSize,
-			&RenderScene::setParticleEmitterSize,
-			&RenderScene::getParticleEmitterSizeCount,
-			1,
-			1));
-			*/
+	static auto particle_emitter_size = component("particle_emitter_size",
+		sampled_func_property("Size", &RenderScene::getParticleEmitterSize, &RenderScene::setParticleEmitterSize, &RenderScene::getParticleEmitterSizeCount, 1)
+	);
+	Properties::registerComponent(&particle_emitter_size);
 
 	static auto particle_emitter = component("particle_emitter",
 		property("Life", &RenderScene::getParticleEmitterInitialLife, &RenderScene::setParticleEmitterInitialLife),

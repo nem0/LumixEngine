@@ -196,6 +196,12 @@ template <typename T> struct Property : PropertyBase {};
 struct IBlobProperty : PropertyBase {};
 
 
+struct ISampledFuncProperty : PropertyBase
+{
+	virtual float getMaxX() const = 0;
+};
+
+
 struct IEnumProperty : public PropertyBase
 {
 	void visit(IAttributeVisitor& visitor) const override {}
@@ -232,6 +238,7 @@ struct IComponentVisitor
 	virtual void visit(const IArrayProperty& prop) = 0;
 	virtual void visit(const IEnumProperty& prop) = 0;
 	virtual void visit(const IBlobProperty& prop) = 0;
+	virtual void visit(const ISampledFuncProperty& prop) = 0;
 };
 
 
@@ -252,6 +259,7 @@ struct ISimpleComponentVisitor : IComponentVisitor
 	void visit(const IArrayProperty& prop) override { visitProperty(prop); }
 	void visit(const IEnumProperty& prop) override { visitProperty(prop); }
 	void visit(const IBlobProperty& prop) override { visitProperty(prop); }
+	void visit(const ISampledFuncProperty& prop) override { visitProperty(prop); }
 };
 
 
@@ -344,21 +352,57 @@ struct DynEnumProperty : IEnumProperty
 };
 
 
+template <typename Getter, typename Setter, typename Counter>
+struct SampledFuncProperty : ISampledFuncProperty
+{
+	void getValue(ComponentUID cmp, int index, OutputBlob& stream) const override
+	{
+		ASSERT(index == -1);
+		using C = typename detail::ClassOf<Getter>::type;
+		C* inst = static_cast<C*>(cmp.scene);
+		int count = (inst->*counter)(cmp.handle);
+		stream.write(count);
+		const Vec2* values = (inst->*getter)(cmp.handle);
+		stream.write(values, sizeof(values[0]) * count);
+	}
+
+	void setValue(ComponentUID cmp, int index, InputBlob& stream) const override
+	{
+		ASSERT(index == -1);
+		using C = typename detail::ClassOf<Getter>::type;
+		C* inst = static_cast<C*>(cmp.scene);
+		int count;
+		stream.read(count);
+		auto* buf = (const Vec2*)stream.skip(sizeof(Vec2) * count);
+		(inst->*setter)(cmp.handle, buf, count);
+	}
+
+	float getMaxX() const override { return max_x; }
+
+	void visit(IAttributeVisitor& visitor) const override {}
+
+	Getter getter;
+	Setter setter;
+	Counter counter;
+	float max_x;
+};
+
+
 template <typename Getter, typename Setter, typename... Attributes>
 struct BlobProperty : IBlobProperty
 {
 	void getValue(ComponentUID cmp, int index, OutputBlob& stream) const override
 	{
 		using C = typename detail::ClassOf<Getter>::type;
-		C* x = static_cast<C*>(cmp.scene);
-		(x->*getter)(cmp.handle, stream);
+		C* inst = static_cast<C*>(cmp.scene);
+		(inst->*getter)(cmp.handle, stream);
 	}
 
 	void setValue(ComponentUID cmp, int index, InputBlob& stream) const override
 	{
 		using C = typename detail::ClassOf<Getter>::type;
-		C* x = static_cast<C*>(cmp.scene);
-		(x->*setter)(cmp.handle, stream);
+		C* inst = static_cast<C*>(cmp.scene);
+		(inst->*setter)(cmp.handle, stream);
 	}
 
 	void visit(IAttributeVisitor& visitor) const override {
@@ -382,15 +426,15 @@ struct CommonProperty : Property<T>
 	void getValue(ComponentUID cmp, int index, OutputBlob& stream) const override
 	{
 		using C = typename detail::ClassOf<Getter>::type;
-		C* x = static_cast<C*>(cmp.scene);
-		detail::GetterProxy<Getter>::invoke(stream, x, getter, cmp.handle, index);
+		C* inst = static_cast<C*>(cmp.scene);
+		detail::GetterProxy<Getter>::invoke(stream, inst, getter, cmp.handle, index);
 	}
 
 	void setValue(ComponentUID cmp, int index, InputBlob& stream) const override
 	{
 		using C = typename detail::ClassOf<Getter>::type;
-		C* x = static_cast<C*>(cmp.scene);
-		detail::SetterProxy<Setter>::invoke(stream, x, setter, cmp.handle, index);
+		C* inst = static_cast<C*>(cmp.scene);
+		detail::SetterProxy<Setter>::invoke(stream, inst, setter, cmp.handle, index);
 	}
 
 
@@ -475,27 +519,24 @@ struct ArrayProperty : IArrayProperty
 	void addItem(ComponentUID cmp, int index) const override
 	{
 		using C = typename detail::ClassOf<Counter>::type;
-		C* x = static_cast<C*>(cmp.scene);
-
-		(x->*adder)(cmp.handle, index);
+		C* inst = static_cast<C*>(cmp.scene);
+		(inst->*adder)(cmp.handle, index);
 	}
 
 
 	void removeItem(ComponentUID cmp, int index) const override
 	{
 		using C = typename detail::ClassOf<Counter>::type;
-		C* x = static_cast<C*>(cmp.scene);
-
-		(x->*remover)(cmp.handle, index);
+		C* inst = static_cast<C*>(cmp.scene);
+		(inst->*remover)(cmp.handle, index);
 	}
 
 
 	int getCount(ComponentUID cmp) const override
 	{ 
 		using C = typename detail::ClassOf<Counter>::type;
-		C* x = static_cast<C*>(cmp.scene);
-
-		return (x->*counter)(cmp.handle);
+		C* inst = static_cast<C*>(cmp.scene);
+		return (inst->*counter)(cmp.handle);
 	}
 
 
@@ -513,6 +554,7 @@ struct ArrayProperty : IArrayProperty
 	Adder adder;
 	Remover remover;
 };
+
 
 template <typename Counter, typename... Properties>
 struct ConstArrayProperty : IArrayProperty
@@ -587,9 +629,8 @@ struct ConstArrayProperty : IArrayProperty
 	int getCount(ComponentUID cmp) const override
 	{
 		using C = typename detail::ClassOf<Counter>::type;
-		C* x = static_cast<C*>(cmp.scene);
-
-		return (x->*counter)(cmp.handle);
+		C* inst = static_cast<C*>(cmp.scene);
+		return (inst->*counter)(cmp.handle);
 	}
 
 
@@ -650,6 +691,20 @@ auto blob_property(const char* name, Getter getter, Setter setter, Attributes...
 	p.getter = getter;
 	p.setter = setter;
 	p.name = name;
+	return p;
+}
+
+
+template <typename Getter, typename Setter, typename Counter>
+auto sampled_func_property(const char* name, Getter getter, Setter setter, Counter counter, float max_x)
+{
+	using R = typename detail::ResultOf<Getter>::type;
+	SampledFuncProperty<Getter, Setter, Counter> p;
+	p.getter = getter;
+	p.setter = setter;
+	p.counter = counter;
+	p.name = name;
+	p.max_x = max_x;
 	return p;
 }
 

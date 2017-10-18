@@ -688,6 +688,7 @@ public:
 
 		void visit(const Properties::IEnumProperty& prop) override { notSupported(prop); }
 		void visit(const Properties::IBlobProperty& prop) override { notSupported(prop); }
+		void visit(const Properties::ISampledFuncProperty& prop) override { notSupported(prop); }
 
 
 		void notSupported(const Properties::PropertyBase& prop)
