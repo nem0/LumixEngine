@@ -461,7 +461,7 @@ void AssetBrowser::fileColumn()
 	
 	auto callbacks = [this](FileInfo& tile) {
 		if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tile.filepath.data);
-		if (ImGui::IsMouseDragging() && ImGui::IsItemHoveredRect())
+		if (ImGui::IsMouseDragging() && ImGui::IsItemRectHovered())
 		{
 			if (m_app.getDragData().type == StudioApp::DragData::NONE)
 			{
@@ -688,7 +688,7 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* bu
 	auto pos = ImGui::GetCursorPos();
 	pos.x += text_width;
 	ImGui::BeginGroup();
-	ImGui::AlignFirstTextHeightToWidgets();
+	ImGui::AlignTextToFramePadding();
 	ImGui::PushTextWrapPos(pos.x);
 	ImGui::Text("%s", c);
 	ImGui::PopTextWrapPos();
@@ -700,7 +700,7 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* bu
 		ImGui::OpenPopup(popup_name);
 	}
 	ImGui::EndGroup();
-	if (ImGui::IsItemHoveredRect())
+	if (ImGui::IsItemRectHovered())
 	{
 		if (ImGui::IsMouseReleased(0) && m_app.getDragData().type == StudioApp::DragData::PATH)
 		{

@@ -28,7 +28,7 @@ static void loadStyle(lua_State* L)
 		auto& style = ImGui::GetStyle();
 		for (int i = 0; i < ImGuiCol_COUNT; ++i)
 		{
-			const char* name = ImGui::GetStyleColName(i);
+			const char* name = ImGui::GetStyleColorName(i);
 			if (lua_getfield(L, -1, name) == LUA_TTABLE)
 			{
 				if (lua_rawgeti(L, -1, 1) == LUA_TNUMBER) style.Colors[i].x = (float)lua_tonumber(L, -1);
@@ -50,7 +50,7 @@ static void saveStyle(FS::OsFile& file)
 	file << "style = {";
 	for (int i = 0; i < ImGuiCol_COUNT; ++i)
 	{
-		file << ImGui::GetStyleColName(i) << " = {" << style.Colors[i].x
+		file << ImGui::GetStyleColorName(i) << " = {" << style.Colors[i].x
 			<< ", " << style.Colors[i].y
 			<< ", " << style.Colors[i].z
 			<< ", " << style.Colors[i].w << "},\n";
@@ -466,7 +466,7 @@ void Settings::showShortcutSettings()
 		Action& a = *actions[i];
 		if (m_filter[0] == 0 || stristr(a.label, m_filter) != 0)
 		{
-			ImGui::AlignFirstTextHeightToWidgets();
+			ImGui::AlignTextToFramePadding();
 			ImGui::Text("%s", a.label);
 			ImGui::NextColumn();
 			shortcutInput(a.shortcut[0]);
@@ -508,7 +508,7 @@ void Settings::onGUI()
 			ImGui::InputInt("Font size (needs restart)", &m_font_size);
 			ImGui::DragFloat2("Mouse sensitivity", &m_mouse_sensitivity.x, 0.1f, 500.0f);
 
-			ImGui::AlignFirstTextHeightToWidgets();
+			ImGui::AlignTextToFramePadding();
 			ImGui::Text("%s", m_data_dir[0] != '\0' ? m_data_dir : "Not set");
 			ImGui::SameLine();
 			if (m_data_dir[0] != '\0')

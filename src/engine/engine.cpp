@@ -218,9 +218,9 @@ int SetNextWindowPos(lua_State* L)
 }
 
 
-int AlignFirstTextHeightToWidgets(lua_State* L)
+int AlignTextToFramePadding(lua_State* L)
 {
-	ImGui::AlignFirstTextHeightToWidgets();
+	ImGui::AlignTextToFramePadding();
 	return 0;
 }
 
@@ -294,7 +294,8 @@ bool IsMouseClicked(int button)
 
 int SetNextWindowPosCenter(lua_State* L)
 {
-	ImGui::SetNextWindowPosCenter();
+	ImVec2 size = ImGui::GetIO().DisplaySize;
+	ImGui::SetNextWindowPos(ImVec2(size.x * 0.5f, size.y * 0.5f), 0, ImVec2(0.5f, 0.5f));
 	return 0;
 }
 
@@ -1062,7 +1063,7 @@ public:
 		LuaWrapper::createSystemVariable(m_state, "ImGui", "StyleVar_ItemSpacing", ImGuiStyleVar_ItemSpacing);
 		LuaWrapper::createSystemVariable(m_state, "ImGui", "StyleVar_ItemInnerSpacing", ImGuiStyleVar_ItemInnerSpacing);
 		LuaWrapper::createSystemVariable(m_state, "ImGui", "StyleVar_WindowPadding", ImGuiStyleVar_WindowPadding);
-		LuaImGui::registerCFunction(m_state, "AlignFirstTextHeightToWidgets", &LuaImGui::AlignFirstTextHeightToWidgets);
+		LuaImGui::registerCFunction(m_state, "AlignTextToFramePadding", &LuaImGui::AlignTextToFramePadding);
 		LuaImGui::registerCFunction(m_state, "Begin", &LuaImGui::Begin);
 		LuaImGui::registerCFunction(m_state, "BeginChildFrame", &LuaImGui::BeginChildFrame);
 		LuaImGui::registerCFunction(m_state, "BeginDock", LuaImGui::BeginDock);

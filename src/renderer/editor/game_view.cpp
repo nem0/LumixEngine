@@ -162,14 +162,12 @@ void GameView::captureMouse(bool capture)
 
 void GameView::onFullscreenGUI()
 {
-	ImGui::SetNextWindowPos(ImVec2(0, 0));
 	bool open = true;
 	ImGuiIO& io = ImGui::GetIO();
 	ImVec2 size = io.DisplaySize;
+	ImGui::SetNextWindowPos(size);
 	if (!ImGui::Begin("game view fullscreen",
 		&open,
-		size,
-		1.0f,
 		ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse |
 		ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
 		ImGuiWindowFlags_ShowBorders))
@@ -288,7 +286,7 @@ void GameView::onWindowGUI()
 	if (ImGui::BeginDock(window_name, &m_is_open))
 	{
 		is_game_view_visible = true;
-		m_is_mouse_hovering_window = ImGui::IsMouseHoveringWindow();
+		m_is_mouse_hovering_window = ImGui::IsWindowRectHovered();
 
 		auto content_min = ImGui::GetCursorScreenPos();
 		auto size = ImGui::GetContentRegionAvail();

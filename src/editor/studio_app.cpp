@@ -642,7 +642,8 @@ public:
 		int w, h;
 		SDL_GetWindowSize(m_window, &w, &h);
 		ImVec2 size((float)w, (float)h);
-		if (ImGui::Begin("Welcome", nullptr, size, -1, flags))
+		ImGui::SetNextWindowSize(size);
+		if (ImGui::Begin("Welcome", nullptr, flags))
 		{
 			ImGui::Text("Welcome to Lumix Studio");
 
@@ -1273,7 +1274,7 @@ public:
 		{
 			startDrag(StudioApp::DragData::ENTITY, &entity, sizeof(entity));
 		}
-		if (ImGui::IsItemHoveredRect() && ImGui::IsMouseReleased(0) && m_drag_data.type == StudioApp::DragData::ENTITY)
+		if (ImGui::IsItemRectHovered() && ImGui::IsMouseReleased(0) && m_drag_data.type == StudioApp::DragData::ENTITY)
 		{
 			Entity dropped_entity = *(Entity*)m_drag_data.data;
 			if (dropped_entity != entity)
