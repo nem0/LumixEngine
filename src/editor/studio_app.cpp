@@ -1302,37 +1302,41 @@ public:
 			auto* universe = m_editor->getUniverse();
 			ImGui::FilterInput("Filter", filter, sizeof(filter));
 
-			ImGui::PushItemWidth(ImGui::GetContentRegionAvailWidth() - ImGui::GetStyle().FramePadding.x);
-			if (filter[0] == '\0')
+			if (ImGui::BeginChild("entities"))
 			{
-				for (Entity e = universe->getFirstEntity(); e.isValid(); e = universe->getNextEntity(e))
+				ImGui::PushItemWidth(ImGui::GetContentRegionAvailWidth() - ImGui::GetStyle().FramePadding.x);
+				if (filter[0] == '\0')
 				{
-					if (!universe->getParent(e).isValid())
+					for (Entity e = universe->getFirstEntity(); e.isValid(); e = universe->getNextEntity(e))
 					{
-						showHierarchy(e, entities);
+						if (!universe->getParent(e).isValid())
+						{
+							showHierarchy(e, entities);
+						}
 					}
 				}
-			}
-			else
-			{
-				for (Entity e = universe->getFirstEntity(); e.isValid(); e = universe->getNextEntity(e))
+				else
 				{
-					char buffer[1024];
-					Universe* universe = m_editor->getUniverse();
-					getEntityListDisplayName(*m_editor, buffer, sizeof(buffer), e);
-					if (stristr(buffer, filter) == nullptr) continue;
-					bool selected = entities.indexOf(e) >= 0;
-					if (ImGui::Selectable(buffer, &selected))
+					for (Entity e = universe->getFirstEntity(); e.isValid(); e = universe->getNextEntity(e))
 					{
-						m_editor->selectEntities(&e, 1);
-					}
-					if (ImGui::IsMouseDragging() && ImGui::IsItemActive())
-					{
-						startDrag(StudioApp::DragData::ENTITY, &e, sizeof(e));
+						char buffer[1024];
+						Universe* universe = m_editor->getUniverse();
+						getEntityListDisplayName(*m_editor, buffer, sizeof(buffer), e);
+						if (stristr(buffer, filter) == nullptr) continue;
+						bool selected = entities.indexOf(e) >= 0;
+						if (ImGui::Selectable(buffer, &selected))
+						{
+							m_editor->selectEntities(&e, 1);
+						}
+						if (ImGui::IsMouseDragging() && ImGui::IsItemActive())
+						{
+							startDrag(StudioApp::DragData::ENTITY, &e, sizeof(e));
+						}
 					}
 				}
+				ImGui::PopItemWidth();
 			}
-			ImGui::PopItemWidth();
+			ImGui::EndChild();
 		}
 		ImGui::EndDock();
 	}
