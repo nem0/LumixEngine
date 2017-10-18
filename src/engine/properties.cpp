@@ -116,6 +116,7 @@ const PropertyBase* getProperty(ComponentType cmp_type, u32 property_name_hash)
 			if (crc32(prop.name) == property_name_hash) result = &prop;
 		}
 		void visit(const IArrayProperty& prop) override {
+			if (result) return;
 			visitProperty(prop);
 			prop.visit(*this);
 		}
@@ -209,8 +210,17 @@ void init(IAllocator& allocator)
 }
 
 
+static void destroy(ComponentLink* link)
+{
+	if (!link) return;
+	destroy(link->next);
+	LUMIX_DELETE(*g_allocator, link);
+}
+
+
 void shutdown()
 {
+	destroy(g_first_component);
 	g_allocator = nullptr;
 }
 

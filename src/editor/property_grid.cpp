@@ -504,6 +504,7 @@ void PropertyGrid::showComponentProperties(const Array<Entity>& entities, Compon
 	if (ImGui::SmallButton("Remove"))
 	{
 		m_editor.destroyComponent(&entities[0], entities.size(), cmp_type);
+		if (is_open) ImGui::TreePop();
 		return;
 	}
 

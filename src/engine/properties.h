@@ -210,6 +210,7 @@ struct IEnumProperty : public PropertyBase
 };
 
 
+struct ComponentBase;
 struct IComponentVisitor;
 
 
@@ -225,6 +226,7 @@ struct IArrayProperty : PropertyBase
 
 struct IComponentVisitor
 {
+	virtual void begin(const ComponentBase&) {}
 	virtual void visit(const Property<float>& prop) = 0;
 	virtual void visit(const Property<int>& prop) = 0;
 	virtual void visit(const Property<Entity>& prop) = 0;
@@ -239,6 +241,7 @@ struct IComponentVisitor
 	virtual void visit(const IEnumProperty& prop) = 0;
 	virtual void visit(const IBlobProperty& prop) = 0;
 	virtual void visit(const ISampledFuncProperty& prop) = 0;
+	virtual void end(const ComponentBase&) {}
 };
 
 
@@ -265,6 +268,7 @@ struct ISimpleComponentVisitor : IComponentVisitor
 
 struct ComponentBase
 {
+	virtual int getPropertyCount() const = 0;
 	virtual void visit(IComponentVisitor&) const = 0;
 
 	const char* name;
@@ -669,9 +673,14 @@ struct Scene
 template <typename... Properties>
 struct Component : ComponentBase
 {
+	int getPropertyCount() const override { return sizeof...(Properties); }
+
+
 	void visit(IComponentVisitor& visitor) const override
 	{
+		visitor.begin(*this);
 		apply([&](auto& x) { visitor.visit(x); }, properties);
+		visitor.end(*this);
 	}
 
 

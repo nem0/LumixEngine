@@ -49,6 +49,25 @@ static const ComponentType MODEL_INSTANCE_TYPE = Properties::getComponentType("r
 static const ComponentType CAMERA_TYPE = Properties::getComponentType("camera");
 
 
+static void load(ComponentUID cmp, int index, InputBlob& blob)
+{
+	int count = blob.read<int>();
+	for (int i = 0; i < count; ++i)
+	{
+		u32 hash = blob.read<u32>();
+		int size = blob.read<int>();
+		const Properties::PropertyBase* prop = Properties::getProperty(cmp.type, hash);
+		if (!prop)
+		{
+			blob.skip(size);
+			continue;
+		}
+
+		prop->setValue(cmp, index, blob);
+	}
+}
+
+
 struct BeginGroupCommand LUMIX_FINAL : public IEditorCommand
 {
 	BeginGroupCommand() {}
@@ -727,26 +746,22 @@ struct GatherResourcesVisitor : Properties::ISimpleComponentVisitor
 
 struct SaveVisitor : Properties::ISimpleComponentVisitor
 {
+	void begin(const Properties::ComponentBase& cmp) override
+	{
+		stream->write(cmp.getPropertyCount());
+	}
+
 	void visitProperty(const Properties::PropertyBase& prop) override
 	{
+		stream->write(crc32(prop.name));
+		int size = stream->getPos();
+		stream->write(size);
 		prop.getValue(cmp, index, *stream);
+		*(int*)((u8*)stream->getData() + size) = stream->getPos() - size - sizeof(int);
 	}
 
 	ComponentUID cmp;
 	OutputBlob* stream;
-	int index = -1;
-};
-
-
-struct LoadVisitor : Properties::ISimpleComponentVisitor
-{
-	void visitProperty(const Properties::PropertyBase& prop) override
-	{
-		prop.setValue(cmp, index, *stream);
-	}
-
-	ComponentUID cmp;
-	InputBlob* stream;
 	int index = -1;
 };
 
@@ -816,11 +831,7 @@ public:
 	{
 		m_property->addItem(m_component, m_index);
 		InputBlob old_values(m_old_values);
-		LoadVisitor load;
-		load.index = m_index;
-		load.cmp = m_component;
-		load.stream = &old_values;
-		m_property->visit(load);
+		load(m_component, m_index, old_values);
 	}
 
 
@@ -1281,20 +1292,7 @@ private:
 			Universe* universe = m_editor.getUniverse();
 			for (int i = 0; i < count; ++i)
 			{
-				u64 prefab = prefab_system.getPrefab(entities[i]);
-				if (prefab != 0)
-				{
-					Entity instance = prefab_system.getFirstInstance(prefab);
-					while (instance.isValid())
-					{
-						m_entities.push(instance);
-						instance = prefab_system.getNextInstance(instance);
-					}
-				}
-				else
-				{
-					m_entities.push(entities[i]);
-				}
+				m_entities.push(entities[i]);
 			}
 			m_transformations.reserve(m_entities.size());
 		}
@@ -1480,12 +1478,7 @@ private:
 					new_component.scene = scene;
 					new_component.type = cmp_type;
 					
-					const Properties::ComponentBase* cmp_desc = Properties::getComponent(cmp_type);
-
-					LoadVisitor v;
-					v.cmp = new_component;
-					v.stream = &blob;
-					cmp_desc->visit(v);
+					::Lumix::load(new_component, -1, blob);
 				}
 				u64 tpl;
 				blob.read(tpl);
@@ -1598,10 +1591,7 @@ private:
 			{
 				cmp.entity = entity;
 				cmp.handle = cmp.scene->createComponent(cmp.type, cmp.entity);
-				LoadVisitor v;
-				v.cmp = cmp;
-				v.stream = &blob;
-				cmp_desc->visit(v);
+				::Lumix::load(cmp, -1, blob);
 			}
 		}
 
@@ -2985,10 +2975,7 @@ public:
 		cmp_desc->visit(save);
 
 		InputBlob blob(stream);
-		LoadVisitor load;
-		load.cmp = clone;
-		load.stream = &blob;
-		cmp_desc->visit(load);
+		::Lumix::load(clone, -1, blob);
 	}
 
 
@@ -3937,10 +3924,7 @@ bool PasteEntityCommand::execute()
 			ComponentUID cmp = m_editor.getEngine().createComponent(universe, new_entity, type);
 			const Properties::ComponentBase* cmp_desc = Properties::getComponent(cmp.type);
 			
-			LoadVisitor load;
-			load.cmp = cmp;
-			load.stream = &blob;
-			cmp_desc->visit(load);
+			load(cmp, -1, blob);
 		}
 	}
 	return true;
