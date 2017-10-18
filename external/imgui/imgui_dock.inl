@@ -459,8 +459,6 @@ struct DockContext
 
 		Begin("##Overlay",
 			NULL,
-			ImVec2(0, 0),
-			0.f,
 			ImGuiWindowFlags_Tooltip | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove |
 				ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
 				ImGuiWindowFlags_AlwaysAutoResize);
@@ -951,11 +949,9 @@ struct DockContext
 		if (is_float)
 		{
 			SetNextWindowPos(dock.pos);
-			SetNextWindowSize(dock.size);
+			SetNextWindowSize(dock.size, ImGuiCond_FirstUseEver);
 			bool ret = Begin(label,
 				opened,
-				dock.size,
-				-1.0f,
 				ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_ShowBorders | extra_flags);
 			m_end_action = EndAction_End;
 			dock.pos = GetWindowPos();

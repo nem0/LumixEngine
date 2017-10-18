@@ -52,7 +52,7 @@ namespace ImGui
 		if (size.x == 0) size.x = GetContentRegionAvailWidth();
 		SetNextWindowSize(size);
 
-		bool ret = is_global ? Begin(str_id, nullptr, size, -1, flags) : BeginChild(str_id, size, false, flags);
+		bool ret = is_global ? Begin(str_id, nullptr, flags) : BeginChild(str_id, size, false, flags);
 		PopStyleVar(3);
 
 		return ret;
@@ -83,6 +83,21 @@ namespace ImGui
 	void ResetActiveID()
 	{
 		SetActiveID(0, nullptr);
+	}
+
+
+	static bool IsHovered(const ImRect& bb, ImGuiID id)
+	{
+		ImGuiContext& g = *GImGui;
+		if (g.HoveredId == 0 || g.HoveredId == id || g.HoveredIdAllowOverlap)
+		{
+			ImGuiWindow* window = GetCurrentWindowRead();
+			if (g.HoveredWindow == window)
+				if ((g.ActiveId == 0 || g.ActiveId == id || g.ActiveIdAllowOverlap) && IsMouseHoveringRect(bb.Min, bb.Max))
+					if (IsWindowContentHoverable(g.HoveredRootWindow))
+						return true;
+		}
+		return false;
 	}
 
 
@@ -245,7 +260,7 @@ namespace ImGui
 	bool IsFocusedHierarchy()
 	{
 		ImGuiContext& g = *GImGui;
-		return isPredecessor(g.CurrentWindow, g.FocusedWindow) || isPredecessor(g.FocusedWindow, g.CurrentWindow);
+		return isPredecessor(g.CurrentWindow, g.NavWindow) || isPredecessor(g.NavWindow, g.CurrentWindow);
 	}
 
 
@@ -448,7 +463,7 @@ namespace ImGui
 			ImVec2(label_size.x > 0.0f ? style.ItemInnerSpacing.x + label_size.x : 0.0f, 0));
 
 		ItemSize(total_bb, style.FramePadding.y);
-		if (!ItemAdd(total_bb, nullptr)) return editor;
+		if (!ItemAdd(total_bb, 0)) return editor;
 
 		editor.valid = true;
 		PushID(label);
@@ -640,9 +655,9 @@ namespace ImGui
 
 		char name[32];
 		ImFormatString(name, 20, "##popup_%08x", id);
-		float alpha = 1.0f;
 
-		bool opened = ImGui::Begin(name, NULL, size_on_first_use, alpha, flags);
+		ImGui::SetNextWindowSize(size_on_first_use, ImGuiCond_FirstUseEver);
+		bool opened = ImGui::Begin(name, NULL, flags);
 		if (!(window->Flags & ImGuiWindowFlags_ShowBorders))
 			g.CurrentWindow->Flags &= ~ImGuiWindowFlags_ShowBorders;
 		if (!opened)
@@ -695,7 +710,7 @@ namespace ImGui
 		{
 			pos.x += GetStyle().FramePadding.x;
 			SetCursorPos(pos);
-			AlignFirstTextHeightToWidgets();
+			AlignTextToFramePadding();
 			TextColored(GetStyle().Colors[ImGuiCol_TextDisabled], "Filter");
 		}
 		PopItemWidth();

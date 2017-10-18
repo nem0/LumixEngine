@@ -389,7 +389,7 @@ void SceneView::onWindowGUI()
 			{
 				ImGui::Image(&m_texture_handle, size);
 			}
-			if (ImGui::IsItemHoveredRect())
+			if (ImGui::IsItemRectHovered())
 			{
 				if (ImGui::IsMouseReleased(0) && m_app.getDragData().type == StudioApp::DragData::PATH)
 				{
