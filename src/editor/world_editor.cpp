@@ -1030,7 +1030,6 @@ public:
 			ComponentUID component = m_editor.getUniverse()->getComponent(entity, m_component_type);
 			blob.rewind();
 			m_property->setValue(component, m_index, blob);
-			//m_property_descriptor->set(component, m_index, blob);
 		}
 		return true;
 	}
@@ -1043,7 +1042,6 @@ public:
 		{
 			ComponentUID component = m_editor.getUniverse()->getComponent(entity, m_component_type);
 			m_property->setValue(component, m_index, blob);
-			//m_property_descriptor->set(component, m_index, blob);
 		}
 	}
 
