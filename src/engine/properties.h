@@ -50,11 +50,11 @@ template <typename T> T readFromStream(InputBlob& stream)
 	return stream.read<T>();
 };
 
-template <> Path readFromStream<Path>(InputBlob& stream);
-template <> void writeToStream<Path>(OutputBlob& stream, Path);
-template <> void writeToStream<const Path&>(OutputBlob& stream, const Path& path);
-template <> const char* readFromStream<const char*>(InputBlob& stream);
-template <> void writeToStream<const char*>(OutputBlob& stream, const char* path);
+template <> LUMIX_ENGINE_API Path readFromStream<Path>(InputBlob& stream);
+template <> LUMIX_ENGINE_API void writeToStream<Path>(OutputBlob& stream, Path);
+template <> LUMIX_ENGINE_API void writeToStream<const Path&>(OutputBlob& stream, const Path& path);
+template <> LUMIX_ENGINE_API const char* readFromStream<const char*>(InputBlob& stream);
+template <> LUMIX_ENGINE_API void writeToStream<const char*>(OutputBlob& stream, const char* path);
 
 
 template <typename Getter> struct GetterProxy;

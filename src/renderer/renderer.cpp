@@ -220,6 +220,12 @@ static void registerProperties(IAllocator& allocator)
 	);
 	Properties::registerComponent(&particle_emitter_alpha);
 
+	static auto particle_emitter_random_rotation = component("particle_emitter_random_rotation");
+	Properties::registerComponent(&particle_emitter_random_rotation);
+
+	static auto environment_probe = component("environment_probe");
+	Properties::registerComponent(&environment_probe);
+
 	static auto particle_emitter_force = component("particle_emitter_force",
 		property("Acceleration", &RenderScene::getParticleEmitterAcceleration, &RenderScene::setParticleEmitterAcceleration)
 	);

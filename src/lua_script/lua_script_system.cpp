@@ -570,180 +570,123 @@ namespace Lumix
 		}
 
 
+		struct GetPropertyVisitor LUMIX_FINAL : Properties::IComponentVisitor
+		{
+			template <typename T>
+			LUMIX_FORCE_INLINE void get(const Properties::Property<T>& prop)
+			{
+				T v;
+				OutputBlob blob(&v, sizeof(v));
+				prop.getValue(cmp, -1, blob);
+				LuaWrapper::push(L, v);
+			}
+
+			void visit(const Properties::Property<float>& prop) override { get(prop); }
+			void visit(const Properties::Property<int>& prop) override { get(prop); }
+			void visit(const Properties::Property<bool>& prop) override { get(prop); }
+			void visit(const Properties::Property<Int2>& prop) override { get(prop); }
+			void visit(const Properties::Property<Vec2>& prop) override { get(prop); }
+			void visit(const Properties::Property<Vec3>& prop) override { get(prop); }
+			void visit(const Properties::Property<Vec4>& prop) override { get(prop); }
+			void visit(const Properties::Property<Entity>& prop) override { get(prop); }
+
+			void visit(const Properties::Property<Path>& prop) override
+			{
+				char buf[1024];
+				OutputBlob blob(buf, sizeof(buf));
+				prop.getValue(cmp, -1, blob);
+				LuaWrapper::push(L, buf);
+			}
+
+			void visit(const Properties::Property<const char*>& prop) override
+			{
+				char buf[1024];
+				OutputBlob blob(buf, sizeof(buf));
+				prop.getValue(cmp, -1, blob);
+				LuaWrapper::push(L, buf);
+			}
+
+			void visit(const Properties::IArrayProperty& prop) override { ASSERT(false); }
+			void visit(const Properties::IEnumProperty& prop) override { ASSERT(false); }
+			void visit(const Properties::IBlobProperty& prop) override { ASSERT(false); }
+			void visit(const Properties::ISampledFuncProperty& prop) override { ASSERT(false); }
+
+			ComponentUID cmp;
+			lua_State* L;
+		};
+
+
+		template <typename T>
 		static int LUA_getProperty(lua_State* L)
 		{
-			/*auto* desc = LuaWrapper::toType<PropertyDescriptorBase*>(L, lua_upvalueindex(1));
-			ComponentType type = { LuaWrapper::toType<int>(L, lua_upvalueindex(2)) };
-			ComponentUID cmp;
-			cmp.scene = LuaWrapper::checkArg<IScene*>(L, 1);
-			cmp.handle = LuaWrapper::checkArg<ComponentHandle>(L, 2);
-			cmp.type = type;
-			cmp.entity = INVALID_ENTITY;
-			switch (desc->getType())
-			{
-				case PropertyDescriptorBase::DECIMAL:
-				{
-					float v;
-					OutputBlob blob(&v, sizeof(v));
-					desc->get(cmp, -1, blob);
-					LuaWrapper::push(L, v);
-				}
-				break;
-				case PropertyDescriptorBase::BOOL:
-				{
-					bool v;
-					OutputBlob blob(&v, sizeof(v));
-					desc->get(cmp, -1, blob);
-					LuaWrapper::push(L, v);
-				}
-				break;
-				case PropertyDescriptorBase::INTEGER:
-				{
-					int v;
-					OutputBlob blob(&v, sizeof(v));
-					desc->get(cmp, -1, blob);
-					LuaWrapper::push(L, v);
-				}
-				break;
-				case PropertyDescriptorBase::RESOURCE:
-				case PropertyDescriptorBase::FILE:
-				case PropertyDescriptorBase::STRING:
-				{
-					char buf[1024];
-					OutputBlob blob(buf, sizeof(buf));
-					desc->get(cmp, -1, blob);
-					LuaWrapper::push(L, buf);
-				}
-				break;
-				case PropertyDescriptorBase::COLOR:
-				case PropertyDescriptorBase::VEC3:
-				{
-					Vec3 v;
-					OutputBlob blob(&v, sizeof(v));
-					desc->get(cmp, -1, blob);
-					LuaWrapper::push(L, v);
-				}
-				break;
-				case PropertyDescriptorBase::VEC2:
-				{
-					Vec2 v;
-					OutputBlob blob(&v, sizeof(v));
-					desc->get(cmp, -1, blob);
-					LuaWrapper::push(L, v);
-				}
-				break;
-				case PropertyDescriptorBase::INT2:
-				{
-					Int2 v;
-					OutputBlob blob(&v, sizeof(v));
-					desc->get(cmp, -1, blob);
-					LuaWrapper::push(L, v);
-				}
-				break;
-				case PropertyDescriptorBase::ENTITY:
-				{
-					Entity v;
-					OutputBlob blob(&v, sizeof(v));
-					desc->get(cmp, -1, blob);
-					LuaWrapper::push(L, v);
-				}
-				break;
-				case PropertyDescriptorBase::ENUM:
-				{
-					int v;
-					OutputBlob blob(&v, sizeof(v));
-					desc->get(cmp, -1, blob);
-					LuaWrapper::push(L, v);
-				}
-				break;
-				default: luaL_argerror(L, 1, "Unsupported property type"); break;
-			}
-			return 1;*/
-			// TODO
+			auto* prop = LuaWrapper::toType<T*>(L, lua_upvalueindex(1));
+			GetPropertyVisitor visitor;
+			visitor.L = L;
+			visitor.cmp.type = { LuaWrapper::toType<int>(L, lua_upvalueindex(2)) };
+			visitor.cmp.scene = LuaWrapper::checkArg<IScene*>(L, 1);
+			visitor.cmp.handle = LuaWrapper::checkArg<ComponentHandle>(L, 2);
+			visitor.cmp.entity = INVALID_ENTITY;
+			visitor.visit(*prop);
+			return 1;
 		}
 
 
+		struct SetPropertyVisitor LUMIX_FINAL : Properties::IComponentVisitor
+		{
+			template <typename T>
+			LUMIX_FORCE_INLINE void set(const Properties::Property<T>& prop)
+			{
+				auto v = LuaWrapper::checkArg<T>(L, 3);
+				InputBlob blob(&v, sizeof(v));
+				prop.setValue(cmp, -1, blob);
+			}
+
+			void visit(const Properties::Property<float>& prop) override { set(prop); }
+			void visit(const Properties::Property<int>& prop) override { set(prop); }
+			void visit(const Properties::Property<bool>& prop) override { set(prop); }
+			void visit(const Properties::Property<Int2>& prop) override { set(prop); }
+			void visit(const Properties::Property<Vec2>& prop) override { set(prop); }
+			void visit(const Properties::Property<Vec3>& prop) override { set(prop); }
+			void visit(const Properties::Property<Vec4>& prop) override { set(prop); }
+			void visit(const Properties::Property<Entity>& prop) override { set(prop); }
+
+			void visit(const Properties::Property<Path>& prop) override
+			{
+				auto* v = LuaWrapper::checkArg<const char*>(L, 3);
+				InputBlob blob(v, stringLength(v) + 1);
+				prop.setValue(cmp, -1, blob);
+			}
+			
+			void visit(const Properties::Property<const char*>& prop) override
+			{
+				auto* v = LuaWrapper::checkArg<const char*>(L, 3);
+				InputBlob blob(v, stringLength(v) + 1);
+				prop.setValue(cmp, -1, blob);
+			}
+
+			void visit(const Properties::IArrayProperty& prop) override { ASSERT(false); }
+			void visit(const Properties::IEnumProperty& prop) override { ASSERT(false); }
+			void visit(const Properties::IBlobProperty& prop) override { ASSERT(false); }
+			void visit(const Properties::ISampledFuncProperty& prop) override { ASSERT(false); }
+
+			ComponentUID cmp;
+			lua_State* L;
+		};
+
+
+		template <typename T>
 		static int LUA_setProperty(lua_State* L)
 		{
-			/*auto* desc = LuaWrapper::toType<PropertyDescriptorBase*>(L, lua_upvalueindex(1));
+			auto* prop = LuaWrapper::toType<T*>(L, lua_upvalueindex(1));
 			ComponentType type = { LuaWrapper::toType<int>(L, lua_upvalueindex(2)) };
-			ComponentUID cmp;
-			cmp.scene = LuaWrapper::checkArg<IScene*>(L, 1);
-			cmp.handle = LuaWrapper::checkArg<ComponentHandle>(L, 2);
-			cmp.type = type;
-			cmp.entity = INVALID_ENTITY;
-			switch(desc->getType())
-			{
-				case PropertyDescriptorBase::DECIMAL:
-				{
-					auto v = LuaWrapper::checkArg<float>(L, 3);
-					InputBlob blob(&v, sizeof(v));
-					desc->set(cmp, -1, blob);
-				}
-				break;
-				case PropertyDescriptorBase::INTEGER:
-				{
-					auto v = LuaWrapper::checkArg<int>(L, 3);
-					InputBlob blob(&v, sizeof(v));
-					desc->set(cmp, -1, blob);
-				}
-				break;
-				case PropertyDescriptorBase::BOOL:
-				{
-					auto v = LuaWrapper::checkArg<bool>(L, 3);
-					InputBlob blob(&v, sizeof(v));
-					desc->set(cmp, -1, blob);
-				}
-				break;
-				case PropertyDescriptorBase::RESOURCE:
-				case PropertyDescriptorBase::FILE:
-				case PropertyDescriptorBase::STRING:
-				{
-					auto* v = LuaWrapper::checkArg<const char*>(L, 3);
-					InputBlob blob(v, stringLength(v) + 1);
-					desc->set(cmp, -1, blob);
-				}
-				break;
-				case PropertyDescriptorBase::COLOR:
-				case PropertyDescriptorBase::VEC3:
-				{
-					auto v = LuaWrapper::checkArg<Vec3>(L, 3);
-					InputBlob blob(&v, sizeof(v));
-					desc->set(cmp, -1, blob);
-				}
-				break;
-				case PropertyDescriptorBase::VEC2:
-				{
-					auto v = LuaWrapper::checkArg<Vec2>(L, 3);
-					InputBlob blob(&v, sizeof(v));
-					desc->set(cmp, -1, blob);
-				}
-				break;
-				case PropertyDescriptorBase::INT2:
-				{
-					auto v = LuaWrapper::checkArg<Int2>(L, 3);
-					InputBlob blob(&v, sizeof(v));
-					desc->set(cmp, -1, blob);
-				}
-				break;
-				case PropertyDescriptorBase::ENTITY:
-				{
-					auto v = LuaWrapper::checkArg<Entity>(L, 3);
-					InputBlob blob(&v, sizeof(v));
-					desc->set(cmp, -1, blob);
-				}
-				break;
-				case PropertyDescriptorBase::ENUM:
-				{
-					auto v = LuaWrapper::checkArg<int>(L, 3);
-					InputBlob blob(&v, sizeof(v));
-					desc->set(cmp, -1, blob);
-				}
-				break;
-				default: luaL_argerror(L, 1, "Unsupported property type"); break;
-			}*/
+			SetPropertyVisitor visitor;
+			visitor.L = L;
+			visitor.cmp.scene = LuaWrapper::checkArg<IScene*>(L, 1);
+			visitor.cmp.handle = LuaWrapper::checkArg<ComponentHandle>(L, 2);
+			visitor.cmp.type = type;
+			visitor.cmp.entity = INVALID_ENTITY;
+			visitor.visit(*prop);
 
-			// TODO
 			return 0;
 		}
 
@@ -776,9 +719,52 @@ namespace Lumix
 		}
 
 
+		struct LuaCreatePropertyVisitor : Properties::IComponentVisitor
+		{
+			template <typename T>
+			void set(T& prop)
+			{
+				char tmp[50];
+				char setter[50];
+				char getter[50];
+				convertPropertyToLuaName(prop.name, tmp, lengthOf(tmp));
+				copyString(setter, "set");
+				copyString(getter, "get");
+				catString(setter, tmp);
+				catString(getter, tmp);
+				lua_pushlightuserdata(L, (void*)&prop);
+				lua_pushinteger(L, cmp_type.index);
+				lua_pushcclosure(L, &LUA_setProperty<T>, 2);
+				lua_setfield(L, -2, setter);
+
+				lua_pushlightuserdata(L, (void*)&prop);
+				lua_pushinteger(L, cmp_type.index);
+				lua_pushcclosure(L, &LUA_getProperty<T>, 2);
+				lua_setfield(L, -2, getter);
+			}
+
+			void visit(const Properties::Property<float>& prop) override { set(prop); }
+			void visit(const Properties::Property<int>& prop) override { set(prop); }
+			void visit(const Properties::Property<Entity>& prop) override { set(prop); }
+			void visit(const Properties::Property<Int2>& prop) override { set(prop); }
+			void visit(const Properties::Property<Vec2>& prop) override { set(prop); }
+			void visit(const Properties::Property<Vec3>& prop) override { set(prop); }
+			void visit(const Properties::Property<Vec4>& prop) override { set(prop); }
+			void visit(const Properties::Property<Path>& prop) override { set(prop); }
+			void visit(const Properties::Property<bool>& prop) override { set(prop); }
+			void visit(const Properties::Property<const char*>& prop) override { set(prop); }
+			void visit(const Properties::IArrayProperty& prop) override {}
+			void visit(const Properties::IEnumProperty& prop) override {}
+			void visit(const Properties::IBlobProperty& prop) override {}
+			void visit(const Properties::ISampledFuncProperty& prop) override {}
+
+			ComponentType cmp_type;
+			lua_State* L;
+		};
+
 		void registerProperties()
 		{
-			/*int cmps_count = Properties::getComponentTypesCount();
+			int cmps_count = Properties::getComponentTypesCount();
 			lua_State* L = m_system.m_engine.getState();
 			for (int i = 0; i < cmps_count; ++i)
 			{
@@ -790,46 +776,17 @@ namespace Lumix
 				lua_setglobal(L, tmp);
 
 				ComponentType cmp_type = Properties::getComponentType(cmp_name);
-				auto& descs = Properties::getDescriptors(cmp_type);
-				char setter[50];
-				char getter[50];
-				for (auto* desc : descs)
-				{
-					switch (desc->getType())
-					{
-						case PropertyDescriptorBase::ENTITY:
-						case PropertyDescriptorBase::ENUM:
-						case PropertyDescriptorBase::DECIMAL:
-						case PropertyDescriptorBase::INTEGER:
-						case PropertyDescriptorBase::BOOL:
-						case PropertyDescriptorBase::VEC3:
-						case PropertyDescriptorBase::VEC2:
-						case PropertyDescriptorBase::INT2:
-						case PropertyDescriptorBase::COLOR:
-						case PropertyDescriptorBase::RESOURCE:
-						case PropertyDescriptorBase::FILE:
-						case PropertyDescriptorBase::STRING:
-							convertPropertyToLuaName(desc->getName(), tmp, lengthOf(tmp));
-							copyString(setter, "set");
-							copyString(getter, "get");
-							catString(setter, tmp);
-							catString(getter, tmp);
-							lua_pushlightuserdata(L, desc);
-							lua_pushinteger(L, cmp_type.index);
-							lua_pushcclosure(L, &LUA_setProperty, 2);
-							lua_setfield(L, -2, setter);
+				const char* x = Properties::getComponentTypeID(cmp_type.index);
+				const Properties::IComponentDescriptor* cmp_desc = Properties::getComponent(cmp_type);
+				
+				LuaCreatePropertyVisitor visitor;
+				visitor.cmp_type = cmp_type;
+				visitor.L = L;
 
-							lua_pushlightuserdata(L, desc);
-							lua_pushinteger(L, cmp_type.index);
-							lua_pushcclosure(L, &LUA_getProperty, 2);
-							lua_setfield(L, -2, getter);
-							break;
-						default: break;
-					}
-				}
+				cmp_desc->visit(visitor);
+
 				lua_pop(L, 1);
-			}*/
-			//TODO
+			}
 		}
 
 

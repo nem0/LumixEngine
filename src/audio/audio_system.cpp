@@ -34,6 +34,9 @@ static void registerProperties(IAllocator& allocator)
 	);
 	Properties::registerComponent(&ambient_sound);
 	
+	static auto audio_listener = component("audio_listener");
+	Properties::registerComponent(&audio_listener);
+
 	static auto echo_zone = component("echo_zone",
 		property("Radius", &AudioScene::getEchoZoneRadius, &AudioScene::setEchoZoneRadius,
 			MinAttribute(0)),
