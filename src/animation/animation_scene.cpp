@@ -11,8 +11,7 @@
 #include "engine/lua_wrapper.h"
 #include "engine/job_system.h"
 #include "engine/profiler.h"
-#include "engine/property_descriptor.h"
-#include "engine/property_register.h"
+#include "engine/properties.h"
 #include "engine/resource_manager.h"
 #include "engine/serializer.h"
 #include "engine/universe/universe.h"
@@ -35,59 +34,11 @@ enum class AnimationSceneVersion
 };
 
 
-static const ComponentType ANIMABLE_TYPE = PropertyRegister::getComponentType("animable");
-static const ComponentType CONTROLLER_TYPE = PropertyRegister::getComponentType("anim_controller");
-static const ComponentType SHARED_CONTROLLER_TYPE = PropertyRegister::getComponentType("shared_anim_controller");
+static const ComponentType ANIMABLE_TYPE = Properties::getComponentType("animable");
+static const ComponentType CONTROLLER_TYPE = Properties::getComponentType("anim_controller");
+static const ComponentType SHARED_CONTROLLER_TYPE = Properties::getComponentType("shared_anim_controller");
 static const ResourceType ANIMATION_TYPE("animation");
 static const ResourceType CONTROLLER_RESOURCE_TYPE("anim_controller");
-
-
-struct AnimSetPropertyDescriptor : public IEnumPropertyDescriptor
-{
-	AnimSetPropertyDescriptor(const char* name)
-	{
-		setName(name);
-		m_type = ENUM;
-	}
-
-
-	void set(ComponentUID cmp, int index, InputBlob& stream) const override
-	{
-		int value;
-		stream.read(&value, sizeof(value));
-		(static_cast<AnimationScene*>(cmp.scene)->setControllerDefaultSet)(cmp.handle, value);
-	};
-
-
-	void get(ComponentUID cmp, int index, OutputBlob& stream) const override
-	{
-		int value;
-		ASSERT(index == -1);
-		value = (static_cast<AnimationScene*>(cmp.scene)->getControllerDefaultSet)(cmp.handle);
-		stream.write(&value, sizeof(value));
-	}
-
-
-	int getEnumCount(IScene* scene, ComponentHandle cmp) override
-	{
-		Anim::ControllerResource* res = static_cast<AnimationScene*>(scene)->getControllerResource(cmp);
-		return res->m_sets_names.size();
-	}
-
-
-	const char* getEnumItemName(IScene* scene, ComponentHandle cmp, int index) override
-	{
-		Anim::ControllerResource* res = static_cast<AnimationScene*>(scene)->getControllerResource(cmp);
-		return res->m_sets_names[index];
-	}
-
-
-	void getEnumItemName(IScene* scene, ComponentHandle cmp, int index, char* buf, int max_size) override
-	{
-		Anim::ControllerResource* res = static_cast<AnimationScene*>(scene)->getControllerResource(cmp);
-		copyString(buf, max_size, res->m_sets_names[index]);
-	}
-};
 
 
 namespace FS

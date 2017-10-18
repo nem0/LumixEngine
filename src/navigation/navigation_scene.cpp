@@ -11,8 +11,7 @@
 #include "engine/lua_wrapper.h"
 #include "engine/lumix.h"
 #include "engine/profiler.h"
-#include "engine/property_descriptor.h"
-#include "engine/property_register.h"
+#include "engine/properties.h"
 #include "engine/serializer.h"
 #include "engine/universe/universe.h"
 #include "engine/vec.h"
@@ -44,8 +43,8 @@ enum class NavigationSceneVersion : int
 };
 
 
-static const ComponentType NAVMESH_AGENT_TYPE = PropertyRegister::getComponentType("navmesh_agent");
-static const ComponentType ANIM_CONTROLLER_TYPE = PropertyRegister::getComponentType("anim_controller");
+static const ComponentType NAVMESH_AGENT_TYPE = Properties::getComponentType("navmesh_agent");
+static const ComponentType ANIM_CONTROLLER_TYPE = Properties::getComponentType("anim_controller");
 static const int CELLS_PER_TILE_SIDE = 256;
 static const float CELL_SIZE = 0.3f;
 static void registerLuaAPI(lua_State* L);

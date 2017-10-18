@@ -22,7 +22,7 @@
 #include "engine/path_utils.h"
 #include "engine/plugin_manager.h"
 #include "engine/profiler.h"
-#include "engine/property_register.h"
+#include "engine/properties.h"
 #include "engine/quat.h"
 #include "engine/resource_manager.h"
 #include "engine/system.h"
@@ -366,7 +366,7 @@ public:
 	void registerComponentWithResource(const char* type,
 		const char* label,
 		ResourceType resource_type,
-		const char* property_name) override
+		const Properties::PropertyBase& property) override
 	{
 		struct Plugin LUMIX_FINAL : public IAddComponentPlugin
 		{
@@ -375,7 +375,6 @@ public:
 				ImGui::SetNextWindowSize(ImVec2(300, 300));
 				const char* last = reverseFind(label, nullptr, '/');
 				if (!ImGui::BeginMenu(last && !from_filter ? last + 1 : label)) return;
-				auto* desc = PropertyRegister::getDescriptor(type, property_id);
 				char buf[MAX_PATH_LENGTH];
 				bool create_empty = ImGui::Selectable("Empty", false);
 				if (asset_browser->resourceList(buf, lengthOf(buf), resource_type, 0) || create_empty)
@@ -391,7 +390,7 @@ public:
 					{
 						editor->setProperty(type,
 							-1,
-							*desc,
+							*property,
 							&editor->getSelectedEntities()[0],
 							editor->getSelectedEntities().size(),
 							buf,
@@ -413,7 +412,7 @@ public:
 			WorldEditor* editor;
 			ComponentType type;
 			ResourceType resource_type;
-			u32 property_id;
+			const Properties::PropertyBase* property;
 			char label[50];
 		};
 
@@ -421,9 +420,9 @@ public:
 		auto* plugin = LUMIX_NEW(allocator, Plugin);
 		plugin->property_grid = m_property_grid;
 		plugin->asset_browser = m_asset_browser;
-		plugin->type = PropertyRegister::getComponentType(type);
+		plugin->type = Properties::getComponentType(type);
 		plugin->editor = m_editor;
-		plugin->property_id = crc32(property_name);
+		plugin->property = &property;
 		plugin->resource_type = resource_type;
 		copyString(plugin->label, label);
 		addPlugin(*plugin);
@@ -436,7 +435,7 @@ public:
 	{
 		addPlugin(plugin);
 		auto& allocator = m_editor->getAllocator();
-		m_component_labels.insert(PropertyRegister::getComponentType(id), string(plugin.getLabel(), m_allocator));
+		m_component_labels.insert(Properties::getComponentType(id), string(plugin.getLabel(), m_allocator));
 	}
 
 
@@ -475,7 +474,7 @@ public:
 		auto* plugin = LUMIX_NEW(allocator, Plugin);
 		plugin->property_grid = m_property_grid;
 		plugin->editor = m_editor;
-		plugin->type = PropertyRegister::getComponentType(type);
+		plugin->type = Properties::getComponentType(type);
 		copyString(plugin->label, label);
 		addPlugin(*plugin);
 

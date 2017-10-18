@@ -3,6 +3,7 @@
 
 #include "engine/log.h"
 #include "engine/matrix.h"
+#include "engine/metaprogramming.h"
 #include <lua.hpp>
 #include <lauxlib.h> // must be after lua.hpp
 
@@ -513,69 +514,10 @@ namespace details
 {
 
 
-template <class T> struct remove_reference
-{
-	using type = T;
-};
-
-template <class T> struct remove_reference<T&>
-{
-	using type = T;
-};
-
-template <class T> struct remove_reference<T&&>
-{
-	using type = T;
-};
-
-template <class T> struct remove_const
-{
-	using type = T;
-};
-
-template <class T> struct remove_const<const T>
-{
-	using type = T;
-};
-
-template <class T> struct remove_volatile
-{
-	using type = T;
-};
-
-template <class T> struct remove_volatile<volatile T>
-{
-	using type = T;
-};
-
-template <class T> struct remove_cv_reference
-{
-	using type =  typename remove_const<typename remove_volatile<typename remove_reference<T>::type>::type>::type;
-};
-
-
-template <int... T>
-struct Indices {};
-
-
-template <int offset, int size, int... T>
-struct build_indices
-{
-	using result = typename build_indices<offset, size - 1, size + offset, T...>::result;
-};
-
-
-template <int offset, int... T>
-struct build_indices<offset, 0, T...>
-{
-	using result = Indices<T...>;
-};
-
-
 template <typename T, int index>
-typename remove_cv_reference<T>::type convert(lua_State* L)
+RemoveCVR<T> convert(lua_State* L)
 {
-	return checkArg<typename remove_cv_reference<T>::type>(L, index);
+	return checkArg<RemoveCVR<T>>(L, index);
 }
 
 
@@ -713,14 +655,14 @@ template <typename R, typename C, typename... Args> constexpr int arity(R (C::*f
 
 template <typename T, T t> int wrap(lua_State* L)
 {
-	using indices = typename details::build_indices<0, details::arity(t)>::result;
+	using indices = typename BuildIndices<0, details::arity(t)>::result;
 	return details::Caller<indices>::callFunction(t, L);
 }
 
 
 template <typename C, typename T, T t> int wrapMethod(lua_State* L)
 {
-	using indices = typename details::build_indices<1, details::arity(t)>::result;
+	using indices = typename BuildIndices<1, details::arity(t)>::result;
 	auto* inst = checkArg<C*>(L, 1);
 	return details::Caller<indices>::callMethod(inst, t, L);
 }
@@ -728,7 +670,7 @@ template <typename C, typename T, T t> int wrapMethod(lua_State* L)
 
 template <typename C, typename T, T t> int wrapMethodClosure(lua_State* L)
 {
-	using indices = typename details::build_indices<0, details::arity(t)>::result;
+	using indices = typename BuildIndices<0, details::arity(t)>::result;
 	int index = lua_upvalueindex(1);
 	if (!isType<T>(L, index))
 	{

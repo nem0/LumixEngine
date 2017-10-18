@@ -9,13 +9,12 @@
 #include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/geometry.h"
-#include "engine/iproperty_descriptor.h"
 #include "engine/json_serializer.h"
 #include "engine/log.h"
 #include "engine/path_utils.h"
 #include "engine/prefab.h"
 #include "engine/profiler.h"
-#include "engine/property_register.h"
+#include "engine/properties.h"
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
 #include "engine/universe/universe.h"
@@ -34,9 +33,9 @@ namespace Lumix
 {
 
 
-static const ComponentType MODEL_INSTANCE_TYPE = PropertyRegister::getComponentType("renderable");
-static const ComponentType TERRAIN_TYPE = PropertyRegister::getComponentType("terrain");
-static const ComponentType HEIGHTFIELD_TYPE = PropertyRegister::getComponentType("physical_heightfield");
+static const ComponentType MODEL_INSTANCE_TYPE = Properties::getComponentType("renderable");
+static const ComponentType TERRAIN_TYPE = Properties::getComponentType("terrain");
+static const ComponentType HEIGHTFIELD_TYPE = Properties::getComponentType("physical_heightfield");
 static const ResourceType MATERIAL_TYPE("material");
 static const ResourceType TEXTURE_TYPE("texture");
 static const ResourceType PREFAB_TYPE("prefab");

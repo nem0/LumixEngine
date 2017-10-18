@@ -21,8 +21,7 @@
 #include "engine/lua_wrapper.h"
 #include "engine/path_utils.h"
 #include "engine/plugin_manager.h"
-#include "engine/property_descriptor.h"
-#include "engine/property_register.h"
+#include "engine/properties.h"
 #include "engine/resource_manager.h"
 #include "engine/system.h"
 #include "engine/universe/universe.h"
@@ -35,7 +34,7 @@
 using namespace Lumix;
 
 
-static const ComponentType LUA_SCRIPT_TYPE = PropertyRegister::getComponentType("lua_script");
+static const ComponentType LUA_SCRIPT_TYPE = Properties::getComponentType("lua_script");
 static const ResourceType LUA_SCRIPT_RESOURCE_TYPE("lua_script");
 
 
