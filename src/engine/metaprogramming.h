@@ -5,15 +5,15 @@ namespace Lumix
 {
 
 
-template <class T> struct RemoveReference { using type = T; };
-template <class T> struct RemoveReference<T&> { using type = T; };
-template <class T> struct RemoveReference<T&&> { using type = T; };
-template <class T> struct RemoveConst { using type = T; };
-template <class T> struct RemoveConst<const T> { using type = T; };
-template <class T> struct RemoveVolatile { using type = T; };
-template <class T> struct RemoveVolatile<volatile T> { using type = T; };
-template <class T> using RemoveCR = typename RemoveConst<typename RemoveReference<T>::type>::type;
-template <class T> using RemoveCVR = typename RemoveVolatile<RemoveCR<T>>::type;
+template <class T> struct RemoveReference { using Type = T; };
+template <class T> struct RemoveReference<T&> { using Type = T; };
+template <class T> struct RemoveReference<T&&> { using Type = T; };
+template <class T> struct RemoveConst { using Type = T; };
+template <class T> struct RemoveConst<const T> { using Type = T; };
+template <class T> struct RemoveVolatile { using Type = T; };
+template <class T> struct RemoveVolatile<volatile T> { using Type = T; };
+template <class T> using RemoveCR = typename RemoveConst<typename RemoveReference<T>::Type>::Type;
+template <class T> using RemoveCVR = typename RemoveVolatile<RemoveCR<T>>::Type;
 
 
 template <int... T> struct Indices {};
@@ -32,63 +32,64 @@ struct BuildIndices<offset, 0, T...>
 	using result = Indices<T...>;
 };
 
-template <typename... Types> struct tuple;
+template <typename... Types> struct Tuple;
 
-template <>
-struct tuple<>
-{
-	tuple() {}
-};
+template <> struct Tuple<> {};
 
 template <typename Head, typename... Tail>
-struct tuple<Head, Tail...> : tuple<Tail...>
+struct Tuple<Head, Tail...> : Tuple<Tail...>
 {
 	Head value;
 
-	tuple() {}
-	tuple(Head head, Tail... tail) : tuple<Tail...>(tail...), value(head) {}
+	Tuple() {}
+	Tuple(Head head, Tail... tail) : Tuple<Tail...>(tail...), value(head) {}
 	
-	tuple(const tuple<Head, Tail...>& rhs) : tuple<Tail...>(rhs) { value = rhs.value; }
+	Tuple(const Tuple<Head, Tail...>& rhs) : Tuple<Tail...>(rhs) { value = rhs.value; }
 };
 
 
 template <typename... Types>
-auto make_tuple(Types... types)
+auto makeTuple(Types... types)
 {
-	using R = tuple<Types...>;
-	return tuple<Types...>(types...);
+	using R = Tuple<Types...>;
+	return Tuple<Types...>(types...);
 }
 
-template<class _Tuple> struct tuple_size;
+template<class T> struct TupleSize;
 
-template<class... _Types>
-struct tuple_size<const tuple<_Types...> >
+template<class... Types>
+struct TupleSize<const Tuple<Types...> >
 {
-	enum { result = sizeof...(_Types) };
+	enum { result = sizeof...(Types) };
 };
 
-
-template<int _Index, class _Tuple> struct tuple_element;
-
-template<class _This, class... _Rest>
-struct tuple_element<0, const tuple<_This, _Rest...> >
+template<class... Types>
+struct TupleSize<Tuple<Types...> >
 {
-	typedef _This type;
-	typedef const tuple<_This, _Rest...> _Ttype;
+	enum { result = sizeof...(Types) };
 };
 
-template<int _Index, class _This, class... _Rest>
-struct tuple_element<_Index, const tuple<_This, _Rest...> >
-	: public tuple_element<_Index - 1, const tuple<_Rest...> >
+template<int Index, class Tuple> struct TupleElement;
+
+template<class HeadType, class... TailTypes>
+struct TupleElement<0, const Tuple<HeadType, TailTypes...> >
+{
+	using Head = HeadType;
+	using Tail = const Tuple<HeadType, TailTypes...>;
+};
+
+template<int Index, class Head, class... Tail>
+struct TupleElement<Index, const Tuple<Head, Tail...> >
+	: public TupleElement<Index - 1, const Tuple<Tail...> >
 {
 };
 
 
 template<int Index, typename... Types>
-constexpr auto get(const tuple<Types...>& tuple)
+constexpr auto& get(const Tuple<Types...>& tuple)
 {
-	using _Ttype = typename tuple_element<Index, const ::Lumix::tuple<Types...> >::_Ttype;
-	return (((_Ttype&)tuple).value);
+	using Subtuple = typename TupleElement<Index, const ::Lumix::Tuple<Types...> >::Tail;
+	return (((Subtuple&)tuple).value);
 }
 
 
@@ -99,7 +100,7 @@ constexpr void apply_impl(F& f, Tuple& t, Indices<I...>)
 	(void)expand
 	{
 		(
-			f(Lumix::get<I>(t)),
+			f(get<I>(t)),
 			true
 			)...
 	};
@@ -111,7 +112,7 @@ constexpr void apply_impl(F& f, Tuple& t, Indices<>) {}
 template <class F, class Tuple>
 constexpr void apply(F& f, Tuple& t)
 {
-	apply_impl(f, t, typename BuildIndices<-1, Lumix::tuple_size<Tuple>::result>::result{});
+	apply_impl(f, t, typename BuildIndices<-1, TupleSize<Tuple>::result>::result{});
 }
 
 

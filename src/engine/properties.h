@@ -263,10 +263,12 @@ struct ISimpleComponentVisitor : IComponentVisitor
 };
 
 
-struct IComponentDescriptor
+struct ComponentBase
 {
-	virtual ComponentType getComponentType() const = 0;
 	virtual void visit(IComponentVisitor&) const = 0;
+
+	const char* name;
+	ComponentType component_type;
 };
 
 
@@ -409,7 +411,7 @@ struct BlobProperty : IBlobProperty
 		apply([&](auto& x) { visitor.visit(x); }, attributes);
 	}
 
-	Lumix::tuple<Attributes...> attributes;
+	Tuple<Attributes...> attributes;
 	Getter getter;
 	Setter setter;
 };
@@ -438,7 +440,7 @@ struct CommonProperty : Property<T>
 	}
 
 
-	Lumix::tuple<Attributes...> attributes;
+	Tuple<Attributes...> attributes;
 	Getter getter;
 	Setter setter;
 };
@@ -549,7 +551,7 @@ struct ArrayProperty : IArrayProperty
 	void visit(IAttributeVisitor& visitor) const override {}
 
 
-	Lumix::tuple<Properties...> properties;
+	Tuple<Properties...> properties;
 	Counter counter;
 	Adder adder;
 	Remover remover;
@@ -645,41 +647,56 @@ struct ConstArrayProperty : IArrayProperty
 	}
 
 
-	Lumix::tuple<Properties...> properties;
+	Tuple<Properties...> properties;
 	Counter counter;
 };
 
 
-template <typename... Properties>
-struct ComponentDesciptor : IComponentDescriptor
+template <typename... Components>
+struct Scene
 {
-	Lumix::tuple<Properties...> properties;
+	void registerScene()
+	{
+		apply([&](auto& cmp) { Properties::registerComponent(&cmp); }, components);
+	}
+
+
+	Tuple<Components...> components;
 	const char* name;
-	ComponentType cmp_type;
-
-
-	ComponentType getComponentType() const override { return cmp_type; }
-
-
-	ComponentDesciptor(const char* name, Properties... props)
-	{
-		this->properties = Lumix::make_tuple(props...);
-		this->name = name;
-		this->cmp_type = Properties::getComponentType(name);
-	}
-
-
-	void visit(IComponentVisitor& visitor) const override
-	{
-		apply([&](auto& x) { visitor.visit(x); }, properties);
-	}
 };
 
 
 template <typename... Properties>
-ComponentDesciptor<Properties...> component(const char* name, Properties... props)
+struct Component : ComponentBase
 {
-	return ComponentDesciptor<Properties...>(name, props...);
+	void visit(IComponentVisitor& visitor) const override
+	{
+		apply([&](auto& x) { visitor.visit(x); }, properties);
+	}
+
+
+	Tuple<Properties...> properties;
+};
+
+
+template <typename... Components>
+auto scene(const char* name, Components... components)
+{
+	Scene<Components...> scene;
+	scene.name = name;
+	scene.components = makeTuple(components...);
+	return scene;
+}
+
+
+template <typename... Properties>
+auto component(const char* name, Properties... props)
+{
+	Component<Properties...> cmp;
+	cmp.name = name;
+	cmp.properties = makeTuple(props...);
+	cmp.component_type = Properties::getComponentType(name);
+	return cmp;
 }
 
 
@@ -687,7 +704,7 @@ template <typename Getter, typename Setter, typename... Attributes>
 auto blob_property(const char* name, Getter getter, Setter setter, Attributes... attributes)
 {
 	BlobProperty<Getter, Setter, Attributes...> p;
-	p.attributes = Lumix::make_tuple(attributes...);
+	p.attributes = makeTuple(attributes...);
 	p.getter = getter;
 	p.setter = setter;
 	p.name = name;
@@ -714,7 +731,7 @@ auto property(const char* name, Getter getter, Setter setter, Attributes... attr
 {
 	using R = typename detail::ResultOf<Getter>::type;
 	CommonProperty<R, Getter, Setter, Attributes...> p;
-	p.attributes = Lumix::make_tuple(attributes...);
+	p.attributes = makeTuple(attributes...);
 	p.getter = getter;
 	p.setter = setter;
 	p.name = name;
@@ -756,7 +773,7 @@ auto array(const char* name, Counter counter, Adder adder, Remover remover, Prop
 	p.counter = counter;
 	p.adder = adder;
 	p.remover = remover;
-	p.properties = Lumix::make_tuple(properties...);
+	p.properties = makeTuple(properties...);
 	return p;
 }
 
@@ -767,7 +784,7 @@ auto const_array(const char* name, Counter counter, Properties... properties)
 	ConstArrayProperty<Counter, Properties...> p;
 	p.name = name;
 	p.counter = counter;
-	p.properties = Lumix::make_tuple(properties...);
+	p.properties = makeTuple(properties...);
 	return p;
 }
 
@@ -777,8 +794,8 @@ LUMIX_ENGINE_API void shutdown();
 
 
 LUMIX_ENGINE_API const IAttribute* getAttribute(const PropertyBase& prop, IAttribute::Type type);
-LUMIX_ENGINE_API void registerComponent(IComponentDescriptor* desc);
-LUMIX_ENGINE_API IComponentDescriptor* getComponent(ComponentType cmp_type);
+LUMIX_ENGINE_API void registerComponent(const ComponentBase* desc);
+LUMIX_ENGINE_API const ComponentBase* getComponent(ComponentType cmp_type);
 LUMIX_ENGINE_API const PropertyBase* getProperty(ComponentType cmp_type, const char* property);
 LUMIX_ENGINE_API const PropertyBase* getProperty(ComponentType cmp_type, u32 property_name_hash);
 LUMIX_ENGINE_API const PropertyBase* getProperty(ComponentType cmp_type, const char* property, const char* subproperty);

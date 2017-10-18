@@ -752,7 +752,7 @@ public:
 				if (scene)
 				{
 					ComponentUID cmp(e, cmp_type, scene, scene->createComponent(cmp_type, e));
-					Properties::IComponentDescriptor* cmp_des = Properties::getComponent(cmp_type);
+					const Properties::ComponentBase* cmp_des = Properties::getComponent(cmp_type);
 					if (cmp.isValid())
 					{
 						lua_pushvalue(L, -1);

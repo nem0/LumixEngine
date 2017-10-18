@@ -509,7 +509,7 @@ void PropertyGrid::showComponentProperties(const Array<Entity>& entities, Compon
 
 	if (!is_open) return;
 
-	Properties::IComponentDescriptor* component = Properties::getComponent(cmp_type);
+	const Properties::ComponentBase* component = Properties::getComponent(cmp_type);
 	GridUIVisitor visitor(m_app, -1, entities, cmp_type, m_editor);
 	if (component) component->visit(visitor);
 

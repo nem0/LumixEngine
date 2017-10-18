@@ -777,7 +777,7 @@ namespace Lumix
 
 				ComponentType cmp_type = Properties::getComponentType(cmp_name);
 				const char* x = Properties::getComponentTypeID(cmp_type.index);
-				const Properties::IComponentDescriptor* cmp_desc = Properties::getComponent(cmp_type);
+				const Properties::ComponentBase* cmp_desc = Properties::getComponent(cmp_type);
 				
 				LuaCreatePropertyVisitor visitor;
 				visitor.cmp_type = cmp_type;
@@ -1759,10 +1759,12 @@ namespace Lumix
 		m_script_manager.create(LUA_SCRIPT_RESOURCE_TYPE, engine.getResourceManager());
 
 		using namespace Properties;
-		static auto lua_script = component("lua_script",
-			blob_property("data", &LuaScriptScene::getScriptData, &LuaScriptScene::setScriptData)
+		static auto lua_scene = scene("lua_script",
+			component("lua_script",
+				blob_property("data", &LuaScriptScene::getScriptData, &LuaScriptScene::setScriptData)
+			)
 		);
-		Properties::registerComponent(&lua_script);
+		lua_scene.registerScene();
 	}
 
 

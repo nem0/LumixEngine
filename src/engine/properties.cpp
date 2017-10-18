@@ -68,7 +68,7 @@ static IAllocator* g_allocator = nullptr;
 
 struct ComponentLink
 {
-	IComponentDescriptor* desc;
+	const ComponentBase* desc;
 	ComponentLink* next;
 };
 
@@ -93,12 +93,12 @@ const IAttribute* getAttribute(const PropertyBase& prop, IAttribute::Type type)
 }
 
 
-IComponentDescriptor* getComponent(ComponentType cmp_type)
+const ComponentBase* getComponent(ComponentType cmp_type)
 {
 	ComponentLink* link = g_first_component;
 	while (link)
 	{
-		if (link->desc->getComponentType() == cmp_type) return link->desc;
+		if (link->desc->component_type == cmp_type) return link->desc;
 		link = link->next;
 	}
 
@@ -186,7 +186,7 @@ const PropertyBase* getProperty(ComponentType cmp_type, const char* property)
 }
 
 
-void registerComponent(IComponentDescriptor* desc)
+void registerComponent(const ComponentBase* desc)
 {
 	ComponentLink* link = LUMIX_NEW(*g_allocator, ComponentLink);
 	link->next = g_first_component;

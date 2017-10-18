@@ -1405,7 +1405,7 @@ private:
 					cmp = universe->getNextComponent(cmp))
 				{
 					m_old_values.write(cmp.type);
-					const Properties::IComponentDescriptor* cmp_desc = Properties::getComponent(cmp.type);
+					const Properties::ComponentBase* cmp_desc = Properties::getComponent(cmp.type);
 
 					GatherResourcesVisitor gather;
 					gather.cmp = cmp;
@@ -1482,7 +1482,7 @@ private:
 					new_component.scene = scene;
 					new_component.type = cmp_type;
 					
-					const Properties::IComponentDescriptor* cmp_desc = Properties::getComponent(cmp_type);
+					const Properties::ComponentBase* cmp_desc = Properties::getComponent(cmp_type);
 
 					LoadVisitor v;
 					v.cmp = new_component;
@@ -1595,7 +1595,7 @@ private:
 			cmp.type = m_cmp_type;
 			ASSERT(cmp.scene);
 			InputBlob blob(m_old_values);
-			const Properties::IComponentDescriptor* cmp_desc = Properties::getComponent(cmp.type);
+			const Properties::ComponentBase* cmp_desc = Properties::getComponent(cmp.type);
 			for (Entity entity : m_entities)
 			{
 				cmp.entity = entity;
@@ -1616,7 +1616,7 @@ private:
 
 		bool execute() override
 		{
-			const Properties::IComponentDescriptor* cmp_desc = Properties::getComponent(m_cmp_type);
+			const Properties::ComponentBase* cmp_desc = Properties::getComponent(m_cmp_type);
 			ComponentUID cmp;
 			cmp.type = m_cmp_type;
 			cmp.scene = m_editor.getUniverse()->getScene(m_cmp_type);
@@ -2940,7 +2940,7 @@ public:
 			{
 				u32 cmp_type = Properties::getComponentTypeHash(cmp.type);
 				blob.write(cmp_type);
-				const Properties::IComponentDescriptor* cmp_desc = Properties::getComponent(cmp.type);
+				const Properties::ComponentBase* cmp_desc = Properties::getComponent(cmp.type);
 				
 				SaveVisitor v;
 				v.stream = &blob;
@@ -2978,7 +2978,7 @@ public:
 		IScene* scene = m_universe->getScene(src.type);
 		ComponentUID clone(entity, src.type, scene, scene->createComponent(src.type, entity));
 
-		const Properties::IComponentDescriptor* cmp_desc = Properties::getComponent(src.type);
+		const Properties::ComponentBase* cmp_desc = Properties::getComponent(src.type);
 		OutputBlob stream(m_allocator);
 		
 		SaveVisitor save;
@@ -3937,7 +3937,7 @@ bool PasteEntityCommand::execute()
 			blob.read(hash);
 			ComponentType type = Properties::getComponentTypeFromHash(hash);
 			ComponentUID cmp = m_editor.getEngine().createComponent(universe, new_entity, type);
-			const Properties::IComponentDescriptor* cmp_desc = Properties::getComponent(cmp.type);
+			const Properties::ComponentBase* cmp_desc = Properties::getComponent(cmp.type);
 			
 			LoadVisitor load;
 			load.cmp = cmp;

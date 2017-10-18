@@ -29,8 +29,6 @@
 #include <bgfx/bgfx.h>
 #include <cfloat>
 #include <cstdio>
-#include <tuple>
-#include <vector>
 
 
 namespace bx
@@ -86,45 +84,16 @@ static const ResourceType TEXTURE_TYPE("texture");
 static const ResourceType SHADER_BINARY_TYPE("shader_binary");
 
 
-struct GrassRotationModeProperty : public Properties::IEnumProperty
+static const char* getGrassRotationModeName(int index) 
 {
-	GrassRotationModeProperty() { name = "Mode"; }
-
-
-	void getValue(ComponentUID cmp, int index, OutputBlob& stream) const override
+	switch ((Terrain::GrassType::RotationMode)index)
 	{
-		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
-		int value = scene->getGrassRotationMode(cmp.handle, index);
-		stream.write(value);
+		case Terrain::GrassType::RotationMode::ALL_RANDOM: return "XYZ Random";
+		case Terrain::GrassType::RotationMode::Y_UP: return "Y Up";
+		case Terrain::GrassType::RotationMode::ALIGN_WITH_NORMAL: return "Align with normal";
+		default: ASSERT(false); return "Error";
 	}
-
-
-	void setValue(ComponentUID cmp, int index, InputBlob& stream) const override
-	{
-		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
-		int value = stream.read<int>();
-		scene->setGrassRotationMode(cmp.handle, index, value);
-	}
-
-
-	
-	int getEnumCount(ComponentUID) const override
-	{
-		return (int)Terrain::GrassType::RotationMode::COUNT;
-	}
-
-
-	const char* getEnumName(ComponentUID, int index) const override
-	{
-		switch ((Terrain::GrassType::RotationMode)index)
-		{
-			case Terrain::GrassType::RotationMode::ALL_RANDOM: return "XYZ Random";
-			case Terrain::GrassType::RotationMode::Y_UP: return "Y Up";
-			case Terrain::GrassType::RotationMode::ALIGN_WITH_NORMAL: return "Align with normal";
-			default: ASSERT(false); return "Error";
-		}
-	}
-};
+}
 
 
 struct BoneProperty : Properties::IEnumProperty
@@ -184,170 +153,138 @@ static void registerProperties(IAllocator& allocator)
 {
 	using namespace Properties;
 
-	static auto bone_attachment = component("bone_attachment",
-		property("Parent", &RenderScene::getBoneAttachmentParent, &RenderScene::setBoneAttachmentParent),
-		property("Relative position", &RenderScene::getBoneAttachmentPosition, &RenderScene::setBoneAttachmentPosition),
-		property("Relative rotation", &RenderScene::getBoneAttachmentRotation, &RenderScene::setBoneAttachmentRotation, 
-			RadiansAttribute()),
-		BoneProperty()
-	);
-	Properties::registerComponent(&bone_attachment);
-
-	static auto particle_emitter_spawn_shape = component("particle_emitter_spawn_shape",
-		property("Radius", &RenderScene::getParticleEmitterShapeRadius, &RenderScene::setParticleEmitterShapeRadius)
-	);
-	Properties::registerComponent(&particle_emitter_spawn_shape);
-
-	static auto particle_emitter_plane = component("particle_emitter_plane",
-		property("Bounce", &RenderScene::getParticleEmitterPlaneBounce, &RenderScene::setParticleEmitterPlaneBounce,
-			ClampAttribute(0, 1)),
-		array("Planes", &RenderScene::getParticleEmitterPlaneCount, &RenderScene::addParticleEmitterPlane, &RenderScene::removeParticleEmitterPlane, 
-			property("Entity", &RenderScene::getParticleEmitterPlaneEntity, &RenderScene::setParticleEmitterPlaneEntity)
-		)
-	);
-	Properties::registerComponent(&particle_emitter_plane);
-
-	static auto particle_emitter_attractor = component("particle_emitter_attractor",
-		property("Force", &RenderScene::getParticleEmitterAttractorForce, &RenderScene::setParticleEmitterAttractorForce),
-		array("Attractors", &RenderScene::getParticleEmitterAttractorCount, &RenderScene::addParticleEmitterAttractor, &RenderScene::removeParticleEmitterAttractor,
-			property("Entity", &RenderScene::getParticleEmitterAttractorEntity, &RenderScene::setParticleEmitterAttractorEntity)
-		)
-	);
-	Properties::registerComponent(&particle_emitter_attractor);
-	
-	static auto particle_emitter_alpha = component("particle_emitter_alpha",
-		sampled_func_property("Alpha", &RenderScene::getParticleEmitterAlpha, &RenderScene::setParticleEmitterAlpha, &RenderScene::getParticleEmitterAlphaCount, 1)
-	);
-	Properties::registerComponent(&particle_emitter_alpha);
-
-	static auto particle_emitter_random_rotation = component("particle_emitter_random_rotation");
-	Properties::registerComponent(&particle_emitter_random_rotation);
-
-	static auto environment_probe = component("environment_probe");
-	Properties::registerComponent(&environment_probe);
-
-	static auto particle_emitter_force = component("particle_emitter_force",
-		property("Acceleration", &RenderScene::getParticleEmitterAcceleration, &RenderScene::setParticleEmitterAcceleration)
-	);
-	Properties::registerComponent(&particle_emitter_force);
-
-	static auto particle_emitter_subimage = component("particle_emitter_subimage",
-		property("Rows", &RenderScene::getParticleEmitterSubimageRows, &RenderScene::setParticleEmitterSubimageRows),
-		property("Columns", &RenderScene::getParticleEmitterSubimageCols, &RenderScene::setParticleEmitterSubimageCols)
-	);
-	Properties::registerComponent(&particle_emitter_subimage);
-
-	static auto particle_emitter_size = component("particle_emitter_size",
-		sampled_func_property("Size", &RenderScene::getParticleEmitterSize, &RenderScene::setParticleEmitterSize, &RenderScene::getParticleEmitterSizeCount, 1)
-	);
-	Properties::registerComponent(&particle_emitter_size);
-
-	static auto particle_emitter = component("particle_emitter",
-		property("Life", &RenderScene::getParticleEmitterInitialLife, &RenderScene::setParticleEmitterInitialLife),
-		property("Initial size", &RenderScene::getParticleEmitterInitialSize, &RenderScene::setParticleEmitterInitialSize),
-		property("Spawn period", &RenderScene::getParticleEmitterSpawnPeriod, &RenderScene::setParticleEmitterSpawnPeriod),
-		property("Autoemit", &RenderScene::getParticleEmitterAutoemit, &RenderScene::setParticleEmitterAutoemit),
-		property("Local space", &RenderScene::getParticleEmitterLocalSpace, &RenderScene::setParticleEmitterLocalSpace),
-		property("Material", &RenderScene::getParticleEmitterMaterialPath, &RenderScene::setParticleEmitterMaterialPath,
-			ResourceAttribute("Material (*.mat)", MATERIAL_TYPE)),
-		property("Spawn count", &RenderScene::getParticleEmitterSpawnCount, &RenderScene::setParticleEmitterSpawnCount)
-	);
-	Properties::registerComponent(&particle_emitter);
-
-	static auto particle_emitter_linear_movement = component("particle_emitter_linear_movement",
-		property("x", &RenderScene::getParticleEmitterLinearMovementX, &RenderScene::setParticleEmitterLinearMovementX),
-		property("y", &RenderScene::getParticleEmitterLinearMovementY, &RenderScene::setParticleEmitterLinearMovementY),
-		property("z", &RenderScene::getParticleEmitterLinearMovementZ, &RenderScene::setParticleEmitterLinearMovementZ)
-	);
-	Properties::registerComponent(&particle_emitter_linear_movement);
-
-	static auto camera = component("camera",
-		property("Slot", &RenderScene::getCameraSlot, &RenderScene::setCameraSlot),
-		property("Orthographic size", &RenderScene::getCameraOrthoSize, &RenderScene::setCameraOrthoSize, 
-			MinAttribute(0)),
-		property("Orthographic", &RenderScene::isCameraOrtho, &RenderScene::setCameraOrtho),
-		property("FOV", &RenderScene::getCameraFOV, &RenderScene::setCameraFOV,
-			RadiansAttribute()),
-		property("Near", &RenderScene::getCameraNearPlane, &RenderScene::setCameraNearPlane, 
-			MinAttribute(0)),
-		property("Far", &RenderScene::getCameraFarPlane, &RenderScene::setCameraFarPlane, 
-			MinAttribute(0))
-	);
-	Properties::registerComponent(&camera);
-
-	static auto renderable = component("renderable",
-		property("Source", &RenderScene::getModelInstancePath, &RenderScene::setModelInstancePath,
-			ResourceAttribute("Mesh (*.msh)", MODEL_TYPE)),
-		property("Keep skin", &RenderScene::getModelInstanceKeepSkin, &RenderScene::setModelInstanceKeepSkin),
-		const_array("Materials", &RenderScene::getModelInstanceMaterialsCount, 
-			property("Source", &RenderScene::getModelInstanceMaterial, &RenderScene::setModelInstanceMaterial,
-				ResourceAttribute("Material (*.mat)", MATERIAL_TYPE))
-		)
-	);
-	Properties::registerComponent(&renderable);
-
-	static auto global_light = component("global_light",
-		property("Color", &RenderScene::getGlobalLightColor, &RenderScene::setGlobalLightColor,
-			ColorAttribute()),
-		property("Intensity", &RenderScene::getGlobalLightIntensity, &RenderScene::setGlobalLightIntensity, 
-			MinAttribute(0)),
-		property("Indirect intensity", &RenderScene::getGlobalLightIndirectIntensity, &RenderScene::setGlobalLightIndirectIntensity, MinAttribute(0)),
-		property("Fog density", &RenderScene::getFogDensity, &RenderScene::setFogDensity,
-			ClampAttribute(0, 1)),
-		property("Fog bottom", &RenderScene::getFogBottom, &RenderScene::setFogBottom),
-		property("Fog height", &RenderScene::getFogHeight, &RenderScene::setFogHeight, 
-			MinAttribute(0)),
-		property("Fog color", &RenderScene::getFogColor, &RenderScene::setFogColor,
-			ColorAttribute()),
-		property("Shadow cascades", &RenderScene::getShadowmapCascades, &RenderScene::setShadowmapCascades)
-	);
-	Properties::registerComponent(&global_light);
-
-	static auto point_light = component("point_light",
-		property("Diffuse color", &RenderScene::getPointLightColor, &RenderScene::setPointLightColor,
-			ColorAttribute()),
-		property("Specular color", &RenderScene::getPointLightSpecularColor, &RenderScene::setPointLightSpecularColor,
-			ColorAttribute()),
-		property("Diffuse intensity", &RenderScene::getPointLightIntensity, &RenderScene::setPointLightIntensity, 
-			MinAttribute(0)),
-		property("Specular intensity", &RenderScene::getPointLightSpecularIntensity, &RenderScene::setPointLightSpecularIntensity, MinAttribute(0)),
-		property("FOV", &RenderScene::getLightFOV, &RenderScene::setLightFOV, 
-			ClampAttribute(0, 360),
-			RadiansAttribute()),
-		property("Attenuation", &RenderScene::getLightAttenuation, &RenderScene::setLightAttenuation,
-			ClampAttribute(0, 1000)),
-		property("Range", &RenderScene::getLightRange, &RenderScene::setLightRange, 
-			MinAttribute(0)),
-		property("Cast shadows", &RenderScene::getLightCastShadows, &RenderScene::setLightCastShadows, 
-			MinAttribute(0))
-	);
-	Properties::registerComponent(&point_light);
-
-	static auto decal = component("decal",
-		property("Material", &RenderScene::getDecalMaterialPath, &RenderScene::setDecalMaterialPath,
-			ResourceAttribute("Material (*.mat)", MATERIAL_TYPE)),
-		property("Scale", &RenderScene::getDecalScale, &RenderScene::setDecalScale, 
-			MinAttribute(0))
-	);
-	Properties::registerComponent(&decal);
-
-	static auto terrain = component("terrain",
-		property("Material", &RenderScene::getTerrainMaterialPath, &RenderScene::setTerrainMaterialPath,
-			ResourceAttribute("Material (*.mat)", MATERIAL_TYPE)),
-		property("XZ scale", &RenderScene::getTerrainXZScale, &RenderScene::setTerrainXZScale, 
-			MinAttribute(0)),
-		property("Height scale", &RenderScene::getTerrainYScale, &RenderScene::setTerrainYScale, 
-			MinAttribute(0)),
-		array("grass", &RenderScene::getGrassCount, &RenderScene::addGrass, &RenderScene::removeGrass,
-			property("Mesh", &RenderScene::getGrassPath, &RenderScene::setGrassPath,
+	static auto render_scene = scene("renderer", 
+		component("bone_attachment",
+			property("Parent", &RenderScene::getBoneAttachmentParent, &RenderScene::setBoneAttachmentParent),
+			property("Relative position", &RenderScene::getBoneAttachmentPosition, &RenderScene::setBoneAttachmentPosition),
+			property("Relative rotation", &RenderScene::getBoneAttachmentRotation, &RenderScene::setBoneAttachmentRotation, 
+				RadiansAttribute()),
+			BoneProperty()
+		),
+		component("particle_emitter_spawn_shape",
+			property("Radius", &RenderScene::getParticleEmitterShapeRadius, &RenderScene::setParticleEmitterShapeRadius)
+		),
+		component("particle_emitter_plane",
+			property("Bounce", &RenderScene::getParticleEmitterPlaneBounce, &RenderScene::setParticleEmitterPlaneBounce,
+				ClampAttribute(0, 1)),
+			array("Planes", &RenderScene::getParticleEmitterPlaneCount, &RenderScene::addParticleEmitterPlane, &RenderScene::removeParticleEmitterPlane, 
+				property("Entity", &RenderScene::getParticleEmitterPlaneEntity, &RenderScene::setParticleEmitterPlaneEntity)
+			)
+		),
+		component("particle_emitter_attractor",
+			property("Force", &RenderScene::getParticleEmitterAttractorForce, &RenderScene::setParticleEmitterAttractorForce),
+			array("Attractors", &RenderScene::getParticleEmitterAttractorCount, &RenderScene::addParticleEmitterAttractor, &RenderScene::removeParticleEmitterAttractor,
+				property("Entity", &RenderScene::getParticleEmitterAttractorEntity, &RenderScene::setParticleEmitterAttractorEntity)
+			)
+		),
+		component("particle_emitter_alpha",
+			sampled_func_property("Alpha", &RenderScene::getParticleEmitterAlpha, &RenderScene::setParticleEmitterAlpha, &RenderScene::getParticleEmitterAlphaCount, 1)
+		),
+		component("particle_emitter_random_rotation"),
+		component("environment_probe"),
+		component("particle_emitter_force",
+			property("Acceleration", &RenderScene::getParticleEmitterAcceleration, &RenderScene::setParticleEmitterAcceleration)
+		),
+		component("particle_emitter_subimage",
+			property("Rows", &RenderScene::getParticleEmitterSubimageRows, &RenderScene::setParticleEmitterSubimageRows),
+			property("Columns", &RenderScene::getParticleEmitterSubimageCols, &RenderScene::setParticleEmitterSubimageCols)
+		),
+		component("particle_emitter_size",
+			sampled_func_property("Size", &RenderScene::getParticleEmitterSize, &RenderScene::setParticleEmitterSize, &RenderScene::getParticleEmitterSizeCount, 1)
+		),
+		component("particle_emitter",
+			property("Life", &RenderScene::getParticleEmitterInitialLife, &RenderScene::setParticleEmitterInitialLife),
+			property("Initial size", &RenderScene::getParticleEmitterInitialSize, &RenderScene::setParticleEmitterInitialSize),
+			property("Spawn period", &RenderScene::getParticleEmitterSpawnPeriod, &RenderScene::setParticleEmitterSpawnPeriod),
+			property("Autoemit", &RenderScene::getParticleEmitterAutoemit, &RenderScene::setParticleEmitterAutoemit),
+			property("Local space", &RenderScene::getParticleEmitterLocalSpace, &RenderScene::setParticleEmitterLocalSpace),
+			property("Material", &RenderScene::getParticleEmitterMaterialPath, &RenderScene::setParticleEmitterMaterialPath,
+				ResourceAttribute("Material (*.mat)", MATERIAL_TYPE)),
+			property("Spawn count", &RenderScene::getParticleEmitterSpawnCount, &RenderScene::setParticleEmitterSpawnCount)
+		),
+		component("particle_emitter_linear_movement",
+			property("x", &RenderScene::getParticleEmitterLinearMovementX, &RenderScene::setParticleEmitterLinearMovementX),
+			property("y", &RenderScene::getParticleEmitterLinearMovementY, &RenderScene::setParticleEmitterLinearMovementY),
+			property("z", &RenderScene::getParticleEmitterLinearMovementZ, &RenderScene::setParticleEmitterLinearMovementZ)
+		),
+		component("camera",
+			property("Slot", &RenderScene::getCameraSlot, &RenderScene::setCameraSlot),
+			property("Orthographic size", &RenderScene::getCameraOrthoSize, &RenderScene::setCameraOrthoSize, 
+				MinAttribute(0)),
+			property("Orthographic", &RenderScene::isCameraOrtho, &RenderScene::setCameraOrtho),
+			property("FOV", &RenderScene::getCameraFOV, &RenderScene::setCameraFOV,
+				RadiansAttribute()),
+			property("Near", &RenderScene::getCameraNearPlane, &RenderScene::setCameraNearPlane, 
+				MinAttribute(0)),
+			property("Far", &RenderScene::getCameraFarPlane, &RenderScene::setCameraFarPlane, 
+				MinAttribute(0))
+		),
+		component("renderable",
+			property("Source", &RenderScene::getModelInstancePath, &RenderScene::setModelInstancePath,
 				ResourceAttribute("Mesh (*.msh)", MODEL_TYPE)),
-			property("Distance", &RenderScene::getGrassDistance, &RenderScene::setGrassDistance,
-				MinAttribute(1)),
-			property("Density", &RenderScene::getGrassDensity, &RenderScene::setGrassDensity),
-			GrassRotationModeProperty()
+			property("Keep skin", &RenderScene::getModelInstanceKeepSkin, &RenderScene::setModelInstanceKeepSkin),
+			const_array("Materials", &RenderScene::getModelInstanceMaterialsCount, 
+				property("Source", &RenderScene::getModelInstanceMaterial, &RenderScene::setModelInstanceMaterial,
+					ResourceAttribute("Material (*.mat)", MATERIAL_TYPE))
+			)
+		),
+		component("global_light",
+			property("Color", &RenderScene::getGlobalLightColor, &RenderScene::setGlobalLightColor,
+				ColorAttribute()),
+			property("Intensity", &RenderScene::getGlobalLightIntensity, &RenderScene::setGlobalLightIntensity, 
+				MinAttribute(0)),
+			property("Indirect intensity", &RenderScene::getGlobalLightIndirectIntensity, &RenderScene::setGlobalLightIndirectIntensity, MinAttribute(0)),
+			property("Fog density", &RenderScene::getFogDensity, &RenderScene::setFogDensity,
+				ClampAttribute(0, 1)),
+			property("Fog bottom", &RenderScene::getFogBottom, &RenderScene::setFogBottom),
+			property("Fog height", &RenderScene::getFogHeight, &RenderScene::setFogHeight, 
+				MinAttribute(0)),
+			property("Fog color", &RenderScene::getFogColor, &RenderScene::setFogColor,
+				ColorAttribute()),
+			property("Shadow cascades", &RenderScene::getShadowmapCascades, &RenderScene::setShadowmapCascades)
+		),
+		component("point_light",
+			property("Diffuse color", &RenderScene::getPointLightColor, &RenderScene::setPointLightColor,
+				ColorAttribute()),
+			property("Specular color", &RenderScene::getPointLightSpecularColor, &RenderScene::setPointLightSpecularColor,
+				ColorAttribute()),
+			property("Diffuse intensity", &RenderScene::getPointLightIntensity, &RenderScene::setPointLightIntensity, 
+				MinAttribute(0)),
+			property("Specular intensity", &RenderScene::getPointLightSpecularIntensity, &RenderScene::setPointLightSpecularIntensity, MinAttribute(0)),
+			property("FOV", &RenderScene::getLightFOV, &RenderScene::setLightFOV, 
+				ClampAttribute(0, 360),
+				RadiansAttribute()),
+			property("Attenuation", &RenderScene::getLightAttenuation, &RenderScene::setLightAttenuation,
+				ClampAttribute(0, 1000)),
+			property("Range", &RenderScene::getLightRange, &RenderScene::setLightRange, 
+				MinAttribute(0)),
+			property("Cast shadows", &RenderScene::getLightCastShadows, &RenderScene::setLightCastShadows, 
+				MinAttribute(0))
+		),
+		component("decal",
+			property("Material", &RenderScene::getDecalMaterialPath, &RenderScene::setDecalMaterialPath,
+				ResourceAttribute("Material (*.mat)", MATERIAL_TYPE)),
+			property("Scale", &RenderScene::getDecalScale, &RenderScene::setDecalScale, 
+				MinAttribute(0))
+		),
+		component("terrain",
+			property("Material", &RenderScene::getTerrainMaterialPath, &RenderScene::setTerrainMaterialPath,
+				ResourceAttribute("Material (*.mat)", MATERIAL_TYPE)),
+			property("XZ scale", &RenderScene::getTerrainXZScale, &RenderScene::setTerrainXZScale, 
+				MinAttribute(0)),
+			property("Height scale", &RenderScene::getTerrainYScale, &RenderScene::setTerrainYScale, 
+				MinAttribute(0)),
+			array("grass", &RenderScene::getGrassCount, &RenderScene::addGrass, &RenderScene::removeGrass,
+				property("Mesh", &RenderScene::getGrassPath, &RenderScene::setGrassPath,
+					ResourceAttribute("Mesh (*.msh)", MODEL_TYPE)),
+				property("Distance", &RenderScene::getGrassDistance, &RenderScene::setGrassDistance,
+					MinAttribute(1)),
+				property("Density", &RenderScene::getGrassDensity, &RenderScene::setGrassDensity),
+				enum_property("Mode", &RenderScene::getGrassRotationMode, &RenderScene::setGrassRotationMode, (int)Terrain::GrassType::RotationMode::COUNT, getGrassRotationModeName)
+			)
 		)
 	);
-	Properties::registerComponent(&terrain);
+	render_scene.registerScene();
 }
 
 

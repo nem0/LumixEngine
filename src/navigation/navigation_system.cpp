@@ -139,15 +139,17 @@ NavigationSystem* NavigationSystem::s_instance = nullptr;
 void NavigationSystem::registerProperties()
 {
 	using namespace Properties;
-	static auto navmesh_agent = component("navmesh_agent",
-		property("Radius", &NavigationScene::getAgentRadius, &NavigationScene::setAgentRadius,
-			MinAttribute(0)),
-		property("Height", &NavigationScene::getAgentHeight, &NavigationScene::setAgentHeight,
-			MinAttribute(0)),
-		property("Use root motion", &NavigationScene::useAgentRootMotion, &NavigationScene::setUseAgentRootMotion),
-		property("Get root motion from animation", &NavigationScene::isGettingRootMotionFromAnim, &NavigationScene::setIsGettingRootMotionFromAnim)
+	static auto navigation_scene = scene("navigation",
+		component("navmesh_agent",
+			property("Radius", &NavigationScene::getAgentRadius, &NavigationScene::setAgentRadius,
+				MinAttribute(0)),
+			property("Height", &NavigationScene::getAgentHeight, &NavigationScene::setAgentHeight,
+				MinAttribute(0)),
+			property("Use root motion", &NavigationScene::useAgentRootMotion, &NavigationScene::setUseAgentRootMotion),
+			property("Get root motion from animation", &NavigationScene::isGettingRootMotionFromAnim, &NavigationScene::setIsGettingRootMotionFromAnim)
+		)
 	);
-	Properties::registerComponent(&navmesh_agent);
+	navigation_scene.registerScene();
 }
 
 

@@ -28,22 +28,20 @@ static const ResourceType CLIP_TYPE("clip");
 static void registerProperties(IAllocator& allocator)
 {
 	using namespace Properties;
-	static auto ambient_sound = component("ambient_sound",
-		property("3D", &AudioScene::isAmbientSound3D, &AudioScene::setAmbientSound3D),
-		dyn_enum_property("Sound", &AudioScene::getAmbientSoundClipIndex, &AudioScene::setAmbientSoundClipIndex, &AudioScene::getClipCount, &AudioScene::getClipName)
+	static auto audio_scene = scene("audio",
+		component("ambient_sound",
+			property("3D", &AudioScene::isAmbientSound3D, &AudioScene::setAmbientSound3D),
+			dyn_enum_property("Sound", &AudioScene::getAmbientSoundClipIndex, &AudioScene::setAmbientSoundClipIndex, &AudioScene::getClipCount, &AudioScene::getClipName)
+		),
+		component("audio_listener"),
+		component("echo_zone",
+			property("Radius", &AudioScene::getEchoZoneRadius, &AudioScene::setEchoZoneRadius,
+				MinAttribute(0)),
+			property("Delay (ms)", &AudioScene::getEchoZoneDelay, &AudioScene::setEchoZoneDelay,
+				MinAttribute(0))
+		)
 	);
-	Properties::registerComponent(&ambient_sound);
-	
-	static auto audio_listener = component("audio_listener");
-	Properties::registerComponent(&audio_listener);
-
-	static auto echo_zone = component("echo_zone",
-		property("Radius", &AudioScene::getEchoZoneRadius, &AudioScene::setEchoZoneRadius,
-			MinAttribute(0)),
-		property("Delay (ms)", &AudioScene::getEchoZoneDelay, &AudioScene::setEchoZoneDelay,
-			MinAttribute(0))
-	);
-	Properties::registerComponent(&echo_zone);
+	audio_scene.registerScene();
 }
 
 
