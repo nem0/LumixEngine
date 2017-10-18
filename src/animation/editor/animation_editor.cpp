@@ -20,7 +20,7 @@
 #include "engine/path.h"
 #include "engine/path_utils.h"
 #include "engine/plugin_manager.h"
-#include "engine/property_register.h"
+#include "engine/properties.h"
 #include "engine/resource_manager.h"
 #include "engine/universe/universe.h"
 #include <SDL.h>
@@ -33,8 +33,8 @@ namespace Lumix
 {
 
 
-static const ComponentType ANIMABLE_HASH = PropertyRegister::getComponentType("animable");
-static const ComponentType CONTROLLER_TYPE = PropertyRegister::getComponentType("anim_controller");
+static const ComponentType ANIMABLE_HASH = Properties::getComponentType("animable");
+static const ComponentType CONTROLLER_TYPE = Properties::getComponentType("anim_controller");
 static const ResourceType ANIMATION_TYPE("animation");
 static const ResourceType CONTROLLER_RESOURCE_TYPE("anim_controller");
 

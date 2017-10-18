@@ -16,7 +16,7 @@
 #include "engine/path_utils.h"
 #include "engine/plugin_manager.h"
 #include "engine/profiler.h"
-#include "engine/property_register.h"
+#include "engine/properties.h"
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
 #include "engine/string.h"
@@ -37,7 +37,7 @@ namespace Lumix
 {
 
 
-static const ComponentType MODEL_INSTANCE_TYPE = PropertyRegister::getComponentType("renderable");
+static const ComponentType MODEL_INSTANCE_TYPE = Properties::getComponentType("renderable");
 static const ResourceType MODEL_TYPE("model");
 static const ResourceType SHADER_TYPE("shader");
 static const ResourceType TEXTURE_TYPE("texture");
@@ -248,13 +248,12 @@ void SceneView::handleDrop(float x, float y)
 			m_editor.setEntitiesPositions(&entity, &pos, 1);
 			m_editor.selectEntities(&entity, 1);
 			m_editor.addComponent(MODEL_INSTANCE_TYPE);
-			const auto* desc = PropertyRegister::getDescriptor(MODEL_INSTANCE_TYPE, crc32("Source"));
-			m_editor.setProperty(MODEL_INSTANCE_TYPE, -1, *desc, &entity, 1, path, stringLength(path) + 1);
+			auto* prop = Properties::getProperty(MODEL_INSTANCE_TYPE, "Source");
+			m_editor.setProperty(MODEL_INSTANCE_TYPE, -1, *prop, &entity, 1, path, stringLength(path) + 1);
 			m_editor.endCommandGroup();
 		}
 		else if (PathUtils::hasExtension(path, "mat") && hit.m_mesh)
 		{
-			auto* desc = PropertyRegister::getDescriptor(MODEL_INSTANCE_TYPE, crc32("Material"));
 			auto drag_data = m_app.getDragData();
 			m_editor.selectEntities(&hit.m_entity, 1);
 			auto* model = m_pipeline->getScene()->getModelInstanceModel(hit.m_component);
@@ -267,8 +266,8 @@ void SceneView::handleDrop(float x, float y)
 					break;
 				}
 			}
-			
-			m_editor.setProperty(MODEL_INSTANCE_TYPE, mesh_index, *desc, &hit.m_entity, 1, drag_data.data, drag_data.size);
+			auto* prop= Properties::getProperty(MODEL_INSTANCE_TYPE, "Materials", "Source");
+			m_editor.setProperty(MODEL_INSTANCE_TYPE, mesh_index, *prop, &hit.m_entity, 1, drag_data.data, drag_data.size);
 		}
 	}
 }

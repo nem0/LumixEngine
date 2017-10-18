@@ -210,6 +210,9 @@ function defaultConfigurations()
 
 	configuration { "asmjs" }
 		buildoptions { "-std=c++14" }
+
+	configuration { "vs20*"}
+		buildoptions { "/wd4503"}
 		
 	configuration {}
 		files { "lumix.natvis" }

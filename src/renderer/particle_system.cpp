@@ -3,7 +3,7 @@
 #include "engine/crc32.h"
 #include "engine/math_utils.h"
 #include "engine/profiler.h"
-#include "engine/property_register.h"
+#include "engine/properties.h"
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
 #include "editor/gizmo.h"
@@ -83,7 +83,7 @@ void ParticleEmitter::SubimageModule::deserialize(InputBlob& blob)
 }
 
 
-const ComponentType ParticleEmitter::SubimageModule::s_type = PropertyRegister::getComponentType("particle_emitter_subimage");
+const ComponentType ParticleEmitter::SubimageModule::s_type = Properties::getComponentType("particle_emitter_subimage");
 
 
 ParticleEmitter::ForceModule::ForceModule(ParticleEmitter& emitter)
@@ -117,7 +117,7 @@ void ParticleEmitter::ForceModule::update(float time_delta)
 }
 
 
-const ComponentType ParticleEmitter::ForceModule::s_type = PropertyRegister::getComponentType("particle_emitter_force");
+const ComponentType ParticleEmitter::ForceModule::s_type = Properties::getComponentType("particle_emitter_force");
 
 
 void ParticleEmitter::drawGizmo(WorldEditor& editor, RenderScene& scene)
@@ -198,7 +198,7 @@ void ParticleEmitter::AttractorModule::deserialize(InputBlob& blob)
 
 
 const ComponentType ParticleEmitter::AttractorModule::s_type =
-	PropertyRegister::getComponentType("particle_emitter_attractor");
+	Properties::getComponentType("particle_emitter_attractor");
 
 
 ParticleEmitter::PlaneModule::PlaneModule(ParticleEmitter& emitter)
@@ -289,7 +289,7 @@ void ParticleEmitter::PlaneModule::deserialize(InputBlob& blob)
 }
 
 
-const ComponentType ParticleEmitter::PlaneModule::s_type = PropertyRegister::getComponentType("particle_emitter_plane");
+const ComponentType ParticleEmitter::PlaneModule::s_type = Properties::getComponentType("particle_emitter_plane");
 
 
 ParticleEmitter::SpawnShapeModule::SpawnShapeModule(ParticleEmitter& emitter)
@@ -334,7 +334,7 @@ void ParticleEmitter::SpawnShapeModule::deserialize(InputBlob& blob)
 
 
 const ComponentType ParticleEmitter::SpawnShapeModule::s_type =
-	PropertyRegister::getComponentType("particle_emitter_spawn_shape");
+	Properties::getComponentType("particle_emitter_spawn_shape");
 
 
 ParticleEmitter::LinearMovementModule::LinearMovementModule(ParticleEmitter& emitter)
@@ -371,7 +371,7 @@ void ParticleEmitter::LinearMovementModule::deserialize(InputBlob& blob)
 
 
 const ComponentType ParticleEmitter::LinearMovementModule::s_type =
-	PropertyRegister::getComponentType("particle_emitter_linear_movement");
+	Properties::getComponentType("particle_emitter_linear_movement");
 
 
 static void sampleBezier(float max_life, const Array<Vec2>& values, Array<float>& sampled)
@@ -470,7 +470,7 @@ void ParticleEmitter::AlphaModule::update(float)
 }
 
 
-const ComponentType ParticleEmitter::AlphaModule::s_type = PropertyRegister::getComponentType("particle_emitter_alpha");
+const ComponentType ParticleEmitter::AlphaModule::s_type = Properties::getComponentType("particle_emitter_alpha");
 
 
 ParticleEmitter::SizeModule::SizeModule(ParticleEmitter& emitter)
@@ -535,7 +535,7 @@ void ParticleEmitter::SizeModule::update(float)
 }
 
 
-const ComponentType ParticleEmitter::SizeModule::s_type = PropertyRegister::getComponentType("particle_emitter_size");
+const ComponentType ParticleEmitter::SizeModule::s_type = Properties::getComponentType("particle_emitter_size");
 
 
 ParticleEmitter::RandomRotationModule::RandomRotationModule(ParticleEmitter& emitter)
@@ -551,7 +551,7 @@ void ParticleEmitter::RandomRotationModule::spawnParticle(int index)
 
 
 const ComponentType ParticleEmitter::RandomRotationModule::s_type =
-	PropertyRegister::getComponentType("particle_emitter_random_rotation");
+	Properties::getComponentType("particle_emitter_random_rotation");
 
 
 Interval::Interval()
@@ -751,7 +751,7 @@ void ParticleEmitter::serialize(OutputBlob& blob)
 	blob.write(m_modules.size());
 	for (auto* module : m_modules)
 	{
-		blob.write(PropertyRegister::getComponentTypeHash(module->getType()));
+		blob.write(Properties::getComponentTypeHash(module->getType()));
 		module->serialize(blob);
 	}
 }
@@ -784,7 +784,7 @@ void ParticleEmitter::deserialize(InputBlob& blob, ResourceManager& manager)
 		ParticleEmitter::ModuleBase* module = nullptr;
 		u32 hash;
 		blob.read(hash);
-		ComponentType type = PropertyRegister::getComponentTypeFromHash(hash);
+		ComponentType type = Properties::getComponentTypeFromHash(hash);
 		module = createModule(type, *this);
 		if (module)
 		{

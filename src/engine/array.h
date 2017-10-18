@@ -235,21 +235,9 @@ public:
 	}
 
 
-	template <class _Ty> struct remove_reference
-	{ // remove rvalue reference
-		typedef _Ty type;
-	};
-
-
-	template <class _Ty> struct remove_reference<_Ty&>
-	{ // remove rvalue reference
-		typedef _Ty type;
-	};
-
-	template <class _Ty> struct remove_reference<_Ty&&>
-	{ // remove rvalue reference
-		typedef _Ty type;
-	};
+	template <class _Ty> struct remove_reference { typedef _Ty type; };
+	template <class _Ty> struct remove_reference<_Ty&> { typedef _Ty type; };
+	template <class _Ty> struct remove_reference<_Ty&&> { typedef _Ty type; };
 
 	template <class _Ty> inline _Ty&& myforward(typename remove_reference<_Ty>::type& _Arg)
 	{

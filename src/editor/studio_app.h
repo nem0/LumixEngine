@@ -26,6 +26,12 @@ namespace Lumix
 {
 
 
+namespace Properties
+{
+struct  PropertyBase;
+}
+
+
 struct Action;
 struct ComponentUID;
 struct ResourceType;
@@ -105,7 +111,7 @@ public:
 	virtual void registerComponentWithResource(const char* id,
 		const char* label,
 		ResourceType resource_type,
-		const char* property_name) = 0;
+		const Properties::PropertyBase& property) = 0;
 	virtual const AddCmpTreeNode& getAddComponentTreeRoot() const = 0;
 	virtual int getExitCode() const = 0;
 	virtual void runScript(const char* src, const char* script_name) = 0;

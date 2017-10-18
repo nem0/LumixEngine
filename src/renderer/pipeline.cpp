@@ -1177,7 +1177,8 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		material->setDefine(m_has_shadowmap_define_idx, shadowmap != nullptr);
 		if (shadowmap)
 		{
-			bgfx::setTexture(15 - m_global_textures_count, m_tex_shadowmap_uniform, shadowmap->framebuffer->getRenderbufferHandle(0));
+			u32 flags = BGFX_TEXTURE_MIN_ANISOTROPIC | BGFX_TEXTURE_MAG_ANISOTROPIC;
+			bgfx::setTexture(15 - m_global_textures_count, m_tex_shadowmap_uniform, shadowmap->framebuffer->getRenderbufferHandle(0), flags);
 			bgfx::setUniform(m_shadowmap_matrices_uniform,
 				&shadowmap->matrices[0],
 				m_scene->getLightFOV(shadowmap->light) > Math::PI ? 4 : 1);

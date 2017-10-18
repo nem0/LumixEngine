@@ -6,12 +6,12 @@
 #include "engine/blob.h"
 #include "engine/engine.h"
 #include "engine/iplugin.h"
-#include "engine/iproperty_descriptor.h"
 #include "engine/math_utils.h"
 #include "engine/prefab.h"
-#include "engine/property_register.h"
+#include "engine/properties.h"
 #include "engine/resource.h"
 #include "engine/serializer.h"
+#include "engine/universe/universe.h"
 #include "engine/vec.h"
 #include "imgui/imgui.h"
 #include "utils.h"
@@ -32,7 +32,6 @@ PropertyGrid::PropertyGrid(StudioApp& app)
 	m_particle_emitter_updating = true;
 	m_particle_emitter_timescale = 1.0f;
 	m_component_filter[0] = '\0';
-	m_entity_filter[0] = '\0';
 }
 
 
@@ -45,478 +44,482 @@ PropertyGrid::~PropertyGrid()
 }
 
 
-void PropertyGrid::showProperty(PropertyDescriptorBase& desc,
-	int index,
-	const Array<Entity>& entities,
-	ComponentType cmp_type)
+struct GridUIVisitor LUMIX_FINAL : Properties::IComponentVisitor
 {
-	if (desc.getType() == PropertyDescriptorBase::BLOB) return;
+	GridUIVisitor(StudioApp& app, int index, const Array<Entity>& entities, ComponentType cmp_type, WorldEditor& editor)
+		: m_entities(entities)
+		, m_cmp_type(cmp_type)
+		, m_editor(editor)
+		, m_index(index)
+		, m_grid(app.getPropertyGrid())
+		, m_app(app)
+	{}
 
-	OutputBlob stream(m_editor.getAllocator());
-	ComponentUID first_entity_cmp;
-	first_entity_cmp.type = cmp_type;
-	first_entity_cmp.scene = m_editor.getUniverse()->getScene(cmp_type);
-	first_entity_cmp.entity = entities[0];
-	first_entity_cmp.handle = first_entity_cmp.scene->getComponent(entities[0], cmp_type);
-	desc.get(first_entity_cmp, index, stream);
-	InputBlob tmp(stream);
 
-	StaticString<100> desc_name(desc.getName(), "###", (u64)&desc);
-
-	switch (desc.getType())
+	ComponentUID getComponent()
 	{
-	case PropertyDescriptorBase::DECIMAL:
+		ComponentUID first_entity_cmp;
+		first_entity_cmp.type = m_cmp_type;
+		first_entity_cmp.scene = m_editor.getUniverse()->getScene(m_cmp_type);
+		first_entity_cmp.entity = m_entities[0];
+		first_entity_cmp.handle = first_entity_cmp.scene->getComponent(m_entities[0], m_cmp_type);
+		return first_entity_cmp;
+	}
+
+
+	struct Attributes : Properties::IAttributeVisitor
 	{
-		float f;
-		tmp.read(f);
-		auto& d = static_cast<NumericPropertyDescriptorBase<float>&>(desc);
-		if (d.isInRadians()) f = Math::radiansToDegrees(f);
-		if ((d.getMax() - d.getMin()) / d.getStep() <= 100)
+		void visit(const Properties::IAttribute& attr) override
 		{
-			if (ImGui::SliderFloat(desc_name, &f, d.getMin(), d.getMax()))
+			switch (attr.getType())
 			{
-				if (d.isInRadians()) f = Math::degreesToRadians(f);
-				m_editor.setProperty(cmp_type, index, desc, &entities[0], entities.size(), &f, sizeof(f));
+				case Properties::IAttribute::RADIANS:
+					is_radians = true;
+					break;
+				case Properties::IAttribute::COLOR:
+					is_color = true;
+					break;
+				case Properties::IAttribute::MIN:
+					min = ((Properties::MinAttribute&)attr).min;
+					break;
+				case Properties::IAttribute::CLAMP:
+					min = ((Properties::ClampAttribute&)attr).min;
+					max = ((Properties::ClampAttribute&)attr).max;
+					break;
+				case Properties::IAttribute::RESOURCE:
+					resource_type = ((Properties::ResourceAttribute&)attr).type;
+					break;
+			}
+		}
+
+		float max = FLT_MAX;
+		float min = -FLT_MAX;
+		bool is_color = false;
+		bool is_radians = false;
+		ResourceType resource_type;
+	};
+
+
+	static Attributes getAttributes(const Properties::PropertyBase& prop)
+	{
+		Attributes attrs;
+		prop.visit(attrs);
+		return attrs;
+	}
+
+
+	void visit(const Properties::Property<float>& prop) override
+	{
+		Attributes attrs = getAttributes(prop);
+		ComponentUID cmp = getComponent();
+		float f;
+		prop.getValue(cmp, m_index, OutputBlob(&f, sizeof(f)));
+
+		if (attrs.is_radians) f = Math::radiansToDegrees(f);
+		if (ImGui::DragFloat(prop.name, &f, 1, attrs.min, attrs.max))
+		{
+			f = Math::clamp(f, attrs.min, attrs.max);
+			if (attrs.is_radians) f = Math::degreesToRadians(f);
+			m_editor.setProperty(m_cmp_type, m_index, prop, &m_entities[0], m_entities.size(), &f, sizeof(f));
+		}
+	}
+
+
+	void visit(const Properties::Property<int>& prop) override
+	{
+		ComponentUID cmp = getComponent();
+		int value;
+		prop.getValue(cmp, m_index, OutputBlob(&value, sizeof(value)));
+
+		if (ImGui::InputInt(prop.name, &value))
+		{
+			m_editor.setProperty(m_cmp_type, m_index, prop, &m_entities[0], m_entities.size(), &value, sizeof(value));
+		}
+	}
+
+
+	void visit(const Properties::Property<Entity>& prop) override
+	{
+		OutputBlob blob(m_editor.getAllocator());
+
+		ComponentUID cmp = getComponent();
+		Entity entity;
+		prop.getValue(cmp, m_index, OutputBlob(&entity, sizeof(entity)));
+
+		char buf[128];
+		getEntityListDisplayName(m_editor, buf, lengthOf(buf), entity);
+		ImGui::LabelText(prop.name, "%s", buf);
+		ImGui::SameLine();
+		ImGui::PushID(prop.name);
+		if (ImGui::Button("...")) ImGui::OpenPopup(prop.name);
+		Universe& universe = *m_editor.getUniverse();
+		if (ImGui::BeginPopup(prop.name))
+		{
+			if (entity.isValid() && ImGui::Button("Select")) m_deferred_select = entity;
+
+			static char entity_filter[32] = {};
+			ImGui::FilterInput("Filter", entity_filter, sizeof(entity_filter));
+			for (auto i = universe.getFirstEntity(); i.isValid(); i = universe.getNextEntity(i))
+			{
+				getEntityListDisplayName(m_editor, buf, lengthOf(buf), i);
+				bool show = entity_filter[0] == '\0' || stristr(buf, entity_filter) != 0;
+				if (show && ImGui::Selectable(buf))
+				{
+					m_editor.setProperty(m_cmp_type, m_index, prop, &m_entities[0], m_entities.size(), &i, sizeof(i));
+				}
+			}
+			ImGui::EndPopup();
+		}
+		ImGui::PopID();
+	}
+
+
+	void visit(const Properties::Property<Int2>& prop) override
+	{
+		ComponentUID cmp = getComponent();
+		Int2 value;
+		prop.getValue(cmp, m_index, OutputBlob(&value, sizeof(value)));
+		if (ImGui::DragInt2(prop.name, &value.x))
+		{
+			m_editor.setProperty(m_cmp_type, m_index, prop, &m_entities[0], m_entities.size(), &value, sizeof(value));
+		}
+	}
+
+
+	void visit(const Properties::Property<Vec2>& prop) override
+	{
+		ComponentUID cmp = getComponent();
+		Vec2 value;
+		prop.getValue(cmp, m_index, OutputBlob(&value, sizeof(value)));
+		if (ImGui::DragFloat2(prop.name, &value.x))
+		{
+			m_editor.setProperty(m_cmp_type, m_index, prop, &m_entities[0], m_entities.size(), &value, sizeof(value));
+		}
+	}
+
+
+	void visit(const Properties::Property<Vec3>& prop) override
+	{
+		Attributes attrs = getAttributes(prop);
+		ComponentUID cmp = getComponent();
+		Vec3 value;
+		prop.getValue(cmp, m_index, OutputBlob(&value, sizeof(value)));
+
+		if (attrs.is_color)
+		{
+			if (ImGui::ColorEdit3(prop.name, &value.x))
+			{
+				m_editor.setProperty(m_cmp_type, m_index, prop, &m_entities[0], m_entities.size(), &value, sizeof(value));
 			}
 		}
 		else
 		{
-			if (ImGui::DragFloat(desc_name, &f, d.getStep(), d.getMin(), d.getMax()))
+			if (attrs.is_radians) value = Math::radiansToDegrees(value);
+			if (ImGui::DragFloat3(prop.name, &value.x, 1, attrs.min, attrs.max))
 			{
-				if (d.isInRadians()) f = Math::degreesToRadians(f);
-				m_editor.setProperty(cmp_type, index, desc, &entities[0], entities.size(), &f, sizeof(f));
+				if (attrs.is_radians) value = Math::degreesToRadians(value);
+				m_editor.setProperty(m_cmp_type, m_index, prop, &m_entities[0], m_entities.size(), &value, sizeof(value));
 			}
 		}
-		break;
 	}
-	case PropertyDescriptorBase::INTEGER:
+
+
+	void visit(const Properties::Property<Vec4>& prop) override
 	{
-		int i;
-		tmp.read(i);
-		auto& d = static_cast<NumericPropertyDescriptorBase<int>&>(desc);
-		if (ImGui::DragInt(desc_name, &i, (float)d.getStep(), d.getMin(), d.getMax()))
+		ComponentUID cmp = getComponent();
+		Vec4 value;
+		prop.getValue(cmp, m_index, OutputBlob(&value, sizeof(value)));
+
+		if (ImGui::DragFloat4(prop.name, &value.x))
 		{
-			m_editor.setProperty(cmp_type, index, desc, &entities[0], entities.size(), &i, sizeof(i));
+			m_editor.setProperty(m_cmp_type, m_index, prop, &m_entities[0], m_entities.size(), &value, sizeof(value));
 		}
-		break;
 	}
-	case PropertyDescriptorBase::UNSIGNED_INTEGER:
+
+
+	void visit(const Properties::Property<bool>& prop) override
 	{
-		unsigned int ui;
-		tmp.read(ui);
-		int i = (int)ui;
-		if (ImGui::DragInt(desc_name, &i))
+		ComponentUID cmp = getComponent();
+		bool value;
+		prop.getValue(cmp, m_index, OutputBlob(&value, sizeof(value)));
+
+		if (ImGui::Checkbox(prop.name, &value))
 		{
-			ui = (unsigned int)i;
-			m_editor.setProperty(cmp_type, index, desc, &entities[0], entities.size(), &ui, sizeof(ui));
+			m_editor.setProperty(m_cmp_type, m_index, prop, &m_entities[0], m_entities.size(), &value, sizeof(value));
 		}
-		break;
 	}
-	case PropertyDescriptorBase::BOOL:
+
+
+	void visit(const Properties::Property<Path>& prop) override
 	{
-		bool b;
-		tmp.read(b);
-		if (ImGui::Checkbox(desc_name, &b))
+		ComponentUID cmp = getComponent();
+		char tmp[1024];
+		prop.getValue(cmp, m_index, OutputBlob(&tmp, sizeof(tmp)));
+
+		Attributes attrs = getAttributes(prop);
+
+		if (attrs.resource_type != INVALID_RESOURCE_TYPE)
 		{
-			m_editor.setProperty(cmp_type, index, desc, &entities[0], entities.size(), &b, sizeof(b));
-		}
-		break;
-	}
-	case PropertyDescriptorBase::COLOR:
-	{
-		Vec3 v;
-		tmp.read(v);
-		if (ImGui::ColorEdit3(desc_name, &v.x))
-		{
-			m_editor.setProperty(cmp_type, index, desc, &entities[0], entities.size(), &v, sizeof(v));
-		}
-		break;
-	}
-	case PropertyDescriptorBase::VEC2:
-	{
-		Vec2 v;
-		tmp.read(v);
-		if (desc.isInRadians())
-		{
-			v.x = Math::radiansToDegrees(v.x);
-			v.y = Math::radiansToDegrees(v.y);
-		}
-		if (ImGui::DragFloat2(desc_name, &v.x))
-		{
-			if (desc.isInRadians())
+			if (m_app.getAssetBrowser().resourceInput(prop.name, StaticString<20>("", (u64)&prop), tmp, sizeof(tmp), attrs.resource_type))
 			{
-				v.x = Math::degreesToRadians(v.x);
-				v.y = Math::degreesToRadians(v.y);
-			}
-			m_editor.setProperty(cmp_type, index, desc, &entities[0], entities.size(), &v, sizeof(v));
-		}
-		break;
-	}
-	case PropertyDescriptorBase::INT2:
-	{
-		Int2 v;
-		tmp.read(v);
-		if (ImGui::DragInt2(desc_name, &v.x))
-		{
-			m_editor.setProperty(cmp_type, index, desc, &entities[0], entities.size(), &v, sizeof(v));
-		}
-		break;
-	}
-	case PropertyDescriptorBase::VEC3:
-	{
-		Vec3 v;
-		tmp.read(v);
-		if (desc.isInRadians()) v = Math::radiansToDegrees(v);
-		if (ImGui::DragFloat3(desc_name, &v.x))
-		{
-			if (desc.isInRadians()) v = Math::degreesToRadians(v);
-			m_editor.setProperty(cmp_type, index, desc, &entities[0], entities.size(), &v, sizeof(v));
-		}
-		break;
-	}
-	case PropertyDescriptorBase::VEC4:
-	{
-		Vec4 v;
-		tmp.read(v);
-		if (ImGui::DragFloat4(desc_name, &v.x))
-		{
-			m_editor.setProperty(cmp_type, index, desc, &entities[0], entities.size(), &v, sizeof(v));
-		}
-		break;
-	}
-	case PropertyDescriptorBase::RESOURCE:
-	{
-		char buf[1024];
-		copyString(buf, (const char*)stream.getData());
-		auto& resource_descriptor = static_cast<IResourcePropertyDescriptor&>(desc);
-		ResourceType rm_type = resource_descriptor.getResourceType();
-		if (m_app.getAssetBrowser().resourceInput(
-				desc.getName(), StaticString<20>("", (u64)&desc), buf, sizeof(buf), rm_type))
-		{
-			m_editor.setProperty(cmp_type, index, desc, &entities[0], entities.size(), buf, stringLength(buf) + 1);
-		}
-		break;
-	}
-	case PropertyDescriptorBase::STRING:
-	case PropertyDescriptorBase::FILE:
-	{
-		char buf[1024];
-		copyString(buf, (const char*)stream.getData());
-		if (ImGui::InputText(desc_name, buf, sizeof(buf)))
-		{
-			m_editor.setProperty(cmp_type, index, desc, &entities[0], entities.size(), buf, stringLength(buf) + 1);
-		}
-		break;
-	}
-	case PropertyDescriptorBase::ARRAY:
-		showArrayProperty(entities, cmp_type, static_cast<ArrayDescriptorBase&>(desc));
-		break;
-	case PropertyDescriptorBase::SAMPLED_FUNCTION:
-		showSampledFunctionProperty(entities, cmp_type, static_cast<ISampledFunctionDescriptor&>(desc));
-		break;
-	case PropertyDescriptorBase::ENTITY:
-		showEntityProperty(entities, cmp_type, index, static_cast<IEnumPropertyDescriptor&>(desc));
-		break;
-	case PropertyDescriptorBase::ENUM:
-		showEnumProperty(entities, cmp_type, index, static_cast<IEnumPropertyDescriptor&>(desc));
-		break;
-	case PropertyDescriptorBase::BLOB:
-	default:
-		ASSERT(false);
-		break;
-	}
-}
-
-
-void PropertyGrid::showEntityProperty(const Array<Entity>& entities,
-	ComponentType cmp_type,
-	int index,
-	PropertyDescriptorBase& desc)
-{
-	OutputBlob blob(m_editor.getAllocator());
-	
-	ComponentUID cmp;
-	cmp.scene = m_editor.getUniverse()->getScene(cmp_type);
-	cmp.type = cmp_type;
-	cmp.entity = entities[0];
-	cmp.handle = cmp.scene->getComponent(cmp.entity, cmp.type);
-	desc.get(cmp, index, blob);
-	Entity entity = *(Entity*)blob.getData();
-
-	char buf[128];
-	getEntityListDisplayName(m_editor, buf, lengthOf(buf), entity);
-	ImGui::LabelText(desc.getName(), "%s", buf);
-	ImGui::SameLine();
-	ImGui::PushID(desc.getName());
-	if (ImGui::Button("...")) ImGui::OpenPopup(desc.getName());
-	Universe& universe = *m_editor.getUniverse();
-	if (ImGui::BeginPopup(desc.getName()))
-	{
-		if (entity.isValid() && ImGui::Button("Select")) m_deferred_select = entity;
-
-		ImGui::FilterInput("Filter", m_entity_filter, sizeof(m_entity_filter));
-		for (auto i = universe.getFirstEntity(); i.isValid(); i = universe.getNextEntity(i))
-		{
-			getEntityListDisplayName(m_editor, buf, lengthOf(buf), i);
-			bool show = m_entity_filter[0] == '\0' || stristr(buf, m_entity_filter) != 0;
-			if (show && ImGui::Selectable(buf))
-			{
-				m_editor.setProperty(cmp_type, index, desc, &entities[0], entities.size(), &i, sizeof(i));
+				m_editor.setProperty(m_cmp_type, m_index, prop, &m_entities[0], m_entities.size(), tmp, stringLength(tmp) + 1);
 			}
 		}
-		ImGui::EndPopup();
-	}
-	ImGui::PopID();
-}
-
-
-void PropertyGrid::showEnumProperty(const Array<Entity>& entities,
-	ComponentType cmp_type,
-	int index,
-	IEnumPropertyDescriptor& desc)
-{
-	if(entities.size() > 1)
-	{
-		ImGui::LabelText(desc.getName(), "Multi-object editing not supported.");
-		return;
-	}
-
-	ComponentUID cmp;
-	cmp.type = cmp_type;
-	cmp.entity = entities[0];
-	cmp.scene = m_editor.getUniverse()->getScene(cmp_type);
-	cmp.handle = cmp.scene->getComponent(cmp.entity, cmp.type);
-	OutputBlob blob(m_editor.getAllocator());
-	desc.get(cmp, index, blob);
-	int value = *(int*)blob.getData();
-	int count = desc.getEnumCount(cmp.scene, cmp.handle);
-
-	struct Data
-	{
-		IEnumPropertyDescriptor* descriptor;
-		ComponentHandle cmp;
-		IScene* scene;
-	};
-
-	auto getter = [](void* data, int index, const char** out) -> bool {
-		auto* combo_data = static_cast<Data*>(data);
-		*out = combo_data->descriptor->getEnumItemName(combo_data->scene, combo_data->cmp, index);
-		if (!*out)
+		else
 		{
-			static char buf[100];
-			combo_data->descriptor->getEnumItemName(
-				combo_data->scene, combo_data->cmp, index, buf, lengthOf(buf));
-			*out = buf;
+			if (ImGui::InputText(prop.name, tmp, sizeof(tmp)))
+			{
+				m_editor.setProperty(m_cmp_type, m_index, prop, &m_entities[0], m_entities.size(), tmp, stringLength(tmp) + 1);
+			}
 		}
-
-		return true;
-	};
-
-	Data data;
-	data.cmp = cmp.handle;
-	data.scene = cmp.scene;
-	data.descriptor = &desc;
-
-	if (ImGui::Combo(desc.getName(), &value, getter, &data, count))
-	{
-		m_editor.setProperty(cmp.type, index, desc, &cmp.entity, 1, &value, sizeof(value));
 	}
-}
 
 
-void PropertyGrid::showSampledFunctionProperty(const Array<Entity>& entities,
-	ComponentType cmp_type,
-	ISampledFunctionDescriptor& desc)
-{
-	static const int MIN_COUNT = 6;
-
-	OutputBlob blob(m_editor.getAllocator());
-	ComponentUID cmp;
-	cmp.type = cmp_type;
-	cmp.entity = entities[0];
-	cmp.scene = m_editor.getUniverse()->getScene(cmp_type);
-	cmp.handle = cmp.scene->getComponent(cmp.entity, cmp.type);
-	desc.get(cmp, -1, blob);
-	int count;
-	InputBlob input(blob);
-	input.read(count);
-	Vec2* f = (Vec2*)input.skip(sizeof(Vec2) * count);
-
-	auto editor = ImGui::BeginCurveEditor(desc.getName());
-	if (editor.valid)
+	void visit(const Properties::Property<const char*>& prop) override
 	{
-		bool changed = false;
+		ComponentUID cmp = getComponent();
+		char tmp[1024];
+		prop.getValue(cmp, m_index, OutputBlob(&tmp, sizeof(tmp)));
 
-		changed |= ImGui::CurveSegment((ImVec2*)(f + 1), editor);
-
-		for (int i = 1; i < count - 3; i += 3)
+		if (ImGui::InputText(prop.name, tmp, sizeof(tmp)))
 		{
-			changed |= ImGui::CurveSegment((ImVec2*)(f + i), editor);
+			m_editor.setProperty(m_cmp_type, m_index, prop, &m_entities[0], m_entities.size(), tmp, stringLength(tmp) + 1);
+		}
+	}
+
+
+	void visit(const Properties::IBlobProperty& prop) override {}
+
+
+	void visit(const Properties::ISampledFuncProperty& prop) override
+	{
+		static const int MIN_COUNT = 6;
+		ComponentUID cmp = getComponent();
+
+		OutputBlob blob(m_editor.getAllocator());
+		prop.getValue(cmp, -1, blob);
+		int count;
+		InputBlob input(blob);
+		input.read(count);
+		Vec2* f = (Vec2*)input.skip(sizeof(Vec2) * count);
+
+		auto editor = ImGui::BeginCurveEditor(prop.name);
+		if (editor.valid)
+		{
+			bool changed = false;
+
+			changed |= ImGui::CurveSegment((ImVec2*)(f + 1), editor);
+
+			for (int i = 1; i < count - 3; i += 3)
+			{
+				changed |= ImGui::CurveSegment((ImVec2*)(f + i), editor);
+
+				if (changed)
+				{
+					f[i + 3].x = Math::maximum(f[i].x + 0.001f, f[i + 3].x);
+
+					if (i + 3 < count)
+					{
+						f[i + 3].x = Math::minimum(f[i + 6].x - 0.001f, f[i + 3].x);
+					}
+				}
+
+				if (ImGui::IsItemActive() && ImGui::IsMouseDoubleClicked(0)
+					&& count > MIN_COUNT && i + 3 < count - 2)
+				{
+					for (int j = i + 2; j < count - 3; ++j)
+					{
+						f[j] = f[j + 3];
+					}
+					count -= 3;
+					*(int*)blob.getData() = count;
+					changed = true;
+				}
+			}
+
+			f[count - 2].x = 1;
+			f[1].x = 0;
+			ImGui::EndCurveEditor(editor);
+
+			if (ImGui::IsItemActive() && ImGui::IsMouseDoubleClicked(0))
+			{
+				auto mp = ImGui::GetMousePos();
+				mp.x -= editor.inner_bb_min.x - 1;
+				mp.y -= editor.inner_bb_min.y - 1;
+				mp.x /= (editor.inner_bb_max.x - editor.inner_bb_min.x);
+				mp.y /= (editor.inner_bb_max.y - editor.inner_bb_min.y);
+				mp.y = 1 - mp.y;
+				blob.write(ImVec2(-0.2f, 0));
+				blob.write(mp);
+				blob.write(ImVec2(0.2f, 0));
+				count += 3;
+				*(int*)blob.getData() = count;
+				f = (Vec2*)((int*)blob.getData() + 1);
+				changed = true;
+
+				auto compare = [](const void* a, const void* b) -> int
+				{
+					float fa = ((const float*)a)[2];
+					float fb = ((const float*)b)[2];
+					return fa < fb ? -1 : (fa > fb) ? 1 : 0;
+				};
+
+				qsort(f, count / 3, 3 * sizeof(f[0]), compare);
+			}
 
 			if (changed)
 			{
-				f[i + 3].x = Math::maximum(f[i].x + 0.001f, f[i + 3].x);
-
-				if (i + 3 < count)
+				for (int i = 2; i < count - 3; i += 3)
 				{
-					f[i + 3].x = Math::minimum(f[i + 6].x - 0.001f, f[i + 3].x);
+					auto prev_p = ((Vec2*)f)[i - 1];
+					auto next_p = ((Vec2*)f)[i + 2];
+					auto& tangent = ((Vec2*)f)[i];
+					auto& tangent2 = ((Vec2*)f)[i + 1];
+					float half = 0.5f * (next_p.x - prev_p.x);
+					tangent = tangent.normalized() * half;
+					tangent2 = tangent2.normalized() * half;
+				}
+
+				f[0].x = 0;
+				f[count - 1].x = prop.getMaxX();
+				m_editor.setProperty(cmp.type, -1, prop, &m_entities[0], m_entities.size(), blob.getData(), blob.getPos());
+			}
+		}
+	}
+
+	void visit(const Properties::IArrayProperty& prop) override
+	{
+		bool is_open = ImGui::TreeNodeEx(prop.name, ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowOverlapMode);
+		if (m_entities.size() > 1)
+		{
+			ImGui::Text("Multi-object editing not supported.");
+			if (is_open) ImGui::TreePop();
+			return;
+		}
+
+		ComponentUID cmp = getComponent();
+		int count = prop.getCount(cmp);
+		if (prop.canAddRemove())
+		{
+			float w = ImGui::GetContentRegionAvailWidth();
+			ImGui::SameLine(w - 45);
+			if (ImGui::SmallButton("Add"))
+			{
+				m_editor.addArrayPropertyItem(cmp, prop);
+				count = prop.getCount(cmp);
+			}
+		}
+		if (!is_open) return;
+
+		for (int i = 0; i < count; ++i)
+		{
+			char tmp[10];
+			toCString(i, tmp, sizeof(tmp));
+			ImGui::PushID(i);
+			ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowOverlapMode;
+			bool is_open = !prop.canAddRemove() || ImGui::TreeNodeEx(tmp, flags);
+			if (prop.canAddRemove())
+			{
+				float w = ImGui::GetContentRegionAvailWidth();
+				ImGui::SameLine(w - 45);
+				if (ImGui::SmallButton("Remove"))
+				{
+					m_editor.removeArrayPropertyItem(cmp, i, prop);
+					--i;
+					count = prop.getCount(cmp);
+					if(is_open) ImGui::TreePop();
+					ImGui::PopID();
+					continue;
 				}
 			}
 
-			if (ImGui::IsItemActive() && ImGui::IsMouseDoubleClicked(0)
-				&& count > MIN_COUNT && i + 3 < count - 2)
+			if (is_open)
 			{
-				for (int j = i + 2; j < count - 3; ++j)
-				{
-					f[j] = f[j + 3];
-				}
-				count -= 3;
-				*(int*)blob.getData() = count;
-				changed = true;
+				GridUIVisitor v(m_app, i, m_entities, m_cmp_type, m_editor);
+				prop.visit(v);
+				if (prop.canAddRemove()) ImGui::TreePop();
 			}
+
+			ImGui::PopID();
 		}
+		ImGui::TreePop();
+	}
 
-		f[count - 2].x = 1;
-		f[1].x = 0;
-		ImGui::EndCurveEditor(editor);
 
-		if (ImGui::IsItemActive() && ImGui::IsMouseDoubleClicked(0))
+	void visit(const Properties::IEnumProperty& prop) override
+	{
+		if (m_entities.size() > 1)
 		{
-			auto mp = ImGui::GetMousePos();
-			mp.x -= editor.inner_bb_min.x - 1;
-			mp.y -= editor.inner_bb_min.y - 1;
-			mp.x /= (editor.inner_bb_max.x - editor.inner_bb_min.x);
-			mp.y /= (editor.inner_bb_max.y - editor.inner_bb_min.y);
-			mp.y = 1 - mp.y;
-			blob.write(ImVec2(-0.2f, 0));
-			blob.write(mp);
-			blob.write(ImVec2(0.2f, 0));
-			count += 3;
-			*(int*)blob.getData() = count;
-			f = (Vec2*)((int*)blob.getData() + 1);
-			changed = true;
-
-			auto compare = [](const void* a, const void* b) -> int
-			{
-				float fa = ((const float*)a)[2];
-				float fb = ((const float*)b)[2];
-				return fa < fb ? -1 : (fa > fb) ? 1 : 0;
-			};
-
-			qsort(f, count / 3, 3 * sizeof(f[0]), compare);
+			ImGui::LabelText(prop.name, "Multi-object editing not supported.");
+			return;
 		}
 
-		if (changed)
+		ComponentUID cmp = getComponent();
+		int value;
+		prop.getValue(cmp, m_index, OutputBlob(&value, sizeof(value)));
+		int count = prop.getEnumCount(cmp);
+
+		struct Data
 		{
-			for (int i = 2; i < count - 3; i += 3)
-			{
-				auto prev_p = ((Vec2*)f)[i - 1];
-				auto next_p = ((Vec2*)f)[i + 2];
-				auto& tangent = ((Vec2*)f)[i];
-				auto& tangent2 = ((Vec2*)f)[i + 1];
-				float half = 0.5f * (next_p.x - prev_p.x);
-				tangent = tangent.normalized() * half;
-				tangent2 = tangent2.normalized() * half;
-			}
+			const Properties::IEnumProperty* prop;
+			ComponentUID cmp;
+		};
 
-			f[0].x = 0;
-			f[count - 1].x = desc.getMaxX();
-			m_editor.setProperty(cmp_type, -1, desc, &entities[0], entities.size(), blob.getData(), blob.getPos());
-		}
-	}
-}
+		auto getter = [](void* data, int index, const char** out) -> bool {
+			Data* combo_data = (Data*)data;
+			*out = combo_data->prop->getEnumName(combo_data->cmp, index);
+			return true;
+		};
 
+		Data data;
+		data.cmp = cmp;
+		data.prop = &prop;
 
-void PropertyGrid::showArrayProperty(const Array<Entity>& entities,
-	ComponentType cmp_type,
-	ArrayDescriptorBase& desc)
-{
-	ComponentUID cmp;
-	cmp.type = cmp_type;
-	cmp.scene = m_editor.getUniverse()->getScene(cmp_type);
-	cmp.entity = entities[0];
-	cmp.handle = cmp.scene->getComponent(cmp.entity, cmp.type);
-	StaticString<100> desc_name(desc.getName(), "###", (u64)&desc);
-
-	if (!ImGui::CollapsingHeader(desc_name, nullptr, ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_DefaultOpen)) return;
-	if (entities.size() > 1)
-	{
-		ImGui::Text("Multi-object editing not supported.");
-		return;
-	}
-
-	int count = desc.getCount(cmp);
-	ImGui::PushID(&desc);
-	if (desc.canAdd() && ImGui::Button("Add"))
-	{
-		m_editor.addArrayPropertyItem(cmp, desc);
-	}
-	count = desc.getCount(cmp);
-
-	for (int i = 0; i < count; ++i)
-	{
-		char tmp[10];
-		toCString(i, tmp, sizeof(tmp));
-		ImGui::PushID(i);
-		if (!desc.canRemove() || ImGui::TreeNode(tmp))
+		if (ImGui::Combo(prop.name, &value, getter, &data, count))
 		{
-			if (desc.canRemove() && ImGui::Button("Remove"))
-			{
-				m_editor.removeArrayPropertyItem(cmp, i, desc);
-				--i;
-				count = desc.getCount(cmp);
-				ImGui::TreePop();
-				ImGui::PopID();
-				continue;
-			}
-
-			for (int j = 0; j < desc.getChildren().size(); ++j)
-			{
-				auto* child = desc.getChildren()[j];
-				showProperty(*child, i, entities, cmp_type);
-			}
-			if (desc.canRemove()) ImGui::TreePop();
+			m_editor.setProperty(cmp.type, m_index, prop, &cmp.entity, 1, &value, sizeof(value));
 		}
-		ImGui::PopID();
 	}
-	ImGui::PopID();
 
-	if (m_deferred_select.isValid())
-	{
-		m_editor.selectEntities(&m_deferred_select, 1);
-		m_deferred_select = INVALID_ENTITY;
-	}
-}
+
+	StudioApp& m_app;
+	WorldEditor& m_editor;
+	ComponentType m_cmp_type;
+	const Array<Entity>& m_entities;
+	int m_index;
+	PropertyGrid& m_grid;
+	Entity m_deferred_select = INVALID_ENTITY;
+};
 
 
 void PropertyGrid::showComponentProperties(const Array<Entity>& entities, ComponentType cmp_type)
 {
-	ImGuiTreeNodeFlags flags =
-		ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowOverlapMode;
-	bool is_opened = ImGui::CollapsingHeader(m_app.getComponentTypeName(cmp_type), nullptr, flags);
+	ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowOverlapMode;
+	ImGui::Separator();
+	const char* cmp_type_name = m_app.getComponentTypeName(cmp_type);
+	bool is_open = ImGui::TreeNodeEx((void*)(intptr_t)cmp_type.index, flags, "%s", cmp_type_name);
 
-	ImGui::PushID(cmp_type.index);
 	float w = ImGui::GetContentRegionAvailWidth();
 	ImGui::SameLine(w - 45);
-	if (ImGui::Button("Remove"))
+	if (ImGui::SmallButton("Remove"))
 	{
 		m_editor.destroyComponent(&entities[0], entities.size(), cmp_type);
-		ImGui::PopID();
+		if (is_open) ImGui::TreePop();
 		return;
 	}
 
-	if (!is_opened)
+	if (!is_open) return;
+
+	const Properties::ComponentBase* component = Properties::getComponent(cmp_type);
+	GridUIVisitor visitor(m_app, -1, entities, cmp_type, m_editor);
+	if (component) component->visit(visitor);
+
+	if (visitor.m_deferred_select.isValid())
 	{
-		ImGui::PopID();
-		return;
+		m_editor.selectEntities(&visitor.m_deferred_select, 1);
+		visitor.m_deferred_select = INVALID_ENTITY;
 	}
 
-	auto& descs = PropertyRegister::getDescriptors(cmp_type);
-
-	for (auto* desc : descs)
-	{
-		showProperty(*desc, -1, entities, cmp_type);
-	}
 
 	if (entities.size() == 1)
 	{
@@ -530,8 +533,7 @@ void PropertyGrid::showComponentProperties(const Array<Entity>& entities, Compon
 			i->onGUI(*this, cmp);
 		}
 	}
-
-	ImGui::PopID();
+	ImGui::TreePop();
 }
 
 

@@ -12,9 +12,9 @@
 #include "engine/iplugin.h"
 #include "engine/path.h"
 #include "engine/plugin_manager.h"
-#include "engine/property_descriptor.h"
-#include "engine/property_register.h"
+#include "engine/properties.h"
 #include "engine/resource_manager.h"
+#include "engine/universe/universe.h"
 #include "renderer/render_scene.h"
 
 
@@ -27,31 +27,21 @@ static const ResourceType CLIP_TYPE("clip");
 
 static void registerProperties(IAllocator& allocator)
 {
-	PropertyRegister::add("ambient_sound",
-		LUMIX_NEW(allocator, DynamicEnumPropertyDescriptor<AudioScene>)("Sound",
-			&AudioScene::getAmbientSoundClipIndex,
-			&AudioScene::setAmbientSoundClipIndex,
-			&AudioScene::getClipCount,
-			&AudioScene::getClipName));
-
-	PropertyRegister::add("ambient_sound",
-		LUMIX_NEW(allocator, BoolPropertyDescriptor<AudioScene>)(
-			"3D", &AudioScene::isAmbientSound3D, &AudioScene::setAmbientSound3D));
-
-	PropertyRegister::add("echo_zone",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<AudioScene>)("Radius",
-			&AudioScene::getEchoZoneRadius,
-			&AudioScene::setEchoZoneRadius,
-			0.01f,
-			FLT_MAX,
-			0.1f));
-	PropertyRegister::add("echo_zone",
-		LUMIX_NEW(allocator, DecimalPropertyDescriptor<AudioScene>)("Delay (ms)",
-			&AudioScene::getEchoZoneDelay,
-			&AudioScene::setEchoZoneDelay,
-			0.01f,
-			FLT_MAX,
-			100.0f));
+	using namespace Properties;
+	static auto audio_scene = scene("audio",
+		component("ambient_sound",
+			property("3D", &AudioScene::isAmbientSound3D, &AudioScene::setAmbientSound3D),
+			dyn_enum_property("Sound", &AudioScene::getAmbientSoundClipIndex, &AudioScene::setAmbientSoundClipIndex, &AudioScene::getClipCount, &AudioScene::getClipName)
+		),
+		component("audio_listener"),
+		component("echo_zone",
+			property("Radius", &AudioScene::getEchoZoneRadius, &AudioScene::setEchoZoneRadius,
+				MinAttribute(0)),
+			property("Delay (ms)", &AudioScene::getEchoZoneDelay, &AudioScene::setEchoZoneDelay,
+				MinAttribute(0))
+		)
+	);
+	audio_scene.registerScene();
 }
 
 
