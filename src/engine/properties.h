@@ -294,10 +294,52 @@ struct EnumProperty : IEnumProperty
 		return namer(index);
 	}
 
-	const char* name;
 	Getter getter;
 	Setter setter;
 	int count;
+	Namer namer;
+};
+
+
+template <typename Getter, typename Setter, typename Counter, typename Namer>
+struct DynEnumProperty : IEnumProperty
+{
+	void getValue(ComponentUID cmp, int index, OutputBlob& stream) const override
+	{
+		using C = typename detail::ClassOf<Getter>::type;
+		C* inst = static_cast<C*>(cmp.scene);
+		static_assert(4 == sizeof(detail::ResultOf<Getter>::type), "enum must have 4 bytes");
+		detail::GetterProxy<Getter>::invoke(stream, inst, getter, cmp.handle, index);
+	}
+
+	void setValue(ComponentUID cmp, int index, InputBlob& stream) const override
+	{
+		using C = typename detail::ClassOf<Getter>::type;
+		C* inst = static_cast<C*>(cmp.scene);
+
+		static_assert(4 == sizeof(detail::ResultOf<Getter>::type), "enum must have 4 bytes");
+		detail::SetterProxy<Setter>::invoke(stream, inst, setter, cmp.handle, index);
+	}
+
+
+	int getEnumCount(ComponentUID cmp) const override
+	{
+		using C = typename detail::ClassOf<Getter>::type;
+		C* inst = static_cast<C*>(cmp.scene);
+		return (inst->*counter)();
+	}
+
+
+	const char* getEnumName(ComponentUID cmp, int index) const override
+	{
+		using C = typename detail::ClassOf<Getter>::type;
+		C* inst = static_cast<C*>(cmp.scene);
+		return (inst->*namer)(index);
+	}
+
+	Getter getter;
+	Setter setter;
+	Counter counter;
 	Namer namer;
 };
 
@@ -633,6 +675,19 @@ auto enum_property(const char* name, Getter getter, Setter setter, int count, Na
 	p.setter = setter;
 	p.namer = namer;
 	p.count = count;
+	p.name = name;
+	return p;
+}
+
+
+template <typename Getter, typename Setter, typename Counter, typename Namer, typename... Attributes>
+auto dyn_enum_property(const char* name, Getter getter, Setter setter, Counter counter, Namer namer, Attributes... attributes)
+{
+	DynEnumProperty<Getter, Setter, Counter, Namer> p;
+	p.getter = getter;
+	p.setter = setter;
+	p.namer = namer;
+	p.counter = counter;
 	p.name = name;
 	return p;
 }

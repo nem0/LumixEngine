@@ -29,18 +29,11 @@ static void registerProperties(IAllocator& allocator)
 {
 	using namespace Properties;
 	static auto ambient_sound = component("ambient_sound",
-		property("Parent", &AnimationScene::getSharedControllerParent, &AnimationScene::setSharedControllerParent),
-		property("3D", &AudioScene::isAmbientSound3D, &AudioScene::setAmbientSound3D)
+		property("3D", &AudioScene::isAmbientSound3D, &AudioScene::setAmbientSound3D),
+		dyn_enum_property("Sound", &AudioScene::getAmbientSoundClipIndex, &AudioScene::setAmbientSoundClipIndex, &AudioScene::getClipCount, &AudioScene::getClipName)
 	);
 	Properties::registerComponent(&ambient_sound);
-	// TODO
-	/*Properties::add("ambient_sound",
-	LUMIX_NEW(allocator, DynamicEnumPropertyDescriptor<AudioScene>)("Sound",
-	&AudioScene::getAmbientSoundClipIndex,
-	&AudioScene::setAmbientSoundClipIndex,
-	&AudioScene::getClipCount,
-	&AudioScene::getClipName));*/
-
+	
 	static auto echo_zone = component("echo_zone",
 		property("Radius", &AudioScene::getEchoZoneRadius, &AudioScene::setEchoZoneRadius,
 			MinAttribute(0)),
