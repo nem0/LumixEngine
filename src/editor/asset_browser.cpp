@@ -569,6 +569,7 @@ void AssetBrowser::onGUI()
 		if (m_activate) ImGui::SetDockActive();
 		m_activate = false;
 		ImGui::EndDock();
+		detailsGUI();
 		return;
 	}
 	if (m_is_focus_requested)
