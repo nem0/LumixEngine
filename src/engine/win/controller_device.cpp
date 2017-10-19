@@ -26,7 +26,69 @@ static struct {
 
 struct XInputControllerDevice : ControllerDevice
 {
-	void update(float dt) override {}
+	void update(float dt) override
+	{
+		XINPUT_STATE new_state;
+		const XINPUT_STATE& old_state = g_controllers.states[index];
+		g_controllers.get_state(index, &new_state);
+		InputSystem& input = *g_controllers.input;
+
+		bool is_changed = new_state.dwPacketNumber != old_state.dwPacketNumber;
+		if (!is_changed) return;
+
+		if (new_state.Gamepad.wButtons != old_state.Gamepad.wButtons)
+		{
+			for (int i = 0; i < 16; ++i)
+			{
+				WORD mask = 1 << i;
+				WORD new_bit = new_state.Gamepad.wButtons & mask;
+				WORD old_bit = old_state.Gamepad.wButtons & mask;
+				if (new_bit != old_bit)
+				{
+					InputSystem::Event event;
+					event.device = this;
+					event.type = InputSystem::Event::BUTTON;
+					event.data.button.key_id = i;
+					event.data.button.state = new_bit != 0 ? InputSystem::ButtonEvent::DOWN : InputSystem::ButtonEvent::UP;
+					input.injectEvent(event);
+				}
+			}
+		}
+
+		auto checkAxisEvent = [this, &input](BYTE new_state, BYTE old_state, InputSystem::AxisEvent::Axis axis, float max_value) {
+			if (new_state != old_state)
+			{
+				InputSystem::Event event;
+				event.device = this;
+				event.type = InputSystem::Event::AXIS;
+				event.data.axis.x_abs = new_state / max_value;
+				event.data.axis.axis = axis;
+				input.injectEvent(event);
+			}
+
+		};
+
+		checkAxisEvent(new_state.Gamepad.bLeftTrigger, old_state.Gamepad.bLeftTrigger, InputSystem::AxisEvent::LTRIGGER, 255.0f);
+		checkAxisEvent(new_state.Gamepad.bRightTrigger, old_state.Gamepad.bRightTrigger, InputSystem::AxisEvent::RTRIGGER, 255.0f);
+
+		auto check2AxisEvent = [this, &input](SHORT new_x, SHORT old_x, SHORT new_y, SHORT old_y, InputSystem::AxisEvent::Axis axis, float max_value) {
+			if (new_x != old_x || new_y != old_y)
+			{
+				InputSystem::Event event;
+				event.device = this;
+				event.type = InputSystem::Event::AXIS;
+				event.data.axis.x_abs = new_x / max_value;
+				event.data.axis.y_abs = new_y / max_value;
+				event.data.axis.axis = axis;
+				input.injectEvent(event);
+			}
+		};
+
+		check2AxisEvent(new_state.Gamepad.sThumbLX, old_state.Gamepad.sThumbLX, new_state.Gamepad.sThumbLY, old_state.Gamepad.sThumbLY, InputSystem::AxisEvent::LTHUMB, 65535.0f);
+		check2AxisEvent(new_state.Gamepad.sThumbRX, old_state.Gamepad.sThumbRX, new_state.Gamepad.sThumbRY, old_state.Gamepad.sThumbRY, InputSystem::AxisEvent::RTHUMB, 65535.0f);
+
+		g_controllers.states[index] = new_state;
+	}
 };
 
 

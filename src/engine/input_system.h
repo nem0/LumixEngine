@@ -44,10 +44,19 @@ class LUMIX_ENGINE_API InputSystem
 
 		struct AxisEvent
 		{
+			enum Axis
+			{
+				LTRIGGER,
+				RTRIGGER,
+				LTHUMB,
+				RTHUMB
+			};
+
 			float x;
 			float y;
 			float x_abs;
 			float y_abs;
+			Axis axis;
 		};
 
 		struct Event
