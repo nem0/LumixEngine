@@ -385,7 +385,7 @@ struct SampledFuncProperty : ISampledFuncProperty
 		int count = (inst->*counter)(cmp.handle);
 		stream.write(count);
 		const Vec2* values = (inst->*getter)(cmp.handle);
-		stream.write(values, sizeof(values[0]) * count);
+		stream.write(values, sizeof(float) * 2 * count);
 	}
 
 	void setValue(ComponentUID cmp, int index, InputBlob& stream) const override
@@ -395,7 +395,7 @@ struct SampledFuncProperty : ISampledFuncProperty
 		C* inst = static_cast<C*>(cmp.scene);
 		int count;
 		stream.read(count);
-		auto* buf = (const Vec2*)stream.skip(sizeof(Vec2) * count);
+		auto* buf = (const Vec2*)stream.skip(sizeof(float) * 2 * count);
 		(inst->*setter)(cmp.handle, buf, count);
 	}
 

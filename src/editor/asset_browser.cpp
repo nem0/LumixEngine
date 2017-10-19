@@ -677,10 +677,11 @@ bool AssetBrowser::acceptExtension(const char* ext, ResourceType type)
 
 bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* buf, int max_size, ResourceType type)
 {
+	ImGui::PushID(str_id);
 	float item_w = ImGui::CalcItemWidth();
 	auto& style = ImGui::GetStyle();
 	float text_width = Math::maximum(
-		50.0f, item_w - ImGui::CalcTextSize("...View").x - style.FramePadding.x * 4 - style.ItemSpacing.x * 2);
+		50.0f, item_w - ImGui::CalcTextSize("...").x - style.FramePadding.x * 2);
 
 	char* c = buf + stringLength(buf);
 	while (c > buf && *c != '/' && *c != '\\') --c;
@@ -695,10 +696,9 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* bu
 	ImGui::PopTextWrapPos();
 	ImGui::SameLine();
 	ImGui::SetCursorPos(pos);
-	StaticString<50> popup_name("pu", str_id);
-	if (ImGui::Button(StaticString<30>("...###browse", str_id)))
+	if (ImGui::Button("..."))
 	{
-		ImGui::OpenPopup(popup_name);
+		ImGui::OpenPopup("popup");
 	}
 	ImGui::EndGroup();
 	if (ImGui::IsItemRectHovered())
@@ -711,35 +711,38 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* bu
 			if (acceptExtension(ext, type))
 			{
 				copyString(buf, max_size, path);
+				ImGui::PopID();
 				return true;
 			}
 		}
 	}
 	ImGui::SameLine();
-	if (ImGui::Button(StaticString<30>("View###go", str_id)))
-	{
-		m_is_focus_requested = true;
-		m_is_open = true;
-		m_wanted_resource = buf;
-	}
-	ImGui::SameLine();
 	ImGui::Text("%s", label);
 
-	if (ImGui::BeginResizablePopup(popup_name, ImVec2(300, 300)))
+	if (ImGui::BeginResizablePopup("popup", ImVec2(300, 300)))
 	{
+		if (buf[0] != '\0' && ImGui::Button(StaticString<30>("View###go", str_id)))
+		{
+			m_is_focus_requested = true;
+			m_is_open = true;
+			m_wanted_resource = buf;
+		}
 		if (ImGui::Selectable("Empty", false))
 		{
 			*buf = '\0';
 			ImGui::EndPopup();
+			ImGui::PopID();
 			return true;
 		}
 		if (resourceList(buf, max_size, type, 0))
 		{
 			ImGui::EndPopup();
+			ImGui::PopID();
 			return true;
 		}
 		ImGui::EndPopup();
 	}
+	ImGui::PopID();
 	return false;
 }
 
