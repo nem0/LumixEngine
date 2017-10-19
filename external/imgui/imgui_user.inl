@@ -711,7 +711,7 @@ namespace ImGui
 			pos.x += GetStyle().FramePadding.x;
 			SetCursorPos(pos);
 			AlignTextToFramePadding();
-			TextColored(GetStyle().Colors[ImGuiCol_TextDisabled], label);
+			TextColored(GetStyle().Colors[ImGuiCol_TextDisabled], "%s", label);
 		}
 		PopItemWidth();
 		return ret;
