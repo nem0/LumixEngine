@@ -429,6 +429,8 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 					copyFile("models/editor/tile_texture.dds", out_path);
 					continue;
 				}
+				image_width = desc.m_width;
+				image_height = desc.m_height;
 				stbir_resize_uint8((u8*)raw_img[0],
 					image_width,
 					image_height,
