@@ -113,7 +113,8 @@ struct GridUIVisitor LUMIX_FINAL : Properties::IComponentVisitor
 		Attributes attrs = getAttributes(prop);
 		ComponentUID cmp = getComponent();
 		float f;
-		prop.getValue(cmp, m_index, OutputBlob(&f, sizeof(f)));
+		OutputBlob blob(&f, sizeof(f));
+		prop.getValue(cmp, m_index, blob);
 
 		if (attrs.is_radians) f = Math::radiansToDegrees(f);
 		if (ImGui::DragFloat(prop.name, &f, 1, attrs.min, attrs.max))
@@ -129,7 +130,8 @@ struct GridUIVisitor LUMIX_FINAL : Properties::IComponentVisitor
 	{
 		ComponentUID cmp = getComponent();
 		int value;
-		prop.getValue(cmp, m_index, OutputBlob(&value, sizeof(value)));
+		OutputBlob blob(&value, sizeof(value));
+		prop.getValue(cmp, m_index, blob);
 
 		if (ImGui::InputInt(prop.name, &value))
 		{
@@ -140,17 +142,15 @@ struct GridUIVisitor LUMIX_FINAL : Properties::IComponentVisitor
 
 	void visit(const Properties::Property<Entity>& prop) override
 	{
-		OutputBlob blob(m_editor.getAllocator());
-
 		ComponentUID cmp = getComponent();
 		Entity entity;
-		prop.getValue(cmp, m_index, OutputBlob(&entity, sizeof(entity)));
+		OutputBlob blob(&entity, sizeof(entity));
+		prop.getValue(cmp, m_index, blob);
 
 		char buf[128];
 		getEntityListDisplayName(m_editor, buf, lengthOf(buf), entity);
 		ImGui::PushID(prop.name);
 		
-		/*****/
 		float item_w = ImGui::CalcItemWidth();
 		auto& style = ImGui::GetStyle();
 		float text_width = Math::maximum(50.0f, item_w - ImGui::CalcTextSize("...").x - style.FramePadding.x * 2);
@@ -178,7 +178,7 @@ struct GridUIVisitor LUMIX_FINAL : Properties::IComponentVisitor
 			if (entity.isValid() && ImGui::Button("Select")) m_deferred_select = entity;
 
 			static char entity_filter[32] = {};
-			ImGui::FilterInput("Filter", entity_filter, sizeof(entity_filter));
+			ImGui::LabellessInputText("Filter", entity_filter, sizeof(entity_filter));
 			for (auto i = universe.getFirstEntity(); i.isValid(); i = universe.getNextEntity(i))
 			{
 				getEntityListDisplayName(m_editor, buf, lengthOf(buf), i);
@@ -198,7 +198,8 @@ struct GridUIVisitor LUMIX_FINAL : Properties::IComponentVisitor
 	{
 		ComponentUID cmp = getComponent();
 		Int2 value;
-		prop.getValue(cmp, m_index, OutputBlob(&value, sizeof(value)));
+		OutputBlob blob(&value, sizeof(value));
+		prop.getValue(cmp, m_index, blob);
 		if (ImGui::DragInt2(prop.name, &value.x))
 		{
 			m_editor.setProperty(m_cmp_type, m_index, prop, &m_entities[0], m_entities.size(), &value, sizeof(value));
@@ -210,7 +211,8 @@ struct GridUIVisitor LUMIX_FINAL : Properties::IComponentVisitor
 	{
 		ComponentUID cmp = getComponent();
 		Vec2 value;
-		prop.getValue(cmp, m_index, OutputBlob(&value, sizeof(value)));
+		OutputBlob blob(&value, sizeof(value));
+		prop.getValue(cmp, m_index, blob);
 		if (ImGui::DragFloat2(prop.name, &value.x))
 		{
 			m_editor.setProperty(m_cmp_type, m_index, prop, &m_entities[0], m_entities.size(), &value, sizeof(value));
@@ -223,7 +225,8 @@ struct GridUIVisitor LUMIX_FINAL : Properties::IComponentVisitor
 		Attributes attrs = getAttributes(prop);
 		ComponentUID cmp = getComponent();
 		Vec3 value;
-		prop.getValue(cmp, m_index, OutputBlob(&value, sizeof(value)));
+		OutputBlob blob(&value, sizeof(value));
+		prop.getValue(cmp, m_index, blob);
 
 		if (attrs.is_color)
 		{
@@ -520,7 +523,8 @@ void PropertyGrid::showComponentProperties(const Array<Entity>& entities, Compon
 	bool is_open = ImGui::TreeNodeEx((void*)(intptr_t)cmp_type.index, flags, "%s", cmp_type_name);
 
 	float w = ImGui::GetContentRegionAvailWidth();
-	ImGui::SameLine(w - 45);
+	ImGuiStyle& style = ImGui::GetStyle();
+	ImGui::SameLine(w - ImGui::CalcTextSize("Remove").x - style.FramePadding.x * 2);
 	if (ImGui::SmallButton("Remove"))
 	{
 		m_editor.destroyComponent(&entities[0], entities.size(), cmp_type);
@@ -627,6 +631,11 @@ bool PropertyGrid::entityInput(const char* label, const char* str_id, Entity& en
 
 void PropertyGrid::showCoreProperties(const Array<Entity>& entities)
 {
+	char name[256];
+	const char* tmp = m_editor.getUniverse()->getEntityName(entities[0]);
+	copyString(name, tmp);
+	if (ImGui::LabellessInputText("Name", name, sizeof(name))) m_editor.setEntityName(entities[0], name);
+	if (!ImGui::TreeNodeEx("General", ImGuiTreeNodeFlags_DefaultOpen)) return;
 	if (entities.size() == 1)
 	{
 		PrefabSystem& prefab_system = m_editor.getPrefabSystem();
@@ -640,7 +649,6 @@ void PropertyGrid::showCoreProperties(const Array<Entity>& entities)
 			}
 		}
 
-		char name[256];
 
 		ImGui::LabelText("ID", "%d", entities[0].index);
 		EntityGUID guid = m_editor.getEntityGUID(entities[0]);
@@ -672,10 +680,6 @@ void PropertyGrid::showCoreProperties(const Array<Entity>& entities)
 				m_editor.setEntitiesLocalCoordinate(&entities[0], entities.size(), (&tr.pos.x)[(int)coord], coord);
 			}
 		}
-
-		const char* tmp = m_editor.getUniverse()->getEntityName(entities[0]);
-		copyString(name, tmp);
-		if (ImGui::InputText("Name", name, sizeof(name))) m_editor.setEntityName(entities[0], name);
 	}
 	else
 	{
@@ -725,6 +729,7 @@ void PropertyGrid::showCoreProperties(const Array<Entity>& entities)
 	{
 		m_editor.setEntitiesScale(&entities[0], entities.size(), scale);
 	}
+	ImGui::TreePop();
 }
 
 
@@ -768,7 +773,7 @@ void PropertyGrid::onGUI()
 		}
 		if (ImGui::BeginPopup("AddComponentPopup"))
 		{
-			ImGui::FilterInput("Filter", m_component_filter, sizeof(m_component_filter));
+			ImGui::LabellessInputText("Filter", m_component_filter, sizeof(m_component_filter));
 			showAddComponentNode(m_app.getAddComponentTreeRoot().child, m_component_filter);
 			ImGui::EndPopup();
 		}

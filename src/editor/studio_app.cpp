@@ -1036,7 +1036,7 @@ public:
 	{
 		doMenuItem(*getAction("createEntity"), true);
 		ImGui::Separator();
-		ImGui::FilterInput("Filter", m_component_filter, sizeof(m_component_filter));
+		ImGui::LabellessInputText("Filter", m_component_filter, sizeof(m_component_filter));
 		showAddComponentNode(m_add_cmp_root.child, m_component_filter);
 	}
 
@@ -1100,7 +1100,7 @@ public:
 		doMenuItem(*getAction("newUniverse"), true);
 		if (ImGui::BeginMenu("Open"))
 		{
-			ImGui::FilterInput("Filter", m_open_filter, sizeof(m_open_filter));
+			ImGui::LabellessInputText("Filter", m_open_filter, sizeof(m_open_filter));
 			for (auto& univ : m_universes)
 			{
 				if ((m_open_filter[0] == '\0' || stristr(univ.data, m_open_filter)) &&
@@ -1300,7 +1300,7 @@ public:
 		if (ImGui::BeginDock("Entity List", &m_is_entity_list_open))
 		{
 			auto* universe = m_editor->getUniverse();
-			ImGui::FilterInput("Filter", filter, sizeof(filter));
+			ImGui::LabellessInputText("Filter", filter, sizeof(filter));
 
 			if (ImGui::BeginChild("entities"))
 			{

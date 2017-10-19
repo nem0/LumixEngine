@@ -584,7 +584,7 @@ void AssetBrowser::onGUI()
 	ImGui::Checkbox("Thumbnails", &m_show_thumbnails);
 	ImGui::SameLine();
 	checkbox_w = ImGui::GetCursorPosX() - checkbox_w;
-	if (ImGui::FilterInput("filter", m_filter, sizeof(m_filter), 100)) doFilter();
+	if (ImGui::LabellessInputText("Filter", m_filter, sizeof(m_filter), 100)) doFilter();
 	ImGui::SameLine(130 + checkbox_w);
 	breadcrumbs();
 	ImGui::Separator();
@@ -750,7 +750,7 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* bu
 bool AssetBrowser::resourceList(char* buf, int max_size, ResourceType type, float height)
 {
 	static char filter[128] = "";
-	ImGui::FilterInput("Filter", filter, sizeof(filter));
+	ImGui::LabellessInputText("Filter", filter, sizeof(filter));
 
 	ImGui::BeginChild("Resources", ImVec2(0, height));
 	for (auto& res : getResources(getTypeIndex(type)))

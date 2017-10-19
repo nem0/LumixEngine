@@ -698,7 +698,7 @@ namespace ImGui
 	}
 
 
-	bool FilterInput(const char* label, char* buf, size_t buf_size, float width)
+	bool LabellessInputText(const char* label, char* buf, size_t buf_size, float width)
 	{
 		auto pos = GetCursorPos();
 		PushItemWidth(width < 0 ? GetContentRegionAvail().x : width);
@@ -711,7 +711,7 @@ namespace ImGui
 			pos.x += GetStyle().FramePadding.x;
 			SetCursorPos(pos);
 			AlignTextToFramePadding();
-			TextColored(GetStyle().Colors[ImGuiCol_TextDisabled], "Filter");
+			TextColored(GetStyle().Colors[ImGuiCol_TextDisabled], label);
 		}
 		PopItemWidth();
 		return ret;
