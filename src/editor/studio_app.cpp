@@ -2161,6 +2161,12 @@ public:
 					checkShortcuts();
 				}
 				break;
+				case SDL_DROPFILE:
+					for (IPlugin* plugin : m_plugins)
+					{
+						if (plugin->onDropFile(event.drop.file)) break;
+					}
+					break;
 				case SDL_MOUSEWHEEL:
 				{
 					io.MouseWheel = float(event.wheel.x != 0 ? event.wheel.x : event.wheel.y);
