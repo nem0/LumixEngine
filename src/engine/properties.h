@@ -26,6 +26,57 @@ namespace Properties
 {
 
 
+struct IAttribute
+{
+	enum Type
+	{
+		MIN,
+		CLAMP,
+		RADIANS,
+		COLOR,
+		RESOURCE
+	};
+
+	virtual int getType() const = 0;
+};
+
+struct ComponentBase;
+struct IComponentVisitor;
+
+struct IAttributeVisitor
+{
+	virtual void visit(const IAttribute& attr) = 0;
+};
+
+struct PropertyBase
+{
+	virtual void visit(IAttributeVisitor& visitor) const = 0;
+	virtual void setValue(ComponentUID cmp, int index, InputBlob& stream) const = 0;
+	virtual void getValue(ComponentUID cmp, int index, OutputBlob& stream) const = 0;
+
+	const char* name;
+};
+
+
+LUMIX_ENGINE_API void init(IAllocator& allocator);
+LUMIX_ENGINE_API void shutdown();
+
+
+LUMIX_ENGINE_API const IAttribute* getAttribute(const PropertyBase& prop, IAttribute::Type type);
+LUMIX_ENGINE_API void registerComponent(const ComponentBase* desc);
+LUMIX_ENGINE_API const ComponentBase* getComponent(ComponentType cmp_type);
+LUMIX_ENGINE_API const PropertyBase* getProperty(ComponentType cmp_type, const char* property);
+LUMIX_ENGINE_API const PropertyBase* getProperty(ComponentType cmp_type, u32 property_name_hash);
+LUMIX_ENGINE_API const PropertyBase* getProperty(ComponentType cmp_type, const char* property, const char* subproperty);
+
+
+LUMIX_ENGINE_API ComponentType getComponentType(const char* id);
+LUMIX_ENGINE_API u32 getComponentTypeHash(ComponentType type);
+LUMIX_ENGINE_API ComponentType getComponentTypeFromHash(u32 hash);
+LUMIX_ENGINE_API int getComponentTypesCount();
+LUMIX_ENGINE_API const char* getComponentTypeID(int index);
+
+
 namespace detail 
 {
 
@@ -112,27 +163,6 @@ struct SetterProxy<void (C::*)(ComponentHandle, A)>
 } // namespace detail
 
 
-struct IAttribute
-{
-	enum Type
-	{
-		MIN,
-		CLAMP,
-		RADIANS,
-		COLOR,
-		RESOURCE
-	};
-
-	virtual int getType() const = 0;
-};
-
-
-struct IAttributeVisitor
-{
-	virtual void visit(const IAttribute& attr) = 0;
-};
-
-
 struct ResourceAttribute : IAttribute
 {
 	ResourceAttribute(const char* file_type, ResourceType type) { this->file_type = file_type; this->type = type; }
@@ -180,16 +210,6 @@ struct ColorAttribute : IAttribute
 };
 
 
-struct PropertyBase
-{
-	virtual void visit(IAttributeVisitor& visitor) const = 0;
-	virtual void setValue(ComponentUID cmp, int index, InputBlob& stream) const = 0;
-	virtual void getValue(ComponentUID cmp, int index, OutputBlob& stream) const = 0;
-
-	const char* name;
-};
-
-
 template <typename T> struct Property : PropertyBase {};
 
 
@@ -208,10 +228,6 @@ struct IEnumProperty : public PropertyBase
 	virtual int getEnumCount(ComponentUID cmp) const = 0;
 	virtual const char* getEnumName(ComponentUID cmp, int index) const = 0;
 };
-
-
-struct ComponentBase;
-struct IComponentVisitor;
 
 
 struct IArrayProperty : PropertyBase
@@ -796,26 +812,6 @@ auto const_array(const char* name, Counter counter, Properties... properties)
 	p.properties = makeTuple(properties...);
 	return p;
 }
-
-
-LUMIX_ENGINE_API void init(IAllocator& allocator);
-LUMIX_ENGINE_API void shutdown();
-
-
-LUMIX_ENGINE_API const IAttribute* getAttribute(const PropertyBase& prop, IAttribute::Type type);
-LUMIX_ENGINE_API void registerComponent(const ComponentBase* desc);
-LUMIX_ENGINE_API const ComponentBase* getComponent(ComponentType cmp_type);
-LUMIX_ENGINE_API const PropertyBase* getProperty(ComponentType cmp_type, const char* property);
-LUMIX_ENGINE_API const PropertyBase* getProperty(ComponentType cmp_type, u32 property_name_hash);
-LUMIX_ENGINE_API const PropertyBase* getProperty(ComponentType cmp_type, const char* property, const char* subproperty);
-
-
-LUMIX_ENGINE_API ComponentType getComponentType(const char* id);
-LUMIX_ENGINE_API u32 getComponentTypeHash(ComponentType type);
-LUMIX_ENGINE_API ComponentType getComponentTypeFromHash(u32 hash);
-LUMIX_ENGINE_API int getComponentTypesCount();
-LUMIX_ENGINE_API const char* getComponentTypeID(int index);
-
 
 
 } // namespace Properties
