@@ -427,7 +427,6 @@ void AssetBrowser::thumbnail(FileInfo& tile)
 	{
 		ImGui::Rect(img_size.x, img_size.y, 0xffffFFFF);
 		StaticString<MAX_PATH_LENGTH> path(".lumix/asset_tiles/", tile.file_path_hash, ".dds");
-		createTile(tile, path);
 		if (PlatformInterface::fileExists(path))
 		{
 			RenderInterface* ri = m_app.getWorldEditor().getRenderInterface();
@@ -435,6 +434,14 @@ void AssetBrowser::thumbnail(FileInfo& tile)
 			{
 				tile.tex = ri->loadTexture(Path(path));
 			}
+			else
+			{
+				createTile(tile, path);
+			}
+		}
+		else
+		{
+			createTile(tile, path);
 		}
 	}
 	ImVec2 text_size = ImGui::CalcTextSize(tile.clamped_filename);
