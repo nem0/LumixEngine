@@ -977,7 +977,11 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 	void setJointConnectedBody(ComponentHandle cmp, Entity entity) override
 	{
-		m_joints[{cmp.index}].connected_body = entity;
+		int idx = m_joints.find({cmp.index});
+		Joint& joint = m_joints.at(idx);
+		Entity join_entity = m_joints.getKey(idx);
+		joint.connected_body = entity;
+		if (m_is_game_running) initJoint(join_entity, joint);
 	}
 
 
@@ -1206,15 +1210,31 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			m_universe.destroyComponent(entity, type, this, cmp);
 		}
 		else if (type == RIGID_ACTOR_TYPE || type == MESH_ACTOR_TYPE || type == BOX_ACTOR_TYPE || type == CAPSULE_ACTOR_TYPE ||
-				 type == SPHERE_ACTOR_TYPE)
+			type == SPHERE_ACTOR_TYPE)
 		{
-			Entity entity = {cmp.index};
+			Entity entity = { cmp.index };
 			auto* actor = m_actors[entity];
 			actor->setPhysxActor(nullptr);
 			LUMIX_DELETE(m_allocator, actor);
 			m_actors.erase(entity);
 			m_dynamic_actors.eraseItem(actor);
 			m_universe.destroyComponent(entity, type, this, cmp);
+			if (m_is_game_running)
+			{
+				for (int i = 0, c = m_joints.size(); i < c; ++i)
+				{
+					Joint& joint = m_joints.at(i);
+					if (m_joints.getKey(i) == entity || joint.connected_body == entity)
+					{
+						if (joint.physx) joint.physx->release();
+						joint.physx = PxDistanceJointCreate(m_scene->getPhysics(),
+							m_dummy_actor,
+							PxTransform::createIdentity(),
+							nullptr,
+							PxTransform::createIdentity());
+					}
+				}
+			}
 		}
 		else if (type == RAGDOLL_TYPE)
 		{
@@ -2284,34 +2304,38 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
+	void initJoint(Entity entity, Joint& joint)
+	{
+		PxRigidActor* actors[2] = { nullptr, nullptr };
+		int idx = m_actors.find(entity);
+		if (idx >= 0) actors[0] = m_actors.at(idx)->physx_actor;
+		idx = m_actors.find(joint.connected_body);
+		if (idx >= 0) actors[1] = m_actors.at(idx)->physx_actor;
+		if (!actors[0] || !actors[1]) return;
+
+		Vec3 pos0 = m_universe.getPosition(entity);
+		Quat rot0 = m_universe.getRotation(entity);
+		Vec3 pos1 = m_universe.getPosition(joint.connected_body);
+		Quat rot1 = m_universe.getRotation(joint.connected_body);
+		PxTransform entity0_frame(toPhysx(pos0), toPhysx(rot0));
+		PxTransform entity1_frame(toPhysx(pos1), toPhysx(rot1));
+
+		PxTransform axis_local_frame1 = entity1_frame.getInverse() * entity0_frame * joint.local_frame0;
+
+		joint.physx->setLocalPose(PxJointActorIndex::eACTOR0, joint.local_frame0);
+		joint.physx->setLocalPose(PxJointActorIndex::eACTOR1, axis_local_frame1);
+		joint.physx->setActors(actors[0], actors[1]);
+		joint.physx->setConstraintFlag(PxConstraintFlag::eVISUALIZATION, true);
+	}
+
+
 	void initJoints()
 	{
 		for (int i = 0, c = m_joints.size(); i < c; ++i)
 		{
-			auto& joint = m_joints.at(i);
-
+			Joint& joint = m_joints.at(i);
 			Entity entity = m_joints.getKey(i);
-
-			PxRigidActor* actors[2] = { nullptr, nullptr };
-			int idx = m_actors.find(entity);
-			if (idx >= 0) actors[0] = m_actors.at(idx)->physx_actor;
-			idx = m_actors.find(joint.connected_body);
-			if (idx >= 0) actors[1] = m_actors.at(idx)->physx_actor;
-			if (!actors[0] || !actors[1]) continue;
-
-			Vec3 pos0 = m_universe.getPosition(entity);
-			Quat rot0 = m_universe.getRotation(entity);
-			Vec3 pos1 = m_universe.getPosition(joint.connected_body);
-			Quat rot1 = m_universe.getRotation(joint.connected_body);
-			PxTransform entity0_frame(toPhysx(pos0), toPhysx(rot0));
-			PxTransform entity1_frame(toPhysx(pos1), toPhysx(rot1));
-
-			PxTransform axis_local_frame1 = entity1_frame.getInverse() * entity0_frame * joint.local_frame0;
-
-			joint.physx->setLocalPose(PxJointActorIndex::eACTOR0, joint.local_frame0);
-			joint.physx->setLocalPose(PxJointActorIndex::eACTOR1, axis_local_frame1);
-			joint.physx->setActors(actors[0], actors[1]);
-			joint.physx->setConstraintFlag(PxConstraintFlag::eVISUALIZATION, true);
+			initJoint(entity, joint);
 		}
 	}
 
@@ -2462,6 +2486,16 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		return status;
 	}
 
+	void onEntityDestroyed(Entity entity)
+	{
+		for (int i = 0, c = m_joints.size(); i < c; ++i)
+		{
+			if (m_joints.at(i).connected_body == entity)
+			{
+				setJointConnectedBody({m_joints.getKey(i).index}, INVALID_ENTITY);
+			}
+		}
+	}
 
 	void onEntityMoved(Entity entity)
 	{
@@ -4970,6 +5004,7 @@ PhysicsScene* PhysicsScene::create(PhysicsSystem& system, Universe& context, Eng
 {
 	PhysicsSceneImpl* impl = LUMIX_NEW(allocator, PhysicsSceneImpl)(context, allocator);
 	impl->m_universe.entityTransformed().bind<PhysicsSceneImpl, &PhysicsSceneImpl::onEntityMoved>(impl);
+	impl->m_universe.entityDestroyed().bind<PhysicsSceneImpl, &PhysicsSceneImpl::onEntityDestroyed>(impl);
 	impl->m_engine = &engine;
 	PxSceneDesc sceneDesc(system.getPhysics()->getTolerancesScale());
 	sceneDesc.gravity = PxVec3(0.0f, -9.8f, 0.0f);

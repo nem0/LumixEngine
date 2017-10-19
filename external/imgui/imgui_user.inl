@@ -129,7 +129,7 @@ namespace ImGui
 			frame_bb.Max +
 			ImVec2(label_size.x > 0.0f ? style.ItemInnerSpacing.x + label_size.x : 0.0f, 0));
 		ItemSize(total_bb, style.FramePadding.y);
-		if (!ItemAdd(total_bb, NULL)) return -1;
+		if (!ItemAdd(total_bb, 0)) return -1;
 
 		// Determine scale from values if not specified
 		if (scale_min == FLT_MAX || scale_max == FLT_MAX)
@@ -684,7 +684,7 @@ namespace ImGui
 		const ImRect inner_bb(frame_bb.Min + style.FramePadding, frame_bb.Max - style.FramePadding);
 		const ImRect total_bb(frame_bb.Min, frame_bb.Max);
 		ItemSize(total_bb, style.FramePadding.y);
-		if (!ItemAdd(total_bb, NULL)) return;
+		if (!ItemAdd(total_bb, 0)) return;
 
 		double graph_length = double(scele_max - scale_min);
 		const ImU32 col_base = GetColorU32(ImGuiCol_PlotHistogram);
@@ -725,7 +725,7 @@ namespace ImGui
 		ImVec2 end_pos = screen_pos + ImVec2(w, h);
 		ImRect total_bb(screen_pos, end_pos);
 		ItemSize(total_bb);
-		if (!ItemAdd(total_bb, NULL)) return;
+		if (!ItemAdd(total_bb, 0)) return;
 		win->DrawList->AddRectFilled(screen_pos, end_pos, color);
 	}
 
