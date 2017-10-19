@@ -643,15 +643,18 @@ struct FBXImporter
 		// TODO error message
 		// TODO check if all meshes have the same vertex decls
 		
-		int vertex_size = getVertexSize(*scene.getMesh(0));
-		for (int i = 0; i < mesh_count; ++i)
+		int vertex_size = -1;
+		for(ImportMesh& mesh : meshes)
 		{
-			const ofbx::Mesh* mesh = scene.getMesh(i);
-			if (vertex_size != getVertexSize(*mesh))
+			if (!mesh.import) continue;
+			const ofbx::Mesh* fbx_mesh = mesh.fbx;
+			int tmp = getVertexSize(*fbx_mesh);
+			if (vertex_size >= 0 && vertex_size != tmp)
 			{
 				dialog.setMessage("Meshes have different vertex sizes.");
 				return false;
 			}
+			vertex_size = tmp;
 		}
 		return true;
 	}
