@@ -402,32 +402,69 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 
 			IAllocator& allocator = m_app.getWorldEditor().getAllocator();
 
-			int image_width, image_height, image_comp;
-			auto data = stbi_load(tile, &image_width, &image_height, &image_comp, 4);
-			if (!data)
-			{
-				g_log_error.log("Editor") << "Failed to load " << tile;
-				continue;
-			}
-
+			int image_width, image_height;
+			u32 hash = crc32(tile);
+			StaticString<MAX_PATH_LENGTH> out_path(".lumix/asset_tiles/", hash, ".dds");
 			Array<u8> resized_data(allocator);
 			resized_data.resize(AssetBrowser::TILE_SIZE * AssetBrowser::TILE_SIZE * 4);
-			stbir_resize_uint8(data,
-				image_width,
-				image_height,
-				0,
-				&resized_data[0],
-				AssetBrowser::TILE_SIZE,
-				AssetBrowser::TILE_SIZE,
-				0,
-				4);
-			stbi_image_free(data);
-
-			u32 hash = crc32(tile);
-			StaticString<MAX_PATH_LENGTH> path(".lumix/asset_tiles/", hash, ".dds");
-			if (!saveAsDDS(path, &resized_data[0], AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE))
+			if (PathUtils::hasExtension(tile, "dds"))
 			{
-				g_log_error.log("Editor") << "Failed to save " << path;
+				FS::OsFile file;
+				if (!file.open(tile, FS::Mode::OPEN_AND_READ, allocator))
+				{
+					copyFile("models/editor/tile_texture.dds", out_path);
+					g_log_error.log("Editor") << "Failed to load " << tile;
+					continue;
+				}
+				Array<u8> data(allocator);
+				data.resize((int)file.size());
+				file.read(&data[0], data.size());
+				file.close();
+
+				crn_uint32* raw_img[cCRNMaxFaces * cCRNMaxLevels];
+				crn_texture_desc desc;
+				bool success = crn_decompress_dds_to_images(&data[0], data.size(), raw_img, desc);
+				if (!success)
+				{
+					copyFile("models/editor/tile_texture.dds", out_path);
+					continue;
+				}
+				stbir_resize_uint8((u8*)raw_img[0],
+					image_width,
+					image_height,
+					0,
+					&resized_data[0],
+					AssetBrowser::TILE_SIZE,
+					AssetBrowser::TILE_SIZE,
+					0,
+					4);
+				crn_free_all_images(raw_img, desc);
+			}
+			else
+			{
+				int image_comp;
+				auto data = stbi_load(tile, &image_width, &image_height, &image_comp, 4);
+				if (!data)
+				{
+					g_log_error.log("Editor") << "Failed to load " << tile;
+					copyFile("models/editor/tile_texture.dds", out_path);
+					continue;
+				}
+				stbir_resize_uint8(data,
+					image_width,
+					image_height,
+					0,
+					&resized_data[0],
+					AssetBrowser::TILE_SIZE,
+					AssetBrowser::TILE_SIZE,
+					0,
+					4);
+				stbi_image_free(data);
+			}
+
+			if (!saveAsDDS(out_path, &resized_data[0], AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE))
+			{
+				g_log_error.log("Editor") << "Failed to save " << out_path;
 			}
 		}
 		m_texture_tile_creator.shutdown_event.trigger();
@@ -807,17 +844,10 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 	{
 		if (type == TEXTURE_TYPE)
 		{
-			if (!PathUtils::hasExtension(in_path, "dds"))
-			{
-				MT::SpinLock lock(m_texture_tile_creator.lock);
-				m_texture_tile_creator.tiles.emplace(in_path);
-				MT::atomicDecrement(&m_texture_tile_creator.count);
-				return true;
-			}
-			else
-			{
-				return copyFile("models/editor/tile_texture.dds", out_path);
-			}
+			MT::SpinLock lock(m_texture_tile_creator.lock);
+			m_texture_tile_creator.tiles.emplace(in_path);
+			MT::atomicDecrement(&m_texture_tile_creator.count);
+			return true;
 		}
 		if (type == MATERIAL_TYPE) return copyFile("models/editor/tile_material.dds", out_path);
 		if (type == SHADER_TYPE) return copyFile("models/editor/tile_shader.dds", out_path);
