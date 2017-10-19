@@ -1514,6 +1514,10 @@ namespace Lumix
 
 			switch(event.type)
 			{
+				case InputSystem::Event::DEVICE_ADDED:
+					break;
+				case InputSystem::Event::DEVICE_REMOVED:
+					break;
 				case InputSystem::Event::BUTTON:
 					LuaWrapper::push(L, (u32)event.data.button.state); // [lua_event, button.state]
 					lua_setfield(L, -2, "state"); // [lua_event]

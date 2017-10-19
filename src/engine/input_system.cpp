@@ -34,6 +34,7 @@ struct InputSystemImpl LUMIX_FINAL : public InputSystem
 		, m_events(m_allocator)
 		, m_is_enabled(false)
 		, m_devices(m_allocator)
+		, m_to_remove(m_allocator)
 	{
 		m_mouse_device = LUMIX_NEW(m_allocator, MouseDevice);
 		m_mouse_device->type = Device::MOUSE;
@@ -57,19 +58,28 @@ struct InputSystemImpl LUMIX_FINAL : public InputSystem
 
 	IAllocator& getAllocator() override { return m_allocator; }
 	void enable(bool enabled) override { m_is_enabled = enabled; }
-	void addDevice(Device* device) override { m_devices.push(device); }
+	
+	
+	void addDevice(Device* device) override
+	{
+		m_devices.push(device);
+		Event event;
+		event.type = Event::DEVICE_ADDED;
+		event.device = device;
+		injectEvent(event);
+	}
 
 
 	void removeDevice(Device* device) override 
 	{ 
 		ASSERT(device != m_keyboard_device);
 		ASSERT(device != m_mouse_device);
-		m_devices.eraseItemFast(device); LUMIX_DELETE(m_allocator, device); 
+		m_to_remove.push(device);
 
-		for (int i = m_events.size() - 1; i >= 0; --i)
-		{
-			if (m_events[i].device == device) m_events.erase(i);
-		}
+		Event event;
+		event.type = Event::DEVICE_REMOVED;
+		event.device = device;
+		injectEvent(event);
 	}
 
 
@@ -77,10 +87,16 @@ struct InputSystemImpl LUMIX_FINAL : public InputSystem
 	{
 		PROFILE_FUNCTION();
 
+		for (Device* device : m_to_remove)
+		{
+			m_devices.eraseItem(device);
+			LUMIX_DELETE(m_allocator, device);
+		}
+
 		m_events.clear();
 
-		ControllerDevice::frame(dt);
 		for (Device* device : m_devices) device->update(dt);
+		ControllerDevice::frame(dt);
 	}
 
 	
@@ -110,6 +126,7 @@ struct InputSystemImpl LUMIX_FINAL : public InputSystem
 	bool m_is_enabled;
 	Vec2 m_cursor_pos;
 	Array<Device*> m_devices;
+	Array<Device*> m_to_remove;
 };
 
 
