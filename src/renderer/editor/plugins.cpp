@@ -388,17 +388,6 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 	}
 
 
-	static crn_bool ddsConvertCallback(crn_uint32 phase_index,
-		crn_uint32 total_phases,
-		crn_uint32 subphase_index,
-		crn_uint32 total_subphases,
-		void* pUser_data_ptr)
-	{
-		float fraction = phase_index / float(total_phases) + (subphase_index / float(total_subphases)) / total_phases;
-		return true;
-	}
-
-
 	void createTextureTileTask()
 	{
 		while (!m_texture_tile_creator.shutdown)

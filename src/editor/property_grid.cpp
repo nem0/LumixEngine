@@ -251,7 +251,8 @@ struct GridUIVisitor LUMIX_FINAL : Properties::IComponentVisitor
 	{
 		ComponentUID cmp = getComponent();
 		Vec4 value;
-		prop.getValue(cmp, m_index, OutputBlob(&value, sizeof(value)));
+		OutputBlob blob(&value, sizeof(value));
+		prop.getValue(cmp, m_index, blob);
 
 		if (ImGui::DragFloat4(prop.name, &value.x))
 		{
@@ -264,7 +265,8 @@ struct GridUIVisitor LUMIX_FINAL : Properties::IComponentVisitor
 	{
 		ComponentUID cmp = getComponent();
 		bool value;
-		prop.getValue(cmp, m_index, OutputBlob(&value, sizeof(value)));
+		OutputBlob blob(&value, sizeof(value));
+		prop.getValue(cmp, m_index, blob);
 
 		if (ImGui::Checkbox(prop.name, &value))
 		{
@@ -277,7 +279,8 @@ struct GridUIVisitor LUMIX_FINAL : Properties::IComponentVisitor
 	{
 		ComponentUID cmp = getComponent();
 		char tmp[1024];
-		prop.getValue(cmp, m_index, OutputBlob(&tmp, sizeof(tmp)));
+		OutputBlob blob(&tmp, sizeof(tmp));
+		prop.getValue(cmp, m_index, blob);
 
 		Attributes attrs = getAttributes(prop);
 
@@ -302,7 +305,8 @@ struct GridUIVisitor LUMIX_FINAL : Properties::IComponentVisitor
 	{
 		ComponentUID cmp = getComponent();
 		char tmp[1024];
-		prop.getValue(cmp, m_index, OutputBlob(&tmp, sizeof(tmp)));
+		OutputBlob blob(&tmp, sizeof(tmp));
+		prop.getValue(cmp, m_index, blob);
 
 		if (ImGui::InputText(prop.name, tmp, sizeof(tmp)))
 		{
@@ -479,7 +483,8 @@ struct GridUIVisitor LUMIX_FINAL : Properties::IComponentVisitor
 
 		ComponentUID cmp = getComponent();
 		int value;
-		prop.getValue(cmp, m_index, OutputBlob(&value, sizeof(value)));
+		OutputBlob blob(&value, sizeof(value));
+		prop.getValue(cmp, m_index, blob);
 		int count = prop.getEnumCount(cmp);
 
 		struct Data
