@@ -1641,7 +1641,7 @@ void TerrainEditor::onGUI()
 			
 			static char filter[100] = {0};
 			static ImVec2 size(-1, 100);
-			ImGui::FilterInput("Filter", filter, sizeof(filter));
+			ImGui::LabellessInputText("Filter", filter, sizeof(filter));
 			ImGui::ListBoxHeader("Prefabs", size);
 			int resources_idx  = m_app.getAssetBrowser().getTypeIndex(PREFAB_TYPE);
 			auto& all_prefabs = m_app.getAssetBrowser().getResources(resources_idx);

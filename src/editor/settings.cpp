@@ -449,7 +449,7 @@ void Settings::showToolbarSettings()
 void Settings::showShortcutSettings()
 {
 	auto& actions = m_app.getActions();
-	ImGui::FilterInput("Filter", m_filter, lengthOf(m_filter));
+	ImGui::LabellessInputText("Filter", m_filter, lengthOf(m_filter));
 	ImGui::Columns(4);
 	ImGui::Text("Label");
 	ImGui::NextColumn();

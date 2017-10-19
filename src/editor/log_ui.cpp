@@ -194,7 +194,7 @@ void LogUI::onGUI()
 
 		ImGui::SameLine();
 		char filter[128] = "";
-		ImGui::FilterInput("Filter", filter, sizeof(filter));
+		ImGui::LabellessInputText("Filter", filter, sizeof(filter));
 		int len = 0;
 		if (ImGui::Button("Copy to clipboard"))
 		{
