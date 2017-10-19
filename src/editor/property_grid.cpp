@@ -525,7 +525,7 @@ void PropertyGrid::showComponentProperties(const Array<Entity>& entities, Compon
 	ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowOverlapMode;
 	ImGui::Separator();
 	const char* cmp_type_name = m_app.getComponentTypeName(cmp_type);
-	bool is_open = ImGui::TreeNodeEx((void*)(intptr_t)cmp_type.index, flags, "%s", cmp_type_name);
+	bool is_open = ImGui::TreeNodeEx((void*)(uintptr)cmp_type.index, flags, "%s", cmp_type_name);
 
 	float w = ImGui::GetContentRegionAvailWidth();
 	ImGuiStyle& style = ImGui::GetStyle();
