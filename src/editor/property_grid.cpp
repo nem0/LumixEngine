@@ -148,10 +148,30 @@ struct GridUIVisitor LUMIX_FINAL : Properties::IComponentVisitor
 
 		char buf[128];
 		getEntityListDisplayName(m_editor, buf, lengthOf(buf), entity);
-		ImGui::LabelText(prop.name, "%s", buf);
-		ImGui::SameLine();
 		ImGui::PushID(prop.name);
-		if (ImGui::Button("...")) ImGui::OpenPopup(prop.name);
+		
+		/*****/
+		float item_w = ImGui::CalcItemWidth();
+		auto& style = ImGui::GetStyle();
+		float text_width = Math::maximum(50.0f, item_w - ImGui::CalcTextSize("...").x - style.FramePadding.x * 2);
+
+		auto pos = ImGui::GetCursorPos();
+		pos.x += text_width;
+		ImGui::BeginGroup();
+		ImGui::AlignTextToFramePadding();
+		ImGui::PushTextWrapPos(pos.x);
+		ImGui::Text("%s", buf);
+		ImGui::PopTextWrapPos();
+		ImGui::SameLine();
+		ImGui::SetCursorPos(pos);
+		if (ImGui::Button("..."))
+		{
+			ImGui::OpenPopup(prop.name);
+		}
+		ImGui::EndGroup();
+		ImGui::SameLine();
+		ImGui::Text("%s", prop.name);
+
 		Universe& universe = *m_editor.getUniverse();
 		if (ImGui::BeginPopup(prop.name))
 		{
