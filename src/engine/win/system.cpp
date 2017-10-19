@@ -8,7 +8,19 @@ namespace Lumix
 {
 	bool copyFile(const char* from, const char* to)
 	{
-		return CopyFile(from, to, FALSE) != FALSE;
+		if (CopyFile(from, to, FALSE) == FALSE) return false;
+
+		FILETIME ft;
+		SYSTEMTIME st;
+
+		GetSystemTime(&st);
+		SystemTimeToFileTime(&st, &ft);
+		HANDLE handle = CreateFile(to, GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+		bool f = SetFileTime(handle, (LPFILETIME)NULL, (LPFILETIME)NULL, &ft) != FALSE;
+		ASSERT(f);
+		CloseHandle(handle);
+
+		return false;
 	}
 
 
