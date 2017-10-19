@@ -2526,6 +2526,18 @@ void ImportAssetDialog::setMessage(const char* message)
 }
 
 
+bool ImportAssetDialog::onDropFile(const char* file)
+{
+	if (PathUtils::hasExtension(file, "fbx") || PathUtils::hasExtension(file, "tga") || PathUtils::hasExtension(file, "dds"))
+	{
+		m_is_open = true;
+		addSource(file);
+		return true;
+	}
+	return false;
+}
+
+
 void ImportAssetDialog::setImportMessage(const char* message, float progress_fraction)
 {
 	MT::SpinLock lock(m_mutex);

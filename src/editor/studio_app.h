@@ -51,6 +51,7 @@ public:
 		virtual void update(float) {}
 		virtual void pluginAdded(IPlugin& plugin) {}
 		virtual const char* getName() const = 0;
+		virtual bool onDropFile(const char* file) { return false; }
 	};
 
 	struct IAddComponentPlugin
