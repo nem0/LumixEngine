@@ -25,7 +25,9 @@
 #include "renderer/renderer.h"
 #include "renderer/texture.h"
 #include <cstdio>
-#ifdef _MSC_VER
+#include <SDL.h>
+#include <SDL_syswm.h>
+#ifdef _WIN32
 	#include <windows.h>
 #endif
 
@@ -45,14 +47,8 @@ struct GUIInterface : GUISystem::Interface
 
 	void enableCursor(bool enable) override
 	{
-		if (enable)
-		{
-			while (ShowCursor(true) < 0);
-		}
-		else
-		{
-			while (ShowCursor(false) >= 0);
-		}
+		SDL_ShowCursor(enable);
+		SDL_SetRelativeMouseMode(!enable ? SDL_TRUE : SDL_FALSE);
 	}
 
 
@@ -85,109 +81,13 @@ public:
 	}
 
 
-	LRESULT onMessage(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
-	{
-		auto& input_system = m_engine->getInputSystem();
-		switch (msg)
-		{
-			case WM_KILLFOCUS: m_engine->getInputSystem().enable(false); break;
-			case WM_SETFOCUS: m_engine->getInputSystem().enable(true); break;
-			case WM_CLOSE: PostQuitMessage(0); break;
-			case WM_MOVE:
-			case WM_SIZE: onResize(); break;
-			case WM_QUIT: m_finished = true; break;
-			case WM_INPUT: handleRawInput(lparam); break;
-		}
-		return DefWindowProc(hwnd, msg, wparam, lparam);
-	}
-
-
-	static LRESULT CALLBACK msgProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
-	{
-		if (!s_instance || !s_instance->m_pipeline) return DefWindowProc(hwnd, msg, wparam, lparam);
-
-		return s_instance->onMessage(hwnd, msg, wparam, lparam);
-	}
-
-
 	void onResize()
 	{
-		RECT rect;
-		RECT screen_rect;
-		GetClientRect(m_hwnd, &rect);
-		GetWindowRect(m_hwnd, &screen_rect);
-		int w = rect.right - rect.left;
-		int h = rect.bottom - rect.top;
-		if (w > 0)
-		{
-			ClipCursor(&screen_rect);
-			m_pipeline->resize(w, h);
-			Renderer* renderer =
-				static_cast<Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
-			renderer->resize(w, h);
-		}
-	}
-
-
-	void createWindow()
-	{
-		HINSTANCE hInst = GetModuleHandle(NULL);
-		WNDCLASSEX wnd;
-		wnd = {};
-		wnd.cbSize = sizeof(wnd);
-		wnd.style = CS_HREDRAW | CS_VREDRAW;
-		wnd.lpfnWndProc = msgProc;
-		wnd.hInstance = hInst;
-		wnd.hIcon = LoadIcon(NULL, IDI_APPLICATION);
-		wnd.hCursor = LoadCursor(NULL, IDC_ARROW);
-		wnd.lpszClassName = "App";
-		wnd.hIconSm = LoadIcon(NULL, IDI_APPLICATION);
-		RegisterClassExA(&wnd);
-
-		RECT rect = { 0, 0, 600, 400 };
-		AdjustWindowRect(&rect, WS_OVERLAPPEDWINDOW | WS_VISIBLE, FALSE);
-
-		m_hwnd = CreateWindowA("App",
-			"App",
-			WS_OVERLAPPEDWINDOW | WS_VISIBLE,
-			0,
-			0,
-			rect.right - rect.left,
-			rect.bottom - rect.top,
-			NULL,
-			NULL,
-			hInst,
-			0);
-
-		if(!m_window_mode) setFullscreenBorderless();
-
-		RAWINPUTDEVICE Rid;
-		Rid.usUsagePage = 0x01;
-		Rid.usUsage = 0x02;
-		Rid.dwFlags = 0;
-		Rid.hwndTarget = 0;
-		RegisterRawInputDevices(&Rid, 1, sizeof(Rid));
-	}
-
-
-	void setFullscreenBorderless()
-	{
-		HMONITOR hmon = MonitorFromWindow(m_hwnd, MONITOR_DEFAULTTONEAREST);
-		MONITORINFO mi = {sizeof(mi)};
-		if (!GetMonitorInfo(hmon, &mi)) return;
-
-		SetWindowLong(m_hwnd, GWL_STYLE, GetWindowLong(m_hwnd, GWL_STYLE) & ~(WS_CAPTION | WS_THICKFRAME));
-		SetWindowLong(m_hwnd,
-			GWL_EXSTYLE,
-			GetWindowLong(m_hwnd, GWL_EXSTYLE) &
-				~(WS_EX_DLGMODALFRAME | WS_EX_WINDOWEDGE | WS_EX_CLIENTEDGE | WS_EX_STATICEDGE));
-		SetWindowPos(m_hwnd,
-			NULL,
-			mi.rcMonitor.left,
-			mi.rcMonitor.top,
-			mi.rcMonitor.right - mi.rcMonitor.left,
-			mi.rcMonitor.bottom - mi.rcMonitor.top,
-			SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+		int w, h;
+		SDL_GetWindowSize(m_window, &w, &h);
+		m_pipeline->resize(w, h);
+		Renderer* renderer = (Renderer*)m_engine->getPluginManager().getPlugin("renderer");
+		renderer->resize(w, h);
 	}
 
 
@@ -218,7 +118,8 @@ public:
 			}
 		}
 
-		createWindow();
+		u32 flags = SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE;
+		if (!m_window_mode) flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
 
 		g_log_info.getCallback().bind<outputToVS>();
 		g_log_warning.getCallback().bind<outputToVS>();
@@ -234,7 +135,11 @@ public:
 
 		m_mem_file_device = LUMIX_NEW(m_allocator, FS::MemoryFileDevice)(m_allocator);
 		char current_dir[MAX_PATH_LENGTH];
-		GetCurrentDirectory(sizeof(current_dir), current_dir);
+		#ifdef _WIN32
+			GetCurrentDirectory(sizeof(current_dir), current_dir); 
+		#else
+			current_dir[0] = '\0';
+		#endif
 		m_disk_file_device = LUMIX_NEW(m_allocator, FS::DiskFileDevice)("disk", current_dir, m_allocator);
 		m_pack_file_device = LUMIX_NEW(m_allocator, FS::PackFileDevice)(m_allocator);
 
@@ -246,8 +151,20 @@ public:
 		m_file_system->setSaveGameDevice("memory:disk");
 
 		m_engine = Engine::create(current_dir, "", m_file_system, m_allocator);
-		Engine::PlatformData platform_data;
-		platform_data.window_handle = m_hwnd;
+		m_window = SDL_CreateWindow("Lumix App", 0, 0, 600, 400, flags);
+		if (!m_window_mode) SDL_SetWindowFullscreen(m_window, SDL_WINDOW_FULLSCREEN_DESKTOP);
+		SDL_SysWMinfo window_info;
+		SDL_VERSION(&window_info.version);
+		SDL_GetWindowWMInfo(m_window, &window_info);
+		Engine::PlatformData platform_data = {};
+		#ifdef _WIN32
+			platform_data.window_handle = window_info.info.win.window;
+		#elif defined(__linux__)
+			platform_data.window_handle = (void*)(uintptr_t)window_info.info.x11.window;
+			platform_data.display = window_info.info.x11.display;
+		#else
+			#error PLATFORM_NOT_SUPPORTED
+		#endif
 		m_engine->setPlatformData(platform_data);
 
 		m_engine->getPluginManager().load("renderer");
@@ -289,7 +206,8 @@ public:
 
 		gui_system->setInterface(m_gui_interface);
 		
-		while (ShowCursor(false) >= 0);
+		SDL_ShowCursor(false);
+		SDL_SetRelativeMouseMode(true ? SDL_TRUE : SDL_FALSE);
 		onResize();
 
 		runStartupScript();
@@ -303,8 +221,8 @@ public:
 		if (file)
 		{
 			m_engine->runScript((const char*)file->getBuffer(), (int)file->size(), m_startup_script_path);
+			fs.close(*file);
 		}
-		fs.close(*file);
 	}
 
 
@@ -414,54 +332,147 @@ public:
 	int getExitCode() const { return m_exit_code; }
 
 
-	void handleRawInput(LPARAM lParam)
-	{
-		UINT dwSize;
-		char data[sizeof(RAWINPUT) * 10];
-
-		GetRawInputData((HRAWINPUT)lParam, RID_INPUT, NULL, &dwSize, sizeof(RAWINPUTHEADER));
-		if (dwSize > sizeof(data)) return;
-
-		if (GetRawInputData((HRAWINPUT)lParam, RID_INPUT, data, &dwSize, sizeof(RAWINPUTHEADER)) !=
-			dwSize) return;
-
-		RAWINPUT* raw = (RAWINPUT*)data;
-		if (raw->header.dwType == RIM_TYPEMOUSE &&
-			raw->data.mouse.usFlags == MOUSE_MOVE_RELATIVE)
-		{
-			POINT p;
-			GetCursorPos(&p);
-			ScreenToClient(m_hwnd, &p);
-			auto& input_system = m_engine->getInputSystem();
-			/*input_system.injectMouseXMove(float(raw->data.mouse.lLastX), (float)p.x);
-			input_system.injectMouseYMove(float(raw->data.mouse.lLastY), (float)p.y);*/
-			// TODO
-		}
-	}
-
-
+#if 1
 	void handleEvents()
 	{
-		MSG msg;
-		while (PeekMessage(&msg, 0, 0, 0, PM_REMOVE))
+		SDL_Event event;
+		InputSystem& input = m_engine->getInputSystem();
+		while (SDL_PollEvent(&event))
 		{
-			TranslateMessage(&msg);
-			DispatchMessage(&msg);
-
-			onMessage(msg.hwnd, msg.message, msg.wParam, msg.lParam);
+			switch (event.type)
+			{
+			case SDL_MOUSEBUTTONDOWN:
+				{
+					Vec2 rel_mp = {(float)event.button.x, (float)event.button.y};
+					InputSystem::Event input_event;
+					input_event.type = InputSystem::Event::BUTTON;
+					input_event.device = input.getMouseDevice();
+					input_event.data.button.key_id = event.button.button;
+					input_event.data.button.state = InputSystem::ButtonEvent::DOWN;
+					input_event.data.button.x_abs = rel_mp.x;
+					input_event.data.button.y_abs = rel_mp.y;
+					input.injectEvent(input_event);
+				}
+				break;
+			case SDL_MOUSEBUTTONUP:
+				{
+					Vec2 rel_mp = { (float)event.button.x, (float)event.button.y };
+					InputSystem::Event input_event;
+					input_event.type = InputSystem::Event::BUTTON;
+					input_event.device = input.getMouseDevice();
+					input_event.data.button.key_id = event.button.button;
+					input_event.data.button.state = InputSystem::ButtonEvent::UP;
+					input_event.data.button.x_abs = rel_mp.x;
+					input_event.data.button.y_abs = rel_mp.y;
+					input.injectEvent(input_event);
+				}
+				break;
+			case SDL_MOUSEMOTION:
+				{
+					Vec2 rel_mp = { (float)event.motion.x, (float)event.motion.y };
+					InputSystem::Event input_event;
+					input_event.type = InputSystem::Event::AXIS;
+					input_event.device = input.getMouseDevice();
+					input_event.data.axis.x_abs = rel_mp.x;
+					input_event.data.axis.y_abs = rel_mp.y;
+					input_event.data.axis.x = (float)event.motion.xrel;
+					input_event.data.axis.y = (float)event.motion.yrel;
+					input.injectEvent(input_event);
+				}
+				break;
+			case SDL_KEYDOWN:
+				{
+					InputSystem::Event input_event;
+					input_event.type = InputSystem::Event::BUTTON;
+					input_event.device = input.getKeyboardDevice();
+					input_event.data.button.state = InputSystem::ButtonEvent::DOWN;
+					input_event.data.button.key_id = event.key.keysym.sym;
+					input.injectEvent(input_event);
+				}
+				break;
+			case SDL_KEYUP:
+				{
+					InputSystem::Event input_event;
+					input_event.type = InputSystem::Event::BUTTON;
+					input_event.device = input.getKeyboardDevice();
+					input_event.data.button.state = InputSystem::ButtonEvent::UP;
+					input_event.data.button.key_id = event.key.keysym.sym;
+					input.injectEvent(input_event);
+				}
+				break;
+			case SDL_WINDOWEVENT:
+				switch (event.window.event)
+				{
+				case SDL_WINDOWEVENT_CLOSE:
+					m_finished = true;
+					break;
+				case SDL_WINDOWEVENT_RESIZED:
+				case SDL_WINDOWEVENT_SIZE_CHANGED:
+				case SDL_WINDOWEVENT_MOVED:
+					onResize();
+					break;
+				}
+				break;
+			case SDL_QUIT: m_finished = true; break;
+			case SDL_WINDOWEVENT_FOCUS_GAINED: m_engine->getInputSystem().enable(true); break;
+			case SDL_WINDOWEVENT_FOCUS_LOST: m_engine->getInputSystem().enable(false); break;
+			}
 		}
 	}
+#else
+	void handleEvents()
+	{
+		SDL_Event event;
+		while (SDL_PollEvent(&event))
+		{
+			switch (event.type)
+			{
+				case SDL_WINDOWEVENT:
+					switch (event.window.event)
+					{
+						case SDL_WINDOWEVENT_MOVED:
+						case SDL_WINDOWEVENT_SIZE_CHANGED:
+						{
+							int x, y, w, h;
+							SDL_GetWindowSize(m_window, &w, &h);
+							SDL_GetWindowPosition(m_window, &x, &y);
+							onResize();
+						}
+						break;
+						case SDL_WINDOWEVENT_CLOSE: m_finished = true; break;
+					}
+					break;
+				case SDL_QUIT: m_finished = true; break;
+				case SDL_MOUSEBUTTONDOWN:
+					break;
+				case SDL_MOUSEBUTTONUP:
+					break;
+				case SDL_MOUSEMOTION:
+					break;
+				case SDL_TEXTINPUT: 
+					break;
+				case SDL_KEYDOWN:
+				case SDL_KEYUP:
+					break;
+				case SDL_MOUSEWHEEL:
+					break;
+			}
+		}
+	}
+#endif
 
 
 	static void outputToVS(const char* system, const char* message)
 	{
-		char tmp[2048];
-		copyString(tmp, system);
-		catString(tmp, " : ");
-		catString(tmp, message);
-		catString(tmp, "\r");
+		#ifdef _MSC_VER
+			char tmp[2048];
+			copyString(tmp, system);
+			catString(tmp, " : ");
+			catString(tmp, message);
+			catString(tmp, "\r");
 
-		OutputDebugString(tmp);
+			OutputDebugString(tmp);
+		#endif
 	}
 
 
@@ -525,7 +536,7 @@ private:
 	int m_exit_code;
 	char m_startup_script_path[MAX_PATH_LENGTH];
 	char m_pipeline_path[MAX_PATH_LENGTH];
-	HWND m_hwnd;
+	SDL_Window* m_window;
 
 	static App* s_instance;
 };
@@ -536,8 +547,11 @@ App* App::s_instance = nullptr;
 
 }
 
-
+#ifdef _WIN32
 INT WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, INT)
+#else
+int main(int args, char* argv[])
+#endif
 {
 	Lumix::App app;
 	app.init();
@@ -545,4 +559,3 @@ INT WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, INT)
 	app.shutdown();
 	return app.getExitCode();
 }
-

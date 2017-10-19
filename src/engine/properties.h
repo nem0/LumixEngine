@@ -466,7 +466,7 @@ struct CommonProperty : Property<T>
 };
 
 
-template <typename Counter, typename Adder, typename Remover, typename... Properties>
+template <typename Counter, typename Adder, typename Remover, typename... Props>
 struct ArrayProperty : IArrayProperty
 {
 	ArrayProperty() {}
@@ -571,14 +571,14 @@ struct ArrayProperty : IArrayProperty
 	void visit(IAttributeVisitor& visitor) const override {}
 
 
-	Tuple<Properties...> properties;
+	Tuple<Props...> properties;
 	Counter counter;
 	Adder adder;
 	Remover remover;
 };
 
 
-template <typename Counter, typename... Properties>
+template <typename Counter, typename... Props>
 struct ConstArrayProperty : IArrayProperty
 {
 	ConstArrayProperty() {}
@@ -667,7 +667,7 @@ struct ConstArrayProperty : IArrayProperty
 	}
 
 
-	Tuple<Properties...> properties;
+	Tuple<Props...> properties;
 	Counter counter;
 };
 
@@ -677,7 +677,7 @@ struct Scene
 {
 	void registerScene()
 	{
-		apply([&](auto& cmp) { Properties::registerComponent(&cmp); }, components);
+		apply([&](auto& cmp) { registerComponent(&cmp); }, components);
 	}
 
 
@@ -686,10 +686,10 @@ struct Scene
 };
 
 
-template <typename... Properties>
+template <typename... Props>
 struct Component : ComponentBase
 {
-	int getPropertyCount() const override { return sizeof...(Properties); }
+	int getPropertyCount() const override { return sizeof...(Props); }
 
 
 	void visit(IComponentVisitor& visitor) const override
@@ -700,7 +700,7 @@ struct Component : ComponentBase
 	}
 
 
-	Tuple<Properties...> properties;
+	Tuple<Props...> properties;
 };
 
 
@@ -714,13 +714,13 @@ auto scene(const char* name, Components... components)
 }
 
 
-template <typename... Properties>
-auto component(const char* name, Properties... props)
+template <typename... Props>
+auto component(const char* name, Props... props)
 {
-	Component<Properties...> cmp;
+	Component<Props...> cmp;
 	cmp.name = name;
 	cmp.properties = makeTuple(props...);
-	cmp.component_type = Properties::getComponentType(name);
+	cmp.component_type = getComponentType(name);
 	return cmp;
 }
 
@@ -790,10 +790,10 @@ auto dyn_enum_property(const char* name, Getter getter, Setter setter, Counter c
 }
 
 
-template <typename Counter, typename Adder, typename Remover, typename... Properties>
-auto array(const char* name, Counter counter, Adder adder, Remover remover, Properties... properties)
+template <typename Counter, typename Adder, typename Remover, typename... Props>
+auto array(const char* name, Counter counter, Adder adder, Remover remover, Props... properties)
 {
-	ArrayProperty<Counter, Adder, Remover, Properties...> p;
+	ArrayProperty<Counter, Adder, Remover, Props...> p;
 	p.name = name;
 	p.counter = counter;
 	p.adder = adder;
@@ -803,10 +803,10 @@ auto array(const char* name, Counter counter, Adder adder, Remover remover, Prop
 }
 
 
-template <typename Counter, typename... Properties>
-auto const_array(const char* name, Counter counter, Properties... properties)
+template <typename Counter, typename... Props>
+auto const_array(const char* name, Counter counter, Props... properties)
 {
-	ConstArrayProperty<Counter, Properties...> p;
+	ConstArrayProperty<Counter, Props...> p;
 	p.name = name;
 	p.counter = counter;
 	p.properties = makeTuple(properties...);

@@ -116,7 +116,6 @@ newoption {
 		value = "GCC",
 		description = "Choose GCC flavor",
 		allowed = {
-			{ "asmjs",          	"Emscripten/asm.js"       	 		},
 			{ "android-x86",    	"Android - x86"            	 		},
 			{ "linux-gcc", 			"Linux (GCC compiler)" 				},
 			{ "linux-gcc-5", 		"Linux (GCC-5 compiler)"			},
@@ -163,20 +162,7 @@ newaction {
 
 
 function strip()
-	configuration { "asmjs" }
-		postbuildcommands {
-			"$(SILENT) echo Running asmjs finalize.",
-			"$(SILENT) \"$(EMSCRIPTEN)/emcc\" -O2 "
---				.. "-s EMTERPRETIFY=1 "
---				.. "-s EMTERPRETIFY_ASYNC=1 "
-				.. "-s TOTAL_MEMORY=268435456 "
---				.. "-s ALLOW_MEMORY_GROWTH=1 "
---				.. "-s USE_WEBGL2=1 "
-				.. "--memory-init-file 1 "
-				.. "\"$(TARGET)\" -o \"$(TARGET)\".html "
---				.. "--preload-file ../../../examples/runtime@/"
-		}
-		
+
 	configuration { "android-x86", "Release" }
 		postbuildcommands {
 			"$(SILENT) echo Stripping symbols.",
@@ -208,9 +194,6 @@ function defaultConfigurations()
 		defines { "_GLIBCXX_USE_CXX11_ABI=0" }
 		links { "pthread" }
 
-	configuration { "asmjs" }
-		buildoptions { "-std=c++14" }
-
 	configuration { "vs20*"}
 		buildoptions { "/wd4503"}
 		
@@ -240,7 +223,7 @@ function useLua()
 	if _OPTIONS["static-plugins"] then
 		linkLib("lua")
 	else
-		configuration { "windows", "not asmjs" }
+		configuration { "windows" }
 			defines { "LUA_BUILD_AS_DLL" }
 		configuration {}
 	end
@@ -378,18 +361,8 @@ solution "LumixEngine"
 	
 		configuration {}	
 	
-		if "asmjs" == _OPTIONS["gcc"] then
-			if not os.getenv("EMSCRIPTEN") then
-				print("Set EMSCRIPTEN enviroment variable.")
-			end
-			premake.gcc.cc   = "\"$(EMSCRIPTEN)/emcc\""
-			premake.gcc.cxx  = "\"$(EMSCRIPTEN)/em++\""
-			premake.gcc.ar   = "\"$(EMSCRIPTEN)/emar\""
-			_G["premake"].gcc.llvm = true
-			premake.gcc.llvm = true
-			LOCATION = "tmp/emscripten_gmake"
 		
-		elseif "android-x86" == _OPTIONS["gcc"] then
+		if "android-x86" == _OPTIONS["gcc"] then
 			if not os.getenv("ANDROID_NDK_X86") or not os.getenv("ANDROID_NDK_ROOT") then
 				print("Set ANDROID_NDK_X86 and ANDROID_NDK_ROOT envrionment variables.")
 			end
@@ -476,9 +449,6 @@ solution "LumixEngine"
 	configuration "not windows"
 		removefiles { "../src/**/win/*"}
 
-	configuration "asmjs"
-		removefiles { "../src/**/win/*"}
-
 	configuration "android-*"
 		removefiles { "../src/**/win/*"}
 		
@@ -555,7 +525,7 @@ project "renderer"
 	configuration {}
 	useLua()
 	
-	configuration { "windows", "not asmjs" }
+	configuration { "windows" }
 		links { "psapi" }
 
 	defaultConfigurations()
@@ -772,19 +742,12 @@ if build_app then
 		linkLib "bgfx"
 		linkLib "lua"
 		linkLib "recast"
-		
-		configuration { "asmjs" }
-			targetextension ".bc"
-			files { "../src/app/main_asmjs.cpp" }
+		files { "../src/app/main.cpp" }
 
-		configuration { "windows", "not android-*" }
+		configuration { "windows" }
 			kind "WindowedApp"
 
-		configuration { "windows", "not asmjs", "not android-*" }
-			files { "../src/app/main_win.cpp" }
-
 		configuration { "linux-*" }
-			files { "../src/app/main_linux.cpp" }
 			links { "GL", "X11", "dl", "rt" }
 		
 		configuration {}
@@ -831,7 +794,7 @@ if build_studio then
 			defines { "LUMIXENGINE_PLUGINS=" .. def }
 		end
 
-		configuration { "windows", "not asmjs" }
+		configuration { "windows" }
 			links { "winmm" }
 
 		configuration {}
