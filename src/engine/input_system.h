@@ -55,7 +55,9 @@ class LUMIX_ENGINE_API InputSystem
 			enum Type : u32
 			{
 				BUTTON,
-				AXIS
+				AXIS,
+				DEVICE_ADDED,
+				DEVICE_REMOVED
 			};
 
 			Type type;

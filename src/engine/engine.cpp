@@ -1124,6 +1124,8 @@ public:
 
 		LuaWrapper::createSystemVariable(m_state, "Engine", "INPUT_EVENT_BUTTON", InputSystem::Event::BUTTON);
 		LuaWrapper::createSystemVariable(m_state, "Engine", "INPUT_EVENT_AXIS", InputSystem::Event::AXIS);
+		LuaWrapper::createSystemVariable(m_state, "Engine", "INPUT_EVENT_DEVICE_ADDED", InputSystem::Event::DEVICE_ADDED);
+		LuaWrapper::createSystemVariable(m_state, "Engine", "INPUT_EVENT_DEVICE_REMOVED", InputSystem::Event::DEVICE_REMOVED);
 
 		lua_pop(m_state, 1);
 
