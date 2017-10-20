@@ -48,6 +48,7 @@ enum class Mode : u32
 {
 	ROTATE,
 	TRANSLATE,
+	SCALE,
 
 	COUNT
 };
@@ -83,6 +84,7 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 	{
 		m_steps[int(Mode::TRANSLATE)] = 10;
 		m_steps[int(Mode::ROTATE)] = 45;
+		m_steps[int(Mode::SCALE)] = 1;
 		editor.universeDestroyed().bind<GizmoImpl, &GizmoImpl::onUniverseDestroyed>(this);
 	}
 
@@ -215,6 +217,85 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 		m_editor.getRenderInterface()->render(mtx, indices, 9, vertices, 9, false);
 	}
 
+
+
+	void renderScaleGizmo(const Matrix& gizmo_mtx,
+		bool is_active,
+		const Vec3& camera_pos,
+		const Vec3& camera_dir,
+		float fov,
+		bool is_ortho)
+	{
+		Axis transform_axis = is_active ? m_transform_axis : Axis::NONE;
+		Matrix scale_mtx = Matrix::IDENTITY;
+		auto entity_pos = gizmo_mtx.getTranslation();
+		float scale = getScale(camera_pos, fov, entity_pos, gizmo_mtx.getXVector().length(), is_ortho);
+		scale_mtx.m11 = scale_mtx.m22 = scale_mtx.m33 = scale;
+
+		Vec3 to_entity_dir = is_ortho ? camera_dir : camera_pos - entity_pos;
+		Matrix mtx = gizmo_mtx * scale_mtx;
+
+		RenderInterface::Vertex vertices[9];
+		u16 indices[12];
+		vertices[0].position = Vec3(0, 0, 0);
+		vertices[0].color = transform_axis == Axis::X ? SELECTED_COLOR : X_COLOR;
+		indices[0] = 0;
+		vertices[1].position = Vec3(1, 0, 0);
+		vertices[1].color = transform_axis == Axis::X ? SELECTED_COLOR : X_COLOR;
+		indices[1] = 1;
+		vertices[2].position = Vec3(0, 0, 0);
+		vertices[2].color = transform_axis == Axis::Y ? SELECTED_COLOR : Y_COLOR;
+		indices[2] = 2;
+		vertices[3].position = Vec3(0, 1, 0);
+		vertices[3].color = transform_axis == Axis::Y ? SELECTED_COLOR : Y_COLOR;
+		indices[3] = 3;
+		vertices[4].position = Vec3(0, 0, 0);
+		vertices[4].color = transform_axis == Axis::Z ? SELECTED_COLOR : Z_COLOR;
+		indices[4] = 4;
+		vertices[5].position = Vec3(0, 0, 1);
+		vertices[5].color = transform_axis == Axis::Z ? SELECTED_COLOR : Z_COLOR;
+		indices[5] = 5;
+
+		m_editor.getRenderInterface()->render(mtx, indices, 6, vertices, 6, true);
+
+		auto renderCube = [this](u32 color, const Matrix& mtx, const Vec3& pos) 
+		{
+			RenderInterface::Vertex vertices[8];
+
+			for (int i = 0; i < 8; ++i) vertices[i].color = color;
+
+			vertices[0].position = pos + Vec3(-0.1f, -0.1f, -0.1f);
+			vertices[1].position = pos + Vec3(0.1f, -0.1f, -0.1f);
+			vertices[2].position = pos + Vec3(0.1f, -0.1f, 0.1f);
+			vertices[3].position = pos + Vec3(-0.1f, -0.1f, 0.1f);
+
+			vertices[4].position = pos + Vec3(-0.1f, 0.1f, -0.1f);
+			vertices[5].position = pos + Vec3(0.1f, 0.1f, -0.1f);
+			vertices[6].position = pos + Vec3(0.1f, 0.1f, 0.1f);
+			vertices[7].position = pos + Vec3(-0.1f, 0.1f, 0.1f);
+
+			u16 indices[36] =
+			{
+				0, 1, 2,
+				0, 2, 3,
+				4, 6, 5,
+				4, 7, 6,
+				0, 4, 5,
+				0, 5, 1,
+				2, 6, 7,
+				2, 7, 3,
+				0, 3, 7,
+				0, 7, 4,
+				1, 2, 6,
+				1, 6, 5
+			};
+			m_editor.getRenderInterface()->render(mtx, indices, 36, vertices, 8, false);
+		};
+		renderCube(transform_axis == Axis::X ? SELECTED_COLOR : X_COLOR, mtx, Vec3(1, 0, 0));
+		renderCube(transform_axis == Axis::Y ? SELECTED_COLOR : Y_COLOR, mtx, Vec3(0, 1, 0));
+		renderCube(transform_axis == Axis::Z ? SELECTED_COLOR : Z_COLOR, mtx, Vec3(0, 0, 1));
+		
+	}
 
 	void renderQuarterRing(const Matrix& mtx, const Vec3& a, const Vec3& b, u32 color)
 	{
@@ -440,6 +521,52 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 	}
 
 
+	Axis collideScale(const Matrix& gizmo_mtx,
+		const Vec3& camera_pos,
+		const Vec3& camera_dir,
+		float fov,
+		bool is_ortho,
+		const Vec3& origin,
+		const Vec3& dir)
+	{
+		Matrix scale_mtx = Matrix::IDENTITY;
+		Vec3 entity_pos = gizmo_mtx.getTranslation();
+		float scale = getScale(camera_pos, fov, entity_pos, gizmo_mtx.getXVector().length(), is_ortho);
+		scale_mtx.m11 = scale_mtx.m22 = scale_mtx.m33 = scale;
+
+		Vec3 to_entity_dir = is_ortho ? camera_dir : camera_pos - entity_pos;
+		Matrix mtx = gizmo_mtx * scale_mtx;
+		Vec3 pos = mtx.getTranslation();
+
+		Vec3 x = mtx.getXVector() * 0.5f;
+		Vec3 y = mtx.getYVector() * 0.5f;
+		Vec3 z = mtx.getZVector() * 0.5f;
+
+		if (dotProduct(gizmo_mtx.getXVector(), to_entity_dir) < 0) x = -x;
+		if (dotProduct(gizmo_mtx.getYVector(), to_entity_dir) < 0) y = -y;
+		if (dotProduct(gizmo_mtx.getZVector(), to_entity_dir) < 0) z = -z;
+
+		float x_dist = Math::getLineSegmentDistance(origin, dir, pos, pos + mtx.getXVector());
+		float y_dist = Math::getLineSegmentDistance(origin, dir, pos, pos + mtx.getYVector());
+		float z_dist = Math::getLineSegmentDistance(origin, dir, pos, pos + mtx.getZVector());
+
+		float influenced_dist = scale * INFLUENCE_DISTANCE;
+		if (x_dist > influenced_dist && y_dist > influenced_dist && z_dist > influenced_dist)
+		{
+			return Axis::NONE;
+		}
+
+		if (x_dist < y_dist && x_dist < z_dist)
+			return Axis::X;
+		else if (y_dist < z_dist)
+			return Axis::Y;
+		else
+			return Axis::Z;
+
+		return Axis::NONE;
+	}
+
+
 	Axis collideRotate(const Matrix& gizmo_mtx,
 		const Vec3& camera_pos,
 		const Vec3& camera_dir,
@@ -503,9 +630,20 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 		Vec3 origin, cursor_dir;
 		Vec2 mouse_pos = m_editor.getMousePos();
 		m_editor.getRenderInterface()->getRay(edit_camera.handle, mouse_pos, origin, cursor_dir);
-		Axis axis = m_mode == Mode::TRANSLATE
-							   ? collideTranslate(gizmo_mtx, camera_pos, camera_dir, fov, is_ortho, origin, cursor_dir)
-							   : collideRotate(gizmo_mtx, camera_pos, camera_dir, fov, is_ortho, origin, cursor_dir);
+		
+		Axis axis;
+		switch(m_mode)
+		{
+			case Mode::TRANSLATE:
+				axis = collideTranslate(gizmo_mtx, camera_pos, camera_dir, fov, is_ortho, origin, cursor_dir);
+				break;
+			case Mode::ROTATE:
+				axis = collideRotate(gizmo_mtx, camera_pos, camera_dir, fov, is_ortho, origin, cursor_dir);
+				break;
+			case Mode::SCALE:
+				axis = collideScale(gizmo_mtx, camera_pos, camera_dir, fov, is_ortho, origin, cursor_dir);
+				break;
+		}
 		if (axis != Axis::NONE)
 		{
 			m_transform_axis = axis;
@@ -529,9 +667,19 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 		{
 			Matrix gizmo_mtx = getMatrix(m_entities[i]);
 
-			Axis axis = m_mode == Mode::TRANSLATE
-							? collideTranslate(gizmo_mtx, camera_pos, camera_dir, fov, is_ortho, origin, cursor_dir)
-							: collideRotate(gizmo_mtx, camera_pos, camera_dir, fov, is_ortho, origin, cursor_dir);
+			Axis axis;
+			switch (m_mode)
+			{
+				case Mode::TRANSLATE:
+					axis = collideTranslate(gizmo_mtx, camera_pos, camera_dir, fov, is_ortho, origin, cursor_dir);
+					break;
+				case Mode::ROTATE:
+					axis = collideRotate(gizmo_mtx, camera_pos, camera_dir, fov, is_ortho, origin, cursor_dir);
+					break;
+				case Mode::SCALE:
+					axis = collideScale(gizmo_mtx, camera_pos, camera_dir, fov, is_ortho, origin, cursor_dir);
+					break;
+			}
 			if (axis != Axis::NONE)
 			{
 				m_transform_axis = axis;
@@ -621,6 +769,26 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 		if (!m_is_dragging) return false;
 		if (m_mode == Mode::ROTATE) return rotate(frame.rot);
 		if (m_mode == Mode::TRANSLATE) return translate(frame);
+		if (m_mode == Mode::SCALE) return scale(frame);
+		return false;
+	}
+
+
+	bool scale(Transform& frame)
+	{
+		Vec2 mouse_pos = m_editor.getMousePos();
+		Vec3 intersection = getMousePlaneIntersection(mouse_pos, frame, m_transform_axis);
+		Vec2 old_mouse_pos = { mouse_pos.x - m_editor.getMouseRelX(),mouse_pos.y - m_editor.getMouseRelY() };
+		Vec3 old_intersection = getMousePlaneIntersection(old_mouse_pos, frame, m_transform_axis);
+		Vec3 delta = intersection - old_intersection;
+		if (!m_is_step || delta.length() > float(getStep()))
+		{
+			if (m_is_step) delta = delta.normalized() * float(getStep());
+
+			frame.scale += delta.length();
+
+			return true;
+		}
 		return false;
 	}
 
@@ -723,6 +891,42 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 	}
 
 
+	void scale()
+	{
+		Transform entity_frame = m_editor.getUniverse()->getTransform(m_entities[m_active]);
+		Vec3 intersection = getMousePlaneIntersection(m_editor.getMousePos(), entity_frame, m_transform_axis);
+		Vec3 delta_vec = intersection - m_transform_point;
+		float delta = delta_vec.length();
+		Vec3 entity_to_intersection = intersection - entity_frame.pos;
+		if (dotProduct(delta_vec, entity_to_intersection) < 0) delta = -delta;
+		if (!m_is_step || delta > float(getStep()))
+		{
+			if (m_is_step) delta = delta * float(getStep());
+
+			Array<float> new_scales(m_editor.getAllocator());
+			if (m_entities[m_active] == m_editor.getSelectedEntities()[0])
+			{
+				for (int i = 0, ci = m_editor.getSelectedEntities().size(); i < ci; ++i)
+				{
+					float scale = m_editor.getUniverse()->getScale(m_editor.getSelectedEntities()[i]);
+					scale += delta;
+					new_scales.push(scale);
+				}
+				m_editor.setEntitiesScales(&m_editor.getSelectedEntities()[0], &new_scales[0], new_scales.size());
+			}
+			else
+			{
+				float scale = m_editor.getUniverse()->getScale(m_entities[m_active]);
+				scale += delta;
+				new_scales.push(scale);
+				m_editor.setEntitiesScales(&m_entities[m_active], &new_scales[0], 1);
+			}
+
+			m_transform_point = intersection;
+		}
+	}
+
+
 	void translate()
 	{
 		Transform entity_frame = m_editor.getUniverse()->getTransform(m_entities[m_active]);
@@ -772,13 +976,11 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 		}
 		if (!m_is_dragging || m_active < 0) return;
 
-		if (m_mode == Mode::ROTATE)
+		switch (m_mode)
 		{
-			rotate();
-		}
-		else
-		{
-			translate();
+			case Mode::ROTATE: rotate(); break;
+			case Mode::TRANSLATE: translate(); break;
+			case Mode::SCALE: scale(); break;
 		}
 	}
 
@@ -792,13 +994,17 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 		auto camera_dir = m_editor.getUniverse()->getRotation(edit_camera.entity).rotate(Vec3(0, 0, -1));
 		float fov = render_interface->getCameraFOV(edit_camera.handle);
 
-		if (m_mode == Mode::TRANSLATE)
+		switch (m_mode)
 		{
-			renderTranslateGizmo(gizmo_mtx, is_active, camera_pos, camera_dir, fov, is_ortho);
-		}
-		else
-		{
-			renderRotateGizmo(gizmo_mtx, is_active, camera_pos, camera_dir, fov, is_ortho);
+			case Mode::TRANSLATE:
+				renderTranslateGizmo(gizmo_mtx, is_active, camera_pos, camera_dir, fov, is_ortho);
+				break;
+			case Mode::ROTATE:
+				renderRotateGizmo(gizmo_mtx, is_active, camera_pos, camera_dir, fov, is_ortho);
+				break;
+			case Mode::SCALE:
+				renderScaleGizmo(gizmo_mtx, is_active, camera_pos, camera_dir, fov, is_ortho);
+				break;
 		}
 	}
 
@@ -842,10 +1048,14 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 		m_mode = Mode::TRANSLATE;
 	}
 
-
 	void setRotateMode() override
 	{
 		m_mode = Mode::ROTATE;
+	}
+
+	void setScaleMode() override
+	{
+		m_mode = Mode::SCALE;
 	}
 
 	void setPivotCenter() override { m_pivot = Pivot::CENTER; }
@@ -862,6 +1072,7 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 	bool isAutosnapDown() const override { return m_is_autosnap_down; }
 	void setAutosnapDown(bool snap) override { m_is_autosnap_down = snap; }
 	bool isTranslateMode() const override { return m_mode == Mode::TRANSLATE; }
+	bool isScaleMode() const override { return m_mode == Mode::SCALE; }
 	bool isRotateMode() const override { return m_mode == Mode::ROTATE; }
 
 	Pivot m_pivot;

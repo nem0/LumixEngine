@@ -26,6 +26,7 @@ public:
 	virtual void render() = 0;
 	virtual void setTranslateMode() = 0;
 	virtual void setRotateMode() = 0;
+	virtual void setScaleMode() = 0;
 	virtual void setGlobalCoordSystem() = 0;
 	virtual void setLocalCoordSystem() = 0;
 	virtual int getStep() const = 0;
@@ -35,6 +36,7 @@ public:
 	virtual void setAutosnapDown(bool snap) = 0;
 	virtual bool isTranslateMode() const = 0;
 	virtual bool isRotateMode() const = 0;
+	virtual bool isScaleMode() const = 0;
 	virtual bool isLocalCoordSystem() const = 0;
 	virtual bool isGlobalCoordSystem() const = 0;
 	virtual void setPivotCenter() = 0;
