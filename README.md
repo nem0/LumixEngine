@@ -20,6 +20,12 @@
 
 ![Editor screenshot](https://user-images.githubusercontent.com/153526/29975939-9c3db48e-8f38-11e7-80f1-2a777e7a43c8.png)
 
+Who is using it?
+
+* [On the Hunt](http://www.indiedb.com/games/on-the-hunt)
+
+![4k_1](https://user-images.githubusercontent.com/153526/31843558-f6f077fe-b5f3-11e7-8883-3244e28b2a9c.jpg)
+
 [3rd party libraries](https://github.com/nem0/lumixengine_3rdparty)
 
 * [bgfx](https://github.com/bkaradzic/bgfx)
@@ -35,8 +41,5 @@ Project generator
 
 * [Genie](https://github.com/bkaradzic/genie)
 
-Who is using it?
-
-* [On the Hunt](http://www.indiedb.com/games/on-the-hunt)
 
 Contact: mikulas.florek@gamedev.sk
