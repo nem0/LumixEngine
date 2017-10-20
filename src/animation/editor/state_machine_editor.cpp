@@ -1090,6 +1090,7 @@ void AnimationNode::onGUI()
 			root_rotation_input = decl.inputFromLinearIdx(linear);
 		}
 	}
+
 	if (root_rotation_input != -1)
 	{
 		float deg = Math::radiansToDegrees(node->max_root_rotation_speed);
@@ -1098,6 +1099,7 @@ void AnimationNode::onGUI()
 			node->max_root_rotation_speed = Math::degreesToRadians(deg);
 		}
 	}
+	ImGui::DragFloat("Speed multiplicator", &node->speed_multiplier, 0.1f);
 }
 
 

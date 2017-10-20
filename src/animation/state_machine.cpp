@@ -382,6 +382,7 @@ void AnimationNode::serialize(OutputBlob& blob)
 	blob.write(new_on_loop);
 	blob.write(root_rotation_input_offset);
 	blob.write(max_root_rotation_speed);
+	blob.write(speed_multiplier);
 }
 
 
@@ -402,6 +403,10 @@ void AnimationNode::deserialize(InputBlob& blob, Container* parent, int version)
 	if (version > (int)ControllerResource::Version::MAX_ROOT_ROTATION_SPEED)
 	{
 		blob.read(max_root_rotation_speed);
+	}
+	if (version > (int)ControllerResource::Version::ANIMATION_SPEED_MULTIPLIER)
+	{
+		blob.read(speed_multiplier);
 	}
 }
 
@@ -542,8 +547,9 @@ struct AnimationNodeInstance : public NodeInstance
 	{
 		if (!resource) return check_edges ? checkOutEdges(node, rc) : this;
 
+		float time_delta = rc.time_delta * node.speed_multiplier;
 		float old_time = time;
-		time += rc.time_delta;
+		time += time_delta;
 		float length = resource->getLength();
 		if (node.looped && time > length)
 		{
@@ -586,7 +592,7 @@ struct AnimationNodeInstance : public NodeInstance
 		if (root_rotation_input_offset >= 0)
 		{
 			float yaw = *(float*)&rc.input[root_rotation_input_offset];
-			float max_yaw_diff = rc.time_delta * node.max_root_rotation_speed;
+			float max_yaw_diff = time_delta * node.max_root_rotation_speed;
 			yaw = Math::clamp(yaw, -max_yaw_diff, max_yaw_diff);
 			root_motion.rot = Quat({ 0, 1, 0 }, yaw);
 		}
