@@ -72,6 +72,10 @@ GameView::GameView(StudioApp& app)
 	action->is_selected.bind<GameView, &GameView::isOpen>(this);
 	app.addWindowAction(action);
 
+	Action* fullscreen_action = LUMIX_NEW(editor.getAllocator(), Action)("Game View fullscreen", "game_view_fullscreen");
+	fullscreen_action->func.bind<GameView, &GameView::toggleFullscreen>(this);
+	app.addAction(fullscreen_action);
+
 	auto* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
 	Path path("pipelines/main.lua");
 	m_pipeline = Pipeline::create(*renderer, path, "GAME_VIEW", engine.getAllocator());
@@ -202,6 +206,13 @@ void GameView::onFullscreenGUI()
 	{
 		setFullscreen(false);
 	}
+}
+
+
+void GameView::toggleFullscreen()
+{
+	if (!m_editor.isGameMode()) return;
+	setFullscreen(!m_is_fullscreen);
 }
 
 
