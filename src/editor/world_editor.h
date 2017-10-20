@@ -121,6 +121,7 @@ public:
 	virtual void setEntitiesCoordinate(const Entity* entities, int count, float value, Coordinate coord) = 0;
 	virtual void setEntitiesLocalCoordinate(const Entity* entities, int count, float value, Coordinate coord) = 0;
 	virtual void setEntitiesScale(const Entity* entities, int count, float scale) = 0;
+	virtual void setEntitiesScales(const Entity* entities, const float* scales, int count) = 0;
 	virtual void setEntitiesRotations(const Entity* entity, const Quat* rotations, int count) = 0;
 	virtual void setEntitiesPositionsAndRotations(const Entity* entity,
 		const Vec3* position,

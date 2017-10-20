@@ -596,6 +596,7 @@ class ScaleEntityCommand LUMIX_FINAL : public IEditorCommand
 public:
 	explicit ScaleEntityCommand(WorldEditor& editor)
 		: m_old_scales(editor.getAllocator())
+		, m_new_scales(editor.getAllocator())
 		, m_entities(editor.getAllocator())
 		, m_editor(editor)
 	{
@@ -608,22 +609,48 @@ public:
 		float scale,
 		IAllocator& allocator)
 		: m_old_scales(allocator)
+		, m_new_scales(allocator)
 		, m_entities(allocator)
 		, m_editor(editor)
-		, m_scale(scale)
 	{
 		Universe* universe = m_editor.getUniverse();
 		for (int i = count - 1; i >= 0; --i)
 		{
 			m_entities.push(entities[i]);
 			m_old_scales.push(universe->getScale(entities[i]));
+			m_new_scales.push(scale);
+		}
+	}
+
+
+	ScaleEntityCommand(WorldEditor& editor,
+		const Entity* entities,
+		const float* scales,
+		int count,
+		IAllocator& allocator)
+		: m_old_scales(allocator)
+		, m_new_scales(allocator)
+		, m_entities(allocator)
+		, m_editor(editor)
+	{
+		Universe* universe = m_editor.getUniverse();
+		for (int i = count - 1; i >= 0; --i)
+		{
+			m_entities.push(entities[i]);
+			m_old_scales.push(universe->getScale(entities[i]));
+			m_new_scales.push(scales[i]);
 		}
 	}
 
 
 	void serialize(JsonSerializer& serializer) override
 	{
-		serializer.serialize("scale", m_scale);
+		serializer.beginArray("new_scales");
+		for (int i = 0; i < m_new_scales.size(); ++i)
+		{
+			serializer.serializeArrayItem(m_new_scales[i]);
+		}
+		serializer.endArray();
 		serializer.beginArray("entities");
 		for (int i = 0; i < m_entities.size(); ++i)
 		{
@@ -636,9 +663,14 @@ public:
 	void deserialize(JsonSerializer& serializer) override
 	{
 		Universe* universe = m_editor.getUniverse();
-		int count;
-		serializer.deserialize("scale", m_scale, 1.0f);
-		serializer.deserialize("count", count, 0);
+		serializer.deserializeArrayBegin("new_scales");
+		while (!serializer.isArrayEnd())
+		{
+			float scale;
+			serializer.deserializeArrayItem(scale, 1);
+			m_new_scales.push(scale);
+		}
+		serializer.deserializeArrayEnd();
 		serializer.deserializeArrayBegin("entities");
 		while (!serializer.isArrayEnd())
 		{
@@ -657,7 +689,7 @@ public:
 		for (int i = 0, c = m_entities.size(); i < c; ++i)
 		{
 			Entity entity = m_entities[i];
-			universe->setScale(entity, m_scale);
+			universe->setScale(entity, m_new_scales[i]);
 		}
 		return true;
 	}
@@ -689,8 +721,11 @@ public:
 				{
 					return false;
 				}
+				if (m_new_scales[i] != my_command.m_new_scales[i])
+				{
+					return false;
+				}
 			}
-			my_command.m_scale = m_scale;
 			return true;
 		}
 		else
@@ -702,7 +737,7 @@ public:
 private:
 	WorldEditor& m_editor;
 	Array<Entity> m_entities;
-	float m_scale;
+	Array<float> m_new_scales;
 	Array<float> m_old_scales;
 };
 
@@ -2607,6 +2642,17 @@ public:
 			pos = universe->getPosition(m_camera) + universe->getRotation(m_camera).rotate(Vec3(0, 0, -2));
 		}
 		return pos;
+	}
+
+
+
+	void setEntitiesScales(const Entity* entities, const float* scales, int count) override
+	{
+		if (count <= 0) return;
+
+		IEditorCommand* command =
+			LUMIX_NEW(m_allocator, ScaleEntityCommand)(*this, entities, scales, count, m_allocator);
+		executeCommand(command);
 	}
 
 

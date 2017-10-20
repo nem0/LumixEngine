@@ -863,6 +863,7 @@ public:
 	void toggleGameMode() { m_editor->toggleGameMode(); }
 	void setTranslateGizmoMode() { m_editor->getGizmo().setTranslateMode(); }
 	void setRotateGizmoMode() { m_editor->getGizmo().setRotateMode(); }
+	void setScaleGizmoMode() { m_editor->getGizmo().setScaleMode(); }
 
 
 	void makeParent()
@@ -1078,6 +1079,7 @@ public:
 		doMenuItem(*getAction("orbitCamera"), is_any_entity_selected || m_editor->isOrbitCamera());
 		doMenuItem(*getAction("setTranslateGizmoMode"), true);
 		doMenuItem(*getAction("setRotateGizmoMode"), true);
+		doMenuItem(*getAction("setScaleGizmoMode"), true);
 		doMenuItem(*getAction("setPivotCenter"), true);
 		doMenuItem(*getAction("setPivotOrigin"), true);
 		doMenuItem(*getAction("setLocalCoordSystem"), true);
@@ -1483,6 +1485,8 @@ public:
 			.is_selected.bind<Gizmo, &Gizmo::isTranslateMode>(&m_editor->getGizmo());
 		addAction<&StudioAppImpl::setRotateGizmoMode>("Rotate", "setRotateGizmoMode")
 			.is_selected.bind<Gizmo, &Gizmo::isRotateMode>(&m_editor->getGizmo());
+		addAction<&StudioAppImpl::setScaleGizmoMode>("Scale", "setScaleGizmoMode")
+			.is_selected.bind<Gizmo, &Gizmo::isScaleMode>(&m_editor->getGizmo());
 		addAction<&StudioAppImpl::setTopView>("Top", "viewTop");
 		addAction<&StudioAppImpl::setFrontView>("Front", "viewFront");
 		addAction<&StudioAppImpl::setSideView>("Side", "viewSide");
