@@ -141,6 +141,7 @@ struct AnimationNode : public Node
 	void deserialize(InputBlob& blob, Container* parent, int version) override;
 
 	Array<u32> animations_hashes;
+	float speed_multiplier = 1;
 	bool looped = true;
 	bool new_on_loop = true;
 	int root_rotation_input_offset = -1;
