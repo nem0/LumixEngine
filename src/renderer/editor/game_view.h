@@ -42,6 +42,7 @@ public:
 	bool m_is_open;
 
 private:
+	void processInputEvents();
 	void onResourceChanged(const Path& path, const char* /*ext*/);
 	void onUniverseCreated();
 	void onUniverseDestroyed();
