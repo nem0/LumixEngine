@@ -162,10 +162,13 @@ void GameView::captureMouse(bool capture)
 
 void GameView::onFullscreenGUI()
 {
-	bool open = true;
+	processInputEvents();
+
 	ImGuiIO& io = ImGui::GetIO();
+	bool open = true;
 	ImVec2 size = io.DisplaySize;
-	ImGui::SetNextWindowPos(size);
+	ImGui::SetNextWindowPos(ImVec2(0, 0));
+	ImGui::SetNextWindowSize(size);
 	if (!ImGui::Begin("game view fullscreen",
 		&open,
 		ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse |
@@ -258,6 +261,86 @@ void GameView::forceViewport(bool enable, int w, int h)
 	m_forced_viewport.height = h;
 }
 
+void GameView::processInputEvents()
+{
+	if (!m_is_mouse_captured) return;
+	
+	InputSystem& input = m_editor.getEngine().getInputSystem();
+	const SDL_Event* events = m_studio_app.getEvents();
+	for (int i = 0, c = m_studio_app.getEventsCount(); i < c; ++i)
+	{
+		SDL_Event sdl_event = events[i];
+		switch (sdl_event.type)
+		{
+		case SDL_MOUSEBUTTONDOWN:
+		{
+			ImVec2 rel_mp = { (float)sdl_event.button.x, (float)sdl_event.button.y };
+			rel_mp.x -= m_pos.x;
+			rel_mp.y -= m_pos.y;
+			InputSystem::Event event;
+			event.type = InputSystem::Event::BUTTON;
+			event.device = input.getMouseDevice();
+			event.data.button.key_id = sdl_event.button.button;
+			event.data.button.state = InputSystem::ButtonEvent::DOWN;
+			event.data.button.x_abs = rel_mp.x;
+			event.data.button.y_abs = rel_mp.y;
+			input.injectEvent(event);
+		}
+		break;
+		case SDL_MOUSEBUTTONUP:
+		{
+			ImVec2 rel_mp = { (float)sdl_event.button.x, (float)sdl_event.button.y };
+			rel_mp.x -= m_pos.x;
+			rel_mp.y -= m_pos.y;
+			InputSystem::Event event;
+			event.type = InputSystem::Event::BUTTON;
+			event.device = input.getMouseDevice();
+			event.data.button.key_id = sdl_event.button.button;
+			event.data.button.state = InputSystem::ButtonEvent::UP;
+			event.data.button.x_abs = rel_mp.x;
+			event.data.button.y_abs = rel_mp.y;
+			input.injectEvent(event);
+		}
+		break;
+		case SDL_MOUSEMOTION:
+		{
+			ImVec2 rel_mp = { (float)sdl_event.motion.x, (float)sdl_event.motion.y };
+			rel_mp.x -= m_pos.x;
+			rel_mp.y -= m_pos.y;
+			InputSystem::Event event;
+			event.type = InputSystem::Event::AXIS;
+			event.device = input.getMouseDevice();
+			event.data.axis.x_abs = rel_mp.x;
+			event.data.axis.y_abs = rel_mp.y;
+			event.data.axis.x = (float)sdl_event.motion.xrel;
+			event.data.axis.y = (float)sdl_event.motion.yrel;
+			input.injectEvent(event);
+		}
+		break;
+		case SDL_KEYDOWN:
+		{
+			InputSystem::Event event;
+			event.type = InputSystem::Event::BUTTON;
+			event.device = input.getKeyboardDevice();
+			event.data.button.state = InputSystem::ButtonEvent::DOWN;
+			event.data.button.key_id = sdl_event.key.keysym.sym;
+			input.injectEvent(event);
+		}
+		break;
+		case SDL_KEYUP:
+		{
+			InputSystem::Event event;
+			event.type = InputSystem::Event::BUTTON;
+			event.device = input.getKeyboardDevice();
+			event.data.button.state = InputSystem::ButtonEvent::UP;
+			event.data.button.key_id = sdl_event.key.keysym.sym;
+			input.injectEvent(event);
+		}
+		break;
+		}
+	}
+}
+
 
 void GameView::onWindowGUI()
 {
@@ -319,84 +402,7 @@ void GameView::onWindowGUI()
 				PlatformInterface::clipCursor((int)pos.x, (int)pos.y, (int)m_size.x, (int)m_size.y);
 			}
 
-			if (m_is_mouse_captured)
-			{
-				InputSystem& input = m_editor.getEngine().getInputSystem();
-				const SDL_Event* events = m_studio_app.getEvents();
-				for (int i = 0, c = m_studio_app.getEventsCount(); i < c; ++i)
-				{
-					SDL_Event sdl_event = events[i];
-					switch (sdl_event.type)
-					{
-						case SDL_MOUSEBUTTONDOWN:
-							{
-								ImVec2 rel_mp = {(float)sdl_event.button.x, (float)sdl_event.button.y};
-								rel_mp.x -= m_pos.x;
-								rel_mp.y -= m_pos.y;
-								InputSystem::Event event;
-								event.type = InputSystem::Event::BUTTON;
-								event.device = input.getMouseDevice();
-								event.data.button.key_id = sdl_event.button.button;
-								event.data.button.state = InputSystem::ButtonEvent::DOWN;
-								event.data.button.x_abs = rel_mp.x;
-								event.data.button.y_abs = rel_mp.y;
-								input.injectEvent(event);
-							}
-							break;
-						case SDL_MOUSEBUTTONUP:
-							{
-								ImVec2 rel_mp = {(float)sdl_event.button.x, (float)sdl_event.button.y};
-								rel_mp.x -= m_pos.x;
-								rel_mp.y -= m_pos.y;
-								InputSystem::Event event;
-								event.type = InputSystem::Event::BUTTON;
-								event.device = input.getMouseDevice();
-								event.data.button.key_id = sdl_event.button.button;
-								event.data.button.state = InputSystem::ButtonEvent::UP;
-								event.data.button.x_abs = rel_mp.x;
-								event.data.button.y_abs = rel_mp.y;
-								input.injectEvent(event);
-							}
-							break;
-						case SDL_MOUSEMOTION:
-							{
-								ImVec2 rel_mp = { (float)sdl_event.motion.x, (float)sdl_event.motion.y };
-								rel_mp.x -= m_pos.x;
-								rel_mp.y -= m_pos.y;
-								InputSystem::Event event;
-								event.type = InputSystem::Event::AXIS;
-								event.device = input.getMouseDevice();
-								event.data.axis.x_abs = rel_mp.x;
-								event.data.axis.y_abs = rel_mp.y;
-								event.data.axis.x = (float)sdl_event.motion.xrel;
-								event.data.axis.y = (float)sdl_event.motion.yrel;
-								input.injectEvent(event);
-							}
-							break;
-						case SDL_KEYDOWN:
-							{
-								InputSystem::Event event;
-								event.type = InputSystem::Event::BUTTON;
-								event.device = input.getKeyboardDevice();
-								event.data.button.state = InputSystem::ButtonEvent::DOWN;
-								event.data.button.key_id = sdl_event.key.keysym.sym;
-								input.injectEvent(event);
-							}
-							break;
-						case SDL_KEYUP:
-							{
-								InputSystem::Event event;
-								event.type = InputSystem::Event::BUTTON;
-								event.device = input.getKeyboardDevice();
-								event.data.button.state = InputSystem::ButtonEvent::UP;
-								event.data.button.key_id = sdl_event.key.keysym.sym;
-								input.injectEvent(event);
-							}
-							break;
-					}
-				}
-			}
-
+			processInputEvents();
 
 			if (ImGui::Checkbox("Pause", &m_paused))
 			{
