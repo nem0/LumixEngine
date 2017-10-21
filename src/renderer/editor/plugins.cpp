@@ -1223,7 +1223,7 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		ComponentHandle camera_cmp = scene->getCameraInSlot("probe");
 		if (!camera_cmp.isValid())
 		{
-			g_log_error.log("Renderer") << "No camera camera in slot 'probe'.";
+			g_log_error.log("Renderer") << "No camera in slot 'probe'.";
 			return;
 		}
 
