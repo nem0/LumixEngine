@@ -389,7 +389,7 @@ void SceneView::onWindowGUI()
 			{
 				ImGui::Image(&m_texture_handle, size);
 			}
-			if (ImGui::IsItemRectHovered())
+			if (ImGui::IsItemHovered())
 			{
 				if (ImGui::IsMouseReleased(0) && m_app.getDragData().type == StudioApp::DragData::PATH)
 				{
@@ -402,39 +402,42 @@ void SceneView::onWindowGUI()
 
 
 			bool handle_input = ImGui::IsItemHovered();
-			const SDL_Event* events = m_app.getEvents();
-			for (int i = 0, c = m_app.getEventsCount(); i < c; ++i)
+			if(handle_input)
 			{
-				SDL_Event event = events[i];
-				switch (event.type)
+				const SDL_Event* events = m_app.getEvents();
+				for (int i = 0, c = m_app.getEventsCount(); i < c; ++i)
 				{
-					case SDL_MOUSEBUTTONDOWN:
-						{
-							if (handle_input) ImGui::ResetActiveID();
-							if (event.button.button == SDL_BUTTON_RIGHT) captureMouse(true);
-							Vec2 rel_mp = { (float)event.button.x, (float)event.button.y };
-							rel_mp.x -= m_screen_x;
-							rel_mp.y -= m_screen_y;
-							if(handle_input) m_editor.onMouseDown((int)rel_mp.x, (int)rel_mp.y, (MouseButton::Value)event.button.button);
-						}
-						break;
-					case SDL_MOUSEBUTTONUP:
-						{
-							if (event.button.button == SDL_BUTTON_RIGHT) captureMouse(false);
-							Vec2 rel_mp = { (float)event.button.x, (float)event.button.y };
-							rel_mp.x -= m_screen_x;
-							rel_mp.y -= m_screen_y;
-							if (handle_input) m_editor.onMouseUp((int)rel_mp.x, (int)rel_mp.y, (MouseButton::Value)event.button.button);
-						}
-						break;
-					case SDL_MOUSEMOTION:
-						{
-							Vec2 rel_mp = {(float)event.motion.x, (float)event.motion.y};
-							rel_mp.x -= m_screen_x;
-							rel_mp.y -= m_screen_y;
-							if (handle_input) m_editor.onMouseMove((int)rel_mp.x, (int)rel_mp.y, (int)event.motion.xrel, (int)event.motion.yrel);
-						}
-						break;
+					SDL_Event event = events[i];
+					switch (event.type)
+					{
+						case SDL_MOUSEBUTTONDOWN:
+							{
+								ImGui::ResetActiveID();
+								if (event.button.button == SDL_BUTTON_RIGHT) captureMouse(true);
+								Vec2 rel_mp = { (float)event.button.x, (float)event.button.y };
+								rel_mp.x -= m_screen_x;
+								rel_mp.y -= m_screen_y;
+								m_editor.onMouseDown((int)rel_mp.x, (int)rel_mp.y, (MouseButton::Value)event.button.button);
+							}
+							break;
+						case SDL_MOUSEBUTTONUP:
+							{
+								if (event.button.button == SDL_BUTTON_RIGHT) captureMouse(false);
+								Vec2 rel_mp = { (float)event.button.x, (float)event.button.y };
+								rel_mp.x -= m_screen_x;
+								rel_mp.y -= m_screen_y;
+								m_editor.onMouseUp((int)rel_mp.x, (int)rel_mp.y, (MouseButton::Value)event.button.button);
+							}
+							break;
+						case SDL_MOUSEMOTION:
+							{
+								Vec2 rel_mp = {(float)event.motion.x, (float)event.motion.y};
+								rel_mp.x -= m_screen_x;
+								rel_mp.y -= m_screen_y;
+								m_editor.onMouseMove((int)rel_mp.x, (int)rel_mp.y, (int)event.motion.xrel, (int)event.motion.yrel);
+							}
+							break;
+					}
 				}
 			}
 			m_pipeline->render();
