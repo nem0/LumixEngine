@@ -1,0 +1,1 @@
+genie.exe --with-unit-tests vs2017

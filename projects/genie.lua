@@ -1,4 +1,4 @@
-local ide_dir = iif(_ACTION == nil, "vs2015", _ACTION)
+local ide_dir = iif(_ACTION == nil, "vs2017", _ACTION)
 if "linux-gcc" == _OPTIONS["gcc"] then
 	ide_dir = "gcc"
 elseif "linux-gcc-5" == _OPTIONS["gcc"] then
@@ -13,7 +13,7 @@ local build_physics = true
 local build_unit_tests = false
 local build_app = true
 local build_studio = true
-local build_gui = _ACTION == "vs2015"
+local build_gui = _ACTION == "vs2017"
 local build_steam = false
 local build_game = false
 local plugins = {}
@@ -127,7 +127,7 @@ newaction {
 	trigger = "install",
 	description = "Install in ../../LumixEngine_data/bin",
 	execute = function()
-		local src_dir = "tmp/vs2015/bin/RelWithDebInfo/"
+		local src_dir = "tmp/vs2017/bin/RelWithDebInfo/"
 		local dst_dir = "../../LumixEngine_data/bin/"
 		
 		function installDll(filename)
@@ -891,7 +891,7 @@ if build_studio then
 		useLua()
 		defaultConfigurations()
 		
-		if _ACTION == "vs2015" then
+		if _ACTION == "vs2017" then
 			copyDlls("Debug", "win64", "Debug")
 			copyDlls("Release", "win64", "Release")
 			copyDlls("Release", "win64", "RelWithDebInfo")
