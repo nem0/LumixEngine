@@ -19,6 +19,7 @@ class StudioApp;
 
 class LUMIX_EDITOR_API PropertyGrid
 {
+friend struct GridUIVisitor;
 public:
 	struct IPlugin
 	{
@@ -33,7 +34,7 @@ public:
 	void addPlugin(IPlugin& plugin) { m_plugins.push(&plugin); }
 	void removePlugin(IPlugin& plugin) { m_plugins.eraseItem(&plugin); }
 	void onGUI();
-	bool entityInput(const char* label, const char* str_id, Entity& entity) const;
+	bool entityInput(const char* label, const char* str_id, Entity& entity);
 
 public:
 	bool m_is_open;
@@ -49,6 +50,7 @@ private:
 	StudioApp& m_app;
 	WorldEditor& m_editor;
 	Array<IPlugin*> m_plugins;
+	Entity m_deferred_select;
 	
 	char m_component_filter[32];
 
