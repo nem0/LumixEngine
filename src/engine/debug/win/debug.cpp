@@ -3,7 +3,10 @@
 #include "engine/string.h"
 #include "engine/system.h"
 #include <windows.h>
+#pragma warning (push)
+#pragma warning (disable: 4091)                             // declaration of 'xx' hides previous local declaration
 #include <DbgHelp.h>
+#pragma warning (pop)
 #include <mapi.h>
 #include <cstdlib>
 #include <cstdio>
