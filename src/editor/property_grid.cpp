@@ -610,19 +610,39 @@ bool PropertyGrid::entityInput(const char* label, const char* str_id, Entity& en
 			}
 		}
 		Universe* universe = m_editor.getUniverse();
-		static int current_item;
+		static char entity_filter[32] = {};
+		ImGui::LabellessInputText("Filter", entity_filter, sizeof(entity_filter));
 		if (ImGui::ListBoxHeader("Entities"))
 		{
-			for (auto i = universe->getFirstEntity(); i.isValid(); i = universe->getNextEntity(i))
+			if (entity_filter[0])
 			{
-				getEntityListDisplayName(m_editor, buf, lengthOf(buf), i);
-				if (ImGui::Selectable(buf))
+				for (auto i = universe->getFirstEntity(); i.isValid(); i = universe->getNextEntity(i))
 				{
-					ImGui::ListBoxFooter();
-					entity = i;
-					ImGui::CloseCurrentPopup();
-					ImGui::EndPopup();
-					return true;
+					getEntityListDisplayName(m_editor, buf, lengthOf(buf), i);
+					if (stristr(buf, entity_filter) == nullptr) continue;
+					if (ImGui::Selectable(buf))
+					{
+						ImGui::ListBoxFooter();
+						entity = i;
+						ImGui::CloseCurrentPopup();
+						ImGui::EndPopup();
+						return true;
+					}
+				}
+			}
+			else
+			{
+				for (auto i = universe->getFirstEntity(); i.isValid(); i = universe->getNextEntity(i))
+				{
+					getEntityListDisplayName(m_editor, buf, lengthOf(buf), i);
+					if (ImGui::Selectable(buf))
+					{
+						ImGui::ListBoxFooter();
+						entity = i;
+						ImGui::CloseCurrentPopup();
+						ImGui::EndPopup();
+						return true;
+					}
 				}
 			}
 			ImGui::ListBoxFooter();
