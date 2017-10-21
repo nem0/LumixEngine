@@ -3149,6 +3149,12 @@ void ImportAssetDialog::convert(bool use_ui)
 	{
 		if (!m_fbx_importer->isValid(*scene)) return;
 	}
+	if (m_fbx_importer->bones.size() > Model::Bone::MAX_COUNT)
+	{
+		setMessage("Too many bones.");
+		return;
+	}
+
 
 	for (auto& material : m_fbx_importer->materials)
 	{

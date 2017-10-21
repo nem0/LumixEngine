@@ -495,10 +495,13 @@ bool Model::parseBones(FS::IFile& file)
 {
 	int bone_count;
 	file.read(&bone_count, sizeof(bone_count));
-	if (bone_count < 0)
+	if (bone_count < 0) return false;
+	if (bone_count > Bone::MAX_COUNT)
 	{
+		g_log_warning.log("Renderer") << "Model " << getPath().c_str() << " has too many bones.";
 		return false;
 	}
+
 	m_bones.reserve(bone_count);
 	for (int i = 0; i < bone_count; ++i)
 	{
