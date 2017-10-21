@@ -175,7 +175,7 @@ struct GridUIVisitor LUMIX_FINAL : Properties::IComponentVisitor
 		Universe& universe = *m_editor.getUniverse();
 		if (ImGui::BeginPopup(prop.name))
 		{
-			if (entity.isValid() && ImGui::Button("Select")) m_deferred_select = entity;
+			if (entity.isValid() && ImGui::Button("Select")) m_grid.m_deferred_select = entity;
 
 			static char entity_filter[32] = {};
 			ImGui::LabellessInputText("Filter", entity_filter, sizeof(entity_filter));
@@ -516,7 +516,6 @@ struct GridUIVisitor LUMIX_FINAL : Properties::IComponentVisitor
 	const Array<Entity>& m_entities;
 	int m_index;
 	PropertyGrid& m_grid;
-	Entity m_deferred_select = INVALID_ENTITY;
 };
 
 
@@ -543,10 +542,10 @@ void PropertyGrid::showComponentProperties(const Array<Entity>& entities, Compon
 	GridUIVisitor visitor(m_app, -1, entities, cmp_type, m_editor);
 	if (component) component->visit(visitor);
 
-	if (visitor.m_deferred_select.isValid())
+	if (m_deferred_select.isValid())
 	{
-		m_editor.selectEntities(&visitor.m_deferred_select, 1);
-		visitor.m_deferred_select = INVALID_ENTITY;
+		m_editor.selectEntities(&m_deferred_select, 1);
+		m_deferred_select = INVALID_ENTITY;
 	}
 
 
@@ -566,7 +565,7 @@ void PropertyGrid::showComponentProperties(const Array<Entity>& entities, Compon
 }
 
 
-bool PropertyGrid::entityInput(const char* label, const char* str_id, Entity& entity) const
+bool PropertyGrid::entityInput(const char* label, const char* str_id, Entity& entity)
 {
 	const auto& style = ImGui::GetStyle();
 	float item_w = ImGui::CalcItemWidth();
@@ -599,7 +598,7 @@ bool PropertyGrid::entityInput(const char* label, const char* str_id, Entity& en
 	{
 		if (entity.isValid())
 		{
-			if (ImGui::Button("Select current")) m_editor.selectEntities(&entity, 1);
+			if (ImGui::Button("Select current")) m_deferred_select = entity;
 			ImGui::SameLine();
 			if (ImGui::Button("Empty"))
 			{
