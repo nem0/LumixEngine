@@ -144,6 +144,8 @@ public:
 
 	struct Bone
 	{
+		enum { MAX_COUNT = 196 };
+
 		explicit Bone(IAllocator& allocator)
 			: name(allocator)
 			, parent(allocator)

@@ -115,7 +115,8 @@ void getExtension(char* extension, int max_length, const char* src)
 bool hasExtension(const char* filename, const char* ext)
 {
 	char tmp[20];
-	getExtension(tmp, sizeof(tmp), filename);
+	getExtension(tmp, lengthOf(tmp), filename);
+	makeLowercase(tmp, lengthOf(tmp), tmp);
 
 	return equalStrings(tmp, ext);
 }
