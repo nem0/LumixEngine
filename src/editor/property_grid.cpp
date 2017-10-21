@@ -28,6 +28,7 @@ PropertyGrid::PropertyGrid(StudioApp& app)
 	, m_is_open(true)
 	, m_editor(app.getWorldEditor())
 	, m_plugins(app.getWorldEditor().getAllocator())
+	, m_deferred_select(INVALID_ENTITY)
 {
 	m_particle_emitter_updating = true;
 	m_particle_emitter_timescale = 1.0f;
