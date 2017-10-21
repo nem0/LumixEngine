@@ -1221,7 +1221,11 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		Vec3 probe_position = universe->getPosition(cmp.entity);
 		auto* scene = static_cast<RenderScene*>(universe->getScene(CAMERA_TYPE));
 		ComponentHandle camera_cmp = scene->getCameraInSlot("probe");
-		if (!camera_cmp.isValid()) return;
+		if (!camera_cmp.isValid())
+		{
+			g_log_error.log("Renderer") << "No camera camera in slot 'probe'.";
+			return;
+		}
 
 		Entity camera_entity = scene->getCameraEntity(camera_cmp);
 		scene->setCameraFOV(camera_cmp, Math::degreesToRadians(90));
