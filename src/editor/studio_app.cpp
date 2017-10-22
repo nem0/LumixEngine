@@ -180,7 +180,7 @@ public:
 		m_engine = Engine::create(current_dir, data_dir_path, nullptr, m_allocator);
 		createLua();
 
-		m_window = SDL_CreateWindow("Lumix Studio", 0, 0, 800, 600, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+		m_window = SDL_CreateWindow("Lumix Studio", 0, 0, 800, 600, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
 		PlatformInterface::setWindow(m_window);
 		SDL_SysWMinfo window_info;
 		SDL_VERSION(&window_info.version);
@@ -1401,7 +1401,10 @@ public:
 	void initIMGUI()
 	{
 		ImGuiIO& io = ImGui::GetIO();
-		m_font = io.Fonts->AddFontFromFileTTF("bin/VeraMono.ttf", (float)m_settings.m_font_size);
+		float ddpi;
+		float font_scale = 1;
+		if (SDL_GetDisplayDPI(0, &ddpi, nullptr, nullptr) == 0) font_scale = ddpi / 96;
+		m_font = io.Fonts->AddFontFromFileTTF("bin/VeraMono.ttf", (float)m_settings.m_font_size * font_scale);
 
 		io.KeyMap[ImGuiKey_Tab] = SDLK_TAB;
 		io.KeyMap[ImGuiKey_LeftArrow] = SDL_SCANCODE_LEFT;
