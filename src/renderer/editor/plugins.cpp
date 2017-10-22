@@ -18,6 +18,7 @@
 #include "engine/lua_wrapper.h"
 #include "engine/lumix.h"
 #include "engine/mt/atomic.h"
+#include "engine/mt/thread.h"
 #include "engine/path_utils.h"
 #include "engine/plugin_manager.h"
 #include "engine/properties.h"
@@ -1302,7 +1303,7 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 			, 10
 			, 1
 			, cmft::EdgeFixup::None
-			, 0xff
+			, MT::getCPUsCount()
 		);
 
 		cmft::imageFromRgba32f(image, cmft::TextureFormat::RGBA8);
