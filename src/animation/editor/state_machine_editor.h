@@ -154,6 +154,7 @@ private:
 	Node* m_from;
 	Node* m_to;
 	StaticString<128> m_expression;
+	Anim::Condition::Error m_expression_error;
 };
 
 

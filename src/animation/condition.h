@@ -156,10 +156,26 @@ struct InputDecl
 
 struct Condition
 {
+	enum class Error
+	{
+		NONE,
+		UNKNOWN_IDENTIFIER,
+		MISSING_LEFT_PARENTHESIS,
+		MISSING_RIGHT_PARENTHESIS,
+		UNEXPECTED_CHAR,
+		OUT_OF_MEMORY,
+		MISSING_BINARY_OPERAND,
+		NOT_ENOUGH_PARAMETERS,
+		INCORRECT_TYPE_ARGS,
+		NO_RETURN_VALUE
+	};
+
+	static const char* errorToString(Error error);
+
 	Condition(IAllocator& allocator);
 
 	bool operator()(RunningContext& rc);
-	bool compile(const char* expression, InputDecl& decl);
+	Error compile(const char* expression, InputDecl& decl);
 
 	Array<u8> bytecode;
 };

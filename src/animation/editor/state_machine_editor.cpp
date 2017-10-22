@@ -467,6 +467,7 @@ Edge::Edge(Anim::Edge* engine_cmp, Container* parent, ControllerResource& contro
 	m_from->addEdge(this);
 	m_to->addInEdge(this);
 	m_expression = "finishing()";
+	m_expression_error = Anim::Condition::Error::NONE;
 }
 
 
@@ -495,7 +496,7 @@ void Edge::debug(ImDrawList* draw, const ImVec2& canvas_screen_pos, Anim::Compon
 void Edge::compile()
 {
 	auto* engine_edge = (Anim::Edge*)engine_cmp;
-	engine_edge->condition.compile(m_expression, m_controller.getEngineResource()->m_input_decl);
+	m_expression_error = engine_edge->condition.compile(m_expression, m_controller.getEngineResource()->m_input_decl);
 }
 
 
@@ -510,6 +511,13 @@ void Edge::onGUI()
 	auto* engine_edge = (Anim::Edge*)engine_cmp;
 	ImGui::DragFloat("Length", &engine_edge->length);
 	
+	bool pop_color = false;
+	if (m_expression_error != Anim::Condition::Error::NONE)
+	{
+		pop_color = true;
+		ImGui::PushStyleColor(ImGuiCol_Text, 0xff0000ff);
+	}
+
 	if (ImGui::InputText("Expression",
 			m_expression.data,
 			lengthOf(m_expression.data),
@@ -517,10 +525,20 @@ void Edge::onGUI()
 			autocompleteCallback,
 			&getController()))
 	{
-		if (!engine_edge->condition.compile(m_expression, m_controller.getEngineResource()->m_input_decl))
+		m_expression_error = engine_edge->condition.compile(m_expression, m_controller.getEngineResource()->m_input_decl);
+		if (m_expression_error != Anim::Condition::Error::NONE)
 		{
 			g_log_error.log("Animation") << "Failed to compile condition " << m_expression;
 		}
+	}
+
+	if (pop_color)
+	{
+		if (ImGui::IsItemHovered())
+		{
+			ImGui::SetTooltip(Anim::Condition::errorToString(m_expression_error));
+		}
+		ImGui::PopStyleColor();
 	}
 }
 

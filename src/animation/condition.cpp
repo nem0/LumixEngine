@@ -122,26 +122,11 @@ public:
 		Operator oper;
 	};
 
-
-	enum class Error
-	{
-		NONE,
-		UNKNOWN_IDENTIFIER,
-		MISSING_LEFT_PARENTHESIS,
-		MISSING_RIGHT_PARENTHESIS,
-		UNEXPECTED_CHAR,
-		OUT_OF_MEMORY,
-		MISSING_BINARY_OPERAND,
-		NOT_ENOUGH_PARAMETERS,
-		INCORRECT_TYPE_ARGS,
-		NO_RETURN_VALUE
-	};
-
 	public:
-	int tokenize(const char* src, Token* tokens, int max_size);
-	int compile(const char* src, const Token* tokens, int token_count, u8* byte_code, int max_size, InputDecl& decl);
-	int toPostfix(const Token* input, Token* output, int count);
-	ExpressionCompiler::Error getError() const { return m_compile_time_error; }
+		int tokenize(const char* src, Token* tokens, int max_size);
+		int compile(const char* src, const Token* tokens, int token_count, u8* byte_code, int max_size, InputDecl& decl);
+		int toPostfix(const Token* input, Token* output, int count);
+		Condition::Error getError() const { return m_compile_time_error; }
 
 
 private:
@@ -201,7 +186,7 @@ private:
 
 
 private:
-	ExpressionCompiler::Error m_compile_time_error;
+	Condition::Error m_compile_time_error;
 	int m_compile_time_offset;
 };
 
@@ -376,7 +361,7 @@ int ExpressionCompiler::toPostfix(const Token* input, Token* output, int count)
 			}
 			else
 			{
-				m_compile_time_error = ExpressionCompiler::Error::MISSING_LEFT_PARENTHESIS;
+				m_compile_time_error = Condition::Error::MISSING_LEFT_PARENTHESIS;
 				m_compile_time_offset = token.offset;
 				return -1;
 			}
@@ -400,7 +385,7 @@ int ExpressionCompiler::toPostfix(const Token* input, Token* output, int count)
 	{
 		if(func_stack[i].type == Token::LEFT_PARENTHESIS)
 		{
-			m_compile_time_error = ExpressionCompiler::Error::MISSING_RIGHT_PARENTHESIS;
+			m_compile_time_error = Condition::Error::MISSING_RIGHT_PARENTHESIS;
 			m_compile_time_offset = func_stack[i].offset;
 			return -1;
 		}
@@ -560,7 +545,7 @@ int ExpressionCompiler::compile(const char* src,
 			case Token::NUMBER:
 				if (max_size - (out - byte_code) < sizeof(float) + 1)
 				{
-					m_compile_time_error = ExpressionCompiler::Error::OUT_OF_MEMORY;
+					m_compile_time_error = Condition::Error::OUT_OF_MEMORY;
 					return -1;
 				}
 				*out = Instruction::PUSH_FLOAT;
@@ -577,13 +562,13 @@ int ExpressionCompiler::compile(const char* src,
 
 					if (type_stack_idx < fn.arity())
 					{
-						m_compile_time_error = ExpressionCompiler::Error::NOT_ENOUGH_PARAMETERS;
+						m_compile_time_error = Condition::Error::NOT_ENOUGH_PARAMETERS;
 						m_compile_time_offset = token.offset;
 						return -1;
 					}
 					if (!fn.checkArgTypes(type_stack, type_stack_idx))
 					{
-						m_compile_time_error = ExpressionCompiler::Error::INCORRECT_TYPE_ARGS;
+						m_compile_time_error = Condition::Error::INCORRECT_TYPE_ARGS;
 						m_compile_time_offset = token.offset;
 						return -1;
 					}
@@ -603,14 +588,14 @@ int ExpressionCompiler::compile(const char* src,
 						auto& fn = FUNCTIONS[func_idx];
 						if (type_stack_idx < fn.arity())
 						{
-							m_compile_time_error = ExpressionCompiler::Error::NOT_ENOUGH_PARAMETERS;
+							m_compile_time_error = Condition::Error::NOT_ENOUGH_PARAMETERS;
 							m_compile_time_offset = token.offset;
 							return -1;
 						}
 
 						if (!fn.checkArgTypes(type_stack, type_stack_idx))
 						{
-							m_compile_time_error = ExpressionCompiler::Error::INCORRECT_TYPE_ARGS;
+							m_compile_time_error = Condition::Error::INCORRECT_TYPE_ARGS;
 							m_compile_time_offset = token.offset;
 							return -1;
 						}
@@ -691,7 +676,7 @@ int ExpressionCompiler::compile(const char* src,
 								bool bool_const_value;
 								if (!getBoolConstValue(src, token, bool_const_value))
 								{
-									m_compile_time_error = ExpressionCompiler::Error::UNKNOWN_IDENTIFIER;
+									m_compile_time_error = Condition::Error::UNKNOWN_IDENTIFIER;
 									m_compile_time_offset = token.offset;
 									return -1;
 								}
@@ -719,12 +704,12 @@ int ExpressionCompiler::compile(const char* src,
 	}
 	if (max_size - (out - byte_code) < 1)
 	{
-		m_compile_time_error = ExpressionCompiler::Error::OUT_OF_MEMORY;
+		m_compile_time_error = Condition::Error::OUT_OF_MEMORY;
 		return -1;
 	}
 	if (type_stack_idx < 1)
 	{
-		m_compile_time_error = ExpressionCompiler::Error::NO_RETURN_VALUE;
+		m_compile_time_error = Condition::Error::NO_RETURN_VALUE;
 		return -1;
 	}
 	switch(type_stack[type_stack_idx - 1])
@@ -754,7 +739,7 @@ int ExpressionCompiler::tokenize(const char* src, Token* tokens, int max_size)
 		{ "not", false, ExpressionCompiler::Token::NOT}
 	};
 
-	m_compile_time_error = ExpressionCompiler::Error::NONE;
+	m_compile_time_error = Condition::Error::NONE;
 	const char* c = src;
 	int token_count = 0;
 	bool binary = false;
@@ -767,7 +752,7 @@ int ExpressionCompiler::tokenize(const char* src, Token* tokens, int max_size)
 			if (strncmp(c, i.c, strlen(i.c)) != 0) continue;
 			if (i.binary && !binary)
 			{
-				m_compile_time_error = ExpressionCompiler::Error::MISSING_BINARY_OPERAND;
+				m_compile_time_error = Condition::Error::MISSING_BINARY_OPERAND;
 				m_compile_time_offset = token.offset;
 				return -1;
 			}
@@ -826,7 +811,7 @@ int ExpressionCompiler::tokenize(const char* src, Token* tokens, int max_size)
 			}
 			else
 			{
-				m_compile_time_error = ExpressionCompiler::Error::UNEXPECTED_CHAR;
+				m_compile_time_error = Condition::Error::UNEXPECTED_CHAR;
 				m_compile_time_offset = token.offset;
 			}
 		}
@@ -838,7 +823,7 @@ int ExpressionCompiler::tokenize(const char* src, Token* tokens, int max_size)
 			}
 			else
 			{
-				m_compile_time_error = ExpressionCompiler::Error::OUT_OF_MEMORY;
+				m_compile_time_error = Condition::Error::OUT_OF_MEMORY;
 				return -1;
 			}
 			++token_count;
@@ -846,6 +831,25 @@ int ExpressionCompiler::tokenize(const char* src, Token* tokens, int max_size)
 		++c;
 	}
 	return token_count;
+}
+
+
+const char* Condition::errorToString(Error error)
+{
+	switch (error)
+	{
+		case Error::NONE: return "None"; break;
+		case Error::UNKNOWN_IDENTIFIER: return "Unknown identifier"; break;
+		case Error::MISSING_LEFT_PARENTHESIS: return "Missing left parenthesis"; break;
+		case Error::MISSING_RIGHT_PARENTHESIS: return "Missing right parenthesis"; break;
+		case Error::UNEXPECTED_CHAR: return "Unexpected char"; break;
+		case Error::OUT_OF_MEMORY: return "Out of memory"; break;
+		case Error::MISSING_BINARY_OPERAND: return "Missing binary operand"; break;
+		case Error::NOT_ENOUGH_PARAMETERS: return "Not enough parameters"; break;
+		case Error::INCORRECT_TYPE_ARGS: return "Incorrect type args"; break;
+		case Error::NO_RETURN_VALUE: return "No return value"; break;
+		default: ASSERT(false); return "Unknown error"; break;
+	}
 }
 
 
@@ -862,7 +866,7 @@ bool Condition::operator()(RunningContext& rc)
 }
 
 
-bool Condition::compile(const char* expression, InputDecl& decl)
+Condition::Error Condition::compile(const char* expression, InputDecl& decl)
 {
 	ExpressionCompiler compiler;
 	ExpressionCompiler::Token tokens[128];
@@ -871,23 +875,23 @@ bool Condition::compile(const char* expression, InputDecl& decl)
 	if (tokens_count < 0)
 	{
 		compile("1 < 0", decl);
-		return false;
+		return compiler.getError();
 	}
 	tokens_count = compiler.toPostfix(tokens, postfix_tokens, tokens_count);
 	if (tokens_count < 0)
 	{
 		compile("1 < 0", decl);
-		return false;
+		return compiler.getError();
 	}
 	bytecode.resize(128);
 	int size = compiler.compile(expression, postfix_tokens, tokens_count, &bytecode[0], bytecode.size(), decl);
 	if (size < 0)
 	{
 		compile("1 < 0", decl);
-		return false;
+		return compiler.getError();
 	}
 	bytecode.resize(size);
-	return true;
+	return Condition::Error::NONE;
 }
 
 
