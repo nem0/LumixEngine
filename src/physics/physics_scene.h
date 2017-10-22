@@ -230,6 +230,7 @@ public:
 	virtual RagdollBone* getRagdollBoneChild(RagdollBone* bone) = 0;
 	virtual RagdollBone* getRagdollBoneSibling(RagdollBone* bone) = 0;
 	virtual RagdollBone* getRagdollBoneByName(ComponentHandle cmp, u32 bone_name_hash) = 0;
+	virtual const char* getRagdollBoneName(RagdollBone* bone) = 0;
 	virtual float getRagdollBoneHeight(RagdollBone* bone) = 0;
 	virtual float getRagdollBoneRadius(RagdollBone* bone) = 0;
 	virtual void setRagdollBoneHeight(RagdollBone* bone, float value) = 0;

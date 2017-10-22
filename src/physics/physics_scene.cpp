@@ -1858,6 +1858,21 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
+	const char* getRagdollBoneName(RagdollBone* bone) override
+	{
+		Entity entity = {(int)(intptr_t)(void*)bone->actor->userData};
+		auto* render_scene = static_cast<RenderScene*>(m_universe.getScene(RENDERER_HASH));
+		ASSERT(render_scene);
+
+		ComponentHandle model_instance = render_scene->getModelInstanceComponent(entity);
+		ASSERT(model_instance.isValid());
+		Model* model = render_scene->getModelInstanceModel(model_instance);
+		ASSERT(model && model->isReady());
+
+		return model->getBone(bone->pose_bone_idx).name.c_str();
+	}
+
+
 	RagdollBone* getRagdollBoneByName(ComponentHandle cmp, u32 bone_name_hash) override
 	{
 		Entity entity = {cmp.index};
