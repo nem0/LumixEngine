@@ -48,6 +48,7 @@
 #include "terrain_editor.h"
 #include <SDL.h>
 #include <cmath>
+#include <cmft/clcontext.h>
 #include <cmft/cubemapfilter.h>
 #include <crnlib.h>
 #include <cstddef>
@@ -1107,11 +1108,18 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		Path pipeline_path("pipelines/probe.lua");
 		m_pipeline = Pipeline::create(*renderer, pipeline_path, "", allocator);
 		m_pipeline->load();
+
+		m_cl_context = cmft::clLoad() > 0 ? cmft::clInit() : nullptr;
 	}
 
 
 	~EnvironmentProbePlugin()
 	{
+		if (m_cl_context)
+		{
+			cmft::clDestroy(m_cl_context);
+			cmft::clUnload();
+		}
 		Pipeline::destroy(m_pipeline);
 	}
 
@@ -1292,8 +1300,6 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		copyMemory(image.m_data, &data[0], data.size());
 		cmft::imageToRgba32f(image);
 		
-		cmft::imageIrradianceFilterSh(irradiance, 32, image);
-
 		cmft::imageRadianceFilter(
 			image
 			, 128
@@ -1303,8 +1309,11 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 			, 10
 			, 1
 			, cmft::EdgeFixup::None
-			, MT::getCPUsCount()
+			, 0
+			, m_cl_context
 		);
+
+		cmft::imageIrradianceFilterSh(irradiance, 32, image);
 
 		cmft::imageFromRgba32f(image, cmft::TextureFormat::RGBA8);
 		cmft::imageFromRgba32f(irradiance, cmft::TextureFormat::RGBA8);
@@ -1332,6 +1341,8 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 
 	StudioApp& m_app;
 	Pipeline* m_pipeline;
+
+	cmft::ClContext* m_cl_context;
 };
 
 
