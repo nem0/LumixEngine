@@ -350,6 +350,13 @@ struct FBXImporter
 					tex.src = src_dir;
 					tex.src << file_info.m_basename << "." << file_info.m_extension;
 					tex.is_valid = PlatformInterface::fileExists(tex.src);
+
+					if (!tex.is_valid)
+					{
+						tex.src = src_dir;
+						tex.src << tex.path;
+						tex.is_valid = PlatformInterface::fileExists(tex.src);
+					}
 				}
 
 				tex.import = true;
