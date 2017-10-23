@@ -11,6 +11,7 @@
 #include "engine/fs/file_system.h"
 #include "engine/fs/os_file.h"
 #include "engine/fs/resource_file_device.h"
+#include "engine/job_system.h"
 #include "engine/log.h"
 #include "engine/mt/thread.h"
 #include "engine/path.h"
@@ -38,6 +39,7 @@ namespace Lumix
 
 
 static const ResourceType SHADER_TYPE("shader");
+static const ResourceType SHADER_BINARY_TYPE("shader_binary");
 
 
 ShaderCompiler::ShaderCompiler(StudioApp& app, LogUI& log_ui)
@@ -46,22 +48,94 @@ ShaderCompiler::ShaderCompiler(StudioApp& app, LogUI& log_ui)
 	, m_log_ui(log_ui)
 	, m_dependencies(m_editor.getAllocator())
 	, m_to_compile(m_editor.getAllocator())
+	, m_hooked_files(m_editor.getAllocator())
 	, m_to_reload(m_editor.getAllocator())
 	, m_shd_files(m_editor.getAllocator())
 	, m_changed_files(m_editor.getAllocator())
 	, m_mutex(false)
+	, m_load_hook(*m_editor.getEngine().getResourceManager().get(SHADER_TYPE), *this)
 {
+	JobSystem::JobDecl job;
+	job.task = [](void* data) { ((ShaderCompiler*)data)->compileTask(); };
+	job.data = this;
+	JobSystem::runJobs(&job, 1, nullptr);
 	m_is_opengl = bgfx::getRendererType() == bgfx::RendererType::OpenGL || bgfx::getRendererType() == bgfx::RendererType::OpenGLES;
 
 	m_notifications_id = -1;
+	m_empty_queue = 1;
 
 	m_watcher = FileSystemWatcher::create("pipelines", m_editor.getAllocator());
 	m_watcher->getCallback().bind<ShaderCompiler, &ShaderCompiler::onFileChanged>(this);
 	
 	findShaderFiles("pipelines/");
 	parseDependencies();
-	makeUpToDate(false);
+	//makeUpToDate(false);
+
+	Engine& engine = m_editor.getEngine();
+	ResourceManagerBase* shader_manager = engine.getResourceManager().get(SHADER_BINARY_TYPE);
+	shader_manager->setLoadHook(m_load_hook);
 }
+
+
+ShaderCompiler::LoadHook::LoadHook(ResourceManagerBase& manager, ShaderCompiler& compiler)
+	: ResourceManagerBase::LoadHook(manager)
+	, m_compiler(compiler)
+{
+}
+
+
+void ShaderCompiler::compileTask()
+{
+	m_job_runnig = 1;
+	for (;;)
+	{
+		JobSystem::wait(&m_empty_queue);
+		if (m_job_exit_request) break;
+
+		m_app.getAssetBrowser().enableUpdate(false);
+		StaticString<MAX_PATH_LENGTH> to_compile;
+			
+		{
+			MT::SpinLock lock(m_mutex);
+			to_compile = m_to_compile.back();
+			m_to_compile.pop();
+			m_empty_queue = m_to_compile.empty();
+		}
+		compile(to_compile, false);
+
+		if(m_empty_queue) m_app.getAssetBrowser().enableUpdate(true);
+	}
+	m_job_runnig = 0;
+}
+
+
+bool ShaderCompiler::LoadHook::onBeforeLoad(Resource& resource)
+{
+	if (PlatformInterface::fileExists(resource.getPath().c_str())) return false;
+
+	char source_path[MAX_PATH_LENGTH];
+	PathUtils::getBasename(source_path, lengthOf(source_path), resource.getPath().c_str());
+	if (m_compiler.getSourceFromBinaryBasename(source_path, lengthOf(source_path), source_path))
+	{
+		m_compiler.queueCompile(source_path);
+
+		MT::SpinLock lock(m_compiler.m_mutex);
+		m_compiler.m_hooked_files.push(&resource);
+		m_compiler.m_hooked_files.removeDuplicates();
+	}
+	
+	return true;
+}
+
+
+void ShaderCompiler::queueCompile(const char* path)
+{
+	MT::SpinLock lock(m_mutex);
+	m_to_compile.emplace(path);
+	m_to_compile.removeDuplicates();
+	m_empty_queue = 0;
+}
+
 
 
 bool ShaderCompiler::getSourceFromBinaryBasename(char* out, int max_size, const char* binary_basename)
@@ -188,7 +262,7 @@ void ShaderCompiler::findShaderFiles(const char* src_dir)
 
 void ShaderCompiler::makeUpToDate(bool wait)
 {
-	if (!m_to_compile.empty())
+	if (!m_empty_queue)
 	{
 		if (wait) this->wait();
 		return;
@@ -238,7 +312,7 @@ void ShaderCompiler::makeUpToDate(bool wait)
 		StaticString<MAX_PATH_LENGTH> bin_base_path(compiled_dir, "/", basename, "_");
 		if (isChanged(combinations, bin_base_path, shd_path.c_str()))
 		{
-			m_to_compile.emplace(shd_path.c_str(), m_editor.getAllocator());
+			queueCompile(shd_path.c_str());
 		}
 	}
 
@@ -257,13 +331,11 @@ void ShaderCompiler::makeUpToDate(bool wait)
 				char tmp[MAX_PATH_LENGTH];
 				if (getSourceFromBinaryBasename(tmp, sizeof(tmp), basename))
 				{
-					m_to_compile.emplace(tmp, m_editor.getAllocator());
+					queueCompile(tmp);
 				}
 			}
 		}
 	}
-
-	m_to_compile.removeDuplicates();
 
 	if (wait) this->wait();
 }
@@ -383,6 +455,9 @@ void ShaderCompiler::addDependency(const char* ckey, const char* cvalue)
 
 ShaderCompiler::~ShaderCompiler()
 {
+	m_job_exit_request = true;
+	m_empty_queue = 0;
+	JobSystem::wait(&m_job_runnig);
 	FileSystemWatcher::destroy(m_watcher);
 }
 
@@ -403,16 +478,16 @@ void ShaderCompiler::reloadShaders()
 
 void ShaderCompiler::updateNotifications()
 {
-	if (!m_to_compile.empty() && m_notifications_id < 0)
+	if (!m_empty_queue && m_notifications_id < 0)
 	{
 		m_notifications_id = m_log_ui.addNotification("Compiling shaders...");
 	}
 
-	if (m_to_compile.empty())
+	if (!m_empty_queue && m_notifications_id != -1)
 	{
 		m_log_ui.setNotificationTime(m_notifications_id, 3.0f);
-		m_notifications_id = -1;
 	}
+	if(m_empty_queue) m_notifications_id = -1;
 }
 
 
@@ -437,7 +512,6 @@ void ShaderCompiler::compilePass(const char* shd_path,
 	{
 		if ((mask & (~define_mask)) == 0)
 		{
-			updateNotifications();
 			PathUtils::FileInfo shd_file_info(shd_path);
 			StaticString<MAX_PATH_LENGTH> source_path(
 				"", shd_file_info.m_dir, shd_file_info.m_basename, is_vertex_shader ? "_vs.sc" : "_fs.sc");
@@ -505,7 +579,7 @@ void ShaderCompiler::compilePass(const char* shd_path,
 
 void ShaderCompiler::processChangedFiles()
 {
-	if (!m_to_compile.empty()) return;
+	if (!m_empty_queue) return;
 
 	char changed_file_path[MAX_PATH_LENGTH];
 	{
@@ -536,11 +610,11 @@ void ShaderCompiler::processChangedFiles()
 	{
 		if (PathUtils::hasExtension(changed_file_path, "shd"))
 		{
-			m_to_compile.emplace(changed_file_path, m_editor.getAllocator());
+			queueCompile(changed_file_path);
 		}
 		else
 		{
-			Array<string> src_list(m_editor.getAllocator());
+			Array<StaticString<MAX_PATH_LENGTH>> src_list(m_editor.getAllocator());
 
 			for (auto& bin : m_dependencies.at(find_idx))
 			{
@@ -549,8 +623,7 @@ void ShaderCompiler::processChangedFiles()
 				char tmp[MAX_PATH_LENGTH];
 				if (getSourceFromBinaryBasename(tmp, sizeof(tmp), basename))
 				{
-					string src(tmp, m_editor.getAllocator());
-					src_list.push(src);
+					src_list.emplace(tmp);
 				}
 			}
 
@@ -558,7 +631,7 @@ void ShaderCompiler::processChangedFiles()
 
 			for (auto& src : src_list)
 			{
-				m_to_compile.emplace(src.c_str(), m_editor.getAllocator());
+				queueCompile(src);
 			}
 		}
 	}
@@ -567,9 +640,9 @@ void ShaderCompiler::processChangedFiles()
 
 void ShaderCompiler::wait()
 {
-	while (!m_to_compile.empty())
+	while (!m_empty_queue)
 	{
-		update();
+		MT::sleep(5);
 	}
 }
 
@@ -581,18 +654,20 @@ void ShaderCompiler::update()
 
 	processChangedFiles();
 
-	if (!m_to_compile.empty())
+	MT::SpinLock lock(m_mutex);
+	if (!m_to_reload.empty())
 	{
-		m_app.getAssetBrowser().enableUpdate(false);
-		compile(m_to_compile.back().c_str(), false);
-		m_to_compile.pop();
-
-		if (m_to_compile.empty())
+		for (int i = m_hooked_files.size() - 1; i >= 0; --i)
 		{
-			reloadShaders();
-			parseDependencies();
-			m_app.getAssetBrowser().enableUpdate(true);
+			Resource* res = m_hooked_files[i];
+			if (PlatformInterface::fileExists(res->getPath().c_str()))
+			{
+				m_load_hook.continueLoad(*res);
+				m_hooked_files.eraseFast(i);
+			}
 		}
+		reloadShaders();
+		parseDependencies();
 	}
 }
 
@@ -633,8 +708,6 @@ void ShaderCompiler::compile(const char* path, bool debug)
 		}
 	}
 
-	m_to_reload.emplace(path, m_editor.getAllocator());
-
 	auto& fs = m_editor.getEngine().getFileSystem();
 	auto* file = fs.open(fs.getDiskDevice(), Path(path), FS::Mode::OPEN_AND_READ);
 	if (file)
@@ -655,6 +728,11 @@ void ShaderCompiler::compile(const char* path, bool debug)
 	else
 	{
 		g_log_error.log("Editor") << "Could not open " << path;
+	}
+
+	{
+		MT::SpinLock lock(m_mutex);
+		m_to_reload.emplace(path, m_editor.getAllocator());
 	}
 }
 

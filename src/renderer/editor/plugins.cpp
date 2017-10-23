@@ -1309,7 +1309,7 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 			, 10
 			, 1
 			, cmft::EdgeFixup::None
-			, 0
+			, m_cl_context ? 0 : MT::getCPUsCount()
 			, m_cl_context
 		);
 
