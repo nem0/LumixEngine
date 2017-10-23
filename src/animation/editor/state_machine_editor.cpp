@@ -536,7 +536,7 @@ void Edge::onGUI()
 	{
 		if (ImGui::IsItemHovered())
 		{
-			ImGui::SetTooltip(Anim::Condition::errorToString(m_expression_error));
+			ImGui::SetTooltip("%s", Anim::Condition::errorToString(m_expression_error));
 		}
 		ImGui::PopStyleColor();
 	}
