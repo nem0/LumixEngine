@@ -26,7 +26,7 @@ class LUMIX_ENGINE_API ResourceManagerBase
 public:
 	typedef HashMap<u32, Resource*> ResourceTable;
 
-	struct LoadHook
+	struct LUMIX_ENGINE_API LoadHook
 	{
 		LoadHook(ResourceManagerBase& manager) : m_manager(manager) {}
 
