@@ -299,7 +299,7 @@ struct EnumProperty : IEnumProperty
 	{
 		using C = typename detail::ClassOf<Getter>::Type;
 		C* inst = static_cast<C*>(cmp.scene);
-		static_assert(4 == sizeof(detail::ResultOf<Getter>::Type), "enum must have 4 bytes");
+		static_assert(4 == sizeof(typename detail::ResultOf<Getter>::Type), "enum must have 4 bytes");
 		detail::GetterProxy<Getter>::invoke(stream, inst, getter, cmp.handle, index);
 	}
 
@@ -308,7 +308,7 @@ struct EnumProperty : IEnumProperty
 		using C = typename detail::ClassOf<Getter>::Type;
 		C* inst = static_cast<C*>(cmp.scene);
 
-		static_assert(4 == sizeof(detail::ResultOf<Getter>::Type), "enum must have 4 bytes");
+		static_assert(4 == sizeof(typename detail::ResultOf<Getter>::Type), "enum must have 4 bytes");
 		detail::SetterProxy<Setter>::invoke(stream, inst, setter, cmp.handle, index);
 	}
 
@@ -338,7 +338,7 @@ struct DynEnumProperty : IEnumProperty
 	{
 		using C = typename detail::ClassOf<Getter>::Type;
 		C* inst = static_cast<C*>(cmp.scene);
-		static_assert(4 == sizeof(detail::ResultOf<Getter>::Type), "enum must have 4 bytes");
+		static_assert(4 == sizeof(typename detail::ResultOf<Getter>::Type), "enum must have 4 bytes");
 		detail::GetterProxy<Getter>::invoke(stream, inst, getter, cmp.handle, index);
 	}
 
@@ -347,7 +347,7 @@ struct DynEnumProperty : IEnumProperty
 		using C = typename detail::ClassOf<Getter>::Type;
 		C* inst = static_cast<C*>(cmp.scene);
 
-		static_assert(4 == sizeof(detail::ResultOf<Getter>::Type), "enum must have 4 bytes");
+		static_assert(4 == sizeof(typename detail::ResultOf<Getter>::Type), "enum must have 4 bytes");
 		detail::SetterProxy<Setter>::invoke(stream, inst, setter, cmp.handle, index);
 	}
 
