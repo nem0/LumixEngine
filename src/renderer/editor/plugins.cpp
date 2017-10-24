@@ -58,6 +58,7 @@ using namespace Lumix;
 
 
 static const ComponentType PARTICLE_EMITTER_TYPE = Properties::getComponentType("particle_emitter");
+static const ComponentType SCRIPTED_PARTICLE_EMITTER_TYPE = Properties::getComponentType("scripted_particle_emitter");
 static const ComponentType TERRAIN_TYPE = Properties::getComponentType("terrain");
 static const ComponentType CAMERA_TYPE = Properties::getComponentType("camera");
 static const ComponentType DECAL_TYPE = Properties::getComponentType("decal");
@@ -2973,6 +2974,7 @@ LUMIX_STUDIO_ENTRY(renderer)
 
 	app.registerComponentWithResource("renderable", "Render/Mesh", MODEL_TYPE, *Properties::getProperty(MODEL_INSTANCE_TYPE, "Source"));
 	app.registerComponentWithResource("particle_emitter", "Render/Particle emitter/Emitter", MATERIAL_TYPE, *Properties::getProperty(PARTICLE_EMITTER_TYPE, "Material"));
+	app.registerComponentWithResource("scripted_particle_emitter", "Render/Particle emitter/DO NOT USE YET! Scripted Emitter", MATERIAL_TYPE, *Properties::getProperty(SCRIPTED_PARTICLE_EMITTER_TYPE, "Material"));
 	app.registerComponent("particle_emitter_spawn_shape", "Render/Particle emitter/Spawn shape");
 	app.registerComponent("particle_emitter_alpha", "Render/Particle emitter/Alpha");
 	app.registerComponent("particle_emitter_plane", "Render/Particle emitter/Plane");

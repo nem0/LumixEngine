@@ -244,6 +244,10 @@ public:
 	virtual void setCameraOrthoSize(ComponentHandle camera, float value) = 0;
 	virtual Vec2 getCameraScreenSize(ComponentHandle camera) = 0;
 
+	virtual void setScriptedParticleEmitterMaterialPath(ComponentHandle cmp, const Path& path) = 0;
+	virtual Path getScriptedParticleEmitterMaterialPath(ComponentHandle cmp) = 0;
+	virtual const AssociativeArray<Entity, class ScriptedParticleEmitter*>& getScriptedParticleEmitters() const = 0;
+
 	virtual class ParticleEmitter* getParticleEmitter(ComponentHandle cmp) = 0;
 	virtual void resetParticleEmitter(ComponentHandle cmp) = 0;
 	virtual void updateEmitter(ComponentHandle cmp, float time_delta) = 0;

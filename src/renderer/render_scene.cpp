@@ -51,6 +51,7 @@ enum class RenderSceneVersion : int
 	BONE_ATTACHMENT_TRANSFORM,
 	MODEL_INSTNACE_FLAGS,
 	INDIRECT_INTENSITY,
+	SCRIPTED_PARTICLES,
 
 	LATEST
 };
@@ -60,6 +61,7 @@ static const ComponentType MODEL_INSTANCE_TYPE = Properties::getComponentType("r
 static const ComponentType DECAL_TYPE = Properties::getComponentType("decal");
 static const ComponentType POINT_LIGHT_TYPE = Properties::getComponentType("point_light");
 static const ComponentType PARTICLE_EMITTER_TYPE = Properties::getComponentType("particle_emitter");
+static const ComponentType SCRIPTED_PARTICLE_EMITTER_TYPE = Properties::getComponentType("scripted_particle_emitter");
 static const ComponentType PARTICLE_EMITTER_ALPHA_TYPE = Properties::getComponentType("particle_emitter_alpha");
 static const ComponentType PARTICLE_EMITTER_FORCE_HASH = Properties::getComponentType("particle_emitter_force");
 static const ComponentType PARTICLE_EMITTER_ATTRACTOR_TYPE =
@@ -233,6 +235,11 @@ public:
 			LUMIX_DELETE(m_allocator, emitter);
 		}
 		m_particle_emitters.clear();
+		for (auto* emitter : m_scripted_particle_emitters)
+		{
+			LUMIX_DELETE(m_allocator, emitter);
+		}
+		m_scripted_particle_emitters.clear();
 
 		for (auto& i : m_model_instances)
 		{
@@ -329,6 +336,12 @@ public:
 			if (index < 0) return INVALID_COMPONENT;
 			if (m_particle_emitters.at(index)->m_is_valid) return {entity.index};
 			return INVALID_COMPONENT;
+		}
+		if (type == SCRIPTED_PARTICLE_EMITTER_TYPE)
+		{
+			int index = m_scripted_particle_emitters.find(entity);
+			if (index < 0) return INVALID_COMPONENT;
+			return {entity.index};
 		}
 		if (type == BONE_ATTACHMENT_TYPE)
 		{
@@ -686,6 +699,10 @@ public:
 			{
 				if (emitter->m_is_valid) emitter->update(dt);
 			}
+			for (auto* emitter : m_scripted_particle_emitters)
+			{
+				emitter->update(dt);
+			}
 		}
 	}
 
@@ -1008,6 +1025,30 @@ public:
 		probe.radiance->setFlag(BGFX_TEXTURE_MAG_ANISOTROPIC, true);
 
 		m_universe.addComponent(entity, ENVIRONMENT_PROBE_TYPE, this, {entity.index});
+	}
+
+
+	void serializeScriptedParticleEmitter(ISerializer& serializer, ComponentHandle cmp)
+	{
+		ScriptedParticleEmitter* emitter = m_scripted_particle_emitters[{cmp.index}];
+		const Material* material = emitter->getMaterial();
+		serializer.write("material", material ? material->getPath().c_str() : "");
+	}
+
+
+	void deserializeScriptedParticleEmitter(IDeserializer& serializer, Entity entity, int scene_version)
+	{
+		ScriptedParticleEmitter* emitter = LUMIX_NEW(m_allocator, ScriptedParticleEmitter)(entity, m_allocator);
+		emitter->m_entity = entity;
+
+		char tmp[MAX_PATH_LENGTH];
+		serializer.read(tmp, lengthOf(tmp));
+		ResourceManagerBase* material_manager = m_engine.getResourceManager().get(MATERIAL_TYPE);
+		Material* material = (Material*)material_manager->load(Path(tmp));
+		emitter->setMaterial(material);
+
+		m_scripted_particle_emitters.insert(entity, emitter);
+		m_universe.addComponent(entity, SCRIPTED_PARTICLE_EMITTER_TYPE, this, {entity.index});
 	}
 
 
@@ -1511,6 +1552,17 @@ public:
 				m_particle_emitters.insert(emitter->m_entity, emitter);
 			}
 		}
+
+		serializer.read(count);
+		m_scripted_particle_emitters.reserve(count);
+		for (int i = 0; i < count; ++i)
+		{
+			ScriptedParticleEmitter* emitter = LUMIX_NEW(m_allocator, ScriptedParticleEmitter)(INVALID_ENTITY, m_allocator);
+			emitter->deserialize(serializer, m_engine.getResourceManager());
+			m_scripted_particle_emitters.insert(emitter->m_entity, emitter);
+			ComponentHandle cmp = {emitter->m_entity.index};
+			m_universe.addComponent(emitter->m_entity, SCRIPTED_PARTICLE_EMITTER_TYPE, this, cmp);
+		}
 	}
 
 
@@ -1520,6 +1572,12 @@ public:
 		for (auto* emitter : m_particle_emitters)
 		{
 			serializer.write(emitter->m_is_valid);
+			emitter->serialize(serializer);
+		}
+
+		serializer.write(m_scripted_particle_emitters.size());
+		for (auto* emitter : m_scripted_particle_emitters)
+		{
 			emitter->serialize(serializer);
 		}
 	}
@@ -1772,6 +1830,15 @@ public:
 		emitter->m_is_valid = false;
 		m_universe.destroyComponent(emitter->m_entity, PARTICLE_EMITTER_TYPE, this, component);
 		cleanup(emitter);
+	}
+
+
+	void destroyScriptedParticleEmitter(ComponentHandle component)
+	{
+		auto* emitter = m_scripted_particle_emitters[{component.index}];
+		m_universe.destroyComponent(emitter->m_entity, SCRIPTED_PARTICLE_EMITTER_TYPE, this, component);
+		m_scripted_particle_emitters.erase(emitter->m_entity);
+		LUMIX_DELETE(m_allocator, emitter);
 	}
 
 
@@ -2342,7 +2409,15 @@ public:
 		auto module = LUMIX_NEW(m_allocator, ParticleEmitter::SizeModule)(*emitter);
 		emitter->addModule(module);
 		m_universe.addComponent(entity, PARTICLE_EMITTER_SIZE_TYPE, this, { entity.index });
-		return{ entity.index };
+		return { entity.index };
+	}
+
+
+	ComponentHandle createScriptedParticleEmitter(Entity entity)
+	{
+		m_scripted_particle_emitters.insert(entity, LUMIX_NEW(m_allocator, ScriptedParticleEmitter)(entity, m_allocator));
+		m_universe.addComponent(entity, SCRIPTED_PARTICLE_EMITTER_TYPE, this, { entity.index });
+		return { entity.index };
 	}
 
 
@@ -2353,7 +2428,7 @@ public:
 
 		m_universe.addComponent(entity, PARTICLE_EMITTER_TYPE, this, {entity.index});
 
-		return {entity.index};
+		return { entity.index };
 	}
 
 
@@ -4826,6 +4901,25 @@ public:
 	}
 
 
+	void setScriptedParticleEmitterMaterialPath(ComponentHandle cmp, const Path& path) override
+	{
+		if (!m_scripted_particle_emitters[{cmp.index}]) return;
+
+		auto* manager = m_engine.getResourceManager().get(MATERIAL_TYPE);
+		Material* material = static_cast<Material*>(manager->load(path));
+		m_scripted_particle_emitters[{cmp.index}]->setMaterial(material);
+	}
+
+
+	Path getScriptedParticleEmitterMaterialPath(ComponentHandle cmp) override
+	{
+		ScriptedParticleEmitter* emitter = m_scripted_particle_emitters[{cmp.index}];
+		if (!emitter) return Path("");
+		if (!emitter->getMaterial()) return Path("");
+
+		return emitter->getMaterial()->getPath();
+	}
+
 	void setParticleEmitterMaterialPath(ComponentHandle cmp, const Path& path) override
 	{
 		if (!m_particle_emitters[{cmp.index}]) return;
@@ -4851,6 +4945,11 @@ public:
 		return m_particle_emitters;
 	}
 
+	const AssociativeArray<Entity, ScriptedParticleEmitter*>& getScriptedParticleEmitters() const override
+	{
+		return m_scripted_particle_emitters;
+	}
+
 private:
 	IAllocator& m_allocator;
 	Universe& m_universe;
@@ -4872,6 +4971,7 @@ private:
 	AssociativeArray<Entity, EnvironmentProbe> m_environment_probes;
 	HashMap<Entity, Terrain*> m_terrains;
 	AssociativeArray<Entity, ParticleEmitter*> m_particle_emitters;
+	AssociativeArray<Entity, ScriptedParticleEmitter*> m_scripted_particle_emitters;
 
 	Array<DebugTriangle> m_debug_triangles;
 	Array<DebugLine> m_debug_lines;
@@ -4916,6 +5016,7 @@ static struct
 	COMPONENT_TYPE(BONE_ATTACHMENT_TYPE, BoneAttachment),
 	COMPONENT_TYPE(ENVIRONMENT_PROBE_TYPE, EnvironmentProbe),
 	COMPONENT_TYPE(PARTICLE_EMITTER_TYPE, ParticleEmitter),
+	COMPONENT_TYPE(SCRIPTED_PARTICLE_EMITTER_TYPE, ScriptedParticleEmitter),
 	COMPONENT_TYPE(PARTICLE_EMITTER_ALPHA_TYPE, ParticleEmitterAlpha),
 	COMPONENT_TYPE(PARTICLE_EMITTER_ATTRACTOR_TYPE, ParticleEmitterAttractor),
 	COMPONENT_TYPE(PARTICLE_EMITTER_FORCE_HASH, ParticleEmitterForce),
@@ -4954,6 +5055,7 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	, m_is_grass_enabled(true)
 	, m_is_game_running(false)
 	, m_particle_emitters(m_allocator)
+	, m_scripted_particle_emitters(m_allocator)
 	, m_point_lights_map(m_allocator)
 	, m_bone_attachments(m_allocator)
 	, m_environment_probes(m_allocator)

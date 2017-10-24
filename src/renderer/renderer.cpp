@@ -192,6 +192,10 @@ static void registerProperties(IAllocator& allocator)
 		component("particle_emitter_size",
 			sampled_func_property("Size", &RenderScene::getParticleEmitterSize, &RenderScene::setParticleEmitterSize, &RenderScene::getParticleEmitterSizeCount, 1)
 		),
+		component("scripted_particle_emitter",
+			property("Material", &RenderScene::getScriptedParticleEmitterMaterialPath, &RenderScene::setScriptedParticleEmitterMaterialPath,
+				ResourceAttribute("Material (*.mat)", MATERIAL_TYPE))
+		),
 		component("particle_emitter",
 			property("Life", &RenderScene::getParticleEmitterInitialLife, &RenderScene::setParticleEmitterInitialLife),
 			property("Initial size", &RenderScene::getParticleEmitterInitialSize, &RenderScene::setParticleEmitterInitialSize),
