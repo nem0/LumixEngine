@@ -719,6 +719,44 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
+	void renderParticlesFromEmitter(const ScriptedParticleEmitter& emitter)
+	{
+		if (!m_current_view) return;
+
+		static const int PARTICLE_BATCH_SIZE = 256;
+
+		if (!emitter.getMaterial()) return;
+		if (!emitter.getMaterial()->isReady()) return;
+
+		Material* material = emitter.getMaterial();
+		static const int local_space_define_idx = m_renderer.getShaderDefineIdx("LOCAL_SPACE");
+		material->setDefine(local_space_define_idx, true);
+		bgfx::InstanceDataBuffer instance_buffer = emitter.generateInstanceBuffer();
+		if (!instance_buffer.data) return;
+		static const int subimage_define_idx = m_renderer.getShaderDefineIdx("SUBIMAGE");
+		material->setDefine(subimage_define_idx, false);
+		auto& view = *m_current_view;
+		Matrix mtx = m_scene->getUniverse().getMatrix(emitter.m_entity);
+		auto draw = [this, material, &view, mtx](const bgfx::InstanceDataBuffer& instance_buffer, int count) {
+			executeCommandBuffer(material->getCommandBuffer(), material);
+			executeCommandBuffer(view.command_buffer.buffer, material);
+
+			bgfx::setInstanceDataBuffer(&instance_buffer, count);
+			bgfx::setVertexBuffer(0, m_particle_vertex_buffer);
+			bgfx::setIndexBuffer(m_particle_index_buffer);
+			bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
+			bgfx::setState(view.render_state | material->getRenderStates());
+			++m_stats.draw_call_count;
+			m_stats.instance_count += count;
+			m_stats.triangle_count += count * 2;
+			bgfx::setUniform(m_emitter_matrix_uniform, &mtx);
+			bgfx::submit(view.bgfx_id, material->getShaderInstance().getProgramHandle(view.pass_idx));
+		};
+
+		draw(instance_buffer, instance_buffer.num);
+	}
+
+
 	void renderParticles()
 	{
 		PROFILE_FUNCTION();
@@ -729,6 +767,14 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			if (!emitter->m_is_valid) continue;
 
 			renderParticlesFromEmitter(*emitter);
+		}
+
+		const auto& scripted_emitters = m_scene->getScriptedParticleEmitters();
+		for (int i = 0, c = scripted_emitters.size(); i < c; ++i)
+		{
+			auto* scripted_emitter = scripted_emitters.at(i);
+
+			renderParticlesFromEmitter(*scripted_emitter);
 		}
 	}
 
