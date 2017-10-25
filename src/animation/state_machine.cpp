@@ -369,8 +369,15 @@ ComponentInstance* LayersNodeInstance::update(RunningContext& rc, bool check_edg
 
 void LayersNodeInstance::enter(RunningContext& rc, ComponentInstance* from)
 {
-	for (int i = 0; i < layers_count; ++i)
+	queueEnterEvents(rc);
+	if (node.children.size() > lengthOf(layers))
 	{
+		g_log_error.log("Animation") << "Too many layers in LayerNode, only " << lengthOf(layers) << " are used.";
+	}
+	for (int i = 0; i < node.children.size() && i < lengthOf(layers); ++i)
+	{
+		++layers_count;
+		layers[i] = (NodeInstance*)node.children[i]->createInstance(*rc.allocator);
 		layers[i]->enter(rc, nullptr);
 	}
 }

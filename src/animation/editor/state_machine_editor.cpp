@@ -686,7 +686,10 @@ LayersNode::LayersNode(Anim::Component* engine_cmp, Container* parent, Controlle
 	: Container(engine_cmp, parent, controller)
 {}
 
-void LayersNode::compile() {}
+void LayersNode::compile()
+{
+	Container::compile();
+}
 
 
 void LayersNode::onGUI()
@@ -724,8 +727,18 @@ void LayersNode::onGUI()
 }
 
 
-void LayersNode::serialize(OutputBlob& blob) {}
-void LayersNode::deserialize(InputBlob& blob) {}
+void LayersNode::serialize(OutputBlob& blob)
+{
+	Container::serialize(blob);
+}
+
+
+void LayersNode::deserialize(InputBlob& blob)
+{
+	Container::deserialize(blob);
+}
+
+
 void LayersNode::drawInside(ImDrawList* draw, const ImVec2& canvas_screen_pos) {}
 
 
