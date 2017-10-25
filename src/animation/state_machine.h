@@ -31,6 +31,7 @@ struct Component;
 struct Container;
 struct ComponentInstance;
 struct Edge;
+struct LayersNode;
 struct StateMachine;
 
 
@@ -58,7 +59,8 @@ struct Component
 		SIMPLE_ANIMATION,
 		EDGE,
 		STATE_MACHINE,
-		BLEND1D
+		BLEND1D,
+		LAYERS
 	};
 
 	Component(Type _type) : type(_type), uid(-1) {}
@@ -186,6 +188,33 @@ struct Blend1DNode : public Container
 
 	Array<Item> items;
 	int input_offset = 0;
+};
+
+
+struct LayersNodeInstance : public NodeInstance
+{
+	LayersNodeInstance(LayersNode& _node);
+
+	RigidTransform getRootMotion() const override;
+	float getTime() const override;
+	float getLength() const override;
+	void fillPose(Engine& engine, Pose& pose, Model& model, float weight) override;
+	ComponentInstance* update(RunningContext& rc, bool check_edges) override;
+	void enter(RunningContext& rc, ComponentInstance* from) override;
+	void onAnimationSetUpdated(AnimSet& anim_set) override;
+
+	NodeInstance* layers[16];
+	int layers_count = 0;
+	LayersNode& node;
+};
+
+
+struct LayersNode : public Container
+{
+	LayersNode(IAllocator& allocator);
+	ComponentInstance* createInstance(IAllocator& allocator) override;
+	void serialize(OutputBlob& blob) override;
+	void deserialize(InputBlob& blob, Container* parent, int version) override;
 };
 
 

@@ -111,6 +111,7 @@ static Component* createComponent(Anim::Component* engine_cmp, Container* parent
 	{
 	case Anim::Component::EDGE: return LUMIX_NEW(allocator, Edge)((Anim::Edge*)engine_cmp, parent, controller);
 	case Anim::Component::BLEND1D: return LUMIX_NEW(allocator, Blend1DNode)((Anim::Blend1DNode*)engine_cmp, parent, controller);
+	case Anim::Component::LAYERS: return LUMIX_NEW(allocator, LayersNode)((Anim::LayersNode*)engine_cmp, parent, controller);
 	case Anim::Component::SIMPLE_ANIMATION:
 		return LUMIX_NEW(allocator, AnimationNode)(engine_cmp, parent, controller);
 	case Anim::Component::STATE_MACHINE: return LUMIX_NEW(allocator, StateMachine)(engine_cmp, parent, controller);
@@ -219,9 +220,9 @@ static const char* getEventTypeName(u32 type, AnimEditor::IAnimationEditor& edit
 }
 
 
-void Node::destroy(IAnimationEditor& editor)
+void Node::destroy()
 {
-	editor.destroyNode(m_controller, this);
+	m_controller.getEditor().destroyNode(m_controller, this);
 }
 
 
@@ -500,9 +501,9 @@ void Edge::compile()
 }
 
 
-void Edge::destroy(IAnimationEditor& editor)
+void Edge::destroy()
 {
-	editor.destroyEdge(m_controller, this);
+	m_controller.getEditor().destroyEdge(m_controller, this);
 }
 
 
@@ -679,6 +680,69 @@ private:
 	Blend1DNode* m_parent;
 	Node* m_to;
 };
+
+
+LayersNode::LayersNode(Anim::Component* engine_cmp, Container* parent, ControllerResource& controller) 
+	: Container(engine_cmp, parent, controller)
+{}
+
+void LayersNode::compile() {}
+
+
+void LayersNode::onGUI()
+{
+	Container::onGUI();
+	auto* engine_layer = (Anim::LayersNode*)engine_cmp;
+	if (ImGui::Button("Add layer"))
+	{
+		createNode(Anim::Component::STATE_MACHINE, m_controller.createUID(), ImVec2(0, 0));
+	}
+
+	if(ImGui::BeginChild("layers"))
+	{
+		ImGui::Columns(3);
+		for (Component* layer : m_editor_cmps)
+		{
+			Node* node = ((Node*)layer);
+			ImGui::PushID(layer);
+			ImGui::InputText("", node->name.data, sizeof(node->name.data));
+			ImGui::NextColumn();
+			if (ImGui::Button("View"))
+			{
+				m_controller.getEditor().setContainer((Container*)layer);
+			}
+			ImGui::NextColumn();
+			if (ImGui::Button("Delete"))
+			{
+				layer->destroy();
+			}
+			ImGui::NextColumn();
+			ImGui::PopID();
+		}
+	}
+	ImGui::EndChild();
+}
+
+
+void LayersNode::serialize(OutputBlob& blob) {}
+void LayersNode::deserialize(InputBlob& blob) {}
+void LayersNode::drawInside(ImDrawList* draw, const ImVec2& canvas_screen_pos) {}
+
+
+void LayersNode::dropSlot(const char* name, u32 slot, const ImVec2& canvas_screen_pos) {}
+
+
+void LayersNode::createNode(Anim::Component::Type type, int uid, const ImVec2& pos)
+{
+	auto* cmp = (Node*)createComponent(Anim::createComponent(type, m_allocator), this, m_controller);
+	cmp->pos = pos;
+	cmp->size.x = 100;
+	cmp->size.y = 30;
+	cmp->engine_cmp->uid = uid;
+	m_editor_cmps.push(cmp);
+	((Anim::LayersNode*)engine_cmp)->children.push(cmp->engine_cmp);
+	m_selected_component = cmp;
+}
 
 
 Blend1DNode::Blend1DNode(Anim::Component* engine_cmp, Container* parent, ControllerResource& controller)
@@ -922,13 +986,14 @@ void Blend1DNode::drawInside(ImDrawList* draw, const ImVec2& canvas_screen_pos)
 			if (ImGui::MenuItem("Simple")) editor.createNode(m_controller, this, Anim::Component::SIMPLE_ANIMATION, pos_on_canvas);
 			if (ImGui::MenuItem("State machine")) editor.createNode(m_controller, this, Anim::Component::STATE_MACHINE, pos_on_canvas);
 			if (ImGui::MenuItem("Blend 1D")) editor.createNode(m_controller, this, Anim::Component::BLEND1D, pos_on_canvas);
+			if (ImGui::MenuItem("Layers")) editor.createNode(m_controller, this, Anim::Component::LAYERS, pos_on_canvas);
 			ImGui::EndMenu();
 		}
 		if (m_context_cmp && m_context_cmp != m_root_node && m_context_cmp->isNode())
 		{
 			if (ImGui::MenuItem("Remove"))
 			{
-				m_context_cmp->destroy(editor);
+				m_context_cmp->destroy();
 				if (m_selected_component == m_context_cmp) m_selected_component = nullptr;
 				if (m_drag_source == m_context_cmp) m_drag_source = nullptr;
 				m_context_cmp = nullptr;
@@ -1510,13 +1575,14 @@ void StateMachine::drawInside(ImDrawList* draw, const ImVec2& canvas_screen_pos)
 			if (ImGui::MenuItem("Simple")) editor.createNode(m_controller, this, Anim::Component::SIMPLE_ANIMATION, pos_on_canvas);
 			if (ImGui::MenuItem("State machine")) editor.createNode(m_controller, this, Anim::Component::STATE_MACHINE, pos_on_canvas);
 			if (ImGui::MenuItem("Blend 1D")) editor.createNode(m_controller, this, Anim::Component::BLEND1D, pos_on_canvas);
+			if (ImGui::MenuItem("Layers")) editor.createNode(m_controller, this, Anim::Component::LAYERS, pos_on_canvas);
 			ImGui::EndMenu();
 		}
 		if (m_context_cmp && m_context_cmp != m_entry_node)
 		{
 			if (ImGui::MenuItem("Remove"))
 			{
-				m_context_cmp->destroy(editor);
+				m_context_cmp->destroy();
 				if (m_selected_component == m_context_cmp) m_selected_component = nullptr;
 				if (m_drag_source == m_context_cmp) m_drag_source = nullptr;
 				m_context_cmp = nullptr;

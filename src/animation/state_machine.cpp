@@ -320,6 +320,95 @@ void Blend1DNodeInstance::enter(RunningContext& rc, ComponentInstance* from)
 }
 
 
+LayersNodeInstance::LayersNodeInstance(LayersNode& _node)
+	: NodeInstance(_node)
+	, node(_node)
+{
+}
+
+
+RigidTransform LayersNodeInstance::getRootMotion() const
+{
+	if (layers_count == 0) return {{0, 0, 0}, {0, 0, 0, 1}};
+	return layers[0]->getRootMotion();
+}
+
+
+float LayersNodeInstance::getTime() const
+{
+	if (layers_count == 0) return 0;
+	return layers[0]->getTime();
+}
+
+
+float LayersNodeInstance::getLength() const
+{
+	if (layers_count == 0) return 0;
+	return layers[0]->getLength();
+}
+
+
+void LayersNodeInstance::fillPose(Engine& engine, Pose& pose, Model& model, float weight)
+{
+	for (int i = 0; i < layers_count; ++i)
+	{
+		layers[i]->fillPose(engine, pose, model, weight);
+	}
+}
+
+
+ComponentInstance* LayersNodeInstance::update(RunningContext& rc, bool check_edges)
+{
+	for (int i = 0; i < layers_count; ++i)
+	{
+		layers[i]->update(rc, false);
+	}
+	return check_edges ? checkOutEdges(node, rc) : this;
+}
+
+
+void LayersNodeInstance::enter(RunningContext& rc, ComponentInstance* from)
+{
+	for (int i = 0; i < layers_count; ++i)
+	{
+		layers[i]->enter(rc, nullptr);
+	}
+}
+
+
+void LayersNodeInstance::onAnimationSetUpdated(AnimSet& anim_set)
+{
+	for (int i = 0; i < layers_count; ++i)
+	{
+		layers[i]->onAnimationSetUpdated(anim_set);
+	}
+}
+
+
+LayersNode::LayersNode(IAllocator& allocator)
+	: Container(Component::LAYERS, allocator)
+{
+}
+
+
+ComponentInstance* LayersNode::createInstance(IAllocator& allocator)
+{
+	return LUMIX_NEW(allocator, LayersNodeInstance)(*this);
+}
+
+
+void LayersNode::serialize(OutputBlob& blob)
+{
+	Container::serialize(blob);
+}
+
+
+void LayersNode::deserialize(InputBlob& blob, Container* parent, int version)
+{
+	Container::deserialize(blob, parent, version);
+}
+
+
 Blend1DNode::Blend1DNode(IAllocator& allocator)
 	: Container(Component::BLEND1D, allocator)
 	, items(allocator)
@@ -814,6 +903,7 @@ Component* createComponent(Component::Type type, IAllocator& allocator)
 		case Component::EDGE: return LUMIX_NEW(allocator, Edge)(allocator);
 		case Component::STATE_MACHINE: return LUMIX_NEW(allocator, StateMachine)(allocator);
 		case Component::SIMPLE_ANIMATION: return LUMIX_NEW(allocator, AnimationNode)(allocator);
+		case Component::LAYERS: return LUMIX_NEW(allocator, LayersNode)(allocator);
 		default: ASSERT(false); return nullptr;
 	}
 }

@@ -40,7 +40,7 @@ public:
 	}
 
 	virtual ~Component();
-	virtual void destroy(IAnimationEditor& editor) {};
+	virtual void destroy() {};
 	virtual bool draw(ImDrawList* draw, const ImVec2& canvas_screen_pos, bool selected) = 0;
 	virtual void onGUI() {}
 	virtual void serialize(OutputBlob& blob) = 0;
@@ -76,7 +76,7 @@ public:
 	~Node();
 
 	bool isNode() const override { return true; }
-	void destroy(IAnimationEditor& editor) override;
+	void destroy() override;
 	bool hitTest(const ImVec2& on_canvas_pos) const override;
 	void onGUI() override;
 	void serialize(OutputBlob& blob) override;
@@ -138,7 +138,7 @@ public:
 	~Edge();
 
 	bool isNode() const override { return false; }
-	void destroy(IAnimationEditor& editor) override;
+	void destroy() override;
 	void onGUI() override;
 	bool draw(ImDrawList* draw, const ImVec2& canvas_screen_pos, bool selected) override;
 	void serialize(OutputBlob& blob) override;
@@ -169,6 +169,23 @@ public:
 	void deserialize(InputBlob& blob) override;
 
 	int root_rotation_input = -1;
+};
+
+
+class LayersNode : public Container
+{
+public:
+	LayersNode(Anim::Component* engine_cmp, Container* parent, ControllerResource& controller);
+
+	void compile() override;
+	void onGUI() override;
+	void serialize(OutputBlob& blob) override;
+	void deserialize(InputBlob& blob) override;
+	void drawInside(ImDrawList* draw, const ImVec2& canvas_screen_pos) override;
+	void dropSlot(const char* name, u32 slot, const ImVec2& canvas_screen_pos) override;
+
+private:
+	void createNode(Anim::Component::Type type, int uid, const ImVec2& pos) override;
 };
 
 
