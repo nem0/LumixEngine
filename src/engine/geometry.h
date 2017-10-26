@@ -163,7 +163,7 @@ struct LUMIX_ENGINE_API AABB
 	}
 
 
-	bool overlaps(const AABB& aabb)
+	bool overlaps(const AABB& aabb) const
 	{
 		if (min.x > aabb.max.x) return false;
 		if (min.y > aabb.max.y) return false;
@@ -177,8 +177,8 @@ struct LUMIX_ENGINE_API AABB
 
 	void transform(const Matrix& matrix);
 	void getCorners(const Matrix& matrix, Vec3* points) const;
-	Vec3 minCoords(const Vec3& a, const Vec3& b);
-	Vec3 maxCoords(const Vec3& a, const Vec3& b);
+	static Vec3 minCoords(const Vec3& a, const Vec3& b);
+	static Vec3 maxCoords(const Vec3& a, const Vec3& b);
 
 
 	Vec3 min;
