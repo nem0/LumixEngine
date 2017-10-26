@@ -1028,21 +1028,23 @@ template <typename T> struct Property;
 template <typename C, typename T> 
 struct Property<T (C::*)()>
 {
-	using Member = T(C::*)();
+	using Getter = T(C::*)();
 
-	T& getValue(C& obj) const { return (obj.*member)(); }
+	T getValue(C& obj) const { return (obj.*getter)(); }
 
 	const char* name;
-	Member member;
+	Getter getter;
 };
 
 
 template <typename C, typename T>
 struct Property<T (C::*)>
 {
+	using Value = RemoveCVR<T>;
 	using Member = T(C::*);
 
-	T& getValue(C& obj) const { return (obj.*member); }
+	Value& getValue(C& obj) const { return (obj.*member); }
+	void setValue(C& obj, const T& value) { (obj.*member) = value; }
 
 	const char* name;
 	Member member;
@@ -1058,12 +1060,25 @@ auto klass(const char* name, Members... members)
 	return class_desc;
 }
 
-template <typename T>
-auto property(const char* name, T member)
+template <typename... T> auto property(const char* name, T... member);
+
+
+template <typename T, typename C> 
+auto property(const char* name, T (C::*member))
 {
-	Property<T> prop;
+	Property<T(C::*)> prop;
 	prop.name = name;
 	prop.member = member;
+	return prop;
+}
+
+
+template <typename R, typename C>
+auto property(const char* name, R& (C::*getter)())
+{
+	Property<R&(C::*)()> prop;
+	prop.name = name;
+	prop.getter = getter;
 	return prop;
 }
 
@@ -1120,16 +1135,15 @@ struct SetPropertyCommand : IEditorCommand
 
 	bool execute() override 
 	{
-		auto& x = pp.getValueFromRoot(controller);
-		old_value = x;
-		x = value;
+		old_value = pp.getValueFromRoot(controller);
+		pp.setValueFromRoot(controller, value);
 		return true;
 	}
 
 
-	void undo() override {
-		auto& x = pp.getValueFromRoot(controller);
-		x = old_value;
+	void undo() override 
+	{
+		pp.setValueFromRoot(controller, old_value);
 	}
 
 
@@ -1145,27 +1159,213 @@ struct SetPropertyCommand : IEditorCommand
 };
 
 
+struct Serializer
+{
+	static void serialize(OutputBlob& blob, string& obj)
+	{
+		blob.write(obj);
+	}
+
+
+	/*template <typename T>
+	static void serialize(OutputBlob& blob, Array<T>& array)
+	{
+		blob.write(array.size());
+		for (T& item : array)
+		{
+			auto l = [&blob, &item](const auto& member) {
+				decltype(auto) x = member.getValue(item);
+				serialize(blob, x);
+			};
+			apply(l, getMembers<T>().members);
+		}
+	}*/
+
+	static void serialize(OutputBlob& blob, Array<string>& array)
+	{
+		blob.write(array.size());
+		for (string& item : array)
+		{
+			blob.write(item);
+		}
+	}
+
+
+	template <typename T>
+	static void serialize(OutputBlob& blob, T& obj)
+	{
+		auto l = [&blob, &obj](const auto& member) {
+			decltype(auto) x = member.getValue(obj);
+			serialize(blob, x);
+		};
+		apply(l, getMembers<T>().members);
+	}
+};
+
+
+
+
+struct Deserializer
+{
+	template <typename O>
+	static void deserialize(O& owner, InputBlob& blob, string& obj)
+	{
+		blob.read(obj);
+	}
+
+/*
+	template <typename O, typename T>
+	static void deserialize(O& owner, InputBlob& blob, Array<T>& array)
+	{
+		int count = blob.read<int>();
+		for (int i = 0; i < count; ++i)
+		{
+			construct(owner, array);
+			deserialize(array, blob, array[i]);
+		}
+	}
+*/
+
+	template <typename O>
+	static void deserialize(O& owner, InputBlob& blob, Array<string>& array)
+	{
+		int count = blob.read<int>();
+		for (int i = 0; i < count; ++i)
+		{
+			construct(owner, array);
+			blob.read(array[i]);
+		}
+	}
+
+
+	template <typename O, typename T>
+	static void deserialize(O& owner, InputBlob& blob, T& obj)
+	{
+		auto l = [&blob, &obj](const auto& member) {
+			decltype(auto) x = member.getValue(obj);
+			deserialize(obj, blob, x);
+		};
+		apply(l, getMembers<T>().members);
+	}
+
+	template <typename T>
+	static void deserialize(InputBlob& blob, T& obj)
+	{
+		auto l = [&blob, &obj](const auto& member) {
+			decltype(auto) x = member.getValue(obj);
+			deserialize(obj, blob, x);
+		};
+		apply(l, getMembers<T>().members);
+	}
+
+};
+
+
+
+template <typename PP>
+struct RemoveArrayItemCommand : IEditorCommand
+{
+	RemoveArrayItemCommand(ControllerResource& _controller, PP _pp, int _index)
+		: controller(_controller)
+		, pp(_pp)
+		, index(_index)
+		, blob(_controller.getAllocator())
+	{}
+
+
+	bool execute() override
+	{
+		auto& owner = ((PP::Base&)pp).getValueFromRoot(controller);
+		auto& array = pp.getValueFromRoot(controller);
+		::Lumix::AnimEditor::Serializer::serialize(blob, array[index]);
+		array.erase(index);
+		return true;
+	}
+
+
+	void undo() override
+	{
+		auto& owner = ((PP::Base&)pp).getValueFromRoot(controller);
+		auto& array = pp.getValueFromRoot(controller);
+		construct(owner, array);
+		::Lumix::AnimEditor::Deserializer::deserialize(InputBlob(blob), array[index]);
+	}
+
+
+	void serialize(JsonSerializer& serializer) override { ASSERT(false); }
+	void deserialize(JsonSerializer& serializer) override { ASSERT(false); }
+	const char* getType() override { return "remove_array_item_anim_editor_property"; }
+	bool merge(IEditorCommand& command) override { return false; }
+
+	OutputBlob blob;
+	PP pp;
+	int index;
+	ControllerResource& controller;
+};
+
+
+template <typename PP>
+struct AddArrayItemCommand : IEditorCommand
+{
+	AddArrayItemCommand(ControllerResource& _controller, PP _pp)
+		: controller(_controller)
+		, pp(_pp)
+	{}
+
+
+	bool execute() override
+	{
+		auto& owner = ((PP::Base&)pp).getValueFromRoot(controller);
+		auto& array = pp.getValueFromRoot(controller);
+		construct(owner, array);
+		return true;
+	}
+
+
+	void undo() override
+	{
+		auto& array = pp.getValueFromRoot(controller);
+		array.pop();
+	}
+
+
+	void serialize(JsonSerializer& serializer) override { ASSERT(false); }
+	void deserialize(JsonSerializer& serializer) override { ASSERT(false); }
+	const char* getType() override { return "add_array_item_anim_editor_property"; }
+	bool merge(IEditorCommand& command) override { return false; }
+
+	PP pp;
+	ControllerResource& controller;
+};
+
 
 struct PropertyPathBegin 
 {
 	template <typename T>
-	auto& getValueFromRoot(T& root) const { return root; }
-
+	decltype(auto) getValueFromRoot(T& root) const { return root; }
 };
 
 template <typename Prev, typename Member>
 struct PropertyPath : Prev
 {
+	using Base = Prev;
+
 	PropertyPath(Prev& prev, Member _head) : Prev(prev), head(_head), name(_head.name) {}
 
 	template <typename T>
-	auto& getValue(T& obj) const { return head.getValue(obj); }
+	decltype(auto) getValue(T& obj) const { return head.getValue(obj); }
 
 	template <typename T>
-	auto& getValueFromRoot(T& root) const
+	decltype(auto) getValueFromRoot(T& root) const
+	{
+		return head.getValue(Prev::getValueFromRoot(root));
+	}
+
+	template <typename T, typename O>
+	void setValueFromRoot(T& root, const O& value)
 	{
 		auto& x = Prev::getValueFromRoot(root);
-		return head.getValue(x);
+		head.setValue(x, value);
 	}
 
 	Member head;
@@ -1173,25 +1373,31 @@ struct PropertyPath : Prev
 };
 
 
-template <typename Prev, typename Member>
+template <typename Prev>
 struct PropertyPathArray : Prev
 {
-	PropertyPathArray(Prev& prev, Member _head, int _index) 
-		: Prev(prev), head(_head), name(_head.name), index(_index) {}
+	using Base = Prev;
+
+	PropertyPathArray(Prev& prev, int _index) 
+		: Prev(prev), index(_index) {}
 
 	template <typename T>
-	auto& getValue(T& obj) const { return head.getValue(obj); }
+	auto& getValue(T& obj) const { return obj[index]; }
 
 	template <typename T>
 	auto& getValueFromRoot(T& root) const
 	{
-		auto& x = Prev::getValueFromRoot(root)[index];
-		return head.getValue(x);
+		return Prev::getValueFromRoot(root)[index];
 	}
 
-	Member head;
+
+	template <typename T, typename O>
+	void setValueFromRoot(T& root, const O& value)
+	{
+		Prev::getValueFromRoot(root)[index] = value;
+	}
+
 	int index;
-	const char* name;
 };
 
 
@@ -1202,10 +1408,10 @@ auto makePP(Prev& prev, Member head)
 }
 
 
-template <typename Prev, typename Member>
-auto makePP(Prev& prev, Member head, int index)
+template <typename Prev>
+auto makePP(Prev& prev, int index)
 {
-	return PropertyPathArray<Prev, RemoveReference<Member>::Type>(prev, head, index);
+	return PropertyPathArray<Prev>(prev, index);
 }
 
 
@@ -1255,14 +1461,18 @@ struct UIBuilder
 	template <typename O, typename M>
 	void ui(O& owner, const M& member, Array<string>& array)
 	{
+		IAllocator& allocator = m_editor.getApp().getWorldEditor().getAllocator();
 		bool expanded = ImGui::TreeNodeEx(member.name, ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_AllowOverlapMode);
 		ImGui::SameLine();
 		if (ImGui::Button(StaticString<32>("Add")))
 		{
-			construct(owner, array);
+			using PP = RemoveReference<M>::Type;
+			auto* command = LUMIX_NEW(allocator, AddArrayItemCommand<PP>)(m_editor.getController(), member);
+			m_editor.executeCommand(*command);
 		}
 		if (!expanded) return;
 
+		int i = 0;
 		for (string& item : array)
 		{
 			ImGui::PushID(&item);
@@ -1270,9 +1480,14 @@ struct UIBuilder
 			copyString(tmp, item.c_str());
 			if (ImGui::LabellessInputText("Value", tmp, sizeof(tmp)))
 			{
-				item = tmp;
+				string tmp_str(tmp, allocator);
+				auto array_item_pp = makePP(member, i);
+				using PP = decltype(array_item_pp);
+				auto* command = LUMIX_NEW(allocator, SetPropertyCommand<string, PP>)(m_editor.getController(), array_item_pp, tmp_str);
+				m_editor.executeCommand(*command);
 			}
 			ImGui::PopID();
+			++i;
 		}
 		ImGui::TreePop();
 	}
@@ -1281,11 +1496,14 @@ struct UIBuilder
 	template <typename O, typename M, typename T>
 	void ui(O& owner, const M& member, Array<T>& array)
 	{
+		IAllocator& allocator = m_editor.getApp().getWorldEditor().getAllocator();
 		bool expanded = ImGui::TreeNodeEx(member.name, ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_AllowOverlapMode);
 		ImGui::SameLine();
 		if (ImGui::Button(StaticString<32>("Add ", getMembers<T>().name)))
 		{
-			construct(owner, array);
+			using PP = RemoveReference<M>::Type;
+			auto* command = LUMIX_NEW(allocator, AddArrayItemCommand<PP>)(m_editor.getController(), member);
+			m_editor.executeCommand(*command);
 		}
 		if (!expanded) return;
 
@@ -1299,17 +1517,14 @@ struct UIBuilder
 			ImGui::SameLine();
 			if (ImGui::SmallButton("Remove"))
 			{
-				array.erase(i - 1);
+				auto* command = LUMIX_NEW(allocator, RemoveArrayItemCommand<M>)(m_editor.getController(), member, i - 1);
+				m_editor.executeCommand(*command);
 				if (expanded) ImGui::TreePop();
 				break;
 			}
 			if(expanded)
 			{
-				apply([i, &member, this, &item](const auto& m) {
-					auto& v = m.getValue(item);
-					auto pp = makePP(member, m, i - 1);
-					ui(item, pp, v);
-				}, members);
+				ui(array, makePP(member, i-1), item);
 				ImGui::TreePop();
 			}
 		}
@@ -1324,46 +1539,6 @@ void AnimationEditor::masksGUI()
 {
 	UIBuilder ui_builder(*this);
 	ui_builder.build(*m_resource);
-
-/*
-	if (!ImGui::CollapsingHeader("Masks")) return;
-	IAllocator& allocator = m_app.getWorldEditor().getAllocator();
-	if (ImGui::Button("Add")) addMask(*m_resource);
-	auto& masks = m_resource->getMasks();
-	ImGui::Indent();
-	for (int i = 0; i < masks.size(); ++i)
-	{
-		ControllerResource::Mask& mask = masks[i];
-		StaticString<32> header_label("Mask ", mask.name.c_str(), "###", i);
-		if (!ImGui::TreeNodeEx(header_label, ImGuiTreeNodeFlags_Framed)) continue;
-
-		char tmp[32];
-		copyString(tmp, mask.name.c_str());
-		if (ImGui::InputText("Mask name", tmp, sizeof(tmp)))
-		{
-			setMaskName(*m_resource, i, tmp);
-		}
-
-		if (ImGui::Button("Add bone")) addBone(*m_resource, i);
-
-		ImGui::Indent();
-		for (int i = 0; i < mask.bones.size(); ++i)
-		{
-			ImGui::PushID(i);
-			char bone[32] = "";
-			copyString(bone, mask.bones[i].c_str());
-			if (ImGui::LabellessInputText("Bone name", bone, sizeof(bone)))
-			{
-				mask.bones[i] = bone;
-			}
-			ImGui::PopID();
-
-		}
-		ImGui::Unindent();
-		ImGui::TreePop();
-	}
-	ImGui::Unindent();*/
-
 }
 
 
