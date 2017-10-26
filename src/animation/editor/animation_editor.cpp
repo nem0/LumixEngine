@@ -404,6 +404,7 @@ public:
 	void destroyNode(ControllerResource& ctrl, Node* node) override;
 	void destroyEdge(ControllerResource& ctrl, Edge* edge) override;
 	bool hasFocus() override { return m_is_focused; }
+	ControllerResource& getController() { return *m_resource; }
 
 private:
 	void checkShortcuts();
@@ -419,6 +420,7 @@ private:
 	void editorGUI();
 	void inputsGUI();
 	void constantsGUI();
+	void masksGUI();
 	void animationSlotsGUI();
 	void menuGUI();
 	void onSetInputGUI(u8* data, Component& component);
@@ -1001,10 +1003,367 @@ void AnimationEditor::inputsGUI()
 			}
 		}
 
+		masksGUI();
 		constantsGUI();
 		animationSlotsGUI();
 	}
 	ImGui::EndDock();
+}
+
+
+template <typename T> auto getMembers();
+
+
+template <typename T, typename... Members>
+struct ClassDesc
+{
+	const char* name;
+	Tuple<Members...> members;
+};
+
+
+template <typename T> struct Property;
+
+
+template <typename C, typename T> 
+struct Property<T (C::*)()>
+{
+	using Member = T(C::*)();
+
+	T& getValue(C& obj) const { return (obj.*member)(); }
+
+	const char* name;
+	Member member;
+};
+
+
+template <typename C, typename T>
+struct Property<T (C::*)>
+{
+	using Member = T(C::*);
+
+	T& getValue(C& obj) const { return (obj.*member); }
+
+	const char* name;
+	Member member;
+};
+
+
+template <typename T, typename... Members>
+auto klass(const char* name, Members... members)
+{
+	ClassDesc<T, Members...> class_desc;
+	class_desc.name = name;
+	class_desc.members = makeTuple(members...);
+	return class_desc;
+}
+
+template <typename T>
+auto property(const char* name, T member)
+{
+	Property<T> prop;
+	prop.name = name;
+	prop.member = member;
+	return prop;
+}
+
+
+template <>
+auto getMembers<ControllerResource>()
+{
+	return klass<ControllerResource>("controller",
+		property("Masks", &ControllerResource::getMasks)
+	);
+}
+
+
+template <>
+auto getMembers<ControllerResource::Mask>()
+{
+	return klass<ControllerResource>("Mask",
+		property("Name", &ControllerResource::Mask::name),
+		property("Bones", &ControllerResource::Mask::bones)
+	);
+}
+
+
+template <typename O, typename T>
+void construct(O& owner, Array<T>& array)
+{
+	array.emplace();
+}
+
+
+template <typename T>
+void construct(ControllerResource& owner, Array<T>& array)
+{
+	array.emplace(owner.getAllocator());
+}
+
+template <typename T>
+void construct(ControllerResource::Mask& owner, Array<T>& array)
+{
+	array.emplace("", owner.allocator);
+}
+
+
+template <typename T, typename PP>
+struct SetPropertyCommand : IEditorCommand
+{
+	SetPropertyCommand(ControllerResource& _controller, PP _pp, T _value) 
+		: controller(_controller)
+		, pp(_pp) 
+		, value(_value)
+		, old_value(_value)
+	{}
+
+
+	bool execute() override 
+	{
+		auto& x = pp.getValueFromRoot(controller);
+		old_value = x;
+		x = value;
+		return true;
+	}
+
+
+	void undo() override {
+		auto& x = pp.getValueFromRoot(controller);
+		x = old_value;
+	}
+
+
+	void serialize(JsonSerializer& serializer) override { ASSERT(false); }
+	void deserialize(JsonSerializer& serializer) override { ASSERT(false); }
+	const char* getType() override { return "set_anim_editor_property"; }
+	bool merge(IEditorCommand& command) override { return false; }
+
+	T value;
+	T old_value;
+	PP pp;
+	ControllerResource& controller;
+};
+
+
+
+struct PropertyPathBegin 
+{
+	template <typename T>
+	auto& getValueFromRoot(T& root) const { return root; }
+
+};
+
+template <typename Prev, typename Member>
+struct PropertyPath : Prev
+{
+	PropertyPath(Prev& prev, Member _head) : Prev(prev), head(_head), name(_head.name) {}
+
+	template <typename T>
+	auto& getValue(T& obj) const { return head.getValue(obj); }
+
+	template <typename T>
+	auto& getValueFromRoot(T& root) const
+	{
+		auto& x = Prev::getValueFromRoot(root);
+		return head.getValue(x);
+	}
+
+	Member head;
+	const char* name;
+};
+
+
+template <typename Prev, typename Member>
+struct PropertyPathArray : Prev
+{
+	PropertyPathArray(Prev& prev, Member _head, int _index) 
+		: Prev(prev), head(_head), name(_head.name), index(_index) {}
+
+	template <typename T>
+	auto& getValue(T& obj) const { return head.getValue(obj); }
+
+	template <typename T>
+	auto& getValueFromRoot(T& root) const
+	{
+		auto& x = Prev::getValueFromRoot(root)[index];
+		return head.getValue(x);
+	}
+
+	Member head;
+	int index;
+	const char* name;
+};
+
+
+template <typename Prev, typename Member>
+auto makePP(Prev& prev, Member head)
+{
+	return PropertyPath<Prev, RemoveReference<Member>::Type>(prev, head);
+}
+
+
+template <typename Prev, typename Member>
+auto makePP(Prev& prev, Member head, int index)
+{
+	return PropertyPathArray<Prev, RemoveReference<Member>::Type>(prev, head, index);
+}
+
+
+struct UIBuilder
+{
+	UIBuilder(AnimationEditor& editor) : m_editor(editor) {}
+
+
+	template <typename T>
+	void build(T& obj)
+	{
+		apply([this, &obj](const auto& member) {
+			auto pp = makePP(PropertyPathBegin{}, member);
+			auto& v = member.getValue(obj);
+			ui(obj, pp, v);
+		}, getMembers<T>().members);
+	}
+
+
+	template <typename O, typename M, typename T>
+	void ui(O& owner, const M& member, T& obj)
+	{
+		apply([&member, this, &obj](const auto& m) {
+			auto& v = m.getValue(obj);
+			auto pp = makePP(member, m);
+			ui(obj, pp, v);
+		}, getMembers<T>().members);
+	}
+
+
+	template <typename O, typename M>
+	void ui(O& owner, const M& member, string& obj)
+	{
+		char tmp[32];
+		copyString(tmp, obj.c_str());
+		if (ImGui::InputText(member.name, tmp, sizeof(tmp)))
+		{
+			IAllocator& allocator = m_editor.getApp().getWorldEditor().getAllocator();
+			string tmp_str(tmp, allocator);
+			using PP = RemoveReference<M>::Type;
+			auto* command = LUMIX_NEW(allocator, SetPropertyCommand<string, PP>)(m_editor.getController(), member, tmp_str);
+			m_editor.executeCommand(*command);
+		}
+	}
+
+
+	template <typename O, typename M>
+	void ui(O& owner, const M& member, Array<string>& array)
+	{
+		bool expanded = ImGui::TreeNodeEx(member.name, ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_AllowOverlapMode);
+		ImGui::SameLine();
+		if (ImGui::Button(StaticString<32>("Add")))
+		{
+			construct(owner, array);
+		}
+		if (!expanded) return;
+
+		for (string& item : array)
+		{
+			ImGui::PushID(&item);
+			char tmp[32];
+			copyString(tmp, item.c_str());
+			if (ImGui::LabellessInputText("Value", tmp, sizeof(tmp)))
+			{
+				item = tmp;
+			}
+			ImGui::PopID();
+		}
+		ImGui::TreePop();
+	}
+
+
+	template <typename O, typename M, typename T>
+	void ui(O& owner, const M& member, Array<T>& array)
+	{
+		bool expanded = ImGui::TreeNodeEx(member.name, ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_AllowOverlapMode);
+		ImGui::SameLine();
+		if (ImGui::Button(StaticString<32>("Add ", getMembers<T>().name)))
+		{
+			construct(owner, array);
+		}
+		if (!expanded) return;
+
+		auto members = getMembers<T>().members;
+		int i = 0;
+		for (T& item : array)
+		{
+			++i;
+			StaticString<32> label("", i);
+			bool expanded = ImGui::TreeNodeEx(label, ImGuiTreeNodeFlags_AllowOverlapMode);
+			ImGui::SameLine();
+			if (ImGui::SmallButton("Remove"))
+			{
+				array.erase(i - 1);
+				if (expanded) ImGui::TreePop();
+				break;
+			}
+			if(expanded)
+			{
+				apply([i, &member, this, &item](const auto& m) {
+					auto& v = m.getValue(item);
+					auto pp = makePP(member, m, i - 1);
+					ui(item, pp, v);
+				}, members);
+				ImGui::TreePop();
+			}
+		}
+		ImGui::TreePop();
+	}
+
+	AnimationEditor& m_editor;
+};
+
+
+void AnimationEditor::masksGUI()
+{
+	UIBuilder ui_builder(*this);
+	ui_builder.build(*m_resource);
+
+/*
+	if (!ImGui::CollapsingHeader("Masks")) return;
+	IAllocator& allocator = m_app.getWorldEditor().getAllocator();
+	if (ImGui::Button("Add")) addMask(*m_resource);
+	auto& masks = m_resource->getMasks();
+	ImGui::Indent();
+	for (int i = 0; i < masks.size(); ++i)
+	{
+		ControllerResource::Mask& mask = masks[i];
+		StaticString<32> header_label("Mask ", mask.name.c_str(), "###", i);
+		if (!ImGui::TreeNodeEx(header_label, ImGuiTreeNodeFlags_Framed)) continue;
+
+		char tmp[32];
+		copyString(tmp, mask.name.c_str());
+		if (ImGui::InputText("Mask name", tmp, sizeof(tmp)))
+		{
+			setMaskName(*m_resource, i, tmp);
+		}
+
+		if (ImGui::Button("Add bone")) addBone(*m_resource, i);
+
+		ImGui::Indent();
+		for (int i = 0; i < mask.bones.size(); ++i)
+		{
+			ImGui::PushID(i);
+			char bone[32] = "";
+			copyString(bone, mask.bones[i].c_str());
+			if (ImGui::LabellessInputText("Bone name", bone, sizeof(bone)))
+			{
+				mask.bones[i] = bone;
+			}
+			ImGui::PopID();
+
+		}
+		ImGui::Unindent();
+		ImGui::TreePop();
+	}
+	ImGui::Unindent();*/
+
 }
 
 

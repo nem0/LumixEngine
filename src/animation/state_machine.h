@@ -206,6 +206,7 @@ struct LayersNodeInstance : public NodeInstance
 	NodeInstance* layers[16];
 	int layers_count = 0;
 	LayersNode& node;
+	float time;
 };
 
 

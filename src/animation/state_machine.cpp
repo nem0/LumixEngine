@@ -359,16 +359,20 @@ void LayersNodeInstance::fillPose(Engine& engine, Pose& pose, Model& model, floa
 
 ComponentInstance* LayersNodeInstance::update(RunningContext& rc, bool check_edges)
 {
+	float old_time = time;
+	time += rc.time_delta;
 	for (int i = 0; i < layers_count; ++i)
 	{
 		layers[i]->update(rc, false);
 	}
+	queueEvents(rc, old_time, time, 0);
 	return check_edges ? checkOutEdges(node, rc) : this;
 }
 
 
 void LayersNodeInstance::enter(RunningContext& rc, ComponentInstance* from)
 {
+	time = 0;
 	queueEnterEvents(rc);
 	if (node.children.size() > lengthOf(layers))
 	{

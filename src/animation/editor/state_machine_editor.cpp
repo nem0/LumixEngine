@@ -1622,6 +1622,7 @@ ControllerResource::ControllerResource(IAnimationEditor& editor,
 	: m_animation_slots(allocator)
 	, m_allocator(allocator)
 	, m_editor(editor)
+	, m_masks(allocator)
 {
 	m_engine_resource = LUMIX_NEW(allocator, Anim::ControllerResource)(Path("editor"), manager, allocator);
 	auto* engine_root = LUMIX_NEW(allocator, Anim::StateMachine)(allocator);
@@ -1650,6 +1651,17 @@ void ControllerResource::serialize(OutputBlob& blob)
 	{
 		blob.writeString(slot.c_str());
 	}
+
+	blob.write(m_masks.size());
+	for (const Mask& mask : m_masks)
+	{
+		blob.write(mask.name);
+		blob.write(mask.bones.size());
+		for (const string& bone : mask.bones)
+		{
+			blob.write(bone);
+		}
+	}
 }
 
 
@@ -1662,7 +1674,8 @@ bool ControllerResource::deserialize(InputBlob& blob, Engine& engine, IAllocator
 	m_engine_resource =
 		LUMIX_NEW(allocator, Anim::ControllerResource)(Path("editor"), *manager, allocator);
 	m_engine_resource->create();
-	if (!m_engine_resource->deserialize(blob)) return false;
+	int version;
+	if (!m_engine_resource->deserialize(blob, version)) return false;
 
 	blob.read(m_last_uid);
 	m_root = createComponent(m_engine_resource->m_root, nullptr, *this);
@@ -1677,6 +1690,22 @@ bool ControllerResource::deserialize(InputBlob& blob, Engine& engine, IAllocator
 		char tmp[64];
 		blob.readString(tmp, lengthOf(tmp));
 		slot = tmp;
+	}
+
+	if (version > (int)Anim::ControllerResource::Version::MASKS)
+	{
+		count = blob.read<int>();
+		for (int i = 0; i < count; ++i)
+		{
+			Mask& mask = m_masks.emplace(m_allocator);
+			blob.read(mask.name);
+			int bone_count = blob.read<int>();
+			for (int j = 0; j < bone_count; ++j)
+			{
+				string& bone = mask.bones.emplace(m_allocator);
+				blob.read(bone);
+			}
+		}
 	}
 
 	return true;

@@ -155,6 +155,12 @@ namespace Lumix
 	}
 	
 
+	void OutputBlob::write(const string& string)
+	{
+		writeString(string.c_str());
+	}
+
+
 	void OutputBlob::write(const void* data, int size)
 	{
 		if (!size) return;
@@ -258,6 +264,16 @@ namespace Lumix
 		}
 		m_pos += size;
 		return true;
+	}
+
+
+	bool InputBlob::read(string& string)
+	{
+		i32 size;
+		read(size);
+		string.resize(size);
+		bool res = read(string.getData(), size);
+		return res;
 	}
 
 

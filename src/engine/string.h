@@ -155,6 +155,8 @@ public:
 	string(const char* rhs, IAllocator& allocator);
 	~string();
 
+	void resize(int size);
+	char* getData() { return m_cstr; }
 	char operator[](int index);
 	const char operator[](int index) const;
 	void set(const char* rhs, int size);

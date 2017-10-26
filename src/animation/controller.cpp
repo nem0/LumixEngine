@@ -32,6 +32,7 @@ ControllerResource::ControllerResource(const Path& path, ResourceManagerBase& re
 	, m_allocator(allocator)
 	, m_animation_set(allocator)
 	, m_sets_names(allocator)
+	, m_masks(allocator)
 {
 }
 
@@ -66,12 +67,14 @@ void ControllerResource::unload()
 bool ControllerResource::load(FS::IFile& file)
 {
 	InputBlob blob(file.getBuffer(), (int)file.size());
-	return deserialize(blob);
+	int version;
+	return deserialize(blob, version);
 }
 
 
-bool ControllerResource::deserialize(InputBlob& blob)
+bool ControllerResource::deserialize(InputBlob& blob, int& version)
 {
+	version = -1;
 	Header header;
 	blob.read(header);
 	if (header.magic != Header::FILE_MAGIC)
@@ -85,6 +88,7 @@ bool ControllerResource::deserialize(InputBlob& blob)
 		return false;
 	}
 
+	version = header.version;
 	Component::Type type;
 	blob.read(type);
 	m_root = createComponent(type, m_allocator);
@@ -145,7 +149,12 @@ bool ControllerResource::deserialize(InputBlob& blob)
 	{
 		m_sets_names.emplace("default");
 	}
-
+	if (header.version > (int)Version::MASKS)
+	{
+		int masks_count = blob.read<int>();
+		m_masks.resize(masks_count);
+		blob.read(&m_masks[0], sizeof(m_masks[0]) * masks_count);
+	}
 	return true;
 }
 
@@ -195,6 +204,8 @@ void ControllerResource::serialize(OutputBlob& blob)
 	{
 		blob.writeString(name);
 	}
+	blob.write(m_masks.size());
+	if (!m_masks.empty()) blob.write(&m_masks[0], sizeof(m_masks[0]) * m_masks.size());
 }
 
 

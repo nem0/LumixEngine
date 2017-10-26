@@ -287,6 +287,15 @@ private:
 class ControllerResource
 {
 public:
+	struct Mask
+	{
+		Mask(IAllocator& _allocator) : allocator(_allocator), name("", allocator), bones(allocator) {}
+		IAllocator& allocator;
+		string name;
+		Array<string> bones;
+	};
+
+public:
 	ControllerResource(IAnimationEditor& editor,
 		ResourceManagerBase& manager,
 		IAllocator& allocator);
@@ -296,6 +305,7 @@ public:
 	bool deserialize(InputBlob& blob, Engine& engine, IAllocator& allocator);
 	Component* getRoot() { return m_root; }
 	Array<string>& getAnimationSlots() { return m_animation_slots; }
+	Array<Mask>& getMasks() { return m_masks; }
 	IAllocator& getAllocator() { return m_allocator; }
 	Anim::ControllerResource* getEngineResource() { return m_engine_resource; }
 	IAnimationEditor& getEditor() { return m_editor; }
@@ -311,6 +321,7 @@ private:
 	Component* m_root;
 	Anim::ControllerResource* m_engine_resource;
 	Array<string> m_animation_slots;
+	Array<Mask> m_masks;
 };
 
 

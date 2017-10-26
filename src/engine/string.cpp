@@ -159,6 +159,17 @@ string string::substr(int start, int length) const
 }
 
 
+void string::resize(int size)
+{
+	ASSERT(size > 0);
+	if (size <= 0) return;
+	
+	m_cstr = (char*)m_allocator.reallocate(m_cstr, size);
+	m_size = size;
+	m_cstr[size - 1] = '\0';
+}
+
+
 string& string::cat(const char* value, int length)
 {
 	if (value < m_cstr || value >= m_cstr + m_size)
