@@ -152,8 +152,13 @@ bool ControllerResource::deserialize(InputBlob& blob, int& version)
 	if (header.version > (int)Version::MASKS)
 	{
 		int masks_count = blob.read<int>();
-		m_masks.resize(masks_count);
-		blob.read(&m_masks[0], sizeof(m_masks[0]) * masks_count);
+		for (int i = 0; i < masks_count; ++i)
+		{
+			Mask& mask = m_masks.emplace(m_allocator);
+			int bone_count = blob.read<int>();
+			mask.bones.resize(bone_count);
+			blob.read(&mask.bones[0], sizeof(mask.bones[0]) * mask.bones.size());
+		}
 	}
 	return true;
 }
@@ -205,7 +210,11 @@ void ControllerResource::serialize(OutputBlob& blob)
 		blob.writeString(name);
 	}
 	blob.write(m_masks.size());
-	if (!m_masks.empty()) blob.write(&m_masks[0], sizeof(m_masks[0]) * m_masks.size());
+	for (Mask& mask : m_masks)
+	{
+		blob.write(mask.bones.size());
+		if (!mask.bones.empty()) blob.write(&mask.bones[0], sizeof(mask.bones[0]) * mask.bones.size());
+	}
 }
 
 

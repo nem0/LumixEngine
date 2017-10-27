@@ -186,6 +186,8 @@ public:
 
 private:
 	void createNode(Anim::Component::Type type, int uid, const ImVec2& pos) override;
+
+	Array<u32> m_masks;
 };
 
 
@@ -289,10 +291,34 @@ class ControllerResource
 public:
 	struct Mask
 	{
-		Mask(IAllocator& _allocator) : allocator(_allocator), name("", allocator), bones(allocator) {}
-		IAllocator& allocator;
+		class Bone
+		{
+			public:
+				Bone(ControllerResource& _controller) 
+					: controller(_controller)
+					, name("", _controller.m_allocator) {}
+
+				void setName(const string& name);
+				const string& getName() const { return name; }
+				string& getName() { return name; }
+
+			private:
+				string name;
+				ControllerResource& controller;
+		};
+
+		Mask(ControllerResource& _controller) 
+			: controller(_controller)
+			, name("", controller.m_allocator)
+			, bones(controller.m_allocator)
+		{}
+
+		void addBone(int index);
+		void removeBone(int index);
+		
+		ControllerResource& controller;
 		string name;
-		Array<string> bones;
+		Array<Bone> bones;
 	};
 
 public:
@@ -306,6 +332,8 @@ public:
 	Component* getRoot() { return m_root; }
 	Array<string>& getAnimationSlots() { return m_animation_slots; }
 	Array<Mask>& getMasks() { return m_masks; }
+	void addMask(int index);
+	void removeMask(int index);
 	IAllocator& getAllocator() { return m_allocator; }
 	Anim::ControllerResource* getEngineResource() { return m_engine_resource; }
 	IAnimationEditor& getEditor() { return m_editor; }

@@ -16,6 +16,22 @@ template <class T> using RemoveCR = typename RemoveConst<typename RemoveReferenc
 template <class T> using RemoveCVR = typename RemoveVolatile<RemoveCR<T>>::Type;
 
 
+template <typename T> struct ResultOf;
+template <typename R, typename C, typename... Args> struct ResultOf<R(C::*)(Args...)> { using Type = R; };
+
+template <typename T> struct ClassOf;
+template <typename R, typename C, typename... Args>
+struct ClassOf<R(C::*)(Args...)>
+{
+	using Type = C;
+};
+template <typename R, typename C>
+struct ClassOf<R(C::*)>
+{
+	using Type = C;
+};
+
+
 template <int... T> struct Indices {};
 
 

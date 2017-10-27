@@ -69,9 +69,15 @@ public:
 		Animation* animation;
 	};
 
+	struct Mask
+	{
+		Mask(IAllocator& allocator) : bones(allocator) {}
+		Array<u32> bones;
+	};
+
 	Array<AnimSetEntry> m_animation_set;
 	Array<StaticString<32>> m_sets_names;
-	Array<u32> m_masks;
+	Array<Mask> m_masks;
 	InputDecl m_input_decl;
 	Component* m_root;
 

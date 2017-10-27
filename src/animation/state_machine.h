@@ -216,6 +216,8 @@ struct LayersNode : public Container
 	ComponentInstance* createInstance(IAllocator& allocator) override;
 	void serialize(OutputBlob& blob) override;
 	void deserialize(InputBlob& blob, Container* parent, int version) override;
+
+	int masks[16];
 };
 
 

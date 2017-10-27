@@ -684,11 +684,41 @@ private:
 
 LayersNode::LayersNode(Anim::Component* engine_cmp, Container* parent, ControllerResource& controller) 
 	: Container(engine_cmp, parent, controller)
+	, m_masks(controller.getAllocator())
 {}
 
 void LayersNode::compile()
 {
 	Container::compile();
+
+	auto* engine_layers = ((Anim::LayersNode*)engine_cmp);
+	auto& masks = m_controller.getMasks();
+	for (int i = 0; i < m_masks.size(); ++i)
+	{
+		u32 mask_name_hash = m_masks[i];
+		int mask_idx = masks.find([mask_name_hash](const ControllerResource::Mask& mask) {
+			return crc32(mask.name.c_str()) == mask_name_hash;
+		});
+
+		int offset = 0;
+		for (int j = 0; j < mask_idx; ++j)
+		{
+			offset += masks[j].bones.size() + 1;
+		}
+
+		engine_layers->masks[i] = offset;
+	}
+}
+
+
+static int getLayerMaskIndex(u32 mask_name_hash, ControllerResource& controller)
+{
+	auto& masks = controller.getMasks();
+	for (int i = 0, c = masks.size(); i < c; ++i)
+	{
+		if (crc32(masks[i].name.c_str()) == mask_name_hash) return i;
+	}
+	return -1;
 }
 
 
@@ -699,16 +729,28 @@ void LayersNode::onGUI()
 	if (ImGui::Button("Add layer"))
 	{
 		createNode(Anim::Component::STATE_MACHINE, m_controller.createUID(), ImVec2(0, 0));
+		m_masks.push(0);
 	}
 
 	if(ImGui::BeginChild("layers"))
 	{
-		ImGui::Columns(3);
-		for (Component* layer : m_editor_cmps)
+		ImGui::Columns(4);
+		for (int i = 0; i < m_editor_cmps.size(); ++i)
 		{
+			Component* layer = m_editor_cmps[i];
 			Node* node = ((Node*)layer);
 			ImGui::PushID(layer);
 			ImGui::InputText("", node->name.data, sizeof(node->name.data));
+			ImGui::NextColumn();
+			int mask = getLayerMaskIndex(m_masks[i], m_controller);
+			auto getter = [](void* data, int index, const char** out) {
+				*out = ((LayersNode*)data)->getController().getMasks()[index].name.c_str();
+				return true;
+			};
+			if (ImGui::Combo("Mask", &mask, getter, this, m_controller.getMasks().size()))
+			{
+				m_masks[i] = crc32(m_controller.getMasks()[mask].name.c_str());
+			};
 			ImGui::NextColumn();
 			if (ImGui::Button("View"))
 			{
@@ -718,10 +760,13 @@ void LayersNode::onGUI()
 			if (ImGui::Button("Delete"))
 			{
 				layer->destroy();
+				ImGui::PopID();
+				break;
 			}
 			ImGui::NextColumn();
 			ImGui::PopID();
 		}
+		ImGui::Columns();
 	}
 	ImGui::EndChild();
 }
@@ -1640,8 +1685,10 @@ ControllerResource::~ControllerResource()
 
 void ControllerResource::serialize(OutputBlob& blob)
 {
+	m_engine_resource->m_masks.clear();
+	
 	m_root->compile();
-
+	
 	m_engine_resource->serialize(blob);
 
 	blob.write(m_last_uid);
@@ -1657,9 +1704,9 @@ void ControllerResource::serialize(OutputBlob& blob)
 	{
 		blob.write(mask.name);
 		blob.write(mask.bones.size());
-		for (const string& bone : mask.bones)
+		for (const Mask::Bone& bone : mask.bones)
 		{
-			blob.write(bone);
+			blob.write(bone.getName());
 		}
 	}
 }
@@ -1697,18 +1744,80 @@ bool ControllerResource::deserialize(InputBlob& blob, Engine& engine, IAllocator
 		count = blob.read<int>();
 		for (int i = 0; i < count; ++i)
 		{
-			Mask& mask = m_masks.emplace(m_allocator);
+			Mask& mask = m_masks.emplace(*this);
 			blob.read(mask.name);
 			int bone_count = blob.read<int>();
 			for (int j = 0; j < bone_count; ++j)
 			{
-				string& bone = mask.bones.emplace(m_allocator);
-				blob.read(bone);
+				Mask::Bone& bone = mask.bones.emplace(mask.controller);
+				blob.read(bone.getName());
 			}
 		}
 	}
 
 	return true;
+}
+
+
+void ControllerResource::Mask::Bone::setName(const string& _name)
+{
+	name = _name;
+	for (int i = 0; i < controller.m_masks.size(); ++i)
+	{
+		const ControllerResource::Mask& mask = controller.m_masks[i];
+		for (int j = 0; j < mask.bones.size(); ++j)
+		{
+			if (this == &mask.bones[j])
+			{
+				controller.m_engine_resource->m_masks[i].bones[j] = crc32(name.c_str());
+				return;
+			}
+		}
+	}
+}
+
+
+void ControllerResource::Mask::addBone(int index)
+{
+	int idx = int(this - &controller.m_masks[0]);
+	if (index < 0)
+	{
+		bones.emplace(controller);
+		controller.m_engine_resource->m_masks[idx].bones.push(0);
+	}
+	else
+	{
+		bones.emplaceAt(index, controller);
+		controller.m_engine_resource->m_masks[idx].bones.emplaceAt(index, 0);
+	}
+}
+
+
+void ControllerResource::Mask::removeBone(int index)
+{
+	bones.erase(index);
+}
+
+
+void ControllerResource::removeMask(int index)
+{
+	m_masks.erase(index);
+	m_engine_resource->m_masks.erase(index);
+}
+
+
+void ControllerResource::addMask(int index)
+{
+	if (index < 0)
+	{
+		m_masks.emplace(*this);
+		m_engine_resource->m_masks.emplace(m_engine_resource->getAllocator());
+	}
+	else
+	{
+		m_masks.emplaceAt(index, *this);
+		m_engine_resource->m_masks.emplaceAt(index, m_engine_resource->getAllocator());
+	}
 }
 
 
