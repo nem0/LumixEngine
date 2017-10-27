@@ -1145,7 +1145,7 @@ template <>
 auto getMembers<ControllerResource::Mask>()
 {
 	return klass<ControllerResource>("Mask",
-		property("Name", &ControllerResource::Mask::name),
+		property("Name", &ControllerResource::Mask::getName, &ControllerResource::Mask::setName),
 		property("Bones", &ControllerResource::Mask::bones,
 			array_attribute(&ControllerResource::Mask::addBone, &ControllerResource::Mask::removeBone)
 		)

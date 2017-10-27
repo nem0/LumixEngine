@@ -91,7 +91,7 @@ bool ControllerResource::deserialize(InputBlob& blob, int& version)
 	version = header.version;
 	Component::Type type;
 	blob.read(type);
-	m_root = createComponent(type, m_allocator);
+	m_root = createComponent(*this, type, m_allocator);
 	m_root->deserialize(blob, nullptr, header.version);
 	blob.read(m_input_decl.inputs_count);
 	for (int j = 0; j < m_input_decl.inputs_count; ++j)
@@ -151,14 +151,24 @@ bool ControllerResource::deserialize(InputBlob& blob, int& version)
 	}
 	if (header.version > (int)Version::MASKS)
 	{
+		m_masks.clear();
 		int masks_count = blob.read<int>();
 		for (int i = 0; i < masks_count; ++i)
 		{
-			Mask& mask = m_masks.emplace(m_allocator);
+			BoneMask& mask = m_masks.emplace(m_allocator);
+			blob.read(mask.name);
 			int bone_count = blob.read<int>();
-			mask.bones.resize(bone_count);
-			blob.read(&mask.bones[0], sizeof(mask.bones[0]) * mask.bones.size());
+			for (int i = 0; i < bone_count; ++i)
+			{
+				u32 key = blob.read<u32>();
+				mask.bones.insert(key, 1);
+			}
 		}
+	}
+	if (header.version > (int)Version::END_GUARD)
+	{
+		u32 end_guard = blob.read<u32>();
+		if (end_guard != header.magic) return false;
 	}
 	return true;
 }
@@ -210,11 +220,16 @@ void ControllerResource::serialize(OutputBlob& blob)
 		blob.writeString(name);
 	}
 	blob.write(m_masks.size());
-	for (Mask& mask : m_masks)
+	for (BoneMask& mask : m_masks)
 	{
+		blob.write(mask.name);
 		blob.write(mask.bones.size());
-		if (!mask.bones.empty()) blob.write(&mask.bones[0], sizeof(mask.bones[0]) * mask.bones.size());
+		for (auto iter = mask.bones.begin(), end = mask.bones.end(); iter != end; ++iter)
+		{
+			blob.write(iter.key());
+		}
 	}
+	blob.write(header.magic);
 }
 
 

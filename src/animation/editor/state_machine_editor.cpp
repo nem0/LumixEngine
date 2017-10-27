@@ -413,7 +413,7 @@ void Container::createEdge(int from_uid, int to_uid, int edge_uid)
 {
 	auto* engine_parent = ((Anim::Container*)engine_cmp);
 	// TODO different kind of edges
-	auto* engine_edge = LUMIX_NEW(m_allocator, Anim::Edge)(m_allocator);
+	auto* engine_edge = LUMIX_NEW(m_allocator, Anim::Edge)(*m_controller.getEngineResource(), m_allocator);
 	engine_edge->uid = edge_uid;
 	engine_edge->from = (Anim::Node*)getByUID(from_uid)->engine_cmp;
 	engine_edge->to = (Anim::Node*)getByUID(to_uid)->engine_cmp;
@@ -690,24 +690,6 @@ LayersNode::LayersNode(Anim::Component* engine_cmp, Container* parent, Controlle
 void LayersNode::compile()
 {
 	Container::compile();
-
-	auto* engine_layers = ((Anim::LayersNode*)engine_cmp);
-	auto& masks = m_controller.getMasks();
-	for (int i = 0; i < m_masks.size(); ++i)
-	{
-		u32 mask_name_hash = m_masks[i];
-		int mask_idx = masks.find([mask_name_hash](const ControllerResource::Mask& mask) {
-			return crc32(mask.name.c_str()) == mask_name_hash;
-		});
-
-		int offset = 0;
-		for (int j = 0; j < mask_idx; ++j)
-		{
-			offset += masks[j].bones.size() + 1;
-		}
-
-		engine_layers->masks[i] = offset;
-	}
 }
 
 
@@ -716,7 +698,7 @@ static int getLayerMaskIndex(u32 mask_name_hash, ControllerResource& controller)
 	auto& masks = controller.getMasks();
 	for (int i = 0, c = masks.size(); i < c; ++i)
 	{
-		if (crc32(masks[i].name.c_str()) == mask_name_hash) return i;
+		if (crc32(masks[i].getName().c_str()) == mask_name_hash) return i;
 	}
 	return -1;
 }
@@ -744,12 +726,21 @@ void LayersNode::onGUI()
 			ImGui::NextColumn();
 			int mask = getLayerMaskIndex(m_masks[i], m_controller);
 			auto getter = [](void* data, int index, const char** out) {
-				*out = ((LayersNode*)data)->getController().getMasks()[index].name.c_str();
+				auto& masks = ((LayersNode*)data)->getController().getMasks();
+				if (index == masks.size())
+				{
+					*out = "";
+				}
+				else
+				{
+					*out = masks[index].getName().c_str();
+				}
 				return true;
 			};
-			if (ImGui::Combo("Mask", &mask, getter, this, m_controller.getMasks().size()))
+			if (ImGui::Combo("Mask", &mask, getter, this, m_controller.getMasks().size() + 1))
 			{
-				m_masks[i] = crc32(m_controller.getMasks()[mask].name.c_str());
+				m_masks[i] = mask == m_controller.getMasks().size() ? 0 : crc32(m_controller.getMasks()[mask].getName().c_str());
+				engine_layer->masks[i] = m_masks[i];
 			};
 			ImGui::NextColumn();
 			if (ImGui::Button("View"))
@@ -775,12 +766,17 @@ void LayersNode::onGUI()
 void LayersNode::serialize(OutputBlob& blob)
 {
 	Container::serialize(blob);
+	blob.write(m_masks.size());
+	if (!m_masks.empty()) blob.write(&m_masks[0], m_masks.size() * sizeof(m_masks[0]));
 }
 
 
 void LayersNode::deserialize(InputBlob& blob)
 {
 	Container::deserialize(blob);
+	int count = blob.read<int>();
+	m_masks.resize(count);
+	if (count > 0) blob.read(&m_masks[0], m_masks.size() * sizeof(m_masks[0]));
 }
 
 
@@ -792,7 +788,7 @@ void LayersNode::dropSlot(const char* name, u32 slot, const ImVec2& canvas_scree
 
 void LayersNode::createNode(Anim::Component::Type type, int uid, const ImVec2& pos)
 {
-	auto* cmp = (Node*)createComponent(Anim::createComponent(type, m_allocator), this, m_controller);
+	auto* cmp = (Node*)createComponent(Anim::createComponent(*m_controller.getEngineResource(), type, m_allocator), this, m_controller);
 	cmp->pos = pos;
 	cmp->size.x = 100;
 	cmp->size.y = 30;
@@ -918,7 +914,7 @@ void Blend1DNode::deserialize(InputBlob& blob)
 
 void Blend1DNode::createNode(Anim::Component::Type type, int uid, const ImVec2& pos)
 {
-	auto* cmp = (Node*)createComponent(Anim::createComponent(type, m_allocator), this, m_controller);
+	auto* cmp = (Node*)createComponent(Anim::createComponent(*m_controller.getEngineResource(), type, m_allocator), this, m_controller);
 	cmp->pos = pos;
 	cmp->size.x = 100;
 	cmp->size.y = 30;
@@ -1002,7 +998,7 @@ void Blend1DNode::drawInside(ImDrawList* draw, const ImVec2& canvas_screen_pos)
 					else
 					{
 						auto* engine_parent = ((Anim::Container*)engine_cmp);
-						auto* engine_edge = LUMIX_NEW(m_allocator, Anim::Edge)(m_allocator);
+						auto* engine_edge = LUMIX_NEW(m_allocator, Anim::Edge)(*m_controller.getEngineResource(), m_allocator);
 						engine_edge->uid = m_controller.createUID();
 						engine_edge->from = (Anim::Node*)m_drag_source->engine_cmp;
 						engine_edge->to = (Anim::Node*)hit_cmp->engine_cmp;
@@ -1455,7 +1451,7 @@ void Container::serialize(OutputBlob& blob)
 
 void StateMachine::createNode(Anim::Component::Type type, int uid, const ImVec2& pos)
 {
-	auto* cmp = (Node*)createComponent(Anim::createComponent(type, m_allocator), this, m_controller);
+	auto* cmp = (Node*)createComponent(Anim::createComponent(*m_controller.getEngineResource(), type, m_allocator), this, m_controller);
 	cmp->pos = pos;
 	cmp->size.x = 100;
 	cmp->size.y = 30;
@@ -1670,7 +1666,7 @@ ControllerResource::ControllerResource(IAnimationEditor& editor,
 	, m_masks(allocator)
 {
 	m_engine_resource = LUMIX_NEW(allocator, Anim::ControllerResource)(Path("editor"), manager, allocator);
-	auto* engine_root = LUMIX_NEW(allocator, Anim::StateMachine)(allocator);
+	auto* engine_root = LUMIX_NEW(allocator, Anim::StateMachine)(*m_engine_resource, allocator);
 	m_engine_resource->m_root = engine_root;
 	m_root = LUMIX_NEW(allocator, StateMachine)(engine_root, nullptr, *this);
 }
@@ -1685,8 +1681,6 @@ ControllerResource::~ControllerResource()
 
 void ControllerResource::serialize(OutputBlob& blob)
 {
-	m_engine_resource->m_masks.clear();
-	
 	m_root->compile();
 	
 	m_engine_resource->serialize(blob);
@@ -1702,7 +1696,7 @@ void ControllerResource::serialize(OutputBlob& blob)
 	blob.write(m_masks.size());
 	for (const Mask& mask : m_masks)
 	{
-		blob.write(mask.name);
+		blob.write(mask.getName());
 		blob.write(mask.bones.size());
 		for (const Mask::Bone& bone : mask.bones)
 		{
@@ -1745,7 +1739,7 @@ bool ControllerResource::deserialize(InputBlob& blob, Engine& engine, IAllocator
 		for (int i = 0; i < count; ++i)
 		{
 			Mask& mask = m_masks.emplace(*this);
-			blob.read(mask.name);
+			blob.read(mask.getName());
 			int bone_count = blob.read<int>();
 			for (int j = 0; j < bone_count; ++j)
 			{
@@ -1761,7 +1755,6 @@ bool ControllerResource::deserialize(InputBlob& blob, Engine& engine, IAllocator
 
 void ControllerResource::Mask::Bone::setName(const string& _name)
 {
-	name = _name;
 	for (int i = 0; i < controller.m_masks.size(); ++i)
 	{
 		const ControllerResource::Mask& mask = controller.m_masks[i];
@@ -1769,11 +1762,21 @@ void ControllerResource::Mask::Bone::setName(const string& _name)
 		{
 			if (this == &mask.bones[j])
 			{
-				controller.m_engine_resource->m_masks[i].bones[j] = crc32(name.c_str());
+				controller.m_engine_resource->m_masks[i].bones.erase(crc32(name.c_str()));
+				controller.m_engine_resource->m_masks[i].bones.insert(crc32(_name.c_str()), 1);
 				return;
 			}
 		}
 	}
+	name = _name;
+}
+
+
+void ControllerResource::Mask::setName(const string& value)
+{
+	name = value;
+	int idx = controller.m_masks.find([this](auto& mask) { return &mask == this; });
+	controller.m_engine_resource->m_masks[idx].name = crc32(value.c_str());
 }
 
 
@@ -1783,19 +1786,19 @@ void ControllerResource::Mask::addBone(int index)
 	if (index < 0)
 	{
 		bones.emplace(controller);
-		controller.m_engine_resource->m_masks[idx].bones.push(0);
 	}
 	else
 	{
 		bones.emplaceAt(index, controller);
-		controller.m_engine_resource->m_masks[idx].bones.emplaceAt(index, 0);
 	}
 }
 
 
 void ControllerResource::Mask::removeBone(int index)
 {
+	int idx = int(this - &controller.m_masks[0]);
 	bones.erase(index);
+	controller.m_engine_resource->m_masks[idx].bones.erase(index);
 }
 
 

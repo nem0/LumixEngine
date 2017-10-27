@@ -315,10 +315,16 @@ public:
 
 		void addBone(int index);
 		void removeBone(int index);
+		string& getName() { return name; }
+		const string& getName() const { return name; }
+		void setName(const string& value);
 		
 		ControllerResource& controller;
-		string name;
 		Array<Bone> bones;
+	
+	
+	private:
+		string name;
 	};
 
 public:
