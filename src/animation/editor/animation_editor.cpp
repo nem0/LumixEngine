@@ -1524,9 +1524,9 @@ struct UIBuilder
 	void ui(O& owner, const M& member, Array<T>& array)
 	{
 		IAllocator& allocator = m_editor.getApp().getWorldEditor().getAllocator();
-		bool expanded = ImGui::TreeNodeEx(member.name, ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_AllowOverlapMode);
+		bool expanded = ImGui::TreeNodeEx(member.name, ImGuiTreeNodeFlags_AllowOverlapMode);
 		ImGui::SameLine();
-		if (ImGui::Button(StaticString<32>("Add")))
+		if (ImGui::SmallButton(StaticString<32>("Add")))
 		{
 			using PP = RemoveReference<M>::Type;
 			auto* command = LUMIX_NEW(allocator, AddArrayItemCommand<PP>)(m_editor.getController(), member);
@@ -1535,23 +1535,45 @@ struct UIBuilder
 		if (!expanded) return;
 
 		int i = 0;
-		for (T& item : array)
+		int subproperties_count = TupleSize<decltype(getMembers<T>().members)>::result;
+		if (subproperties_count > 1)
 		{
-			++i;
-			StaticString<32> label("", i);
-			bool expanded = ImGui::TreeNodeEx(label, ImGuiTreeNodeFlags_AllowOverlapMode);
-			ImGui::SameLine();
-			if (ImGui::SmallButton("Remove"))
+			for (T& item : array)
 			{
-				auto* command = LUMIX_NEW(allocator, RemoveArrayItemCommand<M>)(m_editor.getController(), member, i - 1);
-				m_editor.executeCommand(*command);
-				if (expanded) ImGui::TreePop();
-				break;
+				StaticString<32> label("", i + 1);
+				bool expanded = ImGui::TreeNodeEx(label, ImGuiTreeNodeFlags_AllowOverlapMode);
+				ImGui::SameLine();
+				if (ImGui::SmallButton("Remove"))
+				{
+					auto* command = LUMIX_NEW(allocator, RemoveArrayItemCommand<M>)(m_editor.getController(), member, i);
+					m_editor.executeCommand(*command);
+					if (expanded) ImGui::TreePop();
+					break;
+				}
+
+				if (expanded)
+				{
+					ui(array, makePP(member, i), item);
+					ImGui::TreePop();
+				}
+				++i;
 			}
-			if(expanded)
+		}
+		else
+		{
+			for (T& item : array)
 			{
-				ui(array, makePP(member, i-1), item);
-				ImGui::TreePop();
+				ImGui::PushID(&item);
+				ui(array, makePP(member, i), item);
+				ImGui::SameLine();
+				if (ImGui::SmallButton("Remove"))
+				{
+					auto* command = LUMIX_NEW(allocator, RemoveArrayItemCommand<M>)(m_editor.getController(), member, i);
+					m_editor.executeCommand(*command);
+					break;
+				}
+				ImGui::PopID();
+				++i;
 			}
 		}
 		ImGui::TreePop();
