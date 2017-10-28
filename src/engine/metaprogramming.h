@@ -110,7 +110,7 @@ constexpr auto& get(const Tuple<Types...>& tuple)
 
 
 template <class F, class Tuple, int... I>
-constexpr void apply_impl(const F& f, Tuple& t, Indices<I...>)
+constexpr void apply_impl(F& f, Tuple& t, Indices<I...>)
 {
 	using expand = bool[];
 	(void)expand
@@ -123,10 +123,10 @@ constexpr void apply_impl(const F& f, Tuple& t, Indices<I...>)
 }
 
 template <class F, class Tuple>
-constexpr void apply_impl(const F& f, Tuple& t, Indices<>) {}
+constexpr void apply_impl(F& f, Tuple& t, Indices<>) {}
 
 template <class F, class Tuple>
-constexpr void apply(const F& f, Tuple& t)
+constexpr void apply(F& f, Tuple& t)
 {
 	apply_impl(f, t, typename BuildIndices<-1, TupleSize<Tuple>::result>::result{});
 }

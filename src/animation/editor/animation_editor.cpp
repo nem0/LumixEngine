@@ -40,6 +40,40 @@ static const ResourceType ANIMATION_TYPE("animation");
 static const ResourceType CONTROLLER_RESOURCE_TYPE("anim_controller");
 
 
+using namespace AnimEditor;
+
+
+template <>
+auto getMembers<ControllerResource>()
+{
+	return type<ControllerResource>("controller",
+		property("Masks", &ControllerResource::getMasks,
+			array_attribute(&ControllerResource::addMask, &ControllerResource::removeMask)
+		)
+	);
+}
+
+
+template <>
+auto getMembers<ControllerResource::Mask>()
+{
+	return type<ControllerResource>("Mask",
+		property("Name", &ControllerResource::Mask::getName, &ControllerResource::Mask::setName),
+		property("Bones", &ControllerResource::Mask::bones,
+			array_attribute(&ControllerResource::Mask::addBone, &ControllerResource::Mask::removeBone)
+			)
+		);
+}
+
+template <>
+auto getMembers<ControllerResource::Mask::Bone>()
+{
+	return type<ControllerResource::Mask>("Bone",
+		property("Name", &ControllerResource::Mask::Bone::getName, &ControllerResource::Mask::Bone::setName)
+		);
+}
+
+
 namespace AnimEditor
 {
 
@@ -960,7 +994,7 @@ void AnimationEditor::inputsGUI()
 				if (input.type == Anim::InputDecl::EMPTY) continue;
 				ImGui::PushID(&input);
 				ImGui::PushItemWidth(100);
-				ImGui::InputText("##name", input.name, lengthOf(input.name));
+				ImGui::InputText("##name", input.name.data, lengthOf(input.name.data));
 				ImGui::SameLine();
 				if (ImGui::Combo("##type", (int*)&input.type, "float\0int\0bool\0"))
 				{
@@ -994,7 +1028,7 @@ void AnimationEditor::inputsGUI()
 				{
 					if (input.type == Anim::InputDecl::EMPTY)
 					{
-						input.name[0] = 0;
+						input.name = "";
 						input.type = Anim::InputDecl::BOOL;
 						input.offset = input_decl.getSize();
 						++input_decl.inputs_count;
@@ -1012,147 +1046,11 @@ void AnimationEditor::inputsGUI()
 }
 
 
-template <>
-auto getMembers<ControllerResource>()
-{
-	return klass<ControllerResource>("controller",
-		property("Masks", &ControllerResource::getMasks,
-			array_attribute(&ControllerResource::addMask, &ControllerResource::removeMask)
-			)
-		);
-}
-
-
-template <>
-auto getMembers<ControllerResource::Mask>()
-{
-	return klass<ControllerResource>("Mask",
-		property("Name", &ControllerResource::Mask::getName, &ControllerResource::Mask::setName),
-		property("Bones", &ControllerResource::Mask::bones,
-			array_attribute(&ControllerResource::Mask::addBone, &ControllerResource::Mask::removeBone)
-			)
-		);
-}
-
-template <>
-auto getMembers<ControllerResource::Mask::Bone>()
-{
-	return klass<ControllerResource::Mask>("Bone",
-		property("Name", &ControllerResource::Mask::Bone::getName, &ControllerResource::Mask::Bone::setName)
-		);
-}
-
-struct UIBuilder
-{
-	UIBuilder(AnimationEditor& editor) : m_editor(editor) {}
-
-
-	template <typename T>
-	void build(T& obj)
-	{
-		apply([this, &obj](const auto& member) {
-			auto pp = makePP(PropertyPathBegin{}, member);
-			auto& v = member.getValue(obj);
-			ui(obj, pp, v);
-		}, getMembers<T>().members);
-	}
-
-
-	template <typename O, typename M, typename T>
-	void ui(O& owner, const M& member, T& obj)
-	{
-		apply([&member, this, &obj](const auto& m) {
-			auto& v = m.getValue(obj);
-			auto pp = makePP(member, m);
-			ui(obj, pp, v);
-		}, getMembers<T>().members);
-	}
-
-
-	template <typename O, typename M>
-	void ui(O& owner, const M& member, string& obj)
-	{
-		char tmp[32];
-		copyString(tmp, obj.c_str());
-		if (ImGui::InputText(member.name, tmp, sizeof(tmp)))
-		{
-			IAllocator& allocator = m_editor.getApp().getWorldEditor().getAllocator();
-			string tmp_str(tmp, allocator);
-			using PP = RemoveReference<M>::Type;
-			auto* command = LUMIX_NEW(allocator, SetPropertyCommand<string, PP>)(m_editor.getController(), member, tmp_str);
-			m_editor.executeCommand(*command);
-		}
-	}
-
-
-	template <typename Owner, typename M, typename T>
-	void ui(Owner& owner, const M& member, Array<T>& array)
-	{
-		IAllocator& allocator = m_editor.getApp().getWorldEditor().getAllocator();
-		bool expanded = ImGui::TreeNodeEx(member.name, ImGuiTreeNodeFlags_AllowOverlapMode);
-		ImGui::SameLine();
-		if (ImGui::SmallButton(StaticString<32>("Add")))
-		{
-			using PP = RemoveReference<M>::Type;
-			auto* command = LUMIX_NEW(allocator, AddArrayItemCommand<PP>)(m_editor.getController(), member);
-			m_editor.executeCommand(*command);
-		}
-		if (!expanded) return;
-
-		int i = 0;
-		int subproperties_count = TupleSize<decltype(getMembers<T>().members)>::result;
-		if (subproperties_count > 1)
-		{
-			for (T& item : array)
-			{
-				StaticString<32> label("", i + 1);
-				bool expanded = ImGui::TreeNodeEx(label, ImGuiTreeNodeFlags_AllowOverlapMode);
-				ImGui::SameLine();
-				if (ImGui::SmallButton("Remove"))
-				{
-					auto* command = LUMIX_NEW(allocator, RemoveArrayItemCommand<M>)(m_editor.getController(), member, i);
-					m_editor.executeCommand(*command);
-					if (expanded) ImGui::TreePop();
-					break;
-				}
-
-				if (expanded)
-				{
-					ui(array, makePP(member, i), item);
-					ImGui::TreePop();
-				}
-				++i;
-			}
-		}
-		else
-		{
-			for (T& item : array)
-			{
-				ImGui::PushID(&item);
-				ui(array, makePP(member, i), item);
-				ImGui::SameLine();
-				if (ImGui::SmallButton("Remove"))
-				{
-					auto* command = LUMIX_NEW(allocator, RemoveArrayItemCommand<M>)(m_editor.getController(), member, i);
-					m_editor.executeCommand(*command);
-					break;
-				}
-				ImGui::PopID();
-				++i;
-			}
-		}
-		ImGui::TreePop();
-	}
-
-	AnimationEditor& m_editor;
-};
-
-
-
 void AnimationEditor::masksGUI()
 {
-	UIBuilder ui_builder(*this);
-	ui_builder.build(*m_resource);
+	IAllocator& allocator = m_app.getWorldEditor().getAllocator();
+	UIBuilder<AnimationEditor, ControllerResource> ui_builder(*this, *m_resource, allocator);
+	ui_builder.build();
 }
 
 

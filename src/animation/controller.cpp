@@ -99,7 +99,7 @@ bool ControllerResource::deserialize(InputBlob& blob, int& version)
 		int i = j;
 		if (header.version >(int)Version::INPUT_REFACTOR) blob.read(i);
 		auto& input = m_input_decl.inputs[i];
-		blob.readString(input.name, lengthOf(input.name));
+		blob.readString(input.name.data, lengthOf(input.name.data));
 		blob.read(input.type);
 		blob.read(input.offset);
 	}
