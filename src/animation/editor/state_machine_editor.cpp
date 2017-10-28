@@ -1764,11 +1764,12 @@ void ControllerResource::Mask::Bone::setName(const string& _name)
 			{
 				controller.m_engine_resource->m_masks[i].bones.erase(crc32(name.c_str()));
 				controller.m_engine_resource->m_masks[i].bones.insert(crc32(_name.c_str()), 1);
+				name = _name;
 				return;
 			}
 		}
 	}
-	name = _name;
+	ASSERT(false);
 }
 
 

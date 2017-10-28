@@ -825,12 +825,9 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 
 		Model* model = m_render_scene->getModelInstanceModel(model_instance);
 
-		model->getPose(*pose);
-		pose->computeRelative(*model);
+		model->getRelativePose(*pose);
 
-		static bool bb = true;
-		if(bb)
-			controller.root->fillPose(m_engine, *pose, *model, 1, nullptr);
+		controller.root->fillPose(m_engine, *pose, *model, 1, nullptr);
 
 		pose->computeAbsolute(*model);
 
