@@ -142,7 +142,7 @@ void InputSystemImpl::registerLuaAPI()
 	lua_State* L = m_engine.getState();
 
 	#define REGISTER_SCANCODE(SCANCODE) \
-		LuaWrapper::createSystemVariable(L, "Engine", "INPUT_SCANCODE" #SCANCODE, (int)SDL_SCANCODE_##SCANCODE);
+		LuaWrapper::createSystemVariable(L, "Engine", "INPUT_SCANCODE_" #SCANCODE, (int)SDL_SCANCODE_##SCANCODE);
 
 		REGISTER_SCANCODE(A);
 		REGISTER_SCANCODE(B);
