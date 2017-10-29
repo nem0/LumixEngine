@@ -332,7 +332,6 @@ public:
 	int getExitCode() const { return m_exit_code; }
 
 
-#if 1
 	void handleEvents()
 	{
 		SDL_Event event;
@@ -387,6 +386,7 @@ public:
 					input_event.device = input.getKeyboardDevice();
 					input_event.data.button.state = InputSystem::ButtonEvent::DOWN;
 					input_event.data.button.key_id = event.key.keysym.sym;
+					input_event.data.button.scancode = event.key.keysym.scancode;
 					input.injectEvent(input_event);
 				}
 				break;
@@ -397,6 +397,7 @@ public:
 					input_event.device = input.getKeyboardDevice();
 					input_event.data.button.state = InputSystem::ButtonEvent::UP;
 					input_event.data.button.key_id = event.key.keysym.sym;
+					input_event.data.button.scancode = event.key.keysym.scancode;
 					input.injectEvent(input_event);
 				}
 				break;
@@ -419,47 +420,7 @@ public:
 			}
 		}
 	}
-#else
-	void handleEvents()
-	{
-		SDL_Event event;
-		while (SDL_PollEvent(&event))
-		{
-			switch (event.type)
-			{
-				case SDL_WINDOWEVENT:
-					switch (event.window.event)
-					{
-						case SDL_WINDOWEVENT_MOVED:
-						case SDL_WINDOWEVENT_SIZE_CHANGED:
-						{
-							int x, y, w, h;
-							SDL_GetWindowSize(m_window, &w, &h);
-							SDL_GetWindowPosition(m_window, &x, &y);
-							onResize();
-						}
-						break;
-						case SDL_WINDOWEVENT_CLOSE: m_finished = true; break;
-					}
-					break;
-				case SDL_QUIT: m_finished = true; break;
-				case SDL_MOUSEBUTTONDOWN:
-					break;
-				case SDL_MOUSEBUTTONUP:
-					break;
-				case SDL_MOUSEMOTION:
-					break;
-				case SDL_TEXTINPUT: 
-					break;
-				case SDL_KEYDOWN:
-				case SDL_KEYUP:
-					break;
-				case SDL_MOUSEWHEEL:
-					break;
-			}
-		}
-	}
-#endif
+
 
 
 	static void outputToVS(const char* system, const char* message)

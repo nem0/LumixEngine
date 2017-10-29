@@ -335,6 +335,7 @@ void GameView::processInputEvents()
 			event.device = input.getKeyboardDevice();
 			event.data.button.state = InputSystem::ButtonEvent::DOWN;
 			event.data.button.key_id = sdl_event.key.keysym.sym;
+			event.data.button.scancode = sdl_event.key.keysym.scancode;
 			input.injectEvent(event);
 		}
 		break;
@@ -345,6 +346,7 @@ void GameView::processInputEvents()
 			event.device = input.getKeyboardDevice();
 			event.data.button.state = InputSystem::ButtonEvent::UP;
 			event.data.button.key_id = sdl_event.key.keysym.sym;
+			event.data.button.scancode = sdl_event.key.keysym.scancode;
 			input.injectEvent(event);
 		}
 		break;
