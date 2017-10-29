@@ -427,8 +427,14 @@ void addToArray(const Member& member, Parent& parent, int index)
 }
 
 
+
+struct IHashedCommand : IEditorCommand
+{
+	virtual u32 getTypeHash() = 0;
+};
+
 template <typename Root, typename T, typename PP>
-struct SetPropertyCommand : IEditorCommand
+struct SetPropertyCommand : IHashedCommand
 {
 	SetPropertyCommand(Root& root, PP pp, const T& value)
 		: root(root)
@@ -452,10 +458,27 @@ struct SetPropertyCommand : IEditorCommand
 	}
 
 
+	u32 getTypeHash() override
+	{
+		Root* root_ptr = &root;
+		u32 hash = crc32(&root_ptr, sizeof(root_ptr));
+		hash = continueCrc32(hash, &pp, sizeof(pp));
+		return hash;
+	}
+
+
 	void serialize(JsonSerializer& serializer) override { ASSERT(false); }
 	void deserialize(JsonSerializer& serializer) override { ASSERT(false); }
 	const char* getType() override { return "set_anim_editor_property"; }
-	bool merge(IEditorCommand& command) override { return false; }
+	
+	
+	bool merge(IEditorCommand& command) override
+	{ 
+		if (command.getType() != getType()) return false;
+		if (getTypeHash() != ((IHashedCommand&)command).getTypeHash()) return false;
+		((SetPropertyCommand<Root, T, PP>&)command).value = value;
+		return true; 
+	}
 
 
 	T value;
@@ -822,7 +845,7 @@ struct UIBuilder
 	{
 		if (customUI(owner, pp, array)) return;
 		
-		bool expanded = ImGui::TreeNodeEx(pp.name, ImGuiTreeNodeFlags_AllowOverlapMode);
+		bool expanded = ImGui::TreeNodeEx(pp.name, ImGuiTreeNodeFlags_AllowOverlapMode | ImGuiTreeNodeFlags_Framed);
 		ImGui::SameLine();
 		if (ImGui::SmallButton("Add"))
 		{

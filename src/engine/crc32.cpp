@@ -92,4 +92,18 @@ u32 continueCrc32(u32 original_crc, const char* str)
 }
 
 
+u32 continueCrc32(u32 original_crc, const void* data, int length)
+{
+	const u8* c = reinterpret_cast<const u8*>(data);
+	u32 crc = ~original_crc;
+	while (length)
+	{
+		crc = (crc >> 8) ^ crc32Table[crc & 0xFF ^ *c];
+		++c;
+		--length;
+	}
+	return ~crc;
+}
+
+
 } // namespace Lumix
