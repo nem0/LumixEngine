@@ -33,6 +33,7 @@ class LUMIX_ENGINE_API InputSystem
 		struct ButtonEvent
 		{
 			u32 key_id;
+			u32 scancode;
 			float x_abs;
 			float y_abs;
 			enum : u32
