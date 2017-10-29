@@ -1523,7 +1523,7 @@ namespace Lumix
 					lua_setfield(L, -2, "state"); // [lua_event]
 					LuaWrapper::push(L, event.data.button.scancode); // [lua_event, button.scancode]
 					lua_setfield(L, -2, "scancode"); // [lua_event]
-					LuaWrapper::push(L, event.data.button.x_abs); // [lua_event, button.x_abs]
+					LuaWrapper::push(L, event.data.button.key_id); // [lua_event, button.x_abs]
 					lua_setfield(L, -2, "key_id"); // [lua_event]
 					LuaWrapper::push(L, event.data.button.x_abs); // [lua_event, button.x_abs]
 					lua_setfield(L, -2, "x_abs"); // [lua_event]
