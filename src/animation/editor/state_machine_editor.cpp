@@ -1751,8 +1751,16 @@ bool ControllerResource::deserialize(InputBlob& blob, Engine& engine, IAllocator
 	}
 
 	m_inputs.clear();
-	//TODO inputs
-	ASSERT(false);
+
+	const Anim::InputDecl& decl = m_engine_resource->m_input_decl;
+	for (int i = 0; i < lengthOf(decl.inputs); ++i)
+	{
+		if (decl.inputs[i].type != Anim::InputDecl::Type::EMPTY)
+		{
+			InputProxy& proxy = m_inputs.emplace(*this);
+			proxy.engine_input_idx = i;
+		}
+	}
 
 	return true;
 }
