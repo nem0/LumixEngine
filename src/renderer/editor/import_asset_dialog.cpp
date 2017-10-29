@@ -379,8 +379,38 @@ struct FBXImporter
 	}
 
 
+	void sortBones()
+	{
+		int count = bones.size();
+		for (int i = 0; i < count; ++i)
+		{
+			for (int j = i + 1; j < count; ++j)
+			{
+				if (bones[i]->getParent() == bones[j])
+				{
+					const ofbx::Object* bone = bones[j];
+					bones.eraseFast(j);
+					bones.insert(i, bone);
+					--i;
+					break;
+				}
+			}
+		}
+	}
+
+
 	void gatherBones(const ofbx::IScene& scene)
 	{
+		for (const ImportMesh& mesh : meshes)
+		{
+			const ofbx::Skin* skin = mesh.fbx->getGeometry()->getSkin();
+			for (int i = 0; i < skin->getClusterCount(); ++i)
+			{
+				const ofbx::Cluster* cluster = skin->getCluster(i);
+				insertHierarchy(bones, cluster->getLink());
+			}
+		}
+
 		const ofbx::Object *const * objects = scene.getAllObjects();
 		int count = scene.getAllObjectCount();
 
@@ -394,7 +424,8 @@ struct FBXImporter
 			if (is_bone) insertHierarchy(bones, node);
 		}
 
-
+		bones.removeDuplicates();
+		sortBones();
 	}
 
 
