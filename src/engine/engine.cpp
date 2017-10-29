@@ -511,7 +511,7 @@ public:
 		Properties::init(m_allocator);
 
 		m_plugin_manager = PluginManager::create(*this);
-		m_input_system = InputSystem::create(m_allocator);
+		m_input_system = InputSystem::create(*this);
 
 		g_log_info.log("Core") << "Engine created.";
 	}

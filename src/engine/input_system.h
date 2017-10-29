@@ -7,6 +7,7 @@
 namespace Lumix
 {
 
+class Engine;
 struct IAllocator;
 struct Vec2;
 
@@ -80,7 +81,7 @@ class LUMIX_ENGINE_API InputSystem
 		};
 
 	public:
-		static InputSystem* create(IAllocator& allocator);
+		static InputSystem* create(Engine& engine);
 		static void destroy(InputSystem& system);
 
 		virtual ~InputSystem() {}
