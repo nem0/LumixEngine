@@ -23,6 +23,7 @@
 #include "engine/properties.h"
 #include "engine/resource_manager.h"
 #include "engine/universe/universe.h"
+#include "ui_builder.h"
 #include <SDL.h>
 
 
@@ -37,6 +38,76 @@ static const ComponentType ANIMABLE_HASH = Properties::getComponentType("animabl
 static const ComponentType CONTROLLER_TYPE = Properties::getComponentType("anim_controller");
 static const ResourceType ANIMATION_TYPE("animation");
 static const ResourceType CONTROLLER_RESOURCE_TYPE("anim_controller");
+
+
+using namespace AnimEditor;
+
+
+template <>
+auto getMembers<ControllerResource>()
+{
+	return type("controller",
+		property("Masks", &ControllerResource::getMasks,
+			array_attribute(&ControllerResource::addMask, &ControllerResource::removeMask)
+		),
+		property("Inputs", &ControllerResource::getInputs,
+			array_attribute(&ControllerResource::addInput, &ControllerResource::removeInput)
+		)
+	);
+}
+
+
+struct NoUIBuilder
+{
+	template <typename Owner, typename PP, typename T>
+	static void build(Owner& owner, const PP& pp, T& obj) {}
+};
+
+
+using NoUIAttribute = CustomUIAttribute<NoUIBuilder>;
+
+
+template <>
+auto getEnum<Anim::InputDecl::Type>()
+{
+	return makeTuple(
+		EnumValue<Anim::InputDecl::Type>{ Anim::InputDecl::Type::FLOAT, "Decimal" },
+		EnumValue<Anim::InputDecl::Type>{ Anim::InputDecl::Type::BOOL, "Bool" },
+		EnumValue<Anim::InputDecl::Type>{ Anim::InputDecl::Type::INT, "Integer" }
+	);
+}
+		
+
+template <>
+auto getMembers<ControllerResource::InputProxy>()
+{
+	return type("Input",
+		property("Name", &ControllerResource::InputProxy::getName, &ControllerResource::InputProxy::setName),
+		property("Type", &ControllerResource::InputProxy::getType, &ControllerResource::InputProxy::setType),
+		property("Engine idx", &ControllerResource::InputProxy::getEngineIdx, &ControllerResource::InputProxy::setEngineIdx, 
+			NoUIAttribute()) // TODO setter
+	);
+}
+
+
+template <>
+auto getMembers<ControllerResource::Mask>()
+{
+	return type("Mask",
+		property("Name", &ControllerResource::Mask::getName, &ControllerResource::Mask::setName),
+		property("Bones", &ControllerResource::Mask::bones,
+			array_attribute(&ControllerResource::Mask::addBone, &ControllerResource::Mask::removeBone)
+			)
+		);
+}
+
+template <>
+auto getMembers<ControllerResource::Mask::Bone>()
+{
+	return type("Bone",
+		property("Name", &ControllerResource::Mask::Bone::getName, &ControllerResource::Mask::Bone::setName)
+		);
+}
 
 
 namespace AnimEditor
@@ -404,6 +475,7 @@ public:
 	void destroyNode(ControllerResource& ctrl, Node* node) override;
 	void destroyEdge(ControllerResource& ctrl, Edge* edge) override;
 	bool hasFocus() override { return m_is_focused; }
+	ControllerResource& getController() { return *m_resource; }
 
 private:
 	void checkShortcuts();
@@ -419,6 +491,7 @@ private:
 	void editorGUI();
 	void inputsGUI();
 	void constantsGUI();
+	void masksGUI();
 	void animationSlotsGUI();
 	void menuGUI();
 	void onSetInputGUI(u8* data, Component& component);
@@ -944,6 +1017,7 @@ void AnimationEditor::inputsGUI()
 {
 	if (ImGui::BeginDock("Animation inputs", &m_inputs_open))
 	{
+		/*
 		if (ImGui::CollapsingHeader("Inputs"))
 		{
 			const auto& selected_entities = m_app.getWorldEditor().getSelectedEntities();
@@ -957,7 +1031,7 @@ void AnimationEditor::inputsGUI()
 				if (input.type == Anim::InputDecl::EMPTY) continue;
 				ImGui::PushID(&input);
 				ImGui::PushItemWidth(100);
-				ImGui::InputText("##name", input.name, lengthOf(input.name));
+				ImGui::InputText("##name", input.name.data, lengthOf(input.name.data));
 				ImGui::SameLine();
 				if (ImGui::Combo("##type", (int*)&input.type, "float\0int\0bool\0"))
 				{
@@ -991,7 +1065,7 @@ void AnimationEditor::inputsGUI()
 				{
 					if (input.type == Anim::InputDecl::EMPTY)
 					{
-						input.name[0] = 0;
+						input.name = "";
 						input.type = Anim::InputDecl::BOOL;
 						input.offset = input_decl.getSize();
 						++input_decl.inputs_count;
@@ -999,12 +1073,22 @@ void AnimationEditor::inputsGUI()
 					}
 				}
 			}
-		}
+		}*/
+		// TODO
 
+		masksGUI();
 		constantsGUI();
 		animationSlotsGUI();
 	}
 	ImGui::EndDock();
+}
+
+
+void AnimationEditor::masksGUI()
+{
+	IAllocator& allocator = m_app.getWorldEditor().getAllocator();
+	UIBuilder<AnimationEditor, ControllerResource> ui_builder(*this, *m_resource, allocator);
+	ui_builder.build();
 }
 
 

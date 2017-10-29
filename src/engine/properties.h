@@ -81,16 +81,6 @@ namespace detail
 {
 
 
-template <typename T> struct ResultOf;
-template <typename R, typename C, typename... Args> struct ResultOf<R(C::*)(Args...)> { using Type = R; };
-
-template <typename T> struct ClassOf;
-template <typename R, typename C, typename... Args>
-struct ClassOf<R(C::*)(Args...)>
-{
-	using Type = C;
-};
-
 template <typename T> void writeToStream(OutputBlob& stream, T value)
 {
 	stream.write(value);
@@ -297,18 +287,18 @@ struct EnumProperty : IEnumProperty
 {
 	void getValue(ComponentUID cmp, int index, OutputBlob& stream) const override
 	{
-		using C = typename detail::ClassOf<Getter>::Type;
+		using C = typename ClassOf<Getter>::Type;
 		C* inst = static_cast<C*>(cmp.scene);
-		static_assert(4 == sizeof(typename detail::ResultOf<Getter>::Type), "enum must have 4 bytes");
+		static_assert(4 == sizeof(typename ResultOf<Getter>::Type), "enum must have 4 bytes");
 		detail::GetterProxy<Getter>::invoke(stream, inst, getter, cmp.handle, index);
 	}
 
 	void setValue(ComponentUID cmp, int index, InputBlob& stream) const override
 	{
-		using C = typename detail::ClassOf<Getter>::Type;
+		using C = typename ClassOf<Getter>::Type;
 		C* inst = static_cast<C*>(cmp.scene);
 
-		static_assert(4 == sizeof(typename detail::ResultOf<Getter>::Type), "enum must have 4 bytes");
+		static_assert(4 == sizeof(typename ResultOf<Getter>::Type), "enum must have 4 bytes");
 		detail::SetterProxy<Setter>::invoke(stream, inst, setter, cmp.handle, index);
 	}
 
@@ -336,25 +326,25 @@ struct DynEnumProperty : IEnumProperty
 {
 	void getValue(ComponentUID cmp, int index, OutputBlob& stream) const override
 	{
-		using C = typename detail::ClassOf<Getter>::Type;
+		using C = typename ClassOf<Getter>::Type;
 		C* inst = static_cast<C*>(cmp.scene);
-		static_assert(4 == sizeof(typename detail::ResultOf<Getter>::Type), "enum must have 4 bytes");
+		static_assert(4 == sizeof(typename ResultOf<Getter>::Type), "enum must have 4 bytes");
 		detail::GetterProxy<Getter>::invoke(stream, inst, getter, cmp.handle, index);
 	}
 
 	void setValue(ComponentUID cmp, int index, InputBlob& stream) const override
 	{
-		using C = typename detail::ClassOf<Getter>::Type;
+		using C = typename ClassOf<Getter>::Type;
 		C* inst = static_cast<C*>(cmp.scene);
 
-		static_assert(4 == sizeof(typename detail::ResultOf<Getter>::Type), "enum must have 4 bytes");
+		static_assert(4 == sizeof(typename ResultOf<Getter>::Type), "enum must have 4 bytes");
 		detail::SetterProxy<Setter>::invoke(stream, inst, setter, cmp.handle, index);
 	}
 
 
 	int getEnumCount(ComponentUID cmp) const override
 	{
-		using C = typename detail::ClassOf<Getter>::Type;
+		using C = typename ClassOf<Getter>::Type;
 		C* inst = static_cast<C*>(cmp.scene);
 		return (inst->*counter)();
 	}
@@ -362,7 +352,7 @@ struct DynEnumProperty : IEnumProperty
 
 	const char* getEnumName(ComponentUID cmp, int index) const override
 	{
-		using C = typename detail::ClassOf<Getter>::Type;
+		using C = typename ClassOf<Getter>::Type;
 		C* inst = static_cast<C*>(cmp.scene);
 		return (inst->*namer)(index);
 	}
@@ -380,7 +370,7 @@ struct SampledFuncProperty : ISampledFuncProperty
 	void getValue(ComponentUID cmp, int index, OutputBlob& stream) const override
 	{
 		ASSERT(index == -1);
-		using C = typename detail::ClassOf<Getter>::Type;
+		using C = typename ClassOf<Getter>::Type;
 		C* inst = static_cast<C*>(cmp.scene);
 		int count = (inst->*counter)(cmp.handle);
 		stream.write(count);
@@ -391,7 +381,7 @@ struct SampledFuncProperty : ISampledFuncProperty
 	void setValue(ComponentUID cmp, int index, InputBlob& stream) const override
 	{
 		ASSERT(index == -1);
-		using C = typename detail::ClassOf<Getter>::Type;
+		using C = typename ClassOf<Getter>::Type;
 		C* inst = static_cast<C*>(cmp.scene);
 		int count;
 		stream.read(count);
@@ -415,14 +405,14 @@ struct BlobProperty : IBlobProperty
 {
 	void getValue(ComponentUID cmp, int index, OutputBlob& stream) const override
 	{
-		using C = typename detail::ClassOf<Getter>::Type;
+		using C = typename ClassOf<Getter>::Type;
 		C* inst = static_cast<C*>(cmp.scene);
 		(inst->*getter)(cmp.handle, stream);
 	}
 
 	void setValue(ComponentUID cmp, int index, InputBlob& stream) const override
 	{
-		using C = typename detail::ClassOf<Getter>::Type;
+		using C = typename ClassOf<Getter>::Type;
 		C* inst = static_cast<C*>(cmp.scene);
 		(inst->*setter)(cmp.handle, stream);
 	}
@@ -447,14 +437,14 @@ struct CommonProperty : Property<T>
 
 	void getValue(ComponentUID cmp, int index, OutputBlob& stream) const override
 	{
-		using C = typename detail::ClassOf<Getter>::Type;
+		using C = typename ClassOf<Getter>::Type;
 		C* inst = static_cast<C*>(cmp.scene);
 		detail::GetterProxy<Getter>::invoke(stream, inst, getter, cmp.handle, index);
 	}
 
 	void setValue(ComponentUID cmp, int index, InputBlob& stream) const override
 	{
-		using C = typename detail::ClassOf<Getter>::Type;
+		using C = typename ClassOf<Getter>::Type;
 		C* inst = static_cast<C*>(cmp.scene);
 		detail::SetterProxy<Setter>::invoke(stream, inst, setter, cmp.handle, index);
 	}
@@ -540,7 +530,7 @@ struct ArrayProperty : IArrayProperty
 
 	void addItem(ComponentUID cmp, int index) const override
 	{
-		using C = typename detail::ClassOf<Counter>::Type;
+		using C = typename ClassOf<Counter>::Type;
 		C* inst = static_cast<C*>(cmp.scene);
 		(inst->*adder)(cmp.handle, index);
 	}
@@ -548,7 +538,7 @@ struct ArrayProperty : IArrayProperty
 
 	void removeItem(ComponentUID cmp, int index) const override
 	{
-		using C = typename detail::ClassOf<Counter>::Type;
+		using C = typename ClassOf<Counter>::Type;
 		C* inst = static_cast<C*>(cmp.scene);
 		(inst->*remover)(cmp.handle, index);
 	}
@@ -556,7 +546,7 @@ struct ArrayProperty : IArrayProperty
 
 	int getCount(ComponentUID cmp) const override
 	{ 
-		using C = typename detail::ClassOf<Counter>::Type;
+		using C = typename ClassOf<Counter>::Type;
 		C* inst = static_cast<C*>(cmp.scene);
 		return (inst->*counter)(cmp.handle);
 	}
@@ -650,7 +640,7 @@ struct ConstArrayProperty : IArrayProperty
 
 	int getCount(ComponentUID cmp) const override
 	{
-		using C = typename detail::ClassOf<Counter>::Type;
+		using C = typename ClassOf<Counter>::Type;
 		C* inst = static_cast<C*>(cmp.scene);
 		return (inst->*counter)(cmp.handle);
 	}
@@ -740,7 +730,7 @@ auto blob_property(const char* name, Getter getter, Setter setter, Attributes...
 template <typename Getter, typename Setter, typename Counter>
 auto sampled_func_property(const char* name, Getter getter, Setter setter, Counter counter, float max_x)
 {
-	using R = typename detail::ResultOf<Getter>::Type;
+	using R = typename ResultOf<Getter>::Type;
 	SampledFuncProperty<Getter, Setter, Counter> p;
 	p.getter = getter;
 	p.setter = setter;
@@ -754,7 +744,7 @@ auto sampled_func_property(const char* name, Getter getter, Setter setter, Count
 template <typename Getter, typename Setter, typename... Attributes>
 auto property(const char* name, Getter getter, Setter setter, Attributes... attributes)
 {
-	using R = typename detail::ResultOf<Getter>::Type;
+	using R = typename ResultOf<Getter>::Type;
 	CommonProperty<R, Getter, Setter, Attributes...> p;
 	p.attributes = makeTuple(attributes...);
 	p.getter = getter;

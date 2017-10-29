@@ -44,6 +44,8 @@ public:
 		INPUT_REFACTOR,
 		ENTER_EXIT_EVENTS,
 		ANIMATION_SPEED_MULTIPLIER,
+		MASKS,
+		END_GUARD,
 
 		LAST
 	};
@@ -57,7 +59,7 @@ public:
 	bool load(FS::IFile& file) override;
 	ComponentInstance* createInstance(IAllocator& allocator);
 	void serialize(OutputBlob& blob);
-	bool deserialize(InputBlob& blob);
+	bool deserialize(InputBlob& blob, int& version);
 	IAllocator& getAllocator() { return m_allocator; }
 	void addAnimation(int set, u32 hash, Animation* animation);
 
@@ -70,6 +72,7 @@ public:
 
 	Array<AnimSetEntry> m_animation_set;
 	Array<StaticString<32>> m_sets_names;
+	Array<BoneMask> m_masks;
 	InputDecl m_input_decl;
 	Component* m_root;
 

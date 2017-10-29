@@ -27,6 +27,7 @@ namespace Lumix
 			const void* getData() const { return m_data; }
 			void* getMutableData() { return m_data; }
 			int getPos() const { return m_pos; }
+			void write(const string& string);
 			void write(const void* data, int size);
 			void writeString(const char* string);
 			template <class T> inline void write(const T& value);
@@ -63,6 +64,7 @@ namespace Lumix
 			InputBlob(const void* data, int size);
 			explicit InputBlob(const OutputBlob& blob);
 
+			bool read(string& string);
 			bool read(void* data, int size);
 			bool readString(char* data, int max_size);
 			template <class T> void read(T& value) { read(&value, sizeof(T)); }
