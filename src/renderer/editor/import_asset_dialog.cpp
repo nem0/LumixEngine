@@ -1070,7 +1070,9 @@ struct FBXImporter
 			const ofbx::IScene& scene = *anim.scene;
 			const ofbx::TakeInfo* take_info = scene.getTakeInfo(stack->name);
 
-			float scene_frame_rate = 24.0f / time_scale;
+			float fbx_frame_rate = scene.getSceneFrameRate();
+			if (fbx_frame_rate < 0) fbx_frame_rate = 24;
+			float scene_frame_rate = fbx_frame_rate / time_scale;
 			float sampling_period = 1.0f / scene_frame_rate;
 			int all_frames_count = 0;
 			if (take_info)
