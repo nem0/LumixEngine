@@ -100,24 +100,35 @@ struct InputDecl
 
 	void removeInput(int index)
 	{
-		if (index < inputs_count - 1)
-		{
-			moveMemory(&inputs[index], &inputs[index + 1], sizeof(inputs[0]) * (inputs_count - index - 1));
-		}
+		inputs[index].type = EMPTY;
 		--inputs_count;
 	}
 
 
-	void addInput(int index)
+	void moveInput(int old_idx, int new_idx)
 	{
-		ASSERT(index < lengthOf(inputs));
-		if (index >= 0)
+		if (old_idx == new_idx) return;
+		ASSERT(inputs[new_idx].type == EMPTY);
+		inputs[new_idx] = inputs[old_idx];
+		inputs[old_idx].type = EMPTY;
+	}
+
+
+	int addInput()
+	{
+		ASSERT(inputs_count < lengthOf(inputs));
+		
+		for (int i = 0; i < lengthOf(inputs); ++i)
 		{
-			moveMemory(&inputs[index + 1], &inputs[index], sizeof(inputs[0]) * (inputs_count - index));
+			if (inputs[i].type == EMPTY)
+			{
+				inputs[i].name = "";
+				inputs[i].type = BOOL;
+				++inputs_count;
+				return i;
+			}
 		}
-		inputs[inputs_count].name = "";
-		inputs[inputs_count].type = BOOL;
-		++inputs_count;
+		return -1;
 	}
 
 

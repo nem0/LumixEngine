@@ -1,7 +1,6 @@
 #pragma once
 
 
-
 namespace Lumix
 {
 
@@ -10,7 +9,7 @@ template <typename T> auto getMembers();
 
 
 // inspired by https://github.com/eliasdaler/MetaStuff
-template <typename T, typename... Members>
+template <typename... Members>
 struct ClassDesc
 {
 	const char* name;
@@ -22,20 +21,25 @@ template <typename Class, typename T, typename... Attrs>
 struct Member
 {
 	using RefSetter = void (Class::*)(const T&);
+	using ValueSetter = void (Class::*)(T);
 	using RefGetter = T& (Class::*)();
 	using MemberPtr = T (Class::*);
 
 	Member() {}
 	Member(const char* name, MemberPtr member_ptr, Attrs... attrs);
+	Member(const char* name, RefGetter getter, Attrs... attrs);
 	Member(const char* name, RefGetter getter, RefSetter setter, Attrs... attrs);
+	Member(const char* name, RefGetter getter, ValueSetter setter, Attrs... attrs);
 
 	T& getRef(Class& obj) const;
 	template <typename V> void set(Class& obj, const V& value) const;
+	bool hasSetter() const { return ref_setter || value_setter; }
 
 	const char* name = nullptr;
 	bool has_member_ptr = false;
 	MemberPtr member_ptr = nullptr;
 	RefSetter ref_setter = nullptr;
+	ValueSetter value_setter = nullptr;
 	RefGetter ref_getter = nullptr;
 	Tuple<Attrs...> attributes;
 };
@@ -62,12 +66,35 @@ Member<Class, T, Attrs...>::Member(const char* name, RefGetter getter, RefSetter
 
 
 template <typename Class, typename T, typename... Attrs>
+Member<Class, T, Attrs...>::Member(const char* name, RefGetter getter, Attrs... attrs)
+	: name(name)
+	, ref_getter(getter)
+{
+	attributes = makeTuple(attrs...);
+}
+
+
+template <typename Class, typename T, typename... Attrs>
+Member<Class, T, Attrs...>::Member(const char* name, RefGetter getter, ValueSetter setter, Attrs... attrs)
+	: name(name)
+	, ref_getter(getter)
+	, value_setter(setter)
+{
+	attributes = makeTuple(attrs...);
+}
+
+
+template <typename Class, typename T, typename... Attrs>
 template <typename V> 
 void Member<Class, T, Attrs...>::set(Class& obj, const V& value) const
 {
 	if (ref_setter)
 	{
 		(obj.*ref_setter)(value);
+	}
+	else if (value_setter)
+	{
+		(obj.*value_setter)(value);
 	}
 	else if (has_member_ptr)
 	{
@@ -90,10 +117,10 @@ T& Member<Class, T, Attrs...>::getRef(Class& obj) const
 }
 
 
-template <typename T, typename... Members>
+template <typename... Members>
 auto type(const char* name, Members... members)
 {
-	ClassDesc<T, Members...> class_desc;
+	ClassDesc<Members...> class_desc;
 	class_desc.name = name;
 	class_desc.members = makeTuple(members...);
 	return class_desc;
@@ -103,7 +130,7 @@ auto type(const char* name, Members... members)
 template <typename T, typename Class, typename... Attrs>
 auto property(const char* name, T (Class::*getter)(), Attrs... attrs)
 {
-	return Member<Class, RemoveCVR<T>, Attrs...>(name, getter, nullptr, attrs...);
+	return Member<Class, RemoveCVR<T>, Attrs...>(name, getter, attrs...);
 }
 
 
@@ -120,6 +147,37 @@ auto property(const char* name, R& (Class::*getter)(), void (Class::*setter)(T),
 	return Member<Class, RemoveCVR<R>, Attrs...>(name, getter, setter, attrs...);
 }
 
+
+template <typename T>
+struct EnumValue
+{
+	T value;
+	const char* name;
+};
+
+
+template <typename T> auto getEnum() { return makeTuple(); }
+template <typename T> 
+int getEnumValueIndex(T value)
+{
+	int out = 0;
+	int idx = 0;
+	apply([&out, &idx, value](const auto& enum_value) {
+		if (enum_value.value == value) out = idx;
+		++idx;
+	}, getEnum<T>());
+	return out;
+}
+template <typename T> 
+T getEnumValueFromIndex(int idx)
+{
+	T out;
+	apply([&idx, &out](const auto& enum_value) {
+		if (idx == 0) out = enum_value.value;
+		--idx;
+	}, getEnum<T>());
+	return out;
+}
 
 template <typename Counter>
 struct ArraySizeAttribute
@@ -158,7 +216,14 @@ auto array_size_attribute(Counter counter)
 	return attr;
 }
 
+
 inline void serialize(OutputBlob& blob, string& obj)
+{
+	blob.write(obj);
+}
+
+
+inline void serialize(OutputBlob& blob, int obj)
 {
 	blob.write(obj);
 }
@@ -184,13 +249,22 @@ void serialize(OutputBlob& blob, Array<T>& array)
 
 
 template <typename T>
-void serialize(OutputBlob& blob, T& obj)
+typename EnableIf<TupleSize<decltype(getEnum<T>())>::result == 0>::Type
+serialize(OutputBlob& blob, T& obj)
 {
 	auto l = [&blob, &obj](const auto& member) {
 		decltype(auto) x = member.getRef(obj);
 		serialize(blob, x);
 	};
 	apply(l, getMembers<RemoveCVR<T>>().members);
+}
+
+
+template <typename T>
+typename EnableIf<TupleSize<decltype(getEnum<T>())>::result != 0>::Type
+serialize(OutputBlob& blob, T& obj)
+{
+	blob.write(obj);
 }
 
 
@@ -206,8 +280,10 @@ void deserialize(InputBlob& blob, Class& obj)
 
 
 template <typename Parent, typename Member, typename Class>
-void deserialize(InputBlob& blob, Parent& parent, const Member&, Class& obj)
+typename EnableIf<TupleSize<decltype(getEnum<Class>())>::result == 0>::Type
+deserialize(InputBlob& blob, Parent& parent, const Member& member, Class& obj)
 {
+	ASSERT(!member.hasSetter());
 	auto l = [&blob, &obj](const auto& member) {
 		auto& value = member.getRef(obj);
 		deserialize(blob, obj, member, value);
@@ -216,22 +292,42 @@ void deserialize(InputBlob& blob, Parent& parent, const Member&, Class& obj)
 }
 
 
-template <typename Parent, typename Member>
-void deserialize(InputBlob& blob, Parent& parent, const Member&, string& obj)
+template <typename Parent, typename Member, typename Class>
+typename EnableIf<TupleSize<decltype(getEnum<Class>())>::result != 0>::Type
+deserialize(InputBlob& blob, Parent& parent, const Member& member, Class& obj)
 {
+	Class tmp;
+	blob.read(tmp);
+	member.set(parent, tmp);
+}
+
+
+template <typename Parent, typename Member>
+void deserialize(InputBlob& blob, Parent& parent, const Member& member, string& obj)
+{
+	ASSERT(!member.hasSetter());
 	blob.read(obj);
 }
 
-template <typename Parent, typename Member, int count>
-void deserialize(InputBlob& blob, Parent& parent, const Member&, StaticString<count>& obj)
+template <typename Parent, typename Member>
+void deserialize(InputBlob& blob, Parent& parent, const Member& member, int& obj)
 {
-	blob.readString(obj.data, lengthOf(obj.data));
+	member.set(parent, obj);
+}
+
+template <typename Parent, typename Member, int count>
+void deserialize(InputBlob& blob, Parent& parent, const Member& member, StaticString<count>& obj)
+{
+	StaticString<count> tmp;
+	blob.readString(tmp.data, lengthOf(tmp.data));
+	member.set(parent, tmp);
 }
 
 
 template <typename Parent, typename Member, typename T>
 void deserialize(InputBlob& blob, Parent& parent, const Member& member, Array<T>& array)
 {
+	ASSERT(!member.hasSetter());
 	int count = blob.read<int>();
 	for (int i = 0; i < count; ++i)
 	{
@@ -560,7 +656,7 @@ struct UIBuilder
 		template <typename F>
 		void operator()(const CustomUIAttribute<F>& attr)
 		{
-			F::build(*this, owner, pp, obj);
+			F::build(owner, pp, obj);
 			has_custom_ui = true;
 		}
 
@@ -656,8 +752,22 @@ struct UIBuilder
 	}
 
 
+	template <typename O, typename PP>
+	void ui(O& owner, const PP& pp, int& obj)
+	{
+		if (customUI(owner, pp, obj)) return;
+
+		if (ImGui::InputInt(pp.name, &obj))
+		{
+			auto* command = LUMIX_NEW(m_allocator, SetPropertyCommand<Root, int, PP>)(m_root, pp, obj);
+			m_editor.executeCommand(*command);
+		}
+	}
+
+
 	template <typename O, typename PP, typename T>
-	void ui(O& owner, const PP& pp, T& obj)
+	typename EnableIf<TupleSize<decltype(getEnum<T>())>::result == 0>::Type
+		ui(O& owner, const PP& pp, T& obj)
 	{
 		if (customUI(owner, pp, obj)) return;
 
@@ -666,6 +776,28 @@ struct UIBuilder
 			auto child_pp = makePP(pp, m);
 			ui(obj, child_pp, v);
 		}, getMembers<T>().members);
+	}
+
+
+	template <typename O, typename PP, typename T>
+	typename EnableIf<TupleSize<decltype(getEnum<T>())>::result != 0>::Type
+		ui(O& owner, const PP& pp, T& obj)
+	{
+		auto enum_values = getEnum<T>();
+		int idx = getEnumValueIndex(obj);
+		auto getter = [](void* data, int index, const char** out){
+			auto enum_values = getEnum<T>();
+			apply([&out, &index](auto& enum_value) {
+				if (index == 0) *out = enum_value.name;
+				--index;
+			}, enum_values);
+			return true;
+		};
+		if (ImGui::Combo(pp.name, &idx, getter, nullptr, TupleSize<decltype(enum_values)>::result))
+		{
+			T val = getEnumValueFromIndex<T>(idx);
+			pp.head.set(owner, val);
+		}
 	}
 
 
@@ -692,7 +824,7 @@ struct UIBuilder
 		
 		bool expanded = ImGui::TreeNodeEx(pp.name, ImGuiTreeNodeFlags_AllowOverlapMode);
 		ImGui::SameLine();
-		if (ImGui::SmallButton(StaticString<32>("Add")))
+		if (ImGui::SmallButton("Add"))
 		{
 			auto* command = LUMIX_NEW(m_allocator, AddArrayItemCommand<Root, PP>)(m_root, pp);
 			m_editor.executeCommand(*command);

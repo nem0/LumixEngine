@@ -1664,6 +1664,7 @@ ControllerResource::ControllerResource(IAnimationEditor& editor,
 	, m_allocator(allocator)
 	, m_editor(editor)
 	, m_masks(allocator)
+	, m_inputs(allocator)
 {
 	m_engine_resource = LUMIX_NEW(allocator, Anim::ControllerResource)(Path("editor"), manager, allocator);
 	auto* engine_root = LUMIX_NEW(allocator, Anim::StateMachine)(*m_engine_resource, allocator);
@@ -1749,6 +1750,10 @@ bool ControllerResource::deserialize(InputBlob& blob, Engine& engine, IAllocator
 		}
 	}
 
+	m_inputs.clear();
+	//TODO inputs
+	ASSERT(false);
+
 	return true;
 }
 
@@ -1770,6 +1775,39 @@ void ControllerResource::Mask::Bone::setName(const string& _name)
 		}
 	}
 	ASSERT(false);
+}
+
+
+StaticString<32>& ControllerResource::InputProxy::getName()
+{
+	return resource.m_engine_resource->m_input_decl.inputs[engine_input_idx].name;
+}
+
+
+Anim::InputDecl::Type& ControllerResource::InputProxy::getType()
+{
+	return resource.m_engine_resource->m_input_decl.inputs[engine_input_idx].type;
+}
+
+
+void ControllerResource::InputProxy::setType(Anim::InputDecl::Type type)
+{
+	Anim::InputDecl& decl = resource.m_engine_resource->m_input_decl;
+	decl.inputs[engine_input_idx].type = type;
+	decl.recalculateOffsets();
+}
+
+
+void ControllerResource::InputProxy::setEngineIdx(int idx)
+{
+	resource.m_engine_resource->m_input_decl.moveInput(engine_input_idx, idx);
+	engine_input_idx = idx;
+}
+
+
+void ControllerResource::InputProxy::setName(const StaticString<32>& value)
+{
+	resource.m_engine_resource->m_input_decl.inputs[engine_input_idx].name = value;
 }
 
 
@@ -1807,6 +1845,29 @@ void ControllerResource::removeMask(int index)
 {
 	m_masks.erase(index);
 	m_engine_resource->m_masks.erase(index);
+}
+
+
+void ControllerResource::addInput(int index)
+{
+	if (index < 0)
+	{
+		InputProxy& proxy = m_inputs.emplace(*this);
+		proxy.engine_input_idx = m_engine_resource->m_input_decl.addInput();
+	}
+	else
+	{
+		InputProxy& proxy = m_inputs.emplaceAt(index, *this);
+		proxy.engine_input_idx = m_engine_resource->m_input_decl.addInput();
+	}
+}
+
+
+void ControllerResource::removeInput(int index)
+{
+	int engine_idx = m_inputs[index].engine_input_idx;
+	m_engine_resource->m_input_decl.removeInput(engine_idx);
+	m_inputs.erase(index);
 }
 
 

@@ -16,6 +16,13 @@ template <class T> using RemoveCR = typename RemoveConst<typename RemoveReferenc
 template <class T> using RemoveCVR = typename RemoveVolatile<RemoveCR<T>>::Type;
 
 
+template<bool B, class T = void>
+struct EnableIf {};
+
+template<class T>
+struct EnableIf<true, T> { using Type = T; };
+
+
 template <typename T> struct ResultOf;
 template <typename R, typename C, typename... Args> struct ResultOf<R(C::*)(Args...)> { using Type = R; };
 

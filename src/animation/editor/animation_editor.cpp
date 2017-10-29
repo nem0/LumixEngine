@@ -46,10 +46,46 @@ using namespace AnimEditor;
 template <>
 auto getMembers<ControllerResource>()
 {
-	return type<ControllerResource>("controller",
+	return type("controller",
 		property("Masks", &ControllerResource::getMasks,
 			array_attribute(&ControllerResource::addMask, &ControllerResource::removeMask)
+		),
+		property("Inputs", &ControllerResource::getInputs,
+			array_attribute(&ControllerResource::addInput, &ControllerResource::removeInput)
 		)
+	);
+}
+
+
+struct NoUIBuilder
+{
+	template <typename Owner, typename PP, typename T>
+	static void build(Owner& owner, const PP& pp, T& obj) {}
+};
+
+
+using NoUIAttribute = CustomUIAttribute<NoUIBuilder>;
+
+
+template <>
+auto getEnum<Anim::InputDecl::Type>()
+{
+	return makeTuple(
+		EnumValue<Anim::InputDecl::Type>{ Anim::InputDecl::Type::FLOAT, "Decimal" },
+		EnumValue<Anim::InputDecl::Type>{ Anim::InputDecl::Type::BOOL, "Bool" },
+		EnumValue<Anim::InputDecl::Type>{ Anim::InputDecl::Type::INT, "Integer" }
+	);
+}
+		
+
+template <>
+auto getMembers<ControllerResource::InputProxy>()
+{
+	return type("Input",
+		property("Name", &ControllerResource::InputProxy::getName, &ControllerResource::InputProxy::setName),
+		property("Type", &ControllerResource::InputProxy::getType, &ControllerResource::InputProxy::setType),
+		property("Engine idx", &ControllerResource::InputProxy::getEngineIdx, &ControllerResource::InputProxy::setEngineIdx, 
+			NoUIAttribute()) // TODO setter
 	);
 }
 
@@ -57,7 +93,7 @@ auto getMembers<ControllerResource>()
 template <>
 auto getMembers<ControllerResource::Mask>()
 {
-	return type<ControllerResource>("Mask",
+	return type("Mask",
 		property("Name", &ControllerResource::Mask::getName, &ControllerResource::Mask::setName),
 		property("Bones", &ControllerResource::Mask::bones,
 			array_attribute(&ControllerResource::Mask::addBone, &ControllerResource::Mask::removeBone)
@@ -68,7 +104,7 @@ auto getMembers<ControllerResource::Mask>()
 template <>
 auto getMembers<ControllerResource::Mask::Bone>()
 {
-	return type<ControllerResource::Mask>("Bone",
+	return type("Bone",
 		property("Name", &ControllerResource::Mask::Bone::getName, &ControllerResource::Mask::Bone::setName)
 		);
 }
@@ -981,6 +1017,7 @@ void AnimationEditor::inputsGUI()
 {
 	if (ImGui::BeginDock("Animation inputs", &m_inputs_open))
 	{
+		/*
 		if (ImGui::CollapsingHeader("Inputs"))
 		{
 			const auto& selected_entities = m_app.getWorldEditor().getSelectedEntities();
@@ -1036,7 +1073,8 @@ void AnimationEditor::inputsGUI()
 					}
 				}
 			}
-		}
+		}*/
+		// TODO
 
 		masksGUI();
 		constantsGUI();
