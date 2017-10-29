@@ -162,20 +162,22 @@ int getEnumValueIndex(T value)
 {
 	int out = 0;
 	int idx = 0;
+	auto enum_desc = getEnum<T>();
 	apply([&out, &idx, value](const auto& enum_value) {
 		if (enum_value.value == value) out = idx;
 		++idx;
-	}, getEnum<T>());
+	}, enum_desc);
 	return out;
 }
 template <typename T> 
 T getEnumValueFromIndex(int idx)
 {
 	T out;
+	auto enum_desc = getEnum<T>();
 	apply([&idx, &out](const auto& enum_value) {
 		if (idx == 0) out = enum_value.value;
 		--idx;
-	}, getEnum<T>());
+	}, enum_desc);
 	return out;
 }
 
@@ -252,11 +254,12 @@ template <typename T>
 typename EnableIf<TupleSize<decltype(getEnum<T>())>::result == 0>::Type
 serialize(OutputBlob& blob, T& obj)
 {
+	auto desc = getMembers<RemoveCVR<T>>();
 	auto l = [&blob, &obj](const auto& member) {
 		decltype(auto) x = member.getRef(obj);
 		serialize(blob, x);
 	};
-	apply(l, getMembers<RemoveCVR<T>>().members);
+	apply(l, desc.members);
 }
 
 
@@ -271,11 +274,12 @@ serialize(OutputBlob& blob, T& obj)
 template <typename Class>
 void deserialize(InputBlob& blob, Class& obj)
 {
+	auto desc = getMembers<Class>();
 	auto l = [&blob, &obj](const auto& member) {
 		auto& value = member.getRef(obj);
 		deserialize(blob, obj, member, value);
 	};
-	apply(l, getMembers<Class>().members);
+	apply(l, desc.members);
 }
 
 
@@ -501,7 +505,7 @@ struct RemoveArrayItemCommand : IEditorCommand
 
 	bool execute() override
 	{
-		auto& owner = ((PP::Base&)pp).getValueFromRoot(root);
+		auto& owner = ((typename PP::Base&)pp).getValueFromRoot(root);
 		auto& array = pp.getValueFromRoot(root);
 		::Lumix::serialize(blob, array[index]);
 		removeFromArray(pp.head, owner, index);
@@ -511,7 +515,7 @@ struct RemoveArrayItemCommand : IEditorCommand
 
 	void undo() override
 	{
-		auto& owner = ((PP::Base&)pp).getValueFromRoot(root);
+		auto& owner = ((typename PP::Base&)pp).getValueFromRoot(root);
 		addToArray(pp.head, owner, index);
 		InputBlob input_blob(blob);
 		auto& array = pp.getValueFromRoot(root);
@@ -542,7 +546,7 @@ struct AddArrayItemCommand : IEditorCommand
 
 	bool execute() override
 	{
-		auto& owner = ((PropertyPath::Base&)pp).getValueFromRoot(root);
+		auto& owner = ((typename PropertyPath::Base&)pp).getValueFromRoot(root);
 		addToArray(pp.head, owner, -1);
 		return true;
 	}
@@ -550,7 +554,7 @@ struct AddArrayItemCommand : IEditorCommand
 
 	void undo() override
 	{
-		auto& owner = ((PropertyPath::Base&)pp).getValueFromRoot(root);
+		auto& owner = ((typename PropertyPath::Base&)pp).getValueFromRoot(root);
 		auto& array = pp.getValueFromRoot(root);
 		int size = getArraySize(pp.head, owner);
 		removeFromArray(pp.head, owner, size - 1);
@@ -579,7 +583,7 @@ struct PropertyPath : Prev
 {
 	using Base = Prev;
 
-	PropertyPath(Prev& prev, Member _head) : Prev(prev), head(_head), name(_head.name) {}
+	PropertyPath(const Prev& prev, Member _head) : Prev(prev), head(_head), name(_head.name) {}
 
 	template <typename T>
 	decltype(auto) getValue(T& obj) const { return head.getRef(obj); }
@@ -607,7 +611,7 @@ struct PropertyPathArray : Prev
 {
 	using Base = Prev;
 
-	PropertyPathArray(Prev& prev, int _index)
+	PropertyPathArray(const Prev& prev, int _index)
 		: Prev(prev), index(_index) {}
 
 	template <typename T>
@@ -631,14 +635,14 @@ struct PropertyPathArray : Prev
 
 
 template <typename Prev, typename Member>
-auto makePP(Prev& prev, Member head)
+auto makePP(const Prev& prev, const Member& head)
 {
-	return PropertyPath<Prev, RemoveReference<Member>::Type>(prev, head);
+	return PropertyPath<typename RemoveReference<Prev>::Type, typename RemoveReference<Member>::Type>(prev, head);
 }
 
 
 template <typename Prev>
-auto makePP(Prev& prev, int index)
+auto makePP(const Prev& prev, int index)
 {
 	return PropertyPathArray<Prev>(prev, index);
 }
@@ -656,11 +660,12 @@ struct UIBuilder
 
 	void build()
 	{
+		auto desc = getMembers<Root>();
 		apply([this](const auto& member) {
 			auto pp = makePP(PropertyPathBegin{}, member);
 			auto& v = member.getRef(m_root);
-			ui(m_root, pp, v);
-		}, getMembers<Root>().members);
+			this->ui(m_root, pp, v);
+		}, desc.members);
 	}
 
 
@@ -673,8 +678,8 @@ struct UIBuilder
 			, obj(obj)
 		{}
 
-		template <typename T>
-		void operator()(const T& attr) {}
+		template <typename Attr>
+		void operator()(const Attr& attr) {}
 		
 		template <typename F>
 		void operator()(const CustomUIAttribute<F>& attr)
@@ -794,11 +799,12 @@ struct UIBuilder
 	{
 		if (customUI(owner, pp, obj)) return;
 
+		auto desc = getMembers<T>();
 		apply([&pp, this, &obj](const auto& m) {
 			auto& v = m.getRef(obj);
 			auto child_pp = makePP(pp, m);
-			ui(obj, child_pp, v);
-		}, getMembers<T>().members);
+			this->ui(obj, child_pp, v);
+		}, desc.members);
 	}
 
 
