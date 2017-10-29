@@ -304,8 +304,8 @@ bool DataView::operator==(const char* rhs) const
 
 
 struct Property;
-template <typename T> bool parseArrayRaw(const Property& property, T* out, int max_size);
-template <typename T> bool parseBinaryArray(const Property& property, std::vector<T>* out);
+template <typename T> static bool parseArrayRaw(const Property& property, T* out, int max_size);
+template <typename T> static bool parseBinaryArray(const Property& property, std::vector<T>* out);
 
 
 struct Property : IElementProperty
@@ -1173,8 +1173,8 @@ struct ClusterImpl : Cluster
 	int getIndicesCount() const override { return (int)indices.size(); }
 	const double* getWeights() const override { return &weights[0]; }
 	int getWeightsCount() const override { return (int)weights.size(); }
-	Matrix getTransformMatrix() const { return transform_matrix; }
-	Matrix getTransformLinkMatrix() const { return transform_link_matrix; }
+	Matrix getTransformMatrix() const override { return transform_matrix; }
+	Matrix getTransformLinkMatrix() const override { return transform_link_matrix; }
 	Object* getLink() const override { return link; }
 
 
@@ -1265,7 +1265,7 @@ struct AnimationStackImpl : AnimationStack
 	}
 
 
-	const AnimationLayer* getLayer(int index) const
+	const AnimationLayer* getLayer(int index) const override
 	{
 		assert(index == 0);
 		return resolveObjectLink<AnimationLayer>(index);
@@ -1372,7 +1372,7 @@ struct Scene : IScene
 	};
 
 
-	int getAnimationStackCount() const { return (int)m_animation_stacks.size(); }
+	int getAnimationStackCount() const override { return (int)m_animation_stacks.size(); }
 	int getMeshCount() const override { return (int)m_meshes.size(); }
 
 

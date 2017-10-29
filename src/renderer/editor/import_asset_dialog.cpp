@@ -220,8 +220,20 @@ struct FBXImporter
 
 	struct ImportAnimation
 	{
+		struct Split
+		{
+			int from_frame = 0;
+			int to_frame = 0;
+			StaticString<32> name;
+		};
+
+		ImportAnimation(IAllocator& allocator)
+			: splits(allocator)
+		{}
+
 		const ofbx::AnimationStack* fbx = nullptr;
 		const ofbx::IScene* scene = nullptr;
+		Array<Split> splits;
 		StaticString<MAX_PATH_LENGTH> output_filename;
 		bool import = true;
 		int root_motion_bone_idx = -1;
@@ -446,7 +458,8 @@ struct FBXImporter
 		int anim_count = scene.getAnimationStackCount();
 		for (int i = 0; i < anim_count; ++i)
 		{
-			ImportAnimation& anim = animations.emplace();
+			IAllocator& allocator = app.getWorldEditor().getAllocator();
+			ImportAnimation& anim = animations.emplace(allocator);
 			anim.scene = &scene;
 			anim.fbx = (const ofbx::AnimationStack*)scene.getAnimationStack(i);
 			anim.import = true;
@@ -926,7 +939,8 @@ struct FBXImporter
 	// arg parent_scale - animated scale is not supported, but we can get rid of static scale if we ignore
 	// it in writeSkeleton() and use parent_scale in this function
 	static void compressPositions(Array<TranslationKey>& out,
-		int frames,
+		int from_frame,
+		int to_frame,
 		float sample_period,
 		const ofbx::AnimationCurveNode* curve_node,
 		const ofbx::Object& bone,
@@ -935,24 +949,24 @@ struct FBXImporter
 	{
 		out.clear();
 		if (!curve_node) return;
-		if (frames == 0) return;
+		if (to_frame == from_frame) return;
 
 		ofbx::Vec3 lcl_rotation = bone.getLocalRotation();
-		Vec3 pos = getTranslation(bone.evalLocal(curve_node->getNodeLocalTransform(0), lcl_rotation)) * parent_scale;
+		Vec3 pos = getTranslation(bone.evalLocal(curve_node->getNodeLocalTransform(from_frame * sample_period), lcl_rotation)) * parent_scale;
 		TranslationKey last_written = {pos, 0, 0};
 		out.push(last_written);
-		if (frames == 1) return;
+		if (to_frame == from_frame + 1) return;
 
-		float dt = sample_period;
-		pos = getTranslation(bone.evalLocal(curve_node->getNodeLocalTransform(sample_period), lcl_rotation)) *
+		pos = getTranslation(bone.evalLocal(curve_node->getNodeLocalTransform((from_frame + 1) * sample_period), lcl_rotation)) *
 			  parent_scale;
 		Vec3 dif = (pos - last_written.pos) / sample_period;
 		TranslationKey prev = {pos, sample_period, 1};
-		for (u16 i = 2; i < (u16)frames; ++i)
+		float dt = sample_period;
+		for (u16 i = 2; i < u16(to_frame - from_frame); ++i)
 		{
 			float t = i * sample_period;
 			Vec3 cur =
-				getTranslation(bone.evalLocal(curve_node->getNodeLocalTransform(t), lcl_rotation)) * parent_scale;
+				getTranslation(bone.evalLocal(curve_node->getNodeLocalTransform((from_frame + i) * sample_period), lcl_rotation)) * parent_scale;
 			dt = t - last_written.time;
 			Vec3 estimate = last_written.pos + dif * dt;
 			if (fabs(estimate.x - cur.x) > error || fabs(estimate.y - cur.y) > error ||
@@ -967,17 +981,18 @@ struct FBXImporter
 			prev = {cur, t, i};
 		}
 
-		float t = frames * sample_period;
+		float t = (to_frame - from_frame) * sample_period;
 		last_written = {
-			getTranslation(bone.evalLocal(curve_node->getNodeLocalTransform(t), lcl_rotation)) * parent_scale,
+			getTranslation(bone.evalLocal(curve_node->getNodeLocalTransform(to_frame * sample_period), lcl_rotation)) * parent_scale,
 			t,
-			(u16)frames};
+			u16(to_frame - from_frame)};
 		out.push(last_written);
 	}
 
 
 	static void compressRotations(Array<RotationKey>& out,
-		int frames,
+		int from_frame,
+		int to_frame,
 		float sample_period,
 		const ofbx::AnimationCurveNode* curve_node,
 		const ofbx::Object& bone,
@@ -985,22 +1000,22 @@ struct FBXImporter
 	{
 		out.clear();
 		if (!curve_node) return;
-		if (frames == 0) return;
-
-		ofbx::Vec3 lcl_translation = bone.getLocalTranslation();
-		Quat rot = getRotation(bone.evalLocal(lcl_translation, curve_node->getNodeLocalTransform(0)));
-		RotationKey last_written = {rot, 0, 0};
-		out.push(last_written);
-		if (frames == 1) return;
+		if (to_frame == from_frame) return;
 
 		float dt = sample_period;
-		rot = getRotation(bone.evalLocal(lcl_translation, curve_node->getNodeLocalTransform(sample_period)));
+		ofbx::Vec3 lcl_translation = bone.getLocalTranslation();
+		Quat rot = getRotation(bone.evalLocal(lcl_translation, curve_node->getNodeLocalTransform(from_frame * sample_period)));
+		RotationKey last_written = {rot, 0, 0};
+		out.push(last_written);
+		if (to_frame == from_frame + 1) return;
+
+		rot = getRotation(bone.evalLocal(lcl_translation, curve_node->getNodeLocalTransform((from_frame + 1) * sample_period)));
 		RotationKey after_last = {rot, sample_period, 1};
 		RotationKey prev = after_last;
-		for (u16 i = 2; i < (u16)frames; ++i)
+		for (u16 i = 2; i < u16(to_frame - from_frame); ++i)
 		{
 			float t = i * sample_period;
-			Quat cur = getRotation(bone.evalLocal(lcl_translation, curve_node->getNodeLocalTransform(t)));
+			Quat cur = getRotation(bone.evalLocal(lcl_translation, curve_node->getNodeLocalTransform((from_frame + i) * sample_period)));
 			Quat estimate;
 			nlerp(cur, last_written.rot, &estimate, sample_period / (t - last_written.time));
 			if (fabs(estimate.x - after_last.rot.x) > error || fabs(estimate.y - after_last.rot.y) > error ||
@@ -1014,9 +1029,11 @@ struct FBXImporter
 			prev = {cur, t, i};
 		}
 
-		float t = frames * sample_period;
+		float t = (to_frame - from_frame) * sample_period;
 		last_written = {
-			getRotation(bone.evalLocal(lcl_translation, curve_node->getNodeLocalTransform(t))), t, (u16)frames};
+			getRotation(bone.evalLocal(lcl_translation, curve_node->getNodeLocalTransform(to_frame * sample_period))), 
+			t, 
+			u16(to_frame - from_frame)};
 		out.push(last_written);
 	}
 
@@ -1048,18 +1065,17 @@ struct FBXImporter
 			ImportAnimation& anim = animations[anim_idx];
 			dialog.setImportMessage("Writing animation...", 0.6f + 0.2f * (anim_idx / (float)animations.size()));
 			if (!anim.import) continue;
-
 			const ofbx::AnimationStack* stack = anim.fbx;
 			const char* anim_name = stack->name;
 			const ofbx::IScene& scene = *anim.scene;
 			const ofbx::TakeInfo* take_info = scene.getTakeInfo(stack->name);
 
-			float begin = 0;
-			float end = 0;
+			float scene_frame_rate = 24.0f / time_scale;
+			float sampling_period = 1.0f / scene_frame_rate;
+			int all_frames_count = 0;
 			if (take_info)
 			{
-				begin = (float)take_info->local_time_from;
-				end = (float)take_info->local_time_to;
+				all_frames_count = int((take_info->local_time_to - take_info->local_time_from) / sampling_period + 0.5f);
 			}
 			else
 			{
@@ -1074,91 +1090,97 @@ struct FBXImporter
 			(float)((mode == FbxTime::eCustom) ? scene->GetGlobalSettings().GetCustomFrameRate()
 			: FbxTime::GetFrameRate(mode));
 			*/
-			float scene_frame_rate = 24.0f / time_scale;
-			float sampling_period = 1.0f / scene_frame_rate;
-
-			float duration = (end > begin ? end - begin : 1.0f) * time_scale;
-
-			StaticString<MAX_PATH_LENGTH> tmp(output_dir, anim.output_filename, ".ani");
-			IAllocator& allocator = app.getWorldEditor().getAllocator();
-			if (!out_file.open(tmp, FS::Mode::CREATE_AND_WRITE, allocator))
+			for (int i = 0; i < Math::maximum(1, anim.splits.size()); ++i)
 			{
-				g_log_error.log("FBX") << "Failed to create " << tmp;
-				continue;
-			}
-			Animation::Header header;
-			header.magic = Animation::HEADER_MAGIC;
-			header.version = 3;
-			header.fps = (u32)(scene_frame_rate + 0.5f);
-			write(header);
+				FBXImporter::ImportAnimation::Split whole_anim_split;
+				whole_anim_split.to_frame = all_frames_count;
+				auto* split = anim.splits.empty() ? &whole_anim_split : &anim.splits[i];
 
-			write(anim.root_motion_bone_idx);
-			write(int(duration / sampling_period));
-			int used_bone_count = 0;
+				float begin = sampling_period * split->from_frame;
+				float end = sampling_period * split->to_frame;
 
-			for (const ofbx::Object* bone : bones)
-			{
-				if (&bone->getScene() != &scene) continue;
+				float duration = (end > begin ? end - begin : 1.0f) * time_scale;
+				int frame_count = split->to_frame - split->from_frame;
 
-				const ofbx::AnimationLayer* layer = stack->getLayer(0);
-				const ofbx::AnimationCurveNode* translation_curve_node = layer->getCurveNode(*bone, "Lcl Translation");
-				const ofbx::AnimationCurveNode* rotation_curve_node = layer->getCurveNode(*bone, "Lcl Rotation");
-				if (translation_curve_node || rotation_curve_node) ++used_bone_count;
-			}
-
-
-			write(used_bone_count);
-			Array<TranslationKey> positions(allocator);
-			Array<RotationKey> rotations(allocator);
-			for (const ofbx::Object* bone : bones)
-			{
-				if (&bone->getScene() != &scene) continue;
-				const ofbx::Object* root_bone = anim.root_motion_bone_idx >= 0 ? bones[anim.root_motion_bone_idx] : nullptr;
-
-				const ofbx::AnimationLayer* layer = stack->getLayer(0);
-				const ofbx::AnimationCurveNode* translation_node = layer->getCurveNode(*bone, "Lcl Translation");
-				const ofbx::AnimationCurveNode* rotation_node = layer->getCurveNode(*bone, "Lcl Rotation");
-				if (!translation_node && !rotation_node) continue;
-
-				u32 name_hash = crc32(bone->name);
-				write(name_hash);
-				int frames = int((duration / sampling_period) + 0.5f);
-
-				int depth = getDepth(bone);
-				float parent_scale = bone->getParent() ? (float)getScaleX(bone->getParent()->getGlobalTransform()) : 1;
-				compressPositions(positions, frames, sampling_period, translation_node, *bone, position_error / depth, parent_scale);
-				write(positions.size());
-
-				for (TranslationKey& key : positions) write(key.frame);
-				for (TranslationKey& key : positions)
+				StaticString<MAX_PATH_LENGTH> tmp(output_dir, anim.output_filename, split->name, ".ani");
+				IAllocator& allocator = app.getWorldEditor().getAllocator();
+				if (!out_file.open(tmp, FS::Mode::CREATE_AND_WRITE, allocator))
 				{
-					if (bone == root_bone)
-					{
-						write(fixRootOrientation(key.pos * mesh_scale));
-					}
-					else
-					{
-						write(fixOrientation(key.pos * mesh_scale));
-					}
+					g_log_error.log("FBX") << "Failed to create " << tmp;
+					continue;
+				}
+				Animation::Header header;
+				header.magic = Animation::HEADER_MAGIC;
+				header.version = 3;
+				header.fps = (u32)(scene_frame_rate + 0.5f);
+				write(header);
+
+				write(anim.root_motion_bone_idx);
+				write(frame_count);
+				int used_bone_count = 0;
+
+				for (const ofbx::Object* bone : bones)
+				{
+					if (&bone->getScene() != &scene) continue;
+
+					const ofbx::AnimationLayer* layer = stack->getLayer(0);
+					const ofbx::AnimationCurveNode* translation_curve_node = layer->getCurveNode(*bone, "Lcl Translation");
+					const ofbx::AnimationCurveNode* rotation_curve_node = layer->getCurveNode(*bone, "Lcl Rotation");
+					if (translation_curve_node || rotation_curve_node) ++used_bone_count;
 				}
 
-				compressRotations(rotations, frames, sampling_period, rotation_node, *bone, rotation_error / depth);
-
-				write(rotations.size());
-				for (RotationKey& key : rotations) write(key.frame);
-				for (RotationKey& key : rotations)
+				write(used_bone_count);
+				Array<TranslationKey> positions(allocator);
+				Array<RotationKey> rotations(allocator);
+				for (const ofbx::Object* bone : bones)
 				{
-					if (bone == root_bone)
+					if (&bone->getScene() != &scene) continue;
+					const ofbx::Object* root_bone = anim.root_motion_bone_idx >= 0 ? bones[anim.root_motion_bone_idx] : nullptr;
+
+					const ofbx::AnimationLayer* layer = stack->getLayer(0);
+					const ofbx::AnimationCurveNode* translation_node = layer->getCurveNode(*bone, "Lcl Translation");
+					const ofbx::AnimationCurveNode* rotation_node = layer->getCurveNode(*bone, "Lcl Rotation");
+					if (!translation_node && !rotation_node) continue;
+
+					u32 name_hash = crc32(bone->name);
+					write(name_hash);
+
+					int depth = getDepth(bone);
+					float parent_scale = bone->getParent() ? (float)getScaleX(bone->getParent()->getGlobalTransform()) : 1;
+					compressPositions(positions, split->from_frame, split->to_frame, sampling_period, translation_node, *bone, position_error / depth, parent_scale);
+					write(positions.size());
+
+					for (TranslationKey& key : positions) write(key.frame);
+					for (TranslationKey& key : positions)
 					{
-						write(fixRootOrientation(key.rot));
+						if (bone == root_bone)
+						{
+							write(fixRootOrientation(key.pos * mesh_scale));
+						}
+						else
+						{
+							write(fixOrientation(key.pos * mesh_scale));
+						}
 					}
-					else
+
+					compressRotations(rotations, split->from_frame, split->to_frame, sampling_period, rotation_node, *bone, rotation_error / depth);
+
+					write(rotations.size());
+					for (RotationKey& key : rotations) write(key.frame);
+					for (RotationKey& key : rotations)
 					{
-						write(fixOrientation(key.rot));
+						if (bone == root_bone)
+						{
+							write(fixRootOrientation(key.rot));
+						}
+						else
+						{
+							write(fixOrientation(key.rot));
+						}
 					}
 				}
+				out_file.close();
 			}
-			out_file.close();
 		}
 	}
 
@@ -2784,7 +2806,7 @@ void ImportAssetDialog::onAnimationsGUI()
 	ImGui::DragFloat("Max rotation error", &m_fbx_importer->rotation_error, 0, FLT_MAX);
 
 	ImGui::Indent();
-	ImGui::Columns(3);
+	ImGui::Columns(4);
 	
 	ImGui::Text("Name");
 	ImGui::NextColumn();
@@ -2792,12 +2814,14 @@ void ImportAssetDialog::onAnimationsGUI()
 	ImGui::NextColumn();
 	ImGui::Text("Root motion bone");
 	ImGui::NextColumn();
+	ImGui::Text("Splits");
+	ImGui::NextColumn();
 	ImGui::Separator();
 
 	ImGui::PushID("anims");
 	for (int i = 0; i < m_fbx_importer->animations.size(); ++i)
 	{
-		auto& animation = m_fbx_importer->animations[i];
+		FBXImporter::ImportAnimation& animation = m_fbx_importer->animations[i];
 		ImGui::PushID(i);
 		ImGui::InputText("###name", animation.output_filename.data, lengthOf(animation.output_filename.data));
 		ImGui::NextColumn();
@@ -2809,6 +2833,24 @@ void ImportAssetDialog::onAnimationsGUI()
 			return true;
 		};
 		ImGui::Combo("##rb", &animation.root_motion_bone_idx, getter, this, m_fbx_importer->bones.size());
+		ImGui::NextColumn();
+		if (ImGui::Button("Add split")) animation.splits.emplace();
+		for (int i = 0; i < animation.splits.size(); ++i)
+		{
+			auto& split = animation.splits[i];
+			if (ImGui::TreeNodeEx(StaticString<64>("", i)))
+			{
+				ImGui::InputText("Name", split.name.data, sizeof(split.name.data));
+				ImGui::InputInt("From", &split.from_frame);
+				ImGui::InputInt("To", &split.to_frame);
+				if (ImGui::Button("Remove"))
+				{
+					animation.splits.erase(i);
+					--i;
+				}
+				ImGui::TreePop();
+			}
+		}
 		ImGui::NextColumn();
 		ImGui::PopID();
 	}
