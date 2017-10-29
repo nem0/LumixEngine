@@ -40,7 +40,7 @@ public:
 	}
 
 	virtual ~Component();
-	virtual void destroy(IAnimationEditor& editor) {};
+	virtual void destroy() {};
 	virtual bool draw(ImDrawList* draw, const ImVec2& canvas_screen_pos, bool selected) = 0;
 	virtual void onGUI() {}
 	virtual void serialize(OutputBlob& blob) = 0;
@@ -76,7 +76,7 @@ public:
 	~Node();
 
 	bool isNode() const override { return true; }
-	void destroy(IAnimationEditor& editor) override;
+	void destroy() override;
 	bool hitTest(const ImVec2& on_canvas_pos) const override;
 	void onGUI() override;
 	void serialize(OutputBlob& blob) override;
@@ -138,7 +138,7 @@ public:
 	~Edge();
 
 	bool isNode() const override { return false; }
-	void destroy(IAnimationEditor& editor) override;
+	void destroy() override;
 	void onGUI() override;
 	bool draw(ImDrawList* draw, const ImVec2& canvas_screen_pos, bool selected) override;
 	void serialize(OutputBlob& blob) override;
@@ -169,6 +169,25 @@ public:
 	void deserialize(InputBlob& blob) override;
 
 	int root_rotation_input = -1;
+};
+
+
+class LayersNode : public Container
+{
+public:
+	LayersNode(Anim::Component* engine_cmp, Container* parent, ControllerResource& controller);
+
+	void compile() override;
+	void onGUI() override;
+	void serialize(OutputBlob& blob) override;
+	void deserialize(InputBlob& blob) override;
+	void drawInside(ImDrawList* draw, const ImVec2& canvas_screen_pos) override;
+	void dropSlot(const char* name, u32 slot, const ImVec2& canvas_screen_pos) override;
+
+private:
+	void createNode(Anim::Component::Type type, int uid, const ImVec2& pos) override;
+
+	Array<u32> m_masks;
 };
 
 
@@ -270,6 +289,62 @@ private:
 class ControllerResource
 {
 public:
+	struct Mask
+	{
+		class Bone
+		{
+			public:
+				Bone(ControllerResource& _controller) 
+					: controller(_controller)
+					, name("", _controller.m_allocator) {}
+
+				void setName(const string& name);
+				const string& getName() const { return name; }
+				string& getName() { return name; }
+
+			private:
+				string name;
+				ControllerResource& controller;
+		};
+
+		Mask(ControllerResource& _controller) 
+			: controller(_controller)
+			, name("", controller.m_allocator)
+			, bones(controller.m_allocator)
+		{}
+
+		void addBone(int index);
+		void removeBone(int index);
+		string& getName() { return name; }
+		const string& getName() const { return name; }
+		void setName(const string& value);
+		
+		ControllerResource& controller;
+		Array<Bone> bones;
+	
+	
+	private:
+		string name;
+	};
+
+	struct InputProxy
+	{
+		InputProxy(ControllerResource& resource) : resource(resource) {}
+
+		void setName(const StaticString<32>& name);
+		StaticString<32>& getName();
+
+		int& getEngineIdx() { return engine_input_idx; }
+		void setEngineIdx(int idx);
+
+		Anim::InputDecl::Type& getType();
+		void setType(Anim::InputDecl::Type type);
+
+		int engine_input_idx;
+		ControllerResource& resource;
+	};
+
+public:
 	ControllerResource(IAnimationEditor& editor,
 		ResourceManagerBase& manager,
 		IAllocator& allocator);
@@ -279,6 +354,15 @@ public:
 	bool deserialize(InputBlob& blob, Engine& engine, IAllocator& allocator);
 	Component* getRoot() { return m_root; }
 	Array<string>& getAnimationSlots() { return m_animation_slots; }
+	
+	Array<Mask>& getMasks() { return m_masks; }
+	void addMask(int index);
+	void removeMask(int index);
+
+	Array<InputProxy>& getInputs() { return m_inputs; }
+	void addInput(int index);
+	void removeInput(int index);
+
 	IAllocator& getAllocator() { return m_allocator; }
 	Anim::ControllerResource* getEngineResource() { return m_engine_resource; }
 	IAnimationEditor& getEditor() { return m_editor; }
@@ -294,6 +378,8 @@ private:
 	Component* m_root;
 	Anim::ControllerResource* m_engine_resource;
 	Array<string> m_animation_slots;
+	Array<Mask> m_masks;
+	Array<InputProxy> m_inputs;
 };
 
 

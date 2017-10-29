@@ -15,6 +15,7 @@ class Animation;
 struct AnimationSystem;
 class Engine;
 class InputBlob;
+struct BoneMask;
 class Model;
 class OutputBlob;
 struct Pose;
@@ -28,9 +29,11 @@ namespace Anim
 
 struct Blend1DNode;
 struct Component;
-struct Container;
 struct ComponentInstance;
+struct Container;
+class ControllerResource;
 struct Edge;
+struct LayersNode;
 struct StateMachine;
 
 
@@ -41,7 +44,7 @@ struct ComponentInstance
 	virtual ~ComponentInstance() {}
 	virtual ComponentInstance* update(RunningContext& rc, bool check_edges) = 0;
 	virtual RigidTransform getRootMotion() const = 0;
-	virtual void fillPose(Engine& engine, Pose& pose, Model& model, float weight) = 0;
+	virtual void fillPose(Engine& engine, Pose& pose, Model& model, float weight, BoneMask* mask) = 0;
 	virtual void enter(RunningContext& rc, ComponentInstance* from) = 0;
 	virtual float getTime() const = 0;
 	virtual float getLength() const = 0;
@@ -58,16 +61,21 @@ struct Component
 		SIMPLE_ANIMATION,
 		EDGE,
 		STATE_MACHINE,
-		BLEND1D
+		BLEND1D,
+		LAYERS
 	};
 
-	Component(Type _type) : type(_type), uid(-1) {}
+	Component(ControllerResource& _controller, Type _type) 
+		: controller(_controller)
+		, type(_type)
+		, uid(-1) {}
 	virtual ~Component() {}
 	virtual ComponentInstance* createInstance(IAllocator& allocator) = 0;
 	virtual void serialize(OutputBlob& blob);
 	virtual void deserialize(InputBlob& blob, Container* parent, int version);
 	virtual Component* getByUID(int _uid) { return (uid == _uid) ? this : nullptr; }
 
+	ControllerResource& controller;
 	int uid;
 	const Type type;
 };
@@ -75,7 +83,7 @@ struct Component
 
 struct Node : public Component
 {
-	Node(Component::Type type, IAllocator& _allocator);
+	Node(ControllerResource& controller, Component::Type type, IAllocator& _allocator);
 	~Node();
 
 	void serialize(OutputBlob& blob) override;
@@ -92,7 +100,7 @@ struct Node : public Component
 
 struct Container : public Node
 {
-	Container(Component::Type type, IAllocator& _allocator);
+	Container(ControllerResource& controller, Component::Type type, IAllocator& _allocator);
 	~Container();
 
 	void serialize(OutputBlob& blob) override;
@@ -107,7 +115,7 @@ struct Container : public Node
 
 struct Edge : public Component
 {
-	Edge(IAllocator& allocator);
+	Edge(ControllerResource& controller, IAllocator& allocator);
 	~Edge();
 	ComponentInstance* createInstance(IAllocator& allocator) override;
 	void serialize(OutputBlob& blob) override;
@@ -135,7 +143,7 @@ protected:
 
 struct AnimationNode : public Node
 {
-	AnimationNode(IAllocator& allocator);
+	AnimationNode(ControllerResource& controller, IAllocator& allocator);
 	ComponentInstance* createInstance(IAllocator& allocator) override;
 	void serialize(OutputBlob& blob) override;
 	void deserialize(InputBlob& blob, Container* parent, int version) override;
@@ -156,7 +164,7 @@ struct Blend1DNodeInstance : public NodeInstance
 	RigidTransform getRootMotion() const override;
 	float getTime() const override { return time; }
 	float getLength() const override { return a0 ? a0->getLength() : 0; }
-	void fillPose(Engine& engine, Pose& pose, Model& model, float weight) override;
+	void fillPose(Engine& engine, Pose& pose, Model& model, float weight, BoneMask* mask) override;
 	ComponentInstance* update(RunningContext& rc, bool check_edges) override;
 	void enter(RunningContext& rc, ComponentInstance* from) override;
 	void onAnimationSetUpdated(AnimSet& anim_set) override;
@@ -173,7 +181,7 @@ struct Blend1DNodeInstance : public NodeInstance
 
 struct Blend1DNode : public Container
 {
-	Blend1DNode(IAllocator& allocator);
+	Blend1DNode(ControllerResource& controller, IAllocator& allocator);
 	ComponentInstance* createInstance(IAllocator& allocator) override;
 	void serialize(OutputBlob& blob) override;
 	void deserialize(InputBlob& blob, Container* parent, int version) override;
@@ -189,13 +197,44 @@ struct Blend1DNode : public Container
 };
 
 
+struct LayersNodeInstance : public NodeInstance
+{
+	LayersNodeInstance(LayersNode& _node);
+
+	RigidTransform getRootMotion() const override;
+	float getTime() const override;
+	float getLength() const override;
+	void fillPose(Engine& engine, Pose& pose, Model& model, float weight, BoneMask* mask) override;
+	ComponentInstance* update(RunningContext& rc, bool check_edges) override;
+	void enter(RunningContext& rc, ComponentInstance* from) override;
+	void onAnimationSetUpdated(AnimSet& anim_set) override;
+
+	NodeInstance* layers[16];
+	struct BoneMask* masks[16];
+	int layers_count = 0;
+	LayersNode& node;
+	float time;
+};
+
+
+struct LayersNode : public Container
+{
+	LayersNode(ControllerResource& controller, IAllocator& allocator);
+	ComponentInstance* createInstance(IAllocator& allocator) override;
+	void serialize(OutputBlob& blob) override;
+	void deserialize(InputBlob& blob, Container* parent, int version) override;
+
+	u32 masks[16];
+};
+
+
 struct StateMachineInstance : public NodeInstance
 {
 	StateMachineInstance(StateMachine& _source, IAllocator& _allocator);
 	~StateMachineInstance();
 
 	ComponentInstance* update(RunningContext& rc, bool check_edges) override;
-	void fillPose(Engine& engine, Pose& pose, Model& model, float weight) override;
+	void fillPose(Engine& engine, Pose& pose, Model& model, float weight, BoneMask* mask) override;
 	void enter(RunningContext& rc, ComponentInstance* from) override;
 	float getTime() const override { return current ? current->getTime() : 0; }
 	float getLength() const override { return current ? current->getLength() : 0; }
@@ -211,7 +250,7 @@ struct StateMachineInstance : public NodeInstance
 
 struct StateMachine : public Container
 {
-	StateMachine(IAllocator& _allocator);
+	StateMachine(ControllerResource& controller, IAllocator& _allocator);
 
 	ComponentInstance* createInstance(IAllocator& allocator) override;
 	void serialize(OutputBlob& blob) override;
@@ -228,7 +267,7 @@ struct StateMachine : public Container
 };
 
 
-Component* createComponent(Component::Type type, IAllocator& allocator);
+Component* createComponent(ControllerResource& controller, Component::Type type, IAllocator& allocator);
 
 
 } // namespace Anim

@@ -607,7 +607,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		if (!pose) return;
 
 		model->getRelativePose(*pose);
-		animable.animation->getRelativePose(animable.time, *pose, *model);
+		animable.animation->getRelativePose(animable.time, *pose, *model, nullptr);
 		pose->computeAbsolute(*model);
 
 		float t = animable.time + time_delta * animable.time_scale;
@@ -789,7 +789,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		model->getPose(*pose);
 		pose->computeRelative(*model);
 
-		parent_controller.root->fillPose(m_engine, *pose, *model, 1);
+		parent_controller.root->fillPose(m_engine, *pose, *model, 1, nullptr);
 
 		pose->computeAbsolute(*model);
 		m_render_scene->unlockPose(model_instance, true);
@@ -825,10 +825,9 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 
 		Model* model = m_render_scene->getModelInstanceModel(model_instance);
 
-		model->getPose(*pose);
-		pose->computeRelative(*model);
+		model->getRelativePose(*pose);
 
-		controller.root->fillPose(m_engine, *pose, *model, 1);
+		controller.root->fillPose(m_engine, *pose, *model, 1, nullptr);
 
 		pose->computeAbsolute(*model);
 

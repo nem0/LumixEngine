@@ -16,6 +16,29 @@ template <class T> using RemoveCR = typename RemoveConst<typename RemoveReferenc
 template <class T> using RemoveCVR = typename RemoveVolatile<RemoveCR<T>>::Type;
 
 
+template<bool B, class T = void>
+struct EnableIf {};
+
+template<class T>
+struct EnableIf<true, T> { using Type = T; };
+
+
+template <typename T> struct ResultOf;
+template <typename R, typename C, typename... Args> struct ResultOf<R(C::*)(Args...)> { using Type = R; };
+
+template <typename T> struct ClassOf;
+template <typename R, typename C, typename... Args>
+struct ClassOf<R(C::*)(Args...)>
+{
+	using Type = C;
+};
+template <typename R, typename C>
+struct ClassOf<R(C::*)>
+{
+	using Type = C;
+};
+
+
 template <int... T> struct Indices {};
 
 
@@ -94,7 +117,7 @@ constexpr auto& get(const Tuple<Types...>& tuple)
 
 
 template <class F, class Tuple, int... I>
-constexpr void apply_impl(const F& f, Tuple& t, Indices<I...>)
+constexpr void apply_impl(F& f, Tuple& t, Indices<I...>)
 {
 	using expand = bool[];
 	(void)expand
@@ -107,10 +130,10 @@ constexpr void apply_impl(const F& f, Tuple& t, Indices<I...>)
 }
 
 template <class F, class Tuple>
-constexpr void apply_impl(const F& f, Tuple& t, Indices<>) {}
+constexpr void apply_impl(F& f, Tuple& t, Indices<>) {}
 
 template <class F, class Tuple>
-constexpr void apply(const F& f, Tuple& t)
+constexpr void apply(F& f, Tuple& t)
 {
 	apply_impl(f, t, typename BuildIndices<-1, TupleSize<Tuple>::result>::result{});
 }

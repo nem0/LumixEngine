@@ -51,7 +51,7 @@ Animation::Animation(const Path& path, ResourceManagerBase& resource_manager, IA
 }
 
 
-void Animation::getRelativePose(float time, Pose& pose, Model& model, float weight) const
+void Animation::getRelativePose(float time, Pose& pose, Model& model, float weight, BoneMask* mask) const
 {
 	PROFILE_FUNCTION();
 	ASSERT(!pose.is_absolute);
@@ -70,6 +70,7 @@ void Animation::getRelativePose(float time, Pose& pose, Model& model, float weig
 		{
 			Model::BoneMap::iterator iter = model.getBoneIndex(bone.name);
 			if (!iter.isValid()) continue;
+			if (mask && mask->bones.find(bone.name) == mask->bones.end()) continue;
 
 			int idx = 1;
 			for (int c = bone.pos_count; idx < c; ++idx)
@@ -105,6 +106,7 @@ void Animation::getRelativePose(float time, Pose& pose, Model& model, float weig
 		{
 			Model::BoneMap::iterator iter = model.getBoneIndex(bone.name);
 			if (!iter.isValid()) continue;
+			if (mask && mask->bones.find(bone.name) == mask->bones.end()) continue;
 
 			int model_bone_index = iter.value();
 			lerp(pos[model_bone_index], bone.pos[bone.pos_count - 1], &pos[model_bone_index], weight);
@@ -163,7 +165,7 @@ int Animation::getBoneIndex(u32 name) const
 }
 
 
-void Animation::getRelativePose(float time, Pose& pose, Model& model) const
+void Animation::getRelativePose(float time, Pose& pose, Model& model, BoneMask* mask) const
 {
 	PROFILE_FUNCTION();
 	ASSERT(!pose.is_absolute);
@@ -182,6 +184,7 @@ void Animation::getRelativePose(float time, Pose& pose, Model& model) const
 		{
 			Model::BoneMap::iterator iter = model.getBoneIndex(bone.name);
 			if (!iter.isValid()) continue;
+			if (mask && mask->bones.find(bone.name) == mask->bones.end()) continue;
 
 			int idx = 1;
 			for (int c = bone.pos_count; idx < c; ++idx)
@@ -211,6 +214,7 @@ void Animation::getRelativePose(float time, Pose& pose, Model& model) const
 		{
 			Model::BoneMap::iterator iter = model.getBoneIndex(bone.name);
 			if (!iter.isValid()) continue;
+			if (mask && mask->bones.find(bone.name) == mask->bones.end()) continue;
 
 			int model_bone_index = iter.value();
 			pos[model_bone_index] = bone.pos[bone.pos_count - 1];

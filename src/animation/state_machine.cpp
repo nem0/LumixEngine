@@ -84,10 +84,10 @@ struct EdgeInstance : public ComponentInstance
 	}
 
 
-	void fillPose(Engine& engine, Pose& pose, Model& model, float weight) override
+	void fillPose(Engine& engine, Pose& pose, Model& model, float weight, BoneMask* mask) override
 	{
-		from->fillPose(engine, pose, model, weight);
-		to->fillPose(engine, pose, model, weight * time / edge.length);
+		from->fillPose(engine, pose, model, weight, mask);
+		to->fillPose(engine, pose, model, weight * time / edge.length, mask);
 	}
 
 
@@ -108,8 +108,8 @@ struct EdgeInstance : public ComponentInstance
 };
 
 
-Edge::Edge(IAllocator& allocator)
-	: Component(Component::EDGE)
+Edge::Edge(ControllerResource& controller, IAllocator& allocator)
+	: Component(controller, Component::EDGE)
 	, condition(allocator)
 {
 }
@@ -164,8 +164,8 @@ Node::~Node()
 }
 
 
-Node::Node(Component::Type type, IAllocator& _allocator)
-	: Component(type)
+Node::Node(ControllerResource& controller, Component::Type type, IAllocator& _allocator)
+	: Component(controller, type)
 	, out_edges(_allocator)
 	, allocator(_allocator)
 	, events(allocator)
@@ -239,11 +239,11 @@ Blend1DNodeInstance::Blend1DNodeInstance(Blend1DNode& _node)
 }
 
 
-void Blend1DNodeInstance::fillPose(Engine& engine, Pose& pose, Model& model, float weight)
+void Blend1DNodeInstance::fillPose(Engine& engine, Pose& pose, Model& model, float weight, BoneMask* mask)
 {
 	if (!a0 || !a1) return;
-	a0->fillPose(engine, pose, model, weight);
-	a1->fillPose(engine, pose, model, weight * current_weight);
+	a0->fillPose(engine, pose, model, weight, mask);
+	a1->fillPose(engine, pose, model, weight * current_weight, mask);
 }
 
 
@@ -320,8 +320,123 @@ void Blend1DNodeInstance::enter(RunningContext& rc, ComponentInstance* from)
 }
 
 
-Blend1DNode::Blend1DNode(IAllocator& allocator)
-	: Container(Component::BLEND1D, allocator)
+LayersNodeInstance::LayersNodeInstance(LayersNode& _node)
+	: NodeInstance(_node)
+	, node(_node)
+{
+	static_assert(sizeof(_node.masks) / sizeof(_node.masks[0]) == sizeof(masks) / sizeof(masks[0]), "");
+	for (int i = 0; i < lengthOf(masks); ++i)
+	{
+		masks[i] = nullptr;
+		int idx = _node.controller.m_masks.find([i, &_node](BoneMask& mask) {
+			return mask.name == _node.masks[i];
+		});
+		if (idx < 0) continue;
+
+		masks[i] = &_node.controller.m_masks[idx];
+		if (masks[i]->bones.empty()) masks[i] = nullptr;
+	}
+}
+
+
+RigidTransform LayersNodeInstance::getRootMotion() const
+{
+	if (layers_count == 0) return {{0, 0, 0}, {0, 0, 0, 1}};
+	return layers[0]->getRootMotion();
+}
+
+
+float LayersNodeInstance::getTime() const
+{
+	if (layers_count == 0) return 0;
+	return layers[0]->getTime();
+}
+
+
+float LayersNodeInstance::getLength() const
+{
+	if (layers_count == 0) return 0;
+	return layers[0]->getLength();
+}
+
+
+void LayersNodeInstance::fillPose(Engine& engine, Pose& pose, Model& model, float weight, BoneMask* mask)
+{
+	for (int i = 0; i < layers_count; ++i)
+	{
+		layers[i]->fillPose(engine, pose, model, weight, masks[i]);
+	}
+}
+
+
+ComponentInstance* LayersNodeInstance::update(RunningContext& rc, bool check_edges)
+{
+	float old_time = time;
+	time += rc.time_delta;
+	for (int i = 0; i < layers_count; ++i)
+	{
+		layers[i]->update(rc, false);
+	}
+	queueEvents(rc, old_time, time, 0);
+	return check_edges ? checkOutEdges(node, rc) : this;
+}
+
+
+void LayersNodeInstance::enter(RunningContext& rc, ComponentInstance* from)
+{
+	time = 0;
+	queueEnterEvents(rc);
+	if (node.children.size() > lengthOf(layers))
+	{
+		g_log_error.log("Animation") << "Too many layers in LayerNode, only " << lengthOf(layers) << " are used.";
+	}
+	for (int i = 0; i < node.children.size() && i < lengthOf(layers); ++i)
+	{
+		++layers_count;
+		layers[i] = (NodeInstance*)node.children[i]->createInstance(*rc.allocator);
+		layers[i]->enter(rc, nullptr);
+	}
+}
+
+
+void LayersNodeInstance::onAnimationSetUpdated(AnimSet& anim_set)
+{
+	for (int i = 0; i < layers_count; ++i)
+	{
+		layers[i]->onAnimationSetUpdated(anim_set);
+	}
+}
+
+
+LayersNode::LayersNode(ControllerResource& controller, IAllocator& allocator)
+	: Container(controller, Component::LAYERS, allocator)
+{
+	for (auto& mask : masks) mask = 0;
+}
+
+
+ComponentInstance* LayersNode::createInstance(IAllocator& allocator)
+{
+	return LUMIX_NEW(allocator, LayersNodeInstance)(*this);
+}
+
+
+void LayersNode::serialize(OutputBlob& blob)
+{
+	Container::serialize(blob);
+	blob.write(masks, sizeof(masks));
+}
+
+
+void LayersNode::deserialize(InputBlob& blob, Container* parent, int version)
+{
+	Container::deserialize(blob, parent, version);
+	blob.read(masks, sizeof(masks));
+}
+
+
+Blend1DNode::Blend1DNode(ControllerResource& controller, IAllocator& allocator)
+	: Container(controller, Component::BLEND1D, allocator)
 	, items(allocator)
 {
 }
@@ -363,8 +478,8 @@ void Blend1DNode::deserialize(InputBlob& blob, Container* parent, int version)
 }
 
 
-AnimationNode::AnimationNode(IAllocator& allocator)
-	: Node(Component::SIMPLE_ANIMATION, allocator)
+AnimationNode::AnimationNode(ControllerResource& controller, IAllocator& allocator)
+	: Node(controller, Component::SIMPLE_ANIMATION, allocator)
 	, animations_hashes(allocator)
 {
 }
@@ -529,16 +644,16 @@ struct AnimationNodeInstance : public NodeInstance
 	float getLength() const override { return resource ? resource->getLength() : 0; }
 
 
-	void fillPose(Engine& engine, Pose& pose, Model& model, float weight) override
+	void fillPose(Engine& engine, Pose& pose, Model& model, float weight, BoneMask* mask) override
 	{
 		if (!resource) return;
 		if (weight < 1)
 		{
-			resource->getRelativePose(time, pose, model, weight);
+			resource->getRelativePose(time, pose, model, weight, mask);
 		}
 		else if (weight > 0)
 		{
-			resource->getRelativePose(time, pose, model);
+			resource->getRelativePose(time, pose, model, mask);
 		}
 	}
 
@@ -664,9 +779,9 @@ ComponentInstance* StateMachineInstance::update(RunningContext& rc, bool check_e
 }
 
 
-void StateMachineInstance::fillPose(Engine& engine, Pose& pose, Model& model, float weight)
+void StateMachineInstance::fillPose(Engine& engine, Pose& pose, Model& model, float weight, BoneMask* mask)
 {
-	if(current) current->fillPose(engine, pose, model, weight);
+	if(current) current->fillPose(engine, pose, model, weight, mask);
 }
 
 
@@ -692,8 +807,8 @@ ComponentInstance* StateMachine::createInstance(IAllocator& allocator)
 }
 
 
-StateMachine::StateMachine(IAllocator& _allocator)
-	: Container(Component::STATE_MACHINE, _allocator)
+StateMachine::StateMachine(ControllerResource& controller, IAllocator& _allocator)
+	: Container(controller, Component::STATE_MACHINE, _allocator)
 	, entries(_allocator)
 {
 }
@@ -738,8 +853,8 @@ void StateMachine::deserialize(InputBlob& blob, Container* parent, int version)
 }
 
 
-Container::Container(Component::Type type, IAllocator& _allocator)
-	: Node(type, _allocator)
+Container::Container(ControllerResource& controller, Component::Type type, IAllocator& _allocator)
+	: Node(controller, type, _allocator)
 	, children(_allocator)
 	, allocator(_allocator)
 {
@@ -799,21 +914,22 @@ void Container::deserialize(InputBlob& blob, Container* parent, int version)
 	{
 		Component::Type type;
 		blob.read(type);
-		Component* item = createComponent(type, allocator);
+		Component* item = createComponent(controller, type, allocator);
 		item->deserialize(blob, this, version);
 		children.push(item);
 	}
 }
 
 
-Component* createComponent(Component::Type type, IAllocator& allocator)
+Component* createComponent(ControllerResource& controller, Component::Type type, IAllocator& allocator)
 {
 	switch (type)
 	{
-		case Component::BLEND1D: return LUMIX_NEW(allocator, Blend1DNode)(allocator);
-		case Component::EDGE: return LUMIX_NEW(allocator, Edge)(allocator);
-		case Component::STATE_MACHINE: return LUMIX_NEW(allocator, StateMachine)(allocator);
-		case Component::SIMPLE_ANIMATION: return LUMIX_NEW(allocator, AnimationNode)(allocator);
+		case Component::BLEND1D: return LUMIX_NEW(allocator, Blend1DNode)(controller, allocator);
+		case Component::EDGE: return LUMIX_NEW(allocator, Edge)(controller, allocator);
+		case Component::STATE_MACHINE: return LUMIX_NEW(allocator, StateMachine)(controller, allocator);
+		case Component::SIMPLE_ANIMATION: return LUMIX_NEW(allocator, AnimationNode)(controller, allocator);
+		case Component::LAYERS: return LUMIX_NEW(allocator, LayersNode)(controller, allocator);
 		default: ASSERT(false); return nullptr;
 	}
 }

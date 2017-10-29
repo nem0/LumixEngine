@@ -64,7 +64,7 @@ struct InputDecl
 	{
 		Type type = EMPTY;
 		int offset;
-		char name[32];
+		StaticString<32> name;
 	};
 
 	Input inputs[32];
@@ -95,6 +95,46 @@ struct InputDecl
 			++linear;
 		}
 		return -1;
+	}
+
+
+	void removeInput(int index)
+	{
+		inputs[index].type = EMPTY;
+		--inputs_count;
+	}
+
+
+	void moveInput(int old_idx, int new_idx)
+	{
+		if (old_idx == new_idx) return;
+		ASSERT(inputs[new_idx].type == EMPTY);
+		inputs[new_idx] = inputs[old_idx];
+		inputs[old_idx].type = EMPTY;
+	}
+
+
+	int addInput()
+	{
+		ASSERT(inputs_count < lengthOf(inputs));
+		
+		for (int i = 0; i < lengthOf(inputs); ++i)
+		{
+			if (inputs[i].type == EMPTY)
+			{
+				inputs[i].name = "";
+				inputs[i].type = BOOL;
+				++inputs_count;
+				return i;
+			}
+		}
+		return -1;
+	}
+
+
+	int getInputsCount() const
+	{
+		return inputs_count;
 	}
 
 

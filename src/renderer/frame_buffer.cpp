@@ -25,7 +25,6 @@ FrameBuffer::FrameBuffer(const Declaration& decl)
 {
 	m_autodestroy_handle = true;
 	bgfx::TextureHandle texture_handles[16];
-
 	for (int i = 0; i < decl.m_renderbuffers_count; ++i)
 	{
 		const RenderBuffer& renderbuffer = decl.m_renderbuffers[i];
@@ -42,6 +41,7 @@ FrameBuffer::FrameBuffer(const Declaration& decl)
 				renderbuffer.m_format,
 				DEFAULT_FLAGS);
 		}
+		bgfx::setName(texture_handles[i], StaticString<128>(m_declaration.m_name, " - ", i));
 		m_declaration.m_renderbuffers[i].m_handle = texture_handles[i];
 	}
 
@@ -114,6 +114,7 @@ void FrameBuffer::resize(int width, int height)
 				texture_handles[i] = bgfx::createTexture2D(
 					(uint16_t)width, (uint16_t)height, false, 1, renderbuffer.m_format, DEFAULT_FLAGS);
 			}
+			bgfx::setName(texture_handles[i], StaticString<128>(m_declaration.m_name, " - ", i));
 			m_declaration.m_renderbuffers[i].m_handle = texture_handles[i];
 		}
 
