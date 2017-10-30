@@ -1404,7 +1404,8 @@ public:
 		float ddpi;
 		float font_scale = 1;
 		if (SDL_GetDisplayDPI(0, &ddpi, nullptr, nullptr) == 0) font_scale = ddpi / 96;
-		m_font = io.Fonts->AddFontFromFileTTF("bin/VeraMono.ttf", (float)m_settings.m_font_size * font_scale);
+		m_font = io.Fonts->AddFontFromFileTTF("bin/OpenSans-Regular.ttf", (float)m_settings.m_font_size * font_scale);
+		m_bold_font = io.Fonts->AddFontFromFileTTF("bin/OpenSans-Bold.ttf", (float)m_settings.m_font_size * font_scale);
 
 		io.KeyMap[ImGuiKey_Tab] = SDLK_TAB;
 		io.KeyMap[ImGuiKey_LeftArrow] = SDL_SCANCODE_LEFT;
@@ -2343,6 +2344,12 @@ public:
 	}
 
 
+	ImFont* getBoldFont() override
+	{
+		return m_bold_font;
+	}
+
+
 	DefaultAllocator m_main_allocator;
 	Debug::Allocator m_allocator;
 	Engine* m_engine;
@@ -2397,6 +2404,7 @@ public:
 	bool m_is_save_as_dialog_open;
 	DragData m_drag_data;
 	ImFont* m_font;
+	ImFont* m_bold_font;
 };
 
 

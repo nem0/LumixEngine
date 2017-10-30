@@ -6,7 +6,7 @@
 
 
 union SDL_Event;
-
+struct ImFont;
 
 #ifdef STATIC_PLUGINS
 	#define LUMIX_STUDIO_ENTRY(plugin_name) \
@@ -132,6 +132,7 @@ public:
 	virtual int getEventsCount() const = 0;
 	virtual ~StudioApp() {}
 	virtual void run() = 0;
+	virtual ImFont* getBoldFont() = 0;
 };
 
 
