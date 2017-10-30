@@ -825,6 +825,20 @@ struct DockContext
 		ImVec2 min_size = root->getMinSize();
 		ImVec2 requested_size = size;
 		root->setPosSize(pos, ImMax(min_size, requested_size));
+
+		for (auto it = m_docks.begin(); it != m_docks.end();)
+		{
+			auto& dock = *it;
+			if (*dock->label && (ImGui::GetFrameCount() - dock->last_frame) > 1)
+			{
+				doUndock(*dock);
+				dock->~Dock();
+				MemFree(dock);
+				it = m_docks.erase(it);
+			}
+			else
+				++it;
+		}
 	}
 
 
