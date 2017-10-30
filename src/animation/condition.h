@@ -111,6 +111,8 @@ struct InputDecl
 		ASSERT(inputs[new_idx].type == EMPTY);
 		inputs[new_idx] = inputs[old_idx];
 		inputs[old_idx].type = EMPTY;
+		recalculateOffsets();
+
 	}
 
 
@@ -125,6 +127,7 @@ struct InputDecl
 				inputs[i].name = "";
 				inputs[i].type = BOOL;
 				++inputs_count;
+				recalculateOffsets();
 				return i;
 			}
 		}
