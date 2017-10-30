@@ -269,7 +269,7 @@ struct GridUIVisitor LUMIX_FINAL : Properties::IComponentVisitor
 		OutputBlob blob(&value, sizeof(value));
 		prop.getValue(cmp, m_index, blob);
 
-		if (ImGui::Checkbox(prop.name, &value))
+		if (ImGui::CheckboxEx(prop.name, &value))
 		{
 			m_editor.setProperty(m_cmp_type, m_index, prop, &m_entities[0], m_entities.size(), &value, sizeof(value));
 		}
@@ -418,7 +418,7 @@ struct GridUIVisitor LUMIX_FINAL : Properties::IComponentVisitor
 	void visit(const Properties::IArrayProperty& prop) override
 	{
 		ImGui::Unindent();
-		bool is_open = ImGui::TreeNodeEx(prop.name, ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowOverlapMode);
+		bool is_open = ImGui::TreeNodeEx(prop.name, ImGuiTreeNodeFlags_AllowOverlapMode);
 		if (m_entities.size() > 1)
 		{
 			ImGui::Text("Multi-object editing not supported.");
@@ -429,10 +429,11 @@ struct GridUIVisitor LUMIX_FINAL : Properties::IComponentVisitor
 
 		ComponentUID cmp = getComponent();
 		int count = prop.getCount(cmp);
+		const ImGuiStyle& style = ImGui::GetStyle();
 		if (prop.canAddRemove())
 		{
 			float w = ImGui::GetContentRegionAvailWidth();
-			ImGui::SameLine(w - 45);
+			ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize("Add").x - style.FramePadding.x * 2 - style.WindowPadding.x - 15);
 			if (ImGui::SmallButton("Add"))
 			{
 				m_editor.addArrayPropertyItem(cmp, prop);
@@ -455,7 +456,7 @@ struct GridUIVisitor LUMIX_FINAL : Properties::IComponentVisitor
 			if (prop.canAddRemove())
 			{
 				float w = ImGui::GetContentRegionAvailWidth();
-				ImGui::SameLine(w - 45);
+				ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize("Remove").x - style.FramePadding.x * 2 - style.WindowPadding.x - 15);
 				if (ImGui::SmallButton("Remove"))
 				{
 					m_editor.removeArrayPropertyItem(cmp, i, prop);
@@ -538,7 +539,7 @@ void PropertyGrid::showComponentProperties(const Array<Entity>& entities, Compon
 
 	float w = ImGui::GetContentRegionAvailWidth();
 	ImGuiStyle& style = ImGui::GetStyle();
-	ImGui::SameLine(w - ImGui::CalcTextSize("Remove").x - style.FramePadding.x * 2);
+	ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize("Remove").x - style.FramePadding.x * 2 - style.WindowPadding.x - 15);
 	if (ImGui::SmallButton("Remove"))
 	{
 		m_editor.destroyComponent(&entities[0], entities.size(), cmp_type);
@@ -689,18 +690,16 @@ void PropertyGrid::showCoreProperties(const Array<Entity>& entities)
 			}
 		}
 
-
-		ImGui::LabelText("ID", "%d", entities[0].index);
 		EntityGUID guid = m_editor.getEntityGUID(entities[0]);
 		if (guid == INVALID_ENTITY_GUID)
 		{
-			ImGui::LabelText("GUID", "%s", "runtime");
+			ImGui::Text("ID: %d, GUID: runtime", entities[0].index);
 		}
 		else
 		{
 			char guid_str[32];
 			toCString(guid.value, guid_str, lengthOf(guid_str));
-			ImGui::LabelText("GUID", "%s", guid_str);
+			ImGui::Text("ID: %d, GUID: %s", entities[0].index, guid_str);
 		}
 
 		Entity parent = m_editor.getUniverse()->getParent(entities[0]);

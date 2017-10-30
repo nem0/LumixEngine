@@ -9,6 +9,7 @@ struct lua_State;
 namespace ImGui
 {
 
+IMGUI_API bool CheckboxEx(const char* label, bool* v);
 IMGUI_API ImVec2 GetOsImePosRequest();
 IMGUI_API void ResetActiveID();
 IMGUI_API int PlotHistogramEx(const char* label,
