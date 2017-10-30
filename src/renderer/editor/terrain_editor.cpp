@@ -1469,14 +1469,26 @@ void TerrainEditor::onGUI()
 	if (m_decrease_texture_idx->isRequested()) m_decrease_texture_idx->func.invoke();
 
 	auto* scene = static_cast<RenderScene*>(m_component.scene);
-	if (!ImGui::CollapsingHeader("Terrain editor", nullptr, ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_Framed)) return;
+	ImGui::Unindent();
+	if (!ImGui::TreeNodeEx("Terrain editor"))
+	{
+		ImGui::Indent();
+		return;
+	}
 
 	ImGui::Checkbox("Editor enabled", &m_is_enabled);
-	if (!m_is_enabled) return;
+	if (!m_is_enabled)
+	{
+		ImGui::TreePop();
+		ImGui::Indent();
+		return;
+	}
 
 	if (!getMaterial())
 	{
 		ImGui::Text("No heightmap");
+		ImGui::TreePop();
+		ImGui::Indent();
 		return;
 	}
 	ImGui::SliderFloat("Brush size", &m_terrain_brush_size, MIN_BRUSH_SIZE, 100);
@@ -1570,6 +1582,8 @@ void TerrainEditor::onGUI()
 				}
 			}
 		}
+		ImGui::TreePop();
+		ImGui::Indent();
 	}
 
 

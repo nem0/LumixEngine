@@ -1205,10 +1205,10 @@ public:
 
 		if (m_confirm_load)
 		{
-			ImGui::OpenPopup("confirm_load");
+			ImGui::OpenPopup("Confirm");
 			m_confirm_load = false;
 		}
-		if(ImGui::BeginPopupModal("confirm_load"))
+		if(ImGui::BeginPopupModal("Confirm"))
 		{
 			ImGui::Text("All unsaved changes will be lost, do you want to continue?");
 			if (ImGui::Button("Continue"))
@@ -1426,6 +1426,10 @@ public:
 		io.KeyMap[ImGuiKey_X] = SDLK_x;
 		io.KeyMap[ImGuiKey_Y] = SDLK_y;
 		io.KeyMap[ImGuiKey_Z] = SDLK_z;
+
+		ImGuiStyle& style = ImGui::GetStyle();
+		style.FramePadding.y = 2;
+		style.ItemSpacing.y = 2;
 	}
 
 

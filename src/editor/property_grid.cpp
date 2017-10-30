@@ -417,11 +417,13 @@ struct GridUIVisitor LUMIX_FINAL : Properties::IComponentVisitor
 
 	void visit(const Properties::IArrayProperty& prop) override
 	{
+		ImGui::Unindent();
 		bool is_open = ImGui::TreeNodeEx(prop.name, ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowOverlapMode);
 		if (m_entities.size() > 1)
 		{
 			ImGui::Text("Multi-object editing not supported.");
 			if (is_open) ImGui::TreePop();
+			ImGui::Indent();
 			return;
 		}
 
@@ -437,7 +439,11 @@ struct GridUIVisitor LUMIX_FINAL : Properties::IComponentVisitor
 				count = prop.getCount(cmp);
 			}
 		}
-		if (!is_open) return;
+		if (!is_open)
+		{
+			ImGui::Indent();
+			return;
+		}
 
 		for (int i = 0; i < count; ++i)
 		{
@@ -471,6 +477,7 @@ struct GridUIVisitor LUMIX_FINAL : Properties::IComponentVisitor
 			ImGui::PopID();
 		}
 		ImGui::TreePop();
+		ImGui::Indent();
 	}
 
 
