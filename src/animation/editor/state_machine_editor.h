@@ -329,7 +329,16 @@ public:
 
 	struct InputProxy
 	{
-		InputProxy(ControllerResource& resource) : resource(resource) {}
+		struct ValueProxy
+		{
+			ValueProxy(InputProxy& input) : input(input) {}
+			InputProxy& input;
+		};
+
+		InputProxy(ControllerResource& resource)
+			: resource(resource)
+			, value_proxy(*this)
+		{}
 
 		void setName(const StaticString<32>& name);
 		StaticString<32>& getName();
@@ -340,6 +349,9 @@ public:
 		Anim::InputDecl::Type& getType();
 		void setType(Anim::InputDecl::Type type);
 
+		ValueProxy& getValue() { return value_proxy; }
+
+		ValueProxy value_proxy;
 		int engine_input_idx;
 		ControllerResource& resource;
 	};
