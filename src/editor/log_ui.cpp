@@ -184,6 +184,7 @@ void LogUI::onGUI()
 			}
 		}
 		
+		ImGui::SameLine();
 		char filter[128] = "";
 		ImGui::LabellessInputText("Filter", filter, sizeof(filter));
 		int len = 0;
