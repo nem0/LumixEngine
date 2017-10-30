@@ -354,7 +354,6 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 			cmd->cmp = cmp.handle;
 			editor.executeCommand(cmd);
 		}
-
 		for (int j = 0; j < scene->getScriptCount(cmp.handle); ++j)
 		{
 			char buf[MAX_PATH_LENGTH];
@@ -363,9 +362,9 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 			PathUtils::getBasename(header.data, lengthOf(header.data), buf);
 			if (header.empty()) header << j;
 			header << "###" << j;
-			if (ImGui::CollapsingHeader(header))
+			ImGui::Unindent();
+			if (ImGui::TreeNodeEx(header))
 			{
-				ImGui::PushID(j);
 				if (ImGui::Button("Remove script"))
 				{
 					auto* cmd = LUMIX_NEW(allocator, RemoveScriptCommand)(allocator);
@@ -373,7 +372,8 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 					cmd->scr_index = j;
 					cmd->scene = scene;
 					editor.executeCommand(cmd);
-					ImGui::PopID();
+					ImGui::TreePop();
+					ImGui::Indent();
 					break;
 				}
 				ImGui::SameLine();
@@ -385,7 +385,8 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 					cmd->scene = scene;
 					cmd->up = true;
 					editor.executeCommand(cmd);
-					ImGui::PopID();
+					ImGui::TreePop();
+					ImGui::Indent();
 					break;
 				}
 				ImGui::SameLine();
@@ -397,15 +398,15 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 					cmd->scene = scene;
 					cmd->up = false;
 					editor.executeCommand(cmd);
-					ImGui::PopID();
+					ImGui::TreePop();
+					ImGui::Indent();
 					break;
 				}
 
 				if (m_app.getAssetBrowser().resourceInput(
 						"Source", "src", buf, lengthOf(buf), LUA_SCRIPT_RESOURCE_TYPE))
 				{
-					auto* cmd =
-						LUMIX_NEW(allocator, SetPropertyCommand)(editor, cmp.handle, j, "-source", buf, allocator);
+					auto* cmd = LUMIX_NEW(allocator, SetPropertyCommand)(editor, cmp.handle, j, "-source", buf, allocator);
 					editor.executeCommand(cmd);
 				}
 				for (int k = 0, kc = scene->getPropertyCount(cmp.handle, j); k < kc; ++k)
@@ -480,8 +481,9 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 				{
 					scene->endFunctionCall();
 				}
-				ImGui::PopID();
+				ImGui::TreePop();
 			}
+			ImGui::Indent();
 		}
 	}
 
