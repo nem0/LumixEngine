@@ -1406,8 +1406,8 @@ void Container::deserialize(InputBlob& blob)
 		blob.read(uid);
 		if (uid >= 0)
 		{
-			auto* engine_sm = (Anim::StateMachine*)engine_cmp;
-			Component* cmp = createComponent(engine_sm->getChildByUID(uid), this, m_controller);
+			auto* engine_container = (Anim::Container*)engine_cmp;
+			Component* cmp = createComponent(engine_container->getChildByUID(uid), this, m_controller);
 			cmp->deserialize(blob);
 			m_editor_cmps.push(cmp);
 		}
