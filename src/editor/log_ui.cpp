@@ -11,7 +11,7 @@ namespace Lumix
 LogUI::LogUI(IAllocator& allocator)
 	: m_allocator(allocator)
 	, m_messages(allocator)
-	, m_current_tab(Error)
+	, m_level_filter(1)
 	, m_notifications(allocator)
 	, m_last_uid(1)
 	, m_guard(false)
@@ -26,7 +26,6 @@ LogUI::LogUI(IAllocator& allocator)
 	for (int i = 0; i < Count; ++i)
 	{
 		m_new_message_count[i] = 0;
-		m_messages.emplace(allocator);
 	}
 }
 
@@ -68,7 +67,9 @@ void LogUI::push(Type type, const char* message)
 {
 	MT::SpinLock lock(m_guard);
 	++m_new_message_count[type];
-	m_messages[type].push(string(message, m_allocator));
+	Message& msg = m_messages.emplace(m_allocator);
+	msg.text = message;
+	msg.type = type;
 
 	if (type == Error)
 	{
@@ -174,34 +175,25 @@ void LogUI::onGUI()
 			char label[40];
 			fillLabel(label, sizeof(label), labels[i], m_new_message_count[i]);
 			if(i > 0) ImGui::SameLine();
-			if (ImGui::Button(label))
+			bool b = m_level_filter & (1 << i);
+			if (ImGui::Checkbox(label, &b))
 			{
-				m_current_tab = i;
+				if (b) m_level_filter |= 1 << i;
+				else m_level_filter &= ~(1 << i);
 				m_new_message_count[i] = 0;
 			}
 		}
 		
-		auto* messages = &m_messages[m_current_tab];
-
-		if (ImGui::Button("Clear"))
-		{
-			for (int i = 0; i < m_messages.size(); ++i)
-			{
-				m_messages[m_current_tab].clear();
-				m_new_message_count[m_current_tab] = 0;
-			}
-		}
-
-		ImGui::SameLine();
 		char filter[128] = "";
 		ImGui::LabellessInputText("Filter", filter, sizeof(filter));
 		int len = 0;
 
 		if (ImGui::BeginChild("log_messages", ImVec2(0, 0), true))
 		{
-			for (int i = 0; i < messages->size(); ++i)
+			for (int i = 0; i < m_messages.size(); ++i)
 			{
-				const char* msg = (*messages)[i].c_str();
+				if ((m_level_filter & (1 << m_messages[i].type)) == 0) continue;
+				const char* msg = m_messages[i].text.c_str();
 				if (filter[0] == '\0' || strstr(msg, filter) != nullptr)
 				{
 					ImGui::TextUnformatted(msg);
@@ -214,9 +206,9 @@ void LogUI::onGUI()
 		{
 			if (ImGui::Selectable("Copy"))
 			{
-				for (int i = 0; i < messages->size(); ++i)
+				for (int i = 0; i < m_messages.size(); ++i)
 				{
-					const char* msg = (*messages)[i].c_str();
+					const char* msg = m_messages[i].text.c_str();
 					if (filter[0] == '\0' || strstr(msg, filter) != nullptr)
 					{
 						len += stringLength(msg);
@@ -227,9 +219,9 @@ void LogUI::onGUI()
 				{
 					char* mem = (char*)m_allocator.allocate(len);
 					mem[0] = '\0';
-					for (int i = 0; i < messages->size(); ++i)
+					for (int i = 0; i < m_messages.size(); ++i)
 					{
-						const char* msg = (*messages)[i].c_str();
+						const char* msg = m_messages[i].text.c_str();
 						if (filter[0] == '\0' || strstr(msg, filter) != nullptr)
 						{
 							catString(mem, len, msg);
@@ -240,6 +232,17 @@ void LogUI::onGUI()
 					PlatformInterface::copyToClipboard(mem);
 					m_allocator.deallocate(mem);
 				}
+			}
+			if (ImGui::Selectable("Clear"))
+			{
+				Array<Message> filtered_messages(m_allocator);
+				for (int i = 0; i < m_messages.size(); ++i)
+				{
+					if ((m_level_filter & (1 << m_messages[i].type)) != 0) continue;
+					filtered_messages.emplace(m_messages[i]);
+					m_new_message_count[m_messages[i].type] = 0;
+				}
+				m_messages.swap(filtered_messages);
 			}
 			ImGui::EndPopup();
 		}
