@@ -77,6 +77,37 @@ auto getEnum<Anim::InputDecl::Type>()
 	);
 }
 		
+template <>
+auto getMembers<ControllerResource::InputProxy::ValueProxy>()
+{
+	return type("Input Value");
+}
+
+struct InputValueCustomUI
+{
+	template <typename Owner, typename PP, typename T>
+	static void build(Owner& owner, const PP& pp, T& value)
+	{
+		StudioApp& app = owner.resource.getEditor().getApp();
+
+		const auto& selected_entities = app.getWorldEditor().getSelectedEntities();
+		auto* scene = (AnimationScene*)app.getWorldEditor().getUniverse()->getScene(ANIMABLE_HASH);
+		ComponentHandle cmp = selected_entities.empty() ? INVALID_COMPONENT : scene->getComponent(selected_entities[0], CONTROLLER_TYPE);
+		u8* input_data = cmp.isValid() ? scene->getControllerInput(cmp) : nullptr;
+		Anim::InputDecl& input_decl = owner.resource.getEngineResource()->m_input_decl;
+		Anim::InputDecl::Input& input = input_decl.inputs[owner.engine_input_idx];
+		if (input_data)
+		{
+			switch (input.type)
+			{
+				case Anim::InputDecl::FLOAT: ImGui::DragFloat("Value", (float*)(input_data + input.offset)); break;
+				case Anim::InputDecl::BOOL: ImGui::CheckboxEx("Value", (bool*)(input_data + input.offset)); break;
+				case Anim::InputDecl::INT: ImGui::InputInt("Value", (int*)(input_data + input.offset)); break;
+				default: ASSERT(false); break;
+			}
+		}
+	}
+};
 
 template <>
 auto getMembers<ControllerResource::InputProxy>()
@@ -84,6 +115,7 @@ auto getMembers<ControllerResource::InputProxy>()
 	return type("Input",
 		property("Name", &ControllerResource::InputProxy::getName, &ControllerResource::InputProxy::setName),
 		property("Type", &ControllerResource::InputProxy::getType, &ControllerResource::InputProxy::setType),
+		property("Value", &ControllerResource::InputProxy::getValue, CustomUIAttribute<InputValueCustomUI>()),
 		property("Engine idx", &ControllerResource::InputProxy::getEngineIdx, &ControllerResource::InputProxy::setEngineIdx, 
 			NoUIAttribute()) // TODO setter
 	);
