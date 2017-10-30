@@ -196,37 +196,8 @@ void LogUI::onGUI()
 		char filter[128] = "";
 		ImGui::LabellessInputText("Filter", filter, sizeof(filter));
 		int len = 0;
-		if (ImGui::Button("Copy to clipboard"))
-		{
-			for (int i = 0; i < messages->size(); ++i)
-			{
-				const char* msg = (*messages)[i].c_str();
-				if (filter[0] == '\0' || strstr(msg, filter) != nullptr)
-				{
-					len += stringLength(msg);
-				}
-			}
 
-			if (len > 0)
-			{
-				char* mem = (char*)m_allocator.allocate(len);
-				mem[0] = '\0';
-				for (int i = 0; i < messages->size(); ++i)
-				{
-					const char* msg = (*messages)[i].c_str();
-					if (filter[0] == '\0' || strstr(msg, filter) != nullptr)
-					{
-						catString(mem, len, msg);
-						catString(mem, len, "\n");
-					}
-				}
-
-				PlatformInterface::copyToClipboard(mem);
-				m_allocator.deallocate(mem);
-			}
-		}
-
-		if (ImGui::BeginChild("log_messages"))
+		if (ImGui::BeginChild("log_messages", ImVec2(0, 0), true))
 		{
 			for (int i = 0; i < messages->size(); ++i)
 			{
@@ -238,6 +209,40 @@ void LogUI::onGUI()
 			}
 		}
 		ImGui::EndChild();
+		if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(1)) ImGui::OpenPopup("Context");
+		if (ImGui::BeginPopup("Context"))
+		{
+			if (ImGui::Selectable("Copy"))
+			{
+				for (int i = 0; i < messages->size(); ++i)
+				{
+					const char* msg = (*messages)[i].c_str();
+					if (filter[0] == '\0' || strstr(msg, filter) != nullptr)
+					{
+						len += stringLength(msg);
+					}
+				}
+
+				if (len > 0)
+				{
+					char* mem = (char*)m_allocator.allocate(len);
+					mem[0] = '\0';
+					for (int i = 0; i < messages->size(); ++i)
+					{
+						const char* msg = (*messages)[i].c_str();
+						if (filter[0] == '\0' || strstr(msg, filter) != nullptr)
+						{
+							catString(mem, len, msg);
+							catString(mem, len, "\n");
+						}
+					}
+
+					PlatformInterface::copyToClipboard(mem);
+					m_allocator.deallocate(mem);
+				}
+			}
+			ImGui::EndPopup();
+		}
 	}
 	ImGui::EndDock();
 }
