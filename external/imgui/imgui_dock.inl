@@ -111,7 +111,7 @@ struct DockContext
 		}
 
 
-		bool isContainer() const { return children[0] != nullptr; }
+		bool hasChildren() const { return children[0] != nullptr; }
 
 
 		void setChildrenPosSize(const ImVec2& _pos, const ImVec2& _size)
@@ -175,7 +175,7 @@ struct DockContext
 				tmp->pos = _pos;
 			}
 
-			if (!isContainer()) return;
+			if (!hasChildren()) return;
 			setChildrenPosSize(_pos, _size);
 		}
 
@@ -269,7 +269,7 @@ struct DockContext
 		for (int i = 0; i < m_docks.size(); ++i)
 		{
 			Dock& dock = *m_docks[i];
-			if (!dock.isContainer()) continue;
+			if (!dock.hasChildren()) continue;
 
 			PushID(i);
 			if (!IsMouseDown(0)) dock.status = Status_Docked;
@@ -347,7 +347,7 @@ struct DockContext
 		for (int i = 0; i < m_docks.size(); ++i)
 		{
 			Dock& dock = *m_docks[i];
-			if (dock.isContainer()) continue;
+			if (dock.hasChildren()) continue;
 			if (dock.status != Status_Docked) continue;
 			if (IsMouseHoveringRect(dock.pos, dock.pos + dock.size, false))
 			{
@@ -826,19 +826,24 @@ struct DockContext
 		ImVec2 requested_size = size;
 		root->setPosSize(pos, ImMax(min_size, requested_size));
 
-		for (auto it = m_docks.begin(); it != m_docks.end();)
+		static bool is_first_call = true;
+		if (!is_first_call)
 		{
-			auto& dock = *it;
-			if (dock->isContainer() && (ImGui::GetFrameCount() - dock->last_frame) > 1)
+			for (auto it = m_docks.begin(); it != m_docks.end();)
 			{
-				doUndock(*dock);
-				dock->~Dock();
-				MemFree(dock);
-				it = m_docks.erase(it);
+				auto& dock = *it;
+				if (!dock->hasChildren() && dock != root && (ImGui::GetFrameCount() - dock->last_frame) > 1)
+				{
+					doUndock(*dock);
+					dock->~Dock();
+					MemFree(dock);
+					it = m_docks.erase(it);
+				}
+				else
+					++it;
 			}
-			else
-				++it;
 		}
+		is_first_call = false;
 	}
 
 
