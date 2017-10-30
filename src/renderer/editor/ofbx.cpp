@@ -2317,7 +2317,7 @@ static float getFramerateFromTimeMode(int time_mode)
 		case FrameRate_CINEMA: return 24;
 		case FrameRate_1000: return 1000;
 		case FrameRate_CINEMA_ND: return 23.976f;
-		case FrameRate_CUSTOM: -2;
+		case FrameRate_CUSTOM: return -2;
 	}
 	return -1;
 }
