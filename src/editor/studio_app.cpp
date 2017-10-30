@@ -1430,6 +1430,7 @@ public:
 		ImGuiStyle& style = ImGui::GetStyle();
 		style.FramePadding.y = 2;
 		style.ItemSpacing.y = 2;
+		style.ItemInnerSpacing.x = 2;
 	}
 
 
