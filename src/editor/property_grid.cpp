@@ -525,7 +525,9 @@ void PropertyGrid::showComponentProperties(const Array<Entity>& entities, Compon
 	ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowOverlapMode;
 	ImGui::Separator();
 	const char* cmp_type_name = m_app.getComponentTypeName(cmp_type);
+	ImGui::PushFont(m_app.getBoldFont());
 	bool is_open = ImGui::TreeNodeEx((void*)(uintptr)cmp_type.index, flags, "%s", cmp_type_name);
+	ImGui::PopFont();
 
 	float w = ImGui::GetContentRegionAvailWidth();
 	ImGuiStyle& style = ImGui::GetStyle();
@@ -660,7 +662,13 @@ void PropertyGrid::showCoreProperties(const Array<Entity>& entities)
 	const char* tmp = m_editor.getUniverse()->getEntityName(entities[0]);
 	copyString(name, tmp);
 	if (ImGui::LabellessInputText("Name", name, sizeof(name))) m_editor.setEntityName(entities[0], name);
-	if (!ImGui::TreeNodeEx("General", ImGuiTreeNodeFlags_DefaultOpen)) return;
+	ImGui::PushFont(m_app.getBoldFont());
+	if (!ImGui::TreeNodeEx("General", ImGuiTreeNodeFlags_DefaultOpen))
+	{
+		ImGui::PopFont();
+		return;
+	}
+	ImGui::PopFont();
 	if (entities.size() == 1)
 	{
 		PrefabSystem& prefab_system = m_editor.getPrefabSystem();
