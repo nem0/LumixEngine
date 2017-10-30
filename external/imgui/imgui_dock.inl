@@ -829,7 +829,7 @@ struct DockContext
 		for (auto it = m_docks.begin(); it != m_docks.end();)
 		{
 			auto& dock = *it;
-			if (*dock->label && (ImGui::GetFrameCount() - dock->last_frame) > 1)
+			if (dock->isContainer() && (ImGui::GetFrameCount() - dock->last_frame) > 1)
 			{
 				doUndock(*dock);
 				dock->~Dock();

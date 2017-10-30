@@ -54,11 +54,21 @@ class LUMIX_EDITOR_API LogUI
 		void showNotifications();
 
 	private:
+		struct Message
+		{
+			Message(IAllocator& allocator)
+				: text(allocator)
+			{}
+
+			string text;
+			Type type;
+		};
+
 		IAllocator& m_allocator;
-		Array<Array<string> > m_messages;
+		Array<Message> m_messages;
 		Array<Notification> m_notifications;
 		int m_new_message_count[Count];
-		int m_current_tab;
+		u8 m_level_filter;
 		int m_last_uid;
 		bool m_move_notifications_to_front;
 		bool m_are_notifications_hovered;
