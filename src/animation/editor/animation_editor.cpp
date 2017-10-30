@@ -523,7 +523,6 @@ private:
 	void editorGUI();
 	void inputsGUI();
 	void constantsGUI();
-	void masksGUI();
 	void animationSlotsGUI();
 	void menuGUI();
 	void onSetInputGUI(u8* data, Component& component);
@@ -1049,78 +1048,13 @@ void AnimationEditor::inputsGUI()
 {
 	if (ImGui::BeginDock("Animation inputs", &m_inputs_open))
 	{
-		/*
-		if (ImGui::CollapsingHeader("Inputs"))
-		{
-			const auto& selected_entities = m_app.getWorldEditor().getSelectedEntities();
-			auto* scene = (AnimationScene*)m_app.getWorldEditor().getUniverse()->getScene(ANIMABLE_HASH);
-			ComponentHandle cmp = selected_entities.empty() ? INVALID_COMPONENT : scene->getComponent(selected_entities[0], CONTROLLER_TYPE);
-			u8* input_data = cmp.isValid() ? scene->getControllerInput(cmp) : nullptr;
-			Anim::InputDecl& input_decl = m_resource->getEngineResource()->m_input_decl;
-
-			for (auto& input : input_decl.inputs)
-			{
-				if (input.type == Anim::InputDecl::EMPTY) continue;
-				ImGui::PushID(&input);
-				ImGui::PushItemWidth(100);
-				ImGui::InputText("##name", input.name.data, lengthOf(input.name.data));
-				ImGui::SameLine();
-				if (ImGui::Combo("##type", (int*)&input.type, "float\0int\0bool\0"))
-				{
-					input_decl.recalculateOffsets();
-				}
-				if (input_data)
-				{
-					ImGui::SameLine();
-					switch (input.type)
-					{
-						case Anim::InputDecl::FLOAT: ImGui::DragFloat("##value", (float*)(input_data + input.offset)); break;
-						case Anim::InputDecl::BOOL: ImGui::Checkbox("##value", (bool*)(input_data + input.offset)); break;
-						case Anim::InputDecl::INT: ImGui::InputInt("##value", (int*)(input_data + input.offset)); break;
-						default: ASSERT(false); break;
-					}
-				}
-				ImGui::SameLine();
-				if (ImGui::Button("x"))
-				{
-					input.type = Anim::InputDecl::EMPTY;
-					--input_decl.inputs_count;
-				}
-
-				ImGui::PopItemWidth();
-				ImGui::PopID();
-			}
-
-			if (input_decl.inputs_count < lengthOf(input_decl.inputs) && ImGui::Button("Add"))
-			{
-				for (auto& input : input_decl.inputs)
-				{
-					if (input.type == Anim::InputDecl::EMPTY)
-					{
-						input.name = "";
-						input.type = Anim::InputDecl::BOOL;
-						input.offset = input_decl.getSize();
-						++input_decl.inputs_count;
-						break;
-					}
-				}
-			}
-		}*/
-		// TODO
-
-		masksGUI();
+		IAllocator& allocator = m_app.getWorldEditor().getAllocator();
+		UIBuilder<AnimationEditor, ControllerResource> ui_builder(*this, *m_resource, allocator);
+		ui_builder.build();
 		constantsGUI();
 		animationSlotsGUI();
 	}
 	ImGui::EndDock();
-}
-
-
-void AnimationEditor::masksGUI()
-{
-	IAllocator& allocator = m_app.getWorldEditor().getAllocator();
-	UIBuilder<AnimationEditor, ControllerResource> ui_builder(*this, *m_resource, allocator);
-	ui_builder.build();
 }
 
 

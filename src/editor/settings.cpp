@@ -505,7 +505,6 @@ void Settings::onGUI()
 					enableCrashReporting(m_is_crash_reporting_enabled);
 				}
 			}
-			ImGui::InputInt("Font size (needs restart)", &m_font_size);
 			ImGui::DragFloat2("Mouse sensitivity", &m_mouse_sensitivity.x, 0.1f, 500.0f);
 
 			ImGui::AlignTextToFramePadding();
@@ -534,6 +533,7 @@ void Settings::onGUI()
 		if (ImGui::CollapsingHeader("Style"))
 		{
 			static int selected = 0;
+			ImGui::InputInt("Font size (needs restart)", &m_font_size);
 			ImGui::Combo("Skin", &selected, "Light\0Dark\0");
 			ImGui::SameLine();
 			if (ImGui::Button("Apply"))
