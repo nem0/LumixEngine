@@ -1665,6 +1665,7 @@ ControllerResource::ControllerResource(IAnimationEditor& editor,
 	, m_editor(editor)
 	, m_masks(allocator)
 	, m_inputs(allocator)
+	, m_constants(allocator)
 {
 	m_engine_resource = LUMIX_NEW(allocator, Anim::ControllerResource)(Path("editor"), manager, allocator);
 	auto* engine_root = LUMIX_NEW(allocator, Anim::StateMachine)(*m_engine_resource, allocator);
@@ -1758,9 +1759,21 @@ bool ControllerResource::deserialize(InputBlob& blob, Engine& engine, IAllocator
 		if (decl.inputs[i].type != Anim::InputDecl::Type::EMPTY)
 		{
 			InputProxy& proxy = m_inputs.emplace(*this);
-			proxy.engine_input_idx = i;
+			proxy.engine_idx = i;
 		}
 	}
+
+	m_constants.clear();
+
+	for (int i = 0; i < lengthOf(decl.constants); ++i)
+	{
+		if (decl.constants[i].type != Anim::InputDecl::Type::EMPTY)
+		{
+			ConstantProxy& proxy = m_constants.emplace(*this);
+			proxy.engine_idx = i;
+		}
+	}
+
 
 	return true;
 }
@@ -1786,36 +1799,66 @@ void ControllerResource::Mask::Bone::setName(const string& _name)
 }
 
 
+StaticString<32>& ControllerResource::ConstantProxy::getName()
+{
+	return resource.m_engine_resource->m_input_decl.constants[engine_idx].name;
+}
+
+
+Anim::InputDecl::Type& ControllerResource::ConstantProxy::getType()
+{
+	return resource.m_engine_resource->m_input_decl.constants[engine_idx].type;
+}
+
+void ControllerResource::ConstantProxy::setType(Anim::InputDecl::Type type)
+{
+	Anim::InputDecl& decl = resource.m_engine_resource->m_input_decl;
+	decl.constants[engine_idx].type = type;
+}
+
+
+void ControllerResource::ConstantProxy::setEngineIdx(int idx)
+{
+	resource.m_engine_resource->m_input_decl.moveConstant(engine_idx, idx);
+	engine_idx = idx;
+}
+
+
+void ControllerResource::ConstantProxy::setName(const StaticString<32>& value)
+{
+	resource.m_engine_resource->m_input_decl.constants[engine_idx].name = value;
+}
+
 StaticString<32>& ControllerResource::InputProxy::getName()
 {
-	return resource.m_engine_resource->m_input_decl.inputs[engine_input_idx].name;
+	return resource.m_engine_resource->m_input_decl.inputs[engine_idx].name;
 }
 
 
 Anim::InputDecl::Type& ControllerResource::InputProxy::getType()
 {
-	return resource.m_engine_resource->m_input_decl.inputs[engine_input_idx].type;
+	return resource.m_engine_resource->m_input_decl.inputs[engine_idx].type;
 }
 
 
 void ControllerResource::InputProxy::setType(Anim::InputDecl::Type type)
 {
 	Anim::InputDecl& decl = resource.m_engine_resource->m_input_decl;
-	decl.inputs[engine_input_idx].type = type;
+	decl.inputs[engine_idx].type = type;
 	decl.recalculateOffsets();
 }
 
 
 void ControllerResource::InputProxy::setEngineIdx(int idx)
 {
-	resource.m_engine_resource->m_input_decl.moveInput(engine_input_idx, idx);
-	engine_input_idx = idx;
+	resource.m_engine_resource->m_input_decl.moveInput(engine_idx, idx);
+	engine_idx = idx;
 }
 
 
 void ControllerResource::InputProxy::setName(const StaticString<32>& value)
 {
-	resource.m_engine_resource->m_input_decl.inputs[engine_input_idx].name = value;
+	resource.m_engine_resource->m_input_decl.inputs[engine_idx].name = value;
 }
 
 
@@ -1861,21 +1904,44 @@ void ControllerResource::addInput(int index)
 	if (index < 0)
 	{
 		InputProxy& proxy = m_inputs.emplace(*this);
-		proxy.engine_input_idx = m_engine_resource->m_input_decl.addInput();
+		proxy.engine_idx = m_engine_resource->m_input_decl.addInput();
 	}
 	else
 	{
 		InputProxy& proxy = m_inputs.emplaceAt(index, *this);
-		proxy.engine_input_idx = m_engine_resource->m_input_decl.addInput();
+		proxy.engine_idx = m_engine_resource->m_input_decl.addInput();
 	}
 }
 
 
 void ControllerResource::removeInput(int index)
 {
-	int engine_idx = m_inputs[index].engine_input_idx;
+	int engine_idx = m_inputs[index].engine_idx;
 	m_engine_resource->m_input_decl.removeInput(engine_idx);
 	m_inputs.erase(index);
+}
+
+
+void ControllerResource::addConstant(int index)
+{
+	if (index < 0)
+	{
+		ConstantProxy& proxy = m_constants.emplace(*this);
+		proxy.engine_idx = m_engine_resource->m_input_decl.addConstant();
+	}
+	else
+	{
+		ConstantProxy& proxy = m_constants.emplaceAt(index, *this);
+		proxy.engine_idx = m_engine_resource->m_input_decl.addConstant();
+	}
+}
+
+
+void ControllerResource::removeConstant(int index)
+{
+	int engine_idx = m_constants[index].engine_idx;
+	m_engine_resource->m_input_decl.removeConstant(engine_idx);
+	m_constants.erase(index);
 }
 
 

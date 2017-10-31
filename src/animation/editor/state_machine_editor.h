@@ -343,7 +343,7 @@ public:
 		void setName(const StaticString<32>& name);
 		StaticString<32>& getName();
 
-		int& getEngineIdx() { return engine_input_idx; }
+		int& getEngineIdx() { return engine_idx; }
 		void setEngineIdx(int idx);
 
 		Anim::InputDecl::Type& getType();
@@ -352,7 +352,36 @@ public:
 		ValueProxy& getValue() { return value_proxy; }
 
 		ValueProxy value_proxy;
-		int engine_input_idx;
+		int engine_idx;
+		ControllerResource& resource;
+	};
+
+	struct ConstantProxy
+	{
+		struct ValueProxy
+		{
+			ValueProxy(ConstantProxy& input) : input(input) {}
+			ConstantProxy& input;
+		};
+
+		ConstantProxy(ControllerResource& resource)
+			: resource(resource)
+			, value_proxy(*this)
+		{}
+
+		void setName(const StaticString<32>& name);
+		StaticString<32>& getName();
+
+		int& getEngineIdx() { return engine_idx; }
+		void setEngineIdx(int idx);
+
+		Anim::InputDecl::Type& getType();
+		void setType(Anim::InputDecl::Type type);
+
+		ValueProxy& getValue() { return value_proxy; }
+
+		ValueProxy value_proxy;
+		int engine_idx;
 		ControllerResource& resource;
 	};
 
@@ -375,6 +404,10 @@ public:
 	void addInput(int index);
 	void removeInput(int index);
 
+	Array<ConstantProxy>& getConstants() { return m_constants; }
+	void addConstant(int index);
+	void removeConstant(int index);
+
 	IAllocator& getAllocator() { return m_allocator; }
 	Anim::ControllerResource* getEngineResource() { return m_engine_resource; }
 	IAnimationEditor& getEditor() { return m_editor; }
@@ -392,6 +425,7 @@ private:
 	Array<string> m_animation_slots;
 	Array<Mask> m_masks;
 	Array<InputProxy> m_inputs;
+	Array<ConstantProxy> m_constants;
 };
 
 

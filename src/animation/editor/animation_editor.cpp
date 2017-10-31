@@ -52,6 +52,9 @@ auto getMembers<ControllerResource>()
 		),
 		property("Inputs", &ControllerResource::getInputs,
 			array_attribute(&ControllerResource::addInput, &ControllerResource::removeInput)
+		),
+		property("Constants", &ControllerResource::getConstants,
+			array_attribute(&ControllerResource::addConstant, &ControllerResource::removeConstant)
 		)
 	);
 }
@@ -83,6 +86,12 @@ auto getMembers<ControllerResource::InputProxy::ValueProxy>()
 	return type("Input Value");
 }
 
+template <>
+auto getMembers<ControllerResource::ConstantProxy::ValueProxy>()
+{
+	return type("Constant Value");
+}
+
 struct InputValueCustomUI
 {
 	template <typename Owner, typename PP, typename T>
@@ -95,7 +104,7 @@ struct InputValueCustomUI
 		ComponentHandle cmp = selected_entities.empty() ? INVALID_COMPONENT : scene->getComponent(selected_entities[0], CONTROLLER_TYPE);
 		u8* input_data = cmp.isValid() ? scene->getControllerInput(cmp) : nullptr;
 		Anim::InputDecl& input_decl = owner.resource.getEngineResource()->m_input_decl;
-		Anim::InputDecl::Input& input = input_decl.inputs[owner.engine_input_idx];
+		Anim::InputDecl::Input& input = input_decl.inputs[owner.engine_idx];
 		if (input_data)
 		{
 			switch (input.type)
@@ -109,6 +118,30 @@ struct InputValueCustomUI
 	}
 };
 
+
+struct ConstantValueCustomUI
+{
+	template <typename Owner, typename PP, typename T>
+	static void build(Owner& owner, const PP& pp, T& value)
+	{
+		StudioApp& app = owner.resource.getEditor().getApp();
+
+		const auto& selected_entities = app.getWorldEditor().getSelectedEntities();
+		auto* scene = (AnimationScene*)app.getWorldEditor().getUniverse()->getScene(ANIMABLE_HASH);
+		ComponentHandle cmp = selected_entities.empty() ? INVALID_COMPONENT : scene->getComponent(selected_entities[0], CONTROLLER_TYPE);
+		Anim::InputDecl& input_decl = owner.resource.getEngineResource()->m_input_decl;
+		Anim::InputDecl::Constant& constant = input_decl.constants[owner.engine_idx];
+		switch (constant.type)
+		{
+			case Anim::InputDecl::FLOAT: ImGui::DragFloat("Value", &constant.f_value); break;
+			case Anim::InputDecl::BOOL: ImGui::CheckboxEx("Value", &constant.b_value); break;
+			case Anim::InputDecl::INT: ImGui::InputInt("Value", &constant.i_value); break;
+			default: ASSERT(false); break;
+		}
+	}
+};
+
+
 template <>
 auto getMembers<ControllerResource::InputProxy>()
 {
@@ -117,7 +150,20 @@ auto getMembers<ControllerResource::InputProxy>()
 		property("Type", &ControllerResource::InputProxy::getType, &ControllerResource::InputProxy::setType),
 		property("Value", &ControllerResource::InputProxy::getValue, CustomUIAttribute<InputValueCustomUI>()),
 		property("Engine idx", &ControllerResource::InputProxy::getEngineIdx, &ControllerResource::InputProxy::setEngineIdx, 
-			NoUIAttribute()) // TODO setter
+			NoUIAttribute())
+	);
+}
+
+
+template <>
+auto getMembers<ControllerResource::ConstantProxy>()
+{
+	return type("Constant",
+		property("Name", &ControllerResource::ConstantProxy::getName, &ControllerResource::ConstantProxy::setName),
+		property("Type", &ControllerResource::ConstantProxy::getType, &ControllerResource::ConstantProxy::setType),
+		property("Value", &ControllerResource::ConstantProxy::getValue, CustomUIAttribute<ConstantValueCustomUI>()),
+		property("Engine idx", &ControllerResource::ConstantProxy::getEngineIdx, &ControllerResource::ConstantProxy::setEngineIdx,
+			NoUIAttribute())
 	);
 }
 
@@ -526,7 +572,6 @@ private:
 	void loadFromFile();
 	void editorGUI();
 	void inputsGUI();
-	void constantsGUI();
 	void animationSlotsGUI();
 	void menuGUI();
 	void onSetInputGUI(u8* data, Component& component);
@@ -1055,63 +1100,9 @@ void AnimationEditor::inputsGUI()
 		IAllocator& allocator = m_app.getWorldEditor().getAllocator();
 		UIBuilder<AnimationEditor, ControllerResource> ui_builder(*this, *m_resource, allocator);
 		ui_builder.build();
-		constantsGUI();
 		animationSlotsGUI();
 	}
 	ImGui::EndDock();
-}
-
-
-void AnimationEditor::constantsGUI()
-{
-	if (!ImGui::CollapsingHeader("Constants")) return;
-
-	Anim::InputDecl& input_decl = m_resource->getEngineResource()->m_input_decl;
-	ImGui::PushID("consts");
-	for (auto& constant : input_decl.constants)
-	{
-		if (constant.type == Anim::InputDecl::EMPTY) continue;
-		ImGui::PushID(&constant);
-		ImGui::PushItemWidth(100);
-		ImGui::InputText("", constant.name, lengthOf(constant.name));
-		ImGui::SameLine();
-		if (ImGui::Combo("##cmb", (int*)&constant.type, "float\0int\0bool\0"))
-		{
-			input_decl.recalculateOffsets();
-		}
-		ImGui::SameLine();
-		switch (constant.type)
-		{
-			case Anim::InputDecl::FLOAT: ImGui::DragFloat("##val", &constant.f_value); break;
-			case Anim::InputDecl::BOOL: ImGui::Checkbox("##val", &constant.b_value); break;
-			case Anim::InputDecl::INT: ImGui::InputInt("##val", &constant.i_value); break;
-			default: ASSERT(false); break;
-		}
-		ImGui::SameLine();
-		if (ImGui::Button("x"))
-		{
-			constant.type = Anim::InputDecl::EMPTY;
-			--input_decl.constants_count;
-		}
-		ImGui::PopItemWidth();
-		ImGui::PopID();
-	}
-	ImGui::PopID();
-
-	if (input_decl.constants_count < lengthOf(input_decl.constants) && ImGui::Button("Add##add_const"))
-	{
-		for (auto& constant : input_decl.constants)
-		{
-			if (constant.type == Anim::InputDecl::EMPTY)
-			{
-				constant.name[0] = 0;
-				constant.type = Anim::InputDecl::BOOL;
-				constant.b_value = true;
-				++input_decl.constants_count;
-				break;
-			}
-		}
-	}
 }
 
 
