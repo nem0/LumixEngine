@@ -410,6 +410,13 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 		void captureEnd() override { ASSERT(false); }
 		void captureFrame(const void*, u32) override { ASSERT(false); }
 
+		void setThreadName()
+		{
+			if (m_is_thread_name_set) return;
+			m_is_thread_name_set = true;
+			Profiler::setThreadName("bgfx thread");
+		}
+
 		void profilerBegin(
 			const char* _name
 			, uint32_t _abgr
@@ -417,6 +424,7 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 			, uint16_t _line
 		) override
 		{
+			setThreadName();
 			Profiler::beginBlock("bgfx_dynamic");
 		}
 
@@ -427,6 +435,7 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 			, uint16_t _line
 		) override
 		{
+			setThreadName();
 			Profiler::beginBlock(_name);
 		}
 
@@ -436,6 +445,7 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 			Profiler::endBlock();
 		}
 
+		bool m_is_thread_name_set = false;
 		RendererImpl& m_renderer;
 	};
 
