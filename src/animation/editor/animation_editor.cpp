@@ -375,6 +375,7 @@ struct DestroyNodeCommand : IEditorCommand
 	{
 		m_original_values.clear();
 		Node* node = (Node*)m_controller.getByUID(m_node_uid);
+		node->engine_cmp->serialize(m_original_values);
 		node->serialize(m_original_values);
 		m_cmp_type = node->engine_cmp->type;
 		ASSERT(node->getEdges().empty());
@@ -389,9 +390,12 @@ struct DestroyNodeCommand : IEditorCommand
 		auto* container = (Container*)m_controller.getByUID(m_original_container);
 		container->createNode(m_cmp_type, m_node_uid, ImVec2(0, 0));
 		Component* cmp = m_controller.getByUID(m_node_uid);
+		InputBlob input(m_original_values);
+		cmp->engine_cmp->deserialize(input
+			, (Anim::Container*)container->engine_cmp
+			, (int)Anim::ControllerResource::Version::LAST);
 		ASSERT(cmp->isNode());
 		Node* node = (Node*)cmp;
-		InputBlob input(m_original_values);
 		cmp->deserialize(input);
 	}
 
