@@ -412,7 +412,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 			if (PathUtils::hasExtension(tile, "dds"))
 			{
 				FS::OsFile file;
-				if (!file.open(tile, FS::Mode::OPEN_AND_READ, allocator))
+				if (!file.open(tile, FS::Mode::OPEN_AND_READ))
 				{
 					copyFile("models/editor/tile_texture.dds", out_path);
 					g_log_error.log("Editor") << "Failed to load " << tile;
@@ -735,7 +735,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 
 		FS::OsFile file;
 		IAllocator& allocator = m_app.getWorldEditor().getAllocator();
-		if (file.open(path, FS::Mode::CREATE_AND_WRITE, allocator))
+		if (file.open(path, FS::Mode::CREATE_AND_WRITE))
 		{
 			file.write(data, size);
 			file.close();
@@ -1168,7 +1168,7 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		u64 probe_guid = ((RenderScene*)cmp.scene)->getEnvironmentProbeGUID(cmp.handle);
 		path << probe_guid << postfix << ".dds";
 		auto& allocator = m_app.getWorldEditor().getAllocator();
-		if (!file.open(path, FS::Mode::CREATE_AND_WRITE, allocator))
+		if (!file.open(path, FS::Mode::CREATE_AND_WRITE))
 		{
 			g_log_error.log("Editor") << "Failed to create " << path;
 			crn_free_block(compressed_data);
@@ -2851,7 +2851,7 @@ struct AddTerrainComponentPlugin LUMIX_FINAL : public StudioApp::IAddComponentPl
 		StaticString<MAX_PATH_LENGTH> hm_path(info.m_dir, info.m_basename, ".raw");
 		FS::OsFile file;
 		auto& allocator = app.getWorldEditor().getAllocator();
-		if (!file.open(hm_path, FS::Mode::CREATE_AND_WRITE, allocator))
+		if (!file.open(hm_path, FS::Mode::CREATE_AND_WRITE))
 		{
 			g_log_error.log("Editor") << "Failed to create heightmap " << hm_path;
 			return false;
@@ -2866,7 +2866,7 @@ struct AddTerrainComponentPlugin LUMIX_FINAL : public StudioApp::IAddComponentPl
 			file.close();
 		}
 
-		if (!file.open(normalized_material_path, FS::Mode::CREATE_AND_WRITE, allocator))
+		if (!file.open(normalized_material_path, FS::Mode::CREATE_AND_WRITE))
 		{
 			g_log_error.log("Editor") << "Failed to create material " << normalized_material_path;
 			PlatformInterface::deleteFile(hm_path);

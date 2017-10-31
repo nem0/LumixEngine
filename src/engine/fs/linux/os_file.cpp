@@ -10,54 +10,36 @@ namespace Lumix
 {
 namespace FS
 {
-struct OsFileImpl
-{
-	explicit OsFileImpl(IAllocator& allocator)
-		: m_allocator(allocator)
-	{
-	}
 
-	IAllocator& m_allocator;
-	FILE* m_file;
-};
 
 OsFile::OsFile()
 {
-	m_impl = nullptr;
+	m_handle = nullptr;
 }
 
 OsFile::~OsFile()
 {
-	ASSERT(!m_impl);
+	ASSERT(!m_handle);
 }
 
 bool OsFile::open(const char* path, Mode mode, IAllocator& allocator)
 {
-	FILE* fp = fopen(path, Mode::WRITE & mode ? "wb" : "rb");
-	if (fp)
-	{
-		OsFileImpl* impl = LUMIX_NEW(allocator, OsFileImpl)(allocator);
-		impl->m_file = fp;
-		m_impl = impl;
-
-		return true;
-	}
-	return false;
+	m_handle = fopen(path, Mode::WRITE & mode ? "wb" : "rb");
+	return m_handle;
 }
 
 void OsFile::flush()
 {
-	ASSERT(nullptr != m_impl);
-	fflush(m_impl->m_file);
+	ASSERT(nullptr != m_handle);
+	fflush(m_handle);
 }
 
 void OsFile::close()
 {
-	if (nullptr != m_impl)
+	if (nullptr != m_handle)
 	{
-		fclose(m_impl->m_file);
-		LUMIX_DELETE(m_impl->m_allocator, m_impl);
-		m_impl = nullptr;
+		fclose(m_handle);
+		m_handle = nullptr;
 	}
 }
 
@@ -69,25 +51,25 @@ bool OsFile::writeText(const char* text)
 
 bool OsFile::write(const void* data, size_t size)
 {
-	ASSERT(nullptr != m_impl);
-	size_t written = fwrite(data, size, 1, m_impl->m_file);
+	ASSERT(nullptr != m_handle);
+	size_t written = fwrite(data, size, 1, m_handle);
 	return written == 1;
 }
 
 bool OsFile::read(void* data, size_t size)
 {
-	ASSERT(nullptr != m_impl);
-	size_t read = fread(data, size, 1, m_impl->m_file);
+	ASSERT(nullptr != m_handle);
+	size_t read = fread(data, size, 1, m_handle);
 	return read == 1;
 }
 
 size_t OsFile::size()
 {
-	ASSERT(nullptr != m_impl);
-	long pos = ftell(m_impl->m_file);
-	fseek(m_impl->m_file, 0, SEEK_END);
-	size_t size = (size_t)ftell(m_impl->m_file);
-	fseek(m_impl->m_file, pos, SEEK_SET);
+	ASSERT(nullptr != m_handle);
+	long pos = ftell(m_handle);
+	fseek(m_handle, 0, SEEK_END);
+	size_t size = (size_t)ftell(m_handle);
+	fseek(m_handle, pos, SEEK_SET);
 	return size;
 }
 
@@ -98,14 +80,14 @@ bool OsFile::fileExists(const char* path)
 
 size_t OsFile::pos()
 {
-	ASSERT(nullptr != m_impl);
-	long pos = ftell(m_impl->m_file);
+	ASSERT(nullptr != m_handle);
+	long pos = ftell(m_handle);
 	return (size_t)pos;
 }
 
 bool OsFile::seek(SeekMode base, size_t pos)
 {
-	ASSERT(nullptr != m_impl);
+	ASSERT(nullptr != m_handle);
 	int dir = 0;
 	switch (base)
 	{
@@ -120,7 +102,7 @@ bool OsFile::seek(SeekMode base, size_t pos)
 			break;
 	}
 
-	return fseek(m_impl->m_file, pos, dir) == 0;
+	return fseek(m_handle, pos, dir) == 0;
 }
 
 

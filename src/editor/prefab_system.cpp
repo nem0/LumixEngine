@@ -584,7 +584,7 @@ public:
 		if (prefab != 0) entity = getPrefabRoot(entity);
 
 		FS::OsFile file;
-		if (!file.open(path.c_str(), FS::Mode::CREATE_AND_WRITE, m_editor.getAllocator()))
+		if (!file.open(path.c_str(), FS::Mode::CREATE_AND_WRITE))
 		{
 			g_log_error.log("Editor") << "Failed to create " << path.c_str();
 			return;

@@ -272,7 +272,7 @@ public:
 	bool makeFile(const char* path, const char* content) override
 	{
 		FS::OsFile file;
-		if (!file.open(path, FS::Mode::CREATE_AND_WRITE, m_allocator)) return false;
+		if (!file.open(path, FS::Mode::CREATE_AND_WRITE)) return false;
 		bool success = file.writeText(content);
 		file.close();
 		return success;
@@ -1756,7 +1756,7 @@ public:
 				char tmp[MAX_PATH_LENGTH];
 				parser.getCurrent(tmp, lengthOf(tmp));
 				FS::OsFile file;
-				if (file.open(tmp, FS::Mode::OPEN_AND_READ, m_allocator))
+				if (file.open(tmp, FS::Mode::OPEN_AND_READ))
 				{
 					auto size = file.size();
 					auto* src = (char*)m_allocator.allocate(size + 1);
@@ -1939,7 +1939,7 @@ public:
 		}
 
 		FS::OsFile file;
-		if (!file.open(dest, FS::Mode::CREATE_AND_WRITE, m_allocator))
+		if (!file.open(dest, FS::Mode::CREATE_AND_WRITE))
 		{
 			g_log_error.log("Editor") << "Could not create " << dest;
 			return;
@@ -1965,7 +1965,7 @@ public:
 		{
 			FS::OsFile src;
 			size_t src_size = PlatformInterface::getFileSize(info.path);
-			if (!src.open(info.path, FS::Mode::OPEN_AND_READ, m_allocator))
+			if (!src.open(info.path, FS::Mode::OPEN_AND_READ))
 			{
 				file.close();
 				g_log_error.log("Editor") << "Could not open " << info.path;
@@ -2020,7 +2020,7 @@ public:
 		StaticString<MAX_PATH_LENGTH> path(dir, filename);
 		FS::OsFile file;
 
-		if (file.open(path, FS::Mode::OPEN_AND_READ, m_allocator))
+		if (file.open(path, FS::Mode::OPEN_AND_READ))
 		{
 			auto size = file.size();
 			auto* src = (char*)m_engine->getLIFOAllocator().allocate(size + 1);

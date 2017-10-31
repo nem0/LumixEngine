@@ -303,7 +303,7 @@ bool Settings::save()
 	auto& actions = m_app.getActions();
 	FS::OsFile file;
 	auto& allocator = m_app.getWorldEditor().getAllocator();
-	if (!file.open(SETTINGS_PATH, FS::Mode::CREATE_AND_WRITE, allocator)) return false;
+	if (!file.open(SETTINGS_PATH, FS::Mode::CREATE_AND_WRITE)) return false;
 
 	file << "window = { x = " << m_window.x 
 		<< ", y = " << m_window.y 

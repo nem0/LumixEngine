@@ -51,7 +51,7 @@ namespace Lumix
 					m_use_fallthrough = true;
 					return m_fallthrough->open(path, mode);
 				}
-				return m_file.open(tmp, mode, m_allocator);
+				return m_file.open(tmp, mode);
 			}
 
 			void close() override

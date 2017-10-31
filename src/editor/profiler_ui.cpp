@@ -756,7 +756,7 @@ static const char* getResourceStateString(Resource::State state)
 void ProfilerUIImpl::saveResourceList()
 {
 	FS::OsFile file;
-	if (file.open("resources.csv", FS::Mode::CREATE_AND_WRITE, m_allocator))
+	if (file.open("resources.csv", FS::Mode::CREATE_AND_WRITE))
 	{
 		auto& managers = m_resource_manager.getAll();
 		for (auto* i : managers)

@@ -86,7 +86,7 @@ PackFileDevice::~PackFileDevice()
 bool PackFileDevice::mount(const char* path)
 {
 	m_file.close();
-	if(!m_file.open(path, Mode::OPEN_AND_READ, m_allocator)) return false;
+	if(!m_file.open(path, Mode::OPEN_AND_READ)) return false;
 
 	i32 count;
 	m_file.read(&count, sizeof(count));

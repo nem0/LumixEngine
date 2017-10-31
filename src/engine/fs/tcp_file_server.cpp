@@ -59,7 +59,7 @@ public:
 			{
 				copyString(path, m_buffer);
 			}
-			ret = file->open(path, mode, getAllocator()) ? id : -1;
+			ret = file->open(path, mode) ? id : -1;
 			if (ret == -1)
 			{
 				m_ids.release(id);

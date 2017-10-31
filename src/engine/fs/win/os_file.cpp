@@ -9,30 +9,22 @@ namespace Lumix
 {
 namespace FS
 {
-struct OsFileImpl
-{
-	explicit OsFileImpl(IAllocator& allocator)
-		: m_allocator(allocator)
-	{
-	}
 
-	IAllocator& m_allocator;
-	HANDLE m_file;
-};
 
 OsFile::OsFile()
 {
-	m_impl = nullptr;
+	m_handle = (void*)INVALID_HANDLE_VALUE;
+	static_assert(sizeof(m_handle) >= sizeof(HANDLE), "");
 }
 
 OsFile::~OsFile()
 {
-	ASSERT(!m_impl);
+	ASSERT((HANDLE)m_handle == INVALID_HANDLE_VALUE);
 }
 
-bool OsFile::open(const char* path, Mode mode, IAllocator& allocator)
+bool OsFile::open(const char* path, Mode mode)
 {
-	HANDLE hnd = ::CreateFile(path,
+	m_handle = (HANDLE)::CreateFile(path,
 		Mode::WRITE & mode ? GENERIC_WRITE : 0 | Mode::READ & mode ? GENERIC_READ : 0,
 		Mode::WRITE & mode ? 0 : FILE_SHARE_READ,
 		nullptr,
@@ -41,31 +33,21 @@ bool OsFile::open(const char* path, Mode mode, IAllocator& allocator)
 		nullptr);
 
 
-	if (INVALID_HANDLE_VALUE != hnd)
-	{
-		OsFileImpl* impl = LUMIX_NEW(allocator, OsFileImpl)(allocator);
-		impl->m_file = hnd;
-		m_impl = impl;
-
-		return true;
-	}
-
-	return false;
+	return INVALID_HANDLE_VALUE != m_handle;
 }
 
 void OsFile::flush()
 {
-	ASSERT(nullptr != m_impl);
-	FlushFileBuffers(m_impl->m_file);
+	ASSERT(nullptr != m_handle);
+	FlushFileBuffers((HANDLE)m_handle);
 }
 
 void OsFile::close()
 {
-	if (nullptr != m_impl)
+	if (INVALID_HANDLE_VALUE != (HANDLE)m_handle)
 	{
-		::CloseHandle(m_impl->m_file);
-		LUMIX_DELETE(m_impl->m_allocator, m_impl);
-		m_impl = nullptr;
+		::CloseHandle((HANDLE)m_handle);
+		m_handle = (void*)INVALID_HANDLE_VALUE;
 	}
 }
 
@@ -77,24 +59,24 @@ bool OsFile::writeText(const char* text)
 
 bool OsFile::write(const void* data, size_t size)
 {
-	ASSERT(nullptr != m_impl);
+	ASSERT(INVALID_HANDLE_VALUE != (HANDLE)m_handle);
 	size_t written = 0;
-	::WriteFile(m_impl->m_file, data, (DWORD)size, (LPDWORD)&written, nullptr);
+	::WriteFile((HANDLE)m_handle, data, (DWORD)size, (LPDWORD)&written, nullptr);
 	return size == written;
 }
 
 bool OsFile::read(void* data, size_t size)
 {
-	ASSERT(nullptr != m_impl);
+	ASSERT(INVALID_HANDLE_VALUE != m_handle);
 	DWORD readed = 0;
-	BOOL success = ::ReadFile(m_impl->m_file, data, (DWORD)size, (LPDWORD)&readed, nullptr);
+	BOOL success = ::ReadFile((HANDLE)m_handle, data, (DWORD)size, (LPDWORD)&readed, nullptr);
 	return size == readed;
 }
 
 size_t OsFile::size()
 {
-	ASSERT(nullptr != m_impl);
-	return ::GetFileSize(m_impl->m_file, 0);
+	ASSERT(INVALID_HANDLE_VALUE != m_handle);
+	return ::GetFileSize((HANDLE)m_handle, 0);
 }
 
 bool OsFile::fileExists(const char* path)
@@ -106,13 +88,13 @@ bool OsFile::fileExists(const char* path)
 
 size_t OsFile::pos()
 {
-	ASSERT(nullptr != m_impl);
-	return ::SetFilePointer(m_impl->m_file, 0, nullptr, FILE_CURRENT);
+	ASSERT(INVALID_HANDLE_VALUE != m_handle);
+	return ::SetFilePointer((HANDLE)m_handle, 0, nullptr, FILE_CURRENT);
 }
 
 bool OsFile::seek(SeekMode base, size_t pos)
 {
-	ASSERT(nullptr != m_impl);
+	ASSERT(INVALID_HANDLE_VALUE != m_handle);
 	int dir = 0;
 	switch (base)
 	{
@@ -129,7 +111,7 @@ bool OsFile::seek(SeekMode base, size_t pos)
 
 	LARGE_INTEGER dist;
 	dist.QuadPart = pos;
-	return ::SetFilePointer(m_impl->m_file, dist.u.LowPart, &dist.u.HighPart, dir) != INVALID_SET_FILE_POINTER;
+	return ::SetFilePointer((HANDLE)m_handle, dist.u.LowPart, &dist.u.HighPart, dir) != INVALID_SET_FILE_POINTER;
 }
 
 
