@@ -110,7 +110,7 @@ bool ControllerResource::deserialize(InputBlob& blob, int& version)
 		int i = j;
 		if (header.version >(int)Version::INPUT_REFACTOR) blob.read(i);
 		auto& constant = m_input_decl.constants[i];
-		blob.readString(constant.name, lengthOf(constant.name));
+		blob.readString(constant.name.data, lengthOf(constant.name.data));
 		blob.read(constant.type);
 		switch (constant.type)
 		{

@@ -57,7 +57,7 @@ struct InputDecl
 			int i_value;
 			bool b_value;
 		};
-		char name[32];
+		StaticString<32> name;
 	};
 
 	struct Input
@@ -105,6 +105,22 @@ struct InputDecl
 	}
 
 
+	void removeConstant(int index)
+	{
+		constants[index].type = EMPTY;
+		--constants_count;
+	}
+
+
+	void moveConstant(int old_idx, int new_idx)
+	{
+		if (old_idx == new_idx) return;
+		ASSERT(constants[new_idx].type == EMPTY);
+		constants[new_idx] = constants[old_idx];
+		constants[old_idx].type = EMPTY;
+	}
+
+
 	void moveInput(int old_idx, int new_idx)
 	{
 		if (old_idx == new_idx) return;
@@ -112,7 +128,6 @@ struct InputDecl
 		inputs[new_idx] = inputs[old_idx];
 		inputs[old_idx].type = EMPTY;
 		recalculateOffsets();
-
 	}
 
 
@@ -128,6 +143,24 @@ struct InputDecl
 				inputs[i].type = BOOL;
 				++inputs_count;
 				recalculateOffsets();
+				return i;
+			}
+		}
+		return -1;
+	}
+
+
+	int addConstant()
+	{
+		ASSERT(constants_count < lengthOf(constants));
+
+		for (int i = 0; i < lengthOf(constants); ++i)
+		{
+			if (constants[i].type == EMPTY)
+			{
+				constants[i].name = "";
+				constants[i].type = BOOL;
+				++constants_count;
 				return i;
 			}
 		}
