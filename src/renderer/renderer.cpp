@@ -382,7 +382,7 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 			header.dataType = 2;
 
 			FS::OsFile file;
-			if(!file.open(filePath, FS::Mode::CREATE_AND_WRITE, m_renderer.m_allocator))
+			if(!file.open(filePath, FS::Mode::CREATE_AND_WRITE))
 			{
 				g_log_error.log("Renderer") << "Failed to save screenshot to " << filePath;
 				return;

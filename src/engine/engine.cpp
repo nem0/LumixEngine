@@ -454,7 +454,7 @@ public:
 		Profiler::setThreadName("Main");
 		installUnhandledExceptionHandler();
 
-		g_is_error_file_open = g_error_file.open("error.log", FS::Mode::CREATE_AND_WRITE, allocator);
+		g_is_error_file_open = g_error_file.open("error.log", FS::Mode::CREATE_AND_WRITE);
 
 		g_log_error.getCallback().bind<logErrorToFile>();
 		g_log_info.getCallback().bind<showLogInVS>();

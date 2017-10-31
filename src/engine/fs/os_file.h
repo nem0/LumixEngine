@@ -15,7 +15,7 @@ namespace Lumix
 			OsFile();
 			~OsFile();
 
-			bool open(const char* path, Mode mode, IAllocator& allocator);
+			bool open(const char* path, Mode mode);
 			void close();
 			void flush();
 
@@ -38,7 +38,7 @@ namespace Lumix
 			static bool fileExists(const char* path);
 
 		private:
-			struct OsFileImpl* m_impl;
+			void* m_handle;
 		};
 	} // ~namespace FS
 } // ~namespace Lumix

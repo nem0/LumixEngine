@@ -807,7 +807,7 @@ void AnimationEditor::save()
 	OutputBlob blob(allocator);
 	m_resource->serialize(blob);
 	FS::OsFile file;
-	file.open(m_path, FS::Mode::CREATE_AND_WRITE, allocator);
+	file.open(m_path, FS::Mode::CREATE_AND_WRITE);
 	file.write(blob.getData(), blob.getPos());
 	file.close();
 }
@@ -859,7 +859,7 @@ void AnimationEditor::load()
 {
 	IAllocator& allocator = m_app.getWorldEditor().getAllocator();
 	FS::OsFile file;
-	file.open(m_path, FS::Mode::OPEN_AND_READ, allocator);
+	file.open(m_path, FS::Mode::OPEN_AND_READ);
 	Array<u8> data(allocator);
 	data.resize((int)file.size());
 	file.read(&data[0], data.size());

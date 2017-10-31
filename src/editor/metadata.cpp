@@ -29,7 +29,7 @@ Metadata::Metadata(IAllocator& allocator)
 bool Metadata::load()
 {
 	FS::OsFile file;
-	if (!file.open(METADATA_FILENAME, FS::Mode::OPEN_AND_READ, m_allocator)) return false;
+	if (!file.open(METADATA_FILENAME, FS::Mode::OPEN_AND_READ)) return false;
 
 	m_data.clear();
 	int count;
@@ -92,7 +92,7 @@ bool Metadata::load()
 bool Metadata::save()
 {
 	FS::OsFile file;
-	if (!file.open(METADATA_FILENAME, FS::Mode::CREATE_AND_WRITE, m_allocator)) return false;
+	if (!file.open(METADATA_FILENAME, FS::Mode::CREATE_AND_WRITE)) return false;
 
 	file.write(&METADATA_MAGIC, sizeof(METADATA_MAGIC));
 	i32 version = (int)MetadataVersion::LATEST;

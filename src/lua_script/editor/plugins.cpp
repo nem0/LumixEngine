@@ -710,7 +710,7 @@ struct ConsolePlugin LUMIX_FINAL : public StudioApp::IPlugin
 				{
 					FS::OsFile file;
 					IAllocator& allocator = app.getWorldEditor().getAllocator();
-					if (file.open(tmp, FS::Mode::OPEN_AND_READ, allocator))
+					if (file.open(tmp, FS::Mode::OPEN_AND_READ))
 					{
 						size_t size = file.size();
 						Array<char> data(allocator);
@@ -829,8 +829,7 @@ struct AddComponentPlugin LUMIX_FINAL : public StudioApp::IAddComponentPlugin
 			{
 				FS::OsFile file;
 				WorldEditor& editor = app.getWorldEditor();
-				IAllocator& allocator = editor.getAllocator();
-				if (file.open(full_path, FS::Mode::CREATE_AND_WRITE, allocator))
+				if (file.open(full_path, FS::Mode::CREATE_AND_WRITE))
 				{
 					new_created = true;
 					editor.makeRelative(buf, lengthOf(buf), full_path);

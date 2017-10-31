@@ -743,7 +743,7 @@ struct FBXImporter
 		IAllocator& allocator = app.getWorldEditor().getAllocator();
 
 		FS::OsFile file;
-		if (!file.open(filename, FS::Mode::OPEN_AND_READ, allocator)) return false;
+		if (!file.open(filename, FS::Mode::OPEN_AND_READ)) return false;
 
 		Array<u8> data(allocator);
 		data.resize((int)file.size());
@@ -826,7 +826,7 @@ struct FBXImporter
 		FS::OsFile file;
 		PathBuilder output_material_name(output_dir, "/", mesh_output_filename, "_billboard.mat");
 		IAllocator& allocator = app.getWorldEditor().getAllocator();
-		if (!file.open(output_material_name, FS::Mode::CREATE_AND_WRITE, allocator))
+		if (!file.open(output_material_name, FS::Mode::CREATE_AND_WRITE))
 		{
 			g_log_error.log("FBX") << "Failed to create " << output_material_name;
 			return false;
@@ -880,7 +880,7 @@ struct FBXImporter
 			getMaterialName(material.fbx, mat_name);
 			StaticString<MAX_PATH_LENGTH> path(output_dir, mat_name, ".mat");
 			IAllocator& allocator = app.getWorldEditor().getAllocator();
-			if (!out_file.open(path, FS::Mode::CREATE_AND_WRITE, allocator))
+			if (!out_file.open(path, FS::Mode::CREATE_AND_WRITE))
 			{
 				g_log_error.log("FBX") << "Failed to create " << path;
 				continue;
@@ -1106,7 +1106,7 @@ struct FBXImporter
 
 				StaticString<MAX_PATH_LENGTH> tmp(output_dir, anim.output_filename, split->name, ".ani");
 				IAllocator& allocator = app.getWorldEditor().getAllocator();
-				if (!out_file.open(tmp, FS::Mode::CREATE_AND_WRITE, allocator))
+				if (!out_file.open(tmp, FS::Mode::CREATE_AND_WRITE))
 				{
 					g_log_error.log("FBX") << "Failed to create " << tmp;
 					continue;
@@ -1763,7 +1763,7 @@ struct FBXImporter
 		PlatformInterface::makePath(phy_path);
 		phy_path << "/" << filename;
 		FS::OsFile file;
-		if (!file.open(phy_path, FS::Mode::CREATE_AND_WRITE, dialog.m_editor.getAllocator()))
+		if (!file.open(phy_path, FS::Mode::CREATE_AND_WRITE))
 		{
 			g_log_error.log("Editor") << "Could not create file " << phy_path;
 			return false;
@@ -1831,7 +1831,7 @@ struct FBXImporter
 		qsort(&meshes[0], meshes.size(), sizeof(meshes[0]), cmpMeshes);
 		StaticString<MAX_PATH_LENGTH> out_path(output_dir, output_mesh_filename, ".msh");
 		PlatformInterface::makePath(output_dir);
-		if (!out_file.open(out_path, FS::Mode::CREATE_AND_WRITE, app.getWorldEditor().getAllocator()))
+		if (!out_file.open(out_path, FS::Mode::CREATE_AND_WRITE))
 		{
 			g_log_error.log("FBX") << "Failed to create " << out_path;
 			return;
@@ -2244,7 +2244,7 @@ static bool saveAsRaw(ImportAssetDialog& dialog,
 	dialog.setImportMessage(StaticString<MAX_PATH_LENGTH + 30>("Saving ") << dest_path, -1);
 
 	FS::OsFile file;
-	if (!file.open(dest_path, FS::Mode::CREATE_AND_WRITE, dialog.getEditor().getAllocator()))
+	if (!file.open(dest_path, FS::Mode::CREATE_AND_WRITE))
 	{
 		dialog.setMessage(StaticString<MAX_PATH_LENGTH + 30>("Could not save ") << dest_path);
 		return false;
@@ -2300,7 +2300,7 @@ static bool saveAsDDS(ImportAssetDialog& dialog,
 	}
 
 	FS::OsFile file;
-	if (!file.open(dest_path, FS::Mode::CREATE_AND_WRITE, dialog.getEditor().getAllocator()))
+	if (!file.open(dest_path, FS::Mode::CREATE_AND_WRITE))
 	{
 		dialog.setMessage(StaticString<MAX_PATH_LENGTH + 30>("Could not save ") << dest_path);
 		crn_free_block(data);

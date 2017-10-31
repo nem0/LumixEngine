@@ -2235,7 +2235,7 @@ public:
 		Array<u8> data(m_allocator);
 		FS::OsFile file;
 		auto loadFile = [&file, &data, this](const char* filepath, auto callback) {
-			if (file.open(filepath, FS::Mode::OPEN_AND_READ, m_allocator))
+			if (file.open(filepath, FS::Mode::OPEN_AND_READ))
 			{
 				if (file.size() > 0)
 				{
@@ -2365,7 +2365,7 @@ public:
 		OutputBlob blob(m_allocator);
 		TextSerializer serializer(blob, m_entity_map);
 		auto saveFile = [&file, this, &blob](const char* path) {
-			if (file.open(path, FS::Mode::CREATE_AND_WRITE, m_allocator))
+			if (file.open(path, FS::Mode::CREATE_AND_WRITE))
 			{
 				file.write(blob.getData(), blob.getPos());
 				file.close();
@@ -3790,9 +3790,9 @@ public:
 			FS::OsFile src_file;
 			StaticString<MAX_PATH_LENGTH> dst_path(result_dir, info.filename);
 			StaticString<MAX_PATH_LENGTH> src_path(dir, "/", name, "/", info.filename);
-			if (dst_file.open(dst_path, FS::Mode::OPEN_AND_READ, m_allocator))
+			if (dst_file.open(dst_path, FS::Mode::OPEN_AND_READ))
 			{
-				if (src_file.open(src_path, FS::Mode::OPEN_AND_READ, m_allocator))
+				if (src_file.open(src_path, FS::Mode::OPEN_AND_READ))
 				{
 					int dst_size = (int)dst_file.size();
 					int src_size = (int)src_file.size();
