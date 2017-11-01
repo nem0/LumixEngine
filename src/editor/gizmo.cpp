@@ -685,9 +685,8 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 	}
 
 
-	Vec3 getMousePlaneIntersection(const Vec2& mouse_pos, const Transform& frame, Axis transform_axis) const
+	Vec3 getMousePlaneIntersection(const Vec2& mouse_pos, const Matrix& gizmo_mtx, Axis transform_axis) const
 	{
-		auto gizmo_mtx = frame.toMatrix();
 		auto camera = m_editor.getEditCamera();
 		Vec3 origin, dir;
 		m_editor.getRenderInterface()->getRay(camera.handle, mouse_pos, origin, dir);
@@ -757,7 +756,7 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 		if (m_editor.isMouseClick(MouseButton::LEFT))
 		{
 			m_is_dragging = true;
-			m_transform_point = getMousePlaneIntersection(m_editor.getMousePos(), frame, m_transform_axis);
+			m_transform_point = getMousePlaneIntersection(m_editor.getMousePos(), frame.toMatrix(), m_transform_axis);
 			m_active = -1;
 		}
 
@@ -772,9 +771,10 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 	bool scale(Transform& frame)
 	{
 		Vec2 mouse_pos = m_editor.getMousePos();
-		Vec3 intersection = getMousePlaneIntersection(mouse_pos, frame, m_transform_axis);
+		Matrix frame_mtx = frame.toMatrix();
+		Vec3 intersection = getMousePlaneIntersection(mouse_pos, frame_mtx, m_transform_axis);
 		Vec2 old_mouse_pos = { mouse_pos.x - m_editor.getMouseRelX(),mouse_pos.y - m_editor.getMouseRelY() };
-		Vec3 old_intersection = getMousePlaneIntersection(old_mouse_pos, frame, m_transform_axis);
+		Vec3 old_intersection = getMousePlaneIntersection(old_mouse_pos, frame_mtx, m_transform_axis);
 		Vec3 delta = intersection - old_intersection;
 		if (!m_is_step || delta.length() > float(getStep()))
 		{
@@ -791,9 +791,10 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 	bool translate(Transform& frame)
 	{
 		Vec2 mouse_pos = m_editor.getMousePos();
-		Vec3 intersection = getMousePlaneIntersection(mouse_pos, frame, m_transform_axis);
+		Matrix frame_mtx = frame.toMatrix();
+		Vec3 intersection = getMousePlaneIntersection(mouse_pos, frame_mtx, m_transform_axis);
 		Vec2 old_mouse_pos = {mouse_pos.x - m_editor.getMouseRelX(),mouse_pos.y - m_editor.getMouseRelY()};
-		Vec3 old_intersection = getMousePlaneIntersection(old_mouse_pos, frame, m_transform_axis);
+		Vec3 old_intersection = getMousePlaneIntersection(old_mouse_pos, frame_mtx, m_transform_axis);
 		Vec3 delta = intersection - old_intersection;
 		if (!m_is_step || delta.length() > float(getStep()))
 		{
@@ -888,11 +889,11 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 
 	void scale()
 	{
-		Transform entity_frame = m_editor.getUniverse()->getTransform(m_entities[m_active]);
-		Vec3 intersection = getMousePlaneIntersection(m_editor.getMousePos(), entity_frame, m_transform_axis);
+		Matrix gizmo_mtx = getMatrix(m_entities[m_active]);
+		Vec3 intersection = getMousePlaneIntersection(m_editor.getMousePos(), gizmo_mtx, m_transform_axis);
 		Vec3 delta_vec = intersection - m_transform_point;
 		float delta = delta_vec.length();
-		Vec3 entity_to_intersection = intersection - entity_frame.pos;
+		Vec3 entity_to_intersection = intersection - gizmo_mtx.getTranslation();
 		if (dotProduct(delta_vec, entity_to_intersection) < 0) delta = -delta;
 		if (!m_is_step || delta > float(getStep()))
 		{
@@ -924,8 +925,8 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 
 	void translate()
 	{
-		Transform entity_frame = m_editor.getUniverse()->getTransform(m_entities[m_active]);
-		Vec3 intersection = getMousePlaneIntersection(m_editor.getMousePos(), entity_frame, m_transform_axis);
+		Matrix mtx = getMatrix(m_entities[m_active]);
+		Vec3 intersection = getMousePlaneIntersection(m_editor.getMousePos(), mtx, m_transform_axis);
 		Vec3 delta = intersection - m_transform_point;
 		if (!m_is_step || delta.length() > float(getStep()))
 		{
@@ -961,8 +962,8 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 	{
 		if (m_active >= 0 && m_editor.isMouseClick(MouseButton::LEFT))
 		{
-			Transform entity_frame = m_editor.getUniverse()->getTransform(m_entities[m_active]);
-			m_transform_point = getMousePlaneIntersection(m_editor.getMousePos(), entity_frame, m_transform_axis);
+			Matrix gizmo_mtx = getMatrix(m_entities[m_active]);
+			m_transform_point = getMousePlaneIntersection(m_editor.getMousePos(), gizmo_mtx, m_transform_axis);
 			m_is_dragging = true;
 		}
 		else if (!m_editor.isMouseDown(MouseButton::LEFT))
