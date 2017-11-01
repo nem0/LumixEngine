@@ -288,11 +288,12 @@ typename EnableIf<TupleSize<decltype(getEnum<Class>())>::result == 0>::Type
 deserialize(InputBlob& blob, Parent& parent, const Member& member, Class& obj)
 {
 	ASSERT(!member.hasSetter());
+	auto desc = getMembers<Class>();
 	auto l = [&blob, &obj](const auto& member) {
 		auto& value = member.getRef(obj);
 		deserialize(blob, obj, member, value);
 	};
-	apply(l, getMembers<Class>().members);
+	apply(l, desc.members);
 }
 
 
