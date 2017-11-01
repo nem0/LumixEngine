@@ -22,7 +22,7 @@ OsFile::~OsFile()
 	ASSERT(!m_handle);
 }
 
-bool OsFile::open(const char* path, Mode mode, IAllocator& allocator)
+bool OsFile::open(const char* path, Mode mode)
 {
 	m_handle = (void*)fopen(path, Mode::WRITE & mode ? "wb" : "rb");
 	return m_handle;
