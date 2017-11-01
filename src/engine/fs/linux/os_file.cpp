@@ -24,21 +24,21 @@ OsFile::~OsFile()
 
 bool OsFile::open(const char* path, Mode mode, IAllocator& allocator)
 {
-	m_handle = fopen(path, Mode::WRITE & mode ? "wb" : "rb");
+	m_handle = (void*)fopen(path, Mode::WRITE & mode ? "wb" : "rb");
 	return m_handle;
 }
 
 void OsFile::flush()
 {
 	ASSERT(nullptr != m_handle);
-	fflush(m_handle);
+	fflush((FILE*)m_handle);
 }
 
 void OsFile::close()
 {
 	if (nullptr != m_handle)
 	{
-		fclose(m_handle);
+		fclose((FILE*)m_handle);
 		m_handle = nullptr;
 	}
 }
@@ -52,24 +52,24 @@ bool OsFile::writeText(const char* text)
 bool OsFile::write(const void* data, size_t size)
 {
 	ASSERT(nullptr != m_handle);
-	size_t written = fwrite(data, size, 1, m_handle);
+	size_t written = fwrite(data, size, 1, (FILE*)m_handle);
 	return written == 1;
 }
 
 bool OsFile::read(void* data, size_t size)
 {
 	ASSERT(nullptr != m_handle);
-	size_t read = fread(data, size, 1, m_handle);
+	size_t read = fread(data, size, 1, (FILE*)m_handle);
 	return read == 1;
 }
 
 size_t OsFile::size()
 {
 	ASSERT(nullptr != m_handle);
-	long pos = ftell(m_handle);
-	fseek(m_handle, 0, SEEK_END);
-	size_t size = (size_t)ftell(m_handle);
-	fseek(m_handle, pos, SEEK_SET);
+	long pos = ftell((FILE*)m_handle);
+	fseek((FILE*)m_handle, 0, SEEK_END);
+	size_t size = (size_t)ftell((FILE*)m_handle);
+	fseek((FILE*)m_handle, pos, SEEK_SET);
 	return size;
 }
 
@@ -81,7 +81,7 @@ bool OsFile::fileExists(const char* path)
 size_t OsFile::pos()
 {
 	ASSERT(nullptr != m_handle);
-	long pos = ftell(m_handle);
+	long pos = ftell((FILE*)m_handle);
 	return (size_t)pos;
 }
 
@@ -102,7 +102,7 @@ bool OsFile::seek(SeekMode base, size_t pos)
 			break;
 	}
 
-	return fseek(m_handle, pos, dir) == 0;
+	return fseek((FILE*)m_handle, pos, dir) == 0;
 }
 
 
