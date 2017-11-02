@@ -698,7 +698,7 @@ static int getLayerMaskIndex(u32 mask_name_hash, ControllerResource& controller)
 	auto& masks = controller.getMasks();
 	for (int i = 0, c = masks.size(); i < c; ++i)
 	{
-		if (crc32(masks[i].getName().c_str()) == mask_name_hash) return i;
+		if (crc32(masks[i].getName()) == mask_name_hash) return i;
 	}
 	return -1;
 }
@@ -733,13 +733,13 @@ void LayersNode::onGUI()
 				}
 				else
 				{
-					*out = masks[index].getName().c_str();
+					*out = masks[index].getName();
 				}
 				return true;
 			};
 			if (ImGui::Combo("Mask", &mask, getter, this, m_controller.getMasks().size() + 1))
 			{
-				m_masks[i] = mask == m_controller.getMasks().size() ? 0 : crc32(m_controller.getMasks()[mask].getName().c_str());
+				m_masks[i] = mask == m_controller.getMasks().size() ? 0 : crc32(m_controller.getMasks()[mask].getName());
 				engine_layer->masks[i] = m_masks[i];
 			};
 			ImGui::NextColumn();
@@ -1097,7 +1097,7 @@ void Blend1DNode::onGUI()
 	auto getter = [](void* data, int idx, const char** out) -> bool {
 		auto* node = (Blend1DNode*)data;
 		auto& slots = node->m_controller.getAnimationSlots();
-		*out = slots[idx].c_str();
+		*out = slots[idx].getName();
 		return true;
 	};
 
@@ -1173,7 +1173,7 @@ void AnimationNode::onGUI()
 	auto getter = [](void* data, int idx, const char** out) -> bool {
 		auto* node = (AnimationNode*)data;
 		auto& slots = node->m_controller.getAnimationSlots();
-		*out = slots[idx].c_str();
+		*out = slots[idx].getName();
 		return true;
 	};
 	
@@ -1182,11 +1182,11 @@ void AnimationNode::onGUI()
 
 	for (int i = 0; i < node->animations_hashes.size(); ++i)
 	{
-		for (current = 0; current < slots.size() && crc32(slots[current].c_str()) != node->animations_hashes[i]; ++current);
+		for (current = 0; current < slots.size() && crc32(slots[current].getName()) != node->animations_hashes[i]; ++current);
 		ImGui::PushID(i);
 		if (ImGui::Combo("Animation", &current, getter, this, slots.size()))
 		{
-			node->animations_hashes[i] = crc32(slots[current].c_str());
+			node->animations_hashes[i] = crc32(slots[current].getName());
 		}
 		ImGui::SameLine();
 		if (ImGui::Button("Remove"))
@@ -1666,6 +1666,7 @@ ControllerResource::ControllerResource(IAnimationEditor& editor,
 	, m_masks(allocator)
 	, m_inputs(allocator)
 	, m_constants(allocator)
+	, m_animation_sets(allocator)
 {
 	m_engine_resource = LUMIX_NEW(allocator, Anim::ControllerResource)(Path("editor"), manager, allocator);
 	auto* engine_root = LUMIX_NEW(allocator, Anim::StateMachine)(*m_engine_resource, allocator);
@@ -1692,13 +1693,13 @@ void ControllerResource::serialize(OutputBlob& blob)
 	blob.write(m_animation_slots.size());
 	for (auto& slot : m_animation_slots)
 	{
-		blob.writeString(slot.c_str());
+		blob.writeString(slot.getName());
 	}
 
 	blob.write(m_masks.size());
 	for (const Mask& mask : m_masks)
 	{
-		blob.write(mask.getName());
+		blob.writeString(mask.getName());
 		blob.write(mask.bones.size());
 		for (const Mask::Bone& bone : mask.bones)
 		{
@@ -1724,29 +1725,58 @@ bool ControllerResource::deserialize(InputBlob& blob, Engine& engine, IAllocator
 	m_root = createComponent(m_engine_resource->m_root, nullptr, *this);
 	m_root->deserialize(blob);
 
-	int count;
-	blob.read(count);
+	int slot_count;
+	int set_count = m_engine_resource->m_sets_names.size();
+	blob.read(slot_count);
 	m_animation_slots.clear();
-	for (int i = 0; i < count; ++i)
+	for (int i = 0; i < slot_count; ++i)
 	{
-		auto& slot = m_animation_slots.emplace(allocator);
-		char tmp[64];
-		blob.readString(tmp, lengthOf(tmp));
-		slot = tmp;
+		auto& slot = m_animation_slots.emplace(*this);
+		StaticString<32> tmp;
+		blob.readString(tmp.data, lengthOf(tmp.data));
+		slot.setName(tmp);
+		for (int j = 0; j < set_count; ++j)
+		{
+			slot.values.emplace(slot);
+		}
+	}
+
+	m_animation_sets.clear();
+	for (int i = 0; i < set_count; ++i)
+	{
+		auto& set = m_animation_sets.emplace(*this);
+		set.setName(m_engine_resource->m_sets_names[i]);
+		for (int j = 0; j < slot_count; ++j)
+		{
+			set.values.emplace(set);
+		}
+	}
+
+	for (auto& engine_set : m_engine_resource->m_animation_set)
+	{
+		int slot_idx = m_animation_slots.find([&engine_set](auto& iter) { return engine_set.hash == crc32(iter.name); });
+		auto& set_value = m_animation_sets[engine_set.set].values[slot_idx];
+		auto& slot_value = m_animation_slots[slot_idx].values[engine_set.set];
+		slot_value.anim = engine_set.animation;
+		set_value.anim = engine_set.animation;
 	}
 
 	if (version > (int)Anim::ControllerResource::Version::MASKS)
 	{
-		count = blob.read<int>();
+		int count = blob.read<int>();
 		for (int i = 0; i < count; ++i)
 		{
 			Mask& mask = m_masks.emplace(*this);
-			blob.read(mask.getName());
+			StaticString<32> mask_name;
+			blob.readString(mask_name.data, lengthOf(mask_name.data));
+			mask.setName(mask_name);
 			int bone_count = blob.read<int>();
 			for (int j = 0; j < bone_count; ++j)
 			{
 				Mask::Bone& bone = mask.bones.emplace(mask.controller);
-				blob.read(bone.getName());
+				string bone_name(m_allocator);
+				blob.read(bone_name);
+				bone.setName(bone_name);
 			}
 		}
 	}
@@ -1799,13 +1829,183 @@ void ControllerResource::Mask::Bone::setName(const string& _name)
 }
 
 
-StaticString<32>& ControllerResource::ConstantProxy::getName()
+void ControllerResource::AnimationSet::setName(const StaticString<32>& name)
+{
+	int idx = controller.m_animation_sets.find([this](auto& set) { return &set == this; });
+	controller.m_engine_resource->m_sets_names[idx] = name;
+}
+
+
+const StaticString<32>& ControllerResource::AnimationSet::getName() const
+{
+	int idx = controller.m_animation_sets.find([this](auto& set) { return &set == this; });
+	return controller.m_engine_resource->m_sets_names[idx];
+}
+
+
+const Path& ControllerResource::AnimationSlot::Value::get() const
+{
+	return anim ? anim->getPath() : PathManager::getEmptyPath();
+}
+
+
+void ControllerResource::AnimationSlot::Value::set(const Path& new_path)
+{
+	if (anim) anim->getResourceManager().unload(*anim);
+
+	StudioApp& app = slot.controller.m_editor.getApp();
+	auto* manager = app.getWorldEditor().getEngine().getResourceManager().get(ANIMATION_TYPE);
+
+	anim = new_path.isValid() ? (Animation*)manager->load(new_path) : nullptr;
+
+	u32 hash = crc32(slot.name);
+	int set_idx = slot.values.find([this](auto& iter) { return &iter == this; });
+	ASSERT(set_idx >= 0);
+	auto& engine_sets = slot.controller.m_engine_resource->m_animation_set;
+	for (int i = 0, c = engine_sets.size(); i < c; ++i)
+	{
+		auto &engine_set = engine_sets[i];
+		if (engine_set.set == set_idx && engine_set.hash == hash)
+		{
+			if (!anim)
+			{
+				engine_sets.erase(i);
+			}
+			else
+			{
+				engine_set.animation = anim;
+			}
+			return;
+		}
+	}
+	if (anim)
+	{
+		auto& engine_set = engine_sets.emplace();
+		engine_set.set = set_idx;
+		engine_set.animation = anim;
+		engine_set.hash = hash;
+	}
+}
+
+
+const Path& ControllerResource::AnimationSet::Value::getValue() const
+{
+	return anim ? anim->getPath() : PathManager::getEmptyPath();
+}
+
+
+void ControllerResource::AnimationSet::Value::setValue(const Path& new_path)
+{
+	if (anim) anim->getResourceManager().unload(*anim);
+
+	StudioApp& app = set.controller.m_editor.getApp();
+	auto* manager = app.getWorldEditor().getEngine().getResourceManager().get(ANIMATION_TYPE);
+
+	anim = new_path.isValid() ? (Animation*)manager->load(new_path) : nullptr;
+
+	int slot_idx = set.values.find([this](auto& iter) { return &iter == this; });
+	u32 hash = crc32(set.controller.m_animation_slots[slot_idx].name);
+	int set_idx = set.controller.m_animation_sets.find([this](auto& iter) { return &iter == &set;});
+	auto& engine_sets = set.controller.m_engine_resource->m_animation_set;
+	for (int i = 0, c = engine_sets.size(); i < c; ++i)
+	{
+		auto &engine_set = engine_sets[i];
+		if (engine_set.set == set_idx && engine_set.hash == hash)
+		{
+			if (!anim)
+			{
+				engine_sets.erase(i);
+			}
+			else
+			{
+				engine_set.animation = anim;
+			}
+			return;
+		}
+	}
+	if (anim)
+	{
+		auto& engine_set = engine_sets.emplace();
+		engine_set.set = set_idx;
+		engine_set.animation = anim;
+		engine_set.hash = hash;
+	}
+}
+
+
+/*void ControllerResource::AnimationSlot::serialize(OutputBlob& blob)
+{
+	blob.write(name);
+	u32 hash = crc32(name);
+	int idx = controller.m_animation_slots.find([this](auto& slot) { return &slot == this; });
+	auto& anim_sets = controller.m_engine_resource->m_animation_set;
+	for (auto& set : anim_sets)
+	{
+		if (set.hash != hash) continue;
+		
+		blob.write(set.set);
+		blob.writeString(set.animation ? set.animation->getPath().c_str() : "");
+	}
+	blob.write(-1);
+}
+
+
+void ControllerResource::AnimationSlot::deserialize(InputBlob& blob)
+{
+	blob.read(name);
+	u32 hash = crc32(name);
+	int set_idx = blob.read<int>();
+	auto& anim_sets = controller.m_engine_resource->m_animation_set;
+	StudioApp& app = controller.m_editor.getApp();
+	auto* manager = app.getWorldEditor().getEngine().getResourceManager().get(ANIMATION_TYPE);
+	while (set_idx != -1)
+	{
+		char path[MAX_PATH_LENGTH];
+		blob.readString(path, lengthOf(path));
+		Animation* anim = path[0] != '\0' ? (Animation*)manager->load(Path(path)) : nullptr;
+
+		bool exists = false;
+		for (auto& set : anim_sets)
+		{
+			if (set.set == set_idx && set.hash == hash)
+			{
+				set.animation = anim;
+				goto next;
+			}
+		}
+		auto& set = anim_sets.emplace();
+		set.set = set_idx;
+		set.hash = hash;
+		set.animation = anim;
+
+		next:
+			set_idx = blob.read<int>();
+	}
+}*/
+
+
+void ControllerResource::AnimationSlot::setName(const StaticString<32>& name)
+{
+	u32 old_hash = crc32(this->name);
+	u32 new_hash = crc32(name);
+	
+	auto& engine_anim_set = controller.m_engine_resource->m_animation_set;
+	for (auto& entry : engine_anim_set)
+	{
+		if (entry.hash == old_hash) entry.hash = new_hash;
+	}
+
+	this->name = name;
+}
+
+
+const StaticString<32>& ControllerResource::ConstantProxy::getName() const
 {
 	return resource.m_engine_resource->m_input_decl.constants[engine_idx].name;
 }
 
 
-Anim::InputDecl::Type& ControllerResource::ConstantProxy::getType()
+Anim::InputDecl::Type ControllerResource::ConstantProxy::getType() const
 {
 	return resource.m_engine_resource->m_input_decl.constants[engine_idx].type;
 }
@@ -1829,13 +2029,13 @@ void ControllerResource::ConstantProxy::setName(const StaticString<32>& value)
 	resource.m_engine_resource->m_input_decl.constants[engine_idx].name = value;
 }
 
-StaticString<32>& ControllerResource::InputProxy::getName()
+const StaticString<32>& ControllerResource::InputProxy::getName() const
 {
 	return resource.m_engine_resource->m_input_decl.inputs[engine_idx].name;
 }
 
 
-Anim::InputDecl::Type& ControllerResource::InputProxy::getType()
+Anim::InputDecl::Type ControllerResource::InputProxy::getType() const 
 {
 	return resource.m_engine_resource->m_input_decl.inputs[engine_idx].type;
 }
@@ -1862,11 +2062,11 @@ void ControllerResource::InputProxy::setName(const StaticString<32>& value)
 }
 
 
-void ControllerResource::Mask::setName(const string& value)
+void ControllerResource::Mask::setName(const StaticString<32>& value)
 {
 	name = value;
 	int idx = controller.m_masks.find([this](auto& mask) { return &mask == this; });
-	controller.m_engine_resource->m_masks[idx].name = crc32(value.c_str());
+	controller.m_engine_resource->m_masks[idx].name = crc32(value);
 }
 
 
@@ -1945,6 +2145,112 @@ void ControllerResource::removeConstant(int index)
 }
 
 
+void ControllerResource::addAnimationSet(int idx)
+{
+	auto init = [this](AnimationSet& set, int idx) {
+		for (int i = 0, c = m_animation_slots.size(); i < c; ++i)
+		{
+			auto& slot = m_animation_slots[i];
+			auto& value = set.values.emplace(set);
+			value.anim = slot.values[idx].anim;
+		}
+	};
+	if (idx < 0)
+	{
+		m_engine_resource->m_sets_names.emplace("new set");
+		AnimationSet& set = m_animation_sets.emplace(*this);
+		for (auto& slot : m_animation_slots)
+		{
+			slot.values.emplace(slot);
+		}
+		init(set, m_animation_sets.size() - 1);
+	}
+	else
+	{
+		m_engine_resource->m_sets_names.emplaceAt(idx, "new set");
+		AnimationSet& set = m_animation_sets.emplaceAt(idx, *this);
+		for (auto& slot : m_animation_slots)
+		{
+			slot.values.emplaceAt(idx, slot);
+		}
+		init(set, idx);
+	}
+
+
+}
+
+
+void ControllerResource::removeAnimationSet(int idx)
+{
+	for (auto& slot : m_animation_slots)
+	{
+		slot.values.erase(idx);
+	}
+
+	m_engine_resource->m_animation_set.eraseItems([idx](Anim::ControllerResource::AnimSetEntry& val) {
+		return val.set == idx;
+	});
+	for (int i = m_engine_resource->m_animation_set.size() - 1; i >= 0; --i)
+	{
+		auto& set = m_engine_resource->m_animation_set[i];
+		if (set.set == idx) m_engine_resource->m_animation_set.erase(i);
+	}
+	for (auto& set : m_engine_resource->m_animation_set)
+	{
+		if (set.set > idx)
+		{
+			--set.set;
+		}
+	}
+	m_engine_resource->m_sets_names.erase(idx);
+	m_animation_sets.erase(idx);
+}
+
+
+void ControllerResource::addSlot(int idx)
+{
+	auto init = [this](AnimationSlot& slot, int idx) {
+		for (int i = 0, c = m_animation_sets.size(); i < c; ++i)
+		{
+			auto& set = m_animation_sets[i];
+			auto& value = slot.values.emplace(slot);
+			value.anim = set.values[idx].anim;
+		}
+	};
+
+	if (idx < 0)
+	{
+		AnimationSlot& slot = m_animation_slots.emplace(*this);
+		for (auto& set : m_animation_sets)
+		{
+			set.values.emplace(set);
+		}
+		init(slot, m_animation_slots.size() - 1);
+	}
+	else
+	{
+		AnimationSlot& slot = m_animation_slots.emplaceAt(idx, *this);
+		for (auto& set : m_animation_sets)
+		{
+			set.values.emplaceAt(idx, set);
+		}
+		init(slot, idx);
+	}
+}
+
+
+void ControllerResource::removeSlot(int idx)
+{
+	u32 slot_hash = crc32(m_animation_slots[idx].getName());
+	m_engine_resource->m_animation_set.eraseItems([slot_hash](Anim::ControllerResource::AnimSetEntry& val) { return val.hash == slot_hash; });
+	m_animation_slots.erase(idx);
+	for (auto& set : m_animation_sets)
+	{
+		set.values.erase(idx);
+	}
+}
+
+
 void ControllerResource::addMask(int index)
 {
 	if (index < 0)
@@ -1964,20 +2270,10 @@ const char* ControllerResource::getAnimationSlot(u32 slot_hash) const
 {
 	for (auto& slot : m_animation_slots)
 	{
-		if (crc32(slot.c_str()) == slot_hash) return slot.c_str();
+		if (crc32(slot.getName()) == slot_hash) return slot.getName();
 	}
 	return "";
 }
-
-
-void ControllerResource::createAnimSlot(const char* name, const char* path)
-{
-	m_animation_slots.emplace(m_allocator) = name;
-	auto* manager = m_engine_resource->getResourceManager().getOwner().get(ANIMATION_TYPE);
-	auto* anim = (Animation*)manager->load(Path(path));
-	m_engine_resource->addAnimation(0, crc32(name), anim);
-}
-
 
 
 Component* ControllerResource::getByUID(int uid)

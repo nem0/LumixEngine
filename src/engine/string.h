@@ -184,10 +184,10 @@ public:
 		return *this;
 	}
 
+	IAllocator& m_allocator;
 private:
 	i32 m_size;
 	char* m_cstr;
-	IAllocator& m_allocator;
 };
 
 

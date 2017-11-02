@@ -20,16 +20,21 @@ namespace Lumix
 		, m_allocator(allocator)
 	{
 		g_path_manager = this;
-		m_empty_path = getPath(0, "");
+		m_empty_path = LUMIX_NEW(m_allocator, Path)();
 	}
 
 
 	PathManager::~PathManager()
 	{
-		decrementRefCount(m_empty_path);
-		m_empty_path = nullptr;
+		LUMIX_DELETE(m_allocator, m_empty_path);
 		ASSERT(m_paths.size() == 0);
 		g_path_manager = nullptr;
+	}
+
+
+	const Path& PathManager::getEmptyPath()
+	{
+		return *g_path_manager->m_empty_path;
 	}
 
 

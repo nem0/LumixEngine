@@ -5,9 +5,6 @@ namespace Lumix
 {
 
 
-template <typename T> auto getMembers();
-
-
 // inspired by https://github.com/eliasdaler/MetaStuff
 template <typename... Members>
 struct ClassDesc
@@ -17,20 +14,40 @@ struct ClassDesc
 };
 
 
+template <typename T> auto getMembers()
+{
+	ClassDesc<> cd;
+	cd.name = "not defined";
+	ASSERT(false);
+	return cd;
+}
+
+
 template <typename Class, typename T, typename... Attrs>
 struct Member
 {
 	using RefSetter = void (Class::*)(const T&);
 	using ValueSetter = void (Class::*)(T);
+	using ConstRefGetter = const T& (Class::*)() const;
 	using RefGetter = T& (Class::*)();
+	using ValueGetter = T (Class::*)() const;
 	using MemberPtr = T (Class::*);
 
 	Member() {}
 	Member(const char* name, MemberPtr member_ptr, Attrs... attrs);
 	Member(const char* name, RefGetter getter, Attrs... attrs);
+	Member(const char* name, ConstRefGetter getter, RefSetter setter, Attrs... attrs);
+	Member(const char* name, ValueGetter getter, ValueSetter setter, Attrs... attrs);
 	Member(const char* name, RefGetter getter, RefSetter setter, Attrs... attrs);
 	Member(const char* name, RefGetter getter, ValueSetter setter, Attrs... attrs);
 
+	Member& addConstRefGetter(ConstRefGetter getter) { const_ref_getter = getter; return *this; }
+
+	template <typename F> void callWithValue(Class& obj, F f) const;
+	template <typename F> void callWithValue(const Class& obj, F f) const;
+	const T& getConstRef(Class& obj) const;
+	const T& getConstRef(const Class& obj) const;
+	T getValue(const Class& obj) const { return (obj.*value_getter)(); }
 	T& getRef(Class& obj) const;
 	template <typename V> void set(Class& obj, const V& value) const;
 	bool hasSetter() const { return ref_setter || value_setter; }
@@ -41,6 +58,8 @@ struct Member
 	RefSetter ref_setter = nullptr;
 	ValueSetter value_setter = nullptr;
 	RefGetter ref_getter = nullptr;
+	ConstRefGetter const_ref_getter = nullptr;
+	ValueGetter value_getter = nullptr;
 	Tuple<Attrs...> attributes;
 };
 
@@ -59,6 +78,25 @@ template <typename Class, typename T, typename... Attrs>
 Member<Class, T, Attrs...>::Member(const char* name, RefGetter getter, RefSetter setter, Attrs... attrs)
 	: name(name)
 	, ref_getter(getter)
+	, ref_setter(setter)
+{
+	attributes = makeTuple(attrs...);
+}
+
+
+template <typename Class, typename T, typename... Attrs>
+Member<Class, T, Attrs...>::Member(const char* name, ValueGetter getter, ValueSetter setter, Attrs... attrs)
+	: name(name)
+	, value_getter(getter)
+	, value_setter(setter)
+{
+	attributes = makeTuple(attrs...);
+}
+
+template <typename Class, typename T, typename... Attrs>
+Member<Class, T, Attrs...>::Member(const char* name, ConstRefGetter getter, RefSetter setter, Attrs... attrs)
+	: name(name)
+	, const_ref_getter(getter)
 	, ref_setter(setter)
 {
 	attributes = makeTuple(attrs...);
@@ -117,6 +155,49 @@ T& Member<Class, T, Attrs...>::getRef(Class& obj) const
 }
 
 
+template <typename Class, typename T, typename... Attrs>
+template <typename F>
+void Member<Class, T, Attrs...>::callWithValue(Class& obj, F f) const
+{
+	if (const_ref_getter) return f((obj.*const_ref_getter)());
+	if (ref_getter) return f((obj.*ref_getter)());
+	if (has_member_ptr) return f(obj.*member_ptr);
+	if (value_getter) return f((obj.*value_getter)());
+	ASSERT(false);
+}
+
+
+template <typename Class, typename T, typename... Attrs>
+template <typename F>
+void Member<Class, T, Attrs...>::callWithValue(const Class& obj, F f) const
+{
+	if (const_ref_getter) return f((obj.*const_ref_getter)());
+	if (has_member_ptr) return f(obj.*member_ptr);
+	if (value_getter) return f((obj.*value_getter)());
+	ASSERT(false);
+}
+
+template <typename Class, typename T, typename... Attrs>
+const T& Member<Class, T, Attrs...>::getConstRef(const Class& obj) const
+{
+	if (const_ref_getter) return (obj.*const_ref_getter)();
+	if (has_member_ptr) return obj.*member_ptr;
+	ASSERT(false);
+	return obj.*member_ptr;
+}
+
+
+template <typename Class, typename T, typename... Attrs>
+const T& Member<Class, T, Attrs...>::getConstRef(Class& obj) const
+{
+	if (const_ref_getter) return (obj.*const_ref_getter)();
+	if (ref_getter) return (obj.*ref_getter)();
+	if (has_member_ptr) return obj.*member_ptr;
+	ASSERT(false);
+	return obj.*member_ptr;
+}
+
+
 template <typename... Members>
 auto type(const char* name, Members... members)
 {
@@ -128,7 +209,7 @@ auto type(const char* name, Members... members)
 
 
 template <typename T, typename Class, typename... Attrs>
-auto property(const char* name, T (Class::*getter)(), Attrs... attrs)
+auto property(const char* name, T& (Class::*getter)(), Attrs... attrs)
 {
 	return Member<Class, RemoveCVR<T>, Attrs...>(name, getter, attrs...);
 }
@@ -142,7 +223,21 @@ auto property(const char* name, T (Class::*member), Attrs... attrs)
 
 
 template <typename R, typename Class, typename T, typename... Attrs>
-auto property(const char* name, R& (Class::*getter)(), void (Class::*setter)(T), Attrs... attrs)
+auto property(const char* name, R& (Class::*getter)() const, void (Class::*setter)(T), Attrs... attrs)
+{
+	return Member<Class, RemoveCVR<R>, Attrs...>(name, getter, setter, attrs...);
+}
+
+
+template <typename R, typename Class, typename T, typename... Attrs>
+auto property(const char* name, R (Class::*getter)() const, void (Class::*setter)(T), Attrs... attrs)
+{
+	return Member<Class, RemoveCVR<R>, Attrs...>(name, getter, setter, attrs...);
+}
+
+
+template <typename R, typename Class, typename T, typename... Attrs>
+auto property(const char* name, const R& (Class::*getter)() const, void (Class::*setter)(T), Attrs... attrs)
 {
 	return Member<Class, RemoveCVR<R>, Attrs...>(name, getter, setter, attrs...);
 }
@@ -219,7 +314,7 @@ auto array_size_attribute(Counter counter)
 }
 
 
-inline void serialize(OutputBlob& blob, string& obj)
+inline void serialize(OutputBlob& blob, const string& obj)
 {
 	blob.write(obj);
 }
@@ -232,60 +327,143 @@ inline void serialize(OutputBlob& blob, int obj)
 
 
 template <int count>
-void serialize(OutputBlob& blob, StaticString<count>& obj)
+void serialize(OutputBlob& blob, const StaticString<count>& obj)
 {
 	blob.writeString(obj.data);
 }
 
 
+void serialize(OutputBlob& blob, const Path& obj)
+{
+	blob.writeString(obj.c_str());
+}
+
+
 template <typename T>
-void serialize(OutputBlob& blob, Array<T>& array)
+void serialize(OutputBlob& blob, const Array<T>& array)
 {
 	blob.write(array.size());
 	for (T& item : array)
 	{
 		serialize(blob, item);
-		blob.write(item);
 	}
 }
 
 
+struct CustomSerializer {};
+
+
+template<class B, class D>
+struct IsBaseOf
+{
+	template<typename T> struct dummy {};
+	struct Child : D, dummy<int> {};
+
+	static B* Check(B*);
+	template<class T> static char Check(dummy<T>*);
+
+	static const bool result = (sizeof(Check((Child*)0)) == sizeof(B*));
+};
+
+template <typename F, typename Attr>
+struct GetAttributeVisitor
+{
+	GetAttributeVisitor(F& f) : f(f) {}
+	template <typename T> 
+	typename EnableIf<!IsBaseOf<Attr, T>::result>::Type
+		operator()(const T& attr)
+	{}
+
+	template <typename T>
+	typename EnableIf<IsBaseOf<Attr, T>::result>::Type
+		operator()(const T& attr)
+	{
+		f(attr);
+	}
+	
+	F& f;
+};
+
+
+template <typename Class, typename Attr, typename F>
+void getAttribute(F& f)
+{
+	GetAttributeVisitor<F, Attr> visitor(f);
+	auto attrs = getAttributes<Class>();
+	apply(visitor, attrs);
+}
+
+
+
 template <typename T>
-typename EnableIf<TupleSize<decltype(getEnum<T>())>::result == 0>::Type
-serialize(OutputBlob& blob, T& obj)
+auto serializeImpl(OutputBlob& blob, const T& obj, int)
+-> decltype(obj.serialize(blob), void())
+{
+	obj.serialize(blob);
+}
+
+
+template<class T>
+void serializeImpl(OutputBlob& blob, const T& obj, long)
 {
 	auto desc = getMembers<RemoveCVR<T>>();
 	auto l = [&blob, &obj](const auto& member) {
-		decltype(auto) x = member.getRef(obj);
-		serialize(blob, x);
+		member.callWithValue(obj, [&](const auto& x) {
+			serialize(blob, x);
+		});
 	};
 	apply(l, desc.members);
 }
 
 
 template <typename T>
+typename EnableIf<TupleSize<decltype(getEnum<T>())>::result == 0>::Type
+serialize(OutputBlob& blob, const T& obj)
+{
+	serializeImpl(blob, obj, 0);
+}
+
+
+template <typename T>
 typename EnableIf<TupleSize<decltype(getEnum<T>())>::result != 0>::Type
-serialize(OutputBlob& blob, T& obj)
+serialize(OutputBlob& blob, const T& obj)
 {
 	blob.write(obj);
+}
+
+
+template <typename T>
+auto deserializeImpl(InputBlob& blob, T& obj, int)
+-> decltype(obj.deserialize(blob), void())
+{
+	obj.deserialize(blob);
+}
+
+
+template<class T>
+void deserializeImpl(InputBlob& blob, T& obj, long)
+{
+	auto desc = getMembers<T>();
+	auto l = [&blob, &obj](const auto& member) {
+		member.callWithValue(obj, [&](const auto& value){
+			deserialize(blob, obj, member, value);
+		});
+
+	};
+	apply(l, desc.members);
 }
 
 
 template <typename Class>
 void deserialize(InputBlob& blob, Class& obj)
 {
-	auto desc = getMembers<Class>();
-	auto l = [&blob, &obj](const auto& member) {
-		auto& value = member.getRef(obj);
-		deserialize(blob, obj, member, value);
-	};
-	apply(l, desc.members);
+	deserializeImpl(blob, obj, 0);
 }
 
 
 template <typename Parent, typename Member, typename Class>
 typename EnableIf<TupleSize<decltype(getEnum<Class>())>::result == 0>::Type
-deserialize(InputBlob& blob, Parent& parent, const Member& member, Class& obj)
+deserialize(InputBlob& blob, Parent& parent, const Member& member, const Class& obj)
 {
 	ASSERT(!member.hasSetter());
 	auto desc = getMembers<Class>();
@@ -299,7 +477,7 @@ deserialize(InputBlob& blob, Parent& parent, const Member& member, Class& obj)
 
 template <typename Parent, typename Member, typename Class>
 typename EnableIf<TupleSize<decltype(getEnum<Class>())>::result != 0>::Type
-deserialize(InputBlob& blob, Parent& parent, const Member& member, Class& obj)
+deserialize(InputBlob& blob, Parent& parent, const Member& member, const Class& obj)
 {
 	Class tmp;
 	blob.read(tmp);
@@ -308,20 +486,29 @@ deserialize(InputBlob& blob, Parent& parent, const Member& member, Class& obj)
 
 
 template <typename Parent, typename Member>
-void deserialize(InputBlob& blob, Parent& parent, const Member& member, string& obj)
+void deserialize(InputBlob& blob, Parent& parent, const Member& member, const string& obj)
 {
-	ASSERT(!member.hasSetter());
-	blob.read(obj);
+	string tmp(obj.m_allocator);
+	blob.read(tmp);
+	member.set(parent, tmp);
 }
 
 template <typename Parent, typename Member>
-void deserialize(InputBlob& blob, Parent& parent, const Member& member, int& obj)
+void deserialize(InputBlob& blob, Parent& parent, const Member& member, const Path& obj)
+{
+	char tmp[MAX_PATH_LENGTH];
+	blob.readString(tmp, lengthOf(tmp));
+	member.set(parent, Path(tmp));
+}
+
+template <typename Parent, typename Member>
+void deserialize(InputBlob& blob, Parent& parent, const Member& member, int obj)
 {
 	member.set(parent, obj);
 }
 
 template <typename Parent, typename Member, int count>
-void deserialize(InputBlob& blob, Parent& parent, const Member& member, StaticString<count>& obj)
+void deserialize(InputBlob& blob, Parent& parent, const Member& member, const StaticString<count>& obj)
 {
 	StaticString<count> tmp;
 	blob.readString(tmp.data, lengthOf(tmp.data));
@@ -330,10 +517,11 @@ void deserialize(InputBlob& blob, Parent& parent, const Member& member, StaticSt
 
 
 template <typename Parent, typename Member, typename T>
-void deserialize(InputBlob& blob, Parent& parent, const Member& member, Array<T>& array)
+void deserialize(InputBlob& blob, Parent& parent, const Member& member, const Array<T>&)
 {
 	ASSERT(!member.hasSetter());
 	int count = blob.read<int>();
+	Array<T>& array = member.getRef(parent);
 	for (int i = 0; i < count; ++i)
 	{
 		addToArray(member, parent, -1);
@@ -451,7 +639,7 @@ struct SetPropertyCommand : IHashedCommand
 
 	bool execute() override
 	{
-		old_value = pp.getValueFromRoot(root);
+		old_value = pp.getConstRefFromRoot(root);
 		pp.setValueFromRoot(root, value);
 		return true;
 	}
@@ -501,14 +689,15 @@ struct RemoveArrayItemCommand : IEditorCommand
 		, pp(_pp)
 		, index(_index)
 		, blob(allocator)
-	{}
+	{
+		auto& array = pp.getRefFromRoot(root);
+		::Lumix::serialize(blob, array[index]);
+	}
 
 
 	bool execute() override
 	{
-		auto& owner = ((typename PP::Base&)pp).getValueFromRoot(root);
-		auto& array = pp.getValueFromRoot(root);
-		::Lumix::serialize(blob, array[index]);
+		auto& owner = ((typename PP::Base&)pp).getRefFromRoot(root);
 		removeFromArray(pp.head, owner, index);
 		return true;
 	}
@@ -516,10 +705,10 @@ struct RemoveArrayItemCommand : IEditorCommand
 
 	void undo() override
 	{
-		auto& owner = ((typename PP::Base&)pp).getValueFromRoot(root);
+		auto& owner = ((typename PP::Base&)pp).getRefFromRoot(root);
 		addToArray(pp.head, owner, index);
 		InputBlob input_blob(blob);
-		auto& array = pp.getValueFromRoot(root);
+		auto& array = pp.getRefFromRoot(root);
 		::Lumix::deserialize(input_blob, array[index]);
 	}
 
@@ -547,7 +736,7 @@ struct AddArrayItemCommand : IEditorCommand
 
 	bool execute() override
 	{
-		auto& owner = ((typename PropertyPath::Base&)pp).getValueFromRoot(root);
+		auto& owner = ((typename PropertyPath::Base&)pp).getRefFromRoot(root);
 		addToArray(pp.head, owner, -1);
 		return true;
 	}
@@ -555,8 +744,7 @@ struct AddArrayItemCommand : IEditorCommand
 
 	void undo() override
 	{
-		auto& owner = ((typename PropertyPath::Base&)pp).getValueFromRoot(root);
-		auto& array = pp.getValueFromRoot(root);
+		auto& owner = ((typename PropertyPath::Base&)pp).getRefFromRoot(root);
 		int size = getArraySize(pp.head, owner);
 		removeFromArray(pp.head, owner, size - 1);
 	}
@@ -575,7 +763,9 @@ struct AddArrayItemCommand : IEditorCommand
 struct PropertyPathBegin
 {
 	template <typename T>
-	decltype(auto) getValueFromRoot(T& root) const { return root; }
+	T& getRefFromRoot(T& root) const { return root; }
+	template <typename T>
+	const T& getConstRefFromRoot(const T& root) const { return root; }
 };
 
 
@@ -583,22 +773,28 @@ template <typename Prev, typename Member>
 struct PropertyPath : Prev
 {
 	using Base = Prev;
+	using Result = RemoveCVR<typename ResultOf<decltype(&Member::getRef)>::Type>;
 
 	PropertyPath(const Prev& prev, Member _head) : Prev(prev), head(_head), name(_head.name) {}
 
-	template <typename T>
-	decltype(auto) getValue(T& obj) const { return head.getRef(obj); }
 
 	template <typename T>
-	decltype(auto) getValueFromRoot(T& root) const
+	auto& getRefFromRoot(T& root) const
 	{
-		return head.getRef(Prev::getValueFromRoot(root));
+		return head.getRef(Prev::getRefFromRoot(root));
 	}
 
-	template <typename T, typename O>
-	void setValueFromRoot(T& root, O value)
+	template <typename T>
+	const auto& getConstRefFromRoot(const T& root) const
 	{
-		decltype(auto) x = Prev::getValueFromRoot(root);
+		return head.getConstRef(Prev::getConstRefFromRoot(root));
+	}
+
+
+	template <typename T, typename O>
+	void setValueFromRoot(T& root, const O& value) const
+	{
+		decltype(auto) x = Prev::getRefFromRoot(root);
 		head.set(x, value);
 	}
 
@@ -616,14 +812,16 @@ struct PropertyPathArray : Prev
 		: Prev(prev), index(_index) {}
 
 	template <typename T>
-	auto& getValue(T& obj) const { return obj[index]; }
-
-	template <typename T>
-	auto& getValueFromRoot(T& root) const
+	auto& getRefFromRoot(T& root) const
 	{
-		return Prev::getValueFromRoot(root)[index];
+		return Prev::getRefFromRoot(root)[index];
 	}
 
+	template <typename T>
+	const auto& getConstRefFromRoot(T& root) const
+	{
+		return Prev::getConstRefFromRoot(root)[index];
+	}
 
 	template <typename T, typename O>
 	void setValueFromRoot(T& root, const O& value)
@@ -633,6 +831,125 @@ struct PropertyPathArray : Prev
 
 	int index;
 };
+
+
+template <typename F, typename PP, typename Object>
+auto generatePP(F f, const PP& pp, const Object& object)
+{
+	f(pp);
+}
+
+
+template <typename F, typename PP, typename Parent, typename... Path>
+auto generatePPImpl(int dummy, F& f, const PP& pp, const Parent& parent, int head, Path... path)
+-> decltype(parent[head], void())
+{
+	auto item_pp = makePP(pp, head);
+	decltype(auto) obj = parent[head];
+	generatePP(f, item_pp, obj, path...);
+}
+
+
+template <typename F, typename PP, typename Parent, typename... Path>
+void generatePPImpl(long dummy, F& f, const PP& pp, const Parent& parent, int head, Path... path)
+{
+}
+
+
+template <typename F, typename PP, typename Parent, typename... Path>
+auto generatePP(F& f, const PP& pp, const Parent& parent, int head, Path... path)
+{
+	generatePPImpl(0, f, pp, parent, head, path...);
+}
+
+
+template <typename F, typename PP, typename... Path>
+void generatePP(F& f, const PP& pp, const string& parent, const char* head, Path... path)
+{
+}
+
+
+template <typename F, typename PP, typename Parent, typename... Path>
+void generatePP(F& f, const PP& pp, const Parent& parent, const char* head, Path... path)
+{
+	auto decl = getMembers<Parent>();
+	apply([&f, &head, &pp, &path..., &parent](const auto& member) {
+		if (equalStrings(member.name, head))
+		{
+			auto child_pp = makePP(pp, member);
+			decltype(auto) obj = member.getConstRef(parent);
+			generatePP(f, child_pp, obj, path...);
+		}
+	}, decl.members);
+}
+
+
+template <typename Root, typename Editor, typename... Path>
+void addArrayItem(IAllocator& allocator, Editor& editor, Root& root, Path... path)
+{
+	generatePP([&root, &editor, &allocator](const auto& result_pp) {
+		using Cmd = AddArrayItemCommand<Root, RemoveCVR<decltype(result_pp)>>;
+		auto* cmd = LUMIX_NEW(allocator, Cmd)(root, result_pp);
+		editor.executeCommand(*cmd);
+	}, PropertyPathBegin(), root, path...);
+}
+
+
+template <typename Root, typename Editor, typename Value>
+struct DoForType
+{
+	DoForType(Root& root,
+		const Value& value,
+		Editor& editor,
+		IAllocator& allocator)
+		: root(root)
+		, value(value)
+		, allocator(allocator)
+		, editor(editor)
+	{}
+
+
+	template <typename PP>
+	typename EnableIf<IsSame<RemoveCVR<typename PP::Result>, RemoveCVR<Value>>::result>::Type
+		operator()(const PP& result_pp)
+	{
+		using Cmd = SetPropertyCommand<Root, Value, RemoveCVR<decltype(result_pp)>>;
+		auto* cmd = LUMIX_NEW(allocator, Cmd)(root, result_pp, value);
+		editor.executeCommand(*cmd);
+	}
+	
+	template <typename PP>
+	typename EnableIf<!IsSame<RemoveCVR<typename PP::Result>, RemoveCVR<Value>>::result>::Type
+		operator()(const PP& result_pp)
+	{
+		ASSERT(false);
+	}
+
+
+	IAllocator& allocator;
+	Root& root;
+	const Value& value;
+	Editor& editor;
+};
+
+
+template <typename Root, typename Editor, typename Value, typename... Path>
+void setPropertyValue(IAllocator& allocator, Editor& editor, Root& root, const Value& value, Path... path)
+{
+	DoForType<Root, Editor, Value> do_for_type(root, value, editor, allocator);
+	generatePP(do_for_type, PropertyPathBegin(), root, path...);
+}
+
+
+template <typename Root, typename Editor, typename... Path>
+void removeArrayItem(IAllocator& allocator, Editor& editor, Root& root, int index, Path... path)
+{
+	generatePP([&root, &editor, &allocator, index](const auto& result_pp) {
+		using Cmd = RemoveArrayItemCommand<Root, RemoveCVR<decltype(result_pp)>>;
+		auto* cmd = LUMIX_NEW(allocator, Cmd)(root, result_pp, index, allocator);
+		editor.executeCommand(*cmd);
+	}, PropertyPathBegin(), root, path...);
+}
 
 
 template <typename Prev, typename Member>
@@ -646,6 +963,13 @@ template <typename Prev>
 auto makePP(const Prev& prev, int index)
 {
 	return PropertyPathArray<Prev>(prev, index);
+}
+
+
+template <typename T> 
+int getSubpropertiesCount()
+{
+	return TupleSize<decltype(getMembers<T>().members)>::result;
 }
 
 
@@ -673,7 +997,7 @@ struct UIBuilder
 	template <typename O, typename PP, typename T>
 	struct CustomUIVisitor
 	{
-		CustomUIVisitor(O& owner, const PP& pp, T& obj)
+		CustomUIVisitor(O& owner, const PP& pp, const T& obj)
 			: owner(owner)
 			, pp(pp)
 			, obj(obj)
@@ -691,13 +1015,13 @@ struct UIBuilder
 
 		O& owner;
 		const PP& pp;
-		T& obj;
+		const T& obj;
 		bool has_custom_ui = false;
 	};
 
 
 	template <typename O, typename PP, typename T>
-	bool customUI(O& owner, const PP& pp, T& obj)
+	bool customUI(O& owner, const PP& pp, const T& obj)
 	{
 		CustomUIVisitor<O, PP, T> visitor(owner, pp, obj);
 		apply(visitor, pp.head.attributes);
@@ -706,7 +1030,7 @@ struct UIBuilder
 
 
 	template <typename O, typename PP, typename T, int capacity>
-	void ui(O& owner, const PP& pp, T (&array)[capacity])
+	void ui(O& owner, const PP& pp, const T (&array)[capacity])
 	{
 		if (customUI(owner, pp, array)) return;
 
@@ -769,20 +1093,21 @@ struct UIBuilder
 
 
 	template <typename O, typename PP, int count>
-	void ui(O& owner, const PP& pp, StaticString<count>& obj)
+	void ui(O& owner, const PP& pp, const StaticString<count>& obj)
 	{
 		if (customUI(owner, pp, obj)) return;
 
-		if (ImGui::InputText(pp.name, obj.data, sizeof(obj.data)))
+		StaticString<count> tmp = obj;
+		if (ImGui::InputText(pp.name, tmp.data, sizeof(tmp.data)))
 		{
-			auto* command = LUMIX_NEW(m_allocator, SetPropertyCommand<Root, StaticString<count>, PP>)(m_root, pp, obj);
+			auto* command = LUMIX_NEW(m_allocator, SetPropertyCommand<Root, StaticString<count>, PP>)(m_root, pp, tmp);
 			m_editor.executeCommand(*command);
 		}
 	}
 
 
 	template <typename O, typename PP>
-	void ui(O& owner, const PP& pp, int& obj)
+	void ui(O& owner, const PP& pp, int obj)
 	{
 		if (customUI(owner, pp, obj)) return;
 
@@ -796,22 +1121,24 @@ struct UIBuilder
 
 	template <typename O, typename PP, typename T>
 	typename EnableIf<TupleSize<decltype(getEnum<T>())>::result == 0>::Type
-		ui(O& owner, const PP& pp, T& obj)
+		ui(O& owner, const PP& pp, const T& obj)
 	{
 		if (customUI(owner, pp, obj)) return;
 
 		auto desc = getMembers<T>();
-		apply([&pp, this, &obj](const auto& m) {
-			auto& v = m.getRef(obj);
+		apply([&pp, this](const auto& m) {
 			auto child_pp = makePP(pp, m);
-			this->ui(obj, child_pp, v);
+			auto& obj = pp.getRefFromRoot(m_root);
+			m.callWithValue(obj, [&](const auto& v) {
+				this->ui(obj, child_pp, v);
+			});
 		}, desc.members);
 	}
 
 
 	template <typename O, typename PP, typename T>
 	typename EnableIf<TupleSize<decltype(getEnum<T>())>::result != 0>::Type
-		ui(O& owner, const PP& pp, T& obj)
+		ui(O& owner, const PP& pp, const T& obj)
 	{
 		auto enum_values = getEnum<T>();
 		int idx = getEnumValueIndex(obj);
@@ -826,13 +1153,13 @@ struct UIBuilder
 		if (ImGui::Combo(pp.name, &idx, getter, nullptr, TupleSize<decltype(enum_values)>::result))
 		{
 			T val = getEnumValueFromIndex<T>(idx);
-			pp.head.set(owner, val);
+			pp.setValueFromRoot(m_root, val);
 		}
 	}
 
 
 	template <typename O, typename PP>
-	void ui(O& owner, const PP& pp, string& value)
+	void ui(O& owner, const PP& pp, const string& value)
 	{
 		if (customUI(owner, pp, value)) return;
 
@@ -848,7 +1175,7 @@ struct UIBuilder
 
 
 	template <typename Owner, typename PP, typename T>
-	void ui(Owner& owner, const PP& pp, Array<T>& array)
+	void ui(Owner& owner, const PP& pp, const Array<T>& array)
 	{
 		if (customUI(owner, pp, array)) return;
 		
@@ -862,7 +1189,7 @@ struct UIBuilder
 		if (!expanded) return;
 
 		int i = 0;
-		int subproperties_count = TupleSize<decltype(getMembers<T>().members)>::result;
+		int subproperties_count = getSubpropertiesCount<T>();
 		if (subproperties_count > 1)
 		{
 			for (T& item : array)

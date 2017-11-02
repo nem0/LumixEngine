@@ -43,23 +43,6 @@ static const ResourceType CONTROLLER_RESOURCE_TYPE("anim_controller");
 using namespace AnimEditor;
 
 
-template <>
-auto getMembers<ControllerResource>()
-{
-	return type("controller",
-		property("Masks", &ControllerResource::getMasks,
-			array_attribute(&ControllerResource::addMask, &ControllerResource::removeMask)
-		),
-		property("Inputs", &ControllerResource::getInputs,
-			array_attribute(&ControllerResource::addInput, &ControllerResource::removeInput)
-		),
-		property("Constants", &ControllerResource::getConstants,
-			array_attribute(&ControllerResource::addConstant, &ControllerResource::removeConstant)
-		)
-	);
-}
-
-
 struct NoUIBuilder
 {
 	template <typename Owner, typename PP, typename T>
@@ -71,6 +54,73 @@ using NoUIAttribute = CustomUIAttribute<NoUIBuilder>;
 
 
 template <>
+auto getMembers<ControllerResource>()
+{
+	return type("controller",
+		property("Masks", &ControllerResource::getMasks,
+			array_attribute(&ControllerResource::addMask, &ControllerResource::removeMask)
+		).addConstRefGetter(&ControllerResource::getMasks),
+		
+		property("Inputs", &ControllerResource::getInputs,
+			array_attribute(&ControllerResource::addInput, &ControllerResource::removeInput)
+		).addConstRefGetter(&ControllerResource::getInputs),
+		
+		property("Constants", &ControllerResource::getConstants,
+			array_attribute(&ControllerResource::addConstant, &ControllerResource::removeConstant)
+		).addConstRefGetter(&ControllerResource::getConstants),
+
+		property("Slots", &ControllerResource::getAnimationSlots,
+			array_attribute(&ControllerResource::addSlot, &ControllerResource::removeSlot),
+			NoUIAttribute()
+		).addConstRefGetter(&ControllerResource::getAnimationSlots),
+
+		property("Sets", &ControllerResource::getAnimationSets,
+			array_attribute(&ControllerResource::addAnimationSet, &ControllerResource::removeAnimationSet),
+			NoUIAttribute()
+		).addConstRefGetter(&ControllerResource::getAnimationSets)
+	);
+}
+
+
+template <>
+auto getMembers<ControllerResource::AnimationSet>()
+{
+	return type("Animation Set",
+		property("Name", &ControllerResource::AnimationSet::getName, &ControllerResource::AnimationSet::setName),
+		property("Values", &ControllerResource::AnimationSet::values)
+	);
+}
+
+
+template <>
+auto getMembers<ControllerResource::AnimationSlot>()
+{
+	return type("Animation Slot",
+		property("Name", &ControllerResource::AnimationSlot::getName, &ControllerResource::AnimationSlot::setName),
+		property("Values", &ControllerResource::AnimationSlot::values)
+	);
+}
+
+
+template <>
+auto getMembers<ControllerResource::AnimationSlot::Value>()
+{
+	return type("Animation Slot Value",
+		property("Path", &ControllerResource::AnimationSlot::Value::get, &ControllerResource::AnimationSlot::Value::set)
+	);
+}
+
+
+template <>
+auto getMembers<ControllerResource::AnimationSet::Value>()
+{
+	return type("Animation Set Value",
+		property("Path", &ControllerResource::AnimationSet::Value::getValue, &ControllerResource::AnimationSet::Value::setValue)
+	);
+}
+
+
+template <>
 auto getEnum<Anim::InputDecl::Type>()
 {
 	return makeTuple(
@@ -79,12 +129,14 @@ auto getEnum<Anim::InputDecl::Type>()
 		EnumValue<Anim::InputDecl::Type>{ Anim::InputDecl::Type::INT, "Integer" }
 	);
 }
-		
+
+
 template <>
 auto getMembers<ControllerResource::InputProxy::ValueProxy>()
 {
 	return type("Input Value");
 }
+
 
 template <>
 auto getMembers<ControllerResource::ConstantProxy::ValueProxy>()
@@ -148,7 +200,7 @@ auto getMembers<ControllerResource::InputProxy>()
 	return type("Input",
 		property("Name", &ControllerResource::InputProxy::getName, &ControllerResource::InputProxy::setName),
 		property("Type", &ControllerResource::InputProxy::getType, &ControllerResource::InputProxy::setType),
-		property("Value", &ControllerResource::InputProxy::getValue, CustomUIAttribute<InputValueCustomUI>()),
+		property("Value", &ControllerResource::InputProxy::getValue, CustomUIAttribute<InputValueCustomUI>()).addConstRefGetter(&ControllerResource::InputProxy::getValue),
 		property("Engine idx", &ControllerResource::InputProxy::getEngineIdx, &ControllerResource::InputProxy::setEngineIdx, 
 			NoUIAttribute())
 	);
@@ -161,7 +213,7 @@ auto getMembers<ControllerResource::ConstantProxy>()
 	return type("Constant",
 		property("Name", &ControllerResource::ConstantProxy::getName, &ControllerResource::ConstantProxy::setName),
 		property("Type", &ControllerResource::ConstantProxy::getType, &ControllerResource::ConstantProxy::setType),
-		property("Value", &ControllerResource::ConstantProxy::getValue, CustomUIAttribute<ConstantValueCustomUI>()),
+		property("Value", &ControllerResource::ConstantProxy::getValue, CustomUIAttribute<ConstantValueCustomUI>()).addConstRefGetter(&ControllerResource::ConstantProxy::getValue),
 		property("Engine idx", &ControllerResource::ConstantProxy::getEngineIdx, &ControllerResource::ConstantProxy::setEngineIdx,
 			NoUIAttribute())
 	);
@@ -184,7 +236,7 @@ auto getMembers<ControllerResource::Mask::Bone>()
 {
 	return type("Bone",
 		property("Name", &ControllerResource::Mask::Bone::getName, &ControllerResource::Mask::Bone::setName)
-		);
+	);
 }
 
 
@@ -1109,121 +1161,77 @@ void AnimationEditor::inputsGUI()
 void AnimationEditor::animationSlotsGUI()
 {
 	if (!ImGui::CollapsingHeader("Animation slots")) return;
+	IAllocator& allocator = m_app.getWorldEditor().getAllocator();
 	ImGui::PushID("anim_slots");
 	auto& engine_anim_set = m_resource->getEngineResource()->m_animation_set;
 	auto& slots = m_resource->getAnimationSlots();
-	auto& sets = m_resource->getEngineResource()->m_sets_names;
+	auto& sets = m_resource->getAnimationSets();
 	ImGui::PushItemWidth(-1);
-	ImGui::Columns(sets.size() + 1);
+	ImGui::Columns(sets.size() + 2);
 	ImGui::NextColumn();
 	ImGui::PushID("header");
 	for (int j = 0; j < sets.size(); ++j)
 	{
 		ImGui::PushID(j);
 		ImGui::PushItemWidth(-1);
-		ImGui::InputText("", sets[j].data, lengthOf(sets[j].data));
+		StaticString<32> tmp = sets[j].getName();
+		if (ImGui::InputText("", tmp.data, lengthOf(tmp.data)))
+		{
+			setPropertyValue(allocator, *this, *m_resource, tmp, "Sets", j, "Name");
+		}
 		ImGui::PopItemWidth();
 		ImGui::PopID();
 		ImGui::NextColumn();
 	}
+	if (ImGui::Button("Add")) addArrayItem(allocator, *this, *m_resource, "Sets");
+	ImGui::NextColumn();
+
 	ImGui::PopID();
 	ImGui::Separator();
 	for (int i = 0; i < slots.size(); ++i)
 	{
-		const string& slot = slots[i];
+		ControllerResource::AnimationSlot& slot = slots[i];
 		ImGui::PushID(i);
-		char slot_cstr[64];
-		copyString(slot_cstr, slot.c_str());
+		StaticString<32> slot_name = slot.getName();
 
 		ImGui::PushItemWidth(-20);
-		if (ImGui::InputText("##name", slot_cstr, lengthOf(slot_cstr), ImGuiInputTextFlags_EnterReturnsTrue))
+		if (ImGui::InputText("##name", slot_name.data, lengthOf(slot_name.data), ImGuiInputTextFlags_EnterReturnsTrue))
 		{
-			bool exists = slots.find([&slot_cstr](const string& val) { return val == slot_cstr; }) >= 0;
-
-			if (exists)
-			{
-				g_log_error.log("Animation") << "Slot " << slot_cstr << " already exists.";
-			}
-			else
-			{
-				u32 old_hash = crc32(slot.c_str());
-				u32 new_hash = crc32(slot_cstr);
-
-				for (auto& entry : engine_anim_set)
-				{
-					if (entry.hash == old_hash) entry.hash = new_hash;
-				}
-				slots[i] = slot_cstr;
-			}
+			setPropertyValue(allocator, *this, *m_resource, slot_name, "Slots", i, "Name");
 		}
 		ImGui::PopItemWidth();
 		ImGui::SameLine();
-		u32 slot_hash = crc32(slot.c_str());
+		u32 slot_hash = crc32(slot.getName());
 		if (ImGui::Button("x"))
 		{
-			slots.erase(i);
-			engine_anim_set.eraseItems([slot_hash](Anim::ControllerResource::AnimSetEntry& val) { return val.hash == slot_hash; });
+			removeArrayItem(allocator, *this, *m_resource, i, "Slots");
 			--i;
 		}
 		ImGui::NextColumn();
-		for (int j = 0; j < sets.size(); ++j)
+		for (int j = 0; j < slot.values.size(); ++j)
 		{
-			Anim::ControllerResource::AnimSetEntry* entry = nullptr;
-			for (auto& e : engine_anim_set)
-			{
-				if (e.set == j && e.hash == slot_hash) 
-				{
-					entry = &e;
-					break;
-				}
-			}
-
 			ImGui::PushItemWidth(ImGui::GetColumnWidth());
 			char tmp[MAX_PATH_LENGTH];
-			copyString(tmp, entry && entry->animation ? entry->animation->getPath().c_str() : "");
+			auto* anim = slot.values[j].anim;
+			copyString(tmp, anim ? anim->getPath().c_str() : "");
 			ImGui::PushID(j);
 			if (m_app.getAssetBrowser().resourceInput("", "##res", tmp, lengthOf(tmp), ANIMATION_TYPE))
 			{
-				if (entry && entry->animation) entry->animation->getResourceManager().unload(*entry->animation);
-				auto* manager = m_app.getWorldEditor().getEngine().getResourceManager().get(ANIMATION_TYPE);
-				if (entry)
-				{
-					entry->animation = (Animation*)manager->load(Path(tmp));
-				}
-				else
-				{
-					engine_anim_set.push({j, slot_hash, (Animation*)manager->load(Path(tmp))});
-				}
+				Path path(tmp);
+				setPropertyValue(allocator, *this, *m_resource, path, "Slots", i, "Values", j, "Path");
 			}
 			ImGui::PopID();
 			ImGui::PopItemWidth();
 
-
 			ImGui::NextColumn();
 		}
+		ImGui::NextColumn();
 		ImGui::PopID();
 	}
 	ImGui::Columns();
 
-	if (ImGui::Button("Add slot (row)"))
-	{
-		bool exists = slots.find([](const string& val) { return val == ""; }) >= 0;
-
-		if (exists)
-		{
-			g_log_error.log("Animation") << "Slot with empty name already exists. Please rename it and then you can create a new slot.";
-		}
-		else
-		{
-			IAllocator& allocator = m_app.getWorldEditor().getAllocator();
-			slots.emplace("", allocator);
-		}
-	}
-	if (ImGui::Button("Add set (column)"))
-	{
-		IAllocator& allocator = m_app.getWorldEditor().getAllocator();
-		m_resource->getEngineResource()->m_sets_names.emplace("new set");
-	}
+	if (ImGui::Button("Add row")) addArrayItem(allocator, *this, *m_resource, "Slots");
+	
 	ImGui::PopItemWidth();
 	ImGui::PopID();
 

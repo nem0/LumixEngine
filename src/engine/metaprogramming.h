@@ -22,9 +22,21 @@ struct EnableIf {};
 template<class T>
 struct EnableIf<true, T> { using Type = T; };
 
+template<typename T1, typename T2>
+struct IsSame
+{
+	enum { result = false };
+};
+
+template<typename T>
+struct IsSame<T, T>
+{
+	enum { result = true };
+};
 
 template <typename T> struct ResultOf;
 template <typename R, typename C, typename... Args> struct ResultOf<R(C::*)(Args...)> { using Type = R; };
+template <typename R, typename C, typename... Args> struct ResultOf<R(C::*)(Args...)const> { using Type = R; };
 
 template <typename T> struct ClassOf;
 template <typename R, typename C, typename... Args>
