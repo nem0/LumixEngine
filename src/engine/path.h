@@ -22,34 +22,6 @@ public:
 };
 
 
-class LUMIX_ENGINE_API PathManager
-{
-	friend class Path;
-
-public:
-	explicit PathManager(IAllocator& allocator);
-	~PathManager();
-
-	void serialize(OutputBlob& serializer);
-	void deserialize(InputBlob& serializer);
-
-	void clear();
-
-private:
-	PathInternal* getPath(u32 hash, const char* path);
-	PathInternal* getPath(u32 hash);
-	PathInternal* getPathMultithreadUnsafe(u32 hash, const char* path);
-	void incrementRefCount(PathInternal* path);
-	void decrementRefCount(PathInternal* path);
-
-private:
-	IAllocator& m_allocator;
-	AssociativeArray<u32, PathInternal*> m_paths;
-	MT::SpinMutex m_mutex;
-	PathInternal* m_empty_path;
-};
-
-
 class LUMIX_ENGINE_API Path
 {
 public:
@@ -81,6 +53,36 @@ public:
 private:
 	PathInternal* m_data;
 };
+
+
+class LUMIX_ENGINE_API PathManager
+{
+	friend class Path;
+
+public:
+	explicit PathManager(IAllocator& allocator);
+	~PathManager();
+
+	void serialize(OutputBlob& serializer);
+	void deserialize(InputBlob& serializer);
+
+	void clear();
+	static const Path& getEmptyPath();
+
+private:
+	PathInternal* getPath(u32 hash, const char* path);
+	PathInternal* getPath(u32 hash);
+	PathInternal* getPathMultithreadUnsafe(u32 hash, const char* path);
+	void incrementRefCount(PathInternal* path);
+	void decrementRefCount(PathInternal* path);
+
+private:
+	IAllocator& m_allocator;
+	AssociativeArray<u32, PathInternal*> m_paths;
+	MT::SpinMutex m_mutex;
+	Path* m_empty_path;
+};
+
 
 
 } // namespace Lumix

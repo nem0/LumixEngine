@@ -4,6 +4,7 @@
 #include "animation/animation_scene.h"
 #include "animation/state_machine.h"
 #include "engine/array.h"
+#include "engine/path.h"
 #include "imgui/imgui.h"
 
 
@@ -300,7 +301,6 @@ public:
 
 				void setName(const string& name);
 				const string& getName() const { return name; }
-				string& getName() { return name; }
 
 			private:
 				string name;
@@ -309,22 +309,20 @@ public:
 
 		Mask(ControllerResource& _controller) 
 			: controller(_controller)
-			, name("", controller.m_allocator)
 			, bones(controller.m_allocator)
 		{}
 
 		void addBone(int index);
 		void removeBone(int index);
-		string& getName() { return name; }
-		const string& getName() const { return name; }
-		void setName(const string& value);
+		const StaticString<32>& getName() const { return name; }
+		void setName(const StaticString<32>& value);
 		
 		ControllerResource& controller;
 		Array<Bone> bones;
 	
 	
 	private:
-		string name;
+		StaticString<32> name;
 	};
 
 	struct InputProxy
@@ -341,15 +339,16 @@ public:
 		{}
 
 		void setName(const StaticString<32>& name);
-		StaticString<32>& getName();
+		const StaticString<32>& getName() const;
 
-		int& getEngineIdx() { return engine_idx; }
+		int getEngineIdx() const { return engine_idx; }
 		void setEngineIdx(int idx);
 
-		Anim::InputDecl::Type& getType();
+		Anim::InputDecl::Type getType() const;
 		void setType(Anim::InputDecl::Type type);
 
 		ValueProxy& getValue() { return value_proxy; }
+		const ValueProxy& getValue() const { return value_proxy; }
 
 		ValueProxy value_proxy;
 		int engine_idx;
@@ -370,19 +369,75 @@ public:
 		{}
 
 		void setName(const StaticString<32>& name);
-		StaticString<32>& getName();
+		const StaticString<32>& getName() const;
 
-		int& getEngineIdx() { return engine_idx; }
+		int getEngineIdx() const { return engine_idx; }
 		void setEngineIdx(int idx);
 
-		Anim::InputDecl::Type& getType();
+		Anim::InputDecl::Type getType() const;
 		void setType(Anim::InputDecl::Type type);
 
 		ValueProxy& getValue() { return value_proxy; }
+		const ValueProxy& getValue() const { return value_proxy; }
 
 		ValueProxy value_proxy;
 		int engine_idx;
 		ControllerResource& resource;
+	};
+
+	struct AnimationSlot
+	{
+		AnimationSlot(ControllerResource& controller) 
+			: controller(controller) 
+			, values(controller.getAllocator())
+		{}
+
+		const StaticString<32>& getName() const { return name; }
+		void setName(const StaticString<32>& name);
+
+		/*void serialize(OutputBlob& blob);
+		void deserialize(InputBlob& blob);*/
+
+		struct Value
+		{
+			Value(AnimationSlot& slot) : slot(slot) {}
+
+			const Path& get() const;
+			void set(const Path& anim);
+
+			Animation* anim = nullptr;
+			AnimationSlot& slot;
+		};
+
+		Array<Value> values;
+		StaticString<32> name;
+		ControllerResource& controller;
+	};
+
+
+	struct AnimationSet
+	{
+		AnimationSet(ControllerResource& controller) 
+			: controller(controller)
+			, values(controller.getAllocator())
+		{}
+
+		const StaticString<32>& getName() const;
+		void setName(const StaticString<32>& name);
+
+		struct Value
+		{
+			Value(AnimationSet& set) : set(set) {}
+
+			const Path& getValue() const;
+			void setValue(const Path& anim);
+
+			Animation* anim = nullptr;
+			AnimationSet& set;
+		};
+
+		Array<Value> values;
+		ControllerResource& controller;
 	};
 
 public:
@@ -394,16 +449,28 @@ public:
 	void serialize(OutputBlob& blob);
 	bool deserialize(InputBlob& blob, Engine& engine, IAllocator& allocator);
 	Component* getRoot() { return m_root; }
-	Array<string>& getAnimationSlots() { return m_animation_slots; }
 	
+	const Array<AnimationSlot>& getAnimationSlots() const { return m_animation_slots; }
+	Array<AnimationSlot>& getAnimationSlots() { return m_animation_slots; }
+	void addSlot(int idx);
+	void removeSlot(int idx);
+
+	const Array<AnimationSet>& getAnimationSets() const { return m_animation_sets; }
+	Array<AnimationSet>& getAnimationSets() { return m_animation_sets; }
+	void addAnimationSet(int idx);
+	void removeAnimationSet(int idx);
+
+	const Array<Mask>& getMasks() const { return m_masks; }
 	Array<Mask>& getMasks() { return m_masks; }
 	void addMask(int index);
 	void removeMask(int index);
 
+	const Array<InputProxy>& getInputs() const { return m_inputs; }
 	Array<InputProxy>& getInputs() { return m_inputs; }
 	void addInput(int index);
 	void removeInput(int index);
 
+	const Array<ConstantProxy>& getConstants() const { return m_constants; }
 	Array<ConstantProxy>& getConstants() { return m_constants; }
 	void addConstant(int index);
 	void removeConstant(int index);
@@ -413,7 +480,6 @@ public:
 	IAnimationEditor& getEditor() { return m_editor; }
 	int createUID() { ++m_last_uid; return m_last_uid; }
 	const char* getAnimationSlot(u32 slot_hash) const;
-	void createAnimSlot(const char* name, const char* path);
 	Component* getByUID(int uid);
 
 private:
@@ -422,10 +488,11 @@ private:
 	IAllocator& m_allocator;
 	Component* m_root;
 	Anim::ControllerResource* m_engine_resource;
-	Array<string> m_animation_slots;
 	Array<Mask> m_masks;
 	Array<InputProxy> m_inputs;
 	Array<ConstantProxy> m_constants;
+	Array<AnimationSlot> m_animation_slots;
+	Array<AnimationSet> m_animation_sets;
 };
 
 
