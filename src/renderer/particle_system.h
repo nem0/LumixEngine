@@ -3,6 +3,7 @@
 
 #include "engine/lumix.h"
 #include "engine/array.h"
+#include "engine/blob.h"
 #include "engine/vec.h"
 
 
@@ -100,6 +101,7 @@ private:
 
 	IAllocator& m_allocator;
 	Array<u8> m_bytecode;
+	OutputBlob m_emit_buffer;
 	int m_output_bytecode_offset;
 	int m_emit_bytecode_offset;
 	Constant m_constants[16];

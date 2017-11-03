@@ -46,6 +46,7 @@ ScriptedParticleEmitter::ScriptedParticleEmitter(Entity entity, IAllocator& allo
 	: m_allocator(allocator)
 	, m_bytecode(allocator)
 	, m_entity(entity)
+	, m_emit_buffer(allocator)
 {
 	compile(
 		"constants {"
@@ -143,9 +144,10 @@ void ScriptedParticleEmitter::emit(const float* args)
 				return;
 			case Instructions::ADD_ARG:
 			{
-				u8 ch = blob.read<u8>();
+				u8 result_ch = blob.read<u8>();
+				u8 op1_ch = blob.read<u8>();
 				u8 arg_idx = blob.read<u8>();
-				m_channels[ch].data[m_particles_count] += args[arg_idx];
+				m_channels[result_ch].data[m_particles_count] = m_channels[op1_ch].data[m_particles_count] + args[arg_idx];
 				break;
 			}
 			case Instructions::MOV_CONST:
@@ -527,13 +529,13 @@ void ScriptedParticleEmitter::execute(InputBlob& blob, int particle_index)
 			{
 				float args[16];
 				u8 arg_count = blob.read<u8>();
+				m_emit_buffer.write(arg_count);
 				ASSERT(arg_count < lengthOf(args));
 				for (int i = 0; i < arg_count; ++i)
 				{
 					u8 ch = blob.read<u8>();
-					args[i] = m_channels[ch].data[particle_index];
+					m_emit_buffer.write(m_channels[ch].data[particle_index]);
 				}
-				emit(args);
 				break;
 			}
 		}
@@ -543,8 +545,11 @@ void ScriptedParticleEmitter::execute(InputBlob& blob, int particle_index)
 
 void ScriptedParticleEmitter::update(float dt)
 {
+	PROFILE_FUNCTION();
+	PROFILE_INT("particle count", m_particles_count);
 	if (m_particles_count == 0) return;
 
+	m_emit_buffer.clear();
 	m_constants[0].value = dt;
 	InputBlob blob(&m_bytecode[0], m_bytecode.size());
 
@@ -554,7 +559,7 @@ void ScriptedParticleEmitter::update(float dt)
 		switch ((Instructions)instruction)
 		{
 			case Instructions::END:
-				return;
+				goto end;
 			case Instructions::LT:
 			{
 				u8 ch = blob.read<u8>();
@@ -653,6 +658,17 @@ void ScriptedParticleEmitter::update(float dt)
 				break;
 		}
 	}
+
+	end:
+		InputBlob emit_buffer(m_emit_buffer);
+		while (emit_buffer.getPosition() < emit_buffer.getSize())
+		{
+			u8 count = emit_buffer.read<u8>();
+			float args[16];
+			ASSERT(count <= lengthOf(args));
+			emit_buffer.read(args, sizeof(args[0]) * count);
+			emit(args);
+		}
 }
 
 
