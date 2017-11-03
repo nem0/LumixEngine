@@ -705,7 +705,7 @@ struct PropertyPathBegin
 	template <typename T>
 	T& getRefFromRoot(T& root) const { return root; }
 	template <typename T, typename F>
-	void callWithValue(const T& root, F& f) const { f(root); }
+	void callWithValue(const T& root, const F& f) const { f(root); }
 };
 
 
@@ -725,7 +725,7 @@ struct PropertyPath : Prev
 	}
 
 	template <typename T, typename F>
-	void callWithValue(const T& root, F& f) const
+	void callWithValue(const T& root, const F& f) const
 	{
 		Prev::callWithValue(root, [&](const auto& parent) {
 			head.callWithValue(parent, [&](const auto& value) {
@@ -762,13 +762,11 @@ struct PropertyPathArray : Prev
 	}
 
 	template <typename T, typename F>
-	void callWithValue(T& root, F& f) const
+	void callWithValue(T& root, const F& f) const
 	{
-
 		Prev::callWithValue(root, [&](const auto& array) {
 			f(array[index]);
 		});
-		
 	}
 
 	template <typename T, typename O>
@@ -782,14 +780,14 @@ struct PropertyPathArray : Prev
 
 
 template <typename F, typename PP, typename Object>
-auto generatePP(F f, const PP& pp, const Object& object)
+auto generatePP(const F& f, const PP& pp, const Object& object)
 {
 	f(pp);
 }
 
 
 template <typename F, typename PP, typename Parent, typename... Path>
-auto generatePPImpl(int dummy, F& f, const PP& pp, const Parent& parent, int head, Path... path)
+auto generatePPImpl(int dummy, const F& f, const PP& pp, const Parent& parent, int head, Path... path)
 -> decltype(parent[head], void())
 {
 	auto item_pp = makePP(pp, head);
@@ -799,26 +797,26 @@ auto generatePPImpl(int dummy, F& f, const PP& pp, const Parent& parent, int hea
 
 
 template <typename F, typename PP, typename Parent, typename... Path>
-void generatePPImpl(long dummy, F& f, const PP& pp, const Parent& parent, int head, Path... path)
+void generatePPImpl(long dummy, const F& f, const PP& pp, const Parent& parent, int head, Path... path)
 {
 }
 
 
 template <typename F, typename PP, typename Parent, typename... Path>
-auto generatePP(F& f, const PP& pp, const Parent& parent, int head, Path... path)
+auto generatePP(const F& f, const PP& pp, const Parent& parent, int head, Path... path)
 {
 	generatePPImpl(0, f, pp, parent, head, path...);
 }
 
 
 template <typename F, typename PP, typename... Path>
-void generatePP(F& f, const PP& pp, const string& parent, const char* head, Path... path)
+void generatePP(const F& f, const PP& pp, const string& parent, const char* head, Path... path)
 {
 }
 
 
 template <typename F, typename PP, typename Parent, typename... Path>
-void generatePP(F& f, const PP& pp, const Parent& parent, const char* head, Path... path)
+void generatePP(const F& f, const PP& pp, const Parent& parent, const char* head, Path... path)
 {
 	auto decl = getMembers<Parent>();
 	apply([&f, &head, &pp, &path..., &parent](const auto& member) {
@@ -834,7 +832,7 @@ void generatePP(F& f, const PP& pp, const Parent& parent, const char* head, Path
 
 
 template <typename Root, typename Editor, typename... Path>
-void addArrayItem(IAllocator& allocator, Editor& editor, Root& root, Path... path)
+void addArrayItem(IAllocator& allocator, Editor& editor, const Root& root, Path... path)
 {
 	generatePP([&root, &editor, &allocator](const auto& result_pp) {
 		using Cmd = AddArrayItemCommand<Root, RemoveCVR<decltype(result_pp)>>;
@@ -860,7 +858,7 @@ struct DoForType
 
 	template <typename PP>
 	typename EnableIf<IsSame<RemoveCVR<typename PP::Result>, RemoveCVR<Value>>::result>::Type
-		operator()(const PP& result_pp)
+		operator()(const PP& result_pp) const
 	{
 		using Cmd = SetPropertyCommand<RootGetter, Value, RemoveCVR<decltype(result_pp)>>;
 		auto* cmd = LUMIX_NEW(allocator, Cmd)(root, result_pp, value);
@@ -869,7 +867,7 @@ struct DoForType
 	
 	template <typename PP>
 	typename EnableIf<!IsSame<RemoveCVR<typename PP::Result>, RemoveCVR<Value>>::result>::Type
-		operator()(const PP& result_pp)
+		operator()(const PP& result_pp) const
 	{
 		ASSERT(false);
 	}
@@ -987,7 +985,7 @@ struct UIBuilder
 		ImGui::SameLine();
 		if (ImGui::SmallButton(StaticString<32>("Add")))
 		{
-			auto* command = LUMIX_NEW(m_allocator, AddArrayItemCommand<Root, PP>)(m_root, pp);
+			auto* command = LUMIX_NEW(m_allocator, AddArrayItemCommand<RootGetter, PP>)(m_root, pp);
 			m_editor.executeCommand(*command);
 		}
 		if (!expanded) return;
@@ -1005,7 +1003,7 @@ struct UIBuilder
 				ImGui::SameLine();
 				if (ImGui::SmallButton("Remove"))
 				{
-					auto* command = LUMIX_NEW(m_allocator, RemoveArrayItemCommand<Root, PP>)(m_root, pp, i);
+					auto* command = LUMIX_NEW(m_allocator, RemoveArrayItemCommand<RootGetter, PP>)(m_root, pp, i);
 					m_editor.executeCommand(*command);
 					if (expanded) ImGui::TreePop();
 					break;
@@ -1029,7 +1027,7 @@ struct UIBuilder
 				ImGui::SameLine();
 				if (ImGui::SmallButton("Remove"))
 				{
-					auto* command = LUMIX_NEW(m_allocator, RemoveArrayItemCommand<Root, PP>)(m_root, pp, i, m_allocator);
+					auto* command = LUMIX_NEW(m_allocator, RemoveArrayItemCommand<RootGetter, PP>)(m_root, pp, i, m_allocator);
 					m_editor.executeCommand(*command);
 					ImGui::PopID();
 					break;
