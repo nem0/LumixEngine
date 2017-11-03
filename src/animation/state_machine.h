@@ -91,8 +91,7 @@ struct Node : public Component
 
 	IAllocator& allocator;
 	Array<Edge*> out_edges;
-	Array<u8> events;
-	int events_count = 0;
+	EventArray runtime_events;
 	EventArray enter_events;
 	EventArray exit_events;
 };
