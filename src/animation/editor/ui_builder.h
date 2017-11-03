@@ -838,7 +838,7 @@ void addArrayItem(IAllocator& allocator, Editor& editor, const Root& root, Path.
 		using Cmd = AddArrayItemCommand<Root, RemoveCVR<decltype(result_pp)>>;
 		auto* cmd = LUMIX_NEW(allocator, Cmd)(root, result_pp);
 		editor.executeCommand(*cmd);
-	}, PropertyPathBegin(), root, path...);
+	}, PropertyPathBegin(), root(), path...);
 }
 
 
@@ -895,7 +895,7 @@ void removeArrayItem(IAllocator& allocator, Editor& editor, const RootGetter& ro
 		using Cmd = RemoveArrayItemCommand<RootGetter, RemoveCVR<decltype(result_pp)>>;
 		auto* cmd = LUMIX_NEW(allocator, Cmd)(root, result_pp, index, allocator);
 		editor.executeCommand(*cmd);
-	}, PropertyPathBegin(), root, path...);
+	}, PropertyPathBegin(), root(), path...);
 }
 
 
