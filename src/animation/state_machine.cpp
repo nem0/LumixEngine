@@ -168,7 +168,7 @@ Node::Node(ControllerResource& controller, Component::Type type, IAllocator& _al
 	: Component(controller, type)
 	, out_edges(_allocator)
 	, allocator(_allocator)
-	, events(allocator)
+	, runtime_events(allocator)
 	, enter_events(allocator)
 	, exit_events(allocator)
 {
@@ -178,11 +178,11 @@ Node::Node(ControllerResource& controller, Component::Type type, IAllocator& _al
 void Node::serialize(OutputBlob& blob)
 {
 	Component::serialize(blob);
-	blob.write(events_count);
-	if (events_count > 0)
+	blob.write(runtime_events.count);
+	if (runtime_events.count > 0)
 	{
-		blob.write(events.size());
-		blob.write(&events[0], events.size());
+		blob.write(runtime_events.data.size());
+		blob.write(&runtime_events.data[0], runtime_events.data.size());
 	}
 	blob.write(enter_events.count);
 	if (enter_events.count > 0)
@@ -202,13 +202,13 @@ void Node::serialize(OutputBlob& blob)
 void Node::deserialize(InputBlob& blob, Container* parent, int version)
 {
 	Component::deserialize(blob, parent, version);
-	blob.read(events_count);
-	if (events_count > 0)
+	blob.read(runtime_events.count);
+	if (runtime_events.count > 0)
 	{
 		int size;
 		blob.read(size);
-		events.resize(size);
-		blob.read(&events[0], size);
+		runtime_events.data.resize(size);
+		blob.read(&runtime_events.data[0], size);
 	}
 	if (version > (int)ControllerResource::Version::ENTER_EXIT_EVENTS)
 	{
@@ -529,12 +529,12 @@ void AnimationNode::deserialize(InputBlob& blob, Container* parent, int version)
 void NodeInstance::queueEvents(RunningContext& rc, float old_time, float time, float length)
 {
 	Node& node = (Node&)source;
-	if (node.events_count <= 0) return;
+	if (node.runtime_events.count <= 0) return;
 
 	if (time < old_time)
 	{
-		EventHeader* headers = (EventHeader*)&node.events[0];
-		for (int i = 0; i < node.events_count; ++i)
+		EventHeader* headers = (EventHeader*)&node.runtime_events.data[0];
+		for (int i = 0; i < node.runtime_events.count; ++i)
 		{
 			EventHeader& header = headers[i];
 			if ((header.time >= old_time && header.time < length) || header.time < time)
@@ -543,14 +543,14 @@ void NodeInstance::queueEvents(RunningContext& rc, float old_time, float time, f
 				rc.event_stream->write(rc.controller);
 				rc.event_stream->write(header.size);
 				rc.event_stream->write(
-					&node.events[0] + header.offset + sizeof(EventHeader) * node.events_count, header.size);
+					&node.runtime_events.data[0] + header.offset + sizeof(EventHeader) * node.runtime_events.count, header.size);
 			}
 		}
 	}
 	else
 	{
-		EventHeader* headers = (EventHeader*)&node.events[0];
-		for (int i = 0; i < node.events_count; ++i)
+		EventHeader* headers = (EventHeader*)&node.runtime_events.data[0];
+		for (int i = 0; i < node.runtime_events.count; ++i)
 		{
 			EventHeader& header = headers[i];
 			if (header.time >= old_time && header.time < time)
@@ -559,7 +559,7 @@ void NodeInstance::queueEvents(RunningContext& rc, float old_time, float time, f
 				rc.event_stream->write(rc.controller);
 				rc.event_stream->write(header.size);
 				rc.event_stream->write(
-					&node.events[0] + header.offset + sizeof(EventHeader) * node.events_count, header.size);
+					&node.runtime_events.data[0] + header.offset + sizeof(EventHeader) * node.runtime_events.count, header.size);
 			}
 		}
 	}

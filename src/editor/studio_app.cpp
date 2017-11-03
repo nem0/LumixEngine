@@ -1407,6 +1407,9 @@ public:
 		m_font = io.Fonts->AddFontFromFileTTF("bin/OpenSans-Regular.ttf", (float)m_settings.m_font_size * font_scale);
 		m_bold_font = io.Fonts->AddFontFromFileTTF("bin/OpenSans-Bold.ttf", (float)m_settings.m_font_size * font_scale);
 
+		m_font->DisplayOffset.y = 0;
+		m_bold_font->DisplayOffset.y = 0;
+
 		io.KeyMap[ImGuiKey_Tab] = SDLK_TAB;
 		io.KeyMap[ImGuiKey_LeftArrow] = SDL_SCANCODE_LEFT;
 		io.KeyMap[ImGuiKey_RightArrow] = SDL_SCANCODE_RIGHT;
