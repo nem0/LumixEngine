@@ -332,51 +332,6 @@ void serialize(OutputBlob& blob, const Array<T>& array)
 }
 
 
-struct CustomSerializer {};
-
-
-template<class B, class D>
-struct IsBaseOf
-{
-	template<typename T> struct dummy {};
-	struct Child : D, dummy<int> {};
-
-	static B* Check(B*);
-	template<class T> static char Check(dummy<T>*);
-
-	static const bool result = (sizeof(Check((Child*)0)) == sizeof(B*));
-};
-
-template <typename F, typename Attr>
-struct GetAttributeVisitor
-{
-	GetAttributeVisitor(F& f) : f(f) {}
-	template <typename T> 
-	typename EnableIf<!IsBaseOf<Attr, T>::result>::Type
-		operator()(const T& attr)
-	{}
-
-	template <typename T>
-	typename EnableIf<IsBaseOf<Attr, T>::result>::Type
-		operator()(const T& attr)
-	{
-		f(attr);
-	}
-	
-	F& f;
-};
-
-
-template <typename Class, typename Attr, typename F>
-void getAttribute(F& f)
-{
-	GetAttributeVisitor<F, Attr> visitor(f);
-	auto attrs = getAttributes<Class>();
-	apply(visitor, attrs);
-}
-
-
-
 template <typename T>
 auto serializeImpl(OutputBlob& blob, const T& obj, int)
 -> decltype(obj.serialize(blob), void())
