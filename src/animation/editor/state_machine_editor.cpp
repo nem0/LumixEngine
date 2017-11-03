@@ -236,6 +236,8 @@ void Node::destroy()
 
 void Node::onGUI()
 {
+	if (!engine_cmp) return;
+
 	int uid = engine_cmp->uid;
 	ControllerResource& controller = m_controller;
 	auto root_getter = [uid, &controller]() -> auto& {

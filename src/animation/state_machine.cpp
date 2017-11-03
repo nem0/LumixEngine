@@ -600,16 +600,25 @@ void NodeInstance::queueEventArray(RunningContext& rc, const EventArray& events)
 ComponentInstance* NodeInstance::checkOutEdges(Node& node, RunningContext& rc)
 {
 	rc.current = this;
+	Edge* options[16];
+	int options_count = 0;
 	for (auto* edge : node.out_edges)
 	{
 		rc.edge = edge;
 		if (edge->condition(rc))
 		{
-			ComponentInstance* new_item = edge->createInstance(*rc.allocator);
-			queueExitEvents(rc);
-			new_item->enter(rc, this);
-			return new_item;
+			options[options_count] = edge;
+			++options_count;
+			if (options_count == lengthOf(options)) break;
 		}
+	}
+	if (options_count > 0)
+	{
+		Edge* edge = options[Math::rand(0, options_count - 1)];
+		ComponentInstance* new_item = edge->createInstance(*rc.allocator);
+		queueExitEvents(rc);
+		new_item->enter(rc, this);
+		return new_item;
 	}
 	return this;
 }

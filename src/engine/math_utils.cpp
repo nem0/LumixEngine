@@ -228,9 +228,9 @@ u32 rand()
 }
 
 
-u32 rand(u32 from, u32 to)
+u32 rand(u32 from_incl, u32 to_incl)
 {
-	std::uniform_int_distribution<> dist(from, to);
+	std::uniform_int_distribution<> dist(from_incl, to_incl);
 	return dist(getRandomGenerator());
 }
 
