@@ -12,9 +12,9 @@
 #include "engine/log.h"
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
+#include "ui_builder.h"
 #include <cmath>
 #include <cstdlib>
-
 
 namespace Lumix
 {
@@ -45,6 +45,15 @@ static ImVec2 operator*(const ImVec2& a, float b)
 static float dot(const ImVec2& a, const ImVec2& b)
 {
 	return a.x * b.x + a.y * b.y;
+}
+
+
+template <>
+auto getMembers<AnimEditor::Node>()
+{
+	return type("Animation Node",
+		property("Name", &AnimEditor::Node::name)
+	);
 }
 
 
@@ -128,14 +137,14 @@ static ImVec2 getEdgeStartPoint(Node* a, Node* b, bool is_dir)
 
 static void drawEdge(ImDrawList* draw, Node* from_node, Node* to_node, u32 color, const ImVec2& canvas_screen_pos)
 {
-	ImVec2 from = getEdgeStartPoint(from_node, to_node, true) + canvas_screen_pos;
-	ImVec2 to = getEdgeStartPoint(to_node, from_node, false) + canvas_screen_pos;
-	draw->AddLine(from, to, color);
-	ImVec2 dir = to - from;
-	dir = dir * (1 / sqrt(dot(dir, dir))) * 5;
-	ImVec2 right(dir.y, -dir.x);
-	draw->AddLine(to, to - dir + right, color);
-	draw->AddLine(to, to - dir - right, color);
+ImVec2 from = getEdgeStartPoint(from_node, to_node, true) + canvas_screen_pos;
+ImVec2 to = getEdgeStartPoint(to_node, from_node, false) + canvas_screen_pos;
+draw->AddLine(from, to, color);
+ImVec2 dir = to - from;
+dir = dir * (1 / sqrt(dot(dir, dir))) * 5;
+ImVec2 right(dir.y, -dir.x);
+draw->AddLine(to, to - dir + right, color);
+draw->AddLine(to, to - dir - right, color);
 
 }
 
@@ -188,7 +197,7 @@ void Node::removeEvent(int index)
 	u8* end = &events.back() + 1;
 	u8* event_start = headers_end + header.offset;
 	u8* event_end = event_start + header.size;
-	
+
 	for (int i = index + 1; i < engine_node->events_count; ++i)
 	{
 		auto& h = *(Anim::EventHeader*)&events[sizeof(Anim::EventHeader) * i];
@@ -199,7 +208,7 @@ void Node::removeEvent(int index)
 	u8* header_end = header_start + sizeof(Anim::EventHeader);
 	moveMemory(header_start, header_end, event_start - header_end);
 	moveMemory(event_start - sizeof(Anim::EventHeader), event_end, end - event_end);
-	
+
 	events.resize(events.size() - sizeof(Anim::EventHeader) - header.size);
 
 	--engine_node->events_count;
@@ -228,8 +237,16 @@ void Node::destroy()
 
 void Node::onGUI()
 {
+	int uid = engine_cmp->uid;
+	ControllerResource& controller = m_controller;
+	auto root_getter = [uid, &controller]() -> auto& {
+		return *(Node*)controller.getByUID(uid);
+	};
+	UIBuilder<IAnimationEditor, decltype(root_getter)> builder(m_controller.getEditor(), root_getter, m_controller.getAllocator());
+	builder.build();
+
 	u32 set_input_type = crc32("set_input");
-	ImGui::InputText("Name", name.data, lengthOf(name.data));
+	//ImGui::InputText("Name", name.data, lengthOf(name.data));
 	if (!engine_cmp) return;
 	auto* engine_node = ((Anim::Node*)engine_cmp);
 
@@ -238,8 +255,8 @@ void Node::onGUI()
 
 	if (!ImGui::CollapsingHeader("Events")) return;
 
-	auto& events = engine_node->events;
 	auto& editor = m_controller.getEditor();
+	auto& events = engine_node->events;
 	for(int i = 0; i < engine_node->events_count; ++i)
 	{
 		Anim::EventHeader& header = *(Anim::EventHeader*)&events[sizeof(Anim::EventHeader) * i];

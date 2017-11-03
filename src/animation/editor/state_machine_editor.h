@@ -483,6 +483,8 @@ public:
 	Component* getByUID(int uid);
 
 private:
+	ControllerResource(const ControllerResource& rhs);
+
 	int m_last_uid = 0;
 	IAnimationEditor& m_editor;
 	IAllocator& m_allocator;
