@@ -1,6 +1,10 @@
 #pragma once
 
 
+#include "editor/ieditor_command.h"
+#include "engine/metaprogramming.h"
+
+
 namespace Lumix
 {
 
@@ -45,8 +49,6 @@ struct Member
 
 	template <typename F> void callWithValue(Class& obj, F f) const;
 	template <typename F> void callWithValue(const Class& obj, F f) const;
-	const T& getConstRef(Class& obj) const;
-	const T& getConstRef(const Class& obj) const;
 	T getValue(const Class& obj) const { return (obj.*value_getter)(); }
 	T& getRef(Class& obj) const;
 	template <typename V> void set(Class& obj, const V& value) const;
@@ -175,26 +177,6 @@ void Member<Class, T, Attrs...>::callWithValue(const Class& obj, F f) const
 	if (has_member_ptr) return f(obj.*member_ptr);
 	if (value_getter) return f((obj.*value_getter)());
 	ASSERT(false);
-}
-
-template <typename Class, typename T, typename... Attrs>
-const T& Member<Class, T, Attrs...>::getConstRef(const Class& obj) const
-{
-	if (const_ref_getter) return (obj.*const_ref_getter)();
-	if (has_member_ptr) return obj.*member_ptr;
-	ASSERT(false);
-	return obj.*member_ptr;
-}
-
-
-template <typename Class, typename T, typename... Attrs>
-const T& Member<Class, T, Attrs...>::getConstRef(Class& obj) const
-{
-	if (const_ref_getter) return (obj.*const_ref_getter)();
-	if (ref_getter) return (obj.*ref_getter)();
-	if (has_member_ptr) return obj.*member_ptr;
-	ASSERT(false);
-	return obj.*member_ptr;
 }
 
 
@@ -333,7 +315,7 @@ void serialize(OutputBlob& blob, const StaticString<count>& obj)
 }
 
 
-void serialize(OutputBlob& blob, const Path& obj)
+inline void serialize(OutputBlob& blob, const Path& obj)
 {
 	blob.writeString(obj.c_str());
 }
@@ -620,40 +602,43 @@ void addToArray(const Member& member, Parent& parent, int index)
 }
 
 
-
 struct IHashedCommand : IEditorCommand
 {
 	virtual u32 getTypeHash() = 0;
 };
 
-template <typename Root, typename T, typename PP>
+
+template <typename RootGetter, typename T, typename PP>
 struct SetPropertyCommand : IHashedCommand
 {
-	SetPropertyCommand(Root& root, PP pp, const T& value)
+	SetPropertyCommand(const RootGetter& root, PP pp, const T& value)
 		: root(root)
 		, pp(pp)
 		, value(value)
 		, old_value(value)
-	{}
+	{
+		pp.callWithValue(root(), [&](const auto& v) {
+			old_value = v;
+		});
+	}
 
 
 	bool execute() override
 	{
-		old_value = pp.getConstRefFromRoot(root);
-		pp.setValueFromRoot(root, value);
+		pp.setValueFromRoot(root(), value);
 		return true;
 	}
 
 
 	void undo() override
 	{
-		pp.setValueFromRoot(root, old_value);
+		pp.setValueFromRoot(root(), old_value);
 	}
 
 
 	u32 getTypeHash() override
 	{
-		Root* root_ptr = &root;
+		const auto* root_ptr = &root();
 		u32 hash = crc32(&root_ptr, sizeof(root_ptr));
 		hash = continueCrc32(hash, &pp, sizeof(pp));
 		return hash;
@@ -669,7 +654,7 @@ struct SetPropertyCommand : IHashedCommand
 	{ 
 		if (command.getType() != getType()) return false;
 		if (getTypeHash() != ((IHashedCommand&)command).getTypeHash()) return false;
-		((SetPropertyCommand<Root, T, PP>&)command).value = value;
+		((SetPropertyCommand<RootGetter, T, PP>&)command).value = value;
 		return true; 
 	}
 
@@ -677,27 +662,27 @@ struct SetPropertyCommand : IHashedCommand
 	T value;
 	T old_value;
 	PP pp;
-	Root& root;
+	RootGetter root;
 };
 
 
-template <typename Root, typename PP>
+template <typename RootGetter, typename PP>
 struct RemoveArrayItemCommand : IEditorCommand
 {
-	RemoveArrayItemCommand(Root& root, PP _pp, int _index, IAllocator& allocator)
+	RemoveArrayItemCommand(const RootGetter& root, PP _pp, int _index, IAllocator& allocator)
 		: root(root)
 		, pp(_pp)
 		, index(_index)
 		, blob(allocator)
 	{
-		auto& array = pp.getRefFromRoot(root);
+		auto& array = pp.getRefFromRoot(root());
 		::Lumix::serialize(blob, array[index]);
 	}
 
 
 	bool execute() override
 	{
-		auto& owner = ((typename PP::Base&)pp).getRefFromRoot(root);
+		auto& owner = ((typename PP::Base&)pp).getRefFromRoot(root());
 		removeFromArray(pp.head, owner, index);
 		return true;
 	}
@@ -705,10 +690,10 @@ struct RemoveArrayItemCommand : IEditorCommand
 
 	void undo() override
 	{
-		auto& owner = ((typename PP::Base&)pp).getRefFromRoot(root);
+		auto& owner = ((typename PP::Base&)pp).getRefFromRoot(root());
 		addToArray(pp.head, owner, index);
 		InputBlob input_blob(blob);
-		auto& array = pp.getRefFromRoot(root);
+		auto& array = pp.getRefFromRoot(root());
 		::Lumix::deserialize(input_blob, array[index]);
 	}
 
@@ -721,14 +706,14 @@ struct RemoveArrayItemCommand : IEditorCommand
 	OutputBlob blob;
 	PP pp;
 	int index;
-	Root& root;
+	RootGetter root;
 };
 
 
-template <typename Root, typename PropertyPath>
+template <typename RootGetter, typename PropertyPath>
 struct AddArrayItemCommand : IEditorCommand
 {
-	AddArrayItemCommand(Root& root, PropertyPath _pp)
+	AddArrayItemCommand(const RootGetter& root, PropertyPath _pp)
 		: root(root)
 		, pp(_pp)
 	{}
@@ -736,7 +721,7 @@ struct AddArrayItemCommand : IEditorCommand
 
 	bool execute() override
 	{
-		auto& owner = ((typename PropertyPath::Base&)pp).getRefFromRoot(root);
+		auto& owner = ((typename PropertyPath::Base&)pp).getRefFromRoot(root());
 		addToArray(pp.head, owner, -1);
 		return true;
 	}
@@ -744,7 +729,7 @@ struct AddArrayItemCommand : IEditorCommand
 
 	void undo() override
 	{
-		auto& owner = ((typename PropertyPath::Base&)pp).getRefFromRoot(root);
+		auto& owner = ((typename PropertyPath::Base&)pp).getRefFromRoot(root());
 		int size = getArraySize(pp.head, owner);
 		removeFromArray(pp.head, owner, size - 1);
 	}
@@ -756,7 +741,7 @@ struct AddArrayItemCommand : IEditorCommand
 	bool merge(IEditorCommand& command) override { return false; }
 
 	PropertyPath pp;
-	Root& root;
+	RootGetter root;
 };
 
 
@@ -764,8 +749,8 @@ struct PropertyPathBegin
 {
 	template <typename T>
 	T& getRefFromRoot(T& root) const { return root; }
-	template <typename T>
-	const T& getConstRefFromRoot(const T& root) const { return root; }
+	template <typename T, typename F>
+	void callWithValue(const T& root, F& f) const { f(root); }
 };
 
 
@@ -784,10 +769,14 @@ struct PropertyPath : Prev
 		return head.getRef(Prev::getRefFromRoot(root));
 	}
 
-	template <typename T>
-	const auto& getConstRefFromRoot(const T& root) const
+	template <typename T, typename F>
+	void callWithValue(const T& root, F& f) const
 	{
-		return head.getConstRef(Prev::getConstRefFromRoot(root));
+		Prev::callWithValue(root, [&](const auto& parent) {
+			head.callWithValue(parent, [&](const auto& value) {
+				f(value);
+			});
+		});
 	}
 
 
@@ -817,10 +806,14 @@ struct PropertyPathArray : Prev
 		return Prev::getRefFromRoot(root)[index];
 	}
 
-	template <typename T>
-	const auto& getConstRefFromRoot(T& root) const
+	template <typename T, typename F>
+	void callWithValue(T& root, F& f) const
 	{
-		return Prev::getConstRefFromRoot(root)[index];
+
+		Prev::callWithValue(root, [&](const auto& array) {
+			f(array[index]);
+		});
+		
 	}
 
 	template <typename T, typename O>
@@ -877,8 +870,9 @@ void generatePP(F& f, const PP& pp, const Parent& parent, const char* head, Path
 		if (equalStrings(member.name, head))
 		{
 			auto child_pp = makePP(pp, member);
-			decltype(auto) obj = member.getConstRef(parent);
-			generatePP(f, child_pp, obj, path...);
+			member.callWithValue(parent, [&](const auto& obj) {
+				generatePP(f, child_pp, obj, path...);
+			});
 		}
 	}, decl.members);
 }
@@ -895,10 +889,10 @@ void addArrayItem(IAllocator& allocator, Editor& editor, Root& root, Path... pat
 }
 
 
-template <typename Root, typename Editor, typename Value>
+template <typename RootGetter, typename Editor, typename Value>
 struct DoForType
 {
-	DoForType(Root& root,
+	DoForType(const RootGetter& root,
 		const Value& value,
 		Editor& editor,
 		IAllocator& allocator)
@@ -913,7 +907,7 @@ struct DoForType
 	typename EnableIf<IsSame<RemoveCVR<typename PP::Result>, RemoveCVR<Value>>::result>::Type
 		operator()(const PP& result_pp)
 	{
-		using Cmd = SetPropertyCommand<Root, Value, RemoveCVR<decltype(result_pp)>>;
+		using Cmd = SetPropertyCommand<RootGetter, Value, RemoveCVR<decltype(result_pp)>>;
 		auto* cmd = LUMIX_NEW(allocator, Cmd)(root, result_pp, value);
 		editor.executeCommand(*cmd);
 	}
@@ -927,25 +921,25 @@ struct DoForType
 
 
 	IAllocator& allocator;
-	Root& root;
+	RootGetter root;
 	const Value& value;
 	Editor& editor;
 };
 
 
-template <typename Root, typename Editor, typename Value, typename... Path>
-void setPropertyValue(IAllocator& allocator, Editor& editor, Root& root, const Value& value, Path... path)
+template <typename RootGetter, typename Editor, typename Value, typename... Path>
+void setPropertyValue(IAllocator& allocator, Editor& editor, const RootGetter& root, const Value& value, Path... path)
 {
-	DoForType<Root, Editor, Value> do_for_type(root, value, editor, allocator);
-	generatePP(do_for_type, PropertyPathBegin(), root, path...);
+	DoForType<RootGetter, Editor, Value> do_for_type(root, value, editor, allocator);
+	generatePP(do_for_type, PropertyPathBegin(), root(), path...);
 }
 
 
-template <typename Root, typename Editor, typename... Path>
-void removeArrayItem(IAllocator& allocator, Editor& editor, Root& root, int index, Path... path)
+template <typename RootGetter, typename Editor, typename... Path>
+void removeArrayItem(IAllocator& allocator, Editor& editor, const RootGetter& root, int index, Path... path)
 {
 	generatePP([&root, &editor, &allocator, index](const auto& result_pp) {
-		using Cmd = RemoveArrayItemCommand<Root, RemoveCVR<decltype(result_pp)>>;
+		using Cmd = RemoveArrayItemCommand<RootGetter, RemoveCVR<decltype(result_pp)>>;
 		auto* cmd = LUMIX_NEW(allocator, Cmd)(root, result_pp, index, allocator);
 		editor.executeCommand(*cmd);
 	}, PropertyPathBegin(), root, path...);
@@ -973,10 +967,10 @@ int getSubpropertiesCount()
 }
 
 
-template <typename Editor, typename Root>
+template <typename Editor, typename RootGetter>
 struct UIBuilder
 {
-	UIBuilder(Editor& editor, Root& root, IAllocator& allocator) 
+	UIBuilder(Editor& editor, const RootGetter& root, IAllocator& allocator)
 		: m_editor(editor)
 		, m_root(root)
 		, m_allocator(allocator)
@@ -985,11 +979,11 @@ struct UIBuilder
 
 	void build()
 	{
-		auto desc = getMembers<Root>();
+		auto desc = getMembers<RemoveCVR<decltype(m_root())>>();
 		apply([this](const auto& member) {
 			auto pp = makePP(PropertyPathBegin{}, member);
-			auto& v = member.getRef(m_root);
-			this->ui(m_root, pp, v);
+			auto& v = member.getRef(m_root());
+			this->ui(m_root(), pp, v);
 		}, desc.members);
 	}
 
@@ -1100,7 +1094,7 @@ struct UIBuilder
 		StaticString<count> tmp = obj;
 		if (ImGui::InputText(pp.name, tmp.data, sizeof(tmp.data)))
 		{
-			auto* command = LUMIX_NEW(m_allocator, SetPropertyCommand<Root, StaticString<count>, PP>)(m_root, pp, tmp);
+			auto* command = LUMIX_NEW(m_allocator, SetPropertyCommand<RootGetter, StaticString<count>, PP>)(m_root, pp, tmp);
 			m_editor.executeCommand(*command);
 		}
 	}
@@ -1113,7 +1107,7 @@ struct UIBuilder
 
 		if (ImGui::InputInt(pp.name, &obj))
 		{
-			auto* command = LUMIX_NEW(m_allocator, SetPropertyCommand<Root, int, PP>)(m_root, pp, obj);
+			auto* command = LUMIX_NEW(m_allocator, SetPropertyCommand<RootGetter, int, PP>)(m_root, pp, obj);
 			m_editor.executeCommand(*command);
 		}
 	}
@@ -1128,7 +1122,7 @@ struct UIBuilder
 		auto desc = getMembers<T>();
 		apply([&pp, this](const auto& m) {
 			auto child_pp = makePP(pp, m);
-			auto& obj = pp.getRefFromRoot(m_root);
+			auto& obj = pp.getRefFromRoot(m_root());
 			m.callWithValue(obj, [&](const auto& v) {
 				this->ui(obj, child_pp, v);
 			});
@@ -1153,7 +1147,7 @@ struct UIBuilder
 		if (ImGui::Combo(pp.name, &idx, getter, nullptr, TupleSize<decltype(enum_values)>::result))
 		{
 			T val = getEnumValueFromIndex<T>(idx);
-			pp.setValueFromRoot(m_root, val);
+			pp.setValueFromRoot(m_root(), val);
 		}
 	}
 
@@ -1168,7 +1162,7 @@ struct UIBuilder
 		if (ImGui::InputText(pp.name, tmp, sizeof(tmp)))
 		{
 			string tmp_str(tmp, m_allocator);
-			auto* command = LUMIX_NEW(m_allocator, SetPropertyCommand<Root, string, PP>)(m_root, pp, tmp_str);
+			auto* command = LUMIX_NEW(m_allocator, SetPropertyCommand<RootGetter, string, PP>)(m_root, pp, tmp_str);
 			m_editor.executeCommand(*command);
 		}
 	}
@@ -1183,7 +1177,7 @@ struct UIBuilder
 		ImGui::SameLine();
 		if (ImGui::SmallButton("Add"))
 		{
-			auto* command = LUMIX_NEW(m_allocator, AddArrayItemCommand<Root, PP>)(m_root, pp);
+			auto* command = LUMIX_NEW(m_allocator, AddArrayItemCommand<RootGetter, PP>)(m_root, pp);
 			m_editor.executeCommand(*command);
 		}
 		if (!expanded) return;
@@ -1199,7 +1193,7 @@ struct UIBuilder
 				ImGui::SameLine();
 				if (ImGui::SmallButton("Remove"))
 				{
-					auto* command = LUMIX_NEW(m_allocator, RemoveArrayItemCommand<Root, PP>)(m_root, pp, i, m_allocator);
+					auto* command = LUMIX_NEW(m_allocator, RemoveArrayItemCommand<RootGetter, PP>)(m_root, pp, i, m_allocator);
 					m_editor.executeCommand(*command);
 					if (expanded) ImGui::TreePop();
 					break;
@@ -1222,7 +1216,7 @@ struct UIBuilder
 				ImGui::SameLine();
 				if (ImGui::SmallButton("Remove"))
 				{
-					auto* command = LUMIX_NEW(m_allocator, RemoveArrayItemCommand<Root, PP>)(m_root, pp, i, m_allocator);
+					auto* command = LUMIX_NEW(m_allocator, RemoveArrayItemCommand<RootGetter, PP>)(m_root, pp, i, m_allocator);
 					m_editor.executeCommand(*command);
 					ImGui::PopID();
 					break;
@@ -1236,7 +1230,7 @@ struct UIBuilder
 
 	IAllocator& m_allocator;
 	Editor& m_editor;
-	Root& m_root;
+	RootGetter m_root;
 };
 
 

@@ -599,7 +599,7 @@ public:
 	EventType& createEventType(const char* type) override;
 	EventType& getEventTypeByIdx(int idx) override  { return m_event_types[idx]; }
 	EventType& getEventType(u32 type) override;
-	void executeCommand(IEditorCommand& command);
+	void executeCommand(IEditorCommand& command) override;
 	void createEdge(ControllerResource& ctrl, Container* container, Node* from, Node* to) override;
 	void moveNode(ControllerResource& ctrl, Node* node, const ImVec2& pos) override;
 	void createNode(ControllerResource& ctrl,
@@ -1150,7 +1150,8 @@ void AnimationEditor::inputsGUI()
 	if (ImGui::BeginDock("Animation inputs", &m_inputs_open))
 	{
 		IAllocator& allocator = m_app.getWorldEditor().getAllocator();
-		UIBuilder<AnimationEditor, ControllerResource> ui_builder(*this, *m_resource, allocator);
+		auto root_getter = [&]() -> auto& { return *m_resource; };
+		UIBuilder<AnimationEditor, decltype(root_getter)> ui_builder(*this, root_getter, allocator);
 		ui_builder.build();
 		animationSlotsGUI();
 	}
@@ -1177,13 +1178,13 @@ void AnimationEditor::animationSlotsGUI()
 		StaticString<32> tmp = sets[j].getName();
 		if (ImGui::InputText("", tmp.data, lengthOf(tmp.data)))
 		{
-			setPropertyValue(allocator, *this, *m_resource, tmp, "Sets", j, "Name");
+			setPropertyValue(allocator, *this, [&]() -> auto& {return *m_resource;}, tmp, "Sets", j, "Name");
 		}
 		ImGui::PopItemWidth();
 		ImGui::PopID();
 		ImGui::NextColumn();
 	}
-	if (ImGui::Button("Add")) addArrayItem(allocator, *this, *m_resource, "Sets");
+	if (ImGui::Button("Add")) addArrayItem(allocator, *this, [&]() -> auto& { return *m_resource; }, "Sets");
 	ImGui::NextColumn();
 
 	ImGui::PopID();
@@ -1197,15 +1198,21 @@ void AnimationEditor::animationSlotsGUI()
 		ImGui::PushItemWidth(-20);
 		if (ImGui::InputText("##name", slot_name.data, lengthOf(slot_name.data), ImGuiInputTextFlags_EnterReturnsTrue))
 		{
-			setPropertyValue(allocator, *this, *m_resource, slot_name, "Slots", i, "Name");
+			setPropertyValue(allocator, *this, [&]() -> auto& {return *m_resource;}, slot_name, "Slots", i, "Name");
 		}
 		ImGui::PopItemWidth();
 		ImGui::SameLine();
 		u32 slot_hash = crc32(slot.getName());
 		if (ImGui::Button("x"))
 		{
-			removeArrayItem(allocator, *this, *m_resource, i, "Slots");
+			ImGui::NextColumn();
+			for (int j = 0; j < slot.values.size(); ++j)
+				ImGui::NextColumn();
+			ImGui::NextColumn();
+			ImGui::PopID();
+			removeArrayItem(allocator, *this, [&]() -> auto& { return *m_resource; }, i, "Slots");
 			--i;
+			continue;
 		}
 		ImGui::NextColumn();
 		for (int j = 0; j < slot.values.size(); ++j)
@@ -1218,7 +1225,7 @@ void AnimationEditor::animationSlotsGUI()
 			if (m_app.getAssetBrowser().resourceInput("", "##res", tmp, lengthOf(tmp), ANIMATION_TYPE))
 			{
 				Path path(tmp);
-				setPropertyValue(allocator, *this, *m_resource, path, "Slots", i, "Values", j, "Path");
+				setPropertyValue(allocator, *this, [&]() -> auto& {return *m_resource;}, path, "Slots", i, "Values", j, "Path");
 			}
 			ImGui::PopID();
 			ImGui::PopItemWidth();
@@ -1230,7 +1237,7 @@ void AnimationEditor::animationSlotsGUI()
 	}
 	ImGui::Columns();
 
-	if (ImGui::Button("Add row")) addArrayItem(allocator, *this, *m_resource, "Slots");
+	if (ImGui::Button("Add row")) addArrayItem(allocator, *this, [&]() -> auto& {return *m_resource;}, "Slots");
 	
 	ImGui::PopItemWidth();
 	ImGui::PopID();
