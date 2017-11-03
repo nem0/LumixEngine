@@ -1431,7 +1431,7 @@ public:
 		io.KeyMap[ImGuiKey_Z] = SDLK_z;
 
 		ImGuiStyle& style = ImGui::GetStyle();
-		style.FramePadding.y = 2;
+		style.FramePadding.y = 0;
 		style.ItemSpacing.y = 2;
 		style.ItemInnerSpacing.x = 2;
 	}
