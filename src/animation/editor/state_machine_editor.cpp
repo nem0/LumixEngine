@@ -1640,8 +1640,8 @@ ControllerResource::ControllerResource(IAnimationEditor& editor,
 
 ControllerResource::~ControllerResource()
 {
-	LUMIX_DELETE(m_allocator, m_engine_resource);
 	LUMIX_DELETE(m_allocator, m_root);
+	LUMIX_DELETE(m_allocator, m_engine_resource);
 }
 
 
