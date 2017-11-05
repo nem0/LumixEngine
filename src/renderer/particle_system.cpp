@@ -22,12 +22,20 @@ namespace Lumix
 static const ResourceType MATERIAL_TYPE("material");
 
 
+enum class InstructionArgType : u8
+{
+	CHANNEL,
+	CONSTANT,
+	REGISTER,
+	LITERAL
+};
+
+
 enum class Instructions : u8
 {
 	END,
 	ADD,
 	ADD_CONST,
-	ADD_ARG,
 	SUB,
 	SUB_CONST,
 	MULTIPLY_ADD,
@@ -144,8 +152,11 @@ void ScriptedParticleEmitter::emit(const float* args)
 			case Instructions::END:
 				++m_particles_count;
 				return;
-			case Instructions::ADD_ARG:
+			case Instructions::ADD:
 			{
+				ASSERT((flag & 3) == (u8)InstructionArgType::CHANNEL);
+				ASSERT(((flag >> 2) & 3) == (u8)InstructionArgType::CHANNEL);
+				ASSERT(((flag >> 4) & 3) == (u8)InstructionArgType::REGISTER);
 				u8 result_ch = blob.read<u8>();
 				u8 op1_ch = blob.read<u8>();
 				u8 arg_idx = blob.read<u8>();
@@ -154,6 +165,8 @@ void ScriptedParticleEmitter::emit(const float* args)
 			}
 			case Instructions::MOV:
 			{
+				ASSERT((flag & 3) == (u8)InstructionArgType::CHANNEL);
+				ASSERT(((flag >> 2) & 3) == (u8)InstructionArgType::LITERAL);
 				u8 ch = blob.read<u8>();
 				float value = blob.read<float>();
 				m_channels[ch].data[m_particles_count] = value;
@@ -161,6 +174,9 @@ void ScriptedParticleEmitter::emit(const float* args)
 			}
 			case Instructions::RAND:
 			{
+				ASSERT((flag & 3) == (u8)InstructionArgType::CHANNEL);
+				ASSERT(((flag >> 2) & 3) == (u8)InstructionArgType::LITERAL);
+				ASSERT(((flag >> 4) & 3) == (u8)InstructionArgType::LITERAL);
 				u8 ch = blob.read<u8>();
 				float from = blob.read<float>();
 				float to = blob.read<float>();
@@ -254,13 +270,6 @@ struct {
 	{ "doemit", Instructions::EMIT, 0, false, true }
 };
 
-enum class InstructionArgType : u8
-{
-	CHANNEL,
-	CONSTANT,
-	REGISTER,
-	LITERAL
-};
 
 void ScriptedParticleEmitter::parseInstruction(const char* instruction, ParseContext& ctx)
 {
@@ -337,148 +346,6 @@ void ScriptedParticleEmitter::parseInstruction(const char* instruction, ParseCon
 			return;
 		}
 	}
-	/*
-	char tmp[32];
-	if (equalStrings(instruction, "madd"))
-	{
-		char result[32];
-		getWord(ctx, result);
-		char m1[32];
-		getWord(ctx, m1);
-		char m2[32];
-		getWord(ctx, m2);
-		char add[32];
-		getWord(ctx, add);
-		int m2_ch = getChannel(m2);
-		ctx.current_blob->write(m2_ch >= 0 ? Instructions::MULTIPLY_ADD : Instructions::MULTIPLY_CONST_ADD);
-		ctx.current_blob->write((u8)getChannel(result));
-		ctx.current_blob->write((u8)getChannel(m1));
-		if (m2_ch < 0)
-		{
-			int constant_idx = getConstant(m2);
-			ctx.current_blob->write((u8)constant_idx);
-		}
-		else
-		{
-			ctx.current_blob->write((u8)m2_ch);
-		}
-		ctx.current_blob->write((u8)getChannel(add));
-	}
-	else if (equalStrings(instruction, "add"))
-	{
-		char result[32];
-		getWord(ctx, result);
-		char m1[32];
-		getWord(ctx, m1);
-		char m2[32];
-		getWord(ctx, m2);
-		int m2_ch = getChannel(m2);
-		ctx.current_blob->write(m2[0] == '$' ? Instructions::ADD_ARG : (m2_ch >= 0 ? Instructions::ADD : Instructions::ADD_CONST));
-		ctx.current_blob->write((u8)getChannel(result));
-		ctx.current_blob->write((u8)getChannel(m1));
-		if (m2[0] == '$')
-		{
-			ctx.current_blob->write(u8(m2[1] - '0'));
-		}
-		else if (m2_ch < 0)
-		{
-			int constant_idx = getConstant(m2);
-			ctx.current_blob->write((u8)constant_idx);
-		}
-		else
-		{
-			ctx.current_blob->write((u8)m2_ch);
-		}
-	}
-	else if (equalStrings(instruction, "sub"))
-	{
-		char result[32];
-		getWord(ctx, result);
-		char m1[32];
-		getWord(ctx, m1);
-		char m2[32];
-		getWord(ctx, m2);
-		int m2_ch = getChannel(m2);
-		ctx.current_blob->write(m2_ch >= 0 ? Instructions::SUB : Instructions::SUB_CONST);
-		ctx.current_blob->write((u8)getChannel(result));
-		ctx.current_blob->write((u8)getChannel(m1));
-		if (m2_ch < 0)
-		{
-			int constant_idx = getConstant(m2);
-			ctx.current_blob->write((u8)constant_idx);
-		}
-		else
-		{
-			ctx.current_blob->write((u8)m2_ch);
-		}
-	}
-	else if (equalStrings(instruction, "dokill"))
-	{
-		ctx.current_blob->write(Instructions::KILL);
-	}
-	else if (equalStrings(instruction, "doemit"))
-	{
-		ctx.current_blob->write(Instructions::EMIT);
-		int count_pos = ctx.current_blob->getPos();
-		ctx.current_blob->write((u8)0);
-		getWord(ctx, tmp);
-		ASSERT(equalStrings(tmp, "{"));
-		getWord(ctx, tmp);
-		int count = 0;
-		while (!equalStrings(tmp, "}"))
-		{
-			ctx.current_blob->write((u8)getChannel(tmp));
-			++count;
-			getWord(ctx, tmp);
-		}
-		*((u8*)ctx.current_blob->getMutableData() + count_pos) = count;
-	}
-	else if (equalStrings(instruction, "lt"))
-	{
-		char op1[32];
-		getWord(ctx, op1);
-		ctx.current_blob->write(Instructions::LT);
-		ctx.current_blob->write((u8)getChannel(op1));
-		int size_pos = ctx.current_blob->getPos();
-		ctx.current_blob->write((u8)0);
-		getWord(ctx, tmp);
-		ASSERT(equalStrings(tmp, "{"));
-		getWord(ctx, tmp);
-		while (!equalStrings(tmp, "}"))
-		{
-			parseInstruction(tmp, ctx);
-			getWord(ctx, tmp);
-		}
-		
-		ctx.current_blob->write(Instructions::END);
-		*((u8*)ctx.current_blob->getMutableData() + size_pos) = u8(ctx.current_blob->getPos() - size_pos - 1);
-	}
-	else if (equalStrings(instruction, "mov"))
-	{
-		ASSERT(ctx.current_blob == ctx.emit_blob); // not yet done for others
-		char dst[32];
-		char src[32];
-		getWord(ctx, dst);
-		getWord(ctx, src);
-		ctx.current_blob->write(Instructions::MOV_CONST);
-		ctx.current_blob->write((u8)getChannel(dst));
-		float val = (float)atof(src);
-		ctx.current_blob->write(val);
-	}
-	else if (equalStrings(instruction, "rand"))
-	{
-		ASSERT(ctx.current_blob == ctx.emit_blob); // not yet done for others
-		char dst[32];
-		char from[32];
-		char to[32];
-		getWord(ctx, dst);
-		getWord(ctx, from);
-		getWord(ctx, to);
-		ctx.current_blob->write(Instructions::RAND);
-		ctx.current_blob->write((u8)getChannel(dst));
-		ctx.current_blob->write((float)atof(from));
-		ctx.current_blob->write((float)atof(to));
-	}*/
 }
 
 
@@ -668,6 +535,7 @@ void ScriptedParticleEmitter::update(float dt)
 				goto end;
 			case Instructions::LT:
 			{
+				ASSERT(((flag >> 0) & 3) == (u8)InstructionArgType::CHANNEL);
 				u8 ch = blob.read<u8>();
 				u8 size = blob.read<u8>();
 				const float4* iter = (float4*)m_channels[ch].data;
@@ -694,6 +562,10 @@ void ScriptedParticleEmitter::update(float dt)
 			}
 			case Instructions::MULTIPLY_ADD:
 			{
+				ASSERT(((flag >> 0) & 3) == (u8)InstructionArgType::CHANNEL);
+				ASSERT(((flag >> 2) & 3) == (u8)InstructionArgType::CHANNEL);
+				ASSERT(((flag >> 4) & 3) == (u8)InstructionArgType::CONSTANT);
+				ASSERT(((flag >> 6) & 3) == (u8)InstructionArgType::CHANNEL);
 				u8 result_channel_idx = blob.read<u8>();
 				u8 multiply_channel_idx = blob.read<u8>();
 				u8 constant_index = blob.read<u8>();
@@ -713,6 +585,8 @@ void ScriptedParticleEmitter::update(float dt)
 			}
 			case Instructions::ADD:
 			{
+				ASSERT(((flag >> 0) & 3) == (u8)InstructionArgType::CHANNEL);
+				ASSERT(((flag >> 2) & 3) == (u8)InstructionArgType::CHANNEL);
 				u8 result_channel_idx = blob.read<u8>();
 				u8 op1_index = blob.read<u8>();
 
@@ -740,6 +614,9 @@ void ScriptedParticleEmitter::update(float dt)
 			}
 			case Instructions::SUB:
 			{
+				ASSERT(((flag >> 0) & 3) == (u8)InstructionArgType::CHANNEL);
+				ASSERT(((flag >> 2) & 3) == (u8)InstructionArgType::CHANNEL);
+				ASSERT(((flag >> 4) & 3) == (u8)InstructionArgType::CONSTANT);
 				u8 result_channel_idx = blob.read<u8>();
 				u8 op1_channel_idx = blob.read<u8>();
 				u8 constant_index = blob.read<u8>();
