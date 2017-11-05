@@ -36,6 +36,7 @@ enum class Instructions : u8
 	OUTPUT,
 	OUTPUT_CONST,
 	MOV_CONST,
+	MOV,
 	RAND,
 	KILL,
 	EMIT
@@ -137,6 +138,7 @@ void ScriptedParticleEmitter::emit(const float* args)
 	for (;;)
 	{
 		u8 instruction = blob.read<u8>();
+		u8 flag = blob.read<u8>();
 		switch((Instructions)instruction)
 		{
 			case Instructions::END:
@@ -150,7 +152,7 @@ void ScriptedParticleEmitter::emit(const float* args)
 				m_channels[result_ch].data[m_particles_count] = m_channels[op1_ch].data[m_particles_count] + args[arg_idx];
 				break;
 			}
-			case Instructions::MOV_CONST:
+			case Instructions::MOV:
 			{
 				u8 ch = blob.read<u8>();
 				float value = blob.read<float>();
@@ -235,9 +237,107 @@ static void getWord(ParseContext& ctx, char(&out)[32])
 	*o = '\0';
 };
 
+struct {
+	const char* instruction;
+	Instructions opcode;
+	int params_count;
+	bool is_compound;
+	bool is_variadic;
+} INSTRUCTIONS[] = {
+	{ "madd", Instructions::MULTIPLY_ADD, 4, false, false },
+	{ "add", Instructions::ADD, 3, false, false },
+	{ "sub", Instructions::SUB, 3, false, false },
+	{ "dokill", Instructions::KILL, 0, false, false },
+	{ "mov", Instructions::MOV, 2, false, false },
+	{ "rand", Instructions::RAND, 3, false, false },
+	{ "lt", Instructions::LT, 1, true, false },
+	{ "doemit", Instructions::EMIT, 0, false, true }
+};
+
+enum class InstructionArgType : u8
+{
+	CHANNEL,
+	CONSTANT,
+	REGISTER,
+	LITERAL
+};
 
 void ScriptedParticleEmitter::parseInstruction(const char* instruction, ParseContext& ctx)
 {
+	for (const auto& instr : INSTRUCTIONS)
+	{
+		ASSERT(instr.params_count <= 4); // flags are big enough only for 4 params
+		if (equalIStrings(instruction, instr.instruction))
+		{
+			ctx.current_blob->write(instr.opcode);
+			int flags_offset = ctx.current_blob->getPos();
+			ctx.current_blob->write((u8)0);
+			u8 flags = 0;
+			char tmp[32];
+			for (int i = 0; i < instr.params_count; ++i)
+			{
+				getWord(ctx, tmp);
+				int ch = getChannel(tmp);
+				int constant = getConstant(tmp);
+				if (ch >= 0)
+				{
+					flags |= ((u8)InstructionArgType::CHANNEL) << (i * 2);
+					ctx.current_blob->write((u8)ch);
+				}
+				else if (constant >= 0)
+				{
+					flags |= ((u8)InstructionArgType::CONSTANT) << (i * 2);
+					ctx.current_blob->write((u8)constant);
+				}
+				else if (tmp[0] == '$')
+				{
+					flags |= ((u8)InstructionArgType::REGISTER) << (i * 2);
+					ctx.current_blob->write(tmp[1] - '0');
+				}
+				else if (tmp[0] >= '0' && tmp[0] <= '9' || tmp[0] == '-')
+				{
+					flags |= ((u8)InstructionArgType::LITERAL) << (i * 2);
+					float f = (float)atof(tmp);
+					ctx.current_blob->write(f);
+				}
+			}
+			*((u8*)ctx.current_blob->getMutableData() + flags_offset) = flags;
+			if (instr.is_compound)
+			{
+				int size_pos = ctx.current_blob->getPos();
+				ctx.current_blob->write((u8)0);
+				getWord(ctx, tmp);
+				ASSERT(equalStrings(tmp, "{"));
+				getWord(ctx, tmp);
+				while (!equalStrings(tmp, "}"))
+				{
+					parseInstruction(tmp, ctx);
+					getWord(ctx, tmp);
+				}
+				ctx.current_blob->write(Instructions::END);
+				ctx.current_blob->write((u8)0);
+				*((u8*)ctx.current_blob->getMutableData() + size_pos) = u8(ctx.current_blob->getPos() - size_pos - 1);
+			}
+			if (instr.is_variadic)
+			{
+				int count_pos = ctx.current_blob->getPos();
+				ctx.current_blob->write((u8)0);
+				getWord(ctx, tmp);
+				ASSERT(equalStrings(tmp, "{"));
+				getWord(ctx, tmp);
+				int count = 0;
+				while (!equalStrings(tmp, "}"))
+				{
+					ctx.current_blob->write((u8)getChannel(tmp));
+					++count;
+					getWord(ctx, tmp);
+				}
+				*((u8*)ctx.current_blob->getMutableData() + count_pos) = count;
+			}
+			return;
+		}
+	}
+	/*
 	char tmp[32];
 	if (equalStrings(instruction, "madd"))
 	{
@@ -378,7 +478,7 @@ void ScriptedParticleEmitter::parseInstruction(const char* instruction, ParseCon
 		ctx.current_blob->write((u8)getChannel(dst));
 		ctx.current_blob->write((float)atof(from));
 		ctx.current_blob->write((float)atof(to));
-	}
+	}*/
 }
 
 
@@ -485,9 +585,12 @@ void ScriptedParticleEmitter::compile(const char* code)
 		}
 	}
 	
-	ctx.update_blob->write(Instructions::END);
+	update_blob.write(Instructions::END);
+	update_blob.write((u8)0);
 	output_blob.write(Instructions::END);
+	output_blob.write((u8)0);
 	emit_blob.write(Instructions::END);
+	emit_blob.write((u8)0);
 
 	m_bytecode.resize(update_blob.getPos() + output_blob.getPos() + emit_blob.getPos());
 	m_output_bytecode_offset = update_blob.getPos();
@@ -517,6 +620,8 @@ void ScriptedParticleEmitter::execute(InputBlob& blob, int particle_index)
 	for (;;)
 	{
 		u8 instruction = blob.read<u8>();
+		u8 flag = blob.read<u8>();
+
 		switch ((Instructions)instruction)
 		{
 			case Instructions::END:
@@ -556,6 +661,7 @@ void ScriptedParticleEmitter::update(float dt)
 	for (;;)
 	{
 		u8 instruction = blob.read<u8>();
+		u8 flag = blob.read<u8>();
 		switch ((Instructions)instruction)
 		{
 			case Instructions::END:
@@ -586,7 +692,7 @@ void ScriptedParticleEmitter::update(float dt)
 				blob.skip(size);
 				break;
 			}
-			case Instructions::MULTIPLY_CONST_ADD:
+			case Instructions::MULTIPLY_ADD:
 			{
 				u8 result_channel_idx = blob.read<u8>();
 				u8 multiply_channel_idx = blob.read<u8>();
@@ -605,39 +711,34 @@ void ScriptedParticleEmitter::update(float dt)
 				}
 				break;
 			}
-			case Instructions::ADD_CONST:
-			{
-				u8 result_channel_idx = blob.read<u8>();
-				u8 multiply_channel_idx = blob.read<u8>();
-				u8 constant_index = blob.read<u8>();
-
-				float4* result = (float4*)m_channels[result_channel_idx].data;
-				const float4* end = result + ((m_particles_count + 3) >> 2);
-				const float4* multiply = (float4*)m_channels[multiply_channel_idx].data;
-				const float4 constant = f4Splat(m_constants[constant_index].value);
-				for (; result != end; ++result, ++multiply)
-				{
-					*result = f4Add(*multiply, constant);
-				}
-				break;
-			}
 			case Instructions::ADD:
 			{
 				u8 result_channel_idx = blob.read<u8>();
 				u8 op1_index = blob.read<u8>();
-				u8 op2_index = blob.read<u8>();
 
 				float4* result = (float4*)m_channels[result_channel_idx].data;
 				const float4* end = result + ((m_particles_count + 3) >> 2);
 				const float4* op1 = (float4*)m_channels[op1_index].data;
-				const float4* op2 = (float4*)m_channels[op2_index].data;
-				for (; result != end; ++result, ++op1, ++op2)
+				u8 op2_index = blob.read<u8>();
+				if (((flag >> 4) & 0x3) == (u8)InstructionArgType::CONSTANT)
 				{
-					*result = f4Add(*op1, *op2);
+					const float4 constant = f4Splat(m_constants[op2_index].value);
+					for (; result != end; ++result, ++op1)
+					{
+						*result = f4Add(*op1, constant);
+					}
+				}
+				else
+				{
+					const float4* op2 = (float4*)m_channels[op2_index].data;
+					for (; result != end; ++result, ++op1, ++op2)
+					{
+						*result = f4Add(*op1, *op2);
+					}
 				}
 				break;
 			}
-			case Instructions::SUB_CONST:
+			case Instructions::SUB:
 			{
 				u8 result_channel_idx = blob.read<u8>();
 				u8 op1_channel_idx = blob.read<u8>();
