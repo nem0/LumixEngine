@@ -1804,6 +1804,7 @@ template <typename T> static bool parseBinaryArray(const Property& property, std
 		int elem_count = sizeof(T) / elem_size;
 		out->resize(count / elem_count);
 
+		if (count == 0) return true;
 		return parseArrayRaw(property, &(*out)[0], int(sizeof((*out)[0]) * out->size()));
 	}
 	else
