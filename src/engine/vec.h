@@ -18,6 +18,13 @@ struct Int2
 struct LUMIX_ENGINE_API Vec2
 {
 	Vec2() {}
+
+	Vec2(float a)
+		: x(a)
+		, y(a)
+	{
+	}
+
 	Vec2(float a, float b)
 		: x(a)
 		, y(b)
@@ -30,6 +37,32 @@ struct LUMIX_ENGINE_API Vec2
 		y = b;
 	}
 
+	template<typename L>
+	float& operator[](L i)
+	{
+		return (&x)[i];
+	}
+
+	template<typename L>
+	float operator[](L i) const
+	{
+		return (&x)[i];
+	}
+
+	bool operator==(const Vec2& rhs) const
+	{
+		return x == rhs.x && y == rhs.y;
+	}
+
+	bool operator!=(const Vec2& rhs) const
+	{
+		return x != rhs.x || y != rhs.y;
+	}
+
+	void operator/=(float rhs)
+	{
+		*this *= 1.0f / rhs;
+	}
 
 	void operator*=(float f)
 	{
@@ -39,6 +72,7 @@ struct LUMIX_ENGINE_API Vec2
 
 	Vec2 operator *(const Vec2& v) const { return Vec2(x * v.x, y * v.y); }
 	Vec2 operator *(float f) const { return Vec2(x * f, y * f); }
+	Vec2 operator /(float f) const { return Vec2(x / f, y / f); }
 	Vec2 operator +(const Vec2& v) const { return Vec2(x + v.x, y + v.y); }
 	void operator +=(const Vec2& v) { x += v.x; y += v.y; }
 	Vec2 operator -(const Vec2& v) const { return Vec2(x - v.x, y - v.y); }
@@ -48,6 +82,10 @@ struct LUMIX_ENGINE_API Vec2
 	float squaredLength() const;
 
 	float x, y;
+
+	static const Vec2 MAX;
+	static const Vec2 MIN;
+	static const Vec2 ZERO;
 };
 
 
@@ -61,11 +99,40 @@ struct LUMIX_ENGINE_API Vec3
 		, z(c)
 	{}
 
+	Vec3(float a)
+		: x(a)
+		, y(a)
+		, z(a)
+	{
+	}
+
 	Vec3(float a, float b, float c)
 		: x(a)
 		, y(b)
 		, z(c)
 	{
+	}
+
+	template<typename L>
+	float& operator[](L i)
+	{
+		return (&x)[i];
+	}
+
+	template<typename L>
+	float operator[](L i) const
+	{
+		return (&x)[i];
+	}
+
+	bool operator==(const Vec3& rhs) const
+	{
+		return x == rhs.x && y == rhs.y && z == rhs.z;
+	}
+
+	bool operator!=(const Vec3& rhs) const
+	{
+		return x != rhs.x || y != rhs.y || z != rhs.z;
 	}
 
 	Vec3 operator+(const Vec3& rhs) const { return Vec3(x + rhs.x, y + rhs.y, z + rhs.z); }
@@ -106,6 +173,11 @@ struct LUMIX_ENGINE_API Vec3
 	{
 		float tmp = 1 / s;
 		return Vec3(x * tmp, y * tmp, z * tmp);
+	}	
+	
+	void operator/=(float rhs)
+	{
+		*this *= 1.0f / rhs;
 	}
 
 	void operator*=(float rhs)
@@ -141,9 +213,16 @@ struct LUMIX_ENGINE_API Vec3
 		float z = this->z;
 		return x * x + y * y + z * z;
 	}
+	
+	union
+	{
+		struct { float x, y, z; };
+		struct { float r, g, b; };
+	};
 
-
-	float x, y, z;
+	static const Vec3 MAX;
+	static const Vec3 MIN;
+	static const Vec3 ZERO;
 };
 
 
@@ -156,6 +235,15 @@ inline Vec3 operator *(float f, const Vec3& v)
 struct LUMIX_ENGINE_API Vec4
 {
 	Vec4() {}
+
+	Vec4(float a)
+		: x(a)
+		, y(a)
+		, z(a)
+		, w(a)
+	{
+	}
+
 	Vec4(float a, float b, float c, float d)
 		: x(a)
 		, y(b)
@@ -163,6 +251,15 @@ struct LUMIX_ENGINE_API Vec4
 		, w(d)
 	{
 	}
+
+	Vec4(const Vec2& v1, const Vec2& v2)
+		: x(v1.x)
+		, y(v1.y)
+		, z(v2.x)
+		, w(v2.y)
+	{
+	}
+
 	Vec4(const Vec3& v, float d)
 		: x(v.x)
 		, y(v.y)
@@ -172,6 +269,29 @@ struct LUMIX_ENGINE_API Vec4
 	}
 
 	Vec3 xyz() const { return Vec3(x, y, z); }
+	Vec3 rgb() const { return Vec3(x, y, z); }
+
+	template<typename L>
+	float& operator[](L i)
+	{
+		return (&x)[i];
+	}
+
+	template<typename L>
+	float operator[](L i) const
+	{
+		return (&x)[i];
+	}
+
+	bool operator==(const Vec4& rhs) const
+	{
+		return x == rhs.x && y == rhs.y && z == rhs.z && w == rhs.w;
+	}
+
+	bool operator!=(const Vec4& rhs) const
+	{
+		return x != rhs.x || y != rhs.y || z != rhs.z || w != rhs.w;
+	}
 
 	Vec4 operator+(const Vec4& rhs) const
 	{
@@ -215,6 +335,11 @@ struct LUMIX_ENGINE_API Vec4
 		this->y = y;
 		this->z = z;
 		this->w = w;
+	}
+
+	void operator/=(float rhs)
+	{
+		*this *= 1.0f / rhs;
 	}
 
 	Vec4 operator*(float s) { return Vec4(x * s, y * s, z * s, w * s); }
@@ -274,7 +399,15 @@ struct LUMIX_ENGINE_API Vec4
 
 	operator Vec3() { return Vec3(x, y, z); }
 
-	float x, y, z, w;
+	union
+	{
+		struct { float x, y, z, w; };
+		struct { float r, g, b, a; };
+	};
+
+	static const Vec4 MAX;
+	static const Vec4 MIN;
+	static const Vec4 ZERO;
 };
 
 

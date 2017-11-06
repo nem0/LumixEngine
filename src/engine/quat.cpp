@@ -9,6 +9,9 @@ namespace Lumix
 {
 
 
+const Quat Quat::IDENTITY = { 0, 0, 0, 1 };
+
+
 Quat::AxisAngle Quat::getAxisAngle() const
 {
 	AxisAngle ret;
@@ -112,6 +115,11 @@ void Quat::normalize()
 	w *= l;
 }
 
+Quat Quat::normalized() const
+{
+	float l = 1 / sqrt(x * x + y * y + z * z + w * w);
+	return Quat(x * l, y * l, z * l, -w * l);
+}
 
 void nlerp(const Quat& q1, const Quat& q2, Quat* out, float t)
 {
@@ -147,6 +155,20 @@ Quat Quat::operator-() const
 	return Quat(x, y, z, -w);
 }
 
+Quat Quat::operator+(const Quat& q) const
+{
+	return Quat(x + q.x, y + q.y, z + q.z, w + q.w);
+}
+
+Quat Quat::operator*(float m) const
+{
+	return Quat(x * m, y * m, z * m, w * m);
+}
+
+Vec3 Quat::operator*(const Vec3& q) const
+{
+	return rotate(q);
+}
 
 Matrix Quat::toMatrix() const
 {

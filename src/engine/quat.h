@@ -31,6 +31,7 @@ struct LUMIX_ENGINE_API Quat
 	void conjugate();
 	Quat conjugated() const;
 	void normalize();
+	Quat normalized() const;
 	Matrix toMatrix() const;
 
 	Vec3 rotate(const Vec3& v) const
@@ -49,10 +50,15 @@ struct LUMIX_ENGINE_API Quat
 
 	Quat operator*(const Quat& q) const;
 	Quat operator-() const;
+	Quat operator+(const Quat& q) const;
+	Quat operator*(float m) const;
+	Vec3 operator*(const Vec3& q) const;
 
 	static Quat vec3ToVec3(const Vec3& a, const Vec3& b);
 
 	float x, y, z, w;
+	
+	static const Quat IDENTITY;
 };
 
 
