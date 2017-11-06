@@ -207,6 +207,7 @@ bool Metadata::setRawMemory(u32 file, u32 key, const void* mem, size_t size)
 	if (!data) return false;
 
 	data->m_type = DataItem::RAW_MEMORY;
+	m_allocator.deallocate(data->m_raw.memory);
 	data->m_raw.memory = m_allocator.allocate(size);
 	copyMemory(data->m_raw.memory, mem, size);
 	data->m_raw.size = size;
