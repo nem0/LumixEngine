@@ -1,9 +1,23 @@
 #include "vec.h"
 #include <cmath>
+#include <float.h>
 
 
 namespace Lumix
 {
+
+
+const Vec2 Vec2::MAX = Vec2(FLT_MAX);
+const Vec2 Vec2::MIN = Vec2(-FLT_MAX);
+const Vec2 Vec2::ZERO = Vec2(0);
+
+const Vec3 Vec3::MAX = Vec3(FLT_MAX);
+const Vec3 Vec3::MIN = Vec3(-FLT_MAX);
+const Vec3 Vec3::ZERO = Vec3(0);
+
+const Vec4 Vec4::MAX = Vec4(FLT_MAX);
+const Vec4 Vec4::MIN = Vec4(-FLT_MAX);
+const Vec4 Vec4::ZERO = Vec4(0);
 
 
 float Vec2::squaredLength() const

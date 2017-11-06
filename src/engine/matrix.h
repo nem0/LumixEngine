@@ -131,6 +131,13 @@ LUMIX_ALIGN_BEGIN(16) struct LUMIX_ENGINE_API Matrix
 
 	Matrix() {}
 
+	Matrix(const Vec3& x, const Vec3& y, const Vec3& z)
+	{
+		setXVector(x);
+		setYVector(y);
+		setZVector(z);
+	}
+
 	Matrix(const Vec3& pos, const Quat& rot);
 
 	Matrix(const float* m)
