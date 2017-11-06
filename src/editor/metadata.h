@@ -34,12 +34,11 @@ private:
 	{
 		enum Type
 		{
+			UNINITIALIZED,
 			INT,
 			STRING,
 			RAW_MEMORY
-		};
-
-		Type m_type;
+		} m_type = UNINITIALIZED;
 
 		union
 		{
