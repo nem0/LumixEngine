@@ -308,6 +308,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			.end();
 
 		m_has_shadowmap_define_idx = m_renderer.getShaderDefineIdx("HAS_SHADOWMAP");
+		m_instanced_define_idx = m_renderer.getShaderDefineIdx("INSTANCED");
 
 		createUniforms();
 
@@ -858,6 +859,8 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		Material* material = mesh.material;
 		const u16 stride = model.getVertexDecl().getStride();
 
+		material->setDefine(m_instanced_define_idx, true);
+
 		int view_idx = m_layer_to_view_map[material->getRenderLayer()];
 		ASSERT(view_idx >= 0);
 		auto& view = m_views[view_idx >= 0 ? view_idx : 0];
@@ -874,7 +877,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
 		bgfx::setState(view.render_state | material->getRenderStates());
 		bgfx::setInstanceDataBuffer(&data.buffer, data.instance_count);
-		ShaderInstance& shader_instance = mesh.material->getShaderInstance();
+		ShaderInstance& shader_instance = material->getShaderInstance();
 		++m_stats.draw_call_count;
 		m_stats.instance_count += data.instance_count;
 		m_stats.triangle_count += data.instance_count * mesh.indices_count / 3;
@@ -1975,6 +1978,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		if (!m_current_view) return;
 		m_current_view->render_state |= BGFX_STATE_DEPTH_WRITE;
 	}
+
 	void disableDepthWrite()
 	{
 		if (!m_current_view) return;
@@ -2048,13 +2052,6 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 				renderGrasses(tmp_grasses);
 			}
 		}
-	}
-
-
-	void setViewSeq()
-	{
-		if (!m_current_view) return;
-		bgfx::setViewMode(m_current_view->bgfx_id, bgfx::ViewMode::Sequential);
 	}
 
 
@@ -2296,6 +2293,8 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		Material* material = mesh.material;
 		auto& shader_instance = mesh.material->getShaderInstance();
 
+		material->setDefine(m_instanced_define_idx, false);
+
 		Matrix bone_mtx[196];
 
 		const Pose& pose = *model_instance.pose;
@@ -2341,6 +2340,8 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	{
 		const Mesh& mesh = *info.mesh;
 		Material* material = mesh.material;
+
+		material->setDefine(m_instanced_define_idx, true);
 
 		const Model& model = *model_instance.model;
 
@@ -2388,10 +2389,45 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
+	void renderRigidMeshNoninstancedMesh(const ModelInstance& model_instance, const ModelInstanceMesh& info)
+	{
+		Mesh& mesh = *info.mesh;
+		const Model& model = *model_instance.model;
+		Material* material = mesh.material;
+		const u16 stride = model.getVertexDecl().getStride();
+
+		material->setDefine(m_instanced_define_idx, false);
+
+		int view_idx = m_layer_to_view_map[material->getRenderLayer()];
+		ASSERT(view_idx >= 0);
+		auto& view = m_views[view_idx >= 0 ? view_idx : 0];
+
+		executeCommandBuffer(material->getCommandBuffer(), material);
+		executeCommandBuffer(view.command_buffer.buffer, material);
+
+		bgfx::setTransform(&model_instance.matrix);
+		bgfx::setVertexBuffer(0, model.getVerticesHandle(),
+			mesh.attribute_array_offset / stride,
+			mesh.attribute_array_size / stride);
+		bgfx::setIndexBuffer(model.getIndicesHandle(),
+			mesh.indices_offset,
+			mesh.indices_count);
+		bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
+		bgfx::setState(view.render_state | material->getRenderStates());
+		ShaderInstance& shader_instance = material->getShaderInstance();
+		++m_stats.draw_call_count;
+		++m_stats.instance_count;
+		m_stats.triangle_count += mesh.indices_count / 3;
+		bgfx::submit(view.bgfx_id, shader_instance.getProgramHandle(view.pass_idx));
+	}
+
+
 	void renderMultilayerSkinnedMesh(const ModelInstance& model_instance, const ModelInstanceMesh& info)
 	{
 		const Mesh& mesh = *info.mesh;
 		Material* material = mesh.material;
+
+		material->setDefine(m_instanced_define_idx, false);
 
 		Matrix bone_mtx[196];
 		const Pose& pose = *model_instance.pose;
@@ -2807,18 +2843,21 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		for(auto& mesh : meshes)
 		{
 			ModelInstance& model_instance = model_instances[mesh.model_instance.index];
-			switch (model_instance.type)
+			switch (mesh.mesh->type)
 			{
-				case ModelInstance::RIGID:
+				case Mesh::RIGID_INSTANCED:
 					renderRigidMesh(model_instance, mesh);
 					break;
-				case ModelInstance::SKINNED:
+				case Mesh::RIGID:
+					renderRigidMeshNoninstancedMesh(model_instance, mesh);
+					break;
+				case Mesh::SKINNED:
 					renderSkinnedMesh(model_instance, mesh);
 					break;
-				case ModelInstance::MULTILAYER_SKINNED:
+				case Mesh::MULTILAYER_SKINNED:
 					renderMultilayerSkinnedMesh(model_instance, mesh);
 					break;
-				case ModelInstance::MULTILAYER_RIGID:
+				case Mesh::MULTILAYER_RIGID:
 					renderMultilayerRigidMesh(model_instance, mesh);
 					break;
 			}
@@ -2839,18 +2878,21 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			for (auto& mesh : submeshes)
 			{
 				ModelInstance& model_instance = model_instances[mesh.model_instance.index];
-				switch (model_instance.type)
+				switch (mesh.mesh->type)
 				{
-					case ModelInstance::RIGID:
+					case Mesh::RIGID_INSTANCED:
 						renderRigidMesh(model_instance, mesh);
 						break;
-					case ModelInstance::SKINNED:
+					case Mesh::RIGID:
+						renderRigidMeshNoninstancedMesh(model_instance, mesh);
+						break;
+					case Mesh::SKINNED:
 						renderSkinnedMesh(model_instance, mesh);
 						break;
-					case ModelInstance::MULTILAYER_SKINNED:
+					case Mesh::MULTILAYER_SKINNED:
 						renderMultilayerSkinnedMesh(model_instance, mesh);
 						break;
-					case ModelInstance::MULTILAYER_RIGID:
+					case Mesh::MULTILAYER_RIGID:
 						renderMultilayerRigidMesh(model_instance, mesh);
 						break;
 				}
@@ -3132,6 +3174,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	bgfx::DynamicIndexBufferHandle m_debug_index_buffer;
 	int m_debug_buffer_idx;
 	int m_has_shadowmap_define_idx;
+	int m_instanced_define_idx;
 };
 
 
@@ -3149,6 +3192,16 @@ void Pipeline::destroy(Pipeline* pipeline)
 
 namespace LuaAPI
 {
+
+
+int setViewMode(lua_State* L)
+{
+	PipelineImpl* that = LuaWrapper::checkArg<PipelineImpl*>(L, 1);
+	auto mode = (bgfx::ViewMode::Enum)LuaWrapper::checkArg<int>(L, 2);
+	if (!that->m_current_view) return 0;
+	bgfx::setViewMode(that->m_current_view->bgfx_id, mode);
+	return 0;
+}
 
 
 int bindFramebufferTexture(lua_State* L)
@@ -3360,6 +3413,7 @@ void Pipeline::registerLuaAPI(lua_State* L)
 
 	registerCFunction("newView", &LuaAPI::newView);
 	registerCFunction("bindFramebufferTexture", &LuaAPI::bindFramebufferTexture);
+	registerCFunction("setViewMode", &LuaAPI::setViewMode);
 	
 	#define REGISTER_FUNCTION(name) \
 		do {\
@@ -3368,7 +3422,6 @@ void Pipeline::registerLuaAPI(lua_State* L)
 		} while(false) \
 
 	REGISTER_FUNCTION(render2D);
-	REGISTER_FUNCTION(setViewSeq);
 	REGISTER_FUNCTION(drawQuad);
 	REGISTER_FUNCTION(drawQuadEx);
 	REGISTER_FUNCTION(setPass);
@@ -3477,6 +3530,10 @@ void Pipeline::registerLuaAPI(lua_State* L)
 	registerConst("CLEAR_COLOR", BGFX_CLEAR_COLOR);
 	registerConst("CLEAR_STENCIL", BGFX_CLEAR_STENCIL);
 	registerConst("CLEAR_ALL", BGFX_CLEAR_STENCIL | BGFX_CLEAR_DEPTH | BGFX_CLEAR_COLOR);
+
+	registerConst("VIEW_MODE_DEPTH_ASCENDING", bgfx::ViewMode::DepthAscending);
+	registerConst("VIEW_MODE_DEPTH_DESCENDING", bgfx::ViewMode::DepthDescending);
+	registerConst("VIEW_MODE_SEQUENTIAL", bgfx::ViewMode::Sequential);
 
 	#undef REGISTER_STENCIL_CONST
 }

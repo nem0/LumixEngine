@@ -8,7 +8,7 @@ namespace Lumix
 {
 	Resource* ModelManager::createResource(const Path& path)
 	{
-		return LUMIX_NEW(m_allocator, Model)(path, *this, m_allocator);
+		return LUMIX_NEW(m_allocator, Model)(path, *this, m_renderer, m_allocator);
 	}
 
 	void ModelManager::destroyResource(Resource& resource)

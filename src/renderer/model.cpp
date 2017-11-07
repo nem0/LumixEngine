@@ -14,6 +14,7 @@
 #include "renderer/material.h"
 #include "renderer/model_manager.h"
 #include "renderer/pose.h"
+#include "renderer/renderer.h"
 
 #include <cfloat>
 #include <cmath>
@@ -56,7 +57,33 @@ void Mesh::set(int attribute_array_offset, int attribute_array_size, int indices
 }
 
 
-Model::Model(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator)
+void Mesh::setMaterial(Material* new_material, Model& model, Renderer& renderer)
+{
+	if (material) material->getResourceManager().unload(*material);
+	material = new_material;
+	static const int transparent_layer = renderer.getLayer("transparent");
+	layer_mask = material->getRenderLayerMask();
+	if (material->getRenderLayer() == transparent_layer)
+	{
+		type = Mesh::RIGID;
+	}
+	else if (material->getLayersCount() > 0)
+	{
+		if (model.getBoneCount() > 0)
+		{
+			type = Mesh::MULTILAYER_SKINNED;
+		}
+		else
+		{
+			type = Mesh::MULTILAYER_RIGID;
+		}
+	}
+	else if (model.getBoneCount() > 0) type = Mesh::SKINNED;
+	else type = Mesh::RIGID_INSTANCED;
+}
+
+
+Model::Model(const Path& path, ResourceManagerBase& resource_manager, Renderer& renderer, IAllocator& allocator)
 	: Resource(path, resource_manager, allocator)
 	, m_bounding_radius()
 	, m_allocator(allocator)
@@ -72,6 +99,7 @@ Model::Model(const Path& path, ResourceManagerBase& resource_manager, IAllocator
 	, m_first_nonroot_bone_index(0)
 	, m_flags(0)
 	, m_loading_flags(0)
+	, m_renderer(renderer)
 {
 	if (force_keep_skin) m_loading_flags = (u32)LoadingFlags::KEEP_SKIN;
 	m_lods[0] = { 0, -1, FLT_MAX };
@@ -377,6 +405,33 @@ void Model::create(const bgfx::VertexDecl& vertex_decl,
 	computeRuntimeData((const u8*)attributes_data, true);
 
 	onCreated(State::READY);
+}
+
+
+void Model::onBeforeReady()
+{
+	static const int transparent_layer = m_renderer.getLayer("transparent");
+	for (Mesh& mesh : m_meshes)
+	{
+		mesh.layer_mask = mesh.material->getRenderLayerMask();
+		if (mesh.material->getRenderLayer() == transparent_layer)
+		{
+			mesh.type = Mesh::RIGID;
+		}
+		else if (mesh.material->getLayersCount() > 0)
+		{
+			if (getBoneCount() > 0)
+			{
+				mesh.type = Mesh::MULTILAYER_SKINNED;
+			}
+			else
+			{
+				mesh.type = Mesh::MULTILAYER_RIGID;
+			}
+		}
+		else if (getBoneCount() > 0) mesh.type = Mesh::SKINNED;
+		else mesh.type = Mesh::RIGID_INSTANCED;
+	}
 }
 
 
