@@ -1,5 +1,6 @@
 #include "unit_tests/suite/lumix_unit_tests.h"
 #include "engine/math_utils.h"
+#include <cfloat>
 
 
 using namespace Lumix;
@@ -124,6 +125,36 @@ void UT_math_utils_is_pow_of_two(const char* params)
 }
 
 
+
+void UT_math_utils_float_flip(const char* params)
+{
+	for (float f = 0; f < 10000; f += 0.1f)
+	{
+		u32 i = Math::floatFlip(*(u32*)&f);
+		float f2 = f + 0.1f;
+		u32 i2 = Math::floatFlip(*(u32*)&f2);
+		LUMIX_EXPECT((f < f2) == (i < i2));
+		LUMIX_EXPECT((f > f2) == (i > i2));
+	}
+	for (float f = 0; f > -10000; f -= 0.1f)
+	{
+		u32 i = Math::floatFlip(*(u32*)&f);
+		float f2 = f + 0.1f;
+		u32 i2 = Math::floatFlip(*(u32*)&f2);
+		LUMIX_EXPECT((f < f2) == (i < i2));
+		LUMIX_EXPECT((f > f2) == (i > i2));
+	}
+	for (float f = FLT_MIN; f < FLT_MAX; f *= 2)
+	{
+		u32 i = Math::floatFlip(*(u32*)&f);
+		float f2 = f + 0.1f;
+		u32 i2 = Math::floatFlip(*(u32*)&f2);
+		LUMIX_EXPECT((f < f2) == (i < i2));
+		LUMIX_EXPECT((f > f2) == (i > i2));
+	}
+}
+
+
 void UT_math_utils_min_max(const char* params)
 {
 	LUMIX_EXPECT(Math::minimum(0, 1) == 0);
@@ -160,3 +191,4 @@ REGISTER_TEST("unit_tests/engine/math_utils/math_utils_degrees_to_radians", UT_m
 REGISTER_TEST("unit_tests/engine/math_utils/math_utils_ease_in_out", UT_math_utils_ease_in_out, "")
 REGISTER_TEST("unit_tests/engine/math_utils/is_pow_of_two", UT_math_utils_is_pow_of_two, "")
 REGISTER_TEST("unit_tests/engine/math_utils/min_max", UT_math_utils_min_max, "")
+REGISTER_TEST("unit_tests/engine/math_utils/float_flip", UT_math_utils_float_flip, "")

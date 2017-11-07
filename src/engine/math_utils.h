@@ -75,6 +75,16 @@ template <typename T1, typename... T2> LUMIX_FORCE_INLINE T1 maximum(T1 a, T2...
 	return a > min_b ? a : min_b;
 }
 
+// converts float to uint so it can be used in radix sort
+// float float_value = 0;
+// u32 sort_key = floatFlip(*(u32*)&float_value);
+// http://stereopsis.com/radix.html
+LUMIX_FORCE_INLINE u32 floatFlip(u32 float_bits_value)
+{
+	u32 mask = -i32(float_bits_value >> 31) | 0x80000000;
+	return float_bits_value ^ mask;
+}
+
 LUMIX_FORCE_INLINE float floor(float f)
 {
 	return float(int(f));

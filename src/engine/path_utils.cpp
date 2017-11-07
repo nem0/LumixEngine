@@ -66,7 +66,7 @@ void getBasename(char* basename, int max_length, const char* src)
 	{
 		if (src[i] == '\\' || src[i] == '/' || i == 0)
 		{
-			if (i != 0)
+			if (src[i] == '\\' || src[i] == '/')
 				++i;
 			int j = 0;
 			basename[j] = src[i];
