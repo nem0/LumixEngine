@@ -416,10 +416,13 @@ struct FBXImporter
 		for (const ImportMesh& mesh : meshes)
 		{
 			const ofbx::Skin* skin = mesh.fbx->getGeometry()->getSkin();
-			for (int i = 0; i < skin->getClusterCount(); ++i)
+			if (skin)
 			{
-				const ofbx::Cluster* cluster = skin->getCluster(i);
-				insertHierarchy(bones, cluster->getLink());
+				for (int i = 0; i < skin->getClusterCount(); ++i)
+				{
+					const ofbx::Cluster* cluster = skin->getCluster(i);
+					insertHierarchy(bones, cluster->getLink());
+				}
 			}
 		}
 
