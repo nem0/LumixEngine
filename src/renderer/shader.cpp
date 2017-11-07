@@ -544,13 +544,13 @@ bool ShaderBinary::load(FS::IFile& file)
 	file.read(mem->data, file.size());
 	mem->data[file.size()] = '\0';
 	m_handle = bgfx::createShader(mem);
-	bgfx::setName(m_handle, getPath().c_str());
 	m_size = file.size();
 	if (!bgfx::isValid(m_handle))
 	{
 		g_log_error.log("Renderer") << getPath().c_str() << ": Failed to create bgfx shader";
 		return false;
 	}
+	bgfx::setName(m_handle, getPath().c_str());
 	return true;
 }
 
