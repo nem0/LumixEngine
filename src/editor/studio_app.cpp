@@ -1272,19 +1272,27 @@ public:
 		{
 			m_editor->selectEntities(&entity, 1);
 		}
-		if (ImGui::IsMouseDragging() && ImGui::IsItemActive())
+		if (ImGui::BeginDragDropSource())
 		{
-			startDrag(StudioApp::DragData::ENTITY, &entity, sizeof(entity));
+			ImGui::Text(buffer);
+			ImGui::SetDragDropPayload("entity", &entity, sizeof(entity));
+			ImGui::EndDragDropSource();
 		}
-		if (ImGui::IsItemRectHovered() && ImGui::IsMouseReleased(0) && m_drag_data.type == StudioApp::DragData::ENTITY)
+		if (ImGui::BeginDragDropTarget())
 		{
-			Entity dropped_entity = *(Entity*)m_drag_data.data;
-			if (dropped_entity != entity)
+			if (auto* payload = ImGui::AcceptDragDropPayload("entity"))
 			{
-				universe->setParent(entity, dropped_entity);
-				return;
+				Entity dropped_entity = *(Entity*)payload->Data;
+				if (dropped_entity != entity)
+				{
+					m_editor->makeParent(entity, dropped_entity);
+					return;
+				}
 			}
+
+			ImGui::EndDragDropTarget();
 		}
+
 		ImGui::Indent();
 		for (Entity e = universe->getFirstChild(entity); e.isValid(); e = universe->getNextSibling(e))
 		{
@@ -1330,15 +1338,26 @@ public:
 						{
 							m_editor->selectEntities(&e, 1);
 						}
-						if (ImGui::IsMouseDragging() && ImGui::IsItemActive())
+						if (ImGui::BeginDragDropSource())
 						{
-							startDrag(StudioApp::DragData::ENTITY, &e, sizeof(e));
+							ImGui::Text(buffer);
+							ImGui::SetDragDropPayload("entity", &e, sizeof(e));
+							ImGui::EndDragDropSource();
 						}
 					}
 				}
 				ImGui::PopItemWidth();
 			}
 			ImGui::EndChild();
+			if (ImGui::BeginDragDropTarget())
+			{
+				if (auto* payload = ImGui::AcceptDragDropPayload("entity"))
+				{
+					Entity dropped_entity = *(Entity*)payload->Data;
+					m_editor->makeParent(INVALID_ENTITY, dropped_entity);
+				}
+				ImGui::EndDragDropTarget();
+			}
 		}
 		ImGui::EndDock();
 	}
