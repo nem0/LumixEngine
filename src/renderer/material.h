@@ -53,8 +53,8 @@ public:
 	void setMetallic(float value) { m_metallic = value; createCommandBuffer(); }
 	float getRoughness() const { return m_roughness; }
 	void setRoughness(float value) { m_roughness = value; createCommandBuffer(); }
-	Vec3 getColor() const { return m_color; }
-	void setColor(const Vec3& specular) { m_color = specular;  createCommandBuffer(); }
+	Vec4 getColor() const { return m_color; }
+	void setColor(const Vec4& color) { m_color = color;  createCommandBuffer(); }
 	float getAlphaRef() const { return m_alpha_ref; }
 	void setAlphaRef(float value);
 	u64 getRenderStates() const { return m_render_states; }
@@ -118,7 +118,7 @@ private:
 	Array<Uniform> m_uniforms;
 	IAllocator& m_allocator;
 	u64 m_render_states;
-	Vec3 m_color;
+	Vec4 m_color;
 	float m_alpha_ref;
 	float m_metallic;
 	float m_roughness;

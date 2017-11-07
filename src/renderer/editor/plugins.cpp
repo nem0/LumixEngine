@@ -178,8 +178,8 @@ struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 			}
 		}
 
-		Vec3 color = material->getColor();
-		if (ImGui::ColorEdit3("Color", &color.x))
+		Vec4 color = material->getColor();
+		if (ImGui::ColorEdit4("Color", &color.x))
 		{
 			material->setColor(color);
 		}

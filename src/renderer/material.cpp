@@ -42,7 +42,7 @@ Material::Material(const Path& path, ResourceManagerBase& resource_manager, IAll
 	, m_allocator(allocator)
 	, m_texture_count(0)
 	, m_render_states(BGFX_STATE_CULL_CW)
-	, m_color(1, 1, 1)
+	, m_color(1, 1, 1, 1)
 	, m_metallic(0)
 	, m_roughness(1.0f)
 	, m_shader_instance(nullptr)
@@ -149,7 +149,7 @@ void Material::unload(void)
 		}
 	}
 	m_alpha_ref = 0.3f;
-	m_color.set(1, 1, 1);
+	m_color.set(1, 1, 1, 1);
 	m_custom_flags = 0;
 	m_define_mask = 0;
 	m_layers_count = 0;
@@ -281,6 +281,7 @@ bool Material::save(JsonSerializer& serializer)
 		serializer.serializeArrayItem(m_color.x);
 		serializer.serializeArrayItem(m_color.y);
 		serializer.serializeArrayItem(m_color.z);
+		serializer.serializeArrayItem(m_color.w);
 	serializer.endArray();
 	serializer.endObject();
 	return true;
@@ -503,10 +504,9 @@ void Material::createCommandBuffer()
 		generator.setTexture(i, m_shader->m_texture_slots[i].uniform_handle, m_textures[i]->handle);
 	}
 
-	Vec4 color(m_color, 0);
 	auto& renderer = static_cast<MaterialManager&>(m_resource_manager).getRenderer();
 	auto& uniform = renderer.getMaterialColorUniform();
-	generator.setUniform(uniform, color);
+	generator.setUniform(uniform, m_color);
 
 	Vec4 roughness_metallic(m_roughness, m_metallic, 0, 0);
 	auto& rm_uniform = renderer.getRoughnessMetallicUniform();
@@ -846,6 +846,14 @@ bool Material::load(FS::IFile& file)
 			serializer.deserializeArrayItem(m_color.x, 1.0f);
 			serializer.deserializeArrayItem(m_color.y, 1.0f);
 			serializer.deserializeArrayItem(m_color.z, 1.0f);
+			if (!serializer.isArrayEnd())
+			{
+				serializer.deserializeArrayItem(m_color.w, 1.0f);
+			}
+			else
+			{
+				m_color.w = 1;
+			}
 			serializer.deserializeArrayEnd();
 		}
 		else if (equalStrings(label, "metallic"))
