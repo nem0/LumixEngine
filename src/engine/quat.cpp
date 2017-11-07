@@ -118,7 +118,7 @@ void Quat::normalize()
 Quat Quat::normalized() const
 {
 	float l = 1 / sqrt(x * x + y * y + z * z + w * w);
-	return Quat(x * l, y * l, z * l, -w * l);
+	return Quat(x * l, y * l, z * l, w * l);
 }
 
 void nlerp(const Quat& q1, const Quat& q2, Quat* out, float t)
