@@ -3353,7 +3353,7 @@ public:
 			Array<ModelInstanceMesh>& subinfos = m_temporary_infos[subresult_index];
 			subinfos.clear();
 
-			JobSystem::fromLambda([&subinfos, this, &results, subresult_index, &frustum, lod_ref_point, camera]() {
+			JobSystem::fromLambda([&layer_mask, &subinfos, this, &results, subresult_index, &frustum, lod_ref_point, camera]() {
 				PROFILE_BLOCK("Temporary Info Job");
 				PROFILE_INT("ModelInstance count", results[subresult_index].size());
 				if (results[subresult_index].empty()) return;
@@ -3373,9 +3373,12 @@ public:
 					LODMeshIndices lod = model->getLODMeshIndices(squared_distance);
 					for (int j = lod.from, c = lod.to; j <= c; ++j)
 					{
-						auto& info = subinfos.emplace();
+						Mesh& mesh = model_instance->meshes[j];
+						if ((mesh.layer_mask & layer_mask) == 0) continue;
+						
+						ModelInstanceMesh& info = subinfos.emplace();
 						info.model_instance = raw_subresults[i];
-						info.mesh = &model_instance->meshes[j];
+						info.mesh = &mesh;
 					}
 				}
 			}, &job_storage[subresult_index], &jobs[subresult_index], nullptr);
@@ -4364,20 +4367,7 @@ public:
 		auto* material_manager = static_cast<MaterialManager*>(rm.get(MATERIAL_TYPE));
 
 		auto& r = m_model_instances[component.index];
-		
-		if (model->getMesh(0).material->getLayersCount() > 0)
-		{
-			if (model->getBoneCount() > 0)
-			{
-				r.type = ModelInstance::MULTILAYER_SKINNED;
-			}
-			else
-			{
-				r.type = ModelInstance::MULTILAYER_RIGID;
-			}
-		}
-		else if (model->getBoneCount() > 0) r.type = ModelInstance::SKINNED;
-		else r.type = ModelInstance::RIGID;
+
 		float bounding_radius = r.model->getBoundingRadius();
 		float scale = m_universe.getScale(r.entity);
 		Sphere sphere(r.matrix.getTranslation(), bounding_radius * scale);
@@ -4548,9 +4538,8 @@ public:
 		allocateCustomMeshes(r, new_count);
 		ASSERT(r.meshes);
 
-		if (r.meshes[index].material) material_manager->unload(*r.meshes[index].material);
 		auto* new_material = static_cast<Material*>(material_manager->load(path));
-		r.meshes[index].material = new_material;
+		r.meshes[index].setMaterial(new_material, *r.model, m_renderer);
 	}
 
 

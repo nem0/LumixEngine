@@ -67,14 +67,6 @@ struct ModelInstance
 		PERSISTENT_FLAGS = u8(~RUNTIME_FLAGS)
 	};
 
-	enum Type
-	{
-		RIGID,
-		SKINNED,
-		MULTILAYER_RIGID,
-		MULTILAYER_SKINNED
-	};
-	Type type;
 	Matrix matrix;
 	Model* model;
 	Pose* pose;

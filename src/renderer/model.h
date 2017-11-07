@@ -23,6 +23,7 @@ class Material;
 struct Mesh;
 class Model;
 struct Pose;
+class Renderer;
 class ResourceManager;
 
 
@@ -48,6 +49,15 @@ struct LUMIX_RENDERER_API RayCastModelHit
 
 struct LUMIX_RENDERER_API Mesh
 {
+	enum Type
+	{
+		RIGID_INSTANCED,
+		SKINNED,
+		MULTILAYER_RIGID,
+		MULTILAYER_SKINNED,
+		RIGID,
+	};
+
 	Mesh(Material* mat,
 		int attribute_array_offset,
 		int attribute_array_size,
@@ -57,14 +67,17 @@ struct LUMIX_RENDERER_API Mesh
 		IAllocator& allocator);
 
 	void set(int attribute_array_offset, int attribute_array_size, int indices_offset, int index_count);
+	void setMaterial(Material* material, Model& model, Renderer& renderer);
 
+	Type type;
+	u64 layer_mask;
 	i32 instance_idx;
 	i32 attribute_array_offset;
 	i32 attribute_array_size;
 	i32 indices_offset;
 	i32 indices_count;
-	Material* material;
 	string name;
+	Material* material;
 };
 
 
@@ -161,7 +174,7 @@ public:
 	};
 
 public:
-	Model(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
+	Model(const Path& path, ResourceManagerBase& resource_manager, Renderer& renderer, IAllocator& allocator);
 	~Model();
 
 	void create(const bgfx::VertexDecl& def,
@@ -203,6 +216,7 @@ public:
 	const Array<Vec2>& getUVs() const { return m_uvs; }
 	u32 getFlags() const { return m_flags;	}
 	void setKeepSkin();
+	void onBeforeReady() override;
 
 	static void registerLuaAPI(lua_State* L);
 
@@ -229,6 +243,7 @@ private:
 
 private:
 	IAllocator& m_allocator;
+	Renderer& m_renderer;
 	bgfx::VertexDecl m_vertex_decl;
 	bgfx::IndexBufferHandle m_indices_handle;
 	bgfx::VertexBufferHandle m_vertices_handle;
