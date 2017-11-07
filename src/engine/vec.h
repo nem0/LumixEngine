@@ -40,12 +40,14 @@ struct LUMIX_ENGINE_API Vec2
 	template<typename L>
 	float& operator[](L i)
 	{
+		ASSERT(i >= 0 && i < 2);
 		return (&x)[i];
 	}
 
 	template<typename L>
 	float operator[](L i) const
 	{
+		ASSERT(i >= 0 && i < 2);
 		return (&x)[i];
 	}
 
@@ -118,12 +120,14 @@ struct LUMIX_ENGINE_API Vec3
 	template<typename L>
 	float& operator[](L i)
 	{
+		ASSERT(i >= 0 && i < 3);
 		return (&x)[i];
 	}
 
 	template<typename L>
 	float operator[](L i) const
 	{
+		ASSERT(i >= 0 && i < 3);
 		return (&x)[i];
 	}
 
@@ -276,12 +280,14 @@ struct LUMIX_ENGINE_API Vec4
 	template<typename L>
 	float& operator[](L i)
 	{
+		ASSERT(i >= 0 && i < 4);
 		return (&x)[i];
 	}
 
 	template<typename L>
 	float operator[](L i) const
 	{
+		ASSERT(i >= 0 && i < 4);
 		return (&x)[i];
 	}
 
