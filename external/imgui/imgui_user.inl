@@ -136,6 +136,28 @@ namespace ImGui
 	}
 
 
+
+	static inline bool IsWindowContentHoverableEx(ImGuiWindow* window, ImGuiHoveredFlags flags)
+	{
+		// An active popup disable hovering on other windows (apart from its own children)
+		// FIXME-OPT: This could be cached/stored within the window.
+		ImGuiContext& g = *GImGui;
+		if (g.NavWindow)
+			if (ImGuiWindow* focused_root_window = g.NavWindow->RootWindow)
+				if (focused_root_window->WasActive && focused_root_window != window->RootWindow)
+				{
+					// For the purpose of those flags we differentiate "standard popup" from "modal popup"
+					// NB: The order of those two tests is important because Modal windows are also Popups.
+					if (focused_root_window->Flags & ImGuiWindowFlags_Modal)
+						return false;
+					if ((focused_root_window->Flags & ImGuiWindowFlags_Popup) && !(flags & ImGuiHoveredFlags_AllowWhenBlockedByPopup))
+						return false;
+				}
+
+		return true;
+	}
+
+
 	static bool IsHovered(const ImRect& bb, ImGuiID id)
 	{
 		ImGuiContext& g = *GImGui;
@@ -144,7 +166,7 @@ namespace ImGui
 			ImGuiWindow* window = GetCurrentWindowRead();
 			if (g.HoveredWindow == window)
 				if ((g.ActiveId == 0 || g.ActiveId == id || g.ActiveIdAllowOverlap) && IsMouseHoveringRect(bb.Min, bb.Max))
-					if (IsWindowContentHoverable(g.HoveredRootWindow))
+					if (IsWindowContentHoverableEx(g.HoveredRootWindow, 0))
 						return true;
 		}
 		return false;
