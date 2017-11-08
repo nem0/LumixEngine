@@ -47,7 +47,6 @@ static const ComponentType NAVMESH_AGENT_TYPE = Properties::getComponentType("na
 static const ComponentType ANIM_CONTROLLER_TYPE = Properties::getComponentType("anim_controller");
 static const int CELLS_PER_TILE_SIDE = 256;
 static const float CELL_SIZE = 0.3f;
-static void registerLuaAPI(lua_State* L);
 
 
 struct Agent

@@ -872,7 +872,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	void setD6JointSwingLimit(ComponentHandle cmp, const Vec2& limit)
+	void setD6JointSwingLimit(ComponentHandle cmp, const Vec2& limit) override
 	{
 		auto* joint = getD6Joint(cmp);
 		auto px_limit = joint->getSwingLimit();
@@ -3184,7 +3184,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 				}
 			default:
 				ASSERT(false);
-				break;
+				return;
 		}
 		new_shape->userData = shape->userData;
 	}
@@ -3735,7 +3735,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			serializer.read(&type);
 			int index;
 			serializer.read(&index);
-			PxShape* shape;
+			PxShape* shape = nullptr;
 			RigidTransform tr;
 			serializer.read(&tr);
 			PxTransform local_pos = toPhysx(tr);
@@ -3761,7 +3761,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 					ASSERT(false);
 					break;
 			}
-			shape->userData = (void*)(intptr_t)index;
+			if(shape) shape->userData = (void*)(intptr_t)index;
 		}
 		actor->setPhysxActor(physx_actor);
 
@@ -4025,7 +4025,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 					int type = serializer.read<int>();
 					int index = serializer.read<int>();
 					PxTransform tr = toPhysx(serializer.read<RigidTransform>());
-					PxShape* shape;
+					PxShape* shape = nullptr;
 					switch (type)
 					{
 						case PxGeometryType::eBOX:
@@ -4048,7 +4048,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 							ASSERT(false);
 							break;
 					}
-					shape->userData = (void*)(intptr_t)index;
+					if (shape) shape->userData = (void*)(intptr_t)index;
 				}
 				actor->setPhysxActor(physx_actor);
 				m_universe.addComponent(actor->entity, RIGID_ACTOR_TYPE, this, cmp);

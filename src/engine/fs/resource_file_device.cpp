@@ -24,9 +24,7 @@ public:
 		ASSERT(file == nullptr);
 	}
 
-	~ResourceFile()
-	{
-	}
+	~ResourceFile() = default;
 
 
 	IFileDevice& getDevice() override { return m_device; }

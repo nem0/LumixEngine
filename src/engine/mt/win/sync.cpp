@@ -82,9 +82,8 @@ SpinMutex::SpinMutex(bool locked)
 	}
 }
 
-SpinMutex::~SpinMutex()
-{
-}
+SpinMutex::~SpinMutex() = default;
+
 
 void SpinMutex::lock()
 {

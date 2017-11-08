@@ -1005,7 +1005,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
-	bgfx::TextureHandle& getRenderbuffer(const char* framebuffer_name, int renderbuffer_idx)
+	bgfx::TextureHandle& getRenderbuffer(const char* framebuffer_name, int renderbuffer_idx) override
 	{
 		static bgfx::TextureHandle invalid = BGFX_INVALID_HANDLE;
 		FrameBuffer* fb = getFramebuffer(framebuffer_name);
@@ -2218,7 +2218,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 		if (render_grass)
 		{
-			JobSystem::fromLambda([this, &frustum, &lod_ref_point]() {
+			JobSystem::fromLambda([this, &frustum]() {
 				m_scene->getGrassInfos(frustum, m_applied_camera, m_grasses_buffer);
 			}, &job_storage[2], &jobs[2], nullptr);
 		}
@@ -3094,7 +3094,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
-	Draw2D& getDraw2D() { return m_draw2d; }
+	Draw2D& getDraw2D() override { return m_draw2d; }
 
 
 	IAllocator& m_allocator;

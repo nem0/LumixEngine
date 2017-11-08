@@ -230,7 +230,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
-	int getControllerInputIndex(ComponentHandle cmp, const char* name) const
+	int getControllerInputIndex(ComponentHandle cmp, const char* name) const override
 	{
 		const Controller& controller = m_controllers[{cmp.index}];
 		Anim::InputDecl& decl = controller.resource->m_input_decl;
@@ -553,10 +553,10 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	Entity getSharedControllerParent(ComponentHandle cmp) override { return m_shared_controllers[{cmp.index}].parent; }
 
 
-	float getAnimableTimeScale(ComponentHandle cmp) { return m_animables[{cmp.index}].time_scale; }
-	void setAnimableTimeScale(ComponentHandle cmp, float time_scale) { m_animables[{cmp.index}].time_scale = time_scale; }
-	float getAnimableStartTime(ComponentHandle cmp) { return m_animables[{cmp.index}].start_time; }
-	void setAnimableStartTime(ComponentHandle cmp, float time) { m_animables[{cmp.index}].start_time = time; }
+	float getAnimableTimeScale(ComponentHandle cmp) override { return m_animables[{cmp.index}].time_scale; }
+	void setAnimableTimeScale(ComponentHandle cmp, float time_scale) override { m_animables[{cmp.index}].time_scale = time_scale; }
+	float getAnimableStartTime(ComponentHandle cmp) override { return m_animables[{cmp.index}].start_time; }
+	void setAnimableStartTime(ComponentHandle cmp, float time) override { m_animables[{cmp.index}].start_time = time; }
 
 
 	void setControllerSource(ComponentHandle cmp, const Path& path) override
@@ -684,7 +684,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	Entity getControllerEntity(ComponentHandle cmp) override { return {cmp.index}; }
 
 
-	u8* getControllerInput(ComponentHandle cmp)
+	u8* getControllerInput(ComponentHandle cmp) override
 	{
 		auto& input = m_controllers.get({cmp.index}).input;
 		return input.empty() ? nullptr : &input[0];

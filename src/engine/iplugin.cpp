@@ -4,8 +4,7 @@
 
 namespace Lumix
 {
-	IPlugin::~IPlugin() {}
-
+	IPlugin::~IPlugin() = default;
 
 	
 	static StaticPluginRegister* s_first_plugin = nullptr;

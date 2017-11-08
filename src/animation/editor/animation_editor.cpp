@@ -246,7 +246,7 @@ namespace AnimEditor
 
 struct BeginGroupCommand LUMIX_FINAL : IEditorCommand
 {
-	BeginGroupCommand() {}
+	BeginGroupCommand() = default;
 	BeginGroupCommand(WorldEditor&) {}
 
 	bool execute() override { return true; }
@@ -260,7 +260,7 @@ struct BeginGroupCommand LUMIX_FINAL : IEditorCommand
 
 struct EndGroupCommand LUMIX_FINAL : IEditorCommand
 {
-	EndGroupCommand() {}
+	EndGroupCommand() = default;
 	EndGroupCommand(WorldEditor&) {}
 
 	bool execute() override { return true; }

@@ -581,7 +581,7 @@ struct Blend1DNode::RootEdge : public Component
 
 	void serialize(OutputBlob& blob) override {}
 	void deserialize(InputBlob& blob) override {}
-	bool hitTest(const ImVec2& on_canvas_pos) const
+	bool hitTest(const ImVec2& on_canvas_pos) const override
 	{
 		ImVec2 a = getEdgeStartPoint(m_parent->getRootNode(), m_to, true);
 		ImVec2 b = getEdgeStartPoint(m_to, m_parent->getRootNode(), false);
@@ -1224,7 +1224,7 @@ struct EntryEdge : public Component
 
 	void serialize(OutputBlob& blob) override {}
 	void deserialize(InputBlob& blob) override {}
-	bool hitTest(const ImVec2& on_canvas_pos) const
+	bool hitTest(const ImVec2& on_canvas_pos) const override
 	{
 		ImVec2 a = getEdgeStartPoint(m_parent->getEntryNode(), m_to, true);
 		ImVec2 b = getEdgeStartPoint(m_to, m_parent->getEntryNode(), false);

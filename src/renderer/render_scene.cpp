@@ -3353,7 +3353,7 @@ public:
 			Array<ModelInstanceMesh>& subinfos = m_temporary_infos[subresult_index];
 			subinfos.clear();
 
-			JobSystem::fromLambda([&layer_mask, &subinfos, this, &results, subresult_index, &frustum, lod_ref_point, camera]() {
+			JobSystem::fromLambda([&layer_mask, &subinfos, this, &results, subresult_index, lod_ref_point, camera]() {
 				PROFILE_BLOCK("Temporary Info Job");
 				PROFILE_INT("ModelInstance count", results[subresult_index].size());
 				if (results[subresult_index].empty()) return;

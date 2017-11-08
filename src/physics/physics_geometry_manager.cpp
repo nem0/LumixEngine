@@ -103,9 +103,7 @@ PhysicsGeometry::PhysicsGeometry(const Path& path, ResourceManagerBase& resource
 {
 }
 
-PhysicsGeometry::~PhysicsGeometry()
-{
-}
+PhysicsGeometry::~PhysicsGeometry() = default;
 
 
 bool PhysicsGeometry::load(FS::IFile& file)

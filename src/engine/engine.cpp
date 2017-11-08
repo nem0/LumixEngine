@@ -434,6 +434,9 @@ static void logErrorToFile(const char*, const char* message)
 class EngineImpl LUMIX_FINAL : public Engine
 {
 public:
+	void operator=(const EngineImpl&) = delete;
+	EngineImpl(const EngineImpl&) = delete;
+
 	EngineImpl(const char* base_path0, const char* base_path1, FS::FileSystem* fs, IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_prefab_resource_manager(m_allocator)
@@ -1549,7 +1552,7 @@ public:
 	}
 
 
-	ComponentUID createComponent(Universe& universe, Entity entity, ComponentType type)
+	ComponentUID createComponent(Universe& universe, Entity entity, ComponentType type) override
 	{
 		ComponentUID cmp;
 		IScene* scene = universe.getScene(type);
@@ -1669,10 +1672,6 @@ private:
 	lua_State* m_state;
 	HashMap<int, Resource*> m_lua_resources;
 	int m_last_lua_resource_idx;
-
-private:
-	void operator=(const EngineImpl&);
-	EngineImpl(const EngineImpl&);
 };
 
 

@@ -36,7 +36,7 @@ namespace bx
 
 	struct AllocatorI
 	{
-		virtual ~AllocatorI() {}
+		virtual ~AllocatorI() = default;
 
 		/// Allocated, resizes memory block or frees memory.
 		///

@@ -16,14 +16,17 @@ namespace Lumix
 		class TCPFile LUMIX_FINAL : public IFile
 		{
 		public:
-			TCPFile(Net::TCPStream* stream, TCPFileDevice& device, MT::SpinMutex& spin_mutex) 
+			void operator=(const TCPFile&) = delete;
+			TCPFile(const TCPFile&) = delete;
+			
+			TCPFile(Net::TCPStream* stream, TCPFileDevice& device, MT::SpinMutex& spin_mutex)
 				: m_device(device)
 				, m_stream(stream)
 				, m_spin_mutex(spin_mutex)
 				, m_file(INVALID_FILE)
 			{}
 
-			~TCPFile() {}
+			~TCPFile() = default;
 
 			IFileDevice& getDevice() override
 			{
@@ -142,9 +145,6 @@ namespace Lumix
 			}
 
 		private:
-			void operator=(const TCPFile&);
-			TCPFile(const TCPFile&);
-
 			TCPFileDevice& m_device;
 			Net::TCPStream* m_stream;
 			MT::SpinMutex& m_spin_mutex;

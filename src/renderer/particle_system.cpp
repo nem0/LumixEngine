@@ -114,7 +114,7 @@ ScriptedParticleEmitter::ScriptedParticleEmitter(Entity entity, IAllocator& allo
 }
 
 
-ScriptedParticleEmitter::~ScriptedParticleEmitter()
+ScriptedParticleEmitter::~ScriptedParticleEmitter() 
 {
 	// TODO
 }
@@ -183,6 +183,9 @@ void ScriptedParticleEmitter::emit(const float* args)
 				m_channels[ch].data[m_particles_count] = Math::randFloat(from, to);
 				break;
 			}
+			default:
+				ASSERT(false);
+				break;
 		}
 	}
 }
@@ -303,7 +306,7 @@ void ScriptedParticleEmitter::parseInstruction(const char* instruction, ParseCon
 					flags |= ((u8)InstructionArgType::REGISTER) << (i * 2);
 					ctx.current_blob->write(tmp[1] - '0');
 				}
-				else if (tmp[0] >= '0' && tmp[0] <= '9' || tmp[0] == '-')
+				else if ((tmp[0] >= '0' && tmp[0] <= '9') || tmp[0] == '-')
 				{
 					flags |= ((u8)InstructionArgType::LITERAL) << (i * 2);
 					float f = (float)atof(tmp);
@@ -510,6 +513,9 @@ void ScriptedParticleEmitter::execute(InputBlob& blob, int particle_index)
 				}
 				break;
 			}
+			default:
+				ASSERT(false);
+				break;
 		}
 	}
 }

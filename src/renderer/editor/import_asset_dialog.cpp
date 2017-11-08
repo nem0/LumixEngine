@@ -344,7 +344,7 @@ struct FBXImporter
 			ImportMaterial& mat = materials.emplace();
 			mat.fbx = fbx_mat;
 
-			auto gatherTexture = [&mat, src_dir, this](ofbx::Texture::TextureType type) {
+			auto gatherTexture = [&mat, src_dir](ofbx::Texture::TextureType type) {
 				const ofbx::Texture* texture = mat.fbx->getTexture(type);
 				if (!texture) return;
 
