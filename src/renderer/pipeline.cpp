@@ -2418,7 +2418,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		++m_stats.draw_call_count;
 		++m_stats.instance_count;
 		m_stats.triangle_count += mesh.indices_count / 3;
-		bgfx::submit(view.bgfx_id, shader_instance.getProgramHandle(view.pass_idx));
+		bgfx::submit(view.bgfx_id, shader_instance.getProgramHandle(view.pass_idx), Math::floatFlip(*(u32*)&info.depth));
 	}
 
 

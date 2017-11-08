@@ -81,6 +81,7 @@ struct ModelInstanceMesh
 {
 	ComponentHandle model_instance;
 	Mesh* mesh;
+	float depth;
 };
 
 
