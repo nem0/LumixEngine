@@ -2706,43 +2706,6 @@ struct WorldEditorPlugin LUMIX_FINAL : public WorldEditor::Plugin
 	}
 
 
-	void showModelInstanceGizmo(ComponentUID model_instance)
-	{
-		RenderScene* scene = static_cast<RenderScene*>(model_instance.scene);
-		Universe& universe = scene->getUniverse();
-		Model* model = scene->getModelInstanceModel(model_instance.handle);
-		Vec3 points[8];
-		if (!model) return;
-
-		const AABB& aabb = model->getAABB();
-		points[0] = aabb.min;
-		points[7] = aabb.max;
-		points[1].set(points[0].x, points[0].y, points[7].z);
-		points[2].set(points[0].x, points[7].y, points[0].z);
-		points[3].set(points[0].x, points[7].y, points[7].z);
-		points[4].set(points[7].x, points[0].y, points[0].z);
-		points[5].set(points[7].x, points[0].y, points[7].z);
-		points[6].set(points[7].x, points[7].y, points[0].z);
-		Matrix mtx = universe.getMatrix(model_instance.entity);
-
-		for (int j = 0; j < 8; ++j)
-		{
-			points[j] = mtx.transformPoint(points[j]);
-		}
-
-		Vec3 this_min = points[0];
-		Vec3 this_max = points[0];
-
-		for (int j = 0; j < 8; ++j)
-		{
-			this_min = minCoords(points[j], this_min);
-			this_max = maxCoords(points[j], this_max);
-		}
-
-		scene->addDebugCube(this_min, this_max, 0xffff0000, 0);
-	}
-
-
 	void showGlobalLightGizmo(ComponentUID light)
 	{
 		RenderScene* scene = static_cast<RenderScene*>(light.scene);
@@ -2823,11 +2786,6 @@ struct WorldEditorPlugin LUMIX_FINAL : public WorldEditor::Plugin
 		if (cmp.type == GLOBAL_LIGHT_TYPE)
 		{
 			showGlobalLightGizmo(cmp);
-			return true;
-		}
-		if (cmp.type == MODEL_INSTANCE_TYPE)
-		{
-			showModelInstanceGizmo(cmp);
 			return true;
 		}
 		return false;
