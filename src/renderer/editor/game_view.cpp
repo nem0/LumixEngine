@@ -382,7 +382,7 @@ void GameView::onWindowGUI()
 	if (ImGui::BeginDock(window_name, &m_is_open))
 	{
 		is_game_view_visible = true;
-		m_is_mouse_hovering_window = ImGui::IsWindowHovered(ImGuiHoveredFlags_RectOnly);
+		m_is_mouse_hovering_window = ImGui::IsWindowHovered();
 
 		auto content_min = ImGui::GetCursorScreenPos();
 		auto size = ImGui::GetContentRegionAvail();
