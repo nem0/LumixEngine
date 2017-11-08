@@ -470,7 +470,7 @@ void AssetBrowser::fileColumn()
 		if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tile.filepath.data);
 		if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
 		{
-			ImGui::Text(tile.filepath);
+			ImGui::Text("%s", tile.filepath);
 			ImGui::SetDragDropPayload("path", tile.filepath, stringLength(tile.filepath) + 1, ImGuiCond_Once);
 			ImGui::EndDragDropSource();
 		}
