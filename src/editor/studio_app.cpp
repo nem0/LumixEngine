@@ -164,7 +164,6 @@ public:
 		, m_events(m_allocator)
 	{
 		m_add_cmp_root.label[0] = '\0';
-		m_drag_data = {DragData::NONE, nullptr, 0};
 		m_template_name[0] = '\0';
 		m_open_filter[0] = '\0';
 		SDL_SetMainReady();
@@ -224,7 +223,6 @@ public:
 
 	~StudioAppImpl()
 	{
-		m_allocator.deallocate(m_drag_data.data);
 		saveSettings();
 		unloadIcons();
 
@@ -511,24 +509,6 @@ public:
 
 		ImGui::NewFrame();
 		ImGui::PushFont(m_font);
-
-		if (m_drag_data.type == DragData::PATH)
-		{
-			ImGui::BeginTooltip();
-			char tmp[MAX_PATH_LENGTH];
-			PathUtils::getFilename(tmp, lengthOf(tmp), (const char*)m_drag_data.data);
-			ImGui::Text("%s", tmp);
-			ImGui::EndTooltip();
-		}
-		else if (m_drag_data.type == DragData::ENTITY)
-		{
-			ImGui::BeginTooltip();
-			char buf[1024];
-			getEntityListDisplayName(*m_editor, buf, lengthOf(buf), *(Entity*)m_drag_data.data);
-			ImGui::Text("%s", buf);
-			ImGui::EndTooltip();
-
-		}
 	}
 
 
@@ -587,14 +567,6 @@ public:
 		}
 		ImGui::PopFont();
 		ImGui::Render();
-
-		if (ImGui::GetIO().MouseReleased[0])
-		{
-			m_allocator.deallocate(m_drag_data.data);
-			m_drag_data.data = nullptr;
-			m_drag_data.size = 0;
-			m_drag_data.type = DragData::NONE;
-		}
 	}
 
 	void update()
@@ -1349,7 +1321,8 @@ public:
 				ImGui::PopItemWidth();
 			}
 			ImGui::EndChild();
-			if (ImGui::BeginDragDropTarget())
+			// TODO uncomment once it's fixed in imgui
+			/*if (ImGui::BeginDragDropTarget())
 			{
 				if (auto* payload = ImGui::AcceptDragDropPayload("entity"))
 				{
@@ -1357,7 +1330,7 @@ public:
 					m_editor->makeParent(INVALID_ENTITY, dropped_entity);
 				}
 				ImGui::EndDragDropTarget();
-			}
+			}*/
 		}
 		ImGui::EndDock();
 	}
@@ -1366,34 +1339,9 @@ public:
 	void dummy() {}
 
 
-	void startDrag(DragData::Type type, const void* data, int size) override
-	{
-		m_allocator.deallocate(m_drag_data.data);
-
-		m_drag_data.type = type;
-		if (size > 0)
-		{
-			m_drag_data.data = m_allocator.allocate(size);
-			copyMemory(m_drag_data.data, data, size);
-			m_drag_data.size = size;
-		}
-		else
-		{
-			m_drag_data.data = nullptr;
-			m_drag_data.size = 0;
-		}
-	}
-
-
 	void setFullscreen(bool fullscreen) override
 	{
 		SDL_SetWindowFullscreen(m_window, fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
-	}
-
-
-	DragData getDragData() override
-	{
-		return m_drag_data;
 	}
 
 
@@ -2429,7 +2377,6 @@ public:
 	bool m_is_pack_data_dialog_open;
 	bool m_is_entity_list_open;
 	bool m_is_save_as_dialog_open;
-	DragData m_drag_data;
 	ImFont* m_font;
 	ImFont* m_bold_font;
 };

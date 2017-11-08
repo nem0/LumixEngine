@@ -69,19 +69,6 @@ public:
 		char label[50];
 	};
 
-	struct DragData
-	{
-		enum Type
-		{
-			NONE,
-			PATH,
-			ENTITY
-		};
-		Type type;
-		void* data;
-		int size;
-	};
-
 	struct LUMIX_EDITOR_API StaticPluginRegister
 	{
 		typedef void (*Creator)(StudioApp& app);
@@ -122,8 +109,6 @@ public:
 	virtual void addWindowAction(Action* action) = 0;
 	virtual Action* getAction(const char* name) = 0;
 	virtual SDL_Window* getWindow() = 0;
-	virtual void startDrag(DragData::Type type, const void* data, int size) = 0;
-	virtual DragData getDragData() = 0;
 	virtual void setFullscreen(bool fullscreen) = 0;
 	virtual bool makeFile(const char* path, const char* content) = 0;
 	virtual Vec2 getMouseMove() const = 0;

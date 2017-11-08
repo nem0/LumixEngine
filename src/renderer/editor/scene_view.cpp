@@ -223,9 +223,8 @@ void SceneView::removeDropHandler(DropHandler handler)
 }
 
 
-void SceneView::handleDrop(float x, float y)
+void SceneView::handleDrop(const char* path, float x, float y)
 {
-	const char* path = (const char*)m_app.getDragData().data;
 	auto hit = castRay(x, y);
 
 	for (DropHandler handler : m_drop_handlers)
@@ -238,7 +237,6 @@ void SceneView::handleDrop(float x, float y)
 		
 		if (PathUtils::hasExtension(path, "fab"))
 		{
-			
 		}
 		else if (PathUtils::hasExtension(path, "msh"))
 		{
@@ -254,7 +252,6 @@ void SceneView::handleDrop(float x, float y)
 		}
 		else if (PathUtils::hasExtension(path, "mat") && hit.m_mesh)
 		{
-			auto drag_data = m_app.getDragData();
 			m_editor.selectEntities(&hit.m_entity, 1);
 			auto* model = m_pipeline->getScene()->getModelInstanceModel(hit.m_component);
 			int mesh_index = 0;
@@ -267,7 +264,7 @@ void SceneView::handleDrop(float x, float y)
 				}
 			}
 			auto* prop= Properties::getProperty(MODEL_INSTANCE_TYPE, "Materials", "Source");
-			m_editor.setProperty(MODEL_INSTANCE_TYPE, mesh_index, *prop, &hit.m_entity, 1, drag_data.data, drag_data.size);
+			m_editor.setProperty(MODEL_INSTANCE_TYPE, mesh_index, *prop, &hit.m_entity, 1, path, stringLength(path) + 1);
 		}
 	}
 }
@@ -389,17 +386,17 @@ void SceneView::onWindowGUI()
 			{
 				ImGui::Image(&m_texture_handle, size);
 			}
-			if (ImGui::IsItemHovered())
+			if (ImGui::BeginDragDropTarget())
 			{
-				if (ImGui::IsMouseReleased(0) && m_app.getDragData().type == StudioApp::DragData::PATH)
+				if (auto* payload = ImGui::AcceptDragDropPayload("path"))
 				{
 					float x = (ImGui::GetMousePos().x - content_min.x) / size.x;
 					float y = (ImGui::GetMousePos().y - content_min.y) / size.y;
-					handleDrop(x, y);
+					handleDrop((const char*)payload->Data, x, y);
 				}
+				ImGui::EndDragDropTarget();
 			}
 			view_pos = content_min;
-
 
 			bool handle_input = ImGui::IsItemHovered();
 			if(handle_input)
