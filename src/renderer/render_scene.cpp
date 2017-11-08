@@ -3379,6 +3379,7 @@ public:
 						ModelInstanceMesh& info = subinfos.emplace();
 						info.model_instance = raw_subresults[i];
 						info.mesh = &mesh;
+						info.depth = squared_distance;
 					}
 				}
 			}, &job_storage[subresult_index], &jobs[subresult_index], nullptr);
