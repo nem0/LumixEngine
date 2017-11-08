@@ -36,6 +36,7 @@ class SceneView : public StudioApp::IPlugin
 		const char* getName() const override { return "scene_view"; }
 
 	private:
+		void renderSelection();
 		void renderGizmos();
 		void renderIcons();
 		void onUniverseCreated();
