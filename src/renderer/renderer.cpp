@@ -393,7 +393,8 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 			}
 			file.write(&header, sizeof(header));
 
-			file.write(data, size);
+			for(u32 i = 0; i < height; ++i)
+				file.write((const u8*)data + pitch * i, width * 4);
 			file.close();
 		}
 
