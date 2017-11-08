@@ -468,12 +468,11 @@ void AssetBrowser::fileColumn()
 	
 	auto callbacks = [this](FileInfo& tile) {
 		if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tile.filepath.data);
-		if (ImGui::IsMouseDragging() && ImGui::IsItemHovered(ImGuiHoveredFlags_RectOnly))
+		if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
 		{
-			if (m_app.getDragData().type == StudioApp::DragData::NONE)
-			{
-				m_app.startDrag(StudioApp::DragData::PATH, tile.filepath, stringLength(tile.filepath) + 1);
-			}
+			ImGui::Text(tile.filepath);
+			ImGui::SetDragDropPayload("path", tile.filepath, stringLength(tile.filepath) + 1, ImGuiCond_Once);
+			ImGui::EndDragDropSource();
 		}
 		else if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(0))
 		{
@@ -708,20 +707,22 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* bu
 		ImGui::OpenPopup("popup");
 	}
 	ImGui::EndGroup();
-	if (ImGui::IsItemHovered(ImGuiHoveredFlags_RectOnly))
+	if (ImGui::BeginDragDropTarget())
 	{
-		if (ImGui::IsMouseReleased(0) && m_app.getDragData().type == StudioApp::DragData::PATH)
+		if (auto* payload = ImGui::AcceptDragDropPayload("path"))
 		{
 			char ext[10];
-			const char* path = (const char*)m_app.getDragData().data;
+			const char* path = (const char*)payload->Data;
 			PathUtils::getExtension(ext, lengthOf(ext), path);
 			if (acceptExtension(ext, type))
 			{
 				copyString(buf, max_size, path);
+				ImGui::EndDragDropTarget();
 				ImGui::PopID();
 				return true;
 			}
 		}
+		ImGui::EndDragDropTarget();
 	}
 	ImGui::SameLine();
 	ImGui::Text("%s", label);

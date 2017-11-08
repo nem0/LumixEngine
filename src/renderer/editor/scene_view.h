@@ -42,7 +42,7 @@ class SceneView : public StudioApp::IPlugin
 		void onUniverseDestroyed();
 		void captureMouse(bool capture);
 		RayCastModelHit castRay(float x, float y);
-		void handleDrop(float x, float y);
+		void handleDrop(const char* path, float x, float y);
 		void onToolbar();
 		void resetCameraSpeed();
 		void onResourceChanged(const Path& path, const char* /*ext*/);

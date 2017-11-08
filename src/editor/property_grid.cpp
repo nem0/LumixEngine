@@ -592,13 +592,15 @@ bool PropertyGrid::entityInput(const char* label, const char* str_id, Entity& en
 		ImGui::OpenPopup(popup_name);
 	}
 
-	if (ImGui::IsItemHovered(ImGuiHoveredFlags_RectOnly))
+	if (ImGui::BeginDragDropTarget())
 	{
-		if (ImGui::IsMouseReleased(0) && m_app.getDragData().type == StudioApp::DragData::ENTITY)
+		if (auto* payload = ImGui::AcceptDragDropPayload("entity"))
 		{
-			entity = *(Entity*)m_app.getDragData().data;
+			entity = *(Entity*)payload->Data;
+			ImGui::EndDragDropTarget();
 			return true;
 		}
+		ImGui::EndDragDropTarget();
 	}
 
 	ImGui::SameLine();
