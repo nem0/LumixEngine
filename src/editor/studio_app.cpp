@@ -1312,7 +1312,7 @@ public:
 						}
 						if (ImGui::BeginDragDropSource())
 						{
-							ImGui::Text(buffer);
+							ImGui::Text("%s", buffer);
 							ImGui::SetDragDropPayload("entity", &e, sizeof(e));
 							ImGui::EndDragDropSource();
 						}
