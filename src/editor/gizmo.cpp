@@ -626,7 +626,7 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 		Vec2 mouse_pos = m_editor.getMousePos();
 		m_editor.getRenderInterface()->getRay(edit_camera.handle, mouse_pos, origin, cursor_dir);
 		
-		Axis axis;
+		Axis axis = Axis::NONE;
 		switch(m_mode)
 		{
 			case Mode::TRANSLATE:
@@ -637,6 +637,9 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 				break;
 			case Mode::SCALE:
 				axis = collideScale(gizmo_mtx, camera_pos, camera_dir, fov, is_ortho, origin, cursor_dir);
+				break;
+			default:
+				ASSERT(false);
 				break;
 		}
 		if (axis != Axis::NONE)

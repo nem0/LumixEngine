@@ -27,7 +27,7 @@ namespace Lumix
 
 		u64 getThreadAffinityMask()
 		{
-			DWORD_PTR affinity_mask = ::SetThreadAffinityMask(::GetCurrentThread(), ~(u64)0);
+			DWORD_PTR affinity_mask = ::SetThreadAffinityMask(::GetCurrentThread(), ~(DWORD_PTR)0);
 			::SetThreadAffinityMask(::GetCurrentThread(), affinity_mask);
 			return affinity_mask;
 		}

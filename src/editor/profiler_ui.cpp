@@ -361,7 +361,7 @@ struct ProfilerUIImpl LUMIX_FINAL : public ProfilerUI
 	struct Block
 	{
 		explicit Block(IAllocator& allocator);
-		~Block() {}
+		~Block() = default;
 
 		const char* m_name;
 		Block* m_parent;

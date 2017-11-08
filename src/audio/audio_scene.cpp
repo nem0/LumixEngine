@@ -82,7 +82,7 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 	}
 
 
-	void serialize(ISerializer& serializer)
+	void serialize(ISerializer& serializer) override
 	{
 		serializer.write("count", m_clips.size());
 		for (ClipInfo* clip : m_clips)
@@ -98,7 +98,7 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 	}
 
 
-	void deserialize(IDeserializer& serializer)
+	void deserialize(IDeserializer& serializer) override
 	{
 		int count;
 		serializer.read(&count);

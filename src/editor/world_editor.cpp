@@ -70,7 +70,7 @@ static void load(ComponentUID cmp, int index, InputBlob& blob)
 
 struct BeginGroupCommand LUMIX_FINAL : public IEditorCommand
 {
-	BeginGroupCommand() {}
+	BeginGroupCommand() = default;
 	BeginGroupCommand(WorldEditor&) {}
 
 	bool execute() override { return true; }
@@ -84,7 +84,7 @@ struct BeginGroupCommand LUMIX_FINAL : public IEditorCommand
 
 struct EndGroupCommand LUMIX_FINAL : public IEditorCommand
 {
-	EndGroupCommand() {}
+	EndGroupCommand() = default;
 	EndGroupCommand(WorldEditor&) {}
 
 	bool execute() override { return true; }
@@ -2266,7 +2266,7 @@ public:
 				return;
 			}
 
-			loadFile(filepath, [scene, &versions, &filepath, this](TextDeserializer& deserializer) {
+			loadFile(filepath, [scene, &versions, this](TextDeserializer& deserializer) {
 				int version;
 				deserializer.read(&version);
 				for (int i = 0; i < ComponentType::MAX_TYPES_COUNT; ++i)
@@ -2364,7 +2364,7 @@ public:
 		FS::OsFile file;
 		OutputBlob blob(m_allocator);
 		TextSerializer serializer(blob, m_entity_map);
-		auto saveFile = [&file, this, &blob](const char* path) {
+		auto saveFile = [&file, &blob](const char* path) {
 			if (file.open(path, FS::Mode::CREATE_AND_WRITE))
 			{
 				file.write(blob.getData(), blob.getPos());

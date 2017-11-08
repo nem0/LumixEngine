@@ -59,7 +59,6 @@ class SceneView : public StudioApp::IPlugin
 		Action* m_move_up_action;
 		Action* m_move_down_action;
 		Action* m_camera_speed_action;
-		bool m_is_mouse_hovering_window;
 		bool m_is_open;
 		int m_screen_x;
 		int m_screen_y;

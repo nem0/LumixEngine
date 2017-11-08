@@ -92,9 +92,11 @@ class Universe;
 
 struct AnimationSystemImpl LUMIX_FINAL : public IPlugin
 {
+	void operator=(const AnimationSystemImpl&) = delete;
+	AnimationSystemImpl(const AnimationSystemImpl&) = delete;
+
 	explicit AnimationSystemImpl(Engine& engine);
 	~AnimationSystemImpl();
-
 
 	void registerLuaAPI();
 	void createScenes(Universe& ctx) override;
@@ -106,9 +108,6 @@ struct AnimationSystemImpl LUMIX_FINAL : public IPlugin
 	AnimationManager m_animation_manager;
 	Anim::ControllerManager m_controller_manager;
 
-private:
-	void operator=(const AnimationSystemImpl&);
-	AnimationSystemImpl(const AnimationSystemImpl&);
 };
 
 

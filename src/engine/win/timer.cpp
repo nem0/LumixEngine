@@ -19,7 +19,7 @@ struct TimerImpl LUMIX_FINAL : public Timer
 	}
 
 
-	float getTimeSinceStart()
+	float getTimeSinceStart() override
 	{
 		LARGE_INTEGER tick;
 		QueryPerformanceCounter(&tick);

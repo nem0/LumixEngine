@@ -616,7 +616,7 @@ namespace ImGui
 			return changed;
 		};
 
-		auto handleTangent = [&window, &editor, transform, inner_bb](ImVec2& t, const ImVec2& p) -> bool
+		auto handleTangent = [&window, &editor, transform](ImVec2& t, const ImVec2& p) -> bool
 		{
 			static const float SIZE = 2;
 			static const float LENGTH = 18;

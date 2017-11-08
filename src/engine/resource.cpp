@@ -35,9 +35,7 @@ Resource::Resource(const Path& path, ResourceManagerBase& resource_manager, IAll
 }
 
 
-Resource::~Resource()
-{
-}
+Resource::~Resource() = default;
 
 
 void Resource::checkState()

@@ -1987,7 +1987,7 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 	}
 
 
-	Vec3 getClosestVertex(Universe* universe, Entity entity, const Vec3& wpos)
+	Vec3 getClosestVertex(Universe* universe, Entity entity, const Vec3& wpos) override
 	{
 		Matrix mtx = universe->getMatrix(entity);
 		Matrix inv_mtx = mtx;

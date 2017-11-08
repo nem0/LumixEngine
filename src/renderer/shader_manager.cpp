@@ -60,9 +60,7 @@ ShaderBinaryManager::ShaderBinaryManager(Renderer& renderer, IAllocator& allocat
 }
 
 
-ShaderBinaryManager::~ShaderBinaryManager()
-{
-}
+ShaderBinaryManager::~ShaderBinaryManager() = default;
 
 
 Resource* ShaderBinaryManager::createResource(const Path& path)

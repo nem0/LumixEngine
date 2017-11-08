@@ -177,7 +177,7 @@ class PrefabSystemImpl LUMIX_FINAL : public PrefabSystem
 		}
 
 
-		bool merge(IEditorCommand& command) { return false; }
+		bool merge(IEditorCommand& command) override { return false; }
 
 		PrefabResource* prefab;
 		Vec3 position;

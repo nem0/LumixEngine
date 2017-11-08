@@ -16,6 +16,7 @@ class GUISystem : public IPlugin
 public:
 	struct Interface
 	{
+		virtual ~Interface() {}
 		virtual class Pipeline* getPipeline() = 0;
 		virtual Vec2 getPos() const = 0;
 		virtual void enableCursor(bool enable) = 0;

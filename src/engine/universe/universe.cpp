@@ -19,9 +19,7 @@ namespace Lumix
 static const int RESERVED_ENTITIES_COUNT = 5000;
 
 
-Universe::~Universe()
-{
-}
+Universe::~Universe() = default;
 
 
 Universe::Universe(IAllocator& allocator)

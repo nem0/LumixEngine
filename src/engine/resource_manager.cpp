@@ -13,9 +13,8 @@ namespace Lumix
 	{
 	}
 
-	ResourceManager::~ResourceManager()
-	{
-	}
+	ResourceManager::~ResourceManager() = default;
+
 
 	void ResourceManager::create(FS::FileSystem& fs)
 	{

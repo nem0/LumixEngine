@@ -16,43 +16,12 @@ LuaScript::LuaScript(const Path& path, ResourceManagerBase& resource_manager, IA
 }
 
 
-LuaScript::~LuaScript()
-{
-
-}
+LuaScript::~LuaScript() = default;
 
 
 void LuaScript::unload()
 {
 	m_source_code = "";
-}
-
-
-static bool isWhitespace(char c)
-{
-	return c == ' ' || c == '\n' || c == '\t' || c == '\r';
-}
-
-
-static const char* getToken(const char* src, char* dest, int size)
-{
-	const char* in = src;
-	char* out = dest;
-	--size;
-	while (*in && isWhitespace(*in))
-	{
-		++in;
-	}
-
-	while (*in && !isWhitespace(*in) && size)
-	{
-		*out = *in;
-		++out;
-		++in;
-		--size;
-	}
-	*out = '\0';
-	return in;
 }
 
 
@@ -71,9 +40,7 @@ LuaScriptManager::LuaScriptManager(IAllocator& allocator)
 }
 
 
-LuaScriptManager::~LuaScriptManager()
-{
-}
+LuaScriptManager::~LuaScriptManager() = default;
 
 
 Resource* LuaScriptManager::createResource(const Path& path)

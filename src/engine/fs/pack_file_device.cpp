@@ -61,7 +61,7 @@ public:
 	size_t pos() override { return m_local_offset; }
 
 private:
-	virtual ~PackFile() {}
+	virtual ~PackFile() = default;
 
 	PackFileDevice::PackFileInfo m_file;
 	PackFileDevice& m_device;

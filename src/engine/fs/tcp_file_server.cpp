@@ -31,9 +31,7 @@ public:
 	}
 
 
-	~TCPFileServerTask()
-	{
-	}
+	~TCPFileServerTask() = default;
 
 
 	void openFile(Net::TCPStream* stream)

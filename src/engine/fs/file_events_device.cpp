@@ -12,6 +12,9 @@ namespace Lumix
 		class EventsFile LUMIX_FINAL : public IFile
 		{
 		public:
+			EventsFile& operator= (const EventsFile& rhs) = delete;
+			EventsFile(const EventsFile& rhs) = delete;
+
 			EventsFile(IFile& file, FileEventsDevice& device, FileEventsDevice::EventCallback& cb)
 				: m_file(file)
 				, m_cb(cb)
@@ -108,7 +111,6 @@ namespace Lumix
 
 
 		private:
-			EventsFile& operator= (const EventsFile& rhs);
 
 			void invokeEvent(EventType type, const char* path, i32 ret, i32 param)
 			{
