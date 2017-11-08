@@ -21,6 +21,13 @@ class FrameBuffer
 	public:
 		struct RenderBuffer
 		{
+			static const u32 DEFAULT_FLAGS = BGFX_TEXTURE_RT
+				| BGFX_TEXTURE_U_CLAMP
+				| BGFX_TEXTURE_V_CLAMP
+				| BGFX_TEXTURE_MIP_POINT
+				| BGFX_TEXTURE_MIN_POINT
+				| BGFX_TEXTURE_MAG_POINT;
+
 			bgfx::TextureFormat::Enum m_format;
 			bgfx::TextureHandle m_handle;
 			RenderBuffer* m_shared = nullptr;

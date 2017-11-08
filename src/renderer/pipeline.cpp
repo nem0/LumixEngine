@@ -805,9 +805,9 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		{
 			Texture* irradiance = m_scene->getEnvironmentProbeIrradiance(probe);
 			Texture* radiance = m_scene->getEnvironmentProbeRadiance(probe);
-			m_current_view->command_buffer.setTexture(15 - m_global_textures_count, m_uniforms[irradiance_uniform_idx], irradiance->handle);
+			m_current_view->command_buffer.setTexture(15 - m_global_textures_count, m_uniforms[irradiance_uniform_idx], irradiance->handle, irradiance->bgfx_flags & ~(BGFX_TEXTURE_MAG_MASK | BGFX_TEXTURE_MIN_MASK));
 			++m_global_textures_count;
-			m_current_view->command_buffer.setTexture(15 - m_global_textures_count, m_uniforms[radiance_uniform_idx], radiance->handle);
+			m_current_view->command_buffer.setTexture(15 - m_global_textures_count, m_uniforms[radiance_uniform_idx], radiance->handle, radiance->bgfx_flags & ~(BGFX_TEXTURE_MAG_MASK | BGFX_TEXTURE_MIN_MASK));
 			++m_global_textures_count;
 		}
 		else
@@ -2666,7 +2666,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 					auto handle = m_global_light_shadowmap->getRenderbufferHandle(0);
 					bgfx::setTexture(15 - m_global_textures_count,
 						m_tex_shadowmap_uniform,
-						handle, BGFX_TEXTURE_MIN_ANISOTROPIC | BGFX_TEXTURE_MAG_ANISOTROPIC);
+						handle, FrameBuffer::RenderBuffer::DEFAULT_FLAGS & ~ (BGFX_TEXTURE_MAG_MASK | BGFX_TEXTURE_MIN_MASK));
 					ip += 1;
 					break;
 				}
