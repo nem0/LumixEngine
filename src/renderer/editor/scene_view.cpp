@@ -59,6 +59,7 @@ SceneView::SceneView(StudioApp& app)
 	Path path("pipelines/main.lua");
 	m_pipeline = Pipeline::create(*renderer, path, "SCENE_VIEW", engine.getAllocator());
 	m_pipeline->load();
+	m_pipeline->addCustomCommandHandler("renderSelection").callback.bind<SceneView, &SceneView::renderSelection>(this);
 	m_pipeline->addCustomCommandHandler("renderGizmos").callback.bind<SceneView, &SceneView::renderGizmos>(this);
 	m_pipeline->addCustomCommandHandler("renderIcons").callback.bind<SceneView, &SceneView::renderIcons>(this);
 
@@ -174,6 +175,22 @@ void SceneView::update(float)
 void SceneView::renderIcons()
 {
 	m_editor.renderIcons();
+}
+
+
+void SceneView::renderSelection()
+{
+	const Array<Entity>& entities = m_editor.getSelectedEntities();
+	RenderScene* scene = m_pipeline->getScene();
+	Universe& universe = scene->getUniverse();
+	for (Entity e : entities)
+	{
+		ComponentHandle cmp = scene->getModelInstanceComponent(e);
+		if (!cmp.isValid()) continue;
+		Model* model = scene->getModelInstanceModel(cmp);
+		Matrix mtx = universe.getMatrix(e);
+		m_pipeline->renderModel(*model, mtx);
+	}
 }
 
 
