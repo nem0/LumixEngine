@@ -49,7 +49,13 @@ struct LUMIX_RENDERER_API RayCastModelHit
 
 struct LUMIX_RENDERER_API Mesh
 {
-	enum Type
+	struct Skin
+	{
+		Vec4 weights;
+		i16 indices[4];
+	};
+
+	enum Type : u8
 	{
 		RIGID_INSTANCED,
 		SKINNED,
@@ -58,24 +64,34 @@ struct LUMIX_RENDERER_API Mesh
 		RIGID,
 	};
 
+	enum Flags : u8
+	{
+		INDICES_16_BIT = 1 << 0
+	};
+
 	Mesh(Material* mat,
-		int attribute_array_offset,
-		int attribute_array_size,
-		int indices_offset,
-		int index_count,
+		const bgfx::VertexDecl& vertex_decl,
 		const char* name,
 		IAllocator& allocator);
 
-	void set(int attribute_array_offset, int attribute_array_size, int indices_offset, int index_count);
+	void set(const Mesh& rhs);
+
 	void setMaterial(Material* material, Model& model, Renderer& renderer);
 
+	bool areIndices16() const { return flags & Flags::INDICES_16_BIT; }
+
 	Type type;
+	Array<u8> indices;
+	Array<Vec3> vertices;
+	Array<Vec2> uvs;
+	Array<Skin> skin;
+	u8 flags;
 	u64 layer_mask;
 	i32 instance_idx;
-	i32 attribute_array_offset;
-	i32 attribute_array_size;
-	i32 indices_offset;
-	i32 indices_count;
+	int indices_count;
+	bgfx::VertexDecl vertex_decl;
+	bgfx::VertexBufferHandle vertex_buffer_handle = BGFX_INVALID_HANDLE;
+	bgfx::IndexBufferHandle index_buffer_handle = BGFX_INVALID_HANDLE;
 	string name;
 	Material* material;
 };
@@ -113,12 +129,6 @@ public:
 		TexCoord7,
 	};
 
-	struct Skin
-	{
-		Vec4 weights;
-		i16 indices[4];
-	};
-
 #pragma pack(1)
 	struct FileHeader
 	{
@@ -133,6 +143,7 @@ public:
 		WITH_FLAGS,
 		SINGLE_VERTEX_DECL,
 		BOUNDING_SHAPES_PRECOMPUTED,
+		MULTIPLE_VERTEX_DECLS,
 
 		LATEST // keep this last
 	};
@@ -177,13 +188,6 @@ public:
 	Model(const Path& path, ResourceManagerBase& resource_manager, Renderer& renderer, IAllocator& allocator);
 	~Model();
 
-	void create(const bgfx::VertexDecl& def,
-		Material* material,
-		const int* indices_data,
-		int indices_size,
-		const void* attributes_data,
-		int attributes_size);
-
 	LODMeshIndices getLODMeshIndices(float squared_distance) const
 	{
 		int i = 0;
@@ -192,9 +196,6 @@ public:
 	}
 
 	Mesh& getMesh(int index) { return m_meshes[index]; }
-	bgfx::VertexBufferHandle getVerticesHandle() const { return m_vertices_handle; }
-	bgfx::IndexBufferHandle getIndicesHandle() const { return m_indices_handle; }
-	bgfx::VertexDecl getVertexDecl() const { return m_vertex_decl; }
 	const Mesh& getMesh(int index) const { return m_meshes[index]; }
 	const Mesh* getMeshPtr(int index) const { return &m_meshes[index]; }
 	int getMeshCount() const { return m_meshes.size(); }
@@ -208,12 +209,6 @@ public:
 	RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, const Matrix& model_transform, const Pose* pose);
 	const AABB& getAABB() const { return m_aabb; }
 	LOD* getLODs() { return m_lods; }
-	const u16* getIndices16() const { return areIndices16() ? (u16*)&m_indices[0] : nullptr; }
-	const u32* getIndices32() const { return areIndices16() ? nullptr : (u32*)&m_indices[0]; }
-	bool areIndices16() const { return (m_flags & (u32)Flags::INDICES_16BIT) != 0; }
-	int getIndicesCount() const { return m_indices.size() / (areIndices16() ? 2 : 4); }
-	const Array<Vec3>& getVertices() const { return m_vertices; }
-	const Array<Vec2>& getUVs() const { return m_uvs; }
 	u32 getFlags() const { return m_flags;	}
 	void setKeepSkin();
 	void onBeforeReady() override;
@@ -231,12 +226,11 @@ private:
 
 	bool parseVertexDecl(FS::IFile& file, bgfx::VertexDecl* vertex_decl);
 	bool parseVertexDeclEx(FS::IFile& file, bgfx::VertexDecl* vertex_decl);
-	bool parseGeometry(FS::IFile& file, FileVersion version);
 	bool parseBones(FS::IFile& file);
-	bool parseMeshes(FS::IFile& file, FileVersion version);
+	bool parseMeshes(const bgfx::VertexDecl& global_vertex_decl, FS::IFile& file, FileVersion version);
+	bool parseMeshesOld(bgfx::VertexDecl global_vertex_decl, FS::IFile& file, FileVersion version);
 	bool parseLODs(FS::IFile& file);
 	int getBoneIdx(const char* name);
-	void computeRuntimeData(const u8* vertices, bool compute_bounding_shape);
 
 	void unload(void) override;
 	bool load(FS::IFile& file) override;
@@ -244,15 +238,8 @@ private:
 private:
 	IAllocator& m_allocator;
 	Renderer& m_renderer;
-	bgfx::VertexDecl m_vertex_decl;
-	bgfx::IndexBufferHandle m_indices_handle;
-	bgfx::VertexBufferHandle m_vertices_handle;
 	Array<Mesh> m_meshes;
 	Array<Bone> m_bones;
-	Array<u8> m_indices;
-	Array<Vec3> m_vertices;
-	Array<Vec2> m_uvs;
-	Array<Skin> m_skin;
 	LOD m_lods[MAX_LOD_COUNT];
 	float m_bounding_radius;
 	BoneMap m_bone_map;

@@ -45,7 +45,6 @@ struct InstanceData
 	bgfx::InstanceDataBuffer buffer;
 	int instance_count;
 	Mesh* mesh;
-	const Model* model;
 };
 
 
@@ -855,9 +854,8 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		if (!data.buffer.data) return;
 
 		Mesh& mesh = *data.mesh;
-		const Model& model = *data.model;
 		Material* material = mesh.material;
-		const u16 stride = model.getVertexDecl().getStride();
+		const u16 stride = mesh.vertex_decl.getStride();
 
 		material->setDefine(m_instanced_define_idx, true);
 
@@ -868,12 +866,8 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		executeCommandBuffer(material->getCommandBuffer(), material);
 		executeCommandBuffer(view.command_buffer.buffer, material);
 
-		bgfx::setVertexBuffer(0, model.getVerticesHandle(),
-							  mesh.attribute_array_offset / stride,
-							  mesh.attribute_array_size / stride);
-		bgfx::setIndexBuffer(model.getIndicesHandle(),
-							 mesh.indices_offset,
-							 mesh.indices_count);
+		bgfx::setVertexBuffer(0, mesh.vertex_buffer_handle);
+		bgfx::setIndexBuffer(mesh.index_buffer_handle);
 		bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
 		bgfx::setState(view.render_state | material->getRenderStates());
 		bgfx::setInstanceDataBuffer(&data.buffer, data.instance_count);
@@ -2258,12 +2252,12 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			switch (mesh.type)
 			{
 				case Mesh::RIGID_INSTANCED:
-					renderRigidMeshInstanced(model, mtx, mesh);
+					renderRigidMeshInstanced(mtx, mesh);
 					break;
 				case Mesh::RIGID:
 				{
 					float depth = (camera_pos - mtx.getTranslation()).squaredLength();
-					renderRigidMesh(model, mtx, mesh, depth);
+					renderRigidMesh(mtx, mesh, depth);
 					break;
 				}
 				case Mesh::MULTILAYER_RIGID:
@@ -2300,7 +2294,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			bone_mtx[bone_index] = (tmp * bone.inv_bind_transform).toMatrix();
 		}
 
-		int stride = model.getVertexDecl().getStride();
+		int stride = mesh.vertex_decl.getStride();
 		
 		int view_idx = m_layer_to_view_map[material->getRenderLayer()];
 		ASSERT(view_idx >= 0);
@@ -2313,10 +2307,8 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		executeCommandBuffer(view.command_buffer.buffer, material);
 
 		bgfx::setTransform(&matrix);
-		bgfx::setVertexBuffer(0, model.getVerticesHandle(),
-			mesh.attribute_array_offset / stride,
-			mesh.attribute_array_size / stride);
-		bgfx::setIndexBuffer(model.getIndicesHandle(), mesh.indices_offset, mesh.indices_count);
+		bgfx::setVertexBuffer(0, mesh.vertex_buffer_handle);
+		bgfx::setIndexBuffer(mesh.index_buffer_handle);
 		bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
 		bgfx::setState(view.render_state | material->getRenderStates());
 		++m_stats.draw_call_count;
@@ -2332,7 +2324,6 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 		material->setDefine(m_instanced_define_idx, true);
 
-		int stride = model.getVertexDecl().getStride();
 		int layers_count = material->getLayersCount();
 		auto& shader_instance = mesh.material->getShaderInstance();
 
@@ -2341,10 +2332,8 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			executeCommandBuffer(view.command_buffer.buffer, material);
 
 			bgfx::setTransform(&matrix);
-			bgfx::setVertexBuffer(0, model.getVerticesHandle(),
-				mesh.attribute_array_offset / stride,
-				mesh.attribute_array_size / stride);
-			bgfx::setIndexBuffer(model.getIndicesHandle(), mesh.indices_offset, mesh.indices_count);
+			bgfx::setVertexBuffer(0, mesh.vertex_buffer_handle);
+			bgfx::setIndexBuffer(mesh.index_buffer_handle);
 			bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
 			bgfx::setState(view.render_state | material->getRenderStates());
 			++m_stats.draw_call_count;
@@ -2376,10 +2365,9 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
-	LUMIX_FORCE_INLINE void renderRigidMesh(const Model& model, const Matrix& matrix, Mesh& mesh, float depth)
+	LUMIX_FORCE_INLINE void renderRigidMesh(const Matrix& matrix, Mesh& mesh, float depth)
 	{
 		Material* material = mesh.material;
-		const u16 stride = model.getVertexDecl().getStride();
 
 		material->setDefine(m_instanced_define_idx, false);
 
@@ -2391,12 +2379,8 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		executeCommandBuffer(view.command_buffer.buffer, material);
 
 		bgfx::setTransform(&matrix);
-		bgfx::setVertexBuffer(0, model.getVerticesHandle(),
-			mesh.attribute_array_offset / stride,
-			mesh.attribute_array_size / stride);
-		bgfx::setIndexBuffer(model.getIndicesHandle(),
-			mesh.indices_offset,
-			mesh.indices_count);
+		bgfx::setVertexBuffer(0, mesh.vertex_buffer_handle);
+		bgfx::setIndexBuffer(mesh.index_buffer_handle);
 		bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
 		bgfx::setState(view.render_state | material->getRenderStates());
 		ShaderInstance& shader_instance = material->getShaderInstance();
@@ -2425,7 +2409,6 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			bone_mtx[bone_index] = (tmp * bone.inv_bind_transform).toMatrix();
 		}
 
-		int stride = model.getVertexDecl().getStride();
 		int layers_count = material->getLayersCount();
 		auto& shader_instance = mesh.material->getShaderInstance();
 
@@ -2435,10 +2418,8 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			executeCommandBuffer(view.command_buffer.buffer, material);
 
 			bgfx::setTransform(&matrix);
-			bgfx::setVertexBuffer(0, model.getVerticesHandle(),
-				mesh.attribute_array_offset / stride,
-				mesh.attribute_array_size / stride);
-			bgfx::setIndexBuffer(model.getIndicesHandle(), mesh.indices_offset, mesh.indices_count);
+			bgfx::setVertexBuffer(0, mesh.vertex_buffer_handle);
+			bgfx::setIndexBuffer(mesh.index_buffer_handle);
 			bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
 			bgfx::setState(view.render_state | material->getRenderStates());
 			++m_stats.draw_call_count;
@@ -2544,7 +2525,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
-	LUMIX_FORCE_INLINE void renderRigidMeshInstanced(Model& model, const Matrix& matrix, Mesh& mesh)
+	LUMIX_FORCE_INLINE void renderRigidMeshInstanced(const Matrix& matrix, Mesh& mesh)
 	{
 		int instance_idx = mesh.instance_idx;
 		if (instance_idx == -1)
@@ -2564,7 +2545,6 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			bgfx::allocInstanceDataBuffer(&data.buffer, InstanceData::MAX_INSTANCE_COUNT, sizeof(Matrix));
 			data.instance_count = 0;
 			data.mesh = &mesh;
-			data.model = &model;
 			mesh.instance_idx = instance_idx;
 		}
 		InstanceData& data = m_instances_data[instance_idx];
@@ -2739,9 +2719,9 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 				info.m_morph_const.x, info.m_morph_const.y, info.m_morph_const.z, 0);
 		}
 
-		bgfx::setVertexBuffer(0, info.m_terrain->getVerticesHandle());
+		bgfx::setVertexBuffer(0, mesh.vertex_buffer_handle);
 		int mesh_part_indices_count = mesh.indices_count / 4;
-		bgfx::setIndexBuffer(info.m_terrain->getIndicesHandle(),
+		bgfx::setIndexBuffer(mesh.index_buffer_handle,
 			info.m_index * mesh_part_indices_count,
 			mesh_part_indices_count);
 		bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
@@ -2766,7 +2746,6 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		copyMemory(idb.data, grass.instance_data, sizeof(GrassInfo::InstanceData) * grass.instance_count);
 		const Mesh& mesh = grass.model->getMesh(0);
 		Material* material = mesh.material;
-		int stride = grass.model->getVertexDecl().getStride();
 
 		int view_idx = m_layer_to_view_map[material->getRenderLayer()];
 		ASSERT(view_idx >= 0);
@@ -2777,9 +2756,8 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		auto max_grass_distance = Vec4(grass.type_distance, 0, 0, 0);
 		bgfx::setUniform(m_grass_max_dist_uniform, &max_grass_distance);
 
-		bgfx::setVertexBuffer(0, 
-			grass.model->getVerticesHandle(), mesh.attribute_array_offset / stride, mesh.attribute_array_size / stride);
-		bgfx::setIndexBuffer(grass.model->getIndicesHandle(), mesh.indices_offset, mesh.indices_count);
+		bgfx::setVertexBuffer(0, mesh.vertex_buffer_handle);
+		bgfx::setIndexBuffer(mesh.index_buffer_handle);
 		bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
 		bgfx::setState(view.render_state | material->getRenderStates());
 		bgfx::setInstanceDataBuffer(&idb, grass.instance_count);
@@ -2828,10 +2806,10 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			switch (mesh.mesh->type)
 			{
 				case Mesh::RIGID_INSTANCED:
-					renderRigidMeshInstanced(*model_instance.model, model_instance.matrix, *mesh.mesh);
+					renderRigidMeshInstanced(model_instance.matrix, *mesh.mesh);
 					break;
 				case Mesh::RIGID:
-					renderRigidMesh(*model_instance.model, model_instance.matrix, *mesh.mesh, mesh.depth);
+					renderRigidMesh(model_instance.matrix, *mesh.mesh, mesh.depth);
 					break;
 				case Mesh::SKINNED:
 					renderSkinnedMesh(*model_instance.pose, *model_instance.model, model_instance.matrix, *mesh.mesh);
@@ -2863,10 +2841,10 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 				switch (mesh.mesh->type)
 				{
 					case Mesh::RIGID_INSTANCED:
-						renderRigidMeshInstanced(*model_instance.model, model_instance.matrix, *mesh.mesh);
+						renderRigidMeshInstanced(model_instance.matrix, *mesh.mesh);
 						break;
 					case Mesh::RIGID:
-						renderRigidMesh(*model_instance.model, model_instance.matrix, *mesh.mesh, mesh.depth);
+						renderRigidMesh(model_instance.matrix, *mesh.mesh, mesh.depth);
 						break;
 					case Mesh::SKINNED:
 						renderSkinnedMesh(*model_instance.pose, *model_instance.model, model_instance.matrix, *mesh.mesh);

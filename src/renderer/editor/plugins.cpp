@@ -1493,38 +1493,42 @@ struct FurPainter LUMIX_FINAL : public WorldEditor::Plugin
 
 		ASSERT(!texture->data.empty());
 
-		const u16* idx16 = model->getIndices16();
-		const u32* idx32 = model->getIndices32();
-		const Vec3* vertices = &model->getVertices()[0];
-		setMemory(mem, 0, texture->width * texture->height);
-		for (int i = 0, c = model->getIndicesCount(); i < c; i += 3)
+		for (int i = 0, c = model->getMeshCount(); i < c; ++i)
 		{
-			u32 idx[3];
-			if (idx16)
+			Mesh& mesh = model->getMesh(i);
+			const u16* idx16 = (const u16*)&mesh.indices[0];
+			const u32* idx32 = (const u32*)&mesh.indices[0];
+			const Vec3* vertices = &mesh.vertices[0];
+			setMemory(mem, 0, texture->width * texture->height);
+			for (int i = 0, c = mesh.indices_count; i < c; i += 3)
 			{
-				idx[0] = idx16[i];
-				idx[1] = idx16[i + 1];
-				idx[2] = idx16[i + 2];
+				u32 idx[3];
+				if (idx16)
+				{
+					idx[0] = idx16[i];
+					idx[1] = idx16[i + 1];
+					idx[2] = idx16[i + 2];
+				}
+				else
+				{
+					idx[0] = idx32[i];
+					idx[1] = idx32[i + 1];
+					idx[2] = idx32[i + 2];
+				}
+
+				Vertex v[] = { { mesh.uvs[idx[0]], vertices[idx[0]] },
+				{ mesh.uvs[idx[1]], vertices[idx[1]] },
+				{ mesh.uvs[idx[2]], vertices[idx[2]] } };
+
+				Vec3 n = crossProduct(Vec3(v[0].uv, 0) - Vec3(v[1].uv, 0), Vec3(v[2].uv, 0) - Vec3(v[1].uv, 0));
+				if (n.z > 0) Math::swap(v[1], v[2]);
+
+				v[0].fixUV(texture->width, texture->height);
+				v[1].fixUV(texture->width, texture->height);
+				v[2].fixUV(texture->width, texture->height);
+
+				rasterizeTriangle2(texture->width, mem, v);
 			}
-			else
-			{
-				idx[0] = idx32[i];
-				idx[1] = idx32[i + 1];
-				idx[2] = idx32[i + 2];
-			}
-
-			Vertex v[] = { { model->getUVs()[idx[0]], vertices[idx[0]] },
-			{ model->getUVs()[idx[1]], vertices[idx[1]] },
-			{ model->getUVs()[idx[2]], vertices[idx[2]] } };
-
-			Vec3 n = crossProduct(Vec3(v[0].uv, 0) - Vec3(v[1].uv, 0), Vec3(v[2].uv, 0) - Vec3(v[1].uv, 0));
-			if (n.z > 0) Math::swap(v[1], v[2]);
-
-			v[0].fixUV(texture->width, texture->height);
-			v[1].fixUV(texture->width, texture->height);
-			v[2].fixUV(texture->width, texture->height);
-
-			rasterizeTriangle2(texture->width, mem, v);
 		}
 
 		u32* data = (u32*)&texture->data[0];
@@ -1693,54 +1697,58 @@ struct FurPainter LUMIX_FINAL : public WorldEditor::Plugin
 	{
 		ASSERT(!texture->data.empty());
 
-		const u16* idx16 = model->getIndices16();
-		const u32* idx32 = model->getIndices32();
-		const Vec3* vertices = &model->getVertices()[0];
-		Vec2 min((float)texture->width, (float)texture->height);
-		Vec2 max(0, 0);
-		int tri_count = 0;
-		for (int i = 0, c = model->getIndicesCount(); i < c; i += 3)
+		for (int i = 0, c = model->getMeshCount(); i < c; ++i)
 		{
-			u32 idx[3];
-			if (idx16)
+			const Mesh& mesh = model->getMesh(i);
+			const u16* idx16 = (const u16*)&mesh.indices[0];
+			const u32* idx32 = (const u32*)&mesh.indices[0];
+			const Vec3* vertices = &mesh.vertices[0];
+			Vec2 min((float)texture->width, (float)texture->height);
+			Vec2 max(0, 0);
+			int tri_count = 0;
+			for (int i = 0, c = mesh.indices_count; i < c; i += 3)
 			{
-				idx[0] = idx16[i];
-				idx[1] = idx16[i + 1];
-				idx[2] = idx16[i + 2];
+				u32 idx[3];
+				if (idx16)
+				{
+					idx[0] = idx16[i];
+					idx[1] = idx16[i + 1];
+					idx[2] = idx16[i + 2];
+				}
+				else
+				{
+					idx[0] = idx32[i];
+					idx[1] = idx32[i + 1];
+					idx[2] = idx32[i + 2];
+				}
+
+				if (Math::getSphereTriangleIntersection(
+					hit, brush_radius, vertices[idx[0]], vertices[idx[1]], vertices[idx[2]]))
+				{
+					Vertex v[] = { {mesh.uvs[idx[0]], vertices[idx[0]]},
+						{mesh.uvs[idx[1]], vertices[idx[1]]},
+						{mesh.uvs[idx[2]], vertices[idx[2]]} };
+
+					Vec3 n = crossProduct(Vec3(v[0].uv, 0) - Vec3(v[1].uv, 0), Vec3(v[2].uv, 0) - Vec3(v[1].uv, 0));
+					if (n.z > 0) Math::swap(v[1], v[2]);
+
+					v[0].fixUV(texture->width, texture->height);
+					v[1].fixUV(texture->width, texture->height);
+					v[2].fixUV(texture->width, texture->height);
+
+					min.x = Math::minimum(min.x, v[0].uv.x, v[1].uv.x, v[2].uv.x);
+					max.x = Math::maximum(max.x, v[0].uv.x, v[1].uv.x, v[2].uv.x);
+
+					min.y = Math::minimum(min.y, v[0].uv.y, v[1].uv.y, v[2].uv.y);
+					max.y = Math::maximum(max.y, v[0].uv.y, v[1].uv.y, v[2].uv.y);
+
+					++tri_count;
+					rasterizeTriangle(texture, v, hit);
+				}
 			}
-			else
-			{
-				idx[0] = idx32[i];
-				idx[1] = idx32[i + 1];
-				idx[2] = idx32[i + 2];
-			}
 
-			if (Math::getSphereTriangleIntersection(
-				hit, brush_radius, vertices[idx[0]], vertices[idx[1]], vertices[idx[2]]))
-			{
-				Vertex v[] = {{model->getUVs()[idx[0]], vertices[idx[0]]},
-					{model->getUVs()[idx[1]], vertices[idx[1]]},
-					{model->getUVs()[idx[2]], vertices[idx[2]]}};
-
-				Vec3 n = crossProduct(Vec3(v[0].uv, 0) - Vec3(v[1].uv, 0), Vec3(v[2].uv, 0) - Vec3(v[1].uv, 0));
-				if (n.z > 0) Math::swap(v[1], v[2]);
-
-				v[0].fixUV(texture->width, texture->height);
-				v[1].fixUV(texture->width, texture->height);
-				v[2].fixUV(texture->width, texture->height);
-
-				min.x = Math::minimum(min.x, v[0].uv.x, v[1].uv.x, v[2].uv.x);
-				max.x = Math::maximum(max.x, v[0].uv.x, v[1].uv.x, v[2].uv.x);
-
-				min.y = Math::minimum(min.y, v[0].uv.y, v[1].uv.y, v[2].uv.y);
-				max.y = Math::maximum(max.y, v[0].uv.y, v[1].uv.y, v[2].uv.y);
-
-				++tri_count;
-				rasterizeTriangle(texture, v, hit);
-			}
+			if (tri_count > 0) texture->onDataUpdated((int)min.x, (int)min.y, int(max.x - min.x), int(max.y - min.y));
 		}
-
-		if (tri_count > 0) texture->onDataUpdated((int)min.x, (int)min.y, int(max.x - min.x), int(max.y - min.y));
 	}
 
 
@@ -1997,10 +2005,9 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 		ComponentHandle model_instance = scene->getModelInstanceComponent(entity);
 		if (!model_instance.isValid()) return wpos;
 		Model* model = scene->getModelInstanceModel(model_instance);
-		const Array<Vec3>& vertices = model->getVertices();
+		
 		float min_dist_squared = FLT_MAX;
 		Vec3 closest_vertex = lpos;
-
 		auto processVertex = [&](const Vec3& vertex) {
 			float dist_squared = (vertex - lpos).squaredLength();
 			if (dist_squared < min_dist_squared)
@@ -2010,22 +2017,27 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 			}
 		};
 
-		if (model->areIndices16())
+		for (int i = 0, c = model->getMeshCount(); i < c; ++i)
 		{
-			const u16* indices = model->getIndices16();
-			for (int i = 0, c = model->getIndicesCount(); i < c; ++i)
+			Mesh& mesh = model->getMesh(i);
+
+			if (mesh.areIndices16())
 			{
-				Vec3 vertex = vertices[indices[i]];
-				processVertex(vertex);
+				const u16* indices = (const u16*)&mesh.indices[0];
+				for (int i = 0, c = mesh.indices_count; i < c; ++i)
+				{
+					Vec3 vertex = mesh.vertices[indices[i]];
+					processVertex(vertex);
+				}
 			}
-		}
-		else
-		{
-			const u32* indices = model->getIndices32();
-			for (int i = 0, c = model->getIndicesCount(); i < c; ++i)
+			else
 			{
-				Vec3 vertex = vertices[indices[i]];
-				processVertex(vertex);
+				const u32* indices = (const u32*)&mesh.indices[0];
+				for (int i = 0, c = mesh.indices_count; i < c; ++i)
+				{
+					Vec3 vertex = mesh.vertices[indices[i]];
+					processVertex(vertex);
+				}
 			}
 		}
 		return mtx.transformPoint(closest_vertex);

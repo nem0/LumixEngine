@@ -204,8 +204,6 @@ Terrain::Terrain(Renderer& renderer, Entity entity, RenderScene& scene, IAllocat
 	, m_last_camera_position(m_allocator)
 	, m_grass_types(m_allocator)
 	, m_renderer(renderer)
-	, m_vertices_handle(BGFX_INVALID_HANDLE)
-	, m_indices_handle(BGFX_INVALID_HANDLE)
 	, m_force_grass_update(false)
 {
 	generateGeometry();
@@ -222,9 +220,6 @@ Terrain::GrassType::~GrassType()
 
 Terrain::~Terrain()
 {
-	bgfx::destroy(m_indices_handle);
-	bgfx::destroy(m_vertices_handle);
-
 	setMaterial(nullptr);
 	LUMIX_DELETE(m_allocator, m_mesh);
 	LUMIX_DELETE(m_allocator, m_root);
@@ -953,11 +948,12 @@ void Terrain::generateGeometry()
 		.add(bgfx::Attrib::Position, 3, bgfx::AttribType::Float)
 		.add(bgfx::Attrib::TexCoord0, 2, bgfx::AttribType::Float)
 		.end();
-	m_vertices_handle = bgfx::createVertexBuffer(bgfx::copy(&points[0], sizeof(points[0]) * points.size()), vertex_def);
+	m_mesh = LUMIX_NEW(m_allocator, Mesh)(m_material, vertex_def, "terrain", m_allocator);
+	m_mesh->vertex_buffer_handle = bgfx::createVertexBuffer(bgfx::copy(&points[0], sizeof(points[0]) * points.size()), vertex_def);
 	auto* indices_mem = bgfx::copy(&indices[0], sizeof(indices[0]) * indices.size());
-	m_indices_handle = bgfx::createIndexBuffer(indices_mem);
-	m_mesh = LUMIX_NEW(m_allocator, Mesh)(
-		m_material, 0, int(points.size() * sizeof(points[0])), 0, int(indices.size()), "terrain", m_allocator);
+	m_mesh->index_buffer_handle = bgfx::createIndexBuffer(indices_mem);
+	m_mesh->indices_count = indices.size();
+	m_mesh->flags = Mesh::Flags::INDICES_16_BIT;
 }
 
 TerrainQuad* Terrain::generateQuadTree(float size)

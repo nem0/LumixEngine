@@ -31,29 +31,37 @@ bool Model::force_keep_skin = false;
 
 
 Mesh::Mesh(Material* mat,
-	int attribute_array_offset,
-	int attribute_array_size,
-	int indices_offset,
-	int index_count,
+	const bgfx::VertexDecl& vertex_decl,
 	const char* name,
 	IAllocator& allocator)
 	: name(name, allocator)
+	, vertex_decl(vertex_decl)
+	, material(mat)
+	, instance_idx(-1)
+	, indices(allocator)
+	, vertices(allocator)
+	, uvs(allocator)
+	, skin(allocator)
 {
-	this->material = mat;
-	this->attribute_array_offset = attribute_array_offset;
-	this->attribute_array_size = attribute_array_size;
-	this->indices_offset = indices_offset;
-	this->indices_count = index_count;
-	this->instance_idx = -1;
 }
 
 
-void Mesh::set(int attribute_array_offset, int attribute_array_size, int indices_offset, int index_count)
+void Mesh::set(const Mesh& rhs)
 {
-	this->attribute_array_offset = attribute_array_offset;
-	this->attribute_array_size = attribute_array_size;
-	this->indices_offset = indices_offset;
-	this->indices_count = index_count;
+	type = rhs.type;
+	indices = rhs.indices;
+	vertices = rhs.vertices;
+	uvs = rhs.uvs;
+	skin = rhs.skin;
+	flags = rhs.flags;
+	layer_mask = rhs.layer_mask;
+	instance_idx = rhs.instance_idx;
+	indices_count = rhs.indices_count;
+	vertex_decl = rhs.vertex_decl;
+	vertex_buffer_handle = rhs.vertex_buffer_handle;
+	index_buffer_handle = rhs.index_buffer_handle;
+	name = rhs.name;
+	// all except material
 }
 
 
@@ -90,12 +98,6 @@ Model::Model(const Path& path, ResourceManagerBase& resource_manager, Renderer& 
 	, m_bone_map(m_allocator)
 	, m_meshes(m_allocator)
 	, m_bones(m_allocator)
-	, m_indices(m_allocator)
-	, m_vertices(m_allocator)
-	, m_skin(m_allocator)
-	, m_uvs(m_allocator)
-	, m_vertices_handle(BGFX_INVALID_HANDLE)
-	, m_indices_handle(BGFX_INVALID_HANDLE)
 	, m_first_nonroot_bone_index(0)
 	, m_flags(0)
 	, m_loading_flags(0)
@@ -115,7 +117,7 @@ Model::~Model()
 }
 
 
-static inline Vec3 evaluateSkin(Vec3& p, Model::Skin s, const Matrix* matrices)
+static inline Vec3 evaluateSkin(Vec3& p, Mesh::Skin s, const Matrix* matrices)
 {
 	Matrix m = matrices[s.indices[0]] * s.weights.x + matrices[s.indices[1]] * s.weights.y +
 			   matrices[s.indices[2]] * s.weights.z + matrices[s.indices[3]] * s.weights.w;
@@ -146,15 +148,14 @@ RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Matrix
 	Vec3 local_origin = inv.transformPoint(origin);
 	Vec3 local_dir = static_cast<Vec3>(inv * Vec4(dir.x, dir.y, dir.z, 0));
 
-	const Array<Vec3>& vertices = m_vertices;
-	const Array<Skin>& skin = m_skin;
-	u16* indices16 = (u16*)&m_indices[0];
-	u32* indices32 = (u32*)&m_indices[0];
-	int vertex_offset = 0;
-	bool is16 = m_flags & (u32)Model::Flags::INDICES_16BIT;
 	Matrix matrices[256];
 	ASSERT(!pose || pose->count <= lengthOf(matrices));
-	bool is_skinned = pose && !m_skin.empty() && pose->count <= lengthOf(matrices);
+	bool is_skinned = false;
+	for (int mesh_index = m_lods[0].from_mesh; mesh_index <= m_lods[0].to_mesh; ++mesh_index)
+	{
+		Mesh& mesh = m_meshes[mesh_index];
+		is_skinned = pose && !mesh.skin.empty() && pose->count <= lengthOf(matrices);
+	}
 	if (is_skinned)
 	{
 		computeSkinMatrices(*pose, *this, matrices);
@@ -162,32 +163,36 @@ RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Matrix
 
 	for (int mesh_index = m_lods[0].from_mesh; mesh_index <= m_lods[0].to_mesh; ++mesh_index)
 	{
-		int indices_end = m_meshes[mesh_index].indices_offset + m_meshes[mesh_index].indices_count;
-		for(int i = m_meshes[mesh_index].indices_offset; i < indices_end; i += 3)
+		Mesh& mesh = m_meshes[mesh_index];
+		u16* indices16 = (u16*)&mesh.indices[0];
+		u32* indices32 = (u32*)&mesh.indices[0];
+		bool is16 = mesh.flags & (u32)Mesh::Flags::INDICES_16_BIT;
+		int index_size = is16 ? 2 : 4;
+		for(int i = 0, c = mesh.indices.size() / index_size; i < c; i += 3)
 		{
 			Vec3 p0, p1, p2;
 			if (is16)
 			{
-				p0 = vertices[vertex_offset + indices16[i]];
-				p1 = vertices[vertex_offset + indices16[i + 1]];
-				p2 = vertices[vertex_offset + indices16[i + 2]];
+				p0 = mesh.vertices[indices16[i]];
+				p1 = mesh.vertices[indices16[i + 1]];
+				p2 = mesh.vertices[indices16[i + 2]];
 				if (is_skinned)
 				{
-					p0 = evaluateSkin(p0, skin[vertex_offset + indices16[i]], matrices);
-					p1 = evaluateSkin(p1, skin[vertex_offset + indices16[i + 1]], matrices);
-					p2 = evaluateSkin(p2, skin[vertex_offset + indices16[i + 2]], matrices);
+					p0 = evaluateSkin(p0, mesh.skin[indices16[i]], matrices);
+					p1 = evaluateSkin(p1, mesh.skin[indices16[i + 1]], matrices);
+					p2 = evaluateSkin(p2, mesh.skin[indices16[i + 2]], matrices);
 				}
 			}
 			else
 			{
-				p0 = vertices[vertex_offset + indices32[i]];
-				p1 = vertices[vertex_offset + indices32[i + 1]];
-				p2 = vertices[vertex_offset + indices32[i + 2]];
+				p0 = mesh.vertices[indices32[i]];
+				p1 = mesh.vertices[indices32[i + 1]];
+				p2 = mesh.vertices[indices32[i + 2]];
 				if (is_skinned)
 				{
-					p0 = evaluateSkin(p0, skin[vertex_offset + indices32[i]], matrices);
-					p1 = evaluateSkin(p1, skin[vertex_offset + indices32[i + 1]], matrices);
-					p2 = evaluateSkin(p2, skin[vertex_offset + indices32[i + 2]], matrices);
+					p0 = evaluateSkin(p0, mesh.skin[indices32[i]], matrices);
+					p1 = evaluateSkin(p1, mesh.skin[indices32[i + 1]], matrices);
+					p2 = evaluateSkin(p2, mesh.skin[indices32[i + 2]], matrices);
 				}
 			}
 
@@ -221,7 +226,6 @@ RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Matrix
 				hit.m_mesh = &m_meshes[mesh_index];
 			}
 		}
-		vertex_offset += m_meshes[mesh_index].attribute_array_size / m_vertex_decl.getStride();
 	}
 	hit.m_origin = origin;
 	hit.m_dir = dir;
@@ -371,43 +375,6 @@ bool Model::parseVertexDeclEx(FS::IFile& file, bgfx::VertexDecl* vertex_decl)
 }
 
 
-void Model::create(const bgfx::VertexDecl& vertex_decl,
-	Material* material,
-	const int* indices_data,
-	int indices_size,
-	const void* attributes_data,
-	int attributes_size)
-{
-	ASSERT(!bgfx::isValid(m_vertices_handle));
-	m_vertex_decl = vertex_decl;
-	m_vertices_handle = bgfx::createVertexBuffer(bgfx::copy(attributes_data, attributes_size), vertex_decl);
-
-	ASSERT(!bgfx::isValid(m_indices_handle));
-	auto* mem = bgfx::copy(indices_data, indices_size);
-	m_indices_handle = bgfx::createIndexBuffer(mem, BGFX_BUFFER_INDEX32);
-	m_meshes.emplace(material, 0, attributes_size, 0, indices_size / int(sizeof(int)), "default", m_allocator);
-
-	Model::LOD lod;
-	lod.distance = FLT_MAX;
-	lod.from_mesh = 0;
-	lod.to_mesh = 0;
-	m_lods[0] = lod;
-
-	m_indices.resize(indices_size);
-	copyMemory(&m_indices[0], indices_data, indices_size);
-
-	m_vertices.resize(attributes_size / vertex_decl.getStride());
-	m_uvs.resize(m_vertices.size());
-	if (m_loading_flags & (u32)LoadingFlags::KEEP_SKIN)
-	{
-		m_skin.resize(m_vertices.size());
-	}
-	computeRuntimeData((const u8*)attributes_data, true);
-
-	onCreated(State::READY);
-}
-
-
 void Model::onBeforeReady()
 {
 	static const int transparent_layer = m_renderer.getLayer("transparent");
@@ -442,109 +409,6 @@ void Model::setKeepSkin()
 	if (isReady()) m_resource_manager.reload(*this);
 }
 
-
-void Model::computeRuntimeData(const u8* vertices, bool compute_bounding_shape)
-{
-	int index = 0;
-	float bounding_radius_squared = 0;
-	Vec3 min_vertex(0, 0, 0);
-	Vec3 max_vertex(0, 0, 0);
-
-	int vertex_size = m_vertex_decl.getStride();
-	int position_attribute_offset = m_vertex_decl.getOffset(bgfx::Attrib::Position);
-	int uv_attribute_offset = m_vertex_decl.getOffset(bgfx::Attrib::TexCoord0);
-	int weights_attribute_offset = m_vertex_decl.getOffset(bgfx::Attrib::Weight);
-	int bone_indices_attribute_offset = m_vertex_decl.getOffset(bgfx::Attrib::Indices);
-	bool keep_skin = m_loading_flags & (u32)LoadingFlags::KEEP_SKIN;
-	keep_skin = keep_skin && weights_attribute_offset >= 0 && bone_indices_attribute_offset >= 0;
-	for (int i = 0; i < m_meshes.size(); ++i)
-	{
-		int mesh_vertex_count = m_meshes[i].attribute_array_size / m_vertex_decl.getStride();
-		int mesh_attributes_array_offset = m_meshes[i].attribute_array_offset;
-		for (int j = 0; j < mesh_vertex_count; ++j)
-		{
-			int offset = mesh_attributes_array_offset + j * vertex_size;
-			if (keep_skin)
-			{
-				m_skin[index].weights = *(const Vec4*)&vertices[offset + weights_attribute_offset];
-				copyMemory(m_skin[index].indices,
-					&vertices[offset + bone_indices_attribute_offset],
-					sizeof(m_skin[index].indices));
-			}
-			m_vertices[index] = *(const Vec3*)&vertices[offset + position_attribute_offset];
-			m_uvs[index] = *(const Vec2*)&vertices[offset + uv_attribute_offset];
-			float sq_len = m_vertices[index].squaredLength();
-			bounding_radius_squared = Math::maximum(bounding_radius_squared, sq_len > 0 ? sq_len : 0);
-			min_vertex.x = Math::minimum(min_vertex.x, m_vertices[index].x);
-			min_vertex.y = Math::minimum(min_vertex.y, m_vertices[index].y);
-			min_vertex.z = Math::minimum(min_vertex.z, m_vertices[index].z);
-			max_vertex.x = Math::maximum(max_vertex.x, m_vertices[index].x);
-			max_vertex.y = Math::maximum(max_vertex.y, m_vertices[index].y);
-			max_vertex.z = Math::maximum(max_vertex.z, m_vertices[index].z);
-			++index;
-		}
-	}
-
-	if (compute_bounding_shape)
-	{
-		m_bounding_radius = sqrt(bounding_radius_squared);
-		m_aabb = AABB(min_vertex, max_vertex);
-	}
-}
-
-
-bool Model::parseGeometry(FS::IFile& file, FileVersion version)
-{
-	i32 indices_count = 0;
-	file.read(&indices_count, sizeof(indices_count));
-	if (indices_count <= 0) return false;
-
-	int index_size = (m_flags & (u32)Model::Flags::INDICES_16BIT) ? 2 : 4;
-	m_indices.resize(indices_count * index_size);
-	file.read(&m_indices[0], index_size * indices_count);
-
-	i32 vertices_size = 0;
-	file.read(&vertices_size, sizeof(vertices_size));
-	if (vertices_size <= 0) return false;
-
-	ASSERT(!bgfx::isValid(m_vertices_handle));
-	const bgfx::Memory* vertices_mem = bgfx::alloc(vertices_size);
-	file.read(vertices_mem->data, vertices_size);
-	m_vertices_handle = bgfx::createVertexBuffer(vertices_mem, m_vertex_decl);
-	if (!bgfx::isValid(m_vertices_handle)) return false;
-
-	ASSERT(!bgfx::isValid(m_indices_handle));
-	int indices_size = index_size * indices_count;
-	const bgfx::Memory* mem = bgfx::copy(&m_indices[0], indices_size);
-	m_indices_handle = bgfx::createIndexBuffer(mem, index_size == 4 ? BGFX_BUFFER_INDEX32 : 0);
-	if (!bgfx::isValid(m_indices_handle))
-	{
-		bgfx::destroy(m_vertices_handle);
-		return false;
-	}
-
-	int vertex_count = 0;
-	for (int i = 0; i < m_meshes.size(); ++i)
-	{
-		vertex_count += m_meshes[i].attribute_array_size / m_vertex_decl.getStride();
-	}
-	m_vertices.resize(vertex_count);
-	m_uvs.resize(vertex_count);
-	if (m_loading_flags & (u32)LoadingFlags::KEEP_SKIN)
-	{
-		m_skin.resize(m_vertices.size());
-	}
-
-	if (version > FileVersion::BOUNDING_SHAPES_PRECOMPUTED)
-	{
-		file.read(&m_bounding_radius, sizeof(m_bounding_radius));
-		file.read(&m_aabb, sizeof(m_aabb));
-	}
-
-	computeRuntimeData(vertices_mem->data, version <= FileVersion::BOUNDING_SHAPES_PRECOMPUTED);
-
-	return true;
-}
 
 bool Model::parseBones(FS::IFile& file)
 {
@@ -650,7 +514,110 @@ int Model::getBoneIdx(const char* name)
 	return -1;
 }
 
-bool Model::parseMeshes(FS::IFile& file, FileVersion version)
+
+bool Model::parseMeshes(const bgfx::VertexDecl& global_vertex_decl, FS::IFile& file, FileVersion version)
+{
+	if (version <= FileVersion::MULTIPLE_VERTEX_DECLS) return parseMeshesOld(global_vertex_decl, file, version);
+	
+	int object_count = 0;
+	file.read(&object_count, sizeof(object_count));
+	if (object_count <= 0) return false;
+
+	char model_dir[MAX_PATH_LENGTH];
+	PathUtils::getDir(model_dir, MAX_PATH_LENGTH, getPath().c_str());
+
+	m_meshes.reserve(object_count);
+	for (int i = 0; i < object_count; ++i)
+	{
+		bgfx::VertexDecl vertex_decl;
+		if (!parseVertexDeclEx(file, &vertex_decl)) return false;
+
+		i32 str_size;
+		file.read(&str_size, sizeof(str_size));
+		char material_name[MAX_PATH_LENGTH];
+		file.read(material_name, str_size);
+		if (str_size >= MAX_PATH_LENGTH) return false;
+
+		material_name[str_size] = 0;
+
+		char material_path[MAX_PATH_LENGTH];
+		copyString(material_path, model_dir);
+		catString(material_path, material_name);
+		catString(material_path, ".mat");
+
+		auto* material_manager = m_resource_manager.getOwner().get(MATERIAL_TYPE);
+		Material* material = static_cast<Material*>(material_manager->load(Path(material_path)));
+		
+		file.read(&str_size, sizeof(str_size));
+		char mesh_name[MAX_PATH_LENGTH];
+		mesh_name[str_size] = 0;
+		file.read(mesh_name, str_size);
+
+		Mesh& mesh = m_meshes.emplace(material, vertex_decl, mesh_name, m_allocator);
+	}
+
+	for (int i = 0; i < object_count; ++i)
+	{
+		Mesh& mesh = m_meshes[i];
+		int index_size;
+		int indices_count;
+		file.read(&index_size, sizeof(index_size));
+		if (index_size != 2 && index_size != 0) return false;
+		file.read(&indices_count, sizeof(indices_count));
+		if (indices_count <= 0) return false;
+		mesh.indices.resize(index_size * indices_count);
+		file.read(&mesh.indices[0], mesh.indices.size());
+
+		mesh.flags = index_size == 2 ? Mesh::Flags::INDICES_16_BIT : 0;
+		mesh.indices_count = indices_count;
+		const bgfx::Memory* indices_mem = bgfx::copy(&mesh.indices[0], mesh.indices.size());
+		mesh.index_buffer_handle = bgfx::createIndexBuffer(indices_mem);
+	}
+
+	for (int i = 0; i < object_count; ++i)
+	{
+		Mesh& mesh = m_meshes[i];
+		int data_size;
+		file.read(&data_size, sizeof(data_size));
+		const bgfx::Memory* vertices_mem = bgfx::alloc(data_size);
+		file.read(vertices_mem->data, vertices_mem->size);
+		mesh.vertex_buffer_handle = bgfx::createVertexBuffer(vertices_mem, mesh.vertex_decl);
+
+		int position_attribute_offset = mesh.vertex_decl.getOffset(bgfx::Attrib::Position);
+		int uv_attribute_offset = mesh.vertex_decl.getOffset(bgfx::Attrib::TexCoord0);
+		int weights_attribute_offset = mesh.vertex_decl.getOffset(bgfx::Attrib::Weight);
+		int bone_indices_attribute_offset = mesh.vertex_decl.getOffset(bgfx::Attrib::Indices);
+		bool keep_skin = m_loading_flags & (u32)LoadingFlags::KEEP_SKIN;
+		keep_skin = keep_skin && weights_attribute_offset >= 0 && bone_indices_attribute_offset >= 0;
+
+		int vertex_size = mesh.vertex_decl.getStride();
+		int mesh_vertex_count = vertices_mem->size / mesh.vertex_decl.getStride();
+		mesh.vertices.resize(mesh_vertex_count);
+		mesh.uvs.resize(mesh_vertex_count);
+		if (keep_skin) mesh.skin.resize(mesh_vertex_count);
+		const u8* vertices = vertices_mem->data;
+		for (int j = 0; j < mesh_vertex_count; ++j)
+		{
+			int offset = j * vertex_size;
+			if (keep_skin)
+			{
+				mesh.skin[j].weights = *(const Vec4*)&vertices[offset + weights_attribute_offset];
+				copyMemory(mesh.skin[j].indices,
+					&vertices[offset + bone_indices_attribute_offset],
+					sizeof(mesh.skin[j].indices));
+			}
+			mesh.vertices[j] = *(const Vec3*)&vertices[offset + position_attribute_offset];
+			mesh.uvs[j] = *(const Vec2*)&vertices[offset + uv_attribute_offset];
+		}
+	}
+	file.read(&m_bounding_radius, sizeof(m_bounding_radius));
+	file.read(&m_aabb, sizeof(m_aabb));
+
+	return true;
+}
+
+
+bool Model::parseMeshesOld(bgfx::VertexDecl global_vertex_decl, FS::IFile& file, FileVersion version)
 {
 	int object_count = 0;
 	file.read(&object_count, sizeof(object_count));
@@ -659,6 +626,14 @@ bool Model::parseMeshes(FS::IFile& file, FileVersion version)
 	m_meshes.reserve(object_count);
 	char model_dir[MAX_PATH_LENGTH];
 	PathUtils::getDir(model_dir, MAX_PATH_LENGTH, getPath().c_str());
+	struct Offsets
+	{
+		i32 attribute_array_offset;
+		i32 attribute_array_size;
+		i32 indices_offset;
+		i32 mesh_tri_count;
+	};
+	Array<Offsets> mesh_offsets(m_allocator);
 	for (int i = 0; i < object_count; ++i)
 	{
 		i32 str_size;
@@ -677,14 +652,11 @@ bool Model::parseMeshes(FS::IFile& file, FileVersion version)
 		auto* material_manager = m_resource_manager.getOwner().get(MATERIAL_TYPE);
 		Material* material = static_cast<Material*>(material_manager->load(Path(material_path)));
 
-		i32 attribute_array_offset = 0;
-		file.read(&attribute_array_offset, sizeof(attribute_array_offset));
-		i32 attribute_array_size = 0;
-		file.read(&attribute_array_size, sizeof(attribute_array_size));
-		i32 indices_offset = 0;
-		file.read(&indices_offset, sizeof(indices_offset));
-		i32 mesh_tri_count = 0;
-		file.read(&mesh_tri_count, sizeof(mesh_tri_count));
+		Offsets& offsets = mesh_offsets.emplace();
+		file.read(&offsets.attribute_array_offset, sizeof(offsets.attribute_array_offset));
+		file.read(&offsets.attribute_array_size, sizeof(offsets.attribute_array_size));
+		file.read(&offsets.indices_offset, sizeof(offsets.indices_offset));
+		file.read(&offsets.mesh_tri_count, sizeof(offsets.mesh_tri_count));
 
 		file.read(&str_size, sizeof(str_size));
 		if (str_size >= MAX_PATH_LENGTH)
@@ -697,27 +669,126 @@ bool Model::parseMeshes(FS::IFile& file, FileVersion version)
 		mesh_name[str_size] = 0;
 		file.read(mesh_name, str_size);
 
+		bgfx::VertexDecl vertex_decl = global_vertex_decl;
 		if (version <= FileVersion::SINGLE_VERTEX_DECL)
 		{
-			bgfx::VertexDecl vertex_decl;
 			parseVertexDecl(file, &vertex_decl);
-			if (i != 0 && m_vertex_decl.m_hash != vertex_decl.m_hash)
+			if (i != 0 && global_vertex_decl.m_hash != vertex_decl.m_hash)
 			{
 				g_log_error.log("Renderer") << "Model " << getPath().c_str()
 					<< " contains meshes with different vertex declarations.";
 			}
-			if(i == 0) m_vertex_decl = vertex_decl;
+			if(i == 0) global_vertex_decl = vertex_decl;
 		}
 
+
 		m_meshes.emplace(material,
-						 attribute_array_offset,
-						 attribute_array_size,
-						 indices_offset,
-						 mesh_tri_count * 3,
-						 mesh_name,
-						 m_allocator);
+			vertex_decl,
+			mesh_name,
+			m_allocator);
 		addDependency(*material);
 	}
+
+	i32 indices_count = 0;
+	file.read(&indices_count, sizeof(indices_count));
+	if (indices_count <= 0) return false;
+
+	int index_size = (m_flags & (u32)Model::Flags::INDICES_16BIT) ? 2 : 4;
+	Array<u8> indices(m_allocator);
+	indices.resize(indices_count * index_size);
+	file.read(&indices[0], indices.size());
+
+	i32 vertices_size = 0;
+	file.read(&vertices_size, sizeof(vertices_size));
+	if (vertices_size <= 0) return false;
+
+	Array<u8> vertices(m_allocator);
+	vertices.resize(vertices_size);
+	file.read(&vertices[0], vertices.size());
+
+	int vertex_count = 0;
+	for (const Offsets& offsets : mesh_offsets)
+	{
+		vertex_count += offsets.attribute_array_size / global_vertex_decl.getStride();
+	}
+
+	if (version > FileVersion::BOUNDING_SHAPES_PRECOMPUTED)
+	{
+		file.read(&m_bounding_radius, sizeof(m_bounding_radius));
+		file.read(&m_aabb, sizeof(m_aabb));
+	}
+
+	float bounding_radius_squared = 0;
+	Vec3 min_vertex(0, 0, 0);
+	Vec3 max_vertex(0, 0, 0);
+
+	int vertex_size = global_vertex_decl.getStride();
+	int position_attribute_offset = global_vertex_decl.getOffset(bgfx::Attrib::Position);
+	int uv_attribute_offset = global_vertex_decl.getOffset(bgfx::Attrib::TexCoord0);
+	int weights_attribute_offset = global_vertex_decl.getOffset(bgfx::Attrib::Weight);
+	int bone_indices_attribute_offset = global_vertex_decl.getOffset(bgfx::Attrib::Indices);
+	bool keep_skin = m_loading_flags & (u32)LoadingFlags::KEEP_SKIN;
+	keep_skin = keep_skin && weights_attribute_offset >= 0 && bone_indices_attribute_offset >= 0;
+	for (int i = 0; i < m_meshes.size(); ++i)
+	{
+		Offsets& offsets = mesh_offsets[i];
+		Mesh& mesh = m_meshes[i];
+		mesh.indices_count = offsets.mesh_tri_count * 3;
+		mesh.indices.resize(mesh.indices_count * index_size);
+		copyMemory(&mesh.indices[0], &indices[offsets.indices_offset * index_size], mesh.indices_count * index_size);
+
+		int mesh_vertex_count = offsets.attribute_array_size / global_vertex_decl.getStride();
+		int mesh_attributes_array_offset = offsets.attribute_array_offset;
+		mesh.vertices.resize(mesh_vertex_count);
+		mesh.uvs.resize(mesh_vertex_count);
+		if (keep_skin) mesh.skin.resize(mesh_vertex_count);
+		for (int j = 0; j < mesh_vertex_count; ++j)
+		{
+			int offset = mesh_attributes_array_offset + j * vertex_size;
+			if (keep_skin)
+			{
+				mesh.skin[j].weights = *(const Vec4*)&vertices[offset + weights_attribute_offset];
+				copyMemory(mesh.skin[j].indices,
+					&vertices[offset + bone_indices_attribute_offset],
+					sizeof(mesh.skin[j].indices));
+			}
+			mesh.vertices[j] = *(const Vec3*)&vertices[offset + position_attribute_offset];
+			mesh.uvs[j] = *(const Vec2*)&vertices[offset + uv_attribute_offset];
+			float sq_len = mesh.vertices[j].squaredLength();
+			bounding_radius_squared = Math::maximum(bounding_radius_squared, sq_len > 0 ? sq_len : 0);
+			min_vertex.x = Math::minimum(min_vertex.x, mesh.vertices[j].x);
+			min_vertex.y = Math::minimum(min_vertex.y, mesh.vertices[j].y);
+			min_vertex.z = Math::minimum(min_vertex.z, mesh.vertices[j].z);
+			max_vertex.x = Math::maximum(max_vertex.x, mesh.vertices[j].x);
+			max_vertex.y = Math::maximum(max_vertex.y, mesh.vertices[j].y);
+			max_vertex.z = Math::maximum(max_vertex.z, mesh.vertices[j].z);
+		}
+	}
+
+	if (version <= FileVersion::BOUNDING_SHAPES_PRECOMPUTED)
+	{
+		m_bounding_radius = sqrt(bounding_radius_squared);
+		m_aabb = AABB(min_vertex, max_vertex);
+	}
+
+	for (int i = 0; i < m_meshes.size(); ++i)
+	{
+		Mesh& mesh = m_meshes[i];
+		Offsets offsets = mesh_offsets[i];
+		
+		ASSERT(!bgfx::isValid(mesh.index_buffer_handle));
+		mesh.flags = (m_flags & (u32)Flags::INDICES_16BIT) != 0 ? Mesh::Flags::INDICES_16_BIT : 0;
+		int indices_size = index_size * mesh.indices_count;
+		const bgfx::Memory* mem = bgfx::copy(&indices[offsets.indices_offset * index_size], indices_size);
+		mesh.index_buffer_handle = bgfx::createIndexBuffer(mem, index_size == 4 ? BGFX_BUFFER_INDEX32 : 0);
+		if (!bgfx::isValid(mesh.index_buffer_handle)) return false;
+
+		ASSERT(!bgfx::isValid(mesh.vertex_buffer_handle));
+		const bgfx::Memory* vertices_mem = bgfx::copy(&vertices[offsets.attribute_array_offset], offsets.attribute_array_size);
+		mesh.vertex_buffer_handle = bgfx::createVertexBuffer(vertices_mem, mesh.vertex_decl);
+		if (!bgfx::isValid(mesh.vertex_buffer_handle)) return false;
+	}
+
 	return true;
 }
 
@@ -764,10 +835,13 @@ bool Model::load(FS::IFile& file)
 		file.read(&m_flags, sizeof(m_flags));
 	}
 
-	if (header.version > (u32)FileVersion::SINGLE_VERTEX_DECL) parseVertexDeclEx(file, &m_vertex_decl);
+	bgfx::VertexDecl global_vertex_decl;
+	if (header.version > (u32)FileVersion::SINGLE_VERTEX_DECL && header.version <= (u32)FileVersion::MULTIPLE_VERTEX_DECLS)
+	{
+		parseVertexDeclEx(file, &global_vertex_decl);
+	}
 
-	if (parseMeshes(file, (FileVersion)header.version)
-		&& parseGeometry(file, (FileVersion)header.version)
+	if (parseMeshes(global_vertex_decl, file, (FileVersion)header.version)
 		&& parseBones(file)
 		&& parseLODs(file))
 	{
@@ -775,7 +849,7 @@ bool Model::load(FS::IFile& file)
 		return true;
 	}
 
-	g_log_warning.log("Renderer") << "Error loading model " << getPath().c_str();
+	g_log_error.log("Renderer") << "Error loading model " << getPath().c_str();
 	return false;
 }
 
@@ -826,15 +900,13 @@ void Model::unload(void)
 		removeDependency(*m_meshes[i].material);
 		material_manager->unload(*m_meshes[i].material);
 	}
+	for (Mesh& mesh : m_meshes)
+	{
+		if (bgfx::isValid(mesh.index_buffer_handle)) bgfx::destroy(mesh.index_buffer_handle);
+		if (bgfx::isValid(mesh.vertex_buffer_handle)) bgfx::destroy(mesh.vertex_buffer_handle);
+	}
 	m_meshes.clear();
 	m_bones.clear();
-	m_uvs.clear();
-	m_vertices.clear();
-
-	if(bgfx::isValid(m_vertices_handle)) bgfx::destroy(m_vertices_handle);
-	if(bgfx::isValid(m_indices_handle)) bgfx::destroy(m_indices_handle);
-	m_indices_handle = BGFX_INVALID_HANDLE;
-	m_vertices_handle = BGFX_INVALID_HANDLE;
 }
 
 
