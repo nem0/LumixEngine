@@ -16,7 +16,6 @@ class PackFile LUMIX_FINAL : public IFile
 public:
 	PackFile(PackFileDevice& device, IAllocator& allocator)
 		: m_device(device)
-		, m_allocator(allocator)
 		, m_local_offset(0)
 	{
 	}
@@ -66,7 +65,6 @@ private:
 	PackFileDevice::PackFileInfo m_file;
 	PackFileDevice& m_device;
 	size_t m_local_offset;
-	IAllocator& m_allocator;
 }; // class PackFile
 
 

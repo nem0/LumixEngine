@@ -14,7 +14,7 @@ namespace ofbx
 
 struct Error
 {
-	Error() {}
+	Error() = default;
 	Error(const char* msg) { s_message = msg; }
 
 	static const char* s_message;

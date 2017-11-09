@@ -18,7 +18,6 @@ class LUMIX_ENGINE_API ResourceFile LUMIX_FINAL : public IFile
 public:
 	ResourceFile(IFile* file, ResourceFileDevice& device, IAllocator& allocator)
 		: m_device(device)
-		, m_allocator(allocator)
 		, m_resource(nullptr)
 	{
 		ASSERT(file == nullptr);
@@ -102,7 +101,6 @@ public:
 	size_t pos() override { return m_pos; }
 
 private:
-	IAllocator& m_allocator;
 	ResourceFileDevice& m_device;
 	const mf_resource* m_resource;
 	size_t m_pos;

@@ -3201,7 +3201,6 @@ public:
 		, m_is_loading(false)
 		, m_universe(nullptr)
 		, m_is_orbit(false)
-		, m_gizmo_use_step(false)
 		, m_is_additive_selection(false)
 		, m_mouse_sensitivity(200, 200)
 		, m_render_interface(nullptr)
@@ -3893,7 +3892,6 @@ private:
 	float m_mouse_rel_y;
 	Vec2 m_orbit_delta;
 	Vec2 m_mouse_sensitivity;
-	bool m_gizmo_use_step;
 	bool m_is_game_mode;
 	int m_game_mode_commands;
 	bool m_is_orbit;

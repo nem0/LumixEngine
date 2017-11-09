@@ -38,9 +38,7 @@ namespace Lumix
 
 struct GUIInterface : GUISystem::Interface
 {
-	GUIInterface()
-	{
-	}
+	GUIInterface() = default;
 
 	Pipeline* getPipeline() override { return pipeline; }
 	Vec2 getPos() const override { return Vec2(0, 0); }

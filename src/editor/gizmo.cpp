@@ -665,7 +665,7 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 		{
 			Matrix gizmo_mtx = getMatrix(m_entities[i]);
 
-			Axis axis;
+			Axis axis = Axis::NONE;
 			switch (m_mode)
 			{
 				case Mode::TRANSLATE:
@@ -676,6 +676,9 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 					break;
 				case Mode::SCALE:
 					axis = collideScale(gizmo_mtx, camera_pos, camera_dir, fov, is_ortho, origin, cursor_dir);
+					break;
+				default:
+					ASSERT(false);
 					break;
 			}
 			if (axis != Axis::NONE)
@@ -980,6 +983,7 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 			case Mode::ROTATE: rotate(); break;
 			case Mode::TRANSLATE: translate(); break;
 			case Mode::SCALE: scale(); break;
+			default: ASSERT(false); break;
 		}
 	}
 
@@ -1003,6 +1007,9 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 				break;
 			case Mode::SCALE:
 				renderScaleGizmo(gizmo_mtx, is_active, camera_pos, camera_dir, fov, is_ortho);
+				break;
+			default:
+				ASSERT(false);
 				break;
 		}
 	}

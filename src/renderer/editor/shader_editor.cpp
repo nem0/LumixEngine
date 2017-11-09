@@ -1638,8 +1638,8 @@ void ShaderEditor::saveNodeConnections(OutputBlob& blob, Node& node)
 
 void ShaderEditor::save(const char* path)
 {
-	FILE* fp = fopen(path, "wb");
-	if (!fp)
+	FS::OsFile file;
+	if(!file.open(path, FS::Mode::CREATE_AND_WRITE)) 
 	{
 		g_log_error.log("Editor") << "Could not save shader " << path;
 		return;
@@ -1676,8 +1676,13 @@ void ShaderEditor::save(const char* path)
 		saveNodeConnections(blob, *node);
 	}
 
-	fwrite(blob.getData(), blob.getPos(), 1, fp);
-	fclose(fp);
+	bool success = file.write(blob.getData(), blob.getPos());
+	file.close();
+	if (!success)
+	{
+		g_log_error.log("Editor") << "Could not save shader " << path;
+		return;
+	}
 }
 
 
@@ -1793,20 +1798,23 @@ void ShaderEditor::load()
 
 	clear();
 
-	FILE* fp = fopen(path, "rb");
-	if (!fp)
+	FS::OsFile file;
+	if (!file.open(path, FS::Mode::OPEN_AND_READ))
 	{
 		g_log_error.log("Editor") << "Failed to load shader " << path;
 		return;
 	}
 
-	fseek(fp, 0, SEEK_END);
-	int data_size = (int)ftell(fp);
+	int data_size = (int)file.size();
 	Array<u8> data(m_allocator);
 	data.resize(data_size);
-	fseek(fp, 0, SEEK_SET);
-	size_t read = fread(&data[0], 1, data_size, fp);
-	(void)read;
+	if (!file.read(&data[0], data_size))
+	{
+		g_log_error.log("Editor") << "Failed to load shader " << path;
+		file.close();
+		return;
+	}
+	file.close();
 
 	InputBlob blob(&data[0], data_size);
 	for (int i = 0; i < lengthOf(m_textures); ++i)
@@ -1838,8 +1846,6 @@ void ShaderEditor::load()
 		loadNodeConnections(blob, *node);
 		m_last_node_id = Math::maximum(int(node->m_id + 1), int(m_last_node_id));
 	}
-
-	fclose(fp);
 }
 
 
@@ -2158,8 +2164,8 @@ void ShaderEditor::generateMain(const char* path)
 	catString(shd_path, info.m_basename);
 	catString(shd_path, ".shd");
 
-	FILE* fp = fopen(shd_path, "wb");
-	if (!fp)
+	FS::OsFile file;
+	if (!file.open(shd_path, FS::Mode::CREATE_AND_WRITE))
 	{
 		g_log_error.log("Editor") << "Could not generate " << shd_path;
 		return;
@@ -2167,17 +2173,17 @@ void ShaderEditor::generateMain(const char* path)
 
 	OutputBlob blob(m_allocator);
 	generatePasses(blob);
-	fwrite(blob.getData(), 1, blob.getPos(), fp);
+	file.write(blob.getData(), blob.getPos());
 
 	bool first = true;
 	for(const auto& texture : m_textures)
 	{
 		if(!texture[0]) continue;
 
-		fprintf(fp, "texture_slot(\"%s\", \"%s\")\n", texture, texture);
+		file << "texture_slot(\"" << texture << "\", \"" << texture << "\")\n";
 	}
 
-	fclose(fp);
+	file.close();
 }
 
 
