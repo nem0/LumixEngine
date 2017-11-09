@@ -1582,8 +1582,6 @@ void TerrainEditor::onGUI()
 				}
 			}
 		}
-		ImGui::TreePop();
-		ImGui::Indent();
 	}
 
 
@@ -1755,9 +1753,13 @@ void TerrainEditor::onGUI()
 		mergeSplatmap(dir);
 	}
 
-	if(!m_component.isValid()) return;
-	if(m_action_type == NOT_SET) return;
-	if(!m_is_enabled) return;
+	if (!m_component.isValid() || m_action_type == NOT_SET || !m_is_enabled)
+	{
+		ImGui::TreePop();
+		ImGui::Indent();
+
+		return;
+	}
 
 	float mouse_x = m_world_editor.getMousePos().x;
 	float mouse_y = m_world_editor.getMousePos().y;
@@ -1777,9 +1779,13 @@ void TerrainEditor::onGUI()
 		{
 			Vec3 center = hit.m_origin + hit.m_dir * hit.m_t;
 			drawCursor(*scene, terrain, center);
+			ImGui::TreePop();
+			ImGui::Indent();
 			return;
 		}
 	}
+	ImGui::TreePop();
+	ImGui::Indent();
 }
 
 

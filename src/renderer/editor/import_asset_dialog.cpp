@@ -645,6 +645,10 @@ struct FBXImporter
 			import_mesh.aabb = aabb;
 			import_mesh.radius_squared = radius_squared;
 		}
+		for (int mesh_idx = meshes.size() - 1; mesh_idx >= 0; --mesh_idx)
+		{
+			if (meshes[mesh_idx].indices.empty()) meshes.eraseFast(mesh_idx);
+		}
 	}
 
 
@@ -655,7 +659,7 @@ struct FBXImporter
 		for (int i = 0; i < c; ++i)
 		{
 			const ofbx::Mesh* fbx_mesh = (const ofbx::Mesh*)scene->getMesh(i);
-			
+			if (fbx_mesh->getGeometry()->getVertexCount() == 0) continue;
 			for (int j = 0; j < fbx_mesh->getMaterialCount(); ++j)
 			{
 				ImportMesh& mesh = meshes.emplace(allocator);
@@ -686,31 +690,6 @@ struct FBXImporter
 		fromCString(lod_str, stringLength(lod_str), &lod);
 
 		return lod;
-	}
-
-
-	bool isValid(const ofbx::IScene& scene) const
-	{
-		int mesh_count = scene.getMeshCount();
-		if (mesh_count == 0) return true;
-
-		// TODO error message
-		// TODO check if all meshes have the same vertex decls
-		
-		int vertex_size = -1;
-		for(ImportMesh& mesh : meshes)
-		{
-			if (!mesh.import) continue;
-			const ofbx::Mesh* fbx_mesh = mesh.fbx;
-			int tmp = getVertexSize(*fbx_mesh);
-			if (vertex_size >= 0 && vertex_size != tmp)
-			{
-				dialog.setMessage("Meshes have different vertex sizes.");
-				return false;
-			}
-			vertex_size = tmp;
-		}
-		return true;
 	}
 
 
@@ -1372,6 +1351,10 @@ struct FBXImporter
 			{{0, max.y, min.z}, {128, 255, 128, 0}, {128, 128, 0, 0}, fixUV(x3_max, uv0_min.y)},
 			{{0, max.y, max.z}, {128, 255, 128, 0}, {128, 128, 0, 0}, fixUV(x2_max, uv0_min.y)}};
 
+		int vertex_data_size = sizeof(BillboardSceneData::Vertex);
+		if (!has_tangents) vertex_data_size -= 4;
+		vertex_data_size *= lengthOf(vertices);
+		write(vertex_data_size);
 		for (const BillboardSceneData::Vertex& vertex : vertices)
 		{
 			write(vertex.pos);
@@ -1386,35 +1369,18 @@ struct FBXImporter
 	{
 		AABB aabb = {{0, 0, 0}, {0, 0, 0}};
 		float radius_squared = 0;
-		i32 indices_count = 0;
-		i32 vertex_data_size = 0;
 		IAllocator& allocator = app.getWorldEditor().getAllocator();
-
-		int vertex_size = 0;
-		for (const ImportMesh& mesh : meshes)
-		{
-			if (!mesh.import) continue;
-
-			vertex_size = getVertexSize(*mesh.fbx);
-			indices_count += mesh.indices.size();
-			vertex_data_size += mesh.vertex_data.getPos();
-		}
-		if (create_billboard_lod)
-		{
-			indices_count += 8 * 3;
-			vertex_data_size += 16 * vertex_size;
-		}
-
-		write(indices_count);
-
-		bool are_indices_16_bit = areIndices16Bit();
 
 		OutputBlob vertices_blob(allocator);
 		for (const ImportMesh& import_mesh : meshes)
 		{
 			if (!import_mesh.import) continue;
+			bool are_indices_16_bit = areIndices16Bit(import_mesh);
 			if (are_indices_16_bit)
 			{
+				int index_size = sizeof(u16);
+				write(index_size);
+				write(import_mesh.indices.size());
 				for (int i : import_mesh.indices)
 				{
 					assert(i <= (1 << 16));
@@ -1424,6 +1390,9 @@ struct FBXImporter
 			}
 			else
 			{
+				int index_size = sizeof(import_mesh.indices[0]);
+				write(index_size);
+				write(import_mesh.indices.size());
 				write(&import_mesh.indices[0], sizeof(import_mesh.indices[0]) * import_mesh.indices.size());
 			}
 			aabb.merge(import_mesh.aabb);
@@ -1432,23 +1401,14 @@ struct FBXImporter
 
 		if (create_billboard_lod)
 		{
-			if (are_indices_16_bit)
-			{
-				u16 indices[] = { 0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 8, 9, 10, 8, 10, 11, 12, 13, 14, 12, 14, 15 };
-				write(indices, sizeof(indices));
-			}
-			else
-			{
-				u32 indices[] = { 0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 8, 9, 10, 8, 10, 11, 12, 13, 14, 12, 14, 15 };
-				write(indices, sizeof(indices));
-			}
+			u16 indices[] = { 0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 8, 9, 10, 8, 10, 11, 12, 13, 14, 12, 14, 15 };
+			write(indices, sizeof(indices));
 		}
 
-
-		write(vertex_data_size);
 		for (const ImportMesh& import_mesh : meshes)
 		{
 			if (!import_mesh.import) continue;
+			write(import_mesh.vertex_data.getPos());
 			write(import_mesh.vertex_data.getData(), import_mesh.vertex_data.getPos());
 		}
 		writeBillboardVertices(aabb);
@@ -1463,30 +1423,11 @@ struct FBXImporter
 	void writeBillboardMesh(i32 attribute_array_offset, i32 indices_offset, const char* mesh_output_filename)
 	{
 		if (!create_billboard_lod) return;
-
-		int vertex_size = 0;
-		for (auto& mesh : meshes)
-		{
-			if (mesh.import)
-			{
-				vertex_size = getVertexSize(*mesh.fbx);
-				break;
-			}
-		}
+		
 		StaticString<MAX_PATH_LENGTH + 10> material_name(mesh_output_filename, "_billboard");
 		i32 length = stringLength(material_name);
 		write((const char*)&length, sizeof(length));
 		write(material_name, length);
-
-		write((const char*)&attribute_array_offset, sizeof(attribute_array_offset));
-		i32 attribute_array_size = 16 * vertex_size;
-		attribute_array_offset += attribute_array_size;
-		write((const char*)&attribute_array_size, sizeof(attribute_array_size));
-
-		write((const char*)&indices_offset, sizeof(indices_offset));
-		i32 mesh_tri_count = 8;
-		indices_offset += mesh_tri_count * 3;
-		write((const char*)&mesh_tri_count, sizeof(mesh_tri_count));
 
 		const char* mesh_name = "billboard";
 		length = stringLength(mesh_name);
@@ -1522,31 +1463,52 @@ struct FBXImporter
 
 		i32 attr_offset = 0;
 		i32 indices_offset = 0;
-		int vertex_size = -1;
 		for (ImportMesh& import_mesh : meshes)
 		{
 			if (!import_mesh.import) continue;
-
+			
 			const ofbx::Mesh& mesh = *import_mesh.fbx;
+
+			i32 attribute_count = getAttributeCount(mesh);
+			write(attribute_count);
+
+			i32 pos_attr = 0;
+			write(pos_attr);
+			const ofbx::Geometry* geom = mesh.getGeometry();
+			if (geom->getNormals())
+			{
+				i32 nrm_attr = 1;
+				write(nrm_attr);
+			}
+			if (geom->getUVs())
+			{
+				i32 uv0_attr = 8;
+				write(uv0_attr);
+			}
+			if (geom->getColors() && import_vertex_colors)
+			{
+				i32 color_attr = 4;
+				write(color_attr);
+			}
+			if (geom->getTangents())
+			{
+				i32 color_attr = 2;
+				write(color_attr);
+			}
+			if (isSkinned(mesh))
+			{
+				i32 indices_attr = 6;
+				write(indices_attr);
+				i32 weight_attr = 7;
+				write(weight_attr);
+			}
+
 			const ofbx::Material* material = import_mesh.fbx_mat;
 			char mat[128];
 			getMaterialName(material, mat);
 			i32 mat_len = (i32)strlen(mat);
 			write(mat_len);
 			write(mat, strlen(mat));
-
-			write(attr_offset);
-			ASSERT(vertex_size == -1 || vertex_size == getVertexSize(mesh));
-			if (vertex_size == -1) vertex_size = getVertexSize(mesh);
-			i32 attr_size = import_mesh.vertex_data.getPos();
-			attr_offset += attr_size;
-			write(attr_size);
-
-			write(indices_offset);
-
-			i32 mesh_tri_count = import_mesh.indices.size() / 3;
-			indices_offset += mesh_tri_count * 3;
-			write(mesh_tri_count);
 
 			const char* name = getImportMeshName(import_mesh);
 			i32 name_len = (i32)strlen(name);
@@ -1650,63 +1612,21 @@ struct FBXImporter
 	}
 
 
-	bool areIndices16Bit() const
+	bool areIndices16Bit(const ImportMesh& mesh) const
 	{
-		for (auto& mesh : meshes)
-		{
-			int vertex_size = getVertexSize(*mesh.fbx);
-			if (mesh.import && mesh.vertex_data.getPos() / vertex_size > (1 << 16))
-			{
-				return false;
-			}
-		}
-		return true;
+		int vertex_size = getVertexSize(*mesh.fbx);
+		return !(mesh.import && mesh.vertex_data.getPos() / vertex_size > (1 << 16));
 	}
 
 
 	void writeModelHeader()
 	{
-		const ofbx::Mesh& mesh = *meshes[0].fbx;
 		Model::FileHeader header;
 		header.magic = 0x5f4c4d4f; // == '_LMO';
 		header.version = (u32)Model::FileVersion::LATEST;
 		write(header);
-		u32 flags = areIndices16Bit() ? (u32)Model::Flags::INDICES_16BIT : 0;
+		u32 flags = 0;
 		write(flags);
-
-		i32 attribute_count = getAttributeCount(mesh);
-		write(attribute_count);
-
-		i32 pos_attr = 0;
-		write(pos_attr);
-		const ofbx::Geometry* geom = mesh.getGeometry();
-		if (geom->getNormals())
-		{
-			i32 nrm_attr = 1;
-			write(nrm_attr);
-		}
-		if (geom->getUVs())
-		{
-			i32 uv0_attr = 8;
-			write(uv0_attr);
-		}
-		if (geom->getColors() && import_vertex_colors)
-		{
-			i32 color_attr = 4;
-			write(color_attr);
-		}
-		if (geom->getTangents())
-		{
-			i32 color_attr = 2;
-			write(color_attr);
-		}
-		if (isSkinned(mesh))
-		{
-			i32 indices_attr = 6;
-			write(indices_attr);
-			i32 weight_attr = 7;
-			write(weight_attr);
-		}
 	}
 
 
@@ -3230,16 +3150,11 @@ void ImportAssetDialog::convert(bool use_ui)
 		return;
 	}
 
-	for (ofbx::IScene* scene : m_fbx_importer->scenes)
-	{
-		if (!m_fbx_importer->isValid(*scene)) return;
-	}
 	if (m_fbx_importer->bones.size() > Model::Bone::MAX_COUNT)
 	{
 		setMessage("Too many bones.");
 		return;
 	}
-
 
 	for (auto& material : m_fbx_importer->materials)
 	{

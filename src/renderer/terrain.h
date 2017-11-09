@@ -85,8 +85,6 @@ class Terrain
 		Terrain(Renderer& renderer, Entity entity, RenderScene& scene, IAllocator& allocator);
 		~Terrain();
 
-		bgfx::VertexBufferHandle getVerticesHandle() const { return m_vertices_handle; }
-		bgfx::IndexBufferHandle getIndicesHandle() const { return m_indices_handle; }
 		Material* getMaterial() const { return m_material; }
 		Texture* getDetailTexture() const { return m_detail_texture; }
 		Texture* getSplatmap() const { return m_splatmap; }
@@ -141,8 +139,6 @@ class Terrain
 
 	public:
 		IAllocator& m_allocator;
-		bgfx::VertexBufferHandle m_vertices_handle;
-		bgfx::IndexBufferHandle m_indices_handle;
 		Mesh* m_mesh;
 		TerrainQuad* m_root;
 		i32 m_width;

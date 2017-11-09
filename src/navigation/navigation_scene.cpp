@@ -248,8 +248,6 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 			if (!model) return;
 			ASSERT(model->isReady());
 
-			bool is16 = model->areIndices16();
-
 			Entity entity = render_scene->getModelInstanceEntity(model_instance);
 			Matrix mtx = m_universe.getMatrix(entity);
 			AABB model_aabb = model->getAABB();
@@ -259,19 +257,20 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 			auto lod = model->getLODMeshIndices(0);
 			for (int mesh_idx = lod.from; mesh_idx <= lod.to; ++mesh_idx)
 			{
-				auto& mesh = model->getMesh(mesh_idx);
+				Mesh& mesh = model->getMesh(mesh_idx);
+				bool is16 = mesh.areIndices16();
+
 				if (mesh.material->isCustomFlag(no_navigation_flag)) continue;
 				bool is_walkable = !mesh.material->isCustomFlag(nonwalkable_flag);
-				auto* vertices =
-					&model->getVertices()[mesh.attribute_array_offset / model->getVertexDecl().getStride()];
+				auto* vertices = &mesh.vertices[0];
 				if (is16)
 				{
-					const u16* indices16 = model->getIndices16();
+					const u16* indices16 = (const u16*)&mesh.indices[0];
 					for (int i = 0; i < mesh.indices_count; i += 3)
 					{
-						Vec3 a = mtx.transformPoint(vertices[indices16[mesh.indices_offset + i]]);
-						Vec3 b = mtx.transformPoint(vertices[indices16[mesh.indices_offset + i + 1]]);
-						Vec3 c = mtx.transformPoint(vertices[indices16[mesh.indices_offset + i + 2]]);
+						Vec3 a = mtx.transformPoint(vertices[indices16[i]]);
+						Vec3 b = mtx.transformPoint(vertices[indices16[i + 1]]);
+						Vec3 c = mtx.transformPoint(vertices[indices16[i + 2]]);
 
 						Vec3 n = crossProduct(a - b, a - c).normalized();
 						u8 area = n.y > walkable_threshold && is_walkable ? RC_WALKABLE_AREA : 0;
@@ -280,12 +279,12 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 				}
 				else
 				{
-					const u32* indices32 = model->getIndices32();
+					const u32* indices32 = (const u32*)&mesh.indices[0];
 					for (int i = 0; i < mesh.indices_count; i += 3)
 					{
-						Vec3 a = mtx.transformPoint(vertices[indices32[mesh.indices_offset + i]]);
-						Vec3 b = mtx.transformPoint(vertices[indices32[mesh.indices_offset + i + 1]]);
-						Vec3 c = mtx.transformPoint(vertices[indices32[mesh.indices_offset + i + 2]]);
+						Vec3 a = mtx.transformPoint(vertices[indices32[i]]);
+						Vec3 b = mtx.transformPoint(vertices[indices32[i + 1]]);
+						Vec3 c = mtx.transformPoint(vertices[indices32[i + 2]]);
 
 						Vec3 n = crossProduct(a - b, a - c).normalized();
 						u8 area = n.y > walkable_threshold && is_walkable ? RC_WALKABLE_AREA : 0;
