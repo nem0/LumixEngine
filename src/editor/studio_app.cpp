@@ -1240,10 +1240,12 @@ public:
 		Universe* universe = m_editor->getUniverse();
 		getEntityListDisplayName(*m_editor, buffer, sizeof(buffer), entity);
 		bool selected = selected_entities.indexOf(entity) >= 0;
+		ImGui::PushID(entity.index);
 		if (ImGui::Selectable(buffer, &selected))
 		{
 			m_editor->selectEntities(&entity, 1);
 		}
+		ImGui::PopID();
 		if (ImGui::BeginDragDropSource())
 		{
 			ImGui::Text("%s", buffer);
