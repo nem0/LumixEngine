@@ -709,7 +709,7 @@ public:
 
 	void serializeModelInstance(ISerializer& serialize, ComponentHandle cmp)
 	{
-		ModelInstance& r = m_model_instances[{cmp.index}];
+		ModelInstance& r = m_model_instances[cmp.index];
 		ASSERT(r.entity != INVALID_ENTITY);
 
 		serialize.write("source", r.model ? r.model->getPath().c_str() : "");

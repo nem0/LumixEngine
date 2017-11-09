@@ -114,10 +114,7 @@ ScriptedParticleEmitter::ScriptedParticleEmitter(Entity entity, IAllocator& allo
 }
 
 
-ScriptedParticleEmitter::~ScriptedParticleEmitter() 
-{
-	// TODO
-}
+ScriptedParticleEmitter::~ScriptedParticleEmitter() = default; //TODO
 
 
 void ScriptedParticleEmitter::setMaterial(Material* material)

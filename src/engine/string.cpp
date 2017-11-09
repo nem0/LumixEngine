@@ -263,7 +263,7 @@ int compareStringN(const char* lhs, const char* rhs, int length)
 int compareIStringN(const char* lhs, const char* rhs, int length)
 {
 #ifdef _WIN32
-	return strnicmp(lhs, rhs, length);
+	return _strnicmp(lhs, rhs, length);
 #else
 	return strncasecmp(lhs, rhs, length);
 #endif
@@ -285,7 +285,7 @@ bool equalStrings(const char* lhs, const char* rhs)
 bool equalIStrings(const char* lhs, const char* rhs)
 {
 #ifdef _WIN32
-	return stricmp(lhs, rhs) == 0;
+	return _stricmp(lhs, rhs) == 0;
 #else
 	return strcasecmp(lhs, rhs) == 0;
 #endif

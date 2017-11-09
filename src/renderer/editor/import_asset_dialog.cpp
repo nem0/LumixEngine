@@ -449,7 +449,7 @@ struct FBXImporter
 		char* c = filename;
 		while (*c)
 		{
-			bool is_valid = *c >= 'A' && *c <= 'Z' || *c >= 'a' && *c <= 'z' || *c >= '0' && *c <= '9' || *c == '-' || *c == '_';
+			bool is_valid = (*c >= 'A' && *c <= 'Z') || (*c >= 'a' && *c <= 'z') || (*c >= '0' && *c <= '9') || *c == '-' || *c == '_';
 			if (!is_valid) *c = '_';
 			++c;
 		}
@@ -1503,7 +1503,7 @@ struct FBXImporter
 		while (*iter)
 		{
 			char c = *iter;
-			if (!(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9'))
+			if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')))
 			{
 				*iter = '_';
 			}

@@ -25,10 +25,10 @@ OsFile::~OsFile()
 bool OsFile::open(const char* path, Mode mode)
 {
 	m_handle = (HANDLE)::CreateFile(path,
-		Mode::WRITE & mode ? GENERIC_WRITE : 0 | Mode::READ & mode ? GENERIC_READ : 0,
-		Mode::WRITE & mode ? 0 : FILE_SHARE_READ,
+		(Mode::WRITE & mode) ? GENERIC_WRITE : 0 | ((Mode::READ & mode) ? GENERIC_READ : 0),
+		(Mode::WRITE & mode) ? 0 : FILE_SHARE_READ,
 		nullptr,
-		Mode::CREATE & mode ? CREATE_ALWAYS : OPEN_EXISTING,
+		(Mode::CREATE & mode) ? CREATE_ALWAYS : OPEN_EXISTING,
 		FILE_ATTRIBUTE_NORMAL,
 		nullptr);
 

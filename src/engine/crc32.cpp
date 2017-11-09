@@ -58,7 +58,7 @@ u32 crc32(const void* data, int length)
 	int len = length;
 	while (len)
 	{
-		crc = (crc >> 8) ^ crc32Table[crc & 0xFF ^ *c];
+		crc = (crc >> 8) ^ crc32Table[(crc & 0xFF) ^ *c];
 		--len;
 		++c;
 	}
@@ -72,7 +72,7 @@ u32 crc32(const char* str)
 	u32 crc = 0xffffFFFF;
 	while (*c)
 	{
-		crc = (crc >> 8) ^ crc32Table[crc & 0xFF ^ *c];
+		crc = (crc >> 8) ^ crc32Table[(crc & 0xFF) ^ *c];
 		++c;
 	}
 	return ~crc;
@@ -85,7 +85,7 @@ u32 continueCrc32(u32 original_crc, const char* str)
 	u32 crc = ~original_crc;
 	while (*c)
 	{
-		crc = (crc >> 8) ^ crc32Table[crc & 0xFF ^ *c];
+		crc = (crc >> 8) ^ crc32Table[(crc & 0xFF) ^ *c];
 		++c;
 	}
 	return ~crc;
@@ -98,7 +98,7 @@ u32 continueCrc32(u32 original_crc, const void* data, int length)
 	u32 crc = ~original_crc;
 	while (length)
 	{
-		crc = (crc >> 8) ^ crc32Table[crc & 0xFF ^ *c];
+		crc = (crc >> 8) ^ crc32Table[(crc & 0xFF) ^ *c];
 		++c;
 		--length;
 	}

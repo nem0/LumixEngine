@@ -80,7 +80,7 @@ public:
 	}
 
 
-	~FSTask() {}
+	~FSTask() = default;
 
 
 	int task()

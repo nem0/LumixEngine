@@ -1682,7 +1682,7 @@ struct FurPainter LUMIX_FINAL : public WorldEditor::Plugin
 					u32& val = ((u32*)&texture->data[0])[(p.x >> stepshift) + (p.y >> stepshift) * texture->width];
 					float alpha = ((val & 0xff000000) >> 24) / 255.0f;
 					alpha = brush_strength * q + alpha * (1 - q);
-					val = val & 0x00ffFFFF | (u32)(alpha * 255.0f) << 24;
+					val = (val & 0x00ffFFFF) | ((u32)(alpha * 255.0f) << 24);
 				}
 			}
 		}

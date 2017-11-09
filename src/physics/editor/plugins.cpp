@@ -39,11 +39,9 @@ static const ResourceType PHYSICS_TYPE("physics");
 
 
 static Vec3 fromPhysx(const physx::PxVec3& v) { return Vec3(v.x, v.y, v.z); }
-static physx::PxVec3 toPhysx(const Vec3& v) { return physx::PxVec3(v.x, v.y, v.z); }
 static Quat fromPhysx(const physx::PxQuat& v) { return Quat(v.x, v.y, v.z, v.w); }
 static physx::PxQuat toPhysx(const Quat& v) { return physx::PxQuat(v.x, v.y, v.z, v.w); }
 static RigidTransform fromPhysx(const physx::PxTransform& v) { return{ fromPhysx(v.p), fromPhysx(v.q) }; }
-static physx::PxTransform toPhysx(const RigidTransform& v) { return{ toPhysx(v.pos), toPhysx(v.rot) }; }
 
 
 struct EditorPlugin LUMIX_FINAL : public WorldEditor::Plugin

@@ -89,7 +89,7 @@ static int autocompleteCallback(ImGuiTextEditCallbackData *data)
 
 	if (startsWith("finishing()", tmp))
 	{
-		data->InsertChars(data->CursorPos, "finishing()" + stringLength(tmp));
+		data->InsertChars(data->CursorPos, &("finishing()"[stringLength(tmp)]));
 		return 0;
 	}
 

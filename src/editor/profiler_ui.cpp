@@ -969,7 +969,7 @@ void ProfilerUIImpl::showAllocationTree(AllocationStackNode* node, int column)
 	#ifdef _MSC_VER
 		char size[50];
 		toCStringPretty(node->m_inclusive_size, size, sizeof(size));
-		ImGui::Text(size);
+		ImGui::Text("%s", size);
 		if (node->m_open)
 		{
 			for (auto* child : node->m_children)

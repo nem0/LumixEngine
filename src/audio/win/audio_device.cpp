@@ -93,7 +93,7 @@ struct AudioDeviceImpl LUMIX_FINAL : public AudioDevice
 		auto coinitialize_result = CoInitialize(nullptr);
 		if (!SUCCEEDED(coinitialize_result))
 		{
-			g_log_error.log("Audio") << "CoInitialize failed. Error code: " << coinitialize_result;
+			g_log_error.log("Audio") << "CoInitialize failed. Error code: " << (u32)coinitialize_result;
 			ASSERT(false);
 			return false;
 		}
@@ -117,7 +117,7 @@ struct AudioDeviceImpl LUMIX_FINAL : public AudioDevice
 		auto create_result = dsoundCreate(0, &m_direct_sound, nullptr);
 		if (!SUCCEEDED(create_result))
 		{
-			g_log_error.log("Audio") << "Failed to create DirectSound. Error code: " << create_result;
+			g_log_error.log("Audio") << "Failed to create DirectSound. Error code: " << (u32)create_result;
 			ASSERT(false);
 			FreeLibrary(m_library);
 			return false;
