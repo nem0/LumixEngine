@@ -188,8 +188,10 @@ void SceneView::renderSelection()
 		ComponentHandle cmp = scene->getModelInstanceComponent(e);
 		if (!cmp.isValid()) continue;
 		Model* model = scene->getModelInstanceModel(cmp);
+		Pose* pose = scene->lockPose(cmp);
 		Matrix mtx = universe.getMatrix(e);
-		m_pipeline->renderModel(*model, mtx);
+		m_pipeline->renderModel(*model, pose, mtx);
+		scene->unlockPose(cmp, false);
 	}
 }
 

@@ -21,7 +21,7 @@ class Material;
 struct Mesh;
 class Model;
 class Path;
-struct  Pose;
+struct Pose;
 struct RayCastModelHit;
 class Renderer;
 class Shader;

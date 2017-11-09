@@ -31,6 +31,7 @@ struct IAllocator;
 struct Matrix;
 class Model;
 class Path;
+struct Pose;
 class Renderer;
 class RenderScene;
 struct Vec4;
@@ -120,7 +121,7 @@ class LUMIX_RENDERER_API Pipeline
 			int num_indices,
 			u64 render_states,
 			struct ShaderInstance& shader_instance) = 0;
-		virtual void renderModel(Model& model, const Matrix& mtx) = 0;
+		virtual void renderModel(Model& model, Pose* pose, const Matrix& mtx) = 0;
 		virtual void toggleStats() = 0;
 		virtual void setWindowHandle(void* data) = 0;
 		virtual bool isReady() const = 0;

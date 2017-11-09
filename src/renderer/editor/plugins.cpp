@@ -2245,7 +2245,7 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 	{
 		if (!m_pipeline.isReady() || !m_models[model]->isReady()) return;
 
-		m_pipeline.renderModel(*m_models[model], mtx);
+		m_pipeline.renderModel(*m_models[model], nullptr, mtx);
 	}
 
 
