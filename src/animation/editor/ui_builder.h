@@ -1080,6 +1080,19 @@ struct UIBuilder
 	}
 
 
+	template <typename O, typename PP>
+	void ui(O& owner, const PP& pp, float obj)
+	{
+		if (customUI(owner, pp, obj)) return;
+
+		if (ImGui::DragFloat(pp.name, &obj))
+		{
+			auto* command = LUMIX_NEW(m_allocator, SetPropertyCommand<RootGetter, float, PP>)(m_root, pp, obj);
+			m_editor.executeCommand(*command);
+		}
+	}
+
+
 	template <typename O, typename PP, typename T>
 	typename EnableIf<TupleSize<decltype(getEnum<T>())>::result == 0>::Type
 		ui(O& owner, const PP& pp, const T& obj)

@@ -62,7 +62,8 @@ auto getMembers<AnimEditor::AnimationNode>()
 {
 	return type("Animation Node",
 		property("Looped", &AnimEditor::AnimationNode::isLooped, &AnimEditor::AnimationNode::setIsLooped),
-		property("New selection on loop", &AnimEditor::AnimationNode::isNewSelectionOnLoop, &AnimEditor::AnimationNode::setIsNewSelectionOnLoop)
+		property("New selection on loop", &AnimEditor::AnimationNode::isNewSelectionOnLoop, &AnimEditor::AnimationNode::setIsNewSelectionOnLoop),
+		property("Speed multiplier", &AnimEditor::AnimationNode::getSpeedMultiplier, &AnimEditor::AnimationNode::setSpeedMultiplier)
 	);
 }
 
@@ -1137,6 +1138,18 @@ void AnimationNode::setIsNewSelectionOnLoop(bool is)
 }
 
 
+float AnimationNode::getSpeedMultiplier() const
+{
+	return ((Anim::AnimationNode*)engine_cmp)->speed_multiplier;
+}
+
+
+void AnimationNode::setSpeedMultiplier(float value)
+{
+	((Anim::AnimationNode*)engine_cmp)->speed_multiplier = value;
+}
+
+
 void AnimationNode::compile()
 {
 	auto* engine_node = (Anim::AnimationNode*)engine_cmp;
@@ -1241,7 +1254,6 @@ void AnimationNode::onGUI()
 			node->max_root_rotation_speed = Math::degreesToRadians(deg);
 		}
 	}
-	ImGui::DragFloat("Speed multiplicator", &node->speed_multiplier, 0.1f);
 }
 
 
