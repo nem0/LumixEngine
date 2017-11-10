@@ -51,8 +51,18 @@ static float dot(const ImVec2& a, const ImVec2& b)
 template <>
 auto getMembers<AnimEditor::Node>()
 {
-	return type("Animation Node",
+	return type("Node",
 		property("Name", &AnimEditor::Node::name)
+	);
+}
+
+
+template <>
+auto getMembers<AnimEditor::AnimationNode>()
+{
+	return type("Animation Node",
+		property("Looped", &AnimEditor::AnimationNode::isLooped, &AnimEditor::AnimationNode::setIsLooped),
+		property("New selection on loop", &AnimEditor::AnimationNode::isNewSelectionOnLoop, &AnimEditor::AnimationNode::setIsNewSelectionOnLoop)
 	);
 }
 
@@ -1103,6 +1113,30 @@ void AnimationNode::deserialize(InputBlob& blob)
 }
 
 
+bool AnimationNode::isLooped() const
+{
+	return ((Anim::AnimationNode*)engine_cmp)->looped;
+}
+
+
+void AnimationNode::setIsLooped(bool is_looped)
+{
+	((Anim::AnimationNode*)engine_cmp)->looped = is_looped;
+}
+
+
+bool AnimationNode::isNewSelectionOnLoop() const
+{
+	return ((Anim::AnimationNode*)engine_cmp)->new_on_loop;
+}
+
+
+void AnimationNode::setIsNewSelectionOnLoop(bool is)
+{
+	((Anim::AnimationNode*)engine_cmp)->new_on_loop = is;
+}
+
+
 void AnimationNode::compile()
 {
 	auto* engine_node = (Anim::AnimationNode*)engine_cmp;
@@ -1164,9 +1198,15 @@ void AnimationNode::onGUI()
 	{
 		node->animations_hashes.emplace(0);
 	}
-	ImGui::Checkbox("Looped", &node->looped);
-	ImGui::Checkbox("New selection on loop", &node->new_on_loop);
 
+	int uid = engine_cmp->uid;
+	ControllerResource& controller = m_controller;
+	auto root_getter = [uid, &controller]() -> auto& {
+		return *(AnimationNode*)controller.getByUID(uid);
+	};
+	UIBuilder<IAnimationEditor, decltype(root_getter)> builder(m_controller.getEditor(), root_getter, m_controller.getAllocator());
+	builder.build();
+	
 	Anim::InputDecl& decl = m_controller.getEngineResource()->m_input_decl;
 	auto input_getter = [](void* data, int idx, const char** out) -> bool {
 		auto& decl = *(Anim::InputDecl*)data;

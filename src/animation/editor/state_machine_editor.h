@@ -165,6 +165,10 @@ class AnimationNode : public Node
 public:
 	AnimationNode(Anim::Component* engine_cmp, Container* parent, ControllerResource& controller);
 
+	bool isLooped() const;
+	void setIsLooped(bool is_looped);
+	bool isNewSelectionOnLoop() const;
+	void setIsNewSelectionOnLoop(bool is);
 	void compile() override;
 	void onGUI() override;
 	void debug(ImDrawList* draw, const ImVec2& canvas_screen_pos, Anim::ComponentInstance* runtime) override;

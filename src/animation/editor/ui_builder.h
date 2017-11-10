@@ -935,8 +935,9 @@ struct UIBuilder
 		auto desc = getMembers<RemoveCVR<decltype(m_root())>>();
 		apply([this](const auto& member) {
 			auto pp = makePP(PropertyPathBegin{}, member);
-			auto& v = member.getRef(m_root());
-			this->ui(m_root(), pp, v);
+			member.callWithValue(m_root(), [this, &pp](const auto& value) {
+				this->ui(m_root(), pp, value);
+			});
 		}, desc.members);
 	}
 
@@ -1061,6 +1062,19 @@ struct UIBuilder
 		if (ImGui::InputInt(pp.name, &obj))
 		{
 			auto* command = LUMIX_NEW(m_allocator, SetPropertyCommand<RootGetter, int, PP>)(m_root, pp, obj);
+			m_editor.executeCommand(*command);
+		}
+	}
+
+
+	template <typename O, typename PP>
+	void ui(O& owner, const PP& pp, bool obj)
+	{
+		if (customUI(owner, pp, obj)) return;
+
+		if (ImGui::Checkbox(pp.name, &obj))
+		{
+			auto* command = LUMIX_NEW(m_allocator, SetPropertyCommand<RootGetter, bool, PP>)(m_root, pp, obj);
 			m_editor.executeCommand(*command);
 		}
 	}
