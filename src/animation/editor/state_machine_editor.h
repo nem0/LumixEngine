@@ -165,6 +165,8 @@ class AnimationNode : public Node
 public:
 	AnimationNode(Anim::Component* engine_cmp, Container* parent, ControllerResource& controller);
 
+	float getSpeedMultiplier() const;
+	void setSpeedMultiplier(float value);
 	bool isLooped() const;
 	void setIsLooped(bool is_looped);
 	bool isNewSelectionOnLoop() const;
