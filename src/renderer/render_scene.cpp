@@ -52,6 +52,7 @@ enum class RenderSceneVersion : int
 	MODEL_INSTNACE_FLAGS,
 	INDIRECT_INTENSITY,
 	SCRIPTED_PARTICLES,
+	POINT_LIGHT_NO_COMPONENT,
 
 	LATEST
 };
@@ -101,7 +102,6 @@ struct PointLight
 	float m_diffuse_intensity;
 	float m_specular_intensity;
 	Entity m_entity;
-	ComponentHandle m_component;
 	float m_fov;
 	float m_attenuation_param;
 	float m_range;
@@ -308,7 +308,7 @@ public:
 		{
 			for (auto& i : m_point_lights)
 			{
-				if (i.m_entity == entity) return i.m_component;
+				if (i.m_entity == entity) return {entity.index};
 			}
 			return INVALID_COMPONENT;
 		}
@@ -841,7 +841,6 @@ public:
 		PointLight& light = m_point_lights[m_point_lights_map[cmp]];
 		serializer.write("attenuation", light.m_attenuation_param);
 		serializer.write("cast_shadow", light.m_cast_shadows);
-		serializer.write("component", light.m_component);
 		serializer.write("diffuse_color", light.m_diffuse_color);
 		serializer.write("diffuse_intensity", light.m_diffuse_intensity);
 		serializer.write("fov", light.m_fov);
@@ -851,17 +850,18 @@ public:
 	}
 
 
-	void deserializePointLight(IDeserializer& serializer, Entity entity, int /*scene_version*/)
+	void deserializePointLight(IDeserializer& serializer, Entity entity, int scene_version)
 	{
 		m_light_influenced_geometry.emplace(m_allocator);
 		PointLight& light = m_point_lights.emplace();
 		light.m_entity = entity;
 		serializer.read(&light.m_attenuation_param);
 		serializer.read(&light.m_cast_shadows);
-		serializer.read(&light.m_component);
-		if (light.m_component.index > m_point_light_last_cmp.index)
+		
+		if (scene_version <= (int)RenderSceneVersion::POINT_LIGHT_NO_COMPONENT)
 		{
-			m_point_light_last_cmp = light.m_component;
+			ComponentHandle dummy;
+			serializer.read(&dummy);
 		}
 		serializer.read(&light.m_diffuse_color);
 		serializer.read(&light.m_diffuse_intensity);
@@ -869,9 +869,10 @@ public:
 		serializer.read(&light.m_range);
 		serializer.read(&light.m_specular_color);
 		serializer.read(&light.m_specular_intensity);
-		m_point_lights_map.insert(light.m_component, m_point_lights.size() - 1);
+		ComponentHandle cmp = { light.m_entity.index };
+		m_point_lights_map.insert(cmp, m_point_lights.size() - 1);
 
-		m_universe.addComponent(light.m_entity, POINT_LIGHT_TYPE, this, light.m_component);
+		m_universe.addComponent(light.m_entity, POINT_LIGHT_TYPE, this, cmp);
 	}
 
 
@@ -1350,7 +1351,6 @@ public:
 		{
 			serializer.write(m_point_lights[i]);
 		}
-		serializer.write(m_point_light_last_cmp);
 
 		serializer.write((i32)m_global_lights.size());
 		for (const GlobalLight& light : m_global_lights)
@@ -1680,11 +1680,11 @@ public:
 			m_light_influenced_geometry.emplace(m_allocator);
 			PointLight& light = m_point_lights[i];
 			serializer.read(light);
-			m_point_lights_map.insert(light.m_component, i);
+			ComponentHandle cmp = { light.m_entity.index };
+			m_point_lights_map.insert(cmp, i);
 
-			m_universe.addComponent(light.m_entity, POINT_LIGHT_TYPE, this, light.m_component);
+			m_universe.addComponent(light.m_entity, POINT_LIGHT_TYPE, this, cmp);
 		}
-		serializer.read(m_point_light_last_cmp);
 
 		serializer.read(size);
 		for (int i = 0; i < size; ++i)
@@ -1804,7 +1804,7 @@ public:
 		m_light_influenced_geometry.eraseFast(index);
 		if (index < m_point_lights.size())
 		{
-			m_point_lights_map[m_point_lights[index].m_component] = index;
+			m_point_lights_map[{m_point_lights[index].m_entity.index}] = index;
 		}
 		m_universe.destroyComponent(entity, POINT_LIGHT_TYPE, this, component);
 	}
@@ -2549,7 +2549,7 @@ public:
 		{
 			if (m_point_lights[i].m_entity == entity)
 			{
-				detectLightInfluencedGeometry(m_point_lights[i].m_component);
+				detectLightInfluencedGeometry({ m_point_lights[i].m_entity.index });
 				break;
 			}
 		}
@@ -3177,7 +3177,7 @@ public:
 			float dist_squared = (reference_pos - light_pos).squaredLength();
 
 			dists[light_count] = dist_squared;
-			lights[light_count] = light.m_component;
+			lights[light_count] = { light.m_entity.index };
 
 			for (int i = light_count; i > 0 && dists[i - 1] > dists[i]; --i)
 			{
@@ -3205,7 +3205,7 @@ public:
 			if (dist_squared < dists[max_lights - 1])
 			{
 				dists[max_lights - 1] = dist_squared;
-				lights[max_lights - 1] = light.m_component;
+				lights[max_lights - 1] = { light.m_entity.index };
 
 				for (int i = max_lights - 1; i > 0 && dists[i - 1] > dists[i];
 					 --i)
@@ -3233,7 +3233,7 @@ public:
 
 			if (frustum.isSphereInside(m_universe.getPosition(light.m_entity), light.m_range))
 			{
-				lights.push(light.m_component);
+				lights.push({ light.m_entity.index });
 			}
 		}
 	}
@@ -4795,21 +4795,20 @@ public:
 		light.m_entity = entity;
 		light.m_diffuse_color.set(1, 1, 1);
 		light.m_diffuse_intensity = 1;
-		++m_point_light_last_cmp.index;
-		light.m_component = m_point_light_last_cmp;
 		light.m_fov = Math::degreesToRadians(360);
 		light.m_specular_color.set(1, 1, 1);
 		light.m_specular_intensity = 1;
 		light.m_cast_shadows = false;
 		light.m_attenuation_param = 2;
 		light.m_range = 10;
-		m_point_lights_map.insert(light.m_component, m_point_lights.size() - 1);
+		ComponentHandle cmp = { entity.index };
+		m_point_lights_map.insert(cmp, m_point_lights.size() - 1);
 
-		m_universe.addComponent(entity, POINT_LIGHT_TYPE, this, light.m_component);
+		m_universe.addComponent(entity, POINT_LIGHT_TYPE, this, cmp);
 
-		detectLightInfluencedGeometry(light.m_component);
+		detectLightInfluencedGeometry(cmp);
 
-		return light.m_component;
+		return cmp;
 	}
 
 
@@ -4950,7 +4949,6 @@ private:
 	Engine& m_engine;
 	CullingSystem* m_culling_system;
 
-	ComponentHandle m_point_light_last_cmp;
 	Array<Array<ComponentHandle>> m_light_influenced_geometry;
 	ComponentHandle m_active_global_light_cmp;
 	HashMap<ComponentHandle, int> m_point_lights_map;
@@ -5044,7 +5042,6 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	, m_debug_points(m_allocator)
 	, m_temporary_infos(m_allocator)
 	, m_active_global_light_cmp(INVALID_COMPONENT)
-	, m_point_light_last_cmp(INVALID_COMPONENT)
 	, m_is_grass_enabled(true)
 	, m_is_game_running(false)
 	, m_particle_emitters(m_allocator)
