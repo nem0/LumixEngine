@@ -859,6 +859,10 @@ public:
 		serializer.read(&light.m_attenuation_param);
 		serializer.read(&light.m_cast_shadows);
 		serializer.read(&light.m_component);
+		if (light.m_component.index > m_point_light_last_cmp.index)
+		{
+			m_point_light_last_cmp = light.m_component;
+		}
 		serializer.read(&light.m_diffuse_color);
 		serializer.read(&light.m_diffuse_intensity);
 		serializer.read(&light.m_fov);
