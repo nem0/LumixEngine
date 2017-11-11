@@ -63,7 +63,19 @@ auto getMembers<AnimEditor::AnimationNode>()
 	return type("Animation Node",
 		property("Looped", &AnimEditor::AnimationNode::isLooped, &AnimEditor::AnimationNode::setIsLooped),
 		property("New selection on loop", &AnimEditor::AnimationNode::isNewSelectionOnLoop, &AnimEditor::AnimationNode::setIsNewSelectionOnLoop),
-		property("Speed multiplier", &AnimEditor::AnimationNode::getSpeedMultiplier, &AnimEditor::AnimationNode::setSpeedMultiplier)
+		property("Speed multiplier", &AnimEditor::AnimationNode::getSpeedMultiplier, &AnimEditor::AnimationNode::setSpeedMultiplier),
+		property("Animations", &AnimEditor::AnimationNode::getAnimations,
+			array_attribute(&AnimEditor::AnimationNode::addAnimation, &AnimEditor::AnimationNode::removeAnimation))
+			.addConstRefGetter(&AnimEditor::AnimationNode::getAnimations)
+	);
+}
+
+
+template <>
+auto getMembers<AnimEditor::AnimationNode::AnimationProxy>()
+{
+	return type("Animation",
+		property("Value", &AnimEditor::AnimationNode::AnimationProxy::getValue, &AnimEditor::AnimationNode::AnimationProxy::setValue)
 	);
 }
 
@@ -1093,6 +1105,7 @@ void Blend1DNode::onGUI()
 
 AnimationNode::AnimationNode(Anim::Component* engine_cmp, Container* parent, ControllerResource& controller)
 	: Node(engine_cmp, parent, controller)
+	, m_animations(controller.getAllocator())
 {
 }
 
@@ -1110,6 +1123,12 @@ void AnimationNode::deserialize(InputBlob& blob)
 			root_rotation_input = i;
 			break;
 		}
+	}
+
+	auto* engine_node = (Anim::AnimationNode*)engine_cmp;
+	for (u32 hash : engine_node->animations_hashes)
+	{
+		m_animations.emplace(*this);
 	}
 }
 
@@ -1177,48 +1196,75 @@ void AnimationNode::debug(ImDrawList* draw, const ImVec2& canvas_screen_pos, Ani
 }
 
 
-void AnimationNode::onGUI()
+u32 AnimationNode::AnimationProxy::getValue() const
 {
-	Node::onGUI();
-	
-	auto* node = (Anim::AnimationNode*)engine_cmp;
+	auto* engine_node = (Anim::AnimationNode*)node.engine_cmp;
+	int proxy_idx = node.getAnimations().find([this](const auto& rhs) { return this == &rhs; });
+	return engine_node->animations_hashes[proxy_idx];
+}
+
+
+void AnimationNode::AnimationProxy::setValue(u32 value)
+{
+	auto* engine_node = (Anim::AnimationNode*)node.engine_cmp;
+	int proxy_idx = node.getAnimations().find([this](const auto& rhs) { return this == &rhs; });
+	engine_node->animations_hashes[proxy_idx] = value;
+}
+
+
+template <typename Root>
+void AnimationNode::AnimationProxy::ui(IAnimationEditor& editor, const Root& root)
+{
 	auto getter = [](void* data, int idx, const char** out) -> bool {
 		auto* node = (AnimationNode*)data;
 		auto& slots = node->m_controller.getAnimationSlots();
 		*out = slots[idx].getName();
 		return true;
 	};
-	
-	auto& slots = m_controller.getAnimationSlots();
-	int current = 0;
 
-	for (int i = 0; i < node->animations_hashes.size(); ++i)
+	auto& slots = node.m_controller.getAnimationSlots();
+	auto* engine_node = (Anim::AnimationNode*)node.engine_cmp;
+
+	int proxy_idx = node.getAnimations().find([this](const auto& rhs) { return this == &rhs; });
+	int current = 0;
+	for (current = 0; current < slots.size() && crc32(slots[current].getName()) != engine_node->animations_hashes[proxy_idx]; ++current);
+	if (ImGui::Combo("Animation", &current, getter, &node, slots.size()))
 	{
-		for (current = 0; current < slots.size() && crc32(slots[current].getName()) != node->animations_hashes[i]; ++current);
-		ImGui::PushID(i);
-		if (ImGui::Combo("Animation", &current, getter, this, slots.size()))
-		{
-			node->animations_hashes[i] = crc32(slots[current].getName());
-		}
-		ImGui::SameLine();
-		if (ImGui::Button("Remove"))
-		{
-			node->animations_hashes.erase(i);
-		}
-		ImGui::PopID();
+		IAllocator& allocator = editor.getApp().getWorldEditor().getAllocator();
+		setPropertyValue(allocator, editor, root, crc32(slots[current].getName()), "Animations", proxy_idx, "Value");
 	}
-	if (ImGui::Button("Add animation"))
+}
+
+
+void AnimationNode::addAnimation(int idx)
+{
+	auto* node = (Anim::AnimationNode*)engine_cmp;
+	if (idx < 0)
 	{
 		node->animations_hashes.emplace(0);
+		m_animations.emplace(*this);
 	}
+	else
+	{
+		node->animations_hashes.emplaceAt(idx, 0);
+		m_animations.emplaceAt(idx, *this);
+	}
+}
 
-	int uid = engine_cmp->uid;
-	ControllerResource& controller = m_controller;
-	auto root_getter = [uid, &controller]() -> auto& {
-		return *(AnimationNode*)controller.getByUID(uid);
-	};
-	UIBuilder<IAnimationEditor, decltype(root_getter)> builder(m_controller.getEditor(), root_getter, m_controller.getAllocator());
-	builder.build();
+
+void AnimationNode::removeAnimation(int idx)
+{
+	auto* node = (Anim::AnimationNode*)engine_cmp;
+	node->animations_hashes.erase(idx);
+	m_animations.erase(idx);
+}
+
+
+void AnimationNode::onGUI()
+{
+	Node::onGUI();
+	
+	auto* node = (Anim::AnimationNode*)engine_cmp;
 	
 	Anim::InputDecl& decl = m_controller.getEngineResource()->m_input_decl;
 	auto input_getter = [](void* data, int idx, const char** out) -> bool {
@@ -1254,6 +1300,15 @@ void AnimationNode::onGUI()
 			node->max_root_rotation_speed = Math::degreesToRadians(deg);
 		}
 	}
+
+	int uid = engine_cmp->uid;
+	ControllerResource* controller = &m_controller;
+	auto root_getter = [uid, controller]() -> auto& {
+		return *(AnimationNode*)controller->getByUID(uid);
+	};
+	UIBuilder<IAnimationEditor, decltype(root_getter)> builder(m_controller.getEditor(), root_getter, m_controller.getAllocator());
+	builder.build();
+
 }
 
 
