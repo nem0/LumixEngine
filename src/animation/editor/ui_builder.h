@@ -308,6 +308,12 @@ inline void serialize(OutputBlob& blob, int obj)
 }
 
 
+inline void serialize(OutputBlob& blob, u32 obj)
+{
+	blob.write(obj);
+}
+
+
 template <int count>
 void serialize(OutputBlob& blob, const StaticString<count>& obj)
 {
@@ -441,7 +447,17 @@ void deserialize(InputBlob& blob, Parent& parent, const Member& member, const Pa
 template <typename Parent, typename Member>
 void deserialize(InputBlob& blob, Parent& parent, const Member& member, int obj)
 {
-	member.set(parent, obj);
+	int tmp;
+	blob.read(tmp);
+	member.set(parent, tmp);
+}
+
+template <typename Parent, typename Member>
+void deserialize(InputBlob& blob, Parent& parent, const Member& member, u32 obj)
+{
+	u32 tmp;
+	blob.read(tmp);
+	member.set(parent, tmp);
 }
 
 template <typename Parent, typename Member, int count>
@@ -968,8 +984,36 @@ struct UIBuilder
 	};
 
 
+	template <typename T, typename Root>
+	class HasUIMethod
+	{
+		typedef char one;
+		typedef long two;
+
+		template <typename C> static one test(decltype(&C::template ui<Root>));
+		template <typename C> static two test(...);
+
+	public:
+		enum { value = sizeof(test<T>(0)) == sizeof(char) };
+	};
+
 	template <typename O, typename PP, typename T>
-	bool customUI(O& owner, const PP& pp, const T& obj)
+	auto customUI(O& owner, const PP& pp, const T& obj)
+		-> typename EnableIf<HasUIMethod<T, decltype(m_root)>::value, bool>::Type
+	{
+		CustomUIVisitor<O, PP, T> visitor(owner, pp, obj);
+		apply(visitor, pp.head.attributes);
+		if (!visitor.has_custom_ui)
+		{
+			auto& obj_ref = pp.getRefFromRoot(m_root());
+			obj_ref.ui(m_editor, m_root);
+		}
+		return true;
+	}
+
+	template <typename O, typename PP, typename T>
+	auto customUI(O& owner, const PP& pp, const T& obj) 
+		-> typename EnableIf<!HasUIMethod<T, decltype(m_root)>::value, bool>::Type
 	{
 		CustomUIVisitor<O, PP, T> visitor(owner, pp, obj);
 		apply(visitor, pp.head.attributes);

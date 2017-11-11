@@ -163,6 +163,18 @@ private:
 class AnimationNode : public Node
 {
 public:
+	struct AnimationProxy
+	{
+		AnimationProxy(AnimationNode& node) : node(node) {}
+		AnimationNode& node;
+
+		u32 getValue() const;
+		void setValue(u32 value);
+
+		template <typename Root>
+		void ui(IAnimationEditor& editor, const Root& root);
+	};
+
 	AnimationNode(Anim::Component* engine_cmp, Container* parent, ControllerResource& controller);
 
 	float getSpeedMultiplier() const;
@@ -175,8 +187,13 @@ public:
 	void onGUI() override;
 	void debug(ImDrawList* draw, const ImVec2& canvas_screen_pos, Anim::ComponentInstance* runtime) override;
 	void deserialize(InputBlob& blob) override;
+	void addAnimation(int idx);
+	void removeAnimation(int idx);
+	Array<AnimationProxy>& getAnimations() { return m_animations; }
+	const Array<AnimationProxy>& getAnimations() const { return m_animations; }
 
 	int root_rotation_input = -1;
+	Array<AnimationProxy> m_animations;
 };
 
 
