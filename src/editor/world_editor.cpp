@@ -1860,7 +1860,7 @@ public:
 			m_gizmo->add(m_selected_entities[0]);
 		}
 
-		if (m_is_mouse_down[0] && m_mouse_mode == MouseMode::SELECT)
+		if (m_is_mouse_down[MouseButton::LEFT] && m_mouse_mode == MouseMode::SELECT)
 		{
 			m_render_interface->addRect2D(m_rect_selection_start, m_mouse_pos, 0xfffffFFF);
 			m_render_interface->addRect2D(m_rect_selection_start - Vec2(1, 1), m_mouse_pos + Vec2(1, 1), 0xff000000);
@@ -3904,7 +3904,7 @@ private:
 	DelegateList<void()> m_universe_destroyed;
 	DelegateList<void()> m_universe_created;
 	DelegateList<void(const Array<Entity>&)> m_entity_selected;
-	bool m_is_mouse_down[3];
+	bool m_is_mouse_down[MouseButton::RIGHT + 1];
 	bool m_is_mouse_click[3];
 
 	Array<Plugin*> m_plugins;
