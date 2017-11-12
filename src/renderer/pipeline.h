@@ -27,15 +27,16 @@ namespace Lumix
 
 struct Draw2D;
 class FrameBuffer;
+struct Font;
 struct IAllocator;
 struct Matrix;
+class Material;
 class Model;
 class Path;
 struct Pose;
 class Renderer;
 class RenderScene;
 struct Vec4;
-class Material;
 
 
 struct CommandBufferGenerator
@@ -129,6 +130,7 @@ class LUMIX_RENDERER_API Pipeline
 		virtual Path& getPath() = 0;
 		virtual void callLuaFunction(const char* func) = 0;
 
+		virtual ComponentHandle getAppliedCamera() const = 0;
 		virtual void render(const bgfx::VertexBufferHandle& vertex_buffer,
 			const bgfx::IndexBufferHandle& index_buffer,
 			const bgfx::InstanceDataBuffer& instance_buffer,
@@ -136,6 +138,7 @@ class LUMIX_RENDERER_API Pipeline
 			Material& material) = 0;
 
 		virtual Draw2D& getDraw2D() = 0;
+		virtual Font* getDraw2DFont() = 0;
 };
 
 

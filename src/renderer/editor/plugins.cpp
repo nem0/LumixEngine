@@ -1989,9 +1989,22 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 	}
 
 
+	void addText2D(float x, float y, float font_size, u32 color, const char* text) override
+	{
+		Font* font = m_pipeline.getDraw2DFont();
+		m_pipeline.getDraw2D().AddText(font, font_size, { x, y }, color, text);
+	}
+
+
 	void addRect2D(const Vec2& a, const Vec2& b, u32 color) override
 	{
 		m_pipeline.getDraw2D().AddRect(a, b, color);
+	}
+
+
+	void addRectFilled2D(const Vec2& a, const Vec2& b, u32 color) override
+	{
+		m_pipeline.getDraw2D().AddRectFilled(a, b, color);
 	}
 
 
@@ -2334,6 +2347,18 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 			indices_count,
 			flags,
 			m_shader->getInstance(0));
+	}
+
+
+	Vec2 worldToScreenPixels(const Vec3& world) override
+	{
+		ComponentHandle camera = m_pipeline.getAppliedCamera();
+		Matrix mtx = m_render_scene->getCameraViewProjection(camera);
+		Vec4 pos = mtx * Vec4(world, 1);
+		float inv = 1 / pos.w;
+		Vec2 screen_size = m_render_scene->getCameraScreenSize(camera);
+		Vec2 screen_pos = { 0.5f * pos.x * inv + 0.5f, 1.0f - (0.5f * pos.y * inv + 0.5f) };
+		return screen_pos * screen_size;
 	}
 
 

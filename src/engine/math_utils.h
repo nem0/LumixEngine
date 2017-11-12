@@ -159,13 +159,7 @@ LUMIX_FORCE_INLINE float radiansToDegrees(float angle)
 
 LUMIX_ENGINE_API Vec3 radiansToDegrees(const Vec3& v);
 
-inline float angleDiff(float a, float b)
-{
-	float delta = a - b;
-	if (delta > PI) return PI * 2 - delta;
-	if (delta < -PI) return PI * 2 + delta;
-	return delta;
-}
+LUMIX_ENGINE_API float angleDiff(float a, float b);
 
 inline float easeInOut(float t)
 {

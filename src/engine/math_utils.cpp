@@ -19,6 +19,15 @@ Vec3 radiansToDegrees(const Vec3& v)
 	return Vec3(radiansToDegrees(v.x), radiansToDegrees(v.y), radiansToDegrees(v.z));
 }
 
+float angleDiff(float a, float b)
+{
+	float delta = a - b;
+	delta = fmodf(delta, PI * 2);
+	if (delta > PI) return -PI * 2 + delta;
+	if (delta < -PI) return PI * 2 + delta;
+	return delta;
+}
+
 bool getRayPlaneIntersecion(const Vec3& origin,
 	const Vec3& dir,
 	const Vec3& plane_point,
