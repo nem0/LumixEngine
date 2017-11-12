@@ -163,6 +163,7 @@ void SceneView::update(float)
 
 	float speed = m_camera_speed;
 	if (ImGui::GetIO().KeyShift) speed *= 10;
+	m_editor.getGizmo().enableStep(m_toggle_gizmo_step_action->isActive());
 	if (m_move_forward_action->isActive()) m_editor.navigate(1.0f, 0, 0, speed);
 	if (m_move_back_action->isActive()) m_editor.navigate(-1.0f, 0, 0, speed);
 	if (m_move_left_action->isActive()) m_editor.navigate(0.0f, -1.0f, 0, speed);

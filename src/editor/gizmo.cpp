@@ -1005,7 +1005,7 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 		if (dotProduct(delta_vec, entity_to_intersection) < 0) delta = -delta;
 		if (!m_is_step || delta > float(getStep()))
 		{
-			if (m_is_step) delta = delta * float(getStep());
+			if (m_is_step) delta = float(getStep());
 
 			Array<float> new_scales(m_editor.getAllocator());
 			if (m_entities[m_active] == m_editor.getSelectedEntities()[0])
