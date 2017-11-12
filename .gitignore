@@ -7,3 +7,4 @@ obj/
 *.user
 *.nvuser
 *.orig
+.vscode
