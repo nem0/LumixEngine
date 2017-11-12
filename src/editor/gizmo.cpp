@@ -71,11 +71,9 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 		, m_transform_axis(Axis::X)
 		, m_active(-1)
 		, m_is_step(false)
-		, m_relx_accum(0)
-		, m_rely_accum(0)
+		, m_rel_accum(0, 0)
 		, m_is_dragging(false)
-		, m_mouse_x(0)
-		, m_mouse_y(0)
+		, m_mouse_pos(0, 0)
 	{
 		m_steps[int(Mode::TRANSLATE)] = 10;
 		m_steps[int(Mode::ROTATE)] = 45;
@@ -209,7 +207,18 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 		vertices[8].color = transform_axis == Axis::XZ ? SELECTED_COLOR : Y_COLOR;
 		indices[8] = 8;
 
-		m_editor.getRenderInterface()->render(mtx, indices, 9, vertices, 9, false);
+		RenderInterface* ri = m_editor.getRenderInterface();
+		ri->render(mtx, indices, 9, vertices, 9, false);
+		if (m_is_dragging)
+		{
+			Vec3 intersection = getMousePlaneIntersection(m_editor.getMousePos(), gizmo_mtx, m_transform_axis);
+			Vec3 delta_vec = intersection - m_start_axis_point;
+
+			Vec2 p = ri->worldToScreenPixels(entity_pos);
+			StaticString<128> tmp("", delta_vec.x, "; ", delta_vec.y, "; ", delta_vec.z);
+			ri->addText2D(p.x + 31, p.y + 31, 16, 0xff000000, tmp);
+			ri->addText2D(p.x + 30, p.y + 30, 16, 0xffffFFFF, tmp);
+		}
 	}
 
 
@@ -375,6 +384,35 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 	};
 
 
+	void renderArc(const Vec3& pos, const Vec3& n, const Vec3& origin, float angle, u32 color)
+	{
+		u16 indices[51 * 3];
+		RenderInterface::Vertex vertices[52];
+		
+		int count = Math::clamp(int(fabs(angle) / 0.1f), 1, 50);
+
+		Vec3 side = crossProduct(n.normalized(), origin);
+
+		vertices[0] = { pos, color, 0, 0 };
+		for (int i = 0; i <= count; ++i)
+		{
+			float a = angle / count * i;
+
+			Vec3 p = pos + origin * cosf(a) + side * sinf(a);
+			vertices[i + 1] = { p, color, 0, 0 };
+		}
+		for (int i = 0; i < count; ++i)
+		{
+			indices[i * 3 + 0] = 0;
+			indices[i * 3 + 1] = i+1;
+			indices[i * 3 + 2] = i + 2;
+		}
+
+		RenderInterface* ri = m_editor.getRenderInterface();
+		ri->render(Matrix::IDENTITY, indices, count * 3, vertices, count + 2, false);
+	}
+
+
 	void renderRotateGizmo(const Matrix& gizmo_mtx,
 		bool is_active,
 		const Vec3& camera_pos,
@@ -384,7 +422,7 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 	{
 		Axis transform_axis = is_active ? m_transform_axis : Axis::NONE;
 		Matrix scale_mtx = Matrix::IDENTITY;
-		auto entity_pos = gizmo_mtx.getTranslation();
+		Vec3 entity_pos = gizmo_mtx.getTranslation();
 		float scale = getScale(camera_pos, fov, entity_pos, gizmo_mtx.getXVector().length(), is_ortho);
 		scale_mtx.m11 = scale_mtx.m22 = scale_mtx.m33 = scale;
 
@@ -408,18 +446,26 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 		}
 		else
 		{
+			Axis plane;
+			Vec3 n;
 			Vec3 axis1, axis2;
 			switch (transform_axis)
 			{
 				case Axis::X:
+					plane = Axis::YZ;
+					n = gizmo_mtx.getXVector();
 					axis1 = up;
 					axis2 = dir;
 					break;
 				case Axis::Y:
+					plane = Axis::XZ;
+					n = gizmo_mtx.getYVector();
 					axis1 = right;
 					axis2 = dir;
 					break;
 				case Axis::Z:
+					plane = Axis::XY;
+					n = gizmo_mtx.getZVector();
 					axis1 = right;
 					axis2 = up;
 					break;
@@ -429,6 +475,17 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 			renderQuarterRing(mtx, -axis1, axis2, SELECTED_COLOR);
 			renderQuarterRing(mtx, -axis1, -axis2, SELECTED_COLOR);
 			renderQuarterRing(mtx, axis1, -axis2, SELECTED_COLOR);
+			RenderInterface* ri = m_editor.getRenderInterface();
+
+			Vec3 origin = (m_start_plane_point - entity_pos).normalized();
+			renderArc(entity_pos, n * scale, origin * scale, m_angle_accum, 0x8800a5ff);
+			float angle_degrees = Math::radiansToDegrees(m_angle_accum);
+			Vec2 p = ri->worldToScreenPixels(entity_pos);
+			StaticString<128> tmp("", angle_degrees, " deg");
+			Vec2 screen_delta = (m_start_mouse_pos - p).normalized();
+			Vec2 text_pos = m_start_mouse_pos + screen_delta * 15;
+			ri->addText2D(text_pos.x + 1, text_pos.y + 1, 16, 0xff000000, tmp);
+			ri->addText2D(text_pos.x, text_pos.y, 16, 0xffffFFFF, tmp);
 		}
 	}
 
@@ -732,18 +789,44 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 
 	float computeRotateAngle(int relx, int rely)
 	{
+		if (relx == 0 && rely == 0) return 0;
+
+		Matrix mtx = getMatrix(m_entities[m_active]);
+		Axis plane;
+		Vec3 axis;
+		switch (m_transform_axis)
+		{
+			case Axis::X: plane = Axis::YZ; axis = mtx.getXVector(); break;
+			case Axis::Y: plane = Axis::XZ; axis = mtx.getYVector(); break;
+			case Axis::Z: plane = Axis::XY; axis = mtx.getZVector(); break;
+			default: ASSERT(false); break;
+		}
+
+		Vec3 pos = getMousePlaneIntersection(m_editor.getMousePos(), mtx, plane);
+		Vec3 start_pos = getMousePlaneIntersection(m_mouse_pos, mtx, plane);
+		Vec3 delta = (pos - mtx.getTranslation()).normalized();
+		Vec3 start_delta = (start_pos - mtx.getTranslation()).normalized();
+		
+		Vec3 side = crossProduct(axis, start_delta);
+
+		float y = Math::clamp(dotProduct(delta, start_delta), -1.0f, 1.0f);
+		float x = Math::clamp(dotProduct(delta, side), -1.0f, 1.0f);
+
+		float angle = atan2(x, y);
+		return angle;
+		/*
 		if (m_is_step)
 		{
-			m_relx_accum += relx;
-			m_rely_accum += rely;
-			if (m_relx_accum + m_rely_accum > 50)
+			m_rel_accum.x += relx;
+			m_rel_accum.y += rely;
+			if (m_rel_accum.x + m_rel_accum.y > 50)
 			{
-				m_relx_accum = m_rely_accum = 0;
+				m_rel_accum.x = m_rel_accum.y = 0;
 				return Math::degreesToRadians(float(getStep()));
 			}
-			else if (m_relx_accum + m_rely_accum < -50)
+			else if (m_rel_accum.x + m_rel_accum.y < -50)
 			{
-				m_relx_accum = m_rely_accum = 0;
+				m_rel_accum.x = m_rel_accum.y = 0;
 				return -Math::degreesToRadians(float(getStep()));
 			}
 			else
@@ -751,7 +834,19 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 				return 0;
 			}
 		}
-		return (relx + rely) / 100.0f;
+		return (relx + rely) / 100.0f;*/
+	}
+
+
+	Axis getPlane(Axis axis)
+	{
+		switch (axis)
+		{
+		case Axis::X: return Axis::YZ;
+		case Axis::Y: return Axis::XZ;
+		case Axis::Z: return Axis::XY;
+		default: ASSERT(false); return Axis::NONE;
+		}
 	}
 
 
@@ -763,6 +858,10 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 		{
 			m_is_dragging = true;
 			m_transform_point = getMousePlaneIntersection(m_editor.getMousePos(), frame.toMatrix(), m_transform_axis);
+			m_start_axis_point = m_transform_point;
+			m_start_plane_point = getMousePlaneIntersection(m_editor.getMousePos(), frame.toMatrix(), getPlane(m_transform_axis));
+			m_start_mouse_pos = m_editor.getMousePos();
+			m_angle_accum = 0;
 			m_active = -1;
 		}
 
@@ -832,6 +931,8 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 			default: ASSERT(false); break;
 		}
 		float angle = computeRotateAngle((int)relx, (int)rely);
+		m_angle_accum += angle;
+		m_angle_accum = Math::angleDiff(m_angle_accum, 0);
 
 		rot = Quat(axis, angle) * rot;
 		return true;
@@ -842,8 +943,8 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 	{
 		if (m_active < 0) return;
 
-		float relx = m_editor.getMousePos().x - m_mouse_x;
-		float rely = m_editor.getMousePos().y - m_mouse_y;
+		float relx = m_editor.getMousePos().x - m_mouse_pos.x;
+		float rely = m_editor.getMousePos().y - m_mouse_pos.y;
 
 		Universe* universe = m_editor.getUniverse();
 		Array<Vec3> new_positions(m_editor.getAllocator());
@@ -859,6 +960,8 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 			default: ASSERT(false); break;
 		}
 		float angle = computeRotateAngle((int)relx, (int)rely);
+		m_angle_accum += angle;
+		m_angle_accum = Math::angleDiff(m_angle_accum, 0);
 
 		if (m_editor.getSelectedEntities()[0] == m_entities[m_active])
 		{
@@ -970,6 +1073,10 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 		{
 			Matrix gizmo_mtx = getMatrix(m_entities[m_active]);
 			m_transform_point = getMousePlaneIntersection(m_editor.getMousePos(), gizmo_mtx, m_transform_axis);
+			m_start_axis_point = m_transform_point;
+			m_start_plane_point = getMousePlaneIntersection(m_editor.getMousePos(), gizmo_mtx, getPlane(m_transform_axis));
+			m_start_mouse_pos = m_editor.getMousePos();
+			m_angle_accum = 0;
 			m_is_dragging = true;
 		}
 		else if (!m_editor.isMouseDown(MouseButton::LEFT))
@@ -1034,8 +1141,8 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 			render(gizmo_mtx, m_active == i);
 		}
 
-		m_mouse_x = m_editor.getMousePos().x;
-		m_mouse_y = m_editor.getMousePos().y;
+		m_mouse_pos.x = m_editor.getMousePos().x;
+		m_mouse_pos.y = m_editor.getMousePos().y;
 		m_count = 0;
 	}
 
@@ -1089,12 +1196,14 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 	bool m_is_autosnap_down;
 	WorldEditor& m_editor;
 	Vec3 m_transform_point;
+	Vec3 m_start_axis_point;
+	Vec3 m_start_plane_point;
+	Vec2 m_start_mouse_pos;
+	float m_angle_accum;
 	bool m_is_dragging;
 	int m_active;
-	float m_mouse_x;
-	float m_mouse_y;
-	float m_relx_accum;
-	float m_rely_accum;
+	Vec2 m_mouse_pos;
+	Vec2 m_rel_accum;
 	bool m_is_step;
 	int m_count;
 	Entity m_entities[MAX_GIZMOS];

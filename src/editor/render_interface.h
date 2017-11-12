@@ -66,9 +66,12 @@ public:
 	virtual void hideEntity(Entity entity) = 0;
 	virtual ImFont* addFont(const char* filename, int size) = 0;
 	virtual Vec3 getClosestVertex(Universe* universe, Entity entity, const Vec3& pos) = 0;
+	virtual void addText2D(float x, float y, float font_size, u32 color, const char* text) = 0;
 	virtual void addRect2D(const Vec2& a, const Vec2& b, u32 color) = 0;
+	virtual void addRectFilled2D(const Vec2& a, const Vec2& b, u32 color) = 0;
 	virtual void getModelInstaces(Array<Entity>& entity, const Frustum& frustum, const Vec3& lod_ref_point, ComponentHandle camera) = 0;
 	virtual Frustum getFrustum(ComponentHandle camera_cmp, const Vec2& a, const Vec2& b) = 0;
+	virtual Vec2 worldToScreenPixels(const Vec3& world) = 0;
 };
 
 
