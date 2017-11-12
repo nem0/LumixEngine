@@ -14,6 +14,7 @@ before_install:
   - curl -s http://gamedev.sk/files/coverity.cer | sudo tee -a /etc/ssl/certs/ca-certificates.crt
 before_script:
     - sudo apt-get install ca-certificates
+    - sudo apt-get install libasound2-dev
     - cd projects
     - sh genie_linux_gcc.sh
     - cd tmp/gcc5
