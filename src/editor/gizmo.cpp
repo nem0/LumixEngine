@@ -812,8 +812,7 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 		float y = Math::clamp(dotProduct(delta, start_delta), -1.0f, 1.0f);
 		float x = Math::clamp(dotProduct(delta, side), -1.0f, 1.0f);
 
-		float angle = atan2(x, y);
-		return angle;
+		return atan2(x, y);
 		/*
 		if (m_is_step)
 		{
@@ -842,10 +841,10 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 	{
 		switch (axis)
 		{
-		case Axis::X: return Axis::YZ;
-		case Axis::Y: return Axis::XZ;
-		case Axis::Z: return Axis::XY;
-		default: ASSERT(false); return Axis::NONE;
+			case Axis::X: return Axis::YZ;
+			case Axis::Y: return Axis::XZ;
+			case Axis::Z: return Axis::XY;
+			default: return axis;
 		}
 	}
 
