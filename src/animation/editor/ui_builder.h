@@ -999,7 +999,7 @@ struct UIBuilder
 
 	template <typename O, typename PP, typename T>
 	auto customUI(O& owner, const PP& pp, const T& obj)
-		-> typename EnableIf<HasUIMethod<T, decltype(m_root)>::value, bool>::Type
+		-> typename EnableIf<HasUIMethod<T, RootGetter>::value, bool>::Type
 	{
 		CustomUIVisitor<O, PP, T> visitor(owner, pp, obj);
 		apply(visitor, pp.head.attributes);
@@ -1013,7 +1013,7 @@ struct UIBuilder
 
 	template <typename O, typename PP, typename T>
 	auto customUI(O& owner, const PP& pp, const T& obj) 
-		-> typename EnableIf<!HasUIMethod<T, decltype(m_root)>::value, bool>::Type
+		-> typename EnableIf<!HasUIMethod<T, RootGetter>::value, bool>::Type
 	{
 		CustomUIVisitor<O, PP, T> visitor(owner, pp, obj);
 		apply(visitor, pp.head.attributes);
