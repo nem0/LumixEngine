@@ -51,18 +51,20 @@ public:
 	
 	void update(float time_delta) override 
 	{
-		u16 buffer[1024];
-		for(int i = 0; i < 1024; ++i) buffer[i] = u16(i % 2 ? 32 : 16000);
-		int res = m_api.snd_pcm_writei(m_device, buffer, sizeof(buffer));
-		if (res < 0)
-		{
+		u16 buffer[16*1024];
+		for(int i = 0; i < 16*1024; ++i) buffer[i] = u16(i % 2 ? 32 : 16000);
+		int res = m_api.snd_pcm_wait(m_device, -1);
+		if (res < 0) goto error;
+		res = m_api.snd_pcm_writei(m_device, buffer, sizeof(buffer) / 2 );
+		if (res < 0) goto error;
+		return;
+		
+		error:
+			int x = EBADFD;
+			int y = EPIPE;
+			int z = ESTRPIPE;
 			const char* error_msg = m_api.snd_strerror(res);
 			g_log_error.log("Audio") << error_msg;
-			int e1 = -EBADFD;
-			int e2 = -EPIPE;
-			int e3 = -ESTRPIPE;
-			e1 = 1;
-		}
 	}
 
 
@@ -102,6 +104,13 @@ public:
 		API(snd_pcm_hw_params);
 		API(snd_pcm_hw_params_any);
 		API(snd_pcm_hw_params_sizeof);
+		API(snd_pcm_hw_params_set_format);
+		API(snd_pcm_hw_params_set_channels);
+		API(snd_pcm_hw_params_set_rate_near);
+		API(snd_pcm_hw_params_set_access);
+		API(snd_pcm_name);
+		API(snd_pcm_state);
+		API(snd_pcm_wait);
 
 		#undef API
 
@@ -113,7 +122,10 @@ public:
 	{
 		if (!loadAlsa()) return false;
 		
-		int res = m_api.snd_pcm_open(&m_device, "default", SND_PCM_STREAM_PLAYBACK, 0);
+		unsigned int rate = 44100;
+		int channels = 1;
+
+		int res = m_api.snd_pcm_open(&m_device, "default", SND_PCM_STREAM_PLAYBACK, SND_PCM_NONBLOCK);
 		if(res < 0) goto error;
 
 		snd_pcm_hw_params_t* hw_params;
@@ -121,9 +133,17 @@ public:
 		res = m_api.snd_pcm_hw_params_any(m_device, hw_params);
 		if(res < 0) goto error;
 
+		if (m_api.snd_pcm_hw_params_set_access(m_device, hw_params, SND_PCM_ACCESS_RW_INTERLEAVED) < 0) goto error;
+		if (m_api.snd_pcm_hw_params_set_format(m_device, hw_params, SND_PCM_FORMAT_S16_LE) < 0)  goto error;
+		if (m_api.snd_pcm_hw_params_set_channels(m_device, hw_params, channels) < 0) goto error; 
+		if (m_api.snd_pcm_hw_params_set_rate_near(m_device, hw_params, &rate, 0) < 0) goto error;
+
 		res = m_api.snd_pcm_hw_params(m_device, hw_params);
 		if(res < 0) goto error;
 		
+		g_log_info.log("Audio") << "PCM name: '" << m_api.snd_pcm_name(m_device) << "'";
+		g_log_info.log("Audio") << "PCM state: '" << m_api.snd_pcm_state(m_device) << "'";
+
 		return true;
 
 		error:
@@ -141,6 +161,13 @@ public:
 		int (*snd_pcm_hw_params)(snd_pcm_t *pcm, snd_pcm_hw_params_t *params);
 		const char* (*snd_strerror)(int error_num);
 		size_t (*snd_pcm_hw_params_sizeof)();
+		int (*snd_pcm_hw_params_set_access)(snd_pcm_t *pcm, snd_pcm_hw_params_t *params, snd_pcm_access_t _access);
+		int (*snd_pcm_hw_params_set_format)(snd_pcm_t *pcm, snd_pcm_hw_params_t *params, snd_pcm_format_t val);
+		int (*snd_pcm_hw_params_set_channels)(snd_pcm_t *pcm, snd_pcm_hw_params_t *params, unsigned int val);
+		int (*snd_pcm_hw_params_set_rate_near)(snd_pcm_t *pcm, snd_pcm_hw_params_t *params, unsigned int *val, int *dir);
+		const char* (*snd_pcm_name)(snd_pcm_t *pcm);
+		snd_pcm_state_t (*snd_pcm_state)(snd_pcm_t *pcm);
+		int (*snd_pcm_wait)(snd_pcm_t* pcm, int timeout);
 		snd_pcm_sframes_t (*snd_pcm_writei)(snd_pcm_t *pcm, const void *buffer, snd_pcm_uframes_t size);
 	};
 
