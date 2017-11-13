@@ -21,32 +21,128 @@ public:
 		int sample_rate,
 		int flags) override
 	{
+		ASSERT(flags == 0); // nothing else supported yet
+		for(int i = 0, c = m_buffers.size(); i < c; ++i)
+		{
+			Buffer& buffer = m_buffers[i];
+			if(!(buffer.runtime_flags & (u8)Buffer::RuntimeFlags::READY)) continue;
 
+			buffer.channels = channels;
+			buffer.sample_rate = sample_rate;
+			buffer.flags = flags;
+			buffer.data.resize(size_bytes);
+			buffer.runtime_flags = (u8)Buffer::RuntimeFlags::READY;
+			copyMemory(&buffer.data[0], data, size_bytes);
+
+			return i;
+		}
 		return INVALID_BUFFER_HANDLE;
 	}
+
+
 	void setEcho(BufferHandle handle,
 		float wet_dry_mix,
 		float feedback,
 		float left_delay,
-		float right_delay) override {}
-	void play(BufferHandle buffer, bool looped) override {}
-	bool isPlaying(BufferHandle buffer) override { return false; }
-	void stop(BufferHandle buffer) override {}
-	bool isEnd(BufferHandle buffer) override { return true; }
-	void pause(BufferHandle buffer) override {}
-	void setMasterVolume(float volume) override {}
-	void setVolume(BufferHandle buffer, float volume) override {}
-	void setFrequency(BufferHandle buffer, float frequency) override {}
-	void setCurrentTime(BufferHandle buffer, float time_seconds) override {}
-	float getCurrentTime(BufferHandle buffer) override { return -1; }
-	void setListenerPosition(float x, float y, float z) override {}
+		float right_delay) override 
+	{
+		ASSERT(false); // not implemented yet
+	}
+
+
+	void play(BufferHandle buffer, bool looped) override 
+	{
+		ASSERT(!looped); // nothing else supported right now
+		ASSERT(m_buffers[buffer].runtime_flags & (u8)Buffer::RuntimeFlags::READY);
+		m_buffers[buffer].runtime_flags |= (u8)Buffer::RuntimeFlags::PLAYING;
+	}
+
+
+	bool isPlaying(BufferHandle buffer) override 
+	{
+		ASSERT(m_buffers[buffer].runtime_flags & (u8)Buffer::RuntimeFlags::READY);
+		return m_buffers[buffer].runtime_flags & (u8)Buffer::RuntimeFlags::PLAYING;
+	}
+
+
+	void stop(BufferHandle buffer) override
+	{
+		ASSERT(m_buffers[buffer].runtime_flags & (u8)Buffer::RuntimeFlags::READY);
+		ASSERT(false); // not implemented yet
+	}
+
+
+	bool isEnd(BufferHandle buffer) override
+	{ 
+		ASSERT(m_buffers[buffer].runtime_flags & (u8)Buffer::RuntimeFlags::READY);
+		ASSERT(false); // not implemented yet
+		return true;
+	}
+
+
+	void pause(BufferHandle buffer) override
+	{
+		ASSERT(m_buffers[buffer].runtime_flags & (u8)Buffer::RuntimeFlags::READY);
+		ASSERT(false); // not implemented yet
+	}
+
+
+	void setMasterVolume(float volume) override 
+	{
+		ASSERT(false); // not implemented yet
+	}
+
+
+	void setVolume(BufferHandle buffer, float volume) override 
+	{
+		ASSERT(m_buffers[buffer].runtime_flags & (u8)Buffer::RuntimeFlags::READY);
+		ASSERT(false); // not implemented yet
+	}
+
+
+	void setFrequency(BufferHandle buffer, float frequency) override 
+	{
+		ASSERT(m_buffers[buffer].runtime_flags & (u8)Buffer::RuntimeFlags::READY);
+		ASSERT(false); // not implemented yet
+	}
+
+
+	void setCurrentTime(BufferHandle buffer, float time_seconds) override 
+	{
+		ASSERT(false); // not implemented yet
+	}
+
+
+	float getCurrentTime(BufferHandle buffer) override
+	{
+		ASSERT(m_buffers[buffer].runtime_flags & (u8)Buffer::RuntimeFlags::READY);
+		ASSERT(false); // not implemented yet
+		return -1;
+	}
+
+
+	void setListenerPosition(float x, float y, float z) override
+	{
+		ASSERT(false); // not implemented yet
+	}
+
+
 	void setListenerOrientation(float front_x,
 		float front_y,
 		float front_z,
 		float up_x,
 		float up_y,
-		float up_z) override {}
-	void setSourcePosition(BufferHandle buffer, float x, float y, float z) override {}
+		float up_z) override
+	{
+		ASSERT(false); // not implemented yet
+	}
+	
+
+	void setSourcePosition(BufferHandle buffer, float x, float y, float z) override
+	{
+		ASSERT(m_buffers[buffer].runtime_flags & (u8)Buffer::RuntimeFlags::READY);
+		ASSERT(false); // not implemented yet
+	}
 	
 	
 	void update(float time_delta) override 
@@ -71,7 +167,15 @@ public:
 	AudioDeviceImpl(Engine& engine)
 		: m_allocator(engine.getAllocator())
 		, m_engine(engine)
-	{}
+		, m_buffers(m_allocator)
+	{
+		m_buffers.reserve(MAX_BUFFERS_COUNT);
+		for (int i = 0; i < MAX_BUFFERS_COUNT; ++i)
+		{
+			Buffer& buffer = m_buffers.emplace(m_allocator);
+			buffer.runtime_flags = 0;
+		}
+	}
 
 
 	~AudioDeviceImpl()
@@ -172,7 +276,29 @@ public:
 	};
 
 
+	struct Buffer
+	{
+		enum class RuntimeFlags
+		{
+			READY = 1 << 0,
+			PLAYING = 1 << 1
+		};
+
+		Buffer(IAllocator& allocator) : data(allocator) {}
+		
+		Array<u8> data;
+		int channels;
+		int sample_rate;
+		int flags;
+		u8 runtime_flags;
+	};
+
+
+	static const int MAX_BUFFERS_COUNT = 256;
+
+
 	IAllocator& m_allocator;
+	Array<Buffer> m_buffers;
 	Engine& m_engine;
 	void* m_alsa_lib = nullptr;
 	snd_pcm_t* m_device = nullptr;
