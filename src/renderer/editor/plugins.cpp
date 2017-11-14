@@ -2549,9 +2549,9 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 
 	void draw(ImDrawData* draw_data)
 	{
-		if (!m_gui_pipeline->isReady()) return;
-		if (!m_material || !m_material->isReady()) return;
-		if (!m_material->getTexture(0)) return;
+		if (!m_gui_pipeline->isReady()) goto end;
+		if (!m_material || !m_material->isReady()) goto end;
+		if (!m_material->getTexture(0)) goto end;
 
 		int w, h;
 		SDL_GetWindowSize(m_app.getWindow(), &w, &h);
@@ -2574,8 +2574,10 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 				drawGUICmdList(cmd_list);
 			}
 		}
-		Renderer* renderer = static_cast<Renderer*>(m_engine.getPluginManager().getPlugin("renderer"));
-		renderer->frame(false);
+
+		end:
+			Renderer* renderer = static_cast<Renderer*>(m_engine.getPluginManager().getPlugin("renderer"));
+			renderer->frame(false);
 	}
 
 
