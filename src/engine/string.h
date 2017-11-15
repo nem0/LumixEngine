@@ -133,6 +133,10 @@ template <int size> struct StaticString
 		return equalStrings(data, str);
 	}
 
+	bool operator!=(const char* str) const {
+		return !equalStrings(data, str);
+	}
+
 	StaticString<size> operator +(const char* rhs)
 	{
 		return StaticString<size>(*this, rhs);

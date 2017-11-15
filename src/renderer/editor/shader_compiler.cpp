@@ -117,7 +117,7 @@ bool ShaderCompiler::LoadHook::onBeforeLoad(Resource& resource)
 	if (m_compiler.getSourceFromBinaryBasename(source_path, lengthOf(source_path), source_path))
 	{
 		MT::SpinLock lock(m_compiler.m_mutex);
-		if (m_compiler.m_compiling != source_path 
+		if (m_compiler.m_compiling != source_path
 			&& m_compiler.m_to_reload.find([&source_path](const string& str) { return str == source_path; }) < 0
 			&& m_compiler.m_to_compile.find([&source_path](const auto& str) { return str == source_path; }) < 0)
 		{
