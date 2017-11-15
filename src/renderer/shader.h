@@ -68,6 +68,8 @@ public:
 	ShaderBinary(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
 	bgfx::ShaderHandle getHandle() { return m_handle; }
 
+	Shader* m_shader;
+
 private:
 	void unload() override;
 	bool load(FS::IFile& file) override;
