@@ -15,6 +15,7 @@ namespace Lumix
 void ResourceManagerBase::LoadHook::continueLoad(Resource& resource)
 {
 	ASSERT(resource.isEmpty());
+	resource.remRef(); // release from hook
 	resource.m_desired_state = Resource::State::EMPTY;
 	resource.doLoad();
 }
@@ -67,7 +68,8 @@ Resource* ResourceManagerBase::load(const Path& path)
 		if (m_load_hook && m_load_hook->onBeforeLoad(*resource))
 		{
 			resource->m_desired_state = Resource::State::READY;
-			resource->addRef();
+			resource->addRef(); // for hook
+			resource->addRef(); // for return value
 			return resource;
 		}
 		resource->doLoad();
@@ -100,7 +102,8 @@ void ResourceManagerBase::load(Resource& resource)
 	{
 		if (m_load_hook && m_load_hook->onBeforeLoad(resource))
 		{
-			resource.addRef();
+			resource.addRef(); // for hook
+			resource.addRef(); // for return value
 			return;
 		}
 		resource.doLoad();
