@@ -28,8 +28,8 @@ public:
 
 	void makeUpToDate(bool wait);
 	void update();
-	void compile(const char* path, bool debug);
 	const Array<string>& getSHDFiles() const { return m_shd_files; }
+	void compile(const char* path, bool debug);
 
 private:
 	void compileTask();
@@ -82,6 +82,7 @@ private:
 	int m_notifications_id;
 	AssociativeArray<string, Array<string>> m_dependencies;
 	Array<StaticString<MAX_PATH_LENGTH>> m_to_compile;
+	StaticString<MAX_PATH_LENGTH> m_compiling;
 	Array<Resource*> m_hooked_files;
 	Array<string> m_to_reload;
 	Array<string> m_shd_files;

@@ -93,15 +93,14 @@ void ShaderCompiler::compileTask()
 		if (m_job_exit_request) break;
 
 		m_app.getAssetBrowser().enableUpdate(false);
-		StaticString<MAX_PATH_LENGTH> to_compile;
-			
+
 		{
 			MT::SpinLock lock(m_mutex);
-			to_compile = m_to_compile.back();
+			m_compiling = m_to_compile.back();
 			m_to_compile.pop();
 			m_empty_queue = m_to_compile.empty();
 		}
-		compile(to_compile, false);
+		compile(m_compiling, false);
 
 		if(m_empty_queue) m_app.getAssetBrowser().enableUpdate(true);
 	}
@@ -117,9 +116,14 @@ bool ShaderCompiler::LoadHook::onBeforeLoad(Resource& resource)
 	PathUtils::getBasename(source_path, lengthOf(source_path), resource.getPath().c_str());
 	if (m_compiler.getSourceFromBinaryBasename(source_path, lengthOf(source_path), source_path))
 	{
-		m_compiler.queueCompile(source_path);
-
 		MT::SpinLock lock(m_compiler.m_mutex);
+		if (m_compiler.m_compiling != source_path 
+			&& m_compiler.m_to_reload.find([&source_path](const string& str) { return str == source_path; }) < 0
+			&& m_compiler.m_to_compile.find([&source_path](const auto& str) { return str == source_path; }) < 0)
+		{
+			m_compiler.m_to_compile.emplace(source_path);
+			m_compiler.m_empty_queue = 0;
+		}
 		m_compiler.m_hooked_files.push(&resource);
 		m_compiler.m_hooked_files.removeDuplicates();
 	}
@@ -467,9 +471,22 @@ void ShaderCompiler::reloadShaders()
 	m_to_reload.removeDuplicates();
 
 	auto shader_manager = m_editor.getEngine().getResourceManager().get(SHADER_TYPE);
-	for (auto& path : m_to_reload)
+	for (string& shd_path : m_to_reload)
 	{
-		shader_manager->reload(Path(path.c_str()));
+		bool any_hooked = false;
+		for (int i = m_hooked_files.size() - 1; i >= 0; --i)
+		{
+			Resource* res = m_hooked_files[i];
+			const char* shader_path = ((ShaderBinary*)res)->m_shader->getPath().c_str();
+			if (equalStrings(shader_path, shd_path.c_str()))
+			{
+				any_hooked = true;
+				m_load_hook.continueLoad(*res);
+				m_hooked_files.eraseFast(i);
+			}
+		}
+
+		if(!any_hooked) shader_manager->reload(Path(shd_path.c_str()));
 	}
 
 	m_to_reload.clear();
@@ -657,15 +674,6 @@ void ShaderCompiler::update()
 	MT::SpinLock lock(m_mutex);
 	if (!m_to_reload.empty())
 	{
-		for (int i = m_hooked_files.size() - 1; i >= 0; --i)
-		{
-			Resource* res = m_hooked_files[i];
-			if (PlatformInterface::fileExists(res->getPath().c_str()))
-			{
-				m_load_hook.continueLoad(*res);
-				m_hooked_files.eraseFast(i);
-			}
-		}
 		reloadShaders();
 		parseDependencies();
 	}
@@ -687,6 +695,11 @@ void ShaderCompiler::compileAllPasses(const char* path,
 
 void ShaderCompiler::compile(const char* path, bool debug)
 {
+	{
+		MT::SpinLock lock(m_mutex);
+		m_compiling = path;
+	}
+
 	char basename[MAX_PATH_LENGTH];
 	PathUtils::getBasename(basename, lengthOf(basename), path);
 	if (findSubstring(basename, "_"))
@@ -733,6 +746,7 @@ void ShaderCompiler::compile(const char* path, bool debug)
 	{
 		MT::SpinLock lock(m_mutex);
 		m_to_reload.emplace(path, m_editor.getAllocator());
+		m_compiling = "";
 	}
 }
 

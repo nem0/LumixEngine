@@ -118,6 +118,7 @@ bool Shader::generateInstances()
 
 			Path vs_path(path);
 			auto* vs_binary = static_cast<ShaderBinary*>(binary_manager->load(vs_path));
+			vs_binary->m_shader = this;
 			addDependency(*vs_binary);
 			instance.binaries[pass_idx * 2] = vs_binary;
 
@@ -128,6 +129,7 @@ bool Shader::generateInstances()
 
 			Path fs_path(path);
 			auto* fs_binary = static_cast<ShaderBinary*>(binary_manager->load(fs_path));
+			fs_binary->m_shader = this;
 			addDependency(*fs_binary);
 			instance.binaries[pass_idx * 2 + 1] = fs_binary;
 		}
