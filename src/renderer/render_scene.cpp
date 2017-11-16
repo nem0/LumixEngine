@@ -4386,7 +4386,8 @@ public:
 			int skinned_define_idx = m_renderer.getShaderDefineIdx("SKINNED");
 			for (int i = 0; i < model->getMeshCount(); ++i)
 			{
-				model->getMesh(i).material->setDefine(skinned_define_idx, true);
+				Mesh& mesh = model->getMesh(i);
+				mesh.material->setDefine(skinned_define_idx, !mesh.skin.empty());
 			}
 		}
 		r.matrix = m_universe.getMatrix(r.entity);
