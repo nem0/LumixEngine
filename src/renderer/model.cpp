@@ -86,7 +86,10 @@ void Mesh::setMaterial(Material* new_material, Model& model, Renderer& renderer)
 			type = Mesh::MULTILAYER_RIGID;
 		}
 	}
-	else if (model.getBoneCount() > 0) type = Mesh::SKINNED;
+	else if (model.getBoneCount() > 0)
+	{
+		type = skin.empty() ? Mesh::RIGID_INSTANCED : Mesh::SKINNED;
+	}
 	else type = Mesh::RIGID_INSTANCED;
 }
 
@@ -164,6 +167,7 @@ RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Matrix
 	for (int mesh_index = m_lods[0].from_mesh; mesh_index <= m_lods[0].to_mesh; ++mesh_index)
 	{
 		Mesh& mesh = m_meshes[mesh_index];
+		bool is_mesh_skinned = !mesh.skin.empty();
 		u16* indices16 = (u16*)&mesh.indices[0];
 		u32* indices32 = (u32*)&mesh.indices[0];
 		bool is16 = mesh.flags & (u32)Mesh::Flags::INDICES_16_BIT;
@@ -176,7 +180,7 @@ RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Matrix
 				p0 = mesh.vertices[indices16[i]];
 				p1 = mesh.vertices[indices16[i + 1]];
 				p2 = mesh.vertices[indices16[i + 2]];
-				if (is_skinned)
+				if (is_mesh_skinned)
 				{
 					p0 = evaluateSkin(p0, mesh.skin[indices16[i]], matrices);
 					p1 = evaluateSkin(p1, mesh.skin[indices16[i + 1]], matrices);
@@ -188,7 +192,7 @@ RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Matrix
 				p0 = mesh.vertices[indices32[i]];
 				p1 = mesh.vertices[indices32[i + 1]];
 				p2 = mesh.vertices[indices32[i + 2]];
-				if (is_skinned)
+				if (is_mesh_skinned)
 				{
 					p0 = evaluateSkin(p0, mesh.skin[indices32[i]], matrices);
 					p1 = evaluateSkin(p1, mesh.skin[indices32[i + 1]], matrices);
@@ -396,7 +400,10 @@ void Model::onBeforeReady()
 				mesh.type = Mesh::MULTILAYER_RIGID;
 			}
 		}
-		else if (getBoneCount() > 0) mesh.type = Mesh::SKINNED;
+		else if (getBoneCount() > 0)
+		{
+			mesh.type = mesh.skin.empty() ? Mesh::RIGID_INSTANCED : Mesh::SKINNED;
+		}
 		else mesh.type = Mesh::RIGID_INSTANCED;
 	}
 }
@@ -583,12 +590,13 @@ bool Model::parseMeshes(const bgfx::VertexDecl& global_vertex_decl, FS::IFile& f
 		file.read(vertices_mem->data, vertices_mem->size);
 		mesh.vertex_buffer_handle = bgfx::createVertexBuffer(vertices_mem, mesh.vertex_decl);
 
-		int position_attribute_offset = mesh.vertex_decl.getOffset(bgfx::Attrib::Position);
-		int uv_attribute_offset = mesh.vertex_decl.getOffset(bgfx::Attrib::TexCoord0);
-		int weights_attribute_offset = mesh.vertex_decl.getOffset(bgfx::Attrib::Weight);
-		int bone_indices_attribute_offset = mesh.vertex_decl.getOffset(bgfx::Attrib::Indices);
+		const bgfx::VertexDecl& vertex_decl = mesh.vertex_decl;
+		int position_attribute_offset = vertex_decl.getOffset(bgfx::Attrib::Position);
+		int uv_attribute_offset = vertex_decl.getOffset(bgfx::Attrib::TexCoord0);
+		int weights_attribute_offset = vertex_decl.getOffset(bgfx::Attrib::Weight);
+		int bone_indices_attribute_offset = vertex_decl.getOffset(bgfx::Attrib::Indices);
 		bool keep_skin = m_loading_flags & (u32)LoadingFlags::KEEP_SKIN;
-		keep_skin = keep_skin && weights_attribute_offset >= 0 && bone_indices_attribute_offset >= 0;
+		keep_skin = keep_skin && vertex_decl.has(bgfx::Attrib::Weight) && vertex_decl.has(bgfx::Attrib::Indices);
 
 		int vertex_size = mesh.vertex_decl.getStride();
 		int mesh_vertex_count = vertices_mem->size / mesh.vertex_decl.getStride();
@@ -728,7 +736,7 @@ bool Model::parseMeshesOld(bgfx::VertexDecl global_vertex_decl, FS::IFile& file,
 	int weights_attribute_offset = global_vertex_decl.getOffset(bgfx::Attrib::Weight);
 	int bone_indices_attribute_offset = global_vertex_decl.getOffset(bgfx::Attrib::Indices);
 	bool keep_skin = m_loading_flags & (u32)LoadingFlags::KEEP_SKIN;
-	keep_skin = keep_skin && weights_attribute_offset >= 0 && bone_indices_attribute_offset >= 0;
+	keep_skin = keep_skin && global_vertex_decl.has(bgfx::Attrib::Weight) && global_vertex_decl.has(bgfx::Attrib::Indices);
 	for (int i = 0; i < m_meshes.size(); ++i)
 	{
 		Offsets& offsets = mesh_offsets[i];
