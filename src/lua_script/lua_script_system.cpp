@@ -1561,7 +1561,7 @@ namespace Lumix
 			if (lua_pcall(L, 1, 0, 0) != LUA_OK)// [lua_event, environment]
 			{
 				g_log_error.log("Lua Script") << lua_tostring(L, -1);
-				lua_pop(L, 3); // []
+				lua_pop(L, 1); // []
 			}
 			lua_pop(L, 2); // []
 		}
