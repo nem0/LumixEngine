@@ -59,7 +59,7 @@ namespace Lumix
 			component("sphere_rigid_actor",
 				property("Radius", &PhysicsScene::getSphereRadius, &PhysicsScene::setSphereRadius,
 					MinAttribute(0)),
-				property("Layer", &PhysicsScene::getRagdollLayer, &PhysicsScene::setRagdollLayer),
+				property("Layer", &PhysicsScene::getActorLayer, &PhysicsScene::setActorLayer),
 				enum_property("Dynamic", &PhysicsScene::getDynamicType, &PhysicsScene::setDynamicType, 3, getDynamicTypeName),
 				property("Trigger", &PhysicsScene::getIsTrigger, &PhysicsScene::setIsTrigger) 
 			),
@@ -139,19 +139,19 @@ namespace Lumix
 				)
 			),
 			component("box_rigid_actor",
-				property("Layer", &PhysicsScene::getRagdollLayer, &PhysicsScene::setRagdollLayer),
+				property("Layer", &PhysicsScene::getActorLayer, &PhysicsScene::setActorLayer),
 				enum_property("Dynamic", &PhysicsScene::getDynamicType, &PhysicsScene::setDynamicType, 3, getDynamicTypeName),
 				property("Trigger", &PhysicsScene::getIsTrigger, &PhysicsScene::setIsTrigger),
 				property("Size", &PhysicsScene::getHalfExtents, &PhysicsScene::setHalfExtents)
 			),
 			component("mesh_rigid_actor",
-				property("Layer", &PhysicsScene::getRagdollLayer, &PhysicsScene::setRagdollLayer),
+				property("Layer", &PhysicsScene::getActorLayer, &PhysicsScene::setActorLayer),
 				enum_property("Dynamic", &PhysicsScene::getDynamicType, &PhysicsScene::setDynamicType, 3, getDynamicTypeName),
 				property("Source", &PhysicsScene::getShapeSource, &PhysicsScene::setShapeSource,
 					ResourceAttribute("Physics (*.phy)", PHYSICS_TYPE))
 			),
 			component("physical_heightfield",
-				property("Layer", &PhysicsScene::getRagdollLayer, &PhysicsScene::setRagdollLayer),
+				property("Layer", &PhysicsScene::getActorLayer, &PhysicsScene::setActorLayer),
 				property("Heightmap", &PhysicsScene::getHeightmapSource, &PhysicsScene::setHeightmapSource,
 					ResourceAttribute("Image (*.raw)", TEXTURE_TYPE)),
 				property("Y scale", &PhysicsScene::getHeightmapYScale, &PhysicsScene::setHeightmapYScale,
