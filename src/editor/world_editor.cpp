@@ -768,7 +768,7 @@ struct GatherResourcesVisitor : Properties::ISimpleComponentVisitor
 		prop.getValue(cmp, index, tmp);
 		Path path((const char*)tmp.getData());
 		Resource* resource = resource_manager->get(resource_attr->type)->load(path);
-		resources->push(resource);
+		if(resource) resources->push(resource);
 	}
 
 	ResourceManager* resource_manager;

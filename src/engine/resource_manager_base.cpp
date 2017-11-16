@@ -55,6 +55,7 @@ Resource* ResourceManagerBase::get(const Path& path)
 
 Resource* ResourceManagerBase::load(const Path& path)
 {
+	if (!path.isValid()) return nullptr;
 	Resource* resource = get(path);
 
 	if(nullptr == resource)
