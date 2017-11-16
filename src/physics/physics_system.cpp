@@ -151,7 +151,7 @@ namespace Lumix
 					ResourceAttribute("Physics (*.phy)", PHYSICS_TYPE))
 			),
 			component("physical_heightfield",
-				property("Layer", &PhysicsScene::getActorLayer, &PhysicsScene::setActorLayer),
+				property("Layer", &PhysicsScene::getHeightfieldLayer, &PhysicsScene::setHeightfieldLayer),
 				property("Heightmap", &PhysicsScene::getHeightmapSource, &PhysicsScene::setHeightmapSource,
 					ResourceAttribute("Image (*.raw)", TEXTURE_TYPE)),
 				property("Y scale", &PhysicsScene::getHeightmapYScale, &PhysicsScene::setHeightmapYScale,
