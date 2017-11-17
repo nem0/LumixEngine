@@ -22,7 +22,6 @@ struct AudioTask : MT::Task
 
 	virtual int task() override;
 	void handleError(int error_code);
-	int waitAvailable();
 
 	volatile bool m_finished = false;
 	AudioDeviceImpl& m_device;
@@ -407,52 +406,11 @@ void AudioTask::handleError(int error_code)
 	g_log_error.log("Audio") << error_msg;
 }
 
-int AudioTask::waitAvailable()
-{
-	int wait_result = m_device.m_api.snd_pcm_wait(m_device.m_device, 10);
-	if (wait_result < 0) 
-	{
-		if (wait_result == -EPIPE) 
-		{
-			int recover_result = m_device.m_api.snd_pcm_recover(m_device.m_device, wait_result, 1);
-			if (recover_result < 0)
-			{
-				handleError(recover_result);
-				return 0;
-			}
-		}
-	}
-
-	snd_pcm_sframes_t frames_available = m_device.m_api.snd_pcm_avail_update(m_device.m_device);
-	if (frames_available < 0)
-	{
-		if (frames_available == -EPIPE)
-		{
-			int recover_result = m_device.m_api.snd_pcm_recover(m_device.m_device, wait_result, 1);
-			if (recover_result < 0)
-			{
-				handleError(recover_result);
-				return 0;
-			}
-
-			frames_available = m_device.m_api.snd_pcm_avail_update(m_device.m_device);
-			if (frames_available < 0)
-			{
-				handleError(frames_available);
-				return 0;
-			}
-		}
-	}
-}
-
 
 int AudioTask::task()
 {
 	while(!m_finished)
 	{
-		//int frames_avail = waitAvailable();
-		//if (frames_avail == 0) continue;
-
 		u16 buffer[2*1024];
 		int frames_avail = lengthOf(buffer);
 		m_device.mix(buffer, frames_avail * 2);
