@@ -202,7 +202,9 @@ void SceneView::renderSelection()
 
 void SceneView::renderGizmos()
 {
-	m_editor.getGizmo().render();
+	auto& entities = m_editor.getSelectedEntities();
+	if(entities.empty() || entities[0] != m_editor.getEditCamera().entity)
+		m_editor.getGizmo().render();
 }
 
 
