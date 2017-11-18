@@ -2472,9 +2472,9 @@ public:
 	}
 
 
-	Frustum getPointLightFrustum(ComponentHandle cmp) const
+	Frustum getPointLightFrustum(int light_idx) const
 	{
-		const PointLight& light = m_point_lights[m_point_lights_map[cmp]];
+		const PointLight& light = m_point_lights[light_idx];
 		Frustum frustum;
 		frustum.computeOrtho(m_universe.getPosition(light.m_entity),
 			Vec3(1, 0, 0),
@@ -2531,7 +2531,7 @@ public:
 				}
 
 				Vec3 pos = m_universe.getPosition(r.entity);
-				Frustum frustum = getPointLightFrustum({light_idx});
+				Frustum frustum = getPointLightFrustum(light_idx);
 				if(frustum.isSphereInside(pos, bounding_radius))
 				{
 					m_light_influenced_geometry[light_idx].push(cmp);
@@ -4609,9 +4609,10 @@ public:
 
 	void detectLightInfluencedGeometry(ComponentHandle cmp)
 	{
-		Frustum frustum = getPointLightFrustum(cmp);
+		int light_idx = m_point_lights_map[cmp];
+		Frustum frustum = getPointLightFrustum(light_idx);
 		const CullingSystem::Results& results = m_culling_system->cull(frustum, ~0ULL);
-		auto& influenced_geometry = m_light_influenced_geometry[m_point_lights_map[cmp]];
+		auto& influenced_geometry = m_light_influenced_geometry[light_idx];
 		influenced_geometry.clear();
 		for (int i = 0; i < results.size(); ++i)
 		{
