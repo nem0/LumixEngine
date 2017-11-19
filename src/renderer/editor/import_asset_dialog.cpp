@@ -426,19 +426,6 @@ struct FBXImporter
 			}
 		}
 
-		const ofbx::Object *const * objects = scene.getAllObjects();
-		int count = scene.getAllObjectCount();
-
-		for (int i = 0; i < count; ++i)
-		{
-			const ofbx::Object* node = objects[i];
-			bool in_hierarchy = false;
-			const ofbx::NodeAttribute* node_attr = (const ofbx::NodeAttribute*)node->node_attribute;
-			bool is_bone = node_attr && node_attr->getAttributeType() == "Skeleton";
-
-			if (is_bone) insertHierarchy(bones, node);
-		}
-
 		bones.removeDuplicates();
 		sortBones();
 	}
