@@ -118,6 +118,9 @@ namespace Lumix
 					RadiansAttribute())
 			),
 			component("physical_controller",
+				functions(
+					function(LUMIX_FUNC(PhysicsScene::moveController))
+				),
 				property("Layer", LUMIX_PROP(PhysicsScene, getControllerLayer, setControllerLayer))
 			),
 			component("rigid_actor",

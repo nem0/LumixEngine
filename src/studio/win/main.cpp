@@ -5,7 +5,6 @@
 #define MF_RESOURCE_DONT_INCLUDE_WINDOWS_H
 #include "stb/mf_resource.h"
 
-
 INT WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, INT)
 {
 	SetProcessDPIAware();
