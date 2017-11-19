@@ -34,29 +34,7 @@ struct IsSame<T, T>
 	enum { result = true };
 };
 
-template <typename T> struct ResultOf;
-template <typename R, typename C, typename... Args> struct ResultOf<R(C::*)(Args...)> { using Type = R; };
-template <typename R, typename C, typename... Args> struct ResultOf<R(C::*)(Args...)const> { using Type = R; };
-
-template <typename T> struct Arg1Type;
-template <typename R, typename C, typename A0, typename A1, typename... Args> struct Arg1Type<R(C::*)(A0, A1, Args...)> { using Type = A1; };
-template <typename R, typename C, typename A0, typename A1, typename... Args> struct Arg1Type<R(C::*)(A0, A1, Args...)const> { using Type = A1; };
-
-template <typename T> struct ClassOf;
-template <typename R, typename C, typename... Args>
-struct ClassOf<R(C::*)(Args...)>
-{
-	using Type = C;
-};
-template <typename R, typename C>
-struct ClassOf<R(C::*)>
-{
-	using Type = C;
-};
-
-
 template <int... T> struct Indices {};
-
 
 template <int offset, int size, int... T>
 struct BuildIndices
@@ -197,5 +175,24 @@ constexpr void apply(const F& f, Tuple& t)
 {
 	apply_impl(f, t, typename BuildIndices<-1, TupleSize<Tuple>::result>::result{});
 }
+
+
+template <typename T> struct ResultOf;
+template <typename R, typename C, typename... Args> struct ResultOf<R(C::*)(Args...)> { using Type = R; };
+template <typename R, typename C, typename... Args> struct ResultOf<R(C::*)(Args...)const> { using Type = R; };
+
+template <typename T> struct ArgCount;
+template <typename R, typename C, typename... Args> struct ArgCount<R(C::*)(Args...)> { static const int result = sizeof...(Args); };
+template <typename R, typename C, typename... Args> struct ArgCount<R(C::*)(Args...) const> { static const int result = sizeof...(Args); };
+
+template <int N, typename T> struct ArgNType;
+template <int N, typename R, typename C, typename... Args> struct ArgNType<N, R(C::*)(Args...)> { using Type = typename TupleElement<N, Tuple<Args...>>::Head; };
+template <int N, typename R, typename C, typename... Args> struct ArgNType<N, R(C::*)(Args...) const> { using Type = typename TupleElement<N, Tuple<Args...>>::Head; };
+
+template <typename T> struct ClassOf;
+template <typename R, typename C, typename... Args> struct ClassOf<R(C::*)(Args...)> { using Type = C; };
+template <typename R, typename C, typename... Args> struct ClassOf<R(C::*)(Args...)const > { using Type = C; };
+template <typename R, typename C> struct ClassOf<R(C::*)> { using Type = C; };
+
 
 } // namespace Lumix

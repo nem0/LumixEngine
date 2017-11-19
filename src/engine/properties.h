@@ -11,6 +11,8 @@
 #define LUMIX_PROP(Scene, Getter, Setter) \
 	&Scene::Getter, #Scene "::" #Getter, &Scene::Setter, #Scene "::" #Setter
 
+#define LUMIX_FUNC(Func)\
+	&Func, #Func
 
 namespace Lumix
 {
@@ -278,10 +280,18 @@ struct ISimpleComponentVisitor : IComponentVisitor
 };
 
 
+struct IFunctionVisitor
+{
+	virtual void visit(const struct FunctionBase& func) = 0;
+};
+
+
 struct ComponentBase
 {
 	virtual int getPropertyCount() const = 0;
+	virtual int getFunctionCount() const = 0;
 	virtual void visit(IComponentVisitor&) const = 0;
+	virtual void visit(IFunctionVisitor&) const = 0;
 
 	const char* name;
 	ComponentType component_type;
@@ -682,10 +692,11 @@ struct Scene
 };
 
 
-template <typename... Props>
+template <typename Funcs, typename Props>
 struct Component : ComponentBase
 {
-	int getPropertyCount() const override { return sizeof...(Props); }
+	int getPropertyCount() const override { return TupleSize<Props>::result; }
+	int getFunctionCount() const override { return TupleSize<Funcs>::result; }
 
 
 	void visit(IComponentVisitor& visitor) const override
@@ -696,7 +707,14 @@ struct Component : ComponentBase
 	}
 
 
-	Tuple<Props...> properties;
+	void visit(IFunctionVisitor& visitor) const override
+	{
+		apply([&](auto& x) { visitor.visit(x); }, functions);
+	}
+
+
+	Props properties;
+	Funcs functions;
 };
 
 
@@ -710,10 +728,99 @@ auto scene(const char* name, Components... components)
 }
 
 
+struct FunctionBase
+{
+	const char* decl_code;
+
+	virtual int getArgCount() const = 0;
+	virtual const char* getReturnType() const = 0;
+	virtual const char* getArgType(int i) const = 0;
+};
+
+
+namespace internal
+{
+	static const unsigned int FRONT_SIZE = sizeof("Lumix::Properties::internal::GetTypeNameHelper<") - 1u;
+	static const unsigned int BACK_SIZE = sizeof(">::GetTypeName") - 1u;
+
+	template <typename T>
+	struct GetTypeNameHelper
+	{
+		static const char* GetTypeName(void)
+		{
+			static const size_t size = sizeof(__FUNCTION__) - FRONT_SIZE - BACK_SIZE;
+			static char typeName[size] = {};
+			memcpy(typeName, __FUNCTION__ + FRONT_SIZE, size - 1u);
+
+			return typeName;
+		}
+	};
+}
+
+
+template <typename T>
+const char* getTypeName(void)
+{
+	return internal::GetTypeNameHelper<T>::GetTypeName();
+}
+
+
+template <typename F> struct Function;
+
+
+template <typename R, typename C, typename... Args>
+struct Function<R (C::*)(Args...)> : FunctionBase
+{
+	using F = R(C::*)(Args...);
+	F function;
+
+	int getArgCount() const override { return ArgCount<F>::result; }
+	const char* getReturnType() const override { return getTypeName<typename ResultOf<F>::Type>(); }
+	
+	const char* getArgType(int i) const override
+	{
+		const char* expand[] = {
+			getTypeName<Args>()...
+		};
+		return expand[i];
+	}
+};
+
+
+template <typename F>
+auto function(F func, const char* decl_code)
+{
+	Function<F> ret;
+	ret.function = func;
+	ret.decl_code = decl_code;
+	return ret;
+}
+
+
+template <typename... F>
+auto functions(F... functions)
+{
+	Tuple<F...> f = makeTuple(functions...);
+	return f;
+}
+
+
+template <typename... Props, typename... Funcs>
+auto component(const char* name, Tuple<Funcs...> functions, Props... props)
+{
+	Component<Tuple<Funcs...>, Tuple<Props...>> cmp;
+	cmp.name = name;
+	cmp.functions = functions;
+	cmp.properties = makeTuple(props...);
+	cmp.component_type = getComponentType(name);
+	return cmp;
+}
+
+
 template <typename... Props>
 auto component(const char* name, Props... props)
 {
-	Component<Props...> cmp;
+	Component<Tuple<>, Tuple<Props...>> cmp;
 	cmp.name = name;
 	cmp.properties = makeTuple(props...);
 	cmp.component_type = getComponentType(name);
