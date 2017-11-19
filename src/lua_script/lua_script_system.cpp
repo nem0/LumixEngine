@@ -1767,7 +1767,7 @@ namespace Lumix
 		using namespace Properties;
 		static auto lua_scene = scene("lua_script",
 			component("lua_script",
-				blob_property("data", &LuaScriptScene::getScriptData, &LuaScriptScene::setScriptData)
+				blob_property("data", LUMIX_PROP(LuaScriptScene, getScriptData, setScriptData))
 			)
 		);
 		lua_scene.registerScene();

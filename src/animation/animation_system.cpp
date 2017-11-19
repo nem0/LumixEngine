@@ -123,20 +123,20 @@ AnimationSystemImpl::AnimationSystemImpl(Engine& engine)
 	using namespace Properties;
 	static auto anim_scene = scene("animation",
 		component("anim_controller",
-			property("Source", &AnimationScene::getControllerSource, &AnimationScene::setControllerSource,
+			property("Source", LUMIX_PROP(AnimationScene, getControllerSource, setControllerSource),
 				ResourceAttribute("Animation controller (*.act)", CONTROLLER_RESOURCE_TYPE)),
 			AnimSetProperty()
 		),
 		component("animable",
-			property("Animation", &AnimationScene::getAnimation, &AnimationScene::setAnimation,
+			property("Animation", LUMIX_PROP(AnimationScene, getAnimation, setAnimation),
 				ResourceAttribute("Animation (*.ani)", ANIMATION_TYPE)),
-			property("Start time", &AnimationScene::getAnimableStartTime, &AnimationScene::setAnimableStartTime,
+			property("Start time", LUMIX_PROP(AnimationScene, getAnimableStartTime, setAnimableStartTime),
 				MinAttribute(0)),
-			property("Time scale", &AnimationScene::getAnimableTimeScale, &AnimationScene::setAnimableTimeScale,
+			property("Time scale", LUMIX_PROP(AnimationScene, getAnimableTimeScale, setAnimableTimeScale),
 				MinAttribute(0))
 		),
 		component("shared_anim_controller",
-			property("Parent", &AnimationScene::getSharedControllerParent, &AnimationScene::setSharedControllerParent)
+			property("Parent", LUMIX_PROP(AnimationScene, getSharedControllerParent, setSharedControllerParent))
 		)
 	);
 	anim_scene.registerScene();

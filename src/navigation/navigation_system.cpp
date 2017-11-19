@@ -141,12 +141,12 @@ void NavigationSystem::registerProperties()
 	using namespace Properties;
 	static auto navigation_scene = scene("navigation",
 		component("navmesh_agent",
-			property("Radius", &NavigationScene::getAgentRadius, &NavigationScene::setAgentRadius,
+			property("Radius", LUMIX_PROP(NavigationScene, getAgentRadius, setAgentRadius),
 				MinAttribute(0)),
-			property("Height", &NavigationScene::getAgentHeight, &NavigationScene::setAgentHeight,
+			property("Height", LUMIX_PROP(NavigationScene, getAgentHeight, setAgentHeight),
 				MinAttribute(0)),
-			property("Use root motion", &NavigationScene::useAgentRootMotion, &NavigationScene::setUseAgentRootMotion),
-			property("Get root motion from animation", &NavigationScene::isGettingRootMotionFromAnim, &NavigationScene::setIsGettingRootMotionFromAnim)
+			property("Use root motion", LUMIX_PROP(NavigationScene, useAgentRootMotion, setUseAgentRootMotion)),
+			property("Get root motion from animation", LUMIX_PROP(NavigationScene, isGettingRootMotionFromAnim, setIsGettingRootMotionFromAnim))
 		)
 	);
 	navigation_scene.registerScene();
