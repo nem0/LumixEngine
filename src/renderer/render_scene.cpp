@@ -15,7 +15,7 @@
 #include "engine/path_utils.h"
 #include "engine/plugin_manager.h"
 #include "engine/profiler.h"
-#include "engine/properties.h"
+#include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
 #include "engine/serializer.h"
@@ -58,30 +58,30 @@ enum class RenderSceneVersion : int
 };
 
 
-static const ComponentType MODEL_INSTANCE_TYPE = Properties::getComponentType("renderable");
-static const ComponentType DECAL_TYPE = Properties::getComponentType("decal");
-static const ComponentType POINT_LIGHT_TYPE = Properties::getComponentType("point_light");
-static const ComponentType PARTICLE_EMITTER_TYPE = Properties::getComponentType("particle_emitter");
-static const ComponentType SCRIPTED_PARTICLE_EMITTER_TYPE = Properties::getComponentType("scripted_particle_emitter");
-static const ComponentType PARTICLE_EMITTER_ALPHA_TYPE = Properties::getComponentType("particle_emitter_alpha");
-static const ComponentType PARTICLE_EMITTER_FORCE_HASH = Properties::getComponentType("particle_emitter_force");
+static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("renderable");
+static const ComponentType DECAL_TYPE = Reflection::getComponentType("decal");
+static const ComponentType POINT_LIGHT_TYPE = Reflection::getComponentType("point_light");
+static const ComponentType PARTICLE_EMITTER_TYPE = Reflection::getComponentType("particle_emitter");
+static const ComponentType SCRIPTED_PARTICLE_EMITTER_TYPE = Reflection::getComponentType("scripted_particle_emitter");
+static const ComponentType PARTICLE_EMITTER_ALPHA_TYPE = Reflection::getComponentType("particle_emitter_alpha");
+static const ComponentType PARTICLE_EMITTER_FORCE_HASH = Reflection::getComponentType("particle_emitter_force");
 static const ComponentType PARTICLE_EMITTER_ATTRACTOR_TYPE =
-	Properties::getComponentType("particle_emitter_attractor");
+	Reflection::getComponentType("particle_emitter_attractor");
 static const ComponentType PARTICLE_EMITTER_SUBIMAGE_TYPE =
-	Properties::getComponentType("particle_emitter_subimage");
+	Reflection::getComponentType("particle_emitter_subimage");
 static const ComponentType PARTICLE_EMITTER_LINEAR_MOVEMENT_TYPE =
-	Properties::getComponentType("particle_emitter_linear_movement");
+	Reflection::getComponentType("particle_emitter_linear_movement");
 static const ComponentType PARTICLE_EMITTER_SPAWN_SHAPE_TYPE =
-	Properties::getComponentType("particle_emitter_spawn_shape");
-static const ComponentType PARTICLE_EMITTER_PLANE_TYPE = Properties::getComponentType("particle_emitter_plane");
+	Reflection::getComponentType("particle_emitter_spawn_shape");
+static const ComponentType PARTICLE_EMITTER_PLANE_TYPE = Reflection::getComponentType("particle_emitter_plane");
 static const ComponentType PARTICLE_EMITTER_RANDOM_ROTATION_TYPE =
-	Properties::getComponentType("particle_emitter_random_rotation");
-static const ComponentType PARTICLE_EMITTER_SIZE_TYPE = Properties::getComponentType("particle_emitter_size");
-static const ComponentType GLOBAL_LIGHT_TYPE = Properties::getComponentType("global_light");
-static const ComponentType CAMERA_TYPE = Properties::getComponentType("camera");
-static const ComponentType TERRAIN_TYPE = Properties::getComponentType("terrain");
-static const ComponentType BONE_ATTACHMENT_TYPE = Properties::getComponentType("bone_attachment");
-static const ComponentType ENVIRONMENT_PROBE_TYPE = Properties::getComponentType("environment_probe");
+	Reflection::getComponentType("particle_emitter_random_rotation");
+static const ComponentType PARTICLE_EMITTER_SIZE_TYPE = Reflection::getComponentType("particle_emitter_size");
+static const ComponentType GLOBAL_LIGHT_TYPE = Reflection::getComponentType("global_light");
+static const ComponentType CAMERA_TYPE = Reflection::getComponentType("camera");
+static const ComponentType TERRAIN_TYPE = Reflection::getComponentType("terrain");
+static const ComponentType BONE_ATTACHMENT_TYPE = Reflection::getComponentType("bone_attachment");
+static const ComponentType ENVIRONMENT_PROBE_TYPE = Reflection::getComponentType("environment_probe");
 
 static const ResourceType MATERIAL_TYPE("material");
 static const ResourceType TEXTURE_TYPE("texture");

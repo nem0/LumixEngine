@@ -1,4 +1,4 @@
-#include "engine/properties.h"
+#include "engine/reflection.h"
 #include "engine/associative_array.h"
 #include "engine/crc32.h"
 #include "engine/default_allocator.h"
@@ -9,7 +9,7 @@ namespace Lumix
 {
 
 
-namespace Properties
+namespace Reflection
 {
 
 
@@ -284,7 +284,7 @@ const char* getComponentTypeID(int index)
 }
 
 
-} // namespace Properties
+} // namespace Reflection
 
 
 } // namespace Lumix

@@ -22,7 +22,7 @@
 #include "engine/path_utils.h"
 #include "engine/plugin_manager.h"
 #include "engine/profiler.h"
-#include "engine/properties.h"
+#include "engine/reflection.h"
 #include "engine/quat.h"
 #include "engine/resource_manager.h"
 #include "engine/system.h"
@@ -364,7 +364,7 @@ public:
 	void registerComponentWithResource(const char* type,
 		const char* label,
 		ResourceType resource_type,
-		const Properties::PropertyBase& property) override
+		const Reflection::PropertyBase& property) override
 	{
 		struct Plugin LUMIX_FINAL : public IAddComponentPlugin
 		{
@@ -410,7 +410,7 @@ public:
 			WorldEditor* editor;
 			ComponentType type;
 			ResourceType resource_type;
-			const Properties::PropertyBase* property;
+			const Reflection::PropertyBase* property;
 			char label[50];
 		};
 
@@ -418,7 +418,7 @@ public:
 		auto* plugin = LUMIX_NEW(allocator, Plugin);
 		plugin->property_grid = m_property_grid;
 		plugin->asset_browser = m_asset_browser;
-		plugin->type = Properties::getComponentType(type);
+		plugin->type = Reflection::getComponentType(type);
 		plugin->editor = m_editor;
 		plugin->property = &property;
 		plugin->resource_type = resource_type;
@@ -433,7 +433,7 @@ public:
 	{
 		addPlugin(plugin);
 		auto& allocator = m_editor->getAllocator();
-		m_component_labels.insert(Properties::getComponentType(id), string(plugin.getLabel(), m_allocator));
+		m_component_labels.insert(Reflection::getComponentType(id), string(plugin.getLabel(), m_allocator));
 	}
 
 
@@ -472,7 +472,7 @@ public:
 		auto* plugin = LUMIX_NEW(allocator, Plugin);
 		plugin->property_grid = m_property_grid;
 		plugin->editor = m_editor;
-		plugin->type = Properties::getComponentType(type);
+		plugin->type = Reflection::getComponentType(type);
 		copyString(plugin->label, label);
 		addPlugin(*plugin);
 

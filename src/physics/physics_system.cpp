@@ -7,7 +7,7 @@
 #include "engine/log.h"
 #include "engine/resource_manager.h"
 #include "engine/engine.h"
-#include "engine/properties.h"
+#include "engine/reflection.h"
 #include "physics/physics_geometry_manager.h"
 #include "physics/physics_scene.h"
 #include "renderer/render_scene.h"
@@ -49,7 +49,7 @@ namespace Lumix
 
 	static void registerProperties(IAllocator& allocator)
 	{
-		using namespace Properties;
+		using namespace Reflection;
 
 		static auto phy_scene = scene("physics",
 			component("ragdoll",

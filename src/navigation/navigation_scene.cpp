@@ -11,7 +11,7 @@
 #include "engine/lua_wrapper.h"
 #include "engine/lumix.h"
 #include "engine/profiler.h"
-#include "engine/properties.h"
+#include "engine/reflection.h"
 #include "engine/serializer.h"
 #include "engine/universe/universe.h"
 #include "engine/vec.h"
@@ -43,8 +43,8 @@ enum class NavigationSceneVersion : int
 };
 
 
-static const ComponentType NAVMESH_AGENT_TYPE = Properties::getComponentType("navmesh_agent");
-static const ComponentType ANIM_CONTROLLER_TYPE = Properties::getComponentType("anim_controller");
+static const ComponentType NAVMESH_AGENT_TYPE = Reflection::getComponentType("navmesh_agent");
+static const ComponentType ANIM_CONTROLLER_TYPE = Reflection::getComponentType("anim_controller");
 static const int CELLS_PER_TILE_SIDE = 256;
 static const float CELL_SIZE = 0.3f;
 

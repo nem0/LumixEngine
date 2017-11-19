@@ -12,7 +12,7 @@
 #include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/plugin_manager.h"
-#include "engine/properties.h"
+#include "engine/reflection.h"
 #include "engine/system.h"
 #include "engine/universe/universe.h"
 #include "imgui/imgui.h"
@@ -246,7 +246,7 @@ struct EditorPlugin LUMIX_FINAL : public WorldEditor::Plugin
 
 	bool showGizmo(ComponentUID cmp) override
 	{
-		static const ComponentType ECHO_ZONE_TYPE = Properties::getComponentType("echo_zone");
+		static const ComponentType ECHO_ZONE_TYPE = Reflection::getComponentType("echo_zone");
 
 		if (cmp.type == ECHO_ZONE_TYPE)
 		{

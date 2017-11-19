@@ -9,7 +9,7 @@
 #include "engine/lifo_allocator.h"
 #include "engine/log.h"
 #include "engine/profiler.h"
-#include "engine/properties.h"
+#include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/string.h"
 #include "engine/system.h"
@@ -73,10 +73,10 @@ namespace Lumix
 {
 
 
-static const ComponentType GLOBAL_LIGHT_TYPE = Properties::getComponentType("global_light");
-static const ComponentType POINT_LIGHT_TYPE = Properties::getComponentType("point_light");
-static const ComponentType MODEL_INSTANCE_TYPE = Properties::getComponentType("renderable");
-static const ComponentType CAMERA_TYPE = Properties::getComponentType("camera");
+static const ComponentType GLOBAL_LIGHT_TYPE = Reflection::getComponentType("global_light");
+static const ComponentType POINT_LIGHT_TYPE = Reflection::getComponentType("point_light");
+static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("renderable");
+static const ComponentType CAMERA_TYPE = Reflection::getComponentType("camera");
 static const ResourceType MATERIAL_TYPE("material");
 static const ResourceType MODEL_TYPE("model");
 static const ResourceType SHADER_TYPE("shader");
@@ -96,7 +96,7 @@ static const char* getGrassRotationModeName(int index)
 }
 
 
-struct BoneProperty : Properties::IEnumProperty
+struct BoneProperty : Reflection::IEnumProperty
 {
 	BoneProperty() { name = "Bone"; }
 
@@ -151,7 +151,7 @@ struct BoneProperty : Properties::IEnumProperty
 
 static void registerProperties(IAllocator& allocator)
 {
-	using namespace Properties;
+	using namespace Reflection;
 
 	static auto render_scene = scene("renderer", 
 		component("bone_attachment",

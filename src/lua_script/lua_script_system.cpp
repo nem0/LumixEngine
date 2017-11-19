@@ -16,7 +16,7 @@
 #include "engine/path_utils.h"
 #include "engine/plugin_manager.h"
 #include "engine/profiler.h"
-#include "engine/properties.h"
+#include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/serializer.h"
 #include "engine/string.h"
@@ -28,7 +28,7 @@ namespace Lumix
 {
 
 
-	static const ComponentType LUA_SCRIPT_TYPE = Properties::getComponentType("lua_script");
+	static const ComponentType LUA_SCRIPT_TYPE = Reflection::getComponentType("lua_script");
 	static const ResourceType LUA_SCRIPT_RESOURCE_TYPE("lua_script");
 
 
@@ -570,10 +570,10 @@ namespace Lumix
 		}
 
 
-		struct GetPropertyVisitor LUMIX_FINAL : Properties::IComponentVisitor
+		struct GetPropertyVisitor LUMIX_FINAL : Reflection::IComponentVisitor
 		{
 			template <typename T>
-			LUMIX_FORCE_INLINE void get(const Properties::Property<T>& prop)
+			LUMIX_FORCE_INLINE void get(const Reflection::Property<T>& prop)
 			{
 				T v;
 				OutputBlob blob(&v, sizeof(v));
@@ -581,16 +581,16 @@ namespace Lumix
 				LuaWrapper::push(L, v);
 			}
 
-			void visit(const Properties::Property<float>& prop) override { get(prop); }
-			void visit(const Properties::Property<int>& prop) override { get(prop); }
-			void visit(const Properties::Property<bool>& prop) override { get(prop); }
-			void visit(const Properties::Property<Int2>& prop) override { get(prop); }
-			void visit(const Properties::Property<Vec2>& prop) override { get(prop); }
-			void visit(const Properties::Property<Vec3>& prop) override { get(prop); }
-			void visit(const Properties::Property<Vec4>& prop) override { get(prop); }
-			void visit(const Properties::Property<Entity>& prop) override { get(prop); }
+			void visit(const Reflection::Property<float>& prop) override { get(prop); }
+			void visit(const Reflection::Property<int>& prop) override { get(prop); }
+			void visit(const Reflection::Property<bool>& prop) override { get(prop); }
+			void visit(const Reflection::Property<Int2>& prop) override { get(prop); }
+			void visit(const Reflection::Property<Vec2>& prop) override { get(prop); }
+			void visit(const Reflection::Property<Vec3>& prop) override { get(prop); }
+			void visit(const Reflection::Property<Vec4>& prop) override { get(prop); }
+			void visit(const Reflection::Property<Entity>& prop) override { get(prop); }
 
-			void visit(const Properties::Property<Path>& prop) override
+			void visit(const Reflection::Property<Path>& prop) override
 			{
 				char buf[1024];
 				OutputBlob blob(buf, sizeof(buf));
@@ -598,7 +598,7 @@ namespace Lumix
 				LuaWrapper::push(L, buf);
 			}
 
-			void visit(const Properties::Property<const char*>& prop) override
+			void visit(const Reflection::Property<const char*>& prop) override
 			{
 				char buf[1024];
 				OutputBlob blob(buf, sizeof(buf));
@@ -606,10 +606,10 @@ namespace Lumix
 				LuaWrapper::push(L, buf);
 			}
 
-			void visit(const Properties::IArrayProperty& prop) override { ASSERT(false); }
-			void visit(const Properties::IEnumProperty& prop) override { ASSERT(false); }
-			void visit(const Properties::IBlobProperty& prop) override { ASSERT(false); }
-			void visit(const Properties::ISampledFuncProperty& prop) override { ASSERT(false); }
+			void visit(const Reflection::IArrayProperty& prop) override { ASSERT(false); }
+			void visit(const Reflection::IEnumProperty& prop) override { ASSERT(false); }
+			void visit(const Reflection::IBlobProperty& prop) override { ASSERT(false); }
+			void visit(const Reflection::ISampledFuncProperty& prop) override { ASSERT(false); }
 
 			ComponentUID cmp;
 			lua_State* L;
@@ -631,43 +631,43 @@ namespace Lumix
 		}
 
 
-		struct SetPropertyVisitor LUMIX_FINAL : Properties::IComponentVisitor
+		struct SetPropertyVisitor LUMIX_FINAL : Reflection::IComponentVisitor
 		{
 			template <typename T>
-			LUMIX_FORCE_INLINE void set(const Properties::Property<T>& prop)
+			LUMIX_FORCE_INLINE void set(const Reflection::Property<T>& prop)
 			{
 				auto v = LuaWrapper::checkArg<T>(L, 3);
 				InputBlob blob(&v, sizeof(v));
 				prop.setValue(cmp, -1, blob);
 			}
 
-			void visit(const Properties::Property<float>& prop) override { set(prop); }
-			void visit(const Properties::Property<int>& prop) override { set(prop); }
-			void visit(const Properties::Property<bool>& prop) override { set(prop); }
-			void visit(const Properties::Property<Int2>& prop) override { set(prop); }
-			void visit(const Properties::Property<Vec2>& prop) override { set(prop); }
-			void visit(const Properties::Property<Vec3>& prop) override { set(prop); }
-			void visit(const Properties::Property<Vec4>& prop) override { set(prop); }
-			void visit(const Properties::Property<Entity>& prop) override { set(prop); }
+			void visit(const Reflection::Property<float>& prop) override { set(prop); }
+			void visit(const Reflection::Property<int>& prop) override { set(prop); }
+			void visit(const Reflection::Property<bool>& prop) override { set(prop); }
+			void visit(const Reflection::Property<Int2>& prop) override { set(prop); }
+			void visit(const Reflection::Property<Vec2>& prop) override { set(prop); }
+			void visit(const Reflection::Property<Vec3>& prop) override { set(prop); }
+			void visit(const Reflection::Property<Vec4>& prop) override { set(prop); }
+			void visit(const Reflection::Property<Entity>& prop) override { set(prop); }
 
-			void visit(const Properties::Property<Path>& prop) override
+			void visit(const Reflection::Property<Path>& prop) override
 			{
 				auto* v = LuaWrapper::checkArg<const char*>(L, 3);
 				InputBlob blob(v, stringLength(v) + 1);
 				prop.setValue(cmp, -1, blob);
 			}
 			
-			void visit(const Properties::Property<const char*>& prop) override
+			void visit(const Reflection::Property<const char*>& prop) override
 			{
 				auto* v = LuaWrapper::checkArg<const char*>(L, 3);
 				InputBlob blob(v, stringLength(v) + 1);
 				prop.setValue(cmp, -1, blob);
 			}
 
-			void visit(const Properties::IArrayProperty& prop) override { ASSERT(false); }
-			void visit(const Properties::IEnumProperty& prop) override { ASSERT(false); }
-			void visit(const Properties::IBlobProperty& prop) override { ASSERT(false); }
-			void visit(const Properties::ISampledFuncProperty& prop) override { ASSERT(false); }
+			void visit(const Reflection::IArrayProperty& prop) override { ASSERT(false); }
+			void visit(const Reflection::IEnumProperty& prop) override { ASSERT(false); }
+			void visit(const Reflection::IBlobProperty& prop) override { ASSERT(false); }
+			void visit(const Reflection::ISampledFuncProperty& prop) override { ASSERT(false); }
 
 			ComponentUID cmp;
 			lua_State* L;
@@ -719,7 +719,7 @@ namespace Lumix
 		}
 
 
-		struct LuaCreatePropertyVisitor : Properties::IComponentVisitor
+		struct LuaCreatePropertyVisitor : Reflection::IComponentVisitor
 		{
 			template <typename T>
 			void set(T& prop)
@@ -743,20 +743,20 @@ namespace Lumix
 				lua_setfield(L, -2, getter);
 			}
 
-			void visit(const Properties::Property<float>& prop) override { set(prop); }
-			void visit(const Properties::Property<int>& prop) override { set(prop); }
-			void visit(const Properties::Property<Entity>& prop) override { set(prop); }
-			void visit(const Properties::Property<Int2>& prop) override { set(prop); }
-			void visit(const Properties::Property<Vec2>& prop) override { set(prop); }
-			void visit(const Properties::Property<Vec3>& prop) override { set(prop); }
-			void visit(const Properties::Property<Vec4>& prop) override { set(prop); }
-			void visit(const Properties::Property<Path>& prop) override { set(prop); }
-			void visit(const Properties::Property<bool>& prop) override { set(prop); }
-			void visit(const Properties::Property<const char*>& prop) override { set(prop); }
-			void visit(const Properties::IArrayProperty& prop) override {}
-			void visit(const Properties::IEnumProperty& prop) override {}
-			void visit(const Properties::IBlobProperty& prop) override {}
-			void visit(const Properties::ISampledFuncProperty& prop) override {}
+			void visit(const Reflection::Property<float>& prop) override { set(prop); }
+			void visit(const Reflection::Property<int>& prop) override { set(prop); }
+			void visit(const Reflection::Property<Entity>& prop) override { set(prop); }
+			void visit(const Reflection::Property<Int2>& prop) override { set(prop); }
+			void visit(const Reflection::Property<Vec2>& prop) override { set(prop); }
+			void visit(const Reflection::Property<Vec3>& prop) override { set(prop); }
+			void visit(const Reflection::Property<Vec4>& prop) override { set(prop); }
+			void visit(const Reflection::Property<Path>& prop) override { set(prop); }
+			void visit(const Reflection::Property<bool>& prop) override { set(prop); }
+			void visit(const Reflection::Property<const char*>& prop) override { set(prop); }
+			void visit(const Reflection::IArrayProperty& prop) override {}
+			void visit(const Reflection::IEnumProperty& prop) override {}
+			void visit(const Reflection::IBlobProperty& prop) override {}
+			void visit(const Reflection::ISampledFuncProperty& prop) override {}
 
 			ComponentType cmp_type;
 			lua_State* L;
@@ -764,20 +764,20 @@ namespace Lumix
 
 		void registerProperties()
 		{
-			int cmps_count = Properties::getComponentTypesCount();
+			int cmps_count = Reflection::getComponentTypesCount();
 			lua_State* L = m_system.m_engine.getState();
 			for (int i = 0; i < cmps_count; ++i)
 			{
-				const char* cmp_name = Properties::getComponentTypeID(i);
+				const char* cmp_name = Reflection::getComponentTypeID(i);
 				lua_newtable(L);
 				lua_pushvalue(L, -1);
 				char tmp[50];
 				convertPropertyToLuaName(cmp_name, tmp, lengthOf(tmp));
 				lua_setglobal(L, tmp);
 
-				ComponentType cmp_type = Properties::getComponentType(cmp_name);
-				const char* x = Properties::getComponentTypeID(cmp_type.index);
-				const Properties::ComponentBase* cmp_desc = Properties::getComponent(cmp_type);
+				ComponentType cmp_type = Reflection::getComponentType(cmp_name);
+				const char* x = Reflection::getComponentTypeID(cmp_type.index);
+				const Reflection::ComponentBase* cmp_desc = Reflection::getComponent(cmp_type);
 				
 				LuaCreatePropertyVisitor visitor;
 				visitor.cmp_type = cmp_type;
@@ -1764,7 +1764,7 @@ namespace Lumix
 	{
 		m_script_manager.create(LUA_SCRIPT_RESOURCE_TYPE, engine.getResourceManager());
 
-		using namespace Properties;
+		using namespace Reflection;
 		static auto lua_scene = scene("lua_script",
 			component("lua_script",
 				blob_property("data", LUMIX_PROP(LuaScriptScene, getScriptData, setScriptData))

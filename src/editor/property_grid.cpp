@@ -8,7 +8,7 @@
 #include "engine/iplugin.h"
 #include "engine/math_utils.h"
 #include "engine/prefab.h"
-#include "engine/properties.h"
+#include "engine/reflection.h"
 #include "engine/resource.h"
 #include "engine/serializer.h"
 #include "engine/universe/universe.h"
@@ -45,7 +45,7 @@ PropertyGrid::~PropertyGrid()
 }
 
 
-struct GridUIVisitor LUMIX_FINAL : Properties::IComponentVisitor
+struct GridUIVisitor LUMIX_FINAL : Reflection::IComponentVisitor
 {
 	GridUIVisitor(StudioApp& app, int index, const Array<Entity>& entities, ComponentType cmp_type, WorldEditor& editor)
 		: m_entities(entities)
@@ -68,27 +68,27 @@ struct GridUIVisitor LUMIX_FINAL : Properties::IComponentVisitor
 	}
 
 
-	struct Attributes : Properties::IAttributeVisitor
+	struct Attributes : Reflection::IAttributeVisitor
 	{
-		void visit(const Properties::IAttribute& attr) override
+		void visit(const Reflection::IAttribute& attr) override
 		{
 			switch (attr.getType())
 			{
-				case Properties::IAttribute::RADIANS:
+				case Reflection::IAttribute::RADIANS:
 					is_radians = true;
 					break;
-				case Properties::IAttribute::COLOR:
+				case Reflection::IAttribute::COLOR:
 					is_color = true;
 					break;
-				case Properties::IAttribute::MIN:
-					min = ((Properties::MinAttribute&)attr).min;
+				case Reflection::IAttribute::MIN:
+					min = ((Reflection::MinAttribute&)attr).min;
 					break;
-				case Properties::IAttribute::CLAMP:
-					min = ((Properties::ClampAttribute&)attr).min;
-					max = ((Properties::ClampAttribute&)attr).max;
+				case Reflection::IAttribute::CLAMP:
+					min = ((Reflection::ClampAttribute&)attr).min;
+					max = ((Reflection::ClampAttribute&)attr).max;
 					break;
-				case Properties::IAttribute::RESOURCE:
-					resource_type = ((Properties::ResourceAttribute&)attr).type;
+				case Reflection::IAttribute::RESOURCE:
+					resource_type = ((Reflection::ResourceAttribute&)attr).type;
 					break;
 			}
 		}
@@ -101,7 +101,7 @@ struct GridUIVisitor LUMIX_FINAL : Properties::IComponentVisitor
 	};
 
 
-	static Attributes getAttributes(const Properties::PropertyBase& prop)
+	static Attributes getAttributes(const Reflection::PropertyBase& prop)
 	{
 		Attributes attrs;
 		prop.visit(attrs);
@@ -109,7 +109,7 @@ struct GridUIVisitor LUMIX_FINAL : Properties::IComponentVisitor
 	}
 
 
-	void visit(const Properties::Property<float>& prop) override
+	void visit(const Reflection::Property<float>& prop) override
 	{
 		Attributes attrs = getAttributes(prop);
 		ComponentUID cmp = getComponent();
@@ -127,7 +127,7 @@ struct GridUIVisitor LUMIX_FINAL : Properties::IComponentVisitor
 	}
 
 
-	void visit(const Properties::Property<int>& prop) override
+	void visit(const Reflection::Property<int>& prop) override
 	{
 		ComponentUID cmp = getComponent();
 		int value;
@@ -141,7 +141,7 @@ struct GridUIVisitor LUMIX_FINAL : Properties::IComponentVisitor
 	}
 
 
-	void visit(const Properties::Property<Entity>& prop) override
+	void visit(const Reflection::Property<Entity>& prop) override
 	{
 		ComponentUID cmp = getComponent();
 		Entity entity;
@@ -195,7 +195,7 @@ struct GridUIVisitor LUMIX_FINAL : Properties::IComponentVisitor
 	}
 
 
-	void visit(const Properties::Property<Int2>& prop) override
+	void visit(const Reflection::Property<Int2>& prop) override
 	{
 		ComponentUID cmp = getComponent();
 		Int2 value;
@@ -208,7 +208,7 @@ struct GridUIVisitor LUMIX_FINAL : Properties::IComponentVisitor
 	}
 
 
-	void visit(const Properties::Property<Vec2>& prop) override
+	void visit(const Reflection::Property<Vec2>& prop) override
 	{
 		ComponentUID cmp = getComponent();
 		Vec2 value;
@@ -221,7 +221,7 @@ struct GridUIVisitor LUMIX_FINAL : Properties::IComponentVisitor
 	}
 
 
-	void visit(const Properties::Property<Vec3>& prop) override
+	void visit(const Reflection::Property<Vec3>& prop) override
 	{
 		Attributes attrs = getAttributes(prop);
 		ComponentUID cmp = getComponent();
@@ -248,7 +248,7 @@ struct GridUIVisitor LUMIX_FINAL : Properties::IComponentVisitor
 	}
 
 
-	void visit(const Properties::Property<Vec4>& prop) override
+	void visit(const Reflection::Property<Vec4>& prop) override
 	{
 		ComponentUID cmp = getComponent();
 		Vec4 value;
@@ -262,7 +262,7 @@ struct GridUIVisitor LUMIX_FINAL : Properties::IComponentVisitor
 	}
 
 
-	void visit(const Properties::Property<bool>& prop) override
+	void visit(const Reflection::Property<bool>& prop) override
 	{
 		ComponentUID cmp = getComponent();
 		bool value;
@@ -276,7 +276,7 @@ struct GridUIVisitor LUMIX_FINAL : Properties::IComponentVisitor
 	}
 
 
-	void visit(const Properties::Property<Path>& prop) override
+	void visit(const Reflection::Property<Path>& prop) override
 	{
 		ComponentUID cmp = getComponent();
 		char tmp[1024];
@@ -302,7 +302,7 @@ struct GridUIVisitor LUMIX_FINAL : Properties::IComponentVisitor
 	}
 
 
-	void visit(const Properties::Property<const char*>& prop) override
+	void visit(const Reflection::Property<const char*>& prop) override
 	{
 		ComponentUID cmp = getComponent();
 		char tmp[1024];
@@ -316,10 +316,10 @@ struct GridUIVisitor LUMIX_FINAL : Properties::IComponentVisitor
 	}
 
 
-	void visit(const Properties::IBlobProperty& prop) override {}
+	void visit(const Reflection::IBlobProperty& prop) override {}
 
 
-	void visit(const Properties::ISampledFuncProperty& prop) override
+	void visit(const Reflection::ISampledFuncProperty& prop) override
 	{
 		static const int MIN_COUNT = 6;
 		ComponentUID cmp = getComponent();
@@ -415,7 +415,7 @@ struct GridUIVisitor LUMIX_FINAL : Properties::IComponentVisitor
 		}
 	}
 
-	void visit(const Properties::IArrayProperty& prop) override
+	void visit(const Reflection::IArrayProperty& prop) override
 	{
 		ImGui::Unindent();
 		bool is_open = ImGui::TreeNodeEx(prop.name, ImGuiTreeNodeFlags_AllowOverlapMode);
@@ -482,7 +482,7 @@ struct GridUIVisitor LUMIX_FINAL : Properties::IComponentVisitor
 	}
 
 
-	void visit(const Properties::IEnumProperty& prop) override
+	void visit(const Reflection::IEnumProperty& prop) override
 	{
 		if (m_entities.size() > 1)
 		{
@@ -498,7 +498,7 @@ struct GridUIVisitor LUMIX_FINAL : Properties::IComponentVisitor
 
 		struct Data
 		{
-			const Properties::IEnumProperty* prop;
+			const Reflection::IEnumProperty* prop;
 			ComponentUID cmp;
 		};
 
@@ -549,7 +549,7 @@ void PropertyGrid::showComponentProperties(const Array<Entity>& entities, Compon
 
 	if (!is_open) return;
 
-	const Properties::ComponentBase* component = Properties::getComponent(cmp_type);
+	const Reflection::ComponentBase* component = Reflection::getComponent(cmp_type);
 	GridUIVisitor visitor(m_app, -1, entities, cmp_type, m_editor);
 	if (component) component->visit(visitor);
 

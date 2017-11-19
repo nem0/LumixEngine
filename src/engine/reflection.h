@@ -28,7 +28,7 @@ struct Vec3;
 struct Vec4;
 
 
-namespace Properties
+namespace Reflection
 {
 
 
@@ -740,7 +740,7 @@ struct FunctionBase
 
 namespace internal
 {
-	static const unsigned int FRONT_SIZE = sizeof("Lumix::Properties::internal::GetTypeNameHelper<") - 1u;
+	static const unsigned int FRONT_SIZE = sizeof("Lumix::Reflection::internal::GetTypeNameHelper<") - 1u;
 	static const unsigned int BACK_SIZE = sizeof(">::GetTypeName") - 1u;
 
 	template <typename T>
@@ -927,7 +927,7 @@ auto const_array(const char* name, Counter counter, Props... properties)
 }
 
 
-} // namespace Properties
+} // namespace Reflection
 
 
 } // namespace Lumix

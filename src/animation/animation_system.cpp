@@ -11,7 +11,7 @@
 #include "engine/lua_wrapper.h"
 #include "engine/job_system.h"
 #include "engine/profiler.h"
-#include "engine/properties.h"
+#include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/serializer.h"
 #include "engine/universe/universe.h"
@@ -34,14 +34,14 @@ enum class AnimationSceneVersion
 };
 
 
-static const ComponentType ANIMABLE_TYPE = Properties::getComponentType("animable");
-static const ComponentType CONTROLLER_TYPE = Properties::getComponentType("anim_controller");
-static const ComponentType SHARED_CONTROLLER_TYPE = Properties::getComponentType("shared_anim_controller");
+static const ComponentType ANIMABLE_TYPE = Reflection::getComponentType("animable");
+static const ComponentType CONTROLLER_TYPE = Reflection::getComponentType("anim_controller");
+static const ComponentType SHARED_CONTROLLER_TYPE = Reflection::getComponentType("shared_anim_controller");
 static const ResourceType ANIMATION_TYPE("animation");
 static const ResourceType CONTROLLER_RESOURCE_TYPE("anim_controller");
 
 
-struct AnimSetProperty : public Properties::IEnumProperty
+struct AnimSetProperty : public Reflection::IEnumProperty
 {
 	AnimSetProperty() { name = "Default set"; }
 
@@ -120,7 +120,7 @@ AnimationSystemImpl::AnimationSystemImpl(Engine& engine)
 	m_animation_manager.create(ANIMATION_TYPE, m_engine.getResourceManager());
 	m_controller_manager.create(CONTROLLER_RESOURCE_TYPE, m_engine.getResourceManager());
 
-	using namespace Properties;
+	using namespace Reflection;
 	static auto anim_scene = scene("animation",
 		component("anim_controller",
 			property("Source", LUMIX_PROP(AnimationScene, getControllerSource, setControllerSource),

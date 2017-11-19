@@ -26,7 +26,7 @@ namespace Lumix
 {
 
 
-namespace Properties
+namespace Reflection
 {
 struct  PropertyBase;
 }
@@ -99,7 +99,7 @@ public:
 	virtual void registerComponentWithResource(const char* id,
 		const char* label,
 		ResourceType resource_type,
-		const Properties::PropertyBase& property) = 0;
+		const Reflection::PropertyBase& property) = 0;
 	virtual const AddCmpTreeNode& getAddComponentTreeRoot() const = 0;
 	virtual int getExitCode() const = 0;
 	virtual void runScript(const char* src, const char* script_name) = 0;

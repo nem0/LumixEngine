@@ -18,7 +18,7 @@
 #include "engine/plugin_manager.h"
 #include "engine/prefab.h"
 #include "engine/profiler.h"
-#include "engine/properties.h"
+#include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/timer.h"
 #include "engine/universe/component.h"
@@ -511,7 +511,7 @@ public:
 		m_timer = Timer::create(m_allocator);
 		m_fps_timer = Timer::create(m_allocator);
 		m_fps_frame = 0;
-		Properties::init(m_allocator);
+		Reflection::init(m_allocator);
 
 		m_plugin_manager = PluginManager::create(*this);
 		m_input_system = InputSystem::create(*this);
@@ -541,7 +541,7 @@ public:
 	static ComponentHandle LUA_createComponent(Universe* universe, Entity entity, const char* type)
 	{
 		if (!universe) return INVALID_COMPONENT;
-		ComponentType cmp_type = Properties::getComponentType(type);
+		ComponentType cmp_type = Reflection::getComponentType(type);
 		IScene* scene = universe->getScene(cmp_type);
 		if (!scene) return INVALID_COMPONENT;
 		if (scene->getComponent(entity, cmp_type) != INVALID_COMPONENT)
@@ -560,9 +560,9 @@ public:
 	}
 
 
-	struct SetPropertyVisitor : public Properties::IComponentVisitor
+	struct SetPropertyVisitor : public Reflection::IComponentVisitor
 	{
-		void visit(const Properties::Property<float>& prop) override
+		void visit(const Reflection::Property<float>& prop) override
 		{
 			if (!equalStrings(property_name, prop.name)) return;
 			if (lua_isnumber(L, -1))
@@ -574,7 +574,7 @@ public:
 		}
 
 
-		void visit(const Properties::Property<int>& prop) override
+		void visit(const Reflection::Property<int>& prop) override
 		{
 			if (!equalStrings(property_name, prop.name)) return;
 			if (lua_isinteger(L, -1))
@@ -587,7 +587,7 @@ public:
 		}
 
 
-		void visit(const Properties::Property<Entity>& prop) override
+		void visit(const Reflection::Property<Entity>& prop) override
 		{
 			if (!equalStrings(property_name, prop.name)) return;
 			if (lua_isinteger(L, -1))
@@ -600,7 +600,7 @@ public:
 		}
 
 
-		void visit(const Properties::Property<Int2>& prop) override
+		void visit(const Reflection::Property<Int2>& prop) override
 		{
 			if (!equalStrings(property_name, prop.name)) return;
 			if (lua_istable(L, -1))
@@ -612,7 +612,7 @@ public:
 		}
 
 
-		void visit(const Properties::Property<Vec2>& prop) override
+		void visit(const Reflection::Property<Vec2>& prop) override
 		{
 			if (!equalStrings(property_name, prop.name)) return;
 			if (lua_istable(L, -1))
@@ -624,7 +624,7 @@ public:
 		}
 
 
-		void visit(const Properties::Property<Vec3>& prop) override
+		void visit(const Reflection::Property<Vec3>& prop) override
 		{
 			if (!equalStrings(property_name, prop.name)) return;
 			if (lua_istable(L, -1))
@@ -636,7 +636,7 @@ public:
 		}
 
 
-		void visit(const Properties::Property<Vec4>& prop) override
+		void visit(const Reflection::Property<Vec4>& prop) override
 		{
 			if (!equalStrings(property_name, prop.name)) return;
 			if (lua_istable(L, -1))
@@ -648,7 +648,7 @@ public:
 		}
 
 
-		void visit(const Properties::Property<Path>& prop) override
+		void visit(const Reflection::Property<Path>& prop) override
 		{
 			if (!equalStrings(property_name, prop.name)) return;
 			if (lua_isstring(L, -1))
@@ -660,7 +660,7 @@ public:
 		}
 
 
-		void visit(const Properties::Property<bool>& prop) override
+		void visit(const Reflection::Property<bool>& prop) override
 		{
 			if (!equalStrings(property_name, prop.name)) return;
 			if (lua_isboolean(L, -1))
@@ -672,7 +672,7 @@ public:
 		}
 
 
-		void visit(const Properties::Property<const char*>& prop) override
+		void visit(const Reflection::Property<const char*>& prop) override
 		{
 			if (!equalStrings(property_name, prop.name)) return;
 			if (lua_isstring(L, -1))
@@ -684,18 +684,18 @@ public:
 		}
 
 
-		void visit(const Properties::IArrayProperty& prop) override
+		void visit(const Reflection::IArrayProperty& prop) override
 		{
 			if (!equalStrings(property_name, prop.name)) return;
 			g_log_error.log("Lua Script") << "Property " << prop.name << " has unsupported type";
 		}
 
-		void visit(const Properties::IEnumProperty& prop) override { notSupported(prop); }
-		void visit(const Properties::IBlobProperty& prop) override { notSupported(prop); }
-		void visit(const Properties::ISampledFuncProperty& prop) override { notSupported(prop); }
+		void visit(const Reflection::IEnumProperty& prop) override { notSupported(prop); }
+		void visit(const Reflection::IBlobProperty& prop) override { notSupported(prop); }
+		void visit(const Reflection::ISampledFuncProperty& prop) override { notSupported(prop); }
 
 
-		void notSupported(const Properties::PropertyBase& prop)
+		void notSupported(const Reflection::PropertyBase& prop)
 		{
 			if (!equalStrings(property_name, prop.name)) return;
 			g_log_error.log("Lua Script") << "Property " << prop.name << " has unsupported type";
@@ -710,7 +710,7 @@ public:
 
 	static int LUA_getComponentType(const char* component_type)
 	{
-		return Properties::getComponentType(component_type).index;
+		return Reflection::getComponentType(component_type).index;
 	}
 
 
@@ -751,12 +751,12 @@ public:
 			}
 			else
 			{
-				ComponentType cmp_type = Properties::getComponentType(parameter_name);
+				ComponentType cmp_type = Reflection::getComponentType(parameter_name);
 				IScene* scene = ctx->getScene(cmp_type);
 				if (scene)
 				{
 					ComponentUID cmp(e, cmp_type, scene, scene->createComponent(cmp_type, e));
-					const Properties::ComponentBase* cmp_des = Properties::getComponent(cmp_type);
+					const Reflection::ComponentBase* cmp_des = Reflection::getComponent(cmp_type);
 					if (cmp.isValid())
 					{
 						lua_pushvalue(L, -1);
@@ -1213,7 +1213,7 @@ public:
 			res->getResourceManager().unload(*res);
 		}
 
-		Properties::shutdown();
+		Reflection::shutdown();
 		Timer::destroy(m_timer);
 		Timer::destroy(m_fps_timer);
 		PluginManager::destroy(m_plugin_manager);
