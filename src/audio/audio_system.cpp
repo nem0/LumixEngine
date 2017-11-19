@@ -12,7 +12,7 @@
 #include "engine/iplugin.h"
 #include "engine/path.h"
 #include "engine/plugin_manager.h"
-#include "engine/properties.h"
+#include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/universe/universe.h"
 #include "renderer/render_scene.h"
@@ -27,7 +27,7 @@ static const ResourceType CLIP_TYPE("clip");
 
 static void registerProperties(IAllocator& allocator)
 {
-	using namespace Properties;
+	using namespace Reflection;
 	static auto audio_scene = scene("audio",
 		component("ambient_sound",
 			property("3D", LUMIX_PROP(AudioScene, isAmbientSound3D, setAmbientSound3D)),

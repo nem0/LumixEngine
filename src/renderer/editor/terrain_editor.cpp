@@ -14,7 +14,7 @@
 #include "engine/path_utils.h"
 #include "engine/prefab.h"
 #include "engine/profiler.h"
-#include "engine/properties.h"
+#include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
 #include "engine/universe/universe.h"
@@ -33,9 +33,9 @@ namespace Lumix
 {
 
 
-static const ComponentType MODEL_INSTANCE_TYPE = Properties::getComponentType("renderable");
-static const ComponentType TERRAIN_TYPE = Properties::getComponentType("terrain");
-static const ComponentType HEIGHTFIELD_TYPE = Properties::getComponentType("physical_heightfield");
+static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("renderable");
+static const ComponentType TERRAIN_TYPE = Reflection::getComponentType("terrain");
+static const ComponentType HEIGHTFIELD_TYPE = Reflection::getComponentType("physical_heightfield");
 static const ResourceType MATERIAL_TYPE("material");
 static const ResourceType TEXTURE_TYPE("texture");
 static const ResourceType PREFAB_TYPE("prefab");

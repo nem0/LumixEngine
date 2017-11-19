@@ -3,7 +3,7 @@
 #include "engine/engine.h"
 #include "engine/math_utils.h"
 #include "engine/matrix.h"
-#include "engine/properties.h"
+#include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
 #include "engine/universe/universe.h"
@@ -16,13 +16,13 @@ namespace Lumix
 {
 
 
-static const ComponentType MODEL_INSTANCE_TYPE = Properties::getComponentType("renderable");
-static const ComponentType PHYSICAL_CONTROLLER_TYPE = Properties::getComponentType("physical_controller");
-static const ComponentType BOX_RIGID_ACTOR_TYPE = Properties::getComponentType("box_rigid_actor");
-static const ComponentType CAMERA_TYPE = Properties::getComponentType("camera");
-static const ComponentType GLOBAL_LIGHT_TYPE = Properties::getComponentType("global_light");
-static const ComponentType POINT_LIGHT_TYPE = Properties::getComponentType("point_light");
-static const ComponentType TERRAIN_TYPE = Properties::getComponentType("terrain");
+static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("renderable");
+static const ComponentType PHYSICAL_CONTROLLER_TYPE = Reflection::getComponentType("physical_controller");
+static const ComponentType BOX_RIGID_ACTOR_TYPE = Reflection::getComponentType("box_rigid_actor");
+static const ComponentType CAMERA_TYPE = Reflection::getComponentType("camera");
+static const ComponentType GLOBAL_LIGHT_TYPE = Reflection::getComponentType("global_light");
+static const ComponentType POINT_LIGHT_TYPE = Reflection::getComponentType("point_light");
+static const ComponentType TERRAIN_TYPE = Reflection::getComponentType("terrain");
 
 
 enum class IconType

@@ -16,7 +16,7 @@
 #include "engine/path_utils.h"
 #include "engine/plugin_manager.h"
 #include "engine/profiler.h"
-#include "engine/properties.h"
+#include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
 #include "engine/string.h"
@@ -37,7 +37,7 @@ namespace Lumix
 {
 
 
-static const ComponentType MODEL_INSTANCE_TYPE = Properties::getComponentType("renderable");
+static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("renderable");
 static const ResourceType MODEL_TYPE("model");
 static const ResourceType SHADER_TYPE("shader");
 static const ResourceType TEXTURE_TYPE("texture");
@@ -271,7 +271,7 @@ void SceneView::handleDrop(const char* path, float x, float y)
 			m_editor.setEntitiesPositions(&entity, &pos, 1);
 			m_editor.selectEntities(&entity, 1);
 			m_editor.addComponent(MODEL_INSTANCE_TYPE);
-			auto* prop = Properties::getProperty(MODEL_INSTANCE_TYPE, "Source");
+			auto* prop = Reflection::getProperty(MODEL_INSTANCE_TYPE, "Source");
 			m_editor.setProperty(MODEL_INSTANCE_TYPE, -1, *prop, &entity, 1, path, stringLength(path) + 1);
 			m_editor.endCommandGroup();
 		}
@@ -288,7 +288,7 @@ void SceneView::handleDrop(const char* path, float x, float y)
 					break;
 				}
 			}
-			auto* prop= Properties::getProperty(MODEL_INSTANCE_TYPE, "Materials", "Source");
+			auto* prop= Reflection::getProperty(MODEL_INSTANCE_TYPE, "Materials", "Source");
 			m_editor.setProperty(MODEL_INSTANCE_TYPE, mesh_index, *prop, &hit.m_entity, 1, path, stringLength(path) + 1);
 		}
 	}

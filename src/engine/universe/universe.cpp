@@ -6,7 +6,7 @@
 #include "engine/log.h"
 #include "engine/matrix.h"
 #include "engine/prefab.h"
-#include "engine/properties.h"
+#include "engine/reflection.h"
 #include "engine/serializer.h"
 #include "engine/universe/component.h"
 #include <cstdint>
@@ -744,7 +744,7 @@ Entity Universe::instantiatePrefab(const PrefabResource& prefab,
 		deserializer.read(&cmp_type_hash);
 		while (cmp_type_hash != 0)
 		{
-			ComponentType cmp_type = Properties::getComponentTypeFromHash(cmp_type_hash);
+			ComponentType cmp_type = Reflection::getComponentTypeFromHash(cmp_type_hash);
 			int scene_version;
 			deserializer.read(&scene_version);
 			deserializeComponent(deserializer, entity, cmp_type, scene_version);
@@ -822,7 +822,7 @@ void Universe::destroyComponent(Entity entity, ComponentType component_type, ISc
 	auto mask = m_entities[entity.index].components;
 	auto old_mask = mask;
 	mask &= ~((u64)1 << component_type.index);
-	auto x = Properties::getComponentTypeID(component_type.index);
+	auto x = Reflection::getComponentTypeID(component_type.index);
 	ASSERT(old_mask != mask);
 	m_entities[entity.index].components = mask;
 	m_component_destroyed.invoke(ComponentUID(entity, component_type, scene, index));

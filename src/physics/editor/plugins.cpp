@@ -10,7 +10,7 @@
 #include "editor/world_editor.h"
 #include "engine/crc32.h"
 #include "engine/math_utils.h"
-#include "engine/properties.h"
+#include "engine/reflection.h"
 #include "engine/universe/universe.h"
 #include "physics/physics_geometry_manager.h"
 #include "physics/physics_scene.h"
@@ -25,15 +25,15 @@ namespace
 {
 
 
-static const ComponentType RAGDOLL_TYPE = Properties::getComponentType("ragdoll");
-static const ComponentType BOX_ACTOR_TYPE = Properties::getComponentType("box_rigid_actor");
-static const ComponentType SPHERE_ACTOR_TYPE = Properties::getComponentType("sphere_rigid_actor");
-static const ComponentType CAPSULE_ACTOR_TYPE = Properties::getComponentType("capsule_rigid_actor");
-static const ComponentType CONTROLLER_TYPE = Properties::getComponentType("physical_controller");
-static const ComponentType DISTANCE_JOINT_TYPE = Properties::getComponentType("distance_joint");
-static const ComponentType HINGE_JOINT_TYPE = Properties::getComponentType("hinge_joint");
-static const ComponentType SPHERICAL_JOINT_TYPE = Properties::getComponentType("spherical_joint");
-static const ComponentType D6_JOINT_TYPE = Properties::getComponentType("d6_joint");
+static const ComponentType RAGDOLL_TYPE = Reflection::getComponentType("ragdoll");
+static const ComponentType BOX_ACTOR_TYPE = Reflection::getComponentType("box_rigid_actor");
+static const ComponentType SPHERE_ACTOR_TYPE = Reflection::getComponentType("sphere_rigid_actor");
+static const ComponentType CAPSULE_ACTOR_TYPE = Reflection::getComponentType("capsule_rigid_actor");
+static const ComponentType CONTROLLER_TYPE = Reflection::getComponentType("physical_controller");
+static const ComponentType DISTANCE_JOINT_TYPE = Reflection::getComponentType("distance_joint");
+static const ComponentType HINGE_JOINT_TYPE = Reflection::getComponentType("hinge_joint");
+static const ComponentType SPHERICAL_JOINT_TYPE = Reflection::getComponentType("spherical_joint");
+static const ComponentType D6_JOINT_TYPE = Reflection::getComponentType("d6_joint");
 static const u32 RENDERER_HASH = crc32("renderer");
 static const ResourceType PHYSICS_TYPE("physics");
 

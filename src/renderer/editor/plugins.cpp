@@ -21,7 +21,7 @@
 #include "engine/mt/thread.h"
 #include "engine/path_utils.h"
 #include "engine/plugin_manager.h"
-#include "engine/properties.h"
+#include "engine/reflection.h"
 #include "engine/queue.h"
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
@@ -57,15 +57,15 @@
 using namespace Lumix;
 
 
-static const ComponentType PARTICLE_EMITTER_TYPE = Properties::getComponentType("particle_emitter");
-static const ComponentType SCRIPTED_PARTICLE_EMITTER_TYPE = Properties::getComponentType("scripted_particle_emitter");
-static const ComponentType TERRAIN_TYPE = Properties::getComponentType("terrain");
-static const ComponentType CAMERA_TYPE = Properties::getComponentType("camera");
-static const ComponentType DECAL_TYPE = Properties::getComponentType("decal");
-static const ComponentType POINT_LIGHT_TYPE = Properties::getComponentType("point_light");
-static const ComponentType GLOBAL_LIGHT_TYPE = Properties::getComponentType("global_light");
-static const ComponentType MODEL_INSTANCE_TYPE = Properties::getComponentType("renderable");
-static const ComponentType ENVIRONMENT_PROBE_TYPE = Properties::getComponentType("environment_probe");
+static const ComponentType PARTICLE_EMITTER_TYPE = Reflection::getComponentType("particle_emitter");
+static const ComponentType SCRIPTED_PARTICLE_EMITTER_TYPE = Reflection::getComponentType("scripted_particle_emitter");
+static const ComponentType TERRAIN_TYPE = Reflection::getComponentType("terrain");
+static const ComponentType CAMERA_TYPE = Reflection::getComponentType("camera");
+static const ComponentType DECAL_TYPE = Reflection::getComponentType("decal");
+static const ComponentType POINT_LIGHT_TYPE = Reflection::getComponentType("point_light");
+static const ComponentType GLOBAL_LIGHT_TYPE = Reflection::getComponentType("global_light");
+static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("renderable");
+static const ComponentType ENVIRONMENT_PROBE_TYPE = Reflection::getComponentType("environment_probe");
 static const ResourceType MATERIAL_TYPE("material");
 static const ResourceType MODEL_TYPE("model");
 static const ResourceType SHADER_BINARY_TYPE("shader_binary");
@@ -2939,7 +2939,7 @@ struct AddTerrainComponentPlugin LUMIX_FINAL : public StudioApp::IAddComponentPl
 
 			if (!create_empty)
 			{
-				auto* prop = Properties::getProperty(TERRAIN_TYPE, "Material");
+				auto* prop = Reflection::getProperty(TERRAIN_TYPE, "Material");
 				editor.setProperty(TERRAIN_TYPE, -1, *prop, &entity, 1, buf, stringLength(buf));
 			}
 
@@ -2969,9 +2969,9 @@ LUMIX_STUDIO_ENTRY(renderer)
 	app.registerComponent("camera", "Render/Camera");
 	app.registerComponent("global_light", "Render/Global light");
 
-	app.registerComponentWithResource("renderable", "Render/Mesh", MODEL_TYPE, *Properties::getProperty(MODEL_INSTANCE_TYPE, "Source"));
-	app.registerComponentWithResource("particle_emitter", "Render/Particle emitter/Emitter", MATERIAL_TYPE, *Properties::getProperty(PARTICLE_EMITTER_TYPE, "Material"));
-	app.registerComponentWithResource("scripted_particle_emitter", "Render/Particle emitter/DO NOT USE YET! Scripted Emitter", MATERIAL_TYPE, *Properties::getProperty(SCRIPTED_PARTICLE_EMITTER_TYPE, "Material"));
+	app.registerComponentWithResource("renderable", "Render/Mesh", MODEL_TYPE, *Reflection::getProperty(MODEL_INSTANCE_TYPE, "Source"));
+	app.registerComponentWithResource("particle_emitter", "Render/Particle emitter/Emitter", MATERIAL_TYPE, *Reflection::getProperty(PARTICLE_EMITTER_TYPE, "Material"));
+	app.registerComponentWithResource("scripted_particle_emitter", "Render/Particle emitter/DO NOT USE YET! Scripted Emitter", MATERIAL_TYPE, *Reflection::getProperty(SCRIPTED_PARTICLE_EMITTER_TYPE, "Material"));
 	app.registerComponent("particle_emitter_spawn_shape", "Render/Particle emitter/Spawn shape");
 	app.registerComponent("particle_emitter_alpha", "Render/Particle emitter/Alpha");
 	app.registerComponent("particle_emitter_plane", "Render/Particle emitter/Plane");

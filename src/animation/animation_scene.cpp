@@ -11,7 +11,7 @@
 #include "engine/lua_wrapper.h"
 #include "engine/job_system.h"
 #include "engine/profiler.h"
-#include "engine/properties.h"
+#include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/serializer.h"
 #include "engine/universe/universe.h"
@@ -34,9 +34,9 @@ enum class AnimationSceneVersion
 };
 
 
-static const ComponentType ANIMABLE_TYPE = Properties::getComponentType("animable");
-static const ComponentType CONTROLLER_TYPE = Properties::getComponentType("anim_controller");
-static const ComponentType SHARED_CONTROLLER_TYPE = Properties::getComponentType("shared_anim_controller");
+static const ComponentType ANIMABLE_TYPE = Reflection::getComponentType("animable");
+static const ComponentType CONTROLLER_TYPE = Reflection::getComponentType("anim_controller");
+static const ComponentType SHARED_CONTROLLER_TYPE = Reflection::getComponentType("shared_anim_controller");
 static const ResourceType ANIMATION_TYPE("animation");
 static const ResourceType CONTROLLER_RESOURCE_TYPE("anim_controller");
 

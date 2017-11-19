@@ -15,7 +15,7 @@
 #include "engine/math_utils.h"
 #include "engine/matrix.h"
 #include "engine/prefab.h"
-#include "engine/properties.h"
+#include "engine/reflection.h"
 #include "engine/resource.h"
 #include "engine/serializer.h"
 #include "engine/string.h"
@@ -463,7 +463,7 @@ public:
 			deserializer.read(&cmp_type_hash);
 			while (cmp_type_hash != 0)
 			{
-				ComponentType cmp_type = Properties::getComponentTypeFromHash(cmp_type_hash);
+				ComponentType cmp_type = Reflection::getComponentTypeFromHash(cmp_type_hash);
 				int scene_version;
 				deserializer.read(&scene_version);
 				m_universe->deserializeComponent(deserializer, entity, cmp_type, scene_version);
@@ -519,8 +519,8 @@ public:
 		for (ComponentUID cmp = universe->getFirstComponent(entity); cmp.isValid();
 			cmp = universe->getNextComponent(cmp))
 		{
-			const char* cmp_name = Properties::getComponentTypeID(cmp.type.index);
-			u32 type_hash = Properties::getComponentTypeHash(cmp.type);
+			const char* cmp_name = Reflection::getComponentTypeID(cmp.type.index);
+			u32 type_hash = Reflection::getComponentTypeHash(cmp.type);
 			serializer.write(cmp_name, type_hash);
 			int scene_version = universe->getScene(cmp.type)->getVersion();
 			serializer.write("scene_version", scene_version);
