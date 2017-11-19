@@ -8,6 +8,10 @@
 #include "engine/metaprogramming.h"
 
 
+#define LUMIX_PROP(Scene, Getter, Setter) \
+	&Scene::Getter, #Scene "::" #Getter, &Scene::Setter, #Scene "::" #Setter
+
+
 namespace Lumix
 {
 
@@ -55,6 +59,8 @@ struct PropertyBase
 	virtual void getValue(ComponentUID cmp, int index, OutputBlob& stream) const = 0;
 
 	const char* name;
+	const char* getter_code = "";
+	const char* setter_code = "";
 };
 
 
@@ -716,24 +722,28 @@ auto component(const char* name, Props... props)
 
 
 template <typename Getter, typename Setter, typename... Attributes>
-auto blob_property(const char* name, Getter getter, Setter setter, Attributes... attributes)
+auto blob_property(const char* name, Getter getter, const char* getter_code, Setter setter, const char* setter_code, Attributes... attributes)
 {
 	BlobProperty<Getter, Setter, Attributes...> p;
 	p.attributes = makeTuple(attributes...);
 	p.getter = getter;
 	p.setter = setter;
+	p.getter_code = getter_code;
+	p.setter_code = setter_code;
 	p.name = name;
 	return p;
 }
 
 
 template <typename Getter, typename Setter, typename Counter>
-auto sampled_func_property(const char* name, Getter getter, Setter setter, Counter counter, float max_x)
+auto sampled_func_property(const char* name, Getter getter, const char* getter_code, Setter setter, const char* setter_code, Counter counter, float max_x)
 {
 	using R = typename ResultOf<Getter>::Type;
 	SampledFuncProperty<Getter, Setter, Counter> p;
 	p.getter = getter;
 	p.setter = setter;
+	p.getter_code = getter_code;
+	p.setter_code = setter_code;
 	p.counter = counter;
 	p.name = name;
 	p.max_x = max_x;
@@ -742,24 +752,28 @@ auto sampled_func_property(const char* name, Getter getter, Setter setter, Count
 
 
 template <typename Getter, typename Setter, typename... Attributes>
-auto property(const char* name, Getter getter, Setter setter, Attributes... attributes)
+auto property(const char* name, Getter getter, const char* getter_code, Setter setter, const char* setter_code, Attributes... attributes)
 {
 	using R = typename ResultOf<Getter>::Type;
 	CommonProperty<R, Getter, Setter, Attributes...> p;
 	p.attributes = makeTuple(attributes...);
 	p.getter = getter;
 	p.setter = setter;
+	p.getter_code = getter_code;
+	p.setter_code = setter_code;
 	p.name = name;
 	return p;
 }
 
 
 template <typename Getter, typename Setter, typename Namer, typename... Attributes>
-auto enum_property(const char* name, Getter getter, Setter setter, int count, Namer namer, Attributes... attributes)
+auto enum_property(const char* name, Getter getter, const char* getter_code, Setter setter, const char* setter_code, int count, Namer namer, Attributes... attributes)
 {
 	EnumProperty<Getter, Setter, Namer> p;
 	p.getter = getter;
 	p.setter = setter;
+	p.getter_code = getter_code;
+	p.setter_code = setter_code;
 	p.namer = namer;
 	p.count = count;
 	p.name = name;
@@ -768,11 +782,13 @@ auto enum_property(const char* name, Getter getter, Setter setter, int count, Na
 
 
 template <typename Getter, typename Setter, typename Counter, typename Namer, typename... Attributes>
-auto dyn_enum_property(const char* name, Getter getter, Setter setter, Counter counter, Namer namer, Attributes... attributes)
+auto dyn_enum_property(const char* name, Getter getter, const char* getter_code, Setter setter, const char* setter_code, Counter counter, Namer namer, Attributes... attributes)
 {
 	DynEnumProperty<Getter, Setter, Counter, Namer> p;
 	p.getter = getter;
 	p.setter = setter;
+	p.getter_code = getter_code;
+	p.setter_code = setter_code;
 	p.namer = namer;
 	p.counter = counter;
 	p.name = name;

@@ -30,14 +30,14 @@ static void registerProperties(IAllocator& allocator)
 	using namespace Properties;
 	static auto audio_scene = scene("audio",
 		component("ambient_sound",
-			property("3D", &AudioScene::isAmbientSound3D, &AudioScene::setAmbientSound3D),
-			dyn_enum_property("Sound", &AudioScene::getAmbientSoundClipIndex, &AudioScene::setAmbientSoundClipIndex, &AudioScene::getClipCount, &AudioScene::getClipName)
+			property("3D", LUMIX_PROP(AudioScene, isAmbientSound3D, setAmbientSound3D)),
+			dyn_enum_property("Sound", LUMIX_PROP(AudioScene, getAmbientSoundClipIndex, setAmbientSoundClipIndex), &AudioScene::getClipCount, &AudioScene::getClipName)
 		),
 		component("audio_listener"),
 		component("echo_zone",
-			property("Radius", &AudioScene::getEchoZoneRadius, &AudioScene::setEchoZoneRadius,
+			property("Radius", LUMIX_PROP(AudioScene, getEchoZoneRadius, setEchoZoneRadius),
 				MinAttribute(0)),
-			property("Delay (ms)", &AudioScene::getEchoZoneDelay, &AudioScene::setEchoZoneDelay,
+			property("Delay (ms)", LUMIX_PROP(AudioScene, getEchoZoneDelay, setEchoZoneDelay),
 				MinAttribute(0))
 		)
 	);

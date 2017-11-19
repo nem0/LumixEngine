@@ -38,6 +38,10 @@ template <typename T> struct ResultOf;
 template <typename R, typename C, typename... Args> struct ResultOf<R(C::*)(Args...)> { using Type = R; };
 template <typename R, typename C, typename... Args> struct ResultOf<R(C::*)(Args...)const> { using Type = R; };
 
+template <typename T> struct Arg1Type;
+template <typename R, typename C, typename A0, typename A1, typename... Args> struct Arg1Type<R(C::*)(A0, A1, Args...)> { using Type = A1; };
+template <typename R, typename C, typename A0, typename A1, typename... Args> struct Arg1Type<R(C::*)(A0, A1, Args...)const> { using Type = A1; };
+
 template <typename T> struct ClassOf;
 template <typename R, typename C, typename... Args>
 struct ClassOf<R(C::*)(Args...)>
@@ -119,11 +123,32 @@ struct TupleElement<Index, const Tuple<Head, Tail...> >
 {
 };
 
+template<class HeadType, class... TailTypes>
+struct TupleElement<0, Tuple<HeadType, TailTypes...> >
+{
+	using Head = HeadType;
+	using Tail = Tuple<HeadType, TailTypes...>;
+};
+
+template<int Index, class Head, class... Tail>
+struct TupleElement<Index, Tuple<Head, Tail...> >
+	: public TupleElement<Index - 1, Tuple<Tail...> >
+{
+};
+
 
 template<int Index, typename... Types>
 constexpr auto& get(const Tuple<Types...>& tuple)
 {
 	using Subtuple = typename TupleElement<Index, const ::Lumix::Tuple<Types...> >::Tail;
+	return (((Subtuple&)tuple).value);
+}
+
+
+template<int Index, typename... Types>
+constexpr auto& get(Tuple<Types...>& tuple)
+{
+	using Subtuple = typename TupleElement<Index, ::Lumix::Tuple<Types...> >::Tail;
 	return (((Subtuple&)tuple).value);
 }
 
