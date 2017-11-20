@@ -47,7 +47,8 @@ struct IAttribute
 };
 
 struct ComponentBase;
-struct IComponentVisitor;
+struct IPropertyVisitor;
+struct SceneBase;
 
 struct IAttributeVisitor
 {
@@ -69,9 +70,12 @@ struct PropertyBase
 LUMIX_ENGINE_API void init(IAllocator& allocator);
 LUMIX_ENGINE_API void shutdown();
 
+LUMIX_ENGINE_API int getScenesCount();
+LUMIX_ENGINE_API const SceneBase& getScene(int index);
 
 LUMIX_ENGINE_API const IAttribute* getAttribute(const PropertyBase& prop, IAttribute::Type type);
-LUMIX_ENGINE_API void registerComponent(const ComponentBase* desc);
+LUMIX_ENGINE_API void registerComponent(const ComponentBase& desc);
+LUMIX_ENGINE_API void registerScene(const SceneBase& scene);
 LUMIX_ENGINE_API const ComponentBase* getComponent(ComponentType cmp_type);
 LUMIX_ENGINE_API const PropertyBase* getProperty(ComponentType cmp_type, const char* property);
 LUMIX_ENGINE_API const PropertyBase* getProperty(ComponentType cmp_type, u32 property_name_hash);
@@ -234,11 +238,11 @@ struct IArrayProperty : PropertyBase
 	virtual void addItem(ComponentUID cmp, int index) const = 0;
 	virtual void removeItem(ComponentUID cmp, int index) const = 0;
 	virtual int getCount(ComponentUID cmp) const = 0;
-	virtual void visit(IComponentVisitor& visitor) const = 0;
+	virtual void visit(IPropertyVisitor& visitor) const = 0;
 };
 
 
-struct IComponentVisitor
+struct IPropertyVisitor
 {
 	virtual void begin(const ComponentBase&) {}
 	virtual void visit(const Property<float>& prop) = 0;
@@ -259,7 +263,7 @@ struct IComponentVisitor
 };
 
 
-struct ISimpleComponentVisitor : IComponentVisitor
+struct ISimpleComponentVisitor : IPropertyVisitor
 {
 	virtual void visitProperty(const PropertyBase& prop) = 0;
 
@@ -290,7 +294,7 @@ struct ComponentBase
 {
 	virtual int getPropertyCount() const = 0;
 	virtual int getFunctionCount() const = 0;
-	virtual void visit(IComponentVisitor&) const = 0;
+	virtual void visit(IPropertyVisitor&) const = 0;
 	virtual void visit(IFunctionVisitor&) const = 0;
 
 	const char* name;
@@ -568,7 +572,7 @@ struct ArrayProperty : IArrayProperty
 	}
 
 
-	void visit(IComponentVisitor& visitor) const override
+	void visit(IPropertyVisitor& visitor) const override
 	{
 		apply([&](auto& x) { visitor.visit(x); }, properties);
 	}
@@ -662,7 +666,7 @@ struct ConstArrayProperty : IArrayProperty
 	}
 
 
-	void visit(IComponentVisitor& visitor) const override
+	void visit(IPropertyVisitor& visitor) const override
 	{
 		apply([&](auto& x) { visitor.visit(x); }, properties);
 	}
@@ -678,17 +682,42 @@ struct ConstArrayProperty : IArrayProperty
 };
 
 
-template <typename... Components>
-struct Scene
+struct IComponentVisitor
 {
-	void registerScene()
+	virtual void visit(const ComponentBase& cmp) = 0;
+};
+
+
+struct SceneBase
+{
+	virtual int getFunctionCount() const = 0;
+	virtual void visit(IFunctionVisitor&) const = 0;
+	virtual void visit(IComponentVisitor& visitor) const = 0;
+
+	const char* name;
+};
+
+
+template <typename Components, typename Funcs>
+struct Scene : SceneBase
+{
+	int getFunctionCount() const override { return TupleSize<Funcs>::result; }
+
+
+	void visit(IFunctionVisitor& visitor) const override
 	{
-		apply([&](auto& cmp) { registerComponent(&cmp); }, components);
+		apply([&](const auto& func) { visitor.visit(func); }, functions);
 	}
 
 
-	Tuple<Components...> components;
-	const char* name;
+	void visit(IComponentVisitor& visitor) const override
+	{
+		apply([&](const auto& cmp) { visitor.visit(cmp); }, components);
+	}
+
+
+	Components components;
+	Funcs functions;
 };
 
 
@@ -699,7 +728,7 @@ struct Component : ComponentBase
 	int getFunctionCount() const override { return TupleSize<Funcs>::result; }
 
 
-	void visit(IComponentVisitor& visitor) const override
+	void visit(IPropertyVisitor& visitor) const override
 	{
 		visitor.begin(*this);
 		apply([&](auto& x) { visitor.visit(x); }, properties);
@@ -718,10 +747,21 @@ struct Component : ComponentBase
 };
 
 
+template <typename... Components, typename... Funcs>
+auto scene(const char* name, Tuple<Funcs...> funcs, Components... components)
+{
+	Scene<Tuple<Components...>, Tuple<Funcs...>> scene;
+	scene.name = name;
+	scene.functions = funcs;
+	scene.components = makeTuple(components...);
+	return scene;
+}
+
+
 template <typename... Components>
 auto scene(const char* name, Components... components)
 {
-	Scene<Components...> scene;
+	Scene<Tuple<Components...>, Tuple<>> scene;
 	scene.name = name;
 	scene.components = makeTuple(components...);
 	return scene;

@@ -560,7 +560,7 @@ public:
 	}
 
 
-	struct SetPropertyVisitor : public Reflection::IComponentVisitor
+	struct SetPropertyVisitor : public Reflection::IPropertyVisitor
 	{
 		void visit(const Reflection::Property<float>& prop) override
 		{

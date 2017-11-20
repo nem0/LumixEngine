@@ -139,7 +139,7 @@ AnimationSystemImpl::AnimationSystemImpl(Engine& engine)
 			property("Parent", LUMIX_PROP(AnimationScene, getSharedControllerParent, setSharedControllerParent))
 		)
 	);
-	anim_scene.registerScene();
+	registerScene(anim_scene);
 
 	registerLuaAPI();
 }

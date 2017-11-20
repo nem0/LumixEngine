@@ -570,7 +570,7 @@ namespace Lumix
 		}
 
 
-		struct GetPropertyVisitor LUMIX_FINAL : Reflection::IComponentVisitor
+		struct GetPropertyVisitor LUMIX_FINAL : Reflection::IPropertyVisitor
 		{
 			template <typename T>
 			LUMIX_FORCE_INLINE void get(const Reflection::Property<T>& prop)
@@ -631,7 +631,7 @@ namespace Lumix
 		}
 
 
-		struct SetPropertyVisitor LUMIX_FINAL : Reflection::IComponentVisitor
+		struct SetPropertyVisitor LUMIX_FINAL : Reflection::IPropertyVisitor
 		{
 			template <typename T>
 			LUMIX_FORCE_INLINE void set(const Reflection::Property<T>& prop)
@@ -719,7 +719,7 @@ namespace Lumix
 		}
 
 
-		struct LuaCreatePropertyVisitor : Reflection::IComponentVisitor
+		struct LuaCreatePropertyVisitor : Reflection::IPropertyVisitor
 		{
 			template <typename T>
 			void set(T& prop)
@@ -1770,7 +1770,7 @@ namespace Lumix
 				blob_property("data", LUMIX_PROP(LuaScriptScene, getScriptData, setScriptData))
 			)
 		);
-		lua_scene.registerScene();
+		registerScene(lua_scene);
 	}
 
 

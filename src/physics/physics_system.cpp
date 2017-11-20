@@ -52,6 +52,9 @@ namespace Lumix
 		using namespace Reflection;
 
 		static auto phy_scene = scene("physics",
+			functions(
+				function(LUMIX_FUNC(PhysicsScene::raycast))
+			),
 			component("ragdoll",
 				blob_property("data", LUMIX_PROP(PhysicsScene, getRagdollData, setRagdollData)),
 				property("Layer", LUMIX_PROP(PhysicsScene, getRagdollLayer, setRagdollLayer))
@@ -163,7 +166,7 @@ namespace Lumix
 					MinAttribute(0))
 			)
 		);
-		phy_scene.registerScene();
+		registerScene(phy_scene);
 	}
 
 

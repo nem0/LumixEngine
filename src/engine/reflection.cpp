@@ -64,6 +64,8 @@ struct ComponentTypeData
 
 
 static IAllocator* g_allocator = nullptr;
+static const SceneBase* g_scenes[64];
+static int g_scenes_count = 0;
 
 
 struct ComponentLink
@@ -187,11 +189,28 @@ const PropertyBase* getProperty(ComponentType cmp_type, const char* property)
 }
 
 
-void registerComponent(const ComponentBase* desc)
+void registerScene(const SceneBase& scene)
+{
+	struct : IComponentVisitor
+	{
+		void visit(const ComponentBase& cmp) override
+		{
+			registerComponent(cmp);
+		}
+	} visitor;
+	scene.visit(visitor);
+
+	ASSERT(g_scenes_count < lengthOf(g_scenes));
+	g_scenes[g_scenes_count] = &scene;
+	++g_scenes_count;
+}
+
+
+void registerComponent(const ComponentBase& desc)
 {
 	ComponentLink* link = LUMIX_NEW(*g_allocator, ComponentLink);
 	link->next = g_first_component;
-	link->desc = desc;
+	link->desc = &desc;
 	g_first_component = link;
 }
 
@@ -281,6 +300,19 @@ int getComponentTypesCount()
 const char* getComponentTypeID(int index)
 {
 	return getComponentTypes()[index].id;
+}
+
+
+int getScenesCount()
+{
+	return g_scenes_count;
+}
+
+
+const SceneBase& getScene(int index)
+{
+	ASSERT(index < lengthOf(g_scenes) && g_scenes[index]);
+	return *g_scenes[index];
 }
 
 

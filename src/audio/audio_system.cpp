@@ -41,7 +41,7 @@ static void registerProperties(IAllocator& allocator)
 				MinAttribute(0))
 		)
 	);
-	audio_scene.registerScene();
+	registerScene(audio_scene);
 }
 
 

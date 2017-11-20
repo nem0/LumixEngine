@@ -149,7 +149,7 @@ void NavigationSystem::registerProperties()
 			property("Get root motion from animation", LUMIX_PROP(NavigationScene, isGettingRootMotionFromAnim, setIsGettingRootMotionFromAnim))
 		)
 	);
-	navigation_scene.registerScene();
+	registerScene(navigation_scene);
 }
 
 
