@@ -45,7 +45,7 @@ PropertyGrid::~PropertyGrid()
 }
 
 
-struct GridUIVisitor LUMIX_FINAL : Reflection::IComponentVisitor
+struct GridUIVisitor LUMIX_FINAL : Reflection::IPropertyVisitor
 {
 	GridUIVisitor(StudioApp& app, int index, const Array<Entity>& entities, ComponentType cmp_type, WorldEditor& editor)
 		: m_entities(entities)

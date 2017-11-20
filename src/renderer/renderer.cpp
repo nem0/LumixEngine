@@ -288,7 +288,7 @@ static void registerProperties(IAllocator& allocator)
 			)
 		)
 	);
-	render_scene.registerScene();
+	registerScene(render_scene);
 }
 
 
