@@ -478,7 +478,7 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 	}
 
 
-	void destroyChorusZone(ComponentHandle component) override
+	void destroyChorusZone(ComponentHandle component)
 	{
 		Entity entity = { component.index };
 		int idx = m_chorus_zones.find(entity);
