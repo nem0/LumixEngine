@@ -49,6 +49,13 @@ public:
 		float feedback,
 		float left_delay,
 		float right_delay) = 0;
+	virtual void setChorus(BufferHandle handle,
+		float wet_dry_mix,
+		float depth,
+		float feedback,
+		float frequency,
+		float delay,
+		i32 phase) = 0;
 	virtual void play(BufferHandle buffer, bool looped) = 0;
 	virtual bool isPlaying(BufferHandle buffer) = 0;
 	virtual bool isEnd(BufferHandle buffer) = 0;

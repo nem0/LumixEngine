@@ -16,7 +16,6 @@
 #include "engine/universe/universe.h"
 #include "lua_script/lua_script_system.h"
 
-
 namespace Lumix
 {
 
@@ -24,6 +23,7 @@ namespace Lumix
 static const ComponentType LISTENER_TYPE = Reflection::getComponentType("audio_listener");
 static const ComponentType AMBIENT_SOUND_TYPE = Reflection::getComponentType("ambient_sound");
 static const ComponentType ECHO_ZONE_TYPE = Reflection::getComponentType("echo_zone");
+static const ComponentType CHORUS_ZONE_TYPE = Reflection::getComponentType("chorus_zone");
 static const ResourceType CLIP_RESOURCE_TYPE("clip");
 
 
@@ -40,6 +40,17 @@ struct EchoZone
 	float delay;
 };
 
+struct ChorusZone
+{
+	Entity entity;
+	float radius;
+	float delay;
+	float wet_dry_mix;
+	float depth;
+	float feedback;
+	float frequency;
+	i32 phase;
+};
 
 struct AmbientSound
 {
@@ -69,6 +80,7 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 		, m_device(system.getDevice())
 		, m_ambient_sounds(allocator)
 		, m_echo_zones(allocator)
+		, m_chorus_zones(allocator)
 	{
 		m_listener.entity = INVALID_ENTITY;
 		for (auto& i : m_playing_sounds)
@@ -79,6 +91,7 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 		context.registerComponentType(LISTENER_TYPE, this, &AudioSceneImpl::serializeListener, &AudioSceneImpl::deserializeListener);
 		context.registerComponentType(AMBIENT_SOUND_TYPE, this, &AudioSceneImpl::serializeAmbientSound, &AudioSceneImpl::deserializeAmbientSound);
 		context.registerComponentType(ECHO_ZONE_TYPE, this, &AudioSceneImpl::serializeEchoZone, &AudioSceneImpl::deserializeEchoZone);
+		context.registerComponentType(CHORUS_ZONE_TYPE, this, &AudioSceneImpl::serializeChorusZone, &AudioSceneImpl::deserializeChorusZone);
 	}
 
 
@@ -143,6 +156,32 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 		m_universe.addComponent(entity, ECHO_ZONE_TYPE, this, {entity.index});
 	}
 
+	void serializeChorusZone(ISerializer& serializer, ComponentHandle cmp)
+	{
+		ChorusZone& zone = m_chorus_zones[{cmp.index}];
+		serializer.write("radius", zone.radius);
+		serializer.write("delay", zone.delay);
+		serializer.write("depth", zone.depth);
+		serializer.write("feedback", zone.feedback);
+		serializer.write("frequency", zone.frequency);
+		serializer.write("phase", zone.phase);
+		serializer.write("wet_dry_mix", zone.wet_dry_mix);
+	}
+
+
+	void deserializeChorusZone(IDeserializer& serializer, Entity entity, int /*scene_version*/)
+	{
+		ChorusZone& zone = m_chorus_zones.insert(entity);
+		zone.entity = entity;
+		serializer.read(&zone.radius);
+		serializer.read(&zone.delay);
+		serializer.read(&zone.depth);
+		serializer.read(&zone.feedback);
+		serializer.read(&zone.frequency);
+		serializer.read(&zone.phase);
+		serializer.read(&zone.wet_dry_mix);
+		m_universe.addComponent(entity, CHORUS_ZONE_TYPE, this, { entity.index });
+	}
 
 	void serializeAmbientSound(ISerializer& serializer, ComponentHandle cmp)
 	{
@@ -185,6 +224,7 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 		m_clips.clear();
 		m_ambient_sounds.clear();
 		m_echo_zones.clear();
+		m_chorus_zones.clear();
 	}
 
 
@@ -397,6 +437,55 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 		m_universe.destroyComponent(entity, ECHO_ZONE_TYPE, this, component);
 	}
 
+	ComponentHandle createChorusZone(Entity entity)
+	{
+		ChorusZone& zone = m_chorus_zones.insert(entity);
+		zone.entity = entity;
+		zone.delay = 500.0f;
+		zone.radius = 10;
+		zone.depth = 1;
+		zone.feedback = 0;
+		zone.frequency = 1;
+		zone.phase = 0;
+		zone.wet_dry_mix = 0.5f;
+		ComponentHandle cmp = { entity.index };
+		m_universe.addComponent(entity, CHORUS_ZONE_TYPE, this, cmp);
+		return cmp;
+	}
+
+
+	float getChorusZoneDelay(ComponentHandle cmp) override
+	{
+		return m_chorus_zones[{cmp.index}].delay;
+	}
+
+
+	void setChorusZoneDelay(ComponentHandle cmp, float delay) override
+	{
+		m_chorus_zones[{cmp.index}].delay = delay;
+	}
+
+
+	float getChorusZoneRadius(ComponentHandle cmp) override
+	{
+		return m_chorus_zones[{cmp.index}].radius;
+	}
+
+
+	void setChorusZoneRadius(ComponentHandle cmp, float radius) override
+	{
+		m_chorus_zones[{cmp.index}].radius = radius;
+	}
+
+
+	void destroyChorusZone(ComponentHandle component) override
+	{
+		Entity entity = { component.index };
+		int idx = m_chorus_zones.find(entity);
+		m_chorus_zones.eraseAt(idx);
+		m_universe.destroyComponent(entity, CHORUS_ZONE_TYPE, this, component);
+	}
+
 
 	ComponentHandle createAmbientSound(Entity entity)
 	{
@@ -458,6 +547,12 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 
 		serializer.write(m_echo_zones.size());
 		for (EchoZone& zone : m_echo_zones)
+		{
+			serializer.write(zone);
+		}
+
+		serializer.write(m_chorus_zones.size());
+		for (ChorusZone& zone : m_chorus_zones)
 		{
 			serializer.write(zone);
 		}
@@ -525,6 +620,17 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 			m_echo_zones.insert(zone.entity, zone);
 			m_universe.addComponent(zone.entity, ECHO_ZONE_TYPE, this, {zone.entity.index});
 		}
+
+		serializer.read(count);
+
+		for (int i = 0; i < count; ++i)
+		{
+			ChorusZone zone;
+			serializer.read(zone);
+
+			m_chorus_zones.insert(zone.entity, zone);
+			m_universe.addComponent(zone.entity, CHORUS_ZONE_TYPE, this, { zone.entity.index });
+		}
 	}
 
 
@@ -546,6 +652,12 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 			int idx = m_echo_zones.find(entity);
 			if (idx < 0) return INVALID_COMPONENT;
 			return {entity.index};
+		}
+		if (type == CHORUS_ZONE_TYPE)
+		{
+			int idx = m_chorus_zones.find(entity);
+			if (idx < 0) return INVALID_COMPONENT;
+			return { entity.index };
 		}
 		return INVALID_COMPONENT;
 	}
@@ -677,6 +789,17 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 					break;
 				}
 
+				for (const ChorusZone& zone : m_chorus_zones)
+				{
+					float dist2 = (pos - m_universe.getPosition(zone.entity)).squaredLength();
+					float r2 = zone.radius * zone.radius;
+					if (dist2 > r2) continue;
+
+					float w = dist2 / r2;
+					m_device.setChorus(buffer, 1, 1, 0, 1, zone.delay, 0);
+					break;
+				}
+
 				return i;
 			}
 		}
@@ -715,6 +838,7 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 
 	AssociativeArray<Entity, AmbientSound> m_ambient_sounds;
 	AssociativeArray<Entity, EchoZone> m_echo_zones;
+	AssociativeArray<Entity, ChorusZone> m_chorus_zones;
 	AudioDevice& m_device;
 	Listener m_listener;
 	IAllocator& m_allocator;
@@ -734,7 +858,8 @@ static struct
 } COMPONENT_INFOS[] = {
 	{ LISTENER_TYPE, &AudioSceneImpl::createListener, &AudioSceneImpl::destroyListener },
 	{ AMBIENT_SOUND_TYPE, &AudioSceneImpl::createAmbientSound, &AudioSceneImpl::destroyAmbientSound },
-	{ ECHO_ZONE_TYPE, &AudioSceneImpl::createEchoZone, &AudioSceneImpl::destroyEchoZone }
+	{ ECHO_ZONE_TYPE, &AudioSceneImpl::createEchoZone, &AudioSceneImpl::destroyEchoZone },
+	{ CHORUS_ZONE_TYPE, &AudioSceneImpl::createChorusZone, &AudioSceneImpl::destroyChorusZone }
 };
 
 

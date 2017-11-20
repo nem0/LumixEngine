@@ -38,6 +38,11 @@ static void registerProperties(IAllocator& allocator)
 			property("Radius", LUMIX_PROP(AudioScene, getEchoZoneRadius, setEchoZoneRadius),
 				MinAttribute(0)),
 			property("Delay (ms)", LUMIX_PROP(AudioScene, getEchoZoneDelay, setEchoZoneDelay),
+				MinAttribute(0))),
+		component("chorus_zone",
+			property("Radius", LUMIX_PROP(AudioScene, getChorusZoneRadius, setChorusZoneRadius),
+				MinAttribute(0)),
+			property("Delay (ms)", LUMIX_PROP(AudioScene, getChorusZoneDelay, setChorusZoneDelay),
 				MinAttribute(0))
 		)
 	);
