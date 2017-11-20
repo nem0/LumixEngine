@@ -27,6 +27,14 @@ static const ComponentType CHORUS_ZONE_TYPE = Reflection::getComponentType("chor
 static const ResourceType CLIP_RESOURCE_TYPE("clip");
 
 
+enum class AudioSceneVersion : int
+{
+	CHORUS = 0,
+
+	LAST
+};
+
+
 struct Listener
 {
 	Entity entity;
@@ -212,6 +220,9 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 		m_listener.entity = entity;
 		m_universe.addComponent(entity, LISTENER_TYPE, this, {0});
 	}
+
+
+	int getVersion() const override { return (int)AudioSceneVersion::LAST; }
 
 
 	void clear() override
