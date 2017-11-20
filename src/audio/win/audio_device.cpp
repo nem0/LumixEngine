@@ -294,7 +294,67 @@ struct AudioDeviceImpl LUMIX_FINAL : public AudioDevice
 		}
 	}
 
-	
+	void setChorus(BufferHandle handle,
+		float wet_dry_mix,
+		float depth, 
+		float feedback, 
+		float frequency, 
+		float delay, 
+		i32 phase) override
+	{
+		auto buffer = m_buffers[m_buffer_map[handle]];
+		DSEFFECTDESC chorus_effect = {};
+		chorus_effect.dwSize = sizeof(DSEFFECTDESC);
+		chorus_effect.guidDSFXClass = GUID_DSFX_STANDARD_CHORUS;
+		if (!buffer.handle8) return;
+
+		DWORD buffer_status;
+		if (FAILED(buffer.handle->GetStatus(&buffer_status))) return;
+
+		buffer.handle->Stop();
+		DWORD res = 0;
+
+		IDirectSoundFXChorus8* chorus = NULL;
+		if (FAILED(buffer.handle8->GetObjectInPath(
+			GUID_DSFX_STANDARD_CHORUS, 0, IID_IDirectSoundFXEcho8, (LPVOID*)&chorus)))
+		{
+			if (FAILED(buffer.handle8->SetFX(1, &chorus_effect, &res)))
+			{
+				if (buffer_status & DSBSTATUS_PLAYING)
+				{
+					buffer.handle->Play(0, 0, buffer_status & DSBSTATUS_LOOPING ? DSBPLAY_LOOPING : 0);
+
+				}
+				return;
+			}
+			if (FAILED(buffer.handle8->GetObjectInPath(
+				GUID_DSFX_STANDARD_CHORUS, 0, IID_IDirectSoundFXEcho8, (LPVOID*)&chorus)))
+			{
+				if (buffer_status & DSBSTATUS_PLAYING)
+				{
+					buffer.handle->Play(0, 0, buffer_status & DSBSTATUS_LOOPING ? DSBPLAY_LOOPING : 0);
+				}
+				return;
+			}
+		}
+
+		DSFXChorus chorus_params;
+
+		chorus_params.fWetDryMix = DSFXCHORUS_WETDRYMIX_MIN + wet_dry_mix * DSFXCHORUS_WETDRYMIX_MAX;
+		chorus_params.fDepth = DSFXCHORUS_WETDRYMIX_MIN + depth * DSFXCHORUS_WETDRYMIX_MAX;
+		chorus_params.fFeedback = DSFXCHORUS_FEEDBACK_MIN + feedback * DSFXCHORUS_FEEDBACK_MAX;
+		chorus_params.fFrequency = DSFXCHORUS_FREQUENCY_MIN + frequency * DSFXCHORUS_FREQUENCY_MAX;
+		chorus_params.lWaveform = DSFXCHORUS_WAVE_TRIANGLE;
+		chorus_params.fDelay = DSFXCHORUS_DELAY_MIN + delay * DSFXCHORUS_DELAY_MAX;
+		chorus_params.lPhase = (phase < DSFXCHORUS_PHASE_MIN) ? DSFXCHORUS_PHASE_MIN : (phase > DSFXCHORUS_PHASE_MAX) ? DSFXCHORUS_PHASE_MAX : phase;
+
+		chorus->SetAllParameters(&chorus_params);
+		if (buffer_status & DSBSTATUS_PLAYING)
+		{
+			buffer.handle->Play(0, 0, buffer_status & DSBSTATUS_LOOPING ? DSBPLAY_LOOPING : 0);
+		}
+	}
+
 	bool isPlaying(BufferHandle handle) override
 	{
 		auto buffer = m_buffers[m_buffer_map[handle]].handle;
@@ -521,6 +581,15 @@ public:
 		float feedback,
 		float left_delay,
 		float right_delay) override {}
+
+	virtual void setChorus(BufferHandle handle,
+		float wet_dry_mix,
+		float depth,
+		float feedback,
+		float frequency,
+		float delay,
+		i32 phase) override {}
+
 	void play(BufferHandle buffer, bool looped) override {}
 	bool isPlaying(BufferHandle buffer) override { return false; }
 	void stop(BufferHandle buffer) override {}
