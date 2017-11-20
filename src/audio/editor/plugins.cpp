@@ -247,11 +247,24 @@ struct EditorPlugin LUMIX_FINAL : public WorldEditor::Plugin
 	bool showGizmo(ComponentUID cmp) override
 	{
 		static const ComponentType ECHO_ZONE_TYPE = Reflection::getComponentType("echo_zone");
+		static const ComponentType CHORUS_ZONE_TYPE = Reflection::getComponentType("chorus_zone");
 
 		if (cmp.type == ECHO_ZONE_TYPE)
 		{
 			auto* audio_scene = static_cast<AudioScene*>(cmp.scene);
 			float radius = audio_scene->getEchoZoneRadius(cmp.handle);
+			Universe& universe = audio_scene->getUniverse();
+			Vec3 pos = universe.getPosition(cmp.entity);
+
+			auto* scene = static_cast<RenderScene*>(universe.getScene(crc32("renderer")));
+			if (!scene) return true;
+			scene->addDebugSphere(pos, radius, 0xff0000ff, 0);
+			return true;
+		}
+		else if (cmp.type == CHORUS_ZONE_TYPE)
+		{
+			auto* audio_scene = static_cast<AudioScene*>(cmp.scene);
+			float radius = audio_scene->getChorusZoneRadius(cmp.handle);
 			Universe& universe = audio_scene->getUniverse();
 			Vec3 pos = universe.getPosition(cmp.entity);
 
@@ -275,6 +288,7 @@ LUMIX_STUDIO_ENTRY(audio)
 	app.registerComponent("ambient_sound", "Audio/Ambient sound");
 	app.registerComponent("audio_listener", "Audio/Listener");
 	app.registerComponent("echo_zone", "Audio/Echo zone");
+	app.registerComponent("chorus_zone", "Audio/Chorus zone");
 
 	auto& editor = app.getWorldEditor();
 	auto& allocator = editor.getAllocator();

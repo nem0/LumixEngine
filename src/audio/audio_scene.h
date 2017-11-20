@@ -60,6 +60,12 @@ public:
 	virtual float getEchoZoneDelay(ComponentHandle cmp) = 0;
 	virtual void setEchoZoneDelay(ComponentHandle cmp, float delay) = 0;
 
+	virtual float getChorusZoneDelay(ComponentHandle cmp) = 0;
+	virtual void setChorusZoneDelay(ComponentHandle cmp, float delay) = 0;
+	virtual float getChorusZoneRadius(ComponentHandle cmp) = 0;
+	virtual void setChorusZoneRadius(ComponentHandle cmp, float radius) = 0;
+	virtual void destroyChorusZone(ComponentHandle component) = 0;
+
 	virtual ClipInfo* getAmbientSoundClip(ComponentHandle cmp) = 0;
 	virtual int getAmbientSoundClipIndex(ComponentHandle cmp) = 0;
 	virtual void setAmbientSoundClipIndex(ComponentHandle cmp, int index) = 0;
