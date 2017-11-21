@@ -65,6 +65,9 @@ public:
 	virtual float getChorusZoneRadius(ComponentHandle cmp) = 0;
 	virtual void setChorusZoneRadius(ComponentHandle cmp, float radius) = 0;
 
+	virtual float getDistortionZoneRadius(ComponentHandle cmp) = 0;
+	virtual void setDistortionZoneRadius(ComponentHandle cmp, float radius) = 0;
+
 	virtual ClipInfo* getAmbientSoundClip(ComponentHandle cmp) = 0;
 	virtual int getAmbientSoundClipIndex(ComponentHandle cmp) = 0;
 	virtual void setAmbientSoundClipIndex(ComponentHandle cmp, int index) = 0;

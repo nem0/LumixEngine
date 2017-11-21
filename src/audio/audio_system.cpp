@@ -43,8 +43,11 @@ static void registerProperties(IAllocator& allocator)
 			property("Radius", LUMIX_PROP(AudioScene, getChorusZoneRadius, setChorusZoneRadius),
 				MinAttribute(0)),
 			property("Delay (ms)", LUMIX_PROP(AudioScene, getChorusZoneDelay, setChorusZoneDelay),
+				MinAttribute(0))),
+		component("distortion_zone",
+			property("Radius", LUMIX_PROP(AudioScene, getDistortionZoneRadius, setDistortionZoneRadius),
 				MinAttribute(0))
-		)
+	)
 	);
 	registerScene(audio_scene);
 }

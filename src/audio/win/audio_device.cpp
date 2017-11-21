@@ -376,7 +376,7 @@ struct AudioDeviceImpl LUMIX_FINAL : public AudioDevice
 
 		IDirectSoundFXDistortion8* distortion = NULL;
 		if (FAILED(buffer.handle8->GetObjectInPath(
-			GUID_DSFX_STANDARD_CHORUS, 0, IID_IDirectSoundFXDistortion8, (LPVOID*)&distortion)))
+			GUID_DSFX_STANDARD_DISTORTION, 0, IID_IDirectSoundFXDistortion8, (LPVOID*)&distortion)))
 		{
 			if (FAILED(buffer.handle8->SetFX(1, &distortion_effect, &res)))
 			{
