@@ -16,6 +16,7 @@ local build_studio = true
 local build_gui = _ACTION == "vs2017"
 local build_steam = false
 local build_game = false
+local working_dir = nil
 local plugins = {}
 local embed_resources = false
 build_studio_callbacks = {}
@@ -68,6 +69,11 @@ newoption {
 }
 
 newoption {
+	trigger = "working-dir",
+	description = "Working directory."
+}
+
+newoption {
 	trigger = "no-studio",
 	description = "Do not build Studio."
 }
@@ -87,6 +93,10 @@ end
 if _OPTIONS["with-game"] then
 	build_game = _OPTIONS["with-game"]
 	table.insert(plugins, build_game)
+end
+
+if _OPTIONS["working-dir"] then
+	working_dir = _OPTIONS["working-dir"]
 end
 
 if _OPTIONS["no-physics"] then
@@ -664,7 +674,9 @@ if build_app then
 	project "app"
 		if build_game then
 			debugdir ("../../" .. build_game)
-		else
+		elseif working_dir then
+			debugdir ("../../" .. working_dir)
+		else 
 			debugdir "../../LumixEngine_data"
 		end
 
@@ -814,6 +826,8 @@ if build_studio then
 
 		if build_game then
 			debugdir ("../../" .. build_game)
+		elseif working_dir then
+			debugdir ("../../" .. working_dir)
 		else
 			debugdir "../../LumixEngine_data"
 		end
