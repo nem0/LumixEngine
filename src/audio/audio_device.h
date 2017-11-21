@@ -56,6 +56,12 @@ public:
 		float frequency,
 		float delay,
 		i32 phase) = 0;
+	virtual void setDistortion(BufferHandle handle,
+		float distortionEdge,
+		float distortionGain,
+		float distortionPostEQBandwidth,
+		float distortionPostEQCenterFreq,
+		float distortionPreLowpassCutoff) = 0;
 	virtual void play(BufferHandle buffer, bool looped) = 0;
 	virtual bool isPlaying(BufferHandle buffer) = 0;
 	virtual bool isEnd(BufferHandle buffer) = 0;

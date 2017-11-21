@@ -316,7 +316,7 @@ struct AudioDeviceImpl LUMIX_FINAL : public AudioDevice
 
 		IDirectSoundFXChorus8* chorus = NULL;
 		if (FAILED(buffer.handle8->GetObjectInPath(
-			GUID_DSFX_STANDARD_CHORUS, 0, IID_IDirectSoundFXEcho8, (LPVOID*)&chorus)))
+			GUID_DSFX_STANDARD_CHORUS, 0, IID_IDirectSoundFXChorus8, (LPVOID*)&chorus)))
 		{
 			if (FAILED(buffer.handle8->SetFX(1, &chorus_effect, &res)))
 			{
@@ -328,7 +328,7 @@ struct AudioDeviceImpl LUMIX_FINAL : public AudioDevice
 				return;
 			}
 			if (FAILED(buffer.handle8->GetObjectInPath(
-				GUID_DSFX_STANDARD_CHORUS, 0, IID_IDirectSoundFXEcho8, (LPVOID*)&chorus)))
+				GUID_DSFX_STANDARD_CHORUS, 0, IID_IDirectSoundFXChorus8, (LPVOID*)&chorus)))
 			{
 				if (buffer_status & DSBSTATUS_PLAYING)
 				{
@@ -349,6 +349,63 @@ struct AudioDeviceImpl LUMIX_FINAL : public AudioDevice
 		chorus_params.lPhase = (phase < DSFXCHORUS_PHASE_MIN) ? DSFXCHORUS_PHASE_MIN : (phase > DSFXCHORUS_PHASE_MAX) ? DSFXCHORUS_PHASE_MAX : phase;
 
 		chorus->SetAllParameters(&chorus_params);
+		if (buffer_status & DSBSTATUS_PLAYING)
+		{
+			buffer.handle->Play(0, 0, buffer_status & DSBSTATUS_LOOPING ? DSBPLAY_LOOPING : 0);
+		}
+	}
+
+	void setDistortion(BufferHandle handle,
+		float distortionEdge,
+		float distortionGain,
+		float distortionPostEQBandwidth,
+		float distortionPostEQCenterFreq,
+		float distortionPreLowpassCutoff) override
+	{
+		auto buffer = m_buffers[m_buffer_map[handle]];
+		DSEFFECTDESC distortion_effect = {};
+		distortion_effect.dwSize = sizeof(DSEFFECTDESC);
+		distortion_effect.guidDSFXClass = GUID_DSFX_STANDARD_DISTORTION;
+		if (!buffer.handle8) return;
+
+		DWORD buffer_status;
+		if (FAILED(buffer.handle->GetStatus(&buffer_status))) return;
+
+		buffer.handle->Stop();
+		DWORD res = 0;
+
+		IDirectSoundFXDistortion8* distortion = NULL;
+		if (FAILED(buffer.handle8->GetObjectInPath(
+			GUID_DSFX_STANDARD_CHORUS, 0, IID_IDirectSoundFXDistortion8, (LPVOID*)&distortion)))
+		{
+			if (FAILED(buffer.handle8->SetFX(1, &distortion_effect, &res)))
+			{
+				if (buffer_status & DSBSTATUS_PLAYING)
+				{
+					buffer.handle->Play(0, 0, buffer_status & DSBSTATUS_LOOPING ? DSBPLAY_LOOPING : 0);
+
+				}
+				return;
+			}
+			if (FAILED(buffer.handle8->GetObjectInPath(
+				GUID_DSFX_STANDARD_DISTORTION, 0, IID_IDirectSoundFXDistortion8, (LPVOID*)&distortion)))
+			{
+				if (buffer_status & DSBSTATUS_PLAYING)
+				{
+					buffer.handle->Play(0, 0, buffer_status & DSBSTATUS_LOOPING ? DSBPLAY_LOOPING : 0);
+				}
+				return;
+			}
+		}
+
+		DSFXDistortion distortion_params;
+		distortion_params.fEdge = DSFXDISTORTION_EDGE_MIN + distortionEdge * DSFXDISTORTION_EDGE_MAX;
+		distortion_params.fGain = DSFXDISTORTION_GAIN_MIN + distortionGain * DSFXDISTORTION_GAIN_MAX;
+		distortion_params.fPostEQBandwidth = DSFXDISTORTION_POSTEQBANDWIDTH_MIN + distortionPostEQBandwidth * DSFXDISTORTION_POSTEQBANDWIDTH_MAX;
+		distortion_params.fPostEQCenterFrequency = DSFXDISTORTION_POSTEQCENTERFREQUENCY_MIN * distortionPostEQCenterFreq * DSFXDISTORTION_POSTEQCENTERFREQUENCY_MAX;
+		distortion_params.fPreLowpassCutoff = DSFXDISTORTION_PRELOWPASSCUTOFF_MIN + distortionPreLowpassCutoff * DSFXDISTORTION_PRELOWPASSCUTOFF_MAX;
+
+		distortion->SetAllParameters(&distortion_params);
 		if (buffer_status & DSBSTATUS_PLAYING)
 		{
 			buffer.handle->Play(0, 0, buffer_status & DSBSTATUS_LOOPING ? DSBPLAY_LOOPING : 0);
@@ -589,6 +646,13 @@ public:
 		float frequency,
 		float delay,
 		i32 phase) override {}
+
+	virtual void setDistortion(BufferHandle handle,
+		float distortionEdge,
+		float distortionGain,
+		float distortionPostEQBandwidth,
+		float distortionPostEQCenterFreq,
+		float distortionPreLowpassCutoff) override {}
 
 	void play(BufferHandle buffer, bool looped) override {}
 	bool isPlaying(BufferHandle buffer) override { return false; }
