@@ -321,7 +321,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		createCubeBuffers();
 		m_stats = {};
 
-		m_draw2d_font = m_draw2d_font_atlas.AddFontFromFileTTF("bin/OpenSans-Regular.ttf", 16);
+		m_draw2d_font = m_draw2d_font_atlas.AddFontFromFileTTF("ui/fonts/OpenSans-Regular.ttf", 16);
 		
 		u8* pixels;
 		int w, h;

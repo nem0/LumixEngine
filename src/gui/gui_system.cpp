@@ -41,7 +41,7 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 		ImGui::SetCurrentContext(m_context);
 		ImGuiIO& io = ImGui::GetIO();
 		
-		m_font = io.Fonts->AddFontFromFileTTF("bin/VeraMono.ttf", 20);
+		m_font = io.Fonts->AddFontFromFileTTF("ui/fonts/VeraMono.ttf", 20);
 		u8* pixels;
 		int w, h;
 		io.Fonts->GetTexDataAsRGBA32(&pixels, &w, &h);
