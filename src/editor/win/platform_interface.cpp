@@ -365,7 +365,19 @@ u64 getLastModified(const char* file)
 
 bool makePath(const char* path)
 {
-	return SHCreateDirectoryEx(NULL, path, NULL) == ERROR_SUCCESS;
+	char tmp[MAX_PATH];
+	char* out = tmp;
+	const char* in = path;
+	while (*in && out - tmp < lengthOf(tmp) - 1)
+	{
+		*out = *in == '/' ? '\\' : *in;
+		++out;
+		++in;
+	}
+	*out = '\0';
+
+	int error_code = SHCreateDirectoryEx(NULL, tmp, NULL);
+	return error_code == ERROR_SUCCESS;
 }
 
 
