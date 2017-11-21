@@ -402,7 +402,7 @@ struct AudioDeviceImpl LUMIX_FINAL : public AudioDevice
 		distortion_params.fEdge = DSFXDISTORTION_EDGE_MIN + distortionEdge * DSFXDISTORTION_EDGE_MAX;
 		distortion_params.fGain = DSFXDISTORTION_GAIN_MIN + distortionGain * DSFXDISTORTION_GAIN_MAX;
 		distortion_params.fPostEQBandwidth = DSFXDISTORTION_POSTEQBANDWIDTH_MIN + distortionPostEQBandwidth * DSFXDISTORTION_POSTEQBANDWIDTH_MAX;
-		distortion_params.fPostEQCenterFrequency = DSFXDISTORTION_POSTEQCENTERFREQUENCY_MIN * distortionPostEQCenterFreq * DSFXDISTORTION_POSTEQCENTERFREQUENCY_MAX;
+		distortion_params.fPostEQCenterFrequency = DSFXDISTORTION_POSTEQCENTERFREQUENCY_MIN + distortionPostEQCenterFreq * DSFXDISTORTION_POSTEQCENTERFREQUENCY_MAX;
 		distortion_params.fPreLowpassCutoff = DSFXDISTORTION_PRELOWPASSCUTOFF_MIN + distortionPreLowpassCutoff * DSFXDISTORTION_PRELOWPASSCUTOFF_MAX;
 
 		distortion->SetAllParameters(&distortion_params);
