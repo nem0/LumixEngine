@@ -1373,8 +1373,8 @@ public:
 		float ddpi;
 		float font_scale = 1;
 		if (SDL_GetDisplayDPI(0, &ddpi, nullptr, nullptr) == 0) font_scale = ddpi / 96;
-		m_font = io.Fonts->AddFontFromFileTTF("bin/OpenSans-Regular.ttf", (float)m_settings.m_font_size * font_scale);
-		m_bold_font = io.Fonts->AddFontFromFileTTF("bin/OpenSans-Bold.ttf", (float)m_settings.m_font_size * font_scale);
+		m_font = io.Fonts->AddFontFromFileTTF("ui/fonts/OpenSans-Regular.ttf", (float)m_settings.m_font_size * font_scale);
+		m_bold_font = io.Fonts->AddFontFromFileTTF("ui/fonts/OpenSans-Bold.ttf", (float)m_settings.m_font_size * font_scale);
 
 		m_font->DisplayOffset.y = 0;
 		m_bold_font->DisplayOffset.y = 0;
