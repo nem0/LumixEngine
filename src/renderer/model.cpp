@@ -561,6 +561,7 @@ bool Model::parseMeshes(const bgfx::VertexDecl& global_vertex_decl, FS::IFile& f
 		file.read(mesh_name, str_size);
 
 		Mesh& mesh = m_meshes.emplace(material, vertex_decl, mesh_name, m_allocator);
+		addDependency(*material);
 	}
 
 	for (int i = 0; i < object_count; ++i)

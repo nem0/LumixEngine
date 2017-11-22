@@ -78,6 +78,7 @@ void Resource::fileLoaded(FS::IFile& file, bool success)
 	if (!success)
 	{
 		g_log_error.log("Core") << "Could not open " << getPath().c_str();
+		ASSERT(m_empty_dep_count > 0);
 		--m_empty_dep_count;
 		++m_failed_dep_count;
 		checkState();
@@ -90,6 +91,7 @@ void Resource::fileLoaded(FS::IFile& file, bool success)
 		++m_failed_dep_count;
 	}
 
+	ASSERT(m_empty_dep_count > 0);
 	--m_empty_dep_count;
 	checkState();
 	m_async_op = FS::FileSystem::INVALID_ASYNC;
@@ -156,8 +158,16 @@ void Resource::addDependency(Resource& dependent_resource)
 void Resource::removeDependency(Resource& dependent_resource)
 {
 	dependent_resource.m_cb.unbind<Resource, &Resource::onStateChanged>(this);
-	if (dependent_resource.isEmpty()) --m_empty_dep_count;
-	if (dependent_resource.isFailure()) --m_failed_dep_count;
+	if (dependent_resource.isEmpty()) 
+	{
+		ASSERT(m_empty_dep_count > 0); 
+		--m_empty_dep_count;
+	}
+	if (dependent_resource.isFailure())
+	{
+		ASSERT(m_failed_dep_count > 0);
+		--m_failed_dep_count;
+	}
 
 	checkState();
 }
@@ -168,8 +178,16 @@ void Resource::onStateChanged(State old_state, State new_state, Resource&)
 	ASSERT(old_state != new_state);
 	ASSERT(m_current_state != State::EMPTY || m_desired_state != State::EMPTY);
 
-	if (old_state == State::EMPTY) --m_empty_dep_count;
-	if (old_state == State::FAILURE) --m_failed_dep_count;
+	if (old_state == State::EMPTY)
+	{
+		ASSERT(m_empty_dep_count > 0);
+		--m_empty_dep_count;
+	}
+	if (old_state == State::FAILURE)
+	{
+		ASSERT(m_failed_dep_count > 0);
+		--m_failed_dep_count;
+	}
 
 	if (new_state == State::EMPTY) ++m_empty_dep_count;
 	if (new_state == State::FAILURE) ++m_failed_dep_count;
