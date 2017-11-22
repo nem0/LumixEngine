@@ -14,7 +14,7 @@ namespace ofbx
 
 struct Error
 {
-	Error() = default;
+	Error() {}
 	Error(const char* msg) { s_message = msg; }
 
 	static const char* s_message;
@@ -1019,8 +1019,10 @@ struct MaterialImpl : Material
 
 
 	const Texture* getTexture(Texture::TextureType type) const override { return textures[type]; }
+	Color getDiffuseColor() const override { return diffuse_color; }
 
 	const Texture* textures[Texture::TextureType::COUNT];
+	Color diffuse_color;
 };
 
 
@@ -1616,7 +1618,8 @@ static OptionalError<Object*> parseMesh(const Scene& scene, const Element& eleme
 static OptionalError<Object*> parseMaterial(const Scene& scene, const Element& element)
 {
 	MaterialImpl* material = new MaterialImpl(scene, element);
-	/*const Element* prop = findChild(element, "Properties70");
+	const Element* prop = findChild(element, "Properties70");
+	material->diffuse_color = { 1, 1, 1 };
 	if (prop) prop = prop->child;
 	while (prop)
 	{
@@ -1624,11 +1627,13 @@ static OptionalError<Object*> parseMaterial(const Scene& scene, const Element& e
 		{
 			if (prop->first_property->value == "DiffuseColor")
 			{
-				// TODO
+				material->diffuse_color.r = (float)prop->getProperty(4)->getValue().toDouble();
+				material->diffuse_color.g = (float)prop->getProperty(5)->getValue().toDouble();
+				material->diffuse_color.b = (float)prop->getProperty(6)->getValue().toDouble();
 			}
 		}
 		prop = prop->sibling;
-	}*/
+	}
 	return material;
 }
 
