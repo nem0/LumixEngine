@@ -15,6 +15,7 @@
 #include "engine/path.h"
 #include "engine/path_utils.h"
 #include "engine/plugin_manager.h"
+#include "engine/prefab.h"
 #include "engine/profiler.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
@@ -41,6 +42,7 @@ static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("r
 static const ResourceType MODEL_TYPE("model");
 static const ResourceType SHADER_TYPE("shader");
 static const ResourceType TEXTURE_TYPE("texture");
+static const ResourceType PREFAB_TYPE("prefab");
 
 
 SceneView::SceneView(StudioApp& app)
@@ -257,40 +259,34 @@ void SceneView::handleDrop(const char* path, float x, float y)
 		if (handler.invoke(m_app, x, y, hit)) return;
 	}
 
-	if (hit.m_is_hit)
+	if (PathUtils::hasExtension(path, "msh"))
 	{
-		
-		if (PathUtils::hasExtension(path, "fab"))
+		Vec3 pos = hit.m_origin + (hit.m_is_hit ? hit.m_t : 1) * hit.m_dir;
+
+		m_editor.beginCommandGroup(crc32("insert_mesh"));
+		Entity entity = m_editor.addEntity();
+		m_editor.setEntitiesPositions(&entity, &pos, 1);
+		m_editor.selectEntities(&entity, 1);
+		m_editor.addComponent(MODEL_INSTANCE_TYPE);
+		auto* prop = Reflection::getProperty(MODEL_INSTANCE_TYPE, "Source");
+		m_editor.setProperty(MODEL_INSTANCE_TYPE, -1, *prop, &entity, 1, path, stringLength(path) + 1);
+		m_editor.endCommandGroup();
+	}
+	else if (hit.m_is_hit && PathUtils::hasExtension(path, "mat") && hit.m_mesh)
+	{
+		m_editor.selectEntities(&hit.m_entity, 1);
+		auto* model = m_pipeline->getScene()->getModelInstanceModel(hit.m_component);
+		int mesh_index = 0;
+		for (int i = 0; i < model->getMeshCount(); ++i)
 		{
-		}
-		else if (PathUtils::hasExtension(path, "msh"))
-		{
-			m_editor.beginCommandGroup(crc32("insert_mesh"));
-			Entity entity = m_editor.addEntity();
-			Vec3 pos = hit.m_origin + hit.m_t * hit.m_dir;
-			m_editor.setEntitiesPositions(&entity, &pos, 1);
-			m_editor.selectEntities(&entity, 1);
-			m_editor.addComponent(MODEL_INSTANCE_TYPE);
-			auto* prop = Reflection::getProperty(MODEL_INSTANCE_TYPE, "Source");
-			m_editor.setProperty(MODEL_INSTANCE_TYPE, -1, *prop, &entity, 1, path, stringLength(path) + 1);
-			m_editor.endCommandGroup();
-		}
-		else if (PathUtils::hasExtension(path, "mat") && hit.m_mesh)
-		{
-			m_editor.selectEntities(&hit.m_entity, 1);
-			auto* model = m_pipeline->getScene()->getModelInstanceModel(hit.m_component);
-			int mesh_index = 0;
-			for (int i = 0; i < model->getMeshCount(); ++i)
+			if (&model->getMesh(i) == hit.m_mesh)
 			{
-				if (&model->getMesh(i) == hit.m_mesh)
-				{
-					mesh_index = i;
-					break;
-				}
+				mesh_index = i;
+				break;
 			}
-			auto* prop= Reflection::getProperty(MODEL_INSTANCE_TYPE, "Materials", "Source");
-			m_editor.setProperty(MODEL_INSTANCE_TYPE, mesh_index, *prop, &hit.m_entity, 1, path, stringLength(path) + 1);
 		}
+		auto* prop= Reflection::getProperty(MODEL_INSTANCE_TYPE, "Materials", "Source");
+		m_editor.setProperty(MODEL_INSTANCE_TYPE, mesh_index, *prop, &hit.m_entity, 1, path, stringLength(path) + 1);
 	}
 }
 
