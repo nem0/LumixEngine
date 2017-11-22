@@ -876,14 +876,18 @@ struct FBXImporter
 					if (srgb) writeString(" \"srgb\" : true ");
 					writeString("}");
 				}
-
-
 			};
 
 			writeTexture(material.textures[0], true);
 			writeTexture(material.textures[1], false);
 
-			writeString("}");
+			ofbx::Color diffuse_color = material.fbx->getDiffuseColor();
+			out_file << ",\n\t\"color\" : [" << diffuse_color.r 
+				<< "," << diffuse_color.g
+				<< "," << diffuse_color.b
+				<< ",1]";
+
+			writeString("\n}");
 
 			out_file.close();
 		}

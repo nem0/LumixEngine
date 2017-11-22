@@ -45,6 +45,12 @@ struct Quat
 };
 
 
+struct Color
+{
+	float r, g, b;
+};
+
+
 struct DataView
 {
 	const u8* begin = nullptr;
@@ -214,6 +220,7 @@ struct Material : Object
 
 	Material(const Scene& _scene, const IElement& _element);
 
+	virtual Color getDiffuseColor() const = 0;
 	virtual const Texture* getTexture(Texture::TextureType type) const = 0;
 };
 
