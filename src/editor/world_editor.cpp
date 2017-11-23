@@ -3498,7 +3498,7 @@ public:
 		destroyUndoStack();
 		m_universe_destroyed.invoke();
 		m_editor_icons->clear();
-		if (m_gizmo) m_gizmo->clearEntities();
+		m_gizmo->clearEntities();
 		selectEntities(nullptr, 0);
 		m_camera = INVALID_ENTITY;
 		m_engine->destroyUniverse(*m_universe);
