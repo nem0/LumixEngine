@@ -95,17 +95,17 @@ AssetBrowser::AssetBrowser(StudioApp& app)
 		m_watchers[1] = nullptr;
 	}
 
-	m_auto_reload_action = LUMIX_NEW(allocator, Action)("Auto-reload", "autoReload");
+	m_auto_reload_action = LUMIX_NEW(allocator, Action)("Auto-reload", "Auto-reload assets", "autoReload");
 	m_auto_reload_action->is_global = false;
 	m_auto_reload_action->func.bind<AssetBrowser, &AssetBrowser::toggleAutoreload>(this);
 	m_auto_reload_action->is_selected.bind<AssetBrowser, &AssetBrowser::isAutoreload>(this);
-	m_back_action = LUMIX_NEW(allocator, Action)("Back", "back");
+	m_back_action = LUMIX_NEW(allocator, Action)("Back", "Back in asset history", "back");
 	m_back_action->is_global = false;
 	m_back_action->func.bind<AssetBrowser, &AssetBrowser::goBack>(this);
-	m_forward_action = LUMIX_NEW(allocator, Action)("Forward", "forward");
+	m_forward_action = LUMIX_NEW(allocator, Action)("Forward", "Forward in asset history", "forward");
 	m_forward_action->is_global = false;
 	m_forward_action->func.bind<AssetBrowser, &AssetBrowser::goForward>(this);
-	m_refresh_action = LUMIX_NEW(allocator, Action)("Refresh", "refresh");
+	m_refresh_action = LUMIX_NEW(allocator, Action)("Refresh", "Refresh assets", "refresh");
 	m_refresh_action->is_global = false;
 	m_refresh_action->func.bind<AssetBrowser, &AssetBrowser::findResources>(this);
 	m_app.addAction(m_auto_reload_action);

@@ -24,7 +24,7 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		, is_open(false)
 	{
 		IAllocator& allocator = app.getWorldEditor().getAllocator();
-		Action* action = LUMIX_NEW(allocator, Action)("Navigation", "toggleNavigationWindow");
+		Action* action = LUMIX_NEW(allocator, Action)("Navigation", "Toggle navigation UI", "toggleNavigationWindow");
 		action->func.bind<StudioAppPlugin, &StudioAppPlugin::onAction>(this);
 		action->is_selected.bind<StudioAppPlugin, &StudioAppPlugin::isOpen>(this);
 		app.addWindowAction(action);

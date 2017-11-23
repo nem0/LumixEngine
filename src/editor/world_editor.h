@@ -138,7 +138,8 @@ public:
 		int count,
 		const void* data,
 		int size) = 0;
-	virtual void setSnapMode(bool enable, bool vertex_snap, bool preview) = 0;
+	virtual void setCustomPivot() = 0;
+	virtual void setSnapMode(bool enable, bool vertex_snap) = 0;
 	virtual void setAdditiveSelection(bool additive) = 0;
 	virtual void addArrayPropertyItem(const ComponentUID& cmp, const Reflection::IArrayProperty& property) = 0;
 	virtual void removeArrayPropertyItem(const ComponentUID& cmp, int index, const Reflection::IArrayProperty& property) = 0;

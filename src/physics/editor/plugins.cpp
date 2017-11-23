@@ -418,7 +418,7 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		, m_selected_bone(-1)
 		, m_is_window_open(false)
 	{
-		Action* action = LUMIX_NEW(m_editor.getAllocator(), Action)("Physics", "physics");
+		Action* action = LUMIX_NEW(m_editor.getAllocator(), Action)("Physics", "Toggle physics UI", "physics");
 		action->func.bind<StudioAppPlugin, &StudioAppPlugin::onAction>(this);
 		action->is_selected.bind<StudioAppPlugin, &StudioAppPlugin::isOpen>(this);
 		app.addWindowAction(action);

@@ -1820,7 +1820,7 @@ struct FurPainterPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		, is_open(false)
 	{
 		fur_painter = LUMIX_NEW(app.getWorldEditor().getAllocator(), FurPainter)(_app);
-		Action* action = LUMIX_NEW(app.getWorldEditor().getAllocator(), Action)("Fur Painter", "fur_painter");
+		Action* action = LUMIX_NEW(app.getWorldEditor().getAllocator(), Action)("Fur Painter", "Toggle fur painter", "fur_painter");
 		action->func.bind<FurPainterPlugin, &FurPainterPlugin::onAction>(this);
 		action->is_selected.bind<FurPainterPlugin, &FurPainterPlugin::isOpen>(this);
 		app.addWindowAction(action);
@@ -2396,7 +2396,7 @@ struct RenderStatsPlugin LUMIX_FINAL : public StudioApp::IPlugin
 {
 	RenderStatsPlugin(StudioApp& app)
 	{
-		Action* action = LUMIX_NEW(app.getWorldEditor().getAllocator(), Action)("Render Stats", "render_stats");
+		Action* action = LUMIX_NEW(app.getWorldEditor().getAllocator(), Action)("Render Stats", "Toggle render stats", "render_stats");
 		action->func.bind<RenderStatsPlugin, &RenderStatsPlugin::onAction>(this);
 		action->is_selected.bind<RenderStatsPlugin, &RenderStatsPlugin::isOpen>(this);
 		app.addWindowAction(action);
@@ -2684,7 +2684,7 @@ struct ShaderEditorPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		: m_shader_editor(app.getWorldEditor().getAllocator())
 		, m_app(app)
 	{
-		Action* action = LUMIX_NEW(app.getWorldEditor().getAllocator(), Action)("Shader Editor", "shaderEditor");
+		Action* action = LUMIX_NEW(app.getWorldEditor().getAllocator(), Action)("Shader Editor", "Toggle shader editor", "shaderEditor");
 		action->func.bind<ShaderEditorPlugin, &ShaderEditorPlugin::onAction>(this);
 		action->is_selected.bind<ShaderEditorPlugin, &ShaderEditorPlugin::isOpen>(this);
 		app.addWindowAction(action);

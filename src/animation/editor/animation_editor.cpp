@@ -659,12 +659,12 @@ AnimationEditor::AnimationEditor(StudioApp& app)
 	m_path = "";
 	IAllocator& allocator = app.getWorldEditor().getAllocator();
 
-	auto* action = LUMIX_NEW(allocator, Action)("Animation Editor", "animation_editor");
+	auto* action = LUMIX_NEW(allocator, Action)("Animation Editor", "Toggle animation editor", "animation_editor");
 	action->func.bind<AnimationEditor, &AnimationEditor::toggleEditorOpen>(this);
 	action->is_selected.bind<AnimationEditor, &AnimationEditor::isEditorOpen>(this);
 	app.addWindowAction(action);
 
-	action = LUMIX_NEW(allocator, Action)("Animation Inputs", "animation_inputs");
+	action = LUMIX_NEW(allocator, Action)("Animation Inputs", "Toggle animation inputs", "animation_inputs");
 	action->func.bind<AnimationEditor, &AnimationEditor::toggleInputsOpen>(this);
 	action->is_selected.bind<AnimationEditor, &AnimationEditor::isInputsOpen>(this);
 	app.addWindowAction(action);
@@ -679,13 +679,13 @@ AnimationEditor::AnimationEditor(StudioApp& app)
 	event_type.label = "Set Input";
 	event_type.editor.bind<AnimationEditor, &AnimationEditor::onSetInputGUI>(this);
 
-	Action* undo_action = LUMIX_NEW(allocator, Action)("Undo", "animeditor_undo", SDL_SCANCODE_LCTRL, 'Z', -1);
+	Action* undo_action = LUMIX_NEW(allocator, Action)("Undo", "Animation editor - undo", "animeditor_undo", SDL_SCANCODE_LCTRL, 'Z', -1);
 	undo_action->is_global = true;
 	undo_action->plugin = this;
 	undo_action->func.bind<AnimationEditor, &AnimationEditor::undo>(this);
 	app.addAction(undo_action);
 
-	Action* redo_action = LUMIX_NEW(allocator, Action)("Redo", "animeditor_redo", SDL_SCANCODE_LCTRL, KMOD_SHIFT, 'Z');
+	Action* redo_action = LUMIX_NEW(allocator, Action)("Redo", "Animation editor - redo", "animeditor_redo", SDL_SCANCODE_LCTRL, KMOD_SHIFT, 'Z');
 	redo_action->is_global = true;
 	redo_action->plugin = this;
 	redo_action->func.bind<AnimationEditor, &AnimationEditor::redo>(this);

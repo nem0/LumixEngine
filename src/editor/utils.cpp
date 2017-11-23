@@ -14,32 +14,38 @@ namespace Lumix
 {
 
 
-Action::Action(const char* label, const char* name)
+Action::Action(const char* label_short, const char* label_long, const char* name)
+	: label_long(label_long)
+	, label_short(label_short)
+	, name(name)
+	, plugin(nullptr)
+	, is_global(true)
+	, icon(nullptr)
 {
-	this->label = label;
+	this->label_short = label_short;
+	this->label_long = label_long;
 	this->name = name;
-	plugin = nullptr;
 	shortcut[0] = shortcut[1] = shortcut[2] = -1;
-	is_global = true;
-	icon = nullptr;
 	is_selected.bind<falseConst>();
 }
 
 
-Action::Action(const char* label,
+Action::Action(const char* label_short,
+	const char* label_long,
 	const char* name,
 	int shortcut0,
 	int shortcut1,
 	int shortcut2)
+	: label_long(label_long)
+	, label_short(label_short)
+	, name(name)
+	, plugin(nullptr)
+	, is_global(true)
+	, icon(nullptr)
 {
-	this->label = label;
-	this->name = name;
-	plugin = nullptr;
 	shortcut[0] = shortcut0;
 	shortcut[1] = shortcut1;
 	shortcut[2] = shortcut2;
-	is_global = true;
-	icon = nullptr;
 	is_selected.bind<falseConst>();
 }
 
@@ -50,7 +56,7 @@ bool Action::toolbarButton()
 
 	ImVec4 col_active = ImGui::GetStyle().Colors[ImGuiCol_ButtonActive];
 	ImVec4 bg_color = is_selected.invoke() ? col_active : ImVec4(0, 0, 0, 0);
-	if (ImGui::ToolbarButton(icon, bg_color, label))
+	if (ImGui::ToolbarButton(icon, bg_color, label_long))
 	{
 		func.invoke();
 		return true;
@@ -117,8 +123,9 @@ bool Action::isActive()
 		{
 			return true;
 		}
+		SDL_Scancode scancode = SDL_GetScancodeFromKey(shortcut[i]);
 
-		if (shortcut[i] >= key_count || !state[shortcut[i]]) return false;
+		if (scancode >= key_count || !state[scancode]) return false;
 	}
 	return false;
 }

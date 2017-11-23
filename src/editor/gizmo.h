@@ -10,6 +10,7 @@ namespace Lumix
 
 struct Matrix;
 struct Transform;
+struct Vec3;
 class WorldEditor;
 
 
@@ -21,6 +22,8 @@ public:
 
 	virtual ~Gizmo() {}
 
+	virtual Vec3 getOffset() const = 0;
+	virtual void setOffset(const Vec3& offset) = 0;
 	virtual bool isActive() const = 0;
 	virtual void add(Entity entity) = 0;
 	virtual void render() = 0;

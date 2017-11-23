@@ -2377,7 +2377,7 @@ ImportAssetDialog::ImportAssetDialog(StudioApp& app)
 	m_texture_output_dir[0] = '\0';
 	copyString(m_last_dir, m_editor.getEngine().getDiskFileDevice()->getBasePath());
 
-	Action* action = LUMIX_NEW(m_editor.getAllocator(), Action)("Import Asset", "import_asset");
+	Action* action = LUMIX_NEW(m_editor.getAllocator(), Action)("Import Asset", "Toggle import asset dialog", "import_asset");
 	action->func.bind<ImportAssetDialog, &ImportAssetDialog::onAction>(this);
 	action->is_selected.bind<ImportAssetDialog, &ImportAssetDialog::isOpen>(this);
 	app.addWindowAction(action);
