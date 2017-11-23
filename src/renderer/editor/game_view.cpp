@@ -67,12 +67,12 @@ GameView::GameView(StudioApp& app)
 	LuaWrapper::createSystemClosure(engine.getState(), "GameView", this, "forceViewport", f);
 
 	WorldEditor& editor = app.getWorldEditor();
-	Action* action = LUMIX_NEW(editor.getAllocator(), Action)("Game View", "game_view");
+	Action* action = LUMIX_NEW(editor.getAllocator(), Action)("Game View", "Toggle game view", "game_view");
 	action->func.bind<GameView, &GameView::onAction>(this);
 	action->is_selected.bind<GameView, &GameView::isOpen>(this);
 	app.addWindowAction(action);
 
-	Action* fullscreen_action = LUMIX_NEW(editor.getAllocator(), Action)("Game View fullscreen", "game_view_fullscreen");
+	Action* fullscreen_action = LUMIX_NEW(editor.getAllocator(), Action)("Game View fullscreen", "Game View fullscreen", "game_view_fullscreen");
 	fullscreen_action->func.bind<GameView, &GameView::toggleFullscreen>(this);
 	app.addAction(fullscreen_action);
 

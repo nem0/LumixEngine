@@ -69,35 +69,35 @@ SceneView::SceneView(StudioApp& app)
 	m_editor.universeDestroyed().bind<SceneView, &SceneView::onUniverseDestroyed>(this);
 
 	m_toggle_gizmo_step_action =
-		LUMIX_NEW(allocator, Action)("Enable/disable gizmo step", "toggleGizmoStep");
+		LUMIX_NEW(allocator, Action)("Enable/disable gizmo step", "Enable/disable gizmo step", "toggleGizmoStep");
 	m_toggle_gizmo_step_action->is_global = false;
 	m_app.addAction(m_toggle_gizmo_step_action);
 
-	m_move_forward_action = LUMIX_NEW(allocator, Action)("Move forward", "moveForward");
+	m_move_forward_action = LUMIX_NEW(allocator, Action)("Move forward", "Move camera forward", "moveForward");
 	m_move_forward_action->is_global = false;
 	m_app.addAction(m_move_forward_action);
 
-	m_move_back_action = LUMIX_NEW(allocator, Action)("Move back", "moveBack");
+	m_move_back_action = LUMIX_NEW(allocator, Action)("Move back", "Move camera back", "moveBack");
 	m_move_back_action->is_global = false;
 	m_app.addAction(m_move_back_action);
 
-	m_move_left_action = LUMIX_NEW(allocator, Action)("Move left", "moveLeft");
+	m_move_left_action = LUMIX_NEW(allocator, Action)("Move left", "Move camera left", "moveLeft");
 	m_move_left_action->is_global = false;
 	m_app.addAction(m_move_left_action);
 
-	m_move_right_action = LUMIX_NEW(allocator, Action)("Move right", "moveRight");
+	m_move_right_action = LUMIX_NEW(allocator, Action)("Move right", "Move camera right", "moveRight");
 	m_move_right_action->is_global = false;
 	m_app.addAction(m_move_right_action);
 
-	m_move_up_action = LUMIX_NEW(allocator, Action)("Move up", "moveUp");
+	m_move_up_action = LUMIX_NEW(allocator, Action)("Move up", "Move camera up", "moveUp");
 	m_move_up_action->is_global = false;
 	m_app.addAction(m_move_up_action);
 
-	m_move_down_action = LUMIX_NEW(allocator, Action)("Move down", "moveDown");
+	m_move_down_action = LUMIX_NEW(allocator, Action)("Move down", "Move camera down", "moveDown");
 	m_move_down_action->is_global = false;
 	m_app.addAction(m_move_down_action);
 
-	m_camera_speed_action = LUMIX_NEW(allocator, Action)("Camera speed", "cameraSpeed");
+	m_camera_speed_action = LUMIX_NEW(allocator, Action)("Camera speed", "Reset camera speed", "cameraSpeed");
 	m_camera_speed_action->is_global = false;
 	m_camera_speed_action->func.bind<SceneView, &SceneView::resetCameraSpeed>(this);
 	m_app.addAction(m_camera_speed_action);

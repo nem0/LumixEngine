@@ -74,6 +74,7 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 		, m_rel_accum(0, 0)
 		, m_is_dragging(false)
 		, m_mouse_pos(0, 0)
+		, m_offset(0, 0, 0)
 	{
 		m_steps[int(Mode::TRANSLATE)] = 10;
 		m_steps[int(Mode::ROTATE)] = 45;
@@ -101,6 +102,7 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 		if (m_pivot == Pivot::OBJECT_PIVOT)
 		{
 			mtx = universe->getPositionAndRotation(entity);
+			mtx.translate(mtx.getRotation().rotate(m_offset));
 		}
 		else if (m_pivot == Pivot::CENTER)
 		{
@@ -492,6 +494,8 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 
 	void clearEntities() override
 	{
+		m_pivot = Pivot::CENTER;
+		m_offset.set(0, 0, 0);
 		m_count = 0;
 	}
 
@@ -1146,6 +1150,19 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 	}
 
 
+	Vec3 getOffset() const override
+	{
+		return m_offset;
+	}
+
+
+	void setOffset(const Vec3& offset) override
+	{
+		m_pivot = Pivot::OBJECT_PIVOT;
+		m_offset = offset;
+	}
+
+
 	void add(Entity entity) override
 	{
 		if (m_count >= MAX_GIZMOS) return;
@@ -1170,7 +1187,7 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 		m_mode = Mode::SCALE;
 	}
 
-	void setPivotCenter() override { m_pivot = Pivot::CENTER; }
+	void setPivotCenter() override { m_pivot = Pivot::CENTER; m_offset.set(0, 0, 0); }
 	void setPivotOrigin() override { m_pivot = Pivot::OBJECT_PIVOT; }
 	bool isPivotCenter() const override { return m_pivot == Pivot::CENTER; }
 	bool isPivotOrigin() const override { return m_pivot == Pivot::OBJECT_PIVOT; }
@@ -1206,6 +1223,7 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 	bool m_is_step;
 	int m_count;
 	Entity m_entities[MAX_GIZMOS];
+	Vec3 m_offset;
 };
 
 

@@ -12,8 +12,8 @@ namespace Lumix
 
 struct LUMIX_EDITOR_API Action
 {
-	Action(const char* label, const char* name);
-	Action(const char* label, const char* name, int shortcut0, int shortcut1, int shortcut2);
+	Action(const char* label_short, const char* label_long, const char* name);
+	Action(const char* label_short, const char* label_long, const char* name, int shortcut0, int shortcut1, int shortcut2);
 	bool toolbarButton();
 	bool isActive();
 	void getIconPath(char* path, int max_size);
@@ -23,7 +23,8 @@ struct LUMIX_EDITOR_API Action
 
 	int shortcut[3];
 	const char* name;
-	const char* label;
+	const char* label_short;
+	const char* label_long;
 	bool is_global;
 	void* plugin;
 	ImTextureID icon;

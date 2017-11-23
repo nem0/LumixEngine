@@ -1831,7 +1831,7 @@ public:
 
 	void previewSnapVertex()
 	{
-		if (m_snap_mode != SnapMode::VERTEX_PREVIEW) return;
+		if (m_snap_mode != SnapMode::VERTEX) return;
 
 		Vec3 origin, dir;
 		ComponentUID camera_cmp = getUniverse()->getComponent(m_camera, CAMERA_TYPE);
@@ -1879,7 +1879,10 @@ public:
 
 	~WorldEditorImpl()
 	{
+		destroyUniverse();
+
 		Gizmo::destroy(*m_gizmo);
+		m_gizmo = nullptr;
 
 		removePlugin(*m_measure_tool);
 		LUMIX_DELETE(m_allocator, m_measure_tool);
@@ -1887,9 +1890,7 @@ public:
 		{
 			LUMIX_DELETE(getAllocator(), plugin);
 		}
-		destroyUndoStack();
 
-		destroyUniverse();
 		EditorIcons::destroy(*m_editor_icons);
 		PrefabSystem::destroy(m_prefab_system);
 
@@ -2080,7 +2081,10 @@ public:
 				{
 					Vec3 snap_pos = origin + dir * hit.t;
 					if (m_snap_mode == SnapMode::VERTEX) snap_pos = getClosestVertex(hit);
-					snapEntities(snap_pos);
+					Vec3 offset = m_gizmo->getOffset();
+					Quat rot = m_universe->getRotation(m_selected_entities[0]);
+					offset = rot.rotate(offset);
+					snapEntities(snap_pos - offset);
 				}
 				else
 				{
@@ -2470,6 +2474,27 @@ public:
 	RenderInterface* getRenderInterface() override
 	{
 		return m_render_interface;
+	}
+
+
+	void setCustomPivot() override
+	{
+		if (m_selected_entities.empty()) return;
+
+		Vec3 origin, dir;
+		ComponentUID camera_cmp = getUniverse()->getComponent(m_camera, CAMERA_TYPE);
+		if (!camera_cmp.isValid()) return;
+
+		InputSystem& input = m_engine->getInputSystem();
+		m_render_interface->getRay(camera_cmp.handle, m_mouse_pos, origin, dir);
+		auto hit = m_render_interface->castRay(origin, dir, INVALID_COMPONENT);
+		if (!hit.is_hit || hit.entity != m_selected_entities[0]) return;
+
+		Vec3 snap_pos = getClosestVertex(hit);
+
+		Matrix mtx = m_universe->getMatrix(m_selected_entities[0]);
+		mtx.inverse();
+		m_gizmo->setOffset(mtx.transformPoint(snap_pos));
 	}
 
 
@@ -3310,9 +3335,9 @@ public:
 	}
 
 
-	void setSnapMode(bool enable, bool vertex_snap, bool preview) override
+	void setSnapMode(bool enable, bool vertex_snap) override
 	{
-		m_snap_mode = enable ? (vertex_snap ? (preview ? SnapMode::VERTEX_PREVIEW : SnapMode::VERTEX) : SnapMode::FREE) : SnapMode::NONE;
+		m_snap_mode = enable ? (vertex_snap ? SnapMode::VERTEX : SnapMode::FREE) : SnapMode::NONE;
 	}
 
 
@@ -3449,6 +3474,7 @@ public:
 
 	void selectEntities(const Entity* entities, int count) override
 	{
+		m_gizmo->clearEntities();
 		m_selected_entities.clear();
 		for (int i = 0; i < count; ++i)
 		{
@@ -3472,6 +3498,7 @@ public:
 		destroyUndoStack();
 		m_universe_destroyed.invoke();
 		m_editor_icons->clear();
+		if (m_gizmo) m_gizmo->clearEntities();
 		selectEntities(nullptr, 0);
 		m_camera = INVALID_ENTITY;
 		m_engine->destroyUniverse(*m_universe);
@@ -3867,8 +3894,7 @@ private:
 	{
 		NONE,
 		FREE,
-		VERTEX,
-		VERTEX_PREVIEW
+		VERTEX
 	};
 
 	struct GoToParameters

@@ -64,7 +64,7 @@ static void shortcutInput(int& shortcut)
 	StaticString<50> popup_name("");
 	popup_name << (i64)&shortcut;
 
-	StaticString<50> button_label(SDL_GetKeyName(SDL_GetKeyFromScancode((SDL_Scancode)shortcut)));
+	StaticString<50> button_label(SDL_GetKeyName((SDL_Keycode)shortcut));
 	button_label << "###" << (i64)&shortcut;
 
 	if (ImGui::Button(button_label, ImVec2(65, 0))) shortcut = -1;
@@ -78,7 +78,7 @@ static void shortcutInput(int& shortcut)
 		{
 			if (state[i])
 			{
-				shortcut = i;
+				shortcut = SDL_GetKeyFromScancode((SDL_Scancode)i);
 				break;
 			}
 		}
@@ -418,13 +418,13 @@ void Settings::showToolbarSettings()
 	}
 	ImGui::NewLine();
 
-	if (dragged) ImGui::SetTooltip("%s", dragged->label);
+	if (dragged) ImGui::SetTooltip("%s", dragged->label_long);
 	if (ImGui::IsMouseReleased(0)) dragged = nullptr;
 
 	static int tmp = 0;
 	auto getter = [](void* data, int idx, const char** out) -> bool {
 		Action** tools = (Action**)data;
-		*out = tools[idx]->label;
+		*out = tools[idx]->label_long;
 		return true;
 	};
 	Action* tools[1024];
@@ -464,10 +464,10 @@ void Settings::showShortcutSettings()
 	for (int i = 0; i < actions.size(); ++i)
 	{
 		Action& a = *actions[i];
-		if (m_filter[0] == 0 || stristr(a.label, m_filter) != 0)
+		if (m_filter[0] == 0 || stristr(a.label_long, m_filter) != 0)
 		{
 			ImGui::AlignTextToFramePadding();
-			ImGui::Text("%s", a.label);
+			ImGui::Text("%s", a.label_long);
 			ImGui::NextColumn();
 			shortcutInput(a.shortcut[0]);
 			ImGui::NextColumn();

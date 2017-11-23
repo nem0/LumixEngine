@@ -82,7 +82,7 @@ struct LuaPlugin : public StudioApp::IPlugin
 			name = lua_tostring(L, -1);
 		}
 
-		Action* action = LUMIX_NEW(editor.getAllocator(), Action)(name, name);
+		Action* action = LUMIX_NEW(editor.getAllocator(), Action)(name, name, name);
 		action->func.bind<LuaPlugin, &LuaPlugin::onAction>(this);
 		app.addWindowAction(action);
 		m_is_open = false;
@@ -207,6 +207,11 @@ public:
 
 		loadSettings();
 		initIMGUI();
+
+		m_custom_pivot_action = LUMIX_NEW(m_editor->getAllocator(), Action)(
+			"Set Custom Pivot", "Set Custom Pivot", "set_custom_pivot", SDLK_v, -1, -1);
+		m_custom_pivot_action->is_global = false;
+		addAction(m_custom_pivot_action);
 
 		if (!m_metadata.load()) g_log_info.log("Editor") << "Could not load metadata";
 
@@ -579,11 +584,15 @@ public:
 		ImGuiIO& io = ImGui::GetIO();
 		if (!io.KeyShift)
 		{
-			m_editor->setSnapMode(false, false, false);
+			m_editor->setSnapMode(false, false);
 		}
 		else if (io.KeyCtrl)
 		{
-			m_editor->setSnapMode(io.KeyShift, io.KeyCtrl, !io.MouseDown[0]);
+			m_editor->setSnapMode(io.KeyShift, io.KeyCtrl);
+		}
+		if (m_custom_pivot_action->isActive())
+		{
+			m_editor->setCustomPivot();
 		}
 
 		m_editor->setMouseSensitivity(m_settings.m_mouse_sensitivity.x, m_settings.m_mouse_sensitivity.y);
@@ -707,7 +716,7 @@ public:
 	{
 		char buf[20];
 		getShortcut(a, buf, sizeof(buf));
-		if (ImGui::MenuItem(a.label, buf, a.is_selected.invoke(), enabled))
+		if (ImGui::MenuItem(a.label_short, buf, a.is_selected.invoke(), enabled))
 		{
 			a.func.invoke();
 		}
@@ -922,7 +931,7 @@ public:
 		addAction(action);
 		for (int i = 0; i < m_window_actions.size(); ++i)
 		{
-			if (compareString(m_window_actions[i]->label, action->label) > 0)
+			if (compareString(m_window_actions[i]->label_long, action->label_long) > 0)
 			{
 				m_window_actions.insert(i, action);
 				return;
@@ -936,7 +945,7 @@ public:
 	{
 		for (int i = 0; i < m_actions.size(); ++i)
 		{
-			if (compareString(m_actions[i]->label, action->label) > 0)
+			if (compareString(m_actions[i]->label_long, action->label_long) > 0)
 			{
 				m_actions.insert(i, action);
 				return;
@@ -947,9 +956,9 @@ public:
 
 
 	template <void (StudioAppImpl::*func)()>
-	Action& addAction(const char* label, const char* name)
+	Action& addAction(const char* label_short, const char* label_long, const char* name)
 	{
-		auto* a = LUMIX_NEW(m_editor->getAllocator(), Action)(label, name);
+		auto* a = LUMIX_NEW(m_editor->getAllocator(), Action)(label_short, label_long, name);
 		a->func.bind<StudioAppImpl, func>(this);
 		addAction(a);
 		return *a;
@@ -957,10 +966,10 @@ public:
 
 
 	template <void (StudioAppImpl::*func)()>
-	void addAction(const char* label, const char* name, int shortcut0, int shortcut1, int shortcut2)
+	void addAction(const char* label_short, const char* label_long, const char* name, int shortcut0, int shortcut1, int shortcut2)
 	{
 		auto* a = LUMIX_NEW(m_editor->getAllocator(), Action)(
-			label, name, shortcut0, shortcut1, shortcut2);
+			label_short, label_long, name, shortcut0, shortcut1, shortcut2);
 		a->func.bind<StudioAppImpl, func>(this);
 		addAction(a);
 	}
@@ -1379,7 +1388,7 @@ public:
 		m_font->DisplayOffset.y = 0;
 		m_bold_font->DisplayOffset.y = 0;
 
-		io.KeyMap[ImGuiKey_Tab] = SDLK_TAB;
+		io.KeyMap[ImGuiKey_Tab] = SDL_SCANCODE_TAB;
 		io.KeyMap[ImGuiKey_LeftArrow] = SDL_SCANCODE_LEFT;
 		io.KeyMap[ImGuiKey_RightArrow] = SDL_SCANCODE_RIGHT;
 		io.KeyMap[ImGuiKey_UpArrow] = SDL_SCANCODE_UP;
@@ -1388,16 +1397,16 @@ public:
 		io.KeyMap[ImGuiKey_PageDown] = SDL_SCANCODE_PAGEDOWN;
 		io.KeyMap[ImGuiKey_Home] = SDL_SCANCODE_HOME;
 		io.KeyMap[ImGuiKey_End] = SDL_SCANCODE_END;
-		io.KeyMap[ImGuiKey_Delete] = SDLK_DELETE;
-		io.KeyMap[ImGuiKey_Backspace] = SDLK_BACKSPACE;
-		io.KeyMap[ImGuiKey_Enter] = SDLK_RETURN;
-		io.KeyMap[ImGuiKey_Escape] = SDLK_ESCAPE;
-		io.KeyMap[ImGuiKey_A] = SDLK_a;
-		io.KeyMap[ImGuiKey_C] = SDLK_c;
-		io.KeyMap[ImGuiKey_V] = SDLK_v;
-		io.KeyMap[ImGuiKey_X] = SDLK_x;
-		io.KeyMap[ImGuiKey_Y] = SDLK_y;
-		io.KeyMap[ImGuiKey_Z] = SDLK_z;
+		io.KeyMap[ImGuiKey_Delete] = SDL_SCANCODE_DELETE;
+		io.KeyMap[ImGuiKey_Backspace] = SDL_SCANCODE_BACKSPACE;
+		io.KeyMap[ImGuiKey_Enter] = SDL_SCANCODE_RETURN;
+		io.KeyMap[ImGuiKey_Escape] = SDL_SCANCODE_ESCAPE;
+		io.KeyMap[ImGuiKey_A] = SDL_SCANCODE_A;
+		io.KeyMap[ImGuiKey_C] = SDL_SCANCODE_C;
+		io.KeyMap[ImGuiKey_V] = SDL_SCANCODE_V;
+		io.KeyMap[ImGuiKey_X] = SDL_SCANCODE_X;
+		io.KeyMap[ImGuiKey_Y] = SDL_SCANCODE_Y;
+		io.KeyMap[ImGuiKey_Z] = SDL_SCANCODE_Z;
 
 		ImGuiStyle& style = ImGui::GetStyle();
 		style.FramePadding.y = 0;
@@ -1443,66 +1452,57 @@ public:
 
 	void addActions()
 	{
-		addAction<&StudioAppImpl::newUniverse>("New", "newUniverse");
-		addAction<&StudioAppImpl::save>("Save", "save", SDL_SCANCODE_LCTRL, 'S', -1);
-		addAction<&StudioAppImpl::saveAs>("Save As",
-			"saveAs",
-			KMOD_CTRL,
-			KMOD_SHIFT,
-			'S');
-		addAction<&StudioAppImpl::exit>("Exit", "exit", SDL_SCANCODE_LCTRL, 'X', -1);
-
-		addAction<&StudioAppImpl::redo>("Redo",
-			"redo",
-			KMOD_CTRL,
-			KMOD_SHIFT,
-			'Z');
-		addAction<&StudioAppImpl::undo>("Undo", "undo", SDL_SCANCODE_LCTRL, 'Z', -1);
-		addAction<&StudioAppImpl::copy>("Copy", "copy", SDL_SCANCODE_LCTRL, 'C', -1);
-		addAction<&StudioAppImpl::paste>("Paste", "paste", SDL_SCANCODE_LCTRL, 'V', -1);
-		addAction<&StudioAppImpl::toggleOrbitCamera>("Orbit camera", "orbitCamera")
+		addAction<&StudioAppImpl::newUniverse>("New", "New universe", "newUniverse");
+		addAction<&StudioAppImpl::save>("Save", "Save universe", "save", SDLK_LCTRL, 'S', -1);
+		addAction<&StudioAppImpl::saveAs>("Save As", "Save universe as", "saveAs", SDLK_LCTRL, SDLK_LSHIFT, 'S');
+		addAction<&StudioAppImpl::exit>("Exit", "Exit Studio", "exit", SDLK_LCTRL, 'X', -1);
+		addAction<&StudioAppImpl::redo>("Redo", "Redo scene action", "redo", SDLK_LCTRL, SDLK_LSHIFT, 'Z');
+		addAction<&StudioAppImpl::undo>("Undo", "Undo scene action", "undo", SDLK_LCTRL, 'Z', -1);
+		addAction<&StudioAppImpl::copy>("Copy", "Copy entity", "copy", SDLK_LCTRL, 'C', -1);
+		addAction<&StudioAppImpl::paste>("Paste", "Paste entity", "paste", SDLK_LCTRL, 'V', -1);
+		addAction<&StudioAppImpl::toggleOrbitCamera>("Orbit camera", "Orbit camera", "orbitCamera")
 			.is_selected.bind<StudioAppImpl, &StudioAppImpl::isOrbitCamera>(this);
-		addAction<&StudioAppImpl::setTranslateGizmoMode>("Translate", "setTranslateGizmoMode")
+		addAction<&StudioAppImpl::setTranslateGizmoMode>("Translate", "Set translate mode", "setTranslateGizmoMode")
 			.is_selected.bind<Gizmo, &Gizmo::isTranslateMode>(&m_editor->getGizmo());
-		addAction<&StudioAppImpl::setRotateGizmoMode>("Rotate", "setRotateGizmoMode")
+		addAction<&StudioAppImpl::setRotateGizmoMode>("Rotate", "Set rotate mode", "setRotateGizmoMode")
 			.is_selected.bind<Gizmo, &Gizmo::isRotateMode>(&m_editor->getGizmo());
-		addAction<&StudioAppImpl::setScaleGizmoMode>("Scale", "setScaleGizmoMode")
+		addAction<&StudioAppImpl::setScaleGizmoMode>("Scale", "Set scale mode", "setScaleGizmoMode")
 			.is_selected.bind<Gizmo, &Gizmo::isScaleMode>(&m_editor->getGizmo());
-		addAction<&StudioAppImpl::setTopView>("Top", "viewTop");
-		addAction<&StudioAppImpl::setFrontView>("Front", "viewFront");
-		addAction<&StudioAppImpl::setSideView>("Side", "viewSide");
-		addAction<&StudioAppImpl::setLocalCoordSystem>("Local", "setLocalCoordSystem")
+		addAction<&StudioAppImpl::setTopView>("Top", "Set top camera view", "viewTop");
+		addAction<&StudioAppImpl::setFrontView>("Front", "Set front camera view", "viewFront");
+		addAction<&StudioAppImpl::setSideView>("Side", "Set side camera view", "viewSide");
+		addAction<&StudioAppImpl::setLocalCoordSystem>("Local", "Set local transform system", "setLocalCoordSystem")
 			.is_selected.bind<Gizmo, &Gizmo::isLocalCoordSystem>(&m_editor->getGizmo());
-		addAction<&StudioAppImpl::setGlobalCoordSystem>("Global", "setGlobalCoordSystem")
+		addAction<&StudioAppImpl::setGlobalCoordSystem>("Global", "Set global transform system", "setGlobalCoordSystem")
 			.is_selected.bind<Gizmo, &Gizmo::isGlobalCoordSystem>(&m_editor->getGizmo());
-		addAction<&StudioAppImpl::setPivotCenter>("Center", "setPivotCenter")
+		addAction<&StudioAppImpl::setPivotCenter>("Center", "Set center transform system", "setPivotCenter")
 			.is_selected.bind<Gizmo, &Gizmo::isPivotCenter>(&m_editor->getGizmo());
-		addAction<&StudioAppImpl::setPivotOrigin>("Origin", "setPivotOrigin")
+		addAction<&StudioAppImpl::setPivotOrigin>("Pivot", "Set pivot transform system", "setPivotOrigin")
 			.is_selected.bind<Gizmo, &Gizmo::isPivotOrigin>(&m_editor->getGizmo());
 
-		addAction<&StudioAppImpl::createEntity>("Create empty", "createEntity");
-		addAction<&StudioAppImpl::destroyEntity>("Destroy", "destroyEntity", SDLK_DELETE, -1, -1);
-		addAction<&StudioAppImpl::showEntities>("Show", "showEntities");
-		addAction<&StudioAppImpl::hideEntities>("Hide", "hideEntities");
-		addAction<&StudioAppImpl::savePrefab>("Save prefab", "savePrefab");
-		addAction<&StudioAppImpl::makeParent>("Make parent", "makeParent");
-		addAction<&StudioAppImpl::unparent>("Unparent", "unparent");
+		addAction<&StudioAppImpl::createEntity>("Create empty", "Create empty entity", "createEntity");
+		addAction<&StudioAppImpl::destroyEntity>("Destroy", "Destroy entity", "destroyEntity", SDLK_DELETE, -1, -1);
+		addAction<&StudioAppImpl::showEntities>("Show", "Show selected entities", "showEntities");
+		addAction<&StudioAppImpl::hideEntities>("Hide", "Hide selected entities", "hideEntities");
+		addAction<&StudioAppImpl::savePrefab>("Save prefab", "Save selected entities as prefab", "savePrefab");
+		addAction<&StudioAppImpl::makeParent>("Make parent", "Make entity parent", "makeParent");
+		addAction<&StudioAppImpl::unparent>("Unparent", "Unparent entity", "unparent");
 
-		addAction<&StudioAppImpl::toggleGameMode>("Game Mode", "toggleGameMode")
+		addAction<&StudioAppImpl::toggleGameMode>("Game Mode", "Toggle game mode", "toggleGameMode")
 			.is_selected.bind<WorldEditor, &WorldEditor::isGameMode>(m_editor);
-		addAction<&StudioAppImpl::toggleMeasure>("Toggle measure", "toggleMeasure")
+		addAction<&StudioAppImpl::toggleMeasure>("Toggle measure", "Toggle measure mode", "toggleMeasure")
 			.is_selected.bind<WorldEditor, &WorldEditor::isMeasureToolActive>(m_editor);
-		addAction<&StudioAppImpl::autosnapDown>("Autosnap down", "autosnapDown")
+		addAction<&StudioAppImpl::autosnapDown>("Autosnap down", "Toggle autosnap down", "autosnapDown")
 			.is_selected.bind<Gizmo, &Gizmo::isAutosnapDown>(&m_editor->getGizmo());
-		addAction<&StudioAppImpl::snapDown>("Snap down", "snapDown");
-		addAction<&StudioAppImpl::lookAtSelected>("Look at selected", "lookAtSelected");
-		addAction<&StudioAppImpl::toggleAssetBrowser>("Asset Browser", "assetBrowser")
+		addAction<&StudioAppImpl::snapDown>("Snap down", "Snap entities down", "snapDown");
+		addAction<&StudioAppImpl::lookAtSelected>("Look at selected", "Look at selected entity", "lookAtSelected");
+		addAction<&StudioAppImpl::toggleAssetBrowser>("Asset Browser", "Toggle asset browser", "assetBrowser")
 			.is_selected.bind<StudioAppImpl, &StudioAppImpl::isAssetBrowserOpen>(this);
-		addAction<&StudioAppImpl::toggleEntityList>("Entity List", "entityList")
+		addAction<&StudioAppImpl::toggleEntityList>("Entity List", "Toggle entity list", "entityList")
 			.is_selected.bind<StudioAppImpl, &StudioAppImpl::isEntityListOpen>(this);
-		addAction<&StudioAppImpl::toggleSettings>("Settings", "settings")
+		addAction<&StudioAppImpl::toggleSettings>("Settings", "Toggle settings UI", "settings")
 			.is_selected.bind<StudioAppImpl, &StudioAppImpl::areSettingsOpen>(this);
-		addAction<&StudioAppImpl::showPackDataDialog>("Pack data", "pack_data");
+		addAction<&StudioAppImpl::showPackDataDialog>("Pack data", "Pack data", "pack_data");
 	}
 
 
@@ -2102,7 +2102,7 @@ public:
 				case SDL_QUIT: exit(); break;
 				case SDL_MOUSEBUTTONDOWN:
 					m_editor->setAdditiveSelection(io.KeyCtrl);
-					m_editor->setSnapMode(io.KeyShift, io.KeyCtrl, false);
+					m_editor->setSnapMode(io.KeyShift, io.KeyCtrl);
 					switch (event.button.button)
 					{
 						case SDL_BUTTON_LEFT: io.MouseDown[0] = true; break;
@@ -2134,8 +2134,8 @@ public:
 				case SDL_KEYDOWN:
 				case SDL_KEYUP:
 				{
-					int key = event.key.keysym.sym & ~SDLK_SCANCODE_MASK;
-					io.KeysDown[key] = (event.type == SDL_KEYDOWN);
+					int scancode = event.key.keysym.scancode;
+					io.KeysDown[scancode] = (event.type == SDL_KEYDOWN);
 					if (event.key.keysym.scancode == SDL_SCANCODE_KP_ENTER)
 					{
 						io.KeysDown[SDLK_RETURN] = (event.type == SDL_KEYDOWN);
@@ -2272,14 +2272,17 @@ public:
 
 				if (i == lengthOf(a->shortcut)) break;
 				if (a->shortcut[i] == -1) break;
-				if (a->shortcut[i] >= key_count) break;
-				if (!state[a->shortcut[i]]) break;
-				if (a->shortcut[i] == SDL_SCANCODE_LCTRL) action_modifiers |= KMOD_LCTRL;
-				else if (a->shortcut[i] == SDL_SCANCODE_LALT) action_modifiers |= KMOD_LALT;
-				else if (a->shortcut[i] == SDL_SCANCODE_LSHIFT) action_modifiers |= KMOD_LSHIFT;
-				else if (a->shortcut[i] == SDL_SCANCODE_RCTRL) action_modifiers |= KMOD_RCTRL;
-				else if (a->shortcut[i] == SDL_SCANCODE_RALT) action_modifiers |= KMOD_RALT;
-				else if (a->shortcut[i] == SDL_SCANCODE_RSHIFT) action_modifiers |= KMOD_RSHIFT;
+
+				SDL_Scancode scancode = SDL_GetScancodeFromKey(a->shortcut[i]);
+
+				if (scancode >= key_count) break;
+				if (!state[scancode]) break;
+				if (a->shortcut[i] == SDLK_LCTRL) action_modifiers |= KMOD_LCTRL;
+				else if (a->shortcut[i] == SDLK_LALT) action_modifiers |= KMOD_LALT;
+				else if (a->shortcut[i] == SDLK_LSHIFT) action_modifiers |= KMOD_LSHIFT;
+				else if (a->shortcut[i] == SDLK_RCTRL) action_modifiers |= KMOD_RCTRL;
+				else if (a->shortcut[i] == SDLK_RALT) action_modifiers |= KMOD_RALT;
+				else if (a->shortcut[i] == SDLK_RSHIFT) action_modifiers |= KMOD_RSHIFT;
 			}
 		}
 	}
@@ -2341,6 +2344,7 @@ public:
 	AddCmpTreeNode m_add_cmp_root;
 	HashMap<ComponentType, string> m_component_labels;
 	WorldEditor* m_editor;
+	Action* m_custom_pivot_action;
 	bool m_confirm_exit;
 	bool m_confirm_load;
 	bool m_confirm_new;

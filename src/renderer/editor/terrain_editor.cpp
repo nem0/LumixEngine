@@ -723,38 +723,38 @@ TerrainEditor::TerrainEditor(WorldEditor& editor, StudioApp& app)
 	, m_y_spread(0, 0)
 {
 	editor.registerEditorCommandCreator("paint_terrain", createPaintTerrainCommand);
-	m_increase_brush_size = LUMIX_NEW(editor.getAllocator(), Action)("Increase brush size", "increaseBrushSize");
+	m_increase_brush_size = LUMIX_NEW(editor.getAllocator(), Action)("Increase brush size", "Terrain editor - Increase brush size", "increaseBrushSize");
 	m_increase_brush_size->is_global = false;
 	m_increase_brush_size->func.bind<TerrainEditor, &TerrainEditor::increaseBrushSize>(this);
-	m_decrease_brush_size = LUMIX_NEW(editor.getAllocator(), Action)("Decrease brush size", "decreaseBrushSize");
+	m_decrease_brush_size = LUMIX_NEW(editor.getAllocator(), Action)("Decrease brush size", "Terrain editor - decrease brush size", "decreaseBrushSize");
 	m_decrease_brush_size->func.bind<TerrainEditor, &TerrainEditor::decreaseBrushSize>(this);
 	m_decrease_brush_size->is_global = false;
 	app.addAction(m_increase_brush_size);
 	app.addAction(m_decrease_brush_size);
 
-	m_increase_texture_idx = LUMIX_NEW(editor.getAllocator(), Action)("Next terrain texture", "nextTerrainTexture");
+	m_increase_texture_idx = LUMIX_NEW(editor.getAllocator(), Action)("Next terrain texture", "Terrain editor - next texture", "nextTerrainTexture");
 	m_increase_texture_idx->is_global = false;
 	m_increase_texture_idx->func.bind<TerrainEditor, &TerrainEditor::nextTerrainTexture>(this);
-	m_decrease_texture_idx = LUMIX_NEW(editor.getAllocator(), Action)("Previous terrain texture", "prevTerrainTexture");
+	m_decrease_texture_idx = LUMIX_NEW(editor.getAllocator(), Action)("Previous terrain texture", "Terrain editor - previous texture", "prevTerrainTexture");
 	m_decrease_texture_idx->func.bind<TerrainEditor, &TerrainEditor::prevTerrainTexture>(this);
 	m_decrease_texture_idx->is_global = false;
 	app.addAction(m_increase_texture_idx);
 	app.addAction(m_decrease_texture_idx);
 
-	m_smooth_terrain_action = LUMIX_NEW(editor.getAllocator(), Action)("Smooth terrain", "smoothTerrain");
+	m_smooth_terrain_action = LUMIX_NEW(editor.getAllocator(), Action)("Smooth terrain", "Terrain editor - smooth", "smoothTerrain");
 	m_smooth_terrain_action->is_global = false;
-	m_lower_terrain_action = LUMIX_NEW(editor.getAllocator(), Action)("Lower terrain", "lowerTerrain");
+	m_lower_terrain_action = LUMIX_NEW(editor.getAllocator(), Action)("Lower terrain", "Terrain editor - lower", "lowerTerrain");
 	m_lower_terrain_action->is_global = false;
 	app.addAction(m_smooth_terrain_action);
 	app.addAction(m_lower_terrain_action);
 
 	m_remove_grass_action =
-		LUMIX_NEW(editor.getAllocator(), Action)("Remove grass from terrain", "removeGrassFromTerrain");
+		LUMIX_NEW(editor.getAllocator(), Action)("Remove grass from terrain", "Terrain editor - remove grass", "removeGrassFromTerrain");
 	m_remove_grass_action->is_global = false;
 	app.addAction(m_remove_grass_action);
 
 	m_remove_entity_action =
-		LUMIX_NEW(editor.getAllocator(), Action)("Remove entities from terrain", "removeEntitiesFromTerrain");
+		LUMIX_NEW(editor.getAllocator(), Action)("Remove entities from terrain", "Terrain editor - remove entities", "removeEntitiesFromTerrain");
 	m_remove_entity_action->is_global = false;
 	app.addAction(m_remove_entity_action);
 
