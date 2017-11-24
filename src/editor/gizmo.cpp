@@ -494,6 +494,7 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 
 	void clearEntities() override
 	{
+		m_active = -1;
 		m_pivot = Pivot::CENTER;
 		m_offset.set(0, 0, 0);
 		m_count = 0;
