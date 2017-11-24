@@ -39,11 +39,11 @@ namespace Lumix
 
 
 static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("renderable");
+static const ComponentType MESH_ACTOR_TYPE = Reflection::getComponentType("mesh_rigid_actor");
 static const ResourceType MODEL_TYPE("model");
 static const ResourceType SHADER_TYPE("shader");
 static const ResourceType TEXTURE_TYPE("texture");
 static const ResourceType PREFAB_TYPE("prefab");
-
 
 SceneView::SceneView(StudioApp& app)
 	: m_app(app)
@@ -271,6 +271,30 @@ void SceneView::handleDrop(const char* path, float x, float y)
 		auto* prop = Reflection::getProperty(MODEL_INSTANCE_TYPE, "Source");
 		m_editor.setProperty(MODEL_INSTANCE_TYPE, -1, *prop, &entity, 1, path, stringLength(path) + 1);
 		m_editor.endCommandGroup();
+	}
+	else if (PathUtils::hasExtension(path, "phy"))
+	{
+		if (hit.m_is_hit && hit.m_entity.isValid())
+		{
+			m_editor.beginCommandGroup(crc32("insert_phy_component"));
+			m_editor.selectEntities(&hit.m_entity, 1);
+			m_editor.addComponent(MESH_ACTOR_TYPE);
+			auto* prop = Reflection::getProperty(MESH_ACTOR_TYPE, "Source");
+			m_editor.setProperty(MESH_ACTOR_TYPE, -1, *prop, &hit.m_entity, 1, path, stringLength(path) + 1);
+			m_editor.endCommandGroup();
+		}
+		else
+		{
+			Vec3 pos = hit.m_origin + (hit.m_is_hit ? hit.m_t : 1) * hit.m_dir;
+			m_editor.beginCommandGroup(crc32("insert_phy"));
+			Entity entity = m_editor.addEntity();
+			m_editor.setEntitiesPositions(&entity, &pos, 1);
+			m_editor.selectEntities(&entity, 1);
+			m_editor.addComponent(MESH_ACTOR_TYPE);
+			auto* prop = Reflection::getProperty(MESH_ACTOR_TYPE, "Source");
+			m_editor.setProperty(MESH_ACTOR_TYPE, -1, *prop, &entity, 1, path, stringLength(path) + 1);
+			m_editor.endCommandGroup();
+		}
 	}
 	else if (hit.m_is_hit && PathUtils::hasExtension(path, "mat") && hit.m_mesh)
 	{
