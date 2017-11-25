@@ -580,7 +580,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			void operator()(RagdollBone* bone, int layer)
 			{
 				if (!bone) return;
-				scene.updateFilterData(bone->actor, layer);
+				if (bone->actor) scene.updateFilterData(bone->actor, layer);
 				(*this)(bone->child, layer);
 				(*this)(bone->next, layer);
 			}
@@ -603,7 +603,10 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		ASSERT(layer < lengthOf(m_layers_names));
 		auto* actor = m_actors[{cmp.index}];
 		actor->layer = layer;
-		updateFilterData(actor->physx_actor, actor->layer);
+		if (actor->physx_actor)
+		{
+			updateFilterData(actor->physx_actor, actor->layer);
+		}
 	}
 
 
