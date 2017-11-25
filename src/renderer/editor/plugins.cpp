@@ -2375,7 +2375,10 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 		{
 			for (ModelInstanceMesh m : sub)
 			{
-				entities.push({m.model_instance.index});
+				if (entities.indexOf({m.model_instance.index}) < 0)
+				{
+					entities.push({ m.model_instance.index });
+				}
 			}
 		}
 	}
