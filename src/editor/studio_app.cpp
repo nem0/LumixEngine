@@ -1651,6 +1651,18 @@ public:
 	}
 
 
+	void LUA_savePrefab(const char* path)
+	{
+		m_editor->getPrefabSystem().savePrefab(Path(path));
+	}
+
+
+	void LUA_selectEntity(Entity e)
+	{
+		m_editor->selectEntities(&e, 1);
+	}
+
+
 	void LUA_exitGameMode()
 	{
 		m_deferred_game_mode_exit = true;
@@ -1661,6 +1673,141 @@ public:
 	{
 		m_finished = true;
 		m_exit_code = exit_code;
+	}
+
+
+	struct SetPropertyVisitor : public Reflection::IPropertyVisitor
+	{
+		void visit(const Reflection::Property<int>& prop) override 
+		{ 
+			if (!equalStrings(property_name, prop.name)) return;
+			if (!lua_isinteger(L, -1)) return;
+
+			int val = (int)lua_tointeger(L, -1);
+			editor->setProperty(cmp.type, 0, prop, &cmp.entity, 1, &val, sizeof(val));
+		}
+
+
+		// TODO 
+		void visit(const Reflection::Property<float>& prop) override { notSupported(prop); }
+		void visit(const Reflection::Property<Entity>& prop) override { notSupported(prop); }
+		void visit(const Reflection::Property<Int2>& prop) override { notSupported(prop); }
+		void visit(const Reflection::Property<Vec2>& prop) override { notSupported(prop); }
+		void visit(const Reflection::Property<Vec3>& prop) override { notSupported(prop); }
+		void visit(const Reflection::Property<Vec4>& prop) override { notSupported(prop); }
+
+
+		void visit(const Reflection::Property<const char*>& prop) override
+		{
+			if (!equalStrings(property_name, prop.name)) return;
+			if (!lua_isstring(L, -1)) return;
+
+			const char* str = lua_tostring(L, -1);
+			editor->setProperty(cmp.type, 0, prop, &cmp.entity, 1, str, stringLength(str) + 1);
+		}
+
+
+		void visit(const Reflection::Property<Path>& prop) override 
+		{ 
+			if (!equalStrings(property_name, prop.name)) return;
+			if (!lua_isstring(L, -1)) return;
+
+			const char* str = lua_tostring(L, -1);
+			editor->setProperty(cmp.type, 0, prop, &cmp.entity, 1, str, stringLength(str) + 1);
+		}
+
+
+		void visit(const Reflection::Property<bool>& prop) override 
+		{
+			if (!equalStrings(property_name, prop.name)) return;
+			if (!lua_isboolean(L, -1)) return;
+
+			bool val = lua_toboolean(L, -1) != 0;
+			editor->setProperty(cmp.type, 0, prop, &cmp.entity, 1, &val, sizeof(val));
+		}
+
+		void visit(const Reflection::IArrayProperty& prop) override { notSupported(prop); }
+		void visit(const Reflection::IEnumProperty& prop) override { notSupported(prop); }
+		void visit(const Reflection::IBlobProperty& prop) override { notSupported(prop); }
+		void visit(const Reflection::ISampledFuncProperty& prop) override { notSupported(prop); }
+
+
+		void notSupported(const Reflection::PropertyBase& prop)
+		{
+			if (!equalStrings(property_name, prop.name)) return;
+			g_log_error.log("Lua Script") << "Property " << prop.name << " has unsupported type";
+		}
+
+
+		lua_State* L;
+		ComponentUID cmp;
+		const char* property_name;
+		WorldEditor* editor;
+	};
+
+
+	static int createEntityEx(lua_State* L)
+	{
+		auto* studio = LuaWrapper::checkArg<StudioAppImpl*>(L, 1);
+		LuaWrapper::checkTableArg(L, 2);
+
+		WorldEditor& editor = *studio->m_editor;
+		editor.beginCommandGroup(crc32("createEntityEx"));
+		Entity e = editor.addEntity();
+		editor.selectEntities(&e, 1);
+
+		lua_pushvalue(L, 2);
+		lua_pushnil(L);
+		while (lua_next(L, -2) != 0)
+		{
+			const char* parameter_name = luaL_checkstring(L, -2);
+			if (equalStrings(parameter_name, "position"))
+			{
+				auto pos = LuaWrapper::toType<Vec3>(L, -1);
+				editor.setEntitiesPositions(&e, &pos, 1);
+			}
+			else if (equalStrings(parameter_name, "rotation"))
+			{
+				auto rot = LuaWrapper::toType<Quat>(L, -1);
+				editor.setEntitiesRotations(&e, &rot, 1);
+			}
+			else
+			{
+				ComponentType cmp_type = Reflection::getComponentType(parameter_name);
+				editor.addComponent(cmp_type);
+
+				IScene* scene = editor.getUniverse()->getScene(cmp_type);
+				if (scene)
+				{
+					ComponentUID cmp(e, cmp_type, scene, scene->getComponent(e, cmp_type));
+					const Reflection::ComponentBase* cmp_des = Reflection::getComponent(cmp_type);
+					if (cmp.isValid())
+					{
+						lua_pushvalue(L, -1);
+						lua_pushnil(L);
+						while (lua_next(L, -2) != 0)
+						{
+							const char* property_name = luaL_checkstring(L, -2);
+							SetPropertyVisitor v;
+							v.property_name = property_name;
+							v.cmp = cmp;
+							v.L = L;
+							v.editor = &editor;
+							cmp_des->visit(v);
+
+							lua_pop(L, 1);
+						}
+						lua_pop(L, 1);
+					}
+				}
+			}
+			lua_pop(L, 1);
+		}
+		lua_pop(L, 1);
+
+		editor.endCommandGroup();
+		LuaWrapper::push(L, e);
+		return 1;
 	}
 
 
@@ -1708,10 +1855,13 @@ public:
 		REGISTER_FUNCTION(runTest);
 		REGISTER_FUNCTION(exit);
 		REGISTER_FUNCTION(exitGameMode);
+		REGISTER_FUNCTION(savePrefab);
+		REGISTER_FUNCTION(selectEntity);
 
 		#undef REGISTER_FUNCTION
 
 		LuaWrapper::createSystemFunction(L, "Editor", "getResources", &getResources);
+		LuaWrapper::createSystemFunction(L, "Editor", "createEntityEx", &createEntityEx);
 	}
 
 

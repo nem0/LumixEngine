@@ -1208,6 +1208,7 @@ private:
 		{
 			bool ret = false;
 			IScene* scene = m_editor.getUniverse()->getScene(m_type);
+			if (!scene) return false;
 
 			for (int j = 0; j < m_entities.size(); ++j)
 			{
