@@ -1657,6 +1657,12 @@ public:
 	}
 
 
+	void LUA_destroyEntity(Entity e)
+	{
+		m_editor->destroyEntities(&e, 1);
+	}
+
+
 	void LUA_selectEntity(Entity e)
 	{
 		m_editor->selectEntities(&e, 1);
@@ -1857,6 +1863,7 @@ public:
 		REGISTER_FUNCTION(exitGameMode);
 		REGISTER_FUNCTION(savePrefab);
 		REGISTER_FUNCTION(selectEntity);
+		REGISTER_FUNCTION(destroyEntity);
 
 		#undef REGISTER_FUNCTION
 
