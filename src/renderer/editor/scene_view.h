@@ -36,6 +36,7 @@ class SceneView : public StudioApp::IPlugin
 		const char* getName() const override { return "scene_view"; }
 
 	private:
+		void processDeferPrefabInserts();
 		void renderSelection();
 		void renderGizmos();
 		void renderIcons();
@@ -73,6 +74,14 @@ class SceneView : public StudioApp::IPlugin
 		bool m_show_stats;
 		LogUI& m_log_ui;
 		Array<DropHandler> m_drop_handlers;
+
+		struct DeferredPrefabInsert
+		{
+			Vec3 pos;
+			struct PrefabResource* prefab;
+		};
+
+		Array<DeferredPrefabInsert> m_deferred_prefab_inserts;
 };
 
 

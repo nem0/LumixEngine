@@ -50,6 +50,7 @@ SceneView::SceneView(StudioApp& app)
 	, m_drop_handlers(app.getWorldEditor().getAllocator())
 	, m_log_ui(app.getLogUI())
 	, m_editor(m_app.getWorldEditor())
+	, m_deferred_prefab_inserts(app.getWorldEditor().getAllocator())
 {
 	m_camera_speed = 0.1f;
 	m_is_mouse_captured = false;
@@ -147,9 +148,26 @@ void SceneView::onUniverseDestroyed()
 }
 
 
+void SceneView::processDeferPrefabInserts()
+{
+	for (int i = m_deferred_prefab_inserts.size() - 1; i >= 0; --i)
+	{
+		DeferredPrefabInsert& defer = m_deferred_prefab_inserts[i];
+		if (defer.prefab->isReady())
+		{
+			m_editor.getPrefabSystem().instantiatePrefab(*defer.prefab, defer.pos, Quat::IDENTITY, 1);
+			defer.prefab->getResourceManager().unload(*defer.prefab);
+			m_deferred_prefab_inserts.erase(i);
+		}
+	}
+}
+
+
 void SceneView::update(float)
 {
 	PROFILE_FUNCTION();
+
+	processDeferPrefabInserts();
 
 	if (ImGui::IsAnyItemActive()) return;
 	if (!m_is_open) return;
@@ -271,6 +289,14 @@ void SceneView::handleDrop(const char* path, float x, float y)
 		auto* prop = Reflection::getProperty(MODEL_INSTANCE_TYPE, "Source");
 		m_editor.setProperty(MODEL_INSTANCE_TYPE, -1, *prop, &entity, 1, path, stringLength(path) + 1);
 		m_editor.endCommandGroup();
+	}
+	else if (PathUtils::hasExtension(path, "fab"))
+	{
+		DeferredPrefabInsert defer;
+		defer.pos = hit.m_origin + (hit.m_is_hit ? hit.m_t : 1) * hit.m_dir;
+		ResourceManagerBase* prefab_manager = m_editor.getEngine().getResourceManager().get(PREFAB_TYPE);
+		defer.prefab = (PrefabResource*)prefab_manager->load(Path(path));
+		m_deferred_prefab_inserts.push(defer);
 	}
 	else if (PathUtils::hasExtension(path, "phy"))
 	{
