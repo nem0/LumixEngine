@@ -586,6 +586,7 @@ public:
 	AnimationEditor(StudioApp& app);
 	~AnimationEditor();
 
+	OutputBlob& getCopyBuffer() override;
 	void update(float time_delta) override;
 	const char* getName() const override { return "animation_editor"; }
 	void setContainer(Container* container) override { m_container = container; }
@@ -645,6 +646,7 @@ private:
 	bool m_is_playing = false;
 	bool m_is_focused = false;
 	u32 m_current_group_type;
+	OutputBlob m_copy_buffer;
 };
 
 
@@ -655,6 +657,7 @@ AnimationEditor::AnimationEditor(StudioApp& app)
 	, m_offset(0, 0)
 	, m_event_types(app.getWorldEditor().getAllocator())
 	, m_undo_stack(app.getWorldEditor().getAllocator())
+	, m_copy_buffer(app.getWorldEditor().getAllocator())
 {
 	m_path = "";
 	IAllocator& allocator = app.getWorldEditor().getAllocator();
@@ -811,6 +814,12 @@ void AnimationEditor::endCommandGroup()
 	cmd->group_type = m_current_group_type;
 	m_undo_stack.push(cmd);
 	++m_undo_index;
+}
+
+
+OutputBlob& AnimationEditor::getCopyBuffer()
+{
+	return m_copy_buffer;
 }
 
 

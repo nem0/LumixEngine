@@ -795,6 +795,12 @@ Blend1DNode::Blend1DNode(Anim::Component* engine_cmp, Container* parent, Control
 }
 
 
+bool Blend1DNode::isFixed(Node& node) const
+{
+	return &node == m_root_node;
+}
+
+
 void Blend1DNode::debugInside(ImDrawList* draw,
 	const ImVec2& canvas_screen_pos,
 	Anim::ComponentInstance* runtime,
@@ -925,6 +931,47 @@ Blend1DNode::RootEdge* Blend1DNode::createRootEdge(Node* node)
 }
 
 
+bool Container::isFixed(Node& node) const
+{
+	return false;
+}
+
+
+void Container::contextMenu(const ImVec2& canvas_screen_pos)
+{
+	if (!ImGui::BeginPopup("context_menu")) return;
+
+	IAnimationEditor& editor = m_controller.getEditor();
+	ImVec2 pos_on_canvas = ImGui::GetMousePos() - canvas_screen_pos;
+	if (ImGui::BeginMenu("Create"))
+	{
+		if (ImGui::MenuItem("Simple")) editor.createNode(m_controller, this, Anim::Component::SIMPLE_ANIMATION, pos_on_canvas);
+		if (ImGui::MenuItem("State machine")) editor.createNode(m_controller, this, Anim::Component::STATE_MACHINE, pos_on_canvas);
+		if (ImGui::MenuItem("Blend 1D")) editor.createNode(m_controller, this, Anim::Component::BLEND1D, pos_on_canvas);
+		if (ImGui::MenuItem("Layers")) editor.createNode(m_controller, this, Anim::Component::LAYERS, pos_on_canvas);
+		ImGui::EndMenu();
+	}
+	if (m_context_cmp && m_context_cmp->isNode() && !isFixed(*(Node*)m_context_cmp))
+	{
+		if (ImGui::MenuItem("Remove"))
+		{
+			m_context_cmp->destroy();
+			if (m_selected_component == m_context_cmp) m_selected_component = nullptr;
+			if (m_drag_source == m_context_cmp) m_drag_source = nullptr;
+			m_context_cmp = nullptr;
+		}
+		/*if (ImGui::MenuItem("Copy"))
+		{
+			OutputBlob& copy_buffer = editor.getCopyBuffer();
+			copy_buffer.clear();
+			copy_buffer.write(m_context_cmp->engine_cmp->type);
+			m_context_cmp->engine_cmp->serialize(copy_buffer);
+			m_context_cmp->serialize(copy_buffer);
+		}*/
+	}
+	ImGui::EndPopup();
+}
+
 
 void Blend1DNode::drawInside(ImDrawList* draw, const ImVec2& canvas_screen_pos)
 {
@@ -1019,30 +1066,7 @@ void Blend1DNode::drawInside(ImDrawList* draw, const ImVec2& canvas_screen_pos)
 		draw->AddLine(canvas_screen_pos + m_drag_source->pos + m_drag_source->size * 0.5f, ImGui::GetMousePos(), 0xfff00FFF);
 	}
 
-	auto& editor = m_controller.getEditor();
-	if (ImGui::BeginPopup("context_menu"))
-	{
-		ImVec2 pos_on_canvas = ImGui::GetMousePos() - canvas_screen_pos;
-		if (ImGui::BeginMenu("Create"))
-		{
-			if (ImGui::MenuItem("Simple")) editor.createNode(m_controller, this, Anim::Component::SIMPLE_ANIMATION, pos_on_canvas);
-			if (ImGui::MenuItem("State machine")) editor.createNode(m_controller, this, Anim::Component::STATE_MACHINE, pos_on_canvas);
-			if (ImGui::MenuItem("Blend 1D")) editor.createNode(m_controller, this, Anim::Component::BLEND1D, pos_on_canvas);
-			if (ImGui::MenuItem("Layers")) editor.createNode(m_controller, this, Anim::Component::LAYERS, pos_on_canvas);
-			ImGui::EndMenu();
-		}
-		if (m_context_cmp && m_context_cmp != m_root_node && m_context_cmp->isNode())
-		{
-			if (ImGui::MenuItem("Remove"))
-			{
-				m_context_cmp->destroy();
-				if (m_selected_component == m_context_cmp) m_selected_component = nullptr;
-				if (m_drag_source == m_context_cmp) m_drag_source = nullptr;
-				m_context_cmp = nullptr;
-			}
-		}
-		ImGui::EndPopup();
-	}
+	contextMenu(canvas_screen_pos);
 }
 
 
@@ -1406,8 +1430,6 @@ EntryNode::EntryNode(Container* parent, ControllerResource& controller)
 
 StateMachine::StateMachine(Anim::Component* engine_cmp, Container* parent, ControllerResource& controller)
 	: Container(engine_cmp, parent, controller)
-	, m_drag_source(nullptr)
-	, m_context_cmp(nullptr)
 {
 	m_entry_node = LUMIX_NEW(controller.getAllocator(), EntryNode)(this, controller);
 	m_editor_cmps.push(m_entry_node);
@@ -1607,6 +1629,12 @@ EntryEdge* StateMachine::createEntryEdge(Node* node)
 }
 
 
+bool StateMachine::isFixed(Node& node) const
+{
+	return &node == m_entry_node;
+}
+
+
 void StateMachine::drawInside(ImDrawList* draw, const ImVec2& canvas_screen_pos)
 {
 	if (ImGui::IsWindowHovered())
@@ -1693,29 +1721,7 @@ void StateMachine::drawInside(ImDrawList* draw, const ImVec2& canvas_screen_pos)
 		draw->AddLine(canvas_screen_pos + m_drag_source->pos + m_drag_source->size * 0.5f, ImGui::GetMousePos(), 0xfff00FFF);
 	}
 
-	if (ImGui::BeginPopup("context_menu"))
-	{
-		ImVec2 pos_on_canvas = ImGui::GetMousePos() - canvas_screen_pos;
-		if (ImGui::BeginMenu("Create"))
-		{
-			if (ImGui::MenuItem("Simple")) editor.createNode(m_controller, this, Anim::Component::SIMPLE_ANIMATION, pos_on_canvas);
-			if (ImGui::MenuItem("State machine")) editor.createNode(m_controller, this, Anim::Component::STATE_MACHINE, pos_on_canvas);
-			if (ImGui::MenuItem("Blend 1D")) editor.createNode(m_controller, this, Anim::Component::BLEND1D, pos_on_canvas);
-			if (ImGui::MenuItem("Layers")) editor.createNode(m_controller, this, Anim::Component::LAYERS, pos_on_canvas);
-			ImGui::EndMenu();
-		}
-		if (m_context_cmp && m_context_cmp != m_entry_node)
-		{
-			if (ImGui::MenuItem("Remove"))
-			{
-				m_context_cmp->destroy();
-				if (m_selected_component == m_context_cmp) m_selected_component = nullptr;
-				if (m_drag_source == m_context_cmp) m_drag_source = nullptr;
-				m_context_cmp = nullptr;
-			}
-		}
-		ImGui::EndPopup();
-	}
+	contextMenu(canvas_screen_pos);
 }
 
 

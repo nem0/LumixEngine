@@ -127,8 +127,14 @@ public:
 	virtual void createNode(Anim::Node::Type type, int uid, const ImVec2& pos) = 0;
 
 protected:
+	void contextMenu(const ImVec2& canvas_screen_pos);
+	virtual bool isFixed(Node& node) const;
+
+protected:
 	Array<Component*> m_editor_cmps;
-	Component* m_selected_component;
+	Component* m_selected_component = nullptr;
+	Component* m_context_cmp = nullptr;
+	Node* m_drag_source = nullptr;
 };
 
 
@@ -247,6 +253,7 @@ public:
 private:
 	void createNode(Anim::Component::Type type, int uid, const ImVec2& pos) override;
 	RootEdge* createRootEdge(Node* node);
+	bool isFixed(Node& node) const override;
 
 private:
 	enum MouseStatus
@@ -258,9 +265,7 @@ private:
 		NEW_EDGE
 	} m_mouse_status;
 	int m_input = -1;
-	Node* m_drag_source = nullptr;
 	RootNode* m_root_node;
-	Component* m_context_cmp = nullptr;
 };
 
 
@@ -295,6 +300,7 @@ public:
 private:
 	void createNode(Anim::Component::Type type, int uid, const ImVec2& pos) override;
 	EntryEdge* createEntryEdge(Node* node);
+	bool isFixed(Node& node) const override;
 
 private:
 	enum MouseStatus
@@ -305,9 +311,7 @@ private:
 		DRAG_NODE,
 		NEW_EDGE
 	} m_mouse_status;
-	Node* m_drag_source;
 	EntryNode* m_entry_node;
-	Component* m_context_cmp;
 };
 
 
