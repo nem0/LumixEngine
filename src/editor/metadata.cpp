@@ -1,6 +1,5 @@
 #include "metadata.h"
 #include "engine/fs/os_file.h"
-#include <cstdio>
 
 
 namespace Lumix

@@ -2,11 +2,9 @@
 #include "engine/iallocator.h"
 #include "engine/path_utils.h"
 #include "engine/string.h"
-#include "imgui/imgui.h"
 
 #include <SDL.h>
 #include <ShlObj.h>
-#include <mmsystem.h>
 #include <SDL_syswm.h>
 
 
@@ -389,7 +387,6 @@ void setWindow(SDL_Window* window)
 	SDL_SysWMinfo window_info;
 	SDL_VERSION(&window_info.version);
 	SDL_GetWindowWMInfo(window, &window_info);
-	Engine::PlatformData platform_data = {};
 	g_window = window_info.info.win.window;
 }
 

@@ -84,7 +84,7 @@ namespace Lumix
 						atomicIncrement(&m_fr);
 						break;
 					}
-				};
+				}
 			}
 
 			bool push(const T* tr, bool wait)

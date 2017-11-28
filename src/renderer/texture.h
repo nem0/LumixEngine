@@ -77,7 +77,7 @@ class LUMIX_RENDERER_API Texture LUMIX_FINAL : public Resource
 		Array<u8> data;
 
 	private:
-		void unload(void) override;
+		void unload() override;
 		bool load(FS::IFile& file) override;
 		bool loadTGA(FS::IFile& file);
 };

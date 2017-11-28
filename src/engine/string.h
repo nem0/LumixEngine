@@ -161,8 +161,7 @@ public:
 
 	void resize(int size);
 	char* getData() { return m_cstr; }
-	char operator[](int index);
-	const char operator[](int index) const;
+	char operator[](int index) const;
 	void set(const char* rhs, int size);
 	void operator=(const string& rhs);
 	void operator=(const char* rhs);

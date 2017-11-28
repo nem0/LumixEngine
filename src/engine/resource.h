@@ -67,7 +67,7 @@ protected:
 
 	virtual void onBeforeReady() {}
 	virtual void onBeforeEmpty() {}
-	virtual void unload(void) = 0;
+	virtual void unload() = 0;
 	virtual bool load(FS::IFile& file) = 0;
 
 	void onCreated(State state);
@@ -89,8 +89,8 @@ private:
 	void doLoad();
 	void fileLoaded(FS::IFile& file, bool success);
 	void onStateChanged(State old_state, State new_state, Resource&);
-	u32 addRef(void) { return ++m_ref_count; }
-	u32 remRef(void) { return --m_ref_count; }
+	u32 addRef() { return ++m_ref_count; }
+	u32 remRef() { return --m_ref_count; }
 
 	Resource(const Resource&);
 	void operator=(const Resource&);

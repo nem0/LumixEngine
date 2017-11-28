@@ -12,9 +12,6 @@ namespace Lumix
 {
 
 
-static const ResourceType PHYSICS_TYPE("physics");
-
-
 struct OutputStream LUMIX_FINAL : public physx::PxOutputStream
 {
 	explicit OutputStream(IAllocator& allocator)
@@ -28,7 +25,7 @@ struct OutputStream LUMIX_FINAL : public physx::PxOutputStream
 	~OutputStream() { allocator.deallocate(data); }
 
 
-	virtual physx::PxU32 write(const void* src, physx::PxU32 count)
+	physx::PxU32 write(const void* src, physx::PxU32 count) override
 	{
 		if (size + (int)count > capacity)
 		{
@@ -60,7 +57,7 @@ struct InputStream LUMIX_FINAL : public physx::PxInputStream
 		pos = 0;
 	}
 
-	virtual physx::PxU32 read(void* dest, physx::PxU32 count)
+	physx::PxU32 read(void* dest, physx::PxU32 count) override
 	{
 		if (pos + (int)count <= size)
 		{

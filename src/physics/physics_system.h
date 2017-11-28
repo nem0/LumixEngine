@@ -1,7 +1,6 @@
 #pragma once
 
 
-#include "engine/lumix.h"
 #include "engine/iplugin.h"
 
 

@@ -20,7 +20,7 @@ namespace Lumix
 			const Vec3& getFrom() const { return m_from; }
 			const Vec3& getTo() const { return m_to; }
 			float getDistance() const { return (m_from - m_to).length(); }
-			void createEditorLines(class RenderInterface& interface);
+			void createEditorLines(class RenderInterface& interface) const;
 			Delegate<void(float)>& distanceMeasured() { return m_distance_measured; }
 
 		private:

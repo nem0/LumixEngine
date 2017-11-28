@@ -6,7 +6,6 @@
 #include "editor/prefab_system.h"
 #include "editor/render_interface.h"
 #include "editor/world_editor.h"
-#include "engine/blob.h"
 #include "engine/command_line_parser.h"
 #include "engine/crc32.h"
 #include "engine/debug/debug.h"
@@ -318,7 +317,7 @@ public:
 	}
 
 
-	void insertAddCmpNodeOrdered(AddCmpTreeNode& parent, AddCmpTreeNode* node)
+	static void insertAddCmpNodeOrdered(AddCmpTreeNode& parent, AddCmpTreeNode* node)
 	{
 		if (!parent.child)
 		{
@@ -437,7 +436,6 @@ public:
 	void registerComponent(const char* id, IAddComponentPlugin& plugin) override
 	{
 		addPlugin(plugin);
-		auto& allocator = m_editor->getAllocator();
 		m_component_labels.insert(Reflection::getComponentType(id), string(plugin.getLabel(), m_allocator));
 	}
 
@@ -499,7 +497,7 @@ public:
 	}
 
 
-	void guiBeginFrame()
+	void guiBeginFrame() const
 	{
 		PROFILE_FUNCTION();
 
@@ -523,13 +521,9 @@ public:
 
 		auto frame_padding = ImGui::GetStyle().FramePadding;
 		float padding = frame_padding.y * 2;
-		ImVec4 active_color = ImGui::GetStyle().Colors[ImGuiCol_ButtonActive];
-		ImVec4 inactive_color(0, 0, 0, 0);
 		ImVec2 toolbar_size(ImGui::GetIO().DisplaySize.x, 24 + padding);
 		if (ImGui::BeginToolbar("main_toolbar", ImVec2(1, menu_height), toolbar_size))
 		{
-			auto& render_interface = *m_editor->getRenderInterface();
-
 			for (auto* action : m_toolbar_actions)
 			{
 				action->toolbarButton();
@@ -690,7 +684,7 @@ public:
 	}
 
 
-	void setTitle(const char* title)
+	void setTitle(const char* title) const
 	{
 		char tmp[100];
 		copyString(tmp, "Lumix Studio - ");
@@ -712,7 +706,7 @@ public:
 	}
 
 
-	void doMenuItem(Action& a, bool enabled)
+	void doMenuItem(Action& a, bool enabled) const
 	{
 		char buf[20];
 		getShortcut(a, buf, sizeof(buf));
@@ -955,22 +949,22 @@ public:
 	}
 
 
-	template <void (StudioAppImpl::*func)()>
+	template <void (StudioAppImpl::*Func)()>
 	Action& addAction(const char* label_short, const char* label_long, const char* name)
 	{
 		auto* a = LUMIX_NEW(m_editor->getAllocator(), Action)(label_short, label_long, name);
-		a->func.bind<StudioAppImpl, func>(this);
+		a->func.bind<StudioAppImpl, Func>(this);
 		addAction(a);
 		return *a;
 	}
 
 
-	template <void (StudioAppImpl::*func)()>
+	template <void (StudioAppImpl::*Func)()>
 	void addAction(const char* label_short, const char* label_long, const char* name, int shortcut0, int shortcut1, int shortcut2)
 	{
 		auto* a = LUMIX_NEW(m_editor->getAllocator(), Action)(
 			label_short, label_long, name, shortcut0, shortcut1, shortcut2);
-		a->func.bind<StudioAppImpl, func>(this);
+		a->func.bind<StudioAppImpl, Func>(this);
 		addAction(a);
 	}
 
@@ -1148,7 +1142,6 @@ public:
 
 	float showMainMenu()
 	{
-		bool is_any_entity_selected = !m_editor->getSelectedEntities().empty();
 		if (m_confirm_exit)
 		{
 			ImGui::OpenPopup("confirm_exit");
@@ -1313,7 +1306,6 @@ public:
 					for (Entity e = universe->getFirstEntity(); e.isValid(); e = universe->getNextEntity(e))
 					{
 						char buffer[1024];
-						Universe* universe = m_editor->getUniverse();
 						getEntityListDisplayName(*m_editor, buffer, sizeof(buffer), e);
 						if (stristr(buffer, filter) == nullptr) continue;
 						bool selected = entities.indexOf(e) >= 0;
@@ -1624,10 +1616,10 @@ public:
 	void setStudioApp()
 	{
 		m_editor->getPrefabSystem().setStudioApp(*this);
-		auto& plugin_manager = m_editor->getEngine().getPluginManager();
 		#ifdef STATIC_PLUGINS
 			StudioApp::StaticPluginRegister::create(*this);
 		#else
+			auto& plugin_manager = m_editor->getEngine().getPluginManager();
 			for (auto* lib : plugin_manager.getLibraries())
 			{
 				auto* f = (void (*)(StudioApp&))getLibrarySymbol(lib, "setStudioApp");
@@ -2354,7 +2346,7 @@ public:
 	}
 
 
-	void checkWorkingDirector()
+	static void checkWorkingDirector()
 	{
 		if (!PlatformInterface::fileExists("../LumixStudio.lnk")) return;
 
@@ -2457,7 +2449,7 @@ public:
 	}
 
 
-	void clearInputs()
+	static void clearInputs()
 	{
 		auto& io = ImGui::GetIO();
 		io.KeyAlt = false;

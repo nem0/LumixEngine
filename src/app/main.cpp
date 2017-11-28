@@ -5,7 +5,6 @@
 #include "engine/engine.h"
 #include "engine/fs/disk_file_device.h"
 #include "engine/fs/file_system.h"
-#include "engine/fs/file_system.h"
 #include "engine/fs/memory_file_device.h"
 #include "engine/fs/pack_file_device.h"
 #include "engine/input_system.h"
@@ -15,8 +14,6 @@
 #include "engine/path_utils.h"
 #include "engine/plugin_manager.h"
 #include "engine/profiler.h"
-#include "engine/resource_manager.h"
-#include "engine/resource_manager_base.h"
 #include "engine/system.h"
 #include "engine/timer.h"
 #include "engine/universe/universe.h"
@@ -79,7 +76,7 @@ public:
 	}
 
 
-	void onResize()
+	void onResize() const
 	{
 		int w, h;
 		SDL_GetWindowSize(m_window, &w, &h);
@@ -205,14 +202,14 @@ public:
 		gui_system->setInterface(m_gui_interface);
 		
 		SDL_ShowCursor(false);
-		SDL_SetRelativeMouseMode(true ? SDL_TRUE : SDL_FALSE);
+		SDL_SetRelativeMouseMode(SDL_TRUE);
 		onResize();
 
 		runStartupScript();
 	}
 
 
-	void runStartupScript()
+	void runStartupScript() const
 	{
 		FS::FileSystem& fs = m_engine->getFileSystem();
 		FS::IFile* file = fs.open(fs.getDefaultDevice(), Path(m_startup_script_path), FS::Mode::OPEN_AND_READ);

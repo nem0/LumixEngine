@@ -1,3 +1,4 @@
+#include "engine/iallocator.h"
 #include "engine/mt/task.h"
 #include "engine/profiler.h"
 #include "engine/string.h"
@@ -79,7 +80,7 @@ public:
 	}
 
 
-	virtual Delegate<void(const char*)>& getCallback() { return m_callback; }
+	Delegate<void(const char*)>& getCallback() override { return m_callback; }
 
 
 	Delegate<void(const char*)> m_callback;

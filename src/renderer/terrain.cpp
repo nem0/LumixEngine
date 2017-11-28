@@ -2,7 +2,6 @@
 #include "engine/blob.h"
 #include "engine/crc32.h"
 #include "engine/geometry.h"
-#include "engine/json_serializer.h"
 #include "engine/lifo_allocator.h"
 #include "engine/log.h"
 #include "engine/math_utils.h"
@@ -28,16 +27,7 @@ namespace Lumix
 static const float GRASS_QUAD_SIZE = 10.0f;
 static const float GRASS_QUAD_RADIUS = GRASS_QUAD_SIZE * 0.7072f;
 static const int GRID_SIZE = 16;
-static const int COPY_COUNT = 50;
 static const ComponentType TERRAIN_HASH = Reflection::getComponentType("terrain");
-static const u32 MORPH_CONST_HASH = crc32("morph_const");
-static const u32 QUAD_SIZE_HASH = crc32("quad_size");
-static const u32 QUAD_MIN_HASH = crc32("quad_min");
-
-static const u32 BRUSH_POSITION_HASH = crc32("brush_position");
-static const u32 BRUSH_SIZE_HASH = crc32("brush_size");
-static const u32 MAP_SIZE_HASH = crc32("map_size");
-static const u32 CAMERA_POS_HASH = crc32("camera_pos");
 static const ResourceType MODEL_TYPE("model");
 static const ResourceType MATERIAL_TYPE("material");
 static const char* TEX_COLOR_UNIFORM = "u_texColor";
@@ -290,7 +280,7 @@ Terrain::GrassType::RotationMode Terrain::getGrassTypeRotationMode(int index) co
 
 void Terrain::setGrassTypeRotationMode(int index, Terrain::GrassType::RotationMode mode)
 {
-	m_grass_types[index].m_rotation_mode = mode;;
+	m_grass_types[index].m_rotation_mode = mode;
 	forceGrassUpdate();
 }
 
@@ -398,7 +388,6 @@ void Terrain::generateGrassTypeQuad(GrassPatch& patch, const Matrix& terrain_mat
 
 	PROFILE_FUNCTION();
 	
-	const float DIV255 = 1 / 255.0f;
 	const Texture* splat_map = m_splatmap;
 
 	float grass_quad_size_hm_space = GRASS_QUAD_SIZE / m_scale.x;
@@ -522,7 +511,6 @@ void Terrain::updateGrass(ComponentHandle camera)
 	from_quad_x = Math::maximum(0.0f, from_quad_x);
 	from_quad_z = Math::maximum(0.0f, from_quad_z);
 
-	int old_quad_size = quads.size();
 	for (float quad_z = from_quad_z; quad_z <= to_quad_z; quad_z += GRASS_QUAD_SIZE)
 	{
 		for (float quad_x = from_quad_x; quad_x <= to_quad_x; quad_x += GRASS_QUAD_SIZE)
@@ -753,7 +741,6 @@ float Terrain::getHeight(float x, float z) const
 float Terrain::getHeight(int x, int z) const
 {
 	const float DIV64K = 1.0f / 65535.0f;
-	const float DIV255 = 1.0f / 255.0f;
 	if (!m_heightmap) return 0;
 
 	Texture* t = m_heightmap;
@@ -774,8 +761,6 @@ void Terrain::setXZScale(float scale)
 
 void Terrain::setHeight(int x, int z, float h)
 {
-	const float DIV64K = 1.0f / 65535.0f;
-	const float DIV255 = 1.0f / 255.0f;
 	if (!m_heightmap) return;
 
 	Texture* t = m_heightmap;

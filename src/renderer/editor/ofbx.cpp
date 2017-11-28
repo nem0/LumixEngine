@@ -438,13 +438,12 @@ static bool decompress(const u8* in, size_t in_size, u8* out, size_t out_size)
 	mz_stream stream = {};
 	mz_inflateInit(&stream);
 
-	int status;
 	stream.avail_in = (int)in_size;
 	stream.next_in = in;
 	stream.avail_out = (int)out_size;
 	stream.next_out = out;
 
-	status = mz_inflate(&stream, Z_SYNC_FLUSH);
+	int status = mz_inflate(&stream, Z_SYNC_FLUSH);
 
 	if (status != Z_STREAM_END) return false;
 
@@ -916,7 +915,6 @@ static OptionalError<Element*> tokenize(const u8* data, size_t size)
 		if (!*element) return root;
 		element = &(*element)->sibling;
 	}
-	return root;
 }
 
 
@@ -2006,7 +2004,7 @@ static int getTriCountFromPoly(const std::vector<int>& indices, int* idx)
 	while (indices[*idx + 1 + count] >= 0)
 	{
 		++count;
-	};
+	}
 
 	*idx = *idx + 2 + count;
 	return count;
@@ -2634,7 +2632,7 @@ static bool parseObjects(const Element& root, Scene* scene)
 			{
 				Error::s_message = "Failed to postprocess cluster";
 				return false;
-			};
+			}
 		}
 	}
 

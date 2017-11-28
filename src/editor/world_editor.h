@@ -53,7 +53,8 @@ public:
 	{
 		X,
 		Y,
-		Z
+		Z,
+		NONE
 	};
 
 	struct RayHit

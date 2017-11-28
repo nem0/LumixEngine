@@ -6,7 +6,6 @@
 #include "engine/debug/debug.h"
 #include "engine/engine.h"
 #include "engine/fs/os_file.h"
-#include "engine/lifo_allocator.h"
 #include "engine/log.h"
 #include "engine/profiler.h"
 #include "engine/reflection.h"
@@ -27,7 +26,6 @@
 #include "renderer/texture.h"
 #include "renderer/texture_manager.h"
 #include <bgfx/bgfx.h>
-#include <cfloat>
 #include <cstdio>
 
 
@@ -73,10 +71,6 @@ namespace Lumix
 {
 
 
-static const ComponentType GLOBAL_LIGHT_TYPE = Reflection::getComponentType("global_light");
-static const ComponentType POINT_LIGHT_TYPE = Reflection::getComponentType("point_light");
-static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("renderable");
-static const ComponentType CAMERA_TYPE = Reflection::getComponentType("camera");
 static const ResourceType MATERIAL_TYPE("material");
 static const ResourceType MODEL_TYPE("model");
 static const ResourceType SHADER_TYPE("shader");

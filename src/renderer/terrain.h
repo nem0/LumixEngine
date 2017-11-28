@@ -6,7 +6,6 @@
 #include "engine/matrix.h"
 #include "engine/resource.h"
 #include "engine/vec.h"
-#include <bgfx/bgfx.h>
 
 
 namespace Lumix
@@ -36,7 +35,7 @@ class Terrain
 	public:
 		struct GrassType
 		{
-			GrassType(Terrain& terrain);
+			explicit GrassType(Terrain& terrain);
 			~GrassType();
 
 			Model* m_grass_model;

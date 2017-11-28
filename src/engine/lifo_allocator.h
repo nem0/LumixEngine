@@ -74,8 +74,6 @@ namespace Lumix
 			void deallocate_aligned(void* ptr) override
 			{
 				if (!ptr) return;
-				size_t last_size_with_padding = *(size_t*)((u8*)m_current - sizeof(size_t));
-				u8* last_mem = (u8*)m_current - last_size_with_padding - sizeof(size_t);
 				m_current = ptr;
 			}
 

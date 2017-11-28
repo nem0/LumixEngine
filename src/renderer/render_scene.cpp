@@ -7,19 +7,15 @@
 #include "engine/fs/file_system.h"
 #include "engine/geometry.h"
 #include "engine/job_system.h"
-#include "engine/json_serializer.h"
-#include "engine/lifo_allocator.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
 #include "engine/math_utils.h"
-#include "engine/path_utils.h"
 #include "engine/plugin_manager.h"
 #include "engine/profiler.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
 #include "engine/serializer.h"
-#include "engine/timer.h"
 #include "engine/universe/universe.h"
 #include "lua_script/lua_script_system.h"
 #include "renderer/culling_system.h"
@@ -31,10 +27,8 @@
 #include "renderer/pipeline.h"
 #include "renderer/pose.h"
 #include "renderer/renderer.h"
-#include "renderer/shader.h"
 #include "renderer/terrain.h"
 #include "renderer/texture.h"
-#include "renderer/texture_manager.h"
 #include <cfloat>
 #include <cmath>
 
@@ -3547,7 +3541,6 @@ public:
 		static const int COLS = 36;
 		static const int ROWS = COLS >> 1;
 		static const float STEP = Math::degreesToRadians(360.0f) / COLS;
-		int p2 = COLS >> 1;
 		for (int y = 0; y < ROWS >> 1; ++y)
 		{
 			float cy = cos(y * STEP);

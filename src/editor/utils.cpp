@@ -91,8 +91,8 @@ bool Action::isRequested()
 {
 	if (ImGui::IsAnyItemActive()) return false;
 
-	bool* keysDown = ImGui::GetIO().KeysDown;
-	float* keysDownDuration = ImGui::GetIO().KeysDownDuration;
+	bool* keys_down = ImGui::GetIO().KeysDown;
+	float* keys_down_duration = ImGui::GetIO().KeysDownDuration;
 	if (shortcut[0] == -1) return false;
 
 	for (int i = 0; i < lengthOf(shortcut) + 1; ++i)
@@ -102,7 +102,7 @@ bool Action::isRequested()
 			return true;
 		}
 
-		if (!keysDown[shortcut[i]] || keysDownDuration[shortcut[i]] > 0) return false;
+		if (!keys_down[shortcut[i]] || keys_down_duration[shortcut[i]] > 0) return false;
 	}
 	return false;
 }

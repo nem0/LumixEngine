@@ -198,10 +198,8 @@ Matrix Matrix::operator *(const Matrix& rhs) const
 	const float4 c = f4Load(&m31);
 	const float4 d = f4Load(&m41);
 
-	float4 t1, t2;
-
-	t1 = f4Splat(rhs.m11);
-	t2 = f4Mul(a, t1);
+	float4 t1 = f4Splat(rhs.m11);
+	float4 t2 = f4Mul(a, t1);
 	t1 = f4Splat(rhs.m12);
 	t2 = f4Add(f4Mul(b, t1), t2);
 	t1 = f4Splat(rhs.m13);

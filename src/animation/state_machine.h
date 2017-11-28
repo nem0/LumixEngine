@@ -39,7 +39,7 @@ struct StateMachine;
 
 struct ComponentInstance
 {
-	ComponentInstance(Component& _source) : source(_source) {}
+	explicit ComponentInstance(Component& _source) : source(_source) {}
 
 	virtual ~ComponentInstance() {}
 	virtual ComponentInstance* update(RunningContext& rc, bool check_edges) = 0;
@@ -129,7 +129,7 @@ struct Edge : public Component
 
 struct NodeInstance : public ComponentInstance
 {
-	NodeInstance(Node& node) : ComponentInstance(node) {}
+	explicit NodeInstance(Node& node) : ComponentInstance(node) {}
 
 	ComponentInstance* checkOutEdges(Node& node, RunningContext& rc);
 	void queueEvents(RunningContext& rc, float old_time, float time, float length);
@@ -158,7 +158,7 @@ struct AnimationNode : public Node
 
 struct Blend1DNodeInstance : public NodeInstance
 {
-	Blend1DNodeInstance(Blend1DNode& _node);
+	explicit Blend1DNodeInstance(Blend1DNode& _node);
 
 	RigidTransform getRootMotion() const override;
 	float getTime() const override { return time; }
@@ -198,7 +198,7 @@ struct Blend1DNode : public Container
 
 struct LayersNodeInstance : public NodeInstance
 {
-	LayersNodeInstance(LayersNode& _node);
+	explicit LayersNodeInstance(LayersNode& _node);
 
 	RigidTransform getRootMotion() const override;
 	float getTime() const override;
@@ -257,7 +257,7 @@ struct StateMachine : public Container
 
 	struct Entry
 	{
-		Entry(IAllocator& allocator) : condition(allocator) {}
+		explicit Entry(IAllocator& allocator) : condition(allocator) {}
 
 		Condition condition;
 		Node* node = nullptr;

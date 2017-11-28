@@ -185,7 +185,7 @@ struct InputDecl
 		return size;
 	}
 
-	int getSize(Type type) const
+	static int getSize(Type type)
 	{
 		switch (type)
 		{
@@ -248,7 +248,7 @@ struct Condition
 
 	static const char* errorToString(Error error);
 
-	Condition(IAllocator& allocator);
+	explicit Condition(IAllocator& allocator);
 
 	bool operator()(RunningContext& rc);
 	Error compile(const char* expression, InputDecl& decl);

@@ -1,5 +1,3 @@
-#include "physics/physics_system.h"
-
 #include <PxPhysicsAPI.h>
 
 #include "editor/asset_browser.h"
@@ -25,23 +23,23 @@ namespace
 {
 
 
-static const ComponentType RAGDOLL_TYPE = Reflection::getComponentType("ragdoll");
-static const ComponentType BOX_ACTOR_TYPE = Reflection::getComponentType("box_rigid_actor");
-static const ComponentType SPHERE_ACTOR_TYPE = Reflection::getComponentType("sphere_rigid_actor");
-static const ComponentType CAPSULE_ACTOR_TYPE = Reflection::getComponentType("capsule_rigid_actor");
-static const ComponentType CONTROLLER_TYPE = Reflection::getComponentType("physical_controller");
-static const ComponentType DISTANCE_JOINT_TYPE = Reflection::getComponentType("distance_joint");
-static const ComponentType HINGE_JOINT_TYPE = Reflection::getComponentType("hinge_joint");
-static const ComponentType SPHERICAL_JOINT_TYPE = Reflection::getComponentType("spherical_joint");
-static const ComponentType D6_JOINT_TYPE = Reflection::getComponentType("d6_joint");
-static const u32 RENDERER_HASH = crc32("renderer");
-static const ResourceType PHYSICS_TYPE("physics");
+const ComponentType RAGDOLL_TYPE = Reflection::getComponentType("ragdoll");
+const ComponentType BOX_ACTOR_TYPE = Reflection::getComponentType("box_rigid_actor");
+const ComponentType SPHERE_ACTOR_TYPE = Reflection::getComponentType("sphere_rigid_actor");
+const ComponentType CAPSULE_ACTOR_TYPE = Reflection::getComponentType("capsule_rigid_actor");
+const ComponentType CONTROLLER_TYPE = Reflection::getComponentType("physical_controller");
+const ComponentType DISTANCE_JOINT_TYPE = Reflection::getComponentType("distance_joint");
+const ComponentType HINGE_JOINT_TYPE = Reflection::getComponentType("hinge_joint");
+const ComponentType SPHERICAL_JOINT_TYPE = Reflection::getComponentType("spherical_joint");
+const ComponentType D6_JOINT_TYPE = Reflection::getComponentType("d6_joint");
+const u32 RENDERER_HASH = crc32("renderer");
+const ResourceType PHYSICS_TYPE("physics");
 
 
-static Vec3 fromPhysx(const physx::PxVec3& v) { return Vec3(v.x, v.y, v.z); }
-static Quat fromPhysx(const physx::PxQuat& v) { return Quat(v.x, v.y, v.z, v.w); }
-static physx::PxQuat toPhysx(const Quat& v) { return physx::PxQuat(v.x, v.y, v.z, v.w); }
-static RigidTransform fromPhysx(const physx::PxTransform& v) { return{ fromPhysx(v.p), fromPhysx(v.q) }; }
+Vec3 fromPhysx(const physx::PxVec3& v) { return Vec3(v.x, v.y, v.z); }
+Quat fromPhysx(const physx::PxQuat& v) { return Quat(v.x, v.y, v.z, v.w); }
+physx::PxQuat toPhysx(const Quat& v) { return physx::PxQuat(v.x, v.y, v.z, v.w); }
+RigidTransform fromPhysx(const physx::PxTransform& v) { return{ fromPhysx(v.p), fromPhysx(v.q) }; }
 
 
 struct EditorPlugin LUMIX_FINAL : public WorldEditor::Plugin

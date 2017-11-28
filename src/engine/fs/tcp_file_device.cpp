@@ -1,6 +1,5 @@
 #include "engine/fs/tcp_file_device.h"
 #include "engine/iallocator.h"
-#include "engine/blob.h"
 #include "engine/fs/file_system.h"
 #include "engine/mt/sync.h"
 #include "engine/path.h"

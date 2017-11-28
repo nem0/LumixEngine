@@ -6,23 +6,17 @@
 #include "editor/utils.h"
 #include "editor/world_editor.h"
 #include "engine/array.h"
-#include "engine/base_proxy_allocator.h"
-#include "engine/binary_array.h"
 #include "engine/blob.h"
 #include "engine/crc32.h"
-#include "engine/debug/debug.h"
 #include "engine/engine.h"
 #include "engine/fs/file_system.h"
 #include "engine/fs/os_file.h"
 #include "engine/iallocator.h"
-#include "engine/iplugin.h"
 #include "engine/json_serializer.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
 #include "engine/path_utils.h"
-#include "engine/plugin_manager.h"
 #include "engine/reflection.h"
-#include "engine/resource_manager.h"
 #include "engine/system.h"
 #include "engine/universe/universe.h"
 #include "imgui/imgui.h"
@@ -248,7 +242,6 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 			{
 				char tmp[1024];
 				tmp[0] = '\0';
-				u32 prop_name_hash = crc32(property_name);
 				scene->getPropertyValue(cmp, scr_index, property_name, tmp, lengthOf(tmp));
 				old_value = tmp;
 				return;
@@ -477,7 +470,7 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 						default: ASSERT(false); break;
 					}
 				}
-				if (auto* call = scene->beginFunctionCall(cmp.handle, j, "onGUI"))
+				if (scene->beginFunctionCall(cmp.handle, j, "onGUI"))
 				{
 					scene->endFunctionCall();
 				}
@@ -571,7 +564,7 @@ struct AssetBrowserPlugin : AssetBrowser::IPlugin
 
 struct ConsolePlugin LUMIX_FINAL : public StudioApp::IPlugin
 {
-	ConsolePlugin(StudioApp& _app)
+	explicit ConsolePlugin(StudioApp& _app)
 		: app(_app)
 		, open(false)
 		, autocomplete(_app.getWorldEditor().getAllocator())
@@ -809,7 +802,7 @@ IEditorCommand* createRemoveScriptCommand(WorldEditor& editor)
 
 struct AddComponentPlugin LUMIX_FINAL : public StudioApp::IAddComponentPlugin
 {
-	AddComponentPlugin(StudioApp& _app)
+	explicit AddComponentPlugin(StudioApp& _app)
 		: app(_app)
 	{
 	}
@@ -893,7 +886,7 @@ struct AddComponentPlugin LUMIX_FINAL : public StudioApp::IAddComponentPlugin
 
 struct EditorPlugin : public WorldEditor::Plugin
 {
-	EditorPlugin(WorldEditor& _editor)
+	explicit EditorPlugin(WorldEditor& _editor)
 		: editor(_editor)
 	{
 	}
@@ -907,7 +900,7 @@ struct EditorPlugin : public WorldEditor::Plugin
 			int count = scene->getScriptCount(cmp.handle);
 			for (int i = 0; i < count; ++i)
 			{
-				if (auto* call = scene->beginFunctionCall(cmp.handle, i, "onDrawGizmo"))
+				if (scene->beginFunctionCall(cmp.handle, i, "onDrawGizmo"))
 				{
 					scene->endFunctionCall();
 				}

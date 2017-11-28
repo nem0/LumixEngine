@@ -28,8 +28,9 @@ public:
 
 	struct LUMIX_ENGINE_API LoadHook
 	{
-		LoadHook(ResourceManagerBase& manager) : m_manager(manager) {}
+		explicit LoadHook(ResourceManagerBase& manager) : m_manager(manager) {}
 
+		virtual ~LoadHook() {}
 		virtual bool onBeforeLoad(Resource& resource) = 0;
 		void continueLoad(Resource& resource);
 
@@ -54,7 +55,7 @@ public:
 	void reload(Resource& resource);
 	ResourceTable& getResourceTable() { return m_resources; }
 
-	ResourceManagerBase(IAllocator& allocator);
+	explicit ResourceManagerBase(IAllocator& allocator);
 	virtual ~ResourceManagerBase();
 	ResourceManager& getOwner() const { return *m_owner; }
 

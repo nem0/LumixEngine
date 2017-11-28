@@ -8,7 +8,6 @@
 #include "imgui/imgui.h"
 #include "platform_interface.h"
 #include "utils.h"
-#include <cstdio>
 #include <lua.hpp>
 #include <SDL.h>
 
@@ -69,7 +68,6 @@ static void shortcutInput(int& shortcut)
 
 	if (ImGui::Button(button_label, ImVec2(65, 0))) shortcut = -1;
 
-	auto& io = ImGui::GetIO();
 	int key_count;
 	auto* state = SDL_GetKeyboardState(&key_count);
 	if (ImGui::IsItemHovered())
@@ -258,7 +256,7 @@ bool Settings::load()
 }
 
 
-void Settings::setValue(const char* name, bool value)
+void Settings::setValue(const char* name, bool value) const
 {
 	lua_getglobal(m_state, "custom");
 	lua_pushboolean(m_state, value);
@@ -267,7 +265,7 @@ void Settings::setValue(const char* name, bool value)
 }
 
 
-void Settings::setValue(const char* name, int value)
+void Settings::setValue(const char* name, int value) const
 {
 	lua_getglobal(m_state, "custom");
 	lua_pushinteger(m_state, value);
@@ -302,7 +300,6 @@ bool Settings::save()
 {
 	auto& actions = m_app.getActions();
 	FS::OsFile file;
-	auto& allocator = m_app.getWorldEditor().getAllocator();
 	if (!file.open(SETTINGS_PATH, FS::Mode::CREATE_AND_WRITE)) return false;
 
 	file << "window = { x = " << m_window.x 
@@ -393,7 +390,7 @@ bool Settings::save()
 
 
 
-void Settings::showToolbarSettings()
+void Settings::showToolbarSettings() const
 {
 	auto& actions = m_app.getToolbarActions();
 	static Action* dragged = nullptr;
@@ -631,6 +628,7 @@ void Settings::onGUI()
 						style.Colors[ImGuiCol_PopupBg] = ImVec4(0.00f, 0.00f, 0.00f, 0.94f);
 						style.Colors[ImGuiCol_ModalWindowDarkening] = ImVec4(0.06f, 0.06f, 0.06f, 0.35f);
 						break;
+					default: ASSERT(false); break;
 				}
 			}
 

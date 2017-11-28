@@ -19,7 +19,7 @@ public:
 	{
 	}
 
-	void unload(void) override;
+	void unload() override;
 	bool load(FS::IFile& file) override;
 	int getChannels() const { return m_channels; }
 	int getSampleRate() const { return m_sample_rate; }

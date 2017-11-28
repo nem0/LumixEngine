@@ -73,7 +73,7 @@ class Animation LUMIX_FINAL : public Resource
 		int getBoneIndex(u32 name) const;
 
 	private:
-		IAllocator& getAllocator();
+		IAllocator& getAllocator() const;
 
 		void unload() override;
 		bool load(FS::IFile& file) override;

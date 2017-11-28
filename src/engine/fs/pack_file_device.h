@@ -19,7 +19,7 @@ class LUMIX_ENGINE_API PackFileDevice LUMIX_FINAL : public IFileDevice
 {
 	friend class PackFile;
 public:
-	PackFileDevice(IAllocator& allocator);
+	explicit PackFileDevice(IAllocator& allocator);
 	~PackFileDevice();
 
 	IFile* createFile(IFile* child) override;

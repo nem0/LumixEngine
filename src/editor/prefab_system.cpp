@@ -12,11 +12,11 @@
 #include "engine/iplugin.h"
 #include "engine/json_serializer.h"
 #include "engine/log.h"
-#include "engine/math_utils.h"
 #include "engine/matrix.h"
 #include "engine/prefab.h"
 #include "engine/reflection.h"
 #include "engine/resource.h"
+#include "engine/resource_manager.h"
 #include "engine/serializer.h"
 #include "engine/string.h"
 #include "engine/universe/universe.h"
@@ -33,9 +33,9 @@ static const ResourceType PREFAB_TYPE("prefab");
 class AssetBrowserPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 {
 public:
-	AssetBrowserPlugin(WorldEditor& _editor, PrefabSystem& _system)
-		: system(_system)
-		, editor(_editor)
+	AssetBrowserPlugin(WorldEditor& editor, PrefabSystem& system)
+		: system(system)
+		, editor(editor)
 	{}
 
 
@@ -80,8 +80,8 @@ class PrefabSystemImpl LUMIX_FINAL : public PrefabSystem
 {
 	struct InstantiatePrefabCommand LUMIX_FINAL : public IEditorCommand
 	{
-		InstantiatePrefabCommand(WorldEditor& _editor)
-			: editor(_editor)
+		InstantiatePrefabCommand(WorldEditor& editor)
+			: editor(editor)
 		{
 		}
 
@@ -92,7 +92,7 @@ class PrefabSystemImpl LUMIX_FINAL : public PrefabSystem
 		}
 
 
-		void createEntityGUIDRecursive(Entity entity)
+		void createEntityGUIDRecursive(Entity entity) const
 		{
 			if (!entity.isValid()) return;
 
@@ -104,7 +104,7 @@ class PrefabSystemImpl LUMIX_FINAL : public PrefabSystem
 		}
 
 
-		void destroyEntityRecursive(Entity entity)
+		void destroyEntityRecursive(Entity entity) const
 		{
 			if (!entity.isValid()) return;
 
@@ -225,7 +225,7 @@ public:
 	}
 
 
-	WorldEditor& getEditor() { return m_editor; }
+	WorldEditor& getEditor() const { return m_editor; }
 
 
 	void setUniverse(Universe* universe)
@@ -371,8 +371,8 @@ public:
 
 	struct LoadEntityGUIDMap : public ILoadEntityGUIDMap
 	{
-		LoadEntityGUIDMap(const Array<Entity>& _entities)
-			: entities(_entities)
+		explicit LoadEntityGUIDMap(const Array<Entity>& entities)
+			: entities(entities)
 		{
 		}
 
@@ -390,8 +390,8 @@ public:
 
 	struct SaveEntityGUIDMap : public ISaveEntityGUIDMap
 	{
-		SaveEntityGUIDMap(const Array<Entity>& _entities)
-			: entities(_entities)
+		explicit SaveEntityGUIDMap(const Array<Entity>& entities)
+			: entities(entities)
 		{
 		}
 
@@ -533,7 +533,7 @@ public:
 		{
 			serializePrefabEntity(prefab, index, serializer, universe, universe->getNextSibling(entity), false);
 		}
-	};
+	}
 
 
 
@@ -564,7 +564,7 @@ public:
 	}
 
 
-	void gatherHierarchy(Entity entity, bool is_root, Array<Entity>& out)
+	void gatherHierarchy(Entity entity, bool is_root, Array<Entity>& out) const
 	{
 		if (!entity.isValid()) return;
 

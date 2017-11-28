@@ -71,7 +71,7 @@ class PhysicsGeometry LUMIX_FINAL : public Resource
 	private:
 		IAllocator& getAllocator();
 
-		void unload(void) override;
+		void unload() override;
 		bool load(FS::IFile& file) override;
 
 };

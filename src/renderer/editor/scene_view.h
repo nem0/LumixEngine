@@ -23,7 +23,7 @@ class SceneView : public StudioApp::IPlugin
 		typedef Delegate<bool(StudioApp&, float, float, const RayCastModelHit&)> DropHandler;
 
 	public:
-		SceneView(StudioApp& app);
+		explicit SceneView(StudioApp& app);
 		~SceneView();
 
 		void update(float time_delta) override;

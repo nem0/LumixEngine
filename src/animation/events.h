@@ -32,7 +32,7 @@ struct EnterExitEventHeader
 
 struct EventArray
 {
-	EventArray(IAllocator& allocator)
+	explicit EventArray(IAllocator& allocator)
 		: data(allocator)
 		, count(0)
 	{}

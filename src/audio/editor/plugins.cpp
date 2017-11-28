@@ -1,11 +1,9 @@
-#include "animation/animation_scene.h"
 #include "animation/editor/animation_editor.h"
 #include "audio_device.h"
 #include "audio_scene.h"
 #include "audio_system.h"
 #include "clip_manager.h"
 #include "editor/asset_browser.h"
-#include "editor/property_grid.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
@@ -26,7 +24,7 @@ namespace
 {
 
 
-static const ResourceType CLIP_TYPE("clip");
+const ResourceType CLIP_TYPE("clip");
 
 
 struct AssetBrowserPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
@@ -39,7 +37,7 @@ struct AssetBrowserPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 	}
 
 
-	AudioDevice& getAudioDevice(Engine& engine)
+	static AudioDevice& getAudioDevice(Engine& engine)
 	{
 		auto* audio = static_cast<AudioSystem*>(engine.getPluginManager().getPlugin("audio"));
 		return audio->getDevice();
@@ -146,7 +144,7 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	}
 
 
-	void onSoundEventGUI(u8* data, AnimEditor::Component& component)
+	void onSoundEventGUI(u8* data, AnimEditor::Component& component) const
 	{
 		auto* ev = (SoundAnimationEvent*)data;
 		AudioScene* scene = (AudioScene*)m_app.getWorldEditor().getUniverse()->getScene(crc32("audio"));
@@ -155,9 +153,8 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 			*out = scene->getClipName(idx);
 			return true;
 		};
-		int current = 0;
 		AudioScene::ClipInfo* clip = scene->getClipInfo(ev->clip);
-		current = clip ? scene->getClipInfoIndex(clip) : -1;
+		int current = clip ? scene->getClipInfoIndex(clip) : -1;
 
 		if (ImGui::Combo("Clip", &current, getter, scene, scene->getClipCount()))
 		{
@@ -186,7 +183,7 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 			{
 				auto* clip_info = audio_scene->getClipInfo(clip_id);
 
-				if (m_filter[0] != 0 && stristr(clip_info->name, m_filter) == 0)
+				if (m_filter[0] != 0 && stristr(clip_info->name, m_filter) == nullptr)
 				{
 					continue;
 				}

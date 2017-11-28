@@ -5,7 +5,6 @@
 #include "engine/geometry.h"
 #include "engine/hash_map.h"
 #include "engine/matrix.h"
-#include "engine/quat.h"
 #include "engine/string.h"
 #include "engine/vec.h"
 #include "engine/resource.h"
@@ -232,7 +231,7 @@ private:
 	bool parseLODs(FS::IFile& file);
 	int getBoneIdx(const char* name);
 
-	void unload(void) override;
+	void unload() override;
 	bool load(FS::IFile& file) override;
 
 private:

@@ -2,7 +2,6 @@
 
 
 #include "engine/array.h"
-#include "engine/universe/component.h"
 
 
 namespace Lumix
@@ -10,6 +9,7 @@ namespace Lumix
 
 
 class ArrayDescriptorBase;
+struct ComponentUID;
 struct IEnumPropertyDescriptor;
 class PropertyDescriptorBase;
 struct ISampledFunctionDescriptor;
@@ -28,7 +28,7 @@ public:
 	};
 
 public:
-	PropertyGrid(StudioApp& app);
+	explicit PropertyGrid(StudioApp& app);
 	~PropertyGrid();
 
 	void addPlugin(IPlugin& plugin) { m_plugins.push(&plugin); }
@@ -40,11 +40,8 @@ public:
 	bool m_is_open;
 
 private:
-	void showSampledFunctionProperty(const Array<Entity>& entities,
-		ComponentType cmp_type,
-		ISampledFunctionDescriptor& desc);
 	void showComponentProperties(const Array<Entity>& entities, ComponentType cmp_type);
-	void showCoreProperties(const Array<Entity>& entities);
+	void showCoreProperties(const Array<Entity>& entities) const;
 
 private:
 	StudioApp& m_app;

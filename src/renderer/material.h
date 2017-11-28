@@ -4,7 +4,6 @@
 #include "engine/array.h"
 #include "engine/resource.h"
 #include "engine/vec.h"
-#include <bgfx/bgfx.h>
 
 
 namespace Lumix
@@ -100,7 +99,7 @@ public:
 
 private:
 	void onBeforeReady() override;
-	void unload(void) override;
+	void unload() override;
 	bool load(FS::IFile& file) override;
 
 	bool deserializeTexture(JsonSerializer& serializer, const char* material_dir);

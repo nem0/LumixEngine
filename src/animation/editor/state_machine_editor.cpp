@@ -1,6 +1,5 @@
 #include "state_machine_editor.h"
 #include "animation/animation.h"
-#include "animation/animation_scene.h"
 #include "animation/controller.h"
 #include "animation/editor/animation_editor.h"
 #include "animation/events.h"
@@ -117,7 +116,7 @@ static int autocompleteCallback(ImGuiTextEditCallbackData *data)
 	}
 
 	return 0;
-};
+}
 
 
 static ImVec2 getEdgeStartPoint(const ImVec2 a_pos, const ImVec2 a_size, const ImVec2 b_pos, const ImVec2 b_size, bool is_dir)
@@ -213,7 +212,6 @@ bool Node::hitTest(const ImVec2& on_canvas_pos) const
 
 void Node::removeEvent(Anim::EventArray& events, int index)
 {
-	auto* engine_node = ((Anim::Node*)engine_cmp);
 	Anim::EventHeader header = *(Anim::EventHeader*)&events.data[sizeof(Anim::EventHeader) * index];
 	u8* headers_end = &events.data[sizeof(Anim::EventHeader) * events.count];
 	u8* end = &events.data.back() + 1;
@@ -283,7 +281,6 @@ void Node::onGuiEvents(Anim::EventArray& events, const char* label)
 	if (!ImGui::CollapsingHeader(label)) return;
 	ImGui::PushID(label);
 
-	auto* engine_node = ((Anim::Node*)engine_cmp);
 	auto& editor = m_controller.getEditor();
 	for (int i = 0; i < events.count; ++i)
 	{
@@ -729,7 +726,7 @@ void LayersNode::onGUI()
 			{
 				m_masks[i] = mask == m_controller.getMasks().size() ? 0 : crc32(m_controller.getMasks()[mask].getName());
 				engine_layer->masks[i] = m_masks[i];
-			};
+			}
 			ImGui::NextColumn();
 			if (ImGui::Button("View"))
 			{
@@ -937,11 +934,25 @@ bool Container::isFixed(Node& node) const
 }
 
 
+void Container::pasteNode(const ImVec2& pos_on_canvas)
+{
+	/*IAnimationEditor& editor = m_controller.getEditor();
+	OutputBlob& copy_buffer = editor.getCopyBuffer();
+	InputBlob blob(copy_buffer);
+	Anim::Component::Type type;
+	blob.read(type);
+	Node* node = editor.createNode(m_controller, this, type, pos_on_canvas);
+	node->engine_cmp->deserialize(blob, (Anim::Container*)engine_cmp, (int)Anim::ControllerResource::Version::LAST);
+	node->deserialize(blob);*/
+}
+
+
 void Container::contextMenu(const ImVec2& canvas_screen_pos)
 {
 	if (!ImGui::BeginPopup("context_menu")) return;
 
 	IAnimationEditor& editor = m_controller.getEditor();
+	OutputBlob& copy_buffer = editor.getCopyBuffer();
 	ImVec2 pos_on_canvas = ImGui::GetMousePos() - canvas_screen_pos;
 	if (ImGui::BeginMenu("Create"))
 	{
@@ -951,6 +962,8 @@ void Container::contextMenu(const ImVec2& canvas_screen_pos)
 		if (ImGui::MenuItem("Layers")) editor.createNode(m_controller, this, Anim::Component::LAYERS, pos_on_canvas);
 		ImGui::EndMenu();
 	}
+	//if (ImGui::MenuItem("Paste", nullptr, false, copy_buffer.getPos() > 0)) pasteNode(pos_on_canvas);
+
 	if (m_context_cmp && m_context_cmp->isNode() && !isFixed(*(Node*)m_context_cmp))
 	{
 		if (ImGui::MenuItem("Remove"))
@@ -960,14 +973,13 @@ void Container::contextMenu(const ImVec2& canvas_screen_pos)
 			if (m_drag_source == m_context_cmp) m_drag_source = nullptr;
 			m_context_cmp = nullptr;
 		}
-		/*if (ImGui::MenuItem("Copy"))
+		if (ImGui::MenuItem("Copy"))
 		{
-			OutputBlob& copy_buffer = editor.getCopyBuffer();
 			copy_buffer.clear();
 			copy_buffer.write(m_context_cmp->engine_cmp->type);
 			m_context_cmp->engine_cmp->serialize(copy_buffer);
 			m_context_cmp->serialize(copy_buffer);
-		}*/
+		}
 	}
 	ImGui::EndPopup();
 }
@@ -1105,7 +1117,6 @@ void Blend1DNode::onGUI()
 		m_controller.getEditor().setContainer(this);
 	}
 
-	auto* node = (Anim::Blend1DNode*)engine_cmp;
 	auto getter = [](void* data, int idx, const char** out) -> bool {
 		auto* node = (Blend1DNode*)data;
 		auto& slots = node->m_controller.getAnimationSlots();
@@ -1250,7 +1261,7 @@ void AnimationNode::AnimationProxy::ui(IAnimationEditor& editor, const Root& roo
 	auto* engine_node = (Anim::AnimationNode*)node.engine_cmp;
 
 	int proxy_idx = node.getAnimations().find([this](const auto& rhs) { return this == &rhs; });
-	int current = 0;
+	int current;
 	for (current = 0; current < slots.size() && crc32(slots[current].getName()) != engine_node->animations_hashes[proxy_idx]; ++current);
 	if (ImGui::Combo("Animation", &current, getter, &node, slots.size()))
 	{
@@ -1394,7 +1405,7 @@ struct EntryEdge : public Component
 	{
 		u32 color = ImGui::ColorConvertFloat4ToU32(
 			selected ? ImGui::GetStyle().Colors[ImGuiCol_ButtonHovered] : ImGui::GetStyle().Colors[ImGuiCol_Button]);
-		drawEdge(draw, m_parent->getEntryNode(), m_to, color, canvas_screen_pos);;
+		drawEdge(draw, m_parent->getEntryNode(), m_to, color, canvas_screen_pos);
 		if (ImGui::IsMouseClicked(0) && hitTest(ImGui::GetMousePos() - canvas_screen_pos))
 		{
 			return true;
@@ -1454,7 +1465,6 @@ void StateMachine::removeEntry(EntryEdge& entry)
 void StateMachine::removeChild(Component* component)
 {
 	Container::removeChild(component);
-	auto* sm = (Anim::StateMachine*)engine_cmp;
 	for (int i = 0; i < m_entry_node->entries.size(); ++i)
 	{
 		auto entry = m_entry_node->entries[i];
@@ -1756,6 +1766,7 @@ ControllerResource::ControllerResource(IAnimationEditor& editor,
 ControllerResource::~ControllerResource()
 {
 	LUMIX_DELETE(m_allocator, m_root);
+	LUMIX_DELETE(m_allocator, m_engine_resource->m_root);
 	LUMIX_DELETE(m_allocator, m_engine_resource);
 }
 
@@ -2150,7 +2161,6 @@ void ControllerResource::Mask::setName(const StaticString<32>& value)
 
 void ControllerResource::Mask::addBone(int index)
 {
-	int idx = int(this - &controller.m_masks[0]);
 	if (index < 0)
 	{
 		bones.emplace(controller);

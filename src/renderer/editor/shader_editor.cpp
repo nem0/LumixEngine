@@ -1681,7 +1681,6 @@ void ShaderEditor::save(const char* path)
 	if (!success)
 	{
 		g_log_error.log("Editor") << "Could not save shader " << path;
-		return;
 	}
 }
 
@@ -1907,8 +1906,6 @@ void ShaderEditor::onGUIRightColumn()
 		{
 			Node* output = node->m_outputs[i];
 			if(!output) continue;
-
-			auto output_screen_pos = cursor_screen_pos + output->m_pos + m_canvas_pos;
 
 			auto output_pos = ImGui::GetNodeOutputPos(node->m_id, i);
 			auto input_pos = ImGui::GetNodeInputPos(output->m_id, output->m_inputs.indexOf(node));
@@ -2175,7 +2172,6 @@ void ShaderEditor::generateMain(const char* path)
 	generatePasses(blob);
 	file.write(blob.getData(), blob.getPos());
 
-	bool first = true;
 	for(const auto& texture : m_textures)
 	{
 		if(!texture[0]) continue;

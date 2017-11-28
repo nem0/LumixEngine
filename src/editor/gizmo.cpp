@@ -1,4 +1,3 @@
-#include "engine/engine.h"
 #include "editor/gizmo.h"
 #include "engine/math_utils.h"
 #include "engine/matrix.h"
@@ -95,7 +94,7 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 	}
 
 
-	Matrix getMatrix(Entity entity)
+	Matrix getMatrix(Entity entity) const
 	{
 		Matrix mtx;
 		auto* universe = m_editor.getUniverse();
@@ -141,7 +140,7 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 		const Vec3& camera_pos,
 		const Vec3& camera_dir,
 		float fov,
-		bool is_ortho)
+		bool is_ortho) const
 	{
 		Axis transform_axis = is_active ? m_transform_axis : Axis::NONE;
 		Matrix scale_mtx = Matrix::IDENTITY;
@@ -238,7 +237,6 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 		float scale = getScale(camera_pos, fov, entity_pos, gizmo_mtx.getXVector().length(), is_ortho);
 		scale_mtx.m11 = scale_mtx.m22 = scale_mtx.m33 = scale;
 
-		Vec3 to_entity_dir = is_ortho ? camera_dir : camera_pos - entity_pos;
 		Matrix mtx = gizmo_mtx * scale_mtx;
 
 		RenderInterface::Vertex vertices[9];
@@ -303,7 +301,7 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 		
 	}
 
-	void renderQuarterRing(const Matrix& mtx, const Vec3& a, const Vec3& b, u32 color)
+	void renderQuarterRing(const Matrix& mtx, const Vec3& a, const Vec3& b, u32 color) const
 	{
 		RenderInterface::Vertex vertices[1200];
 		u16 indices[1200];
@@ -383,10 +381,10 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 		}
 
 		m_editor.getRenderInterface()->render(mtx, indices, offset, vertices, offset, true);
-	};
+	}
 
 
-	void renderArc(const Vec3& pos, const Vec3& n, const Vec3& origin, float angle, u32 color)
+	void renderArc(const Vec3& pos, const Vec3& n, const Vec3& origin, float angle, u32 color) const
 	{
 		u16 indices[51 * 3];
 		RenderInterface::Vertex vertices[52];
@@ -431,7 +429,6 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 		Vec3 to_entity_dir = is_ortho ? camera_dir : camera_pos - entity_pos;
 		Matrix mtx = gizmo_mtx * scale_mtx;
 
-		Vec3 pos = mtx.getTranslation();
 		Vec3 right(1, 0, 0);
 		Vec3 up(0, 1, 0);
 		Vec3 dir(0, 0, 1);
@@ -448,25 +445,21 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 		}
 		else
 		{
-			Axis plane;
 			Vec3 n;
 			Vec3 axis1, axis2;
 			switch (transform_axis)
 			{
 				case Axis::X:
-					plane = Axis::YZ;
 					n = gizmo_mtx.getXVector();
 					axis1 = up;
 					axis2 = dir;
 					break;
 				case Axis::Y:
-					plane = Axis::XZ;
 					n = gizmo_mtx.getYVector();
 					axis1 = right;
 					axis2 = dir;
 					break;
 				case Axis::Z:
-					plane = Axis::XY;
 					n = gizmo_mtx.getZVector();
 					axis1 = right;
 					axis2 = up;
@@ -513,7 +506,7 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 		float fov,
 		bool is_ortho,
 		const Vec3& origin,
-		const Vec3& dir)
+		const Vec3& dir) const
 	{
 		Matrix scale_mtx = Matrix::IDENTITY;
 		Vec3 entity_pos = gizmo_mtx.getTranslation();
@@ -571,14 +564,11 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 			return Axis::X;
 		else if (y_dist < z_dist)
 			return Axis::Y;
-		else
-			return Axis::Z;
-
-		return Axis::NONE;
+		return Axis::Z;
 	}
 
 
-	Axis collideScale(const Matrix& gizmo_mtx,
+	static Axis collideScale(const Matrix& gizmo_mtx,
 		const Vec3& camera_pos,
 		const Vec3& camera_dir,
 		float fov,
@@ -595,14 +585,6 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 		Matrix mtx = gizmo_mtx * scale_mtx;
 		Vec3 pos = mtx.getTranslation();
 
-		Vec3 x = mtx.getXVector() * 0.5f;
-		Vec3 y = mtx.getYVector() * 0.5f;
-		Vec3 z = mtx.getZVector() * 0.5f;
-
-		if (dotProduct(gizmo_mtx.getXVector(), to_entity_dir) < 0) x = -x;
-		if (dotProduct(gizmo_mtx.getYVector(), to_entity_dir) < 0) y = -y;
-		if (dotProduct(gizmo_mtx.getZVector(), to_entity_dir) < 0) z = -z;
-
 		float x_dist = Math::getLineSegmentDistance(origin, dir, pos, pos + mtx.getXVector());
 		float y_dist = Math::getLineSegmentDistance(origin, dir, pos, pos + mtx.getYVector());
 		float z_dist = Math::getLineSegmentDistance(origin, dir, pos, pos + mtx.getZVector());
@@ -617,10 +599,7 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 			return Axis::X;
 		else if (y_dist < z_dist)
 			return Axis::Y;
-		else
-			return Axis::Z;
-
-		return Axis::NONE;
+		return Axis::Z;
 	}
 
 
@@ -630,7 +609,7 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 		float fov,
 		bool is_ortho,
 		const Vec3& origin,
-		const Vec3& dir)
+		const Vec3& dir) const
 	{
 		Vec3 pos = gizmo_mtx.getTranslation();
 		float scale = getScale(camera_pos, fov, pos, gizmo_mtx.getXVector().length(), is_ortho);
@@ -783,7 +762,7 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 			case Axis::X: axis = gizmo_mtx.getXVector(); break;
 			case Axis::Y: axis = gizmo_mtx.getYVector(); break;
 			case Axis::Z: axis = gizmo_mtx.getZVector(); break;
-			default: ASSERT(false); break;
+			default: ASSERT(false); return Vec3::ZERO;
 		}
 		Vec3 pos = gizmo_mtx.getTranslation();
 		Vec3 normal = crossProduct(crossProduct(dir, axis), dir);
@@ -804,7 +783,7 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 			case Axis::X: plane = Axis::YZ; axis = mtx.getXVector(); break;
 			case Axis::Y: plane = Axis::XZ; axis = mtx.getYVector(); break;
 			case Axis::Z: plane = Axis::XY; axis = mtx.getZVector(); break;
-			default: ASSERT(false); break;
+			default: ASSERT(false); return 0;
 		}
 
 		Vec3 pos = getMousePlaneIntersection(m_editor.getMousePos(), mtx, plane);
@@ -842,7 +821,7 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 	}
 
 
-	Axis getPlane(Axis axis)
+	static Axis getPlane(Axis axis)
 	{
 		switch (axis)
 		{
@@ -877,7 +856,7 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 	}
 
 
-	bool scale(Transform& frame)
+	bool scale(Transform& frame) const
 	{
 		Vec2 mouse_pos = m_editor.getMousePos();
 		Matrix frame_mtx = frame.toMatrix();
@@ -897,7 +876,7 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 	}
 
 
-	bool translate(Transform& frame)
+	bool translate(Transform& frame) const
 	{
 		Vec2 mouse_pos = m_editor.getMousePos();
 		Matrix frame_mtx = frame.toMatrix();

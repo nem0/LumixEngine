@@ -457,8 +457,6 @@ void AssetBrowser::fileColumn()
 {
 	ImGui::BeginChild("main_col");
 
-	IAllocator& allocator = m_app.getWorldEditor().getAllocator();
-
 	float w = ImGui::GetContentRegionAvailWidth();
 	int columns = m_show_thumbnails ? (int)w / TILE_SIZE : 1;
 	columns = Math::maximum(columns, 1);
@@ -508,7 +506,6 @@ void AssetBrowser::fileColumn()
 		}
 	}
 	ImGui::EndChild();
-	return;
 }
 
 
@@ -596,12 +593,9 @@ void AssetBrowser::onGUI()
 	ImGui::Separator();
 
 	float content_w = ImGui::GetContentRegionAvailWidth();
-	ImVec2 main_size(content_w - m_left_column_width, 0);
 	ImVec2 left_size(m_left_column_width, 0);
 	if (left_size.x < 10) left_size.x = 10;
 	if (left_size.x > content_w - 10) left_size.x = content_w - 10;
-	if (main_size.x < 10) main_size.x = 10;
-	if (content_w - left_size.x - main_size.x < 60) main_size.x = content_w - 60 - left_size.x;
 	
 	dirColumn();
 
@@ -755,7 +749,7 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* bu
 }
 
 
-bool AssetBrowser::resourceList(char* buf, int max_size, ResourceType type, float height)
+bool AssetBrowser::resourceList(char* buf, int max_size, ResourceType type, float height) const
 {
 	static char filter[128] = "";
 	ImGui::LabellessInputText("Filter", filter, sizeof(filter));
@@ -777,13 +771,13 @@ bool AssetBrowser::resourceList(char* buf, int max_size, ResourceType type, floa
 }
 
 
-void AssetBrowser::openInExternalEditor(Resource* resource)
+void AssetBrowser::openInExternalEditor(Resource* resource) const
 {
 	openInExternalEditor(resource->getPath().c_str());
 }
 
 
-void AssetBrowser::openInExternalEditor(const char* path)
+void AssetBrowser::openInExternalEditor(const char* path) const
 {
 	if (m_editor.getEngine().getPatchFileDevice())
 	{

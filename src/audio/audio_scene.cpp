@@ -5,12 +5,10 @@
 #include "clip_manager.h"
 #include "engine/blob.h"
 #include "engine/crc32.h"
-#include "engine/engine.h"
 #include "engine/iallocator.h"
 #include "engine/lua_wrapper.h"
 #include "engine/matrix.h"
 #include "engine/reflection.h"
-#include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
 #include "engine/serializer.h"
 #include "engine/universe/universe.h"
@@ -24,7 +22,6 @@ static const ComponentType LISTENER_TYPE = Reflection::getComponentType("audio_l
 static const ComponentType AMBIENT_SOUND_TYPE = Reflection::getComponentType("ambient_sound");
 static const ComponentType ECHO_ZONE_TYPE = Reflection::getComponentType("echo_zone");
 static const ComponentType CHORUS_ZONE_TYPE = Reflection::getComponentType("chorus_zone");
-static const ResourceType CLIP_RESOURCE_TYPE("clip");
 
 
 enum class AudioSceneVersion : int
@@ -806,7 +803,6 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 					float r2 = zone.radius * zone.radius;
 					if (dist2 > r2) continue;
 
-					float w = dist2 / r2;
 					m_device.setChorus(buffer, 1, 1, 0, 1, zone.delay, 0);
 					break;
 				}

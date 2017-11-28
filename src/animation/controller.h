@@ -1,7 +1,6 @@
 #pragma once
 
 
-#include "engine/hash_map.h"
 #include "engine/resource.h"
 #include "engine/resource_manager_base.h"
 #include "state_machine.h"
@@ -23,7 +22,7 @@ public:
 		, m_allocator(allocator)
 	{}
 	~ControllerManager() {}
-	IAllocator& getAllocator() { return m_allocator; }
+	IAllocator& getAllocator() const { return m_allocator; }
 
 protected:
 	Resource* createResource(const Path& path) override;
@@ -55,12 +54,12 @@ public:
 	~ControllerResource();
 
 	void create() { onCreated(State::READY); }
-	void unload(void) override;
+	void unload() override;
 	bool load(FS::IFile& file) override;
-	ComponentInstance* createInstance(IAllocator& allocator);
+	ComponentInstance* createInstance(IAllocator& allocator) const;
 	void serialize(OutputBlob& blob);
 	bool deserialize(InputBlob& blob, int& version);
-	IAllocator& getAllocator() { return m_allocator; }
+	IAllocator& getAllocator() const { return m_allocator; }
 	void addAnimation(int set, u32 hash, Animation* animation);
 
 	struct AnimSetEntry

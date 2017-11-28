@@ -19,7 +19,7 @@ namespace Lumix
 			T& value() { u32 idx = cursor & (count - 1); return owner->m_buffer[idx]; }
 		};
 
-		Queue(IAllocator& allocator)
+		explicit Queue(IAllocator& allocator)
 			: m_allocator(allocator)
 		{
 			ASSERT(Math::isPowOfTwo(count));

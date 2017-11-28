@@ -2,14 +2,12 @@
 #include "engine/blob.h"
 #include "engine/crc32.h"
 #include "engine/iplugin.h"
-#include "engine/json_serializer.h"
 #include "engine/log.h"
 #include "engine/matrix.h"
 #include "engine/prefab.h"
 #include "engine/reflection.h"
 #include "engine/serializer.h"
 #include "engine/universe/component.h"
-#include <cstdint>
 
 
 namespace Lumix
@@ -97,7 +95,6 @@ void Universe::transformEntity(Entity entity, bool update_local)
 		}
 
 		Entity child = h.first_child;
-		float my_scale = m_entities[entity.index].scale;
 		while (child.isValid())
 		{
 			Hierarchy& child_h = m_hierarchy[m_entities[child.index].hierarchy];
@@ -519,8 +516,6 @@ void Universe::setParent(Entity new_parent, Entity child)
 			h.next_sibling = INVALID_ENTITY;
 		}
 
-		Hierarchy& new_parent_h = m_hierarchy[new_parent_idx];
-
 		m_hierarchy[child_idx].parent = new_parent;
 		Transform parent_tr = getTransform(new_parent);
 		Transform child_tr = getTransform(child);
@@ -679,7 +674,7 @@ void Universe::deserialize(InputBlob& serializer)
 
 struct PrefabEntityGUIDMap : public ILoadEntityGUIDMap
 {
-	PrefabEntityGUIDMap(const Array<Entity>& _entities)
+	explicit PrefabEntityGUIDMap(const Array<Entity>& _entities)
 		: entities(_entities)
 	{
 	}
@@ -823,7 +818,6 @@ void Universe::destroyComponent(Entity entity, ComponentType component_type, ISc
 	auto mask = m_entities[entity.index].components;
 	auto old_mask = mask;
 	mask &= ~((u64)1 << component_type.index);
-	auto x = Reflection::getComponentTypeID(component_type.index);
 	ASSERT(old_mask != mask);
 	m_entities[entity.index].components = mask;
 	m_component_destroyed.invoke(ComponentUID(entity, component_type, scene, index));

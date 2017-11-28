@@ -8,18 +8,14 @@
 #include "editor/asset_browser.h"
 #include "editor/ieditor_command.h"
 #include "editor/platform_interface.h"
-#include "editor/property_grid.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
 #include "engine/blob.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/fs/os_file.h"
-#include "engine/hash_map.h"
 #include "engine/log.h"
 #include "engine/path.h"
-#include "engine/path_utils.h"
-#include "engine/plugin_manager.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/universe/universe.h"
@@ -176,11 +172,6 @@ struct ConstantValueCustomUI
 	template <typename Owner, typename PP, typename T>
 	static void build(Owner& owner, const PP& pp, T& value)
 	{
-		StudioApp& app = owner.resource.getEditor().getApp();
-
-		const auto& selected_entities = app.getWorldEditor().getSelectedEntities();
-		auto* scene = (AnimationScene*)app.getWorldEditor().getUniverse()->getScene(ANIMABLE_HASH);
-		ComponentHandle cmp = selected_entities.empty() ? INVALID_COMPONENT : scene->getComponent(selected_entities[0], CONTROLLER_TYPE);
 		Anim::InputDecl& input_decl = owner.resource.getEngineResource()->m_input_decl;
 		Anim::InputDecl::Constant& constant = input_decl.constants[owner.engine_idx];
 		switch (constant.type)
@@ -247,7 +238,7 @@ namespace AnimEditor
 struct BeginGroupCommand LUMIX_FINAL : IEditorCommand
 {
 	BeginGroupCommand() = default;
-	BeginGroupCommand(WorldEditor&) {}
+	explicit BeginGroupCommand(WorldEditor&) {}
 
 	bool execute() override { return true; }
 	void undo() override { ASSERT(false); }
@@ -337,12 +328,14 @@ struct CreateAnimNodeCommand : IEditorCommand
 	CreateAnimNodeCommand(ControllerResource& controller,
 		Container* container,
 		Anim::Component::Type type,
-		const ImVec2& pos)
+		const ImVec2& pos,
+		Node** node)
 		: m_controller(controller)
 		, m_node_uid(-1)
 		, m_container_uid(container->engine_cmp->uid)
 		, m_type(type)
 		, m_pos(pos)
+		, m_node(node)
 	{
 	}
 
@@ -352,6 +345,7 @@ struct CreateAnimNodeCommand : IEditorCommand
 		auto* container = (Container*)m_controller.getByUID(m_container_uid);
 		if (m_node_uid < 0) m_node_uid = m_controller.createUID();
 		container->createNode(m_type, m_node_uid, m_pos);
+		if (m_node) *m_node = (Node*)m_controller.getByUID(m_node_uid);
 		return true;
 	}
 
@@ -387,6 +381,7 @@ struct CreateAnimNodeCommand : IEditorCommand
 	int m_node_uid;
 	ImVec2 m_pos;
 	Anim::Component::Type m_type;
+	Node** m_node;
 };
 
 
@@ -493,7 +488,6 @@ struct DestroyNodeCommand : IEditorCommand
 			, (Anim::Container*)container->engine_cmp
 			, (int)Anim::ControllerResource::Version::LAST);
 		ASSERT(cmp->isNode());
-		Node* node = (Node*)cmp;
 		cmp->deserialize(input);
 	}
 
@@ -583,7 +577,7 @@ struct CreateAnimEdgeCommand : IEditorCommand
 class AnimationEditor : public IAnimationEditor
 {
 public:
-	AnimationEditor(StudioApp& app);
+	explicit AnimationEditor(StudioApp& app);
 	~AnimationEditor();
 
 	OutputBlob& getCopyBuffer() override;
@@ -603,17 +597,16 @@ public:
 	void executeCommand(IEditorCommand& command) override;
 	void createEdge(ControllerResource& ctrl, Container* container, Node* from, Node* to) override;
 	void moveNode(ControllerResource& ctrl, Node* node, const ImVec2& pos) override;
-	void createNode(ControllerResource& ctrl,
+	Node* createNode(ControllerResource& ctrl,
 		Container* container,
 		Anim::Node::Type type,
 		const ImVec2& pos) override;
 	void destroyNode(ControllerResource& ctrl, Node* node) override;
 	void destroyEdge(ControllerResource& ctrl, Edge* edge) override;
 	bool hasFocus() override { return m_is_focused; }
-	ControllerResource& getController() { return *m_resource; }
+	ControllerResource& getController() const { return *m_resource; }
 
 private:
-	void checkShortcuts();
 	void beginCommandGroup(u32 type);
 	void endCommandGroup();
 	void newController();
@@ -627,7 +620,7 @@ private:
 	void inputsGUI();
 	void animationSlotsGUI();
 	void menuGUI();
-	void onSetInputGUI(u8* data, Component& component);
+	void onSetInputGUI(u8* data, Component& component) const;
 	void undo();
 	void redo();
 	void clearUndoStack();
@@ -677,7 +670,7 @@ AnimationEditor::AnimationEditor(StudioApp& app)
 	m_resource = LUMIX_NEW(allocator, ControllerResource)(*this, *manager, allocator);
 	m_container = (Container*)m_resource->getRoot();
 
-	EventType& event_type = createEventType("set_input");
+	EventType& event_type = AnimationEditor::createEventType("set_input");
 	event_type.size = sizeof(Anim::SetInputEvent);
 	event_type.label = "Set Input";
 	event_type.editor.bind<AnimationEditor, &AnimationEditor::onSetInputGUI>(this);
@@ -714,14 +707,16 @@ void AnimationEditor::moveNode(ControllerResource& ctrl, Node* node, const ImVec
 }
 
 
-void AnimationEditor::createNode(ControllerResource& ctrl,
+Node* AnimationEditor::createNode(ControllerResource& ctrl,
 	Container* container,
 	Anim::Node::Type type,
 	const ImVec2& pos)
 {
 	IAllocator& allocator = m_app.getWorldEditor().getAllocator();
-	auto* cmd = LUMIX_NEW(allocator, CreateAnimNodeCommand)(ctrl, container, type, pos);
+	Node* node;
+	auto* cmd = LUMIX_NEW(allocator, CreateAnimNodeCommand)(ctrl, container, type, pos, &node);
 	executeCommand(*cmd);
+	return node;
 }
 
 
@@ -863,7 +858,7 @@ AnimationEditor::EventType& AnimationEditor::getEventType(u32 type)
 }
 
 
-void AnimationEditor::onSetInputGUI(u8* data, Component& component)
+void AnimationEditor::onSetInputGUI(u8* data, Component& component) const
 {
 	auto event = (Anim::SetInputEvent*)data;
 	auto& input_decl = component.getController().getEngineResource()->m_input_decl;
@@ -1114,15 +1109,8 @@ void AnimationEditor::clearUndoStack()
 }
 
 
-void AnimationEditor::checkShortcuts()
-{
-
-}
-
-
 void AnimationEditor::update(float time_delta)
 {
-	checkShortcuts();
 	if (!m_is_playing) return;
 	auto& entities = m_app.getWorldEditor().getSelectedEntities();
 	if (entities.empty()) return;
@@ -1173,7 +1161,6 @@ void AnimationEditor::animationSlotsGUI()
 	if (!ImGui::CollapsingHeader("Animation slots")) return;
 	IAllocator& allocator = m_app.getWorldEditor().getAllocator();
 	ImGui::PushID("anim_slots");
-	auto& engine_anim_set = m_resource->getEngineResource()->m_animation_set;
 	auto& slots = m_resource->getAnimationSlots();
 	auto& sets = m_resource->getAnimationSets();
 	ImGui::PushItemWidth(-1);
@@ -1211,7 +1198,6 @@ void AnimationEditor::animationSlotsGUI()
 		}
 		ImGui::PopItemWidth();
 		ImGui::SameLine();
-		u32 slot_hash = crc32(slot.getName());
 		if (ImGui::Button("x"))
 		{
 			ImGui::NextColumn();

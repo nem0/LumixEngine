@@ -239,7 +239,7 @@ public:
 	template <class _Ty> struct remove_reference<_Ty&> { typedef _Ty type; };
 	template <class _Ty> struct remove_reference<_Ty&&> { typedef _Ty type; };
 
-	template <class _Ty> inline _Ty&& myforward(typename remove_reference<_Ty>::type& _Arg)
+	template <class _Ty> _Ty&& myforward(typename remove_reference<_Ty>::type& _Arg)
 	{
 		return (static_cast<_Ty&&>(_Arg));
 	}

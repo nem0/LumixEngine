@@ -5,12 +5,10 @@
 #include "cooking/PxCooking.h"
 #include "engine/base_proxy_allocator.h"
 #include "engine/log.h"
-#include "engine/resource_manager.h"
 #include "engine/engine.h"
 #include "engine/reflection.h"
 #include "physics/physics_geometry_manager.h"
 #include "physics/physics_scene.h"
-#include "renderer/render_scene.h"
 #include "engine/universe/universe.h"
 #include <cstdlib>
 

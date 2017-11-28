@@ -140,7 +140,7 @@ LUMIX_ALIGN_BEGIN(16) struct LUMIX_ENGINE_API Matrix
 
 	Matrix(const Vec3& pos, const Quat& rot);
 
-	Matrix(const float* m)
+	explicit Matrix(const float* m)
 	{
 		m11 = m[0]; m12 = m[1]; m13 = m[2]; m14 = m[3];
 		m21 = m[4]; m22 = m[5]; m23 = m[6]; m24 = m[7];

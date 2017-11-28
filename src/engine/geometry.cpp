@@ -234,9 +234,6 @@ void Frustum::computePerspective(const Vec3& position,
 	ASSERT(near_distance < far_distance);
 	ASSERT(fov > 0);
 	ASSERT(ratio > 0);
-	float tang = (float)tan(fov * 0.5f);
-	float near_height = near_distance * tang;
-	float near_width = near_height * ratio;
 	float scale = (float)tan(fov * 0.5f);
 	Vec3 right = crossProduct(direction, up);
 	Vec3 up_near = up * near_distance * scale;

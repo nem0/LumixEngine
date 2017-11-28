@@ -1,10 +1,8 @@
 #include "editor_icon.h"
 #include "editor/platform_interface.h"
-#include "engine/engine.h"
 #include "engine/math_utils.h"
 #include "engine/matrix.h"
 #include "engine/reflection.h"
-#include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
 #include "engine/universe/universe.h"
 #include "render_interface.h"
@@ -201,7 +199,6 @@ struct EditorIconsImpl LUMIX_FINAL : public EditorIcons
 		ComponentHandle camera = m_editor.getEditCamera().handle;
 		if (!camera.isValid()) return hit;
 		Matrix camera_mtx = universe.getMatrix(m_editor.getEditCamera().entity);
-		Vec3 camera_pos = camera_mtx.getTranslation();
 		bool is_ortho = render_interface->isCameraOrtho(camera);
 		float ortho_size = render_interface->getCameraOrthoSize(camera);
 

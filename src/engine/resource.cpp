@@ -4,7 +4,6 @@
 #include "engine/log.h"
 #include "engine/lumix.h"
 #include "engine/path.h"
-#include "engine/resource.h"
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
 

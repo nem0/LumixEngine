@@ -728,7 +728,6 @@ public:
 
 	static int LUA_createEntityEx(lua_State* L)
 	{
-		auto* engine = LuaWrapper::checkArg<Engine*>(L, 1);
 		auto* ctx = LuaWrapper::checkArg<Universe*>(L, 2);
 		LuaWrapper::checkTableArg(L, 3);
 
@@ -1142,7 +1141,7 @@ public:
 		{
 			g_log_error.log("Engine") << "Lua \"package\" is not a table";
 			return;
-		};
+		}
 		if (lua_getfield(m_state, -1, "searchers") != LUA_TTABLE)
 		{
 			g_log_error.log("Engine") << "Lua \"package.searchers\" is not a table";
@@ -1387,14 +1386,13 @@ public:
 	void update(Universe& context) override
 	{
 		PROFILE_FUNCTION();
-		float dt;
 		++m_fps_frame;
 		if (m_fps_timer->getTimeSinceTick() > 0.5f)
 		{
 			m_fps = m_fps_frame / m_fps_timer->tick();
 			m_fps_frame = 0;
 		}
-		dt = m_timer->tick() * m_time_multiplier;
+		float dt = m_timer->tick() * m_time_multiplier;
 		if (m_next_frame)
 		{
 			m_paused = false;
@@ -1554,7 +1552,6 @@ public:
 
 	ComponentUID createComponent(Universe& universe, Entity entity, ComponentType type) override
 	{
-		ComponentUID cmp;
 		IScene* scene = universe.getScene(type);
 		if (!scene) return ComponentUID::INVALID;
 

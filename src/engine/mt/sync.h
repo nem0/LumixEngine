@@ -88,7 +88,7 @@ private:
 class SpinLock
 {
 public:
-	SpinLock(SpinMutex& mutex)
+	explicit SpinLock(SpinMutex& mutex)
 		: m_mutex(mutex)
 	{
 		mutex.lock();

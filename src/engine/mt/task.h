@@ -15,7 +15,7 @@ namespace MT
 class LUMIX_ENGINE_API Task
 {
 public:
-	Task(IAllocator& allocator);
+	explicit Task(IAllocator& allocator);
 	virtual ~Task();
 
 	virtual int task() = 0;

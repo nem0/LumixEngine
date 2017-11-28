@@ -2,8 +2,6 @@
 
 
 #include "engine/array.h"
-#include "engine/associative_array.h"
-#include "engine/binary_array.h"
 #include "engine/mt/sync.h"
 #include "engine/string.h"
 #include "engine/lumix.h"
@@ -39,7 +37,7 @@ class ImportAssetDialog LUMIX_FINAL : public StudioApp::IPlugin
 		};
 
 	public:
-		ImportAssetDialog(StudioApp& app);
+		explicit ImportAssetDialog(StudioApp& app);
 		~ImportAssetDialog();
 		void setMessage(const char* message);
 		void setImportMessage(const char* message, float progress_fraction);

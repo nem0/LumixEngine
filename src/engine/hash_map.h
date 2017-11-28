@@ -546,7 +546,7 @@ namespace Lumix
 		{
 			ASSERT(Math::isPowOfTwo(ids_count));
 			m_table = (node_type*)m_allocator.allocate(sizeof(node_type) * ids_count);
-			for(node_type* i = m_table; i < &m_table[ids_count]; i++)
+			for(node_type* i = m_table; i < &m_table[ids_count]; ++i)
 				construct(i, m_sentinel);
 
 			m_mask = (ids_count - 1);

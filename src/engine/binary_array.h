@@ -29,24 +29,8 @@ namespace Lumix
 						return *this = (bool)value;
 					}
 
-					Accessor& operator =(bool value)
-					{
-						if (value)
-						{
-							m_array.m_data[m_index >> 5] |= m_array.INDEX_BIT[m_index & 31];
-						}
-						else
-						{
-							m_array.m_data[m_index >> 5] &= ~m_array.INDEX_BIT[m_index & 31];
-						}
-						return *this;
-					}
-
-
-					operator bool() const
-					{
-						return (m_array.m_data[m_index >> 5] & m_array.INDEX_BIT[m_index & 31]) > 0;
-					}
+					Accessor& operator =(bool value);
+					operator bool() const;
 
 				private:
 					BinaryArray& m_array;
@@ -79,8 +63,6 @@ namespace Lumix
 			void operator =(const BinaryArray& rhs);
 
 		private:
-			static StoreType BINARY_MASK[sizeof(StoreType) << 3];
-			static StoreType INDEX_BIT[sizeof(StoreType) << 3];
 			IAllocator& m_allocator;
 			StoreType* m_data;
 			int m_size;

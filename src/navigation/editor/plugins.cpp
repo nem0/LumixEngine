@@ -1,10 +1,8 @@
 #include "editor/platform_interface.h"
-#include "editor/property_grid.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
 #include "engine/crc32.h"
-#include "engine/math_utils.h"
 #include "engine/universe/universe.h"
 #include "navigation/navigation_scene.h"
 #include <DetourCrowd.h>
@@ -19,7 +17,7 @@ namespace
 
 struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 {
-	StudioAppPlugin(StudioApp& _app)
+	explicit StudioAppPlugin(StudioApp& _app)
 		: app(_app)
 		, is_open(false)
 	{

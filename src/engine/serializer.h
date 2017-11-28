@@ -28,18 +28,22 @@ inline bool isValid(EntityGUID guid) { return guid.value != INVALID_ENTITY_GUID.
 
 struct ISaveEntityGUIDMap
 {
+	virtual ~ISaveEntityGUIDMap() {}
 	virtual EntityGUID get(Entity entity) = 0;
 };
 
 
 struct ILoadEntityGUIDMap
 {
+	virtual ~ILoadEntityGUIDMap() {}
 	virtual Entity get(EntityGUID guid) = 0;
 };
 
 
 struct ISerializer
 {
+	virtual ~ISerializer() {}
+
 	virtual void write(const char* label, Entity entity) = 0;
 	virtual void write(const char* label, ComponentHandle value) = 0;
 	virtual void write(const char* label, const RigidTransform& value) = 0;
@@ -61,6 +65,8 @@ struct ISerializer
 
 struct IDeserializer
 {
+	virtual ~IDeserializer() {}
+
 	virtual void read(Entity* entity) = 0;
 	virtual void read(ComponentHandle* value) = 0;
 	virtual void read(RigidTransform* value) = 0;

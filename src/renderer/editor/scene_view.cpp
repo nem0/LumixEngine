@@ -1,17 +1,12 @@
 #include "scene_view.h"
 #include "editor/asset_browser.h"
 #include "editor/gizmo.h"
-#include "editor/ieditor_command.h"
 #include "editor/log_ui.h"
-#include "editor/platform_interface.h"
 #include "editor/prefab_system.h"
 #include "editor/render_interface.h"
-#include "editor/settings.h"
 #include "editor/studio_app.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
-#include "engine/input_system.h"
-#include "engine/json_serializer.h"
 #include "engine/path.h"
 #include "engine/path_utils.h"
 #include "engine/plugin_manager.h"
@@ -29,8 +24,6 @@
 #include "renderer/pipeline.h"
 #include "renderer/render_scene.h"
 #include "renderer/renderer.h"
-#include "renderer/shader.h"
-#include "renderer/texture.h"
 #include <SDL.h>
 
 
@@ -40,9 +33,6 @@ namespace Lumix
 
 static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("renderable");
 static const ComponentType MESH_ACTOR_TYPE = Reflection::getComponentType("mesh_rigid_actor");
-static const ResourceType MODEL_TYPE("model");
-static const ResourceType SHADER_TYPE("shader");
-static const ResourceType TEXTURE_TYPE("texture");
 static const ResourceType PREFAB_TYPE("prefab");
 
 SceneView::SceneView(StudioApp& app)
@@ -440,7 +430,6 @@ void SceneView::onWindowGUI()
 		m_texture_handle = m_pipeline->getRenderbuffer("default", 0);
 		if (size.x > 0 && size.y > 0)
 		{
-			auto pos = ImGui::GetWindowPos();
 			m_pipeline->resize(int(size.x), int(size.y));
 			auto cursor_pos = ImGui::GetCursorScreenPos();
 			m_screen_x = int(cursor_pos.x);
@@ -448,7 +437,6 @@ void SceneView::onWindowGUI()
 			m_width = int(size.x);
 			m_height = int(size.y);
 			auto content_min = ImGui::GetCursorScreenPos();
-			ImVec2 content_max(content_min.x + size.x, content_min.y + size.y);
 			if (bgfx::getCaps()->originBottomLeft)
 			{
 				ImGui::Image(&m_texture_handle, size, ImVec2(0, 1), ImVec2(1, 0));

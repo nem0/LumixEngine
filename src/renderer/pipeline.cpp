@@ -4,14 +4,12 @@
 #include "engine/fs/disk_file_device.h"
 #include "engine/fs/file_system.h"
 #include "engine/geometry.h"
-#include "engine/lifo_allocator.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
 #include "engine/job_system.h"
 #include "engine/profiler.h"
 #include "engine/engine.h"
 #include "imgui/imgui.h"
-#include "lua_script/lua_script_system.h"
 #include "renderer/draw2d.h"
 #include "renderer/frame_buffer.h"
 #include "renderer/material.h"
@@ -34,14 +32,13 @@ namespace Lumix
 {
 
 	
-static const ResourceType TEXTURE_TYPE("texture");
 static const float SHADOW_CAM_NEAR = 50.0f;
 static const float SHADOW_CAM_FAR = 5000.0f;
 
 
 struct InstanceData
 {
-	static const int MAX_INSTANCE_COUNT = 128;
+	static const int MAX_INSTANCE_COUNT = 32;
 
 	bgfx::InstanceDataBuffer buffer;
 	int instance_count;
@@ -457,7 +454,6 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		{
 			g_log_error.log("Renderer") << m_path.c_str() << ": " << lua_tostring(m_lua_state, -1);
 			lua_pop(m_lua_state, 1);
-			return;
 		}
 	}
 
@@ -654,8 +650,6 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	{
 		if (!m_current_view) return;
 
-		static const int PARTICLE_BATCH_SIZE = 256;
-
 		if (emitter.m_life.empty()) return;
 		if (!emitter.getMaterial()) return;
 		if (!emitter.getMaterial()->isReady()) return;
@@ -741,8 +735,6 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	void renderParticlesFromEmitter(const ScriptedParticleEmitter& emitter)
 	{
 		if (!m_current_view) return;
-
-		static const int PARTICLE_BATCH_SIZE = 256;
 
 		if (!emitter.getMaterial()) return;
 		if (!emitter.getMaterial()->isReady()) return;
@@ -874,7 +866,6 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 		Mesh& mesh = *data.mesh;
 		Material* material = mesh.material;
-		const u16 stride = mesh.vertex_decl.getStride();
 
 		material->setDefine(m_instanced_define_idx, true);
 
@@ -1093,8 +1084,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	void executeCustomCommand(const char* name)
 	{
 		u32 name_hash = crc32(name);
-		CustomCommandHandler handler;
-		for(auto& handler : m_custom_commands_handlers)
+		for(CustomCommandHandler& handler : m_custom_commands_handlers)
 		{
 			if(handler.hash == name_hash)
 			{
@@ -1896,9 +1886,6 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		Vec4 light_pos_radius(light_pos, range);
 		Vec4 light_color_attenuation(color, attenuation);
 		Vec4 light_dir_fov(light_dir, fov);
-		float specular_intensity = m_scene->getPointLightSpecularIntensity(light_cmp);
-		Vec4 light_specular(m_scene->getPointLightSpecularColor(light_cmp) * specular_intensity *
-								specular_intensity, 1);
 
 		m_current_view->command_buffer.setUniform(m_light_pos_radius_uniform, light_pos_radius);
 		m_current_view->command_buffer.setUniform(m_light_color_attenuation_uniform, light_color_attenuation);
@@ -2217,8 +2204,6 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 		if (!m_applied_camera.isValid()) return;
 
-		Engine& engine = m_renderer.getEngine();
-		IAllocator& allocator = engine.getAllocator();
 		Entity camera_entity = m_scene->getCameraEntity(camera);
 		Vec3 lod_ref_point = m_scene->getUniverse().getPosition(camera_entity);
 		m_is_current_light_global = true;
@@ -2320,8 +2305,6 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			bone_mtx[bone_index] = (tmp * bone.inv_bind_transform).toMatrix();
 		}
 
-		int stride = mesh.vertex_decl.getStride();
-		
 		int view_idx = m_layer_to_view_map[material->getRenderLayer()];
 		ASSERT(view_idx >= 0);
 		auto& view = m_views[view_idx >= 0 ? view_idx : 0];
@@ -2585,7 +2568,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
-	virtual void render(const bgfx::VertexBufferHandle& vertex_buffer,
+	void render(const bgfx::VertexBufferHandle& vertex_buffer,
 		const bgfx::IndexBufferHandle& index_buffer,
 		const bgfx::InstanceDataBuffer& instance_buffer,
 		int count,
@@ -2702,8 +2685,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		Texture* splat_texture = info.m_terrain->getSplatmap();
 		if (!splat_texture) return;
 
-		Matrix inv_world_matrix;
-		inv_world_matrix = info.m_world_matrix;
+		Matrix inv_world_matrix = info.m_world_matrix;
 		inv_world_matrix.fastInverse();
 		Vec3 camera_pos =
 			m_scene->getUniverse().getPosition(m_scene->getCameraEntity(m_applied_camera));

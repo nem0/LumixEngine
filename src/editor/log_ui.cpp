@@ -23,7 +23,7 @@ LogUI::LogUI(IAllocator& allocator)
 	g_log_error.getCallback().bind<LogUI, &LogUI::onError>(this);
 	g_log_warning.getCallback().bind<LogUI, &LogUI::onWarning>(this);
 
-	for (int i = 0; i < Count; ++i)
+	for (int i = 0; i < COUNT; ++i)
 	{
 		m_new_message_count[i] = 0;
 	}
@@ -71,7 +71,7 @@ void LogUI::push(Type type, const char* message)
 	msg.text = message;
 	msg.type = type;
 
-	if (type == Error)
+	if (type == ERROR)
 	{
 		addNotification(message);
 	}
@@ -80,19 +80,19 @@ void LogUI::push(Type type, const char* message)
 
 void LogUI::onInfo(const char* system, const char* message)
 {
-	push(Info, message);
+	push(INFO, message);
 }
 
 
 void LogUI::onWarning(const char* system, const char* message)
 {
-	push(Warning, message);
+	push(WARNING, message);
 }
 
 
 void LogUI::onError(const char* system, const char* message)
 {
-	push(Error, message);
+	push(ERROR, message);
 }
 
 
@@ -158,7 +158,7 @@ void LogUI::update(float time_delta)
 
 int LogUI::getUnreadErrorCount() const
 {
-	return m_new_message_count[Error];
+	return m_new_message_count[ERROR];
 }
 
 

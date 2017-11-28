@@ -86,7 +86,7 @@ namespace Lumix
 			}
 		}
 
-		i32 alloc(void)
+		i32 alloc()
 		{
 			return m_pool_index > 0 ? m_pool[--m_pool_index] : (-1);
 		}

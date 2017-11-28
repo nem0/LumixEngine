@@ -28,11 +28,11 @@ class LUMIX_EDITOR_API LogUI
 	private:
 		enum Type
 		{
-			Info,
-			Warning,
-			Error,
+			INFO,
+			WARNING,
+			ERROR,
 
-			Count
+			COUNT
 		};
 
 		struct Notification
@@ -67,7 +67,7 @@ class LUMIX_EDITOR_API LogUI
 		IAllocator& m_allocator;
 		Array<Message> m_messages;
 		Array<Notification> m_notifications;
-		int m_new_message_count[Count];
+		int m_new_message_count[COUNT];
 		u8 m_level_filter;
 		int m_last_uid;
 		bool m_move_notifications_to_front;
