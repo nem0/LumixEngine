@@ -40,7 +40,7 @@ struct ILoadEntityGUIDMap
 };
 
 
-struct ISerializer
+struct LUMIX_ENGINE_API ISerializer
 {
 	virtual ~ISerializer() {}
 
@@ -63,7 +63,7 @@ struct ISerializer
 };
 
 
-struct IDeserializer
+struct LUMIX_ENGINE_API IDeserializer
 {
 	virtual ~IDeserializer() {}
 
