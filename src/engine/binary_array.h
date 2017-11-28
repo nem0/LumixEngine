@@ -17,7 +17,7 @@ namespace Lumix
 			typedef u32 StoreType;
 			static const size_t ITEM_SIZE = sizeof(StoreType);
 
-			class Accessor
+			class LUMIX_ENGINE_API Accessor
 			{
 				public:
 					Accessor(BinaryArray& array, int index);
