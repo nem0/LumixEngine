@@ -427,10 +427,10 @@ struct ProfilerUIImpl LUMIX_FINAL : public ProfilerUI
 	void cloneBlock(Block* my_block, Profiler::Block* remote_block);
 	void addToTree(Debug::Allocator::AllocationInfo* info);
 	void refreshAllocations();
-	void showAllocationTree(AllocationStackNode* node, int column);
+	void showAllocationTree(AllocationStackNode* node, int column) const;
 	AllocationStackNode* getOrCreate(AllocationStackNode* my_node,
 		Debug::StackNode* external_node, size_t size);
-	void saveResourceList();
+	void saveResourceList() const;
 
 	struct Thread
 	{
@@ -744,16 +744,16 @@ static const char* getResourceStateString(Resource::State state)
 {
 	switch (state)
 	{
-		case Resource::State::EMPTY: return "Empty"; break;
-		case Resource::State::FAILURE: return "Failure"; break;
-		case Resource::State::READY: return "Ready"; break;
+		case Resource::State::EMPTY: return "Empty";
+		case Resource::State::FAILURE: return "Failure";
+		case Resource::State::READY: return "Ready";
 	}
 
 	return "Unknown";
 }
 
 
-void ProfilerUIImpl::saveResourceList()
+void ProfilerUIImpl::saveResourceList() const
 {
 	FS::OsFile file;
 	if (file.open("resources.csv", FS::Mode::CREATE_AND_WRITE))
@@ -795,7 +795,7 @@ void ProfilerUIImpl::onGUIResources()
 
 	ImGui::LabellessInputText("Filter###resource_filter", m_resource_filter, lengthOf(m_resource_filter));
 
-	static const ResourceType resource_types[] = { ResourceType("animation"),
+	static const ResourceType RESOURCE_TYPES[] = { ResourceType("animation"),
 		ResourceType("material"),
 		ResourceType("model"),
 		ResourceType("physics"),
@@ -809,13 +809,13 @@ void ProfilerUIImpl::onGUIResources()
 		"Shaders",
 		"Textures"
 	};
-	ASSERT(lengthOf(resource_types) == lengthOf(manager_names));
+	ASSERT(lengthOf(RESOURCE_TYPES) == lengthOf(manager_names));
 	ImGui::Indent();
-	for (int i = 0; i < lengthOf(resource_types); ++i)
+	for (int i = 0; i < lengthOf(RESOURCE_TYPES); ++i)
 	{
 		if (!ImGui::CollapsingHeader(manager_names[i])) continue;
 
-		auto* resource_manager = m_resource_manager.get(resource_types[i]);
+		auto* resource_manager = m_resource_manager.get(RESOURCE_TYPES[i]);
 		auto& resources = resource_manager->getResourceTable();
 
 		ImGui::Columns(4, "resc");
@@ -924,7 +924,7 @@ void ProfilerUIImpl::refreshAllocations()
 }
 
 
-void ProfilerUIImpl::showAllocationTree(AllocationStackNode* node, int column)
+void ProfilerUIImpl::showAllocationTree(AllocationStackNode* node, int column) const
 {
 	if (column == FUNCTION)
 	{

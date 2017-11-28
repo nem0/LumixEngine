@@ -655,19 +655,16 @@ BOOL SendFile(LPCSTR lpszSubject,
 static void getStack(CONTEXT& context, char* out, int max_size)
 {
 	BOOL result;
-	HANDLE process;
-	HANDLE thread;
 	STACKFRAME64 stack;
 	char symbol_mem[sizeof(IMAGEHLP_SYMBOL64) + 256];
 	IMAGEHLP_SYMBOL64* symbol = (IMAGEHLP_SYMBOL64*)symbol_mem;
-	DWORD64 displacement;
 	char name[256];
 	copyString(out, max_size, "Crash callstack:\n");
 	memset(&stack, 0, sizeof(STACKFRAME64));
 
-	process = GetCurrentProcess();
-	thread = GetCurrentThread();
-	displacement = 0;
+	HANDLE process = GetCurrentProcess();
+	HANDLE thread = GetCurrentThread();
+	DWORD64 displacement = 0;
 	DWORD machineType;
 
 #ifdef _M_X64

@@ -2,21 +2,13 @@
 #include "animation/animation_scene.h"
 #include "animation/controller.h"
 #include "animation/editor/animation_editor.h"
-#include "animation/editor/state_machine_editor.h"
-#include "animation/state_machine.h"
 #include "editor/asset_browser.h"
 #include "editor/property_grid.h"
 #include "editor/studio_app.h"
-#include "editor/utils.h"
 #include "editor/world_editor.h"
-#include "engine/blob.h"
-#include "engine/crc32.h"
 #include "engine/engine.h"
-#include "engine/fs/os_file.h"
 #include "engine/hash_map.h"
-#include "engine/path.h"
 #include "engine/reflection.h"
-#include "engine/resource_manager.h"
 #include "engine/system.h"
 #include "engine/universe/universe.h"
 #include "imgui/imgui.h"
@@ -90,7 +82,6 @@ struct AssetBrowserPlugin : AssetBrowser::IPlugin
 	}
 
 
-	float m_time = 0;
 	StudioApp& m_app;
 };
 
@@ -114,8 +105,6 @@ struct AnimControllerAssetBrowserPlugin : AssetBrowser::IPlugin
 	{
 		if (type == CONTROLLER_RESOURCE_TYPE)
 		{
-			auto* controller = static_cast<Anim::ControllerResource*>(resource);
-
 			return true;
 		}
 		return false;

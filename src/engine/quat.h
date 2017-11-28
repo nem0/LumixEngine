@@ -38,10 +38,9 @@ struct LUMIX_ENGINE_API Quat
 	{
 		// nVidia SDK implementation
 
-		Vec3 uv, uuv;
 		Vec3 qvec(x, y, z);
-		uv = crossProduct(qvec, v);
-		uuv = crossProduct(qvec, uv);
+		Vec3 uv = crossProduct(qvec, v);
+		Vec3 uuv = crossProduct(qvec, uv);
 		uv *= (2.0f * w);
 		uuv *= 2.0f;
 

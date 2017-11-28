@@ -10,17 +10,12 @@
 #include "engine/blob.h"
 #include "engine/command_line_parser.h"
 #include "engine/crc32.h"
-#include "engine/debug/debug.h"
 #include "engine/delegate_list.h"
 #include "engine/engine.h"
 #include "engine/fs/disk_file_device.h"
 #include "engine/fs/file_system.h"
-#include "engine/fs/memory_file_device.h"
 #include "engine/fs/os_file.h"
-#include "engine/fs/tcp_file_device.h"
-#include "engine/fs/tcp_file_server.h"
 #include "engine/geometry.h"
-#include "engine/input_system.h"
 #include "engine/iplugin.h"
 #include "engine/json_serializer.h"
 #include "engine/log.h"
@@ -71,7 +66,7 @@ static void load(ComponentUID cmp, int index, InputBlob& blob)
 struct BeginGroupCommand LUMIX_FINAL : public IEditorCommand
 {
 	BeginGroupCommand() = default;
-	BeginGroupCommand(WorldEditor&) {}
+	explicit BeginGroupCommand(WorldEditor&) {}
 
 	bool execute() override { return true; }
 	void undo() override { ASSERT(false); }
@@ -1324,8 +1319,6 @@ private:
 			, m_resources(editor.getAllocator())
 		{
 			m_entities.reserve(count);
-			PrefabSystem& prefab_system = m_editor.getPrefabSystem();
-			Universe* universe = m_editor.getUniverse();
 			for (int i = 0; i < count; ++i)
 			{
 				m_entities.push(entities[i]);
@@ -1622,7 +1615,6 @@ private:
 			cmp.type = m_cmp_type;
 			ASSERT(cmp.scene);
 			InputBlob blob(m_old_values);
-			const Reflection::ComponentBase* cmp_desc = Reflection::getComponent(cmp.type);
 			for (Entity entity : m_entities)
 			{
 				cmp.entity = entity;
@@ -1768,7 +1760,6 @@ public:
 	{
 		if (m_selected_entities.empty()) return;
 
-		ComponentUID camera_cmp = getUniverse()->getComponent(m_camera, CAMERA_TYPE);
 		Universe* universe = getUniverse();
 
 		if (m_selected_entities.size() > 1)
@@ -1838,7 +1829,6 @@ public:
 		ComponentUID camera_cmp = getUniverse()->getComponent(m_camera, CAMERA_TYPE);
 		if (!camera_cmp.isValid()) return;
 
-		InputSystem& input = m_engine->getInputSystem();
 		m_render_interface->getRay(camera_cmp.handle, m_mouse_pos, origin, dir);
 		auto hit = m_render_interface->castRay(origin, dir, INVALID_COMPONENT);
 		//if (m_gizmo->isActive()) return;
@@ -2044,7 +2034,6 @@ public:
 	{
 		Array<Entity> entities(m_allocator);
 		
-		Frustum frustum;
 		ComponentUID camera_cmp = getUniverse()->getComponent(m_camera, CAMERA_TYPE);
 		if (!camera_cmp.isValid()) return;
 
@@ -2054,7 +2043,7 @@ public:
 		Vec2 max = m_mouse_pos;
 		if (min.x > max.x) Math::swap(min.x, max.x);
 		if (min.y > max.y) Math::swap(min.y, max.y);
-		frustum = m_render_interface->getFrustum(camera_cmp.handle, min, max);
+		Frustum frustum = m_render_interface->getFrustum(camera_cmp.handle, min, max);
 		m_render_interface->getModelInstaces(entities, frustum, camera_pos, camera_cmp.handle);
 		selectEntities(entities.empty() ? nullptr : &entities[0], entities.size());
 	}
@@ -2158,7 +2147,7 @@ public:
 	// TODO split
 	struct EntityGUIDMap : public ILoadEntityGUIDMap, public ISaveEntityGUIDMap
 	{
-		EntityGUIDMap(IAllocator& allocator)
+		explicit EntityGUIDMap(IAllocator& allocator)
 			: guid_to_entity(allocator)
 			, entity_to_guid(allocator)
 			, is_random(true)
@@ -2486,7 +2475,6 @@ public:
 		ComponentUID camera_cmp = getUniverse()->getComponent(m_camera, CAMERA_TYPE);
 		if (!camera_cmp.isValid()) return;
 
-		InputSystem& input = m_engine->getInputSystem();
 		m_render_interface->getRay(camera_cmp.handle, m_mouse_pos, origin, dir);
 		auto hit = m_render_interface->castRay(origin, dir, INVALID_COMPONENT);
 		if (!hit.is_hit || hit.entity != m_selected_entities[0]) return;
@@ -3375,8 +3363,6 @@ public:
 		const void* data,
 		int size) override
 	{
-		ComponentUID cmp = getUniverse()->getComponent(m_selected_entities[0], component_type);
-
 		IEditorCommand* command = LUMIX_NEW(m_allocator, SetPropertyCommand)(
 			*this, entities, count, component_type, index, property, data, size);
 		executeCommand(command);
@@ -3989,14 +3975,12 @@ bool PasteEntityCommand::execute()
 		universe.setMatrix(new_entity, mtx);
 		i32 count;
 		blob.read(count);
-		for (int i = 0; i < count; ++i)
+		for (int j = 0; j < count; ++j)
 		{
 			u32 hash;
 			blob.read(hash);
 			ComponentType type = Reflection::getComponentTypeFromHash(hash);
 			ComponentUID cmp = m_editor.getEngine().createComponent(universe, new_entity, type);
-			const Reflection::ComponentBase* cmp_desc = Reflection::getComponent(cmp.type);
-			
 			load(cmp, -1, blob);
 		}
 	}

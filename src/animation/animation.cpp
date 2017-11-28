@@ -25,9 +25,6 @@ enum class Version
 };
 
 
-static const ResourceType ANIMATION_TYPE("animation");
-
-
 Resource* AnimationManager::createResource(const Path& path)
 {
 	return LUMIX_NEW(m_allocator, Animation)(path, *this, m_allocator);
@@ -226,7 +223,6 @@ void Animation::getRelativePose(float time, Pose& pose, Model& model, BoneMask* 
 
 bool Animation::load(FS::IFile& file)
 {
-	IAllocator& allocator = getAllocator();
 	m_bones.clear();
 	m_mem.clear();
 	Header header;
@@ -267,11 +263,11 @@ bool Animation::load(FS::IFile& file)
 
 		m_bones[i].pos_count = blob.read<int>();
 		m_bones[i].pos_times = (const u16*)blob.skip(m_bones[i].pos_count * sizeof(u16));
-		m_bones[i].pos = (const Vec3*)blob.skip(m_bones[i].pos_count * sizeof(Vec3));;
+		m_bones[i].pos = (const Vec3*)blob.skip(m_bones[i].pos_count * sizeof(Vec3));
 		
 		m_bones[i].rot_count = blob.read<int>();
-		m_bones[i].rot_times = (const u16*)blob.skip(m_bones[i].rot_count * sizeof(u16));;
-		m_bones[i].rot = (const Quat*)blob.skip(m_bones[i].rot_count * sizeof(Quat));;
+		m_bones[i].rot_times = (const u16*)blob.skip(m_bones[i].rot_count * sizeof(u16));
+		m_bones[i].rot = (const Quat*)blob.skip(m_bones[i].rot_count * sizeof(Quat));
 	}
 
 	m_size = file.size();
@@ -279,13 +275,13 @@ bool Animation::load(FS::IFile& file)
 }
 
 
-IAllocator& Animation::getAllocator()
+IAllocator& Animation::getAllocator() const
 {
 	return static_cast<AnimationManager&>(m_resource_manager).getAllocator();
 }
 
 
-void Animation::unload(void)
+void Animation::unload()
 {
 	m_bones.clear();
 	m_mem.clear();

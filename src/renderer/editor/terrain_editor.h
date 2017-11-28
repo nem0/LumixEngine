@@ -54,10 +54,6 @@ private:
 	Material* getMaterial();
 	void paint(const Vec3& hit, TerrainEditor::ActionType action_type, bool new_stroke);
 
-	static void getProjections(const Vec3& axis,
-		const Vec3 vertices[8],
-		float& min,
-		float& max);
 	void removeEntities(const Vec3& hit);
 	void paintEntities(const Vec3& hit);
 	void increaseBrushSize();

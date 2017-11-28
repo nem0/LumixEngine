@@ -150,7 +150,7 @@ public:
 private:
 	bool generateInstances();
 
-	void unload(void) override;
+	void unload() override;
 	bool load(FS::IFile& file) override;
 };
 

@@ -457,8 +457,8 @@ inline const char* luaTypeToString(int type)
 		case LUA_TSTRING: return "string";
 		case LUA_TTABLE: return "table";
 		case LUA_TUSERDATA: return "userdata";
+		default: return "Unknown";
 	}
-	return "Unknown";
 }
 
 

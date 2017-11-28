@@ -28,7 +28,7 @@ namespace Lumix
 
 struct GUIInterface : GUISystem::Interface
 {
-	GUIInterface(GameView& game_view)
+	explicit GUIInterface(GameView& game_view)
 		: m_game_view(game_view)
 	{
 	}

@@ -139,7 +139,7 @@ private:
 	}
 
 
-	static const u16 getFunctionIdx(const char* src, const ExpressionCompiler::Token& token)
+	static u16 getFunctionIdx(const char* src, const ExpressionCompiler::Token& token)
 	{
 		int i = 0;
 		for(auto& fn : FUNCTIONS)
@@ -203,13 +203,13 @@ public:
 			type = Types::NONE;
 		}
 
-		ReturnValue(float f)
+		explicit ReturnValue(float f)
 		{
 			f_value = f;
 			type = Types::FLOAT;
 		}
 
-		ReturnValue(bool b)
+		explicit ReturnValue(bool b)
 		{
 			b_value = b;
 			type = Types::BOOL;
@@ -285,8 +285,8 @@ ExpressionVM::ReturnValue ExpressionVM::evaluate(const u8* code, RunningContext&
 				push<int>(*(int*)(rc.input + *(int*)cp));
 				cp += sizeof(int);
 				break;
-			case Instruction::RET_FLOAT: return pop<float>();
-			case Instruction::RET_BOOL: return pop<bool>();
+			case Instruction::RET_FLOAT: return ExpressionVM::ReturnValue(pop<float>());
+			case Instruction::RET_BOOL: return ExpressionVM::ReturnValue(pop<bool>());
 			case Instruction::ADD_FLOAT: push<float>(pop<float>() + pop<float>()); break;
 			case Instruction::SUB_FLOAT: push<float>(-pop<float>() + pop<float>()); break;
 			case Instruction::PUSH_BOOL: cp = pushStackConst<bool>(cp); break;
@@ -838,17 +838,17 @@ const char* Condition::errorToString(Error error)
 {
 	switch (error)
 	{
-		case Error::NONE: return "None"; break;
-		case Error::UNKNOWN_IDENTIFIER: return "Unknown identifier"; break;
-		case Error::MISSING_LEFT_PARENTHESIS: return "Missing left parenthesis"; break;
-		case Error::MISSING_RIGHT_PARENTHESIS: return "Missing right parenthesis"; break;
-		case Error::UNEXPECTED_CHAR: return "Unexpected char"; break;
-		case Error::OUT_OF_MEMORY: return "Out of memory"; break;
-		case Error::MISSING_BINARY_OPERAND: return "Missing binary operand"; break;
-		case Error::NOT_ENOUGH_PARAMETERS: return "Not enough parameters"; break;
-		case Error::INCORRECT_TYPE_ARGS: return "Incorrect type args"; break;
-		case Error::NO_RETURN_VALUE: return "No return value"; break;
-		default: ASSERT(false); return "Unknown error"; break;
+		case Error::NONE: return "None";
+		case Error::UNKNOWN_IDENTIFIER: return "Unknown identifier";
+		case Error::MISSING_LEFT_PARENTHESIS: return "Missing left parenthesis";
+		case Error::MISSING_RIGHT_PARENTHESIS: return "Missing right parenthesis";
+		case Error::UNEXPECTED_CHAR: return "Unexpected char";
+		case Error::OUT_OF_MEMORY: return "Out of memory";
+		case Error::MISSING_BINARY_OPERAND: return "Missing binary operand";
+		case Error::NOT_ENOUGH_PARAMETERS: return "Not enough parameters";
+		case Error::INCORRECT_TYPE_ARGS: return "Incorrect type args";
+		case Error::NO_RETURN_VALUE: return "No return value";
+		default: ASSERT(false); return "Unknown error";
 	}
 }
 

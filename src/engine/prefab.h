@@ -3,7 +3,6 @@
 
 #include "engine/blob.h"
 #include "engine/resource.h"
-#include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
 
 
@@ -29,7 +28,7 @@ struct PrefabResource LUMIX_FINAL : public Resource
 	}
 
 
-	void unload(void) override { blob.clear(); }
+	void unload() override { blob.clear(); }
 
 
 	bool load(FS::IFile& file) override
@@ -46,7 +45,7 @@ struct PrefabResource LUMIX_FINAL : public Resource
 class PrefabResourceManager LUMIX_FINAL : public ResourceManagerBase
 {
 public:
-	PrefabResourceManager(IAllocator& allocator)
+	explicit PrefabResourceManager(IAllocator& allocator)
 		: m_allocator(allocator)
 		, ResourceManagerBase(allocator)
 	{

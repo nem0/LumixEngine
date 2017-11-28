@@ -58,14 +58,7 @@ string::string(const char* rhs, IAllocator& allocator)
 string::~string() { m_allocator.deallocate(m_cstr); }
 
 
-char string::operator[](int index)
-{
-	ASSERT(index >= 0 && index < m_size);
-	return m_cstr[index];
-}
-
-
-const char string::operator[](int index) const
+char string::operator[](int index) const
 {
 	ASSERT(index >= 0 && index < m_size);
 	return m_cstr[index];

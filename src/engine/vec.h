@@ -19,7 +19,7 @@ struct LUMIX_ENGINE_API Vec2
 {
 	Vec2() {}
 
-	Vec2(float a)
+	explicit Vec2(float a)
 		: x(a)
 		, y(a)
 	{
@@ -103,7 +103,7 @@ struct LUMIX_ENGINE_API Vec3
 		, z(c)
 	{}
 
-	Vec3(float a)
+	explicit Vec3(float a)
 		: x(a)
 		, y(a)
 		, z(a)
@@ -242,7 +242,7 @@ struct LUMIX_ENGINE_API Vec4
 {
 	Vec4() {}
 
-	Vec4(float a)
+	explicit Vec4(float a)
 		: x(a)
 		, y(a)
 		, z(a)

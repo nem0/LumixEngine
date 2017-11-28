@@ -7,7 +7,6 @@
 #include "engine/blob.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
-#include "engine/json_serializer.h"
 #include "engine/lua_wrapper.h"
 #include "engine/job_system.h"
 #include "engine/profiler.h"
@@ -44,7 +43,7 @@ static const ResourceType CONTROLLER_RESOURCE_TYPE("anim_controller");
 namespace FS
 {
 class FileSystem;
-};
+}
 
 
 class Animation;
@@ -65,7 +64,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 
 	struct Controller
 	{
-		Controller(IAllocator& allocator) : input(allocator), animations(allocator) {}
+		explicit Controller(IAllocator& allocator) : input(allocator), animations(allocator) {}
 
 		Entity entity;
 		Anim::ControllerResource* resource = nullptr;
@@ -383,7 +382,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
-	void unloadAnimation(Animation* animation)
+	static void unloadAnimation(Animation* animation)
 	{
 		if (!animation) return;
 
@@ -391,7 +390,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
-	void unloadController(Anim::ControllerResource* res)
+	static void unloadController(Anim::ControllerResource* res)
 	{
 		if (!res) return;
 
@@ -426,7 +425,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	{
 		for (auto& controller : m_controllers)
 		{
-			if ((controller.resource == &resource) && (controller.root != nullptr) && (new_state != Resource::State::READY))
+			if (controller.resource == &resource && controller.root != nullptr && new_state != Resource::State::READY)
 			{
 				LUMIX_DELETE(m_engine.getAllocator(), controller.root);
 				controller.root = nullptr;
@@ -768,7 +767,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
-	void updateSharedController(SharedController& controller, float time_delta)
+	void updateSharedController(SharedController& controller)
 	{
 		if (!controller.parent.isValid()) return;
 
@@ -835,13 +834,13 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		{
 			if (ik.weight == 0) break;
 
-			updateIK(ik, *pose, *model, controller.entity);
+			updateIK(ik, *pose, *model);
 		}
 		m_render_scene->unlockPose(model_instance, true);
 	}
 
 
-	void updateIK(Controller::IK& ik, Pose& pose, Model& model, Entity& entity)
+	static void updateIK(Controller::IK& ik, Pose& pose, Model& model)
 	{
 		decltype(model.getBoneIndex(0)) bones_iters[Controller::IK::MAX_BONES_COUNT];
 		for (int i = 0; i < ik.bones_count; ++i)
@@ -912,7 +911,6 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	{
 		if (m_animables.size() == 0) return;
 
-		IAllocator& allocator = m_engine.getAllocator();
 		JobSystem::JobDecl jobs[16];
 		JobSystem::LambdaJob job_storage[16];
 
@@ -925,7 +923,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 				PROFILE_BLOCK("Animate Job");
 				int all_count = m_animables.size();
 				int batch_count = all_count / job_count;
-				if (i == job_count - 1) batch_count = all_count - ((job_count - 1) * batch_count);
+				if (i == job_count - 1) batch_count = all_count - (job_count - 1) * batch_count;
 				for (int j = 0; j < batch_count; ++j)
 				{
 					Animable& animable = m_animables.at(j + i * all_count / job_count);
@@ -955,7 +953,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 
 		for (SharedController& controller : m_shared_controllers)
 		{
-			AnimationSceneImpl::updateSharedController(controller, time_delta);
+			updateSharedController(controller);
 		}
 
 		processEventStream();
@@ -1000,14 +998,14 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
-	Animation* loadAnimation(const Path& path)
+	Animation* loadAnimation(const Path& path) const
 	{
 		ResourceManager& rm = m_engine.getResourceManager();
 		return static_cast<Animation*>(rm.get(ANIMATION_TYPE)->load(path));
 	}
 
 
-	Anim::ControllerResource* loadController(const Path& path)
+	Anim::ControllerResource* loadController(const Path& path) const
 	{
 		ResourceManager& rm = m_engine.getResourceManager();
 		return static_cast<Anim::ControllerResource*>(rm.get(CONTROLLER_RESOURCE_TYPE)->load(path));

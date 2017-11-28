@@ -44,7 +44,7 @@ namespace Lumix
 		class LUMIX_ENGINE_API FileEventsDevice LUMIX_FINAL : public IFileDevice
 		{
 		public:
-			FileEventsDevice(IAllocator& allocator) : m_allocator(allocator) {}
+			explicit FileEventsDevice(IAllocator& allocator) : m_allocator(allocator) {}
 
 			typedef Delegate<void(const Event&)>  EventCallback;
 

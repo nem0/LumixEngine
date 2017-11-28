@@ -43,6 +43,7 @@ struct IAttribute
 		RESOURCE
 	};
 
+	virtual ~IAttribute() {}
 	virtual int getType() const = 0;
 };
 
@@ -52,11 +53,14 @@ struct SceneBase;
 
 struct IAttributeVisitor
 {
+	virtual ~IAttributeVisitor() {}
 	virtual void visit(const IAttribute& attr) = 0;
 };
 
 struct PropertyBase
 {
+	virtual ~PropertyBase() {}
+
 	virtual void visit(IAttributeVisitor& visitor) const = 0;
 	virtual void setValue(ComponentUID cmp, int index, InputBlob& stream) const = 0;
 	virtual void getValue(ComponentUID cmp, int index, OutputBlob& stream) const = 0;
@@ -96,12 +100,12 @@ namespace detail
 template <typename T> void writeToStream(OutputBlob& stream, T value)
 {
 	stream.write(value);
-};
+}
 	
 template <typename T> T readFromStream(InputBlob& stream)
 {
 	return stream.read<T>();
-};
+}
 
 template <> LUMIX_ENGINE_API Path readFromStream<Path>(InputBlob& stream);
 template <> LUMIX_ENGINE_API void writeToStream<Path>(OutputBlob& stream, Path);
@@ -179,7 +183,7 @@ struct ResourceAttribute : IAttribute
 
 struct MinAttribute : IAttribute
 {
-	MinAttribute(float min) { this->min = min; }
+	explicit MinAttribute(float min) { this->min = min; }
 	MinAttribute() {}
 
 	int getType() const override { return MIN; }
@@ -244,6 +248,8 @@ struct IArrayProperty : PropertyBase
 
 struct IPropertyVisitor
 {
+	virtual ~IPropertyVisitor() {}
+
 	virtual void begin(const ComponentBase&) {}
 	virtual void visit(const Property<float>& prop) = 0;
 	virtual void visit(const Property<int>& prop) = 0;
@@ -286,12 +292,15 @@ struct ISimpleComponentVisitor : IPropertyVisitor
 
 struct IFunctionVisitor
 {
+	virtual ~IFunctionVisitor() {}
 	virtual void visit(const struct FunctionBase& func) = 0;
 };
 
 
 struct ComponentBase
 {
+	virtual ~ComponentBase() {}
+
 	virtual int getPropertyCount() const = 0;
 	virtual int getFunctionCount() const = 0;
 	virtual void visit(IPropertyVisitor&) const = 0;
@@ -684,12 +693,15 @@ struct ConstArrayProperty : IArrayProperty
 
 struct IComponentVisitor
 {
+	virtual ~IComponentVisitor() {}
 	virtual void visit(const ComponentBase& cmp) = 0;
 };
 
 
 struct SceneBase
 {
+	virtual ~SceneBase() {}
+
 	virtual int getFunctionCount() const = 0;
 	virtual void visit(IFunctionVisitor&) const = 0;
 	virtual void visit(IComponentVisitor& visitor) const = 0;
@@ -770,11 +782,13 @@ auto scene(const char* name, Components... components)
 
 struct FunctionBase
 {
-	const char* decl_code;
+	virtual ~FunctionBase() {}
 
 	virtual int getArgCount() const = 0;
 	virtual const char* getReturnType() const = 0;
 	virtual const char* getArgType(int i) const = 0;
+
+	const char* decl_code;
 };
 
 
@@ -786,7 +800,7 @@ namespace internal
 	template <typename T>
 	struct GetTypeNameHelper
 	{
-		static const char* GetTypeName(void)
+		static const char* GetTypeName()
 		{
 			static const size_t size = sizeof(__FUNCTION__) - FRONT_SIZE - BACK_SIZE;
 			static char typeName[size] = {};
@@ -799,7 +813,7 @@ namespace internal
 
 
 template <typename T>
-const char* getTypeName(void)
+const char* getTypeName()
 {
 	return internal::GetTypeNameHelper<T>::GetTypeName();
 }

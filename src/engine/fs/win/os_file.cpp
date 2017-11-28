@@ -1,5 +1,4 @@
 #include "engine/fs/os_file.h"
-#include "engine/iallocator.h"
 #include "engine/win/simple_win.h"
 #include "engine/string.h"
 #include "engine/lumix.h"
@@ -70,7 +69,7 @@ bool OsFile::read(void* data, size_t size)
 	ASSERT(INVALID_HANDLE_VALUE != m_handle);
 	DWORD readed = 0;
 	BOOL success = ::ReadFile((HANDLE)m_handle, data, (DWORD)size, (LPDWORD)&readed, nullptr);
-	return size == readed;
+	return success && size == readed;
 }
 
 size_t OsFile::size()
@@ -106,6 +105,9 @@ bool OsFile::seek(SeekMode base, size_t pos)
 			break;
 		case SeekMode::CURRENT:
 			dir = FILE_CURRENT;
+			break;
+		default:
+			ASSERT(false);
 			break;
 	}
 

@@ -1,23 +1,17 @@
 #include "lua_script_system.h"
 #include "engine/array.h"
-#include "engine/base_proxy_allocator.h"
 #include "engine/binary_array.h"
 #include "engine/blob.h"
 #include "engine/crc32.h"
 #include "engine/debug/debug.h"
 #include "engine/engine.h"
-#include "engine/fs/file_system.h"
 #include "engine/iallocator.h"
 #include "engine/input_system.h"
 #include "engine/iplugin.h"
-#include "engine/json_serializer.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
-#include "engine/path_utils.h"
-#include "engine/plugin_manager.h"
 #include "engine/profiler.h"
 #include "engine/reflection.h"
-#include "engine/resource_manager.h"
 #include "engine/serializer.h"
 #include "engine/string.h"
 #include "engine/universe/universe.h"
@@ -776,7 +770,6 @@ namespace Lumix
 				lua_setglobal(L, tmp);
 
 				ComponentType cmp_type = Reflection::getComponentType(cmp_name);
-				const char* x = Reflection::getComponentTypeID(cmp_type.index);
 				const Reflection::ComponentBase* cmp_desc = Reflection::getComponent(cmp_type);
 				
 				LuaCreatePropertyVisitor visitor;
@@ -1308,7 +1301,6 @@ namespace Lumix
 			int count;
 			serializer.read(&count);
 			script->m_scripts.reserve(count);
-			auto* manager = m_system.m_engine.getResourceManager().get(LUA_SCRIPT_RESOURCE_TYPE);
 			for (int i = 0; i < count; ++i)
 			{
 				ScriptInstance& inst = script->m_scripts.emplace(allocator);

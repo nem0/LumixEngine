@@ -13,6 +13,7 @@
 #include "renderer/render_scene.h"
 #include "engine/universe/universe.h"
 #include <cmath>
+#include <bgfx/bgfx.h>
 
 
 namespace Lumix
@@ -251,7 +252,7 @@ static void getWord(ParseContext& ctx, char(&out)[32])
 		++ctx.in;
 	}
 	*o = '\0';
-};
+}
 
 struct {
 	const char* instruction;
@@ -487,7 +488,7 @@ void ScriptedParticleEmitter::execute(InputBlob& blob, int particle_index)
 	for (;;)
 	{
 		u8 instruction = blob.read<u8>();
-		u8 flag = blob.read<u8>();
+		/*u8 flag = */blob.read<u8>();
 
 		switch ((Instructions)instruction)
 		{
@@ -712,8 +713,6 @@ bgfx::InstanceDataBuffer ScriptedParticleEmitter::generateInstanceBuffer() const
 				break;
 		}
 	}
-	ASSERT(false);
-	return buffer;
 }
 
 
@@ -921,7 +920,6 @@ void ParticleEmitter::PlaneModule::drawGizmo(WorldEditor& editor, RenderScene& s
 		Matrix mtx = m_emitter.m_universe.getMatrix(entity);
 		Vec3 pos = mtx.getTranslation();
 		Vec3 right = mtx.getXVector();
-		Vec3 normal = mtx.getYVector();
 		Vec3 forward = mtx.getZVector();
 		u32 color = 0xffff0000;
 

@@ -24,7 +24,7 @@ class GameView : public StudioApp::IPlugin
 {
 friend struct GUIInterface;
 public:
-	GameView(StudioApp& app);
+	explicit GameView(StudioApp& app);
 	~GameView();
 
 	void setScene(RenderScene* scene);

@@ -17,7 +17,6 @@ namespace Lumix
 {
 
 
-static const ResourceType SHADER_TYPE("shader");
 static const ResourceType SHADER_BINARY_TYPE("shader_binary");
 
 
@@ -415,7 +414,7 @@ bool Shader::load(FS::IFile& file)
 }
 
 
-void Shader::unload(void)
+void Shader::unload()
 {
 	m_combintions = {};
 

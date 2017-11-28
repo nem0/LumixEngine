@@ -2,7 +2,6 @@
 #include "engine/json_serializer.h"
 #include "engine/log.h"
 #include "engine/string.h"
-#include "engine/vec.h"
 #include <bgfx/bgfx.h>
 #include <lua.hpp>
 #include <lauxlib.h>

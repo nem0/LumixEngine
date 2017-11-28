@@ -486,7 +486,7 @@ void deserialize(InputBlob& blob, Parent& parent, const Member& member, const Ar
 template <typename F>
 struct ArrayAttributeVisitor
 {
-	ArrayAttributeVisitor(F f)
+	explicit ArrayAttributeVisitor(F f)
 		: f(f)
 	{}
 
@@ -506,7 +506,7 @@ struct ArrayAttributeVisitor
 template <typename F>
 struct ArraySizeAttributeVisitor
 {
-	ArraySizeAttributeVisitor(F f)
+	explicit ArraySizeAttributeVisitor(F f)
 		: f(f)
 	{}
 
@@ -1035,7 +1035,6 @@ struct UIBuilder
 		}
 		if (!expanded) return;
 
-		int i = 0;
 		int subproperties_count = TupleSize<decltype(getMembers<T>().members)>::result;
 		if (subproperties_count > 1)
 		{

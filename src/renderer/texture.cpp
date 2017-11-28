@@ -14,9 +14,6 @@ namespace Lumix
 {
 
 
-static const ResourceType TEXTURE_TYPE("texture");
-
-
 Texture::Texture(const Path& path, ResourceManagerBase& resource_manager, IAllocator& _allocator)
 	: Resource(path, resource_manager, _allocator)
 	, data_reference(0)
@@ -282,7 +279,7 @@ void Texture::onDataUpdated(int x, int y, int w, int h)
 {
 	PROFILE_FUNCTION();
 
-	const bgfx::Memory* mem = nullptr;
+	const bgfx::Memory* mem;
 
 	if (bytes_per_pixel == 2)
 	{
@@ -626,7 +623,7 @@ bool Texture::load(FS::IFile& file)
 }
 
 
-void Texture::unload(void)
+void Texture::unload()
 {
 	if (bgfx::isValid(handle))
 	{

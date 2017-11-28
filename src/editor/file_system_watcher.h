@@ -1,12 +1,12 @@
 #pragma once
 
 #include "engine/delegate.h"
-#include "engine/path.h"
 
 
 namespace Lumix
 {
 
+struct IAllocator;
 
 class LUMIX_EDITOR_API FileSystemWatcher
 {

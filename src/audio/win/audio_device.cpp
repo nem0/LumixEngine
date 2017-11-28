@@ -1,7 +1,5 @@
 #include "audio_device.h"
-#include "clip_manager.h"
 #include "engine/engine.h"
-#include "engine/iplugin.h"
 #include "engine/log.h"
 #include <cmath>
 #include <dsound.h>
@@ -512,7 +510,7 @@ struct AudioDeviceImpl LUMIX_FINAL : public AudioDevice
 
 		if (FAILED(buffer.handle->Unlock(p1, s1, p2, s2)))
 		{
-			return;
+			g_log_error.log("Audio") << "Failed to unlock buffer.";
 		}
 	}
 
@@ -582,7 +580,7 @@ public:
 		float left_delay,
 		float right_delay) override {}
 
-	virtual void setChorus(BufferHandle handle,
+	void setChorus(BufferHandle handle,
 		float wet_dry_mix,
 		float depth,
 		float feedback,

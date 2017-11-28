@@ -1,6 +1,5 @@
 #include "engine/fs/tcp_file_server.h"
 
-#include "engine/array.h"
 #include "engine/free_list.h"
 #include "engine/fs/os_file.h"
 #include "engine/fs/tcp_file_device.h"
@@ -165,7 +164,7 @@ public:
 	}
 
 
-	int task()
+	int task() override
 	{
 		bool quit = false;
 

@@ -12,7 +12,7 @@ template <typename T> class DelegateList;
 template <typename R, typename... Args> class DelegateList<R(Args...)>
 {
 public:
-	DelegateList(IAllocator& allocator)
+	explicit DelegateList(IAllocator& allocator)
 		: m_delegates(allocator)
 	{
 	}

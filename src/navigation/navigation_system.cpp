@@ -1,32 +1,16 @@
 #include "navigation_scene.h"
-#include "navigation_scene.h"
 #include "animation/animation_scene.h"
-#include "engine/array.h"
 #include "engine/base_proxy_allocator.h"
-#include "engine/blob.h"
-#include "engine/crc32.h"
 #include "engine/engine.h"
-#include "engine/fs/os_file.h"
 #include "engine/iallocator.h"
-#include "engine/log.h"
 #include "engine/lua_wrapper.h"
 #include "engine/lumix.h"
-#include "engine/profiler.h"
 #include "engine/reflection.h"
-#include "engine/serializer.h"
 #include "engine/universe/universe.h"
 #include "engine/vec.h"
-#include "lua_script/lua_script_system.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
-#include "renderer/render_scene.h"
-#include "renderer/texture.h"
 #include <DetourAlloc.h>
-#include <DetourCrowd.h>
-#include <DetourNavMesh.h>
-#include <DetourNavMeshBuilder.h>
-#include <DetourNavMeshQuery.h>
-#include <Recast.h>
 #include <RecastAlloc.h>
 #include <cmath>
 
@@ -44,10 +28,6 @@ enum class NavigationSceneVersion : int
 };
 
 
-static const ComponentType NAVMESH_AGENT_TYPE = Reflection::getComponentType("navmesh_agent");
-static const ComponentType ANIM_CONTROLLER_TYPE = Reflection::getComponentType("anim_controller");
-static const int CELLS_PER_TILE_SIDE = 256;
-static const float CELL_SIZE = 0.3f;
 static void registerLuaAPI(lua_State* L);
 
 
@@ -74,7 +54,7 @@ struct Agent
 
 struct NavigationSystem LUMIX_FINAL : public IPlugin
 {
-	NavigationSystem(Engine& engine)
+	explicit NavigationSystem(Engine& engine)
 		: m_engine(engine)
 		, m_allocator(engine.getAllocator())
 	{

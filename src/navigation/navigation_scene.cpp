@@ -1,7 +1,6 @@
 #include "navigation_scene.h"
 #include "animation/animation_scene.h"
 #include "engine/array.h"
-#include "engine/base_proxy_allocator.h"
 #include "engine/blob.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
@@ -19,14 +18,12 @@
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include "renderer/render_scene.h"
-#include "renderer/texture.h"
 #include <DetourAlloc.h>
 #include <DetourCrowd.h>
 #include <DetourNavMesh.h>
 #include <DetourNavMeshBuilder.h>
 #include <DetourNavMeshQuery.h>
 #include <Recast.h>
-#include <RecastAlloc.h>
 #include <cmath>
 
 
@@ -701,7 +698,6 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 		Vec3 orig = m_debug_tile_origin;
 		int width = m_debug_heightfield->width;
 		float cell_height = 0.1f;
-		int rendered_cubes = 0;
 		for(int z = 0; z < m_debug_heightfield->height; ++z)
 		{
 			for(int x = 0; x < width; ++x)
@@ -900,8 +896,6 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 		if (!render_scene) return;
 
 		dtPolyRef base = m_navmesh->getPolyRefBase(tile);
-
-		int tileNum = m_navmesh->decodePolyIdTile(base);
 
 		for (int i = 0; i < tile->header->polyCount; ++i)
 		{

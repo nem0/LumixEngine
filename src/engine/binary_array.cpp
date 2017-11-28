@@ -7,15 +7,34 @@ namespace Lumix
 {
 
 static const int BITMASK_7BIT = sizeof(i32) * 8 - 1;
-
-BinaryArray::StoreType BinaryArray::BINARY_MASK[32];
-BinaryArray::StoreType BinaryArray::INDEX_BIT[32];
+static BinaryArray::StoreType BINARY_MASK[sizeof(BinaryArray::StoreType) << 3];
+static BinaryArray::StoreType INDEX_BIT[sizeof(BinaryArray::StoreType) << 3];
 
 
 BinaryArray::Accessor::Accessor(BinaryArray& array, int index)
 	: m_array(array)
 	, m_index(index)
 {
+}
+
+
+BinaryArray::Accessor::operator bool() const
+{
+	return (m_array.m_data[m_index >> 5] & INDEX_BIT[m_index & 31]) > 0;
+}
+
+
+BinaryArray::Accessor& BinaryArray::Accessor::operator =(bool value)
+{
+	if (value)
+	{
+		m_array.m_data[m_index >> 5] |= INDEX_BIT[m_index & 31];
+	}
+	else
+	{
+		m_array.m_data[m_index >> 5] &= ~INDEX_BIT[m_index & 31];
+	}
+	return *this;
 }
 
 

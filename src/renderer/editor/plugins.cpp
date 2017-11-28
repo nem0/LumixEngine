@@ -1,5 +1,4 @@
 #include "editor/asset_browser.h"
-#include "editor/ieditor_command.h"
 #include "editor/platform_interface.h"
 #include "editor/property_grid.h"
 #include "editor/render_interface.h"
@@ -11,7 +10,6 @@
 #include "engine/fs/disk_file_device.h"
 #include "engine/fs/file_system.h"
 #include "engine/fs/os_file.h"
-#include "engine/input_system.h"
 #include "engine/job_system.h"
 #include "engine/json_serializer.h"
 #include "engine/log.h"
@@ -33,7 +31,6 @@
 #include "renderer/frame_buffer.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
-#include "renderer/model_manager.h"
 #include "renderer/particle_system.h"
 #include "renderer/pipeline.h"
 #include "renderer/render_scene.h"
@@ -144,7 +141,6 @@ struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		ImGui::SameLine();
 		if (ImGui::Button("Open in external editor")) m_app.getAssetBrowser().openInExternalEditor(material);
 
-		bool b;
 		auto* plugin = m_app.getWorldEditor().getEngine().getPluginManager().getPlugin("renderer");
 		auto* renderer = static_cast<Renderer*>(plugin);
 
@@ -161,7 +157,7 @@ struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 			material->setRenderLayer(render_layer);
 		}
 
-		b = material->isBackfaceCulling();
+		bool b = material->isBackfaceCulling();
 		if (ImGui::Checkbox("Backface culling", &b)) material->enableBackfaceCulling(b);
 
 		if (material->hasDefine(alpha_cutout_define))
@@ -530,7 +526,6 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 
 	void showPreview(Model& model)
 	{
-		auto& engine = m_app.getWorldEditor().getEngine();
 		auto* render_scene = static_cast<RenderScene*>(m_universe->getScene(MODEL_INSTANCE_TYPE));
 		if (!render_scene) return;
 		if (!model.isReady()) return;
@@ -551,8 +546,6 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		m_pipeline->resize((int)image_size.x, (int)image_size.y);
 		m_pipeline->render();
 
-		auto content_min = ImGui::GetCursorScreenPos();
-		ImVec2 content_max(content_min.x + image_size.x, content_min.y + image_size.y);
 		ImGui::Image(&m_pipeline->getRenderbuffer("default", 0), image_size);
 		bool mouse_down = ImGui::IsMouseDown(0) || ImGui::IsMouseDown(1);
 		if (m_is_mouse_captured && !mouse_down)
@@ -565,7 +558,6 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		
 		if (ImGui::IsItemHovered() && mouse_down)
 		{
-			auto& input = engine.getInputSystem();
 			auto delta = m_app.getMouseMove();
 
 			if (!m_is_mouse_captured)
@@ -581,7 +573,6 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 				const Vec2 MOUSE_SENSITIVITY(50, 50);
 				Vec3 pos = m_universe->getPosition(m_camera_entity);
 				Quat rot = m_universe->getRotation(m_camera_entity);
-				Quat old_rot = rot;
 
 				float yaw = -Math::signum(delta.x) * (Math::pow(Math::abs((float)delta.x / MOUSE_SENSITIVITY.x), 1.2f));
 				Quat yaw_rot(Vec3(0, 1, 0), yaw);
@@ -627,7 +618,6 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 			ImGui::Text("# of triangles"); ImGui::NextColumn();
 			ImGui::Separator();
 			int lod_count = 1;
-			bool is_infinite_lod = false;
 			for (int i = 0; i < Model::MAX_LOD_COUNT && lods[i].to_mesh >= 0; ++i)
 			{
 				ImGui::PushID(i);
@@ -735,7 +725,6 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		if (!data) return false;
 
 		FS::OsFile file;
-		IAllocator& allocator = m_app.getWorldEditor().getAllocator();
 		if (file.open(path, FS::Mode::CREATE_AND_WRITE))
 		{
 			file.write(data, size);
@@ -801,7 +790,6 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 
 		popTileQueue();
 
-		IAllocator& editor_allocator = m_app.getWorldEditor().getAllocator();
 		Engine& engine = m_app.getWorldEditor().getEngine();
 		RenderScene* render_scene = (RenderScene*)m_tile.universe->getScene(MODEL_INSTANCE_TYPE);
 		if (!render_scene) return;
@@ -905,7 +893,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 	
 	struct TextureTileCreator
 	{
-		TextureTileCreator(IAllocator& allocator)
+		explicit TextureTileCreator(IAllocator& allocator)
 			: tiles(allocator)
 			, lock(false)
 			, shutdown_event(true)
@@ -1168,7 +1156,6 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		}
 		u64 probe_guid = ((RenderScene*)cmp.scene)->getEnvironmentProbeGUID(cmp.handle);
 		path << probe_guid << postfix << ".dds";
-		auto& allocator = m_app.getWorldEditor().getAllocator();
 		if (!file.open(path, FS::Mode::CREATE_AND_WRITE))
 		{
 			g_log_error.log("Editor") << "Failed to create " << path;
@@ -1415,7 +1402,7 @@ struct TerrainPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 
 struct FurPainter LUMIX_FINAL : public WorldEditor::Plugin
 {
-	FurPainter(StudioApp& _app)
+	explicit FurPainter(StudioApp& _app)
 		: app(_app)
 		, brush_radius(0.1f)
 		, brush_strength(1.0f)
@@ -1611,8 +1598,6 @@ struct FurPainter LUMIX_FINAL : public WorldEditor::Plugin
 
 	void rasterizeTriangle2(int width, u8* mem, Vertex v[3]) const
 	{
-		float squared_radius_rcp = 1.0f / (brush_radius * brush_radius);
-
 		static const i64 substep = 256;
 		static const i64 submask = substep - 1;
 		static const i64 stepshift = 8;
@@ -2397,7 +2382,7 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 
 struct RenderStatsPlugin LUMIX_FINAL : public StudioApp::IPlugin
 {
-	RenderStatsPlugin(StudioApp& app)
+	explicit RenderStatsPlugin(StudioApp& app)
 	{
 		Action* action = LUMIX_NEW(app.getWorldEditor().getAllocator(), Action)("Render Stats", "Toggle render stats", "render_stats");
 		action->func.bind<RenderStatsPlugin, &RenderStatsPlugin::onAction>(this);
@@ -2791,18 +2776,6 @@ struct WorldEditorPlugin LUMIX_FINAL : public WorldEditor::Plugin
 	void showCameraGizmo(ComponentUID cmp)
 	{
 		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
-		Universe& universe = scene->getUniverse();
-		Vec3 pos = universe.getPosition(cmp.entity);
-
-		bool is_ortho = scene->isCameraOrtho(cmp.handle);
-		float near_distance = scene->getCameraNearPlane(cmp.handle);
-		float far_distance = scene->getCameraFarPlane(cmp.handle);
-		Vec3 dir = universe.getRotation(cmp.entity).rotate(Vec3(0, 0, -1));
-		Vec3 right = universe.getRotation(cmp.entity).rotate(Vec3(1, 0, 0));
-		Vec3 up = universe.getRotation(cmp.entity).rotate(Vec3(0, 1, 0));
-		float w = scene->getCameraScreenWidth(cmp.handle);
-		float h = scene->getCameraScreenHeight(cmp.handle);
-		float ratio = h < 1.0f ? 1 : w / h;
 
 		scene->addDebugFrustum(scene->getCameraFrustum(cmp.handle), 0xffff0000, 0);
 	}
@@ -2837,7 +2810,7 @@ struct WorldEditorPlugin LUMIX_FINAL : public WorldEditor::Plugin
 
 struct AddTerrainComponentPlugin LUMIX_FINAL : public StudioApp::IAddComponentPlugin
 {
-	AddTerrainComponentPlugin(StudioApp& _app)
+	explicit AddTerrainComponentPlugin(StudioApp& _app)
 		: app(_app)
 	{
 	}
@@ -2851,7 +2824,6 @@ struct AddTerrainComponentPlugin LUMIX_FINAL : public StudioApp::IAddComponentPl
 		PathUtils::FileInfo info(normalized_material_path);
 		StaticString<MAX_PATH_LENGTH> hm_path(info.m_dir, info.m_basename, ".raw");
 		FS::OsFile file;
-		auto& allocator = app.getWorldEditor().getAllocator();
 		if (!file.open(hm_path, FS::Mode::CREATE_AND_WRITE))
 		{
 			g_log_error.log("Editor") << "Failed to create heightmap " << hm_path;
@@ -2935,10 +2907,6 @@ struct AddTerrainComponentPlugin LUMIX_FINAL : public StudioApp::IAddComponentPl
 			{
 				editor.addComponent(TERRAIN_TYPE);
 			}
-
-			auto& allocator = editor.getAllocator();
-			auto* render_scene = static_cast<RenderScene*>(editor.getUniverse()->getScene(TERRAIN_TYPE));
-			ComponentHandle cmp = editor.getUniverse()->getComponent(entity, TERRAIN_TYPE).handle;
 
 			if (!create_empty)
 			{

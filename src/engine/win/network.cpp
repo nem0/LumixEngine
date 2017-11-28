@@ -27,9 +27,8 @@ TCPAcceptor::~TCPAcceptor()
 
 bool TCPAcceptor::start(const char* ip, u16 port)
 {
-	WORD sockVer;
 	WSADATA wsaData;
-	sockVer = 2 | (2 << 8);
+	WORD sockVer = 2 | (2 << 8);
 	if (WSAStartup(sockVer, &wsaData) != 0) return false;
 
 	SOCKET socket = ::socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -78,9 +77,8 @@ TCPConnector::~TCPConnector()
 
 TCPStream* TCPConnector::connect(const char* ip, u16 port)
 {
-	WORD sockVer;
 	WSADATA wsaData;
-	sockVer = 2 | (2 << 8);
+	WORD sockVer = 2 | (2 << 8);
 	if (WSAStartup(sockVer, &wsaData) != 0) return nullptr;
 
 	SOCKET socket = ::socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);

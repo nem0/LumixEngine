@@ -1,7 +1,6 @@
 #include "engine/fs/file_system.h"
 #include "engine/iallocator.h"
 #include "engine/path.h"
-#include "engine/string.h"
 #include "pack_file_device.h"
 
 

@@ -120,10 +120,8 @@ inline u32 nextPow2(u32 v)
 
 inline u32 log2(u32 v)
 {
-	u32 r;
-	u32 shift;
-	r = (v > 0xffff) << 4; v >>= r;
-	shift = (v > 0xff) << 3; v >>= shift; r |= shift;
+	u32 r = (v > 0xffff) << 4; v >>= r;
+	u32 shift = (v > 0xff) << 3; v >>= shift; r |= shift;
 	shift = (v > 0xf) << 2; v >>= shift; r |= shift;
 	shift = (v > 0x3) << 1; v >>= shift; r |= shift;
 	r |= (v >> 1);

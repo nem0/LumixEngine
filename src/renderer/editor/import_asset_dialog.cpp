@@ -7,7 +7,6 @@
 #include "editor/world_editor.h"
 #include "engine/blob.h"
 #include "engine/crc32.h"
-#include "engine/debug/floating_points.h"
 #include "engine/engine.h"
 #include "engine/fs/disk_file_device.h"
 #include "engine/fs/os_file.h"
@@ -29,7 +28,6 @@
 #include "renderer/pipeline.h"
 #include "renderer/render_scene.h"
 #include "renderer/renderer.h"
-#include "renderer/texture.h"
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
 #if defined _MSC_VER && _MSC_VER == 1900 
@@ -227,7 +225,7 @@ struct FBXImporter
 			StaticString<32> name;
 		};
 
-		ImportAnimation(IAllocator& allocator)
+		explicit ImportAnimation(IAllocator& allocator)
 			: splits(allocator)
 		{}
 
@@ -300,15 +298,6 @@ struct FBXImporter
 			}
 		}
 		return nullptr;
-	}
-
-
-	void splitMeshes()
-	{
-		for (ImportMesh& mesh : meshes)
-		{
-
-		}
 	}
 
 
@@ -481,7 +470,6 @@ struct FBXImporter
 		const u8* data = (const u8*)haystack.getData();
 		const u8* needle_data = (const u8*)needle.getData();
 		int step_size = needle.getPos();
-		int step_count = haystack.getPos() / step_size;
 		int idx = first_subblob;
 		while(idx != -1)
 		{
@@ -584,7 +572,6 @@ struct FBXImporter
 			Array<int> subblobs(allocator);
 			subblobs.reserve(vertex_count);
 
-			int default_mat = 0;
 			const int* materials = geom->getMaterials();
 			for (int i = 0; i < vertex_count; ++i)
 			{
@@ -794,7 +781,6 @@ struct FBXImporter
 
 		FS::OsFile file;
 		PathBuilder output_material_name(output_dir, "/", mesh_output_filename, "_billboard.mat");
-		IAllocator& allocator = app.getWorldEditor().getAllocator();
 		if (!file.open(output_material_name, FS::Mode::CREATE_AND_WRITE))
 		{
 			g_log_error.log("FBX") << "Failed to create " << output_material_name;
@@ -848,7 +834,6 @@ struct FBXImporter
 			char mat_name[128];
 			getMaterialName(material.fbx, mat_name);
 			StaticString<MAX_PATH_LENGTH> path(output_dir, mat_name, ".mat");
-			IAllocator& allocator = app.getWorldEditor().getAllocator();
 			if (!out_file.open(path, FS::Mode::CREATE_AND_WRITE))
 			{
 				g_log_error.log("FBX") << "Failed to create " << path;
@@ -934,7 +919,7 @@ struct FBXImporter
 			  parent_scale;
 		Vec3 dif = (pos - last_written.pos) / sample_period;
 		TranslationKey prev = {pos, sample_period, 1};
-		float dt = sample_period;
+		float dt;
 		for (u16 i = 2; i < u16(to_frame - from_frame); ++i)
 		{
 			float t = i * sample_period;
@@ -975,7 +960,6 @@ struct FBXImporter
 		if (!curve_node) return;
 		if (to_frame == from_frame) return;
 
-		float dt = sample_period;
 		ofbx::Vec3 lcl_translation = bone.getLocalTranslation();
 		Quat rot = getRotation(bone.evalLocal(lcl_translation, curve_node->getNodeLocalTransform(from_frame * sample_period)));
 		RotationKey last_written = {rot, 0, 0};
@@ -1039,7 +1023,6 @@ struct FBXImporter
 			dialog.setImportMessage("Writing animation...", 0.6f + 0.2f * (anim_idx / (float)animations.size()));
 			if (!anim.import) continue;
 			const ofbx::AnimationStack* stack = anim.fbx;
-			const char* anim_name = stack->name;
 			const ofbx::IScene& scene = *anim.scene;
 			const ofbx::TakeInfo* take_info = scene.getTakeInfo(stack->name);
 
@@ -1071,10 +1054,6 @@ struct FBXImporter
 				whole_anim_split.to_frame = all_frames_count;
 				auto* split = anim.splits.empty() ? &whole_anim_split : &anim.splits[i];
 
-				float begin = sampling_period * split->from_frame;
-				float end = sampling_period * split->to_frame;
-
-				float duration = (end > begin ? end - begin : 1.0f) * time_scale;
 				int frame_count = split->to_frame - split->from_frame;
 
 				StaticString<MAX_PATH_LENGTH> tmp(output_dir, anim.output_filename, split->name, ".ani");
@@ -1887,7 +1866,6 @@ int setAnimationParams(lua_State* L)
 	if (lua_getfield(L, 2, "root_bone") == LUA_TSTRING)
 	{
 		const char* name = lua_tostring(L, -1);
-		auto* layer = anim.fbx->getLayer(0);
 		for (int i = 0; i < dlg->m_fbx_importer->bones.size(); ++i)
 		{
 			if (equalStrings(dlg->m_fbx_importer->bones[i]->name, name))

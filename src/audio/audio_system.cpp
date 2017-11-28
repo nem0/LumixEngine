@@ -3,19 +3,11 @@
 #include "audio_device.h"
 #include "audio_scene.h"
 #include "clip_manager.h"
-#include "editor/asset_browser.h"
-#include "editor/studio_app.h"
-#include "editor/utils.h"
-#include "editor/world_editor.h"
-#include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/iplugin.h"
-#include "engine/path.h"
-#include "engine/plugin_manager.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/universe/universe.h"
-#include "renderer/render_scene.h"
 
 
 namespace Lumix

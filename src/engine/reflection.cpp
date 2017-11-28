@@ -1,5 +1,4 @@
 #include "engine/reflection.h"
-#include "engine/associative_array.h"
 #include "engine/crc32.h"
 #include "engine/default_allocator.h"
 #include "engine/log.h"
@@ -23,21 +22,21 @@ template <> Path readFromStream<Path>(InputBlob& stream)
 	Path path(c_str);
 	stream.skip(stringLength(c_str) + 1);
 	return path;
-};
+}
 
 
 template <> void writeToStream<const Path&>(OutputBlob& stream, const Path& path)
 {
 	const char* str = path.c_str();
 	stream.write(str, stringLength(str) + 1);
-};
+}
 
 
 template <> void writeToStream<Path>(OutputBlob& stream, Path path)
 {
 	const char* str = path.c_str();
 	stream.write(str, stringLength(str) + 1);
-};
+}
 
 
 template <> const char* readFromStream<const char*>(InputBlob& stream)
@@ -45,13 +44,13 @@ template <> const char* readFromStream<const char*>(InputBlob& stream)
 	const char* c_str = (const char*)stream.getData() + stream.getPosition();
 	stream.skip(stringLength(c_str) + 1);
 	return c_str;
-};
+}
 
 
 template <> void writeToStream<const char*>(OutputBlob& stream, const char* value)
 {
 	stream.write(value, stringLength(value) + 1);
-};
+}
 
 
 }

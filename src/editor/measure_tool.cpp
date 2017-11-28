@@ -32,7 +32,7 @@ namespace Lumix
 	}
 
 
-	void MeasureTool::createEditorLines(RenderInterface& interface)
+	void MeasureTool::createEditorLines(RenderInterface& interface) const
 	{
 		if (!m_is_enabled) return;
 		

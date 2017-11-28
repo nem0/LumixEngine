@@ -2,7 +2,6 @@
 
 
 #include "engine/associative_array.h"
-#include "engine/string.h"
 
 
 namespace Lumix

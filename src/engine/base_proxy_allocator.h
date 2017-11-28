@@ -12,7 +12,7 @@ namespace Lumix
 class BaseProxyAllocator : public IAllocator
 {
 public:
-	BaseProxyAllocator(IAllocator& source)
+	explicit BaseProxyAllocator(IAllocator& source)
 		: m_source(source)
 	{
 		m_allocation_count = 0;

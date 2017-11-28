@@ -3,7 +3,6 @@
 
 #include "engine/lumix.h"
 #include "engine/geometry.h"
-#include "engine/matrix.h"
 #include "engine/path.h"
 #include "engine/vec.h"
 #include "editor/world_editor.h"

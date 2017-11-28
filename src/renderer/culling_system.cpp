@@ -1,6 +1,5 @@
 #include "culling_system.h"
 #include "engine/array.h"
-#include "engine/binary_array.h"
 #include "engine/free_list.h"
 #include "engine/geometry.h"
 #include "engine/job_system.h"
@@ -13,8 +12,6 @@ namespace Lumix
 typedef Array<u64> LayerMasks;
 typedef Array<int> ModelInstancetoSphereMap;
 typedef Array<ComponentHandle> SphereToModelInstanceMap;
-
-static const int MIN_ENTITIES_PER_THREAD = 50;
 
 static void doCulling(int start_index,
 	const Sphere* LUMIX_RESTRICT start,
@@ -78,7 +75,7 @@ struct CullingJobData
 class CullingSystemImpl LUMIX_FINAL : public CullingSystem
 {
 public:
-	CullingSystemImpl(IAllocator& allocator)
+	explicit CullingSystemImpl(IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_job_allocator(allocator)
 		, m_spheres(allocator)

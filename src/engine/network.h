@@ -21,7 +21,7 @@ class TCPStream;
 class LUMIX_ENGINE_API TCPAcceptor
 {
 public:
-	TCPAcceptor(IAllocator& allocator);
+	explicit TCPAcceptor(IAllocator& allocator);
 	~TCPAcceptor();
 
 	bool start(const char* ip, u16 port);
@@ -37,7 +37,7 @@ private:
 class LUMIX_ENGINE_API TCPConnector
 {
 public:
-	TCPConnector(IAllocator& allocator);
+	explicit TCPConnector(IAllocator& allocator);
 	~TCPConnector();
 
 	TCPStream* connect(const char* ip, u16 port);
@@ -52,7 +52,7 @@ private:
 class LUMIX_ENGINE_API TCPStream
 {
 public:
-	TCPStream(uintptr socket)
+	explicit TCPStream(uintptr socket)
 		: m_socket(socket)
 	{
 	}

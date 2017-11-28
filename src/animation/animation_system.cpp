@@ -2,22 +2,12 @@
 
 #include "animation/animation.h"
 #include "animation/controller.h"
-#include "animation/events.h"
 #include "engine/base_proxy_allocator.h"
 #include "engine/blob.h"
-#include "engine/crc32.h"
 #include "engine/engine.h"
-#include "engine/json_serializer.h"
-#include "engine/lua_wrapper.h"
-#include "engine/job_system.h"
-#include "engine/profiler.h"
 #include "engine/reflection.h"
-#include "engine/resource_manager.h"
-#include "engine/serializer.h"
 #include "engine/universe/universe.h"
 #include "renderer/model.h"
-#include "renderer/pose.h"
-#include "renderer/render_scene.h"
 #include <cfloat>
 #include <cmath>
 
@@ -34,9 +24,6 @@ enum class AnimationSceneVersion
 };
 
 
-static const ComponentType ANIMABLE_TYPE = Reflection::getComponentType("animable");
-static const ComponentType CONTROLLER_TYPE = Reflection::getComponentType("anim_controller");
-static const ComponentType SHARED_CONTROLLER_TYPE = Reflection::getComponentType("shared_anim_controller");
 static const ResourceType ANIMATION_TYPE("animation");
 static const ResourceType CONTROLLER_RESOURCE_TYPE("anim_controller");
 
@@ -66,7 +53,7 @@ struct AnimSetProperty : public Reflection::IEnumProperty
 	int getEnumCount(ComponentUID cmp) const override
 	{
 		Anim::ControllerResource* res = static_cast<AnimationScene*>(cmp.scene)->getControllerResource(cmp.handle);
-		return res->m_sets_names.size();
+		return res ? res->m_sets_names.size() : 0;
 	}
 
 
@@ -81,7 +68,7 @@ struct AnimSetProperty : public Reflection::IEnumProperty
 namespace FS
 {
 class FileSystem;
-};
+}
 
 
 class Animation;
@@ -98,7 +85,7 @@ struct AnimationSystemImpl LUMIX_FINAL : public IPlugin
 	explicit AnimationSystemImpl(Engine& engine);
 	~AnimationSystemImpl();
 
-	void registerLuaAPI();
+	void registerLuaAPI() const;
 	void createScenes(Universe& ctx) override;
 	void destroyScene(IScene* scene) override;
 	const char* getName() const override { return "animation"; }
@@ -152,7 +139,7 @@ AnimationSystemImpl::~AnimationSystemImpl()
 }
 
 
-void AnimationSystemImpl::registerLuaAPI()
+void AnimationSystemImpl::registerLuaAPI() const
 {
 	AnimationScene::registerLuaAPI(m_engine.getState());
 }

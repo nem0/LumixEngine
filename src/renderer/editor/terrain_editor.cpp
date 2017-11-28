@@ -5,7 +5,6 @@
 #include "editor/prefab_system.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
-#include "engine/blob.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/geometry.h"
@@ -23,7 +22,6 @@
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include "renderer/render_scene.h"
-#include "renderer/terrain.h"
 #include "renderer/texture.h"
 #include "stb/stb_image.h"
 #include <cmath>
@@ -36,7 +34,6 @@ namespace Lumix
 static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("renderable");
 static const ComponentType TERRAIN_TYPE = Reflection::getComponentType("terrain");
 static const ComponentType HEIGHTFIELD_TYPE = Reflection::getComponentType("physical_heightfield");
-static const ResourceType MATERIAL_TYPE("material");
 static const ResourceType TEXTURE_TYPE("texture");
 static const ResourceType PREFAB_TYPE("prefab");
 static const char* HEIGHTMAP_UNIFORM = "u_texHeightmap";
@@ -242,7 +239,7 @@ private:
 
 	Texture* getDestinationTexture()
 	{
-		const char* uniform_name = "";
+		const char* uniform_name;
 		switch (m_action_type)
 		{
 			case TerrainEditor::REMOVE_GRASS:
@@ -420,8 +417,7 @@ private:
 		ASSERT(texture->bytes_per_pixel == 2);
 
 		int texture_size = texture->width;
-		Rectangle rect;
-		rect = item.getBoundingRectangle(texture_size);
+		Rectangle rect = item.getBoundingRectangle(texture_size);
 
 		float avg = computeAverage16(texture, rect.from_x, rect.to_x, rect.from_y, rect.to_y);
 		for (int i = rect.from_x, end = rect.to_x; i < end; ++i)
@@ -443,8 +439,7 @@ private:
 		ASSERT(texture->bytes_per_pixel == 2);
 
 		int texture_size = texture->width;
-		Rectangle rect;
-		rect = item.getBoundingRectangle(texture_size);
+		Rectangle rect = item.getBoundingRectangle(texture_size);
 
 		for (int i = rect.from_x, end = rect.to_x; i < end; ++i)
 		{
@@ -495,8 +490,7 @@ private:
 		ASSERT(texture->bytes_per_pixel == 2);
 
 		int texture_size = texture->width;
-		Rectangle rect;
-		rect = item.getBoundingRectangle(texture_size);
+		Rectangle rect = item.getBoundingRectangle(texture_size);
 
 		const float STRENGTH_MULTIPLICATOR = 256.0f;
 		float amount = Math::maximum(item.m_amount * item.m_amount * STRENGTH_MULTIPLICATOR, 1.0f);
@@ -1528,6 +1522,7 @@ void TerrainEditor::onGUI()
 			if (ImGui::Button("Save colormap"))
 				getMaterial()->getTextureByUniform(COLORMAP_UNIFORM)->save();
 			break;
+		case ENTITY: break;
 	}
 
 	if (m_current_brush == LAYER || m_current_brush == GRASS || m_current_brush == COLOR)

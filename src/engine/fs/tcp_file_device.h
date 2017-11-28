@@ -51,8 +51,6 @@ namespace Lumix
 			void connect(const char* ip, u16 port, IAllocator& allocator);
 			void disconnect();
 
-			Net::TCPStream* getStream();
-
 		private:
 			TCPImpl* m_impl;
 		};

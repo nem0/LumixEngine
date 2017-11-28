@@ -18,10 +18,8 @@ namespace Lumix
 {
 
 
-static const u32 SHADOWMAP_HASH = crc32("shadowmap");
 static const ResourceType TEXTURE_TYPE("texture");
 static const ResourceType SHADER_TYPE("shader");
-static const ResourceType MATERIAL_TYPE("material");
 static const float DEFAULT_ALPHA_REF_VALUE = 0.3f;
 
 
@@ -132,7 +130,7 @@ void Material::setDefine(u8 define_idx, bool enabled)
 }
 
 
-void Material::unload(void)
+void Material::unload()
 {
 	if(m_command_buffer != &DEFAULT_COMMAND_BUFFER) m_allocator.deallocate(m_command_buffer);
 	m_command_buffer = &DEFAULT_COMMAND_BUFFER;
@@ -778,8 +776,6 @@ bool Material::isBackfaceCulling() const
 bool Material::load(FS::IFile& file)
 {
 	PROFILE_FUNCTION();
-
-	auto& renderer = static_cast<MaterialManager&>(m_resource_manager).getRenderer();
 
 	m_render_states = BGFX_STATE_CULL_CW;
 	setAlphaRef(DEFAULT_ALPHA_REF_VALUE);

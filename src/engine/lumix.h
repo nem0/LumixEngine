@@ -75,20 +75,20 @@ const u32 MAX_PATH_LENGTH = 260;
 struct ComponentHandle
 {
 	int index;
-	bool operator==(const ComponentHandle& rhs) const { return rhs.index == index; };
-	bool operator<(const ComponentHandle& rhs) const { return rhs.index < index; };
-	bool operator>(const ComponentHandle& rhs) const { return rhs.index > index; };
-	bool operator!=(const ComponentHandle& rhs) const { return rhs.index != index; };
+	bool operator==(const ComponentHandle& rhs) const { return rhs.index == index; }
+	bool operator<(const ComponentHandle& rhs) const { return rhs.index < index; }
+	bool operator>(const ComponentHandle& rhs) const { return rhs.index > index; }
+	bool operator!=(const ComponentHandle& rhs) const { return rhs.index != index; }
 	bool isValid() const { return index >= 0; }
 };
 
 struct Entity
 {
 	int index;
-	bool operator==(const Entity& rhs) const { return rhs.index == index; };
-	bool operator<(const Entity& rhs) const { return rhs.index < index; };
-	bool operator>(const Entity& rhs) const { return rhs.index > index; };
-	bool operator!=(const Entity& rhs) const { return rhs.index != index; };
+	bool operator==(const Entity& rhs) const { return rhs.index == index; }
+	bool operator<(const Entity& rhs) const { return rhs.index < index; }
+	bool operator>(const Entity& rhs) const { return rhs.index > index; }
+	bool operator!=(const Entity& rhs) const { return rhs.index != index; }
 	bool isValid() const { return index >= 0; }
 };
 
@@ -97,10 +97,10 @@ struct ComponentType
 	enum { MAX_TYPES_COUNT = 64 };
 
 	int index;
-	bool operator==(const ComponentType& rhs) const { return rhs.index == index; };
-	bool operator<(const ComponentType& rhs) const { return rhs.index < index; };
-	bool operator>(const ComponentType& rhs) const { return rhs.index > index; };
-	bool operator!=(const ComponentType& rhs) const { return rhs.index != index; };
+	bool operator==(const ComponentType& rhs) const { return rhs.index == index; }
+	bool operator<(const ComponentType& rhs) const { return rhs.index < index; }
+	bool operator>(const ComponentType& rhs) const { return rhs.index > index; }
+	bool operator!=(const ComponentType& rhs) const { return rhs.index != index; }
 };
 const ComponentType INVALID_COMPONENT_TYPE = {-1};
 const Entity INVALID_ENTITY = {-1};

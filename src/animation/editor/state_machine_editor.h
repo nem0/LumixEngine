@@ -42,7 +42,7 @@ public:
 	}
 
 	virtual ~Component();
-	virtual void destroy() {};
+	virtual void destroy() {}
 	virtual bool draw(ImDrawList* draw, const ImVec2& canvas_screen_pos, bool selected) = 0;
 	virtual void onGUI() {}
 	virtual void serialize(OutputBlob& blob) = 0;
@@ -118,7 +118,7 @@ public:
 	void deserialize(InputBlob& blob) override;
 	void serialize(OutputBlob& blob) override;
 	void compile() override;
-	virtual Component* getByUID(int uid) override;
+	Component* getByUID(int uid) override;
 	virtual void dropSlot(const char* name, u32 slot, const ImVec2& canvas_screen_pos) {}
 	virtual void removeChild(Component* component);
 	bool isContainer() const override { return true; }
@@ -129,6 +129,7 @@ public:
 protected:
 	void contextMenu(const ImVec2& canvas_screen_pos);
 	virtual bool isFixed(Node& node) const;
+	void pasteNode(const ImVec2& pos_on_canvas);
 
 protected:
 	Array<Component*> m_editor_cmps;
@@ -171,7 +172,7 @@ class AnimationNode : public Node
 public:
 	struct AnimationProxy
 	{
-		AnimationProxy(AnimationNode& node) : node(node) {}
+		explicit AnimationProxy(AnimationNode& node) : node(node) {}
 		AnimationNode& node;
 
 		u32 getValue() const;
@@ -323,7 +324,7 @@ public:
 		class Bone
 		{
 			public:
-				Bone(ControllerResource& _controller) 
+				explicit Bone(ControllerResource& _controller) 
 					: controller(_controller)
 					, name("", _controller.m_allocator) {}
 
@@ -335,7 +336,7 @@ public:
 				ControllerResource& controller;
 		};
 
-		Mask(ControllerResource& _controller) 
+		explicit Mask(ControllerResource& _controller) 
 			: controller(_controller)
 			, bones(controller.m_allocator)
 		{}
@@ -357,7 +358,7 @@ public:
 	{
 		struct ValueProxy
 		{
-			ValueProxy(InputProxy& input) : input(input) {}
+			explicit ValueProxy(InputProxy& input) : input(input) {}
 			InputProxy& input;
 		};
 
@@ -387,7 +388,7 @@ public:
 	{
 		struct ValueProxy
 		{
-			ValueProxy(ConstantProxy& input) : input(input) {}
+			explicit ValueProxy(ConstantProxy& input) : input(input) {}
 			ConstantProxy& input;
 		};
 
@@ -415,7 +416,7 @@ public:
 
 	struct AnimationSlot
 	{
-		AnimationSlot(ControllerResource& controller) 
+		explicit AnimationSlot(ControllerResource& controller) 
 			: controller(controller) 
 			, values(controller.getAllocator())
 		{}
@@ -428,7 +429,7 @@ public:
 
 		struct Value
 		{
-			Value(AnimationSlot& slot) : slot(slot) {}
+			explicit Value(AnimationSlot& slot) : slot(slot) {}
 
 			const Path& get() const;
 			void set(const Path& anim);
@@ -445,7 +446,7 @@ public:
 
 	struct AnimationSet
 	{
-		AnimationSet(ControllerResource& controller) 
+		explicit AnimationSet(ControllerResource& controller) 
 			: controller(controller)
 			, values(controller.getAllocator())
 		{}
@@ -455,7 +456,7 @@ public:
 
 		struct Value
 		{
-			Value(AnimationSet& set) : set(set) {}
+			explicit Value(AnimationSet& set) : set(set) {}
 
 			const Path& getValue() const;
 			void setValue(const Path& anim);

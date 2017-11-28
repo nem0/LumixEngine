@@ -2,9 +2,7 @@
 #include "engine/blob.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
-#include "engine/fs/file_system.h"
 #include "engine/job_system.h"
-#include "engine/json_serializer.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
 #include "engine/matrix.h"
@@ -23,7 +21,6 @@
 #include "renderer/render_scene.h"
 #include "renderer/texture.h"
 #include <PxPhysicsAPI.h>
-#include <cooking/PxCooking.h>
 
 
 using namespace physx;
@@ -104,7 +101,7 @@ struct OutputStream LUMIX_FINAL : public PxOutputStream
 	~OutputStream() { allocator.deallocate(data); }
 
 
-	virtual PxU32 write(const void* src, PxU32 count)
+	PxU32 write(const void* src, PxU32 count) override
 	{
 		if (size + (int)count > capacity)
 		{
@@ -138,7 +135,7 @@ struct InputStream LUMIX_FINAL : public PxInputStream
 		pos = 0;
 	}
 
-	virtual PxU32 read(void* dest, PxU32 count)
+	PxU32 read(void* dest, PxU32 count) override
 	{
 		if (pos + (int)count <= size)
 		{
@@ -236,7 +233,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 				if (!(cp.events & PxPairFlag::eNOTIFY_TOUCH_FOUND)) continue;
 
 				PxContactPairPoint contact;
-				auto contact_count = cp.extractContacts(&contact, 1);
+				cp.extractContacts(&contact, 1);
 
 				ContactData contact_data;
 				contact_data.position = fromPhysx(contact.position);
@@ -1898,7 +1895,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	{
 		auto* bone = &model->getBone(bone_index);
 		if (bone->parent_idx < 0) return nullptr;
-		RagdollBone* phy_bone = nullptr;
+		RagdollBone* phy_bone;
 		do
 		{
 			bone = &model->getBone(bone->parent_idx);
@@ -2626,8 +2623,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			PxTransform transform = toPhysx(m_universe.getTransform(terrain.m_entity).getRigidPart());
 			transform.p.y += terrain.m_y_scale * 0.5f;
 
-			PxRigidActor* actor;
-			actor = PxCreateStatic(*m_system->getPhysics(), transform, hfGeom, *m_default_material);
+			PxRigidActor* actor = PxCreateStatic(*m_system->getPhysics(), transform, hfGeom, *m_default_material);
 			if (actor)
 			{
 				actor->userData = (void*)(intptr_t)terrain.m_entity.index;
@@ -2745,7 +2741,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 					}
 					(*this)(bone->child);
 					(*this)(bone->next);
-				};
+				}
 				PxShape* shapes[8];
 				PxFilterData data;
 			};
@@ -2892,8 +2888,6 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		int count = getGeometryCount(cmp, type);
 		PxShape* shape = getShape(cmp, index, type);
 		shape->getActor()->detachShape(*shape);
-
-		//0, 1, 2
 
 		for (int i = index + 1; i < count; ++i)
 		{
@@ -5065,16 +5059,13 @@ void PhysicsSceneImpl::RigidActor::onStateChanged(Resource::State, Resource::Sta
 
 		PxTransform transform = toPhysx(scene.getUniverse().getTransform(entity).getRigidPart());
 
-		PxRigidActor* actor;
-		auto& physics = *scene.m_system->getPhysics();
-
 		PxMeshScale scale(scene.getUniverse().getScale(entity));
 		PxConvexMeshGeometry convex_geom(resource->convex_mesh, scale);
 		PxTriangleMeshGeometry tri_geom(resource->tri_mesh, scale);
 		const PxGeometry* geom = resource->convex_mesh ? static_cast<PxGeometry*>(&convex_geom)
 															  : static_cast<PxGeometry*>(&tri_geom);
 
-		actor = scene.createPhysXActor(this, transform, *geom);
+		PxRigidActor* actor = scene.createPhysXActor(this, transform, *geom);
 
 		if (actor)
 		{

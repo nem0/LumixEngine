@@ -189,7 +189,7 @@ static BlockInfo getBlock(const char* name)
 {
 	auto thread_id = MT::getCurrentThreadID();
 
-	ThreadData* thread_data = nullptr;
+	ThreadData* thread_data;
 	{
 		MT::SpinLock lock(g_instance.m_mutex);
 		auto iter = g_instance.threads.find(thread_id);
@@ -347,7 +347,7 @@ Block* getCurrentBlock()
 {
 	auto thread_id = MT::getCurrentThreadID();
 
-	ThreadData* thread_data = nullptr;
+	ThreadData* thread_data;
 	{
 		MT::SpinLock lock(g_instance.m_mutex);
 		auto iter = g_instance.threads.find(thread_id);
@@ -363,7 +363,7 @@ void* endBlock()
 {
 	auto thread_id = MT::getCurrentThreadID();
 
-	ThreadData* thread_data = nullptr;
+	ThreadData* thread_data;
 	{
 		MT::SpinLock lock(g_instance.m_mutex);
 		auto iter = g_instance.threads.find(thread_id);

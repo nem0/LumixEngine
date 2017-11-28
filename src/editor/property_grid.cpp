@@ -4,7 +4,6 @@
 #include "editor/studio_app.h"
 #include "editor/world_editor.h"
 #include "engine/blob.h"
-#include "engine/engine.h"
 #include "engine/iplugin.h"
 #include "engine/math_utils.h"
 #include "engine/prefab.h"
@@ -57,7 +56,7 @@ struct GridUIVisitor LUMIX_FINAL : Reflection::IPropertyVisitor
 	{}
 
 
-	ComponentUID getComponent()
+	ComponentUID getComponent() const
 	{
 		ComponentUID first_entity_cmp;
 		first_entity_cmp.type = m_cmp_type;
@@ -432,7 +431,6 @@ struct GridUIVisitor LUMIX_FINAL : Reflection::IPropertyVisitor
 		const ImGuiStyle& style = ImGui::GetStyle();
 		if (prop.canAddRemove())
 		{
-			float w = ImGui::GetContentRegionAvailWidth();
 			ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize("Add").x - style.FramePadding.x * 2 - style.WindowPadding.x - 15);
 			if (ImGui::SmallButton("Add"))
 			{
@@ -455,7 +453,6 @@ struct GridUIVisitor LUMIX_FINAL : Reflection::IPropertyVisitor
 			bool is_open = !prop.canAddRemove() || ImGui::TreeNodeEx(tmp, flags);
 			if (prop.canAddRemove())
 			{
-				float w = ImGui::GetContentRegionAvailWidth();
 				ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize("Remove").x - style.FramePadding.x * 2 - style.WindowPadding.x - 15);
 				if (ImGui::SmallButton("Remove"))
 				{
@@ -537,7 +534,6 @@ void PropertyGrid::showComponentProperties(const Array<Entity>& entities, Compon
 	bool is_open = ImGui::TreeNodeEx((void*)(uintptr)cmp_type.index, flags, "%s", cmp_type_name);
 	ImGui::PopFont();
 
-	float w = ImGui::GetContentRegionAvailWidth();
 	ImGuiStyle& style = ImGui::GetStyle();
 	ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize("Remove").x - style.FramePadding.x * 2 - style.WindowPadding.x - 15);
 	if (ImGui::SmallButton("Remove"))
@@ -666,7 +662,7 @@ bool PropertyGrid::entityInput(const char* label, const char* str_id, Entity& en
 }
 
 
-void PropertyGrid::showCoreProperties(const Array<Entity>& entities)
+void PropertyGrid::showCoreProperties(const Array<Entity>& entities) const
 {
 	char name[256];
 	const char* tmp = m_editor.getUniverse()->getEntityName(entities[0]);
@@ -714,11 +710,14 @@ void PropertyGrid::showCoreProperties(const Array<Entity>& entities)
 			Vec3 old_pos = tr.pos;
 			if (ImGui::DragFloat3("Local position", &tr.pos.x))
 			{
-				WorldEditor::Coordinate coord;
+				WorldEditor::Coordinate coord = WorldEditor::Coordinate::NONE;
 				if (tr.pos.x != old_pos.x) coord = WorldEditor::Coordinate::X;
 				if (tr.pos.y != old_pos.y) coord = WorldEditor::Coordinate::Y;
 				if (tr.pos.z != old_pos.z) coord = WorldEditor::Coordinate::Z;
-				m_editor.setEntitiesLocalCoordinate(&entities[0], entities.size(), (&tr.pos.x)[(int)coord], coord);
+				if (coord != WorldEditor::Coordinate::NONE)
+				{
+					m_editor.setEntitiesLocalCoordinate(&entities[0], entities.size(), (&tr.pos.x)[(int)coord], coord);
+				}
 			}
 		}
 	}
@@ -733,11 +732,14 @@ void PropertyGrid::showCoreProperties(const Array<Entity>& entities)
 	Vec3 old_pos = pos;
 	if (ImGui::DragFloat3("Position", &pos.x))
 	{
-		WorldEditor::Coordinate coord;
+		WorldEditor::Coordinate coord = WorldEditor::Coordinate::NONE;
 		if (pos.x != old_pos.x) coord = WorldEditor::Coordinate::X;
 		if (pos.y != old_pos.y) coord = WorldEditor::Coordinate::Y;
 		if (pos.z != old_pos.z) coord = WorldEditor::Coordinate::Z;
-		m_editor.setEntitiesCoordinate(&entities[0], entities.size(), (&pos.x)[(int)coord], coord);
+		if (coord != WorldEditor::Coordinate::NONE)
+		{
+			m_editor.setEntitiesCoordinate(&entities[0], entities.size(), (&pos.x)[(int)coord], coord);
+		}
 	}
 
 	Universe* universe = m_editor.getUniverse();

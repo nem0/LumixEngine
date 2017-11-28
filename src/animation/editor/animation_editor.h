@@ -60,7 +60,7 @@ public:
 	virtual void moveNode(ControllerResource& ctrl, Node* node, const ImVec2& pos) = 0;
 	virtual void destroyNode(ControllerResource& ctrl, Node* node) = 0;
 	virtual void destroyEdge(ControllerResource& ctrl, Edge* edge) = 0;
-	virtual void createNode(ControllerResource& ctrl,
+	virtual Node* createNode(ControllerResource& ctrl,
 		Container* container,
 		Anim::Node::Type type,
 		const ImVec2& pos) = 0;

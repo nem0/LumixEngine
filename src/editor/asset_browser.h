@@ -41,7 +41,7 @@ public:
 	typedef DelegateList<void(const Path&, const char*)> OnResourceChanged;
 
 public:
-	AssetBrowser(StudioApp& app);
+	explicit AssetBrowser(StudioApp& app);
 	~AssetBrowser();
 	void onGUI();
 	void update();
@@ -51,11 +51,11 @@ public:
 	bool resourceInput(const char* label, const char* str_id, char* buf, int max_size, ResourceType type);
 	void onInitFinished();
 	void addPlugin(IPlugin& plugin);
-	void openInExternalEditor(Resource* resource);
-	void openInExternalEditor(const char* path);
+	void openInExternalEditor(Resource* resource) const;
+	void openInExternalEditor(const char* path) const;
 	void enableUpdate(bool enable) { m_is_update_enabled = enable; }
 	OnResourceChanged& resourceChanged() { return m_on_resource_changed; }
-	bool resourceList(char* buf, int max_size, ResourceType type, float height);
+	bool resourceList(char* buf, int max_size, ResourceType type, float height) const;
 
 public:
 	bool m_is_open;
@@ -81,7 +81,6 @@ private:
 	int getThumbnailIndex(int i, int j, int columns) const;
 	void doFilter();
 	void breadcrumbs();
-	void onTilesGUI();
 	void changeDir(const char* path);
 	void onFileChanged(const char* path);
 	void findResources();

@@ -1,6 +1,5 @@
 ﻿#include "gui_system.h"
 #include "engine/delegate.h"
-#include "engine/delegate_list.h"
 #include "engine/engine.h"
 #include "engine/iallocator.h"
 #include "engine/input_system.h"
@@ -32,7 +31,7 @@ static const ResourceType TEXTURE_TYPE("texture");
 
 struct GUISystemImpl LUMIX_FINAL : public GUISystem
 {
-	GUISystemImpl(Engine& engine)
+	explicit GUISystemImpl(Engine& engine)
 		: m_engine(engine)
 		, m_interface(nullptr)
 	{

@@ -53,8 +53,8 @@ struct LUMIX_EDITOR_API Settings
 	bool save();
 	bool load();
 	void onGUI();
-	void setValue(const char* name, bool value);
-	void setValue(const char* name, int value);
+	void setValue(const char* name, bool value) const;
+	void setValue(const char* name, int value) const;
 	int getValue(const char* name, int default_value) const;
 	bool getValue(const char* name, bool default_value) const;
 
@@ -64,7 +64,7 @@ private:
 
 private:
 	void showShortcutSettings();
-	void showToolbarSettings();
+	void showToolbarSettings() const;
 };
 
 

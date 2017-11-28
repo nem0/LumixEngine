@@ -12,7 +12,6 @@
 #include "engine/resource_manager_base.h"
 #include "engine/vec.h"
 #include "renderer/material.h"
-#include "renderer/model_manager.h"
 #include "renderer/pose.h"
 #include "renderer/renderer.h"
 
@@ -120,7 +119,7 @@ Model::~Model()
 }
 
 
-static inline Vec3 evaluateSkin(Vec3& p, Mesh::Skin s, const Matrix* matrices)
+static Vec3 evaluateSkin(Vec3& p, Mesh::Skin s, const Matrix* matrices)
 {
 	Matrix m = matrices[s.indices[0]] * s.weights.x + matrices[s.indices[1]] * s.weights.y +
 			   matrices[s.indices[2]] * s.weights.z + matrices[s.indices[3]] * s.weights.w;
@@ -129,7 +128,7 @@ static inline Vec3 evaluateSkin(Vec3& p, Mesh::Skin s, const Matrix* matrices)
 }
 
 
-static inline void computeSkinMatrices(const Pose& pose, const Model& model, Matrix* matrices)
+static void computeSkinMatrices(const Pose& pose, const Model& model, Matrix* matrices)
 {
 	for (int i = 0; i < pose.count; ++i)
 	{
@@ -560,7 +559,7 @@ bool Model::parseMeshes(const bgfx::VertexDecl& global_vertex_decl, FS::IFile& f
 		mesh_name[str_size] = 0;
 		file.read(mesh_name, str_size);
 
-		Mesh& mesh = m_meshes.emplace(material, vertex_decl, mesh_name, m_allocator);
+		m_meshes.emplace(material, vertex_decl, mesh_name, m_allocator);
 		addDependency(*material);
 	}
 
@@ -901,7 +900,7 @@ void Model::registerLuaAPI(lua_State* L)
 }
 
 
-void Model::unload(void)
+void Model::unload()
 {
 	auto* material_manager = m_resource_manager.getOwner().get(MATERIAL_TYPE);
 	for (int i = 0; i < m_meshes.size(); ++i)

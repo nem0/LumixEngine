@@ -11,7 +11,7 @@ namespace Lumix
 class CommandLineParser
 {
 public:
-	CommandLineParser(const char* cmd_line)
+	explicit CommandLineParser(const char* cmd_line)
 		: m_cmd_line(cmd_line)
 		, m_current(nullptr)
 	{

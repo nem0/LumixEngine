@@ -30,7 +30,7 @@ namespace Lumix
 			void write(const string& string);
 			void write(const void* data, int size);
 			void writeString(const char* string);
-			template <class T> inline void write(const T& value);
+			template <class T> void write(const T& value);
 			void clear();
 
 			OutputBlob& operator << (const char* str);
@@ -47,7 +47,7 @@ namespace Lumix
 			IAllocator* m_allocator;
 	};
 
-	template <class T> inline void OutputBlob::write(const T& value)
+	template <class T> void OutputBlob::write(const T& value)
 	{
 		write(&value, sizeof(T));
 	}
@@ -68,7 +68,7 @@ namespace Lumix
 			bool read(void* data, int size);
 			bool readString(char* data, int max_size);
 			template <class T> void read(T& value) { read(&value, sizeof(T)); }
-			template <class T> inline T read();
+			template <class T> T read();
 			const void* skip(int size);
 			const void* getData() const { return (const void*)m_data; }
 			int getSize() const { return m_size; }
@@ -83,7 +83,7 @@ namespace Lumix
 			int m_pos;
 	};
 
-	template <class T> inline T InputBlob::read()
+	template <class T> T InputBlob::read()
 	{
 		T v;
 		read(&v, sizeof(v));

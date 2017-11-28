@@ -39,7 +39,7 @@ ControllerResource::ControllerResource(const Path& path, ResourceManagerBase& re
 
 ControllerResource::~ControllerResource()
 {
-	unload();
+	ASSERT(isEmpty());
 }
 
 
@@ -158,7 +158,7 @@ bool ControllerResource::deserialize(InputBlob& blob, int& version)
 			BoneMask& mask = m_masks.emplace(m_allocator);
 			blob.read(mask.name);
 			int bone_count = blob.read<int>();
-			for (int i = 0; i < bone_count; ++i)
+			for (int j = 0; j < bone_count; ++j)
 			{
 				u32 key = blob.read<u32>();
 				mask.bones.insert(key, 1);
@@ -240,7 +240,7 @@ void ControllerResource::addAnimation(int set, u32 hash, Animation* animation)
 }
 
 
-ComponentInstance* ControllerResource::createInstance(IAllocator& allocator)
+ComponentInstance* ControllerResource::createInstance(IAllocator& allocator) const
 {
 	return m_root ? m_root->createInstance(allocator) : nullptr;
 }

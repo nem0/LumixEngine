@@ -37,7 +37,6 @@ private:
 	bool getSourceFromBinaryBasename(char* out, int max_size, const char* binary_basename);
 	void wait();
 	void reloadShaders();
-	void onCompiled(int value);
 	void updateNotifications();
 	void compileAllPasses(const char* path,
 		bool is_vertex_shader,

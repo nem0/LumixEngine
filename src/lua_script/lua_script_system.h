@@ -46,6 +46,7 @@ public:
 
 	struct IFunctionCall
 	{
+		virtual ~IFunctionCall() {}
 		virtual void add(int parameter) = 0;
 		virtual void add(bool parameter) = 0;
 		virtual void add(float parameter) = 0;

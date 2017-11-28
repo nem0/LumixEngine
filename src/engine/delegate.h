@@ -35,13 +35,13 @@ private:
 	}
 
 public:
-	Delegate(void)
+	Delegate()
 	{
 		m_stub.first = nullptr;
 		m_stub.second = nullptr;
 	}
 
-	template <R (*Function)()> void bind(void)
+	template <R (*Function)()> void bind()
 	{
 		m_stub.first = nullptr;
 		m_stub.second = &FunctionStub<Function>;
@@ -91,14 +91,20 @@ private:
 		return (Function)(args...);
 	}
 
-	template <class C, R (C::*Function)(Args...)>
+	template <class C, R(C::*Function)(Args...)>
+	static LUMIX_FORCE_INLINE R ClassMethodStub(InstancePtr instance, Args... args)
+	{
+		return (static_cast<C*>(instance)->*Function)(args...);
+	}
+
+	template <class C, R(C::*Function)(Args...) const>
 	static LUMIX_FORCE_INLINE R ClassMethodStub(InstancePtr instance, Args... args)
 	{
 		return (static_cast<C*>(instance)->*Function)(args...);
 	}
 
 public:
-	Delegate(void)
+	Delegate()
 	{
 		m_stub.first = nullptr;
 		m_stub.second = nullptr;
@@ -106,13 +112,19 @@ public:
 
 	bool isValid() { return m_stub.second != nullptr; }
 
-	template <R (*Function)(Args...)> void bind(void)
+	template <R (*Function)(Args...)> void bind()
 	{
 		m_stub.first = nullptr;
 		m_stub.second = &FunctionStub<Function>;
 	}
 
 	template <class C, R (C::*Function)(Args...)> void bind(C* instance)
+	{
+		m_stub.first = instance;
+		m_stub.second = &ClassMethodStub<C, Function>;
+	}
+
+	template <class C, R(C::*Function)(Args...) const> void bind(C* instance)
 	{
 		m_stub.first = instance;
 		m_stub.second = &ClassMethodStub<C, Function>;
