@@ -1696,11 +1696,24 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	void updateControllers(float time_delta)
 	{
 		PROFILE_FUNCTION();
-		Vec3 g(0, time_delta * -9.8f, 0);
 		for (auto& controller : m_controllers)
 		{
-			Vec3 dif = g + controller.m_frame_change;
+			Vec3 dif = controller.m_frame_change;
 			controller.m_frame_change.set(0, 0, 0);
+
+			PxControllerState state;
+			controller.m_controller->getState(state);
+			bool apply_gravity = (state.collisionFlags & PxControllerCollisionFlag::eCOLLISION_DOWN) == 0;
+			if(apply_gravity)
+			{
+				dif.y += controller.gravity_speed * time_delta;
+				controller.gravity_speed += time_delta * -9.8f;
+			}
+			else
+			{
+				controller.gravity_speed = 0;
+			}
+
 			const PxExtendedVec3& p = controller.m_controller->getPosition();
 			controller.m_controller->move(toPhysx(dif), 0.01f, time_delta, PxControllerFilters());
 
@@ -4976,6 +4989,8 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		float m_radius;
 		float m_height;
 		int m_layer;
+
+		float gravity_speed = 0;
 	};
 
 	IAllocator& m_allocator;
