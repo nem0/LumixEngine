@@ -1,6 +1,9 @@
 #pragma once
 
 
+#include "engine/engine.h"
+
+
 namespace Lumix
 {
 	class LUMIX_ENGINE_API Timer
