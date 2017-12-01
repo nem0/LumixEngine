@@ -1737,6 +1737,8 @@ public:
 		Entity entity = {component.index};
 		auto& probe = m_environment_probes[entity];
 		if (probe.texture) probe.texture->getResourceManager().unload(*probe.texture);
+		if (probe.irradiance) probe.irradiance->getResourceManager().unload(*probe.irradiance);
+		if (probe.radiance) probe.radiance->getResourceManager().unload(*probe.radiance);
 		m_environment_probes.erase(entity);
 		m_universe.destroyComponent(entity, ENVIRONMENT_PROBE_TYPE, this, component);
 	}
