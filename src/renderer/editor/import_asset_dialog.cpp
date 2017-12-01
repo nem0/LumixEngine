@@ -628,8 +628,10 @@ struct FBXImporter
 
 	void gatherMeshes(ofbx::IScene* scene)
 	{
-		IAllocator& allocator = app.getWorldEditor().getAllocator();
+		int min_lod = 2;
 		int c = scene->getMeshCount();
+		IAllocator& allocator = app.getWorldEditor().getAllocator();
+		int start_index = meshes.size();
 		for (int i = 0; i < c; ++i)
 		{
 			const ofbx::Mesh* fbx_mesh = (const ofbx::Mesh*)scene->getMesh(i);
@@ -640,7 +642,13 @@ struct FBXImporter
 				mesh.fbx = fbx_mesh;
 				mesh.fbx_mat = fbx_mesh->getMaterial(j);
 				mesh.lod = detectMeshLOD(mesh);
+				min_lod = Math::minimum(min_lod, mesh.lod);
 			}
+		}
+		if (min_lod != 1) return;
+		for (int i = start_index, n = meshes.size(); i < n; ++i)
+		{
+			--meshes[i].lod;
 		}
 	}
 
