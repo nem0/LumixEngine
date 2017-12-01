@@ -2062,6 +2062,12 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
+	u64 getLayerMask(const char* layer)
+	{
+		return u64(1) << m_renderer.getLayer(layer);
+	}
+
+
 	void drawQuadEx(float left, float top, float w, float h, float u0, float v0, float u1, float v1, int material_index)
 	{
 		Resource* res = m_scene->getEngine().getLuaResource(material_index);
@@ -3394,6 +3400,7 @@ void Pipeline::registerLuaAPI(lua_State* L)
 
 	REGISTER_FUNCTION(render2D);
 	REGISTER_FUNCTION(drawQuad);
+	REGISTER_FUNCTION(getLayerMask);
 	REGISTER_FUNCTION(drawQuadEx);
 	REGISTER_FUNCTION(setPass);
 	REGISTER_FUNCTION(bindRenderbuffer);
