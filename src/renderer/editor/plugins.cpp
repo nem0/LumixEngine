@@ -1126,7 +1126,7 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		comp_params.m_dxt_compressor_type = cCRNDXTCompressorRYG;
 		comp_params.m_pProgress_func = nullptr;
 		comp_params.m_pProgress_func_data = nullptr;
-		comp_params.m_num_helper_threads = 3;
+		comp_params.m_num_helper_threads = MT::getCPUsCount() - 1;
 		comp_params.m_faces = 6;
 		for (int i = 0; i < 6; ++i)
 		{
