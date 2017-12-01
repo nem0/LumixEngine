@@ -2111,7 +2111,6 @@ public:
 
 		const char* bin_files[] = {
 			"app.exe",
-			"assimp.dll",
 			"nvToolsExt64_1.dll",
 			"PhysX3CharacterKinematicCHECKED_x64.dll",
 			"PhysX3CHECKED_x64.dll",

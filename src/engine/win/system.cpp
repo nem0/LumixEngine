@@ -20,7 +20,7 @@ namespace Lumix
 		ASSERT(f);
 		CloseHandle(handle);
 
-		return false;
+		return true;
 	}
 
 
