@@ -938,7 +938,7 @@ void Terrain::generateGeometry()
 	auto* indices_mem = bgfx::copy(&indices[0], sizeof(indices[0]) * indices.size());
 	m_mesh->index_buffer_handle = bgfx::createIndexBuffer(indices_mem);
 	m_mesh->indices_count = indices.size();
-	m_mesh->flags = Mesh::Flags::INDICES_16_BIT;
+	m_mesh->flags.set(Mesh::Flags::INDICES_16_BIT);
 }
 
 TerrainQuad* Terrain::generateQuadTree(float size)

@@ -101,11 +101,9 @@ Model::Model(const Path& path, ResourceManagerBase& resource_manager, Renderer& 
 	, m_meshes(m_allocator)
 	, m_bones(m_allocator)
 	, m_first_nonroot_bone_index(0)
-	, m_flags(0)
-	, m_loading_flags(0)
 	, m_renderer(renderer)
 {
-	if (force_keep_skin) m_loading_flags = (u32)LoadingFlags::KEEP_SKIN;
+	if (force_keep_skin) m_loading_flags.set(LoadingFlags::KEEP_SKIN);
 	m_lods[0] = { 0, -1, FLT_MAX };
 	m_lods[1] = { 0, -1, FLT_MAX };
 	m_lods[2] = { 0, -1, FLT_MAX };
@@ -169,7 +167,7 @@ RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Matrix
 		bool is_mesh_skinned = !mesh.skin.empty();
 		u16* indices16 = (u16*)&mesh.indices[0];
 		u32* indices32 = (u32*)&mesh.indices[0];
-		bool is16 = mesh.flags & (u32)Mesh::Flags::INDICES_16_BIT;
+		bool is16 = mesh.flags.isSet(Mesh::Flags::INDICES_16_BIT);
 		int index_size = is16 ? 2 : 4;
 		for(int i = 0, c = mesh.indices.size() / index_size; i < c; i += 3)
 		{
@@ -410,8 +408,8 @@ void Model::onBeforeReady()
 
 void Model::setKeepSkin()
 {
-	if (m_loading_flags & (u32)LoadingFlags::KEEP_SKIN) return;
-	m_loading_flags = m_loading_flags | (u32)LoadingFlags::KEEP_SKIN;
+	if (m_loading_flags.isSet(LoadingFlags::KEEP_SKIN)) return;
+	m_loading_flags.set(LoadingFlags::KEEP_SKIN);
 	if (isReady()) m_resource_manager.reload(*this);
 }
 
@@ -521,9 +519,9 @@ int Model::getBoneIdx(const char* name)
 }
 
 
-bool Model::parseMeshes(const bgfx::VertexDecl& global_vertex_decl, FS::IFile& file, FileVersion version)
+bool Model::parseMeshes(const bgfx::VertexDecl& global_vertex_decl, FS::IFile& file, FileVersion version, u32 global_flags)
 {
-	if (version <= FileVersion::MULTIPLE_VERTEX_DECLS) return parseMeshesOld(global_vertex_decl, file, version);
+	if (version <= FileVersion::MULTIPLE_VERTEX_DECLS) return parseMeshesOld(global_vertex_decl, file, version, global_flags);
 	
 	int object_count = 0;
 	file.read(&object_count, sizeof(object_count));
@@ -575,7 +573,7 @@ bool Model::parseMeshes(const bgfx::VertexDecl& global_vertex_decl, FS::IFile& f
 		mesh.indices.resize(index_size * indices_count);
 		file.read(&mesh.indices[0], mesh.indices.size());
 
-		mesh.flags = index_size == 2 ? Mesh::Flags::INDICES_16_BIT : 0;
+		if (index_size == 2) mesh.flags.set(Mesh::Flags::INDICES_16_BIT);
 		mesh.indices_count = indices_count;
 		const bgfx::Memory* indices_mem = bgfx::copy(&mesh.indices[0], mesh.indices.size());
 		mesh.index_buffer_handle = bgfx::createIndexBuffer(indices_mem);
@@ -595,7 +593,7 @@ bool Model::parseMeshes(const bgfx::VertexDecl& global_vertex_decl, FS::IFile& f
 		int uv_attribute_offset = vertex_decl.getOffset(bgfx::Attrib::TexCoord0);
 		int weights_attribute_offset = vertex_decl.getOffset(bgfx::Attrib::Weight);
 		int bone_indices_attribute_offset = vertex_decl.getOffset(bgfx::Attrib::Indices);
-		bool keep_skin = m_loading_flags & (u32)LoadingFlags::KEEP_SKIN;
+		bool keep_skin = m_loading_flags.isSet(LoadingFlags::KEEP_SKIN);
 		keep_skin = keep_skin && vertex_decl.has(bgfx::Attrib::Weight) && vertex_decl.has(bgfx::Attrib::Indices);
 
 		int vertex_size = mesh.vertex_decl.getStride();
@@ -625,7 +623,7 @@ bool Model::parseMeshes(const bgfx::VertexDecl& global_vertex_decl, FS::IFile& f
 }
 
 
-bool Model::parseMeshesOld(bgfx::VertexDecl global_vertex_decl, FS::IFile& file, FileVersion version)
+bool Model::parseMeshesOld(bgfx::VertexDecl global_vertex_decl, FS::IFile& file, FileVersion version, u32 global_flags)
 {
 	int object_count = 0;
 	file.read(&object_count, sizeof(object_count));
@@ -701,7 +699,8 @@ bool Model::parseMeshesOld(bgfx::VertexDecl global_vertex_decl, FS::IFile& file,
 	file.read(&indices_count, sizeof(indices_count));
 	if (indices_count <= 0) return false;
 
-	int index_size = (m_flags & (u32)Model::Flags::INDICES_16BIT) ? 2 : 4;
+	u32 INDICES_16BIT_FLAG = 1;
+	int index_size = global_flags & INDICES_16BIT_FLAG ? 2 : 4;
 	Array<u8> indices(m_allocator);
 	indices.resize(indices_count * index_size);
 	file.read(&indices[0], indices.size());
@@ -735,7 +734,7 @@ bool Model::parseMeshesOld(bgfx::VertexDecl global_vertex_decl, FS::IFile& file,
 	int uv_attribute_offset = global_vertex_decl.getOffset(bgfx::Attrib::TexCoord0);
 	int weights_attribute_offset = global_vertex_decl.getOffset(bgfx::Attrib::Weight);
 	int bone_indices_attribute_offset = global_vertex_decl.getOffset(bgfx::Attrib::Indices);
-	bool keep_skin = m_loading_flags & (u32)LoadingFlags::KEEP_SKIN;
+	bool keep_skin = m_loading_flags.isSet(LoadingFlags::KEEP_SKIN);
 	keep_skin = keep_skin && global_vertex_decl.has(bgfx::Attrib::Weight) && global_vertex_decl.has(bgfx::Attrib::Indices);
 	for (int i = 0; i < m_meshes.size(); ++i)
 	{
@@ -785,7 +784,10 @@ bool Model::parseMeshesOld(bgfx::VertexDecl global_vertex_decl, FS::IFile& file,
 		Offsets offsets = mesh_offsets[i];
 		
 		ASSERT(!bgfx::isValid(mesh.index_buffer_handle));
-		mesh.flags = (m_flags & (u32)Flags::INDICES_16BIT) != 0 ? Mesh::Flags::INDICES_16_BIT : 0;
+		if (global_flags & INDICES_16BIT_FLAG)
+		{
+			mesh.flags.set(Mesh::Flags::INDICES_16_BIT);
+		}
 		int indices_size = index_size * mesh.indices_count;
 		const bgfx::Memory* mem = bgfx::copy(&indices[offsets.indices_offset * index_size], indices_size);
 		mesh.index_buffer_handle = bgfx::createIndexBuffer(mem, index_size == 4 ? BGFX_BUFFER_INDEX32 : 0);
@@ -837,10 +839,10 @@ bool Model::load(FS::IFile& file)
 		return false;
 	}
 
-	m_flags = 0;
+	u32 global_flags = 0; // backward compatibility
 	if(header.version > (u32)FileVersion::WITH_FLAGS)
 	{
-		file.read(&m_flags, sizeof(m_flags));
+		file.read(&global_flags, sizeof(global_flags));
 	}
 
 	bgfx::VertexDecl global_vertex_decl;
@@ -849,7 +851,7 @@ bool Model::load(FS::IFile& file)
 		parseVertexDeclEx(file, &global_vertex_decl);
 	}
 
-	if (parseMeshes(global_vertex_decl, file, (FileVersion)header.version)
+	if (parseMeshes(global_vertex_decl, file, (FileVersion)header.version, global_flags)
 		&& parseBones(file)
 		&& parseLODs(file))
 	{

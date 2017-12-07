@@ -2,6 +2,7 @@
 
 
 #include "engine/array.h"
+#include "engine/flag_set.h"
 #include "engine/geometry.h"
 #include "engine/hash_map.h"
 #include "engine/matrix.h"
@@ -77,14 +78,14 @@ struct LUMIX_RENDERER_API Mesh
 
 	void setMaterial(Material* material, Model& model, Renderer& renderer);
 
-	bool areIndices16() const { return flags & Flags::INDICES_16_BIT; }
+	bool areIndices16() const { return flags.isSet(Flags::INDICES_16_BIT); }
 
 	Type type;
 	Array<u8> indices;
 	Array<Vec3> vertices;
 	Array<Vec2> uvs;
 	Array<Skin> skin;
-	u8 flags;
+	FlagSet<Flags, u8> flags;
 	u64 layer_mask;
 	i32 instance_idx;
 	int indices_count;
@@ -152,11 +153,6 @@ public:
 		KEEP_SKIN = 1 << 0
 	};
 
-	enum class Flags : u32
-	{
-		INDICES_16BIT = 1 << 0
-	};
-
 	struct LOD
 	{
 		int from_mesh;
@@ -208,7 +204,6 @@ public:
 	RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, const Matrix& model_transform, const Pose* pose);
 	const AABB& getAABB() const { return m_aabb; }
 	LOD* getLODs() { return m_lods; }
-	u32 getFlags() const { return m_flags;	}
 	void setKeepSkin();
 	void onBeforeReady() override;
 
@@ -226,8 +221,8 @@ private:
 	bool parseVertexDecl(FS::IFile& file, bgfx::VertexDecl* vertex_decl);
 	bool parseVertexDeclEx(FS::IFile& file, bgfx::VertexDecl* vertex_decl);
 	bool parseBones(FS::IFile& file);
-	bool parseMeshes(const bgfx::VertexDecl& global_vertex_decl, FS::IFile& file, FileVersion version);
-	bool parseMeshesOld(bgfx::VertexDecl global_vertex_decl, FS::IFile& file, FileVersion version);
+	bool parseMeshes(const bgfx::VertexDecl& global_vertex_decl, FS::IFile& file, FileVersion version, u32 global_flags);
+	bool parseMeshesOld(bgfx::VertexDecl global_vertex_decl, FS::IFile& file, FileVersion version, u32 global_flags);
 	bool parseLODs(FS::IFile& file);
 	int getBoneIdx(const char* name);
 
@@ -243,8 +238,7 @@ private:
 	float m_bounding_radius;
 	BoneMap m_bone_map;
 	AABB m_aabb;
-	u32 m_flags;
-	u32 m_loading_flags;
+	FlagSet<LoadingFlags, u32> m_loading_flags;
 	int m_first_nonroot_bone_index;
 };
 

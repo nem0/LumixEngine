@@ -354,9 +354,16 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 			StaticString<MAX_PATH_LENGTH + 20> header;
 			PathUtils::getBasename(header.data, lengthOf(header.data), buf);
 			if (header.empty()) header << j;
-			header << "###" << j;
 			ImGui::Unindent();
-			if (ImGui::TreeNodeEx(header))
+			bool open = ImGui::TreeNodeEx(StaticString<32>("###", j), ImGuiTreeNodeFlags_AllowOverlapMode);
+			bool enabled = scene->isScriptEnabled(cmp.handle, j);
+			ImGui::SameLine();
+			if (ImGui::Checkbox(header, &enabled))
+			{
+				scene->enableScript(cmp.handle, j, enabled);
+			}
+
+			if (open)
 			{
 				if (ImGui::Button("Remove script"))
 				{
