@@ -53,6 +53,8 @@ public:
 	ControllerResource(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
 	~ControllerResource();
 
+	ResourceType getType() const override { return ResourceType("anim_controller"); }
+
 	void create() { onCreated(State::READY); }
 	void unload() override;
 	bool load(FS::IFile& file) override;

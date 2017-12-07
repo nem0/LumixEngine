@@ -19,6 +19,8 @@ public:
 	{
 	}
 
+	ResourceType getType() const override { return ResourceType("clip"); }
+
 	void unload() override;
 	bool load(FS::IFile& file) override;
 	int getChannels() const { return m_channels; }

@@ -41,6 +41,7 @@ public:
 	typedef DelegateList<void(State, State, Resource&)> ObserverCallback;
 
 public:
+	virtual ResourceType getType() const = 0;
 	State getState() const { return m_current_state; }
 
 	bool isEmpty() const { return State::EMPTY == m_current_state; }

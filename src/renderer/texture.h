@@ -38,6 +38,8 @@ class LUMIX_RENDERER_API Texture LUMIX_FINAL : public Resource
 		Texture(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
 		~Texture();
 
+		ResourceType getType() const override { return ResourceType("texture"); }
+
 		bool create(int w, int h, const void* data);
 		void destroy();
 

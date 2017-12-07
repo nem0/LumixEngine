@@ -64,6 +64,8 @@ class PhysicsGeometry LUMIX_FINAL : public Resource
 		PhysicsGeometry(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
 		~PhysicsGeometry();
 
+		ResourceType getType() const override { return ResourceType("physics"); }
+
 	public:
 		physx::PxTriangleMesh* tri_mesh;
 		physx::PxConvexMesh* convex_mesh;

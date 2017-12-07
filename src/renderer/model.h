@@ -183,6 +183,8 @@ public:
 	Model(const Path& path, ResourceManagerBase& resource_manager, Renderer& renderer, IAllocator& allocator);
 	~Model();
 
+	ResourceType getType() const override { return ResourceType("model"); }
+
 	LODMeshIndices getLODMeshIndices(float squared_distance) const
 	{
 		int i = 0;
