@@ -5,6 +5,7 @@
 #include "engine/crc32.h"
 #include "engine/debug/debug.h"
 #include "engine/engine.h"
+#include "engine/flag_set.h"
 #include "engine/iallocator.h"
 #include "engine/input_system.h"
 #include "engine/iplugin.h"
@@ -70,6 +71,11 @@ namespace Lumix
 
 		struct ScriptInstance
 		{
+			enum Flags : u32
+			{
+				ENABLED = 1 << 0
+			};
+
 			explicit ScriptInstance(IAllocator& allocator)
 				: m_properties(allocator)
 				, m_script(nullptr)
@@ -77,6 +83,7 @@ namespace Lumix
 				, m_environment(-1)
 				, m_thread_ref(-1)
 			{
+				m_flags.set(ENABLED);
 			}
 
 			LuaScript* m_script;
@@ -84,6 +91,7 @@ namespace Lumix
 			int m_environment;
 			int m_thread_ref;
 			Array<Property> m_properties;
+			FlagSet<Flags, u32> m_flags;
 		};
 
 
@@ -972,24 +980,8 @@ namespace Lumix
 		}
 
 
-		void destroyInstance(ScriptComponent& scr,  ScriptInstance& inst)
+		void disableScript(ScriptInstance& inst)
 		{
-			bool is_env_valid = lua_rawgeti(inst.m_state, LUA_REGISTRYINDEX, inst.m_environment) == LUA_TTABLE;
-			ASSERT(is_env_valid);
-			if (lua_getfield(inst.m_state, -1, "onDestroy") != LUA_TFUNCTION)
-			{
-				lua_pop(inst.m_state, 2);
-			}
-			else
-			{
-				if (lua_pcall(inst.m_state, 0, 0, 0) != LUA_OK)
-				{
-					g_log_error.log("Lua Script") << lua_tostring(inst.m_state, -1);
-					lua_pop(inst.m_state, 1);
-				}
-				lua_pop(inst.m_state, 1);
-			}
-
 			for (int i = 0; i < m_timers.size(); ++i)
 			{
 				if (m_timers[i].state == inst.m_state)
@@ -1008,7 +1000,7 @@ namespace Lumix
 					break;
 				}
 			}
-			
+
 			for (int i = 0; i < m_input_handlers.size(); ++i)
 			{
 				if (m_input_handlers[i].state == inst.m_state)
@@ -1017,6 +1009,28 @@ namespace Lumix
 					break;
 				}
 			}
+		}
+
+
+		void destroyInstance(ScriptComponent& scr,  ScriptInstance& inst)
+		{
+			bool is_env_valid = lua_rawgeti(inst.m_state, LUA_REGISTRYINDEX, inst.m_environment) == LUA_TTABLE;
+			ASSERT(is_env_valid);
+			if (lua_getfield(inst.m_state, -1, "onDestroy") != LUA_TFUNCTION)
+			{
+				lua_pop(inst.m_state, 2);
+			}
+			else
+			{
+				if (lua_pcall(inst.m_state, 0, 0, 0) != LUA_OK)
+				{
+					g_log_error.log("Lua Script") << lua_tostring(inst.m_state, -1);
+					lua_pop(inst.m_state, 1);
+				}
+				lua_pop(inst.m_state, 1);
+			}
+
+			disableScript(inst);
 
 			luaL_unref(inst.m_state, LUA_REGISTRYINDEX, inst.m_thread_ref);
 			luaL_unref(inst.m_state, LUA_REGISTRYINDEX, inst.m_environment);
@@ -1046,25 +1060,10 @@ namespace Lumix
 
 		void startScript(ScriptInstance& instance, bool is_restart)
 		{
-			if (is_restart)
-			{
-				for (int i = 0; i < m_updates.size(); ++i)
-				{
-					if (m_updates[i].state == instance.m_state)
-					{
-						m_updates.eraseFast(i);
-						break;
-					}
-				}
-				for (int i = 0; i < m_input_handlers.size(); ++i)
-				{
-					if (m_input_handlers[i].state == instance.m_state)
-					{
-						m_input_handlers.eraseFast(i);
-						break;
-					}
-				}
-			}
+			if (!instance.m_flags.isSet(ScriptInstance::ENABLED)) return;
+			if (!instance.m_state) return;
+
+			if (is_restart) disableScript(instance);
 
 			if (lua_rawgeti(instance.m_state, LUA_REGISTRYINDEX, instance.m_environment) != LUA_TTABLE)
 			{
@@ -1362,6 +1361,7 @@ namespace Lumix
 				for (auto& scr : script_cmp->m_scripts)
 				{
 					serializer.writeString(scr.m_script ? scr.m_script->getPath().c_str() : "");
+					serializer.write(scr.m_flags);
 					serializer.write(scr.m_properties.size());
 					for (Property& prop : scr.m_properties)
 					{
@@ -1403,6 +1403,7 @@ namespace Lumix
 
 					char tmp[MAX_PATH_LENGTH];
 					serializer.readString(tmp, MAX_PATH_LENGTH);
+					serializer.read(scr.m_flags);
 					scr.m_state = nullptr;
 					int prop_count;
 					serializer.read(prop_count);
@@ -1443,6 +1444,7 @@ namespace Lumix
 					auto& instance = scr->m_scripts[j];
 					if (!instance.m_script) continue;
 					if (!instance.m_script->isReady()) continue;
+					if (!instance.m_flags.isSet(ScriptInstance::ENABLED)) continue;
 
 					startScript(instance, false);
 				}
@@ -1578,7 +1580,8 @@ namespace Lumix
 		{
 			PROFILE_FUNCTION();
 
-			if (m_is_game_running && !m_scripts_init_called) initScripts();
+			if (!m_is_game_running) return;
+			if (!m_scripts_init_called) initScripts();
 
 			if (paused) return;
 
@@ -1679,6 +1682,29 @@ namespace Lumix
 			ScriptInstance tmp = script_cmp->m_scripts[scr_index];
 			script_cmp->m_scripts[scr_index] = script_cmp->m_scripts[other];
 			script_cmp->m_scripts[other] = tmp;
+		}
+
+
+		void enableScript(ComponentHandle cmp, int scr_index, bool enable) override
+		{
+			ScriptInstance& inst = m_scripts[{cmp.index}]->m_scripts[scr_index];
+			if (inst.m_flags.isSet(ScriptInstance::ENABLED) == enable) return;
+
+			inst.m_flags.set(ScriptInstance::ENABLED, enable);
+			if(enable)
+			{
+				startScript(inst, false);
+			}
+			else
+			{
+				disableScript(inst);
+			}
+		}
+
+
+		bool isScriptEnabled(ComponentHandle cmp, int scr_index) const override
+		{
+			return m_scripts[{cmp.index}]->m_scripts[scr_index].m_flags.isSet(ScriptInstance::ENABLED);
 		}
 
 
