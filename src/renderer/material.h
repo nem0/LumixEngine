@@ -48,6 +48,8 @@ public:
 	Material(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
 	~Material();
 
+	ResourceType getType() const override { return ResourceType("material"); }
+
 	float getMetallic() const { return m_metallic; }
 	void setMetallic(float value) { m_metallic = value; createCommandBuffer(); }
 	float getRoughness() const { return m_roughness; }

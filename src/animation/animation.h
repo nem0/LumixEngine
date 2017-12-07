@@ -62,6 +62,8 @@ class Animation LUMIX_FINAL : public Resource
 	public:
 		Animation(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
 
+		ResourceType getType() const override { return ResourceType("animation"); }
+
 		int getRootMotionBoneIdx() const { return m_root_motion_bone_idx; }
 		RigidTransform getBoneTransform(float time, int bone_idx) const;
 		void getRelativePose(float time, Pose& pose, Model& model, BoneMask* mask) const;

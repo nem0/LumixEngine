@@ -66,6 +66,9 @@ class LUMIX_RENDERER_API ShaderBinary LUMIX_FINAL : public Resource
 {
 public:
 	ShaderBinary(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
+	
+	ResourceType getType() const override { return ResourceType("shader_binary"); }
+
 	bgfx::ShaderHandle getHandle() { return m_handle; }
 
 	Shader* m_shader;
@@ -126,6 +129,8 @@ public:
 public:
 	Shader(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
 	~Shader();
+
+	ResourceType getType() const override { return ResourceType("shader"); }
 
 	bool hasDefine(u8 define_idx) const;
 	ShaderInstance& getInstance(u32 mask);

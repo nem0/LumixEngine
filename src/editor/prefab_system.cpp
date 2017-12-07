@@ -410,6 +410,7 @@ public:
 
 	Entity doInstantiatePrefab(PrefabResource& prefab_res, const Vec3& pos, const Quat& rot, float scale)
 	{
+		if (!prefab_res.isReady()) return INVALID_ENTITY;
 		if (!m_resources.find(prefab_res.getPath().getHash()).isValid())
 		{
 			m_resources.insert(prefab_res.getPath().getHash(), &prefab_res);

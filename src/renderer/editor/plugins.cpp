@@ -19,6 +19,7 @@
 #include "engine/mt/thread.h"
 #include "engine/path_utils.h"
 #include "engine/plugin_manager.h"
+#include "engine/prefab.h"
 #include "engine/reflection.h"
 #include "engine/queue.h"
 #include "engine/resource_manager.h"
@@ -65,6 +66,7 @@ static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("r
 static const ComponentType ENVIRONMENT_PROBE_TYPE = Reflection::getComponentType("environment_probe");
 static const ResourceType MATERIAL_TYPE("material");
 static const ResourceType MODEL_TYPE("model");
+static const ResourceType PREFAB_TYPE("prefab");
 static const ResourceType SHADER_BINARY_TYPE("shader_binary");
 static const ResourceType SHADER_TYPE("shader");
 static const ResourceType TEXTURE_TYPE("texture");
@@ -394,7 +396,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 			JobSystem::wait(&m_texture_tile_creator.count);
 			if (m_texture_tile_creator.shutdown) break;
 			MT::SpinLock lock(m_texture_tile_creator.lock);
-			
+
 			StaticString<MAX_PATH_LENGTH> tile = m_texture_tile_creator.tiles.back();
 			m_texture_tile_creator.tiles.pop();
 			MT::atomicIncrement(&m_texture_tile_creator.count);
@@ -535,11 +537,11 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 			render_scene->setModelInstancePath(m_mesh, model.getPath());
 			AABB aabb = model.getAABB();
 
-			m_universe->setRotation(m_camera_entity, {0, 0, 0, 1});
+			m_universe->setRotation(m_camera_entity, { 0, 0, 0, 1 });
 			m_universe->setPosition(m_camera_entity,
-				{(aabb.max.x + aabb.min.x) * 0.5f,
-					(aabb.max.y + aabb.min.y) * 0.5f,
-					aabb.max.z + aabb.max.x - aabb.min.x});
+			{ (aabb.max.x + aabb.min.x) * 0.5f,
+				(aabb.max.y + aabb.min.y) * 0.5f,
+				aabb.max.z + aabb.max.x - aabb.min.x });
 		}
 		ImVec2 image_size(ImGui::GetContentRegionAvailWidth(), ImGui::GetContentRegionAvailWidth());
 
@@ -555,7 +557,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 			SDL_SetRelativeMouseMode(SDL_FALSE);
 			SDL_WarpMouseInWindow(nullptr, m_captured_mouse_x, m_captured_mouse_y);
 		}
-		
+
 		if (ImGui::IsItemHovered() && mouse_down)
 		{
 			auto delta = m_app.getMouseMove();
@@ -693,8 +695,8 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 	void onResourceUnloaded(Resource* resource) override {}
 	const char* getName() const override { return "Model"; }
 	bool hasResourceManager(ResourceType type) const override { return type == MODEL_TYPE; }
-	
-	
+
+
 	ResourceType getResourceType(const char* ext) override
 	{
 		return equalStrings(ext, "msh") ? MODEL_TYPE : INVALID_RESOURCE_TYPE;
@@ -744,12 +746,20 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		WorldEditor& editor = m_app.getWorldEditor();
 		Engine& engine = editor.getEngine();
 		ResourceManager& resource_manager = engine.getResourceManager();
-		ResourceManagerBase* model_manager = resource_manager.get(MODEL_TYPE);
 
-		Model* model = (Model*)model_manager->load(path);
-		m_tile.queue.push(model);
+		ResourceManagerBase* manager;
+		if (PathUtils::hasExtension(path.c_str(), "fab"))
+		{
+			manager = resource_manager.get(PREFAB_TYPE);
+		}
+		else
+		{
+			manager = resource_manager.get(MODEL_TYPE);
+		}
+		Resource* resource = manager->load(path);
+		m_tile.queue.push(resource);
 	}
-	
+
 
 	void popTileQueue()
 	{
@@ -764,7 +774,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 
 	void update() override
 	{
-		if(m_tile.frame_countdown >= 0)
+		if (m_tile.frame_countdown >= 0)
 		{
 			--m_tile.frame_countdown;
 			if (m_tile.frame_countdown == -1)
@@ -777,19 +787,37 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 			return;
 		}
 
+		if (m_tile.m_entity_in_fly.isValid()) return;
 		if (m_tile.queue.empty()) return;
 
-		Model* model = m_tile.queue.front();
-		if(model->isFailure())
+		Resource* resource = m_tile.queue.front();
+		if (resource->isFailure())
 		{
-			g_log_error.log("Editor") << "Failed to load " << model->getPath();
+			g_log_error.log("Editor") << "Failed to load " << resource->getPath();
 			popTileQueue();
 			return;
 		}
-		if (!model->isReady()) return;
+		if (!resource->isReady()) return;
 
 		popTileQueue();
 
+		if (resource->getType() == MODEL_TYPE)
+		{
+			renderTile((Model*)resource);
+		}
+		else if (resource->getType() == PREFAB_TYPE)
+		{
+			renderTile((PrefabResource*)resource);
+		}
+		else
+		{
+			ASSERT(false);
+		}
+	}
+
+
+	void renderTile(PrefabResource* prefab)
+	{
 		Engine& engine = m_app.getWorldEditor().getEngine();
 		RenderScene* render_scene = (RenderScene*)m_tile.universe->getScene(MODEL_INSTANCE_TYPE);
 		if (!render_scene) return;
@@ -797,7 +825,76 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		Renderer* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
 		if (!renderer) return;
 
-		Entity mesh_entity = m_tile.universe->createEntity({0, 0, 0}, {0, 0, 0, 1});
+		Entity mesh_entity = m_tile.universe->instantiatePrefab(*prefab, Vec3::ZERO, Quat::IDENTITY, 1);
+		if (!mesh_entity.isValid()) return;
+
+		ComponentHandle tile_mesh = render_scene->getModelInstanceComponent(mesh_entity);
+		if (!tile_mesh.isValid()) return;
+
+		Model* model = render_scene->getModelInstanceModel(tile_mesh);
+		if (!model) return;
+
+		m_tile.path_hash = prefab->getPath().getHash();
+		prefab->getResourceManager().unload(*prefab);
+		m_tile.m_entity_in_fly = mesh_entity;
+		model->onLoaded<ModelPlugin, &ModelPlugin::renderPrefabSecondStage>(this);
+	}
+
+
+	void renderPrefabSecondStage(Resource::State old_state, Resource::State new_state, Resource& resource)
+	{
+		Engine& engine = m_app.getWorldEditor().getEngine();
+		
+		RenderScene* render_scene = (RenderScene*)m_tile.universe->getScene(MODEL_INSTANCE_TYPE);
+		if (!render_scene) return;
+
+		Renderer* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
+		if (!renderer) return;
+
+		Model* model = (Model*)&resource;
+		if (!model->isReady()) return;
+
+		AABB aabb = model->getAABB();
+
+		m_tile.universe->setRotation(m_tile.camera_entity, { 0, 0, 0, 1 });
+		m_tile.universe->setPosition(m_tile.camera_entity,
+		{ (aabb.max.x + aabb.min.x) * 0.5f,
+			(aabb.max.y + aabb.min.y) * 0.5f,
+			aabb.max.z + aabb.max.x - aabb.min.x });
+
+		m_tile.pipeline->resize(AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE);
+		m_tile.pipeline->render();
+
+		m_tile.texture =
+			bgfx::createTexture2D(AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, false, 1, bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK);
+		renderer->viewCounterAdd();
+		bgfx::touch(renderer->getViewCounter());
+		bgfx::setViewName(renderer->getViewCounter(), "billboard_blit");
+		bgfx::TextureHandle color_renderbuffer = m_tile.pipeline->getRenderbuffer("default", 0);
+		bgfx::blit(renderer->getViewCounter(), m_tile.texture, 0, 0, color_renderbuffer);
+
+		renderer->viewCounterAdd();
+		bgfx::setViewName(renderer->getViewCounter(), "billboard_read");
+		m_tile.data.resize(AssetBrowser::TILE_SIZE * AssetBrowser::TILE_SIZE * 4);
+		bgfx::readTexture(m_tile.texture, &m_tile.data[0]);
+		bgfx::touch(renderer->getViewCounter());
+		m_tile.universe->destroyEntity(m_tile.m_entity_in_fly);
+
+		m_tile.frame_countdown = 2;
+		m_tile.m_entity_in_fly = INVALID_ENTITY;
+	}
+
+
+	void renderTile(Model* model)
+	{
+		Engine& engine = m_app.getWorldEditor().getEngine();
+		RenderScene* render_scene = (RenderScene*)m_tile.universe->getScene(MODEL_INSTANCE_TYPE);
+		if (!render_scene) return;
+
+		Renderer* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
+		if (!renderer) return;
+
+		Entity mesh_entity = m_tile.universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
 		ComponentHandle tile_mesh = render_scene->createComponent(MODEL_INSTANCE_TYPE, mesh_entity);
 
 		render_scene->setModelInstancePath(tile_mesh, model->getPath());
@@ -845,7 +942,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		if (type == MATERIAL_TYPE) return copyFile("models/editor/tile_material.dds", out_path);
 		if (type == SHADER_TYPE) return copyFile("models/editor/tile_shader.dds", out_path);
 
-		if (type != MODEL_TYPE) return false;
+		if (type != MODEL_TYPE && type != PREFAB_TYPE) return false;
 
 		Path path(in_path);
 
@@ -870,13 +967,14 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 
 		Universe* universe = nullptr;
 		Pipeline* pipeline = nullptr;
+		Entity m_entity_in_fly = INVALID_ENTITY;
 		Entity camera_entity = INVALID_ENTITY;
 		ComponentHandle camera_cmp = INVALID_COMPONENT;
 		int frame_countdown = -1;
 		u32 path_hash;
 		Array<u8> data;
 		bgfx::TextureHandle texture = BGFX_INVALID_HANDLE;
-		Queue<Model*, 8> queue;
+		Queue<Resource*, 8> queue;
 		Array<Path> paths;
 	} m_tile;
 

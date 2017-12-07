@@ -28,6 +28,9 @@ struct PrefabResource LUMIX_FINAL : public Resource
 	}
 
 
+	ResourceType getType() const override { return ResourceType("prefab"); }
+
+
 	void unload() override { blob.clear(); }
 
 
