@@ -30,6 +30,7 @@ namespace Lumix
 	enum class LuaSceneVersion : int
 	{
 		PROPERTY_TYPE,
+		FLAGS,
 
 		LATEST
 	};
@@ -413,6 +414,7 @@ namespace Lumix
 			{
 				auto& inst = scr->m_scripts[i];
 				blob.writeString(inst.m_script ? inst.m_script->getPath().c_str() : "");
+				blob.write(inst.m_flags);
 				blob.write(inst.m_properties.size());
 				for (auto& prop : inst.m_properties)
 				{
@@ -439,6 +441,7 @@ namespace Lumix
 				auto& inst = scr->m_scripts[idx];
 				char tmp[MAX_PATH_LENGTH];
 				blob.readString(tmp, lengthOf(tmp));
+				blob.read(inst.m_flags);
 				setScriptPath(cmp, idx, Path(tmp));
 				
 				int prop_count;
@@ -1246,6 +1249,7 @@ namespace Lumix
 			for (ScriptInstance& inst : script->m_scripts)
 			{
 				serializer.write("source", inst.m_script ? inst.m_script->getPath().c_str() : "");
+				serializer.write("flags", inst.m_flags.base);
 				serializer.write("prop_count", inst.m_properties.size());
 				for (Property& prop : inst.m_properties)
 				{
@@ -1306,6 +1310,8 @@ namespace Lumix
 				char tmp[MAX_PATH_LENGTH];
 				serializer.read(tmp, lengthOf(tmp));
 				setScriptPath(cmp, i, Path(tmp));
+				if(scene_version >(int)LuaSceneVersion::FLAGS)
+					serializer.read(&inst.m_flags.base);
 
 				int prop_count;
 				serializer.read(&prop_count);
@@ -1719,6 +1725,7 @@ namespace Lumix
 		{
 			auto& scr = m_scripts[{cmp.index}]->m_scripts[scr_index];
 			blob.writeString(scr.m_script ? scr.m_script->getPath().c_str() : "");
+			blob.write(scr.m_flags);
 			blob.write(scr.m_properties.size());
 			for (auto prop : scr.m_properties)
 			{
@@ -1744,6 +1751,7 @@ namespace Lumix
 			int count;
 			char path[MAX_PATH_LENGTH];
 			blob.readString(path, lengthOf(path));
+			blob.read(scr.m_flags);
 			blob.read(count);
 			scr.m_environment = -1;
 			scr.m_properties.clear();
