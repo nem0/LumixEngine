@@ -2379,22 +2379,6 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 	}
 
 
-	void showEntity(Entity entity) override
-	{
-		ComponentHandle cmp = m_render_scene->getModelInstanceComponent(entity);
-		if (cmp == INVALID_COMPONENT) return;
-		m_render_scene->enableModelInstance(cmp, true);
-	}
-
-
-	void hideEntity(Entity entity) override
-	{
-		ComponentHandle cmp = m_render_scene->getModelInstanceComponent(entity);
-		if (cmp == INVALID_COMPONENT) return;
-		m_render_scene->enableModelInstance(cmp, false);
-	}
-
-
 	Path getModelInstancePath(ComponentHandle cmp) override
 	{
 		return m_render_scene->getModelInstancePath(cmp);

@@ -4,6 +4,7 @@
 #include "editor/studio_app.h"
 #include "editor/world_editor.h"
 #include "engine/blob.h"
+#include "engine/crc32.h"
 #include "engine/iplugin.h"
 #include "engine/math_utils.h"
 #include "engine/prefab.h"
@@ -20,6 +21,9 @@
 
 namespace Lumix
 {
+
+
+static const u32 ENABLED_HASH = crc32("Enabled");
 
 
 PropertyGrid::PropertyGrid(StudioApp& app)
@@ -108,8 +112,15 @@ struct GridUIVisitor LUMIX_FINAL : Reflection::IPropertyVisitor
 	}
 
 
+	bool skipProperty(const Reflection::PropertyBase& prop)
+	{
+		return equalStrings(prop.name, "Enabled");
+	}
+
+
 	void visit(const Reflection::Property<float>& prop) override
 	{
+		if (skipProperty(prop)) return;
 		Attributes attrs = getAttributes(prop);
 		ComponentUID cmp = getComponent();
 		float f;
@@ -128,6 +139,7 @@ struct GridUIVisitor LUMIX_FINAL : Reflection::IPropertyVisitor
 
 	void visit(const Reflection::Property<int>& prop) override
 	{
+		if (skipProperty(prop)) return;
 		ComponentUID cmp = getComponent();
 		int value;
 		OutputBlob blob(&value, sizeof(value));
@@ -196,6 +208,7 @@ struct GridUIVisitor LUMIX_FINAL : Reflection::IPropertyVisitor
 
 	void visit(const Reflection::Property<Int2>& prop) override
 	{
+		if (skipProperty(prop)) return;
 		ComponentUID cmp = getComponent();
 		Int2 value;
 		OutputBlob blob(&value, sizeof(value));
@@ -209,6 +222,7 @@ struct GridUIVisitor LUMIX_FINAL : Reflection::IPropertyVisitor
 
 	void visit(const Reflection::Property<Vec2>& prop) override
 	{
+		if (skipProperty(prop)) return;
 		ComponentUID cmp = getComponent();
 		Vec2 value;
 		OutputBlob blob(&value, sizeof(value));
@@ -222,6 +236,7 @@ struct GridUIVisitor LUMIX_FINAL : Reflection::IPropertyVisitor
 
 	void visit(const Reflection::Property<Vec3>& prop) override
 	{
+		if (skipProperty(prop)) return;
 		Attributes attrs = getAttributes(prop);
 		ComponentUID cmp = getComponent();
 		Vec3 value;
@@ -249,6 +264,7 @@ struct GridUIVisitor LUMIX_FINAL : Reflection::IPropertyVisitor
 
 	void visit(const Reflection::Property<Vec4>& prop) override
 	{
+		if (skipProperty(prop)) return;
 		ComponentUID cmp = getComponent();
 		Vec4 value;
 		OutputBlob blob(&value, sizeof(value));
@@ -263,6 +279,7 @@ struct GridUIVisitor LUMIX_FINAL : Reflection::IPropertyVisitor
 
 	void visit(const Reflection::Property<bool>& prop) override
 	{
+		if (skipProperty(prop)) return;
 		ComponentUID cmp = getComponent();
 		bool value;
 		OutputBlob blob(&value, sizeof(value));
@@ -277,6 +294,7 @@ struct GridUIVisitor LUMIX_FINAL : Reflection::IPropertyVisitor
 
 	void visit(const Reflection::Property<Path>& prop) override
 	{
+		if (skipProperty(prop)) return;
 		ComponentUID cmp = getComponent();
 		char tmp[1024];
 		OutputBlob blob(&tmp, sizeof(tmp));
@@ -303,6 +321,7 @@ struct GridUIVisitor LUMIX_FINAL : Reflection::IPropertyVisitor
 
 	void visit(const Reflection::Property<const char*>& prop) override
 	{
+		if (skipProperty(prop)) return;
 		ComponentUID cmp = getComponent();
 		char tmp[1024];
 		OutputBlob blob(&tmp, sizeof(tmp));
@@ -320,6 +339,7 @@ struct GridUIVisitor LUMIX_FINAL : Reflection::IPropertyVisitor
 
 	void visit(const Reflection::ISampledFuncProperty& prop) override
 	{
+		if (skipProperty(prop)) return;
 		static const int MIN_COUNT = 6;
 		ComponentUID cmp = getComponent();
 
@@ -416,6 +436,7 @@ struct GridUIVisitor LUMIX_FINAL : Reflection::IPropertyVisitor
 
 	void visit(const Reflection::IArrayProperty& prop) override
 	{
+		if (skipProperty(prop)) return;
 		ImGui::Unindent();
 		bool is_open = ImGui::TreeNodeEx(prop.name, ImGuiTreeNodeFlags_AllowOverlapMode);
 		if (m_entities.size() > 1)
@@ -481,6 +502,7 @@ struct GridUIVisitor LUMIX_FINAL : Reflection::IPropertyVisitor
 
 	void visit(const Reflection::IEnumProperty& prop) override
 	{
+		if (skipProperty(prop)) return;
 		if (m_entities.size() > 1)
 		{
 			ImGui::LabelText(prop.name, "Multi-object editing not supported.");
@@ -525,15 +547,43 @@ struct GridUIVisitor LUMIX_FINAL : Reflection::IPropertyVisitor
 };
 
 
-void PropertyGrid::showComponentProperties(const Array<Entity>& entities, ComponentType cmp_type)
+static bool componentTreeNode(StudioApp& app, ComponentType cmp_type, const Entity* entities, int entities_count)
 {
+	const Reflection::PropertyBase* enabled_prop = Reflection::getProperty(cmp_type, ENABLED_HASH);
+
 	ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowOverlapMode;
 	ImGui::Separator();
-	const char* cmp_type_name = m_app.getComponentTypeName(cmp_type);
-	ImGui::PushFont(m_app.getBoldFont());
-	bool is_open = ImGui::TreeNodeEx((void*)(uintptr)cmp_type.index, flags, "%s", cmp_type_name);
+	const char* cmp_type_name = app.getComponentTypeName(cmp_type);
+	ImGui::PushFont(app.getBoldFont());
+	bool is_open;
+	if (enabled_prop)
+	{
+		is_open = ImGui::TreeNodeEx((void*)(uintptr)cmp_type.index, flags, "%s", "");
+		ImGui::SameLine();
+		bool b;
+		ComponentUID cmp;
+		cmp.type = cmp_type;
+		cmp.entity = entities[0];
+		cmp.scene = app.getWorldEditor().getUniverse()->getScene(cmp_type);
+		cmp.handle = cmp.scene->getComponent(cmp.entity, cmp.type);
+		enabled_prop->getValue(cmp, -1, OutputBlob(&b, sizeof(b)));
+		if(ImGui::Checkbox(cmp_type_name, &b))
+		{
+			app.getWorldEditor().setProperty(cmp_type, -1, *enabled_prop, entities, entities_count, &b, sizeof(b));
+		}
+	}
+	else
+	{ 
+		is_open = ImGui::TreeNodeEx((void*)(uintptr)cmp_type.index, flags, "%s", cmp_type_name);
+	}
 	ImGui::PopFont();
+	return is_open;
+}
 
+
+void PropertyGrid::showComponentProperties(const Array<Entity>& entities, ComponentType cmp_type)
+{
+	bool is_open = componentTreeNode(m_app, cmp_type, &entities[0], entities.size());
 	ImGuiStyle& style = ImGui::GetStyle();
 	ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize("Remove").x - style.FramePadding.x * 2 - style.WindowPadding.x - 15);
 	if (ImGui::SmallButton("Remove"))
@@ -554,7 +604,6 @@ void PropertyGrid::showComponentProperties(const Array<Entity>& entities, Compon
 		m_editor.selectEntities(&m_deferred_select, 1);
 		m_deferred_select = INVALID_ENTITY;
 	}
-
 
 	if (entities.size() == 1)
 	{
