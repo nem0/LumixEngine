@@ -2931,42 +2931,6 @@ public:
 	}
 
 
-	void showEntities(const Entity* entities, int count) override
-	{
-		for (int i = 0, c = count; i < c; ++i)
-		{
-			m_render_interface->showEntity(entities[i]);
-		}
-	}
-
-
-	void showSelectedEntities() override
-	{
-		for (auto entity : m_selected_entities)
-		{
-			m_render_interface->showEntity(entity);
-		}
-	}
-
-
-	void hideEntities(const Entity* entities, int count) override
-	{
-		for (int i = 0, c = count; i < c; ++i)
-		{
-			m_render_interface->hideEntity(entities[i]);
-		}
-	}
-
-
-	void hideSelectedEntities() override
-	{
-		for (auto entity : m_selected_entities)
-		{
-			m_render_interface->hideEntity(entity);
-		}
-	}
-
-
 	void copyEntities(const Entity* entities, int count, OutputBlob& blob) override
 	{
 		blob.write(count);

@@ -218,7 +218,7 @@ static void registerProperties(IAllocator& allocator)
 				MinAttribute(0))
 		),
 		component("renderable",
-			//property("Enabled", LUMIX_PROP(RenderScene, isModelInstanceEnabled, enableModelInstance)),
+			property("Enabled", LUMIX_PROP(RenderScene, isModelInstanceEnabled, enableModelInstance)),
 			property("Source", LUMIX_PROP(RenderScene, getModelInstancePath, setModelInstancePath),
 				ResourceAttribute("Mesh (*.msh)", MODEL_TYPE)),
 			property("Keep skin", LUMIX_PROP(RenderScene, getModelInstanceKeepSkin, setModelInstanceKeepSkin)),

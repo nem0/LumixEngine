@@ -100,10 +100,6 @@ public:
 	virtual void loadUniverse(const char* basename) = 0;
 	virtual void saveUniverse(const char* basename, bool save_path) = 0;
 	virtual void newUniverse() = 0;
-	virtual void showEntities(const Entity* entities, int count) = 0;
-	virtual void showSelectedEntities() = 0;
-	virtual void hideEntities(const Entity* entities, int count) = 0;
-	virtual void hideSelectedEntities() = 0;
 	virtual void copyEntities(const Entity* entities, int count, OutputBlob& blob) = 0;
 	virtual void copyEntities() = 0;
 	virtual bool canPasteEntities() const = 0;

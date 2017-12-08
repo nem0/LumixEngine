@@ -61,8 +61,6 @@ public:
 		Vertex* vertices,
 		int vertices_count,
 		bool lines) = 0;
-	virtual void showEntity(Entity entity) = 0;
-	virtual void hideEntity(Entity entity) = 0;
 	virtual ImFont* addFont(const char* filename, int size) = 0;
 	virtual Vec3 getClosestVertex(Universe* universe, Entity entity, const Vec3& pos) = 0;
 	virtual void addText2D(float x, float y, float font_size, u32 color, const char* text) = 0;

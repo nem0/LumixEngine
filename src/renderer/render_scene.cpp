@@ -47,6 +47,7 @@ enum class RenderSceneVersion : int
 	INDIRECT_INTENSITY,
 	SCRIPTED_PARTICLES,
 	POINT_LIGHT_NO_COMPONENT,
+	MODEL_INSTANCE_ENABLE,
 
 	LATEST
 };
@@ -759,6 +760,11 @@ public:
 		{
 			serializer.read(&r.flags.base);
 			r.flags.base &= ModelInstance::PERSISTENT_FLAGS;
+
+			if (scene_version <= (int)RenderSceneVersion::MODEL_INSTANCE_ENABLE)
+			{
+				r.flags.set(ModelInstance::ENABLED);
+			}
 		}
 
 		ComponentHandle cmp = {r.entity.index};
@@ -2778,15 +2784,17 @@ public:
 
 	bool isModelInstanceEnabled(ComponentHandle cmp) override
 	{
-		return m_culling_system->isAdded(cmp);
+		ModelInstance& model_instance = m_model_instances[cmp.index];
+		return model_instance.flags.isSet(ModelInstance::ENABLED);
 	}
 
 
 	void enableModelInstance(ComponentHandle cmp, bool enable) override
 	{
+		ModelInstance& model_instance = m_model_instances[cmp.index];
+		model_instance.flags.set(ModelInstance::ENABLED, enable);
 		if (enable)
 		{
-			ModelInstance& model_instance = m_model_instances[cmp.index];
 			if (!model_instance.model || !model_instance.model->isReady()) return;
 
 			Sphere sphere(m_universe.getPosition(model_instance.entity), model_instance.model->getBoundingRadius());
@@ -4008,6 +4016,7 @@ public:
 		{
 			auto& r = m_model_instances[i];
 			if (ignored_model_instance.index == i || !r.model) continue;
+			if (!r.flags.isSet(ModelInstance::ENABLED)) continue;
 
 			const Vec3& pos = r.matrix.getTranslation();
 			float scale = universe.getScale(r.entity);
@@ -4378,7 +4387,7 @@ public:
 		float bounding_radius = r.model->getBoundingRadius();
 		float scale = m_universe.getScale(r.entity);
 		Sphere sphere(r.matrix.getTranslation(), bounding_radius * scale);
-		m_culling_system->addStatic(component, sphere, getLayerMask(r));
+		if(r.flags.isSet(ModelInstance::ENABLED)) m_culling_system->addStatic(component, sphere, getLayerMask(r));
 		ASSERT(!r.pose);
 		if (model->getBoneCount() > 0)
 		{

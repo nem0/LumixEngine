@@ -819,8 +819,6 @@ public:
 	void setPivotOrigin() { m_editor->getGizmo().setPivotOrigin(); }
 	void setPivotCenter() { m_editor->getGizmo().setPivotCenter(); }
 	void createEntity() { m_editor->addEntity(); }
-	void showEntities() { m_editor->showSelectedEntities(); }
-	void hideEntities() { m_editor->hideSelectedEntities(); }
 	void toggleMeasure() { m_editor->toggleMeasure(); }
 	void snapDown() { m_editor->snapDown(); }
 	void lookAtSelected() { m_editor->lookAtSelected(); }
@@ -1474,8 +1472,6 @@ public:
 
 		addAction<&StudioAppImpl::createEntity>("Create empty", "Create empty entity", "createEntity");
 		addAction<&StudioAppImpl::destroyEntity>("Destroy", "Destroy entity", "destroyEntity", SDLK_DELETE, -1, -1);
-		addAction<&StudioAppImpl::showEntities>("Show", "Show selected entities", "showEntities");
-		addAction<&StudioAppImpl::hideEntities>("Hide", "Hide selected entities", "hideEntities");
 		addAction<&StudioAppImpl::savePrefab>("Save prefab", "Save selected entities as prefab", "savePrefab");
 		addAction<&StudioAppImpl::makeParent>("Make parent", "Make entity parent", "makeParent");
 		addAction<&StudioAppImpl::unparent>("Unparent", "Unparent entity", "unparent");
