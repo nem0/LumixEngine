@@ -622,7 +622,7 @@ public:
 		if (entity.isValid() && entity.index < m_model_instances.size())
 		{
 			ModelInstance& mi = m_model_instances[entity.index];
-			mi.flags = mi.flags | ModelInstance::IS_BONE_ATTACHMENT_PARENT;
+			mi.flags.set(ModelInstance::IS_BONE_ATTACHMENT_PARENT);
 		}
 		updateRelativeMatrix(ba);
 	}
@@ -707,7 +707,7 @@ public:
 		ASSERT(r.entity != INVALID_ENTITY);
 
 		serialize.write("source", r.model ? r.model->getPath().c_str() : "");
-		serialize.write("flags", u8(r.flags & ModelInstance::PERSISTENT_FLAGS));
+		serialize.write("flags", u8(r.flags.base & ModelInstance::PERSISTENT_FLAGS));
 		bool has_changed_materials = r.model && r.model->isReady() && r.meshes != &r.model->getMesh(0);
 		serialize.write("custom_materials", has_changed_materials ? r.mesh_count : 0);
 		if (has_changed_materials)
@@ -722,13 +722,13 @@ public:
 
 	static bool keepSkin(ModelInstance& r)
 	{
-		return (r.flags & (u8)ModelInstance::KEEP_SKIN) != 0;
+		return r.flags.isSet(ModelInstance::KEEP_SKIN);
 	}
 
 
 	static bool hasCustomMeshes(ModelInstance& r)
 	{
-		return (r.flags & (u8)ModelInstance::CUSTOM_MESHES) != 0;
+		return r.flags.isSet(ModelInstance::CUSTOM_MESHES);
 	}
 
 
@@ -747,7 +747,7 @@ public:
 		r.entity = entity;
 		r.model = nullptr;
 		r.pose = nullptr;
-		r.flags = 0;
+		r.flags.clear();
 		r.meshes = nullptr;
 		r.mesh_count = 0;
 
@@ -757,8 +757,8 @@ public:
 		serializer.read(path, lengthOf(path));
 		if (scene_version > (int)RenderSceneVersion::MODEL_INSTNACE_FLAGS)
 		{
-			serializer.read(&r.flags);
-			r.flags &= ModelInstance::PERSISTENT_FLAGS;
+			serializer.read(&r.flags.base);
+			r.flags.base &= ModelInstance::PERSISTENT_FLAGS;
 		}
 
 		ComponentHandle cmp = {r.entity.index};
@@ -941,7 +941,7 @@ public:
 		if (parent_entity.isValid() && parent_entity.index < m_model_instances.size())
 		{
 			ModelInstance& mi = m_model_instances[parent_entity.index];
-			mi.flags = mi.flags | ModelInstance::IS_BONE_ATTACHMENT_PARENT;
+			mi.flags.set(ModelInstance::IS_BONE_ATTACHMENT_PARENT);
 		}
 	}
 
@@ -1360,7 +1360,7 @@ public:
 		for (auto& r : m_model_instances)
 		{
 			serializer.write(r.entity);
-			serializer.write(u8(r.flags & ModelInstance::PERSISTENT_FLAGS));
+			serializer.write(u8(r.flags.base & ModelInstance::PERSISTENT_FLAGS));
 			if(r.entity != INVALID_ENTITY)
 			{
 				serializer.write(r.model ? r.model->getPath().getHash() : 0);
@@ -1625,7 +1625,7 @@ public:
 			auto& r = m_model_instances.emplace();
 			serializer.read(r.entity);
 			serializer.read(r.flags);
-			r.flags &= ModelInstance::PERSISTENT_FLAGS;
+			r.flags.base &= ModelInstance::PERSISTENT_FLAGS;
 			ASSERT(r.entity.index == i || !r.entity.isValid());
 			r.model = nullptr;
 			r.pose = nullptr;
@@ -1725,7 +1725,7 @@ public:
 		if (parent_entity.isValid() && parent_entity.index < m_model_instances.size())
 		{
 			ModelInstance& mi = m_model_instances[bone_attachment.parent_entity.index];
-			mi.flags = mi.flags & ~ModelInstance::IS_BONE_ATTACHMENT_PARENT;
+			mi.flags.unset(ModelInstance::IS_BONE_ATTACHMENT_PARENT);
 		}
 		m_bone_attachments.erase(entity);
 		m_universe.destroyComponent(entity, BONE_ATTACHMENT_TYPE, this, component);
@@ -2741,7 +2741,7 @@ public:
 	{
 		if (!changed) return;
 		if (cmp.index < m_model_instances.size()
-			&& (m_model_instances[cmp.index].flags & ModelInstance::IS_BONE_ATTACHMENT_PARENT) == 0)
+			&& (m_model_instances[cmp.index].flags.isSet(ModelInstance::IS_BONE_ATTACHMENT_PARENT)) == 0)
 		{
 			return;
 		}
@@ -2776,20 +2776,27 @@ public:
 	}
 
 
-	void showModelInstance(ComponentHandle cmp) override
+	bool isModelInstanceEnabled(ComponentHandle cmp) override
 	{
-		auto& model_instance = m_model_instances[cmp.index];
-		if (!model_instance.model || !model_instance.model->isReady()) return;
-
-		Sphere sphere(m_universe.getPosition(model_instance.entity), model_instance.model->getBoundingRadius());
-		u64 layer_mask = getLayerMask(model_instance);
-		if(!m_culling_system->isAdded(cmp)) m_culling_system->addStatic(cmp, sphere, layer_mask);
+		return m_culling_system->isAdded(cmp);
 	}
 
 
-	void hideModelInstance(ComponentHandle cmp) override
+	void enableModelInstance(ComponentHandle cmp, bool enable) override
 	{
-		m_culling_system->removeStatic(cmp);
+		if (enable)
+		{
+			ModelInstance& model_instance = m_model_instances[cmp.index];
+			if (!model_instance.model || !model_instance.model->isReady()) return;
+
+			Sphere sphere(m_universe.getPosition(model_instance.entity), model_instance.model->getBoundingRadius());
+			u64 layer_mask = getLayerMask(model_instance);
+			if (!m_culling_system->isAdded(cmp)) m_culling_system->addStatic(cmp, sphere, layer_mask);
+		}
+		else
+		{
+			m_culling_system->removeStatic(cmp);
+		}
 	}
 
 
@@ -4356,7 +4363,7 @@ public:
 		}
 		m_allocator.deallocate(r.meshes);
 		r.meshes = nullptr;
-		r.flags = r.flags & ~(u8)ModelInstance::CUSTOM_MESHES;
+		r.flags.unset(ModelInstance::CUSTOM_MESHES);
 		r.mesh_count = 0;
 	}
 
@@ -4407,7 +4414,7 @@ public:
 			r.mesh_count = r.model->getMeshCount();
 		}
 
-		if ((r.flags & ModelInstance::IS_BONE_ATTACHMENT_PARENT) != 0)
+		if (r.flags.isSet(ModelInstance::IS_BONE_ATTACHMENT_PARENT))
 		{
 			updateBoneAttachment(m_bone_attachments[r.entity]);
 		}
@@ -4501,7 +4508,7 @@ public:
 		}
 		r.meshes = new_meshes;
 		r.mesh_count = count;
-		r.flags |= (u8)ModelInstance::CUSTOM_MESHES;
+		r.flags.set(ModelInstance::CUSTOM_MESHES);
 	}
 
 
@@ -4515,14 +4522,7 @@ public:
 	void setModelInstanceKeepSkin(ComponentHandle cmp, bool keep) override
 	{
 		auto& r = m_model_instances[cmp.index];
-		if (keep)
-		{
-			r.flags |= (u8)ModelInstance::KEEP_SKIN;
-		}
-		else
-		{
-			r.flags &= ~(u8)ModelInstance::KEEP_SKIN;
-		}
+		r.flags.set(ModelInstance::KEEP_SKIN, keep);
 	}
 
 
@@ -4881,7 +4881,7 @@ public:
 		r.model = nullptr;
 		r.meshes = nullptr;
 		r.pose = nullptr;
-		r.flags = 0;
+		r.flags.clear();
 		r.mesh_count = 0;
 		r.matrix = m_universe.getMatrix(entity);
 		ComponentHandle cmp = {entity.index};
@@ -5134,8 +5134,7 @@ void RenderScene::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(getTerrainMaterial);
 	REGISTER_FUNCTION(getTerrainNormalAt);
 	REGISTER_FUNCTION(setTerrainHeightAt);
-	REGISTER_FUNCTION(hideModelInstance);
-	REGISTER_FUNCTION(showModelInstance);
+	REGISTER_FUNCTION(enableModelInstance);
 	REGISTER_FUNCTION(getPoseBonePosition);
 
 	#undef REGISTER_FUNCTION

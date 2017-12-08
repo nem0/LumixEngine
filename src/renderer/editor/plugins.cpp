@@ -2383,7 +2383,7 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 	{
 		ComponentHandle cmp = m_render_scene->getModelInstanceComponent(entity);
 		if (cmp == INVALID_COMPONENT) return;
-		m_render_scene->showModelInstance(cmp);
+		m_render_scene->enableModelInstance(cmp, true);
 	}
 
 
@@ -2391,7 +2391,7 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 	{
 		ComponentHandle cmp = m_render_scene->getModelInstanceComponent(entity);
 		if (cmp == INVALID_COMPONENT) return;
-		m_render_scene->hideModelInstance(cmp);
+		m_render_scene->enableModelInstance(cmp, false);
 	}
 
 

@@ -2,6 +2,7 @@
 
 
 #include "engine/lumix.h"
+#include "engine/flag_set.h"
 #include "engine/matrix.h"
 #include "engine/iplugin.h"
 
@@ -72,7 +73,7 @@ struct ModelInstance
 	Pose* pose;
 	Entity entity;
 	Mesh* meshes;
-	u8 flags;
+	FlagSet<Flags, u8> flags;
 	i8 mesh_count;
 };
 
@@ -297,8 +298,8 @@ public:
 	virtual float getParticleEmitterAttractorForce(ComponentHandle cmp) = 0;
 	virtual void setParticleEmitterAttractorForce(ComponentHandle cmp, float value) = 0;
 
-	virtual void showModelInstance(ComponentHandle cmp) = 0;
-	virtual void hideModelInstance(ComponentHandle cmp) = 0;
+	virtual void enableModelInstance(ComponentHandle cmp, bool enable) = 0;
+	virtual bool isModelInstanceEnabled(ComponentHandle cmp) = 0;
 	virtual ComponentHandle getModelInstanceComponent(Entity entity) = 0;
 	virtual ModelInstance* getModelInstance(ComponentHandle cmp) = 0;
 	virtual ModelInstance* getModelInstances() = 0;
