@@ -1029,8 +1029,6 @@ public:
 		doMenuItem(*getAction("destroyEntity"), is_any_entity_selected);
 
 		doMenuItem(*getAction("savePrefab"), selected_entities.size() == 1);
-		doMenuItem(*getAction("showEntities"), is_any_entity_selected);
-		doMenuItem(*getAction("hideEntities"), is_any_entity_selected);
 		doMenuItem(*getAction("makeParent"), selected_entities.size() == 2);
 		bool can_unparent = selected_entities.size() == 1 && m_editor->getUniverse()->getParent(selected_entities[0]).isValid();
 		doMenuItem(*getAction("unparent"), can_unparent);
