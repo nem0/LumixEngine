@@ -890,7 +890,7 @@ public:
 	}
 
 
-	void destroyEntity()
+	void destroySelectedEntity()
 	{
 		auto& selected_entities = m_editor->getSelectedEntities();
 		if (selected_entities.empty()) return;
@@ -1027,7 +1027,6 @@ public:
 			ImGui::EndMenu();
 		}
 		doMenuItem(*getAction("destroyEntity"), is_any_entity_selected);
-
 		doMenuItem(*getAction("savePrefab"), selected_entities.size() == 1);
 		doMenuItem(*getAction("makeParent"), selected_entities.size() == 2);
 		bool can_unparent = selected_entities.size() == 1 && m_editor->getUniverse()->getParent(selected_entities[0]).isValid();
@@ -1469,7 +1468,7 @@ public:
 			.is_selected.bind<Gizmo, &Gizmo::isPivotOrigin>(&m_editor->getGizmo());
 
 		addAction<&StudioAppImpl::createEntity>("Create empty", "Create empty entity", "createEntity");
-		addAction<&StudioAppImpl::destroyEntity>("Destroy", "Destroy entity", "destroyEntity", SDLK_DELETE, -1, -1);
+		addAction<&StudioAppImpl::destroySelectedEntity>("Destroy", "Destroy entity", "destroyEntity", SDLK_DELETE, -1, -1);
 		addAction<&StudioAppImpl::savePrefab>("Save prefab", "Save selected entities as prefab", "savePrefab");
 		addAction<&StudioAppImpl::makeParent>("Make parent", "Make entity parent", "makeParent");
 		addAction<&StudioAppImpl::unparent>("Unparent", "Unparent entity", "unparent");
@@ -1637,31 +1636,31 @@ public:
 	}
 
 
-	void LUA_savePrefab(const char* path)
+	void savePrefabAs(const char* path)
 	{
 		m_editor->getPrefabSystem().savePrefab(Path(path));
 	}
 
 
-	void LUA_destroyEntity(Entity e)
+	void destroyEntity(Entity e)
 	{
 		m_editor->destroyEntities(&e, 1);
 	}
 
 
-	void LUA_selectEntity(Entity e)
+	void selectEntity(Entity e)
 	{
 		m_editor->selectEntities(&e, 1);
 	}
 
 
-	void LUA_exitGameMode()
+	void exitGameMode()
 	{
 		m_deferred_game_mode_exit = true;
 	}
 
 
-	void LUA_exit(int exit_code)
+	void exitWithCode(int exit_code)
 	{
 		m_finished = true;
 		m_exit_code = exit_code;
@@ -1826,12 +1825,30 @@ public:
 	}
 
 
-	bool LUA_runTest(const char* dir, const char* name)
+	void executeUndoStack(const char* path)
 	{
-		return m_editor->runTest(dir, name);
+		m_editor->executeUndoStack(Path(path));
 	}
 
-	
+
+	void saveUniverseAs(const char* basename, bool save_path)
+	{
+		m_editor->saveUniverse(basename, save_path);
+	}
+
+
+	void saveUniverse()
+	{
+		save();
+	}
+
+
+	void runTest(const char* dir, const char* name)
+	{
+		m_editor->runTest(dir, name);
+	}
+
+
 	void createLua()
 	{
 		lua_State* L = m_engine->getState();
@@ -1840,16 +1857,21 @@ public:
 
 		#define REGISTER_FUNCTION(F) \
 			do { \
-				auto* f = &LuaWrapper::wrapMethod<StudioAppImpl, decltype(&StudioAppImpl::LUA_##F), &StudioAppImpl::LUA_##F>; \
-				LuaWrapper::createSystemFunction(L, "Editor", #F, f); \
+				auto f = &LuaWrapper::wrapMethodClosure<StudioAppImpl, decltype(&StudioAppImpl::F), &StudioAppImpl::F>; \
+				LuaWrapper::createSystemClosure(L, "Editor", this, #F, f); \
 			} while(false) \
 
-		REGISTER_FUNCTION(runTest);
-		REGISTER_FUNCTION(exit);
-		REGISTER_FUNCTION(exitGameMode);
-		REGISTER_FUNCTION(savePrefab);
+
+		REGISTER_FUNCTION(savePrefabAs);
 		REGISTER_FUNCTION(selectEntity);
 		REGISTER_FUNCTION(destroyEntity);
+		REGISTER_FUNCTION(newUniverse);
+		REGISTER_FUNCTION(saveUniverse);
+		REGISTER_FUNCTION(saveUniverseAs);
+		REGISTER_FUNCTION(runTest);
+		REGISTER_FUNCTION(executeUndoStack);
+		REGISTER_FUNCTION(exitWithCode);
+		REGISTER_FUNCTION(exitGameMode);
 
 		#undef REGISTER_FUNCTION
 
