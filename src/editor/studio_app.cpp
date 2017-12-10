@@ -1843,9 +1843,9 @@ public:
 	}
 
 
-	void runTest(const char* dir, const char* name)
+	bool runTest(const char* dir, const char* name)
 	{
-		m_editor->runTest(dir, name);
+		return m_editor->runTest(dir, name);
 	}
 
 
