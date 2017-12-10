@@ -132,6 +132,30 @@ newoption {
 			{ "linux-clang", 		"Linux (Clang compiler)"			}
 		}
 	}
+
+newaction {
+	trigger = "update-tests",
+	description = "Update render & editor tests, use when serializaiton changes",
+	
+	execute = function() 
+		local editor_tests = { "all_components", "basic", "copy_paste_delete" }
+		os.execute([[cd ..\..\lumixengine_data\ && bin\studio.exe -run_script unit_tests\editor\update_tests.lua -pseudorandom_guid]])
+		for _, test in ipairs(editor_tests) do
+			os.execute([[rmdir /S /Q "..\..\lumixengine_data\unit_tests\editor\]] .. test .. [["]])
+			os.execute([[del /Q "..\..\lumixengine_data\unit_tests\editor\]] .. test .. [[.unv"]])
+			os.execute([[xcopy /I /Y /E "..\..\lumixengine_data\universes\]] .. test ..[[" "..\..\lumixengine_data\unit_tests\editor\]] .. test .. [["]])
+			os.execute([[rmdir /S /Q "..\..\lumixengine_data\universes\]] .. test .. [["]])
+			os.execute([[del /Q "..\..\lumixengine_data\universes\]] .. test .. [[.unv"]])
+		end
+		
+		local render_tests = { "direct_light", "indirect_light" }
+		for _, test in ipairs(render_tests) do
+			os.execute([[xcopy /I /Y /E "..\..\lumixengine_data\unit_tests\render_tests\]] .. test ..[[" "..\..\lumixengine_data\universes\]] .. test .. [["]])
+			os.execute([[cd ..\..\lumixengine_data\ && bin\studio.exe -run_script unit_tests\render_tests\update_tests.lua -open ]] .. test)
+			os.execute([[rmdir /S /Q "..\..\lumixengine_data\universes\]] .. test .. [["]])
+		end
+	end
+}
 	
 newaction {
 	trigger = "install",
