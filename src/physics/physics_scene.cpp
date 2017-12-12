@@ -281,6 +281,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			, type(_type)
 			, dynamic_type(DynamicType::STATIC)
 			, is_trigger(false)
+			, scale(1)
 		{
 		}
 
@@ -295,6 +296,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		void setPhysxActor(PxRigidActor* actor);
 
 		Entity entity;
+		float scale;
 		int layer;
 		PxRigidActor* physx_actor;
 		PhysicsGeometry* resource;
@@ -1360,17 +1362,42 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
+	void initControllerDesc(PxCapsuleControllerDesc& desc)
+	{
+		static struct CB : PxControllerBehaviorCallback
+		{
+			PxControllerBehaviorFlags getBehaviorFlags(const PxShape& shape, const PxActor& actor) override
+			{
+				return PxControllerBehaviorFlag::eCCT_CAN_RIDE_ON_OBJECT | PxControllerBehaviorFlag::eCCT_SLIDE;
+			}
+
+
+			PxControllerBehaviorFlags getBehaviorFlags(const PxController& controller) override
+			{
+				return PxControllerBehaviorFlag::eCCT_CAN_RIDE_ON_OBJECT;
+			}
+
+
+			PxControllerBehaviorFlags getBehaviorFlags(const PxObstacle& obstacle) override
+			{
+				return PxControllerBehaviorFlag::eCCT_CAN_RIDE_ON_OBJECT;
+			}
+		} cb;
+
+		desc.material = m_default_material;
+		desc.height = 1.8f;
+		desc.radius = 0.25f;
+		desc.slopeLimit = 0.0f;
+		desc.contactOffset = 0.1f;
+		desc.stepOffset = 0.02f;
+		desc.behaviorCallback = &cb;
+	}
+
+
 	ComponentHandle createController(Entity entity)
 	{
 		PxCapsuleControllerDesc cDesc;
-		cDesc.material = m_default_material;
-		cDesc.height = 1.8f;
-		cDesc.radius = 0.25f;
-		cDesc.slopeLimit = 0.0f;
-		cDesc.contactOffset = 0.1f;
-		cDesc.stepOffset = 0.02f;
-		cDesc.callback = nullptr;
-		cDesc.behaviorCallback = nullptr;
+		initControllerDesc(cDesc);
 		Vec3 position = m_universe.getPosition(entity);
 		cDesc.position.set(position.x, position.y, position.z);
 		Controller& c = m_controllers.insert(entity);
@@ -1717,7 +1744,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			}
 
 			const PxExtendedVec3& p = controller.m_controller->getPosition();
-			controller.m_controller->move(toPhysx(dif), 0.01f, time_delta, PxControllerFilters());
+			controller.m_controller->move(toPhysx(dif), 0.001f, time_delta, PxControllerFilters());
 
 			float y = (float)p.y - controller.m_height * 0.5f - controller.m_radius;
 			m_universe.setPosition(controller.m_entity, (float)p.x, y, (float)p.z);
@@ -2559,9 +2586,20 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			RigidActor* actor = m_actors.at(idx);
 			if (actor->physx_actor && m_update_in_progress != actor)
 			{
-				RigidTransform trans = m_universe.getTransform(entity).getRigidPart();
-				actor->physx_actor->setGlobalPose(toPhysx(trans), false);
-				if (actor->resource) actor->rescale();
+				Transform trans = m_universe.getTransform(entity);
+				if (actor->dynamic_type == DynamicType::KINEMATIC)
+				{
+					auto* rigid_dynamic = (PxRigidDynamic*)actor->physx_actor;
+					rigid_dynamic->setKinematicTarget(toPhysx(trans.getRigidPart()));
+				}
+				else
+				{
+					actor->physx_actor->setGlobalPose(toPhysx(trans.getRigidPart()), false);
+				}
+				if (actor->resource && actor->scale != trans.scale)
+				{
+					actor->rescale();
+				}
 			}
 		}
 	}
@@ -3280,14 +3318,9 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		serializer.read(&c.m_height);
 
 		PxCapsuleControllerDesc cDesc;
-		cDesc.material = m_default_material;
+		initControllerDesc(cDesc);
 		cDesc.height = c.m_height;
 		cDesc.radius = c.m_radius;
-		cDesc.slopeLimit = 0.0f;
-		cDesc.contactOffset = 0.1f;
-		cDesc.stepOffset = 0.02f;
-		cDesc.callback = nullptr;
-		cDesc.behaviorCallback = nullptr;
 		Vec3 position = m_universe.getPosition(entity);
 		cDesc.position.set(position.x, position.y - cDesc.height * 0.5f, position.z);
 		c.m_controller = m_controller_manager->createController(cDesc);
@@ -4713,14 +4746,9 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			serializer.read(c.m_radius);
 			serializer.read(c.m_height);
 			PxCapsuleControllerDesc cDesc;
-			cDesc.material = m_default_material;
+			initControllerDesc(cDesc);
 			cDesc.height = c.m_height;
 			cDesc.radius = c.m_radius;
-			cDesc.slopeLimit = 0.0f;
-			cDesc.contactOffset = 0.1f;
-			cDesc.stepOffset = 0.02f;
-			cDesc.callback = nullptr;
-			cDesc.behaviorCallback = nullptr;
 			Vec3 position = m_universe.getPosition(entity);
 			cDesc.position.set(position.x, position.y - cDesc.height * 0.5f, position.z);
 			c.m_controller = m_controller_manager->createController(cDesc);
@@ -5060,7 +5088,7 @@ PhysicsScene* PhysicsScene::create(PhysicsSystem& system, Universe& context, Eng
 	impl->m_controller_manager = PxCreateControllerManager(*impl->m_scene);
 
 	impl->m_system = &system;
-	impl->m_default_material = impl->m_system->getPhysics()->createMaterial(0.5, 0.5, 0.5);
+	impl->m_default_material = impl->m_system->getPhysics()->createMaterial(9999.0f, 9999.0f, 0.1f);
 	PxSphereGeometry geom(1);
 	impl->m_dummy_actor = PxCreateDynamic(
 		impl->m_scene->getPhysics(), PxTransform::createIdentity(), geom, *impl->m_default_material, 1);
@@ -5084,7 +5112,8 @@ void PhysicsSceneImpl::RigidActor::onStateChanged(Resource::State, Resource::Sta
 
 		PxTransform transform = toPhysx(scene.getUniverse().getTransform(entity).getRigidPart());
 
-		PxMeshScale scale(scene.getUniverse().getScale(entity));
+		scale = scene.getUniverse().getScale(entity);
+		PxMeshScale scale(scale);
 		PxConvexMeshGeometry convex_geom(resource->convex_mesh, scale);
 		PxTriangleMeshGeometry tri_geom(resource->tri_mesh, scale);
 		const PxGeometry* geom = resource->convex_mesh ? static_cast<PxGeometry*>(&convex_geom)
