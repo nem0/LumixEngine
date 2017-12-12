@@ -3192,6 +3192,13 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 					new_shape = actor->createShape(geom, *m_default_material, shape->getLocalPose());
 					break;
 				}
+			case PxGeometryType::eCONVEXMESH:
+				{
+					PxConvexMeshGeometry geom;
+					shape->getConvexMeshGeometry(geom);
+					new_shape = actor->createShape(geom, *m_default_material, shape->getLocalPose());
+					break;
+				}
 			default:
 				ASSERT(false);
 				return;
