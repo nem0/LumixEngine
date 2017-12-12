@@ -82,6 +82,7 @@ public:
 	void setMatrix(Entity entity, const Matrix& mtx);
 	Matrix getPositionAndRotation(Entity entity) const;
 	Matrix getMatrix(Entity entity) const;
+	void setTransform(Entity entity, const RigidTransform& transform);
 	void setTransform(Entity entity, const Transform& transform);
 	void setTransformKeepChildren(Entity entity, const Transform& transform);
 	void setTransform(Entity entity, const Vec3& pos, const Quat& rot, float scale);

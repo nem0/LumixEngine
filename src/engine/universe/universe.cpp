@@ -190,6 +190,15 @@ void Universe::setTransform(Entity entity, const Transform& transform)
 }
 
 
+void Universe::setTransform(Entity entity, const RigidTransform& transform)
+{
+	auto& tmp = m_entities[entity.index];
+	tmp.position = transform.pos;
+	tmp.rotation = transform.rot;
+	transformEntity(entity, true);
+}
+
+
 void Universe::setTransform(Entity entity, const Vec3& pos, const Quat& rot, float scale)
 {
 	auto& tmp = m_entities[entity.index];
