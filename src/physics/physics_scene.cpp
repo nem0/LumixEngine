@@ -2529,7 +2529,6 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 	void onEntityMoved(Entity entity)
 	{
-		return;
 		int ctrl_idx = m_controllers.find(entity);
 		if(ctrl_idx >= 0)
 		{
