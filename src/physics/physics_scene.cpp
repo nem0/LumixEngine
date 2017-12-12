@@ -1673,8 +1673,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		for (auto* actor : m_dynamic_actors)
 		{
 			PxTransform trans = actor->physx_actor->getGlobalPose();
-			m_universe.setPosition(actor->entity, trans.p.x, trans.p.y, trans.p.z);
-			m_universe.setRotation(actor->entity, trans.q.x, trans.q.y, trans.q.z, trans.q.w);
+			m_universe.setTransform(actor->entity, fromPhysx(trans));
 		}
 	}
 
@@ -3123,7 +3122,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		RigidActor* actor = m_actors[{cmp.index}];
 		if (actor->dynamic_type == new_value) return;
 
-		if (actor->type == ActorType::MESH && new_value != DynamicType::STATIC)
+		if (actor->type == ActorType::MESH && new_value != DynamicType::STATIC && actor->physx_actor)
 		{
 			PxShape* shape;
 			if (actor->physx_actor->getShapes(&shape, 1, 0) == 1)
