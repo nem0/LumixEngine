@@ -325,6 +325,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		, m_script_scene(nullptr)
 		, m_debug_visualization_flags(0)
 		, m_is_updating_ragdoll(false)
+		, m_update_in_progress(nullptr)
 	{
 		setMemory(m_layers_names, 0, sizeof(m_layers_names));
 		for (int i = 0; i < lengthOf(m_layers_names); ++i)
@@ -1672,9 +1673,11 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		PROFILE_FUNCTION();
 		for (auto* actor : m_dynamic_actors)
 		{
+			m_update_in_progress = actor;
 			PxTransform trans = actor->physx_actor->getGlobalPose();
 			m_universe.setTransform(actor->entity, fromPhysx(trans));
 		}
+		m_update_in_progress = nullptr;
 	}
 
 
@@ -2526,6 +2529,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 	void onEntityMoved(Entity entity)
 	{
+		return;
 		int ctrl_idx = m_controllers.find(entity);
 		if(ctrl_idx >= 0)
 		{
@@ -2554,7 +2558,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		if(idx >= 0)
 		{
 			RigidActor* actor = m_actors.at(idx);
-			if (actor->physx_actor)
+			if (actor->physx_actor && m_update_in_progress != actor)
 			{
 				RigidTransform trans = m_universe.getTransform(entity).getRigidPart();
 				actor->physx_actor->setGlobalPose(toPhysx(trans), false);
@@ -5019,6 +5023,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	AssociativeArray<Entity, Heightfield> m_terrains;
 
 	Array<RigidActor*> m_dynamic_actors;
+	RigidActor* m_update_in_progress;
 	DelegateList<void(const ContactData&)> m_contact_callbacks;
 	bool m_is_game_running;
 	bool m_is_updating_ragdoll;
