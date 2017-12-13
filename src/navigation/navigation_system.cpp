@@ -121,6 +121,9 @@ void NavigationSystem::registerProperties()
 	using namespace Reflection;
 	static auto navigation_scene = scene("navigation",
 		component("navmesh_agent",
+			functions(
+				function(LUMIX_FUNC(NavigationScene::navigate))
+			),
 			property("Radius", LUMIX_PROP(NavigationScene, getAgentRadius, setAgentRadius),
 				MinAttribute(0)),
 			property("Height", LUMIX_PROP(NavigationScene, getAgentHeight, setAgentHeight),

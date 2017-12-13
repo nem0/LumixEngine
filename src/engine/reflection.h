@@ -804,7 +804,7 @@ namespace internal
 		{
 			static const size_t size = sizeof(__FUNCTION__) - FRONT_SIZE - BACK_SIZE;
 			static char typeName[size] = {};
-			memcpy(typeName, __FUNCTION__ + FRONT_SIZE, size - 1u);
+			copyMemory(typeName, __FUNCTION__ + FRONT_SIZE, size - 1u);
 
 			return typeName;
 		}
