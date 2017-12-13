@@ -671,6 +671,11 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 
 	int getPassIdx(const char* pass) override
 	{
+		if(stringLength(pass) > sizeof(m_passes[0].data))
+		{
+			g_log_error.log("Renderer") << "Pass name \"" << pass << "\" is too long.";
+			return 0;
+		}
 		for (int i = 0; i < m_passes.size(); ++i)
 		{
 			if (m_passes[i] == pass)
