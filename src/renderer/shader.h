@@ -47,8 +47,7 @@ struct LUMIX_RENDERER_API ShaderCombinations
 {
 	ShaderCombinations();
 
-	typedef char Define[40];
-	typedef StaticString<20> Pass;
+	typedef StaticString<32> Pass;
 	typedef u8 Defines[16];
 	typedef Pass Passes[32];
 
