@@ -749,6 +749,7 @@ public:
 		r.model = nullptr;
 		r.pose = nullptr;
 		r.flags.clear();
+		r.flags.set(ModelInstance::ENABLED);
 		r.meshes = nullptr;
 		r.mesh_count = 0;
 
@@ -4891,6 +4892,7 @@ public:
 		r.meshes = nullptr;
 		r.pose = nullptr;
 		r.flags.clear();
+		r.flags.set(ModelInstance::ENABLED);
 		r.mesh_count = 0;
 		r.matrix = m_universe.getMatrix(entity);
 		ComponentHandle cmp = {entity.index};
