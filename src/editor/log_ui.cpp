@@ -11,7 +11,7 @@ namespace Lumix
 LogUI::LogUI(IAllocator& allocator)
 	: m_allocator(allocator)
 	, m_messages(allocator)
-	, m_level_filter(1)
+	, m_level_filter(2 | 4)
 	, m_notifications(allocator)
 	, m_last_uid(1)
 	, m_guard(false)

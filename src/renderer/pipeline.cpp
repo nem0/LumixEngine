@@ -3191,7 +3191,12 @@ int bindFramebufferTexture(lua_State* L)
 	u32 flags = lua_gettop(L) > 4 ? LuaWrapper::checkArg<u32>(L, 5) : 0xffffFFFF;
 
 	FrameBuffer* fb = that->getFramebuffer(framebuffer_name);
-	if (!fb) return 0;
+	if (!fb)
+	{
+		StaticString<128> tmp("Framebuffer ", framebuffer_name, " does not exist");
+		luaL_argerror(L, 2, tmp);
+		return 0;
+	}
 
 	Vec4 size;
 	size.x = (float)fb->getWidth();
