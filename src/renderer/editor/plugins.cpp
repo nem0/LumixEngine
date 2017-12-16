@@ -567,6 +567,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 			if (ImGui::Selectable("Save preview"))
 			{
 				Matrix mtx = m_universe->getMatrix(m_camera_entity);
+				model.getResourceManager().load(model);
 				renderTile(&model, &mtx);
 			}
 			ImGui::EndPopup();
