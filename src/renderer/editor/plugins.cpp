@@ -537,11 +537,13 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 			render_scene->setModelInstancePath(m_mesh, model.getPath());
 			AABB aabb = model.getAABB();
 
-			m_universe->setRotation(m_camera_entity, { 0, 0, 0, 1 });
-			m_universe->setPosition(m_camera_entity,
-			{ (aabb.max.x + aabb.min.x) * 0.5f,
-				(aabb.max.y + aabb.min.y) * 0.5f,
-				aabb.max.z + aabb.max.x - aabb.min.x });
+			Matrix mtx;
+			Vec3 center = (aabb.max + aabb.min) * 0.5f;
+			Vec3 eye = center + Vec3(1, 1, 1) * (aabb.max - aabb.min).length();
+			
+			mtx.lookAt(eye, center, Vec3(-1, 1, -1).normalized());
+			mtx.inverse();
+			m_universe->setMatrix(m_camera_entity, mtx);
 		}
 		ImVec2 image_size(ImGui::GetContentRegionAvailWidth(), ImGui::GetContentRegionAvailWidth());
 
@@ -900,11 +902,12 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		render_scene->setModelInstancePath(tile_mesh, model->getPath());
 		AABB aabb = model->getAABB();
 
-		m_tile.universe->setRotation(m_tile.camera_entity, { 0, 0, 0, 1 });
-		m_tile.universe->setPosition(m_tile.camera_entity,
-		{ (aabb.max.x + aabb.min.x) * 0.5f,
-			(aabb.max.y + aabb.min.y) * 0.5f,
-			aabb.max.z + aabb.max.x - aabb.min.x });
+		Matrix mtx;
+		Vec3 center = (aabb.max + aabb.min) * 0.5f;
+		Vec3 eye = center + Vec3(1, 1, 1) * (aabb.max - aabb.min).length() / Math::SQRT2;
+		mtx.lookAt(eye, center, Vec3(-1, 1, -1).normalized());
+		mtx.inverse();
+		m_tile.universe->setMatrix(m_tile.camera_entity, mtx);
 
 		m_tile.pipeline->resize(AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE);
 		m_tile.pipeline->render();
