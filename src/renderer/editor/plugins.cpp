@@ -560,6 +560,18 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 			SDL_WarpMouseInWindow(nullptr, m_captured_mouse_x, m_captured_mouse_y);
 		}
 
+		if (ImGui::GetIO().MouseClicked[1] && ImGui::IsItemHovered()) ImGui::OpenPopup("PreviewPopup");
+
+		if (ImGui::BeginPopup("PreviewPopup"))
+		{
+			if (ImGui::Selectable("Save preview"))
+			{
+				Matrix mtx = m_universe->getMatrix(m_camera_entity);
+				renderTile(&model, &mtx);
+			}
+			ImGui::EndPopup();
+		}
+
 		if (ImGui::IsItemHovered() && mouse_down)
 		{
 			auto delta = m_app.getMouseMove();
@@ -805,7 +817,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 
 		if (resource->getType() == MODEL_TYPE)
 		{
-			renderTile((Model*)resource);
+			renderTile((Model*)resource, nullptr);
 		}
 		else if (resource->getType() == PREFAB_TYPE)
 		{
@@ -887,7 +899,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 	}
 
 
-	void renderTile(Model* model)
+	void renderTile(Model* model, Matrix* in_mtx)
 	{
 		Engine& engine = m_app.getWorldEditor().getEngine();
 		RenderScene* render_scene = (RenderScene*)m_tile.universe->getScene(MODEL_INSTANCE_TYPE);
@@ -907,6 +919,10 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		Vec3 eye = center + Vec3(1, 1, 1) * (aabb.max - aabb.min).length() / Math::SQRT2;
 		mtx.lookAt(eye, center, Vec3(-1, 1, -1).normalized());
 		mtx.inverse();
+		if (in_mtx)
+		{
+			mtx = *in_mtx;
+		}
 		m_tile.universe->setMatrix(m_tile.camera_entity, mtx);
 
 		m_tile.pipeline->resize(AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE);
