@@ -616,7 +616,11 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 
 	void fileLoaded(FS::IFile& file, bool success)
 	{
-		if (!success) return;
+		if (!success)
+		{
+			g_log_error.log("Navigation") << "Could not load navmesh";
+			return;
+		}
 		if (!initNavmesh()) return;
 
 		file.read(&m_aabb, sizeof(m_aabb));

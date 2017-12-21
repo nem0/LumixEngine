@@ -279,6 +279,39 @@ void TextDeserializer::read(i8* value)
 }
 
 
+static int getStringLength(const InputBlob& blob)
+{
+	u8* string_start = (u8*)blob.getData() + blob.getPosition();
+	u8* c = string_start;
+	u8* end = (u8*)blob.getData() + blob.getSize();
+
+	if (*c != '"') return 0;
+	++c;
+
+	while(*c != '"' && c != end)
+	{
+		++c;
+	}
+	if (*c != '"') return 0;
+	return int(c - string_start) - 1;
+}
+
+
+void TextDeserializer::read(string* value)
+{
+	skip();
+	value->resize(getStringLength(blob) + 1);
+
+	u8 c = blob.readChar();
+	ASSERT(c == '"');
+	
+	blob.read(value->getData(), value->length());
+	value->getData()[value->length() - 1] = '\0';
+	c = blob.readChar();
+	ASSERT(c == '"');
+}
+
+
 void TextDeserializer::read(char* value, int max_size)
 {
 	skip();
