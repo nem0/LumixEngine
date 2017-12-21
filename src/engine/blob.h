@@ -72,7 +72,7 @@ namespace Lumix
 			const void* skip(int size);
 			const void* getData() const { return (const void*)m_data; }
 			int getSize() const { return m_size; }
-			int getPosition() { return m_pos; }
+			int getPosition() const { return m_pos; }
 			void setPosition(int pos) { m_pos = pos; }
 			void rewind() { m_pos = 0; }
 			u8 readChar() { ++m_pos; return m_data[m_pos - 1]; }

@@ -51,7 +51,8 @@ namespace Lumix
 
 		static auto phy_scene = scene("physics",
 			functions(
-				function(LUMIX_FUNC(PhysicsScene::raycast))
+				function(LUMIX_FUNC(PhysicsScene::raycast)),
+				function(LUMIX_FUNC(PhysicsScene::raycastEx))
 			),
 			component("ragdoll",
 				blob_property("data", LUMIX_PROP(PhysicsScene, getRagdollData, setRagdollData)),

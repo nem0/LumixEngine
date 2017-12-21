@@ -158,7 +158,7 @@ void string::resize(int size)
 	if (size <= 0) return;
 	
 	m_cstr = (char*)m_allocator.reallocate(m_cstr, size);
-	m_size = size;
+	m_size = size - 1;
 	m_cstr[size - 1] = '\0';
 }
 

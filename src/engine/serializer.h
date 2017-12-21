@@ -11,9 +11,9 @@ class InputBlob;
 class OutputBlob;
 struct Quat;
 struct RigidTransform;
+class string;
 struct Vec3;
 struct Vec4;
-
 
 struct EntityGUID
 {
@@ -82,6 +82,7 @@ struct LUMIX_ENGINE_API IDeserializer
 	virtual void read(u8* value) = 0;
 	virtual void read(i8* value) = 0;
 	virtual void read(char* value, int max_size) = 0;
+	virtual void read(string* value) = 0;
 	virtual Entity getEntity(EntityGUID guid) = 0;
 };
 
@@ -139,6 +140,7 @@ struct LUMIX_ENGINE_API TextDeserializer LUMIX_FINAL : public IDeserializer
 	void read(u8* value)  override;
 	void read(i8* value)  override;
 	void read(char* value, int max_size)  override;
+	void read(string* value)  override;
 	Entity getEntity(EntityGUID guid) override;
 
 	void skip();

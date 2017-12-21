@@ -120,6 +120,9 @@ void NavigationSystem::registerProperties()
 {
 	using namespace Reflection;
 	static auto navigation_scene = scene("navigation",
+		functions(
+			function(LUMIX_FUNC(NavigationScene::load))
+		),
 		component("navmesh_agent",
 			functions(
 				function(LUMIX_FUNC(NavigationScene::navigate))
