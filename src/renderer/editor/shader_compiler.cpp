@@ -3,6 +3,7 @@
 #include "editor/file_system_watcher.h"
 #include "editor/log_ui.h"
 #include "editor/platform_interface.h"
+#include "editor/render_interface.h"
 #include "editor/studio_app.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
@@ -492,6 +493,13 @@ void ShaderCompiler::reloadShaders()
 
 void ShaderCompiler::updateNotifications()
 {
+	if(!m_empty_queue)
+	{
+		RenderInterface* ri = m_editor.getRenderInterface();
+		ri->addText2D(1, 1, 16, 0xff000000, "Compiling shaders...");
+		ri->addText2D(0, 0, 16, 0xffffFFFF, "Compiling shaders...");
+	}
+
 	if (!m_empty_queue && m_notifications_id < 0)
 	{
 		m_notifications_id = m_log_ui.addNotification("Compiling shaders...");
