@@ -566,7 +566,8 @@ static bool componentTreeNode(StudioApp& app, ComponentType cmp_type, const Enti
 		cmp.entity = entities[0];
 		cmp.scene = app.getWorldEditor().getUniverse()->getScene(cmp_type);
 		cmp.handle = cmp.scene->getComponent(cmp.entity, cmp.type);
-		enabled_prop->getValue(cmp, -1, OutputBlob(&b, sizeof(b)));
+		OutputBlob blob(&b, sizeof(b));
+		enabled_prop->getValue(cmp, -1, blob);
 		if(ImGui::Checkbox(cmp_type_name, &b))
 		{
 			app.getWorldEditor().setProperty(cmp_type, -1, *enabled_prop, entities, entities_count, &b, sizeof(b));
