@@ -53,6 +53,7 @@ enum class PhysicsSceneVersion
 	DYNAMIC_TYPE,
 	TRIGGERS,
 	RIGID_ACTOR,
+	CONTROLLER_SHAPE,
 
 	LATEST,
 };
@@ -653,7 +654,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 	void setCapsuleRadius(ComponentHandle cmp, float value) override
 	{
-		if (value == 0) return;
+		if (value <= 0) return;
 		PxRigidActor* actor = m_actors[{cmp.index}]->physx_actor;
 		PxShape* shapes;
 		if (actor->getNbShapes() == 1 && actor->getShapes(&shapes, 1))
@@ -680,7 +681,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 	void setCapsuleHeight(ComponentHandle cmp, float value) override
 	{
-		if (value == 0) return;
+		if (value <= 0) return;
 		PxRigidActor* actor = m_actors[{cmp.index}]->physx_actor;
 		PxShape* shapes;
 		if (actor->getNbShapes() == 1 && actor->getShapes(&shapes, 1))
@@ -2415,6 +2416,46 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 	float getControllerRadius(ComponentHandle cmp) override { return m_controllers[{cmp.index}].m_radius; }
 	float getControllerHeight(ComponentHandle cmp) override { return m_controllers[{cmp.index}].m_height; }
+
+
+	void setControllerRadius(ComponentHandle cmp, float value) override
+	{
+		if (value <= 0) return;
+
+		Controller& ctrl = m_controllers[{cmp.index}];
+		ctrl.m_radius = value;
+
+		PxRigidActor* actor = ctrl.m_controller->getActor();
+		PxShape* shapes;
+		if (actor->getNbShapes() == 1 && actor->getShapes(&shapes, 1))
+		{
+			PxCapsuleGeometry capsule;
+			bool is_capsule = shapes->getCapsuleGeometry(capsule);
+			ASSERT(is_capsule);
+			capsule.radius = value;
+			shapes->setGeometry(capsule);
+		}
+	}
+
+
+	void setControllerHeight(ComponentHandle cmp, float value) override
+	{
+		if (value <= 0) return;
+
+		Controller& ctrl = m_controllers[{cmp.index}];
+		ctrl.m_height = value;
+
+		PxRigidActor* actor = ctrl.m_controller->getActor();
+		PxShape* shapes;
+		if (actor->getNbShapes() == 1 && actor->getShapes(&shapes, 1))
+		{
+			PxCapsuleGeometry capsule;
+			bool is_capsule = shapes->getCapsuleGeometry(capsule);
+			ASSERT(is_capsule);
+			capsule.halfHeight = value * 0.5f;
+			shapes->setGeometry(capsule);
+		}
+	}
 
 
 	bool isControllerTouchingDown(ComponentHandle cmp) override

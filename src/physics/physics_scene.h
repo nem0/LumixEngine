@@ -197,7 +197,9 @@ public:
 	virtual int getControllerLayer(ComponentHandle cmp) = 0;
 	virtual void setControllerLayer(ComponentHandle cmp, int layer) = 0;
 	virtual float getControllerRadius(ComponentHandle cmp) = 0;
+	virtual void setControllerRadius(ComponentHandle cmp, float radius) = 0;
 	virtual float getControllerHeight(ComponentHandle cmp) = 0;
+	virtual void setControllerHeight(ComponentHandle cmp, float height) = 0;
 	virtual bool isControllerTouchingDown(ComponentHandle cmp) = 0;
 	virtual void resizeController(ComponentHandle cmp, float height) = 0;
 

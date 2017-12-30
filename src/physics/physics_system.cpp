@@ -123,6 +123,8 @@ namespace Lumix
 				functions(
 					function(LUMIX_FUNC(PhysicsScene::moveController))
 				),
+				property("Radius", LUMIX_PROP(PhysicsScene, getControllerRadius, setControllerRadius)),
+				property("Height", LUMIX_PROP(PhysicsScene, getControllerHeight, setControllerHeight)),
 				property("Layer", LUMIX_PROP(PhysicsScene, getControllerLayer, setControllerLayer))
 			),
 			component("rigid_actor",
