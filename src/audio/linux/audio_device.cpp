@@ -89,6 +89,19 @@ public:
 	}
 
 
+	void setChorus(BufferHandle handle,
+		float wet_dry_mix,
+		float depth,
+		float feedback,
+		float frequency,
+		float delay,
+		i32 phase) override
+	{
+		MT::SpinLock lock(m_mutex);
+		ASSERT(false); // not implemented yet
+	}
+
+
 	void mix(u16* output, int size_bytes)
 	{
 		setMemory(output, 0, size_bytes);
@@ -470,6 +483,13 @@ public:
 		float feedback,
 		float left_delay,
 		float right_delay) override {}
+	void setChorus(BufferHandle handle,
+		float wet_dry_mix,
+		float depth,
+		float feedback,
+		float frequency,
+		float delay,
+		i32 phase) override {}
 	void play(BufferHandle buffer, bool looped) override {}
 	bool isPlaying(BufferHandle buffer) override { return false; }
 	void stop(BufferHandle buffer) override {}
