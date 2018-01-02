@@ -89,6 +89,7 @@ public:
 	void init()
 	{
 		copyString(m_pipeline_path, "pipelines/main.lua");
+		m_pipeline_define = "APP";
 		copyString(m_startup_script_path, "startup.lua");
 		char cmd_line[1024];
 		getCommandLine(cmd_line, lengthOf(cmd_line));
@@ -104,6 +105,12 @@ public:
 				if (!parser.next()) break;
 
 				parser.getCurrent(m_pipeline_path, lengthOf(m_pipeline_path));
+			}
+			else if (parser.currentEquals("-pipeline_define"))
+			{
+				if (!parser.next()) break;
+
+				parser.getCurrent(m_pipeline_define.data, lengthOf(m_pipeline_define.data));
 			}
 			else if(parser.currentEquals("-script"))
 			{
@@ -178,7 +185,7 @@ public:
 		#endif
 		m_engine->getInputSystem().enable(true);
 		Renderer* renderer = static_cast<Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
-		m_pipeline = Pipeline::create(*renderer, Path(m_pipeline_path), "APP", m_engine->getAllocator());
+		m_pipeline = Pipeline::create(*renderer, Path(m_pipeline_path), m_pipeline_define, m_engine->getAllocator());
 		m_pipeline->load();
 		renderer->setMainPipeline(m_pipeline);
 
@@ -492,6 +499,7 @@ private:
 	int m_exit_code;
 	char m_startup_script_path[MAX_PATH_LENGTH];
 	char m_pipeline_path[MAX_PATH_LENGTH];
+	StaticString<64> m_pipeline_define;
 	SDL_Window* m_window;
 
 	static App* s_instance;

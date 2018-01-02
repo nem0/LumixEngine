@@ -1212,11 +1212,11 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		PluginManager& plugin_manager = world_editor.getEngine().getPluginManager();
 		Renderer*  renderer = static_cast<Renderer*>(plugin_manager.getPlugin("renderer"));
 		IAllocator& allocator = world_editor.getAllocator();
-		Path pipeline_path("pipelines/probe.lua");
-		m_pipeline = Pipeline::create(*renderer, pipeline_path, "", allocator);
+		Path pipeline_path("pipelines/main.lua");
+		m_pipeline = Pipeline::create(*renderer, pipeline_path, "PROBE", allocator);
 		m_pipeline->load();
 
-		m_cl_context = cmft::clLoad() > 0 ? cmft::clInit() : nullptr;
+		m_cl_context = nullptr; //cmft::clLoad() > 0 ? cmft::clInit() : nullptr;
 	}
 
 
