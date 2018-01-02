@@ -29,7 +29,7 @@ test_script:
     & "..\projects\tmp\vs2017\bin\RelWithDebInfo\studio.exe" -pseudorandom_guid -run_script unit_tests/editor/main.lua | Write-Output
 
 - ps: >-
-    & "..\projects\tmp\vs2017\bin\RelWithDebInfo\app.exe" -window -pipeline pipelines/render_test.lua -script unit_tests/render_tests/main.lua | Write-Output
+    & "..\projects\tmp\vs2017\bin\RelWithDebInfo\app.exe" -window -pipeline_define RENDER_TEST -script unit_tests/render_tests/main.lua | Write-Output
   
 after_build:
  - 7z a lumix.zip %APPVEYOR_BUILD_FOLDER%\projects\tmp\vs2017\bin\RelWithDebInfo\animation.dll
