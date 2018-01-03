@@ -192,6 +192,7 @@ public:
 	virtual float getActorSpeed(ComponentHandle cmp) = 0;
 	virtual void putToSleep(ComponentHandle cmp) = 0;
 
+	virtual bool isControllerCollisionDown(ComponentHandle cmp) const = 0;
 	virtual void moveController(ComponentHandle cmp, const Vec3& v) = 0;
 	virtual ComponentHandle getController(Entity entity) = 0;
 	virtual int getControllerLayer(ComponentHandle cmp) = 0;
