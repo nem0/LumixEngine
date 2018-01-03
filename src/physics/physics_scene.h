@@ -150,6 +150,12 @@ public:
 	virtual void setD6JointTwistLimit(ComponentHandle cmp, const Vec2& limit) = 0;
 	virtual Vec2 getD6JointSwingLimit(ComponentHandle cmp) = 0;
 	virtual void setD6JointSwingLimit(ComponentHandle cmp, const Vec2& limit) = 0;
+	virtual float getD6JointDamping(ComponentHandle cmp) = 0;
+	virtual void setD6JointDamping(ComponentHandle cmp, float value) = 0;
+	virtual float getD6JointStiffness(ComponentHandle cmp) = 0;
+	virtual void setD6JointStiffness(ComponentHandle cmp, float value) = 0;
+	virtual float getD6JointRestitution(ComponentHandle cmp) = 0;
+	virtual void setD6JointRestitution(ComponentHandle cmp, float value) = 0;
 
 	virtual float getDistanceJointDamping(ComponentHandle cmp) = 0;
 	virtual void setDistanceJointDamping(ComponentHandle cmp, float value) = 0;

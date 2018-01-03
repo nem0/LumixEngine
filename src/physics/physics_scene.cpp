@@ -852,6 +852,51 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
+	float getD6JointDamping(ComponentHandle cmp) override
+	{
+		return getD6Joint(cmp)->getLinearLimit().damping;
+	}
+
+
+	void setD6JointDamping(ComponentHandle cmp, float value) override 
+	{
+		PxD6Joint* joint = getD6Joint(cmp);
+		PxJointLinearLimit limit = joint->getLinearLimit();
+		limit.damping = value;
+		joint->setLinearLimit(limit);
+	}
+
+
+	float getD6JointStiffness(ComponentHandle cmp) override
+	{
+		return getD6Joint(cmp)->getLinearLimit().stiffness;
+	}
+
+
+	void setD6JointStiffness(ComponentHandle cmp, float value) override
+	{
+		PxD6Joint* joint = getD6Joint(cmp);
+		PxJointLinearLimit limit = joint->getLinearLimit();
+		limit.stiffness = value;
+		joint->setLinearLimit(limit);
+	}
+
+
+	float getD6JointRestitution(ComponentHandle cmp) override
+	{
+		return getD6Joint(cmp)->getLinearLimit().restitution;
+	}
+
+
+	void setD6JointRestitution(ComponentHandle cmp, float value) override
+	{
+		PxD6Joint* joint = getD6Joint(cmp);
+		PxJointLinearLimit limit = joint->getLinearLimit();
+		limit.restitution = value;
+		joint->setLinearLimit(limit);
+	}
+
+
 	Vec2 getD6JointTwistLimit(ComponentHandle cmp) override
 	{
 		auto limit = getD6Joint(cmp)->getTwistLimit();

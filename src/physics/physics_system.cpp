@@ -87,7 +87,10 @@ namespace Lumix
 				property("Swing limit", LUMIX_PROP(PhysicsScene, getD6JointSwingLimit, setD6JointSwingLimit),
 					RadiansAttribute()),
 				property("Twist limit", LUMIX_PROP(PhysicsScene, getD6JointTwistLimit, setD6JointTwistLimit),
-					RadiansAttribute())
+					RadiansAttribute()),
+				property("Damping", LUMIX_PROP(PhysicsScene, getD6JointDamping, setD6JointDamping)),
+				property("Stiffness", LUMIX_PROP(PhysicsScene, getD6JointStiffness, setD6JointStiffness)),
+				property("Restitution", LUMIX_PROP(PhysicsScene, getD6JointRestitution, setD6JointRestitution))
 			),
 			component("spherical_joint",
 				property("Connected body", LUMIX_PROP(PhysicsScene, getJointConnectedBody, setJointConnectedBody)),
