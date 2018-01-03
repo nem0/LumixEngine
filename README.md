@@ -30,7 +30,7 @@ Who is using it?
 
 * [bgfx](https://github.com/bkaradzic/bgfx)
 * [lua](https://github.com/LuaDist/lua)
-* [crunch/crnlib](https://github.com/richgel999/crunch)
+* [crunch/crnlib](https://github.com/BinomialLLC/crunch)
 * [PhysX](https://developer.nvidia.com/physx-sdk)
 * [dear imgui](https://github.com/ocornut/imgui)
 * [stb](https://github.com/nothings/stb)
