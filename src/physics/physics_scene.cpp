@@ -1723,6 +1723,15 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
+	bool isControllerCollisionDown(ComponentHandle cmp) const override
+	{
+		const Controller& ctrl = m_controllers[{cmp.index}];
+		PxControllerState state;
+		ctrl.m_controller->getState(state);
+		return (state.collisionFlags & PxControllerCollisionFlag::eCOLLISION_DOWN) != 0;
+	}
+
+
 	void updateControllers(float time_delta)
 	{
 		PROFILE_FUNCTION();
@@ -5258,6 +5267,7 @@ void PhysicsScene::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(getActorSpeed);
 	REGISTER_FUNCTION(applyForceToActor);
 	REGISTER_FUNCTION(moveController);
+	REGISTER_FUNCTION(isControllerCollisionDown);
 	REGISTER_FUNCTION(setRagdollKinematic);
 	REGISTER_FUNCTION(addForceAtPos);
 	
