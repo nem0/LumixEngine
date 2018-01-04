@@ -3,6 +3,7 @@
 #include "engine/flag_set.h"
 #include "engine/iallocator.h"
 #include "engine/reflection.h"
+#include "engine/serializer.h"
 #include "engine/universe/universe.h"
 #include "renderer/draw2d.h"
 #include "renderer/pipeline.h"
@@ -228,44 +229,124 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	}
 
 
-
-	void serialize(ISerializer& serializer) override
+	void serializeRect(ISerializer& serializer, ComponentHandle cmp)
 	{
+		const GUIRect& rect = *m_rects[{cmp.index}];
+		
+		serializer.write("top_pts", rect.top.points);
+		serializer.write("top_rel", rect.top.relative);
+
+		serializer.write("right_pts", rect.right.points);
+		serializer.write("right_rel", rect.right.relative);
+
+		serializer.write("bottom_pts", rect.bottom.points);
+		serializer.write("bottom_rel", rect.bottom.relative);
+
+		serializer.write("left_pts", rect.left.points);
+		serializer.write("left_rel", rect.left.relative);
 	}
 
 
-	void deserialize(IDeserializer& serializer) override
+	void deserializeRect(IDeserializer& serializer, Entity entity, int /*scene_version*/)
 	{
+		ComponentHandle cmp = { entity.index };
+
+		int idx = m_rects.find(entity);
+		GUIRect* rect;
+		if (idx >= 0)
+		{
+			rect = m_rects.at(idx);
+		}
+		else
+		{
+			rect = LUMIX_NEW(m_allocator, GUIRect);
+			m_rects.insert(entity, rect);
+		}
+		rect->entity = entity;
+		rect->flags.set(GUIRect::IS_VALID);
+		serializer.read(&rect->top.points);
+		serializer.read(&rect->top.relative);
+
+		serializer.read(&rect->right.points);
+		serializer.read(&rect->right.relative);
+
+		serializer.read(&rect->bottom.points);
+		serializer.read(&rect->bottom.relative);
+
+		serializer.read(&rect->left.points);
+		serializer.read(&rect->left.relative);
+		
+		m_root = findRoot();
+		
+		m_universe.addComponent(entity, GUI_RECT_TYPE, this, cmp);
 	}
 
 
-	void serializeRect(ISerializer&, ComponentHandle) {}
-
-
-	void deserializeRect(IDeserializer&, Entity entity, int /*scene_version*/)
+	void serializeImage(ISerializer& serializer, ComponentHandle cmp)
 	{
+		const GUIRect& rect = *m_rects[{cmp.index}];
+		serializer.write("color", rect.image->color);
 	}
 
 
-	void serializeImage(ISerializer&, ComponentHandle) {}
-
-
-	void deserializeImage(IDeserializer&, Entity entity, int /*scene_version*/)
+	void deserializeImage(IDeserializer& serializer, Entity entity, int /*scene_version*/)
 	{
+		int idx = m_rects.find(entity);
+		if (idx < 0)
+		{
+			GUIRect* rect = LUMIX_NEW(m_allocator, GUIRect);
+			rect->entity = entity;
+			idx = m_rects.insert(entity, rect);
+		}
+		GUIRect& rect = *m_rects.at(idx);
+		rect.image = LUMIX_NEW(m_allocator, GUIImage);
+		
+		serializer.read(&rect.image->color);
+		
+		ComponentHandle cmp = {entity.index};
+		m_universe.addComponent(entity, GUI_IMAGE_TYPE, this, cmp);
 	}
 
 
-	void serializeText(ISerializer&, ComponentHandle) {}
-
-
-	void deserializeText(IDeserializer&, Entity entity, int /*scene_version*/)
+	void serializeText(ISerializer& serializer, ComponentHandle cmp)
 	{
+		const GUIRect& rect = *m_rects[{cmp.index}];
+		serializer.write("color", rect.text->color);
+		serializer.write("font_size", rect.text->font_size);
+		serializer.write("text", rect.text->text.c_str());
+	}
+
+
+	void deserializeText(IDeserializer& serializer, Entity entity, int /*scene_version*/)
+	{
+		int idx = m_rects.find(entity);
+		if (idx < 0)
+		{
+			GUIRect* rect = LUMIX_NEW(m_allocator, GUIRect);
+			rect->entity = entity;
+			idx = m_rects.insert(entity, rect);
+		}
+		GUIRect& rect = *m_rects.at(idx);
+		rect.text = LUMIX_NEW(m_allocator, GUIText)(m_allocator);
+
+		serializer.read(&rect.text->color);
+		serializer.read(&rect.text->font_size);
+		serializer.read(&rect.text->text);
+
+		ComponentHandle cmp = { entity.index };
+		m_universe.addComponent(entity, GUI_TEXT_TYPE, this, cmp);
 	}
 
 
 	void clear() override
 	{
-		 //TODO
+		for (GUIRect* rect : m_rects)
+		{
+			LUMIX_DELETE(m_allocator, rect->image);
+			LUMIX_DELETE(m_allocator, rect->text);
+			LUMIX_DELETE(m_allocator, rect);
+		}
+		m_rects.clear();
 	}
 
 
@@ -396,12 +477,67 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 
 	void serialize(OutputBlob& serializer) override
 	{
+		serializer.write(m_rects.size());
+		for (GUIRect* rect : m_rects)
+		{
+			serializer.write(rect->flags);
+			serializer.write(rect->entity);
+			serializer.write(rect->top);
+			serializer.write(rect->right);
+			serializer.write(rect->bottom);
+			serializer.write(rect->left);
 
+			serializer.write(rect->image != nullptr);
+			if (rect->image)
+			{
+				serializer.write(rect->image->color);
+			}
+
+			serializer.write(rect->text != nullptr);
+			if (rect->text)
+			{
+				serializer.write(rect->text->color);
+				serializer.write(rect->text->font_size);
+				serializer.write(rect->text->text);
+			}
+		}
 	}
 
 
 	void deserialize(InputBlob& serializer) override
 	{
+		clear();
+		int count = serializer.read<int>();
+		for (int i = 0; i < count; ++i)
+		{
+			GUIRect* rect = LUMIX_NEW(m_allocator, GUIRect);
+			serializer.read(rect->flags);
+			serializer.read(rect->entity);
+			serializer.read(rect->top);
+			serializer.read(rect->right);
+			serializer.read(rect->bottom);
+			serializer.read(rect->left);
+			// TODO m_universe->addComponent...
+
+			m_rects.insert(rect->entity, rect);
+
+			bool has_image = serializer.read<bool>();
+			if (has_image)
+			{
+				// TODO m_universe->addComponent...
+				rect->image = LUMIX_NEW(m_allocator, GUIImage);
+				serializer.read(rect->image->color);
+			}
+			bool has_text = serializer.read<bool>();
+			if (has_text)
+			{
+				// TODO m_universe->addComponent...
+				rect->text = LUMIX_NEW(m_allocator, GUIText)(m_allocator);
+				serializer.read(rect->text->color);
+				serializer.read(rect->text->font_size);
+				serializer.read(rect->text->text);
+			}
+		}
 	}
 
 
