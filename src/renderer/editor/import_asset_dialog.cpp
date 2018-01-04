@@ -1657,12 +1657,9 @@ struct FBXImporter
 		if (!any) return true;
 
 		dialog.setImportMessage("Importing physics...", -1);
-		char filename[MAX_PATH_LENGTH];
-		PathUtils::getBasename(filename, sizeof(filename), dialog.m_source);
-		catString(filename, ".phy");
 		PathBuilder phy_path(dialog.m_output_dir);
 		PlatformInterface::makePath(phy_path);
-		phy_path << "/" << filename;
+		phy_path << "/" << dialog.m_mesh_output_filename << ".phy";
 		FS::OsFile file;
 		if (!file.open(phy_path, FS::Mode::CREATE_AND_WRITE))
 		{
