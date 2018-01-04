@@ -8,8 +8,9 @@ namespace Lumix
 {
 
 
-struct Draw2D;
 class GUISystem;
+class Pipeline;
+class string;
 struct Vec2;
 struct Vec4;
 
@@ -22,7 +23,7 @@ public:
 		struct IAllocator& allocator);
 	static void destroyInstance(GUIScene* scene);
 
-	virtual void render(Draw2D& draw2d, const Vec2& canvas_size) = 0;
+	virtual void render(Pipeline& pipeline, const Vec2& canvas_size) = 0;
 
 	virtual float getRectLeftPoints(ComponentHandle cmp) = 0;
 	virtual void setRectLeftPoints(ComponentHandle cmp, float value) = 0;
@@ -46,6 +47,13 @@ public:
 
 	virtual Vec4 getImageColorRGBA(ComponentHandle cmp) = 0;
 	virtual void setImageColorRGBA(ComponentHandle cmp, const Vec4& color) = 0;
+
+	virtual void setText(ComponentHandle cmp, const char* text) = 0;
+	virtual const char* getText(ComponentHandle cmp) = 0;
+	virtual void setTextFontSize(ComponentHandle cmp, int value) = 0;
+	virtual int getTextFontSize(ComponentHandle cmp) = 0;
+	virtual Vec4 getTextColorRGBA(ComponentHandle cmp) = 0;
+	virtual void setTextColorRGBA(ComponentHandle cmp, const Vec4& color) = 0;
 };
 
 
