@@ -740,7 +740,7 @@ if build_app then
 				forceLink("setStudioApp_lua_script")
 				forceLink("setStudioApp_navigation")
 				forceLink("setStudioApp_renderer")
-				--forceLink("setStudioApp_gui")
+				forceLink("setStudioApp_gui")
 				for _, plugin in ipairs(plugins) do
 					forceLink("setStudioApp_" .. plugin)
 				end
@@ -883,6 +883,7 @@ if build_studio then
 			forceLink("setStudioApp_lua_script")
 			forceLink("setStudioApp_navigation")
 			forceLink("setStudioApp_renderer")
+			forceLink("setStudioApp_gui")
 
 			if build_physics then
 				forceLink("s_physics_plugin_register")
