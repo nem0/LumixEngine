@@ -5,6 +5,7 @@
 #include "engine/reflection.h"
 #include "engine/universe/universe.h"
 #include "renderer/draw2d.h"
+#include "renderer/pipeline.h"
 #include "renderer/texture.h"
 
 
@@ -14,11 +15,22 @@ namespace Lumix
 
 static const ComponentType GUI_RECT_TYPE = Reflection::getComponentType("gui_rect");
 static const ComponentType GUI_IMAGE_TYPE = Reflection::getComponentType("gui_image");
+static const ComponentType GUI_TEXT_TYPE = Reflection::getComponentType("gui_text");
 
 
 struct GUISprite
 {
 	Texture* image = nullptr;
+};
+
+
+struct GUIText
+{
+	GUIText(IAllocator& allocator) : text("", allocator) {}
+
+	string text;
+	int font_size = 13;
+	u32 color = 0xaa000000;
 };
 
 
@@ -45,11 +57,12 @@ struct GUIRect
 	Entity entity;
 	FlagSet<Flags, u8> flags;
 	Anchor top;
-	Anchor right;
-	Anchor bottom;
+	Anchor right = { 0, 1 };
+	Anchor bottom = { 0, 1 };
 	Anchor left;
 
 	GUIImage* image = nullptr;
+	GUIText* text = nullptr;
 };
 
 
@@ -64,6 +77,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	{
 		context.registerComponentType(GUI_RECT_TYPE, this, &GUISceneImpl::serializeRect, &GUISceneImpl::deserializeRect);
 		context.registerComponentType(GUI_IMAGE_TYPE, this, &GUISceneImpl::serializeImage, &GUISceneImpl::deserializeImage);
+		context.registerComponentType(GUI_TEXT_TYPE, this, &GUISceneImpl::serializeText, &GUISceneImpl::deserializeText);
 	}
 
 
@@ -73,7 +87,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	};
 
 
-	void renderRect(GUIRect& rect, Draw2D& draw2d, const Rect& parent_rect)
+	void renderRect(GUIRect& rect, Pipeline& pipeline, const Rect& parent_rect)
 	{
 		if (!rect.flags.isSet(GUIRect::IS_VALID)) return;
 		
@@ -82,7 +96,9 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		float t = parent_rect.y + rect.top.points + parent_rect.h * rect.top.relative;
 		float b = parent_rect.y + rect.bottom.points + parent_rect.h * rect.bottom.relative;
 			 
-		if (rect.image) draw2d.AddRectFilled({l, t}, {r, b}, rect.image->color);
+		if (rect.image) pipeline.getDraw2D().AddRectFilled({ l, t }, { r, b }, rect.image->color);
+		Font* font = pipeline.getDraw2DFont();
+		if (rect.text) pipeline.getDraw2D().AddText(font, (float)rect.text->font_size, {l, t}, rect.text->color, rect.text->text.c_str());
 
 		Entity child = m_universe.getFirstChild(rect.entity);
 		if (child.isValid())
@@ -90,7 +106,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 			int idx = m_rects.find(child);
 			if (idx >= 0)
 			{
-				renderRect(*m_rects.at(idx), draw2d, { l, t, r - l, b - t });
+				renderRect(*m_rects.at(idx), pipeline, { l, t, r - l, b - t });
 			}
 		}
 		Entity sibling = m_universe.getNextSibling(rect.entity);
@@ -99,42 +115,53 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 			int idx = m_rects.find(sibling);
 			if (idx >= 0)
 			{
-				renderRect(*m_rects.at(idx), draw2d, parent_rect);
+				renderRect(*m_rects.at(idx), pipeline, parent_rect);
 			}
 		}
 	}
 
 
-	void render(Draw2D& draw2d, const Vec2& canvas_size) override
+	void render(Pipeline& pipeline, const Vec2& canvas_size) override
 	{
 		if (!m_root) return;
 
-		renderRect(*m_root, draw2d, {0, 0, canvas_size.x, canvas_size.y});
+		renderRect(*m_root, pipeline, {0, 0, canvas_size.x, canvas_size.y});
 	}
 
 
 	Vec4 getImageColorRGBA(ComponentHandle cmp) override
 	{
 		GUIImage* image = m_rects[{cmp.index}]->image;
-		u32 color = image->color;
+		return ARGBu32ToRGBAVec4(image->color);
+	}
+
+
+	static Vec4 ARGBu32ToRGBAVec4(u32 value)
+	{
 		float inv = 1 / 255.0f;
 		return {
-			((color >> 16) & 0xFF) * inv,
-			((color >> 8) & 0xFF) * inv,
-			((color >> 0) & 0xFF) * inv,
-			((color >> 24) & 0xFF) * inv,
+			((value >> 16) & 0xFF) * inv,
+			((value >> 8) & 0xFF) * inv,
+			((value >> 0) & 0xFF) * inv,
+			((value >> 24) & 0xFF) * inv,
 		};
+	}
+
+
+	static u32 RGBAVec4ToARGBu32(const Vec4& value)
+	{
+		u8 r = u8(value.x * 255 + 0.5f);
+		u8 g = u8(value.y * 255 + 0.5f);
+		u8 b = u8(value.z * 255 + 0.5f);
+		u8 a = u8(value.w * 255 + 0.5f);
+		return (a << 24) + (r << 16) + (g << 8) + b;
 	}
 
 
 	void setImageColorRGBA(ComponentHandle cmp, const Vec4& color) override
 	{
 		GUIImage* image = m_rects[{cmp.index}]->image;
-		u8 r = u8(color.x * 255 + 0.5f);
-		u8 g = u8(color.y * 255 + 0.5f);
-		u8 b = u8(color.z * 255 + 0.5f);
-		u8 a = u8(color.w * 255 + 0.5f);
-		image->color = (a << 24) + (r << 16) + (g << 8) + b;
+		image->color = RGBAVec4ToARGBu32(color);
 	}
 
 
@@ -159,6 +186,49 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	void setRectBottomRelative(ComponentHandle cmp, float value) override { m_rects[{cmp.index}]->bottom.relative = value; }
 
 
+	void setTextFontSize(ComponentHandle cmp, int value) override
+	{
+		GUIText* gui_text = m_rects[{cmp.index}]->text;
+		gui_text->font_size = value;
+	}
+	
+	
+	int getTextFontSize(ComponentHandle cmp) override
+	{
+		GUIText* gui_text = m_rects[{cmp.index}]->text;
+		return gui_text->font_size;
+	}
+	
+	
+	Vec4 getTextColorRGBA(ComponentHandle cmp) override
+	{
+		GUIText* gui_text = m_rects[{cmp.index}]->text;
+		return ARGBu32ToRGBAVec4(gui_text->color);
+	}
+
+
+	void setTextColorRGBA(ComponentHandle cmp, const Vec4& color) override
+	{
+		GUIText* gui_text = m_rects[{cmp.index}]->text;
+		gui_text->color = RGBAVec4ToARGBu32(color);
+	}
+
+
+	void setText(ComponentHandle cmp, const char* value) override
+	{
+		GUIText* gui_text = m_rects[{cmp.index}]->text;
+		gui_text->text = value;
+	}
+
+
+	const char* getText(ComponentHandle cmp) override
+	{
+		GUIText* text = m_rects[{cmp.index}]->text;
+		return text->text.c_str();
+	}
+
+
+
 	void serialize(ISerializer& serializer) override
 	{
 	}
@@ -181,6 +251,14 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 
 
 	void deserializeImage(IDeserializer&, Entity entity, int /*scene_version*/)
+	{
+	}
+
+
+	void serializeText(ISerializer&, ComponentHandle) {}
+
+
+	void deserializeText(IDeserializer&, Entity entity, int /*scene_version*/)
 	{
 	}
 
@@ -216,6 +294,23 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		m_universe.addComponent(entity, GUI_RECT_TYPE, this, cmp);
 		m_root = findRoot();
 
+		return cmp;
+	}
+
+
+	ComponentHandle createText(Entity entity)
+	{
+		int idx = m_rects.find(entity);
+		if (idx < 0)
+		{
+			GUIRect* rect = LUMIX_NEW(m_allocator, GUIRect);
+			rect->entity = entity;
+			idx = m_rects.insert(entity, rect);
+		}
+		GUIRect& rect = *m_rects.at(idx);
+		rect.text = LUMIX_NEW(m_allocator, GUIText)(m_allocator);
+		ComponentHandle cmp = {entity.index};
+		m_universe.addComponent(entity, GUI_TEXT_TYPE, this, cmp);
 		return cmp;
 	}
 
@@ -262,15 +357,15 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		Entity entity = {component.index};
 		GUIRect* rect = m_rects[entity];
 		rect->flags.set(GUIRect::IS_VALID, false);
-		if (rect->image == nullptr)
+		if (rect->image == nullptr && rect->text == nullptr)
 		{
 			LUMIX_DELETE(m_allocator, rect);
 			m_rects.erase(entity);
 			
-			if (rect == m_root)
-			{
-				m_root = findRoot();
-			}
+		}
+		if (rect == m_root)
+		{
+			m_root = findRoot();
 		}
 		m_universe.destroyComponent(entity, GUI_RECT_TYPE, this, component);
 	}
@@ -283,6 +378,16 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		LUMIX_DELETE(m_allocator, rect->image);
 		rect->image = nullptr;
 		m_universe.destroyComponent(entity, GUI_IMAGE_TYPE, this, component);
+	}
+
+
+	void destroyText(ComponentHandle component)
+	{
+		Entity entity = { component.index };
+		GUIRect* rect = m_rects[entity];
+		LUMIX_DELETE(m_allocator, rect->text);
+		rect->text = nullptr;
+		m_universe.destroyComponent(entity, GUI_TEXT_TYPE, this, component);
 	}
 
 
@@ -302,6 +407,13 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 
 	ComponentHandle getComponent(Entity entity, ComponentType type) override
 	{
+		if (type == GUI_TEXT_TYPE)
+		{
+			int idx = m_rects.find(entity);
+			if (idx < 0) return INVALID_COMPONENT;
+			if (!m_rects.at(idx)->text) return INVALID_COMPONENT;
+			return {entity.index};
+		}
 		if (type == GUI_RECT_TYPE)
 		{
 			if (m_rects.find(entity) < 0) return INVALID_COMPONENT;
@@ -337,7 +449,8 @@ static struct
 	void (GUISceneImpl::*destroyer)(ComponentHandle);
 } COMPONENT_INFOS[] = {
 	{ GUI_RECT_TYPE, &GUISceneImpl::createRect, &GUISceneImpl::destroyRect },
-	{ GUI_IMAGE_TYPE, &GUISceneImpl::createImage, &GUISceneImpl::destroyImage}
+	{ GUI_IMAGE_TYPE, &GUISceneImpl::createImage, &GUISceneImpl::destroyImage },
+	{ GUI_TEXT_TYPE, &GUISceneImpl::createText, &GUISceneImpl::destroyText }
 };
 
 

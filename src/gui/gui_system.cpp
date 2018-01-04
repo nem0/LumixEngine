@@ -74,6 +74,12 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 
 		using namespace Reflection;
 		static auto lua_scene = scene("gui",
+			component("gui_text",
+				property("Text", LUMIX_PROP(GUIScene, getText, setText)),
+				property("Font Size", LUMIX_PROP(GUIScene, getTextFontSize, setTextFontSize)),
+				property("Color", LUMIX_PROP(GUIScene, getTextColorRGBA, setTextColorRGBA),
+					ColorAttribute())
+			),
 			component("gui_image",
 				property("Color", LUMIX_PROP(GUIScene, getImageColorRGBA, setImageColorRGBA),
 					ColorAttribute())
@@ -266,7 +272,7 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 		Draw2D& draw2d = pipeline->getDraw2D();
 		auto* scene = (GUIScene*)pipeline->getScene()->getUniverse().getScene(crc32("gui"));
 		Vec2 size = {(float)pipeline->getWidth(), (float)pipeline->getHeight()};
-		scene->render(draw2d, size);
+		scene->render(*pipeline, size);
 	}
 
 
