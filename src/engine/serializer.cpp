@@ -306,7 +306,7 @@ void TextDeserializer::read(string* value)
 	ASSERT(c == '"');
 	
 	blob.read(value->getData(), value->length());
-	value->getData()[value->length() - 1] = '\0';
+	value->getData()[value->length()] = '\0';
 	c = blob.readChar();
 	ASSERT(c == '"');
 }
