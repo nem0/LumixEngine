@@ -1,4 +1,5 @@
 ﻿#include "gui_system.h"
+#include "engine/crc32.h"
 #include "engine/delegate.h"
 #include "engine/engine.h"
 #include "engine/iallocator.h"
@@ -7,11 +8,15 @@
 #include "engine/matrix.h"
 #include "engine/path.h"
 #include "engine/plugin_manager.h"
+#include "engine/reflection.h"
 #include "engine/resource_manager.h"
+#include "engine/universe/universe.h"
+#include "gui/gui_scene.h"
 #include "renderer/material.h"
 #include "renderer/material_manager.h"
 #include "renderer/pipeline.h"
 #include "renderer/renderer.h"
+#include "renderer/render_scene.h"
 #include "renderer/shader.h"
 #include "renderer/texture.h"
 #include <bgfx/bgfx.h>
@@ -66,6 +71,25 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 		ImGui::SetCurrentContext(m_original_context);
 
 		registerLuaAPI();
+
+		using namespace Reflection;
+		static auto lua_scene = scene("gui",
+			component("gui_image",
+				property("Color", LUMIX_PROP(GUIScene, getImageColorRGBA, setImageColorRGBA),
+					ColorAttribute())
+			),
+			component("gui_rect",
+				property("Top Points", LUMIX_PROP(GUIScene, getRectTopPoints, setRectTopPoints)),
+				property("Top Relative", LUMIX_PROP(GUIScene, getRectTopRelative, setRectTopRelative)),
+				property("Right Points", LUMIX_PROP(GUIScene, getRectRightPoints, setRectRightPoints)),
+				property("Right Relative", LUMIX_PROP(GUIScene, getRectRightRelative, setRectRightRelative)),
+				property("Bottom Points", LUMIX_PROP(GUIScene, getRectBottomPoints, setRectBottomPoints)),
+				property("Bottom Relative", LUMIX_PROP(GUIScene, getRectBottomRelative, setRectBottomRelative)),
+				property("Left Points", LUMIX_PROP(GUIScene, getRectLeftPoints, setRectLeftPoints)),
+				property("Left Relative", LUMIX_PROP(GUIScene, getRectLeftRelative, setRectLeftRelative))
+			)
+		);
+		registerScene(lua_scene);
 	}
 
 
@@ -82,6 +106,20 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 		m_material->getResourceManager().unload(*m_material);
 
 		ImGui::DestroyContext(m_context);
+	}
+
+
+	void createScenes(Universe& universe) override
+	{
+		IAllocator& allocator = m_engine.getAllocator();
+		auto* scene = GUIScene::createInstance(*this, universe, allocator);
+		universe.addScene(scene);
+	}
+
+
+	void destroyScene(IScene* scene) override
+	{
+		GUIScene::destroyInstance(static_cast<GUIScene*>(scene));
 	}
 
 
@@ -217,6 +255,18 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 
 		ImGui::NewFrame();
 		ImGui::SetCurrentContext(m_original_context);
+
+		renderNewUI();
+	}
+
+
+	void renderNewUI()
+	{
+		Pipeline* pipeline = m_interface->getPipeline();
+		Draw2D& draw2d = pipeline->getDraw2D();
+		auto* scene = (GUIScene*)pipeline->getScene()->getUniverse().getScene(crc32("gui"));
+		Vec2 size = {(float)pipeline->getWidth(), (float)pipeline->getHeight()};
+		scene->render(draw2d, size);
 	}
 
 
