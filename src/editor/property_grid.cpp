@@ -265,14 +265,25 @@ struct GridUIVisitor LUMIX_FINAL : Reflection::IPropertyVisitor
 	void visit(const Reflection::Property<Vec4>& prop) override
 	{
 		if (skipProperty(prop)) return;
+		Attributes attrs = getAttributes(prop);
 		ComponentUID cmp = getComponent();
 		Vec4 value;
 		OutputBlob blob(&value, sizeof(value));
 		prop.getValue(cmp, m_index, blob);
 
-		if (ImGui::DragFloat4(prop.name, &value.x))
+		if (attrs.is_color)
 		{
-			m_editor.setProperty(m_cmp_type, m_index, prop, &m_entities[0], m_entities.size(), &value, sizeof(value));
+			if (ImGui::ColorEdit4(prop.name, &value.x))
+			{
+				m_editor.setProperty(m_cmp_type, m_index, prop, &m_entities[0], m_entities.size(), &value, sizeof(value));
+			}
+		}
+		else
+		{
+			if (ImGui::DragFloat4(prop.name, &value.x))
+			{
+				m_editor.setProperty(m_cmp_type, m_index, prop, &m_entities[0], m_entities.size(), &value, sizeof(value));
+			}
 		}
 	}
 
