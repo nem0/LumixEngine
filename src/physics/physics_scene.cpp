@@ -475,6 +475,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		};
 
 		setFlag(PxVisualizationParameter::eBODY_AXES);
+		setFlag(PxVisualizationParameter::eBODY_MASS_AXES);
 		setFlag(PxVisualizationParameter::eBODY_LIN_VELOCITY);
 		setFlag(PxVisualizationParameter::eBODY_ANG_VELOCITY);
 		setFlag(PxVisualizationParameter::eCONTACT_NORMAL);

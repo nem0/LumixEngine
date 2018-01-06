@@ -517,25 +517,28 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 			serializer.read(rect->right);
 			serializer.read(rect->bottom);
 			serializer.read(rect->left);
-			// TODO m_universe->addComponent...
-
 			m_rects.insert(rect->entity, rect);
+			if (rect->flags.isSet(GUIRect::IS_VALID))
+			{
+				m_universe.addComponent(rect->entity, GUI_RECT_TYPE, this, {rect->entity.index});
+			}
 
 			bool has_image = serializer.read<bool>();
 			if (has_image)
 			{
-				// TODO m_universe->addComponent...
 				rect->image = LUMIX_NEW(m_allocator, GUIImage);
 				serializer.read(rect->image->color);
+				m_universe.addComponent(rect->entity, GUI_IMAGE_TYPE, this, {rect->entity.index});
+
 			}
 			bool has_text = serializer.read<bool>();
 			if (has_text)
 			{
-				// TODO m_universe->addComponent...
 				rect->text = LUMIX_NEW(m_allocator, GUIText)(m_allocator);
 				serializer.read(rect->text->color);
 				serializer.read(rect->text->font_size);
 				serializer.read(rect->text->text);
+				m_universe.addComponent(rect->entity, GUI_TEXT_TYPE, this, {rect->entity.index});
 			}
 		}
 	}
