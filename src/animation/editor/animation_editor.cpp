@@ -950,6 +950,7 @@ void AnimationEditor::loadFromEntity()
 	auto* scene = (AnimationScene*)m_app.getWorldEditor().getUniverse()->getScene(ANIMABLE_HASH);
 	ComponentHandle ctrl = scene->getComponent(entities[0], CONTROLLER_TYPE);
 	if (!ctrl.isValid()) return;
+	newController();
 	m_path = scene->getControllerSource(ctrl).c_str();
 	clearUndoStack();
 	load();
