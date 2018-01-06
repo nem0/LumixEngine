@@ -2176,8 +2176,9 @@ void ControllerResource::Mask::addBone(int index)
 void ControllerResource::Mask::removeBone(int index)
 {
 	int idx = int(this - &controller.m_masks[0]);
+	u32 hash = crc32(bones[index].getName().c_str());
 	bones.erase(index);
-	controller.m_engine_resource->m_masks[idx].bones.erase(index);
+	controller.m_engine_resource->m_masks[idx].bones.erase(hash);
 }
 
 
