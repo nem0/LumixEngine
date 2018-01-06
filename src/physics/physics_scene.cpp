@@ -3305,6 +3305,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			actor->physx_actor->getShapes(&shape, 1, i);
 			duplicateShape(shape, new_physx_actor);
 		}
+		PxRigidBodyExt::updateMassAndInertia(*new_physx_actor->isRigidBody(), 1);
 		actor->setPhysxActor(new_physx_actor);
 	}
 
