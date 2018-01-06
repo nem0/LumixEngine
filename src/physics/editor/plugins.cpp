@@ -594,6 +594,7 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		};
 
 		flag_gui("Body axes", physx::PxVisualizationParameter::eBODY_AXES);
+		flag_gui("Mass axes", physx::PxVisualizationParameter::eBODY_MASS_AXES);
 		flag_gui("Body linear velocity", physx::PxVisualizationParameter::eBODY_LIN_VELOCITY);
 		flag_gui("Body angular velocity", physx::PxVisualizationParameter::eBODY_ANG_VELOCITY);
 		flag_gui("Contact normal", physx::PxVisualizationParameter::eCONTACT_NORMAL);
