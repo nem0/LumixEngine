@@ -1765,6 +1765,7 @@ ControllerResource::ControllerResource(IAnimationEditor& editor,
 
 ControllerResource::~ControllerResource()
 {
+	m_engine_resource->destroy();
 	LUMIX_DELETE(m_allocator, m_root);
 	LUMIX_DELETE(m_allocator, m_engine_resource->m_root);
 	LUMIX_DELETE(m_allocator, m_engine_resource);
