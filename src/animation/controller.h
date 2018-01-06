@@ -56,6 +56,7 @@ public:
 	ResourceType getType() const override { return ResourceType("anim_controller"); }
 
 	void create() { onCreated(State::READY); }
+	void destroy() { doUnload(); }
 	void unload() override;
 	bool load(FS::IFile& file) override;
 	ComponentInstance* createInstance(IAllocator& allocator) const;
