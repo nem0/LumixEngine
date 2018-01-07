@@ -206,9 +206,10 @@ struct EditorPlugin LUMIX_FINAL : public WorldEditor::Plugin
 
 		Entity other_entity = phy_scene->getJointConnectedBody(cmp.handle);
 		if (!other_entity.isValid()) return;
-		
-		Vec3 pos = universe.getPosition(cmp.entity);
-		Vec3 other_pos = universe.getPosition(other_entity);
+		RigidTransform local_frame = phy_scene->getJointConnectedBodyLocalFrame(cmp.handle);
+
+		Vec3 pos = universe.getPosition(other_entity);
+		Vec3 other_pos = (universe.getTransform(other_entity).getRigidPart() * local_frame).pos;
 		Vec3 dir = other_pos - pos;
 
 		dir = dir * (1.0f / SEGMENT_COUNT);
