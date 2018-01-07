@@ -547,6 +547,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 				m_universe.addComponent(rect->entity, GUI_TEXT_TYPE, this, {rect->entity.index});
 			}
 		}
+		m_root = findRoot();
 	}
 
 
