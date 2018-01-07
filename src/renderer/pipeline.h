@@ -27,7 +27,6 @@ namespace Lumix
 
 struct Draw2D;
 class FrameBuffer;
-struct Font;
 struct IAllocator;
 struct Matrix;
 class Material;
@@ -138,7 +137,6 @@ class LUMIX_RENDERER_API Pipeline
 			Material& material) = 0;
 
 		virtual Draw2D& getDraw2D() = 0;
-		virtual Font* getDraw2DFont() = 0;
 };
 
 

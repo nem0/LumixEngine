@@ -16,6 +16,7 @@ namespace Lumix
 
 
 class Engine;
+struct Font;
 struct FontAtlas;
 class LIFOAllocator;
 class MaterialManager;
@@ -52,6 +53,8 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 		virtual int getLayer(const char* name) = 0;
 		virtual const char* getLayerName(int idx) const = 0;
 		virtual FontAtlas& getFontAtlas() = 0;
+		virtual Font* getDefaultFont() = 0;
+		virtual Font* getFont(const char* path, int size) = 0;
 		virtual void setMainPipeline(Pipeline* pipeline) = 0;
 		virtual Pipeline* getMainPipeline() = 0;
 
