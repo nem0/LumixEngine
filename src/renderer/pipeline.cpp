@@ -289,7 +289,6 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		, m_height(-1)
 		, m_define(define, allocator)
 		, m_draw2d(allocator)
-		, m_draw2d_font_atlas(allocator)
 	{
 		for (auto& handle : m_debug_vertex_buffers)
 		{
@@ -318,26 +317,11 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		createCubeBuffers();
 		m_stats = {};
 
-		m_draw2d_font = m_draw2d_font_atlas.AddFontFromFileTTF("ui/fonts/OpenSans-Regular.ttf", 16);
-		
-		u8* pixels;
-		int w, h;
-		m_draw2d_font_atlas.GetTexDataAsRGBA32(&pixels, &w, &h);
-
-		auto* old_texture = m_draw2d_material->getTexture(0);
-		Texture* texture = LUMIX_NEW(m_allocator, Texture)(Path("font_draw2d"), renderer.getTextureManager(), m_allocator);
-
-		texture->create(w, h, pixels);
-		m_draw2d_material->setTexture(0, texture);
-		if (old_texture)
-		{
-			old_texture->destroy();
-			LUMIX_DELETE(m_allocator, old_texture);
-		}
+		Font* font = m_renderer.getDefaultFont();
 		m_draw2d.FontTexUvWhitePixel = m_renderer.getFontAtlas().TexUvWhitePixel;
 		m_draw2d.Clear();
 		m_draw2d.PushClipRectFullScreen();
-		m_draw2d.PushTextureID(m_draw2d_font->ContainerAtlas->TexID);
+		m_draw2d.PushTextureID(font->ContainerAtlas->TexID);
 	}
 
 
@@ -941,7 +925,8 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		auto resetDraw2D =  [this](){
 			m_draw2d.Clear();
 			m_draw2d.PushClipRectFullScreen();
-			m_draw2d.PushTextureID(m_draw2d_font->ContainerAtlas->TexID);
+			Font* font = m_renderer.getDefaultFont();
+			m_draw2d.PushTextureID(font->ContainerAtlas->TexID);
 		};
 
 		Vec2 size((float)getWidth(), (float)getHeight());
@@ -3068,7 +3053,6 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
-	Font* getDraw2DFont() override { return m_draw2d_font; }
 	Draw2D& getDraw2D() override { return m_draw2d; }
 
 
@@ -3082,8 +3066,6 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	View m_views[64];
 	View* m_current_view;
 	int m_pass_idx;
-	FontAtlas m_draw2d_font_atlas;
-	Font* m_draw2d_font;
 	Draw2D m_draw2d;
 	Path m_path;
 	Renderer& m_renderer;

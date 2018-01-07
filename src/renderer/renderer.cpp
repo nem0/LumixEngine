@@ -564,20 +564,19 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	}
 
 
-	void initDraw2DFont()
+	void updateFontTexture()
 	{
-		m_font_atlas.AddFontDefault();
 		u8* pixels;
 		int w, h;
 		m_font_atlas.GetTexDataAsRGBA32(&pixels, &w, &h);
 		auto* material_manager = m_engine.getResourceManager().get(MATERIAL_TYPE);
 		Resource* resource = material_manager->load(Path("pipelines/common/draw2d.mat"));
 		m_draw2d_material = (Material*)resource;
-		
+
 		Texture* old_texture = m_draw2d_material->getTexture(0);
 		Texture* texture = LUMIX_NEW(m_engine.getAllocator(), Texture)(
 			Path("draw2d_font"), *m_engine.getResourceManager().get(TEXTURE_TYPE), m_engine.getAllocator());
-		
+
 		texture->create(w, h, pixels);
 		m_draw2d_material->setTexture(0, texture);
 		if (old_texture)
@@ -587,6 +586,13 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 		}
 
 		m_font_atlas.TexID = &texture->handle;
+	}
+
+
+	void initDraw2DFont()
+	{
+		m_default_font = m_font_atlas.AddFontDefault();
+		updateFontTexture();
 	}
 
 
@@ -605,6 +611,20 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	FontAtlas& getFontAtlas() override
 	{
 		return m_font_atlas;
+	}
+
+
+	Font* getDefaultFont() override
+	{
+		return m_default_font;
+	}
+
+
+	Font* getFont(const char* path, int size) override
+	{
+		Font* font = m_font_atlas.AddFontFromFileTTF(path, (float)size);
+		updateFontTexture();
+		return font;
 	}
 
 
@@ -722,6 +742,7 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	bgfx::UniformHandle m_mat_color_uniform;
 	bgfx::UniformHandle m_roughness_metallic_uniform;
 	FontAtlas m_font_atlas;
+	Font* m_default_font;
 	Material* m_draw2d_material;
 	Pipeline* m_main_pipeline;
 };

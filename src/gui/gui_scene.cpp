@@ -7,6 +7,8 @@
 #include "engine/universe/universe.h"
 #include "renderer/draw2d.h"
 #include "renderer/pipeline.h"
+#include "renderer/renderer.h"
+#include "renderer/render_scene.h"
 #include "renderer/texture.h"
 
 
@@ -100,7 +102,8 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		float b = parent_rect.y + rect.bottom.points + parent_rect.h * rect.bottom.relative;
 			 
 		if (rect.image) pipeline.getDraw2D().AddRectFilled({ l, t }, { r, b }, rect.image->color);
-		Font* font = pipeline.getDraw2DFont();
+		Renderer& renderer = static_cast<Renderer&>(pipeline.getScene()->getPlugin());
+		Font* font = renderer.getDefaultFont();
 		if (rect.text) pipeline.getDraw2D().AddText(font, (float)rect.text->font_size, {l, t}, rect.text->color, rect.text->text.c_str());
 
 		Entity child = m_universe.getFirstChild(rect.entity);

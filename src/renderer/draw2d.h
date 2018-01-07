@@ -139,7 +139,7 @@ struct FontAtlas
 };
 
 
-struct Draw2D
+struct LUMIX_RENDERER_API Draw2D
 {
 	typedef unsigned short DrawIdx;
 	typedef void* TextureID;
