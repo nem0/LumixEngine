@@ -1461,6 +1461,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		int controller_layer = c.m_layer;
 		data.word0 = 1 << controller_layer;
 		data.word1 = m_collision_filter[controller_layer];
+		c.m_filter_data = data;
 		PxShape* shapes[8];
 		int shapes_count = c.m_controller->getActor()->getShapes(shapes, lengthOf(shapes));
 		c.m_controller->getActor()->userData = (void*)(intptr_t)entity.index;
