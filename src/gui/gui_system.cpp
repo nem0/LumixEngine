@@ -32,6 +32,7 @@ struct GUISystemImpl;
 
 static const ResourceType MATERIAL_TYPE("material");
 static const ResourceType TEXTURE_TYPE("texture");
+static const ResourceType FONT_TYPE("font");
 
 
 struct GUISystemImpl LUMIX_FINAL : public GUISystem
@@ -76,6 +77,8 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 		static auto lua_scene = scene("gui",
 			component("gui_text",
 				property("Text", LUMIX_PROP(GUIScene, getText, setText)),
+				property("Font", LUMIX_PROP(GUIScene, getTextFontPath, setTextFontPath),
+					ResourceAttribute("Font (*.ttf)", FONT_TYPE)),
 				property("Font Size", LUMIX_PROP(GUIScene, getTextFontSize, setTextFontSize)),
 				property("Color", LUMIX_PROP(GUIScene, getTextColorRGBA, setTextColorRGBA),
 					ColorAttribute())
@@ -114,6 +117,9 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 
 		ImGui::DestroyContext(m_context);
 	}
+
+
+	Engine& getEngine() override { return m_engine; }
 
 
 	void createScenes(Universe& universe) override

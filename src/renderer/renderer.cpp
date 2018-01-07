@@ -15,6 +15,7 @@
 #include "engine/universe/component.h"
 #include "engine/universe/universe.h"
 #include "renderer/draw2d.h"
+#include "renderer/font_manager.h"
 #include "renderer/material.h"
 #include "renderer/material_manager.h"
 #include "renderer/model.h"
@@ -74,6 +75,7 @@ namespace Lumix
 static const ResourceType MATERIAL_TYPE("material");
 static const ResourceType MODEL_TYPE("model");
 static const ResourceType SHADER_TYPE("shader");
+static const ResourceType FONT_TYPE("font");
 static const ResourceType TEXTURE_TYPE("texture");
 static const ResourceType SHADER_BINARY_TYPE("shader_binary");
 
@@ -457,6 +459,7 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 		, m_model_manager(*this, m_allocator)
 		, m_material_manager(*this, m_allocator)
 		, m_shader_manager(*this, m_allocator)
+		, m_font_manager(m_allocator)
 		, m_shader_binary_manager(*this, m_allocator)
 		, m_passes(m_allocator)
 		, m_shader_defines(m_allocator)
@@ -507,6 +510,7 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 		m_model_manager.create(MODEL_TYPE, manager);
 		m_material_manager.create(MATERIAL_TYPE, manager);
 		m_shader_manager.create(SHADER_TYPE, manager);
+		m_font_manager.create(FONT_TYPE, manager);
 		m_shader_binary_manager.create(SHADER_BINARY_TYPE, manager);
 
 		m_current_pass_hash = crc32("MAIN");
@@ -554,6 +558,7 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 		m_model_manager.destroy();
 		m_material_manager.destroy();
 		m_shader_manager.destroy();
+		m_font_manager.destroy();
 		m_shader_binary_manager.destroy();
 
 		bgfx::destroy(m_mat_color_uniform);
@@ -729,6 +734,7 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	CallbackStub m_callback_stub;
 	TextureManager m_texture_manager;
 	MaterialManager m_material_manager;
+	FontManager m_font_manager;
 	ShaderManager m_shader_manager;
 	ShaderBinaryManager m_shader_binary_manager;
 	ModelManager m_model_manager;
