@@ -85,6 +85,7 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 					ColorAttribute())
 			),
 			component("gui_rect",
+				property("Enabled", LUMIX_PROP(GUIScene, isRectEnabled, enableRect)),
 				property("Top Points", LUMIX_PROP(GUIScene, getRectTopPoints, setRectTopPoints)),
 				property("Top Relative", LUMIX_PROP(GUIScene, getRectTopRelative, setRectTopRelative)),
 				property("Right Points", LUMIX_PROP(GUIScene, getRectRightPoints, setRectRightPoints)),

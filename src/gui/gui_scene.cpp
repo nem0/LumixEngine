@@ -46,7 +46,8 @@ struct GUIRect
 {
 	enum Flags
 	{
-		IS_VALID = 1 << 0
+		IS_VALID = 1 << 0,
+		IS_ENABLED = 1 << 1
 	};
 
 	struct Anchor
@@ -56,7 +57,7 @@ struct GUIRect
 	};
 
 	Entity entity;
-	FlagSet<Flags, u8> flags;
+	FlagSet<Flags, u32> flags;
 	Anchor top;
 	Anchor right = { 0, 1 };
 	Anchor bottom = { 0, 1 };
@@ -91,6 +92,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	void renderRect(GUIRect& rect, Pipeline& pipeline, const Rect& parent_rect)
 	{
 		if (!rect.flags.isSet(GUIRect::IS_VALID)) return;
+		if (!rect.flags.isSet(GUIRect::IS_ENABLED)) return;
 		
 		float l = parent_rect.x + rect.left.points + parent_rect.w * rect.left.relative;
 		float r = parent_rect.x + rect.right.points + parent_rect.w * rect.right.relative;
@@ -166,6 +168,8 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	}
 
 
+	void enableRect(ComponentHandle cmp, bool enable) override { m_rects[{cmp.index}]->flags.set(GUIRect::IS_ENABLED, enable); }
+	bool isRectEnabled(ComponentHandle cmp) override { return m_rects[{cmp.index}]->flags.isSet(GUIRect::IS_ENABLED); }
 	float getRectLeftPoints(ComponentHandle cmp) override { return m_rects[{cmp.index}]->left.points; }
 	void setRectLeftPoints(ComponentHandle cmp, float value) override { m_rects[{cmp.index}]->left.points = value; }
 	float getRectLeftRelative(ComponentHandle cmp) override { return m_rects[{cmp.index}]->left.relative; }
@@ -233,6 +237,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	{
 		const GUIRect& rect = *m_rects[{cmp.index}];
 		
+		serializer.write("flags", rect.flags.base);
 		serializer.write("top_pts", rect.top.points);
 		serializer.write("top_rel", rect.top.relative);
 
@@ -263,7 +268,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 			m_rects.insert(entity, rect);
 		}
 		rect->entity = entity;
-		rect->flags.set(GUIRect::IS_VALID);
+		serializer.read(&rect->flags.base);
 		serializer.read(&rect->top.points);
 		serializer.read(&rect->top.relative);
 
@@ -372,6 +377,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		}
 		rect->entity = entity;
 		rect->flags.set(GUIRect::IS_VALID);
+		rect->flags.set(GUIRect::IS_ENABLED);
 		m_universe.addComponent(entity, GUI_RECT_TYPE, this, cmp);
 		m_root = findRoot();
 
