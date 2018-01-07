@@ -25,6 +25,8 @@ public:
 
 	virtual void render(Pipeline& pipeline, const Vec2& canvas_size) = 0;
 
+	virtual void enableRect(ComponentHandle cmp, bool enable) = 0;
+	virtual bool isRectEnabled(ComponentHandle cmp) = 0;
 	virtual float getRectLeftPoints(ComponentHandle cmp) = 0;
 	virtual void setRectLeftPoints(ComponentHandle cmp, float value) = 0;
 	virtual float getRectLeftRelative(ComponentHandle cmp) = 0;
