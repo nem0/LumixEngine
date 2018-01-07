@@ -1,11 +1,15 @@
 #include "gui_scene.h"
 #include "gui_system.h"
+#include "engine/engine.h"
 #include "engine/flag_set.h"
 #include "engine/iallocator.h"
 #include "engine/reflection.h"
+#include "engine/resource_manager.h"
+#include "engine/resource_manager_base.h"
 #include "engine/serializer.h"
 #include "engine/universe/universe.h"
 #include "renderer/draw2d.h"
+#include "renderer/font_manager.h"
 #include "renderer/pipeline.h"
 #include "renderer/renderer.h"
 #include "renderer/render_scene.h"
@@ -19,6 +23,7 @@ namespace Lumix
 static const ComponentType GUI_RECT_TYPE = Reflection::getComponentType("gui_rect");
 static const ComponentType GUI_IMAGE_TYPE = Reflection::getComponentType("gui_image");
 static const ComponentType GUI_TEXT_TYPE = Reflection::getComponentType("gui_text");
+static const ResourceType FONT_TYPE("font");
 
 
 struct GUISprite
@@ -30,10 +35,12 @@ struct GUISprite
 struct GUIText
 {
 	GUIText(IAllocator& allocator) : text("", allocator) {}
+	~GUIText() { if (font) font->getResourceManager().unload(*font); }
 
+	FontResource* font = nullptr;
 	string text;
 	int font_size = 13;
-	u32 color = 0xaa000000;
+	u32 color = 0xff000000;
 };
 
 
@@ -219,6 +226,25 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	{
 		GUIText* gui_text = m_rects[{cmp.index}]->text;
 		gui_text->color = RGBAVec4ToABGRu32(color);
+	}
+
+
+	Path getTextFontPath(ComponentHandle cmp) override
+	{
+		GUIText* gui_text = m_rects[{cmp.index}]->text;
+		return gui_text->font == nullptr ? Path() : gui_text->font->getPath();
+	}
+
+
+	void setTextFontPath(ComponentHandle cmp, const Path& path) override
+	{
+		GUIText* gui_text = m_rects[{cmp.index}]->text;
+		if (gui_text->font)
+		{
+			gui_text->font->getResourceManager().unload(*gui_text->font);
+		}
+		ResourceManagerBase* manager = m_system.getEngine().getResourceManager().get(FONT_TYPE);
+		gui_text->font = (FontResource*)manager->load(path);
 	}
 
 

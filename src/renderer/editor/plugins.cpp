@@ -64,12 +64,41 @@ static const ComponentType POINT_LIGHT_TYPE = Reflection::getComponentType("poin
 static const ComponentType GLOBAL_LIGHT_TYPE = Reflection::getComponentType("global_light");
 static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("renderable");
 static const ComponentType ENVIRONMENT_PROBE_TYPE = Reflection::getComponentType("environment_probe");
+static const ResourceType FONT_TYPE("font");
 static const ResourceType MATERIAL_TYPE("material");
 static const ResourceType MODEL_TYPE("model");
 static const ResourceType PREFAB_TYPE("prefab");
 static const ResourceType SHADER_BINARY_TYPE("shader_binary");
 static const ResourceType SHADER_TYPE("shader");
 static const ResourceType TEXTURE_TYPE("texture");
+
+
+struct FontPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
+{
+	bool onGUI(Resource* resource, ResourceType type) override 
+	{
+		if (type != FONT_TYPE) return false;
+		return true;
+	}
+
+
+	ResourceType getResourceType(const char* ext) override
+	{
+		return equalStrings(ext, "ttf") ? FONT_TYPE : INVALID_RESOURCE_TYPE;
+	}
+
+
+	void onResourceUnloaded(Resource* resource) override {}
+	const char* getName() const override { return "Font"; }
+
+	bool hasResourceManager(ResourceType type) const override { return type == FONT_TYPE; }
+
+
+	bool acceptExtension(const char* ext, ResourceType type) const override
+	{
+		return type == FONT_TYPE && equalStrings(ext, "ttf");
+	}
+};
 
 
 struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
@@ -3066,6 +3095,7 @@ LUMIX_STUDIO_ENTRY(renderer)
 	auto& asset_browser = app.getAssetBrowser();
 	asset_browser.addPlugin(*LUMIX_NEW(allocator, ModelPlugin)(app));
 	asset_browser.addPlugin(*LUMIX_NEW(allocator, MaterialPlugin)(app));
+	asset_browser.addPlugin(*LUMIX_NEW(allocator, FontPlugin)());
 	asset_browser.addPlugin(*LUMIX_NEW(allocator, TexturePlugin)(app));
 	asset_browser.addPlugin(*LUMIX_NEW(allocator, ShaderPlugin)(app));
 

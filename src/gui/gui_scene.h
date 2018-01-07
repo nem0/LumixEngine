@@ -9,6 +9,7 @@ namespace Lumix
 
 
 class GUISystem;
+class Path;
 class Pipeline;
 class string;
 struct Vec2;
@@ -56,6 +57,8 @@ public:
 	virtual int getTextFontSize(ComponentHandle cmp) = 0;
 	virtual Vec4 getTextColorRGBA(ComponentHandle cmp) = 0;
 	virtual void setTextColorRGBA(ComponentHandle cmp, const Vec4& color) = 0;
+	virtual Path getTextFontPath(ComponentHandle cmp) = 0;
+	virtual void setTextFontPath(ComponentHandle cmp, const Path& path) = 0;
 };
 
 
