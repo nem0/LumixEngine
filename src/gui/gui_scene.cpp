@@ -135,36 +135,36 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	Vec4 getImageColorRGBA(ComponentHandle cmp) override
 	{
 		GUIImage* image = m_rects[{cmp.index}]->image;
-		return ARGBu32ToRGBAVec4(image->color);
+		return ABGRu32ToRGBAVec4(image->color);
 	}
 
 
-	static Vec4 ARGBu32ToRGBAVec4(u32 value)
+	static Vec4 ABGRu32ToRGBAVec4(u32 value)
 	{
 		float inv = 1 / 255.0f;
 		return {
-			((value >> 16) & 0xFF) * inv,
-			((value >> 8) & 0xFF) * inv,
 			((value >> 0) & 0xFF) * inv,
+			((value >> 8) & 0xFF) * inv,
+			((value >> 16) & 0xFF) * inv,
 			((value >> 24) & 0xFF) * inv,
 		};
 	}
 
 
-	static u32 RGBAVec4ToARGBu32(const Vec4& value)
+	static u32 RGBAVec4ToABGRu32(const Vec4& value)
 	{
 		u8 r = u8(value.x * 255 + 0.5f);
 		u8 g = u8(value.y * 255 + 0.5f);
 		u8 b = u8(value.z * 255 + 0.5f);
 		u8 a = u8(value.w * 255 + 0.5f);
-		return (a << 24) + (r << 16) + (g << 8) + b;
+		return (a << 24) + (b << 16) + (g << 8) + r;
 	}
 
 
 	void setImageColorRGBA(ComponentHandle cmp, const Vec4& color) override
 	{
 		GUIImage* image = m_rects[{cmp.index}]->image;
-		image->color = RGBAVec4ToARGBu32(color);
+		image->color = RGBAVec4ToABGRu32(color);
 	}
 
 
@@ -208,14 +208,14 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	Vec4 getTextColorRGBA(ComponentHandle cmp) override
 	{
 		GUIText* gui_text = m_rects[{cmp.index}]->text;
-		return ARGBu32ToRGBAVec4(gui_text->color);
+		return ABGRu32ToRGBAVec4(gui_text->color);
 	}
 
 
 	void setTextColorRGBA(ComponentHandle cmp, const Vec4& color) override
 	{
 		GUIText* gui_text = m_rects[{cmp.index}]->text;
-		gui_text->color = RGBAVec4ToARGBu32(color);
+		gui_text->color = RGBAVec4ToABGRu32(color);
 	}
 
 
