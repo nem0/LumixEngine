@@ -102,6 +102,7 @@ namespace Lumix
 			),
 			component("distance_joint",
 				property("Connected body", LUMIX_PROP(PhysicsScene, getJointConnectedBody, setJointConnectedBody)),
+				property("Axis position", LUMIX_PROP(PhysicsScene, getJointAxisPosition, setJointAxisPosition)),
 				property("Damping", LUMIX_PROP(PhysicsScene, getDistanceJointDamping, setDistanceJointDamping),
 					MinAttribute(0)),
 				property("Stiffness", LUMIX_PROP(PhysicsScene, getDistanceJointStiffness, setDistanceJointStiffness),
