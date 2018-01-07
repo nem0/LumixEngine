@@ -393,9 +393,8 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		int idx = m_rects.find(entity);
 		if (idx < 0)
 		{
-			GUIRect* rect = LUMIX_NEW(m_allocator, GUIRect);
-			rect->entity = entity;
-			idx = m_rects.insert(entity, rect);
+			createRect(entity);
+			idx = m_rects.find(entity);
 		}
 		GUIRect& rect = *m_rects.at(idx);
 		rect.text = LUMIX_NEW(m_allocator, GUIText)(m_allocator);
@@ -410,9 +409,8 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		int idx = m_rects.find(entity);
 		if (idx < 0)
 		{
-			GUIRect* rect = LUMIX_NEW(m_allocator, GUIRect);
-			rect->entity = entity;
-			idx = m_rects.insert(entity, rect);
+			createRect(entity);
+			idx = m_rects.find(entity);
 		}
 		GUIRect& rect = *m_rects.at(idx);
 		rect.image = LUMIX_NEW(m_allocator, GUIImage);
