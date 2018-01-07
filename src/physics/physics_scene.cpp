@@ -564,12 +564,14 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		PxFilterData data;
 		data.word0 = 1 << layer;
 		data.word1 = m_collision_filter[layer];
+		controller.m_filter_data = data;
 		PxShape* shapes[8];
 		int shapes_count = controller.m_controller->getActor()->getShapes(shapes, lengthOf(shapes));
 		for (int i = 0; i < shapes_count; ++i)
 		{
 			shapes[i]->setSimulationFilterData(data);
 		}
+		controller.m_controller->invalidateCache();
 	}
 
 
@@ -1800,7 +1802,8 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			}
 
 			const PxExtendedVec3& p = controller.m_controller->getPosition();
-			controller.m_controller->move(toPhysx(dif), 0.001f, time_delta, PxControllerFilters());
+			PxControllerFilters filters(nullptr, &controller.m_filter_callback);
+			controller.m_controller->move(toPhysx(dif), 0.001f, time_delta, filters);
 
 			float y = (float)p.y - controller.m_height * 0.5f - controller.m_radius;
 			m_universe.setPosition(controller.m_entity, (float)p.x, y, (float)p.z);
@@ -2923,12 +2926,14 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			int controller_layer = controller.m_layer;
 			data.word0 = 1 << controller_layer;
 			data.word1 = m_collision_filter[controller_layer];
+			controller.m_filter_data = data;
 			PxShape* shapes[8];
 			int shapes_count = controller.m_controller->getActor()->getShapes(shapes, lengthOf(shapes));
 			for (int i = 0; i < shapes_count; ++i)
 			{
 				shapes[i]->setSimulationFilterData(data);
 			}
+			controller.m_controller->invalidateCache();
 		}
 
 		for (auto& terrain : m_terrains)
@@ -3423,6 +3428,20 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		c.m_controller = m_controller_manager->createController(cDesc);
 		c.m_controller->getActor()->userData = (void*)(intptr_t)entity.index;
 		c.m_entity = entity;
+		
+		PxFilterData data;
+		int controller_layer = c.m_layer;
+		data.word0 = 1 << controller_layer;
+		data.word1 = m_collision_filter[controller_layer];
+		c.m_filter_data = data;
+		PxShape* shapes[8];
+		int shapes_count = c.m_controller->getActor()->getShapes(shapes, lengthOf(shapes));
+		for (int i = 0; i < shapes_count; ++i)
+		{
+			shapes[i]->setSimulationFilterData(data);
+		}
+		c.m_controller->invalidateCache();
+
 		m_universe.addComponent(entity, CONTROLLER_TYPE, this, {entity.index});
 	}
 
@@ -5117,12 +5136,41 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 	struct Controller
 	{
+		struct FilterCallback : PxQueryFilterCallback
+		{
+			FilterCallback(Controller& controller) : controller(controller) {}
+
+			PxQueryHitType::Enum preFilter(const PxFilterData& filterData
+				, const PxShape* shape
+				, const PxRigidActor* actor
+				, PxHitFlags& queryFlags) override 
+			{
+				PxFilterData fd0 = shape->getSimulationFilterData();
+				PxFilterData fd1 = controller.m_filter_data;
+				if (!(fd0.word0 & fd1.word1) || !(fd0.word0 & fd1.word1)) return PxQueryHitType::eNONE;
+				return PxQueryHitType::eBLOCK;
+			}
+
+			PxQueryHitType::Enum postFilter(const PxFilterData& filterData, const PxQueryHit& hit) override
+			{
+				return PxQueryHitType::eNONE;
+			}
+
+			Controller& controller;
+		};
+
+
+		Controller() : m_filter_callback(*this) {}
+
+
 		PxController* m_controller;
 		Entity m_entity;
 		Vec3 m_frame_change;
 		float m_radius;
 		float m_height;
 		int m_layer;
+		FilterCallback m_filter_callback;
+		PxFilterData m_filter_data;
 
 		float gravity_speed = 0;
 	};
