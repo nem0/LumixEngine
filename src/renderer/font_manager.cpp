@@ -64,11 +64,12 @@ void FontManager::updateFontTexture()
 	if (m_atlas_texture)
 	{
 		m_atlas_texture->destroy();
-		LUMIX_DELETE(m_allocator, m_atlas_texture);
 	}
-
-	auto& texture_manager = m_renderer.getTextureManager();
-	m_atlas_texture = LUMIX_NEW(m_allocator, Texture)(Path("draw2d_atlas"), texture_manager, m_allocator);
+	else
+	{
+		auto& texture_manager = m_renderer.getTextureManager();
+		m_atlas_texture = LUMIX_NEW(m_allocator, Texture)(Path("draw2d_atlas"), texture_manager, m_allocator);
+	}
 	m_atlas_texture->create(w, h, pixels);
 
 	m_font_atlas.TexID = &m_atlas_texture->handle;

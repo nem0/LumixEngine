@@ -3,6 +3,7 @@
 #include "engine/engine.h"
 #include "engine/flag_set.h"
 #include "engine/iallocator.h"
+#include "engine/plugin_manager.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
@@ -35,9 +36,17 @@ struct GUISprite
 struct GUIText
 {
 	GUIText(IAllocator& allocator) : text("", allocator) {}
-	~GUIText() { if (font) font->getResourceManager().unload(*font); }
+	~GUIText()
+	{
+		if (font_resource)
+		{
+			font_resource->removeRef(*font);
+			font_resource->getResourceManager().unload(*font_resource);
+		}
+	}
 
-	FontResource* font = nullptr;
+	FontResource* font_resource = nullptr;
+	Font* font = nullptr;
 	string text;
 	int font_size = 13;
 	u32 color = 0xff000000;
@@ -89,6 +98,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		context.registerComponentType(GUI_RECT_TYPE, this, &GUISceneImpl::serializeRect, &GUISceneImpl::deserializeRect);
 		context.registerComponentType(GUI_IMAGE_TYPE, this, &GUISceneImpl::serializeImage, &GUISceneImpl::deserializeImage);
 		context.registerComponentType(GUI_TEXT_TYPE, this, &GUISceneImpl::serializeText, &GUISceneImpl::deserializeText);
+		m_font_manager = (FontManager*)system.getEngine().getResourceManager().get(FONT_TYPE);
 	}
 
 
@@ -109,9 +119,10 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		float b = parent_rect.y + rect.bottom.points + parent_rect.h * rect.bottom.relative;
 			 
 		if (rect.image) pipeline.getDraw2D().AddRectFilled({ l, t }, { r, b }, rect.image->color);
-		Renderer& renderer = static_cast<Renderer&>(pipeline.getScene()->getPlugin());
-		Font* font = renderer.getFontManager().getDefaultFont();
-		if (rect.text) pipeline.getDraw2D().AddText(font, (float)rect.text->font_size, {l, t}, rect.text->color, rect.text->text.c_str());
+		if (rect.text)
+		{
+			pipeline.getDraw2D().AddText(rect.text->font, (float)rect.text->font_size, { l, t }, rect.text->color, rect.text->text.c_str());
+		}
 
 		Entity child = m_universe.getFirstChild(rect.entity);
 		if (child.isValid())
@@ -204,7 +215,10 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	void setTextFontSize(ComponentHandle cmp, int value) override
 	{
 		GUIText* gui_text = m_rects[{cmp.index}]->text;
+		FontResource* res = gui_text->font_resource;
+		if (res) res->removeRef(*gui_text->font);
 		gui_text->font_size = value;
+		if (res) gui_text->font = res->addRef(gui_text->font_size);
 	}
 	
 	
@@ -232,19 +246,27 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	Path getTextFontPath(ComponentHandle cmp) override
 	{
 		GUIText* gui_text = m_rects[{cmp.index}]->text;
-		return gui_text->font == nullptr ? Path() : gui_text->font->getPath();
+		return gui_text->font_resource == nullptr ? Path() : gui_text->font_resource->getPath();
 	}
 
 
 	void setTextFontPath(ComponentHandle cmp, const Path& path) override
 	{
 		GUIText* gui_text = m_rects[{cmp.index}]->text;
-		if (gui_text->font)
+		FontResource* res = gui_text->font_resource;
+		if (res)
 		{
-			gui_text->font->getResourceManager().unload(*gui_text->font);
+			res->removeRef(*gui_text->font);
+			res->getResourceManager().unload(*res);
 		}
-		ResourceManagerBase* manager = m_system.getEngine().getResourceManager().get(FONT_TYPE);
-		gui_text->font = (FontResource*)manager->load(path);
+		if (!path.isValid())
+		{
+			gui_text->font_resource = nullptr;
+			gui_text->font = m_font_manager->getDefaultFont();
+			return;
+		}
+		gui_text->font_resource = (FontResource*)m_font_manager->load(path);
+		gui_text->font = gui_text->font_resource->addRef(gui_text->font_size);
 	}
 
 
@@ -345,6 +367,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	void serializeText(ISerializer& serializer, ComponentHandle cmp)
 	{
 		const GUIRect& rect = *m_rects[{cmp.index}];
+		serializer.write("font", rect.text->font_resource ? rect.text->font_resource->getPath().c_str() : "");
 		serializer.write("color", rect.text->color);
 		serializer.write("font_size", rect.text->font_size);
 		serializer.write("text", rect.text->text.c_str());
@@ -363,9 +386,21 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		GUIRect& rect = *m_rects.at(idx);
 		rect.text = LUMIX_NEW(m_allocator, GUIText)(m_allocator);
 
+		char tmp[MAX_PATH_LENGTH];
+		serializer.read(tmp, lengthOf(tmp));
 		serializer.read(&rect.text->color);
 		serializer.read(&rect.text->font_size);
 		serializer.read(&rect.text->text);
+		if (tmp[0] == '\0')
+		{
+			rect.text->font_resource = nullptr;
+			rect.text->font = m_font_manager->getDefaultFont();
+		}
+		else
+		{
+			rect.text->font_resource = (FontResource*)m_font_manager->load(Path(tmp));
+			rect.text->font = rect.text->font_resource->addRef(rect.text->font_size);
+		}
 
 		ComponentHandle cmp = { entity.index };
 		m_universe.addComponent(entity, GUI_TEXT_TYPE, this, cmp);
@@ -424,6 +459,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		}
 		GUIRect& rect = *m_rects.at(idx);
 		rect.text = LUMIX_NEW(m_allocator, GUIText)(m_allocator);
+		rect.text->font = m_font_manager->getDefaultFont();
 		ComponentHandle cmp = {entity.index};
 		m_universe.addComponent(entity, GUI_TEXT_TYPE, this, cmp);
 		return cmp;
@@ -529,6 +565,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 			serializer.write(rect->text != nullptr);
 			if (rect->text)
 			{
+				serializer.writeString(rect->text->font_resource ? rect->text->font_resource->getPath().c_str() : "");
 				serializer.write(rect->text->color);
 				serializer.write(rect->text->font_size);
 				serializer.write(rect->text->text);
@@ -568,9 +605,22 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 			if (has_text)
 			{
 				rect->text = LUMIX_NEW(m_allocator, GUIText)(m_allocator);
-				serializer.read(rect->text->color);
-				serializer.read(rect->text->font_size);
-				serializer.read(rect->text->text);
+				GUIText& text = *rect->text;
+				char tmp[MAX_PATH_LENGTH];
+				serializer.readString(tmp, lengthOf(tmp));
+				serializer.read(text.color);
+				serializer.read(text.font_size);
+				serializer.read(text.text);
+				if (tmp[0] == '\0')
+				{
+					text.font_resource = nullptr;
+					text.font = m_font_manager->getDefaultFont();
+				}
+				else
+				{
+					text.font_resource = (FontResource*)m_font_manager->load(Path(tmp));
+					text.font = text.font_resource->addRef(text.font_size);
+				}
 				m_universe.addComponent(rect->entity, GUI_TEXT_TYPE, this, {rect->entity.index});
 			}
 		}
@@ -612,6 +662,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	Array<GUISprite*> m_sprites;
 	AssociativeArray<Entity, GUIRect*> m_rects;
 	GUIRect* m_root = nullptr;
+	FontManager* m_font_manager = nullptr;
 };
 
 
