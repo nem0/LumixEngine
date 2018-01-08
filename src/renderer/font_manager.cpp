@@ -49,6 +49,7 @@ FontManager::FontManager(Renderer& renderer, IAllocator& allocator)
 	, m_renderer(renderer)
 	, m_font_atlas(allocator)
 	, m_atlas_texture(nullptr)
+	, m_atlas_texture_changed(allocator)
 {
 	m_default_font = m_font_atlas.AddFontDefault();
 	updateFontTexture();
@@ -73,6 +74,7 @@ void FontManager::updateFontTexture()
 	m_atlas_texture->create(w, h, pixels);
 
 	m_font_atlas.TexID = &m_atlas_texture->handle;
+	m_atlas_texture_changed.invoke();
 }
 
 

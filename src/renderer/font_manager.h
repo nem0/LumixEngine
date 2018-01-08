@@ -2,6 +2,7 @@
 
 
 #include "engine/hash_map.h"
+#include "engine/delegate_list.h"
 #include "engine/resource.h"
 #include "engine/resource_manager_base.h"
 #include "renderer/draw2d.h"
@@ -46,6 +47,7 @@ public:
 	FontAtlas& getFontAtlas() { return m_font_atlas; }
 	Font* getDefaultFont() const { return m_default_font; }
 	Texture* getAtlasTexture() const { return m_atlas_texture; }
+	DelegateList<void()>& onAtlasTextureChanged() { return m_atlas_texture_changed; }
 
 private:
 	Resource* createResource(const Path& path) override;
@@ -58,6 +60,7 @@ private:
 	FontAtlas m_font_atlas;
 	Font* m_default_font;
 	Texture* m_atlas_texture;
+	DelegateList<void()> m_atlas_texture_changed;
 };
 
 
