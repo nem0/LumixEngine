@@ -459,7 +459,7 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 		, m_model_manager(*this, m_allocator)
 		, m_material_manager(*this, m_allocator)
 		, m_shader_manager(*this, m_allocator)
-		, m_font_manager(m_allocator)
+		, m_font_manager(nullptr)
 		, m_shader_binary_manager(*this, m_allocator)
 		, m_passes(m_allocator)
 		, m_shader_defines(m_allocator)
@@ -467,7 +467,6 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 		, m_bgfx_allocator(m_allocator)
 		, m_callback_stub(*this)
 		, m_vsync(true)
-		, m_font_atlas(m_allocator)
 		, m_main_pipeline(nullptr)
 	{
 		registerProperties(engine.getAllocator());
@@ -510,7 +509,8 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 		m_model_manager.create(MODEL_TYPE, manager);
 		m_material_manager.create(MATERIAL_TYPE, manager);
 		m_shader_manager.create(SHADER_TYPE, manager);
-		m_font_manager.create(FONT_TYPE, manager);
+		m_font_manager = LUMIX_NEW(m_allocator, FontManager)(*this, m_allocator);
+		m_font_manager->create(FONT_TYPE, manager);
 		m_shader_binary_manager.create(SHADER_BINARY_TYPE, manager);
 
 		m_current_pass_hash = crc32("MAIN");
@@ -537,28 +537,18 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 		m_layers.emplace("transparent");
 		m_layers.emplace("water");
 		m_layers.emplace("fur");
-		initDraw2DFont();
 	}
 
 
 	~RendererImpl()
 	{
-		Texture* draw2d_texture = m_draw2d_material->getTexture(0);
-		m_draw2d_material->setTexture(0, nullptr);
-		if (draw2d_texture)
-		{
-			draw2d_texture->destroy();
-			LUMIX_DELETE(m_engine.getAllocator(), draw2d_texture);
-		}
-
-		m_draw2d_material->getResourceManager().unload(*m_draw2d_material);
-
 		m_shader_manager.unload(*m_default_shader);
 		m_texture_manager.destroy();
 		m_model_manager.destroy();
 		m_material_manager.destroy();
 		m_shader_manager.destroy();
-		m_font_manager.destroy();
+		m_font_manager->destroy();
+		LUMIX_DELETE(m_allocator, m_font_manager);
 		m_shader_binary_manager.destroy();
 
 		bgfx::destroy(m_mat_color_uniform);
@@ -566,38 +556,6 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 		bgfx::frame();
 		bgfx::frame();
 		bgfx::shutdown();
-	}
-
-
-	void updateFontTexture()
-	{
-		u8* pixels;
-		int w, h;
-		m_font_atlas.GetTexDataAsRGBA32(&pixels, &w, &h);
-		auto* material_manager = m_engine.getResourceManager().get(MATERIAL_TYPE);
-		Resource* resource = material_manager->load(Path("pipelines/common/draw2d.mat"));
-		m_draw2d_material = (Material*)resource;
-
-		Texture* old_texture = m_draw2d_material->getTexture(0);
-		Texture* texture = LUMIX_NEW(m_engine.getAllocator(), Texture)(
-			Path("draw2d_font"), *m_engine.getResourceManager().get(TEXTURE_TYPE), m_engine.getAllocator());
-
-		texture->create(w, h, pixels);
-		m_draw2d_material->setTexture(0, texture);
-		if (old_texture)
-		{
-			old_texture->destroy();
-			LUMIX_DELETE(m_engine.getAllocator(), old_texture);
-		}
-
-		m_font_atlas.TexID = &texture->handle;
-	}
-
-
-	void initDraw2DFont()
-	{
-		m_default_font = m_font_atlas.AddFontDefault();
-		updateFontTexture();
 	}
 
 
@@ -610,26 +568,6 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	Pipeline* getMainPipeline() override
 	{
 		return m_main_pipeline;
-	}
-
-
-	FontAtlas& getFontAtlas() override
-	{
-		return m_font_atlas;
-	}
-
-
-	Font* getDefaultFont() override
-	{
-		return m_default_font;
-	}
-
-
-	Font* getFont(const char* path, int size) override
-	{
-		Font* font = m_font_atlas.AddFontFromFileTTF(path, (float)size);
-		updateFontTexture();
-		return font;
 	}
 
 
@@ -652,6 +590,7 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	ModelManager& getModelManager() override { return m_model_manager; }
 	MaterialManager& getMaterialManager() override { return m_material_manager; }
 	TextureManager& getTextureManager() override { return m_texture_manager; }
+	FontManager& getFontManager() override { return *m_font_manager; }
 	const bgfx::VertexDecl& getBasicVertexDecl() const override { return m_basic_vertex_decl; }
 	const bgfx::VertexDecl& getBasic2DVertexDecl() const override { return m_basic_2d_vertex_decl; }
 
@@ -734,7 +673,7 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	CallbackStub m_callback_stub;
 	TextureManager m_texture_manager;
 	MaterialManager m_material_manager;
-	FontManager m_font_manager;
+	FontManager* m_font_manager;
 	ShaderManager m_shader_manager;
 	ShaderBinaryManager m_shader_binary_manager;
 	ModelManager m_model_manager;
@@ -747,9 +686,6 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	bgfx::VertexDecl m_basic_2d_vertex_decl;
 	bgfx::UniformHandle m_mat_color_uniform;
 	bgfx::UniformHandle m_roughness_metallic_uniform;
-	FontAtlas m_font_atlas;
-	Font* m_default_font;
-	Material* m_draw2d_material;
 	Pipeline* m_main_pipeline;
 };
 

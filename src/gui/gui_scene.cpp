@@ -110,7 +110,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 			 
 		if (rect.image) pipeline.getDraw2D().AddRectFilled({ l, t }, { r, b }, rect.image->color);
 		Renderer& renderer = static_cast<Renderer&>(pipeline.getScene()->getPlugin());
-		Font* font = renderer.getDefaultFont();
+		Font* font = renderer.getFontManager().getDefaultFont();
 		if (rect.text) pipeline.getDraw2D().AddText(font, (float)rect.text->font_size, {l, t}, rect.text->color, rect.text->text.c_str());
 
 		Entity child = m_universe.getFirstChild(rect.entity);

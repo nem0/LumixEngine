@@ -18,6 +18,7 @@ namespace Lumix
 class Engine;
 struct Font;
 struct FontAtlas;
+class FontManager;
 class LIFOAllocator;
 class MaterialManager;
 class ModelManager;
@@ -43,6 +44,7 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 		virtual int getShaderDefinesCount() const = 0;
 		virtual const bgfx::VertexDecl& getBasicVertexDecl() const = 0;
 		virtual const bgfx::VertexDecl& getBasic2DVertexDecl() const = 0;
+		virtual FontManager& getFontManager() = 0;
 		virtual MaterialManager& getMaterialManager() = 0;
 		virtual ModelManager& getModelManager() = 0;
 		virtual TextureManager& getTextureManager() = 0;
@@ -52,9 +54,6 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 		virtual int getLayersCount() const = 0;
 		virtual int getLayer(const char* name) = 0;
 		virtual const char* getLayerName(int idx) const = 0;
-		virtual FontAtlas& getFontAtlas() = 0;
-		virtual Font* getDefaultFont() = 0;
-		virtual Font* getFont(const char* path, int size) = 0;
 		virtual void setMainPipeline(Pipeline* pipeline) = 0;
 		virtual Pipeline* getMainPipeline() = 0;
 

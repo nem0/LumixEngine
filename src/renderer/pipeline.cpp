@@ -11,6 +11,7 @@
 #include "engine/engine.h"
 #include "imgui/imgui.h"
 #include "renderer/draw2d.h"
+#include "renderer/font_manager.h"
 #include "renderer/frame_buffer.h"
 #include "renderer/material.h"
 #include "renderer/material_manager.h"
@@ -317,11 +318,11 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		createCubeBuffers();
 		m_stats = {};
 
-		Font* font = m_renderer.getDefaultFont();
-		m_draw2d.FontTexUvWhitePixel = m_renderer.getFontAtlas().TexUvWhitePixel;
+		FontAtlas& font_atlas = m_renderer.getFontManager().getFontAtlas();
+		m_draw2d.FontTexUvWhitePixel = font_atlas.TexUvWhitePixel;
 		m_draw2d.Clear();
 		m_draw2d.PushClipRectFullScreen();
-		m_draw2d.PushTextureID(font->ContainerAtlas->TexID);
+		m_draw2d.PushTextureID(font_atlas.TexID);
 	}
 
 
@@ -925,8 +926,9 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		auto resetDraw2D =  [this](){
 			m_draw2d.Clear();
 			m_draw2d.PushClipRectFullScreen();
-			Font* font = m_renderer.getDefaultFont();
-			m_draw2d.PushTextureID(font->ContainerAtlas->TexID);
+			FontAtlas& atlas = m_renderer.getFontManager().getFontAtlas();
+			m_draw2d.FontTexUvWhitePixel = atlas.TexUvWhitePixel;
+			m_draw2d.PushTextureID(atlas.TexID);
 		};
 
 		Vec2 size((float)getWidth(), (float)getHeight());
@@ -973,8 +975,9 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 				u16(Math::minimum(pcmd->ClipRect.z, 65535.0f) - Math::maximum(pcmd->ClipRect.x, 0.0f)),
 				u16(Math::minimum(pcmd->ClipRect.w, 65535.0f) - Math::maximum(pcmd->ClipRect.y, 0.0f)));
 			
+			Texture* atlas_texture = m_renderer.getFontManager().getAtlasTexture();
 			const bgfx::TextureHandle& texture_id =
-			pcmd->TextureId ? *(bgfx::TextureHandle*)pcmd->TextureId : m_draw2d_material->getTexture(0)->handle;
+			pcmd->TextureId ? *(bgfx::TextureHandle*)pcmd->TextureId : atlas_texture->handle;
 			auto texture_uniform = m_draw2d_material->getShader()->m_texture_slots[0].uniform_handle;
 			setTexture(0, texture_id, texture_uniform);
 			render(vertex_buffer,

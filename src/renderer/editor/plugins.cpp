@@ -29,6 +29,7 @@
 #include "game_view.h"
 #include "import_asset_dialog.h"
 #include "renderer/draw2d.h"
+#include "renderer/font_manager.h"
 #include "renderer/frame_buffer.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
@@ -2124,7 +2125,7 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 	void addText2D(float x, float y, float font_size, u32 color, const char* text) override
 	{
 		auto& renderer = static_cast<Renderer&>(m_render_scene->getPlugin());
-		Font* font = renderer.getDefaultFont();
+		Font* font = renderer.getFontManager().getDefaultFont();
 		m_pipeline.getDraw2D().AddText(font, font_size, { x, y }, color, text);
 	}
 
