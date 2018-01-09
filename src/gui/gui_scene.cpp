@@ -102,12 +102,6 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	}
 
 
-	struct Rect
-	{
-		float x, y, w, h;
-	};
-
-
 	void renderRect(GUIRect& rect, Pipeline& pipeline, const Rect& parent_rect)
 	{
 		if (!rect.flags.isSet(GUIRect::IS_VALID)) return;
@@ -186,6 +180,74 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	{
 		GUIImage* image = m_rects[{cmp.index}]->image;
 		image->color = RGBAVec4ToABGRu32(color);
+	}
+
+
+	bool hasGUI(Entity entity) const override
+	{
+		int idx = m_rects.find(entity);
+		if (idx < 0) return false;
+		return m_rects.at(idx)->flags.isSet(GUIRect::IS_VALID);
+	}
+
+
+	Entity getRectEntity(ComponentHandle cmp) const override
+	{
+		return {cmp.index};
+	}
+
+
+	ComponentHandle getRectAt(GUIRect& rect, const Vec2& pos, const Rect& parent_rect) const
+	{
+		if (!rect.flags.isSet(GUIRect::IS_VALID)) return INVALID_COMPONENT;
+
+		Rect r;
+		r.x = parent_rect.x + rect.left.points + parent_rect.w * rect.left.relative;
+		r.y = parent_rect.y + rect.top.points + parent_rect.h * rect.top.relative;
+		float right = parent_rect.x + rect.right.points + parent_rect.w * rect.right.relative;
+		float bottom = parent_rect.y + rect.bottom.points + parent_rect.h * rect.bottom.relative;
+
+		r.w = right - r.x;
+		r.h = bottom - r.y;
+
+		bool intersect = pos.x >= r.x && pos.y >= r.y && pos.x <= r.x + r.w && pos.y <= r.y + r.h;
+
+		for (Entity child = m_universe.getFirstChild(rect.entity); child.isValid(); child = m_universe.getNextSibling(child))
+		{
+			int idx = m_rects.find(child);
+			if (idx < 0) continue;
+
+			GUIRect* child_rect = m_rects.at(idx);
+			ComponentHandle cmp = getRectAt(*child_rect, pos, r);
+			if (cmp.isValid()) return cmp;
+		}
+
+		ComponentHandle cmp = { rect.entity.index };
+		return intersect ? cmp : INVALID_COMPONENT;
+	}
+
+
+	ComponentHandle getRectAt(const Vec2& pos, const Vec2& canvas_size) const override
+	{
+		if (!m_root) return INVALID_COMPONENT;
+
+		return getRectAt(*m_root, pos, { 0, 0, canvas_size.x, canvas_size.y });
+	}
+
+
+	Rect getRectOnCanvas(Entity entity, const Vec2& canvas_size) const override
+	{
+		int idx = m_rects.find(entity);
+		if (idx < 0) return { 0, 0, canvas_size.x, canvas_size.y };
+		Entity parent = m_universe.getParent(entity);
+		Rect parent_rect = getRectOnCanvas(parent, canvas_size);
+		GUIRect* gui = m_rects[entity];
+		float l = parent_rect.x + parent_rect.w * gui->left.relative + gui->left.points;
+		float r = parent_rect.x + parent_rect.w * gui->right.relative + gui->right.points;
+		float t = parent_rect.y + parent_rect.h * gui->top.relative + gui->top.points;
+		float b = parent_rect.y + parent_rect.h * gui->bottom.relative + gui->bottom.points;
+
+		return { l, t, r - l, b - t };
 	}
 
 
