@@ -1,3 +1,4 @@
+#include "editor/asset_browser.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
@@ -9,6 +10,7 @@
 #include "engine/reflection.h"
 #include "engine/universe/universe.h"
 #include "gui/gui_scene.h"
+#include "gui/sprite_manager.h"
 #include "imgui/imgui.h"
 #include "renderer/draw2d.h"
 #include "renderer/pipeline.h"
@@ -24,6 +26,71 @@ namespace
 
 
 static const ComponentType GUI_RECT_TYPE = Reflection::getComponentType("gui_rect");
+static const ResourceType SPRITE_TYPE("sprite");
+static const ResourceType TEXTURE_TYPE("texture");
+
+
+struct SpritePlugin LUMIX_FINAL : public AssetBrowser::IPlugin
+{
+	SpritePlugin(StudioApp& app) : app(app) {}
+
+
+	bool onGUI(Resource* resource, ResourceType type) override
+	{
+		if (type != SPRITE_TYPE) return false;
+
+		Sprite* sprite = (Sprite*)resource;
+		
+		char tmp[MAX_PATH_LENGTH];
+		Texture* tex = sprite->getTexture();
+		copyString(tmp, tex ? tex->getPath().c_str() : "");
+		if (app.getAssetBrowser().resourceInput("Texture", "texture", tmp, lengthOf(tmp), TEXTURE_TYPE))
+		{
+			sprite->setTexture(Path(tmp));
+		}
+
+		switch (sprite->type)
+		{
+			case Sprite::Type::PATCH9:
+				ImGui::LabelText("Type", "%s", "9 patch");
+				break;
+			case Sprite::Type::SIMPLE:
+				ImGui::LabelText("Type", "%s", "Simple");
+				break;
+			default:
+				ImGui::LabelText("Type", "%s", "Unknown");
+				ASSERT(false);
+				break;
+		}
+
+		ImGui::InputInt("Top", &sprite->top);
+		ImGui::InputInt("Right", &sprite->right);
+		ImGui::InputInt("Bottom", &sprite->bottom);
+		ImGui::InputInt("Left", &sprite->left);
+
+		return true;
+	}
+
+
+	ResourceType getResourceType(const char* ext) override
+	{
+		return equalStrings(ext, "spr") ? SPRITE_TYPE : INVALID_RESOURCE_TYPE;
+	}
+
+
+	void onResourceUnloaded(Resource* resource) override {}
+	const char* getName() const override { return "Sprite"; }
+
+	bool hasResourceManager(ResourceType type) const override { return type == SPRITE_TYPE; }
+
+
+	bool acceptExtension(const char* ext, ResourceType type) const override
+	{
+		return type == SPRITE_TYPE && equalStrings(ext, "spr");
+	}
+
+	StudioApp& app;
+};
 
 
 class GUIEditor LUMIX_FINAL : public StudioApp::IPlugin
@@ -226,4 +293,6 @@ LUMIX_STUDIO_ENTRY(gui)
 
 	IAllocator& allocator = app.getWorldEditor().getAllocator();
 	app.addPlugin(*LUMIX_NEW(allocator, GUIEditor)(app));
+	
+	app.getAssetBrowser().addPlugin(*LUMIX_NEW(allocator, SpritePlugin)(app));
 }

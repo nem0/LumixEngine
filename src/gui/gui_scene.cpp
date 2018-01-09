@@ -1,5 +1,6 @@
 #include "gui_scene.h"
 #include "gui_system.h"
+#include "sprite_manager.h"
 #include "engine/engine.h"
 #include "engine/flag_set.h"
 #include "engine/iallocator.h"
@@ -25,12 +26,7 @@ static const ComponentType GUI_RECT_TYPE = Reflection::getComponentType("gui_rec
 static const ComponentType GUI_IMAGE_TYPE = Reflection::getComponentType("gui_image");
 static const ComponentType GUI_TEXT_TYPE = Reflection::getComponentType("gui_text");
 static const ResourceType FONT_TYPE("font");
-
-
-struct GUISprite
-{
-	Texture* image = nullptr;
-};
+static const ResourceType SPRITE_TYPE("sprite");
 
 
 struct GUIText
@@ -55,7 +51,7 @@ struct GUIText
 
 struct GUIImage
 {
-	GUISprite* sprite = nullptr;
+	Sprite* sprite = nullptr;
 	u32 color = 0xffffFFFF;
 };
 
@@ -92,7 +88,6 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		: m_allocator(allocator)
 		, m_universe(context)
 		, m_system(system)
-		, m_sprites(allocator)
 		, m_rects(allocator)
 	{
 		context.registerComponentType(GUI_RECT_TYPE, this, &GUISceneImpl::serializeRect, &GUISceneImpl::deserializeRect);
@@ -112,10 +107,56 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		float t = parent_rect.y + rect.top.points + parent_rect.h * rect.top.relative;
 		float b = parent_rect.y + rect.bottom.points + parent_rect.h * rect.bottom.relative;
 			 
-		if (rect.image) pipeline.getDraw2D().AddRectFilled({ l, t }, { r, b }, rect.image->color);
+		Draw2D& draw = pipeline.getDraw2D();
+		if (rect.image)
+		{
+			if (rect.image->sprite && rect.image->sprite->getTexture())
+			{
+				Sprite* sprite = rect.image->sprite;
+				Texture* tex = sprite->getTexture();
+				if (sprite->type == Sprite::PATCH9)
+				{
+					struct Quad {
+						float l, t, r, b;
+					} pos = {
+						l + sprite->left,
+						t + sprite->top,
+						r - tex->width + sprite->right,
+						b - tex->height + sprite->bottom
+					};
+					Quad uvs = {
+						sprite->left / (float)tex->width,
+						sprite->top / (float)tex->height,
+						sprite->right / (float)tex->width,
+						sprite->bottom / (float)tex->height
+					};
+
+					draw.AddImage(&tex->handle, { l, t }, { pos.l, pos.t }, { 0, 0 }, { uvs.l, uvs.t });
+					draw.AddImage(&tex->handle, { pos.l, t }, { pos.r, pos.t }, { uvs.l, 0 }, { uvs.r, uvs.t });
+					draw.AddImage(&tex->handle, { pos.r, t }, { r, pos.t }, { uvs.r, 0 }, { 1, uvs.t });
+
+					draw.AddImage(&tex->handle, { l, pos.t }, { pos.l, pos.b }, { 0, uvs.t }, { uvs.l, uvs.b });
+					draw.AddImage(&tex->handle, { pos.l, pos.t }, { pos.r, pos.b }, { uvs.l, uvs.t }, { uvs.r, uvs.b });
+					draw.AddImage(&tex->handle, { pos.r, pos.t }, { r, pos.b }, { uvs.r, uvs.t }, { 1, uvs.b });
+
+					draw.AddImage(&tex->handle, { l, pos.b }, { pos.l, b }, { 0, uvs.b }, { uvs.l, 1 });
+					draw.AddImage(&tex->handle, { pos.l, pos.b }, { pos.r, b }, { uvs.l, uvs.b }, { uvs.r, 1 });
+					draw.AddImage(&tex->handle, { pos.r, pos.b }, { r, b }, { uvs.r, uvs.b }, { 1, 1 });
+
+				}
+				else
+				{
+					draw.AddImage(&tex->handle, { l, t }, { r, b });
+				}
+			}
+			else
+			{
+				draw.AddRectFilled({ l, t }, { r, b }, rect.image->color);
+			}
+		}
 		if (rect.text)
 		{
-			pipeline.getDraw2D().AddText(rect.text->font, (float)rect.text->font_size, { l, t }, rect.text->color, rect.text->text.c_str());
+			draw.AddText(rect.text->font, (float)rect.text->font_size, { l, t }, rect.text->color, rect.text->text.c_str());
 		}
 
 		Entity child = m_universe.getFirstChild(rect.entity);
@@ -173,6 +214,32 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		u8 b = u8(value.z * 255 + 0.5f);
 		u8 a = u8(value.w * 255 + 0.5f);
 		return (a << 24) + (b << 16) + (g << 8) + r;
+	}
+
+
+	Path getImageSprite(ComponentHandle cmp) override
+	{
+		GUIImage* image = m_rects[{cmp.index}]->image;
+		return image->sprite ? image->sprite->getPath() : Path();
+	}
+
+
+	void setImageSprite(ComponentHandle cmp, const Path& path) override
+	{
+		GUIImage* image = m_rects[{cmp.index}]->image;
+		if (image->sprite)
+		{
+			image->sprite->getResourceManager().unload(*image->sprite);
+		}
+		auto* manager = m_system.getEngine().getResourceManager().get(SPRITE_TYPE);
+		if (path.isValid())
+		{
+			image->sprite = (Sprite*)manager->load(path);
+		}
+		else
+		{
+			image->sprite = nullptr;
+		}
 	}
 
 
@@ -559,7 +626,6 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 			if (parent == INVALID_ENTITY) return &rect;
 			if (m_rects.find(parent) < 0) return &rect;
 		}
-		ASSERT(false);
 		return nullptr;
 	}
 
@@ -721,7 +787,6 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	Universe& m_universe;
 	GUISystem& m_system;
 	
-	Array<GUISprite*> m_sprites;
 	AssociativeArray<Entity, GUIRect*> m_rects;
 	GUIRect* m_root = nullptr;
 	FontManager* m_font_manager = nullptr;

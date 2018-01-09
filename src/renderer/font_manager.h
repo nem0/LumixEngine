@@ -44,6 +44,8 @@ class LUMIX_RENDERER_API FontManager LUMIX_FINAL : public ResourceManagerBase
 friend class FontResource;
 public:
 	FontManager(Renderer& renderer, IAllocator& allocator);
+	~FontManager();
+
 	FontAtlas& getFontAtlas() { return m_font_atlas; }
 	Font* getDefaultFont() const { return m_default_font; }
 	Texture* getAtlasTexture() const { return m_atlas_texture; }
