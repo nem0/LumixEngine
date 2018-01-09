@@ -60,6 +60,8 @@ public:
 
 	virtual Vec4 getImageColorRGBA(ComponentHandle cmp) = 0;
 	virtual void setImageColorRGBA(ComponentHandle cmp, const Vec4& color) = 0;
+	virtual Path getImageSprite(ComponentHandle cmp) = 0;
+	virtual void setImageSprite(ComponentHandle cmp, const Path& path) = 0;
 
 	virtual void setText(ComponentHandle cmp, const char* text) = 0;
 	virtual const char* getText(ComponentHandle cmp) = 0;

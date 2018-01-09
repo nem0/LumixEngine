@@ -56,6 +56,16 @@ FontManager::FontManager(Renderer& renderer, IAllocator& allocator)
 }
 
 
+FontManager::~FontManager()
+{
+	if (m_atlas_texture)
+	{
+		m_atlas_texture->destroy();
+		LUMIX_DELETE(m_allocator, m_atlas_texture);
+	}
+}
+
+
 void FontManager::updateFontTexture()
 {
 	u8* pixels;

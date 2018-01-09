@@ -12,6 +12,7 @@
 #include "engine/resource_manager.h"
 #include "engine/universe/universe.h"
 #include "gui/gui_scene.h"
+#include "gui/sprite_manager.h"
 #include "renderer/material.h"
 #include "renderer/material_manager.h"
 #include "renderer/pipeline.h"
@@ -33,6 +34,7 @@ struct GUISystemImpl;
 static const ResourceType MATERIAL_TYPE("material");
 static const ResourceType TEXTURE_TYPE("texture");
 static const ResourceType FONT_TYPE("font");
+static const ResourceType SPRITE_TYPE("sprite");
 
 
 struct GUISystemImpl LUMIX_FINAL : public GUISystem
@@ -40,6 +42,7 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 	explicit GUISystemImpl(Engine& engine)
 		: m_engine(engine)
 		, m_interface(nullptr)
+		, m_sprite_manager(engine.getAllocator())
 	{
 		m_context = ImGui::CreateContext();
 		m_original_context = ImGui::GetCurrentContext();
@@ -85,7 +88,9 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 			),
 			component("gui_image",
 				property("Color", LUMIX_PROP(GUIScene, getImageColorRGBA, setImageColorRGBA),
-					ColorAttribute())
+					ColorAttribute()),
+				property("Sprite", LUMIX_PROP(GUIScene, getImageSprite, setImageSprite),
+					ResourceAttribute("Sprite (*.spr)", SPRITE_TYPE))
 			),
 			component("gui_rect",
 				property("Enabled", LUMIX_PROP(GUIScene, isRectEnabled, enableRect)),
@@ -100,11 +105,13 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 			)
 		);
 		registerScene(lua_scene);
+		m_sprite_manager.create(SPRITE_TYPE, m_engine.getResourceManager());
 	}
 
 
 	~GUISystemImpl()
 	{
+		m_sprite_manager.destroy();
 		Texture* texture = m_material->getTexture(0);
 		if (texture)
 		{
@@ -343,6 +350,7 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 
 
 	Engine& m_engine;
+	SpriteManager m_sprite_manager;
 	Interface* m_interface;
 	ImGuiContext* m_context;
 	ImGuiContext* m_original_context;
