@@ -1242,6 +1242,21 @@ public:
 		{
 			m_editor->selectEntities(&entity, 1);
 		}
+		if (ImGui::IsMouseReleased(1) && ImGui::IsItemHovered())
+		{
+			ImGui::OpenPopup("entity_context_menu");
+		}
+		if (ImGui::BeginPopup("entity_context_menu"))
+		{
+			if (ImGui::MenuItem("Create child"))
+			{
+				m_editor->beginCommandGroup(crc32("create_child_entity"));
+				Entity child = m_editor->addEntity();
+				m_editor->makeParent(entity, child);
+				m_editor->endCommandGroup();
+			}
+			ImGui::EndPopup();
+		}
 		ImGui::PopID();
 		if (ImGui::BeginDragDropSource())
 		{
