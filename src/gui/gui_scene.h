@@ -19,12 +19,22 @@ struct Vec4;
 class GUIScene : public IScene
 {
 public:
+	struct Rect
+	{
+		float x, y, w, h;
+	};
+
 	static GUIScene* createInstance(GUISystem& system,
 		Universe& universe,
 		struct IAllocator& allocator);
 	static void destroyInstance(GUIScene* scene);
 
 	virtual void render(Pipeline& pipeline, const Vec2& canvas_size) = 0;
+
+	virtual bool hasGUI(Entity entity) const = 0;
+	virtual Rect getRectOnCanvas(Entity entity, const Vec2& canva_size) const = 0;
+	virtual Entity getRectEntity(ComponentHandle cmp) const = 0;
+	virtual ComponentHandle getRectAt(const Vec2& pos, const Vec2& canvas_size) const = 0;
 
 	virtual void enableRect(ComponentHandle cmp, bool enable) = 0;
 	virtual bool isRectEnabled(ComponentHandle cmp) = 0;
