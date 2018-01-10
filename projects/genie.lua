@@ -647,6 +647,8 @@ if build_gui then
 		links { "engine", "renderer" }
 		linkLib "bgfx"
 		
+		defines { "BUILDING_GUI" }
+		
 		configuration { "vs*" }
 			links { "winmm", "psapi" }
 		configuration {}
