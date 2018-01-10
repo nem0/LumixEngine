@@ -5,15 +5,6 @@
 #include "engine/resource_manager_base.h"
 
 
-#ifdef STATIC_PLUGINS
-	#define LUMIX_GUI_API
-#elif defined BUILDING_GUI
-	#define LUMIX_GUI_API LUMIX_LIBRARY_EXPORT
-#else
-	#define LUMIX_GUI_API LUMIX_LIBRARY_IMPORT
-#endif
-
-
 namespace Lumix
 {
 
@@ -22,7 +13,7 @@ class Renderer;
 class Texture;
 
 
-class LUMIX_GUI_API Sprite LUMIX_FINAL : public Resource
+class Sprite LUMIX_FINAL : public Resource
 {
 public:
 	enum Type
@@ -52,7 +43,7 @@ private:
 };
 
 
-class LUMIX_GUI_API SpriteManager LUMIX_FINAL : public ResourceManagerBase
+class SpriteManager LUMIX_FINAL : public ResourceManagerBase
 {
 friend class Sprite;
 public:
