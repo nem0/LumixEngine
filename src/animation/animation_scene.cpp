@@ -85,6 +85,21 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	};
 
 
+	struct Animator
+	{
+		struct Key
+		{
+		
+		};
+
+		Animator(IAllocator& allocator)
+			: curves(allocator)
+		{}
+
+		Array<Key> curves;
+	};
+
+
 	struct Animable
 	{
 		float time;
