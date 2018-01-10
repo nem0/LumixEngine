@@ -1,6 +1,7 @@
 #include "animation_scene.h"
 
 #include "animation/animation.h"
+#include "animation/property_animation.h"
 #include "animation/controller.h"
 #include "engine/base_proxy_allocator.h"
 #include "engine/blob.h"
@@ -25,6 +26,7 @@ enum class AnimationSceneVersion
 
 
 static const ResourceType ANIMATION_TYPE("animation");
+static const ResourceType PROPERTY_ANIMATION_TYPE("property_animation");
 static const ResourceType CONTROLLER_RESOURCE_TYPE("anim_controller");
 
 
@@ -93,6 +95,7 @@ struct AnimationSystemImpl LUMIX_FINAL : public IPlugin
 	IAllocator& m_allocator;
 	Engine& m_engine;
 	AnimationManager m_animation_manager;
+	PropertyAnimationManager m_property_animation_manager;
 	Anim::ControllerManager m_controller_manager;
 
 };
@@ -102,9 +105,11 @@ AnimationSystemImpl::AnimationSystemImpl(Engine& engine)
 	: m_allocator(engine.getAllocator())
 	, m_engine(engine)
 	, m_animation_manager(m_allocator)
+	, m_property_animation_manager(m_allocator)
 	, m_controller_manager(m_allocator)
 {
 	m_animation_manager.create(ANIMATION_TYPE, m_engine.getResourceManager());
+	m_property_animation_manager.create(PROPERTY_ANIMATION_TYPE, m_engine.getResourceManager());
 	m_controller_manager.create(CONTROLLER_RESOURCE_TYPE, m_engine.getResourceManager());
 
 	using namespace Reflection;
@@ -135,6 +140,7 @@ AnimationSystemImpl::AnimationSystemImpl(Engine& engine)
 AnimationSystemImpl::~AnimationSystemImpl()
 {
 	m_animation_manager.destroy();
+	m_property_animation_manager.destroy();
 	m_controller_manager.destroy();
 }
 

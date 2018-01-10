@@ -1,6 +1,7 @@
 #include "animation/animation.h"
 #include "animation/animation_scene.h"
 #include "animation/controller.h"
+#include "animation/property_animation.h"
 #include "animation/editor/animation_editor.h"
 #include "editor/asset_browser.h"
 #include "editor/property_grid.h"
@@ -24,6 +25,7 @@ static const ComponentType ANIMABLE_TYPE = Reflection::getComponentType("animabl
 static const ComponentType CONTROLLER_TYPE = Reflection::getComponentType("anim_controller");
 static const ComponentType RENDERABLE_TYPE = Reflection::getComponentType("renderable");
 static const ResourceType ANIMATION_TYPE("animation");
+static const ResourceType PROPERTY_ANIMATION_TYPE("property_animation");
 static const ResourceType CONTROLLER_RESOURCE_TYPE("anim_controller");
 
 
@@ -31,10 +33,9 @@ namespace
 {
 
 
-struct AssetBrowserPlugin : AssetBrowser::IPlugin
+struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 {
-
-	explicit AssetBrowserPlugin(StudioApp& app)
+	explicit AnimationAssetBrowserPlugin(StudioApp& app)
 		: m_app(app)
 	{
 	}
@@ -78,6 +79,51 @@ struct AssetBrowserPlugin : AssetBrowser::IPlugin
 	ResourceType getResourceType(const char* ext) override
 	{
 		if (equalStrings(ext, "ani")) return ANIMATION_TYPE;
+		return INVALID_RESOURCE_TYPE;
+	}
+
+
+	StudioApp& m_app;
+};
+
+
+struct PropertyAnimationAssetBrowserPlugin : AssetBrowser::IPlugin
+{
+	explicit PropertyAnimationAssetBrowserPlugin(StudioApp& app)
+		: m_app(app)
+	{
+	}
+
+
+	bool acceptExtension(const char* ext, ResourceType type) const override
+	{
+		return type == PROPERTY_ANIMATION_TYPE && equalStrings(ext, "anp");
+	}
+
+
+	bool onGUI(Resource* resource, ResourceType type) override
+	{
+		if (type == PROPERTY_ANIMATION_TYPE)
+		{
+			auto* animation = static_cast<PropertyAnimation*>(resource);
+			return true;
+		}
+		return false;
+	}
+
+
+	void onResourceUnloaded(Resource* resource) override {}
+
+
+	const char* getName() const override { return "Property animation"; }
+
+
+	bool hasResourceManager(ResourceType type) const override { return type == PROPERTY_ANIMATION_TYPE; }
+
+
+	ResourceType getResourceType(const char* ext) override
+	{
+		if (equalStrings(ext, "anp")) return PROPERTY_ANIMATION_TYPE;
 		return INVALID_RESOURCE_TYPE;
 	}
 
@@ -213,8 +259,11 @@ LUMIX_STUDIO_ENTRY(animation)
 	app.registerComponent("shared_anim_controller", "Animation/Shared controller");
 
 	auto& allocator = app.getWorldEditor().getAllocator();
-	auto* ab_plugin = LUMIX_NEW(allocator, AssetBrowserPlugin)(app);
-	app.getAssetBrowser().addPlugin(*ab_plugin);
+	auto* anim_ab_plugin = LUMIX_NEW(allocator, AnimationAssetBrowserPlugin)(app);
+	app.getAssetBrowser().addPlugin(*anim_ab_plugin);
+
+	auto* prop_anim_ab_plugin = LUMIX_NEW(allocator, PropertyAnimationAssetBrowserPlugin)(app);
+	app.getAssetBrowser().addPlugin(*prop_anim_ab_plugin);
 
 	auto* anim_controller_ab_plugin = LUMIX_NEW(allocator, AnimControllerAssetBrowserPlugin)(app);
 	app.getAssetBrowser().addPlugin(*anim_controller_ab_plugin);
