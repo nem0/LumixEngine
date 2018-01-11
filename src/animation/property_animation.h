@@ -44,22 +44,19 @@ class PropertyAnimation LUMIX_FINAL : public Resource
 public:
 	struct Curve
 	{
+		Curve(IAllocator& allocator) : frames(allocator), values(allocator) {}
+
 		ComponentType cmp_type;
 		const Reflection::PropertyBase* property;
-	};
-
-	struct Key
-	{
-		int frame;
-		int curve;
-		float value;
+		
+		Array<int> frames;
+		Array<float> values;
 	};
 
 	PropertyAnimation(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
 
 	ResourceType getType() const override { return ResourceType("animation"); }
 
-	Array<Key> keys;
 	Array<Curve> curves;
 	int fps;
 

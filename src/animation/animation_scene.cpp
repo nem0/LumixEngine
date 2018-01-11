@@ -1025,36 +1025,36 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 
 	void updatePropertyAnimators(float time_delta)
 	{
-		/*PROFILE_FUNCTION();
-		for (int i = 0, n = m_property_animators.size(); i < n; ++i)
+		PROFILE_FUNCTION();
+		for (int anim_idx = 0, c = m_property_animators.size(); anim_idx < c; ++anim_idx)
 		{
-			Entity entity = m_property_animators.getKey(i);
-			PropertyAnimator& animator = m_property_animators.at(i);
+			Entity entity = m_property_animators.getKey(anim_idx);
+			PropertyAnimator& animator = m_property_animators.at(anim_idx);
 			const PropertyAnimation* animation = animator.animation;
 			if (!animation || !animation->isReady()) continue;
 
 			animator.time += time_delta;
 			int frame = int(animator.time * animation->fps + 0.5f);
-			if (frame > animation->keys.back().frame)
+			frame = frame % animation->curves[0].frames.back();
+			for (PropertyAnimation::Curve& curve : animation->curves)
 			{
-				frame = frame % animation->keys.back().frame;
-			}
-			for (int i = 1; i < animation->keys.size(); ++i)
-			{
-				if (frame <= animation->keys[i].frame)
+				for (int i = 1, n = curve.frames.size(); i < n; ++i)
 				{
-					float t = (frame - animation->keys[i - 1].frame) / float(animation->keys[i].frame - animation->keys[i - 1].frame);
-					float v = animation->keys[i].value * t + animation->keys[i - 1].value * (1 - t);
-					ComponentUID cmp;
-					cmp.type = animation->curves[0].cmp_type;
-					cmp.scene = m_universe.getScene(cmp.type);
-					cmp.handle = cmp.scene->getComponent(entity, cmp.type);
-					cmp.entity = entity;
-					animation->curves[0].property->setValue(cmp, -1, InputBlob(&v, sizeof(v)));
-					break;
+					if (frame <= curve.frames[i])
+					{
+						float t = (frame - curve.frames[i-1]) / float(curve.frames[i] - curve.frames[i - 1]);
+						float v = curve.values[i] * t + curve.values[i - 1] * (1 - t);
+						ComponentUID cmp;
+						cmp.type = curve.cmp_type;
+						cmp.scene = m_universe.getScene(cmp.type);
+						cmp.handle = cmp.scene->getComponent(entity, cmp.type);
+						cmp.entity = entity;
+						curve.property->setValue(cmp, -1, InputBlob(&v, sizeof(v)));
+						break;
+					}
 				}
 			}
-		}*/
+		}
 	}
 
 
