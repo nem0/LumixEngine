@@ -286,7 +286,7 @@ bool Material::save(JsonSerializer& serializer)
 }
 
 
-void Material::deserializeCustomFlags(JsonSerializer& serializer)
+void Material::deserializeCustomFlags(JsonDeserializer& serializer)
 {
 	m_custom_flags = 0;
 	serializer.deserializeArrayBegin();
@@ -300,7 +300,7 @@ void Material::deserializeCustomFlags(JsonSerializer& serializer)
 }
 
 
-void Material::deserializeDefines(JsonSerializer& serializer)
+void Material::deserializeDefines(JsonDeserializer& serializer)
 {
 	auto& renderer = static_cast<MaterialManager&>(m_resource_manager).getRenderer();
 	serializer.deserializeArrayBegin();
@@ -315,7 +315,7 @@ void Material::deserializeDefines(JsonSerializer& serializer)
 }
 
 
-void Material::deserializeUniforms(JsonSerializer& serializer)
+void Material::deserializeUniforms(JsonDeserializer& serializer)
 {
 	serializer.deserializeArrayBegin();
 	m_uniforms.clear();
@@ -633,7 +633,7 @@ bool Material::isTextureDefine(u8 define_idx) const
 	return false;
 }
 
-bool Material::deserializeTexture(JsonSerializer& serializer, const char* material_dir)
+bool Material::deserializeTexture(JsonDeserializer& serializer, const char* material_dir)
 {
 	char path[MAX_PATH_LENGTH];
 	serializer.deserializeObjectBegin();
@@ -780,7 +780,7 @@ bool Material::load(FS::IFile& file)
 	m_render_states = BGFX_STATE_CULL_CW;
 	setAlphaRef(DEFAULT_ALPHA_REF_VALUE);
 	m_uniforms.clear();
-	JsonSerializer serializer(file, JsonSerializer::READ, getPath(), m_allocator);
+	JsonDeserializer serializer(file, getPath(), m_allocator);
 	serializer.deserializeObjectBegin();
 	char label[256];
 	char material_dir[MAX_PATH_LENGTH];

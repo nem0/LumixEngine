@@ -243,7 +243,7 @@ struct BeginGroupCommand LUMIX_FINAL : IEditorCommand
 	bool execute() override { return true; }
 	void undo() override { ASSERT(false); }
 	void serialize(JsonSerializer& serializer) override {}
-	void deserialize(JsonSerializer& serializer) override {}
+	void deserialize(JsonDeserializer& serializer) override {}
 	bool merge(IEditorCommand& command) override { ASSERT(false); return false; }
 	const char* getType() override { return "begin_group"; }
 };
@@ -257,7 +257,7 @@ struct EndGroupCommand LUMIX_FINAL : IEditorCommand
 	bool execute() override { return true; }
 	void undo() override { ASSERT(false); }
 	void serialize(JsonSerializer& serializer) override {}
-	void deserialize(JsonSerializer& serializer) override {}
+	void deserialize(JsonDeserializer& serializer) override {}
 	bool merge(IEditorCommand& command) override { ASSERT(false); return false; }
 	const char* getType() override { return "end_group"; }
 
@@ -310,7 +310,7 @@ struct MoveAnimNodeCommand : IEditorCommand
 	}
 
 
-	void deserialize(JsonSerializer& serializer) override
+	void deserialize(JsonDeserializer& serializer) override
 	{
 		// TODO
 		ASSERT(false);
@@ -370,7 +370,7 @@ struct CreateAnimNodeCommand : IEditorCommand
 	}
 
 
-	void deserialize(JsonSerializer& serializer) override
+	void deserialize(JsonDeserializer& serializer) override
 	{
 		// TODO
 		ASSERT(false);
@@ -435,7 +435,7 @@ struct DestroyAnimEdgeCommand : IEditorCommand
 	}
 
 
-	void deserialize(JsonSerializer& serializer) override
+	void deserialize(JsonDeserializer& serializer) override
 	{
 		ASSERT(false);
 	}
@@ -505,7 +505,7 @@ struct DestroyNodeCommand : IEditorCommand
 	}
 
 
-	void deserialize(JsonSerializer& serializer) override
+	void deserialize(JsonDeserializer& serializer) override
 	{
 		// TODO
 		ASSERT(false);
@@ -560,7 +560,7 @@ struct CreateAnimEdgeCommand : IEditorCommand
 	}
 
 
-	void deserialize(JsonSerializer& serializer) override
+	void deserialize(JsonDeserializer& serializer) override
 	{
 		// TODO
 		ASSERT(false);

@@ -13,7 +13,7 @@ namespace Lumix
 class ErrorProxy
 {
 public:
-	explicit ErrorProxy(JsonSerializer& serializer)
+	explicit ErrorProxy(JsonDeserializer& serializer)
 		: m_log(g_log_error, "serializer", serializer.m_allocator)
 	{
 		serializer.m_is_error = true;
@@ -40,12 +40,17 @@ private:
 };
 
 
-JsonSerializer::JsonSerializer(FS::IFile& file,
-	AccessMode access_mode,
+JsonSerializer::JsonSerializer(FS::IFile& file, const Path& path)
+	: m_file(file)
+{
+	m_is_first_in_block = true;
+}
+
+
+JsonDeserializer::JsonDeserializer(FS::IFile& file,
 	const Path& path,
 	IAllocator& allocator)
 	: m_file(file)
-	, m_access_mode(access_mode)
 	, m_allocator(allocator)
 {
 	m_is_error = false;
@@ -53,35 +58,29 @@ JsonSerializer::JsonSerializer(FS::IFile& file,
 	m_is_first_in_block = true;
 	m_data = nullptr;
 	m_is_string_token = false;
-	if (m_access_mode == READ)
+	m_data_size = (int)file.size();
+	if (file.getBuffer() != nullptr)
 	{
-		m_data_size = (int)file.size();
-		if (file.getBuffer() != nullptr)
-		{
-			m_data = (const char*)file.getBuffer();
-			m_own_data = false;
-		}
-		else
-		{
-			int size = (int)m_file.size();
-			char* data = (char*)m_allocator.allocate(size);
-			m_own_data = true;
-			file.read(data, m_data_size);
-			m_data = data;
-		}
-		m_token = m_data;
-		m_token_size = 0;
-		deserializeToken();
+		m_data = (const char*)file.getBuffer();
+		m_own_data = false;
 	}
+	else
+	{
+		int size = (int)m_file.size();
+		char* data = (char*)m_allocator.allocate(size);
+		m_own_data = true;
+		file.read(data, m_data_size);
+		m_data = data;
+	}
+	m_token = m_data;
+	m_token_size = 0;
+	deserializeToken();
 }
 
 
-JsonSerializer::~JsonSerializer()
+JsonDeserializer::~JsonDeserializer()
 {
-	if (m_access_mode == READ && m_own_data)
-	{
-		m_allocator.deallocate((void*)m_data);
-	}
+	if (m_own_data) m_allocator.deallocate((void*)m_data);
 }
 
 
@@ -305,7 +304,7 @@ void JsonSerializer::serializeArrayItem(bool value)
 #pragma region deserialization
 
 
-bool JsonSerializer::isNextBoolean() const
+bool JsonDeserializer::isNextBoolean() const
 {
 	if (m_is_string_token) return false;
 	if (m_token_size == 4 && compareStringN(m_token, "true", 4) == 0) return true;
@@ -314,19 +313,19 @@ bool JsonSerializer::isNextBoolean() const
 }
 
 
-void JsonSerializer::deserialize(const char* label, Entity& value, Entity default_value)
+void JsonDeserializer::deserialize(const char* label, Entity& value, Entity default_value)
 {
 	deserialize(label, value.index, default_value.index);
 }
 
 
-void JsonSerializer::deserialize(const char* label, ComponentHandle& value, ComponentHandle default_value)
+void JsonDeserializer::deserialize(const char* label, ComponentHandle& value, ComponentHandle default_value)
 {
 	deserialize(label, value.index, default_value.index);
 }
 
 
-void JsonSerializer::deserialize(bool& value, bool default_value)
+void JsonDeserializer::deserialize(bool& value, bool default_value)
 {
 	value = !m_is_string_token ? m_token_size == 4 && (compareStringN(m_token, "true", 4) == 0)
 							   : default_value;
@@ -334,7 +333,7 @@ void JsonSerializer::deserialize(bool& value, bool default_value)
 }
 
 
-void JsonSerializer::deserialize(float& value, float default_value)
+void JsonDeserializer::deserialize(float& value, float default_value)
 {
 	if (!m_is_string_token)
 	{
@@ -348,7 +347,7 @@ void JsonSerializer::deserialize(float& value, float default_value)
 }
 
 
-void JsonSerializer::deserialize(i32& value, i32 default_value)
+void JsonDeserializer::deserialize(i32& value, i32 default_value)
 {
 	if (m_is_string_token || !fromCString(m_token, m_token_size, &value))
 	{
@@ -358,7 +357,7 @@ void JsonSerializer::deserialize(i32& value, i32 default_value)
 }
 
 
-void JsonSerializer::deserialize(const char* label, Path& value, const Path& default_value)
+void JsonDeserializer::deserialize(const char* label, Path& value, const Path& default_value)
 {
 	deserializeLabel(label);
 	if (!m_is_string_token)
@@ -377,7 +376,7 @@ void JsonSerializer::deserialize(const char* label, Path& value, const Path& def
 }
 
 
-void JsonSerializer::deserialize(Path& value, const Path& default_value)
+void JsonDeserializer::deserialize(Path& value, const Path& default_value)
 {
 	if (!m_is_string_token)
 	{
@@ -395,7 +394,7 @@ void JsonSerializer::deserialize(Path& value, const Path& default_value)
 }
 
 
-void JsonSerializer::deserialize(char* value, int max_length, const char* default_value)
+void JsonDeserializer::deserialize(char* value, int max_length, const char* default_value)
 {
 	if (!m_is_string_token)
 	{
@@ -411,7 +410,7 @@ void JsonSerializer::deserialize(char* value, int max_length, const char* defaul
 }
 
 
-void JsonSerializer::deserialize(const char* label, float& value, float default_value)
+void JsonDeserializer::deserialize(const char* label, float& value, float default_value)
 {
 	deserializeLabel(label);
 	if (!m_is_string_token)
@@ -426,7 +425,7 @@ void JsonSerializer::deserialize(const char* label, float& value, float default_
 }
 
 
-void JsonSerializer::deserialize(const char* label, u32& value, u32 default_value)
+void JsonDeserializer::deserialize(const char* label, u32& value, u32 default_value)
 {
 	deserializeLabel(label);
 	if (m_is_string_token || !fromCString(m_token, m_token_size, &value))
@@ -440,7 +439,7 @@ void JsonSerializer::deserialize(const char* label, u32& value, u32 default_valu
 }
 
 
-void JsonSerializer::deserialize(const char* label, u16& value, u16 default_value)
+void JsonDeserializer::deserialize(const char* label, u16& value, u16 default_value)
 {
 	deserializeLabel(label);
 	if (m_is_string_token || !fromCString(m_token, m_token_size, &value))
@@ -454,7 +453,7 @@ void JsonSerializer::deserialize(const char* label, u16& value, u16 default_valu
 }
 
 
-bool JsonSerializer::isObjectEnd()
+bool JsonDeserializer::isObjectEnd()
 {
 	if (m_token == m_data + m_data_size)
 	{
@@ -466,7 +465,7 @@ bool JsonSerializer::isObjectEnd()
 }
 
 
-void JsonSerializer::deserialize(const char* label, i32& value, i32 default_value)
+void JsonDeserializer::deserialize(const char* label, i32& value, i32 default_value)
 {
 	deserializeLabel(label);
 	if (m_is_string_token || !fromCString(m_token, m_token_size, &value))
@@ -477,7 +476,7 @@ void JsonSerializer::deserialize(const char* label, i32& value, i32 default_valu
 }
 
 
-void JsonSerializer::deserialize(const char* label,
+void JsonDeserializer::deserialize(const char* label,
 	char* value,
 	int max_length,
 	const char* default_value)
@@ -497,7 +496,7 @@ void JsonSerializer::deserialize(const char* label,
 }
 
 
-void JsonSerializer::deserializeArrayBegin(const char* label)
+void JsonDeserializer::deserializeArrayBegin(const char* label)
 {
 	deserializeLabel(label);
 	expectToken('[');
@@ -506,7 +505,7 @@ void JsonSerializer::deserializeArrayBegin(const char* label)
 }
 
 
-void JsonSerializer::expectToken(char expected_token)
+void JsonDeserializer::expectToken(char expected_token)
 {
 	if (m_is_string_token || m_token_size != 1 || m_token[0] != expected_token)
 	{
@@ -521,7 +520,7 @@ void JsonSerializer::expectToken(char expected_token)
 }
 
 
-void JsonSerializer::deserializeArrayBegin()
+void JsonDeserializer::deserializeArrayBegin()
 {
 	expectToken('[');
 	m_is_first_in_block = true;
@@ -529,7 +528,7 @@ void JsonSerializer::deserializeArrayBegin()
 }
 
 
-void JsonSerializer::deserializeRawString(char* buffer, int max_length)
+void JsonDeserializer::deserializeRawString(char* buffer, int max_length)
 {
 	int size = Math::minimum(max_length - 1, m_token_size);
 	copyMemory(buffer, m_token, size);
@@ -538,7 +537,7 @@ void JsonSerializer::deserializeRawString(char* buffer, int max_length)
 }
 
 
-void JsonSerializer::nextArrayItem()
+void JsonDeserializer::nextArrayItem()
 {
 	if (!m_is_first_in_block)
 	{
@@ -548,7 +547,7 @@ void JsonSerializer::nextArrayItem()
 }
 
 
-bool JsonSerializer::isArrayEnd()
+bool JsonDeserializer::isArrayEnd()
 {
 	if (m_token == m_data + m_data_size)
 	{
@@ -560,7 +559,7 @@ bool JsonSerializer::isArrayEnd()
 }
 
 
-void JsonSerializer::deserializeArrayEnd()
+void JsonDeserializer::deserializeArrayEnd()
 {
 	expectToken(']');
 	m_is_first_in_block = false;
@@ -568,7 +567,7 @@ void JsonSerializer::deserializeArrayEnd()
 }
 
 
-void JsonSerializer::deserializeArrayItem(char* value, int max_length, const char* default_value)
+void JsonDeserializer::deserializeArrayItem(char* value, int max_length, const char* default_value)
 {
 	deserializeArrayComma();
 	if (m_is_string_token)
@@ -589,19 +588,19 @@ void JsonSerializer::deserializeArrayItem(char* value, int max_length, const cha
 }
 
 
-void JsonSerializer::deserializeArrayItem(Entity& value, Entity default_value)
+void JsonDeserializer::deserializeArrayItem(Entity& value, Entity default_value)
 {
 	deserializeArrayItem(value.index, default_value.index);
 }
 
 
-void JsonSerializer::deserializeArrayItem(ComponentHandle& value, ComponentHandle default_value)
+void JsonDeserializer::deserializeArrayItem(ComponentHandle& value, ComponentHandle default_value)
 {
 	deserializeArrayItem(value.index, default_value.index);
 }
 
 
-void JsonSerializer::deserializeArrayItem(u32& value, u32 default_value)
+void JsonDeserializer::deserializeArrayItem(u32& value, u32 default_value)
 {
 	deserializeArrayComma();
 	if (m_is_string_token || !fromCString(m_token, m_token_size, &value))
@@ -612,7 +611,7 @@ void JsonSerializer::deserializeArrayItem(u32& value, u32 default_value)
 }
 
 
-void JsonSerializer::deserializeArrayItem(i32& value, i32 default_value)
+void JsonDeserializer::deserializeArrayItem(i32& value, i32 default_value)
 {
 	deserializeArrayComma();
 	if (m_is_string_token || !fromCString(m_token, m_token_size, &value))
@@ -623,7 +622,7 @@ void JsonSerializer::deserializeArrayItem(i32& value, i32 default_value)
 }
 
 
-void JsonSerializer::deserializeArrayItem(i64& value, i64 default_value)
+void JsonDeserializer::deserializeArrayItem(i64& value, i64 default_value)
 {
 	deserializeArrayComma();
 	if (m_is_string_token || !fromCString(m_token, m_token_size, &value))
@@ -634,7 +633,7 @@ void JsonSerializer::deserializeArrayItem(i64& value, i64 default_value)
 }
 
 
-void JsonSerializer::deserializeArrayItem(float& value, float default_value)
+void JsonDeserializer::deserializeArrayItem(float& value, float default_value)
 {
 	deserializeArrayComma();
 	if (m_is_string_token)
@@ -649,7 +648,7 @@ void JsonSerializer::deserializeArrayItem(float& value, float default_value)
 }
 
 
-void JsonSerializer::deserializeArrayItem(bool& value, bool default_value)
+void JsonDeserializer::deserializeArrayItem(bool& value, bool default_value)
 {
 	deserializeArrayComma();
 	if (m_is_string_token)
@@ -664,7 +663,7 @@ void JsonSerializer::deserializeArrayItem(bool& value, bool default_value)
 }
 
 
-void JsonSerializer::deserialize(const char* label, bool& value, bool default_value)
+void JsonDeserializer::deserialize(const char* label, bool& value, bool default_value)
 {
 	deserializeLabel(label);
 	if (!m_is_string_token)
@@ -685,7 +684,7 @@ static bool isDelimiter(char c)
 }
 
 
-void JsonSerializer::deserializeArrayComma()
+void JsonDeserializer::deserializeArrayComma()
 {
 	if (m_is_first_in_block)
 	{
@@ -706,7 +705,7 @@ static bool isSingleCharToken(char c)
 }
 
 
-void JsonSerializer::deserializeToken()
+void JsonDeserializer::deserializeToken()
 {
 	m_token += m_token_size;
 	if (m_is_string_token)
@@ -761,14 +760,14 @@ void JsonSerializer::deserializeToken()
 }
 
 
-void JsonSerializer::deserializeObjectBegin()
+void JsonDeserializer::deserializeObjectBegin()
 {
 	m_is_first_in_block = true;
 	expectToken('{');
 	deserializeToken();
 }
 
-void JsonSerializer::deserializeObjectEnd()
+void JsonDeserializer::deserializeObjectEnd()
 {
 	expectToken('}');
 	m_is_first_in_block = false;
@@ -776,7 +775,7 @@ void JsonSerializer::deserializeObjectEnd()
 }
 
 
-void JsonSerializer::deserializeLabel(char* label, int max_length)
+void JsonDeserializer::deserializeLabel(char* label, int max_length)
 {
 	if (!m_is_first_in_block)
 	{
@@ -821,7 +820,7 @@ void JsonSerializer::writeBlockComma()
 }
 
 
-void JsonSerializer::deserializeLabel(const char* label)
+void JsonDeserializer::deserializeLabel(const char* label)
 {
 	if (!m_is_first_in_block)
 	{
@@ -861,7 +860,7 @@ void JsonSerializer::deserializeLabel(const char* label)
 #pragma endregion
 
 
-float JsonSerializer::tokenToFloat()
+float JsonDeserializer::tokenToFloat()
 {
 	char tmp[64];
 	int size = Math::minimum((int)sizeof(tmp) - 1, m_token_size);
@@ -871,4 +870,4 @@ float JsonSerializer::tokenToFloat()
 }
 
 
-} // ~namespace Lumix
+} // namespace Lumix

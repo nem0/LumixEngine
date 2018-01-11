@@ -14,6 +14,7 @@ namespace FS
 	struct IFile;
 }
 
+class JsonDeserializer;
 class JsonSerializer;
 class ResourceManager;
 class Shader;
@@ -104,10 +105,10 @@ private:
 	void unload() override;
 	bool load(FS::IFile& file) override;
 
-	bool deserializeTexture(JsonSerializer& serializer, const char* material_dir);
-	void deserializeUniforms(JsonSerializer& serializer);
-	void deserializeDefines(JsonSerializer& serializer);
-	void deserializeCustomFlags(JsonSerializer& serializer);
+	bool deserializeTexture(JsonDeserializer& serializer, const char* material_dir);
+	void deserializeUniforms(JsonDeserializer& serializer);
+	void deserializeDefines(JsonDeserializer& serializer);
+	void deserializeCustomFlags(JsonDeserializer& serializer);
 
 private:
 	static const int MAX_TEXTURE_COUNT = 16;

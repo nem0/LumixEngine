@@ -129,7 +129,7 @@ struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		}
 
 		auto& allocator = m_app.getWorldEditor().getAllocator();
-		JsonSerializer serializer(*file, JsonSerializer::AccessMode::WRITE, material->getPath(), allocator);
+		JsonSerializer serializer(*file, material->getPath());
 		if (!material->save(serializer))
 		{
 			g_log_error.log("Editor") << "Could not save file " << material->getPath().c_str();

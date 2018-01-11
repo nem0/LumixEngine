@@ -64,7 +64,7 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		void serialize(JsonSerializer& serializer) override { serializer.serialize("component", cmp); }
 
 
-		void deserialize(JsonSerializer& serializer) override
+		void deserialize(JsonDeserializer& serializer) override
 		{
 			serializer.deserialize("component", cmp, INVALID_COMPONENT);
 		}
@@ -125,7 +125,7 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		}
 
 
-		void deserialize(JsonSerializer& serializer) override
+		void deserialize(JsonDeserializer& serializer) override
 		{
 			serializer.deserialize("component", cmp, INVALID_COMPONENT);
 			serializer.deserialize("scr_index", scr_index, 0);
@@ -190,7 +190,7 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		}
 
 
-		void deserialize(JsonSerializer& serializer) override
+		void deserialize(JsonDeserializer& serializer) override
 		{
 			serializer.deserialize("component", cmp, INVALID_COMPONENT);
 			serializer.deserialize("scr_index", scr_index, 0);
@@ -288,7 +288,7 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		}
 
 
-		void deserialize(JsonSerializer& serializer) override
+		void deserialize(JsonDeserializer& serializer) override
 		{
 			serializer.deserialize("component", component, INVALID_COMPONENT);
 			serializer.deserialize("script_index", script_index, 0);

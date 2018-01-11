@@ -1049,7 +1049,8 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 						cmp.scene = m_universe.getScene(cmp.type);
 						cmp.handle = cmp.scene->getComponent(entity, cmp.type);
 						cmp.entity = entity;
-						curve.property->setValue(cmp, -1, InputBlob(&v, sizeof(v)));
+						InputBlob blob(&v, sizeof(v));
+						curve.property->setValue(cmp, -1, blob);
 						break;
 					}
 				}

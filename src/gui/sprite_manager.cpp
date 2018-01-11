@@ -51,7 +51,7 @@ bool Sprite::load(FS::IFile& file)
 {
 	auto& manager = (SpriteManager&)getResourceManager();
 	IAllocator& allocator = manager.m_allocator;
-	JsonSerializer serializer(file, JsonSerializer::READ, getPath(), allocator);
+	JsonDeserializer serializer(file, getPath(), allocator);
 	serializer.deserializeObjectBegin();
 	while (!serializer.isObjectEnd())
 	{
