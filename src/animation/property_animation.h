@@ -41,34 +41,33 @@ private:
 
 class PropertyAnimation LUMIX_FINAL : public Resource
 {
-	public:
-		PropertyAnimation(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
+public:
+	struct Curve
+	{
+		ComponentType cmp_type;
+		const Reflection::PropertyBase* property;
+	};
 
-		ResourceType getType() const override { return ResourceType("animation"); }
+	struct Key
+	{
+		int frame;
+		int curve;
+		float value;
+	};
 
-	private:
-		IAllocator& getAllocator() const;
+	PropertyAnimation(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
 
-		void unload() override;
-		bool load(FS::IFile& file) override;
+	ResourceType getType() const override { return ResourceType("animation"); }
 
-	private:
-		struct Curve
-		{
-			ComponentType cmp_type;
-			const Reflection::PropertyBase* property;
-		};
+	Array<Key> keys;
+	Array<Curve> curves;
+	int fps;
 
-		struct Key
-		{
-			int frame;
-			int curve;
-			float value;
-		};
+private:
+	IAllocator& getAllocator() const;
 
-		Array<Key> m_keys;
-		Array<Curve> m_curves;
-		int m_fps;
+	void unload() override;
+	bool load(FS::IFile& file) override;
 };
 
 

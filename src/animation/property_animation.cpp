@@ -24,9 +24,9 @@ void PropertyAnimationManager::destroyResource(Resource& resource)
 
 PropertyAnimation::PropertyAnimation(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator)
 	: Resource(path, resource_manager, allocator)
-	, m_fps(30)
-	, m_curves(allocator)
-	, m_keys(allocator)
+	, fps(30)
+	, curves(allocator)
+	, keys(allocator)
 {
 }
 
@@ -48,7 +48,8 @@ bool PropertyAnimation::load(FS::IFile& file)
 			serializer.deserializeArrayBegin();
 			while (!serializer.isArrayEnd())
 			{
-				Curve& curve = m_curves.emplace();
+				serializer.nextArrayItem();
+				Curve& curve = curves.emplace();
 				serializer.deserializeObjectBegin();
 				u32 prop_hash = 0;
 				while (!serializer.isObjectEnd())
@@ -80,7 +81,9 @@ bool PropertyAnimation::load(FS::IFile& file)
 			serializer.deserializeArrayBegin();
 			while (!serializer.isArrayEnd())
 			{
-				Key& key = m_keys.emplace();
+				serializer.nextArrayItem();
+				Key& key = keys.emplace();
+				serializer.deserializeObjectBegin();
 				while (!serializer.isObjectEnd())
 				{
 					serializer.deserializeLabel(tmp, lengthOf(tmp));
@@ -104,7 +107,7 @@ bool PropertyAnimation::load(FS::IFile& file)
 				}
 				serializer.deserializeObjectEnd();
 			}
-			serializer.deserializeObjectEnd();
+			serializer.deserializeArrayEnd();
 		}
 		else
 		{
@@ -116,16 +119,16 @@ bool PropertyAnimation::load(FS::IFile& file)
 	return true;
 	
 	fail:
-		m_curves.clear();
-		m_keys.clear();
+		curves.clear();
+		keys.clear();
 		return false;
 }
 
 
 void PropertyAnimation::unload()
 {
-	m_curves.clear();
-	m_keys.clear();
+	curves.clear();
+	keys.clear();
 }
 
 

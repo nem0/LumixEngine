@@ -3,6 +3,7 @@
 #include "animation/animation.h"
 #include "animation/controller.h"
 #include "animation/events.h"
+#include "animation/property_animation.h"
 #include "engine/base_proxy_allocator.h"
 #include "engine/blob.h"
 #include "engine/crc32.h"
@@ -28,14 +29,17 @@ namespace Lumix
 enum class AnimationSceneVersion
 {
 	SHARED_CONTROLLER,
+	PROPERTY_ANIMATOR,
 
 	LATEST
 };
 
 
 static const ComponentType ANIMABLE_TYPE = Reflection::getComponentType("animable");
+static const ComponentType PROPERTY_ANIMATOR_TYPE = Reflection::getComponentType("property_animator");
 static const ComponentType CONTROLLER_TYPE = Reflection::getComponentType("anim_controller");
 static const ComponentType SHARED_CONTROLLER_TYPE = Reflection::getComponentType("shared_anim_controller");
+static const ResourceType PROPERTY_ANIMATION_TYPE("property_animation");
 static const ResourceType ANIMATION_TYPE("animation");
 static const ResourceType CONTROLLER_RESOURCE_TYPE("anim_controller");
 
@@ -85,18 +89,28 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	};
 
 
-	struct Animator
+	struct PropertyAnimator
 	{
 		struct Key
 		{
-		
+			int frame0;
+			int frame1;
+			float value0;
+			float value1;
 		};
 
-		Animator(IAllocator& allocator)
-			: curves(allocator)
-		{}
+		enum Flags
+		{
+			LOOPED = 1 << 0
+		};
 
-		Array<Key> curves;
+		PropertyAnimator(IAllocator& allocator) : keys(allocator) {}
+
+		PropertyAnimation* animation;
+		Array<Key> keys;
+
+		FlagSet<Flags, u32> flags;
+		float time;
 	};
 
 
@@ -115,6 +129,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		, m_engine(engine)
 		, m_anim_system(anim_system)
 		, m_animables(allocator)
+		, m_property_animators(allocator)
 		, m_controllers(allocator)
 		, m_shared_controllers(allocator)
 		, m_event_stream(allocator)
@@ -122,6 +137,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	{
 		m_is_game_running = false;
 		m_render_scene = static_cast<RenderScene*>(universe.getScene(crc32("renderer")));
+		universe.registerComponentType(PROPERTY_ANIMATOR_TYPE, this, &AnimationSceneImpl::serializePropertyAnimator, &AnimationSceneImpl::deserializePropertyAnimator);
 		universe.registerComponentType(ANIMABLE_TYPE, this, &AnimationSceneImpl::serializeAnimable, &AnimationSceneImpl::deserializeAnimable);
 		universe.registerComponentType(CONTROLLER_TYPE, this, &AnimationSceneImpl::serializeController, &AnimationSceneImpl::deserializeController);
 		universe.registerComponentType(SHARED_CONTROLLER_TYPE, this, &AnimationSceneImpl::serializeSharedController, &AnimationSceneImpl::deserializeSharedController);
@@ -142,6 +158,27 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		serializer.read(&parent);
 		m_shared_controllers.insert(entity, {entity, parent});
 		m_universe.addComponent(entity, SHARED_CONTROLLER_TYPE, this, {entity.index});
+	}
+
+
+	void serializePropertyAnimator(ISerializer& serializer, ComponentHandle cmp)
+	{
+		int idx = m_property_animators.find({ cmp.index });
+		PropertyAnimator& animator = m_property_animators.at(idx);
+		serializer.write("animation", animator.animation ? animator.animation->getPath().c_str() : "");
+		serializer.write("flags", animator.flags.base);
+	}
+		
+
+	void deserializePropertyAnimator(IDeserializer& serializer, Entity entity, int /*scene_version*/)
+	{
+		PropertyAnimator& animator = m_property_animators.emplace(entity, m_allocator);
+		animator.time = 0;
+		char tmp[MAX_PATH_LENGTH];
+		serializer.read(tmp, lengthOf(tmp));
+		animator.animation = loadPropertyAnimation(Path(tmp));
+		serializer.read(&animator.flags.base);
+		m_universe.addComponent(entity, PROPERTY_ANIMATOR_TYPE, this, {entity.index});
 	}
 
 
@@ -203,15 +240,21 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 
 	void clear() override
 	{
+		for (PropertyAnimator& anim : m_property_animators)
+		{
+			unloadResource(anim.animation);
+		}
+		m_property_animators.clear();
+
 		for (Animable& animable : m_animables)
 		{
-			unloadAnimation(animable.animation);
+			unloadResource(animable.animation);
 		}
 		m_animables.clear();
 
 		for (Controller& controller : m_controllers)
 		{
-			unloadController(controller.resource);
+			unloadResource(controller.resource);
 			setControllerResource(controller, nullptr);
 		}
 		m_controllers.clear();
@@ -374,6 +417,11 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 			if (m_animables.find(entity) < 0) return INVALID_COMPONENT;
 			return {entity.index};
 		}
+		else if (type == PROPERTY_ANIMATOR_TYPE)
+		{
+			if (m_property_animators.find(entity) < 0) return INVALID_COMPONENT;
+			return {entity.index};
+		}
 		else if (type == CONTROLLER_TYPE)
 		{
 			if (m_controllers.find(entity) < 0) return INVALID_COMPONENT;
@@ -390,6 +438,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 
 	ComponentHandle createComponent(ComponentType type, Entity entity) override
 	{
+		if (type == PROPERTY_ANIMATOR_TYPE) return createPropertyAnimator(entity);
 		if (type == ANIMABLE_TYPE) return createAnimable(entity);
 		if (type == CONTROLLER_TYPE) return createController(entity);
 		if (type == SHARED_CONTROLLER_TYPE) return createSharedController(entity);
@@ -397,15 +446,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
-	static void unloadAnimation(Animation* animation)
-	{
-		if (!animation) return;
-
-		animation->getResourceManager().unload(*animation);
-	}
-
-
-	static void unloadController(Anim::ControllerResource* res)
+	static void unloadResource(Resource* res)
 	{
 		if (!res) return;
 
@@ -458,15 +499,24 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		{
 			Entity entity = {component.index};
 			auto& animable = m_animables[entity];
-			unloadAnimation(animable.animation);
+			unloadResource(animable.animation);
 			m_animables.erase(entity);
+			m_universe.destroyComponent(entity, type, this, component);
+		}
+		else if (type == PROPERTY_ANIMATOR_TYPE)
+		{
+			Entity entity = {component.index};
+			int idx = m_property_animators.find(entity);
+			auto& animator = m_property_animators.at(idx);
+			unloadResource(animator.animation);
+			m_property_animators.erase(entity);
 			m_universe.destroyComponent(entity, type, this, component);
 		}
 		else if (type == CONTROLLER_TYPE)
 		{
 			Entity entity = {component.index};
 			auto& controller = m_controllers.get(entity);
-			unloadController(controller.resource);
+			unloadResource(controller.resource);
 			setControllerResource(controller, nullptr);
 			m_controllers.erase(entity);
 			m_universe.destroyComponent(entity, type, this, component);
@@ -489,6 +539,16 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 			serializer.write(animable.time_scale);
 			serializer.write(animable.start_time);
 			serializer.writeString(animable.animation ? animable.animation->getPath().c_str() : "");
+		}
+
+		serializer.write((i32)m_property_animators.size());
+		for (int i = 0, n = m_property_animators.size(); i < n; ++i)
+		{
+			const PropertyAnimator& animator = m_property_animators.at(i);
+			Entity entity = m_property_animators.getKey(i);
+			serializer.write(entity);
+			serializer.writeString(animator.animation ? animator.animation->getPath().c_str() : "");
+			serializer.write(animator.flags.base);
 		}
 
 		serializer.write(m_controllers.size());
@@ -528,6 +588,24 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 			ComponentHandle cmp = {animable.entity.index};
 			m_universe.addComponent(animable.entity, ANIMABLE_TYPE, this, cmp);
 		}
+
+		serializer.read(count);
+		m_property_animators.reserve(count);
+		for (int i = 0; i < count; ++i)
+		{
+			Entity entity;
+			serializer.read(entity);
+
+			PropertyAnimator& animator = m_property_animators.emplace(entity, m_allocator);
+			char path[MAX_PATH_LENGTH];
+			serializer.readString(path, sizeof(path));
+			serializer.read(animator.flags.base);
+			animator.time = 0;
+			animator.animation = loadPropertyAnimation(Path(path));
+			ComponentHandle cmp = { entity.index };
+			m_universe.addComponent(entity, PROPERTY_ANIMATOR_TYPE, this, cmp);
+		}
+
 
 		serializer.read(count);
 		m_controllers.reserve(count);
@@ -576,7 +654,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	void setControllerSource(ComponentHandle cmp, const Path& path) override
 	{
 		auto& controller = m_controllers.get({cmp.index});
-		unloadController(controller.resource);
+		unloadResource(controller.resource);
 		setControllerResource(controller, loadController(path));
 		if (controller.resource->isReady() && m_is_game_running)
 		{
@@ -592,6 +670,29 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
+	PropertyAnimator& getPropertyAnimator(ComponentHandle cmp)
+	{
+		int idx = m_property_animators.find({ cmp.index });
+		return m_property_animators.at(idx);
+	}
+
+
+	Path getPropertyAnimation(ComponentHandle cmp) override
+	{
+		const auto& animator =  getPropertyAnimator(cmp);
+		return animator.animation ? animator.animation->getPath() : Path("");
+	}
+	
+	
+	void setPropertyAnimation(ComponentHandle cmp, const Path& path) override
+	{
+		auto& animator = getPropertyAnimator(cmp);
+		animator.time = 0;
+		unloadResource(animator.animation);
+		animator.animation = loadPropertyAnimation(path);
+	}
+
+
 	Path getAnimation(ComponentHandle cmp) override
 	{
 		const auto& animable = m_animables[{cmp.index}];
@@ -602,7 +703,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	void setAnimation(ComponentHandle cmp, const Path& path) override
 	{
 		auto& animable = m_animables[{cmp.index}];
-		unloadAnimation(animable.animation);
+		unloadResource(animable.animation);
 		animable.animation = loadAnimation(path);
 		animable.time = 0;
 	}
@@ -922,8 +1023,44 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
+	void updatePropertyAnimators(float time_delta)
+	{
+		/*PROFILE_FUNCTION();
+		for (int i = 0, n = m_property_animators.size(); i < n; ++i)
+		{
+			Entity entity = m_property_animators.getKey(i);
+			PropertyAnimator& animator = m_property_animators.at(i);
+			const PropertyAnimation* animation = animator.animation;
+			if (!animation || !animation->isReady()) continue;
+
+			animator.time += time_delta;
+			int frame = int(animator.time * animation->fps + 0.5f);
+			if (frame > animation->keys.back().frame)
+			{
+				frame = frame % animation->keys.back().frame;
+			}
+			for (int i = 1; i < animation->keys.size(); ++i)
+			{
+				if (frame <= animation->keys[i].frame)
+				{
+					float t = (frame - animation->keys[i - 1].frame) / float(animation->keys[i].frame - animation->keys[i - 1].frame);
+					float v = animation->keys[i].value * t + animation->keys[i - 1].value * (1 - t);
+					ComponentUID cmp;
+					cmp.type = animation->curves[0].cmp_type;
+					cmp.scene = m_universe.getScene(cmp.type);
+					cmp.handle = cmp.scene->getComponent(entity, cmp.type);
+					cmp.entity = entity;
+					animation->curves[0].property->setValue(cmp, -1, InputBlob(&v, sizeof(v)));
+					break;
+				}
+			}
+		}*/
+	}
+
+
 	void updateAnimables(float time_delta)
 	{
+		PROFILE_FUNCTION();
 		if (m_animables.size() == 0) return;
 
 		JobSystem::JobDecl jobs[16];
@@ -960,6 +1097,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		m_event_stream.clear();
 
 		updateAnimables(time_delta);
+		updatePropertyAnimators(time_delta);
 
 		for (Controller& controller : m_controllers)
 		{
@@ -1013,6 +1151,14 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
+	PropertyAnimation* loadPropertyAnimation(const Path& path) const
+	{
+		if (!path.isValid()) return nullptr;
+		ResourceManager& rm = m_engine.getResourceManager();
+		return static_cast<PropertyAnimation*>(rm.get(PROPERTY_ANIMATION_TYPE)->load(path));
+	}
+
+
 	Animation* loadAnimation(const Path& path) const
 	{
 		ResourceManager& rm = m_engine.getResourceManager();
@@ -1024,6 +1170,17 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	{
 		ResourceManager& rm = m_engine.getResourceManager();
 		return static_cast<Anim::ControllerResource*>(rm.get(CONTROLLER_RESOURCE_TYPE)->load(path));
+	}
+
+
+	ComponentHandle createPropertyAnimator(Entity entity)
+	{
+		PropertyAnimator& animator = m_property_animators.emplace(entity, m_allocator);
+		animator.animation = nullptr;
+		animator.time = 0;
+		ComponentHandle cmp = { entity.index };
+		m_universe.addComponent(entity, PROPERTY_ANIMATOR_TYPE, this, cmp);
+		return cmp;
 	}
 
 
@@ -1069,6 +1226,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	IPlugin& m_anim_system;
 	Engine& m_engine;
 	AssociativeArray<Entity, Animable> m_animables;
+	AssociativeArray<Entity, PropertyAnimator> m_property_animators;
 	AssociativeArray<Entity, Controller> m_controllers;
 	AssociativeArray<Entity, SharedController> m_shared_controllers;
 	RenderScene* m_render_scene;

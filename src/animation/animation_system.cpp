@@ -114,6 +114,10 @@ AnimationSystemImpl::AnimationSystemImpl(Engine& engine)
 
 	using namespace Reflection;
 	static auto anim_scene = scene("animation",
+		component("property_animator", 
+			property("Animation", LUMIX_PROP(AnimationScene, getPropertyAnimation, setPropertyAnimation),
+				ResourceAttribute("Property animation (*.anp)", PROPERTY_ANIMATION_TYPE))
+		),
 		component("anim_controller",
 			property("Source", LUMIX_PROP(AnimationScene, getControllerSource, setControllerSource),
 				ResourceAttribute("Animation controller (*.act)", CONTROLLER_RESOURCE_TYPE)),

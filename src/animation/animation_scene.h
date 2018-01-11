@@ -29,6 +29,8 @@ struct AnimationScene : public IScene
 	static void registerLuaAPI(lua_State* L);
 
 	virtual const OutputBlob& getEventStream() const = 0;
+	virtual Path getPropertyAnimation(ComponentHandle cmp) = 0;
+	virtual void setPropertyAnimation(ComponentHandle cmp, const Path& path) = 0;
 	virtual class Animation* getAnimableAnimation(ComponentHandle cmp) = 0;
 	virtual Path getAnimation(ComponentHandle cmp) = 0;
 	virtual void setAnimation(ComponentHandle cmp, const Path& path) = 0;
