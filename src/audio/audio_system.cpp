@@ -14,9 +14,6 @@ namespace Lumix
 {
 
 
-static const ResourceType CLIP_TYPE("clip");
-
-
 static void registerProperties(IAllocator& allocator)
 {
 	using namespace Reflection;
@@ -52,7 +49,7 @@ struct AudioSystemImpl LUMIX_FINAL : public AudioSystem
 		registerProperties(engine.getAllocator());
 		AudioScene::registerLuaAPI(m_engine.getState());
 		m_device = AudioDevice::create(m_engine);
-		m_manager.create(CLIP_TYPE, m_engine.getResourceManager());
+		m_manager.create(Clip::TYPE, m_engine.getResourceManager());
 	}
 
 

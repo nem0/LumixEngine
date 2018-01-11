@@ -10,9 +10,6 @@ namespace Lumix
 {
 
 
-static const ResourceType ANIMATION_TYPE("animation");
-
-
 namespace Anim
 {
 
@@ -24,6 +21,9 @@ struct Header
 	int version = (int)ControllerResource::Version::LAST;
 	u32 reserved[4] = {0};
 };
+
+
+const ResourceType ControllerResource::TYPE("anim_controller");
 
 
 ControllerResource::ControllerResource(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator)
@@ -122,7 +122,7 @@ bool ControllerResource::deserialize(InputBlob& blob, int& version)
 	}
 
 	clearAnimationSets();
-	auto* manager = m_resource_manager.getOwner().get(ANIMATION_TYPE);
+	auto* manager = m_resource_manager.getOwner().get(Animation::TYPE);
 
 	int count = blob.read<int>();
 	m_animation_set.reserve(count);

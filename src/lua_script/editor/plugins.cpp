@@ -29,7 +29,6 @@ using namespace Lumix;
 
 
 static const ComponentType LUA_SCRIPT_TYPE = Reflection::getComponentType("lua_script");
-static const ResourceType LUA_SCRIPT_RESOURCE_TYPE("lua_script");
 
 
 namespace
@@ -404,7 +403,7 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 				}
 
 				if (m_app.getAssetBrowser().resourceInput(
-						"Source", "src", buf, lengthOf(buf), LUA_SCRIPT_RESOURCE_TYPE))
+						"Source", "src", buf, lengthOf(buf), LuaScript::TYPE))
 				{
 					auto* cmd = LUMIX_NEW(allocator, SetPropertyCommand)(editor, cmp.handle, j, "-source", buf, allocator);
 					editor.executeCommand(cmd);
@@ -502,13 +501,13 @@ struct AssetBrowserPlugin : AssetBrowser::IPlugin
 
 	bool acceptExtension(const char* ext, ResourceType type) const override
 	{
-		return type == LUA_SCRIPT_RESOURCE_TYPE && equalStrings(".lua", ext);
+		return type == LuaScript::TYPE && equalStrings(".lua", ext);
 	}
 
 
 	bool onGUI(Resource* resource, ResourceType type) override
 	{
-		if (type != LUA_SCRIPT_RESOURCE_TYPE) return false;
+		if (type != LuaScript::TYPE) return false;
 
 		auto* script = static_cast<LuaScript*>(resource);
 
@@ -542,7 +541,7 @@ struct AssetBrowserPlugin : AssetBrowser::IPlugin
 
 	ResourceType getResourceType(const char* ext) override
 	{
-		if (equalStrings(ext, "lua")) return LUA_SCRIPT_RESOURCE_TYPE;
+		if (equalStrings(ext, "lua")) return LuaScript::TYPE;
 		return INVALID_RESOURCE_TYPE;
 	}
 
@@ -551,12 +550,12 @@ struct AssetBrowserPlugin : AssetBrowser::IPlugin
 	const char* getName() const override { return "Lua Script"; }
 
 
-	bool hasResourceManager(ResourceType type) const override { return type == LUA_SCRIPT_RESOURCE_TYPE; }
+	bool hasResourceManager(ResourceType type) const override { return type == LuaScript::TYPE; }
 
 
 	bool createTile(const char* in_path, const char* out_path, ResourceType type) override
 	{
-		if (type == LUA_SCRIPT_RESOURCE_TYPE)
+		if (type == LuaScript::TYPE)
 		{
 			return copyFile("models/editor/tile_lua_script.dds", out_path);
 		}
@@ -843,7 +842,7 @@ struct AddComponentPlugin LUMIX_FINAL : public StudioApp::IAddComponentPlugin
 		}
 		bool create_empty = ImGui::Selectable("Empty", false);
 
-		if (asset_browser.resourceList(buf, lengthOf(buf), LUA_SCRIPT_RESOURCE_TYPE, 0) || create_empty || new_created)
+		if (asset_browser.resourceList(buf, lengthOf(buf), LuaScript::TYPE, 0) || create_empty || new_created)
 		{
 			WorldEditor& editor = app.getWorldEditor();
 			if (create_entity)

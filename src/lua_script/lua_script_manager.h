@@ -16,11 +16,13 @@ public:
 	LuaScript(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
 	virtual ~LuaScript();
 
-	ResourceType getType() const override { return ResourceType("lua_script"); }
+	ResourceType getType() const override { return TYPE; }
 
 	void unload() override;
 	bool load(FS::IFile& file) override;
 	const char* getSourceCode() const { return m_source_code.c_str(); }
+
+	static const ResourceType TYPE;
 
 private:
 	string m_source_code;

@@ -24,7 +24,6 @@ namespace Lumix
 
 
 	static const ComponentType LUA_SCRIPT_TYPE = Reflection::getComponentType("lua_script");
-	static const ResourceType LUA_SCRIPT_RESOURCE_TYPE("lua_script");
 
 
 	enum class LuaSceneVersion : int
@@ -1788,7 +1787,7 @@ namespace Lumix
 		, m_allocator(engine.getAllocator())
 		, m_script_manager(m_allocator)
 	{
-		m_script_manager.create(LUA_SCRIPT_RESOURCE_TYPE, engine.getResourceManager());
+		m_script_manager.create(LuaScript::TYPE, engine.getResourceManager());
 
 		using namespace Reflection;
 		static auto lua_scene = scene("lua_script",

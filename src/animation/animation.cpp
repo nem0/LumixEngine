@@ -37,6 +37,9 @@ void AnimationManager::destroyResource(Resource& resource)
 }
 
 
+const ResourceType Animation::TYPE("animation");
+
+
 Animation::Animation(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator)
 	: Resource(path, resource_manager, allocator)
 	, m_frame_count(0)

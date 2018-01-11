@@ -39,9 +39,6 @@ static const ComponentType ANIMABLE_TYPE = Reflection::getComponentType("animabl
 static const ComponentType PROPERTY_ANIMATOR_TYPE = Reflection::getComponentType("property_animator");
 static const ComponentType CONTROLLER_TYPE = Reflection::getComponentType("anim_controller");
 static const ComponentType SHARED_CONTROLLER_TYPE = Reflection::getComponentType("shared_anim_controller");
-static const ResourceType PROPERTY_ANIMATION_TYPE("property_animation");
-static const ResourceType ANIMATION_TYPE("animation");
-static const ResourceType CONTROLLER_RESOURCE_TYPE("anim_controller");
 
 
 namespace FS
@@ -199,7 +196,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		serializer.read(&animable.start_time);
 		char tmp[MAX_PATH_LENGTH];
 		serializer.read(tmp, lengthOf(tmp));
-		auto* res = tmp[0] ? m_engine.getResourceManager().get(ANIMATION_TYPE)->load(Path(tmp)) : nullptr;
+		auto* res = tmp[0] ? m_engine.getResourceManager().get(Animation::TYPE)->load(Path(tmp)) : nullptr;
 		animable.animation = (Animation*)res;
 		m_universe.addComponent(entity, ANIMABLE_TYPE, this, {entity.index});
 	}
@@ -226,7 +223,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		{
 			serializer.read(&controller.default_set);
 		}
-		auto* res = tmp[0] ? m_engine.getResourceManager().get(CONTROLLER_RESOURCE_TYPE)->load(Path(tmp)) : nullptr;
+		auto* res = tmp[0] ? m_engine.getResourceManager().get(Anim::ControllerResource::TYPE)->load(Path(tmp)) : nullptr;
 		setControllerResource(controller, (Anim::ControllerResource*)res);
 		m_universe.addComponent(entity, CONTROLLER_TYPE, this, {entity.index});
 	}
@@ -1156,21 +1153,21 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	{
 		if (!path.isValid()) return nullptr;
 		ResourceManager& rm = m_engine.getResourceManager();
-		return static_cast<PropertyAnimation*>(rm.get(PROPERTY_ANIMATION_TYPE)->load(path));
+		return static_cast<PropertyAnimation*>(rm.get(PropertyAnimation::TYPE)->load(path));
 	}
 
 
 	Animation* loadAnimation(const Path& path) const
 	{
 		ResourceManager& rm = m_engine.getResourceManager();
-		return static_cast<Animation*>(rm.get(ANIMATION_TYPE)->load(path));
+		return static_cast<Animation*>(rm.get(Animation::TYPE)->load(path));
 	}
 
 
 	Anim::ControllerResource* loadController(const Path& path) const
 	{
 		ResourceManager& rm = m_engine.getResourceManager();
-		return static_cast<Anim::ControllerResource*>(rm.get(CONTROLLER_RESOURCE_TYPE)->load(path));
+		return static_cast<Anim::ControllerResource*>(rm.get(Anim::ControllerResource::TYPE)->load(path));
 	}
 
 

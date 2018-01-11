@@ -25,11 +25,6 @@ enum class AnimationSceneVersion
 };
 
 
-static const ResourceType ANIMATION_TYPE("animation");
-static const ResourceType PROPERTY_ANIMATION_TYPE("property_animation");
-static const ResourceType CONTROLLER_RESOURCE_TYPE("anim_controller");
-
-
 struct AnimSetProperty : public Reflection::IEnumProperty
 {
 	AnimSetProperty() { name = "Default set"; }
@@ -108,24 +103,24 @@ AnimationSystemImpl::AnimationSystemImpl(Engine& engine)
 	, m_property_animation_manager(m_allocator)
 	, m_controller_manager(m_allocator)
 {
-	m_animation_manager.create(ANIMATION_TYPE, m_engine.getResourceManager());
-	m_property_animation_manager.create(PROPERTY_ANIMATION_TYPE, m_engine.getResourceManager());
-	m_controller_manager.create(CONTROLLER_RESOURCE_TYPE, m_engine.getResourceManager());
+	m_animation_manager.create(Animation::TYPE, m_engine.getResourceManager());
+	m_property_animation_manager.create(PropertyAnimation::TYPE, m_engine.getResourceManager());
+	m_controller_manager.create(Anim::ControllerResource::TYPE, m_engine.getResourceManager());
 
 	using namespace Reflection;
 	static auto anim_scene = scene("animation",
 		component("property_animator", 
 			property("Animation", LUMIX_PROP(AnimationScene, PropertyAnimation),
-				ResourceAttribute("Property animation (*.anp)", PROPERTY_ANIMATION_TYPE))
+				ResourceAttribute("Property animation (*.anp)", PropertyAnimation::TYPE))
 		),
 		component("anim_controller",
 			property("Source", LUMIX_PROP(AnimationScene, ControllerSource),
-				ResourceAttribute("Animation controller (*.act)", CONTROLLER_RESOURCE_TYPE)),
+				ResourceAttribute("Animation controller (*.act)", Anim::ControllerResource::TYPE)),
 			AnimSetProperty()
 		),
 		component("animable",
 			property("Animation", LUMIX_PROP(AnimationScene, Animation),
-				ResourceAttribute("Animation (*.ani)", ANIMATION_TYPE)),
+				ResourceAttribute("Animation (*.ani)", Animation::TYPE)),
 			property("Start time", LUMIX_PROP(AnimationScene, AnimableStartTime),
 				MinAttribute(0)),
 			property("Time scale", LUMIX_PROP(AnimationScene, AnimableTimeScale),

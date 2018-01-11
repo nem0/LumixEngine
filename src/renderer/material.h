@@ -45,11 +45,13 @@ public:
 		};
 	};
 
+	static const ResourceType TYPE;
+
 public:
 	Material(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
 	~Material();
 
-	ResourceType getType() const override { return ResourceType("material"); }
+	ResourceType getType() const override { return TYPE; }
 
 	float getMetallic() const { return m_metallic; }
 	void setMetallic(float value) { m_metallic = value; createCommandBuffer(); }

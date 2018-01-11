@@ -32,8 +32,6 @@ namespace Lumix
 
 static const ComponentType ANIMABLE_HASH = Reflection::getComponentType("animable");
 static const ComponentType CONTROLLER_TYPE = Reflection::getComponentType("anim_controller");
-static const ResourceType ANIMATION_TYPE("animation");
-static const ResourceType CONTROLLER_RESOURCE_TYPE("anim_controller");
 
 
 using namespace AnimEditor;
@@ -666,7 +664,7 @@ AnimationEditor::AnimationEditor(StudioApp& app)
 	app.addWindowAction(action);
 
 	Engine& engine = m_app.getWorldEditor().getEngine();
-	auto* manager = engine.getResourceManager().get(CONTROLLER_RESOURCE_TYPE);
+	auto* manager = engine.getResourceManager().get(Anim::ControllerResource::TYPE);
 	m_resource = LUMIX_NEW(allocator, ControllerResource)(*this, *manager, allocator);
 	m_container = (Container*)m_resource->getRoot();
 
@@ -974,7 +972,7 @@ void AnimationEditor::load()
 	{
 		LUMIX_DELETE(allocator, m_resource);
 		Engine& engine = m_app.getWorldEditor().getEngine();
-		auto* manager = engine.getResourceManager().get(CONTROLLER_RESOURCE_TYPE);
+		auto* manager = engine.getResourceManager().get(Anim::ControllerResource::TYPE);
 		m_resource = LUMIX_NEW(allocator, ControllerResource)(*this, *manager, allocator);
 		m_container = (Container*)m_resource->getRoot();
 	}
@@ -995,7 +993,7 @@ void AnimationEditor::newController()
 	IAllocator& allocator = m_app.getWorldEditor().getAllocator();
 	LUMIX_DELETE(allocator, m_resource);
 	Engine& engine = m_app.getWorldEditor().getEngine();
-	auto* manager = engine.getResourceManager().get(CONTROLLER_RESOURCE_TYPE);
+	auto* manager = engine.getResourceManager().get(Anim::ControllerResource::TYPE);
 	m_resource = LUMIX_NEW(allocator, ControllerResource)(*this, *manager, allocator);
 	m_container = (Container*)m_resource->getRoot();
 	m_path = "";
@@ -1218,7 +1216,7 @@ void AnimationEditor::animationSlotsGUI()
 			auto* anim = slot.values[j].anim;
 			copyString(tmp, anim ? anim->getPath().c_str() : "");
 			ImGui::PushID(j);
-			if (m_app.getAssetBrowser().resourceInput("", "##res", tmp, lengthOf(tmp), ANIMATION_TYPE))
+			if (m_app.getAssetBrowser().resourceInput("", "##res", tmp, lengthOf(tmp), Animation::TYPE))
 			{
 				Path path(tmp);
 				setPropertyValue(allocator, *this, [&]() -> auto& {return *m_resource;}, path, "Slots", i, "Values", j, "Path");

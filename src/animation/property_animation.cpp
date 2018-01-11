@@ -22,13 +22,15 @@ void PropertyAnimationManager::destroyResource(Resource& resource)
 }
 
 
+const ResourceType PropertyAnimation::TYPE("property_animation");
+
+
 PropertyAnimation::PropertyAnimation(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator)
 	: Resource(path, resource_manager, allocator)
 	, fps(30)
 	, curves(allocator)
 {
 }
-
 
 
 bool PropertyAnimation::load(FS::IFile& file)

@@ -18,8 +18,6 @@ namespace Lumix
 {
 
 
-static const ResourceType TEXTURE_TYPE("texture");
-static const ResourceType SHADER_TYPE("shader");
 static const float DEFAULT_ALPHA_REF_VALUE = 0.3f;
 
 
@@ -31,6 +29,9 @@ static struct CustomFlags
 
 
 static u8 DEFAULT_COMMAND_BUFFER = 0;
+
+
+const ResourceType Material::TYPE("material");
 
 
 Material::Material(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator)
@@ -137,7 +138,7 @@ void Material::unload()
 	m_uniforms.clear();
 	setShader(nullptr);
 
-	ResourceManagerBase* texture_manager = m_resource_manager.getOwner().get(TEXTURE_TYPE);
+	ResourceManagerBase* texture_manager = m_resource_manager.getOwner().get(Texture::TYPE);
 	for (int i = 0; i < m_texture_count; i++)
 	{
 		if (m_textures[i])
@@ -397,7 +398,7 @@ void Material::setTexturePath(int i, const Path& path)
 	}
 	else
 	{
-		Texture* texture = static_cast<Texture*>(m_resource_manager.getOwner().get(TEXTURE_TYPE)->load(path));
+		Texture* texture = static_cast<Texture*>(m_resource_manager.getOwner().get(Texture::TYPE)->load(path));
 		setTexture(i, texture);
 	}
 }
@@ -435,7 +436,7 @@ void Material::setTexture(int i, Texture* texture)
 	if (old_texture)
 	{
 		removeDependency(*old_texture);
-		m_resource_manager.getOwner().get(TEXTURE_TYPE)->unload(*old_texture);
+		m_resource_manager.getOwner().get(Texture::TYPE)->unload(*old_texture);
 	}
 	if (isReady() && m_shader)
 	{
@@ -460,7 +461,7 @@ void Material::setTexture(int i, Texture* texture)
 
 void Material::setShader(const Path& path)
 {
-	Shader* shader = static_cast<Shader*>(m_resource_manager.getOwner().get(SHADER_TYPE)->load(path));
+	Shader* shader = static_cast<Shader*>(m_resource_manager.getOwner().get(Shader::TYPE)->load(path));
 	setShader(shader);
 }
 
@@ -581,7 +582,7 @@ void Material::setShader(Shader* shader)
 		Shader* shader = m_shader;
 		m_shader = nullptr;
 		removeDependency(*shader);
-		m_resource_manager.getOwner().get(SHADER_TYPE)->unload(*shader);
+		m_resource_manager.getOwner().get(Shader::TYPE)->unload(*shader);
 	}
 	m_shader = shader;
 	if (m_shader)
@@ -659,7 +660,7 @@ bool Material::deserializeTexture(JsonDeserializer& serializer, const char* mate
 				{
 					copyString(texture_path, path);
 				}
-				auto* mng = m_resource_manager.getOwner().get(TEXTURE_TYPE);
+				auto* mng = m_resource_manager.getOwner().get(Texture::TYPE);
 				m_textures[m_texture_count] = static_cast<Texture*>(mng->load(Path(texture_path)));
 				addDependency(*m_textures[m_texture_count]);
 			}
@@ -864,7 +865,7 @@ bool Material::load(FS::IFile& file)
 		{
 			Path path;
 			serializer.deserialize(path, Path(""));
-			auto* manager = m_resource_manager.getOwner().get(SHADER_TYPE);
+			auto* manager = m_resource_manager.getOwner().get(Shader::TYPE);
 			setShader(static_cast<Shader*>(manager->load(Path(path))));
 		}
 		else

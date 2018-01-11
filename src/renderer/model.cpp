@@ -23,9 +23,6 @@ namespace Lumix
 {
 
 
-static const ResourceType MATERIAL_TYPE("material");
-
-
 bool Model::force_keep_skin = false;
 
 
@@ -91,6 +88,9 @@ void Mesh::setMaterial(Material* new_material, Model& model, Renderer& renderer)
 	}
 	else type = Mesh::RIGID_INSTANCED;
 }
+
+
+const ResourceType Model::TYPE("model");
 
 
 Model::Model(const Path& path, ResourceManagerBase& resource_manager, Renderer& renderer, IAllocator& allocator)
@@ -549,7 +549,7 @@ bool Model::parseMeshes(const bgfx::VertexDecl& global_vertex_decl, FS::IFile& f
 		catString(material_path, material_name);
 		catString(material_path, ".mat");
 
-		auto* material_manager = m_resource_manager.getOwner().get(MATERIAL_TYPE);
+		auto* material_manager = m_resource_manager.getOwner().get(Material::TYPE);
 		Material* material = static_cast<Material*>(material_manager->load(Path(material_path)));
 		
 		file.read(&str_size, sizeof(str_size));
@@ -655,7 +655,7 @@ bool Model::parseMeshesOld(bgfx::VertexDecl global_vertex_decl, FS::IFile& file,
 		catString(material_path, material_name);
 		catString(material_path, ".mat");
 
-		auto* material_manager = m_resource_manager.getOwner().get(MATERIAL_TYPE);
+		auto* material_manager = m_resource_manager.getOwner().get(Material::TYPE);
 		Material* material = static_cast<Material*>(material_manager->load(Path(material_path)));
 
 		Offsets& offsets = mesh_offsets.emplace();
@@ -904,7 +904,7 @@ void Model::registerLuaAPI(lua_State* L)
 
 void Model::unload()
 {
-	auto* material_manager = m_resource_manager.getOwner().get(MATERIAL_TYPE);
+	auto* material_manager = m_resource_manager.getOwner().get(Material::TYPE);
 	for (int i = 0; i < m_meshes.size(); ++i)
 	{
 		removeDependency(*m_meshes[i].material);

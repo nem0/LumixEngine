@@ -13,6 +13,7 @@
 #include "engine/universe/universe.h"
 #include "gui/gui_scene.h"
 #include "gui/sprite_manager.h"
+#include "renderer/font_manager.h"
 #include "renderer/material.h"
 #include "renderer/material_manager.h"
 #include "renderer/pipeline.h"
@@ -31,12 +32,6 @@ namespace Lumix
 struct GUISystemImpl;
 
 
-static const ResourceType MATERIAL_TYPE("material");
-static const ResourceType TEXTURE_TYPE("texture");
-static const ResourceType FONT_TYPE("font");
-static const ResourceType SPRITE_TYPE("sprite");
-
-
 struct GUISystemImpl LUMIX_FINAL : public GUISystem
 {
 	explicit GUISystemImpl(Engine& engine)
@@ -53,13 +48,13 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 		u8* pixels;
 		int w, h;
 		io.Fonts->GetTexDataAsRGBA32(&pixels, &w, &h);
-		auto* material_manager = m_engine.getResourceManager().get(MATERIAL_TYPE);
+		auto* material_manager = m_engine.getResourceManager().get(Material::TYPE);
 		auto* resource = material_manager->load(Path("pipelines/imgui/imgui.mat"));
 		m_material = static_cast<Material*>(resource);
 
 		auto* old_texture = m_material->getTexture(0);
 		Texture* texture = LUMIX_NEW(m_engine.getAllocator(), Texture)(
-			Path("font"), *m_engine.getResourceManager().get(TEXTURE_TYPE), m_engine.getAllocator());
+			Path("font"), *m_engine.getResourceManager().get(Texture::TYPE), m_engine.getAllocator());
 
 		texture->create(w, h, pixels);
 		m_material->setTexture(0, texture);
@@ -81,7 +76,7 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 			component("gui_text",
 				property("Text", LUMIX_PROP(GUIScene, Text)),
 				property("Font", LUMIX_PROP(GUIScene, TextFontPath),
-					ResourceAttribute("Font (*.ttf)", FONT_TYPE)),
+					ResourceAttribute("Font (*.ttf)", FontResource::TYPE)),
 				property("Font Size", LUMIX_PROP(GUIScene, TextFontSize)),
 				property("Color", LUMIX_PROP(GUIScene, TextColorRGBA),
 					ColorAttribute())
@@ -90,7 +85,7 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 				property("Color", LUMIX_PROP(GUIScene, ImageColorRGBA),
 					ColorAttribute()),
 				property("Sprite", LUMIX_PROP(GUIScene, ImageSprite),
-					ResourceAttribute("Sprite (*.spr)", SPRITE_TYPE))
+					ResourceAttribute("Sprite (*.spr)", Sprite::TYPE))
 			),
 			component("gui_rect",
 				property("Enabled", LUMIX_PROP_FULL(GUIScene, isRectEnabled, enableRect)),
@@ -105,7 +100,7 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 			)
 		);
 		registerScene(lua_scene);
-		m_sprite_manager.create(SPRITE_TYPE, m_engine.getResourceManager());
+		m_sprite_manager.create(Sprite::TYPE, m_engine.getResourceManager());
 	}
 
 

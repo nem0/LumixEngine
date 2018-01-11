@@ -14,6 +14,9 @@ namespace Lumix
 {
 
 
+const ResourceType Texture::TYPE("texture");
+
+
 Texture::Texture(const Path& path, ResourceManagerBase& resource_manager, IAllocator& _allocator)
 	: Resource(path, resource_manager, _allocator)
 	, data_reference(0)

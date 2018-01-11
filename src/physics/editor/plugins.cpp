@@ -33,7 +33,6 @@ const ComponentType HINGE_JOINT_TYPE = Reflection::getComponentType("hinge_joint
 const ComponentType SPHERICAL_JOINT_TYPE = Reflection::getComponentType("spherical_joint");
 const ComponentType D6_JOINT_TYPE = Reflection::getComponentType("d6_joint");
 const u32 RENDERER_HASH = crc32("renderer");
-const ResourceType PHYSICS_TYPE("physics");
 
 
 Vec3 fromPhysx(const physx::PxVec3& v) { return Vec3(v.x, v.y, v.z); }
@@ -1015,7 +1014,7 @@ struct PhysicsGeometryPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 
 	bool onGUI(Resource* resource, ResourceType type) override
 	{
-		if (type != PHYSICS_TYPE) return false;
+		if (type != PhysicsGeometry::TYPE) return false;
 
 		auto* geom = static_cast<PhysicsGeometry*>(resource);
 		if (geom->isFailure())
@@ -1029,12 +1028,12 @@ struct PhysicsGeometryPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 
 	void onResourceUnloaded(Resource* resource) override {}
 	const char* getName() const override { return "Physics geometry"; }
-	bool hasResourceManager(ResourceType type) const override { return type == PHYSICS_TYPE; }
+	bool hasResourceManager(ResourceType type) const override { return type == PhysicsGeometry::TYPE; }
 
 
 	ResourceType getResourceType(const char* ext) override
 	{
-		if (equalStrings(ext, "phy")) return PHYSICS_TYPE;
+		if (equalStrings(ext, "phy")) return PhysicsGeometry::TYPE;
 		return INVALID_RESOURCE_TYPE;
 	}
 

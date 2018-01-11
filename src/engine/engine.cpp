@@ -397,7 +397,6 @@ void registerCFunction(lua_State* L, const char* name, lua_CFunction f)
 }
 
 static const u32 SERIALIZED_ENGINE_MAGIC = 0x5f4c454e; // == '_LEN'
-static const ResourceType PREFAB_TYPE("prefab");
 
 
 static FS::OsFile g_error_file;
@@ -506,7 +505,7 @@ public:
 		}
 
 		m_resource_manager.create(*m_file_system);
-		m_prefab_resource_manager.create(PREFAB_TYPE, m_resource_manager);
+		m_prefab_resource_manager.create(PrefabResource::TYPE, m_resource_manager);
 
 		m_timer = Timer::create(m_allocator);
 		m_fps_timer = Timer::create(m_allocator);

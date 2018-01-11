@@ -33,7 +33,6 @@ namespace Lumix
 
 static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("renderable");
 static const ComponentType MESH_ACTOR_TYPE = Reflection::getComponentType("mesh_rigid_actor");
-static const ResourceType PREFAB_TYPE("prefab");
 
 SceneView::SceneView(StudioApp& app)
 	: m_app(app)
@@ -284,7 +283,7 @@ void SceneView::handleDrop(const char* path, float x, float y)
 	{
 		DeferredPrefabInsert defer;
 		defer.pos = hit.m_origin + (hit.m_is_hit ? hit.m_t : 1) * hit.m_dir;
-		ResourceManagerBase* prefab_manager = m_editor.getEngine().getResourceManager().get(PREFAB_TYPE);
+		ResourceManagerBase* prefab_manager = m_editor.getEngine().getResourceManager().get(PrefabResource::TYPE);
 		defer.prefab = (PrefabResource*)prefab_manager->load(Path(path));
 		m_deferred_prefab_inserts.push(defer);
 	}

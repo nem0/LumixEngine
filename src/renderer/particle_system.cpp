@@ -20,9 +20,6 @@ namespace Lumix
 {
 
 
-static const ResourceType MATERIAL_TYPE("material");
-
-
 enum class InstructionArgType : u8
 {
 	CHANNEL,
@@ -225,7 +222,7 @@ void ScriptedParticleEmitter::deserialize(InputBlob& blob, ResourceManager& mana
 	blob.read(m_entity);
 	char path[MAX_PATH_LENGTH];
 	blob.readString(path, lengthOf(path));
-	auto material_manager = manager.get(MATERIAL_TYPE);
+	auto material_manager = manager.get(Material::TYPE);
 	auto material = static_cast<Material*>(material_manager->load(Path(path)));
 	setMaterial(material);
 }
@@ -1462,7 +1459,7 @@ void ParticleEmitter::deserialize(InputBlob& blob, ResourceManager& manager)
 	blob.read(m_local_space);
 	char path[MAX_PATH_LENGTH];
 	blob.readString(path, lengthOf(path));
-	auto material_manager = manager.get(MATERIAL_TYPE);
+	auto material_manager = manager.get(Material::TYPE);
 	auto material = static_cast<Material*>(material_manager->load(Path(path)));
 	setMaterial(material);
 

@@ -38,7 +38,7 @@ class LUMIX_RENDERER_API Texture LUMIX_FINAL : public Resource
 		Texture(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
 		~Texture();
 
-		ResourceType getType() const override { return ResourceType("texture"); }
+		ResourceType getType() const override { return TYPE; }
 
 		bool create(int w, int h, const void* data);
 		void destroy();
@@ -63,6 +63,8 @@ class LUMIX_RENDERER_API Texture LUMIX_FINAL : public Resource
 			const Path& path,
 			IAllocator& allocator);
 		static bool loadTGA(FS::IFile& file, TGAHeader& header, Array<u8>& data, const char* path);
+
+		static const ResourceType TYPE;
 
 	public:
 		int width;

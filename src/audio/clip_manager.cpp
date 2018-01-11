@@ -13,6 +13,9 @@ namespace Lumix
 {
 
 
+const ResourceType Clip::TYPE("clip");
+
+
 void Clip::unload()
 {
 	m_data.clear();

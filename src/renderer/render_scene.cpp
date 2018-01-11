@@ -78,10 +78,6 @@ static const ComponentType TERRAIN_TYPE = Reflection::getComponentType("terrain"
 static const ComponentType BONE_ATTACHMENT_TYPE = Reflection::getComponentType("bone_attachment");
 static const ComponentType ENVIRONMENT_PROBE_TYPE = Reflection::getComponentType("environment_probe");
 
-static const ResourceType MATERIAL_TYPE("material");
-static const ResourceType TEXTURE_TYPE("texture");
-static const ResourceType MODEL_TYPE("model");
-
 
 struct Decal : public DecalInfo
 {
@@ -207,7 +203,7 @@ public:
 	void clear() override
 	{
 		auto& rm = m_engine.getResourceManager();
-		auto* material_manager = static_cast<MaterialManager*>(rm.get(MATERIAL_TYPE));
+		auto* material_manager = static_cast<MaterialManager*>(rm.get(Material::TYPE));
 
 		m_model_loaded_callbacks.clear();
 
@@ -771,7 +767,7 @@ public:
 		ComponentHandle cmp = {r.entity.index};
 		if (path[0] != 0)
 		{
-			auto* model = static_cast<Model*>(m_engine.getResourceManager().get(MODEL_TYPE)->load(Path(path)));
+			auto* model = static_cast<Model*>(m_engine.getResourceManager().get(Model::TYPE)->load(Path(path)));
 			setModel(cmp, model);
 		}
 
@@ -887,7 +883,7 @@ public:
 
 	void deserializeDecal(IDeserializer& serializer, Entity entity, int /*scene_version*/)
 	{
-		ResourceManagerBase* material_manager = m_engine.getResourceManager().get(MATERIAL_TYPE);
+		ResourceManagerBase* material_manager = m_engine.getResourceManager().get(Material::TYPE);
 		Decal& decal = m_decals.insert(entity);
 		char tmp[MAX_PATH_LENGTH];
 		decal.entity = entity;
@@ -978,7 +974,7 @@ public:
 		serializer.read(&terrain->m_scale);
 		char tmp[MAX_PATH_LENGTH];
 		serializer.read(tmp, lengthOf(tmp));
-		auto* material = tmp[0] ? m_engine.getResourceManager().get(MATERIAL_TYPE)->load(Path(tmp)) : nullptr;
+		auto* material = tmp[0] ? m_engine.getResourceManager().get(Material::TYPE)->load(Path(tmp)) : nullptr;
 		terrain->setMaterial((Material*)material);
 
 		int count;
@@ -1012,7 +1008,7 @@ public:
 
 	void deserializeEnvironmentProbe(IDeserializer& serializer, Entity entity, int /*scene_version*/)
 	{
-		auto* texture_manager = m_engine.getResourceManager().get(TEXTURE_TYPE);
+		auto* texture_manager = m_engine.getResourceManager().get(Texture::TYPE);
 		StaticString<MAX_PATH_LENGTH> probe_dir("universes/", m_universe.getName(), "/probes/");
 		EnvironmentProbe& probe = m_environment_probes.insert(entity);
 		serializer.read(&probe.guid);
@@ -1049,7 +1045,7 @@ public:
 
 		char tmp[MAX_PATH_LENGTH];
 		serializer.read(tmp, lengthOf(tmp));
-		ResourceManagerBase* material_manager = m_engine.getResourceManager().get(MATERIAL_TYPE);
+		ResourceManagerBase* material_manager = m_engine.getResourceManager().get(Material::TYPE);
 		Material* material = (Material*)material_manager->load(Path(tmp));
 		emitter->setMaterial(material);
 
@@ -1094,7 +1090,7 @@ public:
 		{
 			char tmp[MAX_PATH_LENGTH];
 			serializer.read(tmp, lengthOf(tmp));
-			ResourceManagerBase* material_manager = m_engine.getResourceManager().get(MATERIAL_TYPE);
+			ResourceManagerBase* material_manager = m_engine.getResourceManager().get(Material::TYPE);
 			Material* material = (Material*)material_manager->load(Path(tmp));
 			emitter->setMaterial(material);
 		}
@@ -1397,7 +1393,7 @@ public:
 
 	void deserializeDecals(InputBlob& serializer)
 	{
-		ResourceManagerBase* material_manager = m_engine.getResourceManager().get(MATERIAL_TYPE);
+		ResourceManagerBase* material_manager = m_engine.getResourceManager().get(Material::TYPE);
 		int count;
 		serializer.read(count);
 		m_decals.reserve(count);
@@ -1446,7 +1442,7 @@ public:
 		i32 count;
 		serializer.read(count);
 		m_environment_probes.reserve(count);
-		auto* texture_manager = m_engine.getResourceManager().get(TEXTURE_TYPE);
+		auto* texture_manager = m_engine.getResourceManager().get(Texture::TYPE);
 		StaticString<MAX_PATH_LENGTH> probe_dir("universes/", m_universe.getName(), "/probes/");
 		for (int i = 0; i < count; ++i)
 		{
@@ -1649,7 +1645,7 @@ public:
 				ComponentHandle cmp = { r.entity.index };
 				if (path != 0)
 				{
-					auto* model = static_cast<Model*>(m_engine.getResourceManager().get(MODEL_TYPE)->load(Path(path)));
+					auto* model = static_cast<Model*>(m_engine.getResourceManager().get(Model::TYPE)->load(Path(path)));
 					setModel(cmp, model);
 				}
 
@@ -2649,7 +2645,7 @@ public:
 	{
 		if (path.isValid())
 		{
-			Material* material = static_cast<Material*>(m_engine.getResourceManager().get(MATERIAL_TYPE)->load(path));
+			Material* material = static_cast<Material*>(m_engine.getResourceManager().get(Material::TYPE)->load(path));
 			m_terrains[{cmp.index}]->setMaterial(material);
 		}
 		else
@@ -2689,7 +2685,7 @@ public:
 
 	void setDecalMaterialPath(ComponentHandle cmp, const Path& path) override
 	{
-		ResourceManagerBase* material_manager = m_engine.getResourceManager().get(MATERIAL_TYPE);
+		ResourceManagerBase* material_manager = m_engine.getResourceManager().get(Material::TYPE);
 		Decal& decal = m_decals[{cmp.index}];
 		if (decal.material)
 		{
@@ -2825,7 +2821,7 @@ public:
 	{
 		ModelInstance& r = m_model_instances[cmp.index];
 
-		auto* manager = m_engine.getResourceManager().get(MODEL_TYPE);
+		auto* manager = m_engine.getResourceManager().get(Model::TYPE);
 		if (path.isValid())
 		{
 			Model* model = static_cast<Model*>(manager->load(path));
@@ -4260,7 +4256,7 @@ public:
 	{
 		Entity entity = {cmp.index};
 		auto& probe = m_environment_probes[entity];
-		auto* texture_manager = m_engine.getResourceManager().get(TEXTURE_TYPE);
+		auto* texture_manager = m_engine.getResourceManager().get(Texture::TYPE);
 		if (probe.texture) texture_manager->unload(*probe.texture);
 		StaticString<MAX_PATH_LENGTH> path("universes/", m_universe.getName(), "/probes/", probe.guid, ".dds");
 		probe.texture = static_cast<Texture*>(texture_manager->load(Path(path)));
@@ -4381,7 +4377,7 @@ public:
 	void modelLoaded(Model* model, ComponentHandle component)
 	{
 		auto& rm = m_engine.getResourceManager();
-		auto* material_manager = static_cast<MaterialManager*>(rm.get(MATERIAL_TYPE));
+		auto* material_manager = static_cast<MaterialManager*>(rm.get(Material::TYPE));
 
 		auto& r = m_model_instances[component.index];
 
@@ -4481,7 +4477,7 @@ public:
 
 		ASSERT(r.model);
 		auto& rm = r.model->getResourceManager();
-		auto* material_manager = static_cast<MaterialManager*>(rm.getOwner().get(MATERIAL_TYPE));
+		auto* material_manager = static_cast<MaterialManager*>(rm.getOwner().get(Material::TYPE));
 
 		auto* new_meshes = (Mesh*)m_allocator.allocate(count * sizeof(Mesh));
 		if (r.meshes)
@@ -4542,7 +4538,7 @@ public:
 		if (r.meshes && r.mesh_count > index && r.meshes[index].material && path == r.meshes[index].material->getPath()) return;
 
 		auto& rm = r.model->getResourceManager();
-		auto* material_manager = static_cast<MaterialManager*>(rm.getOwner().get(MATERIAL_TYPE));
+		auto* material_manager = static_cast<MaterialManager*>(rm.getOwner().get(Material::TYPE));
 
 		int new_count = Math::maximum(i8(index + 1), r.mesh_count);
 		allocateCustomMeshes(r, new_count);
@@ -4576,7 +4572,7 @@ public:
 		if (old_model)
 		{
 			auto& rm = old_model->getResourceManager();
-			auto* material_manager = static_cast<MaterialManager*>(rm.getOwner().get(MATERIAL_TYPE));
+			auto* material_manager = static_cast<MaterialManager*>(rm.getOwner().get(Material::TYPE));
 			freeCustomMeshes(model_instance, material_manager);
 			ModelLoadedCallback& callback = getModelLoadedCallback(old_model);
 			--callback.m_ref_count;
@@ -4849,7 +4845,7 @@ public:
 	ComponentHandle createEnvironmentProbe(Entity entity)
 	{
 		EnvironmentProbe& probe = m_environment_probes.insert(entity);
-		auto* texture_manager = m_engine.getResourceManager().get(TEXTURE_TYPE);
+		auto* texture_manager = m_engine.getResourceManager().get(Texture::TYPE);
 		probe.texture = static_cast<Texture*>(texture_manager->load(Path("pipelines/pbr/default_probe.dds")));
 		probe.texture->setFlag(BGFX_TEXTURE_SRGB, true);
 		probe.irradiance = static_cast<Texture*>(texture_manager->load(Path("pipelines/pbr/default_probe.dds")));
@@ -4905,7 +4901,7 @@ public:
 	{
 		if (!m_scripted_particle_emitters[{cmp.index}]) return;
 
-		auto* manager = m_engine.getResourceManager().get(MATERIAL_TYPE);
+		auto* manager = m_engine.getResourceManager().get(Material::TYPE);
 		Material* material = static_cast<Material*>(manager->load(path));
 		m_scripted_particle_emitters[{cmp.index}]->setMaterial(material);
 	}
@@ -4924,7 +4920,7 @@ public:
 	{
 		if (!m_particle_emitters[{cmp.index}]) return;
 
-		auto* manager = m_engine.getResourceManager().get(MATERIAL_TYPE);
+		auto* manager = m_engine.getResourceManager().get(Material::TYPE);
 		Material* material = static_cast<Material*>(manager->load(path));
 		m_particle_emitters[{cmp.index}]->setMaterial(material);
 	}

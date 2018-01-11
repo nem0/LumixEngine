@@ -8,6 +8,9 @@ namespace Lumix
 {
 
 
+const ResourceType FontResource::TYPE("font");
+
+
 FontResource::FontResource(const Path& path, ResourceManagerBase& manager, IAllocator& allocator)
 	: Resource(path, manager, allocator)
 	, m_fonts(allocator)

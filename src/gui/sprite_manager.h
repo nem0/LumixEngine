@@ -24,7 +24,7 @@ public:
 
 	Sprite(const Path& path, ResourceManagerBase& manager, IAllocator& allocator);
 
-	ResourceType getType() const override { return ResourceType("sprite"); }
+	ResourceType getType() const override { return TYPE; }
 
 	void unload() override;
 	bool load(FS::IFile& file) override;
@@ -37,6 +37,8 @@ public:
 	int bottom;
 	int left;
 	int right;
+
+	static const ResourceType TYPE;
 
 private:
 	Texture* m_texture;
