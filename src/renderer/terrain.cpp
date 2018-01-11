@@ -643,7 +643,7 @@ void Terrain::deserialize(InputBlob& serializer, Universe& universe, RenderScene
 		serializer.read(m_grass_types[i].m_rotation_mode);
 		setGrassTypePath(i, Path(path));
 	}
-	universe.addComponent(m_entity, TERRAIN_HASH, &scene, cmp);
+	universe.onComponentCreated(m_entity, TERRAIN_HASH, &scene, cmp);
 }
 
 	

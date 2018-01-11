@@ -88,9 +88,24 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		, m_system(system)
 		, m_rects(allocator)
 	{
-		context.registerComponentType(GUI_RECT_TYPE, this, &GUISceneImpl::serializeRect, &GUISceneImpl::deserializeRect);
-		context.registerComponentType(GUI_IMAGE_TYPE, this, &GUISceneImpl::serializeImage, &GUISceneImpl::deserializeImage);
-		context.registerComponentType(GUI_TEXT_TYPE, this, &GUISceneImpl::serializeText, &GUISceneImpl::deserializeText);
+		context.registerComponentType(GUI_RECT_TYPE
+			, this
+			, &GUISceneImpl::createRect
+			, &GUISceneImpl::destroyRect
+			, &GUISceneImpl::serializeRect
+			, &GUISceneImpl::deserializeRect);
+		context.registerComponentType(GUI_IMAGE_TYPE
+			, this
+			, &GUISceneImpl::createImage
+			, &GUISceneImpl::destroyImage
+			, &GUISceneImpl::serializeImage
+			, &GUISceneImpl::deserializeImage);
+		context.registerComponentType(GUI_TEXT_TYPE
+			, this
+			, &GUISceneImpl::createText
+			, &GUISceneImpl::destroyText
+			, &GUISceneImpl::serializeText
+			, &GUISceneImpl::deserializeText);
 		m_font_manager = (FontManager*)system.getEngine().getResourceManager().get(FontResource::TYPE);
 	}
 
@@ -461,7 +476,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		
 		m_root = findRoot();
 		
-		m_universe.addComponent(entity, GUI_RECT_TYPE, this, cmp);
+		m_universe.onComponentCreated(entity, GUI_RECT_TYPE, this, cmp);
 	}
 
 
@@ -487,7 +502,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		serializer.read(&rect.image->color);
 		
 		ComponentHandle cmp = {entity.index};
-		m_universe.addComponent(entity, GUI_IMAGE_TYPE, this, cmp);
+		m_universe.onComponentCreated(entity, GUI_IMAGE_TYPE, this, cmp);
 	}
 
 
@@ -530,7 +545,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		}
 
 		ComponentHandle cmp = { entity.index };
-		m_universe.addComponent(entity, GUI_TEXT_TYPE, this, cmp);
+		m_universe.onComponentCreated(entity, GUI_TEXT_TYPE, this, cmp);
 	}
 
 
@@ -569,7 +584,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		rect->entity = entity;
 		rect->flags.set(GUIRect::IS_VALID);
 		rect->flags.set(GUIRect::IS_ENABLED);
-		m_universe.addComponent(entity, GUI_RECT_TYPE, this, cmp);
+		m_universe.onComponentCreated(entity, GUI_RECT_TYPE, this, cmp);
 		m_root = findRoot();
 
 		return cmp;
@@ -588,7 +603,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		rect.text = LUMIX_NEW(m_allocator, GUIText)(m_allocator);
 		rect.text->font = m_font_manager->getDefaultFont();
 		ComponentHandle cmp = {entity.index};
-		m_universe.addComponent(entity, GUI_TEXT_TYPE, this, cmp);
+		m_universe.onComponentCreated(entity, GUI_TEXT_TYPE, this, cmp);
 		return cmp;
 	}
 
@@ -604,12 +619,9 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		GUIRect& rect = *m_rects.at(idx);
 		rect.image = LUMIX_NEW(m_allocator, GUIImage);
 		ComponentHandle cmp = {entity.index};
-		m_universe.addComponent(entity, GUI_IMAGE_TYPE, this, cmp);
+		m_universe.onComponentCreated(entity, GUI_IMAGE_TYPE, this, cmp);
 		return cmp;
 	}
-
-
-	ComponentHandle createComponent(ComponentType type, Entity entity) override;
 
 
 	GUIRect* findRoot()
@@ -643,7 +655,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		{
 			m_root = findRoot();
 		}
-		m_universe.destroyComponent(entity, GUI_RECT_TYPE, this, component);
+		m_universe.onComponentDestroyed(entity, GUI_RECT_TYPE, this, component);
 	}
 
 
@@ -653,7 +665,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		GUIRect* rect = m_rects[entity];
 		LUMIX_DELETE(m_allocator, rect->image);
 		rect->image = nullptr;
-		m_universe.destroyComponent(entity, GUI_IMAGE_TYPE, this, component);
+		m_universe.onComponentDestroyed(entity, GUI_IMAGE_TYPE, this, component);
 	}
 
 
@@ -663,11 +675,8 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		GUIRect* rect = m_rects[entity];
 		LUMIX_DELETE(m_allocator, rect->text);
 		rect->text = nullptr;
-		m_universe.destroyComponent(entity, GUI_TEXT_TYPE, this, component);
+		m_universe.onComponentDestroyed(entity, GUI_TEXT_TYPE, this, component);
 	}
-
-
-	void destroyComponent(ComponentHandle component, ComponentType type) override;
 
 
 	void serialize(OutputBlob& serializer) override
@@ -716,7 +725,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 			m_rects.insert(rect->entity, rect);
 			if (rect->flags.isSet(GUIRect::IS_VALID))
 			{
-				m_universe.addComponent(rect->entity, GUI_RECT_TYPE, this, {rect->entity.index});
+				m_universe.onComponentCreated(rect->entity, GUI_RECT_TYPE, this, {rect->entity.index});
 			}
 
 			bool has_image = serializer.read<bool>();
@@ -724,7 +733,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 			{
 				rect->image = LUMIX_NEW(m_allocator, GUIImage);
 				serializer.read(rect->image->color);
-				m_universe.addComponent(rect->entity, GUI_IMAGE_TYPE, this, {rect->entity.index});
+				m_universe.onComponentCreated(rect->entity, GUI_IMAGE_TYPE, this, {rect->entity.index});
 
 			}
 			bool has_text = serializer.read<bool>();
@@ -747,7 +756,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 					text.font_resource = (FontResource*)m_font_manager->load(Path(tmp));
 					text.font = text.font_resource->addRef(text.font_size);
 				}
-				m_universe.addComponent(rect->entity, GUI_TEXT_TYPE, this, {rect->entity.index});
+				m_universe.onComponentCreated(rect->entity, GUI_TEXT_TYPE, this, {rect->entity.index});
 			}
 		}
 		m_root = findRoot();
@@ -789,44 +798,6 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	GUIRect* m_root = nullptr;
 	FontManager* m_font_manager = nullptr;
 };
-
-
-static struct
-{
-	ComponentType type;
-	ComponentHandle(GUISceneImpl::*creator)(Entity);
-	void (GUISceneImpl::*destroyer)(ComponentHandle);
-} COMPONENT_INFOS[] = {
-	{ GUI_RECT_TYPE, &GUISceneImpl::createRect, &GUISceneImpl::destroyRect },
-	{ GUI_IMAGE_TYPE, &GUISceneImpl::createImage, &GUISceneImpl::destroyImage },
-	{ GUI_TEXT_TYPE, &GUISceneImpl::createText, &GUISceneImpl::destroyText }
-};
-
-
-ComponentHandle GUISceneImpl::createComponent(ComponentType type, Entity entity)
-{
-	for(auto& i : COMPONENT_INFOS)
-	{
-		if(i.type == type)
-		{
-			return (this->*i.creator)(entity);
-		}
-	}
-	return INVALID_COMPONENT;
-}
-
-
-void GUISceneImpl::destroyComponent(ComponentHandle component, ComponentType type)
-{
-	for(auto& i : COMPONENT_INFOS)
-	{
-		if(i.type == type)
-		{
-			(this->*i.destroyer)(component);
-			return;
-		}
-	}
-}
 
 
 GUIScene* GUIScene::createInstance(GUISystem& system,

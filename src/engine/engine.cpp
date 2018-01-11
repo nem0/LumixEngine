@@ -549,7 +549,7 @@ public:
 			return INVALID_COMPONENT;
 		}
 
-		return scene->createComponent(cmp_type, entity);
+		return universe->createComponent(cmp_type, entity);
 	}
 
 
@@ -753,7 +753,7 @@ public:
 				IScene* scene = ctx->getScene(cmp_type);
 				if (scene)
 				{
-					ComponentUID cmp(e, cmp_type, scene, scene->createComponent(cmp_type, e));
+					ComponentUID cmp(e, cmp_type, scene, ctx->createComponent(cmp_type, e));
 					const Reflection::ComponentBase* cmp_des = Reflection::getComponent(cmp_type);
 					if (cmp.isValid())
 					{
@@ -1554,7 +1554,7 @@ public:
 		IScene* scene = universe.getScene(type);
 		if (!scene) return ComponentUID::INVALID;
 
-		return ComponentUID(entity, type, scene, scene->createComponent(type, entity));
+		return ComponentUID(entity, type, scene, universe.createComponent(type, entity));
 	}
 
 

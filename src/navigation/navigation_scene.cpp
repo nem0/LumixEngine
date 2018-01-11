@@ -90,7 +90,12 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	{
 		setGeneratorParams(0.3f, 0.1f, 0.3f, 2.0f, 60.0f, 0.3f);
 		m_universe.entityTransformed().bind<NavigationSceneImpl, &NavigationSceneImpl::onEntityMoved>(this);
-		universe.registerComponentType(NAVMESH_AGENT_TYPE, this, &NavigationSceneImpl::serializeAgent, &NavigationSceneImpl::deserializeAgent);
+		universe.registerComponentType(NAVMESH_AGENT_TYPE
+			, this
+			, &NavigationSceneImpl::createAgent
+			, &NavigationSceneImpl::destroyAgent
+			, &NavigationSceneImpl::serializeAgent
+			, &NavigationSceneImpl::deserializeAgent);
 	}
 
 
@@ -1340,42 +1345,31 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	}
 
 
-	ComponentHandle createComponent(ComponentType type, Entity entity) override
+	ComponentHandle createAgent(Entity entity)
 	{
-		if (type == NAVMESH_AGENT_TYPE)
-		{
-			Agent agent;
-			agent.entity = entity;
-			agent.radius = 0.5f;
-			agent.height = 2.0f;
-			agent.agent = -1;
-			agent.flags = Agent::USE_ROOT_MOTION;
-			agent.is_finished = true;
-			if (m_crowd) addCrowdAgent(agent);
-			m_agents.insert(entity, agent);
-			ComponentHandle cmp = {entity.index};
-			m_universe.addComponent(entity, type, this, cmp);
-			return cmp;
-		}
-		return INVALID_COMPONENT;
+		Agent agent;
+		agent.entity = entity;
+		agent.radius = 0.5f;
+		agent.height = 2.0f;
+		agent.agent = -1;
+		agent.flags = Agent::USE_ROOT_MOTION;
+		agent.is_finished = true;
+		if (m_crowd) addCrowdAgent(agent);
+		m_agents.insert(entity, agent);
+		ComponentHandle cmp = {entity.index};
+		m_universe.onComponentCreated(entity, NAVMESH_AGENT_TYPE, this, cmp);
+		return cmp;
 	}
 
 
-	void destroyComponent(ComponentHandle component, ComponentType type) override
+	void destroyAgent(ComponentHandle component)
 	{
-		if (type == NAVMESH_AGENT_TYPE)
-		{
-			Entity entity = { component.index };
-			auto iter = m_agents.find(entity);
-			const Agent& agent = iter.value();
-			if (m_crowd && agent.agent >= 0) m_crowd->removeAgent(agent.agent);
-			m_agents.erase(iter);
-			m_universe.destroyComponent(entity, type, this, component);
-		}
-		else
-		{
-			ASSERT(false);
-		}
+		Entity entity = { component.index };
+		auto iter = m_agents.find(entity);
+		const Agent& agent = iter.value();
+		if (m_crowd && agent.agent >= 0) m_crowd->removeAgent(agent.agent);
+		m_agents.erase(iter);
+		m_universe.onComponentDestroyed(entity, NAVMESH_AGENT_TYPE, this, component);
 	}
 
 
@@ -1417,7 +1411,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 		if (m_crowd) addCrowdAgent(agent);
 		m_agents.insert(agent.entity, agent);
 		ComponentHandle cmp = {agent.entity.index};
-		m_universe.addComponent(agent.entity, NAVMESH_AGENT_TYPE, this, cmp);
+		m_universe.onComponentCreated(agent.entity, NAVMESH_AGENT_TYPE, this, cmp);
 	}
 
 
@@ -1451,7 +1445,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 			agent.agent = -1;
 			m_agents.insert(agent.entity, agent);
 			ComponentHandle cmp = {agent.entity.index};
-			m_universe.addComponent(agent.entity, NAVMESH_AGENT_TYPE, this, cmp);
+			m_universe.onComponentCreated(agent.entity, NAVMESH_AGENT_TYPE, this, cmp);
 		}
 	}
 

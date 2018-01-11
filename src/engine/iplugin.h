@@ -20,8 +20,6 @@ namespace Lumix
 	{
 		virtual ~IScene() {}
 
-		virtual ComponentHandle createComponent(ComponentType, Entity) = 0;
-		virtual void destroyComponent(ComponentHandle component, ComponentType type) = 0;
 		virtual void serialize(OutputBlob& serializer) = 0;
 		virtual void serialize(ISerializer& serializer) {}
 		virtual void deserialize(IDeserializer& serializer) {}

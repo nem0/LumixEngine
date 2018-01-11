@@ -26,11 +26,15 @@ struct PrefabResource;
 class LUMIX_ENGINE_API Universe
 {
 public:
+	typedef ComponentHandle (IScene::*Create)(Entity);
+	typedef void (IScene::*Destroy)(ComponentHandle);
 	typedef void (IScene::*Serialize)(ISerializer&, ComponentHandle);
 	typedef void (IScene::*Deserialize)(IDeserializer&, Entity, int);
 	struct ComponentTypeEntry
 	{
 		IScene* scene = nullptr;
+		ComponentHandle(IScene::*create)(Entity);
+		void (IScene::*destroy)(ComponentHandle);
 		void (IScene::*serialize)(ISerializer&, ComponentHandle);
 		void (IScene::*deserialize)(IDeserializer&, Entity, int);
 	};
@@ -45,17 +49,21 @@ public:
 	void emplaceEntity(Entity entity);
 	Entity createEntity(const Vec3& position, const Quat& rotation);
 	void destroyEntity(Entity entity);
-	void addComponent(Entity entity, ComponentType component_type, IScene* scene, ComponentHandle index);
-	void destroyComponent(Entity entity, ComponentType component_type, IScene* scene, ComponentHandle index);
+	ComponentHandle createComponent(ComponentType type, Entity entity);
+	void destroyComponent(ComponentHandle cmp, ComponentType type);
+	void onComponentCreated(Entity entity, ComponentType component_type, IScene* scene, ComponentHandle index);
+	void onComponentDestroyed(Entity entity, ComponentType component_type, IScene* scene, ComponentHandle index);
 	bool hasComponent(Entity entity, ComponentType component_type) const;
 	ComponentUID getComponent(Entity entity, ComponentType type) const;
 	ComponentUID getFirstComponent(Entity entity) const;
 	ComponentUID getNextComponent(const ComponentUID& cmp) const;
 	ComponentTypeEntry& registerComponentType(ComponentType type) { return m_component_type_map[type.index]; }
-	template <typename T1, typename T2>
-	void registerComponentType(ComponentType type, IScene* scene, T1 serialize, T2 deserialize)
+	template <typename T1, typename T2, typename T3, typename T4>
+	void registerComponentType(ComponentType type, IScene* scene, T1 create, T2 destroy, T3 serialize, T4 deserialize)
 	{
 		m_component_type_map[type.index].scene = scene;
+		m_component_type_map[type.index].create = static_cast<Create>(create);
+		m_component_type_map[type.index].destroy = static_cast<Destroy>(destroy);
 		m_component_type_map[type.index].serialize = static_cast<Serialize>(serialize);
 		m_component_type_map[type.index].deserialize = static_cast<Deserialize>(deserialize);
 	}

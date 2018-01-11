@@ -340,18 +340,29 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 		m_queued_forces.reserve(64);
 
-		context.registerComponentType(RIGID_ACTOR_TYPE, this, &PhysicsSceneImpl::serializeRigidActor, &PhysicsSceneImpl::deserializeRigidActor);
-		context.registerComponentType(BOX_ACTOR_TYPE, this, &PhysicsSceneImpl::serializeBoxActor, &PhysicsSceneImpl::deserializeBoxActor);
-		context.registerComponentType(MESH_ACTOR_TYPE, this, &PhysicsSceneImpl::serializeMeshActor, &PhysicsSceneImpl::deserializeMeshActor);
-		context.registerComponentType(HEIGHTFIELD_TYPE, this, &PhysicsSceneImpl::serializeHeightfield, &PhysicsSceneImpl::deserializeHeightfield);
-		context.registerComponentType(CONTROLLER_TYPE, this, &PhysicsSceneImpl::serializeController, &PhysicsSceneImpl::deserializeController);
-		context.registerComponentType(DISTANCE_JOINT_TYPE, this, &PhysicsSceneImpl::serializeDistanceJoint, &PhysicsSceneImpl::deserializeDistanceJoint);
-		context.registerComponentType(HINGE_JOINT_TYPE, this, &PhysicsSceneImpl::serializeHingeJoint, &PhysicsSceneImpl::deserializeHingeJoint);
-		context.registerComponentType(CAPSULE_ACTOR_TYPE, this, &PhysicsSceneImpl::serializeCapsuleActor, &PhysicsSceneImpl::deserializeCapsuleActor);
-		context.registerComponentType(SPHERE_ACTOR_TYPE, this, &PhysicsSceneImpl::serializeSphereActor, &PhysicsSceneImpl::deserializeSphereActor);
-		context.registerComponentType(SPHERICAL_JOINT_TYPE, this, &PhysicsSceneImpl::serializeSphericalJoint, &PhysicsSceneImpl::deserializeSphericalJoint);
-		context.registerComponentType(D6_JOINT_TYPE, this, &PhysicsSceneImpl::serializeD6Joint, &PhysicsSceneImpl::deserializeD6Joint);
-		context.registerComponentType(RAGDOLL_TYPE, this, &PhysicsSceneImpl::serializeRagdoll, &PhysicsSceneImpl::deserializeRagdoll);
+		#define REGISTER_COMPONENT(TYPE, COMPONENT) \
+			context.registerComponentType(TYPE \
+				, this \
+				, &PhysicsSceneImpl::create##COMPONENT \
+				, &PhysicsSceneImpl::destroy##COMPONENT \
+				, &PhysicsSceneImpl::serialize##COMPONENT \
+				, &PhysicsSceneImpl::deserialize##COMPONENT);
+
+
+		REGISTER_COMPONENT(RIGID_ACTOR_TYPE, RigidActor);
+		REGISTER_COMPONENT(BOX_ACTOR_TYPE, BoxActor);
+		REGISTER_COMPONENT(MESH_ACTOR_TYPE, MeshActor);
+		REGISTER_COMPONENT(CAPSULE_ACTOR_TYPE, CapsuleActor);
+		REGISTER_COMPONENT(SPHERE_ACTOR_TYPE, SphereActor);
+		REGISTER_COMPONENT(HEIGHTFIELD_TYPE, Heightfield);
+		REGISTER_COMPONENT(CONTROLLER_TYPE, Controller);
+		REGISTER_COMPONENT(DISTANCE_JOINT_TYPE, DistanceJoint);
+		REGISTER_COMPONENT(HINGE_JOINT_TYPE, HingeJoint);
+		REGISTER_COMPONENT(SPHERICAL_JOINT_TYPE, SphericalJoint);
+		REGISTER_COMPONENT(D6_JOINT_TYPE, D6Joint);
+		REGISTER_COMPONENT(RAGDOLL_TYPE, Ragdoll);
+
+		#undef REGISTER_COMPONENT
 	}
 
 
@@ -1190,123 +1201,82 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	ComponentHandle createComponent(ComponentType component_type, Entity entity) override
+	void destroyHeightfield(ComponentHandle cmp)
 	{
-		if (component_type == DISTANCE_JOINT_TYPE)
-		{
-			return createDistanceJoint(entity);
-		}
-		else if (component_type == HINGE_JOINT_TYPE)
-		{
-			return createHingeJoint(entity);
-		}
-		else if (component_type == SPHERICAL_JOINT_TYPE)
-		{
-			return createSphericalJoint(entity);
-		}
-		else if (component_type == D6_JOINT_TYPE)
-		{
-			return createD6Joint(entity);
-		}
-		else if (component_type == HEIGHTFIELD_TYPE)
-		{
-			return createHeightfield(entity);
-		}
-		else if (component_type == CONTROLLER_TYPE)
-		{
-			return createController(entity);
-		}
-		else if (component_type == BOX_ACTOR_TYPE)
-		{
-			return createBoxRigidActor(entity);
-		}
-		else if (component_type == RIGID_ACTOR_TYPE)
-		{
-			return createRigidActor(entity);
-		}
-		else if (component_type == RAGDOLL_TYPE)
-		{
-			return createRagdoll(entity);
-		}
-		else if (component_type == SPHERE_ACTOR_TYPE)
-		{
-			return createSphereRigidActor(entity);
-		}
-		else if (component_type == CAPSULE_ACTOR_TYPE)
-		{
-			return createCapsuleRigidActor(entity);
-		}
-		else if (component_type == MESH_ACTOR_TYPE)
-		{
-			return createMeshRigidActor(entity);
-		}
-		return INVALID_COMPONENT;
+		Entity entity = { cmp.index };
+		m_terrains.erase(entity);
+		m_universe.onComponentDestroyed(entity, HEIGHTFIELD_TYPE, this, cmp);
 	}
 
 
-	void destroyComponent(ComponentHandle cmp, ComponentType type) override
+	void destroyController(ComponentHandle cmp)
 	{
-		if (type == HEIGHTFIELD_TYPE)
+		Entity entity = { cmp.index };
+		m_controllers[entity].m_controller->release();
+		m_controllers.erase(entity);
+		m_universe.onComponentDestroyed(entity, CONTROLLER_TYPE, this, cmp);
+	}
+
+
+	void destroyRagdoll(ComponentHandle cmp)
+	{
+		int idx = m_ragdolls.find({ cmp.index });
+		Entity entity = m_ragdolls.at(idx).entity;
+		destroySkeleton(m_ragdolls.at(idx).root);
+		m_ragdolls.eraseAt(idx);
+		m_universe.onComponentDestroyed(entity, RAGDOLL_TYPE, this, cmp);
+	}
+
+
+	void destroyRigidActor(ComponentHandle cmp) { destroyActorGeneric(cmp, RIGID_ACTOR_TYPE); }
+	void destroyMeshActor(ComponentHandle cmp) { destroyActorGeneric(cmp, MESH_ACTOR_TYPE); }
+	void destroyBoxActor(ComponentHandle cmp) { destroyActorGeneric(cmp, BOX_ACTOR_TYPE); }
+	void destroySphereActor(ComponentHandle cmp) { destroyActorGeneric(cmp, SPHERE_ACTOR_TYPE); }
+	void destroyCapsuleActor(ComponentHandle cmp) { destroyActorGeneric(cmp, CAPSULE_ACTOR_TYPE); }
+
+
+	void destroySphericalJoint(ComponentHandle cmp) { destroyJointGeneric(cmp, SPHERE_ACTOR_TYPE); }
+	void destroyHingeJoint(ComponentHandle cmp) { destroyJointGeneric(cmp, SPHERE_ACTOR_TYPE); }
+	void destroyD6Joint(ComponentHandle cmp) { destroyJointGeneric(cmp, SPHERE_ACTOR_TYPE); }
+	void destroyDistanceJoint(ComponentHandle cmp) { destroyJointGeneric(cmp, SPHERE_ACTOR_TYPE); }
+
+
+	void destroyActorGeneric(ComponentHandle cmp, ComponentType type)
+	{
+		Entity entity = { cmp.index };
+		auto* actor = m_actors[entity];
+		actor->setPhysxActor(nullptr);
+		LUMIX_DELETE(m_allocator, actor);
+		m_actors.erase(entity);
+		m_dynamic_actors.eraseItem(actor);
+		m_universe.onComponentDestroyed(entity, type, this, cmp);
+		if (m_is_game_running)
 		{
-			Entity entity = {cmp.index};
-			m_terrains.erase(entity);
-			m_universe.destroyComponent(entity, type, this, cmp);
-		}
-		else if (type == CONTROLLER_TYPE)
-		{
-			Entity entity = {cmp.index};
-			m_controllers[entity].m_controller->release();
-			m_controllers.erase(entity);
-			m_universe.destroyComponent(entity, type, this, cmp);
-		}
-		else if (type == RIGID_ACTOR_TYPE || type == MESH_ACTOR_TYPE || type == BOX_ACTOR_TYPE || type == CAPSULE_ACTOR_TYPE ||
-			type == SPHERE_ACTOR_TYPE)
-		{
-			Entity entity = { cmp.index };
-			auto* actor = m_actors[entity];
-			actor->setPhysxActor(nullptr);
-			LUMIX_DELETE(m_allocator, actor);
-			m_actors.erase(entity);
-			m_dynamic_actors.eraseItem(actor);
-			m_universe.destroyComponent(entity, type, this, cmp);
-			if (m_is_game_running)
+			for (int i = 0, c = m_joints.size(); i < c; ++i)
 			{
-				for (int i = 0, c = m_joints.size(); i < c; ++i)
+				Joint& joint = m_joints.at(i);
+				if (m_joints.getKey(i) == entity || joint.connected_body == entity)
 				{
-					Joint& joint = m_joints.at(i);
-					if (m_joints.getKey(i) == entity || joint.connected_body == entity)
-					{
-						if (joint.physx) joint.physx->release();
-						joint.physx = PxDistanceJointCreate(m_scene->getPhysics(),
-							m_dummy_actor,
-							PxTransform::createIdentity(),
-							nullptr,
-							PxTransform::createIdentity());
-					}
+					if (joint.physx) joint.physx->release();
+					joint.physx = PxDistanceJointCreate(m_scene->getPhysics(),
+						m_dummy_actor,
+						PxTransform::createIdentity(),
+						nullptr,
+						PxTransform::createIdentity());
 				}
 			}
 		}
-		else if (type == RAGDOLL_TYPE)
-		{
-			int idx = m_ragdolls.find({cmp.index});
-			Entity entity = m_ragdolls.at(idx).entity;
-			destroySkeleton(m_ragdolls.at(idx).root);
-			m_ragdolls.eraseAt(idx);
-			m_universe.destroyComponent(entity, type, this, cmp);
-		}
-		else if (type == SPHERICAL_JOINT_TYPE || type == HINGE_JOINT_TYPE || type == DISTANCE_JOINT_TYPE ||
-				 type == D6_JOINT_TYPE)
-		{
-			Entity entity = {cmp.index};
-			auto& joint = m_joints[entity];
-			if (joint.physx) joint.physx->release();
-			m_joints.erase(entity);
-			m_universe.destroyComponent(entity, type, this, cmp);
-		}
-		else
-		{
-			ASSERT(false);
-		}
+
+	}
+
+
+	void destroyJointGeneric(ComponentHandle cmp, ComponentType type)
+	{
+		Entity entity = {cmp.index};
+		auto& joint = m_joints[entity];
+		if (joint.physx) joint.physx->release();
+		m_joints.erase(entity);
+		m_universe.onComponentDestroyed(entity, type, this, cmp);
 	}
 
 
@@ -1326,7 +1296,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		static_cast<PxDistanceJoint*>(joint.physx)->setDistanceJointFlag(PxDistanceJointFlag::eSPRING_ENABLED, true);
 
 		ComponentHandle cmp = {entity.index};
-		m_universe.addComponent(entity, DISTANCE_JOINT_TYPE, this, cmp);
+		m_universe.onComponentCreated(entity, DISTANCE_JOINT_TYPE, this, cmp);
 		return cmp;
 	}
 
@@ -1346,7 +1316,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		joint.physx->setConstraintFlag(PxConstraintFlag::eVISUALIZATION, true);
 
 		ComponentHandle cmp = {entity.index};
-		m_universe.addComponent(entity, SPHERICAL_JOINT_TYPE, this, cmp);
+		m_universe.onComponentCreated(entity, SPHERICAL_JOINT_TYPE, this, cmp);
 		return cmp;
 	}
 
@@ -1370,7 +1340,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		joint.physx->setConstraintFlag(PxConstraintFlag::eVISUALIZATION, true);
 
 		ComponentHandle cmp = {entity.index};
-		m_universe.addComponent(entity, D6_JOINT_TYPE, this, cmp);
+		m_universe.onComponentCreated(entity, D6_JOINT_TYPE, this, cmp);
 		return cmp;
 	}
 
@@ -1390,7 +1360,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		joint.physx->setConstraintFlag(PxConstraintFlag::eVISUALIZATION, true);
 
 		ComponentHandle cmp = { entity.index };
-		m_universe.addComponent(entity, HINGE_JOINT_TYPE, this, cmp);
+		m_universe.onComponentCreated(entity, HINGE_JOINT_TYPE, this, cmp);
 		return cmp;
 	}
 
@@ -1404,7 +1374,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		terrain.m_entity = entity;
 
 		ComponentHandle cmp = {entity.index};
-		m_universe.addComponent(entity, HEIGHTFIELD_TYPE, this, cmp);
+		m_universe.onComponentCreated(entity, HEIGHTFIELD_TYPE, this, cmp);
 		return cmp;
 	}
 
@@ -1469,12 +1439,12 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		}
 
 		ComponentHandle cmp = {entity.index};
-		m_universe.addComponent(entity, CONTROLLER_TYPE, this, cmp);
+		m_universe.onComponentCreated(entity, CONTROLLER_TYPE, this, cmp);
 		return cmp;
 	}
 
 
-	ComponentHandle createCapsuleRigidActor(Entity entity)
+	ComponentHandle createCapsuleActor(Entity entity)
 	{
 		if (m_actors.find(entity) >= 0) return INVALID_COMPONENT;
 		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, ActorType::CAPSULE);
@@ -1492,7 +1462,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		actor->setPhysxActor(physx_actor);
 
 		ComponentHandle cmp = {entity.index};
-		m_universe.addComponent(entity, CAPSULE_ACTOR_TYPE, this, cmp);
+		m_universe.onComponentCreated(entity, CAPSULE_ACTOR_TYPE, this, cmp);
 		return cmp;
 	}
 
@@ -1507,7 +1477,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		ragdoll.root_transform.rot.set(0, 0, 0, 1);
 
 		ComponentHandle cmp = {entity.index};
-		m_universe.addComponent(entity, RAGDOLL_TYPE, this, cmp);
+		m_universe.onComponentCreated(entity, RAGDOLL_TYPE, this, cmp);
 		return cmp;
 	}
 
@@ -1526,12 +1496,12 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		actor->setPhysxActor(physx_actor);
 
 		ComponentHandle cmp = {entity.index};
-		m_universe.addComponent(entity, RIGID_ACTOR_TYPE, this, cmp);
+		m_universe.onComponentCreated(entity, RIGID_ACTOR_TYPE, this, cmp);
 		return cmp;
 	}
 
 
-	ComponentHandle createBoxRigidActor(Entity entity)
+	ComponentHandle createBoxActor(Entity entity)
 	{
 		if (m_actors.find(entity) >= 0) return INVALID_COMPONENT;
 		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, ActorType::BOX);
@@ -1550,12 +1520,12 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		actor->setPhysxActor(physx_actor);
 
 		ComponentHandle cmp = {entity.index};
-		m_universe.addComponent(entity, BOX_ACTOR_TYPE, this, cmp);
+		m_universe.onComponentCreated(entity, BOX_ACTOR_TYPE, this, cmp);
 		return cmp;
 	}
 
 
-	ComponentHandle createSphereRigidActor(Entity entity)
+	ComponentHandle createSphereActor(Entity entity)
 	{
 		if (m_actors.find(entity) >= 0) return INVALID_COMPONENT;
 		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, ActorType::SPHERE);
@@ -1572,12 +1542,12 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		actor->setPhysxActor(physx_actor);
 
 		ComponentHandle cmp = {entity.index};
-		m_universe.addComponent(entity, SPHERE_ACTOR_TYPE, this, cmp);
+		m_universe.onComponentCreated(entity, SPHERE_ACTOR_TYPE, this, cmp);
 		return cmp;
 	}
 
 
-	ComponentHandle createMeshRigidActor(Entity entity)
+	ComponentHandle createMeshActor(Entity entity)
 	{
 		if (m_actors.find(entity) >= 0) return INVALID_COMPONENT;
 		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, ActorType::MESH);
@@ -1585,7 +1555,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		actor->entity = entity;
 
 		ComponentHandle cmp = {entity.index};
-		m_universe.addComponent(entity, MESH_ACTOR_TYPE, this, cmp);
+		m_universe.onComponentCreated(entity, MESH_ACTOR_TYPE, this, cmp);
 		return cmp;
 	}
 
@@ -3396,7 +3366,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		{
 			setHeightmapSource(cmp, Path(tmp));
 		}
-		m_universe.addComponent(terrain.m_entity, HEIGHTFIELD_TYPE, this, cmp);
+		m_universe.onComponentCreated(terrain.m_entity, HEIGHTFIELD_TYPE, this, cmp);
 	}
 
 
@@ -3441,7 +3411,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		}
 		c.m_controller->invalidateCache();
 
-		m_universe.addComponent(entity, CONTROLLER_TYPE, this, {entity.index});
+		m_universe.onComponentCreated(entity, CONTROLLER_TYPE, this, {entity.index});
 	}
 
 
@@ -3465,7 +3435,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 		setRagdollRoot(ragdoll, deserializeRagdollBone(ragdoll, nullptr, serializer));
 		ComponentHandle cmp = {ragdoll.entity.index};
-		m_universe.addComponent(ragdoll.entity, RAGDOLL_TYPE, this, cmp);
+		m_universe.onComponentCreated(ragdoll.entity, RAGDOLL_TYPE, this, cmp);
 	}
 	
 
@@ -3525,7 +3495,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			PxTransform::createIdentity());
 		joint.physx = px_joint;
 		deserializeJoint(serializer, px_joint);
-		m_universe.addComponent(entity, SPHERICAL_JOINT_TYPE, this, {entity.index});
+		m_universe.onComponentCreated(entity, SPHERICAL_JOINT_TYPE, this, {entity.index});
 	}
 
 
@@ -3584,7 +3554,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			PxTransform::createIdentity());
 		joint.physx = px_joint;
 		deserializeJoint(serializer, px_joint);
-		m_universe.addComponent(entity, DISTANCE_JOINT_TYPE, this, {entity.index});
+		m_universe.onComponentCreated(entity, DISTANCE_JOINT_TYPE, this, {entity.index});
 	}
 
 
@@ -3692,7 +3662,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 		deserializeJoint(serializer, px_joint);
 
-		m_universe.addComponent(entity, D6_JOINT_TYPE, this, {entity.index});
+		m_universe.onComponentCreated(entity, D6_JOINT_TYPE, this, {entity.index});
 	}
 
 
@@ -3752,7 +3722,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			PxTransform::createIdentity());
 		joint.physx = px_joint;
 		deserializeJoint(serializer, px_joint);
-		m_universe.addComponent(entity, HINGE_JOINT_TYPE, this, {entity.index});
+		m_universe.onComponentCreated(entity, HINGE_JOINT_TYPE, this, {entity.index});
 	}
 
 
@@ -3804,7 +3774,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		auto* geometry = manager->load(Path(tmp));
 		actor->setResource(static_cast<PhysicsGeometry*>(geometry));
 		
-		m_universe.addComponent(actor->entity, MESH_ACTOR_TYPE, this, {entity.index});
+		m_universe.onComponentCreated(actor->entity, MESH_ACTOR_TYPE, this, {entity.index});
 	}
 
 
@@ -3932,7 +3902,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		}
 		actor->setPhysxActor(physx_actor);
 
-		m_universe.addComponent(entity, RIGID_ACTOR_TYPE, this, { entity.index });
+		m_universe.onComponentCreated(entity, RIGID_ACTOR_TYPE, this, { entity.index });
 
 	}
 
@@ -3966,7 +3936,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		}
 		actor->setPhysxActor(physx_actor);
 
-		m_universe.addComponent(entity, BOX_ACTOR_TYPE, this, {entity.index});
+		m_universe.onComponentCreated(entity, BOX_ACTOR_TYPE, this, {entity.index});
 	}
 
 
@@ -4016,7 +3986,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		}
 		actor->setPhysxActor(physx_actor);
 
-		m_universe.addComponent(entity, CAPSULE_ACTOR_TYPE, this, {entity.index});
+		m_universe.onComponentCreated(entity, CAPSULE_ACTOR_TYPE, this, {entity.index});
 	}
 
 
@@ -4064,7 +4034,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		}
 		actor->setPhysxActor(physx_actor);
 
-		m_universe.addComponent(entity, SPHERE_ACTOR_TYPE, this, {entity.index});
+		m_universe.onComponentCreated(entity, SPHERE_ACTOR_TYPE, this, {entity.index});
 	}
 
 
@@ -4218,7 +4188,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 					if (shape) shape->userData = (void*)(intptr_t)index;
 				}
 				actor->setPhysxActor(physx_actor);
-				m_universe.addComponent(actor->entity, RIGID_ACTOR_TYPE, this, cmp);
+				m_universe.onComponentCreated(actor->entity, RIGID_ACTOR_TYPE, this, cmp);
 			}
 			break;
 			case ActorType::BOX:
@@ -4229,7 +4199,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 				PxRigidActor* physx_actor = createPhysXActor(actor, transform, box_geom);
 
 				actor->setPhysxActor(physx_actor);
-				m_universe.addComponent(actor->entity, BOX_ACTOR_TYPE, this, cmp);
+				m_universe.onComponentCreated(actor->entity, BOX_ACTOR_TYPE, this, cmp);
 			}
 			break;
 			case ActorType::SPHERE:
@@ -4239,7 +4209,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 				serializer.read(sphere_geom.radius);
 				PxRigidActor* physx_actor = createPhysXActor(actor, transform, sphere_geom);
 				actor->setPhysxActor(physx_actor);
-				m_universe.addComponent(actor->entity, SPHERE_ACTOR_TYPE, this, cmp);
+				m_universe.onComponentCreated(actor->entity, SPHERE_ACTOR_TYPE, this, cmp);
 			}
 			break;
 			case ActorType::CAPSULE:
@@ -4250,7 +4220,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 				serializer.read(capsule_geom.radius);
 				PxRigidActor* physx_actor = createPhysXActor(actor, transform, capsule_geom);
 				actor->setPhysxActor(physx_actor);
-				m_universe.addComponent(actor->entity, CAPSULE_ACTOR_TYPE, this, cmp);
+				m_universe.onComponentCreated(actor->entity, CAPSULE_ACTOR_TYPE, this, cmp);
 			}
 			break;
 			case ActorType::MESH:
@@ -4260,7 +4230,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 				ResourceManagerBase* manager = m_engine->getResourceManager().get(PhysicsGeometry::TYPE);
 				auto* geometry = manager->load(Path(tmp));
 				actor->setResource(static_cast<PhysicsGeometry*>(geometry));
-				m_universe.addComponent(actor->entity, MESH_ACTOR_TYPE, this, cmp);
+				m_universe.onComponentCreated(actor->entity, MESH_ACTOR_TYPE, this, cmp);
 			}
 			break;
 			default:
@@ -4869,7 +4839,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			c.m_controller = m_controller_manager->createController(cDesc);
 			c.m_controller->getActor()->userData = (void*)(intptr_t)entity.index;
 			c.m_entity = entity;
-			m_universe.addComponent(entity, CONTROLLER_TYPE, this, {entity.index});
+			m_universe.onComponentCreated(entity, CONTROLLER_TYPE, this, {entity.index});
 		}
 	}
 
@@ -4903,7 +4873,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			ragdoll.entity = entity;
 			setRagdollRoot(ragdoll, deserializeRagdollBone(ragdoll, nullptr, serializer));
 			ComponentHandle cmp = {ragdoll.entity.index};
-			m_universe.addComponent(ragdoll.entity, RAGDOLL_TYPE, this, cmp);
+			m_universe.onComponentCreated(ragdoll.entity, RAGDOLL_TYPE, this, cmp);
 		}
 	}
 
@@ -5016,7 +4986,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			}
 
 			ComponentHandle cmp = {entity.index};
-			m_universe.addComponent(entity, cmp_type, this, cmp);
+			m_universe.onComponentCreated(entity, cmp_type, this, cmp);
 		}
 
 	}
@@ -5043,7 +5013,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			{
 				setHeightmapSource(cmp, Path(tmp));
 			}
-			m_universe.addComponent(terrain.m_entity, HEIGHTFIELD_TYPE, this, cmp);
+			m_universe.onComponentCreated(terrain.m_entity, HEIGHTFIELD_TYPE, this, cmp);
 		}
 	}
 

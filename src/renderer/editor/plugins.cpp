@@ -513,12 +513,12 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 
 		Entity light_entity = m_tile.universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
 		RenderScene* render_scene = (RenderScene*)m_tile.universe->getScene(MODEL_INSTANCE_TYPE);
-		ComponentHandle light_cmp = render_scene->createComponent(GLOBAL_LIGHT_TYPE, light_entity);
+		ComponentHandle light_cmp = m_tile.universe->createComponent(GLOBAL_LIGHT_TYPE, light_entity);
 		render_scene->setGlobalLightIntensity(light_cmp, 1);
 		render_scene->setGlobalLightIndirectIntensity(light_cmp, 1);
 
 		m_tile.camera_entity = m_tile.universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
-		m_tile.camera_cmp = render_scene->createComponent(CAMERA_TYPE, m_tile.camera_entity);
+		m_tile.camera_cmp = m_tile.universe->createComponent(CAMERA_TYPE, m_tile.camera_entity);
 		render_scene->setCameraSlot(m_tile.camera_cmp, "editor");
 
 		m_tile.pipeline->setScene(render_scene);
@@ -535,14 +535,14 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 
 		auto mesh_entity = m_universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
 		auto* render_scene = static_cast<RenderScene*>(m_universe->getScene(MODEL_INSTANCE_TYPE));
-		m_mesh = render_scene->createComponent(MODEL_INSTANCE_TYPE, mesh_entity);
+		m_mesh = m_universe->createComponent(MODEL_INSTANCE_TYPE, mesh_entity);
 
 		auto light_entity = m_universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
-		auto light_cmp = render_scene->createComponent(GLOBAL_LIGHT_TYPE, light_entity);
+		auto light_cmp = m_universe->createComponent(GLOBAL_LIGHT_TYPE, light_entity);
 		render_scene->setGlobalLightIntensity(light_cmp, 1);
 
 		m_camera_entity = m_universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
-		m_camera_cmp = render_scene->createComponent(CAMERA_TYPE, m_camera_entity);
+		m_camera_cmp = m_universe->createComponent(CAMERA_TYPE, m_camera_entity);
 		render_scene->setCameraSlot(m_camera_cmp, "editor");
 
 		m_pipeline->setScene(render_scene);
@@ -933,7 +933,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		if (!renderer) return;
 
 		Entity mesh_entity = m_tile.universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
-		ComponentHandle tile_mesh = render_scene->createComponent(MODEL_INSTANCE_TYPE, mesh_entity);
+		ComponentHandle tile_mesh = m_tile.universe->createComponent(MODEL_INSTANCE_TYPE, mesh_entity);
 
 		render_scene->setModelInstancePath(tile_mesh, model->getPath());
 		AABB aabb = model->getAABB();

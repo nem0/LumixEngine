@@ -93,10 +93,30 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 			i.entity = INVALID_ENTITY;
 			i.buffer_id = AudioDevice::INVALID_BUFFER_HANDLE;
 		}
-		context.registerComponentType(LISTENER_TYPE, this, &AudioSceneImpl::serializeListener, &AudioSceneImpl::deserializeListener);
-		context.registerComponentType(AMBIENT_SOUND_TYPE, this, &AudioSceneImpl::serializeAmbientSound, &AudioSceneImpl::deserializeAmbientSound);
-		context.registerComponentType(ECHO_ZONE_TYPE, this, &AudioSceneImpl::serializeEchoZone, &AudioSceneImpl::deserializeEchoZone);
-		context.registerComponentType(CHORUS_ZONE_TYPE, this, &AudioSceneImpl::serializeChorusZone, &AudioSceneImpl::deserializeChorusZone);
+		context.registerComponentType(LISTENER_TYPE
+			, this
+			, &AudioSceneImpl::createListener
+			, &AudioSceneImpl::destroyListener
+			, &AudioSceneImpl::serializeListener
+			, &AudioSceneImpl::deserializeListener);
+		context.registerComponentType(AMBIENT_SOUND_TYPE
+			, this
+			, &AudioSceneImpl::createAmbientSound
+			, &AudioSceneImpl::destroyAmbientSound
+			, &AudioSceneImpl::serializeAmbientSound
+			, &AudioSceneImpl::deserializeAmbientSound);
+		context.registerComponentType(ECHO_ZONE_TYPE
+			, this
+			, &AudioSceneImpl::createEchoZone
+			, &AudioSceneImpl::destroyEchoZone
+			, &AudioSceneImpl::serializeEchoZone
+			, &AudioSceneImpl::deserializeEchoZone);
+		context.registerComponentType(CHORUS_ZONE_TYPE
+			, this
+			, &AudioSceneImpl::createChorusZone
+			, &AudioSceneImpl::destroyChorusZone
+			, &AudioSceneImpl::serializeChorusZone
+			, &AudioSceneImpl::deserializeChorusZone);
 	}
 
 
@@ -158,7 +178,7 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 		zone.entity = entity;
 		serializer.read(&zone.radius);
 		serializer.read(&zone.delay);
-		m_universe.addComponent(entity, ECHO_ZONE_TYPE, this, {entity.index});
+		m_universe.onComponentCreated(entity, ECHO_ZONE_TYPE, this, {entity.index});
 	}
 
 	void serializeChorusZone(ISerializer& serializer, ComponentHandle cmp)
@@ -185,7 +205,7 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 		serializer.read(&zone.frequency);
 		serializer.read(&zone.phase);
 		serializer.read(&zone.wet_dry_mix);
-		m_universe.addComponent(entity, CHORUS_ZONE_TYPE, this, { entity.index });
+		m_universe.onComponentCreated(entity, CHORUS_ZONE_TYPE, this, { entity.index });
 	}
 
 	void serializeAmbientSound(ISerializer& serializer, ComponentHandle cmp)
@@ -205,7 +225,7 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 		serializer.read(&clip);
 		serializer.read(&sound.is_3d);
 		sound.clip = clip >= 0 ? m_clips[clip] : nullptr;
-		m_universe.addComponent(entity, AMBIENT_SOUND_TYPE, this, {entity.index});
+		m_universe.onComponentCreated(entity, AMBIENT_SOUND_TYPE, this, {entity.index});
 	}
 
 
@@ -215,7 +235,7 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 	void deserializeListener(IDeserializer&, Entity entity, int /*scene_version*/)
 	{
 		m_listener.entity = entity;
-		m_universe.addComponent(entity, LISTENER_TYPE, this, {0});
+		m_universe.onComponentCreated(entity, LISTENER_TYPE, this, {0});
 	}
 
 
@@ -362,7 +382,7 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 		}
 
 		m_listener.entity = entity;
-		m_universe.addComponent(entity, LISTENER_TYPE, this, {0});
+		m_universe.onComponentCreated(entity, LISTENER_TYPE, this, {0});
 		return {0};
 	}
 
@@ -408,7 +428,7 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 		zone.delay = 500.0f;
 		zone.radius = 10;
 		ComponentHandle cmp = {entity.index};
-		m_universe.addComponent(entity, ECHO_ZONE_TYPE, this, cmp);
+		m_universe.onComponentCreated(entity, ECHO_ZONE_TYPE, this, cmp);
 		return cmp;
 	}
 
@@ -442,7 +462,7 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 		Entity entity = {component.index};
 		int idx = m_echo_zones.find(entity);
 		m_echo_zones.eraseAt(idx);
-		m_universe.destroyComponent(entity, ECHO_ZONE_TYPE, this, component);
+		m_universe.onComponentDestroyed(entity, ECHO_ZONE_TYPE, this, component);
 	}
 
 	ComponentHandle createChorusZone(Entity entity)
@@ -457,7 +477,7 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 		zone.phase = 0;
 		zone.wet_dry_mix = 0.5f;
 		ComponentHandle cmp = { entity.index };
-		m_universe.addComponent(entity, CHORUS_ZONE_TYPE, this, cmp);
+		m_universe.onComponentCreated(entity, CHORUS_ZONE_TYPE, this, cmp);
 		return cmp;
 	}
 
@@ -491,7 +511,7 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 		Entity entity = { component.index };
 		int idx = m_chorus_zones.find(entity);
 		m_chorus_zones.eraseAt(idx);
-		m_universe.destroyComponent(entity, CHORUS_ZONE_TYPE, this, component);
+		m_universe.onComponentDestroyed(entity, CHORUS_ZONE_TYPE, this, component);
 	}
 
 
@@ -502,12 +522,9 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 		sound.clip = nullptr;
 		sound.playing_sound = -1;
 		ComponentHandle cmp = {entity.index};
-		m_universe.addComponent(entity, AMBIENT_SOUND_TYPE, this, cmp);
+		m_universe.onComponentCreated(entity, AMBIENT_SOUND_TYPE, this, cmp);
 		return cmp;
 	}
-
-
-	ComponentHandle createComponent(ComponentType type, Entity entity) override;
 
 
 	void destroyListener(ComponentHandle component)
@@ -515,7 +532,7 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 		ASSERT(component.index == 0);
 		auto entity = m_listener.entity;
 		m_listener.entity = INVALID_ENTITY;
-		m_universe.destroyComponent(entity, LISTENER_TYPE, this, component);
+		m_universe.onComponentDestroyed(entity, LISTENER_TYPE, this, component);
 	}
 
 
@@ -523,11 +540,8 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 	{
 		Entity entity = {component.index};
 		m_ambient_sounds.erase(entity);
-		m_universe.destroyComponent(entity, AMBIENT_SOUND_TYPE, this, component);
+		m_universe.onComponentDestroyed(entity, AMBIENT_SOUND_TYPE, this, component);
 	}
-
-
-	void destroyComponent(ComponentHandle component, ComponentType type) override;
 
 
 	void serialize(OutputBlob& serializer) override
@@ -574,7 +588,7 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 		serializer.read(m_listener.entity);
 		if (m_listener.entity != INVALID_ENTITY)
 		{
-			m_universe.addComponent(m_listener.entity, LISTENER_TYPE, this, {0});
+			m_universe.onComponentCreated(m_listener.entity, LISTENER_TYPE, this, {0});
 		}
 
 		int count = 0;
@@ -615,7 +629,7 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 
 			ComponentHandle cmp = {sound.entity.index};
 			m_ambient_sounds.insert(sound.entity, sound);
-			m_universe.addComponent(sound.entity, AMBIENT_SOUND_TYPE, this, cmp);
+			m_universe.onComponentCreated(sound.entity, AMBIENT_SOUND_TYPE, this, cmp);
 		}
 
 		serializer.read(count);
@@ -626,7 +640,7 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 			serializer.read(zone);
 
 			m_echo_zones.insert(zone.entity, zone);
-			m_universe.addComponent(zone.entity, ECHO_ZONE_TYPE, this, {zone.entity.index});
+			m_universe.onComponentCreated(zone.entity, ECHO_ZONE_TYPE, this, {zone.entity.index});
 		}
 
 		serializer.read(count);
@@ -637,7 +651,7 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 			serializer.read(zone);
 
 			m_chorus_zones.insert(zone.entity, zone);
-			m_universe.addComponent(zone.entity, CHORUS_ZONE_TYPE, this, { zone.entity.index });
+			m_universe.onComponentCreated(zone.entity, CHORUS_ZONE_TYPE, this, { zone.entity.index });
 		}
 	}
 
@@ -855,46 +869,6 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 	PlayingSound m_playing_sounds[AudioDevice::MAX_PLAYING_SOUNDS];
 	AnimationScene* m_animation_scene = nullptr;
 };
-
-
-static struct
-{
-	ComponentType type;
-	ComponentHandle(AudioSceneImpl::*creator)(Entity);
-	void (AudioSceneImpl::*destroyer)(ComponentHandle);
-} COMPONENT_INFOS[] = {
-	{ LISTENER_TYPE, &AudioSceneImpl::createListener, &AudioSceneImpl::destroyListener },
-	{ AMBIENT_SOUND_TYPE, &AudioSceneImpl::createAmbientSound, &AudioSceneImpl::destroyAmbientSound },
-	{ ECHO_ZONE_TYPE, &AudioSceneImpl::createEchoZone, &AudioSceneImpl::destroyEchoZone },
-	{ CHORUS_ZONE_TYPE, &AudioSceneImpl::createChorusZone, &AudioSceneImpl::destroyChorusZone }
-};
-
-
-ComponentHandle AudioSceneImpl::createComponent(ComponentType type, Entity entity)
-{
-	for(auto& i : COMPONENT_INFOS)
-	{
-		if(i.type == type)
-		{
-			return (this->*i.creator)(entity);
-		}
-	}
-
-	return INVALID_COMPONENT;
-}
-
-
-void AudioSceneImpl::destroyComponent(ComponentHandle component, ComponentType type)
-{
-	for(auto& i : COMPONENT_INFOS)
-	{
-		if(i.type == type)
-		{
-			(this->*i.destroyer)(component);
-			return;
-		}
-	}
-}
 
 
 AudioScene* AudioScene::createInstance(AudioSystem& system,
