@@ -79,29 +79,29 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 		using namespace Reflection;
 		static auto lua_scene = scene("gui",
 			component("gui_text",
-				property("Text", LUMIX_PROP(GUIScene, getText, setText)),
-				property("Font", LUMIX_PROP(GUIScene, getTextFontPath, setTextFontPath),
+				property("Text", LUMIX_PROP(GUIScene, Text)),
+				property("Font", LUMIX_PROP(GUIScene, TextFontPath),
 					ResourceAttribute("Font (*.ttf)", FONT_TYPE)),
-				property("Font Size", LUMIX_PROP(GUIScene, getTextFontSize, setTextFontSize)),
-				property("Color", LUMIX_PROP(GUIScene, getTextColorRGBA, setTextColorRGBA),
+				property("Font Size", LUMIX_PROP(GUIScene, TextFontSize)),
+				property("Color", LUMIX_PROP(GUIScene, TextColorRGBA),
 					ColorAttribute())
 			),
 			component("gui_image",
-				property("Color", LUMIX_PROP(GUIScene, getImageColorRGBA, setImageColorRGBA),
+				property("Color", LUMIX_PROP(GUIScene, ImageColorRGBA),
 					ColorAttribute()),
-				property("Sprite", LUMIX_PROP(GUIScene, getImageSprite, setImageSprite),
+				property("Sprite", LUMIX_PROP(GUIScene, ImageSprite),
 					ResourceAttribute("Sprite (*.spr)", SPRITE_TYPE))
 			),
 			component("gui_rect",
-				property("Enabled", LUMIX_PROP(GUIScene, isRectEnabled, enableRect)),
-				property("Top Points", LUMIX_PROP(GUIScene, getRectTopPoints, setRectTopPoints)),
-				property("Top Relative", LUMIX_PROP(GUIScene, getRectTopRelative, setRectTopRelative)),
-				property("Right Points", LUMIX_PROP(GUIScene, getRectRightPoints, setRectRightPoints)),
-				property("Right Relative", LUMIX_PROP(GUIScene, getRectRightRelative, setRectRightRelative)),
-				property("Bottom Points", LUMIX_PROP(GUIScene, getRectBottomPoints, setRectBottomPoints)),
-				property("Bottom Relative", LUMIX_PROP(GUIScene, getRectBottomRelative, setRectBottomRelative)),
-				property("Left Points", LUMIX_PROP(GUIScene, getRectLeftPoints, setRectLeftPoints)),
-				property("Left Relative", LUMIX_PROP(GUIScene, getRectLeftRelative, setRectLeftRelative))
+				property("Enabled", LUMIX_PROP_FULL(GUIScene, isRectEnabled, enableRect)),
+				property("Top Points", LUMIX_PROP(GUIScene, RectTopPoints)),
+				property("Top Relative", LUMIX_PROP(GUIScene, RectTopRelative)),
+				property("Right Points", LUMIX_PROP(GUIScene, RectRightPoints)),
+				property("Right Relative", LUMIX_PROP(GUIScene, RectRightRelative)),
+				property("Bottom Points", LUMIX_PROP(GUIScene, RectBottomPoints)),
+				property("Bottom Relative", LUMIX_PROP(GUIScene, RectBottomRelative)),
+				property("Left Points", LUMIX_PROP(GUIScene, RectLeftPoints)),
+				property("Left Relative", LUMIX_PROP(GUIScene, RectLeftRelative))
 			)
 		);
 		registerScene(lua_scene);

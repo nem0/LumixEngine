@@ -115,24 +115,24 @@ AnimationSystemImpl::AnimationSystemImpl(Engine& engine)
 	using namespace Reflection;
 	static auto anim_scene = scene("animation",
 		component("property_animator", 
-			property("Animation", LUMIX_PROP(AnimationScene, getPropertyAnimation, setPropertyAnimation),
+			property("Animation", LUMIX_PROP(AnimationScene, PropertyAnimation),
 				ResourceAttribute("Property animation (*.anp)", PROPERTY_ANIMATION_TYPE))
 		),
 		component("anim_controller",
-			property("Source", LUMIX_PROP(AnimationScene, getControllerSource, setControllerSource),
+			property("Source", LUMIX_PROP(AnimationScene, ControllerSource),
 				ResourceAttribute("Animation controller (*.act)", CONTROLLER_RESOURCE_TYPE)),
 			AnimSetProperty()
 		),
 		component("animable",
-			property("Animation", LUMIX_PROP(AnimationScene, getAnimation, setAnimation),
+			property("Animation", LUMIX_PROP(AnimationScene, Animation),
 				ResourceAttribute("Animation (*.ani)", ANIMATION_TYPE)),
-			property("Start time", LUMIX_PROP(AnimationScene, getAnimableStartTime, setAnimableStartTime),
+			property("Start time", LUMIX_PROP(AnimationScene, AnimableStartTime),
 				MinAttribute(0)),
-			property("Time scale", LUMIX_PROP(AnimationScene, getAnimableTimeScale, setAnimableTimeScale),
+			property("Time scale", LUMIX_PROP(AnimationScene, AnimableTimeScale),
 				MinAttribute(0))
 		),
 		component("shared_anim_controller",
-			property("Parent", LUMIX_PROP(AnimationScene, getSharedControllerParent, setSharedControllerParent))
+			property("Parent", LUMIX_PROP(AnimationScene, SharedControllerParent))
 		)
 	);
 	registerScene(anim_scene);
