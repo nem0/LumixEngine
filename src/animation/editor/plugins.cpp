@@ -24,9 +24,6 @@ using namespace Lumix;
 static const ComponentType ANIMABLE_TYPE = Reflection::getComponentType("animable");
 static const ComponentType CONTROLLER_TYPE = Reflection::getComponentType("anim_controller");
 static const ComponentType RENDERABLE_TYPE = Reflection::getComponentType("renderable");
-static const ResourceType ANIMATION_TYPE("animation");
-static const ResourceType PROPERTY_ANIMATION_TYPE("property_animation");
-static const ResourceType CONTROLLER_RESOURCE_TYPE("anim_controller");
 
 
 namespace
@@ -43,13 +40,13 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 
 	bool acceptExtension(const char* ext, ResourceType type) const override
 	{
-		return type == ANIMATION_TYPE && equalStrings(ext, "anm");
+		return type == Animation::TYPE && equalStrings(ext, "anm");
 	}
 
 
 	bool onGUI(Resource* resource, ResourceType type) override
 	{
-		if (type == ANIMATION_TYPE)
+		if (type == Animation::TYPE)
 		{
 			auto* animation = static_cast<Animation*>(resource);
 			ImGui::LabelText("FPS", "%d", animation->getFPS());
@@ -67,18 +64,18 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 	const char* getName() const override { return "Animation"; }
 
 
-	bool hasResourceManager(ResourceType type) const override { return type == ANIMATION_TYPE; }
+	bool hasResourceManager(ResourceType type) const override { return type == Animation::TYPE; }
 
 
 	bool createTile(const char* in_path, const char* out_path, ResourceType type) override
 	{
-		if (type == ANIMATION_TYPE) return copyFile("models/editor/tile_animation.dds", out_path);
+		if (type == Animation::TYPE) return copyFile("models/editor/tile_animation.dds", out_path);
 		return false;
 	}
 
 	ResourceType getResourceType(const char* ext) override
 	{
-		if (equalStrings(ext, "ani")) return ANIMATION_TYPE;
+		if (equalStrings(ext, "ani")) return Animation::TYPE;
 		return INVALID_RESOURCE_TYPE;
 	}
 
@@ -97,13 +94,13 @@ struct PropertyAnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 
 	bool acceptExtension(const char* ext, ResourceType type) const override
 	{
-		return type == PROPERTY_ANIMATION_TYPE && equalStrings(ext, "anp");
+		return type == PropertyAnimation::TYPE && equalStrings(ext, "anp");
 	}
 
 
 	bool onGUI(Resource* resource, ResourceType type) override
 	{
-		if (type == PROPERTY_ANIMATION_TYPE)
+		if (type == PropertyAnimation::TYPE)
 		{
 			auto* animation = static_cast<PropertyAnimation*>(resource);
 			return true;
@@ -118,12 +115,12 @@ struct PropertyAnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 	const char* getName() const override { return "Property animation"; }
 
 
-	bool hasResourceManager(ResourceType type) const override { return type == PROPERTY_ANIMATION_TYPE; }
+	bool hasResourceManager(ResourceType type) const override { return type == PropertyAnimation::TYPE; }
 
 
 	ResourceType getResourceType(const char* ext) override
 	{
-		if (equalStrings(ext, "anp")) return PROPERTY_ANIMATION_TYPE;
+		if (equalStrings(ext, "anp")) return PropertyAnimation::TYPE;
 		return INVALID_RESOURCE_TYPE;
 	}
 
@@ -143,13 +140,13 @@ struct AnimControllerAssetBrowserPlugin : AssetBrowser::IPlugin
 
 	bool acceptExtension(const char* ext, ResourceType type) const override
 	{
-		return type == CONTROLLER_RESOURCE_TYPE && equalStrings(ext, "act");
+		return type == Anim::ControllerResource::TYPE && equalStrings(ext, "act");
 	}
 
 
 	bool onGUI(Resource* resource, ResourceType type) override
 	{
-		if (type == CONTROLLER_RESOURCE_TYPE)
+		if (type == Anim::ControllerResource::TYPE)
 		{
 			return true;
 		}
@@ -163,19 +160,19 @@ struct AnimControllerAssetBrowserPlugin : AssetBrowser::IPlugin
 	const char* getName() const override { return "Animation Controller"; }
 
 
-	bool hasResourceManager(ResourceType type) const override { return type == CONTROLLER_RESOURCE_TYPE; }
+	bool hasResourceManager(ResourceType type) const override { return type == Anim::ControllerResource::TYPE; }
 
 
 	ResourceType getResourceType(const char* ext) override
 	{
-		if (equalStrings(ext, "act")) return CONTROLLER_RESOURCE_TYPE;
+		if (equalStrings(ext, "act")) return Anim::ControllerResource::TYPE;
 		return INVALID_RESOURCE_TYPE;
 	}
 
 
 	bool createTile(const char* in_path, const char* out_path, ResourceType type) override
 	{
-		if (type == CONTROLLER_RESOURCE_TYPE) return copyFile("models/editor/tile_animation_graph.dds", out_path);
+		if (type == Anim::ControllerResource::TYPE) return copyFile("models/editor/tile_animation_graph.dds", out_path);
 		return false;
 	}
 
@@ -255,8 +252,8 @@ struct PropertyGridPlugin : PropertyGrid::IPlugin
 LUMIX_STUDIO_ENTRY(animation)
 {
 	app.registerComponent("property_animator", "Animation/Property animator");
-	app.registerComponentWithResource("animable", "Animation/Animable", ANIMATION_TYPE, *Reflection::getProperty(ANIMABLE_TYPE, "Animation"));
-	app.registerComponentWithResource("anim_controller", "Animation/Controller", CONTROLLER_RESOURCE_TYPE, *Reflection::getProperty(CONTROLLER_TYPE, "Source"));
+	app.registerComponentWithResource("animable", "Animation/Animable", Animation::TYPE, *Reflection::getProperty(ANIMABLE_TYPE, "Animation"));
+	app.registerComponentWithResource("anim_controller", "Animation/Controller", Anim::ControllerResource::TYPE, *Reflection::getProperty(CONTROLLER_TYPE, "Source"));
 	app.registerComponent("shared_anim_controller", "Animation/Shared controller");
 
 	auto& allocator = app.getWorldEditor().getAllocator();

@@ -55,10 +55,12 @@ public:
 
 	PropertyAnimation(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
 
-	ResourceType getType() const override { return ResourceType("animation"); }
+	ResourceType getType() const override { return TYPE; }
 
 	Array<Curve> curves;
 	int fps;
+
+	static const ResourceType TYPE;
 
 private:
 	IAllocator& getAllocator() const;

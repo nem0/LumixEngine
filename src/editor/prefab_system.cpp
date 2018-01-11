@@ -27,9 +27,6 @@ namespace Lumix
 {
 
 
-static const ResourceType PREFAB_TYPE("prefab");
-
-
 class AssetBrowserPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 {
 public:
@@ -41,7 +38,7 @@ public:
 
 	bool onGUI(Resource* resource, ResourceType type) override
 	{
-		if (type != PREFAB_TYPE) return false;
+		if (type != PrefabResource::TYPE) return false;
 
 		if (ImGui::Button("instantiate"))
 		{
@@ -55,19 +52,19 @@ public:
 
 	ResourceType getResourceType(const char* ext) override
 	{
-		if (equalStrings(ext, "fab")) return PREFAB_TYPE;
+		if (equalStrings(ext, "fab")) return PrefabResource::TYPE;
 		return INVALID_RESOURCE_TYPE;
 	}
 	
 	
 	void onResourceUnloaded(Resource* resource) override {}
 	const char* getName() const override { return "Prefab"; }
-	bool hasResourceManager(ResourceType type) const override { return type == PREFAB_TYPE; }
+	bool hasResourceManager(ResourceType type) const override { return type == PrefabResource::TYPE; }
 
 
 	bool acceptExtension(const char* ext, ResourceType type) const override
 	{
-		return type == PREFAB_TYPE && equalStrings(ext, "fab");
+		return type == PrefabResource::TYPE && equalStrings(ext, "fab");
 	}
 
 
@@ -167,7 +164,7 @@ class PrefabSystemImpl LUMIX_FINAL : public PrefabSystem
 			serializer.deserialize("scale", scale, 0);
 			char path[MAX_PATH_LENGTH];
 			serializer.deserialize("path_hash", path, lengthOf(path), "");
-			prefab = (PrefabResource*)editor.getEngine().getResourceManager().get(PREFAB_TYPE)->load(Path(path));
+			prefab = (PrefabResource*)editor.getEngine().getResourceManager().get(PrefabResource::TYPE)->load(Path(path));
 		}
 
 
@@ -609,7 +606,7 @@ public:
 
 			Transform tr = m_universe->getTransform(entity);
 			m_editor.destroyEntities(&entities[0], entities.size());
-			auto* resource_manager = m_editor.getEngine().getResourceManager().get(PREFAB_TYPE);
+			auto* resource_manager = m_editor.getEngine().getResourceManager().get(PrefabResource::TYPE);
 			auto* res = (PrefabResource*)resource_manager->load(path);
 			FS::FileSystem& fs = m_editor.getEngine().getFileSystem();
 			while (fs.hasWork()) fs.updateAsyncTransactions();
@@ -655,7 +652,7 @@ public:
 			m_instances.insert(key, value);
 		}
 		serializer.read(count);
-		auto* resource_manager = m_editor.getEngine().getResourceManager().get(PREFAB_TYPE);
+		auto* resource_manager = m_editor.getEngine().getResourceManager().get(PrefabResource::TYPE);
 		for (int i = 0; i < count; ++i)
 		{
 			char tmp[MAX_PATH_LENGTH];
@@ -700,7 +697,7 @@ public:
 		serializer.read(&count);
 		reserve({count-1});
 		
-		auto* mng = m_editor.getEngine().getResourceManager().get(PREFAB_TYPE);
+		auto* mng = m_editor.getEngine().getResourceManager().get(PrefabResource::TYPE);
 		for (;;)
 		{
 			char tmp[MAX_PATH_LENGTH];

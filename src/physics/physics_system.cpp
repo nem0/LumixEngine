@@ -7,18 +7,15 @@
 #include "engine/log.h"
 #include "engine/engine.h"
 #include "engine/reflection.h"
+#include "engine/universe/universe.h"
 #include "physics/physics_geometry_manager.h"
 #include "physics/physics_scene.h"
-#include "engine/universe/universe.h"
+#include "renderer/texture.h"
 #include <cstdlib>
 
 
 namespace Lumix
 {
-
-
-	static const ResourceType TEXTURE_TYPE("texture");
-	static const ResourceType PHYSICS_TYPE("physics");
 
 
 	const char* getD6MotionName(int index)
@@ -159,12 +156,12 @@ namespace Lumix
 				property("Layer", LUMIX_PROP(PhysicsScene, ActorLayer)),
 				enum_property("Dynamic", LUMIX_PROP(PhysicsScene, DynamicType), 3, getDynamicTypeName),
 				property("Source", LUMIX_PROP(PhysicsScene, ShapeSource),
-					ResourceAttribute("Physics (*.phy)", PHYSICS_TYPE))
+					ResourceAttribute("Physics (*.phy)", PhysicsGeometry::TYPE))
 			),
 			component("physical_heightfield",
 				property("Layer", LUMIX_PROP(PhysicsScene, HeightfieldLayer)),
 				property("Heightmap", LUMIX_PROP(PhysicsScene, HeightmapSource),
-					ResourceAttribute("Image (*.raw)", TEXTURE_TYPE)),
+					ResourceAttribute("Image (*.raw)", Texture::TYPE)),
 				property("Y scale", LUMIX_PROP(PhysicsScene, HeightmapYScale),
 					MinAttribute(0)),
 				property("XZ scale", LUMIX_PROP(PhysicsScene, HeightmapXZScale),
@@ -219,7 +216,7 @@ namespace Lumix
 			, m_manager(*this, engine.getAllocator())
 		{
 			registerProperties(engine.getAllocator());
-			m_manager.create(PHYSICS_TYPE, engine.getResourceManager());
+			m_manager.create(PhysicsGeometry::TYPE, engine.getResourceManager());
 			PhysicsScene::registerLuaAPI(m_engine.getState());
 
 			m_foundation = PxCreateFoundation(PX_PHYSICS_VERSION, m_physx_allocator, m_error_callback);

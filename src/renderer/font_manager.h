@@ -21,12 +21,14 @@ class LUMIX_RENDERER_API FontResource LUMIX_FINAL : public Resource
 public:
 	FontResource(const Path& path, ResourceManagerBase& manager, IAllocator& allocator);
 
-	ResourceType getType() const override { return ResourceType("font"); }
+	ResourceType getType() const override { return TYPE; }
 
 	void unload() override {}
 	bool load(FS::IFile& file) override { return true; }
 	Font* addRef(int font_size);
 	void removeRef(Font& font);
+
+	static const ResourceType TYPE;
 
 private:
 	struct FontRef

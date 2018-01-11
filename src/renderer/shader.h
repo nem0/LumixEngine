@@ -66,11 +66,13 @@ class LUMIX_RENDERER_API ShaderBinary LUMIX_FINAL : public Resource
 public:
 	ShaderBinary(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
 	
-	ResourceType getType() const override { return ResourceType("shader_binary"); }
+	ResourceType getType() const override { return TYPE; }
 
 	bgfx::ShaderHandle getHandle() { return m_handle; }
 
 	Shader* m_shader;
+
+	static const ResourceType TYPE;
 
 private:
 	void unload() override;
@@ -129,7 +131,7 @@ public:
 	Shader(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
 	~Shader();
 
-	ResourceType getType() const override { return ResourceType("shader"); }
+	ResourceType getType() const override { return TYPE; }
 
 	bool hasDefine(u8 define_idx) const;
 	ShaderInstance& getInstance(u32 mask);
@@ -150,6 +152,8 @@ public:
 	TextureSlot m_texture_slots[MAX_TEXTURE_SLOT_COUNT];
 	int m_texture_slot_count;
 	Array<Uniform> m_uniforms;
+
+	static const ResourceType TYPE;
 
 private:
 	bool generateInstances();

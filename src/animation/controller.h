@@ -53,7 +53,7 @@ public:
 	ControllerResource(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
 	~ControllerResource();
 
-	ResourceType getType() const override { return ResourceType("anim_controller"); }
+	ResourceType getType() const override { return TYPE; }
 
 	void create() { onCreated(State::READY); }
 	void destroy() { doUnload(); }
@@ -77,6 +77,8 @@ public:
 	Array<BoneMask> m_masks;
 	InputDecl m_input_decl;
 	Component* m_root;
+
+	static const ResourceType TYPE;
 
 private:
 	void clearAnimationSets();

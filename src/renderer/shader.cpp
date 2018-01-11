@@ -17,7 +17,8 @@ namespace Lumix
 {
 
 
-static const ResourceType SHADER_BINARY_TYPE("shader_binary");
+const ResourceType Shader::TYPE("shader");
+const ResourceType ShaderBinary::TYPE("shader_binary");
 
 
 Shader::Shader(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator)
@@ -96,7 +97,7 @@ bool Shader::generateInstances()
 
 	u32 count = 1 << m_combintions.define_count;
 
-	auto* binary_manager = m_resource_manager.getOwner().get(SHADER_BINARY_TYPE);
+	auto* binary_manager = m_resource_manager.getOwner().get(ShaderBinary::TYPE);
 	char basename[MAX_PATH_LENGTH];
 	PathUtils::getBasename(basename, sizeof(basename), getPath().c_str());
 

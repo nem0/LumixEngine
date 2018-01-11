@@ -11,7 +11,7 @@ namespace Lumix
 {
 
 
-static const ResourceType TEXTURE_TYPE("texture");
+const ResourceType Sprite::TYPE("sprite");
 
 
 Sprite::Sprite(const Path& path, ResourceManagerBase& manager, IAllocator& allocator)
@@ -38,7 +38,7 @@ void Sprite::setTexture(const Path& path)
 	}
 	if (path.isValid())
 	{
-		m_texture = (Texture*)getResourceManager().getOwner().get(TEXTURE_TYPE)->load(path);
+		m_texture = (Texture*)getResourceManager().getOwner().get(Texture::TYPE)->load(path);
 	}
 	else
 	{
@@ -82,7 +82,7 @@ bool Sprite::load(FS::IFile& file)
 		{
 			char texture_path[MAX_PATH_LENGTH];
 			serializer.deserialize(texture_path, lengthOf(texture_path), "");
-			auto* mng = m_resource_manager.getOwner().get(TEXTURE_TYPE);
+			auto* mng = m_resource_manager.getOwner().get(Texture::TYPE);
 			m_texture = texture_path[0] != '\0' ? (Texture*)mng->load(Path(texture_path)) : nullptr;
 		}
 		else

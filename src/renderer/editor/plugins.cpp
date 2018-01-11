@@ -65,39 +65,32 @@ static const ComponentType POINT_LIGHT_TYPE = Reflection::getComponentType("poin
 static const ComponentType GLOBAL_LIGHT_TYPE = Reflection::getComponentType("global_light");
 static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("renderable");
 static const ComponentType ENVIRONMENT_PROBE_TYPE = Reflection::getComponentType("environment_probe");
-static const ResourceType FONT_TYPE("font");
-static const ResourceType MATERIAL_TYPE("material");
-static const ResourceType MODEL_TYPE("model");
-static const ResourceType PREFAB_TYPE("prefab");
-static const ResourceType SHADER_BINARY_TYPE("shader_binary");
-static const ResourceType SHADER_TYPE("shader");
-static const ResourceType TEXTURE_TYPE("texture");
 
 
 struct FontPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 {
 	bool onGUI(Resource* resource, ResourceType type) override 
 	{
-		if (type != FONT_TYPE) return false;
+		if (type != FontResource::TYPE) return false;
 		return true;
 	}
 
 
 	ResourceType getResourceType(const char* ext) override
 	{
-		return equalStrings(ext, "ttf") ? FONT_TYPE : INVALID_RESOURCE_TYPE;
+		return equalStrings(ext, "ttf") ? FontResource::TYPE : INVALID_RESOURCE_TYPE;
 	}
 
 
 	void onResourceUnloaded(Resource* resource) override {}
 	const char* getName() const override { return "Font"; }
 
-	bool hasResourceManager(ResourceType type) const override { return type == FONT_TYPE; }
+	bool hasResourceManager(ResourceType type) const override { return type == FontResource::TYPE; }
 
 
 	bool acceptExtension(const char* ext, ResourceType type) const override
 	{
-		return type == FONT_TYPE && equalStrings(ext, "ttf");
+		return type == FontResource::TYPE && equalStrings(ext, "ttf");
 	}
 };
 
@@ -112,7 +105,7 @@ struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 
 	bool acceptExtension(const char* ext, ResourceType type) const override
 	{
-		return type == MATERIAL_TYPE && equalStrings(ext, "mat");
+		return type == Material::TYPE && equalStrings(ext, "mat");
 	}
 
 
@@ -165,7 +158,7 @@ struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 
 	bool onGUI(Resource* resource, ResourceType type) override
 	{
-		if (type != MATERIAL_TYPE) return false;
+		if (type != Material::TYPE) return false;
 
 		auto* material = static_cast<Material*>(resource);
 
@@ -226,7 +219,7 @@ struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 
 		char buf[MAX_PATH_LENGTH];
 		copyString(buf, material->getShader() ? material->getShader()->getPath().c_str() : "");
-		if (m_app.getAssetBrowser().resourceInput("Shader", "shader", buf, sizeof(buf), SHADER_TYPE))
+		if (m_app.getAssetBrowser().resourceInput("Shader", "shader", buf, sizeof(buf), Shader::TYPE))
 		{
 			material->setShader(Path(buf));
 		}
@@ -243,7 +236,7 @@ struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 			bool is_node_open = ImGui::TreeNodeEx((const void*)(intptr_t)i, ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_AllowOverlapMode | ImGuiTreeNodeFlags_Framed, "%s", "");
 			ImGui::PopStyleColor(4);
 			ImGui::SameLine();
-			if (m_app.getAssetBrowser().resourceInput(slot.name, StaticString<30>("", (u64)&slot), buf, sizeof(buf), TEXTURE_TYPE))
+			if (m_app.getAssetBrowser().resourceInput(slot.name, StaticString<30>("", (u64)&slot), buf, sizeof(buf), Texture::TYPE))
 			{
 				material->setTexturePath(i, Path(buf));
 			}
@@ -371,12 +364,12 @@ struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 
 	void onResourceUnloaded(Resource* resource) override {}
 	const char* getName() const override { return "Material"; }
-	bool hasResourceManager(ResourceType type) const override { return type == MATERIAL_TYPE; }
+	bool hasResourceManager(ResourceType type) const override { return type == Material::TYPE; }
 
 
 	ResourceType getResourceType(const char* ext) override
 	{
-		return equalStrings(ext, "mat") ? MATERIAL_TYPE : INVALID_RESOURCE_TYPE;
+		return equalStrings(ext, "mat") ? Material::TYPE : INVALID_RESOURCE_TYPE;
 	}
 
 
@@ -506,7 +499,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 
 	bool acceptExtension(const char* ext, ResourceType type) const override
 	{
-		return type == MODEL_TYPE && equalStrings(ext, "msh");
+		return type == Model::TYPE && equalStrings(ext, "msh");
 	}
 
 
@@ -649,7 +642,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 
 	bool onGUI(Resource* resource, ResourceType type) override
 	{
-		if (type != MODEL_TYPE) return false;
+		if (type != Model::TYPE) return false;
 
 		auto* model = static_cast<Model*>(resource);
 		ImGui::LabelText("Bounding radius", "%f", model->getBoundingRadius());
@@ -739,12 +732,12 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 
 	void onResourceUnloaded(Resource* resource) override {}
 	const char* getName() const override { return "Model"; }
-	bool hasResourceManager(ResourceType type) const override { return type == MODEL_TYPE; }
+	bool hasResourceManager(ResourceType type) const override { return type == Model::TYPE; }
 
 
 	ResourceType getResourceType(const char* ext) override
 	{
-		return equalStrings(ext, "msh") ? MODEL_TYPE : INVALID_RESOURCE_TYPE;
+		return equalStrings(ext, "msh") ? Model::TYPE : INVALID_RESOURCE_TYPE;
 	}
 
 
@@ -795,11 +788,11 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		ResourceManagerBase* manager;
 		if (PathUtils::hasExtension(path.c_str(), "fab"))
 		{
-			manager = resource_manager.get(PREFAB_TYPE);
+			manager = resource_manager.get(PrefabResource::TYPE);
 		}
 		else
 		{
-			manager = resource_manager.get(MODEL_TYPE);
+			manager = resource_manager.get(Model::TYPE);
 		}
 		Resource* resource = manager->load(path);
 		m_tile.queue.push(resource);
@@ -846,11 +839,11 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 
 		popTileQueue();
 
-		if (resource->getType() == MODEL_TYPE)
+		if (resource->getType() == Model::TYPE)
 		{
 			renderTile((Model*)resource, nullptr);
 		}
-		else if (resource->getType() == PREFAB_TYPE)
+		else if (resource->getType() == PrefabResource::TYPE)
 		{
 			renderTile((PrefabResource*)resource);
 		}
@@ -982,17 +975,17 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 
 	bool createTile(const char* in_path, const char* out_path, ResourceType type) override
 	{
-		if (type == TEXTURE_TYPE)
+		if (type == Texture::TYPE)
 		{
 			MT::SpinLock lock(m_texture_tile_creator.lock);
 			m_texture_tile_creator.tiles.emplace(in_path);
 			MT::atomicDecrement(&m_texture_tile_creator.count);
 			return true;
 		}
-		if (type == MATERIAL_TYPE) return copyFile("models/editor/tile_material.dds", out_path);
-		if (type == SHADER_TYPE) return copyFile("models/editor/tile_shader.dds", out_path);
+		if (type == Material::TYPE) return copyFile("models/editor/tile_material.dds", out_path);
+		if (type == Shader::TYPE) return copyFile("models/editor/tile_shader.dds", out_path);
 
-		if (type != MODEL_TYPE && type != PREFAB_TYPE) return false;
+		if (type != Model::TYPE && type != PrefabResource::TYPE) return false;
 
 		Path path(in_path);
 
@@ -1068,13 +1061,13 @@ struct TexturePlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 
 	bool acceptExtension(const char* ext, ResourceType type) const override 
 	{ 
-		return type == TEXTURE_TYPE && (equalStrings(ext, "tga") || equalStrings(ext, "dds"));
+		return type == Texture::TYPE && (equalStrings(ext, "tga") || equalStrings(ext, "dds"));
 	}
 
 
 	bool onGUI(Resource* resource, ResourceType type) override
 	{
-		if (type != TEXTURE_TYPE) return false;
+		if (type != Texture::TYPE) return false;
 
 		auto* texture = static_cast<Texture*>(resource);
 		if (texture->isFailure())
@@ -1114,14 +1107,14 @@ struct TexturePlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 
 	void onResourceUnloaded(Resource* resource) override {}
 	const char* getName() const override { return "Texture"; }
-	bool hasResourceManager(ResourceType type) const override { return type == TEXTURE_TYPE; }
+	bool hasResourceManager(ResourceType type) const override { return type == Texture::TYPE; }
 
 
 	ResourceType getResourceType(const char* ext) override
 	{
-		if (equalStrings(ext, "tga")) return TEXTURE_TYPE;
-		if (equalStrings(ext, "dds")) return TEXTURE_TYPE;
-		if (equalStrings(ext, "raw")) return TEXTURE_TYPE;
+		if (equalStrings(ext, "tga")) return Texture::TYPE;
+		if (equalStrings(ext, "dds")) return Texture::TYPE;
+		if (equalStrings(ext, "raw")) return Texture::TYPE;
 		return INVALID_RESOURCE_TYPE;
 	}
 
@@ -1139,13 +1132,13 @@ struct ShaderPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 
 	bool acceptExtension(const char* ext, ResourceType type) const override
 	{
-		return type == SHADER_TYPE && equalStrings("shd", ext);
+		return type == Shader::TYPE && equalStrings("shd", ext);
 	}
 
 
 	bool onGUI(Resource* resource, ResourceType type) override
 	{
-		if (type != SHADER_TYPE) return false;
+		if (type != Shader::TYPE) return false;
 
 		auto* shader = static_cast<Shader*>(resource);
 		char basename[MAX_PATH_LENGTH];
@@ -1219,13 +1212,13 @@ struct ShaderPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 
 	void onResourceUnloaded(Resource* resource) override {}
 	const char* getName() const override { return "Shader"; }
-	bool hasResourceManager(ResourceType type) const override { return type == SHADER_TYPE; }
+	bool hasResourceManager(ResourceType type) const override { return type == Shader::TYPE; }
 	
 	
 	ResourceType getResourceType(const char* ext) override
 	{
-		if (equalStrings(ext, "shb")) return SHADER_BINARY_TYPE;
-		return equalStrings(ext, "shd") ? SHADER_TYPE : INVALID_RESOURCE_TYPE;
+		if (equalStrings(ext, "shb")) return ShaderBinary::TYPE;
+		return equalStrings(ext, "shd") ? Shader::TYPE : INVALID_RESOURCE_TYPE;
 	}
 
 
@@ -2105,7 +2098,7 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 		m_model_index = -1;
 		auto& rm = m_editor.getEngine().getResourceManager();
 		Path shader_path("pipelines/editor/debugline.shd");
-		m_shader = static_cast<Shader*>(rm.get(SHADER_TYPE)->load(shader_path));
+		m_shader = static_cast<Shader*>(rm.get(Shader::TYPE)->load(shader_path));
 
 		editor.universeCreated().bind<RenderInterfaceImpl, &RenderInterfaceImpl::onUniverseCreated>(this);
 		editor.universeDestroyed().bind<RenderInterfaceImpl, &RenderInterfaceImpl::onUniverseDestroyed>(this);
@@ -2115,7 +2108,7 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 	~RenderInterfaceImpl()
 	{
 		auto& rm = m_editor.getEngine().getResourceManager();
-		rm.get(SHADER_TYPE)->unload(*m_shader);
+		rm.get(Shader::TYPE)->unload(*m_shader);
 
 		m_editor.universeCreated().unbind<RenderInterfaceImpl, &RenderInterfaceImpl::onUniverseCreated>(this);
 		m_editor.universeDestroyed().unbind<RenderInterfaceImpl, &RenderInterfaceImpl::onUniverseDestroyed>(this);
@@ -2200,13 +2193,13 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 		unsigned char* pixels;
 		int width, height;
 		ImGui::GetIO().Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
-		auto* material_manager = engine.getResourceManager().get(MATERIAL_TYPE);
+		auto* material_manager = engine.getResourceManager().get(Material::TYPE);
 		Resource* resource = material_manager->load(Path("pipelines/imgui/imgui.mat"));
 		Material* material = (Material*)resource;
 
 		Texture* old_texture = material->getTexture(0);
 		Texture* texture = LUMIX_NEW(engine.getAllocator(), Texture)(
-			Path("font"), *engine.getResourceManager().get(TEXTURE_TYPE), engine.getAllocator());
+			Path("font"), *engine.getResourceManager().get(Texture::TYPE), engine.getAllocator());
 
 		texture->create(width, height, pixels);
 		material->setTexture(0, texture);
@@ -2223,7 +2216,7 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 	ModelHandle loadModel(Path& path) override
 	{
 		auto& rm = m_editor.getEngine().getResourceManager();
-		m_models.insert(m_model_index, static_cast<Model*>(rm.get(MODEL_TYPE)->load(path)));
+		m_models.insert(m_model_index, static_cast<Model*>(rm.get(Model::TYPE)->load(path)));
 		++m_model_index;
 		return m_model_index - 1;
 	}
@@ -2251,7 +2244,7 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 	{
 		auto& rm = m_editor.getEngine().getResourceManager();
 		auto& allocator = m_editor.getAllocator();
-		Texture* texture = LUMIX_NEW(allocator, Texture)(Path(name), *rm.get(TEXTURE_TYPE), allocator);
+		Texture* texture = LUMIX_NEW(allocator, Texture)(Path(name), *rm.get(Texture::TYPE), allocator);
 		texture->create(w, h, pixels);
 		m_textures.insert(&texture->handle, texture);
 		return &texture->handle;
@@ -2273,7 +2266,7 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 	ImTextureID loadTexture(const Path& path) override
 	{
 		auto& rm = m_editor.getEngine().getResourceManager();
-		auto* texture = static_cast<Texture*>(rm.get(TEXTURE_TYPE)->load(path));
+		auto* texture = static_cast<Texture*>(rm.get(Texture::TYPE)->load(path));
 		m_textures.insert(&texture->handle, texture);
 		return &texture->handle;
 	}
@@ -2614,13 +2607,13 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		unsigned char* pixels;
 		int width, height;
 		ImGui::GetIO().Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
-		auto* material_manager = m_engine.getResourceManager().get(MATERIAL_TYPE);
+		auto* material_manager = m_engine.getResourceManager().get(Material::TYPE);
 		Resource* resource = material_manager->load(Path("pipelines/imgui/imgui.mat"));
 		m_material = static_cast<Material*>(resource);
 
 		Texture* old_texture = m_material->getTexture(0);
 		Texture* texture = LUMIX_NEW(editor.getAllocator(), Texture)(
-			Path("font"), *m_engine.getResourceManager().get(TEXTURE_TYPE), editor.getAllocator());
+			Path("font"), *m_engine.getResourceManager().get(Texture::TYPE), editor.getAllocator());
 
 		texture->create(width, height, pixels);
 		m_material->setTexture(0, texture);
@@ -3026,7 +3019,7 @@ struct AddTerrainComponentPlugin LUMIX_FINAL : public StudioApp::IAddComponentPl
 			ImGui::EndMenu();
 		}
 		bool create_empty = ImGui::Selectable("Empty", false);
-		if (asset_browser.resourceList(buf, lengthOf(buf), MATERIAL_TYPE, 0) || create_empty || new_created)
+		if (asset_browser.resourceList(buf, lengthOf(buf), Material::TYPE, 0) || create_empty || new_created)
 		{
 			if (create_entity)
 			{
@@ -3073,9 +3066,9 @@ LUMIX_STUDIO_ENTRY(renderer)
 	app.registerComponent("camera", "Render/Camera");
 	app.registerComponent("global_light", "Render/Global light");
 
-	app.registerComponentWithResource("renderable", "Render/Mesh", MODEL_TYPE, *Reflection::getProperty(MODEL_INSTANCE_TYPE, "Source"));
-	app.registerComponentWithResource("particle_emitter", "Render/Particle emitter/Emitter", MATERIAL_TYPE, *Reflection::getProperty(PARTICLE_EMITTER_TYPE, "Material"));
-	app.registerComponentWithResource("scripted_particle_emitter", "Render/Particle emitter/DO NOT USE YET! Scripted Emitter", MATERIAL_TYPE, *Reflection::getProperty(SCRIPTED_PARTICLE_EMITTER_TYPE, "Material"));
+	app.registerComponentWithResource("renderable", "Render/Mesh", Model::TYPE, *Reflection::getProperty(MODEL_INSTANCE_TYPE, "Source"));
+	app.registerComponentWithResource("particle_emitter", "Render/Particle emitter/Emitter", Material::TYPE, *Reflection::getProperty(PARTICLE_EMITTER_TYPE, "Material"));
+	app.registerComponentWithResource("scripted_particle_emitter", "Render/Particle emitter/DO NOT USE YET! Scripted Emitter", Material::TYPE, *Reflection::getProperty(SCRIPTED_PARTICLE_EMITTER_TYPE, "Material"));
 	app.registerComponent("particle_emitter_spawn_shape", "Render/Particle emitter/Spawn shape");
 	app.registerComponent("particle_emitter_alpha", "Render/Particle emitter/Alpha");
 	app.registerComponent("particle_emitter_plane", "Render/Particle emitter/Plane");

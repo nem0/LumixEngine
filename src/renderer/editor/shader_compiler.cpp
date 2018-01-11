@@ -36,10 +36,6 @@ namespace Lumix
 {
 
 
-static const ResourceType SHADER_TYPE("shader");
-static const ResourceType SHADER_BINARY_TYPE("shader_binary");
-
-
 ShaderCompiler::ShaderCompiler(StudioApp& app, LogUI& log_ui)
 	: m_app(app)
 	, m_editor(app.getWorldEditor())
@@ -51,7 +47,7 @@ ShaderCompiler::ShaderCompiler(StudioApp& app, LogUI& log_ui)
 	, m_shd_files(m_editor.getAllocator())
 	, m_changed_files(m_editor.getAllocator())
 	, m_mutex(false)
-	, m_load_hook(*m_editor.getEngine().getResourceManager().get(SHADER_TYPE), *this)
+	, m_load_hook(*m_editor.getEngine().getResourceManager().get(Shader::TYPE), *this)
 {
 	JobSystem::JobDecl job;
 	job.task = [](void* data) { ((ShaderCompiler*)data)->compileTask(); };
@@ -70,7 +66,7 @@ ShaderCompiler::ShaderCompiler(StudioApp& app, LogUI& log_ui)
 	//makeUpToDate(false);
 
 	Engine& engine = m_editor.getEngine();
-	ResourceManagerBase* shader_manager = engine.getResourceManager().get(SHADER_BINARY_TYPE);
+	ResourceManagerBase* shader_manager = engine.getResourceManager().get(ShaderBinary::TYPE);
 	shader_manager->setLoadHook(m_load_hook);
 }
 
@@ -468,7 +464,7 @@ void ShaderCompiler::reloadShaders()
 {
 	m_to_reload.removeDuplicates();
 
-	auto shader_manager = m_editor.getEngine().getResourceManager().get(SHADER_TYPE);
+	auto shader_manager = m_editor.getEngine().getResourceManager().get(Shader::TYPE);
 	for (string& shd_path : m_to_reload)
 	{
 		bool any_hooked = false;

@@ -25,8 +25,6 @@ namespace Lumix
 static const ComponentType GUI_RECT_TYPE = Reflection::getComponentType("gui_rect");
 static const ComponentType GUI_IMAGE_TYPE = Reflection::getComponentType("gui_image");
 static const ComponentType GUI_TEXT_TYPE = Reflection::getComponentType("gui_text");
-static const ResourceType FONT_TYPE("font");
-static const ResourceType SPRITE_TYPE("sprite");
 
 
 struct GUIText
@@ -93,7 +91,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		context.registerComponentType(GUI_RECT_TYPE, this, &GUISceneImpl::serializeRect, &GUISceneImpl::deserializeRect);
 		context.registerComponentType(GUI_IMAGE_TYPE, this, &GUISceneImpl::serializeImage, &GUISceneImpl::deserializeImage);
 		context.registerComponentType(GUI_TEXT_TYPE, this, &GUISceneImpl::serializeText, &GUISceneImpl::deserializeText);
-		m_font_manager = (FontManager*)system.getEngine().getResourceManager().get(FONT_TYPE);
+		m_font_manager = (FontManager*)system.getEngine().getResourceManager().get(FontResource::TYPE);
 	}
 
 
@@ -231,7 +229,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		{
 			image->sprite->getResourceManager().unload(*image->sprite);
 		}
-		auto* manager = m_system.getEngine().getResourceManager().get(SPRITE_TYPE);
+		auto* manager = m_system.getEngine().getResourceManager().get(Sprite::TYPE);
 		if (path.isValid())
 		{
 			image->sprite = (Sprite*)manager->load(path);

@@ -50,6 +50,7 @@ class Animation LUMIX_FINAL : public Resource
 {
 	public:
 		static const u32 HEADER_MAGIC = 0x5f4c4146; // '_LAF'
+		static const ResourceType TYPE;
 
 	public:
 		struct Header
@@ -62,7 +63,7 @@ class Animation LUMIX_FINAL : public Resource
 	public:
 		Animation(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
 
-		ResourceType getType() const override { return ResourceType("animation"); }
+		ResourceType getType() const override { return TYPE; }
 
 		int getRootMotionBoneIdx() const { return m_root_motion_bone_idx; }
 		RigidTransform getBoneTransform(float time, int bone_idx) const;

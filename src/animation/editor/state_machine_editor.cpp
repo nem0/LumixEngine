@@ -19,10 +19,6 @@ namespace Lumix
 {
 
 
-static const ResourceType CONTROLLER_RESOURCE_TYPE("anim_controller");
-static const ResourceType ANIMATION_TYPE("animation");
-
-
 static ImVec2 operator+(const ImVec2& a, const ImVec2& b)
 {
 	return ImVec2(a.x + b.x, a.y + b.y);
@@ -1804,7 +1800,7 @@ bool ControllerResource::deserialize(InputBlob& blob, Engine& engine, IAllocator
 	LUMIX_DELETE(m_allocator, m_engine_resource);
 	LUMIX_DELETE(m_allocator, m_root);
 	m_root = nullptr;
-	auto* manager = engine.getResourceManager().get(CONTROLLER_RESOURCE_TYPE);
+	auto* manager = engine.getResourceManager().get(Anim::ControllerResource::TYPE);
 	m_engine_resource =
 		LUMIX_NEW(allocator, Anim::ControllerResource)(Path("editor"), *manager, allocator);
 	m_engine_resource->create();
@@ -1944,7 +1940,7 @@ void ControllerResource::AnimationSlot::Value::set(const Path& new_path)
 	if (anim) anim->getResourceManager().unload(*anim);
 
 	StudioApp& app = slot.controller.m_editor.getApp();
-	auto* manager = app.getWorldEditor().getEngine().getResourceManager().get(ANIMATION_TYPE);
+	auto* manager = app.getWorldEditor().getEngine().getResourceManager().get(Animation::TYPE);
 
 	anim = new_path.isValid() ? (Animation*)manager->load(new_path) : nullptr;
 
@@ -1989,7 +1985,7 @@ void ControllerResource::AnimationSet::Value::setValue(const Path& new_path)
 	if (anim) anim->getResourceManager().unload(*anim);
 
 	StudioApp& app = set.controller.m_editor.getApp();
-	auto* manager = app.getWorldEditor().getEngine().getResourceManager().get(ANIMATION_TYPE);
+	auto* manager = app.getWorldEditor().getEngine().getResourceManager().get(Animation::TYPE);
 
 	anim = new_path.isValid() ? (Animation*)manager->load(new_path) : nullptr;
 

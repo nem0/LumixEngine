@@ -34,8 +34,6 @@ namespace Lumix
 static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("renderable");
 static const ComponentType TERRAIN_TYPE = Reflection::getComponentType("terrain");
 static const ComponentType HEIGHTFIELD_TYPE = Reflection::getComponentType("physical_heightfield");
-static const ResourceType TEXTURE_TYPE("texture");
-static const ResourceType PREFAB_TYPE("prefab");
 static const char* HEIGHTMAP_UNIFORM = "u_texHeightmap";
 static const char* SPLATMAP_UNIFORM = "u_texSplatmap";
 static const char* COLORMAP_UNIFORM = "u_texColormap";
@@ -1570,7 +1568,7 @@ void TerrainEditor::onGUI()
 						LUMIX_DELETE(m_world_editor.getAllocator(), m_brush_texture);
 					}
 					m_brush_texture = LUMIX_NEW(m_world_editor.getAllocator(), Texture)(
-						Path("brush_texture"), *rm.get(TEXTURE_TYPE), m_world_editor.getAllocator());
+						Path("brush_texture"), *rm.get(Texture::TYPE), m_world_editor.getAllocator());
 					m_brush_texture->create(image_width, image_height, data);
 
 					stbi_image_free(data);
@@ -1650,7 +1648,7 @@ void TerrainEditor::onGUI()
 			static ImVec2 size(-1, 100);
 			ImGui::LabellessInputText("Filter", filter, sizeof(filter));
 			ImGui::ListBoxHeader("Prefabs", size);
-			int resources_idx  = m_app.getAssetBrowser().getTypeIndex(PREFAB_TYPE);
+			int resources_idx  = m_app.getAssetBrowser().getTypeIndex(PrefabResource::TYPE);
 			auto& all_prefabs = m_app.getAssetBrowser().getResources(resources_idx);
 			for(int i = 0; i < all_prefabs.size(); ++i)
 			{
@@ -1663,7 +1661,7 @@ void TerrainEditor::onGUI()
 				{
 					if (selected)
 					{
-						ResourceManagerBase* prefab_manager = m_world_editor.getEngine().getResourceManager().get(PREFAB_TYPE);
+						ResourceManagerBase* prefab_manager = m_world_editor.getEngine().getResourceManager().get(PrefabResource::TYPE);
 						PrefabResource* prefab = (PrefabResource*)prefab_manager->load(all_prefabs[i]);
 						m_selected_prefabs.push(prefab);
 					}

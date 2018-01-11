@@ -28,8 +28,6 @@ static const float GRASS_QUAD_SIZE = 10.0f;
 static const float GRASS_QUAD_RADIUS = GRASS_QUAD_SIZE * 0.7072f;
 static const int GRID_SIZE = 16;
 static const ComponentType TERRAIN_HASH = Reflection::getComponentType("terrain");
-static const ResourceType MODEL_TYPE("model");
-static const ResourceType MATERIAL_TYPE("material");
 static const char* TEX_COLOR_UNIFORM = "u_texColor";
 
 struct Sample
@@ -347,7 +345,7 @@ void Terrain::setGrassTypePath(int index, const Path& path)
 	}
 	if (path.isValid())
 	{
-		type.m_grass_model = static_cast<Model*>(m_scene.getEngine().getResourceManager().get(MODEL_TYPE)->load(path));
+		type.m_grass_model = static_cast<Model*>(m_scene.getEngine().getResourceManager().get(Model::TYPE)->load(path));
 		type.m_grass_model->onLoaded<Terrain, &Terrain::grassLoaded>(this);
 	}
 }
@@ -622,7 +620,7 @@ void Terrain::deserialize(InputBlob& serializer, Universe& universe, RenderScene
 	serializer.read(m_layer_mask);
 	char path[MAX_PATH_LENGTH];
 	serializer.readString(path, MAX_PATH_LENGTH);
-	setMaterial(static_cast<Material*>(scene.getEngine().getResourceManager().get(MATERIAL_TYPE)->load(Path(path))));
+	setMaterial(static_cast<Material*>(scene.getEngine().getResourceManager().get(Material::TYPE)->load(Path(path))));
 	serializer.read(m_scale.x);
 	serializer.read(m_scale.y);
 	m_scale.z = m_scale.x;

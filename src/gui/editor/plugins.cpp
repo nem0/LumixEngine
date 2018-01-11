@@ -26,8 +26,6 @@ namespace
 
 
 static const ComponentType GUI_RECT_TYPE = Reflection::getComponentType("gui_rect");
-static const ResourceType SPRITE_TYPE("sprite");
-static const ResourceType TEXTURE_TYPE("texture");
 
 
 struct SpritePlugin LUMIX_FINAL : public AssetBrowser::IPlugin
@@ -37,14 +35,14 @@ struct SpritePlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 
 	bool onGUI(Resource* resource, ResourceType type) override
 	{
-		if (type != SPRITE_TYPE) return false;
+		if (type != Sprite::TYPE) return false;
 
 		Sprite* sprite = (Sprite*)resource;
 		
 		char tmp[MAX_PATH_LENGTH];
 		Texture* tex = sprite->getTexture();
 		copyString(tmp, tex ? tex->getPath().c_str() : "");
-		if (app.getAssetBrowser().resourceInput("Texture", "texture", tmp, lengthOf(tmp), TEXTURE_TYPE))
+		if (app.getAssetBrowser().resourceInput("Texture", "texture", tmp, lengthOf(tmp), Texture::TYPE))
 		{
 			sprite->setTexture(Path(tmp));
 		}
@@ -74,19 +72,19 @@ struct SpritePlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 
 	ResourceType getResourceType(const char* ext) override
 	{
-		return equalStrings(ext, "spr") ? SPRITE_TYPE : INVALID_RESOURCE_TYPE;
+		return equalStrings(ext, "spr") ? Sprite::TYPE : INVALID_RESOURCE_TYPE;
 	}
 
 
 	void onResourceUnloaded(Resource* resource) override {}
 	const char* getName() const override { return "Sprite"; }
 
-	bool hasResourceManager(ResourceType type) const override { return type == SPRITE_TYPE; }
+	bool hasResourceManager(ResourceType type) const override { return type == Sprite::TYPE; }
 
 
 	bool acceptExtension(const char* ext, ResourceType type) const override
 	{
-		return type == SPRITE_TYPE && equalStrings(ext, "spr");
+		return type == Sprite::TYPE && equalStrings(ext, "spr");
 	}
 
 	StudioApp& app;

@@ -72,14 +72,6 @@ namespace Lumix
 {
 
 
-static const ResourceType MATERIAL_TYPE("material");
-static const ResourceType MODEL_TYPE("model");
-static const ResourceType SHADER_TYPE("shader");
-static const ResourceType FONT_TYPE("font");
-static const ResourceType TEXTURE_TYPE("texture");
-static const ResourceType SHADER_BINARY_TYPE("shader_binary");
-
-
 static const char* getGrassRotationModeName(int index) 
 {
 	switch ((Terrain::GrassType::RotationMode)index)
@@ -192,7 +184,7 @@ static void registerProperties(IAllocator& allocator)
 		),
 		component("scripted_particle_emitter",
 			property("Material", LUMIX_PROP(RenderScene, ScriptedParticleEmitterMaterialPath),
-				ResourceAttribute("Material (*.mat)", MATERIAL_TYPE))
+				ResourceAttribute("Material (*.mat)", Material::TYPE))
 		),
 		component("particle_emitter",
 			property("Life", LUMIX_PROP(RenderScene, ParticleEmitterInitialLife)),
@@ -201,7 +193,7 @@ static void registerProperties(IAllocator& allocator)
 			property("Autoemit", LUMIX_PROP(RenderScene, ParticleEmitterAutoemit)),
 			property("Local space", LUMIX_PROP(RenderScene, ParticleEmitterLocalSpace)),
 			property("Material", LUMIX_PROP(RenderScene, ParticleEmitterMaterialPath),
-				ResourceAttribute("Material (*.mat)", MATERIAL_TYPE)),
+				ResourceAttribute("Material (*.mat)", Material::TYPE)),
 			property("Spawn count", LUMIX_PROP(RenderScene, ParticleEmitterSpawnCount))
 		),
 		component("particle_emitter_linear_movement",
@@ -224,11 +216,11 @@ static void registerProperties(IAllocator& allocator)
 		component("renderable",
 			property("Enabled", LUMIX_PROP_FULL(RenderScene, isModelInstanceEnabled, enableModelInstance)),
 			property("Source", LUMIX_PROP(RenderScene, ModelInstancePath),
-				ResourceAttribute("Mesh (*.msh)", MODEL_TYPE)),
+				ResourceAttribute("Mesh (*.msh)", Model::TYPE)),
 			property("Keep skin", LUMIX_PROP(RenderScene, ModelInstanceKeepSkin)),
 			const_array("Materials", &RenderScene::getModelInstanceMaterialsCount, 
 				property("Source", LUMIX_PROP(RenderScene, ModelInstanceMaterial),
-					ResourceAttribute("Material (*.mat)", MATERIAL_TYPE))
+					ResourceAttribute("Material (*.mat)", Material::TYPE))
 			)
 		),
 		component("global_light",
@@ -266,20 +258,20 @@ static void registerProperties(IAllocator& allocator)
 		),
 		component("decal",
 			property("Material", LUMIX_PROP(RenderScene, DecalMaterialPath),
-				ResourceAttribute("Material (*.mat)", MATERIAL_TYPE)),
+				ResourceAttribute("Material (*.mat)", Material::TYPE)),
 			property("Scale", LUMIX_PROP(RenderScene, DecalScale), 
 				MinAttribute(0))
 		),
 		component("terrain",
 			property("Material", LUMIX_PROP(RenderScene, TerrainMaterialPath),
-				ResourceAttribute("Material (*.mat)", MATERIAL_TYPE)),
+				ResourceAttribute("Material (*.mat)", Material::TYPE)),
 			property("XZ scale", LUMIX_PROP(RenderScene, TerrainXZScale), 
 				MinAttribute(0)),
 			property("Height scale", LUMIX_PROP(RenderScene, TerrainYScale), 
 				MinAttribute(0)),
 			array("grass", &RenderScene::getGrassCount, &RenderScene::addGrass, &RenderScene::removeGrass,
 				property("Mesh", LUMIX_PROP(RenderScene, GrassPath),
-					ResourceAttribute("Mesh (*.msh)", MODEL_TYPE)),
+					ResourceAttribute("Mesh (*.msh)", Model::TYPE)),
 				property("Distance", LUMIX_PROP(RenderScene, GrassDistance),
 					MinAttribute(1)),
 				property("Density", LUMIX_PROP(RenderScene, GrassDensity)),
@@ -507,13 +499,13 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 		bgfx::setDebug(BGFX_DEBUG_TEXT | BGFX_DEBUG_PROFILER);
 
 		ResourceManager& manager = engine.getResourceManager();
-		m_texture_manager.create(TEXTURE_TYPE, manager);
-		m_model_manager.create(MODEL_TYPE, manager);
-		m_material_manager.create(MATERIAL_TYPE, manager);
-		m_shader_manager.create(SHADER_TYPE, manager);
+		m_texture_manager.create(Texture::TYPE, manager);
+		m_model_manager.create(Model::TYPE, manager);
+		m_material_manager.create(Material::TYPE, manager);
+		m_shader_manager.create(Shader::TYPE, manager);
 		m_font_manager = LUMIX_NEW(m_allocator, FontManager)(*this, m_allocator);
-		m_font_manager->create(FONT_TYPE, manager);
-		m_shader_binary_manager.create(SHADER_BINARY_TYPE, manager);
+		m_font_manager->create(FontResource::TYPE, manager);
+		m_shader_binary_manager.create(ShaderBinary::TYPE, manager);
 
 		m_current_pass_hash = crc32("MAIN");
 		m_view_counter = 0;
