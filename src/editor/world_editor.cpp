@@ -1202,12 +1202,11 @@ private:
 		bool execute() override
 		{
 			bool ret = false;
-			IScene* scene = m_editor.getUniverse()->getScene(m_type);
-			if (!scene) return false;
+			Universe* universe = m_editor.getUniverse();
 
 			for (int j = 0; j < m_entities.size(); ++j)
 			{
-				ComponentHandle cmp = scene->createComponent(m_type, m_entities[j]);
+				ComponentHandle cmp = universe->createComponent(m_type, m_entities[j]);
 				if (cmp.isValid())
 				{
 					ret = true;
@@ -1222,7 +1221,7 @@ private:
 			for (int i = 0; i < m_entities.size(); ++i)
 			{
 				const ComponentUID& cmp = m_editor.getUniverse()->getComponent(m_entities[i], m_type);
-				cmp.scene->destroyComponent(cmp.handle, cmp.type);
+				m_editor.getUniverse()->destroyComponent(cmp.handle, cmp.type);
 			}
 		}
 
@@ -1502,7 +1501,7 @@ private:
 					ComponentUID new_component;
 					IScene* scene = universe->getScene(cmp_type);
 					ASSERT(scene);
-					new_component.handle = scene->createComponent(cmp_type, new_entity);
+					new_component.handle = universe->createComponent(cmp_type, new_entity);
 					new_component.entity = new_entity;
 					new_component.scene = scene;
 					new_component.type = cmp_type;
@@ -1611,14 +1610,15 @@ private:
 		void undo() override
 		{
 			ComponentUID cmp;
-			cmp.scene = m_editor.getUniverse()->getScene(m_cmp_type);
+			Universe* universe = m_editor.getUniverse();
+			cmp.scene = universe->getScene(m_cmp_type);
 			cmp.type = m_cmp_type;
 			ASSERT(cmp.scene);
 			InputBlob blob(m_old_values);
 			for (Entity entity : m_entities)
 			{
 				cmp.entity = entity;
-				cmp.handle = cmp.scene->createComponent(cmp.type, cmp.entity);
+				cmp.handle = universe->createComponent(cmp.type, cmp.entity);
 				::Lumix::load(cmp, -1, blob);
 			}
 		}
@@ -1656,7 +1656,7 @@ private:
 				gather.resource_manager = &resource_manager;
 				cmp_desc->visit(gather);
 
-				cmp.scene->destroyComponent(cmp.handle, m_cmp_type);
+				m_editor.getUniverse()->destroyComponent(cmp.handle, m_cmp_type);
 			}
 			return true;
 		}
@@ -2990,7 +2990,7 @@ public:
 	void cloneComponent(const ComponentUID& src, Entity entity) override
 	{
 		IScene* scene = m_universe->getScene(src.type);
-		ComponentUID clone(entity, src.type, scene, scene->createComponent(src.type, entity));
+		ComponentUID clone(entity, src.type, scene, m_universe->createComponent(src.type, entity));
 
 		const Reflection::ComponentBase* cmp_desc = Reflection::getComponent(src.type);
 		OutputBlob stream(m_allocator);

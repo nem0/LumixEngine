@@ -323,7 +323,12 @@ namespace Lumix
 			m_function_call.is_in_progress = false;
 			
 			registerAPI();
-			ctx.registerComponentType(LUA_SCRIPT_TYPE, this, &LuaScriptSceneImpl::serializeLuaScript, &LuaScriptSceneImpl::deserializeLuaScript);
+			ctx.registerComponentType(LUA_SCRIPT_TYPE
+				, this
+				, &LuaScriptSceneImpl::createLuaScriptComponent
+				, &LuaScriptSceneImpl::destroyLuaScriptComponent
+				, &LuaScriptSceneImpl::serializeLuaScript
+				, &LuaScriptSceneImpl::deserializeLuaScript);
 		}
 
 
@@ -1124,25 +1129,20 @@ namespace Lumix
 		}
 
 
-		ComponentHandle createComponent(ComponentType type, Entity entity) override
+		ComponentHandle createLuaScriptComponent(Entity entity)
 		{
-			if (type != LUA_SCRIPT_TYPE) return INVALID_COMPONENT;
-
 			auto& allocator = m_system.m_allocator;
 			ScriptComponent* script = LUMIX_NEW(allocator, ScriptComponent)(*this, allocator);
 			ComponentHandle cmp = {entity.index};
 			script->m_entity = entity;
 			m_scripts.insert(entity, script);
-			m_universe.addComponent(entity, type, this, cmp);
-
+			m_universe.onComponentCreated(entity, LUA_SCRIPT_TYPE, this, cmp);
 			return cmp;
 		}
 
 
-		void destroyComponent(ComponentHandle component, ComponentType type) override
+		void destroyLuaScriptComponent(ComponentHandle component)
 		{
-			if (type != LUA_SCRIPT_TYPE) return;
-
 			Entity entity = {component.index};
 			auto* script = m_scripts[entity];
 			for (auto& scr : script->m_scripts)
@@ -1157,7 +1157,7 @@ namespace Lumix
 			}
 			LUMIX_DELETE(m_system.m_allocator, script);
 			m_scripts.erase(entity);
-			m_universe.destroyComponent(entity, type, this, component);
+			m_universe.onComponentDestroyed(entity, LUA_SCRIPT_TYPE, this, component);
 		}
 
 
@@ -1351,7 +1351,7 @@ namespace Lumix
 				}
 			}
 
-			m_universe.addComponent(entity, LUA_SCRIPT_TYPE, this, cmp);
+			m_universe.onComponentCreated(entity, LUA_SCRIPT_TYPE, this, cmp);
 		}
 
 
@@ -1426,7 +1426,7 @@ namespace Lumix
 					setScriptPath(*script, scr, Path(tmp));
 				}
 				ComponentHandle cmp = {script->m_entity.index};
-				m_universe.addComponent(script->m_entity, LUA_SCRIPT_TYPE, this, cmp);
+				m_universe.onComponentCreated(script->m_entity, LUA_SCRIPT_TYPE, this, cmp);
 			}
 		}
 

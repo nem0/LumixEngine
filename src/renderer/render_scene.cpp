@@ -784,7 +784,7 @@ public:
 			}
 		}
 
-		m_universe.addComponent(r.entity, MODEL_INSTANCE_TYPE, this, cmp);
+		m_universe.onComponentCreated(r.entity, MODEL_INSTANCE_TYPE, this, cmp);
 	}
 
 
@@ -828,7 +828,7 @@ public:
 		serializer.read(&light.m_fog_height);
 		m_global_lights.insert(entity, light);
 		ComponentHandle cmp = {entity.index};
-		m_universe.addComponent(light.m_entity, GLOBAL_LIGHT_TYPE, this, cmp);
+		m_universe.onComponentCreated(light.m_entity, GLOBAL_LIGHT_TYPE, this, cmp);
 		m_active_global_light_cmp = cmp;
 	}
 	
@@ -869,7 +869,7 @@ public:
 		ComponentHandle cmp = { light.m_entity.index };
 		m_point_lights_map.insert(cmp, m_point_lights.size() - 1);
 
-		m_universe.addComponent(light.m_entity, POINT_LIGHT_TYPE, this, cmp);
+		m_universe.onComponentCreated(light.m_entity, POINT_LIGHT_TYPE, this, cmp);
 	}
 
 
@@ -891,7 +891,7 @@ public:
 		serializer.read(tmp, lengthOf(tmp));
 		decal.material = tmp[0] == '\0' ? nullptr : static_cast<Material*>(material_manager->load(Path(tmp)));
 		updateDecalInfo(decal);
-		m_universe.addComponent(decal.entity, DECAL_TYPE, this, {decal.entity.index});
+		m_universe.onComponentCreated(decal.entity, DECAL_TYPE, this, {decal.entity.index});
 	}
 
 
@@ -918,7 +918,7 @@ public:
 		serializer.read(&camera.near);
 		serializer.read(camera.slot, lengthOf(camera.slot));
 		m_cameras.insert(camera.entity, camera);
-		m_universe.addComponent(camera.entity, CAMERA_TYPE, this, {camera.entity.index});
+		m_universe.onComponentCreated(camera.entity, CAMERA_TYPE, this, {camera.entity.index});
 	}
 
 
@@ -939,7 +939,7 @@ public:
 		serializer.read(&bone_attachment.parent_entity);
 		serializer.read(&bone_attachment.relative_transform);
 		ComponentHandle cmp = {bone_attachment.entity.index};
-		m_universe.addComponent(bone_attachment.entity, BONE_ATTACHMENT_TYPE, this, cmp);
+		m_universe.onComponentCreated(bone_attachment.entity, BONE_ATTACHMENT_TYPE, this, cmp);
 		Entity parent_entity = bone_attachment.parent_entity;
 		if (parent_entity.isValid() && parent_entity.index < m_model_instances.size())
 		{
@@ -994,7 +994,7 @@ public:
 			terrain->setGrassTypePath(terrain->m_grass_types.size() - 1, Path(tmp));
 		}
 
-		m_universe.addComponent(entity, TERRAIN_TYPE, this, { entity.index });
+		m_universe.onComponentCreated(entity, TERRAIN_TYPE, this, { entity.index });
 	}
 
 	void serializeEnvironmentProbe(ISerializer& serializer, ComponentHandle cmp) 
@@ -1026,7 +1026,7 @@ public:
 		probe.radiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
 		probe.radiance->setFlag(BGFX_TEXTURE_MAG_ANISOTROPIC, true);
 
-		m_universe.addComponent(entity, ENVIRONMENT_PROBE_TYPE, this, {entity.index});
+		m_universe.onComponentCreated(entity, ENVIRONMENT_PROBE_TYPE, this, {entity.index});
 	}
 
 
@@ -1050,7 +1050,7 @@ public:
 		emitter->setMaterial(material);
 
 		m_scripted_particle_emitters.insert(entity, emitter);
-		m_universe.addComponent(entity, SCRIPTED_PARTICLE_EMITTER_TYPE, this, {entity.index});
+		m_universe.onComponentCreated(entity, SCRIPTED_PARTICLE_EMITTER_TYPE, this, {entity.index});
 	}
 
 
@@ -1096,7 +1096,7 @@ public:
 		}
 
 		m_particle_emitters.insert(entity, emitter);
-		m_universe.addComponent(entity, PARTICLE_EMITTER_TYPE, this, {entity.index});
+		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_TYPE, this, {entity.index});
 	}
 
 	void serializeParticleEmitterAlpha(ISerializer& serializer, ComponentHandle cmp)
@@ -1127,7 +1127,7 @@ public:
 		}
 		module->sample();
 		emitter->addModule(module);
-		m_universe.addComponent(entity, PARTICLE_EMITTER_ALPHA_TYPE, this, {entity.index});
+		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_ALPHA_TYPE, this, {entity.index});
 	}
 
 
@@ -1155,7 +1155,7 @@ public:
 			serializer.read(&module->m_entities[i]);
 		}
 		emitter->addModule(module);
-		m_universe.addComponent(entity, PARTICLE_EMITTER_ATTRACTOR_TYPE, this, {entity.index});
+		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_ATTRACTOR_TYPE, this, {entity.index});
 	}
 
 	void serializeParticleEmitterForce(ISerializer& serializer, ComponentHandle cmp)
@@ -1172,7 +1172,7 @@ public:
 		auto* module = LUMIX_NEW(m_allocator, ParticleEmitter::ForceModule)(*emitter);
 		serializer.read(&module->m_acceleration);
 		emitter->addModule(module);
-		m_universe.addComponent(entity, PARTICLE_EMITTER_FORCE_HASH, this, {entity.index});
+		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_FORCE_HASH, this, {entity.index});
 	}
 
 
@@ -1200,7 +1200,7 @@ public:
 		serializer.read(&module->m_z.from);
 		serializer.read(&module->m_z.to);
 		emitter->addModule(module);
-		m_universe.addComponent(entity, PARTICLE_EMITTER_LINEAR_MOVEMENT_TYPE, this, {entity.index});
+		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_LINEAR_MOVEMENT_TYPE, this, {entity.index});
 	}
 
 
@@ -1228,7 +1228,7 @@ public:
 			serializer.read(&module->m_entities[i]);
 		}
 		emitter->addModule(module);
-		m_universe.addComponent(entity, PARTICLE_EMITTER_PLANE_TYPE, this, {entity.index});
+		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_PLANE_TYPE, this, {entity.index});
 	}
 
 	void serializeParticleEmitterSpawnShape(ISerializer& serializer, ComponentHandle cmp)
@@ -1247,7 +1247,7 @@ public:
 		serializer.read((u8*)&module->m_shape);
 		serializer.read(&module->m_radius);
 		emitter->addModule(module);
-		m_universe.addComponent(entity, PARTICLE_EMITTER_SPAWN_SHAPE_TYPE, this, {entity.index});
+		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_SPAWN_SHAPE_TYPE, this, {entity.index});
 	}
 
 	void serializeParticleEmitterSize(ISerializer& serializer, ComponentHandle cmp)
@@ -1278,7 +1278,7 @@ public:
 		}
 		module->sample();
 		emitter->addModule(module);
-		m_universe.addComponent(entity, PARTICLE_EMITTER_SIZE_TYPE, this, {entity.index});
+		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_SIZE_TYPE, this, {entity.index});
 	}
 
 
@@ -1290,7 +1290,7 @@ public:
 		ParticleEmitter* emitter = m_particle_emitters[entity];
 		auto* module = LUMIX_NEW(m_allocator, ParticleEmitter::RandomRotationModule)(*emitter);
 		emitter->addModule(module);
-		m_universe.addComponent(entity, PARTICLE_EMITTER_RANDOM_ROTATION_TYPE, this, {entity.index});
+		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_RANDOM_ROTATION_TYPE, this, {entity.index});
 	}
 
 
@@ -1310,7 +1310,7 @@ public:
 		serializer.read(&module->rows);
 		serializer.read(&module->cols);
 		emitter->addModule(module);
-		m_universe.addComponent(entity, PARTICLE_EMITTER_SUBIMAGE_TYPE, this, {entity.index});
+		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_SUBIMAGE_TYPE, this, {entity.index});
 	}
 
 
@@ -1407,7 +1407,7 @@ public:
 			decal.material = tmp[0] == '\0' ? nullptr : static_cast<Material*>(material_manager->load(Path(tmp)));
 			updateDecalInfo(decal);
 			m_decals.insert(decal.entity, decal);
-			m_universe.addComponent(decal.entity, DECAL_TYPE, this, {decal.entity.index});
+			m_universe.onComponentCreated(decal.entity, DECAL_TYPE, this, {decal.entity.index});
 		}
 	}
 
@@ -1465,7 +1465,7 @@ public:
 			probe.radiance->setFlag(BGFX_TEXTURE_MAG_ANISOTROPIC, true);
 
 			ComponentHandle cmp = {entity.index};
-			m_universe.addComponent(entity, ENVIRONMENT_PROBE_TYPE, this, cmp);
+			m_universe.onComponentCreated(entity, ENVIRONMENT_PROBE_TYPE, this, cmp);
 		}
 	}
 
@@ -1485,7 +1485,7 @@ public:
 			serializer.read(bone_attachment.relative_transform);
 			m_bone_attachments.insert(bone_attachment.entity, bone_attachment);
 			ComponentHandle cmp = {bone_attachment.entity.index};
-			m_universe.addComponent(bone_attachment.entity, BONE_ATTACHMENT_TYPE, this, cmp);
+			m_universe.onComponentCreated(bone_attachment.entity, BONE_ATTACHMENT_TYPE, this, cmp);
 		}
 	}
 
@@ -1503,44 +1503,44 @@ public:
 			{
 				emitter->deserialize(serializer, m_engine.getResourceManager());
 				ComponentHandle cmp = {emitter->m_entity.index};
-				if (emitter->m_is_valid) m_universe.addComponent(emitter->m_entity, PARTICLE_EMITTER_TYPE, this, cmp);
+				if (emitter->m_is_valid) m_universe.onComponentCreated(emitter->m_entity, PARTICLE_EMITTER_TYPE, this, cmp);
 				for (auto* module : emitter->m_modules)
 				{
 					if (module->getType() == ParticleEmitter::AlphaModule::s_type)
 					{
-						m_universe.addComponent(emitter->m_entity, PARTICLE_EMITTER_ALPHA_TYPE, this, cmp);
+						m_universe.onComponentCreated(emitter->m_entity, PARTICLE_EMITTER_ALPHA_TYPE, this, cmp);
 					}
 					else if (module->getType() == ParticleEmitter::ForceModule::s_type)
 					{
-						m_universe.addComponent(emitter->m_entity, PARTICLE_EMITTER_FORCE_HASH, this, cmp);
+						m_universe.onComponentCreated(emitter->m_entity, PARTICLE_EMITTER_FORCE_HASH, this, cmp);
 					}
 					else if (module->getType() == ParticleEmitter::SubimageModule::s_type)
 					{
-						m_universe.addComponent(emitter->m_entity, PARTICLE_EMITTER_SUBIMAGE_TYPE, this, cmp);
+						m_universe.onComponentCreated(emitter->m_entity, PARTICLE_EMITTER_SUBIMAGE_TYPE, this, cmp);
 					}
 					else if (module->getType() == ParticleEmitter::SpawnShapeModule::s_type)
 					{
-						m_universe.addComponent(emitter->m_entity, PARTICLE_EMITTER_SPAWN_SHAPE_TYPE, this, cmp);
+						m_universe.onComponentCreated(emitter->m_entity, PARTICLE_EMITTER_SPAWN_SHAPE_TYPE, this, cmp);
 					}
 					else if (module->getType() == ParticleEmitter::AttractorModule::s_type)
 					{
-						m_universe.addComponent(emitter->m_entity, PARTICLE_EMITTER_ATTRACTOR_TYPE, this, cmp);
+						m_universe.onComponentCreated(emitter->m_entity, PARTICLE_EMITTER_ATTRACTOR_TYPE, this, cmp);
 					}
 					else if (module->getType() == ParticleEmitter::LinearMovementModule::s_type)
 					{
-						m_universe.addComponent(emitter->m_entity, PARTICLE_EMITTER_LINEAR_MOVEMENT_TYPE, this, cmp);
+						m_universe.onComponentCreated(emitter->m_entity, PARTICLE_EMITTER_LINEAR_MOVEMENT_TYPE, this, cmp);
 					}
 					else if (module->getType() == ParticleEmitter::PlaneModule::s_type)
 					{
-						m_universe.addComponent(emitter->m_entity, PARTICLE_EMITTER_PLANE_TYPE, this, cmp);
+						m_universe.onComponentCreated(emitter->m_entity, PARTICLE_EMITTER_PLANE_TYPE, this, cmp);
 					}
 					else if (module->getType() == ParticleEmitter::RandomRotationModule::s_type)
 					{
-						m_universe.addComponent(emitter->m_entity, PARTICLE_EMITTER_RANDOM_ROTATION_TYPE, this, cmp);
+						m_universe.onComponentCreated(emitter->m_entity, PARTICLE_EMITTER_RANDOM_ROTATION_TYPE, this, cmp);
 					}
 					else if (module->getType() == ParticleEmitter::SizeModule::s_type)
 					{
-						m_universe.addComponent(emitter->m_entity, PARTICLE_EMITTER_SIZE_TYPE, this, cmp);
+						m_universe.onComponentCreated(emitter->m_entity, PARTICLE_EMITTER_SIZE_TYPE, this, cmp);
 					}
 				}
 			}
@@ -1562,7 +1562,7 @@ public:
 			emitter->deserialize(serializer, m_engine.getResourceManager());
 			m_scripted_particle_emitters.insert(emitter->m_entity, emitter);
 			ComponentHandle cmp = {emitter->m_entity.index};
-			m_universe.addComponent(emitter->m_entity, SCRIPTED_PARTICLE_EMITTER_TYPE, this, cmp);
+			m_universe.onComponentCreated(emitter->m_entity, SCRIPTED_PARTICLE_EMITTER_TYPE, this, cmp);
 		}
 	}
 
@@ -1614,7 +1614,7 @@ public:
 			serializer.readString(camera.slot, lengthOf(camera.slot));
 
 			m_cameras.insert(camera.entity, camera);
-			m_universe.addComponent(camera.entity, CAMERA_TYPE, this, {camera.entity.index});
+			m_universe.onComponentCreated(camera.entity, CAMERA_TYPE, this, {camera.entity.index});
 		}
 	}
 
@@ -1662,7 +1662,7 @@ public:
 					}
 				}
 
-				m_universe.addComponent(r.entity, MODEL_INSTANCE_TYPE, this, cmp);
+				m_universe.onComponentCreated(r.entity, MODEL_INSTANCE_TYPE, this, cmp);
 			}
 		}
 	}
@@ -1680,7 +1680,7 @@ public:
 			ComponentHandle cmp = { light.m_entity.index };
 			m_point_lights_map.insert(cmp, i);
 
-			m_universe.addComponent(light.m_entity, POINT_LIGHT_TYPE, this, cmp);
+			m_universe.onComponentCreated(light.m_entity, POINT_LIGHT_TYPE, this, cmp);
 		}
 
 		serializer.read(size);
@@ -1689,7 +1689,7 @@ public:
 			GlobalLight light;
 			serializer.read(light);
 			m_global_lights.insert(light.m_entity, light);
-			m_universe.addComponent(light.m_entity, GLOBAL_LIGHT_TYPE, this, {light.m_entity.index});
+			m_universe.onComponentCreated(light.m_entity, GLOBAL_LIGHT_TYPE, this, {light.m_entity.index});
 		}
 		serializer.read(m_active_global_light_cmp);
 	}
@@ -1731,7 +1731,7 @@ public:
 			mi.flags.unset(ModelInstance::IS_BONE_ATTACHMENT_PARENT);
 		}
 		m_bone_attachments.erase(entity);
-		m_universe.destroyComponent(entity, BONE_ATTACHMENT_TYPE, this, component);
+		m_universe.onComponentDestroyed(entity, BONE_ATTACHMENT_TYPE, this, component);
 	}
 
 
@@ -1743,7 +1743,7 @@ public:
 		if (probe.irradiance) probe.irradiance->getResourceManager().unload(*probe.irradiance);
 		if (probe.radiance) probe.radiance->getResourceManager().unload(*probe.radiance);
 		m_environment_probes.erase(entity);
-		m_universe.destroyComponent(entity, ENVIRONMENT_PROBE_TYPE, this, component);
+		m_universe.onComponentDestroyed(entity, ENVIRONMENT_PROBE_TYPE, this, component);
 	}
 
 
@@ -1768,7 +1768,7 @@ public:
 		LUMIX_DELETE(m_allocator, model_instance.pose);
 		model_instance.pose = nullptr;
 		model_instance.entity = INVALID_ENTITY;
-		m_universe.destroyComponent(entity, MODEL_INSTANCE_TYPE, this, component);
+		m_universe.onComponentDestroyed(entity, MODEL_INSTANCE_TYPE, this, component);
 	}
 
 
@@ -1776,7 +1776,7 @@ public:
 	{
 		Entity entity = {component.index};
 
-		m_universe.destroyComponent(entity, GLOBAL_LIGHT_TYPE, this, component);
+		m_universe.onComponentDestroyed(entity, GLOBAL_LIGHT_TYPE, this, component);
 
 		if (component == m_active_global_light_cmp)
 		{
@@ -1790,7 +1790,7 @@ public:
 	{
 		Entity entity = {component.index};
 		m_decals.erase(entity);
-		m_universe.destroyComponent(entity, DECAL_TYPE, this, component);
+		m_universe.onComponentDestroyed(entity, DECAL_TYPE, this, component);
 	}
 
 
@@ -1805,7 +1805,7 @@ public:
 		{
 			m_point_lights_map[{m_point_lights[index].m_entity.index}] = index;
 		}
-		m_universe.destroyComponent(entity, POINT_LIGHT_TYPE, this, component);
+		m_universe.onComponentDestroyed(entity, POINT_LIGHT_TYPE, this, component);
 	}
 
 
@@ -1813,7 +1813,7 @@ public:
 	{
 		Entity entity = {component.index};
 		m_cameras.erase(entity);
-		m_universe.destroyComponent(entity, CAMERA_TYPE, this, component);
+		m_universe.onComponentDestroyed(entity, CAMERA_TYPE, this, component);
 	}
 
 
@@ -1822,7 +1822,7 @@ public:
 		Entity entity = {component.index};
 		LUMIX_DELETE(m_allocator, m_terrains[entity]);
 		m_terrains.erase(entity);
-		m_universe.destroyComponent(entity, TERRAIN_TYPE, this, component);
+		m_universe.onComponentDestroyed(entity, TERRAIN_TYPE, this, component);
 	}
 
 
@@ -1831,7 +1831,7 @@ public:
 		auto* emitter = m_particle_emitters[{component.index}];
 		emitter->reset();
 		emitter->m_is_valid = false;
-		m_universe.destroyComponent(emitter->m_entity, PARTICLE_EMITTER_TYPE, this, component);
+		m_universe.onComponentDestroyed(emitter->m_entity, PARTICLE_EMITTER_TYPE, this, component);
 		cleanup(emitter);
 	}
 
@@ -1839,7 +1839,7 @@ public:
 	void destroyScriptedParticleEmitter(ComponentHandle component)
 	{
 		auto* emitter = m_scripted_particle_emitters[{component.index}];
-		m_universe.destroyComponent(emitter->m_entity, SCRIPTED_PARTICLE_EMITTER_TYPE, this, component);
+		m_universe.onComponentDestroyed(emitter->m_entity, SCRIPTED_PARTICLE_EMITTER_TYPE, this, component);
 		m_scripted_particle_emitters.erase(emitter->m_entity);
 		LUMIX_DELETE(m_allocator, emitter);
 	}
@@ -1863,7 +1863,7 @@ public:
 
 		LUMIX_DELETE(m_allocator, module);
 		emitter->m_modules.eraseItem(module);
-		m_universe.destroyComponent(emitter->m_entity, PARTICLE_EMITTER_ALPHA_TYPE, this, component);
+		m_universe.onComponentDestroyed(emitter->m_entity, PARTICLE_EMITTER_ALPHA_TYPE, this, component);
 		cleanup(emitter);
 	}
 
@@ -1877,7 +1877,7 @@ public:
 
 		LUMIX_DELETE(m_allocator, module);
 		emitter->m_modules.eraseItem(module);
-		m_universe.destroyComponent(emitter->m_entity, PARTICLE_EMITTER_FORCE_HASH, this, component);
+		m_universe.onComponentDestroyed(emitter->m_entity, PARTICLE_EMITTER_FORCE_HASH, this, component);
 		cleanup(emitter);
 	}
 
@@ -1892,7 +1892,7 @@ public:
 		LUMIX_DELETE(m_allocator, module);
 		emitter->m_modules.eraseItem(module);
 		emitter->m_subimage_module = nullptr;
-		m_universe.destroyComponent(emitter->m_entity, PARTICLE_EMITTER_SUBIMAGE_TYPE, this, component);
+		m_universe.onComponentDestroyed(emitter->m_entity, PARTICLE_EMITTER_SUBIMAGE_TYPE, this, component);
 		cleanup(emitter);
 	}
 
@@ -1906,7 +1906,7 @@ public:
 
 		LUMIX_DELETE(m_allocator, module);
 		emitter->m_modules.eraseItem(module);
-		m_universe.destroyComponent(emitter->m_entity, PARTICLE_EMITTER_ATTRACTOR_TYPE, this, component);
+		m_universe.onComponentDestroyed(emitter->m_entity, PARTICLE_EMITTER_ATTRACTOR_TYPE, this, component);
 		cleanup(emitter);
 	}
 
@@ -1920,7 +1920,7 @@ public:
 
 		LUMIX_DELETE(m_allocator, module);
 		emitter->m_modules.eraseItem(module);
-		m_universe.destroyComponent(emitter->m_entity, PARTICLE_EMITTER_SIZE_TYPE, this, component);
+		m_universe.onComponentDestroyed(emitter->m_entity, PARTICLE_EMITTER_SIZE_TYPE, this, component);
 		cleanup(emitter);
 
 	}
@@ -1991,7 +1991,7 @@ public:
 
 		LUMIX_DELETE(m_allocator, module);
 		emitter->m_modules.eraseItem(module);
-		m_universe.destroyComponent(emitter->m_entity, PARTICLE_EMITTER_PLANE_TYPE, this, component);
+		m_universe.onComponentDestroyed(emitter->m_entity, PARTICLE_EMITTER_PLANE_TYPE, this, component);
 		cleanup(emitter);
 	}
 
@@ -2005,7 +2005,7 @@ public:
 
 		LUMIX_DELETE(m_allocator, module);
 		emitter->m_modules.eraseItem(module);
-		m_universe.destroyComponent(emitter->m_entity, PARTICLE_EMITTER_LINEAR_MOVEMENT_TYPE, this, component);
+		m_universe.onComponentDestroyed(emitter->m_entity, PARTICLE_EMITTER_LINEAR_MOVEMENT_TYPE, this, component);
 		cleanup(emitter);
 	}
 
@@ -2019,7 +2019,7 @@ public:
 
 		LUMIX_DELETE(m_allocator, module);
 		emitter->m_modules.eraseItem(module);
-		m_universe.destroyComponent(emitter->m_entity, PARTICLE_EMITTER_SPAWN_SHAPE_TYPE, this, component);
+		m_universe.onComponentDestroyed(emitter->m_entity, PARTICLE_EMITTER_SPAWN_SHAPE_TYPE, this, component);
 		cleanup(emitter);
 
 	}
@@ -2034,13 +2034,10 @@ public:
 
 		LUMIX_DELETE(m_allocator, module);
 		emitter->m_modules.eraseItem(module);
-		m_universe.destroyComponent(emitter->m_entity, PARTICLE_EMITTER_RANDOM_ROTATION_TYPE, this, component);
+		m_universe.onComponentDestroyed(emitter->m_entity, PARTICLE_EMITTER_RANDOM_ROTATION_TYPE, this, component);
 		cleanup(emitter);
 
 	}
-
-
-	void destroyComponent(ComponentHandle component, ComponentType type) override;
 
 
 	void setParticleEmitterAlpha(ComponentHandle cmp, const Vec2* values, int count) override
@@ -2299,7 +2296,7 @@ public:
 		camera.slot[0] = '\0';
 		if (!getCameraInSlot("main").isValid()) copyString(camera.slot, "main");
 		m_cameras.insert(entity, camera);
-		m_universe.addComponent(entity, CAMERA_TYPE, this, {entity.index});
+		m_universe.onComponentCreated(entity, CAMERA_TYPE, this, {entity.index});
 		return {entity.index};
 	}
 
@@ -2308,12 +2305,9 @@ public:
 	{
 		Terrain* terrain = LUMIX_NEW(m_allocator, Terrain)(m_renderer, entity, *this, m_allocator);
 		m_terrains.insert(entity, terrain);
-		m_universe.addComponent(entity, TERRAIN_TYPE, this, {entity.index});
+		m_universe.onComponentCreated(entity, TERRAIN_TYPE, this, {entity.index});
 		return {entity.index};
 	}
-
-
-	ComponentHandle createComponent(ComponentType type, Entity entity) override;
 
 
 	ComponentHandle createParticleEmitterRandomRotation(Entity entity)
@@ -2322,7 +2316,7 @@ public:
 		auto* emitter = m_particle_emitters.at(index);
 		auto module = LUMIX_NEW(m_allocator, ParticleEmitter::RandomRotationModule)(*emitter);
 		emitter->addModule(module);
-		m_universe.addComponent(entity, PARTICLE_EMITTER_RANDOM_ROTATION_TYPE, this, {entity.index});
+		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_RANDOM_ROTATION_TYPE, this, {entity.index});
 		return {entity.index};
 	}
 
@@ -2333,7 +2327,7 @@ public:
 		auto* emitter = m_particle_emitters.at(index);
 		auto module = LUMIX_NEW(m_allocator, ParticleEmitter::PlaneModule)(*emitter);
 		emitter->addModule(module);
-		m_universe.addComponent(entity, PARTICLE_EMITTER_PLANE_TYPE, this, {entity.index});
+		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_PLANE_TYPE, this, {entity.index});
 		return {entity.index};
 	}
 
@@ -2344,7 +2338,7 @@ public:
 		auto* emitter = m_particle_emitters.at(index);
 		auto module = LUMIX_NEW(m_allocator, ParticleEmitter::LinearMovementModule)(*emitter);
 		emitter->addModule(module);
-		m_universe.addComponent(entity, PARTICLE_EMITTER_LINEAR_MOVEMENT_TYPE, this, {entity.index});
+		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_LINEAR_MOVEMENT_TYPE, this, {entity.index});
 		return {entity.index};
 	}
 
@@ -2355,7 +2349,7 @@ public:
 		auto* emitter = m_particle_emitters.at(index);
 		auto module = LUMIX_NEW(m_allocator, ParticleEmitter::SpawnShapeModule)(*emitter);
 		emitter->addModule(module);
-		m_universe.addComponent(entity, PARTICLE_EMITTER_SPAWN_SHAPE_TYPE, this, {entity.index});
+		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_SPAWN_SHAPE_TYPE, this, {entity.index});
 		return {entity.index};
 	}
 
@@ -2366,7 +2360,7 @@ public:
 		auto* emitter = m_particle_emitters.at(index);
 		auto module = LUMIX_NEW(m_allocator, ParticleEmitter::AlphaModule)(*emitter);
 		emitter->addModule(module);
-		m_universe.addComponent(entity, PARTICLE_EMITTER_ALPHA_TYPE, this, {entity.index});
+		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_ALPHA_TYPE, this, {entity.index});
 		return {entity.index};
 	}
 
@@ -2377,7 +2371,7 @@ public:
 		auto* emitter = m_particle_emitters.at(index);
 		auto module = LUMIX_NEW(m_allocator, ParticleEmitter::ForceModule)(*emitter);
 		emitter->addModule(module);
-		m_universe.addComponent(entity, PARTICLE_EMITTER_FORCE_HASH, this, {entity.index});
+		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_FORCE_HASH, this, {entity.index});
 		return {entity.index};
 	}
 
@@ -2388,7 +2382,7 @@ public:
 		auto* emitter = m_particle_emitters.at(index);
 		auto module = LUMIX_NEW(m_allocator, ParticleEmitter::SubimageModule)(*emitter);
 		emitter->addModule(module);
-		m_universe.addComponent(entity, PARTICLE_EMITTER_SUBIMAGE_TYPE, this, {entity.index});
+		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_SUBIMAGE_TYPE, this, {entity.index});
 		return {entity.index};
 	}
 
@@ -2399,7 +2393,7 @@ public:
 		auto* emitter = m_particle_emitters.at(index);
 		auto module = LUMIX_NEW(m_allocator, ParticleEmitter::AttractorModule)(*emitter);
 		emitter->addModule(module);
-		m_universe.addComponent(entity, PARTICLE_EMITTER_ATTRACTOR_TYPE, this, { entity.index });
+		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_ATTRACTOR_TYPE, this, { entity.index });
 		return{ entity.index };
 	}
 
@@ -2411,7 +2405,7 @@ public:
 		auto* emitter = m_particle_emitters.at(index);
 		auto module = LUMIX_NEW(m_allocator, ParticleEmitter::SizeModule)(*emitter);
 		emitter->addModule(module);
-		m_universe.addComponent(entity, PARTICLE_EMITTER_SIZE_TYPE, this, { entity.index });
+		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_SIZE_TYPE, this, { entity.index });
 		return { entity.index };
 	}
 
@@ -2419,7 +2413,7 @@ public:
 	ComponentHandle createScriptedParticleEmitter(Entity entity)
 	{
 		m_scripted_particle_emitters.insert(entity, LUMIX_NEW(m_allocator, ScriptedParticleEmitter)(entity, m_allocator));
-		m_universe.addComponent(entity, SCRIPTED_PARTICLE_EMITTER_TYPE, this, { entity.index });
+		m_universe.onComponentCreated(entity, SCRIPTED_PARTICLE_EMITTER_TYPE, this, { entity.index });
 		return { entity.index };
 	}
 
@@ -2429,7 +2423,7 @@ public:
 		int index = allocateParticleEmitter(entity);
 		m_particle_emitters.at(index)->init();
 
-		m_universe.addComponent(entity, PARTICLE_EMITTER_TYPE, this, {entity.index});
+		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_TYPE, this, {entity.index});
 
 		return { entity.index };
 	}
@@ -4786,7 +4780,7 @@ public:
 		if (m_global_lights.empty()) m_active_global_light_cmp = cmp;
 
 		m_global_lights.insert(entity, light);
-		m_universe.addComponent(entity, GLOBAL_LIGHT_TYPE, this, cmp);
+		m_universe.onComponentCreated(entity, GLOBAL_LIGHT_TYPE, this, cmp);
 		return cmp;
 	}
 
@@ -4807,7 +4801,7 @@ public:
 		ComponentHandle cmp = { entity.index };
 		m_point_lights_map.insert(cmp, m_point_lights.size() - 1);
 
-		m_universe.addComponent(entity, POINT_LIGHT_TYPE, this, cmp);
+		m_universe.onComponentCreated(entity, POINT_LIGHT_TYPE, this, cmp);
 
 		detectLightInfluencedGeometry(cmp);
 
@@ -4837,7 +4831,7 @@ public:
 		updateDecalInfo(decal);
 
 		ComponentHandle cmp = {entity.index};
-		m_universe.addComponent(entity, DECAL_TYPE, this, cmp);
+		m_universe.onComponentCreated(entity, DECAL_TYPE, this, cmp);
 		return cmp;
 	}
 
@@ -4855,7 +4849,7 @@ public:
 		probe.guid = Math::randGUID();
 
 		ComponentHandle cmp = {entity.index};
-		m_universe.addComponent(entity, ENVIRONMENT_PROBE_TYPE, this, cmp);
+		m_universe.onComponentCreated(entity, ENVIRONMENT_PROBE_TYPE, this, cmp);
 		return cmp;
 	}
 
@@ -4868,7 +4862,7 @@ public:
 		attachment.bone_index = -1;
 
 		ComponentHandle cmp = { entity.index };
-		m_universe.addComponent(entity, BONE_ATTACHMENT_TYPE, this, cmp);
+		m_universe.onComponentCreated(entity, BONE_ATTACHMENT_TYPE, this, cmp);
 		return cmp;
 	}
 
@@ -4892,7 +4886,7 @@ public:
 		r.mesh_count = 0;
 		r.matrix = m_universe.getMatrix(entity);
 		ComponentHandle cmp = {entity.index};
-		m_universe.addComponent(entity, MODEL_INSTANCE_TYPE, this, cmp);
+		m_universe.onComponentCreated(entity, MODEL_INSTANCE_TYPE, this, cmp);
 		return cmp;
 	}
 
@@ -5064,36 +5058,8 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 
 	for (auto& i : COMPONENT_INFOS)
 	{
-		universe.registerComponentType(i.type, this, i.serialize, i.deserialize);
+		universe.registerComponentType(i.type, this, i.creator, i.destroyer, i.serialize, i.deserialize);
 	}
-}
-
-
-ComponentHandle RenderSceneImpl::createComponent(ComponentType type, Entity entity)
-{
-	for (auto& i : COMPONENT_INFOS)
-	{
-		if (i.type == type)
-		{
-			return (this->*i.creator)(entity);
-		}
-	}
-
-	return INVALID_COMPONENT;
-}
-
-
-void RenderSceneImpl::destroyComponent(ComponentHandle component, ComponentType type)
-{
-	for (auto& i : COMPONENT_INFOS)
-	{
-		if (i.type == type)
-		{
-			(this->*i.destroyer)(component);
-			return;
-		}
-	}
-	ASSERT(false);
 }
 
 

@@ -134,10 +134,30 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	{
 		m_is_game_running = false;
 		m_render_scene = static_cast<RenderScene*>(universe.getScene(crc32("renderer")));
-		universe.registerComponentType(PROPERTY_ANIMATOR_TYPE, this, &AnimationSceneImpl::serializePropertyAnimator, &AnimationSceneImpl::deserializePropertyAnimator);
-		universe.registerComponentType(ANIMABLE_TYPE, this, &AnimationSceneImpl::serializeAnimable, &AnimationSceneImpl::deserializeAnimable);
-		universe.registerComponentType(CONTROLLER_TYPE, this, &AnimationSceneImpl::serializeController, &AnimationSceneImpl::deserializeController);
-		universe.registerComponentType(SHARED_CONTROLLER_TYPE, this, &AnimationSceneImpl::serializeSharedController, &AnimationSceneImpl::deserializeSharedController);
+		universe.registerComponentType(PROPERTY_ANIMATOR_TYPE
+			, this
+			, &AnimationSceneImpl::createPropertyAnimator
+			, &AnimationSceneImpl::destroyPropertyAnimator
+			, &AnimationSceneImpl::serializePropertyAnimator
+			, &AnimationSceneImpl::deserializePropertyAnimator);
+		universe.registerComponentType(ANIMABLE_TYPE
+			, this
+			, &AnimationSceneImpl::createAnimable
+			, &AnimationSceneImpl::destroyAnimable
+			, &AnimationSceneImpl::serializeAnimable
+			, &AnimationSceneImpl::deserializeAnimable);
+		universe.registerComponentType(CONTROLLER_TYPE
+			, this
+			, &AnimationSceneImpl::createController
+			, &AnimationSceneImpl::destroyController
+			, &AnimationSceneImpl::serializeController
+			, &AnimationSceneImpl::deserializeController);
+		universe.registerComponentType(SHARED_CONTROLLER_TYPE
+			, this
+			, &AnimationSceneImpl::createSharedController
+			, &AnimationSceneImpl::destroySharedController
+			, &AnimationSceneImpl::serializeSharedController
+			, &AnimationSceneImpl::deserializeSharedController);
 		ASSERT(m_render_scene);
 	}
 
@@ -154,7 +174,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		Entity parent;
 		serializer.read(&parent);
 		m_shared_controllers.insert(entity, {entity, parent});
-		m_universe.addComponent(entity, SHARED_CONTROLLER_TYPE, this, {entity.index});
+		m_universe.onComponentCreated(entity, SHARED_CONTROLLER_TYPE, this, {entity.index});
 	}
 
 
@@ -175,7 +195,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		serializer.read(tmp, lengthOf(tmp));
 		animator.animation = loadPropertyAnimation(Path(tmp));
 		serializer.read(&animator.flags.base);
-		m_universe.addComponent(entity, PROPERTY_ANIMATOR_TYPE, this, {entity.index});
+		m_universe.onComponentCreated(entity, PROPERTY_ANIMATOR_TYPE, this, {entity.index});
 	}
 
 
@@ -198,7 +218,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		serializer.read(tmp, lengthOf(tmp));
 		auto* res = tmp[0] ? m_engine.getResourceManager().get(Animation::TYPE)->load(Path(tmp)) : nullptr;
 		animable.animation = (Animation*)res;
-		m_universe.addComponent(entity, ANIMABLE_TYPE, this, {entity.index});
+		m_universe.onComponentCreated(entity, ANIMABLE_TYPE, this, {entity.index});
 	}
 
 
@@ -225,7 +245,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		}
 		auto* res = tmp[0] ? m_engine.getResourceManager().get(Anim::ControllerResource::TYPE)->load(Path(tmp)) : nullptr;
 		setControllerResource(controller, (Anim::ControllerResource*)res);
-		m_universe.addComponent(entity, CONTROLLER_TYPE, this, {entity.index});
+		m_universe.onComponentCreated(entity, CONTROLLER_TYPE, this, {entity.index});
 	}
 
 
@@ -433,16 +453,6 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
-	ComponentHandle createComponent(ComponentType type, Entity entity) override
-	{
-		if (type == PROPERTY_ANIMATOR_TYPE) return createPropertyAnimator(entity);
-		if (type == ANIMABLE_TYPE) return createAnimable(entity);
-		if (type == CONTROLLER_TYPE) return createController(entity);
-		if (type == SHARED_CONTROLLER_TYPE) return createSharedController(entity);
-		return INVALID_COMPONENT;
-	}
-
-
 	static void unloadResource(Resource* res)
 	{
 		if (!res) return;
@@ -490,40 +500,42 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
-	void destroyComponent(ComponentHandle component, ComponentType type) override
+	void destroyPropertyAnimator(ComponentHandle component)
 	{
-		if (type == ANIMABLE_TYPE)
-		{
-			Entity entity = {component.index};
-			auto& animable = m_animables[entity];
-			unloadResource(animable.animation);
-			m_animables.erase(entity);
-			m_universe.destroyComponent(entity, type, this, component);
-		}
-		else if (type == PROPERTY_ANIMATOR_TYPE)
-		{
-			Entity entity = {component.index};
-			int idx = m_property_animators.find(entity);
-			auto& animator = m_property_animators.at(idx);
-			unloadResource(animator.animation);
-			m_property_animators.erase(entity);
-			m_universe.destroyComponent(entity, type, this, component);
-		}
-		else if (type == CONTROLLER_TYPE)
-		{
-			Entity entity = {component.index};
-			auto& controller = m_controllers.get(entity);
-			unloadResource(controller.resource);
-			setControllerResource(controller, nullptr);
-			m_controllers.erase(entity);
-			m_universe.destroyComponent(entity, type, this, component);
-		}
-		else if (type == SHARED_CONTROLLER_TYPE)
-		{
-			Entity entity = {component.index};
-			m_shared_controllers.erase(entity);
-			m_universe.destroyComponent(entity, type, this, component);
-		}
+		Entity entity = { component.index };
+		int idx = m_property_animators.find(entity);
+		auto& animator = m_property_animators.at(idx);
+		unloadResource(animator.animation);
+		m_property_animators.erase(entity);
+		m_universe.onComponentDestroyed(entity, PROPERTY_ANIMATOR_TYPE, this, component);
+	}
+
+	void destroyAnimable(ComponentHandle component)
+	{
+		Entity entity = { component.index };
+		auto& animable = m_animables[entity];
+		unloadResource(animable.animation);
+		m_animables.erase(entity);
+		m_universe.onComponentDestroyed(entity, ANIMABLE_TYPE, this, component);
+	}
+
+
+	void destroyController(ComponentHandle component)
+	{
+		Entity entity = { component.index };
+		auto& controller = m_controllers.get(entity);
+		unloadResource(controller.resource);
+		setControllerResource(controller, nullptr);
+		m_controllers.erase(entity);
+		m_universe.onComponentDestroyed(entity, CONTROLLER_TYPE, this, component);
+	}
+
+
+	void destroySharedController(ComponentHandle component)
+	{
+		Entity entity = {component.index};
+		m_shared_controllers.erase(entity);
+		m_universe.onComponentDestroyed(entity, SHARED_CONTROLLER_TYPE, this, component);
 	}
 
 
@@ -583,7 +595,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 			animable.animation = path[0] == '\0' ? nullptr : loadAnimation(Path(path));
 			m_animables.insert(animable.entity, animable);
 			ComponentHandle cmp = {animable.entity.index};
-			m_universe.addComponent(animable.entity, ANIMABLE_TYPE, this, cmp);
+			m_universe.onComponentCreated(animable.entity, ANIMABLE_TYPE, this, cmp);
 		}
 
 		serializer.read(count);
@@ -600,7 +612,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 			animator.time = 0;
 			animator.animation = loadPropertyAnimation(Path(path));
 			ComponentHandle cmp = { entity.index };
-			m_universe.addComponent(entity, PROPERTY_ANIMATOR_TYPE, this, cmp);
+			m_universe.onComponentCreated(entity, PROPERTY_ANIMATOR_TYPE, this, cmp);
 		}
 
 
@@ -616,7 +628,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 			setControllerResource(controller, tmp[0] ? loadController(Path(tmp)) : nullptr);
 			m_controllers.insert(controller.entity, controller);
 			ComponentHandle cmp = { controller.entity.index };
-			m_universe.addComponent(controller.entity, CONTROLLER_TYPE, this, cmp);
+			m_universe.onComponentCreated(controller.entity, CONTROLLER_TYPE, this, cmp);
 		}
 
 		serializer.read(count);
@@ -628,7 +640,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 			serializer.read(controller.parent);
 			m_shared_controllers.insert(controller.entity, controller);
 			ComponentHandle cmp = {controller.entity.index};
-			m_universe.addComponent(controller.entity, SHARED_CONTROLLER_TYPE, this, cmp);
+			m_universe.onComponentCreated(controller.entity, SHARED_CONTROLLER_TYPE, this, cmp);
 		}
 	}
 
@@ -1177,7 +1189,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		animator.animation = nullptr;
 		animator.time = 0;
 		ComponentHandle cmp = { entity.index };
-		m_universe.addComponent(entity, PROPERTY_ANIMATOR_TYPE, this, cmp);
+		m_universe.onComponentCreated(entity, PROPERTY_ANIMATOR_TYPE, this, cmp);
 		return cmp;
 	}
 
@@ -1192,7 +1204,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		animable.start_time = 0;
 
 		ComponentHandle cmp = {entity.index};
-		m_universe.addComponent(entity, ANIMABLE_TYPE, this, cmp);
+		m_universe.onComponentCreated(entity, ANIMABLE_TYPE, this, cmp);
 		return cmp;
 	}
 
@@ -1202,7 +1214,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		Controller& controller = m_controllers.emplace(entity, m_allocator);
 		controller.entity = entity;
 		ComponentHandle cmp = {entity.index};
-		m_universe.addComponent(entity, CONTROLLER_TYPE, this, cmp);
+		m_universe.onComponentCreated(entity, CONTROLLER_TYPE, this, cmp);
 		return cmp;
 	}
 
@@ -1211,7 +1223,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	{
 		m_shared_controllers.insert(entity, {entity, INVALID_ENTITY});
 		ComponentHandle cmp = {entity.index};
-		m_universe.addComponent(entity, SHARED_CONTROLLER_TYPE, this, cmp);
+		m_universe.onComponentCreated(entity, SHARED_CONTROLLER_TYPE, this, cmp);
 		return cmp;
 	}
 
