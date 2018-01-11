@@ -254,6 +254,7 @@ struct PropertyGridPlugin : PropertyGrid::IPlugin
 
 LUMIX_STUDIO_ENTRY(animation)
 {
+	app.registerComponent("property_animator", "Animation/Property animator");
 	app.registerComponentWithResource("animable", "Animation/Animable", ANIMATION_TYPE, *Reflection::getProperty(ANIMABLE_TYPE, "Animation"));
 	app.registerComponentWithResource("anim_controller", "Animation/Controller", CONTROLLER_RESOURCE_TYPE, *Reflection::getProperty(CONTROLLER_TYPE, "Source"));
 	app.registerComponent("shared_anim_controller", "Animation/Shared controller");
