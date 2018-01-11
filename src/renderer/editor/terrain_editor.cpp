@@ -135,7 +135,7 @@ struct PaintTerrainCommand LUMIX_FINAL : public IEditorCommand
 	}
 
 
-	void deserialize(JsonSerializer& serializer) override
+	void deserialize(JsonDeserializer& serializer) override
 	{
 		m_items.clear();
 		int action_type;

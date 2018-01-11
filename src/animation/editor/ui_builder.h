@@ -617,7 +617,7 @@ struct SetPropertyCommand : IHashedCommand
 
 
 	void serialize(JsonSerializer& serializer) override { ASSERT(false); }
-	void deserialize(JsonSerializer& serializer) override { ASSERT(false); }
+	void deserialize(JsonDeserializer& serializer) override { ASSERT(false); }
 	const char* getType() override { return "set_anim_editor_property"; }
 	
 	
@@ -670,7 +670,7 @@ struct RemoveArrayItemCommand : IEditorCommand
 
 
 	void serialize(JsonSerializer& serializer) override { ASSERT(false); }
-	void deserialize(JsonSerializer& serializer) override { ASSERT(false); }
+	void deserialize(JsonDeserializer& serializer) override { ASSERT(false); }
 	const char* getType() override { return "remove_array_item_anim_editor_property"; }
 	bool merge(IEditorCommand& command) override { return false; }
 
@@ -707,7 +707,7 @@ struct AddArrayItemCommand : IEditorCommand
 
 
 	void serialize(JsonSerializer& serializer) override { ASSERT(false); }
-	void deserialize(JsonSerializer& serializer) override { ASSERT(false); }
+	void deserialize(JsonDeserializer& serializer) override { ASSERT(false); }
 	const char* getType() override { return "add_array_item_anim_editor_property"; }
 	bool merge(IEditorCommand& command) override { return false; }
 

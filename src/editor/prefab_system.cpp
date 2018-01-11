@@ -155,7 +155,7 @@ class PrefabSystemImpl LUMIX_FINAL : public PrefabSystem
 		}
 
 
-		void deserialize(JsonSerializer& serializer) override
+		void deserialize(JsonDeserializer& serializer) override
 		{
 			serializer.deserialize("position_x", position.x, 0);
 			serializer.deserialize("position_y", position.y, 0);

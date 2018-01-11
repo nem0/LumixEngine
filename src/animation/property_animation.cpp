@@ -34,7 +34,7 @@ PropertyAnimation::PropertyAnimation(const Path& path, ResourceManagerBase& reso
 bool PropertyAnimation::load(FS::IFile& file)
 {
 	auto& manager = (PropertyAnimationManager&)getResourceManager();
-	JsonSerializer serializer(file, JsonSerializer::READ, getPath(), manager.getAllocator());
+	JsonDeserializer serializer(file, getPath(), manager.getAllocator());
 	if (serializer.isError()) return false;
 	
 	serializer.deserializeArrayBegin();

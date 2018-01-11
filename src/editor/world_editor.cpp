@@ -71,7 +71,7 @@ struct BeginGroupCommand LUMIX_FINAL : public IEditorCommand
 	bool execute() override { return true; }
 	void undo() override { ASSERT(false); }
 	void serialize(JsonSerializer& serializer) override {}
-	void deserialize(JsonSerializer& serializer) override {}
+	void deserialize(JsonDeserializer& serializer) override {}
 	bool merge(IEditorCommand& command) override { ASSERT(false); return false; }
 	const char* getType() override { return "begin_group"; }
 };
@@ -85,7 +85,7 @@ struct EndGroupCommand LUMIX_FINAL : public IEditorCommand
 	bool execute() override { return true; }
 	void undo() override { ASSERT(false); }
 	void serialize(JsonSerializer& serializer) override {}
-	void deserialize(JsonSerializer& serializer) override {}
+	void deserialize(JsonDeserializer& serializer) override {}
 	bool merge(IEditorCommand& command) override { ASSERT(false); return false; }
 	const char* getType() override { return "end_group"; }
 
@@ -120,7 +120,7 @@ public:
 	}
 
 
-	void deserialize(JsonSerializer& serializer) override
+	void deserialize(JsonDeserializer& serializer) override
 	{
 		char name[100];
 		serializer.deserialize("name", name, sizeof(name), "");
@@ -215,7 +215,7 @@ public:
 	}
 
 
-	void deserialize(JsonSerializer& serializer) override
+	void deserialize(JsonDeserializer& serializer) override
 	{
 		serializer.deserialize("pos_x", m_position.x, 0);
 		serializer.deserialize("pos_y", m_position.y, 0);
@@ -346,7 +346,7 @@ public:
 	}
 
 
-	void deserialize(JsonSerializer& serializer) override
+	void deserialize(JsonDeserializer& serializer) override
 	{
 		Universe* universe = m_editor.getUniverse();
 		int count;
@@ -506,7 +506,7 @@ public:
 	}
 
 
-	void deserialize(JsonSerializer& serializer) override
+	void deserialize(JsonDeserializer& serializer) override
 	{
 		Universe* universe = m_editor.getUniverse();
 		int count;
@@ -655,7 +655,7 @@ public:
 	}
 
 
-	void deserialize(JsonSerializer& serializer) override
+	void deserialize(JsonDeserializer& serializer) override
 	{
 		Universe* universe = m_editor.getUniverse();
 		serializer.deserializeArrayBegin("new_scales");
@@ -834,7 +834,7 @@ public:
 	}
 
 
-	void deserialize(JsonSerializer& serializer) override
+	void deserialize(JsonDeserializer& serializer) override
 	{
 		serializer.deserialize("inedx", m_index, 0);
 		serializer.deserialize("entity_index", m_component.entity, INVALID_ENTITY);
@@ -909,7 +909,7 @@ public:
 	}
 
 
-	void deserialize(JsonSerializer& serializer) override
+	void deserialize(JsonDeserializer& serializer) override
 	{
 		serializer.deserialize("inedx", m_index, 0);
 		serializer.deserialize("entity_index", m_component.entity, INVALID_ENTITY);
@@ -1029,7 +1029,7 @@ public:
 	}
 
 
-	void deserialize(JsonSerializer& serializer) override
+	void deserialize(JsonDeserializer& serializer) override
 	{
 		serializer.deserialize("index", m_index, 0);
 		serializer.deserializeArrayBegin("entities");
@@ -1177,7 +1177,7 @@ private:
 		}
 
 
-		void deserialize(JsonSerializer& serializer) override
+		void deserialize(JsonDeserializer& serializer) override
 		{
 			u32 hash;
 			serializer.deserialize("component_type", hash, 0);
@@ -1258,7 +1258,7 @@ private:
 		}
 
 
-		void deserialize(JsonSerializer& serializer) override
+		void deserialize(JsonDeserializer& serializer) override
 		{
 			serializer.deserialize("parent", m_parent, INVALID_ENTITY);
 			serializer.deserialize("child", m_child, INVALID_ENTITY);
@@ -1356,7 +1356,7 @@ private:
 		}
 
 
-		void deserialize(JsonSerializer& serializer) override
+		void deserialize(JsonDeserializer& serializer) override
 		{
 			int count;
 			serializer.deserialize("count", count, 0);
@@ -1591,7 +1591,7 @@ private:
 		}
 
 
-		void deserialize(JsonSerializer& serializer) override
+		void deserialize(JsonDeserializer& serializer) override
 		{
 			serializer.deserializeArrayBegin("entities");
 			while (!serializer.isArrayEnd())
@@ -1713,7 +1713,7 @@ private:
 		}
 
 
-		void deserialize(JsonSerializer& serializer) override
+		void deserialize(JsonDeserializer& serializer) override
 		{
 			serializer.deserialize("pos_x", m_position.x, 0);
 			serializer.deserialize("pos_y", m_position.y, 0);
@@ -3610,7 +3610,7 @@ public:
 		FS::IFile* file = fs.open(fs.getDiskDevice(), path, FS::Mode::CREATE_AND_WRITE);
 		if (file)
 		{
-			JsonSerializer serializer(*file, JsonSerializer::WRITE, path, m_allocator);
+			JsonSerializer serializer(*file, path);
 			serializer.beginObject();
 			serializer.beginArray("commands");
 			for (int i = 0; i < m_undo_stack.size(); ++i)
@@ -3656,7 +3656,7 @@ public:
 		FS::IFile* file = fs.open(fs.getDiskDevice(), path, FS::Mode::OPEN_AND_READ);
 		if (file)
 		{
-			JsonSerializer serializer(*file, JsonSerializer::READ, path, m_allocator);
+			JsonDeserializer serializer(*file, path, m_allocator);
 			serializer.deserializeObjectBegin();
 			serializer.deserializeArrayBegin("commands");
 			while (!serializer.isArrayEnd())
