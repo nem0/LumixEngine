@@ -1793,7 +1793,7 @@ namespace Lumix
 		using namespace Reflection;
 		static auto lua_scene = scene("lua_script",
 			component("lua_script",
-				blob_property("data", LUMIX_PROP(LuaScriptScene, getScriptData, setScriptData))
+				blob_property("data", LUMIX_PROP(LuaScriptScene, ScriptData))
 			)
 		);
 		registerScene(lua_scene);

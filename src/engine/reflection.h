@@ -8,8 +8,10 @@
 #include "engine/metaprogramming.h"
 
 
-#define LUMIX_PROP(Scene, Getter, Setter) \
+#define LUMIX_PROP_FULL(Scene, Getter, Setter) \
 	&Scene::Getter, #Scene "::" #Getter, &Scene::Setter, #Scene "::" #Setter
+#define LUMIX_PROP(Scene, Property) \
+	&Scene::get##Property, #Scene "::get" #Property, &Scene::set##Property, #Scene "::set" #Property
 
 #define LUMIX_FUNC(Func)\
 	&Func, #Func

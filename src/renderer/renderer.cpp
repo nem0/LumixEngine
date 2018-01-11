@@ -149,139 +149,141 @@ static void registerProperties(IAllocator& allocator)
 {
 	using namespace Reflection;
 
+	//&RenderScene::getParticleEmitterShapeRadius
+
 	static auto render_scene = scene("renderer", 
 		component("bone_attachment",
-			property("Parent", LUMIX_PROP(RenderScene, getBoneAttachmentParent, setBoneAttachmentParent)),
-			property("Relative position", LUMIX_PROP(RenderScene, getBoneAttachmentPosition, setBoneAttachmentPosition)),
-			property("Relative rotation", LUMIX_PROP(RenderScene, getBoneAttachmentRotation, setBoneAttachmentRotation), 
+			property("Parent", LUMIX_PROP(RenderScene, BoneAttachmentParent)),
+			property("Relative position", LUMIX_PROP(RenderScene, BoneAttachmentPosition)),
+			property("Relative rotation", LUMIX_PROP(RenderScene, BoneAttachmentRotation), 
 				RadiansAttribute()),
 			BoneProperty()
 		),
 		component("particle_emitter_spawn_shape",
-			property("Radius", LUMIX_PROP(RenderScene, getParticleEmitterShapeRadius, setParticleEmitterShapeRadius))
+			property("Radius", LUMIX_PROP(RenderScene, ParticleEmitterShapeRadius))
 		),
 		component("particle_emitter_plane",
-			property("Bounce", LUMIX_PROP(RenderScene, getParticleEmitterPlaneBounce, setParticleEmitterPlaneBounce),
+			property("Bounce", LUMIX_PROP(RenderScene, ParticleEmitterPlaneBounce),
 				ClampAttribute(0, 1)),
 			array("Planes", &RenderScene::getParticleEmitterPlaneCount, &RenderScene::addParticleEmitterPlane, &RenderScene::removeParticleEmitterPlane, 
-				property("Entity", LUMIX_PROP(RenderScene, getParticleEmitterPlaneEntity, setParticleEmitterPlaneEntity))
+				property("Entity", LUMIX_PROP(RenderScene, ParticleEmitterPlaneEntity))
 			)
 		),
 		component("particle_emitter_attractor",
-			property("Force", LUMIX_PROP(RenderScene, getParticleEmitterAttractorForce, setParticleEmitterAttractorForce)),
+			property("Force", LUMIX_PROP(RenderScene, ParticleEmitterAttractorForce)),
 			array("Attractors", &RenderScene::getParticleEmitterAttractorCount, &RenderScene::addParticleEmitterAttractor, &RenderScene::removeParticleEmitterAttractor,
-				property("Entity", LUMIX_PROP(RenderScene, getParticleEmitterAttractorEntity, setParticleEmitterAttractorEntity))
+				property("Entity", LUMIX_PROP(RenderScene, ParticleEmitterAttractorEntity))
 			)
 		),
 		component("particle_emitter_alpha",
-			sampled_func_property("Alpha", LUMIX_PROP(RenderScene, getParticleEmitterAlpha, setParticleEmitterAlpha), &RenderScene::getParticleEmitterAlphaCount, 1)
+			sampled_func_property("Alpha", LUMIX_PROP(RenderScene, ParticleEmitterAlpha), &RenderScene::getParticleEmitterAlphaCount, 1)
 		),
 		component("particle_emitter_random_rotation"),
 		component("environment_probe"),
 		component("particle_emitter_force",
-			property("Acceleration", LUMIX_PROP(RenderScene, getParticleEmitterAcceleration, setParticleEmitterAcceleration))
+			property("Acceleration", LUMIX_PROP(RenderScene, ParticleEmitterAcceleration))
 		),
 		component("particle_emitter_subimage",
-			property("Rows", LUMIX_PROP(RenderScene, getParticleEmitterSubimageRows, setParticleEmitterSubimageRows)),
-			property("Columns", LUMIX_PROP(RenderScene, getParticleEmitterSubimageCols, setParticleEmitterSubimageCols))
+			property("Rows", LUMIX_PROP(RenderScene, ParticleEmitterSubimageRows)),
+			property("Columns", LUMIX_PROP(RenderScene, ParticleEmitterSubimageCols))
 		),
 		component("particle_emitter_size",
-			sampled_func_property("Size", LUMIX_PROP(RenderScene, getParticleEmitterSize, setParticleEmitterSize), &RenderScene::getParticleEmitterSizeCount, 1)
+			sampled_func_property("Size", LUMIX_PROP(RenderScene, ParticleEmitterSize), &RenderScene::getParticleEmitterSizeCount, 1)
 		),
 		component("scripted_particle_emitter",
-			property("Material", LUMIX_PROP(RenderScene, getScriptedParticleEmitterMaterialPath, setScriptedParticleEmitterMaterialPath),
+			property("Material", LUMIX_PROP(RenderScene, ScriptedParticleEmitterMaterialPath),
 				ResourceAttribute("Material (*.mat)", MATERIAL_TYPE))
 		),
 		component("particle_emitter",
-			property("Life", LUMIX_PROP(RenderScene, getParticleEmitterInitialLife, setParticleEmitterInitialLife)),
-			property("Initial size", LUMIX_PROP(RenderScene, getParticleEmitterInitialSize, setParticleEmitterInitialSize)),
-			property("Spawn period", LUMIX_PROP(RenderScene, getParticleEmitterSpawnPeriod, setParticleEmitterSpawnPeriod)),
-			property("Autoemit", LUMIX_PROP(RenderScene, getParticleEmitterAutoemit, setParticleEmitterAutoemit)),
-			property("Local space", LUMIX_PROP(RenderScene, getParticleEmitterLocalSpace, setParticleEmitterLocalSpace)),
-			property("Material", LUMIX_PROP(RenderScene, getParticleEmitterMaterialPath, setParticleEmitterMaterialPath),
+			property("Life", LUMIX_PROP(RenderScene, ParticleEmitterInitialLife)),
+			property("Initial size", LUMIX_PROP(RenderScene, ParticleEmitterInitialSize)),
+			property("Spawn period", LUMIX_PROP(RenderScene, ParticleEmitterSpawnPeriod)),
+			property("Autoemit", LUMIX_PROP(RenderScene, ParticleEmitterAutoemit)),
+			property("Local space", LUMIX_PROP(RenderScene, ParticleEmitterLocalSpace)),
+			property("Material", LUMIX_PROP(RenderScene, ParticleEmitterMaterialPath),
 				ResourceAttribute("Material (*.mat)", MATERIAL_TYPE)),
-			property("Spawn count", LUMIX_PROP(RenderScene, getParticleEmitterSpawnCount, setParticleEmitterSpawnCount))
+			property("Spawn count", LUMIX_PROP(RenderScene, ParticleEmitterSpawnCount))
 		),
 		component("particle_emitter_linear_movement",
-			property("x", LUMIX_PROP(RenderScene, getParticleEmitterLinearMovementX, setParticleEmitterLinearMovementX)),
-			property("y", LUMIX_PROP(RenderScene, getParticleEmitterLinearMovementY, setParticleEmitterLinearMovementY)),
-			property("z", LUMIX_PROP(RenderScene, getParticleEmitterLinearMovementZ, setParticleEmitterLinearMovementZ))
+			property("x", LUMIX_PROP(RenderScene, ParticleEmitterLinearMovementX)),
+			property("y", LUMIX_PROP(RenderScene, ParticleEmitterLinearMovementY)),
+			property("z", LUMIX_PROP(RenderScene, ParticleEmitterLinearMovementZ))
 		),
 		component("camera",
-			property("Slot", LUMIX_PROP(RenderScene, getCameraSlot, setCameraSlot)),
-			property("Orthographic size", LUMIX_PROP(RenderScene, getCameraOrthoSize, setCameraOrthoSize), 
+			property("Slot", LUMIX_PROP(RenderScene, CameraSlot)),
+			property("Orthographic size", LUMIX_PROP(RenderScene, CameraOrthoSize), 
 				MinAttribute(0)),
-			property("Orthographic", LUMIX_PROP(RenderScene, isCameraOrtho, setCameraOrtho)),
-			property("FOV", LUMIX_PROP(RenderScene, getCameraFOV, setCameraFOV),
+			property("Orthographic", LUMIX_PROP_FULL(RenderScene, isCameraOrtho, setCameraOrtho)),
+			property("FOV", LUMIX_PROP(RenderScene, CameraFOV),
 				RadiansAttribute()),
-			property("Near", LUMIX_PROP(RenderScene, getCameraNearPlane, setCameraNearPlane), 
+			property("Near", LUMIX_PROP(RenderScene, CameraNearPlane), 
 				MinAttribute(0)),
-			property("Far", LUMIX_PROP(RenderScene, getCameraFarPlane, setCameraFarPlane), 
+			property("Far", LUMIX_PROP(RenderScene, CameraFarPlane), 
 				MinAttribute(0))
 		),
 		component("renderable",
-			property("Enabled", LUMIX_PROP(RenderScene, isModelInstanceEnabled, enableModelInstance)),
-			property("Source", LUMIX_PROP(RenderScene, getModelInstancePath, setModelInstancePath),
+			property("Enabled", LUMIX_PROP_FULL(RenderScene, isModelInstanceEnabled, enableModelInstance)),
+			property("Source", LUMIX_PROP(RenderScene, ModelInstancePath),
 				ResourceAttribute("Mesh (*.msh)", MODEL_TYPE)),
-			property("Keep skin", LUMIX_PROP(RenderScene, getModelInstanceKeepSkin, setModelInstanceKeepSkin)),
+			property("Keep skin", LUMIX_PROP(RenderScene, ModelInstanceKeepSkin)),
 			const_array("Materials", &RenderScene::getModelInstanceMaterialsCount, 
-				property("Source", LUMIX_PROP(RenderScene, getModelInstanceMaterial, setModelInstanceMaterial),
+				property("Source", LUMIX_PROP(RenderScene, ModelInstanceMaterial),
 					ResourceAttribute("Material (*.mat)", MATERIAL_TYPE))
 			)
 		),
 		component("global_light",
-			property("Color", LUMIX_PROP(RenderScene, getGlobalLightColor, setGlobalLightColor),
+			property("Color", LUMIX_PROP(RenderScene, GlobalLightColor),
 				ColorAttribute()),
-			property("Intensity", LUMIX_PROP(RenderScene, getGlobalLightIntensity, setGlobalLightIntensity), 
+			property("Intensity", LUMIX_PROP(RenderScene, GlobalLightIntensity), 
 				MinAttribute(0)),
-			property("Indirect intensity", LUMIX_PROP(RenderScene, getGlobalLightIndirectIntensity, setGlobalLightIndirectIntensity), MinAttribute(0)),
-			property("Fog density", LUMIX_PROP(RenderScene, getFogDensity, setFogDensity),
+			property("Indirect intensity", LUMIX_PROP(RenderScene, GlobalLightIndirectIntensity), MinAttribute(0)),
+			property("Fog density", LUMIX_PROP(RenderScene, FogDensity),
 				ClampAttribute(0, 1)),
-			property("Fog bottom", LUMIX_PROP(RenderScene, getFogBottom, setFogBottom)),
-			property("Fog height", LUMIX_PROP(RenderScene, getFogHeight, setFogHeight), 
+			property("Fog bottom", LUMIX_PROP(RenderScene, FogBottom)),
+			property("Fog height", LUMIX_PROP(RenderScene, FogHeight), 
 				MinAttribute(0)),
-			property("Fog color", LUMIX_PROP(RenderScene, getFogColor, setFogColor),
+			property("Fog color", LUMIX_PROP(RenderScene, FogColor),
 				ColorAttribute()),
-			property("Shadow cascades", LUMIX_PROP(RenderScene, getShadowmapCascades, setShadowmapCascades))
+			property("Shadow cascades", LUMIX_PROP(RenderScene, ShadowmapCascades))
 		),
 		component("point_light",
-			property("Diffuse color", LUMIX_PROP(RenderScene, getPointLightColor, setPointLightColor),
+			property("Diffuse color", LUMIX_PROP(RenderScene, PointLightColor),
 				ColorAttribute()),
-			property("Specular color", LUMIX_PROP(RenderScene, getPointLightSpecularColor, setPointLightSpecularColor),
+			property("Specular color", LUMIX_PROP(RenderScene, PointLightSpecularColor),
 				ColorAttribute()),
-			property("Diffuse intensity", LUMIX_PROP(RenderScene, getPointLightIntensity, setPointLightIntensity), 
+			property("Diffuse intensity", LUMIX_PROP(RenderScene, PointLightIntensity), 
 				MinAttribute(0)),
-			property("Specular intensity", LUMIX_PROP(RenderScene, getPointLightSpecularIntensity, setPointLightSpecularIntensity), MinAttribute(0)),
-			property("FOV", LUMIX_PROP(RenderScene, getLightFOV, setLightFOV), 
+			property("Specular intensity", LUMIX_PROP(RenderScene, PointLightSpecularIntensity)),
+			property("FOV", LUMIX_PROP(RenderScene, LightFOV), 
 				ClampAttribute(0, 360),
 				RadiansAttribute()),
-			property("Attenuation", LUMIX_PROP(RenderScene, getLightAttenuation, setLightAttenuation),
+			property("Attenuation", LUMIX_PROP(RenderScene, LightAttenuation),
 				ClampAttribute(0, 1000)),
-			property("Range", LUMIX_PROP(RenderScene, getLightRange, setLightRange), 
+			property("Range", LUMIX_PROP(RenderScene, LightRange), 
 				MinAttribute(0)),
-			property("Cast shadows", LUMIX_PROP(RenderScene, getLightCastShadows, setLightCastShadows), 
+			property("Cast shadows", LUMIX_PROP(RenderScene, LightCastShadows), 
 				MinAttribute(0))
 		),
 		component("decal",
-			property("Material", LUMIX_PROP(RenderScene, getDecalMaterialPath, setDecalMaterialPath),
+			property("Material", LUMIX_PROP(RenderScene, DecalMaterialPath),
 				ResourceAttribute("Material (*.mat)", MATERIAL_TYPE)),
-			property("Scale", LUMIX_PROP(RenderScene, getDecalScale, setDecalScale), 
+			property("Scale", LUMIX_PROP(RenderScene, DecalScale), 
 				MinAttribute(0))
 		),
 		component("terrain",
-			property("Material", LUMIX_PROP(RenderScene, getTerrainMaterialPath, setTerrainMaterialPath),
+			property("Material", LUMIX_PROP(RenderScene, TerrainMaterialPath),
 				ResourceAttribute("Material (*.mat)", MATERIAL_TYPE)),
-			property("XZ scale", LUMIX_PROP(RenderScene, getTerrainXZScale, setTerrainXZScale), 
+			property("XZ scale", LUMIX_PROP(RenderScene, TerrainXZScale), 
 				MinAttribute(0)),
-			property("Height scale", LUMIX_PROP(RenderScene, getTerrainYScale, setTerrainYScale), 
+			property("Height scale", LUMIX_PROP(RenderScene, TerrainYScale), 
 				MinAttribute(0)),
 			array("grass", &RenderScene::getGrassCount, &RenderScene::addGrass, &RenderScene::removeGrass,
-				property("Mesh", LUMIX_PROP(RenderScene, getGrassPath, setGrassPath),
+				property("Mesh", LUMIX_PROP(RenderScene, GrassPath),
 					ResourceAttribute("Mesh (*.msh)", MODEL_TYPE)),
-				property("Distance", LUMIX_PROP(RenderScene, getGrassDistance, setGrassDistance),
+				property("Distance", LUMIX_PROP(RenderScene, GrassDistance),
 					MinAttribute(1)),
-				property("Density", LUMIX_PROP(RenderScene, getGrassDensity, setGrassDensity)),
-				enum_property("Mode", LUMIX_PROP(RenderScene, getGrassRotationMode, setGrassRotationMode), (int)Terrain::GrassType::RotationMode::COUNT, getGrassRotationModeName)
+				property("Density", LUMIX_PROP(RenderScene, GrassDensity)),
+				enum_property("Mode", LUMIX_PROP(RenderScene, GrassRotationMode), (int)Terrain::GrassType::RotationMode::COUNT, getGrassRotationModeName)
 			)
 		)
 	);

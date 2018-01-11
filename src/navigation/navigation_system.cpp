@@ -127,12 +127,12 @@ void NavigationSystem::registerProperties()
 			functions(
 				function(LUMIX_FUNC(NavigationScene::navigate))
 			),
-			property("Radius", LUMIX_PROP(NavigationScene, getAgentRadius, setAgentRadius),
+			property("Radius", LUMIX_PROP(NavigationScene, AgentRadius),
 				MinAttribute(0)),
-			property("Height", LUMIX_PROP(NavigationScene, getAgentHeight, setAgentHeight),
+			property("Height", LUMIX_PROP(NavigationScene, AgentHeight),
 				MinAttribute(0)),
-			property("Use root motion", LUMIX_PROP(NavigationScene, useAgentRootMotion, setUseAgentRootMotion)),
-			property("Get root motion from animation", LUMIX_PROP(NavigationScene, isGettingRootMotionFromAnim, setIsGettingRootMotionFromAnim))
+			property("Use root motion", LUMIX_PROP_FULL(NavigationScene, useAgentRootMotion, setUseAgentRootMotion)),
+			property("Get root motion from animation", LUMIX_PROP_FULL(NavigationScene, isGettingRootMotionFromAnim, setIsGettingRootMotionFromAnim))
 		)
 	);
 	registerScene(navigation_scene);
