@@ -42,7 +42,7 @@ namespace
 		DefaultAllocator allocator;
 		JobSystem::init(allocator);
 		Array<Sphere> spheres(allocator);
-		Array<ComponentHandle> model_instances(allocator);
+		Array<Entity> model_instances(allocator);
 		int model_instance = 0;
 		for(float i = 0.f; i < 30000000.0f; i += 15.f)
 		{

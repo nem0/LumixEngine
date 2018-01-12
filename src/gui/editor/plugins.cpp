@@ -171,19 +171,18 @@ private:
 		};
 
 		MouseMode ret = MouseMode::NONE;
-		ComponentHandle cmp = scene.getComponent(e, GUI_RECT_TYPE);
 		if (drawHandle(bottom_right, mouse_canvas_pos))
 		{
-			m_bottom_right_start_transform.x = scene.getRectRightPoints(cmp);
-			m_bottom_right_start_transform.y = scene.getRectBottomPoints(cmp);
+			m_bottom_right_start_transform.x = scene.getRectRightPoints(e);
+			m_bottom_right_start_transform.y = scene.getRectBottomPoints(e);
 			ret = MouseMode::RESIZE;
 		}
 		if (drawHandle(mid, mouse_canvas_pos))
 		{
-			m_bottom_right_start_transform.x = scene.getRectRightPoints(cmp);
-			m_bottom_right_start_transform.y = scene.getRectBottomPoints(cmp);
-			m_top_left_start_move.y = scene.getRectTopPoints(cmp);
-			m_top_left_start_move.x = scene.getRectLeftPoints(cmp);
+			m_bottom_right_start_transform.x = scene.getRectRightPoints(e);
+			m_bottom_right_start_transform.y = scene.getRectBottomPoints(e);
+			m_top_left_start_move.y = scene.getRectTopPoints(e);
+			m_top_left_start_move.x = scene.getRectLeftPoints(e);
 			ret = MouseMode::MOVE;
 		}
 		return ret;
@@ -217,28 +216,27 @@ private:
 			if (m_editor->getSelectedEntities().size() == 1)
 			{
 				Entity e = m_editor->getSelectedEntities()[0];
-				ComponentHandle cmp = scene->getComponent(e, GUI_RECT_TYPE);
 				switch (m_mouse_mode)
 				{
 					case MouseMode::RESIZE:
 					{
 						float b = m_bottom_right_start_transform.y + ImGui::GetMouseDragDelta(0).y;
-						scene->setRectBottomPoints(cmp, b);
+						scene->setRectBottomPoints(e, b);
 						float r = m_bottom_right_start_transform.x + ImGui::GetMouseDragDelta(0).x;
-						scene->setRectRightPoints(cmp, r);
+						scene->setRectRightPoints(e, r);
 					}
 					break;
 					case MouseMode::MOVE:
 					{
 						float b = m_bottom_right_start_transform.y + ImGui::GetMouseDragDelta(0).y;
-						scene->setRectBottomPoints(cmp, b);
+						scene->setRectBottomPoints(e, b);
 						float r = m_bottom_right_start_transform.x + ImGui::GetMouseDragDelta(0).x;
-						scene->setRectRightPoints(cmp, r);
+						scene->setRectRightPoints(e, r);
 
 						float t = m_top_left_start_move.y + ImGui::GetMouseDragDelta(0).y;
-						scene->setRectTopPoints(cmp, t);
+						scene->setRectTopPoints(e, t);
 						float l = m_top_left_start_move.x + ImGui::GetMouseDragDelta(0).x;
-						scene->setRectLeftPoints(cmp, l);
+						scene->setRectLeftPoints(e, l);
 					}
 					break;
 				}
@@ -246,12 +244,8 @@ private:
 
 			if (ImGui::IsMouseClicked(0) && m_mouse_mode == MouseMode::NONE)
 			{
-				ComponentHandle cmp = scene->getRectAt(toLumix(mouse_canvas_pos), toLumix(size));
-				if (cmp.isValid())
-				{
-					Entity e = scene->getRectEntity(cmp);
-					if(e.isValid()) m_editor->selectEntities(&e, 1);
-				}
+				Entity e = scene->getRectAt(toLumix(mouse_canvas_pos), toLumix(size));
+				if (e.isValid()) m_editor->selectEntities(&e, 1);
 			}
 
 			m_pipeline->resize(int(size.x), int(size.y));

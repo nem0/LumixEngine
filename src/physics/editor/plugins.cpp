@@ -23,6 +23,7 @@ namespace
 {
 
 
+const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("renderable");
 const ComponentType RAGDOLL_TYPE = Reflection::getComponentType("ragdoll");
 const ComponentType BOX_ACTOR_TYPE = Reflection::getComponentType("box_rigid_actor");
 const ComponentType SPHERE_ACTOR_TYPE = Reflection::getComponentType("sphere_rigid_actor");
@@ -154,11 +155,11 @@ struct EditorPlugin LUMIX_FINAL : public WorldEditor::Plugin
 		auto* render_scene = static_cast<RenderScene*>(universe.getScene(RENDERER_HASH));
 		if (!render_scene) return;
 
-		Entity other_entity = phy_scene->getJointConnectedBody(cmp.handle);
+		Entity other_entity = phy_scene->getJointConnectedBody(cmp.entity);
 		if (!other_entity.isValid()) return;
 
 
-		RigidTransform local_frame0 = phy_scene->getJointLocalFrame(cmp.handle);
+		RigidTransform local_frame0 = phy_scene->getJointLocalFrame(cmp.entity);
 		RigidTransform global_frame0 = universe.getTransform(cmp.entity).getRigidPart() * local_frame0;
 		Vec3 joint_pos = global_frame0.pos;
 		Matrix mtx0 = global_frame0.toMatrix();
@@ -167,14 +168,14 @@ struct EditorPlugin LUMIX_FINAL : public WorldEditor::Plugin
 		render_scene->addDebugLine(joint_pos, joint_pos + mtx0.getYVector(), 0xff00ff00, 0);
 		render_scene->addDebugLine(joint_pos, joint_pos + mtx0.getZVector(), 0xff0000ff, 0);
 
-		RigidTransform local_frame1 = phy_scene->getJointConnectedBodyLocalFrame(cmp.handle);
+		RigidTransform local_frame1 = phy_scene->getJointConnectedBodyLocalFrame(cmp.entity);
 		RigidTransform global_frame1 = universe.getTransform(other_entity).getRigidPart() * local_frame1;
 		Matrix mtx1 = global_frame1.toMatrix();
 
-		bool use_limit = phy_scene->getSphericalJointUseLimit(cmp.handle);
+		bool use_limit = phy_scene->getSphericalJointUseLimit(cmp.entity);
 		if (use_limit)
 		{
-			Vec2 limit = phy_scene->getSphericalJointLimit(cmp.handle);
+			Vec2 limit = phy_scene->getSphericalJointLimit(cmp.entity);
 			Vec3 other_pos = universe.getPosition(other_entity);
 			render_scene->addDebugLine(joint_pos, other_pos, 0xffff0000, 0);
 			render_scene->addDebugCone(joint_pos,
@@ -203,9 +204,9 @@ struct EditorPlugin LUMIX_FINAL : public WorldEditor::Plugin
 		auto* render_scene = static_cast<RenderScene*>(universe.getScene(RENDERER_HASH));
 		if (!render_scene) return;
 
-		Entity other_entity = phy_scene->getJointConnectedBody(cmp.handle);
+		Entity other_entity = phy_scene->getJointConnectedBody(cmp.entity);
 		if (!other_entity.isValid()) return;
-		RigidTransform local_frame = phy_scene->getJointConnectedBodyLocalFrame(cmp.handle);
+		RigidTransform local_frame = phy_scene->getJointConnectedBodyLocalFrame(cmp.entity);
 
 		Vec3 pos = universe.getPosition(other_entity);
 		Vec3 other_pos = (universe.getTransform(other_entity).getRigidPart() * local_frame).pos;
@@ -223,7 +224,7 @@ struct EditorPlugin LUMIX_FINAL : public WorldEditor::Plugin
 		right *= Math::minimum(1.0f, 5 * dir_len);
 		up *= Math::minimum(1.0f, 5 * dir_len);
 
-		Vec3 force = phy_scene->getDistanceJointLinearForce(cmp.handle);
+		Vec3 force = phy_scene->getDistanceJointLinearForce(cmp.entity);
 
 		float t = Math::minimum(force.length() / 10.0f, 1.0f);
 		u32 color = 0xff000000 + (u32(t * 0xff) << 16) + u32((1 - t) * 0xff);
@@ -248,11 +249,11 @@ struct EditorPlugin LUMIX_FINAL : public WorldEditor::Plugin
 	static void showHingeJointGizmo(ComponentUID cmp)
 	{
 		auto* phy_scene = static_cast<PhysicsScene*>(cmp.scene);
-		Entity connected_body = phy_scene->getJointConnectedBody(cmp.handle);
-		Vec2 limit = phy_scene->getHingeJointLimit(cmp.handle);
-		bool use_limit = phy_scene->getHingeJointUseLimit(cmp.handle);
+		Entity connected_body = phy_scene->getJointConnectedBody(cmp.entity);
+		Vec2 limit = phy_scene->getHingeJointLimit(cmp.entity);
+		bool use_limit = phy_scene->getHingeJointUseLimit(cmp.entity);
 		if (!connected_body.isValid()) return;
-		RigidTransform global_frame1 = phy_scene->getJointConnectedBodyLocalFrame(cmp.handle);
+		RigidTransform global_frame1 = phy_scene->getJointConnectedBodyLocalFrame(cmp.entity);
 		global_frame1 = phy_scene->getUniverse().getTransform(connected_body).getRigidPart() * global_frame1;
 		showHingeJointGizmo(*phy_scene, limit, use_limit, global_frame1.toMatrix());
 	}
@@ -301,7 +302,7 @@ struct EditorPlugin LUMIX_FINAL : public WorldEditor::Plugin
 		auto* phy_scene = static_cast<PhysicsScene*>(cmp.scene);
 		Universe& universe = phy_scene->getUniverse();
 
-		Vec3 extents = phy_scene->getHalfExtents(cmp.handle);
+		Vec3 extents = phy_scene->getHalfExtents(cmp.entity);
 		Matrix mtx = universe.getPositionAndRotation(cmp.entity);
 
 		render_scene.addDebugCube(mtx.getTranslation(),
@@ -318,7 +319,7 @@ struct EditorPlugin LUMIX_FINAL : public WorldEditor::Plugin
 		auto* phy_scene = static_cast<PhysicsScene*>(cmp.scene);
 		Universe& universe = phy_scene->getUniverse();
 
-		float radius = phy_scene->getSphereRadius(cmp.handle);
+		float radius = phy_scene->getSphereRadius(cmp.entity);
 		Vec3 pos = universe.getPosition(cmp.entity);
 
 		render_scene.addDebugSphere(pos, radius, 0xffff0000, 0);
@@ -330,8 +331,8 @@ struct EditorPlugin LUMIX_FINAL : public WorldEditor::Plugin
 		auto* phy_scene = static_cast<PhysicsScene*>(cmp.scene);
 		Universe& universe = phy_scene->getUniverse();
 
-		float radius = phy_scene->getCapsuleRadius(cmp.handle);
-		float height = phy_scene->getCapsuleHeight(cmp.handle);
+		float radius = phy_scene->getCapsuleRadius(cmp.entity);
+		float height = phy_scene->getCapsuleHeight(cmp.entity);
 		Matrix mtx = universe.getPositionAndRotation(cmp.entity);
 		Vec3 physx_capsule_up = mtx.getXVector();
 		mtx.setXVector(mtx.getYVector());
@@ -351,8 +352,8 @@ struct EditorPlugin LUMIX_FINAL : public WorldEditor::Plugin
 		
 		if (cmp.type == CONTROLLER_TYPE)
 		{
-			float height = phy_scene->getControllerHeight(cmp.handle);
-			float radius = phy_scene->getControllerRadius(cmp.handle);
+			float height = phy_scene->getControllerHeight(cmp.entity);
+			float radius = phy_scene->getControllerRadius(cmp.entity);
 
 			Vec3 pos = universe.getPosition(cmp.entity);
 			render_scene->addDebugCapsule(pos, height, radius, 0xff0000ff, 0);
@@ -379,7 +380,7 @@ struct EditorPlugin LUMIX_FINAL : public WorldEditor::Plugin
 
 		if (cmp.type == D6_JOINT_TYPE)
 		{
-			physx::PxD6Joint* joint = static_cast<physx::PxD6Joint*>(phy_scene->getJoint(cmp.handle));
+			physx::PxD6Joint* joint = static_cast<physx::PxD6Joint*>(phy_scene->getJoint(cmp.entity));
 			showD6JointGizmo(universe.getTransform(cmp.entity).getRigidPart(), *render_scene, joint);
 			return true;
 		}
@@ -528,11 +529,10 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 			for (int i = 0; i < count; ++i)
 			{
 				ComponentUID cmp;
-				cmp.handle = scene->getJointComponent(i);
+				cmp.entity = scene->getJointEntity(i);
 				cmp.scene = scene;
-				cmp.entity = scene->getJointEntity(cmp.handle);
-				physx::PxJoint* joint = scene->getJoint(cmp.handle);
-				switch ((physx::PxJointConcreteType::Enum)scene->getJoint(cmp.handle)->getConcreteType())
+				physx::PxJoint* joint = scene->getJoint(cmp.entity);
+				switch ((physx::PxJointConcreteType::Enum)scene->getJoint(cmp.entity)->getConcreteType())
 				{
 					case physx::PxJointConcreteType::eDISTANCE:
 						cmp.type = DISTANCE_JOINT_TYPE;
@@ -562,7 +562,7 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 				if (ImGui::Selectable(tmp, &b)) m_editor.selectEntities(&cmp.entity, 1);
 				ImGui::NextColumn();
 
-				Entity other_entity = scene->getJointConnectedBody(cmp.handle);
+				Entity other_entity = scene->getJointConnectedBody(cmp.entity);
 				getEntityListDisplayName(m_editor, tmp, lengthOf(tmp), other_entity);
 				if (other_entity.isValid() && ImGui::Selectable(tmp, &b)) m_editor.selectEntities(&other_entity, 1);
 				ImGui::NextColumn();
@@ -638,7 +638,7 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 			if (ImGui::Selectable(tmp, &selected)) m_editor.selectEntities(&cmp.entity, 1);
 			ImGui::NextColumn();
 			auto type = scene->getActorType(i);
-			cmp.handle = scene->getActorComponentHandle(i);
+			cmp.entity = scene->getActorEntity(i);
 			cmp.scene = scene;
 			switch (type)
 			{
@@ -743,17 +743,17 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	}
 
 
-	void autogeneratePhySkeleton(PhysicsScene& scene, ComponentHandle cmp, Model* model)
+	void autogeneratePhySkeleton(PhysicsScene& scene, Entity entity, Model* model)
 	{
-		while (scene.getRagdollRootBone(cmp))
+		while (scene.getRagdollRootBone(entity))
 		{
-			scene.destroyRagdollBone(cmp, scene.getRagdollRootBone(cmp));
+			scene.destroyRagdollBone(entity, scene.getRagdollRootBone(entity));
 		}
 
 		for (int i = 0; i < model->getBoneCount(); ++i)
 		{
 			auto& bone = model->getBone(i);
-			scene.createRagdollBone(cmp, crc32(bone.name.c_str()));
+			scene.createRagdollBone(entity, crc32(bone.name.c_str()));
 		}
 	}
 
@@ -772,18 +772,18 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		if (!render_scene) return;
 
 		Entity entity = m_editor.getSelectedEntities()[0];
-		ComponentHandle model_instance = render_scene->getModelInstanceComponent(entity);
+		bool has_model_instance = render_scene->getUniverse().hasComponent(entity, MODEL_INSTANCE_TYPE);
 		auto* phy_scene = static_cast<PhysicsScene*>(m_editor.getUniverse()->getScene(crc32("physics")));
 
-		ComponentHandle cmp = phy_scene->getComponent(entity, RAGDOLL_TYPE);
-		if (!cmp.isValid() || !model_instance.isValid())
+		bool has_ragdoll = render_scene->getUniverse().hasComponent(entity, RAGDOLL_TYPE);
+		if (!has_ragdoll || !has_model_instance)
 		{
 			ImGui::Text("%s", "Please select an entity with ragdoll and mesh components.");
 			return;
 		}
 
 		Matrix mtx = m_editor.getUniverse()->getMatrix(entity);
-		Model* model = render_scene->getModelInstanceModel(model_instance);
+		Model* model = render_scene->getModelInstanceModel(entity);
 		if (!model || !model->isReady()) return;
 
 		static bool visualize = true;
@@ -795,13 +795,13 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		if (m_selected_bone >= 0 && m_selected_bone < model->getBoneCount())
 		{
 			u32 hash = crc32(model->getBone(m_selected_bone).name.c_str());
-			selected_bone = phy_scene->getRagdollBoneByName(cmp, hash);
+			selected_bone = phy_scene->getRagdollBoneByName(entity, hash);
 		}
-		if (visualize) renderBone(*render_scene, *phy_scene, phy_scene->getRagdollRootBone(cmp), selected_bone);
+		if (visualize) renderBone(*render_scene, *phy_scene, phy_scene->getRagdollRootBone(entity), selected_bone);
 		ImGui::SameLine();
-		if (ImGui::Button("Autogenerate")) autogeneratePhySkeleton(*phy_scene, cmp, model);
+		if (ImGui::Button("Autogenerate")) autogeneratePhySkeleton(*phy_scene, entity, model);
 		ImGui::SameLine();
-		auto* root = phy_scene->getRagdollRootBone(cmp);
+		auto* root = phy_scene->getRagdollRootBone(entity);
 		if (ImGui::Button("All kinematic")) phy_scene->setRagdollBoneKinematicRecursive(root, true);
 		PhysicsScene::BoneOrientation new_bone_orientation = phy_scene->getNewBoneOrientation();
 		if (ImGui::Combo("New bone orientation", (int*)&new_bone_orientation, "X\0Y\0"))
@@ -830,28 +830,28 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 			else
 			{
 				auto& bone = model->getBone(m_selected_bone);
-				onBonePropertiesGUI(*phy_scene, cmp, crc32(bone.name.c_str()));
+				onBonePropertiesGUI(*phy_scene, entity, crc32(bone.name.c_str()));
 			}
 		}
 		ImGui::EndChild();
 	}
 
 
-	void onBonePropertiesGUI(PhysicsScene& scene, ComponentHandle cmp, u32 bone_name_hash)
+	void onBonePropertiesGUI(PhysicsScene& scene, Entity entity, u32 bone_name_hash)
 	{
-		auto* bone_handle = scene.getRagdollBoneByName(cmp, bone_name_hash);
+		auto* bone_handle = scene.getRagdollBoneByName(entity, bone_name_hash);
 		if (!bone_handle)
 		{
 			if (ImGui::Button("Add"))
 			{
-				scene.createRagdollBone(cmp, bone_name_hash);
+				scene.createRagdollBone(entity, bone_name_hash);
 			}
 			return;
 		}
 
 		if (ImGui::Button("Remove"))
 		{
-			scene.destroyRagdollBone(cmp, bone_handle);
+			scene.destroyRagdollBone(entity, bone_handle);
 			return;
 		}
 

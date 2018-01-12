@@ -365,7 +365,7 @@ void Terrain::forceGrassUpdate()
 	}
 }
 
-Array<Terrain::GrassQuad*>& Terrain::getQuads(ComponentHandle camera)
+Array<Terrain::GrassQuad*>& Terrain::getQuads(Entity camera)
 {
 	int quads_index = m_grass_quads.find(camera);
 	if (quads_index < 0)
@@ -459,14 +459,13 @@ void Terrain::generateGrassTypeQuad(GrassPatch& patch, const Matrix& terrain_mat
 }
 
 
-void Terrain::updateGrass(ComponentHandle camera)
+void Terrain::updateGrass(Entity camera)
 {
 	PROFILE_FUNCTION();
 	if (!m_splatmap) return;
 
 	Universe& universe = m_scene.getUniverse();
-	Entity camera_entity = m_scene.getCameraEntity(camera);
-	Vec3 camera_pos = universe.getPosition(camera_entity);
+	Vec3 camera_pos = universe.getPosition(camera);
 
 	if ((m_last_camera_position[camera] - camera_pos).length() <= FLT_MIN && !m_force_grass_update) return;
 	m_last_camera_position[camera] = camera_pos;
@@ -555,13 +554,12 @@ void Terrain::grassLoaded(Resource::State, Resource::State, Resource&)
 }
 
 
-void Terrain::getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, ComponentHandle camera)
+void Terrain::getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, Entity camera)
 {
 	if (!m_material || !m_material->isReady()) return;
 
 	Universe& universe = m_scene.getUniverse();
-	Entity camera_entity = m_scene.getCameraEntity(camera);
-	Vec3 camera_pos = universe.getPosition(camera_entity);
+	Vec3 camera_pos = universe.getPosition(camera);
 	updateGrass(camera);
 	Array<GrassQuad*>& quads = getQuads(camera);
 	
@@ -616,7 +614,6 @@ void Terrain::setMaterial(Material* material)
 void Terrain::deserialize(InputBlob& serializer, Universe& universe, RenderScene& scene)
 {
 	serializer.read(m_entity);
-	ComponentHandle cmp = {m_entity.index};
 	serializer.read(m_layer_mask);
 	char path[MAX_PATH_LENGTH];
 	serializer.readString(path, MAX_PATH_LENGTH);
@@ -643,7 +640,7 @@ void Terrain::deserialize(InputBlob& serializer, Universe& universe, RenderScene
 		serializer.read(m_grass_types[i].m_rotation_mode);
 		setGrassTypePath(i, Path(path));
 	}
-	universe.onComponentCreated(m_entity, TERRAIN_HASH, &scene, cmp);
+	universe.onComponentCreated(m_entity, TERRAIN_HASH, &scene);
 }
 
 	

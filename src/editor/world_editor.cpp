@@ -828,7 +828,6 @@ public:
 	{
 		serializer.serialize("inedx", m_index);
 		serializer.serialize("entity_index", m_component.entity);
-		serializer.serialize("component_index", m_component.handle);
 		serializer.serialize("component_type", Reflection::getComponentTypeHash(m_component.type));
 		serializer.serialize("property_name_hash", crc32(m_property->name));
 	}
@@ -838,7 +837,6 @@ public:
 	{
 		serializer.deserialize("inedx", m_index, 0);
 		serializer.deserialize("entity_index", m_component.entity, INVALID_ENTITY);
-		serializer.deserialize("component_index", m_component.handle, INVALID_COMPONENT);
 		u32 hash;
 		serializer.deserialize("component_type", hash, 0);
 		m_component.type = Reflection::getComponentTypeFromHash(hash);
@@ -903,7 +901,6 @@ public:
 	{
 		serializer.serialize("inedx", m_index);
 		serializer.serialize("entity_index", m_component.entity);
-		serializer.serialize("component_index", m_component.handle);
 		serializer.serialize("component_type", Reflection::getComponentTypeHash(m_component.type));
 		serializer.serialize("property_name_hash", crc32(m_property->name));
 	}
@@ -913,7 +910,6 @@ public:
 	{
 		serializer.deserialize("inedx", m_index, 0);
 		serializer.deserialize("entity_index", m_component.entity, INVALID_ENTITY);
-		serializer.deserialize("component_index", m_component.handle, INVALID_COMPONENT);
 		u32 hash;
 		serializer.deserialize("component_type", hash, 0);
 		m_component.type = Reflection::getComponentTypeFromHash(hash);
@@ -1206,8 +1202,8 @@ private:
 
 			for (int j = 0; j < m_entities.size(); ++j)
 			{
-				ComponentHandle cmp = universe->createComponent(m_type, m_entities[j]);
-				if (cmp.isValid())
+				universe->createComponent(m_type, m_entities[j]);
+				if (universe->hasComponent(m_entities[j], m_type))
 				{
 					ret = true;
 				}
@@ -1221,7 +1217,7 @@ private:
 			for (int i = 0; i < m_entities.size(); ++i)
 			{
 				const ComponentUID& cmp = m_editor.getUniverse()->getComponent(m_entities[i], m_type);
-				m_editor.getUniverse()->destroyComponent(cmp.handle, cmp.type);
+				m_editor.getUniverse()->destroyComponent(cmp.entity, cmp.type);
 			}
 		}
 
@@ -1501,7 +1497,7 @@ private:
 					ComponentUID new_component;
 					IScene* scene = universe->getScene(cmp_type);
 					ASSERT(scene);
-					new_component.handle = universe->createComponent(cmp_type, new_entity);
+					universe->createComponent(cmp_type, new_entity);
 					new_component.entity = new_entity;
 					new_component.scene = scene;
 					new_component.type = cmp_type;
@@ -1617,8 +1613,8 @@ private:
 			InputBlob blob(m_old_values);
 			for (Entity entity : m_entities)
 			{
+				universe->createComponent(cmp.type, cmp.entity);
 				cmp.entity = entity;
-				cmp.handle = universe->createComponent(cmp.type, cmp.entity);
 				::Lumix::load(cmp, -1, blob);
 			}
 		}
@@ -1643,7 +1639,6 @@ private:
 			for (Entity entity : m_entities)
 			{
 				cmp.entity = entity;
-				cmp.handle = cmp.scene->getComponent(entity, m_cmp_type);
 				SaveVisitor save;
 				save.cmp = cmp;
 				save.stream = &m_old_values;
@@ -1656,7 +1651,7 @@ private:
 				gather.resource_manager = &resource_manager;
 				cmp_desc->visit(gather);
 
-				m_editor.getUniverse()->destroyComponent(cmp.handle, m_cmp_type);
+				m_editor.getUniverse()->destroyComponent(cmp.entity, m_cmp_type);
 			}
 			return true;
 		}
@@ -1829,8 +1824,8 @@ public:
 		ComponentUID camera_cmp = getUniverse()->getComponent(m_camera, CAMERA_TYPE);
 		if (!camera_cmp.isValid()) return;
 
-		m_render_interface->getRay(camera_cmp.handle, m_mouse_pos, origin, dir);
-		auto hit = m_render_interface->castRay(origin, dir, INVALID_COMPONENT);
+		m_render_interface->getRay(camera_cmp.entity, m_mouse_pos, origin, dir);
+		auto hit = m_render_interface->castRay(origin, dir, INVALID_ENTITY);
 		//if (m_gizmo->isActive()) return;
 		if (!hit.is_hit) return;
 
@@ -1973,8 +1968,8 @@ public:
 			ComponentUID camera_cmp = getUniverse()->getComponent(m_camera, CAMERA_TYPE);
 			if (!camera_cmp.isValid()) return;
 
-			m_render_interface->getRay(camera_cmp.handle, {(float)x, (float)y}, origin, dir);
-			auto hit = m_render_interface->castRay(origin, dir, INVALID_COMPONENT);
+			m_render_interface->getRay(camera_cmp.entity, {(float)x, (float)y}, origin, dir);
+			auto hit = m_render_interface->castRay(origin, dir, INVALID_ENTITY);
 			if (m_gizmo->isActive()) return;
 
 			for (int i = 0; i < m_plugins.size(); ++i)
@@ -2037,14 +2032,14 @@ public:
 		ComponentUID camera_cmp = getUniverse()->getComponent(m_camera, CAMERA_TYPE);
 		if (!camera_cmp.isValid()) return;
 
-		Entity camera_entity = m_render_interface->getCameraEntity(camera_cmp.handle);
+		Entity camera_entity = camera_cmp.entity;
 		Vec3 camera_pos = m_universe->getPosition(camera_entity);
 		Vec2 min = m_rect_selection_start;
 		Vec2 max = m_mouse_pos;
 		if (min.x > max.x) Math::swap(min.x, max.x);
 		if (min.y > max.y) Math::swap(min.y, max.y);
-		Frustum frustum = m_render_interface->getFrustum(camera_cmp.handle, min, max);
-		m_render_interface->getModelInstaces(entities, frustum, camera_pos, camera_cmp.handle);
+		Frustum frustum = m_render_interface->getFrustum(camera_entity, min, max);
+		m_render_interface->getModelInstaces(entities, frustum, camera_pos, camera_entity);
 		selectEntities(entities.empty() ? nullptr : &entities[0], entities.size());
 	}
 
@@ -2064,8 +2059,8 @@ public:
 				ComponentUID camera_cmp = getUniverse()->getComponent(m_camera, CAMERA_TYPE);
 				if (!camera_cmp.isValid()) return;
 
-				m_render_interface->getRay(camera_cmp.handle, m_mouse_pos, origin, dir);
-				auto hit = m_render_interface->castRay(origin, dir, INVALID_COMPONENT);
+				m_render_interface->getRay(camera_cmp.entity, m_mouse_pos, origin, dir);
+				auto hit = m_render_interface->castRay(origin, dir, INVALID_ENTITY);
 
 				if (m_snap_mode != SnapMode::NONE && !m_selected_entities.empty() && hit.is_hit)
 				{
@@ -2345,7 +2340,7 @@ public:
 				if (prefab != 0) m_entity_map.create({i});
 			}
 		});
-		m_camera = m_render_interface->getCameraEntity(m_render_interface->getCameraInSlot("editor"));
+		m_camera = m_render_interface->getCameraInSlot("editor");
 	}
 
 	
@@ -2392,13 +2387,13 @@ public:
 			serializer.write("parent", parent);
 			EntityGUID guid = m_entity_map.get(entity);
 			StaticString<MAX_PATH_LENGTH> entity_file_path(dir, guid.value, ".ent");
-			for (ComponentUID cmp = m_universe->getFirstComponent(entity); cmp.handle.isValid();
+			for (ComponentUID cmp = m_universe->getFirstComponent(entity); cmp.entity.isValid();
 				 cmp = m_universe->getNextComponent(cmp))
 			{
 				const char* cmp_name = Reflection::getComponentTypeID(cmp.type.index);
 				u32 type_hash = Reflection::getComponentTypeHash(cmp.type);
 				serializer.write(cmp_name, type_hash);
-				m_universe->serializeComponent(serializer, cmp.type, cmp.handle);
+				m_universe->serializeComponent(serializer, cmp.type, cmp.entity);
 			}
 			serializer.write("cmp_end", (u32)0);
 			saveFile(entity_file_path);
@@ -2475,8 +2470,8 @@ public:
 		ComponentUID camera_cmp = getUniverse()->getComponent(m_camera, CAMERA_TYPE);
 		if (!camera_cmp.isValid()) return;
 
-		m_render_interface->getRay(camera_cmp.handle, m_mouse_pos, origin, dir);
-		auto hit = m_render_interface->castRay(origin, dir, INVALID_COMPONENT);
+		m_render_interface->getRay(camera_cmp.entity, m_mouse_pos, origin, dir);
+		auto hit = m_render_interface->castRay(origin, dir, INVALID_ENTITY);
 		if (!hit.is_hit || hit.entity != m_selected_entities[0]) return;
 
 		Vec3 snap_pos = getClosestVertex(hit);
@@ -2498,16 +2493,15 @@ public:
 		{
 			Entity entity = m_selected_entities[i];
 
-			ComponentUID model_instance = getUniverse()->getComponent(m_selected_entities[i], MODEL_INSTANCE_TYPE);
 			Vec3 origin = universe->getPosition(entity);
-			auto hit = m_render_interface->castRay(origin, Vec3(0, -1, 0), model_instance.handle);
+			auto hit = m_render_interface->castRay(origin, Vec3(0, -1, 0), m_selected_entities[i]);
 			if (hit.is_hit)
 			{
 				new_positions.push(origin + Vec3(0, -hit.t, 0));
 			}
 			else
 			{
-				hit = m_render_interface->castRay(origin, Vec3(0, 1, 0), model_instance.handle);
+				hit = m_render_interface->castRay(origin, Vec3(0, 1, 0), m_selected_entities[i]);
 				if (hit.is_hit)
 				{
 					new_positions.push(origin + Vec3(0, hit.t, 0));
@@ -2606,21 +2600,19 @@ public:
 
 	Entity addEntity() override
 	{
-		ComponentUID cmp = getUniverse()->getComponent(m_camera, CAMERA_TYPE);
-		Vec2 size = m_render_interface->getCameraScreenSize(cmp.handle);
+		Vec2 size = m_render_interface->getCameraScreenSize(m_camera);
 		return addEntityAt((int)size.x >> 1, (int)size.y >> 1);
 	}
 
 
 	Entity addEntityAt(int camera_x, int camera_y) override
 	{
-		ComponentUID camera_cmp = getUniverse()->getComponent(m_camera, CAMERA_TYPE);
 		Universe* universe = getUniverse();
 		Vec3 origin;
 		Vec3 dir;
 
-		m_render_interface->getRay(camera_cmp.handle, {(float)camera_x, (float)camera_y}, origin, dir);
-		auto hit = m_render_interface->castRay(origin, dir, INVALID_COMPONENT);
+		m_render_interface->getRay(m_camera, {(float)camera_x, (float)camera_y}, origin, dir);
+		auto hit = m_render_interface->castRay(origin, dir, INVALID_ENTITY);
 		Vec3 pos;
 		if (hit.is_hit)
 		{
@@ -2639,15 +2631,14 @@ public:
 
 	Vec3 getCameraRaycastHit() override
 	{
-		ComponentUID camera_cmp = getUniverse()->getComponent(m_camera, CAMERA_TYPE);
 		Universe* universe = getUniverse();
-		Vec2 screen_size = m_render_interface->getCameraScreenSize(camera_cmp.handle);
+		Vec2 screen_size = m_render_interface->getCameraScreenSize(m_camera);
 		screen_size *= 0.5f;
 
 		Vec3 origin;
 		Vec3 dir;
-		m_render_interface->getRay(camera_cmp.handle, {(float)screen_size.x, (float)screen_size.y}, origin, dir);
-		auto hit = m_render_interface->castRay(origin, dir, INVALID_COMPONENT);
+		m_render_interface->getRay(m_camera, {(float)screen_size.x, (float)screen_size.y}, origin, dir);
+		auto hit = m_render_interface->castRay(origin, dir, INVALID_ENTITY);
 		Vec3 pos;
 		if (hit.is_hit)
 		{
@@ -2990,7 +2981,8 @@ public:
 	void cloneComponent(const ComponentUID& src, Entity entity) override
 	{
 		IScene* scene = m_universe->getScene(src.type);
-		ComponentUID clone(entity, src.type, scene, m_universe->createComponent(src.type, entity));
+		m_universe->createComponent(src.type, entity);
+		ComponentUID clone(entity, src.type, scene);
 
 		const Reflection::ComponentBase* cmp_desc = Reflection::getComponent(src.type);
 		OutputBlob stream(m_allocator);
@@ -3130,7 +3122,7 @@ public:
 		if (m_engine->deserialize(*m_universe, blob))
 		{
 			m_prefab_system->deserialize(blob);
-			m_camera = m_render_interface->getCameraEntity(m_render_interface->getCameraInSlot("editor"));
+			m_camera = m_render_interface->getCameraInSlot("editor");
 
 			g_log_info.log("Editor") << "Universe parsed in " << timer->getTimeSinceStart() << " seconds";
 		}
@@ -3509,7 +3501,7 @@ public:
 		universe->setEntityName(m_camera, "editor_camera");
 		ComponentUID cmp = m_engine->createComponent(*universe, m_camera, CAMERA_TYPE);
 		ASSERT(cmp.isValid());
-		m_render_interface->setCameraSlot(cmp.handle, "editor");
+		m_render_interface->setCameraSlot(cmp.entity, "editor");
 	}
 
 

@@ -249,7 +249,7 @@ struct EditorPlugin LUMIX_FINAL : public WorldEditor::Plugin
 		if (cmp.type == ECHO_ZONE_TYPE)
 		{
 			auto* audio_scene = static_cast<AudioScene*>(cmp.scene);
-			float radius = audio_scene->getEchoZoneRadius(cmp.handle);
+			float radius = audio_scene->getEchoZoneRadius(cmp.entity);
 			Universe& universe = audio_scene->getUniverse();
 			Vec3 pos = universe.getPosition(cmp.entity);
 
@@ -261,7 +261,7 @@ struct EditorPlugin LUMIX_FINAL : public WorldEditor::Plugin
 		else if (cmp.type == CHORUS_ZONE_TYPE)
 		{
 			auto* audio_scene = static_cast<AudioScene*>(cmp.scene);
-			float radius = audio_scene->getChorusZoneRadius(cmp.handle);
+			float radius = audio_scene->getChorusZoneRadius(cmp.entity);
 			Universe& universe = audio_scene->getUniverse();
 			Vec3 pos = universe.getPosition(cmp.entity);
 

@@ -251,7 +251,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 	struct PointLightShadowmap
 	{
-		ComponentHandle light;
+		Entity light;
 		FrameBuffer* framebuffer;
 		Matrix matrices[4];
 	};
@@ -791,10 +791,10 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	{
 		if (!m_current_view) return;
 
-		if (m_applied_camera == INVALID_COMPONENT) return;
-		Entity cam = m_scene->getCameraEntity(m_applied_camera);
+		if (!m_applied_camera.isValid()) return;
+		Entity cam = m_applied_camera;
 		Vec3 pos = m_scene->getUniverse().getPosition(cam);
-		ComponentHandle probe = m_scene->getNearestEnvironmentProbe(pos);
+		Entity probe = m_scene->getNearestEnvironmentProbe(pos);
 		m_current_view->command_buffer.beginAppend();
 		if (probe.isValid())
 		{
@@ -880,17 +880,17 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 	void applyCamera(const char* slot)
 	{
-		ComponentHandle cmp = m_scene->getCameraInSlot(slot);
-		if (!cmp.isValid()) return;
+		Entity camera = m_scene->getCameraInSlot(slot);
+		if (!camera.isValid()) return;
 
-		m_scene->setCameraScreenSize(cmp, m_width, m_height);
-		m_applied_camera = cmp;
-		m_camera_frustum = m_scene->getCameraFrustum(cmp);
+		m_scene->setCameraScreenSize(camera, m_width, m_height);
+		m_applied_camera = camera;
+		m_camera_frustum = m_scene->getCameraFrustum(camera);
 
-		Matrix projection_matrix = m_scene->getCameraProjection(cmp);
+		Matrix projection_matrix = m_scene->getCameraProjection(camera);
 
 		Universe& universe = m_scene->getUniverse();
-		Matrix view = universe.getMatrix(m_scene->getCameraEntity(cmp));
+		Matrix view = universe.getMatrix(camera);
 		view.fastInverse();
 		bgfx::setViewTransform(m_current_view->bgfx_id, &view.m11, &projection_matrix.m11);
 		bgfx::setViewRect(m_current_view->bgfx_id, 0, 0, (u16)m_width, (u16)m_height);
@@ -915,7 +915,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
-	ComponentHandle getAppliedCamera() const override
+	Entity getAppliedCamera() const override
 	{
 		return m_applied_camera;
 	}
@@ -1265,13 +1265,13 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	void renderLightVolumes(int material_index)
 	{
 		PROFILE_FUNCTION();
-		if (m_applied_camera == INVALID_COMPONENT) return;
+		if (!m_applied_camera.isValid()) return;
 		Resource* res = m_scene->getEngine().getLuaResource(material_index);
 		Material* material = static_cast<Material*>(res);
 		if (!material->isReady()) return;
 
 		IAllocator& frame_allocator = m_renderer.getEngine().getLIFOAllocator();
-		Array<ComponentHandle> local_lights(frame_allocator);
+		Array<Entity> local_lights(frame_allocator);
 		m_scene->getPointLights(m_camera_frustum, local_lights);
 
 		PROFILE_INT("light count", local_lights.size());
@@ -1363,7 +1363,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	void renderDecalsVolumes()
 	{
 		PROFILE_FUNCTION();
-		if (m_applied_camera == INVALID_COMPONENT) return;
+		if (!m_applied_camera.isValid()) return;
 		if (!m_current_view) return;
 
 		IAllocator& frame_allocator = m_renderer.getEngine().getLIFOAllocator();
@@ -1394,7 +1394,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
-	void renderSpotLightShadowmap(ComponentHandle light)
+	void renderSpotLightShadowmap(Entity light)
 	{
 		newView("point_light", ~0ULL);
 
@@ -1431,7 +1431,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
-	void renderOmniLightShadowmap(ComponentHandle light)
+	void renderOmniLightShadowmap(Entity light)
 	{
 		Entity light_entity = m_scene->getPointLightEntity(light);
 		Vec3 light_pos = m_scene->getUniverse().getPosition(light_entity);
@@ -1516,15 +1516,14 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
-	void renderLocalLightShadowmaps(ComponentHandle camera, FrameBuffer** fbs, int framebuffers_count)
+	void renderLocalLightShadowmaps(Entity camera, FrameBuffer** fbs, int framebuffers_count)
 	{
 		if (!camera.isValid()) return;
 
 		Universe& universe = m_scene->getUniverse();
-		Entity camera_entity = m_scene->getCameraEntity(camera);
-		Vec3 camera_pos = universe.getPosition(camera_entity);
+		Vec3 camera_pos = universe.getPosition(camera);
 
-		ComponentHandle lights[16];
+		Entity lights[16];
 		int light_count = m_scene->getClosestPointLights(camera_pos, lights, lengthOf(lights));
 
 		int fb_index = 0;
@@ -1600,12 +1599,12 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	{
 		if (!m_current_view) return;
 		Universe& universe = m_scene->getUniverse();
-		ComponentHandle light_cmp = m_scene->getActiveGlobalLight();
-		if (!light_cmp.isValid() || !m_applied_camera.isValid()) return;
+		Entity light = m_scene->getActiveGlobalLight();
+		if (!light.isValid() || !m_applied_camera.isValid()) return;
 		float camera_height = m_scene->getCameraScreenHeight(m_applied_camera);
 		if (!camera_height) return;
 
-		Matrix light_mtx = universe.getMatrix(m_scene->getGlobalLightEntity(light_cmp));
+		Matrix light_mtx = universe.getMatrix(light);
 		m_global_light_shadowmap = m_current_framebuffer;
 		float shadowmap_height = (float)m_current_framebuffer->getHeight();
 		float shadowmap_width = (float)m_current_framebuffer->getWidth();
@@ -1613,7 +1612,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		float viewports_gl[] = { 0, 0.5f, 0.5f, 0.5f, 0, 0, 0.5f, 0};
 		float camera_fov = m_scene->getCameraFOV(m_applied_camera);
 		float camera_ratio = m_scene->getCameraScreenWidth(m_applied_camera) / camera_height;
-		Vec4 cascades = m_scene->getShadowmapCascades(light_cmp);
+		Vec4 cascades = m_scene->getShadowmapCascades(light);
 		float split_distances[] = {0.1f, cascades.x, cascades.y, cascades.z, cascades.w};
 		m_is_rendering_in_shadowmap = true;
 		bgfx::setViewClear(m_current_view->bgfx_id, BGFX_CLEAR_DEPTH | BGFX_CLEAR_COLOR, 0xffffffff, 1.0f, 0);
@@ -1626,7 +1625,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			(u16)(0.5f * shadowmap_height - 2));
 
 		Frustum camera_frustum;
-		Matrix camera_matrix = universe.getMatrix(m_scene->getCameraEntity(m_applied_camera));
+		Matrix camera_matrix = universe.getMatrix(m_applied_camera);
 		camera_frustum.computePerspective(camera_matrix.getTranslation(),
 			-camera_matrix.getZVector(),
 			camera_matrix.getYVector(),
@@ -1856,21 +1855,21 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
-	void setPointLightUniforms(ComponentHandle light_cmp)
+	void setPointLightUniforms(Entity light)
 	{
-		if (!light_cmp.isValid()) return;
+		if (!light.isValid()) return;
 		if (!m_current_view) return;
 
 		Universe& universe = m_scene->getUniverse();
-		Entity light_entity = m_scene->getPointLightEntity(light_cmp);
+		Entity light_entity = m_scene->getPointLightEntity(light);
 		Vec3 light_pos = universe.getPosition(light_entity);
 		Vec3 light_dir = universe.getRotation(light_entity).rotate(Vec3(0, 0, -1));
-		float fov = m_scene->getLightFOV(light_cmp);
-		float intensity = m_scene->getPointLightIntensity(light_cmp);
+		float fov = m_scene->getLightFOV(light);
+		float intensity = m_scene->getPointLightIntensity(light);
 		intensity *= intensity;
-		Vec3 color = m_scene->getPointLightColor(light_cmp) * intensity;
-		float range = m_scene->getLightRange(light_cmp);
-		float attenuation = m_scene->getLightAttenuation(light_cmp);
+		Vec3 color = m_scene->getPointLightColor(light) * intensity;
+		float range = m_scene->getLightRange(light);
+		float attenuation = m_scene->getLightAttenuation(light);
 		Vec4 light_pos_radius(light_pos, range);
 		Vec4 light_color_attenuation(color, attenuation);
 		Vec4 light_dir_fov(light_dir, fov);
@@ -1880,16 +1879,16 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		m_current_view->command_buffer.setUniform(m_light_dir_fov_uniform, light_dir_fov);
 
 		FrameBuffer* shadowmap = nullptr;
-		if (m_scene->getLightCastShadows(light_cmp))
+		if (m_scene->getLightCastShadows(light))
 		{
 			for (auto& info : m_point_light_shadowmaps)
 			{
-				if (info.light == light_cmp)
+				if (info.light == light)
 				{
 					shadowmap = info.framebuffer;
 					m_current_view->command_buffer.setUniform(m_shadowmap_matrices_uniform,
 						&info.matrices[0],
-						m_scene->getLightFOV(light_cmp) > Math::PI ? 4 : 1);
+						m_scene->getLightFOV(light) > Math::PI ? 4 : 1);
 					break;
 				}
 			}
@@ -2003,7 +2002,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
-	void renderPointLightInfluencedGeometry(ComponentHandle light)
+	void renderPointLightInfluencedGeometry(Entity light)
 	{
 		PROFILE_FUNCTION();
 
@@ -2017,13 +2016,13 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	{
 		PROFILE_FUNCTION();
 
-		Array<ComponentHandle> lights(m_allocator);
+		Array<Entity> lights(m_allocator);
 		m_scene->getPointLights(frustum, lights);
 		IAllocator& frame_allocator = m_renderer.getEngine().getLIFOAllocator();
 		m_is_current_light_global = false;
 		for (int i = 0; i < lights.size(); ++i)
 		{
-			ComponentHandle light = lights[i];
+			Entity light = lights[i];
 			setPointLightUniforms(light);
 
 			{
@@ -2034,8 +2033,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 			{
 				Array<TerrainInfo> tmp_terrains(frame_allocator);
-				Entity camera_entity = m_scene->getCameraEntity(m_applied_camera);
-				Vec3 lod_ref_point = m_scene->getUniverse().getPosition(camera_entity);
+				Vec3 lod_ref_point = m_scene->getUniverse().getPosition(m_applied_camera);
 				Frustum frustum = m_scene->getCameraFrustum(m_applied_camera);
 				m_scene->getTerrainInfos(frustum, lod_ref_point, tmp_terrains);
 				renderTerrains(tmp_terrains);
@@ -2156,8 +2154,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			float near_plane = m_scene->getCameraNearPlane(m_applied_camera);
 			float far_plane = m_scene->getCameraFarPlane(m_applied_camera);
 			float ratio = float(m_width) / m_height;
-			Entity camera_entity = m_scene->getCameraEntity(m_applied_camera);
-			Matrix inv_view_matrix = universe.getPositionAndRotation(camera_entity);
+			Matrix inv_view_matrix = universe.getPositionAndRotation(m_applied_camera);
 			Matrix view_matrix = inv_view_matrix;
 			view_matrix.fastInverse();
 			projection_matrix.setPerspective(fov, ratio, near_plane, far_plane, bgfx::getCaps()->homogeneousDepth);
@@ -2192,14 +2189,13 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
-	void renderAll(const Frustum& frustum, bool render_grass, ComponentHandle camera, u64 layer_mask)
+	void renderAll(const Frustum& frustum, bool render_grass, Entity camera, u64 layer_mask)
 	{
 		PROFILE_FUNCTION();
 
 		if (!m_applied_camera.isValid()) return;
 
-		Entity camera_entity = m_scene->getCameraEntity(camera);
-		Vec3 lod_ref_point = m_scene->getUniverse().getPosition(camera_entity);
+		Vec3 lod_ref_point = m_scene->getUniverse().getPosition(camera);
 		m_is_current_light_global = true;
 
 		m_grasses_buffer.clear();
@@ -2248,8 +2244,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 	void renderModel(Model& model, Pose* pose, const Matrix& mtx) override
 	{
-		Entity camera_entity = m_scene->getCameraEntity(m_applied_camera);
-		Vec3 camera_pos = m_scene->getUniverse().getPosition(camera_entity);
+		Vec3 camera_pos = m_scene->getUniverse().getPosition(m_applied_camera);
 
 		for (int i = 0; i < model.getMeshCount(); ++i)
 		{
@@ -2682,7 +2677,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		Matrix inv_world_matrix = info.m_world_matrix;
 		inv_world_matrix.fastInverse();
 		Vec3 camera_pos =
-			m_scene->getUniverse().getPosition(m_scene->getCameraEntity(m_applied_camera));
+			m_scene->getUniverse().getPosition(m_applied_camera);
 
 		Vec4 rel_cam_pos(
 			inv_world_matrix.transformPoint(camera_pos) / info.m_terrain->getXZScale(), 1);
@@ -2903,7 +2898,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		if (!m_scene) return false;
 
 		m_stats = {};
-		m_applied_camera = INVALID_COMPONENT;
+		m_applied_camera = INVALID_ENTITY;
 		m_global_light_shadowmap = nullptr;
 		m_current_view = nullptr;
 		m_view_idx = -1;
@@ -2990,7 +2985,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 	bool cameraExists(const char* slot_name)
 	{
-		return m_scene->getCameraInSlot(slot_name) != INVALID_COMPONENT;
+		return m_scene->getCameraInSlot(slot_name).isValid();
 	}
 
 
@@ -3081,7 +3076,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	FrameBuffer* m_global_light_shadowmap;
 	InstanceData m_instances_data[128];
 	int m_instance_data_idx;
-	ComponentHandle m_applied_camera;
+	Entity m_applied_camera;
 	bgfx::VertexBufferHandle m_cube_vb;
 	bgfx::IndexBufferHandle m_cube_ib;
 	bool m_is_current_light_global;
@@ -3272,7 +3267,7 @@ int renderModels(lua_State* L)
 {
 	auto* pipeline = LuaWrapper::checkArg<PipelineImpl*>(L, 1);
 
-	ComponentHandle cam = pipeline->m_applied_camera;
+	Entity cam = pipeline->m_applied_camera;
 
 	pipeline->renderAll(pipeline->m_camera_frustum, true, cam, pipeline->m_layer_mask);
 	pipeline->m_layer_mask = 0;
@@ -3348,7 +3343,7 @@ int renderLocalLightsShadowmaps(lua_State* L)
 	}
 
 	RenderScene* scene = pipeline->m_scene;
-	ComponentHandle camera = scene->getCameraInSlot(camera_slot);
+	Entity camera = scene->getCameraInSlot(camera_slot);
 	pipeline->renderLocalLightShadowmaps(camera, fbs, len);
 
 	return 0;

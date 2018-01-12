@@ -33,7 +33,7 @@ struct AnimSetProperty : public Reflection::IEnumProperty
 	void getValue(ComponentUID cmp, int index, OutputBlob& stream) const override
 	{
 		AnimationScene* scene = static_cast<AnimationScene*>(cmp.scene);
-		int value = scene->getControllerDefaultSet(cmp.handle);
+		int value = scene->getControllerDefaultSet(cmp.entity);
 		stream.write(value);
 	}
 
@@ -42,21 +42,21 @@ struct AnimSetProperty : public Reflection::IEnumProperty
 	{
 		AnimationScene* scene = static_cast<AnimationScene*>(cmp.scene);
 		int value = stream.read<int>();
-		scene->setControllerDefaultSet(cmp.handle, value);
+		scene->setControllerDefaultSet(cmp.entity, value);
 	}
 
 
 
 	int getEnumCount(ComponentUID cmp) const override
 	{
-		Anim::ControllerResource* res = static_cast<AnimationScene*>(cmp.scene)->getControllerResource(cmp.handle);
+		Anim::ControllerResource* res = static_cast<AnimationScene*>(cmp.scene)->getControllerResource(cmp.entity);
 		return res ? res->m_sets_names.size() : 0;
 	}
 
 
 	const char* getEnumName(ComponentUID cmp, int index) const override
 	{
-		Anim::ControllerResource* res = static_cast<AnimationScene*>(cmp.scene)->getControllerResource(cmp.handle);
+		Anim::ControllerResource* res = static_cast<AnimationScene*>(cmp.scene)->getControllerResource(cmp.entity);
 		return res->m_sets_names[index];
 	}
 };

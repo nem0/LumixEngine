@@ -147,19 +147,20 @@ struct InputValueCustomUI
 
 		const auto& selected_entities = app.getWorldEditor().getSelectedEntities();
 		auto* scene = (AnimationScene*)app.getWorldEditor().getUniverse()->getScene(ANIMABLE_HASH);
-		ComponentHandle cmp = selected_entities.empty() ? INVALID_COMPONENT : scene->getComponent(selected_entities[0], CONTROLLER_TYPE);
-		u8* input_data = cmp.isValid() ? scene->getControllerInput(cmp) : nullptr;
+		
+		if (!scene->getUniverse().hasComponent(selected_entities[0], CONTROLLER_TYPE)) return;
+		
+		u8* input_data = scene->getControllerInput(selected_entities[0]);
+		if (!input_data) return;
+
 		Anim::InputDecl& input_decl = owner.resource.getEngineResource()->m_input_decl;
 		Anim::InputDecl::Input& input = input_decl.inputs[owner.engine_idx];
-		if (input_data)
+		switch (input.type)
 		{
-			switch (input.type)
-			{
-				case Anim::InputDecl::FLOAT: ImGui::DragFloat("Value", (float*)(input_data + input.offset)); break;
-				case Anim::InputDecl::BOOL: ImGui::CheckboxEx("Value", (bool*)(input_data + input.offset)); break;
-				case Anim::InputDecl::INT: ImGui::InputInt("Value", (int*)(input_data + input.offset)); break;
-				default: ASSERT(false); break;
-			}
+			case Anim::InputDecl::FLOAT: ImGui::DragFloat("Value", (float*)(input_data + input.offset)); break;
+			case Anim::InputDecl::BOOL: ImGui::CheckboxEx("Value", (bool*)(input_data + input.offset)); break;
+			case Anim::InputDecl::INT: ImGui::InputInt("Value", (int*)(input_data + input.offset)); break;
+			default: ASSERT(false); break;
 		}
 	}
 };
@@ -925,10 +926,9 @@ void AnimationEditor::drawGraph()
 	Anim::ComponentInstance* runtime = nullptr;
 	if (!entities.empty())
 	{
-		ComponentHandle ctrl = scene->getComponent(entities[0], CONTROLLER_TYPE);
-		if (ctrl.isValid())
+		if(scene->getUniverse().hasComponent(entities[0], CONTROLLER_TYPE))
 		{
-			runtime = scene->getControllerRoot(ctrl);
+			runtime = scene->getControllerRoot(entities[0]);
 		}
 	}
 
@@ -945,11 +945,12 @@ void AnimationEditor::loadFromEntity()
 {
 	auto& entities = m_app.getWorldEditor().getSelectedEntities();
 	if (entities.empty()) return;
+
 	auto* scene = (AnimationScene*)m_app.getWorldEditor().getUniverse()->getScene(ANIMABLE_HASH);
-	ComponentHandle ctrl = scene->getComponent(entities[0], CONTROLLER_TYPE);
-	if (!ctrl.isValid()) return;
+	if (!scene->getUniverse().hasComponent(entities[0], CONTROLLER_TYPE)) return;
+
 	newController();
-	m_path = scene->getControllerSource(ctrl).c_str();
+	m_path = scene->getControllerSource(entities[0]).c_str();
 	clearUndoStack();
 	load();
 }
@@ -1111,12 +1112,14 @@ void AnimationEditor::clearUndoStack()
 void AnimationEditor::update(float time_delta)
 {
 	if (!m_is_playing) return;
+
 	auto& entities = m_app.getWorldEditor().getSelectedEntities();
 	if (entities.empty()) return;
+
 	auto* scene = (AnimationScene*)m_app.getWorldEditor().getUniverse()->getScene(ANIMABLE_HASH);
-	ComponentHandle ctrl = scene->getComponent(entities[0], CONTROLLER_TYPE);
-	if (!ctrl.isValid()) return;
-	scene->updateController(ctrl, time_delta);
+	if (!scene->getUniverse().hasComponent(entities[0], CONTROLLER_TYPE)) return;
+
+	scene->updateController(entities[0], time_delta);
 }
 
 

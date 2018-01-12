@@ -84,6 +84,9 @@ static const char* getGrassRotationModeName(int index)
 }
 
 
+static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("renderable");
+
+
 struct BoneProperty : Reflection::IEnumProperty
 {
 	BoneProperty() { name = "Bone"; }
@@ -92,7 +95,7 @@ struct BoneProperty : Reflection::IEnumProperty
 	void getValue(ComponentUID cmp, int index, OutputBlob& stream) const override
 	{
 		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
-		int value = scene->getBoneAttachmentBone(cmp.handle);
+		int value = scene->getBoneAttachmentBone(cmp.entity);
 		stream.write(value);
 	}
 
@@ -101,26 +104,27 @@ struct BoneProperty : Reflection::IEnumProperty
 	{
 		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
 		int value = stream.read<int>();
-		scene->setBoneAttachmentBone(cmp.handle, value);
+		scene->setBoneAttachmentBone(cmp.entity, value);
 	}
 
 
-	ComponentHandle getModelInstance(RenderScene* render_scene, ComponentHandle bone_attachment_cmp) const
+	Entity getModelInstance(RenderScene* render_scene, Entity bone_attachment) const
 	{
-		Entity parent_entity = render_scene->getBoneAttachmentParent(bone_attachment_cmp);
-		if (parent_entity == INVALID_ENTITY) return INVALID_COMPONENT;
-		ComponentHandle model_instance = render_scene->getModelInstanceComponent(parent_entity);
-		return model_instance;
+		Entity parent_entity = render_scene->getBoneAttachmentParent(bone_attachment);
+		if (parent_entity == INVALID_ENTITY) return INVALID_ENTITY;
+		return render_scene->getUniverse().hasComponent(parent_entity, MODEL_INSTANCE_TYPE) ? parent_entity : INVALID_ENTITY;
 	}
 
 
 	int getEnumCount(ComponentUID cmp) const override
 	{
 		RenderScene* render_scene = static_cast<RenderScene*>(cmp.scene);
-		ComponentHandle model_instance = getModelInstance(render_scene, cmp.handle);
-		if (model_instance == INVALID_COMPONENT) return 0;
+		Entity model_instance = getModelInstance(render_scene, cmp.entity);
+		if (!model_instance.isValid()) return 0;
+
 		auto* model = render_scene->getModelInstanceModel(model_instance);
 		if (!model || !model->isReady()) return 0;
+
 		return model->getBoneCount();
 	}
 
@@ -128,10 +132,12 @@ struct BoneProperty : Reflection::IEnumProperty
 	const char* getEnumName(ComponentUID cmp, int index) const override
 	{
 		RenderScene* render_scene = static_cast<RenderScene*>(cmp.scene);
-		ComponentHandle model_instance = getModelInstance(render_scene, cmp.handle);
-		if (model_instance == INVALID_COMPONENT) return "";
+		Entity model_instance = getModelInstance(render_scene, cmp.entity);
+		if (!model_instance.isValid()) return "";
+
 		auto* model = render_scene->getModelInstanceModel(model_instance);
 		if (!model) return "";
+
 		return model->getBone(index).name.c_str();
 	}
 };

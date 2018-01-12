@@ -26,16 +26,16 @@ struct PrefabResource;
 class LUMIX_ENGINE_API Universe
 {
 public:
-	typedef ComponentHandle (IScene::*Create)(Entity);
-	typedef void (IScene::*Destroy)(ComponentHandle);
-	typedef void (IScene::*Serialize)(ISerializer&, ComponentHandle);
+	typedef void (IScene::*Create)(Entity);
+	typedef void (IScene::*Destroy)(Entity);
+	typedef void (IScene::*Serialize)(ISerializer&, Entity);
 	typedef void (IScene::*Deserialize)(IDeserializer&, Entity, int);
 	struct ComponentTypeEntry
 	{
 		IScene* scene = nullptr;
-		ComponentHandle(IScene::*create)(Entity);
-		void (IScene::*destroy)(ComponentHandle);
-		void (IScene::*serialize)(ISerializer&, ComponentHandle);
+		void (IScene::*create)(Entity);
+		void (IScene::*destroy)(Entity);
+		void (IScene::*serialize)(ISerializer&, Entity);
 		void (IScene::*deserialize)(IDeserializer&, Entity, int);
 	};
 
@@ -49,10 +49,10 @@ public:
 	void emplaceEntity(Entity entity);
 	Entity createEntity(const Vec3& position, const Quat& rotation);
 	void destroyEntity(Entity entity);
-	ComponentHandle createComponent(ComponentType type, Entity entity);
-	void destroyComponent(ComponentHandle cmp, ComponentType type);
-	void onComponentCreated(Entity entity, ComponentType component_type, IScene* scene, ComponentHandle index);
-	void onComponentDestroyed(Entity entity, ComponentType component_type, IScene* scene, ComponentHandle index);
+	void createComponent(ComponentType type, Entity entity);
+	void destroyComponent(Entity entity, ComponentType type);
+	void onComponentCreated(Entity entity, ComponentType component_type, IScene* scene);
+	void onComponentDestroyed(Entity entity, ComponentType component_type, IScene* scene);
 	bool hasComponent(Entity entity, ComponentType component_type) const;
 	ComponentUID getComponent(Entity entity, ComponentType type) const;
 	ComponentUID getFirstComponent(Entity entity) const;
@@ -119,7 +119,7 @@ public:
 	DelegateList<void(const ComponentUID&)>& componentDestroyed() { return m_component_destroyed; }
 	DelegateList<void(const ComponentUID&)>& componentAdded() { return m_component_added; }
 
-	void serializeComponent(ISerializer& serializer, ComponentType type, ComponentHandle cmp);
+	void serializeComponent(ISerializer& serializer, ComponentType type, Entity entity);
 	void deserializeComponent(IDeserializer& serializer, Entity entity, ComponentType type, int scene_version);
 	void serialize(OutputBlob& serializer);
 	void deserialize(InputBlob& serializer);

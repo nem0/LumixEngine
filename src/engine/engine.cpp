@@ -537,19 +537,20 @@ public:
 	}
 
 
-	static ComponentHandle LUA_createComponent(Universe* universe, Entity entity, const char* type)
+	static bool LUA_createComponent(Universe* universe, Entity entity, const char* type)
 	{
-		if (!universe) return INVALID_COMPONENT;
+		if (!universe) return false;
 		ComponentType cmp_type = Reflection::getComponentType(type);
 		IScene* scene = universe->getScene(cmp_type);
-		if (!scene) return INVALID_COMPONENT;
-		if (scene->getComponent(entity, cmp_type) != INVALID_COMPONENT)
+		if (!scene) return false;
+		if (universe->hasComponent(entity, cmp_type))
 		{
 			g_log_error.log("Lua Script") << "Component " << type << " already exists in entity " << entity.index;
-			return INVALID_COMPONENT;
+			return false;
 		}
 
-		return universe->createComponent(cmp_type, entity);
+		universe->createComponent(cmp_type, entity);
+		return true;
 	}
 
 
@@ -713,15 +714,9 @@ public:
 	}
 
 
-	static ComponentHandle LUA_getComponent(Universe* universe, Entity entity, int component_type)
+	static bool LUA_hasComponent(Universe* universe, Entity entity, int component_type)
 	{
-		if (!universe->hasComponent(entity, {component_type})) return INVALID_COMPONENT;
-		ComponentType type = {component_type};
-		IScene* scene = universe->getScene(type);
-		if (scene) return scene->getComponent(entity, type);
-		
-		ASSERT(false);
-		return INVALID_COMPONENT;
+		return universe->hasComponent(entity, {component_type});
 	}
 
 
@@ -753,25 +748,23 @@ public:
 				IScene* scene = ctx->getScene(cmp_type);
 				if (scene)
 				{
-					ComponentUID cmp(e, cmp_type, scene, ctx->createComponent(cmp_type, e));
+					ComponentUID cmp(e, cmp_type, scene);
 					const Reflection::ComponentBase* cmp_des = Reflection::getComponent(cmp_type);
-					if (cmp.isValid())
+					ctx->createComponent(cmp_type, e);
+					lua_pushvalue(L, -1);
+					lua_pushnil(L);
+					while (lua_next(L, -2) != 0)
 					{
-						lua_pushvalue(L, -1);
-						lua_pushnil(L);
-						while (lua_next(L, -2) != 0)
-						{
-							const char* property_name = luaL_checkstring(L, -2);
-							SetPropertyVisitor v;
-							v.property_name = property_name;
-							v.cmp = cmp;
-							v.L = L;
-							cmp_des->visit(v);
+						const char* property_name = luaL_checkstring(L, -2);
+						SetPropertyVisitor v;
+						v.property_name = property_name;
+						v.cmp = cmp;
+						v.L = L;
+						cmp_des->visit(v);
 
-							lua_pop(L, 1);
-						}
 						lua_pop(L, 1);
 					}
+					lua_pop(L, 1);
 				}
 			}
 			lua_pop(L, 1);
@@ -1009,7 +1002,7 @@ public:
 		REGISTER_FUNCTION(createUniverse);
 		REGISTER_FUNCTION(destroyEntity);
 		REGISTER_FUNCTION(destroyUniverse);
-		REGISTER_FUNCTION(getComponent);
+		REGISTER_FUNCTION(hasComponent);
 		REGISTER_FUNCTION(getComponentType);
 		REGISTER_FUNCTION(getEntityDirection);
 		REGISTER_FUNCTION(getEntityPosition);
@@ -1554,7 +1547,8 @@ public:
 		IScene* scene = universe.getScene(type);
 		if (!scene) return ComponentUID::INVALID;
 
-		return ComponentUID(entity, type, scene, universe.createComponent(type, entity));
+		universe.createComponent(type, entity);
+		return ComponentUID(entity, type, scene);
 	}
 
 

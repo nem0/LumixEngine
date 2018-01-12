@@ -117,7 +117,7 @@ class Terrain
 		void setMaterial(Material* material);
 
 		void getInfos(Array<TerrainInfo>& infos, const Frustum& frustum, const Vec3& lod_ref_point);
-		void getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, ComponentHandle camera);
+		void getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, Entity camera);
 
 		RayCastModelHit castRay(const Vec3& origin, const Vec3& dir);
 		void serialize(OutputBlob& serializer);
@@ -128,9 +128,9 @@ class Terrain
 		void forceGrassUpdate();
 
 	private: 
-		Array<Terrain::GrassQuad*>& getQuads(ComponentHandle camera);
+		Array<Terrain::GrassQuad*>& getQuads(Entity camera);
 		TerrainQuad* generateQuadTree(float size);
-		void updateGrass(ComponentHandle camera);
+		void updateGrass(Entity camera);
 		void generateGrassTypeQuad(GrassPatch& patch, const Matrix& terrain_matrix, const Vec2& quad_pos_hm_space);
 		void generateGeometry();
 		void onMaterialLoaded(Resource::State, Resource::State new_state, Resource&);
@@ -151,8 +151,8 @@ class Terrain
 		Texture* m_detail_texture;
 		RenderScene& m_scene;
 		Array<GrassType> m_grass_types;
-		AssociativeArray<ComponentHandle, Array<GrassQuad*> > m_grass_quads;
-		AssociativeArray<ComponentHandle, Vec3> m_last_camera_position;
+		AssociativeArray<Entity, Array<GrassQuad*> > m_grass_quads;
+		AssociativeArray<Entity, Vec3> m_last_camera_position;
 		bool m_force_grass_update;
 		Renderer& m_renderer;
 };

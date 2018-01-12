@@ -195,15 +195,15 @@ void SceneView::renderSelection()
 	Universe& universe = scene->getUniverse();
 	for (Entity e : entities)
 	{
-		ComponentHandle cmp = scene->getModelInstanceComponent(e);
-		if (!cmp.isValid()) continue;
-		Model* model = scene->getModelInstanceModel(cmp);
+		if (!scene->getUniverse().hasComponent(e, MODEL_INSTANCE_TYPE)) continue;
+
+		Model* model = scene->getModelInstanceModel(e);
 		Matrix mtx = universe.getMatrix(e);
 		if (model)
 		{
-			Pose* pose = scene->lockPose(cmp);
+			Pose* pose = scene->lockPose(e);
 			m_pipeline->renderModel(*model, pose, mtx);
-			scene->unlockPose(cmp, false);
+			scene->unlockPose(e, false);
 		}
 	}
 }
@@ -234,14 +234,14 @@ RayCastModelHit SceneView::castRay(float x, float y)
 	ASSERT(scene);
 	
 	ComponentUID camera_cmp = m_editor.getEditCamera();
-	Vec2 screen_size = scene->getCameraScreenSize(camera_cmp.handle);
+	Vec2 screen_size = scene->getCameraScreenSize(camera_cmp.entity);
 	screen_size.x *= x;
 	screen_size.y *= y;
 
 	Vec3 origin;
 	Vec3 dir;
-	scene->getRay(camera_cmp.handle, screen_size, origin, dir);
-	return scene->castRay(origin, dir, INVALID_COMPONENT);
+	scene->getRay(camera_cmp.entity, screen_size, origin, dir);
+	return scene->castRay(origin, dir, INVALID_ENTITY);
 }
 
 
@@ -314,7 +314,8 @@ void SceneView::handleDrop(const char* path, float x, float y)
 	else if (hit.m_is_hit && PathUtils::hasExtension(path, "mat") && hit.m_mesh)
 	{
 		m_editor.selectEntities(&hit.m_entity, 1);
-		auto* model = m_pipeline->getScene()->getModelInstanceModel(hit.m_component);
+		RenderScene* scene = m_pipeline->getScene();
+		Model* model = scene->getModelInstanceModel(hit.m_entity);
 		int mesh_index = 0;
 		for (int i = 0; i < model->getMeshCount(); ++i)
 		{

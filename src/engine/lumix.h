@@ -72,15 +72,6 @@ static_assert(sizeof(i16) == 2, "Incorrect size of i16");
 static_assert(sizeof(i8) == 1, "Incorrect size of i8");
 
 const u32 MAX_PATH_LENGTH = 260;
-struct ComponentHandle
-{
-	int index;
-	bool operator==(const ComponentHandle& rhs) const { return rhs.index == index; }
-	bool operator<(const ComponentHandle& rhs) const { return rhs.index < index; }
-	bool operator>(const ComponentHandle& rhs) const { return rhs.index > index; }
-	bool operator!=(const ComponentHandle& rhs) const { return rhs.index != index; }
-	bool isValid() const { return index >= 0; }
-};
 
 struct Entity
 {
@@ -104,7 +95,6 @@ struct ComponentType
 };
 const ComponentType INVALID_COMPONENT_TYPE = {-1};
 const Entity INVALID_ENTITY = {-1};
-const ComponentHandle INVALID_COMPONENT = {-1};
 
 template <typename T, int count> int lengthOf(const T (&)[count])
 {
