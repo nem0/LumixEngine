@@ -16,32 +16,29 @@ struct LUMIX_ENGINE_API ComponentUID final
 
 	ComponentUID()
 	{
-		handle = INVALID_COMPONENT;
 		scene = nullptr;
 		entity = INVALID_ENTITY;
 		type = {-1};
 	}
 
-	ComponentUID(Entity _entity, ComponentType _type, IScene* _scene, ComponentHandle _handle)
+	ComponentUID(Entity _entity, ComponentType _type, IScene* _scene)
 		: entity(_entity)
 		, type(_type)
 		, scene(_scene)
-		, handle(_handle)
 	{
 	}
 
 	Entity entity; 
 	ComponentType type;
 	IScene* scene;
-	ComponentHandle handle;
 
 	static const ComponentUID INVALID;
 
 	bool operator==(const ComponentUID& rhs) const
 	{
-		return type == rhs.type && scene == rhs.scene && handle == rhs.handle;
+		return type == rhs.type && scene == rhs.scene && entity == rhs.entity;
 	}
-	bool isValid() const { return handle.isValid(); }
+	bool isValid() const { return entity.isValid(); }
 };
 
 

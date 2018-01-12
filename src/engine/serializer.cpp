@@ -31,11 +31,6 @@ void TextSerializer::write(const char* label, Entity entity)
 	blob << "#" << label << "\n\t" << guid.value << "\n";
 }
 
-void TextSerializer::write(const char* label, ComponentHandle value)
-{
-	blob << "#" << label << "\n\t" << value.index << "\n";
-}
-
 void TextSerializer::write(const char* label, const RigidTransform& value)
 {
 	blob << "#" << label << " (" << value.pos.x << ", " << value.pos.y << ", " << value.pos.z << ") "
@@ -176,13 +171,6 @@ void TextDeserializer::read(Quat* value)
 	value->z = asFloat(readU32());
 	skip();
 	value->w = asFloat(readU32());
-}
-
-
-void TextDeserializer::read(ComponentHandle* value)
-{
-	skip();
-	value->index = readU32();
 }
 
 

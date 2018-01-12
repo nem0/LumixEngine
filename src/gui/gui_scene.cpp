@@ -201,9 +201,9 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	}
 
 
-	Vec4 getImageColorRGBA(ComponentHandle cmp) override
+	Vec4 getImageColorRGBA(Entity entity) override
 	{
-		GUIImage* image = m_rects[{cmp.index}]->image;
+		GUIImage* image = m_rects[entity]->image;
 		return ABGRu32ToRGBAVec4(image->color);
 	}
 
@@ -230,16 +230,16 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	}
 
 
-	Path getImageSprite(ComponentHandle cmp) override
+	Path getImageSprite(Entity entity) override
 	{
-		GUIImage* image = m_rects[{cmp.index}]->image;
+		GUIImage* image = m_rects[entity]->image;
 		return image->sprite ? image->sprite->getPath() : Path();
 	}
 
 
-	void setImageSprite(ComponentHandle cmp, const Path& path) override
+	void setImageSprite(Entity entity, const Path& path) override
 	{
-		GUIImage* image = m_rects[{cmp.index}]->image;
+		GUIImage* image = m_rects[entity]->image;
 		if (image->sprite)
 		{
 			image->sprite->getResourceManager().unload(*image->sprite);
@@ -256,9 +256,9 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	}
 
 
-	void setImageColorRGBA(ComponentHandle cmp, const Vec4& color) override
+	void setImageColorRGBA(Entity entity, const Vec4& color) override
 	{
-		GUIImage* image = m_rects[{cmp.index}]->image;
+		GUIImage* image = m_rects[entity]->image;
 		image->color = RGBAVec4ToABGRu32(color);
 	}
 
@@ -271,15 +271,9 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	}
 
 
-	Entity getRectEntity(ComponentHandle cmp) const override
+	Entity getRectAt(GUIRect& rect, const Vec2& pos, const Rect& parent_rect) const
 	{
-		return {cmp.index};
-	}
-
-
-	ComponentHandle getRectAt(GUIRect& rect, const Vec2& pos, const Rect& parent_rect) const
-	{
-		if (!rect.flags.isSet(GUIRect::IS_VALID)) return INVALID_COMPONENT;
+		if (!rect.flags.isSet(GUIRect::IS_VALID)) return INVALID_ENTITY;
 
 		Rect r;
 		r.x = parent_rect.x + rect.left.points + parent_rect.w * rect.left.relative;
@@ -298,18 +292,17 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 			if (idx < 0) continue;
 
 			GUIRect* child_rect = m_rects.at(idx);
-			ComponentHandle cmp = getRectAt(*child_rect, pos, r);
-			if (cmp.isValid()) return cmp;
+			Entity entity = getRectAt(*child_rect, pos, r);
+			if (entity.isValid()) return entity;
 		}
 
-		ComponentHandle cmp = { rect.entity.index };
-		return intersect ? cmp : INVALID_COMPONENT;
+		return intersect ? rect.entity : INVALID_ENTITY;
 	}
 
 
-	ComponentHandle getRectAt(const Vec2& pos, const Vec2& canvas_size) const override
+	Entity getRectAt(const Vec2& pos, const Vec2& canvas_size) const override
 	{
-		if (!m_root) return INVALID_COMPONENT;
+		if (!m_root) return INVALID_ENTITY;
 
 		return getRectAt(*m_root, pos, { 0, 0, canvas_size.x, canvas_size.y });
 	}
@@ -331,32 +324,32 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	}
 
 
-	void enableRect(ComponentHandle cmp, bool enable) override { m_rects[{cmp.index}]->flags.set(GUIRect::IS_ENABLED, enable); }
-	bool isRectEnabled(ComponentHandle cmp) override { return m_rects[{cmp.index}]->flags.isSet(GUIRect::IS_ENABLED); }
-	float getRectLeftPoints(ComponentHandle cmp) override { return m_rects[{cmp.index}]->left.points; }
-	void setRectLeftPoints(ComponentHandle cmp, float value) override { m_rects[{cmp.index}]->left.points = value; }
-	float getRectLeftRelative(ComponentHandle cmp) override { return m_rects[{cmp.index}]->left.relative; }
-	void setRectLeftRelative(ComponentHandle cmp, float value) override { m_rects[{cmp.index}]->left.relative = value; }
+	void enableRect(Entity entity, bool enable) override { m_rects[entity]->flags.set(GUIRect::IS_ENABLED, enable); }
+	bool isRectEnabled(Entity entity) override { return m_rects[entity]->flags.isSet(GUIRect::IS_ENABLED); }
+	float getRectLeftPoints(Entity entity) override { return m_rects[entity]->left.points; }
+	void setRectLeftPoints(Entity entity, float value) override { m_rects[entity]->left.points = value; }
+	float getRectLeftRelative(Entity entity) override { return m_rects[entity]->left.relative; }
+	void setRectLeftRelative(Entity entity, float value) override { m_rects[entity]->left.relative = value; }
 
-	float getRectRightPoints(ComponentHandle cmp) override { return m_rects[{cmp.index}]->right.points; }
-	void setRectRightPoints(ComponentHandle cmp, float value) override { m_rects[{cmp.index}]->right.points = value; }
-	float getRectRightRelative(ComponentHandle cmp) override { return m_rects[{cmp.index}]->right.relative; }
-	void setRectRightRelative(ComponentHandle cmp, float value) override { m_rects[{cmp.index}]->right.relative = value; }
+	float getRectRightPoints(Entity entity) override { return m_rects[entity]->right.points; }
+	void setRectRightPoints(Entity entity, float value) override { m_rects[entity]->right.points = value; }
+	float getRectRightRelative(Entity entity) override { return m_rects[entity]->right.relative; }
+	void setRectRightRelative(Entity entity, float value) override { m_rects[entity]->right.relative = value; }
 
-	float getRectTopPoints(ComponentHandle cmp) override { return m_rects[{cmp.index}]->top.points; }
-	void setRectTopPoints(ComponentHandle cmp, float value) override { m_rects[{cmp.index}]->top.points = value; }
-	float getRectTopRelative(ComponentHandle cmp) override { return m_rects[{cmp.index}]->top.relative; }
-	void setRectTopRelative(ComponentHandle cmp, float value) override { m_rects[{cmp.index}]->top.relative = value; }
+	float getRectTopPoints(Entity entity) override { return m_rects[entity]->top.points; }
+	void setRectTopPoints(Entity entity, float value) override { m_rects[entity]->top.points = value; }
+	float getRectTopRelative(Entity entity) override { return m_rects[entity]->top.relative; }
+	void setRectTopRelative(Entity entity, float value) override { m_rects[entity]->top.relative = value; }
 
-	float getRectBottomPoints(ComponentHandle cmp) override { return m_rects[{cmp.index}]->bottom.points; }
-	void setRectBottomPoints(ComponentHandle cmp, float value) override { m_rects[{cmp.index}]->bottom.points = value; }
-	float getRectBottomRelative(ComponentHandle cmp) override { return m_rects[{cmp.index}]->bottom.relative; }
-	void setRectBottomRelative(ComponentHandle cmp, float value) override { m_rects[{cmp.index}]->bottom.relative = value; }
+	float getRectBottomPoints(Entity entity) override { return m_rects[entity]->bottom.points; }
+	void setRectBottomPoints(Entity entity, float value) override { m_rects[entity]->bottom.points = value; }
+	float getRectBottomRelative(Entity entity) override { return m_rects[entity]->bottom.relative; }
+	void setRectBottomRelative(Entity entity, float value) override { m_rects[entity]->bottom.relative = value; }
 
 
-	void setTextFontSize(ComponentHandle cmp, int value) override
+	void setTextFontSize(Entity entity, int value) override
 	{
-		GUIText* gui_text = m_rects[{cmp.index}]->text;
+		GUIText* gui_text = m_rects[entity]->text;
 		FontResource* res = gui_text->font_resource;
 		if (res) res->removeRef(*gui_text->font);
 		gui_text->font_size = value;
@@ -364,37 +357,37 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	}
 	
 	
-	int getTextFontSize(ComponentHandle cmp) override
+	int getTextFontSize(Entity entity) override
 	{
-		GUIText* gui_text = m_rects[{cmp.index}]->text;
+		GUIText* gui_text = m_rects[entity]->text;
 		return gui_text->font_size;
 	}
 	
 	
-	Vec4 getTextColorRGBA(ComponentHandle cmp) override
+	Vec4 getTextColorRGBA(Entity entity) override
 	{
-		GUIText* gui_text = m_rects[{cmp.index}]->text;
+		GUIText* gui_text = m_rects[entity]->text;
 		return ABGRu32ToRGBAVec4(gui_text->color);
 	}
 
 
-	void setTextColorRGBA(ComponentHandle cmp, const Vec4& color) override
+	void setTextColorRGBA(Entity entity, const Vec4& color) override
 	{
-		GUIText* gui_text = m_rects[{cmp.index}]->text;
+		GUIText* gui_text = m_rects[entity]->text;
 		gui_text->color = RGBAVec4ToABGRu32(color);
 	}
 
 
-	Path getTextFontPath(ComponentHandle cmp) override
+	Path getTextFontPath(Entity entity) override
 	{
-		GUIText* gui_text = m_rects[{cmp.index}]->text;
+		GUIText* gui_text = m_rects[entity]->text;
 		return gui_text->font_resource == nullptr ? Path() : gui_text->font_resource->getPath();
 	}
 
 
-	void setTextFontPath(ComponentHandle cmp, const Path& path) override
+	void setTextFontPath(Entity entity, const Path& path) override
 	{
-		GUIText* gui_text = m_rects[{cmp.index}]->text;
+		GUIText* gui_text = m_rects[entity]->text;
 		FontResource* res = gui_text->font_resource;
 		if (res)
 		{
@@ -412,23 +405,23 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	}
 
 
-	void setText(ComponentHandle cmp, const char* value) override
+	void setText(Entity entity, const char* value) override
 	{
-		GUIText* gui_text = m_rects[{cmp.index}]->text;
+		GUIText* gui_text = m_rects[entity]->text;
 		gui_text->text = value;
 	}
 
 
-	const char* getText(ComponentHandle cmp) override
+	const char* getText(Entity entity) override
 	{
-		GUIText* text = m_rects[{cmp.index}]->text;
+		GUIText* text = m_rects[entity]->text;
 		return text->text.c_str();
 	}
 
 
-	void serializeRect(ISerializer& serializer, ComponentHandle cmp)
+	void serializeRect(ISerializer& serializer, Entity entity)
 	{
-		const GUIRect& rect = *m_rects[{cmp.index}];
+		const GUIRect& rect = *m_rects[entity];
 		
 		serializer.write("flags", rect.flags.base);
 		serializer.write("top_pts", rect.top.points);
@@ -447,8 +440,6 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 
 	void deserializeRect(IDeserializer& serializer, Entity entity, int /*scene_version*/)
 	{
-		ComponentHandle cmp = { entity.index };
-
 		int idx = m_rects.find(entity);
 		GUIRect* rect;
 		if (idx >= 0)
@@ -476,13 +467,13 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		
 		m_root = findRoot();
 		
-		m_universe.onComponentCreated(entity, GUI_RECT_TYPE, this, cmp);
+		m_universe.onComponentCreated(entity, GUI_RECT_TYPE, this);
 	}
 
 
-	void serializeImage(ISerializer& serializer, ComponentHandle cmp)
+	void serializeImage(ISerializer& serializer, Entity entity)
 	{
-		const GUIRect& rect = *m_rects[{cmp.index}];
+		const GUIRect& rect = *m_rects[entity];
 		serializer.write("color", rect.image->color);
 	}
 
@@ -501,14 +492,13 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		
 		serializer.read(&rect.image->color);
 		
-		ComponentHandle cmp = {entity.index};
-		m_universe.onComponentCreated(entity, GUI_IMAGE_TYPE, this, cmp);
+		m_universe.onComponentCreated(entity, GUI_IMAGE_TYPE, this);
 	}
 
 
-	void serializeText(ISerializer& serializer, ComponentHandle cmp)
+	void serializeText(ISerializer& serializer, Entity entity)
 	{
-		const GUIRect& rect = *m_rects[{cmp.index}];
+		const GUIRect& rect = *m_rects[entity];
 		serializer.write("font", rect.text->font_resource ? rect.text->font_resource->getPath().c_str() : "");
 		serializer.write("color", rect.text->color);
 		serializer.write("font_size", rect.text->font_size);
@@ -544,8 +534,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 			rect.text->font = rect.text->font_resource->addRef(rect.text->font_size);
 		}
 
-		ComponentHandle cmp = { entity.index };
-		m_universe.onComponentCreated(entity, GUI_TEXT_TYPE, this, cmp);
+		m_universe.onComponentCreated(entity, GUI_TEXT_TYPE, this);
 	}
 
 
@@ -566,10 +555,8 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	}
 
 
-	ComponentHandle createRect(Entity entity)
+	void createRect(Entity entity)
 	{
-		ComponentHandle cmp = { entity.index };
-		
 		int idx = m_rects.find(entity);
 		GUIRect* rect;
 		if (idx >= 0)
@@ -584,14 +571,12 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		rect->entity = entity;
 		rect->flags.set(GUIRect::IS_VALID);
 		rect->flags.set(GUIRect::IS_ENABLED);
-		m_universe.onComponentCreated(entity, GUI_RECT_TYPE, this, cmp);
+		m_universe.onComponentCreated(entity, GUI_RECT_TYPE, this);
 		m_root = findRoot();
-
-		return cmp;
 	}
 
 
-	ComponentHandle createText(Entity entity)
+	void createText(Entity entity)
 	{
 		int idx = m_rects.find(entity);
 		if (idx < 0)
@@ -602,13 +587,12 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		GUIRect& rect = *m_rects.at(idx);
 		rect.text = LUMIX_NEW(m_allocator, GUIText)(m_allocator);
 		rect.text->font = m_font_manager->getDefaultFont();
-		ComponentHandle cmp = {entity.index};
-		m_universe.onComponentCreated(entity, GUI_TEXT_TYPE, this, cmp);
-		return cmp;
+
+		m_universe.onComponentCreated(entity, GUI_TEXT_TYPE, this);
 	}
 
 
-	ComponentHandle createImage(Entity entity)
+	void createImage(Entity entity)
 	{
 		int idx = m_rects.find(entity);
 		if (idx < 0)
@@ -618,9 +602,8 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		}
 		GUIRect& rect = *m_rects.at(idx);
 		rect.image = LUMIX_NEW(m_allocator, GUIImage);
-		ComponentHandle cmp = {entity.index};
-		m_universe.onComponentCreated(entity, GUI_IMAGE_TYPE, this, cmp);
-		return cmp;
+
+		m_universe.onComponentCreated(entity, GUI_IMAGE_TYPE, this);
 	}
 
 
@@ -640,9 +623,8 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	}
 
 
-	void destroyRect(ComponentHandle component)
+	void destroyRect(Entity entity)
 	{
-		Entity entity = {component.index};
 		GUIRect* rect = m_rects[entity];
 		rect->flags.set(GUIRect::IS_VALID, false);
 		if (rect->image == nullptr && rect->text == nullptr)
@@ -655,27 +637,25 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		{
 			m_root = findRoot();
 		}
-		m_universe.onComponentDestroyed(entity, GUI_RECT_TYPE, this, component);
+		m_universe.onComponentDestroyed(entity, GUI_RECT_TYPE, this);
 	}
 
 
-	void destroyImage(ComponentHandle component)
+	void destroyImage(Entity entity)
 	{
-		Entity entity = {component.index};
 		GUIRect* rect = m_rects[entity];
 		LUMIX_DELETE(m_allocator, rect->image);
 		rect->image = nullptr;
-		m_universe.onComponentDestroyed(entity, GUI_IMAGE_TYPE, this, component);
+		m_universe.onComponentDestroyed(entity, GUI_IMAGE_TYPE, this);
 	}
 
 
-	void destroyText(ComponentHandle component)
+	void destroyText(Entity entity)
 	{
-		Entity entity = { component.index };
 		GUIRect* rect = m_rects[entity];
 		LUMIX_DELETE(m_allocator, rect->text);
 		rect->text = nullptr;
-		m_universe.onComponentDestroyed(entity, GUI_TEXT_TYPE, this, component);
+		m_universe.onComponentDestroyed(entity, GUI_TEXT_TYPE, this);
 	}
 
 
@@ -725,7 +705,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 			m_rects.insert(rect->entity, rect);
 			if (rect->flags.isSet(GUIRect::IS_VALID))
 			{
-				m_universe.onComponentCreated(rect->entity, GUI_RECT_TYPE, this, {rect->entity.index});
+				m_universe.onComponentCreated(rect->entity, GUI_RECT_TYPE, this);
 			}
 
 			bool has_image = serializer.read<bool>();
@@ -733,7 +713,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 			{
 				rect->image = LUMIX_NEW(m_allocator, GUIImage);
 				serializer.read(rect->image->color);
-				m_universe.onComponentCreated(rect->entity, GUI_IMAGE_TYPE, this, {rect->entity.index});
+				m_universe.onComponentCreated(rect->entity, GUI_IMAGE_TYPE, this);
 
 			}
 			bool has_text = serializer.read<bool>();
@@ -756,36 +736,12 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 					text.font_resource = (FontResource*)m_font_manager->load(Path(tmp));
 					text.font = text.font_resource->addRef(text.font_size);
 				}
-				m_universe.onComponentCreated(rect->entity, GUI_TEXT_TYPE, this, {rect->entity.index});
+				m_universe.onComponentCreated(rect->entity, GUI_TEXT_TYPE, this);
 			}
 		}
 		m_root = findRoot();
 	}
 
-
-	ComponentHandle getComponent(Entity entity, ComponentType type) override
-	{
-		if (type == GUI_TEXT_TYPE)
-		{
-			int idx = m_rects.find(entity);
-			if (idx < 0) return INVALID_COMPONENT;
-			if (!m_rects.at(idx)->text) return INVALID_COMPONENT;
-			return {entity.index};
-		}
-		if (type == GUI_RECT_TYPE)
-		{
-			if (m_rects.find(entity) < 0) return INVALID_COMPONENT;
-			return {entity.index};
-		}
-		if (type == GUI_IMAGE_TYPE)
-		{
-			int idx = m_rects.find(entity);
-			if (idx < 0) return INVALID_COMPONENT;
-			if (!m_rects.at(idx)->image) return INVALID_COMPONENT;
-			return {entity.index};
-		}
-		return INVALID_COMPONENT;
-	}
 
 	Universe& getUniverse() override { return m_universe; }
 	IPlugin& getPlugin() const override { return m_system; }

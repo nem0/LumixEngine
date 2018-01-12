@@ -18,7 +18,7 @@ namespace Lumix
 	{
 	public:
 		typedef Array<Sphere> InputSpheres;
-		typedef Array<ComponentHandle> Subresults;
+		typedef Array<Entity> Subresults;
 		typedef Array<Subresults> Results;
 
 		CullingSystem() { }
@@ -32,16 +32,16 @@ namespace Lumix
 
 		virtual Results& cull(const Frustum& frustum, u64 layer_mask) = 0;
 
-		virtual bool isAdded(ComponentHandle model_instance) = 0;
-		virtual void addStatic(ComponentHandle model_instance, const Sphere& sphere, u64 layer_mask) = 0;
-		virtual void removeStatic(ComponentHandle model_instance) = 0;
+		virtual bool isAdded(Entity model_instance) = 0;
+		virtual void addStatic(Entity model_instance, const Sphere& sphere, u64 layer_mask) = 0;
+		virtual void removeStatic(Entity model_instance) = 0;
 
-		virtual void setLayerMask(ComponentHandle model_instance, u64 layer) = 0;
-		virtual u64 getLayerMask(ComponentHandle model_instance) = 0;
+		virtual void setLayerMask(Entity model_instance, u64 layer) = 0;
+		virtual u64 getLayerMask(Entity model_instance) = 0;
 
-		virtual void updateBoundingSphere(const Sphere& sphere, ComponentHandle model_instance) = 0;
+		virtual void updateBoundingSphere(const Sphere& sphere, Entity model_instance) = 0;
 
-		virtual void insert(const InputSpheres& spheres, const Array<ComponentHandle>& model_instances) = 0;
-		virtual const Sphere& getSphere(ComponentHandle model_instance) = 0;
+		virtual void insert(const InputSpheres& spheres, const Array<Entity>& model_instances) = 0;
+		virtual const Sphere& getSphere(Entity model_instance) = 0;
 	};
 } // ~namespace Lux

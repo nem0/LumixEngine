@@ -32,14 +32,13 @@ public:
 	virtual ~RenderInterface() {}
 
 	virtual AABB getEntityAABB(Universe& universe, Entity entity) = 0;
-	virtual float getCameraFOV(ComponentHandle cmp) = 0;
-	virtual bool isCameraOrtho(ComponentHandle cmp) = 0;
-	virtual float getCameraOrthoSize(ComponentHandle cmp) = 0;
-	virtual Vec2 getCameraScreenSize(ComponentHandle cmp) = 0;
-	virtual ComponentHandle getCameraInSlot(const char* slot) = 0;
-	virtual void setCameraSlot(ComponentHandle cmp, const char* slot) = 0;
-	virtual Entity getCameraEntity(ComponentHandle cmp) = 0;
-	virtual void getRay(ComponentHandle camera_index, const Vec2& screen_pos, Vec3& origin, Vec3& dir) = 0;
+	virtual float getCameraFOV(Entity entity) = 0;
+	virtual bool isCameraOrtho(Entity entity) = 0;
+	virtual float getCameraOrthoSize(Entity entity) = 0;
+	virtual Vec2 getCameraScreenSize(Entity entity) = 0;
+	virtual Entity getCameraInSlot(const char* slot) = 0;
+	virtual void setCameraSlot(Entity entity, const char* slot) = 0;
+	virtual void getRay(Entity entity, const Vec2& screen_pos, Vec3& origin, Vec3& dir) = 0;
 	virtual float castRay(ModelHandle model, const Vec3& origin, const Vec3& dir, const Matrix& mtx, const Pose* pose) = 0;
 	virtual void renderModel(ModelHandle model, const Matrix& mtx) = 0;
 	virtual ModelHandle loadModel(Path& path) = 0;
@@ -53,8 +52,8 @@ public:
 	virtual void addDebugCube(const Vec3& minimum, const Vec3& maximum, u32 color, float life) = 0;
 	virtual void addDebugCross(const Vec3& pos, float size, u32 color, float life) = 0;
 	virtual void addDebugLine(const Vec3& from, const Vec3& to, u32 color, float life) = 0;
-	virtual WorldEditor::RayHit castRay(const Vec3& origin, const Vec3& dir, ComponentHandle ignored) = 0;
-	virtual Path getModelInstancePath(ComponentHandle cmp) = 0;
+	virtual WorldEditor::RayHit castRay(const Vec3& origin, const Vec3& dir, Entity ignored) = 0;
+	virtual Path getModelInstancePath(Entity entity) = 0;
 	virtual void render(const Matrix& mtx,
 		u16* indices,
 		int indices_count,
@@ -66,8 +65,8 @@ public:
 	virtual void addText2D(float x, float y, float font_size, u32 color, const char* text) = 0;
 	virtual void addRect2D(const Vec2& a, const Vec2& b, u32 color) = 0;
 	virtual void addRectFilled2D(const Vec2& a, const Vec2& b, u32 color) = 0;
-	virtual void getModelInstaces(Array<Entity>& entity, const Frustum& frustum, const Vec3& lod_ref_point, ComponentHandle camera) = 0;
-	virtual Frustum getFrustum(ComponentHandle camera_cmp, const Vec2& a, const Vec2& b) = 0;
+	virtual void getModelInstaces(Array<Entity>& entity, const Frustum& frustum, const Vec3& lod_ref_point, Entity camera) = 0;
+	virtual Frustum getFrustum(Entity camera, const Vec2& a, const Vec2& b) = 0;
 	virtual Vec2 worldToScreenPixels(const Vec3& world) = 0;
 };
 

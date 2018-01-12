@@ -140,11 +140,10 @@ void getEntityListDisplayName(WorldEditor& editor, char* buf, int max_size, Enti
 	}
 	const char* name = editor.getUniverse()->getEntityName(entity);
 	static const auto MODEL_INSTANCE_TYPE = Reflection::getComponentType("renderable");
-	ComponentHandle model_instance = editor.getUniverse()->getComponent(entity, MODEL_INSTANCE_TYPE).handle;
-	if (model_instance.isValid())
+	if (editor.getUniverse()->hasComponent(entity, MODEL_INSTANCE_TYPE))
 	{
 		auto* render_interface = editor.getRenderInterface();
-		auto path = render_interface->getModelInstancePath(model_instance);
+		auto path = render_interface->getModelInstancePath(entity);
 		if (path.isValid())
 		{
 			char basename[MAX_PATH_LENGTH];

@@ -27,7 +27,6 @@ namespace Lumix
 		virtual IPlugin& getPlugin() const = 0;
 		virtual void update(float time_delta, bool paused) = 0;
 		virtual void lateUpdate(float time_delta, bool paused) {}
-		virtual ComponentHandle getComponent(Entity entity, ComponentType type) = 0;
 		virtual Universe& getUniverse() = 0;
 		virtual void startGame() {}
 		virtual void stopGame() {}

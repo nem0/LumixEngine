@@ -254,165 +254,70 @@ public:
 	}
 
 
-	void resetParticleEmitter(ComponentHandle cmp) override
+	void resetParticleEmitter(Entity entity) override
 	{
-		m_particle_emitters[{cmp.index}]->reset();
+		m_particle_emitters[entity]->reset();
 	}
 
 
-	ParticleEmitter* getParticleEmitter(ComponentHandle cmp) override
+	ParticleEmitter* getParticleEmitter(Entity entity) override
 	{
-		return m_particle_emitters[{cmp.index}];
+		return m_particle_emitters[entity];
 	}
 
 
-	void updateEmitter(ComponentHandle cmp, float time_delta) override
+	void updateEmitter(Entity entity, float time_delta) override
 	{
-		m_particle_emitters[{cmp.index}]->update(time_delta);
+		m_particle_emitters[entity]->update(time_delta);
 	}
 
 
 	Universe& getUniverse() override { return m_universe; }
 
 
-	ComponentHandle getComponent(Entity entity, ComponentType type) override
-	{
-		if (type == MODEL_INSTANCE_TYPE)
-		{
-			if (entity.index >= m_model_instances.size()) return INVALID_COMPONENT;
-			ComponentHandle cmp = {entity.index};
-			return m_model_instances[entity.index].entity.isValid() ? cmp : INVALID_COMPONENT;
-		}
-		if (type == ENVIRONMENT_PROBE_TYPE)
-		{
-			int index = m_environment_probes.find(entity);
-			if (index < 0) return INVALID_COMPONENT;
-			return {entity.index};
-		}
-		if (type == DECAL_TYPE)
-		{
-			int index = m_decals.find(entity);
-			if (index < 0) return INVALID_COMPONENT;
-			return {entity.index};
-		}
-		if (type == POINT_LIGHT_TYPE)
-		{
-			for (auto& i : m_point_lights)
-			{
-				if (i.m_entity == entity) return {entity.index};
-			}
-			return INVALID_COMPONENT;
-		}
-		if (type == GLOBAL_LIGHT_TYPE)
-		{
-			auto iter = m_global_lights.find(entity);
-			if (iter.isValid()) return {entity.index};
-			return INVALID_COMPONENT;
-		}
-		if (type == CAMERA_TYPE)
-		{
-			auto iter = m_cameras.find(entity);
-			ComponentHandle cmp = {entity.index};
-			return iter.isValid() ? cmp : INVALID_COMPONENT;
-		}
-		if (type == TERRAIN_TYPE)
-		{
-			auto iter = m_terrains.find(entity);
-			if (!iter.isValid()) return INVALID_COMPONENT;
-			return {entity.index};
-		}
-		if (type == PARTICLE_EMITTER_TYPE)
-		{
-			int index = m_particle_emitters.find(entity);
-			if (index < 0) return INVALID_COMPONENT;
-			if (m_particle_emitters.at(index)->m_is_valid) return {entity.index};
-			return INVALID_COMPONENT;
-		}
-		if (type == SCRIPTED_PARTICLE_EMITTER_TYPE)
-		{
-			int index = m_scripted_particle_emitters.find(entity);
-			if (index < 0) return INVALID_COMPONENT;
-			return {entity.index};
-		}
-		if (type == BONE_ATTACHMENT_TYPE)
-		{
-			for (auto& attachment : m_bone_attachments)
-			{
-				if (attachment.entity == entity)
-				{
-					return {entity.index};
-				}
-			}
-			return INVALID_COMPONENT;
-		}
-
-		static const ComponentType EMITTER_MODULES[] = {ParticleEmitter::AttractorModule::s_type,
-			ParticleEmitter::AlphaModule::s_type,
-			ParticleEmitter::ForceModule::s_type,
-			ParticleEmitter::LinearMovementModule::s_type,
-			ParticleEmitter::PlaneModule::s_type,
-			ParticleEmitter::RandomRotationModule::s_type,
-			ParticleEmitter::SizeModule::s_type,
-			ParticleEmitter::SubimageModule::s_type,
-			ParticleEmitter::SpawnShapeModule::s_type};
-
-		for (auto& module : EMITTER_MODULES)
-		{
-			if (module == type)
-			{
-				int index = m_particle_emitters.find(entity);
-				if (index < 0) return INVALID_COMPONENT;
-				auto* emitter = m_particle_emitters.at(index);
-
-				if (emitter->getModule(type)) return {entity.index};
-				return INVALID_COMPONENT;
-			}
-		}
-		return INVALID_COMPONENT;
-	}
-
-
 	IPlugin& getPlugin() const override { return m_renderer; }
 
 
-	Int2 getParticleEmitterSpawnCount(ComponentHandle cmp) override
+	Int2 getParticleEmitterSpawnCount(Entity entity) override
 	{
 		Int2 ret;
-		ret.x = m_particle_emitters[{cmp.index}]->m_spawn_count.from;
-		ret.y = m_particle_emitters[{cmp.index}]->m_spawn_count.to;
+		ParticleEmitter* emitter = m_particle_emitters[entity];
+		ret.x = emitter->m_spawn_count.from;
+		ret.y = emitter->m_spawn_count.to;
 		return ret;
 	}
 
 
-	void setParticleEmitterSpawnCount(ComponentHandle cmp, const Int2& value) override
+	void setParticleEmitterSpawnCount(Entity entity, const Int2& value) override
 	{
-		m_particle_emitters[{cmp.index}]->m_spawn_count.from = value.x;
-		m_particle_emitters[{cmp.index}]->m_spawn_count.to = Math::maximum(value.x, value.y);
+		ParticleEmitter* emitter = m_particle_emitters[entity];
+		emitter->m_spawn_count.from = value.x;
+		emitter->m_spawn_count.to = Math::maximum(value.x, value.y);
 	}
 
 
 
-	void getRay(ComponentHandle camera_index,
+	void getRay(Entity camera_entity,
 		const Vec2& screen_pos,
 		Vec3& origin,
 		Vec3& dir) override
 	{
-		Camera& camera = m_cameras[{camera_index.index}];
-		origin = m_universe.getPosition(camera.entity);
+		Camera& camera = m_cameras[camera_entity];
+		origin = m_universe.getPosition(camera_entity);
 
 		float width = camera.screen_width;
 		float height = camera.screen_height;
 		if (width <= 0 || height <= 0)
 		{
-			dir = m_universe.getRotation(camera.entity).rotate(Vec3(0, 0, 1));
+			dir = m_universe.getRotation(camera_entity).rotate(Vec3(0, 0, 1));
 			return;
 		}
 
 		float nx = 2 * (screen_pos.x / width) - 1;
 		float ny = 2 * ((height - screen_pos.y) / height) - 1;
 
-		Matrix projection_matrix = getCameraProjection(camera_index);
-		Matrix view_matrix = m_universe.getMatrix(camera.entity);
+		Matrix projection_matrix = getCameraProjection(camera_entity);
+		Matrix view_matrix = m_universe.getMatrix(camera_entity);
 
 		if (camera.is_ortho)
 		{
@@ -434,10 +339,10 @@ public:
 	}
 
 
-	Frustum getCameraFrustum(ComponentHandle cmp) const override
+	Frustum getCameraFrustum(Entity entity) const override
 	{
-		const Camera& camera = m_cameras[{cmp.index}];
-		Matrix mtx = m_universe.getMatrix(camera.entity);
+		const Camera& camera = m_cameras[entity];
+		Matrix mtx = m_universe.getMatrix(entity);
 		Frustum ret;
 		float ratio = camera.screen_height > 0 ? camera.screen_width / camera.screen_height : 1;
 		if (camera.is_ortho)
@@ -463,10 +368,10 @@ public:
 	}
 
 
-	Frustum getCameraFrustum(ComponentHandle cmp, const Vec2& viewport_min_px, const Vec2& viewport_max_px) const override
+	Frustum getCameraFrustum(Entity entity, const Vec2& viewport_min_px, const Vec2& viewport_max_px) const override
 	{
-		const Camera& camera = m_cameras[{cmp.index}];
-		Matrix mtx = m_universe.getMatrix(camera.entity);
+		const Camera& camera = m_cameras[entity];
+		Matrix mtx = m_universe.getMatrix(entity);
 		Frustum ret;
 		float ratio = camera.screen_height > 0 ? camera.screen_width / camera.screen_height : 1;
 		Vec2 viewport_min = { viewport_min_px.x / camera.screen_width * 2 - 1, (1 - viewport_max_px.y / camera.screen_height) * 2 - 1 };
@@ -501,8 +406,9 @@ public:
 	void updateBoneAttachment(const BoneAttachment& bone_attachment)
 	{
 		if (!bone_attachment.parent_entity.isValid()) return;
-		ComponentHandle model_instance = getModelInstanceComponent(bone_attachment.parent_entity);
-		if (model_instance == INVALID_COMPONENT) return;
+		Entity model_instance = bone_attachment.parent_entity;
+		if (!model_instance.isValid()) return;
+		if (!m_universe.hasComponent(model_instance, MODEL_INSTANCE_TYPE)) return;
 		const Pose* parent_pose = lockPose(model_instance);
 		if (!parent_pose) return;
 
@@ -523,9 +429,9 @@ public:
 	}
 
 
-	Entity getBoneAttachmentParent(ComponentHandle cmp) override
+	Entity getBoneAttachmentParent(Entity entity) override
 	{
-		return m_bone_attachments[{cmp.index}].parent_entity;
+		return m_bone_attachments[entity].parent_entity;
 	}
 
 
@@ -533,8 +439,9 @@ public:
 	{
 		if (attachment.parent_entity == INVALID_ENTITY) return;
 		if (attachment.bone_index < 0) return;
-		ComponentHandle model_instance = getModelInstanceComponent(attachment.parent_entity);
-		if (model_instance == INVALID_COMPONENT) return;
+		Entity model_instance = attachment.parent_entity;
+		if (!model_instance.isValid()) return;
+		if (!m_universe.hasComponent(model_instance, MODEL_INSTANCE_TYPE)) return;
 		const Pose* pose = lockPose(model_instance);
 		if (!pose) return;
 		ASSERT(pose->is_absolute);
@@ -554,15 +461,15 @@ public:
 	}
 
 
-	Vec3 getBoneAttachmentPosition(ComponentHandle cmp) override
+	Vec3 getBoneAttachmentPosition(Entity entity) override
 	{
-		return m_bone_attachments[{cmp.index}].relative_transform.pos;
+		return m_bone_attachments[entity].relative_transform.pos;
 	}
 
 
-	void setBoneAttachmentPosition(ComponentHandle cmp, const Vec3& pos) override
+	void setBoneAttachmentPosition(Entity entity, const Vec3& pos) override
 	{
-		BoneAttachment& attachment = m_bone_attachments[{cmp.index}];
+		BoneAttachment& attachment = m_bone_attachments[entity];
 		attachment.relative_transform.pos = pos;
 		m_is_updating_attachments = true;
 		updateBoneAttachment(attachment);
@@ -570,15 +477,15 @@ public:
 	}
 
 
-	Vec3 getBoneAttachmentRotation(ComponentHandle cmp) override
+	Vec3 getBoneAttachmentRotation(Entity entity) override
 	{
-		return m_bone_attachments[{cmp.index}].relative_transform.rot.toEuler();
+		return m_bone_attachments[entity].relative_transform.rot.toEuler();
 	}
 
 
-	void setBoneAttachmentRotation(ComponentHandle cmp, const Vec3& rot) override
+	void setBoneAttachmentRotation(Entity entity, const Vec3& rot) override
 	{
-		BoneAttachment& attachment = m_bone_attachments[{cmp.index}];
+		BoneAttachment& attachment = m_bone_attachments[entity];
 		Vec3 euler = rot;
 		euler.x = Math::clamp(euler.x, -Math::PI * 0.5f, Math::PI * 0.5f);
 		attachment.relative_transform.rot.fromEuler(euler);
@@ -588,9 +495,9 @@ public:
 	}
 
 
-	void setBoneAttachmentRotationQuat(ComponentHandle cmp, const Quat& rot) override
+	void setBoneAttachmentRotationQuat(Entity entity, const Quat& rot) override
 	{
-		BoneAttachment& attachment = m_bone_attachments[{cmp.index}];
+		BoneAttachment& attachment = m_bone_attachments[entity];
 		attachment.relative_transform.rot = rot;
 		m_is_updating_attachments = true;
 		updateBoneAttachment(attachment);
@@ -598,23 +505,23 @@ public:
 	}
 
 
-	int getBoneAttachmentBone(ComponentHandle cmp) override
+	int getBoneAttachmentBone(Entity entity) override
 	{
-		return m_bone_attachments[{cmp.index}].bone_index;
+		return m_bone_attachments[entity].bone_index;
 	}
 
 
-	void setBoneAttachmentBone(ComponentHandle cmp, int value) override
+	void setBoneAttachmentBone(Entity entity, int value) override
 	{
-		BoneAttachment& ba = m_bone_attachments[{cmp.index}];
+		BoneAttachment& ba = m_bone_attachments[entity];
 		ba.bone_index = value;
 		updateRelativeMatrix(ba);
 	}
 
 
-	void setBoneAttachmentParent(ComponentHandle cmp, Entity entity) override
+	void setBoneAttachmentParent(Entity entity, Entity parent) override
 	{
-		BoneAttachment& ba = m_bone_attachments[{cmp.index}];
+		BoneAttachment& ba = m_bone_attachments[entity];
 		ba.parent_entity = entity;
 		if (entity.isValid() && entity.index < m_model_instances.size())
 		{
@@ -698,9 +605,9 @@ public:
 	}
 
 
-	void serializeModelInstance(ISerializer& serialize, ComponentHandle cmp)
+	void serializeModelInstance(ISerializer& serialize, Entity entity)
 	{
-		ModelInstance& r = m_model_instances[cmp.index];
+		ModelInstance& r = m_model_instances[entity.index];
 		ASSERT(r.entity != INVALID_ENTITY);
 
 		serialize.write("source", r.model ? r.model->getPath().c_str() : "");
@@ -764,11 +671,10 @@ public:
 			}
 		}
 
-		ComponentHandle cmp = {r.entity.index};
 		if (path[0] != 0)
 		{
 			auto* model = static_cast<Model*>(m_engine.getResourceManager().get(Model::TYPE)->load(Path(path)));
-			setModel(cmp, model);
+			setModel(r.entity, model);
 		}
 
 		int material_count;
@@ -780,17 +686,17 @@ public:
 			{
 				char path[MAX_PATH_LENGTH];
 				serializer.read(path, lengthOf(path));
-				setModelInstanceMaterial(cmp, j, Path(path));
+				setModelInstanceMaterial(r.entity, j, Path(path));
 			}
 		}
 
-		m_universe.onComponentCreated(r.entity, MODEL_INSTANCE_TYPE, this, cmp);
+		m_universe.onComponentCreated(r.entity, MODEL_INSTANCE_TYPE, this);
 	}
 
 
-	void serializeGlobalLight(ISerializer& serializer, ComponentHandle cmp)
+	void serializeGlobalLight(ISerializer& serializer, Entity entity)
 	{
-		GlobalLight& light = m_global_lights[{cmp.index}];
+		GlobalLight& light = m_global_lights[entity];
 		serializer.write("cascades", light.m_cascades);
 		serializer.write("diffuse_color", light.m_diffuse_color);
 		serializer.write("diffuse_intensity", light.m_diffuse_intensity);
@@ -809,7 +715,7 @@ public:
 		serializer.read(&light.m_cascades);
 		if (scene_version <= (int)RenderSceneVersion::GLOBAL_LIGHT_REFACTOR)
 		{
-			ComponentHandle dummy;
+			int dummy;
 			serializer.read(&dummy);
 		}
 		serializer.read(&light.m_diffuse_color);
@@ -827,15 +733,14 @@ public:
 		serializer.read(&light.m_fog_density);
 		serializer.read(&light.m_fog_height);
 		m_global_lights.insert(entity, light);
-		ComponentHandle cmp = {entity.index};
-		m_universe.onComponentCreated(light.m_entity, GLOBAL_LIGHT_TYPE, this, cmp);
-		m_active_global_light_cmp = cmp;
+		m_universe.onComponentCreated(light.m_entity, GLOBAL_LIGHT_TYPE, this);
+		m_active_global_light_entity = entity;
 	}
 	
 	
-	void serializePointLight(ISerializer& serializer, ComponentHandle cmp)
+	void serializePointLight(ISerializer& serializer, Entity entity)
 	{
-		PointLight& light = m_point_lights[m_point_lights_map[cmp]];
+		PointLight& light = m_point_lights[m_point_lights_map[entity]];
 		serializer.write("attenuation", light.m_attenuation_param);
 		serializer.write("cast_shadow", light.m_cast_shadows);
 		serializer.write("diffuse_color", light.m_diffuse_color);
@@ -857,7 +762,7 @@ public:
 		
 		if (scene_version <= (int)RenderSceneVersion::POINT_LIGHT_NO_COMPONENT)
 		{
-			ComponentHandle dummy;
+			int dummy;
 			serializer.read(&dummy);
 		}
 		serializer.read(&light.m_diffuse_color);
@@ -866,16 +771,15 @@ public:
 		serializer.read(&light.m_range);
 		serializer.read(&light.m_specular_color);
 		serializer.read(&light.m_specular_intensity);
-		ComponentHandle cmp = { light.m_entity.index };
-		m_point_lights_map.insert(cmp, m_point_lights.size() - 1);
+		m_point_lights_map.insert(light.m_entity, m_point_lights.size() - 1);
 
-		m_universe.onComponentCreated(light.m_entity, POINT_LIGHT_TYPE, this, cmp);
+		m_universe.onComponentCreated(light.m_entity, POINT_LIGHT_TYPE, this);
 	}
 
 
-	void serializeDecal(ISerializer& serializer, ComponentHandle cmp)
+	void serializeDecal(ISerializer& serializer, Entity entity)
 	{
-		const Decal& decal = m_decals[{cmp.index}];
+		const Decal& decal = m_decals[entity];
 		serializer.write("scale", decal.scale);
 		serializer.write("material", decal.material ? decal.material->getPath().c_str() : "");
 	}
@@ -891,13 +795,13 @@ public:
 		serializer.read(tmp, lengthOf(tmp));
 		decal.material = tmp[0] == '\0' ? nullptr : static_cast<Material*>(material_manager->load(Path(tmp)));
 		updateDecalInfo(decal);
-		m_universe.onComponentCreated(decal.entity, DECAL_TYPE, this, {decal.entity.index});
+		m_universe.onComponentCreated(decal.entity, DECAL_TYPE, this);
 	}
 
 
-	void serializeCamera(ISerializer& serialize, ComponentHandle cmp)
+	void serializeCamera(ISerializer& serialize, Entity entity)
 	{
-		Camera& camera = m_cameras[{cmp.index}];
+		Camera& camera = m_cameras[entity];
 		serialize.write("far", camera.far);
 		serialize.write("fov", camera.fov);
 		serialize.write("is_ortho", camera.is_ortho);
@@ -918,13 +822,13 @@ public:
 		serializer.read(&camera.near);
 		serializer.read(camera.slot, lengthOf(camera.slot));
 		m_cameras.insert(camera.entity, camera);
-		m_universe.onComponentCreated(camera.entity, CAMERA_TYPE, this, {camera.entity.index});
+		m_universe.onComponentCreated(camera.entity, CAMERA_TYPE, this);
 	}
 
 
-	void serializeBoneAttachment(ISerializer& serializer, ComponentHandle cmp) 
+	void serializeBoneAttachment(ISerializer& serializer, Entity entity) 
 	{
-		BoneAttachment& attachment = m_bone_attachments[{cmp.index}];
+		BoneAttachment& attachment = m_bone_attachments[entity];
 		serializer.write("bone_index", attachment.bone_index);
 		serializer.write("parent", attachment.parent_entity);
 		serializer.write("relative_transform", attachment.relative_transform);
@@ -938,8 +842,7 @@ public:
 		serializer.read(&bone_attachment.bone_index);
 		serializer.read(&bone_attachment.parent_entity);
 		serializer.read(&bone_attachment.relative_transform);
-		ComponentHandle cmp = {bone_attachment.entity.index};
-		m_universe.onComponentCreated(bone_attachment.entity, BONE_ATTACHMENT_TYPE, this, cmp);
+		m_universe.onComponentCreated(bone_attachment.entity, BONE_ATTACHMENT_TYPE, this);
 		Entity parent_entity = bone_attachment.parent_entity;
 		if (parent_entity.isValid() && parent_entity.index < m_model_instances.size())
 		{
@@ -949,9 +852,9 @@ public:
 	}
 
 
-	void serializeTerrain(ISerializer& serializer, ComponentHandle cmp)
+	void serializeTerrain(ISerializer& serializer, Entity entity)
 	{
-		Terrain* terrain = m_terrains[{cmp.index}];
+		Terrain* terrain = m_terrains[entity];
 		serializer.write("layer_mask", terrain->m_layer_mask);
 		serializer.write("scale", terrain->m_scale);
 		serializer.write("material", terrain->m_material ? terrain->m_material->getPath().c_str() : "");
@@ -994,12 +897,12 @@ public:
 			terrain->setGrassTypePath(terrain->m_grass_types.size() - 1, Path(tmp));
 		}
 
-		m_universe.onComponentCreated(entity, TERRAIN_TYPE, this, { entity.index });
+		m_universe.onComponentCreated(entity, TERRAIN_TYPE, this);
 	}
 
-	void serializeEnvironmentProbe(ISerializer& serializer, ComponentHandle cmp) 
+	void serializeEnvironmentProbe(ISerializer& serializer, Entity entity) 
 	{
-		serializer.write("guid", m_environment_probes[{cmp.index}].guid);
+		serializer.write("guid", m_environment_probes[entity].guid);
 	}
 
 
@@ -1026,13 +929,13 @@ public:
 		probe.radiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
 		probe.radiance->setFlag(BGFX_TEXTURE_MAG_ANISOTROPIC, true);
 
-		m_universe.onComponentCreated(entity, ENVIRONMENT_PROBE_TYPE, this, {entity.index});
+		m_universe.onComponentCreated(entity, ENVIRONMENT_PROBE_TYPE, this);
 	}
 
 
-	void serializeScriptedParticleEmitter(ISerializer& serializer, ComponentHandle cmp)
+	void serializeScriptedParticleEmitter(ISerializer& serializer, Entity entity)
 	{
-		ScriptedParticleEmitter* emitter = m_scripted_particle_emitters[{cmp.index}];
+		ScriptedParticleEmitter* emitter = m_scripted_particle_emitters[entity];
 		const Material* material = emitter->getMaterial();
 		serializer.write("material", material ? material->getPath().c_str() : "");
 	}
@@ -1050,13 +953,13 @@ public:
 		emitter->setMaterial(material);
 
 		m_scripted_particle_emitters.insert(entity, emitter);
-		m_universe.onComponentCreated(entity, SCRIPTED_PARTICLE_EMITTER_TYPE, this, {entity.index});
+		m_universe.onComponentCreated(entity, SCRIPTED_PARTICLE_EMITTER_TYPE, this);
 	}
 
 
-	void serializeParticleEmitter(ISerializer& serializer, ComponentHandle cmp)
+	void serializeParticleEmitter(ISerializer& serializer, Entity entity)
 	{
-		ParticleEmitter* emitter = m_particle_emitters[{cmp.index}];
+		ParticleEmitter* emitter = m_particle_emitters[entity];
 		serializer.write("autoemit", emitter->m_autoemit);
 		serializer.write("local_space", emitter->m_local_space);
 		serializer.write("spawn_period_from", emitter->m_spawn_period.from);
@@ -1096,12 +999,12 @@ public:
 		}
 
 		m_particle_emitters.insert(entity, emitter);
-		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_TYPE, this, {entity.index});
+		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_TYPE, this);
 	}
 
-	void serializeParticleEmitterAlpha(ISerializer& serializer, ComponentHandle cmp)
+	void serializeParticleEmitterAlpha(ISerializer& serializer, Entity entity)
 	{
-		ParticleEmitter* emitter = m_particle_emitters[{cmp.index}];
+		ParticleEmitter* emitter = m_particle_emitters[entity];
 		auto* module = (ParticleEmitter::AlphaModule*)emitter->getModule(PARTICLE_EMITTER_ALPHA_TYPE);
 		serializer.write("count", module->m_values.size());
 		for (Vec2 v : module->m_values)
@@ -1127,13 +1030,13 @@ public:
 		}
 		module->sample();
 		emitter->addModule(module);
-		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_ALPHA_TYPE, this, {entity.index});
+		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_ALPHA_TYPE, this);
 	}
 
 
-	void serializeParticleEmitterAttractor(ISerializer& serializer, ComponentHandle cmp)
+	void serializeParticleEmitterAttractor(ISerializer& serializer, Entity entity)
 	{
-		ParticleEmitter* emitter = m_particle_emitters[{cmp.index}];
+		ParticleEmitter* emitter = m_particle_emitters[entity];
 		auto* module = (ParticleEmitter::AttractorModule*)emitter->getModule(PARTICLE_EMITTER_ATTRACTOR_TYPE);
 		serializer.write("force", module->m_force);
 		serializer.write("count", module->m_count);
@@ -1155,12 +1058,12 @@ public:
 			serializer.read(&module->m_entities[i]);
 		}
 		emitter->addModule(module);
-		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_ATTRACTOR_TYPE, this, {entity.index});
+		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_ATTRACTOR_TYPE, this);
 	}
 
-	void serializeParticleEmitterForce(ISerializer& serializer, ComponentHandle cmp)
+	void serializeParticleEmitterForce(ISerializer& serializer, Entity entity)
 	{
-		ParticleEmitter* emitter = m_particle_emitters[{cmp.index}];
+		ParticleEmitter* emitter = m_particle_emitters[entity];
 		auto* module = (ParticleEmitter::ForceModule*)emitter->getModule(PARTICLE_EMITTER_FORCE_HASH);
 		serializer.write("acceleration", module->m_acceleration);
 	}
@@ -1172,13 +1075,13 @@ public:
 		auto* module = LUMIX_NEW(m_allocator, ParticleEmitter::ForceModule)(*emitter);
 		serializer.read(&module->m_acceleration);
 		emitter->addModule(module);
-		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_FORCE_HASH, this, {entity.index});
+		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_FORCE_HASH, this);
 	}
 
 
-	void serializeParticleEmitterLinearMovement(ISerializer& serializer, ComponentHandle cmp)
+	void serializeParticleEmitterLinearMovement(ISerializer& serializer, Entity entity)
 	{
-		ParticleEmitter* emitter = m_particle_emitters[{cmp.index}];
+		ParticleEmitter* emitter = m_particle_emitters[entity];
 		auto* module = (ParticleEmitter::LinearMovementModule*)emitter->getModule(PARTICLE_EMITTER_LINEAR_MOVEMENT_TYPE);
 		serializer.write("x_from", module->m_x.from);
 		serializer.write("x_to", module->m_x.to);
@@ -1200,13 +1103,13 @@ public:
 		serializer.read(&module->m_z.from);
 		serializer.read(&module->m_z.to);
 		emitter->addModule(module);
-		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_LINEAR_MOVEMENT_TYPE, this, {entity.index});
+		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_LINEAR_MOVEMENT_TYPE, this);
 	}
 
 
-	void serializeParticleEmitterPlane(ISerializer& serializer, ComponentHandle cmp)
+	void serializeParticleEmitterPlane(ISerializer& serializer, Entity entity)
 	{
-		ParticleEmitter* emitter = m_particle_emitters[{cmp.index}];
+		ParticleEmitter* emitter = m_particle_emitters[entity];
 		auto* module = (ParticleEmitter::PlaneModule*)emitter->getModule(PARTICLE_EMITTER_PLANE_TYPE);
 		serializer.write("bounce", module->m_bounce);
 		serializer.write("entities_count", module->m_count);
@@ -1228,12 +1131,12 @@ public:
 			serializer.read(&module->m_entities[i]);
 		}
 		emitter->addModule(module);
-		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_PLANE_TYPE, this, {entity.index});
+		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_PLANE_TYPE, this);
 	}
 
-	void serializeParticleEmitterSpawnShape(ISerializer& serializer, ComponentHandle cmp)
+	void serializeParticleEmitterSpawnShape(ISerializer& serializer, Entity entity)
 	{
-		ParticleEmitter* emitter = m_particle_emitters[{cmp.index}];
+		ParticleEmitter* emitter = m_particle_emitters[entity];
 		auto* module = (ParticleEmitter::SpawnShapeModule*)emitter->getModule(PARTICLE_EMITTER_SPAWN_SHAPE_TYPE);
 		serializer.write("shape", (u8)module->m_shape);
 		serializer.write("radius", module->m_radius);
@@ -1247,12 +1150,12 @@ public:
 		serializer.read((u8*)&module->m_shape);
 		serializer.read(&module->m_radius);
 		emitter->addModule(module);
-		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_SPAWN_SHAPE_TYPE, this, {entity.index});
+		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_SPAWN_SHAPE_TYPE, this);
 	}
 
-	void serializeParticleEmitterSize(ISerializer& serializer, ComponentHandle cmp)
+	void serializeParticleEmitterSize(ISerializer& serializer, Entity entity)
 	{
-		ParticleEmitter* emitter = m_particle_emitters[{cmp.index}];
+		ParticleEmitter* emitter = m_particle_emitters[entity];
 		auto* module = (ParticleEmitter::SizeModule*)emitter->getModule(PARTICLE_EMITTER_SIZE_TYPE);
 		serializer.write("count", module->m_values.size());
 		for (Vec2 v : module->m_values)
@@ -1278,11 +1181,11 @@ public:
 		}
 		module->sample();
 		emitter->addModule(module);
-		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_SIZE_TYPE, this, {entity.index});
+		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_SIZE_TYPE, this);
 	}
 
 
-	void serializeParticleEmitterRandomRotation(ISerializer& serialize, ComponentHandle cmp) {}
+	void serializeParticleEmitterRandomRotation(ISerializer& serialize, Entity entity) {}
 
 
 	void deserializeParticleEmitterRandomRotation(IDeserializer& serialize, Entity entity, int /*scene_version*/)
@@ -1290,13 +1193,13 @@ public:
 		ParticleEmitter* emitter = m_particle_emitters[entity];
 		auto* module = LUMIX_NEW(m_allocator, ParticleEmitter::RandomRotationModule)(*emitter);
 		emitter->addModule(module);
-		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_RANDOM_ROTATION_TYPE, this, {entity.index});
+		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_RANDOM_ROTATION_TYPE, this);
 	}
 
 
-	void serializeParticleEmitterSubimage(ISerializer& serializer, ComponentHandle cmp)
+	void serializeParticleEmitterSubimage(ISerializer& serializer, Entity entity)
 	{
-		ParticleEmitter* emitter = m_particle_emitters[{cmp.index}];
+		ParticleEmitter* emitter = m_particle_emitters[entity];
 		auto* module = (ParticleEmitter::SubimageModule*)emitter->getModule(PARTICLE_EMITTER_SUBIMAGE_TYPE);
 		serializer.write("rows", module->rows);
 		serializer.write("cols", module->cols);
@@ -1310,7 +1213,7 @@ public:
 		serializer.read(&module->rows);
 		serializer.read(&module->cols);
 		emitter->addModule(module);
-		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_SUBIMAGE_TYPE, this, {entity.index});
+		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_SUBIMAGE_TYPE, this);
 	}
 
 
@@ -1354,7 +1257,7 @@ public:
 		{
 			serializer.write(light);
 		}
-		serializer.write(m_active_global_light_cmp);
+		serializer.write(m_active_global_light_entity);
 	}
 
 	void serializeModelInstances(OutputBlob& serializer)
@@ -1407,7 +1310,7 @@ public:
 			decal.material = tmp[0] == '\0' ? nullptr : static_cast<Material*>(material_manager->load(Path(tmp)));
 			updateDecalInfo(decal);
 			m_decals.insert(decal.entity, decal);
-			m_universe.onComponentCreated(decal.entity, DECAL_TYPE, this, {decal.entity.index});
+			m_universe.onComponentCreated(decal.entity, DECAL_TYPE, this);
 		}
 	}
 
@@ -1464,8 +1367,7 @@ public:
 			probe.radiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
 			probe.radiance->setFlag(BGFX_TEXTURE_MAG_ANISOTROPIC, true);
 
-			ComponentHandle cmp = {entity.index};
-			m_universe.onComponentCreated(entity, ENVIRONMENT_PROBE_TYPE, this, cmp);
+			m_universe.onComponentCreated(entity, ENVIRONMENT_PROBE_TYPE, this);
 		}
 	}
 
@@ -1484,8 +1386,7 @@ public:
 			serializer.read(bone_attachment.parent_entity);
 			serializer.read(bone_attachment.relative_transform);
 			m_bone_attachments.insert(bone_attachment.entity, bone_attachment);
-			ComponentHandle cmp = {bone_attachment.entity.index};
-			m_universe.onComponentCreated(bone_attachment.entity, BONE_ATTACHMENT_TYPE, this, cmp);
+			m_universe.onComponentCreated(bone_attachment.entity, BONE_ATTACHMENT_TYPE, this);
 		}
 	}
 
@@ -1502,45 +1403,44 @@ public:
 			if (emitter->m_is_valid)
 			{
 				emitter->deserialize(serializer, m_engine.getResourceManager());
-				ComponentHandle cmp = {emitter->m_entity.index};
-				if (emitter->m_is_valid) m_universe.onComponentCreated(emitter->m_entity, PARTICLE_EMITTER_TYPE, this, cmp);
+				if (emitter->m_is_valid) m_universe.onComponentCreated(emitter->m_entity, PARTICLE_EMITTER_TYPE, this);
 				for (auto* module : emitter->m_modules)
 				{
 					if (module->getType() == ParticleEmitter::AlphaModule::s_type)
 					{
-						m_universe.onComponentCreated(emitter->m_entity, PARTICLE_EMITTER_ALPHA_TYPE, this, cmp);
+						m_universe.onComponentCreated(emitter->m_entity, PARTICLE_EMITTER_ALPHA_TYPE, this);
 					}
 					else if (module->getType() == ParticleEmitter::ForceModule::s_type)
 					{
-						m_universe.onComponentCreated(emitter->m_entity, PARTICLE_EMITTER_FORCE_HASH, this, cmp);
+						m_universe.onComponentCreated(emitter->m_entity, PARTICLE_EMITTER_FORCE_HASH, this);
 					}
 					else if (module->getType() == ParticleEmitter::SubimageModule::s_type)
 					{
-						m_universe.onComponentCreated(emitter->m_entity, PARTICLE_EMITTER_SUBIMAGE_TYPE, this, cmp);
+						m_universe.onComponentCreated(emitter->m_entity, PARTICLE_EMITTER_SUBIMAGE_TYPE, this);
 					}
 					else if (module->getType() == ParticleEmitter::SpawnShapeModule::s_type)
 					{
-						m_universe.onComponentCreated(emitter->m_entity, PARTICLE_EMITTER_SPAWN_SHAPE_TYPE, this, cmp);
+						m_universe.onComponentCreated(emitter->m_entity, PARTICLE_EMITTER_SPAWN_SHAPE_TYPE, this);
 					}
 					else if (module->getType() == ParticleEmitter::AttractorModule::s_type)
 					{
-						m_universe.onComponentCreated(emitter->m_entity, PARTICLE_EMITTER_ATTRACTOR_TYPE, this, cmp);
+						m_universe.onComponentCreated(emitter->m_entity, PARTICLE_EMITTER_ATTRACTOR_TYPE, this);
 					}
 					else if (module->getType() == ParticleEmitter::LinearMovementModule::s_type)
 					{
-						m_universe.onComponentCreated(emitter->m_entity, PARTICLE_EMITTER_LINEAR_MOVEMENT_TYPE, this, cmp);
+						m_universe.onComponentCreated(emitter->m_entity, PARTICLE_EMITTER_LINEAR_MOVEMENT_TYPE, this);
 					}
 					else if (module->getType() == ParticleEmitter::PlaneModule::s_type)
 					{
-						m_universe.onComponentCreated(emitter->m_entity, PARTICLE_EMITTER_PLANE_TYPE, this, cmp);
+						m_universe.onComponentCreated(emitter->m_entity, PARTICLE_EMITTER_PLANE_TYPE, this);
 					}
 					else if (module->getType() == ParticleEmitter::RandomRotationModule::s_type)
 					{
-						m_universe.onComponentCreated(emitter->m_entity, PARTICLE_EMITTER_RANDOM_ROTATION_TYPE, this, cmp);
+						m_universe.onComponentCreated(emitter->m_entity, PARTICLE_EMITTER_RANDOM_ROTATION_TYPE, this);
 					}
 					else if (module->getType() == ParticleEmitter::SizeModule::s_type)
 					{
-						m_universe.onComponentCreated(emitter->m_entity, PARTICLE_EMITTER_SIZE_TYPE, this, cmp);
+						m_universe.onComponentCreated(emitter->m_entity, PARTICLE_EMITTER_SIZE_TYPE, this);
 					}
 				}
 			}
@@ -1561,8 +1461,7 @@ public:
 			ScriptedParticleEmitter* emitter = LUMIX_NEW(m_allocator, ScriptedParticleEmitter)(INVALID_ENTITY, m_allocator);
 			emitter->deserialize(serializer, m_engine.getResourceManager());
 			m_scripted_particle_emitters.insert(emitter->m_entity, emitter);
-			ComponentHandle cmp = {emitter->m_entity.index};
-			m_universe.onComponentCreated(emitter->m_entity, SCRIPTED_PARTICLE_EMITTER_TYPE, this, cmp);
+			m_universe.onComponentCreated(emitter->m_entity, SCRIPTED_PARTICLE_EMITTER_TYPE, this);
 		}
 	}
 
@@ -1614,7 +1513,7 @@ public:
 			serializer.readString(camera.slot, lengthOf(camera.slot));
 
 			m_cameras.insert(camera.entity, camera);
-			m_universe.onComponentCreated(camera.entity, CAMERA_TYPE, this, {camera.entity.index});
+			m_universe.onComponentCreated(camera.entity, CAMERA_TYPE, this);
 		}
 	}
 
@@ -1642,11 +1541,10 @@ public:
 				u32 path;
 				serializer.read(path);
 
-				ComponentHandle cmp = { r.entity.index };
 				if (path != 0)
 				{
 					auto* model = static_cast<Model*>(m_engine.getResourceManager().get(Model::TYPE)->load(Path(path)));
-					setModel(cmp, model);
+					setModel(r.entity, model);
 				}
 
 				int material_count;
@@ -1658,11 +1556,11 @@ public:
 					{
 						char path[MAX_PATH_LENGTH];
 						serializer.readString(path, lengthOf(path));
-						setModelInstanceMaterial(cmp, j, Path(path));
+						setModelInstanceMaterial(r.entity, j, Path(path));
 					}
 				}
 
-				m_universe.onComponentCreated(r.entity, MODEL_INSTANCE_TYPE, this, cmp);
+				m_universe.onComponentCreated(r.entity, MODEL_INSTANCE_TYPE, this);
 			}
 		}
 	}
@@ -1677,10 +1575,9 @@ public:
 			m_light_influenced_geometry.emplace(m_allocator);
 			PointLight& light = m_point_lights[i];
 			serializer.read(light);
-			ComponentHandle cmp = { light.m_entity.index };
-			m_point_lights_map.insert(cmp, i);
+			m_point_lights_map.insert(light.m_entity, i);
 
-			m_universe.onComponentCreated(light.m_entity, POINT_LIGHT_TYPE, this, cmp);
+			m_universe.onComponentCreated(light.m_entity, POINT_LIGHT_TYPE, this);
 		}
 
 		serializer.read(size);
@@ -1689,9 +1586,9 @@ public:
 			GlobalLight light;
 			serializer.read(light);
 			m_global_lights.insert(light.m_entity, light);
-			m_universe.onComponentCreated(light.m_entity, GLOBAL_LIGHT_TYPE, this, {light.m_entity.index});
+			m_universe.onComponentCreated(light.m_entity, GLOBAL_LIGHT_TYPE, this);
 		}
-		serializer.read(m_active_global_light_cmp);
+		serializer.read(m_active_global_light_entity);
 	}
 
 	void deserializeTerrains(InputBlob& serializer)
@@ -1720,9 +1617,8 @@ public:
 	}
 
 
-	void destroyBoneAttachment(ComponentHandle component)
+	void destroyBoneAttachment(Entity entity)
 	{
-		Entity entity = {component.index};
 		const BoneAttachment& bone_attachment = m_bone_attachments[entity];
 		Entity parent_entity = bone_attachment.parent_entity;
 		if (parent_entity.isValid() && parent_entity.index < m_model_instances.size())
@@ -1731,30 +1627,29 @@ public:
 			mi.flags.unset(ModelInstance::IS_BONE_ATTACHMENT_PARENT);
 		}
 		m_bone_attachments.erase(entity);
-		m_universe.onComponentDestroyed(entity, BONE_ATTACHMENT_TYPE, this, component);
+		m_universe.onComponentDestroyed(entity, BONE_ATTACHMENT_TYPE, this);
 	}
 
 
-	void destroyEnvironmentProbe(ComponentHandle component)
+	void destroyEnvironmentProbe(Entity entity)
 	{
-		Entity entity = {component.index};
 		auto& probe = m_environment_probes[entity];
 		if (probe.texture) probe.texture->getResourceManager().unload(*probe.texture);
 		if (probe.irradiance) probe.irradiance->getResourceManager().unload(*probe.irradiance);
 		if (probe.radiance) probe.radiance->getResourceManager().unload(*probe.radiance);
 		m_environment_probes.erase(entity);
-		m_universe.onComponentDestroyed(entity, ENVIRONMENT_PROBE_TYPE, this, component);
+		m_universe.onComponentDestroyed(entity, ENVIRONMENT_PROBE_TYPE, this);
 	}
 
 
-	void destroyModelInstance(ComponentHandle component)
+	void destroyModelInstance(Entity entity)
 	{
 		for (int i = 0; i < m_light_influenced_geometry.size(); ++i)
 		{
-			Array<ComponentHandle>& influenced_geometry = m_light_influenced_geometry[i];
+			Array<Entity>& influenced_geometry = m_light_influenced_geometry[i];
 			for (int j = 0; j < influenced_geometry.size(); ++j)
 			{
-				if (influenced_geometry[j] == component)
+				if (influenced_geometry[j] == entity)
 				{
 					influenced_geometry.erase(j);
 					break;
@@ -1762,84 +1657,77 @@ public:
 			}
 		}
 
-		setModel(component, nullptr);
-		auto& model_instance = m_model_instances[component.index];
-		Entity entity = model_instance.entity;
+		setModel(entity, nullptr);
+		auto& model_instance = m_model_instances[entity.index];
 		LUMIX_DELETE(m_allocator, model_instance.pose);
 		model_instance.pose = nullptr;
 		model_instance.entity = INVALID_ENTITY;
-		m_universe.onComponentDestroyed(entity, MODEL_INSTANCE_TYPE, this, component);
+		m_universe.onComponentDestroyed(entity, MODEL_INSTANCE_TYPE, this);
 	}
 
 
-	void destroyGlobalLight(ComponentHandle component)
+	void destroyGlobalLight(Entity entity)
 	{
-		Entity entity = {component.index};
+		m_universe.onComponentDestroyed(entity, GLOBAL_LIGHT_TYPE, this);
 
-		m_universe.onComponentDestroyed(entity, GLOBAL_LIGHT_TYPE, this, component);
-
-		if (component == m_active_global_light_cmp)
+		if (entity == m_active_global_light_entity)
 		{
-			m_active_global_light_cmp = INVALID_COMPONENT;
+			m_active_global_light_entity = INVALID_ENTITY;
 		}
 		m_global_lights.erase(entity);
 	}
 
 
-	void destroyDecal(ComponentHandle component)
+	void destroyDecal(Entity entity)
 	{
-		Entity entity = {component.index};
 		m_decals.erase(entity);
-		m_universe.onComponentDestroyed(entity, DECAL_TYPE, this, component);
+		m_universe.onComponentDestroyed(entity, DECAL_TYPE, this);
 	}
 
 
-	void destroyPointLight(ComponentHandle component)
+	void destroyPointLight(Entity entity)
 	{
-		int index = m_point_lights_map[component];
-		Entity entity = m_point_lights[index].m_entity;
+		int index = m_point_lights_map[entity];
 		m_point_lights.eraseFast(index);
-		m_point_lights_map.erase(component);
+		m_point_lights_map.erase(entity);
 		m_light_influenced_geometry.eraseFast(index);
 		if (index < m_point_lights.size())
 		{
 			m_point_lights_map[{m_point_lights[index].m_entity.index}] = index;
 		}
-		m_universe.onComponentDestroyed(entity, POINT_LIGHT_TYPE, this, component);
+		m_universe.onComponentDestroyed(entity, POINT_LIGHT_TYPE, this);
 	}
 
 
-	void destroyCamera(ComponentHandle component)
+	void destroyCamera(Entity entity)
 	{
-		Entity entity = {component.index};
 		m_cameras.erase(entity);
-		m_universe.onComponentDestroyed(entity, CAMERA_TYPE, this, component);
+		m_universe.onComponentDestroyed(entity, CAMERA_TYPE, this);
 	}
 
 
-	void destroyTerrain(ComponentHandle component)
+	void destroyTerrain(Entity entity)
 	{
-		Entity entity = {component.index};
 		LUMIX_DELETE(m_allocator, m_terrains[entity]);
 		m_terrains.erase(entity);
-		m_universe.onComponentDestroyed(entity, TERRAIN_TYPE, this, component);
+		m_universe.onComponentDestroyed(entity, TERRAIN_TYPE, this);
 	}
 
 
-	void destroyParticleEmitter(ComponentHandle component)
+	void destroyParticleEmitter(Entity entity)
 	{
-		auto* emitter = m_particle_emitters[{component.index}];
+		auto* emitter = m_particle_emitters[entity];
 		emitter->reset();
 		emitter->m_is_valid = false;
-		m_universe.onComponentDestroyed(emitter->m_entity, PARTICLE_EMITTER_TYPE, this, component);
+		m_universe.onComponentDestroyed(emitter->m_entity, PARTICLE_EMITTER_TYPE, this);
 		cleanup(emitter);
 	}
 
 
-	void destroyScriptedParticleEmitter(ComponentHandle component)
+	void destroyScriptedParticleEmitter(Entity entity)
 	{
-		auto* emitter = m_scripted_particle_emitters[{component.index}];
-		m_universe.onComponentDestroyed(emitter->m_entity, SCRIPTED_PARTICLE_EMITTER_TYPE, this, component);
+		auto* emitter = m_scripted_particle_emitters[entity];
+		m_universe.onComponentDestroyed(emitter->m_entity, SCRIPTED_PARTICLE_EMITTER_TYPE, this);
 		m_scripted_particle_emitters.erase(emitter->m_entity);
 		LUMIX_DELETE(m_allocator, emitter);
 	}
@@ -1855,36 +1743,36 @@ public:
 	}
 
 
-	void destroyParticleEmitterAlpha(ComponentHandle component)
+	void destroyParticleEmitterAlpha(Entity entity)
 	{
-		auto* emitter = m_particle_emitters[{component.index}];
+		auto* emitter = m_particle_emitters[entity];
 		auto* module = emitter->getModule(PARTICLE_EMITTER_ALPHA_TYPE);
 		ASSERT(module);
 
 		LUMIX_DELETE(m_allocator, module);
 		emitter->m_modules.eraseItem(module);
-		m_universe.onComponentDestroyed(emitter->m_entity, PARTICLE_EMITTER_ALPHA_TYPE, this, component);
+		m_universe.onComponentDestroyed(emitter->m_entity, PARTICLE_EMITTER_ALPHA_TYPE, this);
 		cleanup(emitter);
 	}
 
 
-	void destroyParticleEmitterForce(ComponentHandle component)
+	void destroyParticleEmitterForce(Entity entity)
 	{
-		auto* emitter = m_particle_emitters[{component.index}];
+		auto* emitter = m_particle_emitters[entity];
 		auto* module = emitter->getModule(PARTICLE_EMITTER_FORCE_HASH);
 
 		ASSERT(module);
 
 		LUMIX_DELETE(m_allocator, module);
 		emitter->m_modules.eraseItem(module);
-		m_universe.onComponentDestroyed(emitter->m_entity, PARTICLE_EMITTER_FORCE_HASH, this, component);
+		m_universe.onComponentDestroyed(emitter->m_entity, PARTICLE_EMITTER_FORCE_HASH, this);
 		cleanup(emitter);
 	}
 
 
-	void destroyParticleEmitterSubimage(ComponentHandle component)
+	void destroyParticleEmitterSubimage(Entity entity)
 	{
-		auto* emitter = m_particle_emitters[{component.index}];
+		auto* emitter = m_particle_emitters[entity];
 		auto* module = emitter->getModule(PARTICLE_EMITTER_SUBIMAGE_TYPE);
 
 		ASSERT(module);
@@ -1892,43 +1780,43 @@ public:
 		LUMIX_DELETE(m_allocator, module);
 		emitter->m_modules.eraseItem(module);
 		emitter->m_subimage_module = nullptr;
-		m_universe.onComponentDestroyed(emitter->m_entity, PARTICLE_EMITTER_SUBIMAGE_TYPE, this, component);
+		m_universe.onComponentDestroyed(emitter->m_entity, PARTICLE_EMITTER_SUBIMAGE_TYPE, this);
 		cleanup(emitter);
 	}
 
 
-	void destroyParticleEmitterAttractor(ComponentHandle component)
+	void destroyParticleEmitterAttractor(Entity entity)
 	{
-		auto* emitter = m_particle_emitters[{component.index}];
+		auto* emitter = m_particle_emitters[entity];
 		auto* module = emitter->getModule(PARTICLE_EMITTER_ATTRACTOR_TYPE);
 
 		ASSERT(module);
 
 		LUMIX_DELETE(m_allocator, module);
 		emitter->m_modules.eraseItem(module);
-		m_universe.onComponentDestroyed(emitter->m_entity, PARTICLE_EMITTER_ATTRACTOR_TYPE, this, component);
+		m_universe.onComponentDestroyed(emitter->m_entity, PARTICLE_EMITTER_ATTRACTOR_TYPE, this);
 		cleanup(emitter);
 	}
 
 
-	void destroyParticleEmitterSize(ComponentHandle component)
+	void destroyParticleEmitterSize(Entity entity)
 	{
-		auto* emitter = m_particle_emitters[{component.index}];
+		auto* emitter = m_particle_emitters[entity];
 		auto* module = emitter->getModule(PARTICLE_EMITTER_SIZE_TYPE);
 
 		ASSERT(module);
 
 		LUMIX_DELETE(m_allocator, module);
 		emitter->m_modules.eraseItem(module);
-		m_universe.onComponentDestroyed(emitter->m_entity, PARTICLE_EMITTER_SIZE_TYPE, this, component);
+		m_universe.onComponentDestroyed(emitter->m_entity, PARTICLE_EMITTER_SIZE_TYPE, this);
 		cleanup(emitter);
 
 	}
 
 
-	float getParticleEmitterPlaneBounce(ComponentHandle cmp) override
+	float getParticleEmitterPlaneBounce(Entity entity) override
 	{
-		auto* emitter = m_particle_emitters[{cmp.index}];
+		auto* emitter = m_particle_emitters[entity];
 		for(auto* module : emitter->m_modules)
 		{
 			if(module->getType() == ParticleEmitter::PlaneModule::s_type)
@@ -1940,9 +1828,9 @@ public:
 	}
 
 
-	void setParticleEmitterPlaneBounce(ComponentHandle cmp, float value) override
+	void setParticleEmitterPlaneBounce(Entity entity, float value) override
 	{
-		auto* emitter = m_particle_emitters[{cmp.index}];
+		auto* emitter = m_particle_emitters[entity];
 		for (auto* module : emitter->m_modules)
 		{
 			if (module->getType() == ParticleEmitter::PlaneModule::s_type)
@@ -1954,9 +1842,9 @@ public:
 	}
 
 
-	float getParticleEmitterAttractorForce(ComponentHandle cmp) override
+	float getParticleEmitterAttractorForce(Entity entity) override
 	{
-		auto* emitter = m_particle_emitters[{cmp.index}];
+		auto* emitter = m_particle_emitters[entity];
 		for (auto* module : emitter->m_modules)
 		{
 			if (module->getType() == ParticleEmitter::AttractorModule::s_type)
@@ -1968,9 +1856,9 @@ public:
 	}
 
 
-	void setParticleEmitterAttractorForce(ComponentHandle cmp, float value) override
+	void setParticleEmitterAttractorForce(Entity entity, float value) override
 	{
-		auto* emitter = m_particle_emitters[{cmp.index}];
+		auto* emitter = m_particle_emitters[entity];
 		for (auto* module : emitter->m_modules)
 		{
 			if (module->getType() == ParticleEmitter::AttractorModule::s_type)
@@ -1982,71 +1870,71 @@ public:
 	}
 
 
-	void destroyParticleEmitterPlane(ComponentHandle component)
+	void destroyParticleEmitterPlane(Entity entity)
 	{
-		auto* emitter = m_particle_emitters[{component.index}];
+		auto* emitter = m_particle_emitters[entity];
 		auto* module = emitter->getModule(PARTICLE_EMITTER_PLANE_TYPE);
 
 		ASSERT(module);
 
 		LUMIX_DELETE(m_allocator, module);
 		emitter->m_modules.eraseItem(module);
-		m_universe.onComponentDestroyed(emitter->m_entity, PARTICLE_EMITTER_PLANE_TYPE, this, component);
+		m_universe.onComponentDestroyed(emitter->m_entity, PARTICLE_EMITTER_PLANE_TYPE, this);
 		cleanup(emitter);
 	}
 
 
-	void destroyParticleEmitterLinearMovement(ComponentHandle component)
+	void destroyParticleEmitterLinearMovement(Entity entity)
 	{
-		auto* emitter = m_particle_emitters[{component.index}];
+		auto* emitter = m_particle_emitters[entity];
 		auto* module = emitter->getModule(PARTICLE_EMITTER_LINEAR_MOVEMENT_TYPE);
 
 		ASSERT(module);
 
 		LUMIX_DELETE(m_allocator, module);
 		emitter->m_modules.eraseItem(module);
-		m_universe.onComponentDestroyed(emitter->m_entity, PARTICLE_EMITTER_LINEAR_MOVEMENT_TYPE, this, component);
+		m_universe.onComponentDestroyed(emitter->m_entity, PARTICLE_EMITTER_LINEAR_MOVEMENT_TYPE, this);
 		cleanup(emitter);
 	}
 
 
-	void destroyParticleEmitterSpawnShape(ComponentHandle component)
+	void destroyParticleEmitterSpawnShape(Entity entity)
 	{
-		auto* emitter = m_particle_emitters[{component.index}];
+		auto* emitter = m_particle_emitters[entity];
 		auto* module = emitter->getModule(PARTICLE_EMITTER_SPAWN_SHAPE_TYPE);
 
 		ASSERT(module);
 
 		LUMIX_DELETE(m_allocator, module);
 		emitter->m_modules.eraseItem(module);
-		m_universe.onComponentDestroyed(emitter->m_entity, PARTICLE_EMITTER_SPAWN_SHAPE_TYPE, this, component);
+		m_universe.onComponentDestroyed(emitter->m_entity, PARTICLE_EMITTER_SPAWN_SHAPE_TYPE, this);
 		cleanup(emitter);
 
 	}
 
 
-	void destroyParticleEmitterRandomRotation(ComponentHandle component)
+	void destroyParticleEmitterRandomRotation(Entity entity)
 	{
-		auto* emitter = m_particle_emitters[{component.index}];
+		auto* emitter = m_particle_emitters[entity];
 		auto* module = emitter->getModule(PARTICLE_EMITTER_RANDOM_ROTATION_TYPE);
 
 		ASSERT(module);
 
 		LUMIX_DELETE(m_allocator, module);
 		emitter->m_modules.eraseItem(module);
-		m_universe.onComponentDestroyed(emitter->m_entity, PARTICLE_EMITTER_RANDOM_ROTATION_TYPE, this, component);
+		m_universe.onComponentDestroyed(emitter->m_entity, PARTICLE_EMITTER_RANDOM_ROTATION_TYPE, this);
 		cleanup(emitter);
 
 	}
 
 
-	void setParticleEmitterAlpha(ComponentHandle cmp, const Vec2* values, int count) override
+	void setParticleEmitterAlpha(Entity entity, const Vec2* values, int count) override
 	{
 		ASSERT(count > 0);
 		ASSERT(values[1].x < 0.001f);
 		ASSERT(values[count - 2].x > 0.999f);
 
-		auto* alpha_module = getEmitterModule<ParticleEmitter::AlphaModule>(cmp);
+		auto* alpha_module = getEmitterModule<ParticleEmitter::AlphaModule>(entity);
 		if (!alpha_module) return;
 
 		alpha_module->m_values.resize(count);
@@ -2058,93 +1946,93 @@ public:
 	}
 
 
-	void setParticleEmitterSubimageRows(ComponentHandle cmp, const int& value) override
+	void setParticleEmitterSubimageRows(Entity entity, const int& value) override
 	{
-		auto* module = getEmitterModule<ParticleEmitter::SubimageModule>(cmp);
+		auto* module = getEmitterModule<ParticleEmitter::SubimageModule>(entity);
 		if (module) module->rows = value;
 	}
 
 
-	void setParticleEmitterSubimageCols(ComponentHandle cmp, const int& value) override
+	void setParticleEmitterSubimageCols(Entity entity, const int& value) override
 	{
-		auto* module = getEmitterModule<ParticleEmitter::SubimageModule>(cmp);
+		auto* module = getEmitterModule<ParticleEmitter::SubimageModule>(entity);
 		if (module) module->cols = value;
 	}
 
 
-	int getParticleEmitterSubimageRows(ComponentHandle cmp) override
+	int getParticleEmitterSubimageRows(Entity entity) override
 	{
-		auto* module = getEmitterModule<ParticleEmitter::SubimageModule>(cmp);
+		auto* module = getEmitterModule<ParticleEmitter::SubimageModule>(entity);
 		return module ? module->rows : 1;
 	}
 
 
-	int getParticleEmitterSubimageCols(ComponentHandle cmp) override
+	int getParticleEmitterSubimageCols(Entity entity) override
 	{
-		auto* module = getEmitterModule<ParticleEmitter::SubimageModule>(cmp);
+		auto* module = getEmitterModule<ParticleEmitter::SubimageModule>(entity);
 		return module ? module->cols : 1;
 	}
 
 
-	void setParticleEmitterAcceleration(ComponentHandle cmp, const Vec3& value) override
+	void setParticleEmitterAcceleration(Entity entity, const Vec3& value) override
 	{
-		auto* module = getEmitterModule<ParticleEmitter::ForceModule>(cmp);
+		auto* module = getEmitterModule<ParticleEmitter::ForceModule>(entity);
 		if (module) module->m_acceleration = value;
 	}
 
 
-	void setParticleEmitterAutoemit(ComponentHandle cmp, bool autoemit) override
+	void setParticleEmitterAutoemit(Entity entity, bool autoemit) override
 	{
-		m_particle_emitters[{cmp.index}]->m_autoemit = autoemit;
+		m_particle_emitters[entity]->m_autoemit = autoemit;
 	}
 
 
-	bool getParticleEmitterAutoemit(ComponentHandle cmp) override
+	bool getParticleEmitterAutoemit(Entity entity) override
 	{
-		return m_particle_emitters[{cmp.index}]->m_autoemit;
+		return m_particle_emitters[entity]->m_autoemit;
 	}
 
 
-	void setParticleEmitterLocalSpace(ComponentHandle cmp, bool local_space) override
+	void setParticleEmitterLocalSpace(Entity entity, bool local_space) override
 	{
-		m_particle_emitters[{cmp.index}]->m_local_space = local_space;
+		m_particle_emitters[entity]->m_local_space = local_space;
 	}
 
 
-	bool getParticleEmitterLocalSpace(ComponentHandle cmp) override
+	bool getParticleEmitterLocalSpace(Entity entity) override
 	{
-		return m_particle_emitters[{cmp.index}]->m_local_space;
+		return m_particle_emitters[entity]->m_local_space;
 	}
 
 
-	Vec3 getParticleEmitterAcceleration(ComponentHandle cmp) override
+	Vec3 getParticleEmitterAcceleration(Entity entity) override
 	{
-		auto* module = getEmitterModule<ParticleEmitter::ForceModule>(cmp);
+		auto* module = getEmitterModule<ParticleEmitter::ForceModule>(entity);
 		return module ? module->m_acceleration : Vec3();
 	}
 
 
-	int getParticleEmitterSizeCount(ComponentHandle cmp) override
+	int getParticleEmitterSizeCount(Entity entity) override
 	{
-		auto* module = getEmitterModule<ParticleEmitter::SizeModule>(cmp);
+		auto* module = getEmitterModule<ParticleEmitter::SizeModule>(entity);
 		return module ? module->m_values.size() : 0; 
 	}
 
 
-	const Vec2* getParticleEmitterSize(ComponentHandle cmp) override
+	const Vec2* getParticleEmitterSize(Entity entity) override
 	{
-		auto* module = getEmitterModule<ParticleEmitter::SizeModule>(cmp);
+		auto* module = getEmitterModule<ParticleEmitter::SizeModule>(entity);
 		return module ? &module->m_values[0] : nullptr;
 	}
 
 
-	void setParticleEmitterSize(ComponentHandle cmp, const Vec2* values, int count) override
+	void setParticleEmitterSize(Entity entity, const Vec2* values, int count) override
 	{
 		ASSERT(count > 0);
 		ASSERT(values[0].x < 0.001f);
 		ASSERT(values[count-1].x > 0.999f);
 
-		auto* module = getEmitterModule<ParticleEmitter::SizeModule>(cmp);
+		auto* module = getEmitterModule<ParticleEmitter::SizeModule>(entity);
 		if (!module) return;
 
 		auto size_module = static_cast<ParticleEmitter::SizeModule*>(module);
@@ -2158,9 +2046,9 @@ public:
 
 
 	template <typename T>
-	T* getEmitterModule(ComponentHandle cmp) const
+	T* getEmitterModule(Entity entity) const
 	{
-		auto& modules = m_particle_emitters[{cmp.index}]->m_modules;
+		auto& modules = m_particle_emitters[entity]->m_modules;
 		for (auto* module : modules)
 		{
 			if (module->getType() == T::s_type)
@@ -2172,30 +2060,30 @@ public:
 	}
 
 
-	int getParticleEmitterAlphaCount(ComponentHandle cmp) override 
+	int getParticleEmitterAlphaCount(Entity entity) override 
 	{
-		auto* module = getEmitterModule<ParticleEmitter::AlphaModule>(cmp);
+		auto* module = getEmitterModule<ParticleEmitter::AlphaModule>(entity);
 		return module ? module->m_values.size() : 0;
 	}
 
 
-	const Vec2* getParticleEmitterAlpha(ComponentHandle cmp) override
+	const Vec2* getParticleEmitterAlpha(Entity entity) override
 	{
-		auto* module = getEmitterModule<ParticleEmitter::AlphaModule>(cmp);
+		auto* module = getEmitterModule<ParticleEmitter::AlphaModule>(entity);
 		return module ? &module->m_values[0] : 0;
 	}
 
 
-	Vec2 getParticleEmitterLinearMovementX(ComponentHandle cmp) override
+	Vec2 getParticleEmitterLinearMovementX(Entity entity) override
 	{
-		auto* module = getEmitterModule<ParticleEmitter::LinearMovementModule>(cmp);
+		auto* module = getEmitterModule<ParticleEmitter::LinearMovementModule>(entity);
 		return module ? Vec2(module->m_x.from, module->m_x.to) : Vec2(0, 0);
 	}
 
 
-	void setParticleEmitterLinearMovementX(ComponentHandle cmp, const Vec2& value) override
+	void setParticleEmitterLinearMovementX(Entity entity, const Vec2& value) override
 	{
-		auto* module = getEmitterModule<ParticleEmitter::LinearMovementModule>(cmp);
+		auto* module = getEmitterModule<ParticleEmitter::LinearMovementModule>(entity);
 		if (module)
 		{
 			module->m_x = value;
@@ -2204,16 +2092,16 @@ public:
 	}
 
 
-	Vec2 getParticleEmitterLinearMovementY(ComponentHandle cmp) override
+	Vec2 getParticleEmitterLinearMovementY(Entity entity) override
 	{
-		auto* module = getEmitterModule<ParticleEmitter::LinearMovementModule>(cmp);
+		auto* module = getEmitterModule<ParticleEmitter::LinearMovementModule>(entity);
 		return module ? Vec2(module->m_y.from, module->m_y.to) : Vec2(0, 0);
 	}
 
 
-	void setParticleEmitterLinearMovementY(ComponentHandle cmp, const Vec2& value) override
+	void setParticleEmitterLinearMovementY(Entity entity, const Vec2& value) override
 	{
-		auto* module = getEmitterModule<ParticleEmitter::LinearMovementModule>(cmp);
+		auto* module = getEmitterModule<ParticleEmitter::LinearMovementModule>(entity);
 		if (module)
 		{
 			module->m_y = value;
@@ -2222,16 +2110,16 @@ public:
 	}
 
 
-	Vec2 getParticleEmitterLinearMovementZ(ComponentHandle cmp) override
+	Vec2 getParticleEmitterLinearMovementZ(Entity entity) override
 	{
-		auto* module = getEmitterModule<ParticleEmitter::LinearMovementModule>(cmp);
+		auto* module = getEmitterModule<ParticleEmitter::LinearMovementModule>(entity);
 		return module ? Vec2(module->m_z.from, module->m_z.to) : Vec2(0, 0);
 	}
 
 
-	void setParticleEmitterLinearMovementZ(ComponentHandle cmp, const Vec2& value) override
+	void setParticleEmitterLinearMovementZ(Entity entity, const Vec2& value) override
 	{
-		auto* module = getEmitterModule<ParticleEmitter::LinearMovementModule>(cmp);
+		auto* module = getEmitterModule<ParticleEmitter::LinearMovementModule>(entity);
 		if (module)
 		{
 			module->m_z = value;
@@ -2240,48 +2128,48 @@ public:
 	}
 
 
-	Vec2 getParticleEmitterInitialLife(ComponentHandle cmp) override
+	Vec2 getParticleEmitterInitialLife(Entity entity) override
 	{
-		return m_particle_emitters[{cmp.index}]->m_initial_life;
+		return m_particle_emitters[entity]->m_initial_life;
 	}
 
 
-	Vec2 getParticleEmitterSpawnPeriod(ComponentHandle cmp) override
+	Vec2 getParticleEmitterSpawnPeriod(Entity entity) override
 	{
-		return m_particle_emitters[{cmp.index}]->m_spawn_period;
+		return m_particle_emitters[entity]->m_spawn_period;
 	}
 
 
-	void setParticleEmitterInitialLife(ComponentHandle cmp, const Vec2& value) override
+	void setParticleEmitterInitialLife(Entity entity, const Vec2& value) override
 	{
-		m_particle_emitters[{cmp.index}]->m_initial_life = value;
-		m_particle_emitters[{cmp.index}]->m_initial_life.checkZero();
+		m_particle_emitters[entity]->m_initial_life = value;
+		m_particle_emitters[entity]->m_initial_life.checkZero();
 	}
 
 
-	void setParticleEmitterInitialSize(ComponentHandle cmp, const Vec2& value) override
+	void setParticleEmitterInitialSize(Entity entity, const Vec2& value) override
 	{
-		m_particle_emitters[{cmp.index}]->m_initial_size = value;
-		m_particle_emitters[{cmp.index}]->m_initial_size.checkZero();
+		m_particle_emitters[entity]->m_initial_size = value;
+		m_particle_emitters[entity]->m_initial_size.checkZero();
 	}
 
 
-	Vec2 getParticleEmitterInitialSize(ComponentHandle cmp) override
+	Vec2 getParticleEmitterInitialSize(Entity entity) override
 	{
-		return m_particle_emitters[{cmp.index}]->m_initial_size;
+		return m_particle_emitters[entity]->m_initial_size;
 	}
 
 
-	void setParticleEmitterSpawnPeriod(ComponentHandle cmp, const Vec2& value) override
+	void setParticleEmitterSpawnPeriod(Entity entity, const Vec2& value) override
 	{
-		auto* emitter = m_particle_emitters[{cmp.index}];
+		auto* emitter = m_particle_emitters[entity];
 		emitter->m_spawn_period = value;
 		emitter->m_spawn_period.from = Math::maximum(0.01f, emitter->m_spawn_period.from);
 		emitter->m_spawn_period.checkZero();
 	}
 
 
-	ComponentHandle createCamera(Entity entity)
+	void createCamera(Entity entity)
 	{
 		Camera camera;
 		camera.is_ortho = false;
@@ -2296,136 +2184,121 @@ public:
 		camera.slot[0] = '\0';
 		if (!getCameraInSlot("main").isValid()) copyString(camera.slot, "main");
 		m_cameras.insert(entity, camera);
-		m_universe.onComponentCreated(entity, CAMERA_TYPE, this, {entity.index});
-		return {entity.index};
+		m_universe.onComponentCreated(entity, CAMERA_TYPE, this);
 	}
 
 
-	ComponentHandle createTerrain(Entity entity)
+	void createTerrain(Entity entity)
 	{
 		Terrain* terrain = LUMIX_NEW(m_allocator, Terrain)(m_renderer, entity, *this, m_allocator);
 		m_terrains.insert(entity, terrain);
-		m_universe.onComponentCreated(entity, TERRAIN_TYPE, this, {entity.index});
-		return {entity.index};
+		m_universe.onComponentCreated(entity, TERRAIN_TYPE, this);
 	}
 
 
-	ComponentHandle createParticleEmitterRandomRotation(Entity entity)
+	void createParticleEmitterRandomRotation(Entity entity)
 	{
 		int index = allocateParticleEmitter(entity);
 		auto* emitter = m_particle_emitters.at(index);
 		auto module = LUMIX_NEW(m_allocator, ParticleEmitter::RandomRotationModule)(*emitter);
 		emitter->addModule(module);
-		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_RANDOM_ROTATION_TYPE, this, {entity.index});
-		return {entity.index};
+		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_RANDOM_ROTATION_TYPE, this);
 	}
 
 
-	ComponentHandle createParticleEmitterPlane(Entity entity)
+	void createParticleEmitterPlane(Entity entity)
 	{
 		int index = allocateParticleEmitter(entity);
 		auto* emitter = m_particle_emitters.at(index);
 		auto module = LUMIX_NEW(m_allocator, ParticleEmitter::PlaneModule)(*emitter);
 		emitter->addModule(module);
-		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_PLANE_TYPE, this, {entity.index});
-		return {entity.index};
+		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_PLANE_TYPE, this);
 	}
 
 
-	ComponentHandle createParticleEmitterLinearMovement(Entity entity)
+	void createParticleEmitterLinearMovement(Entity entity)
 	{
 		int index = allocateParticleEmitter(entity);
 		auto* emitter = m_particle_emitters.at(index);
 		auto module = LUMIX_NEW(m_allocator, ParticleEmitter::LinearMovementModule)(*emitter);
 		emitter->addModule(module);
-		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_LINEAR_MOVEMENT_TYPE, this, {entity.index});
-		return {entity.index};
+		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_LINEAR_MOVEMENT_TYPE, this);
 	}
 
 
-	ComponentHandle createParticleEmitterSpawnShape(Entity entity)
+	void createParticleEmitterSpawnShape(Entity entity)
 	{
 		int index = allocateParticleEmitter(entity);
 		auto* emitter = m_particle_emitters.at(index);
 		auto module = LUMIX_NEW(m_allocator, ParticleEmitter::SpawnShapeModule)(*emitter);
 		emitter->addModule(module);
-		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_SPAWN_SHAPE_TYPE, this, {entity.index});
-		return {entity.index};
+		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_SPAWN_SHAPE_TYPE, this);
 	}
 
 
-	ComponentHandle createParticleEmitterAlpha(Entity entity)
+	void createParticleEmitterAlpha(Entity entity)
 	{
 		int index = allocateParticleEmitter(entity);
 		auto* emitter = m_particle_emitters.at(index);
 		auto module = LUMIX_NEW(m_allocator, ParticleEmitter::AlphaModule)(*emitter);
 		emitter->addModule(module);
-		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_ALPHA_TYPE, this, {entity.index});
-		return {entity.index};
+		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_ALPHA_TYPE, this);
 	}
 
 
-	ComponentHandle createParticleEmitterForce(Entity entity)
+	void createParticleEmitterForce(Entity entity)
 	{
 		int index = allocateParticleEmitter(entity);
 		auto* emitter = m_particle_emitters.at(index);
 		auto module = LUMIX_NEW(m_allocator, ParticleEmitter::ForceModule)(*emitter);
 		emitter->addModule(module);
-		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_FORCE_HASH, this, {entity.index});
-		return {entity.index};
+		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_FORCE_HASH, this);
 	}
 
 
-	ComponentHandle createParticleEmitterSubimage(Entity entity)
+	void createParticleEmitterSubimage(Entity entity)
 	{
 		int index = allocateParticleEmitter(entity);
 		auto* emitter = m_particle_emitters.at(index);
 		auto module = LUMIX_NEW(m_allocator, ParticleEmitter::SubimageModule)(*emitter);
 		emitter->addModule(module);
-		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_SUBIMAGE_TYPE, this, {entity.index});
-		return {entity.index};
+		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_SUBIMAGE_TYPE, this);
 	}
 
 
-	ComponentHandle createParticleEmitterAttractor(Entity entity)
+	void createParticleEmitterAttractor(Entity entity)
 	{
 		int index = allocateParticleEmitter(entity);
 		auto* emitter = m_particle_emitters.at(index);
 		auto module = LUMIX_NEW(m_allocator, ParticleEmitter::AttractorModule)(*emitter);
 		emitter->addModule(module);
-		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_ATTRACTOR_TYPE, this, { entity.index });
-		return{ entity.index };
+		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_ATTRACTOR_TYPE, this);
 	}
 
 
-
-	ComponentHandle createParticleEmitterSize(Entity entity)
+	void createParticleEmitterSize(Entity entity)
 	{
 		int index = allocateParticleEmitter(entity);
 		auto* emitter = m_particle_emitters.at(index);
 		auto module = LUMIX_NEW(m_allocator, ParticleEmitter::SizeModule)(*emitter);
 		emitter->addModule(module);
-		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_SIZE_TYPE, this, { entity.index });
-		return { entity.index };
+		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_SIZE_TYPE, this);
 	}
 
 
-	ComponentHandle createScriptedParticleEmitter(Entity entity)
+	void createScriptedParticleEmitter(Entity entity)
 	{
 		m_scripted_particle_emitters.insert(entity, LUMIX_NEW(m_allocator, ScriptedParticleEmitter)(entity, m_allocator));
-		m_universe.onComponentCreated(entity, SCRIPTED_PARTICLE_EMITTER_TYPE, this, { entity.index });
-		return { entity.index };
+		m_universe.onComponentCreated(entity, SCRIPTED_PARTICLE_EMITTER_TYPE, this);
 	}
 
 
-	ComponentHandle createParticleEmitter(Entity entity)
+	void createParticleEmitter(Entity entity)
 	{
 		int index = allocateParticleEmitter(entity);
 		m_particle_emitters.at(index)->init();
 
-		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_TYPE, this, {entity.index});
-
-		return { entity.index };
+		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_TYPE, this);
 	}
 
 
@@ -2443,22 +2316,13 @@ public:
 	}
 
 
-	ModelInstance* getModelInstance(ComponentHandle cmp) override
+	ModelInstance* getModelInstance(Entity entity) override
 	{
-		return &m_model_instances[cmp.index];
+		return &m_model_instances[entity.index];
 	}
 
 
-	ComponentHandle getModelInstanceComponent(Entity entity) override
-	{
-		ComponentHandle cmp = {entity.index};
-		if (cmp.index >= m_model_instances.size()) return INVALID_COMPONENT;
-		if (!m_model_instances[cmp.index].entity.isValid()) return INVALID_COMPONENT;
-		return cmp;
-	}
-
-
-	Vec3 getPoseBonePosition(ComponentHandle model_instance, int bone_index)
+	Vec3 getPoseBonePosition(Entity model_instance, int bone_index)
 	{
 		Pose* pose = m_model_instances[model_instance.index].pose;
 		return pose->positions[bone_index];
@@ -2497,7 +2361,6 @@ public:
 	void onEntityMoved(Entity entity)
 	{
 		int index = entity.index;
-		ComponentHandle cmp = {index};
 
 		if (index < m_model_instances.size() && m_model_instances[index].entity.isValid() &&
 			m_model_instances[index].model && m_model_instances[index].model->isReady())
@@ -2508,7 +2371,7 @@ public:
 			{
 				float radius = m_universe.getScale(entity) * r.model->getBoundingRadius();
 				Vec3 position = m_universe.getPosition(entity);
-				m_culling_system->updateBoundingSphere({position, radius}, cmp);
+				m_culling_system->updateBoundingSphere({position, radius}, entity);
 			}
 
 			float bounding_radius = r.model ? r.model->getBoundingRadius() : 1;
@@ -2516,7 +2379,7 @@ public:
 			{
 				for (int j = 0, c2 = m_light_influenced_geometry[light_idx].size(); j < c2; ++j)
 				{
-					if(m_light_influenced_geometry[light_idx][j] == cmp)
+					if(m_light_influenced_geometry[light_idx][j] == entity)
 					{
 						m_light_influenced_geometry[light_idx].eraseFast(j);
 						break;
@@ -2527,7 +2390,7 @@ public:
 				Frustum frustum = getPointLightFrustum(light_idx);
 				if(frustum.isSphereInside(pos, bounding_radius))
 				{
-					m_light_influenced_geometry[light_idx].push(cmp);
+					m_light_influenced_geometry[light_idx].push(entity);
 				}
 			}
 		}
@@ -2573,96 +2436,88 @@ public:
 	Engine& getEngine() const override { return m_engine; }
 
 
-	Entity getTerrainEntity(ComponentHandle cmp) override
+	Entity getTerrainEntity(Entity entity) override
 	{
-		return {cmp.index};
+		return entity;
 	}
 
 
-	Vec2 getTerrainResolution(ComponentHandle cmp) override
+	Vec2 getTerrainResolution(Entity entity) override
 	{
-		auto* terrain = m_terrains[{cmp.index}];
+		auto* terrain = m_terrains[entity];
 		return Vec2((float)terrain->getWidth(), (float)terrain->getHeight());
 	}
 
 
-	ComponentHandle getFirstTerrain() override
+	Entity getFirstTerrain() override
 	{
-		if (m_terrains.empty()) return INVALID_COMPONENT;
+		if (m_terrains.empty()) return INVALID_ENTITY;
 		auto iter = m_terrains.begin();
-		return {iter.value()->getEntity().index};
+		return iter.value()->getEntity();
 	}
 
 
-	ComponentHandle getNextTerrain(ComponentHandle cmp) override
-	{
-		auto iter = m_terrains.find({cmp.index});
-		++iter;
-		if (!iter.isValid()) return INVALID_COMPONENT;
-		return {iter.value()->getEntity().index};
-	}
-
-
-	ComponentHandle getTerrainComponent(Entity entity) override
+	Entity getNextTerrain(Entity entity) override
 	{
 		auto iter = m_terrains.find(entity);
-		if (!iter.isValid()) return INVALID_COMPONENT;
-		return {iter.value()->getEntity().index};
+		++iter;
+		if (!iter.isValid()) return INVALID_ENTITY;
+		return iter.value()->getEntity();
 	}
 
 
-	Vec3 getTerrainNormalAt(ComponentHandle cmp, float x, float z) override
+	Vec3 getTerrainNormalAt(Entity entity, float x, float z) override
 	{
-		return m_terrains[{cmp.index}]->getNormal(x, z);
+		return m_terrains[entity]->getNormal(x, z);
 	}
 
 
-	float getTerrainHeightAt(ComponentHandle cmp, float x, float z) override
+	float getTerrainHeightAt(Entity entity, float x, float z) override
 	{
-		return m_terrains[{cmp.index}]->getHeight(x, z);
+		return m_terrains[entity]->getHeight(x, z);
 	}
 
 
-	AABB getTerrainAABB(ComponentHandle cmp) override
+	AABB getTerrainAABB(Entity entity) override
 	{
-		return m_terrains[{cmp.index}]->getAABB();
+		return m_terrains[entity]->getAABB();
 	}
 
 
-	Vec2 getTerrainSize(ComponentHandle cmp) override
+	Vec2 getTerrainSize(Entity entity) override
 	{
-		return m_terrains[{cmp.index}]->getSize();
+		return m_terrains[entity]->getSize();
 	}
 
 
-	void setTerrainMaterialPath(ComponentHandle cmp, const Path& path) override
+	void setTerrainMaterialPath(Entity entity, const Path& path) override
 	{
 		if (path.isValid())
 		{
 			Material* material = static_cast<Material*>(m_engine.getResourceManager().get(Material::TYPE)->load(path));
-			m_terrains[{cmp.index}]->setMaterial(material);
+			m_terrains[entity]->setMaterial(material);
 		}
 		else
 		{
-			m_terrains[{cmp.index}]->setMaterial(nullptr);
+			m_terrains[entity]->setMaterial(nullptr);
 		}
 	}
 
 
-	Material* getTerrainMaterial(ComponentHandle cmp) override { return m_terrains[{cmp.index}]->getMaterial(); }
+	Material* getTerrainMaterial(Entity entity) override { return m_terrains[entity]->getMaterial(); }
 
 
-	void setDecalScale(ComponentHandle cmp, const Vec3& value) override
+	void setDecalScale(Entity entity, const Vec3& value) override
 	{
-		Decal& decal = m_decals[{cmp.index}];
+		Decal& decal = m_decals[entity];
 		decal.scale = value;
 		updateDecalInfo(decal);
 	}
 
 
-	Vec3 getDecalScale(ComponentHandle cmp) override
+	Vec3 getDecalScale(Entity entity) override
 	{
-		return m_decals[{cmp.index}].scale;
+		return m_decals[entity].scale;
 	}
 
 
@@ -2677,10 +2532,10 @@ public:
 	}
 
 
-	void setDecalMaterialPath(ComponentHandle cmp, const Path& path) override
+	void setDecalMaterialPath(Entity entity, const Path& path) override
 	{
 		ResourceManagerBase* material_manager = m_engine.getResourceManager().get(Material::TYPE);
-		Decal& decal = m_decals[{cmp.index}];
+		Decal& decal = m_decals[entity];
 		if (decal.material)
 		{
 			material_manager->unload(*decal.material);
@@ -2696,16 +2551,16 @@ public:
 	}
 
 
-	Path getDecalMaterialPath(ComponentHandle cmp) override
+	Path getDecalMaterialPath(Entity entity) override
 	{
-		Decal& decal = m_decals[{cmp.index}];
+		Decal& decal = m_decals[entity];
 		return decal.material ? decal.material->getPath() : Path("");
 	}
 
 
-	Path getTerrainMaterialPath(ComponentHandle cmp) override
+	Path getTerrainMaterialPath(Entity entity) override
 	{
-		Terrain* terrain = m_terrains[{cmp.index}];
+		Terrain* terrain = m_terrains[entity];
 		if (terrain->getMaterial())
 		{
 			return terrain->getMaterial()->getPath();
@@ -2717,33 +2572,33 @@ public:
 	}
 
 
-	void setTerrainXZScale(ComponentHandle cmp, float scale) override
+	void setTerrainXZScale(Entity entity, float scale) override
 	{
-		m_terrains[{cmp.index}]->setXZScale(scale);
+		m_terrains[entity]->setXZScale(scale);
 	}
 
-	float getTerrainXZScale(ComponentHandle cmp) override { return m_terrains[{cmp.index}]->getXZScale(); }
+	float getTerrainXZScale(Entity entity) override { return m_terrains[entity]->getXZScale(); }
 
 
-	void setTerrainYScale(ComponentHandle cmp, float scale) override
+	void setTerrainYScale(Entity entity, float scale) override
 	{
-		m_terrains[{cmp.index}]->setYScale(scale);
+		m_terrains[entity]->setYScale(scale);
 	}
 
-	float getTerrainYScale(ComponentHandle cmp) override { return m_terrains[{cmp.index}]->getYScale(); }
+	float getTerrainYScale(Entity entity) override { return m_terrains[entity]->getYScale(); }
 
 
-	Pose* lockPose(ComponentHandle cmp) override { return m_model_instances[cmp.index].pose; }
-	void unlockPose(ComponentHandle cmp, bool changed) override
+	Pose* lockPose(Entity entity) override { return m_model_instances[entity.index].pose; }
+	void unlockPose(Entity entity, bool changed) override
 	{
 		if (!changed) return;
-		if (cmp.index < m_model_instances.size()
-			&& (m_model_instances[cmp.index].flags.isSet(ModelInstance::IS_BONE_ATTACHMENT_PARENT)) == 0)
+		if (entity.index < m_model_instances.size()
+			&& (m_model_instances[entity.index].flags.isSet(ModelInstance::IS_BONE_ATTACHMENT_PARENT)) == 0)
 		{
 			return;
 		}
 
-		Entity parent = {cmp.index};
+		Entity parent = entity;
 		for (BoneAttachment& ba : m_bone_attachments)
 		{
 			if (ba.parent_entity != parent) continue;
@@ -2754,10 +2609,7 @@ public:
 	}
 
 
-	Entity getModelInstanceEntity(ComponentHandle cmp) override { return m_model_instances[cmp.index].entity; }
-
-
-	Model* getModelInstanceModel(ComponentHandle cmp) override { return m_model_instances[cmp.index].model; }
+	Model* getModelInstanceModel(Entity entity) override { return m_model_instances[entity.index].model; }
 
 
 	static u64 getLayerMask(ModelInstance& model_instance)
@@ -2773,16 +2625,16 @@ public:
 	}
 
 
-	bool isModelInstanceEnabled(ComponentHandle cmp) override
+	bool isModelInstanceEnabled(Entity entity) override
 	{
-		ModelInstance& model_instance = m_model_instances[cmp.index];
+		ModelInstance& model_instance = m_model_instances[entity.index];
 		return model_instance.flags.isSet(ModelInstance::ENABLED);
 	}
 
 
-	void enableModelInstance(ComponentHandle cmp, bool enable) override
+	void enableModelInstance(Entity entity, bool enable) override
 	{
-		ModelInstance& model_instance = m_model_instances[cmp.index];
+		ModelInstance& model_instance = m_model_instances[entity.index];
 		model_instance.flags.set(ModelInstance::ENABLED, enable);
 		if (enable)
 		{
@@ -2790,46 +2642,46 @@ public:
 
 			Sphere sphere(m_universe.getPosition(model_instance.entity), model_instance.model->getBoundingRadius());
 			u64 layer_mask = getLayerMask(model_instance);
-			if (!m_culling_system->isAdded(cmp)) m_culling_system->addStatic(cmp, sphere, layer_mask);
+			if (!m_culling_system->isAdded(entity)) m_culling_system->addStatic(entity, sphere, layer_mask);
 		}
 		else
 		{
-			m_culling_system->removeStatic(cmp);
+			m_culling_system->removeStatic(entity);
 		}
 	}
 
 
-	Path getModelInstancePath(ComponentHandle cmp) override
+	Path getModelInstancePath(Entity entity) override
 	{
-		return m_model_instances[cmp.index].model ? m_model_instances[cmp.index].model->getPath() : Path("");
+		return m_model_instances[entity.index].model ? m_model_instances[entity.index].model->getPath() : Path("");
 	}
 
 
-	int getModelInstanceMaterialsCount(ComponentHandle cmp) override
+	int getModelInstanceMaterialsCount(Entity entity) override
 	{
-		return m_model_instances[cmp.index].model ? m_model_instances[cmp.index].mesh_count : 0;
+		return m_model_instances[entity.index].model ? m_model_instances[entity.index].mesh_count : 0;
 	}
 
 
-	void setModelInstancePath(ComponentHandle cmp, const Path& path) override
+	void setModelInstancePath(Entity entity, const Path& path) override
 	{
-		ModelInstance& r = m_model_instances[cmp.index];
+		ModelInstance& r = m_model_instances[entity.index];
 
 		auto* manager = m_engine.getResourceManager().get(Model::TYPE);
 		if (path.isValid())
 		{
 			Model* model = static_cast<Model*>(manager->load(path));
-			setModel(cmp, model);
+			setModel(entity, model);
 		}
 		else
 		{
-			setModel(cmp, nullptr);
+			setModel(entity, nullptr);
 		}
 		r.matrix = m_universe.getMatrix(r.entity);
 	}
 
 
-	void forceGrassUpdate(ComponentHandle cmp) override { m_terrains[{cmp.index}]->forceGrassUpdate(); }
+	void forceGrassUpdate(Entity entity) override { m_terrains[entity]->forceGrassUpdate(); }
 
 
 	void getTerrainInfos(const Frustum& frustum, const Vec3& lod_ref_point, Array<TerrainInfo>& infos) override
@@ -2843,7 +2695,7 @@ public:
 	}
 
 
-	void getGrassInfos(const Frustum& frustum, ComponentHandle camera, Array<GrassInfo>& infos) override
+	void getGrassInfos(const Frustum& frustum, Entity camera, Array<GrassInfo>& infos) override
 	{
 		PROFILE_FUNCTION();
 
@@ -2861,8 +2713,8 @@ public:
 		auto* scene = LuaWrapper::checkArg<RenderSceneImpl*>(L, 1);
 		const char* slot = LuaWrapper::checkArg<const char*>(L, 2);
 		float x, y;
-		ComponentHandle camera_cmp = scene->getCameraInSlot(slot);
-		if (!camera_cmp.isValid()) return 0;
+		Entity camera_entity = scene->getCameraInSlot(slot);
+		if (!camera_entity.isValid()) return 0;
 		if (lua_gettop(L) > 3)
 		{
 			x = LuaWrapper::checkArg<float>(L, 3);
@@ -2870,14 +2722,14 @@ public:
 		}
 		else
 		{
-			x = scene->getCameraScreenWidth(camera_cmp) * 0.5f;
-			y = scene->getCameraScreenHeight(camera_cmp) * 0.5f;
+			x = scene->getCameraScreenWidth(camera_entity) * 0.5f;
+			y = scene->getCameraScreenHeight(camera_entity) * 0.5f;
 		}
 
 		Vec3 origin, dir;
-		scene->getRay(camera_cmp, {x, y}, origin, dir);
+		scene->getRay(camera_entity, {x, y}, origin, dir);
 
-		RayCastModelHit hit = scene->castRay(origin, dir, INVALID_COMPONENT);
+		RayCastModelHit hit = scene->castRay(origin, dir, INVALID_ENTITY);
 		LuaWrapper::push(L, hit.m_is_hit);
 		LuaWrapper::push(L, hit.m_is_hit ? hit.m_origin + hit.m_dir * hit.m_t : Vec3(0, 0, 0));
 
@@ -2935,23 +2787,23 @@ public:
 	}
 
 
-	static float LUA_getTerrainHeightAt(RenderSceneImpl* render_scene, ComponentHandle cmp, int x, int z)
+	static float LUA_getTerrainHeightAt(RenderSceneImpl* render_scene, Entity entity, int x, int z)
 	{
-		return render_scene->m_terrains[{cmp.index}]->getHeight(x, z);
+		return render_scene->m_terrains[entity]->getHeight(x, z);
 	}
 
 
-	static void LUA_emitParticle(RenderSceneImpl* render_scene, ComponentHandle emitter)
+	static void LUA_emitParticle(RenderSceneImpl* render_scene, Entity emitter)
 	{
-		int idx = render_scene->m_particle_emitters.find({ emitter.index });
+		int idx = render_scene->m_particle_emitters.find(emitter);
 		if (idx < 0) return;
 		return render_scene->m_particle_emitters.at(idx)->emit();
 	}
 
 
-	void setTerrainHeightAt(ComponentHandle cmp, int x, int z, float height)
+	void setTerrainHeightAt(Entity entity, int x, int z, float height)
 	{
-		m_terrains[{cmp.index}]->setHeight(x, z, height);
+		m_terrains[entity]->setHeight(x, z, height);
 	}
 
 	static u32 LUA_getTexturePixel(Texture* texture, int x, int y)
@@ -3063,11 +2915,11 @@ public:
 
 
 	static void LUA_setModelInstanceMaterial(RenderScene* scene,
-		ComponentHandle cmp,
+		Entity entity,
 		int index,
 		const char* path)
 	{
-		scene->setModelInstanceMaterial(cmp, index, Path(path));
+		scene->setModelInstanceMaterial(entity, index, Path(path));
 	}
 
 
@@ -3077,94 +2929,94 @@ public:
 	}
 
 
-	int getGrassRotationMode(ComponentHandle cmp, int index) override
+	int getGrassRotationMode(Entity entity, int index) override
 	{
-		return (int)m_terrains[{cmp.index}]->getGrassTypeRotationMode(index);
+		return (int)m_terrains[entity]->getGrassTypeRotationMode(index);
 	}
 
 
-	void setGrassRotationMode(ComponentHandle cmp, int index, int value) override
+	void setGrassRotationMode(Entity entity, int index, int value) override
 	{
-		m_terrains[{cmp.index}]->setGrassTypeRotationMode(index, (Terrain::GrassType::RotationMode)value);
+		m_terrains[entity]->setGrassTypeRotationMode(index, (Terrain::GrassType::RotationMode)value);
 	}
 
 
-	float getGrassDistance(ComponentHandle cmp, int index) override
+	float getGrassDistance(Entity entity, int index) override
 	{
-		return m_terrains[{cmp.index}]->getGrassTypeDistance(index);
+		return m_terrains[entity]->getGrassTypeDistance(index);
 	}
 
 
-	void setGrassDistance(ComponentHandle cmp, int index, float value) override
+	void setGrassDistance(Entity entity, int index, float value) override
 	{
-		m_terrains[{cmp.index}]->setGrassTypeDistance(index, value);
+		m_terrains[entity]->setGrassTypeDistance(index, value);
 	}
 
 
 	void enableGrass(bool enabled) override { m_is_grass_enabled = enabled; }
 
 
-	void setGrassDensity(ComponentHandle cmp, int index, int density) override
+	void setGrassDensity(Entity entity, int index, int density) override
 	{
-		m_terrains[{cmp.index}]->setGrassTypeDensity(index, density);
+		m_terrains[entity]->setGrassTypeDensity(index, density);
 	}
 
 
-	int getGrassDensity(ComponentHandle cmp, int index) override
+	int getGrassDensity(Entity entity, int index) override
 	{
-		return m_terrains[{cmp.index}]->getGrassTypeDensity(index);
+		return m_terrains[entity]->getGrassTypeDensity(index);
 	}
 
 
-	void setGrassPath(ComponentHandle cmp, int index, const Path& path) override
+	void setGrassPath(Entity entity, int index, const Path& path) override
 	{
-		m_terrains[{cmp.index}]->setGrassTypePath(index, path);
+		m_terrains[entity]->setGrassTypePath(index, path);
 	}
 
 
-	Path getGrassPath(ComponentHandle cmp, int index) override
+	Path getGrassPath(Entity entity, int index) override
 	{
-		return m_terrains[{cmp.index}]->getGrassTypePath(index);
+		return m_terrains[entity]->getGrassTypePath(index);
 	}
 
 
-	int getGrassCount(ComponentHandle cmp) override
+	int getGrassCount(Entity entity) override
 	{
-		return m_terrains[{cmp.index}]->getGrassTypeCount();
+		return m_terrains[entity]->getGrassTypeCount();
 	}
 
 
-	void addGrass(ComponentHandle cmp, int index) override
+	void addGrass(Entity entity, int index) override
 	{
-		m_terrains[{cmp.index}]->addGrassType(index);
+		m_terrains[entity]->addGrassType(index);
 	}
 
 
-	void removeGrass(ComponentHandle cmp, int index) override
+	void removeGrass(Entity entity, int index) override
 	{
-		m_terrains[{cmp.index}]->removeGrassType(index);
+		m_terrains[entity]->removeGrassType(index);
 	}
 
 
-	ComponentHandle getFirstModelInstance() override
+	Entity getFirstModelInstance() override
 	{
-		return getNextModelInstance(INVALID_COMPONENT);
+		return getNextModelInstance(INVALID_ENTITY);
 	}
 
 
-	ComponentHandle getNextModelInstance(ComponentHandle cmp) override
+	Entity getNextModelInstance(Entity entity) override
 	{
-		for(int i = cmp.index + 1; i < m_model_instances.size(); ++i)
+		for(int i = entity.index + 1; i < m_model_instances.size(); ++i)
 		{
 			if (m_model_instances[i].entity != INVALID_ENTITY) return {i};
 		}
-		return INVALID_COMPONENT;
+		return INVALID_ENTITY;
 	}
 
 	
 	int getClosestPointLights(const Vec3& reference_pos,
-									   ComponentHandle* lights,
-									   int max_lights) override
+		Entity* lights,
+		int max_lights) override
 	{
 
 		float dists[16];
@@ -3187,7 +3039,7 @@ public:
 				dists[i] = dists[i - 1];
 				dists[i - 1] = tmp;
 
-				ComponentHandle tmp2 = lights[i];
+				Entity tmp2 = lights[i];
 				lights[i] = lights[i - 1];
 				lights[i - 1] = tmp2;
 			}
@@ -3216,7 +3068,7 @@ public:
 					dists[i] = dists[i - 1];
 					dists[i - 1] = tmp;
 
-					ComponentHandle tmp2 = lights[i];
+					Entity tmp2 = lights[i];
 					lights[i] = lights[i - 1];
 					lights[i - 1] = tmp2;
 				}
@@ -3227,7 +3079,7 @@ public:
 	}
 
 
-	void getPointLights(const Frustum& frustum, Array<ComponentHandle>& lights) override
+	void getPointLights(const Frustum& frustum, Array<Entity>& lights) override
 	{
 		for (int i = 0, ci = m_point_lights.size(); i < ci; ++i)
 		{
@@ -3235,57 +3087,54 @@ public:
 
 			if (frustum.isSphereInside(m_universe.getPosition(light.m_entity), light.m_range))
 			{
-				lights.push({ light.m_entity.index });
+				lights.push(light.m_entity);
 			}
 		}
 	}
 
 
-	Entity getCameraEntity(ComponentHandle camera) const override { return {camera.index}; }
-
-
-	void setLightCastShadows(ComponentHandle cmp, bool cast_shadows) override
+	void setLightCastShadows(Entity entity, bool cast_shadows) override
 	{
-		m_point_lights[m_point_lights_map[cmp]].m_cast_shadows = cast_shadows;
+		m_point_lights[m_point_lights_map[entity]].m_cast_shadows = cast_shadows;
 	}
 
 
-	bool getLightCastShadows(ComponentHandle cmp) override
+	bool getLightCastShadows(Entity entity) override
 	{
-		return m_point_lights[m_point_lights_map[cmp]].m_cast_shadows;
+		return m_point_lights[m_point_lights_map[entity]].m_cast_shadows;
 	}
 
 
-	void getPointLightInfluencedGeometry(ComponentHandle light_cmp,
+	void getPointLightInfluencedGeometry(Entity light,
 		const Frustum& frustum,
 		Array<ModelInstanceMesh>& infos) override
 	{
 		PROFILE_FUNCTION();
 
-		int light_index = m_point_lights_map[light_cmp];
+		int light_index = m_point_lights_map[light];
 		for (int j = 0, cj = m_light_influenced_geometry[light_index].size(); j < cj; ++j)
 		{
-			ComponentHandle model_instance_cmp = m_light_influenced_geometry[light_index][j];
-			ModelInstance& model_instance = m_model_instances[model_instance_cmp.index];
-			const Sphere& sphere = m_culling_system->getSphere(model_instance_cmp);
+			Entity model_instance_entity = m_light_influenced_geometry[light_index][j];
+			ModelInstance& model_instance = m_model_instances[model_instance_entity.index];
+			const Sphere& sphere = m_culling_system->getSphere(model_instance_entity);
 			if (frustum.isSphereInside(sphere.position, sphere.radius))
 			{
 				for (int k = 0, kc = model_instance.model->getMeshCount(); k < kc; ++k)
 				{
 					auto& info = infos.emplace();
 					info.mesh = &model_instance.model->getMesh(k);
-					info.model_instance = model_instance_cmp;
+					info.model_instance = model_instance_entity;
 				}
 			}
 		}
 	}
 
 
-	void getPointLightInfluencedGeometry(ComponentHandle light_cmp, Array<ModelInstanceMesh>& infos) override
+	void getPointLightInfluencedGeometry(Entity light, Array<ModelInstanceMesh>& infos) override
 	{
 		PROFILE_FUNCTION();
 
-		int light_index = m_point_lights_map[light_cmp];
+		int light_index = m_point_lights_map[light];
 		auto& geoms = m_light_influenced_geometry[light_index];
 		for (int j = 0, cj = geoms.size(); j < cj; ++j)
 		{
@@ -3308,15 +3157,15 @@ public:
 
 		for (auto& subresults : results)
 		{
-			for (ComponentHandle model_instance_cmp : subresults)
+			for (Entity model_instance : subresults)
 			{
-				entities.push(m_model_instances[model_instance_cmp.index].entity);
+				entities.push(model_instance);
 			}
 		}
 	}
 
 
-	float getCameraLODMultiplier(ComponentHandle camera)
+	float getCameraLODMultiplier(Entity camera)
 	{
 		float lod_multiplier;
 		if (isCameraOrtho(camera))
@@ -3334,7 +3183,7 @@ public:
 
 	Array<Array<ModelInstanceMesh>>& getModelInstanceInfos(const Frustum& frustum,
 		const Vec3& lod_ref_point,
-		ComponentHandle camera,
+		Entity camera,
 		u64 layer_mask) override
 	{
 		for (auto& i : m_temporary_infos) i.clear();
@@ -3367,7 +3216,7 @@ public:
 				float lod_multiplier = getCameraLODMultiplier(camera);
 				Vec3 ref_point = lod_ref_point;
 				float final_lod_multiplier = m_lod_multiplier * lod_multiplier;
-				const ComponentHandle* LUMIX_RESTRICT raw_subresults = &results[subresult_index][0];
+				const Entity* LUMIX_RESTRICT raw_subresults = &results[subresult_index][0];
 				ModelInstance* LUMIX_RESTRICT model_instances = &m_model_instances[0];
 				for (int i = 0, c = results[subresult_index].size(); i < c; ++i)
 				{
@@ -3397,46 +3246,39 @@ public:
 	}
 
 
-	void setCameraSlot(ComponentHandle cmp, const char* slot) override
+	void setCameraSlot(Entity entity, const char* slot) override
 	{
-		auto& camera = m_cameras[{cmp.index}];
+		auto& camera = m_cameras[entity];
 		copyString(camera.slot, lengthOf(camera.slot), slot);
 	}
 
 
-	ComponentHandle getCameraComponent(Entity entity)
-	{
-		auto iter = m_cameras.find(entity);
-		if (!iter.isValid()) return INVALID_COMPONENT;
-		return {entity.index};
-	}
-
-	const char* getCameraSlot(ComponentHandle camera) override { return m_cameras[{camera.index}].slot; }
-	float getCameraFOV(ComponentHandle camera) override { return m_cameras[{camera.index}].fov; }
-	void setCameraFOV(ComponentHandle camera, float fov) override { m_cameras[{camera.index}].fov = fov; }
-	void setCameraNearPlane(ComponentHandle camera, float near_plane) override { m_cameras[{camera.index}].near = Math::maximum(near_plane, 0.00001f); }
-	float getCameraNearPlane(ComponentHandle camera) override { return m_cameras[{camera.index}].near; }
-	void setCameraFarPlane(ComponentHandle camera, float far_plane) override { m_cameras[{camera.index}].far = far_plane; }
-	float getCameraFarPlane(ComponentHandle camera) override { return m_cameras[{camera.index}].far; }
-	float getCameraScreenWidth(ComponentHandle camera) override { return m_cameras[{camera.index}].screen_width; }
-	float getCameraScreenHeight(ComponentHandle camera) override { return m_cameras[{camera.index}].screen_height; }
+	const char* getCameraSlot(Entity camera) override { return m_cameras[camera].slot; }
+	float getCameraFOV(Entity camera) override { return m_cameras[camera].fov; }
+	void setCameraFOV(Entity camera, float fov) override { m_cameras[camera].fov = fov; }
+	void setCameraNearPlane(Entity camera, float near_plane) override { m_cameras[camera].near = Math::maximum(near_plane, 0.00001f); }
+	float getCameraNearPlane(Entity camera) override { return m_cameras[camera].near; }
+	void setCameraFarPlane(Entity camera, float far_plane) override { m_cameras[camera].far = far_plane; }
+	float getCameraFarPlane(Entity camera) override { return m_cameras[camera].far; }
+	float getCameraScreenWidth(Entity camera) override { return m_cameras[camera].screen_width; }
+	float getCameraScreenHeight(Entity camera) override { return m_cameras[camera].screen_height; }
 
 
 	void setGlobalLODMultiplier(float multiplier) { m_lod_multiplier = multiplier; }
 	float getGlobalLODMultiplier() const { return m_lod_multiplier; }
 
 
-	Matrix getCameraViewProjection(ComponentHandle cmp) override
+	Matrix getCameraViewProjection(Entity entity) override
 	{
-		Matrix view = m_universe.getMatrix({cmp.index});
+		Matrix view = m_universe.getMatrix(entity);
 		view.fastInverse();
-		return getCameraProjection(cmp) * view;
+		return getCameraProjection(entity) * view;
 	}
 
 
-	Matrix getCameraProjection(ComponentHandle cmp) override
+	Matrix getCameraProjection(Entity entity) override
 	{
-		Camera& camera = m_cameras[{cmp.index}];
+		Camera& camera = m_cameras[entity];
 		Matrix mtx;
 		float ratio = camera.screen_height > 0 ? camera.screen_width / camera.screen_height : 1;
 		bool is_homogenous_depth = bgfx::getCaps()->homogeneousDepth;
@@ -3458,7 +3300,7 @@ public:
 	}
 
 
-	void setCameraScreenSize(ComponentHandle camera, int w, int h) override
+	void setCameraScreenSize(Entity camera, int w, int h) override
 	{
 		auto& cam = m_cameras[{camera.index}];
 		cam.screen_width = (float)w;
@@ -3467,17 +3309,17 @@ public:
 	}
 
 
-	Vec2 getCameraScreenSize(ComponentHandle camera) override
+	Vec2 getCameraScreenSize(Entity camera) override
 	{
 		auto& cam = m_cameras[{camera.index}];
 		return Vec2(cam.screen_width, cam.screen_height);
 	}
 
 
-	float getCameraOrthoSize(ComponentHandle camera) override { return m_cameras[{camera.index}].ortho_size; }
-	void setCameraOrthoSize(ComponentHandle camera, float value) override { m_cameras[{camera.index}].ortho_size = value; }
-	bool isCameraOrtho(ComponentHandle camera) override { return m_cameras[{camera.index}].is_ortho; }
-	void setCameraOrtho(ComponentHandle camera, bool is_ortho) override { m_cameras[{camera.index}].is_ortho = is_ortho; }
+	float getCameraOrthoSize(Entity camera) override { return m_cameras[{camera.index}].ortho_size; }
+	void setCameraOrthoSize(Entity camera, float value) override { m_cameras[{camera.index}].ortho_size = value; }
+	bool isCameraOrtho(Entity camera) override { return m_cameras[{camera.index}].is_ortho; }
+	void setCameraOrtho(Entity camera, bool is_ortho) override { m_cameras[{camera.index}].is_ortho = is_ortho; }
 
 
 	const Array<DebugTriangle>& getDebugTriangles() const override { return m_debug_triangles; }
@@ -3978,23 +3820,22 @@ public:
 	}
 
 
-	RayCastModelHit castRayTerrain(ComponentHandle cmp, const Vec3& origin, const Vec3& dir) override
+	RayCastModelHit castRayTerrain(Entity entity, const Vec3& origin, const Vec3& dir) override
 	{
 		RayCastModelHit hit;
 		hit.m_is_hit = false;
-		auto iter = m_terrains.find({cmp.index});
+		auto iter = m_terrains.find(entity);
 		if (!iter.isValid()) return hit;
 
 		auto* terrain = iter.value();
 		hit = terrain->castRay(origin, dir);
-		hit.m_component = cmp;
 		hit.m_component_type = TERRAIN_TYPE;
 		hit.m_entity = terrain->getEntity();
 		return hit;
 	}
 
 
-	RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, ComponentHandle ignored_model_instance) override
+	RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, Entity ignored_model_instance) override
 	{
 		PROFILE_FUNCTION();
 		RayCastModelHit hit;
@@ -4021,7 +3862,6 @@ public:
 				RayCastModelHit new_hit = r.model->castRay(origin, dir, r.matrix, r.pose);
 				if (new_hit.m_is_hit && (!hit.m_is_hit || new_hit.m_t < hit.m_t))
 				{
-					new_hit.m_component = {i};
 					new_hit.m_entity = r.entity;
 					new_hit.m_component_type = MODEL_INSTANCE_TYPE;
 					hit = new_hit;
@@ -4036,7 +3876,6 @@ public:
 			RayCastModelHit terrain_hit = terrain->castRay(origin, dir);
 			if (terrain_hit.m_is_hit && (!hit.m_is_hit || terrain_hit.m_t < hit.m_t))
 			{
-				terrain_hit.m_component = {terrain->getEntity().index};
 				terrain_hit.m_component_type = TERRAIN_TYPE;
 				terrain_hit.m_entity = terrain->getEntity();
 				hit = terrain_hit;
@@ -4047,13 +3886,13 @@ public:
 	}
 
 	
-	Vec4 getShadowmapCascades(ComponentHandle cmp) override
+	Vec4 getShadowmapCascades(Entity entity) override
 	{
-		return m_global_lights[{cmp.index}].m_cascades;
+		return m_global_lights[entity].m_cascades;
 	}
 
 
-	void setShadowmapCascades(ComponentHandle cmp, const Vec4& value) override
+	void setShadowmapCascades(Entity entity, const Vec4& value) override
 	{
 		Vec4 valid_value = value;
 		valid_value.x = Math::maximum(valid_value.x, 0.02f);
@@ -4061,194 +3900,193 @@ public:
 		valid_value.z = Math::maximum(valid_value.y + 0.01f, valid_value.z);
 		valid_value.w = Math::maximum(valid_value.z + 0.01f, valid_value.w);
 
-		m_global_lights[{cmp.index}].m_cascades = valid_value;
+		m_global_lights[entity].m_cascades = valid_value;
 	}
 
 
-	void setFogDensity(ComponentHandle cmp, float density) override
+	void setFogDensity(Entity entity, float density) override
 	{
-		m_global_lights[{cmp.index}].m_fog_density = density;
+		m_global_lights[entity].m_fog_density = density;
 	}
 
 
-	void setFogColor(ComponentHandle cmp, const Vec3& color) override
+	void setFogColor(Entity entity, const Vec3& color) override
 	{
-		m_global_lights[{cmp.index}].m_fog_color = color;
+		m_global_lights[entity].m_fog_color = color;
 	}
 
 
-	float getFogDensity(ComponentHandle cmp) override
+	float getFogDensity(Entity entity) override
 	{
-		return m_global_lights[{cmp.index}].m_fog_density;
+		return m_global_lights[entity].m_fog_density;
 	}
 
 
-	float getFogBottom(ComponentHandle cmp) override
+	float getFogBottom(Entity entity) override
 	{
-		return m_global_lights[{cmp.index}].m_fog_bottom;
+		return m_global_lights[entity].m_fog_bottom;
 	}
 
 
-	void setFogBottom(ComponentHandle cmp, float bottom) override
+	void setFogBottom(Entity entity, float bottom) override
 	{
-		m_global_lights[{cmp.index}].m_fog_bottom = bottom;
+		m_global_lights[entity].m_fog_bottom = bottom;
 	}
 
 
-	float getFogHeight(ComponentHandle cmp) override
+	float getFogHeight(Entity entity) override
 	{
-		return m_global_lights[{cmp.index}].m_fog_height;
+		return m_global_lights[entity].m_fog_height;
 	}
 
 
-	void setFogHeight(ComponentHandle cmp, float height) override
+	void setFogHeight(Entity entity, float height) override
 	{
-		m_global_lights[{cmp.index}].m_fog_height = height;
+		m_global_lights[entity].m_fog_height = height;
 	}
 
 
-	Vec3 getFogColor(ComponentHandle cmp) override
+	Vec3 getFogColor(Entity entity) override
 	{
-		return m_global_lights[{cmp.index}].m_fog_color;
+		return m_global_lights[entity].m_fog_color;
 	}
 
 
-	float getLightAttenuation(ComponentHandle cmp) override
+	float getLightAttenuation(Entity entity) override
 	{
-		return m_point_lights[m_point_lights_map[cmp]].m_attenuation_param;
+		return m_point_lights[m_point_lights_map[entity]].m_attenuation_param;
 	}
 
 
-	void setLightAttenuation(ComponentHandle cmp, float attenuation) override
+	void setLightAttenuation(Entity entity, float attenuation) override
 	{
-		int index = m_point_lights_map[cmp];
+		int index = m_point_lights_map[entity];
 		m_point_lights[index].m_attenuation_param = attenuation;
 	}
 
 
-	float getLightRange(ComponentHandle cmp) override
+	float getLightRange(Entity entity) override
 	{
-		return m_point_lights[m_point_lights_map[cmp]].m_range;
+		return m_point_lights[m_point_lights_map[entity]].m_range;
 	}
 
 
-	void setLightRange(ComponentHandle cmp, float value) override
+	void setLightRange(Entity entity, float value) override
 	{
-		m_point_lights[m_point_lights_map[cmp]].m_range = value;
+		m_point_lights[m_point_lights_map[entity]].m_range = value;
 	}
 
 
-	void setPointLightIntensity(ComponentHandle cmp, float intensity) override
+	void setPointLightIntensity(Entity entity, float intensity) override
 	{
-		m_point_lights[m_point_lights_map[cmp]].m_diffuse_intensity = intensity;
+		m_point_lights[m_point_lights_map[entity]].m_diffuse_intensity = intensity;
 	}
 
 
-	void setGlobalLightIntensity(ComponentHandle cmp, float intensity) override
+	void setGlobalLightIntensity(Entity entity, float intensity) override
 	{
-		m_global_lights[{cmp.index}].m_diffuse_intensity = intensity;
+		m_global_lights[entity].m_diffuse_intensity = intensity;
 	}
 
 
-	void setGlobalLightIndirectIntensity(ComponentHandle cmp, float intensity) override
+	void setGlobalLightIndirectIntensity(Entity entity, float intensity) override
 	{
-		m_global_lights[{cmp.index}].m_indirect_intensity = intensity;
+		m_global_lights[entity].m_indirect_intensity = intensity;
 	}
 
 
-	void setPointLightColor(ComponentHandle cmp, const Vec3& color) override
+	void setPointLightColor(Entity entity, const Vec3& color) override
 	{
-		m_point_lights[m_point_lights_map[cmp]].m_diffuse_color = color;
+		m_point_lights[m_point_lights_map[entity]].m_diffuse_color = color;
 	}
 
 
-	void setGlobalLightColor(ComponentHandle cmp, const Vec3& color) override
+	void setGlobalLightColor(Entity entity, const Vec3& color) override
 	{
-		m_global_lights[{cmp.index}].m_diffuse_color = color;
+		m_global_lights[entity].m_diffuse_color = color;
 	}
 
 	
-	float getPointLightIntensity(ComponentHandle cmp) override
+	float getPointLightIntensity(Entity entity) override
 	{
-		return m_point_lights[m_point_lights_map[cmp]].m_diffuse_intensity;
+		return m_point_lights[m_point_lights_map[entity]].m_diffuse_intensity;
 	}
 
 
-	float getGlobalLightIntensity(ComponentHandle cmp) override
+	float getGlobalLightIntensity(Entity entity) override
 	{
-		return m_global_lights[{cmp.index}].m_diffuse_intensity;
+		return m_global_lights[entity].m_diffuse_intensity;
 	}
 
 
-	float getGlobalLightIndirectIntensity(ComponentHandle cmp) override
+	float getGlobalLightIndirectIntensity(Entity entity) override
 	{
-		return m_global_lights[{cmp.index}].m_indirect_intensity;
+		return m_global_lights[entity].m_indirect_intensity;
 	}
 
 
-	Vec3 getPointLightColor(ComponentHandle cmp) override
+	Vec3 getPointLightColor(Entity entity) override
 	{
-		return m_point_lights[m_point_lights_map[cmp]].m_diffuse_color;
+		return m_point_lights[m_point_lights_map[entity]].m_diffuse_color;
 	}
 
 
-	void setPointLightSpecularColor(ComponentHandle cmp, const Vec3& color) override
+	void setPointLightSpecularColor(Entity entity, const Vec3& color) override
 	{
-		m_point_lights[m_point_lights_map[cmp]].m_specular_color = color;
+		m_point_lights[m_point_lights_map[entity]].m_specular_color = color;
 	}
 
 
-	Vec3 getPointLightSpecularColor(ComponentHandle cmp) override
+	Vec3 getPointLightSpecularColor(Entity entity) override
 	{
-		return m_point_lights[m_point_lights_map[cmp]].m_specular_color;
+		return m_point_lights[m_point_lights_map[entity]].m_specular_color;
 	}
 
 
-	void setPointLightSpecularIntensity(ComponentHandle cmp, float intensity) override
+	void setPointLightSpecularIntensity(Entity entity, float intensity) override
 	{
-		m_point_lights[m_point_lights_map[cmp]].m_specular_intensity = intensity;
+		m_point_lights[m_point_lights_map[entity]].m_specular_intensity = intensity;
 	}
 
 
-	float getPointLightSpecularIntensity(ComponentHandle cmp) override
+	float getPointLightSpecularIntensity(Entity entity) override
 	{
-		return m_point_lights[m_point_lights_map[cmp]].m_specular_intensity;
+		return m_point_lights[m_point_lights_map[entity]].m_specular_intensity;
 	}
 
 
-	Vec3 getGlobalLightColor(ComponentHandle cmp) override
+	Vec3 getGlobalLightColor(Entity entity) override
 	{
-		return m_global_lights[{cmp.index}].m_diffuse_color;
+		return m_global_lights[entity].m_diffuse_color;
 	}
 
 
-	void setActiveGlobalLight(ComponentHandle cmp) override
+	void setActiveGlobalLight(Entity entity) override
 	{
-		m_active_global_light_cmp = cmp;
+		m_active_global_light_entity = entity;
 	}
 
 
-	ComponentHandle getActiveGlobalLight() override
+	Entity getActiveGlobalLight() override
 	{
-		return m_active_global_light_cmp;
+		return m_active_global_light_entity;
 	}
 
 
-	Entity getPointLightEntity(ComponentHandle cmp) const override
+	Entity getPointLightEntity(Entity entity) const override
 	{
-		return m_point_lights[m_point_lights_map[cmp]].m_entity;
+		return m_point_lights[m_point_lights_map[entity]].m_entity;
 	}
 
 
-	Entity getGlobalLightEntity(ComponentHandle cmp) const override
+	Entity getGlobalLightEntity(Entity entity) const override
 	{
-		return m_global_lights[{cmp.index}].m_entity;
+		return m_global_lights[entity].m_entity;
 	}
 
 
-	void reloadEnvironmentProbe(ComponentHandle cmp) override
+	void reloadEnvironmentProbe(Entity entity) override
 	{
-		Entity entity = {cmp.index};
 		auto& probe = m_environment_probes[entity];
 		auto* texture_manager = m_engine.getResourceManager().get(Texture::TYPE);
 		if (probe.texture) texture_manager->unload(*probe.texture);
@@ -4270,7 +4108,7 @@ public:
 	}
 
 
-	ComponentHandle getNearestEnvironmentProbe(const Vec3& pos) const override
+	Entity getNearestEnvironmentProbe(const Vec3& pos) const override
 	{
 		float nearest_dist_squared = FLT_MAX;
 		Entity nearest = INVALID_ENTITY;
@@ -4285,58 +4123,54 @@ public:
 				nearest_dist_squared = dist_squared;
 			}
 		}
-		if (!nearest.isValid()) return INVALID_COMPONENT;
-		return {nearest.index};
+		if (!nearest.isValid()) return INVALID_ENTITY;
+		return nearest;
 	}
 
 
-	Texture* getEnvironmentProbeTexture(ComponentHandle cmp) const override
+	Texture* getEnvironmentProbeTexture(Entity entity) const override
 	{
-		Entity entity = {cmp.index};
 		return m_environment_probes[entity].texture;
 	}
 
 
-	Texture* getEnvironmentProbeIrradiance(ComponentHandle cmp) const override
+	Texture* getEnvironmentProbeIrradiance(Entity entity) const override
 	{
-		Entity entity = {cmp.index};
 		return m_environment_probes[entity].irradiance;
 	}
 
 
-	Texture* getEnvironmentProbeRadiance(ComponentHandle cmp) const override
+	Texture* getEnvironmentProbeRadiance(Entity entity) const override
 	{
-		Entity entity = {cmp.index};
 		return m_environment_probes[entity].radiance;
 	}
 
 
-	u64 getEnvironmentProbeGUID(ComponentHandle cmp) const override
+	u64 getEnvironmentProbeGUID(Entity entity) const override
 	{
-		Entity entity = { cmp.index };
 		return m_environment_probes[entity].guid;
 	}
 
 
-	ComponentHandle getCameraInSlot(const char* slot) override
+	Entity getCameraInSlot(const char* slot) override
 	{
 		for (const auto& camera : m_cameras)
 		{
 			if (equalStrings(camera.slot, slot))
 			{
-				return {camera.entity.index};
+				return camera.entity;
 			}
 		}
-		return INVALID_COMPONENT;
+		return INVALID_ENTITY;
 	}
 
 
 	float getTime() const override { return m_time; }
 
 
-	void modelUnloaded(Model*, ComponentHandle component)
+	void modelUnloaded(Model*, Entity entity)
 	{
-		auto& r = m_model_instances[component.index];
+		auto& r = m_model_instances[entity.index];
 		if (!hasCustomMeshes(r))
 		{
 			r.meshes = nullptr;
@@ -4347,9 +4181,9 @@ public:
 
 		for (int i = 0; i < m_point_lights.size(); ++i)
 		{
-			m_light_influenced_geometry[i].eraseItemFast(component);
+			m_light_influenced_geometry[i].eraseItemFast(entity);
 		}
-		m_culling_system->removeStatic(component);
+		m_culling_system->removeStatic(entity);
 	}
 
 
@@ -4368,17 +4202,17 @@ public:
 	}
 
 
-	void modelLoaded(Model* model, ComponentHandle component)
+	void modelLoaded(Model* model, Entity entity)
 	{
 		auto& rm = m_engine.getResourceManager();
 		auto* material_manager = static_cast<MaterialManager*>(rm.get(Material::TYPE));
 
-		auto& r = m_model_instances[component.index];
+		auto& r = m_model_instances[entity.index];
 
 		float bounding_radius = r.model->getBoundingRadius();
 		float scale = m_universe.getScale(r.entity);
 		Sphere sphere(r.matrix.getTranslation(), bounding_radius * scale);
-		if(r.flags.isSet(ModelInstance::ENABLED)) m_culling_system->addStatic(component, sphere, getLayerMask(r));
+		if(r.flags.isSet(ModelInstance::ENABLED)) m_culling_system->addStatic(entity, sphere, getLayerMask(r));
 		ASSERT(!r.pose);
 		if (model->getBoneCount() > 0)
 		{
@@ -4427,7 +4261,7 @@ public:
 			if ((t - m_universe.getPosition(light.m_entity)).squaredLength() <
 				(radius + light.m_range) * (radius + light.m_range))
 			{
-				m_light_influenced_geometry[i].push(component);
+				m_light_influenced_geometry[i].push(entity);
 			}
 		}
 	}
@@ -4512,23 +4346,23 @@ public:
 	}
 
 
-	bool getModelInstanceKeepSkin(ComponentHandle cmp) override
+	bool getModelInstanceKeepSkin(Entity entity) override
 	{
-		auto& r = m_model_instances[cmp.index];
+		auto& r = m_model_instances[entity.index];
 		return keepSkin(r);
 	}
 
 
-	void setModelInstanceKeepSkin(ComponentHandle cmp, bool keep) override
+	void setModelInstanceKeepSkin(Entity entity, bool keep) override
 	{
-		auto& r = m_model_instances[cmp.index];
+		auto& r = m_model_instances[entity.index];
 		r.flags.set(ModelInstance::KEEP_SKIN, keep);
 	}
 
 
-	void setModelInstanceMaterial(ComponentHandle cmp, int index, const Path& path) override
+	void setModelInstanceMaterial(Entity entity, int index, const Path& path) override
 	{
-		auto& r = m_model_instances[cmp.index];
+		auto& r = m_model_instances[entity.index];
 		if (r.meshes && r.mesh_count > index && r.meshes[index].material && path == r.meshes[index].material->getPath()) return;
 
 		auto& rm = r.model->getResourceManager();
@@ -4543,18 +4377,18 @@ public:
 	}
 
 
-	Path getModelInstanceMaterial(ComponentHandle cmp, int index) override
+	Path getModelInstanceMaterial(Entity entity, int index) override
 	{
-		auto& r = m_model_instances[cmp.index];
+		auto& r = m_model_instances[entity.index];
 		if (!r.meshes) return Path("");
 
 		return r.meshes[index].material->getPath();
 	}
 
 
-	void setModel(ComponentHandle component, Model* model)
+	void setModel(Entity entity, Model* model)
 	{
-		auto& model_instance = m_model_instances[component.index];
+		auto& model_instance = m_model_instances[entity.index];
 		ASSERT(model_instance.entity.isValid());
 		Model* old_model = model_instance.model;
 		bool no_change = model == old_model && old_model;
@@ -4577,7 +4411,7 @@ public:
 
 			if (old_model->isReady())
 			{
-				m_culling_system->removeStatic(component);
+				m_culling_system->removeStatic(entity);
 			}
 			old_model->getResourceManager().unload(*old_model);
 		}
@@ -4594,7 +4428,7 @@ public:
 
 			if (model->isReady())
 			{
-				modelLoaded(model, component);
+				modelLoaded(model, entity);
 			}
 		}
 	}
@@ -4602,9 +4436,9 @@ public:
 	IAllocator& getAllocator() override { return m_allocator; }
 
 
-	void detectLightInfluencedGeometry(ComponentHandle cmp)
+	void detectLightInfluencedGeometry(Entity entity)
 	{
-		int light_idx = m_point_lights_map[cmp];
+		int light_idx = m_point_lights_map[entity];
 		Frustum frustum = getPointLightFrustum(light_idx);
 		const CullingSystem::Results& results = m_culling_system->cull(frustum, ~0ULL);
 		auto& influenced_geometry = m_light_influenced_geometry[light_idx];
@@ -4621,16 +4455,16 @@ public:
 	}
 
 
-	int getParticleEmitterAttractorCount(ComponentHandle cmp) override
+	int getParticleEmitterAttractorCount(Entity entity) override
 	{
-		auto* module = getEmitterModule<ParticleEmitter::AttractorModule>(cmp);
+		auto* module = getEmitterModule<ParticleEmitter::AttractorModule>(entity);
 		return module ? module->m_count : 0;
 	}
 
 
-	void addParticleEmitterAttractor(ComponentHandle cmp, int index) override
+	void addParticleEmitterAttractor(Entity entity, int index) override
 	{
-		auto* module = getEmitterModule<ParticleEmitter::AttractorModule>(cmp);
+		auto* module = getEmitterModule<ParticleEmitter::AttractorModule>(entity);
 		if (!module) return;
 
 		auto* plane_module = static_cast<ParticleEmitter::AttractorModule*>(module);
@@ -4652,9 +4486,9 @@ public:
 	}
 
 
-	void removeParticleEmitterAttractor(ComponentHandle cmp, int index) override
+	void removeParticleEmitterAttractor(Entity entity, int index) override
 	{
-		auto* module = getEmitterModule<ParticleEmitter::AttractorModule>(cmp);
+		auto* module = getEmitterModule<ParticleEmitter::AttractorModule>(entity);
 		if (!module) return;
 
 		for (int i = index; i < module->m_count - 1; ++i)
@@ -4665,44 +4499,44 @@ public:
 	}
 
 
-	Entity getParticleEmitterAttractorEntity(ComponentHandle cmp, int index) override
+	Entity getParticleEmitterAttractorEntity(Entity entity, int index) override
 	{
-		auto* module = getEmitterModule<ParticleEmitter::AttractorModule>(cmp);
+		auto* module = getEmitterModule<ParticleEmitter::AttractorModule>(entity);
 		return module ? module->m_entities[index] : INVALID_ENTITY;
 	}
 
 
-	void setParticleEmitterAttractorEntity(ComponentHandle cmp, int index, Entity entity) override
+	void setParticleEmitterAttractorEntity(Entity module_entity, int index, Entity entity) override
 	{
-		auto* module = getEmitterModule<ParticleEmitter::AttractorModule>(cmp);
+		auto* module = getEmitterModule<ParticleEmitter::AttractorModule>(module_entity);
 		if(module) module->m_entities[index] = entity;
 	}
 
 
-	float getParticleEmitterShapeRadius(ComponentHandle cmp) override
+	float getParticleEmitterShapeRadius(Entity entity) override
 	{
-		auto* module = getEmitterModule<ParticleEmitter::SpawnShapeModule>(cmp);
+		auto* module = getEmitterModule<ParticleEmitter::SpawnShapeModule>(entity);
 		return module ? module->m_radius : 0.0f;
 	}
 
 
-	void setParticleEmitterShapeRadius(ComponentHandle cmp, float value) override
+	void setParticleEmitterShapeRadius(Entity entity, float value) override
 	{
-		auto* module = getEmitterModule<ParticleEmitter::SpawnShapeModule>(cmp);
+		auto* module = getEmitterModule<ParticleEmitter::SpawnShapeModule>(entity);
 		if (module) module->m_radius = value;
 	}
 
 
-	int getParticleEmitterPlaneCount(ComponentHandle cmp) override
+	int getParticleEmitterPlaneCount(Entity entity) override
 	{
-		auto* module = getEmitterModule<ParticleEmitter::PlaneModule>(cmp);
+		auto* module = getEmitterModule<ParticleEmitter::PlaneModule>(entity);
 		return module ? module->m_count : 0;
 	}
 
 
-	void addParticleEmitterPlane(ComponentHandle cmp, int index) override
+	void addParticleEmitterPlane(Entity entity, int index) override
 	{
-		auto* plane_module = getEmitterModule<ParticleEmitter::PlaneModule>(cmp);
+		auto* plane_module = getEmitterModule<ParticleEmitter::PlaneModule>(entity);
 		if (!plane_module) return;
 
 		if (plane_module->m_count == lengthOf(plane_module->m_entities)) return;
@@ -4724,9 +4558,9 @@ public:
 	}
 
 
-	void removeParticleEmitterPlane(ComponentHandle cmp, int index) override
+	void removeParticleEmitterPlane(Entity entity, int index) override
 	{
-		auto* plane_module = getEmitterModule<ParticleEmitter::PlaneModule>(cmp);
+		auto* plane_module = getEmitterModule<ParticleEmitter::PlaneModule>(entity);
 		if (!plane_module) return;
 
 		for (int i = index; i < plane_module->m_count - 1; ++i)
@@ -4737,33 +4571,33 @@ public:
 	}
 
 
-	Entity getParticleEmitterPlaneEntity(ComponentHandle cmp, int index) override
+	Entity getParticleEmitterPlaneEntity(Entity entity, int index) override
 	{
-		auto* module = getEmitterModule<ParticleEmitter::PlaneModule>(cmp);
+		auto* module = getEmitterModule<ParticleEmitter::PlaneModule>(entity);
 		return module ? module->m_entities[index] : INVALID_ENTITY;
 	}
 
 
-	void setParticleEmitterPlaneEntity(ComponentHandle cmp, int index, Entity entity) override
+	void setParticleEmitterPlaneEntity(Entity module_entity, int index, Entity entity) override
 	{
-		auto* module = getEmitterModule<ParticleEmitter::PlaneModule>(cmp);
+		auto* module = getEmitterModule<ParticleEmitter::PlaneModule>(module_entity);
 		if (module) module->m_entities[index] = entity;
 	}
 
 
-	float getLightFOV(ComponentHandle cmp) override
+	float getLightFOV(Entity entity) override
 	{
-		return m_point_lights[m_point_lights_map[cmp]].m_fov;
+		return m_point_lights[m_point_lights_map[entity]].m_fov;
 	}
 
 
-	void setLightFOV(ComponentHandle cmp, float fov) override
+	void setLightFOV(Entity entity, float fov) override
 	{
-		m_point_lights[m_point_lights_map[cmp]].m_fov = fov;
+		m_point_lights[m_point_lights_map[entity]].m_fov = fov;
 	}
 
 
-	ComponentHandle createGlobalLight(Entity entity)
+	void createGlobalLight(Entity entity)
 	{
 		GlobalLight light;
 		light.m_entity = entity;
@@ -4776,16 +4610,14 @@ public:
 		light.m_fog_bottom = 0.0f;
 		light.m_fog_height = 10.0f;
 
-		ComponentHandle cmp = {entity.index};
-		if (m_global_lights.empty()) m_active_global_light_cmp = cmp;
+		if (m_global_lights.empty()) m_active_global_light_entity = entity;
 
 		m_global_lights.insert(entity, light);
-		m_universe.onComponentCreated(entity, GLOBAL_LIGHT_TYPE, this, cmp);
-		return cmp;
+		m_universe.onComponentCreated(entity, GLOBAL_LIGHT_TYPE, this);
 	}
 
 
-	ComponentHandle createPointLight(Entity entity)
+	void createPointLight(Entity entity)
 	{
 		PointLight& light = m_point_lights.emplace();
 		m_light_influenced_geometry.emplace(m_allocator);
@@ -4798,14 +4630,11 @@ public:
 		light.m_cast_shadows = false;
 		light.m_attenuation_param = 2;
 		light.m_range = 10;
-		ComponentHandle cmp = { entity.index };
-		m_point_lights_map.insert(cmp, m_point_lights.size() - 1);
+		m_point_lights_map.insert(entity, m_point_lights.size() - 1);
 
-		m_universe.onComponentCreated(entity, POINT_LIGHT_TYPE, this, cmp);
+		m_universe.onComponentCreated(entity, POINT_LIGHT_TYPE, this);
 
-		detectLightInfluencedGeometry(cmp);
-
-		return cmp;
+		detectLightInfluencedGeometry(entity);
 	}
 
 
@@ -4822,7 +4651,7 @@ public:
 	}
 
 
-	ComponentHandle createDecal(Entity entity)
+	void createDecal(Entity entity)
 	{
 		Decal& decal = m_decals.insert(entity);
 		decal.material = nullptr;
@@ -4830,13 +4659,11 @@ public:
 		decal.scale.set(1, 1, 1);
 		updateDecalInfo(decal);
 
-		ComponentHandle cmp = {entity.index};
-		m_universe.onComponentCreated(entity, DECAL_TYPE, this, cmp);
-		return cmp;
+		m_universe.onComponentCreated(entity, DECAL_TYPE, this);
 	}
 
 
-	ComponentHandle createEnvironmentProbe(Entity entity)
+	void createEnvironmentProbe(Entity entity)
 	{
 		EnvironmentProbe& probe = m_environment_probes.insert(entity);
 		auto* texture_manager = m_engine.getResourceManager().get(Texture::TYPE);
@@ -4848,26 +4675,22 @@ public:
 		probe.radiance->setFlag(BGFX_TEXTURE_SRGB, true);
 		probe.guid = Math::randGUID();
 
-		ComponentHandle cmp = {entity.index};
-		m_universe.onComponentCreated(entity, ENVIRONMENT_PROBE_TYPE, this, cmp);
-		return cmp;
+		m_universe.onComponentCreated(entity, ENVIRONMENT_PROBE_TYPE, this);
 	}
 
 
-	ComponentHandle createBoneAttachment(Entity entity)
+	void createBoneAttachment(Entity entity)
 	{
 		BoneAttachment& attachment = m_bone_attachments.emplace(entity);
 		attachment.entity = entity;
 		attachment.parent_entity = INVALID_ENTITY;
 		attachment.bone_index = -1;
 
-		ComponentHandle cmp = { entity.index };
-		m_universe.onComponentCreated(entity, BONE_ATTACHMENT_TYPE, this, cmp);
-		return cmp;
+		m_universe.onComponentCreated(entity, BONE_ATTACHMENT_TYPE, this);
 	}
 
 
-	ComponentHandle createModelInstance(Entity entity)
+	void createModelInstance(Entity entity)
 	{
 		while(entity.index >= m_model_instances.size())
 		{
@@ -4885,44 +4708,42 @@ public:
 		r.flags.set(ModelInstance::ENABLED);
 		r.mesh_count = 0;
 		r.matrix = m_universe.getMatrix(entity);
-		ComponentHandle cmp = {entity.index};
-		m_universe.onComponentCreated(entity, MODEL_INSTANCE_TYPE, this, cmp);
-		return cmp;
+		m_universe.onComponentCreated(entity, MODEL_INSTANCE_TYPE, this);
 	}
 
 
-	void setScriptedParticleEmitterMaterialPath(ComponentHandle cmp, const Path& path) override
+	void setScriptedParticleEmitterMaterialPath(Entity entity, const Path& path) override
 	{
-		if (!m_scripted_particle_emitters[{cmp.index}]) return;
+		if (!m_scripted_particle_emitters[entity]) return;
 
 		auto* manager = m_engine.getResourceManager().get(Material::TYPE);
 		Material* material = static_cast<Material*>(manager->load(path));
-		m_scripted_particle_emitters[{cmp.index}]->setMaterial(material);
+		m_scripted_particle_emitters[entity]->setMaterial(material);
 	}
 
 
-	Path getScriptedParticleEmitterMaterialPath(ComponentHandle cmp) override
+	Path getScriptedParticleEmitterMaterialPath(Entity entity) override
 	{
-		ScriptedParticleEmitter* emitter = m_scripted_particle_emitters[{cmp.index}];
+		ScriptedParticleEmitter* emitter = m_scripted_particle_emitters[entity];
 		if (!emitter) return Path("");
 		if (!emitter->getMaterial()) return Path("");
 
 		return emitter->getMaterial()->getPath();
 	}
 
-	void setParticleEmitterMaterialPath(ComponentHandle cmp, const Path& path) override
+	void setParticleEmitterMaterialPath(Entity entity, const Path& path) override
 	{
-		if (!m_particle_emitters[{cmp.index}]) return;
+		if (!m_particle_emitters[entity]) return;
 
 		auto* manager = m_engine.getResourceManager().get(Material::TYPE);
 		Material* material = static_cast<Material*>(manager->load(path));
-		m_particle_emitters[{cmp.index}]->setMaterial(material);
+		m_particle_emitters[entity]->setMaterial(material);
 	}
 
 
-	Path getParticleEmitterMaterialPath(ComponentHandle cmp) override
+	Path getParticleEmitterMaterialPath(Entity entity) override
 	{
-		ParticleEmitter* emitter = m_particle_emitters[{cmp.index}];
+		ParticleEmitter* emitter = m_particle_emitters[entity];
 		if (!emitter) return Path("");
 		if (!emitter->getMaterial()) return Path("");
 
@@ -4947,9 +4768,9 @@ private:
 	Engine& m_engine;
 	CullingSystem* m_culling_system;
 
-	Array<Array<ComponentHandle>> m_light_influenced_geometry;
-	ComponentHandle m_active_global_light_cmp;
-	HashMap<ComponentHandle, int> m_point_lights_map;
+	Array<Array<Entity>> m_light_influenced_geometry;
+	Entity m_active_global_light_entity;
+	HashMap<Entity, int> m_point_lights_map;
 
 	AssociativeArray<Entity, Decal> m_decals;
 	Array<ModelInstance> m_model_instances;
@@ -4993,8 +4814,8 @@ static struct
 	ComponentType type;
 	Universe::Serialize serialize;
 	Universe::Deserialize deserialize;
-	ComponentHandle(RenderSceneImpl::*creator)(Entity);
-	void (RenderSceneImpl::*destroyer)(ComponentHandle);
+	void (RenderSceneImpl::*creator)(Entity);
+	void (RenderSceneImpl::*destroyer)(Entity);
 } COMPONENT_INFOS[] = {
 	COMPONENT_TYPE(MODEL_INSTANCE_TYPE, ModelInstance),
 	COMPONENT_TYPE(GLOBAL_LIGHT_TYPE, GlobalLight),
@@ -5039,7 +4860,7 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	, m_debug_lines(m_allocator)
 	, m_debug_points(m_allocator)
 	, m_temporary_infos(m_allocator)
-	, m_active_global_light_cmp(INVALID_COMPONENT)
+	, m_active_global_light_entity(INVALID_ENTITY)
 	, m_is_grass_enabled(true)
 	, m_is_game_running(false)
 	, m_particle_emitters(m_allocator)
@@ -5095,10 +4916,7 @@ void RenderScene::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(getGlobalLightEntity);
 	REGISTER_FUNCTION(getActiveGlobalLight);
 	REGISTER_FUNCTION(getCameraInSlot);
-	REGISTER_FUNCTION(getCameraEntity);
 	REGISTER_FUNCTION(getCameraSlot);
-	REGISTER_FUNCTION(getCameraComponent);
-	REGISTER_FUNCTION(getModelInstanceComponent);
 	REGISTER_FUNCTION(getModelInstanceModel);
 	REGISTER_FUNCTION(addDebugCross);
 	REGISTER_FUNCTION(addDebugLine);

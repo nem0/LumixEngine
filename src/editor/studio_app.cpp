@@ -1785,7 +1785,7 @@ public:
 				IScene* scene = editor.getUniverse()->getScene(cmp_type);
 				if (scene)
 				{
-					ComponentUID cmp(e, cmp_type, scene, scene->getComponent(e, cmp_type));
+					ComponentUID cmp(e, cmp_type, scene);
 					const Reflection::ComponentBase* cmp_des = Reflection::getComponent(cmp_type);
 					if (cmp.isValid())
 					{

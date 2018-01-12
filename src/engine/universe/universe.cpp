@@ -370,7 +370,7 @@ void Universe::destroyEntity(Entity entity)
 			auto original_mask = mask;
 			IScene* scene = m_component_type_map[i].scene;
 			auto destroy_method = m_component_type_map[i].destroy;
-			(scene->*destroy_method)(scene->getComponent(entity, type));
+			(scene->*destroy_method)(entity);
 			mask = entity_data.components;
 			ASSERT(original_mask != mask);
 		}
@@ -624,11 +624,11 @@ float Universe::getLocalScale(Entity entity) const
 
 
 
-void Universe::serializeComponent(ISerializer& serializer, ComponentType type, ComponentHandle cmp)
+void Universe::serializeComponent(ISerializer& serializer, ComponentType type, Entity entity)
 {
 	auto* scene = m_component_type_map[type.index].scene;
 	auto& method = m_component_type_map[type.index].serialize;
-	(scene->*method)(serializer, cmp);
+	(scene->*method)(serializer, entity);
 }
 
 
@@ -785,7 +785,7 @@ ComponentUID Universe::getFirstComponent(Entity entity) const
 		if ((mask & (u64(1) << i)) != 0)
 		{
 			IScene* scene = m_component_type_map[i].scene;
-			return ComponentUID(entity, {i}, scene, scene->getComponent(entity, {i}));
+			return ComponentUID(entity, {i}, scene);
 		}
 	}
 	return ComponentUID::INVALID;
@@ -800,7 +800,7 @@ ComponentUID Universe::getNextComponent(const ComponentUID& cmp) const
 		if ((mask & (u64(1) << i)) != 0)
 		{
 			IScene* scene = m_component_type_map[i].scene;
-			return ComponentUID(cmp.entity, {i}, scene, scene->getComponent(cmp.entity, {i}));
+			return ComponentUID(cmp.entity, {i}, scene);
 		}
 	}
 	return ComponentUID::INVALID;
@@ -812,7 +812,7 @@ ComponentUID Universe::getComponent(Entity entity, ComponentType component_type)
 	u64 mask = m_entities[entity.index].components;
 	if ((mask & (u64(1) << component_type.index)) == 0) return ComponentUID::INVALID;
 	IScene* scene = m_component_type_map[component_type.index].scene;
-	return ComponentUID(entity, component_type, scene, scene->getComponent(entity, component_type));
+	return ComponentUID(entity, component_type, scene);
 }
 
 
@@ -823,36 +823,36 @@ bool Universe::hasComponent(Entity entity, ComponentType component_type) const
 }
 
 
-void Universe::onComponentDestroyed(Entity entity, ComponentType component_type, IScene* scene, ComponentHandle index)
+void Universe::onComponentDestroyed(Entity entity, ComponentType component_type, IScene* scene)
 {
 	auto mask = m_entities[entity.index].components;
 	auto old_mask = mask;
 	mask &= ~((u64)1 << component_type.index);
 	ASSERT(old_mask != mask);
 	m_entities[entity.index].components = mask;
-	m_component_destroyed.invoke(ComponentUID(entity, component_type, scene, index));
+	m_component_destroyed.invoke(ComponentUID(entity, component_type, scene));
 }
 
 
-ComponentHandle Universe::createComponent(ComponentType type, Entity entity)
+void Universe::createComponent(ComponentType type, Entity entity)
 {
 	IScene* scene = m_component_type_map[type.index].scene;
 	auto& create_method = m_component_type_map[type.index].create;
-	return (scene->*create_method)(entity);
+	(scene->*create_method)(entity);
 }
 
 
-void Universe::destroyComponent(ComponentHandle cmp, ComponentType type)
+void Universe::destroyComponent(Entity entity, ComponentType type)
 {
 	IScene* scene = m_component_type_map[type.index].scene;
 	auto& destroy_method = m_component_type_map[type.index].destroy;
-	(scene->*destroy_method)(cmp);
+	(scene->*destroy_method)(entity);
 }
 
 
-void Universe::onComponentCreated(Entity entity, ComponentType component_type, IScene* scene, ComponentHandle index)
+void Universe::onComponentCreated(Entity entity, ComponentType component_type, IScene* scene)
 {
-	ComponentUID cmp(entity, component_type, scene, index);
+	ComponentUID cmp(entity, component_type, scene);
 	m_entities[entity.index].components |= (u64)1 << component_type.index;
 	m_component_added.invoke(cmp);
 }

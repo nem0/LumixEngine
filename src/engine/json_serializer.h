@@ -24,7 +24,6 @@ class LUMIX_ENGINE_API JsonSerializer
 		JsonSerializer(FS::IFile& file, const Path& path);
 
 		void serialize(const char* label, Entity value);
-		void serialize(const char* label, ComponentHandle value);
 		void serialize(const char* label, u32 value);
 		void serialize(const char* label, u16 value);
 		void serialize(const char* label, float value);
@@ -38,7 +37,6 @@ class LUMIX_ENGINE_API JsonSerializer
 		void beginArray(const char* label);
 		void endArray();
 		void serializeArrayItem(Entity value);
-		void serializeArrayItem(ComponentHandle value);
 		void serializeArrayItem(u32 value);
 		void serializeArrayItem(i32 value);
 		void serializeArrayItem(i64 value);
@@ -69,7 +67,6 @@ public:
 	~JsonDeserializer();
 
 	void deserialize(const char* label, Entity& value, Entity default_value);
-	void deserialize(const char* label, ComponentHandle& value, ComponentHandle default_value);
 	void deserialize(const char* label, u32& value, u32 default_value);
 	void deserialize(const char* label, u16& value, u16 default_value);
 	void deserialize(const char* label, float& value, float default_value);
@@ -87,7 +84,6 @@ public:
 	void deserializeArrayEnd();
 	bool isArrayEnd();
 	void deserializeArrayItem(Entity& value, Entity default_value);
-	void deserializeArrayItem(ComponentHandle& value, ComponentHandle default_value);
 	void deserializeArrayItem(u32& value, u32 default_value);
 	void deserializeArrayItem(i32& value, i32 default_value);
 	void deserializeArrayItem(i64& value, i64 default_value);

@@ -33,44 +33,43 @@ public:
 
 	virtual bool hasGUI(Entity entity) const = 0;
 	virtual Rect getRectOnCanvas(Entity entity, const Vec2& canva_size) const = 0;
-	virtual Entity getRectEntity(ComponentHandle cmp) const = 0;
-	virtual ComponentHandle getRectAt(const Vec2& pos, const Vec2& canvas_size) const = 0;
+	virtual Entity getRectAt(const Vec2& pos, const Vec2& canvas_size) const = 0;
 
-	virtual void enableRect(ComponentHandle cmp, bool enable) = 0;
-	virtual bool isRectEnabled(ComponentHandle cmp) = 0;
-	virtual float getRectLeftPoints(ComponentHandle cmp) = 0;
-	virtual void setRectLeftPoints(ComponentHandle cmp, float value) = 0;
-	virtual float getRectLeftRelative(ComponentHandle cmp) = 0;
-	virtual void setRectLeftRelative(ComponentHandle cmp, float value) = 0;
+	virtual void enableRect(Entity entity, bool enable) = 0;
+	virtual bool isRectEnabled(Entity entity) = 0;
+	virtual float getRectLeftPoints(Entity entity) = 0;
+	virtual void setRectLeftPoints(Entity entity, float value) = 0;
+	virtual float getRectLeftRelative(Entity entity) = 0;
+	virtual void setRectLeftRelative(Entity entity, float value) = 0;
 
-	virtual float getRectRightPoints(ComponentHandle cmp) = 0;
-	virtual void setRectRightPoints(ComponentHandle cmp, float value) = 0;
-	virtual float getRectRightRelative(ComponentHandle cmp) = 0;
-	virtual void setRectRightRelative(ComponentHandle cmp, float value) = 0;
+	virtual float getRectRightPoints(Entity entity) = 0;
+	virtual void setRectRightPoints(Entity entity, float value) = 0;
+	virtual float getRectRightRelative(Entity entity) = 0;
+	virtual void setRectRightRelative(Entity entity, float value) = 0;
 
-	virtual float getRectTopPoints(ComponentHandle cmp) = 0;
-	virtual void setRectTopPoints(ComponentHandle cmp, float value) = 0;
-	virtual float getRectTopRelative(ComponentHandle cmp) = 0;
-	virtual void setRectTopRelative(ComponentHandle cmp, float value) = 0;
+	virtual float getRectTopPoints(Entity entity) = 0;
+	virtual void setRectTopPoints(Entity entity, float value) = 0;
+	virtual float getRectTopRelative(Entity entity) = 0;
+	virtual void setRectTopRelative(Entity entity, float value) = 0;
 
-	virtual float getRectBottomPoints(ComponentHandle cmp) = 0;
-	virtual void setRectBottomPoints(ComponentHandle cmp, float value) = 0;
-	virtual float getRectBottomRelative(ComponentHandle cmp) = 0;
-	virtual void setRectBottomRelative(ComponentHandle cmp, float value) = 0;
+	virtual float getRectBottomPoints(Entity entity) = 0;
+	virtual void setRectBottomPoints(Entity entity, float value) = 0;
+	virtual float getRectBottomRelative(Entity entity) = 0;
+	virtual void setRectBottomRelative(Entity entity, float value) = 0;
 
-	virtual Vec4 getImageColorRGBA(ComponentHandle cmp) = 0;
-	virtual void setImageColorRGBA(ComponentHandle cmp, const Vec4& color) = 0;
-	virtual Path getImageSprite(ComponentHandle cmp) = 0;
-	virtual void setImageSprite(ComponentHandle cmp, const Path& path) = 0;
+	virtual Vec4 getImageColorRGBA(Entity entity) = 0;
+	virtual void setImageColorRGBA(Entity entity, const Vec4& color) = 0;
+	virtual Path getImageSprite(Entity entity) = 0;
+	virtual void setImageSprite(Entity entity, const Path& path) = 0;
 
-	virtual void setText(ComponentHandle cmp, const char* text) = 0;
-	virtual const char* getText(ComponentHandle cmp) = 0;
-	virtual void setTextFontSize(ComponentHandle cmp, int value) = 0;
-	virtual int getTextFontSize(ComponentHandle cmp) = 0;
-	virtual Vec4 getTextColorRGBA(ComponentHandle cmp) = 0;
-	virtual void setTextColorRGBA(ComponentHandle cmp, const Vec4& color) = 0;
-	virtual Path getTextFontPath(ComponentHandle cmp) = 0;
-	virtual void setTextFontPath(ComponentHandle cmp, const Path& path) = 0;
+	virtual void setText(Entity entity, const char* text) = 0;
+	virtual const char* getText(Entity entity) = 0;
+	virtual void setTextFontSize(Entity entity, int value) = 0;
+	virtual int getTextFontSize(Entity entity) = 0;
+	virtual Vec4 getTextColorRGBA(Entity entity) = 0;
+	virtual void setTextColorRGBA(Entity entity, const Vec4& color) = 0;
+	virtual Path getTextFontPath(Entity entity) = 0;
+	virtual void setTextFontPath(Entity entity, const Path& path) = 0;
 };
 
 

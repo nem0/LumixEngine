@@ -40,6 +40,7 @@ enum class NavigationSceneVersion : int
 };
 
 
+static const ComponentType LUA_SCRIPT_TYPE = Reflection::getComponentType("lua_script");
 static const ComponentType NAVMESH_AGENT_TYPE = Reflection::getComponentType("navmesh_agent");
 static const ComponentType ANIM_CONTROLLER_TYPE = Reflection::getComponentType("anim_controller");
 static const int CELLS_PER_TILE_SIDE = 256;
@@ -181,14 +182,13 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 		auto render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
 		if (!render_scene) return;
 
-		ComponentHandle cmp = render_scene->getFirstTerrain();
-		while (cmp != INVALID_COMPONENT)
+		Entity entity = render_scene->getFirstTerrain();
+		while (entity.isValid())
 		{
-			Entity entity = render_scene->getTerrainEntity(cmp);
 			Vec3 pos = m_universe.getPosition(entity);
 			Quat rot = m_universe.getRotation(entity);
-			Vec2 res = render_scene->getTerrainResolution(cmp);
-			float scaleXZ = render_scene->getTerrainXZScale(cmp);
+			Vec2 res = render_scene->getTerrainResolution(entity);
+			float scaleXZ = render_scene->getTerrainXZScale(entity);
 			AABB terrain_space_aabb = getTerrainSpaceAABB(pos, rot, aabb);
 			int from_z = (int)Math::clamp(terrain_space_aabb.min.z / scaleXZ - 1, 0.0f, res.y - 1);
 			int to_z = (int)Math::clamp(terrain_space_aabb.max.z / scaleXZ + 1, 0.0f, res.y - 1);
@@ -200,22 +200,22 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 				{
 					float x = i * scaleXZ;
 					float z = j * scaleXZ;
-					float h0 = render_scene->getTerrainHeightAt(cmp, x, z);
+					float h0 = render_scene->getTerrainHeightAt(entity, x, z);
 					Vec3 p0 = pos + rot.rotate(Vec3(x, h0, z));
 
 					x = (i + 1) * scaleXZ;
 					z = j * scaleXZ;
-					float h1 = render_scene->getTerrainHeightAt(cmp, x, z);
+					float h1 = render_scene->getTerrainHeightAt(entity, x, z);
 					Vec3 p1 = pos + rot.rotate(Vec3(x, h1, z));
 
 					x = (i + 1) * scaleXZ;
 					z = (j + 1) * scaleXZ;
-					float h2 = render_scene->getTerrainHeightAt(cmp, x, z);
+					float h2 = render_scene->getTerrainHeightAt(entity, x, z);
 					Vec3 p2 = pos + rot.rotate(Vec3(x, h2, z));
 
 					x = i * scaleXZ;
 					z = (j + 1) * scaleXZ;
-					float h3 = render_scene->getTerrainHeightAt(cmp, x, z);
+					float h3 = render_scene->getTerrainHeightAt(entity, x, z);
 					Vec3 p3 = pos + rot.rotate(Vec3(x, h3, z));
 
 					Vec3 n = crossProduct(p1 - p0, p0 - p2).normalized();
@@ -228,7 +228,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 				}
 			}
 
-			cmp = render_scene->getNextTerrain(cmp);
+			entity = render_scene->getNextTerrain(entity);
 		}
 	}
 
@@ -243,14 +243,14 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 
 		u32 no_navigation_flag = Material::getCustomFlag("no_navigation");
 		u32 nonwalkable_flag = Material::getCustomFlag("nonwalkable");
-		for (auto model_instance = render_scene->getFirstModelInstance(); model_instance != INVALID_COMPONENT;
+		for (Entity model_instance = render_scene->getFirstModelInstance(); model_instance.isValid();
 			 model_instance = render_scene->getNextModelInstance(model_instance))
 		{
 			auto* model = render_scene->getModelInstanceModel(model_instance);
 			if (!model) return;
 			ASSERT(model->isReady());
 
-			Entity entity = render_scene->getModelInstanceEntity(model_instance);
+			Entity entity = model_instance;
 			Matrix mtx = m_universe.getMatrix(entity);
 			AABB model_aabb = model->getAABB();
 			model_aabb.transform(mtx);
@@ -302,12 +302,11 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	{
 		if (!m_script_scene) return;
 		
-		auto cmp = m_script_scene->getComponent(agent.entity);
-		if (cmp == INVALID_COMPONENT) return;
+		if (!m_universe.hasComponent(agent.entity, LUA_SCRIPT_TYPE)) return;
 
-		for (int i = 0, c = m_script_scene->getScriptCount(cmp); i < c; ++i)
+		for (int i = 0, c = m_script_scene->getScriptCount(agent.entity); i < c; ++i)
 		{
-			auto* call = m_script_scene->beginFunctionCall(cmp, i, "onPathFinished");
+			auto* call = m_script_scene->beginFunctionCall(agent.entity, i, "onPathFinished");
 			if (!call) continue;
 
 			m_script_scene->endFunctionCall();
@@ -315,27 +314,27 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	}
 
 
-	bool isFinished(ComponentHandle cmp) override
+	bool isFinished(Entity entity) override
 	{
-		return m_agents[{cmp.index}].is_finished;
+		return m_agents[entity].is_finished;
 	}
 
 
-	float getAgentSpeed(ComponentHandle cmp) override
+	float getAgentSpeed(Entity entity) override
 	{
-		return m_agents[{cmp.index}].speed;
+		return m_agents[entity].speed;
 	}
 
 
-	float getAgentYawDiff(ComponentHandle cmp) override
+	float getAgentYawDiff(Entity entity) override
 	{
-		return m_agents[{cmp.index}].yaw_diff;
+		return m_agents[entity].yaw_diff;
 	}
 
 
-	void setAgentRootMotion(ComponentHandle cmp, const Vec3& root_motion) override
+	void setAgentRootMotion(Entity entity, const Vec3& root_motion) override
 	{
-		m_agents[{cmp.index}].root_motion = root_motion;
+		m_agents[entity].root_motion = root_motion;
 	}
 
 
@@ -389,10 +388,12 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 			Quat rot = m_universe.getRotation(agent.entity);
 			if (agent.flags & Agent::GET_ROOT_MOTION_FROM_ANIM_CONTROLLER && anim_scene)
 			{
-				ComponentHandle ctrl = anim_scene->getComponent(agent.entity, ANIM_CONTROLLER_TYPE);
-				RigidTransform root_motion = anim_scene->getControllerRootMotion(ctrl);
-				agent.root_motion = root_motion.pos;
-				//m_universe.setRotation(agent.entity, m_universe.getRotation(agent.entity) * root_motion.rot);
+				if (anim_scene->getUniverse().hasComponent(agent.entity, ANIM_CONTROLLER_TYPE))
+				{
+					RigidTransform root_motion = anim_scene->getControllerRootMotion(agent.entity);
+					agent.root_motion = root_motion.pos;
+					//m_universe.setRotation(agent.entity, m_universe.getRotation(agent.entity) * root_motion.rot);
+				}
 			}
 			if (agent.flags & Agent::USE_ROOT_MOTION)
 			{
@@ -429,9 +430,11 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 			}
 			else if (agent.flags & Agent::GET_ROOT_MOTION_FROM_ANIM_CONTROLLER && anim_scene)
 			{
-				ComponentHandle ctrl = anim_scene->getComponent(agent.entity, ANIM_CONTROLLER_TYPE);
-				RigidTransform root_motion = anim_scene->getControllerRootMotion(ctrl);
-				m_universe.setRotation(agent.entity, m_universe.getRotation(agent.entity) * root_motion.rot);
+				if (anim_scene->getUniverse().hasComponent(agent.entity, ANIM_CONTROLLER_TYPE))
+				{
+					RigidTransform root_motion = anim_scene->getControllerRootMotion(agent.entity);
+					m_universe.setRotation(agent.entity, m_universe.getRotation(agent.entity) * root_motion.rot);
+				}
 			}
 
 			if (dt_agent->ncorners == 0 && dt_agent->targetState != DT_CROWDAGENT_TARGET_REQUESTING)
@@ -519,11 +522,11 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	}
 
 
-	const dtCrowdAgent* getDetourAgent(ComponentHandle cmp) override
+	const dtCrowdAgent* getDetourAgent(Entity entity) override
 	{
 		if (!m_crowd) return nullptr;
 
-		auto iter = m_agents.find({cmp.index});
+		auto iter = m_agents.find(entity);
 		if (iter == m_agents.end()) return nullptr;
 
 		const Agent& agent = iter.value();
@@ -532,13 +535,13 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	}
 
 
-	void debugDrawPath(ComponentHandle cmp) override
+	void debugDrawPath(Entity entity) override
 	{
 		auto render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
 		if (!render_scene) return;
 		if (!m_crowd) return;
 
-		auto iter = m_agents.find({cmp.index});
+		auto iter = m_agents.find(entity);
 		if (iter == m_agents.end()) return;
 		const Agent& agent = iter.value();
 		if (agent.agent < 0) return;
@@ -565,7 +568,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 		}
 		render_scene->addDebugCross(*(Vec3*)dt_agent->targetPos, 1.0f, 0xffffffff, 0);
 		Vec3 vel = *(Vec3*)dt_agent->vel;
-		Vec3 pos = m_universe.getPosition({cmp.index});
+		Vec3 pos = m_universe.getPosition(entity);
 		render_scene->addDebugLine(pos, pos + vel, 0xff0000ff, 0);
 	}
 
@@ -965,9 +968,8 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	}
 
 
-	void cancelNavigation(ComponentHandle cmp) override
+	void cancelNavigation(Entity entity) override
 	{
-		Entity entity = {cmp.index};
 		auto iter = m_agents.find(entity);
 		if (iter == m_agents.end()) return;
 
@@ -978,12 +980,12 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	}
 
 
-	void setActorActive(ComponentHandle cmp, bool active) override
+	void setActorActive(Entity entity, bool active) override
 	{
 		if (!m_crowd) return;
-		if (!cmp.isValid()) return;
+		if (!entity.isValid()) return;
 
-		auto iter = m_agents.find({cmp.index});
+		auto iter = m_agents.find(entity);
 		if (iter == m_agents.end()) return;
 
 		Agent& agent = iter.value();
@@ -994,9 +996,8 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	}
 
 
-	bool navigate(ComponentHandle cmp, const Vec3& dest, float speed, float stop_distance) override
+	bool navigate(Entity entity, const Vec3& dest, float speed, float stop_distance) override
 	{
-		Entity entity = {cmp.index};
 		if (!m_navquery) return false;
 		if (!m_crowd) return false;
 		if (entity == INVALID_ENTITY) return false;
@@ -1234,7 +1235,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 		auto* render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
 		if (!render_scene) return;
 
-		for (auto model_instance = render_scene->getFirstModelInstance(); model_instance != INVALID_COMPONENT;
+		for (Entity model_instance = render_scene->getFirstModelInstance(); model_instance.isValid();
 			model_instance = render_scene->getNextModelInstance(model_instance))
 		{
 			auto* model = render_scene->getModelInstanceModel(model_instance);
@@ -1242,20 +1243,20 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 			ASSERT(model->isReady());
 
 			AABB model_bb = model->getAABB();
-			Matrix mtx = m_universe.getMatrix(render_scene->getModelInstanceEntity(model_instance));
+			Matrix mtx = m_universe.getMatrix(model_instance);
 			model_bb.transform(mtx);
 			m_aabb.merge(model_bb);
 		}
 
-		ComponentHandle cmp = render_scene->getFirstTerrain();
-		while (cmp != INVALID_COMPONENT)
+		Entity entity = render_scene->getFirstTerrain();
+		while (entity.isValid())
 		{
-			AABB terrain_aabb = render_scene->getTerrainAABB(cmp);
-			Matrix mtx = m_universe.getMatrix(render_scene->getTerrainEntity(cmp));
+			AABB terrain_aabb = render_scene->getTerrainAABB(entity);
+			Matrix mtx = m_universe.getMatrix(render_scene->getTerrainEntity(entity));
 			terrain_aabb.transform(mtx);
 			m_aabb.merge(terrain_aabb);
 
-			cmp = render_scene->getNextTerrain(cmp);
+			entity = render_scene->getNextTerrain(entity);
 		}
 	}
 
@@ -1345,7 +1346,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	}
 
 
-	ComponentHandle createAgent(Entity entity)
+	void createAgent(Entity entity)
 	{
 		Agent agent;
 		agent.entity = entity;
@@ -1356,29 +1357,26 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 		agent.is_finished = true;
 		if (m_crowd) addCrowdAgent(agent);
 		m_agents.insert(entity, agent);
-		ComponentHandle cmp = {entity.index};
-		m_universe.onComponentCreated(entity, NAVMESH_AGENT_TYPE, this, cmp);
-		return cmp;
+		m_universe.onComponentCreated(entity, NAVMESH_AGENT_TYPE, this);
 	}
 
 
-	void destroyAgent(ComponentHandle component)
+	void destroyAgent(Entity entity)
 	{
-		Entity entity = { component.index };
 		auto iter = m_agents.find(entity);
 		const Agent& agent = iter.value();
 		if (m_crowd && agent.agent >= 0) m_crowd->removeAgent(agent.agent);
 		m_agents.erase(iter);
-		m_universe.onComponentDestroyed(entity, NAVMESH_AGENT_TYPE, this, component);
+		m_universe.onComponentDestroyed(entity, NAVMESH_AGENT_TYPE, this);
 	}
 
 
 	int getVersion() const override { return (int)NavigationSceneVersion::LATEST; }
 
 
-	void serializeAgent(ISerializer& serializer, ComponentHandle cmp)
+	void serializeAgent(ISerializer& serializer, Entity entity)
 	{
-		Agent& agent = m_agents[{cmp.index}];
+		Agent& agent = m_agents[entity];
 		serializer.write("radius", agent.radius);
 		serializer.write("height", agent.height);
 		serializer.write("use_root_motion", (agent.flags & Agent::USE_ROOT_MOTION) != 0);
@@ -1410,8 +1408,8 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 		agent.agent = -1;
 		if (m_crowd) addCrowdAgent(agent);
 		m_agents.insert(agent.entity, agent);
-		ComponentHandle cmp = {agent.entity.index};
-		m_universe.onComponentCreated(agent.entity, NAVMESH_AGENT_TYPE, this, cmp);
+		
+		m_universe.onComponentCreated(agent.entity, NAVMESH_AGENT_TYPE, this);
 	}
 
 
@@ -1444,22 +1442,20 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 			agent.is_finished = true;
 			agent.agent = -1;
 			m_agents.insert(agent.entity, agent);
-			ComponentHandle cmp = {agent.entity.index};
-			m_universe.onComponentCreated(agent.entity, NAVMESH_AGENT_TYPE, this, cmp);
+			Entity entity = {agent.entity.index};
+			m_universe.onComponentCreated(agent.entity, NAVMESH_AGENT_TYPE, this);
 		}
 	}
 
 
-	bool isGettingRootMotionFromAnim(ComponentHandle cmp) override
+	bool isGettingRootMotionFromAnim(Entity entity) override
 	{
-		Entity entity = {cmp.index};
 		return (m_agents[entity].flags & Agent::GET_ROOT_MOTION_FROM_ANIM_CONTROLLER) != 0;
 	}
 
 
-	void setIsGettingRootMotionFromAnim(ComponentHandle cmp, bool is) override 
+	void setIsGettingRootMotionFromAnim(Entity entity, bool is) override 
 	{
-		Entity entity = {cmp.index};
 		if (is)
 			m_agents[entity].flags |= Agent::GET_ROOT_MOTION_FROM_ANIM_CONTROLLER;
 		else
@@ -1467,16 +1463,14 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	}
 
 
-	bool useAgentRootMotion(ComponentHandle cmp) override
+	bool useAgentRootMotion(Entity entity) override
 	{
-		Entity entity = {cmp.index};
 		return (m_agents[entity].flags & Agent::USE_ROOT_MOTION) != 0;
 	}
 
 
-	void setUseAgentRootMotion(ComponentHandle cmp, bool use_root_motion) override
+	void setUseAgentRootMotion(Entity entity, bool use_root_motion) override
 	{
-		Entity entity = {cmp.index};
 		if (use_root_motion)
 			m_agents[entity].flags |= Agent::USE_ROOT_MOTION;
 		else
@@ -1484,40 +1478,31 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	}
 
 
-	void setAgentRadius(ComponentHandle cmp, float radius) override
+	void setAgentRadius(Entity entity, float radius) override
 	{
-		Entity entity = {cmp.index};
 		m_agents[entity].radius = radius;
 	}
 
 
-	float getAgentRadius(ComponentHandle cmp) override
+	float getAgentRadius(Entity entity) override
 	{
-		Entity entity = { cmp.index };
 		return m_agents[entity].radius;
 	}
 
 
-	void setAgentHeight(ComponentHandle cmp, float height) override
+	void setAgentHeight(Entity entity, float height) override
 	{
-		Entity entity = { cmp.index };
 		m_agents[entity].height = height;
 	}
 
 
-	float getAgentHeight(ComponentHandle cmp) override
+	float getAgentHeight(Entity entity) override
 	{
-		Entity entity = {cmp.index};
 		return m_agents[entity].height;
 	}
 
 
 	IPlugin& getPlugin() const override { return m_system; }
-	ComponentHandle getComponent(Entity entity, ComponentType type) override
-	{
-		if (type == NAVMESH_AGENT_TYPE) return {entity.index};
-		return INVALID_COMPONENT;
-	}
 	Universe& getUniverse() override { return m_universe; }
 
 	IAllocator& m_allocator;

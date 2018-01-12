@@ -196,7 +196,7 @@ struct EditorIconsImpl LUMIX_FINAL : public EditorIcons
 		if(!render_interface) return hit;
 
 		const auto& universe = *m_editor.getUniverse();
-		ComponentHandle camera = m_editor.getEditCamera().handle;
+		Entity camera = m_editor.getEditCamera().entity;
 		if (!camera.isValid()) return hit;
 		Matrix camera_mtx = universe.getMatrix(m_editor.getEditCamera().entity);
 		bool is_ortho = render_interface->isCameraOrtho(camera);
@@ -284,7 +284,7 @@ struct EditorIconsImpl LUMIX_FINAL : public EditorIcons
 		if(!render_interface) return;
 
 		const auto& universe = *m_editor.getUniverse();
-		ComponentHandle camera = m_editor.getEditCamera().handle;
+		Entity camera = m_editor.getEditCamera().entity;
 		if (!camera.isValid()) return;
 		Matrix camera_mtx = universe.getMatrix(m_editor.getEditCamera().entity);
 		Vec3 camera_pos = camera_mtx.getTranslation();

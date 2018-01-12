@@ -658,14 +658,14 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 
 		auto edit_camera = m_editor.getEditCamera();
 		auto* render_interface = m_editor.getRenderInterface();
-		bool is_ortho = render_interface->isCameraOrtho(edit_camera.handle);
+		bool is_ortho = render_interface->isCameraOrtho(edit_camera.entity);
 		auto camera_pos = m_editor.getUniverse()->getPosition(edit_camera.entity);
 		auto camera_dir = m_editor.getUniverse()->getRotation(edit_camera.entity).rotate(Vec3(0, 0, -1));
-		float fov = render_interface->getCameraFOV(edit_camera.handle);
+		float fov = render_interface->getCameraFOV(edit_camera.entity);
 
 		Vec3 origin, cursor_dir;
 		Vec2 mouse_pos = m_editor.getMousePos();
-		m_editor.getRenderInterface()->getRay(edit_camera.handle, mouse_pos, origin, cursor_dir);
+		m_editor.getRenderInterface()->getRay(edit_camera.entity, mouse_pos, origin, cursor_dir);
 		
 		Axis axis = Axis::NONE;
 		switch(m_mode)
@@ -698,7 +698,7 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 		auto edit_camera = m_editor.getEditCamera();
 		Vec3 origin, cursor_dir;
 		Vec2 mouse_pos = m_editor.getMousePos();
-		m_editor.getRenderInterface()->getRay(edit_camera.handle, mouse_pos, origin, cursor_dir);
+		m_editor.getRenderInterface()->getRay(edit_camera.entity, mouse_pos, origin, cursor_dir);
 
 		m_transform_axis = Axis::NONE;
 		m_active = -1;
@@ -736,7 +736,7 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 	{
 		auto camera = m_editor.getEditCamera();
 		Vec3 origin, dir;
-		m_editor.getRenderInterface()->getRay(camera.handle, mouse_pos, origin, dir);
+		m_editor.getRenderInterface()->getRay(camera.entity, mouse_pos, origin, dir);
 		dir.normalize();
 		bool is_two_axed = transform_axis == Axis::XZ || transform_axis == Axis::XY || transform_axis == Axis::YZ;
 		if (is_two_axed)
@@ -1082,10 +1082,10 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 	{
 		auto edit_camera = m_editor.getEditCamera();
 		auto* render_interface = m_editor.getRenderInterface();
-		bool is_ortho = render_interface->isCameraOrtho(edit_camera.handle);
+		bool is_ortho = render_interface->isCameraOrtho(edit_camera.entity);
 		auto camera_pos = m_editor.getUniverse()->getPosition(edit_camera.entity);
 		auto camera_dir = m_editor.getUniverse()->getRotation(edit_camera.entity).rotate(Vec3(0, 0, -1));
-		float fov = render_interface->getCameraFOV(edit_camera.handle);
+		float fov = render_interface->getCameraFOV(edit_camera.entity);
 
 		switch (m_mode)
 		{
@@ -1109,10 +1109,10 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 	{
 		auto edit_camera = m_editor.getEditCamera();
 		auto* render_interface = m_editor.getRenderInterface();
-		bool is_ortho = render_interface->isCameraOrtho(edit_camera.handle);
+		bool is_ortho = render_interface->isCameraOrtho(edit_camera.entity);
 		auto camera_pos = m_editor.getUniverse()->getPosition(edit_camera.entity);
 		auto camera_dir = m_editor.getUniverse()->getRotation(edit_camera.entity).rotate(Vec3(0, 0, -1));
-		float fov = render_interface->getCameraFOV(edit_camera.handle);
+		float fov = render_interface->getCameraFOV(edit_camera.entity);
 
 		collide(camera_pos, camera_dir, fov, is_ortho);
 		transform();

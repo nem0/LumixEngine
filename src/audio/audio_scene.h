@@ -55,22 +55,22 @@ public:
 	virtual void removeClip(ClipInfo* clip) = 0;
 	virtual void setClip(int clip_id, const Path& path) = 0;
 
-	virtual float getEchoZoneRadius(ComponentHandle cmp) = 0;
-	virtual void setEchoZoneRadius(ComponentHandle cmp, float radius) = 0;
-	virtual float getEchoZoneDelay(ComponentHandle cmp) = 0;
-	virtual void setEchoZoneDelay(ComponentHandle cmp, float delay) = 0;
+	virtual float getEchoZoneRadius(Entity entity) = 0;
+	virtual void setEchoZoneRadius(Entity entity, float radius) = 0;
+	virtual float getEchoZoneDelay(Entity entity) = 0;
+	virtual void setEchoZoneDelay(Entity entity, float delay) = 0;
 
-	virtual float getChorusZoneDelay(ComponentHandle cmp) = 0;
-	virtual void setChorusZoneDelay(ComponentHandle cmp, float delay) = 0;
-	virtual float getChorusZoneRadius(ComponentHandle cmp) = 0;
-	virtual void setChorusZoneRadius(ComponentHandle cmp, float radius) = 0;
+	virtual float getChorusZoneDelay(Entity entity) = 0;
+	virtual void setChorusZoneDelay(Entity entity, float delay) = 0;
+	virtual float getChorusZoneRadius(Entity entity) = 0;
+	virtual void setChorusZoneRadius(Entity entity, float radius) = 0;
 
-	virtual ClipInfo* getAmbientSoundClip(ComponentHandle cmp) = 0;
-	virtual int getAmbientSoundClipIndex(ComponentHandle cmp) = 0;
-	virtual void setAmbientSoundClipIndex(ComponentHandle cmp, int index) = 0;
-	virtual void setAmbientSoundClip(ComponentHandle cmp, ClipInfo* clip) = 0;
-	virtual bool isAmbientSound3D(ComponentHandle cmp) = 0;
-	virtual void setAmbientSound3D(ComponentHandle cmp, bool is_3d) = 0;
+	virtual ClipInfo* getAmbientSoundClip(Entity entity) = 0;
+	virtual int getAmbientSoundClipIndex(Entity entity) = 0;
+	virtual void setAmbientSoundClipIndex(Entity entity, int index) = 0;
+	virtual void setAmbientSoundClip(Entity entity, ClipInfo* clip) = 0;
+	virtual bool isAmbientSound3D(Entity entity) = 0;
+	virtual void setAmbientSound3D(Entity entity, bool is_3d) = 0;
 
 	virtual SoundHandle play(Entity entity, ClipInfo* clip, bool is_3d) = 0;
 	virtual void stop(SoundHandle sound_id) = 0;

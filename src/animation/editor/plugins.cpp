@@ -195,32 +195,31 @@ struct PropertyGridPlugin : PropertyGrid::IPlugin
 		if (cmp.type != ANIMABLE_TYPE) return;
 
 		auto* scene = static_cast<AnimationScene*>(cmp.scene);
-		auto* animation = scene->getAnimableAnimation(cmp.handle);
+		auto* animation = scene->getAnimableAnimation(cmp.entity);
 		if (!animation) return;
 		if (!animation->isReady()) return;
 
 		ImGui::Checkbox("Preview", &m_is_playing);
-		float time = scene->getAnimableTime(cmp.handle);
+		float time = scene->getAnimableTime(cmp.entity);
 		if (ImGui::SliderFloat("Time", &time, 0, animation->getLength()))
 		{
-			scene->setAnimableTime(cmp.handle, time);
-			scene->updateAnimable(cmp.handle, 0);
+			scene->setAnimableTime(cmp.entity, time);
+			scene->updateAnimable(cmp.entity, 0);
 		}
 
 		if (m_is_playing)
 		{
 			float time_delta = m_app.getWorldEditor().getEngine().getLastTimeDelta();
-			scene->updateAnimable(cmp.handle, time_delta);
+			scene->updateAnimable(cmp.entity, time_delta);
 		}
 
 		if (ImGui::CollapsingHeader("Transformation"))
 		{
 			auto* render_scene = (RenderScene*)scene->getUniverse().getScene(RENDERABLE_TYPE);
-			ComponentHandle renderable = render_scene->getComponent(cmp.entity, RENDERABLE_TYPE);
-			if (renderable.isValid())
+			if (scene->getUniverse().hasComponent(cmp.entity, RENDERABLE_TYPE))
 			{
-				const Pose* pose = render_scene->lockPose(renderable);
-				Model* model = render_scene->getModelInstanceModel(renderable);
+				const Pose* pose = render_scene->lockPose(cmp.entity);
+				Model* model = render_scene->getModelInstanceModel(cmp.entity);
 				if (pose && model)
 				{
 					ImGui::Columns(3);
@@ -235,7 +234,7 @@ struct PropertyGridPlugin : PropertyGrid::IPlugin
 					}
 					ImGui::Columns();
 				}
-				if (pose) render_scene->unlockPose(renderable, false);
+				if (pose) render_scene->unlockPose(cmp.entity, false);
 			}
 		}
 	}

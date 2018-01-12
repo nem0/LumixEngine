@@ -3011,29 +3011,29 @@ static bool createBillboard(ImportAssetDialog& dialog,
 
 	auto mesh_entity = universe.createEntity({0, 0, 0}, {0, 0, 0, 0});
 	static const auto MODEL_INSTANCE_TYPE = Reflection::getComponentType("renderable");
-	auto mesh_cmp = universe.createComponent(MODEL_INSTANCE_TYPE, mesh_entity);
-	render_scene->setModelInstancePath(mesh_cmp, mesh_path);
+	universe.createComponent(MODEL_INSTANCE_TYPE, mesh_entity);
+	render_scene->setModelInstancePath(mesh_entity, mesh_path);
 
 	auto mesh_left_entity = universe.createEntity({ 0, 0, 0 }, { Vec3(0, 1, 0), Math::PI * 0.5f });
-	auto mesh_left_cmp = universe.createComponent(MODEL_INSTANCE_TYPE, mesh_left_entity);
-	render_scene->setModelInstancePath(mesh_left_cmp, mesh_path);
+	universe.createComponent(MODEL_INSTANCE_TYPE, mesh_left_entity);
+	render_scene->setModelInstancePath(mesh_left_entity, mesh_path);
 
 	auto mesh_back_entity = universe.createEntity({ 0, 0, 0 }, { Vec3(0, 1, 0), Math::PI });
-	auto mesh_back_cmp = universe.createComponent(MODEL_INSTANCE_TYPE, mesh_back_entity);
-	render_scene->setModelInstancePath(mesh_back_cmp, mesh_path);
+	universe.createComponent(MODEL_INSTANCE_TYPE, mesh_back_entity);
+	render_scene->setModelInstancePath(mesh_back_entity, mesh_path);
 
 	auto mesh_right_entity = universe.createEntity({ 0, 0, 0 }, { Vec3(0, 1, 0), Math::PI * 1.5f});
-	auto mesh_right_cmp = universe.createComponent(MODEL_INSTANCE_TYPE, mesh_right_entity);
-	render_scene->setModelInstancePath(mesh_right_cmp, mesh_path);
+	universe.createComponent(MODEL_INSTANCE_TYPE, mesh_right_entity);
+	render_scene->setModelInstancePath(mesh_right_entity, mesh_path);
 
 	auto light_entity = universe.createEntity({0, 0, 0}, {0, 0, 0, 0});
 	static const auto GLOBAL_LIGHT_TYPE = Reflection::getComponentType("global_light");
-	auto light_cmp = universe.createComponent(GLOBAL_LIGHT_TYPE, light_entity);
-	render_scene->setGlobalLightIntensity(light_cmp, 0);
+	universe.createComponent(GLOBAL_LIGHT_TYPE, light_entity);
+	render_scene->setGlobalLightIntensity(light_entity, 0);
 
 	while (engine.getFileSystem().hasWork()) engine.getFileSystem().updateAsyncTransactions();
 
-	auto* model = render_scene->getModelInstanceModel(mesh_cmp);
+	auto* model = render_scene->getModelInstanceModel(mesh_entity);
 	int width = 640, height = 480;
 	float original_lod_0 = FLT_MAX;
 	if (model->isReady())
@@ -3050,12 +3050,12 @@ static bool createBillboard(ImportAssetDialog& dialog,
 		BillboardSceneData data(aabb, texture_size);
 		auto camera_entity = universe.createEntity(data.position, { 0, 0, 0, 1 });
 		static const auto CAMERA_TYPE = Reflection::getComponentType("camera");
-		auto camera_cmp = universe.createComponent(CAMERA_TYPE, camera_entity);
-		render_scene->setCameraOrtho(camera_cmp, true);
-		render_scene->setCameraSlot(camera_cmp, "main");
+		universe.createComponent(CAMERA_TYPE, camera_entity);
+		render_scene->setCameraOrtho(camera_entity, true);
+		render_scene->setCameraSlot(camera_entity, "main");
 		width = data.width;
 		height = data.height;
-		render_scene->setCameraOrthoSize(camera_cmp, data.ortho_size);
+		render_scene->setCameraOrthoSize(camera_entity, data.ortho_size);
 	}
 
 	pipeline->setScene(render_scene);

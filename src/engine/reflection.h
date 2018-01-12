@@ -119,23 +119,23 @@ template <> LUMIX_ENGINE_API void writeToStream<const char*>(OutputBlob& stream,
 template <typename Getter> struct GetterProxy;
 
 template <typename R, typename C>
-struct GetterProxy<R(C::*)(ComponentHandle, int)>
+struct GetterProxy<R(C::*)(Entity, int)>
 {
-	using Getter = R(C::*)(ComponentHandle, int);
-	static void invoke(OutputBlob& stream, C* inst, Getter getter, ComponentHandle cmp, int index)
+	using Getter = R(C::*)(Entity, int);
+	static void invoke(OutputBlob& stream, C* inst, Getter getter, Entity entity, int index)
 	{
-		R value = (inst->*getter)(cmp, index);
+		R value = (inst->*getter)(entity, index);
 		writeToStream(stream, value);
 	}
 };
 
 template <typename R, typename C>
-struct GetterProxy<R(C::*)(ComponentHandle)>
+struct GetterProxy<R(C::*)(Entity)>
 {
-	using Getter = R(C::*)(ComponentHandle);
-	static void invoke(OutputBlob& stream, C* inst, Getter getter, ComponentHandle cmp, int index)
+	using Getter = R(C::*)(Entity);
+	static void invoke(OutputBlob& stream, C* inst, Getter getter, Entity entity, int index)
 	{
-		R value = (inst->*getter)(cmp);
+		R value = (inst->*getter)(entity);
 		writeToStream(stream, value);
 	}
 };
@@ -144,26 +144,26 @@ struct GetterProxy<R(C::*)(ComponentHandle)>
 template <typename Setter> struct SetterProxy;
 
 template <typename C, typename A>
-struct SetterProxy<void (C::*)(ComponentHandle, int, A)>
+struct SetterProxy<void (C::*)(Entity, int, A)>
 {
-	using Setter = void (C::*)(ComponentHandle, int, A);
-	static void invoke(InputBlob& stream, C* inst, Setter setter, ComponentHandle cmp, int index)
+	using Setter = void (C::*)(Entity, int, A);
+	static void invoke(InputBlob& stream, C* inst, Setter setter, Entity entity, int index)
 	{
 		using Value = RemoveCR<A>;
 		auto value = readFromStream<Value>(stream);
-		(inst->*setter)(cmp, index, value);
+		(inst->*setter)(entity, index, value);
 	}
 };
 
 template <typename C, typename A>
-struct SetterProxy<void (C::*)(ComponentHandle, A)>
+struct SetterProxy<void (C::*)(Entity, A)>
 {
-	using Setter = void (C::*)(ComponentHandle, A);
-	static void invoke(InputBlob& stream, C* inst, Setter setter, ComponentHandle cmp, int index)
+	using Setter = void (C::*)(Entity, A);
+	static void invoke(InputBlob& stream, C* inst, Setter setter, Entity entity, int index)
 	{
 		using Value = RemoveCR<A>;
 		auto value = readFromStream<Value>(stream);
-		(inst->*setter)(cmp, value);
+		(inst->*setter)(entity, value);
 	}
 };
 
@@ -321,7 +321,7 @@ struct EnumProperty : IEnumProperty
 		using C = typename ClassOf<Getter>::Type;
 		C* inst = static_cast<C*>(cmp.scene);
 		static_assert(4 == sizeof(typename ResultOf<Getter>::Type), "enum must have 4 bytes");
-		detail::GetterProxy<Getter>::invoke(stream, inst, getter, cmp.handle, index);
+		detail::GetterProxy<Getter>::invoke(stream, inst, getter, cmp.entity, index);
 	}
 
 	void setValue(ComponentUID cmp, int index, InputBlob& stream) const override
@@ -330,7 +330,7 @@ struct EnumProperty : IEnumProperty
 		C* inst = static_cast<C*>(cmp.scene);
 
 		static_assert(4 == sizeof(typename ResultOf<Getter>::Type), "enum must have 4 bytes");
-		detail::SetterProxy<Setter>::invoke(stream, inst, setter, cmp.handle, index);
+		detail::SetterProxy<Setter>::invoke(stream, inst, setter, cmp.entity, index);
 	}
 
 
@@ -360,7 +360,7 @@ struct DynEnumProperty : IEnumProperty
 		using C = typename ClassOf<Getter>::Type;
 		C* inst = static_cast<C*>(cmp.scene);
 		static_assert(4 == sizeof(typename ResultOf<Getter>::Type), "enum must have 4 bytes");
-		detail::GetterProxy<Getter>::invoke(stream, inst, getter, cmp.handle, index);
+		detail::GetterProxy<Getter>::invoke(stream, inst, getter, cmp.entity, index);
 	}
 
 	void setValue(ComponentUID cmp, int index, InputBlob& stream) const override
@@ -369,7 +369,7 @@ struct DynEnumProperty : IEnumProperty
 		C* inst = static_cast<C*>(cmp.scene);
 
 		static_assert(4 == sizeof(typename ResultOf<Getter>::Type), "enum must have 4 bytes");
-		detail::SetterProxy<Setter>::invoke(stream, inst, setter, cmp.handle, index);
+		detail::SetterProxy<Setter>::invoke(stream, inst, setter, cmp.entity, index);
 	}
 
 
@@ -403,9 +403,9 @@ struct SampledFuncProperty : ISampledFuncProperty
 		ASSERT(index == -1);
 		using C = typename ClassOf<Getter>::Type;
 		C* inst = static_cast<C*>(cmp.scene);
-		int count = (inst->*counter)(cmp.handle);
+		int count = (inst->*counter)(cmp.entity);
 		stream.write(count);
-		const Vec2* values = (inst->*getter)(cmp.handle);
+		const Vec2* values = (inst->*getter)(cmp.entity);
 		stream.write(values, sizeof(float) * 2 * count);
 	}
 
@@ -417,7 +417,7 @@ struct SampledFuncProperty : ISampledFuncProperty
 		int count;
 		stream.read(count);
 		auto* buf = (const Vec2*)stream.skip(sizeof(float) * 2 * count);
-		(inst->*setter)(cmp.handle, buf, count);
+		(inst->*setter)(cmp.entity, buf, count);
 	}
 
 	float getMaxX() const override { return max_x; }
@@ -438,14 +438,14 @@ struct BlobProperty : IBlobProperty
 	{
 		using C = typename ClassOf<Getter>::Type;
 		C* inst = static_cast<C*>(cmp.scene);
-		(inst->*getter)(cmp.handle, stream);
+		(inst->*getter)(cmp.entity, stream);
 	}
 
 	void setValue(ComponentUID cmp, int index, InputBlob& stream) const override
 	{
 		using C = typename ClassOf<Getter>::Type;
 		C* inst = static_cast<C*>(cmp.scene);
-		(inst->*setter)(cmp.handle, stream);
+		(inst->*setter)(cmp.entity, stream);
 	}
 
 	void visit(IAttributeVisitor& visitor) const override {
@@ -470,14 +470,14 @@ struct CommonProperty : Property<T>
 	{
 		using C = typename ClassOf<Getter>::Type;
 		C* inst = static_cast<C*>(cmp.scene);
-		detail::GetterProxy<Getter>::invoke(stream, inst, getter, cmp.handle, index);
+		detail::GetterProxy<Getter>::invoke(stream, inst, getter, cmp.entity, index);
 	}
 
 	void setValue(ComponentUID cmp, int index, InputBlob& stream) const override
 	{
 		using C = typename ClassOf<Getter>::Type;
 		C* inst = static_cast<C*>(cmp.scene);
-		detail::SetterProxy<Setter>::invoke(stream, inst, setter, cmp.handle, index);
+		detail::SetterProxy<Setter>::invoke(stream, inst, setter, cmp.entity, index);
 	}
 
 
@@ -563,7 +563,7 @@ struct ArrayProperty : IArrayProperty
 	{
 		using C = typename ClassOf<Counter>::Type;
 		C* inst = static_cast<C*>(cmp.scene);
-		(inst->*adder)(cmp.handle, index);
+		(inst->*adder)(cmp.entity, index);
 	}
 
 
@@ -571,7 +571,7 @@ struct ArrayProperty : IArrayProperty
 	{
 		using C = typename ClassOf<Counter>::Type;
 		C* inst = static_cast<C*>(cmp.scene);
-		(inst->*remover)(cmp.handle, index);
+		(inst->*remover)(cmp.entity, index);
 	}
 
 
@@ -579,7 +579,7 @@ struct ArrayProperty : IArrayProperty
 	{ 
 		using C = typename ClassOf<Counter>::Type;
 		C* inst = static_cast<C*>(cmp.scene);
-		return (inst->*counter)(cmp.handle);
+		return (inst->*counter)(cmp.entity);
 	}
 
 
@@ -673,7 +673,7 @@ struct ConstArrayProperty : IArrayProperty
 	{
 		using C = typename ClassOf<Counter>::Type;
 		C* inst = static_cast<C*>(cmp.scene);
-		return (inst->*counter)(cmp.handle);
+		return (inst->*counter)(cmp.entity);
 	}
 
 

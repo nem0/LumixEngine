@@ -522,7 +522,7 @@ public:
 			serializer.write(cmp_name, type_hash);
 			int scene_version = universe->getScene(cmp.type)->getVersion();
 			serializer.write("scene_version", scene_version);
-			universe->serializeComponent(serializer, cmp.type, cmp.handle);
+			universe->serializeComponent(serializer, cmp.type, cmp.entity);
 		}
 		serializer.write("cmp_end", 0);
 

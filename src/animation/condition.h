@@ -32,7 +32,7 @@ struct RunningContext
 	struct Edge* edge;
 	AnimSet* anim_set;
 	OutputBlob* event_stream;
-	ComponentHandle controller;
+	Entity controller;
 };
 
 

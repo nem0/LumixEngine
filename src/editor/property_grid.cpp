@@ -66,7 +66,6 @@ struct GridUIVisitor LUMIX_FINAL : Reflection::IPropertyVisitor
 		first_entity_cmp.type = m_cmp_type;
 		first_entity_cmp.scene = m_editor.getUniverse()->getScene(m_cmp_type);
 		first_entity_cmp.entity = m_entities[0];
-		first_entity_cmp.handle = first_entity_cmp.scene->getComponent(m_entities[0], m_cmp_type);
 		return first_entity_cmp;
 	}
 
@@ -576,7 +575,6 @@ static bool componentTreeNode(StudioApp& app, ComponentType cmp_type, const Enti
 		cmp.type = cmp_type;
 		cmp.entity = entities[0];
 		cmp.scene = app.getWorldEditor().getUniverse()->getScene(cmp_type);
-		cmp.handle = cmp.scene->getComponent(cmp.entity, cmp.type);
 		OutputBlob blob(&b, sizeof(b));
 		enabled_prop->getValue(cmp, -1, blob);
 		if(ImGui::Checkbox(cmp_type_name, &b))
@@ -623,7 +621,6 @@ void PropertyGrid::showComponentProperties(const Array<Entity>& entities, Compon
 		cmp.type = cmp_type;
 		cmp.scene = m_editor.getUniverse()->getScene(cmp.type);
 		cmp.entity = entities[0];
-		cmp.handle = cmp.scene->getComponent(cmp.entity, cmp.type);
 		for (auto* i : m_plugins)
 		{
 			i->onGUI(*this, cmp);
