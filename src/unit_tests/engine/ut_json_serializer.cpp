@@ -17,7 +17,7 @@ void UT_json_serializer(const char* params)
 	FS::MemoryFileDevice device(allocator);
 	FS::IFile* file = device.createFile(NULL);
 	{
-		JsonSerializer serializer(*file, JsonSerializer::WRITE, Path(""), allocator);
+		JsonSerializer serializer(*file, Path(""));
 		serializer.beginObject();
 
 		serializer.beginArray("array");
@@ -39,7 +39,7 @@ void UT_json_serializer(const char* params)
 	file->seek(FS::SeekMode::BEGIN, 0);
 
 	{
-		JsonSerializer serializer(*file, JsonSerializer::READ, Path(""), allocator);
+		JsonDeserializer serializer(*file, Path(""), allocator);
 		serializer.deserializeObjectBegin();
 
 		LUMIX_EXPECT(!serializer.isObjectEnd());
