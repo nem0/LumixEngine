@@ -51,6 +51,11 @@ IMGUI_API void EndTimeline();
 
 struct CurveEditor
 {
+	enum Flags
+	{
+		NO_TANGENTS = 1 << 0
+	};
+
 	bool valid;
 	ImVec2 beg_pos;
 	ImVec2 graph_size;
@@ -58,10 +63,13 @@ struct CurveEditor
 	static const float HEIGHT;
 	ImVec2 inner_bb_min;
 	ImVec2 inner_bb_max;
+	ImVec2 offset;
+	float zoom = 1;
 	int point_idx;
+	ImU32 flags = 0;
 };
 
-IMGUI_API CurveEditor BeginCurveEditor(const char* label);
+IMGUI_API CurveEditor BeginCurveEditor(const char* label, const ImVec2& size = ImVec2(-1, -1), ImU32 flags = 0);
 IMGUI_API bool CurveSegment(ImVec2* point, CurveEditor& editor);
 IMGUI_API void EndCurveEditor(const CurveEditor& editor);
 IMGUI_API bool BeginResizablePopup(const char* str_id, const ImVec2& size_on_first_use);

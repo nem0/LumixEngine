@@ -367,9 +367,14 @@ struct GridUIVisitor LUMIX_FINAL : Reflection::IPropertyVisitor
 
 			changed |= ImGui::CurveSegment((ImVec2*)(f + 1), editor);
 
+			f[1].x = Math::clamp(f[1].x, 0.0f, 1.0f);
+			f[1].y = Math::clamp(f[1].y, 0.0f, 1.0f);
+
 			for (int i = 1; i < count - 3; i += 3)
 			{
 				changed |= ImGui::CurveSegment((ImVec2*)(f + i), editor);
+				f[i + 3].x = Math::clamp(f[i + 3].x, 0.0f, 1.0f);
+				f[i + 3].y = Math::clamp(f[i + 3].y, 0.0f, 1.0f);
 
 				if (changed)
 				{
