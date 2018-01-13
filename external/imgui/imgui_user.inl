@@ -504,15 +504,21 @@ namespace ImGui
 
 	const float CurveEditor::GRAPH_MARGIN = 14;
 	const float CurveEditor::HEIGHT = 100;
+	static ImVec2 offset;
 
 
-	CurveEditor BeginCurveEditor(const char* label)
+	CurveEditor BeginCurveEditor(const char* label, const ImVec2& size, ImU32 flags)
 	{
 		CurveEditor editor;
 		editor.valid = false;
+		editor.flags = flags;
 
 		ImGuiWindow* window = GetCurrentWindow();
 		if (window->SkipItems) return editor;
+		
+		editor.offset.x = window->StateStorage.GetFloat(0x100, 0);
+		editor.offset.y = window->StateStorage.GetFloat(0x101, 0);
+		editor.zoom = window->StateStorage.GetFloat(0x107, 1);
 
 		ImGuiContext& g = *GImGui;
 		const ImGuiStyle& style = g.Style;
@@ -522,8 +528,8 @@ namespace ImGui
 
 		const ImVec2 label_size = CalcTextSize(label, nullptr, true);
 
-		editor.graph_size.x = CalcItemWidth() + (style.FramePadding.x * 2);
-		editor.graph_size.y = CurveEditor::HEIGHT;
+		editor.graph_size.x = size.x < 0 ? CalcItemWidth() + (style.FramePadding.x * 2) : size.x;
+		editor.graph_size.y = size.y < 0 ? CurveEditor::HEIGHT : size.y;
 
 		const ImRect frame_bb(cursor_pos, cursor_pos + editor.graph_size);
 		const ImRect inner_bb(frame_bb.Min + style.FramePadding, frame_bb.Max - style.FramePadding);
@@ -547,13 +553,50 @@ namespace ImGui
 		SetCursorScreenPos(cursor_pos);
 
 		editor.point_idx = -1;
+		window->DrawList->PushClipRect(editor.inner_bb_min, editor.inner_bb_max);
 
+		if (ImGui::GetIO().MouseWheel != 0)
+		{
+			editor.zoom += ImGui::GetIO().MouseWheel * 0.1f;
+			window->StateStorage.SetFloat(0x107, editor.zoom);
+		}
+
+		if (ImGui::IsMouseDragging(1) && ImGui::IsMouseHoveringRect(editor.inner_bb_min, editor.inner_bb_max))
+		{
+			window->StateStorage.SetBool(0x102, true);
+			window->StateStorage.SetFloat(0x103, editor.offset.x);
+			window->StateStorage.SetFloat(0x104, editor.offset.y);
+		}
+		if (ImGui::IsMouseReleased(1))
+		{
+			window->StateStorage.SetBool(0x102, false);
+			editor.offset.x = window->StateStorage.GetFloat(0x103, 0);
+			editor.offset.y = window->StateStorage.GetFloat(0x104, 0);
+			editor.offset.x += window->StateStorage.GetFloat(0x105, 0);
+			editor.offset.y += window->StateStorage.GetFloat(0x106, 0);
+			window->StateStorage.SetFloat(0x100, editor.offset.x);
+			window->StateStorage.SetFloat(0x101, editor.offset.y);
+		}
+		if (window->StateStorage.GetBool(0x102, false))
+		{
+			ImVec2 drag_offset = ImGui::GetMouseDragDelta(1);
+			editor.offset.x = window->StateStorage.GetFloat(0x103, editor.offset.x);
+			editor.offset.y = window->StateStorage.GetFloat(0x104, editor.offset.y);
+			editor.offset.x += drag_offset.x;
+			editor.offset.y += drag_offset.y;
+			window->StateStorage.SetFloat(0x105, drag_offset.x);
+			window->StateStorage.SetFloat(0x106, drag_offset.y);
+		}
+		
 		return editor;
 	}
 
 
 	void EndCurveEditor(const CurveEditor& editor)
 	{
+		ImGuiWindow* window = GetCurrentWindow();
+		window->DrawList->PopClipRect();
+
 		SetCursorScreenPos(editor.inner_bb_min);
 		PopID();
 
@@ -569,17 +612,42 @@ namespace ImGui
 		const ImRect inner_bb(editor.inner_bb_min, editor.inner_bb_max);
 
 		ImVec2 p_last = points[0];
-		ImVec2 tangent_last = points[1];
-		ImVec2 tangent = points[2];
-		ImVec2 p = points[3];
-
-		auto transform = [inner_bb](const ImVec2& p) -> ImVec2
+		ImVec2 tangent_last;
+		ImVec2 tangent;
+		ImVec2 p;
+		if (editor.flags & CurveEditor::NO_TANGENTS)
 		{
-			return ImVec2(inner_bb.Min.x * (1 - p.x) + inner_bb.Max.x * p.x,
-				inner_bb.Min.y * p.y + inner_bb.Max.y * (1 - p.y));
+			p = points[1];
+		}
+		else
+		{
+			tangent_last = points[1];
+			tangent = points[2];
+			p = points[3];
+		}
+
+		auto transform = [inner_bb, &editor](const ImVec2& pos) -> ImVec2
+		{
+			ImVec2 p = pos;
+			p.x *= editor.zoom;
+			p.y *= editor.zoom;
+			return ImVec2(editor.offset.x + inner_bb.Min.x * (1 - p.x) + inner_bb.Max.x * p.x,
+				editor.offset.y + inner_bb.Min.y * p.y + inner_bb.Max.y * (1 - p.y));
 		};
 
-		auto handlePoint = [&window, &editor, transform, inner_bb](ImVec2& p) -> bool
+		auto invTransform = [inner_bb, &editor](const ImVec2& pos) -> ImVec2
+		{
+			ImVec2 p = pos;
+			p.x -= editor.offset.x;
+			p.y -= editor.offset.y;
+			p.x = (p.x - inner_bb.Min.x) / (inner_bb.Max.x - inner_bb.Min.x);
+			p.y = (inner_bb.Max.y - p.y) / (inner_bb.Max.y - inner_bb.Min.y);
+			p.x /= editor.zoom;
+			p.y /= editor.zoom;
+			return p;
+		};
+
+		auto handlePoint = [&](ImVec2& p) -> bool
 		{
 			static const float SIZE = 3;
 
@@ -602,11 +670,8 @@ namespace ImGui
 			if (IsItemActive() && IsMouseDragging(0))
 			{
 				pos += GetIO().MouseDelta;
-				ImVec2 v;
-				v.x = (pos.x - inner_bb.Min.x) / (inner_bb.Max.x - inner_bb.Min.x);
-				v.y = (inner_bb.Max.y - pos.y) / (inner_bb.Max.y - inner_bb.Min.y);
+				ImVec2 v = invTransform(pos);
 
-				v = ImClamp(v, ImVec2(0, 0), ImVec2(1, 1));
 				p = v;
 				changed = true;
 			}
@@ -674,31 +739,41 @@ namespace ImGui
 		}
 		else
 		{
-			window->DrawList->AddBezierCurve(
-				transform(p_last),
-				transform(p_last + tangent_last),
-				transform(p + tangent),
-				transform(p),
-				GetColorU32(ImGuiCol_PlotLines),
-				1.0f,
-				20);
-
-			if (handleTangent(tangent_last, p_last))
+			if ((editor.flags & CurveEditor::NO_TANGENTS) == 0)
 			{
-				points[1] = ImClamp(tangent_last, ImVec2(0, -1), ImVec2(1, 1));
-				changed = true;
+				window->DrawList->AddBezierCurve(
+					transform(p_last),
+					transform(p_last + tangent_last),
+					transform(p + tangent),
+					transform(p),
+					GetColorU32(ImGuiCol_PlotLines),
+					1.0f,
+					20);
+				if (handleTangent(tangent_last, p_last))
+				{
+					points[1] = ImClamp(tangent_last, ImVec2(0, -1), ImVec2(1, 1));
+					changed = true;
+				}
+				if (handleTangent(tangent, p))
+				{
+					points[2] = ImClamp(tangent, ImVec2(-1, -1), ImVec2(0, 1));
+					changed = true;
+				}
+				if (handlePoint(p))
+				{
+					points[3] = p;
+					changed = true;
+				}
+
 			}
-
-			if (handleTangent(tangent, p))
+			else
 			{
-				points[2] = ImClamp(tangent, ImVec2(-1, -1), ImVec2(0, 1));
-				changed = true;
-			}
-
-			if (handlePoint(p))
-			{
-				points[3] = p;
-				changed = true;
+				window->DrawList->AddLine(transform(p_last), transform(p), GetColorU32(ImGuiCol_PlotLines), 1.0f);
+				if (handlePoint(p))
+				{
+					points[1] = p;
+					changed = true;
+				}
 			}
 		}
 
