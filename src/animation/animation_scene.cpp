@@ -1000,12 +1000,14 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 			PropertyAnimator& animator = m_property_animators.at(anim_idx);
 			const PropertyAnimation* animation = animator.animation;
 			if (!animation || !animation->isReady()) continue;
+			if (animation->curves[0].frames.empty()) continue;
 
 			animator.time += time_delta;
 			int frame = int(animator.time * animation->fps + 0.5f);
 			frame = frame % animation->curves[0].frames.back();
 			for (PropertyAnimation::Curve& curve : animation->curves)
 			{
+				if (curve.frames.size() < 2) continue;
 				for (int i = 1, n = curve.frames.size(); i < n; ++i)
 				{
 					if (frame <= curve.frames[i])
