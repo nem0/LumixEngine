@@ -26,6 +26,8 @@ namespace
 
 
 static const ComponentType GUI_RECT_TYPE = Reflection::getComponentType("gui_rect");
+static const ComponentType GUI_IMAGE_TYPE = Reflection::getComponentType("gui_image");
+static const ComponentType GUI_TEXT_TYPE = Reflection::getComponentType("gui_text");
 
 
 struct SpritePlugin LUMIX_FINAL : public AssetBrowser::IPlugin
@@ -93,6 +95,15 @@ struct SpritePlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 
 class GUIEditor LUMIX_FINAL : public StudioApp::IPlugin
 {
+enum class EdgeMask
+{
+	LEFT = 1 << 0,
+	RIGHT = 1 << 1,
+	TOP = 1 << 2,
+	BOTTOM = 1 << 3,
+	ALL = LEFT | RIGHT | TOP | BOTTOM
+};
+
 public:
 	GUIEditor(StudioApp& app)
 	{
@@ -242,7 +253,7 @@ private:
 				}
 			}
 
-			if (ImGui::IsMouseClicked(0) && m_mouse_mode == MouseMode::NONE)
+			if (ImGui::IsMouseClicked(0) && ImGui::IsItemHovered() && m_mouse_mode == MouseMode::NONE)
 			{
 				Entity e = scene->getRectAt(toLumix(mouse_canvas_pos), toLumix(size));
 				if (e.isValid()) m_editor->selectEntities(&e, 1);
@@ -252,9 +263,142 @@ private:
 			m_pipeline->render();
 			m_texture_handle = m_pipeline->getRenderbuffer("default", 0);
 			ImGui::Image(&m_texture_handle, size);
+
+			bool has_rect = false;
+			if (m_editor->getSelectedEntities().size() == 1)
+			{
+				has_rect = m_editor->getUniverse()->hasComponent(m_editor->getSelectedEntities()[0], GUI_RECT_TYPE);
+			}
+			if (has_rect && ImGui::BeginPopupContextItem("context"))
+			{
+				Entity e = m_editor->getSelectedEntities()[0];
+				if (ImGui::BeginMenu("Make relative"))
+				{
+					if (ImGui::MenuItem("All")) makeRelative(e, toLumix(size), (u8)EdgeMask::ALL);
+					if (ImGui::MenuItem("Top")) makeRelative(e, toLumix(size), (u8)EdgeMask::TOP);
+					if (ImGui::MenuItem("Right")) makeRelative(e, toLumix(size), (u8)EdgeMask::RIGHT);
+					if (ImGui::MenuItem("Bottom")) makeRelative(e, toLumix(size), (u8)EdgeMask::BOTTOM);
+					if (ImGui::MenuItem("Left")) makeRelative(e, toLumix(size), (u8)EdgeMask::LEFT);
+					
+					ImGui::EndMenu();
+				}
+				if (ImGui::BeginMenu("Make absolute"))
+				{
+					if (ImGui::MenuItem("All")) makeAbsolute(e, toLumix(size), (u8)EdgeMask::ALL);
+					if (ImGui::MenuItem("Top")) makeAbsolute(e, toLumix(size), (u8)EdgeMask::TOP);
+					if (ImGui::MenuItem("Right")) makeAbsolute(e, toLumix(size), (u8)EdgeMask::RIGHT);
+					if (ImGui::MenuItem("Bottom")) makeAbsolute(e, toLumix(size), (u8)EdgeMask::BOTTOM);
+					if (ImGui::MenuItem("Left")) makeAbsolute(e, toLumix(size), (u8)EdgeMask::LEFT);
+					ImGui::EndMenu();
+				}
+				if (ImGui::BeginMenu("Create child"))
+				{
+					if (ImGui::MenuItem("Rect")) createChild(e, GUI_RECT_TYPE);
+					if (ImGui::MenuItem("Image")) createChild(e, GUI_IMAGE_TYPE);
+					if (ImGui::MenuItem("Text")) createChild(e, GUI_TEXT_TYPE);
+					ImGui::EndMenu();
+				}
+				ImGui::EndPopup();
+			}
 		}
 
 		ImGui::EndDock();
+	}
+
+
+	void createChild(Entity entity, ComponentType child_type)
+	{
+		m_editor->beginCommandGroup(crc32("create_gui_rect_child"));
+		Entity child = m_editor->addEntity();
+		m_editor->makeParent(entity, child);
+		m_editor->selectEntities(&child, 1);
+		m_editor->addComponent(child_type);
+		m_editor->endCommandGroup();
+	}
+
+
+	void setRectProperty(Entity e, const char* prop_name, float value)
+	{
+		const Reflection::PropertyBase* prop = Reflection::getProperty(GUI_RECT_TYPE, crc32(prop_name));
+		ASSERT(prop);
+		m_editor->setProperty(GUI_RECT_TYPE, -1, *prop, &e, 1, &value, sizeof(value));
+	}
+
+	
+	void makeAbsolute(Entity entity, const Vec2& canvas_size, u8 mask)
+	{
+		GUIScene* scene = (GUIScene*)m_editor->getUniverse()->getScene(crc32("gui"));
+
+		Entity parent = scene->getUniverse().getParent(entity);
+		GUIScene::Rect parent_rect = scene->getRectOnCanvas(parent, canvas_size);
+		GUIScene::Rect child_rect = scene->getRectOnCanvas(entity, canvas_size);
+
+		m_editor->beginCommandGroup(crc32("make_gui_rect_absolute"));
+
+		if (mask & (u8)EdgeMask::TOP)
+		{
+			setRectProperty(entity, "Top Relative", 0);
+			setRectProperty(entity, "Top Points", child_rect.y - parent_rect.y);
+		}
+		
+		if (mask & (u8)EdgeMask::LEFT)
+		{
+			setRectProperty(entity, "Left Relative", 0);
+			setRectProperty(entity, "Left Points", child_rect.x - parent_rect.x);
+		}
+
+		if (mask & (u8)EdgeMask::RIGHT)
+		{
+			setRectProperty(entity, "Right Relative", 0);
+			setRectProperty(entity, "Right Points", child_rect.x + child_rect.w - parent_rect.x);
+		}
+		
+		if (mask & (u8)EdgeMask::BOTTOM)
+		{
+			setRectProperty(entity, "Bottom Relative", 0);
+			setRectProperty(entity, "Bottom Points", child_rect.y + child_rect.h - parent_rect.y);
+		}
+
+		m_editor->endCommandGroup();
+	}
+
+
+	void makeRelative(Entity entity, const Vec2& canvas_size, u8 mask)
+	{
+		GUIScene* scene = (GUIScene*)m_editor->getUniverse()->getScene(crc32("gui"));
+		
+		Entity parent = scene->getUniverse().getParent(entity);
+		GUIScene::Rect parent_rect = scene->getRectOnCanvas(parent, canvas_size);
+		GUIScene::Rect child_rect = scene->getRectOnCanvas(entity, canvas_size);
+
+		m_editor->beginCommandGroup(crc32("make_gui_rect_relative"));
+		
+		if (mask & (u8)EdgeMask::TOP)
+		{
+			setRectProperty(entity, "Top Points", 0);
+			setRectProperty(entity, "Top Relative", (child_rect.y - parent_rect.y) / parent_rect.h);
+		}
+
+		if (mask & (u8)EdgeMask::RIGHT)
+		{
+			setRectProperty(entity, "Right Points", 0);
+			setRectProperty(entity, "Right Relative", (child_rect.x + child_rect.w - parent_rect.x) / parent_rect.w);
+		}
+
+		
+		if (mask & (u8)EdgeMask::LEFT)
+		{
+			setRectProperty(entity, "Left Points", 0);
+			setRectProperty(entity, "Left Relative", (child_rect.x - parent_rect.x) / parent_rect.w);
+		}
+			
+		if (mask & (u8)EdgeMask::BOTTOM)
+		{
+			setRectProperty(entity, "Bottom Points", 0);
+			setRectProperty(entity, "Bottom Relative", (child_rect.y + child_rect.h - parent_rect.y) / parent_rect.h);
+		}
+
+		m_editor->endCommandGroup();
 	}
 
 

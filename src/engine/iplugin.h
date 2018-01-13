@@ -13,7 +13,6 @@ namespace Lumix
 	struct ISerializer;
 	class OutputBlob;
 	class Universe;
-	class Universe;
 
 
 	struct LUMIX_ENGINE_API IScene
