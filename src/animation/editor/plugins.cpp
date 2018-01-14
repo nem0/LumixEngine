@@ -110,7 +110,7 @@ struct PropertyAnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 				PropertyAnimation::Curve& curve = animation->curves[i];
 				const char* cmp_name = m_app.getComponentTypeName(curve.cmp_type);
 				StaticString<64> tmp(cmp_name, " - ", curve.property->name);
-				if (ImGui::Selectable(tmp)) m_selected_curve = i;
+				if (ImGui::Selectable(tmp, m_selected_curve == i)) m_selected_curve = i;
 			}
 
 			if (m_selected_curve >= animation->curves.size()) m_selected_curve = -1;
@@ -118,41 +118,31 @@ struct PropertyAnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 
 			ImGui::PushItemWidth(ImGui::GetContentRegionAvailWidth() - 20);
 			static ImVec2 size(-1, 200);
-			ImGui::CurveEditor curve_editor = ImGui::BeginCurveEditor("", size, ImGui::CurveEditor::NO_TANGENTS);
+			// TODO
+/*			ImGui::CurveEditor curve_editor = ImGui::BeginCurveEditor("", size, ImGui::CurveEditor::NO_TANGENTS);
 			
 			PropertyAnimation::Curve& curve = animation->curves[m_selected_curve];
-			float max_value = -FLT_MAX;
-			float min_value = FLT_MAX;
-			for (float f : curve.values)
-			{
-				max_value = Math::maximum(max_value, f);
-				min_value = Math::minimum(min_value, f);
-			}
 
 			{
-				float x0 = curve.frames[0] / (float)curve.frames.back();
-				float y0 = (curve.values[0] - min_value) / (max_value - min_value);
-				ImVec2 points[2] = { { x0, y0 }, { 0, 0 } };
+				ImVec2 points[2] = { { (float)curve.frames[0], curve.values[0] }, { 0, 0 } };
 				ImGui::CurveSegment(points, curve_editor);
-				curve.values[0] = points[0].y * (max_value - min_value) + min_value;
+				curve.values[0] = points[0].y;
 			}
 
 			for (int i = 1, n = curve.frames.size(); i < n; ++i)
 			{
-				float x1 = curve.frames[i] / (float)curve.frames.back();
-				float y1 = (curve.values[i] - min_value) / (max_value - min_value);
-				float x0 = curve.frames[i-1] / (float)curve.frames.back();
-				float y0 = (curve.values[i-1] - min_value) / (max_value - min_value);
-				ImVec2 points[2] = { {x0, y0}, {x1,y1} };
+				ImVec2 points[2] = { 
+					{ (float)curve.frames[i - 1], curve.values[i - 1] }, 
+					{ (float)curve.frames[i], curve.values[i] } };
 				ImGui::CurveSegment(points, curve_editor);
-				curve.values[i] = points[1].y * (max_value - min_value) + min_value;
-				curve.frames[i] = int(points[1].x * curve.frames.back() + 0.5f);
+				curve.values[i] = points[1].y;
+				curve.frames[i] = int(points[1].x + 0.5f);
 			}
 			ImGui::EndCurveEditor(curve_editor);
 			ImGui::PopItemWidth();
 
 			ImGui::HSplitter("sizer", &size);
-
+			*/
 			return true;
 		}
 		return false;

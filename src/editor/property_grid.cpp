@@ -360,45 +360,32 @@ struct GridUIVisitor LUMIX_FINAL : Reflection::IPropertyVisitor
 		input.read(count);
 		Vec2* f = (Vec2*)input.skip(sizeof(Vec2) * count);
 
-		auto editor = ImGui::BeginCurveEditor(prop.name);
-		if (editor.valid)
+		int changed = ImGui::CurveEditor(prop.name, (float*)f, count / 3) * 3 + 1;
+		if (changed >= 0)
 		{
-			bool changed = false;
-
-			changed |= ImGui::CurveSegment((ImVec2*)(f + 1), editor);
-
-			f[1].x = Math::clamp(f[1].x, 0.0f, 1.0f);
-			f[1].y = Math::clamp(f[1].y, 0.0f, 1.0f);
-
-			for (int i = 1; i < count - 3; i += 3)
+			f[changed].x = Math::clamp(f[changed].x, 0.0f, 1.0f);
+			f[changed].y = Math::clamp(f[changed].y, 0.0f, 1.0f);
+			if (changed + 3 < count)
 			{
-				changed |= ImGui::CurveSegment((ImVec2*)(f + i), editor);
-				f[i + 3].x = Math::clamp(f[i + 3].x, 0.0f, 1.0f);
-				f[i + 3].y = Math::clamp(f[i + 3].y, 0.0f, 1.0f);
-
-				if (changed)
-				{
-					f[i + 3].x = Math::maximum(f[i].x + 0.001f, f[i + 3].x);
-
-					if (i + 3 < count)
-					{
-						f[i + 3].x = Math::minimum(f[i + 6].x - 0.001f, f[i + 3].x);
-					}
-				}
-
-				if (ImGui::IsItemActive() && ImGui::IsMouseDoubleClicked(0)
-					&& count > MIN_COUNT && i + 3 < count - 2)
-				{
-					for (int j = i + 2; j < count - 3; ++j)
-					{
-						f[j] = f[j + 3];
-					}
-					count -= 3;
-					*(int*)blob.getData() = count;
-					changed = true;
-				}
+				f[changed].x = Math::minimum(f[changed + 3].x - 0.001f, f[changed].x);
 			}
-
+			if (changed - 3 > 0)
+			{
+				f[changed].x = Math::maximum(f[changed - 3].x + 0.001f, f[changed].x);
+			}
+		}
+		/*if (ImGui::IsItemActive() && ImGui::IsMouseDoubleClicked(0)
+			&& count > MIN_COUNT && i + 3 < count - 2)
+		{
+			for (int j = i + 2; j < count - 3; ++j)
+			{
+				f[j] = f[j + 3];
+			}
+			count -= 3;
+			*(int*)blob.getData() = count;
+			changed = true;
+		}
+		/*
 			f[count - 2].x = 1;
 			f[1].x = 0;
 			ImGui::EndCurveEditor(editor);
@@ -428,24 +415,22 @@ struct GridUIVisitor LUMIX_FINAL : Reflection::IPropertyVisitor
 
 				qsort(f, count / 3, 3 * sizeof(f[0]), compare);
 			}
-
-			if (changed)
+			*/
+		if (changed >= 0)
+		{
+			for (int i = 2; i < count - 3; i += 3)
 			{
-				for (int i = 2; i < count - 3; i += 3)
-				{
-					auto prev_p = ((Vec2*)f)[i - 1];
-					auto next_p = ((Vec2*)f)[i + 2];
-					auto& tangent = ((Vec2*)f)[i];
-					auto& tangent2 = ((Vec2*)f)[i + 1];
-					float half = 0.5f * (next_p.x - prev_p.x);
-					tangent = tangent.normalized() * half;
-					tangent2 = tangent2.normalized() * half;
-				}
-
-				f[0].x = 0;
-				f[count - 1].x = prop.getMaxX();
-				m_editor.setProperty(cmp.type, -1, prop, &m_entities[0], m_entities.size(), blob.getData(), blob.getPos());
+				auto prev_p = ((Vec2*)f)[i - 1];
+				auto next_p = ((Vec2*)f)[i + 2];
+				auto& tangent = ((Vec2*)f)[i];
+				auto& tangent2 = ((Vec2*)f)[i + 1];
+				float half = 0.5f * (next_p.x - prev_p.x);
+				tangent = tangent.normalized() * half;
+				tangent2 = tangent2.normalized() * half;
 			}
+			f[1].x = 0;
+			f[count - 2].x = prop.getMaxX();
+			m_editor.setProperty(cmp.type, -1, prop, &m_entities[0], m_entities.size(), blob.getData(), blob.getPos());
 		}
 	}
 

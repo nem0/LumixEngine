@@ -1017,7 +1017,8 @@ public:
 	
 	void deserializeParticleEmitterAlpha(IDeserializer& serializer, Entity entity, int /*scene_version*/)
 	{
-		ParticleEmitter* emitter = m_particle_emitters[entity];
+		int index = allocateParticleEmitter(entity);
+		ParticleEmitter* emitter = m_particle_emitters.at(index);
 		auto* module = LUMIX_NEW(m_allocator, ParticleEmitter::AlphaModule)(*emitter);
 		int count;
 		serializer.read(&count);
@@ -1049,7 +1050,9 @@ public:
 
 	void deserializeParticleEmitterAttractor(IDeserializer& serializer, Entity entity, int /*scene_version*/)
 	{
-		ParticleEmitter* emitter = m_particle_emitters[entity];
+		int index = allocateParticleEmitter(entity);
+		ParticleEmitter* emitter = m_particle_emitters.at(index);
+
 		auto* module = LUMIX_NEW(m_allocator, ParticleEmitter::AttractorModule)(*emitter);
 		serializer.read(&module->m_force);
 		serializer.read(&module->m_count);
@@ -1071,7 +1074,9 @@ public:
 
 	void deserializeParticleEmitterForce(IDeserializer& serializer, Entity entity, int /*scene_version*/)
 	{
-		ParticleEmitter* emitter = m_particle_emitters[entity];
+		int index = allocateParticleEmitter(entity);
+		ParticleEmitter* emitter = m_particle_emitters.at(index);
+
 		auto* module = LUMIX_NEW(m_allocator, ParticleEmitter::ForceModule)(*emitter);
 		serializer.read(&module->m_acceleration);
 		emitter->addModule(module);
@@ -1094,7 +1099,9 @@ public:
 
 	void deserializeParticleEmitterLinearMovement(IDeserializer& serializer, Entity entity, int /*scene_version*/)
 	{
-		ParticleEmitter* emitter = m_particle_emitters[entity];
+		int index = allocateParticleEmitter(entity);
+		ParticleEmitter* emitter = m_particle_emitters.at(index);
+
 		auto* module = LUMIX_NEW(m_allocator, ParticleEmitter::LinearMovementModule)(*emitter);
 		serializer.read(&module->m_x.from);
 		serializer.read(&module->m_x.to);
@@ -1122,7 +1129,9 @@ public:
 
 	void deserializeParticleEmitterPlane(IDeserializer& serializer, Entity entity, int /*scene_version*/)
 	{
-		ParticleEmitter* emitter = m_particle_emitters[entity];
+		int index = allocateParticleEmitter(entity);
+		ParticleEmitter* emitter = m_particle_emitters.at(index);
+
 		auto* module = LUMIX_NEW(m_allocator, ParticleEmitter::PlaneModule)(*emitter);
 		serializer.read(&module->m_bounce);
 		serializer.read(&module->m_count);
@@ -1145,7 +1154,9 @@ public:
 
 	void deserializeParticleEmitterSpawnShape(IDeserializer& serializer, Entity entity, int /*scene_version*/)
 	{
-		ParticleEmitter* emitter = m_particle_emitters[entity];
+		int index = allocateParticleEmitter(entity);
+		ParticleEmitter* emitter = m_particle_emitters.at(index);
+
 		auto* module = LUMIX_NEW(m_allocator, ParticleEmitter::SpawnShapeModule)(*emitter);
 		serializer.read((u8*)&module->m_shape);
 		serializer.read(&module->m_radius);
@@ -1168,7 +1179,9 @@ public:
 
 	void deserializeParticleEmitterSize(IDeserializer& serializer, Entity entity, int /*scene_version*/)
 	{
-		ParticleEmitter* emitter = m_particle_emitters[entity];
+		int index = allocateParticleEmitter(entity);
+		ParticleEmitter* emitter = m_particle_emitters.at(index);
+
 		auto* module = LUMIX_NEW(m_allocator, ParticleEmitter::SizeModule)(*emitter);
 		int count;
 		serializer.read(&count);
@@ -1190,7 +1203,9 @@ public:
 
 	void deserializeParticleEmitterRandomRotation(IDeserializer& serialize, Entity entity, int /*scene_version*/)
 	{
-		ParticleEmitter* emitter = m_particle_emitters[entity];
+		int index = allocateParticleEmitter(entity);
+		ParticleEmitter* emitter = m_particle_emitters.at(index);
+
 		auto* module = LUMIX_NEW(m_allocator, ParticleEmitter::RandomRotationModule)(*emitter);
 		emitter->addModule(module);
 		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_RANDOM_ROTATION_TYPE, this);
@@ -1208,7 +1223,9 @@ public:
 
 	void deserializeParticleEmitterSubimage(IDeserializer& serializer, Entity entity, int /*scene_version*/)
 	{
-		ParticleEmitter* emitter = m_particle_emitters[entity];
+		int index = allocateParticleEmitter(entity);
+		ParticleEmitter* emitter = m_particle_emitters.at(index);
+
 		auto* module = LUMIX_NEW(m_allocator, ParticleEmitter::SubimageModule)(*emitter);
 		serializer.read(&module->rows);
 		serializer.read(&module->cols);
