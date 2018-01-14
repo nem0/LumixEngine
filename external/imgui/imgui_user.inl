@@ -502,10 +502,18 @@ namespace ImGui
 	}
 
 
-	int CurveEditor(const char* label, float* values, int points_count, const ImVec2& editor_size, ImU32 flags)
+	int CurveEditor(const char* label
+		, float* values
+		, int points_count
+		, const ImVec2& editor_size
+		, ImU32 flags
+		, int* new_count)
 	{
 		const float GRAPH_MARGIN = 14;
 		const float HEIGHT = 100;
+
+		int hovered_idx = -1;
+		if (new_count) *new_count = points_count;
 
 		ImGuiWindow* window = GetCurrentWindow();
 		if (window->SkipItems) return -1;
@@ -579,16 +587,45 @@ namespace ImGui
 			window->StateStorage.SetFloat(0x106, drag_offset.y);
 		}
 	
-		int changed = -1;
+		auto transform = [&](const ImVec2& pos) -> ImVec2
+		{
+			ImVec2 p = pos;
+			p.x *= zoom;
+			p.y *= zoom;
+			return ImVec2(offset_x + inner_bb.Min.x * (1 - p.x) + inner_bb.Max.x * p.x,
+				offset_y + inner_bb.Min.y * p.y + inner_bb.Max.y * (1 - p.y));
+		};
+
+		auto invTransform = [&](const ImVec2& pos) -> ImVec2
+		{
+			ImVec2 p = pos;
+			p.x -= offset_x;
+			p.y -= offset_y;
+			p.x = (p.x - inner_bb.Min.x) / (inner_bb.Max.x - inner_bb.Min.x);
+			p.y = (inner_bb.Max.y - p.y) / (inner_bb.Max.y - inner_bb.Min.y);
+			p.x /= zoom;
+			p.y /= zoom;
+			return p;
+		};
+
+		int changed_idx = -1;
 		for (int point_idx = 0; point_idx < points_count - 1; ++point_idx)
 		{
 			ImGuiWindow* window = GetCurrentWindow();
 
 			const ImRect inner_bb(inner_bb.Min, inner_bb.Max);
 
-			int stride = flags & (int)CurveEditorFlags::NO_TANGENTS ? 1 : 3;
-			ImVec2* points = ((ImVec2*)values) + 1 + ((point_idx == 0 ? 0 : point_idx) * stride);
-			ImVec2 p_last = points[0];
+			ImVec2* points;
+			if (flags & (int)CurveEditorFlags::NO_TANGENTS)
+			{
+				points = ((ImVec2*)values) + ((point_idx == 0 ? 0 : point_idx));
+			}
+			else
+			{
+				points = ((ImVec2*)values) + 1 + ((point_idx == 0 ? 0 : point_idx) * 3);
+			}
+			
+			ImVec2 p_prev = points[0];
 			ImVec2 tangent_last;
 			ImVec2 tangent;
 			ImVec2 p;
@@ -602,27 +639,6 @@ namespace ImGui
 				tangent = points[2];
 				p = points[3];
 			}
-
-			auto transform = [&](const ImVec2& pos) -> ImVec2
-			{
-				ImVec2 p = pos;
-				p.x *= zoom;
-				p.y *= zoom;
-				return ImVec2(offset_x + inner_bb.Min.x * (1 - p.x) + inner_bb.Max.x * p.x,
-					offset_y + inner_bb.Min.y * p.y + inner_bb.Max.y * (1 - p.y));
-			};
-
-			auto invTransform = [&](const ImVec2& pos) -> ImVec2
-			{
-				ImVec2 p = pos;
-				p.x -= offset_x;
-				p.y -= offset_y;
-				p.x = (p.x - inner_bb.Min.x) / (inner_bb.Max.x - inner_bb.Min.x);
-				p.y = (inner_bb.Max.y - p.y) / (inner_bb.Max.y - inner_bb.Min.y);
-				p.x /= zoom;
-				p.y /= zoom;
-				return p;
-			};
 
 			auto handlePoint = [&](ImVec2& p, int idx) -> bool
 			{
@@ -641,6 +657,8 @@ namespace ImGui
 				window->DrawList->AddLine(pos + ImVec2(SIZE, 0), pos + ImVec2(0, SIZE), col);
 				window->DrawList->AddLine(pos + ImVec2(SIZE, 0), pos + ImVec2(0, -SIZE), col);
 				window->DrawList->AddLine(pos + ImVec2(-SIZE, 0), pos + ImVec2(0, -SIZE), col);
+
+				if (IsItemHovered()) hovered_idx = point_idx + idx;
 
 				bool changed = false;
 				if (IsItemActive() && IsMouseClicked(0))
@@ -719,47 +737,57 @@ namespace ImGui
 			PushID(point_idx);
 			if (point_idx == 0)
 			{
-				if (handlePoint(p_last, 0))
+				if (handlePoint(p_prev, 0))
 				{
-					p_last.x = 0;
-					points[0] = p_last;
-					changed = point_idx;
+					if (p.x <= p_prev.x) p_prev.x = p.x - 0.001f;
+					points[0] = p_prev;
+					changed_idx = point_idx;
 				}
 			}
 			if ((flags & (int)CurveEditorFlags::NO_TANGENTS) == 0)
 			{
 				window->DrawList->AddBezierCurve(
-					transform(p_last),
-					transform(p_last + tangent_last),
+					transform(p_prev),
+					transform(p_prev + tangent_last),
 					transform(p + tangent),
 					transform(p),
 					GetColorU32(ImGuiCol_PlotLines),
 					1.0f,
 					20);
-				if (handleTangent(tangent_last, p_last, 0))
+				if (handleTangent(tangent_last, p_prev, 0))
 				{
 					points[1] = ImClamp(tangent_last, ImVec2(0, -1), ImVec2(1, 1));
-					changed = point_idx;
+					changed_idx = point_idx;
 				}
 				if (handleTangent(tangent, p, 1))
 				{
 					points[2] = ImClamp(tangent, ImVec2(-1, -1), ImVec2(0, 1));
-					changed = point_idx + 1;
+					changed_idx = point_idx + 1;
 				}
 				if (handlePoint(p, 1))
 				{
+					if (p.x <= p_prev.x) p.x = p_prev.x + 0.001f;
+					if (point_idx < points_count - 2 && p.x >= points[6].x)
+					{
+						p.x = points[6].x - 0.001f;
+					}
 					points[3] = p;
-					changed = point_idx + 1;
+					changed_idx = point_idx + 1;
 				}
 
 			}
 			else
 			{
-				window->DrawList->AddLine(transform(p_last), transform(p), GetColorU32(ImGuiCol_PlotLines), 1.0f);
+				window->DrawList->AddLine(transform(p_prev), transform(p), GetColorU32(ImGuiCol_PlotLines), 1.0f);
 				if (handlePoint(p, 1))
 				{
+					if (p.x <= p_prev.x) p.x = p_prev.x + 0.001f;
+					if (point_idx < points_count - 2 && p.x >= points[2].x)
+					{
+						p.x = points[2].x - 0.001f;
+					}
 					points[1] = p;
-					changed = point_idx + 1;
+					changed_idx = point_idx + 1;
 				}
 			}
 			PopID();
@@ -772,7 +800,69 @@ namespace ImGui
 
 		InvisibleButton("bg", inner_bb.Max - inner_bb.Min);
 		SetCursorScreenPos(beg_pos + ImVec2(0, size.y + 2 * GRAPH_MARGIN + 4));
-		return changed;
+
+		if (ImGui::IsItemActive() && ImGui::IsMouseDoubleClicked(0) && new_count)
+		{
+			ImVec2 mp = ImGui::GetMousePos();
+			ImVec2 new_p = invTransform(mp);
+			ImVec2* points = (ImVec2*)values;
+
+			if ((flags & (int)CurveEditorFlags::NO_TANGENTS) == 0)
+			{
+				points[points_count * 3 + 0] = ImVec2(-0.2f, 0);
+				points[points_count * 3 + 1] = new_p;
+				points[points_count * 3 + 2] = ImVec2(0.2f, 0);;
+				++*new_count;
+
+				auto compare = [](const void* a, const void* b) -> int
+				{
+					float fa = (((const ImVec2*)a) + 1)->x;
+					float fb = (((const ImVec2*)b) + 1)->x;
+					return fa < fb ? -1 : (fa > fb) ? 1 : 0;
+				};
+
+				qsort(values, points_count + 1, sizeof(ImVec2) * 3, compare);
+
+			}
+			else
+			{
+				points[points_count] = new_p;
+				++*new_count;
+
+				auto compare = [](const void* a, const void* b) -> int
+				{
+					float fa = ((const ImVec2*)a)->x;
+					float fb = ((const ImVec2*)b)->x;
+					return fa < fb ? -1 : (fa > fb) ? 1 : 0;
+				};
+
+				qsort(values, points_count + 1, sizeof(ImVec2), compare);
+			}
+		}
+
+		if (hovered_idx >= 0 && ImGui::IsMouseDoubleClicked(0) && new_count && points_count > 2)
+		{
+			ImVec2* points = (ImVec2*)values;
+			--*new_count;
+			if ((flags & (int)CurveEditorFlags::NO_TANGENTS) == 0)
+			{
+				for (int j = hovered_idx * 3; j < points_count * 3 - 3; j += 3)
+				{
+					points[j + 0] = points[j + 3];
+					points[j + 1] = points[j + 4];
+					points[j + 2] = points[j + 5];
+				}
+			}
+			else
+			{
+				for (int j = hovered_idx; j < points_count - 1; ++j)
+				{
+					points[j] = points[j + 1];
+				}
+			}
+		}
+
+		return changed_idx;
 	}
 
 

@@ -118,31 +118,35 @@ struct PropertyAnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 
 			ImGui::PushItemWidth(ImGui::GetContentRegionAvailWidth() - 20);
 			static ImVec2 size(-1, 200);
-			// TODO
-/*			ImGui::CurveEditor curve_editor = ImGui::BeginCurveEditor("", size, ImGui::CurveEditor::NO_TANGENTS);
 			
 			PropertyAnimation::Curve& curve = animation->curves[m_selected_curve];
-
+			ImVec2 points[16];
+			for (int i = 0; i < curve.frames.size(); ++i)
 			{
-				ImVec2 points[2] = { { (float)curve.frames[0], curve.values[0] }, { 0, 0 } };
-				ImGui::CurveSegment(points, curve_editor);
-				curve.values[0] = points[0].y;
+				points[i].x = (float)curve.frames[i];
+				points[i].y = curve.values[i];
+			}
+			int new_count;
+			int changed = ImGui::CurveEditor("", (float*)points, curve.frames.size(), size, (int)ImGui::CurveEditorFlags::NO_TANGENTS, &new_count);
+			if (changed >= 0)
+			{
+				curve.frames[changed] = int(points[changed].x + 0.5f);
+				curve.values[changed] = points[changed].y;
+			}
+			if (new_count != curve.frames.size())
+			{
+				curve.frames.resize(new_count);
+				curve.values.resize(new_count);
+				for (int i = 0; i < new_count; ++i)
+				{
+					curve.frames[i] = int(points[i].x + 0.5f);
+					curve.values[i] = points[i].y;
+				}
 			}
 
-			for (int i = 1, n = curve.frames.size(); i < n; ++i)
-			{
-				ImVec2 points[2] = { 
-					{ (float)curve.frames[i - 1], curve.values[i - 1] }, 
-					{ (float)curve.frames[i], curve.values[i] } };
-				ImGui::CurveSegment(points, curve_editor);
-				curve.values[i] = points[1].y;
-				curve.frames[i] = int(points[1].x + 0.5f);
-			}
-			ImGui::EndCurveEditor(curve_editor);
 			ImGui::PopItemWidth();
 
 			ImGui::HSplitter("sizer", &size);
-			*/
 			return true;
 		}
 		return false;
