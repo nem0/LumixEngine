@@ -3106,20 +3106,28 @@ public:
 
 
 	void getPointLightInfluencedGeometry(Entity light,
+		Entity camera,
+		const Vec3& lod_ref_point,
 		const Frustum& frustum,
 		Array<ModelInstanceMesh>& infos) override
 	{
 		PROFILE_FUNCTION();
 
 		int light_index = m_point_lights_map[light];
+		float lod_multiplier = getCameraLODMultiplier(camera);
+		float final_lod_multiplier = m_lod_multiplier * lod_multiplier;
 		for (int j = 0, cj = m_light_influenced_geometry[light_index].size(); j < cj; ++j)
 		{
 			Entity model_instance_entity = m_light_influenced_geometry[light_index][j];
 			ModelInstance& model_instance = m_model_instances[model_instance_entity.index];
 			const Sphere& sphere = m_culling_system->getSphere(model_instance_entity);
+			float squared_distance = (model_instance.matrix.getTranslation() - lod_ref_point).squaredLength();
+			squared_distance *= final_lod_multiplier;
+
 			if (frustum.isSphereInside(sphere.position, sphere.radius))
 			{
-				for (int k = 0, kc = model_instance.model->getMeshCount(); k < kc; ++k)
+				LODMeshIndices lod = model_instance.model->getLODMeshIndices(squared_distance);
+				for (int k = lod.from, c = lod.to; k <= c; ++k)
 				{
 					auto& info = infos.emplace();
 					info.mesh = &model_instance.model->getMesh(k);
@@ -3130,16 +3138,24 @@ public:
 	}
 
 
-	void getPointLightInfluencedGeometry(Entity light, Array<ModelInstanceMesh>& infos) override
+	void getPointLightInfluencedGeometry(Entity light, 
+		Entity camera, 
+		const Vec3& lod_ref_point,
+		Array<ModelInstanceMesh>& infos) override
 	{
 		PROFILE_FUNCTION();
 
 		int light_index = m_point_lights_map[light];
 		auto& geoms = m_light_influenced_geometry[light_index];
+		float lod_multiplier = getCameraLODMultiplier(camera);
+		float final_lod_multiplier = m_lod_multiplier * lod_multiplier;
 		for (int j = 0, cj = geoms.size(); j < cj; ++j)
 		{
 			const ModelInstance& model_instance = m_model_instances[geoms[j].index];
-			for (int k = 0, kc = model_instance.model->getMeshCount(); k < kc; ++k)
+			float squared_distance = (model_instance.matrix.getTranslation() - lod_ref_point).squaredLength();
+			squared_distance *= final_lod_multiplier;
+			LODMeshIndices lod = model_instance.model->getLODMeshIndices(squared_distance);
+			for (int k = lod.from, kc = lod.to; k <= kc; ++k)
 			{
 				auto& info = infos.emplace();
 				info.mesh = &model_instance.model->getMesh(k);

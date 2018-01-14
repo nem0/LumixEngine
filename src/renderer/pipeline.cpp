@@ -1509,7 +1509,12 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 			Array<ModelInstanceMesh> tmp_meshes(frame_allocator);
 			m_is_current_light_global = false;
-			m_scene->getPointLightInfluencedGeometry(light, frustum, tmp_meshes);
+			Vec3 lod_ref_point = m_scene->getUniverse().getPosition(m_applied_camera);
+			m_scene->getPointLightInfluencedGeometry(light
+				, m_applied_camera
+				, lod_ref_point
+				, frustum
+				, tmp_meshes);
 
 			renderMeshes(tmp_meshes);
 		}
@@ -2007,7 +2012,8 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		PROFILE_FUNCTION();
 
 		Array<ModelInstanceMesh> tmp_meshes(m_renderer.getEngine().getLIFOAllocator());
-		m_scene->getPointLightInfluencedGeometry(light, tmp_meshes);
+		Vec3 lod_ref_point = m_scene->getUniverse().getPosition(m_applied_camera);
+		m_scene->getPointLightInfluencedGeometry(light, m_applied_camera, lod_ref_point, tmp_meshes);
 		renderMeshes(tmp_meshes);
 	}
 
@@ -2024,16 +2030,20 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		{
 			Entity light = lights[i];
 			setPointLightUniforms(light);
+			Vec3 lod_ref_point = m_scene->getUniverse().getPosition(m_applied_camera);
 
 			{
 				Array<ModelInstanceMesh> tmp_meshes(frame_allocator);
-				m_scene->getPointLightInfluencedGeometry(light, frustum, tmp_meshes);
+				m_scene->getPointLightInfluencedGeometry(light
+					, m_applied_camera
+					, lod_ref_point
+					, frustum
+					, tmp_meshes);
 				renderMeshes(tmp_meshes);
 			}
 
 			{
 				Array<TerrainInfo> tmp_terrains(frame_allocator);
-				Vec3 lod_ref_point = m_scene->getUniverse().getPosition(m_applied_camera);
 				Frustum frustum = m_scene->getCameraFrustum(m_applied_camera);
 				m_scene->getTerrainInfos(frustum, lod_ref_point, tmp_terrains);
 				renderTerrains(tmp_terrains);
