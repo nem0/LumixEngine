@@ -353,83 +353,56 @@ struct GridUIVisitor LUMIX_FINAL : Reflection::IPropertyVisitor
 		static const int MIN_COUNT = 6;
 		ComponentUID cmp = getComponent();
 
+		struct Point
+		{
+			Vec2 prev_tangent;
+			Vec2 p;
+			Vec2 next_tangent;
+		};
+
 		OutputBlob blob(m_editor.getAllocator());
 		prop.getValue(cmp, -1, blob);
+		blob.reserve(blob.getPos() + sizeof(Point));
 		int count;
 		InputBlob input(blob);
 		input.read(count);
-		Vec2* f = (Vec2*)input.skip(sizeof(Vec2) * count);
+		count /= 3;
+		Point* points = (Point*)input.skip(sizeof(Point) * count);
 
-		int changed = ImGui::CurveEditor(prop.name, (float*)f, count / 3) * 3 + 1;
-		if (changed >= 0)
+		bool changed = false;
+		int new_count;
+		int changed_idx = ImGui::CurveEditor(prop.name, (float*)points, count, ImVec2(-1, -1), 0, &new_count);
+		if (changed_idx >= 0)
 		{
-			f[changed].x = Math::clamp(f[changed].x, 0.0f, 1.0f);
-			f[changed].y = Math::clamp(f[changed].y, 0.0f, 1.0f);
-			if (changed + 3 < count)
-			{
-				f[changed].x = Math::minimum(f[changed + 3].x - 0.001f, f[changed].x);
-			}
-			if (changed - 3 > 0)
-			{
-				f[changed].x = Math::maximum(f[changed - 3].x + 0.001f, f[changed].x);
-			}
-		}
-		/*if (ImGui::IsItemActive() && ImGui::IsMouseDoubleClicked(0)
-			&& count > MIN_COUNT && i + 3 < count - 2)
-		{
-			for (int j = i + 2; j < count - 3; ++j)
-			{
-				f[j] = f[j + 3];
-			}
-			count -= 3;
-			*(int*)blob.getData() = count;
 			changed = true;
+			points[changed_idx].p.x = Math::clamp(points[changed_idx].p.x, 0.0f, 1.0f);
+			points[changed_idx].p.y = Math::clamp(points[changed_idx].p.y, 0.0f, 1.0f);
 		}
-		/*
-			f[count - 2].x = 1;
-			f[1].x = 0;
-			ImGui::EndCurveEditor(editor);
-
-			if (ImGui::IsItemActive() && ImGui::IsMouseDoubleClicked(0))
-			{
-				auto mp = ImGui::GetMousePos();
-				mp.x -= editor.inner_bb_min.x - 1;
-				mp.y -= editor.inner_bb_min.y - 1;
-				mp.x /= (editor.inner_bb_max.x - editor.inner_bb_min.x);
-				mp.y /= (editor.inner_bb_max.y - editor.inner_bb_min.y);
-				mp.y = 1 - mp.y;
-				blob.write(ImVec2(-0.2f, 0));
-				blob.write(mp);
-				blob.write(ImVec2(0.2f, 0));
-				count += 3;
-				*(int*)blob.getData() = count;
-				f = (Vec2*)((int*)blob.getData() + 1);
-				changed = true;
-
-				auto compare = [](const void* a, const void* b) -> int
-				{
-					float fa = ((const float*)a)[2];
-					float fb = ((const float*)b)[2];
-					return fa < fb ? -1 : (fa > fb) ? 1 : 0;
-				};
-
-				qsort(f, count / 3, 3 * sizeof(f[0]), compare);
-			}
-			*/
-		if (changed >= 0)
+		if (new_count != count)
 		{
-			for (int i = 2; i < count - 3; i += 3)
+			changed = true;
+			if (new_count > count)
+				blob.resize(blob.getPos() + sizeof(Point));
+			else
+				blob.resize(blob.getPos() - sizeof(Point));
+			count = new_count;
+			*(int*)blob.getData() = count * 3;
+		}
+		
+		if (changed)
+		{
+			for (int i = 1; i < count; ++i)
 			{
-				auto prev_p = ((Vec2*)f)[i - 1];
-				auto next_p = ((Vec2*)f)[i + 2];
-				auto& tangent = ((Vec2*)f)[i];
-				auto& tangent2 = ((Vec2*)f)[i + 1];
+				auto prev_p = points[i-1].p;
+				auto next_p = points[i].p;
+				auto& tangent = points[i - 1].next_tangent;
+				auto& tangent2 = points[i].prev_tangent;
 				float half = 0.5f * (next_p.x - prev_p.x);
 				tangent = tangent.normalized() * half;
 				tangent2 = tangent2.normalized() * half;
 			}
-			f[1].x = 0;
-			f[count - 2].x = prop.getMaxX();
+			points[0].p.x = 0;
+			points[count - 1].p.x = prop.getMaxX();
 			m_editor.setProperty(cmp.type, -1, prop, &m_entities[0], m_entities.size(), blob.getData(), blob.getPos());
 		}
 	}

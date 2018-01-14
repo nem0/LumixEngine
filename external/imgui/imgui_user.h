@@ -58,7 +58,8 @@ IMGUI_API int CurveEditor(const char* label
 	, float* values
 	, int points_count
 	, const ImVec2& size = ImVec2(-1, -1)
-	, ImU32 flags = 0);
+	, ImU32 flags = 0
+	, int* new_count = nullptr);
 IMGUI_API bool BeginResizablePopup(const char* str_id, const ImVec2& size_on_first_use);
 IMGUI_API void IntervalGraph(const unsigned long long* value_pairs,
 	int value_pairs_count,
