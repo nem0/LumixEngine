@@ -119,12 +119,18 @@ struct PropertyAnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 				void visitProperty(const Reflection::PropertyBase& prop) override {}
 				void visit(const Reflection::Property<float>& prop) override
 				{
-					if (ImGui::MenuItem(prop.name))
+					int idx = animation->curves.find([&](PropertyAnimation::Curve& rhs) {
+						return rhs.cmp_type == cmp.type && rhs.property == &prop;
+					});
+					if (idx < 0 &&ImGui::MenuItem(prop.name))
 					{
-						// TODO detect duplicates
 						PropertyAnimation::Curve& curve = animation->addCurve();
 						curve.cmp_type = cmp.type;
 						curve.property = &prop;
+						curve.frames.push(0);
+						curve.frames.push(animation->curves.size() > 1 ? animation->curves[0].frames.back() : 1);
+						curve.values.push(0);
+						curve.values.push(0);
 					}
 				}
 				PropertyAnimation* animation;
@@ -173,11 +179,14 @@ struct PropertyAnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 				points[i].y = curve.values[i];
 			}
 			int new_count;
+			int last_frame = curve.frames.back();
 			int changed = ImGui::CurveEditor("", (float*)points, curve.frames.size(), size, (int)ImGui::CurveEditorFlags::NO_TANGENTS, &new_count);
 			if (changed >= 0)
 			{
 				curve.frames[changed] = int(points[changed].x + 0.5f);
 				curve.values[changed] = points[changed].y;
+				curve.frames.back() = last_frame;
+				curve.frames[0] = 0;
 			}
 			if (new_count != curve.frames.size())
 			{

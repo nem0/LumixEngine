@@ -509,120 +509,134 @@ namespace ImGui
 		, ImU32 flags
 		, int* new_count)
 	{
-		const float GRAPH_MARGIN = 14;
+		enum class StorageValues : ImGuiID
+		{
+			FROM_X = 100,
+			FROM_Y,
+			WIDTH,
+			HEIGHT,
+			IS_PANNING,
+			POINT_START_X,
+			POINT_START_Y
+		};
+
 		const float HEIGHT = 100;
+		static ImVec2 start_pan;
+
+		ImGuiContext& g = *GImGui;
+		const ImGuiStyle& style = g.Style;
+		ImVec2 size = editor_size;
+		size.x = size.x < 0 ? CalcItemWidth() + (style.FramePadding.x * 2) : size.x;
+		size.y = size.y < 0 ? HEIGHT : size.y;
+
+		ImGuiWindow* parent_window = GetCurrentWindow();
+		ImGuiID id = parent_window->GetID(label);
+		if (!BeginChildFrame(id, size, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse))
+		{
+			EndChild();
+			return -1;
+		}
 
 		int hovered_idx = -1;
 		if (new_count) *new_count = points_count;
 
 		ImGuiWindow* window = GetCurrentWindow();
-		if (window->SkipItems) return -1;
+		if (window->SkipItems)
+		{
+			EndChild();
+			return -1;
+		}
 		
-		float offset_x = window->StateStorage.GetFloat(0x100, 0);
-		float offset_y = window->StateStorage.GetFloat(0x101, 0);
-		float zoom = window->StateStorage.GetFloat(0x107, 1);
+		ImVec2 points_min(FLT_MAX, FLT_MAX);
+		ImVec2 points_max(-FLT_MAX, -FLT_MAX);
+		for (int point_idx = 0; point_idx < points_count; ++point_idx)
+		{
+			ImVec2 point;
+			if (flags & (int)CurveEditorFlags::NO_TANGENTS)
+			{
+				point = ((ImVec2*)values)[point_idx];
+			}
+			else
+			{
+				point = ((ImVec2*)values)[1 + point_idx * 3];
+			}
+			points_max = ImMax(points_max, point);
+			points_min = ImMin(points_min, point);
+		}
 
-		ImGuiContext& g = *GImGui;
-		const ImGuiStyle& style = g.Style;
+		float from_x = window->StateStorage.GetFloat((ImGuiID)StorageValues::FROM_X, points_min.x);
+		float from_y = window->StateStorage.GetFloat((ImGuiID)StorageValues::FROM_Y, points_min.y);
+		float width = window->StateStorage.GetFloat((ImGuiID)StorageValues::WIDTH, points_max.x - points_min.x);
+		float height = window->StateStorage.GetFloat((ImGuiID)StorageValues::HEIGHT, points_max.y - points_min.y);
+
 		ImVec2 beg_pos = GetCursorScreenPos();
-		ImVec2 cursor_pos = beg_pos + ImVec2(GRAPH_MARGIN, GRAPH_MARGIN);
-		SetCursorScreenPos(cursor_pos);
 
-		const ImVec2 label_size = CalcTextSize(label, nullptr, true);
-
-		ImVec2 size = editor_size;
-		size.x = size.x < 0 ? CalcItemWidth() + (style.FramePadding.x * 2) : size.x;
-		size.y = size.y < 0 ? HEIGHT : size.y;
-
-		const ImRect frame_bb(cursor_pos, cursor_pos + size);
-		const ImRect inner_bb(frame_bb.Min + style.FramePadding, frame_bb.Max - style.FramePadding);
-
-		const ImRect total_bb(frame_bb.Min,
-			frame_bb.Max +
-			ImVec2(label_size.x > 0.0f ? style.ItemInnerSpacing.x + label_size.x : 0.0f, 0));
-
-		ItemSize(total_bb, style.FramePadding.y);
-		if (!ItemAdd(total_bb, 0)) return -1;
-
-		PushID(label);
-
-		RenderFrame(
-			frame_bb.Min, frame_bb.Max, GetColorU32(ImGuiCol_FrameBg), true, style.FrameRounding);
-		RenderText(ImVec2(frame_bb.Max.x + style.ItemInnerSpacing.x, inner_bb.Min.y), label);
-
-		SetCursorScreenPos(cursor_pos);
-
-		window->DrawList->PushClipRect(inner_bb.Min, inner_bb.Max);
+		const ImRect inner_bb = window->InnerRect;
+		const ImRect frame_bb(inner_bb.Min - style.FramePadding, inner_bb.Max + style.FramePadding);
 
 		if (ImGui::GetIO().MouseWheel != 0 && ImGui::IsItemHovered())
 		{
-			zoom *= powf(2, ImGui::GetIO().MouseWheel);
-			window->StateStorage.SetFloat(0x107, zoom);
-		}
-
-		if (ImGui::IsMouseDragging(1) && ImGui::IsItemHovered())
-		{
-			window->StateStorage.SetBool(0x102, true);
-			window->StateStorage.SetFloat(0x103, offset_x);
-			window->StateStorage.SetFloat(0x104, offset_y);
+			float scale = powf(2, ImGui::GetIO().MouseWheel);
+			width *= scale;
+			height *= scale;
+			window->StateStorage.SetFloat((ImGuiID)StorageValues::WIDTH, width);
+			window->StateStorage.SetFloat((ImGuiID)StorageValues::HEIGHT, height);
 		}
 		if (ImGui::IsMouseReleased(1))
 		{
-			window->StateStorage.SetBool(0x102, false);
-			offset_x = window->StateStorage.GetFloat(0x103, 0);
-			offset_y = window->StateStorage.GetFloat(0x104, 0);
-			offset_x += window->StateStorage.GetFloat(0x105, 0);
-			offset_y += window->StateStorage.GetFloat(0x106, 0);
-			window->StateStorage.SetFloat(0x100, offset_x);
-			window->StateStorage.SetFloat(0x101, offset_y);
+			window->StateStorage.SetBool((ImGuiID)StorageValues::IS_PANNING, false);
 		}
-		if (window->StateStorage.GetBool(0x102, false))
+		if (window->StateStorage.GetBool((ImGuiID)StorageValues::IS_PANNING, false))
 		{
 			ImVec2 drag_offset = ImGui::GetMouseDragDelta(1);
-			offset_x = window->StateStorage.GetFloat(0x103, offset_x);
-			offset_y = window->StateStorage.GetFloat(0x104, offset_y);
-			offset_x += drag_offset.x;
-			offset_y += drag_offset.y;
-			window->StateStorage.SetFloat(0x105, drag_offset.x);
-			window->StateStorage.SetFloat(0x106, drag_offset.y);
+			from_x = start_pan.x;
+			from_y = start_pan.y;
+			from_x -= drag_offset.x * width / (inner_bb.Max.x - inner_bb.Min.x);
+			from_y += drag_offset.y * height / (inner_bb.Max.y - inner_bb.Min.y);
+			window->StateStorage.SetFloat((ImGuiID)StorageValues::FROM_X, from_x);
+			window->StateStorage.SetFloat((ImGuiID)StorageValues::FROM_Y, from_y);
 		}
+		else if (ImGui::IsMouseDragging(1) && ImGui::IsItemHovered())
+		{
+			window->StateStorage.SetBool((ImGuiID)StorageValues::IS_PANNING, true);
+			start_pan.x = from_x;
+			start_pan.y = from_y;
+		}
+
 	
 		auto transform = [&](const ImVec2& pos) -> ImVec2
 		{
-			ImVec2 p = pos;
-			p.x *= zoom;
-			p.y *= zoom;
-			return ImVec2(offset_x + inner_bb.Min.x * (1 - p.x) + inner_bb.Max.x * p.x,
-				offset_y + inner_bb.Min.y * p.y + inner_bb.Max.y * (1 - p.y));
+			float x = (pos.x - from_x) / width;
+			float y = (pos.y - from_y) / height;
+
+			return ImVec2(
+				inner_bb.Min.x * (1 - x) + inner_bb.Max.x * x,
+				inner_bb.Min.y * y + inner_bb.Max.y * (1 - y)
+			);
 		};
 
 		auto invTransform = [&](const ImVec2& pos) -> ImVec2
 		{
-			ImVec2 p = pos;
-			p.x -= offset_x;
-			p.y -= offset_y;
-			p.x = (p.x - inner_bb.Min.x) / (inner_bb.Max.x - inner_bb.Min.x);
-			p.y = (inner_bb.Max.y - p.y) / (inner_bb.Max.y - inner_bb.Min.y);
-			p.x /= zoom;
-			p.y /= zoom;
-			return p;
+			float x = (pos.x - inner_bb.Min.x) / (inner_bb.Max.x - inner_bb.Min.x);
+			float y = (inner_bb.Max.y - pos.y) / (inner_bb.Max.y - inner_bb.Min.y);
+
+			return ImVec2(
+				from_x + width * x,
+				from_y + height * y
+			);
 		};
 
 		int changed_idx = -1;
-		for (int point_idx = 0; point_idx < points_count - 1; ++point_idx)
+		for (int point_idx = points_count - 2; point_idx >= 0; --point_idx)
 		{
-			ImGuiWindow* window = GetCurrentWindow();
-
-			const ImRect inner_bb(inner_bb.Min, inner_bb.Max);
-
 			ImVec2* points;
 			if (flags & (int)CurveEditorFlags::NO_TANGENTS)
 			{
-				points = ((ImVec2*)values) + ((point_idx == 0 ? 0 : point_idx));
+				points = ((ImVec2*)values) + point_idx;
 			}
 			else
 			{
-				points = ((ImVec2*)values) + 1 + ((point_idx == 0 ? 0 : point_idx) * 3);
+				points = ((ImVec2*)values) + 1 + point_idx * 3;
 			}
 			
 			ImVec2 p_prev = points[0];
@@ -651,7 +665,7 @@ namespace ImGui
 				PushID(idx);
 				InvisibleButton("", ImVec2(2 * NODE_SLOT_RADIUS, 2 * NODE_SLOT_RADIUS));
 
-				ImU32 col = IsItemHovered() ? GetColorU32(ImGuiCol_PlotLinesHovered) : GetColorU32(ImGuiCol_PlotLines);
+				ImU32 col = IsItemActive() || IsItemHovered() ? GetColorU32(ImGuiCol_PlotLinesHovered) : GetColorU32(ImGuiCol_PlotLines);
 
 				window->DrawList->AddLine(pos + ImVec2(-SIZE, 0), pos + ImVec2(0, SIZE), col);
 				window->DrawList->AddLine(pos + ImVec2(SIZE, 0), pos + ImVec2(0, SIZE), col);
@@ -663,8 +677,8 @@ namespace ImGui
 				bool changed = false;
 				if (IsItemActive() && IsMouseClicked(0))
 				{
-					window->StateStorage.SetFloat(0x108, pos.x);
-					window->StateStorage.SetFloat(0x109, pos.y);
+					window->StateStorage.SetFloat((ImGuiID)StorageValues::POINT_START_X, pos.x);
+					window->StateStorage.SetFloat((ImGuiID)StorageValues::POINT_START_Y, pos.y);
 				}
 
 				if (IsItemHovered() || IsItemActive() && IsMouseDragging(0))
@@ -676,8 +690,8 @@ namespace ImGui
 
 				if (IsItemActive() && IsMouseDragging(0))
 				{
-					pos.x = window->StateStorage.GetFloat(0x108, pos.x);
-					pos.y = window->StateStorage.GetFloat(0x109, pos.y);
+					pos.x = window->StateStorage.GetFloat((ImGuiID)StorageValues::POINT_START_X, pos.x);
+					pos.y = window->StateStorage.GetFloat((ImGuiID)StorageValues::POINT_START_Y, pos.y);
 					pos += ImGui::GetMouseDragDelta();
 					ImVec2 v = invTransform(pos);
 
@@ -735,15 +749,6 @@ namespace ImGui
 			};
 
 			PushID(point_idx);
-			if (point_idx == 0)
-			{
-				if (handlePoint(p_prev, 0))
-				{
-					if (p.x <= p_prev.x) p_prev.x = p.x - 0.001f;
-					points[0] = p_prev;
-					changed_idx = point_idx;
-				}
-			}
 			if ((flags & (int)CurveEditorFlags::NO_TANGENTS) == 0)
 			{
 				window->DrawList->AddBezierCurve(
@@ -790,16 +795,21 @@ namespace ImGui
 					changed_idx = point_idx + 1;
 				}
 			}
+			if (point_idx == 0)
+			{
+				if (handlePoint(p_prev, 0))
+				{
+					if (p.x <= p_prev.x) p_prev.x = p.x - 0.001f;
+					points[0] = p_prev;
+					changed_idx = point_idx;
+				}
+			}
 			PopID();
 		}
 
-		window->DrawList->PopClipRect();
-
 		SetCursorScreenPos(inner_bb.Min);
-		PopID();
 
 		InvisibleButton("bg", inner_bb.Max - inner_bb.Min);
-		SetCursorScreenPos(beg_pos + ImVec2(0, size.y + 2 * GRAPH_MARGIN + 4));
 
 		if (ImGui::IsItemActive() && ImGui::IsMouseDoubleClicked(0) && new_count)
 		{
@@ -862,6 +872,8 @@ namespace ImGui
 			}
 		}
 
+		EndChildFrame();
+		RenderText(ImVec2(frame_bb.Max.x + style.ItemInnerSpacing.x, inner_bb.Min.y), label);
 		return changed_idx;
 	}
 
