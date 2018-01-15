@@ -56,6 +56,7 @@ public:
 	PropertyAnimation(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
 
 	ResourceType getType() const override { return TYPE; }
+	Curve& addCurve();
 
 	Array<Curve> curves;
 	int fps;
