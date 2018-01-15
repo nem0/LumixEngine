@@ -98,12 +98,58 @@ struct PropertyAnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 	}
 
 
+	void ShowAddCurveMenu(PropertyAnimation* animation)
+	{
+		WorldEditor& editor = m_app.getWorldEditor();
+		auto& selected_entities = editor.getSelectedEntities();
+		if (selected_entities.empty()) return;
+			
+		if (!ImGui::BeginMenu("Add curve")) return;
+
+		Universe* universe = editor.getUniverse();
+		;
+		for (ComponentUID cmp = universe->getFirstComponent(selected_entities[0]); cmp.isValid(); cmp = universe->getNextComponent(cmp))
+		{
+			const char* cmp_type_name = m_app.getComponentTypeName(cmp.type);
+			if (!ImGui::BeginMenu(cmp_type_name)) continue;
+
+			const Reflection::ComponentBase* component = Reflection::getComponent(cmp.type);
+			struct : Reflection::ISimpleComponentVisitor
+			{
+				void visitProperty(const Reflection::PropertyBase& prop) override {}
+				void visit(const Reflection::Property<float>& prop) override
+				{
+					if (ImGui::MenuItem(prop.name))
+					{
+						// TODO detect duplicates
+						PropertyAnimation::Curve& curve = animation->addCurve();
+						curve.cmp_type = cmp.type;
+						curve.property = &prop;
+					}
+				}
+				PropertyAnimation* animation;
+				ComponentUID cmp;
+			} visitor;
+
+			visitor.animation = animation;
+			visitor.cmp = cmp;
+			component->visit(visitor);
+
+			ImGui::EndMenu();
+		}
+
+		ImGui::EndMenu();
+	}
+
+
 	bool onGUI(Resource* resource, ResourceType type) override
 	{
 		if (type == PropertyAnimation::TYPE)
 		{
 			auto* animation = static_cast<PropertyAnimation*>(resource);
 			if (!animation->isReady()) return true;
+
+			ShowAddCurveMenu(animation);
 
 			for (int i = 0, n = animation->curves.size(); i < n; ++i)
 			{

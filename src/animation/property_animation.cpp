@@ -33,6 +33,13 @@ PropertyAnimation::PropertyAnimation(const Path& path, ResourceManagerBase& reso
 }
 
 
+PropertyAnimation::Curve& PropertyAnimation::addCurve()
+{
+	auto& manager = (PropertyAnimationManager&)getResourceManager();
+	return curves.emplace(manager.getAllocator());
+}
+
+
 bool PropertyAnimation::load(FS::IFile& file)
 {
 	auto& manager = (PropertyAnimationManager&)getResourceManager();
