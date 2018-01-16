@@ -51,7 +51,8 @@ IMGUI_API void EndTimeline();
 
 enum class CurveEditorFlags
 {
-	NO_TANGENTS = 1 << 0
+	NO_TANGENTS = 1 << 0,
+	SHOW_GRID = 1 << 1
 };
 
 IMGUI_API int CurveEditor(const char* label

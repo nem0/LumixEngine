@@ -563,16 +563,91 @@ namespace ImGui
 			points_max = ImMax(points_max, point);
 			points_min = ImMin(points_min, point);
 		}
+		points_max.y = ImMax(points_max.y, points_min.y + 0.0001f);
 
 		float from_x = window->StateStorage.GetFloat((ImGuiID)StorageValues::FROM_X, points_min.x);
 		float from_y = window->StateStorage.GetFloat((ImGuiID)StorageValues::FROM_Y, points_min.y);
 		float width = window->StateStorage.GetFloat((ImGuiID)StorageValues::WIDTH, points_max.x - points_min.x);
 		float height = window->StateStorage.GetFloat((ImGuiID)StorageValues::HEIGHT, points_max.y - points_min.y);
+		window->StateStorage.SetFloat((ImGuiID)StorageValues::FROM_X, from_x);
+		window->StateStorage.SetFloat((ImGuiID)StorageValues::FROM_Y, from_y);
+		window->StateStorage.SetFloat((ImGuiID)StorageValues::WIDTH, width);
+		window->StateStorage.SetFloat((ImGuiID)StorageValues::HEIGHT, height);
 
 		ImVec2 beg_pos = GetCursorScreenPos();
 
 		const ImRect inner_bb = window->InnerRect;
 		const ImRect frame_bb(inner_bb.Min - style.FramePadding, inner_bb.Max + style.FramePadding);
+
+		auto transform = [&](const ImVec2& pos) -> ImVec2
+		{
+			float x = (pos.x - from_x) / width;
+			float y = (pos.y - from_y) / height;
+
+			return ImVec2(
+				inner_bb.Min.x * (1 - x) + inner_bb.Max.x * x,
+				inner_bb.Min.y * y + inner_bb.Max.y * (1 - y)
+			);
+		};
+
+		auto invTransform = [&](const ImVec2& pos) -> ImVec2
+		{
+			float x = (pos.x - inner_bb.Min.x) / (inner_bb.Max.x - inner_bb.Min.x);
+			float y = (inner_bb.Max.y - pos.y) / (inner_bb.Max.y - inner_bb.Min.y);
+
+			return ImVec2(
+				from_x + width * x,
+				from_y + height * y
+			);
+		};
+
+		if (flags & (int)CurveEditorFlags::SHOW_GRID)
+		{
+			int exp;
+			frexp(width / 5, &exp);
+			float step_x = (float)ldexp(1.0, exp);
+			int cell_cols = int(width / step_x);
+
+			float x = step_x * int(from_x / step_x);
+			for (int i = -1; i < cell_cols + 2; ++i)
+			{
+				ImVec2 a = transform({ x + i * step_x, from_y });
+				ImVec2 b = transform({ x + i * step_x, from_y + height });
+				window->DrawList->AddLine(a, b, 0x55000000);
+				char buf[64];
+				if (exp > 0)
+				{
+					ImFormatString(buf, sizeof(buf), " %d", int(x + i * step_x));
+				}
+				else
+				{
+					ImFormatString(buf, sizeof(buf), " %f", x + i * step_x);
+				}
+				window->DrawList->AddText(b, 0x55000000, buf);
+			}
+
+			frexp(height / 5, &exp);
+			float step_y = (float)ldexp(1.0, exp);
+			int cell_rows = int(height / step_y);
+
+			float y = step_y * int(from_y / step_y);
+			for (int i = -1; i < cell_rows + 2; ++i)
+			{
+				ImVec2 a = transform({ from_x, y + i * step_y });
+				ImVec2 b = transform({ from_x + width, y + i * step_y });
+				window->DrawList->AddLine(a, b, 0x55000000);
+				char buf[64];
+				if (exp > 0)
+				{
+					ImFormatString(buf, sizeof(buf), " %d", int(y + i * step_y));
+				}
+				else
+				{
+					ImFormatString(buf, sizeof(buf), " %f", y + i * step_y);
+				}
+				window->DrawList->AddText(a, 0x55000000, buf);
+			}
+		}
 
 		if (ImGui::GetIO().MouseWheel != 0 && ImGui::IsItemHovered())
 		{
@@ -602,29 +677,6 @@ namespace ImGui
 			start_pan.x = from_x;
 			start_pan.y = from_y;
 		}
-
-	
-		auto transform = [&](const ImVec2& pos) -> ImVec2
-		{
-			float x = (pos.x - from_x) / width;
-			float y = (pos.y - from_y) / height;
-
-			return ImVec2(
-				inner_bb.Min.x * (1 - x) + inner_bb.Max.x * x,
-				inner_bb.Min.y * y + inner_bb.Max.y * (1 - y)
-			);
-		};
-
-		auto invTransform = [&](const ImVec2& pos) -> ImVec2
-		{
-			float x = (pos.x - inner_bb.Min.x) / (inner_bb.Max.x - inner_bb.Min.x);
-			float y = (inner_bb.Max.y - pos.y) / (inner_bb.Max.y - inner_bb.Min.y);
-
-			return ImVec2(
-				from_x + width * x,
-				from_y + height * y
-			);
-		};
 
 		int changed_idx = -1;
 		for (int point_idx = points_count - 2; point_idx >= 0; --point_idx)
