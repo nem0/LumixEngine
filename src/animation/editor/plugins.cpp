@@ -157,6 +157,18 @@ struct PropertyAnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 
 			ShowAddCurveMenu(animation);
 
+			if (!animation->curves.empty())
+			{
+				int frames = animation->curves[0].frames.back();
+				if (ImGui::InputInt("Frames", &frames))
+				{
+					for (auto& curve : animation->curves)
+					{
+						curve.frames.back() = frames;
+					}
+				}
+			}
+
 			for (int i = 0, n = animation->curves.size(); i < n; ++i)
 			{
 				PropertyAnimation::Curve& curve = animation->curves[i];
@@ -180,7 +192,8 @@ struct PropertyAnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 			}
 			int new_count;
 			int last_frame = curve.frames.back();
-			int changed = ImGui::CurveEditor("", (float*)points, curve.frames.size(), size, (int)ImGui::CurveEditorFlags::NO_TANGENTS, &new_count);
+			int flags = (int)ImGui::CurveEditorFlags::NO_TANGENTS | (int)ImGui::CurveEditorFlags::SHOW_GRID;
+			int changed = ImGui::CurveEditor("", (float*)points, curve.frames.size(), size, flags, &new_count);
 			if (changed >= 0)
 			{
 				curve.frames[changed] = int(points[changed].x + 0.5f);
