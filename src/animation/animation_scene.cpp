@@ -1000,6 +1000,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 			PropertyAnimator& animator = m_property_animators.at(anim_idx);
 			const PropertyAnimation* animation = animator.animation;
 			if (!animation || !animation->isReady()) continue;
+			if (animation->curves.empty()) continue;
 			if (animation->curves[0].frames.empty()) continue;
 
 			animator.time += time_delta;

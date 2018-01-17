@@ -4,6 +4,7 @@
 #include "engine/engine.h"
 #include "engine/flag_set.h"
 #include "engine/iallocator.h"
+#include "engine/input_system.h"
 #include "engine/plugin_manager.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
@@ -22,6 +23,7 @@ namespace Lumix
 {
 
 
+static const ComponentType GUI_BUTTON_TYPE = Reflection::getComponentType("gui_button");
 static const ComponentType GUI_RECT_TYPE = Reflection::getComponentType("gui_rect");
 static const ComponentType GUI_IMAGE_TYPE = Reflection::getComponentType("gui_image");
 static const ComponentType GUI_TEXT_TYPE = Reflection::getComponentType("gui_text");
@@ -44,6 +46,13 @@ struct GUIText
 	string text;
 	int font_size = 13;
 	u32 color = 0xff000000;
+};
+
+
+struct GUIButton
+{
+	u32 normal_color;
+	u32 hovered_color;
 };
 
 
@@ -87,6 +96,10 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		, m_universe(context)
 		, m_system(system)
 		, m_rects(allocator)
+		, m_buttons(allocator)
+		, m_rect_hovered(allocator)
+		, m_rect_hovered_out(allocator)
+		, m_button_clicked(allocator)
 	{
 		context.registerComponentType(GUI_RECT_TYPE
 			, this
@@ -106,6 +119,12 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 			, &GUISceneImpl::destroyText
 			, &GUISceneImpl::serializeText
 			, &GUISceneImpl::deserializeText);
+		context.registerComponentType(GUI_BUTTON_TYPE
+			, this
+			, &GUISceneImpl::createButton
+			, &GUISceneImpl::destroyButton
+			, &GUISceneImpl::serializeButton
+			, &GUISceneImpl::deserializeButton);
 		m_font_manager = (FontManager*)system.getEngine().getResourceManager().get(FontResource::TYPE);
 	}
 
@@ -197,7 +216,32 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	{
 		if (!m_root) return;
 
+		m_canvas_size = canvas_size;
 		renderRect(*m_root, pipeline, {0, 0, canvas_size.x, canvas_size.y});
+	}
+
+
+	Vec4 getButtonNormalColorRGBA(Entity entity) override
+	{
+		return ABGRu32ToRGBAVec4(m_buttons[entity].normal_color);
+	}
+
+
+	void setButtonNormalColorRGBA(Entity entity, const Vec4& color) override
+	{
+		m_buttons[entity].normal_color = RGBAVec4ToABGRu32(color);
+	}
+
+
+	Vec4 getButtonHoveredColorRGBA(Entity entity) override
+	{
+		return ABGRu32ToRGBAVec4(m_buttons[entity].hovered_color);
+	}
+
+
+	void setButtonHoveredColorRGBA(Entity entity, const Vec4& color) override
+	{
+		m_buttons[entity].hovered_color = RGBAVec4ToABGRu32(color);
 	}
 
 
@@ -471,6 +515,23 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	}
 
 
+	void serializeButton(ISerializer& serializer, Entity entity)
+	{
+		const GUIButton& button = m_buttons[entity];
+		serializer.write("normal_color", button.normal_color);
+		serializer.write("hovered_color", button.hovered_color);
+	}
+
+	
+	void deserializeButton(IDeserializer& serializer, Entity entity, int /*scene_version*/)
+	{
+		GUIButton& button = m_buttons.emplace(entity);
+		serializer.read(&button.normal_color);
+		serializer.read(&button.hovered_color);
+		m_universe.onComponentCreated(entity, GUI_BUTTON_TYPE, this);
+	}
+
+
 	void serializeImage(ISerializer& serializer, Entity entity)
 	{
 		const GUIRect& rect = *m_rects[entity];
@@ -547,11 +608,114 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 			LUMIX_DELETE(m_allocator, rect);
 		}
 		m_rects.clear();
+		m_buttons.clear();
+	}
+
+
+	void hoverOut(Entity entity)
+	{
+		if (!entity.isValid()) return;
+
+		int idx = m_buttons.find(entity);
+		if (idx < 0) return;
+
+		const GUIButton& button = m_buttons.at(idx);
+		idx = m_rects.find(entity);
+		if (idx < 0) return;
+
+		GUIRect* rect = m_rects.at(idx);
+		if (!rect->image) return;
+
+		rect->image->color = button.normal_color;
+
+		m_rect_hovered_out.invoke(entity);
+	}
+
+
+	void hover(Entity entity)
+	{
+		if (!entity.isValid()) return;
+
+		int idx = m_buttons.find(entity);
+		if (idx < 0) return;
+
+		const GUIButton& button = m_buttons.at(idx);
+		idx = m_rects.find(entity);
+		if (idx < 0) return;
+
+		GUIRect* rect = m_rects.at(idx);
+		if (!rect->image) return;
+
+		rect->image->color = button.hovered_color;
+
+		m_rect_hovered.invoke(entity);
+	}
+
+
+	void handleMouseAxisEvent(const InputSystem::Event& event)
+	{
+		Vec2 new_pos(event.data.axis.x_abs, event.data.axis.y_abs);
+		Vec2 old_pos = new_pos - Vec2(event.data.axis.x, event.data.axis.y);
+		Entity e = getRectAt(new_pos, m_canvas_size);
+		Entity e_old = getRectAt(old_pos, m_canvas_size);
+
+		if (e != e_old)
+		{
+			hoverOut(e_old);
+			hover(e);
+		}
+	}
+
+
+	void handleMouseButtonEvent(const InputSystem::Event& event)
+	{
+		Vec2 pos(event.data.button.x_abs, event.data.button.y_abs);
+		Entity e = getRectAt(pos, m_canvas_size);
+		if (event.data.button.state == InputSystem::ButtonEvent::DOWN)
+		{
+			m_mouse_down_entity = e;
+			return;
+		}
+
+		if (!m_mouse_down_entity.isValid()) return;
+		if (m_mouse_down_entity != e) return;
+
+		m_button_clicked.invoke(e);
+	}
+
+
+	void handleInput()
+	{
+		InputSystem& input = m_system.getEngine().getInputSystem();
+		const InputSystem::Event* events = input.getEvents();
+		int events_count = input.getEventsCount();
+		for (int i = 0; i < events_count; ++i)
+		{
+			const InputSystem::Event& event = events[i];
+			switch (event.type)
+			{
+				case InputSystem::Event::AXIS:
+					if (event.device->type == InputSystem::Device::MOUSE)
+					{
+						handleMouseAxisEvent(event);
+					}
+					break;
+				case InputSystem::Event::BUTTON:
+					if (event.device->type == InputSystem::Device::MOUSE)
+					{
+						handleMouseButtonEvent(event);
+					}
+					break;
+			}
+		}
 	}
 
 
 	void update(float time_delta, bool paused) override
 	{
+		if (paused) return;
+
+		handleInput();
 	}
 
 
@@ -589,6 +753,13 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		rect.text->font = m_font_manager->getDefaultFont();
 
 		m_universe.onComponentCreated(entity, GUI_TEXT_TYPE, this);
+	}
+
+
+	void createButton(Entity entity)
+	{
+		m_buttons.emplace(entity);
+		m_universe.onComponentCreated(entity, GUI_BUTTON_TYPE, this);
 	}
 
 
@@ -641,6 +812,13 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	}
 
 
+	void destroyButton(Entity entity)
+	{
+		m_buttons.erase(entity);
+		m_universe.onComponentDestroyed(entity, GUI_BUTTON_TYPE, this);
+	}
+
+
 	void destroyImage(Entity entity)
 	{
 		GUIRect* rect = m_rects[entity];
@@ -685,6 +863,14 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 				serializer.write(rect->text->font_size);
 				serializer.write(rect->text->text);
 			}
+		}
+
+		serializer.write(m_buttons.size());
+		for (int i = 0, c = m_buttons.size(); i < c; ++i)
+		{
+			serializer.write(m_buttons.getKey(i));
+			const GUIButton& button = m_buttons.at(i);
+			serializer.write(button);
 		}
 	}
 
@@ -739,7 +925,33 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 				m_universe.onComponentCreated(rect->entity, GUI_TEXT_TYPE, this);
 			}
 		}
+		count = serializer.read<int>();
+		for (int i = 0; i < count; ++i)
+		{
+			Entity e;
+			serializer.read(e);
+			GUIButton& button = m_buttons.emplace(e);
+			serializer.read(button);
+		}
 		m_root = findRoot();
+	}
+	
+	
+	DelegateList<void(Entity)>& buttonClicked() override
+	{
+		return m_button_clicked;
+	}
+
+
+	DelegateList<void(Entity)>& rectHovered() override
+	{
+		return m_rect_hovered;
+	}
+
+
+	DelegateList<void(Entity)>& rectHoveredOut() override
+	{
+		return m_rect_hovered_out;
 	}
 
 
@@ -751,8 +963,14 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	GUISystem& m_system;
 	
 	AssociativeArray<Entity, GUIRect*> m_rects;
+	AssociativeArray<Entity, GUIButton> m_buttons;
 	GUIRect* m_root = nullptr;
 	FontManager* m_font_manager = nullptr;
+	Vec2 m_canvas_size;
+	Entity m_mouse_down_entity;
+	DelegateList<void(Entity)> m_button_clicked;
+	DelegateList<void(Entity)> m_rect_hovered;
+	DelegateList<void(Entity)> m_rect_hovered_out;
 };
 
 
