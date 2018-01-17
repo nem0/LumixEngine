@@ -52,7 +52,8 @@ IMGUI_API void EndTimeline();
 enum class CurveEditorFlags
 {
 	NO_TANGENTS = 1 << 0,
-	SHOW_GRID = 1 << 1
+	SHOW_GRID = 1 << 1,
+	RESET = 1 << 2
 };
 
 IMGUI_API int CurveEditor(const char* label
@@ -60,7 +61,8 @@ IMGUI_API int CurveEditor(const char* label
 	, int points_count
 	, const ImVec2& size = ImVec2(-1, -1)
 	, ImU32 flags = 0
-	, int* new_count = nullptr);
+	, int* new_count = nullptr
+	, int* selected_point = nullptr);
 IMGUI_API bool BeginResizablePopup(const char* str_id, const ImVec2& size_on_first_use);
 IMGUI_API void IntervalGraph(const unsigned long long* value_pairs,
 	int value_pairs_count,
