@@ -185,6 +185,7 @@ struct PropertyAnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 			
 			PropertyAnimation::Curve& curve = animation->curves[m_selected_curve];
 			ImVec2 points[16];
+			ASSERT(curve.frames.size() < lengthOf(points));
 			for (int i = 0; i < curve.frames.size(); ++i)
 			{
 				points[i].x = (float)curve.frames[i];
@@ -193,7 +194,12 @@ struct PropertyAnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 			int new_count;
 			int last_frame = curve.frames.back();
 			int flags = (int)ImGui::CurveEditorFlags::NO_TANGENTS | (int)ImGui::CurveEditorFlags::SHOW_GRID;
-			int changed = ImGui::CurveEditor("", (float*)points, curve.frames.size(), size, flags, &new_count);
+			if (m_fit_curve_in_editor)
+			{
+				flags |= (int)ImGui::CurveEditorFlags::RESET;
+				m_fit_curve_in_editor = false;
+			}
+			int changed = ImGui::CurveEditor("curve", (float*)points, curve.frames.size(), size, flags, &new_count, &m_selected_point);
 			if (changed >= 0)
 			{
 				curve.frames[changed] = int(points[changed].x + 0.5f);
@@ -213,6 +219,19 @@ struct PropertyAnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 			}
 
 			ImGui::PopItemWidth();
+
+			if (ImGui::BeginPopupContextItem("curve"))
+			{
+				if (ImGui::Selectable("Fit data")) m_fit_curve_in_editor = true;
+
+				ImGui::EndPopup();
+			}
+
+			if (m_selected_point >= 0 && m_selected_point < curve.frames.size())
+			{
+				ImGui::InputInt("Frame", &curve.frames[m_selected_point]);
+				ImGui::InputFloat("Value", &curve.values[m_selected_point]);
+			}
 
 			ImGui::HSplitter("sizer", &size);
 			return true;
@@ -237,7 +256,9 @@ struct PropertyAnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 	}
 
 
+	int m_selected_point = -1;
 	int m_selected_curve = -1;
+	bool m_fit_curve_in_editor = false;
 	StudioApp& m_app;
 };
 

@@ -507,7 +507,8 @@ namespace ImGui
 		, int points_count
 		, const ImVec2& editor_size
 		, ImU32 flags
-		, int* new_count)
+		, int* new_count
+		, int* selected_point)
 	{
 		enum class StorageValues : ImGuiID
 		{
@@ -564,6 +565,8 @@ namespace ImGui
 			points_min = ImMin(points_min, point);
 		}
 		points_max.y = ImMax(points_max.y, points_min.y + 0.0001f);
+
+		if (flags & (int)CurveEditorFlags::RESET) window->StateStorage.Clear();
 
 		float from_x = window->StateStorage.GetFloat((ImGuiID)StorageValues::FROM_X, points_min.x);
 		float from_y = window->StateStorage.GetFloat((ImGuiID)StorageValues::FROM_Y, points_min.y);
@@ -657,13 +660,13 @@ namespace ImGui
 			window->StateStorage.SetFloat((ImGuiID)StorageValues::WIDTH, width);
 			window->StateStorage.SetFloat((ImGuiID)StorageValues::HEIGHT, height);
 		}
-		if (ImGui::IsMouseReleased(1))
+		if (ImGui::IsMouseReleased(2))
 		{
 			window->StateStorage.SetBool((ImGuiID)StorageValues::IS_PANNING, false);
 		}
 		if (window->StateStorage.GetBool((ImGuiID)StorageValues::IS_PANNING, false))
 		{
-			ImVec2 drag_offset = ImGui::GetMouseDragDelta(1);
+			ImVec2 drag_offset = ImGui::GetMouseDragDelta(2);
 			from_x = start_pan.x;
 			from_y = start_pan.y;
 			from_x -= drag_offset.x * width / (inner_bb.Max.x - inner_bb.Min.x);
@@ -671,7 +674,7 @@ namespace ImGui
 			window->StateStorage.SetFloat((ImGuiID)StorageValues::FROM_X, from_x);
 			window->StateStorage.SetFloat((ImGuiID)StorageValues::FROM_Y, from_y);
 		}
-		else if (ImGui::IsMouseDragging(1) && ImGui::IsItemHovered())
+		else if (ImGui::IsMouseDragging(2) && ImGui::IsItemHovered())
 		{
 			window->StateStorage.SetBool((ImGuiID)StorageValues::IS_PANNING, true);
 			start_pan.x = from_x;
@@ -717,18 +720,21 @@ namespace ImGui
 				PushID(idx);
 				InvisibleButton("", ImVec2(2 * NODE_SLOT_RADIUS, 2 * NODE_SLOT_RADIUS));
 
+				bool is_selected = selected_point && *selected_point == point_idx + idx;
+				float thickness = is_selected ? 2.0f : 1.0f;
 				ImU32 col = IsItemActive() || IsItemHovered() ? GetColorU32(ImGuiCol_PlotLinesHovered) : GetColorU32(ImGuiCol_PlotLines);
 
-				window->DrawList->AddLine(pos + ImVec2(-SIZE, 0), pos + ImVec2(0, SIZE), col);
-				window->DrawList->AddLine(pos + ImVec2(SIZE, 0), pos + ImVec2(0, SIZE), col);
-				window->DrawList->AddLine(pos + ImVec2(SIZE, 0), pos + ImVec2(0, -SIZE), col);
-				window->DrawList->AddLine(pos + ImVec2(-SIZE, 0), pos + ImVec2(0, -SIZE), col);
+				window->DrawList->AddLine(pos + ImVec2(-SIZE, 0), pos + ImVec2(0, SIZE), col, thickness);
+				window->DrawList->AddLine(pos + ImVec2(SIZE, 0), pos + ImVec2(0, SIZE), col, thickness);
+				window->DrawList->AddLine(pos + ImVec2(SIZE, 0), pos + ImVec2(0, -SIZE), col, thickness);
+				window->DrawList->AddLine(pos + ImVec2(-SIZE, 0), pos + ImVec2(0, -SIZE), col, thickness);
 
 				if (IsItemHovered()) hovered_idx = point_idx + idx;
 
 				bool changed = false;
 				if (IsItemActive() && IsMouseClicked(0))
 				{
+					if (selected_point) *selected_point = point_idx + idx;
 					window->StateStorage.SetFloat((ImGuiID)StorageValues::POINT_START_X, pos.x);
 					window->StateStorage.SetFloat((ImGuiID)StorageValues::POINT_START_Y, pos.y);
 				}
