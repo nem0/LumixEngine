@@ -14,6 +14,7 @@ class Pipeline;
 class string;
 struct Vec2;
 struct Vec4;
+template <typename T> class DelegateList;
 
 
 class GUIScene : public IScene
@@ -57,6 +58,11 @@ public:
 	virtual float getRectBottomRelative(Entity entity) = 0;
 	virtual void setRectBottomRelative(Entity entity, float value) = 0;
 
+	virtual Vec4 getButtonNormalColorRGBA(Entity entity) = 0;
+	virtual void setButtonNormalColorRGBA(Entity entity, const Vec4& color) = 0;
+	virtual Vec4 getButtonHoveredColorRGBA(Entity entity) = 0;
+	virtual void setButtonHoveredColorRGBA(Entity entity, const Vec4& color) = 0;
+
 	virtual Vec4 getImageColorRGBA(Entity entity) = 0;
 	virtual void setImageColorRGBA(Entity entity, const Vec4& color) = 0;
 	virtual Path getImageSprite(Entity entity) = 0;
@@ -70,6 +76,10 @@ public:
 	virtual void setTextColorRGBA(Entity entity, const Vec4& color) = 0;
 	virtual Path getTextFontPath(Entity entity) = 0;
 	virtual void setTextFontPath(Entity entity, const Path& path) = 0;
+
+	virtual DelegateList<void(Entity)>& buttonClicked() = 0;
+	virtual DelegateList<void(Entity)>& rectHovered() = 0;
+	virtual DelegateList<void(Entity)>& rectHoveredOut() = 0;
 };
 
 

@@ -28,6 +28,7 @@ namespace
 static const ComponentType GUI_RECT_TYPE = Reflection::getComponentType("gui_rect");
 static const ComponentType GUI_IMAGE_TYPE = Reflection::getComponentType("gui_image");
 static const ComponentType GUI_TEXT_TYPE = Reflection::getComponentType("gui_text");
+static const ComponentType GUI_BUTTON_TYPE = Reflection::getComponentType("gui_button");
 
 
 struct SpritePlugin LUMIX_FINAL : public AssetBrowser::IPlugin
@@ -293,8 +294,9 @@ private:
 				}
 				if (ImGui::BeginMenu("Create child"))
 				{
-					if (ImGui::MenuItem("Rect")) createChild(e, GUI_RECT_TYPE);
+					if (ImGui::MenuItem("Button")) createChild(e, GUI_BUTTON_TYPE);
 					if (ImGui::MenuItem("Image")) createChild(e, GUI_IMAGE_TYPE);
+					if (ImGui::MenuItem("Rect")) createChild(e, GUI_RECT_TYPE);
 					if (ImGui::MenuItem("Text")) createChild(e, GUI_TEXT_TYPE);
 					ImGui::EndMenu();
 				}
@@ -423,6 +425,7 @@ private:
 
 LUMIX_STUDIO_ENTRY(gui)
 {
+	app.registerComponent("gui_button", "GUI/Button");
 	app.registerComponent("gui_image", "GUI/Image");
 	app.registerComponent("gui_rect", "GUI/Rect");
 	app.registerComponent("gui_text", "GUI/Text");
