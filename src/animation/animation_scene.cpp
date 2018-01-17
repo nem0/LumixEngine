@@ -99,7 +99,8 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 
 		enum Flags
 		{
-			LOOPED = 1 << 0
+			LOOPED = 1 << 0,
+			DISABLED = 1 << 1
 		};
 
 		PropertyAnimator(IAllocator& allocator) : keys(allocator) {}
@@ -646,6 +647,22 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		return controller.resource ? controller.resource->getPath() : Path("");
 	}
 
+	bool isPropertyAnimatorEnabled(Entity entity) override
+	{
+		return !m_property_animators.get(entity).flags.isSet(PropertyAnimator::DISABLED);
+	}
+
+
+	void enablePropertyAnimator(Entity entity, bool enabled) override
+	{
+		PropertyAnimator& animator = m_property_animators.get(entity);
+		animator.flags.set(PropertyAnimator::DISABLED, !enabled);
+		animator.time = 0;
+		if (!enabled)
+		{
+			applyPropertyAnimator(entity, animator);
+		}
+	}
 
 
 	Path getPropertyAnimation(Entity entity) override
@@ -991,6 +1008,33 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
+	void applyPropertyAnimator(Entity entity, PropertyAnimator& animator)
+	{
+		const PropertyAnimation* animation = animator.animation;
+		int frame = int(animator.time * animation->fps + 0.5f);
+		frame = frame % animation->curves[0].frames.back();
+		for (PropertyAnimation::Curve& curve : animation->curves)
+		{
+			if (curve.frames.size() < 2) continue;
+			for (int i = 1, n = curve.frames.size(); i < n; ++i)
+			{
+				if (frame <= curve.frames[i])
+				{
+					float t = (frame - curve.frames[i - 1]) / float(curve.frames[i] - curve.frames[i - 1]);
+					float v = curve.values[i] * t + curve.values[i - 1] * (1 - t);
+					ComponentUID cmp;
+					cmp.type = curve.cmp_type;
+					cmp.scene = m_universe.getScene(cmp.type);
+					cmp.entity = entity;
+					InputBlob blob(&v, sizeof(v));
+					curve.property->setValue(cmp, -1, blob);
+					break;
+				}
+			}
+		}
+	}
+
+
 	void updatePropertyAnimators(float time_delta)
 	{
 		PROFILE_FUNCTION();
@@ -1002,29 +1046,11 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 			if (!animation || !animation->isReady()) continue;
 			if (animation->curves.empty()) continue;
 			if (animation->curves[0].frames.empty()) continue;
+			if (animator.flags.isSet(PropertyAnimator::DISABLED)) continue;
 
 			animator.time += time_delta;
-			int frame = int(animator.time * animation->fps + 0.5f);
-			frame = frame % animation->curves[0].frames.back();
-			for (PropertyAnimation::Curve& curve : animation->curves)
-			{
-				if (curve.frames.size() < 2) continue;
-				for (int i = 1, n = curve.frames.size(); i < n; ++i)
-				{
-					if (frame <= curve.frames[i])
-					{
-						float t = (frame - curve.frames[i-1]) / float(curve.frames[i] - curve.frames[i - 1]);
-						float v = curve.values[i] * t + curve.values[i - 1] * (1 - t);
-						ComponentUID cmp;
-						cmp.type = curve.cmp_type;
-						cmp.scene = m_universe.getScene(cmp.type);
-						cmp.entity = entity;
-						InputBlob blob(&v, sizeof(v));
-						curve.property->setValue(cmp, -1, blob);
-						break;
-					}
-				}
-			}
+			
+			applyPropertyAnimator(entity, animator);
 		}
 	}
 

@@ -31,6 +31,8 @@ struct AnimationScene : public IScene
 	virtual const OutputBlob& getEventStream() const = 0;
 	virtual Path getPropertyAnimation(Entity entity) = 0;
 	virtual void setPropertyAnimation(Entity entity, const Path& path) = 0;
+	virtual bool isPropertyAnimatorEnabled(Entity entity) = 0;
+	virtual void enablePropertyAnimator(Entity entity, bool enabled) = 0;
 	virtual class Animation* getAnimableAnimation(Entity entity) = 0;
 	virtual Path getAnimation(Entity entity) = 0;
 	virtual void setAnimation(Entity entity, const Path& path) = 0;
