@@ -111,7 +111,8 @@ AnimationSystemImpl::AnimationSystemImpl(Engine& engine)
 	static auto anim_scene = scene("animation",
 		component("property_animator", 
 			property("Animation", LUMIX_PROP(AnimationScene, PropertyAnimation),
-				ResourceAttribute("Property animation (*.anp)", PropertyAnimation::TYPE))
+				ResourceAttribute("Property animation (*.anp)", PropertyAnimation::TYPE)),
+			property("Enabled", LUMIX_PROP_FULL(AnimationScene, isPropertyAnimatorEnabled, enablePropertyAnimator))
 		),
 		component("anim_controller",
 			property("Source", LUMIX_PROP(AnimationScene, ControllerSource),
