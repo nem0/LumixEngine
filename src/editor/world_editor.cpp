@@ -2930,6 +2930,7 @@ public:
 			Entity entity = entities[i];
 			auto mtx = m_universe->getMatrix(entity);
 			blob.write(mtx);
+			blob.write(m_universe->getParent(entity));
 
 			i32 cmp_count = 0;
 			for (ComponentUID cmp = m_universe->getFirstComponent(entity); cmp.isValid();
@@ -3913,6 +3914,8 @@ bool PasteEntityCommand::execute()
 	{
 		Matrix mtx;
 		blob.read(mtx);
+		Entity parent;
+		blob.read(parent);
 		if (i == 0)
 		{
 			Matrix inv = mtx;
@@ -3929,6 +3932,7 @@ bool PasteEntityCommand::execute()
 		((WorldEditorImpl&)m_editor).m_entity_map.create(new_entity);
 		m_entities.push(new_entity);
 		universe.setMatrix(new_entity, mtx);
+		universe.setParent(parent, new_entity);
 		i32 count;
 		blob.read(count);
 		for (int j = 0; j < count; ++j)
