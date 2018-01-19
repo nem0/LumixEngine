@@ -205,6 +205,7 @@ bool Texture::saveTGA(FS::IFile* file,
 	header.height = (short)height;
 	header.width = (short)width;
 	header.dataType = 2;
+	header.imageDescriptor = 32;
 
 	file->write(&header, sizeof(header));
 
