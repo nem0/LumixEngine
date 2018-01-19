@@ -352,6 +352,17 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	}
 
 
+	static Rect getRectOnCanvas(const Rect& parent_rect, GUIRect& rect)
+	{
+		float l = parent_rect.x + parent_rect.w * rect.left.relative + rect.left.points;
+		float r = parent_rect.x + parent_rect.w * rect.right.relative + rect.right.points;
+		float t = parent_rect.y + parent_rect.h * rect.top.relative + rect.top.points;
+		float b = parent_rect.y + parent_rect.h * rect.bottom.relative + rect.bottom.points;
+
+		return { l, t, r - l, b - t };
+	}
+
+
 	Rect getRectOnCanvas(Entity entity, const Vec2& canvas_size) const override
 	{
 		int idx = m_rects.find(entity);
@@ -612,80 +623,84 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	}
 
 
-	void hoverOut(Entity entity)
+	void hoverOut(const GUIRect& rect)
 	{
-		if (!entity.isValid()) return;
-
-		int idx = m_buttons.find(entity);
+		int idx = m_buttons.find(rect.entity);
 		if (idx < 0) return;
 
 		const GUIButton& button = m_buttons.at(idx);
-		idx = m_rects.find(entity);
-		if (idx < 0) return;
+		if (!rect.image) return;
 
-		GUIRect* rect = m_rects.at(idx);
-		if (!rect->image) return;
+		rect.image->color = button.normal_color;
 
-		rect->image->color = button.normal_color;
-
-		m_rect_hovered_out.invoke(entity);
+		m_rect_hovered_out.invoke(rect.entity);
 	}
 
 
-	void hover(Entity entity)
+	void hover(const GUIRect& rect)
 	{
-		if (!entity.isValid()) return;
-
-		int idx = m_buttons.find(entity);
+		int idx = m_buttons.find(rect.entity);
 		if (idx < 0) return;
 
 		const GUIButton& button = m_buttons.at(idx);
-		idx = m_rects.find(entity);
-		if (idx < 0) return;
 
-		GUIRect* rect = m_rects.at(idx);
-		if (!rect->image) return;
+		if (!rect.image) return;
 
-		rect->image->color = button.hovered_color;
+		rect.image->color = button.hovered_color;
 
-		m_rect_hovered.invoke(entity);
+		m_rect_hovered.invoke(rect.entity);
 	}
 
 
-	void handleMouseAxisEvent(const InputSystem::Event& event)
+	void handleMouseAxisEvent(const Rect& parent_rect, GUIRect& rect, const Vec2& mouse_pos, const Vec2& prev_mouse_pos)
 	{
-		Vec2 new_pos(event.data.axis.x_abs, event.data.axis.y_abs);
-		Vec2 old_pos = new_pos - Vec2(event.data.axis.x, event.data.axis.y);
-		Entity e = getRectAt(new_pos, m_canvas_size);
-		Entity e_old = getRectAt(old_pos, m_canvas_size);
+		if (!rect.flags.isSet(GUIRect::IS_ENABLED)) return;
 
-		if (e != e_old)
+		const Rect& r = getRectOnCanvas(parent_rect, rect);
+
+		bool is = contains(r, mouse_pos);
+		bool was = contains(r, prev_mouse_pos);
+		if (is != was)
 		{
-			hoverOut(e_old);
-			hover(e);
+			is ? hover(rect) : hoverOut(rect);
+		}
+
+		for (Entity e = m_universe.getFirstChild(rect.entity); e.isValid(); e = m_universe.getNextSibling(e))
+		{
+			int idx = m_rects.find(e);
+			if (idx < 0) continue;
+			handleMouseAxisEvent(r, *m_rects.at(idx), mouse_pos, prev_mouse_pos);
 		}
 	}
 
 
-	void handleMouseButtonEvent(const InputSystem::Event& event)
+	static bool contains(const Rect& rect, const Vec2& pos)
 	{
+		return pos.x >= rect.x && pos.y >= rect.y && pos.x <= rect.x + rect.w && pos.y <= rect.y + rect.h;
+	}
+
+
+	void handleMouseButtonEvent(const Rect& parent_rect, GUIRect& rect, const InputSystem::Event& event)
+	{
+		if (!rect.flags.isSet(GUIRect::IS_ENABLED)) return;
+
 		Vec2 pos(event.data.button.x_abs, event.data.button.y_abs);
-		Entity e = getRectAt(pos, m_canvas_size);
-		if (event.data.button.state == InputSystem::ButtonEvent::DOWN)
+		const Rect& r = getRectOnCanvas(parent_rect, rect);
+		
+		if (contains(r, pos)) m_button_clicked.invoke(rect.entity);
+
+		for (Entity e = m_universe.getFirstChild(rect.entity); e.isValid(); e = m_universe.getNextSibling(e))
 		{
-			m_mouse_down_entity = e;
-			return;
+			int idx = m_rects.find(e);
+			if (idx < 0) continue;
+			handleMouseButtonEvent(r, *m_rects.at(idx), event);
 		}
-
-		if (!m_mouse_down_entity.isValid()) return;
-		if (m_mouse_down_entity != e) return;
-
-		m_button_clicked.invoke(e);
 	}
 
 
 	void handleInput()
 	{
+		if (!m_root) return;
 		InputSystem& input = m_system.getEngine().getInputSystem();
 		const InputSystem::Event* events = input.getEvents();
 		int events_count = input.getEventsCount();
@@ -697,13 +712,15 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 				case InputSystem::Event::AXIS:
 					if (event.device->type == InputSystem::Device::MOUSE)
 					{
-						handleMouseAxisEvent(event);
+						Vec2 pos(event.data.axis.x_abs, event.data.axis.y_abs);
+						Vec2 old_pos = pos - Vec2(event.data.axis.x, event.data.axis.y);
+						handleMouseAxisEvent({0, 0,  m_canvas_size.x, m_canvas_size.y }, *m_root, pos, old_pos);
 					}
 					break;
 				case InputSystem::Event::BUTTON:
 					if (event.device->type == InputSystem::Device::MOUSE)
 					{
-						handleMouseButtonEvent(event);
+						handleMouseButtonEvent({ 0, 0, m_canvas_size.x, m_canvas_size.y }, *m_root, event);
 					}
 					break;
 			}
