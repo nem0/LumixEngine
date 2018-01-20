@@ -178,6 +178,8 @@ public:
 	string& cat(float value);
 	string& cat(char* value);
 	string& cat(const char* value);
+	void insert(int position, const char* value);
+	void eraseAt(int position);
 
 	template <class V> string& cat(V value)
 	{

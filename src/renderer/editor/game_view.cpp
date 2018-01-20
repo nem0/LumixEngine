@@ -313,6 +313,16 @@ void GameView::processInputEvents()
 			input.injectEvent(event);
 		}
 		break;
+		case SDL_TEXTINPUT:
+		{
+			InputSystem::Event event;
+			event.type = InputSystem::Event::TEXT_INPUT;
+			event.device = input.getKeyboardDevice();
+			ASSERT(sizeof(event.data.text.text) >= sizeof(sdl_event.text.text));
+			copyMemory(event.data.text.text, sdl_event.text.text, sizeof(sdl_event.text.text));
+			input.injectEvent(event);
+		}
+		break;
 		case SDL_MOUSEMOTION:
 		{
 			ImVec2 rel_mp = { (float)sdl_event.motion.x, (float)sdl_event.motion.y };

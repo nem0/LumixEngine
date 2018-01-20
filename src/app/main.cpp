@@ -392,6 +392,16 @@ public:
 					input.injectEvent(input_event);
 				}
 				break;
+			case SDL_TEXTINPUT:
+				{
+					InputSystem::Event input_event;
+					input_event.type = InputSystem::Event::TEXT_INPUT;
+					input_event.device = input.getKeyboardDevice();
+					ASSERT(sizeof(input_event.data.text.text) >= sizeof(event.text.text));
+					copyMemory(input_event.data.text.text, event.text.text, sizeof(event.text.text));
+					input.injectEvent(input_event);
+				}
+				break;
 			case SDL_KEYUP:
 				{
 					InputSystem::Event input_event;

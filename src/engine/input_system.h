@@ -61,12 +61,18 @@ class LUMIX_ENGINE_API InputSystem
 			Axis axis;
 		};
 
+		struct TextEvent
+		{
+			char text[32];
+		};
+
 		struct Event
 		{
 			enum Type : u32
 			{
 				BUTTON,
 				AXIS,
+				TEXT_INPUT,
 				DEVICE_ADDED,
 				DEVICE_REMOVED
 			};
@@ -77,6 +83,7 @@ class LUMIX_ENGINE_API InputSystem
 			{
 				ButtonEvent button;
 				AxisEvent axis;
+				TextEvent text;
 			} data;
 		};
 
