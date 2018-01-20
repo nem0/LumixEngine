@@ -34,6 +34,7 @@ public:
 
 	virtual bool hasGUI(Entity entity) const = 0;
 	virtual Rect getRectOnCanvas(Entity entity, const Vec2& canva_size) const = 0;
+	virtual Rect getRect(Entity entity) const = 0;
 	virtual Entity getRectAt(const Vec2& pos, const Vec2& canvas_size) const = 0;
 
 	virtual void enableRect(Entity entity, bool enable) = 0;

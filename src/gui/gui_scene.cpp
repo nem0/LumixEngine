@@ -396,6 +396,12 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	}
 
 
+	Rect getRect(Entity entity) const override
+	{
+		return getRectOnCanvas(entity, m_canvas_size);
+	}
+
+
 	Rect getRectOnCanvas(Entity entity, const Vec2& canvas_size) const override
 	{
 		int idx = m_rects.find(entity);

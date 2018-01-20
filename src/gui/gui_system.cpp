@@ -146,6 +146,24 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 	}
 
 
+	static int LUA_GUIRect_getScreenRect(lua_State* L)
+	{
+		GUIScene* scene = LuaWrapper::checkArg<GUIScene*>(L, 1);
+		Entity e = LuaWrapper::checkArg<Entity>(L, 2);
+		GUIScene::Rect rect = scene->getRect(e);
+		lua_newtable(L);
+		LuaWrapper::push(L, rect.x);
+		lua_setfield(L, -2, "x");
+		LuaWrapper::push(L, rect.y);
+		lua_setfield(L, -2, "y");
+		LuaWrapper::push(L, rect.w);
+		lua_setfield(L, -2, "w");
+		LuaWrapper::push(L, rect.h);
+		lua_setfield(L, -2, "h");
+		return 1;
+	}
+
+
 	void registerLuaAPI()
 	{
 		lua_State* L = m_engine.getState();
@@ -163,6 +181,8 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 		REGISTER_FUNCTION(getMouseX);
 		REGISTER_FUNCTION(getMouseY);
 		REGISTER_FUNCTION(isMouseClicked);
+
+		LuaWrapper::createSystemFunction(L, "Gui", "getScreenRect", LUA_GUIRect_getScreenRect);
 
 		LuaWrapper::createSystemVariable(L, "Gui", "instance", this);
 
