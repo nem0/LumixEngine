@@ -844,6 +844,7 @@ public:
 	static void LUA_nextFrame(Engine* engine) { engine->nextFrame(); }
 	static void LUA_setTimeMultiplier(Engine* engine, float multiplier) { engine->setTimeMultiplier(multiplier); }
 	static Entity LUA_getFirstEntity(Universe* universe) { return universe->getFirstEntity(); }
+	static Entity LUA_getParent(Universe* universe, Entity e) { return universe->getParent(e); }
 	static Entity LUA_getNextEntity(Universe* universe, Entity entity) { return universe->getNextEntity(entity); }
 	static Vec4 LUA_multMatrixVec(const Matrix& m, const Vec4& v) { return m * v; }
 	static Quat LUA_multQuat(const Quat& a, const Quat& b) { return a * b; }
@@ -1008,6 +1009,7 @@ public:
 		REGISTER_FUNCTION(getEntityPosition);
 		REGISTER_FUNCTION(getEntityRotation);
 		REGISTER_FUNCTION(getEntityByName);
+		REGISTER_FUNCTION(getParent);
 		REGISTER_FUNCTION(getFirstEntity);
 		REGISTER_FUNCTION(getNextEntity);
 		REGISTER_FUNCTION(getScene);
@@ -1116,6 +1118,8 @@ public:
 		LuaWrapper::createSystemVariable(m_state, "Engine", "INPUT_DEVICE_MOUSE", InputSystem::Device::MOUSE);
 		LuaWrapper::createSystemVariable(m_state, "Engine", "INPUT_DEVICE_CONTROLLER", InputSystem::Device::CONTROLLER);
 
+		LuaWrapper::createSystemVariable(m_state, "Engine", "INPUT_BUTTON_STATE_UP", InputSystem::ButtonEvent::UP);
+		LuaWrapper::createSystemVariable(m_state, "Engine", "INPUT_BUTTON_STATE_DOWN", InputSystem::ButtonEvent::DOWN);
 		LuaWrapper::createSystemVariable(m_state, "Engine", "INPUT_EVENT_BUTTON", InputSystem::Event::BUTTON);
 		LuaWrapper::createSystemVariable(m_state, "Engine", "INPUT_EVENT_AXIS", InputSystem::Event::AXIS);
 		LuaWrapper::createSystemVariable(m_state, "Engine", "INPUT_EVENT_TEXT_INPUT", InputSystem::Event::TEXT_INPUT);
