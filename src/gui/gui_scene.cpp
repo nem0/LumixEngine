@@ -606,6 +606,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	void serializeImage(ISerializer& serializer, Entity entity)
 	{
 		const GUIRect& rect = *m_rects[entity];
+		serializer.write("sprite", rect.image->sprite ? rect.image->sprite->getPath().c_str() : "");
 		serializer.write("color", rect.image->color);
 		serializer.write("flags", rect.image->flags.base);
 	}
@@ -623,6 +624,18 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		GUIRect& rect = *m_rects.at(idx);
 		rect.image = LUMIX_NEW(m_allocator, GUIImage);
 		
+		char tmp[MAX_PATH_LENGTH];
+		serializer.read(tmp, lengthOf(tmp));
+		if (tmp[0] == '\0')
+		{
+			rect.image->sprite = nullptr;
+		}
+		else
+		{
+			auto* manager = m_system.getEngine().getResourceManager().get(Sprite::TYPE);
+			rect.image->sprite = (Sprite*)manager->load(Path(tmp));
+		}
+
 		serializer.read(&rect.image->color);
 		serializer.read(&rect.image->flags.base);
 		
@@ -1063,6 +1076,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 			serializer.write(rect->image != nullptr);
 			if (rect->image)
 			{
+				serializer.writeString(rect->image->sprite ? rect->image->sprite->getPath().c_str() : "");
 				serializer.write(rect->image->color);
 				serializer.write(rect->image->flags.base);
 			}
@@ -1109,10 +1123,21 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 				m_universe.onComponentCreated(rect->entity, GUI_RECT_TYPE, this);
 			}
 
+			char tmp[MAX_PATH_LENGTH];
 			bool has_image = serializer.read<bool>();
 			if (has_image)
 			{
 				rect->image = LUMIX_NEW(m_allocator, GUIImage);
+				serializer.readString(tmp, lengthOf(tmp));
+				if (tmp[0] == '\0')
+				{
+					rect->image->sprite = nullptr;
+				}
+				else
+				{
+					auto* manager = m_system.getEngine().getResourceManager().get(Sprite::TYPE);
+					rect->image->sprite = (Sprite*)manager->load(Path(tmp));
+				}
 				serializer.read(rect->image->color);
 				serializer.read(rect->image->flags.base);
 				m_universe.onComponentCreated(rect->entity, GUI_IMAGE_TYPE, this);
@@ -1130,7 +1155,6 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 			{
 				rect->text = LUMIX_NEW(m_allocator, GUIText)(m_allocator);
 				GUIText& text = *rect->text;
-				char tmp[MAX_PATH_LENGTH];
 				serializer.readString(tmp, lengthOf(tmp));
 				serializer.read(text.color);
 				serializer.read(text.font_size);
