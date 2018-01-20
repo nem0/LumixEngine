@@ -67,8 +67,13 @@ struct GUIInputField
 
 struct GUIImage
 {
+	enum Flags
+	{
+		IS_ENABLED = 1 << 1
+	};
 	Sprite* sprite = nullptr;
 	u32 color = 0xffffFFFF;
+	FlagSet<Flags, u32> flags;
 };
 
 
@@ -156,7 +161,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		float b = parent_rect.y + rect.bottom.points + parent_rect.h * rect.bottom.relative;
 			 
 		Draw2D& draw = pipeline.getDraw2D();
-		if (rect.image)
+		if (rect.image && rect.image->flags.isSet(GUIImage::IS_ENABLED))
 		{
 			if (rect.image->sprite && rect.image->sprite->getTexture())
 			{
@@ -267,6 +272,10 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	{
 		m_buttons[entity].hovered_color = RGBAVec4ToABGRu32(color);
 	}
+
+
+	void enableImage(Entity entity, bool enable) override { m_rects[entity]->image->flags.set(GUIImage::IS_ENABLED, enable); }
+	bool isImageEnabled(Entity entity) override { return m_rects[entity]->image->flags.isSet(GUIImage::IS_ENABLED); }
 
 
 	Vec4 getImageColorRGBA(Entity entity) override
@@ -592,6 +601,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	{
 		const GUIRect& rect = *m_rects[entity];
 		serializer.write("color", rect.image->color);
+		serializer.write("flags", rect.image->flags.base);
 	}
 
 
@@ -608,6 +618,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		rect.image = LUMIX_NEW(m_allocator, GUIImage);
 		
 		serializer.read(&rect.image->color);
+		serializer.read(&rect.image->flags.base);
 		
 		m_universe.onComponentCreated(entity, GUI_IMAGE_TYPE, this);
 	}
@@ -729,11 +740,12 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	void handleMouseButtonEvent(const Rect& parent_rect, GUIRect& rect, const InputSystem::Event& event)
 	{
 		if (!rect.flags.isSet(GUIRect::IS_ENABLED)) return;
+		if (event.data.button.state != InputSystem::ButtonEvent::UP) return;
 
 		Vec2 pos(event.data.button.x_abs, event.data.button.y_abs);
 		const Rect& r = getRectOnCanvas(parent_rect, rect);
 		
-		if (contains(r, pos))
+		if (contains(r, pos) && contains(r, m_mouse_down_pos))
 		{
 			if (m_buttons.find(rect.entity) >= 0)
 			{
@@ -845,6 +857,11 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 				case InputSystem::Event::BUTTON:
 					if (event.device->type == InputSystem::Device::MOUSE)
 					{
+						if (event.data.button.state == InputSystem::ButtonEvent::DOWN)
+						{
+							m_mouse_down_pos.x = event.data.button.x_abs;
+							m_mouse_down_pos.y = event.data.button.y_abs;
+						}
 						handleMouseButtonEvent({ 0, 0, m_canvas_size.x, m_canvas_size.y }, *m_root, event);
 					}
 					else if (event.device->type == InputSystem::Device::KEYBOARD)
@@ -951,6 +968,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		}
 		GUIRect& rect = *m_rects.at(idx);
 		rect.image = LUMIX_NEW(m_allocator, GUIImage);
+		rect.image->flags.set(GUIImage::IS_ENABLED);
 
 		m_universe.onComponentCreated(entity, GUI_IMAGE_TYPE, this);
 	}
@@ -1040,6 +1058,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 			if (rect->image)
 			{
 				serializer.write(rect->image->color);
+				serializer.write(rect->image->flags.base);
 			}
 
 			serializer.write(rect->input_field != nullptr);
@@ -1089,6 +1108,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 			{
 				rect->image = LUMIX_NEW(m_allocator, GUIImage);
 				serializer.read(rect->image->color);
+				serializer.read(rect->image->flags.base);
 				m_universe.onComponentCreated(rect->entity, GUI_IMAGE_TYPE, this);
 
 			}
@@ -1165,7 +1185,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	GUIRect* m_root = nullptr;
 	FontManager* m_font_manager = nullptr;
 	Vec2 m_canvas_size;
-	Entity m_mouse_down_entity;
+	Vec2 m_mouse_down_pos;
 	DelegateList<void(Entity)> m_button_clicked;
 	DelegateList<void(Entity)> m_rect_hovered;
 	DelegateList<void(Entity)> m_rect_hovered_out;

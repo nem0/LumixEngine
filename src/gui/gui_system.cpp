@@ -89,6 +89,7 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 					ColorAttribute())
 			),
 			component("gui_image",
+				property("Enabled", LUMIX_PROP_FULL(GUIScene, isImageEnabled, enableImage)),
 				property("Color", LUMIX_PROP(GUIScene, ImageColorRGBA),
 					ColorAttribute()),
 				property("Sprite", LUMIX_PROP(GUIScene, ImageSprite),

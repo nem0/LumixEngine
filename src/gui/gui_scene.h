@@ -63,6 +63,8 @@ public:
 	virtual Vec4 getButtonHoveredColorRGBA(Entity entity) = 0;
 	virtual void setButtonHoveredColorRGBA(Entity entity, const Vec4& color) = 0;
 
+	virtual void enableImage(Entity entity, bool enable) = 0;
+	virtual bool isImageEnabled(Entity entity) = 0;
 	virtual Vec4 getImageColorRGBA(Entity entity) = 0;
 	virtual void setImageColorRGBA(Entity entity, const Vec4& color) = 0;
 	virtual Path getImageSprite(Entity entity) = 0;
