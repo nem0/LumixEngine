@@ -427,6 +427,7 @@ LUMIX_STUDIO_ENTRY(gui)
 {
 	app.registerComponent("gui_button", "GUI/Button");
 	app.registerComponent("gui_image", "GUI/Image");
+	app.registerComponent("gui_input_field", "GUI/Input field");
 	app.registerComponent("gui_rect", "GUI/Rect");
 	app.registerComponent("gui_text", "GUI/Text");
 

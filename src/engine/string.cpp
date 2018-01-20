@@ -204,6 +204,39 @@ string& string::cat(char* value)
 }
 
 
+void string::eraseAt(int position)
+{
+	if (position < 0 || position >= m_size) return;
+	moveMemory(m_cstr + position, m_cstr + position + 1, m_size - position - 1);
+	--m_size;
+	m_cstr[m_size] = '\0';
+}
+
+
+void string::insert(int position, const char* value)
+{
+	if (m_cstr)
+	{
+		int value_len = stringLength(value);
+		i32 new_size = m_size + value_len;
+		char* new_cstr = (char*)m_allocator.allocate(new_size + 1);
+		if (position > 0) copyMemory(new_cstr, m_cstr, sizeof(char) * position);
+		if (value_len > 0) copyMemory(new_cstr + position, value, sizeof(char) * value_len);
+		copyMemory(new_cstr + position + value_len, m_cstr + position, sizeof(char) * (m_size - position) + 1);
+		
+		m_allocator.deallocate(m_cstr);
+		m_cstr = new_cstr;
+		m_size = new_size;
+	}
+	else
+	{
+		m_size = stringLength(value);
+		m_cstr = (char*)m_allocator.allocate(m_size + 1);
+		copyString(m_cstr, m_size + 1, value);
+	}
+}
+
+
 string& string::cat(const char* rhs)
 {
 	if (rhs < m_cstr || rhs >= m_cstr + m_size)

@@ -81,7 +81,8 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 				property("Color", LUMIX_PROP(GUIScene, TextColorRGBA),
 					ColorAttribute())
 			),
-			component("gui_button", 
+			component("gui_input_field"),
+			component("gui_button",
 				property("Normal color", LUMIX_PROP(GUIScene, ButtonNormalColorRGBA),
 					ColorAttribute()),
 				property("Hovered color", LUMIX_PROP(GUIScene, ButtonHoveredColorRGBA),

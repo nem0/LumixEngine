@@ -17,7 +17,7 @@
 #include "renderer/renderer.h"
 #include "renderer/render_scene.h"
 #include "renderer/texture.h"
-
+#include <SDL.h>
 
 namespace Lumix
 {
@@ -27,6 +27,8 @@ static const ComponentType GUI_BUTTON_TYPE = Reflection::getComponentType("gui_b
 static const ComponentType GUI_RECT_TYPE = Reflection::getComponentType("gui_rect");
 static const ComponentType GUI_IMAGE_TYPE = Reflection::getComponentType("gui_image");
 static const ComponentType GUI_TEXT_TYPE = Reflection::getComponentType("gui_text");
+static const ComponentType GUI_INPUT_FIELD_TYPE = Reflection::getComponentType("gui_input_field");
+static const float CURSOR_BLINK_PERIOD = 1.0f;
 
 
 struct GUIText
@@ -53,6 +55,13 @@ struct GUIButton
 {
 	u32 normal_color;
 	u32 hovered_color;
+};
+
+
+struct GUIInputField
+{
+	int cursor = 0;
+	float anim = 0;
 };
 
 
@@ -86,6 +95,7 @@ struct GUIRect
 
 	GUIImage* image = nullptr;
 	GUIText* text = nullptr;
+	GUIInputField* input_field = nullptr;
 };
 
 
@@ -113,6 +123,12 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 			, &GUISceneImpl::destroyImage
 			, &GUISceneImpl::serializeImage
 			, &GUISceneImpl::deserializeImage);
+		context.registerComponentType(GUI_INPUT_FIELD_TYPE
+			, this
+			, &GUISceneImpl::createInputField
+			, &GUISceneImpl::destroyInputField
+			, &GUISceneImpl::serializeInputField
+			, &GUISceneImpl::deserializeInputField);
 		context.registerComponentType(GUI_TEXT_TYPE
 			, this
 			, &GUISceneImpl::createText
@@ -189,6 +205,14 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		if (rect.text)
 		{
 			draw.AddText(rect.text->font, (float)rect.text->font_size, { l, t }, rect.text->color, rect.text->text.c_str());
+			if (rect.input_field && m_focused_entity == rect.entity && rect.input_field->anim < CURSOR_BLINK_PERIOD * 0.5f)
+			{
+				
+				const char* text = rect.text->text.c_str();
+				const char* text_end = text + rect.input_field->cursor;
+				Vec2 text_size = rect.text->font->CalcTextSizeA((float)rect.text->font_size, FLT_MAX, 0, text, text_end);
+				draw.AddLine({ l + text_size.x, t }, { l + text_size.x, t + text_size.y }, rect.text->color, 1);
+			}
 		}
 
 		Entity child = m_universe.getFirstChild(rect.entity);
@@ -543,6 +567,27 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	}
 
 
+	void serializeInputField(ISerializer& serializer, Entity entity)
+	{
+	}
+
+
+	void deserializeInputField(IDeserializer& serializer, Entity entity, int /*scene_version*/)
+	{
+		int idx = m_rects.find(entity);
+		if (idx < 0)
+		{
+			GUIRect* rect = LUMIX_NEW(m_allocator, GUIRect);
+			rect->entity = entity;
+			idx = m_rects.insert(entity, rect);
+		}
+		GUIRect& rect = *m_rects.at(idx);
+		rect.input_field = LUMIX_NEW(m_allocator, GUIInputField);
+
+		m_universe.onComponentCreated(entity, GUI_INPUT_FIELD_TYPE, this);
+	}
+
+
 	void serializeImage(ISerializer& serializer, Entity entity)
 	{
 		const GUIRect& rect = *m_rects[entity];
@@ -614,6 +659,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	{
 		for (GUIRect* rect : m_rects)
 		{
+			LUMIX_DELETE(m_allocator, rect->input_field);
 			LUMIX_DELETE(m_allocator, rect->image);
 			LUMIX_DELETE(m_allocator, rect->text);
 			LUMIX_DELETE(m_allocator, rect);
@@ -660,7 +706,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 
 		bool is = contains(r, mouse_pos);
 		bool was = contains(r, prev_mouse_pos);
-		if (is != was)
+		if (is != was && m_buttons.find(rect.entity) >= 0)
 		{
 			is ? hover(rect) : hoverOut(rect);
 		}
@@ -687,13 +733,89 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		Vec2 pos(event.data.button.x_abs, event.data.button.y_abs);
 		const Rect& r = getRectOnCanvas(parent_rect, rect);
 		
-		if (contains(r, pos)) m_button_clicked.invoke(rect.entity);
+		if (contains(r, pos))
+		{
+			if (m_buttons.find(rect.entity) >= 0)
+			{
+				m_focused_entity = INVALID_ENTITY;
+				m_button_clicked.invoke(rect.entity);
+			}
+			
+			if (rect.input_field)
+			{
+				m_focused_entity = rect.entity;
+				if (rect.text)
+				{
+					rect.input_field->cursor = rect.text->text.length();
+					rect.input_field->anim = 0;
+				}
+			}
+		}
 
 		for (Entity e = m_universe.getFirstChild(rect.entity); e.isValid(); e = m_universe.getNextSibling(e))
 		{
 			int idx = m_rects.find(e);
 			if (idx < 0) continue;
 			handleMouseButtonEvent(r, *m_rects.at(idx), event);
+		}
+	}
+
+
+	GUIRect* getInput(Entity e)
+	{
+		if (!e.isValid()) return nullptr;
+
+		int rect_idx = m_rects.find(e);
+		if (rect_idx < 0) return nullptr;
+
+		GUIRect* rect = m_rects.at(rect_idx);
+		if (!rect->text) return nullptr;
+		if (!rect->input_field) return nullptr;
+
+		return rect;
+	}
+
+
+	void handleTextInput(const InputSystem::Event& event)
+	{
+		const GUIRect* rect = getInput(m_focused_entity);
+		if (!rect) return;
+		rect->text->text.insert(rect->input_field->cursor, event.data.text.text);
+		rect->input_field->cursor += stringLength(event.data.text.text);
+	}
+
+
+	void handleKeyboardButtonEvent(const InputSystem::Event& event)
+	{
+		const GUIRect* rect = getInput(m_focused_entity);
+		if (!rect) return;
+		if (event.data.button.state != InputSystem::ButtonEvent::DOWN) return;
+
+		rect->input_field->anim = 0;
+
+		switch (event.data.button.key_id)
+		{
+			case SDLK_HOME: rect->input_field->cursor = 0; break;
+			case SDLK_END: rect->input_field->cursor = rect->text->text.length(); break;
+			case SDLK_BACKSPACE:
+				if (rect->text->text.length() > 0 && rect->input_field->cursor > 0)
+				{
+					rect->text->text.eraseAt(rect->input_field->cursor - 1);
+					--rect->input_field->cursor;
+				}
+				break;
+			case SDLK_DELETE:
+				if (rect->input_field->cursor < rect->text->text.length())
+				{
+					rect->text->text.eraseAt(rect->input_field->cursor);
+				}
+				break;
+			case SDLK_LEFT:
+				if (rect->input_field->cursor > 0) --rect->input_field->cursor;
+				break;
+			case SDLK_RIGHT:
+				if (rect->input_field->cursor < rect->text->text.length()) ++rect->input_field->cursor;
+				break;
 		}
 	}
 
@@ -709,6 +831,9 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 			const InputSystem::Event& event = events[i];
 			switch (event.type)
 			{
+				case InputSystem::Event::TEXT_INPUT:
+					handleTextInput(event);
+					break;
 				case InputSystem::Event::AXIS:
 					if (event.device->type == InputSystem::Device::MOUSE)
 					{
@@ -722,9 +847,23 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 					{
 						handleMouseButtonEvent({ 0, 0, m_canvas_size.x, m_canvas_size.y }, *m_root, event);
 					}
+					else if (event.device->type == InputSystem::Device::KEYBOARD)
+					{
+						handleKeyboardButtonEvent(event);
+					}
 					break;
 			}
 		}
+	}
+
+
+	void blinkCursor(float time_delta)
+	{
+		GUIRect* rect = getInput(m_focused_entity);
+		if (!rect) return;
+
+		rect->input_field->anim += time_delta;
+		rect->input_field->anim = fmodf(rect->input_field->anim, CURSOR_BLINK_PERIOD);
 	}
 
 
@@ -733,6 +872,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		if (paused) return;
 
 		handleInput();
+		blinkCursor(time_delta);
 	}
 
 
@@ -775,8 +915,29 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 
 	void createButton(Entity entity)
 	{
+		int idx = m_rects.find(entity);
+		if (idx < 0)
+		{
+			createRect(entity);
+			idx = m_rects.find(entity);
+		}
 		m_buttons.emplace(entity);
 		m_universe.onComponentCreated(entity, GUI_BUTTON_TYPE, this);
+	}
+
+
+	void createInputField(Entity entity)
+	{
+		int idx = m_rects.find(entity);
+		if (idx < 0)
+		{
+			createRect(entity);
+			idx = m_rects.find(entity);
+		}
+		GUIRect& rect = *m_rects.at(idx);
+		rect.input_field = LUMIX_NEW(m_allocator, GUIInputField);
+
+		m_universe.onComponentCreated(entity, GUI_INPUT_FIELD_TYPE, this);
 	}
 
 
@@ -836,6 +997,15 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	}
 
 
+	void destroyInputField(Entity entity)
+	{
+		GUIRect* rect = m_rects[entity];
+		LUMIX_DELETE(m_allocator, rect->input_field);
+		rect->input_field = nullptr;
+		m_universe.onComponentDestroyed(entity, GUI_INPUT_FIELD_TYPE, this);
+	}
+
+
 	void destroyImage(Entity entity)
 	{
 		GUIRect* rect = m_rects[entity];
@@ -872,6 +1042,8 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 				serializer.write(rect->image->color);
 			}
 
+			serializer.write(rect->input_field != nullptr);
+
 			serializer.write(rect->text != nullptr);
 			if (rect->text)
 			{
@@ -889,6 +1061,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 			const GUIButton& button = m_buttons.at(i);
 			serializer.write(button);
 		}
+
 	}
 
 
@@ -917,6 +1090,13 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 				rect->image = LUMIX_NEW(m_allocator, GUIImage);
 				serializer.read(rect->image->color);
 				m_universe.onComponentCreated(rect->entity, GUI_IMAGE_TYPE, this);
+
+			}
+			bool has_input_field = serializer.read<bool>();
+			if (has_input_field)
+			{
+				rect->input_field = LUMIX_NEW(m_allocator, GUIInputField);
+				m_universe.onComponentCreated(rect->entity, GUI_INPUT_FIELD_TYPE, this);
 
 			}
 			bool has_text = serializer.read<bool>();
@@ -981,6 +1161,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	
 	AssociativeArray<Entity, GUIRect*> m_rects;
 	AssociativeArray<Entity, GUIButton> m_buttons;
+	Entity m_focused_entity = INVALID_ENTITY;
 	GUIRect* m_root = nullptr;
 	FontManager* m_font_manager = nullptr;
 	Vec2 m_canvas_size;
