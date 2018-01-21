@@ -20,6 +20,13 @@ template <typename T> class DelegateList;
 class GUIScene : public IScene
 {
 public:
+	enum class TextHAlign : int
+	{
+		LEFT,
+		CENTER,
+		RIGHT
+	};
+
 	struct Rect
 	{
 		float x, y, w, h;
@@ -73,6 +80,8 @@ public:
 
 	virtual void setText(Entity entity, const char* text) = 0;
 	virtual const char* getText(Entity entity) = 0;
+	virtual TextHAlign getTextHAlign(Entity entity) = 0;
+	virtual void setTextHAlign(Entity entity, TextHAlign align) = 0;
 	virtual void setTextFontSize(Entity entity, int value) = 0;
 	virtual int getTextFontSize(Entity entity) = 0;
 	virtual Vec4 getTextColorRGBA(Entity entity) = 0;

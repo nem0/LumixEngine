@@ -34,6 +34,18 @@ struct GUISystemImpl;
 
 struct GUISystemImpl LUMIX_FINAL : public GUISystem
 {
+	static const char* getTextHAlignName(int index)
+	{
+		switch ((GUIScene::TextHAlign) index)
+		{
+		case GUIScene::TextHAlign::LEFT: return "left";
+		case GUIScene::TextHAlign::RIGHT: return "right";
+		case GUIScene::TextHAlign::CENTER: return "center";
+		default: ASSERT(false); return "Unknown";
+		}
+	}
+
+
 	explicit GUISystemImpl(Engine& engine)
 		: m_engine(engine)
 		, m_interface(nullptr)
@@ -78,6 +90,7 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 				property("Font", LUMIX_PROP(GUIScene, TextFontPath),
 					ResourceAttribute("Font (*.ttf)", FontResource::TYPE)),
 				property("Font Size", LUMIX_PROP(GUIScene, TextFontSize)),
+				enum_property("Horizontal align", LUMIX_PROP(GUIScene, TextHAlign), 3, getTextHAlignName),
 				property("Color", LUMIX_PROP(GUIScene, TextColorRGBA),
 					ColorAttribute())
 			),

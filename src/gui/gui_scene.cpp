@@ -47,6 +47,7 @@ struct GUIText
 	Font* font = nullptr;
 	string text;
 	int font_size = 13;
+	GUIScene::TextHAlign horizontal_align = GUIScene::TextHAlign::LEFT;
 	u32 color = 0xff000000;
 };
 
@@ -149,6 +150,18 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		m_font_manager = (FontManager*)system.getEngine().getResourceManager().get(FontResource::TYPE);
 	}
 
+	void renderTextCursor(GUIRect& rect, Draw2D& draw, const Vec2& pos)
+	{
+		if (!rect.input_field) return;
+		if (m_focused_entity != rect.entity) return;
+		if (rect.input_field->anim > CURSOR_BLINK_PERIOD * 0.5f) return;
+
+		const char* text = rect.text->text.c_str();
+		const char* text_end = text + rect.input_field->cursor;
+		Vec2 text_size = rect.text->font->CalcTextSizeA((float)rect.text->font_size, FLT_MAX, 0, text, text_end);
+		draw.AddLine({ pos.x + text_size.x, pos.y }, { pos.x + text_size.x, pos.y + text_size.y }, rect.text->color, 1);
+	}
+
 
 	void renderRect(GUIRect& rect, Pipeline& pipeline, const Rect& parent_rect)
 	{
@@ -209,15 +222,20 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		}
 		if (rect.text)
 		{
-			draw.AddText(rect.text->font, (float)rect.text->font_size, { l, t }, rect.text->color, rect.text->text.c_str());
-			if (rect.input_field && m_focused_entity == rect.entity && rect.input_field->anim < CURSOR_BLINK_PERIOD * 0.5f)
+			const char* text_cstr = rect.text->text.c_str();
+			float font_size = (float)rect.text->font_size;
+			Vec2 text_size = rect.text->font->CalcTextSizeA(font_size, FLT_MAX, 0, text_cstr);
+			Vec2 text_pos(l, t);
+
+			switch (rect.text->horizontal_align)
 			{
-				
-				const char* text = rect.text->text.c_str();
-				const char* text_end = text + rect.input_field->cursor;
-				Vec2 text_size = rect.text->font->CalcTextSizeA((float)rect.text->font_size, FLT_MAX, 0, text, text_end);
-				draw.AddLine({ l + text_size.x, t }, { l + text_size.x, t + text_size.y }, rect.text->color, 1);
+				case TextHAlign::LEFT: break;
+				case TextHAlign::RIGHT: text_pos.x = r - text_size.x; break;
+				case TextHAlign::CENTER: text_pos.x = (r + l - text_size.x) * 0.5f; break; 
 			}
+
+			draw.AddText(rect.text->font, font_size, text_pos, rect.text->color, text_cstr);
+			renderTextCursor(rect, draw, text_pos);
 		}
 
 		Entity child = m_universe.getFirstChild(rect.entity);
@@ -499,6 +517,21 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	}
 
 
+	TextHAlign getTextHAlign(Entity entity) override
+	{
+		GUIText* gui_text = m_rects[entity]->text;
+		return gui_text->horizontal_align;
+		
+	}
+
+
+	void setTextHAlign(Entity entity, TextHAlign value) override
+	{
+		GUIText* gui_text = m_rects[entity]->text;
+		gui_text->horizontal_align = value;
+	}
+
+
 	void setText(Entity entity, const char* value) override
 	{
 		GUIText* gui_text = m_rects[entity]->text;
@@ -647,6 +680,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	{
 		const GUIRect& rect = *m_rects[entity];
 		serializer.write("font", rect.text->font_resource ? rect.text->font_resource->getPath().c_str() : "");
+		serializer.write("color", (int)rect.text->horizontal_align);
 		serializer.write("color", rect.text->color);
 		serializer.write("font_size", rect.text->font_size);
 		serializer.write("text", rect.text->text.c_str());
@@ -667,6 +701,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 
 		char tmp[MAX_PATH_LENGTH];
 		serializer.read(tmp, lengthOf(tmp));
+		serializer.read((int*)&rect.text->horizontal_align);
 		serializer.read(&rect.text->color);
 		serializer.read(&rect.text->font_size);
 		serializer.read(&rect.text->text);
@@ -1087,6 +1122,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 			if (rect->text)
 			{
 				serializer.writeString(rect->text->font_resource ? rect->text->font_resource->getPath().c_str() : "");
+				serializer.write(rect->text->horizontal_align);
 				serializer.write(rect->text->color);
 				serializer.write(rect->text->font_size);
 				serializer.write(rect->text->text);
@@ -1156,6 +1192,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 				rect->text = LUMIX_NEW(m_allocator, GUIText)(m_allocator);
 				GUIText& text = *rect->text;
 				serializer.readString(tmp, lengthOf(tmp));
+				serializer.read(text.horizontal_align);
 				serializer.read(text.color);
 				serializer.read(text.font_size);
 				serializer.read(text.text);
