@@ -102,7 +102,11 @@ enum class EdgeMask
 	RIGHT = 1 << 1,
 	TOP = 1 << 2,
 	BOTTOM = 1 << 3,
-	ALL = LEFT | RIGHT | TOP | BOTTOM
+	CENTER_HORIZONTAL = 1 << 4,
+	CENTER_VERTICAL = 1 << 5,
+	ALL = LEFT | RIGHT | TOP | BOTTOM,
+	HORIZONTAL = LEFT | RIGHT,
+	VERTICAL = TOP | BOTTOM
 };
 
 public:
@@ -208,6 +212,69 @@ private:
 
 
 
+	struct CopyPositionBufferItem
+	{
+		const Reflection::PropertyBase* prop = nullptr;
+		float value;
+
+		void set(GUIScene* scene, Entity e, const char* prop_name)
+		{
+			prop = Reflection::getProperty(GUI_RECT_TYPE, prop_name);
+			OutputBlob blob(&value, sizeof(value));
+			prop->getValue({ e, GUI_RECT_TYPE, scene }, -1, blob);
+		}
+	} m_copy_position_buffer[8];
+	
+	int m_copy_position_buffer_count = 0;
+
+	void copy(Entity e, u8 mask)
+	{
+		GUIScene* scene = (GUIScene*)m_editor->getUniverse()->getScene(crc32("gui"));
+		m_copy_position_buffer_count = 0;
+
+		if (mask & (u8)EdgeMask::TOP)
+		{
+			m_copy_position_buffer[m_copy_position_buffer_count].set(scene, e, "Top Points");
+			m_copy_position_buffer[m_copy_position_buffer_count+1].set(scene, e, "Top Relative");
+			m_copy_position_buffer_count += 2;
+		}
+
+		if (mask & (u8)EdgeMask::BOTTOM)
+		{
+			m_copy_position_buffer[m_copy_position_buffer_count].set(scene, e, "Bottom Points");
+			m_copy_position_buffer[m_copy_position_buffer_count + 1].set(scene, e, "Bottom Relative");
+			m_copy_position_buffer_count += 2;
+		}
+
+		if (mask & (u8)EdgeMask::LEFT)
+		{
+			m_copy_position_buffer[m_copy_position_buffer_count].set(scene, e, "Left Points");
+			m_copy_position_buffer[m_copy_position_buffer_count + 1].set(scene, e, "Left Relative");
+			m_copy_position_buffer_count += 2;
+		}
+
+		if (mask & (u8)EdgeMask::RIGHT)
+		{
+			m_copy_position_buffer[m_copy_position_buffer_count].set(scene, e, "Right Points");
+			m_copy_position_buffer[m_copy_position_buffer_count + 1].set(scene, e, "Right Relative");
+			m_copy_position_buffer_count += 2;
+		}
+	}
+
+
+	void paste(Entity e)
+	{
+		m_editor->beginCommandGroup(crc32("gui_editor_paste"));
+		GUIScene* scene = (GUIScene*)m_editor->getUniverse()->getScene(crc32("gui"));
+		for (int i = 0; i < m_copy_position_buffer_count; ++i)
+		{
+			CopyPositionBufferItem& item = m_copy_position_buffer[i];
+			m_editor->setProperty(GUI_RECT_TYPE, -1, *item.prop, &e, 1, &item.value, sizeof(item.value));
+		}
+		m_editor->endCommandGroup();
+	}
+
+
 	void onWindowGUI() override
 	{
 		if (ImGui::BeginDock("GUIEditor", &m_is_window_open))
@@ -292,6 +359,40 @@ private:
 					if (ImGui::MenuItem("Left")) makeAbsolute(e, toLumix(size), (u8)EdgeMask::LEFT);
 					ImGui::EndMenu();
 				}
+				if (ImGui::BeginMenu("Expand"))
+				{
+					if (ImGui::MenuItem("All")) expand(e, (u8)EdgeMask::ALL);
+					if (ImGui::MenuItem("Top")) expand(e, (u8)EdgeMask::TOP);
+					if (ImGui::MenuItem("Right")) expand(e, (u8)EdgeMask::RIGHT);
+					if (ImGui::MenuItem("Bottom")) expand(e, (u8)EdgeMask::BOTTOM);
+					if (ImGui::MenuItem("Left")) expand(e, (u8)EdgeMask::LEFT);
+					if (ImGui::MenuItem("Horizontal")) expand(e, (u8)EdgeMask::HORIZONTAL);
+					if (ImGui::MenuItem("Vertical")) expand(e, (u8)EdgeMask::VERTICAL);
+					ImGui::EndMenu();
+				}
+				if (ImGui::BeginMenu("Align"))
+				{
+					if (ImGui::MenuItem("Top")) align(e, (u8)EdgeMask::TOP);
+					if (ImGui::MenuItem("Right")) align(e, (u8)EdgeMask::RIGHT);
+					if (ImGui::MenuItem("Bottom")) align(e, (u8)EdgeMask::BOTTOM);
+					if (ImGui::MenuItem("Left")) align(e, (u8)EdgeMask::LEFT);
+					if (ImGui::MenuItem("Center horizontal")) align(e, (u8)EdgeMask::CENTER_HORIZONTAL);
+					if (ImGui::MenuItem("Center vertical")) align(e, (u8)EdgeMask::CENTER_VERTICAL);
+					ImGui::EndMenu();
+				}
+				if (ImGui::BeginMenu("Copy position"))
+				{
+					if (ImGui::MenuItem("All")) copy(e, (u8)EdgeMask::ALL);
+					if (ImGui::MenuItem("Top")) copy(e, (u8)EdgeMask::TOP);
+					if (ImGui::MenuItem("Right")) copy(e, (u8)EdgeMask::RIGHT);
+					if (ImGui::MenuItem("Bottom")) copy(e, (u8)EdgeMask::BOTTOM);
+					if (ImGui::MenuItem("Left")) copy(e, (u8)EdgeMask::LEFT);
+					if (ImGui::MenuItem("Horizontal")) copy(e, (u8)EdgeMask::HORIZONTAL);
+					if (ImGui::MenuItem("Vertical")) copy(e, (u8)EdgeMask::VERTICAL);
+					ImGui::EndMenu();
+				}
+				if (ImGui::MenuItem("Paste")) paste(e);
+
 				if (ImGui::BeginMenu("Create child"))
 				{
 					if (ImGui::MenuItem("Button")) createChild(e, GUI_BUTTON_TYPE);
@@ -300,6 +401,7 @@ private:
 					if (ImGui::MenuItem("Text")) createChild(e, GUI_TEXT_TYPE);
 					ImGui::EndMenu();
 				}
+
 				ImGui::EndPopup();
 			}
 		}
@@ -326,7 +428,7 @@ private:
 		m_editor->setProperty(GUI_RECT_TYPE, -1, *prop, &e, 1, &value, sizeof(value));
 	}
 
-	
+
 	void makeAbsolute(Entity entity, const Vec2& canvas_size, u8 mask)
 	{
 		GUIScene* scene = (GUIScene*)m_editor->getUniverse()->getScene(crc32("gui"));
@@ -359,6 +461,106 @@ private:
 		{
 			setRectProperty(entity, "Bottom Relative", 0);
 			setRectProperty(entity, "Bottom Points", child_rect.y + child_rect.h - parent_rect.y);
+		}
+
+		m_editor->endCommandGroup();
+	}
+
+
+	void align(Entity entity, u8 mask)
+	{
+		GUIScene* scene = (GUIScene*)m_editor->getUniverse()->getScene(crc32("gui"));
+
+		m_editor->beginCommandGroup(crc32("align_gui_rect"));
+
+		float br = scene->getRectBottomRelative(entity);
+		float bp = scene->getRectBottomPoints(entity);
+		float tr = scene->getRectTopRelative(entity);
+		float tp = scene->getRectTopPoints(entity);
+		float rr = scene->getRectRightRelative(entity);
+		float rp = scene->getRectRightPoints(entity);
+		float lr = scene->getRectLeftRelative(entity);
+		float lp = scene->getRectLeftPoints(entity);
+
+		if (mask & (u8)EdgeMask::TOP)
+		{
+			setRectProperty(entity, "Bottom Relative", br - tr);
+			setRectProperty(entity, "Bottom Points", bp - tp);
+			setRectProperty(entity, "Top Relative", 0);
+			setRectProperty(entity, "Top Points", 0);
+		}
+
+		if (mask & (u8)EdgeMask::LEFT)
+		{
+			setRectProperty(entity, "Right Relative", rr - lr);
+			setRectProperty(entity, "Right Points", rp - lp);
+			setRectProperty(entity, "Left Relative", 0);
+			setRectProperty(entity, "Left Points", 0);
+		}
+
+		if (mask & (u8)EdgeMask::RIGHT)
+		{
+			setRectProperty(entity, "Left Relative", lr + 1 - rr);
+			setRectProperty(entity, "Left Points", lp - rp);
+			setRectProperty(entity, "Right Relative", 1);
+			setRectProperty(entity, "Right Points", 0);
+		}
+
+		if (mask & (u8)EdgeMask::BOTTOM)
+		{
+			setRectProperty(entity, "Top Relative", tr + 1 - br);
+			setRectProperty(entity, "Top Points", tp - bp);
+			setRectProperty(entity, "Bottom Relative", 1);
+			setRectProperty(entity, "Bottom Points", 0);
+		}
+
+		if (mask & (u8)EdgeMask::CENTER_VERTICAL)
+		{
+			setRectProperty(entity, "Top Relative", 0.5f - (br - tr) * 0.5f);
+			setRectProperty(entity, "Top Points", -(bp - tp) * 0.5f);
+			setRectProperty(entity, "Bottom Relative", 0.5f + (br - tr) * 0.5f);
+			setRectProperty(entity, "Bottom Points", (bp - tp) * 0.5f);
+		}
+
+		if (mask & (u8)EdgeMask::CENTER_HORIZONTAL)
+		{
+			setRectProperty(entity, "Left Relative", 0.5f - (rr - lr) * 0.5f);
+			setRectProperty(entity, "Left Points", -(rp - lp) * 0.5f);
+			setRectProperty(entity, "Right Relative", 0.5f + (rr - lr) * 0.5f);
+			setRectProperty(entity, "Right Points", (rp - lp) * 0.5f);
+		}
+
+		m_editor->endCommandGroup();
+	}
+
+	void expand(Entity entity, u8 mask)
+	{
+		GUIScene* scene = (GUIScene*)m_editor->getUniverse()->getScene(crc32("gui"));
+		m_editor->beginCommandGroup(crc32("expand_gui_rect"));
+
+		if (mask & (u8)EdgeMask::TOP)
+		{
+			setRectProperty(entity, "Top Points", 0);
+			setRectProperty(entity, "Top Relative", 0);
+		}
+
+		if (mask & (u8)EdgeMask::RIGHT)
+		{
+			setRectProperty(entity, "Right Points", 0);
+			setRectProperty(entity, "Right Relative", 1);
+		}
+
+
+		if (mask & (u8)EdgeMask::LEFT)
+		{
+			setRectProperty(entity, "Left Points", 0);
+			setRectProperty(entity, "Left Relative", 0);
+		}
+
+		if (mask & (u8)EdgeMask::BOTTOM)
+		{
+			setRectProperty(entity, "Bottom Points", 0);
+			setRectProperty(entity, "Bottom Relative", 1);
 		}
 
 		m_editor->endCommandGroup();
