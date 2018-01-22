@@ -110,6 +110,7 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 			),
 			component("gui_rect",
 				property("Enabled", LUMIX_PROP_FULL(GUIScene, isRectEnabled, enableRect)),
+				property("Clip content", LUMIX_PROP(GUIScene, RectClip)),
 				property("Top Points", LUMIX_PROP(GUIScene, RectTopPoints)),
 				property("Top Relative", LUMIX_PROP(GUIScene, RectTopRelative)),
 				property("Right Points", LUMIX_PROP(GUIScene, RectRightPoints)),
