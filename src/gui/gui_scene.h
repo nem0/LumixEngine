@@ -46,6 +46,8 @@ public:
 
 	virtual void enableRect(Entity entity, bool enable) = 0;
 	virtual bool isRectEnabled(Entity entity) = 0;
+	virtual bool getRectClip(Entity entity) = 0;
+	virtual void setRectClip(Entity entity, bool value) = 0;
 	virtual float getRectLeftPoints(Entity entity) = 0;
 	virtual void setRectLeftPoints(Entity entity, float value) = 0;
 	virtual float getRectLeftRelative(Entity entity) = 0;

@@ -83,7 +83,8 @@ struct GUIRect
 	enum Flags
 	{
 		IS_VALID = 1 << 0,
-		IS_ENABLED = 1 << 1
+		IS_ENABLED = 1 << 1,
+		IS_CLIP = 1 << 2
 	};
 
 	struct Anchor
@@ -167,13 +168,15 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	{
 		if (!rect.flags.isSet(GUIRect::IS_VALID)) return;
 		if (!rect.flags.isSet(GUIRect::IS_ENABLED)) return;
-		
+
 		float l = parent_rect.x + rect.left.points + parent_rect.w * rect.left.relative;
 		float r = parent_rect.x + rect.right.points + parent_rect.w * rect.right.relative;
 		float t = parent_rect.y + rect.top.points + parent_rect.h * rect.top.relative;
 		float b = parent_rect.y + rect.bottom.points + parent_rect.h * rect.bottom.relative;
 			 
 		Draw2D& draw = pipeline.getDraw2D();
+		if (rect.flags.isSet(GUIRect::IS_CLIP)) draw.PushClipRect({ l, t }, { r, b });
+
 		if (rect.image && rect.image->flags.isSet(GUIImage::IS_ENABLED))
 		{
 			if (rect.image->sprite && rect.image->sprite->getTexture())
@@ -247,6 +250,8 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 				renderRect(*m_rects.at(idx), pipeline, { l, t, r - l, b - t });
 			}
 		}
+		if (rect.flags.isSet(GUIRect::IS_CLIP)) draw.PopClipRect();
+
 		Entity sibling = m_universe.getNextSibling(rect.entity);
 		if (sibling.isValid())
 		{
@@ -435,7 +440,8 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		return { l, t, r - l, b - t };
 	}
 
-
+	void setRectClip(Entity entity, bool enable) override { m_rects[entity]->flags.set(GUIRect::IS_CLIP, enable); }
+	bool getRectClip(Entity entity) override { return m_rects[entity]->flags.isSet(GUIRect::IS_CLIP); }
 	void enableRect(Entity entity, bool enable) override { m_rects[entity]->flags.set(GUIRect::IS_ENABLED, enable); }
 	bool isRectEnabled(Entity entity) override { return m_rects[entity]->flags.isSet(GUIRect::IS_ENABLED); }
 	float getRectLeftPoints(Entity entity) override { return m_rects[entity]->left.points; }
