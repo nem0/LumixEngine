@@ -1026,7 +1026,7 @@ struct UIBuilder
 	{
 		if (customUI(owner, pp, array)) return;
 
-		bool expanded = ImGui::TreeNodeEx(pp.name, ImGuiTreeNodeFlags_AllowOverlapMode);
+		bool expanded = ImGui::TreeNodeEx(pp.name, ImGuiTreeNodeFlags_AllowItemOverlap);
 		ImGui::SameLine();
 		if (ImGui::SmallButton(StaticString<32>("Add")))
 		{
