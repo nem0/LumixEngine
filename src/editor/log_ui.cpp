@@ -114,15 +114,9 @@ void LogUI::showNotifications()
 
 	ImGui::SetNextWindowPos(ImVec2(10, 30));
 	bool open;
-	if (!ImGui::Begin("Notifications",
-			&open,
-			ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize |
-				ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
-				ImGuiWindowFlags_ShowBorders))
-	{
-		ImGui::End();
-		return;
-	}
+	ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings;
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1);
+	if (!ImGui::Begin("Notifications", &open, flags)) goto end;
 
 	m_are_notifications_hovered = ImGui::IsWindowHovered();
 
@@ -135,7 +129,10 @@ void LogUI::showNotifications()
 		if (i > 0) ImGui::Separator();
 		ImGui::Text("%s", m_notifications[i].message.c_str());
 	}
-	ImGui::End();
+
+	end:
+		ImGui::End();
+		ImGui::PopStyleVar();
 }
 
 

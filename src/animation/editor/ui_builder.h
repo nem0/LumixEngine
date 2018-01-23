@@ -1196,7 +1196,7 @@ struct UIBuilder
 	{
 		if (customUI(owner, pp, array)) return;
 		
-		bool expanded = ImGui::TreeNodeEx(pp.name, ImGuiTreeNodeFlags_AllowOverlapMode | ImGuiTreeNodeFlags_Framed);
+		bool expanded = ImGui::TreeNodeEx(pp.name, ImGuiTreeNodeFlags_AllowItemOverlap | ImGuiTreeNodeFlags_Framed);
 		ImGui::SameLine();
 		if (ImGui::SmallButton("Add"))
 		{
@@ -1212,7 +1212,7 @@ struct UIBuilder
 			for (T& item : array)
 			{
 				StaticString<32> label("", i + 1);
-				bool expanded = ImGui::TreeNodeEx(label, ImGuiTreeNodeFlags_AllowOverlapMode);
+				bool expanded = ImGui::TreeNodeEx(label, ImGuiTreeNodeFlags_AllowItemOverlap);
 				ImGui::SameLine();
 				if (ImGui::SmallButton("Remove"))
 				{
