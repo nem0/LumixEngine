@@ -498,7 +498,7 @@ struct AssetBrowserPlugin : AssetBrowser::IPlugin
 		m_text_buffer[0] = 0;
 	}
 
-
+	
 	bool acceptExtension(const char* ext, ResourceType type) const override
 	{
 		return type == LuaScript::TYPE && equalStrings(".lua", ext);

@@ -27,6 +27,7 @@ const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("renderab
 const ComponentType RAGDOLL_TYPE = Reflection::getComponentType("ragdoll");
 const ComponentType BOX_ACTOR_TYPE = Reflection::getComponentType("box_rigid_actor");
 const ComponentType SPHERE_ACTOR_TYPE = Reflection::getComponentType("sphere_rigid_actor");
+const ComponentType MESH_ACTOR_TYPE = Reflection::getComponentType("mesh_rigid_actor");
 const ComponentType CAPSULE_ACTOR_TYPE = Reflection::getComponentType("capsule_rigid_actor");
 const ComponentType CONTROLLER_TYPE = Reflection::getComponentType("physical_controller");
 const ComponentType DISTANCE_JOINT_TYPE = Reflection::getComponentType("distance_joint");
@@ -1054,7 +1055,7 @@ LUMIX_STUDIO_ENTRY(physics)
 	app.registerComponent("sphere_rigid_actor", "Physics/Sphere");
 	app.registerComponent("capsule_rigid_actor", "Physics/Capsule");
 	app.registerComponent("physical_controller", "Physics/Controller");
-	app.registerComponent("mesh_rigid_actor", "Physics/Mesh");
+	app.registerComponentWithResource("mesh_rigid_actor", "Physics/Mesh", PhysicsGeometry::TYPE, *Reflection::getProperty(MESH_ACTOR_TYPE, "Source"));
 	app.registerComponent("physical_heightfield", "Physics/Heightfield");
 	app.registerComponent("ragdoll", "Physics/Ragdoll");
 	app.registerComponent("rigid_actor", "Physics/Rigid actor");

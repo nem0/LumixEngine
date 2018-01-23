@@ -751,6 +751,19 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* bu
 
 bool AssetBrowser::resourceList(char* buf, int max_size, ResourceType type, float height) const
 {
+	for (IPlugin* plugin : m_plugins)
+	{
+		if (plugin->hasResourceManager(type) && plugin->canCreateResource() && ImGui::Selectable("New"))
+		{
+			char path[MAX_PATH_LENGTH];
+			if (plugin->createResource(path, lengthOf(path)))
+			{
+				copyString(buf, max_size, path);
+				return true;
+			}
+		}
+	}
+
 	static char filter[128] = "";
 	ImGui::LabellessInputText("Filter", filter, sizeof(filter));
 
