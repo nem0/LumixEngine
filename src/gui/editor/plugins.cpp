@@ -54,28 +54,102 @@ struct SpritePlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 			sprite->setTexture(Path(tmp));
 		}
 
+		static const char* TYPES_STR[] = { "9 patch", "Simple" };
+		if (ImGui::BeginCombo("Type", TYPES_STR[sprite->type]))
+		{
+			if (ImGui::Selectable("9 patch")) sprite->type = Sprite::Type::PATCH9;
+			if (ImGui::Selectable("Simple")) sprite->type = Sprite::Type::SIMPLE;
+			ImGui::EndCombo();
+		}
 		switch (sprite->type)
 		{
 			case Sprite::Type::PATCH9:
-				ImGui::LabelText("Type", "%s", "9 patch");
+				ImGui::InputInt("Top", &sprite->top);
+				ImGui::InputInt("Right", &sprite->right);
+				ImGui::InputInt("Bottom", &sprite->bottom);
+				ImGui::InputInt("Left", &sprite->left);
+				patch9edit(sprite);
 				break;
-			case Sprite::Type::SIMPLE:
-				ImGui::LabelText("Type", "%s", "Simple");
-				break;
-			default:
-				ImGui::LabelText("Type", "%s", "Unknown");
-				ASSERT(false);
-				break;
+			case Sprite::Type::SIMPLE: break;
+			default: ASSERT(false); break;
 		}
 
-		ImGui::InputInt("Top", &sprite->top);
-		ImGui::InputInt("Right", &sprite->right);
-		ImGui::InputInt("Bottom", &sprite->bottom);
-		ImGui::InputInt("Left", &sprite->left);
 
 		if (ImGui::Button("Save")) saveSprite(sprite);
 
 		return true;
+	}
+
+
+
+	void patch9edit(Sprite* sprite)
+	{
+		Texture* texture = sprite->getTexture();
+
+		if (sprite->type != Sprite::Type::PATCH9 || !texture || !texture->isReady()) return;
+		ImVec2 size;
+		size.x = Math::minimum(ImGui::GetContentRegionAvailWidth(), texture->width * 2.0f);
+		size.y = size.x / texture->width * texture->height;
+		float scale = size.x / texture->width;
+		ImGui::Dummy(size);
+
+		ImDrawList* draw = ImGui::GetWindowDrawList();
+		ImVec2 a = ImGui::GetItemRectMin();
+		ImVec2 b = ImGui::GetItemRectMax();
+		draw->AddImage(&texture->handle, a, b);
+
+		auto drawHandle = [&](const char* id, const ImVec2& a, const ImVec2& b, int* value, bool vertical) {
+			const float SIZE = 5;
+			ImVec2 rect_pos((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f);
+			if (vertical)
+			{
+				rect_pos.x = a.x + (sprite->left + sprite->right) * 0.5f * scale;
+			}
+			else
+			{
+				rect_pos.y = a.y + (sprite->top + sprite->bottom) * 0.5f * scale;
+			}
+
+			ImGui::SetCursorScreenPos({ rect_pos.x - SIZE, rect_pos.y - SIZE });
+			ImGui::InvisibleButton(id, { SIZE * 2, SIZE * 2 });
+			bool changed = false;
+			if (ImGui::IsItemActive())
+			{
+				static int start_drag_value;
+				if (ImGui::IsMouseDragging())
+				{
+					ImVec2 drag = ImGui::GetMouseDragDelta();
+					if (vertical)
+					{
+						*value = int(start_drag_value + drag.y / scale);
+					}
+					else
+					{
+						*value = int(start_drag_value + drag.x / scale);
+					}
+				}
+				else if (ImGui::IsMouseClicked(0))
+				{
+					start_drag_value = *value;
+				}
+				changed = true;
+			}
+
+
+			bool is_hovered = ImGui::IsItemHovered();
+			draw->AddLine(a, b, 0xffff00ff);
+			draw->AddRectFilled(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), is_hovered ? 0xffffffff : 0x77ffFFff);
+			draw->AddRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), 0xff777777);
+
+			return changed;
+		};
+
+		ImVec2 cp = ImGui::GetCursorScreenPos();
+		drawHandle("left", { a.x + sprite->left * scale, a.y }, { a.x + sprite->left * scale, b.y }, &sprite->left, false);
+		drawHandle("right", { a.x + sprite->right * scale, a.y }, { a.x + sprite->right * scale, b.y }, &sprite->right, false);
+		drawHandle("top", { a.x, a.y + sprite->top * scale }, { b.x, a.y + sprite->top * scale }, &sprite->top, true);
+		drawHandle("bottom", { a.x, a.y + sprite->bottom * scale }, { b.x, a.y + sprite->bottom * scale }, &sprite->bottom, true);
+		ImGui::SetCursorScreenPos(cp);
 	}
 
 
