@@ -9,6 +9,7 @@ namespace Lumix
 {
 
 
+class JsonSerializer;
 class Renderer;
 class Texture;
 
@@ -28,6 +29,7 @@ public:
 
 	void unload() override;
 	bool load(FS::IFile& file) override;
+	bool save(JsonSerializer& serializer);
 	
 	void setTexture(const Path& path);
 	Texture* getTexture() const { return m_texture; }
