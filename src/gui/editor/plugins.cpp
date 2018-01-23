@@ -6,6 +6,7 @@
 #include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/fs/disk_file_device.h"
+#include "engine/fs/os_file.h"
 #include "engine/json_serializer.h"
 #include "engine/log.h"
 #include "engine/math_utils.h"
@@ -38,6 +39,29 @@ static const ComponentType GUI_BUTTON_TYPE = Reflection::getComponentType("gui_b
 struct SpritePlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 {
 	SpritePlugin(StudioApp& app) : app(app) {}
+
+
+	bool canCreateResource() const override { return true; }
+
+
+	bool createResource(char* out, int max_size) override
+	{
+		char full_path[MAX_PATH_LENGTH];
+		if (!PlatformInterface::getSaveFilename(full_path, lengthOf(full_path), "Sprite\0*.spr\0", "spr")) return false;
+		
+		FS::OsFile file;
+		WorldEditor& editor = app.getWorldEditor();
+		if (!file.open(full_path, FS::Mode::CREATE_AND_WRITE))
+		{
+			g_log_error.log("GUI") << "Failed to create " << full_path;
+			return false;
+		}
+
+		file << "{ \"type\" : \"simple\" }";
+		file.close();
+		editor.makeRelative(out, max_size, full_path);
+		return true;
+	}
 
 
 	bool onGUI(Resource* resource, ResourceType type) override
@@ -757,7 +781,7 @@ private:
 LUMIX_STUDIO_ENTRY(gui)
 {
 	app.registerComponent("gui_button", "GUI/Button");
-	app.registerComponent("gui_image", "GUI/Image");
+	app.registerComponentWithResource("gui_image", "GUI/Image", Sprite::TYPE, *Reflection::getProperty(GUI_IMAGE_TYPE, "Sprite"));
 	app.registerComponent("gui_input_field", "GUI/Input field");
 	app.registerComponent("gui_rect", "GUI/Rect");
 	app.registerComponent("gui_text", "GUI/Text");

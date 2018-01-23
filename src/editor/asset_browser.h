@@ -28,6 +28,8 @@ public:
 	{
 		virtual ~IPlugin() {}
 
+		virtual bool canCreateResource() const { return false; }
+		virtual bool createResource(char* out_path, int max_size) { return false; }
 		virtual bool onGUI(Resource* resource, ResourceType type) = 0;
 		virtual ResourceType getResourceType(const char* ext) = 0;
 		virtual void onResourceUnloaded(Resource* resource) = 0;

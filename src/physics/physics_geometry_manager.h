@@ -46,6 +46,7 @@ class PhysicsGeometry LUMIX_FINAL : public Resource
 {
 	public:
 		static const u32 HEADER_MAGIC = 0x5f4c5046; // '_LPF'
+		static const ResourceType TYPE;
 		struct Header
 		{
 			u32 m_magic;
@@ -70,7 +71,6 @@ class PhysicsGeometry LUMIX_FINAL : public Resource
 	public:
 		physx::PxTriangleMesh* tri_mesh;
 		physx::PxConvexMesh* convex_mesh;
-		static const ResourceType TYPE;
 
 	private:
 		IAllocator& getAllocator();
