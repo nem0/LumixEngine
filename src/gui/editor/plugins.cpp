@@ -67,9 +67,14 @@ struct SpritePlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 	bool onGUI(Resource* resource, ResourceType type) override
 	{
 		if (type != Sprite::TYPE) return false;
+		if (!resource->isReady()) return false;
 
 		Sprite* sprite = (Sprite*)resource;
 		
+		if (ImGui::Button("Save")) saveSprite(*sprite);
+		ImGui::SameLine();
+		if (ImGui::Button("Open in external editor")) app.getAssetBrowser().openInExternalEditor(sprite);
+
 		char tmp[MAX_PATH_LENGTH];
 		Texture* tex = sprite->getTexture();
 		copyString(tmp, tex ? tex->getPath().c_str() : "");
@@ -97,9 +102,6 @@ struct SpritePlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 			case Sprite::Type::SIMPLE: break;
 			default: ASSERT(false); break;
 		}
-
-
-		if (ImGui::Button("Save")) saveSprite(sprite);
 
 		return true;
 	}
@@ -177,49 +179,18 @@ struct SpritePlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 	}
 
 
-	void saveSprite(Sprite* sprite)
+	void saveSprite(Sprite& sprite)
 	{
-		FS::FileSystem& fs = app.getWorldEditor().getEngine().getFileSystem();
-		// use temporary because otherwise the material is reloaded during saving
-		StaticString<MAX_PATH_LENGTH> tmp_path(sprite->getPath().c_str(), ".tmp");
-		FS::IFile* file = fs.open(fs.getDefaultDevice(), Path(tmp_path), FS::Mode::CREATE_AND_WRITE);
-		if (!file)
+		if (FS::IFile* file = app.getAssetBrowser().beginSaveResource(sprite))
 		{
-			g_log_error.log("Editor") << "Could not save file " << sprite->getPath().c_str();
-			return;
-		}
-
-		IAllocator& allocator = app.getWorldEditor().getAllocator();
-		JsonSerializer serializer(*file, sprite->getPath());
-		if (!sprite->save(serializer))
-		{
-			g_log_error.log("Editor") << "Could not save file " << sprite->getPath().c_str();
-			fs.close(*file);
-			return;
-		}
-		fs.close(*file);
-
-		Engine& engine = app.getWorldEditor().getEngine();
-		StaticString<MAX_PATH_LENGTH> src_full_path;
-		StaticString<MAX_PATH_LENGTH> dest_full_path;
-		if (engine.getPatchFileDevice())
-		{
-			src_full_path << engine.getPatchFileDevice()->getBasePath() << tmp_path;
-			dest_full_path << engine.getPatchFileDevice()->getBasePath() << sprite->getPath().c_str();
-		}
-		if (!engine.getPatchFileDevice() || !PlatformInterface::fileExists(src_full_path))
-		{
-			src_full_path.data[0] = 0;
-			dest_full_path.data[0] = 0;
-			src_full_path << engine.getDiskFileDevice()->getBasePath() << tmp_path;
-			dest_full_path << engine.getDiskFileDevice()->getBasePath() << sprite->getPath().c_str();
-		}
-
-		PlatformInterface::deleteFile(dest_full_path);
-
-		if (!PlatformInterface::moveFile(src_full_path, dest_full_path))
-		{
-			g_log_error.log("Editor") << "Could not save file " << sprite->getPath().c_str();
+			JsonSerializer serializer(*file, sprite.getPath());
+			bool success = true;
+			if (!sprite.save(serializer))
+			{
+				success = false;
+				g_log_error.log("Editor") << "Could not save file " << sprite.getPath().c_str();
+			}
+			app.getAssetBrowser().endSaveResource(sprite, *file, success);
 		}
 	}
 

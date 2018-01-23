@@ -9,6 +9,8 @@
 #include "editor/world_editor.h"
 #include "engine/engine.h"
 #include "engine/hash_map.h"
+#include "engine/json_serializer.h"
+#include "engine/log.h"
 #include "engine/reflection.h"
 #include "engine/system.h"
 #include "engine/universe/universe.h"
@@ -22,6 +24,7 @@ using namespace Lumix;
 
 
 static const ComponentType ANIMABLE_TYPE = Reflection::getComponentType("animable");
+static const ComponentType PROPERTY_ANIMATOR_TYPE = Reflection::getComponentType("property_animator");
 static const ComponentType CONTROLLER_TYPE = Reflection::getComponentType("anim_controller");
 static const ComponentType RENDERABLE_TYPE = Reflection::getComponentType("renderable");
 
@@ -148,6 +151,22 @@ struct PropertyAnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 	}
 
 
+	void savePropertyAnimation(PropertyAnimation& anim)
+	{
+		if (FS::IFile* file = m_app.getAssetBrowser().beginSaveResource(anim))
+		{
+			bool success = true;
+			JsonSerializer serializer(*file, anim.getPath());
+			if (!anim.save(serializer))
+			{
+				success = false;
+				g_log_error.log("Editor") << "Could not save file " << anim.getPath().c_str();
+			}
+			m_app.getAssetBrowser().endSaveResource(anim, *file, success);
+		}
+	}
+
+
 	bool onGUI(Resource* resource, ResourceType type) override
 	{
 		if (type == PropertyAnimation::TYPE)
@@ -155,6 +174,10 @@ struct PropertyAnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 			auto* animation = static_cast<PropertyAnimation*>(resource);
 			if (!animation->isReady()) return true;
 
+			if (ImGui::Button("Save")) savePropertyAnimation(*animation);
+			ImGui::SameLine();
+			if (ImGui::Button("Open in external editor")) m_app.getAssetBrowser().openInExternalEditor(animation);
+			
 			ShowAddCurveMenu(animation);
 
 			if (!animation->curves.empty())
@@ -384,7 +407,7 @@ struct PropertyGridPlugin : PropertyGrid::IPlugin
 
 LUMIX_STUDIO_ENTRY(animation)
 {
-	app.registerComponent("property_animator", "Animation/Property animator");
+	app.registerComponentWithResource("property_animator", "Animation/Property animator", PropertyAnimation::TYPE, *Reflection::getProperty(PROPERTY_ANIMATOR_TYPE, "Animation"));
 	app.registerComponentWithResource("animable", "Animation/Animable", Animation::TYPE, *Reflection::getProperty(ANIMABLE_TYPE, "Animation"));
 	app.registerComponentWithResource("anim_controller", "Animation/Controller", Anim::ControllerResource::TYPE, *Reflection::getProperty(CONTROLLER_TYPE, "Source"));
 	app.registerComponent("shared_anim_controller", "Animation/Shared controller");
