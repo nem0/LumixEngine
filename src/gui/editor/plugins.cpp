@@ -1,9 +1,13 @@
 #include "editor/asset_browser.h"
+#include "editor/platform_interface.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
+#include "engine/fs/disk_file_device.h"
+#include "engine/json_serializer.h"
+#include "engine/log.h"
 #include "engine/math_utils.h"
 #include "engine/path.h"
 #include "engine/plugin_manager.h"
@@ -69,7 +73,56 @@ struct SpritePlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		ImGui::InputInt("Bottom", &sprite->bottom);
 		ImGui::InputInt("Left", &sprite->left);
 
+		if (ImGui::Button("Save")) saveSprite(sprite);
+
 		return true;
+	}
+
+
+	void saveSprite(Sprite* sprite)
+	{
+		FS::FileSystem& fs = app.getWorldEditor().getEngine().getFileSystem();
+		// use temporary because otherwise the material is reloaded during saving
+		StaticString<MAX_PATH_LENGTH> tmp_path(sprite->getPath().c_str(), ".tmp");
+		FS::IFile* file = fs.open(fs.getDefaultDevice(), Path(tmp_path), FS::Mode::CREATE_AND_WRITE);
+		if (!file)
+		{
+			g_log_error.log("Editor") << "Could not save file " << sprite->getPath().c_str();
+			return;
+		}
+
+		IAllocator& allocator = app.getWorldEditor().getAllocator();
+		JsonSerializer serializer(*file, sprite->getPath());
+		if (!sprite->save(serializer))
+		{
+			g_log_error.log("Editor") << "Could not save file " << sprite->getPath().c_str();
+			fs.close(*file);
+			return;
+		}
+		fs.close(*file);
+
+		Engine& engine = app.getWorldEditor().getEngine();
+		StaticString<MAX_PATH_LENGTH> src_full_path;
+		StaticString<MAX_PATH_LENGTH> dest_full_path;
+		if (engine.getPatchFileDevice())
+		{
+			src_full_path << engine.getPatchFileDevice()->getBasePath() << tmp_path;
+			dest_full_path << engine.getPatchFileDevice()->getBasePath() << sprite->getPath().c_str();
+		}
+		if (!engine.getPatchFileDevice() || !PlatformInterface::fileExists(src_full_path))
+		{
+			src_full_path.data[0] = 0;
+			dest_full_path.data[0] = 0;
+			src_full_path << engine.getDiskFileDevice()->getBasePath() << tmp_path;
+			dest_full_path << engine.getDiskFileDevice()->getBasePath() << sprite->getPath().c_str();
+		}
+
+		PlatformInterface::deleteFile(dest_full_path);
+
+		if (!PlatformInterface::moveFile(src_full_path, dest_full_path))
+		{
+			g_log_error.log("Editor") << "Could not save file " << sprite->getPath().c_str();
+		}
 	}
 
 
@@ -181,7 +234,9 @@ private:
 			float dx = pos.x - mouse_pos.x;
 			float dy = pos.y - mouse_pos.y;
 			bool is_hovered = Math::abs(dx) < SIZE && Math::abs(dy) < SIZE;
+			
 			draw.AddRectFilled(pos - Vec2(SIZE, SIZE), pos + Vec2(SIZE, SIZE), is_hovered ? 0xffffffff : 0x77ffFFff);
+			draw.AddRect(pos - Vec2(SIZE, SIZE), pos + Vec2(SIZE, SIZE), 0xff777777);
 
 			return is_hovered && ImGui::IsMouseClicked(0);
 		};

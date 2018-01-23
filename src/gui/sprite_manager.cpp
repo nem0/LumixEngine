@@ -47,6 +47,23 @@ void Sprite::setTexture(const Path& path)
 }
 
 
+bool Sprite::save(JsonSerializer& serializer)
+{
+	if (!isReady()) return false;
+
+	serializer.beginObject();
+	serializer.serialize("type", type == PATCH9 ? "patch9" : "simple");
+	serializer.serialize("top", top);
+	serializer.serialize("bottom", bottom);
+	serializer.serialize("left", left);
+	serializer.serialize("right", right);
+	serializer.serialize("texture", m_texture ? m_texture->getPath().c_str() : "");
+	serializer.endObject();
+
+	return true;
+}
+
+
 bool Sprite::load(FS::IFile& file)
 {
 	auto& manager = (SpriteManager&)getResourceManager();
