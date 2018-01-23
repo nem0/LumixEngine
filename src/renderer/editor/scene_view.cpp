@@ -514,8 +514,7 @@ void SceneView::onWindowGUI()
 		if (ImGui::Begin("###stats_overlay",
 				nullptr,
 				ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize |
-					ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
-					ImGuiWindowFlags_ShowBorders))
+					ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings))
 		{
 			const bgfx::Stats* bgfx_stats = bgfx::getStats();
 			const auto& stats = m_pipeline->getStats();

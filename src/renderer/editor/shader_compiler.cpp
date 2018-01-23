@@ -489,23 +489,30 @@ void ShaderCompiler::reloadShaders()
 
 void ShaderCompiler::updateNotifications()
 {
-	if(!m_empty_queue)
+	bool is_compiling = ([&](){
+		if (m_empty_queue == 0) return true;
+
+		MT::SpinLock lock(m_mutex);
+		return m_compiling != "";
+	})();
+
+	if(is_compiling)
 	{
 		RenderInterface* ri = m_editor.getRenderInterface();
 		ri->addText2D(1, 1, 16, 0xff000000, "Compiling shaders...");
 		ri->addText2D(0, 0, 16, 0xffffFFFF, "Compiling shaders...");
 	}
 
-	if (!m_empty_queue && m_notifications_id < 0)
+	if (is_compiling && m_notifications_id < 0)
 	{
 		m_notifications_id = m_log_ui.addNotification("Compiling shaders...");
 	}
 
-	if (!m_empty_queue && m_notifications_id != -1)
+	if (is_compiling && m_notifications_id != -1)
 	{
 		m_log_ui.setNotificationTime(m_notifications_id, 3.0f);
 	}
-	if(m_empty_queue) m_notifications_id = -1;
+	if(!is_compiling) m_notifications_id = -1;
 }
 
 

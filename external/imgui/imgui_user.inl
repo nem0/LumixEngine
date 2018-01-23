@@ -940,7 +940,7 @@ namespace ImGui
 	{
 		if (GImGui->OpenPopupStack.Size <= GImGui->CurrentPopupStack.Size)
 		{
-			ClearSetNextWindowData();
+			GImGui->NextWindowData.Clear();
 			return false;
 		}
 		ImGuiContext& g = *GImGui;
@@ -948,20 +948,17 @@ namespace ImGui
 		const ImGuiID id = window->GetID(str_id);
 		if (!IsPopupOpen(id))
 		{
-			ClearSetNextWindowData();
+			GImGui->NextWindowData.Clear();
 			return false;
 		}
 
-		ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
-		ImGuiWindowFlags flags = ImGuiWindowFlags_ShowBorders | ImGuiWindowFlags_Popup | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings;
+		ImGuiWindowFlags flags = ImGuiWindowFlags_Popup | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings;
 
 		char name[32];
 		ImFormatString(name, 20, "##popup_%08x", id);
 
 		ImGui::SetNextWindowSize(size_on_first_use, ImGuiCond_FirstUseEver);
 		bool opened = ImGui::Begin(name, NULL, flags);
-		if (!(window->Flags & ImGuiWindowFlags_ShowBorders))
-			g.CurrentWindow->Flags &= ~ImGuiWindowFlags_ShowBorders;
 		if (!opened)
 			ImGui::EndPopup();
 

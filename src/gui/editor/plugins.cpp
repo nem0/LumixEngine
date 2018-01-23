@@ -376,16 +376,16 @@ private:
 				}
 			}
 
+			m_pipeline->resize(int(size.x), int(size.y));
+			m_pipeline->render();
+			m_texture_handle = m_pipeline->getRenderbuffer("default", 0);
+			ImGui::Image(&m_texture_handle, size);
+
 			if (ImGui::IsMouseClicked(0) && ImGui::IsItemHovered() && m_mouse_mode == MouseMode::NONE)
 			{
 				Entity e = scene->getRectAt(toLumix(mouse_canvas_pos), toLumix(size));
 				if (e.isValid()) m_editor->selectEntities(&e, 1);
 			}
-
-			m_pipeline->resize(int(size.x), int(size.y));
-			m_pipeline->render();
-			m_texture_handle = m_pipeline->getRenderbuffer("default", 0);
-			ImGui::Image(&m_texture_handle, size);
 
 			bool has_rect = false;
 			if (m_editor->getSelectedEntities().size() == 1)

@@ -411,7 +411,7 @@ struct GridUIVisitor LUMIX_FINAL : Reflection::IPropertyVisitor
 	{
 		if (skipProperty(prop)) return;
 		ImGui::Unindent();
-		bool is_open = ImGui::TreeNodeEx(prop.name, ImGuiTreeNodeFlags_AllowOverlapMode);
+		bool is_open = ImGui::TreeNodeEx(prop.name, ImGuiTreeNodeFlags_AllowItemOverlap);
 		if (m_entities.size() > 1)
 		{
 			ImGui::Text("Multi-object editing not supported.");
@@ -443,7 +443,7 @@ struct GridUIVisitor LUMIX_FINAL : Reflection::IPropertyVisitor
 			char tmp[10];
 			toCString(i, tmp, sizeof(tmp));
 			ImGui::PushID(i);
-			ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowOverlapMode;
+			ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowItemOverlap;
 			bool is_open = !prop.canAddRemove() || ImGui::TreeNodeEx(tmp, flags);
 			if (prop.canAddRemove())
 			{
@@ -524,7 +524,7 @@ static bool componentTreeNode(StudioApp& app, ComponentType cmp_type, const Enti
 {
 	const Reflection::PropertyBase* enabled_prop = Reflection::getProperty(cmp_type, ENABLED_HASH);
 
-	ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowOverlapMode;
+	ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowItemOverlap;
 	ImGui::Separator();
 	const char* cmp_type_name = app.getComponentTypeName(cmp_type);
 	ImGui::PushFont(app.getBoldFont());

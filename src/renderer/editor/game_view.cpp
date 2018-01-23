@@ -176,8 +176,7 @@ void GameView::onFullscreenGUI()
 	if (!ImGui::Begin("game view fullscreen",
 		&open,
 		ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse |
-		ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
-		ImGuiWindowFlags_ShowBorders))
+		ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings))
 	{
 		ImGui::End();
 		return;
@@ -236,11 +235,8 @@ void GameView::onStatsGUI(const ImVec2& view_pos)
 	auto col = ImGui::GetStyle().Colors[ImGuiCol_WindowBg];
 	col.w = 0.3f;
 	ImGui::PushStyleColor(ImGuiCol_WindowBg, col);
-	if (ImGui::Begin("###stats_overlay",
-		nullptr,
-		ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize |
-		ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
-		ImGuiWindowFlags_ShowBorders))
+	ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings;
+	if (ImGui::Begin("###stats_overlay", nullptr, flags))
 	{
 		const bgfx::Stats* bgfx_stats = bgfx::getStats();
 		const auto& stats = m_pipeline->getStats();

@@ -233,7 +233,7 @@ struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 			ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0, 0, 0, 0));
 			ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0, 0, 0, 0));
 			ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0, 0, 0, 0));
-			bool is_node_open = ImGui::TreeNodeEx((const void*)(intptr_t)i, ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_AllowOverlapMode | ImGuiTreeNodeFlags_Framed, "%s", "");
+			bool is_node_open = ImGui::TreeNodeEx((const void*)(intptr_t)i, ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_AllowItemOverlap | ImGuiTreeNodeFlags_Framed, "%s", "");
 			ImGui::PopStyleColor(4);
 			ImGui::SameLine();
 			if (m_app.getAssetBrowser().resourceInput(slot.name, StaticString<30>("", (u64)&slot), buf, sizeof(buf), Texture::TYPE))

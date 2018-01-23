@@ -354,7 +354,7 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 			PathUtils::getBasename(header.data, lengthOf(header.data), buf);
 			if (header.empty()) header << j;
 			ImGui::Unindent();
-			bool open = ImGui::TreeNodeEx(StaticString<32>("###", j), ImGuiTreeNodeFlags_AllowOverlapMode);
+			bool open = ImGui::TreeNodeEx(StaticString<32>("###", j), ImGuiTreeNodeFlags_AllowItemOverlap);
 			bool enabled = scene->isScriptEnabled(cmp.entity, j);
 			ImGui::SameLine();
 			if (ImGui::Checkbox(header, &enabled))

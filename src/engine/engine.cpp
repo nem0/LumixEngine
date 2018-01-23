@@ -120,7 +120,7 @@ int SetStyleColor(lua_State* L)
 
 int ShowTestWindow(lua_State* L)
 {
-	ImGui::ShowTestWindow();
+	ImGui::ShowDemoWindow();
 	return 0;
 }
 
@@ -340,6 +340,15 @@ int BeginDock(lua_State* L)
 {
 	auto* label = LuaWrapper::checkArg<const char*>(L, 1);
 	bool res = ImGui::BeginDock(label);
+	lua_pushboolean(L, res);
+	return 1;
+}
+
+
+int BeginPopup(lua_State* L)
+{
+	auto* label = LuaWrapper::checkArg<const char*>(L, 1);
+	bool res = ImGui::BeginPopup(label);
 	lua_pushboolean(L, res);
 	return 1;
 }
@@ -1064,7 +1073,7 @@ public:
 		LuaImGui::registerCFunction(m_state, "Begin", &LuaImGui::Begin);
 		LuaImGui::registerCFunction(m_state, "BeginChildFrame", &LuaImGui::BeginChildFrame);
 		LuaImGui::registerCFunction(m_state, "BeginDock", LuaImGui::BeginDock);
-		LuaImGui::registerCFunction(m_state, "BeginPopup", &LuaWrapper::wrap<decltype(&ImGui::BeginPopup), &ImGui::BeginPopup>);
+		LuaImGui::registerCFunction(m_state, "BeginPopup", LuaImGui::BeginPopup);
 		LuaImGui::registerCFunction(m_state, "Button", &LuaImGui::Button);
 		LuaImGui::registerCFunction(m_state, "CalcTextSize", &LuaImGui::CalcTextSize);
 		LuaImGui::registerCFunction(m_state, "Checkbox", &LuaImGui::Checkbox);
