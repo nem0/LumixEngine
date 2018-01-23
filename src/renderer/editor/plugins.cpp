@@ -111,47 +111,16 @@ struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 
 	void saveMaterial(Material* material)
 	{
-		FS::FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
-		// use temporary because otherwise the material is reloaded during saving
-		StaticString<MAX_PATH_LENGTH> tmp_path(material->getPath().c_str(), ".tmp");
-		FS::IFile* file = fs.open(fs.getDefaultDevice(), Path(tmp_path), FS::Mode::CREATE_AND_WRITE);
-		if (!file)
+		if (FS::IFile* file = m_app.getAssetBrowser().beginSaveResource(*material))
 		{
-			g_log_error.log("Editor") << "Could not save file " << material->getPath().c_str();
-			return;
-		}
-
-		auto& allocator = m_app.getWorldEditor().getAllocator();
-		JsonSerializer serializer(*file, material->getPath());
-		if (!material->save(serializer))
-		{
-			g_log_error.log("Editor") << "Could not save file " << material->getPath().c_str();
-			fs.close(*file);
-			return;
-		}
-		fs.close(*file);
-
-		auto& engine = m_app.getWorldEditor().getEngine();
-		StaticString<MAX_PATH_LENGTH> src_full_path;
-		StaticString<MAX_PATH_LENGTH> dest_full_path;
-		if (engine.getPatchFileDevice())
-		{
-			src_full_path << engine.getPatchFileDevice()->getBasePath() << tmp_path;
-			dest_full_path << engine.getPatchFileDevice()->getBasePath() << material->getPath().c_str();
-		}
-		if (!engine.getPatchFileDevice() || !PlatformInterface::fileExists(src_full_path))
-		{
-			src_full_path.data[0] = 0;
-			dest_full_path.data[0] = 0;
-			src_full_path << engine.getDiskFileDevice()->getBasePath() << tmp_path;
-			dest_full_path << engine.getDiskFileDevice()->getBasePath() << material->getPath().c_str();
-		}
-
-		PlatformInterface::deleteFile(dest_full_path);
-
-		if (!PlatformInterface::moveFile(src_full_path, dest_full_path))
-		{
-			g_log_error.log("Editor") << "Could not save file " << material->getPath().c_str();
+			JsonSerializer serializer(*file, material->getPath());
+			bool success = true;
+			if (!material->save(serializer))
+			{
+				success = false;
+				g_log_error.log("Editor") << "Could not save file " << material->getPath().c_str();
+			}
+			m_app.getAssetBrowser().endSaveResource(*material, *file, success);
 		}
 	}
 

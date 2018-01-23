@@ -40,6 +40,33 @@ PropertyAnimation::Curve& PropertyAnimation::addCurve()
 }
 
 
+bool PropertyAnimation::save(JsonSerializer& serializer)
+{
+	if (!isReady()) return false;
+
+	serializer.beginArray();
+	for (Curve& curve : curves)
+	{
+		serializer.beginObject();
+		serializer.serialize("component", Reflection::getComponent(curve.cmp_type)->name);
+		serializer.serialize("property", curve.property->name);
+		serializer.beginArray("keys");
+		for (int i = 0; i < curve.frames.size(); ++i)
+		{
+			serializer.beginObject();
+			serializer.serialize("frame", curve.frames[i]);
+			serializer.serialize("value", curve.values[i]);
+			serializer.endObject();
+		}
+		serializer.endArray();
+		serializer.endObject();
+	}
+	serializer.endArray();
+
+	return true;
+}
+
+
 bool PropertyAnimation::load(FS::IFile& file)
 {
 	auto& manager = (PropertyAnimationManager&)getResourceManager();

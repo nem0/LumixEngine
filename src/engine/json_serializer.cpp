@@ -211,6 +211,14 @@ void JsonSerializer::beginArray(const char* label)
 }
 
 
+void JsonSerializer::beginArray()
+{
+	writeBlockComma();
+	m_file.write("[", 1);
+	m_is_first_in_block = true;
+}
+
+
 void JsonSerializer::endArray()
 {
 	m_file.write("]", 1);

@@ -20,6 +20,9 @@ namespace Reflection
 }
 
 
+class JsonSerializer;
+
+
 class PropertyAnimationManager LUMIX_FINAL : public ResourceManagerBase
 {
 public:
@@ -57,6 +60,7 @@ public:
 
 	ResourceType getType() const override { return TYPE; }
 	Curve& addCurve();
+	bool save(JsonSerializer& serializer);
 
 	Array<Curve> curves;
 	int fps;

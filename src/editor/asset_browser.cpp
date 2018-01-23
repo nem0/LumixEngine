@@ -749,6 +749,54 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* bu
 }
 
 
+FS::IFile* AssetBrowser::beginSaveResource(Resource& resource)
+{
+	FS::FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+	// use temporary because otherwise the resource is reloaded during saving
+	StaticString<MAX_PATH_LENGTH> tmp_path(resource.getPath().c_str(), ".tmp");
+	FS::IFile* file = fs.open(fs.getDefaultDevice(), Path(tmp_path), FS::Mode::CREATE_AND_WRITE);
+	if (!file)
+	{
+		g_log_error.log("Editor") << "Could not save file " << resource.getPath().c_str();
+		return nullptr;
+	}
+	return file;
+}
+
+
+void AssetBrowser::endSaveResource(Resource& resource, FS::IFile& file, bool success)
+{
+	FS::FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+	fs.close(file);
+
+	if (!success) return;
+
+	auto& engine = m_app.getWorldEditor().getEngine();
+	StaticString<MAX_PATH_LENGTH> src_full_path;
+	StaticString<MAX_PATH_LENGTH> dest_full_path;
+	StaticString<MAX_PATH_LENGTH> tmp_path(resource.getPath().c_str(), ".tmp");
+	if (engine.getPatchFileDevice())
+	{
+		src_full_path << engine.getPatchFileDevice()->getBasePath() << tmp_path;
+		dest_full_path << engine.getPatchFileDevice()->getBasePath() << resource.getPath().c_str();
+	}
+	if (!engine.getPatchFileDevice() || !PlatformInterface::fileExists(src_full_path))
+	{
+		src_full_path.data[0] = 0;
+		dest_full_path.data[0] = 0;
+		src_full_path << engine.getDiskFileDevice()->getBasePath() << tmp_path;
+		dest_full_path << engine.getDiskFileDevice()->getBasePath() << resource.getPath().c_str();
+	}
+
+	PlatformInterface::deleteFile(dest_full_path);
+
+	if (!PlatformInterface::moveFile(src_full_path, dest_full_path))
+	{
+		g_log_error.log("Editor") << "Could not save file " << resource.getPath().c_str();
+	}
+}
+
+
 bool AssetBrowser::resourceList(char* buf, int max_size, ResourceType type, float height) const
 {
 	for (IPlugin* plugin : m_plugins)

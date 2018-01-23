@@ -10,6 +10,7 @@
 namespace Lumix
 {
 
+namespace FS { struct IFile; }
 
 class Material;
 class Resource;
@@ -58,6 +59,8 @@ public:
 	void enableUpdate(bool enable) { m_is_update_enabled = enable; }
 	OnResourceChanged& resourceChanged() { return m_on_resource_changed; }
 	bool resourceList(char* buf, int max_size, ResourceType type, float height) const;
+	FS::IFile* beginSaveResource(Resource& resource);
+	void endSaveResource(Resource& resource, FS::IFile& file, bool success);
 
 public:
 	bool m_is_open;

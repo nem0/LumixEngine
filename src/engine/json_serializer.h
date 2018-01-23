@@ -34,6 +34,7 @@ class LUMIX_ENGINE_API JsonSerializer
 		void beginObject();
 		void beginObject(const char* label);
 		void endObject();
+		void beginArray();
 		void beginArray(const char* label);
 		void endArray();
 		void serializeArrayItem(Entity value);
