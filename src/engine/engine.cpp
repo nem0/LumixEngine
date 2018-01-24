@@ -854,6 +854,7 @@ public:
 	static void LUA_setTimeMultiplier(Engine* engine, float multiplier) { engine->setTimeMultiplier(multiplier); }
 	static Entity LUA_getFirstEntity(Universe* universe) { return universe->getFirstEntity(); }
 	static Entity LUA_getParent(Universe* universe, Entity e) { return universe->getParent(e); }
+	static void LUA_setParent(Universe* universe, Entity parent, Entity child) { universe->setParent(parent, child); }
 	static Entity LUA_getNextEntity(Universe* universe, Entity entity) { return universe->getNextEntity(entity); }
 	static Vec4 LUA_multMatrixVec(const Matrix& m, const Vec4& v) { return m * v; }
 	static Quat LUA_multQuat(const Quat& a, const Quat& b) { return a * b; }
@@ -1036,6 +1037,7 @@ public:
 		REGISTER_FUNCTION(setEntityLocalRotation);
 		REGISTER_FUNCTION(setEntityPosition);
 		REGISTER_FUNCTION(setEntityRotation);
+		REGISTER_FUNCTION(setParent);
 		REGISTER_FUNCTION(setTimeMultiplier);
 		REGISTER_FUNCTION(startGame);
 		REGISTER_FUNCTION(unloadResource);
