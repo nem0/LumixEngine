@@ -69,29 +69,16 @@ static const ComponentType ENVIRONMENT_PROBE_TYPE = Reflection::getComponentType
 
 struct FontPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 {
-	bool onGUI(Resource* resource, ResourceType type) override 
+	FontPlugin(StudioApp& app)
 	{
-		if (type != FontResource::TYPE) return false;
-		return true;
+		app.getAssetBrowser().registerExtension("ttf", FontResource::TYPE);
 	}
 
-
-	ResourceType getResourceType(const char* ext) override
-	{
-		return equalStrings(ext, "ttf") ? FontResource::TYPE : INVALID_RESOURCE_TYPE;
-	}
-
-
+	void onGUI(Resource* resource) override {}
 	void onResourceUnloaded(Resource* resource) override {}
 	const char* getName() const override { return "Font"; }
 
-	bool hasResourceManager(ResourceType type) const override { return type == FontResource::TYPE; }
-
-
-	bool acceptExtension(const char* ext, ResourceType type) const override
-	{
-		return type == FontResource::TYPE && equalStrings(ext, "ttf");
-	}
+	ResourceType getResourceType() const override { return FontResource::TYPE; }
 };
 
 
@@ -100,12 +87,7 @@ struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 	explicit MaterialPlugin(StudioApp& app)
 		: m_app(app)
 	{
-	}
-
-
-	bool acceptExtension(const char* ext, ResourceType type) const override
-	{
-		return type == Material::TYPE && equalStrings(ext, "mat");
+		app.getAssetBrowser().registerExtension("mat", Material::TYPE);
 	}
 
 
@@ -125,10 +107,8 @@ struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 	}
 
 
-	bool onGUI(Resource* resource, ResourceType type) override
+	void onGUI(Resource* resource) override
 	{
-		if (type != Material::TYPE) return false;
-
 		auto* material = static_cast<Material*>(resource);
 
 		if (ImGui::Button("Save")) saveMaterial(material);
@@ -327,19 +307,12 @@ struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 				}
 			}
 		}
-		return true;
 	}
 
 
 	void onResourceUnloaded(Resource* resource) override {}
 	const char* getName() const override { return "Material"; }
-	bool hasResourceManager(ResourceType type) const override { return type == Material::TYPE; }
-
-
-	ResourceType getResourceType(const char* ext) override
-	{
-		return equalStrings(ext, "mat") ? Material::TYPE : INVALID_RESOURCE_TYPE;
-	}
+	ResourceType getResourceType() const override { return Material::TYPE; }
 
 
 	StudioApp& m_app;
@@ -358,6 +331,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		, m_tile(app.getWorldEditor().getAllocator())
 		, m_texture_tile_creator(app.getWorldEditor().getAllocator())
 	{
+		app.getAssetBrowser().registerExtension("msh", Model::TYPE);
 		JobSystem::JobDecl job;
 		job.data = this;
 		job.task = [](void* data) { ((ModelPlugin*)data)->createTextureTileTask(); };
@@ -462,12 +436,6 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 			}
 		}
 		m_texture_tile_creator.shutdown_event.trigger();
-	}
-
-
-	bool acceptExtension(const char* ext, ResourceType type) const override
-	{
-		return type == Model::TYPE && equalStrings(ext, "msh");
 	}
 
 
@@ -609,10 +577,8 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 	}
 
 
-	bool onGUI(Resource* resource, ResourceType type) override
+	void onGUI(Resource* resource) override
 	{
-		if (type != Model::TYPE) return false;
-
 		auto* model = static_cast<Model*>(resource);
 		ImGui::LabelText("Bounding radius", "%f", model->getBoundingRadius());
 
@@ -694,20 +660,12 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		}
 
 		showPreview(*model);
-
-		return true;
 	}
 
 
 	void onResourceUnloaded(Resource* resource) override {}
 	const char* getName() const override { return "Model"; }
-	bool hasResourceManager(ResourceType type) const override { return type == Model::TYPE; }
-
-
-	ResourceType getResourceType(const char* ext) override
-	{
-		return equalStrings(ext, "msh") ? Model::TYPE : INVALID_RESOURCE_TYPE;
-	}
+	ResourceType getResourceType() const override { return Model::TYPE; }
 
 
 	bool saveAsDDS(const char* path, const u8* image_data, int image_width, int image_height) const
@@ -1022,25 +980,15 @@ struct TexturePlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 	explicit TexturePlugin(StudioApp& app)
 		: m_app(app)
 	{
+		app.getAssetBrowser().registerExtension("tga", Texture::TYPE);
+		app.getAssetBrowser().registerExtension("dds", Texture::TYPE);
+		app.getAssetBrowser().registerExtension("raw", Texture::TYPE);
 	}
 
 
-	bool acceptExtension(const char* ext, ResourceType type) const override 
-	{ 
-		return type == Texture::TYPE && (equalStrings(ext, "tga") || equalStrings(ext, "dds"));
-	}
-
-
-	bool onGUI(Resource* resource, ResourceType type) override
+	void onGUI(Resource* resource) override
 	{
-		if (type != Texture::TYPE) return false;
-
 		auto* texture = static_cast<Texture*>(resource);
-		if (texture->isFailure())
-		{
-			ImGui::Text("Texture failed to load.");
-			return true;
-		}
 
 		ImGui::LabelText("Size", "%dx%d", texture->width, texture->height);
 		ImGui::LabelText("Mips", "%d", texture->mips);
@@ -1048,7 +996,7 @@ struct TexturePlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		if (texture->is_cubemap)
 		{
 			ImGui::Text("Cubemap");
-			return true;
+			return;
 		}
 
 		if (bgfx::isValid(texture->handle))
@@ -1067,22 +1015,13 @@ struct TexturePlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		
 			if (ImGui::Button("Open")) m_app.getAssetBrowser().openInExternalEditor(resource);
 		}
-		return true;
 	}
 
 
 	void onResourceUnloaded(Resource* resource) override {}
 	const char* getName() const override { return "Texture"; }
-	bool hasResourceManager(ResourceType type) const override { return type == Texture::TYPE; }
+	ResourceType getResourceType() const override { return Texture::TYPE; }
 
-
-	ResourceType getResourceType(const char* ext) override
-	{
-		if (equalStrings(ext, "tga")) return Texture::TYPE;
-		if (equalStrings(ext, "dds")) return Texture::TYPE;
-		if (equalStrings(ext, "raw")) return Texture::TYPE;
-		return INVALID_RESOURCE_TYPE;
-	}
 
 	StudioApp& m_app;
 };
@@ -1093,19 +1032,13 @@ struct ShaderPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 	explicit ShaderPlugin(StudioApp& app)
 		: m_app(app)
 	{
+		app.getAssetBrowser().registerExtension("shd", Shader::TYPE);
+		app.getAssetBrowser().registerExtension("shb", ShaderBinary::TYPE);
 	}
 
 
-	bool acceptExtension(const char* ext, ResourceType type) const override
+	void onGUI(Resource* resource) override
 	{
-		return type == Shader::TYPE && equalStrings("shd", ext);
-	}
-
-
-	bool onGUI(Resource* resource, ResourceType type) override
-	{
-		if (type != Shader::TYPE) return false;
-
 		auto* shader = static_cast<Shader*>(resource);
 		char basename[MAX_PATH_LENGTH];
 		PathUtils::getBasename(basename, lengthOf(basename), resource->getPath().c_str());
@@ -1172,20 +1105,12 @@ struct ShaderPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 			}
 			ImGui::Columns(1);
 		}
-		return true;
 	}
 
 
 	void onResourceUnloaded(Resource* resource) override {}
 	const char* getName() const override { return "Shader"; }
-	bool hasResourceManager(ResourceType type) const override { return type == Shader::TYPE; }
-	
-	
-	ResourceType getResourceType(const char* ext) override
-	{
-		if (equalStrings(ext, "shb")) return ShaderBinary::TYPE;
-		return equalStrings(ext, "shd") ? Shader::TYPE : INVALID_RESOURCE_TYPE;
-	}
+	ResourceType getResourceType() const override { return Shader::TYPE; }
 
 
 	StudioApp& m_app;
@@ -3047,7 +2972,7 @@ LUMIX_STUDIO_ENTRY(renderer)
 	auto& asset_browser = app.getAssetBrowser();
 	asset_browser.addPlugin(*LUMIX_NEW(allocator, ModelPlugin)(app));
 	asset_browser.addPlugin(*LUMIX_NEW(allocator, MaterialPlugin)(app));
-	asset_browser.addPlugin(*LUMIX_NEW(allocator, FontPlugin)());
+	asset_browser.addPlugin(*LUMIX_NEW(allocator, FontPlugin)(app));
 	asset_browser.addPlugin(*LUMIX_NEW(allocator, TexturePlugin)(app));
 	asset_browser.addPlugin(*LUMIX_NEW(allocator, ShaderPlugin)(app));
 

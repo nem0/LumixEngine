@@ -181,6 +181,12 @@ namespace Lumix
 				return m_values[index];
 			}
 
+			const Value& get(const Key& key) const
+			{
+				int index = find(key);
+				ASSERT(index >= 0);
+				return m_values[index];
+			}
 
 			Value* begin() { return m_values; }
 			Value* end() { return m_values + m_size; }

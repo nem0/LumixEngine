@@ -2,8 +2,10 @@
 
 
 #include "engine/array.h"
+#include "engine/hash_map.h"
 #include "engine/delegate_list.h"
 #include "engine/path.h"
+#include "engine/resource.h"
 #include "engine/mt/sync.h"
 
 
@@ -13,13 +15,21 @@ namespace Lumix
 namespace FS { struct IFile; }
 
 class Material;
-class Resource;
-struct ResourceType;
 class WorldEditor;
 struct Action;
 class FileSystemWatcher;
 class Metadata;
 class StudioApp;
+
+
+template<>
+struct HashFunc<ResourceType>
+{
+	static u32 get(const ResourceType& key)
+	{
+		return HashFunc<u32>::get(key.type);
+	}
+};
 
 
 class LUMIX_EDITOR_API AssetBrowser
@@ -31,12 +41,10 @@ public:
 
 		virtual bool canCreateResource() const { return false; }
 		virtual bool createResource(char* out_path, int max_size) { return false; }
-		virtual bool onGUI(Resource* resource, ResourceType type) = 0;
-		virtual ResourceType getResourceType(const char* ext) = 0;
+		virtual void onGUI(Resource* resource) = 0;
 		virtual void onResourceUnloaded(Resource* resource) = 0;
 		virtual const char* getName() const = 0;
-		virtual bool hasResourceManager(ResourceType type) const = 0;
-		virtual bool acceptExtension(const char* ext, ResourceType type) const = 0;
+		virtual ResourceType getResourceType() const = 0;
 		virtual bool createTile(const char* in_path, const char* out_path, ResourceType type);
 		virtual void update() {}
 	};
@@ -48,7 +56,7 @@ public:
 	~AssetBrowser();
 	void onGUI();
 	void update();
-	const Array<Path>& getResources(int type) const;
+	const Array<Path>& getResources(ResourceType type) const;
 	int getTypeIndex(ResourceType type) const;
 	void selectResource(const Path& resource, bool record_history);
 	bool resourceInput(const char* label, const char* str_id, char* buf, int max_size, ResourceType type);
@@ -61,6 +69,7 @@ public:
 	bool resourceList(char* buf, int max_size, ResourceType type, float height) const;
 	FS::IFile* beginSaveResource(Resource& resource);
 	void endSaveResource(Resource& resource, FS::IFile& file, bool success);
+	void registerExtension(const char* extension, ResourceType type);
 
 public:
 	bool m_is_open;
@@ -93,7 +102,6 @@ private:
 	void addResource(const char* path, const char* filename);
 	void unloadResource();
 	void selectResource(Resource* resource, bool record_history);
-	int getResourceTypeIndex(const char* ext);
 	bool acceptExtension(const char* ext, ResourceType type);
 	void goBack();
 	void goForward();
@@ -113,9 +121,10 @@ private:
 	OnResourceChanged m_on_resource_changed;
 	Array<Path> m_history;
 	int m_history_index;
-	Array<IPlugin*> m_plugins;
+	AssociativeArray<ResourceType, IPlugin*> m_plugins;
+	HashMap<u32, ResourceType> m_registered_extensions;
 	MT::SpinMutex m_changed_files_mutex;
-	Array<Array<Path> > m_resources;
+	HashMap<ResourceType, Array<Path>> m_resources;
 	Resource* m_selected_resource;
 	WorldEditor& m_editor;
 	FileSystemWatcher* m_watchers[2];

@@ -37,11 +37,8 @@ ResourceType AssetBrowser::getResourceType(const char* path) const
 	char ext[10];
 	PathUtils::getExtension(ext, sizeof(ext), path);
 
-	for (auto* plugin : m_plugins)
-	{
-		ResourceType type = plugin->getResourceType(ext);
-		if (isValid(type)) return type;
-	}
+	auto iter = m_registered_extensions.find(crc32(ext));
+	if (iter.isValid()) return iter.value();
 
 	return INVALID_RESOURCE_TYPE;
 }
@@ -70,10 +67,10 @@ AssetBrowser::AssetBrowser(StudioApp& app)
 	, m_file_infos(app.getWorldEditor().getAllocator())
 	, m_filtered_file_infos(app.getWorldEditor().getAllocator())
 	, m_subdirs(app.getWorldEditor().getAllocator())
+	, m_registered_extensions(app.getWorldEditor().getAllocator())
 {
 	IAllocator& allocator = m_editor.getAllocator();
 	m_filter[0] = '\0';
-	m_resources.emplace(allocator);
 
 	const char* base_path = m_editor.getEngine().getDiskFileDevice()->getBasePath();
 
@@ -166,17 +163,6 @@ void AssetBrowser::unloadResource()
 }
 
 
-int AssetBrowser::getTypeIndex(ResourceType type) const
-{
-	for (int i = 0; i < m_plugins.size(); ++i)
-	{
-		if (m_plugins[i]->hasResourceManager(type)) return 1 + i;
-	}
-
-	return 0;
-}
-
-
 void AssetBrowser::update()
 {
 	PROFILE_FUNCTION();
@@ -230,8 +216,7 @@ void AssetBrowser::update()
 
 			if (!PlatformInterface::fileExists(tmp_path))
 			{
-				int index = getTypeIndex(resource_type);
-				m_resources[index].eraseItemFast(path);
+				m_resources[resource_type].eraseItemFast(path);
 				continue;
 			}
 		}
@@ -523,35 +508,29 @@ void AssetBrowser::detailsGUI()
 		}
 		ImGui::EndToolbar();
 
-		if (!m_selected_resource) goto end;
+		if (!m_selected_resource)
+		{
+			ImGui::EndDock();
+			return;
+		}
 
 		const char* path = m_selected_resource->getPath().c_str();
 		ImGui::Separator();
 		ImGui::LabelText("Selected resource", "%s", path);
 		ImGui::Separator();
 
-		if (!m_selected_resource->isReady() && !m_selected_resource->isFailure())
-		{
-			ImGui::Text("Not ready");
-			goto end;
-		}
-
 		char source[MAX_PATH_LENGTH];
 		if (m_metadata.getString(m_selected_resource->getPath().getHash(), SOURCE_HASH, source, lengthOf(source)))
 		{
 			ImGui::LabelText("Source", "%s", source);
 		}
+		ImGui::LabelText("Status", "%s", m_selected_resource->isFailure() ? "failure" : (m_selected_resource->isReady() ? "Ready" : "Not ready"));
 
-		auto resource_type = getResourceType(path);
-		for (auto* plugin : m_plugins)
-		{
-			if (plugin->onGUI(m_selected_resource, resource_type)) goto end;
-		}
-		ASSERT(false); // unimplemented resource
+		ResourceType resource_type = getResourceType(path);
+		IPlugin* plugin = m_plugins.get(resource_type);
+		if (m_selected_resource->isReady()) plugin->onGUI(m_selected_resource);
 	}
-
-	end:
-		ImGui::EndDock();
+	ImGui::EndDock();
 }
 
 
@@ -646,8 +625,7 @@ void AssetBrowser::onInitFinished()
 
 void AssetBrowser::addPlugin(IPlugin& plugin)
 {
-	m_plugins.push(&plugin);
-	m_resources.emplace(m_editor.getAllocator());
+	m_plugins.insert(plugin.getResourceType(), &plugin);
 	if(m_is_init_finished) findResources();
 }
 
@@ -666,12 +644,9 @@ void AssetBrowser::selectResource(const Path& resource, bool record_history)
 
 bool AssetBrowser::acceptExtension(const char* ext, ResourceType type)
 {
-	for (int i = 0; i < m_plugins.size(); ++i)
-	{
-		if (m_plugins[i]->acceptExtension(ext, type)) return true;
-	}
-
-	return false;
+	auto iter = m_registered_extensions.find(crc32(ext));
+	if (!iter.isValid()) return false;
+	return iter.value() == type;
 }
 
 
@@ -749,6 +724,17 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* bu
 }
 
 
+void AssetBrowser::registerExtension(const char* extension, ResourceType type)
+{
+	u32 hash = crc32(extension);
+	ASSERT(!m_registered_extensions.find(hash).isValid());
+
+	m_registered_extensions.insert(hash, type);
+
+	if (!m_resources.find(type).isValid()) m_resources.insert(type, Array<Path>(m_editor.getAllocator()));
+}
+
+
 FS::IFile* AssetBrowser::beginSaveResource(Resource& resource)
 {
 	FS::FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
@@ -799,16 +785,14 @@ void AssetBrowser::endSaveResource(Resource& resource, FS::IFile& file, bool suc
 
 bool AssetBrowser::resourceList(char* buf, int max_size, ResourceType type, float height) const
 {
-	for (IPlugin* plugin : m_plugins)
+	IPlugin* plugin = m_plugins.get(type);
+	if (plugin->canCreateResource() && ImGui::Selectable("New"))
 	{
-		if (plugin->hasResourceManager(type) && plugin->canCreateResource() && ImGui::Selectable("New"))
+		char path[MAX_PATH_LENGTH];
+		if (plugin->createResource(path, lengthOf(path)))
 		{
-			char path[MAX_PATH_LENGTH];
-			if (plugin->createResource(path, lengthOf(path)))
-			{
-				copyString(buf, max_size, path);
-				return true;
-			}
+			copyString(buf, max_size, path);
+			return true;
 		}
 	}
 
@@ -816,7 +800,7 @@ bool AssetBrowser::resourceList(char* buf, int max_size, ResourceType type, floa
 	ImGui::LabellessInputText("Filter", filter, sizeof(filter));
 
 	ImGui::BeginChild("Resources", ImVec2(0, height));
-	for (auto& res : getResources(getTypeIndex(type)))
+	for (auto& res : getResources(type))
 	{
 		if (filter[0] != '\0' && strstr(res.c_str(), filter) == nullptr) continue;
 
@@ -872,20 +856,9 @@ void AssetBrowser::goForward()
 }
 
 
-const Array<Path>& AssetBrowser::getResources(int type) const
+const Array<Path>& AssetBrowser::getResources(ResourceType type) const
 {
 	return m_resources[type];
-}
-
-
-int AssetBrowser::getResourceTypeIndex(const char* ext)
-{
-	for (int i = 0; i < m_plugins.size(); ++i)
-	{
-		if (isValid(m_plugins[i]->getResourceType(ext))) return 1 + i;
-	}
-
-	return -1;
 }
 
 
@@ -900,15 +873,16 @@ void AssetBrowser::addResource(const char* path, const char* filename)
 	catString(fullpath, "/");
 	catString(fullpath, filename);
 	
-	int index = getResourceTypeIndex(ext);
+	ResourceType type = getResourceType(fullpath);
 
 	if (startsWith(path, "/unit_tests") != 0) return;
-	if (index < 0) return;
+	if (type == INVALID_RESOURCE_TYPE) return;
 
 	Path path_obj(fullpath);
-	if (m_resources[index].indexOf(path_obj) == -1)
+	Array<Path>& resources = m_resources[type];
+	if (resources.indexOf(path_obj) == -1)
 	{
-		m_resources[index].push(path_obj);
+		resources.push(path_obj);
 	}
 }
 

@@ -38,26 +38,16 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 	explicit AnimationAssetBrowserPlugin(StudioApp& app)
 		: m_app(app)
 	{
+		app.getAssetBrowser().registerExtension("ani", Animation::TYPE);
 	}
 
 
-	bool acceptExtension(const char* ext, ResourceType type) const override
+	void onGUI(Resource* resource) override
 	{
-		return type == Animation::TYPE && equalStrings(ext, "anm");
-	}
-
-
-	bool onGUI(Resource* resource, ResourceType type) override
-	{
-		if (type == Animation::TYPE)
-		{
-			auto* animation = static_cast<Animation*>(resource);
-			ImGui::LabelText("FPS", "%d", animation->getFPS());
-			ImGui::LabelText("Length", "%.3fs", animation->getLength());
-			ImGui::LabelText("Frames", "%d", animation->getFrameCount());
-			return true;
-		}
-		return false;
+		auto* animation = static_cast<Animation*>(resource);
+		ImGui::LabelText("FPS", "%d", animation->getFPS());
+		ImGui::LabelText("Length", "%.3fs", animation->getLength());
+		ImGui::LabelText("Frames", "%d", animation->getFrameCount());
 	}
 
 
@@ -67,7 +57,7 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 	const char* getName() const override { return "Animation"; }
 
 
-	bool hasResourceManager(ResourceType type) const override { return type == Animation::TYPE; }
+	ResourceType getResourceType() const override { return Animation::TYPE; }
 
 
 	bool createTile(const char* in_path, const char* out_path, ResourceType type) override
@@ -75,13 +65,6 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 		if (type == Animation::TYPE) return copyFile("models/editor/tile_animation.dds", out_path);
 		return false;
 	}
-
-	ResourceType getResourceType(const char* ext) override
-	{
-		if (equalStrings(ext, "ani")) return Animation::TYPE;
-		return INVALID_RESOURCE_TYPE;
-	}
-
 
 	StudioApp& m_app;
 };
@@ -92,12 +75,7 @@ struct PropertyAnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 	explicit PropertyAnimationAssetBrowserPlugin(StudioApp& app)
 		: m_app(app)
 	{
-	}
-
-
-	bool acceptExtension(const char* ext, ResourceType type) const override
-	{
-		return type == PropertyAnimation::TYPE && equalStrings(ext, "anp");
+		app.getAssetBrowser().registerExtension("anp", PropertyAnimation::TYPE);
 	}
 
 
@@ -167,116 +145,100 @@ struct PropertyAnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 	}
 
 
-	bool onGUI(Resource* resource, ResourceType type) override
+	void onGUI(Resource* resource) override
 	{
-		if (type == PropertyAnimation::TYPE)
+		auto* animation = static_cast<PropertyAnimation*>(resource);
+		if (!animation->isReady()) return;
+
+		if (ImGui::Button("Save")) savePropertyAnimation(*animation);
+		ImGui::SameLine();
+		if (ImGui::Button("Open in external editor")) m_app.getAssetBrowser().openInExternalEditor(animation);
+			
+		ShowAddCurveMenu(animation);
+
+		if (!animation->curves.empty())
 		{
-			auto* animation = static_cast<PropertyAnimation*>(resource);
-			if (!animation->isReady()) return true;
-
-			if (ImGui::Button("Save")) savePropertyAnimation(*animation);
-			ImGui::SameLine();
-			if (ImGui::Button("Open in external editor")) m_app.getAssetBrowser().openInExternalEditor(animation);
-			
-			ShowAddCurveMenu(animation);
-
-			if (!animation->curves.empty())
+			int frames = animation->curves[0].frames.back();
+			if (ImGui::InputInt("Frames", &frames))
 			{
-				int frames = animation->curves[0].frames.back();
-				if (ImGui::InputInt("Frames", &frames))
+				for (auto& curve : animation->curves)
 				{
-					for (auto& curve : animation->curves)
-					{
-						curve.frames.back() = frames;
-					}
+					curve.frames.back() = frames;
 				}
 			}
-
-			for (int i = 0, n = animation->curves.size(); i < n; ++i)
-			{
-				PropertyAnimation::Curve& curve = animation->curves[i];
-				const char* cmp_name = m_app.getComponentTypeName(curve.cmp_type);
-				StaticString<64> tmp(cmp_name, " - ", curve.property->name);
-				if (ImGui::Selectable(tmp, m_selected_curve == i)) m_selected_curve = i;
-			}
-
-			if (m_selected_curve >= animation->curves.size()) m_selected_curve = -1;
-			if (m_selected_curve < 0) return true;
-
-			ImGui::PushItemWidth(ImGui::GetContentRegionAvailWidth() - 20);
-			static ImVec2 size(-1, 200);
-			
-			PropertyAnimation::Curve& curve = animation->curves[m_selected_curve];
-			ImVec2 points[16];
-			ASSERT(curve.frames.size() < lengthOf(points));
-			for (int i = 0; i < curve.frames.size(); ++i)
-			{
-				points[i].x = (float)curve.frames[i];
-				points[i].y = curve.values[i];
-			}
-			int new_count;
-			int last_frame = curve.frames.back();
-			int flags = (int)ImGui::CurveEditorFlags::NO_TANGENTS | (int)ImGui::CurveEditorFlags::SHOW_GRID;
-			if (m_fit_curve_in_editor)
-			{
-				flags |= (int)ImGui::CurveEditorFlags::RESET;
-				m_fit_curve_in_editor = false;
-			}
-			int changed = ImGui::CurveEditor("curve", (float*)points, curve.frames.size(), size, flags, &new_count, &m_selected_point);
-			if (changed >= 0)
-			{
-				curve.frames[changed] = int(points[changed].x + 0.5f);
-				curve.values[changed] = points[changed].y;
-				curve.frames.back() = last_frame;
-				curve.frames[0] = 0;
-			}
-			if (new_count != curve.frames.size())
-			{
-				curve.frames.resize(new_count);
-				curve.values.resize(new_count);
-				for (int i = 0; i < new_count; ++i)
-				{
-					curve.frames[i] = int(points[i].x + 0.5f);
-					curve.values[i] = points[i].y;
-				}
-			}
-
-			ImGui::PopItemWidth();
-
-			if (ImGui::BeginPopupContextItem("curve"))
-			{
-				if (ImGui::Selectable("Fit data")) m_fit_curve_in_editor = true;
-
-				ImGui::EndPopup();
-			}
-
-			if (m_selected_point >= 0 && m_selected_point < curve.frames.size())
-			{
-				ImGui::InputInt("Frame", &curve.frames[m_selected_point]);
-				ImGui::InputFloat("Value", &curve.values[m_selected_point]);
-			}
-
-			ImGui::HSplitter("sizer", &size);
-			return true;
 		}
-		return false;
+
+		for (int i = 0, n = animation->curves.size(); i < n; ++i)
+		{
+			PropertyAnimation::Curve& curve = animation->curves[i];
+			const char* cmp_name = m_app.getComponentTypeName(curve.cmp_type);
+			StaticString<64> tmp(cmp_name, " - ", curve.property->name);
+			if (ImGui::Selectable(tmp, m_selected_curve == i)) m_selected_curve = i;
+		}
+
+		if (m_selected_curve >= animation->curves.size()) m_selected_curve = -1;
+		if (m_selected_curve < 0) return;
+
+		ImGui::PushItemWidth(ImGui::GetContentRegionAvailWidth() - 20);
+		static ImVec2 size(-1, 200);
+			
+		PropertyAnimation::Curve& curve = animation->curves[m_selected_curve];
+		ImVec2 points[16];
+		ASSERT(curve.frames.size() < lengthOf(points));
+		for (int i = 0; i < curve.frames.size(); ++i)
+		{
+			points[i].x = (float)curve.frames[i];
+			points[i].y = curve.values[i];
+		}
+		int new_count;
+		int last_frame = curve.frames.back();
+		int flags = (int)ImGui::CurveEditorFlags::NO_TANGENTS | (int)ImGui::CurveEditorFlags::SHOW_GRID;
+		if (m_fit_curve_in_editor)
+		{
+			flags |= (int)ImGui::CurveEditorFlags::RESET;
+			m_fit_curve_in_editor = false;
+		}
+		int changed = ImGui::CurveEditor("curve", (float*)points, curve.frames.size(), size, flags, &new_count, &m_selected_point);
+		if (changed >= 0)
+		{
+			curve.frames[changed] = int(points[changed].x + 0.5f);
+			curve.values[changed] = points[changed].y;
+			curve.frames.back() = last_frame;
+			curve.frames[0] = 0;
+		}
+		if (new_count != curve.frames.size())
+		{
+			curve.frames.resize(new_count);
+			curve.values.resize(new_count);
+			for (int i = 0; i < new_count; ++i)
+			{
+				curve.frames[i] = int(points[i].x + 0.5f);
+				curve.values[i] = points[i].y;
+			}
+		}
+
+		ImGui::PopItemWidth();
+
+		if (ImGui::BeginPopupContextItem("curve"))
+		{
+			if (ImGui::Selectable("Fit data")) m_fit_curve_in_editor = true;
+
+			ImGui::EndPopup();
+		}
+
+		if (m_selected_point >= 0 && m_selected_point < curve.frames.size())
+		{
+			ImGui::InputInt("Frame", &curve.frames[m_selected_point]);
+			ImGui::InputFloat("Value", &curve.values[m_selected_point]);
+		}
+
+		ImGui::HSplitter("sizer", &size);
 	}
 
 
 	void onResourceUnloaded(Resource* resource) override {}
-
-
 	const char* getName() const override { return "Property animation"; }
-
-
-	bool hasResourceManager(ResourceType type) const override { return type == PropertyAnimation::TYPE; }
-
-
-	ResourceType getResourceType(const char* ext) override
-	{
-		if (equalStrings(ext, "anp")) return PropertyAnimation::TYPE;
-		return INVALID_RESOURCE_TYPE;
-	}
+	ResourceType getResourceType() const override { return PropertyAnimation::TYPE; }
 
 
 	int m_selected_point = -1;
@@ -292,39 +254,16 @@ struct AnimControllerAssetBrowserPlugin : AssetBrowser::IPlugin
 	explicit AnimControllerAssetBrowserPlugin(StudioApp& app)
 		: m_app(app)
 	{
+		app.getAssetBrowser().registerExtension("act", Anim::ControllerResource::TYPE);
 	}
 
 
-	bool acceptExtension(const char* ext, ResourceType type) const override
-	{
-		return type == Anim::ControllerResource::TYPE && equalStrings(ext, "act");
-	}
-
-
-	bool onGUI(Resource* resource, ResourceType type) override
-	{
-		if (type == Anim::ControllerResource::TYPE)
-		{
-			return true;
-		}
-		return false;
-	}
+	void onGUI(Resource* resource) override {}
 
 
 	void onResourceUnloaded(Resource* resource) override {}
-
-
 	const char* getName() const override { return "Animation Controller"; }
-
-
-	bool hasResourceManager(ResourceType type) const override { return type == Anim::ControllerResource::TYPE; }
-
-
-	ResourceType getResourceType(const char* ext) override
-	{
-		if (equalStrings(ext, "act")) return Anim::ControllerResource::TYPE;
-		return INVALID_RESOURCE_TYPE;
-	}
+	ResourceType getResourceType() const override { return Anim::ControllerResource::TYPE; }
 
 
 	bool createTile(const char* in_path, const char* out_path, ResourceType type) override

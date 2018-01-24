@@ -53,6 +53,7 @@ namespace Lumix
 		}
 	};
 
+
 	template<>
 	struct HashFunc<i32>
 	{

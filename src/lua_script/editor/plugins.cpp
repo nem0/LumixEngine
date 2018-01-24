@@ -495,20 +495,13 @@ struct AssetBrowserPlugin : AssetBrowser::IPlugin
 	explicit AssetBrowserPlugin(StudioApp& app)
 		: m_app(app)
 	{
+		app.getAssetBrowser().registerExtension("lua", LuaScript::TYPE);
 		m_text_buffer[0] = 0;
 	}
 
 	
-	bool acceptExtension(const char* ext, ResourceType type) const override
+	void onGUI(Resource* resource) override
 	{
-		return type == LuaScript::TYPE && equalStrings(".lua", ext);
-	}
-
-
-	bool onGUI(Resource* resource, ResourceType type) override
-	{
-		if (type != LuaScript::TYPE) return false;
-
 		auto* script = static_cast<LuaScript*>(resource);
 
 		if (m_text_buffer[0] == '\0')
@@ -524,7 +517,7 @@ struct AssetBrowserPlugin : AssetBrowser::IPlugin
 			if (!file)
 			{
 				g_log_warning.log("Lua Script") << "Could not save " << resource->getPath();
-				return true;
+				return;
 			}
 
 			file->write(m_text_buffer, stringLength(m_text_buffer));
@@ -535,14 +528,6 @@ struct AssetBrowserPlugin : AssetBrowser::IPlugin
 		{
 			m_app.getAssetBrowser().openInExternalEditor(resource);
 		}
-		return true;
-	}
-
-
-	ResourceType getResourceType(const char* ext) override
-	{
-		if (equalStrings(ext, "lua")) return LuaScript::TYPE;
-		return INVALID_RESOURCE_TYPE;
 	}
 
 
@@ -550,7 +535,7 @@ struct AssetBrowserPlugin : AssetBrowser::IPlugin
 	const char* getName() const override { return "Lua Script"; }
 
 
-	bool hasResourceManager(ResourceType type) const override { return type == LuaScript::TYPE; }
+	ResourceType getResourceType() const override { return LuaScript::TYPE; }
 
 
 	bool createTile(const char* in_path, const char* out_path, ResourceType type) override

@@ -30,42 +30,27 @@ namespace Lumix
 class AssetBrowserPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 {
 public:
-	AssetBrowserPlugin(WorldEditor& editor, PrefabSystem& system)
+	AssetBrowserPlugin(StudioApp& app, PrefabSystem& system)
 		: system(system)
 		, editor(editor)
-	{}
-
-
-	bool onGUI(Resource* resource, ResourceType type) override
 	{
-		if (type != PrefabResource::TYPE) return false;
+		app.getAssetBrowser().registerExtension("fab", PrefabResource::TYPE);
+	}
 
+
+	void onGUI(Resource* resource) override
+	{
 		if (ImGui::Button("instantiate"))
 		{
 			Array<Entity> entities(editor.getAllocator());
 			system.instantiatePrefab(*(PrefabResource*)resource, editor.getCameraRaycastHit(), {0, 0, 0, 1}, 1);
 		}
-
-		return true;
 	}
 
 
-	ResourceType getResourceType(const char* ext) override
-	{
-		if (equalStrings(ext, "fab")) return PrefabResource::TYPE;
-		return INVALID_RESOURCE_TYPE;
-	}
-	
-	
 	void onResourceUnloaded(Resource* resource) override {}
 	const char* getName() const override { return "Prefab"; }
-	bool hasResourceManager(ResourceType type) const override { return type == PrefabResource::TYPE; }
-
-
-	bool acceptExtension(const char* ext, ResourceType type) const override
-	{
-		return type == PrefabResource::TYPE && equalStrings(ext, "fab");
-	}
+	ResourceType getResourceType() const override { return PrefabResource::TYPE; }
 
 
 	PrefabSystem& system;
@@ -212,7 +197,7 @@ public:
 
 	void setStudioApp(StudioApp& app) override
 	{
-		app.getAssetBrowser().addPlugin(*LUMIX_NEW(m_editor.getAllocator(), AssetBrowserPlugin)(m_editor, *this));
+		app.getAssetBrowser().addPlugin(*LUMIX_NEW(m_editor.getAllocator(), AssetBrowserPlugin)(app, *this));
 	}
 	
 

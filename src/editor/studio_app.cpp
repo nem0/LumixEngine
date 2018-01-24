@@ -1823,9 +1823,8 @@ public:
 		auto* type = LuaWrapper::checkArg<const char*>(L, 2);
 
 		AssetBrowser& browser = studio->getAssetBrowser();
-		int type_idx = browser.getTypeIndex(ResourceType(type));
-		if (type_idx < 0) return 0;
-		auto& resources_paths = browser.getResources(type_idx);
+		if (ResourceType(type) == INVALID_RESOURCE_TYPE) return 0;
+		auto& resources_paths = browser.getResources(ResourceType(type));
 
 		lua_createtable(L, resources_paths.size(), 0);
 		int i = 0;

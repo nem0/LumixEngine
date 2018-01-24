@@ -21,6 +21,7 @@ struct LUMIX_ENGINE_API ResourceType
 	u32 type;
 	bool operator !=(const ResourceType& rhs) const { return rhs.type != type; }
 	bool operator ==(const ResourceType& rhs) const { return rhs.type == type; }
+	bool operator <(const ResourceType& rhs) const { return rhs.type < type; }
 };
 inline bool isValid(ResourceType type) { return type.type != 0; }
 const ResourceType INVALID_RESOURCE_TYPE("");
