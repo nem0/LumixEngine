@@ -38,7 +38,11 @@ static const ComponentType GUI_BUTTON_TYPE = Reflection::getComponentType("gui_b
 
 struct SpritePlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 {
-	SpritePlugin(StudioApp& app) : app(app) {}
+	SpritePlugin(StudioApp& app) 
+		: app(app) 
+	{
+		app.getAssetBrowser().registerExtension("spr", Sprite::TYPE);
+	}
 
 
 	bool canCreateResource() const override { return true; }
@@ -64,11 +68,8 @@ struct SpritePlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 	}
 
 
-	bool onGUI(Resource* resource, ResourceType type) override
+	void onGUI(Resource* resource) override
 	{
-		if (type != Sprite::TYPE) return false;
-		if (!resource->isReady()) return false;
-
 		Sprite* sprite = (Sprite*)resource;
 		
 		if (ImGui::Button("Save")) saveSprite(*sprite);
@@ -102,8 +103,6 @@ struct SpritePlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 			case Sprite::Type::SIMPLE: break;
 			default: ASSERT(false); break;
 		}
-
-		return true;
 	}
 
 
@@ -195,22 +194,10 @@ struct SpritePlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 	}
 
 
-	ResourceType getResourceType(const char* ext) override
-	{
-		return equalStrings(ext, "spr") ? Sprite::TYPE : INVALID_RESOURCE_TYPE;
-	}
-
-
 	void onResourceUnloaded(Resource* resource) override {}
 	const char* getName() const override { return "Sprite"; }
+	ResourceType getResourceType() const override { return Sprite::TYPE; }
 
-	bool hasResourceManager(ResourceType type) const override { return type == Sprite::TYPE; }
-
-
-	bool acceptExtension(const char* ext, ResourceType type) const override
-	{
-		return type == Sprite::TYPE && equalStrings(ext, "spr");
-	}
 
 	StudioApp& app;
 };

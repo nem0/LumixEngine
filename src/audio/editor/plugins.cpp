@@ -24,9 +24,6 @@ namespace
 {
 
 
-const ResourceType CLIP_TYPE("clip");
-
-
 struct AssetBrowserPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 {
 	explicit AssetBrowserPlugin(StudioApp& app)
@@ -34,6 +31,7 @@ struct AssetBrowserPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		, m_browser(app.getAssetBrowser())
 		, m_playing_clip(-1)
 	{
+		app.getAssetBrowser().registerExtension("ogg", Clip::TYPE);
 	}
 
 
@@ -42,9 +40,6 @@ struct AssetBrowserPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		auto* audio = static_cast<AudioSystem*>(engine.getPluginManager().getPlugin("audio"));
 		return audio->getDevice();
 	}
-
-
-	bool acceptExtension(const char* ext, ResourceType type) const override { return false; }
 
 
 	void stopAudio()
@@ -59,9 +54,8 @@ struct AssetBrowserPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 	const char* getName() const override { return "Audio"; }
 
 
-	bool onGUI(Resource* resource, ResourceType type) override
+	void onGUI(Resource* resource) override
 	{
-		if (type != CLIP_TYPE) return false;
 		auto* clip = static_cast<Clip*>(resource);
 		ImGui::LabelText("Length", "%f", clip->getLengthSeconds());
 		auto& device = getAudioDevice(m_app.getWorldEditor().getEngine());
@@ -71,7 +65,7 @@ struct AssetBrowserPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 			if (ImGui::Button("Stop"))
 			{
 				stopAudio();
-				return true;
+				return;
 			}
 			float time = device.getCurrentTime(m_playing_clip);
 			if (ImGui::SliderFloat("Time", &time, 0, clip->getLengthSeconds(), "%.2fs"))
@@ -89,28 +83,21 @@ struct AssetBrowserPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 			device.play(handle, true);
 			m_playing_clip = handle;
 		}
-		return true;
 	}
 
 
 	void onResourceUnloaded(Resource*) override { stopAudio(); }
 
 
-	bool hasResourceManager(ResourceType type) const override { return type == CLIP_TYPE; }
-
+	ResourceType getResourceType() const override { return Clip::TYPE; }
+	
 
 	bool createTile(const char* in_path, const char* out_path, ResourceType type) override
 	{
-		if (type == CLIP_TYPE) return copyFile("models/editor/tile_audio.dds", out_path);
+		if (type == Clip::TYPE) return copyFile("models/editor/tile_audio.dds", out_path);
 		return false;
 	}
 
-
-	ResourceType getResourceType(const char* ext) override
-	{
-		if (equalStrings(ext, "ogg")) return CLIP_TYPE;
-		return INVALID_RESOURCE_TYPE;
-	}
 
 	int m_playing_clip;
 	StudioApp& m_app;
@@ -200,7 +187,7 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 					auto* clip = audio_scene->getClipInfo(clip_id)->clip;
 					char path[MAX_PATH_LENGTH];
 					copyString(path, clip ? clip->getPath().c_str() : "");
-					if (m_app.getAssetBrowser().resourceInput("Clip", "", path, lengthOf(path), CLIP_TYPE))
+					if (m_app.getAssetBrowser().resourceInput("Clip", "", path, lengthOf(path), Clip::TYPE))
 					{
 						audio_scene->setClip(clip_id, Path(path));
 					}

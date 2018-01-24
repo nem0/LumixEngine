@@ -1007,36 +1007,17 @@ struct PhysicsGeometryPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 	explicit PhysicsGeometryPlugin(StudioApp& app)
 		: m_app(app)
 	{
+		app.getAssetBrowser().registerExtension("phy", PhysicsGeometry::TYPE);
 	}
 
 
-	bool acceptExtension(const char* ext, ResourceType type) const override { return false; }
-
-
-	bool onGUI(Resource* resource, ResourceType type) override
-	{
-		if (type != PhysicsGeometry::TYPE) return false;
-
-		auto* geom = static_cast<PhysicsGeometry*>(resource);
-		if (geom->isFailure())
-		{
-			ImGui::Text("Failed to load.");
-			return true;
-		}
-		return true;
-	}
+	void onGUI(Resource* resource) override {}
 
 
 	void onResourceUnloaded(Resource* resource) override {}
 	const char* getName() const override { return "Physics geometry"; }
-	bool hasResourceManager(ResourceType type) const override { return type == PhysicsGeometry::TYPE; }
+	ResourceType getResourceType() const override { return PhysicsGeometry::TYPE; }
 
-
-	ResourceType getResourceType(const char* ext) override
-	{
-		if (equalStrings(ext, "phy")) return PhysicsGeometry::TYPE;
-		return INVALID_RESOURCE_TYPE;
-	}
 
 	StudioApp& m_app;
 };
