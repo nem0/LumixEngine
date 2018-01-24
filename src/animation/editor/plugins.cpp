@@ -4,10 +4,12 @@
 #include "animation/property_animation.h"
 #include "animation/editor/animation_editor.h"
 #include "editor/asset_browser.h"
+#include "editor/platform_interface.h"
 #include "editor/property_grid.h"
 #include "editor/studio_app.h"
 #include "editor/world_editor.h"
 #include "engine/engine.h"
+#include "engine/fs/os_file.h"
 #include "engine/hash_map.h"
 #include "engine/json_serializer.h"
 #include "engine/log.h"
@@ -76,6 +78,29 @@ struct PropertyAnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 		: m_app(app)
 	{
 		app.getAssetBrowser().registerExtension("anp", PropertyAnimation::TYPE);
+	}
+
+
+	bool canCreateResource() const override { return true; }
+
+
+	bool createResource(char* out, int max_size) override
+	{
+		char full_path[MAX_PATH_LENGTH];
+		if (!PlatformInterface::getSaveFilename(full_path, lengthOf(full_path), "Property animation\0*.anp\0", "anp")) return false;
+
+		FS::OsFile file;
+		WorldEditor& editor = m_app.getWorldEditor();
+		if (!file.open(full_path, FS::Mode::CREATE_AND_WRITE))
+		{
+			g_log_error.log("Animation") << "Failed to create " << full_path;
+			return false;
+		}
+
+		file << "[]";
+		file.close();
+		editor.makeRelative(out, max_size, full_path);
+		return true;
 	}
 
 
