@@ -54,8 +54,8 @@ struct GUIText
 
 struct GUIButton
 {
-	u32 normal_color;
-	u32 hovered_color;
+	u32 normal_color = 0xffFFffFF;
+	u32 hovered_color = 0xffFFffFF;
 };
 
 
@@ -998,7 +998,13 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 			createRect(entity);
 			idx = m_rects.find(entity);
 		}
-		m_buttons.emplace(entity);
+		GUIImage* image = m_rects.at(idx)->image;
+		GUIButton& button = m_buttons.emplace(entity);
+		if (image)
+		{
+			button.hovered_color = image->color;
+			button.normal_color = image->color;
+		}
 		m_universe.onComponentCreated(entity, GUI_BUTTON_TYPE, this);
 	}
 
