@@ -1556,6 +1556,10 @@ namespace Lumix
 					LuaWrapper::push(L, event.data.axis.y_abs); // [lua_event, axis.y_abs]
 					lua_setfield(L, -2, "y_abs"); // [lua_event]
 					break;
+				case InputSystem::Event::TEXT_INPUT:
+					LuaWrapper::push(L, event.data.text.text); // [lua_event, axis.x]
+					lua_setfield(L, -2, "text"); // [lua_event]
+					break;
 				default:
 					ASSERT(false);
 					break;
