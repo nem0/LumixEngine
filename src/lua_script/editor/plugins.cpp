@@ -332,6 +332,35 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 	}
 
 
+	struct SortedProperty
+	{
+		int index;
+		const char* name;
+	};
+
+
+	static void getSortedProperties(Array<SortedProperty>& props, LuaScriptScene& scene, Entity entity, int script_index)
+	{
+		int property_count = scene.getPropertyCount(entity, script_index);
+		props.resize(property_count);
+		
+		for (int i = 0; i < property_count; ++i)
+		{
+			props[i].index = i;
+			props[i].name = scene.getPropertyName(entity, script_index, i);
+		}
+
+		qsort(&props[0], props.size(), sizeof(props[0]), [](const void* a, const void* b) -> int {
+			auto* pa = (SortedProperty*)a;
+			auto* pb = (SortedProperty*)b;
+
+			if (!pa->name) return -1;
+			if (!pb->name) return 1;
+			return compareString(pa->name, pb->name);
+		});
+	}
+
+
 	void onGUI(PropertyGrid& grid, ComponentUID cmp) override
 	{
 		if (cmp.type != LUA_SCRIPT_TYPE) return;
@@ -346,6 +375,7 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 			cmd->entity = cmp.entity;
 			editor.executeCommand(cmd);
 		}
+
 		for (int j = 0; j < scene->getScriptCount(cmp.entity); ++j)
 		{
 			char buf[MAX_PATH_LENGTH];
@@ -408,8 +438,13 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 					auto* cmd = LUMIX_NEW(allocator, SetPropertyCommand)(editor, cmp.entity, j, "-source", buf, allocator);
 					editor.executeCommand(cmd);
 				}
-				for (int k = 0, kc = scene->getPropertyCount(cmp.entity, j); k < kc; ++k)
+
+				Array<SortedProperty> sorted_props(editor.getEngine().getLIFOAllocator());
+				getSortedProperties(sorted_props, *scene, cmp.entity, j);
+
+				for (const SortedProperty& sorted_prop : sorted_props)
 				{
+					int k = sorted_prop.index;
 					char buf[256];
 					const char* property_name = scene->getPropertyName(cmp.entity, j, k);
 					if (!property_name) continue;
