@@ -504,8 +504,10 @@ struct GridUIVisitor LUMIX_FINAL : Reflection::IPropertyVisitor
 		data.cmp = cmp;
 		data.prop = &prop;
 
-		if (ImGui::Combo(prop.name, &value, getter, &data, count))
+		int idx = prop.getEnumValueIndex(cmp, value);
+		if (ImGui::Combo(prop.name, &idx, getter, &data, count))
 		{
+			value = prop.getEnumValue(cmp, idx);
 			m_editor.setProperty(cmp.type, m_index, prop, &cmp.entity, 1, &value, sizeof(value));
 		}
 	}

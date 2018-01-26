@@ -16,35 +16,23 @@
 
 namespace Lumix
 {
-
-
-	const char* getD6MotionName(int index)
-	{
-		switch ((PhysicsScene::D6Motion)index)
-		{
-			case PhysicsScene::D6Motion::LOCKED: return "locked";
-			case PhysicsScene::D6Motion::LIMITED: return "limited";
-			case PhysicsScene::D6Motion::FREE: return "free";
-			default: ASSERT(false); return "Unknown";
-		}
-	}
-
-
-	const char* getDynamicTypeName(int index)
-	{
-		switch ((PhysicsScene::DynamicType)index)
-		{
-			case PhysicsScene::DynamicType::STATIC: return "static";
-			case PhysicsScene::DynamicType::DYNAMIC: return "dynamic";
-			case PhysicsScene::DynamicType::KINEMATIC: return "kinematic";
-			default: ASSERT(false); return "Unknown";
-		}
-	}
-
-
 	static void registerProperties(IAllocator& allocator)
 	{
 		using namespace Reflection;
+
+		static auto dynamicTypeDesc = enumDesciptor<PhysicsScene::DynamicType>(
+			LUMIX_ENUM_VALUE(PhysicsScene::DynamicType::DYNAMIC),
+			LUMIX_ENUM_VALUE(PhysicsScene::DynamicType::STATIC),
+			LUMIX_ENUM_VALUE(PhysicsScene::DynamicType::KINEMATIC)
+		);
+		registerEnum(dynamicTypeDesc);
+
+		static auto d6MotionNameDesc = enumDesciptor<PhysicsScene::D6Motion>(
+			LUMIX_ENUM_VALUE(PhysicsScene::D6Motion::LOCKED),
+			LUMIX_ENUM_VALUE(PhysicsScene::D6Motion::LIMITED),
+			LUMIX_ENUM_VALUE(PhysicsScene::D6Motion::FREE)
+		);
+		registerEnum(d6MotionNameDesc);
 
 		static auto phy_scene = scene("physics",
 			functions(
@@ -59,26 +47,26 @@ namespace Lumix
 				property("Radius", LUMIX_PROP(PhysicsScene, SphereRadius),
 					MinAttribute(0)),
 				property("Layer", LUMIX_PROP(PhysicsScene, ActorLayer)),
-				enum_property("Dynamic", LUMIX_PROP(PhysicsScene, DynamicType), 3, getDynamicTypeName),
+				enum_property("Dynamic", LUMIX_PROP(PhysicsScene, DynamicType), dynamicTypeDesc),
 				property("Trigger", LUMIX_PROP(PhysicsScene, IsTrigger)) 
 			),
 			component("capsule_rigid_actor",
 				property("Radius", LUMIX_PROP(PhysicsScene, CapsuleRadius),
 					MinAttribute(0)),
 				property("Height", LUMIX_PROP(PhysicsScene, CapsuleHeight)),
-				enum_property("Dynamic", LUMIX_PROP(PhysicsScene, DynamicType), 3, getDynamicTypeName),
+				enum_property("Dynamic", LUMIX_PROP(PhysicsScene, DynamicType), dynamicTypeDesc),
 				property("Trigger", LUMIX_PROP(PhysicsScene, IsTrigger))
 			),
 			component("d6_joint",
 				property("Connected body", LUMIX_PROP(PhysicsScene, JointConnectedBody)),
 				property("Axis position", LUMIX_PROP(PhysicsScene, JointAxisPosition)),
 				property("Axis direction", LUMIX_PROP(PhysicsScene, JointAxisDirection)),
-				enum_property("X motion", LUMIX_PROP(PhysicsScene, D6JointXMotion), 3, getD6MotionName),
-				enum_property("Y motion", LUMIX_PROP(PhysicsScene, D6JointYMotion), 3, getD6MotionName),
-				enum_property("Z motion", LUMIX_PROP(PhysicsScene, D6JointZMotion), 3, getD6MotionName),
-				enum_property("Swing 1", LUMIX_PROP(PhysicsScene, D6JointSwing1Motion), 3, getD6MotionName),
-				enum_property("Swing 2", LUMIX_PROP(PhysicsScene, D6JointSwing2Motion), 3, getD6MotionName),
-				enum_property("Twist", LUMIX_PROP(PhysicsScene, D6JointTwistMotion), 3, getD6MotionName),
+				enum_property("X motion", LUMIX_PROP(PhysicsScene, D6JointXMotion), d6MotionNameDesc),
+				enum_property("Y motion", LUMIX_PROP(PhysicsScene, D6JointYMotion), d6MotionNameDesc),
+				enum_property("Z motion", LUMIX_PROP(PhysicsScene, D6JointZMotion), d6MotionNameDesc),
+				enum_property("Swing 1", LUMIX_PROP(PhysicsScene, D6JointSwing1Motion), d6MotionNameDesc),
+				enum_property("Swing 2", LUMIX_PROP(PhysicsScene, D6JointSwing2Motion), d6MotionNameDesc),
+				enum_property("Twist", LUMIX_PROP(PhysicsScene, D6JointTwistMotion), d6MotionNameDesc),
 				property("Linear limit", LUMIX_PROP(PhysicsScene, D6JointLinearLimit),
 					MinAttribute(0)),
 				property("Swing limit", LUMIX_PROP(PhysicsScene, D6JointSwingLimit),
@@ -130,7 +118,7 @@ namespace Lumix
 			),
 			component("rigid_actor",
 				property("Layer", LUMIX_PROP(PhysicsScene, ActorLayer)),
-				enum_property("Dynamic", LUMIX_PROP(PhysicsScene, DynamicType), 3, getDynamicTypeName),
+				enum_property("Dynamic", LUMIX_PROP(PhysicsScene, DynamicType), dynamicTypeDesc),
 				property("Trigger", LUMIX_PROP(PhysicsScene, IsTrigger)),
 				array("Box geometry", &PhysicsScene::getBoxGeometryCount, &PhysicsScene::addBoxGeometry, &PhysicsScene::removeBoxGeometry,
 					property("Size", LUMIX_PROP(PhysicsScene, BoxGeomHalfExtents)),
@@ -148,13 +136,13 @@ namespace Lumix
 			),
 			component("box_rigid_actor",
 				property("Layer", LUMIX_PROP(PhysicsScene, ActorLayer)),
-				enum_property("Dynamic", LUMIX_PROP(PhysicsScene, DynamicType), 3, getDynamicTypeName),
+				enum_property("Dynamic", LUMIX_PROP(PhysicsScene, DynamicType), dynamicTypeDesc),
 				property("Trigger", LUMIX_PROP(PhysicsScene, IsTrigger)),
 				property("Size", LUMIX_PROP(PhysicsScene, HalfExtents))
 			),
 			component("mesh_rigid_actor",
 				property("Layer", LUMIX_PROP(PhysicsScene, ActorLayer)),
-				enum_property("Dynamic", LUMIX_PROP(PhysicsScene, DynamicType), 3, getDynamicTypeName),
+				enum_property("Dynamic", LUMIX_PROP(PhysicsScene, DynamicType), dynamicTypeDesc),
 				property("Source", LUMIX_PROP(PhysicsScene, ShapeSource),
 					ResourceAttribute("Physics (*.phy)", PhysicsGeometry::TYPE))
 			),

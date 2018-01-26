@@ -72,18 +72,6 @@ namespace Lumix
 {
 
 
-static const char* getGrassRotationModeName(int index) 
-{
-	switch ((Terrain::GrassType::RotationMode)index)
-	{
-		case Terrain::GrassType::RotationMode::ALL_RANDOM: return "XYZ Random";
-		case Terrain::GrassType::RotationMode::Y_UP: return "Y Up";
-		case Terrain::GrassType::RotationMode::ALIGN_WITH_NORMAL: return "Align with normal";
-		default: ASSERT(false); return "Error";
-	}
-}
-
-
 static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("renderable");
 
 
@@ -114,6 +102,10 @@ struct BoneProperty : Reflection::IEnumProperty
 		if (parent_entity == INVALID_ENTITY) return INVALID_ENTITY;
 		return render_scene->getUniverse().hasComponent(parent_entity, MODEL_INSTANCE_TYPE) ? parent_entity : INVALID_ENTITY;
 	}
+
+
+	int getEnumValueIndex(ComponentUID cmp, int value) const { return value; }
+	int getEnumValue(ComponentUID cmp, int index) const { return index; }
 
 
 	int getEnumCount(ComponentUID cmp) const override
@@ -147,7 +139,12 @@ static void registerProperties(IAllocator& allocator)
 {
 	using namespace Reflection;
 
-	//&RenderScene::getParticleEmitterShapeRadius
+	static auto rotationModeDesc = enumDesciptor<Terrain::GrassType::RotationMode>(
+		LUMIX_ENUM_VALUE(Terrain::GrassType::RotationMode::ALL_RANDOM),
+		LUMIX_ENUM_VALUE(Terrain::GrassType::RotationMode::Y_UP),
+		LUMIX_ENUM_VALUE(Terrain::GrassType::RotationMode::ALIGN_WITH_NORMAL)
+	);
+	registerEnum(rotationModeDesc);
 
 	static auto render_scene = scene("renderer", 
 		component("bone_attachment",
@@ -281,7 +278,7 @@ static void registerProperties(IAllocator& allocator)
 				property("Distance", LUMIX_PROP(RenderScene, GrassDistance),
 					MinAttribute(1)),
 				property("Density", LUMIX_PROP(RenderScene, GrassDensity)),
-				enum_property("Mode", LUMIX_PROP(RenderScene, GrassRotationMode), (int)Terrain::GrassType::RotationMode::COUNT, getGrassRotationModeName)
+				enum_property("Mode", LUMIX_PROP(RenderScene, GrassRotationMode), rotationModeDesc)
 			)
 		)
 	);
