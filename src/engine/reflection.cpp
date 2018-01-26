@@ -65,6 +65,7 @@ struct ComponentTypeData
 static IAllocator* g_allocator = nullptr;
 static const SceneBase* g_scenes[64];
 static int g_scenes_count = 0;
+static Array<const EnumBase*>* g_enums = nullptr;
 
 
 struct ComponentLink
@@ -188,6 +189,21 @@ const PropertyBase* getProperty(ComponentType cmp_type, const char* property)
 }
 
 
+void registerComponent(const ComponentBase& desc)
+{
+	ComponentLink* link = LUMIX_NEW(*g_allocator, ComponentLink);
+	link->next = g_first_component;
+	link->desc = &desc;
+	g_first_component = link;
+}
+
+
+void registerEnum(const EnumBase& e)
+{
+	g_enums->push(&e);
+}
+
+
 void registerScene(const SceneBase& scene)
 {
 	struct : IComponentVisitor
@@ -205,15 +221,6 @@ void registerScene(const SceneBase& scene)
 }
 
 
-void registerComponent(const ComponentBase& desc)
-{
-	ComponentLink* link = LUMIX_NEW(*g_allocator, ComponentLink);
-	link->next = g_first_component;
-	link->desc = &desc;
-	g_first_component = link;
-}
-
-
 static Array<ComponentTypeData>& getComponentTypes()
 {
 	static DefaultAllocator allocator;
@@ -225,6 +232,7 @@ static Array<ComponentTypeData>& getComponentTypes()
 void init(IAllocator& allocator)
 {
 	g_allocator = &allocator;
+	g_enums = LUMIX_NEW(allocator, Array<const EnumBase*>)(allocator);
 }
 
 
@@ -233,6 +241,7 @@ static void destroy(ComponentLink* link)
 	if (!link) return;
 	destroy(link->next);
 	LUMIX_DELETE(*g_allocator, link);
+	LUMIX_DELETE(*g_allocator, g_enums);
 }
 
 
@@ -312,6 +321,18 @@ const SceneBase& getScene(int index)
 {
 	ASSERT(index < lengthOf(g_scenes) && g_scenes[index]);
 	return *g_scenes[index];
+}
+
+
+int getEnumsCount()
+{
+	return g_enums->size();
+}
+
+
+const EnumBase& getEnum(int index)
+{
+	return *(*g_enums)[index];
 }
 
 

@@ -12,7 +12,7 @@
 	&Scene::Getter, #Scene "::" #Getter, &Scene::Setter, #Scene "::" #Setter
 #define LUMIX_PROP(Scene, Property) \
 	&Scene::get##Property, #Scene "::get" #Property, &Scene::set##Property, #Scene "::set" #Property
-
+#define LUMIX_ENUM_VALUE(value) EnumValue(#value, (int)value)
 #define LUMIX_FUNC(Func)\
 	&Func, #Func
 
@@ -52,6 +52,7 @@ struct IAttribute
 struct ComponentBase;
 struct IPropertyVisitor;
 struct SceneBase;
+struct EnumBase;
 
 struct IAttributeVisitor
 {
@@ -79,8 +80,11 @@ LUMIX_ENGINE_API void shutdown();
 LUMIX_ENGINE_API int getScenesCount();
 LUMIX_ENGINE_API const SceneBase& getScene(int index);
 
+LUMIX_ENGINE_API int getEnumsCount();
+LUMIX_ENGINE_API const EnumBase& getEnum(int index);
+
 LUMIX_ENGINE_API const IAttribute* getAttribute(const PropertyBase& prop, IAttribute::Type type);
-LUMIX_ENGINE_API void registerComponent(const ComponentBase& desc);
+LUMIX_ENGINE_API void registerEnum(const EnumBase& e);
 LUMIX_ENGINE_API void registerScene(const SceneBase& scene);
 LUMIX_ENGINE_API const ComponentBase* getComponent(ComponentType cmp_type);
 LUMIX_ENGINE_API const PropertyBase* getProperty(ComponentType cmp_type, const char* property);
@@ -235,6 +239,8 @@ struct IEnumProperty : public PropertyBase
 	void visit(IAttributeVisitor& visitor) const override {}
 	virtual int getEnumCount(ComponentUID cmp) const = 0;
 	virtual const char* getEnumName(ComponentUID cmp, int index) const = 0;
+	virtual int getEnumValueIndex(ComponentUID cmp, int value) const = 0;
+	virtual int getEnumValue(ComponentUID cmp, int index) const = 0;
 };
 
 
@@ -313,7 +319,7 @@ struct ComponentBase
 };
 
 
-template <typename Getter, typename Setter, typename Namer>
+template <typename Getter, typename Setter, typename Descriptor>
 struct EnumProperty : IEnumProperty
 {
 	void getValue(ComponentUID cmp, int index, OutputBlob& stream) const override
@@ -336,19 +342,35 @@ struct EnumProperty : IEnumProperty
 
 	int getEnumCount(ComponentUID cmp) const override
 	{
-		return count;
+		return descriptor.values_count;
 	}
 
 
 	const char* getEnumName(ComponentUID cmp, int index) const override
 	{
-		return namer(index);
+		return descriptor.values[index].name;
 	}
+
+
+	int getEnumValue(ComponentUID cmp, int index) const override
+	{
+		return descriptor.values[index].value;
+	}
+
+
+	int getEnumValueIndex(ComponentUID cmp, int value) const override
+	{
+		for (int i = 0; i < descriptor.values_count; ++i)
+		{
+			if (descriptor.values[i].value == value) return i;
+		}
+		return -1;
+	}
+
 
 	Getter getter;
 	Setter setter;
-	int count;
-	Namer namer;
+	Descriptor descriptor;
 };
 
 
@@ -372,6 +394,8 @@ struct DynEnumProperty : IEnumProperty
 		detail::SetterProxy<Setter>::invoke(stream, inst, setter, cmp.entity, index);
 	}
 
+	int getEnumValueIndex(ComponentUID cmp, int value) const override { return value; }
+	int getEnumValue(ComponentUID cmp, int index) const override { return index; }
 
 	int getEnumCount(ComponentUID cmp) const override
 	{
@@ -700,6 +724,75 @@ struct IComponentVisitor
 };
 
 
+struct EnumValue
+{
+	EnumValue() {}
+	EnumValue(const char* name, int value)
+		: name(name)
+		, value(value)
+	{
+		const char* c = name + stringLength(name);
+		while (*c != ':' && c > name)
+		{
+			--c;
+		}
+		if (*c == ':') ++c;
+		this->name = c;
+	}
+
+	const char* name;
+	int value;
+};
+
+
+struct EnumBase
+{
+	const char* name;
+	EnumValue* values;
+	int values_count;
+};
+
+
+template <int Count>
+struct EnumDescriptor : EnumBase
+{
+	EnumDescriptor() {}
+	EnumDescriptor(const EnumDescriptor& rhs)
+	{
+		*this = rhs;
+	}
+
+	void operator =(const EnumDescriptor& rhs)
+	{
+		copyMemory(this, &rhs, sizeof(*this));
+		values = values_buffer;
+	}
+
+	template <int I> void setValues() { }
+
+	template <int I, typename... T>
+	void setValues(EnumValue head, T... tail)
+	{
+		values_buffer[I] = head;
+		values = values_buffer;
+		values_count = lengthOf(values_buffer);
+		setValues<I + 1>(tail...);
+	}
+
+	EnumValue values_buffer[Count];
+};
+
+
+template <typename T, typename... Values>
+auto enumDesciptor(Values... values)
+{
+	EnumDescriptor<sizeof...(Values)> e;
+	e.name = Reflection::getTypeName<T>();
+	e.setValues<0>(values...);
+	return e;
+}
+
+
 struct SceneBase
 {
 	virtual ~SceneBase() {}
@@ -935,16 +1028,15 @@ auto property(const char* name, Getter getter, const char* getter_code, Setter s
 }
 
 
-template <typename Getter, typename Setter, typename Namer, typename... Attributes>
-auto enum_property(const char* name, Getter getter, const char* getter_code, Setter setter, const char* setter_code, int count, Namer namer, Attributes... attributes)
+template <typename Getter, typename Setter, typename Descriptor, typename... Attributes>
+auto enum_property(const char* name, Getter getter, const char* getter_code, Setter setter, const char* setter_code, Descriptor desc, Attributes... attributes)
 {
-	EnumProperty<Getter, Setter, Namer> p;
+	EnumProperty<Getter, Setter, Descriptor> p;
 	p.getter = getter;
 	p.setter = setter;
 	p.getter_code = getter_code;
 	p.setter_code = setter_code;
-	p.namer = namer;
-	p.count = count;
+	p.descriptor = desc;
 	p.name = name;
 	return p;
 }
