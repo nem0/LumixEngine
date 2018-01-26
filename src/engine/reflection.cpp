@@ -241,13 +241,13 @@ static void destroy(ComponentLink* link)
 	if (!link) return;
 	destroy(link->next);
 	LUMIX_DELETE(*g_allocator, link);
-	LUMIX_DELETE(*g_allocator, g_enums);
 }
 
 
 void shutdown()
 {
 	destroy(g_first_component);
+	LUMIX_DELETE(*g_allocator, g_enums);
 	g_allocator = nullptr;
 }
 
