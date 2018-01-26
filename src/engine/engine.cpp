@@ -723,6 +723,19 @@ public:
 	}
 
 
+	static int LUA_getComponentTypesCount()
+	{
+		return Reflection::getComponentTypesCount();
+	}
+
+
+	static int LUA_getComponentTypeByIndex(int index)
+	{
+		const char* id = Reflection::getComponentTypeID(index);
+		return Reflection::getComponentType(id).index;
+	}
+
+
 	static bool LUA_hasComponent(Universe* universe, Entity entity, int component_type)
 	{
 		return universe->hasComponent(entity, {component_type});
@@ -1015,6 +1028,8 @@ public:
 		REGISTER_FUNCTION(destroyUniverse);
 		REGISTER_FUNCTION(hasComponent);
 		REGISTER_FUNCTION(getComponentType);
+		REGISTER_FUNCTION(getComponentTypeByIndex);
+		REGISTER_FUNCTION(getComponentTypesCount);
 		REGISTER_FUNCTION(getEntityDirection);
 		REGISTER_FUNCTION(getEntityPosition);
 		REGISTER_FUNCTION(getEntityRotation);

@@ -818,7 +818,7 @@ public:
 	void setGlobalCoordSystem() { m_editor->getGizmo().setGlobalCoordSystem(); }
 	void setPivotOrigin() { m_editor->getGizmo().setPivotOrigin(); }
 	void setPivotCenter() { m_editor->getGizmo().setPivotCenter(); }
-	void createEntity() { m_editor->addEntity(); }
+	void addEntity() { m_editor->addEntity(); }
 	void toggleMeasure() { m_editor->toggleMeasure(); }
 	void snapDown() { m_editor->snapDown(); }
 	void lookAtSelected() { m_editor->lookAtSelected(); }
@@ -1482,7 +1482,7 @@ public:
 		addAction<&StudioAppImpl::setPivotOrigin>("Pivot", "Set pivot transform system", "setPivotOrigin")
 			.is_selected.bind<Gizmo, &Gizmo::isPivotOrigin>(&m_editor->getGizmo());
 
-		addAction<&StudioAppImpl::createEntity>("Create empty", "Create empty entity", "createEntity");
+		addAction<&StudioAppImpl::addEntity>("Create empty", "Create empty entity", "createEntity");
 		addAction<&StudioAppImpl::destroySelectedEntity>("Destroy", "Destroy entity", "destroyEntity", SDLK_DELETE, -1, -1);
 		addAction<&StudioAppImpl::savePrefab>("Save prefab", "Save selected entities as prefab", "savePrefab");
 		addAction<&StudioAppImpl::makeParent>("Make parent", "Make entity parent", "makeParent");
@@ -1668,6 +1668,17 @@ public:
 		m_editor->selectEntities(&e, 1);
 	}
 
+
+	Entity createEntity()
+	{
+		return m_editor->addEntity();
+	}
+
+	void createComponent(Entity e, int type)
+	{
+		m_editor->selectEntities(&e, 1);
+		m_editor->addComponent({type});
+	}
 
 	void exitGameMode()
 	{
@@ -1878,6 +1889,8 @@ public:
 
 		REGISTER_FUNCTION(savePrefabAs);
 		REGISTER_FUNCTION(selectEntity);
+		REGISTER_FUNCTION(createEntity);
+		REGISTER_FUNCTION(createComponent);
 		REGISTER_FUNCTION(destroyEntity);
 		REGISTER_FUNCTION(newUniverse);
 		REGISTER_FUNCTION(saveUniverse);
