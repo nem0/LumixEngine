@@ -723,6 +723,38 @@ struct IComponentVisitor
 	virtual void visit(const ComponentBase& cmp) = 0;
 };
 
+namespace internal
+{
+	static const unsigned int FRONT_SIZE = sizeof("Lumix::Reflection::internal::GetTypeNameHelper<") - 1u;
+	static const unsigned int BACK_SIZE = sizeof(">::GetTypeName") - 1u;
+
+	template <typename T>
+	struct GetTypeNameHelper
+	{
+		static const char* GetTypeName()
+		{
+#ifdef _WIN32
+			static const size_t size = sizeof(__FUNCTION__) - FRONT_SIZE - BACK_SIZE;
+			static char typeName[size] = {};
+			copyMemory(typeName, __FUNCTION__ + FRONT_SIZE, size - 1u);
+#else
+			static const size_t size = sizeof(__PRETTY_FUNCTION__) - FRONT_SIZE - BACK_SIZE;
+			static char typeName[size] = {};
+			copyMemory(typeName, __PRETTY_FUNCTION__ + FRONT_SIZE, size - 1u);
+#endif
+
+			return typeName;
+		}
+	};
+}
+
+
+template <typename T>
+const char* getTypeName()
+{
+	return internal::GetTypeNameHelper<T>::GetTypeName();
+}
+
 
 struct EnumValue
 {
@@ -885,39 +917,6 @@ struct FunctionBase
 
 	const char* decl_code;
 };
-
-
-namespace internal
-{
-	static const unsigned int FRONT_SIZE = sizeof("Lumix::Reflection::internal::GetTypeNameHelper<") - 1u;
-	static const unsigned int BACK_SIZE = sizeof(">::GetTypeName") - 1u;
-
-	template <typename T>
-	struct GetTypeNameHelper
-	{
-		static const char* GetTypeName()
-		{
-			#ifdef _WIN32
-				static const size_t size = sizeof(__FUNCTION__) - FRONT_SIZE - BACK_SIZE;
-				static char typeName[size] = {};
-				copyMemory(typeName, __FUNCTION__ + FRONT_SIZE, size - 1u);
-			#else
-				static const size_t size = sizeof(__PRETTY_FUNCTION__) - FRONT_SIZE - BACK_SIZE;
-				static char typeName[size] = {};
-				copyMemory(typeName, __PRETTY_FUNCTION__ + FRONT_SIZE, size - 1u);
-			#endif
-
-			return typeName;
-		}
-	};
-}
-
-
-template <typename T>
-const char* getTypeName()
-{
-	return internal::GetTypeNameHelper<T>::GetTypeName();
-}
 
 
 template <typename F> struct Function;
