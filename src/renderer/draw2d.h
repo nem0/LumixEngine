@@ -16,7 +16,7 @@ struct FontAtlas;
 
 
 typedef unsigned short Wchar;
-struct FontConfig
+struct LUMIX_RENDERER_API FontConfig
 {
 	void*           FontData;                   //          // TTF data
 	int             FontDataSize;               //          // TTF data size
@@ -37,7 +37,7 @@ struct FontConfig
 	FontConfig();
 };
 
-struct Font
+struct LUMIX_RENDERER_API Font
 {
 	struct Glyph
 	{
@@ -88,7 +88,7 @@ struct Font
 };
 
 
-struct FontAtlas
+struct LUMIX_RENDERER_API FontAtlas
 {
 	FontAtlas(IAllocator& allocator);
 	~FontAtlas();
