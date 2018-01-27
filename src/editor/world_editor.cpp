@@ -2217,6 +2217,7 @@ public:
 
 
 	static bool deserialize(Universe& universe
+		, const char* basedir
 		, const char* basename
 		, PrefabSystem& prefab_system
 		, EntityGUIDMap& entity_map
@@ -2225,7 +2226,7 @@ public:
 		PROFILE_FUNCTION();
 		
 		entity_map.clear();
-		StaticString<MAX_PATH_LENGTH> scn_dir("universes/", basename, "/scenes/");
+		StaticString<MAX_PATH_LENGTH> scn_dir(basedir, "/", basename, "/scenes/");
 		auto scn_file_iter = PlatformInterface::createFileIterator(scn_dir, allocator);
 		Array<u8> data(allocator);
 		FS::OsFile file;
@@ -2276,7 +2277,7 @@ public:
 		}
 		PlatformInterface::destroyFileIterator(scn_file_iter);
 		
-		StaticString<MAX_PATH_LENGTH> dir("universes/", basename, "/");
+		StaticString<MAX_PATH_LENGTH> dir(basedir, "/", basename, "/");
 		auto file_iter = PlatformInterface::createFileIterator(dir, allocator);
 		while (PlatformInterface::getNextFile(file_iter, &info))
 		{
@@ -2334,7 +2335,7 @@ public:
 		}
 		PlatformInterface::destroyFileIterator(file_iter);
 
-		StaticString<MAX_PATH_LENGTH> filepath("universes/", basename, "/systems/templates.sys");
+		StaticString<MAX_PATH_LENGTH> filepath(basedir, "/", basename, "/systems/templates.sys");
 		loadFile(filepath, [&](TextDeserializer& deserializer) {
 			prefab_system.deserialize(deserializer);
 			for (int i = 0, c = prefab_system.getMaxEntityIndex(); i < c; ++i)
@@ -3050,7 +3051,7 @@ public:
 		m_universe->setName(basename);
 		g_log_info.log("Editor") << "Loading universe " << basename << "...";
 		if (m_camera.isValid()) m_universe->destroyEntity(m_camera);
-		if (!deserialize(*m_universe, basename, *m_prefab_system, m_entity_map, m_allocator)) newUniverse();
+		if (!deserialize(*m_universe, "universes/", basename, *m_prefab_system, m_entity_map, m_allocator)) newUniverse();
 		m_camera = m_render_interface->getCameraInSlot("editor");
 		m_editor_icons->refresh();
 	}
@@ -3739,6 +3740,14 @@ public:
 	}
 
 
+	static int getEntitiesCount(Universe& universe)
+	{
+		int count = 0;
+		for (Entity e = universe.getFirstEntity(); e.isValid(); e = universe.getNextEntity(e)) ++count;
+		return count;
+	}
+
+
 	bool runTest(const char* dir, const char* name) override
 	{
 		FS::FileSystem& fs = m_engine->getFileSystem();
@@ -3746,85 +3755,76 @@ public:
 		newUniverse();
 		Path undo_stack_path(dir, name, ".json");
 		executeUndoStack(undo_stack_path);
-		while (fs.hasWork()) fs.updateAsyncTransactions();
 
-		StaticString<MAX_PATH_LENGTH> result_name("__test_result__", name);
-		serialize(result_name);
-		StaticString<MAX_PATH_LENGTH> result_dir(m_engine->getDiskFileDevice()->getBasePath(), "universes/", result_name, "/");
-
-		bool is_same = true;
-
-		PlatformInterface::FileIterator* iter = PlatformInterface::createFileIterator(result_dir, m_allocator);
-		PlatformInterface::FileInfo info;
-		Array<u8> src_data(m_allocator);
-		Array<u8> dst_data(m_allocator);
-		while (is_same && PlatformInterface::getNextFile(iter, &info))
+		OutputBlob blob0(m_allocator);
+		OutputBlob blob1(m_allocator);
+		Universe& tpl_universe = m_engine->createUniverse(true);
+		PrefabSystem* prefab_system = PrefabSystem::create(*this);
+		EntityGUIDMap entity_guid_map(m_allocator);
+		bool is_same = deserialize(tpl_universe, "unit_tests/editor", name, *prefab_system, entity_guid_map, m_allocator);
+		if (!is_same) goto end;
+		if (getEntitiesCount(tpl_universe) != getEntitiesCount(*m_universe))
 		{
-			if (info.is_directory) continue;
-			if (info.filename[0] == '.') continue;
+			is_same = false;
+			goto end;
+		}
 
-			FS::OsFile dst_file;
-			FS::OsFile src_file;
-			StaticString<MAX_PATH_LENGTH> dst_path(result_dir, info.filename);
-			StaticString<MAX_PATH_LENGTH> src_path(dir, "/", name, "/", info.filename);
-			if (dst_file.open(dst_path, FS::Mode::OPEN_AND_READ))
+		for (Entity e = tpl_universe.getFirstEntity(); e.isValid(); e = tpl_universe.getNextEntity(e))
+		{
+			EntityGUID guid = entity_guid_map.get(e);
+			Entity other_entity = m_entity_map.get(guid);
+			if (!other_entity.isValid())
 			{
-				if (src_file.open(src_path, FS::Mode::OPEN_AND_READ))
-				{
-					int dst_size = (int)dst_file.size();
-					int src_size = (int)src_file.size();
-					if (src_size == dst_size)
-					{
-						dst_data.resize(dst_size);
-						dst_file.read(&dst_data[0], dst_data.size());
-						src_data.resize(src_size);
-						src_file.read(&src_data[0], src_data.size());
+				is_same = false;
+				goto end;
+			}
 
-						for (int i = 0; i < src_size; ++i)
-						{
-							if (src_data[i] != dst_data[i])
-							{
-								is_same = false;
-								break;
-							}
-						}
-					}
-					else
-					{
-						is_same = false;
-					}
-					src_file.close();
-				}
-				else
+			for (ComponentUID cmp = tpl_universe.getFirstComponent(e); cmp.isValid(); cmp = tpl_universe.getNextComponent(cmp))
+			{
+				if (!m_universe->hasComponent(other_entity, cmp.type))
 				{
 					is_same = false;
+					goto end;
 				}
-				dst_file.close();
-			}
-			else
-			{
-				is_same = false;
+
+				ComponentUID other_cmp = m_universe->getComponent(other_entity, cmp.type);
+
+				const Reflection::ComponentBase* base = Reflection::getComponent(cmp.type);
+				struct : Reflection::ISimpleComponentVisitor
+				{
+					void visitProperty(const Reflection::PropertyBase& prop) override
+					{
+						blob0->clear();
+						blob1->clear();
+						prop.getValue(cmp, index, *blob0);
+						prop.getValue(other_cmp, index, *blob1);
+						if (blob0->getPos() != blob1->getPos() 
+							|| compareMemory(blob0->getData(), blob1->getData(), blob0->getPos()) != 0)
+						{
+							*is_same = false;
+						}
+					}
+					int index = -1;
+					bool* is_same;
+					ComponentUID cmp;
+					ComponentUID other_cmp;
+					OutputBlob* blob0;
+					OutputBlob* blob1;
+				} visitor;
+				visitor.is_same = &is_same;
+				visitor.cmp = cmp;
+				visitor.other_cmp = other_cmp;
+				visitor.blob0 = &blob0;
+				visitor.blob1 = &blob1;
+				base->visit(visitor);
+				if (!is_same) goto end;
 			}
 		}
-		PlatformInterface::destroyFileIterator(iter);
 
-		StaticString<MAX_PATH_LENGTH> tmp(dir, "/", name);
-		iter = PlatformInterface::createFileIterator(tmp, m_allocator);
-		while (is_same && PlatformInterface::getNextFile(iter, &info))
-		{
-			if (info.is_directory) continue;
-			if (info.filename[0] == '.') continue;
-
-			StaticString<MAX_PATH_LENGTH> dst_path(result_dir, info.filename);
-			if (!PlatformInterface::fileExists(dst_path))
-			{
-				is_same = false;
-				break;
-			}
-		}
-		PlatformInterface::destroyFileIterator(iter);
-
-		return is_same;
+		end:
+			m_engine->destroyUniverse(tpl_universe);
+			PrefabSystem::destroy(prefab_system);
+			return is_same;
 	}
 
 
