@@ -112,7 +112,13 @@ ScriptedParticleEmitter::ScriptedParticleEmitter(Entity entity, IAllocator& allo
 }
 
 
-ScriptedParticleEmitter::~ScriptedParticleEmitter() = default; //TODO
+ScriptedParticleEmitter::~ScriptedParticleEmitter()
+{
+	for (int i = 0; i < m_channels_count; ++i)
+	{
+		m_allocator.deallocate_aligned(m_channels[i].data);
+	}
+}
 
 
 void ScriptedParticleEmitter::setMaterial(Material* material)
