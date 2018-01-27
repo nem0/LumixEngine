@@ -2216,16 +2216,20 @@ public:
 	};
 
 
-	void deserialize(const char* basename)
+	static bool deserialize(Universe& universe
+		, const char* basename
+		, PrefabSystem& prefab_system
+		, EntityGUIDMap& entity_map
+		, IAllocator& allocator)
 	{
 		PROFILE_FUNCTION();
-		if (m_camera.isValid()) m_universe->destroyEntity(m_camera);
-		m_entity_map.clear();
+		
+		entity_map.clear();
 		StaticString<MAX_PATH_LENGTH> scn_dir("universes/", basename, "/scenes/");
-		auto scn_file_iter = PlatformInterface::createFileIterator(scn_dir, m_allocator);
-		Array<u8> data(m_allocator);
+		auto scn_file_iter = PlatformInterface::createFileIterator(scn_dir, allocator);
+		Array<u8> data(allocator);
 		FS::OsFile file;
-		auto loadFile = [&file, &data, this](const char* filepath, auto callback) {
+		auto loadFile = [&file, &data, &entity_map](const char* filepath, auto callback) {
 			if (file.open(filepath, FS::Mode::OPEN_AND_READ))
 			{
 				if (file.size() > 0)
@@ -2233,7 +2237,7 @@ public:
 					data.resize((int)file.size());
 					file.read(&data[0], data.size());
 					InputBlob blob(&data[0], data.size());
-					TextDeserializer deserializer(blob, m_entity_map);
+					TextDeserializer deserializer(blob, entity_map);
 					callback(deserializer);
 				}
 				file.close();
@@ -2249,21 +2253,20 @@ public:
 			StaticString<MAX_PATH_LENGTH> filepath(scn_dir, info.filename);
 			char plugin_name[64];
 			PathUtils::getBasename(plugin_name, lengthOf(plugin_name), filepath);
-			IScene* scene = m_universe->getScene(crc32(plugin_name));
+			IScene* scene = universe.getScene(crc32(plugin_name));
 			if (!scene)
 			{
 				g_log_error.log("Editor") << "Could not open " << filepath << " since there is not plugin " << plugin_name;
-				newUniverse();
-				return;
+				return false;
 			}
 
-			loadFile(filepath, [scene, &versions, this](TextDeserializer& deserializer) {
+			loadFile(filepath, [scene, &versions, &universe](TextDeserializer& deserializer) {
 				int version;
 				deserializer.read(&version);
 				for (int i = 0; i < ComponentType::MAX_TYPES_COUNT; ++i)
 				{
 					ComponentType cmp_type = {i};
-					if (m_universe->getScene(cmp_type) == scene)
+					if (universe.getScene(cmp_type) == scene)
 					{
 						versions[i] = version;
 					}
@@ -2274,7 +2277,7 @@ public:
 		PlatformInterface::destroyFileIterator(scn_file_iter);
 		
 		StaticString<MAX_PATH_LENGTH> dir("universes/", basename, "/");
-		auto file_iter = PlatformInterface::createFileIterator(dir, m_allocator);
+		auto file_iter = PlatformInterface::createFileIterator(dir, allocator);
 		while (PlatformInterface::getNextFile(file_iter, &info))
 		{
 			if (info.is_directory) continue;
@@ -2286,12 +2289,12 @@ public:
 			PathUtils::getBasename(tmp, lengthOf(tmp), filepath);
 			EntityGUID guid;
 			fromCString(tmp, lengthOf(tmp), &guid.value);
-			Entity entity = m_universe->createEntity({0, 0, 0}, {0, 0, 0, 1});
-			m_entity_map.insert(guid, entity);
+			Entity entity = universe.createEntity({0, 0, 0}, {0, 0, 0, 1});
+			entity_map.insert(guid, entity);
 		}
 		PlatformInterface::destroyFileIterator(file_iter);
 		
-		file_iter = PlatformInterface::createFileIterator(dir, m_allocator);
+		file_iter = PlatformInterface::createFileIterator(dir, allocator);
 		while (PlatformInterface::getNextFile(file_iter, &info))
 		{
 			if (info.is_directory) continue;
@@ -2303,7 +2306,7 @@ public:
 			PathUtils::getBasename(tmp, lengthOf(tmp), filepath);
 			EntityGUID guid;
 			fromCString(tmp, lengthOf(tmp), &guid.value);
-			loadFile(filepath, [&versions, this, guid](TextDeserializer& deserializer) {
+			loadFile(filepath, [&versions, &entity_map, &universe, guid](TextDeserializer& deserializer) {
 				char name[64];
 				deserializer.read(name, lengthOf(name));
 				RigidTransform tr;
@@ -2311,20 +2314,20 @@ public:
 				float scale;
 				deserializer.read(&scale);
 
-				Entity entity = m_entity_map.get(guid);
+				Entity entity = entity_map.get(guid);
 
 				Entity parent;
 				deserializer.read(&parent);
-				if (parent.isValid()) m_universe->setParent(parent, entity);
+				if (parent.isValid()) universe.setParent(parent, entity);
 
-				if(name[0]) m_universe->setEntityName(entity, name);
-				m_universe->setTransformKeepChildren(entity, {tr.pos, tr.rot, scale});
+				if(name[0]) universe.setEntityName(entity, name);
+				universe.setTransformKeepChildren(entity, {tr.pos, tr.rot, scale});
 				u32 cmp_type_hash;
 				deserializer.read(&cmp_type_hash);
 				while (cmp_type_hash != 0)
 				{
 					ComponentType cmp_type = Reflection::getComponentTypeFromHash(cmp_type_hash);
-					m_universe->deserializeComponent(deserializer, entity, cmp_type, versions[cmp_type.index]);
+					universe.deserializeComponent(deserializer, entity, cmp_type, versions[cmp_type.index]);
 					deserializer.read(&cmp_type_hash);
 				}
 			});
@@ -2332,15 +2335,15 @@ public:
 		PlatformInterface::destroyFileIterator(file_iter);
 
 		StaticString<MAX_PATH_LENGTH> filepath("universes/", basename, "/systems/templates.sys");
-		loadFile(filepath, [this](TextDeserializer& deserializer) {
-			m_prefab_system->deserialize(deserializer);
-			for (int i = 0, c = m_prefab_system->getMaxEntityIndex(); i < c; ++i)
+		loadFile(filepath, [&](TextDeserializer& deserializer) {
+			prefab_system.deserialize(deserializer);
+			for (int i = 0, c = prefab_system.getMaxEntityIndex(); i < c; ++i)
 			{
-				u64 prefab = m_prefab_system->getPrefab({i});
-				if (prefab != 0) m_entity_map.create({i});
+				u64 prefab = prefab_system.getPrefab({i});
+				if (prefab != 0) entity_map.create({i});
 			}
 		});
-		m_camera = m_render_interface->getCameraInSlot("editor");
+		return &universe;
 	}
 
 	
@@ -3046,7 +3049,9 @@ public:
 		createUniverse();
 		m_universe->setName(basename);
 		g_log_info.log("Editor") << "Loading universe " << basename << "...";
-		deserialize(basename);
+		if (m_camera.isValid()) m_universe->destroyEntity(m_camera);
+		if (!deserialize(*m_universe, basename, *m_prefab_system, m_entity_map, m_allocator)) newUniverse();
+		m_camera = m_render_interface->getCameraInSlot("editor");
 		m_editor_icons->refresh();
 	}
 
