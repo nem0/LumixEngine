@@ -403,6 +403,16 @@ public:
 	virtual float getPointLightSpecularIntensity(Entity entity) = 0;
 	virtual void setPointLightSpecularIntensity(Entity entity, float color) = 0;
 
+	virtual int getEnvironmentProbeIrradianceSize(Entity entity) = 0;
+	virtual void setEnvironmentProbeIrradianceSize(Entity entity, int size) = 0;
+	virtual int getEnvironmentProbeRadianceSize(Entity entity) = 0;
+	virtual void setEnvironmentProbeRadianceSize(Entity entity, int size) = 0;
+	virtual int getEnvironmentProbeReflectionSize(Entity entity) = 0;
+	virtual void setEnvironmentProbeReflectionSize(Entity entity, int size) = 0;
+	virtual bool isEnvironmentProbeReflectionEnabled(Entity entity) = 0;
+	virtual void enableEnvironmentProbeReflection(Entity entity, bool enable) = 0;
+	virtual bool isEnvironmentProbeCustomSize(Entity entity) = 0;
+	virtual void enableEnvironmentProbeCustomSize(Entity entity, bool enable) = 0;
 	virtual Texture* getEnvironmentProbeTexture(Entity entity) const = 0;
 	virtual Texture* getEnvironmentProbeIrradiance(Entity entity) const = 0;
 	virtual Texture* getEnvironmentProbeRadiance(Entity entity) const = 0;
