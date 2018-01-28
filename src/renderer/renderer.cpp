@@ -77,7 +77,12 @@ static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("r
 
 struct BoneProperty : Reflection::IEnumProperty
 {
-	BoneProperty() { name = "Bone"; }
+	BoneProperty() 
+	{ 
+		name = "Bone"; 
+		getter_code = "RenderScene::getBoneAttachmentBone";
+		setter_code = "RenderScene::setBoneAttachmentBone";
+	}
 
 
 	void getValue(ComponentUID cmp, int index, OutputBlob& stream) const override

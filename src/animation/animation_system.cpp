@@ -27,7 +27,12 @@ enum class AnimationSceneVersion
 
 struct AnimSetProperty : public Reflection::IEnumProperty
 {
-	AnimSetProperty() { name = "Default set"; }
+	AnimSetProperty() 
+	{ 
+		name = "Default set"; 
+		getter_code = "AnimationScene::getControllerDefaultSet";
+		setter_code = "AnimationScene::setControllerDefaultSet";
+	}
 
 
 	void getValue(ComponentUID cmp, int index, OutputBlob& stream) const override
