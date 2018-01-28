@@ -55,6 +55,7 @@ struct LUMIX_ENGINE_API ISerializer
 	virtual void write(const char* label, u64 value) = 0;
 	virtual void write(const char* label, i32 value) = 0;
 	virtual void write(const char* label, u32 value) = 0;
+	virtual void write(const char* label, u16 value) = 0;
 	virtual void write(const char* label, i8 value) = 0;
 	virtual void write(const char* label, u8 value) = 0;
 	virtual void write(const char* label, const char* value) = 0;
@@ -77,6 +78,7 @@ struct LUMIX_ENGINE_API IDeserializer
 	virtual void read(i64* value) = 0;
 	virtual void read(u32* value) = 0;
 	virtual void read(i32* value) = 0;
+	virtual void read(u16* value) = 0;
 	virtual void read(u8* value) = 0;
 	virtual void read(i8* value) = 0;
 	virtual void read(char* value, int max_size) = 0;
@@ -104,6 +106,7 @@ struct LUMIX_ENGINE_API TextSerializer LUMIX_FINAL : public ISerializer
 	void write(const char* label, u64 value)  override;
 	void write(const char* label, i32 value)  override;
 	void write(const char* label, u32 value)  override;
+	void write(const char* label, u16 value)  override;
 	void write(const char* label, i8 value)  override;
 	void write(const char* label, u8 value)  override;
 	void write(const char* label, const char* value)  override;
@@ -133,6 +136,7 @@ struct LUMIX_ENGINE_API TextDeserializer LUMIX_FINAL : public IDeserializer
 	void read(i64* value)  override;
 	void read(u32* value)  override;
 	void read(i32* value)  override;
+	void read(u16* value)  override;
 	void read(u8* value)  override;
 	void read(i8* value)  override;
 	void read(char* value, int max_size)  override;

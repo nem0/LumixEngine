@@ -179,7 +179,12 @@ static void registerProperties(IAllocator& allocator)
 			sampled_func_property("Alpha", LUMIX_PROP(RenderScene, ParticleEmitterAlpha), &RenderScene::getParticleEmitterAlphaCount, 1)
 		),
 		component("particle_emitter_random_rotation"),
-		component("environment_probe"),
+		component("environment_probe",
+			property("Enabled reflection", LUMIX_PROP_FULL(RenderScene, isEnvironmentProbeReflectionEnabled, enableEnvironmentProbeReflection)),
+			property("Override global size", LUMIX_PROP_FULL(RenderScene, isEnvironmentProbeCustomSize, enableEnvironmentProbeCustomSize)),
+			property("Radiance size", LUMIX_PROP(RenderScene, EnvironmentProbeRadianceSize)),
+			property("Irradiance size", LUMIX_PROP(RenderScene, EnvironmentProbeIrradianceSize))
+		),
 		component("particle_emitter_force",
 			property("Acceleration", LUMIX_PROP(RenderScene, ParticleEmitterAcceleration))
 		),

@@ -78,6 +78,11 @@ void TextSerializer::write(const char* label, u32 value)
 	blob << "#" << label << "\n\t" << value << "\n";
 }
 
+void TextSerializer::write(const char* label, u16 value)
+{
+	blob << "#" << label << "\n\t" << value << "\n";
+}
+
 void TextSerializer::write(const char* label, i64 value)
 {
 	blob << "#" << label << "\n\t" << value << "\n";
@@ -192,6 +197,22 @@ void TextDeserializer::read(u32* value)
 {
 	skip();
 	*value = readU32();
+}
+
+
+void TextDeserializer::read(u16* value)
+{
+	skip();
+	char tmp[40];
+	char* c = tmp;
+	*c = blob.readChar();
+	while (*c >= '0' && *c <= '9' && (c - tmp) < lengthOf(tmp))
+	{
+		++c;
+		*c = blob.readChar();
+	}
+	*c = 0;
+	fromCString(tmp, lengthOf(tmp), value);
 }
 
 

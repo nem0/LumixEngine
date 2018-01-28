@@ -1336,9 +1336,26 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 
 		cmft::imageFromRgba32f(image, cmft::TextureFormat::RGBA8);
 		cmft::imageFromRgba32f(irradiance, cmft::TextureFormat::RGBA8);
-		saveCubemap(cmp, (u8*)irradiance.m_data, 32, "_irradiance");
-		saveCubemap(cmp, (u8*)image.m_data, 128, "_radiance");
-		saveCubemap(cmp, &data[0], TEXTURE_SIZE, "");
+
+
+
+		int irradiance_size = 32;
+		int radiance_size = 128;
+		int reflection_size = TEXTURE_SIZE;
+
+		if (scene->isEnvironmentProbeCustomSize(cmp.entity))
+		{
+			irradiance_size = scene->getEnvironmentProbeIrradianceSize(cmp.entity);
+			radiance_size = scene->getEnvironmentProbeRadianceSize(cmp.entity);
+			reflection_size = scene->getEnvironmentProbeReflectionSize(cmp.entity);
+		}
+
+		saveCubemap(cmp, (u8*)irradiance.m_data, irradiance_size, "_irradiance");
+		saveCubemap(cmp, (u8*)image.m_data, radiance_size, "_radiance");
+		if (scene->isEnvironmentProbeReflectionEnabled(cmp.entity))
+		{
+			saveCubemap(cmp, &data[0], reflection_size, "");
+		}
 		bgfx::destroy(texture);
 		
 		scene->reloadEnvironmentProbe(cmp.entity);
@@ -1351,7 +1368,10 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 
 		auto* scene = static_cast<RenderScene*>(cmp.scene);
 		auto* texture = scene->getEnvironmentProbeTexture(cmp.entity);
-		ImGui::LabelText("Path", "%s", texture->getPath().c_str());
+		if (texture)
+		{
+			ImGui::LabelText("Path", "%s", texture->getPath().c_str());
+		}
 		if (ImGui::Button("View")) m_app.getAssetBrowser().selectResource(texture->getPath(), true);
 		ImGui::SameLine();
 		if (ImGui::Button("Generate")) generateCubemap(cmp);
