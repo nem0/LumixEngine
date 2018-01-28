@@ -800,15 +800,15 @@ struct EnumDescriptor : EnumBase
 		values = values_buffer;
 	}
 
-	template <int I> void setValues() { }
+	void setValues(int) { }
 
-	template <int I, typename... T>
-	void setValues(EnumValue head, T... tail)
+	template <typename... T>
+	void setValues(int i, EnumValue head, T... tail)
 	{
-		values_buffer[I] = head;
+		values_buffer[i] = head;
 		values = values_buffer;
 		values_count = lengthOf(values_buffer);
-		setValues<I + 1>(tail...);
+		setValues(i + 1, tail...);
 	}
 
 	EnumValue values_buffer[Count];
@@ -820,7 +820,7 @@ auto enumDesciptor(Values... values)
 {
 	EnumDescriptor<sizeof...(Values)> e;
 	e.name = Reflection::getTypeName<T>();
-	e.setValues<0>(values...);
+	e.setValues(0, values ...);
 	return e;
 }
 
