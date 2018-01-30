@@ -54,6 +54,16 @@ function generateProject()
 	app.ShellExecute("genie_static_vs17.bat")
 }
 
+function updateTests()
+{
+	app.ShellExecute("genie.exe", "update-tests")
+}
+
+function runRenderTests()
+{
+	app.ShellExecute("genie.exe", "run-render-tests")
+}
+
 function openInVS()
 {
 	app.ShellExecute("C:/Program Files (x86)/Microsoft Visual Studio/2017/Community/Common7/IDE/devenv.exe", "tmp/vs2017/LumixEngine.sln")
@@ -80,6 +90,8 @@ function cleanAll()
    <button style="width:200" onclick="publishToItchIO();">Publish to itch.io</button>
    <button style="width:200" onclick="openInVS();">Open in VS</button>
    <button style="width:200" onclick="symstore();">Symstore</button>
+   <button style="width:200" onclick="updateTests();">Update tests</button>
+   <button style="width:200" onclick="runRenderTests();">Run render tests</button>
    <button style="width:200" onclick="cleanAll();">Clean all</button>
 </BODY>
 </HTML>

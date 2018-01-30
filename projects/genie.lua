@@ -134,6 +134,15 @@ newoption {
 	}
 
 newaction {
+	trigger = "run-render-tests",
+	description = "Run render tests",
+	
+	execute = function() 
+		os.execute([[cd ..\..\lumixengine_data\ && bin\app.exe -window -pipeline_define RENDER_TEST -script unit_tests/render_tests/main.lua]])
+	end
+}
+	
+newaction {
 	trigger = "update-tests",
 	description = "Update render & editor tests, use when serializaiton changes",
 	
@@ -148,11 +157,13 @@ newaction {
 			os.execute([[del /Q "..\..\lumixengine_data\universes\]] .. test .. [[.unv"]])
 		end
 		
-		local render_tests = { "direct_light", "indirect_light" }
+		local render_tests = { "direct_light", "indirect_light", "text_mesh" }
 		for _, test in ipairs(render_tests) do
 			os.execute([[xcopy /I /Y /E "..\..\lumixengine_data\unit_tests\render_tests\]] .. test ..[[" "..\..\lumixengine_data\universes\]] .. test .. [["]])
 			os.execute([[cd ..\..\lumixengine_data\ && bin\studio.exe -run_script unit_tests\render_tests\update_tests.lua -open ]] .. test)
+			os.execute([[cp "..\..\lumixengine_data\universes\]] .. test .. [[.unv"  "..\..\lumixengine_data\unit_tests\render_tests"]])
 			os.execute([[rmdir /S /Q "..\..\lumixengine_data\universes\]] .. test .. [["]])
+			os.execute([[del /Q "..\..\lumixengine_data\universes\]] .. test .. [[.unv"]])
 		end
 	end
 }
