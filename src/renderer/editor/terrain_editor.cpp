@@ -1279,7 +1279,7 @@ static bool testOBBCollision(const Matrix& matrix_a,
 
 
 static bool isOBBCollision(RenderScene& scene,
-	const Array<Array<ModelInstanceMesh>>& meshes,
+	const Array<Array<MeshInstance>>& meshes,
 	const Vec3& pos_a,
 	Model* model,
 	float scale)
@@ -1290,7 +1290,7 @@ static bool isOBBCollision(RenderScene& scene,
 	{
 		for(auto& mesh : submeshes)
 		{
-			auto* model_instance = scene.getModelInstance(mesh.model_instance);
+			auto* model_instance = scene.getModelInstance(mesh.owner);
 			Vec3 pos_b = model_instance->matrix.getTranslation();
 			float radius_b = model_instance->model->getBoundingRadius();
 			float radius_squared = radius_a_squared + radius_b * radius_b;

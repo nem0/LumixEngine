@@ -19,6 +19,7 @@
 #include "engine/universe/universe.h"
 #include "lua_script/lua_script_system.h"
 #include "renderer/culling_system.h"
+#include "renderer/font_manager.h"
 #include "renderer/frame_buffer.h"
 #include "renderer/material.h"
 #include "renderer/material_manager.h"
@@ -78,6 +79,7 @@ static const ComponentType CAMERA_TYPE = Reflection::getComponentType("camera");
 static const ComponentType TERRAIN_TYPE = Reflection::getComponentType("terrain");
 static const ComponentType BONE_ATTACHMENT_TYPE = Reflection::getComponentType("bone_attachment");
 static const ComponentType ENVIRONMENT_PROBE_TYPE = Reflection::getComponentType("environment_probe");
+static const ComponentType TEXT_MESH_TYPE = Reflection::getComponentType("text_mesh");
 
 
 struct Decal : public DecalInfo
@@ -160,6 +162,26 @@ struct BoneAttachment
 };
 
 
+struct TextMesh
+{
+	TextMesh(IAllocator& allocator) : text("", allocator) {}
+	~TextMesh()
+	{
+		if (font_resource)
+		{
+			font_resource->removeRef(*font);
+			font_resource->getResourceManager().unload(*font_resource);
+		}
+	}
+
+	FontResource* font_resource = nullptr;
+	Font* font = nullptr;
+	string text;
+	int font_size = 13;
+	u32 color = 0xff000000;
+};
+
+
 class RenderSceneImpl LUMIX_FINAL : public RenderScene
 {
 private:
@@ -217,6 +239,8 @@ public:
 		auto* material_manager = static_cast<MaterialManager*>(rm.get(Material::TYPE));
 
 		m_model_loaded_callbacks.clear();
+
+		m_text_meshes.clear();
 
 		for (Decal& decal : m_decals)
 		{
@@ -810,6 +834,172 @@ public:
 	}
 
 
+	void serializeTextMesh(ISerializer& serializer, Entity entity)
+	{
+		TextMesh& text = m_text_meshes.get(entity);
+		serializer.write("font", text.font_resource ? text.font_resource->getPath().c_str() : "");
+		serializer.write("color", text.color);
+		serializer.write("font_size", text.font_size);
+		serializer.write("text", text.text.c_str());
+	}
+
+
+	void setTextMeshText(Entity entity, const char* text) override
+	{
+		m_text_meshes.get(entity).text = text;
+	}
+
+
+	const char* getTextMeshText(Entity entity) override
+	{
+		return m_text_meshes.get(entity).text.c_str();
+	}
+
+
+	void setTextMeshFontSize(Entity entity, int value) override
+	{
+		TextMesh& text = m_text_meshes.get(entity);
+		FontResource* res = text.font_resource;
+		if (res) res->removeRef(*text.font);
+		text.font_size = value;
+		if (res) text.font = res->addRef(text.font_size);
+	}
+
+
+	int getTextMeshFontSize(Entity entity) override
+	{
+		return m_text_meshes.get(entity).font_size;
+	}
+
+
+	static Vec4 ABGRu32ToRGBAVec4(u32 value)
+	{
+		float inv = 1 / 255.0f;
+		return {
+			((value >> 0) & 0xFF) * inv,
+			((value >> 8) & 0xFF) * inv,
+			((value >> 16) & 0xFF) * inv,
+			((value >> 24) & 0xFF) * inv,
+		};
+	}
+
+
+	static u32 RGBAVec4ToABGRu32(const Vec4& value)
+	{
+		u8 r = u8(value.x * 255 + 0.5f);
+		u8 g = u8(value.y * 255 + 0.5f);
+		u8 b = u8(value.z * 255 + 0.5f);
+		u8 a = u8(value.w * 255 + 0.5f);
+		return (a << 24) + (b << 16) + (g << 8) + r;
+	}
+
+
+	Vec4 getTextMeshColorRGBA(Entity entity) override
+	{
+		return ABGRu32ToRGBAVec4(m_text_meshes.get(entity).color);
+	}
+
+
+	void setTextMeshColorRGBA(Entity entity, const Vec4& color) override
+	{
+		m_text_meshes.get(entity).color = RGBAVec4ToABGRu32(color);
+	}
+
+
+	Path getTextMeshFontPath(Entity entity) override
+	{
+		TextMesh& text = m_text_meshes.get(entity);
+		return text.font_resource == nullptr ? Path() : text.font_resource->getPath();
+	}
+
+
+	void getTextMeshesVertices(Array<TextMeshVertex>& vertices) override
+	{
+		for (int j = 0, nj = m_text_meshes.size(); j < nj; ++j)
+		{
+			TextMesh& text = m_text_meshes.at(j);
+			Entity entity = m_text_meshes.getKey(j);
+			const char* str = text.text.c_str();
+			Vec3 base = m_universe.getPosition(entity);
+			Quat rot = m_universe.getRotation(entity);
+			float scale = m_universe.getScale(entity);
+			Vec3 right = rot.rotate({ 1, 0, 0 }) * scale;
+			Vec3 up = rot.rotate({ 0, -1, 0 }) * scale;
+			u32 color = text.color;
+			Vec2 text_size = text.font->CalcTextSizeA((float)text.font_size, FLT_MAX, 0, str);
+			base += right * text_size.x * -0.5f;
+			base += up * text_size.y * -0.5f;
+			for (int i = 0, n = text.text.length(); i < n; ++i)
+			{
+				const Font::Glyph* glyph = text.font->FindGlyph(str[i]);
+				if (!glyph) continue;
+
+				Vec3 x0y0 = base + right * glyph->X0 + up * glyph->Y0;
+				Vec3 x1y0 = base + right * glyph->X1 + up * glyph->Y0;
+				Vec3 x1y1 = base + right * glyph->X1 + up * glyph->Y1;
+				Vec3 x0y1 = base + right * glyph->X0 + up * glyph->Y1;
+
+				vertices.push({ x0y0, color, { glyph->U0, glyph->V0 } });
+				vertices.push({ x1y0, color, { glyph->U1, glyph->V0 } });
+				vertices.push({ x1y1, color, { glyph->U1, glyph->V1 } });
+
+				vertices.push({ x0y0, color, { glyph->U0, glyph->V0 } });
+				vertices.push({ x1y1, color, { glyph->U1, glyph->V1 } });
+				vertices.push({ x0y1, color, { glyph->U0, glyph->V1 } });
+				
+				base += right * glyph->XAdvance;
+			}
+
+		}
+	}
+
+
+	void setTextMeshFontPath(Entity entity, const Path& path) override
+	{
+		TextMesh& text = m_text_meshes.get(entity);
+		FontResource* res = text.font_resource;
+		if (res)
+		{
+			res->removeRef(*text.font);
+			res->getResourceManager().unload(*res);
+		}
+		FontManager& manager = m_renderer.getFontManager();
+		if (!path.isValid())
+		{
+			text.font_resource = nullptr;
+			text.font = manager.getDefaultFont();
+			return;
+		}
+		text.font_resource = (FontResource*)manager.load(path);
+		text.font = text.font_resource->addRef(text.font_size);
+	}
+
+	
+	void deserializeTextMesh(IDeserializer& serializer, Entity entity, int /*scene_version*/)
+	{
+		TextMesh& text = m_text_meshes.emplace(entity, m_allocator);
+
+		char tmp[MAX_PATH_LENGTH];
+		serializer.read(tmp, lengthOf(tmp));
+		serializer.read(&text.color);
+		serializer.read(&text.font_size);
+		serializer.read(&text.text);
+		FontManager& manager = m_renderer.getFontManager();
+		if (tmp[0] == '\0')
+		{
+			text.font_resource = nullptr;
+			text.font = manager.getDefaultFont();
+		}
+		else
+		{
+			text.font_resource = (FontResource*)manager.load(Path(tmp));
+			text.font = text.font_resource->addRef(text.font_size);
+		}
+
+		m_universe.onComponentCreated(entity, TEXT_MESH_TYPE, this);
+	}
+
+
 	void serializeCamera(ISerializer& serialize, Entity entity)
 	{
 		Camera& camera = m_cameras[entity];
@@ -1340,6 +1530,50 @@ public:
 		}
 	}
 
+	void serializeTextMeshes(OutputBlob& serializer)
+	{
+		serializer.write(m_text_meshes.size());
+		for (int i = 0, n = m_text_meshes.size(); i < n; ++i)
+		{
+			TextMesh& text = m_text_meshes.at(i);
+			Entity e = m_text_meshes.getKey(i);
+			serializer.write(e);
+			serializer.writeString(text.font_resource ? text.font_resource->getPath().c_str() : "");
+			serializer.write(text.color);
+			serializer.write(text.font_size);
+			serializer.write(text.text);
+		}
+	}
+
+	void deserializeTextMeshes(InputBlob& serializer)
+	{
+		int count;
+		serializer.read(count);
+		FontManager& manager = m_renderer.getFontManager();
+		for (int i = 0; i < count; ++i)
+		{
+			Entity e;
+			serializer.read(e);
+			TextMesh& text = m_text_meshes.emplace(e, m_allocator);
+			char tmp[MAX_PATH_LENGTH];
+			serializer.readString(tmp, lengthOf(tmp));
+			serializer.read(text.color);
+			serializer.read(text.font_size);
+			serializer.read(text.text);
+			if (tmp[0] == '\0')
+			{
+				text.font_resource = nullptr;
+				text.font = manager.getDefaultFont();
+			}
+			else
+			{
+				text.font_resource = (FontResource*)manager.load(Path(tmp));
+				text.font = text.font_resource->addRef(text.font_size);
+			}
+			m_universe.onComponentCreated(e, TEXT_MESH_TYPE, this);
+		}
+	}
+
 
 	void deserializeDecals(InputBlob& serializer)
 	{
@@ -1553,6 +1787,7 @@ public:
 		serializeBoneAttachments(serializer);
 		serializeEnvironmentProbes(serializer);
 		serializeDecals(serializer);
+		serializeTextMeshes(serializer);
 	}
 
 
@@ -1674,6 +1909,7 @@ public:
 		deserializeBoneAttachments(serializer);
 		deserializeEnvironmentProbes(serializer);
 		deserializeDecals(serializer);
+		deserializeTextMeshes(serializer);
 	}
 
 
@@ -1756,6 +1992,13 @@ public:
 			m_point_lights_map[{m_point_lights[index].m_entity.index}] = index;
 		}
 		m_universe.onComponentDestroyed(entity, POINT_LIGHT_TYPE, this);
+	}
+
+
+	void destroyTextMesh(Entity entity)
+	{
+		m_text_meshes.erase(entity);
+		m_universe.onComponentDestroyed(entity, TEXT_MESH_TYPE, this);
 	}
 
 
@@ -2226,6 +2469,14 @@ public:
 		emitter->m_spawn_period = value;
 		emitter->m_spawn_period.from = Math::maximum(0.01f, emitter->m_spawn_period.from);
 		emitter->m_spawn_period.checkZero();
+	}
+
+
+	void createTextMesh(Entity entity)
+	{
+		TextMesh& text = m_text_meshes.emplace(entity, m_allocator);
+		text.font = m_renderer.getFontManager().getDefaultFont();
+		m_universe.onComponentCreated(entity, TEXT_MESH_TYPE, this);
 	}
 
 
@@ -3169,7 +3420,7 @@ public:
 		Entity camera,
 		const Vec3& lod_ref_point,
 		const Frustum& frustum,
-		Array<ModelInstanceMesh>& infos) override
+		Array<MeshInstance>& infos) override
 	{
 		PROFILE_FUNCTION();
 
@@ -3191,7 +3442,7 @@ public:
 				{
 					auto& info = infos.emplace();
 					info.mesh = &model_instance.model->getMesh(k);
-					info.model_instance = model_instance_entity;
+					info.owner = model_instance_entity;
 				}
 			}
 		}
@@ -3201,7 +3452,7 @@ public:
 	void getPointLightInfluencedGeometry(Entity light, 
 		Entity camera, 
 		const Vec3& lod_ref_point,
-		Array<ModelInstanceMesh>& infos) override
+		Array<MeshInstance>& infos) override
 	{
 		PROFILE_FUNCTION();
 
@@ -3219,7 +3470,7 @@ public:
 			{
 				auto& info = infos.emplace();
 				info.mesh = &model_instance.model->getMesh(k);
-				info.model_instance = geoms[j];
+				info.owner = geoms[j];
 			}
 		}
 	}
@@ -3257,7 +3508,7 @@ public:
 	}
 
 
-	Array<Array<ModelInstanceMesh>>& getModelInstanceInfos(const Frustum& frustum,
+	Array<Array<MeshInstance>>& getModelInstanceInfos(const Frustum& frustum,
 		const Vec3& lod_ref_point,
 		Entity camera,
 		u64 layer_mask) override
@@ -3281,7 +3532,7 @@ public:
 		volatile int counter = 0;
 		for (int subresult_index = 0; subresult_index < results.size(); ++subresult_index)
 		{
-			Array<ModelInstanceMesh>& subinfos = m_temporary_infos[subresult_index];
+			Array<MeshInstance>& subinfos = m_temporary_infos[subresult_index];
 			subinfos.clear();
 
 			JobSystem::fromLambda([&layer_mask, &subinfos, this, &results, subresult_index, lod_ref_point, camera]() {
@@ -3307,8 +3558,8 @@ public:
 						Mesh& mesh = model_instance->meshes[j];
 						if ((mesh.layer_mask & layer_mask) == 0) continue;
 						
-						ModelInstanceMesh& info = subinfos.emplace();
-						info.model_instance = raw_subresults[i];
+						MeshInstance& info = subinfos.emplace();
+						info.owner = raw_subresults[i];
 						info.mesh = &mesh;
 						info.depth = squared_distance;
 					}
@@ -4913,6 +5164,7 @@ private:
 	HashMap<Entity, GlobalLight> m_global_lights;
 	Array<PointLight> m_point_lights;
 	HashMap<Entity, Camera> m_cameras;
+	AssociativeArray<Entity, TextMesh> m_text_meshes;
 	AssociativeArray<Entity, BoneAttachment> m_bone_attachments;
 	AssociativeArray<Entity, EnvironmentProbe> m_environment_probes;
 	HashMap<Entity, Terrain*> m_terrains;
@@ -4923,7 +5175,7 @@ private:
 	Array<DebugLine> m_debug_lines;
 	Array<DebugPoint> m_debug_points;
 
-	Array<Array<ModelInstanceMesh>> m_temporary_infos;
+	Array<Array<MeshInstance>> m_temporary_infos;
 
 	float m_time;
 	float m_lod_multiplier;
@@ -4971,7 +5223,8 @@ static struct
 	COMPONENT_TYPE(PARTICLE_EMITTER_RANDOM_ROTATION_TYPE, ParticleEmitterRandomRotation),
 	COMPONENT_TYPE(PARTICLE_EMITTER_SIZE_TYPE, ParticleEmitterSize),
 	COMPONENT_TYPE(PARTICLE_EMITTER_SPAWN_SHAPE_TYPE, ParticleEmitterSpawnShape),
-	COMPONENT_TYPE(PARTICLE_EMITTER_SUBIMAGE_TYPE, ParticleEmitterSubimage)
+	COMPONENT_TYPE(PARTICLE_EMITTER_SUBIMAGE_TYPE, ParticleEmitterSubimage),
+	COMPONENT_TYPE(TEXT_MESH_TYPE, TextMesh)
 };
 
 #undef COMPONENT_TYPE
@@ -4987,6 +5240,7 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	, m_model_loaded_callbacks(m_allocator)
 	, m_model_instances(m_allocator)
 	, m_cameras(m_allocator)
+	, m_text_meshes(m_allocator)
 	, m_terrains(m_allocator)
 	, m_point_lights(m_allocator)
 	, m_light_influenced_geometry(m_allocator)
@@ -5012,6 +5266,8 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	m_universe.entityDestroyed().bind<RenderSceneImpl, &RenderSceneImpl::onEntityDestroyed>(this);
 	m_culling_system = CullingSystem::create(m_allocator);
 	m_model_instances.reserve(5000);
+
+	MaterialManager& manager = m_renderer.getMaterialManager();
 
 	for (auto& i : COMPONENT_INFOS)
 	{

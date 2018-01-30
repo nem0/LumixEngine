@@ -64,6 +64,7 @@ static const ComponentType DECAL_TYPE = Reflection::getComponentType("decal");
 static const ComponentType POINT_LIGHT_TYPE = Reflection::getComponentType("point_light");
 static const ComponentType GLOBAL_LIGHT_TYPE = Reflection::getComponentType("global_light");
 static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("renderable");
+static const ComponentType TEXT3D_TYPE = Reflection::getComponentType("text_mesh");
 static const ComponentType ENVIRONMENT_PROBE_TYPE = Reflection::getComponentType("environment_probe");
 
 
@@ -2384,14 +2385,14 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 
 	void getModelInstaces(Array<Entity>& entities, const Frustum& frustum, const Vec3& lod_ref_point, Entity camera) override
 	{
-		Array<Array<ModelInstanceMesh>>& res = m_render_scene->getModelInstanceInfos(frustum, lod_ref_point, camera, ~0ULL);
+		Array<Array<MeshInstance>>& res = m_render_scene->getModelInstanceInfos(frustum, lod_ref_point, camera, ~0ULL);
 		for (auto& sub : res)
 		{
-			for (ModelInstanceMesh m : sub)
+			for (MeshInstance m : sub)
 			{
-				if (entities.indexOf({m.model_instance.index}) < 0)
+				if (entities.indexOf(m.owner) < 0)
 				{
-					entities.push({ m.model_instance.index });
+					entities.push(m.owner);
 				}
 			}
 		}
@@ -2985,6 +2986,7 @@ LUMIX_STUDIO_ENTRY(renderer)
 	app.registerComponent("decal", "Render/Decal");
 	app.registerComponent("bone_attachment", "Render/Bone attachment");
 	app.registerComponent("environment_probe", "Render/Environment probe");
+	app.registerComponentWithResource("text_mesh", "Render/Text 3D", FontResource::TYPE, *Reflection::getProperty(MODEL_INSTANCE_TYPE, "Font"));
 
 	auto* add_terrain_plugin = LUMIX_NEW(allocator, AddTerrainComponentPlugin)(app);
 	app.registerComponent("terrain", *add_terrain_plugin);

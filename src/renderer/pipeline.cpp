@@ -312,6 +312,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 		MaterialManager& material_manager = renderer.getMaterialManager();
 		m_debug_line_material = (Material*)material_manager.load(Path("pipelines/editor/debugline.mat"));
+		m_text_mesh_material = (Material*)material_manager.load(Path("pipelines/common/textmesh.mat"));
 		m_draw2d_material = (Material*)material_manager.load(Path("pipelines/common/draw2d.mat"));
 		m_default_cubemap = (Texture*)renderer.getTextureManager().load(Path("pipelines/pbr/default_probe.dds"));
 		createParticleBuffers();
@@ -921,6 +922,30 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
+	void renderTextMeshes()
+	{
+		IAllocator& allocator = m_renderer.getEngine().getLIFOAllocator();
+		Array<TextMeshVertex> vertices(allocator);
+		vertices.reserve(1024);
+		m_scene->getTextMeshesVertices(vertices);
+
+		const bgfx::VertexDecl& decl = m_renderer.getBasicVertexDecl();
+		bgfx::TransientVertexBuffer vertex_buffer;
+		if (vertices.empty() || bgfx::getAvailTransientVertexBuffer(vertices.size(), decl) < (u32)vertices.size())
+		{
+			return;
+		}
+
+		bgfx::allocTransientVertexBuffer(&vertex_buffer, vertices.size(), decl);
+		copyMemory(vertex_buffer.data, &vertices[0], vertices.size() * sizeof(vertices[0]));
+
+		Texture* atlas_texture = m_renderer.getFontManager().getAtlasTexture();
+		bgfx::UniformHandle texture_uniform = m_text_mesh_material->getShader()->m_texture_slots[0].uniform_handle;
+		setTexture(0, atlas_texture->handle, texture_uniform);
+		render(vertex_buffer, vertices.size(), m_text_mesh_material->getRenderStates(), m_text_mesh_material->getShaderInstance());
+	}
+
+
 	void render2D()
 	{
 		auto resetDraw2D =  [this](){
@@ -1507,7 +1532,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 				0.5, 0.0, 0.0, 0.0, 0.0, ymul, 0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.5, 0.5, 0.5, 1.0);
 			shadowmap_info.matrices[i] = biasMatrix * (projection_matrix * view_matrix);
 
-			Array<ModelInstanceMesh> tmp_meshes(frame_allocator);
+			Array<MeshInstance> tmp_meshes(frame_allocator);
 			m_is_current_light_global = false;
 			Vec3 lod_ref_point = m_scene->getUniverse().getPosition(m_applied_camera);
 			m_scene->getPointLightInfluencedGeometry(light
@@ -2011,7 +2036,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	{
 		PROFILE_FUNCTION();
 
-		Array<ModelInstanceMesh> tmp_meshes(m_renderer.getEngine().getLIFOAllocator());
+		Array<MeshInstance> tmp_meshes(m_renderer.getEngine().getLIFOAllocator());
 		Vec3 lod_ref_point = m_scene->getUniverse().getPosition(m_applied_camera);
 		m_scene->getPointLightInfluencedGeometry(light, m_applied_camera, lod_ref_point, tmp_meshes);
 		renderMeshes(tmp_meshes);
@@ -2033,7 +2058,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			Vec3 lod_ref_point = m_scene->getUniverse().getPosition(m_applied_camera);
 
 			{
-				Array<ModelInstanceMesh> tmp_meshes(frame_allocator);
+				Array<MeshInstance> tmp_meshes(frame_allocator);
 				m_scene->getPointLightInfluencedGeometry(light
 					, m_applied_camera
 					, lod_ref_point
@@ -2533,6 +2558,22 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
+	void render(const bgfx::TransientVertexBuffer& vertex_buffer,
+		int num_vertices,
+		u64 render_states,
+		ShaderInstance& shader_instance)
+	{
+		ASSERT(m_current_view);
+		View& view = *m_current_view;
+		bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
+		bgfx::setState(view.render_state | render_states);
+		bgfx::setVertexBuffer(0, &vertex_buffer);
+		++m_stats.draw_call_count;
+		++m_stats.instance_count;
+		m_stats.triangle_count += num_vertices / 3;
+		bgfx::submit(m_current_view->bgfx_id, shader_instance.getProgramHandle(m_pass_idx));
+	}
+
 	LUMIX_FORCE_INLINE void renderRigidMeshInstanced(const Matrix& matrix, Mesh& mesh)
 	{
 		int instance_idx = mesh.instance_idx;
@@ -2800,7 +2841,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
-	void renderMeshes(const Array<ModelInstanceMesh>& meshes)
+	void renderMeshes(const Array<MeshInstance>& meshes)
 	{
 		PROFILE_FUNCTION();
 		if(meshes.empty()) return;
@@ -2809,7 +2850,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		PROFILE_INT("mesh count", meshes.size());
 		for(auto& mesh : meshes)
 		{
-			ModelInstance& model_instance = model_instances[mesh.model_instance.index];
+			ModelInstance& model_instance = model_instances[mesh.owner.index];
 			switch (mesh.mesh->type)
 			{
 				case Mesh::RIGID_INSTANCED:
@@ -2833,7 +2874,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
-	void renderMeshes(const Array<Array<ModelInstanceMesh>>& meshes)
+	void renderMeshes(const Array<Array<MeshInstance>>& meshes)
 	{
 		PROFILE_FUNCTION();
 		int mesh_count = 0;
@@ -2844,7 +2885,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			mesh_count += submeshes.size();
 			for (auto& mesh : submeshes)
 			{
-				ModelInstance& model_instance = model_instances[mesh.model_instance.index];
+				ModelInstance& model_instance = model_instances[mesh.owner.index];
 				switch (mesh.mesh->type)
 				{
 					case Mesh::RIGID_INSTANCED:
@@ -3094,7 +3135,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	bool m_is_ready;
 	Frustum m_camera_frustum;
 
-	Array<Array<ModelInstanceMesh>>* m_mesh_buffer;
+	Array<Array<MeshInstance>>* m_mesh_buffer;
 	Array<TerrainInfo> m_terrains_buffer;
 	Array<GrassInfo> m_grasses_buffer;
 
@@ -3136,6 +3177,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 	Material* m_debug_line_material;
 	Material* m_draw2d_material;
+	Material* m_text_mesh_material;
 	Texture* m_default_cubemap;
 	bgfx::DynamicVertexBufferHandle m_debug_vertex_buffers[32];
 	bgfx::DynamicIndexBufferHandle m_debug_index_buffer;
@@ -3393,6 +3435,7 @@ void Pipeline::registerLuaAPI(lua_State* L)
 			registerCFunction(#name, f); \
 		} while(false) \
 
+	REGISTER_FUNCTION(renderTextMeshes);
 	REGISTER_FUNCTION(render2D);
 	REGISTER_FUNCTION(drawQuad);
 	REGISTER_FUNCTION(getLayerMask);

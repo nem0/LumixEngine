@@ -269,6 +269,14 @@ static void registerProperties(IAllocator& allocator)
 			property("Cast shadows", LUMIX_PROP(RenderScene, LightCastShadows), 
 				MinAttribute(0))
 		),
+		component("text_mesh",
+			property("Text", LUMIX_PROP(RenderScene, TextMeshText)),
+			property("Font", LUMIX_PROP(RenderScene, TextMeshFontPath),
+				ResourceAttribute("Font (*.ttf)", FontResource::TYPE)),
+			property("Font Size", LUMIX_PROP(RenderScene, TextMeshFontSize)),
+			property("Color", LUMIX_PROP(RenderScene, TextMeshColorRGBA),
+				ColorAttribute())
+		),
 		component("decal",
 			property("Material", LUMIX_PROP(RenderScene, DecalMaterialPath),
 				ResourceAttribute("Material (*.mat)", Material::TYPE)),
