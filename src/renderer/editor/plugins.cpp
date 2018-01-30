@@ -64,7 +64,7 @@ static const ComponentType DECAL_TYPE = Reflection::getComponentType("decal");
 static const ComponentType POINT_LIGHT_TYPE = Reflection::getComponentType("point_light");
 static const ComponentType GLOBAL_LIGHT_TYPE = Reflection::getComponentType("global_light");
 static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("renderable");
-static const ComponentType TEXT3D_TYPE = Reflection::getComponentType("text_mesh");
+static const ComponentType TEXT_MESH_TYPE = Reflection::getComponentType("text_mesh");
 static const ComponentType ENVIRONMENT_PROBE_TYPE = Reflection::getComponentType("environment_probe");
 
 
@@ -2986,7 +2986,7 @@ LUMIX_STUDIO_ENTRY(renderer)
 	app.registerComponent("decal", "Render/Decal");
 	app.registerComponent("bone_attachment", "Render/Bone attachment");
 	app.registerComponent("environment_probe", "Render/Environment probe");
-	app.registerComponentWithResource("text_mesh", "Render/Text 3D", FontResource::TYPE, *Reflection::getProperty(MODEL_INSTANCE_TYPE, "Font"));
+	app.registerComponentWithResource("text_mesh", "Render/Text 3D", FontResource::TYPE, *Reflection::getProperty(TEXT_MESH_TYPE, "Font"));
 
 	auto* add_terrain_plugin = LUMIX_NEW(allocator, AddTerrainComponentPlugin)(app);
 	app.registerComponent("terrain", *add_terrain_plugin);
