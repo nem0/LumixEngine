@@ -396,6 +396,7 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 			header.height = (short)height;
 			header.width = (short)width;
 			header.dataType = 2;
+			header.imageDescriptor = 32;
 
 			FS::OsFile file;
 			if(!file.open(filePath, FS::Mode::CREATE_AND_WRITE))
