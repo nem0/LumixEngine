@@ -686,7 +686,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	{
 		const GUIRect& rect = *m_rects[entity];
 		serializer.write("font", rect.text->font_resource ? rect.text->font_resource->getPath().c_str() : "");
-		serializer.write("color", (int)rect.text->horizontal_align);
+		serializer.write("align", (int)rect.text->horizontal_align);
 		serializer.write("color", rect.text->color);
 		serializer.write("font_size", rect.text->font_size);
 		serializer.write("text", rect.text->text.c_str());

@@ -79,9 +79,9 @@ struct ModelInstance
 };
 
 
-struct ModelInstanceMesh
+struct MeshInstance
 {
-	Entity model_instance;
+	Entity owner;
 	Mesh* mesh;
 	float depth;
 };
@@ -125,6 +125,14 @@ struct DebugPoint
 	Vec3 pos;
 	u32 color;
 	float life;
+};
+
+
+struct TextMeshVertex
+{
+	Vec3 pos;
+	u32 color;
+	Vec2 tex_coord;
 };
 
 
@@ -309,7 +317,7 @@ public:
 	virtual Path getModelInstanceMaterial(Entity entity, int index) = 0;
 	virtual int getModelInstanceMaterialsCount(Entity entity) = 0;
 	virtual void setModelInstancePath(Entity entity, const Path& path) = 0;
-	virtual Array<Array<ModelInstanceMesh>>& getModelInstanceInfos(const Frustum& frustum,
+	virtual Array<Array<MeshInstance>>& getModelInstanceInfos(const Frustum& frustum,
 		const Vec3& lod_ref_point,
 		Entity entity,
 		u64 layer_mask) = 0;
@@ -364,12 +372,12 @@ public:
 	virtual void getPointLightInfluencedGeometry(Entity light,
 		Entity camera,
 		const Vec3& lod_ref_point, 
-		Array<ModelInstanceMesh>& infos) = 0;
+		Array<MeshInstance>& infos) = 0;
 	virtual void getPointLightInfluencedGeometry(Entity light,
 		Entity camera,
 		const Vec3& lod_ref_point,
 		const Frustum& frustum,
-		Array<ModelInstanceMesh>& infos) = 0;
+		Array<MeshInstance>& infos) = 0;
 	virtual void setLightCastShadows(Entity entity, bool cast_shadows) = 0;
 	virtual bool getLightCastShadows(Entity entity) = 0;
 	virtual float getLightAttenuation(Entity entity) = 0;
@@ -419,6 +427,16 @@ public:
 	virtual void reloadEnvironmentProbe(Entity entity) = 0;
 	virtual Entity getNearestEnvironmentProbe(const Vec3& pos) const = 0;
 	virtual u64 getEnvironmentProbeGUID(Entity entity) const = 0;
+
+	virtual void setTextMeshText(Entity entity, const char* text) = 0;
+	virtual const char* getTextMeshText(Entity entity) = 0;
+	virtual void setTextMeshFontSize(Entity entity, int value) = 0;
+	virtual int getTextMeshFontSize(Entity entity) = 0;
+	virtual Vec4 getTextMeshColorRGBA(Entity entity) = 0;
+	virtual void setTextMeshColorRGBA(Entity entity, const Vec4& color) = 0;
+	virtual Path getTextMeshFontPath(Entity entity) = 0;
+	virtual void setTextMeshFontPath(Entity entity, const Path& path) = 0;
+	virtual void getTextMeshesVertices(Array<TextMeshVertex>& vertices) = 0;
 
 protected:
 	virtual ~RenderScene() {}
