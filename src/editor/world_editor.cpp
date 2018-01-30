@@ -1613,8 +1613,8 @@ private:
 			InputBlob blob(m_old_values);
 			for (Entity entity : m_entities)
 			{
-				universe->createComponent(cmp.type, cmp.entity);
 				cmp.entity = entity;
+				universe->createComponent(cmp.type, cmp.entity);
 				::Lumix::load(cmp, -1, blob);
 			}
 		}
