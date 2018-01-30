@@ -604,6 +604,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 		m_debug_line_material->getResourceManager().unload(*m_debug_line_material);
 		m_draw2d_material->getResourceManager().unload(*m_draw2d_material);
+		m_text_mesh_material->getResourceManager().unload(*m_text_mesh_material);
 		m_default_cubemap->getResourceManager().unload(*m_default_cubemap);
 
 		destroyUniforms();
@@ -924,6 +925,8 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 	void renderTextMeshes()
 	{
+		if (!m_text_mesh_material->isReady()) return;
+
 		IAllocator& allocator = m_renderer.getEngine().getLIFOAllocator();
 		Array<TextMeshVertex> vertices(allocator);
 		vertices.reserve(1024);
