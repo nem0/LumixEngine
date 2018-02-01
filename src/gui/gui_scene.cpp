@@ -1060,7 +1060,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	{
 		GUIRect* rect = m_rects[entity];
 		rect->flags.set(GUIRect::IS_VALID, false);
-		if (rect->image == nullptr && rect->text == nullptr)
+		if (rect->image == nullptr && rect->text == nullptr && rect->input_field == nullptr)
 		{
 			LUMIX_DELETE(m_allocator, rect);
 			m_rects.erase(entity);
