@@ -1693,12 +1693,11 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 				controller.gravity_speed = 0;
 			}
 
-			const PxExtendedVec3& p = controller.m_controller->getPosition();
 			PxControllerFilters filters(nullptr, &controller.m_filter_callback);
 			controller.m_controller->move(toPhysx(dif), 0.001f, time_delta, filters);
+			PxExtendedVec3 p = controller.m_controller->getFootPosition();
 
-			float y = (float)p.y - controller.m_height * 0.5f - controller.m_radius;
-			m_universe.setPosition(controller.m_entity, (float)p.x, y, (float)p.z);
+			m_universe.setPosition(controller.m_entity, (float)p.x, (float)p.y, (float)p.z);
 		}
 	}
 
@@ -2527,10 +2526,8 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		{
 			auto& controller = m_controllers.at(ctrl_idx);
 			Vec3 pos = m_universe.getPosition(entity);
-			pos.y += controller.m_height * 0.5f;
-			pos.y += controller.m_radius;
 			PxExtendedVec3 pvec(pos.x, pos.y, pos.z);
-			controller.m_controller->setPosition(pvec);
+			controller.m_controller->setFootPosition(pvec);
 		}
 
 		int ragdoll_idx = m_ragdolls.find(entity);
@@ -3307,6 +3304,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			shapes[i]->setSimulationFilterData(data);
 		}
 		c.m_controller->invalidateCache();
+		c.m_controller->setFootPosition({position.x, position.y, position.z});
 
 		m_universe.onComponentCreated(entity, CONTROLLER_TYPE, this);
 	}
@@ -4735,6 +4733,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			c.m_controller = m_controller_manager->createController(cDesc);
 			c.m_controller->getActor()->userData = (void*)(intptr_t)entity.index;
 			c.m_entity = entity;
+			c.m_controller->setFootPosition({position.x, position.y, position.z});
 			m_universe.onComponentCreated(entity, CONTROLLER_TYPE, this);
 		}
 	}
