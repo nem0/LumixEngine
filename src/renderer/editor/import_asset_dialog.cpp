@@ -415,6 +415,20 @@ struct FBXImporter
 			}
 		}
 
+		for (int i = 0, n = scene.getAnimationStackCount(); i < n; ++i)
+		{
+			const ofbx::AnimationStack* stack = scene.getAnimationStack(i);
+			for (int j = 0; stack->getLayer(j); ++j)
+			{
+				const ofbx::AnimationLayer* layer = stack->getLayer(j);
+				for (int k = 0; layer->getCurveNode(k); ++k)
+				{
+					const ofbx::AnimationCurveNode* node = layer->getCurveNode(k);
+					if (node->getBone()) bones.push(node->getBone());
+				}
+			}
+		}
+
 		bones.removeDuplicates();
 		sortBones();
 	}
