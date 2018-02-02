@@ -186,26 +186,40 @@ void Animation::getRelativePose(float time, Pose& pose, Model& model, BoneMask* 
 			if (!iter.isValid()) continue;
 			if (mask && mask->bones.find(bone.name) == mask->bones.end()) continue;
 
-			int idx = 1;
-			for (int c = bone.pos_count; idx < c; ++idx)
-			{
-				if (bone.pos_times[idx] > frame) break;
-			}
-
-			float t = float(time - bone.pos_times[idx - 1] * rcp_fps) /
-				((bone.pos_times[idx] - bone.pos_times[idx - 1]) * rcp_fps);
 			int model_bone_index = iter.value();
-			lerp(bone.pos[idx - 1], bone.pos[idx], &pos[model_bone_index], t);
-
-			idx = 1;
-			for (int c = bone.rot_count; idx < c; ++idx)
+			if (bone.pos_count > 1)
 			{
-				if (bone.rot_times[idx] > frame) break;
-			}
+				int idx = 1;
+				for (int c = bone.pos_count; idx < c; ++idx)
+				{
+					if (bone.pos_times[idx] > frame) break;
+				}
 
-			t = float(time - bone.rot_times[idx - 1] * rcp_fps) /
-				((bone.rot_times[idx] - bone.rot_times[idx - 1]) * rcp_fps);
-			nlerp(bone.rot[idx - 1], bone.rot[idx], &rot[model_bone_index], t);
+				float t = float(time - bone.pos_times[idx - 1] * rcp_fps) /
+					((bone.pos_times[idx] - bone.pos_times[idx - 1]) * rcp_fps);
+				lerp(bone.pos[idx - 1], bone.pos[idx], &pos[model_bone_index], t);
+			}
+			else if (bone.pos_count > 0)
+			{
+				pos[model_bone_index] = bone.pos[0];
+			}
+			
+			if (bone.rot_count > 1)
+			{
+				int idx = 1;
+				for (int c = bone.rot_count; idx < c; ++idx)
+				{
+					if (bone.rot_times[idx] > frame) break;
+				}
+
+				float t = float(time - bone.rot_times[idx - 1] * rcp_fps) /
+					((bone.rot_times[idx] - bone.rot_times[idx - 1]) * rcp_fps);
+				nlerp(bone.rot[idx - 1], bone.rot[idx], &rot[model_bone_index], t);
+			}
+			else if (bone.rot_count > 0)
+			{
+				rot[model_bone_index] = bone.rot[0];
+			}
 		}
 	}
 	else
