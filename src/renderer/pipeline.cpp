@@ -21,6 +21,7 @@
 #include "renderer/render_scene.h"
 #include "renderer/renderer.h"
 #include "renderer/shader.h"
+#include "renderer/shader_manager.h"
 #include "renderer/terrain.h"
 #include "renderer/texture.h"
 #include "renderer/texture_manager.h"
@@ -311,8 +312,9 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		createUniforms();
 
 		MaterialManager& material_manager = renderer.getMaterialManager();
+		ShaderManager& shader_manager = renderer.getShaderManager();
 		m_debug_line_material = (Material*)material_manager.load(Path("pipelines/editor/debugline.mat"));
-		m_text_mesh_material = (Material*)material_manager.load(Path("pipelines/common/textmesh.mat"));
+		m_text_mesh_shader = (Shader*)shader_manager.load(Path("pipelines/common/textmesh.shd"));
 		m_draw2d_material = (Material*)material_manager.load(Path("pipelines/common/draw2d.mat"));
 		m_default_cubemap = (Texture*)renderer.getTextureManager().load(Path("pipelines/pbr/default_probe.dds"));
 		createParticleBuffers();
@@ -604,7 +606,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 		m_debug_line_material->getResourceManager().unload(*m_debug_line_material);
 		m_draw2d_material->getResourceManager().unload(*m_draw2d_material);
-		m_text_mesh_material->getResourceManager().unload(*m_text_mesh_material);
+		m_text_mesh_shader->getResourceManager().unload(*m_text_mesh_shader);
 		m_default_cubemap->getResourceManager().unload(*m_default_cubemap);
 
 		destroyUniforms();
@@ -925,7 +927,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 	void renderTextMeshes()
 	{
-		if (!m_text_mesh_material->isReady()) return;
+		if (!m_text_mesh_shader->isReady()) return;
 
 		IAllocator& allocator = m_renderer.getEngine().getLIFOAllocator();
 		Array<TextMeshVertex> vertices(allocator);
@@ -934,18 +936,18 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 		const bgfx::VertexDecl& decl = m_renderer.getBasicVertexDecl();
 		bgfx::TransientVertexBuffer vertex_buffer;
-		if (vertices.empty() || bgfx::getAvailTransientVertexBuffer(vertices.size(), decl) < (u32)vertices.size())
-		{
-			return;
-		}
+		if (vertices.empty()) return;
+		if (bgfx::getAvailTransientVertexBuffer(vertices.size(), decl) < (u32)vertices.size()) return;
 
 		bgfx::allocTransientVertexBuffer(&vertex_buffer, vertices.size(), decl);
 		copyMemory(vertex_buffer.data, &vertices[0], vertices.size() * sizeof(vertices[0]));
 
 		Texture* atlas_texture = m_renderer.getFontManager().getAtlasTexture();
-		bgfx::UniformHandle texture_uniform = m_text_mesh_material->getShader()->m_texture_slots[0].uniform_handle;
+		bgfx::UniformHandle texture_uniform = m_text_mesh_shader->m_texture_slots[0].uniform_handle;
 		setTexture(0, atlas_texture->handle, texture_uniform);
-		render(vertex_buffer, vertices.size(), m_text_mesh_material->getRenderStates(), m_text_mesh_material->getShaderInstance());
+		ShaderInstance& shader_instance = m_text_mesh_shader->getInstance(0);
+		u64 state = m_text_mesh_shader->m_render_states & ~BGFX_STATE_CULL_MASK;
+		render(vertex_buffer, vertices.size(), state, shader_instance);
 	}
 
 
@@ -3180,7 +3182,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 	Material* m_debug_line_material;
 	Material* m_draw2d_material;
-	Material* m_text_mesh_material;
+	Shader* m_text_mesh_shader;
 	Texture* m_default_cubemap;
 	bgfx::DynamicVertexBufferHandle m_debug_vertex_buffers[32];
 	bgfx::DynamicIndexBufferHandle m_debug_index_buffer;
