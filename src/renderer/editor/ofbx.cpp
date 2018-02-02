@@ -1267,7 +1267,6 @@ struct AnimationStackImpl : AnimationStack
 
 	const AnimationLayer* getLayer(int index) const override
 	{
-		assert(index == 0);
 		return resolveObjectLink<AnimationLayer>(index);
 	}
 
@@ -1447,6 +1446,12 @@ struct AnimationCurveNodeImpl : AnimationCurveNode
 	}
 
 
+	const Object* getBone() const override
+	{
+		return bone;
+	}
+
+
 	Vec3 getNodeLocalTransform(double time) const override
 	{
 		u64 fbx_time = secondsToFbxTime(time);
@@ -1505,6 +1510,12 @@ struct AnimationLayerImpl : AnimationLayer
 
 	Type getType() const override { return Type::ANIMATION_LAYER; }
 
+
+	const AnimationCurveNode* getCurveNode(int index) const override
+	{
+		if (index >= curve_nodes.size() || index < 0) return nullptr;
+		return curve_nodes[index];
+	}
 
 
 	const AnimationCurveNode* getCurveNode(const Object& bone, const char* prop) const override
