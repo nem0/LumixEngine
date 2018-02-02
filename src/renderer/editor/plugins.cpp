@@ -2008,7 +2008,7 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 	{
 		m_model_index = -1;
 		auto& rm = m_editor.getEngine().getResourceManager();
-		Path shader_path("pipelines/editor/debugline.shd");
+		Path shader_path("pipelines/common/debugline.shd");
 		m_shader = static_cast<Shader*>(rm.get(Shader::TYPE)->load(shader_path));
 
 		editor.universeCreated().bind<RenderInterfaceImpl, &RenderInterfaceImpl::onUniverseCreated>(this);

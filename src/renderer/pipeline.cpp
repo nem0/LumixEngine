@@ -276,8 +276,9 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		, m_uniforms(allocator)
 		, m_renderer(renderer)
 		, m_default_framebuffer(nullptr)
-		, m_debug_line_material(nullptr)
-		, m_draw2d_material(nullptr)
+		, m_debug_line_shader(nullptr)
+		, m_draw2d_shader(nullptr)
+		, m_text_mesh_shader(nullptr)
 		, m_default_cubemap(nullptr)
 		, m_debug_flags(BGFX_DEBUG_TEXT)
 		, m_point_light_shadowmaps(allocator)
@@ -311,11 +312,10 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 		createUniforms();
 
-		MaterialManager& material_manager = renderer.getMaterialManager();
 		ShaderManager& shader_manager = renderer.getShaderManager();
-		m_debug_line_material = (Material*)material_manager.load(Path("pipelines/editor/debugline.mat"));
+		m_debug_line_shader = (Shader*)shader_manager.load(Path("pipelines/common/debugline.shd"));
 		m_text_mesh_shader = (Shader*)shader_manager.load(Path("pipelines/common/textmesh.shd"));
-		m_draw2d_material = (Material*)material_manager.load(Path("pipelines/common/draw2d.mat"));
+		m_draw2d_shader = (Shader*)shader_manager.load(Path("pipelines/common/draw2d.shd"));
 		m_default_cubemap = (Texture*)renderer.getTextureManager().load(Path("pipelines/pbr/default_probe.dds"));
 		createParticleBuffers();
 		createCubeBuffers();
@@ -604,8 +604,8 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			luaL_unref(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
 		}
 
-		m_debug_line_material->getResourceManager().unload(*m_debug_line_material);
-		m_draw2d_material->getResourceManager().unload(*m_draw2d_material);
+		m_debug_line_shader->getResourceManager().unload(*m_debug_line_shader);
+		m_draw2d_shader->getResourceManager().unload(*m_draw2d_shader);
 		m_text_mesh_shader->getResourceManager().unload(*m_text_mesh_shader);
 		m_default_cubemap->getResourceManager().unload(*m_default_cubemap);
 
@@ -964,7 +964,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		Vec2 size((float)getWidth(), (float)getHeight());
 		Matrix ortho;
 
-		if (!m_draw2d_material->isReady())
+		if (!m_draw2d_shader->isReady())
 		{
 			resetDraw2D();
 			return;
@@ -996,6 +996,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		u32 elem_offset = 0;
 		const Draw2D::DrawCmd* pcmd_begin = m_draw2d.CmdBuffer.begin();
 		const Draw2D::DrawCmd* pcmd_end = m_draw2d.CmdBuffer.end();
+		ShaderInstance& shader_instance = m_draw2d_shader->getInstance(0);
 		for (const Draw2D::DrawCmd* pcmd = pcmd_begin; pcmd != pcmd_end; pcmd++)
 		{
 			if (0 == pcmd->ElemCount) continue;
@@ -1008,15 +1009,15 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			Texture* atlas_texture = m_renderer.getFontManager().getAtlasTexture();
 			const bgfx::TextureHandle& texture_id =
 			pcmd->TextureId ? *(bgfx::TextureHandle*)pcmd->TextureId : atlas_texture->handle;
-			auto texture_uniform = m_draw2d_material->getShader()->m_texture_slots[0].uniform_handle;
+			auto texture_uniform = m_draw2d_shader->m_texture_slots[0].uniform_handle;
 			setTexture(0, texture_id, texture_uniform);
 			render(vertex_buffer,
 				index_buffer,
 				Matrix::IDENTITY,
 				elem_offset,
 				pcmd->ElemCount,
-				m_draw2d_material->getRenderStates(),
-				m_draw2d_material->getShaderInstance());
+				m_draw2d_shader->m_render_states & ~BGFX_STATE_CULL_MASK,
+				shader_instance);
 				
 			elem_offset += pcmd->ElemCount;
 		}
@@ -1719,11 +1720,12 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		if (!m_current_view) return;
 
 		const Array<DebugPoint>& points = m_scene->getDebugPoints();
-		if (points.empty() || !m_debug_line_material->isReady()) return;
+		if (points.empty() || !m_debug_line_shader->isReady()) return;
 
 		static const int BATCH_SIZE = 0xffff;
 		View& view = *m_current_view;
 
+		ShaderInstance& shader_instance = m_debug_line_shader->getInstance(0);
 		for (int j = 0; j < points.size() && m_debug_buffer_idx < lengthOf(m_debug_vertex_buffers);
 			j += BATCH_SIZE, ++m_debug_buffer_idx)
 		{
@@ -1753,9 +1755,9 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			bgfx::setVertexBuffer(0, m_debug_vertex_buffers[m_debug_buffer_idx]);
 			bgfx::setIndexBuffer(m_debug_index_buffer, 0, point_count);
 			bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
-			bgfx::setState(view.render_state | m_debug_line_material->getRenderStates() | BGFX_STATE_PT_POINTS);
+			bgfx::setState(view.render_state | m_debug_line_shader->m_render_states | BGFX_STATE_PT_POINTS);
 			bgfx::submit(
-				m_current_view->bgfx_id, m_debug_line_material->getShaderInstance().getProgramHandle(m_pass_idx));
+				m_current_view->bgfx_id, shader_instance.getProgramHandle(m_pass_idx));
 		}
 	}
 
@@ -1765,11 +1767,12 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		if (!m_current_view) return;
 
 		const Array<DebugLine>& lines = m_scene->getDebugLines();
-		if (lines.empty() || !m_debug_line_material->isReady()) return;
+		if (lines.empty() || !m_debug_line_shader->isReady()) return;
 
 		static const int BATCH_SIZE = 0xffff / 2;
 		View& view = *m_current_view;
 
+		ShaderInstance& shader_instance = m_debug_line_shader->getInstance(0);
 		for (int j = 0; j < lines.size() && m_debug_buffer_idx < lengthOf(m_debug_vertex_buffers);
 			 j += BATCH_SIZE, ++m_debug_buffer_idx)
 		{
@@ -1805,9 +1808,9 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			bgfx::setVertexBuffer(0, m_debug_vertex_buffers[m_debug_buffer_idx]);
 			bgfx::setIndexBuffer(m_debug_index_buffer, 0, line_count * 2);
 			bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
-			bgfx::setState(view.render_state | m_debug_line_material->getRenderStates() | BGFX_STATE_PT_LINES);
+			bgfx::setState(view.render_state | m_debug_line_shader->m_render_states | BGFX_STATE_PT_LINES);
 			bgfx::submit(
-				m_current_view->bgfx_id, m_debug_line_material->getShaderInstance().getProgramHandle(m_pass_idx));
+				m_current_view->bgfx_id, shader_instance.getProgramHandle(m_pass_idx));
 		}
 	}
 
@@ -1817,11 +1820,12 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		if (!m_current_view) return;
 
 		const auto& tris = m_scene->getDebugTriangles();
-		if(tris.empty() || !m_debug_line_material->isReady()) return;
+		if(tris.empty() || !m_debug_line_shader->isReady()) return;
 
 		static const int BATCH_SIZE = 0xffFF / 3;
 		View& view = *m_current_view;
 
+		ShaderInstance& shader_instance = m_debug_line_shader->getInstance(0);
 		for (int j = 0; j < tris.size() && m_debug_buffer_idx < lengthOf(m_debug_vertex_buffers);
 			 j += BATCH_SIZE, ++m_debug_buffer_idx)
 		{
@@ -1863,9 +1867,9 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			bgfx::setVertexBuffer(0, m_debug_vertex_buffers[m_debug_buffer_idx]);
 			bgfx::setIndexBuffer(m_debug_index_buffer, 0, tri_count * 3);
 			bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
-			bgfx::setState(view.render_state | m_debug_line_material->getRenderStates());
+			bgfx::setState(view.render_state | m_debug_line_shader->m_render_states);
 			bgfx::submit(
-				m_current_view->bgfx_id, m_debug_line_material->getShaderInstance().getProgramHandle(m_pass_idx));
+				m_current_view->bgfx_id, shader_instance.getProgramHandle(m_pass_idx));
 		}
 	}
 
@@ -3180,8 +3184,8 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	int m_global_textures_count;
 	int m_layer_to_view_map[64];
 
-	Material* m_debug_line_material;
-	Material* m_draw2d_material;
+	Shader* m_debug_line_shader;
+	Shader* m_draw2d_shader;
 	Shader* m_text_mesh_shader;
 	Texture* m_default_cubemap;
 	bgfx::DynamicVertexBufferHandle m_debug_vertex_buffers[32];
