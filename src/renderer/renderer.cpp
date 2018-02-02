@@ -605,6 +605,7 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 
 	ModelManager& getModelManager() override { return m_model_manager; }
 	MaterialManager& getMaterialManager() override { return m_material_manager; }
+	ShaderManager& getShaderManager() override { return m_shader_manager; }
 	TextureManager& getTextureManager() override { return m_texture_manager; }
 	FontManager& getFontManager() override { return *m_font_manager; }
 	const bgfx::VertexDecl& getBasicVertexDecl() const override { return m_basic_vertex_decl; }
