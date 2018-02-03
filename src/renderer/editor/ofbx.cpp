@@ -1918,7 +1918,7 @@ static void splat(std::vector<T>* out,
 	GeometryImpl::VertexDataMapping mapping,
 	const std::vector<T>& data,
 	const std::vector<int>& indices,
-	const std::vector<int>& to_old_vertices)
+	const std::vector<int>& original_indices)
 {
 	assert(out);
 	assert(!data.empty());
@@ -1947,12 +1947,14 @@ static void splat(std::vector<T>* out,
 		// uv0 uv1 ...
 		assert(indices.empty());
 
-		out->resize(to_old_vertices.size());
+		out->resize(original_indices.size());
 
 		int data_size = (int)data.size();
-		for (int i = 0, c = (int)to_old_vertices.size(); i < c; ++i)
+		for (int i = 0, c = (int)original_indices.size(); i < c; ++i)
 		{
-			if(to_old_vertices[i] < data_size) (*out)[i] = data[to_old_vertices[i]];
+			int idx = original_indices[i];
+			if (idx < 0) idx = -idx - 1;
+			if(idx < data_size) (*out)[i] = data[idx];
 			else (*out)[i] = T();
 		}
 	}
@@ -2119,7 +2121,7 @@ static OptionalError<Object*> parseGeometry(const Scene& scene, const Element& e
 		GeometryImpl::VertexDataMapping mapping;
 		if (!parseVertexData(*layer_uv_element, "UV", "UVIndex", &tmp, &tmp_indices, &mapping)) return Error("Invalid UVs");
 		geom->uvs.resize(tmp_indices.empty() ? tmp.size() : tmp_indices.size());
-		splat(&geom->uvs, mapping, tmp, tmp_indices, geom->to_old_vertices);
+		splat(&geom->uvs, mapping, tmp, tmp_indices, original_indices);
 		remap(&geom->uvs, to_old_indices);
 	}
 
@@ -2137,7 +2139,7 @@ static OptionalError<Object*> parseGeometry(const Scene& scene, const Element& e
 		{
 			if (!parseVertexData(*layer_tangent_element, "Tangent", "TangentIndex", &tmp, &tmp_indices, &mapping))  return Error("Invalid tangets");
 		}
-		splat(&geom->tangents, mapping, tmp, tmp_indices, geom->to_old_vertices);
+		splat(&geom->tangents, mapping, tmp, tmp_indices, original_indices);
 		remap(&geom->tangents, to_old_indices);
 	}
 
@@ -2148,7 +2150,7 @@ static OptionalError<Object*> parseGeometry(const Scene& scene, const Element& e
 		std::vector<int> tmp_indices;
 		GeometryImpl::VertexDataMapping mapping;
 		if (!parseVertexData(*layer_color_element, "Colors", "ColorIndex", &tmp, &tmp_indices, &mapping)) return Error("Invalid colors");
-		splat(&geom->colors, mapping, tmp, tmp_indices, geom->to_old_vertices);
+		splat(&geom->colors, mapping, tmp, tmp_indices, original_indices);
 		remap(&geom->colors, to_old_indices);
 	}
 
@@ -2159,7 +2161,7 @@ static OptionalError<Object*> parseGeometry(const Scene& scene, const Element& e
 		std::vector<int> tmp_indices;
 		GeometryImpl::VertexDataMapping mapping;
 		if (!parseVertexData(*layer_normal_element, "Normals", "NormalsIndex", &tmp, &tmp_indices, &mapping)) return Error("Invalid normals");
-		splat(&geom->normals, mapping, tmp, tmp_indices, geom->to_old_vertices);
+		splat(&geom->normals, mapping, tmp, tmp_indices, original_indices);
 		remap(&geom->normals, to_old_indices);
 	}
 
