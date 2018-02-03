@@ -350,14 +350,17 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 			props[i].name = scene.getPropertyName(entity, script_index, i);
 		}
 
-		qsort(&props[0], props.size(), sizeof(props[0]), [](const void* a, const void* b) -> int {
-			auto* pa = (SortedProperty*)a;
-			auto* pb = (SortedProperty*)b;
+		if (!props.empty())
+		{
+			qsort(&props[0], props.size(), sizeof(props[0]), [](const void* a, const void* b) -> int {
+				auto* pa = (SortedProperty*)a;
+				auto* pb = (SortedProperty*)b;
 
-			if (!pa->name) return -1;
-			if (!pb->name) return 1;
-			return compareString(pa->name, pb->name);
-		});
+				if (!pa->name) return -1;
+				if (!pb->name) return 1;
+				return compareString(pa->name, pb->name);
+			});
+		}
 	}
 
 
