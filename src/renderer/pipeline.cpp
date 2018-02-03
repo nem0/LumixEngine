@@ -292,6 +292,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		, m_height(-1)
 		, m_define(define, allocator)
 		, m_draw2d(allocator)
+		, m_is_first_render(true)
 	{
 		for (auto& handle : m_debug_vertex_buffers)
 		{
@@ -515,7 +516,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	int m_lua_thread_ref;
 	int m_lua_env;
 	Stats m_stats;
-
+	bool m_is_first_render;
 
 	void createParticleBuffers()
 	{
@@ -2954,8 +2955,19 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	{
 		PROFILE_FUNCTION();
 
-		if (!isReady()) return false;
-		if (!m_scene) return false;
+		if (!isReady() || !m_scene)
+		{
+			m_is_first_render = true;
+			return false;
+		}
+
+		if (m_is_first_render)
+		{
+			// m_draw2d might accumulate too much data to render while pipeline was not ready
+			// so we clear it on the first frame
+			m_is_first_render = false;
+			m_draw2d.Clear();
+		}
 
 		m_stats = {};
 		m_applied_camera = INVALID_ENTITY;
