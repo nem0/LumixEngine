@@ -920,16 +920,15 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		Entity entity = controller.entity;
 		if (!m_universe.hasComponent(entity, MODEL_INSTANCE_TYPE)) return;
 
+		Model* model = m_render_scene->getModelInstanceModel(entity);
+		if (!model || !model->isReady()) return;
+			
 		Pose* pose = m_render_scene->lockPose(entity);
 		if (!pose) return;
-
-		Model* model = m_render_scene->getModelInstanceModel(entity);
 
 		model->getRelativePose(*pose);
 
 		controller.root->fillPose(m_engine, *pose, *model, 1, nullptr);
-
-		pose->computeAbsolute(*model);
 
 		for (Controller::IK& ik : controller.inverse_kinematics)
 		{
@@ -937,73 +936,123 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 
 			updateIK(ik, *pose, *model);
 		}
+
+		pose->computeAbsolute(*model);
 		m_render_scene->unlockPose(entity, true);
+	}
+
+	static RigidTransform getAbsolutePosition(const Pose& pose, const Model& model, int bone_index)
+	{
+		RigidTransform t(Vec3::ZERO, Quat::IDENTITY);
+		const Model::Bone& bone = model.getBone(bone_index);
+		RigidTransform bone_transform(pose.positions[bone_index], pose.rotations[bone_index]);
+		if (bone.parent_idx < 0)
+		{
+			return bone_transform;
+		}
+		return getAbsolutePosition(pose, model, bone.parent_idx) * bone_transform;
 	}
 
 
 	static void updateIK(Controller::IK& ik, Pose& pose, Model& model)
 	{
-		decltype(model.getBoneIndex(0)) bones_iters[Controller::IK::MAX_BONES_COUNT];
-		for (int i = 0; i < ik.bones_count; ++i)
-		{
-			bones_iters[i] = model.getBoneIndex(ik.bones[i]);
-			if (!bones_iters[i].isValid()) return;
-		}
-		
 		int indices[Controller::IK::MAX_BONES_COUNT];
-		Vec3 pos[Controller::IK::MAX_BONES_COUNT];
+		RigidTransform transforms[Controller::IK::MAX_BONES_COUNT];
+		Vec3 old_pos[Controller::IK::MAX_BONES_COUNT];
 		float len[Controller::IK::MAX_BONES_COUNT - 1];
 		float len_sum = 0;
 		for (int i = 0; i < ik.bones_count; ++i)
 		{
-			indices[i] = bones_iters[i].value();
-			pos[i] = pose.positions[indices[i]];
+			auto iter = model.getBoneIndex(ik.bones[i]);
+			if (!iter.isValid()) return;
+
+			indices[i] = iter.value();
+		}
+
+		// convert from bone space to object space
+		const Model::Bone& first_bone = model.getBone(indices[0]);
+		RigidTransform roots_parent;
+		if (first_bone.parent_idx >= 0)
+		{
+			roots_parent = getAbsolutePosition(pose, model, first_bone.parent_idx);
+		}
+		else
+		{
+			roots_parent.pos = Vec3::ZERO;
+			roots_parent.rot = Quat::IDENTITY;
+		}
+
+		RigidTransform parent_tr = roots_parent;
+		for (int i = 0; i < ik.bones_count; ++i)
+		{
+			RigidTransform tr(pose.positions[indices[i]], pose.rotations[indices[i]]);
+			transforms[i] = parent_tr * tr;
+			old_pos[i] = transforms[i].pos;
 			if (i > 0)
 			{
-				len[i - 1] = (pos[i] - pos[i - 1]).length();
+				len[i - 1] = (transforms[i].pos - transforms[i - 1].pos).length();
 				len_sum += len[i - 1];
 			}
+			parent_tr = transforms[i];
 		}
 
 		Vec3 target = ik.target;
-		Vec3 to_target = target - pos[0];
+		Vec3 to_target = target - transforms[0].pos;
 		if (len_sum * len_sum < to_target.squaredLength()) {
 			to_target.normalize();
-			target = pos[0] + to_target * len_sum;
+			target = transforms[0].pos + to_target * len_sum;
 		}
 
 		for (int iteration = 0; iteration < ik.max_iterations; ++iteration)
 		{
-			pos[ik.bones_count - 1] = target;
+			transforms[ik.bones_count - 1].pos = target;
 			
-			// backward
-			for (int i = ik.bones_count - 1; i > 0; --i)
+			for (int i = ik.bones_count - 1; i > 1; --i)
 			{
-				Vec3 dir = (pos[i - 1] - pos[i]).normalized();
-				pos[i - 1] = pos[i] + dir * len[i - 1];
+				Vec3 dir = (transforms[i - 1].pos - transforms[i].pos).normalized();
+				transforms[i - 1].pos = transforms[i].pos + dir * len[i - 1];
 			}
 
-			// backward
 			for (int i = 1; i < ik.bones_count; ++i)
 			{
-				Vec3 dir = (pos[i] - pos[i - 1]).normalized();
-				pos[i] = pos[i - 1] + dir * len[i - 1];
+				Vec3 dir = (transforms[i].pos - transforms[i - 1].pos).normalized();
+				transforms[i].pos = transforms[i - 1].pos + dir * len[i - 1];
 			}
 		}
 
-		for (int i = 0; i < ik.bones_count; ++i)
+		// compute rotations from new positions
+		for (int i = ik.bones_count - 1; i >= 0; --i)
 		{
 			if (i < ik.bones_count - 1)
 			{
-				Vec3 old_d = pose.positions[indices[i + 1]] - pose.positions[indices[i]];
-				Vec3 new_d = pos[i + 1] - pos[i];
+				Vec3 old_d = old_pos[i + 1] - old_pos[i];
+				Vec3 new_d = transforms[i + 1].pos - transforms[i].pos;
 				old_d.normalize();
 				new_d.normalize();
 
 				Quat rel_rot = Quat::vec3ToVec3(old_d, new_d);
-				pose.rotations[indices[i]] = rel_rot * pose.rotations[indices[i]];
+				transforms[i].rot = rel_rot * transforms[i].rot;
 			}
-			pose.positions[indices[i]] = pos[i];
+		}
+
+		// convert from object space to bone space
+		for (int i = ik.bones_count - 1; i > 0; --i)
+		{
+			transforms[i] = transforms[i - 1].inverted() * transforms[i];
+			pose.positions[indices[i]] = transforms[i].pos;
+		}
+		for (int i = ik.bones_count - 2; i > 0; --i)
+		{
+			pose.rotations[indices[i]] = transforms[i].rot;
+		}
+
+		if (first_bone.parent_idx >= 0)
+		{
+			pose.rotations[indices[0]] = roots_parent.rot.conjugated() * transforms[0].rot;
+		}
+		else
+		{
+			pose.rotations[indices[0]] = transforms[0].rot;
 		}
 	}
 
