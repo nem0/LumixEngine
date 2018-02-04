@@ -234,14 +234,14 @@ template <int SIZE> static bool copyString(char (&destination)[SIZE], const char
 }
 
 
-u64 DataView::toLong() const
+u64 DataView::toU64() const
 {
 	if (is_binary)
 	{
 		assert(end - begin == sizeof(u64));
 		return *(u64*)begin;
 	}
-	return atol((const char*)begin);
+	return atoll((const char*)begin);
 }
 
 
@@ -2221,8 +2221,8 @@ static bool parseConnections(const Element& root, Scene* scene)
 		}
 
 		Scene::Connection c;
-		c.from = connection->first_property->next->value.toLong();
-		c.to = connection->first_property->next->next->value.toLong();
+		c.from = connection->first_property->next->value.toU64();
+		c.to = connection->first_property->next->next->value.toU64();
 		if (connection->first_property->value == "OO")
 		{
 			c.type = Scene::Connection::OBJECT_OBJECT;
@@ -2288,8 +2288,8 @@ static bool parseTakes(Scene* scene)
 					return false;
 				}
 
-				take.local_time_from = fbxTimeToSeconds(local_time->first_property->value.toLong());
-				take.local_time_to = fbxTimeToSeconds(local_time->first_property->next->value.toLong());
+				take.local_time_from = fbxTimeToSeconds(local_time->first_property->value.toU64());
+				take.local_time_to = fbxTimeToSeconds(local_time->first_property->next->value.toU64());
 			}
 			const Element* reference_time = findChild(*object, "ReferenceTime");
 			if (reference_time)
@@ -2300,8 +2300,8 @@ static bool parseTakes(Scene* scene)
 					return false;
 				}
 
-				take.reference_time_from = fbxTimeToSeconds(reference_time->first_property->value.toLong());
-				take.reference_time_to = fbxTimeToSeconds(reference_time->first_property->next->value.toLong());
+				take.reference_time_from = fbxTimeToSeconds(reference_time->first_property->value.toU64());
+				take.reference_time_to = fbxTimeToSeconds(reference_time->first_property->next->value.toU64());
 			}
 
 			scene->m_take_infos.push_back(take);
@@ -2410,7 +2410,7 @@ static bool parseObjects(const Element& root, Scene* scene)
 			return false;
 		}
 
-		u64 id = object->first_property->value.toLong();
+		u64 id = object->first_property->value.toU64();
 		scene->m_object_map[id] = {object, nullptr};
 		object = object->sibling;
 	}
@@ -2786,7 +2786,7 @@ Matrix Object::getGlobalTransform() const
 
 Object* Object::resolveObjectLinkReverse(Object::Type type) const
 {
-	u64 id = element.getFirstProperty() ? element.getFirstProperty()->getValue().toLong() : 0;
+	u64 id = element.getFirstProperty() ? element.getFirstProperty()->getValue().toU64() : 0;
 	for (auto& connection : scene.m_connections)
 	{
 		if (connection.from == id && connection.to != 0)
@@ -2807,7 +2807,7 @@ const IScene& Object::getScene() const
 
 Object* Object::resolveObjectLink(int idx) const
 {
-	u64 id = element.getFirstProperty() ? element.getFirstProperty()->getValue().toLong() : 0;
+	u64 id = element.getFirstProperty() ? element.getFirstProperty()->getValue().toU64() : 0;
 	for (auto& connection : scene.m_connections)
 	{
 		if (connection.to == id && connection.from != 0)
@@ -2826,7 +2826,7 @@ Object* Object::resolveObjectLink(int idx) const
 
 Object* Object::resolveObjectLink(Object::Type type, const char* property, int idx) const
 {
-	u64 id = element.getFirstProperty() ? element.getFirstProperty()->getValue().toLong() : 0;
+	u64 id = element.getFirstProperty() ? element.getFirstProperty()->getValue().toU64() : 0;
 	for (auto& connection : scene.m_connections)
 	{
 		if (connection.to == id && connection.from != 0)
