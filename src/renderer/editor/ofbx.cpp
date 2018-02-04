@@ -772,13 +772,20 @@ static OptionalError<Property*> readTextProperty(Cursor* cursor)
 		if (cursor->current < cursor->end) ++cursor->current; // skip ':'
 		skipInsignificantWhitespaces(cursor);
 		prop->value.begin = cursor->current;
-		prop->count = 1;
+		prop->count = 0;
+		bool is_any = false;
 		while (cursor->current < cursor->end && *cursor->current != '}')
 		{
-			if (*cursor->current == ',') ++prop->count;
+			if (*cursor->current == ',')
+			{
+				if (is_any) ++prop->count;
+				is_any = false;
+			}
+			else if (!isspace(*cursor->current) && *cursor->current != '\n') is_any = true;
 			if (*cursor->current == '.') prop->type = 'd';
 			++cursor->current;
 		}
+		if (is_any) ++prop->count;
 		prop->value.end = cursor->current;
 		if (cursor->current < cursor->end) ++cursor->current; // skip '}'
 		return prop.release();
@@ -1777,7 +1784,7 @@ template <> const char* fromString<Matrix>(const char* str, const char* end, Mat
 template<typename T> static void parseTextArray(const Property& property, std::vector<T>* out)
 {
 	const u8* iter = property.value.begin;
-	while (iter < property.value.end)
+	for(int i = 0; i < property.count; ++i)
 	{
 		T val;
 		iter = (const u8*)fromString<T>((const char*)iter, (const char*)property.value.end, &val);
