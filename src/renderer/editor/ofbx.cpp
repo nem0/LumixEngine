@@ -736,7 +736,7 @@ static OptionalError<Property*> readTextProperty(Cursor* cursor)
 			{
 				++cursor->current;
 			}
-			if (cursor->current < cursor->end && *cursor->current == 'e')
+			if (cursor->current < cursor->end && (*cursor->current == 'e' || *cursor->current == 'E'))
 			{
 				// 10.5e-013
 				++cursor->current;
