@@ -60,7 +60,7 @@ struct DataView
 	bool operator!=(const char* rhs) const { return !(*this == rhs); }
 	bool operator==(const char* rhs) const;
 
-	u64 toLong() const;
+	u64 toU64() const;
 	int toInt() const;
 	u32 toU32() const;
 	double toDouble() const;
