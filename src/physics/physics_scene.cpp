@@ -321,7 +321,6 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		, m_is_game_running(false)
 		, m_contact_callback(*this)
 		, m_contact_callbacks(m_allocator)
-		, m_queued_forces(m_allocator)
 		, m_layers_count(2)
 		, m_joints(m_allocator)
 		, m_script_scene(nullptr)
@@ -338,8 +337,6 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			catString(m_layers_names[i], tmp);
 			m_collision_filter[i] = 0xffffFFFF;
 		}
-
-		m_queued_forces.reserve(64);
 
 		#define REGISTER_COMPONENT(TYPE, COMPONENT) \
 			context.registerComponentType(TYPE \
@@ -1702,26 +1699,6 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	void applyQueuedForces()
-	{
-		for (auto& i : m_queued_forces)
-		{
-			auto* actor = m_actors[i.entity];
-			if (actor->dynamic_type != DynamicType::DYNAMIC)
-			{
-				g_log_warning.log("Physics") << "Trying to apply force to static object";
-				return;
-			}
-
-			auto* physx_actor = static_cast<PxRigidDynamic*>(actor->physx_actor);
-			if (!physx_actor) return;
-			PxVec3 f(i.force.x, i.force.y, i.force.z);
-			physx_actor->addForce(f);
-		}
-		m_queued_forces.clear();
-	}
-
-
 	static RagdollBone* getBone(RagdollBone* bone, int pose_bone_idx)
 	{
 		if (!bone) return nullptr;
@@ -2275,8 +2252,6 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	{
 		if (!m_is_game_running || paused) return;
 		
-		applyQueuedForces();
-
 		time_delta = Math::minimum(1 / 20.0f, time_delta);
 		simulateScene(time_delta);
 		fetchResults();
@@ -4962,9 +4937,16 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 	void applyForceToActor(Entity entity, const Vec3& force) override
 	{
-		auto& i = m_queued_forces.emplace();
-		i.entity = entity;
-		i.force = force;
+		RigidActor* actor = m_actors[entity];
+		if (actor->dynamic_type != DynamicType::DYNAMIC)
+		{
+			g_log_warning.log("Physics") << "Trying to apply force to static object #" << entity.index;
+			return;
+		}
+
+		auto* physx_actor = static_cast<PxRigidDynamic*>(actor->physx_actor);
+		if (!physx_actor) return;
+		physx_actor->addForce(toPhysx(force));
 	}
 
 
@@ -5062,7 +5044,6 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	bool m_is_game_running;
 	bool m_is_updating_ragdoll;
 	u32 m_debug_visualization_flags;
-	Array<QueuedForce> m_queued_forces;
 	u32 m_collision_filter[32];
 	char m_layers_names[32][30];
 	int m_layers_count;
