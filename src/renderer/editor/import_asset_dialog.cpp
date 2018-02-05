@@ -564,7 +564,7 @@ struct FBXImporter
 			Matrix transform_matrix = Matrix::IDENTITY;
 			Matrix geometry_matrix = toLumix(mesh.getGeometricMatrix());
 			transform_matrix = toLumix(mesh.getGlobalTransform()) * geometry_matrix;
-			if (center_mesh) transform_matrix.setTranslation({0, 0, 0});
+			if (cancel_mesh_transforms) transform_matrix.setTranslation({0, 0, 0});
 
 			IAllocator& allocator = app.getWorldEditor().getAllocator();
 			OutputBlob blob(allocator);
@@ -1801,7 +1801,7 @@ struct FBXImporter
 	float rotation_error = 0.01f;
 	float bounding_shape_scale = 1.0f;
 	bool to_dds = false;
-	bool center_mesh = false;
+	bool cancel_mesh_transforms = false;
 	bool ignore_skeleton = false;
 	bool import_vertex_colors = true;
 	bool make_convex = false;
@@ -1932,7 +1932,7 @@ int setParams(lua_State* L)
 	lua_pop(L, 1);
 
 	LuaWrapper::getOptionalField(L, 1, "create_billboard", &dlg->m_fbx_importer->create_billboard_lod);
-	LuaWrapper::getOptionalField(L, 1, "center_meshes", &dlg->m_fbx_importer->center_mesh);
+	LuaWrapper::getOptionalField(L, 1, "cancel_mesh_transforms", &dlg->m_fbx_importer->cancel_mesh_transforms);
 	LuaWrapper::getOptionalField(L, 1, "import_vertex_colors", &dlg->m_fbx_importer->import_vertex_colors);
 	LuaWrapper::getOptionalField(L, 1, "scale", &dlg->m_fbx_importer->mesh_scale);
 	LuaWrapper::getOptionalField(L, 1, "time_scale", &dlg->m_fbx_importer->time_scale);
@@ -3391,7 +3391,7 @@ void ImportAssetDialog::onWindowGUI()
 		if (ImGui::CollapsingHeader("Advanced"))
 		{
 			ImGui::Checkbox("Create billboard LOD", &m_fbx_importer->create_billboard_lod);
-			ImGui::Checkbox("Center meshes", &m_fbx_importer->center_mesh);
+			ImGui::Checkbox("Cancel mesh transforms", &m_fbx_importer->cancel_mesh_transforms);
 			ImGui::Checkbox("Import Vertex Colors", &m_fbx_importer->import_vertex_colors);
 			ImGui::DragFloat("Scale", &m_fbx_importer->mesh_scale, 0.01f, 0.001f, 0);
 			ImGui::Combo("Orientation", &(int&)m_fbx_importer->orientation, "Y up\0Z up\0-Z up\0-X up\0X up\0");
