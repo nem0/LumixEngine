@@ -4905,6 +4905,21 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	PhysicsSystem& getSystem() const override { return *m_system; }
 
 
+	Vec3 getActorVelocity(Entity entity) override
+	{
+		auto* actor = m_actors[entity];
+		if (actor->dynamic_type != DynamicType::DYNAMIC)
+		{
+			g_log_warning.log("Physics") << "Trying to get speed of static object";
+			return Vec3::ZERO;
+		}
+
+		auto* physx_actor = static_cast<PxRigidDynamic*>(actor->physx_actor);
+		if (!physx_actor) return Vec3::ZERO;
+		return fromPhysx(physx_actor->getLinearVelocity());
+	}
+
+
 	float getActorSpeed(Entity entity) override
 	{
 		auto* actor = m_actors[entity];
@@ -4938,6 +4953,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	void applyForceToActor(Entity entity, const Vec3& force) override
 	{
 		RigidActor* actor = m_actors[entity];
+		if (!actor) return;
 		if (actor->dynamic_type != DynamicType::DYNAMIC)
 		{
 			g_log_warning.log("Physics") << "Trying to apply force to static object #" << entity.index;
@@ -5202,6 +5218,7 @@ void PhysicsScene::registerLuaAPI(lua_State* L)
 
 	REGISTER_FUNCTION(putToSleep);
 	REGISTER_FUNCTION(getActorSpeed);
+	REGISTER_FUNCTION(getActorVelocity);
 	REGISTER_FUNCTION(applyForceToActor);
 	REGISTER_FUNCTION(moveController);
 	REGISTER_FUNCTION(isControllerCollisionDown);
