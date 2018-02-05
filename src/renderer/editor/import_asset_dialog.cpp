@@ -186,6 +186,13 @@ struct BillboardSceneData
 
 struct FBXImporter
 {
+	enum class Origin : int
+	{
+		SOURCE,
+		CENTER,
+		BOTTOM
+	};
+
 	enum class Orientation
 	{
 		Y_UP,
@@ -543,6 +550,37 @@ struct FBXImporter
 	}
 
 
+	static void centerMesh(const ofbx::Vec3* vertices, int vertices_count, Origin origin, Matrix* transform)
+	{
+		if (vertices_count <= 0) return;
+
+		ofbx::Vec3 min = vertices[0];
+		ofbx::Vec3 max = vertices[0];
+
+		for (int i = 1; i < vertices_count; ++i)
+		{
+			ofbx::Vec3 v = vertices[i];
+			
+			min.x = Math::minimum(min.x, v.x);
+			min.y = Math::minimum(min.y, v.y);
+			min.z = Math::minimum(min.z, v.z);
+			
+			max.x = Math::maximum(max.x, v.x);
+			max.y = Math::maximum(max.y, v.y);
+			max.z = Math::maximum(max.z, v.z);
+		}
+
+		Vec3 center;
+		center.x = float(min.x + max.x) * 0.5f;
+		center.y = float(min.y + max.y) * 0.5f;
+		center.z = float(min.z + max.z) * 0.5f;
+		
+		if (origin == Origin::BOTTOM) center.y = (float)min.y;
+
+		transform->setTranslation(-center);
+	}
+
+
 	void postprocessMeshes()
 	{
 		for (int mesh_idx = 0; mesh_idx < meshes.size(); ++mesh_idx)
@@ -565,6 +603,7 @@ struct FBXImporter
 			Matrix geometry_matrix = toLumix(mesh.getGeometricMatrix());
 			transform_matrix = toLumix(mesh.getGlobalTransform()) * geometry_matrix;
 			if (cancel_mesh_transforms) transform_matrix.setTranslation({0, 0, 0});
+			if (origin != Origin::SOURCE) centerMesh(vertices, vertex_count, origin, &transform_matrix);
 
 			IAllocator& allocator = app.getWorldEditor().getAllocator();
 			OutputBlob blob(allocator);
@@ -1808,24 +1847,7 @@ struct FBXImporter
 	bool create_billboard_lod = false;
 	Orientation orientation = Orientation::Y_UP;
 	Orientation root_orientation = Orientation::Y_UP;
-};
-
-
-enum class VertexAttributeDef : u32
-{
-	POSITION,
-	FLOAT1,
-	FLOAT2,
-	FLOAT3,
-	FLOAT4,
-	INT1,
-	INT2,
-	INT3,
-	INT4,
-	SHORT2,
-	SHORT4,
-	BYTE4,
-	NONE
+	Origin origin = Origin::SOURCE;
 };
 
 
@@ -1928,6 +1950,23 @@ int setParams(lua_State* L)
 	if (lua_getfield(L, 1, "texture_output_dir") == LUA_TSTRING)
 	{
 		copyString(dlg->m_texture_output_dir, LuaWrapper::toType<const char*>(L, -1));
+	}
+	lua_pop(L, 1);
+
+	if (lua_getfield(L, 1, "origin") == LUA_TSTRING)
+	{
+		const char* str = LuaWrapper::toType<const char*>(L, -1);
+		if (equalIStrings(str, "center"))
+			dlg->m_fbx_importer->origin = FBXImporter::Origin::CENTER;
+		else if (equalIStrings(str, "bottom"))
+			dlg->m_fbx_importer->origin = FBXImporter::Origin::BOTTOM;
+		else
+			g_log_error.log("Editor") << "Unknown origin value " << str;
+	}
+	lua_pop(L, 1);
+	if (lua_getfield(L, 1, "origin_bottom") == LUA_TBOOLEAN && LuaWrapper::toType<bool>(L, -1))
+	{
+		dlg->m_fbx_importer->origin = FBXImporter::Origin::BOTTOM;
 	}
 	lua_pop(L, 1);
 
@@ -3392,6 +3431,7 @@ void ImportAssetDialog::onWindowGUI()
 		{
 			ImGui::Checkbox("Create billboard LOD", &m_fbx_importer->create_billboard_lod);
 			ImGui::Checkbox("Cancel mesh transforms", &m_fbx_importer->cancel_mesh_transforms);
+			ImGui::Combo("Origin", (int*)&m_fbx_importer->origin, "Source\0Center\0Bottom\0");
 			ImGui::Checkbox("Import Vertex Colors", &m_fbx_importer->import_vertex_colors);
 			ImGui::DragFloat("Scale", &m_fbx_importer->mesh_scale, 0.01f, 0.001f, 0);
 			ImGui::Combo("Orientation", &(int&)m_fbx_importer->orientation, "Y up\0Z up\0-Z up\0-X up\0X up\0");
