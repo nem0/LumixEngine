@@ -448,7 +448,10 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		m_tile.pipeline = Pipeline::create(*renderer, Path("pipelines/main.lua"), "", engine.getAllocator());
 		m_tile.pipeline->load();
 
+		Matrix mtx;
+		mtx.lookAt({10, 10, 10}, Vec3::ZERO, {0, 1, 0});
 		Entity light_entity = m_tile.universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
+		m_tile.universe->setMatrix(light_entity, mtx);
 		RenderScene* render_scene = (RenderScene*)m_tile.universe->getScene(MODEL_INSTANCE_TYPE);
 		m_tile.universe->createComponent(GLOBAL_LIGHT_TYPE, light_entity);
 		render_scene->setGlobalLightIntensity(light_entity, 1);
