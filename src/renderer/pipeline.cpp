@@ -2115,6 +2115,11 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			bgfx::touch(m_current_view->bgfx_id);
 			return;
 		}
+		if (bgfx::getAvailInstanceDataBuffer(6, m_base_vertex_decl.getStride()) < 6)
+		{
+			g_log_error.log("Renderer") << "Not enough memory to render quad";
+			return;
+		}
 
 		Matrix projection_mtx;
 		projection_mtx.setOrtho(0, 1, 0, 1, 0, 30, bgfx::getCaps()->homogeneousDepth);
@@ -2568,6 +2573,28 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
+	void render(const bgfx::DynamicVertexBufferHandle& vertex_buffer,
+		const bgfx::DynamicIndexBufferHandle& index_buffer,
+		int first_index,
+		int num_indices,
+		int first_vertex,
+		int num_vertices,
+		u64 render_states,
+		ShaderInstance& shader_instance) override
+	{
+		ASSERT(m_current_view);
+		View& view = *m_current_view;
+		bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
+		bgfx::setState(view.render_state | render_states);
+		bgfx::setVertexBuffer(0, vertex_buffer, first_vertex, num_vertices);
+		bgfx::setIndexBuffer(index_buffer, first_index, num_indices);
+		++m_stats.draw_call_count;
+		++m_stats.instance_count;
+		m_stats.triangle_count += num_indices / 3;
+		bgfx::submit(m_current_view->bgfx_id, shader_instance.getProgramHandle(m_pass_idx));
+	}
+
+
 	void render(const bgfx::TransientVertexBuffer& vertex_buffer,
 		int num_vertices,
 		u64 render_states,
@@ -2735,6 +2762,17 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		Texture* splat_texture = info.m_terrain->getSplatmap();
 		if (!splat_texture) return;
 
+		struct TerrainInstanceData
+		{
+			Vec4 m_quad_min_and_size;
+			Vec4 m_morph_const;
+		};
+		if (bgfx::getAvailInstanceDataBuffer(m_terrain_instances[index].m_count, sizeof(TerrainInstanceData)) < (u32)m_terrain_instances[index].m_count)
+		{
+			g_log_error.log("Renderer") << "Not enough memory to render the terrain";
+			return;
+		}
+
 		Matrix inv_world_matrix = info.m_world_matrix;
 		inv_world_matrix.fastInverse();
 		Vec3 camera_pos =
@@ -2759,11 +2797,6 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		executeCommandBuffer(material->getCommandBuffer(), material);
 		executeCommandBuffer(view.command_buffer.buffer, material);
 
-		struct TerrainInstanceData
-		{
-			Vec4 m_quad_min_and_size;
-			Vec4 m_morph_const;
-		};
 		bgfx::InstanceDataBuffer instance_buffer;
 		bgfx::allocInstanceDataBuffer(&instance_buffer, m_terrain_instances[index].m_count, sizeof(TerrainInstanceData));
 		TerrainInstanceData* instance_data = (TerrainInstanceData*)instance_buffer.data;

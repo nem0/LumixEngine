@@ -2532,11 +2532,16 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		IAllocator& allocator = editor.getAllocator();
 		RenderInterface* render_interface = LUMIX_NEW(allocator, RenderInterfaceImpl)(editor, *scene_view.getPipeline());
 		editor.setRenderInterface(render_interface);
+
+		m_index_buffer = bgfx::createDynamicIndexBuffer(1024 * 256);
+		m_vertex_buffer = bgfx::createDynamicVertexBuffer(1024 * 256, renderer->getBasic2DVertexDecl());
 	}
 
 
 	~EditorUIRenderPlugin()
 	{
+		bgfx::destroy(m_index_buffer);
+		bgfx::destroy(m_vertex_buffer);
 		Pipeline::destroy(m_gui_pipeline);
 		WorldEditor& editor = m_app.getWorldEditor();
 		editor.universeCreated().unbind<EditorUIRenderPlugin, &EditorUIRenderPlugin::onUniverseCreated>(this);
@@ -2570,6 +2575,9 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		if (!m_gui_pipeline->isReady()) goto end;
 		if (!m_material || !m_material->isReady()) goto end;
 		if (!m_material->getTexture(0)) goto end;
+
+		m_vb_offset = 0;
+		m_ib_offset = 0;
 
 		int w, h;
 		SDL_GetWindowSize(m_app.getWindow(), &w, &h);
@@ -2630,16 +2638,11 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		int num_indices = cmd_list->IdxBuffer.size();
 		int num_vertices = cmd_list->VtxBuffer.size();
 		auto& decl = renderer->getBasic2DVertexDecl();
-		bgfx::TransientVertexBuffer vertex_buffer;
-		bgfx::TransientIndexBuffer index_buffer;
-		if (bgfx::getAvailTransientIndexBuffer(num_indices) < (u32)num_indices) return;
-		if (bgfx::getAvailTransientVertexBuffer(num_vertices, decl) < (u32)num_vertices) return;
-		bgfx::allocTransientVertexBuffer(&vertex_buffer, num_vertices, decl);
-		bgfx::allocTransientIndexBuffer(&index_buffer, num_indices);
 
-		copyMemory(vertex_buffer.data, &cmd_list->VtxBuffer[0], num_vertices * decl.getStride());
-		copyMemory(index_buffer.data, &cmd_list->IdxBuffer[0], num_indices * sizeof(u16));
-
+		const bgfx::Memory* mem_ib = bgfx::copy(&cmd_list->IdxBuffer[0], num_indices * sizeof(u16));
+		const bgfx::Memory* mem_vb = bgfx::copy(&cmd_list->VtxBuffer[0], num_vertices * decl.getStride());
+		bgfx::updateDynamicIndexBuffer(m_index_buffer, m_ib_offset, mem_ib);
+		bgfx::updateDynamicVertexBuffer(m_vertex_buffer, m_vb_offset, mem_vb);
 		u32 elem_offset = 0;
 		const ImDrawCmd* pcmd_begin = cmd_list->CmdBuffer.begin();
 		const ImDrawCmd* pcmd_end = cmd_list->CmdBuffer.end();
@@ -2669,16 +2672,19 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 				render_states &= ~BGFX_STATE_BLEND_MASK;
 			}
 			m_gui_pipeline->setTexture(0, texture_id, texture_uniform);
-			m_gui_pipeline->render(vertex_buffer,
-				index_buffer,
-				Matrix::IDENTITY,
-				elem_offset,
+			m_gui_pipeline->render(m_vertex_buffer,
+				m_index_buffer,
+				elem_offset + m_ib_offset,
 				pcmd->ElemCount,
+				m_vb_offset,
+				num_vertices,
 				render_states,
 				material->getShaderInstance());
 
 			elem_offset += pcmd->ElemCount;
 		}
+		m_ib_offset += num_indices;
+		m_vb_offset += num_vertices;
 	}
 
 
@@ -2690,6 +2696,10 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	Pipeline* m_gui_pipeline;
 	SceneView& m_scene_view;
 	GameView& m_game_view;
+	bgfx::DynamicVertexBufferHandle m_vertex_buffer;
+	bgfx::DynamicIndexBufferHandle m_index_buffer;
+	int m_vb_offset;
+	int m_ib_offset;
 };
 
 
