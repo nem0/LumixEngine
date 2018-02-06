@@ -9,6 +9,8 @@ struct lua_State;
 
 namespace bgfx
 {
+	struct DynamicVertexBufferHandle;
+	struct DynamicIndexBufferHandle;
 	struct TextureHandle;
 	struct UniformHandle;
 	struct ProgramHandle;
@@ -114,13 +116,21 @@ class LUMIX_RENDERER_API Pipeline
 			bgfx::UniformHandle uniform) = 0;
 		virtual void destroyUniform(bgfx::UniformHandle uniform) = 0;
 		virtual bgfx::UniformHandle createTextureUniform(const char* name) = 0;
+		virtual void render(const bgfx::DynamicVertexBufferHandle& vertex_buffer,
+			const bgfx::DynamicIndexBufferHandle& index_buffer,
+			int first_index,
+			int num_indices,
+			int first_vertex,
+			int num_vertices,
+			u64 render_states,
+			struct ShaderInstance& shader_instance) = 0;
 		virtual void render(const bgfx::TransientVertexBuffer& vertex_buffer,
 			const bgfx::TransientIndexBuffer& index_buffer,
 			const Matrix& mtx,
 			int first_index,
 			int num_indices,
 			u64 render_states,
-			struct ShaderInstance& shader_instance) = 0;
+			ShaderInstance& shader_instance) = 0;
 		virtual void renderModel(Model& model, Pose* pose, const Matrix& mtx) = 0;
 		virtual void toggleStats() = 0;
 		virtual void setWindowHandle(void* data) = 0;
