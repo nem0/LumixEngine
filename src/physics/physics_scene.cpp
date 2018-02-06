@@ -5092,7 +5092,7 @@ PhysicsScene* PhysicsScene::create(PhysicsSystem& system, Universe& context, Eng
 	impl->m_controller_manager = PxCreateControllerManager(*impl->m_scene);
 
 	impl->m_system = &system;
-	impl->m_default_material = impl->m_system->getPhysics()->createMaterial(9999.0f, 9999.0f, 0.1f);
+	impl->m_default_material = impl->m_system->getPhysics()->createMaterial(0.5f, 0.5f, 0.1f);
 	PxSphereGeometry geom(1);
 	impl->m_dummy_actor = PxCreateDynamic(
 		impl->m_scene->getPhysics(), PxTransform::createIdentity(), geom, *impl->m_default_material, 1);
