@@ -3906,11 +3906,10 @@ bool PasteEntityCommand::execute()
 {
 	InputBlob blob(m_blob.getData(), m_blob.getPos());
 
-	m_entities.clear();
-
 	int entity_count;
 	blob.read(entity_count);
 	m_entities.reserve(entity_count);
+	bool is_redo = !m_entities.empty();
 
 	Universe& universe = *m_editor.getUniverse();
 	Matrix base_matrix = Matrix::IDENTITY;
@@ -3933,9 +3932,18 @@ bool PasteEntityCommand::execute()
 		{
 			mtx = base_matrix * mtx;
 		}
-		Entity new_entity = universe.createEntity(Vec3(0, 0, 0), Quat(0, 0, 0, 1));
+		Entity new_entity;
+		if (is_redo)
+		{
+			new_entity = m_entities[i];
+			universe.emplaceEntity(m_entities[i]);
+		}
+		else
+		{
+			new_entity = universe.createEntity(Vec3(0, 0, 0), Quat(0, 0, 0, 1));
+		}
 		((WorldEditorImpl&)m_editor).m_entity_map.create(new_entity);
-		m_entities.push(new_entity);
+		if (!is_redo) m_entities.push(new_entity);
 		universe.setMatrix(new_entity, mtx);
 		universe.setParent(parent, new_entity);
 		i32 count;
@@ -3960,7 +3968,6 @@ void PasteEntityCommand::undo()
 		m_editor.getUniverse()->destroyEntity(entity);
 		((WorldEditorImpl&)m_editor).m_entity_map.erase(entity);
 	}
-	m_entities.clear();
 }
 
 
