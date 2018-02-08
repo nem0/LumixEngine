@@ -58,6 +58,7 @@ enum class CoordSystem
 struct GizmoImpl LUMIX_FINAL : public Gizmo
 {
 	static const int MAX_GIZMOS = 16;
+	static const int MAX_IMMEDIATE = 16;
 
 
 	explicit GizmoImpl(WorldEditor& editor)
@@ -74,6 +75,7 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 		, m_is_dragging(false)
 		, m_mouse_pos(0, 0)
 		, m_offset(0, 0, 0)
+		, m_immediate_count(0)
 	{
 		m_steps[int(Mode::TRANSLATE)] = 10;
 		m_steps[int(Mode::ROTATE)] = 45;
@@ -644,10 +646,12 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 
 	bool immediate(Transform& frame) override
 	{
+		ASSERT(m_immediate_count < MAX_IMMEDIATE);
 		Matrix mtx = frame.toMatrix();
 		collide(mtx);
 		bool ret = transform(frame);
-		render(mtx, m_active < 0);
+		m_immediate_frames[m_immediate_count] = frame;
+		++m_immediate_count;
 		return ret;
 	}
 
@@ -1124,6 +1128,12 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 			render(gizmo_mtx, m_active == i);
 		}
 
+		for (int i = 0; i < m_immediate_count; ++i)
+		{
+			render(m_immediate_frames[i].toMatrix(), m_active < 0);
+		}
+		m_immediate_count = 0;
+
 		m_mouse_pos.x = m_editor.getMousePos().x;
 		m_mouse_pos.y = m_editor.getMousePos().y;
 		m_count = 0;
@@ -1203,6 +1213,8 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 	bool m_is_step;
 	int m_count;
 	Entity m_entities[MAX_GIZMOS];
+	Transform m_immediate_frames[MAX_IMMEDIATE];
+	int m_immediate_count;
 	Vec3 m_offset;
 };
 
