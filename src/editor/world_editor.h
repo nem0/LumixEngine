@@ -124,7 +124,8 @@ public:
 	virtual void setEntitiesPositionsAndRotations(const Entity* entity,
 		const Vec3* position,
 		const Quat* rotation,
-		int count, bool local=false) = 0;
+		int count, 
+		bool local=false) = 0;
 	virtual void setEntityName(Entity entity, const char* name) = 0;
 	virtual void snapDown() = 0;
 	virtual void toggleGameMode() = 0;
