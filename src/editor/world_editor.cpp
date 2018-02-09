@@ -175,7 +175,7 @@ public:
 		: m_blob(editor.getAllocator())
 		, m_editor(editor)
 		, m_entities(editor.getAllocator())
-        , m_identity(false)
+		, m_identity(false)
 	{
 	}
 
@@ -185,7 +185,7 @@ public:
 		, m_editor(editor)
 		, m_position(editor.getCameraRaycastHit())
 		, m_entities(editor.getAllocator())
-        , m_identity(identity)
+		, m_identity(identity)
 	{
 	}
 
@@ -195,7 +195,7 @@ public:
 		, m_editor(editor)
 		, m_position(pos)
 		, m_entities(editor.getAllocator())
-        , m_identity(identity)
+		, m_identity(identity)
 	{
 	}
 
@@ -208,7 +208,7 @@ public:
 		serializer.serialize("pos_x", m_position.x);
 		serializer.serialize("pos_y", m_position.y);
 		serializer.serialize("pos_z", m_position.z);
-        serializer.serialize("identity", m_identity);
+		serializer.serialize("identity", m_identity);
 		serializer.serialize("size", m_blob.getPos());
 		serializer.beginArray("data");
 		for (int i = 0; i < m_blob.getPos(); ++i)
@@ -224,7 +224,7 @@ public:
 		serializer.deserialize("pos_x", m_position.x, 0);
 		serializer.deserialize("pos_y", m_position.y, 0);
 		serializer.deserialize("pos_z", m_position.z, 0);
-        serializer.deserialize("identity", m_identity, false);
+		serializer.deserialize("identity", m_identity, false);
 		int size;
 		serializer.deserialize("size", size, 0);
 		serializer.deserializeArrayBegin("data");
@@ -261,7 +261,7 @@ private:
 	WorldEditor& m_editor;
 	Vec3 m_position;
 	Array<Entity> m_entities;
-    bool m_identity;
+	bool m_identity;
 };
 
 
@@ -275,7 +275,7 @@ public:
 		, m_old_rotations(editor.getAllocator())
 		, m_entities(editor.getAllocator())
 		, m_editor(editor)
-        , m_local(false)
+		, m_local(false)
 	{
 	}
 
@@ -286,14 +286,14 @@ public:
 		const Quat* new_rotations,
 		int count,
 		IAllocator& allocator,
-        bool local=false)
+		bool local=false)
 		: m_new_positions(allocator)
 		, m_new_rotations(allocator)
 		, m_old_positions(allocator)
 		, m_old_rotations(allocator)
 		, m_entities(allocator)
 		, m_editor(editor)
-        , m_local(local)
+		, m_local(local)
 	{
 		ASSERT(count > 0);
 		Universe* universe = m_editor.getUniverse();
@@ -338,7 +338,7 @@ public:
 
 	void serialize(JsonSerializer& serializer) override
 	{
-        serializer.serialize("local", m_local);
+		serializer.serialize("local", m_local);
 		serializer.serialize("count", m_entities.size());
 		serializer.beginArray("entities");
 		for (int i = 0; i < m_entities.size(); ++i)
@@ -360,7 +360,7 @@ public:
 	{
 		Universe* universe = m_editor.getUniverse();
 		int count;
-        serializer.deserialize("local", m_local, false);
+		serializer.deserialize("local", m_local, false);
 		serializer.deserialize("count", count, 0);
 		m_entities.resize(count);
 		m_new_positions.resize(count);
@@ -391,14 +391,14 @@ public:
 		for (int i = 0, c = m_entities.size(); i < c; ++i)
 		{
 			Entity entity = m_entities[i];
-            if (m_local)
-            {
-                universe->setLocalPosition(entity, m_new_positions[i]);
-            }
-            else
-            {
-                universe->setPosition(entity, m_new_positions[i]);
-            }
+			if (m_local)
+			{
+				universe->setLocalPosition(entity, m_new_positions[i]);
+			}
+			else
+			{
+				universe->setPosition(entity, m_new_positions[i]);
+			}
 
 			universe->setRotation(entity, m_new_rotations[i]);
 		}
@@ -412,14 +412,14 @@ public:
 		for (int i = 0, c = m_entities.size(); i < c; ++i)
 		{
 			Entity entity = m_entities[i];
-            if (m_local)
-            {
-                universe->setLocalPosition(entity, m_old_positions[i]);
-            }
-            else
-            {
-                universe->setPosition(entity, m_old_positions[i]);
-            }
+			if (m_local)
+			{
+				universe->setLocalPosition(entity, m_old_positions[i]);
+			}
+			else
+			{
+				universe->setPosition(entity, m_old_positions[i]);
+			}
 
 			universe->setRotation(entity, m_old_rotations[i]);
 		}
@@ -462,7 +462,7 @@ private:
 	Array<Quat> m_new_rotations;
 	Array<Vec3> m_old_positions;
 	Array<Quat> m_old_rotations;
-    bool m_local;
+	bool m_local;
 };
 
 
@@ -2779,20 +2779,20 @@ public:
 		executeCommand(command);
 	}
 
-    void setEntitiesLocalPositions(const Entity* entities, const Vec3* positions, int count) override
-    {
-        ASSERT(entities && positions);
-        if (count <= 0) return;
+	void setEntitiesLocalPositions(const Entity* entities, const Vec3* positions, int count) override
+	{
+		ASSERT(entities && positions);
+		if (count <= 0) return;
 
-        Universe* universe = getUniverse();
-        Array<Quat> rots(m_allocator);
-        for (int i = 0; i < count; ++i) {
-            rots.push(universe->getRotation(entities[i]));
-        }
-        IEditorCommand* command =
-            LUMIX_NEW(m_allocator, MoveEntityCommand)(*this, entities, positions, &rots[0], count, m_allocator, true);
-        executeCommand(command);
-    }
+		Universe* universe = getUniverse();
+		Array<Quat> rots(m_allocator);
+		for (int i = 0; i < count; ++i) {
+			rots.push(universe->getRotation(entities[i]));
+		}
+		IEditorCommand* command =
+			LUMIX_NEW(m_allocator, MoveEntityCommand)(*this, entities, positions, &rots[0], count, m_allocator, true);
+		executeCommand(command);
+	}
 
 
 	void setEntitiesPositionsAndRotations(const Entity* entities,
@@ -3025,13 +3025,13 @@ public:
 		executeCommand(command);
 	}
 
-    void duplicateEntities() override
-    {
-        copyEntities();
+	void duplicateEntities() override
+	{
+		copyEntities();
 
-        PasteEntityCommand* command = LUMIX_NEW(m_allocator, PasteEntityCommand)(*this, m_copy_buffer, true);
-        executeCommand(command);
-    }
+		PasteEntityCommand* command = LUMIX_NEW(m_allocator, PasteEntityCommand)(*this, m_copy_buffer, true);
+		executeCommand(command);
+	}
 
 
 	void cloneComponent(const ComponentUID& src, Entity entity) override
@@ -3972,21 +3972,21 @@ bool PasteEntityCommand::execute()
 		Entity parent;
 		blob.read(parent);
 
-        if (!m_identity)
-        {
-            if (i == 0)
-            {
-                Matrix inv = mtx;
-                inv.inverse();
-                base_matrix.copy3x3(mtx);
-                base_matrix = base_matrix * inv;
-                mtx.setTranslation(m_position);
-            }
-            else
-            {
-                mtx = base_matrix * mtx;
-            }
-        }
+		if (!m_identity)
+		{
+			if (i == 0)
+			{
+				Matrix inv = mtx;
+				inv.inverse();
+				base_matrix.copy3x3(mtx);
+				base_matrix = base_matrix * inv;
+				mtx.setTranslation(m_position);
+			}
+			else
+			{
+				mtx = base_matrix * mtx;
+			}
+		}
 
 		Entity new_entity;
 		if (is_redo)
