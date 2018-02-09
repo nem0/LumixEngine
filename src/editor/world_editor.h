@@ -115,7 +115,7 @@ public:
 	virtual void destroyEntities(const Entity* entities, int count) = 0;
 	virtual void selectEntities(const Entity* entities, int count) = 0;
 	virtual Entity addEntityAt(int camera_x, int camera_y) = 0;
-	virtual void setEntitiesPositions(const Entity* entities, const Vec3* positions, int count, bool local=false) = 0;
+	virtual void setEntitiesPositions(const Entity* entities, const Vec3* positions, int count) = 0;
 	virtual void setEntitiesCoordinate(const Entity* entities, int count, float value, Coordinate coord) = 0;
 	virtual void setEntitiesLocalCoordinate(const Entity* entities, int count, float value, Coordinate coord) = 0;
 	virtual void setEntitiesScale(const Entity* entities, int count, float scale) = 0;
@@ -124,8 +124,7 @@ public:
 	virtual void setEntitiesPositionsAndRotations(const Entity* entity,
 		const Vec3* position,
 		const Quat* rotation,
-		int count, 
-		bool local=false) = 0;
+		int count) = 0;
 	virtual void setEntityName(Entity entity, const char* name) = 0;
 	virtual void snapDown() = 0;
 	virtual void toggleGameMode() = 0;

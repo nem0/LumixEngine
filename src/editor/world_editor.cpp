@@ -275,7 +275,6 @@ public:
 		, m_old_rotations(editor.getAllocator())
 		, m_entities(editor.getAllocator())
 		, m_editor(editor)
-		, m_local(false)
 	{
 	}
 
@@ -285,15 +284,13 @@ public:
 		const Vec3* new_positions,
 		const Quat* new_rotations,
 		int count,
-		IAllocator& allocator,
-		bool local=false)
+		IAllocator& allocator)
 		: m_new_positions(allocator)
 		, m_new_rotations(allocator)
 		, m_old_positions(allocator)
 		, m_old_rotations(allocator)
 		, m_entities(allocator)
 		, m_editor(editor)
-		, m_local(local)
 	{
 		ASSERT(count > 0);
 		Universe* universe = m_editor.getUniverse();
@@ -310,7 +307,7 @@ public:
 			if (prefab != 0 && parent.isValid() && (prefab_system.getPrefab(parent) & 0xffffFFFF) == (prefab & 0xffffFFFF))
 			{
 				float scale = universe->getScale(entities[i]);
-				Transform new_local_tr = universe->computeLocalTransform(parent, {new_positions[i], new_rotations[i], scale});
+				Transform new_local_tr = universe->computeLocalTransform(parent, { new_positions[i], new_rotations[i], scale });
 				Entity instance = prefab_system.getFirstInstance(prefab);
 				while (instance.isValid())
 				{
@@ -338,7 +335,6 @@ public:
 
 	void serialize(JsonSerializer& serializer) override
 	{
-		serializer.serialize("local", m_local);
 		serializer.serialize("count", m_entities.size());
 		serializer.beginArray("entities");
 		for (int i = 0; i < m_entities.size(); ++i)
@@ -360,7 +356,6 @@ public:
 	{
 		Universe* universe = m_editor.getUniverse();
 		int count;
-		serializer.deserialize("local", m_local, false);
 		serializer.deserialize("count", count, 0);
 		m_entities.resize(count);
 		m_new_positions.resize(count);
@@ -391,15 +386,7 @@ public:
 		for (int i = 0, c = m_entities.size(); i < c; ++i)
 		{
 			Entity entity = m_entities[i];
-			if (m_local)
-			{
-				universe->setLocalPosition(entity, m_new_positions[i]);
-			}
-			else
-			{
-				universe->setPosition(entity, m_new_positions[i]);
-			}
-
+			universe->setPosition(entity, m_new_positions[i]);
 			universe->setRotation(entity, m_new_rotations[i]);
 		}
 		return true;
@@ -412,15 +399,7 @@ public:
 		for (int i = 0, c = m_entities.size(); i < c; ++i)
 		{
 			Entity entity = m_entities[i];
-			if (m_local)
-			{
-				universe->setLocalPosition(entity, m_old_positions[i]);
-			}
-			else
-			{
-				universe->setPosition(entity, m_old_positions[i]);
-			}
-
+			universe->setPosition(entity, m_old_positions[i]);
 			universe->setRotation(entity, m_old_rotations[i]);
 		}
 	}
@@ -462,7 +441,6 @@ private:
 	Array<Quat> m_new_rotations;
 	Array<Vec3> m_old_positions;
 	Array<Quat> m_old_rotations;
-	bool m_local;
 };
 
 
@@ -2763,7 +2741,7 @@ public:
 	}
 
 
-	void setEntitiesPositions(const Entity* entities, const Vec3* positions, int count, bool local=false) override
+	void setEntitiesPositions(const Entity* entities, const Vec3* positions, int count) override
 	{
 		ASSERT(entities && positions);
 		if (count <= 0) return;
@@ -2775,19 +2753,18 @@ public:
 			rots.push(universe->getRotation(entities[i]));
 		}
 		IEditorCommand* command =
-			LUMIX_NEW(m_allocator, MoveEntityCommand)(*this, entities, positions, &rots[0], count, m_allocator, local);
+			LUMIX_NEW(m_allocator, MoveEntityCommand)(*this, entities, positions, &rots[0], count, m_allocator);
 		executeCommand(command);
 	}
 
 	void setEntitiesPositionsAndRotations(const Entity* entities,
 		const Vec3* positions,
 		const Quat* rotations,
-		int count,
-		bool local=false) override
+		int count) override
 	{
 		if (count <= 0) return;
 		IEditorCommand* command =
-			LUMIX_NEW(m_allocator, MoveEntityCommand)(*this, entities, positions, rotations, count, m_allocator, local);
+			LUMIX_NEW(m_allocator, MoveEntityCommand)(*this, entities, positions, rotations, count, m_allocator);
 		executeCommand(command);
 	}
 

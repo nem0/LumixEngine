@@ -445,7 +445,7 @@ public:
 	void operator=(const EngineImpl&) = delete;
 	EngineImpl(const EngineImpl&) = delete;
 
-	EngineImpl(const char* base_path0, const char* base_path1, FS::FileSystem* fs, IAllocator& allocator)
+	EngineImpl(const char* working_dir, const char* base_path1, FS::FileSystem* fs, IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_prefab_resource_manager(m_allocator)
 		, m_resource_manager(m_allocator)
@@ -460,6 +460,7 @@ public:
 		, m_paused(false)
 		, m_next_frame(false)
 		, m_lifo_allocator(m_allocator, 10 * 1024 * 1024)
+		, m_working_dir(working_dir)
 	{
 		g_log_info.log("Core") << "Creating engine...";
 		Profiler::setThreadName("Main");
@@ -484,12 +485,12 @@ public:
 
 			m_mem_file_device = LUMIX_NEW(m_allocator, FS::MemoryFileDevice)(m_allocator);
 			m_resource_file_device = LUMIX_NEW(m_allocator, FS::ResourceFileDevice)(m_allocator);
-			m_disk_file_device = LUMIX_NEW(m_allocator, FS::DiskFileDevice)("disk", base_path0, m_allocator);
+			m_disk_file_device = LUMIX_NEW(m_allocator, FS::DiskFileDevice)("disk", working_dir, m_allocator);
 
 			m_file_system->mount(m_mem_file_device);
 			m_file_system->mount(m_resource_file_device);
 			m_file_system->mount(m_disk_file_device);
-			bool is_patching = base_path1[0] != 0 && !equalStrings(base_path0, base_path1);
+			bool is_patching = base_path1[0] != 0 && !equalStrings(working_dir, base_path1);
 			if (is_patching)
 			{
 				m_patch_file_device = LUMIX_NEW(m_allocator, FS::DiskFileDevice)("patch", base_path1, m_allocator);
@@ -1303,6 +1304,9 @@ public:
 	IAllocator& getAllocator() override { return m_allocator; }
 
 
+	const char* getWorkingDirectory() const override { return m_working_dir; }
+
+
 	Universe& createUniverse(bool set_lua_globals) override
 	{
 		Universe* universe = LUMIX_NEW(m_allocator, Universe)(m_allocator);
@@ -1693,6 +1697,7 @@ private:
 	lua_State* m_state;
 	HashMap<int, Resource*> m_lua_resources;
 	int m_last_lua_resource_idx;
+	StaticString<MAX_PATH_LENGTH> m_working_dir;
 };
 
 

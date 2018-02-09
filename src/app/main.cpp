@@ -123,10 +123,6 @@ public:
 		u32 flags = SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI;
 		if (!m_window_mode) flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
 
-		g_log_info.getCallback().bind<outputToVS>();
-		g_log_warning.getCallback().bind<outputToVS>();
-		g_log_error.getCallback().bind<outputToVS>();
-
 		g_log_info.getCallback().bind<outputToConsole>();
 		g_log_warning.getCallback().bind<outputToConsole>();
 		g_log_error.getCallback().bind<outputToConsole>();
