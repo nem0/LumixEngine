@@ -2763,7 +2763,7 @@ public:
 	}
 
 
-	void setEntitiesPositions(const Entity* entities, const Vec3* positions, int count) override
+	void setEntitiesPositions(const Entity* entities, const Vec3* positions, int count, bool local=false) override
 	{
 		ASSERT(entities && positions);
 		if (count <= 0) return;
@@ -2775,34 +2775,19 @@ public:
 			rots.push(universe->getRotation(entities[i]));
 		}
 		IEditorCommand* command =
-			LUMIX_NEW(m_allocator, MoveEntityCommand)(*this, entities, positions, &rots[0], count, m_allocator);
+			LUMIX_NEW(m_allocator, MoveEntityCommand)(*this, entities, positions, &rots[0], count, m_allocator, local);
 		executeCommand(command);
 	}
-
-	void setEntitiesLocalPositions(const Entity* entities, const Vec3* positions, int count) override
-	{
-		ASSERT(entities && positions);
-		if (count <= 0) return;
-
-		Universe* universe = getUniverse();
-		Array<Quat> rots(m_allocator);
-		for (int i = 0; i < count; ++i) {
-			rots.push(universe->getRotation(entities[i]));
-		}
-		IEditorCommand* command =
-			LUMIX_NEW(m_allocator, MoveEntityCommand)(*this, entities, positions, &rots[0], count, m_allocator, true);
-		executeCommand(command);
-	}
-
 
 	void setEntitiesPositionsAndRotations(const Entity* entities,
 		const Vec3* positions,
 		const Quat* rotations,
-		int count) override
+		int count,
+		bool local=false) override
 	{
 		if (count <= 0) return;
 		IEditorCommand* command =
-			LUMIX_NEW(m_allocator, MoveEntityCommand)(*this, entities, positions, rotations, count, m_allocator);
+			LUMIX_NEW(m_allocator, MoveEntityCommand)(*this, entities, positions, rotations, count, m_allocator, local);
 		executeCommand(command);
 	}
 
