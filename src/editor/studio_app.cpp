@@ -1253,6 +1253,8 @@ public:
 				m_editor->beginCommandGroup(crc32("create_child_entity"));
 				Entity child = m_editor->addEntity();
 				m_editor->makeParent(entity, child);
+                Vec3 pos = { 0, 0, 0 };
+                m_editor->setEntitiesLocalPositions(&child, &pos, 1);
 				m_editor->endCommandGroup();
 			}
 			ImGui::EndPopup();
