@@ -269,6 +269,7 @@ public:
 		, m_old_rotations(editor.getAllocator())
 		, m_entities(editor.getAllocator())
 		, m_editor(editor)
+        , m_local(false)
 	{
 	}
 
@@ -278,13 +279,15 @@ public:
 		const Vec3* new_positions,
 		const Quat* new_rotations,
 		int count,
-		IAllocator& allocator)
+		IAllocator& allocator,
+        bool local=false)
 		: m_new_positions(allocator)
 		, m_new_rotations(allocator)
 		, m_old_positions(allocator)
 		, m_old_rotations(allocator)
 		, m_entities(allocator)
 		, m_editor(editor)
+        , m_local(local)
 	{
 		ASSERT(count > 0);
 		Universe* universe = m_editor.getUniverse();
@@ -380,7 +383,15 @@ public:
 		for (int i = 0, c = m_entities.size(); i < c; ++i)
 		{
 			Entity entity = m_entities[i];
-			universe->setPosition(entity, m_new_positions[i]);
+            if (m_local)
+            {
+                universe->setLocalPosition(entity, m_new_positions[i]);
+            }
+            else
+            {
+                universe->setPosition(entity, m_new_positions[i]);
+            }
+
 			universe->setRotation(entity, m_new_rotations[i]);
 		}
 		return true;
@@ -393,7 +404,15 @@ public:
 		for (int i = 0, c = m_entities.size(); i < c; ++i)
 		{
 			Entity entity = m_entities[i];
-			universe->setPosition(entity, m_old_positions[i]);
+            if (m_local)
+            {
+                universe->setLocalPosition(entity, m_old_positions[i]);
+            }
+            else
+            {
+                universe->setPosition(entity, m_old_positions[i]);
+            }
+
 			universe->setRotation(entity, m_old_rotations[i]);
 		}
 	}
@@ -435,6 +454,7 @@ private:
 	Array<Quat> m_new_rotations;
 	Array<Vec3> m_old_positions;
 	Array<Quat> m_old_rotations;
+    bool m_local;
 };
 
 
@@ -2750,6 +2770,21 @@ public:
 			LUMIX_NEW(m_allocator, MoveEntityCommand)(*this, entities, positions, &rots[0], count, m_allocator);
 		executeCommand(command);
 	}
+
+    void setEntitiesLocalPositions(const Entity* entities, const Vec3* positions, int count) override
+    {
+        ASSERT(entities && positions);
+        if (count <= 0) return;
+
+        Universe* universe = getUniverse();
+        Array<Quat> rots(m_allocator);
+        for (int i = 0; i < count; ++i) {
+            rots.push(universe->getRotation(entities[i]));
+        }
+        IEditorCommand* command =
+            LUMIX_NEW(m_allocator, MoveEntityCommand)(*this, entities, positions, &rots[0], count, m_allocator, true);
+        executeCommand(command);
+    }
 
 
 	void setEntitiesPositionsAndRotations(const Entity* entities,
