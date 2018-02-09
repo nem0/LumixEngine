@@ -104,6 +104,7 @@ public:
 	virtual void copyEntities() = 0;
 	virtual bool canPasteEntities() const = 0;
 	virtual void pasteEntities() = 0;
+    virtual void duplicateEntities() = 0;
 	virtual void addComponent(ComponentType type) = 0;
 	virtual void cloneComponent(const ComponentUID& src, Entity entity) = 0;
 	virtual void destroyComponent(const Entity* entities, int count, ComponentType cmp_type) = 0;

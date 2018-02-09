@@ -809,6 +809,7 @@ public:
 	void redo() { m_editor->redo(); }
 	void copy() { m_editor->copyEntities(); }
 	void paste() { m_editor->pasteEntities(); }
+    void duplicate() { m_editor->duplicateEntities(); }
 	bool isOrbitCamera() { return m_editor->isOrbitCamera(); }
 	void toggleOrbitCamera() { m_editor->setOrbitCamera(!m_editor->isOrbitCamera()); }
 	void setTopView() { m_editor->setTopView(); }
@@ -1045,6 +1046,7 @@ public:
 		ImGui::Separator();
 		doMenuItem(*getAction("copy"), is_any_entity_selected);
 		doMenuItem(*getAction("paste"), m_editor->canPasteEntities());
+        doMenuItem(*getAction("duplicate"), is_any_entity_selected);
 		ImGui::Separator();
 		doMenuItem(*getAction("orbitCamera"), is_any_entity_selected || m_editor->isOrbitCamera());
 		doMenuItem(*getAction("setTranslateGizmoMode"), true);
@@ -1464,6 +1466,7 @@ public:
 		addAction<&StudioAppImpl::undo>("Undo", "Undo scene action", "undo", SDLK_LCTRL, 'Z', -1);
 		addAction<&StudioAppImpl::copy>("Copy", "Copy entity", "copy", SDLK_LCTRL, 'C', -1);
 		addAction<&StudioAppImpl::paste>("Paste", "Paste entity", "paste", SDLK_LCTRL, 'V', -1);
+        addAction<&StudioAppImpl::duplicate>("Duplicate", "Duplicate entity", "duplicate", SDLK_LCTRL, 'D', -1);
 		addAction<&StudioAppImpl::toggleOrbitCamera>("Orbit camera", "Orbit camera", "orbitCamera")
 			.is_selected.bind<StudioAppImpl, &StudioAppImpl::isOrbitCamera>(this);
 		addAction<&StudioAppImpl::setTranslateGizmoMode>("Translate", "Set translate mode", "setTranslateGizmoMode")

@@ -175,24 +175,27 @@ public:
 		: m_blob(editor.getAllocator())
 		, m_editor(editor)
 		, m_entities(editor.getAllocator())
+        , m_identity(false)
 	{
 	}
 
 
-	PasteEntityCommand(WorldEditor& editor, const OutputBlob& blob)
+	PasteEntityCommand(WorldEditor& editor, const OutputBlob& blob, bool identity=false)
 		: m_blob(blob, editor.getAllocator())
 		, m_editor(editor)
 		, m_position(editor.getCameraRaycastHit())
 		, m_entities(editor.getAllocator())
+        , m_identity(identity)
 	{
 	}
 
 
-	PasteEntityCommand(WorldEditor& editor, const Vec3& pos, const InputBlob& blob)
+	PasteEntityCommand(WorldEditor& editor, const Vec3& pos, const InputBlob& blob, bool identity = false)
 		: m_blob(blob, editor.getAllocator())
 		, m_editor(editor)
 		, m_position(pos)
 		, m_entities(editor.getAllocator())
+        , m_identity(identity)
 	{
 	}
 
@@ -205,6 +208,7 @@ public:
 		serializer.serialize("pos_x", m_position.x);
 		serializer.serialize("pos_y", m_position.y);
 		serializer.serialize("pos_z", m_position.z);
+        serializer.serialize("identity", m_identity);
 		serializer.serialize("size", m_blob.getPos());
 		serializer.beginArray("data");
 		for (int i = 0; i < m_blob.getPos(); ++i)
@@ -220,6 +224,7 @@ public:
 		serializer.deserialize("pos_x", m_position.x, 0);
 		serializer.deserialize("pos_y", m_position.y, 0);
 		serializer.deserialize("pos_z", m_position.z, 0);
+        serializer.deserialize("identity", m_identity, false);
 		int size;
 		serializer.deserialize("size", size, 0);
 		serializer.deserializeArrayBegin("data");
@@ -256,6 +261,7 @@ private:
 	WorldEditor& m_editor;
 	Vec3 m_position;
 	Array<Entity> m_entities;
+    bool m_identity;
 };
 
 
@@ -332,6 +338,7 @@ public:
 
 	void serialize(JsonSerializer& serializer) override
 	{
+        serializer.serialize("local", m_local);
 		serializer.serialize("count", m_entities.size());
 		serializer.beginArray("entities");
 		for (int i = 0; i < m_entities.size(); ++i)
@@ -353,6 +360,7 @@ public:
 	{
 		Universe* universe = m_editor.getUniverse();
 		int count;
+        serializer.deserialize("local", m_local, false);
 		serializer.deserialize("count", count, 0);
 		m_entities.resize(count);
 		m_new_positions.resize(count);
@@ -3017,6 +3025,14 @@ public:
 		executeCommand(command);
 	}
 
+    void duplicateEntities() override
+    {
+        copyEntities();
+
+        PasteEntityCommand* command = LUMIX_NEW(m_allocator, PasteEntityCommand)(*this, m_copy_buffer, true);
+        executeCommand(command);
+    }
+
 
 	void cloneComponent(const ComponentUID& src, Entity entity) override
 	{
@@ -3955,18 +3971,23 @@ bool PasteEntityCommand::execute()
 		blob.read(mtx);
 		Entity parent;
 		blob.read(parent);
-		if (i == 0)
-		{
-			Matrix inv = mtx;
-			inv.inverse();
-			base_matrix.copy3x3(mtx);
-			base_matrix = base_matrix * inv;
-			mtx.setTranslation(m_position);
-		}
-		else
-		{
-			mtx = base_matrix * mtx;
-		}
+
+        if (!m_identity)
+        {
+            if (i == 0)
+            {
+                Matrix inv = mtx;
+                inv.inverse();
+                base_matrix.copy3x3(mtx);
+                base_matrix = base_matrix * inv;
+                mtx.setTranslation(m_position);
+            }
+            else
+            {
+                mtx = base_matrix * mtx;
+            }
+        }
+
 		Entity new_entity;
 		if (is_redo)
 		{
