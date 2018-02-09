@@ -41,12 +41,13 @@ public:
 public:
 	virtual ~Engine() {}
 
-	static Engine* create(const char* base_path0,
+	static Engine* create(const char* working_dir,
 		const char* base_path1,
 		FS::FileSystem* fs,
 		IAllocator& allocator);
 	static void destroy(Engine* engine, IAllocator& allocator);
 
+	virtual const char* getWorkingDirectory() const = 0;
 	virtual Universe& createUniverse(bool set_lua_globals) = 0;
 	virtual void destroyUniverse(Universe& context) = 0;
 	virtual void setPlatformData(const PlatformData& data) = 0;

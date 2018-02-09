@@ -1375,10 +1375,21 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		auto* texture = scene->getEnvironmentProbeTexture(cmp.entity);
 		if (texture)
 		{
-			ImGui::LabelText("Path", "%s", texture->getPath().c_str());
+			ImGui::LabelText("Reflection path", "%s", texture->getPath().c_str());
+			if (ImGui::Button("View reflection")) m_app.getAssetBrowser().selectResource(texture->getPath(), true);
 		}
-		if (ImGui::Button("View")) m_app.getAssetBrowser().selectResource(texture->getPath(), true);
-		ImGui::SameLine();
+		texture = scene->getEnvironmentProbeIrradiance(cmp.entity);
+		if (texture)
+		{
+			ImGui::LabelText("Irradiance path", "%s", texture->getPath().c_str());
+			if (ImGui::Button("View irradiance")) m_app.getAssetBrowser().selectResource(texture->getPath(), true);
+		}
+		texture = scene->getEnvironmentProbeRadiance(cmp.entity);
+		if (texture)
+		{
+			ImGui::LabelText("Radiance path", "%s", texture->getPath().c_str());
+			if (ImGui::Button("View radiance")) m_app.getAssetBrowser().selectResource(texture->getPath(), true);
+		}
 		if (ImGui::Button("Generate")) generateCubemap(cmp);
 	}
 
