@@ -40,10 +40,11 @@ static const float SHADOW_CAM_FAR = 5000.0f;
 
 struct InstanceData
 {
-	static const int MAX_INSTANCE_COUNT = 32;
+	static const int MAX_INSTANCE_COUNT = 128;
 
 	bgfx::InstanceDataBuffer buffer;
-	int instance_count;
+	int offset;
+	int instances_count;
 	Mesh* mesh;
 };
 
@@ -853,6 +854,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	{
 		InstanceData& data = m_instances_data[idx];
 		if (!data.buffer.data) return;
+		if (data.instances_count == 0) return;
 
 		Mesh& mesh = *data.mesh;
 		Material* material = mesh.material;
@@ -870,16 +872,25 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		bgfx::setIndexBuffer(mesh.index_buffer_handle);
 		bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
 		bgfx::setState(view.render_state | material->getRenderStates());
-		bgfx::setInstanceDataBuffer(&data.buffer, data.instance_count);
+		data.buffer.offset += data.offset * sizeof(Matrix);
+		bgfx::setInstanceDataBuffer(&data.buffer, data.instances_count);
+		data.buffer.offset -= data.offset * sizeof(Matrix);
 		ShaderInstance& shader_instance = material->getShaderInstance();
 		++m_stats.draw_call_count;
-		m_stats.instance_count += data.instance_count;
-		m_stats.triangle_count += data.instance_count * mesh.indices_count / 3;
+		m_stats.instance_count += data.instances_count;
+		m_stats.triangle_count += data.instances_count * mesh.indices_count / 3;
 		bgfx::submit(view.bgfx_id, shader_instance.getProgramHandle(view.pass_idx));
 
-		data.buffer.data = nullptr;
-		data.instance_count = 0;
+		
+		data.offset += data.instances_count;
+		if (data.offset == InstanceData::MAX_INSTANCE_COUNT)
+		{
+			data.buffer.data = nullptr;
+			data.offset = 0;
+		}
+		data.instances_count = 0;
 		mesh.instance_idx = -1;
+		data.mesh = nullptr;
 	}
 
 
@@ -2618,27 +2629,31 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		{
 			instance_idx = m_instance_data_idx;
 			m_instance_data_idx = (m_instance_data_idx + 1) % lengthOf(m_instances_data);
-			if (m_instances_data[instance_idx].buffer.data)
+			InstanceData& data = m_instances_data[instance_idx];
+			if (data.instances_count > 0)
 			{
 				finishInstances(instance_idx);
 			}
-			InstanceData& data = m_instances_data[instance_idx];
-			if (bgfx::getAvailInstanceDataBuffer(InstanceData::MAX_INSTANCE_COUNT, sizeof(Matrix)) < InstanceData::MAX_INSTANCE_COUNT)
+			if (!data.buffer.data)
 			{
-				g_log_warning.log("Renderer") << "Could not allocate instance data buffer";
-				return;
+				if (bgfx::getAvailInstanceDataBuffer(InstanceData::MAX_INSTANCE_COUNT, sizeof(Matrix)) < InstanceData::MAX_INSTANCE_COUNT)
+				{
+					g_log_warning.log("Renderer") << "Could not allocate instance data buffer";
+					return;
+				}
+				bgfx::allocInstanceDataBuffer(&data.buffer, InstanceData::MAX_INSTANCE_COUNT, sizeof(Matrix));
+				data.instances_count = 0;
+				data.offset = 0;
 			}
-			bgfx::allocInstanceDataBuffer(&data.buffer, InstanceData::MAX_INSTANCE_COUNT, sizeof(Matrix));
-			data.instance_count = 0;
 			data.mesh = &mesh;
 			mesh.instance_idx = instance_idx;
 		}
 		InstanceData& data = m_instances_data[instance_idx];
-		float* mtcs = (float*)data.buffer.data;
-		copyMemory(&mtcs[data.instance_count * 16], &matrix, sizeof(matrix));
-		++data.instance_count;
+		Matrix* mtcs = (Matrix*)data.buffer.data;
+		copyMemory(&mtcs[data.offset + data.instances_count], &matrix, sizeof(matrix));
+		++data.instances_count;
 
-		if (data.instance_count == InstanceData::MAX_INSTANCE_COUNT)
+		if (data.instances_count + data.offset == InstanceData::MAX_INSTANCE_COUNT)
 		{
 			finishInstances(instance_idx);
 		}
@@ -3020,7 +3035,8 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		for (int i = 0; i < lengthOf(m_instances_data); ++i)
 		{
 			m_instances_data[i].buffer.data = nullptr;
-			m_instances_data[i].instance_count = 0;
+			m_instances_data[i].instances_count = 0;
+			m_instances_data[i].offset = 0;
 		}
 
 		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
