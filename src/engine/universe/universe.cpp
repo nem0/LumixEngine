@@ -356,7 +356,7 @@ void Universe::destroyEntity(Entity entity)
 	ASSERT(entity_data.valid);
 	for (Entity first_child = getFirstChild(entity); first_child.isValid(); first_child = getFirstChild(entity))
 	{
-		setParent(INVALID_ENTITY, first_child);
+		destroyEntity(first_child);
 	}
 	setParent(INVALID_ENTITY, entity);
 	
