@@ -440,7 +440,7 @@ private:
 			if (ImGui::IsMouseClicked(0) && ImGui::IsItemHovered() && m_mouse_mode == MouseMode::NONE)
 			{
 				Entity e = scene->getRectAt(toLumix(mouse_canvas_pos), toLumix(size));
-				if (e.isValid()) m_editor->selectEntities(&e, 1);
+				if (e.isValid()) m_editor->selectEntities(&e, 1, false);
 			}
 
 			bool has_rect = false;
@@ -526,7 +526,7 @@ private:
 		m_editor->beginCommandGroup(crc32("create_gui_rect_child"));
 		Entity child = m_editor->addEntity();
 		m_editor->makeParent(entity, child);
-		m_editor->selectEntities(&child, 1);
+		m_editor->selectEntities(&child, 1, false);
 		m_editor->addComponent(child_type);
 		m_editor->endCommandGroup();
 	}

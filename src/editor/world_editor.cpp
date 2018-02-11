@@ -1323,7 +1323,9 @@ private:
 			for (int i = 0; i < count; ++i)
 			{
 				m_entities.push(entities[i]);
+				pushChildren(entities[i]);
 			}
+			m_entities.removeDuplicates();
 			m_transformations.reserve(m_entities.size());
 		}
 
@@ -1333,6 +1335,17 @@ private:
 			for (Resource* resource : m_resources)
 			{
 				resource->getResourceManager().unload(*resource);
+			}
+		}
+
+
+		void pushChildren(Entity entity)
+		{
+			Universe* universe = m_editor.getUniverse();
+			for (Entity e = universe->getFirstChild(entity); e.isValid(); e = universe->getNextSibling(e))
+			{
+				m_entities.push(e);
+				pushChildren(e);
 			}
 		}
 
@@ -1412,16 +1425,12 @@ private:
 				{
 					Transform local_tr = universe->getLocalTransform(m_entities[i]);
 					m_old_values.write(local_tr);
-					float local_scale = universe->getLocalScale(m_entities[i]);
-					m_old_values.write(local_scale);
 				}
 				for (Entity child = universe->getFirstChild(m_entities[i]); child.isValid(); child = universe->getNextSibling(child))
 				{
 					m_old_values.write(child);
 					Transform local_tr = universe->getLocalTransform(child);
 					m_old_values.write(local_tr);
-					float local_scale = universe->getLocalScale(child);
-					m_old_values.write(local_scale);
 				}
 				m_old_values.write(INVALID_ENTITY);
 
@@ -1447,9 +1456,11 @@ private:
 				}
 				u64 prefab = m_editor.getPrefabSystem().getPrefab(m_entities[i]);
 				m_old_values.write(prefab);
-
-				universe->destroyEntity(m_entities[i]);
-				m_editor.m_entity_map.erase(m_entities[i]);
+			}
+			for (Entity e : m_entities)
+			{
+				universe->destroyEntity(e);
+				m_editor.m_entity_map.erase(e);
 			}
 			return true;
 		}
@@ -1701,7 +1712,7 @@ private:
 				m_editor.getUniverse()->setPosition(m_entity, m_position);
 			}
 			((WorldEditorImpl&)m_editor).m_entity_map.create(m_entity);
-			m_editor.selectEntities(&m_entity, 1);
+			m_editor.selectEntities(&m_entity, 1, false);
 			return true;
 		}
 
@@ -2046,7 +2057,7 @@ public:
 		if (min.y > max.y) Math::swap(min.y, max.y);
 		Frustum frustum = m_render_interface->getFrustum(camera_entity, min, max);
 		m_render_interface->getModelInstaces(entities, frustum, camera_pos, camera_entity);
-		selectEntities(entities.empty() ? nullptr : &entities[0], entities.size());
+		selectEntities(entities.empty() ? nullptr : &entities[0], entities.size(), false);
 	}
 
 
@@ -2083,26 +2094,12 @@ public:
 					if (icon_hit.entity != INVALID_ENTITY)
 					{
 						Entity e = icon_hit.entity;
-						if (m_is_additive_selection)
-						{
-							addEntitiesToSelection(&e, 1);
-						}
-						else
-						{
-							selectEntities(&e, 1);
-						}
+						selectEntities(&e, 1, true);
 					}
 					else if (hit.is_hit)
 					{
 						Entity entity = hit.entity;
-						if (m_is_additive_selection)
-						{
-							addEntitiesToSelection(&entity, 1);
-						}
-						else
-						{
-							selectEntities(&entity, 1);
-						}
+						selectEntities(&entity, 1, true);
 					}
 				}
 			}
@@ -2899,7 +2896,7 @@ public:
 		ASSERT(m_universe);
 		m_engine->getResourceManager().enableUnload(false);
 		m_engine->stopGame(*m_universe);
-		selectEntities(nullptr, 0);
+		selectEntities(nullptr, 0, false);
 		m_gizmo->clearEntities();
 		m_editor_icons->clear();
 		m_is_game_mode = false;
@@ -2920,7 +2917,7 @@ public:
 		}
 		m_engine->getFileSystem().close(*m_game_mode_file);
 		m_game_mode_file = nullptr;
-		if(m_selected_entity_on_game_mode.isValid()) selectEntities(&m_selected_entity_on_game_mode, 1);
+		if(m_selected_entity_on_game_mode.isValid()) selectEntities(&m_selected_entity_on_game_mode, 1, false);
 		m_engine->getResourceManager().enableUnload(true);
 	}
 
@@ -3193,7 +3190,7 @@ public:
 		, m_is_loading(false)
 		, m_universe(nullptr)
 		, m_is_orbit(false)
-		, m_is_additive_selection(false)
+		, m_is_toggle_selection(false)
 		, m_mouse_sensitivity(200, 200)
 		, m_render_interface(nullptr)
 		, m_selected_entity_on_game_mode(INVALID_ENTITY)
@@ -3306,7 +3303,7 @@ public:
 	}
 
 
-	void setAdditiveSelection(bool additive) override { m_is_additive_selection = additive; }
+	void setToggleSelection(bool is_toggle) override { m_is_toggle_selection = is_toggle; }
 
 
 	void addArrayPropertyItem(const ComponentUID& cmp, const Reflection::IArrayProperty& property) override
@@ -3425,24 +3422,34 @@ public:
 	}
 
 
-	void addEntitiesToSelection(const Entity* entities, int count)
+	void selectEntities(const Entity* entities, int count, bool toggle) override
 	{
-		for (int i = 0; i < count; ++i)
+		if (!toggle || !m_is_toggle_selection)
 		{
-			m_selected_entities.push(entities[i]);
+			m_gizmo->clearEntities();
+			m_selected_entities.clear();
+			for (int i = 0; i < count; ++i)
+			{
+				m_selected_entities.push(entities[i]);
+			}
 		}
-		m_entity_selected.invoke(m_selected_entities);
-	}
-
-
-	void selectEntities(const Entity* entities, int count) override
-	{
-		m_gizmo->clearEntities();
-		m_selected_entities.clear();
-		for (int i = 0; i < count; ++i)
+		else
 		{
-			m_selected_entities.push(entities[i]);
+			for (int i = 0; i < count; ++i)
+			{
+				int idx = m_selected_entities.indexOf(entities[i]);
+				if (idx < 0)
+				{
+					m_selected_entities.push(entities[i]);
+				}
+				else
+				{
+					m_selected_entities.eraseFast(idx);
+				}
+			}
 		}
+
+		m_selected_entities.removeDuplicates();
 		m_entity_selected.invoke(m_selected_entities);
 	}
 
@@ -3462,7 +3469,7 @@ public:
 		m_universe_destroyed.invoke();
 		m_editor_icons->clear();
 		m_gizmo->clearEntities();
-		selectEntities(nullptr, 0);
+		selectEntities(nullptr, 0, false);
 		m_camera = INVALID_ENTITY;
 		m_engine->destroyUniverse(*m_universe);
 		m_universe = nullptr;
@@ -3885,7 +3892,7 @@ private:
 	bool m_is_game_mode;
 	int m_game_mode_commands;
 	bool m_is_orbit;
-	bool m_is_additive_selection;
+	bool m_is_toggle_selection;
 	SnapMode m_snap_mode;
 	FS::IFile* m_game_mode_file;
 	Engine* m_engine;

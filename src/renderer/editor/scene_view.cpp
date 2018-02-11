@@ -273,7 +273,7 @@ void SceneView::handleDrop(const char* path, float x, float y)
 		m_editor.beginCommandGroup(crc32("insert_mesh"));
 		Entity entity = m_editor.addEntity();
 		m_editor.setEntitiesPositions(&entity, &pos, 1);
-		m_editor.selectEntities(&entity, 1);
+		m_editor.selectEntities(&entity, 1, false);
 		m_editor.addComponent(MODEL_INSTANCE_TYPE);
 		auto* prop = Reflection::getProperty(MODEL_INSTANCE_TYPE, "Source");
 		m_editor.setProperty(MODEL_INSTANCE_TYPE, -1, *prop, &entity, 1, path, stringLength(path) + 1);
@@ -292,7 +292,7 @@ void SceneView::handleDrop(const char* path, float x, float y)
 		if (hit.m_is_hit && hit.m_entity.isValid())
 		{
 			m_editor.beginCommandGroup(crc32("insert_phy_component"));
-			m_editor.selectEntities(&hit.m_entity, 1);
+			m_editor.selectEntities(&hit.m_entity, 1, false);
 			m_editor.addComponent(MESH_ACTOR_TYPE);
 			auto* prop = Reflection::getProperty(MESH_ACTOR_TYPE, "Source");
 			m_editor.setProperty(MESH_ACTOR_TYPE, -1, *prop, &hit.m_entity, 1, path, stringLength(path) + 1);
@@ -304,7 +304,7 @@ void SceneView::handleDrop(const char* path, float x, float y)
 			m_editor.beginCommandGroup(crc32("insert_phy"));
 			Entity entity = m_editor.addEntity();
 			m_editor.setEntitiesPositions(&entity, &pos, 1);
-			m_editor.selectEntities(&entity, 1);
+			m_editor.selectEntities(&entity, 1, false);
 			m_editor.addComponent(MESH_ACTOR_TYPE);
 			auto* prop = Reflection::getProperty(MESH_ACTOR_TYPE, "Source");
 			m_editor.setProperty(MESH_ACTOR_TYPE, -1, *prop, &entity, 1, path, stringLength(path) + 1);
@@ -313,7 +313,7 @@ void SceneView::handleDrop(const char* path, float x, float y)
 	}
 	else if (hit.m_is_hit && PathUtils::hasExtension(path, "mat") && hit.m_mesh)
 	{
-		m_editor.selectEntities(&hit.m_entity, 1);
+		m_editor.selectEntities(&hit.m_entity, 1, false);
 		RenderScene* scene = m_pipeline->getScene();
 		Model* model = scene->getModelInstanceModel(hit.m_entity);
 		int mesh_index = 0;

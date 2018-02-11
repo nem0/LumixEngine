@@ -113,7 +113,7 @@ public:
 	virtual EntityGUID getEntityGUID(Entity entity) = 0;
 	virtual Entity addEntity() = 0;
 	virtual void destroyEntities(const Entity* entities, int count) = 0;
-	virtual void selectEntities(const Entity* entities, int count) = 0;
+	virtual void selectEntities(const Entity* entities, int count, bool toggle) = 0;
 	virtual Entity addEntityAt(int camera_x, int camera_y) = 0;
 	virtual void setEntitiesPositions(const Entity* entities, const Vec3* positions, int count) = 0;
 	virtual void setEntitiesCoordinate(const Entity* entities, int count, float value, Coordinate coord) = 0;
@@ -138,7 +138,7 @@ public:
 		int size) = 0;
 	virtual void setCustomPivot() = 0;
 	virtual void setSnapMode(bool enable, bool vertex_snap) = 0;
-	virtual void setAdditiveSelection(bool additive) = 0;
+	virtual void setToggleSelection(bool is_toggle) = 0;
 	virtual void addArrayPropertyItem(const ComponentUID& cmp, const Reflection::IArrayProperty& property) = 0;
 	virtual void removeArrayPropertyItem(const ComponentUID& cmp, int index, const Reflection::IArrayProperty& property) = 0;
 	virtual bool isMouseDown(MouseButton::Value button) const = 0;

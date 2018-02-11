@@ -384,7 +384,7 @@ public:
 					if (create_entity)
 					{
 						Entity entity = editor->addEntity();
-						editor->selectEntities(&entity, 1);
+						editor->selectEntities(&entity, 1, false);
 					}
 
 					editor->addComponent(type);
@@ -452,7 +452,7 @@ public:
 					if (create_entity)
 					{
 						Entity entity = editor->addEntity();
-						editor->selectEntities(&entity, 1);
+						editor->selectEntities(&entity, 1, false);
 					}
 
 					editor->addComponent(type);
@@ -1242,7 +1242,7 @@ public:
 		ImGui::PushID(entity.index);
 		if (ImGui::Selectable(buffer, &selected))
 		{
-			m_editor->selectEntities(&entity, 1);
+			m_editor->selectEntities(&entity, 1, true);
 		}
 		if (ImGui::IsMouseReleased(1) && ImGui::IsItemHovered())
 		{
@@ -1325,7 +1325,7 @@ public:
 						bool selected = entities.indexOf(e) >= 0;
 						if (ImGui::Selectable(buffer, &selected))
 						{
-							m_editor->selectEntities(&e, 1);
+							m_editor->selectEntities(&e, 1, true);
 						}
 						if (ImGui::BeginDragDropSource())
 						{
@@ -1670,7 +1670,7 @@ public:
 
 	void selectEntity(Entity e)
 	{
-		m_editor->selectEntities(&e, 1);
+		m_editor->selectEntities(&e, 1, false);
 	}
 
 
@@ -1681,7 +1681,7 @@ public:
 
 	void createComponent(Entity e, int type)
 	{
-		m_editor->selectEntities(&e, 1);
+		m_editor->selectEntities(&e, 1, false);
 		m_editor->addComponent({type});
 	}
 
@@ -1776,7 +1776,7 @@ public:
 		WorldEditor& editor = *studio->m_editor;
 		editor.beginCommandGroup(crc32("createEntityEx"));
 		Entity e = editor.addEntity();
-		editor.selectEntities(&e, 1);
+		editor.selectEntities(&e, 1, false);
 
 		lua_pushvalue(L, 2);
 		lua_pushnil(L);
@@ -2297,7 +2297,7 @@ public:
 					break;
 				case SDL_QUIT: exit(); break;
 				case SDL_MOUSEBUTTONDOWN:
-					m_editor->setAdditiveSelection(io.KeyCtrl);
+					m_editor->setToggleSelection(io.KeyCtrl);
 					m_editor->setSnapMode(io.KeyShift, io.KeyCtrl);
 					switch (event.button.button)
 					{

@@ -560,12 +560,12 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 				char tmp[256];
 				getEntityListDisplayName(m_editor, tmp, lengthOf(tmp), cmp.entity);
 				bool b = false;
-				if (ImGui::Selectable(tmp, &b)) m_editor.selectEntities(&cmp.entity, 1);
+				if (ImGui::Selectable(tmp, &b)) m_editor.selectEntities(&cmp.entity, 1, false);
 				ImGui::NextColumn();
 
 				Entity other_entity = scene->getJointConnectedBody(cmp.entity);
 				getEntityListDisplayName(m_editor, tmp, lengthOf(tmp), other_entity);
-				if (other_entity.isValid() && ImGui::Selectable(tmp, &b)) m_editor.selectEntities(&other_entity, 1);
+				if (other_entity.isValid() && ImGui::Selectable(tmp, &b)) m_editor.selectEntities(&other_entity, 1, false);
 				ImGui::NextColumn();
 				ImGui::PopID();
 			}
@@ -636,7 +636,7 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 			char tmp[255];
 			getEntityListDisplayName(m_editor, tmp, lengthOf(tmp), cmp.entity);
 			bool selected = false;
-			if (ImGui::Selectable(tmp, &selected)) m_editor.selectEntities(&cmp.entity, 1);
+			if (ImGui::Selectable(tmp, &selected)) m_editor.selectEntities(&cmp.entity, 1, false);
 			ImGui::NextColumn();
 			auto type = scene->getActorType(i);
 			cmp.entity = scene->getActorEntity(i);
