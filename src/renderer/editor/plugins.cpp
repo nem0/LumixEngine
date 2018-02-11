@@ -2574,7 +2574,7 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	void shutdownImGui()
 	{
 		ImGui::ShutdownDock();
-		ImGui::Shutdown();
+		ImGui::DestroyContext();
 
 		Texture* texture = m_material->getTexture(0);
 		m_material->setTexture(0, nullptr);
