@@ -186,7 +186,6 @@ public:
 		Engine::PlatformData platform_data = {};
 		#ifdef _WIN32
 			platform_data.window_handle = window_info.info.win.window;
-			ImGui::GetIO().ImeWindowHandle = window_info.info.win.window;
 		#elif defined(__linux__)
 			platform_data.window_handle = (void*)(uintptr_t)window_info.info.x11.window;
 			platform_data.display = window_info.info.x11.display;
@@ -204,8 +203,12 @@ public:
 		m_profiler_ui = ProfilerUI::create(*m_engine);
 		m_log_ui = LUMIX_NEW(m_allocator, LogUI)(m_editor->getAllocator());
 
+		ImGui::CreateContext();
 		loadSettings();
 		initIMGUI();
+		#ifdef _WIN32
+			ImGui::GetIO().ImeWindowHandle = window_info.info.win.window;
+		#endif
 
 		m_custom_pivot_action = LUMIX_NEW(m_editor->getAllocator(), Action)(
 			"Set Custom Pivot", "Set Custom Pivot", "set_custom_pivot", SDLK_v, -1, -1);
@@ -522,6 +525,7 @@ public:
 		auto frame_padding = ImGui::GetStyle().FramePadding;
 		float padding = frame_padding.y * 2;
 		ImVec2 toolbar_size(ImGui::GetIO().DisplaySize.x, 24 + padding);
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0);
 		if (ImGui::BeginToolbar("main_toolbar", ImVec2(1, menu_height), toolbar_size))
 		{
 			for (auto* action : m_toolbar_actions)
@@ -530,6 +534,7 @@ public:
 			}
 		}
 		ImGui::EndToolbar();
+		ImGui::PopStyleVar();
 		return menu_height + 24 + padding;
 	}
 
@@ -1194,6 +1199,7 @@ public:
 		}
 
 		float menu_height = 0;
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0);
 		if (ImGui::BeginMainMenuBar())
 		{
 			fileMenu();
@@ -1229,6 +1235,7 @@ public:
 			menu_height = ImGui::GetWindowSize().y;
 			ImGui::EndMainMenuBar();
 		}
+		ImGui::PopStyleVar();
 		return menu_height;
 	}
 
@@ -1385,6 +1392,7 @@ public:
 	void initIMGUI()
 	{
 		ImGuiIO& io = ImGui::GetIO();
+		io.NavFlags |= ImGuiNavFlags_EnableKeyboard;
 		float ddpi;
 		float font_scale = 1;
 		if (SDL_GetDisplayDPI(0, &ddpi, nullptr, nullptr) == 0) font_scale = ddpi / 96;
@@ -1394,6 +1402,7 @@ public:
 		m_font->DisplayOffset.y = 0;
 		m_bold_font->DisplayOffset.y = 0;
 
+		io.KeyMap[ImGuiKey_Space] = SDL_SCANCODE_SPACE;
 		io.KeyMap[ImGuiKey_Tab] = SDL_SCANCODE_TAB;
 		io.KeyMap[ImGuiKey_LeftArrow] = SDL_SCANCODE_LEFT;
 		io.KeyMap[ImGuiKey_RightArrow] = SDL_SCANCODE_RIGHT;
