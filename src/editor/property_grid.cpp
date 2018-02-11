@@ -576,7 +576,7 @@ void PropertyGrid::showComponentProperties(const Array<Entity>& entities, Compon
 
 	if (m_deferred_select.isValid())
 	{
-		m_editor.selectEntities(&m_deferred_select, 1);
+		m_editor.selectEntities(&m_deferred_select, 1, false);
 		m_deferred_select = INVALID_ENTITY;
 	}
 
