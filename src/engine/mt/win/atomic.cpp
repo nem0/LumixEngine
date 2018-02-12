@@ -53,5 +53,5 @@ LUMIX_ENGINE_API void memoryBarrier()
 }
 
 
-} // ~namespace MT
-} // ~namespace Lumix
+} // namespace MT
+} // namespace Lumix

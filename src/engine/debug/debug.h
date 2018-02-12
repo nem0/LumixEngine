@@ -1,8 +1,8 @@
 #pragma once
 
 
-#include "engine/lumix.h"
 #include "engine/iallocator.h"
+#include "engine/lumix.h"
 #include "engine/mt/sync.h"
 
 
@@ -55,7 +55,7 @@ public:
 
 public:
 	explicit Allocator(IAllocator& source);
-	virtual ~Allocator();
+	~Allocator();
 
 	void* allocate(size_t size) override;
 	void deallocate(void* ptr) override;

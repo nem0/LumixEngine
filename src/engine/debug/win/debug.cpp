@@ -221,7 +221,8 @@ StackNode* StackTree::record()
 			--ptr;
 			return insertChildren(node->m_next, ptr, stack);
 		}
-		else if (node->m_first_child)
+		
+		if (node->m_first_child)
 		{
 			--ptr;
 			node = node->m_first_child;

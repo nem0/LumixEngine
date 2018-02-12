@@ -109,8 +109,8 @@ struct BoneProperty : Reflection::IEnumProperty
 	}
 
 
-	int getEnumValueIndex(ComponentUID cmp, int value) const { return value; }
-	int getEnumValue(ComponentUID cmp, int index) const { return index; }
+	int getEnumValueIndex(ComponentUID cmp, int value) const override  { return value; }
+	int getEnumValue(ComponentUID cmp, int index) const override { return index; }
 
 
 	int getEnumCount(ComponentUID cmp) const override

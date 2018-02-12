@@ -1231,4 +1231,4 @@ void Gizmo::destroy(Gizmo& gizmo)
 }
 
 
-} // !namespace Lumix
+} // namespace Lumix

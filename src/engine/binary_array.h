@@ -39,6 +39,8 @@ namespace Lumix
 
 		public:
 			explicit BinaryArray(IAllocator& allocator);
+			BinaryArray(const BinaryArray& rhs) = delete;
+			void operator =(const BinaryArray& rhs) = delete;
 			~BinaryArray();
 
 			Accessor operator[](int index);
@@ -59,8 +61,6 @@ namespace Lumix
 
 		private:
 			void grow(int capacity);
-			BinaryArray(const BinaryArray& rhs);
-			void operator =(const BinaryArray& rhs);
 
 		private:
 			IAllocator& m_allocator;

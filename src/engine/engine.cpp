@@ -1716,4 +1716,4 @@ void Engine::destroy(Engine* engine, IAllocator& allocator)
 }
 
 
-} // ~namespace Lumix
+} // namespace Lumix

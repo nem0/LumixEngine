@@ -273,4 +273,4 @@ public:
 };
 
 
-} // !namespace Lumix
+} // namespace Lumix

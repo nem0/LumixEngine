@@ -366,7 +366,6 @@ void Universe::destroyEntity(Entity entity)
 	{
 		if ((mask & ((u64)1 << i)) != 0)
 		{
-			ComponentType type = {i};
 			auto original_mask = mask;
 			IScene* scene = m_component_type_map[i].scene;
 			auto destroy_method = m_component_type_map[i].destroy;

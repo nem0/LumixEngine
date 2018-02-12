@@ -219,11 +219,8 @@ public:
 			{
 				return prev;
 			}
-			else
-			{
-				prev->release();
-				return nullptr;
-			}
+			prev->release();
+			return nullptr;
 		}
 		return nullptr;
 	}

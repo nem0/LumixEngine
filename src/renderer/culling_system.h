@@ -44,4 +44,4 @@ namespace Lumix
 		virtual void insert(const InputSpheres& spheres, const Array<Entity>& model_instances) = 0;
 		virtual const Sphere& getSphere(Entity model_instance) = 0;
 	};
-} // ~namespace Lux
+} // namespace Lux

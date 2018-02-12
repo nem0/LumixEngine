@@ -1,8 +1,8 @@
 #pragma once
 
 
-#include "engine/lumix.h"
 #include "engine/iallocator.h"
+#include "engine/lumix.h"
 #include "engine/math_utils.h"
 #include "engine/string.h"
 
@@ -662,10 +662,7 @@ namespace Lumix
 
 				return m_sentinel;
 			}
-			else
-			{
-				return next;
-			}
+			return next;
 		}
 
 		node_type* _find(const key_type& key) const

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "engine/lumix.h"
 #include "engine/fs/ifile_device.h"
+#include "engine/lumix.h"
 
 namespace Lumix
 {
@@ -27,5 +27,5 @@ namespace Lumix
 			char m_base_path[MAX_PATH_LENGTH];
 			char m_name[20];
 		};
-	} // ~namespace FS
-} // ~namespace Lumix
+	} // namespace FS
+} // namespace Lumix

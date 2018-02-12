@@ -130,5 +130,5 @@ public:
 };
 
 
-} // ~namespace FS
-} // ~namespace Lumix
+} // namespace FS
+} // namespace Lumix

@@ -63,5 +63,5 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 }; 
 
 
-} // !namespace Lumix
+} // namespace Lumix
 

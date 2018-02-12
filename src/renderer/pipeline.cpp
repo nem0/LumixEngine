@@ -3625,4 +3625,4 @@ void Pipeline::registerLuaAPI(lua_State* L)
 }
 
 
-} // ~namespace Lumix
+} // namespace Lumix

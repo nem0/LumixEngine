@@ -22,6 +22,8 @@ class LUMIX_ENGINE_API JsonSerializer
 {
 	public:
 		JsonSerializer(FS::IFile& file, const Path& path);
+		void operator=(const JsonSerializer&) = delete;
+		JsonSerializer(const JsonSerializer&) = delete;
 
 		void serialize(const char* label, Entity value);
 		void serialize(const char* label, u32 value);
@@ -51,10 +53,6 @@ class LUMIX_ENGINE_API JsonSerializer
 		void writeBlockComma();
 
 	private:
-		void operator=(const JsonSerializer&) = delete;
-		JsonSerializer(const JsonSerializer&) = delete;
-
-	private:
 		bool m_is_first_in_block;
 		FS::IFile& m_file;
 };
@@ -65,6 +63,8 @@ class LUMIX_ENGINE_API JsonDeserializer
 	friend class ErrorProxy;
 public:
 	JsonDeserializer(FS::IFile& file, const Path& path, IAllocator& allocator);
+	void operator=(const JsonDeserializer&) = delete;
+	JsonDeserializer(const JsonDeserializer&) = delete;
 	~JsonDeserializer();
 
 	void deserialize(const char* label, Entity& value, Entity default_value);
@@ -107,10 +107,6 @@ private:
 	void deserializeArrayComma();
 	float tokenToFloat();
 	void expectToken(char expected_token);
-
-private:
-	void operator=(const JsonDeserializer&) = delete;
-	JsonDeserializer(const JsonDeserializer&) = delete;
 
 private:
 	bool m_is_first_in_block;

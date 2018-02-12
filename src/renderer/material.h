@@ -134,4 +134,4 @@ private:
 	int m_layers_count;
 };
 
-} // ~namespace Lumix
+} // namespace Lumix

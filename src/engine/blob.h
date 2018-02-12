@@ -1,8 +1,8 @@
 #pragma once
 
 
-#include "engine/lumix.h"
 #include "engine/array.h"
+#include "engine/lumix.h"
 
 
 namespace Lumix
@@ -96,4 +96,4 @@ namespace Lumix
 		read(&v, sizeof(v));
 		return v != 0;
 	}
-} // !namespace Lumix
+} // namespace Lumix

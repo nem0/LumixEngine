@@ -359,4 +359,4 @@ private:
 };
 
 
-} // ~namespace Lumix
+} // namespace Lumix

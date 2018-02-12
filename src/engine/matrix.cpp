@@ -385,4 +385,4 @@ void Matrix::setIdentity()
 }
 
 
-} // !namespace Lumix
+} // namespace Lumix

@@ -124,11 +124,8 @@ namespace Lumix
 			m_paths.insert(hash, internal);
 			return internal;
 		}
-		else
-		{
-			++m_paths.at(index)->m_ref_count;
-			return m_paths.at(index);
-		}
+		++m_paths.at(index)->m_ref_count;
+		return m_paths.at(index);
 	}
 
 

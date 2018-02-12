@@ -37,4 +37,4 @@ struct LUMIX_RENDERER_API Pose
 };
 
 
-} // ~namespace Lumix
+} // namespace Lumix

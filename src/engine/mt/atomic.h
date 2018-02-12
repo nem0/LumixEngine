@@ -18,5 +18,5 @@ LUMIX_ENGINE_API bool compareAndExchange64(i64 volatile* dest, i64 exchange, i64
 LUMIX_ENGINE_API void memoryBarrier();
 
 
-} // ~namespace MT
-} // ~namespace Lumix
+} // namespace MT
+} // namespace Lumix

@@ -264,5 +264,5 @@ float randFloat(float from, float to)
 }
 
 
-} // ~namespace Math
-} // ~namespace Lumix
+} // namespace Math
+} // namespace Lumix

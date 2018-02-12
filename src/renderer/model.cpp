@@ -920,4 +920,4 @@ void Model::unload()
 }
 
 
-} // ~namespace Lumix
+} // namespace Lumix

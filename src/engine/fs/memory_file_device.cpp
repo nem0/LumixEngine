@@ -1,6 +1,6 @@
+#include "engine/fs/file_system.h"
 #include "engine/fs/memory_file_device.h"
 #include "engine/iallocator.h"
-#include "engine/fs/file_system.h"
 #include "engine/math_utils.h"
 #include "engine/string.h"
 
@@ -177,5 +177,5 @@ namespace Lumix
 		{
 			return LUMIX_NEW(m_allocator, MemoryFile)(child, *this, m_allocator);
 		}
-	} // ~namespace FS
-} // ~namespace Lumix
+	} // namespace FS
+} // namespace Lumix

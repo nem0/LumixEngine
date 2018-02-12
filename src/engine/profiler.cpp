@@ -1,9 +1,9 @@
-#include "profiler.h"
 #include "engine/hash_map.h"
 #include "engine/log.h"
 #include "engine/timer.h"
 #include "engine/mt/sync.h"
 #include "engine/mt/thread.h"
+#include "profiler.h"
 
 
 namespace Lumix
