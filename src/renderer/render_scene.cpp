@@ -4417,9 +4417,14 @@ public:
 		auto& probe = m_environment_probes[entity];
 		auto* texture_manager = m_engine.getResourceManager().get(Texture::TYPE);
 		if (probe.texture) texture_manager->unload(*probe.texture);
-		StaticString<MAX_PATH_LENGTH> path("universes/", m_universe.getName(), "/probes/", probe.guid, ".dds");
-		probe.texture = static_cast<Texture*>(texture_manager->load(Path(path)));
-		probe.texture->setFlag(BGFX_TEXTURE_SRGB, true);
+		probe.texture = nullptr;
+		StaticString<MAX_PATH_LENGTH> path;
+		if (probe.flags.isSet(EnvironmentProbe::REFLECTION))
+		{
+			path  << "universes/" << m_universe.getName() << "/probes/" << probe.guid << ".dds";
+			probe.texture = static_cast<Texture*>(texture_manager->load(Path(path)));
+			probe.texture->setFlag(BGFX_TEXTURE_SRGB, true);
+		}
 		path = "universes/";
 		path << m_universe.getName() << "/probes/" << probe.guid << "_irradiance.dds";
 		probe.irradiance = static_cast<Texture*>(texture_manager->load(Path(path)));
