@@ -18,7 +18,7 @@ public:
 		m_allocation_count = 0;
 	}
 
-	virtual ~BaseProxyAllocator() { ASSERT(m_allocation_count == 0); }
+	~BaseProxyAllocator() { ASSERT(m_allocation_count == 0); }
 
 
 	void* allocate_aligned(size_t size, size_t align) override

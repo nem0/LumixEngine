@@ -291,4 +291,4 @@ namespace Lumix
 	}
 
 
-} // !namespace Lumix
+} // namespace Lumix

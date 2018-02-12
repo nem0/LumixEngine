@@ -1,7 +1,7 @@
 #pragma once
 
-#include "engine/lumix.h"
 #include "engine/fs/ifile_device.h"
+#include "engine/lumix.h"
 
 struct mf_resource;
 

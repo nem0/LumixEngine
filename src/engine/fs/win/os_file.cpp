@@ -1,7 +1,7 @@
 #include "engine/fs/os_file.h"
-#include "engine/win/simple_win.h"
-#include "engine/string.h"
 #include "engine/lumix.h"
+#include "engine/string.h"
+#include "engine/win/simple_win.h"
 
 
 namespace Lumix

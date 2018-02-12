@@ -75,4 +75,4 @@ namespace Lumix
 #endif
 
 
-} // ~namespace Lumix
+} // namespace Lumix

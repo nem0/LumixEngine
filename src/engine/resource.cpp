@@ -195,4 +195,4 @@ void Resource::onStateChanged(State old_state, State new_state, Resource&)
 }
 
 
-} // ~namespace Lumix
+} // namespace Lumix

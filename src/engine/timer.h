@@ -47,4 +47,4 @@ namespace Lumix
 		const char* m_name;
 		Timer* m_timer;
 	};
-} // !namespace Lumix
+} // namespace Lumix

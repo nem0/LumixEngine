@@ -101,4 +101,4 @@ namespace Lumix
 		i32		m_pool_index;
 		i32		m_pool[chunk_size];
 	};
-} // ~namespace Lumix
+} // namespace Lumix

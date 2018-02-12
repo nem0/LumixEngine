@@ -1,6 +1,6 @@
 #include "engine/fs/file_events_device.h"
-#include "engine/iallocator.h"
 #include "engine/fs/file_system.h"
+#include "engine/iallocator.h"
 #include "engine/path.h"
 
 #ifdef FILE_EVENT_DEVICE
@@ -23,7 +23,7 @@ namespace Lumix
 			}
 
 
-			virtual ~EventsFile() 
+			~EventsFile() 
 			{
 				m_file.release();
 			}
@@ -141,6 +141,6 @@ namespace Lumix
 			return LUMIX_NEW(m_allocator, EventsFile)(*child, *this, OnEvent);
 		}
 	} // namespace FS
-} // ~namespace Lumix
+} // namespace Lumix
 
 #endif //FILE_EVENT_DEVICE

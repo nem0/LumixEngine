@@ -202,5 +202,5 @@ namespace Lumix
 			volatile bool		m_aborted;
 			MT::Semaphore		m_data_signal;
 		};
-	} // ~namespace MT
-} // ~namespace Lumix
+	} // namespace MT
+} // namespace Lumix

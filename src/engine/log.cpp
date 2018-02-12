@@ -87,4 +87,4 @@ LogProxy& LogProxy::operator<<(const Path& path)
 }
 
 
-} // ~namespace Lumix
+} // namespace Lumix

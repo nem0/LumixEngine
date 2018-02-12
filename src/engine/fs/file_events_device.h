@@ -3,10 +3,9 @@
 #define FILE_EVENT_DEVICE
 #ifdef FILE_EVENT_DEVICE
 
-#include "engine/lumix.h"
-#include "engine/fs/ifile_device.h"
-
 #include "engine/delegate.h"
+#include "engine/fs/ifile_device.h"
+#include "engine/lumix.h"
 
 namespace Lumix
 {
@@ -59,6 +58,6 @@ namespace Lumix
 			IAllocator& m_allocator;
 		};
 	} // namespace FS
-} // ~namespace Lumix
+} // namespace Lumix
 
 #endif //FILE_EVENT_DEVICE

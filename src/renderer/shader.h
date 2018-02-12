@@ -162,4 +162,4 @@ private:
 	bool load(FS::IFile& file) override;
 };
 
-} // ~namespace Lumix
+} // namespace Lumix

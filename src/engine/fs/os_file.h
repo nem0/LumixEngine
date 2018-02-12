@@ -1,7 +1,7 @@
 #pragma once
 
-#include "engine/lumix.h"
 #include "engine/fs/file_system.h"
+#include "engine/lumix.h"
 
 namespace Lumix
 {
@@ -40,5 +40,5 @@ namespace Lumix
 		private:
 			void* m_handle;
 		};
-	} // ~namespace FS
-} // ~namespace Lumix
+	} // namespace FS
+} // namespace Lumix

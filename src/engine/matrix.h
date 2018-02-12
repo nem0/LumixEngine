@@ -373,4 +373,4 @@ LUMIX_ALIGN_BEGIN(16) struct LUMIX_ENGINE_API Matrix
 } LUMIX_ALIGN_END(16);
 
 
-} // !namespace Lumix
+} // namespace Lumix

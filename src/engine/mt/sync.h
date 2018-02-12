@@ -95,9 +95,10 @@ public:
 	}
 	~SpinLock() { m_mutex.unlock(); }
 
+	SpinLock(const SpinLock&) = delete;
+	void operator=(const SpinLock&) = delete;
+
 private:
-	SpinLock(const SpinLock&);
-	void operator=(const SpinLock&);
 	SpinMutex& m_mutex;
 };
 

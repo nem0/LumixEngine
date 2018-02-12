@@ -887,4 +887,4 @@ bool Material::load(FS::IFile& file)
 }
 
 
-} // ~namespace Lumix
+} // namespace Lumix

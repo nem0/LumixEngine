@@ -114,9 +114,8 @@ bool Frustum::isSphereInside(const Vec3& center, float radius) const
 	t = f4Add(t, f4Mul(cz, pz));
 	t = f4Add(t, pd);
 	t = f4Sub(t, f4Splat(-radius));
-	if (f4MoveMask(t)) return false;
-
-	return true;
+	
+	return f4MoveMask(t) == 0;
 }
 
 

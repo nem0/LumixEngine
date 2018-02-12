@@ -68,7 +68,6 @@ struct Tuple<Head, Tail...> : Tuple<Tail...>
 template <typename... Types>
 auto makeTuple(Types... types)
 {
-	using R = Tuple<Types...>;
 	return Tuple<Types...>(types...);
 }
 

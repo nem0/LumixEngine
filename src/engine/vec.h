@@ -471,4 +471,4 @@ inline void lerp(const Vec2& op1, const Vec2& op2, Vec2* out, float t)
 }
 
 
-} // !namespace Lumix
+} // namespace Lumix

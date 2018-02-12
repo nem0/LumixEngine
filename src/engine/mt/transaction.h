@@ -19,5 +19,5 @@ namespace Lumix
 			MT::Event	m_event;
 			T			data;
 		};
-	} // ~namespace MT
-} // ~namespace Lumix
+	} // namespace MT
+} // namespace Lumix

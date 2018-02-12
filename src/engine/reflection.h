@@ -1,11 +1,11 @@
 #pragma once
 
 
-#include "engine/lumix.h"
 #include "engine/blob.h"
+#include "engine/lumix.h"
+#include "engine/metaprogramming.h"
 #include "engine/resource.h"
 #include "engine/universe/component.h"
-#include "engine/metaprogramming.h"
 
 
 #define LUMIX_PROP_FULL(Scene, Getter, Setter) \

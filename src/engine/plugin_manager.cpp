@@ -1,11 +1,11 @@
-#include "engine/plugin_manager.h"
 #include "engine/array.h"
-#include "engine/log.h"
-#include "engine/profiler.h"
-#include "engine/system.h"
 #include "engine/debug/debug.h"
 #include "engine/engine.h"
 #include "engine/iplugin.h"
+#include "engine/log.h"
+#include "engine/plugin_manager.h"
+#include "engine/profiler.h"
+#include "engine/system.h"
 
 
 namespace Lumix 
@@ -92,7 +92,7 @@ class PluginManagerImpl LUMIX_FINAL : public PluginManager
 					return m_plugins[i];
 				}
 			}
-			return 0;
+			return nullptr;
 		}
 
 
@@ -194,4 +194,4 @@ void PluginManager::destroy(PluginManager* manager)
 }
 
 
-} // ~namespace Lumix
+} // namespace Lumix

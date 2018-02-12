@@ -1,8 +1,8 @@
 #pragma once
 
 
-#include "engine/lumix.h"
 #include "engine/iallocator.h"
+#include "engine/lumix.h"
 
 
 namespace Lumix
@@ -11,9 +11,6 @@ namespace Lumix
 class LUMIX_ENGINE_API DefaultAllocator LUMIX_FINAL : public IAllocator
 {
 public:
-	DefaultAllocator() {}
-	~DefaultAllocator() {}
-
 	void* allocate(size_t n) override;
 	void deallocate(void* p) override;
 	void* reallocate(void* ptr, size_t size) override;
@@ -23,4 +20,4 @@ public:
 };
 
 
-} // ~namespace Lumix
+} // namespace Lumix

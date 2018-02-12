@@ -326,4 +326,4 @@ void EditorIcons::destroy(EditorIcons& icons)
 }
 
 
-} // !namespace Lumix
+} // namespace Lumix

@@ -89,4 +89,4 @@ protected:
 };
 
 
-} // ~namespace Lumix
+} // namespace Lumix

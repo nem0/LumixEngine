@@ -313,7 +313,6 @@ function linkPhysX()
 		configuration { "x64", "linux-*" }
 			libdirs {"../external/physx/lib/linux64_gcc5", "../external/physx/dll/linux64_gcc5"}
 			links {"PhysX3CHECKED_x64", "PhysX3CommonCHECKED_x64", "PhysX3CharacterKinematicCHECKED_x64", "PhysX3CookingCHECKED_x64" }
-		
 
 		configuration { "Debug" }
 			links { "PhysX3ExtensionsDEBUG", "PhysXVisualDebuggerSDKDEBUG" }
@@ -321,7 +320,7 @@ function linkPhysX()
 			links { "PhysX3ExtensionsCHECKED", "PhysXVisualDebuggerSDKCHECKED" }
 		configuration { "RelWithDebInfo" }
 			links { "PhysX3ExtensionsCHECKED", "PhysXVisualDebuggerSDKCHECKED" }
-			
+
 		configuration {}
 	end
 end

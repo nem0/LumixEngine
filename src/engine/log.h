@@ -63,4 +63,4 @@ namespace Lumix
 	extern Log LUMIX_ENGINE_API g_log_error;
 
 
-} // ~namespace Lumix
+} // namespace Lumix

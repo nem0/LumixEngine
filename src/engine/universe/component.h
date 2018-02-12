@@ -42,4 +42,4 @@ struct LUMIX_ENGINE_API ComponentUID final
 };
 
 
-} // ~namespace Lumix
+} // namespace Lumix

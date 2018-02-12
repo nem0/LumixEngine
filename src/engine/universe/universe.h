@@ -3,11 +3,11 @@
 
 #include "engine/array.h"
 #include "engine/delegate_list.h"
+#include "engine/iplugin.h"
 #include "engine/lumix.h"
 #include "engine/matrix.h"
 #include "engine/quat.h"
 #include "engine/string.h"
-#include "engine/iplugin.h"
 
 
 namespace Lumix
@@ -193,4 +193,4 @@ private:
 };
 
 
-} // !namespace Lumix
+} // namespace Lumix

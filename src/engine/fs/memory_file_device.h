@@ -1,7 +1,7 @@
 #pragma once
 
-#include "engine/lumix.h"
 #include "engine/fs/ifile_device.h"
+#include "engine/lumix.h"
 
 namespace Lumix
 {
@@ -24,5 +24,5 @@ namespace Lumix
 		private:
 			IAllocator& m_allocator;
 		};
-	} // ~namespace FS
-} // ~namespace Lumix
+	} // namespace FS
+} // namespace Lumix

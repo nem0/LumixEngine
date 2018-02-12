@@ -81,4 +81,4 @@ void Timer::destroy(Timer* timer)
 }
 
 
-} // ~namespace Lumix
+} // namespace Lumix

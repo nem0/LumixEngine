@@ -129,4 +129,4 @@ namespace Lumix
 			return LUMIX_NEW(m_allocator, DiskFile)(fallthrough, *this, m_allocator);
 		}
 	} // namespace FS
-} // ~namespace Lumix
+} // namespace Lumix

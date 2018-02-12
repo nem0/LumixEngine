@@ -821,7 +821,7 @@ bool toCString(u32 value, char* output, int length)
 	return false;
 }
 
-static bool increment(char* output, char* end, bool is_space_after)
+static bool increment(const char* output, char* end, bool is_space_after)
 {
 	char carry = 1;
 	char* c = end;
@@ -954,4 +954,4 @@ bool startsWith(const char* str, const char* prefix)
 }
 
 
-} // ~namespace Lumix
+} // namespace Lumix
