@@ -4966,6 +4966,22 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
+	void applyImpulseToActor(Entity entity, const Vec3& impulse) override
+	{
+		RigidActor* actor = m_actors[entity];
+		if (!actor) return;
+		if (actor->dynamic_type != DynamicType::DYNAMIC)
+		{
+			g_log_warning.log("Physics") << "Trying to apply force to static object #" << entity.index;
+			return;
+		}
+
+		auto* physx_actor = static_cast<PxRigidDynamic*>(actor->physx_actor);
+		if (!physx_actor) return;
+		physx_actor->addForce(toPhysx(impulse), PxForceMode::eIMPULSE);
+	}
+
+
 	static PxFilterFlags filterShader(
 		PxFilterObjectAttributes attributes0, PxFilterData filterData0,
 		PxFilterObjectAttributes attributes1, PxFilterData filterData1,
@@ -5220,6 +5236,7 @@ void PhysicsScene::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(getActorSpeed);
 	REGISTER_FUNCTION(getActorVelocity);
 	REGISTER_FUNCTION(applyForceToActor);
+	REGISTER_FUNCTION(applyImpulseToActor);
 	REGISTER_FUNCTION(moveController);
 	REGISTER_FUNCTION(isControllerCollisionDown);
 	REGISTER_FUNCTION(setRagdollKinematic);
