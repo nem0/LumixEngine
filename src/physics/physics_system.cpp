@@ -46,6 +46,7 @@ namespace Lumix
 			component("sphere_rigid_actor",
 				functions(
 					function(LUMIX_FUNC(PhysicsScene::applyForceToActor)),
+					function(LUMIX_FUNC(PhysicsScene::applyImpulseToActor)),
 					function(LUMIX_FUNC(PhysicsScene::getActorVelocity))
 				),
 				property("Radius", LUMIX_PROP(PhysicsScene, SphereRadius),
@@ -57,6 +58,7 @@ namespace Lumix
 			component("capsule_rigid_actor",
 				functions(
 					function(LUMIX_FUNC(PhysicsScene::applyForceToActor)),
+					function(LUMIX_FUNC(PhysicsScene::applyImpulseToActor)),
 					function(LUMIX_FUNC(PhysicsScene::getActorVelocity))
 				),
 				property("Radius", LUMIX_PROP(PhysicsScene, CapsuleRadius),
@@ -145,6 +147,7 @@ namespace Lumix
 			component("box_rigid_actor",
 				functions(
 					function(LUMIX_FUNC(PhysicsScene::applyForceToActor)),
+					function(LUMIX_FUNC(PhysicsScene::applyImpulseToActor)),
 					function(LUMIX_FUNC(PhysicsScene::getActorVelocity))
 				),
 				property("Layer", LUMIX_PROP(PhysicsScene, ActorLayer)),
@@ -155,6 +158,7 @@ namespace Lumix
 			component("mesh_rigid_actor",
 				functions(
 					function(LUMIX_FUNC(PhysicsScene::applyForceToActor)),
+					function(LUMIX_FUNC(PhysicsScene::applyImpulseToActor)),
 					function(LUMIX_FUNC(PhysicsScene::getActorVelocity))
 				),
 				property("Layer", LUMIX_PROP(PhysicsScene, ActorLayer)),

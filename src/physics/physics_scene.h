@@ -193,6 +193,7 @@ public:
 	virtual void setSphericalJointLimit(Entity entity, const Vec2& limit) = 0;
 
 	virtual void applyForceToActor(Entity entity, const Vec3& force) = 0;
+	virtual void applyImpulseToActor(Entity entity, const Vec3& force) = 0;
 	virtual Vec3 getActorVelocity(Entity entity) = 0;
 	virtual float getActorSpeed(Entity entity) = 0;
 	virtual void putToSleep(Entity entity) = 0;
