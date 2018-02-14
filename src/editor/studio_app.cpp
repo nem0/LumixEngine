@@ -2173,6 +2173,8 @@ public:
 			"PhysX3CHECKED_x64.dll",
 			"PhysX3CommonCHECKED_x64.dll",
 			"PhysX3CookingCHECKED_x64.dll"
+			"dbghelp.dll",
+			"dbgcore.dll"
 		};
 		for(auto& file : bin_files)
 		{
