@@ -557,8 +557,8 @@ public:
 	void setBoneAttachmentParent(Entity entity, Entity parent) override
 	{
 		BoneAttachment& ba = m_bone_attachments[entity];
-		ba.parent_entity = entity;
-		if (entity.isValid() && entity.index < m_model_instances.size())
+		ba.parent_entity = parent;
+		if (parent.isValid() && parent.index < m_model_instances.size())
 		{
 			ModelInstance& mi = m_model_instances[entity.index];
 			mi.flags.set(ModelInstance::IS_BONE_ATTACHMENT_PARENT);
