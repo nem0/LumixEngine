@@ -23,8 +23,8 @@ public:
 
 	ResourceType getType() const override { return TYPE; }
 
-	void unload() override {}
-	bool load(FS::IFile& file) override { return true; }
+	void unload() override { m_file_data.free(); }
+	bool load(FS::IFile& file) override;
 	Font* addRef(int font_size);
 	void removeRef(Font& font);
 
@@ -37,7 +37,8 @@ private:
 		int ref_count;
 	};
 
-	HashMap<int, FontRef> m_fonts; 
+	HashMap<int, FontRef> m_fonts;
+	Array<u8> m_file_data;
 };
 
 

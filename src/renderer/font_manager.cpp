@@ -14,7 +14,19 @@ const ResourceType FontResource::TYPE("font");
 FontResource::FontResource(const Path& path, ResourceManagerBase& manager, IAllocator& allocator)
 	: Resource(path, manager, allocator)
 	, m_fonts(allocator)
+	, m_file_data(allocator)
 {
+}
+
+
+bool FontResource::load(FS::IFile& file)
+{
+	int size = (int)file.size();
+	if (size <= 0) return false;
+	
+	m_file_data.resize(size);
+	file.read(&m_file_data[0], m_file_data.size());
+	return true;
 }
 
 
@@ -30,7 +42,9 @@ Font* FontResource::addRef(int font_size)
 	auto& manager = (FontManager&)m_resource_manager;
 	FontRef ref;
 	ref.ref_count = 1;
-	ref.font = manager.m_font_atlas.AddFontFromFileTTF(getPath().c_str(), (float)font_size);
+	FontConfig cfg;
+	cfg.FontDataOwnedByAtlas = false;
+	ref.font = manager.m_font_atlas.AddFontFromMemoryTTF(&m_file_data[0], m_file_data.size(), (float)font_size, &cfg);
 	manager.updateFontTexture();
 	m_fonts.insert(font_size, ref);
 	return ref.font;
