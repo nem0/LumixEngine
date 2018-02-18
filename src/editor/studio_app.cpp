@@ -2188,7 +2188,7 @@ public:
 
 		for (IPlugin* plugin : m_plugins)
 		{
-			if (plugin->packData(m_pack.dest_dir))
+			if (!plugin->packData(m_pack.dest_dir))
 			{
 				g_log_error.log("Editor") << "Plugin " << plugin->getName() << " failed to pack data.";
 			}

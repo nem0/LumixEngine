@@ -103,6 +103,16 @@ public:
 		}
 	}
 
+
+	void free()
+	{
+		clear();
+		m_allocator.deallocate_aligned(m_data);
+		m_capacity = 0;
+		m_data = nullptr;
+	}
+
+
 	~Array()
 	{
 		callDestructors(m_data, m_data + m_size);
