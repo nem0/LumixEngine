@@ -186,6 +186,7 @@ int getProcessOutput(Process& process, char* buf, int buf_size)
 
 bool getSaveFilename(char* out, int max_size, const char* filter, const char* default_extension)
 {
+	ASSERT(false); // TODO
 	/*OPENFILENAME ofn;
 	ZeroMemory(&ofn, sizeof(ofn));
 	ofn.lStructSize = sizeof(ofn);
@@ -206,8 +207,15 @@ bool getSaveFilename(char* out, int max_size, const char* filter, const char* de
 }
 
 
+void getExecutablePath(char* buffer, int buffer_size)
+{
+	ASSERT(false); // TODO
+}
+
+
 bool getOpenFilename(char* out, int max_size, const char* filter, const char* starting_file)
 {
+	ASSERT(false); // TODO
 	/*OPENFILENAME ofn;
 	ZeroMemory(&ofn, sizeof(ofn));
 	ofn.lStructSize = sizeof(ofn);
@@ -242,6 +250,7 @@ bool getOpenFilename(char* out, int max_size, const char* filter, const char* st
 
 bool getOpenDirectory(char* out, int max_size, const char* starting_dir)
 {
+	ASSERT(false); // TODO
 	/*bool ret = false;
 	IFileDialog *pfd;
 	if (SUCCEEDED(CoCreateInstance(
