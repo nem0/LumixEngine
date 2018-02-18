@@ -52,6 +52,7 @@ public:
 		virtual void pluginAdded(IPlugin& plugin) {}
 		virtual const char* getName() const = 0;
 		virtual bool onDropFile(const char* file) { return false; }
+		virtual void packData(const char* dest_dir) {}
 	};
 
 	struct IAddComponentPlugin

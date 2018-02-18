@@ -2172,7 +2172,7 @@ public:
 			"PhysX3CharacterKinematicCHECKED_x64.dll",
 			"PhysX3CHECKED_x64.dll",
 			"PhysX3CommonCHECKED_x64.dll",
-			"PhysX3CookingCHECKED_x64.dll"
+			"PhysX3CookingCHECKED_x64.dll",
 			"dbghelp.dll",
 			"dbgcore.dll"
 		};
@@ -2185,6 +2185,12 @@ public:
 				g_log_error.log("Editor") << "Failed to copy " << src << " to " << tmp;
 			}
 		}
+
+		for (IPlugin* plugin : m_plugins)
+		{
+			plugin->packData(m_pack.dest_dir);
+		}
+
 		StaticString<MAX_PATH_LENGTH> tmp(m_pack.dest_dir);
 		tmp << "startup.lua";
 		if (!copyFile("startup.lua", tmp))
