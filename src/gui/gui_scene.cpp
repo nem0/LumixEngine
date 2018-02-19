@@ -41,10 +41,13 @@ struct GUIText
 	{
 		if (m_font_resource)
 		{
+			if (m_font)
+			{
+				m_font_resource->removeRef(*m_font);
+				m_font = nullptr;
+			}
 			m_font_resource->getObserverCb().unbind<GUIText, &GUIText::onFontLoaded>(this);
-			m_font_resource->removeRef(*font);
 			m_font_resource->getResourceManager().unload(*m_font_resource);
-			font = nullptr;
 		}
 		m_font_resource = res;
 		if (res) res->onLoaded<GUIText, &GUIText::onFontLoaded>(this);
@@ -53,25 +56,37 @@ struct GUIText
 
 	void onFontLoaded(Resource::State old_state, Resource::State new_state, Resource&)
 	{
-		if (font && new_state != Resource::State::READY)
+		if (m_font && new_state != Resource::State::READY)
 		{
-			m_font_resource->removeRef(*font);
-			font = nullptr;
+			m_font_resource->removeRef(*m_font);
+			m_font = nullptr;
 		}
-		if(new_state == Resource::State::READY) font = m_font_resource->addRef(font_size);
+		if (new_state == Resource::State::READY) m_font = m_font_resource->addRef(m_font_size);
+	}
+
+	void setFontSize(int value)
+	{
+		m_font_size = value;
+		if (m_font_resource && m_font_resource->isReady())
+		{
+			if(m_font) m_font_resource->removeRef(*m_font);
+			m_font = m_font_resource->addRef(m_font_size);
+		}
 	}
 
 
 	FontResource* getFontResource() const { return m_font_resource; }
+	int getFontSize() const { return m_font_size; }
+	Font* getFont() const { return m_font; }
 
 
-	Font* font = nullptr;
 	string text;
-	int font_size = 13;
 	GUIScene::TextHAlign horizontal_align = GUIScene::TextHAlign::LEFT;
 	u32 color = 0xff000000;
 
 private:
+	int m_font_size = 13;
+	Font* m_font = nullptr;
 	FontResource* m_font_resource = nullptr;
 };
 
@@ -183,7 +198,9 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 
 		const char* text = rect.text->text.c_str();
 		const char* text_end = text + rect.input_field->cursor;
-		Vec2 text_size = rect.text->font->CalcTextSizeA((float)rect.text->font_size, FLT_MAX, 0, text, text_end);
+		Font* font = rect.text->getFont();
+		float font_size = (float)rect.text->getFontSize();
+		Vec2 text_size = font->CalcTextSizeA(font_size, FLT_MAX, 0, text, text_end);
 		draw.AddLine({ pos.x + text_size.x, pos.y }, { pos.x + text_size.x, pos.y + text_size.y }, rect.text->color, 1);
 	}
 
@@ -249,9 +266,12 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		}
 		if (rect.text)
 		{
+			Font* font = rect.text->getFont();
+			if (!font) font = m_font_manager->getDefaultFont();
+
 			const char* text_cstr = rect.text->text.c_str();
-			float font_size = (float)rect.text->font_size;
-			Vec2 text_size = rect.text->font->CalcTextSizeA(font_size, FLT_MAX, 0, text_cstr);
+			float font_size = (float)rect.text->getFontSize();
+			Vec2 text_size = font->CalcTextSizeA(font_size, FLT_MAX, 0, text_cstr);
 			Vec2 text_pos(l, t);
 
 			switch (rect.text->horizontal_align)
@@ -261,7 +281,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 				case TextHAlign::CENTER: text_pos.x = (r + l - text_size.x) * 0.5f; break; 
 			}
 
-			draw.AddText(rect.text->font, font_size, text_pos, rect.text->color, text_cstr);
+			draw.AddText(font, font_size, text_pos, rect.text->color, text_cstr);
 			renderTextCursor(rect, draw, text_pos);
 		}
 
@@ -492,17 +512,14 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	void setTextFontSize(Entity entity, int value) override
 	{
 		GUIText* gui_text = m_rects[entity]->text;
-		FontResource* res = gui_text->getFontResource();
-		if (res) res->removeRef(*gui_text->font);
-		gui_text->font_size = value;
-		if (res) gui_text->font = res->addRef(gui_text->font_size);
+		gui_text->setFontSize(value);
 	}
 	
 	
 	int getTextFontSize(Entity entity) override
 	{
 		GUIText* gui_text = m_rects[entity]->text;
-		return gui_text->font_size;
+		return gui_text->getFontSize();
 	}
 	
 	
@@ -700,7 +717,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		serializer.write("font", rect.text->getFontResource() ? rect.text->getFontResource()->getPath().c_str() : "");
 		serializer.write("align", (int)rect.text->horizontal_align);
 		serializer.write("color", rect.text->color);
-		serializer.write("font_size", rect.text->font_size);
+		serializer.write("font_size", rect.text->getFontSize());
 		serializer.write("text", rect.text->text.c_str());
 	}
 
@@ -721,17 +738,12 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		serializer.read(tmp, lengthOf(tmp));
 		serializer.read((int*)&rect.text->horizontal_align);
 		serializer.read(&rect.text->color);
-		serializer.read(&rect.text->font_size);
+		int font_size;
+		serializer.read(&font_size);
+		rect.text->setFontSize(font_size);
 		serializer.read(&rect.text->text);
-		rect.text->font = m_font_manager->getDefaultFont();
-		if (tmp[0] == '\0')
-		{
-			rect.text->setFontResource(nullptr);
-		}
-		else
-		{
-			rect.text->setFontResource((FontResource*)m_font_manager->load(Path(tmp)));
-		}
+		FontResource* res = tmp[0] ? (FontResource*)m_font_manager->load(Path(tmp)) : nullptr;
+		rect.text->setFontResource(res);
 
 		m_universe.onComponentCreated(entity, GUI_TEXT_TYPE, this);
 	}
@@ -995,7 +1007,6 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		}
 		GUIRect& rect = *m_rects.at(idx);
 		rect.text = LUMIX_NEW(m_allocator, GUIText)(m_allocator);
-		rect.text->font = m_font_manager->getDefaultFont();
 
 		m_universe.onComponentCreated(entity, GUI_TEXT_TYPE, this);
 	}
@@ -1147,7 +1158,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 				serializer.writeString(rect->text->getFontResource() ? rect->text->getFontResource()->getPath().c_str() : "");
 				serializer.write(rect->text->horizontal_align);
 				serializer.write(rect->text->color);
-				serializer.write(rect->text->font_size);
+				serializer.write(rect->text->getFontSize());
 				serializer.write(rect->text->text);
 			}
 		}
@@ -1217,7 +1228,9 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 				serializer.readString(tmp, lengthOf(tmp));
 				serializer.read(text.horizontal_align);
 				serializer.read(text.color);
-				serializer.read(text.font_size);
+				int font_size;
+				serializer.read(font_size);
+				text.setFontSize(font_size);
 				serializer.read(text.text);
 				FontResource* res = tmp[0] == 0 ? nullptr : (FontResource*)m_font_manager->load(Path(tmp));
 				text.setFontResource(res);
