@@ -167,6 +167,12 @@ struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 			material->setMetallic(metallic);
 		}
 
+		float emission = material->getEmission();
+		if (ImGui::DragFloat("Emission", &emission, 0.01f, 0.0f))
+		{
+			material->setEmission(emission);
+		}
+
 		char buf[MAX_PATH_LENGTH];
 		copyString(buf, material->getShader() ? material->getShader()->getPath().c_str() : "");
 		if (m_app.getAssetBrowser().resourceInput("Shader", "shader", buf, sizeof(buf), Shader::TYPE))

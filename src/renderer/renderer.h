@@ -52,7 +52,7 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 		virtual TextureManager& getTextureManager() = 0;
 		virtual Shader* getDefaultShader() = 0;
 		virtual const bgfx::UniformHandle& getMaterialColorUniform() const = 0;
-		virtual const bgfx::UniformHandle& getRoughnessMetallicUniform() const = 0;
+		virtual const bgfx::UniformHandle& getRoughnessMetallicEmissionUniform() const = 0;
 		virtual int getLayersCount() const = 0;
 		virtual int getLayer(const char* name) = 0;
 		virtual const char* getLayerName(int idx) const = 0;
