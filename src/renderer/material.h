@@ -57,6 +57,8 @@ public:
 	void setMetallic(float value) { m_metallic = value; createCommandBuffer(); }
 	float getRoughness() const { return m_roughness; }
 	void setRoughness(float value) { m_roughness = value; createCommandBuffer(); }
+	float getEmission() const { return m_emission; }
+	void setEmission(float value) { m_emission = value; createCommandBuffer(); }
 	Vec4 getColor() const { return m_color; }
 	void setColor(const Vec4& color) { m_color = color;  createCommandBuffer(); }
 	float getAlphaRef() const { return m_alpha_ref; }
@@ -126,6 +128,7 @@ private:
 	float m_alpha_ref;
 	float m_metallic;
 	float m_roughness;
+	float m_emission;
 	u32 m_define_mask;
 	u8* m_command_buffer;
 	u32 m_custom_flags;

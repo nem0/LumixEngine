@@ -44,6 +44,7 @@ Material::Material(const Path& path, ResourceManagerBase& resource_manager, IAll
 	, m_color(1, 1, 1, 1)
 	, m_metallic(0)
 	, m_roughness(1.0f)
+	, m_emission(0.0f)
 	, m_shader_instance(nullptr)
 	, m_define_mask(0)
 	, m_command_buffer(&DEFAULT_COMMAND_BUFFER)
@@ -156,6 +157,7 @@ void Material::unload()
 	m_render_layer = 0;
 	m_render_layer_mask = 1;
 	m_roughness = 1.0f;
+	m_emission = 0.0f;
 	m_texture_count = 0;
 }
 
@@ -275,6 +277,7 @@ bool Material::save(JsonSerializer& serializer)
 	serializer.endArray();
 	serializer.serialize("metallic", m_metallic);
 	serializer.serialize("roughness", m_roughness);
+	serializer.serialize("emission", m_emission);
 	serializer.serialize("alpha_ref", m_alpha_ref);
 	serializer.beginArray("color");
 		serializer.serializeArrayItem(m_color.x);
@@ -507,9 +510,9 @@ void Material::createCommandBuffer()
 	auto& uniform = renderer.getMaterialColorUniform();
 	generator.setUniform(uniform, m_color);
 
-	Vec4 roughness_metallic(m_roughness, m_metallic, 0, 0);
-	auto& rm_uniform = renderer.getRoughnessMetallicUniform();
-	generator.setUniform(rm_uniform, roughness_metallic);
+	Vec4 roughness_metallic_emission(m_roughness, m_metallic, m_emission, 0);
+	auto& rme_uniform = renderer.getRoughnessMetallicEmissionUniform();
+	generator.setUniform(rme_uniform, roughness_metallic_emission);
 	generator.end();
 
 	m_command_buffer = (u8*)m_allocator.allocate(generator.getSize());
@@ -860,6 +863,10 @@ bool Material::load(FS::IFile& file)
 		else if (equalStrings(label, "roughness"))
 		{
 			serializer.deserialize(m_roughness, 1.0f);
+		}
+		else if (equalStrings(label, "emission"))
+		{
+			serializer.deserialize(m_emission, 0.0f);
 		}
 		else if (equalStrings(label, "shader"))
 		{
