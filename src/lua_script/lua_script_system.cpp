@@ -880,7 +880,7 @@ namespace Lumix
 			m_system.m_engine.unloadLuaResource(res_idx);
 			lua_pop(script.m_state, 1);
 
-			int new_res = m_system.m_engine.addLuaResource(Path(value), prop.resource_type);
+			int new_res = value[0] ? m_system.m_engine.addLuaResource(Path(value), prop.resource_type) : -1;
 			lua_pushinteger(script.m_state, new_res);
 			lua_setfield(script.m_state, -2, name);
 			lua_pop(script.m_state, 1);
