@@ -359,6 +359,23 @@ bool loadRaw(Texture& texture, FS::IFile& file)
 }
 
 
+static void flipVertical(u32* image, int width, int height)
+{
+	for (int j = 0; j < height / 2; ++j)
+	{
+		int row_offset = width * j;
+		int inv_j = height - j - 1;
+		int inv_row_offset = width * inv_j;
+		for (int i = 0; i < width; ++i)
+		{
+			u32 tmp = image[i + row_offset];
+			image[i + row_offset] = image[i + inv_row_offset];
+			image[i + inv_row_offset] = tmp;
+		}
+	}
+}
+
+
 bool Texture::loadTGA(FS::IFile& file, TGAHeader& header, Array<u8>& data, const char* path)
 {
 	PROFILE_FUNCTION();
@@ -441,6 +458,7 @@ bool Texture::loadTGA(FS::IFile& file, TGAHeader& header, Array<u8>& data, const
 			}
 		}
 	}
+	if ((header.imageDescriptor & 32) == 0) flipVertical((u32*)image_dest, header.width, header.height);
 	return true;
 }
 
@@ -535,6 +553,8 @@ bool Texture::loadTGA(FS::IFile& file)
 			}
 		}
 	}
+	if ((header.imageDescriptor & 32) == 0) flipVertical((u32*)image_dest, header.width, header.height);
+
 	bytes_per_pixel = 4;
 	mips = 1;
 	handle = bgfx::createTexture2D(
