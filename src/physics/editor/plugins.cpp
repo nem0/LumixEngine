@@ -2,13 +2,17 @@
 
 #include "editor/asset_browser.h"
 #include "editor/gizmo.h"
+#include "editor/platform_interface.h"
 #include "editor/property_grid.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
 #include "engine/crc32.h"
+#include "engine/log.h"
 #include "engine/math_utils.h"
+#include "engine/path_utils.h"
 #include "engine/reflection.h"
+#include "engine/system.h"
 #include "engine/universe/universe.h"
 #include "physics/physics_geometry_manager.h"
 #include "physics/physics_scene.h"
@@ -423,6 +427,36 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		action->is_selected.bind<StudioAppPlugin, &StudioAppPlugin::isOpen>(this);
 		app.addWindowAction(action);
 	}
+
+
+	bool packData(const char* dest_dir) override
+	{
+		char exe_path[MAX_PATH_LENGTH];
+		getExecutablePath(exe_path, lengthOf(exe_path));
+		char exe_dir[MAX_PATH_LENGTH];
+
+		const char* physx_dlls[] = {
+			"nvToolsExt64_1.dll",
+			"PhysX3CharacterKinematicCHECKED_x64.dll",
+			"PhysX3CHECKED_x64.dll",
+			"PhysX3CommonCHECKED_x64.dll",
+			"PhysX3CookingCHECKED_x64.dll",
+		};
+		for (const char* dll : physx_dlls)
+		{
+			PathUtils::getDir(exe_dir, lengthOf(exe_dir), exe_path);
+			StaticString<MAX_PATH_LENGTH> tmp(exe_dir, dll);
+			if (!PlatformInterface::fileExists(tmp)) return false;
+			StaticString<MAX_PATH_LENGTH> dest(dest_dir, dll);
+			if (!copyFile(tmp, dest))
+			{
+				g_log_error.log("Physics") << "Failed to copy " << tmp << " to " << dest;
+				return false;
+			}
+		}
+		return true; 
+	}
+
 
 
 	const char* getName() const override { return "physics"; }
