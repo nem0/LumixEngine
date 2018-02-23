@@ -24,6 +24,12 @@ namespace Lumix
 	}
 
 
+	void getExecutablePath(char* buffer, int buffer_size)
+	{
+		GetModuleFileName(NULL, buffer, buffer_size);
+	}
+
+
 	void messageBox(const char* text)
 	{
 		MessageBox(NULL, text, "Message", MB_OK);

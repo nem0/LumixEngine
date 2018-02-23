@@ -207,12 +207,6 @@ bool getSaveFilename(char* out, int max_size, const char* filter, const char* de
 }
 
 
-void getExecutablePath(char* buffer, int buffer_size)
-{
-	ASSERT(false); // TODO
-}
-
-
 bool getOpenFilename(char* out, int max_size, const char* filter, const char* starting_file)
 {
 	ASSERT(false); // TODO

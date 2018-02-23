@@ -2176,10 +2176,17 @@ public:
 			"dbghelp.dll",
 			"dbgcore.dll"
 		};
+		StaticString<MAX_PATH_LENGTH> src_dir("bin/");
+		if (!PlatformInterface::fileExists("bin/app.exe"))
+		{
+			char tmp[MAX_PATH_LENGTH];
+			getExecutablePath(tmp, lengthOf(tmp));
+			PathUtils::getDir(src_dir.data, lengthOf(src_dir.data), tmp);
+		}
 		for(auto& file : bin_files)
 		{
 			StaticString<MAX_PATH_LENGTH> tmp(m_pack.dest_dir, file);
-			StaticString<MAX_PATH_LENGTH> src("bin/", file);
+			StaticString<MAX_PATH_LENGTH> src(src_dir, file);
 			if (!copyFile(src, tmp))
 			{
 				g_log_error.log("Editor") << "Failed to copy " << src << " to " << tmp;
