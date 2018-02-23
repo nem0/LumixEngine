@@ -782,7 +782,7 @@ namespace Lumix
 				visitor.cmp_type = cmp_type;
 				visitor.L = L;
 
-				cmp_desc->visit(visitor);
+				if(cmp_desc) cmp_desc->visit(visitor);
 
 				lua_pop(L, 1);
 			}
