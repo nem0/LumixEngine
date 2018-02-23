@@ -313,12 +313,6 @@ bool deleteFile(const char* path)
 }
 
 
-void getExecutablePath(char* buffer, int buffer_size)
-{
-	GetModuleFileName(NULL, buffer, buffer_size);
-}
-
-
 bool moveFile(const char* from, const char* to)
 {
 	return MoveFile(from, to) != FALSE;

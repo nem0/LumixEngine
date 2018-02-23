@@ -28,6 +28,12 @@ namespace Lumix
 	}
 
 
+	void getExecutablePath(char* buffer, int buffer_size)
+	{
+		ASSERT(false); // TODO
+	}
+
+
 	void messageBox(const char* text)
 	{
 		printf("%s", text);
