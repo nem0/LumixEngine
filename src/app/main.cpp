@@ -208,11 +208,16 @@ public:
 		SDL_SetRelativeMouseMode(SDL_TRUE);
 		onResize();
 
-		runStartupScript();
+		if (!runStartupScript())
+		{
+			loadUniverse("universes/main.unv");
+			while (m_engine->getFileSystem().hasWork()) m_engine->getFileSystem().updateAsyncTransactions();
+			m_engine->startGame(*m_universe);
+		}
 	}
 
 
-	void runStartupScript() const
+	bool runStartupScript() const
 	{
 		FS::FileSystem& fs = m_engine->getFileSystem();
 		FS::IFile* file = fs.open(fs.getDefaultDevice(), Path(m_startup_script_path), FS::Mode::OPEN_AND_READ);
@@ -220,9 +225,10 @@ public:
 		{
 			m_engine->runScript((const char*)file->getBuffer(), (int)file->size(), m_startup_script_path);
 			fs.close(*file);
+			return true;
 		}
+		return false;
 	}
-
 
 
 	void registerLuaAPI()
