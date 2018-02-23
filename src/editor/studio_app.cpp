@@ -754,6 +754,7 @@ public:
 				m_is_save_as_dialog_open = false;
 				setTitle(name);
 				m_editor->saveUniverse(name, true);
+				scanUniverses();
 			}
 			ImGui::SameLine();
 			if (ImGui::Button("Close")) m_is_save_as_dialog_open = false;
@@ -2200,13 +2201,6 @@ public:
 				g_log_error.log("Editor") << "Plugin " << plugin->getName() << " failed to pack data.";
 			}
 		}
-
-		StaticString<MAX_PATH_LENGTH> tmp(m_pack.dest_dir);
-		tmp << "startup.lua";
-		if (!copyFile("startup.lua", tmp))
-		{
-			g_log_error.log("Editor") << "Failed to copy startup.lua to " << tmp;
-		}
 	}
 
 
@@ -2237,6 +2231,7 @@ public:
 
 	void scanUniverses()
 	{
+		m_universes.clear();
 		auto* iter = PlatformInterface::createFileIterator("universes/", m_allocator);
 		PlatformInterface::FileInfo info;
 		while (PlatformInterface::getNextFile(iter, &info))
