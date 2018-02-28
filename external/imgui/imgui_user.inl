@@ -532,19 +532,19 @@ namespace ImGui
 
 		ImGuiWindow* parent_window = GetCurrentWindow();
 		ImGuiID id = parent_window->GetID(label);
+		if (new_count) *new_count = points_count;
 		if (!BeginChildFrame(id, size, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse))
 		{
-			EndChild();
+			EndChildFrame();
 			return -1;
 		}
 
 		int hovered_idx = -1;
-		if (new_count) *new_count = points_count;
 
 		ImGuiWindow* window = GetCurrentWindow();
 		if (window->SkipItems)
 		{
-			EndChild();
+			EndChildFrame();
 			return -1;
 		}
 		
