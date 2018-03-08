@@ -2517,17 +2517,10 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 
 		PluginManager& plugin_manager = m_engine.getPluginManager();
 		Renderer* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
-		Path path("pipelines/imgui/imgui.lua");
-		m_gui_pipeline = Pipeline::create(*renderer, path, "", m_engine.getAllocator());
-		m_gui_pipeline->load();
 
 		int w, h;
 		SDL_GetWindowSize(m_app.getWindow(), &w, &h);
-		m_gui_pipeline->resize(w, h);
 		renderer->resize(w, h);
-		editor.universeCreated().bind<EditorUIRenderPlugin, &EditorUIRenderPlugin::onUniverseCreated>(this);
-		editor.universeDestroyed().bind<EditorUIRenderPlugin, &EditorUIRenderPlugin::onUniverseDestroyed>(this);
-		if (editor.getUniverse()) onUniverseCreated();
 
 		unsigned char* pixels;
 		int width, height;
@@ -2563,10 +2556,7 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	{
 		bgfx::destroy(m_index_buffer);
 		bgfx::destroy(m_vertex_buffer);
-		Pipeline::destroy(m_gui_pipeline);
 		WorldEditor& editor = m_app.getWorldEditor();
-		editor.universeCreated().unbind<EditorUIRenderPlugin, &EditorUIRenderPlugin::onUniverseCreated>(this);
-		editor.universeDestroyed().unbind<EditorUIRenderPlugin, &EditorUIRenderPlugin::onUniverseDestroyed>(this);
 		shutdownImGui();
 	}
 
@@ -2591,9 +2581,48 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	}
 
 
+	u8 beginViewportRender(FrameBuffer* framebuffer)
+	{
+		PluginManager& plugin_manager = m_engine.getPluginManager();
+		Renderer* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
+
+		renderer->viewCounterAdd();
+		u8 view = (u8)renderer->getViewCounter();
+		if (framebuffer)
+		{
+			bgfx::setViewFrameBuffer(view, framebuffer->getHandle());
+		}
+		else
+		{
+			bgfx::setViewFrameBuffer(view, BGFX_INVALID_HANDLE);
+		}
+		bgfx::setViewClear(view, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, 0x303030ff, 1.0f, 0);
+		bgfx::setViewName(view, "imgui viewport");
+		bgfx::setViewMode(view, bgfx::ViewMode::Sequential);
+
+		float left = 0;
+		float top = 0;
+		float width = ImGui::GetIO().DisplaySize.x;
+		float right = width + left;
+		float height = ImGui::GetIO().DisplaySize.y;
+		float bottom = height + top;
+		Matrix ortho;
+		ortho.setOrtho(left, right, bottom, top, -1.0f, 1.0f, bgfx::getCaps()->homogeneousDepth);
+		if (framebuffer && (framebuffer->getWidth() != int(width + 0.5f) || framebuffer->getHeight() != int(height + 0.5f)))
+		{
+			framebuffer->resize((int)width, (int)height);
+		}
+
+		bgfx::setViewRect(view, 0, 0, (uint16_t)width, (uint16_t)height);
+		bgfx::setViewTransform(view, nullptr, &ortho.m11);
+		bgfx::touch(view);
+
+		return view;
+	}
+
+
 	void draw(ImDrawData* draw_data)
 	{
-		if (!m_gui_pipeline->isReady()) goto end;
 		if (!m_material || !m_material->isReady()) goto end;
 		if (!m_material->getTexture(0)) goto end;
 
@@ -2611,15 +2640,12 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 			if (renderer) renderer->resize(m_width, m_height);
 		}
 
-		if (m_gui_pipeline->render())
+		u8 view = beginViewportRender(nullptr);
+		
+		for (int i = 0; i < draw_data->CmdListsCount; ++i)
 		{
-			setGUIProjection();
-
-			for (int i = 0; i < draw_data->CmdListsCount; ++i)
-			{
-				ImDrawList* cmd_list = draw_data->CmdLists[i];
-				drawGUICmdList(cmd_list);
-			}
+			ImDrawList* cmd_list = draw_data->CmdLists[i];
+			drawGUICmdList(view, cmd_list);
 		}
 
 		end:
@@ -2628,33 +2654,13 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	}
 
 
-	void onUniverseCreated()
-	{
-		auto* universe = m_app.getWorldEditor().getUniverse();
-		auto* scene = static_cast<RenderScene*>(universe->getScene(MODEL_INSTANCE_TYPE));
-
-		m_gui_pipeline->setScene(scene);
-	}
-
-
-	void onUniverseDestroyed() { m_gui_pipeline->setScene(nullptr); }
 	static void imGuiCallback(ImDrawData* draw_data) { s_instance->draw(draw_data); }
 
 
-	void setGUIProjection()
-	{
-		float width = ImGui::GetIO().DisplaySize.x;
-		float height = ImGui::GetIO().DisplaySize.y;
-		Matrix ortho;
-		ortho.setOrtho(0.0f, width, height, 0.0f, -1.0f, 1.0f, bgfx::getCaps()->homogeneousDepth);
-		m_gui_pipeline->resize((int)width, (int)height);
-		m_gui_pipeline->setViewProjection(ortho, (int)width, (int)height);
-	}
-
-
-	void drawGUICmdList(ImDrawList* cmd_list)
+	void drawGUICmdList(u8 view, ImDrawList* cmd_list)
 	{
 		Renderer* renderer = static_cast<Renderer*>(m_engine.getPluginManager().getPlugin("renderer"));
+		int pass_idx = renderer->getPassIdx("MAIN");
 
 		int num_indices = cmd_list->IdxBuffer.size();
 		int num_vertices = cmd_list->VtxBuffer.size();
@@ -2678,7 +2684,8 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 
 			if (0 == pcmd->ElemCount) continue;
 
-			m_gui_pipeline->setScissor(u16(Math::maximum(pcmd->ClipRect.x, 0.0f)),
+			bgfx::setScissor(
+				u16(Math::maximum(pcmd->ClipRect.x, 0.0f)),
 				u16(Math::maximum(pcmd->ClipRect.y, 0.0f)),
 				u16(Math::minimum(pcmd->ClipRect.z, 65535.0f) - Math::maximum(pcmd->ClipRect.x, 0.0f)),
 				u16(Math::minimum(pcmd->ClipRect.w, 65535.0f) - Math::maximum(pcmd->ClipRect.y, 0.0f)));
@@ -2692,15 +2699,16 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 			{
 				render_states &= ~BGFX_STATE_BLEND_MASK;
 			}
-			m_gui_pipeline->setTexture(0, texture_id, texture_uniform);
-			m_gui_pipeline->render(m_vertex_buffer,
-				m_index_buffer,
-				elem_offset + m_ib_offset,
-				pcmd->ElemCount,
-				m_vb_offset,
-				num_vertices,
-				render_states,
-				material->getShaderInstance());
+			bgfx::setTexture(0, texture_uniform, texture_id);
+			
+			ShaderInstance& shader_instance = material->getShaderInstance();
+			bgfx::setStencil(BGFX_STENCIL_NONE, BGFX_STENCIL_NONE);
+			bgfx::setState(BGFX_STATE_RGB_WRITE | BGFX_STATE_ALPHA_WRITE | BGFX_STATE_DEPTH_WRITE | render_states);
+			bgfx::setVertexBuffer(0, m_vertex_buffer, m_vb_offset, num_vertices);
+			u32 first_index = elem_offset + m_ib_offset;
+			bgfx::setIndexBuffer(m_index_buffer, first_index, pcmd->ElemCount);
+			bgfx::submit(view, shader_instance.getProgramHandle(pass_idx));
+			
 
 			elem_offset += pcmd->ElemCount;
 		}
@@ -2714,7 +2722,6 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	StudioApp& m_app;
 	Engine& m_engine;
 	Material* m_material;
-	Pipeline* m_gui_pipeline;
 	SceneView& m_scene_view;
 	GameView& m_game_view;
 	bgfx::DynamicVertexBufferHandle m_vertex_buffer;
