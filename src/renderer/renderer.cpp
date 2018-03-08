@@ -275,7 +275,8 @@ static void registerProperties(IAllocator& allocator)
 				ResourceAttribute("Font (*.ttf)", FontResource::TYPE)),
 			property("Font Size", LUMIX_PROP(RenderScene, TextMeshFontSize)),
 			property("Color", LUMIX_PROP(RenderScene, TextMeshColorRGBA),
-				ColorAttribute())
+				ColorAttribute()),
+			property("Camera-oriented", LUMIX_PROP_FULL(RenderScene, isTextMeshCameraOriented, setTextMeshCameraOriented))
 		),
 		component("decal",
 			property("Material", LUMIX_PROP(RenderScene, DecalMaterialPath),

@@ -436,7 +436,9 @@ public:
 	virtual void setTextMeshColorRGBA(Entity entity, const Vec4& color) = 0;
 	virtual Path getTextMeshFontPath(Entity entity) = 0;
 	virtual void setTextMeshFontPath(Entity entity, const Path& path) = 0;
-	virtual void getTextMeshesVertices(Array<TextMeshVertex>& vertices) = 0;
+	virtual bool isTextMeshCameraOriented(Entity entity) = 0;
+	virtual void setTextMeshCameraOriented(Entity entity, bool is_oriented) = 0;
+	virtual void getTextMeshesVertices(Array<TextMeshVertex>& vertices, Entity camera) = 0;
 
 protected:
 	virtual ~RenderScene() {}

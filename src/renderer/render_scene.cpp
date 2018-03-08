@@ -164,6 +164,11 @@ struct BoneAttachment
 
 struct TextMesh
 {
+	enum Flags : u32
+	{
+		CAMERA_ORIENTED = 1 << 0
+	};
+	
 	TextMesh(IAllocator& allocator) : text("", allocator) {}
 	~TextMesh() { setFontResource(nullptr); }
 
@@ -211,11 +216,13 @@ struct TextMesh
 
 	string text;
 	u32 color = 0xff000000;
+	FlagSet<Flags, u32> m_flags;
 
 private:
 	int m_font_size = 13;
 	Font* m_font = nullptr;
 	FontResource* m_font_resource = nullptr;
+
 };
 
 
@@ -897,6 +904,20 @@ public:
 	}
 
 
+	bool isTextMeshCameraOriented(Entity entity) override
+	{
+		TextMesh& text = *m_text_meshes.get(entity);
+		return text.m_flags.isSet(TextMesh::CAMERA_ORIENTED);
+	}
+
+
+	void setTextMeshCameraOriented(Entity entity, bool is_oriented) override
+	{
+		TextMesh& text = *m_text_meshes.get(entity);
+		text.m_flags.set(TextMesh::CAMERA_ORIENTED, is_oriented);
+	}
+
+
 	void setTextMeshFontSize(Entity entity, int value) override
 	{
 		TextMesh& text = *m_text_meshes.get(entity);
@@ -951,8 +972,11 @@ public:
 	}
 
 
-	void getTextMeshesVertices(Array<TextMeshVertex>& vertices) override
+	void getTextMeshesVertices(Array<TextMeshVertex>& vertices, Entity camera) override
 	{
+		Matrix camera_mtx = m_universe.getMatrix(camera);
+		Vec3 cam_right = camera_mtx.getXVector();
+		Vec3 cam_up = -camera_mtx.getYVector();
 		for (int j = 0, nj = m_text_meshes.size(); j < nj; ++j)
 		{
 			TextMesh& text = *m_text_meshes.at(j);
@@ -965,6 +989,11 @@ public:
 			float scale = m_universe.getScale(entity);
 			Vec3 right = rot.rotate({ 1, 0, 0 }) * scale;
 			Vec3 up = rot.rotate({ 0, -1, 0 }) * scale;
+			if (text.m_flags.isSet(TextMesh::CAMERA_ORIENTED))
+			{
+				right = cam_right;
+				up = cam_up;
+			}
 			u32 color = text.color;
 			Vec2 text_size = font->CalcTextSizeA((float)text.getFontSize(), FLT_MAX, 0, str);
 			base += right * text_size.x * -0.5f;
