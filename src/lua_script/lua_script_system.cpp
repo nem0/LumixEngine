@@ -134,7 +134,7 @@ namespace Lumix
 					if (lua_type(L, -1) != LUA_TFUNCTION)
 					{
 						const char* name = lua_tostring(L, -2);
-						if(name[0] != '_')
+						if(name[0] != '_' && !equalStrings(name, "enabled"))
 						{
 							u32 hash = crc32(name);
 							if (m_scene.m_property_names.find(hash) < 0)
@@ -189,8 +189,9 @@ namespace Lumix
 			void onScriptLoaded(Resource::State, Resource::State, Resource& resource)
 			{
 				lua_State* L = m_scene.m_system.m_engine.getState();
-				for (auto& script : m_scripts)
+				for (int scr_index = 0, c = m_scripts.size(); scr_index < c; ++scr_index)
 				{
+					auto& script = m_scripts[scr_index];
 					if (!script.m_script) continue;
 					if (!script.m_script->isReady()) continue;
 					if (script.m_script != &resource) continue;
@@ -251,6 +252,9 @@ namespace Lumix
 					lua_pop(script.m_state, 1); // []
 
 					detectProperties(script);
+					
+					bool enabled = script.m_flags.isSet(ScriptInstance::ENABLED);
+					m_scene.setEnableProperty(m_entity, scr_index, script, enabled);
 
 					if (m_scene.m_is_game_running) m_scene.startScript(script, is_reload);
 				}
@@ -1704,12 +1708,30 @@ namespace Lumix
 		}
 
 
+		void setEnableProperty(Entity entity, int scr_index, ScriptInstance& inst, bool enabled)
+		{
+			if (!inst.m_state) return;
+
+			bool is_env_valid = lua_rawgeti(inst.m_state, LUA_REGISTRYINDEX, inst.m_environment) == LUA_TTABLE; // [env]
+			ASSERT(is_env_valid);
+			lua_pushboolean(inst.m_state, enabled);  // [env, enabled]
+			lua_setfield(inst.m_state, -2, "enabled"); // [env]
+			lua_pop(inst.m_state, 1); // []
+
+			const char* fn = enabled ? "onEnable" : "onDisable";
+			if (beginFunctionCall(entity, scr_index, fn)) endFunctionCall();
+		}
+
+
 		void enableScript(Entity entity, int scr_index, bool enable) override
 		{
 			ScriptInstance& inst = m_scripts[entity]->m_scripts[scr_index];
 			if (inst.m_flags.isSet(ScriptInstance::ENABLED) == enable) return;
 
 			inst.m_flags.set(ScriptInstance::ENABLED, enable);
+
+			setEnableProperty(entity, scr_index, inst, enable);
+
 			if(enable)
 			{
 				startScript(inst, false);
