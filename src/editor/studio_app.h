@@ -47,6 +47,7 @@ public:
 		virtual ~IPlugin() {}
 
 		virtual void onWindowGUI() = 0;
+		virtual void guiEndFrame() {}
 		virtual bool hasFocus() { return false; }
 		virtual void update(float) {}
 		virtual void pluginAdded(IPlugin& plugin) {}

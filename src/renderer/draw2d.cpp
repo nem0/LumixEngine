@@ -2018,7 +2018,7 @@ void FontAtlas::RenderCustomTexData(int pass, void* p_rects)
 		TexUvWhitePixel = Vec2((r.x + 0.5f) * tex_uv_scale.x, (r.y + 0.5f) * tex_uv_scale.y);
 
 		// Setup mouse cursors
-		const Vec2 cursor_datas[ImGuiMouseCursor_Count_][3] =
+		const Vec2 cursor_datas[ImGuiMouseCursor_COUNT][3] =
 		{
 			// Pos ........ Size ......... Offset ......
 			{ Vec2(0,3),  Vec2(12,19), Vec2(0, 0) }, // ImGuiMouseCursor_Arrow

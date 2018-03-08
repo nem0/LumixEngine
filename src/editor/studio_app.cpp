@@ -28,6 +28,7 @@
 #include "engine/timer.h"
 #include "engine/universe/universe.h"
 #include "imgui/imgui.h"
+#include "imgui/imgui_internal.h"
 #include "log_ui.h"
 #include "metadata.h"
 #include "platform_interface.h"
@@ -37,7 +38,6 @@
 #include "utils.h"
 #include <SDL.h>
 #include <SDL_syswm.h>
-
 
 namespace Lumix
 {
@@ -205,10 +205,7 @@ public:
 
 		ImGui::CreateContext();
 		loadSettings();
-		initIMGUI();
-		#ifdef _WIN32
-			ImGui::GetIO().ImeWindowHandle = window_info.info.win.window;
-		#endif
+		initIMGUI(window_info);
 
 		m_custom_pivot_action = LUMIX_NEW(m_editor->getAllocator(), Action)(
 			"Set Custom Pivot", "Set Custom Pivot", "set_custom_pivot", SDLK_v, -1, -1);
@@ -541,6 +538,10 @@ public:
 
 	void guiEndFrame()
 	{
+#if 0
+		ImGui::Begin("test1"); ImGui::End();
+		ImGui::Begin("test2"); ImGui::End();
+#else
 		if (m_is_welcome_screen_open)
 		{
 			showWelcomeScreen();
@@ -569,8 +570,15 @@ public:
 			m_settings.onGUI();
 			onPackDataGUI();
 		}
+#endif
 		ImGui::PopFont();
 		ImGui::Render();
+		ImGui::RenderAdditionalViewports();
+
+		for (auto* plugin : m_plugins)
+		{
+			plugin->guiEndFrame();
+		}
 	}
 
 	void update()
@@ -1390,10 +1398,15 @@ public:
 	}
 
 
-	void initIMGUI()
+	void initIMGUI(const SDL_SysWMinfo& window_info)
 	{
 		ImGuiIO& io = ImGui::GetIO();
-		io.NavFlags |= ImGuiNavFlags_EnableKeyboard;
+		#ifdef _WIN32
+			io.ImeWindowHandle = window_info.info.win.window;
+			
+		#endif
+		// TODO
+		//io.NavFlags |= ImGuiNavFlags_EnableKeyboard;
 		float ddpi;
 		float font_scale = 1;
 		if (SDL_GetDisplayDPI(0, &ddpi, nullptr, nullptr) == 0) font_scale = ddpi / 96;
@@ -2072,7 +2085,7 @@ public:
 
 	void onPackDataGUI()
 	{
-		if (ImGui::BeginDock("Pack data", &m_is_pack_data_dialog_open))
+		if (ImGui::Begin("Pack data", &m_is_pack_data_dialog_open))
 		{
 			ImGui::LabelText("Destination dir", "%s", m_pack.dest_dir.data);
 			ImGui::SameLine();
@@ -2088,7 +2101,7 @@ public:
 
 			if (ImGui::Button("Pack")) packData();
 		}
-		ImGui::EndDock();
+		ImGui::End();
 	}
 
 
@@ -2338,8 +2351,29 @@ public:
 					m_mouse_move += {(float)event.motion.xrel, (float)event.motion.yrel};
 					if (SDL_GetRelativeMouseMode() == SDL_FALSE)
 					{
-						io.MousePos.x = (float)event.motion.x;
-						io.MousePos.y = (float)event.motion.y;
+						int mx, my;
+						Uint32 mouse_buttons = SDL_GetMouseState(&mx, &my);
+						SDL_Window* focused_window = SDL_GetKeyboardFocus();
+						if (focused_window)
+						{
+							// SDL_GetMouseState() gives me mouse position seemingly based on the last window entered/focused(?)
+							// The creation of new window and SDL_CaptureMouse both seems to severely mess up with that, so we retrieve that position globally.
+							int wx, wy;
+							SDL_GetWindowPosition(focused_window, &wx, &wy);
+							SDL_GetGlobalMouseState(&mx, &my);
+							mx -= wx;
+							my -= wy;
+						}
+						if (ImGuiViewport* viewport = ImGui::FindViewportByPlatformHandle((void*)focused_window))
+						{
+							io.MousePos = ImVec2(viewport->Pos.x + (float)mx, viewport->Pos.y + (float)my);
+							io.MousePosViewport = viewport->ID;
+						}
+
+/*						io.MousePos.x = (float)event.motion.x;
+						io.MousePos.y = (float)event.motion.y;*/
+
+
 					}
 				}
 				break;

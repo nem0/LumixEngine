@@ -27,6 +27,7 @@
 #include "engine/system.h"
 #include "engine/universe/universe.h"
 #include "game_view.h"
+#include "imgui/imgui_internal.h" 
 #include "import_asset_dialog.h"
 #include "renderer/draw2d.h"
 #include "renderer/font_manager.h"
@@ -46,6 +47,7 @@
 #include "stb/stb_image_resize.h"
 #include "terrain_editor.h"
 #include <SDL.h>
+#include <SDL_syswm.h>
 #include <cmath>
 #include <cmft/clcontext.h>
 #include <cmft/cubemapfilter.h>
@@ -1761,8 +1763,8 @@ struct FurPainter LUMIX_FINAL : public WorldEditor::Plugin
 			const u16* idx16 = (const u16*)&mesh.indices[0];
 			const u32* idx32 = (const u32*)&mesh.indices[0];
 			const Vec3* vertices = &mesh.vertices[0];
-			Vec2 min((float)texture->width, (float)texture->height);
-			Vec2 max(0, 0);
+			Vec2 minimum((float)texture->width, (float)texture->height);
+			Vec2 maximum(0, 0);
 			int tri_count = 0;
 			for (int i = 0, c = mesh.indices_count; i < c; i += 3)
 			{
@@ -1794,18 +1796,18 @@ struct FurPainter LUMIX_FINAL : public WorldEditor::Plugin
 					v[1].fixUV(texture->width, texture->height);
 					v[2].fixUV(texture->width, texture->height);
 
-					min.x = Math::minimum(min.x, v[0].uv.x, v[1].uv.x, v[2].uv.x);
-					max.x = Math::maximum(max.x, v[0].uv.x, v[1].uv.x, v[2].uv.x);
+					minimum.x = Math::minimum(minimum.x, v[0].uv.x, v[1].uv.x, v[2].uv.x);
+					maximum.x = Math::maximum(maximum.x, v[0].uv.x, v[1].uv.x, v[2].uv.x);
 
-					min.y = Math::minimum(min.y, v[0].uv.y, v[1].uv.y, v[2].uv.y);
-					max.y = Math::maximum(max.y, v[0].uv.y, v[1].uv.y, v[2].uv.y);
+					minimum.y = Math::minimum(minimum.y, v[0].uv.y, v[1].uv.y, v[2].uv.y);
+					maximum.y = Math::maximum(maximum.y, v[0].uv.y, v[1].uv.y, v[2].uv.y);
 
 					++tri_count;
 					rasterizeTriangle(texture, v, hit);
 				}
 			}
 
-			if (tri_count > 0) texture->onDataUpdated((int)min.x, (int)min.y, int(max.x - min.x), int(max.y - min.y));
+			if (tri_count > 0) texture->onDataUpdated((int)minimum.x, (int)minimum.y, int(maximum.x - minimum.x), int(maximum.y - minimum.y));
 		}
 	}
 
@@ -2517,17 +2519,10 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 
 		PluginManager& plugin_manager = m_engine.getPluginManager();
 		Renderer* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
-		Path path("pipelines/imgui/imgui.lua");
-		m_gui_pipeline = Pipeline::create(*renderer, path, "", m_engine.getAllocator());
-		m_gui_pipeline->load();
 
 		int w, h;
 		SDL_GetWindowSize(m_app.getWindow(), &w, &h);
-		m_gui_pipeline->resize(w, h);
 		renderer->resize(w, h);
-		editor.universeCreated().bind<EditorUIRenderPlugin, &EditorUIRenderPlugin::onUniverseCreated>(this);
-		editor.universeDestroyed().bind<EditorUIRenderPlugin, &EditorUIRenderPlugin::onUniverseDestroyed>(this);
-		if (editor.getUniverse()) onUniverseCreated();
 
 		unsigned char* pixels;
 		int width, height;
@@ -2548,14 +2543,14 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 			LUMIX_DELETE(m_engine.getAllocator(), old_texture);
 		}
 
-		ImGui::GetIO().RenderDrawListsFn = imGuiCallback;
-
 		IAllocator& allocator = editor.getAllocator();
 		RenderInterface* render_interface = LUMIX_NEW(allocator, RenderInterfaceImpl)(editor, *scene_view.getPipeline());
 		editor.setRenderInterface(render_interface);
 
 		m_index_buffer = bgfx::createDynamicIndexBuffer(1024 * 256);
 		m_vertex_buffer = bgfx::createDynamicVertexBuffer(1024 * 256, renderer->getBasic2DVertexDecl());
+
+		initImGui();
 	}
 
 
@@ -2563,10 +2558,7 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	{
 		bgfx::destroy(m_index_buffer);
 		bgfx::destroy(m_vertex_buffer);
-		Pipeline::destroy(m_gui_pipeline);
 		WorldEditor& editor = m_app.getWorldEditor();
-		editor.universeCreated().unbind<EditorUIRenderPlugin, &EditorUIRenderPlugin::onUniverseCreated>(this);
-		editor.universeDestroyed().unbind<EditorUIRenderPlugin, &EditorUIRenderPlugin::onUniverseDestroyed>(this);
 		shutdownImGui();
 	}
 
@@ -2591,11 +2583,213 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	}
 
 
-	void draw(ImDrawData* draw_data)
+	void initImGui()
 	{
-		if (!m_gui_pipeline->isReady()) goto end;
+		ImGuiIO& io = ImGui::GetIO();
+		io.PlatformInterface.CreateViewport = ImGui_ImplSDL2_CreateViewport;
+		io.PlatformInterface.DestroyViewport = ImGui_ImplSDL2_DestroyViewport;
+		io.PlatformInterface.ShowWindow = ImGui_ImplSDL2_ShowWindow;
+		io.PlatformInterface.SetWindowPos = ImGui_ImplSDL2_SetWindowPos;
+		io.PlatformInterface.GetWindowPos = ImGui_ImplSDL2_GetWindowPos;
+		io.PlatformInterface.SetWindowSize = ImGui_ImplSDL2_SetWindowSize;
+		io.PlatformInterface.GetWindowSize = ImGui_ImplSDL2_GetWindowSize;
+		io.PlatformInterface.SetWindowTitle = ImGui_ImplSDL2_SetWindowTitle;
+		io.PlatformInterface.RenderViewport = ImGui_ImplSDL2_RenderViewport;
+
+		#ifdef _WIN32
+			IAllocator& allocator = m_app.getWorldEditor().getAllocator();
+			PlatformUserData* pud = LUMIX_NEW(allocator, PlatformUserData);
+			pud->plugin = this;
+			pud->framebuffer = nullptr;
+			ImGui::GetMainViewport()->PlatformHandle = m_app.getWindow();
+			ImGui::GetMainViewport()->PlatformUserData = pud;
+		#endif
+
+		io.ConfigFlags = ImGuiConfigFlags_MultiViewports;
+	}
+
+
+	u8 beginViewportRender(FrameBuffer* framebuffer)
+	{
+		PluginManager& plugin_manager = m_engine.getPluginManager();
+		Renderer* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
+
+		renderer->viewCounterAdd();
+		u8 view = (u8)renderer->getViewCounter();
+		if (framebuffer)
+		{
+			bgfx::setViewFrameBuffer(view, framebuffer->getHandle());
+		}
+		else
+		{
+			bgfx::setViewFrameBuffer(view, BGFX_INVALID_HANDLE);
+		}
+		bgfx::setViewClear(view, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, 0x303030ff, 1.0f, 0);
+		bgfx::setViewName(view, "imgui viewport");
+		bgfx::setViewMode(view, bgfx::ViewMode::Sequential);
+
+		float left = ImGui::GetIO().DisplayPos.x;
+		float top = ImGui::GetIO().DisplayPos.y;
+		float width = ImGui::GetIO().DisplaySize.x;
+		float right = width + left;
+		float height = ImGui::GetIO().DisplaySize.y;
+		float bottom = height + top;
+		Matrix ortho;
+		ortho.setOrtho(left, right, bottom, top, -1.0f, 1.0f, bgfx::getCaps()->homogeneousDepth);
+		if (framebuffer && (framebuffer->getWidth() != int(width + 0.5f) || framebuffer->getHeight() != int(height + 0.5f)))
+		{
+			framebuffer->resize((int)width, (int)height);
+		}
+
+		bgfx::setViewRect(view, 0, 0, (uint16_t)width, (uint16_t)height);
+		bgfx::setViewTransform(view, nullptr, &ortho.m11);
+		bgfx::touch(view);
+
+		return view;
+	}
+
+
+	static void ImGui_ImplSDL2_RenderViewport(ImGuiViewport* viewport)
+	{
+		auto* pud = (PlatformUserData*)viewport->PlatformUserData;
+		EditorUIRenderPlugin* that = pud->plugin;
+		PluginManager& plugin_manager = that->m_engine.getPluginManager();
+		Renderer* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
+
+		renderer->viewCounterAdd();
+		u8 view = that->beginViewportRender(pud->framebuffer);
+
+		for (int i = 0; i < viewport->DrawData.CmdListsCount; ++i)
+		{
+			ImDrawList* cmd_list = viewport->DrawData.CmdLists[i];
+			that->drawGUICmdList(view, cmd_list);
+		}
+	}
+
+
+	static ImVec2 ImGui_ImplSDL2_GetWindowPos(ImGuiViewport* viewport)
+	{
+		int x = 0, y = 0;
+		SDL_GetWindowPosition((SDL_Window*)viewport->PlatformHandle, &x, &y);
+		return ImVec2((float)x, (float)y);
+	}
+
+
+	struct PlatformUserData
+	{
+		EditorUIRenderPlugin* plugin;
+		FrameBuffer* framebuffer;
+	};
+
+
+	static void ImGui_ImplSDL2_CreateViewport(ImGuiViewport* viewport)
+	{
+		Uint32 sdl_flags = 0;
+		sdl_flags |= SDL_WINDOW_ALLOW_HIGHDPI;
+		sdl_flags |= SDL_WINDOW_HIDDEN;
+		#if 1
+			//sdl_flags |= (viewport->Flags & ImGuiViewportFlags_NoDecoration) ? SDL_WINDOW_BORDERLESS : 0;
+			sdl_flags |= (viewport->Flags & ImGuiViewportFlags_NoDecoration) ? 0 : SDL_WINDOW_RESIZABLE;
+		#else
+			sdl_flags |= (viewport->Flags & ImGuiViewportFlags_NoDecoration) ? SDL_WINDOW_BORDERLESS : 0;
+			sdl_flags |= (viewport->Flags & ImGuiViewportFlags_NoDecoration) ? 0 : SDL_WINDOW_RESIZABLE;
+		#endif
+		SDL_Window* win = SDL_CreateWindow("Lumix Studio"
+			, 0, 0
+			, (int)viewport->Size.x
+			, (int)viewport->Size.y
+			, sdl_flags);
+		viewport->PlatformHandle = win;
+
+		EditorUIRenderPlugin* that = ((PlatformUserData*)ImGui::GetMainViewport()->PlatformUserData)->plugin;
+
+		IAllocator& allocator = that->m_app.getWorldEditor().getAllocator();
+		PlatformUserData* user_data = LUMIX_NEW(allocator, PlatformUserData);
+		user_data->plugin = that;
+		SDL_SysWMinfo window_info;
+		SDL_VERSION(&window_info.version);
+		SDL_GetWindowWMInfo(win, &window_info);
+		user_data->framebuffer = LUMIX_NEW(allocator, FrameBuffer)("imgui viewport", 800, 600, window_info.info.win.window);
+
+
+		viewport->PlatformUserData = user_data;
+
+	}
+
+
+	static void ImGui_ImplSDL2_SetWindowPos(ImGuiViewport* viewport, ImVec2 pos)
+	{
+		SDL_SetWindowPosition((SDL_Window*)viewport->PlatformHandle, (int)pos.x, (int)pos.y);
+	}
+
+	static ImVec2 ImGui_ImplSDL2_GetWindowSize(ImGuiViewport* viewport)
+	{
+		int w = 0, h = 0;
+		SDL_GetWindowSize((SDL_Window*)viewport->PlatformHandle, &w, &h);
+		return ImVec2((float)w, (float)h);
+	}
+
+	static void ImGui_ImplSDL2_SetWindowSize(ImGuiViewport* viewport, ImVec2 size)
+	{
+		SDL_SetWindowSize((SDL_Window*)viewport->PlatformHandle, (int)size.x, (int)size.y);
+	}
+
+
+	static void ImGui_ImplSDL2_SetWindowTitle(ImGuiViewport* viewport, const char* title)
+	{
+		SDL_SetWindowTitle((SDL_Window*)viewport->PlatformHandle, title);
+	}
+
+
+	static void ImGui_ImplSDL2_DestroyViewport(ImGuiViewport* viewport)
+	{
+		if (viewport->PlatformHandle)
+		{
+			SDL_DestroyWindow((SDL_Window*)viewport->PlatformHandle);
+		}
+		viewport->PlatformUserData = viewport->PlatformHandle = NULL;
+	}
+
+
+	static void ImGui_ImplSDL2_ShowWindow(ImGuiViewport* viewport)
+	{
+		SDL_Window* win = (SDL_Window*)viewport->PlatformHandle;
+		/*#if defined(_WIN32)
+		SDL_SysWMinfo info;
+		SDL_VERSION(&info.version);
+		if (SDL_GetWindowWMInfo(win, &info))
+		{
+		HWND hwnd = info.info.win.window;
+
+		// SDL hack: Hide icon from task bar
+		// Note: SDL 2.0.6+ has a SDL_WINDOW_SKIP_TASKBAR flag which is supported under Windows but the way it create the window breaks our seamless transition.
+		if (viewport->Flags & ImGuiViewportFlags_NoDecoration)
+		{
+		LONG ex_style = ::GetWindowLong(hwnd, GWL_EXSTYLE);
+		ex_style &= ~WS_EX_APPWINDOW;
+		ex_style |= WS_EX_TOOLWINDOW;
+		::SetWindowLong(hwnd, GWL_EXSTYLE, ex_style);
+		}
+
+		// SDL hack: SDL always activate/focus windows :/
+		if (viewport->Flags & ImGuiViewportFlags_NoFocusOnAppearing)
+		{
+		::ShowWindow(hwnd, SW_SHOWNA);
+		return;
+		}
+		}
+		#endif*/
+		SDL_ShowWindow(win);
+	}
+
+
+	void guiEndFrame() override
+	{
 		if (!m_material || !m_material->isReady()) goto end;
 		if (!m_material->getTexture(0)) goto end;
+
+		ImDrawData* draw_data = ImGui::GetDrawData();
+		if (!draw_data) goto end;
 
 		m_vb_offset = 0;
 		m_ib_offset = 0;
@@ -2611,15 +2805,12 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 			if (renderer) renderer->resize(m_width, m_height);
 		}
 
-		if (m_gui_pipeline->render())
-		{
-			setGUIProjection();
+		u8 view = beginViewportRender(nullptr);
 
-			for (int i = 0; i < draw_data->CmdListsCount; ++i)
-			{
-				ImDrawList* cmd_list = draw_data->CmdLists[i];
-				drawGUICmdList(cmd_list);
-			}
+		for (int i = 0; i < draw_data->CmdListsCount; ++i)
+		{
+			ImDrawList* cmd_list = draw_data->CmdLists[i];
+			drawGUICmdList(view, cmd_list);
 		}
 
 		end:
@@ -2628,33 +2819,10 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	}
 
 
-	void onUniverseCreated()
-	{
-		auto* universe = m_app.getWorldEditor().getUniverse();
-		auto* scene = static_cast<RenderScene*>(universe->getScene(MODEL_INSTANCE_TYPE));
-
-		m_gui_pipeline->setScene(scene);
-	}
-
-
-	void onUniverseDestroyed() { m_gui_pipeline->setScene(nullptr); }
-	static void imGuiCallback(ImDrawData* draw_data) { s_instance->draw(draw_data); }
-
-
-	void setGUIProjection()
-	{
-		float width = ImGui::GetIO().DisplaySize.x;
-		float height = ImGui::GetIO().DisplaySize.y;
-		Matrix ortho;
-		ortho.setOrtho(0.0f, width, height, 0.0f, -1.0f, 1.0f, bgfx::getCaps()->homogeneousDepth);
-		m_gui_pipeline->resize((int)width, (int)height);
-		m_gui_pipeline->setViewProjection(ortho, (int)width, (int)height);
-	}
-
-
-	void drawGUICmdList(ImDrawList* cmd_list)
+	void drawGUICmdList(u8 view, ImDrawList* cmd_list)
 	{
 		Renderer* renderer = static_cast<Renderer*>(m_engine.getPluginManager().getPlugin("renderer"));
+		int pass_idx = renderer->getPassIdx("MAIN");
 
 		int num_indices = cmd_list->IdxBuffer.size();
 		int num_vertices = cmd_list->VtxBuffer.size();
@@ -2678,10 +2846,13 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 
 			if (0 == pcmd->ElemCount) continue;
 
-			m_gui_pipeline->setScissor(u16(Math::maximum(pcmd->ClipRect.x, 0.0f)),
-				u16(Math::maximum(pcmd->ClipRect.y, 0.0f)),
-				u16(Math::minimum(pcmd->ClipRect.z, 65535.0f) - Math::maximum(pcmd->ClipRect.x, 0.0f)),
-				u16(Math::minimum(pcmd->ClipRect.w, 65535.0f) - Math::maximum(pcmd->ClipRect.y, 0.0f)));
+			ImGuiIO& io = ImGui::GetIO();
+			bgfx::setScissor(
+				u16(Math::maximum(pcmd->ClipRect.x - io.DisplayPos.x, 0.0f)),
+				u16(Math::maximum(pcmd->ClipRect.y - io.DisplayPos.y, 0.0f)),
+				u16(Math::minimum(pcmd->ClipRect.z - io.DisplayPos.x, 65535.0f) - Math::maximum(pcmd->ClipRect.x - io.DisplayPos.x, 0.0f)),
+				u16(Math::minimum(pcmd->ClipRect.w - io.DisplayPos.y, 65535.0f) - Math::maximum(pcmd->ClipRect.y - io.DisplayPos.y, 0.0f))
+			);
 
 			auto material = m_material;
 			const auto& texture_id =
@@ -2692,16 +2863,15 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 			{
 				render_states &= ~BGFX_STATE_BLEND_MASK;
 			}
-			m_gui_pipeline->setTexture(0, texture_id, texture_uniform);
-			m_gui_pipeline->render(m_vertex_buffer,
-				m_index_buffer,
-				elem_offset + m_ib_offset,
-				pcmd->ElemCount,
-				m_vb_offset,
-				num_vertices,
-				render_states,
-				material->getShaderInstance());
+			bgfx::setTexture(0, texture_uniform, texture_id);
 
+			ShaderInstance& shader_instance = material->getShaderInstance();
+			bgfx::setStencil(BGFX_STENCIL_NONE, BGFX_STENCIL_NONE);
+			bgfx::setState(BGFX_STATE_RGB_WRITE | BGFX_STATE_ALPHA_WRITE | BGFX_STATE_DEPTH_WRITE | render_states);
+			bgfx::setVertexBuffer(0, m_vertex_buffer, m_vb_offset, num_vertices);
+			u32 first_index = elem_offset + m_ib_offset;
+			bgfx::setIndexBuffer(m_index_buffer, first_index, pcmd->ElemCount);
+			bgfx::submit(view, shader_instance.getProgramHandle(pass_idx));
 			elem_offset += pcmd->ElemCount;
 		}
 		m_ib_offset += num_indices;
@@ -2714,7 +2884,6 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	StudioApp& m_app;
 	Engine& m_engine;
 	Material* m_material;
-	Pipeline* m_gui_pipeline;
 	SceneView& m_scene_view;
 	GameView& m_game_view;
 	bgfx::DynamicVertexBufferHandle m_vertex_buffer;
