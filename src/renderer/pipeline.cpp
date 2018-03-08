@@ -940,6 +940,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	void renderTextMeshes()
 	{
 		if (!m_text_mesh_shader->isReady()) return;
+		if (!m_applied_camera.isValid()) return;
 
 		IAllocator& allocator = m_renderer.getEngine().getLIFOAllocator();
 		Array<TextMeshVertex> vertices(allocator);
