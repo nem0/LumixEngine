@@ -1,3 +1,4 @@
+#include "animation/editor/animation_editor.h"
 #include "editor/asset_browser.h"
 #include "editor/ieditor_command.h"
 #include "editor/platform_interface.h"
@@ -603,6 +604,28 @@ struct ConsolePlugin LUMIX_FINAL : public StudioApp::IPlugin
 		action->is_selected.bind<ConsolePlugin, &ConsolePlugin::isOpen>(this);
 		app.addWindowAction(action);
 		buf[0] = '\0';
+	}
+
+
+	static const int LUA_CALL_EVENT_SIZE = 32;
+
+
+	void pluginAdded(IPlugin& plugin) override
+	{
+		if (!equalStrings(plugin.getName(), "animation_editor")) return;
+
+		auto& anim_editor = (AnimEditor::IAnimationEditor&)plugin;
+		auto& event_type = anim_editor.createEventType("lua_call");
+		event_type.size = LUA_CALL_EVENT_SIZE;
+		event_type.label = "Lua call";
+		event_type.editor.bind<ConsolePlugin, &ConsolePlugin::onLuaCallEventGUI>(this);
+	}
+
+
+	void onLuaCallEventGUI(u8* data, AnimEditor::Component& component) const
+	{
+		LuaScriptScene* scene = (LuaScriptScene*)app.getWorldEditor().getUniverse()->getScene(crc32("lua_script"));
+		ImGui::InputText("Function", (char*)data, LUA_CALL_EVENT_SIZE);
 	}
 
 
