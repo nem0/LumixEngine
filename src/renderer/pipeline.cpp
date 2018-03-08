@@ -944,7 +944,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		IAllocator& allocator = m_renderer.getEngine().getLIFOAllocator();
 		Array<TextMeshVertex> vertices(allocator);
 		vertices.reserve(1024);
-		m_scene->getTextMeshesVertices(vertices);
+		m_scene->getTextMeshesVertices(vertices, m_applied_camera);
 
 		const bgfx::VertexDecl& decl = m_renderer.getBasicVertexDecl();
 		bgfx::TransientVertexBuffer vertex_buffer;
