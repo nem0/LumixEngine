@@ -2500,9 +2500,6 @@ struct RenderStatsPlugin LUMIX_FINAL : public StudioApp::IPlugin
 
 struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 {
-	static EditorUIRenderPlugin* s_instance;
-
-
 	EditorUIRenderPlugin(StudioApp& app, SceneView& scene_view, GameView& game_view)
 		: m_app(app)
 		, m_scene_view(scene_view)
@@ -2511,8 +2508,6 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		, m_height(-1)
 		, m_engine(app.getWorldEditor().getEngine())
 	{
-		s_instance = this;
-
 		WorldEditor& editor = app.getWorldEditor();
 
 		PluginManager& plugin_manager = m_engine.getPluginManager();
@@ -2540,8 +2535,6 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 			old_texture->destroy();
 			LUMIX_DELETE(m_engine.getAllocator(), old_texture);
 		}
-
-		ImGui::GetIO().RenderDrawListsFn = imGuiCallback;
 
 		IAllocator& allocator = editor.getAllocator();
 		RenderInterface* render_interface = LUMIX_NEW(allocator, RenderInterfaceImpl)(editor, *scene_view.getPipeline());
@@ -2621,8 +2614,10 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	}
 
 
-	void draw(ImDrawData* draw_data)
+	void guiEndFrame() override
 	{
+		ImDrawData* draw_data = ImGui::GetDrawData();
+
 		if (!m_material || !m_material->isReady()) goto end;
 		if (!m_material->getTexture(0)) goto end;
 
@@ -2652,9 +2647,6 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 			Renderer* renderer = static_cast<Renderer*>(m_engine.getPluginManager().getPlugin("renderer"));
 			renderer->frame(false);
 	}
-
-
-	static void imGuiCallback(ImDrawData* draw_data) { s_instance->draw(draw_data); }
 
 
 	void drawGUICmdList(u8 view, ImDrawList* cmd_list)
@@ -2729,9 +2721,6 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 	int m_vb_offset;
 	int m_ib_offset;
 };
-
-
-EditorUIRenderPlugin* EditorUIRenderPlugin::s_instance = nullptr;
 
 
 struct ShaderEditorPlugin LUMIX_FINAL : public StudioApp::IPlugin

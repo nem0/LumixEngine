@@ -571,6 +571,10 @@ public:
 		}
 		ImGui::PopFont();
 		ImGui::Render();
+		for (auto* plugin : m_plugins)
+		{
+			plugin->guiEndFrame();
+		}
 	}
 
 	void update()
