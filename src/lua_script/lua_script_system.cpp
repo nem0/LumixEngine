@@ -1,4 +1,5 @@
 #include "lua_script_system.h"
+#include "animation/animation_scene.h"
 #include "engine/array.h"
 #include "engine/binary_array.h"
 #include "engine/blob.h"
@@ -324,6 +325,7 @@ namespace Lumix
 			, m_property_names(system.m_allocator)
 			, m_is_game_running(false)
 			, m_is_api_registered(false)
+			, m_animation_scene(nullptr)
 		{
 			m_function_call.is_in_progress = false;
 			
@@ -1127,6 +1129,7 @@ namespace Lumix
 
 		void startGame() override
 		{
+			m_animation_scene = (AnimationScene*)m_universe.getScene(crc32("animation"));
 			m_is_game_running = true;
 			m_gui_scene = (GUIScene*)m_universe.getScene(crc32("gui"));
 			if (m_gui_scene)
@@ -1152,6 +1155,7 @@ namespace Lumix
 			m_updates.clear();
 			m_input_handlers.clear();
 			m_timers.clear();
+			m_animation_scene = nullptr;
 		}
 
 
@@ -1639,6 +1643,49 @@ namespace Lumix
 				}
 				lua_pop(update_item.state, 1);
 			}
+
+			processAnimationEvents();
+		}
+
+
+		void processAnimationEvents()
+		{
+			if (!m_animation_scene) return;
+
+			InputBlob blob(m_animation_scene->getEventStream());
+			u32 lua_call_type = crc32("lua_call");
+			while (blob.getPosition() < blob.getSize())
+			{
+				u32 type;
+				u8 size;
+				Entity entity;
+				blob.read(type);
+				blob.read(entity);
+				blob.read(size);
+				if (type == lua_call_type)
+				{
+					char tmp[64];
+					if (size + 1 > sizeof(tmp))
+					{
+						blob.skip(size);
+						g_log_error.log("Lua Script") << "Skipping lua_call animation event because it is too big.";
+					}
+					else
+					{
+						blob.read(tmp, size);
+						tmp[size] = 0;
+						ScriptComponent* scr = m_scripts[entity];
+						for (int i = 0, c = scr->m_scripts.size(); i < c; ++i)
+						{
+							if (beginFunctionCall(entity, i, tmp)) endFunctionCall();
+						}
+					}
+				}
+				else
+				{
+					blob.skip(size);
+				}
+			}
 		}
 
 
@@ -1816,6 +1863,7 @@ namespace Lumix
 		bool m_is_api_registered = false;
 		bool m_is_game_running = false;
 		GUIScene* m_gui_scene = nullptr;
+		AnimationScene* m_animation_scene;
 	};
 
 
