@@ -2616,6 +2616,7 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 
 	void guiEndFrame() override
 	{
+		u8 view;
 		ImDrawData* draw_data = ImGui::GetDrawData();
 
 		if (!m_material || !m_material->isReady()) goto end;
@@ -2635,7 +2636,7 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::IPlugin
 			if (renderer) renderer->resize(m_width, m_height);
 		}
 
-		u8 view = beginViewportRender(nullptr);
+		view = beginViewportRender(nullptr);
 		
 		for (int i = 0; i < draw_data->CmdListsCount; ++i)
 		{
