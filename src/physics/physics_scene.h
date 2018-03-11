@@ -206,6 +206,10 @@ public:
 	virtual void setControllerRadius(Entity entity, float radius) = 0;
 	virtual float getControllerHeight(Entity entity) = 0;
 	virtual void setControllerHeight(Entity entity, float height) = 0;
+	virtual bool getControllerCustomGravity(Entity entity) = 0;
+	virtual void setControllerCustomGravity(Entity entity, bool gravity) = 0;
+	virtual float getControllerCustomGravitySpeed(Entity entity) = 0;
+	virtual void setControllerCustomGravitySpeed(Entity entity, float gravityspeed) = 0;
 	virtual bool isControllerTouchingDown(Entity entity) = 0;
 	virtual void resizeController(Entity entity, float height) = 0;
 
