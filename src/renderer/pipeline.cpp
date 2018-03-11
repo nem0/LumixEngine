@@ -16,6 +16,7 @@
 #include "renderer/material.h"
 #include "renderer/material_manager.h"
 #include "renderer/model.h"
+#include "renderer/occlusion_buffer.h"
 #include "renderer/particle_system.h"
 #include "renderer/pose.h"
 #include "renderer/render_scene.h"
@@ -294,6 +295,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		, m_define(define, allocator)
 		, m_draw2d(allocator)
 		, m_is_first_render(true)
+		, m_occlusion_buffer(allocator)
 	{
 		for (auto& handle : m_debug_vertex_buffers)
 		{
@@ -2285,6 +2287,21 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		JobSystem::wait(&counter);
 		
 		renderMeshes(*m_mesh_buffer);
+		m_occlusion_buffer.clear();
+		m_occlusion_buffer.rasterize(&m_scene->getUniverse(), m_scene->getCameraViewProjection(m_applied_camera), (*m_mesh_buffer)[0]);
+		m_occlusion_buffer.rasterize(&m_scene->getUniverse(), m_scene->getCameraViewProjection(m_applied_camera), (*m_mesh_buffer)[1]);
+		m_occlusion_buffer.rasterize(&m_scene->getUniverse(), m_scene->getCameraViewProjection(m_applied_camera), (*m_mesh_buffer)[2]);
+		m_occlusion_buffer.rasterize(&m_scene->getUniverse(), m_scene->getCameraViewProjection(m_applied_camera), (*m_mesh_buffer)[3]);
+		m_occlusion_buffer.buildHierarchy();
+
+		static bgfx::TextureHandle texture = bgfx::createTexture2D(384, 192, false, 1, bgfx::TextureFormat::RGBA8, 0);
+		auto mem = bgfx::copy(m_occlusion_buffer.getMip(0), 384 * 192 * 4);
+		bgfx::updateTexture2D(texture, 0, 0, 0, 0, 384, 192, mem, 384*4);
+
+		ImGui::Begin("Debug");
+		ImGui::Image(&texture, { 384, 192 });
+		ImGui::End();
+
 		if(render_grass) renderGrasses(m_grasses_buffer);
 		renderTerrains(m_terrains_buffer);
 	}
@@ -3252,6 +3269,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	Texture* m_default_cubemap;
 	bgfx::DynamicVertexBufferHandle m_debug_vertex_buffers[32];
 	bgfx::DynamicIndexBufferHandle m_debug_index_buffer;
+	OcclusionBuffer m_occlusion_buffer;
 	int m_debug_buffer_idx;
 	int m_has_shadowmap_define_idx;
 	int m_instanced_define_idx;
