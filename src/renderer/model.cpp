@@ -146,7 +146,7 @@ RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Matrix
 	Matrix inv = model_transform;
 	inv.inverse();
 	Vec3 local_origin = inv.transformPoint(origin);
-	Vec3 local_dir = static_cast<Vec3>(inv * Vec4(dir.x, dir.y, dir.z, 0));
+	Vec3 local_dir = (inv * Vec4(dir.x, dir.y, dir.z, 0)).xyz();
 
 	Matrix matrices[256];
 	ASSERT(!pose || pose->count <= lengthOf(matrices));
