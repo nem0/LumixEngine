@@ -417,7 +417,7 @@ public:
 		Vec4 p1 = inverted * Vec4(nx, ny, 1, 1);
 		p0 *= 1 / p0.w;
 		p1 *= 1 / p1.w;
-		dir = p1 - p0;
+		dir = (p1 - p0).xyz();
 		dir.normalize();
 	}
 

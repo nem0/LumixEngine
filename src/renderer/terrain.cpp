@@ -816,7 +816,7 @@ RayCastModelHit Terrain::castRay(const Vec3& origin, const Vec3& dir)
 		Matrix mtx = m_scene.getUniverse().getMatrix(m_entity);
 		mtx.fastInverse();
 		Vec3 rel_origin = mtx.transformPoint(origin);
-		Vec3 rel_dir = mtx * Vec4(dir, 0);
+		Vec3 rel_dir = (mtx * Vec4(dir, 0)).xyz();
 		Vec3 start;
 		Vec3 size(m_root->m_size * m_scale.x, m_scale.y * 65535.0f, m_root->m_size * m_scale.x);
 		if (Math::getRayAABBIntersection(rel_origin, rel_dir, m_root->m_min, size, start))

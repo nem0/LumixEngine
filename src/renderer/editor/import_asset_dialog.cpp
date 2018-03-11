@@ -504,7 +504,7 @@ struct FBXImporter
 	void writePackedVec3(const ofbx::Vec3& vec, const Matrix& mtx, OutputBlob* blob) const
 	{
 		Vec3 v = toLumixVec3(vec);
-		v = mtx * Vec4(v, 0);
+		v = (mtx * Vec4(v, 0)).xyz();
 		v.normalize();
 		v = fixOrientation(v);
 

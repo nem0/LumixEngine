@@ -2287,6 +2287,8 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		JobSystem::wait(&counter);
 		
 		renderMeshes(*m_mesh_buffer);
+		
+#ifdef OCCLUSION_BUFFER_WIP
 		m_occlusion_buffer.clear();
 		m_occlusion_buffer.rasterize(&m_scene->getUniverse(), m_scene->getCameraViewProjection(m_applied_camera), (*m_mesh_buffer)[0]);
 		m_occlusion_buffer.rasterize(&m_scene->getUniverse(), m_scene->getCameraViewProjection(m_applied_camera), (*m_mesh_buffer)[1]);
@@ -2299,9 +2301,10 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		bgfx::updateTexture2D(texture, 0, 0, 0, 0, 384, 192, mem, 384*4);
 
 		ImGui::Begin("Debug");
+		bgfx::setMarker("xx");
 		ImGui::Image(&texture, { 384, 192 });
 		ImGui::End();
-
+#endif
 		if(render_grass) renderGrasses(m_grasses_buffer);
 		renderTerrains(m_terrains_buffer);
 	}

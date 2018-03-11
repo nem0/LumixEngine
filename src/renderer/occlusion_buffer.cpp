@@ -1,3 +1,6 @@
+// clipping is inspired by urho 
+// https://github.com/urho3d/Urho3D/blob/9c666ae6b82e21e67bfb003d84e95e26f8a3d341/Source/Urho3D/Graphics/OcclusionBuffer.cpp#L681 
+
 #include "occlusion_buffer.h"
 #include "engine/array.h"
 #include "engine/matrix.h"
@@ -12,7 +15,7 @@ namespace Lumix
 {
 
 
-static const int Z_SCALE = 1 << 24;
+static const int Z_SCALE = 1 << 30;
 static const int XY_SCALE = 1 << 16;
 static const int WIDTH = 384;
 static const int HEIGHT = 192;
@@ -83,34 +86,33 @@ LUMIX_FORCE_INLINE void rasterizeProjectedTriangle(Vec3(&v)[3], int* depth)
 	int height = HEIGHT;
 
 	struct Point { int x, y; };
-	Point p0 = { int(v[0].x * width + 0.5f), int(v[0].y * height + 0.5f) };
-	Point p1 = { int(v[1].x * width + 0.5f), int(v[1].y * height + 0.5f) };
-	Point p2 = { int(v[2].x * width + 0.5f), int(v[2].y * height + 0.5f) };
+	Point p0 = { int(v[0].x * (width - 1) + 0.5f), int(v[0].y * (height - 1) + 0.5f) };
+	Point p1 = { int(v[1].x * (width - 1) + 0.5f), int(v[1].y * (height - 1) + 0.5f) };
+	Point p2 = { int(v[2].x * (width - 1) + 0.5f), int(v[2].y * (height - 1) + 0.5f) };
 
 	if (p0.y == p2.y) return;
 
-	float xdz = n.x / n.z;
-	float ydz = n.y / n.z;
-	int xdz_int = int(xdz * Z_SCALE);
+	float xdz = -n.x / n.z;
+	int xdz_int = int(xdz * Z_SCALE / WIDTH);
 
 	if (p1.y != p0.y)
 	{
-		int dl = (p1.x - p0.x) * XY_SCALE / (p1.y - p0.y);
-		int dr = (p2.x - p0.x) * XY_SCALE / (p2.y - p0.y);
+		int dl = (p1.x - p0.x) * 2 * XY_SCALE / (2*p1.y - 2*p0.y + 1);
+		int dr = (p2.x - p0.x) * 2 * XY_SCALE / (2*p2.y - 2*p0.y + 1);
 		Vec3 left_p = dl > dr ? v[2] : v[1];
-		int dz_left = int((left_p.z - v[0].z) * XY_SCALE / (left_p.y - v[0].y));
-		int left = p0.x * XY_SCALE;
-		int right = p0.x * XY_SCALE;
-		int z_left = int(v[0].z * Z_SCALE);
+		int dz_left = int((left_p.z - v[0].z) * Z_SCALE / (left_p.y - (v[0].y + 0.5f / HEIGHT)) / HEIGHT);
+		int z_left = int(v[0].z * Z_SCALE) + (dz_left >> 1);
 		if (dl > dr) Math::swap(dl, dr);
+		int left = p0.x * XY_SCALE + (dl >> 1);
+		int right = p0.x * XY_SCALE + (dr >> 1);
 		for (int y = p0.y; y <= p1.y; ++y)
 		{
 			int base = y * width + left / XY_SCALE;
 			int z = z_left;
 			for (int x = 0, n = right / XY_SCALE - left / XY_SCALE; x <= n; ++x)
 			{
-				if (z < depth[base + x]) depth[base + x] = z; // TODO
-				depth[base + x] = 0xfff00FFF;
+				if (z < depth[base + x]) depth[base + x] = z;
+				depth[base + x] = 0xfff00fff;
 				z += xdz_int;
 			}
 			left += dl;
@@ -121,23 +123,23 @@ LUMIX_FORCE_INLINE void rasterizeProjectedTriangle(Vec3(&v)[3], int* depth)
 	
 	if (p2.y == p1.y) return;
 
-	int left = p2.x * XY_SCALE;
-	int right = p2.x * XY_SCALE;
-	int z_left = int(v[2].z * Z_SCALE);
-
-	int dl = -(p1.x - p2.x) * XY_SCALE / (p1.y - p2.y);
-	int dr = -(p0.x - p2.x) * XY_SCALE / (p0.y - p2.y);
+	int dl = -(p1.x - p2.x) * 2 * XY_SCALE / (2 * p1.y - 2 * p2.y - 1);
+	int dr = -(p0.x - p2.x) * 2 * XY_SCALE / (2 * p0.y - 2 * p2.y - 1);
 	Vec3 left_p = dl > dr ? v[0] : v[1];
-	int dz_left = -int((left_p.z - v[2].z) * XY_SCALE / (left_p.y - v[2].y));
+	int dz_left = -int((left_p.z - v[2].z) * Z_SCALE / (left_p.y - (v[2].y - 0.5f / HEIGHT)) / HEIGHT);
+
 	if (dl > dr) Math::swap(dl, dr);
-	for (int y = p2.y; y > p1.y; --y)
+	int left = p2.x * XY_SCALE + (dl >> 1);
+	int right = p2.x * XY_SCALE + (dr >> 1);
+	int z_left = int(v[2].z * Z_SCALE) + (dz_left >> 1);
+	for (int y = p2.y; y >= p1.y; --y)
 	{
 		int base = y * width + left / XY_SCALE;
 		int z = z_left;
 		for (int x = 0, n = right / XY_SCALE - left / XY_SCALE; x <= n; ++x)
 		{
-			if (z < depth[base + x]) depth[base + x] = z; // TODO
-			depth[base + x] = 0xfff00FFF;
+			if (z < depth[base + x]) depth[base + x] = z;
+			depth[base + x] = 0xfff00fff;
 			z += xdz_int;
 		}
 		left += dl;
@@ -148,14 +150,79 @@ LUMIX_FORCE_INLINE void rasterizeProjectedTriangle(Vec3(&v)[3], int* depth)
 }
 
 
-LUMIX_FORCE_INLINE Vec3 toViewport(const Vec4& v)
+static LUMIX_FORCE_INLINE Vec3 toViewport(const Vec4& v)
 {
 	float inv = 0.5f / v.w;
 	return { v.x * inv + 0.5f, v.y * inv + 0.5f, v.z * inv + 0.5f };
 }
 
 
-LUMIX_FORCE_INLINE void rasterizeOccludingTriangle(Vec4 (&vertices)[3], int* depth)
+static LUMIX_FORCE_INLINE Vec4 clip(const Vec4& v0, const Vec4& v1, float d0, float d1)
+{
+	float t = d0 / (d0 - d1);
+	return v0 + t * (v1 - v0);
+}
+
+
+static LUMIX_FORCE_INLINE bool tryClip2Vertices(Vec4* vertices, int index, float* d, int d0, int d1, int d2)
+{
+	if (d[d0] < 0.0f && d[d1] < 0.0f)
+	{
+		vertices[index + d0] = clip(vertices[index + d0], vertices[index + d2], d[d0], d[d2]);
+		vertices[index + d1] = clip(vertices[index + d1], vertices[index + d2], d[d1], d[d2]);
+		return true;
+	}
+	return false;
+}
+
+
+static LUMIX_FORCE_INLINE bool tryClip1Vertex(Vec4* vertices, int index, float* d, int d0, int d1, int d2, bool* triangles, int& tringles_count)
+{
+	bool is_behind_plane = d[d0] < 0;
+	if (!is_behind_plane) return false;
+
+	int new_index = tringles_count * 3;
+	triangles[tringles_count] = true;
+	++tringles_count;
+
+	vertices[new_index + 0] = clip(vertices[index + d0], vertices[index + d2], d[d0], d[d2]);
+	vertices[new_index + 1] = clip(vertices[index + d0], vertices[index + d1], d[d0], d[d1]);
+	vertices[new_index + 2] = vertices[index + d2];
+	vertices[index + d0] = vertices[new_index + 1];
+
+	return true;
+}
+
+
+static void clipTriangles(const Vec4& plane, Vec4* vertices, bool* triangles, int& triangles_count)
+{
+	int count = triangles_count;
+	for (int i = 0; i < count; ++i)
+	{
+		if (!triangles[i]) continue;
+		int index = i * 3;
+		float d[3] = { dotProduct(plane, vertices[index])
+			, dotProduct(plane, vertices[index + 1])
+			, dotProduct(plane, vertices[index + 2])
+		};
+		
+		bool all_behind = d[0] < 0.0f && d[1] < 0.0f && d[2] < 0.0f;
+		if (all_behind)
+		{
+			triangles[i] = false;
+			continue;
+		}
+		if (tryClip2Vertices(vertices, index, d, 0, 1, 2)) continue;
+		if (tryClip2Vertices(vertices, index, d, 0, 2, 1)) continue;
+		if (tryClip2Vertices(vertices, index, d, 1, 2, 0)) continue;
+		if (tryClip1Vertex(vertices, index, d, 0, 1, 2, triangles, triangles_count)) continue;
+		if (tryClip1Vertex(vertices, index, d, 1, 2, 0, triangles, triangles_count)) continue;
+		if (tryClip1Vertex(vertices, index, d, 2, 0, 1, triangles, triangles_count)) continue;
+	}
+}
+
+
+LUMIX_FORCE_INLINE void rasterizeOccludingTriangle(Vec4 (&vertices)[64 * 3], int* depth)
 {
 	enum ClipMask
 	{
@@ -195,8 +262,23 @@ LUMIX_FORCE_INLINE void rasterizeOccludingTriangle(Vec4 (&vertices)[3], int* dep
 	}
 	else
 	{
-		//ASSERT(false);
-		// TODO
+		int triangles_count = 1;
+		bool triangles[64];
+		if (triangle_mask & POSITIVE_X) clipTriangles(Vec4(-1.0f, 0.0f, 0.0f, 1.0f), vertices, triangles, triangles_count);
+		if (triangle_mask & NEGATIVE_X) clipTriangles(Vec4(1.0f, 0.0f, 0.0f, 1.0f), vertices, triangles, triangles_count);
+		if (triangle_mask & POSITIVE_Y) clipTriangles(Vec4(0.0f, -1.0f, 0.0f, 1.0f), vertices, triangles, triangles_count);
+		if (triangle_mask & NEGATIVE_Y) clipTriangles(Vec4(0.0f, 1.0f, 0.0f, 1.0f), vertices, triangles, triangles_count);
+		if (triangle_mask & POSITIVE_Z) clipTriangles(Vec4(0.0f, 0.0f, -1.0f, 1.0f), vertices, triangles, triangles_count);
+		bool is_homogenous_depth = bgfx::getCaps()->homogeneousDepth;
+		if (triangle_mask & NEGATIVE_Z) clipTriangles(Vec4(0.0f, 0.0f, 1.0f, is_homogenous_depth ? 1.0f : 0.0f), vertices, triangles, triangles_count);
+
+		for (int i = 0; i < triangles_count; ++i)
+		{
+			if (!triangles[i]) continue;
+			int index = i * 3;
+			Vec3 projected[] = { toViewport(vertices[index]), toViewport(vertices[index + 1]), toViewport(vertices[index + 2]) };
+			rasterizeProjectedTriangle(projected, depth);
+		}
 	}
 }
 
@@ -208,7 +290,7 @@ static void rasterizeOccludingTriangles(const Mesh* mesh, const Matrix& mvp_mtx,
 	const IndexType* LUMIX_RESTRICT indices = (const IndexType*)&mesh->indices[0];
 	for (int i = 0, n = mesh->indices.size() / sizeof(IndexType); i < n; i += 3)
 	{
-		Vec4 v[3] = {
+		Vec4 v[64*3] = {
 			mvp_mtx * Vec4(vertices[indices[i + 0]], 1),
 			mvp_mtx * Vec4(vertices[indices[i + 1]], 1),
 			mvp_mtx * Vec4(vertices[indices[i + 2]], 1)
