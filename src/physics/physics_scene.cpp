@@ -1358,6 +1358,8 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		c.m_frame_change.set(0, 0, 0);
 		c.m_radius = cDesc.radius;
 		c.m_height = cDesc.height;
+		c.m_custom_gravity = false;
+		c.m_custom_gravity_speed = -9.8f;
 		c.m_layer = 0;
 
 		PxFilterData data;
@@ -1679,11 +1681,21 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 			PxControllerState state;
 			controller.m_controller->getState(state);
+			float gravity_speed = 0.0f;
+			if (controller.m_custom_gravity)
+			{
+				gravity_speed = controller.m_custom_gravity_speed * -1.0f;
+			}
+			else
+			{
+				gravity_speed = m_scene->getGravity().y;
+			}
+
 			bool apply_gravity = (state.collisionFlags & PxControllerCollisionFlag::eCOLLISION_DOWN) == 0;
 			if(apply_gravity)
 			{
 				dif.y += controller.gravity_speed * time_delta;
-				controller.gravity_speed += time_delta * -9.8f;
+				controller.gravity_speed += time_delta * gravity_speed;
 			}
 			else
 			{
@@ -2323,6 +2335,8 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 	float getControllerRadius(Entity entity) override { return m_controllers[entity].m_radius; }
 	float getControllerHeight(Entity entity) override { return m_controllers[entity].m_height; }
+	bool getControllerCustomGravity(Entity entity) override { return m_controllers[entity].m_custom_gravity; }
+	float getControllerCustomGravitySpeed(Entity entity) override { return m_controllers[entity].m_custom_gravity_speed; }
 
 
 	void setControllerRadius(Entity entity, float value) override
@@ -2364,6 +2378,17 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		}
 	}
 
+	void setControllerCustomGravity(Entity entity, bool value)
+	{
+		Controller& ctrl = m_controllers[entity];
+		ctrl.m_custom_gravity = value;
+	}
+
+	void setControllerCustomGravitySpeed(Entity entity, float value)
+	{
+		Controller& ctrl = m_controllers[entity];
+		ctrl.m_custom_gravity_speed = value;
+	}
 
 	bool isControllerTouchingDown(Entity entity) override
 	{
@@ -3245,6 +3270,8 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		serializer.write("layer", controller.m_layer);
 		serializer.write("radius", controller.m_radius);
 		serializer.write("height", controller.m_height);
+		serializer.write("custom_gravity", controller.m_custom_gravity);
+		serializer.write("custom_gravity_speed", controller.m_custom_gravity_speed);
 	}
 
 
@@ -3256,6 +3283,8 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		serializer.read(&c.m_layer);
 		serializer.read(&c.m_radius);
 		serializer.read(&c.m_height);
+		serializer.read(&c.m_custom_gravity);
+		serializer.read(&c.m_custom_gravity_speed);
 
 		PxCapsuleControllerDesc cDesc;
 		initControllerDesc(cDesc);
@@ -4129,6 +4158,8 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			serializer.write(controller.m_layer);
 			serializer.write(controller.m_radius);
 			serializer.write(controller.m_height);
+			serializer.write(controller.m_custom_gravity);
+			serializer.write(controller.m_custom_gravity_speed);
 		}
 		serializer.write((i32)m_terrains.size());
 		for (auto& terrain : m_terrains)
@@ -4699,6 +4730,8 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			serializer.read(c.m_layer);
 			serializer.read(c.m_radius);
 			serializer.read(c.m_height);
+			serializer.read(c.m_custom_gravity);
+			serializer.read(c.m_custom_gravity_speed);
 			PxCapsuleControllerDesc cDesc;
 			initControllerDesc(cDesc);
 			cDesc.height = c.m_height;
@@ -5044,6 +5077,8 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		Vec3 m_frame_change;
 		float m_radius;
 		float m_height;
+		bool m_custom_gravity;
+		float m_custom_gravity_speed;
 		int m_layer;
 		FilterCallback m_filter_callback;
 		PxFilterData m_filter_data;
