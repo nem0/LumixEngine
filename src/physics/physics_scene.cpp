@@ -3289,6 +3289,11 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			serializer.read(&c.m_custom_gravity);
 			serializer.read(&c.m_custom_gravity_acceleration);
 		}
+		else
+		{
+			c.m_custom_gravity = false;
+			c.m_custom_gravity_acceleration = 9.8f;
+		}
 
 		PxCapsuleControllerDesc cDesc;
 		initControllerDesc(cDesc);
