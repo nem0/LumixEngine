@@ -2288,25 +2288,43 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		
 		renderMeshes(*m_mesh_buffer);
 		
-#ifdef OCCLUSION_BUFFER_WIP
-		m_occlusion_buffer.clear();
-		m_occlusion_buffer.rasterize(&m_scene->getUniverse(), m_scene->getCameraViewProjection(m_applied_camera), (*m_mesh_buffer)[0]);
-		m_occlusion_buffer.rasterize(&m_scene->getUniverse(), m_scene->getCameraViewProjection(m_applied_camera), (*m_mesh_buffer)[1]);
-		m_occlusion_buffer.rasterize(&m_scene->getUniverse(), m_scene->getCameraViewProjection(m_applied_camera), (*m_mesh_buffer)[2]);
-		m_occlusion_buffer.rasterize(&m_scene->getUniverse(), m_scene->getCameraViewProjection(m_applied_camera), (*m_mesh_buffer)[3]);
-		m_occlusion_buffer.buildHierarchy();
+		if(render_grass) renderGrasses(m_grasses_buffer);
+		renderTerrains(m_terrains_buffer);
+	}
 
+
+	void rasterizeOccluders(u64 layer_mask)
+	{
+		PROFILE_FUNCTION();
+
+		if (!m_applied_camera.isValid()) return;
+
+		Vec3 lod_ref_point = m_scene->getUniverse().getPosition(m_applied_camera);
+		Frustum frustum = m_scene->getCameraFrustum(m_applied_camera);
+		m_mesh_buffer = &m_scene->getModelInstanceInfos(frustum, lod_ref_point, m_applied_camera, layer_mask);
+
+		m_occlusion_buffer.clear();
+		Universe* universe = &m_scene->getUniverse();
+		Matrix view_projection = m_scene->getCameraViewProjection(m_applied_camera);
+		for (auto& meshes : *m_mesh_buffer)
+		{
+			m_occlusion_buffer.rasterize(universe, view_projection, meshes);
+		}
+		m_occlusion_buffer.buildHierarchy();
+	}
+
+
+
+	void debugOcclusionBuffer()
+	{
 		static bgfx::TextureHandle texture = bgfx::createTexture2D(384, 192, false, 1, bgfx::TextureFormat::RGBA8, 0);
 		auto mem = bgfx::copy(m_occlusion_buffer.getMip(0), 384 * 192 * 4);
-		bgfx::updateTexture2D(texture, 0, 0, 0, 0, 384, 192, mem, 384*4);
+		bgfx::updateTexture2D(texture, 0, 0, 0, 0, 384, 192, mem, 384 * 4);
 
 		ImGui::Begin("Debug");
 		bgfx::setMarker("xx");
 		ImGui::Image(&texture, { 384, 192 });
 		ImGui::End();
-#endif
-		if(render_grass) renderGrasses(m_grasses_buffer);
-		renderTerrains(m_terrains_buffer);
 	}
 
 
@@ -3529,6 +3547,8 @@ void Pipeline::registerLuaAPI(lua_State* L)
 
 	REGISTER_FUNCTION(renderTextMeshes);
 	REGISTER_FUNCTION(render2D);
+	REGISTER_FUNCTION(rasterizeOccluders);
+	REGISTER_FUNCTION(debugOcclusionBuffer);
 	REGISTER_FUNCTION(drawQuad);
 	REGISTER_FUNCTION(getLayerMask);
 	REGISTER_FUNCTION(drawQuadEx);
