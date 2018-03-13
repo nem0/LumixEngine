@@ -361,6 +361,7 @@ bool loadRaw(Texture& texture, FS::IFile& file)
 
 static void flipVertical(u32* image, int width, int height)
 {
+	PROFILE_FUNCTION();
 	for (int j = 0; j < height / 2; ++j)
 	{
 		int row_offset = width * j;
@@ -497,6 +498,7 @@ bool Texture::loadTGA(FS::IFile& file)
 	bool is_rle = header.dataType == 10;
 	if (is_rle)
 	{
+		PROFILE_BLOCK("read rle");
 		u8* out = image_dest;
 		u8 byte;
 		struct Pixel {
@@ -537,19 +539,40 @@ bool Texture::loadTGA(FS::IFile& file)
 	}
 	else
 	{
-		for (long y = 0; y < header.height; y++)
+		PROFILE_BLOCK("read");
+		if (bytes_per_pixel == 4)
 		{
-			long idx = y * header.width * 4;
-			for (long x = 0; x < header.width; x++)
+			PROFILE_BLOCK("read 4BPP");
+			file.read(image_dest, header.width * header.height * bytes_per_pixel);
+			for (long y = 0; y < header.height; y++)
 			{
-				file.read(&image_dest[idx + 2], sizeof(u8));
-				file.read(&image_dest[idx + 1], sizeof(u8));
-				file.read(&image_dest[idx + 0], sizeof(u8));
-				if (bytes_per_pixel == 4)
-					file.read(&image_dest[idx + 3], sizeof(u8));
-				else
-					image_dest[idx + 3] = 255;
-				idx += 4;
+				long idx = y * header.width * bytes_per_pixel;
+				u8* cursor = &image_dest[idx];
+				const u8* row_end = cursor + header.width * bytes_per_pixel;
+				while(cursor != row_end)
+				{
+					Math::swap(cursor[0], cursor[2]);
+					cursor += 4;
+				}
+			}
+		}
+		else
+		{
+			PROFILE_BLOCK("read 3BPP");
+			for (long y = 0; y < header.height; y++)
+			{
+				long idx = y * header.width * 4;
+				for (long x = 0; x < header.width; x++)
+				{
+					file.read(&image_dest[idx + 2], sizeof(u8));
+					file.read(&image_dest[idx + 1], sizeof(u8));
+					file.read(&image_dest[idx + 0], sizeof(u8));
+					if (bytes_per_pixel == 4)
+						file.read(&image_dest[idx + 3], sizeof(u8));
+					else
+						image_dest[idx + 3] = 255;
+					idx += 4;
+				}
 			}
 		}
 	}
