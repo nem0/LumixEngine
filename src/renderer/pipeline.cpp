@@ -1707,7 +1707,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 		findExtraShadowcasterPlanes(light_forward, camera_frustum, camera_matrix.getTranslation(), &shadow_camera_frustum);
 
-		renderAll(shadow_camera_frustum, false, m_applied_camera, m_current_view->layer_mask);
+		renderAll(shadow_camera_frustum, false, m_applied_camera, m_current_view->layer_mask, false);
 
 		m_is_rendering_in_shadowmap = false;
 	}
@@ -2253,7 +2253,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
-	void renderAll(const Frustum& frustum, bool render_grass, Entity camera, u64 layer_mask)
+	void renderAll(const Frustum& frustum, bool render_grass, Entity camera, u64 layer_mask, bool use_occlusion_culling)
 	{
 		PROFILE_FUNCTION();
 
@@ -2286,7 +2286,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		JobSystem::runJobs(jobs, render_grass ? 3 : 2, &counter);
 		JobSystem::wait(&counter);
 		
-		renderMeshes(*m_mesh_buffer);
+		renderMeshes(*m_mesh_buffer, use_occlusion_culling);
 		
 		if(render_grass) renderGrasses(m_grasses_buffer);
 		renderTerrains(m_terrains_buffer);
@@ -2305,10 +2305,13 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 		m_occlusion_buffer.clear();
 		Universe* universe = &m_scene->getUniverse();
-		Matrix view_projection = m_scene->getCameraViewProjection(m_applied_camera);
+		Matrix projection = m_scene->getCameraProjection(m_applied_camera);
+		Matrix view = universe->getMatrix(m_applied_camera);
+		view.fastInverse();
+		m_occlusion_buffer.setCamera(view, projection);
 		for (auto& meshes : *m_mesh_buffer)
 		{
-			m_occlusion_buffer.rasterize(universe, view_projection, meshes);
+			m_occlusion_buffer.rasterize(universe, meshes);
 		}
 		m_occlusion_buffer.buildHierarchy();
 	}
@@ -2661,6 +2664,8 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		bgfx::submit(m_current_view->bgfx_id, shader_instance.getProgramHandle(m_pass_idx));
 	}
 
+
+	
 	LUMIX_FORCE_INLINE void renderRigidMeshInstanced(const Matrix& matrix, Mesh& mesh)
 	{
 		int instance_idx = mesh.instance_idx;
@@ -2971,20 +2976,54 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
-	void renderMeshes(const Array<Array<MeshInstance>>& meshes)
+	void renderMeshes(const Array<Array<MeshInstance>>& meshes, bool use_occlusion_culling)
 	{
 		PROFILE_FUNCTION();
 		int mesh_count = 0;
-		for (auto& submeshes : meshes)
+		if (use_occlusion_culling)
 		{
-			if(submeshes.empty()) continue;
-			ModelInstance* model_instances = m_scene->getModelInstances();
-			mesh_count += submeshes.size();
-			for (auto& mesh : submeshes)
+			for (auto& submeshes : meshes)
 			{
-				ModelInstance& model_instance = model_instances[mesh.owner.index];
-				switch (mesh.mesh->type)
+				if (submeshes.empty()) continue;
+				ModelInstance* model_instances = m_scene->getModelInstances();
+				mesh_count += submeshes.size();
+				for (auto& mesh : submeshes)
 				{
+					ModelInstance& model_instance = model_instances[mesh.owner.index];
+					switch (mesh.mesh->type)
+					{
+					case Mesh::RIGID_INSTANCED:
+						if (m_occlusion_buffer.isOccluded(model_instance.matrix, model_instance.model->getAABB())) break;
+						renderRigidMeshInstanced(model_instance.matrix, *mesh.mesh);
+						break;
+					case Mesh::RIGID:
+						renderRigidMesh(model_instance.matrix, *mesh.mesh, mesh.depth);
+						break;
+					case Mesh::SKINNED:
+						renderSkinnedMesh(*model_instance.pose, *model_instance.model, model_instance.matrix, *mesh.mesh);
+						break;
+					case Mesh::MULTILAYER_SKINNED:
+						renderMultilayerSkinnedMesh(*model_instance.pose, *model_instance.model, model_instance.matrix, *mesh.mesh);
+						break;
+					case Mesh::MULTILAYER_RIGID:
+						renderMultilayerRigidMesh(*model_instance.model, model_instance.matrix, *mesh.mesh);
+						break;
+					}
+				}
+			}
+		}
+		else
+		{
+			for (auto& submeshes : meshes)
+			{
+				if (submeshes.empty()) continue;
+				ModelInstance* model_instances = m_scene->getModelInstances();
+				mesh_count += submeshes.size();
+				for (auto& mesh : submeshes)
+				{
+					ModelInstance& model_instance = model_instances[mesh.owner.index];
+					switch (mesh.mesh->type)
+					{
 					case Mesh::RIGID_INSTANCED:
 						renderRigidMeshInstanced(model_instance.matrix, *mesh.mesh);
 						break;
@@ -3000,6 +3039,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 					case Mesh::MULTILAYER_RIGID:
 						renderMultilayerRigidMesh(*model_instance.model, model_instance.matrix, *mesh.mesh);
 						break;
+					}
 				}
 			}
 		}
@@ -3428,10 +3468,11 @@ int addFramebuffer(lua_State* L)
 int renderModels(lua_State* L)
 {
 	auto* pipeline = LuaWrapper::checkArg<PipelineImpl*>(L, 1);
+	bool use_occlusion_culling = lua_gettop(L) > 1 ? LuaWrapper::checkArg<bool>(L, 2) : false;
 
 	Entity cam = pipeline->m_applied_camera;
 
-	pipeline->renderAll(pipeline->m_camera_frustum, true, cam, pipeline->m_layer_mask);
+	pipeline->renderAll(pipeline->m_camera_frustum, true, cam, pipeline->m_layer_mask, use_occlusion_culling);
 	pipeline->m_layer_mask = 0;
 	return 0;
 }
