@@ -274,6 +274,7 @@ struct LUMIX_ENGINE_API Vec4
 	{
 	}
 
+	Vec2 xy() const { return Vec2(x, y); }
 	Vec3 xyz() const { return Vec3(x, y, z); }
 	Vec3 rgb() const { return Vec3(x, y, z); }
 

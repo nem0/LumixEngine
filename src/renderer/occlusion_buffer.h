@@ -2,6 +2,7 @@
 
 
 #include "engine/array.h"
+#include "engine/matrix.h"
 
 
 namespace Lumix
@@ -10,9 +11,9 @@ namespace Lumix
 
 template <typename T> class Array;
 struct IAllocator;
-struct Matrix;
 struct Mesh;
 struct MeshInstance;
+struct AABB;
 class Universe;
 
 
@@ -21,8 +22,10 @@ class OcclusionBuffer
 public:
 	OcclusionBuffer(IAllocator& allocator);
 
+	bool isOccluded(const Matrix& world_transform, const AABB& aabb);
 	void clear();
-	void rasterize(Universe* universe, const Matrix& projection, const Array<MeshInstance>& meshes);
+	void setCamera(const Matrix& view, const Matrix& projection);
+	void rasterize(Universe* universe, const Array<MeshInstance>& meshes);
 	void buildHierarchy();
 	const int* getMip(int level) { return &m_mips[level][0]; }
 
@@ -33,6 +36,7 @@ private:
 
 	IAllocator& m_allocator;
 	Array<Mip> m_mips;
+	Matrix m_view_projection_matrix;
 };
 
 
