@@ -737,12 +737,6 @@ public:
 	}
 
 
-	static bool LUA_hasComponent(Universe* universe, Entity entity, int component_type)
-	{
-		return universe->hasComponent(entity, {component_type});
-	}
-
-
 	static int LUA_createEntityEx(lua_State* L)
 	{
 		auto* ctx = LuaWrapper::checkArg<Universe*>(L, 2);
@@ -866,10 +860,6 @@ public:
 	static void LUA_pause(Engine* engine, bool pause) { engine->pause(pause); }
 	static void LUA_nextFrame(Engine* engine) { engine->nextFrame(); }
 	static void LUA_setTimeMultiplier(Engine* engine, float multiplier) { engine->setTimeMultiplier(multiplier); }
-	static Entity LUA_getFirstEntity(Universe* universe) { return universe->getFirstEntity(); }
-	static Entity LUA_getParent(Universe* universe, Entity e) { return universe->getParent(e); }
-	static void LUA_setParent(Universe* universe, Entity parent, Entity child) { universe->setParent(parent, child); }
-	static Entity LUA_getNextEntity(Universe* universe, Entity entity) { return universe->getNextEntity(entity); }
 	static Vec4 LUA_multMatrixVec(const Matrix& m, const Vec4& v) { return m * v; }
 	static Quat LUA_multQuat(const Quat& a, const Quat& b) { return a * b; }
 
@@ -983,12 +973,6 @@ public:
 	}
 
 
-	static Entity LUA_getEntityByName(Universe* universe, const char* name)
-	{
-		return universe->getEntityByName(name);
-	}
-
-
 	static Quat LUA_getEntityRotation(Universe* universe, Entity entity)
 	{
 		if (!entity.isValid())
@@ -997,12 +981,6 @@ public:
 			return Quat(0, 0, 0, 1);
 		}
 		return universe->getRotation(entity);
-	}
-
-
-	static void LUA_destroyEntity(Universe* universe, Entity entity)
-	{
-		universe->destroyEntity(entity);
 	}
 
 
@@ -1025,19 +1003,13 @@ public:
 		REGISTER_FUNCTION(createComponent);
 		REGISTER_FUNCTION(createEntity);
 		REGISTER_FUNCTION(createUniverse);
-		REGISTER_FUNCTION(destroyEntity);
 		REGISTER_FUNCTION(destroyUniverse);
-		REGISTER_FUNCTION(hasComponent);
 		REGISTER_FUNCTION(getComponentType);
 		REGISTER_FUNCTION(getComponentTypeByIndex);
 		REGISTER_FUNCTION(getComponentTypesCount);
 		REGISTER_FUNCTION(getEntityDirection);
 		REGISTER_FUNCTION(getEntityPosition);
 		REGISTER_FUNCTION(getEntityRotation);
-		REGISTER_FUNCTION(getEntityByName);
-		REGISTER_FUNCTION(getParent);
-		REGISTER_FUNCTION(getFirstEntity);
-		REGISTER_FUNCTION(getNextEntity);
 		REGISTER_FUNCTION(getScene);
 		REGISTER_FUNCTION(getSceneUniverse);
 		REGISTER_FUNCTION(hasFilesystemWork);
@@ -1053,7 +1025,6 @@ public:
 		REGISTER_FUNCTION(setEntityLocalRotation);
 		REGISTER_FUNCTION(setEntityPosition);
 		REGISTER_FUNCTION(setEntityRotation);
-		REGISTER_FUNCTION(setParent);
 		REGISTER_FUNCTION(setTimeMultiplier);
 		REGISTER_FUNCTION(startGame);
 		REGISTER_FUNCTION(unloadResource);
@@ -1061,6 +1032,24 @@ public:
 		LuaWrapper::createSystemFunction(m_state, "Engine", "loadUniverse", LUA_loadUniverse);
 
 		#undef REGISTER_FUNCTION
+
+		#define REGISTER_FUNCTION(F) \
+			do { \
+				auto f = &LuaWrapper::wrapMethod<Universe, decltype(&Universe::F), &Universe::F>; \
+				LuaWrapper::createSystemFunction(m_state, "Engine", #F, f); \
+			} while(false)
+
+		REGISTER_FUNCTION(destroyEntity);
+		REGISTER_FUNCTION(findChildByName);
+		REGISTER_FUNCTION(getEntityByName);
+		REGISTER_FUNCTION(getFirstEntity);
+		REGISTER_FUNCTION(getNextEntity);
+		REGISTER_FUNCTION(getParent);
+		REGISTER_FUNCTION(hasComponent);
+		REGISTER_FUNCTION(setParent);
+
+		#undef REGISTER_FUNCTION
+
 
 		LuaWrapper::createSystemFunction(m_state, "Engine", "instantiatePrefab", &LUA_instantiatePrefab);
 		LuaWrapper::createSystemFunction(m_state, "Engine", "createEntityEx", &LUA_createEntityEx);
