@@ -608,7 +608,7 @@ public:
 		ba.parent_entity = parent;
 		if (parent.isValid() && parent.index < m_model_instances.size())
 		{
-			ModelInstance& mi = m_model_instances[entity.index];
+			ModelInstance& mi = m_model_instances[parent.index];
 			mi.flags.set(ModelInstance::IS_BONE_ATTACHMENT_PARENT);
 		}
 		updateRelativeMatrix(ba);
