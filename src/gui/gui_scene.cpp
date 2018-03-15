@@ -286,25 +286,16 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		}
 
 		Entity child = m_universe.getFirstChild(rect.entity);
-		if (child.isValid())
+		while (child.isValid())
 		{
 			int idx = m_rects.find(child);
 			if (idx >= 0)
 			{
 				renderRect(*m_rects.at(idx), pipeline, { l, t, r - l, b - t });
 			}
+			child = m_universe.getNextSibling(child);
 		}
 		if (rect.flags.isSet(GUIRect::IS_CLIP)) draw.PopClipRect();
-
-		Entity sibling = m_universe.getNextSibling(rect.entity);
-		if (sibling.isValid())
-		{
-			int idx = m_rects.find(sibling);
-			if (idx >= 0)
-			{
-				renderRect(*m_rects.at(idx), pipeline, parent_rect);
-			}
-		}
 	}
 
 
