@@ -72,6 +72,7 @@ public:
 	Entity getNextEntity(Entity entity) const;
 	const char* getEntityName(Entity entity) const;
 	Entity getEntityByName(const char* name);
+	Entity findChildByName(Entity parent, const char* name);
 	void setEntityName(Entity entity, const char* name);
 	bool hasEntity(Entity entity) const;
 
