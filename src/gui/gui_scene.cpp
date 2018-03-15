@@ -760,9 +760,9 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		if (idx < 0) return;
 
 		const GUIButton& button = m_buttons.at(idx);
-		if (!rect.image) return;
 
-		rect.image->color = button.normal_color;
+		if (rect.image) rect.image->color = button.normal_color;
+		if (rect.text) rect.text->color = button.normal_color;
 
 		m_rect_hovered_out.invoke(rect.entity);
 	}
@@ -775,9 +775,8 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 
 		const GUIButton& button = m_buttons.at(idx);
 
-		if (!rect.image) return;
-
-		rect.image->color = button.hovered_color;
+		if (rect.image) rect.image->color = button.hovered_color;
+		if (rect.text) rect.text->color = button.hovered_color;
 
 		m_rect_hovered.invoke(rect.entity);
 	}
