@@ -745,6 +745,13 @@ public:
 		Entity e = ctx->createEntity(Vec3(0, 0, 0), Quat(0, 0, 0, 1));
 
 		lua_pushvalue(L, 3);
+		if (lua_getfield(L, -1, "parent") != LUA_TNIL)
+		{
+			Entity parent = LuaWrapper::toType<Entity>(L, -1);
+			ctx->setParent(parent, e);
+		}
+		lua_pop(L, 1);
+
 		lua_pushnil(L);
 		while (lua_next(L, -2) != 0)
 		{
