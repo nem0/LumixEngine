@@ -340,6 +340,38 @@ void Universe::emplaceEntity(Entity entity)
 }
 
 
+Entity Universe::cloneEntity(Entity entity)
+{
+	Transform tr = getTransform(entity);
+	Entity parent = getParent(entity);
+	Entity clone = createEntity(tr.pos, tr.rot);
+	setScale(clone, tr.scale);
+	setParent(parent, clone);
+
+	OutputBlob blob_out(m_allocator);
+	blob_out.reserve(1024);
+	for (ComponentUID cmp = getFirstComponent(entity); cmp.isValid(); cmp = getNextComponent(cmp))
+	{
+		blob_out.clear();
+		struct : ISaveEntityGUIDMap
+		{
+			EntityGUID get(Entity entity) override { return { (u64)entity.index }; }
+		} save_map;
+		TextSerializer serializer(blob_out, save_map);
+		serializeComponent(serializer, cmp.type, entity);
+		
+		InputBlob blob_in(blob_out);
+		struct : ILoadEntityGUIDMap
+		{
+			Entity get(EntityGUID guid) override { return { (int)guid.value }; }
+		} load_map;
+		TextDeserializer deserializer(blob_in, load_map);
+		deserializeComponent(deserializer, clone, cmp.type, cmp.scene->getVersion());
+	}
+	return clone;
+}
+
+
 Entity Universe::createEntity(const Vec3& position, const Quat& rotation)
 {
 	EntityData* data;
