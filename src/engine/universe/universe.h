@@ -48,6 +48,7 @@ public:
 	IAllocator& getAllocator() { return m_allocator; }
 	void emplaceEntity(Entity entity);
 	Entity createEntity(const Vec3& position, const Quat& rotation);
+	Entity cloneEntity(Entity entity);
 	void destroyEntity(Entity entity);
 	void createComponent(ComponentType type, Entity entity);
 	void destroyComponent(Entity entity, ComponentType type);

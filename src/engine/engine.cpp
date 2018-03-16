@@ -1046,6 +1046,9 @@ public:
 				LuaWrapper::createSystemFunction(m_state, "Engine", #F, f); \
 			} while(false)
 
+		REGISTER_FUNCTION(getFirstChild);
+		REGISTER_FUNCTION(getNextSibling);
+		REGISTER_FUNCTION(cloneEntity);
 		REGISTER_FUNCTION(destroyEntity);
 		REGISTER_FUNCTION(findChildByName);
 		REGISTER_FUNCTION(getEntityByName);
