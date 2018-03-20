@@ -586,7 +586,6 @@ bool Model::parseMeshes(const bgfx::VertexDecl& global_vertex_decl, FS::IFile& f
 		file.read(&data_size, sizeof(data_size));
 		const bgfx::Memory* vertices_mem = bgfx::alloc(data_size);
 		file.read(vertices_mem->data, vertices_mem->size);
-		mesh.vertex_buffer_handle = bgfx::createVertexBuffer(vertices_mem, mesh.vertex_decl);
 
 		const bgfx::VertexDecl& vertex_decl = mesh.vertex_decl;
 		int position_attribute_offset = vertex_decl.getOffset(bgfx::Attrib::Position);
@@ -615,6 +614,7 @@ bool Model::parseMeshes(const bgfx::VertexDecl& global_vertex_decl, FS::IFile& f
 			mesh.vertices[j] = *(const Vec3*)&vertices[offset + position_attribute_offset];
 			mesh.uvs[j] = *(const Vec2*)&vertices[offset + uv_attribute_offset];
 		}
+		mesh.vertex_buffer_handle = bgfx::createVertexBuffer(vertices_mem, mesh.vertex_decl);
 	}
 	file.read(&m_bounding_radius, sizeof(m_bounding_radius));
 	file.read(&m_aabb, sizeof(m_aabb));
