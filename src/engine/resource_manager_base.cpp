@@ -102,7 +102,6 @@ void ResourceManagerBase::load(Resource& resource)
 		if (m_load_hook && m_load_hook->onBeforeLoad(resource))
 		{
 			resource.addRef(); // for hook
-			resource.addRef(); // for return value
 			return;
 		}
 		resource.doLoad();
