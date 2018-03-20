@@ -567,7 +567,7 @@ bool Model::parseMeshes(const bgfx::VertexDecl& global_vertex_decl, FS::IFile& f
 		int index_size;
 		int indices_count;
 		file.read(&index_size, sizeof(index_size));
-		if (index_size != 2 && index_size != 0) return false;
+		if (index_size != 2 && index_size != 4) return false;
 		file.read(&indices_count, sizeof(indices_count));
 		if (indices_count <= 0) return false;
 		mesh.indices.resize(index_size * indices_count);
