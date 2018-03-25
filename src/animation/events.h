@@ -22,14 +22,6 @@ struct EventHeader
 };
 
 
-struct EnterExitEventHeader
-{
-	u32 type;
-	u16 offset;
-	u8 size;
-};
-
-
 struct EventArray
 {
 	explicit EventArray(IAllocator& allocator)

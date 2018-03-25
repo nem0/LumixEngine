@@ -195,6 +195,33 @@ void Node::serialize(OutputBlob& blob)
 }
 
 
+static void deserializeEventQueue(InputBlob& blob, int version, EventArray* events)
+{
+	blob.read(events->count);
+	if (events->count > 0)
+	{
+		int size;
+		blob.read(size);
+		if (version > (int)ControllerResource::Version::ENTER_EXIT_EVENTS
+			&& version <= (int)ControllerResource::Version::EVENTS_FIX)
+		{
+			events->data.resize(size + sizeof(float) * events->count);
+			EventHeader* headers = (EventHeader*)&events->data[0];
+			for (int i = 0; i < events->count; ++i)
+			{
+				blob.read((u8*)&headers[i] + sizeof(float), sizeof(EventHeader) - sizeof(float));
+			}
+			blob.read(&headers[events->count], size - (sizeof(EventHeader) - sizeof(float)) * events->count);
+		}
+		else
+		{
+			events->data.resize(size);
+			blob.read(&events->data[0], size);
+		}
+	}
+}
+
+
 void Node::deserialize(InputBlob& blob, Container* parent, int version)
 {
 	Component::deserialize(blob, parent, version);
@@ -208,22 +235,8 @@ void Node::deserialize(InputBlob& blob, Container* parent, int version)
 	}
 	if (version > (int)ControllerResource::Version::ENTER_EXIT_EVENTS)
 	{
-		blob.read(enter_events.count);
-		if (enter_events.count > 0)
-		{
-			int size;
-			blob.read(size);
-			enter_events.data.resize(size);
-			blob.read(&enter_events.data[0], size);
-		}
-		blob.read(exit_events.count);
-		if (exit_events.count > 0)
-		{
-			int size;
-			blob.read(size);
-			exit_events.data.resize(size);
-			blob.read(&exit_events.data[0], size);
-		}
+		deserializeEventQueue(blob, version, &enter_events);
+		deserializeEventQueue(blob, version, &exit_events);
 	}
 }
 
@@ -580,7 +593,7 @@ void NodeInstance::queueEventArray(RunningContext& rc, const EventArray& events)
 {
 	if (events.count <= 0) return;
 
-	auto headers = (EnterExitEventHeader*)&events.data[0];
+	auto headers = (EventHeader*)&events.data[0];
 	for (int i = 0; i < events.count; ++i)
 	{
 		auto& header = headers[i];
@@ -588,7 +601,7 @@ void NodeInstance::queueEventArray(RunningContext& rc, const EventArray& events)
 		rc.event_stream->write(rc.controller);
 		rc.event_stream->write(header.size);
 		rc.event_stream->write(
-			&events.data[0] + header.offset + sizeof(EnterExitEventHeader) * events.count, header.size);
+			&events.data[0] + header.offset + sizeof(EventHeader) * events.count, header.size);
 	}
 }
 
@@ -942,7 +955,7 @@ Component* createComponent(ControllerResource& controller, Component::Type type,
 
 void EventArray::remove(int index)
 {
-	auto headers = (Anim::EnterExitEventHeader*)&data[0];
+	auto headers = (Anim::EventHeader*)&data[0];
 	auto header = headers[index];
 	u8* headers_end = (u8*)(headers + count);
 	u8* end = &data.back() + 1;
@@ -956,11 +969,11 @@ void EventArray::remove(int index)
 	}
 
 	u8* header_start = (u8*)&headers[index];
-	u8* header_end = header_start + sizeof(Anim::EnterExitEventHeader);
+	u8* header_end = header_start + sizeof(Anim::EventHeader);
 	moveMemory(header_start, header_end, event_start - header_end);
-	moveMemory(event_start - sizeof(Anim::EnterExitEventHeader), event_end, end - event_end);
+	moveMemory(event_start - sizeof(Anim::EventHeader), event_end, end - event_end);
 
-	data.resize(data.size() - sizeof(Anim::EnterExitEventHeader) - header.size);
+	data.resize(data.size() - sizeof(Anim::EventHeader) - header.size);
 
 	--count;
 }
@@ -968,11 +981,11 @@ void EventArray::remove(int index)
 
 void EventArray::append(int size, u32 type)
 {
-	int old_payload_size = data.size() - sizeof(Anim::EnterExitEventHeader) * count;
-	data.resize(data.size() + size + sizeof(Anim::EnterExitEventHeader));
-	u8* headers_end = &data[count * sizeof(Anim::EnterExitEventHeader)];
-	moveMemory(headers_end + sizeof(Anim::EnterExitEventHeader), headers_end, old_payload_size);
-	auto& event_header = *(Anim::EnterExitEventHeader*)&data[sizeof(Anim::EnterExitEventHeader) * count];
+	int old_payload_size = data.size() - sizeof(Anim::EventHeader) * count;
+	data.resize(data.size() + size + sizeof(Anim::EventHeader));
+	u8* headers_end = &data[count * sizeof(Anim::EventHeader)];
+	moveMemory(headers_end + sizeof(Anim::EventHeader), headers_end, old_payload_size);
+	auto& event_header = *(Anim::EventHeader*)&data[sizeof(Anim::EventHeader) * count];
 	event_header.type = type;
 	event_header.size = size;
 	event_header.offset = old_payload_size;
