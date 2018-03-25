@@ -166,7 +166,7 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 	}
 
 
-	void enableCursor(bool enable)
+	void enableCursor(bool enable) override
 	{
 		if (m_interface) m_interface->enableCursor(enable);
 	}
