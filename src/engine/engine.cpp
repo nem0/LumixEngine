@@ -1051,8 +1051,7 @@ public:
 		REGISTER_FUNCTION(getNextSibling);
 		REGISTER_FUNCTION(cloneEntity);
 		REGISTER_FUNCTION(destroyEntity);
-		REGISTER_FUNCTION(findChildByName);
-		REGISTER_FUNCTION(getEntityByName);
+		REGISTER_FUNCTION(findByName);
 		REGISTER_FUNCTION(getFirstEntity);
 		REGISTER_FUNCTION(getNextEntity);
 		REGISTER_FUNCTION(getParent);
