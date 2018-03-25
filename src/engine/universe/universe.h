@@ -130,6 +130,7 @@ public:
 	IScene* getScene(u32 hash) const;
 	Array<IScene*>& getScenes();
 	void addScene(IScene* scene);
+	void removeScene(IScene* scene);
 
 private:
 	void transformEntity(Entity entity, bool update_local);

@@ -72,6 +72,15 @@ class PluginManagerImpl LUMIX_FINAL : public PluginManager
 		}
 
 
+		void* getLibrary(IPlugin* plugin) const
+		{
+			int idx = m_plugins.indexOf(plugin);
+			if (idx < 0) return nullptr;
+
+			return m_libraries[idx];
+		}
+
+
 		const Array<void*>& getLibraries() const override
 		{
 			return m_libraries;
@@ -102,6 +111,17 @@ class PluginManagerImpl LUMIX_FINAL : public PluginManager
 			return m_library_loaded;
 		}
 		
+
+		void unload(IPlugin* plugin) override
+		{
+			int idx = m_plugins.indexOf(plugin);
+			ASSERT(idx >= 0);
+			LUMIX_DELETE(m_engine.getAllocator(), m_plugins[idx]);
+			unloadLibrary(m_libraries[idx]);
+			m_libraries.erase(idx);
+			m_plugins.erase(idx);
+		}
+
 
 		IPlugin* load(const char* path) override
 		{

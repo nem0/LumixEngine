@@ -14,6 +14,7 @@ namespace PathUtils
 	LUMIX_ENGINE_API void getFilename(char* filename, int max_length, const char* src);
 	LUMIX_ENGINE_API void getExtension(char* extension, int max_length, const char* src);
 	LUMIX_ENGINE_API bool hasExtension(const char* filename, const char* ext);
+	LUMIX_ENGINE_API bool replaceExtension(char* path, const char* ext);
 	LUMIX_ENGINE_API bool isAbsolute(const char* path);
 		
 

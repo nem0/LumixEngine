@@ -15,7 +15,7 @@ struct ImFont;
 		extern "C" void setStudioApp_##plugin_name(StudioApp& app)
 #else
 	#define LUMIX_STUDIO_ENTRY(plugin_name) \
-		extern "C" LUMIX_LIBRARY_EXPORT void setStudioApp(StudioApp& app)	
+		extern "C" LUMIX_LIBRARY_EXPORT void setStudioApp(StudioApp& app)
 #endif
 
 
@@ -108,6 +108,7 @@ public:
 	virtual const Array<Action*>& getActions() = 0;
 	virtual Array<Action*>& getToolbarActions() = 0;
 	virtual void addAction(Action* action) = 0;
+	virtual void removeAction(Action* action) = 0;
 	virtual void addWindowAction(Action* action) = 0;
 	virtual Action* getAction(const char* name) = 0;
 	virtual SDL_Window* getWindow() = 0;

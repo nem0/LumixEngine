@@ -25,6 +25,7 @@ namespace Lumix
 			static PluginManager* create(Engine& engine);
 			static void destroy(PluginManager* manager);
 			
+			virtual void unload(IPlugin* plugin) = 0;
 			virtual IPlugin* load(const char* path) = 0;
 			virtual void addPlugin(IPlugin* plugin) = 0;
 			virtual void update(float dt, bool paused) = 0;
@@ -33,6 +34,7 @@ namespace Lumix
 			virtual IPlugin* getPlugin(const char* name) = 0;
 			virtual const Array<IPlugin*>& getPlugins() const = 0;
 			virtual const Array<void*>& getLibraries() const = 0;
+			virtual void* getLibrary(IPlugin* plugin) const = 0;
 			virtual DelegateList<void(void*)>& libraryLoaded() = 0;
 	};
 

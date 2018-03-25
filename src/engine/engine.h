@@ -50,6 +50,7 @@ public:
 	virtual const char* getWorkingDirectory() const = 0;
 	virtual Universe& createUniverse(bool set_lua_globals) = 0;
 	virtual void destroyUniverse(Universe& context) = 0;
+	virtual const Array<Universe*>& getUniverses() const = 0;
 	virtual void setPlatformData(const PlatformData& data) = 0;
 	virtual const PlatformData& getPlatformData() = 0;
 
