@@ -127,6 +127,7 @@ static void CALLBACK notif(DWORD status, DWORD tferred, LPOVERLAPPED over)
 		task->m_finished = true;
 		return;
 	}
+	if (tferred == 0) return;
 
 	FILE_NOTIFY_INFORMATION* info = &task->m_info[0];
 	while (info)
