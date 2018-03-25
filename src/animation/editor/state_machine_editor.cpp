@@ -280,7 +280,7 @@ void Node::onGuiEvents(Anim::EventArray& events, const char* label)
 	auto& editor = m_controller.getEditor();
 	for (int i = 0; i < events.count; ++i)
 	{
-		auto& header = *(Anim::EnterExitEventHeader*)&events.data[sizeof(Anim::EnterExitEventHeader) * i];
+		auto& header = *(Anim::EventHeader*)&events.data[sizeof(Anim::EventHeader) * i];
 		const char* event_type_name = getEventTypeName(header.type, editor);
 		if (ImGui::TreeNode((void*)(uintptr)i, "%s", event_type_name))
 		{
@@ -290,7 +290,7 @@ void Node::onGuiEvents(Anim::EventArray& events, const char* label)
 				ImGui::TreePop();
 				break;
 			}
-			int event_offset = header.offset + sizeof(Anim::EnterExitEventHeader) * events.count;
+			int event_offset = header.offset + sizeof(Anim::EventHeader) * events.count;
 			editor.getEventType(header.type).editor.invoke(&events.data[event_offset], *this);
 			ImGui::TreePop();
 		}
