@@ -461,6 +461,7 @@ public:
 		, m_next_frame(false)
 		, m_lifo_allocator(m_allocator, 10 * 1024 * 1024)
 		, m_working_dir(working_dir)
+		, m_universes(m_allocator)
 	{
 		g_log_info.log("Core") << "Creating engine...";
 		Profiler::setThreadName("Main");
@@ -1306,9 +1307,16 @@ public:
 	const char* getWorkingDirectory() const override { return m_working_dir; }
 
 
+	const Array<Universe*>& getUniverses() const override
+	{
+		return m_universes;
+	}
+
+
 	Universe& createUniverse(bool set_lua_globals) override
 	{
 		Universe* universe = LUMIX_NEW(m_allocator, Universe)(m_allocator);
+		m_universes.push(universe);
 		const Array<IPlugin*>& plugins = m_plugin_manager->getPlugins();
 		for (auto* plugin : plugins)
 		{
@@ -1337,6 +1345,7 @@ public:
 
 	void destroyUniverse(Universe& universe) override
 	{
+		m_universes.eraseItem(&universe);
 		auto& scenes = universe.getScenes();
 		for (int i = scenes.size() - 1; i >= 0; --i)
 		{
@@ -1695,6 +1704,7 @@ private:
 	PathManager m_path_manager;
 	lua_State* m_state;
 	HashMap<int, Resource*> m_lua_resources;
+	Array<Universe*> m_universes;
 	int m_last_lua_resource_idx;
 	StaticString<MAX_PATH_LENGTH> m_working_dir;
 };

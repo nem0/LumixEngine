@@ -2,6 +2,7 @@
 #include "asset_browser.h"
 #include "audio/audio_scene.h"
 #include "audio/clip_manager.h"
+#include "editor/file_system_watcher.h"
 #include "editor/gizmo.h"
 #include "editor/prefab_system.h"
 #include "editor/render_interface.h"
@@ -230,6 +231,8 @@ public:
 
 	~StudioAppImpl()
 	{
+		if(m_watched_plugin.watcher) FileSystemWatcher::destroy(m_watched_plugin.watcher);
+
 		saveSettings();
 		unloadIcons();
 
@@ -580,6 +583,8 @@ public:
 	void update()
 	{
 		PROFILE_FUNCTION();
+		if (m_watched_plugin.reload_request) tryReloadPlugin();
+
 		guiBeginFrame();
 
 		float time_delta = m_editor->getEngine().getLastTimeDelta();
@@ -926,6 +931,13 @@ public:
 		{
 			m_editor->saveUndoStack(Path(filename));
 		}
+	}
+
+
+	void removeAction(Action* action) override
+	{
+		m_actions.eraseItem(action);
+		m_window_actions.eraseItem(action);
 	}
 
 
@@ -1525,6 +1537,42 @@ public:
 	}
 
 
+	static bool copyPlugin(const char* src, int iteration, char(&out)[MAX_PATH_LENGTH])
+	{
+		char tmp_path[MAX_PATH_LENGTH];
+		getExecutablePath(tmp_path, lengthOf(tmp_path));
+		StaticString<MAX_PATH_LENGTH> copy_path;
+		PathUtils::getDir(copy_path.data, lengthOf(copy_path.data), tmp_path);
+		copy_path << "plugins/" << iteration;
+		PlatformInterface::makePath(copy_path);
+		PathUtils::getBasename(tmp_path, lengthOf(tmp_path), src);
+		copy_path << "/" << tmp_path << "." << getPluginExtension();
+		#ifdef _WIN32
+			StaticString<MAX_PATH_LENGTH> src_pdb(src);
+			StaticString<MAX_PATH_LENGTH> dest_pdb(copy_path);
+			if (PathUtils::replaceExtension(dest_pdb.data, "pdb")
+				&& PathUtils::replaceExtension(src_pdb.data, "pda"))
+			{
+				PlatformInterface::deleteFile(dest_pdb);
+				if (!copyFile(src_pdb, dest_pdb))
+				{
+					copyString(out, src);
+					return false;
+				}
+			}
+		#endif
+		
+		PlatformInterface::deleteFile(copy_path);
+		if (!copyFile(src, copy_path))
+		{
+			copyString(out, src);
+			return false;
+		}
+		copyString(out, copy_path);
+		return true;
+	}
+
+
 	void loadUserPlugins()
 	{
 		char cmd_line[2048];
@@ -1537,15 +1585,126 @@ public:
 			if (!parser.currentEquals("-plugin")) continue;
 			if (!parser.next()) break;
 
-			char tmp[MAX_PATH_LENGTH];
-			parser.getCurrent(tmp, lengthOf(tmp));
-			bool loaded = plugin_manager.load(tmp) != nullptr;
-			if (!loaded)
+			char src[MAX_PATH_LENGTH];
+			parser.getCurrent(src, lengthOf(src));
+
+			bool is_full_path = findSubstring(src, ".") != nullptr;
+			Lumix::IPlugin* loaded_plugin;
+			if (is_full_path)
 			{
-				g_log_error.log("Editor") << "Could not load plugin " << tmp << " requested by command line";
+				char copy_path[MAX_PATH_LENGTH];
+				copyPlugin(src, 0, copy_path);
+				loaded_plugin = plugin_manager.load(copy_path);
+			}
+			else
+			{
+				loaded_plugin = plugin_manager.load(src);
+			}
+
+			if (!loaded_plugin)
+			{
+				g_log_error.log("Editor") << "Could not load plugin " << src << " requested by command line";
+			}
+			else if (is_full_path && !m_watched_plugin.watcher)
+			{
+				char dir[MAX_PATH_LENGTH];
+				char basename[MAX_PATH_LENGTH];
+				PathUtils::getBasename(basename, lengthOf(basename), src);
+				m_watched_plugin.basename = basename;
+				PathUtils::getDir(dir, lengthOf(dir), src);
+				m_watched_plugin.watcher = FileSystemWatcher::create(dir, m_allocator);
+				m_watched_plugin.watcher->getCallback().bind<StudioAppImpl, &StudioAppImpl::onPluginChanged>(this);
+				m_watched_plugin.dir = dir;
+				m_watched_plugin.plugin = loaded_plugin;
 			}
 		}
 	}
+
+
+	static const char* getPluginExtension()
+	{
+		const char* ext =
+			#ifdef _WIN32
+				"dll";
+			#elif defined __linux__
+				"so";
+			#else 
+				#error Unknown platform
+			#endif
+		return ext;
+	}
+
+
+	void onPluginChanged(const char* path)
+	{
+		const char* ext = getPluginExtension();
+		if (!PathUtils::hasExtension(path, ext)
+			#ifdef _WIN32
+				&& !PathUtils::hasExtension(path, "pda")
+			#endif
+		) return;
+
+		char basename[MAX_PATH_LENGTH];
+		PathUtils::getBasename(basename, lengthOf(basename), path);
+		if (!equalIStrings(basename, m_watched_plugin.basename)) return;
+
+		m_watched_plugin.reload_request = true;
+	}
+
+
+	void tryReloadPlugin()
+	{
+		m_watched_plugin.reload_request = false;
+
+		StaticString<MAX_PATH_LENGTH> src(m_watched_plugin.dir, m_watched_plugin.basename, ".", getPluginExtension());
+		char copy_path[MAX_PATH_LENGTH];
+		++m_watched_plugin.iteration;
+
+		if (!copyPlugin(src, m_watched_plugin.iteration, copy_path)) return;
+
+		g_log_info.log("Editor") << "Trying to reload plugin " << m_watched_plugin.basename;
+
+		OutputBlob blob(m_allocator);
+		blob.reserve(16 * 1024);
+		PluginManager& plugin_manager = m_editor->getEngine().getPluginManager();
+		void* lib = plugin_manager.getLibrary(m_watched_plugin.plugin);
+
+		for (Universe* universe : m_editor->getEngine().getUniverses())
+		{
+			for (IScene* scene : universe->getScenes())
+			{
+				if (&scene->getPlugin() != m_watched_plugin.plugin) continue;
+				if (m_editor->isGameMode()) scene->stopGame();
+				scene->serialize(blob);
+				universe->removeScene(scene);
+				scene->getPlugin().destroyScene(scene);
+			}
+		}
+		plugin_manager.unload(m_watched_plugin.plugin);
+
+		// TODO try to delete the old version
+
+		m_watched_plugin.plugin = plugin_manager.load(copy_path);
+		if (!m_watched_plugin.plugin)
+		{
+			g_log_error.log("Editor") << "Failed to load plugin " << copy_path << ". Reload failed.";
+			return;
+		}
+
+		InputBlob input_blob(blob);
+		for (Universe* universe : m_editor->getEngine().getUniverses())
+		{
+			m_watched_plugin.plugin->createScenes(*universe);
+			for (IScene* scene : universe->getScenes())
+			{
+				if (&scene->getPlugin() != m_watched_plugin.plugin) continue;
+				scene->deserialize(input_blob);
+				if (m_editor->isGameMode()) scene->startGame();
+			}
+		}
+		g_log_info.log("Editor") << "Finished reloading plugin.";
+	}
+
 
 	bool shouldSleepWhenInactive()
 	{
@@ -2602,6 +2761,16 @@ public:
 	bool m_is_save_as_dialog_open;
 	ImFont* m_font;
 	ImFont* m_bold_font;
+	
+	struct WatchedPlugin
+	{
+		FileSystemWatcher* watcher = nullptr;
+		StaticString<MAX_PATH_LENGTH> dir;
+		StaticString<MAX_PATH_LENGTH> basename;
+		Lumix::IPlugin* plugin = nullptr;
+		int iteration = 0;
+		bool reload_request = false;
+	} m_watched_plugin;
 };
 
 

@@ -68,6 +68,12 @@ void Universe::addScene(IScene* scene)
 }
 
 
+void Universe::removeScene(IScene* scene)
+{
+	m_scenes.eraseItemFast(scene);
+}
+
+
 const Vec3& Universe::getPosition(Entity entity) const
 {
 	return m_entities[entity.index].position;

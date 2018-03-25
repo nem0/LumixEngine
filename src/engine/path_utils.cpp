@@ -112,6 +112,31 @@ void getExtension(char* extension, int max_length, const char* src)
 }
 
 
+bool replaceExtension(char* path, const char* ext)
+{
+	char* end = path + stringLength(path);
+	while (end > path && *end != '.')
+	{
+		--end;
+	}
+	if (*end != '.') return false;
+
+	++end;
+	const char* src = ext;
+	while (*src != '\0' && *end != '\0')
+	{
+		*end = *src;
+		++end;
+		++src;
+	}
+	bool copied_whole_ext = *src == '\0';
+	if (!copied_whole_ext) return false;
+
+	*end = '\0';
+	return true;
+}
+
+
 bool hasExtension(const char* filename, const char* ext)
 {
 	char tmp[20];
