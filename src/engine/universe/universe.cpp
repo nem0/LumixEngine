@@ -274,33 +274,40 @@ const char* Universe::getEntityName(Entity entity) const
 }
 
 
-Entity Universe::findChildByName(Entity parent, const char* name)
+Entity Universe::findByName(Entity parent, const char* name)
 {
-	int h_idx = m_entities[parent.index].hierarchy;
-	if (h_idx < 0) return INVALID_ENTITY;
+	Entity e;
 
-	Entity child = m_hierarchy[h_idx].first_child;
-	while (child.isValid())
+	if (parent.isValid())
 	{
-		const EntityData& data = m_entities[child.index];
+		int h_idx = m_entities[parent.index].hierarchy;
+		if (h_idx < 0) return INVALID_ENTITY;
+
+		e = m_hierarchy[h_idx].first_child;
+	}
+	else
+	{
+		for (int i = 0, c = m_entities.size(); i < c; ++i)
+		{
+			if (m_entities[i].hierarchy < 0)
+			{
+				e = { i };
+				break;
+			}
+		}
+	}
+	if (!e.isValid()) return INVALID_ENTITY;
+	while (e.isValid())
+	{
+		const EntityData& data = m_entities[e.index];
 		int name_idx = data.name;
 		if (name_idx >= 0)
 		{
-			if (equalStrings(m_names[name_idx].name, name)) return child;
+			if (equalStrings(m_names[name_idx].name, name)) return e;
 		}
-		child = m_hierarchy[data.hierarchy].next_sibling;
+		e = m_hierarchy[data.hierarchy].next_sibling;
 	}
 
-	return INVALID_ENTITY;
-}
-
-
-Entity Universe::getEntityByName(const char* name)
-{
-	for (const EntityName& name_data : m_names)
-	{
-		if (equalStrings(name_data.name, name)) return name_data.entity;
-	}
 	return INVALID_ENTITY;
 }
 
