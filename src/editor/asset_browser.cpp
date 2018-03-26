@@ -128,11 +128,7 @@ AssetBrowser::~AssetBrowser()
 	}
 	m_file_infos.clear();
 
-	for (auto* plugin : m_plugins)
-	{
-		LUMIX_DELETE(m_editor.getAllocator(), plugin);
-	}
-	m_plugins.clear();
+	ASSERT(m_plugins.size() == 0);
 
 	FileSystemWatcher::destroy(m_watchers[0]);
 	FileSystemWatcher::destroy(m_watchers[1]);
@@ -620,6 +616,13 @@ void AssetBrowser::onInitFinished()
 {
 	m_is_init_finished = true;
 	findResources();
+}
+
+
+void AssetBrowser::removePlugin(IPlugin& plugin)
+{
+	m_plugins.erase(plugin.getResourceType());
+	if (m_is_init_finished) findResources();
 }
 
 

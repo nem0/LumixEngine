@@ -44,7 +44,7 @@ namespace Lumix
 {
 
 
-struct LuaPlugin : public StudioApp::IPlugin
+struct LuaPlugin : public StudioApp::GUIPlugin
 {
 	LuaPlugin(StudioApp& app, const char* src, const char* filename)
 		: editor(app.getWorldEditor())
@@ -152,6 +152,7 @@ public:
 		, m_is_pack_data_dialog_open(false)
 		, m_editor(nullptr)
 		, m_settings(*this)
+		, m_gui_plugins(m_allocator)
 		, m_plugins(m_allocator)
 		, m_add_cmp_plugins(m_allocator)
 		, m_component_labels(m_allocator)
@@ -245,11 +246,13 @@ public:
 
 		destroyAddCmpTreeNode(m_add_cmp_root.child);
 
-		for (auto* plugin : m_plugins)
+		for (auto* i : m_plugins)
 		{
-			LUMIX_DELETE(m_editor->getAllocator(), plugin);
+			LUMIX_DELETE(m_editor->getAllocator(), i);
 		}
 		m_plugins.clear();
+		PrefabSystem::destroyAssetBrowserPlugin(*this);
+		ASSERT(m_gui_plugins.empty());
 
 		for (auto* i : m_add_cmp_plugins)
 		{
@@ -565,7 +568,7 @@ public:
 			m_property_grid->onGUI();
 			onEntityListGUI();
 			onSaveAsDialogGUI();
-			for (auto* plugin : m_plugins)
+			for (auto* plugin : m_gui_plugins)
 			{
 				plugin->onWindowGUI();
 			}
@@ -574,7 +577,7 @@ public:
 		}
 		ImGui::PopFont();
 		ImGui::Render();
-		for (auto* plugin : m_plugins)
+		for (auto* plugin : m_gui_plugins)
 		{
 			plugin->guiEndFrame();
 		}
@@ -613,7 +616,7 @@ public:
 			m_editor->toggleGameMode();
 		}
 
-		for (auto* plugin : m_plugins)
+		for (auto* plugin : m_gui_plugins)
 		{
 			plugin->update(time_delta);
 		}
@@ -810,9 +813,9 @@ public:
 	}
 
 
-	IPlugin* getFocusedPlugin()
+	GUIPlugin* getFocusedPlugin()
 	{
-		for(IPlugin* plugin : m_plugins)
+		for(GUIPlugin* plugin : m_gui_plugins)
 		{
 			if(plugin->hasFocus()) return plugin;
 		}
@@ -1772,9 +1775,9 @@ public:
 	}
 
 
-	IPlugin* getPlugin(const char* name) override
+	GUIPlugin* getPlugin(const char* name) override
 	{
-		for (auto* i : m_plugins)
+		for (auto* i : m_gui_plugins)
 		{
 			if (equalStrings(i->getName(), name)) return i;
 		}
@@ -1785,7 +1788,13 @@ public:
 	void addPlugin(IPlugin& plugin) override
 	{
 		m_plugins.push(&plugin);
-		for (auto* i : m_plugins)
+	}
+
+
+	void addPlugin(GUIPlugin& plugin) override
+	{
+		m_gui_plugins.push(&plugin);
+		for (auto* i : m_gui_plugins)
 		{
 			i->pluginAdded(plugin);
 			plugin.pluginAdded(*i);
@@ -1793,25 +1802,29 @@ public:
 	}
 
 
-	void removePlugin(IPlugin& plugin) override
+	void removePlugin(GUIPlugin& plugin) override
 	{
-		m_plugins.eraseItemFast(&plugin);
+		m_gui_plugins.eraseItemFast(&plugin);
 	}
 
 
 	void setStudioApp()
 	{
-		m_editor->getPrefabSystem().setStudioApp(*this);
 		#ifdef STATIC_PLUGINS
 			StudioApp::StaticPluginRegister::create(*this);
 		#else
 			auto& plugin_manager = m_editor->getEngine().getPluginManager();
 			for (auto* lib : plugin_manager.getLibraries())
 			{
-				auto* f = (void (*)(StudioApp&))getLibrarySymbol(lib, "setStudioApp");
-				if (f) f(*this);
+				auto* f = (StudioApp::IPlugin* (*)(StudioApp&))getLibrarySymbol(lib, "setStudioApp");
+				if (f)
+				{
+					StudioApp::IPlugin* plugin = f(*this);
+					addPlugin(*plugin);
+				}
 			}
 		#endif
+		PrefabSystem::createAssetBrowserPlugin(*this, m_editor->getPrefabSystem());
 	}
 
 
@@ -2352,7 +2365,7 @@ public:
 			}
 		}
 
-		for (IPlugin* plugin : m_plugins)
+		for (GUIPlugin* plugin : m_gui_plugins)
 		{
 			if (!plugin->packData(m_pack.dest_dir))
 			{
@@ -2523,7 +2536,7 @@ public:
 				}
 				break;
 				case SDL_DROPFILE:
-					for (IPlugin* plugin : m_plugins)
+					for (GUIPlugin* plugin : m_gui_plugins)
 					{
 						if (plugin->onDropFile(event.drop.file)) break;
 					}
@@ -2626,7 +2639,7 @@ public:
 	void checkShortcuts()
 	{
 		if (ImGui::IsAnyItemActive()) return;
-		IPlugin* plugin = getFocusedPlugin();
+		GUIPlugin* plugin = getFocusedPlugin();
 
 		int key_count;
 		auto* state = SDL_GetKeyboardState(&key_count);
@@ -2714,6 +2727,7 @@ public:
 	Array<Action*> m_actions;
 	Array<Action*> m_window_actions;
 	Array<Action*> m_toolbar_actions;
+	Array<GUIPlugin*> m_gui_plugins;
 	Array<IPlugin*> m_plugins;
 	Array<IAddComponentPlugin*> m_add_cmp_plugins;
 	Array<StaticString<MAX_PATH_LENGTH>> m_universes;
@@ -2821,7 +2835,8 @@ void StudioApp::StaticPluginRegister::create(StudioApp& app)
 	auto* i = s_first_plugin;
 	while (i)
 	{
-		i->creator(app);
+		StudioApp::IPlugin* plugin = i->creator(app);
+		app.addPlugin(*plugin);
 		i = i->next;
 	}
 }

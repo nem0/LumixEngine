@@ -1889,10 +1889,7 @@ public:
 
 		removePlugin(*m_measure_tool);
 		LUMIX_DELETE(m_allocator, m_measure_tool);
-		for (auto* plugin : m_plugins)
-		{
-			LUMIX_DELETE(getAllocator(), plugin);
-		}
+		ASSERT(m_plugins.empty());
 
 		EditorIcons::destroy(*m_editor_icons);
 		PrefabSystem::destroy(m_prefab_system);

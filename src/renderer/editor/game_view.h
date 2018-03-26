@@ -20,7 +20,7 @@ class RenderScene;
 class StudioApp;
 
 
-class GameView : public StudioApp::IPlugin
+class GameView : public StudioApp::GUIPlugin
 {
 friend struct GUIInterface;
 public:

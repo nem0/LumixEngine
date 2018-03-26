@@ -203,7 +203,7 @@ struct SpritePlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 };
 
 
-class GUIEditor LUMIX_FINAL : public StudioApp::IPlugin
+class GUIEditor LUMIX_FINAL : public StudioApp::GUIPlugin
 {
 enum class EdgeMask
 {
@@ -732,20 +732,49 @@ private:
 };
 
 
+struct StudioAppPlugin : StudioApp::IPlugin
+{
+	StudioAppPlugin(StudioApp& app)
+		: m_app(app)
+	{
+		app.registerComponent("gui_button", "GUI/Button");
+		app.registerComponentWithResource("gui_image", "GUI/Image", Sprite::TYPE, *Reflection::getProperty(GUI_IMAGE_TYPE, "Sprite"));
+		app.registerComponent("gui_input_field", "GUI/Input field");
+		app.registerComponent("gui_rect", "GUI/Rect");
+		app.registerComponent("gui_text", "GUI/Text");
+
+		IAllocator& allocator = app.getWorldEditor().getAllocator();
+		m_gui_editor = LUMIX_NEW(allocator, GUIEditor)(app);
+		app.addPlugin(*m_gui_editor);
+
+		m_sprite_plugin = LUMIX_NEW(allocator, SpritePlugin)(app);
+		app.getAssetBrowser().addPlugin(*m_sprite_plugin);
+	}
+
+
+	~StudioAppPlugin()
+	{
+		IAllocator& allocator = m_app.getWorldEditor().getAllocator();
+		m_app.removePlugin(*m_gui_editor);
+		LUMIX_DELETE(allocator, m_gui_editor);
+
+		m_app.getAssetBrowser().removePlugin(*m_sprite_plugin);
+		LUMIX_DELETE(allocator, m_sprite_plugin);
+	}
+
+
+	StudioApp& m_app;
+	GUIEditor* m_gui_editor;
+	SpritePlugin* m_sprite_plugin;
+};
+
+
 
 } // anonymous namespace
 
 
 LUMIX_STUDIO_ENTRY(gui)
 {
-	app.registerComponent("gui_button", "GUI/Button");
-	app.registerComponentWithResource("gui_image", "GUI/Image", Sprite::TYPE, *Reflection::getProperty(GUI_IMAGE_TYPE, "Sprite"));
-	app.registerComponent("gui_input_field", "GUI/Input field");
-	app.registerComponent("gui_rect", "GUI/Rect");
-	app.registerComponent("gui_text", "GUI/Text");
-
 	IAllocator& allocator = app.getWorldEditor().getAllocator();
-	app.addPlugin(*LUMIX_NEW(allocator, GUIEditor)(app));
-	
-	app.getAssetBrowser().addPlugin(*LUMIX_NEW(allocator, SpritePlugin)(app));
+	return LUMIX_NEW(allocator, StudioAppPlugin)(app);
 }
