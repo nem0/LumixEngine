@@ -105,21 +105,21 @@ struct AssetBrowserPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 };
 
 
-struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
+struct ClipManagerUI LUMIX_FINAL : public StudioApp::GUIPlugin
 {
-	explicit StudioAppPlugin(StudioApp& app)
+	explicit ClipManagerUI(StudioApp& app)
 		: m_app(app)
 	{
 		m_filter[0] = 0;
 		m_is_open = false;
 		Action* action = LUMIX_NEW(app.getWorldEditor().getAllocator(), Action)("Clip manager", "Toggle clip manager", "clip_manager");
-		action->func.bind<StudioAppPlugin, &StudioAppPlugin::onAction>(this);
-		action->is_selected.bind<StudioAppPlugin, &StudioAppPlugin::isOpen>(this);
+		action->func.bind<ClipManagerUI, &ClipManagerUI::onAction>(this);
+		action->is_selected.bind<ClipManagerUI, &ClipManagerUI::isOpen>(this);
 		app.addWindowAction(action);
 	}
 
 
-	void pluginAdded(IPlugin& plugin) override
+	void pluginAdded(GUIPlugin& plugin) override
 	{
 		if (!equalStrings(plugin.getName(), "animation_editor")) return;
 
@@ -127,7 +127,7 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 		auto& event_type = anim_editor.createEventType("sound");
 		event_type.size = sizeof(SoundAnimationEvent);
 		event_type.label = "Sound";
-		event_type.editor.bind<StudioAppPlugin, &StudioAppPlugin::onSoundEventGUI>(this);
+		event_type.editor.bind<ClipManagerUI, &ClipManagerUI::onSoundEventGUI>(this);
 	}
 
 
@@ -221,9 +221,9 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 };
 
 
-struct EditorPlugin LUMIX_FINAL : public WorldEditor::Plugin
+struct GizmoPlugin LUMIX_FINAL : public WorldEditor::Plugin
 {
-	explicit EditorPlugin(WorldEditor& editor)
+	explicit GizmoPlugin(WorldEditor& editor)
 		: m_editor(editor)
 	{
 	}
@@ -264,25 +264,60 @@ struct EditorPlugin LUMIX_FINAL : public WorldEditor::Plugin
 	WorldEditor& m_editor;
 };
 
+
+struct StudioAppPlugin : StudioApp::IPlugin
+{
+	explicit StudioAppPlugin(StudioApp& app)
+		: m_app(app)
+	{
+		app.registerComponent("ambient_sound", "Audio/Ambient sound");
+		app.registerComponent("audio_listener", "Audio/Listener");
+		app.registerComponent("echo_zone", "Audio/Echo zone");
+		app.registerComponent("chorus_zone", "Audio/Chorus zone");
+
+		WorldEditor& editor = app.getWorldEditor();
+		IAllocator& allocator = editor.getAllocator();
+
+		m_asset_browser_plugin = LUMIX_NEW(allocator, AssetBrowserPlugin)(app);
+		app.getAssetBrowser().addPlugin(*m_asset_browser_plugin);
+
+		m_clip_manager_ui = LUMIX_NEW(allocator, ClipManagerUI)(app);
+		app.addPlugin(*m_clip_manager_ui);
+
+		m_gizmo_plugin = LUMIX_NEW(allocator, GizmoPlugin)(editor);
+		editor.addPlugin(*m_gizmo_plugin);
+	}
+
+
+	~StudioAppPlugin()
+	{
+		WorldEditor& editor = m_app.getWorldEditor();
+		IAllocator& allocator = editor.getAllocator();
+
+		m_app.getAssetBrowser().removePlugin(*m_asset_browser_plugin);
+		m_app.getWorldEditor().removePlugin(*m_gizmo_plugin);
+		m_app.removePlugin(*m_clip_manager_ui);
+
+		LUMIX_DELETE(allocator, m_asset_browser_plugin);
+		LUMIX_DELETE(allocator, m_gizmo_plugin);
+		LUMIX_DELETE(allocator, m_clip_manager_ui);
+	}
+
+
+	StudioApp& m_app;
+	AssetBrowserPlugin* m_asset_browser_plugin;
+	ClipManagerUI* m_clip_manager_ui;
+	GizmoPlugin* m_gizmo_plugin;
+};
+
+
 } // anonymous namespace
 
 
 LUMIX_STUDIO_ENTRY(audio)
 {
-	app.registerComponent("ambient_sound", "Audio/Ambient sound");
-	app.registerComponent("audio_listener", "Audio/Listener");
-	app.registerComponent("echo_zone", "Audio/Echo zone");
-	app.registerComponent("chorus_zone", "Audio/Chorus zone");
+	WorldEditor& editor = app.getWorldEditor();
+	IAllocator& allocator = editor.getAllocator();
 
-	auto& editor = app.getWorldEditor();
-	auto& allocator = editor.getAllocator();
-
-	auto* asset_browser_plugin = LUMIX_NEW(allocator, AssetBrowserPlugin)(app);
-	app.getAssetBrowser().addPlugin(*asset_browser_plugin);
-
-	auto* app_plugin = LUMIX_NEW(allocator, StudioAppPlugin)(app);
-	app.addPlugin(*app_plugin);
-
-	auto* plugin = LUMIX_NEW(allocator, EditorPlugin)(editor);
-	editor.addPlugin(*plugin);
+	return LUMIX_NEW(allocator, StudioAppPlugin)(app);
 }

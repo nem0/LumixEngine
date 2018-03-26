@@ -23,7 +23,7 @@ class WorldEditor;
 namespace MT { class Task; }
 
 
-class ImportAssetDialog LUMIX_FINAL : public StudioApp::IPlugin
+class ImportAssetDialog LUMIX_FINAL : public StudioApp::GUIPlugin
 {
 	friend struct ImportTask;
 	friend struct ConvertTask;

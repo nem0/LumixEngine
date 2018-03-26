@@ -17,7 +17,7 @@ class Pipeline;
 class RenderScene;
 
 
-class SceneView : public StudioApp::IPlugin
+class SceneView : public StudioApp::GUIPlugin
 {
 	public:
 		typedef Delegate<bool(StudioApp&, float, float, const RayCastModelHit&)> DropHandler;

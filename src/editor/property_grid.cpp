@@ -23,9 +23,6 @@ namespace Lumix
 {
 
 
-static const u32 ENABLED_HASH = crc32("Enabled");
-
-
 PropertyGrid::PropertyGrid(StudioApp& app)
 	: m_app(app)
 	, m_is_open(true)
@@ -41,10 +38,7 @@ PropertyGrid::PropertyGrid(StudioApp& app)
 
 PropertyGrid::~PropertyGrid()
 {
-	for (auto* i : m_plugins)
-	{
-		LUMIX_DELETE(m_editor.getAllocator(), i);
-	}
+	ASSERT(m_plugins.empty());
 }
 
 
@@ -524,6 +518,7 @@ struct GridUIVisitor LUMIX_FINAL : Reflection::IPropertyVisitor
 
 static bool componentTreeNode(StudioApp& app, ComponentType cmp_type, const Entity* entities, int entities_count)
 {
+	static const u32 ENABLED_HASH = crc32("Enabled");
 	const Reflection::PropertyBase* enabled_prop = Reflection::getProperty(cmp_type, ENABLED_HASH);
 
 	ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowItemOverlap;

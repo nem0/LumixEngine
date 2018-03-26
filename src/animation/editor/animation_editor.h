@@ -30,7 +30,7 @@ class Edge;
 class Node;
 
 
-struct IAnimationEditor : public StudioApp::IPlugin
+struct IAnimationEditor : public StudioApp::GUIPlugin
 {
 public:
 	struct EventType
@@ -43,7 +43,8 @@ public:
 
 public:
 	static IAnimationEditor* create(IAllocator& allocator, StudioApp& app);
-
+	
+	virtual ~IAnimationEditor() {}
 	virtual OutputBlob& getCopyBuffer() = 0;
 	virtual void executeCommand(IEditorCommand& command) = 0;
 	virtual void setContainer(Container* container) = 0;

@@ -25,9 +25,10 @@ class LUMIX_EDITOR_API PrefabSystem
 public:
 	static PrefabSystem* create(WorldEditor& editor);
 	static void destroy(PrefabSystem* system);
+	static void createAssetBrowserPlugin(StudioApp& app, PrefabSystem& system);
+	static void destroyAssetBrowserPlugin(StudioApp& app);
 
 	virtual ~PrefabSystem() {}
-	virtual void setStudioApp(StudioApp& app) = 0;
 	virtual void serialize(OutputBlob& serializer) = 0;
 	virtual void deserialize(InputBlob& serializer) = 0;
 	virtual void serialize(ISerializer& serializer) = 0;

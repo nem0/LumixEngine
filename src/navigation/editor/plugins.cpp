@@ -15,16 +15,16 @@ namespace
 {
 
 
-struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
+struct NavmeshEditorPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 {
-	explicit StudioAppPlugin(StudioApp& _app)
+	explicit NavmeshEditorPlugin(StudioApp& _app)
 		: app(_app)
 		, is_open(false)
 	{
 		IAllocator& allocator = app.getWorldEditor().getAllocator();
 		Action* action = LUMIX_NEW(allocator, Action)("Navigation", "Toggle navigation UI", "toggleNavigationWindow");
-		action->func.bind<StudioAppPlugin, &StudioAppPlugin::onAction>(this);
-		action->is_selected.bind<StudioAppPlugin, &StudioAppPlugin::isOpen>(this);
+		action->func.bind<NavmeshEditorPlugin, &NavmeshEditorPlugin::onAction>(this);
+		action->is_selected.bind<NavmeshEditorPlugin, &NavmeshEditorPlugin::isOpen>(this);
 		app.addWindowAction(action);
 	}
 
@@ -157,16 +157,38 @@ struct StudioAppPlugin LUMIX_FINAL : public StudioApp::IPlugin
 };
 
 
+struct StudioAppPlugin : StudioApp::IPlugin
+{
+	StudioAppPlugin(StudioApp& app)
+		: m_app(app)
+	{
+		IAllocator& allocator = app.getWorldEditor().getAllocator();
+		m_navmesh_editor = LUMIX_NEW(allocator, NavmeshEditorPlugin)(app);
+		app.addPlugin(*m_navmesh_editor);
+
+		app.registerComponent("navmesh_agent", "Navmesh Agent");
+	}
+
+
+	~StudioAppPlugin()
+	{
+		m_app.removePlugin(*m_navmesh_editor);
+		IAllocator& allocator = m_app.getWorldEditor().getAllocator();
+		LUMIX_DELETE(allocator, m_navmesh_editor);
+	}
+
+
+	StudioApp& m_app;
+	NavmeshEditorPlugin* m_navmesh_editor;
+};
+
 
 } // anonymous
 
 
 LUMIX_STUDIO_ENTRY(navigation)
 {
-	auto& allocator = app.getWorldEditor().getAllocator();
-	auto* studio_app_plugin = LUMIX_NEW(allocator, StudioAppPlugin)(app);
-	app.addPlugin(*studio_app_plugin);
-
-	app.registerComponent("navmesh_agent", "Navmesh Agent");
+	IAllocator& allocator = app.getWorldEditor().getAllocator();
+	return LUMIX_NEW(allocator, StudioAppPlugin)(app);
 }
 

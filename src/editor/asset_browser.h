@@ -62,6 +62,7 @@ public:
 	bool resourceInput(const char* label, const char* str_id, char* buf, int max_size, ResourceType type);
 	void onInitFinished();
 	void addPlugin(IPlugin& plugin);
+	void removePlugin(IPlugin& plugin);
 	void openInExternalEditor(Resource* resource) const;
 	void openInExternalEditor(const char* path) const;
 	void enableUpdate(bool enable) { m_is_update_enabled = enable; }

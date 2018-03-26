@@ -10,12 +10,12 @@ struct ImFont;
 
 #ifdef STATIC_PLUGINS
 	#define LUMIX_STUDIO_ENTRY(plugin_name) \
-		extern "C" void setStudioApp_##plugin_name(StudioApp& app); \
+		extern "C" StudioApp::IPlugin* setStudioApp_##plugin_name(StudioApp& app); \
 		extern "C" { StudioApp::StaticPluginRegister s_##plugin_name##_editor_register(#plugin_name, setStudioApp_##plugin_name); } \
-		extern "C" void setStudioApp_##plugin_name(StudioApp& app)
+		extern "C" StudioApp::IPlugin* setStudioApp_##plugin_name(StudioApp& app)
 #else
 	#define LUMIX_STUDIO_ENTRY(plugin_name) \
-		extern "C" LUMIX_LIBRARY_EXPORT void setStudioApp(StudioApp& app)
+		extern "C" LUMIX_LIBRARY_EXPORT StudioApp::IPlugin* setStudioApp(StudioApp& app)
 #endif
 
 
@@ -45,11 +45,16 @@ public:
 	struct IPlugin
 	{
 		virtual ~IPlugin() {}
+	};
+
+	struct GUIPlugin
+	{
+		virtual ~GUIPlugin() {}
 
 		virtual void onWindowGUI() = 0;
 		virtual bool hasFocus() { return false; }
 		virtual void update(float) {}
-		virtual void pluginAdded(IPlugin& plugin) {}
+		virtual void pluginAdded(GUIPlugin& plugin) {}
 		virtual const char* getName() const = 0;
 		virtual bool onDropFile(const char* file) { return false; }
 		virtual bool packData(const char* dest_dir) { return true; }
@@ -73,7 +78,7 @@ public:
 
 	struct LUMIX_EDITOR_API StaticPluginRegister
 	{
-		typedef void (*Creator)(StudioApp& app);
+		typedef IPlugin* (*Creator)(StudioApp& app);
 		StaticPluginRegister(const char* name, Creator creator);
 
 		static void create(StudioApp& app);
@@ -93,8 +98,9 @@ public:
 	virtual class AssetBrowser& getAssetBrowser() = 0;
 	virtual WorldEditor& getWorldEditor() = 0;
 	virtual void addPlugin(IPlugin& plugin) = 0;
-	virtual void removePlugin(IPlugin& plugin) = 0;
-	virtual IPlugin* getPlugin(const char* name) = 0;
+	virtual void addPlugin(GUIPlugin& plugin) = 0;
+	virtual void removePlugin(GUIPlugin& plugin) = 0;
+	virtual GUIPlugin* getPlugin(const char* name) = 0;
 	virtual const char* getComponentTypeName(ComponentType cmp_type) const = 0;
 	virtual void registerComponent(const char* id, const char* label) = 0;
 	virtual void registerComponent(const char* id, IAddComponentPlugin& plugin) = 0;

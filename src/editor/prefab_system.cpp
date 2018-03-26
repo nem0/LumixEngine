@@ -195,12 +195,6 @@ public:
 	}
 
 
-	void setStudioApp(StudioApp& app) override
-	{
-		app.getAssetBrowser().addPlugin(*LUMIX_NEW(m_editor.getAllocator(), AssetBrowserPlugin)(app, *this));
-	}
-	
-
 	static IEditorCommand* createInstantiatePrefabCommand(WorldEditor& editor)
 	{
 		return LUMIX_NEW(editor.getAllocator(), InstantiatePrefabCommand)(editor);
@@ -724,6 +718,7 @@ private:
 	HashMap<u32, PrefabResource*> m_resources;
 	Universe* m_universe;
 	WorldEditor& m_editor;
+	StudioApp* m_app;
 }; // class PrefabSystemImpl
 
 
@@ -737,6 +732,24 @@ void PrefabSystem::destroy(PrefabSystem* system)
 {
 	LUMIX_DELETE(
 		static_cast<PrefabSystemImpl*>(system)->getEditor().getAllocator(), system);
+}
+
+
+static AssetBrowserPlugin* ab_plugin = nullptr;
+
+
+void PrefabSystem::createAssetBrowserPlugin(StudioApp& app, PrefabSystem& system)
+{
+	ab_plugin = LUMIX_NEW(app.getWorldEditor().getAllocator(), AssetBrowserPlugin)(app, system);
+	app.getAssetBrowser().addPlugin(*ab_plugin);
+}
+
+
+void PrefabSystem::destroyAssetBrowserPlugin(StudioApp& app)
+{
+	app.getAssetBrowser().removePlugin(*ab_plugin);
+	LUMIX_DELETE(app.getWorldEditor().getAllocator(), ab_plugin);
+	ab_plugin = nullptr;
 }
 
 
