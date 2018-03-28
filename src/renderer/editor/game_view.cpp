@@ -385,7 +385,7 @@ void GameView::onWindowGUI()
 	}
 	ImVec2 view_pos;
 	bool is_game_view_visible = false;
-	if (ImGui::BeginDock(window_name, &m_is_open))
+	if (ImGui::BeginDock(window_name, &m_is_open, ImGuiWindowFlags_NoNavInputs))
 	{
 		is_game_view_visible = true;
 		m_is_mouse_hovering_window = ImGui::IsWindowHovered();
