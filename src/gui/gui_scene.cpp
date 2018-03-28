@@ -5,6 +5,7 @@
 #include "engine/flag_set.h"
 #include "engine/iallocator.h"
 #include "engine/input_system.h"
+#include "engine/log.h"
 #include "engine/plugin_manager.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
@@ -156,6 +157,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		, m_rect_hovered(allocator)
 		, m_rect_hovered_out(allocator)
 		, m_button_clicked(allocator)
+		, m_buttons_down_count(0)
 	{
 		context.registerComponentType(GUI_RECT_TYPE
 			, this
@@ -810,10 +812,20 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	}
 
 
+	bool isButtonDown(Entity e) const
+	{
+		for(int i = 0, c = m_buttons_down_count; i < c; ++i)
+		{
+			if (m_buttons_down[i] == e) return true;
+		}
+		return false;
+	}
+
+
 	void handleMouseButtonEvent(const Rect& parent_rect, GUIRect& rect, const InputSystem::Event& event)
 	{
 		if (!rect.flags.isSet(GUIRect::IS_ENABLED)) return;
-		if (event.data.button.state != InputSystem::ButtonEvent::UP) return;
+		bool is_up = event.data.button.state == InputSystem::ButtonEvent::UP;
 
 		Vec2 pos(event.data.button.x_abs, event.data.button.y_abs);
 		const Rect& r = getRectOnCanvas(parent_rect, rect);
@@ -822,11 +834,26 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		{
 			if (m_buttons.find(rect.entity) >= 0)
 			{
-				m_focused_entity = INVALID_ENTITY;
-				m_button_clicked.invoke(rect.entity);
+				if (is_up && isButtonDown(rect.entity))
+				{
+					m_focused_entity = INVALID_ENTITY;
+					m_button_clicked.invoke(rect.entity);
+				}
+				if (!is_up)
+				{
+					if (m_buttons_down_count < lengthOf(m_buttons_down))
+					{
+						m_buttons_down[m_buttons_down_count] = rect.entity;
+						++m_buttons_down_count;
+					}
+					else
+					{
+						g_log_error.log("GUI") << "Too many buttons pressed at once";
+					}
+				}
 			}
 			
-			if (rect.input_field)
+			if (rect.input_field && is_up)
 			{
 				m_focused_entity = rect.entity;
 				if (rect.text)
@@ -936,6 +963,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 							m_mouse_down_pos.y = event.data.button.y_abs;
 						}
 						handleMouseButtonEvent({ 0, 0, m_canvas_size.x, m_canvas_size.y }, *m_root, event);
+						if (event.data.button.state == InputSystem::ButtonEvent::UP) m_buttons_down_count = 0;
 					}
 					else if (event.device->type == InputSystem::Device::KEYBOARD)
 					{
@@ -1266,6 +1294,8 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	
 	AssociativeArray<Entity, GUIRect*> m_rects;
 	AssociativeArray<Entity, GUIButton> m_buttons;
+	Entity m_buttons_down[16];
+	int m_buttons_down_count;
 	Entity m_focused_entity = INVALID_ENTITY;
 	GUIRect* m_root = nullptr;
 	FontManager* m_font_manager = nullptr;
