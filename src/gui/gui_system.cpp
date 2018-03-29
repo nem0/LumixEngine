@@ -206,7 +206,12 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 	}
 
 
-	void stopGame() override {}
+	void stopGame() override
+	{
+		Pipeline* pipeline = m_interface->getPipeline();
+		Draw2D& draw2d = pipeline->getDraw2D();
+		draw2d.Clear();
+	}
 
 
 	const char* getName() const override { return "gui"; }
