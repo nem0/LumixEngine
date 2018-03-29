@@ -34,6 +34,7 @@ static const ComponentType GUI_RECT_TYPE = Reflection::getComponentType("gui_rec
 static const ComponentType GUI_IMAGE_TYPE = Reflection::getComponentType("gui_image");
 static const ComponentType GUI_TEXT_TYPE = Reflection::getComponentType("gui_text");
 static const ComponentType GUI_BUTTON_TYPE = Reflection::getComponentType("gui_button");
+static const ComponentType GUI_RENDER_TARGET_TYPE = Reflection::getComponentType("gui_render_target");
 
 
 struct SpritePlugin LUMIX_FINAL : public AssetBrowser::IPlugin
@@ -510,6 +511,7 @@ private:
 					if (ImGui::MenuItem("Image")) createChild(e, GUI_IMAGE_TYPE);
 					if (ImGui::MenuItem("Rect")) createChild(e, GUI_RECT_TYPE);
 					if (ImGui::MenuItem("Text")) createChild(e, GUI_TEXT_TYPE);
+					if (ImGui::MenuItem("Render target")) createChild(e, GUI_RENDER_TARGET_TYPE);
 					ImGui::EndMenu();
 				}
 
@@ -741,6 +743,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		app.registerComponentWithResource("gui_image", "GUI/Image", Sprite::TYPE, *Reflection::getProperty(GUI_IMAGE_TYPE, "Sprite"));
 		app.registerComponent("gui_input_field", "GUI/Input field");
 		app.registerComponent("gui_rect", "GUI/Rect");
+		app.registerComponent("gui_render_target", "GUI/Render target");
 		app.registerComponent("gui_text", "GUI/Text");
 
 		IAllocator& allocator = app.getWorldEditor().getAllocator();

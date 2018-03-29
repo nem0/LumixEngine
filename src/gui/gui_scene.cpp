@@ -26,11 +26,12 @@ namespace Lumix
 
 static const ComponentType GUI_BUTTON_TYPE = Reflection::getComponentType("gui_button");
 static const ComponentType GUI_RECT_TYPE = Reflection::getComponentType("gui_rect");
+static const ComponentType GUI_RENDER_TARGET_TYPE = Reflection::getComponentType("gui_render_target");
 static const ComponentType GUI_IMAGE_TYPE = Reflection::getComponentType("gui_image");
 static const ComponentType GUI_TEXT_TYPE = Reflection::getComponentType("gui_text");
 static const ComponentType GUI_INPUT_FIELD_TYPE = Reflection::getComponentType("gui_input_field");
 static const float CURSOR_BLINK_PERIOD = 1.0f;
-
+static bgfx::TextureHandle EMPTY_RENDER_TARGET = BGFX_INVALID_HANDLE;
 
 struct GUIText
 {
@@ -143,6 +144,7 @@ struct GUIRect
 	GUIImage* image = nullptr;
 	GUIText* text = nullptr;
 	GUIInputField* input_field = nullptr;
+	bgfx::TextureHandle* render_target = nullptr;
 };
 
 
@@ -171,6 +173,12 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 			, &GUISceneImpl::destroyImage
 			, &GUISceneImpl::serializeImage
 			, &GUISceneImpl::deserializeImage);
+		context.registerComponentType(GUI_RENDER_TARGET_TYPE
+			, this
+			, &GUISceneImpl::createRenderTarget
+			, &GUISceneImpl::destroyRenderTarget
+			, &GUISceneImpl::serializeRenderTarget
+			, &GUISceneImpl::deserializeRenderTarget);
 		context.registerComponentType(GUI_INPUT_FIELD_TYPE
 			, this
 			, &GUISceneImpl::createInputField
@@ -266,6 +274,12 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 				draw.AddRectFilled({ l, t }, { r, b }, rect.image->color);
 			}
 		}
+
+		if (rect.render_target && bgfx::isValid(*rect.render_target))
+		{
+			draw.AddImage(rect.render_target, { l, t }, { r, b });
+		}
+
 		if (rect.text)
 		{
 			Font* font = rect.text->getFont();
@@ -623,6 +637,26 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		m_root = findRoot();
 		
 		m_universe.onComponentCreated(entity, GUI_RECT_TYPE, this);
+	}
+
+
+	void serializeRenderTarget(ISerializer& serializer, Entity entity)
+	{
+	}
+
+
+	void deserializeRenderTarget(IDeserializer& serializer, Entity entity, int /*scene_version*/)
+	{
+		int idx = m_rects.find(entity);
+		if (idx < 0)
+		{
+			GUIRect* rect = LUMIX_NEW(m_allocator, GUIRect);
+			rect->entity = entity;
+			idx = m_rects.insert(entity, rect);
+		}
+		GUIRect& rect = *m_rects.at(idx);
+		rect.render_target = &EMPTY_RENDER_TARGET;
+		m_universe.onComponentCreated(entity, GUI_RENDER_TARGET_TYPE, this);
 	}
 
 
@@ -1030,6 +1064,19 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	}
 
 
+	void createRenderTarget(Entity entity)
+	{
+		int idx = m_rects.find(entity);
+		if (idx < 0)
+		{
+			createRect(entity);
+			idx = m_rects.find(entity);
+		}
+		m_rects.at(idx)->render_target = &EMPTY_RENDER_TARGET;
+		m_universe.onComponentCreated(entity, GUI_RENDER_TARGET_TYPE, this);
+	}
+
+
 	void createButton(Entity entity)
 	{
 		int idx = m_rects.find(entity);
@@ -1118,6 +1165,14 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 	{
 		m_buttons.erase(entity);
 		m_universe.onComponentDestroyed(entity, GUI_BUTTON_TYPE, this);
+	}
+
+
+	void destroyRenderTarget(Entity entity)
+	{
+		GUIRect* rect = m_rects[entity];
+		rect->render_target = nullptr;
+		m_universe.onComponentDestroyed(entity, GUI_RENDER_TARGET_TYPE, this);
 	}
 
 
@@ -1266,6 +1321,12 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		m_root = findRoot();
 	}
 	
+
+	void setRenderTarget(Entity entity, bgfx::TextureHandle* texture_handle) override
+	{
+		m_rects[entity]->render_target = texture_handle;
+	}
+
 	
 	DelegateList<void(Entity)>& buttonClicked() override
 	{
