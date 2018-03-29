@@ -3,6 +3,8 @@
 
 #include "engine/iplugin.h"
 
+namespace bgfx { struct TextureHandle; }
+
 
 namespace Lumix
 {
@@ -90,6 +92,8 @@ public:
 	virtual void setTextColorRGBA(Entity entity, const Vec4& color) = 0;
 	virtual Path getTextFontPath(Entity entity) = 0;
 	virtual void setTextFontPath(Entity entity, const Path& path) = 0;
+
+	virtual void setRenderTarget(Entity entity, bgfx::TextureHandle* texture_handle) = 0;
 
 	virtual DelegateList<void(Entity)>& buttonClicked() = 0;
 	virtual DelegateList<void(Entity)>& rectHovered() = 0;
