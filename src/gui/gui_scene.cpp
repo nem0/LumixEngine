@@ -160,6 +160,7 @@ struct GUISceneImpl LUMIX_FINAL : public GUIScene
 		, m_rect_hovered_out(allocator)
 		, m_button_clicked(allocator)
 		, m_buttons_down_count(0)
+		, m_canvas_size(800, 600)
 	{
 		context.registerComponentType(GUI_RECT_TYPE
 			, this
