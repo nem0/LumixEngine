@@ -93,7 +93,7 @@ public:
 	const Array<Edge*>& getInEdges() { return m_in_edges; }
 
 protected:
-	void onGuiEvents(Anim::EventArray& events, const char* label);
+	void onGuiEvents(Anim::EventArray& events, const char* label, bool show_time);
 
 public:
 	ImVec2 pos;
