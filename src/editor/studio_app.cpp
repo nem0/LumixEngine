@@ -1672,16 +1672,14 @@ public:
 		PluginManager& plugin_manager = m_editor->getEngine().getPluginManager();
 		void* lib = plugin_manager.getLibrary(m_watched_plugin.plugin);
 
-		for (Universe* universe : m_editor->getEngine().getUniverses())
+		Universe* universe = m_editor->getUniverse();
+		for (IScene* scene : universe->getScenes())
 		{
-			for (IScene* scene : universe->getScenes())
-			{
-				if (&scene->getPlugin() != m_watched_plugin.plugin) continue;
-				if (m_editor->isGameMode()) scene->stopGame();
-				scene->serialize(blob);
-				universe->removeScene(scene);
-				scene->getPlugin().destroyScene(scene);
-			}
+			if (&scene->getPlugin() != m_watched_plugin.plugin) continue;
+			if (m_editor->isGameMode()) scene->stopGame();
+			scene->serialize(blob);
+			universe->removeScene(scene);
+			scene->getPlugin().destroyScene(scene);
 		}
 		plugin_manager.unload(m_watched_plugin.plugin);
 
@@ -1695,15 +1693,12 @@ public:
 		}
 
 		InputBlob input_blob(blob);
-		for (Universe* universe : m_editor->getEngine().getUniverses())
+		m_watched_plugin.plugin->createScenes(*universe);
+		for (IScene* scene : universe->getScenes())
 		{
-			m_watched_plugin.plugin->createScenes(*universe);
-			for (IScene* scene : universe->getScenes())
-			{
-				if (&scene->getPlugin() != m_watched_plugin.plugin) continue;
-				scene->deserialize(input_blob);
-				if (m_editor->isGameMode()) scene->startGame();
-			}
+			if (&scene->getPlugin() != m_watched_plugin.plugin) continue;
+			scene->deserialize(input_blob);
+			if (m_editor->isGameMode()) scene->startGame();
 		}
 		g_log_info.log("Editor") << "Finished reloading plugin.";
 	}
