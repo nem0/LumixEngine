@@ -393,8 +393,8 @@ ComponentInstance* LayersNodeInstance::update(RunningContext& rc, bool check_edg
 
 void LayersNodeInstance::enter(RunningContext& rc, ComponentInstance* from)
 {
-	time = 0;
 	queueEnterEvents(rc);
+	time = 0;
 	if (node.children.size() > lengthOf(layers))
 	{
 		g_log_error.log("Animation") << "Too many layers in LayerNode, only " << lengthOf(layers) << " are used.";
@@ -805,6 +805,7 @@ void StateMachineInstance::fillPose(Engine& engine, Pose& pose, Model& model, fl
 
 void StateMachineInstance::enter(RunningContext& rc, ComponentInstance* from)
 {
+	queueEnterEvents(rc);
 	time = 0;
 	auto& source_sm = (StateMachine&)source;
 	for (auto& entry : source_sm.entries)

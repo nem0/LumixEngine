@@ -266,13 +266,13 @@ void Node::onGUI()
 	if (!engine_cmp) return;
 	auto* engine_node = ((Anim::Node*)engine_cmp);
 
-	onGuiEvents(engine_node->enter_events, "Enter Events");
-	onGuiEvents(engine_node->exit_events, "Exit Events");
-	onGuiEvents(engine_node->runtime_events, "Runtime Events");
+	onGuiEvents(engine_node->enter_events, "Enter Events", false);
+	onGuiEvents(engine_node->exit_events, "Exit Events", false);
+	onGuiEvents(engine_node->runtime_events, "Runtime Events", true);
 }
 
 
-void Node::onGuiEvents(Anim::EventArray& events, const char* label)
+void Node::onGuiEvents(Anim::EventArray& events, const char* label, bool show_time)
 {
 	if (!ImGui::CollapsingHeader(label)) return;
 	ImGui::PushID(label);
@@ -291,6 +291,10 @@ void Node::onGuiEvents(Anim::EventArray& events, const char* label)
 				break;
 			}
 			int event_offset = header.offset + sizeof(Anim::EventHeader) * events.count;
+			if (show_time)
+			{
+				ImGui::InputFloat("Time", &header.time);
+			}
 			editor.getEventType(header.type).editor.invoke(&events.data[event_offset], *this);
 			ImGui::TreePop();
 		}
