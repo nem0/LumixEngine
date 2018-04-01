@@ -1718,20 +1718,6 @@ public:
 	}
 
 
-	bool vSync()
-	{
-		char cmd_line[2048];
-		getCommandLine(cmd_line, lengthOf(cmd_line));
-
-		CommandLineParser parser(cmd_line);
-		while (parser.next())
-		{
-			if (parser.currentEquals("-no_vsync")) return false;
-		}
-		return true;
-	}
-
-
 	void loadUniverseFromCommandLine()
 	{
 		char cmd_line[2048];

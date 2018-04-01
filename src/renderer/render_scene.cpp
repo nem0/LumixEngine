@@ -32,6 +32,7 @@
 #include "renderer/texture.h"
 #include <cfloat>
 #include <cmath>
+#include <algorithm>
 
 
 namespace Lumix
@@ -3612,10 +3613,23 @@ public:
 						info.depth = squared_distance;
 					}
 				}
+				if (!subinfos.empty())
+				{
+					PROFILE_BLOCK("Sort");
+					MeshInstance* begin = &subinfos[0];
+					MeshInstance* end = begin + subinfos.size();
+
+					auto cmp = [](const MeshInstance& a, const MeshInstance& b) -> bool {
+						return (a.depth < b.depth);
+					};
+					std::sort(begin, end, cmp);
+				}
 			}, &job_storage[subresult_index], &jobs[subresult_index], nullptr);
 		}
 		JobSystem::runJobs(jobs, results.size(), &counter);
 		JobSystem::wait(&counter);
+
+		
 
 		return m_temporary_infos;
 	}
