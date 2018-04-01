@@ -615,10 +615,10 @@ void Terrain::deserialize(InputBlob& serializer, Universe& universe, RenderScene
 	serializer.read(m_layer_mask);
 	char path[MAX_PATH_LENGTH];
 	serializer.readString(path, MAX_PATH_LENGTH);
-	setMaterial(static_cast<Material*>(scene.getEngine().getResourceManager().get(Material::TYPE)->load(Path(path))));
 	serializer.read(m_scale.x);
 	serializer.read(m_scale.y);
 	m_scale.z = m_scale.x;
+	setMaterial(static_cast<Material*>(scene.getEngine().getResourceManager().get(Material::TYPE)->load(Path(path))));
 	i32 count;
 	serializer.read(count);
 	while(m_grass_types.size() > count)
