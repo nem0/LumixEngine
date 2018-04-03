@@ -951,7 +951,6 @@ void AnimationEditor::loadFromEntity()
 
 	newController();
 	m_path = scene->getControllerSource(entities[0]).c_str();
-	clearUndoStack();
 	load();
 }
 
@@ -983,8 +982,8 @@ void AnimationEditor::load()
 
 void AnimationEditor::loadFromFile()
 {
+	newController();
 	if (!PlatformInterface::getOpenFilename(m_path.data, lengthOf(m_path.data), "Animation controllers\0*.act\0", "")) return;
-	clearUndoStack();
 	load();
 }
 
