@@ -143,9 +143,11 @@ struct InputValueCustomUI
 	template <typename Owner, typename PP, typename T>
 	static void build(Owner& owner, const PP& pp, T& value)
 	{
+
 		StudioApp& app = owner.resource.getEditor().getApp();
 
 		const auto& selected_entities = app.getWorldEditor().getSelectedEntities();
+		if (selected_entities.empty()) return;
 		auto* scene = (AnimationScene*)app.getWorldEditor().getUniverse()->getScene(ANIMABLE_HASH);
 		
 		if (!scene->getUniverse().hasComponent(selected_entities[0], CONTROLLER_TYPE)) return;
