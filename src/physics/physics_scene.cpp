@@ -2443,7 +2443,8 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			LuaWrapper::push(L, hit.entity != INVALID_ENTITY);
 			LuaWrapper::push(L, hit.entity);
 			LuaWrapper::push(L, hit.position);
-			return 3;
+			LuaWrapper::push(L, hit.normal);
+			return 4;
 		}
 		LuaWrapper::push(L, false);
 		return 1;
