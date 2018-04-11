@@ -1098,7 +1098,7 @@ struct GeometryImpl : Geometry
 
 	std::vector<Vec3> vertices;
 	std::vector<Vec3> normals;
-	std::vector<Vec2> uvs;
+	std::vector<Vec2> uvs[s_uvs_max];
 	std::vector<Vec4> colors;
 	std::vector<Vec3> tangents;
 	std::vector<int> materials;
@@ -1118,7 +1118,7 @@ struct GeometryImpl : Geometry
 	int getVertexCount() const override { return (int)vertices.size(); }
 	const Vec3* getVertices() const override { return &vertices[0]; }
 	const Vec3* getNormals() const override { return normals.empty() ? nullptr : &normals[0]; }
-	const Vec2* getUVs() const override { return uvs.empty() ? nullptr : &uvs[0]; }
+	const Vec2* getUVs(int index = 0) const override { return index < 0 || index >= s_uvs_max || uvs[index].empty() ? nullptr : &uvs[index][0]; }
 	const Vec4* getColors() const override { return colors.empty() ? nullptr : &colors[0]; }
 	const Vec3* getTangents() const override { return tangents.empty() ? nullptr : &tangents[0]; }
 	const Skin* getSkin() const override { return skin; }
@@ -2121,19 +2121,30 @@ static OptionalError<Object*> parseGeometry(const Scene& scene, const Element& e
 	}
 
 	const Element* layer_uv_element = findChild(element, "LayerElementUV");
-	if (layer_uv_element)
-	{
-		std::vector<Vec2> tmp;
-		std::vector<int> tmp_indices;
-		GeometryImpl::VertexDataMapping mapping;
-		if (!parseVertexData(*layer_uv_element, "UV", "UVIndex", &tmp, &tmp_indices, &mapping)) return Error("Invalid UVs");
-		if (!tmp.empty())
-		{
-			geom->uvs.resize(tmp_indices.empty() ? tmp.size() : tmp_indices.size());
-			splat(&geom->uvs, mapping, tmp, tmp_indices, original_indices);
-			remap(&geom->uvs, to_old_indices);
-		}
-	}
+    while (layer_uv_element)
+    {
+        const int uv_index = layer_uv_element->first_property ? layer_uv_element->first_property->getValue().toInt() : 0;
+        if (uv_index >= 0 && uv_index < Geometry::s_uvs_max)
+        {
+            std::vector<Vec2>& uvs = geom->uvs[uv_index];
+
+            std::vector<Vec2> tmp;
+            std::vector<int> tmp_indices;
+            GeometryImpl::VertexDataMapping mapping;
+            if (!parseVertexData(*layer_uv_element, "UV", "UVIndex", &tmp, &tmp_indices, &mapping)) return Error("Invalid UVs");
+            if (!tmp.empty())
+            {
+                uvs.resize(tmp_indices.empty() ? tmp.size() : tmp_indices.size());
+                splat(&uvs, mapping, tmp, tmp_indices, original_indices);
+                remap(&uvs, to_old_indices);
+            }
+        }
+
+        do
+        {
+            layer_uv_element = layer_uv_element->sibling;
+        } while (layer_uv_element && layer_uv_element->id != "LayerElementUV");
+    }
 
 	const Element* layer_tangent_element = findChild(element, "LayerElementTangents");
 	if (layer_tangent_element)
