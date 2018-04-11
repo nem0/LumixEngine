@@ -265,6 +265,7 @@ struct NodeAttribute : Object
 struct Geometry : Object
 {
 	static const Type s_type = Type::GEOMETRY;
+    static const int s_uvs_max = 4;
 
 	Geometry(const Scene& _scene, const IElement& _element);
 
@@ -272,7 +273,7 @@ struct Geometry : Object
 	virtual int getVertexCount() const = 0;
 
 	virtual const Vec3* getNormals() const = 0;
-	virtual const Vec2* getUVs() const = 0;
+	virtual const Vec2* getUVs(int index = 0) const = 0;
 	virtual const Vec4* getColors() const = 0;
 	virtual const Vec3* getTangents() const = 0;
 	virtual const Skin* getSkin() const = 0;
