@@ -9,10 +9,12 @@ typedef unsigned char u8;
 typedef unsigned short u16;
 typedef unsigned int u32;
 typedef unsigned long long u64;
+typedef long long i64;
 
 static_assert(sizeof(u8) == 1, "u8 is not 1 byte");
 static_assert(sizeof(u32) == 4, "u32 is not 4 bytes");
 static_assert(sizeof(u64) == 8, "u64 is not 8 bytes");
+static_assert(sizeof(i64) == 8, "i64 is not 8 bytes");
 
 
 struct Vec2
@@ -61,6 +63,7 @@ struct DataView
 	bool operator==(const char* rhs) const;
 
 	u64 toU64() const;
+	i64 toI64() const;
 	int toInt() const;
 	u32 toU32() const;
 	double toDouble() const;
@@ -105,6 +108,7 @@ struct IElementProperty
 	virtual bool getValues(int* values, int max_size) const = 0;
 	virtual bool getValues(float* values, int max_size) const = 0;
 	virtual bool getValues(u64* values, int max_size) const = 0;
+	virtual bool getValues(i64* values, int max_size) const = 0;
 };
 
 
@@ -321,7 +325,7 @@ struct AnimationCurve : Object
 	AnimationCurve(const Scene& _scene, const IElement& _element);
 
 	virtual int getKeyCount() const = 0;
-	virtual const u64* getKeyTime() const = 0;
+	virtual const i64* getKeyTime() const = 0;
 	virtual const float* getKeyValue() const = 0;
 };
 
