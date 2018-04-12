@@ -360,14 +360,14 @@ struct DockContext
 
 	static ImRect getDockedRect(const ImRect& rect, Slot_ dock_slot)
 	{
-		ImVec2 half_size = rect.GetSize() * 0.5f;
+		ImVec2 size = rect.GetSize();
 		switch (dock_slot)
 		{
 			default: return rect;
-			case Slot_Top: return ImRect(rect.Min, rect.Min + ImVec2(rect.Max.x, half_size.y));
-			case Slot_Right: return ImRect(rect.Min + ImVec2(half_size.x, 0), rect.Max);
-			case Slot_Bottom: return ImRect(rect.Min + ImVec2(0, half_size.y), rect.Max);
-			case Slot_Left: return ImRect(rect.Min, rect.Min + ImVec2(half_size.x, rect.Max.y));
+			case Slot_Top: return ImRect(rect.Min, rect.Min + ImVec2(size.x, size.y * 0.5f));
+			case Slot_Right: return ImRect(rect.Min + ImVec2(size.x * 0.5f, 0), rect.Max);
+			case Slot_Bottom: return ImRect(rect.Min + ImVec2(0, size.y * 0.5f), rect.Max);
+			case Slot_Left: return ImRect(rect.Min, rect.Min + ImVec2(size.x * 0.5f, rect.GetSize().y));
 		}
 	}
 
