@@ -258,9 +258,9 @@ void Matrix::normalizeScale()
 	m21 *= scale.x;
 	m31 *= scale.x;
 
-	m12 *= scale.z;
-	m22 *= scale.z;
-	m32 *= scale.z;
+	m12 *= scale.y;
+	m22 *= scale.y;
+	m32 *= scale.y;
 
 	m13 *= scale.z;
 	m23 *= scale.z;
