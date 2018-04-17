@@ -985,7 +985,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			return;
 		}
 
-		ortho.setOrtho(0.0f, size.x, size.y, 0.0f, -1.0f, 1.0f, bgfx::getCaps()->homogeneousDepth);
+		ortho.setOrtho(0.0f, size.x, size.y, 0.0f, -1.0f, 1.0f, bgfx::getCaps()->homogeneousDepth, true);
 		setViewProjection(ortho, (int)size.x, (int)size.y);
 
 		int num_indices = m_draw2d.IdxBuffer.size();
@@ -1162,7 +1162,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		{
 			bgfx::setViewFrameBuffer(m_current_view->bgfx_id, BGFX_INVALID_HANDLE);
 		}
-		bgfx::setViewClear(m_current_view->bgfx_id, 0);
+		bgfx::setViewClear(m_current_view->bgfx_id, 0, (u32)255, 0, 0);
 		bgfx::setViewName(m_current_view->bgfx_id, debug_name);
 		return m_view_idx;
 	}
@@ -1452,12 +1452,12 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		u16 shadowmap_width = (u16)m_current_framebuffer->getWidth();
 		Vec3 pos = mtx.getTranslation();
 
-		bgfx::setViewClear(m_current_view->bgfx_id, BGFX_CLEAR_DEPTH, 0, 1.0f, 0);
+		bgfx::setViewClear(m_current_view->bgfx_id, BGFX_CLEAR_DEPTH, 0, 0.0f, 0);
 		bgfx::touch(m_current_view->bgfx_id);
 		bgfx::setViewRect(m_current_view->bgfx_id, 0, 0, shadowmap_width, shadowmap_height);
 
 		Matrix projection_matrix;
-		projection_matrix.setPerspective(fov, 1, 0.01f, range, bgfx::getCaps()->homogeneousDepth);
+		projection_matrix.setPerspective(fov, 1, 0.01f, range, bgfx::getCaps()->homogeneousDepth, true);
 		Matrix view_matrix;
 		view_matrix.lookAt(pos, pos - mtx.getZVector(), mtx.getYVector());
 		bgfx::setViewTransform(m_current_view->bgfx_id, &view_matrix.m11, &projection_matrix.m11);
@@ -1511,7 +1511,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		{
 			newView("omnilight", 0xff);
 
-			bgfx::setViewClear(m_current_view->bgfx_id, BGFX_CLEAR_DEPTH, 0, 1.0f, 0);
+			bgfx::setViewClear(m_current_view->bgfx_id, BGFX_CLEAR_DEPTH, 0, 0.0f, 0);
 			bgfx::touch(m_current_view->bgfx_id);
 			u16 view_x = u16(shadowmap_width * viewports[i * 2]);
 			u16 view_y = u16(shadowmap_height * viewports[i * 2 + 1]);
@@ -1523,7 +1523,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			float aspect = tanf(fovx * 0.5f) / tanf(fovy * 0.5f);
 
 			Matrix projection_matrix;
-			projection_matrix.setPerspective(fovx, aspect, 0.01f, range, bgfx::getCaps()->homogeneousDepth);
+			projection_matrix.setPerspective(fovx, aspect, 0.01f, range, bgfx::getCaps()->homogeneousDepth, true);
 
 			Matrix view_matrix;
 			if (bgfx::getCaps()->originBottomLeft)
@@ -1666,7 +1666,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		Vec4 cascades = m_scene->getShadowmapCascades(light);
 		float split_distances[] = {0.1f, cascades.x, cascades.y, cascades.z, cascades.w};
 		m_is_rendering_in_shadowmap = true;
-		bgfx::setViewClear(m_current_view->bgfx_id, BGFX_CLEAR_DEPTH | BGFX_CLEAR_COLOR, 0xffffffff, 1.0f, 0);
+		bgfx::setViewClear(m_current_view->bgfx_id, BGFX_CLEAR_DEPTH | BGFX_CLEAR_COLOR, 0xffffffff, 0, 0);
 		bgfx::touch(m_current_view->bgfx_id);
 		float* viewport = (bgfx::getCaps()->originBottomLeft ? viewports_gl : viewports) + split_index * 2;
 		bgfx::setViewRect(m_current_view->bgfx_id,
@@ -1691,14 +1691,18 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		shadow_cam_pos = shadowmapTexelAlign(shadow_cam_pos, 0.5f * shadowmap_width - 2, bb_size, light_mtx);
 
 		Matrix projection_matrix;
-		projection_matrix.setOrtho(-bb_size, bb_size, -bb_size, bb_size, SHADOW_CAM_NEAR, SHADOW_CAM_FAR, bgfx::getCaps()->homogeneousDepth);
+		projection_matrix.setOrtho(-bb_size, bb_size, -bb_size, bb_size, SHADOW_CAM_NEAR, SHADOW_CAM_FAR, bgfx::getCaps()->homogeneousDepth, true);
 		Vec3 light_forward = light_mtx.getZVector();
 		shadow_cam_pos -= light_forward * SHADOW_CAM_FAR * 0.5f;
 		Matrix view_matrix;
 		view_matrix.lookAt(shadow_cam_pos, shadow_cam_pos + light_forward, light_mtx.getYVector());
 		bgfx::setViewTransform(m_current_view->bgfx_id, &view_matrix.m11, &projection_matrix.m11);
 		float ymul = bgfx::getCaps()->originBottomLeft ? 0.5f : -0.5f;
-		static const Matrix biasMatrix(0.5, 0.0, 0.0, 0.0, 0.0, ymul, 0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.5, 0.5, 0.5, 1.0);
+		static const Matrix biasMatrix(
+			0.5, 0.0, 0.0, 0.0, 
+			0.0, ymul, 0.0, 0.0, 
+			0.0, 0.0, 0.5, 0.0, 
+			0.5, 0.5, 0.5, 1.0);
 		m_shadow_viewprojection[split_index] = biasMatrix * (projection_matrix * view_matrix);
 
 		Frustum shadow_camera_frustum;
@@ -2136,7 +2140,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		}
 
 		Matrix projection_mtx;
-		projection_mtx.setOrtho(0, 1, 0, 1, 0, 30, bgfx::getCaps()->homogeneousDepth);
+		projection_mtx.setOrtho(0, 1, 0, 1, 0, 30, bgfx::getCaps()->homogeneousDepth, true);
 
 		bgfx::setViewTransform(m_current_view->bgfx_id, &Matrix::IDENTITY.m11, &projection_mtx.m11);
 		if (m_current_framebuffer)
@@ -2221,7 +2225,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			Matrix inv_view_matrix = universe.getPositionAndRotation(m_applied_camera);
 			Matrix view_matrix = inv_view_matrix;
 			view_matrix.fastInverse();
-			projection_matrix.setPerspective(fov, ratio, near_plane, far_plane, bgfx::getCaps()->homogeneousDepth);
+			projection_matrix.setPerspective(fov, ratio, near_plane, far_plane, bgfx::getCaps()->homogeneousDepth, true);
 			Matrix inv_projection = projection_matrix;
 			inv_projection.inverse();
 
@@ -3205,7 +3209,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	void clear(u32 flags, u32 color)
 	{
 		if (!m_current_view) return;
-		bgfx::setViewClear(m_current_view->bgfx_id, (u16)flags, color, 1.0f, 0);
+		bgfx::setViewClear(m_current_view->bgfx_id, (u16)flags, color, 0.0f, 0);
 		bgfx::touch(m_current_view->bgfx_id);
 	}
 

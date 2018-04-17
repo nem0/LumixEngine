@@ -173,7 +173,8 @@ struct BillboardSceneData
 			ortho_size,
 			0.0001f,
 			10000.0f,
-			false /* we do not care for z value, so both true and false are correct*/);
+			false /* we do not care for z value, so both true and false are correct*/,
+			true);
 
 		mvp.setTranslation(position);
 		mvp.fastInverse();

@@ -315,7 +315,7 @@ static void depth_test(lua_State* L, bool enabled)
 	if (!shader) return;
 	if (enabled)
 	{
-		shader->m_render_states |= BGFX_STATE_DEPTH_TEST_LEQUAL;
+		shader->m_render_states |= BGFX_STATE_DEPTH_TEST_GEQUAL;
 	}
 	else
 	{
@@ -392,7 +392,7 @@ bool Shader::load(FS::IFile& file)
 	lua_State* L = luaL_newstate();
 	luaL_openlibs(L);
 	registerFunctions(this, &m_combintions, &getRenderer(), L);
-	m_render_states = BGFX_STATE_DEPTH_TEST_LEQUAL;
+	m_render_states = BGFX_STATE_DEPTH_TEST_GEQUAL;
 
 	bool errors = luaL_loadbuffer(L, (const char*)file.getBuffer(), file.size(), "") != LUA_OK;
 	errors = errors || lua_pcall(L, 0, 0, 0) != LUA_OK;
