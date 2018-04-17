@@ -43,7 +43,7 @@ namespace Lumix
 		void App::run(int argc, const char *argv[])
 		{
 			Manager::instance().dumpTests();
-			Manager::instance().runTests("*");
+			Manager::instance().runTests("unit_tests/engine/matrix_ortho");
 			Manager::instance().dumpResults();
 		}
 

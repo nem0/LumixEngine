@@ -148,4 +148,68 @@ void UT_matrix(const char* params)
 }
 
 
+void UT_matrix_perspective(const char* params)
+{
+	Matrix perspective_inverted;
+	perspective_inverted.setPerspective(3.14159265f * 0.5f, 1, 0.1f, 100.0, false, true);
+	Vec4 projected_inverted_far = perspective_inverted * Vec4(0, 0, -100, 1);
+	Vec4 projected_inverted_near = perspective_inverted * Vec4(0, 0, -0.1f, 1);
+	float inv_z_far = projected_inverted_far.z / projected_inverted_far.w;
+	float inv_z_near = projected_inverted_near.z / projected_inverted_near.w;
+
+	LUMIX_EXPECT_CLOSE_EQ(inv_z_far, 0, 0.001f);
+	LUMIX_EXPECT_CLOSE_EQ(inv_z_near, 1, 0.001f);
+
+	Matrix perspective;
+	perspective.setPerspective(3.14159265f * 0.5f, 1, 0.1f, 100.0, false, false);
+	Vec4 projected_far = perspective * Vec4(0, 0, -100, 1);
+	Vec4 projected_near = perspective * Vec4(0, 0, -0.1f, 1);
+	float z_far = projected_far.z / projected_far.w;
+	float z_near = projected_near.z / projected_near.w;
+
+	LUMIX_EXPECT_CLOSE_EQ(z_far, 1, 0.001f);
+	LUMIX_EXPECT_CLOSE_EQ(z_near, 0, 0.001f);
+
+}
+
+
+void UT_matrix_ortho(const char* parmas)
+{
+	Matrix ortho_inverted_homo;
+	ortho_inverted_homo.setOrtho(0, 1, 0, 1, 0.1f, 100, true, true);
+	Vec4 projected_inverted_homo_far = ortho_inverted_homo * Vec4(0, 0, -100, 1);
+	Vec4 projected_inverted_homo_near = ortho_inverted_homo * Vec4(0, 0, -0.1f, 1);
+	float inv_homo_z_far = projected_inverted_homo_far.z / projected_inverted_homo_far.w;
+	float inv_homo_z_near = projected_inverted_homo_near.z / projected_inverted_homo_near.w;
+
+	LUMIX_EXPECT_CLOSE_EQ(inv_homo_z_far, -1, 0.001f);
+	LUMIX_EXPECT_CLOSE_EQ(inv_homo_z_near, 1, 0.001f);
+
+	Matrix ortho;
+	ortho.setOrtho(0, 1, 0, 1, 0.1f, 100, false, false);
+	Vec4 projected_far = ortho * Vec4(0, 0, -100, 1);
+	Vec4 projected_near = ortho * Vec4(0, 0, -0.1f, 1);
+	float z_far = projected_far.z / projected_far.w;
+	float z_near = projected_near.z / projected_near.w;
+
+	LUMIX_EXPECT_CLOSE_EQ(z_far, 1, 0.001f);
+	LUMIX_EXPECT_CLOSE_EQ(z_near, 0, 0.001f);
+
+	Matrix ortho_inverted;
+	ortho_inverted.setOrtho(0, 1, 0, 1, 0.1f, 100, false, true);
+	Vec4 projected_inverted_far = ortho_inverted * Vec4(0, 0, -100, 1);
+	Vec4 projected_inverted_near = ortho_inverted * Vec4(0, 0, -0.1f, 1);
+	float inv_z_far = projected_inverted_far.z / projected_inverted_far.w;
+	float inv_z_near = projected_inverted_near.z / projected_inverted_near.w;
+
+	LUMIX_EXPECT_CLOSE_EQ(inv_z_far, 0, 0.001f);
+	LUMIX_EXPECT_CLOSE_EQ(inv_z_near, 1, 0.001f);
+
+
+
+}
+
+
 REGISTER_TEST("unit_tests/engine/matrix", UT_matrix, "")
+REGISTER_TEST("unit_tests/engine/matrix_perspective", UT_matrix_perspective, "")
+REGISTER_TEST("unit_tests/engine/matrix_ortho", UT_matrix_ortho, "")

@@ -2381,7 +2381,7 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 		copyMemory(vertex_buffer.data, vertices, vertices_count * renderer.getBasicVertexDecl().getStride());
 		copyMemory(index_buffer.data, indices, indices_count * sizeof(u16));
 
-		u64 flags = BGFX_STATE_DEPTH_TEST_LEQUAL;
+		u64 flags = m_shader->m_render_states;
 		if (lines) flags |= BGFX_STATE_PT_LINES;
 		m_pipeline.render(vertex_buffer,
 			index_buffer,
@@ -2607,7 +2607,7 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 		float height = ImGui::GetIO().DisplaySize.y;
 		float bottom = height + top;
 		Matrix ortho;
-		ortho.setOrtho(left, right, bottom, top, -1.0f, 1.0f, bgfx::getCaps()->homogeneousDepth);
+		ortho.setOrtho(left, right, bottom, top, -1.0f, 1.0f, bgfx::getCaps()->homogeneousDepth, true);
 		if (framebuffer && (framebuffer->getWidth() != int(width + 0.5f) || framebuffer->getHeight() != int(height + 0.5f)))
 		{
 			framebuffer->resize((int)width, (int)height);

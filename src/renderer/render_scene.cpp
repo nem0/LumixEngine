@@ -3679,11 +3679,12 @@ public:
 				camera.ortho_size,
 				camera.near,
 				camera.far,
-				is_homogenous_depth);
+				is_homogenous_depth,
+				true);
 		}
 		else
 		{
-			mtx.setPerspective(camera.fov, ratio, camera.near, camera.far, is_homogenous_depth);
+			mtx.setPerspective(camera.fov, ratio, camera.near, camera.far, is_homogenous_depth, true);
 		}
 		return mtx;
 	}
