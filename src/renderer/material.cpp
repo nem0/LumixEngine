@@ -137,17 +137,18 @@ void Material::unload()
 	if(m_command_buffer != &DEFAULT_COMMAND_BUFFER) m_allocator.deallocate(m_command_buffer);
 	m_command_buffer = &DEFAULT_COMMAND_BUFFER;
 	m_uniforms.clear();
-	setShader(nullptr);
 
 	ResourceManagerBase* texture_manager = m_resource_manager.getOwner().get(Texture::TYPE);
 	for (int i = 0; i < m_texture_count; i++)
 	{
-		if (m_textures[i])
+		if (m_textures[i] && (!m_shader || m_textures[i] != m_shader->m_texture_slots[i].default_texture))
 		{
 			removeDependency(*m_textures[i]);
 			texture_manager->unload(*m_textures[i]);
 		}
 	}
+	setShader(nullptr);
+
 	m_alpha_ref = 0.3f;
 	m_color.set(1, 1, 1, 1);
 	m_custom_flags = 0;
@@ -178,7 +179,7 @@ bool Material::save(JsonSerializer& serializer)
 	{
 		char path[MAX_PATH_LENGTH];
 		int flags = 0;
-		if (m_textures[i])
+		if (m_textures[i] && m_textures[i] != m_shader->m_texture_slots[i].default_texture)
 		{
 			flags = m_textures[i]->bgfx_flags;
 			path[0] = '/';
@@ -432,11 +433,15 @@ void Material::setTexture(int i, Texture* texture)
 {
 	Texture* old_texture = i < m_texture_count ? m_textures[i] : nullptr;
 
+	if (!texture && m_shader && m_shader->m_texture_slots[i].default_texture)
+	{
+		texture = m_shader->m_texture_slots[i].default_texture;
+	}
 	if (texture) addDependency(*texture);
 	m_textures[i] = texture;
 	if (i >= m_texture_count) m_texture_count = i + 1;
 
-	if (old_texture)
+	if (old_texture && (!m_shader || old_texture != m_shader->m_texture_slots[i].default_texture))
 	{
 		removeDependency(*old_texture);
 		m_resource_manager.getOwner().get(Texture::TYPE)->unload(*old_texture);
@@ -557,6 +562,11 @@ void Material::onBeforeReady()
 
 	for(int i = 0; i < m_shader->m_texture_slot_count; ++i)
 	{
+		if (!m_textures[i] && m_shader->m_texture_slots[i].default_texture)
+		{
+			m_textures[i] = m_shader->m_texture_slots[i].default_texture;
+			if (i >= m_texture_count) m_texture_count = i + 1;
+		}
 		int define_idx = m_shader->m_texture_slots[i].define_idx;
 		if(define_idx >= 0)
 		{
@@ -591,7 +601,6 @@ void Material::setShader(Shader* shader)
 	if (m_shader)
 	{
 		addDependency(*m_shader);
-		if (m_shader->isReady()) onBeforeReady();
 	}
 	else
 	{

@@ -19,6 +19,7 @@ struct IFile;
 class Renderer;
 class Shader;
 class ShaderBinary;
+class Texture;
 
 
 struct ShaderInstance
@@ -95,12 +96,14 @@ public:
 			name[0] = uniform[0] = '\0';
 			define_idx = -1;
 			uniform_handle = BGFX_INVALID_HANDLE;
+			default_texture = nullptr;
 		}
 
 		char name[30];
 		char uniform[30];
 		int define_idx;
 		bgfx::UniformHandle uniform_handle;
+		Texture* default_texture;
 	};
 
 
