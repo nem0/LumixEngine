@@ -802,7 +802,7 @@ bool AssetBrowser::resourceList(char* buf, int max_size, ResourceType type, floa
 	static char filter[128] = "";
 	ImGui::LabellessInputText("Filter", filter, sizeof(filter));
 
-	ImGui::BeginChild("Resources", ImVec2(0, height));
+	ImGui::BeginChild("Resources", ImVec2(0, height), false, ImGuiWindowFlags_HorizontalScrollbar);
 	for (auto& res : getResources(type))
 	{
 		if (filter[0] != '\0' && strstr(res.c_str(), filter) == nullptr) continue;
