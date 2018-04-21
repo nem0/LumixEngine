@@ -2290,10 +2290,10 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		JobSystem::runJobs(jobs, render_grass ? 3 : 2, &counter);
 		JobSystem::wait(&counter);
 		
+		renderTerrains(m_terrains_buffer);
 		renderMeshes(*m_mesh_buffer, use_occlusion_culling);
 		
 		if(render_grass) renderGrasses(m_grasses_buffer);
-		renderTerrains(m_terrains_buffer);
 	}
 
 
