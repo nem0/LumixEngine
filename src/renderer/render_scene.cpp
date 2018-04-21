@@ -4268,6 +4268,7 @@ public:
 			{
 				terrain_hit.m_component_type = TERRAIN_TYPE;
 				terrain_hit.m_entity = terrain->getEntity();
+				terrain_hit.m_mesh = nullptr;
 				hit = terrain_hit;
 			}
 		}
