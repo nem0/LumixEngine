@@ -111,7 +111,7 @@ bool Action::isRequested()
 
 bool Action::isActive()
 {
-	if (ImGui::IsAnyItemActive()) return false;
+	if (ImGui::IsAnyItemFocused()) return false;
 	if (shortcut[0] == -1) return false;
 
 	int key_count;
