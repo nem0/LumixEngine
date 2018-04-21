@@ -992,8 +992,8 @@ public:
 			Vec3 up = rot.rotate({ 0, -1, 0 }) * scale;
 			if (text.m_flags.isSet(TextMesh::CAMERA_ORIENTED))
 			{
-				right = cam_right;
-				up = cam_up;
+				right = cam_right * scale;
+				up = cam_up * scale;
 			}
 			u32 color = text.color;
 			Vec2 text_size = font->CalcTextSizeA((float)text.getFontSize(), FLT_MAX, 0, str);
