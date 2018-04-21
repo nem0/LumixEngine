@@ -305,9 +305,9 @@ private:
 					float attenuation = getAttenuation(item, i, j, texutre_size);
 					int offset = 4 * (i - m_x + (j - m_y) * m_width);
 					u8* d = &data[offset];
-					d[0] += u8((item.m_color.x * 255 - d[0]) * attenuation);
-					d[1] += u8((item.m_color.y * 255 - d[1]) * attenuation);
-					d[2] += u8((item.m_color.z * 255 - d[2]) * attenuation);
+					d[0] += u8((item.m_color.x * 255 - d[0]) * attenuation * item.m_amount);
+					d[1] += u8((item.m_color.y * 255 - d[1]) * attenuation * item.m_amount);
+					d[2] += u8((item.m_color.z * 255 - d[2]) * attenuation * item.m_amount);
 					d[3] = 255;
 				}
 			}
