@@ -1268,14 +1268,13 @@ public:
 		getEntityListDisplayName(*m_editor, buffer, sizeof(buffer), entity);
 		bool selected = selected_entities.indexOf(entity) >= 0;
 		ImGui::PushID(entity.index);
-		if (ImGui::Selectable(buffer, &selected))
-		{
-			m_editor->selectEntities(&entity, 1, true);
-		}
-		if (ImGui::IsMouseReleased(1) && ImGui::IsItemHovered())
-		{
-			ImGui::OpenPopup("entity_context_menu");
-		}
+		ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_AllowItemOverlap;
+		bool has_child = universe->getFirstChild(entity).isValid();
+		if (!has_child) flags = ImGuiTreeNodeFlags_Leaf;
+		if (selected) flags |= ImGuiTreeNodeFlags_Selected;
+		bool node_open = ImGui::TreeNodeEx(buffer, flags);
+		if (ImGui::IsItemClicked(0)) m_editor->selectEntities(&entity, 1, true);
+		if (ImGui::IsMouseReleased(1) && ImGui::IsItemHovered()) ImGui::OpenPopup("entity_context_menu");
 		if (ImGui::BeginPopup("entity_context_menu"))
 		{
 			if (ImGui::MenuItem("Create child"))
@@ -1304,6 +1303,7 @@ public:
 				if (dropped_entity != entity)
 				{
 					m_editor->makeParent(entity, dropped_entity);
+					if (node_open) ImGui::TreePop();
 					return;
 				}
 			}
@@ -1311,12 +1311,14 @@ public:
 			ImGui::EndDragDropTarget();
 		}
 
-		ImGui::Indent();
-		for (Entity e = universe->getFirstChild(entity); e.isValid(); e = universe->getNextSibling(e))
+		if (node_open)
 		{
-			showHierarchy(e, selected_entities);
+			for (Entity e = universe->getFirstChild(entity); e.isValid(); e = universe->getNextSibling(e))
+			{
+				showHierarchy(e, selected_entities);
+			}
+			ImGui::TreePop();
 		}
-		ImGui::Unindent();
 	}
 
 
