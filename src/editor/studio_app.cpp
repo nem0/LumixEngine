@@ -635,6 +635,7 @@ public:
 		SDL_GetWindowSize(m_window, &w, &h);
 		ImVec2 size((float)w, (float)h);
 		ImGui::SetNextWindowSize(size);
+		ImGui::SetNextWindowPos({ 0, 0 }, ImGuiCond_FirstUseEver);
 		if (ImGui::Begin("Welcome", nullptr, flags))
 		{
 			ImGui::Text("Welcome to Lumix Studio");
@@ -1412,7 +1413,7 @@ public:
 	void initIMGUI()
 	{
 		ImGuiIO& io = ImGui::GetIO();
-		io.NavFlags |= ImGuiNavFlags_EnableKeyboard;
+		io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 		float ddpi;
 		float font_scale = 1;
 		if (SDL_GetDisplayDPI(0, &ddpi, nullptr, nullptr) == 0) font_scale = ddpi / 96;
