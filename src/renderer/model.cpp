@@ -33,7 +33,6 @@ Mesh::Mesh(Material* mat,
 	: name(name, allocator)
 	, vertex_decl(vertex_decl)
 	, material(mat)
-	, instance_idx(-1)
 	, indices(allocator)
 	, vertices(allocator)
 	, uvs(allocator)
@@ -51,7 +50,6 @@ void Mesh::set(const Mesh& rhs)
 	skin = rhs.skin;
 	flags = rhs.flags;
 	layer_mask = rhs.layer_mask;
-	instance_idx = rhs.instance_idx;
 	indices_count = rhs.indices_count;
 	vertex_decl = rhs.vertex_decl;
 	vertex_buffer_handle = rhs.vertex_buffer_handle;
