@@ -41,12 +41,12 @@ static const float SHADOW_CAM_FAR = 5000.0f;
 
 struct InstanceData
 {
-	static const int MAX_INSTANCE_COUNT = 128;
+	static const int MAX_INSTANCE_COUNT = 1024;
 
 	bgfx::InstanceDataBuffer buffer;
-	int offset;
-	int instances_count;
-	Mesh* mesh;
+	int offset = 0;
+	int instances_count = 0;
+	const Mesh* mesh = nullptr;
 };
 
 
@@ -852,13 +852,14 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
-	void finishInstances(int idx)
+	void finishInstances()
 	{
-		InstanceData& data = m_instances_data[idx];
+		InstanceData& data = m_instance_data;
+		if (!data.mesh) return;
 		if (!data.buffer.data) return;
 		if (data.instances_count == 0) return;
 
-		Mesh& mesh = *data.mesh;
+		const Mesh& mesh = *data.mesh;
 		Material* material = mesh.material;
 
 		material->setDefine(m_instanced_define_idx, true);
@@ -891,7 +892,6 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			data.offset = 0;
 		}
 		data.instances_count = 0;
-		mesh.instance_idx = -1;
 		data.mesh = nullptr;
 	}
 
@@ -912,16 +912,6 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		view.fastInverse();
 		bgfx::setViewTransform(m_current_view->bgfx_id, &view.m11, &projection_matrix.m11);
 		bgfx::setViewRect(m_current_view->bgfx_id, 0, 0, (u16)m_width, (u16)m_height);
-	}
-
-
-	void finishInstances()
-	{
-		for (int i = 0; i < lengthOf(m_instances_data); ++i)
-		{
-			finishInstances(i);
-		}
-		m_instance_data_idx = 0;
 	}
 
 
@@ -2670,19 +2660,16 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 
 	
-	LUMIX_FORCE_INLINE void renderRigidMeshInstanced(const Matrix& matrix, Mesh& mesh)
+	LUMIX_FORCE_INLINE void renderRigidMeshInstanced(const Matrix& matrix, const Mesh& mesh)
 	{
-		int instance_idx = mesh.instance_idx;
-		if (instance_idx == -1)
+		InstanceData& data = m_instance_data;
+		if (data.mesh != &mesh)
 		{
-			instance_idx = m_instance_data_idx;
-			m_instance_data_idx = (m_instance_data_idx + 1) % lengthOf(m_instances_data);
-			InstanceData& data = m_instances_data[instance_idx];
-			if (data.instances_count > 0)
+			if (data.mesh)
 			{
-				finishInstances(instance_idx);
+				finishInstances();
 			}
-			if (!data.buffer.data)
+			else if (!data.buffer.data)
 			{
 				if (bgfx::getAvailInstanceDataBuffer(InstanceData::MAX_INSTANCE_COUNT, sizeof(Matrix)) < InstanceData::MAX_INSTANCE_COUNT)
 				{
@@ -2694,16 +2681,14 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 				data.offset = 0;
 			}
 			data.mesh = &mesh;
-			mesh.instance_idx = instance_idx;
 		}
-		InstanceData& data = m_instances_data[instance_idx];
 		Matrix* mtcs = (Matrix*)data.buffer.data;
 		copyMemory(&mtcs[data.offset + data.instances_count], &matrix, sizeof(matrix));
 		++data.instances_count;
 
 		if (data.instances_count + data.offset == InstanceData::MAX_INSTANCE_COUNT)
 		{
-			finishInstances(instance_idx);
+			finishInstances();
 		}
 	}
 
@@ -3108,18 +3093,15 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		m_layer_mask = 0;
 		m_pass_idx = -1;
 		m_current_framebuffer = m_default_framebuffer;
-		m_instance_data_idx = 0;
+		m_instance_data.mesh = nullptr;
+		m_instance_data.buffer.data = nullptr;
+		m_instance_data.instances_count = 0;
+		m_instance_data.offset = 0;
 		m_point_light_shadowmaps.clear();
 		clearLayerToViewMap();
 		for (int i = 0; i < lengthOf(m_terrain_instances); ++i)
 		{
 			m_terrain_instances[i].m_count = 0;
-		}
-		for (int i = 0; i < lengthOf(m_instances_data); ++i)
-		{
-			m_instances_data[i].buffer.data = nullptr;
-			m_instances_data[i].instances_count = 0;
-			m_instances_data[i].offset = 0;
 		}
 
 		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
@@ -3278,8 +3260,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	Array<bgfx::UniformHandle> m_uniforms;
 	Array<PointLightShadowmap> m_point_light_shadowmaps;
 	FrameBuffer* m_global_light_shadowmap;
-	InstanceData m_instances_data[128];
-	int m_instance_data_idx;
+	InstanceData m_instance_data;
 	Entity m_applied_camera;
 	bgfx::VertexBufferHandle m_cube_vb;
 	bgfx::IndexBufferHandle m_cube_ib;

@@ -86,7 +86,6 @@ struct LUMIX_RENDERER_API Mesh
 	Array<Skin> skin;
 	FlagSet<Flags, u8> flags;
 	u64 layer_mask;
-	i32 instance_idx;
 	int indices_count;
 	bgfx::VertexDecl vertex_decl;
 	bgfx::VertexBufferHandle vertex_buffer_handle = BGFX_INVALID_HANDLE;

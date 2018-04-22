@@ -3620,6 +3620,7 @@ public:
 					MeshInstance* end = begin + subinfos.size();
 
 					auto cmp = [](const MeshInstance& a, const MeshInstance& b) -> bool {
+						if (a.mesh != b.mesh) return a.mesh < b.mesh;
 						return (a.depth < b.depth);
 					};
 					std::sort(begin, end, cmp);
