@@ -1,17 +1,33 @@
 /*
- * Copyright 2011-2017 Branimir Karadzic. All rights reserved.
+ * Copyright 2011-2018 Branimir Karadzic. All rights reserved.
  * License: https://github.com/bkaradzic/bgfx#license-bsd-2-clause
  */
 
 #ifndef BGFX_DEFINES_H_HEADER_GUARD
 #define BGFX_DEFINES_H_HEADER_GUARD
 
-#define BGFX_API_VERSION UINT32_C(52)
+#define BGFX_API_VERSION UINT32_C(67)
 
 /// Color RGB/alpha/depth write. When it's not specified write will be disabled.
-#define BGFX_STATE_RGB_WRITE               UINT64_C(0x0000000000000001) //!< Enable RGB write.
-#define BGFX_STATE_ALPHA_WRITE             UINT64_C(0x0000000000000002) //!< Enable alpha write.
-#define BGFX_STATE_DEPTH_WRITE             UINT64_C(0x0000000000000004) //!< Enable depth write.
+#define BGFX_STATE_WRITE_R                 UINT64_C(0x0000000000000001) //!< Enable R write.
+#define BGFX_STATE_WRITE_G                 UINT64_C(0x0000000000000002) //!< Enable G write.
+#define BGFX_STATE_WRITE_B                 UINT64_C(0x0000000000000004) //!< Enable B write.
+#define BGFX_STATE_WRITE_A                 UINT64_C(0x0000000000000008) //!< Enable alpha write.
+#define BGFX_STATE_WRITE_Z                 UINT64_C(0x0000004000000000) //!< Enable depth write.
+
+/// Enable RGB write.
+#define BGFX_STATE_WRITE_RGB (0  \
+			| BGFX_STATE_WRITE_R \
+			| BGFX_STATE_WRITE_G \
+			| BGFX_STATE_WRITE_B \
+			)
+
+/// Write all channels mask.
+#define BGFX_STATE_WRITE_MASK (0   \
+			| BGFX_STATE_WRITE_RGB \
+			| BGFX_STATE_WRITE_A   \
+			| BGFX_STATE_WRITE_Z   \
+			)
 
 /// Depth test state. When `BGFX_STATE_DEPTH_` is not specified depth test will be disabled.
 #define BGFX_STATE_DEPTH_TEST_LESS         UINT64_C(0x0000000000000010) //!< Enable depth test, less.
@@ -93,10 +109,10 @@
 /// Default state is write to RGB, alpha, and depth with depth test less enabled, with clockwise
 /// culling and MSAA (when writing into MSAA frame buffer, otherwise this flag is ignored).
 #define BGFX_STATE_DEFAULT (0            \
-			| BGFX_STATE_RGB_WRITE       \
-			| BGFX_STATE_ALPHA_WRITE     \
+			| BGFX_STATE_WRITE_RGB       \
+			| BGFX_STATE_WRITE_A         \
+			| BGFX_STATE_WRITE_Z         \
 			| BGFX_STATE_DEPTH_TEST_LESS \
-			| BGFX_STATE_DEPTH_WRITE     \
 			| BGFX_STATE_CULL_CW         \
 			| BGFX_STATE_MSAA            \
 			)
@@ -169,13 +185,13 @@
 
 ///
 #define BGFX_STATE_BLEND_FUNC_RT_x(_src, _dst) (0               \
-			| ( uint32_t( (_src)>>BGFX_STATE_BLEND_SHIFT)       \
-			| ( uint32_t( (_dst)>>BGFX_STATE_BLEND_SHIFT)<<4) ) \
+			| ( (uint32_t)( (_src)>>BGFX_STATE_BLEND_SHIFT)       \
+			| ( (uint32_t)( (_dst)>>BGFX_STATE_BLEND_SHIFT)<<4) ) \
 			)
 
 #define BGFX_STATE_BLEND_FUNC_RT_xE(_src, _dst, _equation) (0               \
 			| BGFX_STATE_BLEND_FUNC_RT_x(_src, _dst)                        \
-			| ( uint32_t( (_equation)>>BGFX_STATE_BLEND_EQUATION_SHIFT)<<8) \
+			| ( (uint32_t)( (_equation)>>BGFX_STATE_BLEND_EQUATION_SHIFT)<<8) \
 			)
 
 #define BGFX_STATE_BLEND_FUNC_RT_1(_src, _dst)  (BGFX_STATE_BLEND_FUNC_RT_x(_src, _dst)<< 0)
@@ -241,10 +257,10 @@
 #define BGFX_STENCIL_DEFAULT             UINT32_C(0x00000000) //!<
 
 /// Set stencil ref value.
-#define BGFX_STENCIL_FUNC_REF(_ref) ( (uint32_t(_ref)<<BGFX_STENCIL_FUNC_REF_SHIFT)&BGFX_STENCIL_FUNC_REF_MASK)
+#define BGFX_STENCIL_FUNC_REF(_ref) ( ((uint32_t)(_ref)<<BGFX_STENCIL_FUNC_REF_SHIFT)&BGFX_STENCIL_FUNC_REF_MASK)
 
 /// Set stencil rmask value.
-#define BGFX_STENCIL_FUNC_RMASK(_mask) ( (uint32_t(_mask)<<BGFX_STENCIL_FUNC_RMASK_SHIFT)&BGFX_STENCIL_FUNC_RMASK_MASK)
+#define BGFX_STENCIL_FUNC_RMASK(_mask) ( ((uint32_t)(_mask)<<BGFX_STENCIL_FUNC_RMASK_SHIFT)&BGFX_STENCIL_FUNC_RMASK_MASK)
 
 ///
 #define BGFX_CLEAR_NONE                  UINT16_C(0x0000) //!< No clear flags.
@@ -436,8 +452,9 @@
 #define BGFX_CAPS_TEXTURE_COMPARE_ALL    UINT64_C(0x00000000000c0000) //!< All texture compare modes are supported.
 #define BGFX_CAPS_TEXTURE_COMPARE_LEQUAL UINT64_C(0x0000000000080000) //!< Texture compare less equal mode is supported.
 #define BGFX_CAPS_TEXTURE_CUBE_ARRAY     UINT64_C(0x0000000000100000) //!< Cubemap texture array is supported.
-#define BGFX_CAPS_TEXTURE_READ_BACK      UINT64_C(0x0000000000200000) //!< Read-back texture is supported.
-#define BGFX_CAPS_VERTEX_ATTRIB_HALF     UINT64_C(0x0000000000400000) //!< Vertex attribute half-float is supported.
+#define BGFX_CAPS_TEXTURE_DIRECT_ACCESS  UINT64_C(0x0000000000200000) //!< CPU direct access to GPU texture memory.
+#define BGFX_CAPS_TEXTURE_READ_BACK      UINT64_C(0x0000000000400000) //!< Read-back texture is supported.
+#define BGFX_CAPS_VERTEX_ATTRIB_HALF     UINT64_C(0x0000000000800000) //!< Vertex attribute half-float is supported.
 #define BGFX_CAPS_VERTEX_ATTRIB_UINT10   UINT64_C(0x0000000000800000) //!< Vertex attribute 10_10_10_2 is supported.
 
 ///

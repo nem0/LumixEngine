@@ -2703,7 +2703,7 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 			
 			ShaderInstance& shader_instance = material->getShaderInstance();
 			bgfx::setStencil(BGFX_STENCIL_NONE, BGFX_STENCIL_NONE);
-			bgfx::setState(BGFX_STATE_RGB_WRITE | BGFX_STATE_ALPHA_WRITE | BGFX_STATE_DEPTH_WRITE | render_states);
+			bgfx::setState(BGFX_STATE_WRITE_RGB | BGFX_STATE_WRITE_A | BGFX_STATE_WRITE_Z | render_states);
 			bgfx::setVertexBuffer(0, m_vertex_buffer, m_vb_offset, num_vertices);
 			u32 first_index = elem_offset + m_ib_offset;
 			bgfx::setIndexBuffer(m_index_buffer, first_index, pcmd->ElemCount);
