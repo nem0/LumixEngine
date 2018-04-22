@@ -659,7 +659,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			executeCommandBuffer(material->getCommandBuffer(), material);
 			executeCommandBuffer(view.command_buffer.buffer, material);
 
-			bgfx::setInstanceDataBuffer(&instance_buffer, count);
+			bgfx::setInstanceDataBuffer(&instance_buffer, 0, count);
 			bgfx::setVertexBuffer(0, m_particle_vertex_buffer);
 			bgfx::setIndexBuffer(m_particle_index_buffer);
 			bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
@@ -745,7 +745,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			executeCommandBuffer(material->getCommandBuffer(), material);
 			executeCommandBuffer(view.command_buffer.buffer, material);
 
-			bgfx::setInstanceDataBuffer(&instance_buffer, count);
+			bgfx::setInstanceDataBuffer(&instance_buffer, 0, count);
 			bgfx::setVertexBuffer(0, m_particle_vertex_buffer);
 			bgfx::setIndexBuffer(m_particle_index_buffer);
 			bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
@@ -875,7 +875,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
 		bgfx::setState(view.render_state | material->getRenderStates());
 		data.buffer.offset += data.offset * sizeof(Matrix);
-		bgfx::setInstanceDataBuffer(&data.buffer, data.instances_count);
+		bgfx::setInstanceDataBuffer(&data.buffer, 0, data.instances_count);
 		data.buffer.offset -= data.offset * sizeof(Matrix);
 		ShaderInstance& shader_instance = material->getShaderInstance();
 		++m_stats.draw_call_count;
@@ -1143,7 +1143,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		m_current_view->layer_mask = layer_mask;
 		m_current_view->bgfx_id = (u8)m_renderer.getViewCounter();
 		m_current_view->stencil = BGFX_STENCIL_NONE;
-		m_current_view->render_state = BGFX_STATE_RGB_WRITE | BGFX_STATE_ALPHA_WRITE | BGFX_STATE_DEPTH_WRITE;
+		m_current_view->render_state = BGFX_STATE_WRITE_RGB | BGFX_STATE_WRITE_A | BGFX_STATE_WRITE_Z;
 		m_current_view->pass_idx = m_pass_idx;
 		m_current_view->command_buffer.clear();
 		m_global_textures_count = 0;
@@ -1258,7 +1258,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		PointLightShadowmap* shadowmap)
 	{
 		View& view = *m_current_view;
-		bgfx::setInstanceDataBuffer(instance_buffer, instance_count);
+		bgfx::setInstanceDataBuffer(instance_buffer, 0, instance_count);
 		bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE); 
 		auto state = view.render_state | material->getRenderStates();
 		if (is_intersecting)
@@ -2028,35 +2028,35 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	void enableDepthWrite()
 	{
 		if (!m_current_view) return;
-		m_current_view->render_state |= BGFX_STATE_DEPTH_WRITE;
+		m_current_view->render_state |= BGFX_STATE_WRITE_Z;
 	}
 
 	void disableDepthWrite()
 	{
 		if (!m_current_view) return;
-		m_current_view->render_state &= ~BGFX_STATE_DEPTH_WRITE;
+		m_current_view->render_state &= ~BGFX_STATE_WRITE_Z;
 	}
 
 	void enableAlphaWrite()
 	{
 		if (!m_current_view) return;
-		m_current_view->render_state |= BGFX_STATE_ALPHA_WRITE;
+		m_current_view->render_state |= BGFX_STATE_WRITE_A;
 	}
 	void disableAlphaWrite()
 	{
 		if (!m_current_view) return;
-		m_current_view->render_state &= ~BGFX_STATE_ALPHA_WRITE;
+		m_current_view->render_state &= ~BGFX_STATE_WRITE_A;
 	}
 
 	void enableRGBWrite()
 	{
 		if (!m_current_view) return;
-		m_current_view->render_state |= BGFX_STATE_RGB_WRITE;
+		m_current_view->render_state |= BGFX_STATE_WRITE_RGB;
 	}
 	void disableRGBWrite()
 	{
 		if (!m_current_view) return;
-		m_current_view->render_state &= ~BGFX_STATE_RGB_WRITE;
+		m_current_view->render_state &= ~BGFX_STATE_WRITE_RGB;
 	}
 
 
@@ -2720,7 +2720,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		executeCommandBuffer(material.getCommandBuffer(), &material);
 		executeCommandBuffer(view.command_buffer.buffer, &material);
 
-		bgfx::setInstanceDataBuffer(&instance_buffer, count);
+		bgfx::setInstanceDataBuffer(&instance_buffer, 0, count);
 		bgfx::setVertexBuffer(0, vertex_buffer);
 		bgfx::setIndexBuffer(index_buffer);
 		bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
@@ -2880,7 +2880,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			mesh_part_indices_count);
 		bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
 		bgfx::setState(view.render_state | mesh.material->getRenderStates());
-		bgfx::setInstanceDataBuffer(&instance_buffer, m_terrain_instances[index].m_count);
+		bgfx::setInstanceDataBuffer(&instance_buffer, 0, m_terrain_instances[index].m_count);
 		auto shader_instance = material->getShaderInstance().getProgramHandle(view.pass_idx);
 		++m_stats.draw_call_count;
 		m_stats.instance_count += m_terrain_instances[index].m_count;
@@ -2914,7 +2914,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		bgfx::setIndexBuffer(mesh.index_buffer_handle);
 		bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
 		bgfx::setState(view.render_state | material->getRenderStates());
-		bgfx::setInstanceDataBuffer(&idb, grass.instance_count);
+		bgfx::setInstanceDataBuffer(&idb, 0, grass.instance_count);
 		++m_stats.draw_call_count;
 		m_stats.instance_count += grass.instance_count;
 		m_stats.triangle_count += grass.instance_count * mesh.indices_count;

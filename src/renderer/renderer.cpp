@@ -516,7 +516,11 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 			}
 		}
 
-		bool res = bgfx::init(renderer_type, 0, 0, &m_callback_stub, &m_bgfx_allocator);
+		bgfx::Init init;
+		init.type = renderer_type;
+		init.callback = &m_callback_stub;
+		init.allocator = &m_bgfx_allocator;
+		bool res = bgfx::init(init);
 		ASSERT(res);
 		bgfx::reset(800, 600, m_vsync ? BGFX_RESET_VSYNC : 0);
 		bgfx::setDebug(BGFX_DEBUG_TEXT | BGFX_DEBUG_PROFILER);
