@@ -699,21 +699,25 @@ void ProfilerUIImpl::showProfileBlock(Block* block, int column)
 			}
 			return;
 		case HIT_COUNT:
-			if (block->m_type == Profiler::BlockType::TIME)
+			while (block)
 			{
-				while (block)
+				if (block->m_type == Profiler::BlockType::TIME)
 				{
 					int hit_count =
 						m_current_frame < 0 ? block->m_int_values.back() : block->m_int_values[m_current_frame];
 
 					ImGui::Text("%d", hit_count);
-					if (block->m_is_open)
-					{
-						showProfileBlock(block->m_first_child, column);
-					}
-
-					block = block->m_next;
 				}
+				else
+				{
+					ImGui::Text("%s", "-");
+				}
+				if (block->m_is_open)
+				{
+					showProfileBlock(block->m_first_child, column);
+				}
+
+				block = block->m_next;
 			}
 			return;
 		case HITS:
