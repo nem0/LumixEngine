@@ -7,6 +7,7 @@
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
 #include "engine/job_system.h"
+#include "engine/mt/atomic.h"
 #include "engine/profiler.h"
 #include "engine/engine.h"
 #include "imgui/imgui.h"
@@ -48,6 +49,9 @@ struct InstanceData
 	int instances_count = 0;
 	const Mesh* mesh = nullptr;
 };
+
+
+static thread_local InstanceData s_instance_data;
 
 
 struct View
@@ -852,9 +856,9 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
-	void finishInstances()
+	void finishInstances(bgfx::Encoder* encoder)
 	{
-		InstanceData& data = m_instance_data;
+		InstanceData& data = s_instance_data;
 		if (!data.mesh) return;
 		if (!data.buffer.data) return;
 		if (data.instances_count == 0) return;
@@ -868,23 +872,22 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		ASSERT(view_idx >= 0);
 		auto& view = m_views[view_idx >= 0 ? view_idx : 0];
 
-		executeCommandBuffer(material->getCommandBuffer(), material);
-		executeCommandBuffer(view.command_buffer.buffer, material);
+		executeCommandBuffer(encoder, material->getCommandBuffer(), material);
+		executeCommandBuffer(encoder, view.command_buffer.buffer, material);
 
-		bgfx::setVertexBuffer(0, mesh.vertex_buffer_handle);
-		bgfx::setIndexBuffer(mesh.index_buffer_handle);
-		bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
-		bgfx::setState(view.render_state | material->getRenderStates());
+		encoder->setVertexBuffer(0, mesh.vertex_buffer_handle);
+		encoder->setIndexBuffer(mesh.index_buffer_handle);
+		encoder->setStencil(view.stencil, BGFX_STENCIL_NONE);
+		encoder->setState(view.render_state | material->getRenderStates());
 		data.buffer.offset += data.offset * sizeof(Matrix);
-		bgfx::setInstanceDataBuffer(&data.buffer, 0, data.instances_count);
+		encoder->setInstanceDataBuffer(&data.buffer, 0, data.instances_count);
 		data.buffer.offset -= data.offset * sizeof(Matrix);
 		ShaderInstance& shader_instance = material->getShaderInstance();
-		++m_stats.draw_call_count;
-		m_stats.instance_count += data.instances_count;
-		m_stats.triangle_count += data.instances_count * mesh.indices_count / 3;
-		bgfx::submit(view.bgfx_id, shader_instance.getProgramHandle(view.pass_idx));
+		MT::atomicIncrement(&m_stats.draw_call_count);
+		MT::atomicAdd(&m_stats.instance_count, data.instances_count);
+		MT::atomicAdd(&m_stats.triangle_count, data.instances_count * mesh.indices_count / 3);
+		encoder->submit(view.bgfx_id, shader_instance.getProgramHandle(view.pass_idx));
 
-		
 		data.offset += data.instances_count;
 		if (data.offset == InstanceData::MAX_INSTANCE_COUNT)
 		{
@@ -1116,7 +1119,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 				break;
 			}
 		}
-		finishInstances();
+		finishInstances(m_renderer.getEncoder());
 	}
 
 
@@ -1552,7 +1555,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 				, frustum
 				, tmp_meshes);
 
-			renderMeshes(tmp_meshes);
+			renderMeshes(tmp_meshes, false);
 		}
 	}
 
@@ -2057,7 +2060,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		Array<MeshInstance> tmp_meshes(m_renderer.getEngine().getLIFOAllocator());
 		Vec3 lod_ref_point = m_scene->getUniverse().getPosition(m_applied_camera);
 		m_scene->getPointLightInfluencedGeometry(light, m_applied_camera, lod_ref_point, tmp_meshes);
-		renderMeshes(tmp_meshes);
+		renderMeshes(tmp_meshes, false);
 	}
 
 
@@ -2082,7 +2085,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 					, lod_ref_point
 					, frustum
 					, tmp_meshes);
-				renderMeshes(tmp_meshes);
+				renderMeshes(tmp_meshes, false);
 			}
 
 			{
@@ -2341,6 +2344,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 	void renderModel(Model& model, Pose* pose, const Matrix& mtx) override
 	{
+		bgfx::Encoder* encoder = m_renderer.getEncoder();
 		Vec3 camera_pos = m_scene->getUniverse().getPosition(m_applied_camera);
 
 		for (int i = 0; i < model.getMeshCount(); ++i)
@@ -2349,29 +2353,29 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 			switch (mesh.type)
 			{
 				case Mesh::RIGID_INSTANCED:
-					renderRigidMeshInstanced(mtx, mesh);
+					renderRigidMeshInstanced(encoder, s_instance_data, mtx, mesh);
 					break;
 				case Mesh::RIGID:
 				{
 					float depth = (camera_pos - mtx.getTranslation()).squaredLength();
-					renderRigidMesh(mtx, mesh, depth);
+					renderRigidMesh(encoder, mtx, mesh, depth);
 					break;
 				}
 				case Mesh::MULTILAYER_RIGID:
-					renderMultilayerRigidMesh(model, mtx, mesh);
+					renderMultilayerRigidMesh(encoder, model, mtx, mesh);
 					break;
 				case Mesh::MULTILAYER_SKINNED:
-					renderMultilayerSkinnedMesh(*pose, model, mtx, mesh);
+					renderMultilayerSkinnedMesh(encoder, *pose, model, mtx, mesh);
 					break;
 				case Mesh::SKINNED:
-					if(pose) renderSkinnedMesh(*pose, model, mtx, mesh);
+					if(pose) renderSkinnedMesh(encoder, *pose, model, mtx, mesh);
 					break;
 			}
 		}
 	}
 
 
-	void renderSkinnedMesh(const Pose& pose, const Model& model, const Matrix& matrix, const Mesh& mesh)
+	void renderSkinnedMesh(bgfx::Encoder* encoder, const Pose& pose, const Model& model, const Matrix& matrix, const Mesh& mesh)
 	{
 		Material* material = mesh.material;
 		auto& shader_instance = mesh.material->getShaderInstance();
@@ -2397,23 +2401,23 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 		if (!bgfx::isValid(shader_instance.getProgramHandle(view.pass_idx))) return;
 
-		bgfx::setUniform(m_bone_matrices_uniform, bone_mtx, pose.count);
-		executeCommandBuffer(material->getCommandBuffer(), material);
-		executeCommandBuffer(view.command_buffer.buffer, material);
+		encoder->setUniform(m_bone_matrices_uniform, bone_mtx, pose.count);
+		executeCommandBuffer(encoder, material->getCommandBuffer(), material);
+		executeCommandBuffer(encoder, view.command_buffer.buffer, material);
 
-		bgfx::setTransform(&matrix);
-		bgfx::setVertexBuffer(0, mesh.vertex_buffer_handle);
-		bgfx::setIndexBuffer(mesh.index_buffer_handle);
-		bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
-		bgfx::setState(view.render_state | material->getRenderStates());
+		encoder->setTransform(&matrix);
+		encoder->setVertexBuffer(0, mesh.vertex_buffer_handle);
+		encoder->setIndexBuffer(mesh.index_buffer_handle);
+		encoder->setStencil(view.stencil, BGFX_STENCIL_NONE);
+		encoder->setState(view.render_state | material->getRenderStates());
 		++m_stats.draw_call_count;
 		++m_stats.instance_count;
 		m_stats.triangle_count += mesh.indices_count / 3;
-		bgfx::submit(view.bgfx_id, shader_instance.getProgramHandle(view.pass_idx));
+		encoder->submit(view.bgfx_id, shader_instance.getProgramHandle(view.pass_idx));
 	}
 
 
-	void renderMultilayerRigidMesh(const Model& model, const Matrix& matrix, const Mesh& mesh)
+	void renderMultilayerRigidMesh(bgfx::Encoder* encoder, const Model& model, const Matrix& matrix, const Mesh& mesh)
 	{
 		Material* material = mesh.material;
 
@@ -2423,18 +2427,18 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		auto& shader_instance = mesh.material->getShaderInstance();
 
 		auto renderLayer = [&](View& view) {
-			executeCommandBuffer(material->getCommandBuffer(), material);
-			executeCommandBuffer(view.command_buffer.buffer, material);
+			executeCommandBuffer(encoder, material->getCommandBuffer(), material);
+			executeCommandBuffer(encoder, view.command_buffer.buffer, material);
 
-			bgfx::setTransform(&matrix);
-			bgfx::setVertexBuffer(0, mesh.vertex_buffer_handle);
-			bgfx::setIndexBuffer(mesh.index_buffer_handle);
-			bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
-			bgfx::setState(view.render_state | material->getRenderStates());
+			encoder->setTransform(&matrix);
+			encoder->setVertexBuffer(0, mesh.vertex_buffer_handle);
+			encoder->setIndexBuffer(mesh.index_buffer_handle);
+			encoder->setStencil(view.stencil, BGFX_STENCIL_NONE);
+			encoder->setState(view.render_state | material->getRenderStates());
 			++m_stats.draw_call_count;
 			++m_stats.instance_count;
 			m_stats.triangle_count += mesh.indices_count / 3;
-			bgfx::submit(view.bgfx_id, shader_instance.getProgramHandle(view.pass_idx));
+			encoder->submit(view.bgfx_id, shader_instance.getProgramHandle(view.pass_idx));
 		};
 
 		int view_idx = m_layer_to_view_map[material->getRenderLayer()];
@@ -2446,7 +2450,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 				for (int i = 0; i < layers_count; ++i)
 				{
 					Vec4 layer((i + 1) / (float)layers_count, 0, 0, 0);
-					bgfx::setUniform(m_layer_uniform, &layer);
+					encoder->setUniform(m_layer_uniform, &layer);
 					renderLayer(view);
 				}
 			}
@@ -2460,7 +2464,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
-	LUMIX_FORCE_INLINE void renderRigidMesh(const Matrix& matrix, Mesh& mesh, float depth)
+	LUMIX_FORCE_INLINE void renderRigidMesh(bgfx::Encoder* encoder, const Matrix& matrix, Mesh& mesh, float depth)
 	{
 		Material* material = mesh.material;
 
@@ -2470,23 +2474,23 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		ASSERT(view_idx >= 0);
 		auto& view = m_views[view_idx >= 0 ? view_idx : 0];
 
-		executeCommandBuffer(material->getCommandBuffer(), material);
-		executeCommandBuffer(view.command_buffer.buffer, material);
+		executeCommandBuffer(encoder, material->getCommandBuffer(), material);
+		executeCommandBuffer(encoder, view.command_buffer.buffer, material);
 
-		bgfx::setTransform(&matrix);
-		bgfx::setVertexBuffer(0, mesh.vertex_buffer_handle);
-		bgfx::setIndexBuffer(mesh.index_buffer_handle);
-		bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
-		bgfx::setState(view.render_state | material->getRenderStates());
+		encoder->setTransform(&matrix);
+		encoder->setVertexBuffer(0, mesh.vertex_buffer_handle);
+		encoder->setIndexBuffer(mesh.index_buffer_handle);
+		encoder->setStencil(view.stencil, BGFX_STENCIL_NONE);
+		encoder->setState(view.render_state | material->getRenderStates());
 		ShaderInstance& shader_instance = material->getShaderInstance();
 		++m_stats.draw_call_count;
 		++m_stats.instance_count;
 		m_stats.triangle_count += mesh.indices_count / 3;
-		bgfx::submit(view.bgfx_id, shader_instance.getProgramHandle(view.pass_idx), Math::floatFlip(*(u32*)&depth));
+		encoder->submit(view.bgfx_id, shader_instance.getProgramHandle(view.pass_idx), Math::floatFlip(*(u32*)&depth));
 	}
 
 
-	void renderMultilayerSkinnedMesh(const Pose& pose, const Model& model, const Matrix& matrix, const Mesh& mesh)
+	void renderMultilayerSkinnedMesh(bgfx::Encoder* encoder, const Pose& pose, const Model& model, const Matrix& matrix, const Mesh& mesh)
 	{
 		Material* material = mesh.material;
 
@@ -2508,19 +2512,19 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		auto& shader_instance = mesh.material->getShaderInstance();
 
 		auto renderLayer = [&](View& view) {
-			bgfx::setUniform(m_bone_matrices_uniform, bone_mtx, pose.count);
-			executeCommandBuffer(material->getCommandBuffer(), material);
-			executeCommandBuffer(view.command_buffer.buffer, material);
+			encoder->setUniform(m_bone_matrices_uniform, bone_mtx, pose.count);
+			executeCommandBuffer(encoder, material->getCommandBuffer(), material);
+			executeCommandBuffer(encoder, view.command_buffer.buffer, material);
 
-			bgfx::setTransform(&matrix);
-			bgfx::setVertexBuffer(0, mesh.vertex_buffer_handle);
-			bgfx::setIndexBuffer(mesh.index_buffer_handle);
-			bgfx::setStencil(view.stencil, BGFX_STENCIL_NONE);
-			bgfx::setState(view.render_state | material->getRenderStates());
+			encoder->setTransform(&matrix);
+			encoder->setVertexBuffer(0, mesh.vertex_buffer_handle);
+			encoder->setIndexBuffer(mesh.index_buffer_handle);
+			encoder->setStencil(view.stencil, BGFX_STENCIL_NONE);
+			encoder->setState(view.render_state | material->getRenderStates());
 			++m_stats.draw_call_count;
 			++m_stats.instance_count;
 			m_stats.triangle_count += mesh.indices_count / 3;
-			bgfx::submit(view.bgfx_id, shader_instance.getProgramHandle(view.pass_idx));
+			encoder->submit(view.bgfx_id, shader_instance.getProgramHandle(view.pass_idx));
 		};
 
 		int view_idx = m_layer_to_view_map[material->getRenderLayer()];
@@ -2532,7 +2536,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 				for (int i = 0; i < layers_count; ++i)
 				{
 					Vec4 layer((i + 1) / (float)layers_count, 0, 0, 0);
-					bgfx::setUniform(m_layer_uniform, &layer);
+					encoder->setUniform(m_layer_uniform, &layer);
 					renderLayer(view);
 				}
 			}
@@ -2660,16 +2664,15 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 
 	
-	LUMIX_FORCE_INLINE void renderRigidMeshInstanced(const Matrix& matrix, const Mesh& mesh)
+	LUMIX_FORCE_INLINE void renderRigidMeshInstanced(bgfx::Encoder* encoder, InstanceData& data, const Matrix& matrix, const Mesh& mesh)
 	{
-		InstanceData& data = m_instance_data;
 		if (data.mesh != &mesh)
 		{
 			if (data.mesh)
 			{
-				finishInstances();
+				finishInstances(encoder);
 			}
-			else if (!data.buffer.data)
+			if (!data.buffer.data)
 			{
 				if (bgfx::getAvailInstanceDataBuffer(InstanceData::MAX_INSTANCE_COUNT, sizeof(Matrix)) < InstanceData::MAX_INSTANCE_COUNT)
 				{
@@ -2677,6 +2680,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 					return;
 				}
 				bgfx::allocInstanceDataBuffer(&data.buffer, InstanceData::MAX_INSTANCE_COUNT, sizeof(Matrix));
+				ASSERT(data.buffer.data);
 				data.instances_count = 0;
 				data.offset = 0;
 			}
@@ -2688,7 +2692,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 		if (data.instances_count + data.offset == InstanceData::MAX_INSTANCE_COUNT)
 		{
-			finishInstances();
+			finishInstances(encoder);
 		}
 	}
 
@@ -2717,8 +2721,13 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		bgfx::submit(view.bgfx_id, material.getShaderInstance().getProgramHandle(view.pass_idx));
 	}
 
-
 	void executeCommandBuffer(const u8* data, Material* material) const
+	{
+		bgfx::Encoder* encoder = m_renderer.getEncoder();
+		executeCommandBuffer(encoder, data, material);
+	}
+
+	void executeCommandBuffer(bgfx::Encoder* encoder, const u8* data, Material* material) const
 	{
 		const u8* ip = data;
 		for (;;)
@@ -2730,7 +2739,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 				case BufferCommands::SET_TEXTURE:
 				{
 					auto cmd = (SetTextureCommand*)ip;
-					bgfx::setTexture(cmd->stage, cmd->uniform, cmd->texture, cmd->flags);
+					encoder->setTexture(cmd->stage, cmd->uniform, cmd->texture, cmd->flags);
 					ip += sizeof(*cmd);
 					break;
 				}
@@ -2738,14 +2747,14 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 				{
 					auto cmd = (SetUniformTimeCommand*)ip;
 					auto uniform_time = Vec4(m_scene->getTime(), 0, 0, 0);
-					bgfx::setUniform(cmd->uniform, &uniform_time);
+					encoder->setUniform(cmd->uniform, &uniform_time);
 					ip += sizeof(*cmd);
 					break;
 				}
 				case BufferCommands::SET_UNIFORM_VEC4:
 				{
 					auto cmd = (SetUniformVec4Command*)ip;
-					bgfx::setUniform(cmd->uniform, &cmd->value);
+					encoder->setUniform(cmd->uniform, &cmd->value);
 					ip += sizeof(*cmd);
 					break;
 				}
@@ -2753,14 +2762,14 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 				{
 					auto cmd = (SetUniformArrayCommand*)ip;
 					ip += sizeof(*cmd);
-					bgfx::setUniform(cmd->uniform, ip, cmd->count);
+					encoder->setUniform(cmd->uniform, ip, cmd->count);
 					ip += cmd->size;
 					break;
 				}
 				case BufferCommands::SET_GLOBAL_SHADOWMAP:
 				{
 					auto handle = m_global_light_shadowmap->getRenderbufferHandle(0);
-					bgfx::setTexture(15 - m_global_textures_count,
+					encoder->setTexture(15 - m_global_textures_count,
 						m_tex_shadowmap_uniform,
 						handle, FrameBuffer::RenderBuffer::DEFAULT_FLAGS & ~ (BGFX_TEXTURE_MAG_MASK | BGFX_TEXTURE_MIN_MASK));
 					ip += 1;
@@ -2770,7 +2779,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 				{
 					auto cmd = (SetLocalShadowmapCommand*)ip;
 					material->setDefine(m_has_shadowmap_define_idx, bgfx::isValid(cmd->texture));
-					bgfx::setTexture(15 - m_global_textures_count,
+					encoder->setTexture(15 - m_global_textures_count,
 						m_tex_shadowmap_uniform,
 						cmd->texture);
 					ip += sizeof(*cmd);
@@ -2932,108 +2941,97 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	}
 
 
-	void renderMeshes(const Array<MeshInstance>& meshes)
+	void renderMeshes(const Array<MeshInstance>& meshes, bool use_occlusion_culling)
 	{
+		bgfx::Encoder* encoder = m_renderer.getEncoder();
 		PROFILE_FUNCTION();
-		if(meshes.empty()) return;
-
+		int mesh_count = 0;
 		ModelInstance* model_instances = m_scene->getModelInstances();
-		PROFILE_INT("mesh count", meshes.size());
-		for(auto& mesh : meshes)
+		if (use_occlusion_culling)
 		{
-			ModelInstance& model_instance = model_instances[mesh.owner.index];
-			switch (mesh.mesh->type)
+			mesh_count += meshes.size();
+			for (auto& mesh : meshes)
 			{
+				ModelInstance& model_instance = model_instances[mesh.owner.index];
+				switch (mesh.mesh->type)
+				{
 				case Mesh::RIGID_INSTANCED:
-					renderRigidMeshInstanced(model_instance.matrix, *mesh.mesh);
+					if (m_occlusion_buffer.isOccluded(model_instance.matrix, model_instance.model->getAABB())) break;
+					renderRigidMeshInstanced(encoder, s_instance_data, model_instance.matrix, *mesh.mesh);
 					break;
 				case Mesh::RIGID:
-					renderRigidMesh(model_instance.matrix, *mesh.mesh, mesh.depth);
+					renderRigidMesh(encoder, model_instance.matrix, *mesh.mesh, mesh.depth);
 					break;
 				case Mesh::SKINNED:
-					renderSkinnedMesh(*model_instance.pose, *model_instance.model, model_instance.matrix, *mesh.mesh);
+					renderSkinnedMesh(encoder, *model_instance.pose, *model_instance.model, model_instance.matrix, *mesh.mesh);
 					break;
 				case Mesh::MULTILAYER_SKINNED:
-					renderMultilayerSkinnedMesh(*model_instance.pose, *model_instance.model, model_instance.matrix, *mesh.mesh);
+					renderMultilayerSkinnedMesh(encoder, *model_instance.pose, *model_instance.model, model_instance.matrix, *mesh.mesh);
 					break;
 				case Mesh::MULTILAYER_RIGID:
-					renderMultilayerRigidMesh(*model_instance.model, model_instance.matrix, *mesh.mesh);
+					renderMultilayerRigidMesh(encoder, *model_instance.model, model_instance.matrix, *mesh.mesh);
 					break;
+				}
 			}
 		}
-		finishInstances();
+		else
+		{
+			mesh_count += meshes.size();
+			for (auto& mesh : meshes)
+			{
+				ModelInstance& model_instance = model_instances[mesh.owner.index];
+				switch (mesh.mesh->type)
+				{
+				case Mesh::RIGID_INSTANCED:
+					renderRigidMeshInstanced(encoder, s_instance_data, model_instance.matrix, *mesh.mesh);
+					break;
+				case Mesh::RIGID:
+					renderRigidMesh(encoder, model_instance.matrix, *mesh.mesh, mesh.depth);
+					break;
+				case Mesh::SKINNED:
+					renderSkinnedMesh(encoder, *model_instance.pose, *model_instance.model, model_instance.matrix, *mesh.mesh);
+					break;
+				case Mesh::MULTILAYER_SKINNED:
+					renderMultilayerSkinnedMesh(encoder, *model_instance.pose, *model_instance.model, model_instance.matrix, *mesh.mesh);
+					break;
+				case Mesh::MULTILAYER_RIGID:
+					renderMultilayerRigidMesh(encoder, *model_instance.model, model_instance.matrix, *mesh.mesh);
+					break;
+				}
+			}
+		}
+		finishInstances(encoder);
+		s_instance_data.buffer.data = nullptr;
+		s_instance_data.instances_count = 0;
+		s_instance_data.offset = 0;
+		PROFILE_INT("mesh count", mesh_count);
 	}
 
 
 	void renderMeshes(const Array<Array<MeshInstance>>& meshes, bool use_occlusion_culling)
 	{
 		PROFILE_FUNCTION();
-		int mesh_count = 0;
-		if (use_occlusion_culling)
+		struct Data
 		{
-			for (auto& submeshes : meshes)
-			{
-				if (submeshes.empty()) continue;
-				ModelInstance* model_instances = m_scene->getModelInstances();
-				mesh_count += submeshes.size();
-				for (auto& mesh : submeshes)
-				{
-					ModelInstance& model_instance = model_instances[mesh.owner.index];
-					switch (mesh.mesh->type)
-					{
-					case Mesh::RIGID_INSTANCED:
-						if (m_occlusion_buffer.isOccluded(model_instance.matrix, model_instance.model->getAABB())) break;
-						renderRigidMeshInstanced(model_instance.matrix, *mesh.mesh);
-						break;
-					case Mesh::RIGID:
-						renderRigidMesh(model_instance.matrix, *mesh.mesh, mesh.depth);
-						break;
-					case Mesh::SKINNED:
-						renderSkinnedMesh(*model_instance.pose, *model_instance.model, model_instance.matrix, *mesh.mesh);
-						break;
-					case Mesh::MULTILAYER_SKINNED:
-						renderMultilayerSkinnedMesh(*model_instance.pose, *model_instance.model, model_instance.matrix, *mesh.mesh);
-						break;
-					case Mesh::MULTILAYER_RIGID:
-						renderMultilayerRigidMesh(*model_instance.model, model_instance.matrix, *mesh.mesh);
-						break;
-					}
-				}
-			}
-		}
-		else
+			PipelineImpl* that;
+			const Array<MeshInstance>* meshes;
+			bool use_occlusion_culling;
+		} data[64];
+		JobSystem::JobDecl jobs[64];
+		volatile int counter = 0;
+		for (int i = 0; i < meshes.size(); ++i)
 		{
-			for (auto& submeshes : meshes)
-			{
-				if (submeshes.empty()) continue;
-				ModelInstance* model_instances = m_scene->getModelInstances();
-				mesh_count += submeshes.size();
-				for (auto& mesh : submeshes)
-				{
-					ModelInstance& model_instance = model_instances[mesh.owner.index];
-					switch (mesh.mesh->type)
-					{
-					case Mesh::RIGID_INSTANCED:
-						renderRigidMeshInstanced(model_instance.matrix, *mesh.mesh);
-						break;
-					case Mesh::RIGID:
-						renderRigidMesh(model_instance.matrix, *mesh.mesh, mesh.depth);
-						break;
-					case Mesh::SKINNED:
-						renderSkinnedMesh(*model_instance.pose, *model_instance.model, model_instance.matrix, *mesh.mesh);
-						break;
-					case Mesh::MULTILAYER_SKINNED:
-						renderMultilayerSkinnedMesh(*model_instance.pose, *model_instance.model, model_instance.matrix, *mesh.mesh);
-						break;
-					case Mesh::MULTILAYER_RIGID:
-						renderMultilayerRigidMesh(*model_instance.model, model_instance.matrix, *mesh.mesh);
-						break;
-					}
-				}
-			}
+			data[i].that = this;
+			data[i].use_occlusion_culling = use_occlusion_culling;
+			data[i].meshes = &meshes[i];
+			jobs[i].data = &data[i];
+			jobs[i].task = [](void* data) {
+				Data* job_data = (Data*)data;
+				job_data->that->renderMeshes(*job_data->meshes, job_data->use_occlusion_culling);
+			};
 		}
-		finishInstances();
-		PROFILE_INT("mesh count", mesh_count);
+		JobSystem::runJobs(jobs, meshes.size(), &counter);
+		JobSystem::wait(&counter);
 	}
 
 
@@ -3093,10 +3091,10 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		m_layer_mask = 0;
 		m_pass_idx = -1;
 		m_current_framebuffer = m_default_framebuffer;
-		m_instance_data.mesh = nullptr;
-		m_instance_data.buffer.data = nullptr;
-		m_instance_data.instances_count = 0;
-		m_instance_data.offset = 0;
+		s_instance_data.mesh = nullptr;
+		s_instance_data.buffer.data = nullptr;
+		s_instance_data.instances_count = 0;
+		s_instance_data.offset = 0;
 		m_point_light_shadowmaps.clear();
 		clearLayerToViewMap();
 		for (int i = 0; i < lengthOf(m_terrain_instances); ++i)
@@ -3120,7 +3118,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		{
 			lua_pop(m_lua_state, 1);
 		}
-		finishInstances();
+		ASSERT(!s_instance_data.mesh);
 		return success;
 	}
 
@@ -3260,7 +3258,6 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 	Array<bgfx::UniformHandle> m_uniforms;
 	Array<PointLightShadowmap> m_point_light_shadowmaps;
 	FrameBuffer* m_global_light_shadowmap;
-	InstanceData m_instance_data;
 	Entity m_applied_camera;
 	bgfx::VertexBufferHandle m_cube_vb;
 	bgfx::IndexBufferHandle m_cube_ib;

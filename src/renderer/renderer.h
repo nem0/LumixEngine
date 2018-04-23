@@ -6,6 +6,7 @@
 
 namespace bgfx
 {
+	struct Encoder;
 	struct UniformHandle;
 	struct VertexDecl;
 }
@@ -58,6 +59,7 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 		virtual const char* getLayerName(int idx) const = 0;
 		virtual void setMainPipeline(Pipeline* pipeline) = 0;
 		virtual Pipeline* getMainPipeline() = 0;
+		virtual bgfx::Encoder* getEncoder() = 0;
 
 		virtual Engine& getEngine() = 0;
 }; 
