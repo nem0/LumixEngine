@@ -2672,7 +2672,7 @@ public:
 
 	ModelInstance* getModelInstances() override
 	{
-		return &m_model_instances[0];
+		return m_model_instances.empty() ? nullptr : &m_model_instances[0];
 	}
 
 

@@ -73,7 +73,7 @@ namespace Lumix
 
 
 static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("renderable");
-
+static thread_local bgfx::Encoder* s_encoder = nullptr;
 
 struct BoneProperty : Reflection::IEnumProperty
 {
@@ -485,6 +485,8 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 		, m_callback_stub(*this)
 		, m_vsync(true)
 		, m_main_pipeline(nullptr)
+		, m_encoder_list_mutex(false)
+		, m_encoders(m_allocator)
 	{
 		registerProperties(engine.getAllocator());
 		bgfx::PlatformData d;
@@ -573,8 +575,8 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 
 		bgfx::destroy(m_mat_color_uniform);
 		bgfx::destroy(m_roughness_metallic_emission_uniform);
-		bgfx::frame();
-		bgfx::frame();
+		frame(false);
+		frame(false);
 		bgfx::shutdown();
 	}
 
@@ -582,6 +584,18 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	void setMainPipeline(Pipeline* pipeline) override
 	{
 		m_main_pipeline = pipeline;
+	}
+
+
+	bgfx::Encoder* getEncoder() override
+	{
+		if (s_encoder == nullptr)
+		{
+			s_encoder = bgfx::begin();
+			MT::SpinLock lock(m_encoder_list_mutex);
+			m_encoders.push(&s_encoder);
+		}
+		return s_encoder;
 	}
 
 
@@ -677,6 +691,15 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	void frame(bool capture) override
 	{
 		PROFILE_FUNCTION();
+		{
+			MT::SpinLock lock(m_encoder_list_mutex);
+			for (bgfx::Encoder** encoder : m_encoders)
+			{
+				bgfx::end(*encoder);
+				*encoder = nullptr;
+			}
+			m_encoders.clear();
+		}
 		bgfx::frame(capture);
 		m_view_counter = 0;
 	}
@@ -708,6 +731,8 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	bgfx::UniformHandle m_mat_color_uniform;
 	bgfx::UniformHandle m_roughness_metallic_emission_uniform;
 	Pipeline* m_main_pipeline;
+	MT::SpinMutex m_encoder_list_mutex;
+	Array<bgfx::Encoder**> m_encoders;
 };
 
 
