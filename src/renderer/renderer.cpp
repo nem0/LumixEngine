@@ -519,6 +519,7 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 		}
 
 		bgfx::Init init;
+		init.limits.maxEncoders = MT::getCPUsCount();
 		init.type = renderer_type;
 		init.callback = &m_callback_stub;
 		init.allocator = &m_bgfx_allocator;
