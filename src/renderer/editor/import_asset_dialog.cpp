@@ -2689,6 +2689,7 @@ void ImportAssetDialog::onMaterialsGUI()
 			ImGui::Checkbox("Import material", &mat.import);
 			ImGui::Checkbox("Alpha cutout material", &mat.alpha_cutout);
 
+			ImGui::PushTextWrapPos();
 			ImGui::Columns(4);
 			ImGui::Text("Path");
 			ImGui::NextColumn();
@@ -2721,6 +2722,7 @@ void ImportAssetDialog::onMaterialsGUI()
 				ImGui::NextColumn();
 			}
 			ImGui::Columns();
+			ImGui::PopTextWrapPos();
 
 			ImGui::TreePop();
 		}
