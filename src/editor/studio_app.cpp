@@ -1352,6 +1352,7 @@ public:
 						char buffer[1024];
 						getEntityListDisplayName(*m_editor, buffer, sizeof(buffer), e);
 						if (stristr(buffer, filter) == nullptr) continue;
+						ImGui::PushID(e.index);
 						bool selected = entities.indexOf(e) >= 0;
 						if (ImGui::Selectable(buffer, &selected))
 						{
@@ -1363,6 +1364,7 @@ public:
 							ImGui::SetDragDropPayload("entity", &e, sizeof(e));
 							ImGui::EndDragDropSource();
 						}
+						ImGui::PopID();
 					}
 				}
 				ImGui::PopItemWidth();
