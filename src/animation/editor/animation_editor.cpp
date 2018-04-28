@@ -47,11 +47,26 @@ struct NoUIBuilder
 using NoUIAttribute = CustomUIAttribute<NoUIBuilder>;
 
 
+
+struct MaskItemCustomUI
+{
+	template <typename Owner, typename PP, typename T>
+	static void build(Owner& owner, const PP& pp, T& obj) {
+		if (ImGui::Button("Duplicate")) 
+		{
+			IAnimationEditor& editor = obj.controller.getEditor();
+			editor.duplicateMask(pp.index);
+		}
+	}
+};
+
+
 template <>
 auto getMembers<ControllerResource>()
 {
 	return type("controller",
 		property("Masks", &ControllerResource::getMasks,
+			ArrayItemCustomUIAttribute<MaskItemCustomUI>(),
 			array_attribute(&ControllerResource::addMask, &ControllerResource::removeMask)
 		).addConstRefGetter(&ControllerResource::getMasks),
 		
@@ -520,7 +535,6 @@ struct DestroyNodeCommand : IEditorCommand
 };
 
 
-
 struct CreateAnimEdgeCommand : IEditorCommand
 {
 	CreateAnimEdgeCommand(ControllerResource& controller, Container* container, Node* from, Node* to)
@@ -598,6 +612,7 @@ public:
 	void executeCommand(IEditorCommand& command) override;
 	void createEdge(ControllerResource& ctrl, Container* container, Node* from, Node* to) override;
 	void moveNode(ControllerResource& ctrl, Node* node, const ImVec2& pos) override;
+	void duplicateMask(int index) override;
 	Node* createNode(ControllerResource& ctrl,
 		Container* container,
 		Anim::Node::Type type,
@@ -746,6 +761,26 @@ void AnimationEditor::destroyNode(ControllerResource& ctrl, Node* node)
 	IAllocator& allocator = m_app.getWorldEditor().getAllocator();
 	auto* cmd = LUMIX_NEW(allocator, DestroyNodeCommand)(ctrl, node->engine_cmp->uid);
 	executeCommand(*cmd);
+	endCommandGroup();
+}
+
+
+void AnimationEditor::duplicateMask(int index)
+{
+	beginCommandGroup(crc32("anim_duplicate_mask"));
+	ControllerResource::Mask& src = m_resource->getMasks()[index];
+	int new_mask_index = m_resource->getMasks().size();
+
+	IAllocator& allocator = m_app.getWorldEditor().getAllocator();
+	addArrayItem(allocator, *this, [&]() -> auto& { return *m_resource; }, "Masks");
+	ControllerResource::Mask& clone = m_resource->getMasks().back();
+	for (auto& bone : src.bones)
+	{
+		int bone_index = clone.bones.size();
+		
+		addArrayItem(allocator, *this, [&]() -> auto& { return *m_resource; }, "Masks", new_mask_index, "Bones");
+		setPropertyValue(allocator, *this, [&]() -> auto& {return *m_resource; }, bone.getName(), "Masks", index, "Bones", bone_index, "Name");
+	}
 	endCommandGroup();
 }
 

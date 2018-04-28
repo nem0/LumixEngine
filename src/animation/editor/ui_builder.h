@@ -277,6 +277,10 @@ template <typename F>
 struct CustomUIAttribute {};
 
 
+template <typename F>
+struct ArrayItemCustomUIAttribute {};
+
+
 template <typename Adder, typename Remover>
 auto array_attribute(Adder adder, Remover remover)
 {
@@ -285,7 +289,6 @@ auto array_attribute(Adder adder, Remover remover)
 	attr.remover = remover;
 	return attr;
 }
-
 
 template <typename Counter>
 auto array_size_attribute(Counter counter)
@@ -529,6 +532,20 @@ int getArraySize(const Array<T>& array)
 	return array.size();
 }
 
+
+template <typename T>
+int getArraySize(Array<T>& array)
+{
+	return array.size();
+}
+
+template <typename T>
+int getArraySize(T& array)
+{
+
+	ASSERT(false);
+	return 0;
+}
 
 template <typename T, int count>
 int getArraySize(const T (&array)[count])
@@ -983,6 +1000,28 @@ struct UIBuilder
 		bool has_custom_ui = false;
 	};
 
+	template <typename O, typename PP, typename T>
+	struct CustomArrayItemUIVisitor
+	{
+		CustomArrayItemUIVisitor(O& owner, const PP& pp, const T& obj)
+			: owner(owner)
+			, pp(pp)
+			, obj(obj)
+		{}
+
+		template <typename Attr>
+		void operator()(const Attr& attr) {}
+
+		template <typename F>
+		void operator()(const ArrayItemCustomUIAttribute<F>& attr)
+		{
+			F::build(owner, pp, obj);
+		}
+
+		O& owner;
+		const PP& pp;
+		const T& obj;
+	};
 
 	template <typename T, typename Root>
 	class HasUIMethod
@@ -996,6 +1035,13 @@ struct UIBuilder
 	public:
 		enum { value = sizeof(test<T>(0)) == sizeof(char) };
 	};
+
+	template <typename O, typename PP, typename T>
+	void customArrayItemUI(O& owner, const PP& pp, const T& obj)
+	{
+		CustomArrayItemUIVisitor<O, PP, T> visitor(owner, pp, obj);
+		apply(visitor, pp.head.attributes);
+	}
 
 	template <typename O, typename PP, typename T>
 	auto customUI(O& owner, const PP& pp, const T& obj)
@@ -1209,8 +1255,9 @@ struct UIBuilder
 		int subproperties_count = getSubpropertiesCount<T>();
 		if (subproperties_count > 1)
 		{
-			for (T& item : array)
+			for (int i = 0, c =  array.size(); i < c; ++i)
 			{
+				const T& item = array[i];
 				StaticString<32> label("", i + 1);
 				bool expanded = ImGui::TreeNodeEx(label, ImGuiTreeNodeFlags_AllowItemOverlap);
 				ImGui::SameLine();
@@ -1224,10 +1271,10 @@ struct UIBuilder
 
 				if (expanded)
 				{
+					customArrayItemUI(owner, makePP(pp, i), item);
 					ui(array, makePP(pp, i), item);
 					ImGui::TreePop();
 				}
-				++i;
 			}
 		}
 		else

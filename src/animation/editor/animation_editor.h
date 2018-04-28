@@ -57,6 +57,7 @@ public:
 	virtual EventType& createEventType(const char* type) = 0;
 	virtual EventType& getEventTypeByIdx(int idx) = 0;
 	virtual EventType& getEventType(u32 type) = 0;
+	virtual void duplicateMask(int index) = 0;
 	virtual void createEdge(ControllerResource& ctrl, Container* container, Node* from, Node* to) = 0;
 	virtual void moveNode(ControllerResource& ctrl, Node* node, const ImVec2& pos) = 0;
 	virtual void destroyNode(ControllerResource& ctrl, Node* node) = 0;
