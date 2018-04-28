@@ -349,7 +349,6 @@ public:
 		ControllerResource& controller;
 		Array<Bone> bones;
 	
-	
 	private:
 		StaticString<32> name;
 	};
