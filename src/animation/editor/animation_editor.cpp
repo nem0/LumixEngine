@@ -37,122 +37,6 @@ static const ComponentType CONTROLLER_TYPE = Reflection::getComponentType("anim_
 using namespace AnimEditor;
 
 
-struct NoUIBuilder
-{
-	template <typename Owner, typename PP, typename T>
-	static void build(Owner& owner, const PP& pp, T& obj) {}
-};
-
-
-using NoUIAttribute = CustomUIAttribute<NoUIBuilder>;
-
-
-
-struct MaskItemCustomUI
-{
-	template <typename Owner, typename PP, typename T>
-	static void build(Owner& owner, const PP& pp, T& obj) {
-		if (ImGui::Button("Duplicate")) 
-		{
-			IAnimationEditor& editor = obj.controller.getEditor();
-			editor.duplicateMask(pp.index);
-		}
-	}
-};
-
-
-template <>
-auto getMembers<ControllerResource>()
-{
-	return type("controller",
-		property("Masks", &ControllerResource::getMasks,
-			ArrayItemCustomUIAttribute<MaskItemCustomUI>(),
-			array_attribute(&ControllerResource::addMask, &ControllerResource::removeMask)
-		).addConstRefGetter(&ControllerResource::getMasks),
-		
-		property("Inputs", &ControllerResource::getInputs,
-			array_attribute(&ControllerResource::addInput, &ControllerResource::removeInput)
-		).addConstRefGetter(&ControllerResource::getInputs),
-		
-		property("Constants", &ControllerResource::getConstants,
-			array_attribute(&ControllerResource::addConstant, &ControllerResource::removeConstant)
-		).addConstRefGetter(&ControllerResource::getConstants),
-
-		property("Slots", &ControllerResource::getAnimationSlots,
-			array_attribute(&ControllerResource::addSlot, &ControllerResource::removeSlot),
-			NoUIAttribute()
-		).addConstRefGetter(&ControllerResource::getAnimationSlots),
-
-		property("Sets", &ControllerResource::getAnimationSets,
-			array_attribute(&ControllerResource::addAnimationSet, &ControllerResource::removeAnimationSet),
-			NoUIAttribute()
-		).addConstRefGetter(&ControllerResource::getAnimationSets)
-	);
-}
-
-
-template <>
-auto getMembers<ControllerResource::AnimationSet>()
-{
-	return type("Animation Set",
-		property("Name", &ControllerResource::AnimationSet::getName, &ControllerResource::AnimationSet::setName),
-		property("Values", &ControllerResource::AnimationSet::values)
-	);
-}
-
-
-template <>
-auto getMembers<ControllerResource::AnimationSlot>()
-{
-	return type("Animation Slot",
-		property("Name", &ControllerResource::AnimationSlot::getName, &ControllerResource::AnimationSlot::setName),
-		property("Values", &ControllerResource::AnimationSlot::values)
-	);
-}
-
-
-template <>
-auto getMembers<ControllerResource::AnimationSlot::Value>()
-{
-	return type("Animation Slot Value",
-		property("Path", &ControllerResource::AnimationSlot::Value::get, &ControllerResource::AnimationSlot::Value::set)
-	);
-}
-
-
-template <>
-auto getMembers<ControllerResource::AnimationSet::Value>()
-{
-	return type("Animation Set Value",
-		property("Path", &ControllerResource::AnimationSet::Value::getValue, &ControllerResource::AnimationSet::Value::setValue)
-	);
-}
-
-
-template <>
-auto getEnum<Anim::InputDecl::Type>()
-{
-	return makeTuple(
-		EnumValue<Anim::InputDecl::Type>{ Anim::InputDecl::Type::FLOAT, "Decimal" },
-		EnumValue<Anim::InputDecl::Type>{ Anim::InputDecl::Type::BOOL, "Bool" },
-		EnumValue<Anim::InputDecl::Type>{ Anim::InputDecl::Type::INT, "Integer" }
-	);
-}
-
-
-template <>
-auto getMembers<ControllerResource::InputProxy::ValueProxy>()
-{
-	return type("Input Value");
-}
-
-
-template <>
-auto getMembers<ControllerResource::ConstantProxy::ValueProxy>()
-{
-	return type("Constant Value");
-}
-
 struct InputValueCustomUI
 {
 	template <typename Owner, typename PP, typename T>
@@ -199,52 +83,6 @@ struct ConstantValueCustomUI
 		}
 	}
 };
-
-
-template <>
-auto getMembers<ControllerResource::InputProxy>()
-{
-	return type("Input",
-		property("Name", &ControllerResource::InputProxy::getName, &ControllerResource::InputProxy::setName),
-		property("Type", &ControllerResource::InputProxy::getType, &ControllerResource::InputProxy::setType),
-		property("Value", &ControllerResource::InputProxy::getValue, CustomUIAttribute<InputValueCustomUI>()).addConstRefGetter(&ControllerResource::InputProxy::getValue),
-		property("Engine idx", &ControllerResource::InputProxy::getEngineIdx, &ControllerResource::InputProxy::setEngineIdx, 
-			NoUIAttribute())
-	);
-}
-
-
-template <>
-auto getMembers<ControllerResource::ConstantProxy>()
-{
-	return type("Constant",
-		property("Name", &ControllerResource::ConstantProxy::getName, &ControllerResource::ConstantProxy::setName),
-		property("Type", &ControllerResource::ConstantProxy::getType, &ControllerResource::ConstantProxy::setType),
-		property("Value", &ControllerResource::ConstantProxy::getValue, CustomUIAttribute<ConstantValueCustomUI>()).addConstRefGetter(&ControllerResource::ConstantProxy::getValue),
-		property("Engine idx", &ControllerResource::ConstantProxy::getEngineIdx, &ControllerResource::ConstantProxy::setEngineIdx,
-			NoUIAttribute())
-	);
-}
-
-
-template <>
-auto getMembers<ControllerResource::Mask>()
-{
-	return type("Mask",
-		property("Name", &ControllerResource::Mask::getName, &ControllerResource::Mask::setName),
-		property("Bones", &ControllerResource::Mask::bones,
-			array_attribute(&ControllerResource::Mask::addBone, &ControllerResource::Mask::removeBone)
-			)
-		);
-}
-
-template <>
-auto getMembers<ControllerResource::Mask::Bone>()
-{
-	return type("Bone",
-		property("Name", &ControllerResource::Mask::Bone::getName, &ControllerResource::Mask::Bone::setName)
-	);
-}
 
 
 namespace AnimEditor
@@ -595,6 +433,7 @@ public:
 	explicit AnimationEditor(StudioApp& app);
 	~AnimationEditor();
 
+	IAllocator& getAllocator() override { return m_resource->getAllocator(); }
 	OutputBlob& getCopyBuffer() override;
 	void update(float time_delta) override;
 	const char* getName() const override { return "animation_editor"; }
@@ -772,14 +611,20 @@ void AnimationEditor::duplicateMask(int index)
 	int new_mask_index = m_resource->getMasks().size();
 
 	IAllocator& allocator = m_app.getWorldEditor().getAllocator();
-	addArrayItem(allocator, *this, [&]() -> auto& { return *m_resource; }, "Masks");
+	auto root_getter = [this]() -> auto& { return *m_resource; };
+	auto* cmd = LUMIX_NEW(allocator, AddArrayItemCommand<decltype(root_getter)>)(root_getter, "masks");
+	executeCommand(*cmd);
+	
 	ControllerResource::Mask& clone = m_resource->getMasks().back();
 	for (auto& bone : src.bones)
 	{
 		int bone_index = clone.bones.size();
 		
-		addArrayItem(allocator, *this, [&]() -> auto& { return *m_resource; }, "Masks", new_mask_index, "Bones");
-		setPropertyValue(allocator, *this, [&]() -> auto& {return *m_resource; }, bone.getName(), "Masks", index, "Bones", bone_index, "Name");
+		auto* cmd = LUMIX_NEW(allocator, AddArrayItemCommand<decltype(root_getter)>)(root_getter, "masks", new_mask_index, "bones");
+		executeCommand(*cmd);
+
+		auto* cmd2 = LUMIX_NEW(allocator, SetCommand<decltype(root_getter), string>)(root_getter, clone.bones[bone_index].getName(), bone.getName(), "masks", new_mask_index, "bones", bone_index, "name");
+		executeCommand(*cmd2);
 	}
 	endCommandGroup();
 }
@@ -1186,8 +1031,7 @@ void AnimationEditor::inputsGUI()
 	{
 		IAllocator& allocator = m_app.getWorldEditor().getAllocator();
 		auto root_getter = [&]() -> auto& { return *m_resource; };
-		UIBuilder<AnimationEditor, decltype(root_getter)> ui_builder(*this, root_getter, allocator);
-		ui_builder.build();
+		buildUI(m_resource->getEditor(), root_getter);
 		animationSlotsGUI();
 	}
 	ImGui::EndDock();
@@ -1205,6 +1049,7 @@ void AnimationEditor::animationSlotsGUI()
 	ImGui::Columns(sets.size() + 2);
 	ImGui::NextColumn();
 	ImGui::PushID("header");
+	auto root_getter = [&]() -> auto& { return *m_resource; };
 	for (int j = 0; j < sets.size(); ++j)
 	{
 		ImGui::PushID(j);
@@ -1212,13 +1057,17 @@ void AnimationEditor::animationSlotsGUI()
 		StaticString<32> tmp = sets[j].getName();
 		if (ImGui::InputText("", tmp.data, lengthOf(tmp.data)))
 		{
-			setPropertyValue(allocator, *this, [&]() -> auto& {return *m_resource;}, tmp, "Sets", j, "Name");
+			auto* cmd = LUMIX_NEW(allocator, SetCommand<decltype(root_getter), StaticString<32>>)(root_getter, sets[j].getName(), tmp, "sets", j, "name");
+			executeCommand(*cmd);
 		}
 		ImGui::PopItemWidth();
 		ImGui::PopID();
 		ImGui::NextColumn();
 	}
-	if (ImGui::Button("Add")) addArrayItem(allocator, *this, [&]() -> auto& { return *m_resource; }, "Sets");
+	if (ImGui::Button("Add")) {
+		auto* cmd = LUMIX_NEW(allocator, AddArrayItemCommand<decltype(root_getter)>)(root_getter, "sets");
+		executeCommand(*cmd);
+	}
 	ImGui::NextColumn();
 
 	ImGui::PopID();
@@ -1232,7 +1081,8 @@ void AnimationEditor::animationSlotsGUI()
 		ImGui::PushItemWidth(-20);
 		if (ImGui::InputText("##name", slot_name.data, lengthOf(slot_name.data), ImGuiInputTextFlags_EnterReturnsTrue))
 		{
-			setPropertyValue(allocator, *this, [&]() -> auto& {return *m_resource;}, slot_name, "Slots", i, "Name");
+			auto* cmd = LUMIX_NEW(allocator, SetCommand<decltype(root_getter), StaticString<32>>)(root_getter, slot.getName(), slot_name, "slots", i, "name");
+			executeCommand(*cmd);
 		}
 		ImGui::PopItemWidth();
 		ImGui::SameLine();
@@ -1243,7 +1093,8 @@ void AnimationEditor::animationSlotsGUI()
 				ImGui::NextColumn();
 			ImGui::NextColumn();
 			ImGui::PopID();
-			removeArrayItem(allocator, *this, [&]() -> auto& { return *m_resource; }, i, "Slots");
+			auto* cmd = LUMIX_NEW(allocator, RemoveArrayItemCommand<decltype(root_getter)>)(root_getter, i, allocator, "slots");
+			executeCommand(*cmd);
 			--i;
 			continue;
 		}
@@ -1255,10 +1106,12 @@ void AnimationEditor::animationSlotsGUI()
 			auto* anim = slot.values[j].anim;
 			copyString(tmp, anim ? anim->getPath().c_str() : "");
 			ImGui::PushID(j);
+			Path old_path(tmp);
 			if (m_app.getAssetBrowser().resourceInput("", "##res", tmp, lengthOf(tmp), Animation::TYPE))
 			{
 				Path path(tmp);
-				setPropertyValue(allocator, *this, [&]() -> auto& {return *m_resource;}, path, "Slots", i, "Values", j, "Path");
+				auto* cmd = LUMIX_NEW(allocator, SetCommand<decltype(root_getter), Path>)(root_getter, old_path, path, "slots", i, "values", j, "path");
+				executeCommand(*cmd);
 			}
 			ImGui::PopID();
 			ImGui::PopItemWidth();
@@ -1270,7 +1123,11 @@ void AnimationEditor::animationSlotsGUI()
 	}
 	ImGui::Columns();
 
-	if (ImGui::Button("Add row")) addArrayItem(allocator, *this, [&]() -> auto& {return *m_resource;}, "Slots");
+	if (ImGui::Button("Add row"))
+	{
+		auto* cmd = LUMIX_NEW(allocator, AddArrayItemCommand<decltype(root_getter)>)(root_getter, "slots");
+		executeCommand(*cmd);
+	}
 	
 	ImGui::PopItemWidth();
 	ImGui::PopID();

@@ -9,14 +9,22 @@
 #include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/log.h"
+#include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
+#include "engine/universe/universe.h"
 #include "ui_builder.h"
 #include <cmath>
 #include <cstdlib>
 
+
+
+
 namespace Lumix
 {
+
+
+static const ComponentType CONTROLLER_TYPE = Reflection::getComponentType("anim_controller");
 
 
 static ImVec2 operator+(const ImVec2& a, const ImVec2& b)
@@ -43,36 +51,6 @@ static float dot(const ImVec2& a, const ImVec2& b)
 }
 
 
-template <>
-auto getMembers<AnimEditor::Node>()
-{
-	return type("Node",
-		property("Name", &AnimEditor::Node::name)
-	);
-}
-
-
-template <>
-auto getMembers<AnimEditor::AnimationNode>()
-{
-	return type("Animation Node",
-		property("Looped", &AnimEditor::AnimationNode::isLooped, &AnimEditor::AnimationNode::setIsLooped),
-		property("New selection on loop", &AnimEditor::AnimationNode::isNewSelectionOnLoop, &AnimEditor::AnimationNode::setIsNewSelectionOnLoop),
-		property("Speed multiplier", &AnimEditor::AnimationNode::getSpeedMultiplier, &AnimEditor::AnimationNode::setSpeedMultiplier),
-		property("Animations", &AnimEditor::AnimationNode::getAnimations,
-			array_attribute(&AnimEditor::AnimationNode::addAnimation, &AnimEditor::AnimationNode::removeAnimation))
-			.addConstRefGetter(&AnimEditor::AnimationNode::getAnimations)
-	);
-}
-
-
-template <>
-auto getMembers<AnimEditor::AnimationNode::AnimationProxy>()
-{
-	return type("Animation",
-		property("Value", &AnimEditor::AnimationNode::AnimationProxy::getValue, &AnimEditor::AnimationNode::AnimationProxy::setValue)
-	);
-}
 
 
 namespace AnimEditor
@@ -258,10 +236,9 @@ void Node::onGUI()
 	int uid = engine_cmp->uid;
 	ControllerResource& controller = m_controller;
 	auto root_getter = [uid, &controller]() -> auto& {
-		return *(Node*)controller.getByUID(uid);
+		return *(Node*)controller.getByUID(uid); 
 	};
-	UIBuilder<IAnimationEditor, decltype(root_getter)> builder(m_controller.getEditor(), root_getter, m_controller.getAllocator());
-	builder.build();
+	buildUI(m_controller.getEditor(), root_getter);
 
 	if (!engine_cmp) return;
 	auto* engine_node = ((Anim::Node*)engine_cmp);
@@ -1247,8 +1224,7 @@ void AnimationNode::AnimationProxy::setValue(u32 value)
 }
 
 
-template <typename Root>
-void AnimationNode::AnimationProxy::ui(IAnimationEditor& editor, const Root& root)
+bool AnimationNode::AnimationProxy::ui()
 {
 	auto getter = [](void* data, int idx, const char** out) -> bool {
 		auto* node = (AnimationNode*)data;
@@ -1262,12 +1238,25 @@ void AnimationNode::AnimationProxy::ui(IAnimationEditor& editor, const Root& roo
 
 	int proxy_idx = node.getAnimations().find([this](const auto& rhs) { return this == &rhs; });
 	int current;
-	for (current = 0; current < slots.size() && crc32(slots[current].getName()) != engine_node->animations_hashes[proxy_idx]; ++current);
+	u32 old_value = engine_node->animations_hashes[proxy_idx];
+	for (current = 0; current < slots.size() && crc32(slots[current].getName()) != old_value; ++current);
 	if (ImGui::Combo("Animation", &current, getter, &node, slots.size()))
 	{
+		ControllerResource* ctrler = &node.m_controller;
+		IAnimationEditor& editor = ctrler->getEditor();
 		IAllocator& allocator = editor.getApp().getWorldEditor().getAllocator();
-		setPropertyValue(allocator, editor, root, crc32(slots[current].getName()), "Animations", proxy_idx, "Value");
+		PathItem p0("animations", nullptr);
+		PathItem p1(proxy_idx, &p0);
+		PathItem p2("value", &p1);
+		
+		int uid = node.engine_cmp->uid;
+		auto root_getter = [uid, ctrler]() -> AnimationNode& {
+			return (AnimationNode&)*ctrler->getByUID(uid);
+		};
+		auto* cmd = LUMIX_NEW(allocator, SetCommand<decltype(root_getter), u32>)(root_getter, &p2, old_value, crc32(slots[current].getName()));
+		editor.executeCommand(*cmd);
 	}
+	return true;
 }
 
 
@@ -1341,9 +1330,7 @@ void AnimationNode::onGUI()
 	auto root_getter = [uid, controller]() -> auto& {
 		return *(AnimationNode*)controller->getByUID(uid);
 	};
-	UIBuilder<IAnimationEditor, decltype(root_getter)> builder(m_controller.getEditor(), root_getter, m_controller.getAllocator());
-	builder.build();
-
+	buildUI(m_controller.getEditor(), root_getter);
 }
 
 
@@ -2117,6 +2104,61 @@ void ControllerResource::ConstantProxy::setEngineIdx(int idx)
 void ControllerResource::ConstantProxy::setName(const StaticString<32>& value)
 {
 	resource.m_engine_resource->m_input_decl.constants[engine_idx].name = value;
+}
+
+
+bool ControllerResource::Mask::ui()
+{
+	if (ImGui::Button("Duplicate"))
+	{
+		for (int i = 0; i < controller.m_masks.size(); ++i)
+		{
+			if (&controller.m_masks[i] == this)
+			{
+				controller.getEditor().duplicateMask(i);
+				break;
+			}
+		}
+	}
+	return false;
+}
+
+
+void ControllerResource::InputProxy::ValueProxy::ui(const char* name)
+{
+	StudioApp& app = input.resource.getEditor().getApp();
+
+	const auto& selected_entities = app.getWorldEditor().getSelectedEntities();
+	if (selected_entities.empty()) return;
+	auto* scene = (AnimationScene*)app.getWorldEditor().getUniverse()->getScene(CONTROLLER_TYPE);
+
+	if (!scene->getUniverse().hasComponent(selected_entities[0], CONTROLLER_TYPE)) return;
+
+	u8* input_data = scene->getControllerInput(selected_entities[0]);
+	if (!input_data) return;
+
+	Anim::InputDecl& input_decl = input.resource.getEngineResource()->m_input_decl;
+	Anim::InputDecl::Input& input = input_decl.inputs[this->input.engine_idx];
+	switch (input.type)
+	{
+	case Anim::InputDecl::FLOAT: ImGui::DragFloat("Value", (float*)(input_data + input.offset)); break;
+	case Anim::InputDecl::BOOL: ImGui::CheckboxEx("Value", (bool*)(input_data + input.offset)); break;
+	case Anim::InputDecl::INT: ImGui::InputInt("Value", (int*)(input_data + input.offset)); break;
+	default: ASSERT(false); break;
+	}
+}
+
+void ControllerResource::ConstantProxy::ValueProxy::ui(const char* name)
+{
+	Anim::InputDecl& input_decl = input.resource.getEngineResource()->m_input_decl;
+	Anim::InputDecl::Constant& constant = input_decl.constants[input.engine_idx];
+	switch (constant.type)
+	{
+		case Anim::InputDecl::FLOAT: ImGui::DragFloat("Value", &constant.f_value); break;
+		case Anim::InputDecl::BOOL: ImGui::CheckboxEx("Value", &constant.b_value); break;
+		case Anim::InputDecl::INT: ImGui::InputInt("Value", &constant.i_value); break;
+		default: ASSERT(false); break;
+	}
 }
 
 const StaticString<32>& ControllerResource::InputProxy::getName() const

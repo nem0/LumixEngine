@@ -45,6 +45,7 @@ public:
 	static IAnimationEditor* create(IAllocator& allocator, StudioApp& app);
 	
 	virtual ~IAnimationEditor() {}
+	virtual IAllocator& getAllocator() = 0;
 	virtual OutputBlob& getCopyBuffer() = 0;
 	virtual void executeCommand(IEditorCommand& command) = 0;
 	virtual void setContainer(Container* container) = 0;

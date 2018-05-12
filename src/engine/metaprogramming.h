@@ -65,6 +65,28 @@ struct Tuple<Head, Tail...> : Tuple<Tail...>
 };
 
 
+template <typename T, typename C> struct TupleContains;
+
+template <typename T, typename... Tail> 
+struct TupleContains<T, Tuple<T, Tail...>>
+{
+	static constexpr bool value = true;
+};
+
+template <typename T>
+struct TupleContains<T, Tuple<>>
+{
+	static constexpr bool value = false;
+};
+
+
+template <typename T, typename Head, typename... Tail> 
+struct TupleContains<T, Tuple<Head, Tail...>> 
+{
+	static constexpr bool value = TupleContains<T, Tuple<Tail...>>::value;
+};
+
+
 template <typename... Types>
 auto makeTuple(Types... types)
 {
@@ -184,9 +206,21 @@ template <typename T> struct ArgCount;
 template <typename R, typename C, typename... Args> struct ArgCount<R(C::*)(Args...)> { static const int result = sizeof...(Args); };
 template <typename R, typename C, typename... Args> struct ArgCount<R(C::*)(Args...) const> { static const int result = sizeof...(Args); };
 
-template <int N, typename T> struct ArgNType;
+template <typename R, typename C, typename... Args> Tuple<Args...> argsToTuple(R(C::*)(Args...));
+template <typename R, typename C, typename... Args> Tuple<Args...> argsToTuple(R(C::*)(Args...) const);
+template <typename R, typename... Args> Tuple<Args...> argsToTuple(R(Args...) const);
+template <typename F> decltype(argsToTuple(&F::operator())) argsToTuple(F);
+
+template<class T>
+typename T declval();
+
+template <int N, typename T> struct ArgNType { 
+	using ArgsTuple = decltype(argsToTuple(declval<T>()));
+	using Type = typename TupleElement<N, ArgsTuple>::Head;
+};
 template <int N, typename R, typename C, typename... Args> struct ArgNType<N, R(C::*)(Args...)> { using Type = typename TupleElement<N, Tuple<Args...>>::Head; };
 template <int N, typename R, typename C, typename... Args> struct ArgNType<N, R(C::*)(Args...) const> { using Type = typename TupleElement<N, Tuple<Args...>>::Head; };
+
 
 template <typename T> struct ClassOf;
 template <typename R, typename C, typename... Args> struct ClassOf<R(C::*)(Args...)> { using Type = C; };
