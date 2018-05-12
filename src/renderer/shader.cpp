@@ -444,6 +444,13 @@ void Shader::unload()
 		{
 			bgfx::destroy(m_texture_slots[i].uniform_handle);
 		}
+		if (m_texture_slots[i].default_texture)
+		{
+			Texture* t = m_texture_slots[i].default_texture;
+			t->getResourceManager().unload(*t);
+			m_texture_slots[i].default_texture = nullptr;
+		}
+
 		m_texture_slots[i].uniform_handle = BGFX_INVALID_HANDLE;
 	}
 	m_texture_slot_count = 0;
