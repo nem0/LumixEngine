@@ -31,6 +31,18 @@ struct EntryNode;
 class EventArray;
 
 
+static const char* inputTypeToString(int index)
+{
+	switch (index)
+	{
+		case Anim::InputDecl::Type::FLOAT: return "float";
+		case Anim::InputDecl::Type::BOOL: return "bool";
+		case Anim::InputDecl::Type::INT: return "int";
+	}
+	return nullptr;
+}
+
+
 class Component
 {
 public:
@@ -91,6 +103,12 @@ public:
 	void removeEvent(Anim::EventArray& events, int index);
 	const Array<Edge*>& getEdges() { return m_edges; }
 	const Array<Edge*>& getInEdges() { return m_in_edges; }
+
+	template <typename T>
+	void accept(T& visitor)
+	{
+		visitor.visit("name", name);
+	}
 
 protected:
 	void onGuiEvents(Anim::EventArray& events, const char* label, bool show_time);
@@ -178,8 +196,13 @@ public:
 		u32 getValue() const;
 		void setValue(u32 value);
 
-		template <typename Root>
-		void ui(IAnimationEditor& editor, const Root& root);
+		bool ui();
+
+		template <typename T>
+		void accept(T& visitor)
+		{
+			visitor.visit("value", this, &AnimationProxy::getValue, &AnimationProxy::setValue);
+		}
 	};
 
 	AnimationNode(Anim::Component* engine_cmp, Container* parent, ControllerResource& controller);
@@ -198,6 +221,15 @@ public:
 	void removeAnimation(int idx);
 	Array<AnimationProxy>& getAnimations() { return m_animations; }
 	const Array<AnimationProxy>& getAnimations() const { return m_animations; }
+
+	template <typename T>
+	void accept(T& visitor)
+	{
+		visitor.visit("looped", this, &AnimationNode::isLooped, &AnimationNode::setIsLooped);
+		visitor.visit("new_selection_on_loop", this, &AnimationNode::isNewSelectionOnLoop, &AnimationNode::setIsNewSelectionOnLoop);
+		visitor.visit("speed_multiplier", this, &AnimationNode::getSpeedMultiplier, &AnimationNode::setSpeedMultiplier);
+		visitor.visit("animations", m_animations, [&](int index) { addAnimation(index); }, [&](int index) { removeAnimation(index); });
+	}
 
 	int root_rotation_input = -1;
 	Array<AnimationProxy> m_animations;
@@ -331,6 +363,12 @@ public:
 				void setName(const string& name);
 				const string& getName() const { return name; }
 
+				template <typename T>
+				void accept(T& visitor)
+				{
+					visitor.visit("name", name);
+				}
+
 			private:
 				string name;
 				ControllerResource& controller;
@@ -341,6 +379,14 @@ public:
 			, bones(controller.m_allocator)
 		{}
 
+		template <typename T>
+		void accept(T& visitor)
+		{
+			visitor.visit("name", name);
+			visitor.visit("bones", bones, [this](int index) { addBone(index); }, [this](int index) { removeBone(index); });
+		}
+
+		bool ui();
 		void addBone(int index);
 		void removeBone(int index);
 		const StaticString<32>& getName() const { return name; }
@@ -358,6 +404,9 @@ public:
 		struct ValueProxy
 		{
 			explicit ValueProxy(InputProxy& input) : input(input) {}
+			void ui(const char* name);
+
+			template <typename T> void accept(T& visitor) {}
 			InputProxy& input;
 		};
 
@@ -378,6 +427,18 @@ public:
 		ValueProxy& getValue() { return value_proxy; }
 		const ValueProxy& getValue() const { return value_proxy; }
 
+		template <typename T>
+		void accept(T& visitor)
+		{
+			visitor.visit("name", this, &InputProxy::getName, &InputProxy::setName);
+			auto type = enum_proxy(inputTypeToString, this, &InputProxy::getType, &InputProxy::setType);
+			visitor.visit("type", type);
+			visitor.visit("value", value_proxy);
+			auto engine_idx_proxy = no_ui_proxy(this, &InputProxy::getEngineIdx, &InputProxy::setEngineIdx);
+			visitor.visit("engine_idx", engine_idx_proxy);
+		}
+
+
 		ValueProxy value_proxy;
 		int engine_idx;
 		ControllerResource& resource;
@@ -388,6 +449,8 @@ public:
 		struct ValueProxy
 		{
 			explicit ValueProxy(ConstantProxy& input) : input(input) {}
+			void ui(const char* name);
+			template <typename T> void accept(T& visitor) {}
 			ConstantProxy& input;
 		};
 
@@ -407,6 +470,18 @@ public:
 
 		ValueProxy& getValue() { return value_proxy; }
 		const ValueProxy& getValue() const { return value_proxy; }
+
+		template <typename T>
+		void accept(T& visitor)
+		{
+			visitor.visit("name", this, &ConstantProxy::getName, &ConstantProxy::setName);
+			auto type = enum_proxy(inputTypeToString, this, &ConstantProxy::getType, &ConstantProxy::setType);
+			visitor.visit("type", type);
+			visitor.visit("value", value_proxy);
+			auto engine_idx_proxy = no_ui_proxy(this, &ConstantProxy::getEngineIdx, &ConstantProxy::setEngineIdx);
+			visitor.visit("engine_idx", engine_idx_proxy);
+		}
+
 
 		ValueProxy value_proxy;
 		int engine_idx;
@@ -433,9 +508,22 @@ public:
 			const Path& get() const;
 			void set(const Path& anim);
 
+			template <typename T>
+			void accept(T& visitor)
+			{
+				visitor.visit("path", this, &Value::get, &Value::set);
+			}
+
 			Animation* anim = nullptr;
 			AnimationSlot& slot;
 		};
+
+		template <typename T>
+		void accept(T& visitor)
+		{
+			visitor.visit("name", name);
+			visitor.visit("values", values, [](int index) { ASSERT(false); }, [](int index) { ASSERT(false); });
+		}
 
 		Array<Value> values;
 		StaticString<32> name;
@@ -463,6 +551,12 @@ public:
 			Animation* anim = nullptr;
 			AnimationSet& set;
 		};
+
+		template <typename T>
+		void accept(T& visitor)
+		{
+			visitor.visit("name", this, &AnimationSet::getName, &AnimationSet::setName);
+		}
 
 		Array<Value> values;
 		ControllerResource& controller;
@@ -509,6 +603,16 @@ public:
 	int createUID() { ++m_last_uid; return m_last_uid; }
 	const char* getAnimationSlot(u32 slot_hash) const;
 	Component* getByUID(int uid);
+
+	template <typename T>
+	void accept(T& v)
+	{
+		v.visit("masks", m_masks, [this](int index) { addMask(index); }, [this](int index) { removeMask(index); });
+		v.visit("inputs", m_inputs, [this](int index) { addInput(index); }, [this](int index) { removeInput(index); });
+		v.visit("constants", m_constants, [this](int index) { addConstant(index); }, [this](int index) { removeConstant(index); });
+		v.visit("slots", m_animation_slots, [this](int index) { addSlot(index); }, [this](int index) { removeSlot(index); }, attributes(NoUIAttribute()));
+		v.visit("sets", m_animation_sets, [this](int index) { addAnimationSet(index); }, [this](int index) { removeAnimationSet(index); }, attributes(NoUIAttribute()));
+	}
 
 private:
 	ControllerResource(const ControllerResource& rhs);
