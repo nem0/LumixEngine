@@ -23,6 +23,7 @@ class PrefabSystem;
 class Hierarchy;
 class InputBlob;
 struct IPlugin;
+struct ISerializer;
 class PropertyDescriptorBase;
 class OutputBlob;
 class Path;
@@ -100,7 +101,7 @@ public:
 	virtual void loadUniverse(const char* basename) = 0;
 	virtual void saveUniverse(const char* basename, bool save_path) = 0;
 	virtual void newUniverse() = 0;
-	virtual void copyEntities(const Entity* entities, int count, OutputBlob& blob) = 0;
+	virtual void copyEntities(const Entity* entities, int count, ISerializer& serializer) = 0;
 	virtual void copyEntities() = 0;
 	virtual bool canPasteEntities() const = 0;
 	virtual void pasteEntities() = 0;

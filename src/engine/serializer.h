@@ -12,6 +12,7 @@ class OutputBlob;
 struct Quat;
 struct RigidTransform;
 class string;
+struct Transform;
 struct Vec3;
 struct Vec4;
 
@@ -45,6 +46,7 @@ struct LUMIX_ENGINE_API ISerializer
 	virtual ~ISerializer() {}
 
 	virtual void write(const char* label, Entity entity) = 0;
+	virtual void write(const char* label, const Transform& value) = 0;
 	virtual void write(const char* label, const RigidTransform& value) = 0;
 	virtual void write(const char* label, const Vec4& value) = 0;
 	virtual void write(const char* label, const Vec3& value) = 0;
@@ -68,6 +70,7 @@ struct LUMIX_ENGINE_API IDeserializer
 	virtual ~IDeserializer() {}
 
 	virtual void read(Entity* entity) = 0;
+	virtual void read(Transform* value) = 0;
 	virtual void read(RigidTransform* value) = 0;
 	virtual void read(Vec4* value) = 0;
 	virtual void read(Vec3* value) = 0;
@@ -97,6 +100,7 @@ struct LUMIX_ENGINE_API TextSerializer LUMIX_FINAL : public ISerializer
 
 	void write(const char* label, Entity entity)  override;
 	void write(const char* label, const RigidTransform& value)  override;
+	void write(const char* label, const Transform& value)  override;
 	void write(const char* label, const Vec4& value)  override;
 	void write(const char* label, const Vec3& value)  override;
 	void write(const char* label, const Quat& value)  override;
@@ -127,6 +131,7 @@ struct LUMIX_ENGINE_API TextDeserializer LUMIX_FINAL : public IDeserializer
 
 	void read(Entity* entity)  override;
 	void read(RigidTransform* value)  override;
+	void read(Transform* value)  override;
 	void read(Vec4* value)  override;
 	void read(Vec3* value)  override;
 	void read(Quat* value)  override;
