@@ -168,103 +168,6 @@ private:
 };
 
 
-class PasteEntityCommand LUMIX_FINAL : public IEditorCommand
-{
-public:
-	explicit PasteEntityCommand(WorldEditor& editor)
-		: m_blob(editor.getAllocator())
-		, m_editor(editor)
-		, m_entities(editor.getAllocator())
-		, m_identity(false)
-	{
-	}
-
-
-	PasteEntityCommand(WorldEditor& editor, const OutputBlob& blob, bool identity=false)
-		: m_blob(blob, editor.getAllocator())
-		, m_editor(editor)
-		, m_position(editor.getCameraRaycastHit())
-		, m_entities(editor.getAllocator())
-		, m_identity(identity)
-	{
-	}
-
-
-	PasteEntityCommand(WorldEditor& editor, const Vec3& pos, const InputBlob& blob, bool identity = false)
-		: m_blob(blob, editor.getAllocator())
-		, m_editor(editor)
-		, m_position(pos)
-		, m_entities(editor.getAllocator())
-		, m_identity(identity)
-	{
-	}
-
-
-	bool execute() override;
-
-
-	void serialize(JsonSerializer& serializer) override
-	{
-		serializer.serialize("pos_x", m_position.x);
-		serializer.serialize("pos_y", m_position.y);
-		serializer.serialize("pos_z", m_position.z);
-		serializer.serialize("identity", m_identity);
-		serializer.serialize("size", m_blob.getPos());
-		serializer.beginArray("data");
-		for (int i = 0; i < m_blob.getPos(); ++i)
-		{
-			serializer.serializeArrayItem((i32)((const u8*)m_blob.getData())[i]);
-		}
-		serializer.endArray();
-	}
-
-
-	void deserialize(JsonDeserializer& serializer) override
-	{
-		serializer.deserialize("pos_x", m_position.x, 0);
-		serializer.deserialize("pos_y", m_position.y, 0);
-		serializer.deserialize("pos_z", m_position.z, 0);
-		serializer.deserialize("identity", m_identity, false);
-		int size;
-		serializer.deserialize("size", size, 0);
-		serializer.deserializeArrayBegin("data");
-		m_blob.clear();
-		m_blob.reserve(size);
-		for (int i = 0; i < size; ++i)
-		{
-			i32 data;
-			serializer.deserializeArrayItem(data, 0);
-			m_blob.write((u8)data);
-		}
-		serializer.deserializeArrayEnd();
-	}
-
-
-	void undo() override;
-
-
-	const char* getType() override { return "paste_entity"; }
-
-
-	bool merge(IEditorCommand& command) override
-	{
-		ASSERT(command.getType() == getType());
-		return false;
-	}
-
-
-	const Array<Entity>& getEntities() { return m_entities; }
-
-
-private:
-	OutputBlob m_blob;
-	WorldEditor& m_editor;
-	Vec3 m_position;
-	Array<Entity> m_entities;
-	bool m_identity;
-};
-
-
 class MoveEntityCommand LUMIX_FINAL : public IEditorCommand
 {
 public:
@@ -2925,15 +2828,15 @@ public:
 	}
 
 
-	void copyEntities(const Entity* entities, int count, OutputBlob& blob) override
+	void copyEntities(const Entity* entities, int count, ISerializer& serializer) override
 	{
-		blob.write(count);
+		serializer.write("count", count);
 		for (int i = 0; i < count; ++i)
 		{
 			Entity entity = entities[i];
-			auto mtx = m_universe->getMatrix(entity);
-			blob.write(mtx);
-			blob.write(m_universe->getParent(entity));
+			Transform tr = m_universe->getTransform(entity);
+			serializer.write("transform", tr);
+			serializer.write("parent", m_universe->getParent(entity));
 
 			i32 cmp_count = 0;
 			for (ComponentUID cmp = m_universe->getFirstComponent(entity); cmp.isValid();
@@ -2942,19 +2845,16 @@ public:
 				++cmp_count;
 			}
 
-			blob.write(cmp_count);
+			serializer.write("cmp_count", cmp_count);
 			for (ComponentUID cmp = m_universe->getFirstComponent(entity);
 				cmp.isValid();
 				cmp = m_universe->getNextComponent(cmp))
 			{
 				u32 cmp_type = Reflection::getComponentTypeHash(cmp.type);
-				blob.write(cmp_type);
+				serializer.write("cmp_type", cmp_type);
 				const Reflection::ComponentBase* cmp_desc = Reflection::getComponent(cmp.type);
 				
-				SaveVisitor v;
-				v.stream = &blob;
-				v.cmp = cmp;
-				cmp_desc->visit(v);
+				m_universe->serializeComponent(serializer, cmp.type, cmp.entity);
 			}
 		}
 	}
@@ -2965,7 +2865,36 @@ public:
 		if (m_selected_entities.empty()) return;
 
 		m_copy_buffer.clear();
-		copyEntities(&m_selected_entities[0], m_selected_entities.size(), m_copy_buffer);
+
+		struct : ISaveEntityGUIDMap {
+			EntityGUID get(Entity entity) override {
+				if (!entity.isValid()) return INVALID_ENTITY_GUID;
+				
+				int idx = editor->m_selected_entities.indexOf(entity);
+				if (idx >= 0) {
+					return { (u64)idx };
+				}
+				return { ((u64)1 << 32) | (u64)entity.index };
+			}
+
+			WorldEditorImpl* editor;
+		} map;
+		map.editor = this;
+
+		TextSerializer serializer(m_copy_buffer, map);
+
+		Array<Entity> entities(m_allocator);
+		entities.reserve(m_selected_entities.size());
+		for (Entity e : m_selected_entities) {
+			entities.push(e);
+		}
+		for (int i = 0; i < entities.size(); ++i) {
+			Entity e = entities[i];
+			for (Entity child = m_universe->getFirstChild(e); child.isValid(); child = m_universe->getNextSibling(child)) {
+				if(entities.indexOf(child) < 0) entities.push(child);
+			}
+		}
+		copyEntities(&entities[0], entities.size(), serializer);
 	}
 
 
@@ -2975,19 +2904,8 @@ public:
 	}
 
 
-	void pasteEntities() override
-	{
-		PasteEntityCommand* command = LUMIX_NEW(m_allocator, PasteEntityCommand)(*this, m_copy_buffer);
-		executeCommand(command);
-	}
-
-	void duplicateEntities() override
-	{
-		copyEntities();
-
-		PasteEntityCommand* command = LUMIX_NEW(m_allocator, PasteEntityCommand)(*this, m_copy_buffer, true);
-		executeCommand(command);
-	}
+	void pasteEntities() override;
+	void duplicateEntities() override;
 
 
 	void cloneComponent(const ComponentUID& src, Entity entity) override
@@ -3919,77 +3837,208 @@ private:
 };
 
 
-bool PasteEntityCommand::execute()
+class PasteEntityCommand LUMIX_FINAL : public IEditorCommand
 {
-	InputBlob blob(m_blob.getData(), m_blob.getPos());
-
-	int entity_count;
-	blob.read(entity_count);
-	m_entities.reserve(entity_count);
-	bool is_redo = !m_entities.empty();
-
-	Universe& universe = *m_editor.getUniverse();
-	Matrix base_matrix = Matrix::IDENTITY;
-	base_matrix.setTranslation(m_position);
-	for (int i = 0; i < entity_count; ++i)
+public:
+	explicit PasteEntityCommand(WorldEditor& editor)
+		: m_copy_buffer(editor.getAllocator())
+		, m_editor(editor)
+		, m_entities(editor.getAllocator())
+		, m_identity(false)
 	{
-		Matrix mtx;
-		blob.read(mtx);
-		Entity parent;
-		blob.read(parent);
+	}
 
-		if (!m_identity)
+
+	PasteEntityCommand(WorldEditor& editor, const OutputBlob& copy_buffer, bool identity = false)
+		: m_copy_buffer(copy_buffer)
+		, m_editor(editor)
+		, m_position(editor.getCameraRaycastHit())
+		, m_entities(editor.getAllocator())
+		, m_identity(identity)
+	{
+	}
+
+
+	PasteEntityCommand(WorldEditor& editor, const Vec3& pos, const OutputBlob& copy_buffer, bool identity = false)
+		: m_copy_buffer(copy_buffer)
+		, m_editor(editor)
+		, m_position(pos)
+		, m_entities(editor.getAllocator())
+		, m_identity(identity)
+	{
+	}
+
+
+	void serialize(JsonSerializer& serializer) override
+	{
+		/*serializer.serialize("pos_x", m_position.x);
+		serializer.serialize("pos_y", m_position.y);
+		serializer.serialize("pos_z", m_position.z);
+		serializer.serialize("identity", m_identity);
+		serializer.serialize("size", m_blob.getPos());
+		serializer.beginArray("data");
+		for (int i = 0; i < m_blob.getPos(); ++i)
 		{
-			if (i == 0)
+			serializer.serializeArrayItem((i32)((const u8*)m_blob.getData())[i]);
+		}
+		serializer.endArray();*/
+		// TODO
+	}
+
+
+	void deserialize(JsonDeserializer& serializer) override
+	{
+		// TODO
+		/*
+		serializer.deserialize("pos_x", m_position.x, 0);
+		serializer.deserialize("pos_y", m_position.y, 0);
+		serializer.deserialize("pos_z", m_position.z, 0);
+		serializer.deserialize("identity", m_identity, false);
+		int size;
+		serializer.deserialize("size", size, 0);
+		serializer.deserializeArrayBegin("data");
+		m_blob.clear();
+		m_blob.reserve(size);
+		for (int i = 0; i < size; ++i)
+		{
+			i32 data;
+			serializer.deserializeArrayItem(data, 0);
+			m_blob.write((u8)data);
+		}
+		serializer.deserializeArrayEnd();*/
+	}
+
+
+	bool execute() override
+	{
+		struct Map : ILoadEntityGUIDMap {
+			Map(IAllocator& allocator) : entities(allocator) {}
+
+			Entity get(EntityGUID guid) override 
 			{
-				Matrix inv = mtx;
-				inv.inverse();
-				base_matrix.copy3x3(mtx);
-				base_matrix = base_matrix * inv;
-				mtx.setTranslation(m_position);
+				if (guid == INVALID_ENTITY_GUID) return INVALID_ENTITY;
+
+				if (guid.value > 0xffFFffFF) return { (int)guid.value }; ;
+				
+				return entities[(int)guid.value];
+			}
+
+			Array<Entity> entities;
+		} map(m_editor.getAllocator());
+		InputBlob input_blob(m_copy_buffer);
+		TextDeserializer deserializer(input_blob, map);
+
+		Universe& universe = *m_editor.getUniverse();
+		int entity_count;
+		deserializer.read(&entity_count);
+		map.entities.resize(entity_count);
+		bool is_redo = !m_entities.empty();
+		for (int i = 0; i < entity_count; ++i)
+		{
+			if (is_redo)
+			{
+				map.entities[i] = m_entities[i];
+				universe.emplaceEntity(m_entities[i]);
 			}
 			else
 			{
-				mtx = base_matrix * mtx;
+				map.entities[i] = universe.createEntity(Vec3(0, 0, 0), Quat(0, 0, 0, 1));
 			}
 		}
 
-		Entity new_entity;
-		if (is_redo)
+		m_entities.reserve(entity_count);
+
+		Matrix base_matrix = Matrix::IDENTITY;
+		base_matrix.setTranslation(m_position);
+		for (int i = 0; i < entity_count; ++i)
 		{
-			new_entity = m_entities[i];
-			universe.emplaceEntity(m_entities[i]);
+			Transform tr;
+			deserializer.read(&tr);
+			Matrix mtx = tr.toMatrix();
+			Entity parent;
+			deserializer.read(&parent);
+
+			if (!m_identity)
+			{
+				if (i == 0)
+				{
+					Matrix inv = mtx;
+					inv.inverse();
+					base_matrix.copy3x3(mtx);
+					base_matrix = base_matrix * inv;
+					mtx.setTranslation(m_position);
+				}
+				else
+				{
+					mtx = base_matrix * mtx;
+				}
+			}
+
+			const Entity new_entity = map.entities[i];
+			((WorldEditorImpl&)m_editor).m_entity_map.create(new_entity);
+			if (!is_redo) m_entities.push(new_entity);
+			universe.setMatrix(new_entity, mtx);
+			universe.setParent(parent, new_entity);
+			i32 count;
+			deserializer.read(&count);
+			for (int j = 0; j < count; ++j)
+			{
+				u32 hash;
+				deserializer.read(&hash);
+				ComponentType type = Reflection::getComponentTypeFromHash(hash);
+				const int scene_version = universe.getScene(type)->getVersion();
+				universe.deserializeComponent(deserializer, new_entity, type, scene_version);
+			}
 		}
-		else
+		return true;
+	}
+
+
+	void undo() override
+	{
+		for (auto entity : m_entities)
 		{
-			new_entity = universe.createEntity(Vec3(0, 0, 0), Quat(0, 0, 0, 1));
-		}
-		((WorldEditorImpl&)m_editor).m_entity_map.create(new_entity);
-		if (!is_redo) m_entities.push(new_entity);
-		universe.setMatrix(new_entity, mtx);
-		universe.setParent(parent, new_entity);
-		i32 count;
-		blob.read(count);
-		for (int j = 0; j < count; ++j)
-		{
-			u32 hash;
-			blob.read(hash);
-			ComponentType type = Reflection::getComponentTypeFromHash(hash);
-			ComponentUID cmp = m_editor.getEngine().createComponent(universe, new_entity, type);
-			load(cmp, -1, blob);
+			m_editor.getUniverse()->destroyEntity(entity);
+			((WorldEditorImpl&)m_editor).m_entity_map.erase(entity);
 		}
 	}
-	return true;
+
+
+	const char* getType() override { return "paste_entity"; }
+
+
+	bool merge(IEditorCommand& command) override
+	{
+		ASSERT(command.getType() == getType());
+		return false;
+	}
+
+
+	const Array<Entity>& getEntities() { return m_entities; }
+
+
+private:
+	OutputBlob m_copy_buffer;
+	WorldEditor& m_editor;
+	Vec3 m_position;
+	Array<Entity> m_entities;
+	bool m_identity;
+};
+
+
+void WorldEditorImpl::pasteEntities()
+{
+	PasteEntityCommand* command = LUMIX_NEW(m_allocator, PasteEntityCommand)(*this, m_copy_buffer);
+	executeCommand(command);
 }
 
 
-void PasteEntityCommand::undo()
+void WorldEditorImpl::duplicateEntities()
 {
-	for (auto entity : m_entities)
-	{
-		m_editor.getUniverse()->destroyEntity(entity);
-		((WorldEditorImpl&)m_editor).m_entity_map.erase(entity);
-	}
+	copyEntities();
+
+	PasteEntityCommand* command = LUMIX_NEW(m_allocator, PasteEntityCommand)(*this, m_copy_buffer, true);
+	executeCommand(command);
 }
 
 

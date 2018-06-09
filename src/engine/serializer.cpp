@@ -40,6 +40,14 @@ void TextSerializer::write(const char* label, const RigidTransform& value)
 		<< asU32(value.rot.w) << "\n";
 }
 
+void TextSerializer::write(const char* label, const Transform& value)
+{
+	blob << "#" << label << " (" << value.pos.x << ", " << value.pos.y << ", " << value.pos.z << ") "
+		<< " (" << value.rot.x << ", " << value.rot.y << ", " << value.rot.z << ", " << value.rot.w << ") " << value.scale <<  "\n\t"
+		<< asU32(value.pos.x) << "\n\t" << asU32(value.pos.y) << "\n\t" << asU32(value.pos.z) << "\n\t"
+		<< asU32(value.rot.x) << "\n\t" << asU32(value.rot.y) << "\n\t" << asU32(value.rot.z) << "\n\t"
+		<< asU32(value.rot.w) << "\n\t" << asU32(value.scale) << "\n";
+}
 void TextSerializer::write(const char* label, const Vec3& value)
 {
 	blob << "#" << label << " (" << value.x << ", " << value.y << ", " << value.z << ")\n\t" << asU32(value.x) << "\n\t"
@@ -139,6 +147,27 @@ void TextDeserializer::read(RigidTransform* value)
 	value->rot.z = asFloat(readU32());
 	skip();
 	value->rot.w = asFloat(readU32());
+}
+
+
+void TextDeserializer::read(Transform* value)
+{
+	skip();
+	value->pos.x = asFloat(readU32());
+	skip();
+	value->pos.y = asFloat(readU32());
+	skip();
+	value->pos.z = asFloat(readU32());
+	skip();
+	value->rot.x = asFloat(readU32());
+	skip();
+	value->rot.y = asFloat(readU32());
+	skip();
+	value->rot.z = asFloat(readU32());
+	skip();
+	value->rot.w = asFloat(readU32());
+	skip();
+	value->scale = asFloat(readU32());
 }
 
 
