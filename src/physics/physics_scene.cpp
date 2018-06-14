@@ -1,4 +1,3 @@
-#include "physics/physics_scene.h"
 #include "engine/blob.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
@@ -15,6 +14,7 @@
 #include "engine/universe/universe.h"
 #include "lua_script/lua_script_system.h"
 #include "physics/physics_geometry_manager.h"
+#include "physics/physics_scene.h"
 #include "physics/physics_system.h"
 #include "renderer/model.h"
 #include "renderer/pose.h"
@@ -106,10 +106,8 @@ struct OutputStream LUMIX_FINAL : public PxOutputStream
 	{
 		if (size + (int)count > capacity)
 		{
-			int new_capacity =
-				Math::maximum(size + (int)count, capacity + 4096);
-			u8* new_data =
-				(u8*)allocator.allocate(sizeof(u8) * new_capacity);
+			int new_capacity = Math::maximum(size + (int)count, capacity + 4096);
+			u8* new_data = (u8*)allocator.allocate(sizeof(u8) * new_capacity);
 			copyMemory(new_data, data, size);
 			allocator.deallocate(data);
 			data = new_data;
@@ -160,12 +158,30 @@ struct InputStream LUMIX_FINAL : public PxInputStream
 };
 
 
-static Vec3 fromPhysx(const PxVec3& v) { return Vec3(v.x, v.y, v.z); }
-static PxVec3 toPhysx(const Vec3& v) { return PxVec3(v.x, v.y, v.z); }
-static Quat fromPhysx(const PxQuat& v) { return Quat(v.x, v.y, v.z, v.w); }
-static PxQuat toPhysx(const Quat& v) { return PxQuat(v.x, v.y, v.z, v.w); }
-static RigidTransform fromPhysx(const PxTransform& v) { return{ fromPhysx(v.p), fromPhysx(v.q) }; }
-static PxTransform toPhysx(const RigidTransform& v) { return {toPhysx(v.pos), toPhysx(v.rot)}; }
+static Vec3 fromPhysx(const PxVec3& v)
+{
+	return Vec3(v.x, v.y, v.z);
+}
+static PxVec3 toPhysx(const Vec3& v)
+{
+	return PxVec3(v.x, v.y, v.z);
+}
+static Quat fromPhysx(const PxQuat& v)
+{
+	return Quat(v.x, v.y, v.z, v.w);
+}
+static PxQuat toPhysx(const Quat& v)
+{
+	return PxQuat(v.x, v.y, v.z, v.w);
+}
+static RigidTransform fromPhysx(const PxTransform& v)
+{
+	return {fromPhysx(v.p), fromPhysx(v.q)};
+}
+static PxTransform toPhysx(const RigidTransform& v)
+{
+	return {toPhysx(v.pos), toPhysx(v.rot)};
+}
 
 
 struct Joint
@@ -196,7 +212,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 {
 	struct CPUDispatcher : physx::PxCpuDispatcher
 	{
-		void submitTask(PxBaseTask& task) override 
+		void submitTask(PxBaseTask& task) override
 		{
 			JobSystem::JobDecl job;
 			job.data = &task;
@@ -208,10 +224,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			};
 			JobSystem::runJobs(&job, 1, nullptr);
 		}
-		PxU32 getWorkerCount() const override 
-		{
-			return MT::getCPUsCount();
-		}
+		PxU32 getWorkerCount() const override { return MT::getCPUsCount(); }
 	};
 
 
@@ -223,9 +236,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		}
 
 
-		void onContact(const PxContactPairHeader& pairHeader,
-			const PxContactPair* pairs,
-			PxU32 nbPairs) override
+		void onContact(const PxContactPairHeader& pairHeader, const PxContactPair* pairs, PxU32 nbPairs) override
 		{
 			for (PxU32 i = 0; i < nbPairs; i++)
 			{
@@ -240,7 +251,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 				contact_data.position = fromPhysx(contact.position);
 				contact_data.e1 = {(int)(intptr_t)(pairHeader.actors[0]->userData)};
 				contact_data.e2 = {(int)(intptr_t)(pairHeader.actors[1]->userData)};
-				
+
 				m_scene.onContact(contact_data);
 			}
 		}
@@ -250,7 +261,8 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		{
 			for (PxU32 i = 0; i < count; i++)
 			{
-				const auto REMOVED_FLAGS = PxTriggerPairFlag::eREMOVED_SHAPE_TRIGGER | PxTriggerPairFlag::eREMOVED_SHAPE_OTHER;
+				const auto REMOVED_FLAGS =
+					PxTriggerPairFlag::eREMOVED_SHAPE_TRIGGER | PxTriggerPairFlag::eREMOVED_SHAPE_OTHER;
 				if (pairs[i].flags & REMOVED_FLAGS) continue;
 
 				Entity e1 = {(int)(intptr_t)(pairs[i].triggerActor->userData)};
@@ -339,13 +351,13 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			m_collision_filter[i] = 0xffffFFFF;
 		}
 
-		#define REGISTER_COMPONENT(TYPE, COMPONENT) \
-			context.registerComponentType(TYPE \
-				, this \
-				, &PhysicsSceneImpl::create##COMPONENT \
-				, &PhysicsSceneImpl::destroy##COMPONENT \
-				, &PhysicsSceneImpl::serialize##COMPONENT \
-				, &PhysicsSceneImpl::deserialize##COMPONENT);
+#define REGISTER_COMPONENT(TYPE, COMPONENT)      \
+	context.registerComponentType(TYPE,          \
+		this,                                    \
+		&PhysicsSceneImpl::create##COMPONENT,    \
+		&PhysicsSceneImpl::destroy##COMPONENT,   \
+		&PhysicsSceneImpl::serialize##COMPONENT, \
+		&PhysicsSceneImpl::deserialize##COMPONENT);
 
 
 		REGISTER_COMPONENT(RIGID_ACTOR_TYPE, RigidActor);
@@ -361,7 +373,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		REGISTER_COMPONENT(D6_JOINT_TYPE, D6Joint);
 		REGISTER_COMPONENT(RAGDOLL_TYPE, Ragdoll);
 
-		#undef REGISTER_COMPONENT
+#undef REGISTER_COMPONENT
 	}
 
 
@@ -374,10 +386,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	int getVersion() const override
-	{
-		return (int)PhysicsSceneVersion::LATEST;
-	}
+	int getVersion() const override { return (int)PhysicsSceneVersion::LATEST; }
 
 
 	void clear() override
@@ -415,8 +424,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	{
 		if (!m_script_scene) return;
 
-		auto send = [this, touch_lost](Entity e1, Entity e2)
-		{
+		auto send = [this, touch_lost](Entity e1, Entity e2) {
 			if (!m_script_scene->getUniverse().hasComponent(e1, LUA_SCRIPT_TYPE)) return;
 
 			for (int i = 0, c = m_script_scene->getScriptCount(e1); i < c; ++i)
@@ -439,8 +447,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	{
 		if (!m_script_scene) return;
 
-		auto send = [this](Entity e1, Entity e2, const Vec3& position)
-		{
+		auto send = [this](Entity e1, Entity e2, const Vec3& position) {
 			if (!m_script_scene->getUniverse().hasComponent(e1, LUA_SCRIPT_TYPE)) return;
 
 			for (int i = 0, c = m_script_scene->getScriptCount(e1); i < c; ++i)
@@ -462,10 +469,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	u32 getDebugVisualizationFlags() const override
-	{
-		return m_debug_visualization_flags;
-	}
+	u32 getDebugVisualizationFlags() const override { return m_debug_visualization_flags; }
 
 
 	void setDebugVisualizationFlags(u32 flags) override
@@ -511,10 +515,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	IPlugin& getPlugin() const override { return *m_system; }
 
 
-	int getControllerLayer(Entity entity) override
-	{
-		return m_controllers[entity].m_layer;
-	}
+	int getControllerLayer(Entity entity) override { return m_controllers[entity].m_layer; }
 
 
 	void setControllerLayer(Entity entity, int layer) override
@@ -558,10 +559,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	int getRagdollLayer(Entity entity) override
-	{
-		return m_ragdolls[entity].layer;
-	}
+	int getRagdollLayer(Entity entity) override { return m_ragdolls[entity].layer; }
 
 
 	void setActorLayer(Entity entity, int layer) override
@@ -631,8 +629,8 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			shapes->setGeometry(capsule);
 		}
 	}
-	
-	
+
+
 	float getCapsuleHeight(Entity entity) override
 	{
 		PxRigidActor* actor = m_actors[entity]->physx_actor;
@@ -659,7 +657,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		}
 	}
 
-	
+
 	int getHeightfieldLayer(Entity entity) override { return m_terrains[entity].m_layer; }
 
 
@@ -694,7 +692,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	{
 		PROFILE_FUNCTION();
 		Heightfield& terrain = m_terrains[entity];
-		
+
 		PxShape* shape;
 		terrain.m_actor->getShapes(&shape, 1);
 		PxHeightFieldGeometry geom;
@@ -752,10 +750,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	Entity getJointEntity(int index) override { return {m_joints.getKey(index).index}; }
 
 
-	PxDistanceJoint* getDistanceJoint(Entity entity)
-	{
-		return static_cast<PxDistanceJoint*>(m_joints[entity].physx);
-	}
+	PxDistanceJoint* getDistanceJoint(Entity entity) { return static_cast<PxDistanceJoint*>(m_joints[entity].physx); }
 
 
 	Vec3 getDistanceJointLinearForce(Entity entity) override
@@ -769,10 +764,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	float getDistanceJointDamping(Entity entity) override { return getDistanceJoint(entity)->getDamping(); }
 
 
-	void setDistanceJointDamping(Entity entity, float value) override
-	{
-		getDistanceJoint(entity)->setDamping(value);
-	}
+	void setDistanceJointDamping(Entity entity, float value) override { getDistanceJoint(entity)->setDamping(value); }
 
 
 	float getDistanceJointStiffness(Entity entity) override { return getDistanceJoint(entity)->getStiffness(); }
@@ -810,19 +802,13 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	PxD6Joint* getD6Joint(Entity entity)
-	{
-		return static_cast<PxD6Joint*>(m_joints[entity].physx);
-	}
+	PxD6Joint* getD6Joint(Entity entity) { return static_cast<PxD6Joint*>(m_joints[entity].physx); }
 
 
-	float getD6JointDamping(Entity entity) override
-	{
-		return getD6Joint(entity)->getLinearLimit().damping;
-	}
+	float getD6JointDamping(Entity entity) override { return getD6Joint(entity)->getLinearLimit().damping; }
 
 
-	void setD6JointDamping(Entity entity, float value) override 
+	void setD6JointDamping(Entity entity, float value) override
 	{
 		PxD6Joint* joint = getD6Joint(entity);
 		PxJointLinearLimit limit = joint->getLinearLimit();
@@ -831,10 +817,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	float getD6JointStiffness(Entity entity) override
-	{
-		return getD6Joint(entity)->getLinearLimit().stiffness;
-	}
+	float getD6JointStiffness(Entity entity) override { return getD6Joint(entity)->getLinearLimit().stiffness; }
 
 
 	void setD6JointStiffness(Entity entity, float value) override
@@ -846,10 +829,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	float getD6JointRestitution(Entity entity) override
-	{
-		return getD6Joint(entity)->getLinearLimit().restitution;
-	}
+	float getD6JointRestitution(Entity entity) override { return getD6Joint(entity)->getLinearLimit().restitution; }
 
 
 	void setD6JointRestitution(Entity entity, float value) override
@@ -895,10 +875,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	D6Motion getD6JointXMotion(Entity entity) override
-	{
-		return (D6Motion)getD6Joint(entity)->getMotion(PxD6Axis::eX);
-	}
+	D6Motion getD6JointXMotion(Entity entity) override { return (D6Motion)getD6Joint(entity)->getMotion(PxD6Axis::eX); }
 
 
 	void setD6JointXMotion(Entity entity, D6Motion motion) override
@@ -907,10 +884,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	D6Motion getD6JointYMotion(Entity entity) override
-	{
-		return (D6Motion)getD6Joint(entity)->getMotion(PxD6Axis::eY);
-	}
+	D6Motion getD6JointYMotion(Entity entity) override { return (D6Motion)getD6Joint(entity)->getMotion(PxD6Axis::eY); }
 
 
 	void setD6JointYMotion(Entity entity, D6Motion motion) override
@@ -955,10 +929,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	D6Motion getD6JointZMotion(Entity entity) override
-	{
-		return (D6Motion)getD6Joint(entity)->getMotion(PxD6Axis::eZ);
-	}
+	D6Motion getD6JointZMotion(Entity entity) override { return (D6Motion)getD6Joint(entity)->getMotion(PxD6Axis::eZ); }
 
 
 	void setD6JointZMotion(Entity entity, D6Motion motion) override
@@ -967,10 +938,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	float getD6JointLinearLimit(Entity entity) override
-	{
-		return getD6Joint(entity)->getLinearLimit().value;
-	}
+	float getD6JointLinearLimit(Entity entity) override { return getD6Joint(entity)->getLinearLimit().value; }
 
 
 	void setD6JointLinearLimit(Entity entity, float limit) override
@@ -982,10 +950,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	Entity getJointConnectedBody(Entity entity) override
-	{
-		return m_joints[entity].connected_body;
-	}
+	Entity getJointConnectedBody(Entity entity) override { return m_joints[entity].connected_body; }
 
 
 	void setJointConnectedBody(Entity joint_entity, Entity connected_body) override
@@ -1013,10 +978,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	Vec3 getJointAxisPosition(Entity entity) override
-	{
-		return fromPhysx(m_joints[entity].local_frame0.p);
-	}
+	Vec3 getJointAxisPosition(Entity entity) override { return fromPhysx(m_joints[entity].local_frame0.p); }
 
 
 	Vec3 getJointAxisDirection(Entity entity) override
@@ -1057,24 +1019,18 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	RigidTransform getJointLocalFrame(Entity entity) override
-	{
-		return fromPhysx(m_joints[entity].local_frame0);
-	}
+	RigidTransform getJointLocalFrame(Entity entity) override { return fromPhysx(m_joints[entity].local_frame0); }
 
 
-	PxJoint* getJoint(Entity entity) override
-	{
-		return m_joints[entity].physx;
-	}
+	PxJoint* getJoint(Entity entity) override { return m_joints[entity].physx; }
 
 
 	RigidTransform getJointConnectedBodyLocalFrame(Entity entity) override
 	{
 		auto& joint = m_joints[entity];
 		if (!joint.connected_body.isValid()) return {Vec3(0, 0, 0), Quat(0, 0, 0, 1)};
-		
-		PxRigidActor* a0, *a1;
+
+		PxRigidActor *a0, *a1;
 		joint.physx->getActors(a0, a1);
 		if (a1) return fromPhysx(joint.physx->getLocalPose(PxJointActorIndex::eACTOR1));
 
@@ -1132,7 +1088,6 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		PxJointAngularLimitPair px_limit = joint->getLimit();
 		px_limit.damping = value;
 		joint->setLimit(px_limit);
-
 	}
 
 
@@ -1213,7 +1168,6 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 				}
 			}
 		}
-
 	}
 
 
@@ -1393,8 +1347,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		Transform transform = m_universe.getTransform(entity);
 		PxTransform px_transform = toPhysx({transform.pos, transform.rot});
 
-		PxRigidStatic* physx_actor =
-			PxCreateStatic(*m_system->getPhysics(), px_transform, geom, *m_default_material);
+		PxRigidStatic* physx_actor = PxCreateStatic(*m_system->getPhysics(), px_transform, geom, *m_default_material);
 		actor->setPhysxActor(physx_actor);
 
 		m_universe.onComponentCreated(entity, CAPSULE_ACTOR_TYPE, this);
@@ -1445,8 +1398,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		Transform transform = m_universe.getTransform(entity);
 		PxTransform px_transform = toPhysx({transform.pos, transform.rot});
 
-		PxRigidStatic* physx_actor =
-			PxCreateStatic(*m_system->getPhysics(), px_transform, geom, *m_default_material);
+		PxRigidStatic* physx_actor = PxCreateStatic(*m_system->getPhysics(), px_transform, geom, *m_default_material);
 		actor->setPhysxActor(physx_actor);
 
 		m_universe.onComponentCreated(entity, BOX_ACTOR_TYPE, this);
@@ -1465,8 +1417,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		Transform tr = m_universe.getTransform(entity);
 		PxTransform transform = toPhysx({tr.pos, tr.rot});
 
-		PxRigidStatic* physx_actor =
-			PxCreateStatic(*m_system->getPhysics(), transform, geom, *m_default_material);
+		PxRigidStatic* physx_actor = PxCreateStatic(*m_system->getPhysics(), transform, geom, *m_default_material);
 		actor->setPhysxActor(physx_actor);
 
 		m_universe.onComponentCreated(entity, SPHERE_ACTOR_TYPE, this);
@@ -1509,10 +1460,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	float getHeightmapYScale(Entity entity) override
-	{
-		return m_terrains[entity].m_y_scale;
-	}
+	float getHeightmapYScale(Entity entity) override { return m_terrains[entity].m_y_scale; }
 
 
 	void setHeightmapYScale(Entity entity, float scale) override
@@ -1568,7 +1516,8 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		auto& actor = *m_actors[entity];
 		if (actor.resource && actor.resource->getPath() == str)
 		{
-			bool is_kinematic = actor.physx_actor->isRigidBody()->getRigidBodyFlags().isSet(PxRigidBodyFlag::eKINEMATIC);
+			bool is_kinematic =
+				actor.physx_actor->isRigidBody()->getRigidBodyFlags().isSet(PxRigidBodyFlag::eKINEMATIC);
 			if (actor.dynamic_type == DynamicType::KINEMATIC && is_kinematic) return;
 			if (actor.dynamic_type == DynamicType::DYNAMIC && actor.physx_actor->isRigidDynamic()) return;
 			if (actor.dynamic_type == DynamicType::STATIC && actor.physx_actor->isRigidStatic()) return;
@@ -1630,7 +1579,8 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			for (PxU32 i = 0; i < num_tris; ++i)
 			{
 				const PxDebugTriangle& tri = tris[i];
-				render_scene.addDebugTriangle(fromPhysx(tri.pos0), fromPhysx(tri.pos1), fromPhysx(tri.pos2), tri.color0, 0);
+				render_scene.addDebugTriangle(
+					fromPhysx(tri.pos0), fromPhysx(tri.pos1), fromPhysx(tri.pos2), tri.color0, 0);
 			}
 		}
 	}
@@ -1693,7 +1643,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			}
 
 			bool apply_gravity = (state.collisionFlags & PxControllerCollisionFlag::eCOLLISION_DOWN) == 0;
-			if(apply_gravity)
+			if (apply_gravity)
 			{
 				dif.y += controller.gravity_speed * time_delta;
 				controller.gravity_speed += time_delta * gravity_acceleration;
@@ -1719,7 +1669,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 		auto* handle = getBone(bone->child, pose_bone_idx);
 		if (handle) return handle;
-			
+
 		handle = getBone(bone->next, pose_bone_idx);
 		if (handle) return handle;
 
@@ -1741,40 +1691,22 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	PxJoint* getRagdollBoneJoint(RagdollBone* bone) const override
-	{
-		return bone->parent_joint;
-	}
+	PxJoint* getRagdollBoneJoint(RagdollBone* bone) const override { return bone->parent_joint; }
 
 
-	RagdollBone* getRagdollRootBone(Entity entity) const override
-	{
-		return m_ragdolls[entity].root;
-	}
+	RagdollBone* getRagdollRootBone(Entity entity) const override { return m_ragdolls[entity].root; }
 
 
-	RagdollBone* getRagdollBoneChild(RagdollBone* bone) override
-	{
-		return bone->child;
-	}
+	RagdollBone* getRagdollBoneChild(RagdollBone* bone) override { return bone->child; }
 
 
-	RagdollBone* getRagdollBoneSibling(RagdollBone* bone) override
-	{
-		return bone->next;
-	}
+	RagdollBone* getRagdollBoneSibling(RagdollBone* bone) override { return bone->next; }
 
 
-	float getRagdollBoneHeight(RagdollBone* bone) override
-	{
-		return getCapsuleGeometry(bone).halfHeight * 2.0f;
-	}
+	float getRagdollBoneHeight(RagdollBone* bone) override { return getCapsuleGeometry(bone).halfHeight * 2.0f; }
 
 
-	float getRagdollBoneRadius(RagdollBone* bone) override
-	{
-		return getCapsuleGeometry(bone).radius;
-	}
+	float getRagdollBoneRadius(RagdollBone* bone) override { return getCapsuleGeometry(bone).radius; }
 
 
 	void setRagdollBoneHeight(RagdollBone* bone, float value) override
@@ -1809,7 +1741,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	void setRagdollBoneTransform(RagdollBone* bone, const RigidTransform& transform) override
 	{
 		Entity entity = {(int)(intptr_t)bone->actor->userData};
-		
+
 		auto* render_scene = static_cast<RenderScene*>(m_universe.getScene(RENDERER_HASH));
 		if (!render_scene) return;
 
@@ -1905,7 +1837,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		ragdoll.root_transform = root_transform.inverted() * entity_transform;
 	}
 
-	
+
 	void setRagdollData(Entity entity, InputBlob& blob) override
 	{
 		auto& ragdoll = m_ragdolls[entity];
@@ -1930,11 +1862,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-
-	bool isRagdollBoneKinematic(RagdollBone* bone) override
-	{
-		return bone->is_kinematic;
-	}
+	bool isRagdollBoneKinematic(RagdollBone* bone) override { return bone->is_kinematic; }
 
 
 	void changeRagdollBoneJoint(RagdollBone* child, int type) override
@@ -1976,8 +1904,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 				}
 				break;
 			case PxJointConcreteType::eREVOLUTE:
-				joint =
-					PxRevoluteJointCreate(m_scene->getPhysics(), child->parent->actor, tr0, child->actor, tr1);
+				joint = PxRevoluteJointCreate(m_scene->getPhysics(), child->parent->actor, tr0, child->actor, tr1);
 				if (joint)
 				{
 					auto* hinge = static_cast<PxRevoluteJoint*>(joint);
@@ -1986,8 +1913,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 				}
 				break;
 			case PxJointConcreteType::eSPHERICAL:
-				joint =
-					PxSphericalJointCreate(m_scene->getPhysics(), child->parent->actor, tr0, child->actor, tr1);
+				joint = PxSphericalJointCreate(m_scene->getPhysics(), child->parent->actor, tr0, child->actor, tr1);
 				if (joint)
 				{
 					auto* spherical = static_cast<PxSphericalJoint*>(joint);
@@ -2066,7 +1992,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		bone->child = nullptr;
 		bone->prev = nullptr;
 		bone->next = ragdoll.root;
-		if(bone->next) bone->next->prev = bone;
+		if (bone->next) bone->next->prev = bone;
 	}
 
 
@@ -2148,7 +2074,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	{
 		auto* render_scene = static_cast<RenderScene*>(m_universe.getScene(RENDERER_HASH));
 		ASSERT(render_scene);
-		
+
 		Model* model = render_scene->getModelInstanceModel(entity);
 		ASSERT(model && model->isReady());
 		auto iter = model->getBoneIndex(bone_name_hash);
@@ -2159,10 +2085,10 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		new_bone->parent_joint = nullptr;
 		new_bone->is_kinematic = false;
 		new_bone->pose_bone_idx = iter.value();
-		
+
 		float bone_height;
 		RigidTransform transform = getNewBoneTransform(model, iter.value(), bone_height);
-		
+
 		new_bone->bind_transform = transform.inverted() * model->getBone(iter.value()).transform;
 		new_bone->inv_bind_transform = new_bone->bind_transform.inverted();
 		transform = m_universe.getTransform(entity).getRigidPart() * transform;
@@ -2197,8 +2123,9 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	void setSkeletonPose(const RigidTransform& root_transform, RagdollBone* bone, const Pose* pose)
 	{
 		if (!bone) return;
-		
-		RigidTransform bone_transform(RigidTransform(pose->positions[bone->pose_bone_idx], pose->rotations[bone->pose_bone_idx]));
+
+		RigidTransform bone_transform(
+			RigidTransform(pose->positions[bone->pose_bone_idx], pose->rotations[bone->pose_bone_idx]));
 		bone->actor->setGlobalPose(toPhysx(root_transform * bone_transform * bone->inv_bind_transform));
 
 		setSkeletonPose(root_transform, bone->next, pose);
@@ -2209,10 +2136,11 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	void updateBone(const RigidTransform& root_transform, const RigidTransform& inv_root, RagdollBone* bone, Pose* pose)
 	{
 		if (!bone) return;
-			
+
 		if (bone->is_kinematic)
 		{
-			RigidTransform bone_transform(RigidTransform(pose->positions[bone->pose_bone_idx], pose->rotations[bone->pose_bone_idx]));
+			RigidTransform bone_transform(
+				RigidTransform(pose->positions[bone->pose_bone_idx], pose->rotations[bone->pose_bone_idx]));
 			bone->actor->setKinematicTarget(toPhysx(root_transform * bone_transform * bone->inv_bind_transform));
 		}
 		else
@@ -2264,27 +2192,24 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	void update(float time_delta, bool paused) override
 	{
 		if (!m_is_game_running || paused) return;
-		
+
 		time_delta = Math::minimum(1 / 20.0f, time_delta);
 		simulateScene(time_delta);
 		fetchResults();
 		updateRagdolls();
 		updateDynamicActors();
 		updateControllers(time_delta);
-		
+
 		render();
 	}
 
 
-	DelegateList<void(const ContactData&)>& onContact() override
-	{
-		return m_contact_callbacks;
-	}
-	
+	DelegateList<void(const ContactData&)>& onContact() override { return m_contact_callbacks; }
+
 
 	void initJoint(Entity entity, Joint& joint)
 	{
-		PxRigidActor* actors[2] = { nullptr, nullptr };
+		PxRigidActor* actors[2] = {nullptr, nullptr};
 		int idx = m_actors.find(entity);
 		if (idx >= 0) actors[0] = m_actors.at(idx)->physx_actor;
 		idx = m_actors.find(joint.connected_body);
@@ -2328,16 +2253,16 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	void stopGame() override
-	{
-		m_is_game_running = false;
-	}
+	void stopGame() override { m_is_game_running = false; }
 
 
 	float getControllerRadius(Entity entity) override { return m_controllers[entity].m_radius; }
 	float getControllerHeight(Entity entity) override { return m_controllers[entity].m_height; }
 	bool getControllerCustomGravity(Entity entity) override { return m_controllers[entity].m_custom_gravity; }
-	float getControllerCustomGravityAcceleration(Entity entity) override { return m_controllers[entity].m_custom_gravity_acceleration; }
+	float getControllerCustomGravityAcceleration(Entity entity) override
+	{
+		return m_controllers[entity].m_custom_gravity_acceleration;
+	}
 
 
 	void setControllerRadius(Entity entity, float value) override
@@ -2411,10 +2336,10 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	{
 		int index = m_actors.find(entity);
 		if (index < 0) return;
-		
+
 		RigidActor* actor = m_actors.at(index);
 		if (!actor->physx_actor) return;
-		
+
 		PxRigidBody* rigid_body = actor->physx_actor->isRigidBody();
 		if (!rigid_body) return;
 
@@ -2436,9 +2361,9 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		auto* scene = LuaWrapper::checkArg<PhysicsSceneImpl*>(L, 1);
 		Vec3 origin = LuaWrapper::checkArg<Vec3>(L, 2);
 		Vec3 dir = LuaWrapper::checkArg<Vec3>(L, 3);
-
+		const int layer = lua_gettop(L) > 3 ? LuaWrapper::checkArg<int>(L, 4) : -1;
 		RaycastHit hit;
-		if (scene->raycastEx(origin, dir, FLT_MAX, hit, INVALID_ENTITY))
+		if (scene->raycastEx(origin, dir, FLT_MAX, hit, INVALID_ENTITY, layer))
 		{
 			LuaWrapper::push(L, hit.entity != INVALID_ENTITY);
 			LuaWrapper::push(L, hit.entity);
@@ -2454,7 +2379,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	Entity raycast(const Vec3& origin, const Vec3& dir, Entity ignore_entity) override
 	{
 		RaycastHit hit;
-		if (raycastEx(origin, dir, FLT_MAX, hit, ignore_entity)) return hit.entity;
+		if (raycastEx(origin, dir, FLT_MAX, hit, ignore_entity, -1)) return hit.entity;
 		return INVALID_ENTITY;
 	}
 
@@ -2465,7 +2390,17 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			const PxRigidActor* actor,
 			PxHitFlags& queryFlags) override
 		{
-			if(entity.index == (int)(intptr_t)actor->userData) return PxQueryHitType::eNONE;
+			if (layer >= 0)
+			{
+				const Entity hit_entity = {(int)(intptr_t)actor->userData};
+				const int idx = scene->m_actors.find(hit_entity);
+				if (idx >= 0)
+				{
+					const RigidActor* actor = scene->m_actors.at(idx);
+					if (!scene->canLayersCollide(actor->layer, layer)) return PxQueryHitType::eNONE;
+				}
+			}
+			if (entity.index == (int)(intptr_t)actor->userData) return PxQueryHitType::eNONE;
 			return PxQueryHitType::eBLOCK;
 		}
 
@@ -2476,25 +2411,28 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		}
 
 		Entity entity;
+		int layer;
+		PhysicsSceneImpl* scene;
 	};
 
 
-	bool raycastEx(const Vec3& origin, const Vec3& dir, float distance, RaycastHit& result, Entity ignored) override
+	bool raycastEx(const Vec3& origin, const Vec3& dir, float distance, RaycastHit& result, Entity ignored, int layer)
+		override
 	{
 		PxVec3 physx_origin(origin.x, origin.y, origin.z);
 		PxVec3 unit_dir(dir.x, dir.y, dir.z);
 		PxReal max_distance = distance;
 
-		const PxHitFlags flags =
-			PxHitFlag::eDISTANCE | PxHitFlag::ePOSITION | PxHitFlag::eNORMAL;
+		const PxHitFlags flags = PxHitFlag::eDISTANCE | PxHitFlag::ePOSITION | PxHitFlag::eNORMAL;
 		PxRaycastBuffer hit;
-		
+
 		Filter filter;
 		filter.entity = ignored;
+		filter.layer = layer;
+		filter.scene = this;
 		PxQueryFilterData filter_data;
 		filter_data.flags = PxQueryFlag::eDYNAMIC | PxQueryFlag::eSTATIC | PxQueryFlag::ePREFILTER;
-		bool status =
-			m_scene->raycast(physx_origin, unit_dir, max_distance, hit, flags, filter_data, &filter);
+		bool status = m_scene->raycast(physx_origin, unit_dir, max_distance, hit, flags, filter_data, &filter);
 		result.normal.x = hit.block.normal.x;
 		result.normal.y = hit.block.normal.y;
 		result.normal.z = hit.block.normal.z;
@@ -2524,7 +2462,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	void onEntityMoved(Entity entity)
 	{
 		int ctrl_idx = m_controllers.find(entity);
-		if(ctrl_idx >= 0)
+		if (ctrl_idx >= 0)
 		{
 			auto& controller = m_controllers.at(ctrl_idx);
 			Vec3 pos = m_universe.getPosition(entity);
@@ -2546,7 +2484,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		}
 
 		int idx = m_actors.find(entity);
-		if(idx >= 0)
+		if (idx >= 0)
 		{
 			RigidActor* actor = m_actors.at(idx);
 			if (actor->physx_actor && m_update_in_progress != actor)
@@ -2668,10 +2606,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	void addCollisionLayer() override 
-	{
-		m_layers_count = Math::minimum(lengthOf(m_layers_names), m_layers_count + 1);
-	}
+	void addCollisionLayer() override { m_layers_count = Math::minimum(lengthOf(m_layers_names), m_layers_count + 1); }
 
 
 	void removeCollisionLayer() override
@@ -2694,22 +2629,13 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	void setCollisionLayerName(int index, const char* name) override
-	{
-		copyString(m_layers_names[index], name);
-	}
+	void setCollisionLayerName(int index, const char* name) override { copyString(m_layers_names[index], name); }
 
 
-	const char* getCollisionLayerName(int index) override
-	{
-		return m_layers_names[index];
-	}
+	const char* getCollisionLayerName(int index) override { return m_layers_names[index]; }
 
 
-	bool canLayersCollide(int layer1, int layer2) override
-	{
-		return (m_collision_filter[layer1] & (1 << layer2)) != 0;
-	}
+	bool canLayersCollide(int layer1, int layer2) override { return (m_collision_filter[layer1] & (1 << layer2)) != 0; }
 
 
 	void setLayersCanCollide(int layer1, int layer2, bool can_collide) override
@@ -2820,16 +2746,10 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	int getCollisionsLayersCount() const override
-	{
-		return m_layers_count;
-	}
+	int getCollisionsLayersCount() const override { return m_layers_count; }
 
 
-	bool getIsTrigger(Entity entity) override
-	{
-		return m_actors[entity]->is_trigger;
-	}
+	bool getIsTrigger(Entity entity) override { return m_actors[entity]->is_trigger; }
 
 
 	void setIsTrigger(Entity entity, bool is_trigger) override
@@ -2856,10 +2776,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	DynamicType getDynamicType(Entity entity) override
-	{
-		return m_actors[entity]->dynamic_type;
-	}
+	DynamicType getDynamicType(Entity entity) override { return m_actors[entity]->dynamic_type; }
 
 
 	Vec3 getHalfExtents(Entity entity) override
@@ -2917,10 +2834,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	void removeBoxGeometry(Entity entity, int index) override
-	{
-		removeGeometry(entity, index, PxGeometryType::eBOX);
-	}
+	void removeBoxGeometry(Entity entity, int index) override { removeGeometry(entity, index, PxGeometryType::eBOX); }
 
 
 	Vec3 getBoxGeomHalfExtents(Entity entity, int index) override
@@ -3036,13 +2950,10 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	int getBoxGeometryCount(Entity entity) override
-	{
-		return getGeometryCount(entity, PxGeometryType::eBOX);
-	}
+	int getBoxGeometryCount(Entity entity) override { return getGeometryCount(entity, PxGeometryType::eBOX); }
 
 
-	void addSphereGeometry(Entity entity, int index) override 
+	void addSphereGeometry(Entity entity, int index) override
 	{
 		if (index == -1) index = getSphereGeometryCount(entity);
 		moveShapeIndices(entity, index, PxGeometryType::eSPHERE);
@@ -3054,16 +2965,13 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	void removeSphereGeometry(Entity entity, int index) override 
+	void removeSphereGeometry(Entity entity, int index) override
 	{
 		removeGeometry(entity, index, PxGeometryType::eSPHERE);
 	}
-	
-	
-	int getSphereGeometryCount(Entity entity) override 
-	{
-		return getGeometryCount(entity, PxGeometryType::eSPHERE);
-	}
+
+
+	int getSphereGeometryCount(Entity entity) override { return getGeometryCount(entity, PxGeometryType::eSPHERE); }
 
 
 	float getSphereGeomRadius(Entity entity, int index) override
@@ -3154,23 +3062,19 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			m_dynamic_actors.eraseItemFast(actor);
 		}
 		if (!actor->physx_actor) return;
-		
+
 		PxTransform transform = toPhysx(m_universe.getTransform(actor->entity).getRigidPart());
 		PxRigidActor* new_physx_actor;
 		switch (actor->dynamic_type)
 		{
-			case DynamicType::DYNAMIC:
-				new_physx_actor = m_system->getPhysics()->createRigidDynamic(transform);
-				break;
+			case DynamicType::DYNAMIC: new_physx_actor = m_system->getPhysics()->createRigidDynamic(transform); break;
 			case DynamicType::KINEMATIC:
 				new_physx_actor = m_system->getPhysics()->createRigidDynamic(transform);
 				new_physx_actor->isRigidBody()->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, true);
 				break;
-			case DynamicType::STATIC:
-				new_physx_actor = m_system->getPhysics()->createRigidStatic(transform);
-				break;
+			case DynamicType::STATIC: new_physx_actor = m_system->getPhysics()->createRigidStatic(transform); break;
 		}
-		for(int i = 0, c = actor->physx_actor->getNbShapes(); i < c; ++i)
+		for (int i = 0, c = actor->physx_actor->getNbShapes(); i < c; ++i)
 		{
 			PxShape* shape;
 			actor->physx_actor->getShapes(&shape, 1, i);
@@ -3187,29 +3091,27 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		switch (shape->getGeometryType())
 		{
 			case PxGeometryType::eBOX:
-				{
-					PxBoxGeometry geom;
-					shape->getBoxGeometry(geom);
-					new_shape = actor->createShape(geom, *m_default_material, shape->getLocalPose());
-					break;
-				}
+			{
+				PxBoxGeometry geom;
+				shape->getBoxGeometry(geom);
+				new_shape = actor->createShape(geom, *m_default_material, shape->getLocalPose());
+				break;
+			}
 			case PxGeometryType::eSPHERE:
-				{
-					PxSphereGeometry geom;
-					shape->getSphereGeometry(geom);
-					new_shape = actor->createShape(geom, *m_default_material, shape->getLocalPose());
-					break;
-				}
+			{
+				PxSphereGeometry geom;
+				shape->getSphereGeometry(geom);
+				new_shape = actor->createShape(geom, *m_default_material, shape->getLocalPose());
+				break;
+			}
 			case PxGeometryType::eCONVEXMESH:
-				{
-					PxConvexMeshGeometry geom;
-					shape->getConvexMeshGeometry(geom);
-					new_shape = actor->createShape(geom, *m_default_material, shape->getLocalPose());
-					break;
-				}
-			default:
-				ASSERT(false);
-				return;
+			{
+				PxConvexMeshGeometry geom;
+				shape->getConvexMeshGeometry(geom);
+				new_shape = actor->createShape(geom, *m_default_material, shape->getLocalPose());
+				break;
+			}
+			default: ASSERT(false); return;
 		}
 		new_shape->userData = shape->userData;
 	}
@@ -3305,7 +3207,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		c.m_controller = m_controller_manager->createController(cDesc);
 		c.m_controller->getActor()->userData = (void*)(intptr_t)entity.index;
 		c.m_entity = entity;
-		
+
 		PxFilterData data;
 		int controller_layer = c.m_layer;
 		data.word0 = 1 << controller_layer;
@@ -3328,7 +3230,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	{
 		const Ragdoll& ragdoll = m_ragdolls[entity];
 		serializer.write("layer", ragdoll.layer);
-		
+
 		serializeRagdollBone(ragdoll, ragdoll.root, serializer);
 	}
 
@@ -3336,7 +3238,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	void deserializeRagdoll(IDeserializer& serializer, Entity entity, int /*scene_version*/)
 	{
 		Ragdoll& ragdoll = m_ragdolls.insert(entity);
-		
+
 		ragdoll.entity = entity;
 		ragdoll.root_transform.pos.set(0, 0, 0);
 		ragdoll.root_transform.rot.set(0, 0, 0, 1);
@@ -3345,7 +3247,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		setRagdollRoot(ragdoll, deserializeRagdollBone(ragdoll, nullptr, serializer));
 		m_universe.onComponentCreated(ragdoll.entity, RAGDOLL_TYPE, this);
 	}
-	
+
 
 	static void serializeJoint(ISerializer& serializer, PxSphericalJoint* px_joint)
 	{
@@ -3370,7 +3272,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		serializer.write("local_frame", tr);
 		serializeJoint(serializer, static_cast<PxSphericalJoint*>(joint.physx));
 	}
-	
+
 
 	static void deserializeJoint(IDeserializer& serializer, PxSphericalJoint* px_joint)
 	{
@@ -3396,11 +3298,8 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		RigidTransform tr;
 		serializer.read(&tr);
 		joint.local_frame0 = toPhysx(tr);
-		auto* px_joint = PxSphericalJointCreate(m_scene->getPhysics(),
-			m_dummy_actor,
-			joint.local_frame0,
-			nullptr,
-			PxTransform::createIdentity());
+		auto* px_joint = PxSphericalJointCreate(
+			m_scene->getPhysics(), m_dummy_actor, joint.local_frame0, nullptr, PxTransform::createIdentity());
 		joint.physx = px_joint;
 		deserializeJoint(serializer, px_joint);
 		m_universe.onComponentCreated(entity, SPHERICAL_JOINT_TYPE, this);
@@ -3455,11 +3354,8 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		RigidTransform tr;
 		serializer.read(&tr);
 		joint.local_frame0 = toPhysx(tr);
-		auto* px_joint = PxDistanceJointCreate(m_scene->getPhysics(),
-			m_dummy_actor,
-			joint.local_frame0,
-			nullptr,
-			PxTransform::createIdentity());
+		auto* px_joint = PxDistanceJointCreate(
+			m_scene->getPhysics(), m_dummy_actor, joint.local_frame0, nullptr, PxTransform::createIdentity());
 		joint.physx = px_joint;
 		deserializeJoint(serializer, px_joint);
 		m_universe.onComponentCreated(entity, DISTANCE_JOINT_TYPE, this);
@@ -3516,12 +3412,18 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	static void deserializeJoint(IDeserializer& serializer, PxD6Joint* px_joint)
 	{
 		int tmp;
-		serializer.read(&tmp); 	px_joint->setMotion(PxD6Axis::eX, (PxD6Motion::Enum)tmp);
-		serializer.read(&tmp); 	px_joint->setMotion(PxD6Axis::eY, (PxD6Motion::Enum)tmp);
-		serializer.read(&tmp); 	px_joint->setMotion(PxD6Axis::eZ, (PxD6Motion::Enum)tmp);
-		serializer.read(&tmp); 	px_joint->setMotion(PxD6Axis::eSWING1, (PxD6Motion::Enum)tmp);
-		serializer.read(&tmp); 	px_joint->setMotion(PxD6Axis::eSWING2, (PxD6Motion::Enum)tmp);
-		serializer.read(&tmp); 	px_joint->setMotion(PxD6Axis::eTWIST, (PxD6Motion::Enum)tmp);
+		serializer.read(&tmp);
+		px_joint->setMotion(PxD6Axis::eX, (PxD6Motion::Enum)tmp);
+		serializer.read(&tmp);
+		px_joint->setMotion(PxD6Axis::eY, (PxD6Motion::Enum)tmp);
+		serializer.read(&tmp);
+		px_joint->setMotion(PxD6Axis::eZ, (PxD6Motion::Enum)tmp);
+		serializer.read(&tmp);
+		px_joint->setMotion(PxD6Axis::eSWING1, (PxD6Motion::Enum)tmp);
+		serializer.read(&tmp);
+		px_joint->setMotion(PxD6Axis::eSWING2, (PxD6Motion::Enum)tmp);
+		serializer.read(&tmp);
+		px_joint->setMotion(PxD6Axis::eTWIST, (PxD6Motion::Enum)tmp);
 
 		PxJointLinearLimit linear(0, PxSpring(0, 0));
 		serializer.read(&linear.bounceThreshold);
@@ -3561,11 +3463,8 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		RigidTransform tr;
 		serializer.read(&tr);
 		joint.local_frame0 = toPhysx(tr);
-		auto* px_joint = PxD6JointCreate(m_scene->getPhysics(),
-			m_dummy_actor,
-			joint.local_frame0,
-			nullptr,
-			PxTransform::createIdentity());
+		auto* px_joint = PxD6JointCreate(
+			m_scene->getPhysics(), m_dummy_actor, joint.local_frame0, nullptr, PxTransform::createIdentity());
 		joint.physx = px_joint;
 
 		deserializeJoint(serializer, px_joint);
@@ -3623,11 +3522,8 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		RigidTransform tr;
 		serializer.read(&tr);
 		joint.local_frame0 = toPhysx(tr);
-		auto* px_joint = PxRevoluteJointCreate(m_scene->getPhysics(),
-			m_dummy_actor,
-			joint.local_frame0,
-			nullptr,
-			PxTransform::createIdentity());
+		auto* px_joint = PxRevoluteJointCreate(
+			m_scene->getPhysics(), m_dummy_actor, joint.local_frame0, nullptr, PxTransform::createIdentity());
 		joint.physx = px_joint;
 		deserializeJoint(serializer, px_joint);
 		m_universe.onComponentCreated(entity, HINGE_JOINT_TYPE, this);
@@ -3681,7 +3577,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		ResourceManagerBase* manager = m_engine->getResourceManager().get(PhysicsGeometry::TYPE);
 		auto* geometry = manager->load(Path(tmp));
 		actor->setResource(static_cast<PhysicsGeometry*>(geometry));
-		
+
 		m_universe.onComponentCreated(actor->entity, MESH_ACTOR_TYPE, this);
 	}
 
@@ -3708,24 +3604,22 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			switch (shape->getGeometryType())
 			{
 				case PxGeometryType::eBOX:
-					{
-						PxBoxGeometry geom;
-						shape->getBoxGeometry(geom);
-						serializer.write("x", geom.halfExtents.x);
-						serializer.write("y", geom.halfExtents.y);
-						serializer.write("z", geom.halfExtents.z);
-					}
-					break;
+				{
+					PxBoxGeometry geom;
+					shape->getBoxGeometry(geom);
+					serializer.write("x", geom.halfExtents.x);
+					serializer.write("y", geom.halfExtents.y);
+					serializer.write("z", geom.halfExtents.z);
+				}
+				break;
 				case PxGeometryType::eSPHERE:
-					{
-						PxSphereGeometry geom;
-						shape->getSphereGeometry(geom);
-						serializer.write("radius", geom.radius);
-					}
-					break;
-				default:
-					ASSERT(false);
-					break;
+				{
+					PxSphereGeometry geom;
+					shape->getSphereGeometry(geom);
+					serializer.write("radius", geom.radius);
+				}
+				break;
+				default: ASSERT(false); break;
 			}
 		}
 	}
@@ -3760,16 +3654,12 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		PxRigidActor* physx_actor;
 		switch (actor->dynamic_type)
 		{
-			case DynamicType::DYNAMIC:
-				physx_actor = m_system->getPhysics()->createRigidDynamic(transform);
-				break;
+			case DynamicType::DYNAMIC: physx_actor = m_system->getPhysics()->createRigidDynamic(transform); break;
 			case DynamicType::KINEMATIC:
 				physx_actor = m_system->getPhysics()->createRigidDynamic(transform);
 				physx_actor->isRigidBody()->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, true);
 				break;
-			case DynamicType::STATIC:
-				physx_actor = m_system->getPhysics()->createRigidStatic(transform);
-				break;
+			case DynamicType::STATIC: physx_actor = m_system->getPhysics()->createRigidStatic(transform); break;
 		}
 
 		int count;
@@ -3787,31 +3677,28 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			switch (type)
 			{
 				case PxGeometryType::eBOX:
-					{
-						PxBoxGeometry geom;
-						serializer.read(&geom.halfExtents.x);
-						serializer.read(&geom.halfExtents.y);
-						serializer.read(&geom.halfExtents.z);
-						shape = physx_actor->createShape(geom, *m_default_material, local_pos);
-					}
-					break;
+				{
+					PxBoxGeometry geom;
+					serializer.read(&geom.halfExtents.x);
+					serializer.read(&geom.halfExtents.y);
+					serializer.read(&geom.halfExtents.z);
+					shape = physx_actor->createShape(geom, *m_default_material, local_pos);
+				}
+				break;
 				case PxGeometryType::eSPHERE:
-					{
-						PxSphereGeometry geom;
-						serializer.read(&geom.radius);
-						shape = physx_actor->createShape(geom, *m_default_material, local_pos);
-					}
-					break;
-				default:
-					ASSERT(false);
-					break;
+				{
+					PxSphereGeometry geom;
+					serializer.read(&geom.radius);
+					shape = physx_actor->createShape(geom, *m_default_material, local_pos);
+				}
+				break;
+				default: ASSERT(false); break;
 			}
-			if(shape) shape->userData = (void*)(intptr_t)index;
+			if (shape) shape->userData = (void*)(intptr_t)index;
 		}
 		actor->setPhysxActor(physx_actor);
 
 		m_universe.onComponentCreated(entity, RIGID_ACTOR_TYPE, this);
-
 	}
 
 
@@ -3831,16 +3718,16 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		PxRigidActor* physx_actor;
 		switch (actor->dynamic_type)
 		{
-		case DynamicType::DYNAMIC:
-			physx_actor = PxCreateDynamic(*m_system->getPhysics(), transform, box_geom, *m_default_material, 1.0f);
-			break;
-		case DynamicType::KINEMATIC:
-			physx_actor = PxCreateDynamic(*m_system->getPhysics(), transform, box_geom, *m_default_material, 1.0f);
-			physx_actor->isRigidBody()->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, true);
-			break;
-		case DynamicType::STATIC:
-			physx_actor = PxCreateStatic(*m_system->getPhysics(), transform, box_geom, *m_default_material);
-			break;
+			case DynamicType::DYNAMIC:
+				physx_actor = PxCreateDynamic(*m_system->getPhysics(), transform, box_geom, *m_default_material, 1.0f);
+				break;
+			case DynamicType::KINEMATIC:
+				physx_actor = PxCreateDynamic(*m_system->getPhysics(), transform, box_geom, *m_default_material, 1.0f);
+				physx_actor->isRigidBody()->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, true);
+				break;
+			case DynamicType::STATIC:
+				physx_actor = PxCreateStatic(*m_system->getPhysics(), transform, box_geom, *m_default_material);
+				break;
 		}
 		actor->setPhysxActor(physx_actor);
 
@@ -3968,27 +3855,25 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 					serializer.write((int)(intptr_t)shape->userData);
 					RigidTransform tr = fromPhysx(shape->getLocalPose());
 					serializer.write(tr);
-					switch(type)
+					switch (type)
 					{
 						case PxGeometryType::eBOX:
-							{
-								PxBoxGeometry geom;
-								shape->getBoxGeometry(geom);
-								serializer.write(geom.halfExtents.x);
-								serializer.write(geom.halfExtents.y);
-								serializer.write(geom.halfExtents.z);
-							}
-							break;
+						{
+							PxBoxGeometry geom;
+							shape->getBoxGeometry(geom);
+							serializer.write(geom.halfExtents.x);
+							serializer.write(geom.halfExtents.y);
+							serializer.write(geom.halfExtents.z);
+						}
+						break;
 						case PxGeometryType::eSPHERE:
-							{
-								PxSphereGeometry geom;
-								shape->getSphereGeometry(geom);
-								serializer.write(geom.radius);
-							}
-							break;
-						default:
-							ASSERT(false);
-							break;
+						{
+							PxSphereGeometry geom;
+							shape->getSphereGeometry(geom);
+							serializer.write(geom.radius);
+						}
+						break;
+						default: ASSERT(false); break;
 					}
 				}
 				break;
@@ -4061,9 +3946,9 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		{
 			case ActorType::RIGID:
 			{
-				PxRigidActor* physx_actor = actor->dynamic_type == DynamicType::STATIC 
-					? (PxRigidActor*)m_system->getPhysics()->createRigidStatic(transform) 
-					: (PxRigidActor*)m_system->getPhysics()->createRigidDynamic(transform);
+				PxRigidActor* physx_actor = actor->dynamic_type == DynamicType::STATIC
+												? (PxRigidActor*)m_system->getPhysics()->createRigidStatic(transform)
+												: (PxRigidActor*)m_system->getPhysics()->createRigidDynamic(transform);
 				int count = serializer.read<int>();
 				for (int i = 0; i < count; ++i)
 				{
@@ -4074,24 +3959,22 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 					switch (type)
 					{
 						case PxGeometryType::eBOX:
-							{
-								PxBoxGeometry box_geom;
-								serializer.read(box_geom.halfExtents.x);
-								serializer.read(box_geom.halfExtents.y);
-								serializer.read(box_geom.halfExtents.z);
-								shape = physx_actor->createShape(box_geom, *m_default_material, tr);
-							}
-							break;
+						{
+							PxBoxGeometry box_geom;
+							serializer.read(box_geom.halfExtents.x);
+							serializer.read(box_geom.halfExtents.y);
+							serializer.read(box_geom.halfExtents.z);
+							shape = physx_actor->createShape(box_geom, *m_default_material, tr);
+						}
+						break;
 						case PxGeometryType::eSPHERE:
-							{
-								PxSphereGeometry geom;
-								serializer.read(geom.radius);
-								shape = physx_actor->createShape(geom, *m_default_material, tr);
-							}
-							break;
-						default:
-							ASSERT(false);
-							break;
+						{
+							PxSphereGeometry geom;
+							serializer.read(geom.radius);
+							shape = physx_actor->createShape(geom, *m_default_material, tr);
+						}
+						break;
+						default: ASSERT(false); break;
 					}
 					if (shape) shape->userData = (void*)(intptr_t)index;
 				}
@@ -4141,9 +4024,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 				m_universe.onComponentCreated(actor->entity, MESH_ACTOR_TYPE, this);
 			}
 			break;
-			default:
-				ASSERT(false);
-				break;
+			default: ASSERT(false); break;
 		}
 	}
 
@@ -4315,7 +4196,8 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			serializer.write("half_height", capsule_geom.halfHeight);
 			serializer.write("radius", capsule_geom.radius);
 		}
-		serializer.write("is_kinematic", bone->actor->isRigidBody()->getRigidBodyFlags().isSet(PxRigidBodyFlag::eKINEMATIC));
+		serializer.write(
+			"is_kinematic", bone->actor->isRigidBody()->getRigidBodyFlags().isSet(PxRigidBodyFlag::eKINEMATIC));
 
 		serializeRagdollBone(ragdoll, bone->child, serializer);
 		serializeRagdollBone(ragdoll, bone->next, serializer);
@@ -4425,7 +4307,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			case PxJointConcreteType::eD6:
 			{
 				auto* joint = bone->parent_joint->is<PxD6Joint>();
-				
+
 				PxJointLinearLimit linear_limit(0, PxSpring(0, 0));
 				serializer.read(linear_limit);
 				joint->setLinearLimit(linear_limit);
@@ -4520,7 +4402,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 		RagdollBone::Type type;
 		serializer.read(type);
-		
+
 		switch (type)
 		{
 			case RagdollBone::CAPSULE:
@@ -4528,16 +4410,14 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 				PxCapsuleGeometry shape;
 				serializer.read(shape.halfHeight);
 				serializer.read(shape.radius);
-				bone->actor =
-					PxCreateDynamic(m_scene->getPhysics(), px_transform, shape, *m_default_material, 1.0f);
+				bone->actor = PxCreateDynamic(m_scene->getPhysics(), px_transform, shape, *m_default_material, 1.0f);
 				break;
 			}
 			case RagdollBone::BOX:
 			{
 				PxBoxGeometry shape;
 				serializer.read(shape.halfExtents);
-				bone->actor =
-					PxCreateDynamic(m_scene->getPhysics(), px_transform, shape, *m_default_material, 1.0f);
+				bone->actor = PxCreateDynamic(m_scene->getPhysics(), px_transform, shape, *m_default_material, 1.0f);
 				break;
 			}
 			default: ASSERT(false); break;
@@ -4556,7 +4436,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 		bone->child = deserializeRagdollBone(ragdoll, bone, serializer);
 		bone->next = deserializeRagdollBone(ragdoll, parent, serializer);
-		if(bone->next) bone->next->prev = bone;
+		if (bone->next) bone->next->prev = bone;
 
 		deserializeRagdollJoint(bone, serializer);
 
@@ -4700,7 +4580,6 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			}
 		}
 	}
-
 
 
 	void deserializeActors(InputBlob& serializer)
@@ -4879,7 +4758,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 					serializer.read(motions);
 					px_joint->setMotion(PxD6Axis::eX, (PxD6Motion::Enum)motions[0]);
 					px_joint->setMotion(PxD6Axis::eY, (PxD6Motion::Enum)motions[1]);
-					px_joint->setMotion(PxD6Axis::eZ, (PxD6Motion::Enum) motions[2]);
+					px_joint->setMotion(PxD6Axis::eZ, (PxD6Motion::Enum)motions[2]);
 					px_joint->setMotion(PxD6Axis::eSWING1, (PxD6Motion::Enum)motions[3]);
 					px_joint->setMotion(PxD6Axis::eSWING2, (PxD6Motion::Enum)motions[4]);
 					px_joint->setMotion(PxD6Axis::eTWIST, (PxD6Motion::Enum)motions[5]);
@@ -4899,7 +4778,6 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 
 			m_universe.onComponentCreated(entity, cmp_type, this);
 		}
-
 	}
 
 
@@ -4916,7 +4794,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 			serializer.readString(tmp, MAX_PATH_LENGTH);
 			serializer.read(terrain.m_xz_scale);
 			serializer.read(terrain.m_y_scale);
-				serializer.read(terrain.m_layer);
+			serializer.read(terrain.m_layer);
 
 			m_terrains.insert(terrain.m_entity, terrain);
 			Entity entity = terrain.m_entity;
@@ -5031,10 +4909,13 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	}
 
 
-	static PxFilterFlags filterShader(
-		PxFilterObjectAttributes attributes0, PxFilterData filterData0,
-		PxFilterObjectAttributes attributes1, PxFilterData filterData1,
-		PxPairFlags& pairFlags, const void* constantBlock, PxU32 constantBlockSize)
+	static PxFilterFlags filterShader(PxFilterObjectAttributes attributes0,
+		PxFilterData filterData0,
+		PxFilterObjectAttributes attributes1,
+		PxFilterData filterData1,
+		PxPairFlags& pairFlags,
+		const void* constantBlock,
+		PxU32 constantBlockSize)
 	{
 		if (PxFilterObjectIsTrigger(attributes0) || PxFilterObjectIsTrigger(attributes1))
 		{
@@ -5046,8 +4927,7 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		{
 			return PxFilterFlag::eKILL;
 		}
-		pairFlags = PxPairFlag::eCONTACT_DEFAULT | PxPairFlag::eNOTIFY_TOUCH_FOUND |
-					PxPairFlag::eNOTIFY_CONTACT_POINTS;
+		pairFlags = PxPairFlag::eCONTACT_DEFAULT | PxPairFlag::eNOTIFY_TOUCH_FOUND | PxPairFlag::eNOTIFY_CONTACT_POINTS;
 		return PxFilterFlag::eDEFAULT;
 	}
 
@@ -5063,12 +4943,15 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 	{
 		struct FilterCallback : PxQueryFilterCallback
 		{
-			FilterCallback(Controller& controller) : controller(controller) {}
+			FilterCallback(Controller& controller)
+				: controller(controller)
+			{
+			}
 
-			PxQueryHitType::Enum preFilter(const PxFilterData& filterData
-				, const PxShape* shape
-				, const PxRigidActor* actor
-				, PxHitFlags& queryFlags) override 
+			PxQueryHitType::Enum preFilter(const PxFilterData& filterData,
+				const PxShape* shape,
+				const PxRigidActor* actor,
+				PxHitFlags& queryFlags) override
 			{
 				PxFilterData fd0 = shape->getSimulationFilterData();
 				PxFilterData fd1 = controller.m_filter_data;
@@ -5085,7 +4968,10 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 		};
 
 
-		Controller() : m_filter_callback(*this) {}
+		Controller()
+			: m_filter_callback(*this)
+		{
+		}
 
 
 		PxController* m_controller;
@@ -5134,8 +5020,6 @@ struct PhysicsSceneImpl LUMIX_FINAL : public PhysicsScene
 };
 
 
-
-
 PhysicsScene* PhysicsScene::create(PhysicsSystem& system, Universe& context, Engine& engine, IAllocator& allocator)
 {
 	PhysicsSceneImpl* impl = LUMIX_NEW(allocator, PhysicsSceneImpl)(context, allocator);
@@ -5161,8 +5045,8 @@ PhysicsScene* PhysicsScene::create(PhysicsSystem& system, Universe& context, Eng
 	impl->m_system = &system;
 	impl->m_default_material = impl->m_system->getPhysics()->createMaterial(0.5f, 0.5f, 0.1f);
 	PxSphereGeometry geom(1);
-	impl->m_dummy_actor = PxCreateDynamic(
-		impl->m_scene->getPhysics(), PxTransform::createIdentity(), geom, *impl->m_default_material, 1);
+	impl->m_dummy_actor =
+		PxCreateDynamic(impl->m_scene->getPhysics(), PxTransform::createIdentity(), geom, *impl->m_default_material, 1);
 	return impl;
 }
 
@@ -5170,7 +5054,7 @@ PhysicsScene* PhysicsScene::create(PhysicsSystem& system, Universe& context, Eng
 void PhysicsScene::destroy(PhysicsScene* scene)
 {
 	PhysicsSceneImpl* impl = static_cast<PhysicsSceneImpl*>(scene);
-	
+
 	LUMIX_DELETE(impl->m_allocator, scene);
 }
 
@@ -5187,8 +5071,8 @@ void PhysicsSceneImpl::RigidActor::onStateChanged(Resource::State, Resource::Sta
 		PxMeshScale scale(scale);
 		PxConvexMeshGeometry convex_geom(resource->convex_mesh, scale);
 		PxTriangleMeshGeometry tri_geom(resource->tri_mesh, scale);
-		const PxGeometry* geom = resource->convex_mesh ? static_cast<PxGeometry*>(&convex_geom)
-															  : static_cast<PxGeometry*>(&tri_geom);
+		const PxGeometry* geom =
+			resource->convex_mesh ? static_cast<PxGeometry*>(&convex_geom) : static_cast<PxGeometry*>(&tri_geom);
 
 		PxRigidActor* actor = scene.createPhysXActor(this, transform, *geom);
 
@@ -5257,7 +5141,7 @@ Heightfield::Heightfield()
 
 Heightfield::~Heightfield()
 {
-	if(m_actor) m_actor->release();
+	if (m_actor) m_actor->release();
 	if (m_heightmap)
 	{
 		m_heightmap->getResourceManager().unload(*m_heightmap);
@@ -5277,11 +5161,13 @@ void Heightfield::heightmapLoaded(Resource::State, Resource::State new_state, Re
 
 void PhysicsScene::registerLuaAPI(lua_State* L)
 {
-	#define REGISTER_FUNCTION(name) \
-		do {\
-			auto f = &LuaWrapper::wrapMethod<PhysicsSceneImpl, decltype(&PhysicsSceneImpl::name), &PhysicsSceneImpl::name>; \
-			LuaWrapper::createSystemFunction(L, "Physics", #name, f); \
-		} while(false) \
+#define REGISTER_FUNCTION(name)                                                                                    \
+	do                                                                                                             \
+	{                                                                                                              \
+		auto f =                                                                                                   \
+			&LuaWrapper::wrapMethod<PhysicsSceneImpl, decltype(&PhysicsSceneImpl::name), &PhysicsSceneImpl::name>; \
+		LuaWrapper::createSystemFunction(L, "Physics", #name, f);                                                  \
+	} while (false)
 
 	REGISTER_FUNCTION(putToSleep);
 	REGISTER_FUNCTION(getActorSpeed);
@@ -5292,10 +5178,10 @@ void PhysicsScene::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(isControllerCollisionDown);
 	REGISTER_FUNCTION(setRagdollKinematic);
 	REGISTER_FUNCTION(addForceAtPos);
-	
+
 	LuaWrapper::createSystemFunction(L, "Physics", "raycast", &PhysicsSceneImpl::LUA_raycast);
 
-	#undef REGISTER_FUNCTION
+#undef REGISTER_FUNCTION
 }
 
 
