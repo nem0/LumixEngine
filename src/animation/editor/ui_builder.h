@@ -2,6 +2,7 @@
 
 
 #include "editor/ieditor_command.h"
+#include "engine/blob.h"
 #include "engine/metaprogramming.h"
 
 
@@ -61,12 +62,13 @@ struct Visitor
 		void removeItem(int) const { ASSERT(false); }
 		int size() const { ASSERT(false); return -1; }
 
-		template <typename T2> auto setHelper(const T2& v, int) -> decltype(value = v, void()) { value = v; }
-		template <typename T2> void setHelper(const T2& v, char) { ASSERT(false); }
+		template <typename T2> void set(const T2& v) { value = v; }
+		template <typename T2> auto setHelper(const T2& v, int) const -> decltype(set(v), void()) { value = v; }
+		template <typename T2> void setHelper(const T2& v, char) const { ASSERT(false); }
 
-		template <typename T2> void setValue(const T2& v) { setHelper(v, 0); }
+		template <typename T2> void setValue(const T2& v) const { setHelper(v, 0); }
 
-	T& getValue() { return value; }
+		T& getValue() const { return value; }
 		
 		T& value;
 	};
@@ -83,10 +85,10 @@ struct Visitor
 		void addItem(int) const { ASSERT(false); }
 		void removeItem(int) const { ASSERT(false); }
 		int size() const { ASSERT(false); return -1; }
-		void setValue(const T& value) { (inst->*setter)(value); }
+		void setValue(const T& value) const { (inst->*setter)(value); }
 		template <typename T2>
-		void setValue(const T2& value) { ASSERT(false); }
-		auto getValue() { return (inst->*getter)(); }
+		void setValue(const T2& value) const { ASSERT(false); }
+		auto getValue() const { return (inst->*getter)(); }
 
 		C* inst;
 		T(C::*getter)() const;
@@ -101,8 +103,8 @@ struct Visitor
 		void removeItem(int index) const { remover(index); }
 		int size() const { return value.size(); }
 		template <typename T2>
-		void setValue(const T2& v) { ASSERT(false); }
-		T& getValue() { return value; }
+		void setValue(const T2& v) const { ASSERT(false); }
+		T& getValue() const { return value; }
 
 		T& value;
 		Adder adder;
@@ -248,7 +250,7 @@ struct PathCommand : IEditorCommand
 			tmp[i].prev = &tmp[i - 1];
 			tmp[i - 1].next = &tmp[i];
 		}
-		copyPath(items, &tmp[lengthOf(tmp) - 1]);
+		copyPath(this->items, &tmp[lengthOf(tmp) - 1]);
 	}
 
 	PathItem items[32];
@@ -264,7 +266,7 @@ struct SetCommand : PathCommand<RootGetter>
 		, value(value)
 		, old_value(old_value)
 	{
-		copyPath(items, path);
+		copyPath(this->items, path);
 	}
 
 	template <typename... Args>
@@ -277,24 +279,24 @@ struct SetCommand : PathCommand<RootGetter>
 
 	bool execute() override
 	{
-		auto f = [this] (auto& x) {
+		auto f = [this] (const auto& x) {
 			x.setValue(value);
 		};
 		Visitor<decltype(f)> v(f);
-		v.path = &items[0];
-		root_getter().accept(v);
+		v.path = &this->items[0];
+		this->root_getter().accept(v);
 		return true;
 	}
 
 
 	void undo() override
 	{
-		auto f = [this](auto& x) {
+		auto f = [this](const auto& x) {
 			x.setValue(old_value);
 		};
 		Visitor<decltype(f)> v(f);
-		v.path = &items[0];
-		root_getter().accept(v);
+		v.path = &this->items[0];
+		this->root_getter().accept(v);
 	}
 
 	void serialize(JsonSerializer& serializer) override { ASSERT(false); }
@@ -305,7 +307,7 @@ struct SetCommand : PathCommand<RootGetter>
 	bool merge(IEditorCommand& command) override 
 	{ 
 		auto& rhs = static_cast<PathCommand<RootGetter>&>(command);
-		if (equalPaths(&items[0], &rhs.items[0]))
+		if (equalPaths(&this->items[0], &rhs.items[0]))
 		{
 			static_cast<SetCommand<RootGetter, T>&>(command).value = value;
 			return true;
@@ -325,13 +327,13 @@ struct AddArrayItemCommand : PathCommand<RootGetter>
 	AddArrayItemCommand(RootGetter root_getter, const PathItem* path)
 		: PathCommand<RootGetter>(root_getter)
 	{
-		copyPath(items, path);
+		copyPath(this->items, path);
 	}
 
 	AddArrayItemCommand(RootGetter root_getter, PathItem* path)
 		: PathCommand<RootGetter>(root_getter)
 	{
-		copyPath(items, path);
+		copyPath(this->items, path);
 	}
 
 	template <typename... Args>
@@ -342,25 +344,25 @@ struct AddArrayItemCommand : PathCommand<RootGetter>
 
 	bool execute() override
 	{
-		auto f = [this](auto& x) {
+		auto f = [this](const auto& x) {
 			new_item_index = x.size();
 			x.addItem(-1);
 		};
 		Visitor<decltype(f)> v(f);
-		v.path = &items[0];
-		root_getter().accept(v);
+		v.path = &this->items[0];
+		this->root_getter().accept(v);
 		return true;
 	}
 
 
 	void undo() override
 	{
-		auto f = [this](auto& x) {
+		auto f = [this](const auto& x) {
 			x.removeItem(new_item_index);
 		};
 		Visitor<decltype(f)> v(f);
-		v.path = &items[0];
-		root_getter().accept(v);
+		v.path = &this->items[0];
+		this->root_getter().accept(v);
 	}
 
 	void serialize(JsonSerializer& serializer) override { ASSERT(false); }
@@ -500,7 +502,7 @@ struct RemoveArrayItemCommand : PathCommand<RootGetter>
 		, index(index)
 		, blob(allocator)
 	{
-		copyPath(items, path);
+		copyPath(this->items, path);
 		serialize();
 	}
 
@@ -518,10 +520,10 @@ struct RemoveArrayItemCommand : PathCommand<RootGetter>
 	void serialize()
 	{
 		PathItem tmp[32];
-		copyPath(tmp, items);
+		copyPath(tmp, this->items);
 		addToPath(tmp, index);
 
-		auto f = [this](auto& value) {
+		auto f = [this](const auto& value) {
 			blob.clear();
 			SerializeVisitor v;
 			v.blob = &blob;
@@ -531,17 +533,17 @@ struct RemoveArrayItemCommand : PathCommand<RootGetter>
 
 		Visitor<decltype(f)> v(f);
 		v.path = &tmp[0];
-		root_getter().accept(v);
+		this->root_getter().accept(v);
 	}
 
 
 	void deserialize()
 	{
 		PathItem tmp[32];
-		copyPath(tmp, items);
+		copyPath(tmp, this->items);
 		addToPath(tmp, index);
 
-		auto f = [this](auto& value) {
+		auto f = [this](const auto& value) {
 			DeserializeVisitor v;
 			InputBlob input_blob(blob);
 			v.blob = &input_blob;
@@ -551,31 +553,31 @@ struct RemoveArrayItemCommand : PathCommand<RootGetter>
 
 		Visitor<decltype(f)> v(f);
 		v.path = &tmp[0];
-		root_getter().accept(v);
+		this->root_getter().accept(v);
 	}
 
 
 	bool execute() override
 	{
-		auto f = [this](auto& x) {
+		auto f = [this](const auto& x) {
 			x.removeItem(index);
 		};
 		Visitor<decltype(f)> v(f);
-		v.path = &items[0];
-		root_getter().accept(v);
+		v.path = &this->items[0];
+		this->root_getter().accept(v);
 		return true;
 	}
 
 
 	void undo() override
 	{
-		auto f = [this](auto& x) {
+		auto f = [this](const auto& x) {
 			x.addItem(index);
-			deserialize();
+			this->deserialize();
 		};
 		Visitor<decltype(f)> v(f);
-		v.path = &items[0];
-		root_getter().accept(v);
+		v.path = &this->items[0];
+		this->root_getter().accept(v);
 	}
 
 	void serialize(JsonSerializer& serializer) override { ASSERT(false); }
@@ -759,7 +761,7 @@ struct UIVisitor
 	template <typename T>
 	bool customArrayItemUI(PathItem& path, T& item, char)
 	{
-		auto f = [](auto& v) {};
+		auto f = [](const auto& v) {};
 
 		Visitor<decltype(f)> v(f);
 		v.path = getPathRoot(path);

@@ -208,16 +208,10 @@ template <typename R, typename C, typename... Args> struct ArgCount<R(C::*)(Args
 
 template <typename R, typename C, typename... Args> Tuple<Args...> argsToTuple(R(C::*)(Args...));
 template <typename R, typename C, typename... Args> Tuple<Args...> argsToTuple(R(C::*)(Args...) const);
-template <typename R, typename... Args> Tuple<Args...> argsToTuple(R(Args...) const);
+template <typename R, typename... Args> Tuple<Args...> argsToTuple(R(Args...));
 template <typename F> decltype(argsToTuple(&F::operator())) argsToTuple(F);
 
-template<class T>
-typename T declval();
-
-template <int N, typename T> struct ArgNType { 
-	using ArgsTuple = decltype(argsToTuple(declval<T>()));
-	using Type = typename TupleElement<N, ArgsTuple>::Head;
-};
+template <int N, typename T> struct ArgNType;
 template <int N, typename R, typename C, typename... Args> struct ArgNType<N, R(C::*)(Args...)> { using Type = typename TupleElement<N, Tuple<Args...>>::Head; };
 template <int N, typename R, typename C, typename... Args> struct ArgNType<N, R(C::*)(Args...) const> { using Type = typename TupleElement<N, Tuple<Args...>>::Head; };
 

@@ -1025,6 +1025,8 @@ private:
 	const Reflection::PropertyBase* m_property;
 };
 
+class PasteEntityCommand;
+
 
 struct WorldEditorImpl LUMIX_FINAL : public WorldEditor
 {

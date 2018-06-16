@@ -6,6 +6,7 @@
 #include "engine/array.h"
 #include "engine/path.h"
 #include "imgui/imgui.h"
+#include "ui_builder.h"
 
 
 namespace Lumix
