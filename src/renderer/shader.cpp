@@ -152,6 +152,24 @@ static Shader* getShader(lua_State* L)
 }
 
 
+static ShaderCombinations& getShaderCombinations(lua_State* L)
+{
+	ShaderCombinations* ret = nullptr;
+	int res = lua_getglobal(L, "combinations");
+	ASSERT(res == LUA_TLIGHTUSERDATA);
+	return *LuaWrapper::toType<ShaderCombinations*>(L, -1);
+}
+
+
+static Renderer& getRendererGlobal(lua_State* L)
+{
+	Renderer* ret = nullptr;
+	int res = lua_getglobal(L, "renderer");
+	ASSERT(res == LUA_TLIGHTUSERDATA);
+	return *LuaWrapper::toType<Renderer*>(L, -1);
+}
+
+
 static void default_texture(lua_State* state, const char* path)
 {
 	Shader* shader = getShader(state);
@@ -242,7 +260,7 @@ static void uniform(lua_State* L, const char* name, const char* type)
 
 static void pass(lua_State* state, const char* name)
 {
-	ShaderCombinations& cmb = getShader(state)->m_combinations;
+	ShaderCombinations& cmb = getShaderCombinations(state);
 	if (cmb.pass_count >= lengthOf(cmb.vs_local_mask)) {
 		g_log_error.log("Renderer") << "Too many passes in shader. Pass '" << name << "' is ignored.";
 		return;
@@ -313,8 +331,8 @@ static void depth_test(lua_State* L, bool enabled)
 static void fs(lua_State* L)
 {
 	Shader* shader = getShader(L);
-	ShaderCombinations& cmb = shader->m_combinations;
-	Renderer& renderer = shader->getRenderer();
+	ShaderCombinations& cmb = getShaderCombinations(L);
+	Renderer& renderer = getRendererGlobal(L);
 
 	LuaWrapper::checkTableArg(L, 1);
 	const int len = (int)lua_rawlen(L, 1);
@@ -330,7 +348,7 @@ static void fs(lua_State* L)
 			}
 			else {
 				const char* pass_name = cmb.passes[cmb.pass_count - 1];
-				const char* shader_path = shader->getPath().c_str();
+				const char* shader_path = shader ? shader->getPath().c_str() : "unknown";
 				g_log_error.log("Renderer") << "Too many defines in pass " << pass_name << " in shader " << shader_path;
 			}
 		}
@@ -342,8 +360,8 @@ static void fs(lua_State* L)
 static void vs(lua_State* L)
 {
 	Shader* shader = getShader(L);
-	ShaderCombinations& cmb = shader->m_combinations;
-	Renderer& renderer = shader->getRenderer();
+	ShaderCombinations& cmb = getShaderCombinations(L);
+	Renderer& renderer = getRendererGlobal(L);
 
 	LuaWrapper::checkTableArg(L, 1);
 	int len = (int)lua_rawlen(L, 1);
@@ -365,6 +383,10 @@ static void registerFunctions(Shader* shader, ShaderCombinations* combinations, 
 {
 	lua_pushlightuserdata(L, shader);
 	lua_setglobal(L, "shader");
+	lua_pushlightuserdata(L, combinations);
+	lua_setglobal(L, "combinations");
+	lua_pushlightuserdata(L, renderer);
+	lua_setglobal(L, "renderer");
 	registerCFunction(L, "pass", &LuaWrapper::wrap<decltype(&pass), pass>);
 	registerCFunction(L, "fs", &LuaWrapper::wrap<decltype(&fs), fs>);
 	registerCFunction(L, "vs", &LuaWrapper::wrap<decltype(&vs), vs>);

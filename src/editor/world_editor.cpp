@@ -3871,25 +3871,22 @@ public:
 
 	void serialize(JsonSerializer& serializer) override
 	{
-		/*serializer.serialize("pos_x", m_position.x);
+		serializer.serialize("pos_x", m_position.x);
 		serializer.serialize("pos_y", m_position.y);
 		serializer.serialize("pos_z", m_position.z);
 		serializer.serialize("identity", m_identity);
-		serializer.serialize("size", m_blob.getPos());
+		serializer.serialize("size", m_copy_buffer.getPos());
 		serializer.beginArray("data");
-		for (int i = 0; i < m_blob.getPos(); ++i)
+		for (int i = 0; i < m_copy_buffer.getPos(); ++i)
 		{
-			serializer.serializeArrayItem((i32)((const u8*)m_blob.getData())[i]);
+			serializer.serializeArrayItem((i32)((const u8*)m_copy_buffer.getData())[i]);
 		}
-		serializer.endArray();*/
-		// TODO
+		serializer.endArray();
 	}
 
 
 	void deserialize(JsonDeserializer& serializer) override
 	{
-		// TODO
-		/*
 		serializer.deserialize("pos_x", m_position.x, 0);
 		serializer.deserialize("pos_y", m_position.y, 0);
 		serializer.deserialize("pos_z", m_position.z, 0);
@@ -3897,15 +3894,15 @@ public:
 		int size;
 		serializer.deserialize("size", size, 0);
 		serializer.deserializeArrayBegin("data");
-		m_blob.clear();
-		m_blob.reserve(size);
+		m_copy_buffer.clear();
+		m_copy_buffer.reserve(size);
 		for (int i = 0; i < size; ++i)
 		{
 			i32 data;
 			serializer.deserializeArrayItem(data, 0);
-			m_blob.write((u8)data);
+			m_copy_buffer.write((u8)data);
 		}
-		serializer.deserializeArrayEnd();*/
+		serializer.deserializeArrayEnd();
 	}
 
 
