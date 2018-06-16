@@ -33,6 +33,8 @@ class TextureManager;
 class LUMIX_RENDERER_API Renderer : public IPlugin 
 {
 	public:
+		enum { MAX_SHADER_DEFINES = 32 };
+	public:
 		virtual ~Renderer() {}
 		virtual void frame(bool capture) = 0;
 		virtual void resize(int width, int height) = 0;

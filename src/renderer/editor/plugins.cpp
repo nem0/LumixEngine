@@ -253,6 +253,12 @@ struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 							material->createCommandBuffer();
 						}
 						break;
+					case Shader::Uniform::VEC4:
+						if (ImGui::DragFloat4(shader_uniform.name, uniform.vec4))
+						{
+							material->createCommandBuffer();
+						}
+						break;
 					case Shader::Uniform::VEC2:
 						if (ImGui::DragFloat2(shader_uniform.name, uniform.vec2))
 						{
@@ -1108,6 +1114,7 @@ struct ShaderPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 					case Shader::Uniform::INT: ImGui::Text("int"); break;
 					case Shader::Uniform::MATRIX4: ImGui::Text("Matrix 4x4"); break;
 					case Shader::Uniform::TIME: ImGui::Text("time"); break;
+					case Shader::Uniform::VEC4: ImGui::Text("Vector4"); break;
 					case Shader::Uniform::VEC3: ImGui::Text("Vector3"); break;
 					case Shader::Uniform::VEC2: ImGui::Text("Vector2"); break;
 					default: ASSERT(false); break;

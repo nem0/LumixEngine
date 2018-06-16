@@ -659,9 +659,13 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 		{
 			if (m_shader_defines[i] == define)
 			{
-				ASSERT(i < 256);
 				return i;
 			}
+		}
+
+		if (m_shader_defines.size() >= MAX_SHADER_DEFINES) {
+			ASSERT(false);
+			g_log_error.log("Renderer") << "Too many shader defines.";
 		}
 
 		m_shader_defines.emplace(define);

@@ -36,6 +36,7 @@ typedef short i16;
 typedef unsigned short u16;
 typedef int i32;
 typedef unsigned int u32;
+typedef unsigned int uint;
 
 #ifdef _WIN32
 	typedef long long i64;
