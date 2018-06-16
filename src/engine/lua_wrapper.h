@@ -672,7 +672,7 @@ template <typename C, typename T, T t> int wrapMethodClosure(lua_State* L)
 {
 	using indices = typename BuildIndices<0, details::arity(t)>::result;
 	int index = lua_upvalueindex(1);
-	if (!isType<T>(L, index))
+	if (!isType<C>(L, index))
 	{
 		g_log_error.log("Lua") << "Invalid Lua closure";
 		ASSERT(false);
