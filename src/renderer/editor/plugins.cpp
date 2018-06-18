@@ -3007,8 +3007,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	{
 		IAllocator& allocator = app.getWorldEditor().getAllocator();
 
-		Model::force_keep_skin = true;
-
 		app.registerComponent("camera", "Render/Camera");
 		app.registerComponent("global_light", "Render/Global light");
 

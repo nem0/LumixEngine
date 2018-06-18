@@ -230,7 +230,6 @@ static void registerProperties(IAllocator& allocator)
 			property("Enabled", LUMIX_PROP_FULL(RenderScene, isModelInstanceEnabled, enableModelInstance)),
 			property("Source", LUMIX_PROP(RenderScene, ModelInstancePath),
 				ResourceAttribute("Mesh (*.msh)", Model::TYPE)),
-			property("Keep skin", LUMIX_PROP(RenderScene, ModelInstanceKeepSkin)),
 			const_array("Materials", &RenderScene::getModelInstanceMaterialsCount, 
 				property("Source", LUMIX_PROP(RenderScene, ModelInstanceMaterial),
 					ResourceAttribute("Material (*.mat)", Material::TYPE))
