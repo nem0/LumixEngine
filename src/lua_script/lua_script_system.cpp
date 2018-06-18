@@ -552,7 +552,7 @@ namespace Lumix
 			Entity entity = LuaWrapper::checkArg<Entity>(L, 2);
 			int scr_index = LuaWrapper::checkArg<int>(L, 3);
 
-			if (!scene->getUniverse().hasComponent(entity, LUA_SCRIPT_TYPE))
+			if (!entity.isValid() || !scene->getUniverse().hasComponent(entity, LUA_SCRIPT_TYPE))
 			{
 				lua_pushnil(L);
 				return 1;

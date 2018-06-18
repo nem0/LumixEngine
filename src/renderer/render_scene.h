@@ -61,7 +61,7 @@ struct ModelInstance
 	enum Flags : u8
 	{
 		CUSTOM_MESHES = 1 << 0,
-		KEEP_SKIN = 1 << 1,
+		KEEP_SKIN_DEPRECATED = 1 << 1,
 		IS_BONE_ATTACHMENT_PARENT = 1 << 2,
 		ENABLED = 1 << 3,
 
@@ -310,8 +310,6 @@ public:
 	virtual bool isModelInstanceEnabled(Entity entity) = 0;
 	virtual ModelInstance* getModelInstance(Entity entity) = 0;
 	virtual ModelInstance* getModelInstances() = 0;
-	virtual bool getModelInstanceKeepSkin(Entity entity) = 0;
-	virtual void setModelInstanceKeepSkin(Entity entity, bool keep) = 0;
 	virtual Path getModelInstancePath(Entity entity) = 0;
 	virtual void setModelInstanceMaterial(Entity entity, int index, const Path& path) = 0;
 	virtual Path getModelInstanceMaterial(Entity entity, int index) = 0;

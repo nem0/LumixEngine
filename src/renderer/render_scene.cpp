@@ -708,12 +708,6 @@ public:
 	}
 
 
-	static bool keepSkin(ModelInstance& r)
-	{
-		return r.flags.isSet(ModelInstance::KEEP_SKIN);
-	}
-
-
 	static bool hasCustomMeshes(ModelInstance& r)
 	{
 		return r.flags.isSet(ModelInstance::CUSTOM_MESHES);
@@ -4803,20 +4797,6 @@ public:
 	}
 
 
-	bool getModelInstanceKeepSkin(Entity entity) override
-	{
-		auto& r = m_model_instances[entity.index];
-		return keepSkin(r);
-	}
-
-
-	void setModelInstanceKeepSkin(Entity entity, bool keep) override
-	{
-		auto& r = m_model_instances[entity.index];
-		r.flags.set(ModelInstance::KEEP_SKIN, keep);
-	}
-
-
 	void setModelInstanceMaterial(Entity entity, int index, const Path& path) override
 	{
 		auto& r = m_model_instances[entity.index];
@@ -4879,7 +4859,6 @@ public:
 		model_instance.pose = nullptr;
 		if (model)
 		{
-			if (keepSkin(model_instance)) model->setKeepSkin();
 			ModelLoadedCallback& callback = getModelLoadedCallback(model);
 			++callback.m_ref_count;
 

@@ -148,7 +148,7 @@ public:
 
 	enum class LoadingFlags : u32
 	{
-		KEEP_SKIN = 1 << 0
+		KEEP_SKIN_DEPRECATED = 1 << 0
 	};
 
 	struct LOD
@@ -206,7 +206,6 @@ public:
 	RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, const Matrix& model_transform, const Pose* pose);
 	const AABB& getAABB() const { return m_aabb; }
 	LOD* getLODs() { return m_lods; }
-	void setKeepSkin();
 	void onBeforeReady() override;
 
 	static void registerLuaAPI(lua_State* L);
@@ -214,7 +213,6 @@ public:
 public:
 	static const u32 FILE_MAGIC = 0x5f4c4d4f; // == '_LMO'
 	static const int MAX_LOD_COUNT = 4;
-	static bool force_keep_skin;
 
 private:
 	Model(const Model&);
