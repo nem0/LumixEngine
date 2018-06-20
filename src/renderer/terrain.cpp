@@ -375,7 +375,7 @@ Array<Terrain::GrassQuad*>& Terrain::getQuads(Entity camera)
 }
 
 
-void Terrain::generateGrassTypeQuad(GrassPatch& patch, const Matrix& terrain_matrix, const Vec2& quad_pos)
+void Terrain::generateGrassTypeQuad(GrassPatch& patch, const RigidTransform& terrain_tr, const Vec2& quad_pos)
 {
 	ASSERT(quad_pos.x >= 0);
 	ASSERT(quad_pos.y >= 0);
@@ -386,23 +386,23 @@ void Terrain::generateGrassTypeQuad(GrassPatch& patch, const Matrix& terrain_mat
 	
 	const Texture* splat_map = m_splatmap;
 
-	float grass_quad_size_hm_space = GRASS_QUAD_SIZE / m_scale.x;
-	Vec2 quad_size = {
+	const float grass_quad_size_hm_space = GRASS_QUAD_SIZE / m_scale.x;
+	const Vec2 quad_size = {
 		Math::minimum(grass_quad_size_hm_space, m_heightmap->width - quad_pos.x),
 		Math::minimum(grass_quad_size_hm_space, m_heightmap->height - quad_pos.y)
 	};
 
 	struct { float x, y; void* type; } hashed_patch = { quad_pos.x, quad_pos.y, patch.m_type };
-	u32 hash = crc32(&hashed_patch, sizeof(hashed_patch));
+	const u32 hash = crc32(&hashed_patch, sizeof(hashed_patch));
 	Math::seedRandom(hash);
-	int max_idx = splat_map->width * splat_map->height;
+	const int max_idx = splat_map->width * splat_map->height;
 
-	Vec2 step = quad_size * (1 / (float)patch.m_type->m_density);
+	const Vec2 step = quad_size * (1 / (float)patch.m_type->m_density);
 	for (float dy = 0; dy < quad_size.y; dy += step.y)
 	{
 		for (float dx = 0; dx < quad_size.x; dx += step.x)
 		{
-			Vec2 sm_pos(
+			const Vec2 sm_pos(
 				(dx + quad_pos.x) / m_width * splat_map->width,
 				(dy + quad_pos.y) / m_height * splat_map->height
 			);
@@ -410,47 +410,45 @@ void Terrain::generateGrassTypeQuad(GrassPatch& patch, const Matrix& terrain_mat
 			int tx = int(sm_pos.x) + int(sm_pos.y) * splat_map->width;
 			tx = Math::clamp(tx, 0, max_idx - 1);
 
-			u32 pixel_value = ((u32*)&splat_map->data[0])[tx];
+			const u32 pixel_value = ((u32*)&splat_map->data[0])[tx];
 
-			int ground_mask = (pixel_value >> 16) & 0xffff;
+			const int ground_mask = (pixel_value >> 16) & 0xffff;
 			if ((ground_mask & (1 << patch.m_type->m_idx)) == 0) continue;
 
-			Matrix tmp = Matrix::IDENTITY;
-			float x = (quad_pos.x + dx + step.x * Math::randFloat(-0.5f, 0.5f)) * m_scale.x;
-			float z = (quad_pos.y + dy + step.y * Math::randFloat(-0.5f, 0.5f)) * m_scale.z;
-			tmp.setTranslation(Vec3(x, getHeight(x, z), z));
+			const float x = (quad_pos.x + dx + step.x * Math::randFloat(-0.5f, 0.5f)) * m_scale.x;
+			const float z = (quad_pos.y + dy + step.y * Math::randFloat(-0.5f, 0.5f)) * m_scale.z;
+			const Vec3 instance_rel_pos(x, getHeight(x, z), z);
+			Quat instance_rel_rot;
 			
 			switch (patch.m_type->m_rotation_mode)
 			{
 				case GrassType::RotationMode::Y_UP:
 				{
-					Quat q(Vec3(0, 1, 0), Math::randFloat(0, Math::PI * 2));
-					tmp = tmp * q.toMatrix();
+					instance_rel_rot = Quat(Vec3(0, 1, 0), Math::randFloat(0, Math::PI * 2));
 				}
 				break;
 				case GrassType::RotationMode::ALL_RANDOM:
 				{
-					Vec3 random_axis(Math::randFloat(-1, 1), Math::randFloat(-1, 1), Math::randFloat(-1, 1));
-					float random_angle = Math::randFloat(0, Math::PI * 2);
-					Quat q(random_axis.normalized(), random_angle);
-					tmp = tmp * q.toMatrix();
+					const Vec3 random_axis(Math::randFloat(-1, 1), Math::randFloat(-1, 1), Math::randFloat(-1, 1));
+					const float random_angle = Math::randFloat(0, Math::PI * 2);
+					instance_rel_rot = Quat(random_axis.normalized(), random_angle);
 				}
 				break;
 				case GrassType::RotationMode::ALIGN_WITH_NORMAL:
 				{
-					Vec3 normal = getNormal(x, z);
-					Quat random_base(Vec3(0, 1, 0), Math::randFloat(0, Math::PI * 2));
-					Quat to_normal = Quat::vec3ToVec3({0, 1, 0}, normal);
-					tmp = tmp * (to_normal * random_base).toMatrix();
+					const Vec3 normal = getNormal(x, z);
+					const Quat random_base(Vec3(0, 1, 0), Math::randFloat(0, Math::PI * 2));
+					const Quat to_normal = Quat::vec3ToVec3({0, 1, 0}, normal);
+					instance_rel_rot = to_normal * random_base;
 				}
 				break;
 				default: ASSERT(false); break;
 			}
 
-			tmp = terrain_matrix * tmp;
-			tmp.multiply3x3(Math::randFloat(0.9f, 1.1f));
 			GrassPatch::InstanceData& instance_data = patch.instance_data.emplace();
-			instance_data.matrix = tmp;
+			const Vec3 instance_pos = terrain_tr.pos + terrain_tr.rot * instance_rel_pos;
+			instance_data.pos_scale.set(instance_pos, Math::randFloat(0.9f, 1.1f));
+			instance_data.rot = terrain_tr.rot * instance_rel_rot;
 			instance_data.normal = Vec4(getNormal(x, z), 0);
 		}
 	}
@@ -469,8 +467,8 @@ void Terrain::updateGrass(Entity camera)
 	m_last_camera_position[camera] = camera_pos;
 
 	m_force_grass_update = false;
-	Matrix terrain_mtx = universe.getMatrix(m_entity);
-	Matrix inv_mtx = terrain_mtx;
+	const RigidTransform terrain_tr = universe.getTransform(m_entity).getRigidPart();
+	Matrix inv_mtx = universe.getMatrix(m_entity);
 	inv_mtx.fastInverse();
 	Vec3 local_camera_pos = inv_mtx.transformPoint(camera_pos);
 	float cx = (int)(local_camera_pos.x / (GRASS_QUAD_SIZE)) * GRASS_QUAD_SIZE;
@@ -530,11 +528,11 @@ void Terrain::updateGrass(Entity camera)
 				GrassPatch& patch = quad->m_patches.emplace(m_allocator);
 				patch.m_type = &grass_type;
 
-				generateGrassTypeQuad(patch, terrain_mtx, {quad_x / m_scale.x, quad_z / m_scale.z});
+				generateGrassTypeQuad(patch, terrain_tr, {quad_x / m_scale.x, quad_z / m_scale.z});
 				for (auto instance_data : patch.instance_data)
 				{
-					min_y = Math::minimum(instance_data.matrix.getTranslation().y, min_y);
-					max_y = Math::maximum(instance_data.matrix.getTranslation().y, max_y);
+					min_y = Math::minimum(instance_data.pos_scale.y, min_y);
+					max_y = Math::maximum(instance_data.pos_scale.y, max_y);
 				}
 			}
 

@@ -58,7 +58,8 @@ class Terrain
 		{
 			struct InstanceData
 			{
-				Matrix matrix;
+				Vec4 pos_scale;
+				Quat rot;
 				Vec4 normal;
 			};
 			explicit GrassPatch(IAllocator& allocator)
@@ -131,7 +132,7 @@ class Terrain
 		Array<Terrain::GrassQuad*>& getQuads(Entity camera);
 		TerrainQuad* generateQuadTree(float size);
 		void updateGrass(Entity camera);
-		void generateGrassTypeQuad(GrassPatch& patch, const Matrix& terrain_matrix, const Vec2& quad_pos_hm_space);
+		void generateGrassTypeQuad(GrassPatch& patch, const RigidTransform& terrain_tr, const Vec2& quad_pos_hm_space);
 		void generateGeometry();
 		void onMaterialLoaded(Resource::State, Resource::State new_state, Resource&);
 		void grassLoaded(Resource::State, Resource::State, Resource&);
