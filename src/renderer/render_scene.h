@@ -91,7 +91,8 @@ struct GrassInfo
 {
 	struct InstanceData
 	{
-		Matrix matrix;
+		Vec4 pos_scale;
+		Quat rot;
 		Vec4 normal;
 	};
 	Model* model;
