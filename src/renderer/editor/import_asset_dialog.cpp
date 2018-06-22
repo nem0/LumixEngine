@@ -1339,16 +1339,6 @@ struct FBXImporter
 	{
 		if (!create_billboard_lod) return;
 
-		bool has_tangents = false;
-		for (auto& mesh : meshes)
-		{
-			if (mesh.import)
-			{
-				has_tangents = mesh.fbx->getGeometry()->getTangents() != nullptr;
-				break;
-			}
-		}
-
 		Vec3 max = aabb.max;
 		Vec3 min = aabb.min;
 		Vec3 size = max - min;
@@ -1384,14 +1374,13 @@ struct FBXImporter
 			{{0, max.y, max.z}, {128, 255, 128, 0}, {128, 128, 0, 0}, fixUV(x2_max, uv0_min.y)}};
 
 		int vertex_data_size = sizeof(BillboardSceneData::Vertex);
-		if (!has_tangents) vertex_data_size -= 4;
 		vertex_data_size *= lengthOf(vertices);
 		write(vertex_data_size);
 		for (const BillboardSceneData::Vertex& vertex : vertices)
 		{
 			write(vertex.pos);
 			write(vertex.normal);
-			if(has_tangents) write(vertex.tangent);
+			write(vertex.tangent);
 			write(vertex.uv);
 		}
 	}
@@ -1433,7 +1422,11 @@ struct FBXImporter
 
 		if (create_billboard_lod)
 		{
-			u16 indices[] = { 0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 8, 9, 10, 8, 10, 11, 12, 13, 14, 12, 14, 15 };
+			const int index_size = sizeof(u16);
+			write(index_size);
+			const u16 indices[] = {0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 8, 9, 10, 8, 10, 11, 12, 13, 14, 12, 14, 15};
+			const i32 len = lengthOf(indices);
+			write(len);
 			write(indices, sizeof(indices));
 		}
 
@@ -1455,8 +1448,23 @@ struct FBXImporter
 	void writeBillboardMesh(i32 attribute_array_offset, i32 indices_offset, const char* mesh_output_filename)
 	{
 		if (!create_billboard_lod) return;
-		
-		StaticString<MAX_PATH_LENGTH + 10> material_name(mesh_output_filename, "_billboard");
+
+		const i32 attribute_count = 4;
+		write(attribute_count);
+
+		const i32 pos_attr = 0;
+		write(pos_attr);
+
+		const i32 nrm_attr = 1;
+		write(nrm_attr);
+
+		const i32 tangent_attr = 2;
+		write(tangent_attr);
+
+		const i32 uv0_attr = 8;
+		write(uv0_attr);
+
+		const StaticString<MAX_PATH_LENGTH + 10> material_name(mesh_output_filename, "_billboard");
 		i32 length = stringLength(material_name);
 		write((const char*)&length, sizeof(length));
 		write(material_name, length);
@@ -1524,8 +1532,8 @@ struct FBXImporter
 			}
 			if (geom->getTangents())
 			{
-				i32 color_attr = 2;
-				write(color_attr);
+				i32 tangent_attr = 2;
+				write(tangent_attr);
 			}
 			if (isSkinned(mesh))
 			{
@@ -3064,6 +3072,7 @@ static bool createBillboard(ImportAssetDialog& dialog,
 
 	auto* pipeline = Pipeline::create(*renderer, Path("pipelines/billboard.lua"), "", engine.getAllocator());
 	pipeline->load();
+	while (engine.getFileSystem().hasWork()) engine.getFileSystem().updateAsyncTransactions();
 
 	auto mesh_entity = universe.createEntity({0, 0, 0}, {0, 0, 0, 0});
 	static const auto MODEL_INSTANCE_TYPE = Reflection::getComponentType("renderable");
@@ -3148,8 +3157,8 @@ static bool createBillboard(ImportAssetDialog& dialog,
 	bgfx::readTexture(normal_texture, &data_normal[0]);
 	bgfx::touch(renderer->getViewCounter());
 
-	bgfx::frame(); // submit
-	bgfx::frame(); // wait for gpu
+	renderer->frame(false);
+	renderer->frame(false);
 
 	if (model->isReady())
 	{

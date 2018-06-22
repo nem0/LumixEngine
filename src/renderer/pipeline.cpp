@@ -424,8 +424,9 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		}
 		LUMIX_DELETE(m_allocator, m_default_framebuffer);
 		m_framebuffers.clear();
-		bgfx::frame();
-		bgfx::frame();
+		
+		m_renderer.frame(false);
+		m_renderer.frame(false);
 	}
 
 
@@ -1185,8 +1186,8 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		bgfx::readTexture(texture, &data[0]);
 		bgfx::touch(m_renderer.getViewCounter());
 
-		bgfx::frame(); // submit
-		bgfx::frame(); // wait for gpu
+		m_renderer.frame(false);
+		m_renderer.frame(false);
 
 		FS::FileSystem& fs = m_renderer.getEngine().getFileSystem();
 		FS::IFile* file = fs.open(fs.getDefaultDevice(), Path(out_path), FS::Mode::CREATE_AND_WRITE);
