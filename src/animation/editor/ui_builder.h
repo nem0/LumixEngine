@@ -68,10 +68,10 @@ struct Visitor
 		void removeItem(int) const { ASSERT(false); }
 		int size() const { ASSERT(false); return -1; }
 
-		template <typename T2> auto setHelper(const T2& v, int) const -> decltype(value = v, void()) { value = v; }
-		template <typename T2> void setHelper(const T2& v, char) const { ASSERT(false); }
+		template <typename T2> static auto setHelper(T& dst, const T2& src, int) -> decltype(dst = src, void()) { dst = src; }
+		template <typename T2> static void setHelper(T& dst, const T2& src, char) { ASSERT(false); }
 
-		template <typename T2> void setValue(const T2& v) const { setHelper(v, 0); }
+		template <typename T2> void setValue(const T2& v) const { setHelper(value, v, 0); }
 
 		T& getValue() const { return value; }
 		
