@@ -54,16 +54,21 @@ struct Visitor
 	Visitor(const F& f) : f(f) {}
 
 
-	template <typename T>
+	template <typename T0>
 	struct ValueProxy
 	{
-		ValueProxy(T& value) : value(value) {}
+		using T = RemoveCVR<T0>;
+
+		ValueProxy(T& value)
+			: value(value)
+		{
+		}
+
 		void addItem(int) const { ASSERT(false); }
 		void removeItem(int) const { ASSERT(false); }
 		int size() const { ASSERT(false); return -1; }
 
-		template <typename T2> void set(const T2& v) { value = v; }
-		template <typename T2> auto setHelper(const T2& v, int) const -> decltype(set(v), void()) { value = v; }
+		template <typename T2> auto setHelper(const T2& v, int) const -> decltype(value = v, void()) { value = v; }
 		template <typename T2> void setHelper(const T2& v, char) const { ASSERT(false); }
 
 		template <typename T2> void setValue(const T2& v) const { setHelper(v, 0); }
