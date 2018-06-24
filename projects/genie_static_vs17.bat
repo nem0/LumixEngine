@@ -1,1 +1,1 @@
-genie.exe --static-plugins vs2017
+genie.exe --static-plugins --no-gui vs2017

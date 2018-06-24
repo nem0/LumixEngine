@@ -68,23 +68,7 @@ void Texture::destroy()
 
 bool Texture::create(int w, int h, const void* data)
 {
-	if (data)
-	{
-		handle = bgfx::createTexture2D(
-			(uint16_t)w, (uint16_t)h, false, 1, bgfx::TextureFormat::RGBA8, bgfx_flags, bgfx::copy(data, w * h * 4));
-	}
-	else
-	{
-		handle = bgfx::createTexture2D((uint16_t)w, (uint16_t)h, false, 1, bgfx::TextureFormat::RGBA8, bgfx_flags);
-	}
-	mips = 1;
-	width = w;
-	height = h;
-
-	bool isReady = bgfx::isValid(handle);
-	onCreated(isReady ? State::READY : State::FAILURE);
-
-	return isReady;
+	return false;
 }
 
 
@@ -643,7 +627,7 @@ static bool loadDDSorKTX(Texture& texture, FS::IFile& file)
 bool Texture::load(FS::IFile& file)
 {
 	PROFILE_FUNCTION();
-
+	/*
 	const char* path = getPath().c_str();
 	size_t len = getPath().length();
 	bool loaded = false;
@@ -666,7 +650,9 @@ bool Texture::load(FS::IFile& file)
 	}
 
 	m_size = file.size();
-	return true;
+	return true;*/
+
+	return false;
 }
 
 

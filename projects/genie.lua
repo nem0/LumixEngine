@@ -625,7 +625,7 @@ if has_plugin("renderer") then
 	project "renderer"
 		libType()
 
-		files { "../src/renderer/**.h", "../src/renderer/**.cpp" }
+		files { "../src/renderer/**.h", "../src/renderer/**.cpp", "../src/renderer/**.c"}
 		includedirs { "../src", "../external/bgfx/include", "../external/cmft/include", "../external/crnlib/include" }
 		defines { "BUILDING_RENDERER" }
 		links { "engine" }
@@ -635,6 +635,7 @@ if has_plugin("renderer") then
 			linkLib "crnlib"
 			linkLib "cmft"
 		end
+		links { "opengl32" }
 		linkLib "bgfx"
 		configuration { "linux-*" }
 			links { "GL", "X11" }
@@ -831,7 +832,9 @@ if build_app then
 				end
 			end
 				
-
+			if has_plugin("renderer") then
+				links { "opengl32" }
+			end
 			if has_plugin("physics") then
 				linkPhysX()
 			end
@@ -969,7 +972,12 @@ if build_studio then
 			linkLib "lua"
 			linkLib "recast"
 			
-			linkPhysX()
+			if has_plugin("renderer") then
+				links { "opengl32" }
+			end
+			if has_plugin "physics" then
+				linkPhysX()
+			end
 			
 			configuration { "linux-*" }
 				links { "GL", "X11", "dl", "rt" }

@@ -401,7 +401,7 @@ static void registerFunctions(Shader* shader, ShaderCombinations* combinations, 
 
 bool Shader::load(FS::IFile& file)
 {
-	lua_State* L = luaL_newstate();
+	/*lua_State* L = luaL_newstate();
 	luaL_openlibs(L);
 	registerFunctions(this, &m_combinations, &getRenderer(), L);
 	m_render_states = BGFX_STATE_DEPTH_TEST_GEQUAL;
@@ -417,13 +417,13 @@ bool Shader::load(FS::IFile& file)
 	
 	if (!generateInstances())
 	{
-		g_log_error.log("Renderer") << "Could not load instances of shader " << getPath().c_str();
+		g_log_error.log("Renderer") << "Could not load instances of shader " << getPath().c_str();*/
 		return false;
-	}
+	/*}
 
 	m_size = file.size();
 	lua_close(L);
-	return true;
+	return true;*/
 }
 
 
@@ -563,18 +563,18 @@ void ShaderBinary::unload()
 
 bool ShaderBinary::load(FS::IFile& file)
 {
-	auto* mem = bgfx::alloc((u32)file.size() + 1);
+	/*auto* mem = bgfx::alloc((u32)file.size() + 1);
 	file.read(mem->data, file.size());
 	mem->data[file.size()] = '\0';
 	m_handle = bgfx::createShader(mem);
 	m_size = file.size();
 	if (!bgfx::isValid(m_handle))
 	{
-		g_log_error.log("Renderer") << getPath().c_str() << ": Failed to create bgfx shader";
+		g_log_error.log("Renderer") << getPath().c_str() << ": Failed to create bgfx shader";*/
 		return false;
-	}
+	/*}
 	bgfx::setName(m_handle, getPath().c_str());
-	return true;
+	return true;*/
 }
 
 
