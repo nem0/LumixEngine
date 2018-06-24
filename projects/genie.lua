@@ -9,11 +9,9 @@ end
 
 local LOCATION = "tmp/" .. ide_dir
 local BINARY_DIR = LOCATION .. "/bin/"
-local build_physics = true
 local build_unit_tests = false
 local build_app = true
 local build_studio = true
-local build_gui = _ACTION == "vs2017"
 local build_steam = false
 local build_game = false
 local working_dir = nil
@@ -23,6 +21,15 @@ local plugins = {}
 local embed_resources = false
 build_studio_callbacks = {}
 build_app_callbacks = {}
+
+function has_plugin(plugin)
+	for _, v in ipairs(plugins) do
+    if v == plugin then
+      return true
+    end
+  end
+  return false
+end
 
 
 newoption {
@@ -43,6 +50,31 @@ newoption {
 newoption {
 	trigger = "no-physics",
 	description = "Do not build physics plugin."
+}
+
+newoption {
+	trigger = "no-navigation",
+	description = "Do not build navigation plugin."
+}
+
+newoption {
+	trigger = "no-animation",
+	description = "Do not build animation plugin."
+}
+
+newoption {
+	trigger = "no-renderer",
+	description = "Do not build renderer plugin."
+}
+
+newoption {
+	trigger = "no-audio",
+	description = "Do not build audio plugin."
+}
+
+newoption {
+	trigger = "no-lua-script",
+	description = "Do not build lua script plugin."
 }
 
 newoption {
@@ -119,15 +151,33 @@ if _OPTIONS["release-args"] then
 	release_args = _OPTIONS["release-args"]
 end
 
-if _OPTIONS["no-physics"] then
-	build_physics = false
+if not _OPTIONS["no-physics"] then
+	table.insert(plugins, "physics")
 end
 
-
-if _OPTIONS["no-gui"] then
-	build_gui = false
+if _OPTIONS["no-renderer"] == nil then
+	table.insert(plugins, "renderer")
 end
 
+if _OPTIONS["no-audio"] == nil then
+	table.insert(plugins, "audio")
+end
+
+if _OPTIONS["no-lua-script"] == nil then
+	table.insert(plugins, "lua_script")
+end
+
+if _OPTIONS["no-gui"] == nil or _ACTION ~= "vs2017" then
+	table.insert(plugins, "gui")
+end
+
+if _OPTIONS["no-animation"] == nil then
+	table.insert(plugins, "animation")
+end
+
+if _OPTIONS["no-navigation"] == nil then
+	table.insert(plugins, "navigation")
+end
 
 if _OPTIONS["no-studio"] then
 	build_studio = false
@@ -328,7 +378,7 @@ function libType()
 end
 
 function linkPhysX()
-	if build_physics then
+	if has_plugin("physics") then
 		configuration { "x64", "vs20*" }
 			libdirs {"../external/physx/lib/" .. ide_dir .. "/win64"}
 			links {"PhysX3CHECKED_x64", "PhysX3CommonCHECKED_x64", "PhysX3CharacterKinematicCHECKED_x64", "PhysX3CookingCHECKED_x64" }
@@ -555,7 +605,7 @@ project "engine"
 
 	defaultConfigurations()
 
-if build_physics then
+if has_plugin("physics") then
 	project "physics"
 		libType()
 
@@ -563,8 +613,7 @@ if build_physics then
 
 		includedirs { "../external/physx/include/", "../external/bgfx/include" }
 		defines { "BUILDING_PHYSICS" }
-		links { "engine", "renderer", "editor" }
-
+		links { "engine", "editor", "renderer" }
 		useLua()
 		linkPhysX()
 
@@ -572,48 +621,55 @@ if build_physics then
 end
 
 
-project "renderer"
-	libType()
+if has_plugin("renderer") then
+	project "renderer"
+		libType()
 
-	files { "../src/renderer/**.h", "../src/renderer/**.cpp" }
-	includedirs { "../src", "../external/bgfx/include", "../external/cmft/include", "../external/crnlib/include" }
-	defines { "BUILDING_RENDERER" }
-	links { "engine" }
+		files { "../src/renderer/**.h", "../src/renderer/**.cpp" }
+		includedirs { "../src", "../external/bgfx/include", "../external/cmft/include", "../external/crnlib/include" }
+		defines { "BUILDING_RENDERER" }
+		links { "engine" }
 
-	if build_studio then
-		links { "editor", "shaderc" }
-		linkLib "crnlib"
-		linkLib "cmft"
-	end
-	linkLib "bgfx"
-	configuration { "linux-*" }
-		links { "GL", "X11" }
-	configuration {}
-	useLua()
-	
-	configuration { "windows" }
-		links { "psapi" }
+		if build_studio then
+			links { "editor", "shaderc" }
+			linkLib "crnlib"
+			linkLib "cmft"
+		end
+		linkLib "bgfx"
+		configuration { "linux-*" }
+			links { "GL", "X11" }
+		configuration {}
+		useLua()
+		
+		configuration { "windows" }
+			links { "psapi" }
 
-	defaultConfigurations()
+		defaultConfigurations()
+end
+		
+if has_plugin("animation") then
+	project "animation"
+		libType()
 
-project "animation"
-	libType()
+		files { "../src/animation/**.h", "../src/animation/**.cpp" }
+		includedirs { "../src" }
+		includedirs { "../external/bgfx/include" }
+		defines { "BUILDING_ANIMATION" }
+		links { "engine", "renderer" }
 
-	files { "../src/animation/**.h", "../src/animation/**.cpp" }
-	includedirs { "../src" }
-	includedirs { "../external/bgfx/include" }
-	defines { "BUILDING_ANIMATION" }
-	links { "engine", "renderer" }
-
-	if build_studio then
-		links { "editor" }
-	end
-	
-	useLua()
-	defaultConfigurations()
+		if build_studio then
+			links { "editor" }
+		end
+		
+		useLua()
+		defaultConfigurations()
+end
 
 for _, plugin in ipairs(plugins) do
-	dofile("../../" .. plugin .. "/genie.lua")
+	local path = "../../" .. plugin .. "/genie.lua";
+	if os.isfile(path) then
+		dofile(path)
+	end
 end
 	
 if build_steam then
@@ -631,46 +687,50 @@ if build_steam then
 		defaultConfigurations()
 end
 	
-project "audio"
-	libType()
+if has_plugin("audio") then
+	project "audio"
+		libType()
 
-	files { 
-		"../src/audio/**.h",
-		"../src/audio/**.cpp",
-		"../external/stb/stb_vorbis.cpp"
-	}
-	includedirs { "../src", "../src/audio", "../external/bgfx/include" }
-	defines { "BUILDING_AUDIO" }
-	links { "engine" }
+		files { 
+			"../src/audio/**.h",
+			"../src/audio/**.cpp",
+			"../external/stb/stb_vorbis.cpp"
+		}
+		includedirs { "../src", "../src/audio", "../external/bgfx/include" }
+		defines { "BUILDING_AUDIO" }
+		links { "engine" }
 
-	if build_studio then
-		links { "editor" }
-	end
+		if build_studio then
+			links { "editor" }
+		end
 
-	configuration "windows"
-		links { "dxguid" }
-	configuration {}
+		configuration "windows"
+			links { "dxguid" }
+		configuration {}
 
-	useLua()
-	defaultConfigurations()
+		useLua()
+		defaultConfigurations()
+end
 	
-project "navigation"
-	libType()
+if has_plugin("navigation") then
+	project "navigation"
+		libType()
 
-	files { "../src/navigation/**.h", "../src/navigation/**.cpp", "../external/recast/src/**.cpp" }
-	includedirs { "../src", "../src/navigation", "../external/recast/include" }
-	includedirs { "../external/bgfx/include" }
-	links { "engine", "renderer" }
-	linkLib "recast"
-	
-	if build_studio then
-		links { "editor" }
-	end
-	
-	useLua()
-	defaultConfigurations()
+		files { "../src/navigation/**.h", "../src/navigation/**.cpp", "../external/recast/src/**.cpp" }
+		includedirs { "../src", "../src/navigation", "../external/recast/include" }
+		includedirs { "../external/bgfx/include" }
+		links { "engine", "renderer" }
+		linkLib "recast"
+		
+		if build_studio then
+			links { "editor" }
+		end
+		
+		useLua()
+		defaultConfigurations()
+end
 
-if build_gui then
+if has_plugin("gui") then
 	project "gui"
 		libType()
 
@@ -693,21 +753,23 @@ if build_gui then
 		defaultConfigurations()
 end
 	
-project "lua_script"
-	libType()
+if has_plugin("lua_script") then
+	project "lua_script"
+		libType()
 
-	files { "../src/lua_script/**.h", "../src/lua_script/**.cpp" }
-	includedirs { "../src", "../src/lua_script", "../external/bgfx/include" }
-	defines { "BUILDING_LUA_SCRIPT" }
-	links { "engine", "renderer" }
+		files { "../src/lua_script/**.h", "../src/lua_script/**.cpp" }
+		includedirs { "../src", "../src/lua_script", "../external/bgfx/include" }
+		defines { "BUILDING_LUA_SCRIPT" }
+		links { "engine", "renderer" }
 
-	if build_studio then
-		links { "editor" }
-	end
+		if build_studio then
+			links { "editor" }
+		end
 
-	useLua()
-	defaultConfigurations()
-
+		useLua()
+		defaultConfigurations()
+end
+		
 if build_unit_tests then
 	project "unit_tests"
 		kind "ConsoleApp"
@@ -715,7 +777,7 @@ if build_unit_tests then
 
 		files { "../src/unit_tests/**.h", "../src/unit_tests/**.cpp" }
 		includedirs { "../src", "../src/unit_tests", "../external/bgfx/include" }
-		links { "animation", "renderer", "engine" }
+		links { "animation", "engine", "renderer" }
 		if _OPTIONS["static-plugins"] then	
 			configuration { "vs*" }
 				links { "winmm", "psapi" }
@@ -753,46 +815,26 @@ if build_app then
 		
 		includedirs { "../src", "../src/app", "../external/bgfx/include" }
 		if _OPTIONS["static-plugins"] then	
-			forceLink("s_animation_plugin_register")
-			forceLink("s_audio_plugin_register")
-			forceLink("s_lua_script_plugin_register")
-			forceLink("s_navigation_plugin_register")
-			forceLink("s_renderer_plugin_register")
-			
 			for _, plugin in ipairs(plugins) do
 				forceLink ("s_" .. plugin .. "_plugin_register")
 				links { plugin }
+				if build_studio then
+					forceLink("setStudioApp_" .. plugin)
+				end
 			end
-			
-			if build_gui then
-				forceLink("s_gui_plugin_register")
-			end
-
+					
 			if build_studio then
-				forceLink("setStudioApp_animation")
 				forceLink("setStudioApp_audio")
 				forceLink("setStudioApp_lua_script")
-				forceLink("setStudioApp_navigation")
-				forceLink("setStudioApp_renderer")
-				forceLink("setStudioApp_gui")
 				for _, plugin in ipairs(plugins) do
 					forceLink("setStudioApp_" .. plugin)
 				end
 			end
 				
 
-			if build_physics then
-				forceLink("s_physics_plugin_register")
-				if build_studio then
-					forceLink("setStudioApp_physics")
-				end
-				links { "physics" }
+			if has_plugin("physics") then
 				linkPhysX()
 			end
-			if build_gui then
-				links { "gui" }
-			end
-			links { "audio", "animation", "renderer", "lua_script", "navigation" }
 			if build_studio then links {"editor"} end
 			links {"engine"}
 			
@@ -801,7 +843,7 @@ if build_app then
 
 			configuration {}
 		else
-			links { "renderer", "editor", "engine" }
+			links { "editor", "engine" }
 		end
 		if build_studio then
 			linkLib "crnlib"
@@ -906,11 +948,6 @@ if build_studio then
 		includedirs { "../src" }
 
 		if _OPTIONS["static-plugins"] then	
-			forceLink("s_animation_plugin_register")
-			forceLink("s_audio_plugin_register")
-			forceLink("s_lua_script_plugin_register")
-			forceLink("s_navigation_plugin_register")
-			forceLink("s_renderer_plugin_register")
 			if build_steam then
 				forceLink("s_steam_plugin_register")
 				links { "steam", "steam_api64" }
@@ -923,25 +960,9 @@ if build_studio then
 				links { plugin }
 			end
 			
-			forceLink("setStudioApp_animation")
-			forceLink("setStudioApp_audio")
-			forceLink("setStudioApp_lua_script")
-			forceLink("setStudioApp_navigation")
-			forceLink("setStudioApp_renderer")
-			forceLink("setStudioApp_gui")
+		
 
-			if build_physics then
-				forceLink("s_physics_plugin_register")
-				forceLink("setStudioApp_physics")
-				links { "physics" }
-			end
-
-			if build_gui then
-				forceLink("s_gui_plugin_register")
-				links { "gui" }
-			end
-
-			links { "audio", "animation", "renderer", "lua_script", "navigation", "editor", "engine", "shaderc" }
+			links { "editor", "engine", "shaderc" }
 			linkLib "crnlib"
 			linkLib "cmft"
 			linkLib "bgfx"
