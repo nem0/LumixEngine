@@ -301,39 +301,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		, m_is_first_render(true)
 		, m_occlusion_buffer(allocator)
 	{
-		for (auto& handle : m_debug_vertex_buffers)
-		{
-			handle = BGFX_INVALID_HANDLE;
-		}
-		m_deferred_point_light_vertex_decl.begin()
-			.add(bgfx::Attrib::Position, 3, bgfx::AttribType::Float)
-			.end();
-
-		m_base_vertex_decl.begin()
-			.add(bgfx::Attrib::Position, 3, bgfx::AttribType::Float)
-			.add(bgfx::Attrib::Color0, 4, bgfx::AttribType::Uint8, true)
-			.add(bgfx::Attrib::TexCoord0, 2, bgfx::AttribType::Float)
-			.end();
-
-		m_has_shadowmap_define_idx = m_renderer.getShaderDefineIdx("HAS_SHADOWMAP");
-		m_instanced_define_idx = m_renderer.getShaderDefineIdx("INSTANCED");
-
-		createUniforms();
-
-		ShaderManager& shader_manager = renderer.getShaderManager();
-		m_debug_line_shader = (Shader*)shader_manager.load(Path("pipelines/common/debugline.shd"));
-		m_text_mesh_shader = (Shader*)shader_manager.load(Path("pipelines/common/textmesh.shd"));
-		m_draw2d_shader = (Shader*)shader_manager.load(Path("pipelines/common/draw2d.shd"));
-		m_default_cubemap = (Texture*)renderer.getTextureManager().load(Path("pipelines/pbr/default_probe.dds"));
-		createParticleBuffers();
-		createCubeBuffers();
-		m_stats = {};
-
-		FontAtlas& font_atlas = m_renderer.getFontManager().getFontAtlas();
-		m_draw2d.FontTexUvWhitePixel = font_atlas.TexUvWhitePixel;
-		m_draw2d.Clear();
-		m_draw2d.PushClipRectFullScreen();
-		m_draw2d.PushTextureID(font_atlas.TexID);
+		
 	}
 
 
@@ -395,10 +363,10 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 	void load() override
 	{
-		auto& fs = m_renderer.getEngine().getFileSystem();
+		/*auto& fs = m_renderer.getEngine().getFileSystem();
 		Delegate<void(FS::IFile&, bool)> cb;
 		cb.bind<PipelineImpl, &PipelineImpl::onFileLoaded>(this);
-		fs.openAsync(fs.getDefaultDevice(), m_path, FS::Mode::OPEN_AND_READ, cb);
+		fs.openAsync(fs.getDefaultDevice(), m_path, FS::Mode::OPEN_AND_READ, cb);*/
 	}
 
 
@@ -546,7 +514,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 
 	void createUniforms()
 	{
-		m_grass_max_dist_uniform = bgfx::createUniform("u_grassMaxDist", bgfx::UniformType::Vec4);
+/*		m_grass_max_dist_uniform = bgfx::createUniform("u_grassMaxDist", bgfx::UniformType::Vec4);
 		m_texture_size_uniform = bgfx::createUniform("u_textureSize", bgfx::UniformType::Vec4);
 		m_cam_params = bgfx::createUniform("u_camParams", bgfx::UniformType::Vec4);
 		m_cam_proj_uniform = bgfx::createUniform("u_camProj", bgfx::UniformType::Mat4);
@@ -571,7 +539,7 @@ struct PipelineImpl LUMIX_FINAL : public Pipeline
 		m_layer_uniform = bgfx::createUniform("u_layer", bgfx::UniformType::Vec4);
 		m_terrain_matrix_uniform = bgfx::createUniform("u_terrainMatrix", bgfx::UniformType::Mat4);
 		m_decal_matrix_uniform = bgfx::createUniform("u_decalMatrix", bgfx::UniformType::Mat4);
-		m_emitter_matrix_uniform = bgfx::createUniform("u_emitterMatrix", bgfx::UniformType::Mat4);
+		m_emitter_matrix_uniform = bgfx::createUniform("u_emitterMatrix", bgfx::UniformType::Mat4);*/
 	}
 
 

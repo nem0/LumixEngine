@@ -34,6 +34,7 @@
 #include "platform_interface.h"
 #include "profiler_ui.h"
 #include "property_grid.h"
+#include "renderer/ffr/ffr.h"
 #include "settings.h"
 #include "utils.h"
 #include <SDL.h>
@@ -180,7 +181,11 @@ public:
 		m_engine = Engine::create(current_dir, data_dir_path, nullptr, m_allocator);
 		createLua();
 
-		m_window = SDL_CreateWindow("Lumix Studio", 0, 0, 800, 600, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
+		ffr_preinit();
+		SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
+		SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 5);
+		m_window = SDL_CreateWindow("Lumix Studio", 0, 0, 800, 600, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
+		SDL_GL_CreateContext(m_window);
 		PlatformInterface::setWindow(m_window);
 		SDL_SysWMinfo window_info;
 		SDL_VERSION(&window_info.version);

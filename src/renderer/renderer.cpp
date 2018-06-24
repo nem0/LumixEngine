@@ -26,6 +26,10 @@
 #include "renderer/terrain.h"
 #include "renderer/texture.h"
 #include "renderer/texture_manager.h"
+
+#include <Windows.h>
+#include "gl/GL.h"
+#include "ffr/ffr.h"
 #include <bgfx/bgfx.h>
 #include <cstdio>
 
@@ -352,122 +356,6 @@ struct BGFXAllocator LUMIX_FINAL : public bx::AllocatorI
 
 struct RendererImpl LUMIX_FINAL : public Renderer
 {
-	struct CallbackStub LUMIX_FINAL : public bgfx::CallbackI
-	{
-		explicit CallbackStub(RendererImpl& renderer)
-			: m_renderer(renderer)
-		{}
-
-
-		void fatal(bgfx::Fatal::Enum _code, const char* _str) override
-		{
-			g_log_error.log("Renderer") << _str;
-			if (bgfx::Fatal::DebugCheck == _code || bgfx::Fatal::InvalidShader == _code)
-			{
-				Debug::debugBreak();
-			}
-			else
-			{
-				abort();
-			}
-		}
-
-
-		void traceVargs(const char* _filePath,
-			u16 _line,
-			const char* _format,
-			va_list _argList) override
-		{
-		}
-
-
-		void screenShot(const char* filePath,
-			uint32_t width,
-			uint32_t height,
-			uint32_t pitch,
-			const void* data,
-			uint32_t size,
-			bool yflip) override
-		{
-			TGAHeader header;
-			setMemory(&header, 0, sizeof(header));
-			int bytes_per_pixel = 4;
-			header.bitsPerPixel = (char)(bytes_per_pixel * 8);
-			header.height = (short)height;
-			header.width = (short)width;
-			header.dataType = 2;
-			header.imageDescriptor = 32;
-
-			FS::OsFile file;
-			if(!file.open(filePath, FS::Mode::CREATE_AND_WRITE))
-			{
-				g_log_error.log("Renderer") << "Failed to save screenshot to " << filePath;
-				return;
-			}
-			file.write(&header, sizeof(header));
-
-			for(u32 i = 0; i < height; ++i)
-				file.write((const u8*)data + pitch * i, width * 4);
-			file.close();
-		}
-
-
-		void captureBegin(u32,
-			u32,
-			u32,
-			bgfx::TextureFormat::Enum,
-			bool) override
-		{
-			ASSERT(false);
-		}
-
-
-		u32 cacheReadSize(u64) override { return 0; }
-		bool cacheRead(u64, void*, u32) override { return false; }
-		void cacheWrite(u64, const void*, u32) override {}
-		void captureEnd() override { ASSERT(false); }
-		void captureFrame(const void*, u32) override { ASSERT(false); }
-
-		void setThreadName()
-		{
-			if (m_is_thread_name_set) return;
-			m_is_thread_name_set = true;
-			Profiler::setThreadName("bgfx thread");
-		}
-
-		void profilerBegin(
-			const char* _name
-			, uint32_t _abgr
-			, const char* _filePath
-			, uint16_t _line
-		) override
-		{
-			setThreadName();
-			Profiler::beginBlock("bgfx_dynamic");
-		}
-
-		void profilerBeginLiteral(
-			const char* _name
-			, uint32_t _abgr
-			, const char* _filePath
-			, uint16_t _line
-		) override
-		{
-			setThreadName();
-			Profiler::beginBlock(_name);
-		}
-
-
-		void profilerEnd() override
-		{
-			Profiler::endBlock();
-		}
-
-		bool m_is_thread_name_set = false;
-		RendererImpl& m_renderer;
-	};
-
-
 	explicit RendererImpl(Engine& engine)
 		: m_engine(engine)
 		, m_allocator(engine.getAllocator())
@@ -481,51 +369,25 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 		, m_shader_defines(m_allocator)
 		, m_layers(m_allocator)
 		, m_bgfx_allocator(m_allocator)
-		, m_callback_stub(*this)
 		, m_vsync(true)
 		, m_main_pipeline(nullptr)
 		, m_encoder_list_mutex(false)
-		, m_encoders(m_allocator)
 	{
+		ffr_init(nullptr);
+
 		registerProperties(engine.getAllocator());
-		bgfx::PlatformData d;
-		void* window_handle = engine.getPlatformData().window_handle;
-		void* display = engine.getPlatformData().display;
-		if (window_handle)
-		{
-			setMemory(&d, 0, sizeof(d));
-			d.nwh = window_handle;
-			d.ndt = display;
-			bgfx::setPlatformData(d);
-		}
 		char cmd_line[4096];
-		bgfx::RendererType::Enum renderer_type = bgfx::RendererType::Count;
 		getCommandLine(cmd_line, lengthOf(cmd_line));
 		CommandLineParser cmd_line_parser(cmd_line);
 		m_vsync = true;
 		while (cmd_line_parser.next())
 		{
-			if (cmd_line_parser.currentEquals("-opengl"))
-			{
-				renderer_type = bgfx::RendererType::OpenGL;
-				break;
-			}
-			else if (cmd_line_parser.currentEquals("-no_vsync"))
+			if (cmd_line_parser.currentEquals("-no_vsync"))
 			{
 				m_vsync = false;
 				break;
 			}
 		}
-
-		bgfx::Init init;
-		init.limits.maxEncoders = MT::getCPUsCount();
-		init.type = renderer_type;
-		init.callback = &m_callback_stub;
-		init.allocator = &m_bgfx_allocator;
-		bool res = bgfx::init(init);
-		ASSERT(res);
-		bgfx::reset(800, 600, m_vsync ? BGFX_RESET_VSYNC : 0);
-		bgfx::setDebug(BGFX_DEBUG_TEXT | BGFX_DEBUG_PROFILER);
 
 		ResourceManager& manager = engine.getResourceManager();
 		m_texture_manager.create(Texture::TYPE, manager);
@@ -538,21 +400,7 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 
 		m_current_pass_hash = crc32("MAIN");
 		m_view_counter = 0;
-		m_mat_color_uniform = bgfx::createUniform("u_materialColor", bgfx::UniformType::Vec4);
-		m_roughness_metallic_emission_uniform =
-			bgfx::createUniform("u_roughnessMetallicEmission", bgfx::UniformType::Vec4);
-
-		m_basic_vertex_decl.begin()
-			.add(bgfx::Attrib::Position, 3, bgfx::AttribType::Float)
-			.add(bgfx::Attrib::Color0, 4, bgfx::AttribType::Uint8, true)
-			.add(bgfx::Attrib::TexCoord0, 2, bgfx::AttribType::Float)
-			.end();
-		m_basic_2d_vertex_decl.begin()
-			.add(bgfx::Attrib::Position, 2, bgfx::AttribType::Float)
-			.add(bgfx::Attrib::TexCoord0, 2, bgfx::AttribType::Float)
-			.add(bgfx::Attrib::Color0, 4, bgfx::AttribType::Uint8, true)
-			.end();
-
+		
 		m_default_shader = static_cast<Shader*>(m_shader_manager.load(Path("pipelines/common/default.shd")));
 		RenderScene::registerLuaAPI(m_engine.getState());
 		m_layers.emplace("default");
@@ -573,11 +421,8 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 		LUMIX_DELETE(m_allocator, m_font_manager);
 		m_shader_binary_manager.destroy();
 
-		bgfx::destroy(m_mat_color_uniform);
-		bgfx::destroy(m_roughness_metallic_emission_uniform);
 		frame(false);
 		frame(false);
-		bgfx::shutdown();
 	}
 
 
@@ -589,13 +434,7 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 
 	bgfx::Encoder* getEncoder() override
 	{
-		if (s_encoder == nullptr)
-		{
-			s_encoder = bgfx::begin();
-			MT::SpinLock lock(m_encoder_list_mutex);
-			m_encoders.push(&s_encoder);
-		}
-		return s_encoder;
+		return nullptr;
 	}
 
 
@@ -626,8 +465,8 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	ShaderManager& getShaderManager() override { return m_shader_manager; }
 	TextureManager& getTextureManager() override { return m_texture_manager; }
 	FontManager& getFontManager() override { return *m_font_manager; }
-	const bgfx::VertexDecl& getBasicVertexDecl() const override { return m_basic_vertex_decl; }
-	const bgfx::VertexDecl& getBasic2DVertexDecl() const override { return m_basic_2d_vertex_decl; }
+	const bgfx::VertexDecl& getBasicVertexDecl() const override { static bgfx::VertexDecl v; return v; }
+	const bgfx::VertexDecl& getBasic2DVertexDecl() const override { static bgfx::VertexDecl v; return v; }
 
 
 	void createScenes(Universe& ctx) override
@@ -643,10 +482,10 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	int getShaderDefinesCount() const override { return m_shader_defines.size(); }
 	const char* getShaderDefine(int define_idx) override { return m_shader_defines[define_idx]; }
 	const char* getPassName(int idx) override { return m_passes[idx]; }
-	const bgfx::UniformHandle& getMaterialColorUniform() const override { return m_mat_color_uniform; }
-	const bgfx::UniformHandle& getRoughnessMetallicEmissionUniform() const override { return m_roughness_metallic_emission_uniform; }
-	void makeScreenshot(const Path& filename) override { bgfx::requestScreenShot(BGFX_INVALID_HANDLE, filename.c_str()); }
-	void resize(int w, int h) override { bgfx::reset(w, h, m_vsync ? BGFX_RESET_VSYNC : 0); }
+	const bgfx::UniformHandle& getMaterialColorUniform() const override { static bgfx::UniformHandle v; return v; }
+	const bgfx::UniformHandle& getRoughnessMetallicEmissionUniform() const override { static bgfx::UniformHandle v; return v; }
+	void makeScreenshot(const Path& filename) override {  }
+	void resize(int w, int h) override {  }
 	int getViewCounter() const override { return m_view_counter; }
 	void viewCounterAdd() override { ++m_view_counter; }
 	Shader* getDefaultShader() override { return m_default_shader; }
@@ -694,18 +533,6 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 
 	void frame(bool capture) override
 	{
-		PROFILE_FUNCTION();
-		{
-			MT::SpinLock lock(m_encoder_list_mutex);
-			for (bgfx::Encoder** encoder : m_encoders)
-			{
-				bgfx::end(*encoder);
-				*encoder = nullptr;
-			}
-			m_encoders.clear();
-		}
-		bgfx::frame(capture);
-		m_view_counter = 0;
 	}
 
 
@@ -718,7 +545,6 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	Array<ShaderCombinations::Pass> m_passes;
 	Array<ShaderDefine> m_shader_defines;
 	Array<Layer> m_layers;
-	CallbackStub m_callback_stub;
 	TextureManager m_texture_manager;
 	MaterialManager m_material_manager;
 	FontManager* m_font_manager;
@@ -730,13 +556,8 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	bool m_vsync;
 	Shader* m_default_shader;
 	BGFXAllocator m_bgfx_allocator;
-	bgfx::VertexDecl m_basic_vertex_decl;
-	bgfx::VertexDecl m_basic_2d_vertex_decl;
-	bgfx::UniformHandle m_mat_color_uniform;
-	bgfx::UniformHandle m_roughness_metallic_emission_uniform;
 	Pipeline* m_main_pipeline;
 	MT::SpinMutex m_encoder_list_mutex;
-	Array<bgfx::Encoder**> m_encoders;
 };
 
 

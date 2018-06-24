@@ -808,7 +808,7 @@ bool Model::parseLODs(FS::IFile& file)
 bool Model::load(FS::IFile& file)
 {
 	PROFILE_FUNCTION();
-	FileHeader header;
+	/*FileHeader header;
 	file.read(&header, sizeof(header));
 
 	if (header.magic != FILE_MAGIC)
@@ -843,7 +843,7 @@ bool Model::load(FS::IFile& file)
 		return true;
 	}
 
-	g_log_error.log("Renderer") << "Error loading model " << getPath().c_str();
+	g_log_error.log("Renderer") << "Error loading model " << getPath().c_str();*/
 	return false;
 }
 
