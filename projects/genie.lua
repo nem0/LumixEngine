@@ -336,13 +336,13 @@ end
 
 function useLua()
 	if _OPTIONS["static-plugins"] then
-		linkLib("lua")
+		linkLib "luajit"
 	else
 		configuration { "windows" }
 			defines { "LUA_BUILD_AS_DLL" }
 		configuration {}
 	end
-	includedirs { "../external/lua/include" }
+	includedirs { "../external/luajit/include" }
 end
 
 function copyDlls(src_dir, platform_dir, dest_dir)
@@ -593,9 +593,9 @@ project "engine"
 	end
 
 	defines { "BUILDING_ENGINE" }
-	includedirs { "../external/lua/include" }
+	includedirs { "../external/luajit/include" }
 	
-	linkLib "lua"
+	linkLib "luajit"
 
 	configuration { "vs20*" }
 		if not _OPTIONS["static-plugins"] then
@@ -611,7 +611,7 @@ if has_plugin("physics") then
 
 		files { "../src/physics/**.h", "../src/physics/**.cpp" }
 
-		includedirs { "../external/physx/include/", "../external/bgfx/include" }
+		includedirs { "../external/physx/include/" }
 		defines { "BUILDING_PHYSICS" }
 		links { "engine", "editor", "renderer" }
 		useLua()
@@ -626,17 +626,16 @@ if has_plugin("renderer") then
 		libType()
 
 		files { "../src/renderer/**.h", "../src/renderer/**.cpp", "../src/renderer/**.c"}
-		includedirs { "../src", "../external/bgfx/include", "../external/cmft/include", "../external/crnlib/include" }
+		includedirs { "../src", "../external/cmft/include", "../external/crnlib/include" }
 		defines { "BUILDING_RENDERER" }
 		links { "engine" }
 
 		if build_studio then
-			links { "editor", "shaderc" }
+			links { "editor" }
 			linkLib "crnlib"
 			linkLib "cmft"
 		end
 		links { "opengl32" }
-		linkLib "bgfx"
 		configuration { "linux-*" }
 			links { "GL", "X11" }
 		configuration {}
@@ -654,7 +653,6 @@ if has_plugin("animation") then
 
 		files { "../src/animation/**.h", "../src/animation/**.cpp" }
 		includedirs { "../src" }
-		includedirs { "../external/bgfx/include" }
 		defines { "BUILDING_ANIMATION" }
 		links { "engine", "renderer" }
 
@@ -680,7 +678,7 @@ if build_steam then
 			"../src/steam/**.cpp",
 			"../src/steam/**.h"
 		}
-		includedirs { "../src", "../src/steam", "../../steamworks_sdk/public/steam", "../external/bgfx/include" }
+		includedirs { "../src", "../src/steam", "../../steamworks_sdk/public/steam" }
 		libdirs { "../../steamworks_sdk/redistributable_bin/win64" }
 		defines { "BUILDING_STEAM" }
 		links { "engine", "steam_api64" }
@@ -697,7 +695,7 @@ if has_plugin("audio") then
 			"../src/audio/**.cpp",
 			"../external/stb/stb_vorbis.cpp"
 		}
-		includedirs { "../src", "../src/audio", "../external/bgfx/include" }
+		includedirs { "../src", "../src/audio" }
 		defines { "BUILDING_AUDIO" }
 		links { "engine" }
 
@@ -719,7 +717,6 @@ if has_plugin("navigation") then
 
 		files { "../src/navigation/**.h", "../src/navigation/**.cpp", "../external/recast/src/**.cpp" }
 		includedirs { "../src", "../src/navigation", "../external/recast/include" }
-		includedirs { "../external/bgfx/include" }
 		links { "engine", "renderer" }
 		linkLib "recast"
 		
@@ -736,9 +733,8 @@ if has_plugin("gui") then
 		libType()
 
 		files { "../src/gui/**.h", "../src/gui/**.cpp" }
-		includedirs { "../src", "../src/gui", "../external/bgfx/include" }
+		includedirs { "../src", "../src/gui" }
 		links { "engine", "renderer" }
-		linkLib "bgfx"
 		
 		defines { "BUILDING_GUI" }
 		
@@ -759,7 +755,7 @@ if has_plugin("lua_script") then
 		libType()
 
 		files { "../src/lua_script/**.h", "../src/lua_script/**.cpp" }
-		includedirs { "../src", "../src/lua_script", "../external/bgfx/include" }
+		includedirs { "../src", "../src/lua_script" }
 		defines { "BUILDING_LUA_SCRIPT" }
 		links { "engine", "renderer" }
 
@@ -777,13 +773,12 @@ if build_unit_tests then
 		debugdir "../../LumixEngine_data"
 
 		files { "../src/unit_tests/**.h", "../src/unit_tests/**.cpp" }
-		includedirs { "../src", "../src/unit_tests", "../external/bgfx/include" }
+		includedirs { "../src", "../src/unit_tests" }
 		links { "animation", "engine", "renderer" }
 		if _OPTIONS["static-plugins"] then	
 			configuration { "vs*" }
 				links { "winmm", "psapi" }
 			configuration {} 
-				linkLib "bgfx"
 		end
 
 		useLua()
@@ -814,7 +809,7 @@ if build_app then
 			defines { "LUMIXENGINE_PLUGINS=" .. def }
 		end
 		
-		includedirs { "../src", "../src/app", "../external/bgfx/include" }
+		includedirs { "../src", "../src/app" }
 		if _OPTIONS["static-plugins"] then	
 			for _, plugin in ipairs(plugins) do
 				forceLink ("s_" .. plugin .. "_plugin_register")
@@ -851,11 +846,9 @@ if build_app then
 		if build_studio then
 			linkLib "crnlib"
 			linkLib "cmft"
-			links {"shaderc"}
 		end
 		
-		linkLib "bgfx"
-		linkLib "lua"
+		linkLib "luajit"
 		linkLib "recast"
 		files { "../src/app/main.cpp" }
 
@@ -965,11 +958,10 @@ if build_studio then
 			
 		
 
-			links { "editor", "engine", "shaderc" }
+			links { "editor", "engine" }
 			linkLib "crnlib"
 			linkLib "cmft"
-			linkLib "bgfx"
-			linkLib "lua"
+			linkLib "luajit"
 			linkLib "recast"
 			
 			if has_plugin("renderer") then

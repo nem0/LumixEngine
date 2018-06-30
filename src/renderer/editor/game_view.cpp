@@ -14,7 +14,6 @@
 #include "engine/universe/universe.h"
 #include "gui/gui_system.h"
 #include "imgui/imgui.h"
-#include "renderer/frame_buffer.h"
 #include "renderer/pipeline.h"
 #include "renderer/render_scene.h"
 #include "renderer/renderer.h"
@@ -58,7 +57,7 @@ GameView::GameView(StudioApp& app)
 	, m_time_multiplier(1.0f)
 	, m_paused(false)
 	, m_show_stats(false)
-	, m_texture_handle(BGFX_INVALID_HANDLE)
+	, m_texture_handle(ffr::INVALID_TEXTURE)
 	, m_gui_interface(nullptr)
 	, m_editor(app.getWorldEditor())
 {
@@ -166,7 +165,10 @@ void GameView::captureMouse(bool capture)
 
 void GameView::onFullscreenGUI()
 {
-	processInputEvents();
+				// TODO
+			ASSERT(false);
+			/*
+processInputEvents();
 
 	ImGuiIO& io = ImGui::GetIO();
 	bool open = true;
@@ -184,7 +186,7 @@ void GameView::onFullscreenGUI()
 
 	m_pipeline->resize(int(size.x), int(size.y));
 
-	m_texture_handle = m_pipeline->getRenderbuffer("default", 0);
+	m_texture_handle = m_pipeline->getOutput();
 	if (bgfx::getCaps()->originBottomLeft)
 	{
 		ImGui::Image(&m_texture_handle, size, ImVec2(0, 1), ImVec2(1, 0));
@@ -204,7 +206,7 @@ void GameView::onFullscreenGUI()
 	if (m_is_fullscreen && (io.KeysDown[ImGui::GetKeyIndex(ImGuiKey_Escape)] || !m_editor.isGameMode()))
 	{
 		setFullscreen(false);
-	}
+	}*/
 }
 
 
@@ -225,6 +227,9 @@ void GameView::setFullscreen(bool fullscreen)
 
 void GameView::onStatsGUI(const ImVec2& view_pos)
 {
+			// TODO
+			ASSERT(false);
+			/*
 	if (!m_show_stats || !m_is_open) return;
 	
 	float toolbar_height = 24 + ImGui::GetStyle().FramePadding.y * 2;
@@ -257,7 +262,7 @@ void GameView::onStatsGUI(const ImVec2& view_pos)
 		ImGui::LabelText("Waiting for render thread", "%.2f", wait_render_time);
 	}
 	ImGui::End();
-	ImGui::PopStyleColor();
+	ImGui::PopStyleColor();*/
 }
 
 
@@ -363,7 +368,9 @@ void GameView::processInputEvents()
 
 void GameView::onWindowGUI()
 {
-	PROFILE_FUNCTION();
+				// TODO
+			/*
+PROFILE_FUNCTION();
 	if (!m_pipeline->isReady()) return;
 
 	auto& io = ImGui::GetIO();
@@ -399,7 +406,7 @@ void GameView::onWindowGUI()
 		{
 			m_pipeline->resize(int(size.x), int(size.y));
 			m_pipeline->render();
-			m_texture_handle = m_pipeline->getRenderbuffer("default", 0);
+			m_texture_handle = m_pipeline->getOutput();
 
 			view_pos = ImGui::GetCursorScreenPos();
 			if (bgfx::getCaps()->originBottomLeft)
@@ -469,7 +476,7 @@ void GameView::onWindowGUI()
 		}
 	}
 	ImGui::EndDock();
-	if(is_game_view_visible) onStatsGUI(view_pos);
+	if(is_game_view_visible) onStatsGUI(view_pos);*/
 }
 
 

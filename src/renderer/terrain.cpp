@@ -907,7 +907,7 @@ static void generateSubgrid(Array<Sample>& samples, Array<short>& indices, int& 
 
 void Terrain::generateGeometry()
 {
-	LUMIX_DELETE(m_allocator, m_mesh);
+	/*LUMIX_DELETE(m_allocator, m_mesh);
 	m_mesh = nullptr;
 	Array<Sample> points(m_allocator);
 	points.resize(GRID_SIZE * GRID_SIZE * 4);
@@ -930,6 +930,9 @@ void Terrain::generateGeometry()
 	m_mesh->index_buffer_handle = bgfx::createIndexBuffer(indices_mem);
 	m_mesh->indices_count = indices.size();
 	m_mesh->flags.set(Mesh::Flags::INDICES_16_BIT);
+	*/
+	// TODO
+	ASSERT(false);
 }
 
 TerrainQuad* Terrain::generateQuadTree(float size)

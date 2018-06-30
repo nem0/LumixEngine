@@ -2,7 +2,7 @@
 
 
 #include "engine/resource.h"
-#include <bgfx/bgfx.h>
+#include "ffr/ffr.h"
 
 
 namespace Lumix
@@ -75,7 +75,7 @@ class LUMIX_RENDERER_API Texture LUMIX_FINAL : public Resource
 		int mips;
 		bool is_cubemap;
 		u32 bgfx_flags;
-		bgfx::TextureHandle handle;
+		ffr::TextureHandle handle;
 		IAllocator& allocator;
 		int data_reference;
 		Array<u8> data;

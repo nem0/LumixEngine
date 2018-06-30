@@ -30,46 +30,7 @@
 #include <Windows.h>
 #include "gl/GL.h"
 #include "ffr/ffr.h"
-#include <bgfx/bgfx.h>
 #include <cstdio>
-
-
-namespace bx
-{
-
-	struct AllocatorI
-	{
-		virtual ~AllocatorI() = default;
-
-		/// Allocated, resizes memory block or frees memory.
-		///
-		/// @param[in] _ptr If _ptr is NULL new block will be allocated.
-		/// @param[in] _size If _ptr is set, and _size is 0, memory will be freed.
-		/// @param[in] _align Alignment.
-		/// @param[in] _file Debug file path info.
-		/// @param[in] _line Debug file line info.
-		virtual void* realloc(void* _ptr, size_t _size, size_t _align, const char* _file, uint32_t _line) = 0;
-	};
-
-} // namespace bx
-
-
-namespace bgfx
-{
-
-struct PlatformData
-{
-	void* ndt;			//< Native display type
-	void* nwh;			//< Native window handle
-	void* context;		//< GL context, or D3D device
-	void* backBuffer;   //< GL backbuffer, or D3D render target view
-	void* backBufferDS; //< Backbuffer depth/stencil.
-};
-
-
-void setPlatformData(const PlatformData& _pd);
-
-} // namespace bgfx
 
 
 namespace Lumix
@@ -77,7 +38,6 @@ namespace Lumix
 
 
 static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("renderable");
-static thread_local bgfx::Encoder* s_encoder = nullptr;
 
 struct BoneProperty : Reflection::IEnumProperty
 {
@@ -308,52 +268,6 @@ static void registerProperties(IAllocator& allocator)
 }
 
 
-struct BGFXAllocator LUMIX_FINAL : public bx::AllocatorI
-{
-
-	explicit BGFXAllocator(IAllocator& source)
-		: m_source(source)
-	{
-	}
-
-
-	static const size_t NATURAL_ALIGNEMENT = 8;
-
-
-	void* realloc(void* _ptr, size_t _size, size_t _alignment, const char*, u32) override
-	{
-		if (0 == _size)
-		{
-			if (_ptr)
-			{
-				if (NATURAL_ALIGNEMENT >= _alignment)
-				{
-					m_source.deallocate(_ptr);
-					return nullptr;
-				}
-
-				m_source.deallocate_aligned(_ptr);
-			}
-
-			return nullptr;
-		}
-		else if (!_ptr)
-		{
-			if (NATURAL_ALIGNEMENT >= _alignment) return m_source.allocate(_size);
-
-			return m_source.allocate_aligned(_size, _alignment);
-		}
-
-		if (NATURAL_ALIGNEMENT >= _alignment) return m_source.reallocate(_ptr, _size);
-
-		return m_source.reallocate_aligned(_ptr, _size, _alignment);
-	}
-
-
-	IAllocator& m_source;
-};
-
-
 struct RendererImpl LUMIX_FINAL : public Renderer
 {
 	explicit RendererImpl(Engine& engine)
@@ -364,16 +278,14 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 		, m_material_manager(*this, m_allocator)
 		, m_shader_manager(*this, m_allocator)
 		, m_font_manager(nullptr)
-		, m_shader_binary_manager(*this, m_allocator)
 		, m_passes(m_allocator)
 		, m_shader_defines(m_allocator)
 		, m_layers(m_allocator)
-		, m_bgfx_allocator(m_allocator)
 		, m_vsync(true)
 		, m_main_pipeline(nullptr)
 		, m_encoder_list_mutex(false)
 	{
-		ffr_init(nullptr);
+		ffr::init(m_allocator);
 
 		registerProperties(engine.getAllocator());
 		char cmd_line[4096];
@@ -396,7 +308,6 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 		m_shader_manager.create(Shader::TYPE, manager);
 		m_font_manager = LUMIX_NEW(m_allocator, FontManager)(*this, m_allocator);
 		m_font_manager->create(FontResource::TYPE, manager);
-		m_shader_binary_manager.create(ShaderBinary::TYPE, manager);
 
 		m_current_pass_hash = crc32("MAIN");
 		m_view_counter = 0;
@@ -407,11 +318,16 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 		m_layers.emplace("transparent");
 		m_layers.emplace("water");
 		m_layers.emplace("fur");
+
+		m_global_uniforms_buffer = ffr::createBuffer(64*1024, nullptr);
+		ffr::bindUniformBuffer(0, m_global_uniforms_buffer);
 	}
 
 
 	~RendererImpl()
 	{
+		ffr::destroy(m_global_uniforms_buffer);
+
 		m_shader_manager.unload(*m_default_shader);
 		m_texture_manager.destroy();
 		m_model_manager.destroy();
@@ -419,7 +335,6 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 		m_shader_manager.destroy();
 		m_font_manager->destroy();
 		LUMIX_DELETE(m_allocator, m_font_manager);
-		m_shader_binary_manager.destroy();
 
 		frame(false);
 		frame(false);
@@ -429,12 +344,6 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	void setMainPipeline(Pipeline* pipeline) override
 	{
 		m_main_pipeline = pipeline;
-	}
-
-
-	bgfx::Encoder* getEncoder() override
-	{
-		return nullptr;
 	}
 
 
@@ -465,9 +374,11 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	ShaderManager& getShaderManager() override { return m_shader_manager; }
 	TextureManager& getTextureManager() override { return m_texture_manager; }
 	FontManager& getFontManager() override { return *m_font_manager; }
+// TODO
+	/*
 	const bgfx::VertexDecl& getBasicVertexDecl() const override { static bgfx::VertexDecl v; return v; }
 	const bgfx::VertexDecl& getBasic2DVertexDecl() const override { static bgfx::VertexDecl v; return v; }
-
+	*/
 
 	void createScenes(Universe& ctx) override
 	{
@@ -482,8 +393,11 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	int getShaderDefinesCount() const override { return m_shader_defines.size(); }
 	const char* getShaderDefine(int define_idx) override { return m_shader_defines[define_idx]; }
 	const char* getPassName(int idx) override { return m_passes[idx]; }
+// TODO
+	/*
 	const bgfx::UniformHandle& getMaterialColorUniform() const override { static bgfx::UniformHandle v; return v; }
 	const bgfx::UniformHandle& getRoughnessMetallicEmissionUniform() const override { static bgfx::UniformHandle v; return v; }
+	*/
 	void makeScreenshot(const Path& filename) override {  }
 	void resize(int w, int h) override {  }
 	int getViewCounter() const override { return m_view_counter; }
@@ -531,6 +445,11 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	}
 
 
+	ffr::BufferHandle getGlobalUniformsBuffer() const {
+		return m_global_uniforms_buffer;
+	}
+
+
 	void frame(bool capture) override
 	{
 	}
@@ -549,15 +468,14 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	MaterialManager m_material_manager;
 	FontManager* m_font_manager;
 	ShaderManager m_shader_manager;
-	ShaderBinaryManager m_shader_binary_manager;
 	ModelManager m_model_manager;
 	u32 m_current_pass_hash;
 	int m_view_counter;
 	bool m_vsync;
 	Shader* m_default_shader;
-	BGFXAllocator m_bgfx_allocator;
 	Pipeline* m_main_pipeline;
 	MT::SpinMutex m_encoder_list_mutex;
+	ffr::BufferHandle m_global_uniforms_buffer;
 };
 
 

@@ -9,7 +9,6 @@
 #include "renderer/renderer.h"
 #include "renderer/shader_manager.h"
 #include "renderer/texture.h"
-#include <bgfx/bgfx.h>
 #include <lua.hpp>
 #include <lauxlib.h>
 
@@ -19,7 +18,6 @@ namespace Lumix
 
 
 const ResourceType Shader::TYPE("shader");
-const ResourceType ShaderBinary::TYPE("shader_binary");
 
 
 Shader::Shader(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator)
@@ -30,6 +28,8 @@ Shader::Shader(const Path& path, ResourceManagerBase& resource_manager, IAllocat
 	, m_uniforms(m_allocator)
 	, m_render_states(0)
 	, m_all_defines_mask(0)
+	, m_sources(m_allocator)
+	, m_program_handle(ffr::INVALID_PROGRAM)
 {
 }
 
@@ -62,6 +62,25 @@ ShaderInstance& Shader::getInstance(u32 mask)
 }
 
 
+ffr::ProgramHandle Shader::getProgramHandle()
+{
+	if (!m_program_handle.isValid()) {
+		const char* codes[64];
+		ffr::ShaderType types[64];
+		ASSERT(lengthOf(types) >= m_sources.size());
+		for (int i = 0; i < m_sources.size(); ++i) {
+			codes[i] = m_sources[i].code.c_str();
+			types[i] = m_sources[i].type;
+		}
+		m_program_handle = ffr::createProgram(codes, types, m_sources.size());
+		if(m_program_handle.isValid()) {
+			ffr::uniformBlockBinding(m_program_handle, 0, 0);
+		}
+	}
+	return m_program_handle;
+}
+
+
 Renderer& Shader::getRenderer()
 {
 	return static_cast<ShaderManager&>(m_resource_manager).getRenderer();
@@ -86,6 +105,9 @@ static u32 getDefineMaskFromDense(const Shader& shader, u32 dense)
 
 bool Shader::generateInstances()
 {
+	// TODO
+	ASSERT(false);
+	/*
 	bool is_opengl = bgfx::getRendererType() == bgfx::RendererType::OpenGL ||
 		bgfx::getRendererType() == bgfx::RendererType::OpenGLES;
 	m_instances.clear();
@@ -128,7 +150,7 @@ bool Shader::generateInstances()
 			addDependency(*fs_binary);
 			instance.binaries[pass_idx * 2 + 1] = fs_binary;
 		}
-	}
+	}*/
 	return true;
 }
 
@@ -143,7 +165,8 @@ static void registerCFunction(lua_State* L, const char* name, lua_CFunction func
 static Shader* getShader(lua_State* L)
 {
 	Shader* ret = nullptr;
-	if (lua_getglobal(L, "shader") == LUA_TLIGHTUSERDATA)
+	lua_getglobal(L, "shader");
+	if (lua_type(L, -1) == LUA_TLIGHTUSERDATA)
 	{
 		ret = LuaWrapper::toType<Shader*>(L, -1);
 	}
@@ -155,8 +178,8 @@ static Shader* getShader(lua_State* L)
 static ShaderCombinations& getShaderCombinations(lua_State* L)
 {
 	ShaderCombinations* ret = nullptr;
-	int res = lua_getglobal(L, "combinations");
-	ASSERT(res == LUA_TLIGHTUSERDATA);
+	lua_getglobal(L, "combinations");
+	ASSERT(lua_type(L, -1) == LUA_TLIGHTUSERDATA);
 	return *LuaWrapper::toType<ShaderCombinations*>(L, -1);
 }
 
@@ -164,48 +187,60 @@ static ShaderCombinations& getShaderCombinations(lua_State* L)
 static Renderer& getRendererGlobal(lua_State* L)
 {
 	Renderer* ret = nullptr;
-	int res = lua_getglobal(L, "renderer");
-	ASSERT(res == LUA_TLIGHTUSERDATA);
+	lua_getglobal(L, "renderer");
+	ASSERT(lua_type(L, -1) == LUA_TLIGHTUSERDATA);
 	return *LuaWrapper::toType<Renderer*>(L, -1);
 }
 
 
 static void default_texture(lua_State* state, const char* path)
 {
+	// TODO
+	ASSERT(false);
+	/*
 	Shader* shader = getShader(state);
 	if (!shader) return;
 	if (shader->m_texture_slot_count == 0) return;
 	Shader::TextureSlot& slot = shader->m_texture_slots[shader->m_texture_slot_count - 1];
 	ResourceManagerBase* texture_manager = shader->getResourceManager().getOwner().get(Texture::TYPE);
-	slot.default_texture = (Texture*)texture_manager->load(Path(path));
+	slot.default_texture = (Texture*)texture_manager->load(Path(path));*/
 }
 
 
 static void texture_slot(lua_State* state, const char* name, const char* uniform)
 {
-	Shader* shader = getShader(state);
+		// TODO
+	ASSERT(false);
+	/*
+Shader* shader = getShader(state);
 	if (!shader) return;
 	Shader::TextureSlot& slot = shader->m_texture_slots[shader->m_texture_slot_count];
 	copyString(slot.name, name);
 	slot.uniform_handle = bgfx::createUniform(uniform, bgfx::UniformType::Int1);
 	copyString(slot.uniform, uniform);
-	++shader->m_texture_slot_count;
+	++shader->m_texture_slot_count;*/
 }
 
 
 static void texture_define(lua_State* L, const char* define)
 {
-	Shader* shader = getShader(L);
+		// TODO
+	ASSERT(false);
+	/*
+Shader* shader = getShader(L);
 	if (!shader) return;
 	Renderer& renderer = shader->getRenderer();
 
 	auto& slot = shader->m_texture_slots[shader->m_texture_slot_count - 1];
-	slot.define_idx = renderer.getShaderDefineIdx(lua_tostring(L, -1));
+	slot.define_idx = renderer.getShaderDefineIdx(lua_tostring(L, -1));*/
 }
 
 
 static void uniform(lua_State* L, const char* name, const char* type)
 {
+	// TODO
+	ASSERT(false);
+	/*
 	auto* shader = getShader(L);
 	if (!shader) return;
 	auto& u = shader->m_uniforms.emplace();
@@ -254,7 +289,7 @@ static void uniform(lua_State* L, const char* name, const char* type)
 	else
 	{
 		g_log_error.log("Renderer") << "Unknown uniform type " << type << " in " << shader->getPath().c_str();
-	}
+	}*/
 }
 
 
@@ -291,6 +326,9 @@ static int indexOfDefine(ShaderCombinations& combination, u8 define_idx)
 
 static void alpha_blending(lua_State* L, const char* mode)
 {
+	// TODO
+	ASSERT(false);
+	/*
 	Shader* shader = getShader(L);
 	if (!shader) return;
 	if (equalStrings(mode, "add"))
@@ -304,13 +342,16 @@ static void alpha_blending(lua_State* L, const char* mode)
 	else
 	{
 		g_log_error.log("Renderer") << "Uknown blend mode " << mode << " in " << shader->getPath().c_str();
-	}
+	}*/
 }
 
 
 static void depth_test(lua_State* L, bool enabled)
 {
-	Shader* shader = nullptr;
+		// TODO
+	ASSERT(false);
+	/*
+Shader* shader = nullptr;
 	if (lua_getglobal(L, "shader") == LUA_TLIGHTUSERDATA)
 	{
 		shader = LuaWrapper::toType<Shader*>(L, -1);
@@ -324,7 +365,7 @@ static void depth_test(lua_State* L, bool enabled)
 	else
 	{
 		shader->m_render_states &= ~BGFX_STATE_DEPTH_TEST_MASK;
-	}
+	}*/
 }
 
 
@@ -335,10 +376,11 @@ static void fs(lua_State* L)
 	Renderer& renderer = getRendererGlobal(L);
 
 	LuaWrapper::checkTableArg(L, 1);
-	const int len = (int)lua_rawlen(L, 1);
+	const int len = (int)lua_objlen(L, 1);
 	
 	for (int i = 0; i < len; ++i) {
-		if (lua_rawgeti(L, 1, i + 1) == LUA_TSTRING) {
+		lua_rawgeti(L, 1, i + 1);
+		if (lua_type(L, -1) == LUA_TSTRING) {
 			const char* tmp = lua_tostring(L, -1);
 			const int define_idx = renderer.getShaderDefineIdx(tmp);
 			cmb.all_defines_mask |= 1 << define_idx;
@@ -364,10 +406,11 @@ static void vs(lua_State* L)
 	Renderer& renderer = getRendererGlobal(L);
 
 	LuaWrapper::checkTableArg(L, 1);
-	int len = (int)lua_rawlen(L, 1);
+	int len = (int)lua_objlen(L, 1);
 	for (int i = 0; i < len; ++i)
 	{
-		if (lua_rawgeti(L, 1, i + 1) == LUA_TSTRING)
+		lua_rawgeti(L, 1, i + 1);
+		if (lua_type(L, -1) == LUA_TSTRING)
 		{
 			const char* tmp = lua_tostring(L, -1);
 			int define_idx = renderer.getShaderDefineIdx(tmp);
@@ -399,15 +442,89 @@ static void registerFunctions(Shader* shader, ShaderCombinations* combinations, 
 }
 
 
+namespace LuaAPI
+{
+
+
+int texture_slot(lua_State* L)
+{
+	LuaWrapper::checkTableArg(L, 1);
+
+	lua_getfield(L, LUA_GLOBALSINDEX, "this");
+	Shader* shader = (Shader*)lua_touserdata(L, -1);
+	lua_pop(L, 1);
+
+	if(shader->m_texture_slot_count >= lengthOf(shader->m_texture_slots)) {
+		g_log_error.log("Renderer") << "Too many texture slots in " << shader->getPath();
+		return 0;
+	}
+
+	Shader::TextureSlot& slot = shader->m_texture_slots[shader->m_texture_slot_count];
+	LuaWrapper::getOptionalStringField(L, -1, "uniform", slot.uniform, lengthOf(slot.uniform));
+
+	++shader->m_texture_slot_count;
+
+	return 0;
+}
+
+
+int vertex_shader(lua_State* L)
+{
+	const char* src = LuaWrapper::checkArg<const char*>(L, 1);
+	
+	lua_getfield(L, LUA_GLOBALSINDEX, "this");
+	Shader* shader = (Shader*)lua_touserdata(L, -1);
+	lua_pop(L, 1);
+	Shader::Source& srcobj = shader->m_sources.emplace(shader->m_allocator);
+	srcobj.type = ffr::ShaderType::VERTEX;
+	srcobj.code = src;
+	return 0;
+}
+
+int fragment_shader(lua_State* L)
+{
+	const char* src = LuaWrapper::checkArg<const char*>(L, 1);
+	lua_getfield(L, LUA_GLOBALSINDEX, "this");
+	Shader* shader = (Shader*)lua_touserdata(L, -1);
+	lua_pop(L, 1);
+	Shader::Source& srcobj = shader->m_sources.emplace(shader->m_allocator);
+	srcobj.type = ffr::ShaderType::FRAGMENT;
+	srcobj.code = src;
+	return 0;
+}
+
+} // namespace LuaAPI
+
+
 bool Shader::load(FS::IFile& file)
 {
+	lua_State* L = luaL_newstate();
+
+	lua_pushlightuserdata(L, this);
+	lua_setfield(L, LUA_GLOBALSINDEX, "this");
+	lua_pushcclosure(L, LuaAPI::vertex_shader, 0);
+	lua_setfield(L, LUA_GLOBALSINDEX, "vertex_shader");
+	lua_pushcclosure(L, LuaAPI::fragment_shader, 0);
+	lua_setfield(L, LUA_GLOBALSINDEX, "fragment_shader");
+	lua_pushcclosure(L, LuaAPI::texture_slot, 0);
+	lua_setfield(L, LUA_GLOBALSINDEX, "texture_slot");
+
+	const StringView content((const char*)file.getBuffer(), (int)file.size());
+	if (!LuaWrapper::execute(L, content, getPath().c_str(), 0)) {
+		lua_close(L);
+		return false;
+	}
+
+	lua_close(L);
+	return true;
+
 	/*lua_State* L = luaL_newstate();
 	luaL_openlibs(L);
 	registerFunctions(this, &m_combinations, &getRenderer(), L);
 	m_render_states = BGFX_STATE_DEPTH_TEST_GEQUAL;
 
-	bool errors = luaL_loadbuffer(L, (const char*)file.getBuffer(), file.size(), "") != LUA_OK;
-	errors = errors || lua_pcall(L, 0, 0, 0) != LUA_OK;
+	bool errors = luaL_loadbuffer(L, (const char*)file.getBuffer(), file.size(), "") != 0;
+	errors = errors || lua_pcall(L, 0, 0, 0) != 0;
 	if (errors)
 	{
 		g_log_error.log("Renderer") << getPath().c_str() << ": " << lua_tostring(L, -1);
@@ -429,7 +546,12 @@ bool Shader::load(FS::IFile& file)
 
 void Shader::unload()
 {
-	m_combinations.pass_count = 0;
+	m_sources.clear();
+	ffr::destroy(m_program_handle);
+	m_program_handle = ffr::INVALID_PROGRAM;
+		// TODO
+	/*
+m_combinations.pass_count = 0;
 	m_combinations.define_count = 0;
 	m_combinations.all_defines_mask = 0;
 
@@ -459,9 +581,11 @@ void Shader::unload()
 	m_instances.clear();
 
 	m_all_defines_mask = 0;
-	m_render_states = 0;
+	m_render_states = 0;*/
 }
 
+	// TODO
+	/*
 
 bgfx::ProgramHandle ShaderInstance::getProgramHandle(int pass_idx)
 {
@@ -486,11 +610,14 @@ bgfx::ProgramHandle ShaderInstance::getProgramHandle(int pass_idx)
 
 	return program_handles[pass_idx];
 }
-
+*/
 
 ShaderInstance::~ShaderInstance()
 {
-	for (int i = 0; i < lengthOf(program_handles); ++i)
+		// TODO
+	ASSERT(false);
+	/*
+for (int i = 0; i < lengthOf(program_handles); ++i)
 	{
 		if (bgfx::isValid(program_handles[i]))
 		{
@@ -504,13 +631,15 @@ ShaderInstance::~ShaderInstance()
 
 		shader.removeDependency(*binary);
 		binary->getResourceManager().unload(*binary);
-	}
+	}*/
 }
 
 
 void Shader::onBeforeEmpty()
 {
-	for (ShaderInstance& inst : m_instances)
+		// TODO
+	/*
+for (ShaderInstance& inst : m_instances)
 	{
 		for (int i = 0; i < lengthOf(inst.program_handles); ++i)
 		{
@@ -520,7 +649,7 @@ void Shader::onBeforeEmpty()
 				inst.program_handles[i] = BGFX_INVALID_HANDLE;
 			}
 		}
-	}
+	}*/
 }
 
 
@@ -529,12 +658,15 @@ bool Shader::getShaderCombinations(const char* shd_path,
 	const char* shader_content,
 	ShaderCombinations* output)
 {
-	lua_State* L = luaL_newstate();
+		// TODO
+	ASSERT(false);
+	/*
+lua_State* L = luaL_newstate();
 	luaL_openlibs(L);
 	registerFunctions(nullptr, output, &renderer, L);
 
-	bool errors = luaL_loadbuffer(L, shader_content, stringLength(shader_content), "") != LUA_OK;
-	errors = errors || lua_pcall(L, 0, 0, 0) != LUA_OK;
+	bool errors = luaL_loadbuffer(L, shader_content, stringLength(shader_content), "") != 0;
+	errors = errors || lua_pcall(L, 0, 0, 0) != 0;
 	if (errors)
 	{
 		g_log_error.log("Renderer") << shd_path << " - " << lua_tostring(L, -1);
@@ -542,39 +674,8 @@ bool Shader::getShaderCombinations(const char* shd_path,
 		lua_close(L);
 		return false;
 	}
-	lua_close(L);
+	lua_close(L);*/
 	return true;
-}
-
-
-ShaderBinary::ShaderBinary(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator)
-	: Resource(path, resource_manager, allocator)
-	, m_handle(BGFX_INVALID_HANDLE)
-{
-}
-
-
-void ShaderBinary::unload()
-{
-	if (bgfx::isValid(m_handle)) bgfx::destroy(m_handle);
-	m_handle = BGFX_INVALID_HANDLE;
-}
-
-
-bool ShaderBinary::load(FS::IFile& file)
-{
-	/*auto* mem = bgfx::alloc((u32)file.size() + 1);
-	file.read(mem->data, file.size());
-	mem->data[file.size()] = '\0';
-	m_handle = bgfx::createShader(mem);
-	m_size = file.size();
-	if (!bgfx::isValid(m_handle))
-	{
-		g_log_error.log("Renderer") << getPath().c_str() << ": Failed to create bgfx shader";*/
-		return false;
-	/*}
-	bgfx::setName(m_handle, getPath().c_str());
-	return true;*/
 }
 
 

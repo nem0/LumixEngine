@@ -22,18 +22,24 @@ static const char SETTINGS_PATH[] = "studio.ini";
 
 static void loadStyle(lua_State* L)
 {
-	if (lua_getglobal(L, "style") == LUA_TTABLE)
+	lua_getglobal(L, "style");
+	if (lua_type(L, -1) == LUA_TTABLE)
 	{
 		auto& style = ImGui::GetStyle();
 		for (int i = 0; i < ImGuiCol_COUNT; ++i)
 		{
 			const char* name = ImGui::GetStyleColorName(i);
-			if (lua_getfield(L, -1, name) == LUA_TTABLE)
+			lua_getfield(L, -1, name);
+			if (lua_type(L, -1) == LUA_TTABLE)
 			{
-				if (lua_rawgeti(L, -1, 1) == LUA_TNUMBER) style.Colors[i].x = (float)lua_tonumber(L, -1);
-				if (lua_rawgeti(L, -2, 2) == LUA_TNUMBER) style.Colors[i].y = (float)lua_tonumber(L, -1);
-				if (lua_rawgeti(L, -3, 3) == LUA_TNUMBER) style.Colors[i].z = (float)lua_tonumber(L, -1);
-				if (lua_rawgeti(L, -4, 4) == LUA_TNUMBER) style.Colors[i].w = (float)lua_tonumber(L, -1);
+				lua_rawgeti(L, -1, 1);
+				if (lua_type(L, -1) == LUA_TNUMBER) style.Colors[i].x = (float)lua_tonumber(L, -1);
+				lua_rawgeti(L, -2, 2);
+				if (lua_type(L, -1) == LUA_TNUMBER) style.Colors[i].y = (float)lua_tonumber(L, -1);
+				lua_rawgeti(L, -3, 3);
+				if (lua_type(L, -1) == LUA_TNUMBER) style.Colors[i].z = (float)lua_tonumber(L, -1);
+				lua_rawgeti(L, -4, 4);
+				if (lua_type(L, -1) == LUA_TNUMBER) style.Colors[i].w = (float)lua_tonumber(L, -1);
 				lua_pop(L, 4);
 			}
 			lua_pop(L, 1);
@@ -87,7 +93,8 @@ static void shortcutInput(int& shortcut)
 static int getIntegerField(lua_State* L, const char* name, int default_value)
 {
 	int value = default_value;
-	if (lua_getfield(L, -1, name) == LUA_TNUMBER)
+	lua_getfield(L, -1, name);
+	if (lua_type(L, -1) == LUA_TNUMBER)
 	{
 		value = (int)lua_tointeger(L, -1);
 	}
@@ -99,7 +106,8 @@ static int getIntegerField(lua_State* L, const char* name, int default_value)
 static float getFloat(lua_State* L, const char* name, float default_value)
 {
 	float value = default_value;
-	if (lua_getglobal(L, name) == LUA_TNUMBER)
+	lua_getglobal(L, name);
+	if (lua_type(L, -1) == LUA_TNUMBER)
 	{
 		value = (float)lua_tonumber(L, -1);
 	}
@@ -111,7 +119,8 @@ static float getFloat(lua_State* L, const char* name, float default_value)
 static bool getBoolean(lua_State* L, const char* name, bool default_value)
 {
 	bool value = default_value;
-	if (lua_getglobal(L, name) == LUA_TBOOLEAN)
+	lua_getglobal(L, name);
+	if (lua_type(L, -1) == LUA_TBOOLEAN)
 	{
 		value = lua_toboolean(L, -1) != 0;
 	}
@@ -123,7 +132,8 @@ static bool getBoolean(lua_State* L, const char* name, bool default_value)
 static int getInteger(lua_State* L, const char* name, int default_value)
 {
 	int value = default_value;
-	if (lua_getglobal(L, name) == LUA_TNUMBER)
+	lua_getglobal(L, name);
+	if (lua_type(L, -1) == LUA_TNUMBER)
 	{
 		value = (int)lua_tointeger(L, -1);
 	}
@@ -170,8 +180,8 @@ bool Settings::load()
 {
 	auto L = m_state;
 	bool has_settings = PlatformInterface::fileExists(SETTINGS_PATH);
-	bool errors = luaL_loadfile(L, has_settings ? SETTINGS_PATH : DEFAULT_SETTINGS_PATH) != LUA_OK;
-	errors = errors || lua_pcall(L, 0, 0, 0) != LUA_OK;
+	bool errors = luaL_loadfile(L, has_settings ? SETTINGS_PATH : DEFAULT_SETTINGS_PATH) != 0;
+	errors = errors || lua_pcall(L, 0, 0, 0) != 0;
 	if (errors)
 	{
 		g_log_error.log("Editor") << SETTINGS_PATH << ": " << lua_tostring(L, -1);
@@ -179,7 +189,8 @@ bool Settings::load()
 		return false;
 	}
 
-	if (lua_getglobal(L, "window") == LUA_TTABLE)
+	lua_getglobal(L, "window");
+	if (lua_type(L, -1) == LUA_TTABLE)
 	{
 		m_window.x = getIntegerField(L, "x", 0);
 		m_window.y = getIntegerField(L, "y", 0);
@@ -208,21 +219,25 @@ bool Settings::load()
 
 	if (!m_editor->getEngine().getPatchFileDevice())
 	{
-		if (lua_getglobal(L, "data_dir") == LUA_TSTRING) copyString(m_data_dir, lua_tostring(L, -1));
+		lua_getglobal(L, "data_dir");
+		if (lua_type(L, -1) == LUA_TSTRING) copyString(m_data_dir, lua_tostring(L, -1));
 		lua_pop(L, 1);
 		m_editor->getEngine().setPatchPath(m_data_dir);
 	}
 
 	auto& actions = m_app.getActions();
-	if (lua_getglobal(L, "actions") == LUA_TTABLE)
+	lua_getglobal(L, "actions");
+	if (lua_type(L, -1) == LUA_TTABLE)
 	{
 		for (int i = 0; i < actions.size(); ++i)
 		{
-			if (lua_getfield(L, -1, actions[i]->name) == LUA_TTABLE)
+			lua_getfield(L, -1, actions[i]->name);
+			if (lua_type(L, -1) == LUA_TTABLE)
 			{
 				for (int j = 0; j < lengthOf(actions[i]->shortcut); ++j)
 				{
-					if (lua_rawgeti(L, -1, 1 + j) == LUA_TNUMBER)
+					lua_rawgeti(L, -1, 1 + j);
+					if (lua_type(L, -1) == LUA_TNUMBER)
 					{
 						actions[i]->shortcut[j] = (int)lua_tointeger(L, -1);
 					}
@@ -235,12 +250,14 @@ bool Settings::load()
 	lua_pop(L, 1);
 
 	m_app.getToolbarActions().clear();
-	if (lua_getglobal(L, "toolbar") == LUA_TTABLE)
+	lua_getglobal(L, "toolbar");
+	if (lua_type(L, -1) == LUA_TTABLE)
 	{
-		int len = (int)lua_rawlen(L, -1);
+		int len = (int)lua_objlen(L, -1);
 		for (int i = 0; i < len; ++i)
 		{
-			if (lua_rawgeti(L, -1, i + 1) == LUA_TSTRING)
+			lua_rawgeti(L, -1, i + 1);
+			if (lua_type(L, -1) == LUA_TSTRING)
 			{
 				const char* action_name = lua_tostring(L, -1);
 				Action* action = m_app.getAction(action_name);
@@ -287,7 +304,8 @@ bool Settings::getValue(const char* name, bool default_value) const
 {
 	bool v = default_value;
 	lua_getglobal(m_state, "custom");
-	if (lua_getfield(m_state, -1, name) == LUA_TBOOLEAN)
+	lua_getfield(m_state, -1, name);
+	if (lua_type(m_state, -1) == LUA_TBOOLEAN)
 	{
 		v = lua_toboolean(m_state, -1) != 0;
 	}

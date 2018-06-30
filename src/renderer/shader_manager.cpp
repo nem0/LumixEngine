@@ -53,26 +53,4 @@ u8* ShaderManager::getBuffer(i32 size)
 }
 
 
-ShaderBinaryManager::ShaderBinaryManager(Renderer& renderer, IAllocator& allocator)
-	: ResourceManagerBase(allocator)
-	, m_allocator(allocator)
-{
-}
-
-
-ShaderBinaryManager::~ShaderBinaryManager() = default;
-
-
-Resource* ShaderBinaryManager::createResource(const Path& path)
-{
-	return LUMIX_NEW(m_allocator, ShaderBinary)(path, *this, m_allocator);
-}
-
-
-void ShaderBinaryManager::destroyResource(Resource& resource)
-{
-	LUMIX_DELETE(m_allocator, static_cast<ShaderBinary*>(&resource));
-}
-
-
 } // namespace Lumix

@@ -1,3 +1,4 @@
+#include "../ffr/ffr.h"
 #include "editor/asset_browser.h"
 #include "editor/platform_interface.h"
 #include "editor/property_grid.h"
@@ -20,18 +21,17 @@
 #include "engine/path_utils.h"
 #include "engine/plugin_manager.h"
 #include "engine/prefab.h"
-#include "engine/reflection.h"
 #include "engine/queue.h"
+#include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
 #include "engine/system.h"
 #include "engine/universe/universe.h"
-#include "../ffr/ffr.h"
 #include "game_view.h"
 #include "import_asset_dialog.h"
 #include "renderer/draw2d.h"
+#include "renderer/ffr/ffr.h"
 #include "renderer/font_manager.h"
-#include "renderer/frame_buffer.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include "renderer/particle_system.h"
@@ -54,7 +54,6 @@
 #include <cstddef>
 
 
-
 using namespace Lumix;
 
 
@@ -72,10 +71,7 @@ static const ComponentType ENVIRONMENT_PROBE_TYPE = Reflection::getComponentType
 
 struct FontPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 {
-	FontPlugin(StudioApp& app)
-	{
-		app.getAssetBrowser().registerExtension("ttf", FontResource::TYPE);
-	}
+	FontPlugin(StudioApp& app) { app.getAssetBrowser().registerExtension("ttf", FontResource::TYPE); }
 
 	void onGUI(Resource* resource) override {}
 	void onResourceUnloaded(Resource* resource) override {}
@@ -96,6 +92,9 @@ struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 
 	void saveMaterial(Material* material)
 	{
+		// TODO
+			ASSERT(false);
+			/*
 		if (FS::IFile* file = m_app.getAssetBrowser().beginSaveResource(*material))
 		{
 			JsonSerializer serializer(*file, material->getPath());
@@ -107,12 +106,16 @@ struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 			}
 			m_app.getAssetBrowser().endSaveResource(*material, *file, success);
 		}
+		*/
 	}
 
 
 	void onGUI(Resource* resource) override
 	{
-		auto* material = static_cast<Material*>(resource);
+			// TODO
+			ASSERT(false);
+			/*
+auto* material = static_cast<Material*>(resource);
 
 		if (ImGui::Button("Save")) saveMaterial(material);
 		ImGui::SameLine();
@@ -122,7 +125,7 @@ struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		auto* renderer = static_cast<Renderer*>(plugin);
 
 		int alpha_cutout_define = renderer->getShaderDefineIdx("ALPHA_CUTOUT");
-		
+
 		int render_layer = material->getRenderLayer();
 		auto getter = [](void* data, int idx, const char** out) -> bool {
 			auto* renderer = (Renderer*)data;
@@ -141,10 +144,10 @@ struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		{
 			b = material->isDefined(alpha_cutout_define);
 			if (ImGui::Checkbox("Is alpha cutout", &b)) material->setDefine(alpha_cutout_define, b);
-			if(b)
+			if (b)
 			{
 				float tmp = material->getAlphaRef();
-				if(ImGui::DragFloat("Alpha reference value", &tmp, 0.01f, 0.0f, 1.0f))
+				if (ImGui::DragFloat("Alpha reference value", &tmp, 0.01f, 0.0f, 1.0f))
 				{
 					material->setAlphaRef(tmp);
 				}
@@ -191,10 +194,14 @@ struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 			ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0, 0, 0, 0));
 			ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0, 0, 0, 0));
 			ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0, 0, 0, 0));
-			bool is_node_open = ImGui::TreeNodeEx((const void*)(intptr_t)i, ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_AllowItemOverlap | ImGuiTreeNodeFlags_Framed, "%s", "");
+			bool is_node_open = ImGui::TreeNodeEx((const void*)(intptr_t)i,
+				ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_AllowItemOverlap | ImGuiTreeNodeFlags_Framed,
+				"%s",
+				"");
 			ImGui::PopStyleColor(4);
 			ImGui::SameLine();
-			if (m_app.getAssetBrowser().resourceInput(slot.name, StaticString<30>("", (u64)&slot), buf, sizeof(buf), Texture::TYPE))
+			if (m_app.getAssetBrowser().resourceInput(
+					slot.name, StaticString<30>("", (u64)&slot), buf, sizeof(buf), Texture::TYPE))
 			{
 				material->setTexturePath(i, Path(buf));
 			}
@@ -204,20 +211,24 @@ struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 				continue;
 			}
 
-			if(is_node_open)
+			if (is_node_open)
 			{
 				ImGui::Image(&texture->handle, ImVec2(96, 96));
 
 				if (ImGui::CollapsingHeader("Advanced"))
 				{
-					static const struct { const char* name; u32 value; u32 unset_flag; } FLAGS[] = {
-						{"SRGB", BGFX_TEXTURE_SRGB, 0},
+					static const struct
+					{
+						const char* name;
+						u32 value;
+						u32 unset_flag;
+					} FLAGS[] = {{"SRGB", BGFX_TEXTURE_SRGB, 0},
 						{"u clamp", BGFX_TEXTURE_U_CLAMP, 0},
 						{"v clamp", BGFX_TEXTURE_V_CLAMP, 0},
 						{"Min point", BGFX_TEXTURE_MIN_POINT, BGFX_TEXTURE_MIN_ANISOTROPIC},
 						{"Mag point", BGFX_TEXTURE_MAG_POINT, BGFX_TEXTURE_MAG_ANISOTROPIC},
 						{"Min anisotropic", BGFX_TEXTURE_MIN_ANISOTROPIC, BGFX_TEXTURE_MIN_POINT},
-						{"Mag anisotropic", BGFX_TEXTURE_MAG_ANISOTROPIC, BGFX_TEXTURE_MAG_POINT} };
+						{"Mag anisotropic", BGFX_TEXTURE_MAG_ANISOTROPIC, BGFX_TEXTURE_MAG_POINT}};
 
 					for (int i = 0; i < lengthOf(FLAGS); ++i)
 					{
@@ -235,9 +246,9 @@ struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		}
 
 		auto* shader = material->getShader();
-		if(shader && material->isReady())
+		if (shader && material->isReady())
 		{
-			for(int i = 0; i < shader->m_uniforms.size(); ++i)
+			for (int i = 0; i < shader->m_uniforms.size(); ++i)
 			{
 				auto& uniform = material->getUniform(i);
 				auto& shader_uniform = shader->m_uniforms[i];
@@ -283,7 +294,7 @@ struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 			{
 				material->setLayersCount(layers_count);
 			}
-			
+
 			if (ImGui::CollapsingHeader("Defines"))
 			{
 				for (int define_idx = 0; define_idx < renderer->getShaderDefinesCount(); ++define_idx)
@@ -316,12 +327,14 @@ struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 					bool b = material->isCustomFlag(1 << i);
 					if (ImGui::Checkbox(Material::getCustomFlagName(i), &b))
 					{
-						if (b) material->setCustomFlag(1 << i);
-						else material->unsetCustomFlag(1 << i);
+						if (b)
+							material->setCustomFlag(1 << i);
+						else
+							material->unsetCustomFlag(1 << i);
 					}
 				}
 			}
-		}
+		}*/
 	}
 
 
@@ -343,7 +356,9 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		, m_pipeline(nullptr)
 		, m_universe(nullptr)
 		, m_is_mouse_captured(false)
-		, m_tile(app.getWorldEditor().getAllocator())
+			// TODO
+			/*
+		, m_tile(app.getWorldEditor().getAllocator())*/
 		, m_texture_tile_creator(app.getWorldEditor().getAllocator())
 	{
 		app.getAssetBrowser().registerExtension("msh", Model::TYPE);
@@ -364,8 +379,11 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		auto& engine = m_app.getWorldEditor().getEngine();
 		engine.destroyUniverse(*m_universe);
 		Pipeline::destroy(m_pipeline);
+			// TODO
+			ASSERT(false);
+			/*
 		engine.destroyUniverse(*m_tile.universe);
-		Pipeline::destroy(m_tile.pipeline);
+		Pipeline::destroy(m_tile.pipeline);*/
 	}
 
 
@@ -457,6 +475,8 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 	void createTileUniverse()
 	{
 		Engine& engine = m_app.getWorldEditor().getEngine();
+			// TODO
+			/*
 		m_tile.universe = &engine.createUniverse(false);
 		Renderer* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
 		m_tile.pipeline = Pipeline::create(*renderer, Path("pipelines/main.lua"), "", engine.getAllocator());
@@ -464,18 +484,18 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 
 		Matrix mtx;
 		mtx.lookAt({10, 10, 10}, Vec3::ZERO, {0, 1, 0});
-		Entity light_entity = m_tile.universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
+		Entity light_entity = m_tile.universe->createEntity({0, 0, 0}, {0, 0, 0, 1});
 		m_tile.universe->setMatrix(light_entity, mtx);
 		RenderScene* render_scene = (RenderScene*)m_tile.universe->getScene(MODEL_INSTANCE_TYPE);
 		m_tile.universe->createComponent(GLOBAL_LIGHT_TYPE, light_entity);
 		render_scene->setGlobalLightIntensity(light_entity, 1);
 		render_scene->setGlobalLightIndirectIntensity(light_entity, 1);
 
-		m_tile.camera_entity = m_tile.universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
+		m_tile.camera_entity = m_tile.universe->createEntity({0, 0, 0}, {0, 0, 0, 1});
 		m_tile.universe->createComponent(CAMERA_TYPE, m_tile.camera_entity);
 		render_scene->setCameraSlot(m_tile.camera_entity, "editor");
 
-		m_tile.pipeline->setScene(render_scene);
+		m_tile.pipeline->setScene(render_scene);*/
 	}
 
 
@@ -487,16 +507,16 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		m_pipeline = Pipeline::create(*renderer, Path("pipelines/main.lua"), "", engine.getAllocator());
 		m_pipeline->load();
 
-		auto mesh_entity = m_universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
+		auto mesh_entity = m_universe->createEntity({0, 0, 0}, {0, 0, 0, 1});
 		auto* render_scene = static_cast<RenderScene*>(m_universe->getScene(MODEL_INSTANCE_TYPE));
 		m_mesh = mesh_entity;
 		m_universe->createComponent(MODEL_INSTANCE_TYPE, mesh_entity);
 
-		auto light_entity = m_universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
+		auto light_entity = m_universe->createEntity({0, 0, 0}, {0, 0, 0, 1});
 		m_universe->createComponent(GLOBAL_LIGHT_TYPE, light_entity);
 		render_scene->setGlobalLightIntensity(light_entity, 1);
 
-		m_camera_entity = m_universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
+		m_camera_entity = m_universe->createEntity({0, 0, 0}, {0, 0, 0, 1});
 		m_universe->createComponent(CAMERA_TYPE, m_camera_entity);
 		render_scene->setCameraSlot(m_camera_entity, "editor");
 
@@ -518,7 +538,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 			Matrix mtx;
 			Vec3 center = (aabb.max + aabb.min) * 0.5f;
 			Vec3 eye = center + Vec3(1, 1, 1) * (aabb.max - aabb.min).length();
-			
+
 			mtx.lookAt(eye, center, Vec3(-1, 1, -1).normalized());
 			mtx.inverse();
 			m_universe->setMatrix(m_camera_entity, mtx);
@@ -528,7 +548,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		m_pipeline->resize((int)image_size.x, (int)image_size.y);
 		m_pipeline->render();
 
-		ImGui::Image(&m_pipeline->getRenderbuffer("default", 0), image_size);
+		ImGui::Image(&m_pipeline->getOutput(), image_size);
 		bool mouse_down = ImGui::IsMouseDown(0) || ImGui::IsMouseDown(1);
 		if (m_is_mouse_captured && !mouse_down)
 		{
@@ -590,7 +610,6 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 				m_universe->setRotation(m_camera_entity, rot);
 				m_universe->setPosition(m_camera_entity, pos);
 			}
-
 		}
 	}
 
@@ -605,16 +624,21 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		{
 			ImGui::Separator();
 			ImGui::Columns(4);
-			ImGui::Text("LOD"); ImGui::NextColumn();
-			ImGui::Text("Distance"); ImGui::NextColumn();
-			ImGui::Text("# of meshes"); ImGui::NextColumn();
-			ImGui::Text("# of triangles"); ImGui::NextColumn();
+			ImGui::Text("LOD");
+			ImGui::NextColumn();
+			ImGui::Text("Distance");
+			ImGui::NextColumn();
+			ImGui::Text("# of meshes");
+			ImGui::NextColumn();
+			ImGui::Text("# of triangles");
+			ImGui::NextColumn();
 			ImGui::Separator();
 			int lod_count = 1;
 			for (int i = 0; i < Model::MAX_LOD_COUNT && lods[i].to_mesh >= 0; ++i)
 			{
 				ImGui::PushID(i);
-				ImGui::Text("%d", i); ImGui::NextColumn();
+				ImGui::Text("%d", i);
+				ImGui::NextColumn();
 				if (lods[i].distance == FLT_MAX)
 				{
 					ImGui::Text("Infinite");
@@ -628,14 +652,16 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 					}
 				}
 				ImGui::NextColumn();
-				ImGui::Text("%d", lods[i].to_mesh - lods[i].from_mesh + 1); ImGui::NextColumn();
+				ImGui::Text("%d", lods[i].to_mesh - lods[i].from_mesh + 1);
+				ImGui::NextColumn();
 				int tri_count = 0;
 				for (int j = lods[i].from_mesh; j <= lods[i].to_mesh; ++j)
 				{
 					tri_count += model->getMesh(j).indices_count / 3;
 				}
 
-				ImGui::Text("%d", tri_count); ImGui::NextColumn();
+				ImGui::Text("%d", tri_count);
+				ImGui::NextColumn();
 				++lod_count;
 				ImGui::PopID();
 			}
@@ -725,6 +751,9 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 
 	void pushTileQueue(const Path& path)
 	{
+			// TODO
+			ASSERT(false);
+			/*
 		ASSERT(!m_tile.queue.full());
 		WorldEditor& editor = m_app.getWorldEditor();
 		Engine& engine = editor.getEngine();
@@ -740,24 +769,29 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 			manager = resource_manager.get(Model::TYPE);
 		}
 		Resource* resource = manager->load(path);
-		m_tile.queue.push(resource);
+		m_tile.queue.push(resource);*/
 	}
 
 
 	void popTileQueue()
 	{
-		m_tile.queue.pop();
+					// TODO
+			ASSERT(false);
+			/*
+m_tile.queue.pop();
 		if (m_tile.paths.empty()) return;
 
 		Path path = m_tile.paths.back();
 		m_tile.paths.pop();
-		pushTileQueue(path);
+		pushTileQueue(path);*/
 	}
 
 
 	void update() override
 	{
-		if (m_tile.frame_countdown >= 0)
+					// TODO
+			/*
+if (m_tile.frame_countdown >= 0)
 		{
 			--m_tile.frame_countdown;
 			if (m_tile.frame_countdown == -1)
@@ -795,13 +829,16 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		else
 		{
 			ASSERT(false);
-		}
+		}*/
 	}
 
 
 	void renderTile(PrefabResource* prefab)
 	{
-		Engine& engine = m_app.getWorldEditor().getEngine();
+					// TODO
+			ASSERT(false);
+			/*
+Engine& engine = m_app.getWorldEditor().getEngine();
 		RenderScene* render_scene = (RenderScene*)m_tile.universe->getScene(MODEL_INSTANCE_TYPE);
 		if (!render_scene) return;
 
@@ -819,14 +856,18 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		m_tile.path_hash = prefab->getPath().getHash();
 		prefab->getResourceManager().unload(*prefab);
 		m_tile.m_entity_in_fly = mesh_entity;
-		model->onLoaded<ModelPlugin, &ModelPlugin::renderPrefabSecondStage>(this);
+		model->onLoaded<ModelPlugin, &ModelPlugin::renderPrefabSecondStage>(this);*/
 	}
 
 
 	void renderPrefabSecondStage(Resource::State old_state, Resource::State new_state, Resource& resource)
 	{
-		Engine& engine = m_app.getWorldEditor().getEngine();
+		// TODO
+		ASSERT(false);
+		/*
+Engine& engine = m_app.getWorldEditor().getEngine();
 		
+
 		RenderScene* render_scene = (RenderScene*)m_tile.universe->getScene(MODEL_INSTANCE_TYPE);
 		if (!render_scene) return;
 
@@ -849,8 +890,8 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		m_tile.pipeline->render();
 
 		m_tile.texture =
-			bgfx::createTexture2D(AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, false, 1, bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK);
-		renderer->viewCounterAdd();
+			bgfx::createTexture2D(AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, false, 1,
+bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK); renderer->viewCounterAdd();
 		bgfx::touch(renderer->getViewCounter());
 		bgfx::setViewName(renderer->getViewCounter(), "billboard_blit");
 		bgfx::TextureHandle color_renderbuffer = m_tile.pipeline->getRenderbuffer("default", 0);
@@ -864,13 +905,16 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		m_tile.universe->destroyEntity(m_tile.m_entity_in_fly);
 
 		m_tile.frame_countdown = 2;
-		m_tile.m_entity_in_fly = INVALID_ENTITY;
+		m_tile.m_entity_in_fly = INVALID_ENTITY;*/
 	}
 
 
 	void renderTile(Model* model, Matrix* in_mtx)
 	{
-		Engine& engine = m_app.getWorldEditor().getEngine();
+		// TODO
+		ASSERT(false);
+		/*
+Engine& engine = m_app.getWorldEditor().getEngine();
 		RenderScene* render_scene = (RenderScene*)m_tile.universe->getScene(MODEL_INSTANCE_TYPE);
 		if (!render_scene) return;
 
@@ -898,8 +942,8 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		m_tile.pipeline->render();
 
 		m_tile.texture =
-			bgfx::createTexture2D(AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, false, 1, bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK);
-		renderer->viewCounterAdd();
+			bgfx::createTexture2D(AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, false, 1,
+bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK); renderer->viewCounterAdd();
 		bgfx::touch(renderer->getViewCounter());
 		bgfx::setViewName(renderer->getViewCounter(), "billboard_blit");
 		bgfx::TextureHandle color_renderbuffer = m_tile.pipeline->getRenderbuffer("default", 0);
@@ -914,13 +958,16 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 
 		m_tile.frame_countdown = 2;
 		m_tile.path_hash = model->getPath().getHash();
-		model->getResourceManager().unload(*model);
+		model->getResourceManager().unload(*model);*/
 	}
 
 
 	bool createTile(const char* in_path, const char* out_path, ResourceType type) override
 	{
-		if (type == Texture::TYPE)
+					// TODO
+			ASSERT(false);
+			/*
+if (type == Texture::TYPE)
 		{
 			MT::SpinLock lock(m_texture_tile_creator.lock);
 			m_texture_tile_creator.tiles.emplace(in_path);
@@ -939,19 +986,22 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 			pushTileQueue(path);
 			return true;
 		}
-		
-		m_tile.paths.push(path);
+
+		m_tile.paths.push(path);*/
 		return true;
 	}
 
+				// TODO
+			/*
 
 	struct TileData
 	{
-		TileData(IAllocator& allocator) 
+		TileData(IAllocator& allocator)
 			: data(allocator)
 			, queue(allocator)
 			, paths(allocator)
-		{}
+		{
+		}
 
 		Universe* universe = nullptr;
 		Pipeline* pipeline = nullptr;
@@ -964,7 +1014,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		Queue<Resource*, 8> queue;
 		Array<Path> paths;
 	} m_tile;
-
+	*/
 
 	StudioApp& m_app;
 	Universe* m_universe;
@@ -974,7 +1024,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 	bool m_is_mouse_captured;
 	int m_captured_mouse_x;
 	int m_captured_mouse_y;
-	
+
 	struct TextureTileCreator
 	{
 		explicit TextureTileCreator(IAllocator& allocator)
@@ -1018,7 +1068,7 @@ struct TexturePlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 			return;
 		}
 
-		if (bgfx::isValid(texture->handle))
+		if (texture->handle.isValid())
 		{
 			ImVec2 texture_size(200, 200);
 			if (texture->width > texture->height)
@@ -1031,7 +1081,7 @@ struct TexturePlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 			}
 
 			ImGui::Image(&texture->handle, texture_size);
-		
+
 			if (ImGui::Button("Open")) m_app.getAssetBrowser().openInExternalEditor(resource);
 		}
 	}
@@ -1052,13 +1102,15 @@ struct ShaderPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		: m_app(app)
 	{
 		app.getAssetBrowser().registerExtension("shd", Shader::TYPE);
-		app.getAssetBrowser().registerExtension("shb", ShaderBinary::TYPE);
 	}
 
 
 	void onGUI(Resource* resource) override
 	{
-		auto* shader = static_cast<Shader*>(resource);
+					// TODO
+			ASSERT(false);
+			/*
+auto* shader = static_cast<Shader*>(resource);
 		char basename[MAX_PATH_LENGTH];
 		PathUtils::getBasename(basename, lengthOf(basename), resource->getPath().c_str());
 		StaticString<MAX_PATH_LENGTH> path("/pipelines/", basename, "/", basename);
@@ -1124,7 +1176,7 @@ struct ShaderPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 				ImGui::NextColumn();
 			}
 			ImGui::Columns(1);
-		}
+		}*/
 	}
 
 
@@ -1144,13 +1196,13 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 	{
 		WorldEditor& world_editor = app.getWorldEditor();
 		PluginManager& plugin_manager = world_editor.getEngine().getPluginManager();
-		Renderer*  renderer = static_cast<Renderer*>(plugin_manager.getPlugin("renderer"));
+		Renderer* renderer = static_cast<Renderer*>(plugin_manager.getPlugin("renderer"));
 		IAllocator& allocator = world_editor.getAllocator();
 		Path pipeline_path("pipelines/main.lua");
 		m_pipeline = Pipeline::create(*renderer, pipeline_path, "PROBE", allocator);
 		m_pipeline->load();
 
-		m_cl_context = nullptr; //cmft::clLoad() > 0 ? cmft::clInit() : nullptr;
+		m_cl_context = nullptr; // cmft::clLoad() > 0 ? cmft::clInit() : nullptr;
 	}
 
 
@@ -1253,7 +1305,10 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 
 	void generateCubemap(ComponentUID cmp)
 	{
-		static const int TEXTURE_SIZE = 1024;
+		// TODO
+		ASSERT(false);
+		/*
+static const int TEXTURE_SIZE = 1024;
 
 		Universe* universe = m_app.getWorldEditor().getUniverse();
 		if (universe->getName()[0] == '\0')
@@ -1290,9 +1345,8 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		Array<u8> data(allocator);
 		data.resize(6 * TEXTURE_SIZE * TEXTURE_SIZE * 4);
 		bgfx::TextureHandle texture =
-			bgfx::createTexture2D(TEXTURE_SIZE, TEXTURE_SIZE, false, 1, bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK);
-		renderer->frame(false); // submit
-		renderer->frame(false); // wait for gpu
+			bgfx::createTexture2D(TEXTURE_SIZE, TEXTURE_SIZE, false, 1, bgfx::TextureFormat::RGBA8,
+BGFX_TEXTURE_READ_BACK); renderer->frame(false); // submit renderer->frame(false); // wait for gpu
 
 		for (int i = 0; i < 6; ++i)
 		{
@@ -1339,6 +1393,7 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		copyMemory(image.m_data, &data[0], data.size());
 		cmft::imageToRgba32f(image);
 		
+
 		cmft::imageRadianceFilter(
 			image
 			, 128
@@ -1378,7 +1433,8 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		}
 		bgfx::destroy(texture);
 		
-		scene->reloadEnvironmentProbe(cmp.entity);
+
+		scene->reloadEnvironmentProbe(cmp.entity);*/
 	}
 
 
@@ -1429,7 +1485,7 @@ struct EmitterPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 	void onGUI(PropertyGrid& grid, ComponentUID cmp) override
 	{
 		if (cmp.type != PARTICLE_EMITTER_TYPE) return;
-		
+
 		ImGui::Separator();
 		ImGui::Checkbox("Update", &m_particle_emitter_updating);
 		auto* scene = static_cast<RenderScene*>(cmp.scene);
@@ -1462,10 +1518,7 @@ struct TerrainPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 	}
 
 
-	~TerrainPlugin()
-	{
-		LUMIX_DELETE(m_app.getWorldEditor().getAllocator(), m_terrain_editor);
-	}
+	~TerrainPlugin() { LUMIX_DELETE(m_app.getWorldEditor().getAllocator(), m_terrain_editor); }
 
 
 	void onGUI(PropertyGrid& grid, ComponentUID cmp) override
@@ -1585,9 +1638,9 @@ struct FurPainter LUMIX_FINAL : public WorldEditor::Plugin
 					idx[2] = idx32[i + 2];
 				}
 
-				Vertex v[] = { { mesh.uvs[idx[0]], vertices[idx[0]] },
-				{ mesh.uvs[idx[1]], vertices[idx[1]] },
-				{ mesh.uvs[idx[2]], vertices[idx[2]] } };
+				Vertex v[] = {{mesh.uvs[idx[0]], vertices[idx[0]]},
+					{mesh.uvs[idx[1]], vertices[idx[1]]},
+					{mesh.uvs[idx[2]], vertices[idx[2]]}};
 
 				Vec3 n = crossProduct(Vec3(v[0].uv, 0) - Vec3(v[1].uv, 0), Vec3(v[2].uv, 0) - Vec3(v[1].uv, 0));
 				if (n.z > 0) Math::swap(v[1], v[2]);
@@ -1669,7 +1722,7 @@ struct FurPainter LUMIX_FINAL : public WorldEditor::Plugin
 		{
 			for (int i = 0; i < width; ++i)
 			{
-				data[i + j * width] = distance_field[i + j*width].color;
+				data[i + j * width] = distance_field[i + j * width].color;
 			}
 		}
 
@@ -1684,9 +1737,9 @@ struct FurPainter LUMIX_FINAL : public WorldEditor::Plugin
 		static const i64 submask = substep - 1;
 		static const i64 stepshift = 8;
 
-		Point v0 = { i64(v[0].uv.x * substep), i64(v[0].uv.y * substep) };
-		Point v1 = { i64(v[1].uv.x * substep), i64(v[1].uv.y * substep) };
-		Point v2 = { i64(v[2].uv.x * substep), i64(v[2].uv.y * substep) };
+		Point v0 = {i64(v[0].uv.x * substep), i64(v[0].uv.y * substep)};
+		Point v1 = {i64(v[1].uv.x * substep), i64(v[1].uv.y * substep)};
+		Point v2 = {i64(v[2].uv.x * substep), i64(v[2].uv.y * substep)};
 
 		i64 minX = Math::minimum(v0.x, v1.x, v2.x);
 		i64 minY = Math::minimum(v0.y, v1.y, v2.y);
@@ -1749,7 +1802,7 @@ struct FurPainter LUMIX_FINAL : public WorldEditor::Plugin
 						(float(w0) * v[0].pos + float(w1) * v[1].pos + float(w2) * v[2].pos) * (1.0f / (w0 + w1 + w2));
 					float q = 1 - (center - pos).squaredLength() * squared_radius_rcp;
 					if (q <= 0) continue;
-						
+
 					u32& val = ((u32*)&texture->data[0])[(p.x >> stepshift) + (p.y >> stepshift) * texture->width];
 					float alpha = ((val & 0xff000000) >> 24) / 255.0f;
 					alpha = brush_strength * q + alpha * (1 - q);
@@ -1790,11 +1843,11 @@ struct FurPainter LUMIX_FINAL : public WorldEditor::Plugin
 				}
 
 				if (Math::getSphereTriangleIntersection(
-					hit, brush_radius, vertices[idx[0]], vertices[idx[1]], vertices[idx[2]]))
+						hit, brush_radius, vertices[idx[0]], vertices[idx[1]], vertices[idx[2]]))
 				{
-					Vertex v[] = { {mesh.uvs[idx[0]], vertices[idx[0]]},
+					Vertex v[] = {{mesh.uvs[idx[0]], vertices[idx[0]]},
 						{mesh.uvs[idx[1]], vertices[idx[1]]},
-						{mesh.uvs[idx[2]], vertices[idx[2]]} };
+						{mesh.uvs[idx[2]], vertices[idx[2]]}};
 
 					Vec3 n = crossProduct(Vec3(v[0].uv, 0) - Vec3(v[1].uv, 0), Vec3(v[2].uv, 0) - Vec3(v[1].uv, 0));
 					if (n.z > 0) Math::swap(v[1], v[2]);
@@ -1814,7 +1867,8 @@ struct FurPainter LUMIX_FINAL : public WorldEditor::Plugin
 				}
 			}
 
-			if (tri_count > 0) texture->onDataUpdated((int)uvmin.x, (int)uvmin.y, int(uvmax.x - uvmin.x), int(uvmax.y - uvmin.y));
+			if (tri_count > 0)
+				texture->onDataUpdated((int)uvmin.x, (int)uvmin.y, int(uvmax.x - uvmin.x), int(uvmax.y - uvmin.y));
 		}
 	}
 
@@ -1823,7 +1877,7 @@ struct FurPainter LUMIX_FINAL : public WorldEditor::Plugin
 	{
 		if (!hit.entity.isValid()) return false;
 		auto& ents = app.getWorldEditor().getSelectedEntities();
-		
+
 		if (enabled && ents.size() == 1 && ents[0] == hit.entity)
 		{
 			onMouseMove(x, y, 0, 0);
@@ -1887,7 +1941,8 @@ struct FurPainterPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 		, is_open(false)
 	{
 		fur_painter = LUMIX_NEW(app.getWorldEditor().getAllocator(), FurPainter)(_app);
-		Action* action = LUMIX_NEW(app.getWorldEditor().getAllocator(), Action)("Fur Painter", "Toggle fur painter", "fur_painter");
+		Action* action =
+			LUMIX_NEW(app.getWorldEditor().getAllocator(), Action)("Fur Painter", "Toggle fur painter", "fur_painter");
 		action->func.bind<FurPainterPlugin, &FurPainterPlugin::onAction>(this);
 		action->is_selected.bind<FurPainterPlugin, &FurPainterPlugin::isOpen>(this);
 		app.addWindowAction(action);
@@ -1951,7 +2006,7 @@ struct FurPainterPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 				goto end;
 			}
 
-			if(model->getMeshCount() < 1 || !model->getMesh(0).material)
+			if (model->getMeshCount() < 1 || !model->getMesh(0).material)
 			{
 				ImGui::Text("Model file is invalid.");
 				goto end;
@@ -1964,7 +2019,7 @@ struct FurPainterPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 				goto end;
 			}
 
-			if(!endsWith(texture->getPath().c_str(), ".tga"))
+			if (!endsWith(texture->getPath().c_str(), ".tga"))
 			{
 				ImGui::Text("Only TGA can be painted");
 				goto end;
@@ -1985,9 +2040,9 @@ struct FurPainterPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 
 			drawGizmo();
 		}
-		
-		end:
-			ImGui::EndDock();
+
+	end:
+		ImGui::EndDock();
 	}
 
 
@@ -2045,7 +2100,7 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 	{
 		m_model_index = -1;
 		auto& rm = m_editor.getEngine().getResourceManager();
-		Path shader_path("pipelines/common/debugline.shd");
+		Path shader_path("pipelines/debug_line.shd");
 		m_shader = static_cast<Shader*>(rm.get(Shader::TYPE)->load(shader_path));
 
 		editor.universeCreated().bind<RenderInterfaceImpl, &RenderInterfaceImpl::onUniverseCreated>(this);
@@ -2067,14 +2122,11 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 	{
 		auto& renderer = static_cast<Renderer&>(m_render_scene->getPlugin());
 		Font* font = renderer.getFontManager().getDefaultFont();
-		m_pipeline.getDraw2D().AddText(font, font_size, { x, y }, color, text);
+		m_pipeline.getDraw2D().AddText(font, font_size, {x, y}, color, text);
 	}
 
 
-	void addRect2D(const Vec2& a, const Vec2& b, u32 color) override
-	{
-		m_pipeline.getDraw2D().AddRect(a, b, color);
-	}
+	void addRect2D(const Vec2& a, const Vec2& b, u32 color) override { m_pipeline.getDraw2D().AddRect(a, b, color); }
 
 
 	void addRectFilled2D(const Vec2& a, const Vec2& b, u32 color) override
@@ -2093,7 +2145,7 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 		if (!universe->hasComponent(entity, MODEL_INSTANCE_TYPE)) return wpos;
 
 		Model* model = scene->getModelInstanceModel(entity);
-		
+
 		float min_dist_squared = FLT_MAX;
 		Vec3 closest_vertex = lpos;
 		auto processVertex = [&](const Vec3& vertex) {
@@ -2211,6 +2263,12 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 	}
 
 
+	bool isValid(ImTextureID texture) override
+	{
+		return texture && ((ffr::TextureHandle*)texture)->isValid();
+	}
+
+
 	ImTextureID loadTexture(const Path& path) override
 	{
 		auto& rm = m_editor.getEngine().getResourceManager();
@@ -2240,7 +2298,7 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 	{
 		auto hit = m_render_scene->castRay(origin, dir, ignored);
 
-		return{ hit.m_is_hit, hit.m_t, hit.m_entity, hit.m_origin + hit.m_dir * hit.m_t };
+		return {hit.m_is_hit, hit.m_t, hit.m_entity, hit.m_origin + hit.m_dir * hit.m_t};
 	}
 
 
@@ -2265,7 +2323,7 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 	AABB getEntityAABB(Universe& universe, Entity entity) override
 	{
 		AABB aabb;
-		
+
 		if (universe.hasComponent(entity, MODEL_INSTANCE_TYPE))
 		{
 			Model* model = m_render_scene->getModelInstanceModel(entity);
@@ -2292,40 +2350,22 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 	}
 
 
-	void setCameraSlot(Entity entity, const char* slot) override
-	{
-		m_render_scene->setCameraSlot(entity, slot);
-	}
+	void setCameraSlot(Entity entity, const char* slot) override { m_render_scene->setCameraSlot(entity, slot); }
 
 
-	Entity getCameraInSlot(const char* slot) override
-	{
-		return m_render_scene->getCameraInSlot(slot);
-	}
+	Entity getCameraInSlot(const char* slot) override { return m_render_scene->getCameraInSlot(slot); }
 
 
-	Vec2 getCameraScreenSize(Entity entity) override
-	{
-		return m_render_scene->getCameraScreenSize(entity);
-	}
+	Vec2 getCameraScreenSize(Entity entity) override { return m_render_scene->getCameraScreenSize(entity); }
 
 
-	float getCameraOrthoSize(Entity entity) override
-	{
-		return m_render_scene->getCameraOrthoSize(entity);
-	}
+	float getCameraOrthoSize(Entity entity) override { return m_render_scene->getCameraOrthoSize(entity); }
 
 
-	bool isCameraOrtho(Entity entity) override
-	{
-		return m_render_scene->isCameraOrtho(entity);
-	}
+	bool isCameraOrtho(Entity entity) override { return m_render_scene->isCameraOrtho(entity); }
 
 
-	float getCameraFOV(Entity entity) override
-	{
-		return m_render_scene->getCameraFOV(entity);
-	}
+	float getCameraFOV(Entity entity) override { return m_render_scene->getCameraFOV(entity); }
 
 
 	float castRay(ModelHandle model, const Vec3& origin, const Vec3& dir, const Matrix& mtx, const Pose* pose) override
@@ -2339,7 +2379,7 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 	{
 		if (!m_pipeline.isReady() || !m_models[model]->isReady()) return;
 
-		m_pipeline.renderModel(*m_models[model], nullptr, mtx);
+		m_pipeline.renderModel(*m_models[model], mtx);
 	}
 
 
@@ -2349,10 +2389,7 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 	}
 
 
-	void onUniverseDestroyed()
-	{
-		m_render_scene = nullptr;
-	}
+	void onUniverseDestroyed() { m_render_scene = nullptr; }
 
 
 	Vec3 getModelCenter(Entity entity) override
@@ -2364,47 +2401,47 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 	}
 
 
-	Path getModelInstancePath(Entity entity) override
-	{
-		return m_render_scene->getModelInstancePath(entity);
-	}
+	Path getModelInstancePath(Entity entity) override { return m_render_scene->getModelInstancePath(entity); }
 
 
-	void render(const Matrix& mtx,
-		u16* indices,
-		int indices_count,
-		Vertex* vertices,
-		int vertices_count,
-		bool lines) override
+	void render(const Matrix& mtx
+		, u16* indices
+		, int indices_count
+		, Vertex* vertices
+		, int vertices_count
+		, bool lines)
+		override
 	{
 		if (!m_shader->isReady()) return;
 
-		auto& renderer = static_cast<Renderer&>(m_render_scene->getPlugin());
-		if (bgfx::getAvailTransientIndexBuffer(indices_count) < (u32)indices_count) return;
-		if (bgfx::getAvailTransientVertexBuffer(vertices_count, renderer.getBasicVertexDecl()) < (u32)vertices_count) return;
-		bgfx::TransientVertexBuffer vertex_buffer;
-		bgfx::TransientIndexBuffer index_buffer;
-		bgfx::allocTransientVertexBuffer(&vertex_buffer, vertices_count, renderer.getBasicVertexDecl());
-		bgfx::allocTransientIndexBuffer(&index_buffer, indices_count);
+		ffr::VertexDecl vertex_decl;
+		vertex_decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false);
+		vertex_decl.addAttribute(4, ffr::AttributeType::U8, true, false);
+		vertex_decl.addAttribute(2, ffr::AttributeType::FLOAT, false, false);
 
-		copyMemory(vertex_buffer.data, vertices, vertices_count * renderer.getBasicVertexDecl().getStride());
-		copyMemory(index_buffer.data, indices, indices_count * sizeof(u16));
+		const ffr::BufferHandle index_buffer = ffr::createBuffer(indices_count * sizeof(u16), indices);
+		const ffr::BufferHandle vertex_buffer = ffr::createBuffer(vertices_count * sizeof(Vertex), vertices);
 
-		u64 flags = m_shader->m_render_states;
-		if (lines) flags |= BGFX_STATE_PT_LINES;
-		m_pipeline.render(vertex_buffer,
-			index_buffer,
-			mtx,
-			0,
-			indices_count,
-			flags,
-			m_shader->getInstance(0));
+		ffr::DrawCall dc;
+		dc.index_buffer = index_buffer;
+		dc.indices_count = indices_count;
+		dc.indices_offset = 0;
+		dc.primitive_type = lines ? ffr::PrimitiveType::LINES : ffr::PrimitiveType::TRIANGLES;
+		dc.shader = m_shader->getProgramHandle();
+		dc.textures_count = 0;
+		dc.tex_buffers_count = 0;
+		dc.vertex_buffer = vertex_buffer;
+		dc.vertex_buffer_offset = 0;
+		dc.vertex_decl = &vertex_decl;
+		dc.state = (u32)ffr::StateFlags::DEPTH_TEST;
+		ffr::setUniformMatrix4f(dc.shader, "u_model", 1, &mtx.m11);
+		ffr::draw(dc);
+
 	}
 
 
-	Vec2 worldToScreenPixels(const Vec3& world) override
+	Vec2 worldToScreenPixels(Entity camera, const Vec3& world) override
 	{
-		Entity camera = m_pipeline.getAppliedCamera();
 		Matrix mtx = m_render_scene->getCameraViewProjection(camera);
 		Vec4 pos = mtx * Vec4(world, 1);
 		float inv = 1 / pos.w;
@@ -2420,7 +2457,10 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 	}
 
 
-	void getModelInstaces(Array<Entity>& entities, const Frustum& frustum, const Vec3& lod_ref_point, Entity camera) override
+	void getModelInstaces(Array<Entity>& entities,
+		const Frustum& frustum,
+		const Vec3& lod_ref_point,
+		Entity camera) override
 	{
 		Array<Array<MeshInstance>>& res = m_render_scene->getModelInstanceInfos(frustum, lod_ref_point, camera, ~0ULL);
 		for (auto& sub : res)
@@ -2446,26 +2486,25 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 };
 
 
-
 struct RenderStatsPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 {
 	explicit RenderStatsPlugin(StudioApp& app)
 	{
-		Action* action = LUMIX_NEW(app.getWorldEditor().getAllocator(), Action)("Render Stats", "Toggle render stats", "render_stats");
+		Action* action = LUMIX_NEW(app.getWorldEditor().getAllocator(), Action)(
+			"Render Stats", "Toggle render stats", "render_stats");
 		action->func.bind<RenderStatsPlugin, &RenderStatsPlugin::onAction>(this);
 		action->is_selected.bind<RenderStatsPlugin, &RenderStatsPlugin::isOpen>(this);
 		app.addWindowAction(action);
 	}
 
 
-	const char* getName() const override
-	{
-		return "render_stats";
-	}
+	const char* getName() const override { return "render_stats"; }
 
 
 	void onWindowGUI() override
 	{
+			// TODO
+			/*
 		double total_cpu = 0;
 		double total_gpu = 0;
 		if (ImGui::BeginDock("Renderer Stats", &m_is_open))
@@ -2502,10 +2541,10 @@ struct RenderStatsPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 			ImGui::NextColumn();
 			ImGui::Columns();
 		}
-		ImGui::EndDock();
+		ImGui::EndDock();*/
 	}
 
-	
+
 	bool isOpen() const { return m_is_open; }
 	void onAction() { m_is_open = !m_is_open; }
 
@@ -2537,59 +2576,57 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 		int width, height;
 		ImGui::GetIO().Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
 
-		ffr_destroy_texture(m_texture);
-		m_texture = ffr_create_texture(width, height, pixels);
+		ffr::destroy(m_texture);
+		m_texture = ffr::createTexture(width, height, ffr::TextureFormat::RGBA8, pixels);
 
 		IAllocator& allocator = editor.getAllocator();
-		RenderInterface* render_interface = LUMIX_NEW(allocator, RenderInterfaceImpl)(editor, *scene_view.getPipeline());
+		RenderInterface* render_interface =
+			LUMIX_NEW(allocator, RenderInterfaceImpl)(editor, *scene_view.getPipeline());
 		editor.setRenderInterface(render_interface);
-		
-		m_vertex_buffer = ffr_create_buffer(1024 * 256, nullptr);
-		m_index_buffer = ffr_create_buffer(1024 * 256, nullptr);
 
-		const char* vs =
-			"#version 330\n"
-			"layout(location = 0) in vec2 a_pos;\n"
-			"layout(location = 1) in vec2 a_uv;\n"
-			"layout(location = 2) in vec4 a_color;\n"
-			"out vec4 v_color;\n"
-			"out vec2 v_uv;\n"
-			"void main() {\n"
-			"	v_color = a_color;\n"
-			"	v_uv = a_uv;\n"
-			"	gl_Position = vec4(a_pos * vec2(1/1608.0, 1/1027.0) * 2 - 1, 0, 1);\n"
-			"	gl_Position.y = -gl_Position.y;\n" 
-			"}\n"
-			;
-		const char* fs =
-			"#version 330\n"
-			"in vec4 v_color;\n"
-			"in vec2 v_uv;\n"
-			"out vec4 o_color;\n"
-			"uniform sampler2D test;\n"
-			"void main() {\n"
-			"	vec4 tc = textureLod(test, v_uv, 0);\n"
-			"	o_color = v_color * tc;\n"
-			"}\n"
-			;
-		const char* srcs[] = { vs, fs };
-		ffr_shader_type types[] = { FFR_SHADER_TYPE_VERTEX, FFR_SHADER_TYPE_FRAGMENT };
-		m_shader = ffr_create_program(srcs, types, 2);
+		m_vertex_buffer = ffr::createBuffer(1024 * 256, nullptr);
+		m_index_buffer = ffr::createBuffer(1024 * 256, nullptr);
+
+		const char* vs = "#version 330\n"
+						 "layout(location = 0) in vec2 a_pos;\n"
+						 "layout(location = 1) in vec2 a_uv;\n"
+						 "layout(location = 2) in vec4 a_color;\n"
+						 "out vec4 v_color;\n"
+						 "out vec2 v_uv;\n"
+						 "uniform vec2 u_canvas_size;\n"
+						 "void main() {\n"
+						 "	v_color = a_color;\n"
+						 "	v_uv = a_uv;\n"
+						 "	gl_Position = vec4(a_pos / u_canvas_size * 2 - 1, 0, 1);\n"
+						 "	gl_Position.y = -gl_Position.y;\n"
+						 "}\n";
+		const char* fs = "#version 330\n"
+						 "in vec4 v_color;\n"
+						 "in vec2 v_uv;\n"
+						 "out vec4 o_color;\n"
+						 "uniform sampler2D test;\n"
+						 "void main() {\n"
+						 "	vec4 tc = textureLod(test, v_uv, 0);\n"
+						 "	o_color = v_color * tc;\n"
+						 "}\n";
+		const char* srcs[] = {vs, fs};
+		ffr::ShaderType types[] = {ffr::ShaderType::VERTEX, ffr::ShaderType::FRAGMENT};
+		m_shader = ffr::createProgram(srcs, types, 2);
 	}
 
 
 	~EditorUIRenderPlugin()
 	{
-		ffr_destroy_buffer(m_index_buffer);
-		ffr_destroy_buffer(m_vertex_buffer);
-		ffr_destroy_program(m_shader);
-		ffr_destroy_texture(m_texture);
+		ffr::destroy(m_index_buffer);
+		ffr::destroy(m_vertex_buffer);
+		ffr::destroy(m_shader);
+		ffr::destroy(m_texture);
 		WorldEditor& editor = m_app.getWorldEditor();
 		shutdownImGui();
 	}
 
 
-	void onWindowGUI() override { }
+	void onWindowGUI() override {}
 
 
 	const char* getName() const override { return "editor_ui_render"; }
@@ -2602,44 +2639,25 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 	}
 
 
-	void beginViewportRender(FrameBuffer* framebuffer)
+	void beginViewportRender()
 	{
-		PluginManager& plugin_manager = m_engine.getPluginManager();
-		Renderer* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
+		ffr::setFramebuffer(ffr::INVALID_FRAMEBUFFER);
 
-		
-		if (framebuffer)
-		{
-			ASSERT(false); // TODO
-			//bgfx::setViewFrameBuffer(view, framebuffer->getHandle());
-		}
-		else
-		{
-			ffr_set_framebuffer(FFR_INVALID_HANDLE);
-			//bgfx::setViewFrameBuffer(view, BGFX_INVALID_HANDLE);
-		}
-		
-		const float clear_color[] = { 0.2f, 0.2f, 0.2f, 1.f };
-		ffr_clear(FFR_CLEAR_FLAG_COLOR | FFR_CLEAR_FLAG_DEPTH, clear_color, 1.0);
+		const float clear_color[] = {0.2f, 0.2f, 0.2f, 1.f};
+		ffr::clear((uint)ffr::ClearFlags::COLOR | (uint)ffr::ClearFlags::DEPTH, clear_color, 1.0);
 
-		float left = 0;
-		float top = 0;
-		float width = ImGui::GetIO().DisplaySize.x;
-		float right = width + left;
-		float height = ImGui::GetIO().DisplaySize.y;
-		float bottom = height + top;
-		if (framebuffer && (framebuffer->getWidth() != int(width + 0.5f) || framebuffer->getHeight() != int(height + 0.5f)))
-		{
-			framebuffer->resize((int)width, (int)height);
-		}
+		const float width = ImGui::GetIO().DisplaySize.x;
+		const float height = ImGui::GetIO().DisplaySize.y;
 
-		ffr_viewport(0, 0, uint(width), uint(height));
+		ffr::viewport(0, 0, uint(width), uint(height));
+		const float canvas_size[] = {width, height};
+		ffr::setUniform2f(m_shader, "u_canvas_size", 1, canvas_size);
 	}
 
 
 	void guiEndFrame() override
 	{
-		ImDrawData* draw_data = ImGui::GetDrawData();
+		const ImDrawData* draw_data = ImGui::GetDrawData();
 
 		m_vb_offset = 0;
 		m_ib_offset = 0;
@@ -2655,13 +2673,15 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 			if (renderer) renderer->resize(m_width, m_height);
 		}
 
-		beginViewportRender(nullptr);
-		
+		beginViewportRender();
+
+		ffr::pushDebugGroup("imgui");
 		for (int i = 0; i < draw_data->CmdListsCount; ++i)
 		{
 			ImDrawList* cmd_list = draw_data->CmdLists[i];
 			drawGUICmdList(cmd_list);
 		}
+		ffr::popDebugGroup();
 
 		Renderer* renderer = static_cast<Renderer*>(m_engine.getPluginManager().getPlugin("renderer"));
 		renderer->frame(false);
@@ -2676,10 +2696,13 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 
 		int num_indices = cmd_list->IdxBuffer.size();
 		int num_vertices = cmd_list->VtxBuffer.size();
-		auto& decl = renderer->getBasic2DVertexDecl();
 
-		ffr_update_buffer(m_index_buffer, &cmd_list->IdxBuffer[0], m_ib_offset * sizeof(u16), num_indices * sizeof(u16));
-		ffr_update_buffer(m_vertex_buffer, &cmd_list->VtxBuffer[0], m_vb_offset * sizeof(ImDrawVert), num_vertices * sizeof(ImDrawVert));
+		ffr::update(
+			m_index_buffer, &cmd_list->IdxBuffer[0], m_ib_offset * sizeof(u16), num_indices * sizeof(u16));
+		ffr::update(m_vertex_buffer,
+			&cmd_list->VtxBuffer[0],
+			m_vb_offset * sizeof(ImDrawVert),
+			num_vertices * sizeof(ImDrawVert));
 		u32 elem_offset = 0;
 		const ImDrawCmd* pcmd_begin = cmd_list->CmdBuffer.begin();
 		const ImDrawCmd* pcmd_end = cmd_list->CmdBuffer.end();
@@ -2700,68 +2723,57 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 				u16(Math::minimum(pcmd->ClipRect.z, 65535.0f) - Math::maximum(pcmd->ClipRect.x, 0.0f)),
 				u16(Math::minimum(pcmd->ClipRect.w, 65535.0f) - Math::maximum(pcmd->ClipRect.y, 0.0f)));
 				*/
-/*			auto material = m_material;
-			const auto& texture_id =
-				pcmd->TextureId ? *(bgfx::TextureHandle*)pcmd->TextureId : material->getTexture(0)->handle;
-			auto texture_uniform = material->getShader()->m_texture_slots[0].uniform_handle;
-			u64 render_states = material->getRenderStates();
-			if (&m_scene_view.getTextureHandle() == &texture_id || &m_game_view.getTextureHandle() == &texture_id)
-			{
-				render_states &= ~BGFX_STATE_BLEND_MASK;
-			}
-			bgfx::setTexture(0, texture_uniform, texture_id);
-			
-			ShaderInstance& shader_instance = material->getShaderInstance();
-			bgfx::setStencil(BGFX_STENCIL_NONE, BGFX_STENCIL_NONE);
-			bgfx::setState(BGFX_STATE_WRITE_RGB | BGFX_STATE_WRITE_A | BGFX_STATE_WRITE_Z | render_states);
-			bgfx::setVertexBuffer(0, m_vertex_buffer, m_vb_offset, num_vertices);
-			u32 first_index = elem_offset + m_ib_offset;
-			bgfx::setIndexBuffer(m_index_buffer, first_index, pcmd->ElemCount);
-			bgfx::submit(view, shader_instance.getProgramHandle(pass_idx));
-			*/
+			/*			auto material = m_material;
+						const auto& texture_id =
+							pcmd->TextureId ? *(bgfx::TextureHandle*)pcmd->TextureId : material->getTexture(0)->handle;
+						auto texture_uniform = material->getShader()->m_texture_slots[0].uniform_handle;
+						u64 render_states = material->getRenderStates();
+						if (&m_scene_view.getTextureHandle() == &texture_id || &m_game_view.getTextureHandle() ==
+			   &texture_id)
+						{
+							render_states &= ~BGFX_STATE_BLEND_MASK;
+						}
+						bgfx::setTexture(0, texture_uniform, texture_id);
+						
+
+						ShaderInstance& shader_instance = material->getShaderInstance();
+						bgfx::setStencil(BGFX_STENCIL_NONE, BGFX_STENCIL_NONE);
+						bgfx::setState(BGFX_STATE_WRITE_RGB | BGFX_STATE_WRITE_A | BGFX_STATE_WRITE_Z | render_states);
+						bgfx::setVertexBuffer(0, m_vertex_buffer, m_vb_offset, num_vertices);
+						u32 first_index = elem_offset + m_ib_offset;
+						bgfx::setIndexBuffer(m_index_buffer, first_index, pcmd->ElemCount);
+						bgfx::submit(view, shader_instance.getProgramHandle(pass_idx));
+						*/
 
 			u32 first_index = elem_offset + m_ib_offset;
 
-			ffr_vertex_decl decl;
-			decl.size = 20;
-			decl.attributes_count = 3;
-			decl.attributes[0].normalized = false;
-			decl.attributes[0].offset = 0;
-			decl.attributes[0].size = 2;
-			decl.attributes[0].type = FFR_ATTRIBUTE_TYPE_FLOAT;
+			ffr::VertexDecl decl;
+			decl.addAttribute(2, ffr::AttributeType::FLOAT, false, false);
+			decl.addAttribute(2, ffr::AttributeType::FLOAT, false, false);
+			decl.addAttribute(4, ffr::AttributeType::U8, true, false);
 
-			decl.attributes[1].normalized = false;
-			decl.attributes[1].offset = 8;
-			decl.attributes[1].size = 2;
-			decl.attributes[1].type = FFR_ATTRIBUTE_TYPE_FLOAT;
-
-			decl.attributes[2].normalized = true;
-			decl.attributes[2].offset = 16;
-			decl.attributes[2].size = 4;
-			decl.attributes[2].type = FFR_ATTRIBUTE_TYPE_UBYTE;
-
-			ffr_draw_call dc;
+			ffr::DrawCall dc;
+			dc.state = 0;
 			dc.index_buffer = m_index_buffer;
-			dc.primitive_type = FFR_PRIMITIVE_TYPE_TRIANGLES;
+			dc.primitive_type = ffr::PrimitiveType::TRIANGLES;
 			dc.shader = m_shader;
 			dc.indices_offset = first_index;
 			dc.indices_count = pcmd->ElemCount;
 			dc.tex_buffers = nullptr;
 			dc.tex_buffers_count = 0;
-			dc.textures = &m_texture;
+			dc.textures = pcmd->TextureId ? (ffr::TextureHandle*)pcmd->TextureId : &m_texture;
 			dc.textures_count = 1;
 			dc.vertex_decl = &decl;
 			dc.vertex_buffer = m_vertex_buffer;
 			dc.vertex_buffer_offset = m_vb_offset * sizeof(ImDrawVert);
 
-			ffr_scissor(
-				uint(Math::maximum(pcmd->ClipRect.x, 0.0f)),
+			ffr::scissor(uint(Math::maximum(pcmd->ClipRect.x, 0.0f)),
 				uint(Math::maximum(pcmd->ClipRect.y, 0.0f)),
 				uint(Math::minimum(pcmd->ClipRect.z, 65535.0f) - Math::maximum(pcmd->ClipRect.x, 0.0f)),
 				uint(Math::minimum(pcmd->ClipRect.w, 65535.0f) - Math::maximum(pcmd->ClipRect.y, 0.0f)));
-			ffr_blend();
+			ffr::blend();
 
-			ffr_draw(&dc);
+			ffr::draw(dc);
 
 			elem_offset += pcmd->ElemCount;
 		}
@@ -2776,10 +2788,10 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 	Engine& m_engine;
 	SceneView& m_scene_view;
 	GameView& m_game_view;
-	ffr_buffer_handle m_vertex_buffer;
-	ffr_buffer_handle m_index_buffer;
-	ffr_program_handle m_shader;
-	ffr_texture_handle m_texture;
+	ffr::BufferHandle m_vertex_buffer;
+	ffr::BufferHandle m_index_buffer;
+	ffr::ProgramHandle m_shader;
+	ffr::TextureHandle m_texture;
 	int m_vb_offset;
 	int m_ib_offset;
 };
@@ -2791,7 +2803,8 @@ struct ShaderEditorPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 		: m_shader_editor(app.getWorldEditor().getAllocator())
 		, m_app(app)
 	{
-		Action* action = LUMIX_NEW(app.getWorldEditor().getAllocator(), Action)("Shader Editor", "Toggle shader editor", "shaderEditor");
+		Action* action = LUMIX_NEW(app.getWorldEditor().getAllocator(), Action)(
+			"Shader Editor", "Toggle shader editor", "shaderEditor");
 		action->func.bind<ShaderEditorPlugin, &ShaderEditorPlugin::onAction>(this);
 		action->is_selected.bind<ShaderEditorPlugin, &ShaderEditorPlugin::isOpen>(this);
 		app.addWindowAction(action);
@@ -2800,8 +2813,9 @@ struct ShaderEditorPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 		m_compiler = LUMIX_NEW(app.getWorldEditor().getAllocator(), ShaderCompiler)(app, app.getLogUI());
 
 		lua_State* L = app.getWorldEditor().getEngine().getState();
-		auto* f =
-			&LuaWrapper::wrapMethodClosure<ShaderCompiler, decltype(&ShaderCompiler::makeUpToDate), &ShaderCompiler::makeUpToDate>;
+		auto* f = &LuaWrapper::wrapMethodClosure<ShaderCompiler,
+			decltype(&ShaderCompiler::makeUpToDate),
+			&ShaderCompiler::makeUpToDate>;
 		LuaWrapper::createSystemClosure(L, "Editor", m_compiler, "compileShaders", f);
 	}
 
@@ -2838,17 +2852,13 @@ struct GizmoPlugin LUMIX_FINAL : public WorldEditor::Plugin
 
 	static Vec3 minCoords(const Vec3& a, const Vec3& b)
 	{
-		return Vec3(Math::minimum(a.x, b.x),
-			Math::minimum(a.y, b.y),
-			Math::minimum(a.z, b.z));
+		return Vec3(Math::minimum(a.x, b.x), Math::minimum(a.y, b.y), Math::minimum(a.z, b.z));
 	}
 
 
 	static Vec3 maxCoords(const Vec3& a, const Vec3& b)
 	{
-		return Vec3(Math::maximum(a.x, b.x),
-			Math::maximum(a.y, b.y),
-			Math::maximum(a.z, b.z));
+		return Vec3(Math::maximum(a.x, b.x), Math::maximum(a.y, b.y), Math::maximum(a.z, b.z));
 	}
 
 
@@ -2900,7 +2910,7 @@ struct GizmoPlugin LUMIX_FINAL : public WorldEditor::Plugin
 	}
 
 
-	bool showGizmo(ComponentUID cmp) override 
+	bool showGizmo(ComponentUID cmp) override
 	{
 		if (cmp.type == CAMERA_TYPE)
 		{
@@ -2979,8 +2989,7 @@ struct AddTerrainComponentPlugin LUMIX_FINAL : public StudioApp::IAddComponentPl
 			\"uniforms\" : [\
 				{\"name\" : \"detail_texture_distance\", \"float_value\" : 80.0}, \
 				{ \"name\" : \"texture_scale\", \"float_value\" : 1.0 }], \
-			\"metallic\" : 0.06, \"roughness\" : 0.9, \"alpha_ref\" : 0.3 }"
-		);
+			\"metallic\" : 0.06, \"roughness\" : 0.9, \"alpha_ref\" : 0.3 }");
 
 		file.close();
 		return true;
@@ -3003,7 +3012,8 @@ struct AddTerrainComponentPlugin LUMIX_FINAL : public StudioApp::IAddComponentPl
 			if (ImGui::Button("Create"))
 			{
 				char save_filename[MAX_PATH_LENGTH];
-				if (PlatformInterface::getSaveFilename(save_filename, lengthOf(save_filename), "Material\0*.mat\0", "mat"))
+				if (PlatformInterface::getSaveFilename(
+						save_filename, lengthOf(save_filename), "Material\0*.mat\0", "mat"))
 				{
 					editor.makeRelative(buf, lengthOf(buf), save_filename);
 					new_created = createHeightmap(buf, size);
@@ -3046,7 +3056,6 @@ struct AddTerrainComponentPlugin LUMIX_FINAL : public StudioApp::IAddComponentPl
 };
 
 
-
 struct StudioAppPlugin : StudioApp::IPlugin
 {
 	StudioAppPlugin(StudioApp& app)
@@ -3057,9 +3066,16 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		app.registerComponent("camera", "Render/Camera");
 		app.registerComponent("global_light", "Render/Global light");
 
-		app.registerComponentWithResource("renderable", "Render/Mesh", Model::TYPE, *Reflection::getProperty(MODEL_INSTANCE_TYPE, "Source"));
-		app.registerComponentWithResource("particle_emitter", "Render/Particle emitter/Emitter", Material::TYPE, *Reflection::getProperty(PARTICLE_EMITTER_TYPE, "Material"));
-		app.registerComponentWithResource("scripted_particle_emitter", "Render/Particle emitter/DO NOT USE YET! Scripted Emitter", Material::TYPE, *Reflection::getProperty(SCRIPTED_PARTICLE_EMITTER_TYPE, "Material"));
+		app.registerComponentWithResource(
+			"renderable", "Render/Mesh", Model::TYPE, *Reflection::getProperty(MODEL_INSTANCE_TYPE, "Source"));
+		app.registerComponentWithResource("particle_emitter",
+			"Render/Particle emitter/Emitter",
+			Material::TYPE,
+			*Reflection::getProperty(PARTICLE_EMITTER_TYPE, "Material"));
+		app.registerComponentWithResource("scripted_particle_emitter",
+			"Render/Particle emitter/DO NOT USE YET! Scripted Emitter",
+			Material::TYPE,
+			*Reflection::getProperty(SCRIPTED_PARTICLE_EMITTER_TYPE, "Material"));
 		app.registerComponent("particle_emitter_spawn_shape", "Render/Particle emitter/Spawn shape");
 		app.registerComponent("particle_emitter_alpha", "Render/Particle emitter/Alpha");
 		app.registerComponent("particle_emitter_plane", "Render/Particle emitter/Plane");
@@ -3073,7 +3089,8 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		app.registerComponent("decal", "Render/Decal");
 		app.registerComponent("bone_attachment", "Render/Bone attachment");
 		app.registerComponent("environment_probe", "Render/Environment probe");
-		app.registerComponentWithResource("text_mesh", "Render/Text 3D", FontResource::TYPE, *Reflection::getProperty(TEXT_MESH_TYPE, "Font"));
+		app.registerComponentWithResource(
+			"text_mesh", "Render/Text 3D", FontResource::TYPE, *Reflection::getProperty(TEXT_MESH_TYPE, "Font"));
 
 		m_add_terrain_plugin = LUMIX_NEW(allocator, AddTerrainComponentPlugin)(app);
 		app.registerComponent("terrain", *m_add_terrain_plugin);

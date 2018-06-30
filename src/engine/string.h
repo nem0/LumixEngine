@@ -149,6 +149,29 @@ template <int size> struct StaticString
 };
 
 
+struct StringView
+{
+	StringView() : begin(nullptr), end(nullptr) {}
+	
+	StringView(const char* begin)
+		: begin(begin)
+		, end(begin + stringLength(begin))
+	{
+	}
+
+	StringView(const char* begin, int len)
+		: begin(begin)
+		, end(begin + len)
+	{
+	}
+
+	size_t length() const { return end - begin; }
+
+	const char* begin;
+	const char* end;
+};
+
+
 class LUMIX_ENGINE_API string
 {
 public:

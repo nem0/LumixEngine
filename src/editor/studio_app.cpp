@@ -61,15 +61,15 @@ struct LuaPlugin : public StudioApp::GUIPlugin
 		// environment's metatable & __index
 		lua_pushvalue(L, -1); // [env, env]
 		lua_setmetatable(L, -2); // [env]
-		lua_pushglobaltable(L); // [evn, _G]
+		lua_pushvalue(L, LUA_GLOBALSINDEX);
 		lua_setfield(L, -2, "__index");  // [env]
 
-		bool errors = luaL_loadbuffer(L, src, stringLength(src), filename) != LUA_OK; // [env, func]
+		bool errors = luaL_loadbuffer(L, src, stringLength(src), filename) != 0; // [env, func]
 
 		lua_pushvalue(L, -2); // [env, func, env]
-		lua_setupvalue(L, -2, 1); // function's environment [env, func]
+		lua_setfenv(L, -2); // function's environment [env, func]
 
-		errors = errors || lua_pcall(L, 0, 0, 0) != LUA_OK; // [env]
+		errors = errors || lua_pcall(L, 0, 0, 0) != 0; // [env]
 		if (errors)
 		{
 			g_log_error.log("Editor") << filename << ": " << lua_tostring(L, -1);
@@ -78,7 +78,8 @@ struct LuaPlugin : public StudioApp::GUIPlugin
 		lua_pop(L, 1); // []
 
 		const char* name = "LuaPlugin";
-		if (lua_getglobal(L, "plugin_name") == LUA_TSTRING)
+		lua_getglobal(L, "plugin_name");
+		if (lua_type(L, -1) == LUA_TSTRING)
 		{
 			name = lua_tostring(L, -1);
 		}
@@ -112,9 +113,10 @@ struct LuaPlugin : public StudioApp::GUIPlugin
 	void onWindowGUI() override
 	{
 		if (!m_is_open) return;
-		if (lua_getglobal(L, "onGUI") == LUA_TFUNCTION)
+		lua_getglobal(L, "onGUI");
+		if (lua_type(L, -1) == LUA_TFUNCTION)
 		{
-			if (lua_pcall(L, 0, 0, 0) != LUA_OK)
+			if (lua_pcall(L, 0, 0, 0) != 0)
 			{
 				g_log_error.log("Editor") << "LuaPlugin:" << lua_tostring(L, -1);
 				lua_pop(L, 1);
@@ -181,7 +183,7 @@ public:
 		m_engine = Engine::create(current_dir, data_dir_path, nullptr, m_allocator);
 		createLua();
 
-		ffr_preinit();
+		ffr::preinit();
 		SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
 		SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 5);
 		m_window = SDL_CreateWindow("Lumix Studio", 0, 0, 800, 600, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
@@ -1823,8 +1825,8 @@ public:
 	{
 		lua_State* L = m_engine->getState();
 		bool errors =
-			luaL_loadbuffer(L, src, stringLength(src), script_name) != LUA_OK;
-		errors = errors || lua_pcall(L, 0, 0, 0) != LUA_OK;
+			luaL_loadbuffer(L, src, stringLength(src), script_name) != 0;
+		errors = errors || lua_pcall(L, 0, 0, 0) != 0;
 		if (errors)
 		{
 			g_log_error.log("Editor") << script_name << ": " << lua_tostring(L, -1);
@@ -1880,7 +1882,7 @@ public:
 		void visit(const Reflection::Property<int>& prop) override 
 		{ 
 			if (!equalStrings(property_name, prop.name)) return;
-			if (!lua_isinteger(L, -1)) return;
+			if (!lua_isnumber(L, -1)) return;
 
 			int val = (int)lua_tointeger(L, -1);
 			editor->setProperty(cmp.type, 0, prop, &cmp.entity, 1, &val, sizeof(val));

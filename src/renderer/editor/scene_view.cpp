@@ -19,7 +19,7 @@
 #include "engine/universe/component.h"
 #include "engine/universe/universe.h"
 #include "imgui/imgui.h"
-#include "renderer/frame_buffer.h"
+#include "renderer/ffr/ffr.h"
 #include "renderer/model.h"
 #include "renderer/pipeline.h"
 #include "renderer/render_scene.h"
@@ -184,13 +184,15 @@ void SceneView::update(float)
 
 void SceneView::renderIcons()
 {
+	ffr::pushDebugGroup("icons");
 	m_editor.renderIcons();
+	ffr::popDebugGroup();
 }
 
 
 void SceneView::renderSelection()
 {
-	const Array<Entity>& entities = m_editor.getSelectedEntities();
+	/*const Array<Entity>& entities = m_editor.getSelectedEntities();
 	RenderScene* scene = m_pipeline->getScene();
 	Universe& universe = scene->getUniverse();
 	for (Entity e : entities)
@@ -205,15 +207,19 @@ void SceneView::renderSelection()
 			m_pipeline->renderModel(*model, pose, mtx);
 			scene->unlockPose(e, false);
 		}
-	}
+	}*/
+	ASSERT(false);
+	// TODO
 }
 
 
 void SceneView::renderGizmos()
 {
+	ffr::pushDebugGroup("gizmos");
 	auto& entities = m_editor.getSelectedEntities();
 	if(entities.empty() || entities[0] != m_editor.getEditCamera().entity)
 		m_editor.getGizmo().render();
+	ffr::popDebugGroup();
 }
 
 
@@ -427,7 +433,7 @@ void SceneView::onWindowGUI()
 		m_is_open = true;
 		onToolbar();
 		auto size = ImGui::GetContentRegionAvail();
-		m_texture_handle = m_pipeline->getRenderbuffer("default", 0);
+		m_texture_handle = m_pipeline->getOutput();
 		if (size.x > 0 && size.y > 0)
 		{
 			m_pipeline->resize(int(size.x), int(size.y));
@@ -437,13 +443,16 @@ void SceneView::onWindowGUI()
 			m_width = int(size.x);
 			m_height = int(size.y);
 			auto content_min = ImGui::GetCursorScreenPos();
-			if (bgfx::getCaps()->originBottomLeft)
-			{
-				ImGui::Image(&m_texture_handle, size, ImVec2(0, 1), ImVec2(1, 0));
-			}
-			else
-			{
-				ImGui::Image(&m_texture_handle, size);
+			if(m_texture_handle.isValid()) {
+				// TODO
+				//if (bgfx::getCaps()->originBottomLeft)
+				{
+					ImGui::Image(&m_texture_handle, size, ImVec2(0, 1), ImVec2(1, 0));
+				}
+				/*else
+				{
+					ImGui::Image(&m_texture_handle, size);
+				}*/
 			}
 			if (ImGui::BeginDragDropTarget())
 			{
@@ -502,6 +511,8 @@ void SceneView::onWindowGUI()
 
 	ImGui::EndDock();
 
+			// TODO
+			/*
 	if(m_show_stats && m_is_open)
 	{
 		float toolbar_height = 24 + ImGui::GetStyle().FramePadding.y * 2;
@@ -537,7 +548,7 @@ void SceneView::onWindowGUI()
 		}
 		ImGui::End();
 		ImGui::PopStyleColor();
-	}
+	}*/
 }
 
 

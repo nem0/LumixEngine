@@ -122,8 +122,8 @@ namespace Lumix
 				static const u32 INDEX_HASH = crc32("__index");
 				static const u32 THIS_HASH = crc32("this");
 				lua_State* L = inst.m_state;
-				bool is_env_valid = lua_rawgeti(L, LUA_REGISTRYINDEX, inst.m_environment) == LUA_TTABLE; // [env]
-				ASSERT(is_env_valid);
+				lua_rawgeti(L, LUA_REGISTRYINDEX, inst.m_environment); // [env]
+				ASSERT(lua_type(L, -1) == LUA_TTABLE);
 				lua_pushnil(L); // [env, nil]
 				auto& allocator = m_scene.m_system.m_allocator;
 				BinaryArray valid_properties(m_scene.m_system.m_engine.getLIFOAllocator());
@@ -213,7 +213,7 @@ namespace Lumix
 						// environment's metatable & __index
 						lua_pushvalue(script.m_state, -1); // [env, env]
 						lua_setmetatable(script.m_state, -2); // [env]
-						lua_pushglobaltable(script.m_state); // [evn, _G]
+						lua_pushvalue(script.m_state, LUA_GLOBALSINDEX); // [evn, _G]
 						lua_setfield(script.m_state, -2, "__index");  // [env]
 
 						// set this
@@ -222,14 +222,14 @@ namespace Lumix
 					}
 					else
 					{
-						bool is_env_valid = lua_rawgeti(script.m_state, LUA_REGISTRYINDEX, script.m_environment) == LUA_TTABLE; // [env]
-						ASSERT(is_env_valid);
+						lua_rawgeti(script.m_state, LUA_REGISTRYINDEX, script.m_environment); // [env]
+						ASSERT(lua_type(script.m_state, -1) == LUA_TTABLE);
 					}
 
 					bool errors = luaL_loadbuffer(script.m_state,
 						script.m_script->getSourceCode(),
 						stringLength(script.m_script->getSourceCode()),
-						script.m_script->getPath().c_str()) != LUA_OK; // [env, func]
+						script.m_script->getPath().c_str()) != 0; // [env, func]
 
 					if (errors)
 					{
@@ -240,10 +240,10 @@ namespace Lumix
 					}
 
 					lua_pushvalue(script.m_state, -2); // [env, func, env]
-					lua_setupvalue(script.m_state, -2, 1); // function's environment [env, func]
+					lua_setfenv(script.m_state, -2);
 
 					m_scene.m_current_script_instance = &script;
-					errors = errors || lua_pcall(script.m_state, 0, 0, 0) != LUA_OK; // [env]
+					errors = errors || lua_pcall(script.m_state, 0, 0, 0) != 0; // [env]
 					if (errors)
 					{
 						g_log_error.log("Lua Script") << script.m_script->getPath() << ": "
@@ -300,8 +300,8 @@ namespace Lumix
 
 			void addEnvironment(int env) override
 			{
-				bool is_valid = lua_rawgeti(state, LUA_REGISTRYINDEX, env) == LUA_TTABLE;
-				ASSERT(is_valid);
+				lua_rawgeti(state, LUA_REGISTRYINDEX, env);
+				ASSERT(lua_type(state, -1) == LUA_TTABLE);
 				++parameter_count;
 			}
 
@@ -350,9 +350,10 @@ namespace Lumix
 			auto& script = script_cmp->m_scripts[scr_index];
 			if (!script.m_state) return nullptr;
 
-			bool is_env_valid = lua_rawgeti(script.m_state, LUA_REGISTRYINDEX, script.m_environment) == LUA_TTABLE;
-			ASSERT(is_env_valid);
-			if (lua_getfield(script.m_state, -1, function) != LUA_TFUNCTION)
+			lua_rawgeti(script.m_state, LUA_REGISTRYINDEX, script.m_environment);
+			ASSERT(lua_type(script.m_state, -1) == LUA_TTABLE);
+			lua_getfield(script.m_state, -1, function);
+			if (lua_type(script.m_state, -1) != LUA_TFUNCTION)
 			{
 				lua_pop(script.m_state, 2);
 				return nullptr;
@@ -377,7 +378,7 @@ namespace Lumix
 			auto& script = m_function_call.cmp->m_scripts[m_function_call.scr_index];
 			if (!script.m_state) return;
 
-			if (lua_pcall(script.m_state, m_function_call.parameter_count, 0, 0) != LUA_OK)
+			if (lua_pcall(script.m_state, m_function_call.parameter_count, 0, 0) != 0)
 			{
 				g_log_warning.log("Lua Script") << lua_tostring(script.m_state, -1);
 				lua_pop(script.m_state, 1);
@@ -507,8 +508,8 @@ namespace Lumix
 			{
 				resource_type = ResourceType(LuaWrapper::checkArg<const char*>(L, 3));
 			}
-			int tmp = lua_getglobal(L, "g_scene_lua_script");
-			ASSERT(tmp == LUA_TLIGHTUSERDATA);
+			lua_getglobal(L, "g_scene_lua_script");
+			ASSERT(lua_type(L, -1) == LUA_TLIGHTUSERDATA);
 			auto* scene = LuaWrapper::toType<LuaScriptSceneImpl*>(L, -1);
 			u32 prop_name_hash = crc32(prop_name);
 			for (auto& prop : scene->m_current_script_instance->m_properties)
@@ -571,8 +572,8 @@ namespace Lumix
 			}
 			else
 			{
-				bool is_valid = lua_rawgeti(L, LUA_REGISTRYINDEX, env) == LUA_TTABLE;
-				ASSERT(is_valid);
+				lua_rawgeti(L, LUA_REGISTRYINDEX, env);
+				ASSERT(lua_type(L, -1) == LUA_TTABLE);
 			}
 			return 1;
 		}
@@ -879,8 +880,8 @@ namespace Lumix
 
 		void applyResourceProperty(ScriptInstance& script, const char* name, Property& prop, const char* value)
 		{
-			bool is_env_valid = lua_rawgeti(script.m_state, LUA_REGISTRYINDEX, script.m_environment) == LUA_TTABLE;
-			ASSERT(is_env_valid);
+			lua_rawgeti(script.m_state, LUA_REGISTRYINDEX, script.m_environment);
+			ASSERT(lua_type(script.m_state, -1));
 			lua_getfield(script.m_state, -1, name);
 			int res_idx = LuaWrapper::toType<int>(script.m_state, -1);
 			m_system.m_engine.unloadLuaResource(res_idx);
@@ -911,7 +912,7 @@ namespace Lumix
 			if (prop.type == Property::STRING) tmp << "\"" << value << "\"";
 			else tmp << value;
 
-			bool errors = luaL_loadbuffer(state, tmp, stringLength(tmp), nullptr) != LUA_OK;
+			bool errors = luaL_loadbuffer(state, tmp, stringLength(tmp), nullptr) != 0;
 			if (errors)
 			{
 				g_log_error.log("Lua Script") << script.m_script->getPath() << ": " << lua_tostring(state, -1);
@@ -919,11 +920,11 @@ namespace Lumix
 				return;
 			}
 
-			bool is_env_valid = lua_rawgeti(script.m_state, LUA_REGISTRYINDEX, script.m_environment) == LUA_TTABLE;
-			ASSERT(is_env_valid);
-			lua_setupvalue(script.m_state, -2, 1);
+			lua_rawgeti(script.m_state, LUA_REGISTRYINDEX, script.m_environment);
+			ASSERT(lua_type(script.m_state, -1) == LUA_TTABLE);
+			lua_setfenv(script.m_state, -2);
 
-			errors = errors || lua_pcall(state, 0, 0, 0) != LUA_OK;
+			errors = errors || lua_pcall(state, 0, 0, 0) != 0;
 
 			if (errors)
 			{
@@ -1018,15 +1019,16 @@ namespace Lumix
 
 		void destroyInstance(ScriptComponent& scr,  ScriptInstance& inst)
 		{
-			bool is_env_valid = lua_rawgeti(inst.m_state, LUA_REGISTRYINDEX, inst.m_environment) == LUA_TTABLE;
-			ASSERT(is_env_valid);
-			if (lua_getfield(inst.m_state, -1, "onDestroy") != LUA_TFUNCTION)
+			lua_rawgeti(inst.m_state, LUA_REGISTRYINDEX, inst.m_environment);
+			ASSERT(lua_type(inst.m_state, -1) == LUA_TTABLE);
+			lua_getfield(inst.m_state, -1, "onDestroy");
+			if (lua_type(inst.m_state, -1) != LUA_TFUNCTION)
 			{
 				lua_pop(inst.m_state, 2);
 			}
 			else
 			{
-				if (lua_pcall(inst.m_state, 0, 0, 0) != LUA_OK)
+				if (lua_pcall(inst.m_state, 0, 0, 0) != 0)
 				{
 					g_log_error.log("Lua Script") << lua_tostring(inst.m_state, -1);
 					lua_pop(inst.m_state, 1);
@@ -1068,14 +1070,16 @@ namespace Lumix
 			if (!instance.m_state) return;
 
 			if (is_restart) disableScript(instance);
-
-			if (lua_rawgeti(instance.m_state, LUA_REGISTRYINDEX, instance.m_environment) != LUA_TTABLE)
+			
+			lua_rawgeti(instance.m_state, LUA_REGISTRYINDEX, instance.m_environment);
+			if (lua_type(instance.m_state, -1) != LUA_TTABLE)
 			{
 				ASSERT(false);
 				lua_pop(instance.m_state, 1);
 				return;
 			}
-			if (lua_getfield(instance.m_state, -1, "update") == LUA_TFUNCTION)
+			lua_getfield(instance.m_state, -1, "update");
+			if (lua_type(instance.m_state, -1) == LUA_TFUNCTION)
 			{
 				auto& update_data = m_updates.emplace();
 				update_data.script = instance.m_script;
@@ -1083,7 +1087,8 @@ namespace Lumix
 				update_data.environment = instance.m_environment;
 			}
 			lua_pop(instance.m_state, 1);
-			if (lua_getfield(instance.m_state, -1, "onInputEvent") == LUA_TFUNCTION)
+			lua_getfield(instance.m_state, -1, "onInputEvent");
+			if (lua_type(instance.m_state, -1) == LUA_TFUNCTION)
 			{
 				auto& callback = m_input_handlers.emplace();
 				callback.script = instance.m_script;
@@ -1094,13 +1099,14 @@ namespace Lumix
 
 			if (!is_restart)
 			{
-				if (lua_getfield(instance.m_state, -1, "init") != LUA_TFUNCTION)
+				lua_getfield(instance.m_state, -1, "init");
+				if (lua_type(instance.m_state, -1) != LUA_TFUNCTION)
 				{
 					lua_pop(instance.m_state, 2);
 					return;
 				}
 
-				if (lua_pcall(instance.m_state, 0, 0, 0) != LUA_OK)
+				if (lua_pcall(instance.m_state, 0, 0, 0) != 0)
 				{
 					g_log_error.log("Lua Script") << lua_tostring(instance.m_state, -1);
 					lua_pop(instance.m_state, 1);
@@ -1224,7 +1230,8 @@ namespace Lumix
 
 			*out = '\0';
 			lua_rawgeti(scr.m_state, LUA_REGISTRYINDEX, scr.m_environment);
-			if (lua_getfield(scr.m_state, -1, prop_name) == LUA_TNIL)
+			lua_getfield(scr.m_state, -1, prop_name);
+			if (lua_type(scr.m_state, -1) == LUA_TNIL)
 			{
 				copyString(out, max_size, prop.stored_value.c_str());
 				lua_pop(scr.m_state, 2);
@@ -1289,7 +1296,8 @@ namespace Lumix
 						if (prop.type == Property::ENTITY)
 						{
 							lua_rawgeti(inst.m_state, LUA_REGISTRYINDEX, inst.m_environment);
-							if (lua_getfield(inst.m_state, -1, name) == LUA_TNIL)
+							lua_getfield(inst.m_state, -1, name);
+							if (lua_type(inst.m_state, -1) == LUA_TNIL)
 							{
 								serializer.write("prop_value", prop.stored_value.c_str());
 							}
@@ -1493,12 +1501,13 @@ namespace Lumix
 				timer.time -= time_delta;
 				if (timer.time < 0)
 				{
-					if (lua_rawgeti(timer.state, LUA_REGISTRYINDEX, timer.func) != LUA_TFUNCTION)
+					lua_rawgeti(timer.state, LUA_REGISTRYINDEX, timer.func);
+					if (lua_type(timer.state, -1) != LUA_TFUNCTION)
 					{
 						ASSERT(false);
 					}
 
-					if (lua_pcall(timer.state, 0, 0, 0) != LUA_OK)
+					if (lua_pcall(timer.state, 0, 0, 0) != 0)
 					{
 						g_log_error.log("Lua Script") << lua_tostring(timer.state, -1);
 						lua_pop(timer.state, 1);
@@ -1574,11 +1583,13 @@ namespace Lumix
 			}
 
 
-			if (lua_rawgeti(L, LUA_REGISTRYINDEX, callback.environment) != LUA_TTABLE) // [lua_event, environment]
+			lua_rawgeti(L, LUA_REGISTRYINDEX, callback.environment);
+			if (lua_type(L, -1) != LUA_TTABLE) // [lua_event, environment]
 			{
 				ASSERT(false);
 			}
-			if (lua_getfield(L, -1, "onInputEvent") != LUA_TFUNCTION)  // [lua_event, environment, func]
+			lua_getfield(L, -1, "onInputEvent");
+			if (lua_type(L, -1) != LUA_TFUNCTION)  // [lua_event, environment, func]
 			{
 				lua_pop(L, 3); // []
 				return;
@@ -1586,7 +1597,7 @@ namespace Lumix
 
 			lua_pushvalue(L, -3); // [lua_event, environment, func, lua_event]
 			
-			if (lua_pcall(L, 1, 0, 0) != LUA_OK)// [lua_event, environment]
+			if (lua_pcall(L, 1, 0, 0) != 0)// [lua_event, environment]
 			{
 				g_log_error.log("Lua Script") << lua_tostring(L, -1);
 				lua_pop(L, 1); // []
@@ -1625,18 +1636,20 @@ namespace Lumix
 			for (int i = 0; i < m_updates.size(); ++i)
 			{
 				CallbackData update_item = m_updates[i];
-				if (lua_rawgeti(update_item.state, LUA_REGISTRYINDEX, update_item.environment) != LUA_TTABLE)
+				lua_rawgeti(update_item.state, LUA_REGISTRYINDEX, update_item.environment);
+				if (lua_type(update_item.state, -1) != LUA_TTABLE)
 				{
 					ASSERT(false);
 				}
-				if (lua_getfield(update_item.state, -1, "update") != LUA_TFUNCTION)
+				lua_getfield(update_item.state, -1, "update");
+				if (lua_type(update_item.state, -1) != LUA_TFUNCTION)
 				{
 					lua_pop(update_item.state, 2);
 					continue;
 				}
 
 				lua_pushnumber(update_item.state, time_delta);
-				if (lua_pcall(update_item.state, 1, 0, 0) != LUA_OK)
+				if (lua_pcall(update_item.state, 1, 0, 0) != 0)
 				{
 					g_log_error.log("Lua Script") << lua_tostring(update_item.state, -1);
 					lua_pop(update_item.state, 1);
@@ -1759,8 +1772,8 @@ namespace Lumix
 		{
 			if (!inst.m_state) return;
 
-			bool is_env_valid = lua_rawgeti(inst.m_state, LUA_REGISTRYINDEX, inst.m_environment) == LUA_TTABLE; // [env]
-			ASSERT(is_env_valid);
+			lua_rawgeti(inst.m_state, LUA_REGISTRYINDEX, inst.m_environment); // [env]
+			ASSERT(lua_type(inst.m_state, -1) == LUA_TTABLE);
 			lua_pushboolean(inst.m_state, enabled);  // [env, enabled]
 			lua_setfield(inst.m_state, -2, "enabled"); // [env]
 			lua_pop(inst.m_state, 1); // []

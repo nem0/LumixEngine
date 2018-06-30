@@ -699,7 +699,7 @@ struct ConsolePlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 			copyNString(tmp, lengthOf(tmp), data->Buf + start_word, data->CursorPos - start_word);
 
 			that->autocomplete.clear();
-			lua_pushglobaltable(L);
+			lua_pushvalue(L, LUA_GLOBALSINDEX);
 			that->autocompleteSubstep(L, tmp, data);
 			lua_pop(L, 1);
 			if (!that->autocomplete.empty())
@@ -738,8 +738,9 @@ struct ConsolePlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 			if (ImGui::Button("Execute"))
 			{
 				lua_State* L = app.getWorldEditor().getEngine().getState();
-				bool errors = luaL_loadbuffer(L, buf, stringLength(buf), nullptr) != LUA_OK;
-				errors = errors || lua_pcall(L, 0, 0, 0) != LUA_OK;
+				
+				bool errors = luaL_loadbuffer(L, buf, stringLength(buf), nullptr) != 0;
+				errors = errors || lua_pcall(L, 0, 0, 0) != 0;
 
 				if (errors)
 				{
@@ -763,8 +764,8 @@ struct ConsolePlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 						file.read(&data[0], size);
 						file.close();
 						lua_State* L = app.getWorldEditor().getEngine().getState();
-						bool errors = luaL_loadbuffer(L, &data[0], data.size(), tmp) != LUA_OK;
-						errors = errors || lua_pcall(L, 0, 0, 0) != LUA_OK;
+						bool errors = luaL_loadbuffer(L, &data[0], data.size(), tmp) != 0;
+						errors = errors || lua_pcall(L, 0, 0, 0) != 0;
 
 						if (errors)
 						{

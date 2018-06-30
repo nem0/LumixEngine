@@ -339,7 +339,7 @@ LUMIX_FORCE_INLINE void rasterizeOccludingTriangle(Vec4 (&vertices)[64 * 3], int
 		if (triangle_mask & POSITIVE_Y) clipTriangles(Vec4(0.0f, -1.0f, 0.0f, 1.0f), vertices, triangles, triangles_count);
 		if (triangle_mask & NEGATIVE_Y) clipTriangles(Vec4(0.0f, 1.0f, 0.0f, 1.0f), vertices, triangles, triangles_count);
 		if (triangle_mask & POSITIVE_Z) clipTriangles(Vec4(0.0f, 0.0f, -1.0f, 1.0f), vertices, triangles, triangles_count);
-		bool is_homogenous_depth = bgfx::getCaps()->homogeneousDepth;
+		bool is_homogenous_depth = ffr::isHomogenousDepth();
 		if (triangle_mask & NEGATIVE_Z) clipTriangles(Vec4(0.0f, 0.0f, 1.0f, is_homogenous_depth ? 1.0f : 0.0f), vertices, triangles, triangles_count);
 
 		for (int i = 0; i < triangles_count; ++i)
