@@ -24,14 +24,6 @@
 #include <stb/mf_resource.h>
 
 
-namespace bgfx
-{ 
-	int compileShader(int _argc, const char* _argv[]);
-	typedef void(*UserErrorFn)(void*, const char*, va_list);
-	void setShaderCErrorFunction(UserErrorFn fn, void* user_ptr);
-}
-
-
 namespace Lumix
 {
 
@@ -49,6 +41,8 @@ ShaderCompiler::ShaderCompiler(StudioApp& app, LogUI& log_ui)
 	, m_mutex(false)
 	, m_load_hook(*m_editor.getEngine().getResourceManager().get(Shader::TYPE), *this)
 {
+			// TODO
+			/*
 	JobSystem::JobDecl job;
 	job.task = [](void* data) { ((ShaderCompiler*)data)->compileTask(); };
 	job.data = this;
@@ -67,7 +61,7 @@ ShaderCompiler::ShaderCompiler(StudioApp& app, LogUI& log_ui)
 
 	Engine& engine = m_editor.getEngine();
 	ResourceManagerBase* shader_manager = engine.getResourceManager().get(ShaderBinary::TYPE);
-	shader_manager->setLoadHook(m_load_hook);
+	shader_manager->setLoadHook(m_load_hook);*/
 }
 
 
@@ -462,6 +456,9 @@ ShaderCompiler::~ShaderCompiler()
 
 void ShaderCompiler::reloadShaders()
 {
+			// TODO
+			ASSERT(false);
+			/*
 	m_to_reload.removeDuplicates();
 
 	auto shader_manager = m_editor.getEngine().getResourceManager().get(Shader::TYPE);
@@ -483,7 +480,7 @@ void ShaderCompiler::reloadShaders()
 		if(!any_hooked) shader_manager->reload(Path(shd_path.c_str()));
 	}
 
-	m_to_reload.clear();
+	m_to_reload.clear();*/
 }
 
 
@@ -531,6 +528,10 @@ void ShaderCompiler::compilePass(const char* shd_path,
 	const ShaderCombinations::Defines& all_defines,
 	bool debug)
 {
+	// TODO
+	ASSERT(false);
+/*
+
 	const char* base_path = m_editor.getEngine().getDiskFileDevice()->getBasePath();
 
 	for (int mask = 0; mask < 1 << lengthOf(all_defines); ++mask)
@@ -598,7 +599,7 @@ void ShaderCompiler::compilePass(const char* shd_path,
 				g_log_error.log("Renderer") << "Failed to compile " << source_path << "(" << out_path << "), defines = \"" << defines << "\"";
 			}
 		}
-	}
+	}*/
 }
 
 

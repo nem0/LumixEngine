@@ -6,6 +6,8 @@
 #include "engine/vec.h"
 
 
+struct lua_State;
+
 namespace Lumix
 {
 
@@ -14,8 +16,6 @@ namespace FS
 	struct IFile;
 }
 
-class JsonDeserializer;
-class JsonSerializer;
 class ResourceManager;
 class Shader;
 struct ShaderInstance;
@@ -26,12 +26,6 @@ class LUMIX_RENDERER_API Material LUMIX_FINAL : public Resource
 {
 	friend class MaterialManager;
 public:
-	enum class DepthFunc
-	{
-		LEQUAL,
-		LESS
-	};
-
 	struct Uniform
 	{
 		u32 name_hash;
@@ -74,12 +68,12 @@ public:
 
 	int getTextureCount() const { return m_texture_count; }
 	Texture* getTexture(int i) const { return i < m_texture_count ? m_textures[i] : nullptr; }
-	const char* getTextureUniform(int i);
+	const char* getTextureUniform(int i) const;
 	Texture* getTextureByUniform(const char* uniform) const;
 	bool isTextureDefine(u8 define_idx) const;
 	void setTexture(int i, Texture* texture);
 	void setTexturePath(int i, const Path& path);
-	bool save(JsonSerializer& serializer);
+	bool save(OutputBlob& blob);
 	int getUniformCount() const { return m_uniforms.size(); }
 	Uniform& getUniform(int index) { return m_uniforms[index]; }
 	const Uniform& getUniform(int index) const { return m_uniforms[index]; }
@@ -110,10 +104,10 @@ private:
 	void unload() override;
 	bool load(FS::IFile& file) override;
 
-	bool deserializeTexture(JsonDeserializer& serializer, const char* material_dir);
-	void deserializeUniforms(JsonDeserializer& serializer);
-	void deserializeDefines(JsonDeserializer& serializer);
-	void deserializeCustomFlags(JsonDeserializer& serializer);
+	bool deserializeTexture(lua_State* L, const char* material_dir);
+	void deserializeUniforms(lua_State* L);
+	void deserializeDefines(lua_State* L);
+	void deserializeCustomFlags(lua_State* L);
 
 private:
 	static const int MAX_TEXTURE_COUNT = 16;

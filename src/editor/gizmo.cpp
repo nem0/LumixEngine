@@ -217,7 +217,7 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 			Vec3 intersection = getMousePlaneIntersection(m_editor.getMousePos(), gizmo_mtx, m_transform_axis);
 			Vec3 delta_vec = intersection - m_start_axis_point;
 
-			Vec2 p = ri->worldToScreenPixels(entity_pos);
+			Vec2 p = ri->worldToScreenPixels(m_editor.getEditCamera().entity, entity_pos);
 			StaticString<128> tmp("", delta_vec.x, "; ", delta_vec.y, "; ", delta_vec.z);
 			ri->addText2D(p.x + 31, p.y + 31, 16, 0xff000000, tmp);
 			ri->addText2D(p.x + 30, p.y + 30, 16, 0xffffFFFF, tmp);
@@ -477,7 +477,7 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 			Vec3 origin = (m_start_plane_point - entity_pos).normalized();
 			renderArc(entity_pos, n * scale, origin * scale, m_angle_accum, 0x8800a5ff);
 			float angle_degrees = Math::radiansToDegrees(m_angle_accum);
-			Vec2 p = ri->worldToScreenPixels(entity_pos);
+			Vec2 p = ri->worldToScreenPixels(m_editor.getEditCamera().entity, entity_pos);
 			StaticString<128> tmp("", angle_degrees, " deg");
 			Vec2 screen_delta = (m_start_mouse_pos - p).normalized();
 			Vec2 text_pos = m_start_mouse_pos + screen_delta * 15;

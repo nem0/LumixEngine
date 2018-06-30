@@ -9,7 +9,7 @@
 #include "engine/string.h"
 #include "engine/vec.h"
 #include "engine/resource.h"
-#include <bgfx/bgfx.h>
+#include "ffr/ffr.h"
 
 
 struct lua_State;
@@ -48,6 +48,22 @@ struct LUMIX_RENDERER_API RayCastModelHit
 
 struct LUMIX_RENDERER_API Mesh
 {
+	enum class AttributeSemantic : u8
+	{
+		POSITION,
+		NORMAL,
+		TANGENT,
+		BITANGENT,
+		COLOR0,
+		COLOR1,
+		INDICES,
+		WEIGHTS,
+		TEXCOORD0,
+		TEXCOORD1,
+
+		NONE = 0xff
+	};
+
 	struct Skin
 	{
 		Vec4 weights;
@@ -69,15 +85,16 @@ struct LUMIX_RENDERER_API Mesh
 	};
 
 	Mesh(Material* mat,
-		const bgfx::VertexDecl& vertex_decl,
+		const ffr::VertexDecl& vertex_decl,
 		const char* name,
+		const AttributeSemantic* semantics,
 		IAllocator& allocator);
 
 	void set(const Mesh& rhs);
-
 	void setMaterial(Material* material, Model& model, Renderer& renderer);
-
 	bool areIndices16() const { return flags.isSet(Flags::INDICES_16_BIT); }
+	int getAttributeOffset(AttributeSemantic attr) const;
+	bool hasAttribute(AttributeSemantic attr) const;
 
 	Type type;
 	Array<u8> indices;
@@ -87,9 +104,10 @@ struct LUMIX_RENDERER_API Mesh
 	FlagSet<Flags, u8> flags;
 	u64 layer_mask;
 	int indices_count;
-	bgfx::VertexDecl vertex_decl;
-	bgfx::VertexBufferHandle vertex_buffer_handle = BGFX_INVALID_HANDLE;
-	bgfx::IndexBufferHandle index_buffer_handle = BGFX_INVALID_HANDLE;
+	ffr::VertexDecl vertex_decl;
+	AttributeSemantic attributes_semantic[ffr::VertexDecl::MAX_ATTRIBUTES];
+	ffr::BufferHandle vertex_buffer_handle = ffr::INVALID_BUFFER;
+	ffr::BufferHandle index_buffer_handle = ffr::INVALID_BUFFER;
 	string name;
 	Material* material;
 };
@@ -106,27 +124,7 @@ class LUMIX_RENDERER_API Model LUMIX_FINAL : public Resource
 {
 public:
 	typedef HashMap<u32, int> BoneMap;
-
-	enum class Attrs
-	{
-		Position,
-		Normal,
-		Tangent,
-		Bitangent,
-		Color0,
-		Color1,
-		Indices,
-		Weight,
-		TexCoord0,
-		TexCoord1,
-		TexCoord2,
-		TexCoord3,
-		TexCoord4,
-		TexCoord5,
-		TexCoord6,
-		TexCoord7,
-	};
-
+	
 #pragma pack(1)
 	struct FileHeader
 	{
@@ -137,12 +135,6 @@ public:
 
 	enum class FileVersion : u32
 	{
-		FIRST,
-		WITH_FLAGS,
-		SINGLE_VERTEX_DECL,
-		BOUNDING_SHAPES_PRECOMPUTED,
-		MULTIPLE_VERTEX_DECLS,
-
 		LATEST // keep this last
 	};
 
@@ -211,18 +203,15 @@ public:
 	static void registerLuaAPI(lua_State* L);
 
 public:
-	static const u32 FILE_MAGIC = 0x5f4c4d4f; // == '_LMO'
+	static const u32 FILE_MAGIC = 0x5f4c4d4f; // == '_LM2'
 	static const int MAX_LOD_COUNT = 4;
 
 private:
 	Model(const Model&);
 	void operator=(const Model&);
 
-	bool parseVertexDecl(FS::IFile& file, bgfx::VertexDecl* vertex_decl);
-	bool parseVertexDeclEx(FS::IFile& file, bgfx::VertexDecl* vertex_decl);
 	bool parseBones(FS::IFile& file);
-	bool parseMeshes(const bgfx::VertexDecl& global_vertex_decl, FS::IFile& file, FileVersion version, u32 global_flags);
-	bool parseMeshesOld(bgfx::VertexDecl global_vertex_decl, FS::IFile& file, FileVersion version, u32 global_flags);
+	bool parseMeshes(FS::IFile& file, FileVersion version);
 	bool parseLODs(FS::IFile& file);
 	int getBoneIdx(const char* name);
 

@@ -4,17 +4,11 @@
 #include "engine/iplugin.h"
 
 
-namespace bgfx
-{
-	struct Encoder;
-	struct UniformHandle;
-	struct VertexDecl;
-}
-
-
 namespace Lumix
 {
 
+
+namespace ffr { struct BufferHandle; }
 
 class Engine;
 struct Font;
@@ -38,6 +32,7 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 		virtual ~Renderer() {}
 		virtual void frame(bool capture) = 0;
 		virtual void resize(int width, int height) = 0;
+		virtual ffr::BufferHandle getGlobalUniformsBuffer() const = 0;
 		virtual int getViewCounter() const = 0;
 		virtual void viewCounterAdd() = 0;
 		virtual void makeScreenshot(const Path& filename) = 0;
@@ -46,22 +41,26 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 		virtual u8 getShaderDefineIdx(const char* define) = 0;
 		virtual const char* getShaderDefine(int define_idx) = 0;
 		virtual int getShaderDefinesCount() const = 0;
-		virtual const bgfx::VertexDecl& getBasicVertexDecl() const = 0;
-		virtual const bgfx::VertexDecl& getBasic2DVertexDecl() const = 0;
+		// TODO
+	/*
+virtual const bgfx::VertexDecl& getBasicVertexDecl() const = 0;
+		virtual const bgfx::VertexDecl& getBasic2DVertexDecl() const = 0;*/
 		virtual FontManager& getFontManager() = 0;
 		virtual MaterialManager& getMaterialManager() = 0;
 		virtual ShaderManager& getShaderManager() = 0;
 		virtual ModelManager& getModelManager() = 0;
 		virtual TextureManager& getTextureManager() = 0;
 		virtual Shader* getDefaultShader() = 0;
+		// TODO
+	/*
 		virtual const bgfx::UniformHandle& getMaterialColorUniform() const = 0;
 		virtual const bgfx::UniformHandle& getRoughnessMetallicEmissionUniform() const = 0;
+		*/
 		virtual int getLayersCount() const = 0;
 		virtual int getLayer(const char* name) = 0;
 		virtual const char* getLayerName(int idx) const = 0;
 		virtual void setMainPipeline(Pipeline* pipeline) = 0;
 		virtual Pipeline* getMainPipeline() = 0;
-		virtual bgfx::Encoder* getEncoder() = 0;
 
 		virtual Engine& getEngine() = 0;
 }; 

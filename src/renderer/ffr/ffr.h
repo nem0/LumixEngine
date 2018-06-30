@@ -1,123 +1,165 @@
 #pragma once
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include "engine/lumix.h"
 
 
-typedef unsigned int ffr_uint;
+namespace Lumix {
+
+struct IAllocator;
+
+namespace ffr {
 
 
-typedef struct { ffr_uint value; } ffr_buffer_handle;
-typedef struct { ffr_uint value; } ffr_program_handle;
-typedef struct { ffr_uint value; } ffr_framebuffer_handle;
-typedef struct { ffr_uint value; } ffr_texture_handle;
+struct BufferHandle { uint value; bool isValid() const { return value != 0xFFffFFff; } };
+struct ProgramHandle { uint value; bool isValid() const { return value != 0xFFffFFff; } };
+struct FramebufferHandle { uint value; bool isValid() const { return value != 0xFFffFFff; } };
+struct TextureHandle { uint value; bool isValid() const { return value != 0xFFffFFff; } };
 
 
-#define FFR_INVALID_HANDLE { 0xffFFffFF }
+const BufferHandle INVALID_BUFFER = { 0xffFFffFF };
+const ProgramHandle INVALID_PROGRAM = { 0xffFFffFF };
+const TextureHandle INVALID_TEXTURE = { 0xffFFffFF };
+const FramebufferHandle INVALID_FRAMEBUFFER = { 0xffFFffFF };
 
 
-typedef enum {
-	FFR_LOG_INFO,
-	FFR_LOG_WARNING,
-	FFR_LOG_ERROR,
-	FFR_LOG_FATAL
-} ffr_log_level;
+enum class LogLevel : uint {
+	INFO,
+	WARNING,
+	ERROR,
+	FATAL
+};
 
 
-typedef enum {
-	FFR_INIT_SUCCESS,
-	FFR_INIT_FAIL
-} ffr_init_result;
+enum class StateFlags : u32 {
+	DEPTH_TEST = 1 << 0,
+	CULL_FACE = 1 << 1,
+	WIREFRAME = 1 << 2
+};
 
 
-typedef enum {
-	FFR_PRIMITIVE_TYPE_TRIANGLES,
-	FFR_PRIMITIVE_TYPE_TRIANGLE_STRIP
-} ffr_primitive_type;
+enum class PrimitiveType : uint {
+	TRIANGLES,
+	TRIANGLE_STRIP,
+	LINES
+};
 
 
-typedef enum {
-	FFR_SHADER_TYPE_VERTEX,
-	FFR_SHADER_TYPE_FRAGMENT,
-} ffr_shader_type;
+enum class ShaderType : uint {
+	VERTEX,
+	FRAGMENT,
+};
 
 
-typedef enum {
-	FFR_CLEAR_FLAG_COLOR = 1 << 0,
-	FFR_CLEAR_FLAG_DEPTH = 1 << 1
-} ffr_clear_flag;
+enum class ClearFlags : uint {
+	COLOR = 1 << 0,
+	DEPTH = 1 << 1
+};
 
 
-typedef enum {
-	FFR_ATTRIBUTE_TYPE_UBYTE,
-	FFR_ATTRIBUTE_TYPE_FLOAT
-} ffr_attribute_type;
+enum class AttributeType : uint {
+	U8,
+	FLOAT,
+	I16
+};
 
 
-typedef struct  {
-	void* user_ptr;
-	void (*log)(void* user_ptr, ffr_log_level level, const char* msg);
-	void* (*alloc)(void* user_ptr, size_t size, size_t align);
-	void (*free)(void* user_ptr, void* mem);
-} ffr_init_params;
+enum class TextureFormat : uint {
+	D32,
+	D24,
+	D24S8,
+	RGBA8,
+	RGBA16F,
+	R16F,
+	R16,
+	R32F
+};
 
 
-typedef struct {
-	ffr_uint size;
-	ffr_uint offset;
-	ffr_uint normalized;
-	ffr_attribute_type type;
-} ffr_attribute;
+struct Attribute {
+	uint components_num;
+	uint offset;
+	bool normalized;
+	bool as_int;
+	AttributeType type;
+};
 
 
-typedef struct {
-	ffr_uint size;
-	ffr_uint attributes_count;
-	ffr_attribute attributes[16];
-} ffr_vertex_decl;
+struct VertexDecl {
+	enum { MAX_ATTRIBUTES = 16 };
+
+	void addAttribute(uint components_num, AttributeType type, bool normalized, bool as_int);
+
+	uint size = 0;
+	uint attributes_count = 0;
+	Attribute attributes[MAX_ATTRIBUTES];
+};
 
 
-typedef struct {
-	ffr_program_handle shader;
-	ffr_primitive_type primitive_type;
-	ffr_uint tex_buffers_count;
-	const ffr_buffer_handle* tex_buffers;
-	ffr_uint textures_count;
-	const ffr_texture_handle* textures;
-	ffr_uint indices_offset;
-	ffr_uint indices_count;
-	ffr_buffer_handle index_buffer;
-	ffr_buffer_handle vertex_buffer;
-	ffr_uint vertex_buffer_offset;
-	const ffr_vertex_decl* vertex_decl;
-} ffr_draw_call;
+struct DrawCall {
+	ProgramHandle shader;
+	PrimitiveType primitive_type;
+	uint tex_buffers_count;
+	const BufferHandle* tex_buffers;
+	uint textures_count;
+	const TextureHandle* textures;
+	uint indices_offset;
+	uint indices_count;
+	BufferHandle index_buffer;
+	BufferHandle vertex_buffer;
+	uint vertex_buffer_offset;
+	const VertexDecl* vertex_decl;
+	u32 state;
+};
+
+struct TextureInfo {
+	int width;
+	int height;
+	int depth;
+	int layers;
+	int mips;
+	bool is_cubemap;
+};
 
 
-void ffr_preinit();
-ffr_init_result ffr_init(const ffr_init_params* params);
-void ffr_shutdown();
+void preinit();
+bool init(IAllocator& allocator);
+inline bool isHomogenousDepth() { return true; }
+void shutdown();
 
-void ffr_clear(ffr_uint flags, const float* color, float depth);
+void clear(uint flags, const float* color, float depth);
 
-void ffr_scissor(ffr_uint x, ffr_uint y, ffr_uint w, ffr_uint h);
-void ffr_viewport(ffr_uint x, ffr_uint y, ffr_uint w, ffr_uint h);
-void ffr_blend();
+void scissor(uint x, uint y, uint w, uint h);
+void viewport(uint x, uint y, uint w, uint h);
+void blend();
 
-ffr_program_handle ffr_create_program(const char** srcs, const ffr_shader_type* types, int num);
-ffr_buffer_handle ffr_create_buffer(size_t size, const void* data);
-ffr_texture_handle ffr_create_texture(ffr_uint w, ffr_uint h, const void* data);
+ProgramHandle createProgram(const char** srcs, const ShaderType* types, int num);
+BufferHandle createBuffer(size_t size, const void* data);
+TextureHandle createTexture(uint w, uint h, TextureFormat format, const void* data);
+TextureHandle loadTexture(const void* data, int size, TextureInfo* info);
+FramebufferHandle createFramebuffer(uint renderbuffers_count, const TextureHandle* renderbuffers);
 
-void ffr_update_buffer(ffr_buffer_handle buffer, const void* data, size_t offset, size_t size);
+void setState(u32 flags);
+void uniformBlockBinding(ProgramHandle program, uint index, uint binding);
+void update(BufferHandle buffer, const void* data, size_t offset, size_t size);
+void bindUniformBuffer(uint index, BufferHandle buffer);
 
-void ffr_destroy_program(ffr_program_handle program);
-void ffr_destroy_buffer(ffr_buffer_handle buffer);
-void ffr_destroy_texture(ffr_texture_handle texture);
+void destroy(ProgramHandle program);
+void destroy(BufferHandle buffer);
+void destroy(TextureHandle texture);
+void destroy(FramebufferHandle fb);
 
-void ffr_draw(const ffr_draw_call* draw_call);
+void draw(const DrawCall& draw_call);
 
-void ffr_set_framebuffer(ffr_framebuffer_handle fb);
+void pushDebugGroup(const char* msg);
+void popDebugGroup();
+void setUniform1i(ProgramHandle program, const char* uniform_name, int value);
+void setUniform2f(ProgramHandle program, const char* uniform_name, uint count, const float* value);
+void setUniform4f(ProgramHandle program, const char* uniform_name, uint count, const float* value);
+void setUniformMatrix4f(ProgramHandle program, const char* uniform_name, uint count, const float* value);
 
-#ifdef __cplusplus
-}
-#endif
+void setFramebuffer(FramebufferHandle fb);
+
+
+} // namespace ffr
+
+} // namespace Lumix

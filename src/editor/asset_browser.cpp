@@ -400,9 +400,12 @@ void AssetBrowser::thumbnail(FileInfo& tile)
 {
 	ImGui::BeginGroup();
 	ImVec2 img_size((float)TILE_SIZE, (float)TILE_SIZE);
+	RenderInterface* ri = m_app.getWorldEditor().getRenderInterface();
 	if (tile.tex)
 	{
-		ImGui::Image(tile.tex, img_size);
+		if(ri->isValid(tile.tex)) {
+			ImGui::Image(tile.tex, img_size);
+		}
 	}
 	else
 	{
@@ -410,7 +413,6 @@ void AssetBrowser::thumbnail(FileInfo& tile)
 		StaticString<MAX_PATH_LENGTH> path(".lumix/asset_tiles/", tile.file_path_hash, ".dds");
 		if (PlatformInterface::fileExists(path))
 		{
-			RenderInterface* ri = m_app.getWorldEditor().getRenderInterface();
 			if (PlatformInterface::getLastModified(path) >= PlatformInterface::getLastModified(tile.filepath))
 			{
 				tile.tex = ri->loadTexture(Path(path));

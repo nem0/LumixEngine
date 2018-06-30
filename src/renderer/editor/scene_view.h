@@ -4,7 +4,7 @@
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
-#include <bgfx/bgfx.h>
+#include "renderer/ffr/ffr.h"
 
 
 namespace Lumix
@@ -30,7 +30,7 @@ class SceneView : public StudioApp::GUIPlugin
 		void setScene(RenderScene* scene);
 		void onWindowGUI() override;
 		Pipeline* getPipeline() { return m_pipeline; }
-		const bgfx::TextureHandle& getTextureHandle() const { return m_texture_handle; }
+		const ffr::TextureHandle& getTextureHandle() const { return m_texture_handle; }
 		void addDropHandler(DropHandler handler);
 		void removeDropHandler(DropHandler handler);
 		const char* getName() const override { return "scene_view"; }
@@ -70,7 +70,7 @@ class SceneView : public StudioApp::GUIPlugin
 		float m_camera_speed;
 		WorldEditor& m_editor;
 		Pipeline* m_pipeline;
-		bgfx::TextureHandle m_texture_handle;
+		ffr::TextureHandle m_texture_handle;
 		bool m_show_stats;
 		LogUI& m_log_ui;
 		Array<DropHandler> m_drop_handlers;

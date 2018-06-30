@@ -23,7 +23,6 @@
 #include "imgui/imgui.h"
 #include "ofbx.h"
 #include "physics/physics_geometry_manager.h"
-#include "renderer/frame_buffer.h"
 #include "renderer/model.h"
 #include "renderer/pipeline.h"
 #include "renderer/render_scene.h"
@@ -1665,8 +1664,6 @@ struct FBXImporter
 		header.magic = 0x5f4c4d4f; // == '_LMO';
 		header.version = (u32)Model::FileVersion::LATEST;
 		write(header);
-		u32 flags = 0;
-		write(flags);
 	}
 
 
@@ -1913,7 +1910,8 @@ int setAnimationParams(lua_State* L)
 
 	auto& anim = dlg->m_fbx_importer->animations[anim_idx];
 
-	if (lua_getfield(L, 2, "root_bone") == LUA_TSTRING)
+	lua_getfield(L, 2, "root_bone");
+	if (lua_type(L, -1) == LUA_TSTRING)
 	{
 		const char* name = lua_tostring(L, -1);
 		for (int i = 0; i < dlg->m_fbx_importer->bones.size(); ++i)
@@ -1929,7 +1927,8 @@ int setAnimationParams(lua_State* L)
 
 	LuaWrapper::getOptionalField(L, 2, "import", &anim.import);
 
-	if (lua_getfield(L, 2, "output_filename") == LUA_TSTRING)
+	lua_getfield(L, 2, "output_filename");
+	if (lua_type(L, -1) == LUA_TSTRING)
 	{
 		copyString(anim.output_filename.data, LuaWrapper::toType<const char*>(L, -1));
 	}
@@ -1944,25 +1943,29 @@ int setParams(lua_State* L)
 	auto* dlg = LuaWrapper::toType<ImportAssetDialog*>(L, lua_upvalueindex(1));
 	LuaWrapper::checkTableArg(L, 1);
 
-	if (lua_getfield(L, 1, "output_dir") == LUA_TSTRING)
+	lua_getfield(L, 1, "output_dir");
+	if (lua_type(L, -1) == LUA_TSTRING)
 	{
 		copyString(dlg->m_output_dir, LuaWrapper::toType<const char*>(L, -1));
 	}
 	lua_pop(L, 1);
 
-	if (lua_getfield(L, 1, "mesh_output_filename") == LUA_TSTRING)
+	lua_getfield(L, 1, "mesh_output_filename");
+	if (lua_type(L, -1) == LUA_TSTRING)
 	{
 		copyString(dlg->m_mesh_output_filename, LuaWrapper::toType<const char*>(L, -1));
 	}
 	lua_pop(L, 1);
 
-	if (lua_getfield(L, 1, "texture_output_dir") == LUA_TSTRING)
+	lua_getfield(L, 1, "texture_output_dir");
+	if (lua_type(L, -1) == LUA_TSTRING)
 	{
 		copyString(dlg->m_texture_output_dir, LuaWrapper::toType<const char*>(L, -1));
 	}
 	lua_pop(L, 1);
 
-	if (lua_getfield(L, 1, "origin") == LUA_TSTRING)
+	lua_getfield(L, 1, "origin");
+	if (lua_type(L, -1) == LUA_TSTRING)
 	{
 		const char* str = LuaWrapper::toType<const char*>(L, -1);
 		if (equalIStrings(str, "center"))
@@ -1973,7 +1976,7 @@ int setParams(lua_State* L)
 			g_log_error.log("Editor") << "Unknown origin value " << str;
 	}
 	lua_pop(L, 1);
-	if (lua_getfield(L, 1, "origin_bottom") == LUA_TBOOLEAN && LuaWrapper::toType<bool>(L, -1))
+	if (LuaWrapper::getField(L, 1, "origin_bottom") == LUA_TBOOLEAN && LuaWrapper::toType<bool>(L, -1))
 	{
 		dlg->m_fbx_importer->origin = FBXImporter::Origin::BOTTOM;
 	}
@@ -1986,7 +1989,7 @@ int setParams(lua_State* L)
 	LuaWrapper::getOptionalField(L, 1, "time_scale", &dlg->m_fbx_importer->time_scale);
 	LuaWrapper::getOptionalField(L, 1, "to_dds", &dlg->m_convert_to_dds);
 	LuaWrapper::getOptionalField(L, 1, "normal_map", &dlg->m_is_normal_map);
-	if (lua_getfield(L, 1, "orientation") == LUA_TSTRING)
+	if (LuaWrapper::getField(L, 1, "orientation") == LUA_TSTRING)
 	{
 		const char* tmp = LuaWrapper::toType<const char*>(L, -1);
 		if (equalStrings(tmp, "+y")) dlg->m_fbx_importer->orientation = FBXImporter::Orientation::Y_UP;
@@ -1995,7 +1998,7 @@ int setParams(lua_State* L)
 		else if (equalStrings(tmp, "-z")) dlg->m_fbx_importer->orientation = FBXImporter::Orientation::Z_MINUS_UP;
 	}
 	lua_pop(L, 1);
-	if (lua_getfield(L, 1, "root_orientation") == LUA_TSTRING)
+	if (LuaWrapper::getField(L, 1, "root_orientation") == LUA_TSTRING)
 	{
 		const char* tmp = LuaWrapper::toType<const char*>(L, -1);
 		if (equalStrings(tmp, "+y")) dlg->m_fbx_importer->root_orientation = FBXImporter::Orientation::Y_UP;
@@ -2006,7 +2009,7 @@ int setParams(lua_State* L)
 	lua_pop(L, 1);
 
 
-	if (lua_getfield(L, 1, "lods") == LUA_TTABLE)
+	if (LuaWrapper::getField(L, 1, "lods") == LUA_TTABLE)
 	{
 		lua_pushnil(L);
 		int lod_index = 0;
@@ -3061,7 +3064,10 @@ static bool createBillboard(ImportAssetDialog& dialog,
 	const Path& out_path_normal,
 	int texture_size)
 {
-	auto& engine = dialog.getEditor().getEngine();
+	// TODO
+	ASSERT(false);
+	/*
+auto& engine = dialog.getEditor().getEngine();
 	auto& universe = engine.createUniverse(false);
 
 	auto* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
@@ -3174,7 +3180,7 @@ static bool createBillboard(ImportAssetDialog& dialog,
 	bgfx::destroy(normal_texture);
 	Pipeline::destroy(pipeline);
 	engine.destroyUniverse(universe);
-	
+	*/
 	return true;
 }
 

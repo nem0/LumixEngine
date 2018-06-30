@@ -48,6 +48,7 @@ public:
 	virtual ImTextureID createTexture(const char* name, const void* pixels, int w, int h) = 0;
 	virtual void destroyTexture(ImTextureID handle) = 0;
 	virtual ImTextureID loadTexture(const Path& path) = 0;
+	virtual bool isValid(ImTextureID texture) = 0;
 	virtual void unloadTexture(ImTextureID handle) = 0;
 	virtual void addDebugCube(const Vec3& minimum, const Vec3& maximum, u32 color, float life) = 0;
 	virtual void addDebugCross(const Vec3& pos, float size, u32 color, float life) = 0;
@@ -67,7 +68,7 @@ public:
 	virtual void addRectFilled2D(const Vec2& a, const Vec2& b, u32 color) = 0;
 	virtual void getModelInstaces(Array<Entity>& entity, const Frustum& frustum, const Vec3& lod_ref_point, Entity camera) = 0;
 	virtual Frustum getFrustum(Entity camera, const Vec2& a, const Vec2& b) = 0;
-	virtual Vec2 worldToScreenPixels(const Vec3& world) = 0;
+	virtual Vec2 worldToScreenPixels(Entity camera, const Vec3& world) = 0;
 };
 
 

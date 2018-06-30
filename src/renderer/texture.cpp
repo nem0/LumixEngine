@@ -7,7 +7,6 @@
 #include "engine/resource_manager_base.h"
 #include "renderer/texture.h"
 #include "renderer/texture_manager.h"
-#include <bgfx/bgfx.h>
 #include <cmath>
 
 namespace Lumix
@@ -28,7 +27,7 @@ Texture::Texture(const Path& path, ResourceManagerBase& resource_manager, IAlloc
 {
 	bgfx_flags = 0;
 	is_cubemap = false;
-	handle = BGFX_INVALID_HANDLE;
+	handle = ffr::INVALID_TEXTURE;
 }
 
 
@@ -68,7 +67,15 @@ void Texture::destroy()
 
 bool Texture::create(int w, int h, const void* data)
 {
-	return false;
+	handle = ffr::createTexture(w, h, ffr::TextureFormat::RGBA8, data);
+	mips = 1;
+	width = w;
+	height = h;
+
+	const bool isReady = handle.isValid();
+	onCreated(isReady ? State::READY : State::FAILURE);
+
+	return isReady;
 }
 
 
@@ -265,7 +272,9 @@ void Texture::save()
 
 void Texture::onDataUpdated(int x, int y, int w, int h)
 {
-	PROFILE_FUNCTION();
+	ASSERT(false);
+	// TODO
+	/*PROFILE_FUNCTION();
 
 	const bgfx::Memory* mem;
 
@@ -298,13 +307,15 @@ void Texture::onDataUpdated(int x, int y, int w, int h)
 				bytes_per_pixel * w);
 		}
 	}
-	bgfx::updateTexture2D(handle, 0, 0, (uint16_t)x, (uint16_t)y, (uint16_t)w, (uint16_t)h, mem);
+	bgfx::updateTexture2D(handle, 0, 0, (uint16_t)x, (uint16_t)y, (uint16_t)w, (uint16_t)h, mem);*/
 }
 
 
 bool loadRaw(Texture& texture, FS::IFile& file)
 {
-	PROFILE_FUNCTION();
+		ASSERT(false);
+	// TODO
+	/*PROFILE_FUNCTION();
 	size_t size = file.size();
 	texture.bytes_per_pixel = 2;
 	texture.width = (int)sqrt(size / texture.bytes_per_pixel);
@@ -339,7 +350,9 @@ bool loadRaw(Texture& texture, FS::IFile& file)
 	texture.layers = 1;
 	texture.mips = 1;
 	texture.is_cubemap = false;
-	return bgfx::isValid(texture.handle);
+	return bgfx::isValid(texture.handle);*/
+
+		return false;
 }
 
 
@@ -564,27 +577,13 @@ bool Texture::loadTGA(FS::IFile& file)
 
 	bytes_per_pixel = 4;
 	mips = 1;
-	handle = bgfx::createTexture2D(
-		header.width,
-		header.height,
-		false,
-		0,
-		bgfx::TextureFormat::RGBA8,
-		bgfx_flags,
-		nullptr);
-	bgfx::setName(handle, getPath().c_str());
+	handle = ffr::createTexture(header.width, header.height, ffr::TextureFormat::RGBA8, image_dest);
+	// TODO
+	//bgfx::setName(handle, getPath().c_str());
 	// update must be here because texture is immutable otherwise 
-	bgfx::updateTexture2D(handle,
-		0,
-		0,
-		0,
-		0,
-		header.width,
-		header.height,
-		bgfx::copy(image_dest, header.width * header.height * 4));
 	depth = 1;
 	layers = 1;
-	return bgfx::isValid(handle);
+	return handle.isValid();
 }
 
 
@@ -608,32 +607,32 @@ void Texture::removeDataReference()
 }
 
 
-static bool loadDDSorKTX(Texture& texture, FS::IFile& file)
+static bool loadDDS(Texture& texture, FS::IFile& file)
 {
-	bgfx::TextureInfo info;
-	const auto* mem = bgfx::copy(file.getBuffer(), (u32)file.size());
-	texture.handle = bgfx::createTexture(mem, texture.bgfx_flags, 0, &info);
-	bgfx::setName(texture.handle, texture.getPath().c_str());
-	texture.width = info.width;
-	texture.mips = info.numMips;
-	texture.height = info.height;
-	texture.depth = info.depth;
-	texture.layers = info.numLayers;
-	texture.is_cubemap = info.cubeMap;
-	return bgfx::isValid(texture.handle);
+	ffr::TextureInfo info;
+	texture.handle = ffr::loadTexture(file.getBuffer(), (int)file.size(), &info);
+	if (texture.handle.isValid()) {
+		texture.width = info.width;
+		texture.height = info.height;
+		texture.mips = info.mips;
+		texture.depth = info.depth;
+		texture.layers = info.layers;
+		texture.is_cubemap = info.is_cubemap;
+	}
+
+	return texture.handle.isValid();
 }
 
 
 bool Texture::load(FS::IFile& file)
 {
 	PROFILE_FUNCTION();
-	/*
 	const char* path = getPath().c_str();
 	size_t len = getPath().length();
 	bool loaded = false;
-	if (len > 3 && (equalStrings(path + len - 4, ".dds") || equalStrings(path + len - 4, ".ktx")))
+	if (len > 3 && (equalStrings(path + len - 4, ".dds")))
 	{
-		loaded = loadDDSorKTX(*this, file);
+		loaded = loadDDS(*this, file);
 	}
 	else if (len > 3 && equalStrings(path + len - 4, ".raw"))
 	{
@@ -650,18 +649,15 @@ bool Texture::load(FS::IFile& file)
 	}
 
 	m_size = file.size();
-	return true;*/
-
-	return false;
+	return true;
 }
 
 
 void Texture::unload()
 {
-	if (bgfx::isValid(handle))
-	{
-		bgfx::destroy(handle);
-		handle = BGFX_INVALID_HANDLE;
+	if (handle.isValid()) {
+		ffr::destroy(handle);
+		handle = ffr::INVALID_TEXTURE;
 	}
 	data.clear();
 }

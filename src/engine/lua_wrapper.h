@@ -13,6 +13,31 @@ namespace Lumix
 namespace LuaWrapper
 {
 
+inline bool execute(lua_State* L
+	, StringView content
+	, const char* name
+	, int nresults)
+{
+	if (luaL_loadbuffer(L, content.begin, content.length(), name) != 0) {
+		g_log_error.log("Engine") << name << ": " << lua_tostring(L, -1);
+		lua_pop(L, 1);
+		return false;
+	}
+
+	if (lua_pcall(L, 0, nresults, 0) != 0)
+	{
+		g_log_error.log("Engine") << name << ": " << lua_tostring(L, -1);
+		lua_pop(L, 1);
+		return false;
+	}
+	return true;
+}
+
+inline int getField(lua_State* L, int idx, const char* k)
+{
+	lua_getfield(L, idx, k);
+	return lua_type(L, -1);
+}
 
 template <typename T> inline T toType(lua_State* L, int index)
 {
@@ -190,51 +215,51 @@ template <typename T> inline bool isType(lua_State* L, int index)
 }
 template <> inline bool isType<int>(lua_State* L, int index)
 {
-	return lua_isinteger(L, index) != 0;
+	return lua_isnumber(L, index) != 0;
 }
 template <> inline bool isType<u16>(lua_State* L, int index)
 {
-	return lua_isinteger(L, index) != 0;
+	return lua_isnumber(L, index) != 0;
 }
 template <> inline bool isType<Entity>(lua_State* L, int index)
 {
-	return lua_isinteger(L, index) != 0;
+	return lua_isnumber(L, index) != 0;
 }
 template <> inline bool isType<ComponentType>(lua_State* L, int index)
 {
-	return lua_isinteger(L, index) != 0;
+	return lua_isnumber(L, index) != 0;
 }
 template <> inline bool isType<Vec3>(lua_State* L, int index)
 {
-	return lua_istable(L, index) != 0 && lua_rawlen(L, index) == 3;
+	return lua_istable(L, index) != 0 && lua_objlen(L, index) == 3;
 }
 template <> inline bool isType<Vec4>(lua_State* L, int index)
 {
-	return lua_istable(L, index) != 0 && lua_rawlen(L, index) == 4;
+	return lua_istable(L, index) != 0 && lua_objlen(L, index) == 4;
 }
 template <> inline bool isType<Vec2>(lua_State* L, int index)
 {
-	return lua_istable(L, index) != 0 && lua_rawlen(L, index) == 2;
+	return lua_istable(L, index) != 0 && lua_objlen(L, index) == 2;
 }
 template <> inline bool isType<Matrix>(lua_State* L, int index)
 {
-	return lua_istable(L, index) != 0 && lua_rawlen(L, index) == 16;
+	return lua_istable(L, index) != 0 && lua_objlen(L, index) == 16;
 }
 template <> inline bool isType<Quat>(lua_State* L, int index)
 {
-	return lua_istable(L, index) != 0 && lua_rawlen(L, index) == 4;
+	return lua_istable(L, index) != 0 && lua_objlen(L, index) == 4;
 }
 template <> inline bool isType<u32>(lua_State* L, int index)
 {
-	return lua_isinteger(L, index) != 0;
+	return lua_isnumber(L, index) != 0;
 }
 template <> inline bool isType<u64>(lua_State* L, int index)
 {
-	return lua_isinteger(L, index) != 0;
+	return lua_isnumber(L, index) != 0;
 }
 template <> inline bool isType<i64>(lua_State* L, int index)
 {
-	return lua_isinteger(L, index) != 0;
+	return lua_isnumber(L, index) != 0;
 }
 template <> inline bool isType<bool>(lua_State* L, int index)
 {
@@ -385,7 +410,8 @@ template <> inline void push(lua_State* L, void* value)
 
 inline void createSystemVariable(lua_State* L, const char* system, const char* var_name, void* value)
 {
-	if (lua_getglobal(L, system) == LUA_TNIL)
+	lua_getglobal(L, system);
+	if (lua_type(L, -1) == LUA_TNIL)
 	{
 		lua_pop(L, 1);
 		lua_newtable(L);
@@ -400,7 +426,8 @@ inline void createSystemVariable(lua_State* L, const char* system, const char* v
 
 inline void createSystemVariable(lua_State* L, const char* system, const char* var_name, int value)
 {
-	if (lua_getglobal(L, system) == LUA_TNIL)
+	lua_getglobal(L, system);
+	if (lua_type(L, -1) == LUA_TNIL)
 	{
 		lua_pop(L, 1);
 		lua_newtable(L);
@@ -415,7 +442,8 @@ inline void createSystemVariable(lua_State* L, const char* system, const char* v
 
 inline void createSystemFunction(lua_State* L, const char* system, const char* var_name, lua_CFunction fn)
 {
-	if (lua_getglobal(L, system) == LUA_TNIL)
+	lua_getglobal(L, system);
+	if (lua_type(L, -1) == LUA_TNIL)
 	{
 		lua_pop(L, 1);
 		lua_newtable(L);
@@ -430,7 +458,8 @@ inline void createSystemFunction(lua_State* L, const char* system, const char* v
 
 inline void createSystemClosure(lua_State* L, const char* system, void* system_ptr, const char* var_name, lua_CFunction fn)
 {
-	if (lua_getglobal(L, system) == LUA_TNIL)
+	lua_getglobal(L, system);
+	if (lua_type(L, -1) == LUA_TNIL)
 	{
 		lua_pop(L, 1);
 		lua_newtable(L);
@@ -502,9 +531,20 @@ inline void checkTableArg(lua_State* L, int index)
 template <typename T>
 inline void getOptionalField(lua_State* L, int idx, const char* field_name, T* out)
 {
-	if (lua_getfield(L, idx, field_name) != LUA_TNIL && isType<T>(L, -1))
+	if (LuaWrapper::getField(L, idx, field_name) != LUA_TNIL && isType<T>(L, -1))
 	{
 		*out = toType<T>(L, -1);
+	}
+	lua_pop(L, 1);
+}
+
+
+inline void getOptionalStringField(lua_State* L, int idx, const char* field_name, char* out, int max_size)
+{
+	if (LuaWrapper::getField(L, idx, field_name) != LUA_TNIL && isType<const char*>(L, -1))
+	{
+		const char* src = toType<const char*>(L, -1);;
+		copyString(out, max_size, src);
 	}
 	lua_pop(L, 1);
 }

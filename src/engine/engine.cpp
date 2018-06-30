@@ -474,7 +474,7 @@ public:
 		g_log_error.getCallback().bind<showLogInVS>();
 
 		m_platform_data = {};
-		m_state = lua_newstate(luaAllocator, &m_allocator);
+		m_state = luaL_newstate();
 		luaL_openlibs(m_state);
 		registerLuaAPI();
 
@@ -587,7 +587,7 @@ public:
 		void visit(const Reflection::Property<int>& prop) override
 		{
 			if (!equalStrings(property_name, prop.name)) return;
-			if (lua_isinteger(L, -1))
+			if (lua_isnumber(L, -1))
 			{
 				int i = (int)lua_tointeger(L, -1);
 				InputBlob input_blob(&i, sizeof(i));
@@ -600,7 +600,7 @@ public:
 		void visit(const Reflection::Property<Entity>& prop) override
 		{
 			if (!equalStrings(property_name, prop.name)) return;
-			if (lua_isinteger(L, -1))
+			if (lua_isnumber(L, -1))
 			{
 				int i = (int)lua_tointeger(L, -1);
 				InputBlob input_blob(&i, sizeof(i));
@@ -745,7 +745,8 @@ public:
 		Entity e = ctx->createEntity(Vec3(0, 0, 0), Quat(0, 0, 0, 1));
 
 		lua_pushvalue(L, 3);
-		if (lua_getfield(L, -1, "parent") != LUA_TNIL)
+		lua_getfield(L, -1, "parent");
+		if (lua_type(L, -1) != LUA_TNIL)
 		{
 			Entity parent = LuaWrapper::toType<Entity>(L, -1);
 			ctx->setParent(parent, e);
@@ -913,12 +914,13 @@ public:
 					}
 					else
 					{
-						if (lua_rawgeti(L, LUA_REGISTRYINDEX, lua_func) != LUA_TFUNCTION)
+						lua_rawgeti(L, LUA_REGISTRYINDEX, lua_func);
+						if (lua_type(L, -1) != LUA_TFUNCTION)
 						{
 							ASSERT(false);
 						}
 
-						if (lua_pcall(L, 0, 0, 0) != LUA_OK)
+						if (lua_pcall(L, 0, 0, 0) != 0)
 						{
 							g_log_error.log("Engine") << lua_tostring(L, -1);
 							lua_pop(L, 1);
@@ -1159,12 +1161,14 @@ public:
 
 	void installLuaPackageLoader() const
 	{
-		if (lua_getglobal(m_state, "package") != LUA_TTABLE)
+		lua_getglobal(m_state, "package");
+		if (lua_type(m_state, -1) != LUA_TTABLE)
 		{
 			g_log_error.log("Engine") << "Lua \"package\" is not a table";
 			return;
 		}
-		if (lua_getfield(m_state, -1, "searchers") != LUA_TTABLE)
+		lua_getfield(m_state, -1, "searchers");
+		if (lua_type(m_state, -1) != LUA_TTABLE)
 		{
 			g_log_error.log("Engine") << "Lua \"package.searchers\" is not a table";
 			return;
@@ -1201,7 +1205,7 @@ public:
 			msg << tmp;
 			lua_pushstring(L, msg);
 		}
-		else if (luaL_loadbuffer(L, (const char*)file->getBuffer(), file->size(), tmp) != LUA_OK)
+		else if (luaL_loadbuffer(L, (const char*)file->getBuffer(), file->size(), tmp) != 0)
 		{
 			g_log_error.log("Engine") << "Failed to load package " << tmp << ": " << lua_tostring(L, -1);
 		}
@@ -1209,24 +1213,7 @@ public:
 		return 1;
 	}
 
-
-	static void* luaAllocator(void* ud, void* ptr, size_t osize, size_t nsize)
-	{
-		auto& allocator = *static_cast<IAllocator*>(ud);
-		if (nsize == 0)
-		{
-			allocator.deallocate(ptr);
-			return nullptr;
-		}
-		if (nsize > 0 && ptr == nullptr) return allocator.allocate(nsize);
-
-		void* new_mem = allocator.allocate(nsize);
-		copyMemory(new_mem, ptr, Math::minimum(osize, nsize));
-		allocator.deallocate(ptr);
-		return new_mem;
-	}
-
-
+	
 	~EngineImpl()
 	{
 		for (Resource* res : m_lua_resources)
@@ -1645,14 +1632,14 @@ public:
 
 	void runScript(const char* src, int src_length, const char* path) override
 	{
-		if (luaL_loadbuffer(m_state, src, src_length, path) != LUA_OK)
+		if (luaL_loadbuffer(m_state, src, src_length, path) != 0)
 		{
 			g_log_error.log("Engine") << path << ": " << lua_tostring(m_state, -1);
 			lua_pop(m_state, 1);
 			return;
 		}
 
-		if (lua_pcall(m_state, 0, 0, 0) != LUA_OK)
+		if (lua_pcall(m_state, 0, 0, 0) != 0)
 		{
 			g_log_error.log("Engine") << path << ": " << lua_tostring(m_state, -1);
 			lua_pop(m_state, 1);

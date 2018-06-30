@@ -20,7 +20,6 @@
 #include "lua_script/lua_script_system.h"
 #include "renderer/culling_system.h"
 #include "renderer/font_manager.h"
-#include "renderer/frame_buffer.h"
 #include "renderer/material.h"
 #include "renderer/material_manager.h"
 #include "renderer/model.h"
@@ -1163,6 +1162,9 @@ public:
 
 	void deserializeEnvironmentProbe(IDeserializer& serializer, Entity entity, int scene_version)
 	{
+	// TODO
+	ASSERT(false);
+	/*
 		auto* texture_manager = m_engine.getResourceManager().get(Texture::TYPE);
 		StaticString<MAX_PATH_LENGTH> probe_dir("universes/", m_universe.getName(), "/probes/");
 		EnvironmentProbe& probe = m_environment_probes.insert(entity);
@@ -1195,7 +1197,7 @@ public:
 		probe.radiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
 		probe.radiance->setFlag(BGFX_TEXTURE_MAG_ANISOTROPIC, true);
 
-		m_universe.onComponentCreated(entity, ENVIRONMENT_PROBE_TYPE, this);
+		m_universe.onComponentCreated(entity, ENVIRONMENT_PROBE_TYPE, this);*/
 	}
 
 
@@ -1669,6 +1671,9 @@ public:
 
 	void deserializeEnvironmentProbes(InputBlob& serializer)
 	{
+	// TODO
+	ASSERT(false);
+	/*
 		i32 count;
 		serializer.read(count);
 		m_environment_probes.reserve(count);
@@ -1703,7 +1708,7 @@ public:
 			probe.radiance->setFlag(BGFX_TEXTURE_MAG_ANISOTROPIC, true);
 
 			m_universe.onComponentCreated(entity, ENVIRONMENT_PROBE_TYPE, this);
-		}
+		}*/
 	}
 
 
@@ -3091,56 +3096,6 @@ public:
 	}
 
 
-	static bgfx::TextureHandle* LUA_getTextureHandle(RenderScene* scene, int resource_idx)
-	{
-		Resource* res = scene->getEngine().getLuaResource(resource_idx);
-		if (!res) return nullptr;
-		return &static_cast<Texture*>(res)->handle;
-	}
-
-	
-	static void LUA_setTexturePixel(Texture* texture, int x, int y, u32 value)
-	{
-		if (!texture) return;
-		if (!texture->isReady()) return;
-		if (texture->data.empty()) return;
-		if (texture->bytes_per_pixel != 4) return;
-
-		x = Math::clamp(x, 0, texture->width - 1);
-		y = Math::clamp(y, 0, texture->height - 1);
-
-		((u32*)&texture->data[0])[x + y * texture->width] = value;
-	}
-
-
-	static void LUA_updateTextureData(Texture* texture, int x, int y, int w, int h)
-	{
-		if (!texture) return;
-		if (!texture->isReady()) return;
-		if (texture->data.empty()) return;
-
-		texture->onDataUpdated(x, y, w, h);
-	}
-
-	
-	static int LUA_getTextureWidth(Texture* texture)
-	{
-		if (!texture) return 0;
-		if (!texture->isReady()) return 0;
-
-		return texture->width;
-	}
-
-
-	static int LUA_getTextureHeight(Texture* texture)
-	{
-		if (!texture) return 0;
-		if (!texture->isReady()) return 0;
-
-		return texture->height;
-	}
-
-
 	static float LUA_getTerrainHeightAt(RenderSceneImpl* render_scene, Entity entity, int x, int z)
 	{
 		return render_scene->m_terrains[entity]->getHeight(x, z);
@@ -3208,20 +3163,15 @@ public:
 	}
 
 
+	// TODO
+	/*
 	static bgfx::TextureHandle* LUA_getRenderBuffer(Pipeline* pipeline,
 		const char* framebuffer_name,
 		int renderbuffer_idx)
 	{
-		bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, renderbuffer_idx);
+bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, renderbuffer_idx);
 		return &handle;
-	}
-
-
-	static Texture* LUA_getMaterialTexture(Material* material, int texture_index)
-	{
-		if (!material) return nullptr;
-		return material->getTexture(texture_index);
-	}
+	}*/
 
 
 	static void LUA_setModelInstancePath(IScene* scene, int component, const char* path)
@@ -3662,12 +3612,11 @@ public:
 
 	Matrix getCameraProjection(Entity entity) override
 	{
-		Camera& camera = m_cameras[entity];
+		const Camera& camera = m_cameras[entity];
 		Matrix mtx;
-		float ratio = camera.screen_height > 0 ? camera.screen_width / camera.screen_height : 1;
-		bool is_homogenous_depth = bgfx::getCaps()->homogeneousDepth;
-		if (camera.is_ortho)
-		{
+		const float ratio = camera.screen_height > 0 ? camera.screen_width / camera.screen_height : 1;
+		const bool is_homogenous_depth = ffr::isHomogenousDepth();
+		if (camera.is_ortho) {
 			mtx.setOrtho(-camera.ortho_size * ratio,
 				camera.ortho_size * ratio,
 				-camera.ortho_size,
@@ -3677,8 +3626,7 @@ public:
 				is_homogenous_depth,
 				true);
 		}
-		else
-		{
+		else {
 			mtx.setPerspective(camera.fov, ratio, camera.near, camera.far, is_homogenous_depth, true);
 		}
 		return mtx;
@@ -4473,6 +4421,9 @@ public:
 
 	void reloadEnvironmentProbe(Entity entity) override
 	{
+	// TODO
+	ASSERT(false);
+	/*
 		auto& probe = m_environment_probes[entity];
 		auto* texture_manager = m_engine.getResourceManager().get(Texture::TYPE);
 		if (probe.texture) texture_manager->unload(*probe.texture);
@@ -4495,7 +4446,7 @@ public:
 		probe.radiance = static_cast<Texture*>(texture_manager->load(Path(path)));
 		probe.radiance->setFlag(BGFX_TEXTURE_SRGB, true);
 		probe.radiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
-		probe.radiance->setFlag(BGFX_TEXTURE_MAG_ANISOTROPIC, true);
+		probe.radiance->setFlag(BGFX_TEXTURE_MAG_ANISOTROPIC, true);*/
 	}
 
 
@@ -4752,7 +4703,10 @@ public:
 
 	void allocateCustomMeshes(ModelInstance& r, int count)
 	{
-		if (hasCustomMeshes(r) && r.mesh_count == count) return;
+		// TODO
+	ASSERT(false);
+	/*
+	if (hasCustomMeshes(r) && r.mesh_count == count) return;
 
 		ASSERT(r.model);
 		auto& rm = r.model->getResourceManager();
@@ -4793,7 +4747,7 @@ public:
 		}
 		r.meshes = new_meshes;
 		r.mesh_count = count;
-		r.flags.set(ModelInstance::CUSTOM_MESHES);
+		r.flags.set(ModelInstance::CUSTOM_MESHES);*/
 	}
 
 
@@ -5101,6 +5055,9 @@ public:
 
 	void createEnvironmentProbe(Entity entity)
 	{
+	// TODO
+	ASSERT(false);
+	/*
 		EnvironmentProbe& probe = m_environment_probes.insert(entity);
 		auto* texture_manager = m_engine.getResourceManager().get(Texture::TYPE);
 		probe.texture = static_cast<Texture*>(texture_manager->load(Path("pipelines/pbr/default_probe.dds")));
@@ -5111,7 +5068,7 @@ public:
 		probe.radiance->setFlag(BGFX_TEXTURE_SRGB, true);
 		probe.guid = Math::randGUID();
 
-		m_universe.onComponentCreated(entity, ENVIRONMENT_PROBE_TYPE, this);
+		m_universe.onComponentCreated(entity, ENVIRONMENT_PROBE_TYPE, this);*/
 	}
 
 
@@ -5382,14 +5339,9 @@ void RenderScene::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(setPipelineScene);
 	REGISTER_FUNCTION(getPipelineScene);
 	REGISTER_FUNCTION(pipelineRender);
-	REGISTER_FUNCTION(getRenderBuffer);
-	REGISTER_FUNCTION(getMaterialTexture);
-	REGISTER_FUNCTION(getTextureWidth);
-	REGISTER_FUNCTION(getTextureHeight);
-	REGISTER_FUNCTION(getTexturePixel);
-	REGISTER_FUNCTION(setTexturePixel);
-	REGISTER_FUNCTION(getTextureHandle);
-	REGISTER_FUNCTION(updateTextureData);
+	// TODO
+	/*
+	REGISTER_FUNCTION(getRenderBuffer);*/
 	REGISTER_FUNCTION(setModelInstanceMaterial);
 	REGISTER_FUNCTION(setModelInstancePath);
 	REGISTER_FUNCTION(getModelBoneIndex);

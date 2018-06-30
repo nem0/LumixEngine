@@ -1,8 +1,8 @@
 #include "renderer/material.h"
 #include "engine/crc32.h"
 #include "engine/fs/file_system.h"
-#include "engine/json_serializer.h"
 #include "engine/log.h"
+#include "engine/lua_wrapper.h"
 #include "engine/path_utils.h"
 #include "engine/profiler.h"
 #include "engine/resource_manager.h"
@@ -12,7 +12,6 @@
 #include "renderer/renderer.h"
 #include "renderer/shader.h"
 #include "renderer/texture.h"
-
 
 namespace Lumix
 {
@@ -40,7 +39,9 @@ Material::Material(const Path& path, ResourceManagerBase& resource_manager, IAll
 	, m_uniforms(allocator)
 	, m_allocator(allocator)
 	, m_texture_count(0)
-	, m_render_states(BGFX_STATE_CULL_CW)
+	// TODO
+/*
+	, m_render_states(BGFX_STATE_CULL_CW)*/
 	, m_color(1, 1, 1, 1)
 	, m_metallic(0)
 	, m_roughness(1.0f)
@@ -134,10 +135,12 @@ void Material::setDefine(u8 define_idx, bool enabled)
 
 void Material::unload()
 {
+	// TODO
+/*
 	if(m_command_buffer != &DEFAULT_COMMAND_BUFFER) m_allocator.deallocate(m_command_buffer);
 	m_command_buffer = &DEFAULT_COMMAND_BUFFER;
 	m_uniforms.clear();
-
+	*/
 	ResourceManagerBase* texture_manager = m_resource_manager.getOwner().get(Texture::TYPE);
 	for (int i = 0; i < m_texture_count; i++)
 	{
@@ -163,8 +166,11 @@ void Material::unload()
 }
 
 
-bool Material::save(JsonSerializer& serializer)
+bool Material::save(OutputBlob& blob)
 {
+		// TODO
+	ASSERT(false);
+/*
 	if(!isReady()) return false;
 	if(!m_shader) return false;
 
@@ -294,13 +300,16 @@ bool Material::save(JsonSerializer& serializer)
 		serializer.serializeArrayItem(m_color.z);
 		serializer.serializeArrayItem(m_color.w);
 	serializer.endArray();
-	serializer.endObject();
+	serializer.endObject();*/
 	return true;
 }
 
 
-void Material::deserializeCustomFlags(JsonDeserializer& serializer)
+void Material::deserializeCustomFlags(lua_State* L)
 {
+		// TODO
+	ASSERT(false);
+/*
 	m_custom_flags = 0;
 	serializer.deserializeArrayBegin();
 	while (!serializer.isArrayEnd())
@@ -309,13 +318,16 @@ void Material::deserializeCustomFlags(JsonDeserializer& serializer)
 		serializer.deserializeArrayItem(tmp, lengthOf(tmp), "");
 		setCustomFlag(getCustomFlag(tmp));
 	}
-	serializer.deserializeArrayEnd();
+	serializer.deserializeArrayEnd();*/
 }
 
 
-void Material::deserializeDefines(JsonDeserializer& serializer)
+void Material::deserializeDefines(lua_State* L)
 {
-	auto& renderer = static_cast<MaterialManager&>(m_resource_manager).getRenderer();
+			// TODO
+	ASSERT(false);
+/*
+auto& renderer = static_cast<MaterialManager&>(m_resource_manager).getRenderer();
 	serializer.deserializeArrayBegin();
 	m_define_mask = 0;
 	while (!serializer.isArrayEnd())
@@ -324,13 +336,16 @@ void Material::deserializeDefines(JsonDeserializer& serializer)
 		serializer.deserializeArrayItem(tmp, lengthOf(tmp), "");
 		m_define_mask |= 1 << renderer.getShaderDefineIdx(tmp);
 	}
-	serializer.deserializeArrayEnd();
+	serializer.deserializeArrayEnd();*/
 }
 
 
-void Material::deserializeUniforms(JsonDeserializer& serializer)
+void Material::deserializeUniforms(lua_State* L)
 {
-	serializer.deserializeArrayBegin();
+			// TODO
+	ASSERT(false);
+/*
+serializer.deserializeArrayBegin();
 	m_uniforms.clear();
 	while (!serializer.isArrayEnd())
 	{
@@ -398,7 +413,7 @@ void Material::deserializeUniforms(JsonDeserializer& serializer)
 		}
 		serializer.deserializeObjectEnd();
 	}
-	serializer.deserializeArrayEnd();
+	serializer.deserializeArrayEnd();*/
 }
 
 
@@ -440,7 +455,6 @@ void Material::setRenderLayer(int layer)
 void Material::setTexture(int i, Texture* texture)
 {
 	Texture* old_texture = i < m_texture_count ? m_textures[i] : nullptr;
-
 	if (!texture && m_shader && m_shader->m_texture_slots[i].default_texture)
 	{
 		texture = m_shader->m_texture_slots[i].default_texture;
@@ -469,8 +483,9 @@ void Material::setTexture(int i, Texture* texture)
 			}
 		}
 
-		createCommandBuffer();
-		m_shader_instance = &m_shader->getInstance(m_define_mask);
+		// TODO
+		//createCommandBuffer();
+		//m_shader_instance = &m_shader->getInstance(m_define_mask);
 	}
 }
 
@@ -484,7 +499,7 @@ void Material::setShader(const Path& path)
 
 void Material::createCommandBuffer()
 {
-	if (m_command_buffer != &DEFAULT_COMMAND_BUFFER) m_allocator.deallocate(m_command_buffer);
+/*	if (m_command_buffer != &DEFAULT_COMMAND_BUFFER) m_allocator.deallocate(m_command_buffer);
 	m_command_buffer = &DEFAULT_COMMAND_BUFFER;
 	if (!m_shader) return;
 
@@ -532,12 +547,16 @@ void Material::createCommandBuffer()
 	generator.end();
 
 	m_command_buffer = (u8*)m_allocator.allocate(generator.getSize());
-	generator.getData(m_command_buffer);
+	generator.getData(m_command_buffer);*/
+	ASSERT(false);
+	// TODO
 }
 
 
 void Material::onBeforeReady()
 {
+	// TODO
+/*
 	if (!m_shader) return;
 
 	for(int i = 0; i < m_shader->m_uniforms.size(); ++i)
@@ -593,7 +612,7 @@ void Material::onBeforeReady()
 	}
 
 	createCommandBuffer();
-	m_shader_instance = &m_shader->getInstance(m_define_mask);
+	m_shader_instance = &m_shader->getInstance(m_define_mask);*/
 }
 
 
@@ -621,7 +640,7 @@ void Material::setShader(Shader* shader)
 }
 
 
-const char* Material::getTextureUniform(int i)
+const char* Material::getTextureUniform(int i) const
 {
 	if (i < m_shader->m_texture_slot_count) return m_shader->m_texture_slots[i].uniform;
 	return "";
@@ -630,6 +649,9 @@ const char* Material::getTextureUniform(int i)
 
 Texture* Material::getTextureByUniform(const char* uniform) const
 {
+	// TODO
+	ASSERT(false);
+/*
 	if (!m_shader) return nullptr;
 
 	for (int i = 0, c = m_shader->m_texture_slot_count; i < c; ++i)
@@ -638,13 +660,16 @@ Texture* Material::getTextureByUniform(const char* uniform) const
 		{
 			return m_textures[i];
 		}
-	}
+	}*/
 	return nullptr;
 }
 
 
 bool Material::isTextureDefine(u8 define_idx) const
 {
+	// TODO
+	ASSERT(false);
+/*
 	if (!m_shader) return false;
 
 	for (int i = 0, c = m_shader->m_texture_slot_count; i < c; ++i)
@@ -653,13 +678,16 @@ bool Material::isTextureDefine(u8 define_idx) const
 		{
 			return true;
 		}
-	}
+	}*/
 	return false;
 }
 
-bool Material::deserializeTexture(JsonDeserializer& serializer, const char* material_dir)
+bool Material::deserializeTexture(lua_State* L, const char* material_dir)
 {
-	char path[MAX_PATH_LENGTH];
+		// TODO
+	ASSERT(false);
+/*
+char path[MAX_PATH_LENGTH];
 	serializer.deserializeObjectBegin();
 	char label[256];
 	bool keep_data = false;
@@ -764,7 +792,7 @@ bool Material::deserializeTexture(JsonDeserializer& serializer, const char* mate
 		}
 	}
 	serializer.deserializeObjectEnd();
-	++m_texture_count;
+	++m_texture_count;*/
 	return true;
 }
 
@@ -772,38 +800,94 @@ bool Material::deserializeTexture(JsonDeserializer& serializer, const char* mate
 void Material::setAlphaRef(float value)
 {
 	m_alpha_ref = value;
-	u8 val = u8(value * 255.0f);
-	m_render_states &= ~BGFX_STATE_ALPHA_REF_MASK;
-	m_render_states |= BGFX_STATE_ALPHA_REF(val);
 }
 
 
 void Material::enableBackfaceCulling(bool enable)
 {
-	if (enable)
+		// TODO
+	ASSERT(false);
+/*
+if (enable)
 	{
 		m_render_states |= BGFX_STATE_CULL_CW;
 	}
 	else
 	{
 		m_render_states &= ~BGFX_STATE_CULL_MASK;
-	}
+	}*/
 }
 
 
 bool Material::isBackfaceCulling() const
 {
-	return (m_render_states & BGFX_STATE_CULL_MASK) != 0;
+		// TODO
+	ASSERT(false);
+/*
+return (m_render_states & BGFX_STATE_CULL_MASK) != 0;*/
+	return true;
 }
+
+
+namespace LuaAPI
+{
+
+
+int shader(lua_State* L)
+{
+	const char* path = LuaWrapper::checkArg<const char*>(L, 1);
+	lua_getfield(L, LUA_GLOBALSINDEX, "this");
+	Material* material = (Material*)lua_touserdata(L, -1);
+	lua_pop(L, 1);
+	material->setShader(Path(path));
+	return 0;
+}
+
+
+int texture(lua_State* L)
+{
+	const char* path = LuaWrapper::checkArg<const char*>(L, 1);
+	lua_getfield(L, LUA_GLOBALSINDEX, "this");
+	Material* material = (Material*)lua_touserdata(L, -1);
+	lua_pop(L, 1);
+	const int idx = material->getTextureCount();
+	material->setTexturePath(idx, Path(path));
+	return 0;
+}
+
+
+} // namespace LuaAPI
 
 
 bool Material::load(FS::IFile& file)
 {
 	PROFILE_FUNCTION();
 
-	m_render_states = BGFX_STATE_CULL_CW;
+	lua_State* L = luaL_newstate();
+	lua_pushlightuserdata(L, this);
+	lua_setfield(L, LUA_GLOBALSINDEX, "this");
+	lua_pushcclosure(L, LuaAPI::shader, 0);
+	lua_setfield(L, LUA_GLOBALSINDEX, "shader");
+	lua_pushcclosure(L, LuaAPI::texture, 0);
+	lua_setfield(L, LUA_GLOBALSINDEX, "texture");
+	
 	setAlphaRef(DEFAULT_ALPHA_REF_VALUE);
+
+	const StringView content((const char*)file.getBuffer(), (int)file.size());
+	if (!LuaWrapper::execute(L, content, getPath().c_str(), 0)) {
+		lua_close(L);
+		return false;
+	}
+	lua_close(L);
+	return true;
+
+	// TODO
+	ASSERT(false);
+	/*
+	m_render_states = BGFX_STATE_CULL_CW;
+	
 	m_uniforms.clear();
+	
 	JsonDeserializer serializer(file, getPath(), m_allocator);
 	serializer.deserializeObjectBegin();
 	char label[256];
@@ -851,6 +935,9 @@ bool Material::load(FS::IFile& file)
 		{
 			bool b = true;
 			serializer.deserialize(b, true);
+				// TODO
+	ASSERT(false);
+/*
 			if (b)
 			{
 				m_render_states |= BGFX_STATE_CULL_CW;
@@ -858,7 +945,7 @@ bool Material::load(FS::IFile& file)
 			else
 			{
 				m_render_states &= ~BGFX_STATE_CULL_MASK;
-			}
+			}*//*
 		}
 		else if (equalStrings(label, "color"))
 		{
@@ -897,12 +984,11 @@ bool Material::load(FS::IFile& file)
 		}
 		else
 		{
-			g_log_error.log("Renderer") << "Unknown parameter " << label << " in material "
-										  << getPath();
+			g_log_error.log("Renderer") << "Unknown parameter " << label << " in material " << getPath();
 		}
 	}
 	serializer.deserializeObjectEnd();
-
+	*/
 	if (!m_shader)
 	{
 		g_log_error.log("Renderer") << "Material " << getPath() << " without a shader";

@@ -13,7 +13,6 @@
 #include "renderer/render_scene.h"
 #include "engine/universe/universe.h"
 #include <cmath>
-#include <bgfx/bgfx.h>
 
 
 namespace Lumix
@@ -656,7 +655,8 @@ void ScriptedParticleEmitter::update(float dt)
 		}
 }
 
-
+// TODO
+/*
 bgfx::InstanceDataBuffer ScriptedParticleEmitter::generateInstanceBuffer() const
 {
 	bgfx::InstanceDataBuffer buffer;
@@ -716,7 +716,7 @@ bgfx::InstanceDataBuffer ScriptedParticleEmitter::generateInstanceBuffer() const
 				break;
 		}
 	}
-}
+}*/
 
 
 template <typename T>

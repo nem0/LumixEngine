@@ -3,7 +3,7 @@
 
 #include "editor/studio_app.h"
 #include "engine/vec.h"
-#include <bgfx/bgfx.h>
+#include "renderer/ffr/ffr.h"
 
 
 struct ImVec2;
@@ -36,7 +36,7 @@ public:
 	bool isOpen() const { return m_is_open; }
 	void onAction() { m_is_open = !m_is_open; }
 	void onWindowGUI() override;
-	const bgfx::TextureHandle& getTextureHandle() const { return m_texture_handle; }
+	const ffr::TextureHandle& getTextureHandle() const { return m_texture_handle; }
 
 public:
 	bool m_is_open;
@@ -59,7 +59,7 @@ private:
 	StudioApp& m_studio_app;
 	Vec2 m_pos;
 	Vec2 m_size;
-	bgfx::TextureHandle m_texture_handle;
+	ffr::TextureHandle m_texture_handle;
 	struct GUIInterface* m_gui_interface;
 	bool m_is_mouse_captured;
 	bool m_is_mouse_hovering_window;
