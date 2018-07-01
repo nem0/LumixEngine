@@ -395,13 +395,13 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 
 		Vec3 side = crossProduct(n.normalized(), origin);
 
-		vertices[0] = { pos, color, 0, 0 };
+		vertices[0] = { pos, color };
 		for (int i = 0; i <= count; ++i)
 		{
 			float a = angle / count * i;
 
 			Vec3 p = pos + origin * cosf(a) + side * sinf(a);
-			vertices[i + 1] = { p, color, 0, 0 };
+			vertices[i + 1] = { p, color };
 		}
 		for (int i = 0; i < count; ++i)
 		{
