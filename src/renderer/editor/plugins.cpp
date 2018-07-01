@@ -41,7 +41,6 @@
 #include "renderer/shader.h"
 #include "renderer/texture.h"
 #include "scene_view.h"
-#include "shader_compiler.h"
 #include "shader_editor.h"
 #include "stb/stb_image.h"
 #include "stb/stb_image_resize.h"
@@ -479,7 +478,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 			/*
 		m_tile.universe = &engine.createUniverse(false);
 		Renderer* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
-		m_tile.pipeline = Pipeline::create(*renderer, Path("pipelines/main.lua"), "", engine.getAllocator());
+		m_tile.pipeline = Pipeline::create(*renderer, Path("pipelines/main.pln"), "", engine.getAllocator());
 		m_tile.pipeline->load();
 
 		Matrix mtx;
@@ -504,7 +503,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		auto& engine = m_app.getWorldEditor().getEngine();
 		m_universe = &engine.createUniverse(false);
 		auto* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
-		m_pipeline = Pipeline::create(*renderer, Path("pipelines/main.lua"), "", engine.getAllocator());
+		m_pipeline = Pipeline::create(*renderer, Path("pipelines/main.pln"), "", engine.getAllocator());
 		m_pipeline->load();
 
 		auto mesh_entity = m_universe->createEntity({0, 0, 0}, {0, 0, 0, 1});
@@ -1198,7 +1197,7 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		PluginManager& plugin_manager = world_editor.getEngine().getPluginManager();
 		Renderer* renderer = static_cast<Renderer*>(plugin_manager.getPlugin("renderer"));
 		IAllocator& allocator = world_editor.getAllocator();
-		Path pipeline_path("pipelines/main.lua");
+		Path pipeline_path("pipelines/main.pln");
 		m_pipeline = Pipeline::create(*renderer, pipeline_path, "PROBE", allocator);
 		m_pipeline->load();
 
@@ -2427,16 +2426,19 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 		dc.indices_count = indices_count;
 		dc.indices_offset = 0;
 		dc.primitive_type = lines ? ffr::PrimitiveType::LINES : ffr::PrimitiveType::TRIANGLES;
-		dc.shader = m_shader->getProgramHandle();
+		dc.shader = m_shader->getProgram(0).handle;
 		dc.textures_count = 0;
 		dc.tex_buffers_count = 0;
 		dc.vertex_buffer = vertex_buffer;
 		dc.vertex_buffer_offset = 0;
 		dc.vertex_decl = &vertex_decl;
-		dc.state = (u32)ffr::StateFlags::DEPTH_TEST;
+		dc.state = u64(ffr::StateFlags::DEPTH_TEST);
+		dc.attribute_map = nullptr;
 		ffr::setUniformMatrix4f(dc.shader, "u_model", 1, &mtx.m11);
 		ffr::draw(dc);
 
+		ffr::destroy(index_buffer);
+		ffr::destroy(vertex_buffer);
 	}
 
 
@@ -2604,14 +2606,14 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 						 "in vec4 v_color;\n"
 						 "in vec2 v_uv;\n"
 						 "out vec4 o_color;\n"
-						 "uniform sampler2D test;\n"
+						 "uniform sampler2D u_texture;\n"
 						 "void main() {\n"
-						 "	vec4 tc = textureLod(test, v_uv, 0);\n"
+						 "	vec4 tc = textureLod(u_texture, v_uv, 0);\n"
 						 "	o_color = v_color * tc;\n"
 						 "}\n";
 		const char* srcs[] = {vs, fs};
 		ffr::ShaderType types[] = {ffr::ShaderType::VERTEX, ffr::ShaderType::FRAGMENT};
-		m_shader = ffr::createProgram(srcs, types, 2);
+		m_shader = ffr::createProgram(srcs, types, 2, nullptr, 0, "imgui shader");
 	}
 
 
@@ -2676,6 +2678,7 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 		beginViewportRender();
 
 		ffr::pushDebugGroup("imgui");
+		ffr::setUniform1i(m_shader, "u_texture", 0);
 		for (int i = 0; i < draw_data->CmdListsCount; ++i)
 		{
 			ImDrawList* cmd_list = draw_data->CmdLists[i];
@@ -2692,10 +2695,9 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 	void drawGUICmdList(ImDrawList* cmd_list)
 	{
 		Renderer* renderer = static_cast<Renderer*>(m_engine.getPluginManager().getPlugin("renderer"));
-		int pass_idx = renderer->getPassIdx("MAIN");
 
-		int num_indices = cmd_list->IdxBuffer.size();
-		int num_vertices = cmd_list->VtxBuffer.size();
+		const int num_indices = cmd_list->IdxBuffer.size();
+		const int num_vertices = cmd_list->VtxBuffer.size();
 
 		ffr::update(
 			m_index_buffer, &cmd_list->IdxBuffer[0], m_ib_offset * sizeof(u16), num_indices * sizeof(u16));
@@ -2716,36 +2718,16 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 			}
 
 			if (0 == pcmd->ElemCount) continue;
-			/*
-			bgfx::setScissor(
-				u16(Math::maximum(pcmd->ClipRect.x, 0.0f)),
-				u16(Math::maximum(pcmd->ClipRect.y, 0.0f)),
-				u16(Math::minimum(pcmd->ClipRect.z, 65535.0f) - Math::maximum(pcmd->ClipRect.x, 0.0f)),
-				u16(Math::minimum(pcmd->ClipRect.w, 65535.0f) - Math::maximum(pcmd->ClipRect.y, 0.0f)));
-				*/
 			/*			auto material = m_material;
-						const auto& texture_id =
-							pcmd->TextureId ? *(bgfx::TextureHandle*)pcmd->TextureId : material->getTexture(0)->handle;
-						auto texture_uniform = material->getShader()->m_texture_slots[0].uniform_handle;
 						u64 render_states = material->getRenderStates();
 						if (&m_scene_view.getTextureHandle() == &texture_id || &m_game_view.getTextureHandle() ==
 			   &texture_id)
 						{
 							render_states &= ~BGFX_STATE_BLEND_MASK;
 						}
-						bgfx::setTexture(0, texture_uniform, texture_id);
-						
+			*/
 
-						ShaderInstance& shader_instance = material->getShaderInstance();
-						bgfx::setStencil(BGFX_STENCIL_NONE, BGFX_STENCIL_NONE);
-						bgfx::setState(BGFX_STATE_WRITE_RGB | BGFX_STATE_WRITE_A | BGFX_STATE_WRITE_Z | render_states);
-						bgfx::setVertexBuffer(0, m_vertex_buffer, m_vb_offset, num_vertices);
-						u32 first_index = elem_offset + m_ib_offset;
-						bgfx::setIndexBuffer(m_index_buffer, first_index, pcmd->ElemCount);
-						bgfx::submit(view, shader_instance.getProgramHandle(pass_idx));
-						*/
-
-			u32 first_index = elem_offset + m_ib_offset;
+			const u32 first_index = elem_offset + m_ib_offset;
 
 			ffr::VertexDecl decl;
 			decl.addAttribute(2, ffr::AttributeType::FLOAT, false, false);
@@ -2753,6 +2735,7 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 			decl.addAttribute(4, ffr::AttributeType::U8, true, false);
 
 			ffr::DrawCall dc;
+			dc.attribute_map = nullptr;
 			dc.state = 0;
 			dc.index_buffer = m_index_buffer;
 			dc.primitive_type = ffr::PrimitiveType::TRIANGLES;
@@ -2771,7 +2754,7 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 				uint(Math::maximum(pcmd->ClipRect.y, 0.0f)),
 				uint(Math::minimum(pcmd->ClipRect.z, 65535.0f) - Math::maximum(pcmd->ClipRect.x, 0.0f)),
 				uint(Math::minimum(pcmd->ClipRect.w, 65535.0f) - Math::maximum(pcmd->ClipRect.y, 0.0f)));
-			ffr::blend();
+			ffr::blending(dc.textures[0].value != m_scene_view.getTextureHandle().value);
 
 			ffr::draw(dc);
 
@@ -2809,29 +2792,16 @@ struct ShaderEditorPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 		action->is_selected.bind<ShaderEditorPlugin, &ShaderEditorPlugin::isOpen>(this);
 		app.addWindowAction(action);
 		m_shader_editor.m_is_open = false;
-
-		m_compiler = LUMIX_NEW(app.getWorldEditor().getAllocator(), ShaderCompiler)(app, app.getLogUI());
-
-		lua_State* L = app.getWorldEditor().getEngine().getState();
-		auto* f = &LuaWrapper::wrapMethodClosure<ShaderCompiler,
-			decltype(&ShaderCompiler::makeUpToDate),
-			&ShaderCompiler::makeUpToDate>;
-		LuaWrapper::createSystemClosure(L, "Editor", m_compiler, "compileShaders", f);
 	}
 
 
-	~ShaderEditorPlugin() { LUMIX_DELETE(m_app.getWorldEditor().getAllocator(), m_compiler); }
-
-
 	const char* getName() const override { return "shader_editor"; }
-	void update(float) override { m_compiler->update(); }
 	void onAction() { m_shader_editor.m_is_open = !m_shader_editor.m_is_open; }
-	void onWindowGUI() override { m_shader_editor.onGUI(*m_compiler); }
+	void onWindowGUI() override { m_shader_editor.onGUI(); }
 	bool hasFocus() override { return m_shader_editor.hasFocus(); }
 	bool isOpen() const { return m_shader_editor.m_is_open; }
 
 	StudioApp& m_app;
-	ShaderCompiler* m_compiler;
 	ShaderEditor m_shader_editor;
 };
 

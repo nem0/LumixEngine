@@ -311,11 +311,9 @@ void Texture::onDataUpdated(int x, int y, int w, int h)
 }
 
 
-bool loadRaw(Texture& texture, FS::IFile& file)
+bool loadRaw(Texture& texture, FS::IFile& file, IAllocator& allocator)
 {
-		ASSERT(false);
-	// TODO
-	/*PROFILE_FUNCTION();
+	PROFILE_FUNCTION();
 	size_t size = file.size();
 	texture.bytes_per_pixel = 2;
 	texture.width = (int)sqrt(size / texture.bytes_per_pixel);
@@ -328,31 +326,20 @@ bool loadRaw(Texture& texture, FS::IFile& file)
 	}
 
 	const u16* src_mem = (const u16*)file.getBuffer();
-	const bgfx::Memory* mem = bgfx::alloc(texture.width * texture.height * sizeof(float));
-	float* dst_mem = (float*)mem->data;
+	Array<float> dst_mem(allocator);
+	dst_mem.resize(texture.width * texture.height * sizeof(float));
 
 	for (int i = 0; i < texture.width * texture.height; ++i)
 	{
 		dst_mem[i] = src_mem[i] / 65535.0f;
 	}
 
-	texture.handle = bgfx::createTexture2D((uint16_t)texture.width,
-		(uint16_t)texture.height,
-		false,
-		1,
-		bgfx::TextureFormat::R32F,
-		texture.bgfx_flags,
-		nullptr);
-	bgfx::setName(texture.handle, texture.getPath().c_str());
-	// update must be here because texture is immutable otherwise 
-	bgfx::updateTexture2D(texture.handle, 0, 0, 0, 0, (uint16_t)texture.width, (uint16_t)texture.height, mem);
+	texture.handle = ffr::createTexture(texture.width, texture.height, ffr::TextureFormat::R32F, &dst_mem[0]);
 	texture.depth = 1;
 	texture.layers = 1;
 	texture.mips = 1;
 	texture.is_cubemap = false;
-	return bgfx::isValid(texture.handle);*/
-
-		return false;
+	return texture.handle.isValid();
 }
 
 
@@ -578,9 +565,6 @@ bool Texture::loadTGA(FS::IFile& file)
 	bytes_per_pixel = 4;
 	mips = 1;
 	handle = ffr::createTexture(header.width, header.height, ffr::TextureFormat::RGBA8, image_dest);
-	// TODO
-	//bgfx::setName(handle, getPath().c_str());
-	// update must be here because texture is immutable otherwise 
 	depth = 1;
 	layers = 1;
 	return handle.isValid();
@@ -636,7 +620,7 @@ bool Texture::load(FS::IFile& file)
 	}
 	else if (len > 3 && equalStrings(path + len - 4, ".raw"))
 	{
-		loaded = loadRaw(*this, file);
+		loaded = loadRaw(*this, file, allocator);
 	}
 	else
 	{

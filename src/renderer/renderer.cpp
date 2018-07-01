@@ -16,10 +16,12 @@
 #include "engine/universe/universe.h"
 #include "renderer/draw2d.h"
 #include "renderer/font_manager.h"
+#include "renderer/global_state_uniforms.h"
 #include "renderer/material.h"
 #include "renderer/material_manager.h"
 #include "renderer/model.h"
 #include "renderer/model_manager.h"
+#include "renderer/pipeline.h"
 #include "renderer/render_scene.h"
 #include "renderer/shader.h"
 #include "renderer/shader_manager.h"
@@ -278,14 +280,14 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 		, m_material_manager(*this, m_allocator)
 		, m_shader_manager(*this, m_allocator)
 		, m_font_manager(nullptr)
-		, m_passes(m_allocator)
 		, m_shader_defines(m_allocator)
 		, m_layers(m_allocator)
 		, m_vsync(true)
 		, m_main_pipeline(nullptr)
-		, m_encoder_list_mutex(false)
 	{
 		ffr::init(m_allocator);
+
+		m_global_state_uniforms.create();
 
 		registerProperties(engine.getAllocator());
 		char cmd_line[4096];
@@ -309,25 +311,17 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 		m_font_manager = LUMIX_NEW(m_allocator, FontManager)(*this, m_allocator);
 		m_font_manager->create(FontResource::TYPE, manager);
 
-		m_current_pass_hash = crc32("MAIN");
-		m_view_counter = 0;
-		
-		m_default_shader = static_cast<Shader*>(m_shader_manager.load(Path("pipelines/common/default.shd")));
+		m_default_shader = static_cast<Shader*>(m_shader_manager.load(Path("pipelines/standard.shd")));
 		RenderScene::registerLuaAPI(m_engine.getState());
 		m_layers.emplace("default");
 		m_layers.emplace("transparent");
 		m_layers.emplace("water");
 		m_layers.emplace("fur");
-
-		m_global_uniforms_buffer = ffr::createBuffer(64*1024, nullptr);
-		ffr::bindUniformBuffer(0, m_global_uniforms_buffer);
 	}
 
 
 	~RendererImpl()
 	{
-		ffr::destroy(m_global_uniforms_buffer);
-
 		m_shader_manager.unload(*m_default_shader);
 		m_texture_manager.destroy();
 		m_model_manager.destroy();
@@ -335,6 +329,8 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 		m_shader_manager.destroy();
 		m_font_manager->destroy();
 		LUMIX_DELETE(m_allocator, m_font_manager);
+
+		m_global_state_uniforms.destroy();
 
 		frame(false);
 		frame(false);
@@ -344,6 +340,12 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	void setMainPipeline(Pipeline* pipeline) override
 	{
 		m_main_pipeline = pipeline;
+	}
+
+
+	GlobalStateUniforms& getGlobalStateUniforms() override
+	{
+		return m_global_state_uniforms;
 	}
 
 
@@ -391,8 +393,7 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	const char* getName() const override { return "renderer"; }
 	Engine& getEngine() override { return m_engine; }
 	int getShaderDefinesCount() const override { return m_shader_defines.size(); }
-	const char* getShaderDefine(int define_idx) override { return m_shader_defines[define_idx]; }
-	const char* getPassName(int idx) override { return m_passes[idx]; }
+	const char* getShaderDefine(int define_idx) const override { return m_shader_defines[define_idx]; }
 // TODO
 	/*
 	const bgfx::UniformHandle& getMaterialColorUniform() const override { static bgfx::UniformHandle v; return v; }
@@ -400,8 +401,6 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	*/
 	void makeScreenshot(const Path& filename) override {  }
 	void resize(int w, int h) override {  }
-	int getViewCounter() const override { return m_view_counter; }
-	void viewCounterAdd() override { ++m_view_counter; }
 	Shader* getDefaultShader() override { return m_default_shader; }
 
 
@@ -425,31 +424,6 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	}
 
 
-	int getPassIdx(const char* pass) override
-	{
-		if(stringLength(pass) > sizeof(m_passes[0].data))
-		{
-			g_log_error.log("Renderer") << "Pass name \"" << pass << "\" is too long.";
-			return 0;
-		}
-		for (int i = 0; i < m_passes.size(); ++i)
-		{
-			if (m_passes[i] == pass)
-			{
-				return i;
-			}
-		}
-
-		m_passes.emplace(pass);
-		return m_passes.size() - 1;
-	}
-
-
-	ffr::BufferHandle getGlobalUniformsBuffer() const {
-		return m_global_uniforms_buffer;
-	}
-
-
 	void frame(bool capture) override
 	{
 	}
@@ -461,7 +435,6 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 
 	Engine& m_engine;
 	IAllocator& m_allocator;
-	Array<ShaderCombinations::Pass> m_passes;
 	Array<ShaderDefine> m_shader_defines;
 	Array<Layer> m_layers;
 	TextureManager m_texture_manager;
@@ -469,13 +442,10 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	FontManager* m_font_manager;
 	ShaderManager m_shader_manager;
 	ModelManager m_model_manager;
-	u32 m_current_pass_hash;
-	int m_view_counter;
 	bool m_vsync;
 	Shader* m_default_shader;
 	Pipeline* m_main_pipeline;
-	MT::SpinMutex m_encoder_list_mutex;
-	ffr::BufferHandle m_global_uniforms_buffer;
+	GlobalStateUniforms m_global_state_uniforms;
 };
 
 

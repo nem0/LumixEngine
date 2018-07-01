@@ -16,9 +16,9 @@ namespace FS
 	struct IFile;
 }
 
+class Renderer;
 class ResourceManager;
 class Shader;
-struct ShaderInstance;
 class Texture;
 
 
@@ -43,19 +43,21 @@ public:
 	static const ResourceType TYPE;
 
 public:
-	Material(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
+	Material(const Path& path, ResourceManagerBase& resource_manager, Renderer& renderer, IAllocator& allocator);
 	~Material();
 
 	ResourceType getType() const override { return TYPE; }
 
+	Renderer& getRenderer() { return m_renderer; }
+
 	float getMetallic() const { return m_metallic; }
-	void setMetallic(float value) { m_metallic = value; createCommandBuffer(); }
+	void setMetallic(float value) { m_metallic = value; }
 	float getRoughness() const { return m_roughness; }
-	void setRoughness(float value) { m_roughness = value; createCommandBuffer(); }
+	void setRoughness(float value) { m_roughness = value; }
 	float getEmission() const { return m_emission; }
-	void setEmission(float value) { m_emission = value; createCommandBuffer(); }
+	void setEmission(float value) { m_emission = value; }
 	Vec4 getColor() const { return m_color; }
-	void setColor(const Vec4& color) { m_color = color;  createCommandBuffer(); }
+	void setColor(const Vec4& color) { m_color = color; }
 	float getAlphaRef() const { return m_alpha_ref; }
 	void setAlphaRef(float value);
 	u64 getRenderStates() const { return m_render_states; }
@@ -77,10 +79,6 @@ public:
 	int getUniformCount() const { return m_uniforms.size(); }
 	Uniform& getUniform(int index) { return m_uniforms[index]; }
 	const Uniform& getUniform(int index) const { return m_uniforms[index]; }
-	ShaderInstance& getShaderInstance() { ASSERT(m_shader_instance); return *m_shader_instance; }
-	const ShaderInstance& getShaderInstance() const { ASSERT(m_shader_instance); return *m_shader_instance; }
-	const u8* getCommandBuffer() const { return m_command_buffer; }
-	void createCommandBuffer();
 	int getRenderLayer() const { return m_render_layer; }
 	void setRenderLayer(int layer);
 	u64 getRenderLayerMask() const { return m_render_layer_mask; }
@@ -88,8 +86,8 @@ public:
 	void setLayersCount(int layers);
 
 	void setDefine(u8 define_idx, bool enabled);
-	bool hasDefine(u8 define_idx) const;
 	bool isDefined(u8 define_idx) const;
+	u32 getDefineMask() const { return m_define_mask; }
 
 	void setCustomFlag(u32 flag) { m_custom_flags |= flag; }
 	void unsetCustomFlag(u32 flag) { m_custom_flags &= ~flag; }
@@ -104,28 +102,26 @@ private:
 	void unload() override;
 	bool load(FS::IFile& file) override;
 
-	bool deserializeTexture(lua_State* L, const char* material_dir);
 	void deserializeUniforms(lua_State* L);
-	void deserializeDefines(lua_State* L);
 	void deserializeCustomFlags(lua_State* L);
 
 private:
 	static const int MAX_TEXTURE_COUNT = 16;
 
-	Shader* m_shader;
-	ShaderInstance* m_shader_instance;
-	Texture* m_textures[MAX_TEXTURE_COUNT];
-	int m_texture_count;
-	Array<Uniform> m_uniforms;
 	IAllocator& m_allocator;
-	u64 m_render_states;
-	Vec4 m_color;
-	float m_alpha_ref;
+	Renderer& m_renderer;
+	Shader* m_shader;
 	float m_metallic;
 	float m_roughness;
 	float m_emission;
+	Vec4 m_color;
+	float m_alpha_ref;
+	Texture* m_textures[MAX_TEXTURE_COUNT];
+	int m_texture_count;
 	u32 m_define_mask;
-	u8* m_command_buffer;
+	u32 m_render_states;
+	
+	Array<Uniform> m_uniforms;
 	u32 m_custom_flags;
 	int m_render_layer;
 	u64 m_render_layer_mask;

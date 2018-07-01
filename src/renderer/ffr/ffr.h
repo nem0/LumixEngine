@@ -30,10 +30,11 @@ enum class LogLevel : uint {
 };
 
 
-enum class StateFlags : u32 {
-	DEPTH_TEST = 1 << 0,
-	CULL_FACE = 1 << 1,
-	WIREFRAME = 1 << 2
+enum class StateFlags : u64 {
+	WIREFRAME = 1 << 0,
+	DEPTH_TEST = 1 << 1,
+	CULL_FRONT = 1 << 2,
+	CULL_BACK = 1 << 3
 };
 
 
@@ -108,7 +109,8 @@ struct DrawCall {
 	BufferHandle vertex_buffer;
 	uint vertex_buffer_offset;
 	const VertexDecl* vertex_decl;
-	u32 state;
+	const int* attribute_map;
+	u64 state;
 };
 
 struct TextureInfo {
@@ -130,18 +132,18 @@ void clear(uint flags, const float* color, float depth);
 
 void scissor(uint x, uint y, uint w, uint h);
 void viewport(uint x, uint y, uint w, uint h);
-void blend();
+void blending(int mode);
 
-ProgramHandle createProgram(const char** srcs, const ShaderType* types, int num);
+ProgramHandle createProgram(const char** srcs, const ShaderType* types, int num, const char** prefixes, int prefixes_count, const char* name);
 BufferHandle createBuffer(size_t size, const void* data);
 TextureHandle createTexture(uint w, uint h, TextureFormat format, const void* data);
 TextureHandle loadTexture(const void* data, int size, TextureInfo* info);
 FramebufferHandle createFramebuffer(uint renderbuffers_count, const TextureHandle* renderbuffers);
 
 void setState(u32 flags);
-void uniformBlockBinding(ProgramHandle program, uint index, uint binding);
+void uniformBlockBinding(ProgramHandle program, const char* block_name, uint binding);
 void update(BufferHandle buffer, const void* data, size_t offset, size_t size);
-void bindUniformBuffer(uint index, BufferHandle buffer);
+void bindUniformBuffer(uint index, BufferHandle buffer, size_t offset, size_t size);
 
 void destroy(ProgramHandle program);
 void destroy(BufferHandle buffer);
@@ -152,6 +154,7 @@ void draw(const DrawCall& draw_call);
 
 void pushDebugGroup(const char* msg);
 void popDebugGroup();
+int getAttribLocation(ProgramHandle program, const char* uniform_name);
 void setUniform1i(ProgramHandle program, const char* uniform_name, int value);
 void setUniform2f(ProgramHandle program, const char* uniform_name, uint count, const float* value);
 void setUniform4f(ProgramHandle program, const char* uniform_name, uint count, const float* value);
