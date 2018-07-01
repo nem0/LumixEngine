@@ -30,7 +30,8 @@ namespace Lumix
 struct PipelineImpl LUMIX_FINAL : Pipeline
 {
 	PipelineImpl(Renderer& renderer, const Path& path, const char* define, IAllocator& allocator)
-		: m_renderer(renderer)
+		: m_allocator(allocator)
+		, m_renderer(renderer)
 		, m_path(path)
 		, m_lua_state(nullptr)
 		, m_is_ready(false)
@@ -47,7 +48,9 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 	{
 		ShaderManager& shader_manager = renderer.getShaderManager();
 		m_draw2d_shader = (Shader*)shader_manager.load(Path("pipelines/draw2d.shd"));
+		m_debug_shape_shader = (Shader*)shader_manager.load(Path("pipelines/debug_shape.shd"));
 		
+
 		FontAtlas& font_atlas = m_renderer.getFontManager().getFontAtlas();
 		m_draw2d.FontTexUvWhitePixel = font_atlas.TexUvWhitePixel;
 		m_draw2d.Clear();
@@ -59,6 +62,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 	~PipelineImpl()
 	{
 		m_draw2d_shader->getResourceManager().unload(*m_draw2d_shader);
+		m_debug_shape_shader->getResourceManager().unload(*m_debug_shape_shader);
 	}
 
 
@@ -267,31 +271,18 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		m_stats = {};
 /*		m_applied_camera = INVALID_ENTITY;
 		m_global_light_shadowmap = nullptr;
-		m_current_view = nullptr;
-		m_view_idx = -1;
 		m_layer_mask = 0;
-		m_pass_idx = -1;
 		m_current_framebuffer = m_default_framebuffer;
 		m_instance_data_idx = 0;
 		m_point_light_shadowmaps.clear();
-		clearLayerToViewMap();
-		for (int i = 0; i < lengthOf(m_terrain_instances); ++i)
-		{
-			m_terrain_instances[i].m_count = 0;
-		}
-		for (int i = 0; i < lengthOf(m_instances_data); ++i)
-		{
-			m_instances_data[i].buffer.data = nullptr;
-			m_instances_data[i].instance_count = 0;
-		}
 		*/
 		clearBuffers();
 
 		const Entity global_light = m_scene->getActiveGlobalLight();
 		if(global_light.isValid()) {
 			GlobalStateUniforms& uniforms = m_renderer.getGlobalStateUniforms();
-			uniforms.state.light_direction = m_scene->getUniverse().getRotation(global_light) * Vec3(0, 0, 1); 
-			uniforms.state.light_color = m_scene->getGlobalLightColor(global_light);
+			uniforms.state.light_direction = Vec4(m_scene->getUniverse().getRotation(global_light).rotate(Vec3(0, 0, -1)), 0); 
+			uniforms.state.light_color = Vec4(m_scene->getGlobalLightColor(global_light), 1);
 			uniforms.state.light_intensity = m_scene->getGlobalLightIntensity(global_light);
 			uniforms.state.light_indirect_intensity = m_scene->getGlobalLightIndirectIntensity(global_light);
 			uniforms.update();
@@ -311,9 +302,65 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		else {
 			lua_pop(m_lua_state, 1);
 		}
-		//finishInstances();
 		ffr::setFramebuffer(ffr::INVALID_FRAMEBUFFER);
 		return success;
+	}
+
+
+	void renderDebugLines()
+	{
+		const Array<DebugLine>& lines = m_scene->getDebugLines();
+		if (lines.empty() || !m_debug_shape_shader->isReady()) return;
+
+		const Shader::Program& shader = m_debug_shape_shader->getProgram(0);
+		struct BaseVertex {
+			Vec3 pos;
+			u32 color;
+		};
+
+		Array<BaseVertex> vertices(m_allocator);
+		vertices.resize(lines.size() * 2);
+		for (int j = 0, n = lines.size(); j < n; ++j) {
+			const DebugLine& line = lines[j];
+
+			vertices[j * 2].color = line.color;
+			vertices[j * 2].pos = line.from;
+
+			vertices[j * 2 + 1].color = line.color;
+			vertices[j * 2 + 1].pos = line.to;
+		}
+
+		ffr::VertexDecl vertex_decl;
+		vertex_decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false);
+		vertex_decl.addAttribute(4, ffr::AttributeType::U8, true, false);
+
+		ffr::setUniformMatrix4f(shader.handle, "u_model", 1, &Matrix::IDENTITY.m11);
+
+		const ffr::BufferHandle vb = ffr::createBuffer(vertices.size() * sizeof(vertices[0]), &vertices[0]);
+		ffr::DrawCall dc;
+		dc.attribute_map = nullptr;
+		dc.index_buffer = ffr::INVALID_BUFFER;
+		dc.primitive_type = ffr::PrimitiveType::LINES;
+		dc.shader = shader.handle;
+		dc.state = 0;
+		dc.textures_count = 0;
+		dc.tex_buffers_count = 0;
+		dc.vertex_buffer = vb;
+		dc.vertex_buffer_offset = 0;
+		dc.vertex_decl = &vertex_decl;
+		dc.indices_offset = 0;
+		dc.indices_count = lines.size() * 2;
+		ffr::draw(dc);
+
+		ffr::destroy(vb);
+	}
+
+
+	void renderDebugShapes()
+	{
+		renderDebugLines();
+		/*renderDebugTriangles();
+		renderDebugPoints();*/
 	}
 
 
@@ -468,7 +515,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 
 		uniforms.state.camera_projection = m_scene->getCameraProjection(camera);
 		uniforms.state.camera_view = m_scene->getUniverse().getMatrix(camera);
-		uniforms.state.camera_pos = uniforms.state.camera_view.getTranslation();
+		uniforms.state.camera_pos = Vec4(uniforms.state.camera_view.getTranslation(), 1);
 		uniforms.state.camera_view.fastInverse();
 		
 		uniforms.update();
@@ -721,6 +768,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		int height;
 	};
 
+	IAllocator& m_allocator;
 	Renderer& m_renderer;
 	Path m_path;
 	lua_State* m_lua_state;
@@ -736,6 +784,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 	int m_height;
 	Stats m_stats;
 	ffr::TextureHandle m_output;
+	Shader* m_debug_shape_shader;
 	Array<CustomCommandHandler> m_custom_commands_handlers;
 	Array<Renderbuffer> m_renderbuffers;
 	Array<Framebuffer> m_framebuffers;
@@ -777,8 +826,9 @@ void Pipeline::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(createRenderbuffer);
 	REGISTER_FUNCTION(executeCustomCommand);
 	REGISTER_FUNCTION(getLayerMask);
-	REGISTER_FUNCTION(renderMeshes);
 	REGISTER_FUNCTION(render2D);
+	REGISTER_FUNCTION(renderDebugShapes);
+	REGISTER_FUNCTION(renderMeshes);
 	REGISTER_FUNCTION(setCamera);
 	REGISTER_FUNCTION(setFramebuffer);
 	REGISTER_FUNCTION(setOutput);

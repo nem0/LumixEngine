@@ -2099,7 +2099,7 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 	{
 		m_model_index = -1;
 		auto& rm = m_editor.getEngine().getResourceManager();
-		Path shader_path("pipelines/debug_line.shd");
+		Path shader_path("pipelines/debug_shape.shd");
 		m_shader = static_cast<Shader*>(rm.get(Shader::TYPE)->load(shader_path));
 
 		editor.universeCreated().bind<RenderInterfaceImpl, &RenderInterfaceImpl::onUniverseCreated>(this);
@@ -2416,7 +2416,6 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 		ffr::VertexDecl vertex_decl;
 		vertex_decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false);
 		vertex_decl.addAttribute(4, ffr::AttributeType::U8, true, false);
-		vertex_decl.addAttribute(2, ffr::AttributeType::FLOAT, false, false);
 
 		const ffr::BufferHandle index_buffer = ffr::createBuffer(indices_count * sizeof(u16), indices);
 		const ffr::BufferHandle vertex_buffer = ffr::createBuffer(vertices_count * sizeof(Vertex), vertices);

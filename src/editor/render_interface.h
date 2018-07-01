@@ -25,7 +25,6 @@ public:
 	{
 		Vec3 position;
 		u32 color;
-		float u, v;
 	};
 
 public:

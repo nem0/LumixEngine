@@ -56,12 +56,12 @@ const Shader::Program& Shader::getProgram(u32 defines)
 			"{\n"
 			"	mat4 u_projection;\n"
 			"	mat4 u_view;\n"
+			"	vec3 u_camera_pos;\n"
 			"	vec3 u_light_direction;\n"
 			"	vec3 u_light_color;\n"
 			"	float u_light_intensity;\n"
 			"	float u_light_indirect_intensity;\n"
 			"	ivec2 u_framebuffer_size;\n"
-			"	vec3 u_camera_pos;\n"
 			"};\n";
 
 		const char* codes[64];
