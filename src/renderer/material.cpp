@@ -27,28 +27,22 @@ static struct CustomFlags
 } s_custom_flags = {};
 
 
-static u8 DEFAULT_COMMAND_BUFFER = 0;
-
-
 const ResourceType Material::TYPE("material");
 
 
-Material::Material(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator)
+Material::Material(const Path& path, ResourceManagerBase& resource_manager, Renderer& renderer, IAllocator& allocator)
 	: Resource(path, resource_manager, allocator)
 	, m_shader(nullptr)
 	, m_uniforms(allocator)
 	, m_allocator(allocator)
 	, m_texture_count(0)
-	// TODO
-/*
-	, m_render_states(BGFX_STATE_CULL_CW)*/
+	, m_renderer(renderer)
+	, m_render_states(u64(ffr::StateFlags::CULL_BACK))
 	, m_color(1, 1, 1, 1)
 	, m_metallic(0)
 	, m_roughness(1.0f)
 	, m_emission(0.0f)
-	, m_shader_instance(nullptr)
 	, m_define_mask(0)
-	, m_command_buffer(&DEFAULT_COMMAND_BUFFER)
 	, m_custom_flags(0)
 	, m_render_layer(0)
 	, m_render_layer_mask(1)
@@ -105,30 +99,13 @@ bool Material::isDefined(u8 define_idx) const
 }
 
 
-bool Material::hasDefine(u8 define_idx) const
-{
-	return m_shader->hasDefine(define_idx) != 0;
-}
-
-
 void Material::setDefine(u8 define_idx, bool enabled)
 {
-	u32 old_mask = m_define_mask;
-	if (enabled)
-	{
+	if (enabled) {
 		m_define_mask |= 1 << define_idx;
 	}
-	else
-	{
+	else {
 		m_define_mask &= ~(1 << define_idx);
-	}
-
-	if (!isReady()) return;
-	if (!m_shader) return;
-
-	if (old_mask != m_define_mask)
-	{
-		m_shader_instance = &m_shader->getInstance(m_define_mask);
 	}
 }
 
@@ -137,19 +114,17 @@ void Material::unload()
 {
 	// TODO
 /*
-	if(m_command_buffer != &DEFAULT_COMMAND_BUFFER) m_allocator.deallocate(m_command_buffer);
-	m_command_buffer = &DEFAULT_COMMAND_BUFFER;
 	m_uniforms.clear();
 	*/
 	ResourceManagerBase* texture_manager = m_resource_manager.getOwner().get(Texture::TYPE);
-	for (int i = 0; i < m_texture_count; i++)
-	{
-		if (m_textures[i] && (!m_shader || m_textures[i] != m_shader->m_texture_slots[i].default_texture))
-		{
+	for (int i = 0; i < m_texture_count; i++) {
+		if (m_textures[i] && (!m_shader || m_textures[i] != m_shader->m_texture_slots[i].default_texture)) {
 			removeDependency(*m_textures[i]);
 			texture_manager->unload(*m_textures[i]);
 		}
 	}
+	m_texture_count = 0;
+	
 	setShader(nullptr);
 
 	m_alpha_ref = 0.3f;
@@ -162,7 +137,7 @@ void Material::unload()
 	m_render_layer_mask = 1;
 	m_roughness = 1.0f;
 	m_emission = 0.0f;
-	m_texture_count = 0;
+	m_render_states = u64(ffr::StateFlags::CULL_BACK);
 }
 
 
@@ -322,24 +297,6 @@ void Material::deserializeCustomFlags(lua_State* L)
 }
 
 
-void Material::deserializeDefines(lua_State* L)
-{
-			// TODO
-	ASSERT(false);
-/*
-auto& renderer = static_cast<MaterialManager&>(m_resource_manager).getRenderer();
-	serializer.deserializeArrayBegin();
-	m_define_mask = 0;
-	while (!serializer.isArrayEnd())
-	{
-		char tmp[32];
-		serializer.deserializeArrayItem(tmp, lengthOf(tmp), "");
-		m_define_mask |= 1 << renderer.getShaderDefineIdx(tmp);
-	}
-	serializer.deserializeArrayEnd();*/
-}
-
-
 void Material::deserializeUniforms(lua_State* L)
 {
 			// TODO
@@ -482,10 +439,6 @@ void Material::setTexture(int i, Texture* texture)
 				m_define_mask &= ~(1 << define_idx);
 			}
 		}
-
-		// TODO
-		//createCommandBuffer();
-		//m_shader_instance = &m_shader->getInstance(m_define_mask);
 	}
 }
 
@@ -494,62 +447,6 @@ void Material::setShader(const Path& path)
 {
 	Shader* shader = static_cast<Shader*>(m_resource_manager.getOwner().get(Shader::TYPE)->load(path));
 	setShader(shader);
-}
-
-
-void Material::createCommandBuffer()
-{
-/*	if (m_command_buffer != &DEFAULT_COMMAND_BUFFER) m_allocator.deallocate(m_command_buffer);
-	m_command_buffer = &DEFAULT_COMMAND_BUFFER;
-	if (!m_shader) return;
-
-	CommandBufferGenerator generator;
-
-	for (int i = 0; i < m_shader->m_uniforms.size(); ++i)
-	{
-		const Material::Uniform& uniform = m_uniforms[i];
-		const Shader::Uniform& shader_uniform = m_shader->m_uniforms[i];
-
-		switch (shader_uniform.type)
-		{
-			case Shader::Uniform::FLOAT:
-				generator.setUniform(shader_uniform.handle, Vec4(uniform.float_value, 0, 0, 0));
-				break;
-			case Shader::Uniform::VEC4:
-				generator.setUniform(shader_uniform.handle, Vec4(uniform.vec4[0], uniform.vec4[1], uniform.vec4[2], uniform.vec4[3]));
-				break;
-			case Shader::Uniform::VEC2:
-				generator.setUniform(shader_uniform.handle, Vec4(uniform.vec2[0], uniform.vec2[1], 0, 0));
-				break;
-			case Shader::Uniform::VEC3:
-			case Shader::Uniform::COLOR:
-				generator.setUniform(shader_uniform.handle, Vec4(*(Vec3*)uniform.vec3, 0));
-				break;
-			case Shader::Uniform::TIME: generator.setTimeUniform(shader_uniform.handle); break;
-			default: ASSERT(false); break;
-		}
-	}
-
-	for (int i = 0; i < m_shader->m_texture_slot_count; ++i)
-	{
-		if (i >= m_texture_count || !m_textures[i]) continue;
-
-		generator.setTexture(i, m_shader->m_texture_slots[i].uniform_handle, m_textures[i]->handle);
-	}
-
-	auto& renderer = static_cast<MaterialManager&>(m_resource_manager).getRenderer();
-	auto& uniform = renderer.getMaterialColorUniform();
-	generator.setUniform(uniform, m_color);
-
-	Vec4 roughness_metallic_emission(m_roughness, m_metallic, m_emission, 0);
-	auto& rme_uniform = renderer.getRoughnessMetallicEmissionUniform();
-	generator.setUniform(rme_uniform, roughness_metallic_emission);
-	generator.end();
-
-	m_command_buffer = (u8*)m_allocator.allocate(generator.getSize());
-	generator.getData(m_command_buffer);*/
-	ASSERT(false);
-	// TODO
 }
 
 
@@ -589,53 +486,36 @@ void Material::onBeforeReady()
 	u8 alpha_ref = u8(m_alpha_ref * 255.0f);
 	m_render_states = (m_render_states & ~BGFX_STATE_ALPHA_REF_MASK) | BGFX_STATE_ALPHA_REF(alpha_ref);
 	m_render_states |= m_shader->m_render_states;
-
-	for(int i = 0; i < m_shader->m_texture_slot_count; ++i)
-	{
-		if (!m_textures[i] && m_shader->m_texture_slots[i].default_texture)
-		{
+	*/
+	for(int i = 0; i < m_shader->m_texture_slot_count; ++i) {
+		if (!m_textures[i] && m_shader->m_texture_slots[i].default_texture) {
 			m_textures[i] = m_shader->m_texture_slots[i].default_texture;
 			if (i >= m_texture_count) m_texture_count = i + 1;
 		}
-		int define_idx = m_shader->m_texture_slots[i].define_idx;
-		if(define_idx >= 0)
-		{
-			if(m_textures[i])
-			{
+		const int define_idx = m_shader->m_texture_slots[i].define_idx;
+		if(define_idx >= 0) {
+			if(m_textures[i]) {
 				m_define_mask |= 1 << define_idx;
 			}
-			else
-			{
+			else {
 				m_define_mask &= ~(1 << define_idx);
 			}
 		}
 	}
-
-	createCommandBuffer();
-	m_shader_instance = &m_shader->getInstance(m_define_mask);*/
 }
 
 
 void Material::setShader(Shader* shader)
 {
-	auto& mat_manager = static_cast<MaterialManager&>(m_resource_manager);
-
-	if (m_shader && m_shader != mat_manager.getRenderer().getDefaultShader())
-	{
+	if (m_shader) {
 		Shader* shader = m_shader;
 		m_shader = nullptr;
 		removeDependency(*shader);
 		m_resource_manager.getOwner().get(Shader::TYPE)->unload(*shader);
 	}
 	m_shader = shader;
-	if (m_shader)
-	{
+	if (m_shader) {
 		addDependency(*m_shader);
-	}
-	else
-	{
-		m_shader = mat_manager.getRenderer().getDefaultShader();
-		m_shader_instance = m_shader->m_instances.empty() ? nullptr : &m_shader->m_instances[0];
 	}
 }
 
@@ -649,151 +529,27 @@ const char* Material::getTextureUniform(int i) const
 
 Texture* Material::getTextureByUniform(const char* uniform) const
 {
-	// TODO
-	ASSERT(false);
-/*
 	if (!m_shader) return nullptr;
 
-	for (int i = 0, c = m_shader->m_texture_slot_count; i < c; ++i)
-	{
-		if (equalStrings(m_shader->m_texture_slots[i].uniform, uniform))
-		{
+	for (int i = 0, c = m_shader->m_texture_slot_count; i < c; ++i) {
+		if (equalStrings(m_shader->m_texture_slots[i].uniform, uniform)) {
 			return m_textures[i];
 		}
-	}*/
+	}
 	return nullptr;
 }
 
 
 bool Material::isTextureDefine(u8 define_idx) const
 {
-	// TODO
-	ASSERT(false);
-/*
 	if (!m_shader) return false;
 
-	for (int i = 0, c = m_shader->m_texture_slot_count; i < c; ++i)
-	{
-		if (m_shader->m_texture_slots[i].define_idx == define_idx)
-		{
+	for (int i = 0, c = m_shader->m_texture_slot_count; i < c; ++i) {
+		if (m_shader->m_texture_slots[i].define_idx == define_idx) {
 			return true;
 		}
-	}*/
+	}
 	return false;
-}
-
-bool Material::deserializeTexture(lua_State* L, const char* material_dir)
-{
-		// TODO
-	ASSERT(false);
-/*
-char path[MAX_PATH_LENGTH];
-	serializer.deserializeObjectBegin();
-	char label[256];
-	bool keep_data = false;
-	u32 flags = 0;
-
-	while (!serializer.isObjectEnd())
-	{
-		serializer.deserializeLabel(label, sizeof(label));
-		if (equalStrings(label, "source"))
-		{
-			serializer.deserialize(path, MAX_PATH_LENGTH, "");
-			if (path[0] != '\0')
-			{
-				char texture_path[MAX_PATH_LENGTH];
-				if (path[0] != '/' && path[0] != '\\')
-				{
-					copyString(texture_path, material_dir);
-					catString(texture_path, path);
-				}
-				else
-				{
-					copyString(texture_path, path);
-				}
-				auto* mng = m_resource_manager.getOwner().get(Texture::TYPE);
-				m_textures[m_texture_count] = static_cast<Texture*>(mng->load(Path(texture_path)));
-				addDependency(*m_textures[m_texture_count]);
-			}
-		}
-		else if (equalStrings(label, "min_filter"))
-		{
-			serializer.deserialize(label, sizeof(label), "");
-			if (equalStrings(label, "point"))
-			{
-				flags |= BGFX_TEXTURE_MIN_POINT;
-			}
-			else if (equalStrings(label, "anisotropic"))
-			{
-				flags |= BGFX_TEXTURE_MIN_ANISOTROPIC;
-			}
-			else
-			{
-				g_log_error.log("Renderer") << "Unknown texture filter \"" << label << "\" in material " << getPath();
-			}
-		}
-		else if (equalStrings(label, "mag_filter"))
-		{
-			serializer.deserialize(label, sizeof(label), "");
-			if (equalStrings(label, "point"))
-			{
-				flags |= BGFX_TEXTURE_MAG_POINT;
-			}
-			else if (equalStrings(label, "anisotropic"))
-			{
-				flags |= BGFX_TEXTURE_MAG_ANISOTROPIC;
-			}
-			else
-			{
-				g_log_error.log("Renderer") << "Unknown texture filter \"" << label << "\" in material " << getPath();
-			}
-		}
-		else if (equalStrings(label, "u_clamp"))
-		{
-			bool b;
-			serializer.deserialize(b, false);
-			if (b) flags |= BGFX_TEXTURE_U_CLAMP;
-		}
-		else if (equalStrings(label, "v_clamp"))
-		{
-			bool b;
-			serializer.deserialize(b, false);
-			if (b) flags |= BGFX_TEXTURE_V_CLAMP;
-		}
-		else if (equalStrings(label, "w_clamp"))
-		{
-			bool b;
-			serializer.deserialize(b, false);
-			if (b) flags |= BGFX_TEXTURE_W_CLAMP;
-		}
-		else if (equalStrings(label, "keep_data"))
-		{
-			serializer.deserialize(keep_data, false);
-		}
-		else if (equalStrings(label, "srgb"))
-		{
-			bool is_srgb;
-			serializer.deserialize(is_srgb, false);
-			if(is_srgb) flags |= BGFX_TEXTURE_SRGB;
-		}
-		else
-		{
-			g_log_warning.log("Renderer") << "Unknown data \"" << label << "\" in material " << getPath();
-			return false;
-		}
-	}
-	if (m_textures[m_texture_count])
-	{
-		m_textures[m_texture_count]->setFlags(flags);
-
-		if (keep_data)
-		{
-			m_textures[m_texture_count]->addDataReference();
-		}
-	}
-	serializer.deserializeObjectEnd();
-	++m_texture_count;*/
-	return true;
 }
 
 
@@ -833,6 +589,29 @@ namespace LuaAPI
 {
 
 
+int defines(lua_State* L)
+{
+	lua_getfield(L, LUA_GLOBALSINDEX, "this");
+	Material* material = (Material*)lua_touserdata(L, -1);
+	lua_pop(L, 1);
+
+	const size_t count = lua_objlen(L, 1);
+	for(int i = 0; i < count; ++i) {
+		lua_rawgeti(L, 1, i + 1);
+		auto rype = lua_type(L, -1);
+		if(!lua_isstring(L, -1)) {
+			g_log_error.log("Renderer") << "Define must be string, material " << material->getPath();
+			lua_pop(L, 1);
+			return 0;
+		}
+		const char* define = lua_tostring(L, -1);
+		material->setDefine(material->getRenderer().getShaderDefineIdx(define), true);
+		lua_pop(L, 1);
+	}
+	return 0;
+}
+
+
 int shader(lua_State* L)
 {
 	const char* path = LuaWrapper::checkArg<const char*>(L, 1);
@@ -870,6 +649,8 @@ bool Material::load(FS::IFile& file)
 	lua_setfield(L, LUA_GLOBALSINDEX, "shader");
 	lua_pushcclosure(L, LuaAPI::texture, 0);
 	lua_setfield(L, LUA_GLOBALSINDEX, "texture");
+	lua_pushcclosure(L, LuaAPI::defines, 0);
+	lua_setfield(L, LUA_GLOBALSINDEX, "defines");
 	
 	setAlphaRef(DEFAULT_ALPHA_REF_VALUE);
 
@@ -879,7 +660,7 @@ bool Material::load(FS::IFile& file)
 		return false;
 	}
 	lua_close(L);
-	return true;
+	return m_shader != nullptr;
 
 	// TODO
 	ASSERT(false);
@@ -935,9 +716,6 @@ bool Material::load(FS::IFile& file)
 		{
 			bool b = true;
 			serializer.deserialize(b, true);
-				// TODO
-	ASSERT(false);
-/*
 			if (b)
 			{
 				m_render_states |= BGFX_STATE_CULL_CW;
@@ -945,7 +723,7 @@ bool Material::load(FS::IFile& file)
 			else
 			{
 				m_render_states &= ~BGFX_STATE_CULL_MASK;
-			}*//*
+			}
 		}
 		else if (equalStrings(label, "color"))
 		{

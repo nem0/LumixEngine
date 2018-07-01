@@ -12,6 +12,7 @@
 #include "engine/profiler.h"
 #include "engine/universe/universe.h"
 #include "font_manager.h"
+#include "global_state_uniforms.h"
 #include "material.h"
 #include "model.h"
 #include "pipeline.h"
@@ -28,12 +29,6 @@ namespace Lumix
 
 struct PipelineImpl LUMIX_FINAL : Pipeline
 {
-	struct GlobalUniforms {
-		Matrix camera_projection;
-		Matrix camera_view;
-		Int2 framebuffer_size;
-	};
-
 	PipelineImpl(Renderer& renderer, const Path& path, const char* define, IAllocator& allocator)
 		: m_renderer(renderer)
 		, m_path(path)
@@ -292,6 +287,16 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		*/
 		clearBuffers();
 
+		const Entity global_light = m_scene->getActiveGlobalLight();
+		if(global_light.isValid()) {
+			GlobalStateUniforms& uniforms = m_renderer.getGlobalStateUniforms();
+			uniforms.state.light_direction = m_scene->getUniverse().getRotation(global_light) * Vec3(0, 0, 1); 
+			uniforms.state.light_color = m_scene->getGlobalLightColor(global_light);
+			uniforms.state.light_intensity = m_scene->getGlobalLightIntensity(global_light);
+			uniforms.state.light_indirect_intensity = m_scene->getGlobalLightIndirectIntensity(global_light);
+			uniforms.update();
+		}
+
 		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
 		bool success = true;
 		lua_getfield(m_lua_state, -1, "main");
@@ -344,12 +349,14 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		vertex_decl.addAttribute(4, ffr::AttributeType::U8, true, false);
 
 		ffr::DrawCall dc;
+		dc.attribute_map = nullptr;
 		dc.vertex_buffer = ffr::createBuffer(num_vertices * vertex_decl.size, &m_draw2d.VtxBuffer[0]);
 		dc.index_buffer = ffr::createBuffer(num_indices * sizeof(u16), &m_draw2d.IdxBuffer[0]);
 		dc.vertex_decl = &vertex_decl;
 
 		ffr::pushDebugGroup("draw2d");
-		ffr::setUniform2f(m_draw2d_shader->getProgramHandle(), "u_canvas_size", 1, &size.x);
+		ffr::ProgramHandle prg = m_draw2d_shader->getProgram(0).handle;
+		ffr::setUniform2f(prg, "u_canvas_size", 1, &size.x);
 
 		u32 elem_offset = 0;
 		const Draw2D::DrawCmd* pcmd_begin = m_draw2d.CmdBuffer.begin();
@@ -369,23 +376,26 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 			if (pcmd->TextureId) texture_id = *(ffr::TextureHandle*)pcmd->TextureId;
 			if(!texture_id.isValid()) texture_id = atlas_texture->handle;
 
-			ffr::setUniform1i(m_draw2d_shader->getProgramHandle(), "u_texture", 0);
+			ffr::setUniform1i(prg, "u_texture", 0);
 			
 			dc.indices_offset = 0;
 			dc.indices_count = num_indices;
 			dc.primitive_type = ffr::PrimitiveType::TRIANGLES;
-			dc.shader = m_draw2d_shader->getProgramHandle();
+			dc.shader = prg;
 			dc.state = 0;
 			dc.textures = &texture_id;
 			dc.textures_count = 1;
 			dc.tex_buffers_count = 0;
 			dc.vertex_buffer_offset = 0;
 
+			ffr::blending(1);
 			ffr::draw(dc);
 
 			elem_offset += pcmd->ElemCount;
 		}
 		ffr::popDebugGroup();
+		ffr::destroy(dc.vertex_buffer);
+		ffr::destroy(dc.index_buffer);
 
 		resetDraw2D();
 	}
@@ -451,16 +461,17 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		const Entity camera = m_scene->getCameraInSlot(slot);
 		if(!camera.isValid()) return;
 
-		const int w = m_global_uniforms.framebuffer_size.x;
-		const int h = m_global_uniforms.framebuffer_size.y;
+		GlobalStateUniforms& uniforms = m_renderer.getGlobalStateUniforms();
+		const int w = uniforms.state.framebuffer_size.x;
+		const int h = uniforms.state.framebuffer_size.y;
 		m_scene->setCameraScreenSize(camera, w, h);
 
-		m_global_uniforms.camera_projection = m_scene->getCameraProjection(camera);
-		m_global_uniforms.camera_view = m_scene->getUniverse().getMatrix(camera);
-		m_global_uniforms.camera_view.fastInverse();
+		uniforms.state.camera_projection = m_scene->getCameraProjection(camera);
+		uniforms.state.camera_view = m_scene->getUniverse().getMatrix(camera);
+		uniforms.state.camera_pos = uniforms.state.camera_view.getTranslation();
+		uniforms.state.camera_view.fastInverse();
 		
-		const ffr::BufferHandle gub = m_renderer.getGlobalUniformsBuffer();
-		ffr::update(gub, &m_global_uniforms, 0, sizeof(m_global_uniforms));
+		uniforms.update();
 	}
 
 
@@ -469,8 +480,10 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		const Framebuffer& fb = m_framebuffers[framebuffer];
 		ffr::setFramebuffer(fb.handle);
 		ffr::viewport(0, 0, fb.width, fb.height);
-		m_global_uniforms.framebuffer_size.x = fb.width;
-		m_global_uniforms.framebuffer_size.y = fb.height;
+		
+		GlobalStateUniforms& uniforms = m_renderer.getGlobalStateUniforms();
+		uniforms.state.framebuffer_size.x = fb.width;
+		uniforms.state.framebuffer_size.y = fb.height;
 	}
 
 
@@ -539,25 +552,31 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 			const Mesh& mesh = model.getMesh(i);
 			const Universe& universe = m_scene->getUniverse();
 			const Material* material = mesh.material;
-			const ffr::ProgramHandle prog = material->getShader()->getProgramHandle(); ;
+			const Shader::Program& prog = material->getShader()->getProgram(0); // TODO define
 			const int textures_count = material->getTextureCount();
 
-			if(!prog.isValid()) continue;
+			if(!prog.handle.isValid()) continue;
 
 			ffr::TextureHandle textures[16];
 			for(int i = 0; i < textures_count; ++i) {
 				textures[i] = material->getTexture(i)->handle; 
-				ffr::setUniform1i(prog, material->getTextureUniform(i), i);
+				ffr::setUniform1i(prog.handle, material->getTextureUniform(i), i);
 			}
 
-			ffr::setUniformMatrix4f(prog, "u_model", 1, &mtx.m11);
+			int attribute_map[16];
+			for(uint i = 0; i < mesh.vertex_decl.attributes_count; ++i) {
+				attribute_map[i] = prog.attribute_by_semantics[(int)mesh.attributes_semantic[i]];
+			}
+			
+			ffr::setUniformMatrix4f(prog.handle, "u_model", 1, &mtx.m11);
 			ffr::DrawCall dc;
-			dc.state = (u32)ffr::StateFlags::DEPTH_TEST | (u32)ffr::StateFlags::CULL_FACE;
+			dc.attribute_map = prog.use_semantics ? attribute_map : nullptr;
+			dc.state = u64(ffr::StateFlags::DEPTH_TEST) | material->getRenderStates();
 			dc.index_buffer = mesh.index_buffer_handle;
 			dc.indices_count = mesh.indices_count;
 			dc.indices_offset = 0;
 			dc.primitive_type = ffr::PrimitiveType::TRIANGLES;
-			dc.shader = prog;
+			dc.shader = prog.handle;
 			dc.textures = textures;
 			dc.textures_count = textures_count;
 			dc.tex_buffers_count = 0;
@@ -569,7 +588,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 	}
 
 	
-	void renderMeshes(const char* camera_slot, u64 layer_mask)
+	void renderMeshes(const char* camera_slot, u64 layer_mask, const char* shader_define)
 	{
 		const Entity camera = m_scene->getCameraInSlot(camera_slot);
 		const Frustum frustum = m_scene->getCameraFrustum(camera);
@@ -579,29 +598,43 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 
 		ffr::pushDebugGroup("meshes");
 
+		const u32 define_mask = shader_define && shader_define[0] 
+			? 1 << m_renderer.getShaderDefineIdx(shader_define) 
+			: 0;
+
 		for(auto& submeshes : meshes) {
 			for(auto& mesh : submeshes) {
 				const Material* material = mesh.mesh->material;
-				const ffr::ProgramHandle prog = material->getShader()->getProgramHandle(); ;
-				const Matrix& mtx = universe.getMatrix(mesh.owner);
+
+				const u32 final_define_mask = material->getDefineMask() | define_mask;
+				const Shader::Program prog = material->getShader()->getProgram(final_define_mask);
+
+				if(!prog.handle.isValid()) continue;
+
 				const int textures_count = material->getTextureCount();
-
-				if(!prog.isValid()) continue;
-
 				ffr::TextureHandle textures[16];
 				for(int i = 0; i < textures_count; ++i) {
 					textures[i] = material->getTexture(i)->handle; 
-					ffr::setUniform1i(prog, material->getTextureUniform(i), i);
+					ffr::setUniform1i(prog.handle, material->getTextureUniform(i), i);
 				}
 
-				ffr::setUniformMatrix4f(prog, "u_model", 1, &mtx.m11);
+				const Matrix& mtx = universe.getMatrix(mesh.owner);
+				ffr::setUniformMatrix4f(prog.handle, "u_model", 1, &mtx.m11);
+
+				
+				int attribute_map[16];
+				for(uint i = 0; i < mesh.mesh->vertex_decl.attributes_count; ++i) {
+					attribute_map[i] = prog.attribute_by_semantics[(int)mesh.mesh->attributes_semantic[i]];
+				}
+
 				ffr::DrawCall dc;
-				dc.state = (u32)ffr::StateFlags::DEPTH_TEST | (u32)ffr::StateFlags::CULL_FACE;
+				dc.attribute_map = prog.use_semantics ? attribute_map : nullptr;
+				dc.state = u64(ffr::StateFlags::DEPTH_TEST) | material->getRenderStates();
 				dc.index_buffer = mesh.mesh->index_buffer_handle;
 				dc.indices_count = mesh.mesh->indices_count;
 				dc.indices_offset = 0;
 				dc.primitive_type = ffr::PrimitiveType::TRIANGLES;
-				dc.shader = prog;
+				dc.shader = prog.handle;
 				dc.textures = textures;
 				dc.textures_count = textures_count;
 				dc.tex_buffers_count = 0;
@@ -613,6 +646,17 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		}
 
 		ffr::popDebugGroup();
+	}
+
+
+	void blending(const char* mode)
+	{
+		if(mode[0]) {
+			
+		}
+		else {
+			ffr::blending(0);
+		}
 	}
 
 
@@ -695,7 +739,6 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 	Array<CustomCommandHandler> m_custom_commands_handlers;
 	Array<Renderbuffer> m_renderbuffers;
 	Array<Framebuffer> m_framebuffers;
-	GlobalUniforms m_global_uniforms;
 };
 
 
@@ -729,6 +772,7 @@ void Pipeline::registerLuaAPI(lua_State* L)
 			registerCFunction(#name, f); \
 		} while(false) \
 
+	REGISTER_FUNCTION(blending);
 	REGISTER_FUNCTION(clearFramebuffer);
 	REGISTER_FUNCTION(createRenderbuffer);
 	REGISTER_FUNCTION(executeCustomCommand);

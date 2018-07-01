@@ -76,7 +76,7 @@ GameView::GameView(StudioApp& app)
 	app.addAction(fullscreen_action);
 
 	auto* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
-	Path path("pipelines/main.lua");
+	Path path("pipelines/main.pln");
 	m_pipeline = Pipeline::create(*renderer, path, "GAME_VIEW", engine.getAllocator());
 	m_pipeline->load();
 	renderer->setMainPipeline(m_pipeline);

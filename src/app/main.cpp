@@ -88,7 +88,7 @@ public:
 
 	void init()
 	{
-		copyString(m_pipeline_path, "pipelines/main.lua");
+		copyString(m_pipeline_path, "pipelines/main.pln");
 		m_pipeline_define = "APP";
 		copyString(m_startup_script_path, "startup.lua");
 		char cmd_line[1024];

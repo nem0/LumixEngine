@@ -335,6 +335,7 @@ function linkLib(lib)
 end
 
 function useLua()
+	links {"lua51"}
 	if _OPTIONS["static-plugins"] then
 		linkLib "luajit"
 	else

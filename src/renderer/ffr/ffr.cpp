@@ -422,6 +422,7 @@ static void try_load_renderdoc()
 	pRENDERDOC_GetAPI RENDERDOC_GetAPI = (pRENDERDOC_GetAPI)GetProcAddress(lib, "RENDERDOC_GetAPI");
 	if (RENDERDOC_GetAPI) {
 		RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_1_2, (void **)&s_ffr.rdoc_api);
+		s_ffr.rdoc_api->MaskOverlayBits(~RENDERDOC_OverlayBits::eRENDERDOC_Overlay_Enabled, 0);
 	}
 	/**/
 	//FreeLibrary(lib);
@@ -486,9 +487,14 @@ void viewport(uint x,uint y,uint w,uint h)
 }
 
 
-void blend()
+void blending(int mode)
 {
-	glEnable(GL_BLEND);
+	if (mode) {
+		glEnable(GL_BLEND);
+	}
+	else {
+		glDisable(GL_BLEND);
+	}
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 }
 
@@ -503,14 +509,22 @@ void draw(const DrawCall& dc)
 {
 	if (!dc.shader.isValid()) return;
 
-	auto toggle = [](GLenum state, bool enable) {
-		if(enable) glEnable(state);
-		else glDisable(state);
-	};
+	if( dc.state & u64(StateFlags::DEPTH_TEST)) glEnable(GL_DEPTH_TEST);
+	else glDisable(GL_DEPTH_TEST);
 
-	toggle(GL_DEPTH_TEST, dc.state & (u32)StateFlags::DEPTH_TEST);
-	toggle(GL_CULL_FACE, dc.state & (u32)StateFlags::CULL_FACE);
-	glPolygonMode(GL_FRONT_AND_BACK, dc.state & (u32)StateFlags::WIREFRAME ? GL_LINE : GL_FILL);
+	if(dc.state & u64(StateFlags::CULL_BACK)) {
+		glEnable(GL_CULL_FACE);
+		glCullFace(GL_BACK);
+	}
+	if(dc.state & u64(StateFlags::CULL_FRONT)) {
+		glEnable(GL_CULL_FACE);
+		glCullFace(GL_FRONT); 
+	}
+	else {
+		glDisable(GL_CULL_FACE);
+	}
+
+	glPolygonMode(GL_FRONT_AND_BACK, dc.state & u64(StateFlags::WIREFRAME) ? GL_LINE : GL_FILL);
 
 	const GLuint prg = dc.shader.value;
 	CHECK_GL(glUseProgram(prg));
@@ -556,8 +570,12 @@ void draw(const DrawCall& dc)
 				case AttributeType::FLOAT: gl_attr_type = GL_FLOAT; break;
 				case AttributeType::U8: gl_attr_type = GL_UNSIGNED_BYTE; break;
 			}
-			glEnableVertexAttribArray(i);
-			glVertexAttribPointer(i, attr->components_num, gl_attr_type, attr->normalized, stride, offset);
+			const int index = dc.attribute_map ? dc.attribute_map[i] : i;
+
+			if(index >= 0) {
+				glEnableVertexAttribArray(index);
+				glVertexAttribPointer(index, attr->components_num, gl_attr_type, attr->normalized, stride, offset);
+			}
 		}
 	}
 
@@ -573,24 +591,25 @@ void draw(const DrawCall& dc)
 }
 
 
-void uniformBlockBinding(ProgramHandle program, uint index, uint binding)
+void uniformBlockBinding(ProgramHandle program, const char* block_name, uint binding)
 {
+	const GLint index = glGetUniformBlockIndex(program.value, block_name);
 	glUniformBlockBinding(program.value, index, binding);
 }
 
 
-void bindUniformBuffer(uint index, BufferHandle buffer)
+void bindUniformBuffer(uint index, BufferHandle buffer, size_t offset, size_t size)
 {
-	glBindBufferBase(GL_UNIFORM_BUFFER, index, buffer.value);
+	glBindBufferRange(GL_UNIFORM_BUFFER, index, buffer.value, offset, size);
 }
 
 
 void update(BufferHandle buffer, const void* data, size_t offset, size_t size)
 {
 	const GLuint buf = buffer.value;
-	CHECK_GL(glBindBuffer(GL_ARRAY_BUFFER, buf));
-	CHECK_GL(glBufferSubData(GL_ARRAY_BUFFER, offset, size, data));
-	CHECK_GL(glBindBuffer(GL_ARRAY_BUFFER, 0));
+	CHECK_GL(glBindBuffer(GL_UNIFORM_BUFFER, buf));
+	CHECK_GL(glBufferSubData(GL_UNIFORM_BUFFER, offset, size, data));
+	CHECK_GL(glBindBuffer(GL_UNIFORM_BUFFER, 0));
 }
 
 
@@ -598,9 +617,9 @@ BufferHandle createBuffer(size_t size, const void* data)
 {
 	GLuint buf;
 	CHECK_GL(glGenBuffers(1, &buf));
-	CHECK_GL(glBindBuffer(GL_ARRAY_BUFFER, buf));
-	CHECK_GL(glBufferData(GL_ARRAY_BUFFER, size, data, GL_STATIC_DRAW));
-	CHECK_GL(glBindBuffer(GL_ARRAY_BUFFER, 0));
+	CHECK_GL(glBindBuffer(GL_UNIFORM_BUFFER, buf));
+	CHECK_GL(glBufferData(GL_UNIFORM_BUFFER, size, data, GL_STATIC_DRAW));
+	CHECK_GL(glBindBuffer(GL_UNIFORM_BUFFER, 0));
 
 	return { buf };
 }
@@ -608,7 +627,9 @@ BufferHandle createBuffer(size_t size, const void* data)
 
 void destroy(ProgramHandle program)
 {
-	glDeleteProgram(program.value);
+	if (program.isValid()) {
+		glDeleteProgram(program.value);
+	}
 }
 
 static struct {
@@ -834,13 +855,24 @@ void clear(uint flags, const float* color, float depth)
 	CHECK_GL(glClear(gl_flags));
 }
 
-
-ProgramHandle createProgram(const char** srcs, const ShaderType* types, int num)
+static const char* shaderTypeToString(ShaderType type)
 {
+	switch(type) {
+		case ShaderType::FRAGMENT: return "fragment shader";
+		case ShaderType::VERTEX: return "vertex shader";
+		default: return "unknown shader type";
+	}
+}
+
+
+ProgramHandle createProgram(const char** srcs, const ShaderType* types, int num, const char** prefixes, int prefixes_count, const char* name)
+{
+	const char* combined_srcs[16];
+	ASSERT(prefixes_count < lengthOf(combined_srcs) - 1); 
 	enum { MAX_SHADERS_PER_PROGRAM = 16 };
 
 	if (num > MAX_SHADERS_PER_PROGRAM) {
-		g_log_error.log("Renderer") << "Too many shaders per program.";
+		g_log_error.log("Renderer") << "Too many shaders per program in " << name;
 		return INVALID_PROGRAM;
 	}
 
@@ -854,7 +886,12 @@ ProgramHandle createProgram(const char** srcs, const ShaderType* types, int num)
 			default: ASSERT(0); break;
 		}
 		const GLuint shd = glCreateShader(shader_type);
-		CHECK_GL(glShaderSource(shd, 1, &srcs[i], 0));
+		combined_srcs[prefixes_count] = srcs[i];
+		for (int j = 0; j < prefixes_count; ++j) {
+			combined_srcs[j] = prefixes[j];
+		}
+
+		CHECK_GL(glShaderSource(shd, 1 + prefixes_count, combined_srcs, 0));
 		CHECK_GL(glCompileShader(shd));
 
 		GLint compile_status;
@@ -866,10 +903,10 @@ ProgramHandle createProgram(const char** srcs, const ShaderType* types, int num)
 				Array<char> log_buf(*s_ffr.allocator);
 				log_buf.resize(log_len);
 				CHECK_GL(glGetShaderInfoLog(shd, log_len, &log_len, &log_buf[0]));
-				g_log_error.log("Renderer") << &log_buf[0];
+				g_log_error.log("Renderer") << name << " - " << shaderTypeToString(types[i]) << ": " << &log_buf[0];
 			}
 			else {
-				g_log_error.log("Renderer") << "Failed to compile shader.";
+				g_log_error.log("Renderer") << "Failed to compile shader " << name << " - " << shaderTypeToString(types[i]);
 			}
 			CHECK_GL(glDeleteShader(shd));
 			return INVALID_PROGRAM;
@@ -890,10 +927,10 @@ ProgramHandle createProgram(const char** srcs, const ShaderType* types, int num)
 			Array<char> log_buf(*s_ffr.allocator);
 			log_buf.resize(log_len);
 			CHECK_GL(glGetProgramInfoLog(prg, log_len, &log_len, &log_buf[0]));
-			g_log_error.log("Renderer") << &log_buf[0];
+			g_log_error.log("Renderer") << name << ": " << &log_buf[0];
 		}
 		else {
-			g_log_error.log("Renderer") << "Failed to link program.";
+			g_log_error.log("Renderer") << "Failed to link program " << name;
 		}
 		CHECK_GL(glDeleteProgram(prg));
 		return INVALID_PROGRAM;
@@ -905,9 +942,8 @@ ProgramHandle createProgram(const char** srcs, const ShaderType* types, int num)
 
 static void gl_debug_callback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const char *message, const void *userParam)
 {
-	OutputDebugString("GL: ");
-	OutputDebugString(message);
-	OutputDebugString("\n");
+	if (type != GL_DEBUG_TYPE_ERROR && type != GL_DEBUG_TYPE_PERFORMANCE) return;
+	g_log_error.log("GL") << message;
 }
 
 
@@ -920,10 +956,18 @@ void preinit()
 bool init(IAllocator& allocator)
 {
 	s_ffr.allocator = &allocator;
-	const unsigned char* extensions = glGetString(GL_EXTENSIONS);
-	const unsigned char* version = glGetString(GL_VERSION);
 	
 	if (!load_gl()) return false;
+
+/*	int extensions_count;
+	glGetIntegerv(GL_NUM_EXTENSIONS, &extensions_count);
+	for(int i = 0; i < extensions_count; ++i) {
+		const char* ext = (const char*)glGetStringi(GL_EXTENSIONS, i);
+		OutputDebugString(ext);
+		OutputDebugString("\n");
+	}
+	const unsigned char* extensions = glGetString(GL_EXTENSIONS);
+	const unsigned char* version = glGetString(GL_VERSION);*/
 
 	CHECK_GL(glEnable(GL_DEBUG_OUTPUT));
 	CHECK_GL(glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS));
@@ -953,6 +997,12 @@ void pushDebugGroup(const char* msg)
 void destroy(FramebufferHandle fb)
 {
 	CHECK_GL(glDeleteFramebuffers(1, &fb.value));
+}
+
+
+int getAttribLocation(ProgramHandle program, const char* uniform_name)
+{
+	return glGetAttribLocation(program.value, uniform_name);
 }
 
 

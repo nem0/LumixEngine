@@ -8,7 +8,6 @@
 #include "engine/math_utils.h"
 #include "engine/path_utils.h"
 #include "engine/string.h"
-#include "renderer/editor/shader_compiler.h"
 #include <cstdio>
 
 
@@ -2216,7 +2215,7 @@ void ShaderEditor::onGUIMenu()
 }
 
 
-void ShaderEditor::onGUI(ShaderCompiler& compiler)
+void ShaderEditor::onGUI()
 {
 	StaticString<MAX_PATH_LENGTH + 25> title("Shader Editor");
 	if (m_path.isValid()) title << " - " << m_path.c_str();
@@ -2229,19 +2228,6 @@ void ShaderEditor::onGUI(ShaderCompiler& compiler)
 		onGUILeftColumn();
 		ImGui::SameLine();
 		onGUIRightColumn();
-		if (ImGui::CollapsingHeader("Compiler"))
-		{
-			for (const string& shd_path : compiler.getSHDFiles())
-			{
-				ImGui::PushID(&shd_path);
-				if (ImGui::Button("Compile debug")) compiler.compile(shd_path.c_str(), true);
-				ImGui::SameLine();
-				if (ImGui::Button("Compile")) compiler.compile(shd_path.c_str(), false);
-				ImGui::SameLine();
-				ImGui::Text("%s", shd_path.c_str());
-				ImGui::PopID();
-			}
-		}
 	}
 	else
 	{

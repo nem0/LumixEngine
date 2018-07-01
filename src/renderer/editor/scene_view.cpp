@@ -48,7 +48,7 @@ SceneView::SceneView(StudioApp& app)
 	Engine& engine = m_editor.getEngine();
 	IAllocator& allocator = engine.getAllocator();
 	auto* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
-	Path path("pipelines/main.lua");
+	Path path("pipelines/main.pln");
 	m_pipeline = Pipeline::create(*renderer, path, "SCENE_VIEW", engine.getAllocator());
 	m_pipeline->load();
 	m_pipeline->addCustomCommandHandler("renderSelection").callback.bind<SceneView, &SceneView::renderSelection>(this);
@@ -92,7 +92,10 @@ SceneView::SceneView(StudioApp& app)
 	m_camera_speed_action->func.bind<SceneView, &SceneView::resetCameraSpeed>(this);
 	m_app.addAction(m_camera_speed_action);
 
-	m_app.getAssetBrowser().resourceChanged().bind<SceneView, &SceneView::onResourceChanged>(this);
+	AssetBrowser& asset_browser = m_app.getAssetBrowser();
+	const ResourceType pipeline_type("pipeline");
+	asset_browser.registerExtension("pln", pipeline_type); 
+	asset_browser.resourceChanged().bind<SceneView, &SceneView::onResourceChanged>(this);
 }
 
 

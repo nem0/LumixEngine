@@ -12,7 +12,6 @@ namespace Lumix
 
 class InputBlob;
 class OutputBlob;
-class ShaderCompiler;
 
 
 class ShaderEditor
@@ -75,7 +74,7 @@ public:
 	explicit ShaderEditor(IAllocator& allocator);
 	~ShaderEditor();
 
-	void onGUI(ShaderCompiler& compiler);
+	void onGUI();
 	const char* getTextureName(int index) const { return m_textures[index]; }
 	IAllocator& getAllocator() { return m_allocator; }
 	Node* createNode(int type);
