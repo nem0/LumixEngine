@@ -1162,15 +1162,11 @@ public:
 
 	void deserializeEnvironmentProbe(IDeserializer& serializer, Entity entity, int scene_version)
 	{
-	// TODO
-	ASSERT(false);
-	/*
 		auto* texture_manager = m_engine.getResourceManager().get(Texture::TYPE);
 		StaticString<MAX_PATH_LENGTH> probe_dir("universes/", m_universe.getName(), "/probes/");
 		EnvironmentProbe& probe = m_environment_probes.insert(entity);
 		serializer.read(&probe.guid);
-		if (scene_version > (int)RenderSceneVersion::ENVIRONMENT_PROBE_FLAGS)
-		{
+		if (scene_version > (int)RenderSceneVersion::ENVIRONMENT_PROBE_FLAGS) {
 			serializer.read(&probe.flags.base);
 			serializer.read(&probe.radiance_size);
 			serializer.read(&probe.irradiance_size);
@@ -1180,24 +1176,25 @@ public:
 		StaticString<MAX_PATH_LENGTH> path_str(probe_dir, probe.guid, ".dds");
 		
 		probe.texture = nullptr;
-		if (probe.flags.isSet(EnvironmentProbe::REFLECTION))
-		{
+		if (probe.flags.isSet(EnvironmentProbe::REFLECTION)) {
 			probe.texture = static_cast<Texture*>(texture_manager->load(Path(path_str)));
-			probe.texture->setFlag(BGFX_TEXTURE_SRGB, true);
+			probe.texture->setFlag(Texture::Flags::SRGB, true);
 		}
 		
 		StaticString<MAX_PATH_LENGTH> irr_path_str(probe_dir, probe.guid, "_irradiance.dds");
 		probe.irradiance = static_cast<Texture*>(texture_manager->load(Path(irr_path_str)));
-		probe.irradiance->setFlag(BGFX_TEXTURE_SRGB, true);
-		probe.irradiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
-		probe.irradiance->setFlag(BGFX_TEXTURE_MAG_ANISOTROPIC, true);
+		probe.irradiance->setFlag(Texture::Flags::SRGB, true);
+		// TODO
+		//probe.irradiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
+		//probe.irradiance->setFlag(BGFX_TEXTURE_MAG_ANISOTROPIC, true);
 		StaticString<MAX_PATH_LENGTH> r_path_str(probe_dir, probe.guid, "_radiance.dds");
 		probe.radiance = static_cast<Texture*>(texture_manager->load(Path(r_path_str)));
-		probe.radiance->setFlag(BGFX_TEXTURE_SRGB, true);
-		probe.radiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
-		probe.radiance->setFlag(BGFX_TEXTURE_MAG_ANISOTROPIC, true);
+		probe.radiance->setFlag(Texture::Flags::SRGB, true);
+		// TODO
+		//probe.radiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
+		//probe.radiance->setFlag(BGFX_TEXTURE_MAG_ANISOTROPIC, true);
 
-		m_universe.onComponentCreated(entity, ENVIRONMENT_PROBE_TYPE, this);*/
+		m_universe.onComponentCreated(entity, ENVIRONMENT_PROBE_TYPE, this);
 	}
 
 
@@ -5055,20 +5052,17 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 
 	void createEnvironmentProbe(Entity entity)
 	{
-	// TODO
-	ASSERT(false);
-	/*
 		EnvironmentProbe& probe = m_environment_probes.insert(entity);
 		auto* texture_manager = m_engine.getResourceManager().get(Texture::TYPE);
-		probe.texture = static_cast<Texture*>(texture_manager->load(Path("pipelines/pbr/default_probe.dds")));
-		probe.texture->setFlag(BGFX_TEXTURE_SRGB, true);
-		probe.irradiance = static_cast<Texture*>(texture_manager->load(Path("pipelines/pbr/default_probe.dds")));
-		probe.irradiance->setFlag(BGFX_TEXTURE_SRGB, true);
-		probe.radiance = static_cast<Texture*>(texture_manager->load(Path("pipelines/pbr/default_probe.dds")));
-		probe.radiance->setFlag(BGFX_TEXTURE_SRGB, true);
+		probe.texture = static_cast<Texture*>(texture_manager->load(Path("models/common/default_probe.dds")));
+		probe.texture->setFlag(Texture::Flags::SRGB, true);
+		probe.irradiance = static_cast<Texture*>(texture_manager->load(Path("models/common/default_probe.dds")));
+		probe.irradiance->setFlag(Texture::Flags::SRGB, true);
+		probe.radiance = static_cast<Texture*>(texture_manager->load(Path("models/common/default_probe.dds")));
+		probe.radiance->setFlag(Texture::Flags::SRGB, true);
 		probe.guid = Math::randGUID();
 
-		m_universe.onComponentCreated(entity, ENVIRONMENT_PROBE_TYPE, this);*/
+		m_universe.onComponentCreated(entity, ENVIRONMENT_PROBE_TYPE, this);
 	}
 
 
@@ -5299,7 +5293,6 @@ void RenderScene::destroyInstance(RenderScene* scene)
 
 void RenderScene::registerLuaAPI(lua_State* L)
 {
-	Pipeline::registerLuaAPI(L);
 	Model::registerLuaAPI(L);
 
 	#define REGISTER_FUNCTION(F)\

@@ -625,10 +625,40 @@ int shader(lua_State* L)
 
 int texture(lua_State* L)
 {
-	const char* path = LuaWrapper::checkArg<const char*>(L, 1);
 	lua_getfield(L, LUA_GLOBALSINDEX, "this");
 	Material* material = (Material*)lua_touserdata(L, -1);
 	lua_pop(L, 1);
+
+	if (lua_istable(L, 1)) {
+	
+		lua_getfield(L, 1, "source");
+		if (lua_isstring(L, -1)) {
+			const char* path = lua_tostring(L, -1);
+			const int idx = material->getTextureCount();
+			material->setTexturePath(idx, Path(path));
+		}
+		else {
+			g_log_error.log("Renderer") << material->getPath() << " texture's source is not a string.";
+			lua_pop(L, 1);
+			return 0;
+		}
+		lua_pop(L, 1);
+
+		lua_getfield(L, 1, "srgb");
+		if (lua_isboolean(L, -1)) {
+			const bool srgb = lua_toboolean(L, -1);
+			Texture* texture = material->getTexture(material->getTextureCount() - 1);
+			texture->setSRGB(srgb);
+		}
+		else {
+			g_log_error.log("Renderer") << material->getPath() << " texture's srgb flag is not a boolean.";
+		}
+		lua_pop(L, 1);
+
+		return 0;
+	}
+	
+	const char* path = LuaWrapper::checkArg<const char*>(L, 1);
 	const int idx = material->getTextureCount();
 	material->setTexturePath(idx, Path(path));
 	return 0;

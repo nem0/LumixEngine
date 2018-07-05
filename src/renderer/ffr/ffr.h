@@ -72,7 +72,14 @@ enum class TextureFormat : uint {
 	RGBA16F,
 	R16F,
 	R16,
-	R32F
+	R32F,
+	SRGB,
+	SRGBA
+};
+
+
+enum class TextureFlags : uint {
+	SRGB = 1 << 0
 };
 
 
@@ -125,7 +132,8 @@ struct TextureInfo {
 
 void preinit();
 bool init(IAllocator& allocator);
-inline bool isHomogenousDepth() { return true; }
+bool isHomogenousDepth();
+bool isOriginBottomLeft();
 void shutdown();
 
 void clear(uint flags, const float* color, float depth);
@@ -136,14 +144,15 @@ void blending(int mode);
 
 ProgramHandle createProgram(const char** srcs, const ShaderType* types, int num, const char** prefixes, int prefixes_count, const char* name);
 BufferHandle createBuffer(size_t size, const void* data);
-TextureHandle createTexture(uint w, uint h, TextureFormat format, const void* data);
-TextureHandle loadTexture(const void* data, int size, TextureInfo* info);
+TextureHandle createTexture(uint w, uint h, TextureFormat format, uint flags, const void* data);
+TextureHandle loadTexture(const void* data, int size, uint flags, TextureInfo* info);
 FramebufferHandle createFramebuffer(uint renderbuffers_count, const TextureHandle* renderbuffers);
 
 void setState(u32 flags);
 void uniformBlockBinding(ProgramHandle program, const char* block_name, uint binding);
 void update(BufferHandle buffer, const void* data, size_t offset, size_t size);
 void bindUniformBuffer(uint index, BufferHandle buffer, size_t offset, size_t size);
+void getTextureImage(ffr::TextureHandle texture, uint size, void* buf);
 
 void destroy(ProgramHandle program);
 void destroy(BufferHandle buffer);
@@ -160,7 +169,7 @@ void setUniform2f(ProgramHandle program, const char* uniform_name, uint count, c
 void setUniform4f(ProgramHandle program, const char* uniform_name, uint count, const float* value);
 void setUniformMatrix4f(ProgramHandle program, const char* uniform_name, uint count, const float* value);
 
-void setFramebuffer(FramebufferHandle fb);
+void setFramebuffer(FramebufferHandle fb, bool srgb);
 
 
 } // namespace ffr

@@ -18,11 +18,25 @@ namespace Lumix
 {
 
 
+namespace ffr {
+
+
+struct Texture
+{
+	enum { MAX_COUNT = 4096 };
+
+	GLuint handle;
+	bool cubemap;
+};
+
+
 static struct {
 	RENDERDOC_API_1_1_2* rdoc_api;
 	GLuint vao;
 	GLuint tex_buffers[32];
 	IAllocator* allocator;
+	Texture* textures;
+	int first_free_texture = 0;
 } s_ffr;
 
 
@@ -101,12 +115,14 @@ struct LoadInfo {
 	uint divSize;
 	uint blockBytes;
 	GLenum internalFormat;
+	GLenum internalSRGBFormat;
 	GLenum externalFormat;
 	GLenum type;
 };
 
 static uint sizeDXTC(uint w, uint h, GLuint format) {
-    return ((w + 3) / 4) * ((h + 3) / 4) * (format == GL_COMPRESSED_RGBA_S3TC_DXT1_EXT ? 8 : 16);
+    const bool is_dxt1 = format == GL_COMPRESSED_RGBA_S3TC_DXT1_EXT || format == GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT1_EXT;
+	return ((w + 3) / 4) * ((h + 3) / 4) * (is_dxt1 ? 8 : 16);
 }
 
 static bool isDXT1(PixelFormat& pf)
@@ -173,28 +189,28 @@ static bool isINDEX8(PixelFormat& pf)
 }
 
 static LoadInfo loadInfoDXT1 = {
-	true, false, false, 4, 8, GL_COMPRESSED_RGBA_S3TC_DXT1_EXT
+	true, false, false, 4, 8, GL_COMPRESSED_RGBA_S3TC_DXT1_EXT, GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT1_EXT
 };
 static LoadInfo loadInfoDXT3 = {
-	true, false, false, 4, 16, GL_COMPRESSED_RGBA_S3TC_DXT3_EXT
+	true, false, false, 4, 16, GL_COMPRESSED_RGBA_S3TC_DXT3_EXT, GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT
 };
 static LoadInfo loadInfoDXT5 = {
-	true, false, false, 4, 16, GL_COMPRESSED_RGBA_S3TC_DXT5_EXT
+	true, false, false, 4, 16, GL_COMPRESSED_RGBA_S3TC_DXT5_EXT, GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT
 };
 static LoadInfo loadInfoBGRA8 = {
-	false, false, false, 1, 4, GL_RGBA8, GL_BGRA, GL_UNSIGNED_BYTE
+	false, false, false, 1, 4, GL_RGBA8, GL_SRGB8_ALPHA8, GL_BGRA, GL_UNSIGNED_BYTE
 };
 static LoadInfo loadInfoBGR8 = {
-	false, false, false, 1, 3, GL_RGB8, GL_BGR, GL_UNSIGNED_BYTE
+	false, false, false, 1, 3, GL_RGB8, GL_SRGB8, GL_BGR, GL_UNSIGNED_BYTE
 };
 static LoadInfo loadInfoBGR5A1 = {
-	false, true, false, 1, 2, GL_RGB5_A1, GL_BGRA, GL_UNSIGNED_SHORT_1_5_5_5_REV
+	false, true, false, 1, 2, GL_RGB5_A1, GL_ZERO, GL_BGRA, GL_UNSIGNED_SHORT_1_5_5_5_REV
 };
 static LoadInfo loadInfoBGR565 = {
-	false, true, false, 1, 2, GL_RGB5, GL_RGB, GL_UNSIGNED_SHORT_5_6_5
+	false, true, false, 1, 2, GL_RGB5, GL_ZERO, GL_RGB, GL_UNSIGNED_SHORT_5_6_5
 };
 static LoadInfo loadInfoIndex8 = {
-	false, false, true, 1, 1, GL_RGB8, GL_BGRA, GL_UNSIGNED_BYTE
+	false, false, true, 1, 1, GL_RGB8, GL_SRGB8, GL_BGRA, GL_UNSIGNED_BYTE
 };
 
 struct DXTColBlock
@@ -366,14 +382,17 @@ static void flipCompressedTexture(int w, int h, int format, void* surface)
 
 	switch (format)
 	{
+		case GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT1_EXT:
 		case GL_COMPRESSED_RGBA_S3TC_DXT1_EXT:
 			blocksize = 8;
 			flipBlocksFunction = &flipBlockDXTC1;
 			break;
+		case GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT:
 		case GL_COMPRESSED_RGBA_S3TC_DXT3_EXT:
 			blocksize = 16;
 			flipBlocksFunction = &flipBlockDXTC3;
 			break;
+		case GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT:
 		case GL_COMPRESSED_RGBA_S3TC_DXT5_EXT:
 			blocksize = 16;
 			flipBlocksFunction = &flipBlockDXTC5;
@@ -399,10 +418,9 @@ static void flipCompressedTexture(int w, int h, int format, void* surface)
 	}
 }
 
+
 } // namespace DDS
 
-namespace ffr
-{
 
 #define CHECK_GL(gl) \
 	do { \
@@ -509,22 +527,22 @@ void draw(const DrawCall& dc)
 {
 	if (!dc.shader.isValid()) return;
 
-	if( dc.state & u64(StateFlags::DEPTH_TEST)) glEnable(GL_DEPTH_TEST);
-	else glDisable(GL_DEPTH_TEST);
+	if( dc.state & u64(StateFlags::DEPTH_TEST)) CHECK_GL(glEnable(GL_DEPTH_TEST));
+	else CHECK_GL(glDisable(GL_DEPTH_TEST));
 
 	if(dc.state & u64(StateFlags::CULL_BACK)) {
-		glEnable(GL_CULL_FACE);
-		glCullFace(GL_BACK);
+		CHECK_GL(glEnable(GL_CULL_FACE));
+		CHECK_GL(glCullFace(GL_BACK));
 	}
 	if(dc.state & u64(StateFlags::CULL_FRONT)) {
-		glEnable(GL_CULL_FACE);
-		glCullFace(GL_FRONT); 
+		CHECK_GL(glEnable(GL_CULL_FACE));
+		CHECK_GL(glCullFace(GL_FRONT));
 	}
 	else {
-		glDisable(GL_CULL_FACE);
+		CHECK_GL(glDisable(GL_CULL_FACE));
 	}
 
-	glPolygonMode(GL_FRONT_AND_BACK, dc.state & u64(StateFlags::WIREFRAME) ? GL_LINE : GL_FILL);
+	CHECK_GL(glPolygonMode(GL_FRONT_AND_BACK, dc.state & u64(StateFlags::WIREFRAME) ? GL_LINE : GL_FILL));
 
 	const GLuint prg = dc.shader.value;
 	CHECK_GL(glUseProgram(prg));
@@ -547,11 +565,15 @@ void draw(const DrawCall& dc)
 	}
 
 	for (uint i = 0; i < dc.textures_count; ++i) {
-		const GLuint t = dc.textures[i].value;
-		CHECK_GL(glActiveTexture(GL_TEXTURE0 + i));
-		glBindTexture(GL_TEXTURE_2D, t);
-		const GLint uniform_loc = glGetUniformLocation(prg, "test");
-		CHECK_GL(glUniform1i(uniform_loc, i));
+		if(dc.textures[i].isValid()) {
+			const Texture& t = s_ffr.textures[dc.textures[i].value];
+			CHECK_GL(glActiveTexture(GL_TEXTURE0 + i));
+			CHECK_GL(glBindTexture(t.cubemap ? GL_TEXTURE_CUBE_MAP : GL_TEXTURE_2D, t.handle));
+		}
+		else {
+			CHECK_GL(glActiveTexture(GL_TEXTURE0 + i));
+			CHECK_GL(glBindTexture(GL_TEXTURE_2D, 0));
+		}
 	}
 
 	if (dc.vertex_decl) {
@@ -559,7 +581,7 @@ void draw(const DrawCall& dc)
 		const GLsizei stride = decl->size;
 		const GLuint vb = dc.vertex_buffer.value;
 		const uint vb_offset = dc.vertex_buffer_offset;
-		glBindBuffer(GL_ARRAY_BUFFER, vb);
+		CHECK_GL(glBindBuffer(GL_ARRAY_BUFFER, vb));
 
 		for (uint i = 0; i < decl->attributes_count; ++i) {
 			const Attribute* attr = &decl->attributes[i];
@@ -573,17 +595,17 @@ void draw(const DrawCall& dc)
 			const int index = dc.attribute_map ? dc.attribute_map[i] : i;
 
 			if(index >= 0) {
-				glEnableVertexAttribArray(index);
-				glVertexAttribPointer(index, attr->components_num, gl_attr_type, attr->normalized, stride, offset);
+				CHECK_GL(glEnableVertexAttribArray(index));
+				CHECK_GL(glVertexAttribPointer(index, attr->components_num, gl_attr_type, attr->normalized, stride, offset));
 			}
 		}
 	}
 
 	if (dc.index_buffer.value != 0xffFFffFF) {
 		const GLuint ib = dc.index_buffer.value;
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ib);
-		glDrawElements(pt, dc.indices_count, GL_UNSIGNED_SHORT, (void*)(intptr_t)(dc.indices_offset * sizeof(short)));
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+		CHECK_GL(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ib));
+		CHECK_GL(glDrawElements(pt, dc.indices_count, GL_UNSIGNED_SHORT, (void*)(intptr_t)(dc.indices_offset * sizeof(short))));
+		CHECK_GL(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
 	}
 	else {
 		CHECK_GL(glDrawArrays(pt, dc.indices_offset, dc.indices_count));
@@ -643,6 +665,8 @@ static struct {
 	{TextureFormat::D24S8, GL_DEPTH24_STENCIL8, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8},
 	{TextureFormat::D32, GL_DEPTH_COMPONENT32, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT},
 	
+	{TextureFormat::SRGB, GL_SRGB8, GL_RGBA, GL_UNSIGNED_BYTE},
+	{TextureFormat::SRGBA, GL_SRGB8_ALPHA8, GL_RGBA, GL_UNSIGNED_BYTE},
 	{TextureFormat::RGBA8, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE},
 	{TextureFormat::RGBA16F, GL_RGBA16F, GL_RGBA, GL_HALF_FLOAT},
 	{TextureFormat::R16F, GL_R16F, GL_RED, GL_HALF_FLOAT},
@@ -651,12 +675,9 @@ static struct {
 };
 
 
-TextureHandle loadTexture(const void* input, int input_size, TextureInfo* info)
+TextureHandle loadTexture(const void* input, int input_size, uint flags, TextureInfo* info)
 {
 	DDS::Header hdr;
-	uint width = 0;
-	uint height = 0;
-	uint mipMapCount = 0;
 
 	InputBlob blob(input, input_size);
 	blob.read(&hdr, sizeof(hdr));
@@ -667,9 +688,6 @@ TextureHandle loadTexture(const void* input, int input_size, TextureInfo* info)
 		g_log_error.log("renderer") << "Wrong dds format or corrupted dds.";
 		return INVALID_TEXTURE;
 	}
-
-	width = hdr.dwWidth;
-	height = hdr.dwHeight;
 
 	DDS::LoadInfo* li;
 
@@ -701,99 +719,129 @@ TextureHandle loadTexture(const void* input, int input_size, TextureInfo* info)
 		return INVALID_TEXTURE;
 	}
 
+	const bool is_cubemap = (hdr.caps2.dwCaps2 & DDS::DDSCAPS2_CUBEMAP) != 0;
+
+	if(s_ffr.first_free_texture == 0xffFFffFF) {
+		g_log_error.log("Renderer") << "FFR is out of free texture slots.";
+		return INVALID_TEXTURE;
+	}
+
 	GLuint texture;
 	glGenTextures(1, &texture);
 	if (texture == 0) {
 		return INVALID_TEXTURE;
 	}
 
-	glBindTexture(GL_TEXTURE_2D, texture);
+	const bool is_srgb = flags & (u32)TextureFlags::SRGB;
+	const GLenum internal_format = is_srgb ? li->internalSRGBFormat : li->internalFormat;
 
-	mipMapCount = (hdr.dwFlags & DDS::DDSD_MIPMAPCOUNT) ? hdr.dwMipMapCount : 1;
-	if (li->compressed) {
-		uint size = DDS::sizeDXTC(width, height, li->internalFormat);
-		if (size != hdr.dwPitchOrLinearSize || (hdr.dwFlags & DDS::DDSD_LINEARSIZE) == 0) {
-			glDeleteTextures(1, &texture);
-			return INVALID_TEXTURE;
-		}
-		Array<u8> data(*s_ffr.allocator);
-		data.resize(size);
-		for (uint ix = 0; ix < mipMapCount; ++ix) {
-			blob.read(&data[0], size);
-			//DDS::flipCompressedTexture(width, height, li->internalFormat, &data[0]);
-			glCompressedTexImage2D(GL_TEXTURE_2D, ix, li->internalFormat, width, height, 0, size, &data[0]);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-			width = Math::maximum(1, width >> 1);
-			height = Math::maximum(1, height >> 1);
-			size = DDS::sizeDXTC(width, height, li->internalFormat);
-		}
-	}
-	else if (li->palette) {
-		if ((hdr.dwFlags & DDS::DDSD_PITCH) == 0 || hdr.pixelFormat.dwRGBBitCount != 8) {
-			glDeleteTextures(1, &texture);
-			return INVALID_TEXTURE;
-		}
-		uint size = hdr.dwPitchOrLinearSize * height;
-		if (size != width * height * li->blockBytes) {
-			glDeleteTextures(1, &texture);
-			return INVALID_TEXTURE;
-		}
-		Array<u8> data(*s_ffr.allocator);
-		data.resize(size);
-		uint palette[256];
-		Array<uint> unpacked(*s_ffr.allocator);
-		unpacked.resize(size);
-		blob.read(palette, 4 * 256);
-		for (uint ix = 0; ix < mipMapCount; ++ix) {
-			blob.read(&data[0], size);
-			for (uint zz = 0; zz < size; ++zz) {
-				unpacked[zz] = palette[data[zz]];
+	const uint mipMapCount = (hdr.dwFlags & DDS::DDSD_MIPMAPCOUNT) ? hdr.dwMipMapCount : 1;
+	for(int side = 0; side < (is_cubemap ? 6 : 1); ++side) {
+
+		uint width = hdr.dwWidth;
+		uint height = hdr.dwHeight;
+
+		const GLenum tex_img_target =  is_cubemap ? GL_TEXTURE_CUBE_MAP_POSITIVE_X + side : GL_TEXTURE_2D;
+		const GLenum texture_target = is_cubemap ? GL_TEXTURE_CUBE_MAP : GL_TEXTURE_2D;
+		CHECK_GL(glBindTexture(texture_target, texture));
+
+		if (li->compressed) {
+			uint size = DDS::sizeDXTC(width, height, internal_format);
+			if (size != hdr.dwPitchOrLinearSize || (hdr.dwFlags & DDS::DDSD_LINEARSIZE) == 0) {
+				CHECK_GL(glDeleteTextures(1, &texture));
+				return INVALID_TEXTURE;
 			}
-			//glPixelStorei(GL_UNPACK_ROW_LENGTH, height);
-			glTexImage2D(GL_TEXTURE_2D, ix, li->internalFormat, width, height, 0, li->externalFormat, li->type, &unpacked[0]);
-			width = Math::maximum(1, width >> 1);
-			height = Math::maximum(1, height >> 1);
-			size = width * height * li->blockBytes;
+			Array<u8> data(*s_ffr.allocator);
+			data.resize(size);
+			for (uint ix = 0; ix < mipMapCount; ++ix) {
+				blob.read(&data[0], size);
+				//DDS::flipCompressedTexture(width, height, internal_format, &data[0]);
+				CHECK_GL(glCompressedTexImage2D(tex_img_target, ix, internal_format, width, height, 0, size, &data[0]));
+				CHECK_GL(glTexParameteri(texture_target, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR));
+				CHECK_GL(glTexParameteri(texture_target, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
+				width = Math::maximum(1, width >> 1);
+				height = Math::maximum(1, height >> 1);
+				size = DDS::sizeDXTC(width, height, internal_format);
+			}
 		}
+		else if (li->palette) {
+			if ((hdr.dwFlags & DDS::DDSD_PITCH) == 0 || hdr.pixelFormat.dwRGBBitCount != 8) {
+				CHECK_GL(glDeleteTextures(1, &texture));
+				return INVALID_TEXTURE;
+			}
+			uint size = hdr.dwPitchOrLinearSize * height;
+			if (size != width * height * li->blockBytes) {
+				CHECK_GL(glDeleteTextures(1, &texture));
+				return INVALID_TEXTURE;
+			}
+			Array<u8> data(*s_ffr.allocator);
+			data.resize(size);
+			uint palette[256];
+			Array<uint> unpacked(*s_ffr.allocator);
+			unpacked.resize(size);
+			blob.read(palette, 4 * 256);
+			for (uint ix = 0; ix < mipMapCount; ++ix) {
+				blob.read(&data[0], size);
+				for (uint zz = 0; zz < size; ++zz) {
+					unpacked[zz] = palette[data[zz]];
+				}
+				//glPixelStorei(GL_UNPACK_ROW_LENGTH, height);
+				CHECK_GL(glTexImage2D(tex_img_target, ix, internal_format, width, height, 0, li->externalFormat, li->type, &unpacked[0]));
+				width = Math::maximum(1, width >> 1);
+				height = Math::maximum(1, height >> 1);
+				size = width * height * li->blockBytes;
+			}
+		}
+		else {
+			if (li->swap) {
+				CHECK_GL(glPixelStorei(GL_UNPACK_SWAP_BYTES, GL_TRUE));
+			}
+			uint size = width * height * li->blockBytes;
+			Array<u8> data(*s_ffr.allocator);
+			data.resize(size);
+			for (uint ix = 0; ix < mipMapCount; ++ix) {
+				blob.read(&data[0], size);
+				//glPixelStorei(GL_UNPACK_ROW_LENGTH, height);
+				CHECK_GL(glTexImage2D(tex_img_target, ix, internal_format, width, height, 0, li->externalFormat, li->type, &data[0]));
+				width = Math::maximum(1, width >> 1);
+				height = Math::maximum(1, height >> 1);
+				size = width * height * li->blockBytes;
+			}
+			CHECK_GL(glPixelStorei(GL_UNPACK_SWAP_BYTES, GL_FALSE));
+		}
+		CHECK_GL(glTexParameteri(texture_target, GL_TEXTURE_MAX_LEVEL, mipMapCount - 1));
 	}
-	else {
-		if (li->swap) {
-			glPixelStorei(GL_UNPACK_SWAP_BYTES, GL_TRUE);
-		}
-		uint size = width * height * li->blockBytes;
-		Array<u8> data(*s_ffr.allocator);
-		data.resize(size);
-		for (uint ix = 0; ix < mipMapCount; ++ix) {
-			blob.read(&data[0], size);
-			//glPixelStorei(GL_UNPACK_ROW_LENGTH, height);
-			glTexImage2D(GL_TEXTURE_2D, ix, li->internalFormat, width, height, 0, li->externalFormat, li->type, &data[0]);
-			width = Math::maximum(1, width >> 1);
-			height = Math::maximum(1, height >> 1);
-			size = width * height * li->blockBytes;
-		}
-		glPixelStorei(GL_UNPACK_SWAP_BYTES, GL_FALSE);
-	}
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, mipMapCount - 1);
 
 	if(info) {
-		info->width = width;
-		info->height = height;
+		info->width = hdr.dwWidth;
+		info->height = hdr.dwHeight;
 		info->depth = 1;
 		info->layers = 1;
 		info->mips = mipMapCount;
-		info->is_cubemap = false;
+		info->is_cubemap = is_cubemap;
 	}
 
-	return {texture};
+	Texture& t = s_ffr.textures[s_ffr.first_free_texture];
+	s_ffr.first_free_texture = t.handle;
+	t.handle = texture;
+	t.cubemap = is_cubemap;
+
+	return {uint(&t - s_ffr.textures)};
 }
 
 
-TextureHandle createTexture(uint w,uint h, TextureFormat format, const void* data)
+TextureHandle createTexture(uint w,uint h, TextureFormat format, uint flags, const void* data)
 {
-	GLuint t;
-	CHECK_GL(glGenTextures(1, &t));
-	CHECK_GL(glBindTexture(GL_TEXTURE_2D, t));
+	if(s_ffr.first_free_texture == 0xffFFffFF) {
+		g_log_error.log("Renderer") << "FFR is out of free texture slots.";
+		return INVALID_TEXTURE;
+	}
+	const bool is_srgb = flags & (u32)TextureFlags::SRGB;
+	ASSERT(!is_srgb); // use format argument to enable srgb
+
+	GLuint texture;
+	CHECK_GL(glGenTextures(1, &texture));
+	CHECK_GL(glBindTexture(GL_TEXTURE_2D, texture));
 	int found_format = 0;
 	for (int i = 0; i < sizeof(s_texture_formats) / sizeof(s_texture_formats[0]); ++i) {
 		if(s_texture_formats[i].format == format) {
@@ -813,7 +861,7 @@ TextureHandle createTexture(uint w,uint h, TextureFormat format, const void* dat
 
 	if(!found_format) {
 		CHECK_GL(glBindTexture(GL_TEXTURE_2D, 0));
-		CHECK_GL(glDeleteTextures(1, &t));
+		CHECK_GL(glDeleteTextures(1, &texture));
 		return INVALID_TEXTURE;	
 	}
 
@@ -824,13 +872,23 @@ TextureHandle createTexture(uint w,uint h, TextureFormat format, const void* dat
 	CHECK_GL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR));
 
 	CHECK_GL(glBindTexture(GL_TEXTURE_2D, 0));
-	return {t};
+
+	Texture& t = s_ffr.textures[s_ffr.first_free_texture];
+	s_ffr.first_free_texture = t.handle;
+	t.handle = texture;
+	t.cubemap = false;
+
+	return {uint(&t - s_ffr.textures)};
 }
 
 
 void destroy(TextureHandle texture)
 {
-	CHECK_GL(glDeleteTextures(1, &texture.value));
+	Texture& t = s_ffr.textures[texture.value];
+	const GLuint handle = t.handle;
+	t.handle = s_ffr.first_free_texture;
+	s_ffr.first_free_texture = texture.value;
+	CHECK_GL(glDeleteTextures(1, &handle));
 }
 
 
@@ -956,8 +1014,14 @@ void preinit()
 bool init(IAllocator& allocator)
 {
 	s_ffr.allocator = &allocator;
-	
+
 	if (!load_gl()) return false;
+
+	s_ffr.textures = (Texture*)allocator.allocate(sizeof(Texture) * Texture::MAX_COUNT);
+	for(int i = 0; i < Texture::MAX_COUNT; ++i) {
+		s_ffr.textures[i].handle = i + 1;
+	}
+	s_ffr.textures[Texture::MAX_COUNT - 1].handle = 0xffFFffFF;
 
 /*	int extensions_count;
 	glGetIntegerv(GL_NUM_EXTENSIONS, &extensions_count);
@@ -969,6 +1033,9 @@ bool init(IAllocator& allocator)
 	const unsigned char* extensions = glGetString(GL_EXTENSIONS);
 	const unsigned char* version = glGetString(GL_VERSION);*/
 
+	CHECK_GL(glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE));
+	CHECK_GL(glDepthFunc(GL_GREATER));
+	
 	CHECK_GL(glEnable(GL_DEBUG_OUTPUT));
 	CHECK_GL(glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS));
 	CHECK_GL(glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, 0, GL_TRUE));
@@ -979,6 +1046,18 @@ bool init(IAllocator& allocator)
 	CHECK_GL(glGenTextures(_countof(s_ffr.tex_buffers), s_ffr.tex_buffers));
 
 	return true;
+}
+
+
+bool isHomogenousDepth() { return false; }
+
+
+bool isOriginBottomLeft() { return true; }
+
+
+void getTextureImage(ffr::TextureHandle texture, uint size, void* buf)
+{
+	glGetTextureImage(texture.value, 0, GL_RGBA, GL_UNSIGNED_BYTE, size, buf);
 }
 
 
@@ -1046,7 +1125,7 @@ FramebufferHandle createFramebuffer(uint renderbuffers_count, const TextureHandl
 	
 	int color_attachment_idx = 0;
 	for (uint i = 0; i < renderbuffers_count; ++i) {
-		const GLuint t = renderbuffers[i].value;
+		const GLuint t = s_ffr.textures[renderbuffers[i].value].handle;
 		CHECK_GL(glBindTexture(GL_TEXTURE_2D, t));
 		GLint internal_format;
 		CHECK_GL(glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT, &internal_format));
@@ -1076,19 +1155,28 @@ FramebufferHandle createFramebuffer(uint renderbuffers_count, const TextureHandl
 }
 
 
-void setFramebuffer(FramebufferHandle fb)
+void setFramebuffer(FramebufferHandle fb, bool srgb)
 {
 	if(fb.value == 0xffFFffFF) {
 		CHECK_GL(glBindFramebuffer(GL_FRAMEBUFFER, 0));
 	}
 	else {
 		CHECK_GL(glBindFramebuffer(GL_FRAMEBUFFER, fb.value));
+		const GLenum db[] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+		CHECK_GL(glDrawBuffers(2, db));
+	}
+	if(srgb) {	
+		CHECK_GL(glEnable(GL_FRAMEBUFFER_SRGB));
+	}
+	else {
+		CHECK_GL(glDisable(GL_FRAMEBUFFER_SRGB));
 	}
 }
 
 
 void shutdown()
 {
+	s_ffr.allocator->deallocate(s_ffr.textures);
 }
 
 } // ns ffr 

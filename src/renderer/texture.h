@@ -34,6 +34,11 @@ struct TGAHeader
 
 class LUMIX_RENDERER_API Texture LUMIX_FINAL : public Resource
 {
+	public: 
+		enum class Flags : u32 {
+			SRGB = 1 << 0
+		};
+
 	public:
 		Texture(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
 		~Texture();
@@ -49,10 +54,12 @@ class LUMIX_RENDERER_API Texture LUMIX_FINAL : public Resource
 		void removeDataReference();
 		void onDataUpdated(int x, int y, int w, int h);
 		void save();
+		void setSRGB(bool enable) { setFlags(enable ? flags | u32(Flags::SRGB) : flags & ~u32(Flags::SRGB)); }
 		void setFlags(u32 flags);
-		void setFlag(u32 flag, bool value);
+		void setFlag(Flags flag, bool value);
 		u32 getPixelNearest(int x, int y) const;
 		u32 getPixel(float x, float y) const;
+		u32 getFFRFlags() const;
 
 		static unsigned int compareTGA(FS::IFile* file1, FS::IFile* file2, int difference, IAllocator& allocator);
 		static bool saveTGA(FS::IFile* file,
@@ -74,7 +81,7 @@ class LUMIX_RENDERER_API Texture LUMIX_FINAL : public Resource
 		int layers;
 		int mips;
 		bool is_cubemap;
-		u32 bgfx_flags;
+		u32 flags;
 		ffr::TextureHandle handle;
 		IAllocator& allocator;
 		int data_reference;

@@ -271,7 +271,38 @@ LUMIX_ALIGN_BEGIN(16) struct LUMIX_ENGINE_API Matrix
 		this->m42 = m41 * m12 + m42 * m22 + m43 * m32;
 		this->m43 = m41 * m13 + m42 * m23 + m43 * m33;
 	}
+	
+	// orthonormal
+	Matrix fastInverted() const
+	{
+		Matrix ret;
+		ret.m11 = m11;
+		ret.m22 = m22;
+		ret.m33 = m33;
 
+		ret.m21 = m12;
+		ret.m12 = m12;
+
+		ret.m23 = m32;
+		ret.m32 = m23;
+
+		ret.m13 = m31;
+		ret.m31 = m13;
+
+		ret.m41 = -m41;
+		ret.m42 = -m42;
+		ret.m43 = -m43;
+		ret.m41 = ret.m41 * ret.m11 + ret.m42 * ret.m21 + ret.m43 * ret.m31;
+		ret.m42 = ret.m41 * ret.m12 + ret.m42 * ret.m22 + ret.m43 * ret.m32;
+		ret.m43 = ret.m41 * ret.m13 + ret.m42 * ret.m23 + ret.m43 * ret.m33;
+
+		ret.m14 = 0;
+		ret.m24 = 0;
+		ret.m34 = 0;
+		ret.m44 = 1;
+
+		return ret;
+	}
 	void copy3x3(const Matrix& mtx)
 	{
 		m11 = mtx.m11;
