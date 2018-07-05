@@ -3126,7 +3126,7 @@ public:
 		m_measure_tool = LUMIX_NEW(m_allocator, MeasureTool)();
 		addPlugin(*m_measure_tool);
 
-		const char* plugins[] = { "steam", "renderer", "navigation", "animation", "audio", "physics", "lua_script", "gui"
+		const char* plugins[] = { "steam"
 			#ifdef LUMIXENGINE_PLUGINS
 				, LUMIXENGINE_PLUGINS
 			#endif
