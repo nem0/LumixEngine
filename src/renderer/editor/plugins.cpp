@@ -111,10 +111,7 @@ struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 
 	void onGUI(Resource* resource) override
 	{
-			// TODO
-			ASSERT(false);
-			/*
-auto* material = static_cast<Material*>(resource);
+		Material* material = static_cast<Material*>(resource);
 
 		if (ImGui::Button("Save")) saveMaterial(material);
 		ImGui::SameLine();
@@ -139,6 +136,9 @@ auto* material = static_cast<Material*>(resource);
 		bool b = material->isBackfaceCulling();
 		if (ImGui::Checkbox("Backface culling", &b)) material->enableBackfaceCulling(b);
 
+		// TODO
+				ASSERT(false);
+				/*
 		if (material->hasDefine(alpha_cutout_define))
 		{
 			b = material->isDefined(alpha_cutout_define);
@@ -151,7 +151,7 @@ auto* material = static_cast<Material*>(resource);
 					material->setAlphaRef(tmp);
 				}
 			}
-		}
+		}*/
 
 		Vec4 color = material->getColor();
 		if (ImGui::ColorEdit4("Color", &color.x))
@@ -213,7 +213,9 @@ auto* material = static_cast<Material*>(resource);
 			if (is_node_open)
 			{
 				ImGui::Image(&texture->handle, ImVec2(96, 96));
-
+				// TODO
+				ASSERT(false);
+				/*
 				if (ImGui::CollapsingHeader("Advanced"))
 				{
 					static const struct
@@ -239,7 +241,7 @@ auto* material = static_cast<Material*>(resource);
 							texture->setFlag(flag.value, b);
 						}
 					}
-				}
+				}*/
 				ImGui::TreePop();
 			}
 		}
@@ -247,7 +249,10 @@ auto* material = static_cast<Material*>(resource);
 		auto* shader = material->getShader();
 		if (shader && material->isReady())
 		{
-			for (int i = 0; i < shader->m_uniforms.size(); ++i)
+						// TODO
+				ASSERT(false);
+				/*
+	for (int i = 0; i < shader->m_uniforms.size(); ++i)
 			{
 				auto& uniform = material->getUniform(i);
 				auto& shader_uniform = shader->m_uniforms[i];
@@ -287,13 +292,15 @@ auto* material = static_cast<Material*>(resource);
 					default: ASSERT(false); break;
 				}
 			}
-
+			*/
 			int layers_count = material->getLayersCount();
 			if (ImGui::DragInt("Layers count", &layers_count, 1, 0, 256))
 			{
 				material->setLayersCount(layers_count);
 			}
-
+			// TODO
+				ASSERT(false);
+				/*
 			if (ImGui::CollapsingHeader("Defines"))
 			{
 				for (int define_idx = 0; define_idx < renderer->getShaderDefinesCount(); ++define_idx)
@@ -317,7 +324,7 @@ auto* material = static_cast<Material*>(resource);
 						material->setDefine(define_idx, value);
 					}
 				}
-			}
+			}*/
 
 			if (Material::getCustomFlagCount() > 0 && ImGui::CollapsingHeader("Flags"))
 			{
@@ -333,7 +340,7 @@ auto* material = static_cast<Material*>(resource);
 					}
 				}
 			}
-		}*/
+		}
 	}
 
 
@@ -1304,10 +1311,7 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 
 	void generateCubemap(ComponentUID cmp)
 	{
-		// TODO
-		ASSERT(false);
-		/*
-static const int TEXTURE_SIZE = 1024;
+		static const int TEXTURE_SIZE = 1024;
 
 		Universe* universe = m_app.getWorldEditor().getUniverse();
 		if (universe->getName()[0] == '\0')
@@ -1343,15 +1347,15 @@ static const int TEXTURE_SIZE = 1024;
 
 		Array<u8> data(allocator);
 		data.resize(6 * TEXTURE_SIZE * TEXTURE_SIZE * 4);
-		bgfx::TextureHandle texture =
-			bgfx::createTexture2D(TEXTURE_SIZE, TEXTURE_SIZE, false, 1, bgfx::TextureFormat::RGBA8,
-BGFX_TEXTURE_READ_BACK); renderer->frame(false); // submit renderer->frame(false); // wait for gpu
+		ffr::TextureHandle texture = ffr::createTexture(TEXTURE_SIZE, TEXTURE_SIZE, ffr::TextureFormat::RGBA8, 0, nullptr);
+		renderer->frame(false); // submit 
+		renderer->frame(false); // wait for gpu
 
 		for (int i = 0; i < 6; ++i)
 		{
 			Matrix mtx = Matrix::IDENTITY;
 			mtx.setTranslation(probe_position);
-			bool ndc_bottom_left = bgfx::getCaps()->originBottomLeft;
+			const bool ndc_bottom_left = ffr::isOriginBottomLeft();
 			Vec3 side = crossProduct(ndc_bottom_left ? ups_opengl[i] : ups[i], dirs[i]);
 			mtx.setZVector(dirs[i]);
 			mtx.setYVector(ndc_bottom_left ? ups_opengl[i] : ups[i]);
@@ -1359,18 +1363,8 @@ BGFX_TEXTURE_READ_BACK); renderer->frame(false); // submit renderer->frame(false
 			universe->setMatrix(camera_entity, mtx);
 			m_pipeline->render();
 
-			renderer->viewCounterAdd();
-			bgfx::touch(renderer->getViewCounter());
-			bgfx::setViewName(renderer->getViewCounter(), "probe_blit");
-			bgfx::TextureHandle color_renderbuffer = m_pipeline->getRenderbuffer("default", 0);
-			bgfx::blit(renderer->getViewCounter(), texture, 0, 0, color_renderbuffer);
-
-			renderer->viewCounterAdd();
-			bgfx::setViewName(renderer->getViewCounter(), "probe_read");
-			bgfx::readTexture(texture, &data[i * TEXTURE_SIZE * TEXTURE_SIZE * 4]);
-			bgfx::touch(renderer->getViewCounter());
-			renderer->frame(false); // submit
-			renderer->frame(false); // wait for gpu
+			const ffr::TextureHandle res = m_pipeline->getOutput();
+			ffr::getTextureImage(res, TEXTURE_SIZE * TEXTURE_SIZE * 4, &data[i * TEXTURE_SIZE * TEXTURE_SIZE * 4]);
 
 			if (ndc_bottom_left) continue;
 
@@ -1430,10 +1424,10 @@ BGFX_TEXTURE_READ_BACK); renderer->frame(false); // submit renderer->frame(false
 		{
 			saveCubemap(cmp, &data[0], reflection_size, "");
 		}
-		bgfx::destroy(texture);
+		ffr::destroy(texture);
 		
 
-		scene->reloadEnvironmentProbe(cmp.entity);*/
+		scene->reloadEnvironmentProbe(cmp.entity);
 	}
 
 
@@ -2577,8 +2571,7 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 		int width, height;
 		ImGui::GetIO().Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
 
-		ffr::destroy(m_texture);
-		m_texture = ffr::createTexture(width, height, ffr::TextureFormat::RGBA8, pixels);
+		m_texture = ffr::createTexture(width, height, ffr::TextureFormat::RGBA8, 0, pixels);
 
 		IAllocator& allocator = editor.getAllocator();
 		RenderInterface* render_interface =
@@ -2588,28 +2581,31 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 		m_vertex_buffer = ffr::createBuffer(1024 * 256, nullptr);
 		m_index_buffer = ffr::createBuffer(1024 * 256, nullptr);
 
-		const char* vs = "#version 330\n"
-						 "layout(location = 0) in vec2 a_pos;\n"
-						 "layout(location = 1) in vec2 a_uv;\n"
-						 "layout(location = 2) in vec4 a_color;\n"
-						 "out vec4 v_color;\n"
-						 "out vec2 v_uv;\n"
-						 "uniform vec2 u_canvas_size;\n"
-						 "void main() {\n"
-						 "	v_color = a_color;\n"
-						 "	v_uv = a_uv;\n"
-						 "	gl_Position = vec4(a_pos / u_canvas_size * 2 - 1, 0, 1);\n"
-						 "	gl_Position.y = -gl_Position.y;\n"
-						 "}\n";
-		const char* fs = "#version 330\n"
-						 "in vec4 v_color;\n"
-						 "in vec2 v_uv;\n"
-						 "out vec4 o_color;\n"
-						 "uniform sampler2D u_texture;\n"
-						 "void main() {\n"
-						 "	vec4 tc = textureLod(u_texture, v_uv, 0);\n"
-						 "	o_color = v_color * tc;\n"
-						 "}\n";
+		const char* vs =
+			"#version 330\n"
+			"layout(location = 0) in vec2 a_pos;\n"
+			"layout(location = 1) in vec2 a_uv;\n"
+			"layout(location = 2) in vec4 a_color;\n"
+			"out vec4 v_color;\n"
+			"out vec2 v_uv;\n"
+			"uniform vec2 u_canvas_size;\n"
+			"void main() {\n"
+			"	v_color = a_color;\n"
+			"	v_uv = a_uv;\n"
+			"	gl_Position = vec4(a_pos / u_canvas_size * 2 - 1, 0, 1);\n"
+			"	gl_Position.y = -gl_Position.y;\n"
+			"}\n";
+		const char* fs = 
+			"#version 330\n"
+			"in vec4 v_color;\n"
+			"in vec2 v_uv;\n"
+			"out vec4 o_color;\n"
+			"uniform sampler2D u_texture;\n"
+			"void main() {\n"
+			"	vec4 tc = textureLod(u_texture, v_uv, 0);\n"
+			"	o_color.rgb = pow(tc.rgb, vec3(1/2.2)) * v_color.rgb;\n"
+			"	o_color.a = v_color.a * tc.a;\n"
+			"}\n";
 		const char* srcs[] = {vs, fs};
 		ffr::ShaderType types[] = {ffr::ShaderType::VERTEX, ffr::ShaderType::FRAGMENT};
 		m_shader = ffr::createProgram(srcs, types, 2, nullptr, 0, "imgui shader");
@@ -2642,7 +2638,7 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 
 	void beginViewportRender()
 	{
-		ffr::setFramebuffer(ffr::INVALID_FRAMEBUFFER);
+		ffr::setFramebuffer(ffr::INVALID_FRAMEBUFFER, false);
 
 		const float clear_color[] = {0.2f, 0.2f, 0.2f, 1.f};
 		ffr::clear((uint)ffr::ClearFlags::COLOR | (uint)ffr::ClearFlags::DEPTH, clear_color, 1.0);

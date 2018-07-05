@@ -13,23 +13,48 @@ namespace Lumix
 namespace LuaWrapper
 {
 
+
+inline int traceback (lua_State *L) {
+	if (!lua_isstring(L, 1)) return 1;
+	
+	lua_getfield(L, LUA_GLOBALSINDEX, "debug");
+	if (!lua_istable(L, -1)) {
+		lua_pop(L, 1);
+		return 1;
+	}
+	
+	lua_getfield(L, -1, "traceback");
+	if (!lua_isfunction(L, -1)) {
+		lua_pop(L, 2);
+		return 1;
+	}
+	
+	lua_pushvalue(L, 1);
+	lua_pushinteger(L, 2);
+	lua_call(L, 2, 1);
+
+	return 1;
+}
+
+
 inline bool execute(lua_State* L
 	, StringView content
 	, const char* name
 	, int nresults)
 {
+	lua_pushcfunction(L, traceback);
 	if (luaL_loadbuffer(L, content.begin, content.length(), name) != 0) {
 		g_log_error.log("Engine") << name << ": " << lua_tostring(L, -1);
-		lua_pop(L, 1);
+		lua_pop(L, 2);
 		return false;
 	}
 
-	if (lua_pcall(L, 0, nresults, 0) != 0)
-	{
-		g_log_error.log("Engine") << name << ": " << lua_tostring(L, -1);
-		lua_pop(L, 1);
+	if (lua_pcall(L, 0, nresults, -2) != 0) {
+		g_log_error.log("Engine") << lua_tostring(L, -1);
+		lua_pop(L, 2);
 		return false;
 	}
+	lua_pop(L, 1);
 	return true;
 }
 
@@ -539,14 +564,17 @@ inline void getOptionalField(lua_State* L, int idx, const char* field_name, T* o
 }
 
 
-inline void getOptionalStringField(lua_State* L, int idx, const char* field_name, char* out, int max_size)
+inline bool getOptionalStringField(lua_State* L, int idx, const char* field_name, char* out, int max_size)
 {
+	bool ret = false;
 	if (LuaWrapper::getField(L, idx, field_name) != LUA_TNIL && isType<const char*>(L, -1))
 	{
 		const char* src = toType<const char*>(L, -1);;
 		copyString(out, max_size, src);
+		ret = true;
 	}
 	lua_pop(L, 1);
+	return ret;
 }
 
 

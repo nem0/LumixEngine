@@ -901,39 +901,34 @@ struct FBXImporter
 				continue;
 			}
 
-			writeString("{\n\t\"shader\" : \"pipelines/rigid/rigid.shd\"");
-			if (material.alpha_cutout) writeString(",\n\t\"defines\" : [\"ALPHA_CUTOUT\"]");
+			writeString("shader \"pipelines/standard.shd\"\n");
+			if (material.alpha_cutout) writeString("defines {\"ALPHA_CUTOUT\"}\n");
 			auto writeTexture = [this, texture_output_dir](const ImportTexture& texture, bool srgb) {
 				if (texture.fbx)
 				{
-					writeString(",\n\t\"texture\" : { \"source\" : \"");
+					writeString("texture \"");
 					PathUtils::FileInfo info(texture.src);
 					writeString(texture_output_dir);
 					writeString(info.m_basename);
 					writeString(".");
 					writeString(texture.to_dds ? "dds" : info.m_extension);
-					writeString("\"");
-					if (srgb) writeString(", \"srgb\" : true ");
-					writeString("}");
+					writeString("\"\n");
+//					if (srgb) writeString(", \"srgb\" : true ");
 				}
 				else
 				{
-					writeString(",\n\t\"texture\" : {");
-					if (srgb) writeString(" \"srgb\" : true ");
-					writeString("}");
+					writeString("texture \"\"\n");
 				}
 			};
 
 			writeTexture(material.textures[0], true);
 			writeTexture(material.textures[1], false);
 
-			ofbx::Color diffuse_color = material.fbx->getDiffuseColor();
-			out_file << ",\n\t\"color\" : [" << diffuse_color.r 
+/*			ofbx::Color diffuse_color = material.fbx->getDiffuseColor();
+			out_file << "color {" << diffuse_color.r 
 				<< "," << diffuse_color.g
 				<< "," << diffuse_color.b
-				<< ",1]";
-
-			writeString("\n}");
+				<< ",1}\n";*/
 
 			out_file.close();
 		}

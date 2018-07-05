@@ -54,15 +54,20 @@ const Shader::Program& Shader::getProgram(u32 defines)
 			"#version 420\n"
 			"layout (std140) uniform GlobalState\n"
 			"{\n"
-			"	mat4 u_projection;\n"
-			"	mat4 u_view;\n"
+			"	mat4 u_camera_projection;\n"
+			"	mat4 u_camera_view;\n"
+			"	mat4 u_camera_view_projection;\n"
+			"	mat4 u_camera_inv_view_projection;\n"
 			"	vec3 u_camera_pos;\n"
 			"	vec3 u_light_direction;\n"
 			"	vec3 u_light_color;\n"
 			"	float u_light_intensity;\n"
 			"	float u_light_indirect_intensity;\n"
 			"	ivec2 u_framebuffer_size;\n"
-			"};\n";
+			"};\n"
+			"uniform samplerCube u_irradiancemap;\n"
+			"uniform samplerCube u_radiancemap;\n"
+			;
 
 		const char* codes[64];
 		ffr::ShaderType types[64];
@@ -326,6 +331,12 @@ int texture_slot(lua_State* L)
 	Shader::TextureSlot& slot = shader->m_texture_slots[shader->m_texture_slot_count];
 	LuaWrapper::getOptionalStringField(L, -1, "uniform", slot.uniform, lengthOf(slot.uniform));
 
+	char tmp[MAX_PATH_LENGTH];
+	if(LuaWrapper::getOptionalStringField(L, -1, "default_texture", tmp, lengthOf(tmp))) {
+		ResourceManagerBase* texture_manager = shader->getResourceManager().getOwner().get(Texture::TYPE);
+		slot.default_texture = (Texture*)texture_manager->load(Path(tmp));
+	}
+
 	++shader->m_texture_slot_count;
 
 	return 0;
@@ -420,6 +431,7 @@ int include(lua_State* L)
 bool Shader::load(FS::IFile& file)
 {
 	lua_State* L = luaL_newstate();
+	luaL_openlibs(L);
 
 	ASSERT(m_include.empty());
 	ASSERT(m_programs.empty());

@@ -25,7 +25,7 @@ Texture::Texture(const Path& path, ResourceManagerBase& resource_manager, IAlloc
 	, depth(-1)
 	, layers(1)
 {
-	bgfx_flags = 0;
+	flags = 0;
 	is_cubemap = false;
 	handle = ffr::INVALID_TEXTURE;
 }
@@ -37,11 +37,11 @@ Texture::~Texture()
 }
 
 
-void Texture::setFlag(u32 flag, bool value)
+void Texture::setFlag(Flags flag, bool value)
 {
-	u32 new_flags = bgfx_flags & ~flag;
-	new_flags |= value ? flag : 0;
-	bgfx_flags = new_flags;
+	u32 new_flags = flags & ~u32(flag);
+	new_flags |= value ? u32(flag) : 0;
+	flags = new_flags;
 
 	m_resource_manager.reload(*this);
 }
@@ -49,13 +49,13 @@ void Texture::setFlag(u32 flag, bool value)
 
 void Texture::setFlags(u32 flags)
 {
-	if (isReady() && bgfx_flags != flags)
+	if (isReady() && this->flags != flags)
 	{
 		g_log_warning.log("Renderer") << "Trying to set different flags for texture " << getPath().c_str()
 									  << ". They are ignored.";
 		return;
 	}
-	bgfx_flags = flags;
+	this->flags = flags;
 }
 
 
@@ -67,7 +67,7 @@ void Texture::destroy()
 
 bool Texture::create(int w, int h, const void* data)
 {
-	handle = ffr::createTexture(w, h, ffr::TextureFormat::RGBA8, data);
+	handle = ffr::createTexture(w, h, ffr::TextureFormat::RGBA8, getFFRFlags(), data);
 	mips = 1;
 	width = w;
 	height = h;
@@ -334,7 +334,7 @@ bool loadRaw(Texture& texture, FS::IFile& file, IAllocator& allocator)
 		dst_mem[i] = src_mem[i] / 65535.0f;
 	}
 
-	texture.handle = ffr::createTexture(texture.width, texture.height, ffr::TextureFormat::R32F, &dst_mem[0]);
+	texture.handle = ffr::createTexture(texture.width, texture.height, ffr::TextureFormat::R32F, texture.getFFRFlags(), &dst_mem[0]);
 	texture.depth = 1;
 	texture.layers = 1;
 	texture.mips = 1;
@@ -564,7 +564,7 @@ bool Texture::loadTGA(FS::IFile& file)
 
 	bytes_per_pixel = 4;
 	mips = 1;
-	handle = ffr::createTexture(header.width, header.height, ffr::TextureFormat::RGBA8, image_dest);
+	handle = ffr::createTexture(header.width, header.height, ffr::TextureFormat::RGBA8, getFFRFlags(), image_dest);
 	depth = 1;
 	layers = 1;
 	return handle.isValid();
@@ -594,7 +594,7 @@ void Texture::removeDataReference()
 static bool loadDDS(Texture& texture, FS::IFile& file)
 {
 	ffr::TextureInfo info;
-	texture.handle = ffr::loadTexture(file.getBuffer(), (int)file.size(), &info);
+	texture.handle = ffr::loadTexture(file.getBuffer(), (int)file.size(), texture.getFFRFlags(), &info);
 	if (texture.handle.isValid()) {
 		texture.width = info.width;
 		texture.height = info.height;
@@ -605,6 +605,17 @@ static bool loadDDS(Texture& texture, FS::IFile& file)
 	}
 
 	return texture.handle.isValid();
+}
+
+
+u32 Texture::getFFRFlags() const
+{
+	u32 ffr_flags = 0;
+	if(flags & (u32)Flags::SRGB) {
+		ffr_flags  |= (u32)ffr::TextureFlags::SRGB;
+	}
+
+	return ffr_flags ;
 }
 
 

@@ -39,7 +39,6 @@ public:
 	};
 
 public:
-	static void registerLuaAPI(lua_State* state);
 	static Pipeline* create(Renderer& renderer, const Path& path, const char* define, IAllocator& allocator);
 	static void destroy(Pipeline* pipeline);
 
