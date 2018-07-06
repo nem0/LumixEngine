@@ -113,6 +113,9 @@ LUMIX_ALIGN_BEGIN(16) struct LUMIX_ENGINE_API Frustum
 	};
 
 
+	void setPlanesFromPoints();
+
+
 	Vec3 getNormal(Planes side) const
 	{
 		return Vec3(xs[(int)side], ys[(int)side], zs[(int)side]);

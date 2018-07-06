@@ -49,7 +49,7 @@ SceneView::SceneView(StudioApp& app)
 	IAllocator& allocator = engine.getAllocator();
 	auto* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
 	Path path("pipelines/main.pln");
-	m_pipeline = Pipeline::create(*renderer, path, "SCENE_VIEW", engine.getAllocator());
+	m_pipeline = Pipeline::create(*renderer, path, "SCENE_VIEW", "editor", engine.getAllocator());
 	m_pipeline->load();
 	m_pipeline->addCustomCommandHandler("renderSelection").callback.bind<SceneView, &SceneView::renderSelection>(this);
 	m_pipeline->addCustomCommandHandler("renderGizmos").callback.bind<SceneView, &SceneView::renderGizmos>(this);

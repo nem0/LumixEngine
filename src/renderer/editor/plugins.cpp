@@ -510,7 +510,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		auto& engine = m_app.getWorldEditor().getEngine();
 		m_universe = &engine.createUniverse(false);
 		auto* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
-		m_pipeline = Pipeline::create(*renderer, Path("pipelines/main.pln"), "", engine.getAllocator());
+		m_pipeline = Pipeline::create(*renderer, Path("pipelines/main.pln"), "", "editor", engine.getAllocator());
 		m_pipeline->load();
 
 		auto mesh_entity = m_universe->createEntity({0, 0, 0}, {0, 0, 0, 1});
@@ -1205,7 +1205,7 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		Renderer* renderer = static_cast<Renderer*>(plugin_manager.getPlugin("renderer"));
 		IAllocator& allocator = world_editor.getAllocator();
 		Path pipeline_path("pipelines/main.pln");
-		m_pipeline = Pipeline::create(*renderer, pipeline_path, "PROBE", allocator);
+		m_pipeline = Pipeline::create(*renderer, pipeline_path, "PROBE", "probe", allocator);
 		m_pipeline->load();
 
 		m_cl_context = nullptr; // cmft::clLoad() > 0 ? cmft::clInit() : nullptr;
@@ -2457,7 +2457,8 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 		const Vec3& lod_ref_point,
 		Entity camera) override
 	{
-		Array<Array<MeshInstance>>& res = m_render_scene->getModelInstanceInfos(frustum, lod_ref_point, camera, ~0ULL);
+		const float lod_multiplier = m_render_scene->getCameraLODMultiplier(camera);
+		Array<Array<MeshInstance>>& res = m_render_scene->getModelInstanceInfos(frustum, lod_ref_point, lod_multiplier, ~0ULL);
 		for (auto& sub : res)
 		{
 			for (MeshInstance m : sub)

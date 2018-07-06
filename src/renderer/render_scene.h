@@ -151,6 +151,7 @@ public:
 	virtual RayCastModelHit castRayTerrain(Entity entity, const Vec3& origin, const Vec3& dir) = 0;
 	virtual void getRay(Entity entity, const Vec2& screen_pos, Vec3& origin, Vec3& dir) = 0;
 
+	virtual float getCameraLODMultiplier(Entity entity) const = 0;
 	virtual Frustum getCameraFrustum(Entity entity) const = 0;
 	virtual Frustum getCameraFrustum(Entity entity, const Vec2& a, const Vec2& b) const = 0;
 	virtual float getTime() const = 0;
@@ -229,7 +230,7 @@ public:
 
 	virtual Matrix getCameraProjection(Entity entity) = 0;
 	virtual Matrix getCameraViewProjection(Entity entity) = 0;
-	virtual Entity getCameraInSlot(const char* slot) = 0;
+	virtual Entity getCameraInSlot(const char* slot) const = 0;
 	virtual float getCameraFOV(Entity entity) = 0;
 	virtual void setCameraFOV(Entity entity, float fov) = 0;
 	virtual void setCameraFarPlane(Entity entity, float far) = 0;
@@ -318,7 +319,7 @@ public:
 	virtual void setModelInstancePath(Entity entity, const Path& path) = 0;
 	virtual Array<Array<MeshInstance>>& getModelInstanceInfos(const Frustum& frustum,
 		const Vec3& lod_ref_point,
-		Entity entity,
+		float lod_multiplier,
 		u64 layer_mask) = 0;
 	virtual void getModelInstanceEntities(const Frustum& frustum, Array<Entity>& entities) = 0;
 	virtual Entity getFirstModelInstance() = 0;

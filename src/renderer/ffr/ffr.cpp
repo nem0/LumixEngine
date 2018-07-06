@@ -1117,12 +1117,15 @@ void setUniformMatrix4f(ProgramHandle program, const char* uniform_name, uint co
 }
 
 
-FramebufferHandle createFramebuffer(uint renderbuffers_count, const TextureHandle* renderbuffers)
+void update(FramebufferHandle fb, uint renderbuffers_count, const TextureHandle* renderbuffers)
 {
-	GLuint fb;
-	CHECK_GL(glGenFramebuffers(1, &fb));
-	CHECK_GL(glBindFramebuffer(GL_FRAMEBUFFER, fb));
-	
+	GLint max_attachments = 0;
+	glGetIntegerv(GL_MAX_COLOR_ATTACHMENTS, &max_attachments);
+	for(int i = 0; i < max_attachments; ++i) {
+		glNamedFramebufferRenderbuffer(fb.value, GL_COLOR_ATTACHMENT0 + i, GL_RENDERBUFFER, 0);
+		glNamedFramebufferRenderbuffer(fb.value, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, 0);
+	}
+
 	int color_attachment_idx = 0;
 	for (uint i = 0; i < renderbuffers_count; ++i) {
 		const GLuint t = s_ffr.textures[renderbuffers[i].value].handle;
@@ -1135,14 +1138,25 @@ FramebufferHandle createFramebuffer(uint renderbuffers_count, const TextureHandl
 			case GL_DEPTH24_STENCIL8:
 			case GL_DEPTH_COMPONENT24:
 			case GL_DEPTH_COMPONENT32:
-				CHECK_GL(glNamedFramebufferTexture(fb, GL_DEPTH_ATTACHMENT, t, 0));
+				CHECK_GL(glNamedFramebufferTexture(fb.value, GL_DEPTH_ATTACHMENT, t, 0));
 				break;
 			default:
-				CHECK_GL(glNamedFramebufferTexture(fb, GL_COLOR_ATTACHMENT0 + color_attachment_idx, t, 0));
+				CHECK_GL(glNamedFramebufferTexture(fb.value, GL_COLOR_ATTACHMENT0 + color_attachment_idx, t, 0));
 				++color_attachment_idx;
 				break;
 		}
 	}
+}
+
+
+FramebufferHandle createFramebuffer(uint renderbuffers_count, const TextureHandle* renderbuffers)
+{
+	GLuint fb;
+	CHECK_GL(glGenFramebuffers(1, &fb));
+	CHECK_GL(glBindFramebuffer(GL_FRAMEBUFFER, fb));
+	CHECK_GL(glBindFramebuffer(GL_FRAMEBUFFER, 0));
+
+	update({fb}, renderbuffers_count, renderbuffers);
 
 	GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
 	CHECK_GL(glBindFramebuffer(GL_FRAMEBUFFER, 0));

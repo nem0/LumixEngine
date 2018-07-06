@@ -39,7 +39,7 @@ public:
 	};
 
 public:
-	static Pipeline* create(Renderer& renderer, const Path& path, const char* define, IAllocator& allocator);
+	static Pipeline* create(Renderer& renderer, const Path& path, const char* define, const char* camera_slot, IAllocator& allocator);
 	static void destroy(Pipeline* pipeline);
 
 	virtual ~Pipeline() {}
