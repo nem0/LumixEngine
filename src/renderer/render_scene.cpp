@@ -422,6 +422,16 @@ public:
 	}
 
 
+	float getCameraLODMultiplier(Entity entity) const
+	{
+		const Camera& camera = m_cameras[entity];
+		if(camera.is_ortho) return 1;
+
+		const float lod_multiplier = camera.fov / Math::degreesToRadians(60);
+		return lod_multiplier  * lod_multiplier;
+	}
+
+
 	Frustum getCameraFrustum(Entity entity) const override
 	{
 		const Camera& camera = m_cameras[entity];
@@ -1668,9 +1678,6 @@ public:
 
 	void deserializeEnvironmentProbes(InputBlob& serializer)
 	{
-	// TODO
-	ASSERT(false);
-	/*
 		i32 count;
 		serializer.read(count);
 		m_environment_probes.reserve(count);
@@ -1691,21 +1698,22 @@ public:
 			{
 				StaticString<MAX_PATH_LENGTH> path_str(probe_dir, probe.guid, ".dds");
 				probe.texture = static_cast<Texture*>(texture_manager->load(Path(path_str)));
-				probe.texture->setFlag(BGFX_TEXTURE_SRGB, true);
+				probe.texture->setFlag(Texture::Flags::SRGB, true);
 			}
 			StaticString<MAX_PATH_LENGTH> irr_path_str(probe_dir, probe.guid, "_irradiance.dds");
 			probe.irradiance = static_cast<Texture*>(texture_manager->load(Path(irr_path_str)));
-			probe.irradiance->setFlag(BGFX_TEXTURE_SRGB, true);
-			probe.irradiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
-			probe.irradiance->setFlag(BGFX_TEXTURE_MAG_ANISOTROPIC, true);
+			probe.irradiance->setFlag(Texture::Flags::SRGB, true);
+			// TODO
+			//probe.irradiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
+			//probe.irradiance->setFlag(BGFX_TEXTURE_MAG_ANISOTROPIC, true);
 			StaticString<MAX_PATH_LENGTH> r_path_str(probe_dir, probe.guid, "_radiance.dds");
 			probe.radiance = static_cast<Texture*>(texture_manager->load(Path(r_path_str)));
-			probe.radiance->setFlag(BGFX_TEXTURE_SRGB, true);
-			probe.radiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
-			probe.radiance->setFlag(BGFX_TEXTURE_MAG_ANISOTROPIC, true);
+			probe.radiance->setFlag(Texture::Flags::SRGB, true);
+			// TODO//probe.radiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
+			//probe.radiance->setFlag(BGFX_TEXTURE_MAG_ANISOTROPIC, true);
 
 			m_universe.onComponentCreated(entity, ENVIRONMENT_PROBE_TYPE, this);
-		}*/
+		}
 	}
 
 
@@ -3129,7 +3137,7 @@ public:
 	static Pipeline* LUA_createPipeline(Engine* engine, const char* path)
 	{
 		Renderer& renderer = *static_cast<Renderer*>(engine->getPluginManager().getPlugin("renderer"));
-		Pipeline* pipeline = Pipeline::create(renderer, Path(path), "", renderer.getEngine().getAllocator());
+		Pipeline* pipeline = Pipeline::create(renderer, Path(path), "", "main", renderer.getEngine().getAllocator());
 		pipeline->load();
 		return pipeline;
 	}
@@ -3500,7 +3508,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 
 	Array<Array<MeshInstance>>& getModelInstanceInfos(const Frustum& frustum,
 		const Vec3& lod_ref_point,
-		Entity camera,
+		float lod_multiplier,
 		u64 layer_mask) override
 	{
 		for (auto& i : m_temporary_infos) i.clear();
@@ -3525,12 +3533,11 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 			Array<MeshInstance>& subinfos = m_temporary_infos[subresult_index];
 			subinfos.clear();
 
-			JobSystem::fromLambda([&layer_mask, &subinfos, this, &results, subresult_index, lod_ref_point, camera]() {
+			JobSystem::fromLambda([&layer_mask, &subinfos, this, &results, subresult_index, lod_ref_point, lod_multiplier]() {
 				PROFILE_BLOCK("Temporary Info Job");
 				PROFILE_INT("ModelInstance count", results[subresult_index].size());
 				if (results[subresult_index].empty()) return;
 
-				float lod_multiplier = getCameraLODMultiplier(camera);
 				Vec3 ref_point = lod_ref_point;
 				float final_lod_multiplier = m_lod_multiplier * lod_multiplier;
 				const Entity* LUMIX_RESTRICT raw_subresults = &results[subresult_index][0];
@@ -4551,7 +4558,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	Entity getCameraInSlot(const char* slot) override
+	Entity getCameraInSlot(const char* slot) const override
 	{
 		for (const auto& camera : m_cameras)
 		{

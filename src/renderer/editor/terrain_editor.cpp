@@ -1311,7 +1311,9 @@ static bool isOBBCollision(RenderScene& scene,
 
 void TerrainEditor::paintEntities(const Vec3& hit_pos)
 {
-	PROFILE_FUNCTION();
+	// TODO 
+	ASSERT(false);
+	/*PROFILE_FUNCTION();
 	if (m_selected_prefabs.empty()) return;
 	auto& prefab_system = m_world_editor.getPrefabSystem();
 
@@ -1404,7 +1406,7 @@ void TerrainEditor::paintEntities(const Vec3& hit_pos)
 			}
 		}
 	}
-	m_world_editor.endCommandGroup();
+	m_world_editor.endCommandGroup();*/
 }
 
 

@@ -150,6 +150,7 @@ FramebufferHandle createFramebuffer(uint renderbuffers_count, const TextureHandl
 
 void setState(u32 flags);
 void uniformBlockBinding(ProgramHandle program, const char* block_name, uint binding);
+void update(FramebufferHandle fb, uint renderbuffers_count, const TextureHandle* renderbuffers);
 void update(BufferHandle buffer, const void* data, size_t offset, size_t size);
 void bindUniformBuffer(uint index, BufferHandle buffer, size_t offset, size_t size);
 void getTextureImage(ffr::TextureHandle texture, uint size, void* buf);

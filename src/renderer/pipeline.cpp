@@ -22,22 +22,28 @@
 #include "shader_manager.h"
 #include "texture.h"
 #include "texture_manager.h"
+#include <cmath>
 
 
 namespace Lumix
 {
 
 
+static const float SHADOW_CAM_NEAR = 50.0f;
+static const float SHADOW_CAM_FAR = 5000.0f;
+
+
 struct PipelineImpl LUMIX_FINAL : Pipeline
 {
-	PipelineImpl(Renderer& renderer, const Path& path, const char* define, IAllocator& allocator)
+	PipelineImpl(Renderer& renderer, const Path& path, const char* define, const char* camera_slot, IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_renderer(renderer)
 		, m_path(path)
 		, m_lua_state(nullptr)
 		, m_is_ready(false)
 		, m_custom_commands_handlers(allocator)
-		, m_define(define, allocator)
+		, m_define(define)
+		, m_camera_slot(camera_slot)
 		, m_scene(nullptr)
 		, m_width(-1)
 		, m_height(-1)
@@ -45,8 +51,8 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		, m_draw2d(allocator)
 		, m_output(ffr::INVALID_TEXTURE)
 		, m_renderbuffers(allocator)
-		, m_framebuffers(allocator)
 		, m_shaders(allocator)
+		, m_global_textures(allocator)
 	{
 		ShaderManager& shader_manager = renderer.getShaderManager();
 		m_draw2d_shader = (Shader*)shader_manager.load(Path("pipelines/draw2d.shd"));
@@ -96,6 +102,8 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 
 	void load() override 
 	{
+		if(m_framebuffer.isValid()) ffr::destroy(m_framebuffer);
+		m_framebuffer = ffr::createFramebuffer(0, nullptr);
 		auto& fs = m_renderer.getEngine().getFileSystem();
 		Delegate<void(FS::IFile&, bool)> cb;
 		cb.bind<PipelineImpl, &PipelineImpl::onFileLoaded>(this);
@@ -116,8 +124,8 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 
 	void setDefine()
 	{
-		if (m_define.length() == 0) return;
-		StaticString<256> tmp(m_define.c_str(), " = true");
+		if (m_define == "") return;
+		StaticString<256> tmp(m_define, " = true");
 
 		bool errors = luaL_loadbuffer(m_lua_state, tmp, stringLength(tmp.data), m_path.c_str()) != 0;
 		if (errors)
@@ -244,10 +252,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 
 	void clearBuffers()
 	{
-		for(const Framebuffer& fb : m_framebuffers) {
-			ffr::destroy(fb.handle);
-		}
-		m_framebuffers.clear();
+		m_global_textures.clear();
 
 		for (Renderbuffer& rb : m_renderbuffers) {
 			++rb.frame_counter;
@@ -262,11 +267,48 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 	}
 
 
+	void setGlobalStateUniforms()
+	{
+		GlobalStateUniforms& global_uniforms = m_renderer.getGlobalStateUniforms();
+		GlobalStateUniforms::State& global_state = global_uniforms.state;
+		const int w = global_state.framebuffer_size.x;
+		const int h = global_state.framebuffer_size.y;
+		m_scene->setCameraScreenSize(m_active_camera, w, h);
+
+		Matrix view = m_scene->getUniverse().getMatrix(m_active_camera);
+		global_state.camera_pos = Vec4(view.getTranslation(), 789);
+
+		view.fastInverse();
+		const Matrix projection = m_scene->getCameraProjection(m_active_camera);
+		global_state.camera_projection = projection;
+		global_state.camera_view = view;
+		global_state.camera_view_projection = projection * view;
+		global_state.camera_inv_view_projection = global_state.camera_view_projection;
+		global_state.camera_inv_view_projection.inverse();
+
+		const Entity global_light = m_scene->getActiveGlobalLight();
+		if(global_light.isValid()) {
+			global_state.light_direction = Vec4(m_scene->getUniverse().getRotation(global_light).rotate(Vec3(0, 0, -1)), 456); 
+			global_state.light_color = m_scene->getGlobalLightColor(global_light);
+			global_state.light_intensity = m_scene->getGlobalLightIntensity(global_light);
+			global_state.light_indirect_intensity = m_scene->getGlobalLightIndirectIntensity(global_light);
+		}
+		global_uniforms.update();
+	}
+
+
 	bool render() override 
 	{ 
 		PROFILE_FUNCTION();
 
 		if (!isReady() || !m_scene || m_width < 0 || m_height < 0) {
+			m_is_first_render = true;
+			return false;
+		}
+
+		m_active_camera = m_scene->getCameraInSlot(m_camera_slot);
+		if(!m_active_camera.isValid()) {
+			g_log_error.log("Renderer") << "No camera in slot " << m_camera_slot << " in " << getPath() << " " << m_define;
 			m_is_first_render = true;
 			return false;
 		}
@@ -279,7 +321,6 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		}
 
 		m_stats = {};
-		m_active_camera = INVALID_ENTITY;
 /*		
 		m_global_light_shadowmap = nullptr;
 		m_layer_mask = 0;
@@ -288,16 +329,8 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		m_point_light_shadowmaps.clear();
 		*/
 		clearBuffers();
-
-		const Entity global_light = m_scene->getActiveGlobalLight();
-		if(global_light.isValid()) {
-			GlobalStateUniforms& uniforms = m_renderer.getGlobalStateUniforms();
-			uniforms.state.light_direction = Vec4(m_scene->getUniverse().getRotation(global_light).rotate(Vec3(0, 0, -1)), 456); 
-			uniforms.state.light_color = m_scene->getGlobalLightColor(global_light);
-			uniforms.state.light_intensity = m_scene->getGlobalLightIntensity(global_light);
-			uniforms.state.light_indirect_intensity = m_scene->getGlobalLightIndirectIntensity(global_light);
-			uniforms.update();
-		}
+		
+		setGlobalStateUniforms();
 
 		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
 		bool success = true;
@@ -514,48 +547,6 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 	}
 
 
-	void setCamera(const char* slot)
-	{
-		if (!m_scene) return;
-
-		const Entity camera = m_scene->getCameraInSlot(slot);
-		m_active_camera = camera;
-		if(!camera.isValid()) return;
-
-		GlobalStateUniforms& uniforms = m_renderer.getGlobalStateUniforms();
-		const int w = uniforms.state.framebuffer_size.x;
-		const int h = uniforms.state.framebuffer_size.y;
-		m_scene->setCameraScreenSize(camera, w, h);
-
-		Matrix view = m_scene->getUniverse().getMatrix(camera);
-		uniforms.state.camera_pos = Vec4(view.getTranslation(), 789);
-
-		view.fastInverse();
-		const Matrix projection = m_scene->getCameraProjection(camera);
-		uniforms.state.camera_projection = projection;
-		uniforms.state.camera_view = view;
-		uniforms.state.camera_view_projection = projection * view;
-		uniforms.state.camera_inv_view_projection = uniforms.state.camera_view_projection;
-		uniforms.state.camera_inv_view_projection.inverse();
-		
-		uniforms.update();
-	}
-
-
-	void setFramebuffer(int framebuffer)
-	{
-		const Framebuffer& fb = m_framebuffers[framebuffer];
-		ffr::setFramebuffer(fb.handle, true);
-		if(fb.handle.isValid()) {
-			ffr::viewport(0, 0, fb.width, fb.height);
-		}
-		
-		GlobalStateUniforms& uniforms = m_renderer.getGlobalStateUniforms();
-		uniforms.state.framebuffer_size.x = fb.width;
-		uniforms.state.framebuffer_size.y = fb.height;
-	}
-
-
 	int createRenderbuffer(float w, float h, bool relative, const char* format_str)
 	{
 		const uint rb_w = uint(relative ? w * m_width : w);
@@ -583,6 +574,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 
 		return m_renderbuffers.size() - 1;
 	}
+
 
 
 	static int drawArray(lua_State* L)
@@ -682,7 +674,6 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 			}
 		}
 
-
 		const Vec3 camera_pos = pipeline->m_scene->getUniverse().getPosition(pipeline->m_active_camera);
 		const Entity probe = pipeline->m_scene->getNearestEnvironmentProbe(camera_pos);
 		
@@ -718,9 +709,254 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		ffr::draw(dc);
 		return 0;
 	}
+	
+
+	struct CameraParams
+	{
+		Frustum frustum;
+		Vec3 pos;
+		float lod_multiplier;
+	};
+	
+
+	static int cull(lua_State* L)
+	{
+		const int pipeline_idx = lua_upvalueindex(1);
+		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
+			LuaWrapper::argError<PipelineImpl*>(L, 1);
+		}
+		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
+		const u64 layer_mask = LuaWrapper::checkArg<u64>(L, 1);
+		LuaWrapper::checkTableArg(L, 2);
+		
+		CameraParams cp;
+
+		lua_getfield(L, 2, "frustum");
+		if (!lua_istable(L, -1)) {
+			lua_pop(L, 1);
+			luaL_error(L, "Frustum is not a table");
+		}
+		float* points = cp.frustum.xs;
+		for (int i = 0; i < 32 + 24; ++i) {
+			lua_rawgeti(L, -1, i + 1);
+			if(!LuaWrapper::isType<float>(L, -1)) {
+				lua_pop(L, 2);
+				luaL_error(L, "Frustum must contain exactly 24 floats");
+			}
+			points[i] = LuaWrapper::toType<float>(L, -1);
+			lua_pop(L, 1);
+		}
+		cp.frustum.setPlanesFromPoints();
+		
+		if(!LuaWrapper::checkField(L, 2, "lod_multiplier", &cp.lod_multiplier)) {
+			luaL_error(L, "Missing lod_multiplier in camera params");
+		}
+
+		auto& result = pipeline->m_scene->getModelInstanceInfos(cp.frustum, cp.pos, cp.lod_multiplier, layer_mask);
+
+		lua_pushlightuserdata(L, &result);
+
+		return 1;
+	}
 
 
-	static int createFramebuffer(lua_State* L)
+	static void pushCameraParams(lua_State* L, const CameraParams& params)
+	{
+		lua_createtable(L, 0, 4);
+
+		lua_createtable(L, 32+24, 0);
+		const float* frustum = params.frustum.xs; 
+		for(int i = 0; i < 32+24; ++i) {
+			LuaWrapper::push(L, frustum[i]);
+			lua_rawseti(L, -2, i + 1);
+		}
+
+		lua_setfield(L, -2, "frustum");
+
+		LuaWrapper::setField(L, -2, "position", params.pos);
+		LuaWrapper::setField(L, -2, "lod_multiplier", params.lod_multiplier);
+	}
+
+
+	static int getCameraParams(lua_State* L)
+	{
+		const int pipeline_idx = lua_upvalueindex(1);
+		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
+			LuaWrapper::argError<PipelineImpl*>(L, 1);
+		}
+		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
+
+		RenderScene* scene = pipeline->m_scene;
+		const Entity camera = scene->getCameraInSlot(pipeline->m_camera_slot);
+
+		const Universe& universe = pipeline->m_scene->getUniverse();
+
+		CameraParams cp;
+
+		cp.pos = universe.getPosition(camera);
+		const Quat rot = universe.getRotation(camera);
+		const float near = scene->getCameraNearPlane(camera);
+		const float far = scene->getCameraFarPlane(camera);
+		const Vec2 cam_size = scene->getCameraScreenSize(camera);
+		const float ratio = cam_size.y > 0 ? cam_size.x / cam_size.y : 1;
+
+		const bool is_ortho = scene->isCameraOrtho(camera);
+		const float fov = scene->getCameraFOV(camera);
+		if(is_ortho) {
+			const float ortho_size = scene->getCameraOrthoSize(camera);
+			cp.frustum.computeOrtho(cp.pos, 
+				rot * Vec3(0, 0, 1),
+				rot * Vec3(0, 1, 0),
+				ortho_size * ratio,
+				ortho_size,
+				near,
+				far);
+		}
+		else {
+			cp.frustum.computePerspective(cp.pos, 
+				rot * Vec3(0, 0, -1),
+				rot * Vec3(0, 1, 0),
+				fov,
+				ratio,
+				near,
+				far);
+		}
+		cp.lod_multiplier = scene->getCameraLODMultiplier(camera);
+		pushCameraParams(L, cp);
+
+		return 1;
+	}
+
+
+	static void findExtraShadowcasterPlanes(const Vec3& light_forward, const Frustum& camera_frustum, const Vec3& camera_position, Frustum* shadow_camera_frustum)
+	{
+		static const Frustum::Planes planes[] = {
+			Frustum::Planes::LEFT, Frustum::Planes::TOP, Frustum::Planes::RIGHT, Frustum::Planes::BOTTOM };
+		bool prev_side = dotProduct(light_forward, camera_frustum.getNormal(planes[lengthOf(planes) - 1])) < 0;
+		int out_plane = (int)Frustum::Planes::EXTRA0;
+		Vec3 camera_frustum_center = camera_frustum.computeBoundingSphere().position;
+		for (int i = 0; i < lengthOf(planes); ++i)
+		{
+			bool side = dotProduct(light_forward, camera_frustum.getNormal(planes[i])) < 0;
+			if (prev_side != side)
+			{
+				Vec3 n0 = camera_frustum.getNormal(planes[i]);
+				Vec3 n1 = camera_frustum.getNormal(planes[(i + lengthOf(planes) - 1) % lengthOf(planes)]);
+				Vec3 line_dir = crossProduct(n1, n0);
+				Vec3 n = crossProduct(light_forward, line_dir);
+				float d = -dotProduct(camera_position, n);
+				if (dotProduct(camera_frustum_center, n) + d < 0)
+				{
+					n = -n;
+					d = -dotProduct(camera_position, n);
+				}
+				shadow_camera_frustum->setPlane((Frustum::Planes)out_plane, n, d);
+				++out_plane;
+				if (out_plane >(int)Frustum::Planes::EXTRA1) break;
+			}
+			prev_side = side;
+		}
+	}
+
+
+	static Vec3 shadowmapTexelAlign(const Vec3& shadow_cam_pos,
+		float shadowmap_width,
+		float frustum_radius,
+		const Matrix& light_mtx)
+	{
+		Matrix inv = light_mtx;
+		inv.fastInverse();
+		Vec3 out = inv.transformPoint(shadow_cam_pos);
+		float align = 2 * frustum_radius / (shadowmap_width * 0.5f - 2);
+		out.x -= fmodf(out.x, align);
+		out.y -= fmodf(out.y, align);
+		out = light_mtx.transformPoint(out);
+		return out;
+	}
+
+
+	static int getShadowCameraParams(lua_State* L)
+	{
+		const int pipeline_idx = lua_upvalueindex(1);
+		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
+			LuaWrapper::argError<PipelineImpl*>(L, 1);
+		}
+		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
+
+		const int slice = LuaWrapper::checkArg<int>(L, 1);
+		const int shadowmap_width = LuaWrapper::checkArg<int>(L, 2);
+		
+		RenderScene* scene = pipeline->m_scene;
+		const Entity camera = scene->getCameraInSlot(pipeline->m_camera_slot);
+		
+		const Universe& universe = scene->getUniverse();
+		const Entity light = scene->getActiveGlobalLight();
+		const Matrix light_mtx = universe.getMatrix(light);
+
+		const float camera_height = scene->getCameraScreenHeight(camera);
+		const float camera_fov = scene->getCameraFOV(camera);
+		const float camera_ratio = scene->getCameraScreenWidth(camera) / camera_height;
+		const Vec4 cascades = scene->getShadowmapCascades(light);
+		const float split_distances[] = {0.1f, cascades.x, cascades.y, cascades.z, cascades.w};
+		
+		Frustum camera_frustum;
+		const Matrix camera_matrix = universe.getMatrix(camera);
+		camera_frustum.computePerspective(camera_matrix.getTranslation(),
+			-camera_matrix.getZVector(),
+			camera_matrix.getYVector(),
+			camera_fov,
+			camera_ratio,
+			split_distances[slice],
+			split_distances[slice + 1]);
+
+		const Sphere frustum_bounding_sphere = camera_frustum.computeBoundingSphere();
+		const float bb_size = frustum_bounding_sphere.radius;
+		Vec3 light_forward = light_mtx.getZVector();
+		
+		Vec3 shadow_cam_pos = frustum_bounding_sphere.position;
+		shadow_cam_pos = shadowmapTexelAlign(shadow_cam_pos, 0.5f * shadowmap_width - 2, bb_size, light_mtx);
+
+		GlobalStateUniforms& global_uniforms = pipeline->m_renderer.getGlobalStateUniforms();
+		GlobalStateUniforms::State& global_state = global_uniforms.state;
+
+		Matrix projection_matrix;
+		projection_matrix.setOrtho(-bb_size, bb_size, -bb_size, bb_size, SHADOW_CAM_NEAR, SHADOW_CAM_FAR, ffr::isHomogenousDepth(), true);
+		shadow_cam_pos -= light_forward * SHADOW_CAM_FAR * 0.5f;
+		Matrix view_matrix;
+		view_matrix.lookAt(shadow_cam_pos, shadow_cam_pos + light_forward, light_mtx.getYVector());
+
+		const float ymul = ffr::isOriginBottomLeft() ? 0.5f : -0.5f;
+		const Matrix bias_matrix(
+			0.5, 0.0, 0.0, 0.0, 
+			0.0, ymul, 0.0, 0.0, 
+			0.0, 0.0, 1.0, 0.0, 
+			0.5, 0.5, 0.0, 1.0);
+
+		global_state.shadowmap_matrices[slice] = bias_matrix * projection_matrix * view_matrix;
+
+		global_state.shadow_view_projection = projection_matrix * view_matrix;
+		global_uniforms.update();
+
+		CameraParams cp;
+		cp.lod_multiplier = 1;
+		cp.pos = camera_matrix.getTranslation();
+		cp.frustum.computeOrtho(shadow_cam_pos
+			, -light_forward
+			, light_mtx.getYVector()
+			, bb_size
+			, bb_size
+			, SHADOW_CAM_NEAR
+			, SHADOW_CAM_FAR);
+
+		findExtraShadowcasterPlanes(light_forward, camera_frustum, camera_matrix.getTranslation(), &cp.frustum);
+
+		pushCameraParams(L, cp);
+
+		return 1;
+	}
+
+
+	static int setRenderTargets(lua_State* L)
 	{ 
 		const int pipeline_idx = lua_upvalueindex(1);
 		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
@@ -739,19 +975,23 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 			return 0;
 		}
 
-		Framebuffer fb;
+		uint w = 128, h = 128;
 		for(int i = 0; i < rb_count; ++i) {
 			const int rb_idx = LuaWrapper::checkArg<int>(L, i + 1);
 			const Renderbuffer& rb = pipeline->m_renderbuffers[rb_idx];
 			rbs[i] = rb.handle;	
-			fb.width = rb.width;
-			fb.height = rb.height;
+			w = rb.width;
+			h = rb.height;
 		}
 
-		fb.handle = ffr::createFramebuffer(rb_count, rbs);
-		pipeline->m_framebuffers.push(fb);
+		ffr::update(pipeline->m_framebuffer, rb_count, rbs);
+		ffr::setFramebuffer(pipeline->m_framebuffer, true);
+		ffr::viewport(0, 0, w, h);
 		
-		LuaWrapper::push(L, pipeline->m_framebuffers.size() - 1);
+		GlobalStateUniforms& uniforms = pipeline->m_renderer.getGlobalStateUniforms();
+		uniforms.state.framebuffer_size.x = w;
+		uniforms.state.framebuffer_size.y = h;
+
 		return 1;
 	}
 
@@ -798,25 +1038,21 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		}
 	}
 
-	
-	void renderMeshes(const char* camera_slot, u64 layer_mask, const char* shader_define)
-	{
-		const Entity camera = m_scene->getCameraInSlot(camera_slot);
-		const Frustum frustum = m_scene->getCameraFrustum(camera);
-		const Universe& universe = m_scene->getUniverse();
-		const Vec3 lod_ref_point = universe.getPosition(camera);
-		const auto& meshes = m_scene->getModelInstanceInfos(frustum, lod_ref_point, camera, layer_mask);
 
-		ffr::pushDebugGroup("meshes");
+	void renderMeshes(Array<Array<MeshInstance>>* meshes, const char* shader_define)
+	{
+		ffr::pushDebugGroup(shader_define && shader_define[0] ? shader_define : "meshes");
 
 		const u32 define_mask = shader_define && shader_define[0] 
 			? 1 << m_renderer.getShaderDefineIdx(shader_define) 
 			: 0;
 
-		const Vec3 camera_pos = m_scene->getUniverse().getPosition(m_active_camera);
+		const Universe& universe = m_scene->getUniverse();
+		
+		const Vec3 camera_pos = universe.getPosition(m_active_camera);
 		const Entity probe = m_scene->getNearestEnvironmentProbe(camera_pos);
 
-		for(auto& submeshes : meshes) {
+		for(auto& submeshes : *meshes) {
 			for(auto& mesh : submeshes) {
 				const Material* material = mesh.mesh->material;
 
@@ -825,34 +1061,41 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 
 				if(!prog.handle.isValid()) continue;
 
-				const int textures_count = material->getTextureCount();
+				int textures_count = material->getTextureCount();
 				ffr::TextureHandle textures[16];
 				for(int i = 0; i < textures_count; ++i) {
 					textures[i] = material->getTexture(i)->handle; 
 					ffr::setUniform1i(prog.handle, material->getTextureUniform(i), i);
 				}
 
+				if (probe.isValid()) {
+					Texture* irradiance = m_scene->getEnvironmentProbeIrradiance(probe);
+					Texture* radiance = m_scene->getEnvironmentProbeRadiance(probe);
+					textures[textures_count + 0] = irradiance->handle;
+					textures[textures_count + 1] = radiance->handle;
+				}
+				else {
+					textures[textures_count + 0] = m_default_cubemap->handle;
+					textures[textures_count + 1] = m_default_cubemap->handle;
+				}
+
+				ffr::setUniform1i(prog.handle, "u_irradiancemap", textures_count + 0);
+				ffr::setUniform1i(prog.handle, "u_radiancemap", textures_count + 1);
+				textures_count += 2;
+				
+				const Matrix& mtx = universe.getMatrix(mesh.owner);
+				ffr::setUniformMatrix4f(prog.handle, "u_model", 1, &mtx.m11);
+				
+				for(const GlobalTexture& t : m_global_textures) {
+					textures[textures_count] = t.texture;
+					ffr::setUniform1i(prog.handle, t.uniform, textures_count);
+					++textures_count;
+				}
+
 				for(int i = textures_count; i < lengthOf(textures); ++i) {
 					textures[i] = ffr::INVALID_TEXTURE;
 				}
 
-				if (probe.isValid()) {
-					Texture* irradiance = m_scene->getEnvironmentProbeIrradiance(probe);
-					Texture* radiance = m_scene->getEnvironmentProbeRadiance(probe);
-					textures[4] = irradiance->handle;
-					textures[5] = radiance->handle;
-				}
-				else {
-					textures[4] = m_default_cubemap->handle;
-					textures[5] = m_default_cubemap->handle;
-				}
-				ffr::setUniform1i(prog.handle, "u_irradiancemap", 4);
-				ffr::setUniform1i(prog.handle, "u_radiancemap", 5);
-
-				const Matrix& mtx = universe.getMatrix(mesh.owner);
-				ffr::setUniformMatrix4f(prog.handle, "u_model", 1, &mtx.m11);
-
-				
 				int attribute_map[16];
 				for(uint i = 0; i < mesh.mesh->vertex_decl.attributes_count; ++i) {
 					attribute_map[i] = prog.attribute_by_semantics[(int)mesh.mesh->attributes_semantic[i]];
@@ -891,10 +1134,28 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 	}
 
 
-	void clearFramebuffer(u32 flags, float r, float g, float b, float a, float depth)
+	void clear(u32 flags, float r, float g, float b, float a, float depth)
 	{
 		const float c[] = { r, g, b, a };
 		ffr::clear(flags, c, depth);
+	}
+
+
+	void viewport(int x, int y, int w, int h)
+	{
+		ffr::viewport(x, y, w, h);
+	}
+
+
+	void setGlobalTexture(const char* uniform, int rb_idx)
+	{
+		if (rb_idx < 0 || rb_idx >= m_renderbuffers.size()) {
+			g_log_error.log("Renderer") << "Unknown renderbuffer";
+			return;
+		}
+		GlobalTexture& t = m_global_textures.emplace();
+		t.uniform = uniform;
+		t.texture = m_renderbuffers[rb_idx].handle;
 	}
 
 
@@ -970,7 +1231,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 			} while(false) \
 
 		REGISTER_FUNCTION(blending);
-		REGISTER_FUNCTION(clearFramebuffer);
+		REGISTER_FUNCTION(clear);
 		REGISTER_FUNCTION(createRenderbuffer);
 		REGISTER_FUNCTION(executeCustomCommand);
 		REGISTER_FUNCTION(getLayerMask);
@@ -978,14 +1239,17 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		REGISTER_FUNCTION(render2D);
 		REGISTER_FUNCTION(renderDebugShapes);
 		REGISTER_FUNCTION(renderMeshes);
-		REGISTER_FUNCTION(setCamera);
-		REGISTER_FUNCTION(setFramebuffer);
+		REGISTER_FUNCTION(setGlobalTexture);
 		REGISTER_FUNCTION(setOutput);
+		REGISTER_FUNCTION(viewport);
 
 		registerConst("CLEAR_ALL", (uint)ffr::ClearFlags::COLOR | (uint)ffr::ClearFlags::DEPTH);
 
-		registerCFunction("createFramebuffer", PipelineImpl::createFramebuffer);
+		registerCFunction("cull", PipelineImpl::cull);
 		registerCFunction("drawArray", PipelineImpl::drawArray);
+		registerCFunction("getCameraParams", PipelineImpl::getCameraParams);
+		registerCFunction("getShadowCameraParams", PipelineImpl::getShadowCameraParams);
+		registerCFunction("setRenderTargets", PipelineImpl::setRenderTargets);
 
 		lua_pop(L, 1); // pop env
 
@@ -1008,15 +1272,15 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		int frame_counter;
 	};
 
-	struct Framebuffer {
-		ffr::FramebufferHandle handle;
-		int width;
-		int height;
-	};
-
 	struct ShaderRef {
 		Lumix::Shader* res;
 		int id;
+	};
+
+	struct GlobalTexture
+	{
+		StaticString<32> uniform;
+		ffr::TextureHandle texture;
 	};
 
 	IAllocator& m_allocator;
@@ -1027,7 +1291,8 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 	int m_lua_env;
 	bool m_is_ready;
 	bool m_is_first_render;
-	string m_define;
+	StaticString<32> m_define;
+	StaticString<32> m_camera_slot;
 	RenderScene* m_scene;
 	Draw2D m_draw2d;
 	Shader* m_draw2d_shader;
@@ -1040,14 +1305,15 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 	Texture* m_default_cubemap;
 	Array<CustomCommandHandler> m_custom_commands_handlers;
 	Array<Renderbuffer> m_renderbuffers;
-	Array<Framebuffer> m_framebuffers;
+	Array<GlobalTexture> m_global_textures;
+	ffr::FramebufferHandle m_framebuffer;
 	Array<ShaderRef> m_shaders;
 };
 
 
-Pipeline* Pipeline::create(Renderer& renderer, const Path& path, const char* define, IAllocator& allocator)
+Pipeline* Pipeline::create(Renderer& renderer, const Path& path, const char* define, const char* camera_slot, IAllocator& allocator)
 {
-	return LUMIX_NEW(allocator, PipelineImpl)(renderer, path, define, allocator);
+	return LUMIX_NEW(allocator, PipelineImpl)(renderer, path, define, camera_slot, allocator);
 }
 
 

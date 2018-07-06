@@ -131,21 +131,19 @@ void Frustum::computeOrtho(const Vec3& position,
 }
 
 
-static void setPlanesFromPoints(Frustum& frustum)
+void Frustum::setPlanesFromPoints()
 {
-	Vec3* points = frustum.points;
-
 	Vec3 normal_near = -crossProduct(points[0] - points[1], points[0] - points[2]).normalized();
 	Vec3 normal_far = crossProduct(points[4] - points[5], points[4] - points[6]).normalized();
-	frustum.setPlane(Frustum::Planes::EXTRA0, normal_near, points[0]);
-	frustum.setPlane(Frustum::Planes::EXTRA1, normal_near, points[0]);
-	frustum.setPlane(Frustum::Planes::NEAR, normal_near, points[0]);
-	frustum.setPlane(Frustum::Planes::FAR, normal_far, points[4]);
+	setPlane(Frustum::Planes::EXTRA0, normal_near, points[0]);
+	setPlane(Frustum::Planes::EXTRA1, normal_near, points[0]);
+	setPlane(Frustum::Planes::NEAR, normal_near, points[0]);
+	setPlane(Frustum::Planes::FAR, normal_far, points[4]);
 
-	frustum.setPlane(Frustum::Planes::LEFT, crossProduct(points[1] - points[2], points[1] - points[5]).normalized(), points[1]);
-	frustum.setPlane(Frustum::Planes::RIGHT, -crossProduct(points[0] - points[3], points[0] - points[4]).normalized(), points[0]);
-	frustum.setPlane(Frustum::Planes::TOP, crossProduct(points[0] - points[1], points[0] - points[4]).normalized(), points[0]);
-	frustum.setPlane(Frustum::Planes::BOTTOM, crossProduct(points[2] - points[3], points[2] - points[6]).normalized(), points[2]);
+	setPlane(Frustum::Planes::LEFT, crossProduct(points[1] - points[2], points[1] - points[5]).normalized(), points[1]);
+	setPlane(Frustum::Planes::RIGHT, -crossProduct(points[0] - points[3], points[0] - points[4]).normalized(), points[0]);
+	setPlane(Frustum::Planes::TOP, crossProduct(points[0] - points[1], points[0] - points[4]).normalized(), points[0]);
+	setPlane(Frustum::Planes::BOTTOM, crossProduct(points[2] - points[3], points[2] - points[6]).normalized(), points[2]);
 }
 
 
@@ -174,7 +172,7 @@ static void setPoints(Frustum& frustum
 	points[6] = far_center + right_far * viewport_min.x + up_far * viewport_min.y;
 	points[7] = far_center + right_far * viewport_max.x + up_far * viewport_min.y;
 
-	setPlanesFromPoints(frustum);
+	frustum.setPlanesFromPoints();
 }
 
 

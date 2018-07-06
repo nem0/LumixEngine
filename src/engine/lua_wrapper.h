@@ -58,6 +58,19 @@ inline bool execute(lua_State* L
 	return true;
 }
 
+template <typename T> inline bool checkField(lua_State* L, int idx, const char* k, T* out)
+{
+	lua_getfield(L, idx, k);
+	if(!isType<T>(L, -1)) {
+		lua_pop(L, 1);
+		return false;
+	}
+	*out = toType<T>(L, -1);
+	lua_pop(L, 1);
+	return true;
+}
+
+
 inline int getField(lua_State* L, int idx, const char* k)
 {
 	lua_getfield(L, idx, k);
@@ -303,6 +316,11 @@ template <> inline bool isType<void*>(lua_State* L, int index)
 	return lua_islightuserdata(L, index) != 0;
 }
 
+template <typename T> inline void setField(lua_State* L, int table_idx, const char* name, T value)
+{
+	push(L, value);
+	lua_setfield(L, table_idx, name);
+}
 
 template <typename T> inline void push(lua_State* L, T value)
 {

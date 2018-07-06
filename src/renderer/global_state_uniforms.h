@@ -15,7 +15,9 @@ public:
 	void destroy();
 	void update();
 
-	struct {
+	struct State {
+		Matrix shadow_view_projection;
+		Matrix shadowmap_matrices[4];
 		Matrix camera_projection;
 		Matrix camera_view;
 		Matrix camera_view_projection;
