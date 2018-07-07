@@ -32,6 +32,7 @@
 #include "engine/system.h"
 #include "engine/timer.h"
 #include "engine/universe/universe.h"
+#include "engine/viewport.h"
 #include "ieditor_command.h"
 #include "render_interface.h"
 
@@ -968,11 +969,6 @@ public:
 		InputBlob blob(m_new_value);
 		for (Entity entity : m_entities)
 		{
-			if (m_editor.getEditCamera().entity == entity && m_component_type == CAMERA_TYPE &&
-				equalStrings(m_property->name, "Slot"))
-			{
-				continue;
-			}
 			ComponentUID component = m_editor.getUniverse()->getComponent(entity, m_component_type);
 			blob.rewind();
 			m_property->setValue(component, m_index, blob);
@@ -1662,6 +1658,10 @@ private:
 
 public:
 	IAllocator& getAllocator() override { return m_allocator; }
+
+
+	const Viewport& getViewport() const override { return m_viewport; }
+	void setViewport(const Viewport& viewport) override { m_viewport = viewport; }
 
 
 	Universe* getUniverse() override
@@ -3119,6 +3119,15 @@ public:
 		, m_entity_map(m_allocator)
 		, m_is_guid_pseudorandom(false)
 	{
+		m_viewport.is_ortho = false;
+		m_viewport.pos.set(0, 0, 0);
+		m_viewport.rot.set(0, 0, 0, 1);
+		m_viewport.w = -1;
+		m_viewport.h = -1;
+		m_viewport.fov = Math::degreesToRadians(60.f);
+		m_viewport.near = 0.1f;
+		m_viewport.far = 10000.f;
+
 		for (auto& i : m_is_mouse_down) i = false;
 		for (auto& i : m_is_mouse_click) i = false;
 		m_go_to_parameters.m_is_active = false;
@@ -3836,6 +3845,7 @@ private:
 	u32 m_current_group_type;
 	bool m_is_universe_changed;
 	bool m_is_guid_pseudorandom;
+	Viewport m_viewport;
 };
 
 

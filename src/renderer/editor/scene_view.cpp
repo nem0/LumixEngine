@@ -18,6 +18,7 @@
 #include "engine/string.h"
 #include "engine/universe/component.h"
 #include "engine/universe/universe.h"
+#include "engine/viewport.h"
 #include "imgui/imgui.h"
 #include "renderer/ffr/ffr.h"
 #include "renderer/model.h"
@@ -220,8 +221,7 @@ void SceneView::renderGizmos()
 {
 	ffr::pushDebugGroup("gizmos");
 	auto& entities = m_editor.getSelectedEntities();
-	if(entities.empty() || entities[0] != m_editor.getEditCamera().entity)
-		m_editor.getGizmo().render();
+	if(entities.empty()) m_editor.getGizmo().render();
 	ffr::popDebugGroup();
 }
 
@@ -242,14 +242,10 @@ RayCastModelHit SceneView::castRay(float x, float y)
 	auto* scene =  m_pipeline->getScene();
 	ASSERT(scene);
 	
-	ComponentUID camera_cmp = m_editor.getEditCamera();
-	Vec2 screen_size = scene->getCameraScreenSize(camera_cmp.entity);
-	screen_size.x *= x;
-	screen_size.y *= y;
-
+	const Viewport& vp = m_editor.getViewport();
 	Vec3 origin;
 	Vec3 dir;
-	scene->getRay(camera_cmp.entity, screen_size, origin, dir);
+	vp.getRay({x * vp.w, y * vp.h}, origin, dir);
 	return scene->castRay(origin, dir, INVALID_ENTITY);
 }
 
@@ -507,6 +503,27 @@ void SceneView::onWindowGUI()
 							break;
 					}
 				}
+			}
+
+			RenderScene* scene = m_pipeline->getScene();
+			const Entity camera = scene->getCameraInSlot("editor");
+			if(camera.isValid()) {
+				const Universe& universe = scene->getUniverse();
+				Viewport viewport;
+				viewport.is_ortho = scene->isCameraOrtho(camera);
+				viewport.pos = universe.getPosition(camera);
+				viewport.rot = universe.getRotation(camera);
+				if(viewport.is_ortho) {
+					viewport.ortho_size = scene->getCameraOrthoSize(camera);
+				}
+				else {
+					viewport.fov = scene->getCameraFOV(camera);
+				}
+				viewport.w = (int)size.x;
+				viewport.h = (int)size.y;
+				viewport.near = scene->getCameraNearPlane(camera);
+				viewport.far = scene->getCameraFarPlane(camera);
+				m_editor.setViewport(viewport);
 			}
 			m_pipeline->render();
 		}

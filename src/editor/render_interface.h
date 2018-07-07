@@ -67,7 +67,6 @@ public:
 	virtual void addRectFilled2D(const Vec2& a, const Vec2& b, u32 color) = 0;
 	virtual void getModelInstaces(Array<Entity>& entity, const Frustum& frustum, const Vec3& lod_ref_point, Entity camera) = 0;
 	virtual Frustum getFrustum(Entity camera, const Vec2& a, const Vec2& b) = 0;
-	virtual Vec2 worldToScreenPixels(Entity camera, const Vec3& world) = 0;
 };
 
 
