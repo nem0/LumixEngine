@@ -662,28 +662,22 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 	{
 		if (m_is_dragging) return;
 
-		auto edit_camera = m_editor.getEditCamera();
-		auto* render_interface = m_editor.getRenderInterface();
-		bool is_ortho = render_interface->isCameraOrtho(edit_camera.entity);
-		auto camera_pos = m_editor.getUniverse()->getPosition(edit_camera.entity);
-		auto camera_dir = m_editor.getUniverse()->getRotation(edit_camera.entity).rotate(Vec3(0, 0, -1));
-		float fov = render_interface->getCameraFOV(edit_camera.entity);
-
+		const Viewport& vp = m_editor.getViewport();
+		const Vec3 vp_dir = vp.rot * Vec3(0, 0, -1);
 		Vec3 origin, cursor_dir;
-		Vec2 mouse_pos = m_editor.getMousePos();
-		m_editor.getRenderInterface()->getRay(edit_camera.entity, mouse_pos, origin, cursor_dir);
+		vp.getRay(m_editor.getMousePos(), origin, cursor_dir);
 		
 		Axis axis = Axis::NONE;
 		switch(m_mode)
 		{
 			case Mode::TRANSLATE:
-				axis = collideTranslate(gizmo_mtx, camera_pos, camera_dir, fov, is_ortho, origin, cursor_dir);
+				axis = collideTranslate(gizmo_mtx, vp.pos, vp_dir, vp.fov, vp.is_ortho, origin, cursor_dir);
 				break;
 			case Mode::ROTATE:
-				axis = collideRotate(gizmo_mtx, camera_pos, camera_dir, fov, is_ortho, origin, cursor_dir);
+				axis = collideRotate(gizmo_mtx, vp.pos, vp_dir, vp.fov, vp.is_ortho, origin, cursor_dir);
 				break;
 			case Mode::SCALE:
-				axis = collideScale(gizmo_mtx, camera_pos, camera_dir, fov, is_ortho, origin, cursor_dir);
+				axis = collideScale(gizmo_mtx, vp.pos, vp_dir, vp.fov, vp.is_ortho, origin, cursor_dir);
 				break;
 			default:
 				ASSERT(false);
@@ -701,10 +695,8 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 	{
 		if (m_is_dragging) return;
 
-		auto edit_camera = m_editor.getEditCamera();
 		Vec3 origin, cursor_dir;
-		Vec2 mouse_pos = m_editor.getMousePos();
-		m_editor.getRenderInterface()->getRay(edit_camera.entity, mouse_pos, origin, cursor_dir);
+		m_editor.getViewport().getRay(m_editor.getMousePos(), origin, cursor_dir);
 
 		m_transform_axis = Axis::NONE;
 		m_active = -1;
@@ -740,10 +732,9 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 
 	Vec3 getMousePlaneIntersection(const Vec2& mouse_pos, const Matrix& gizmo_mtx, Axis transform_axis) const
 	{
-		auto camera = m_editor.getEditCamera();
+		const Viewport& vp = m_editor.getViewport();
 		Vec3 origin, dir;
-		m_editor.getRenderInterface()->getRay(camera.entity, mouse_pos, origin, dir);
-		dir.normalize();
+		vp.getRay(mouse_pos, origin, dir);
 		bool is_two_axed = transform_axis == Axis::XZ || transform_axis == Axis::XY || transform_axis == Axis::YZ;
 		if (is_two_axed)
 		{
@@ -1086,23 +1077,20 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 
 	void render(const Matrix& gizmo_mtx, bool is_active)
 	{
-		auto edit_camera = m_editor.getEditCamera();
 		auto* render_interface = m_editor.getRenderInterface();
-		bool is_ortho = render_interface->isCameraOrtho(edit_camera.entity);
-		auto camera_pos = m_editor.getUniverse()->getPosition(edit_camera.entity);
-		auto camera_dir = m_editor.getUniverse()->getRotation(edit_camera.entity).rotate(Vec3(0, 0, -1));
-		float fov = render_interface->getCameraFOV(edit_camera.entity);
+		const Viewport& vp = m_editor.getViewport();
+		const Vec3 vp_dir = vp.rot * Vec3(0, 0, -1);
 
 		switch (m_mode)
 		{
 			case Mode::TRANSLATE:
-				renderTranslateGizmo(gizmo_mtx, is_active, camera_pos, camera_dir, fov, is_ortho);
+				renderTranslateGizmo(gizmo_mtx, is_active, vp.pos, vp_dir, vp.fov, vp.is_ortho);
 				break;
 			case Mode::ROTATE:
-				renderRotateGizmo(gizmo_mtx, is_active, camera_pos, camera_dir, fov, is_ortho);
+				renderRotateGizmo(gizmo_mtx, is_active, vp.pos, vp_dir, vp.fov, vp.is_ortho);
 				break;
 			case Mode::SCALE:
-				renderScaleGizmo(gizmo_mtx, is_active, camera_pos, camera_dir, fov, is_ortho);
+				renderScaleGizmo(gizmo_mtx, is_active, vp.pos, vp_dir, vp.fov, vp.is_ortho);
 				break;
 			default:
 				ASSERT(false);
@@ -1113,14 +1101,10 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 
 	void render() override
 	{
-		auto edit_camera = m_editor.getEditCamera();
 		auto* render_interface = m_editor.getRenderInterface();
-		bool is_ortho = render_interface->isCameraOrtho(edit_camera.entity);
-		auto camera_pos = m_editor.getUniverse()->getPosition(edit_camera.entity);
-		auto camera_dir = m_editor.getUniverse()->getRotation(edit_camera.entity).rotate(Vec3(0, 0, -1));
-		float fov = render_interface->getCameraFOV(edit_camera.entity);
+		const Viewport& vp = m_editor.getViewport();
 
-		collide(camera_pos, camera_dir, fov, is_ortho);
+		collide(vp.pos, vp.rot * Vec3(0, 0, -1), vp.fov, vp.is_ortho);
 		transform();
 
 		for (int i = 0; i < m_count; ++i)

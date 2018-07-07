@@ -358,7 +358,6 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 {
 	explicit ModelPlugin(StudioApp& app)
 		: m_app(app)
-		, m_camera_entity(INVALID_ENTITY)
 		, m_mesh(INVALID_ENTITY)
 		, m_pipeline(nullptr)
 		, m_universe(nullptr)
@@ -375,6 +374,10 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		JobSystem::runJobs(&job, 1, nullptr);
 		createPreviewUniverse();
 		createTileUniverse();
+		m_viewport.is_ortho = false;
+		m_viewport.fov = Math::degreesToRadians(60.f);
+		m_viewport.near = 0.1f;
+		m_viewport.far = 10000.f;
 	}
 
 
@@ -511,7 +514,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		auto& engine = m_app.getWorldEditor().getEngine();
 		m_universe = &engine.createUniverse(false);
 		auto* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
-		m_pipeline = Pipeline::create(*renderer, Path("pipelines/main.pln"), "", "editor", engine.getAllocator());
+		m_pipeline = Pipeline::create(*renderer, Path("pipelines/main.pln"), "",  engine.getAllocator());
 		m_pipeline->load();
 
 		auto mesh_entity = m_universe->createEntity({0, 0, 0}, {0, 0, 0, 1});
@@ -522,10 +525,6 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		auto light_entity = m_universe->createEntity({0, 0, 0}, {0, 0, 0, 1});
 		m_universe->createComponent(GLOBAL_LIGHT_TYPE, light_entity);
 		render_scene->setGlobalLightIntensity(light_entity, 1);
-
-		m_camera_entity = m_universe->createEntity({0, 0, 0}, {0, 0, 0, 1});
-		m_universe->createComponent(CAMERA_TYPE, m_camera_entity);
-		render_scene->setCameraSlot(m_camera_entity, "editor");
 
 		m_pipeline->setScene(render_scene);
 	}
@@ -542,17 +541,15 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 			render_scene->setModelInstancePath(m_mesh, model.getPath());
 			AABB aabb = model.getAABB();
 
-			Matrix mtx;
-			Vec3 center = (aabb.max + aabb.min) * 0.5f;
-			Vec3 eye = center + Vec3(1, 1, 1) * (aabb.max - aabb.min).length();
-
-			mtx.lookAt(eye, center, Vec3(-1, 1, -1).normalized());
-			mtx.inverse();
-			m_universe->setMatrix(m_camera_entity, mtx);
+			const Vec3 center = (aabb.max + aabb.min) * 0.5f;
+			m_viewport.pos = center + Vec3(1, 1, 1) * (aabb.max - aabb.min).length();
+			m_viewport.rot = Quat::vec3ToVec3({0, 0, 1}, {1, 1, 1});
 		}
 		ImVec2 image_size(ImGui::GetContentRegionAvailWidth(), ImGui::GetContentRegionAvailWidth());
 
-		m_pipeline->resize((int)image_size.x, (int)image_size.y);
+		m_viewport.w = (int)image_size.x;
+		m_viewport.h = (int)image_size.y;
+		m_pipeline->setViewport(m_viewport);
 		m_pipeline->render();
 
 		ImGui::Image(&m_pipeline->getOutput(), image_size);
@@ -571,7 +568,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		{
 			if (ImGui::Selectable("Save preview"))
 			{
-				Matrix mtx = m_universe->getMatrix(m_camera_entity);
+				const Matrix mtx(m_viewport.pos, m_viewport.rot);
 				model.getResourceManager().load(model);
 				renderTile(&model, &mtx);
 			}
@@ -593,8 +590,8 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 			if (delta.x != 0 || delta.y != 0)
 			{
 				const Vec2 MOUSE_SENSITIVITY(50, 50);
-				Vec3 pos = m_universe->getPosition(m_camera_entity);
-				Quat rot = m_universe->getRotation(m_camera_entity);
+				Vec3 pos = m_viewport.pos;
+				Quat rot = m_viewport.rot;
 
 				float yaw = -Math::signum(delta.x) * (Math::pow(Math::abs((float)delta.x / MOUSE_SENSITIVITY.x), 1.2f));
 				Quat yaw_rot(Vec3(0, 1, 0), yaw);
@@ -614,8 +611,8 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 				float dist = (origin - pos).length();
 				pos = origin + dir * dist;
 
-				m_universe->setRotation(m_camera_entity, rot);
-				m_universe->setPosition(m_camera_entity, pos);
+				m_viewport.rot = rot;
+				m_viewport.pos = pos;
 			}
 		}
 	}
@@ -916,7 +913,7 @@ bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK); renderer->viewCounterAdd();
 	}
 
 
-	void renderTile(Model* model, Matrix* in_mtx)
+	void renderTile(Model* model, const Matrix* in_mtx)
 	{
 		// TODO
 		ASSERT(false);
@@ -1025,9 +1022,9 @@ if (type == Texture::TYPE)
 
 	StudioApp& m_app;
 	Universe* m_universe;
+	Viewport m_viewport;
 	Pipeline* m_pipeline;
 	Entity m_mesh;
-	Entity m_camera_entity;
 	bool m_is_mouse_captured;
 	int m_captured_mouse_x;
 	int m_captured_mouse_y;
@@ -1206,7 +1203,7 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		Renderer* renderer = static_cast<Renderer*>(plugin_manager.getPlugin("renderer"));
 		IAllocator& allocator = world_editor.getAllocator();
 		Path pipeline_path("pipelines/main.pln");
-		m_pipeline = Pipeline::create(*renderer, pipeline_path, "PROBE", "probe", allocator);
+		m_pipeline = Pipeline::create(*renderer, pipeline_path, "PROBE", allocator);
 		m_pipeline->load();
 
 		m_cl_context = nullptr; // cmft::clLoad() > 0 ? cmft::clInit() : nullptr;
@@ -1338,7 +1335,8 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		scene->setCameraFOV(camera_entity, Math::degreesToRadians(90));
 
 		m_pipeline->setScene(scene);
-		m_pipeline->resize(TEXTURE_SIZE, TEXTURE_SIZE);
+		// TODO
+		//m_pipeline->resize(TEXTURE_SIZE, TEXTURE_SIZE);
 
 		Renderer* renderer = static_cast<Renderer*>(plugin_manager.getPlugin("renderer"));
 
@@ -2345,12 +2343,6 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 	}
 
 
-	void setCameraSlot(Entity entity, const char* slot) override { m_render_scene->setCameraSlot(entity, slot); }
-
-
-	Entity getCameraInSlot(const char* slot) override { return m_render_scene->getCameraInSlot(slot); }
-
-
 	Vec2 getCameraScreenSize(Entity entity) override { return m_render_scene->getCameraScreenSize(entity); }
 
 
@@ -2446,9 +2438,10 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 	void getModelInstaces(Array<Entity>& entities,
 		const Frustum& frustum,
 		const Vec3& lod_ref_point,
-		Entity camera) override
+		float fov,
+		bool is_ortho) override
 	{
-		const float lod_multiplier = m_render_scene->getCameraLODMultiplier(camera);
+		const float lod_multiplier = m_render_scene->getCameraLODMultiplier(fov, is_ortho);
 		Array<Array<MeshInstance>>& res = m_render_scene->getModelInstanceInfos(frustum, lod_ref_point, lod_multiplier, ~0ULL);
 		for (auto& sub : res)
 		{

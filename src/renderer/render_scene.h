@@ -151,6 +151,7 @@ public:
 	virtual RayCastModelHit castRayTerrain(Entity entity, const Vec3& origin, const Vec3& dir) = 0;
 	virtual void getRay(Entity entity, const Vec2& screen_pos, Vec3& origin, Vec3& dir) = 0;
 
+	virtual float getCameraLODMultiplier(float fov, bool is_ortho) const = 0;
 	virtual float getCameraLODMultiplier(Entity entity) const = 0;
 	virtual Frustum getCameraFrustum(Entity entity) const = 0;
 	virtual Frustum getCameraFrustum(Entity entity, const Vec2& a, const Vec2& b) const = 0;
@@ -239,8 +240,6 @@ public:
 	virtual float getCameraNearPlane(Entity entity) = 0;
 	virtual float getCameraScreenWidth(Entity entity) = 0;
 	virtual float getCameraScreenHeight(Entity entity) = 0;
-	virtual void setCameraSlot(Entity entity, const char* slot) = 0;
-	virtual const char* getCameraSlot(Entity entity) = 0;
 	virtual void setCameraScreenSize(Entity entity, int w, int h) = 0;
 	virtual bool isCameraOrtho(Entity entity) = 0;
 	virtual void setCameraOrtho(Entity entity, bool is_ortho) = 0;

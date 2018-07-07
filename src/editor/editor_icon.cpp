@@ -5,6 +5,7 @@
 #include "engine/reflection.h"
 #include "engine/resource_manager_base.h"
 #include "engine/universe/universe.h"
+#include "engine/viewport.h"
 #include "render_interface.h"
 #include "world_editor.h"
 #include <cmath>
@@ -191,19 +192,13 @@ struct EditorIconsImpl LUMIX_FINAL : public EditorIcons
 		hit.t = -1;
 		hit.entity = INVALID_ENTITY;
 
-		auto* render_interface = m_editor.getRenderInterface();
-		if(!render_interface) return hit;
-
-		const auto& universe = *m_editor.getUniverse();
-		Entity camera = m_editor.getEditCamera().entity;
-		if (!camera.isValid()) return hit;
-		Matrix camera_mtx = universe.getMatrix(m_editor.getEditCamera().entity);
-		bool is_ortho = render_interface->isCameraOrtho(camera);
-		float ortho_size = render_interface->getCameraOrthoSize(camera);
+		const Viewport& vp = m_editor.getViewport();
+		Matrix camera_mtx = vp.rot.toMatrix();
+		camera_mtx.setTranslation(vp.pos);
 
 		for(auto& icon : m_icons)
 		{
-			Matrix icon_matrix = getIconMatrix(icon, camera_mtx, is_ortho, ortho_size);
+			Matrix icon_matrix = getIconMatrix(icon, camera_mtx, vp.is_ortho, vp.ortho_size);
 			
 			float t = m_editor.getRenderInterface()->castRay(m_models[(int)icon.type], origin, dir, icon_matrix, nullptr);
 			if(t >= 0 && (t < hit.t || hit.t < 0))
@@ -282,24 +277,18 @@ struct EditorIconsImpl LUMIX_FINAL : public EditorIcons
 		auto* render_interface = m_editor.getRenderInterface();
 		if(!render_interface) return;
 
-		const auto& universe = *m_editor.getUniverse();
-		Entity camera = m_editor.getEditCamera().entity;
-		if (!camera.isValid()) return;
-		Matrix camera_mtx = universe.getMatrix(m_editor.getEditCamera().entity);
-		Vec3 camera_pos = camera_mtx.getTranslation();
-		float fov = m_editor.getRenderInterface()->getCameraFOV(camera);
-		bool is_ortho = m_editor.getRenderInterface()->isCameraOrtho(camera);
-		float ortho_size = is_ortho ? m_editor.getRenderInterface()->getCameraOrthoSize(camera) : 1;
+		const Universe& universe = *m_editor.getUniverse();
+		const Viewport& vp = m_editor.getViewport();
+		Matrix camera_mtx(vp.pos, vp.rot);
 
-		for(auto& icon : m_icons)
-		{
-			Vec3 position = universe.getPosition(icon.entity);
-			float distance = (position - camera_pos).length();
+		for(auto& icon : m_icons) {
+			const Vec3 position = universe.getPosition(icon.entity);
+			const float distance = (position - vp.pos).length();
 			float scale_factor = MIN_SCALE_FACTOR + distance;
 			scale_factor = Math::clamp(scale_factor, MIN_SCALE_FACTOR, MAX_SCALE_FACTOR);
-			icon.scale = tan(fov * 0.5f) * distance / scale_factor;
+			icon.scale = tan(vp.fov * 0.5f) * distance / scale_factor;
 			
-			Matrix icon_mtx = getIconMatrix(icon, camera_mtx, is_ortho, ortho_size);
+			Matrix icon_mtx = getIconMatrix(icon, camera_mtx, vp.is_ortho, vp.ortho_size);
 			render_interface->renderModel(m_models[(int)icon.type], icon_mtx);
 		}
 	}
