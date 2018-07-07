@@ -50,7 +50,7 @@ SceneView::SceneView(StudioApp& app)
 	IAllocator& allocator = engine.getAllocator();
 	auto* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
 	Path path("pipelines/main.pln");
-	m_pipeline = Pipeline::create(*renderer, path, "SCENE_VIEW", "editor", engine.getAllocator());
+	m_pipeline = Pipeline::create(*renderer, path, "SCENE_VIEW", engine.getAllocator());
 	m_pipeline->load();
 	m_pipeline->addCustomCommandHandler("renderSelection").callback.bind<SceneView, &SceneView::renderSelection>(this);
 	m_pipeline->addCustomCommandHandler("renderGizmos").callback.bind<SceneView, &SceneView::renderGizmos>(this);
@@ -221,7 +221,7 @@ void SceneView::renderGizmos()
 {
 	ffr::pushDebugGroup("gizmos");
 	auto& entities = m_editor.getSelectedEntities();
-	if(entities.empty()) m_editor.getGizmo().render();
+	m_editor.getGizmo().render();
 	ffr::popDebugGroup();
 }
 
@@ -435,7 +435,6 @@ void SceneView::onWindowGUI()
 		m_texture_handle = m_pipeline->getOutput();
 		if (size.x > 0 && size.y > 0)
 		{
-			m_pipeline->resize(int(size.x), int(size.y));
 			auto cursor_pos = ImGui::GetCursorScreenPos();
 			m_screen_x = int(cursor_pos.x);
 			m_screen_y = int(cursor_pos.y);
@@ -505,26 +504,11 @@ void SceneView::onWindowGUI()
 				}
 			}
 
-			RenderScene* scene = m_pipeline->getScene();
-			const Entity camera = scene->getCameraInSlot("editor");
-			if(camera.isValid()) {
-				const Universe& universe = scene->getUniverse();
-				Viewport viewport;
-				viewport.is_ortho = scene->isCameraOrtho(camera);
-				viewport.pos = universe.getPosition(camera);
-				viewport.rot = universe.getRotation(camera);
-				if(viewport.is_ortho) {
-					viewport.ortho_size = scene->getCameraOrthoSize(camera);
-				}
-				else {
-					viewport.fov = scene->getCameraFOV(camera);
-				}
-				viewport.w = (int)size.x;
-				viewport.h = (int)size.y;
-				viewport.near = scene->getCameraNearPlane(camera);
-				viewport.far = scene->getCameraFarPlane(camera);
-				m_editor.setViewport(viewport);
-			}
+			Viewport vp = m_editor.getViewport();
+			vp.w = (int)size.x;
+			vp.h = (int)size.y;
+			m_editor.setViewport(vp);
+			m_pipeline->setViewport(vp);
 			m_pipeline->render();
 		}
 	}

@@ -80,7 +80,8 @@ public:
 	{
 		int w, h;
 		SDL_GetWindowSize(m_window, &w, &h);
-		m_pipeline->resize(w, h);
+		// TODO
+		//m_pipeline->resize(w, h);
 		Renderer* renderer = (Renderer*)m_engine->getPluginManager().getPlugin("renderer");
 		renderer->resize(w, h);
 	}
@@ -181,7 +182,7 @@ public:
 		#endif
 		m_engine->getInputSystem().enable(true);
 		Renderer* renderer = static_cast<Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
-		m_pipeline = Pipeline::create(*renderer, Path(m_pipeline_path), m_pipeline_define, "main", m_engine->getAllocator());
+		m_pipeline = Pipeline::create(*renderer, Path(m_pipeline_path), m_pipeline_define, m_engine->getAllocator());
 		m_pipeline->load();
 		renderer->setMainPipeline(m_pipeline);
 
@@ -193,7 +194,8 @@ public:
 
 		m_universe = &m_engine->createUniverse(true);
 		m_pipeline->setScene((RenderScene*)m_universe->getScene(crc32("renderer")));
-		m_pipeline->resize(600, 400);
+		// TODO
+		//m_pipeline->resize(600, 400);
 		renderer->resize(600, 400);
 
 		registerLuaAPI();

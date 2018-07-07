@@ -17,6 +17,7 @@
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
 #include "engine/universe/universe.h"
+#include "engine/viewport.h"
 #include "imgui/imgui.h"
 #include "physics/physics_scene.h"
 #include "renderer/material.h"
@@ -1416,10 +1417,9 @@ void TerrainEditor::onMouseMove(int x, int y, int, int)
 
 	detectModifiers();
 
-	ComponentUID camera_cmp = m_world_editor.getEditCamera();
-	RenderScene* scene = static_cast<RenderScene*>(camera_cmp.scene);
+	RenderScene* scene = static_cast<RenderScene*>(m_component.scene);
 	Vec3 origin, dir;
-	scene->getRay(camera_cmp.entity, {(float)x, (float)y}, origin, dir);
+	m_world_editor.getViewport().getRay({(float)x, (float)y}, origin, dir);
 	RayCastModelHit hit = scene->castRayTerrain(m_component.entity, origin, dir);
 	if (hit.m_is_hit)
 	{
@@ -1763,10 +1763,9 @@ void TerrainEditor::onGUI()
 	{
 		if (!m_world_editor.getUniverse()->hasComponent(entity, TERRAIN_TYPE)) continue;
 		
-		ComponentUID camera_cmp = m_world_editor.getEditCamera();
-		RenderScene* scene = static_cast<RenderScene*>(camera_cmp.scene);
+		RenderScene* scene = static_cast<RenderScene*>(m_component.scene);
 		Vec3 origin, dir;
-		scene->getRay(camera_cmp.entity, {(float)mouse_x, (float)mouse_y}, origin, dir);
+		m_world_editor.getViewport().getRay({(float)mouse_x, (float)mouse_y}, origin, dir);
 		RayCastModelHit hit = scene->castRayTerrain(entity, origin, dir);
 
 		if(hit.m_is_hit)

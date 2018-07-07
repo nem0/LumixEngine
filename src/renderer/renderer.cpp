@@ -181,7 +181,6 @@ static void registerProperties(IAllocator& allocator)
 			property("z", LUMIX_PROP(RenderScene, ParticleEmitterLinearMovementZ))
 		),
 		component("camera",
-			property("Slot", LUMIX_PROP(RenderScene, CameraSlot)),
 			property("Orthographic size", LUMIX_PROP(RenderScene, CameraOrthoSize), 
 				MinAttribute(0)),
 			property("Orthographic", LUMIX_PROP_FULL(RenderScene, isCameraOrtho, setCameraOrtho)),

@@ -74,12 +74,44 @@ void Viewport::getRay(const Vec2& screen_pos, Vec3& origin, Vec3& dir) const
 
 Vec2 Viewport::worldToScreenPixels(const Vec3& world) const
 {
-	const Matrix mtx = getView();
+	const Matrix mtx = getProjection(true) * getView();
 	const Vec4 pos = mtx * Vec4(world, 1);
 	const float inv = 1 / pos.w;
 	const Vec2 screen_size((float)w, (float)h);
 	const Vec2 screen_pos = { 0.5f * pos.x * inv + 0.5f, 1.0f - (0.5f * pos.y * inv + 0.5f) };
 	return screen_pos * screen_size;
+}
+
+
+Frustum Viewport::getFrustum(const Vec2& viewport_min_px, const Vec2& viewport_max_px) const
+{
+	const Matrix mtx(pos, rot);
+	Frustum ret;
+	float ratio = h > 0 ? w / (float)h : 1;
+	Vec2 viewport_min = { viewport_min_px.x / w * 2 - 1, (1 - viewport_max_px.y / h) * 2 - 1 };
+	Vec2 viewport_max = { viewport_max_px.x / w * 2 - 1, (1 - viewport_min_px.y / h) * 2 - 1 };
+	if (is_ortho) {
+		ret.computeOrtho(mtx.getTranslation(),
+			mtx.getZVector(),
+			mtx.getYVector(),
+			ortho_size * ratio,
+			ortho_size,
+			near,
+			far,
+			viewport_min,
+			viewport_max);
+		return ret;
+	}
+	ret.computePerspective(mtx.getTranslation(),
+		-mtx.getZVector(),
+		mtx.getYVector(),
+		fov,
+		ratio,
+		near,
+		far,
+		viewport_min,
+		viewport_max);
+	return ret;
 }
 
 

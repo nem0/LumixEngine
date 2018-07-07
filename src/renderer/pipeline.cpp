@@ -11,6 +11,7 @@
 #include "engine/path.h"
 #include "engine/profiler.h"
 #include "engine/universe/universe.h"
+#include "engine/viewport.h"
 #include "font_manager.h"
 #include "global_state_uniforms.h"
 #include "material.h"
@@ -35,7 +36,7 @@ static const float SHADOW_CAM_FAR = 5000.0f;
 
 struct PipelineImpl LUMIX_FINAL : Pipeline
 {
-	PipelineImpl(Renderer& renderer, const Path& path, const char* define, const char* camera_slot, IAllocator& allocator)
+	PipelineImpl(Renderer& renderer, const Path& path, const char* define, IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_renderer(renderer)
 		, m_path(path)
@@ -43,10 +44,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		, m_is_ready(false)
 		, m_custom_commands_handlers(allocator)
 		, m_define(define)
-		, m_camera_slot(camera_slot)
 		, m_scene(nullptr)
-		, m_width(-1)
-		, m_height(-1)
 		, m_is_first_render(true)
 		, m_draw2d(allocator)
 		, m_output(ffr::INVALID_TEXTURE)
@@ -54,6 +52,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		, m_shaders(allocator)
 		, m_global_textures(allocator)
 	{
+		m_viewport.w = m_viewport.h = -1;
 		ShaderManager& shader_manager = renderer.getShaderManager();
 		m_draw2d_shader = (Shader*)shader_manager.load(Path("pipelines/draw2d.shd"));
 		m_debug_shape_shader = (Shader*)shader_manager.load(Path("pipelines/debug_shape.shd"));
@@ -243,7 +242,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 			return;
 		}
 
-		m_width = m_height = -1;
+		m_viewport.w = m_viewport.h = -1;
 		if (m_scene) callInitScene();
 
 		m_is_ready = true;
@@ -271,15 +270,11 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 	{
 		GlobalStateUniforms& global_uniforms = m_renderer.getGlobalStateUniforms();
 		GlobalStateUniforms::State& global_state = global_uniforms.state;
-		const int w = global_state.framebuffer_size.x;
-		const int h = global_state.framebuffer_size.y;
-		m_scene->setCameraScreenSize(m_active_camera, w, h);
 
-		Matrix view = m_scene->getUniverse().getMatrix(m_active_camera);
-		global_state.camera_pos = Vec4(view.getTranslation(), 789);
+		global_state.camera_pos = Vec4(m_viewport.pos, 789);
 
-		view.fastInverse();
-		const Matrix projection = m_scene->getCameraProjection(m_active_camera);
+		const Matrix view = m_viewport.getView();
+		const Matrix projection = m_viewport.getProjection(ffr::isHomogenousDepth());
 		global_state.camera_projection = projection;
 		global_state.camera_view = view;
 		global_state.camera_view_projection = projection * view;
@@ -297,18 +292,14 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 	}
 
 
+	virtual void setViewport(const Viewport& viewport) override { m_viewport = viewport; }
+
+
 	bool render() override 
 	{ 
 		PROFILE_FUNCTION();
 
-		if (!isReady() || !m_scene || m_width < 0 || m_height < 0) {
-			m_is_first_render = true;
-			return false;
-		}
-
-		m_active_camera = m_scene->getCameraInSlot(m_camera_slot);
-		if(!m_active_camera.isValid()) {
-			g_log_error.log("Renderer") << "No camera in slot " << m_camera_slot << " in " << getPath() << " " << m_define;
+		if (!isReady() || !m_scene || m_viewport.w < 0 || m_viewport.h < 0) {
 			m_is_first_render = true;
 			return false;
 		}
@@ -418,7 +409,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 			m_draw2d.PushTextureID(atlas.TexID);
 		};
 
-		Vec2 size((float)getWidth(), (float)getHeight());
+		Vec2 size((float)m_viewport.w, (float)m_viewport.h);
 		Matrix ortho;
 
 		if (!m_draw2d_shader->isReady()) {
@@ -491,14 +482,6 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		resetDraw2D();
 	}
 
-
-	void resize(int w, int h) override
-	{
-		m_width = w;
-		m_height = h;	
-	}
-	
-
 	void setScene(RenderScene* scene) override
 	{
 		m_scene = scene;
@@ -506,8 +489,6 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 	}
 
 	RenderScene* getScene() const override { return m_scene; }
-	int getWidth() const override { return m_width; }
-	int getHeight() const override { return m_height; }
 
 	CustomCommandHandler& addCustomCommandHandler(const char* name) override 
 	{
@@ -549,8 +530,8 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 
 	int createRenderbuffer(float w, float h, bool relative, const char* format_str)
 	{
-		const uint rb_w = uint(relative ? w * m_width : w);
-		const uint rb_h = uint(relative ? h * m_height : h);
+		const uint rb_w = uint(relative ? w * m_viewport.w : w);
+		const uint rb_h = uint(relative ? h * m_viewport.h : h);
 		const ffr::TextureFormat format = getFormat(format_str);
 
 		for (int i = 0, n = m_renderbuffers.size(); i < n; ++i)
@@ -674,7 +655,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 			}
 		}
 
-		const Vec3 camera_pos = pipeline->m_scene->getUniverse().getPosition(pipeline->m_active_camera);
+		const Vec3 camera_pos = pipeline->m_viewport.pos;
 		const Entity probe = pipeline->m_scene->getNearestEnvironmentProbe(camera_pos);
 		
 		if (probe.isValid()) {
@@ -787,41 +768,12 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
 
 		RenderScene* scene = pipeline->m_scene;
-		const Entity camera = scene->getCameraInSlot(pipeline->m_camera_slot);
-
-		const Universe& universe = pipeline->m_scene->getUniverse();
 
 		CameraParams cp;
 
-		cp.pos = universe.getPosition(camera);
-		const Quat rot = universe.getRotation(camera);
-		const float near = scene->getCameraNearPlane(camera);
-		const float far = scene->getCameraFarPlane(camera);
-		const Vec2 cam_size = scene->getCameraScreenSize(camera);
-		const float ratio = cam_size.y > 0 ? cam_size.x / cam_size.y : 1;
-
-		const bool is_ortho = scene->isCameraOrtho(camera);
-		const float fov = scene->getCameraFOV(camera);
-		if(is_ortho) {
-			const float ortho_size = scene->getCameraOrthoSize(camera);
-			cp.frustum.computeOrtho(cp.pos, 
-				rot * Vec3(0, 0, 1),
-				rot * Vec3(0, 1, 0),
-				ortho_size * ratio,
-				ortho_size,
-				near,
-				far);
-		}
-		else {
-			cp.frustum.computePerspective(cp.pos, 
-				rot * Vec3(0, 0, -1),
-				rot * Vec3(0, 1, 0),
-				fov,
-				ratio,
-				near,
-				far);
-		}
-		cp.lod_multiplier = scene->getCameraLODMultiplier(camera);
+		cp.pos = pipeline->m_viewport.pos;
+		cp.frustum = pipeline->m_viewport.getFrustum();
+		cp.lod_multiplier = scene->getCameraLODMultiplier(pipeline->m_viewport.fov, pipeline->m_viewport.is_ortho);
 		pushCameraParams(L, cp);
 
 		return 1;
@@ -887,23 +839,21 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		const int shadowmap_width = LuaWrapper::checkArg<int>(L, 2);
 		
 		RenderScene* scene = pipeline->m_scene;
-		const Entity camera = scene->getCameraInSlot(pipeline->m_camera_slot);
 		
 		const Universe& universe = scene->getUniverse();
 		const Entity light = scene->getActiveGlobalLight();
-		const Matrix light_mtx = universe.getMatrix(light);
+		const Vec4 cascades = light.isValid() ? scene->getShadowmapCascades(light) : Vec4(3, 10, 60, 150);
+		const Matrix light_mtx = light.isValid() ? universe.getMatrix(light) : Matrix::IDENTITY;
 
-		const float camera_height = scene->getCameraScreenHeight(camera);
-		const float camera_fov = scene->getCameraFOV(camera);
-		const float camera_ratio = scene->getCameraScreenWidth(camera) / camera_height;
-		const Vec4 cascades = scene->getShadowmapCascades(light);
+		const float camera_height = (float)pipeline->m_viewport.h;
+		const float camera_fov = pipeline->m_viewport.fov;
+		const float camera_ratio = pipeline->m_viewport.w / camera_height;
 		const float split_distances[] = {0.1f, cascades.x, cascades.y, cascades.z, cascades.w};
 		
 		Frustum camera_frustum;
-		const Matrix camera_matrix = universe.getMatrix(camera);
-		camera_frustum.computePerspective(camera_matrix.getTranslation(),
-			-camera_matrix.getZVector(),
-			camera_matrix.getYVector(),
+		camera_frustum.computePerspective(pipeline->m_viewport.pos,
+			pipeline->m_viewport.rot * Vec3(0, 0, -1),
+			pipeline->m_viewport.rot * Vec3(0, 1, 0),
 			camera_fov,
 			camera_ratio,
 			split_distances[slice],
@@ -911,7 +861,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 
 		const Sphere frustum_bounding_sphere = camera_frustum.computeBoundingSphere();
 		const float bb_size = frustum_bounding_sphere.radius;
-		Vec3 light_forward = light_mtx.getZVector();
+		const Vec3 light_forward = light_mtx.getZVector();
 		
 		Vec3 shadow_cam_pos = frustum_bounding_sphere.position;
 		shadow_cam_pos = shadowmapTexelAlign(shadow_cam_pos, 0.5f * shadowmap_width - 2, bb_size, light_mtx);
@@ -939,7 +889,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 
 		CameraParams cp;
 		cp.lod_multiplier = 1;
-		cp.pos = camera_matrix.getTranslation();
+		cp.pos = pipeline->m_viewport.pos;
 		cp.frustum.computeOrtho(shadow_cam_pos
 			, -light_forward
 			, light_mtx.getYVector()
@@ -948,7 +898,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 			, SHADOW_CAM_NEAR
 			, SHADOW_CAM_FAR);
 
-		findExtraShadowcasterPlanes(light_forward, camera_frustum, camera_matrix.getTranslation(), &cp.frustum);
+		findExtraShadowcasterPlanes(light_forward, camera_frustum, pipeline->m_viewport.pos, &cp.frustum);
 
 		pushCameraParams(L, cp);
 
@@ -1049,8 +999,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 
 		const Universe& universe = m_scene->getUniverse();
 		
-		const Vec3 camera_pos = universe.getPosition(m_active_camera);
-		const Entity probe = m_scene->getNearestEnvironmentProbe(camera_pos);
+		const Entity probe = m_scene->getNearestEnvironmentProbe(m_viewport.pos);
 
 		for(auto& submeshes : *meshes) {
 			for(auto& mesh : submeshes) {
@@ -1243,6 +1192,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		REGISTER_FUNCTION(setOutput);
 		REGISTER_FUNCTION(viewport);
 
+		registerConst("CLEAR_DEPTH", (uint)ffr::ClearFlags::DEPTH);
 		registerConst("CLEAR_ALL", (uint)ffr::ClearFlags::COLOR | (uint)ffr::ClearFlags::DEPTH);
 
 		registerCFunction("cull", PipelineImpl::cull);
@@ -1292,14 +1242,11 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 	bool m_is_ready;
 	bool m_is_first_render;
 	StaticString<32> m_define;
-	StaticString<32> m_camera_slot;
 	RenderScene* m_scene;
 	Draw2D m_draw2d;
 	Shader* m_draw2d_shader;
-	int m_width;
-	int m_height;
 	Stats m_stats;
-	Entity m_active_camera;
+	Viewport m_viewport;
 	ffr::TextureHandle m_output;
 	Shader* m_debug_shape_shader;
 	Texture* m_default_cubemap;
@@ -1311,9 +1258,9 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 };
 
 
-Pipeline* Pipeline::create(Renderer& renderer, const Path& path, const char* define, const char* camera_slot, IAllocator& allocator)
+Pipeline* Pipeline::create(Renderer& renderer, const Path& path, const char* define, IAllocator& allocator)
 {
-	return LUMIX_NEW(allocator, PipelineImpl)(renderer, path, define, camera_slot, allocator);
+	return LUMIX_NEW(allocator, PipelineImpl)(renderer, path, define, allocator);
 }
 
 

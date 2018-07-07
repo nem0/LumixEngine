@@ -422,13 +422,19 @@ public:
 	}
 
 
-	float getCameraLODMultiplier(Entity entity) const
+	float getCameraLODMultiplier(float fov, bool is_ortho) const override
+	{
+		if (is_ortho) return 1;
+
+		const float lod_multiplier = fov / Math::degreesToRadians(60);
+		return lod_multiplier  * lod_multiplier;
+	}
+
+
+	float getCameraLODMultiplier(Entity entity) const override
 	{
 		const Camera& camera = m_cameras[entity];
-		if(camera.is_ortho) return 1;
-
-		const float lod_multiplier = camera.fov / Math::degreesToRadians(60);
-		return lod_multiplier  * lod_multiplier;
+		return getCameraLODMultiplier(camera.fov, camera.is_ortho);
 	}
 
 
@@ -3075,17 +3081,14 @@ public:
 	static int LUA_castCameraRay(lua_State* L)
 	{
 		auto* scene = LuaWrapper::checkArg<RenderSceneImpl*>(L, 1);
-		const char* slot = LuaWrapper::checkArg<const char*>(L, 2);
-		float x, y;
-		Entity camera_entity = scene->getCameraInSlot(slot);
+		Entity camera_entity = LuaWrapper::checkArg<Entity>(L, 2);
 		if (!camera_entity.isValid()) return 0;
-		if (lua_gettop(L) > 3)
-		{
+		float x, y;
+		if (lua_gettop(L) > 3) {
 			x = LuaWrapper::checkArg<float>(L, 3);
 			y = LuaWrapper::checkArg<float>(L, 4);
 		}
-		else
-		{
+		else {
 			x = scene->getCameraScreenWidth(camera_entity) * 0.5f;
 			y = scene->getCameraScreenHeight(camera_entity) * 0.5f;
 		}
@@ -3137,7 +3140,7 @@ public:
 	static Pipeline* LUA_createPipeline(Engine* engine, const char* path)
 	{
 		Renderer& renderer = *static_cast<Renderer*>(engine->getPluginManager().getPlugin("renderer"));
-		Pipeline* pipeline = Pipeline::create(renderer, Path(path), "", "main", renderer.getEngine().getAllocator());
+		Pipeline* pipeline = Pipeline::create(renderer, Path(path), "", renderer.getEngine().getAllocator());
 		pipeline->load();
 		return pipeline;
 	}
@@ -3158,13 +3161,6 @@ public:
 	static RenderScene* LUA_getPipelineScene(Pipeline* pipeline)
 	{
 		return pipeline->getScene();
-	}
-
-
-	static void LUA_pipelineRender(Pipeline* pipeline, int w, int h)
-	{
-		pipeline->resize(w, h);
-		pipeline->render();
 	}
 
 
@@ -3584,14 +3580,6 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	void setCameraSlot(Entity entity, const char* slot) override
-	{
-		auto& camera = m_cameras[entity];
-		copyString(camera.slot, lengthOf(camera.slot), slot);
-	}
-
-
-	const char* getCameraSlot(Entity camera) override { return m_cameras[camera].slot; }
 	float getCameraFOV(Entity camera) override { return m_cameras[camera].fov; }
 	void setCameraFOV(Entity camera, float fov) override { m_cameras[camera].fov = fov; }
 	void setCameraNearPlane(Entity camera, float near_plane) override { m_cameras[camera].near = Math::maximum(near_plane, 0.00001f); }
@@ -5314,7 +5302,6 @@ void RenderScene::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(getGlobalLightEntity);
 	REGISTER_FUNCTION(getActiveGlobalLight);
 	REGISTER_FUNCTION(getCameraInSlot);
-	REGISTER_FUNCTION(getCameraSlot);
 	REGISTER_FUNCTION(getModelInstanceModel);
 	REGISTER_FUNCTION(addDebugCross);
 	REGISTER_FUNCTION(addDebugLine);
@@ -5338,9 +5325,8 @@ void RenderScene::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(destroyPipeline);
 	REGISTER_FUNCTION(setPipelineScene);
 	REGISTER_FUNCTION(getPipelineScene);
-	REGISTER_FUNCTION(pipelineRender);
 	// TODO
-	/*
+	/*REGISTER_FUNCTION(pipelineRender);
 	REGISTER_FUNCTION(getRenderBuffer);*/
 	REGISTER_FUNCTION(setModelInstanceMaterial);
 	REGISTER_FUNCTION(setModelInstancePath);
