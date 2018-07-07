@@ -27,6 +27,7 @@
 #include "engine/resource_manager_base.h"
 #include "engine/system.h"
 #include "engine/universe/universe.h"
+#include "engine/viewport.h"
 #include "game_view.h"
 #include "import_asset_dialog.h"
 #include "renderer/draw2d.h"
@@ -1904,7 +1905,7 @@ struct FurPainter LUMIX_FINAL : public WorldEditor::Plugin
 		if (!pose) return;
 
 		Vec3 origin, dir;
-		scene->getRay(editor.getEditCamera().entity, {(float)x, (float)y}, origin, dir);
+		editor.getViewport().getRay({(float)x, (float)y}, origin, dir);
 		RayCastModelHit hit = model->castRay(origin, dir, universe->getMatrix(entities[0]), pose);
 		if (!hit.m_is_hit)
 		{
@@ -2063,7 +2064,8 @@ struct FurPainterPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 		if (!pose) return;
 
 		Vec3 origin, dir;
-		scene->getRay(editor.getEditCamera().entity, editor.getMousePos(), origin, dir);
+		
+		editor.getViewport().getRay(editor.getMousePos(), origin, dir);
 		RayCastModelHit hit = model->castRay(origin, dir, editor.getUniverse()->getMatrix(entities[0]), pose);
 		if (!hit.m_is_hit)
 		{
@@ -2432,17 +2434,6 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 
 		ffr::destroy(index_buffer);
 		ffr::destroy(vertex_buffer);
-	}
-
-
-	Vec2 worldToScreenPixels(Entity camera, const Vec3& world) override
-	{
-		Matrix mtx = m_render_scene->getCameraViewProjection(camera);
-		Vec4 pos = mtx * Vec4(world, 1);
-		float inv = 1 / pos.w;
-		Vec2 screen_size = m_render_scene->getCameraScreenSize(camera);
-		Vec2 screen_pos = { 0.5f * pos.x * inv + 0.5f, 1.0f - (0.5f * pos.y * inv + 0.5f) };
-		return screen_pos * screen_size;
 	}
 
 

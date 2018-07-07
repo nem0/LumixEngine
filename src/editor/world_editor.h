@@ -32,6 +32,7 @@ class RenderInterface;
 struct Quat;
 struct RayCastModelHit;
 class Universe;
+struct Viewport;
 
 struct MouseButton
 {
@@ -91,6 +92,8 @@ public:
 	virtual Engine& getEngine() = 0;
 	virtual Universe* getUniverse() = 0;
 	virtual IAllocator& getAllocator() = 0;
+	virtual const Viewport& getViewport() const = 0;
+	virtual void setViewport(const Viewport& viewport) = 0;
 	virtual void renderIcons() = 0;
 	virtual ComponentUID getEditCamera() = 0;
 	virtual class Gizmo& getGizmo() = 0;

@@ -14,6 +14,7 @@
 #include "engine/reflection.h"
 #include "engine/system.h"
 #include "engine/universe/universe.h"
+#include "engine/viewport.h"
 #include "physics/physics_geometry_manager.h"
 #include "physics/physics_scene.h"
 #include "renderer/model.h"
@@ -612,7 +613,7 @@ struct PhysicsUIPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 	void onVisualizationGUI()
 	{
 		auto* scene = static_cast<PhysicsScene*>(m_editor.getUniverse()->getScene(crc32("physics")));
-		Vec3 camera_pos = m_editor.getUniverse()->getPosition(m_editor.getEditCamera().entity);
+		Vec3 camera_pos = m_editor.getViewport().pos;
 		const Vec3 extents(20, 20, 20);
 		scene->setVisualizationCullingBox(camera_pos - extents, camera_pos + extents);
 

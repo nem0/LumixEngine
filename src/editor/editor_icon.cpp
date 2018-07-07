@@ -128,7 +128,6 @@ struct EditorIconsImpl LUMIX_FINAL : public EditorIcons
 	void createIcon(Entity entity)
 	{
 		if (!entity.isValid()) return;
-		if (m_editor.getEditCamera().entity == entity) return;
 
 		Universe& universe = *m_editor.getUniverse();
 		
