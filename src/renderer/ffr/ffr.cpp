@@ -447,8 +447,13 @@ static void try_load_renderdoc()
 }
 
 
-static int load_gl()
+static int load_gl(void* window_handle)
 {
+	HWND hwnd = (HWND)window_handle;
+	HDC hdc = GetDC(hwnd);
+	HGLRC hglrc = wglCreateContext(hdc);
+	wglMakeCurrent(hdc, hglrc);
+
 	#define FFR_GL_IMPORT(prototype, name) \
 		do { \
 			name = (prototype)wglGetProcAddress(#name); \
@@ -1011,11 +1016,11 @@ void preinit()
 }
 
 
-bool init(IAllocator& allocator)
+bool init(void* window_handle, IAllocator& allocator)
 {
 	s_ffr.allocator = &allocator;
 
-	if (!load_gl()) return false;
+	if (!load_gl(window_handle)) return false;
 
 	s_ffr.textures = (Texture*)allocator.allocate(sizeof(Texture) * Texture::MAX_COUNT);
 	for(int i = 0; i < Texture::MAX_COUNT; ++i) {

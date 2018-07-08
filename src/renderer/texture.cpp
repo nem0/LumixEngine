@@ -5,6 +5,7 @@
 #include "engine/profiler.h"
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
+#include "renderer/renderer.h"
 #include "renderer/texture.h"
 #include "renderer/texture_manager.h"
 #include <cmath>
@@ -16,7 +17,7 @@ namespace Lumix
 const ResourceType Texture::TYPE("texture");
 
 
-Texture::Texture(const Path& path, ResourceManagerBase& resource_manager, IAllocator& _allocator)
+Texture::Texture(const Path& path, Renderer& renderer, ResourceManagerBase& resource_manager, IAllocator& _allocator)
 	: Resource(path, resource_manager, _allocator)
 	, data_reference(0)
 	, allocator(_allocator)
@@ -24,10 +25,11 @@ Texture::Texture(const Path& path, ResourceManagerBase& resource_manager, IAlloc
 	, bytes_per_pixel(-1)
 	, depth(-1)
 	, layers(1)
+	, renderer(renderer)
 {
 	flags = 0;
 	is_cubemap = false;
-	handle = ffr::INVALID_TEXTURE;
+	handle.reset();
 }
 
 
@@ -65,9 +67,10 @@ void Texture::destroy()
 }
 
 
-bool Texture::create(int w, int h, const void* data)
+bool Texture::create(int w, int h, const void* data, uint size)
 {
-	handle = ffr::createTexture(w, h, ffr::TextureFormat::RGBA8, getFFRFlags(), data);
+	Renderer::MemRef memory = renderer.copy(data, size);
+	handle = renderer.createTexture(w, h, ffr::TextureFormat::RGBA8, getFFRFlags(), memory);
 	mips = 1;
 	width = w;
 	height = h;
@@ -313,7 +316,7 @@ void Texture::onDataUpdated(int x, int y, int w, int h)
 
 bool loadRaw(Texture& texture, FS::IFile& file, IAllocator& allocator)
 {
-	PROFILE_FUNCTION();
+/*	PROFILE_FUNCTION();
 	size_t size = file.size();
 	texture.bytes_per_pixel = 2;
 	texture.width = (int)sqrt(size / texture.bytes_per_pixel);
@@ -339,7 +342,10 @@ bool loadRaw(Texture& texture, FS::IFile& file, IAllocator& allocator)
 	texture.layers = 1;
 	texture.mips = 1;
 	texture.is_cubemap = false;
-	return texture.handle.isValid();
+	return texture.handle.isValid();*/
+	// TODO
+	ASSERT(false);
+	return false;
 }
 
 
@@ -564,7 +570,8 @@ bool Texture::loadTGA(FS::IFile& file)
 
 	bytes_per_pixel = 4;
 	mips = 1;
-	handle = ffr::createTexture(header.width, header.height, ffr::TextureFormat::RGBA8, getFFRFlags(), image_dest);
+	Renderer::MemRef mem = renderer.copy(image_dest, image_size);
+	handle = renderer.createTexture(header.width, header.height, ffr::TextureFormat::RGBA8, getFFRFlags(), mem);
 	depth = 1;
 	layers = 1;
 	return handle.isValid();
@@ -594,7 +601,8 @@ void Texture::removeDataReference()
 static bool loadDDS(Texture& texture, FS::IFile& file)
 {
 	ffr::TextureInfo info;
-	texture.handle = ffr::loadTexture(file.getBuffer(), (int)file.size(), texture.getFFRFlags(), &info);
+	Renderer::MemRef mem = texture.renderer.copy(file.getBuffer(), (int)file.size());
+	texture.handle = texture.renderer.loadTexture(mem, texture.getFFRFlags(), &info);
 	if (texture.handle.isValid()) {
 		texture.width = info.width;
 		texture.height = info.height;
@@ -651,8 +659,8 @@ bool Texture::load(FS::IFile& file)
 void Texture::unload()
 {
 	if (handle.isValid()) {
-		ffr::destroy(handle);
-		handle = ffr::INVALID_TEXTURE;
+		renderer.destroy(handle);
+		handle.reset();
 	}
 	data.clear();
 }

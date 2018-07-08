@@ -3,6 +3,7 @@
 
 #include "engine/resource.h"
 #include "ffr/ffr.h"
+#include "renderer.h"
 
 
 namespace Lumix
@@ -11,7 +12,6 @@ namespace FS
 {
 	class FileSystem;
 }
-
 
 #pragma pack(1)
 struct TGAHeader
@@ -40,12 +40,12 @@ class LUMIX_RENDERER_API Texture LUMIX_FINAL : public Resource
 		};
 
 	public:
-		Texture(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
+		Texture(const Path& path, Renderer& renderer, ResourceManagerBase& resource_manager, IAllocator& allocator);
 		~Texture();
 
 		ResourceType getType() const override { return TYPE; }
 
-		bool create(int w, int h, const void* data);
+		bool create(int w, int h, const void* data, uint size);
 		void destroy();
 
 		const u8* getData() const { return data.empty() ? nullptr : &data[0]; }
@@ -82,10 +82,11 @@ class LUMIX_RENDERER_API Texture LUMIX_FINAL : public Resource
 		int mips;
 		bool is_cubemap;
 		u32 flags;
-		ffr::TextureHandle handle;
+		Renderer::TextureHandle handle;
 		IAllocator& allocator;
 		int data_reference;
 		Array<u8> data;
+		Renderer& renderer;
 
 	private:
 		void unload() override;
