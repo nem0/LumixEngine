@@ -11,6 +11,7 @@
 #include "engine/json_serializer.h"
 #include "engine/log.h"
 #include "engine/path_utils.h"
+#include "engine/plugin_manager.h"
 #include "engine/prefab.h"
 #include "engine/profiler.h"
 #include "engine/reflection.h"
@@ -23,6 +24,7 @@
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include "renderer/render_scene.h"
+#include "renderer/renderer.h"
 #include "renderer/texture.h"
 #include "stb/stb_image.h"
 #include <cmath>
@@ -1570,9 +1572,12 @@ void TerrainEditor::onGUI()
 						m_brush_texture->destroy();
 						LUMIX_DELETE(m_world_editor.getAllocator(), m_brush_texture);
 					}
+
+					IPlugin* plugin = m_world_editor.getEngine().getPluginManager().getPlugin("renderer");
+					Renderer& renderer = *static_cast<Renderer*>(plugin);
 					m_brush_texture = LUMIX_NEW(m_world_editor.getAllocator(), Texture)(
-						Path("brush_texture"), *rm.get(Texture::TYPE), m_world_editor.getAllocator());
-					m_brush_texture->create(image_width, image_height, data);
+						Path("brush_texture"), renderer, *rm.get(Texture::TYPE), m_world_editor.getAllocator());
+					m_brush_texture->create(image_width, image_height, data, image_width * image_height * 4);
 
 					stbi_image_free(data);
 				}

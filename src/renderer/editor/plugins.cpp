@@ -2191,10 +2191,12 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 		Material* material = (Material*)resource;
 
 		Texture* old_texture = material->getTexture(0);
+		PluginManager& plugin_manager = engine.getPluginManager();
+		Renderer* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
 		Texture* texture = LUMIX_NEW(engine.getAllocator(), Texture)(
-			Path("font"), *engine.getResourceManager().get(Texture::TYPE), engine.getAllocator());
+			Path("font"), *renderer, *engine.getResourceManager().get(Texture::TYPE), engine.getAllocator());
 
-		texture->create(width, height, pixels);
+		texture->create(width, height, pixels, width * height * 4);
 		material->setTexture(0, texture);
 		if (old_texture)
 		{
@@ -2235,10 +2237,14 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 
 	ImTextureID createTexture(const char* name, const void* pixels, int w, int h) override
 	{
-		auto& rm = m_editor.getEngine().getResourceManager();
+		Engine& engine = m_editor.getEngine();
+		auto& rm = engine.getResourceManager();
 		auto& allocator = m_editor.getAllocator();
-		Texture* texture = LUMIX_NEW(allocator, Texture)(Path(name), *rm.get(Texture::TYPE), allocator);
-		texture->create(w, h, pixels);
+		PluginManager& plugin_manager = engine.getPluginManager();
+		Renderer* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
+
+		Texture* texture = LUMIX_NEW(allocator, Texture)(Path(name), *renderer, *rm.get(Texture::TYPE), allocator);
+		texture->create(w, h, pixels, w * h * 4);
 		m_textures.insert(&texture->handle, texture);
 		return &texture->handle;
 	}
@@ -2535,6 +2541,161 @@ struct RenderStatsPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 
 struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 {
+	struct RenderCommand : Renderer::RenderCommandBase
+	{
+		struct CmdList
+		{
+			CmdList(IAllocator& allocator) : commands(allocator) {}
+
+			Renderer::MemRef idx_buffer;
+			Renderer::MemRef vtx_buffer;
+
+			Array<ImDrawCmd> commands;
+		};
+
+		struct Data
+		{
+			Data(IAllocator& allocator)
+				: command_lists(allocator)
+			{}
+
+			uint w, h;
+			Array<CmdList> command_lists;
+		};
+
+		void* setup() override
+		{
+			PluginManager& plugin_manager = plugin->m_engine.getPluginManager();
+			Renderer& renderer = *(Renderer*)plugin_manager.getPlugin("renderer");
+
+			const ImDrawData* draw_data = ImGui::GetDrawData();
+			Data* out_data = LUMIX_NEW(allocator, Data)(allocator);
+
+			out_data->command_lists.reserve(draw_data->CmdListsCount);
+			for (int i = 0; i < draw_data->CmdListsCount; ++i) {
+				ImDrawList* cmd_list = draw_data->CmdLists[i];
+				CmdList& out_cmd_list = out_data->command_lists.emplace(allocator);
+
+				out_cmd_list.idx_buffer = renderer.copy(&cmd_list->IdxBuffer[0], cmd_list->IdxBuffer.size() * sizeof(cmd_list->IdxBuffer[0]));
+				out_cmd_list.vtx_buffer = renderer.copy(&cmd_list->VtxBuffer[0], cmd_list->VtxBuffer.size() * sizeof(cmd_list->VtxBuffer[0]));
+			
+				out_cmd_list.commands.resize(cmd_list->CmdBuffer.size());
+				for (int i = 0, c = out_cmd_list.commands.size(); i < c; ++i) {
+					out_cmd_list.commands[i] = cmd_list->CmdBuffer[i];
+				}
+			}
+
+			return nullptr;
+		}
+
+
+		RenderCommand(IAllocator& allocator)
+			: allocator(allocator)
+		{}
+
+
+		void draw(const CmdList& cmd_list) const
+		{
+			/*Renderer* renderer = static_cast<Renderer*>(m_engine.getPluginManager().getPlugin("renderer"));
+
+			const int num_indices = cmd_list->IdxBuffer.size();
+			const int num_vertices = cmd_list->VtxBuffer.size();
+
+			ffr::update(
+				m_index_buffer, &cmd_list->IdxBuffer[0], m_ib_offset * sizeof(u16), num_indices * sizeof(u16));
+			ffr::update(m_vertex_buffer,
+				&cmd_list->VtxBuffer[0],
+				m_vb_offset * sizeof(ImDrawVert),
+				num_vertices * sizeof(ImDrawVert));
+			u32 elem_offset = 0;
+			const ImDrawCmd* pcmd_begin = cmd_list->CmdBuffer.begin();
+			const ImDrawCmd* pcmd_end = cmd_list->CmdBuffer.end();
+			for (const ImDrawCmd* pcmd = pcmd_begin; pcmd != pcmd_end; pcmd++)
+			{
+				if (pcmd->UserCallback)
+				{
+					pcmd->UserCallback(cmd_list, pcmd);
+					elem_offset += pcmd->ElemCount;
+					continue;
+				}
+
+				if (0 == pcmd->ElemCount) continue;
+				/*			auto material = m_material;
+							u64 render_states = material->getRenderStates();
+							if (&m_scene_view.getTextureHandle() == &texture_id || &m_game_view.getTextureHandle() ==
+				   &texture_id)
+							{
+								render_states &= ~BGFX_STATE_BLEND_MASK;
+							}
+				*//*
+
+				const u32 first_index = elem_offset + m_ib_offset;
+
+				ffr::VertexDecl decl;
+				decl.addAttribute(2, ffr::AttributeType::FLOAT, false, false);
+				decl.addAttribute(2, ffr::AttributeType::FLOAT, false, false);
+				decl.addAttribute(4, ffr::AttributeType::U8, true, false);
+
+				ffr::DrawCall dc;
+				dc.attribute_map = nullptr;
+				dc.state = 0;
+				dc.index_buffer = m_index_buffer;
+				dc.primitive_type = ffr::PrimitiveType::TRIANGLES;
+				dc.shader = m_shader;
+				dc.indices_offset = first_index;
+				dc.indices_count = pcmd->ElemCount;
+				dc.tex_buffers = nullptr;
+				dc.tex_buffers_count = 0;
+				dc.textures = pcmd->TextureId ? (ffr::TextureHandle*)pcmd->TextureId : &m_texture;
+				dc.textures_count = 1;
+				dc.vertex_decl = &decl;
+				dc.vertex_buffer = m_vertex_buffer;
+				dc.vertex_buffer_offset = m_vb_offset * sizeof(ImDrawVert);
+
+				ffr::scissor(uint(Math::maximum(pcmd->ClipRect.x, 0.0f)),
+					uint(Math::maximum(pcmd->ClipRect.y, 0.0f)),
+					uint(Math::minimum(pcmd->ClipRect.z, 65535.0f) - Math::maximum(pcmd->ClipRect.x, 0.0f)),
+					uint(Math::minimum(pcmd->ClipRect.w, 65535.0f) - Math::maximum(pcmd->ClipRect.y, 0.0f)));
+				ffr::blending(dc.textures[0].value != m_scene_view.getTextureHandle().value);
+
+				ffr::draw(dc);
+
+				elem_offset += pcmd->ElemCount;
+			}
+			m_ib_offset += num_indices;
+			m_vb_offset += num_vertices;*/
+		}
+
+
+		void execute(void* user_data) const override
+		{
+			Data* data = (Data*)user_data;
+
+			ffr::setFramebuffer(ffr::INVALID_FRAMEBUFFER, false);
+
+			const float clear_color[] = {0.2f, 0.2f, 0.2f, 1.f};
+			ffr::clear((uint)ffr::ClearFlags::COLOR | (uint)ffr::ClearFlags::DEPTH, clear_color, 1.0);
+
+			ffr::viewport(0, 0, data->w, data->h);
+			const float canvas_size[] = {(float)data->w, (float)data->h};
+			ffr::setUniform2f(shader, "u_canvas_size", 1, canvas_size);
+
+			ffr::pushDebugGroup("imgui");
+			ffr::setUniform1i(shader, "u_texture", 0);
+
+			for(const CmdList& cmd_list : data->command_lists) {
+				draw(cmd_list);
+			}
+
+			ffr::popDebugGroup();
+		}
+
+		IAllocator& allocator;
+		ffr::ProgramHandle shader;
+		EditorUIRenderPlugin* plugin;
+	};
+
+
 	EditorUIRenderPlugin(StudioApp& app, SceneView& scene_view, GameView& game_view)
 		: m_app(app)
 		, m_scene_view(scene_view)
@@ -2547,6 +2708,10 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 
 		PluginManager& plugin_manager = m_engine.getPluginManager();
 		Renderer* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
+
+		RenderCommand* cmd = LUMIX_NEW(renderer->getAllocator(), RenderCommand)(renderer->getAllocator());
+		cmd->plugin = this;
+		renderer->push(cmd);
 
 		int w, h;
 		SDL_GetWindowSize(m_app.getWindow(), &w, &h);
@@ -2621,22 +2786,6 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 	}
 
 
-	void beginViewportRender()
-	{
-		ffr::setFramebuffer(ffr::INVALID_FRAMEBUFFER, false);
-
-		const float clear_color[] = {0.2f, 0.2f, 0.2f, 1.f};
-		ffr::clear((uint)ffr::ClearFlags::COLOR | (uint)ffr::ClearFlags::DEPTH, clear_color, 1.0);
-
-		const float width = ImGui::GetIO().DisplaySize.x;
-		const float height = ImGui::GetIO().DisplaySize.y;
-
-		ffr::viewport(0, 0, uint(width), uint(height));
-		const float canvas_size[] = {width, height};
-		ffr::setUniform2f(m_shader, "u_canvas_size", 1, canvas_size);
-	}
-
-
 	void guiEndFrame() override
 	{
 		const ImDrawData* draw_data = ImGui::GetDrawData();
@@ -2655,93 +2804,10 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 			if (renderer) renderer->resize(m_width, m_height);
 		}
 
-		beginViewportRender();
-
-		ffr::pushDebugGroup("imgui");
-		ffr::setUniform1i(m_shader, "u_texture", 0);
-		for (int i = 0; i < draw_data->CmdListsCount; ++i)
-		{
-			ImDrawList* cmd_list = draw_data->CmdLists[i];
-			drawGUICmdList(cmd_list);
-		}
-		ffr::popDebugGroup();
 
 		Renderer* renderer = static_cast<Renderer*>(m_engine.getPluginManager().getPlugin("renderer"));
 		renderer->frame(false);
 		SDL_GL_SwapWindow(m_app.getWindow());
-	}
-
-
-	void drawGUICmdList(ImDrawList* cmd_list)
-	{
-		Renderer* renderer = static_cast<Renderer*>(m_engine.getPluginManager().getPlugin("renderer"));
-
-		const int num_indices = cmd_list->IdxBuffer.size();
-		const int num_vertices = cmd_list->VtxBuffer.size();
-
-		ffr::update(
-			m_index_buffer, &cmd_list->IdxBuffer[0], m_ib_offset * sizeof(u16), num_indices * sizeof(u16));
-		ffr::update(m_vertex_buffer,
-			&cmd_list->VtxBuffer[0],
-			m_vb_offset * sizeof(ImDrawVert),
-			num_vertices * sizeof(ImDrawVert));
-		u32 elem_offset = 0;
-		const ImDrawCmd* pcmd_begin = cmd_list->CmdBuffer.begin();
-		const ImDrawCmd* pcmd_end = cmd_list->CmdBuffer.end();
-		for (const ImDrawCmd* pcmd = pcmd_begin; pcmd != pcmd_end; pcmd++)
-		{
-			if (pcmd->UserCallback)
-			{
-				pcmd->UserCallback(cmd_list, pcmd);
-				elem_offset += pcmd->ElemCount;
-				continue;
-			}
-
-			if (0 == pcmd->ElemCount) continue;
-			/*			auto material = m_material;
-						u64 render_states = material->getRenderStates();
-						if (&m_scene_view.getTextureHandle() == &texture_id || &m_game_view.getTextureHandle() ==
-			   &texture_id)
-						{
-							render_states &= ~BGFX_STATE_BLEND_MASK;
-						}
-			*/
-
-			const u32 first_index = elem_offset + m_ib_offset;
-
-			ffr::VertexDecl decl;
-			decl.addAttribute(2, ffr::AttributeType::FLOAT, false, false);
-			decl.addAttribute(2, ffr::AttributeType::FLOAT, false, false);
-			decl.addAttribute(4, ffr::AttributeType::U8, true, false);
-
-			ffr::DrawCall dc;
-			dc.attribute_map = nullptr;
-			dc.state = 0;
-			dc.index_buffer = m_index_buffer;
-			dc.primitive_type = ffr::PrimitiveType::TRIANGLES;
-			dc.shader = m_shader;
-			dc.indices_offset = first_index;
-			dc.indices_count = pcmd->ElemCount;
-			dc.tex_buffers = nullptr;
-			dc.tex_buffers_count = 0;
-			dc.textures = pcmd->TextureId ? (ffr::TextureHandle*)pcmd->TextureId : &m_texture;
-			dc.textures_count = 1;
-			dc.vertex_decl = &decl;
-			dc.vertex_buffer = m_vertex_buffer;
-			dc.vertex_buffer_offset = m_vb_offset * sizeof(ImDrawVert);
-
-			ffr::scissor(uint(Math::maximum(pcmd->ClipRect.x, 0.0f)),
-				uint(Math::maximum(pcmd->ClipRect.y, 0.0f)),
-				uint(Math::minimum(pcmd->ClipRect.z, 65535.0f) - Math::maximum(pcmd->ClipRect.x, 0.0f)),
-				uint(Math::minimum(pcmd->ClipRect.w, 65535.0f) - Math::maximum(pcmd->ClipRect.y, 0.0f)));
-			ffr::blending(dc.textures[0].value != m_scene_view.getTextureHandle().value);
-
-			ffr::draw(dc);
-
-			elem_offset += pcmd->ElemCount;
-		}
-		m_ib_offset += num_indices;
-		m_vb_offset += num_vertices;
 	}
 
 

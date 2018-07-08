@@ -6,9 +6,10 @@
 
 namespace Lumix
 {
-	TextureManager::TextureManager(IAllocator& allocator)
+	TextureManager::TextureManager(Renderer& renderer, IAllocator& allocator)
 		: ResourceManagerBase(allocator)
 		, m_allocator(allocator)
+		, m_renderer(renderer)
 	{
 		m_buffer = nullptr;
 		m_buffer_size = -1;
@@ -23,7 +24,7 @@ namespace Lumix
 
 	Resource* TextureManager::createResource(const Path& path)
 	{
-		return LUMIX_NEW(m_allocator, Texture)(path, *this, m_allocator);
+		return LUMIX_NEW(m_allocator, Texture)(path, m_renderer, *this, m_allocator);
 	}
 
 	void TextureManager::destroyResource(Resource& resource)

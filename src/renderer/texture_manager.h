@@ -7,7 +7,7 @@ namespace Lumix
 	class LUMIX_RENDERER_API TextureManager LUMIX_FINAL : public ResourceManagerBase
 	{
 	public:
-		explicit TextureManager(IAllocator& allocator);
+		explicit TextureManager(class Renderer& renderer, IAllocator& allocator);
 		~TextureManager();
 
 		u8* getBuffer(i32 size);
@@ -18,6 +18,7 @@ namespace Lumix
 
 	private:
 		IAllocator& m_allocator;
+		Renderer& m_renderer;
 		u8* m_buffer;
 		i32 m_buffer_size;
 	};
