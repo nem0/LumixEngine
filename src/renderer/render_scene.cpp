@@ -4809,7 +4809,11 @@ public:
 		allocateCustomMeshes(r, new_count);
 		ASSERT(r.meshes);
 
-		auto* new_material = static_cast<Material*>(material_manager->load(path));
+		Material* new_material = static_cast<Material*>(material_manager->load(path));
+
+		const int skinned_define_idx = m_renderer.getShaderDefineIdx("SKINNED");
+		new_material->setDefine(skinned_define_idx, !r.meshes[index].skin.empty());
+
 		r.meshes[index].setMaterial(new_material, *r.model, m_renderer);
 	}
 
