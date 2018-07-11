@@ -21,6 +21,7 @@
 #include "engine/path_utils.h"
 #include "engine/plugin_manager.h"
 #include "engine/prefab.h"
+#include "engine/profiler.h"
 #include "engine/queue.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
@@ -1346,7 +1347,8 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 
 		Array<u8> data(allocator);
 		data.resize(6 * TEXTURE_SIZE * TEXTURE_SIZE * 4);
-		ffr::TextureHandle texture = ffr::createTexture(TEXTURE_SIZE, TEXTURE_SIZE, ffr::TextureFormat::RGBA8, 0, nullptr);
+		ffr::TextureHandle texture = ffr::allocTextureHandle();
+		ffr::createTexture(texture, TEXTURE_SIZE, TEXTURE_SIZE, ffr::TextureFormat::RGBA8, 0, nullptr);
 		renderer->frame(false); // submit 
 		renderer->frame(false); // wait for gpu
 
@@ -2411,8 +2413,11 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 		vertex_decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false);
 		vertex_decl.addAttribute(4, ffr::AttributeType::U8, true, false);
 
-		const ffr::BufferHandle index_buffer = ffr::createBuffer(indices_count * sizeof(u16), indices);
-		const ffr::BufferHandle vertex_buffer = ffr::createBuffer(vertices_count * sizeof(Vertex), vertices);
+		// TODO do not create each frame
+		const ffr::BufferHandle index_buffer = ffr::allocBufferHandle();
+		ffr::createBuffer(index_buffer, indices_count * sizeof(u16), indices);
+		const ffr::BufferHandle vertex_buffer = ffr::allocBufferHandle();
+		ffr::createBuffer(vertex_buffer, vertices_count * sizeof(Vertex), vertices);
 
 		ffr::DrawCall dc;
 		dc.index_buffer = index_buffer;
@@ -2421,7 +2426,6 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 		dc.primitive_type = lines ? ffr::PrimitiveType::LINES : ffr::PrimitiveType::TRIANGLES;
 		dc.shader = m_shader->getProgram(0).handle;
 		dc.textures_count = 0;
-		dc.tex_buffers_count = 0;
 		dc.vertex_buffer = vertex_buffer;
 		dc.vertex_buffer_offset = 0;
 		dc.vertex_decl = &vertex_decl;
@@ -2553,23 +2557,38 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 			Array<ImDrawCmd> commands;
 		};
 
+
 		struct Data
 		{
 			Data(IAllocator& allocator)
 				: command_lists(allocator)
 			{}
 
+			const ffr::TextureHandle* default_texture;
 			uint w, h;
 			Array<CmdList> command_lists;
 		};
 
-		void* setup() override
+
+		RenderCommand(IAllocator& allocator)
+			: allocator(allocator)
+			, index_buffer(ffr::INVALID_BUFFER)
+			, vertex_buffer(ffr::INVALID_BUFFER)
+			, program(ffr::INVALID_PROGRAM)
+		{
+		}
+
+
+		const char* getName() const override { return "render_editor_ui"; }
+
+		Renderer::MemRef setup() override
 		{
 			PluginManager& plugin_manager = plugin->m_engine.getPluginManager();
 			Renderer& renderer = *(Renderer*)plugin_manager.getPlugin("renderer");
 
 			const ImDrawData* draw_data = ImGui::GetDrawData();
-			Data* out_data = LUMIX_NEW(allocator, Data)(allocator);
+			const Renderer::MemRef mem = renderer.allocate(sizeof(Data));
+			Data* out_data = new (Lumix::NewPlaceholder(), mem.data) Data(allocator);
 
 			out_data->command_lists.reserve(draw_data->CmdListsCount);
 			for (int i = 0; i < draw_data->CmdListsCount; ++i) {
@@ -2584,42 +2603,42 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 					out_cmd_list.commands[i] = cmd_list->CmdBuffer[i];
 				}
 			}
+			out_data->w = plugin->m_width;
+			out_data->h = plugin->m_height;
+			out_data->default_texture = &plugin->m_texture;
 
-			return nullptr;
+			return mem;
 		}
 
 
-		RenderCommand(IAllocator& allocator)
-			: allocator(allocator)
-		{}
-
-
-		void draw(const CmdList& cmd_list) const
+		void draw(const CmdList& cmd_list, Data* data)
 		{
-			/*Renderer* renderer = static_cast<Renderer*>(m_engine.getPluginManager().getPlugin("renderer"));
+			const uint num_indices = cmd_list.idx_buffer.size / sizeof(u16);
+			const uint num_vertices = cmd_list.vtx_buffer.size / sizeof(ImDrawVert);
 
-			const int num_indices = cmd_list->IdxBuffer.size();
-			const int num_vertices = cmd_list->VtxBuffer.size();
+			if ((vb_offset + num_vertices) * sizeof(ImDrawVert) > 1024 * 1024) return;
+			if ((ib_offset + num_indices) * sizeof(ImDrawVert) > 1024 * 1024) return;
 
-			ffr::update(
-				m_index_buffer, &cmd_list->IdxBuffer[0], m_ib_offset * sizeof(u16), num_indices * sizeof(u16));
-			ffr::update(m_vertex_buffer,
-				&cmd_list->VtxBuffer[0],
-				m_vb_offset * sizeof(ImDrawVert),
-				num_vertices * sizeof(ImDrawVert));
+			PluginManager& plugin_manager = plugin->m_engine.getPluginManager();	
+			Renderer* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
+
+
+			ffr::update(index_buffer
+				, cmd_list.idx_buffer.data
+				, ib_offset * sizeof(u16)
+				, num_indices * sizeof(u16));
+			ffr::update(vertex_buffer
+				, cmd_list.vtx_buffer.data
+				, vb_offset * sizeof(ImDrawVert)
+				, num_vertices * sizeof(ImDrawVert));
 			u32 elem_offset = 0;
-			const ImDrawCmd* pcmd_begin = cmd_list->CmdBuffer.begin();
-			const ImDrawCmd* pcmd_end = cmd_list->CmdBuffer.end();
+			const ImDrawCmd* pcmd_begin = cmd_list.commands.begin();
+			const ImDrawCmd* pcmd_end = cmd_list.commands.end();
 			for (const ImDrawCmd* pcmd = pcmd_begin; pcmd != pcmd_end; pcmd++)
 			{
-				if (pcmd->UserCallback)
-				{
-					pcmd->UserCallback(cmd_list, pcmd);
-					elem_offset += pcmd->ElemCount;
-					continue;
-				}
-
+				ASSERT(!pcmd->UserCallback);
 				if (0 == pcmd->ElemCount) continue;
+
 				/*			auto material = m_material;
 							u64 render_states = material->getRenderStates();
 							if (&m_scene_view.getTextureHandle() == &texture_id || &m_game_view.getTextureHandle() ==
@@ -2627,10 +2646,10 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 							{
 								render_states &= ~BGFX_STATE_BLEND_MASK;
 							}
-				*//*
+				*/
 
-				const u32 first_index = elem_offset + m_ib_offset;
-
+				const u32 first_index = elem_offset + ib_offset;
+				
 				ffr::VertexDecl decl;
 				decl.addAttribute(2, ffr::AttributeType::FLOAT, false, false);
 				decl.addAttribute(2, ffr::AttributeType::FLOAT, false, false);
@@ -2638,38 +2657,78 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 
 				ffr::DrawCall dc;
 				dc.attribute_map = nullptr;
-				dc.state = 0;
-				dc.index_buffer = m_index_buffer;
+				dc.state = (u64)ffr::StateFlags::SCISSOR_TEST;
+				dc.index_buffer = index_buffer;
 				dc.primitive_type = ffr::PrimitiveType::TRIANGLES;
-				dc.shader = m_shader;
+				dc.shader = program;
 				dc.indices_offset = first_index;
 				dc.indices_count = pcmd->ElemCount;
-				dc.tex_buffers = nullptr;
-				dc.tex_buffers_count = 0;
-				dc.textures = pcmd->TextureId ? (ffr::TextureHandle*)pcmd->TextureId : &m_texture;
+
+				const ffr::TextureHandle* tex = pcmd->TextureId ? (ffr::TextureHandle*)pcmd->TextureId : data->default_texture;
+				if (!tex->isValid()) tex = data->default_texture;
+				dc.textures = tex;
 				dc.textures_count = 1;
 				dc.vertex_decl = &decl;
-				dc.vertex_buffer = m_vertex_buffer;
-				dc.vertex_buffer_offset = m_vb_offset * sizeof(ImDrawVert);
+				dc.vertex_buffer = vertex_buffer;
+				dc.vertex_buffer_offset = vb_offset * sizeof(ImDrawVert);
 
 				ffr::scissor(uint(Math::maximum(pcmd->ClipRect.x, 0.0f)),
 					uint(Math::maximum(pcmd->ClipRect.y, 0.0f)),
 					uint(Math::minimum(pcmd->ClipRect.z, 65535.0f) - Math::maximum(pcmd->ClipRect.x, 0.0f)),
 					uint(Math::minimum(pcmd->ClipRect.w, 65535.0f) - Math::maximum(pcmd->ClipRect.y, 0.0f)));
-				ffr::blending(dc.textures[0].value != m_scene_view.getTextureHandle().value);
+				ffr::blending(1); //dc.textures[0].value != m_scene_view.getTextureHandle().value);
 
 				ffr::draw(dc);
-
+		
 				elem_offset += pcmd->ElemCount;
 			}
-			m_ib_offset += num_indices;
-			m_vb_offset += num_vertices;*/
+			ib_offset += num_indices;
+			vb_offset += num_vertices;
 		}
 
 
-		void execute(void* user_data) const override
+		void execute(const Renderer::MemRef& user_data) override
 		{
-			Data* data = (Data*)user_data;
+			PROFILE_FUNCTION();
+			Data* data = (Data*)user_data.data;
+
+			if(!index_buffer.isValid()) {
+				index_buffer = ffr::allocBufferHandle();
+				ffr::createBuffer(index_buffer, 1024*1024, nullptr);
+				vertex_buffer = ffr::allocBufferHandle();
+				ffr::createBuffer(vertex_buffer, 1024*1024, nullptr);
+			}
+
+			if(!program.isValid()) {
+				const char* vs =
+					"#version 330\n"
+					"layout(location = 0) in vec2 a_pos;\n"
+					"layout(location = 1) in vec2 a_uv;\n"
+					"layout(location = 2) in vec4 a_color;\n"
+					"out vec4 v_color;\n"
+					"out vec2 v_uv;\n"
+					"uniform vec2 u_canvas_size;\n"
+					"void main() {\n"
+					"	v_color = a_color;\n"
+					"	v_uv = a_uv;\n"
+					"	gl_Position = vec4(a_pos / u_canvas_size * 2 - 1, 0, 1);\n"
+					"	gl_Position.y = -gl_Position.y;\n"
+					"}\n";
+				const char* fs = 
+					"#version 330\n"
+					"in vec4 v_color;\n"
+					"in vec2 v_uv;\n"
+					"out vec4 o_color;\n"
+					"uniform sampler2D u_texture;\n"
+					"void main() {\n"
+					"	vec4 tc = textureLod(u_texture, v_uv, 0);\n"
+					"	o_color.rgb = pow(tc.rgb, vec3(1/2.2)) * v_color.rgb;\n"
+					"	o_color.a = v_color.a * tc.a;\n"
+					"}\n";
+				const char* srcs[] = {vs, fs};
+				ffr::ShaderType types[] = {ffr::ShaderType::VERTEX, ffr::ShaderType::FRAGMENT};
+				program = ffr::createProgram(srcs, types, 2, nullptr, 0, "imgui shader");
+			}
 
 			ffr::setFramebuffer(ffr::INVALID_FRAMEBUFFER, false);
 
@@ -2678,20 +2737,27 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 
 			ffr::viewport(0, 0, data->w, data->h);
 			const float canvas_size[] = {(float)data->w, (float)data->h};
-			ffr::setUniform2f(shader, "u_canvas_size", 1, canvas_size);
+			ffr::setUniform2f(program, "u_canvas_size", 1, canvas_size);
 
 			ffr::pushDebugGroup("imgui");
-			ffr::setUniform1i(shader, "u_texture", 0);
+			ffr::setUniform1i(program, "u_texture", 0);
 
+			vb_offset = 0;
+			ib_offset = 0;
 			for(const CmdList& cmd_list : data->command_lists) {
-				draw(cmd_list);
+				draw(cmd_list, data);
 			}
 
 			ffr::popDebugGroup();
+			data->~Data();
 		}
 
+		uint ib_offset;
+		uint vb_offset;
+		ffr::BufferHandle index_buffer;
+		ffr::BufferHandle vertex_buffer;
 		IAllocator& allocator;
-		ffr::ProgramHandle shader;
+		ffr::ProgramHandle program;
 		EditorUIRenderPlugin* plugin;
 	};
 
@@ -2709,65 +2775,35 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 		PluginManager& plugin_manager = m_engine.getPluginManager();
 		Renderer* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
 
-		RenderCommand* cmd = LUMIX_NEW(renderer->getAllocator(), RenderCommand)(renderer->getAllocator());
-		cmd->plugin = this;
-		renderer->push(cmd);
+		m_render_command = LUMIX_NEW(renderer->getAllocator(), RenderCommand)(renderer->getAllocator());
+		m_render_command->plugin = this;
 
 		int w, h;
 		SDL_GetWindowSize(m_app.getWindow(), &w, &h);
+		m_width = w;
+		m_height = h;
 		renderer->resize(w, h);
 
 		unsigned char* pixels;
 		int width, height;
 		ImGui::GetIO().Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
 
-		m_texture = ffr::createTexture(width, height, ffr::TextureFormat::RGBA8, 0, pixels);
+		const Renderer::MemRef mem = renderer->copy(pixels, width * height * 4);
+		m_texture = renderer->createTexture(width, height, ffr::TextureFormat::RGBA8, 0, mem);
 
 		IAllocator& allocator = editor.getAllocator();
 		RenderInterface* render_interface =
 			LUMIX_NEW(allocator, RenderInterfaceImpl)(editor, *scene_view.getPipeline());
 		editor.setRenderInterface(render_interface);
 
-		m_vertex_buffer = ffr::createBuffer(1024 * 256, nullptr);
-		m_index_buffer = ffr::createBuffer(1024 * 256, nullptr);
-
-		const char* vs =
-			"#version 330\n"
-			"layout(location = 0) in vec2 a_pos;\n"
-			"layout(location = 1) in vec2 a_uv;\n"
-			"layout(location = 2) in vec4 a_color;\n"
-			"out vec4 v_color;\n"
-			"out vec2 v_uv;\n"
-			"uniform vec2 u_canvas_size;\n"
-			"void main() {\n"
-			"	v_color = a_color;\n"
-			"	v_uv = a_uv;\n"
-			"	gl_Position = vec4(a_pos / u_canvas_size * 2 - 1, 0, 1);\n"
-			"	gl_Position.y = -gl_Position.y;\n"
-			"}\n";
-		const char* fs = 
-			"#version 330\n"
-			"in vec4 v_color;\n"
-			"in vec2 v_uv;\n"
-			"out vec4 o_color;\n"
-			"uniform sampler2D u_texture;\n"
-			"void main() {\n"
-			"	vec4 tc = textureLod(u_texture, v_uv, 0);\n"
-			"	o_color.rgb = pow(tc.rgb, vec3(1/2.2)) * v_color.rgb;\n"
-			"	o_color.a = v_color.a * tc.a;\n"
-			"}\n";
-		const char* srcs[] = {vs, fs};
-		ffr::ShaderType types[] = {ffr::ShaderType::VERTEX, ffr::ShaderType::FRAGMENT};
-		m_shader = ffr::createProgram(srcs, types, 2, nullptr, 0, "imgui shader");
 	}
 
 
 	~EditorUIRenderPlugin()
 	{
-		ffr::destroy(m_index_buffer);
-		ffr::destroy(m_vertex_buffer);
-		ffr::destroy(m_shader);
-		ffr::destroy(m_texture);
+		PluginManager& plugin_manager = m_engine.getPluginManager();
+		Renderer* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
+		LUMIX_DELETE(renderer->getAllocator(), m_render_command);
 		WorldEditor& editor = m_app.getWorldEditor();
 		shutdownImGui();
 	}
@@ -2790,9 +2826,6 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 	{
 		const ImDrawData* draw_data = ImGui::GetDrawData();
 
-		m_vb_offset = 0;
-		m_ib_offset = 0;
-
 		int w, h;
 		SDL_GetWindowSize(m_app.getWindow(), &w, &h);
 		if (w != m_width || h != m_height)
@@ -2804,10 +2837,10 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 			if (renderer) renderer->resize(m_width, m_height);
 		}
 
-
 		Renderer* renderer = static_cast<Renderer*>(m_engine.getPluginManager().getPlugin("renderer"));
+		renderer->push(m_render_command);
 		renderer->frame(false);
-		SDL_GL_SwapWindow(m_app.getWindow());
+		//SDL_GL_SwapWindow(m_app.getWindow());
 	}
 
 
@@ -2817,12 +2850,8 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 	Engine& m_engine;
 	SceneView& m_scene_view;
 	GameView& m_game_view;
-	ffr::BufferHandle m_vertex_buffer;
-	ffr::BufferHandle m_index_buffer;
-	ffr::ProgramHandle m_shader;
 	ffr::TextureHandle m_texture;
-	int m_vb_offset;
-	int m_ib_offset;
+	RenderCommand* m_render_command;
 };
 
 

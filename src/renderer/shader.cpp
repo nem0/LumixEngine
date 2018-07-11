@@ -8,7 +8,6 @@
 #include "engine/profiler.h"
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
-#include "renderer/global_state_uniforms.h"
 #include "renderer/renderer.h"
 #include "renderer/shader_manager.h"
 #include "renderer/texture.h"
@@ -65,7 +64,6 @@ const Shader::Program& Shader::getProgram(u32 defines)
 			"	vec3 u_light_color;\n"
 			"	float u_light_intensity;\n"
 			"	float u_light_indirect_intensity;\n"
-			"	ivec2 u_framebuffer_size;\n"
 			"};\n"
 			"uniform samplerCube u_irradiancemap;\n"
 			"uniform samplerCube u_radiancemap;\n"
@@ -483,7 +481,8 @@ void Shader::unload()
 	m_attributes.clear();
 	m_sources.clear();
 	for(const Program& prg : m_programs) {
-		ffr::destroy(prg.handle);
+	// TODO
+		//	ffr::destroy(prg.handle);
 	}
 	m_programs.clear();
 		// TODO

@@ -7,6 +7,9 @@
 #include "engine/engine.h"
 #include "engine/fs/os_file.h"
 #include "engine/log.h"
+#include "engine/job_system.h"
+#include "engine/mt/lock_free_fixed_queue.h"
+#include "engine/mt/atomic.h"
 #include "engine/mt/sync.h"
 #include "engine/mt/task.h"
 #include "engine/profiler.h"
@@ -18,7 +21,6 @@
 #include "engine/universe/universe.h"
 #include "renderer/draw2d.h"
 #include "renderer/font_manager.h"
-#include "renderer/global_state_uniforms.h"
 #include "renderer/material.h"
 #include "renderer/material_manager.h"
 #include "renderer/model.h"
@@ -53,484 +55,134 @@
 namespace Lumix
 {
 
-namespace DDS
-{
-
-static const uint DDS_MAGIC = 0x20534444; //  little-endian
-static const uint DDSD_CAPS = 0x00000001;
-static const uint DDSD_HEIGHT = 0x00000002;
-static const uint DDSD_WIDTH = 0x00000004;
-static const uint DDSD_PITCH = 0x00000008;
-static const uint DDSD_PIXELFORMAT = 0x00001000;
-static const uint DDSD_MIPMAPCOUNT = 0x00020000;
-static const uint DDSD_LINEARSIZE = 0x00080000;
-static const uint DDSD_DEPTH = 0x00800000;
-static const uint DDPF_ALPHAPIXELS = 0x00000001;
-static const uint DDPF_FOURCC = 0x00000004;
-static const uint DDPF_INDEXED = 0x00000020;
-static const uint DDPF_RGB = 0x00000040;
-static const uint DDSCAPS_COMPLEX = 0x00000008;
-static const uint DDSCAPS_TEXTURE = 0x00001000;
-static const uint DDSCAPS_MIPMAP = 0x00400000;
-static const uint DDSCAPS2_CUBEMAP = 0x00000200;
-static const uint DDSCAPS2_CUBEMAP_POSITIVEX = 0x00000400;
-static const uint DDSCAPS2_CUBEMAP_NEGATIVEX = 0x00000800;
-static const uint DDSCAPS2_CUBEMAP_POSITIVEY = 0x00001000;
-static const uint DDSCAPS2_CUBEMAP_NEGATIVEY = 0x00002000;
-static const uint DDSCAPS2_CUBEMAP_POSITIVEZ = 0x00004000;
-static const uint DDSCAPS2_CUBEMAP_NEGATIVEZ = 0x00008000;
-static const uint DDSCAPS2_VOLUME = 0x00200000;
-static const uint D3DFMT_DXT1 = '1TXD';
-static const uint D3DFMT_DXT2 = '2TXD';
-static const uint D3DFMT_DXT3 = '3TXD';
-static const uint D3DFMT_DXT4 = '4TXD';
-static const uint D3DFMT_DXT5 = '5TXD';
-
-struct PixelFormat {
-	uint dwSize;
-	uint dwFlags;
-	uint dwFourCC;
-	uint dwRGBBitCount;
-	uint dwRBitMask;
-	uint dwGBitMask;
-	uint dwBBitMask;
-	uint dwAlphaBitMask;
-};
-
-struct Caps2 {
-	uint dwCaps1;
-	uint dwCaps2;
-	uint dwDDSX;
-	uint dwReserved;
-};
-
-struct Header {
-	uint dwMagic;
-	uint dwSize;
-	uint dwFlags;
-	uint dwHeight;
-	uint dwWidth;
-	uint dwPitchOrLinearSize;
-	uint dwDepth;
-	uint dwMipMapCount;
-	uint dwReserved1[11];
-
-	PixelFormat pixelFormat;
-	Caps2 caps2;
-
-	uint dwReserved2;
-};
-
-struct LoadInfo {
-	bool compressed;
-	bool swap;
-	bool palette;
-	uint divSize;
-	uint blockBytes;
-	GLenum internalFormat;
-	GLenum internalSRGBFormat;
-	GLenum externalFormat;
-	GLenum type;
-};
-
-static uint sizeDXTC(uint w, uint h, GLuint format) {
-    const bool is_dxt1 = format == GL_COMPRESSED_RGBA_S3TC_DXT1_EXT || format == GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT1_EXT;
-	return ((w + 3) / 4) * ((h + 3) / 4) * (is_dxt1 ? 8 : 16);
-}
-
-static bool isDXT1(PixelFormat& pf)
-{
-	return ((pf.dwFlags & DDPF_FOURCC) && (pf.dwFourCC == D3DFMT_DXT1));
-}
-
-static bool isDXT3(PixelFormat& pf)
-{
-	return ((pf.dwFlags & DDPF_FOURCC) && (pf.dwFourCC == D3DFMT_DXT3));
-
-}
-
-static bool isDXT5(PixelFormat& pf)
-{
-	return ((pf.dwFlags & DDPF_FOURCC) && (pf.dwFourCC == D3DFMT_DXT5));
-}
-
-static bool isBGRA8(PixelFormat& pf)
-{
-	return ((pf.dwFlags & DDPF_RGB)
-		&& (pf.dwFlags & DDPF_ALPHAPIXELS)
-		&& (pf.dwRGBBitCount == 32)
-		&& (pf.dwRBitMask == 0xff0000)
-		&& (pf.dwGBitMask == 0xff00)
-		&& (pf.dwBBitMask == 0xff)
-		&& (pf.dwAlphaBitMask == 0xff000000U));
-}
-
-static bool isBGR8(PixelFormat& pf)
-{
-	return ((pf.dwFlags & DDPF_ALPHAPIXELS)
-		&& !(pf.dwFlags & DDPF_ALPHAPIXELS)
-		&& (pf.dwRGBBitCount == 24)
-		&& (pf.dwRBitMask == 0xff0000)
-		&& (pf.dwGBitMask == 0xff00)
-		&& (pf.dwBBitMask == 0xff));
-}
-
-static bool isBGR5A1(PixelFormat& pf)
-{
-	return ((pf.dwFlags & DDPF_RGB)
-		&& (pf.dwFlags & DDPF_ALPHAPIXELS)
-		&& (pf.dwRGBBitCount == 16)
-		&& (pf.dwRBitMask == 0x00007c00)
-		&& (pf.dwGBitMask == 0x000003e0)
-		&& (pf.dwBBitMask == 0x0000001f)
-		&& (pf.dwAlphaBitMask == 0x00008000));
-}
-
-static bool isBGR565(PixelFormat& pf)
-{
-	return ((pf.dwFlags & DDPF_RGB)
-		&& !(pf.dwFlags & DDPF_ALPHAPIXELS)
-		&& (pf.dwRGBBitCount == 16)
-		&& (pf.dwRBitMask == 0x0000f800)
-		&& (pf.dwGBitMask == 0x000007e0)
-		&& (pf.dwBBitMask == 0x0000001f));
-}
-
-static bool isINDEX8(PixelFormat& pf)
-{
-	return ((pf.dwFlags & DDPF_INDEXED) && (pf.dwRGBBitCount == 8));
-}
-
-static LoadInfo loadInfoDXT1 = {
-	true, false, false, 4, 8, GL_COMPRESSED_RGBA_S3TC_DXT1_EXT, GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT1_EXT
-};
-static LoadInfo loadInfoDXT3 = {
-	true, false, false, 4, 16, GL_COMPRESSED_RGBA_S3TC_DXT3_EXT, GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT
-};
-static LoadInfo loadInfoDXT5 = {
-	true, false, false, 4, 16, GL_COMPRESSED_RGBA_S3TC_DXT5_EXT, GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT
-};
-static LoadInfo loadInfoBGRA8 = {
-	false, false, false, 1, 4, GL_RGBA8, GL_SRGB8_ALPHA8, GL_BGRA, GL_UNSIGNED_BYTE
-};
-static LoadInfo loadInfoBGR8 = {
-	false, false, false, 1, 3, GL_RGB8, GL_SRGB8, GL_BGR, GL_UNSIGNED_BYTE
-};
-static LoadInfo loadInfoBGR5A1 = {
-	false, true, false, 1, 2, GL_RGB5_A1, GL_ZERO, GL_BGRA, GL_UNSIGNED_SHORT_1_5_5_5_REV
-};
-static LoadInfo loadInfoBGR565 = {
-	false, true, false, 1, 2, GL_RGB5, GL_ZERO, GL_RGB, GL_UNSIGNED_SHORT_5_6_5
-};
-static LoadInfo loadInfoIndex8 = {
-	false, false, true, 1, 1, GL_RGB8, GL_SRGB8, GL_BGRA, GL_UNSIGNED_BYTE
-};
-
-struct DXTColBlock
-{
-	u16 col0;
-	u16 col1;
-	u8 row[4];
-};
-
-struct DXT3AlphaBlock
-{
-	u16 row[4];
-};
-
-struct DXT5AlphaBlock
-{
-	u8 alpha0;
-	u8 alpha1;
-	u8 row[6];
-};
-
-static LUMIX_FORCE_INLINE void swapMemory(void* mem1, void* mem2, int size, IAllocator& allocator)
-{
-	if(size < 2048)
-	{
-		u8 tmp[2048];
-		memcpy(tmp, mem1, size);
-		memcpy(mem1, mem2, size);
-		memcpy(mem2, tmp, size);
-	}
-	else
-	{
-		Array<u8> tmp(allocator);
-		tmp.resize(size);
-		memcpy(&tmp[0], mem1, size);
-		memcpy(mem1, mem2, size);
-		memcpy(mem2, &tmp[0], size);
-	}
-}
-
-static void flipBlockDXTC1(DXTColBlock *line, int numBlocks, IAllocator& allocator)
-{
-	DXTColBlock *curblock = line;
-
-	for (int i = 0; i < numBlocks; i++)
-	{
-		swapMemory(&curblock->row[0], &curblock->row[3], sizeof(u8), allocator);
-		swapMemory(&curblock->row[1], &curblock->row[2], sizeof(u8), allocator);
-		++curblock;
-	}
-}
-
-static void flipBlockDXTC3(DXTColBlock *line, int numBlocks, IAllocator& allocator)
-{
-	DXTColBlock *curblock = line;
-	DXT3AlphaBlock *alphablock;
-
-	for (int i = 0; i < numBlocks; i++)
-	{
-		alphablock = (DXT3AlphaBlock*)curblock;
-
-		swapMemory(&alphablock->row[0], &alphablock->row[3], sizeof(u16), allocator);
-		swapMemory(&alphablock->row[1], &alphablock->row[2], sizeof(u16), allocator);
-		++curblock;
-
-		swapMemory(&curblock->row[0], &curblock->row[3], sizeof(u8), allocator);
-		swapMemory(&curblock->row[1], &curblock->row[2], sizeof(u8), allocator);
-		++curblock;
-	}
-}
-
-static void flipDXT5Alpha(DXT5AlphaBlock *block)
-{
-	u8 tmp_bits[4][4];
-
-	const uint mask = 0x00000007;
-	uint bits = 0;
-	memcpy(&bits, &block->row[0], sizeof(u8) * 3);
-
-	tmp_bits[0][0] = (u8)(bits & mask);
-	bits >>= 3;
-	tmp_bits[0][1] = (u8)(bits & mask);
-	bits >>= 3;
-	tmp_bits[0][2] = (u8)(bits & mask);
-	bits >>= 3;
-	tmp_bits[0][3] = (u8)(bits & mask);
-	bits >>= 3;
-	tmp_bits[1][0] = (u8)(bits & mask);
-	bits >>= 3;
-	tmp_bits[1][1] = (u8)(bits & mask);
-	bits >>= 3;
-	tmp_bits[1][2] = (u8)(bits & mask);
-	bits >>= 3;
-	tmp_bits[1][3] = (u8)(bits & mask);
-
-	bits = 0;
-	memcpy(&bits, &block->row[3], sizeof(u8) * 3);
-
-	tmp_bits[2][0] = (u8)(bits & mask);
-	bits >>= 3;
-	tmp_bits[2][1] = (u8)(bits & mask);
-	bits >>= 3;
-	tmp_bits[2][2] = (u8)(bits & mask);
-	bits >>= 3;
-	tmp_bits[2][3] = (u8)(bits & mask);
-	bits >>= 3;
-	tmp_bits[3][0] = (u8)(bits & mask);
-	bits >>= 3;
-	tmp_bits[3][1] = (u8)(bits & mask);
-	bits >>= 3;
-	tmp_bits[3][2] = (u8)(bits & mask);
-	bits >>= 3;
-	tmp_bits[3][3] = (u8)(bits & mask);
-
-	uint *out_bits = (uint*)&block->row[0];
-
-	*out_bits = *out_bits | (tmp_bits[3][0] << 0);
-	*out_bits = *out_bits | (tmp_bits[3][1] << 3);
-	*out_bits = *out_bits | (tmp_bits[3][2] << 6);
-	*out_bits = *out_bits | (tmp_bits[3][3] << 9);
-
-	*out_bits = *out_bits | (tmp_bits[2][0] << 12);
-	*out_bits = *out_bits | (tmp_bits[2][1] << 15);
-	*out_bits = *out_bits | (tmp_bits[2][2] << 18);
-	*out_bits = *out_bits | (tmp_bits[2][3] << 21);
-
-	out_bits = (uint*)&block->row[3];
-
-	*out_bits &= 0xff000000;
-
-	*out_bits = *out_bits | (tmp_bits[1][0] << 0);
-	*out_bits = *out_bits | (tmp_bits[1][1] << 3);
-	*out_bits = *out_bits | (tmp_bits[1][2] << 6);
-	*out_bits = *out_bits | (tmp_bits[1][3] << 9);
-
-	*out_bits = *out_bits | (tmp_bits[0][0] << 12);
-	*out_bits = *out_bits | (tmp_bits[0][1] << 15);
-	*out_bits = *out_bits | (tmp_bits[0][2] << 18);
-	*out_bits = *out_bits | (tmp_bits[0][3] << 21);
-}
-
-static void flipBlockDXTC5(DXTColBlock *line, int numBlocks, IAllocator& allocator)
-{
-	DXTColBlock *curblock = line;
-	DXT5AlphaBlock *alphablock;
-
-	for (int i = 0; i < numBlocks; i++)
-	{
-		alphablock = (DXT5AlphaBlock*)curblock;
-
-		flipDXT5Alpha(alphablock);
-
-		++curblock;
-
-		swapMemory(&curblock->row[0], &curblock->row[3], sizeof(u8), allocator);
-		swapMemory(&curblock->row[1], &curblock->row[2], sizeof(u8), allocator);
-
-		++curblock;
-	}
-}
-
-/// from gpu gems
-static void flipCompressedTexture(int w, int h, int format, void* surface, IAllocator& allocator)
-{
-	void (*flipBlocksFunction)(DXTColBlock*, int, IAllocator&);
-	int xblocks = w >> 2;
-	int yblocks = h >> 2;
-	int blocksize;
-
-	switch (format)
-	{
-		case GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT1_EXT:
-		case GL_COMPRESSED_RGBA_S3TC_DXT1_EXT:
-			blocksize = 8;
-			flipBlocksFunction = &flipBlockDXTC1;
-			break;
-		case GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT:
-		case GL_COMPRESSED_RGBA_S3TC_DXT3_EXT:
-			blocksize = 16;
-			flipBlocksFunction = &flipBlockDXTC3;
-			break;
-		case GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT:
-		case GL_COMPRESSED_RGBA_S3TC_DXT5_EXT:
-			blocksize = 16;
-			flipBlocksFunction = &flipBlockDXTC5;
-			break;
-		default:
-			ASSERT(false);
-			return;
-	}
-
-	int linesize = xblocks * blocksize;
-
-	DXTColBlock *top = (DXTColBlock*)surface;
-	DXTColBlock *bottom = (DXTColBlock*)((u8*)surface + ((yblocks - 1) * linesize));
-
-	while (top < bottom)
-	{
-		(*flipBlocksFunction)(top, xblocks, allocator);
-		(*flipBlocksFunction)(bottom, xblocks, allocator);
-		swapMemory(bottom, top, linesize, allocator);
-
-		top = (DXTColBlock*)((u8*)top + linesize);
-		bottom = (DXTColBlock*)((u8*)bottom - linesize);
-	}
-}
-
-
-} // namespace DDS
-
 
 static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("renderable");
 
-struct FrameContext
+
+struct GPUProfiler
 {
-	struct GenericCommand
+	struct Query
 	{
-		virtual ~GenericCommand() {}
-		virtual void execute() = 0;
+		const char *name;
+		ffr::QueryHandle queries[4];
+		float frames[128];
+		int parent = -1;
+		int sibling = -1;
+		int child = -1;
+		uint frame = 0xffFFffFF;
 	};
 
-	FrameContext(IAllocator& allocator)
-		: allocator(allocator)
-		, pre_commands(allocator)
-		, post_commands(allocator)
+	GPUProfiler(IAllocator& allocator) 
+		: m_queries(allocator) 
 	{}
 
-	~FrameContext()
+
+	~GPUProfiler()
 	{
-		for(auto* cmd : pre_commands) {
-			LUMIX_DELETE(allocator, cmd);
-		}
-		for(auto* cmd : post_commands) {
-			LUMIX_DELETE(allocator, cmd);
-		}
+		// TODO cleanup
+		ASSERT(false);
 	}
 
-	IAllocator& allocator;
-	Array<GenericCommand*> pre_commands;
-	Array<GenericCommand*> post_commands;
 
-	struct {
-		Renderer::RenderCommandBase* cmd;
-		void* setup_data;
-	} commands[256];
-	int commands_count;
+	void beginQuery(const char* name)
+	{
+		auto push = [&](){
+			Query& q = m_queries.emplace();
+			q.name = name;
+			q.parent = m_current;
+			q.queries[0] = ffr::createQuery();
+			q.queries[1] = ffr::createQuery();
+			q.queries[2] = ffr::createQuery();
+			q.queries[3] = ffr::createQuery();
+			return q;
+		};
+
+		if (m_queries.empty()) {
+			Query& q = push();
+			ffr::queryTimestamp(q.queries[(m_frame * 2 + 0) % lengthOf(q.queries)]);
+			m_current = 0;
+			return;
+		}
+
+		int tmp = 0;
+		int* child = &tmp;
+		if(m_current >= 0) child = &m_queries[m_current].child;
+
+		while(*child >= 0) {
+			Query& q = m_queries[*child];
+			if(equalStrings(q.name, name)) break;
+			child = &q.sibling;
+		}
+
+		if(*child < 0) {
+			Query& q = push();
+			*child = m_queries.size() - 1;
+		}
+
+		Query& q = m_queries[*child];
+		ffr::queryTimestamp(q.queries[(m_frame * 2 + 0) % lengthOf(q.queries)]);
+		m_current = *child;
+	}
+
+
+	void endQuery()
+	{
+		Query& q = m_queries[m_current];
+		q.frame = m_frame;
+		ffr::queryTimestamp(q.queries[(m_frame * 2 + 1) % lengthOf(q.queries)]);
+		m_current = q.parent;
+	}
+
+
+	void frame()
+	{
+		for (Query& q : m_queries) {
+			float t = 0;
+			if (q.frame == m_frame) {
+				const u64 begin = ffr::getQueryResult(q.queries[(m_frame * 2 + 0) % lengthOf(q.queries)]);
+				const u64 end = ffr::getQueryResult(q.queries[(m_frame * 2 + 1) % lengthOf(q.queries)]);
+				t = float((end - begin) / 1'000'000'000.0);
+			}
+			q.frames[m_frame % lengthOf(q.frames)] = t;
+		}
+		MT::atomicIncrement(&m_frame);
+		++m_frame;
+	}
+
+
+	volatile int m_frame = 0;
+	int m_current = -1;
+	Array<Query> m_queries;
 };
+
+
+struct RendererImpl;
 
 
 struct RenderTask : MT::Task
 {
-	RenderTask(Renderer& renderer, IAllocator& allocator) 
+	RenderTask(RendererImpl& renderer, IAllocator& allocator) 
 		: MT::Task(allocator)
 		, m_allocator(allocator)
 		, m_renderer(renderer)
-		, m_ready_event(false)
-		, m_can_push_event(false)
+		, m_profiler(allocator)
 	{}
 
 
-	void init()
-	{
-		void* window_handle = m_renderer.getEngine().getPlatformData().window_handle;
-		ffr::init(window_handle, m_allocator);
-		m_framebuffer = ffr::createFramebuffer(0, nullptr);
-		m_renderer.getGlobalStateUniforms().create();
-	}
-
-	int task() override {
-		init();
-		m_can_push_event.trigger();
-		for(;;) {
-			m_ready_event.wait();
-			FrameContext* ctx = m_frame_context;
-			m_frame_context = nullptr;
-			m_can_push_event.trigger();
-
-			for(FrameContext::GenericCommand* cmd : ctx->pre_commands) {
-				cmd->execute();
-			}
-
-			for(int i = 0, c = ctx->commands_count; i < c; ++i) {
-				ctx->commands[i].cmd->execute(ctx->commands[i].setup_data);
-			}
-
-			for(FrameContext::GenericCommand* cmd : ctx->post_commands) {
-				cmd->execute();
-			}
-
-			LUMIX_DELETE(m_allocator, ctx);
-		}
-		return 0;
-	}
-
-	void push(FrameContext* ctx)
-	{
-		m_can_push_event.wait();
-		m_frame_context = ctx;
-		m_ready_event.trigger();
-	}
+	int task() override;
 
 	IAllocator& m_allocator;
-	Renderer& m_renderer;
-	FrameContext* m_frame_context;
-	MT::Event m_ready_event;
-	MT::Event m_can_push_event;
+	RendererImpl& m_renderer;
 	ffr::FramebufferHandle m_framebuffer;
+	ffr::BufferHandle m_global_state_uniforms;
+	
+	struct PreparedCommand
+	{
+		Renderer::RenderCommandBase* cmd;
+		Renderer::MemRef data;
+	};
+	MT::LockFreeFixedQueue<PreparedCommand, 256> m_commands;
+	GPUProfiler m_profiler;
 };
 
 struct BoneProperty : Reflection::IEnumProperty
@@ -763,13 +415,6 @@ static void registerProperties(IAllocator& allocator)
 
 struct RendererImpl LUMIX_FINAL : public Renderer
 {
-	struct TextureRecord
-	{
-		ffr::TextureHandle handle;
-		uint w;
-		uint h;
-	};
-
 	explicit RendererImpl(Engine& engine)
 		: m_engine(engine)
 		, m_allocator(engine.getAllocator())
@@ -783,17 +428,8 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 		, m_vsync(true)
 		, m_main_pipeline(nullptr)
 		, m_render_task(*this, m_allocator)
-		, m_textures(m_allocator)
-		, m_commands(m_allocator)
-		, m_first_free_texture(0)
+		, m_frame_semaphore(2, 2)
 	{
-		m_frame_context = LUMIX_NEW(m_allocator, FrameContext)(m_allocator);
-		m_textures.resize(4096);
-		for(int i = 0; i < m_textures.size() - 1; ++i) {
-			m_textures[i].handle.value = i + 1;
-		}
-		m_textures.back().handle.value = -1;
-
 		registerProperties(engine.getAllocator());
 		char cmd_line[4096];
 		getCommandLine(cmd_line, lengthOf(cmd_line));
@@ -837,8 +473,6 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 		m_font_manager->destroy();
 		LUMIX_DELETE(m_allocator, m_font_manager);
 
-		m_global_state_uniforms.destroy();
-
 		frame(false);
 		frame(false);
 	}
@@ -858,6 +492,13 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	}
 
 
+	void free(const MemRef& memory) override
+	{
+		ASSERT(memory.own);
+		m_allocator.deallocate(memory.data);
+	}
+
+
 	MemRef allocate(uint size) override
 	{
 		MemRef ret;
@@ -874,97 +515,172 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	}
 
 
-	TextureHandle loadTexture(const MemRef& memory, u32 flags, ffr::TextureInfo* info) override
+	ffr::TextureHandle loadTexture(const MemRef& memory, u32 flags, ffr::TextureInfo* info) override
 	{
-		// TODO
-		TextureHandle t;
-		t.reset();
-		return t;
-	/*	ASSERT(memory.size > 0);
-		TextureHandle t;
-		if (m_first_free_texture < 0) {
-			g_log_error.log("Renderer") << "Out of texture slots.";
-			t.reset();
-			return t;
+		ASSERT(memory.size > 0);
+
+		const ffr::TextureHandle handle = ffr::allocTextureHandle();
+		if (!handle.isValid()) return handle;
+
+		ffr::TextureInfo tmp_info = ffr::getTextureInfo(memory.data);
+		if(info) {
+			*info = tmp_info;
 		}
 
-		t.value = m_first_free_texture;
-		TextureRecord& rec = m_textures[m_first_free_texture];
-		m_first_free_texture = rec.handle;
-
-		const DDS::Header* header = (DDS::Header*)memory.data;
-		rec.w = header->dwWidth;
-		rec.h = header->dwHeight;
-		rec.handle = 0;
-
-		struct Cmd : RenderTask::GenericCommand {
-			void execute() override {
+		struct Cmd : RenderCommandBase {
+			const char* getName() const override { return "load_texture"; }
+			MemRef setup() override { return {0, 0}; }
+			void execute(const MemRef&) override {
+				ffr::loadTexture(handle, memory.data, memory.size, flags, nullptr);
 			}
 
-			TextureRecord* texture;
+			ffr::TextureHandle handle;
 			MemRef memory;
+			u32 flags;
 		};
 
 		Cmd* cmd = LUMIX_NEW(m_render_task.m_allocator, Cmd);
-		cmd->texture = &rec;
+		cmd->handle = handle;
 		cmd->memory = memory;
-		m_render_task.pushPreframe(cmd);
+		cmd->flags = flags;
+		push(cmd);
 
-
-		return t;*/
+		return handle;
 	}
 
 
-	TextureHandle createTexture(uint w, uint h, ffr::TextureFormat format, u32 flags, const MemRef& memory) override
+	ffr::BufferHandle createBuffer(const MemRef& memory) override
 	{
-		TextureHandle t;
-		if(m_first_free_texture < 0) {
-			g_log_error.log("Renderer") << "Out of texture slots.";
-			t.reset();
-			return t;
-		}
-		t.value = m_first_free_texture;
-		TextureRecord& rec = m_textures[m_first_free_texture];
-		m_first_free_texture = rec.handle.value;
-		rec.handle = ffr::INVALID_TEXTURE;
-		rec.w = w;
-		rec.h = h;
+		ffr::BufferHandle handle = ffr::allocBufferHandle();
+		if(!handle.isValid()) return handle;
 
-		struct Cmd : FrameContext::GenericCommand {
-			void execute() override {
-				texture->handle = ffr::createTexture(texture->w, texture->h, format, 0, memory.data);
+		struct Cmd : RenderCommandBase {
+			const char* getName() const override { return "create_buffer"; }
+			MemRef setup() override { return {0, 0}; }
+			void execute(const MemRef&) override {
+				ffr::createBuffer(handle, memory.size, memory.data);
 			}
 
-			TextureRecord* texture;
+			ffr::BufferHandle handle;
 			MemRef memory;
 			ffr::TextureFormat format;
 		};
 
 		Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
-		cmd->texture = &rec;
+		cmd->handle = handle;
+		cmd->memory = memory;
+		push(cmd);
+
+		return handle;
+	}
+
+
+	void destroy(ffr::BufferHandle buffer) override
+	{
+		struct Cmd : RenderCommandBase {
+			const char* getName() const override { return "destroy_buffer"; }
+			MemRef setup() override { return {0, 0}; }
+			void execute(const MemRef&) override { ffr::destroy(buffer); }
+
+			ffr::BufferHandle buffer;
+			RendererImpl* renderer;
+		};
+
+		Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
+		cmd->buffer = buffer;
+		cmd->renderer = this;
+		push(cmd);
+	}
+
+
+	ffr::TextureHandle createTexture(uint w, uint h, ffr::TextureFormat format, u32 flags, const MemRef& memory) override
+	{
+		ffr::TextureHandle handle = ffr::allocTextureHandle();
+		if(!handle.isValid()) return handle;
+
+		struct Cmd : RenderCommandBase {
+			const char* getName() const override { return "create_texture"; }
+			MemRef setup() override { return {0, 0}; }
+			void execute(const MemRef&) override { ffr::createTexture(handle, w, h, format, 0, memory.data); }
+
+			ffr::TextureHandle handle;
+			MemRef memory;
+			uint w;
+			uint h;
+			ffr::TextureFormat format;
+		};
+
+		Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
+		cmd->handle = handle;
 		cmd->memory = memory;
 		cmd->format = format;
-		m_frame_context->pre_commands.push(cmd);
+		cmd->w = w;
+		cmd->h = h;
+		push(cmd);
 
-		return t;
+		return handle;
 	}
 
 
-	ffr::TextureHandle getFFRHandle(TextureHandle tex) const override
+	void destroy(ffr::TextureHandle tex)
 	{
-		return m_textures[tex.value].handle;
+		struct Cmd : RenderCommandBase {
+			const char* getName() const override { return "destroy_texture"; }
+			MemRef setup() override { return {0, 0}; }
+			void execute(const MemRef&) override { ffr::destroy(texture); }
+
+			ffr::TextureHandle texture;
+			RendererImpl* renderer;
+		};
+
+		Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
+		cmd->texture = tex;
+		cmd->renderer = this;
+		push(cmd);
 	}
 
+	struct RenderCommandSetupJobData {
+		RenderCommandBase* cmd;
+		RenderCommandSetupJobData* prev;
+		volatile int counter;
+		RendererImpl* renderer;
+	};
 
-	void destroy(TextureHandle tex)
-	{
-		
-	}
+
+	RenderCommandSetupJobData* m_last_job = nullptr;
 
 
 	void push(RenderCommandBase* cmd) override
 	{
-		m_commands.push(cmd);
+		PROFILE_FUNCTION();
+		RenderCommandSetupJobData* data = LUMIX_NEW(m_allocator, RenderCommandSetupJobData);
+		data->cmd = cmd;
+		data->prev = m_last_job;
+		data->counter = 0;
+		data->renderer = this;
+
+		JobSystem::JobDecl job;
+		job.data = data;
+		job.task = [](void* data){
+			RenderCommandSetupJobData* job_data = (RenderCommandSetupJobData*)data;
+			RenderCommandBase* cmd = job_data->cmd;
+			RendererImpl* renderer = job_data->renderer;
+
+			const MemRef mem = cmd->setup();
+
+			if (job_data->prev) {
+				JobSystem::wait(&job_data->prev->counter);
+				LUMIX_DELETE(renderer->m_allocator, job_data->prev);
+			}
+
+			RenderTask::PreparedCommand* prepared = renderer->m_render_task.m_commands.alloc(true);
+			prepared->cmd = cmd;
+			prepared->data = mem;
+			renderer->m_render_task.m_commands.push(prepared, true);
+		};
+
+		JobSystem::runJobs(&job, 1, &data->counter);
+		m_last_job = data;
 	}
 
 
@@ -974,9 +690,9 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	}
 
 
-	GlobalStateUniforms& getGlobalStateUniforms() override
+	void setGlobalState(const GlobalState& state) override
 	{
-		return m_global_state_uniforms;
+		m_global_state = state;
 	}
 
 
@@ -1055,16 +771,62 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	}
 
 
+	void pushSetGlobalStateCommand()
+	{
+		struct Cmd : RenderCommandBase {
+			const char* getName() const override { return "push_global_state"; }
+			MemRef setup() override
+			{ 
+				const MemRef mem = renderer->allocate(sizeof(GlobalState));
+				copyMemory(mem.data, &state, sizeof(state));
+				return mem;
+			}
+			void execute(const MemRef& user_ptr) override { 
+				ffr::update(renderer->m_render_task.m_global_state_uniforms, user_ptr.data, 0, user_ptr.size);
+			}
+			GlobalState state;
+			RendererImpl* renderer;
+		};
+		static Cmd cmd; // TODO not static
+		cmd.state = m_global_state;
+		cmd.renderer = this;
+		push(&cmd);
+	}
+
+
+	void pushSwapCommand()
+	{
+		struct SwapCmd : RenderCommandBase {
+			const char* getName() const override { return "swap_buffers"; }
+			MemRef setup() override { return {0, 0}; }
+			void execute(const MemRef& user_ptr) override { 
+				PROFILE_FUNCTION();
+				renderer->m_frame_semaphore.signal();
+				ffr::swapBuffers(); 
+				renderer->m_render_task.m_profiler.frame();
+			}
+			RendererImpl* renderer;
+		};
+		static SwapCmd swap_cmd; // TODO not static
+		swap_cmd.renderer = this;
+		push(&swap_cmd);
+	}
+
+
 	void frame(bool capture) override
 	{
-		m_frame_context->commands_count = m_commands.size();
-		for (int i = 0, c = m_commands.size(); i < c; ++i) {
-			RenderCommandBase* cmd = m_commands[i];
-			m_frame_context->commands[i].cmd = cmd;
-			m_frame_context->commands[i].setup_data = cmd->setup();
+		PROFILE_FUNCTION();
+		pushSwapCommand();
+		{
+			PROFILE_BLOCK("wait for render thread");
+			m_frame_semaphore.wait();
 		}
-		m_render_task.push(m_frame_context);
-		m_frame_context = LUMIX_NEW(m_allocator, FrameContext)(m_allocator);
+		if (m_last_job) {
+			JobSystem::wait(&m_last_job->counter);
+			LUMIX_DELETE(m_allocator, m_last_job);
+			m_last_job = nullptr;
+		}
+		pushSetGlobalStateCommand();
 	}
 
 
@@ -1074,6 +836,7 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 
 	Engine& m_engine;
 	IAllocator& m_allocator;
+	MT::Semaphore m_frame_semaphore;
 	Array<ShaderDefine> m_shader_defines;
 	Array<Layer> m_layers;
 	TextureManager m_texture_manager;
@@ -1084,13 +847,39 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	bool m_vsync;
 	Shader* m_default_shader;
 	Pipeline* m_main_pipeline;
-	GlobalStateUniforms m_global_state_uniforms;
 	RenderTask m_render_task;
-	Array<TextureRecord> m_textures;
-	int m_first_free_texture;
-	FrameContext* m_frame_context;
-	Array<RenderCommandBase*> m_commands;
+	GlobalState m_global_state;
 };
+
+
+int RenderTask::task()
+{
+	PROFILE_FUNCTION();
+	void* window_handle = m_renderer.getEngine().getPlatformData().window_handle;
+	ffr::init(window_handle);
+	m_framebuffer = ffr::createFramebuffer(0, nullptr);
+	m_global_state_uniforms = ffr::allocBufferHandle();
+	ffr::createBuffer(m_global_state_uniforms, sizeof(Renderer::GlobalState), nullptr); 
+	ffr::bindUniformBuffer(0, m_global_state_uniforms, 0, sizeof(Renderer::GlobalState));
+
+	for(;;) {
+		Profiler::beginBlock("get command");
+		PreparedCommand* prepared = m_commands.pop(true);
+		Renderer::RenderCommandBase* cmd = prepared->cmd;
+		const Renderer::MemRef data = prepared->data;
+		m_commands.dealoc(prepared);
+		Profiler::endBlock();
+
+		PROFILE_BLOCK("executeCommand");
+		m_profiler.beginQuery(cmd->getName());
+		cmd->execute(data);
+		m_profiler.endQuery();
+		if(data.own) {
+			m_renderer.free(data);
+		}
+	}
+	return 0;
+}
 
 
 extern "C"

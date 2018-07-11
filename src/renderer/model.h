@@ -10,6 +10,7 @@
 #include "engine/vec.h"
 #include "engine/resource.h"
 #include "ffr/ffr.h"
+#include "renderer.h"
 
 
 struct lua_State;
@@ -106,8 +107,8 @@ struct LUMIX_RENDERER_API Mesh
 	int indices_count;
 	ffr::VertexDecl vertex_decl;
 	AttributeSemantic attributes_semantic[ffr::VertexDecl::MAX_ATTRIBUTES];
-	ffr::BufferHandle vertex_buffer_handle = ffr::INVALID_BUFFER;
-	ffr::BufferHandle index_buffer_handle = ffr::INVALID_BUFFER;
+	ffr::BufferHandle vertex_buffer_handle;
+	ffr::BufferHandle index_buffer_handle;
 	string name;
 	Material* material;
 };

@@ -124,6 +124,9 @@ void Material::unload()
 		}
 	}
 	m_texture_count = 0;
+	for(Texture*& tex : m_textures ) {
+		tex = nullptr;
+	}
 	
 	setShader(nullptr);
 
@@ -628,14 +631,27 @@ int texture(lua_State* L)
 	lua_getfield(L, LUA_GLOBALSINDEX, "this");
 	Material* material = (Material*)lua_touserdata(L, -1);
 	lua_pop(L, 1);
+	char material_dir[MAX_PATH_LENGTH];
+	PathUtils::getDir(material_dir, MAX_PATH_LENGTH, material->getPath().c_str());
 
 	if (lua_istable(L, 1)) {
-	
 		lua_getfield(L, 1, "source");
 		if (lua_isstring(L, -1)) {
 			const char* path = lua_tostring(L, -1);
 			const int idx = material->getTextureCount();
-			material->setTexturePath(idx, Path(path));
+			
+			char texture_path[MAX_PATH_LENGTH];
+			if (path[0] != '/' && path[0] != '\\' && path[0] != '\0')
+			{
+				copyString(texture_path, material_dir);
+				catString(texture_path, path);
+			}
+			else
+			{
+				copyString(texture_path, path);
+			}
+
+			material->setTexturePath(idx, Path(texture_path));
 		}
 		else {
 			g_log_error.log("Renderer") << material->getPath() << " texture's source is not a string.";
@@ -650,7 +666,7 @@ int texture(lua_State* L)
 			Texture* texture = material->getTexture(material->getTextureCount() - 1);
 			texture->setSRGB(srgb);
 		}
-		else {
+		else if (!lua_isnil(L, -1)) {
 			g_log_error.log("Renderer") << material->getPath() << " texture's srgb flag is not a boolean.";
 		}
 		lua_pop(L, 1);
@@ -660,7 +676,19 @@ int texture(lua_State* L)
 	
 	const char* path = LuaWrapper::checkArg<const char*>(L, 1);
 	const int idx = material->getTextureCount();
-	material->setTexturePath(idx, Path(path));
+	
+	char texture_path[MAX_PATH_LENGTH];
+	if (path[0] != '/' && path[0] != '\\' && path[0] != '\0')
+	{
+		copyString(texture_path, material_dir);
+		catString(texture_path, path);
+	}
+	else
+	{
+		copyString(texture_path, path);
+	}
+
+	material->setTexturePath(idx, Path(texture_path));
 	return 0;
 }
 

@@ -29,7 +29,7 @@ Texture::Texture(const Path& path, Renderer& renderer, ResourceManagerBase& reso
 {
 	flags = 0;
 	is_cubemap = false;
-	handle.reset();
+	handle = ffr::INVALID_TEXTURE;
 }
 
 
@@ -660,7 +660,7 @@ void Texture::unload()
 {
 	if (handle.isValid()) {
 		renderer.destroy(handle);
-		handle.reset();
+		handle = ffr::INVALID_TEXTURE;
 	}
 	data.clear();
 }
