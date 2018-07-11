@@ -13,7 +13,6 @@
 #include "engine/universe/universe.h"
 #include "engine/viewport.h"
 #include "font_manager.h"
-#include "global_state_uniforms.h"
 #include "material.h"
 #include "model.h"
 #include "pipeline.h"
@@ -47,10 +46,11 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		, m_scene(nullptr)
 		, m_is_first_render(true)
 		, m_draw2d(allocator)
-		, m_output(ffr::INVALID_TEXTURE)
+		, m_output(-1)
 		, m_renderbuffers(allocator)
 		, m_shaders(allocator)
 		, m_global_textures(allocator)
+		, m_commands(allocator)
 	{
 		m_viewport.w = m_viewport.h = 800;
 		ShaderManager& shader_manager = renderer.getShaderManager();
@@ -278,32 +278,6 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 	}
 
 
-	void setGlobalStateUniforms()
-	{
-		GlobalStateUniforms& global_uniforms = m_renderer.getGlobalStateUniforms();
-		GlobalStateUniforms::State& global_state = global_uniforms.state;
-
-		global_state.camera_pos = Vec4(m_viewport.pos, 789);
-
-		const Matrix view = m_viewport.getView();
-		const Matrix projection = m_viewport.getProjection(ffr::isHomogenousDepth());
-		global_state.camera_projection = projection;
-		global_state.camera_view = view;
-		global_state.camera_view_projection = projection * view;
-		global_state.camera_inv_view_projection = global_state.camera_view_projection;
-		global_state.camera_inv_view_projection.inverse();
-
-		const Entity global_light = m_scene->getActiveGlobalLight();
-		if(global_light.isValid()) {
-			global_state.light_direction = Vec4(m_scene->getUniverse().getRotation(global_light).rotate(Vec3(0, 0, -1)), 456); 
-			global_state.light_color = m_scene->getGlobalLightColor(global_light);
-			global_state.light_intensity = m_scene->getGlobalLightIntensity(global_light);
-			global_state.light_indirect_intensity = m_scene->getGlobalLightIndirectIntensity(global_light);
-		}
-		global_uniforms.update();
-	}
-
-
 	virtual void setViewport(const Viewport& viewport) override { m_viewport = viewport; }
 
 
@@ -324,6 +298,43 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		}
 
 		m_stats = {};
+
+		for(Renderbuffer& rb : m_renderbuffers) {
+			if(!rb.use_realtive_size) continue;
+			const uint w = uint(rb.relative_size.x * m_viewport.w + 0.5f);
+			const uint h = uint(rb.relative_size.y * m_viewport.h + 0.5f);
+			if(rb.width != w || rb.height != h) {
+				rb.width = w;
+				rb.height = h;
+				m_renderer.destroy(rb.handle);
+				rb.handle = m_renderer.createTexture(w, h, rb.format, 0, {0, 0});
+			}
+		}
+
+		Renderer::GlobalState state;
+		state.camera_pos = Vec4(m_viewport.pos, 1);
+
+		const Matrix view = m_viewport.getView();
+		const Matrix projection = m_viewport.getProjection(ffr::isHomogenousDepth());
+		state.camera_projection = projection;
+		state.camera_view = view;
+		state.camera_view_projection = projection * view;
+		state.camera_inv_view_projection = state.camera_view_projection;
+		state.camera_inv_view_projection.inverse();
+
+		const Entity global_light = m_scene->getActiveGlobalLight();
+		if(global_light.isValid()) {
+			state.light_direction = Vec4(m_scene->getUniverse().getRotation(global_light).rotate(Vec3(0, 0, -1)), 456); 
+			state.light_color = m_scene->getGlobalLightColor(global_light);
+			state.light_intensity = m_scene->getGlobalLightIntensity(global_light);
+			state.light_indirect_intensity = m_scene->getGlobalLightIndirectIntensity(global_light);
+		}
+
+		m_renderer.setGlobalState(state);
+		for(auto* cmd : m_commands) {
+			m_renderer.push(cmd);
+		}
+
 /*		
 		m_global_light_shadowmap = nullptr;
 		m_layer_mask = 0;
@@ -332,12 +343,6 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		m_point_light_shadowmaps.clear();
 		*/
 		clearBuffers();
-		
-		setGlobalStateUniforms();
-
-
-
-		ffr::setFramebuffer(ffr::INVALID_FRAMEBUFFER, false);
 		return true;
 	}
 
@@ -371,7 +376,9 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 
 		ffr::setUniformMatrix4f(shader.handle, "u_model", 1, &Matrix::IDENTITY.m11);
 
-		const ffr::BufferHandle vb = ffr::createBuffer(vertices.size() * sizeof(vertices[0]), &vertices[0]);
+		// TODO do not create every frame
+		const ffr::BufferHandle vb = ffr::allocBufferHandle();
+		ffr::createBuffer(vb, vertices.size() * sizeof(vertices[0]), &vertices[0]);
 		ffr::DrawCall dc;
 		dc.attribute_map = nullptr;
 		dc.index_buffer = ffr::INVALID_BUFFER;
@@ -379,7 +386,6 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		dc.shader = shader.handle;
 		dc.state = 0;
 		dc.textures_count = 0;
-		dc.tex_buffers_count = 0;
 		dc.vertex_buffer = vb;
 		dc.vertex_buffer_offset = 0;
 		dc.vertex_decl = &vertex_decl;
@@ -532,8 +538,8 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 
 	int createRenderbuffer(float w, float h, bool relative, const char* format_str)
 	{
-		const uint rb_w = uint(relative ? w * m_viewport.w : w);
-		const uint rb_h = uint(relative ? h * m_viewport.h : h);
+		const uint rb_w = uint(relative ? w * m_viewport.w + 0.5f : w);
+		const uint rb_h = uint(relative ? h * m_viewport.h + 0.5f : h);
 		const ffr::TextureFormat format = getFormat(format_str);
 
 		for (int i = 0, n = m_renderbuffers.size(); i < n; ++i)
@@ -549,6 +555,8 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		}
 
 		Renderbuffer& rb = m_renderbuffers.emplace();
+		rb.use_realtive_size = relative;
+		rb.relative_size.set(w, h);
 		rb.frame_counter = 0;
 		rb.width = rb_w;
 		rb.height = rb_h;
@@ -792,7 +800,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 
 	static int getShadowCameraParams(lua_State* L)
 	{
-		const int pipeline_idx = lua_upvalueindex(1);
+	/*	const int pipeline_idx = lua_upvalueindex(1);
 		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
 			LuaWrapper::argError<PipelineImpl*>(L, 1);
 		}
@@ -864,40 +872,63 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		findExtraShadowcasterPlanes(light_forward, camera_frustum, pipeline->m_viewport.pos, &cp.frustum);
 
 		pushCameraParams(L, cp);
-
+		*/
+		// TODO
+		ASSERT(false);
 		return 1;
 	}
 
 
 	struct SetRenderTargetsCommand : Renderer::RenderCommandBase
 	{
-		void* setup() override
+		struct Data
 		{
-			return nullptr;
+			ffr::TextureHandle rbs[16];
+			uint count;
+			uint w;
+			uint h;
+			u32 clear_flags;
+		};
+
+		const char* getName() const override { return "set_render_targets"; }
+
+		Renderer::MemRef setup() override
+		{
+			const Renderer::MemRef mem = m_pipeline->m_renderer.allocate(sizeof(Data));
+			Data* data = (Data*)mem.data;
+
+			for(int i = 0; i < m_rbs_count; ++i) {
+				data->rbs[i] = m_pipeline->m_renderbuffers[m_rbs[i]].handle;
+			}
+			data->count = m_rbs_count;
+			data->w = m_pipeline->m_viewport.w;
+			data->h = m_pipeline->m_viewport.h;
+			data->clear_flags = m_clear_flags;
+
+			return mem;
 		}
 
 
-		void execute(void*) const override
+		void execute(const Renderer::MemRef& mem) override
 		{
-			ffr::TextureHandle rbs[16];
-			for(int i = 0; i < m_rbs_count; ++i) {
-				const Renderer::TextureHandle t =  m_pipeline->m_renderbuffers[m_rbs[i]].handle;
-				rbs[i] = m_pipeline->m_renderer.getFFRHandle(t);
-			}
+			PROFILE_FUNCTION();
+			const Data* data = (Data*)mem.data;
 
 			const ffr::FramebufferHandle fb = m_pipeline->m_renderer.getFramebuffer();
-			ffr::update(fb, m_rbs_count, rbs);
+			
+			ffr::TextureHandle rbs[16];
+			for(uint i = 0; i < data->count; ++i) {
+				rbs[i] = data->rbs[i];
+			}
+
+			ffr::update(fb, data->count, rbs);
 			ffr::setFramebuffer(fb, true);
-			ffr::viewport(0, 0, m_pipeline->m_viewport.w, m_pipeline->m_viewport.h);
+			ffr::viewport(0, 0, data->w, data->h);
 		
 			if(m_clear_flags) {
 				const float c[] = { 0, 0, 0, 1 };
-				ffr::clear(m_clear_flags, c, 0);
+				ffr::clear(data->clear_flags, c, 0);
 			}
-
-			GlobalStateUniforms& uniforms = m_pipeline->m_renderer.getGlobalStateUniforms();
-			uniforms.state.framebuffer_size.x = m_pipeline->m_viewport.w;
-			uniforms.state.framebuffer_size.y = m_pipeline->m_viewport.h;
 		}
 
 
@@ -939,7 +970,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		ASSERT(sizeof(cmd->m_rbs) == sizeof(rbs));
 		copyMemory(cmd->m_rbs, rbs, sizeof(cmd->m_rbs));
 
-		pipeline->m_renderer.push(cmd);
+		pipeline->m_commands.push(cmd);
 
 		return 1;
 	}
@@ -1005,11 +1036,17 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		};
 
 
-		void* setup() override
+		const char* getName() const override { return "render_meshes"; }
+
+
+		Renderer::MemRef setup() override
 		{
-			/*m_define_mask = m_shader_define.empty() 
+			if(!m_pipeline->m_scene) return {};
+
+			Renderer& renderer = m_pipeline->m_renderer;
+			m_define_mask = m_shader_define.empty() 
 				? 0
-				: 1 << m_pipeline->m_renderer.getShaderDefineIdx(m_shader_define);
+				: 1 << renderer.getShaderDefineIdx(m_shader_define);
 			const Universe& universe = m_pipeline->m_scene->getUniverse();
 			
 			const Frustum frustum = m_pipeline->m_viewport.getFrustum();
@@ -1019,7 +1056,8 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 			auto& meshes = scene->getModelInstanceInfos(frustum, pos, lod_multiplier, m_layer_mask);
 			int count = 0;
 			for(const auto& submeshes : meshes) count += submeshes.size();
-			Data* out = (Data*)m_pipeline->m_allocator.allocate(sizeof(Data) + sizeof(Data::Mesh) * count);
+			Renderer::MemRef mem = renderer.allocate(sizeof(Data) + sizeof(Data::Mesh) * count);
+			Data* out = (Data*)mem.data;
 			out->meshes = (Data::Mesh*)((u8*)out + sizeof(Data));
 			out->count = 0;
 			for(const auto& submeshes : meshes) {
@@ -1042,22 +1080,24 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 				out->irradiance_map = m_pipeline->m_default_cubemap->handle;
 				out->radiance_map = m_pipeline->m_default_cubemap->handle;
 			}
-			return out;*/
-			// TODO
-			ASSERT(false);
-			return nullptr;
+			return mem;
 		}
 
 
-		void execute(void* user_data) const override
+		void execute(const Renderer::MemRef& user_mem) override
 		{
-			/*Data* data = (Data*)user_data;
+			PROFILE_FUNCTION();
+
+			if(user_mem.size == 0) return;
+
+			Data* data = (Data*)user_mem.data;
 
 			ffr::pushDebugGroup(m_shader_define.empty() ? "meshes" : m_shader_define);
 
 			for(int i = 0, c = data->count; i < c; ++i) {
 				const auto& mesh = data->meshes[i];
 				const Material* material = mesh.mesh->material;
+				if (!material->isReady()) continue;
 
 				const u32 final_define_mask = material->getDefineMask() | m_define_mask;
 				const Shader::Program prog = material->getShader()->getProgram(final_define_mask);
@@ -1105,7 +1145,6 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 				dc.shader = prog.handle;
 				dc.textures = textures;
 				dc.textures_count = lengthOf(textures);
-				dc.tex_buffers_count = 0;
 				dc.vertex_buffer = mesh.mesh->vertex_buffer_handle;
 				dc.vertex_buffer_offset = 0;
 				dc.vertex_decl = &mesh.mesh->vertex_decl;
@@ -1113,11 +1152,6 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 			}
 
 			ffr::popDebugGroup();
-
-			m_pipeline->m_allocator.deallocate(data);*/
-			// TODO
-			ASSERT(false);
-
 		}
 
 
@@ -1134,7 +1168,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		cmd->m_pipeline = this;
 		cmd->m_layer_mask = layer_mask;
 		cmd->m_shader_define = define;
-		m_renderer.push(cmd);
+		m_commands.push(cmd);
 	}
 
 
@@ -1178,10 +1212,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 
 	void setOutput(int rb_index) 
 	{
-		m_output = ffr::INVALID_TEXTURE;
-		if(rb_index >= 0) {
-			m_output = m_renderer.getFFRHandle(m_renderbuffers[rb_index].handle);
-		}
+		m_output = rb_index;
 	}
 
 
@@ -1282,13 +1313,17 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 	Path& getPath() override { return m_path; }
 
 	Draw2D& getDraw2D() override { return m_draw2d; }
-	ffr::TextureHandle getOutput() override { return m_output; }
+	ffr::TextureHandle getOutput() override { 
+		return m_renderbuffers[m_output].handle;
+	}
 
 	struct Renderbuffer {
 		uint width;
 		uint height;
+		bool use_realtive_size;
+		Vec2 relative_size; 
 		ffr::TextureFormat format;
-		Renderer::TextureHandle handle;
+		ffr::TextureHandle handle;
 		int frame_counter;
 	};
 
@@ -1317,13 +1352,14 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 	Shader* m_draw2d_shader;
 	Stats m_stats;
 	Viewport m_viewport;
-	ffr::TextureHandle m_output;
+	int m_output;
 	Shader* m_debug_shape_shader;
 	Texture* m_default_cubemap;
 	Array<CustomCommandHandler> m_custom_commands_handlers;
 	Array<Renderbuffer> m_renderbuffers;
 	Array<GlobalTexture> m_global_textures;
 	Array<ShaderRef> m_shaders;
+	Array<Renderer::RenderCommandBase*> m_commands; 
 };
 
 

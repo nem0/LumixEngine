@@ -3,11 +3,11 @@
 
 #include "engine/resource.h"
 #include "ffr/ffr.h"
-#include "renderer.h"
 
 
 namespace Lumix
 {
+class Renderer;
 namespace FS
 {
 	class FileSystem;
@@ -82,7 +82,7 @@ class LUMIX_RENDERER_API Texture LUMIX_FINAL : public Resource
 		int mips;
 		bool is_cubemap;
 		u32 flags;
-		Renderer::TextureHandle handle;
+		ffr::TextureHandle handle;
 		IAllocator& allocator;
 		int data_reference;
 		Array<u8> data;

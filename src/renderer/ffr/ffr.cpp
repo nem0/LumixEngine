@@ -2,6 +2,7 @@
 #include "engine/blob.h"
 #include "engine/log.h"
 #include "engine/math_utils.h"
+#include "engine/mt/sync.h"
 #include <Windows.h>
 #include <gl/GL.h>
 #include "renderdoc_app.h"
@@ -20,6 +21,12 @@ namespace Lumix
 
 namespace ffr {
 
+struct Buffer
+{
+	enum { MAX_COUNT = 4096 };
+	
+	GLuint handle;
+};
 
 struct Texture
 {
@@ -35,8 +42,13 @@ static struct {
 	GLuint vao;
 	GLuint tex_buffers[32];
 	IAllocator* allocator;
+	void* device_context;
+	Buffer* buffers;
 	Texture* textures;
 	int first_free_texture = 0;
+	int first_free_buffer = 0;
+	MT::SpinMutex handle_mutex {false};
+	DWORD thread;
 } s_ffr;
 
 
@@ -67,6 +79,8 @@ static const uint DDSCAPS2_CUBEMAP_NEGATIVEY = 0x00002000;
 static const uint DDSCAPS2_CUBEMAP_POSITIVEZ = 0x00004000;
 static const uint DDSCAPS2_CUBEMAP_NEGATIVEZ = 0x00008000;
 static const uint DDSCAPS2_VOLUME = 0x00200000;
+static const uint D3DFMT_ATI1 = '1ITA';
+static const uint D3DFMT_ATI2 = '2ITA';
 static const uint D3DFMT_DXT1 = '1TXD';
 static const uint D3DFMT_DXT2 = '2TXD';
 static const uint D3DFMT_DXT3 = '3TXD';
@@ -112,7 +126,6 @@ struct LoadInfo {
 	bool compressed;
 	bool swap;
 	bool palette;
-	uint divSize;
 	uint blockBytes;
 	GLenum internalFormat;
 	GLenum internalSRGBFormat;
@@ -122,12 +135,23 @@ struct LoadInfo {
 
 static uint sizeDXTC(uint w, uint h, GLuint format) {
     const bool is_dxt1 = format == GL_COMPRESSED_RGBA_S3TC_DXT1_EXT || format == GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT1_EXT;
-	return ((w + 3) / 4) * ((h + 3) / 4) * (is_dxt1 ? 8 : 16);
+	const bool is_ati = format == GL_COMPRESSED_RED_RGTC1;
+	return ((w + 3) / 4) * ((h + 3) / 4) * (is_dxt1 || is_ati ? 8 : 16);
 }
 
 static bool isDXT1(PixelFormat& pf)
 {
 	return ((pf.dwFlags & DDPF_FOURCC) && (pf.dwFourCC == D3DFMT_DXT1));
+}
+
+static bool isATI1(PixelFormat& pf)
+{
+	return ((pf.dwFlags & DDPF_FOURCC) && (pf.dwFourCC == D3DFMT_ATI1));
+}
+
+static bool isATI2(PixelFormat& pf)
+{
+	return ((pf.dwFlags & DDPF_FOURCC) && (pf.dwFourCC == D3DFMT_ATI2));
 }
 
 static bool isDXT3(PixelFormat& pf)
@@ -189,28 +213,34 @@ static bool isINDEX8(PixelFormat& pf)
 }
 
 static LoadInfo loadInfoDXT1 = {
-	true, false, false, 4, 8, GL_COMPRESSED_RGBA_S3TC_DXT1_EXT, GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT1_EXT
+	true, false, false, 8, GL_COMPRESSED_RGBA_S3TC_DXT1_EXT, GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT1_EXT
 };
 static LoadInfo loadInfoDXT3 = {
-	true, false, false, 4, 16, GL_COMPRESSED_RGBA_S3TC_DXT3_EXT, GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT
+	true, false, false, 16, GL_COMPRESSED_RGBA_S3TC_DXT3_EXT, GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT
 };
 static LoadInfo loadInfoDXT5 = {
-	true, false, false, 4, 16, GL_COMPRESSED_RGBA_S3TC_DXT5_EXT, GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT
+	true, false, false, 16, GL_COMPRESSED_RGBA_S3TC_DXT5_EXT, GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT
+};
+static LoadInfo loadInfoATI1 = {
+	true, false, false, 8, GL_COMPRESSED_RED_RGTC1, GL_ZERO
+};
+static LoadInfo loadInfoATI2 = {
+	true, false, false, 16, GL_COMPRESSED_RG_RGTC2, GL_ZERO
 };
 static LoadInfo loadInfoBGRA8 = {
-	false, false, false, 1, 4, GL_RGBA8, GL_SRGB8_ALPHA8, GL_BGRA, GL_UNSIGNED_BYTE
+	false, false, false, 4, GL_RGBA8, GL_SRGB8_ALPHA8, GL_BGRA, GL_UNSIGNED_BYTE
 };
 static LoadInfo loadInfoBGR8 = {
-	false, false, false, 1, 3, GL_RGB8, GL_SRGB8, GL_BGR, GL_UNSIGNED_BYTE
+	false, false, false, 3, GL_RGB8, GL_SRGB8, GL_BGR, GL_UNSIGNED_BYTE
 };
 static LoadInfo loadInfoBGR5A1 = {
-	false, true, false, 1, 2, GL_RGB5_A1, GL_ZERO, GL_BGRA, GL_UNSIGNED_SHORT_1_5_5_5_REV
+	false, true, false, 2, GL_RGB5_A1, GL_ZERO, GL_BGRA, GL_UNSIGNED_SHORT_1_5_5_5_REV
 };
 static LoadInfo loadInfoBGR565 = {
-	false, true, false, 1, 2, GL_RGB5, GL_ZERO, GL_RGB, GL_UNSIGNED_SHORT_5_6_5
+	false, true, false, 2, GL_RGB5, GL_ZERO, GL_RGB, GL_UNSIGNED_SHORT_5_6_5
 };
 static LoadInfo loadInfoIndex8 = {
-	false, false, true, 1, 1, GL_RGB8, GL_SRGB8, GL_BGRA, GL_UNSIGNED_BYTE
+	false, false, true, 1, GL_RGB8, GL_SRGB8, GL_BGRA, GL_UNSIGNED_BYTE
 };
 
 struct DXTColBlock
@@ -432,6 +462,12 @@ static void flipCompressedTexture(int w, int h, int format, void* surface)
 	} while(0)
 
 
+void checkThread()
+{
+	bool is_thread = s_ffr.thread == GetCurrentThreadId();
+	ASSERT(is_thread);
+}
+
 
 static void try_load_renderdoc()
 {
@@ -447,10 +483,9 @@ static void try_load_renderdoc()
 }
 
 
-static int load_gl(void* window_handle)
+static int load_gl(void* device_contex)
 {
-	HWND hwnd = (HWND)window_handle;
-	HDC hdc = GetDC(hwnd);
+	HDC hdc = (HDC)device_contex;
 	HGLRC hglrc = wglCreateContext(hdc);
 	wglMakeCurrent(hdc, hglrc);
 
@@ -506,12 +541,14 @@ void VertexDecl::addAttribute(uint components_num, AttributeType type, bool norm
 
 void viewport(uint x,uint y,uint w,uint h)
 {
+	checkThread();
 	glViewport(x, y, w, h);
 }
 
 
 void blending(int mode)
 {
+	checkThread();
 	if (mode) {
 		glEnable(GL_BLEND);
 	}
@@ -524,17 +561,23 @@ void blending(int mode)
 
 void scissor(uint x,uint y,uint w,uint h)
 {
+	checkThread();
 	glScissor(x, y, w, h);
 }
 
 
 void draw(const DrawCall& dc)
 {
+	checkThread();
 	if (!dc.shader.isValid()) return;
 
 	if( dc.state & u64(StateFlags::DEPTH_TEST)) CHECK_GL(glEnable(GL_DEPTH_TEST));
 	else CHECK_GL(glDisable(GL_DEPTH_TEST));
-
+	// TODO
+	/*
+	if( dc.state & u64(StateFlags::SCISSOR_TEST)) CHECK_GL(glEnable(GL_SCISSOR_TEST));
+	else CHECK_GL(glDisable(GL_SCISSOR_TEST));
+	*/
 	if(dc.state & u64(StateFlags::CULL_BACK)) {
 		CHECK_GL(glEnable(GL_CULL_FACE));
 		CHECK_GL(glCullFace(GL_BACK));
@@ -560,15 +603,6 @@ void draw(const DrawCall& dc)
 		default: ASSERT(0); break;
 	}
 
-	for (uint i = 0; i < dc.tex_buffers_count; ++i) {
-		const GLuint buf = dc.tex_buffers[i].value;
-		CHECK_GL(glActiveTexture(GL_TEXTURE0 + i));
-		CHECK_GL(glBindTexture(GL_TEXTURE_BUFFER, s_ffr.tex_buffers[i]));
-		CHECK_GL(glTexBuffer(GL_TEXTURE_BUFFER, GL_R32F, buf));
-		const GLint uniform_loc = glGetUniformLocation(prg, "test");
-		CHECK_GL(glUniform1i(uniform_loc, i));
-	}
-
 	for (uint i = 0; i < dc.textures_count; ++i) {
 		if(dc.textures[i].isValid()) {
 			const Texture& t = s_ffr.textures[dc.textures[i].value];
@@ -584,7 +618,7 @@ void draw(const DrawCall& dc)
 	if (dc.vertex_decl) {
 		const VertexDecl* decl = dc.vertex_decl;
 		const GLsizei stride = decl->size;
-		const GLuint vb = dc.vertex_buffer.value;
+		const GLuint vb = s_ffr.buffers[dc.vertex_buffer.value].handle;
 		const uint vb_offset = dc.vertex_buffer_offset;
 		CHECK_GL(glBindBuffer(GL_ARRAY_BUFFER, vb));
 
@@ -606,8 +640,8 @@ void draw(const DrawCall& dc)
 		}
 	}
 
-	if (dc.index_buffer.value != 0xffFFffFF) {
-		const GLuint ib = dc.index_buffer.value;
+	if (dc.index_buffer.isValid()) {
+		const GLuint ib = s_ffr.buffers[dc.index_buffer.value].handle;
 		CHECK_GL(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ib));
 		CHECK_GL(glDrawElements(pt, dc.indices_count, GL_UNSIGNED_SHORT, (void*)(intptr_t)(dc.indices_offset * sizeof(short))));
 		CHECK_GL(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
@@ -620,6 +654,7 @@ void draw(const DrawCall& dc)
 
 void uniformBlockBinding(ProgramHandle program, const char* block_name, uint binding)
 {
+	checkThread();
 	const GLint index = glGetUniformBlockIndex(program.value, block_name);
 	glUniformBlockBinding(program.value, index, binding);
 }
@@ -627,33 +662,46 @@ void uniformBlockBinding(ProgramHandle program, const char* block_name, uint bin
 
 void bindUniformBuffer(uint index, BufferHandle buffer, size_t offset, size_t size)
 {
-	glBindBufferRange(GL_UNIFORM_BUFFER, index, buffer.value, offset, size);
+	checkThread();
+	const GLuint buf = s_ffr.buffers[buffer.value].handle;
+	glBindBufferRange(GL_UNIFORM_BUFFER, index, buf, offset, size);
 }
 
 
 void update(BufferHandle buffer, const void* data, size_t offset, size_t size)
 {
-	const GLuint buf = buffer.value;
+	checkThread();
+	const GLuint buf = s_ffr.buffers[buffer.value].handle;
 	CHECK_GL(glBindBuffer(GL_UNIFORM_BUFFER, buf));
 	CHECK_GL(glBufferSubData(GL_UNIFORM_BUFFER, offset, size, data));
 	CHECK_GL(glBindBuffer(GL_UNIFORM_BUFFER, 0));
 }
 
 
-BufferHandle createBuffer(size_t size, const void* data)
+void swapBuffers()
 {
+	checkThread();
+	HDC hdc = (HDC)s_ffr.device_context;
+	SwapBuffers(hdc);
+}
+
+
+void createBuffer(BufferHandle buffer, size_t size, const void* data)
+{
+	checkThread();
 	GLuint buf;
 	CHECK_GL(glGenBuffers(1, &buf));
 	CHECK_GL(glBindBuffer(GL_UNIFORM_BUFFER, buf));
 	CHECK_GL(glBufferData(GL_UNIFORM_BUFFER, size, data, GL_STATIC_DRAW));
 	CHECK_GL(glBindBuffer(GL_UNIFORM_BUFFER, 0));
 
-	return { buf };
+	s_ffr.buffers[buffer.value].handle = buf;
 }
 
 
 void destroy(ProgramHandle program)
 {
+	checkThread();
 	if (program.isValid()) {
 		glDeleteProgram(program.value);
 	}
@@ -680,8 +728,25 @@ static struct {
 };
 
 
-TextureHandle loadTexture(const void* input, int input_size, uint flags, TextureInfo* info)
+TextureInfo getTextureInfo(const void* data)
 {
+	const DDS::Header* hdr = (const DDS::Header*)data;
+	const uint mips = (hdr->dwFlags & DDS::DDSD_MIPMAPCOUNT) ? hdr->dwMipMapCount : 1;
+	const bool is_cubemap = (hdr->caps2.dwCaps2 & DDS::DDSCAPS2_CUBEMAP) != 0;
+	TextureInfo info;
+	info.width = hdr->dwWidth;
+	info.height = hdr->dwHeight;
+	info.depth = 1;
+	info.layers = 1;
+	info.mips = mips;
+	info.is_cubemap = is_cubemap;
+	return info;
+}
+
+
+bool loadTexture(TextureHandle handle, const void* input, int input_size, uint flags, TextureInfo* info)
+{
+	checkThread();
 	DDS::Header hdr;
 
 	InputBlob blob(input, input_size);
@@ -691,7 +756,7 @@ TextureHandle loadTexture(const void* input, int input_size, uint flags, Texture
 		!(hdr.dwFlags & DDS::DDSD_PIXELFORMAT) || !(hdr.dwFlags & DDS::DDSD_CAPS))
 	{
 		g_log_error.log("renderer") << "Wrong dds format or corrupted dds.";
-		return INVALID_TEXTURE;
+		return false;
 	}
 
 	DDS::LoadInfo* li;
@@ -704,6 +769,12 @@ TextureHandle loadTexture(const void* input, int input_size, uint flags, Texture
 	}
 	else if (isDXT5(hdr.pixelFormat)) {
 		li = &DDS::loadInfoDXT5;
+	}
+	else if (isATI1(hdr.pixelFormat)) {
+		li = &DDS::loadInfoATI1;
+	}
+	else if (isATI2(hdr.pixelFormat)) {
+		li = &DDS::loadInfoATI2;
 	}
 	else if (isBGRA8(hdr.pixelFormat)) {
 		li = &DDS::loadInfoBGRA8;
@@ -721,20 +792,15 @@ TextureHandle loadTexture(const void* input, int input_size, uint flags, Texture
 		li = &DDS::loadInfoIndex8;
 	}
 	else {
-		return INVALID_TEXTURE;
+		return false;
 	}
 
 	const bool is_cubemap = (hdr.caps2.dwCaps2 & DDS::DDSCAPS2_CUBEMAP) != 0;
 
-	if(s_ffr.first_free_texture == 0xffFFffFF) {
-		g_log_error.log("Renderer") << "FFR is out of free texture slots.";
-		return INVALID_TEXTURE;
-	}
-
 	GLuint texture;
 	glGenTextures(1, &texture);
 	if (texture == 0) {
-		return INVALID_TEXTURE;
+		return false;
 	}
 
 	const bool is_srgb = flags & (u32)TextureFlags::SRGB;
@@ -754,7 +820,7 @@ TextureHandle loadTexture(const void* input, int input_size, uint flags, Texture
 			uint size = DDS::sizeDXTC(width, height, internal_format);
 			if (size != hdr.dwPitchOrLinearSize || (hdr.dwFlags & DDS::DDSD_LINEARSIZE) == 0) {
 				CHECK_GL(glDeleteTextures(1, &texture));
-				return INVALID_TEXTURE;
+				return false;
 			}
 			Array<u8> data(*s_ffr.allocator);
 			data.resize(size);
@@ -772,12 +838,12 @@ TextureHandle loadTexture(const void* input, int input_size, uint flags, Texture
 		else if (li->palette) {
 			if ((hdr.dwFlags & DDS::DDSD_PITCH) == 0 || hdr.pixelFormat.dwRGBBitCount != 8) {
 				CHECK_GL(glDeleteTextures(1, &texture));
-				return INVALID_TEXTURE;
+				return false;
 			}
 			uint size = hdr.dwPitchOrLinearSize * height;
 			if (size != width * height * li->blockBytes) {
 				CHECK_GL(glDeleteTextures(1, &texture));
-				return INVALID_TEXTURE;
+				return false;
 			}
 			Array<u8> data(*s_ffr.allocator);
 			data.resize(size);
@@ -826,21 +892,48 @@ TextureHandle loadTexture(const void* input, int input_size, uint flags, Texture
 		info->is_cubemap = is_cubemap;
 	}
 
-	Texture& t = s_ffr.textures[s_ffr.first_free_texture];
-	s_ffr.first_free_texture = t.handle;
+	Texture& t = s_ffr.textures[handle.value];
 	t.handle = texture;
 	t.cubemap = is_cubemap;
-
-	return {uint(&t - s_ffr.textures)};
+	return true;
 }
 
 
-TextureHandle createTexture(uint w,uint h, TextureFormat format, uint flags, const void* data)
+BufferHandle allocBufferHandle()
 {
+	MT::SpinLock lock(s_ffr.handle_mutex);
+
+	if(s_ffr.first_free_buffer == 0xffFFffFF) {
+		g_log_error.log("Renderer") << "FFR is out of free buffer slots.";
+		return INVALID_BUFFER;
+	}
+	const int id = s_ffr.first_free_buffer;
+	Buffer& t = s_ffr.buffers[id];
+	s_ffr.first_free_buffer = t.handle;
+	t.handle = 0;
+	return { (uint)id };
+}
+
+
+TextureHandle allocTextureHandle()
+{
+	MT::SpinLock lock(s_ffr.handle_mutex);
+
 	if(s_ffr.first_free_texture == 0xffFFffFF) {
 		g_log_error.log("Renderer") << "FFR is out of free texture slots.";
 		return INVALID_TEXTURE;
 	}
+	const int id = s_ffr.first_free_texture;
+	Texture& t = s_ffr.textures[id];
+	s_ffr.first_free_texture = t.handle;
+	t.handle = 0;
+	return { (uint)id };
+}
+
+
+bool createTexture(TextureHandle handle, uint w,uint h, TextureFormat format, uint flags, const void* data)
+{
+	checkThread();
 	const bool is_srgb = flags & (u32)TextureFlags::SRGB;
 	ASSERT(!is_srgb); // use format argument to enable srgb
 
@@ -867,7 +960,7 @@ TextureHandle createTexture(uint w,uint h, TextureFormat format, uint flags, con
 	if(!found_format) {
 		CHECK_GL(glBindTexture(GL_TEXTURE_2D, 0));
 		CHECK_GL(glDeleteTextures(1, &texture));
-		return INVALID_TEXTURE;	
+		return false;	
 	}
 
 	CHECK_GL(glGenerateMipmap(GL_TEXTURE_2D));
@@ -878,33 +971,45 @@ TextureHandle createTexture(uint w,uint h, TextureFormat format, uint flags, con
 
 	CHECK_GL(glBindTexture(GL_TEXTURE_2D, 0));
 
-	Texture& t = s_ffr.textures[s_ffr.first_free_texture];
-	s_ffr.first_free_texture = t.handle;
+	Texture& t = s_ffr.textures[handle.value];
 	t.handle = texture;
 	t.cubemap = false;
 
-	return {uint(&t - s_ffr.textures)};
+	return true;
 }
 
 
 void destroy(TextureHandle texture)
 {
+	checkThread();
 	Texture& t = s_ffr.textures[texture.value];
 	const GLuint handle = t.handle;
+	CHECK_GL(glDeleteTextures(1, &handle));
+
+	MT::SpinLock lock(s_ffr.handle_mutex);
 	t.handle = s_ffr.first_free_texture;
 	s_ffr.first_free_texture = texture.value;
-	CHECK_GL(glDeleteTextures(1, &handle));
 }
 
 
 void destroy(BufferHandle buffer)
 {
-	CHECK_GL(glDeleteBuffers(1, &buffer.value));
+	checkThread();
+	
+	Buffer& t = s_ffr.buffers[buffer.value];
+	const GLuint handle = t.handle;
+	CHECK_GL(glDeleteBuffers(1, &handle));
+
+	MT::SpinLock lock(s_ffr.handle_mutex);
+	t.handle = s_ffr.first_free_buffer;
+	s_ffr.first_free_buffer = buffer.value;
+
 }
 
 
 void clear(uint flags, const float* color, float depth)
 {
+	checkThread();
 	GLbitfield gl_flags = 0;
 	if (flags & (uint)ClearFlags::COLOR) {
 		CHECK_GL(glClearColor(color[0], color[1], color[2], color[3]));
@@ -930,6 +1035,7 @@ static const char* shaderTypeToString(ShaderType type)
 
 ProgramHandle createProgram(const char** srcs, const ShaderType* types, int num, const char** prefixes, int prefixes_count, const char* name)
 {
+	checkThread();
 	const char* combined_srcs[16];
 	ASSERT(prefixes_count < lengthOf(combined_srcs) - 1); 
 	enum { MAX_SHADERS_PER_PROGRAM = 16 };
@@ -1005,28 +1111,41 @@ ProgramHandle createProgram(const char** srcs, const ShaderType* types, int num,
 
 static void gl_debug_callback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const char *message, const void *userParam)
 {
-	if (type != GL_DEBUG_TYPE_ERROR && type != GL_DEBUG_TYPE_PERFORMANCE) return;
-	g_log_error.log("GL") << message;
+	if(GL_DEBUG_TYPE_PUSH_GROUP == type || type == GL_DEBUG_TYPE_POP_GROUP) return;
+	if (type == GL_DEBUG_TYPE_ERROR || type == GL_DEBUG_TYPE_PERFORMANCE) {
+		g_log_error.log("GL") << message;
+	}
+	else {
+		g_log_info.log("GL") << message;
+	}
 }
 
 
-void preinit()
+void preinit(IAllocator& allocator)
 {
 	try_load_renderdoc();
-}
-
-
-bool init(void* window_handle, IAllocator& allocator)
-{
 	s_ffr.allocator = &allocator;
-
-	if (!load_gl(window_handle)) return false;
-
 	s_ffr.textures = (Texture*)allocator.allocate(sizeof(Texture) * Texture::MAX_COUNT);
 	for(int i = 0; i < Texture::MAX_COUNT; ++i) {
 		s_ffr.textures[i].handle = i + 1;
 	}
 	s_ffr.textures[Texture::MAX_COUNT - 1].handle = 0xffFFffFF;
+
+	s_ffr.buffers = (Buffer*)allocator.allocate(sizeof(Buffer) * Buffer::MAX_COUNT);
+	for(int i = 0; i < Buffer::MAX_COUNT; ++i) {
+		s_ffr.buffers[i].handle = i + 1;
+	}
+	s_ffr.buffers[Buffer::MAX_COUNT - 1].handle = 0xffFFffFF;
+}
+
+
+bool init(void* window_handle)
+{
+	s_ffr.device_context = GetDC((HWND)window_handle);
+	s_ffr.thread = GetCurrentThreadId();
+
+	if (!load_gl(s_ffr.device_context)) return false;
+
 
 /*	int extensions_count;
 	glGetIntegerv(GL_NUM_EXTENSIONS, &extensions_count);
@@ -1062,36 +1181,42 @@ bool isOriginBottomLeft() { return true; }
 
 void getTextureImage(ffr::TextureHandle texture, uint size, void* buf)
 {
+	checkThread();
 	glGetTextureImage(texture.value, 0, GL_RGBA, GL_UNSIGNED_BYTE, size, buf);
 }
 
 
 void popDebugGroup()
 {
+	checkThread();
 	glPopDebugGroup();
 }
 
 
 void pushDebugGroup(const char* msg)
 {
+	checkThread();
 	glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, msg);
 }
 
 
 void destroy(FramebufferHandle fb)
 {
+	checkThread();
 	CHECK_GL(glDeleteFramebuffers(1, &fb.value));
 }
 
 
 int getAttribLocation(ProgramHandle program, const char* uniform_name)
 {
+	checkThread();
 	return glGetAttribLocation(program.value, uniform_name);
 }
 
 
 void setUniform1i(ProgramHandle program, const char* uniform_name, int value)
 {
+	checkThread();
 	CHECK_GL(glUseProgram(program.value));
 	const GLint uniform_loc = glGetUniformLocation(program.value, uniform_name);
 	CHECK_GL(glUniform1i(uniform_loc, value));
@@ -1100,6 +1225,7 @@ void setUniform1i(ProgramHandle program, const char* uniform_name, int value)
 
 void setUniform2f(ProgramHandle program, const char* uniform_name, uint count, const float* value)
 {
+	checkThread();
 	CHECK_GL(glUseProgram(program.value));
 	const GLint uniform_loc = glGetUniformLocation(program.value, uniform_name);
 	CHECK_GL(glUniform2fv(uniform_loc, count, value));
@@ -1108,6 +1234,7 @@ void setUniform2f(ProgramHandle program, const char* uniform_name, uint count, c
 
 void setUniform4f(ProgramHandle program, const char* uniform_name, uint count, const float* value)
 {
+	checkThread();
 	CHECK_GL(glUseProgram(program.value));
 	const GLint uniform_loc = glGetUniformLocation(program.value, uniform_name);
 	CHECK_GL(glUniform4fv(uniform_loc, count, value));
@@ -1116,6 +1243,7 @@ void setUniform4f(ProgramHandle program, const char* uniform_name, uint count, c
 
 void setUniformMatrix4f(ProgramHandle program, const char* uniform_name, uint count, const float* value)
 {
+	checkThread();
 	CHECK_GL(glUseProgram(program.value));
 	const GLint uniform_loc = glGetUniformLocation(program.value, uniform_name);
 	CHECK_GL(glUniformMatrix4fv(uniform_loc, count, false, value));
@@ -1124,14 +1252,10 @@ void setUniformMatrix4f(ProgramHandle program, const char* uniform_name, uint co
 
 void update(FramebufferHandle fb, uint renderbuffers_count, const TextureHandle* renderbuffers)
 {
-	GLint max_attachments = 0;
-	glGetIntegerv(GL_MAX_COLOR_ATTACHMENTS, &max_attachments);
-	for(int i = 0; i < max_attachments; ++i) {
-		glNamedFramebufferRenderbuffer(fb.value, GL_COLOR_ATTACHMENT0 + i, GL_RENDERBUFFER, 0);
-		glNamedFramebufferRenderbuffer(fb.value, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, 0);
-	}
+	checkThread();
 
 	int color_attachment_idx = 0;
+	bool depth_bound = false;
 	for (uint i = 0; i < renderbuffers_count; ++i) {
 		const GLuint t = s_ffr.textures[renderbuffers[i].value].handle;
 		CHECK_GL(glBindTexture(GL_TEXTURE_2D, t));
@@ -1144,6 +1268,7 @@ void update(FramebufferHandle fb, uint renderbuffers_count, const TextureHandle*
 			case GL_DEPTH_COMPONENT24:
 			case GL_DEPTH_COMPONENT32:
 				CHECK_GL(glNamedFramebufferTexture(fb.value, GL_DEPTH_ATTACHMENT, t, 0));
+				depth_bound = true;
 				break;
 			default:
 				CHECK_GL(glNamedFramebufferTexture(fb.value, GL_COLOR_ATTACHMENT0 + color_attachment_idx, t, 0));
@@ -1151,11 +1276,49 @@ void update(FramebufferHandle fb, uint renderbuffers_count, const TextureHandle*
 				break;
 		}
 	}
+
+	GLint max_attachments = 0;
+	glGetIntegerv(GL_MAX_COLOR_ATTACHMENTS, &max_attachments);
+	for(int i = color_attachment_idx; i < max_attachments; ++i) {
+		glNamedFramebufferRenderbuffer(fb.value, GL_COLOR_ATTACHMENT0 + i, GL_RENDERBUFFER, 0);
+	}
+	if (!depth_bound) {
+		glNamedFramebufferRenderbuffer(fb.value, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, 0);
+	}
+}
+
+
+QueryHandle createQuery()
+{
+	GLuint q;
+	CHECK_GL(glGenQueries(1, &q));
+	return {q};
+}
+
+
+u64 getQueryResult(QueryHandle query)
+{
+	u64 time;
+	glGetQueryObjectui64v(query.value, GL_QUERY_RESULT, &time);
+	return time;
+}
+
+
+void destroy(QueryHandle query)
+{
+	glDeleteQueries(1, &query.value);
+}
+
+
+void queryTimestamp(QueryHandle query)
+{
+	glQueryCounter(query.value, GL_TIMESTAMP);
 }
 
 
 FramebufferHandle createFramebuffer(uint renderbuffers_count, const TextureHandle* renderbuffers)
 {
+	checkThread();
 	GLuint fb;
 	CHECK_GL(glGenFramebuffers(1, &fb));
 	CHECK_GL(glBindFramebuffer(GL_FRAMEBUFFER, fb));
@@ -1176,13 +1339,14 @@ FramebufferHandle createFramebuffer(uint renderbuffers_count, const TextureHandl
 
 void setFramebuffer(FramebufferHandle fb, bool srgb)
 {
+	checkThread();
 	if(fb.value == 0xffFFffFF) {
 		CHECK_GL(glBindFramebuffer(GL_FRAMEBUFFER, 0));
 	}
 	else {
 		CHECK_GL(glBindFramebuffer(GL_FRAMEBUFFER, fb.value));
-		const GLenum db[] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
-		CHECK_GL(glDrawBuffers(2, db));
+		//const GLenum db[] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+		//CHECK_GL(glDrawBuffers(2, db));
 	}
 	if(srgb) {	
 		CHECK_GL(glEnable(GL_FRAMEBUFFER_SRGB));
@@ -1195,6 +1359,7 @@ void setFramebuffer(FramebufferHandle fb, bool srgb)
 
 void shutdown()
 {
+	checkThread();
 	s_ffr.allocator->deallocate(s_ffr.textures);
 }
 

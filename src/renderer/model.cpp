@@ -36,6 +36,8 @@ Mesh::Mesh(Material* mat,
 	, uvs(allocator)
 	, skin(allocator)
 {
+	vertex_buffer_handle = ffr::INVALID_BUFFER;
+	index_buffer_handle = ffr::INVALID_BUFFER;
 	for(AttributeSemantic& attr : attributes_semantic) {
 		attr = AttributeSemantic::NONE;
 	}
@@ -517,7 +519,9 @@ bool Model::parseMeshes(FS::IFile& file, FileVersion version)
 
 		if (index_size == 2) mesh.flags.set(Mesh::Flags::INDICES_16_BIT);
 		mesh.indices_count = indices_count;
-		mesh.index_buffer_handle = ffr::createBuffer(mesh.indices.size(), &mesh.indices[0]);
+		// TODO do not copy, allocate in advance
+		const Renderer::MemRef mem = m_renderer.copy(&mesh.indices[0], mesh.indices.size());
+		mesh.index_buffer_handle = m_renderer.createBuffer(mem);
 	}
 
 	for (int i = 0; i < object_count; ++i)
@@ -554,7 +558,9 @@ bool Model::parseMeshes(FS::IFile& file, FileVersion version)
 			mesh.vertices[j] = *(const Vec3*)&vertices[offset + position_attribute_offset];
 			mesh.uvs[j] = *(const Vec2*)&vertices[offset + uv_attribute_offset];
 		}
-		mesh.vertex_buffer_handle = ffr::createBuffer(vertices_mem.size(), &vertices_mem[0]);
+		// TODO do not copy, allocate in advance
+		const Renderer::MemRef mem = m_renderer.copy(&vertices_mem[0], vertices_mem.size());
+		mesh.vertex_buffer_handle = m_renderer.createBuffer(mem);
 	}
 	file.read(&m_bounding_radius, sizeof(m_bounding_radius));
 	file.read(&m_aabb, sizeof(m_aabb));
@@ -660,8 +666,8 @@ void Model::unload()
 	}
 	for (Mesh& mesh : m_meshes)
 	{
-		if (mesh.index_buffer_handle.isValid()) ffr::destroy(mesh.index_buffer_handle);
-		if (mesh.vertex_buffer_handle.isValid()) ffr::destroy(mesh.vertex_buffer_handle);
+		if (mesh.index_buffer_handle.isValid()) m_renderer.destroy(mesh.index_buffer_handle);
+		if (mesh.vertex_buffer_handle.isValid()) m_renderer.destroy(mesh.vertex_buffer_handle);
 	}
 	m_meshes.clear();
 	m_bones.clear();

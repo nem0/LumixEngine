@@ -2,6 +2,7 @@
 
 #include "engine/lumix.h"
 #include "engine/iplugin.h"
+#include "engine/matrix.h"
 #include "ffr/ffr.h"
 
 
@@ -13,7 +14,6 @@ class Engine;
 struct Font;
 struct FontAtlas;
 class FontManager;
-class GlobalStateUniforms;
 class LIFOAllocator;
 class MaterialManager;
 class ModelManager;
@@ -27,20 +27,35 @@ class TextureManager;
 class LUMIX_RENDERER_API Renderer : public IPlugin 
 {
 	public:
-		struct TextureHandle { uint value; bool isValid() const { return value != 0xFFffFFff; } void reset() { value = 0xffFFffFF; } };
+		struct MemRef
+		{
+			uint size = 0;
+			void* data = nullptr;
+			bool own = false;
+		};
 
 		struct RenderCommandBase
 		{
 			virtual ~RenderCommandBase() {}
-			virtual void* setup() = 0;
-			virtual void execute(void* user_data) const = 0;
+			virtual MemRef setup() = 0;
+			virtual void execute(const MemRef& user_ptr) = 0;
+			virtual const char* getName() const = 0;
 		};
 
-		struct MemRef
+		struct GlobalState 
 		{
-			void* data;
-			uint size;
-			bool own;
+			Matrix shadow_view_projection;
+			Matrix shadowmap_matrices[4];
+			Matrix camera_projection;
+			Matrix camera_view;
+			Matrix camera_view_projection;
+			Matrix camera_inv_view_projection;
+			Vec4 camera_pos;
+			Vec4 light_direction;
+			Vec3 light_color;
+			float light_intensity;
+			float light_indirect_intensity;
+			Int2 framebuffer_size;
 		};
 
 		enum { MAX_SHADER_DEFINES = 32 };
@@ -63,15 +78,20 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 		virtual const char* getLayerName(int idx) const = 0;
 		virtual void setMainPipeline(Pipeline* pipeline) = 0;
 		virtual Pipeline* getMainPipeline() = 0;
-		virtual GlobalStateUniforms& getGlobalStateUniforms() = 0;
+		virtual void setGlobalState(const GlobalState& state) = 0;
 		
 		virtual IAllocator& getAllocator() = 0;
 		virtual MemRef allocate(uint size) = 0;
 		virtual MemRef copy(const void* data, uint size) = 0 ;
-		virtual TextureHandle createTexture(uint w, uint h, ffr::TextureFormat format, u32 flags, const MemRef& memory) = 0;
-		virtual TextureHandle loadTexture(const MemRef& memory, u32 flags, ffr::TextureInfo* info) = 0;
-		virtual ffr::TextureHandle getFFRHandle(TextureHandle tex) const = 0;
-		virtual void destroy(TextureHandle tex) = 0;
+		virtual void free(const MemRef& memory) = 0;
+		
+		virtual ffr::BufferHandle createBuffer(const MemRef& memory) = 0;
+		virtual void destroy(ffr::BufferHandle buffer) = 0;
+		
+		virtual ffr::TextureHandle createTexture(uint w, uint h, ffr::TextureFormat format, u32 flags, const MemRef& memory) = 0;
+		virtual ffr::TextureHandle loadTexture(const MemRef& memory, u32 flags, ffr::TextureInfo* info) = 0;
+		virtual void destroy(ffr::TextureHandle tex) = 0;
+		
 		virtual void push(RenderCommandBase* cmd) = 0;
 		virtual ffr::FramebufferHandle getFramebuffer() const = 0;
 

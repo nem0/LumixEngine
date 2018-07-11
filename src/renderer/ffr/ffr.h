@@ -14,12 +14,14 @@ struct BufferHandle { uint value; bool isValid() const { return value != 0xFFffF
 struct ProgramHandle { uint value; bool isValid() const { return value != 0xFFffFFff; } };
 struct FramebufferHandle { uint value; bool isValid() const { return value != 0xFFffFFff; } };
 struct TextureHandle { uint value; bool isValid() const { return value != 0xFFffFFff; } };
+struct QueryHandle { uint value; bool isValid() const { return value != 0xFFffFFff; } };
 
 
 const BufferHandle INVALID_BUFFER = { 0xffFFffFF };
 const ProgramHandle INVALID_PROGRAM = { 0xffFFffFF };
 const TextureHandle INVALID_TEXTURE = { 0xffFFffFF };
 const FramebufferHandle INVALID_FRAMEBUFFER = { 0xffFFffFF };
+const QueryHandle INVALID_QUERY = { 0xffFFffFF };
 
 
 enum class LogLevel : uint {
@@ -34,7 +36,8 @@ enum class StateFlags : u64 {
 	WIREFRAME = 1 << 0,
 	DEPTH_TEST = 1 << 1,
 	CULL_FRONT = 1 << 2,
-	CULL_BACK = 1 << 3
+	CULL_BACK = 1 << 3,
+	SCISSOR_TEST = 1 << 4
 };
 
 
@@ -106,8 +109,6 @@ struct VertexDecl {
 struct DrawCall {
 	ProgramHandle shader;
 	PrimitiveType primitive_type;
-	uint tex_buffers_count;
-	const BufferHandle* tex_buffers;
 	uint textures_count;
 	const TextureHandle* textures;
 	uint indices_offset;
@@ -130,8 +131,9 @@ struct TextureInfo {
 };
 
 
-void preinit();
-bool init(void* window_handle, IAllocator& allocator);
+void preinit(IAllocator& allocator);
+bool init(void* window_handle);
+void swapBuffers();
 bool isHomogenousDepth();
 bool isOriginBottomLeft();
 void shutdown();
@@ -142,11 +144,15 @@ void scissor(uint x, uint y, uint w, uint h);
 void viewport(uint x, uint y, uint w, uint h);
 void blending(int mode);
 
+TextureHandle allocTextureHandle();
+BufferHandle allocBufferHandle();
+
 ProgramHandle createProgram(const char** srcs, const ShaderType* types, int num, const char** prefixes, int prefixes_count, const char* name);
-BufferHandle createBuffer(size_t size, const void* data);
-TextureHandle createTexture(uint w, uint h, TextureFormat format, uint flags, const void* data);
-TextureHandle loadTexture(const void* data, int size, uint flags, TextureInfo* info);
+void createBuffer(BufferHandle handle, size_t size, const void* data);
+bool createTexture(TextureHandle handle, uint w, uint h, TextureFormat format, uint flags, const void* data);
+bool loadTexture(TextureHandle handle, const void* data, int size, uint flags, TextureInfo* info);
 FramebufferHandle createFramebuffer(uint renderbuffers_count, const TextureHandle* renderbuffers);
+QueryHandle createQuery();
 
 void setState(u32 flags);
 void uniformBlockBinding(ProgramHandle program, const char* block_name, uint binding);
@@ -154,11 +160,16 @@ void update(FramebufferHandle fb, uint renderbuffers_count, const TextureHandle*
 void update(BufferHandle buffer, const void* data, size_t offset, size_t size);
 void bindUniformBuffer(uint index, BufferHandle buffer, size_t offset, size_t size);
 void getTextureImage(ffr::TextureHandle texture, uint size, void* buf);
+TextureInfo getTextureInfo(const void* data);
+void queryTimestamp(QueryHandle query);
+u64 getQueryResult(QueryHandle query);
+
 
 void destroy(ProgramHandle program);
 void destroy(BufferHandle buffer);
 void destroy(TextureHandle texture);
 void destroy(FramebufferHandle fb);
+void destroy(QueryHandle query);
 
 void draw(const DrawCall& draw_call);
 
