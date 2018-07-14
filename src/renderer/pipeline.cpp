@@ -660,6 +660,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 			}
 		}
 
+		cmd->camera_params = cp;
 		cmd->pipeline = pipeline;
 		cmd->layer_mask = layer_mask;
 		cmd->shader_define = define;
@@ -1131,12 +1132,11 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 			define_mask = shader_define.empty() 
 				? 0
 				: 1 << renderer.getShaderDefineIdx(shader_define);
-			const Universe& universe = pipeline->m_scene->getUniverse();
-			
-			const Frustum frustum = pipeline->m_viewport.getFrustum();
-			const Vec3 pos = pipeline->m_viewport.pos;
-			const float lod_multiplier = 1;
 			RenderScene* scene = pipeline->getScene();
+			const Universe& universe = scene->getUniverse();
+			const Frustum frustum = camera_params.frustum;;
+			const Vec3 pos = camera_params.pos;
+			const float lod_multiplier = camera_params.lod_multiplier;
 			Array<Array<MeshInstance>> meshes(renderer.getAllocator());
 			scene->getModelInstanceInfos(frustum, pos, lod_multiplier, layer_mask, meshes);
 			int count = 0;
@@ -1235,6 +1235,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		}
 
 
+		CameraParams camera_params;
 		PipelineImpl* pipeline;
 		ffr::TextureHandle irradiance_map;
 		ffr::TextureHandle radiance_map;
