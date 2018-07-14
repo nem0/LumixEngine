@@ -4,6 +4,7 @@
 #include "engine/geometry.h"
 #include "engine/job_system.h"
 #include "engine/lumix.h"
+#include "engine/math_utils.h"
 #include "engine/profiler.h"
 #include "engine/simd.h"
 
@@ -79,20 +80,13 @@ public:
 		: m_allocator(allocator)
 		, m_job_allocator(allocator)
 		, m_spheres(allocator)
-		, m_result(allocator)
 		, m_layer_masks(m_allocator)
 		, m_sphere_to_model_instance_map(m_allocator)
 		, m_model_instance_to_sphere_map(m_allocator)
 	{
-		m_result.emplace(m_allocator);
 		m_model_instance_to_sphere_map.reserve(5000);
 		m_sphere_to_model_instance_map.reserve(5000);
 		m_spheres.reserve(5000);
-		int cpu_count = (int)MT::getCPUsCount();
-		while (m_result.size() < cpu_count)
-		{
-			m_result.emplace(m_allocator);
-		}
 	}
 
 
@@ -106,12 +100,6 @@ public:
 
 
 	IAllocator& getAllocator() { return m_allocator; }
-
-
-	const Results& getResult() override
-	{
-		return m_result;
-	}
 
 
 	static void cullTask(void* data)
@@ -129,33 +117,43 @@ public:
 	}
 
 
-	Results& cull(const Frustum& frustum, u64 layer_mask) override
+	void cull(const Frustum& frustum, u64 layer_mask, Results& result) override
 	{
-		int count = m_spheres.size();
-		for(auto& i : m_result) i.clear();
+		const int count = m_spheres.size();
+		if(count == 0) return;
 
-		int step = count / m_result.size();
-		ASSERT(lengthOf(jobs) >= m_result.size());
-		for (int i = 0; i < m_result.size(); i++)
-		{
-			m_result[i].clear();
+		if (result.empty()) {
+			const int cpus_count = MT::getCPUsCount();
+			const int buckets_count = Math::minimum(cpus_count * 4, count);
+			while(result.size() < buckets_count) result.emplace(m_allocator);
+		}
+
+		int step = count / result.size();
+		
+		// TODO allocate on stack
+		Array<CullingJobData> job_data(m_allocator);
+		Array<JobSystem::JobDecl> jobs(m_allocator);
+		job_data.resize(result.size());
+		jobs.resize(result.size());
+	
+		for (int i = 0; i < result.size(); i++) {
+			result[i].clear();
 			job_data[i] = {
 				&m_spheres,
-				&m_result[i],
+				&result[i],
 				&m_layer_masks,
 				&m_sphere_to_model_instance_map,
 				layer_mask,
 				i * step,
-				i == m_result.size() - 1 ? count - 1 : (i + 1) * step - 1,
+				i == result.size() - 1 ? count - 1 : (i + 1) * step - 1,
 				&frustum
 			};
 			jobs[i].data = &job_data[i];
 			jobs[i].task = &cullTask;
 		}
 		volatile int job_counter = 0;
-		JobSystem::runJobs(jobs, m_result.size(), &job_counter);
+		JobSystem::runJobs(&jobs[0], result.size(), &job_counter);
 		JobSystem::wait(&job_counter);
-		return m_result;
 	}
 
 
@@ -249,12 +247,9 @@ private:
 	IAllocator& m_allocator;
 	FreeList<CullingJobData, 16> m_job_allocator;
 	InputSpheres m_spheres;
-	Results m_result;
 	LayerMasks m_layer_masks;
 	ModelInstancetoSphereMap m_model_instance_to_sphere_map;
 	SphereToModelInstanceMap m_sphere_to_model_instance_map;
-	CullingJobData job_data[16];
-	JobSystem::JobDecl jobs[16];
 };
 
 

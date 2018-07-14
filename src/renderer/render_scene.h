@@ -316,10 +316,11 @@ public:
 	virtual Path getModelInstanceMaterial(Entity entity, int index) = 0;
 	virtual int getModelInstanceMaterialsCount(Entity entity) = 0;
 	virtual void setModelInstancePath(Entity entity, const Path& path) = 0;
-	virtual Array<Array<MeshInstance>>& getModelInstanceInfos(const Frustum& frustum,
+	virtual void getModelInstanceInfos(const Frustum& frustum,
 		const Vec3& lod_ref_point,
 		float lod_multiplier,
-		u64 layer_mask) = 0;
+		u64 layer_mask,
+		Array<Array<MeshInstance>>& result) = 0;
 	virtual void getModelInstanceEntities(const Frustum& frustum, Array<Entity>& entities) = 0;
 	virtual Entity getFirstModelInstance() = 0;
 	virtual Entity getNextModelInstance(Entity entity) = 0;

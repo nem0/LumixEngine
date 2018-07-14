@@ -61,20 +61,17 @@ static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("r
 
 struct GPUProfiler
 {
-	struct Query
-	{
-		const char *name;
-		ffr::QueryHandle queries[4];
-		float frames[128];
-		int parent = -1;
-		int sibling = -1;
-		int child = -1;
-		uint frame = 0xffFFffFF;
-	};
+	using Query = Renderer::GPUProfilerQuery;
 
 	GPUProfiler(IAllocator& allocator) 
 		: m_queries(allocator) 
-	{}
+		, m_pool(allocator)
+		, m_history(allocator)
+	{
+		m_history.emplace(allocator);
+		m_history.emplace(allocator);
+		m_history.emplace(allocator);
+	}
 
 
 	~GPUProfiler()
@@ -84,67 +81,58 @@ struct GPUProfiler
 	}
 
 
+	ffr::QueryHandle allocQuery()
+	{
+		if(!m_pool.empty()) {
+			const ffr::QueryHandle res = m_pool.back();
+			m_pool.pop();
+			return res;
+		}
+		return ffr::createQuery();
+	}
+
+
 	void beginQuery(const char* name)
 	{
-		auto push = [&](){
-			Query& q = m_queries.emplace();
-			q.name = name;
-			q.parent = m_current;
-			q.queries[0] = ffr::createQuery();
-			q.queries[1] = ffr::createQuery();
-			q.queries[2] = ffr::createQuery();
-			q.queries[3] = ffr::createQuery();
-			return q;
-		};
-
-		if (m_queries.empty()) {
-			Query& q = push();
-			ffr::queryTimestamp(q.queries[(m_frame * 2 + 0) % lengthOf(q.queries)]);
-			m_current = 0;
-			return;
-		}
-
-		int tmp = 0;
-		int* child = &tmp;
-		if(m_current >= 0) child = &m_queries[m_current].child;
-
-		while(*child >= 0) {
-			Query& q = m_queries[*child];
-			if(equalStrings(q.name, name)) break;
-			child = &q.sibling;
-		}
-
-		if(*child < 0) {
-			Query& q = push();
-			*child = m_queries.size() - 1;
-		}
-
-		Query& q = m_queries[*child];
-		ffr::queryTimestamp(q.queries[(m_frame * 2 + 0) % lengthOf(q.queries)]);
-		m_current = *child;
+		Query& q = m_queries.emplace();
+		q.name = name;
+		q.is_end = false;
+		q.handle = allocQuery();
+		ffr::queryTimestamp(q.handle);
 	}
 
 
 	void endQuery()
 	{
-		Query& q = m_queries[m_current];
-		q.frame = m_frame;
-		ffr::queryTimestamp(q.queries[(m_frame * 2 + 1) % lengthOf(q.queries)]);
-		m_current = q.parent;
+		Query& q = m_queries.emplace();
+		q.is_end = true;
+		q.handle = allocQuery();
+		ffr::queryTimestamp(q.handle);
+	}
+
+
+	bool getResults(Array<Query>* results)
+	{
+		if (m_history_rd == m_history_wr) {
+			return false;
+		}
+		results->swap(m_history[m_history_rd % m_history.size()]);
+		MT::atomicIncrement((volatile int*)&m_history_rd);
+		return true;
 	}
 
 
 	void frame()
 	{
 		for (Query& q : m_queries) {
-			float t = 0;
-			if (q.frame == m_frame) {
-				const u64 begin = ffr::getQueryResult(q.queries[(m_frame * 2 + 0) % lengthOf(q.queries)]);
-				const u64 end = ffr::getQueryResult(q.queries[(m_frame * 2 + 1) % lengthOf(q.queries)]);
-				t = float((end - begin) / 1'000'000'000.0);
-			}
-			q.frames[m_frame % lengthOf(q.frames)] = t;
+			q.result = ffr::getQueryResult(q.handle);
+			m_pool.push(q.handle);
 		}
+		if (m_history_wr < m_history_rd + m_history.size()) {
+			m_history[m_history_wr % m_history.size()].swap(m_queries);
+			MT::atomicIncrement((volatile int*)&m_history_wr);
+		}
+		m_queries.clear();
 		MT::atomicIncrement(&m_frame);
 		++m_frame;
 	}
@@ -152,7 +140,11 @@ struct GPUProfiler
 
 	volatile int m_frame = 0;
 	int m_current = -1;
+	volatile uint m_history_rd = 0;
+	volatile uint m_history_wr = 0;
+	Array<Array<Query>> m_history;
 	Array<Query> m_queries;
+	Array<ffr::QueryHandle> m_pool;
 };
 
 
@@ -181,7 +173,7 @@ struct RenderTask : MT::Task
 		Renderer::RenderCommandBase* cmd;
 		Renderer::MemRef data;
 	};
-	MT::LockFreeFixedQueue<PreparedCommand, 256> m_commands;
+	MT::LockFreeFixedQueue<Renderer::RenderCommandBase*, 256> m_commands;
 	GPUProfiler m_profiler;
 };
 
@@ -509,6 +501,24 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	}
 
 
+	void beginProfileBlock(const char* name) override
+	{
+		m_render_task.m_profiler.beginQuery(name);
+	}
+
+
+	void endProfileBlock() override
+	{
+		m_render_task.m_profiler.endQuery();
+	}
+
+
+	bool getGPUTimings(Array<GPUProfilerQuery>* results) override
+	{
+		return m_render_task.m_profiler.getResults(results);
+	}
+
+
 	ffr::FramebufferHandle getFramebuffer() const override
 	{
 		return m_render_task.m_framebuffer;
@@ -529,8 +539,8 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 
 		struct Cmd : RenderCommandBase {
 			const char* getName() const override { return "load_texture"; }
-			MemRef setup() override { return {0, 0}; }
-			void execute(const MemRef&) override {
+			void setup() override {}
+			void execute() override {
 				ffr::loadTexture(handle, memory.data, memory.size, flags, nullptr);
 			}
 
@@ -556,8 +566,8 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 
 		struct Cmd : RenderCommandBase {
 			const char* getName() const override { return "create_buffer"; }
-			MemRef setup() override { return {0, 0}; }
-			void execute(const MemRef&) override {
+			void setup() override {}
+			void execute() override {
 				ffr::createBuffer(handle, memory.size, memory.data);
 			}
 
@@ -579,8 +589,8 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	{
 		struct Cmd : RenderCommandBase {
 			const char* getName() const override { return "destroy_buffer"; }
-			MemRef setup() override { return {0, 0}; }
-			void execute(const MemRef&) override { ffr::destroy(buffer); }
+			void setup() override {}
+			void execute() override { ffr::destroy(buffer); }
 
 			ffr::BufferHandle buffer;
 			RendererImpl* renderer;
@@ -600,8 +610,8 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 
 		struct Cmd : RenderCommandBase {
 			const char* getName() const override { return "create_texture"; }
-			MemRef setup() override { return {0, 0}; }
-			void execute(const MemRef&) override { ffr::createTexture(handle, w, h, format, 0, memory.data); }
+			void setup() override {}
+			void execute() override { ffr::createTexture(handle, w, h, format, 0, memory.data); }
 
 			ffr::TextureHandle handle;
 			MemRef memory;
@@ -626,8 +636,8 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	{
 		struct Cmd : RenderCommandBase {
 			const char* getName() const override { return "destroy_texture"; }
-			MemRef setup() override { return {0, 0}; }
-			void execute(const MemRef&) override { ffr::destroy(texture); }
+			void setup() override {}
+			void execute() override { ffr::destroy(texture); }
 
 			ffr::TextureHandle texture;
 			RendererImpl* renderer;
@@ -666,17 +676,16 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 			RenderCommandBase* cmd = job_data->cmd;
 			RendererImpl* renderer = job_data->renderer;
 
-			const MemRef mem = cmd->setup();
+			cmd->setup();
 
 			if (job_data->prev) {
 				JobSystem::wait(&job_data->prev->counter);
 				LUMIX_DELETE(renderer->m_allocator, job_data->prev);
 			}
 
-			RenderTask::PreparedCommand* prepared = renderer->m_render_task.m_commands.alloc(true);
-			prepared->cmd = cmd;
-			prepared->data = mem;
-			renderer->m_render_task.m_commands.push(prepared, true);
+			Renderer::RenderCommandBase** rt_cmd = renderer->m_render_task.m_commands.alloc(true);
+			*rt_cmd = cmd;
+			renderer->m_render_task.m_commands.push(rt_cmd, true);
 		};
 
 		JobSystem::runJobs(&job, 1, &data->counter);
@@ -693,6 +702,13 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	void setGlobalState(const GlobalState& state) override
 	{
 		m_global_state = state;
+		pushSetGlobalStateCommand();
+	}
+
+
+	GlobalState getGlobalState() const override
+	{
+		return m_global_state;
 	}
 
 
@@ -775,22 +791,17 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	{
 		struct Cmd : RenderCommandBase {
 			const char* getName() const override { return "push_global_state"; }
-			MemRef setup() override
-			{ 
-				const MemRef mem = renderer->allocate(sizeof(GlobalState));
-				copyMemory(mem.data, &state, sizeof(state));
-				return mem;
-			}
-			void execute(const MemRef& user_ptr) override { 
-				ffr::update(renderer->m_render_task.m_global_state_uniforms, user_ptr.data, 0, user_ptr.size);
+			void setup() override {}
+			void execute() override { 
+				ffr::update(renderer->m_render_task.m_global_state_uniforms, &state, 0, sizeof(state));
 			}
 			GlobalState state;
 			RendererImpl* renderer;
 		};
-		static Cmd cmd; // TODO not static
-		cmd.state = m_global_state;
-		cmd.renderer = this;
-		push(&cmd);
+		Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
+		cmd->state = m_global_state;
+		cmd->renderer = this;
+		push(cmd);
 	}
 
 
@@ -798,8 +809,8 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	{
 		struct SwapCmd : RenderCommandBase {
 			const char* getName() const override { return "swap_buffers"; }
-			MemRef setup() override { return {0, 0}; }
-			void execute(const MemRef& user_ptr) override { 
+			void setup() override {}
+			void execute() override { 
 				PROFILE_FUNCTION();
 				renderer->m_frame_semaphore.signal();
 				ffr::swapBuffers(); 
@@ -807,9 +818,9 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 			}
 			RendererImpl* renderer;
 		};
-		static SwapCmd swap_cmd; // TODO not static
-		swap_cmd.renderer = this;
-		push(&swap_cmd);
+		SwapCmd* swap_cmd = LUMIX_NEW(m_allocator, SwapCmd);
+		swap_cmd->renderer = this;
+		push(swap_cmd);
 	}
 
 
@@ -826,7 +837,6 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 			LUMIX_DELETE(m_allocator, m_last_job);
 			m_last_job = nullptr;
 		}
-		pushSetGlobalStateCommand();
 	}
 
 
@@ -864,19 +874,14 @@ int RenderTask::task()
 
 	for(;;) {
 		Profiler::beginBlock("get command");
-		PreparedCommand* prepared = m_commands.pop(true);
-		Renderer::RenderCommandBase* cmd = prepared->cmd;
-		const Renderer::MemRef data = prepared->data;
-		m_commands.dealoc(prepared);
+		Renderer::RenderCommandBase** rt_cmd = m_commands.pop(true);
+		Renderer::RenderCommandBase* cmd = *rt_cmd;
+		m_commands.dealoc(rt_cmd);
 		Profiler::endBlock();
 
 		PROFILE_BLOCK("executeCommand");
-		m_profiler.beginQuery(cmd->getName());
-		cmd->execute(data);
-		m_profiler.endQuery();
-		if(data.own) {
-			m_renderer.free(data);
-		}
+		cmd->execute();
+		LUMIX_DELETE(m_renderer.getAllocator(), cmd);
 	}
 	return 0;
 }

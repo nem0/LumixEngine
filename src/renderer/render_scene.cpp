@@ -3474,7 +3474,8 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	{
 		PROFILE_FUNCTION();
 
-		auto& results = m_culling_system->cull(frustum, ~0ULL);
+		CullingSystem::Results results(m_allocator);
+		m_culling_system->cull(frustum, ~0ULL, results);
 
 		for (auto& subresults : results)
 		{
@@ -3502,43 +3503,40 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	Array<Array<MeshInstance>>& getModelInstanceInfos(const Frustum& frustum,
+	void getModelInstanceInfos(const Frustum& frustum,
 		const Vec3& lod_ref_point,
 		float lod_multiplier,
-		u64 layer_mask) override
+		u64 layer_mask,
+		Array<Array<MeshInstance>>& result) override
 	{
-		for (auto& i : m_temporary_infos) i.clear();
-		const CullingSystem::Results& results = m_culling_system->cull(frustum, layer_mask);
+		CullingSystem::Results cull_results(m_allocator);
+		m_culling_system->cull(frustum, layer_mask, cull_results);
+		if (cull_results.empty()) return;
 
-		while (m_temporary_infos.size() < results.size())
-		{
-			m_temporary_infos.emplace(m_allocator);
-		}
-		while (m_temporary_infos.size() > results.size())
-		{
-			m_temporary_infos.pop();
+		while (result.size() < cull_results.size()) {
+			result.emplace(m_allocator);
 		}
 
 		JobSystem::JobDecl jobs[64];
 		JobSystem::LambdaJob job_storage[64];
-		ASSERT(results.size() <= lengthOf(jobs));
+		ASSERT(cull_results.size() <= lengthOf(jobs));
 
 		volatile int counter = 0;
-		for (int subresult_index = 0; subresult_index < results.size(); ++subresult_index)
+		for (int subresult_index = 0; subresult_index < cull_results.size(); ++subresult_index)
 		{
-			Array<MeshInstance>& subinfos = m_temporary_infos[subresult_index];
+			Array<MeshInstance>& subinfos = result[subresult_index];
 			subinfos.clear();
 
-			JobSystem::fromLambda([&layer_mask, &subinfos, this, &results, subresult_index, lod_ref_point, lod_multiplier]() {
+			JobSystem::fromLambda([&layer_mask, &subinfos, this, &cull_results, subresult_index, lod_ref_point, lod_multiplier]() {
 				PROFILE_BLOCK("Temporary Info Job");
-				PROFILE_INT("ModelInstance count", results[subresult_index].size());
-				if (results[subresult_index].empty()) return;
+				PROFILE_INT("ModelInstance count", cull_results[subresult_index].size());
+				if (cull_results[subresult_index].empty()) return;
 
 				Vec3 ref_point = lod_ref_point;
 				float final_lod_multiplier = m_lod_multiplier * lod_multiplier;
-				const Entity* LUMIX_RESTRICT raw_subresults = &results[subresult_index][0];
+				const Entity* LUMIX_RESTRICT raw_subresults = &cull_results[subresult_index][0];
 				ModelInstance* LUMIX_RESTRICT model_instances = &m_model_instances[0];
-				for (int i = 0, c = results[subresult_index].size(); i < c; ++i)
+				for (int i = 0, c = cull_results[subresult_index].size(); i < c; ++i)
 				{
 					const ModelInstance* LUMIX_RESTRICT model_instance = &model_instances[raw_subresults[i].index];
 					float squared_distance = (model_instance->matrix.getTranslation() - ref_point).squaredLength();
@@ -3571,12 +3569,8 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 				}
 			}, &job_storage[subresult_index], &jobs[subresult_index], nullptr);
 		}
-		JobSystem::runJobs(jobs, results.size(), &counter);
+		JobSystem::runJobs(jobs, cull_results.size(), &counter);
 		JobSystem::wait(&counter);
-
-		
-
-		return m_temporary_infos;
 	}
 
 
@@ -4820,9 +4814,10 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 
 	void detectLightInfluencedGeometry(Entity entity)
 	{
-		int light_idx = m_point_lights_map[entity];
-		Frustum frustum = getPointLightFrustum(light_idx);
-		const CullingSystem::Results& results = m_culling_system->cull(frustum, ~0ULL);
+		const int light_idx = m_point_lights_map[entity];
+		const Frustum frustum = getPointLightFrustum(light_idx);
+		CullingSystem::Results results(m_allocator);
+		m_culling_system->cull(frustum, ~0ULL, results);
 		auto& influenced_geometry = m_light_influenced_geometry[light_idx];
 		influenced_geometry.clear();
 		for (int i = 0; i < results.size(); ++i)
@@ -5170,8 +5165,6 @@ private:
 	Array<DebugLine> m_debug_lines;
 	Array<DebugPoint> m_debug_points;
 
-	Array<Array<MeshInstance>> m_temporary_infos;
-
 	float m_time;
 	float m_lod_multiplier;
 	bool m_is_updating_attachments;
@@ -5244,7 +5237,6 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	, m_debug_triangles(m_allocator)
 	, m_debug_lines(m_allocator)
 	, m_debug_points(m_allocator)
-	, m_temporary_infos(m_allocator)
 	, m_active_global_light_entity(INVALID_ENTITY)
 	, m_is_grass_enabled(true)
 	, m_is_game_running(false)

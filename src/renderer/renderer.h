@@ -3,6 +3,7 @@
 #include "engine/lumix.h"
 #include "engine/iplugin.h"
 #include "engine/matrix.h"
+#include "engine/string.h"
 #include "ffr/ffr.h"
 
 
@@ -22,6 +23,7 @@ class Pipeline;
 class Shader;
 class ShaderManager;
 class TextureManager;
+template <typename T> class Array;
 
 
 class LUMIX_RENDERER_API Renderer : public IPlugin 
@@ -36,9 +38,8 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 
 		struct RenderCommandBase
 		{
-			virtual ~RenderCommandBase() {}
-			virtual MemRef setup() = 0;
-			virtual void execute(const MemRef& user_ptr) = 0;
+			virtual void setup() = 0;
+			virtual void execute() = 0;
 			virtual const char* getName() const = 0;
 		};
 
@@ -56,6 +57,14 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 			float light_intensity;
 			float light_indirect_intensity;
 			Int2 framebuffer_size;
+		};
+
+		struct GPUProfilerQuery
+		{
+			StaticString<32> name;
+			ffr::QueryHandle handle;
+			u64 result;
+			bool is_end;
 		};
 
 		enum { MAX_SHADER_DEFINES = 32 };
@@ -78,6 +87,7 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 		virtual const char* getLayerName(int idx) const = 0;
 		virtual void setMainPipeline(Pipeline* pipeline) = 0;
 		virtual Pipeline* getMainPipeline() = 0;
+		virtual GlobalState getGlobalState() const = 0;
 		virtual void setGlobalState(const GlobalState& state) = 0;
 		
 		virtual IAllocator& getAllocator() = 0;
@@ -94,6 +104,10 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 		
 		virtual void push(RenderCommandBase* cmd) = 0;
 		virtual ffr::FramebufferHandle getFramebuffer() const = 0;
+
+		virtual bool getGPUTimings(Array<GPUProfilerQuery>* results) = 0;
+		virtual void beginProfileBlock(const char* name) = 0;
+		virtual void endProfileBlock() = 0;
 
 		virtual Engine& getEngine() = 0;
 }; 

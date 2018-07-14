@@ -2452,8 +2452,9 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 		bool is_ortho) override
 	{
 		const float lod_multiplier = m_render_scene->getCameraLODMultiplier(fov, is_ortho);
-		Array<Array<MeshInstance>>& res = m_render_scene->getModelInstanceInfos(frustum, lod_ref_point, lod_multiplier, ~0ULL);
-		for (auto& sub : res)
+		Array<Array<MeshInstance>> meshes(m_render_scene->getAllocator());
+		m_render_scene->getModelInstanceInfos(frustum, lod_ref_point, lod_multiplier, ~0ULL, meshes);
+		for (auto& sub : meshes)
 		{
 			for (MeshInstance m : sub)
 			{
@@ -2478,7 +2479,74 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 
 struct RenderStatsPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 {
+	struct ProfileTree
+	{
+		ProfileTree(IAllocator& allocator) : m_nodes(allocator) {}
+
+		struct Node
+		{
+			StaticString<32> name;
+			float times[128];
+			u64 query_time;
+			int parent = -1;
+			int child = -1;
+			int sibling = -1;
+		};
+
+		int getChild(int parent, const char* name)
+		{
+			int tmp = 0;
+			int* child = parent < 0 ? &tmp : &m_nodes[parent].child;
+			if(!m_nodes.empty()) {
+				while(*child >= 0) {
+					Node& n = m_nodes[*child];
+					if(equalStrings(n.name, name)) return *child;
+					child = &n.sibling;
+				}
+			}
+
+			Node& n = m_nodes.emplace();
+			n.name = name;
+			n.parent = parent;
+			*child = m_nodes.size() - 1;
+			return *child;
+		}
+
+		void add(const Array<Renderer::GPUProfilerQuery>& queries)
+		{
+			if (queries.empty()) return;
+
+			for (Node& n : m_nodes) {
+				n.times[m_frame % lengthOf(n.times)] = 0;
+			}
+
+			int current = -1;
+			const int start = queries[0].is_end ? 1 : 0;
+			for(int i = start, c = queries.size() - 1; i < c; ++i) {
+				const Renderer::GPUProfilerQuery& q = queries[i];
+				if(q.is_end) {
+					Node& n = m_nodes[current];
+					const float t = float((q.result - n.query_time) / double(1'000'000));
+					n.times[m_frame % lengthOf(n.times)] += t;
+					current = m_nodes[current].parent;
+					continue;
+				}
+				
+				const int idx = getChild(current, q.name);
+				Node& n = m_nodes[idx];
+				n.query_time = q.result;
+				current = idx;
+			}
+			++m_frame;
+		}
+
+		Array<Node> m_nodes;
+		uint m_frame = 0;
+	};
+
 	explicit RenderStatsPlugin(StudioApp& app)
+		: m_app(app)
+		, m_profile_tree(app.getWorldEditor().getAllocator())
 	{
 		Action* action = LUMIX_NEW(app.getWorldEditor().getAllocator(), Action)(
 			"Render Stats", "Toggle render stats", "render_stats");
@@ -2491,14 +2559,42 @@ struct RenderStatsPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 	const char* getName() const override { return "render_stats"; }
 
 
+	void timingsUI(int idx)
+	{
+		if (idx == -1) return;
+		const ProfileTree::Node& n = m_profile_tree.m_nodes[idx];
+		ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_AllowItemOverlap | ImGuiTreeNodeFlags_OpenOnArrow;
+		if (n.child < 0) flags |= ImGuiTreeNodeFlags_Leaf;
+		const bool open = ImGui::TreeNodeEx(n.name, flags);
+		ImGui::NextColumn();
+		ImGui::Text("%.2f ms", n.times[(m_profile_tree.m_frame - 1) % lengthOf(n.times)]);
+		ImGui::NextColumn();
+		if (open) {
+			timingsUI(n.child);
+			ImGui::TreePop();
+		}
+		timingsUI(n.sibling);
+	}
+
+
 	void onWindowGUI() override
 	{
-			// TODO
-			/*
 		double total_cpu = 0;
 		double total_gpu = 0;
 		if (ImGui::BeginDock("Renderer Stats", &m_is_open))
 		{
+			Renderer& renderer = *(Renderer*)m_app.getWorldEditor().getEngine().getPluginManager().getPlugin("renderer");
+			Array<Renderer::GPUProfilerQuery> timings(renderer.getAllocator());
+			renderer.getGPUTimings(&timings);
+			m_profile_tree.add(timings);
+
+			ImGui::Columns(2);
+			if (!timings.empty()) {
+				timingsUI(0);
+			}
+			ImGui::Columns();
+			// TODO
+			/*
 			ImGui::Columns(3);
 			ImGui::Text("%s", "View name");
 			ImGui::NextColumn();
@@ -2529,9 +2625,9 @@ struct RenderStatsPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 			ImGui::NextColumn();
 			ImGui::Text("%f", total_cpu);
 			ImGui::NextColumn();
-			ImGui::Columns();
+			ImGui::Columns();*/
 		}
-		ImGui::EndDock();*/
+		ImGui::EndDock();
 	}
 
 
@@ -2539,6 +2635,8 @@ struct RenderStatsPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 	void onAction() { m_is_open = !m_is_open; }
 
 
+	StudioApp& m_app;
+	ProfileTree m_profile_tree;
 	bool m_is_open = false;
 };
 
@@ -2558,42 +2656,26 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 		};
 
 
-		struct Data
-		{
-			Data(IAllocator& allocator)
-				: command_lists(allocator)
-			{}
-
-			const ffr::TextureHandle* default_texture;
-			uint w, h;
-			Array<CmdList> command_lists;
-		};
-
-
 		RenderCommand(IAllocator& allocator)
 			: allocator(allocator)
-			, index_buffer(ffr::INVALID_BUFFER)
-			, vertex_buffer(ffr::INVALID_BUFFER)
-			, program(ffr::INVALID_PROGRAM)
+			, command_lists(allocator)
 		{
 		}
 
 
 		const char* getName() const override { return "render_editor_ui"; }
 
-		Renderer::MemRef setup() override
+		void setup() override
 		{
 			PluginManager& plugin_manager = plugin->m_engine.getPluginManager();
 			Renderer& renderer = *(Renderer*)plugin_manager.getPlugin("renderer");
 
 			const ImDrawData* draw_data = ImGui::GetDrawData();
-			const Renderer::MemRef mem = renderer.allocate(sizeof(Data));
-			Data* out_data = new (Lumix::NewPlaceholder(), mem.data) Data(allocator);
 
-			out_data->command_lists.reserve(draw_data->CmdListsCount);
+			command_lists.reserve(draw_data->CmdListsCount);
 			for (int i = 0; i < draw_data->CmdListsCount; ++i) {
 				ImDrawList* cmd_list = draw_data->CmdLists[i];
-				CmdList& out_cmd_list = out_data->command_lists.emplace(allocator);
+				CmdList& out_cmd_list = command_lists.emplace(allocator);
 
 				out_cmd_list.idx_buffer = renderer.copy(&cmd_list->IdxBuffer[0], cmd_list->IdxBuffer.size() * sizeof(cmd_list->IdxBuffer[0]));
 				out_cmd_list.vtx_buffer = renderer.copy(&cmd_list->VtxBuffer[0], cmd_list->VtxBuffer.size() * sizeof(cmd_list->VtxBuffer[0]));
@@ -2603,15 +2685,13 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 					out_cmd_list.commands[i] = cmd_list->CmdBuffer[i];
 				}
 			}
-			out_data->w = plugin->m_width;
-			out_data->h = plugin->m_height;
-			out_data->default_texture = &plugin->m_texture;
-
-			return mem;
+			width = plugin->m_width;
+			height = plugin->m_height;
+			default_texture = &plugin->m_texture;
 		}
 
 
-		void draw(const CmdList& cmd_list, Data* data)
+		void draw(const CmdList& cmd_list)
 		{
 			const uint num_indices = cmd_list.idx_buffer.size / sizeof(u16);
 			const uint num_vertices = cmd_list.vtx_buffer.size / sizeof(ImDrawVert);
@@ -2623,11 +2703,11 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 			Renderer* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
 
 
-			ffr::update(index_buffer
+			ffr::update(plugin->m_index_buffer
 				, cmd_list.idx_buffer.data
 				, ib_offset * sizeof(u16)
 				, num_indices * sizeof(u16));
-			ffr::update(vertex_buffer
+			ffr::update(plugin->m_vertex_buffer
 				, cmd_list.vtx_buffer.data
 				, vb_offset * sizeof(ImDrawVert)
 				, num_vertices * sizeof(ImDrawVert));
@@ -2658,18 +2738,18 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 				ffr::DrawCall dc;
 				dc.attribute_map = nullptr;
 				dc.state = (u64)ffr::StateFlags::SCISSOR_TEST;
-				dc.index_buffer = index_buffer;
+				dc.index_buffer = plugin->m_index_buffer;
 				dc.primitive_type = ffr::PrimitiveType::TRIANGLES;
-				dc.shader = program;
+				dc.shader = plugin->m_program;
 				dc.indices_offset = first_index;
 				dc.indices_count = pcmd->ElemCount;
 
-				const ffr::TextureHandle* tex = pcmd->TextureId ? (ffr::TextureHandle*)pcmd->TextureId : data->default_texture;
-				if (!tex->isValid()) tex = data->default_texture;
+				const ffr::TextureHandle* tex = pcmd->TextureId ? (ffr::TextureHandle*)pcmd->TextureId : default_texture;
+				if (!tex->isValid()) tex = default_texture;
 				dc.textures = tex;
 				dc.textures_count = 1;
 				dc.vertex_decl = &decl;
-				dc.vertex_buffer = vertex_buffer;
+				dc.vertex_buffer = plugin->m_vertex_buffer;
 				dc.vertex_buffer_offset = vb_offset * sizeof(ImDrawVert);
 
 				ffr::scissor(uint(Math::maximum(pcmd->ClipRect.x, 0.0f)),
@@ -2687,19 +2767,17 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 		}
 
 
-		void execute(const Renderer::MemRef& user_data) override
+		void execute() override
 		{
 			PROFILE_FUNCTION();
-			Data* data = (Data*)user_data.data;
-
-			if(!index_buffer.isValid()) {
-				index_buffer = ffr::allocBufferHandle();
-				ffr::createBuffer(index_buffer, 1024*1024, nullptr);
-				vertex_buffer = ffr::allocBufferHandle();
-				ffr::createBuffer(vertex_buffer, 1024*1024, nullptr);
+			if(!plugin->m_index_buffer.isValid()) {
+				plugin->m_index_buffer = ffr::allocBufferHandle();
+				ffr::createBuffer(plugin->m_index_buffer, 1024*1024, nullptr);
+				plugin->m_vertex_buffer = ffr::allocBufferHandle();
+				ffr::createBuffer(plugin->m_vertex_buffer, 1024*1024, nullptr);
 			}
 
-			if(!program.isValid()) {
+			if(!plugin->m_program.isValid()) {
 				const char* vs =
 					"#version 330\n"
 					"layout(location = 0) in vec2 a_pos;\n"
@@ -2727,7 +2805,7 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 					"}\n";
 				const char* srcs[] = {vs, fs};
 				ffr::ShaderType types[] = {ffr::ShaderType::VERTEX, ffr::ShaderType::FRAGMENT};
-				program = ffr::createProgram(srcs, types, 2, nullptr, 0, "imgui shader");
+				plugin->m_program = ffr::createProgram(srcs, types, 2, nullptr, 0, "imgui shader");
 			}
 
 			ffr::setFramebuffer(ffr::INVALID_FRAMEBUFFER, false);
@@ -2735,29 +2813,28 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 			const float clear_color[] = {0.2f, 0.2f, 0.2f, 1.f};
 			ffr::clear((uint)ffr::ClearFlags::COLOR | (uint)ffr::ClearFlags::DEPTH, clear_color, 1.0);
 
-			ffr::viewport(0, 0, data->w, data->h);
-			const float canvas_size[] = {(float)data->w, (float)data->h};
-			ffr::setUniform2f(program, "u_canvas_size", 1, canvas_size);
+			ffr::viewport(0, 0, width, height);
+			const float canvas_size[] = {(float)width, (float)height};
+			ffr::setUniform2f(plugin->m_program, "u_canvas_size", 1, canvas_size);
 
 			ffr::pushDebugGroup("imgui");
-			ffr::setUniform1i(program, "u_texture", 0);
+			ffr::setUniform1i(plugin->m_program, "u_texture", 0);
 
 			vb_offset = 0;
 			ib_offset = 0;
-			for(const CmdList& cmd_list : data->command_lists) {
-				draw(cmd_list, data);
+			for(const CmdList& cmd_list : command_lists) {
+				draw(cmd_list);
 			}
 
 			ffr::popDebugGroup();
-			data->~Data();
 		}
-
+		
+		const ffr::TextureHandle* default_texture;
+		uint width, height;
+		Array<CmdList> command_lists;
 		uint ib_offset;
 		uint vb_offset;
-		ffr::BufferHandle index_buffer;
-		ffr::BufferHandle vertex_buffer;
 		IAllocator& allocator;
-		ffr::ProgramHandle program;
 		EditorUIRenderPlugin* plugin;
 	};
 
@@ -2769,14 +2846,14 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 		, m_width(-1)
 		, m_height(-1)
 		, m_engine(app.getWorldEditor().getEngine())
+		, m_index_buffer(ffr::INVALID_BUFFER)
+		, m_vertex_buffer(ffr::INVALID_BUFFER)
+		, m_program(ffr::INVALID_PROGRAM)
 	{
 		WorldEditor& editor = app.getWorldEditor();
 
 		PluginManager& plugin_manager = m_engine.getPluginManager();
 		Renderer* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
-
-		m_render_command = LUMIX_NEW(renderer->getAllocator(), RenderCommand)(renderer->getAllocator());
-		m_render_command->plugin = this;
 
 		int w, h;
 		SDL_GetWindowSize(m_app.getWindow(), &w, &h);
@@ -2803,7 +2880,6 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 	{
 		PluginManager& plugin_manager = m_engine.getPluginManager();
 		Renderer* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
-		LUMIX_DELETE(renderer->getAllocator(), m_render_command);
 		WorldEditor& editor = m_app.getWorldEditor();
 		shutdownImGui();
 	}
@@ -2828,8 +2904,7 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 
 		int w, h;
 		SDL_GetWindowSize(m_app.getWindow(), &w, &h);
-		if (w != m_width || h != m_height)
-		{
+		if (w != m_width || h != m_height) {
 			m_width = w;
 			m_height = h;
 			auto& plugin_manager = m_app.getWorldEditor().getEngine().getPluginManager();
@@ -2838,7 +2913,10 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 		}
 
 		Renderer* renderer = static_cast<Renderer*>(m_engine.getPluginManager().getPlugin("renderer"));
-		renderer->push(m_render_command);
+		RenderCommand* cmd = LUMIX_NEW(renderer->getAllocator(), RenderCommand)(renderer->getAllocator());
+		cmd->plugin = this;
+		
+		renderer->push(cmd);
 		renderer->frame(false);
 		//SDL_GL_SwapWindow(m_app.getWindow());
 	}
@@ -2851,7 +2929,9 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 	SceneView& m_scene_view;
 	GameView& m_game_view;
 	ffr::TextureHandle m_texture;
-	RenderCommand* m_render_command;
+	ffr::BufferHandle m_index_buffer;
+	ffr::BufferHandle m_vertex_buffer;
+	ffr::ProgramHandle m_program;
 };
 
 

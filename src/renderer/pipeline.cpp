@@ -49,8 +49,6 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		, m_output(-1)
 		, m_renderbuffers(allocator)
 		, m_shaders(allocator)
-		, m_global_textures(allocator)
-		, m_commands(allocator)
 	{
 		m_viewport.w = m_viewport.h = 800;
 		ShaderManager& shader_manager = renderer.getShaderManager();
@@ -243,38 +241,22 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		m_viewport.w = m_viewport.h = 800;
 		if (m_scene) callInitScene();
 		
-		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
-		lua_getfield(m_lua_state, -1, "main");
-		if (lua_type(m_lua_state, -1) == LUA_TFUNCTION) {
-			lua_pushlightuserdata(m_lua_state, this);
-			if (lua_pcall(m_lua_state, 1, 0, 0) != 0) {
-				g_log_warning.log("Renderer") << lua_tostring(m_lua_state, -1);
-				lua_pop(m_lua_state, 1);
-				return;
-			}
-		}
-		else {
-			lua_pop(m_lua_state, 1);
-		}
-
 		m_is_ready = true;
 	}
 
 
 	void clearBuffers()
 	{
-		m_global_textures.clear();
-		/*
 		for (Renderbuffer& rb : m_renderbuffers) {
 			++rb.frame_counter;
 		}
 
 		for(int i = m_renderbuffers.size() - 1; i >= 0; --i) {
 			if(m_renderbuffers[i].frame_counter > 1) {
-				ffr::destroy(m_renderbuffers[i].handle);
+				m_renderer.destroy(m_renderbuffers[i].handle);
 				m_renderbuffers.eraseFast(i);
 			}
-		}*/
+		}
 	}
 
 
@@ -331,8 +313,18 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		}
 
 		m_renderer.setGlobalState(state);
-		for(auto* cmd : m_commands) {
-			m_renderer.push(cmd);
+		
+		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
+		lua_getfield(m_lua_state, -1, "main");
+		if (lua_type(m_lua_state, -1) == LUA_TFUNCTION) {
+			lua_pushlightuserdata(m_lua_state, this);
+			if (lua_pcall(m_lua_state, 1, 0, 0) != 0) {
+				g_log_warning.log("Renderer") << lua_tostring(m_lua_state, -1);
+				lua_pop(m_lua_state, 1);
+			}
+		}
+		else {
+			lua_pop(m_lua_state, 1);
 		}
 
 /*		
@@ -567,10 +559,144 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 	}
 
 
+	static int renderMeshes(lua_State* L)
+	{
+		PROFILE_FUNCTION();
+		const int pipeline_idx = lua_upvalueindex(1);
+		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
+			LuaWrapper::argError<PipelineImpl*>(L, 1);
+		}
+		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
+
+		const u64 layer_mask = LuaWrapper::checkArg<u64>(L, 1);
+		const char* define = LuaWrapper::checkArg<const char*>(L, 2);
+		LuaWrapper::checkTableArg(L, 3);
+
+		CameraParams cp;
+
+		lua_getfield(L, 3, "frustum");
+		if (!lua_istable(L, -1)) {
+			lua_pop(L, 1);
+			luaL_error(L, "Frustum is not a table");
+		}
+		float* points = cp.frustum.xs;
+		for (int i = 0; i < 32 + 24; ++i) {
+			lua_rawgeti(L, -1, i + 1);
+			if(!LuaWrapper::isType<float>(L, -1)) {
+				lua_pop(L, 2);
+				luaL_error(L, "Frustum must contain exactly 24 floats");
+			}
+			points[i] = LuaWrapper::toType<float>(L, -1);
+			lua_pop(L, 1);
+		}
+		cp.frustum.setPlanesFromPoints();
+		
+		if(!LuaWrapper::checkField(L, 3, "lod_multiplier", &cp.lod_multiplier)) {
+			luaL_error(L, "Missing lod_multiplier in camera params");
+		}
+
+		if(!LuaWrapper::checkField(L, 3, "position", &cp.pos)) {
+			luaL_error(L, "Missing position in camera params");
+		}
+
+		RenderMeshesCommand* cmd = LUMIX_NEW(pipeline->m_renderer.getAllocator(), RenderMeshesCommand);
+
+		if (lua_gettop(L) > 4 && lua_istable(L, 4)) {
+			lua_pushnil(L);
+			while (lua_next(L, 4) != 0) {
+				if(lua_type(L, -1) != LUA_TNUMBER) {
+					g_log_error.log("Renderer") << "Incorrect global textures arguments of renderMeshes";
+					LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
+					lua_pop(L, 2);
+					return 0;
+				}
+
+				if(lua_type(L, -2) != LUA_TSTRING) {
+					g_log_error.log("Renderer") << "Incorrect global textures arguments of renderMeshes";
+					LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
+					lua_pop(L, 2);
+					return 0;
+				}
+			
+				if (cmd->global_textures_count > lengthOf(cmd->global_textures)) {
+					g_log_error.log("Renderer") << "Too many textures in renderMeshes call";
+					LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
+					lua_pop(L, 2);
+					return 0;
+				}
+
+				const char* uniform = lua_tostring(L, -2);
+				const int rb_idx = (int)lua_tointeger(L, -1);
+				auto& t = cmd->global_textures[cmd->global_textures_count]; 
+				t.handle = pipeline->m_renderbuffers[rb_idx].handle;
+				t.uniform = uniform;
+				++cmd->global_textures_count;
+
+				lua_pop(L, 1);
+			}
+		}
+
+		cmd->pipeline = pipeline;
+		cmd->layer_mask = layer_mask;
+		cmd->shader_define = define;
+		pipeline->m_renderer.push(cmd);
+		return 0;
+	}
+
 
 	static int drawArray(lua_State* L)
 	{
-		/*const int pipeline_idx = lua_upvalueindex(1);
+		PROFILE_FUNCTION();
+		struct Cmd : Renderer::RenderCommandBase {
+			const char* getName() const override { return "draw_array"; }
+			void setup() override {}
+			void execute() override 
+			{
+				ffr::ProgramHandle prg = m_shader->getProgram(0).handle;
+				ffr::DrawCall dc;
+				ffr::TextureHandle textures[16];
+				ASSERT(lengthOf(textures) == lengthOf(m_textures));
+				
+				for(int i = 0; i < m_textures_count; ++i) {
+					textures[i] = m_textures[i].handle;
+					ffr::setUniform1i(prg, m_textures[i].uniform, i);
+				}
+
+				for(int i = 0; i < m_uniforms_count; ++i) {
+					ffr::setUniform4f(prg, m_uniforms[i].name, 1, &m_uniforms[i].value.x);
+				}
+
+				dc.attribute_map = nullptr;
+				dc.index_buffer = ffr::INVALID_BUFFER;
+				dc.indices_count = m_indices_count;
+				dc.indices_offset = m_indices_offset;
+				dc.primitive_type = ffr::PrimitiveType::TRIANGLE_STRIP;
+				dc.shader = prg;
+				dc.state = 0;
+				dc.textures = textures;
+				dc.textures_count = m_textures_count;
+				dc.vertex_buffer = ffr::INVALID_BUFFER;
+				dc.vertex_decl = nullptr;
+
+				ffr::draw(dc);
+			}
+
+			struct { 
+				ffr::TextureHandle handle;
+				StaticString<32> uniform;
+			} m_textures[16];
+			int m_textures_count = 0;
+			struct {
+				Vec4 value;
+				StaticString<32> name;
+			} m_uniforms[16];
+			int m_uniforms_count = 0;
+			Shader* m_shader;
+			int m_indices_count;
+			int m_indices_offset;
+		};
+
+		const int pipeline_idx = lua_upvalueindex(1);
 		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
 			LuaWrapper::argError<PipelineImpl*>(L, 1);
 		}
@@ -598,60 +724,62 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		}
 		if (!shader->isReady()) return 0;
 
-
-		ffr::ProgramHandle prg = shader->getProgram(0).handle;
-		ffr::TextureHandle textures[16];
-		int textures_count = 0;
+		Cmd* cmd = LUMIX_NEW(pipeline->m_renderer.getAllocator(), Cmd);
 		lua_pushnil(L);
 		while (lua_next(L, 4) != 0) {
 			if(lua_type(L, -1) != LUA_TNUMBER) {
 				g_log_error.log("Renderer") << "Incorrect texture arguments of drawArrays";
+				LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
 				lua_pop(L, 2);
 				return 0;
 			}
 
 			if(lua_type(L, -2) != LUA_TSTRING) {
 				g_log_error.log("Renderer") << "Incorrect texture arguments of drawArrays";
+				LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
 				lua_pop(L, 2);
 				return 0;
 			}
 
-			if (textures_count > lengthOf(textures)) {
+			if (cmd->m_textures_count > lengthOf(cmd->m_textures)) {
 				g_log_error.log("Renderer") << "Too many texture in drawArray call";
+				LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
 				lua_pop(L, 2);
 				return 0;
 			}
 
-			const char* uniform = lua_tostring(L, -2);
+			cmd->m_textures[cmd->m_textures_count].uniform = lua_tostring(L, -2);
 			const int rb_idx = (int)lua_tointeger(L, -1);
-			ffr::setUniform1i(prg, uniform, textures_count);
-			textures[textures_count] = pipeline->m_renderbuffers[rb_idx].handle;
-			++textures_count;
+			cmd->m_textures[cmd->m_textures_count].handle = pipeline->m_renderbuffers[rb_idx].handle;
+			++cmd->m_textures_count;
 
 			lua_pop(L, 1);
 		}
-
+		
 		if (lua_istable(L, 5)) {
 			lua_pushnil(L);
 			while (lua_next(L, 5) != 0) {
 				if(lua_type(L, -1) != LUA_TTABLE) {
 					g_log_error.log("Renderer") << "Incorrect uniform arguments of drawArrays";
+					LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
 					lua_pop(L, 2);
 					return 0;
 				}
 
 				if(lua_type(L, -2) != LUA_TSTRING) {
 					g_log_error.log("Renderer") << "Incorrect uniform arguments of drawArrays";
+					LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
 					lua_pop(L, 2);
 					return 0;
 				}
 
-				const char* uniform = lua_tostring(L, -2);
-				float value[4];
+				cmd->m_uniforms[cmd->m_uniforms_count].name = lua_tostring(L, -2);
+				float* value = &cmd->m_uniforms[cmd->m_uniforms_count].value.x;
 				for(int i = 0; i < 4; ++i) {
 					lua_rawgeti(L, -1, 1 + i);
 					if (lua_type(L, -1) != LUA_TNUMBER) {
 						g_log_error.log("Renderer") << "Incorrect uniform arguments of drawArrays. Uniforms can only be Vec4.";
+						LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
 						lua_pop(L, 3);
 						return 0;
 					}
@@ -659,8 +787,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 					lua_pop(L, 1);
 				}
 
-				ffr::setUniform4f(prg, uniform, 1, value);
-
+				++cmd->m_uniforms_count;
 				lua_pop(L, 1);
 			}
 		}
@@ -671,35 +798,23 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		if (probe.isValid()) {
 			Texture* irradiance = pipeline->m_scene->getEnvironmentProbeIrradiance(probe);
 			Texture* radiance = pipeline->m_scene->getEnvironmentProbeRadiance(probe);
-			textures[textures_count + 0] = irradiance->handle;
-			textures[textures_count + 1] = radiance->handle;
+			cmd->m_textures[cmd->m_textures_count + 0].handle = irradiance->handle;
+			cmd->m_textures[cmd->m_textures_count + 1].handle = radiance->handle;
 		}
 		else {
-			textures[textures_count + 0] = pipeline->m_default_cubemap->handle;
-			textures[textures_count + 1] = pipeline->m_default_cubemap->handle;
+			cmd->m_textures[cmd->m_textures_count + 0].handle = pipeline->m_default_cubemap->handle;
+			cmd->m_textures[cmd->m_textures_count + 1].handle = pipeline->m_default_cubemap->handle;
 		}
-		ffr::setUniform1i(prg, "u_irradiancemap", textures_count + 0);
-		ffr::setUniform1i(prg, "u_radiancemap", textures_count + 1);
 
-		textures_count += 2;
+		cmd->m_textures[cmd->m_textures_count + 0].uniform = "u_irradiancemap";
+		cmd->m_textures[cmd->m_textures_count + 1].uniform = "u_radiancemap";
+		cmd->m_textures_count += 2;
 
-		ffr::DrawCall dc;
-		dc.attribute_map = nullptr;
-		dc.index_buffer = ffr::INVALID_BUFFER;
-		dc.indices_count = indices_count;
-		dc.indices_offset = indices_offset;
-		dc.primitive_type = ffr::PrimitiveType::TRIANGLE_STRIP;
-		dc.shader = prg;
-		dc.state = 0;
-		dc.textures = textures;
-		dc.textures_count = textures_count;
-		dc.tex_buffers_count = 0;
-		dc.vertex_buffer = ffr::INVALID_BUFFER;
-		dc.vertex_decl = nullptr;
+		cmd->m_shader = shader;
+		cmd->m_indices_count = indices_count;
+		cmd->m_indices_offset = indices_offset;
+		pipeline->m_renderer.push(cmd);
 
-		ffr::draw(dc);*/
-		// TODO
-		ASSERT(false);
 		return 0;
 	}
 	
@@ -800,7 +915,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 
 	static int getShadowCameraParams(lua_State* L)
 	{
-	/*	const int pipeline_idx = lua_upvalueindex(1);
+		const int pipeline_idx = lua_upvalueindex(1);
 		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
 			LuaWrapper::argError<PipelineImpl*>(L, 1);
 		}
@@ -837,8 +952,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		Vec3 shadow_cam_pos = frustum_bounding_sphere.position;
 		shadow_cam_pos = shadowmapTexelAlign(shadow_cam_pos, 0.5f * shadowmap_width - 2, bb_size, light_mtx);
 
-		GlobalStateUniforms& global_uniforms = pipeline->m_renderer.getGlobalStateUniforms();
-		GlobalStateUniforms::State& global_state = global_uniforms.state;
+		Renderer::GlobalState global_state = pipeline->m_renderer.getGlobalState();
 
 		Matrix projection_matrix;
 		projection_matrix.setOrtho(-bb_size, bb_size, -bb_size, bb_size, SHADOW_CAM_NEAR, SHADOW_CAM_FAR, ffr::isHomogenousDepth(), true);
@@ -856,7 +970,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		global_state.shadowmap_matrices[slice] = bias_matrix * projection_matrix * view_matrix;
 
 		global_state.shadow_view_projection = projection_matrix * view_matrix;
-		global_uniforms.update();
+		pipeline->m_renderer.setGlobalState(global_state);
 
 		CameraParams cp;
 		cp.lod_multiplier = 1;
@@ -872,70 +986,40 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		findExtraShadowcasterPlanes(light_forward, camera_frustum, pipeline->m_viewport.pos, &cp.frustum);
 
 		pushCameraParams(L, cp);
-		*/
-		// TODO
-		ASSERT(false);
 		return 1;
 	}
 
 
 	struct SetRenderTargetsCommand : Renderer::RenderCommandBase
 	{
-		struct Data
-		{
-			ffr::TextureHandle rbs[16];
-			uint count;
-			uint w;
-			uint h;
-			u32 clear_flags;
-		};
-
 		const char* getName() const override { return "set_render_targets"; }
 
-		Renderer::MemRef setup() override
-		{
-			const Renderer::MemRef mem = m_pipeline->m_renderer.allocate(sizeof(Data));
-			Data* data = (Data*)mem.data;
 
-			for(int i = 0; i < m_rbs_count; ++i) {
-				data->rbs[i] = m_pipeline->m_renderbuffers[m_rbs[i]].handle;
-			}
-			data->count = m_rbs_count;
-			data->w = m_pipeline->m_viewport.w;
-			data->h = m_pipeline->m_viewport.h;
-			data->clear_flags = m_clear_flags;
-
-			return mem;
-		}
+		void setup() override { }
 
 
-		void execute(const Renderer::MemRef& mem) override
+		void execute() override
 		{
 			PROFILE_FUNCTION();
-			const Data* data = (Data*)mem.data;
-
-			const ffr::FramebufferHandle fb = m_pipeline->m_renderer.getFramebuffer();
+			const ffr::FramebufferHandle fb = pipeline->m_renderer.getFramebuffer();
 			
-			ffr::TextureHandle rbs[16];
-			for(uint i = 0; i < data->count; ++i) {
-				rbs[i] = data->rbs[i];
-			}
-
-			ffr::update(fb, data->count, rbs);
+			ffr::update(fb, count, rbs);
 			ffr::setFramebuffer(fb, true);
-			ffr::viewport(0, 0, data->w, data->h);
+			ffr::viewport(0, 0, w, h);
 		
-			if(m_clear_flags) {
+			if(clear_flags) {
 				const float c[] = { 0, 0, 0, 1 };
-				ffr::clear(data->clear_flags, c, 0);
+				ffr::clear(clear_flags, c, 0);
 			}
 		}
 
 
-		PipelineImpl* m_pipeline;
-		int m_rbs[16];
-		int m_rbs_count;
-		u32 m_clear_flags;
+		PipelineImpl* pipeline;
+		ffr::TextureHandle rbs[16];
+		uint count;
+		uint w;
+		uint h;
+		u32 clear_flags;
 	};
 
 
@@ -958,19 +1042,18 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 			return 0;
 		}
 
-		const u32 clear_flags = LuaWrapper::checkArg<u32>(L, 1);
+		SetRenderTargetsCommand* cmd = LUMIX_NEW(pipeline->m_renderer.getAllocator(), SetRenderTargetsCommand);
+		cmd->clear_flags = LuaWrapper::checkArg<u32>(L, 1);
 		for(int i = 0; i < rb_count; ++i) {
-			rbs[i] = LuaWrapper::checkArg<int>(L, i + 2);
+			const int rb_idx = LuaWrapper::checkArg<int>(L, i + 2);
+			cmd->rbs[i] = pipeline->m_renderbuffers[rb_idx].handle;
 		}
 
-		SetRenderTargetsCommand* cmd = LUMIX_NEW(pipeline->m_renderer.getAllocator(), SetRenderTargetsCommand);
-		cmd->m_pipeline = pipeline;
-		cmd->m_clear_flags = clear_flags;
-		cmd->m_rbs_count = rb_count;
-		ASSERT(sizeof(cmd->m_rbs) == sizeof(rbs));
-		copyMemory(cmd->m_rbs, rbs, sizeof(cmd->m_rbs));
-
-		pipeline->m_commands.push(cmd);
+		cmd->pipeline = pipeline;
+		cmd->count = rb_count;
+		cmd->w = pipeline->m_viewport.w;
+		cmd->h = pipeline->m_viewport.h;
+		pipeline->m_renderer.push(cmd);
 
 		return 1;
 	}
@@ -1023,96 +1106,78 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 
 	struct RenderMeshesCommand : Renderer::RenderCommandBase
 	{
-		struct Data
-		{
-			ffr::TextureHandle irradiance_map;
-			ffr::TextureHandle radiance_map;
-			int count;
-			struct Mesh {
-				Matrix mtx;
-				Lumix::Mesh* mesh; // TODO
-			};
-			Mesh* meshes;
-		};
-
-
 		const char* getName() const override { return "render_meshes"; }
 
 
-		Renderer::MemRef setup() override
+		void setup() override
 		{
-			if(!m_pipeline->m_scene) return {};
+			if(!pipeline->m_scene) return;
 
-			Renderer& renderer = m_pipeline->m_renderer;
-			m_define_mask = m_shader_define.empty() 
+			Renderer& renderer = pipeline->m_renderer;
+			define_mask = shader_define.empty() 
 				? 0
-				: 1 << renderer.getShaderDefineIdx(m_shader_define);
-			const Universe& universe = m_pipeline->m_scene->getUniverse();
+				: 1 << renderer.getShaderDefineIdx(shader_define);
+			const Universe& universe = pipeline->m_scene->getUniverse();
 			
-			const Frustum frustum = m_pipeline->m_viewport.getFrustum();
-			const Vec3 pos = m_pipeline->m_viewport.pos;
+			const Frustum frustum = pipeline->m_viewport.getFrustum();
+			const Vec3 pos = pipeline->m_viewport.pos;
 			const float lod_multiplier = 1;
-			RenderScene* scene = m_pipeline->getScene();
-			auto& meshes = scene->getModelInstanceInfos(frustum, pos, lod_multiplier, m_layer_mask);
+			RenderScene* scene = pipeline->getScene();
+			Array<Array<MeshInstance>> meshes(renderer.getAllocator());
+			scene->getModelInstanceInfos(frustum, pos, lod_multiplier, layer_mask, meshes);
 			int count = 0;
 			for(const auto& submeshes : meshes) count += submeshes.size();
-			Renderer::MemRef mem = renderer.allocate(sizeof(Data) + sizeof(Data::Mesh) * count);
-			Data* out = (Data*)mem.data;
-			out->meshes = (Data::Mesh*)((u8*)out + sizeof(Data));
-			out->count = 0;
+			Renderer::MemRef mem = renderer.allocate(sizeof(Mesh) * count);
+			this->meshes = (Mesh*)mem.data;
+			meshes_count = 0;
 			for(const auto& submeshes : meshes) {
 				for(const auto& mesh : submeshes) {
-					auto& m = out->meshes[out->count];
+					auto& m = this->meshes[meshes_count];
 					m.mtx = universe.getMatrix(mesh.owner);
 					m.mesh = mesh.mesh;
-					++out->count;
+					++meshes_count;
 				}
 			}
 
-			const Entity probe = scene->getNearestEnvironmentProbe(m_pipeline->m_viewport.pos);
+			const Entity probe = scene->getNearestEnvironmentProbe(pipeline->m_viewport.pos);
 			if (probe.isValid()) {
-				const Texture* irradiance = m_pipeline->m_scene->getEnvironmentProbeIrradiance(probe);
-				const Texture* radiance = m_pipeline->m_scene->getEnvironmentProbeRadiance(probe);
-				out->irradiance_map = irradiance->handle;
-				out->radiance_map = radiance->handle;
+				const Texture* irradiance = pipeline->m_scene->getEnvironmentProbeIrradiance(probe);
+				const Texture* radiance = pipeline->m_scene->getEnvironmentProbeRadiance(probe);
+				irradiance_map = irradiance->handle;
+				radiance_map = radiance->handle;
 			}
 			else {
-				out->irradiance_map = m_pipeline->m_default_cubemap->handle;
-				out->radiance_map = m_pipeline->m_default_cubemap->handle;
+				irradiance_map = pipeline->m_default_cubemap->handle;
+				radiance_map = pipeline->m_default_cubemap->handle;
 			}
-			return mem;
 		}
 
 
-		void execute(const Renderer::MemRef& user_mem) override
+		void execute() override
 		{
 			PROFILE_FUNCTION();
 
-			if(user_mem.size == 0) return;
+			ffr::pushDebugGroup(shader_define.empty() ? "meshes" : shader_define);
 
-			Data* data = (Data*)user_mem.data;
-
-			ffr::pushDebugGroup(m_shader_define.empty() ? "meshes" : m_shader_define);
-
-			for(int i = 0, c = data->count; i < c; ++i) {
-				const auto& mesh = data->meshes[i];
+			for (int i = 0, c = meshes_count; i < c; ++i) {
+				const auto& mesh = meshes[i];
 				const Material* material = mesh.mesh->material;
 				if (!material->isReady()) continue;
 
-				const u32 final_define_mask = material->getDefineMask() | m_define_mask;
-				const Shader::Program prog = material->getShader()->getProgram(final_define_mask);
+				const u32 final_define_mask = material->getDefineMask() | define_mask;
+				const Shader::Program& prog = material->getShader()->getProgram(final_define_mask);
 
-				if(!prog.handle.isValid()) continue;
+				if (!prog.handle.isValid()) continue;
 
 				int textures_count = material->getTextureCount();
 				ffr::TextureHandle textures[16];
-				for(int i = 0; i < textures_count; ++i) {
+				for (int i = 0; i < textures_count; ++i) {
 					textures[i] = material->getTexture(i)->handle; 
 					ffr::setUniform1i(prog.handle, material->getTextureUniform(i), i);
 				}
 
-				textures[textures_count + 0] = data->irradiance_map;
-				textures[textures_count + 1] = data->radiance_map;
+				textures[textures_count + 0] = irradiance_map;
+				textures[textures_count + 1] = radiance_map;
 				ffr::setUniform1i(prog.handle, "u_irradiancemap", textures_count + 0);
 				ffr::setUniform1i(prog.handle, "u_radiancemap", textures_count + 1);
 				textures_count += 2;
@@ -1120,18 +1185,19 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 				const Matrix& mtx = mesh.mtx;
 				ffr::setUniformMatrix4f(prog.handle, "u_model", 1, &mtx.m11);
 				
-				for(const GlobalTexture& t : m_pipeline->m_global_textures) {
-					textures[textures_count] = t.texture;
+				for (int i = 0; i < global_textures_count; ++i) {
+					const auto& t = global_textures[i];
+					textures[textures_count] = t.handle;
 					ffr::setUniform1i(prog.handle, t.uniform, textures_count);
 					++textures_count;
 				}
 
-				for(int i = textures_count; i < lengthOf(textures); ++i) {
+				for (int i = textures_count; i < lengthOf(textures); ++i) {
 					textures[i] = ffr::INVALID_TEXTURE;
 				}
 
 				int attribute_map[16];
-				for(uint i = 0; i < mesh.mesh->vertex_decl.attributes_count; ++i) {
+				for (uint i = 0; i < mesh.mesh->vertex_decl.attributes_count; ++i) {
 					attribute_map[i] = prog.attribute_by_semantics[(int)mesh.mesh->attributes_semantic[i]];
 				}
 
@@ -1155,21 +1221,24 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		}
 
 
-		PipelineImpl* m_pipeline;
-		StaticString<32> m_shader_define;
-		u32 m_define_mask;
-		u64 m_layer_mask;
+		PipelineImpl* pipeline;
+		ffr::TextureHandle irradiance_map;
+		ffr::TextureHandle radiance_map;
+		struct Mesh {
+			Matrix mtx;
+			Lumix::Mesh* mesh; // TODO
+		};
+		Mesh* meshes;
+		int meshes_count;
+		StaticString<32> shader_define;
+		u32 define_mask;
+		u64 layer_mask;
+		struct {
+			ffr::TextureHandle handle;
+			StaticString<32> uniform;
+		} global_textures[16];
+		int global_textures_count = 0;
 	};
-
-
-	void renderMeshes(u64 layer_mask, const char* define)
-	{
-		RenderMeshesCommand* cmd = LUMIX_NEW(m_renderer.getAllocator(), RenderMeshesCommand);
-		cmd->m_pipeline = this;
-		cmd->m_layer_mask = layer_mask;
-		cmd->m_shader_define = define;
-		m_commands.push(cmd);
-	}
 
 
 	void blending(const char* mode)
@@ -1192,21 +1261,60 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 
 	void viewport(int x, int y, int w, int h)
 	{
-		ffr::viewport(x, y, w, h);
+		struct Cmd : Renderer::RenderCommandBase {
+			const char* getName() const override { return "viewport"; }
+			void setup() override {}
+			void execute() override { ffr::viewport(x, y, w, h); }
+			int x, y, w, h;
+		};
+
+		Cmd* cmd = LUMIX_NEW(m_renderer.getAllocator(), Cmd);
+		cmd->x = x;
+		cmd->y = y;
+		cmd->w = w;
+		cmd->h = h;
+
+		m_renderer.push(cmd);
 	}
 
 
-	void setGlobalTexture(const char* uniform, int rb_idx)
+	void beginBlock(const char* name)
 	{
-		/*if (rb_idx < 0 || rb_idx >= m_renderbuffers.size()) {
-			g_log_error.log("Renderer") << "Unknown renderbuffer";
-			return;
-		}
-		GlobalTexture& t = m_global_textures.emplace();
-		t.uniform = uniform;
-		t.texture = m_renderbuffers[rb_idx].handle;*/
-		// TODO 
-		ASSERT(false);
+		struct Cmd : Renderer::RenderCommandBase
+		{
+			const char* getName() const override { return "end_block"; }
+			void setup() override {}
+			void execute() override 
+			{
+				ffr::pushDebugGroup(name);
+				renderer->beginProfileBlock(name);
+			}
+			StaticString<32> name;
+			Renderer* renderer;
+		};
+		Cmd* cmd = LUMIX_NEW(m_renderer.getAllocator(), Cmd);
+		cmd->name = name;
+		cmd->renderer = &m_renderer;
+		m_renderer.push(cmd);
+	}
+
+
+	void endBlock()
+	{
+		struct Cmd : Renderer::RenderCommandBase
+		{
+			const char* getName() const override { return "end_block"; }
+			void setup() override {}
+			void execute() override
+			{
+				renderer->endProfileBlock();
+				ffr::popDebugGroup();
+			}
+			Renderer* renderer;
+		};
+		Cmd* cmd = LUMIX_NEW(m_renderer.getAllocator(), Cmd);
+		cmd->renderer = &m_renderer;
+		m_renderer.push(cmd);
 	}
 
 
@@ -1281,16 +1389,16 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 				registerCFunction(#name, f); \
 			} while(false) \
 
+		REGISTER_FUNCTION(beginBlock);
 		REGISTER_FUNCTION(blending);
 		REGISTER_FUNCTION(clear);
 		REGISTER_FUNCTION(createRenderbuffer);
+		REGISTER_FUNCTION(endBlock);
 		REGISTER_FUNCTION(executeCustomCommand);
 		REGISTER_FUNCTION(getLayerMask);
 		REGISTER_FUNCTION(preloadShader);
 		REGISTER_FUNCTION(render2D);
 		REGISTER_FUNCTION(renderDebugShapes);
-		REGISTER_FUNCTION(renderMeshes);
-		REGISTER_FUNCTION(setGlobalTexture);
 		REGISTER_FUNCTION(setOutput);
 		REGISTER_FUNCTION(viewport);
 
@@ -1300,6 +1408,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		registerCFunction("drawArray", PipelineImpl::drawArray);
 		registerCFunction("getCameraParams", PipelineImpl::getCameraParams);
 		registerCFunction("getShadowCameraParams", PipelineImpl::getShadowCameraParams);
+		registerCFunction("renderMeshes", PipelineImpl::renderMeshes);
 		registerCFunction("setRenderTargets", PipelineImpl::setRenderTargets);
 
 		lua_pop(L, 1); // pop env
@@ -1314,6 +1423,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 
 	Draw2D& getDraw2D() override { return m_draw2d; }
 	ffr::TextureHandle getOutput() override { 
+		if (m_output < 0) return ffr::INVALID_TEXTURE;
 		return m_renderbuffers[m_output].handle;
 	}
 
@@ -1330,12 +1440,6 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 	struct ShaderRef {
 		Lumix::Shader* res;
 		int id;
-	};
-
-	struct GlobalTexture
-	{
-		StaticString<32> uniform;
-		ffr::TextureHandle texture;
 	};
 
 	IAllocator& m_allocator;
@@ -1357,9 +1461,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 	Texture* m_default_cubemap;
 	Array<CustomCommandHandler> m_custom_commands_handlers;
 	Array<Renderbuffer> m_renderbuffers;
-	Array<GlobalTexture> m_global_textures;
 	Array<ShaderRef> m_shaders;
-	Array<Renderer::RenderCommandBase*> m_commands; 
 };
 
 
