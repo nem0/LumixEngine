@@ -423,7 +423,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 
 	void render2D()
 	{
-		/*auto resetDraw2D =  [this](){
+		auto resetDraw2D =  [this](){
 			m_draw2d.Clear();
 			m_draw2d.PushClipRectFullScreen();
 			FontAtlas& atlas = m_renderer.getFontManager().getFontAtlas();
@@ -431,79 +431,115 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 			m_draw2d.PushTextureID(atlas.TexID);
 		};
 
-		Vec2 size((float)m_viewport.w, (float)m_viewport.h);
-		Matrix ortho;
-
 		if (!m_draw2d_shader->isReady()) {
 			resetDraw2D();
 			return;
 		}
 
-		const int num_indices = m_draw2d.IdxBuffer.size();
-		const int num_vertices = m_draw2d.VtxBuffer.size();
-		
-		if (num_indices == 0) {
+		if (m_draw2d.IdxBuffer.size() == 0) {
 			resetDraw2D();
 			return;
 		}
 
-		ffr::VertexDecl vertex_decl;
-		vertex_decl.addAttribute(2, ffr::AttributeType::FLOAT, false, false);
-		vertex_decl.addAttribute(2, ffr::AttributeType::FLOAT, false, false);
-		vertex_decl.addAttribute(4, ffr::AttributeType::U8, true, false);
+		struct Cmd : Renderer::RenderCommandBase
+		{
+			Renderer::MemRef idx_buffer_mem;
+			Renderer::MemRef vtx_buffer_mem;
+			int num_indices;
+			int num_vertices;
+			Array<Draw2D::DrawCmd> cmd_buffer;
 
-		ffr::DrawCall dc;
-		dc.attribute_map = nullptr;
-		dc.vertex_buffer = ffr::createBuffer(num_vertices * vertex_decl.size, &m_draw2d.VtxBuffer[0]);
-		dc.index_buffer = ffr::createBuffer(num_indices * sizeof(u16), &m_draw2d.IdxBuffer[0]);
-		dc.vertex_decl = &vertex_decl;
+			Cmd(IAllocator& allocator) : cmd_buffer(allocator) {}
 
-		ffr::pushDebugGroup("draw2d");
-		ffr::ProgramHandle prg = m_draw2d_shader->getProgram(0).handle;
-		ffr::setUniform2f(prg, "u_canvas_size", 1, &size.x);
+			void setup()
+			{
+				size.set((float)pipeline->m_viewport.w, (float)pipeline->m_viewport.h);
 
-		u32 elem_offset = 0;
-		const Draw2D::DrawCmd* pcmd_begin = m_draw2d.CmdBuffer.begin();
-		const Draw2D::DrawCmd* pcmd_end = m_draw2d.CmdBuffer.end();
+				Draw2D& draw2d = pipeline->m_draw2d;
+
+				num_indices = draw2d.IdxBuffer.size();
+				num_vertices = draw2d.VtxBuffer.size();
+
+				idx_buffer_mem = pipeline->m_renderer.copy(&draw2d.IdxBuffer[0], num_indices * sizeof(ImDrawIdx));
+				vtx_buffer_mem = pipeline->m_renderer.copy(&draw2d.VtxBuffer[0], num_vertices * sizeof(ImDrawVert));
+				cmd_buffer.resize(draw2d.CmdBuffer.size());
+				copyMemory(&cmd_buffer[0], draw2d.CmdBuffer.begin(), sizeof(cmd_buffer[0]) * cmd_buffer.size());
+
+				draw2d.Clear();
+				draw2d.PushClipRectFullScreen();
+				FontAtlas& atlas = pipeline->m_renderer.getFontManager().getFontAtlas();
+				draw2d.FontTexUvWhitePixel = atlas.TexUvWhitePixel;
+				draw2d.PushTextureID(atlas.TexID);
+			}
+
+			void execute()
+			{
+				ffr::VertexDecl vertex_decl;
+				vertex_decl.addAttribute(2, ffr::AttributeType::FLOAT, false, false);
+				vertex_decl.addAttribute(2, ffr::AttributeType::FLOAT, false, false);
+				vertex_decl.addAttribute(4, ffr::AttributeType::U8, true, false);
+
+				ffr::DrawCall dc;
+				dc.attribute_map = nullptr;
+				dc.vertex_buffer = ffr::allocBufferHandle();
+				dc.index_buffer = ffr::allocBufferHandle();
+				ffr::createBuffer(dc.vertex_buffer, vtx_buffer_mem.size, vtx_buffer_mem.data);
+				ffr::createBuffer(dc.index_buffer, idx_buffer_mem.size, idx_buffer_mem.data);
+				pipeline->m_renderer.free(idx_buffer_mem);
+				pipeline->m_renderer.free(vtx_buffer_mem);
+				dc.vertex_decl = &vertex_decl;
+
+				ffr::pushDebugGroup("draw2d");
+				ffr::ProgramHandle prg = pipeline->m_draw2d_shader->getProgram(0).handle;
+				ffr::setUniform2f(prg, "u_canvas_size", 1, &size.x);
+
+				u32 elem_offset = 0;
+				const Draw2D::DrawCmd* pcmd_begin = cmd_buffer.begin();
+				const Draw2D::DrawCmd* pcmd_end = cmd_buffer.end();
 		
-		ASSERT(pcmd_begin <= pcmd_end - 1); // TODO compute correct offsets
-		for (const Draw2D::DrawCmd* pcmd = pcmd_begin; pcmd != pcmd_end; pcmd++) {
-			if (0 == pcmd->ElemCount) continue;
+				ASSERT(pcmd_begin <= pcmd_end - 1); // TODO compute correct offsets
+				for (const Draw2D::DrawCmd* pcmd = pcmd_begin; pcmd != pcmd_end; pcmd++) {
+					if (0 == pcmd->ElemCount) continue;
 			
-			ffr::scissor(uint(Math::maximum(pcmd->ClipRect.x, 0.0f)),
-				uint(Math::maximum(pcmd->ClipRect.y, 0.0f)),
-				uint(Math::minimum(pcmd->ClipRect.z, 65535.0f) - Math::maximum(pcmd->ClipRect.x, 0.0f)),
-				uint(Math::minimum(pcmd->ClipRect.w, 65535.0f) - Math::maximum(pcmd->ClipRect.y, 0.0f)));
+					ffr::scissor(uint(Math::maximum(pcmd->ClipRect.x, 0.0f)),
+						uint(Math::maximum(pcmd->ClipRect.y, 0.0f)),
+						uint(Math::minimum(pcmd->ClipRect.z, 65535.0f) - Math::maximum(pcmd->ClipRect.x, 0.0f)),
+						uint(Math::minimum(pcmd->ClipRect.w, 65535.0f) - Math::maximum(pcmd->ClipRect.y, 0.0f)));
 			
-			const Texture* atlas_texture = m_renderer.getFontManager().getAtlasTexture();
-			ffr::TextureHandle texture_id = atlas_texture->handle;
-			if (pcmd->TextureId) texture_id = *(ffr::TextureHandle*)pcmd->TextureId;
-			if(!texture_id.isValid()) texture_id = atlas_texture->handle;
+					const Texture* atlas_texture = pipeline->m_renderer.getFontManager().getAtlasTexture();
+					ffr::TextureHandle texture_id = atlas_texture->handle;
+					if (pcmd->TextureId) texture_id = *(ffr::TextureHandle*)pcmd->TextureId;
+					if(!texture_id.isValid()) texture_id = atlas_texture->handle;
 
-			ffr::setUniform1i(prg, "u_texture", 0);
+					ffr::setUniform1i(prg, "u_texture", 0);
 			
-			dc.indices_offset = 0;
-			dc.indices_count = num_indices;
-			dc.primitive_type = ffr::PrimitiveType::TRIANGLES;
-			dc.shader = prg;
-			dc.state = 0;
-			dc.textures = &texture_id;
-			dc.textures_count = 1;
-			dc.tex_buffers_count = 0;
-			dc.vertex_buffer_offset = 0;
+					dc.indices_offset = 0;
+					dc.indices_count = num_indices;
+					dc.primitive_type = ffr::PrimitiveType::TRIANGLES;
+					dc.shader = prg;
+					dc.state = 0;
+					dc.textures = &texture_id;
+					dc.textures_count = 1;
+					dc.vertex_buffer_offset = 0;
 
-			ffr::blending(1);
-			ffr::draw(dc);
+					ffr::blending(1);
+					ffr::draw(dc);
 
-			elem_offset += pcmd->ElemCount;
-		}
-		ffr::popDebugGroup();
-		ffr::destroy(dc.vertex_buffer);
-		ffr::destroy(dc.index_buffer);
+					elem_offset += pcmd->ElemCount;
+				}
+				ffr::popDebugGroup();
+				ffr::destroy(dc.vertex_buffer);
+				ffr::destroy(dc.index_buffer);
+			}
 
-		resetDraw2D();*/
-		// TODO
-		ASSERT(false);
+			Vec2 size;
+			PipelineImpl* pipeline;
+		};
+
+		IAllocator& allocator = m_renderer.getAllocator();
+		Cmd* cmd = LUMIX_NEW(allocator, Cmd)(allocator);
+		cmd->pipeline = this;
+		m_renderer.push(cmd);
 	}
 
 	void setScene(RenderScene* scene) override
