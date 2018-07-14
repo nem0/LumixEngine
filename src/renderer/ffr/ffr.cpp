@@ -476,7 +476,7 @@ static void try_load_renderdoc()
 	pRENDERDOC_GetAPI RENDERDOC_GetAPI = (pRENDERDOC_GetAPI)GetProcAddress(lib, "RENDERDOC_GetAPI");
 	if (RENDERDOC_GetAPI) {
 		RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_1_2, (void **)&s_ffr.rdoc_api);
-		//s_ffr.rdoc_api->MaskOverlayBits(~RENDERDOC_OverlayBits::eRENDERDOC_Overlay_Enabled, 0);
+		s_ffr.rdoc_api->MaskOverlayBits(~RENDERDOC_OverlayBits::eRENDERDOC_Overlay_Enabled, 0);
 	}
 	/**/
 	//FreeLibrary(lib);
@@ -1393,6 +1393,7 @@ void shutdown()
 {
 	checkThread();
 	s_ffr.allocator->deallocate(s_ffr.textures);
+	s_ffr.allocator->deallocate(s_ffr.buffers);
 }
 
 } // ns ffr 

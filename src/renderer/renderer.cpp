@@ -64,7 +64,7 @@ struct GPUProfiler
 	using Query = Renderer::GPUProfilerQuery;
 
 	GPUProfiler(IAllocator& allocator) 
-		: m_queries(allocator) 
+		: m_queries(allocator)
 		, m_pool(allocator)
 		, m_history(allocator)
 	{
@@ -76,8 +76,17 @@ struct GPUProfiler
 
 	~GPUProfiler()
 	{
-		// TODO cleanup
-		ASSERT(false);
+		ASSERT(m_pool.empty());
+		ASSERT(m_queries.empty());
+	}
+
+
+	void clear()
+	{
+		for(const ffr::QueryHandle h : m_pool) {
+			ffr::destroy(h);
+		}
+		m_pool.clear();
 	}
 
 
@@ -116,6 +125,7 @@ struct GPUProfiler
 		if (m_history_rd == m_history_wr) {
 			return false;
 		}
+		results->clear();
 		results->swap(m_history[m_history_rd % m_history.size()]);
 		MT::atomicIncrement((volatile int*)&m_history_rd);
 		return true;
@@ -158,15 +168,19 @@ struct RenderTask : MT::Task
 		, m_allocator(allocator)
 		, m_renderer(renderer)
 		, m_profiler(allocator)
+		, m_finished_semaphore(0, 1)
 	{}
 
 
+	void shutdown();
 	int task() override;
 
 	IAllocator& m_allocator;
 	RendererImpl& m_renderer;
 	ffr::FramebufferHandle m_framebuffer;
 	ffr::BufferHandle m_global_state_uniforms;
+	MT::Semaphore m_finished_semaphore;
+	bool m_shutdown_requested = false;
 	
 	struct PreparedCommand
 	{
@@ -464,9 +478,15 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 		m_shader_manager.destroy();
 		m_font_manager->destroy();
 		LUMIX_DELETE(m_allocator, m_font_manager);
-
-		frame(false);
-		frame(false);
+		m_render_task.shutdown();
+		JobSystem::wait(&m_last_job->counter);
+		if (m_last_job) {
+			JobSystem::wait(&m_last_job->counter);
+			LUMIX_DELETE(m_allocator, m_last_job);
+			m_last_job = nullptr;
+		}
+		m_render_task.m_finished_semaphore.wait();
+		m_render_task.destroy();
 	}
 
 
@@ -541,17 +561,22 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 			void setup() override {}
 			void execute() override {
 				ffr::loadTexture(handle, memory.data, memory.size, flags, nullptr);
+				if(memory.own) {
+					renderer->free(memory);
+				}
 			}
 
 			ffr::TextureHandle handle;
 			MemRef memory;
 			u32 flags;
+			RendererImpl* renderer; 
 		};
 
 		Cmd* cmd = LUMIX_NEW(m_render_task.m_allocator, Cmd);
 		cmd->handle = handle;
 		cmd->memory = memory;
 		cmd->flags = flags;
+		cmd->renderer = this;
 		push(cmd);
 
 		return handle;
@@ -567,16 +592,21 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 			void setup() override {}
 			void execute() override {
 				ffr::createBuffer(handle, memory.size, memory.data);
+				if (memory.own) {
+					renderer->free(memory);
+				}
 			}
 
 			ffr::BufferHandle handle;
 			MemRef memory;
 			ffr::TextureFormat format;
+			Renderer* renderer;
 		};
 
 		Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
 		cmd->handle = handle;
 		cmd->memory = memory;
+		cmd->renderer = this;
 		push(cmd);
 
 		return handle;
@@ -607,13 +637,20 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 
 		struct Cmd : RenderCommandBase {
 			void setup() override {}
-			void execute() override { ffr::createTexture(handle, w, h, format, 0, memory.data); }
+			void execute() override
+			{
+				ffr::createTexture(handle, w, h, format, 0, memory.data);
+				if (memory.own) {
+					renderer->free(memory);
+				}
+			}
 
 			ffr::TextureHandle handle;
 			MemRef memory;
 			uint w;
 			uint h;
 			ffr::TextureFormat format;
+			Renderer* renderer;
 		};
 
 		Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
@@ -622,6 +659,7 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 		cmd->format = format;
 		cmd->w = w;
 		cmd->h = h;
+		cmd->renderer = this;
 		push(cmd);
 
 		return handle;
@@ -855,6 +893,18 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 };
 
 
+void RenderTask::shutdown()
+{
+	struct Cmd : Renderer::RenderCommandBase {
+		void setup() override {}
+		void execute() override {}
+	};
+	Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
+	m_renderer.push(cmd);
+	m_shutdown_requested = true;
+}
+
+
 int RenderTask::task()
 {
 	PROFILE_FUNCTION();
@@ -864,18 +914,18 @@ int RenderTask::task()
 	m_global_state_uniforms = ffr::allocBufferHandle();
 	ffr::createBuffer(m_global_state_uniforms, sizeof(Renderer::GlobalState), nullptr); 
 	ffr::bindUniformBuffer(0, m_global_state_uniforms, 0, sizeof(Renderer::GlobalState));
-
-	for(;;) {
-		Profiler::beginBlock("get command");
+	while (!m_shutdown_requested || !m_commands.isEmpty()) {
 		Renderer::RenderCommandBase** rt_cmd = m_commands.pop(true);
 		Renderer::RenderCommandBase* cmd = *rt_cmd;
 		m_commands.dealoc(rt_cmd);
-		Profiler::endBlock();
-
+	
 		PROFILE_BLOCK("executeCommand");
 		cmd->execute();
 		LUMIX_DELETE(m_renderer.getAllocator(), cmd);
 	}
+	m_profiler.clear();
+	ffr::shutdown();
+	m_finished_semaphore.signal();
 	return 0;
 }
 

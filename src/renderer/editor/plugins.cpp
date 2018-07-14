@@ -391,7 +391,6 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		engine.destroyUniverse(*m_universe);
 		Pipeline::destroy(m_pipeline);
 			// TODO
-			ASSERT(false);
 			/*
 		engine.destroyUniverse(*m_tile.universe);
 		Pipeline::destroy(m_tile.pipeline);*/
@@ -2708,6 +2707,8 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 				, cmd_list.vtx_buffer.data
 				, vb_offset * sizeof(ImDrawVert)
 				, num_vertices * sizeof(ImDrawVert));
+			renderer->free(cmd_list.vtx_buffer);
+			renderer->free(cmd_list.idx_buffer);
 			u32 elem_offset = 0;
 			const ImDrawCmd* pcmd_begin = cmd_list.commands.begin();
 			const ImDrawCmd* pcmd_end = cmd_list.commands.end();
