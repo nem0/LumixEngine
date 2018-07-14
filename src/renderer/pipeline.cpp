@@ -341,51 +341,75 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 
 	void renderDebugLines()
 	{
+		struct Cmd : Renderer::RenderCommandBase
+		{
+			Cmd(IAllocator& allocator) : lines(allocator) {}
+
+			void setup() override
+			{
+				const Array<DebugLine>& src_lines = pipeline->m_scene->getDebugLines();
+				lines.resize(src_lines.size());
+				copyMemory(&lines[0], &src_lines[0], lines.size() * sizeof(lines[0]));
+			}
+
+
+			void execute() override {
+				const Shader::Program& shader = pipeline->m_debug_shape_shader->getProgram(0);
+				struct BaseVertex {
+					Vec3 pos;
+					u32 color;
+				};
+
+				Array<BaseVertex> vertices(pipeline->m_allocator);
+				vertices.resize(lines.size() * 2);
+				for (int j = 0, n = lines.size(); j < n; ++j) {
+					const DebugLine& line = lines[j];
+
+					vertices[j * 2].color = line.color;
+					vertices[j * 2].pos = line.from;
+
+					vertices[j * 2 + 1].color = line.color;
+					vertices[j * 2 + 1].pos = line.to;
+				}
+
+				ffr::VertexDecl vertex_decl;
+				vertex_decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false);
+				vertex_decl.addAttribute(4, ffr::AttributeType::U8, true, false);
+
+				ffr::setUniformMatrix4f(shader.handle, "u_model", 1, &Matrix::IDENTITY.m11);
+
+				// TODO do not create every frame
+				const ffr::BufferHandle vb = ffr::allocBufferHandle();
+				ffr::createBuffer(vb, vertices.size() * sizeof(vertices[0]), &vertices[0]);
+				ffr::DrawCall dc;
+				dc.attribute_map = nullptr;
+				dc.index_buffer = ffr::INVALID_BUFFER;
+				dc.primitive_type = ffr::PrimitiveType::LINES;
+				dc.shader = shader.handle;
+				dc.state = 0;
+				dc.textures_count = 0;
+				dc.vertex_buffer = vb;
+				dc.vertex_buffer_offset = 0;
+				dc.vertex_decl = &vertex_decl;
+				dc.indices_offset = 0;
+				dc.indices_count = lines.size() * 2;
+				ffr::draw(dc);
+
+				ffr::destroy(vb);
+			}
+
+			Array<DebugLine> lines;
+			PipelineImpl* pipeline;
+		};
+
+
 		const Array<DebugLine>& lines = m_scene->getDebugLines();
 		if (lines.empty() || !m_debug_shape_shader->isReady()) return;
 
-		const Shader::Program& shader = m_debug_shape_shader->getProgram(0);
-		struct BaseVertex {
-			Vec3 pos;
-			u32 color;
-		};
-
-		Array<BaseVertex> vertices(m_allocator);
-		vertices.resize(lines.size() * 2);
-		for (int j = 0, n = lines.size(); j < n; ++j) {
-			const DebugLine& line = lines[j];
-
-			vertices[j * 2].color = line.color;
-			vertices[j * 2].pos = line.from;
-
-			vertices[j * 2 + 1].color = line.color;
-			vertices[j * 2 + 1].pos = line.to;
-		}
-
-		ffr::VertexDecl vertex_decl;
-		vertex_decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false);
-		vertex_decl.addAttribute(4, ffr::AttributeType::U8, true, false);
-
-		ffr::setUniformMatrix4f(shader.handle, "u_model", 1, &Matrix::IDENTITY.m11);
-
-		// TODO do not create every frame
-		const ffr::BufferHandle vb = ffr::allocBufferHandle();
-		ffr::createBuffer(vb, vertices.size() * sizeof(vertices[0]), &vertices[0]);
-		ffr::DrawCall dc;
-		dc.attribute_map = nullptr;
-		dc.index_buffer = ffr::INVALID_BUFFER;
-		dc.primitive_type = ffr::PrimitiveType::LINES;
-		dc.shader = shader.handle;
-		dc.state = 0;
-		dc.textures_count = 0;
-		dc.vertex_buffer = vb;
-		dc.vertex_buffer_offset = 0;
-		dc.vertex_decl = &vertex_decl;
-		dc.indices_offset = 0;
-		dc.indices_count = lines.size() * 2;
-		ffr::draw(dc);
-
-		ffr::destroy(vb);
+		IAllocator& allocator = m_renderer.getAllocator();
+		Cmd* cmd = LUMIX_NEW(allocator, Cmd)(allocator);
+		cmd->pipeline = this;
+		m_renderer.push(cmd);
 	}
 
 
@@ -1117,8 +1141,8 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 			scene->getModelInstanceInfos(frustum, pos, lod_multiplier, layer_mask, meshes);
 			int count = 0;
 			for(const auto& submeshes : meshes) count += submeshes.size();
-			Renderer::MemRef mem = renderer.allocate(sizeof(Mesh) * count);
-			this->meshes = (Mesh*)mem.data;
+			meshes_mem = renderer.allocate(sizeof(Mesh) * count);
+			this->meshes = (Mesh*)meshes_mem.data;
 			meshes_count = 0;
 			for(const auto& submeshes : meshes) {
 				for(const auto& mesh : submeshes) {
@@ -1206,7 +1230,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 				dc.vertex_decl = &mesh.mesh->vertex_decl;
 				ffr::draw(dc);
 			}
-
+			pipeline->m_renderer.free(meshes_mem);
 			ffr::popDebugGroup();
 		}
 
@@ -1220,6 +1244,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		};
 		Mesh* meshes;
 		int meshes_count;
+		Renderer::MemRef meshes_mem;
 		StaticString<32> shader_define;
 		u32 define_mask;
 		u64 layer_mask;
@@ -1460,6 +1485,8 @@ Pipeline* Pipeline::create(Renderer& renderer, const Path& path, const char* def
 
 void Pipeline::destroy(Pipeline* pipeline)
 {
+	PipelineImpl* p = (PipelineImpl*)pipeline;
+	LUMIX_DELETE(p->m_allocator, p);
 }
 
 

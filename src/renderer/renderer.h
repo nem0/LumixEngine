@@ -38,6 +38,7 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 
 		struct RenderCommandBase
 		{
+			virtual ~RenderCommandBase() {}
 			virtual void setup() = 0;
 			virtual void execute() = 0;
 		};
