@@ -2,21 +2,29 @@
 
 
 #include "engine/lumix.h"
+#include "engine/matrix.h"
 
 
 namespace Lumix
 {
 
 
-struct Matrix;
 struct Transform;
 struct Vec3;
+struct Viewport;
 class WorldEditor;
+template <typename T> class Array;
 
 
 class LUMIX_EDITOR_API Gizmo
 {
 public:
+	struct RenderData
+	{
+		Matrix mtx;
+		bool active;
+	};
+
 	static Gizmo* create(WorldEditor& editor);
 	static void destroy(Gizmo& gizmo);
 
@@ -26,7 +34,8 @@ public:
 	virtual void setOffset(const Vec3& offset) = 0;
 	virtual bool isActive() const = 0;
 	virtual void add(Entity entity) = 0;
-	virtual void render() = 0;
+	virtual void getRenderData(Array<RenderData>* data) = 0;
+	virtual void render(const Array<RenderData>& data, const Viewport& vp) const = 0;
 	virtual void setTranslateMode() = 0;
 	virtual void setRotateMode() = 0;
 	virtual void setScaleMode() = 0;

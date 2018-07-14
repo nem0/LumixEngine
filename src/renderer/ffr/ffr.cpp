@@ -475,8 +475,8 @@ static void try_load_renderdoc()
 	if (!lib) return;
 	pRENDERDOC_GetAPI RENDERDOC_GetAPI = (pRENDERDOC_GetAPI)GetProcAddress(lib, "RENDERDOC_GetAPI");
 	if (RENDERDOC_GetAPI) {
-		RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_0_2, (void **)&s_ffr.rdoc_api);
-		s_ffr.rdoc_api->MaskOverlayBits(~RENDERDOC_OverlayBits::eRENDERDOC_Overlay_Enabled, 0);
+		RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_1_2, (void **)&s_ffr.rdoc_api);
+		//s_ffr.rdoc_api->MaskOverlayBits(~RENDERDOC_OverlayBits::eRENDERDOC_Overlay_Enabled, 0);
 	}
 	/**/
 	//FreeLibrary(lib);
@@ -486,8 +486,30 @@ static void try_load_renderdoc()
 static int load_gl(void* device_contex)
 {
 	HDC hdc = (HDC)device_contex;
-	HGLRC hglrc = wglCreateContext(hdc);
+	const HGLRC dummy_context = wglCreateContext(hdc);
+	wglMakeCurrent(hdc, dummy_context);
+
+	typedef HGLRC (WINAPI * PFNWGLCREATECONTEXTATTRIBSARBPROC) (HDC hDC, HGLRC hShareContext, const int *attribList);
+	PFNWGLCREATECONTEXTATTRIBSARBPROC wglCreateContextAttribsARB = (PFNWGLCREATECONTEXTATTRIBSARBPROC)wglGetProcAddress("wglCreateContextAttribsARB");
+	#define WGL_CONTEXT_DEBUG_BIT_ARB 0x00000001
+	#define WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB 0x00000002
+	#define WGL_CONTEXT_MAJOR_VERSION_ARB 0x2091
+	#define WGL_CONTEXT_MINOR_VERSION_ARB 0x2092
+	#define WGL_CONTEXT_LAYER_PLANE_ARB 0x2093
+	#define WGL_CONTEXT_FLAGS_ARB 0x2094
+	#define WGL_CONTEXT_PROFILE_MASK_ARB 0x9126
+	#define WGL_CONTEXT_CORE_PROFILE_BIT_ARB 0x00000001
+	
+	const int32_t contextAttrs[] = {
+		WGL_CONTEXT_MAJOR_VERSION_ARB, 4,
+		WGL_CONTEXT_MINOR_VERSION_ARB, 5,
+		WGL_CONTEXT_FLAGS_ARB, WGL_CONTEXT_DEBUG_BIT_ARB ,
+		WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
+		0
+	};
+	HGLRC hglrc = wglCreateContextAttribsARB(hdc, 0, contextAttrs);
 	wglMakeCurrent(hdc, hglrc);
+	wglDeleteContext(dummy_context);
 
 	#define FFR_GL_IMPORT(prototype, name) \
 		do { \

@@ -232,7 +232,7 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 		const Vec3& camera_pos,
 		const Vec3& camera_dir,
 		float fov,
-		bool is_ortho)
+		bool is_ortho) const
 	{
 		Axis transform_axis = is_active ? m_transform_axis : Axis::NONE;
 		Matrix scale_mtx = Matrix::IDENTITY;
@@ -421,7 +421,7 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 		const Vec3& camera_pos,
 		const Vec3& camera_dir,
 		float fov,
-		bool is_ortho)
+		bool is_ortho) const
 	{
 		Axis transform_axis = is_active ? m_transform_axis : Axis::NONE;
 		Matrix scale_mtx = Matrix::IDENTITY;
@@ -1075,10 +1075,8 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 	}
 
 
-	void render(const Matrix& gizmo_mtx, bool is_active)
+	void render(const Matrix& gizmo_mtx, bool is_active, const Viewport& vp) const
 	{
-		auto* render_interface = m_editor.getRenderInterface();
-		const Viewport& vp = m_editor.getViewport();
 		const Vec3 vp_dir = vp.rot * Vec3(0, 0, -1);
 
 		switch (m_mode)
@@ -1098,8 +1096,8 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 		}
 	}
 
-
-	void render() override
+	
+	void getRenderData(Array<RenderData>* data) override
 	{
 		auto* render_interface = m_editor.getRenderInterface();
 		const Viewport& vp = m_editor.getViewport();
@@ -1107,22 +1105,28 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 		collide(vp.pos, vp.rot * Vec3(0, 0, -1), vp.fov, vp.is_ortho);
 		transform();
 
-		for (int i = 0; i < m_count; ++i)
-		{
-			Matrix gizmo_mtx = getMatrix(m_entities[i]);
-
-			render(gizmo_mtx, m_active == i);
+		for (int i = 0; i < m_count; ++i) {
+			const Matrix gizmo_mtx = getMatrix(m_entities[i]);
+			data->push({gizmo_mtx, m_active == i});
 		}
 
-		for (int i = 0; i < m_immediate_count; ++i)
-		{
-			render(m_immediate_frames[i].toMatrix(), m_active < 0);
+		for (int i = 0; i < m_immediate_count; ++i) {
+			data->push({m_immediate_frames[i].toMatrix(), m_active == i});
 		}
+
 		m_immediate_count = 0;
 
 		m_mouse_pos.x = m_editor.getMousePos().x;
 		m_mouse_pos.y = m_editor.getMousePos().y;
 		m_count = 0;
+	}
+
+
+	void render(const Array<RenderData>& data, const Viewport& vp) const override
+	{
+		for (const RenderData& i : data) {
+			render(i.mtx, i.active, vp);
+		}
 	}
 
 
