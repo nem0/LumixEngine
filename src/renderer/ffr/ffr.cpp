@@ -637,6 +637,16 @@ void draw(const DrawCall& dc)
 				CHECK_GL(glEnableVertexAttribArray(index));
 				CHECK_GL(glVertexAttribPointer(index, attr->components_num, gl_attr_type, attr->normalized, stride, offset));
 			}
+			else {
+				glDisableVertexAttribArray(i);
+			}
+		}
+	}
+	else {
+		GLint n;
+		glGetIntegerv(GL_MAX_VERTEX_ATTRIBS, &n);
+		for (int i = 0; i < n; ++i) {
+			glDisableVertexAttribArray(i);
 		}
 	}
 
@@ -1345,8 +1355,8 @@ void setFramebuffer(FramebufferHandle fb, bool srgb)
 	}
 	else {
 		CHECK_GL(glBindFramebuffer(GL_FRAMEBUFFER, fb.value));
-		//const GLenum db[] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
-		//CHECK_GL(glDrawBuffers(2, db));
+		const GLenum db[] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+		CHECK_GL(glDrawBuffers(2, db));
 	}
 	if(srgb) {	
 		CHECK_GL(glEnable(GL_FRAMEBUFFER_SRGB));

@@ -28,9 +28,8 @@ namespace Lumix
 		static void destroy(CullingSystem& culling_system);
 
 		virtual void clear() = 0;
-		virtual const Results& getResult() = 0;
 
-		virtual Results& cull(const Frustum& frustum, u64 layer_mask) = 0;
+		virtual void cull(const Frustum& frustum, u64 layer_mask, Results& result) = 0;
 
 		virtual bool isAdded(Entity model_instance) = 0;
 		virtual void addStatic(Entity model_instance, const Sphere& sphere, u64 layer_mask) = 0;
