@@ -40,7 +40,6 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 		{
 			virtual void setup() = 0;
 			virtual void execute() = 0;
-			virtual const char* getName() const = 0;
 		};
 
 		struct GlobalState 

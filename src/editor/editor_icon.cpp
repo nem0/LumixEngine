@@ -269,13 +269,10 @@ struct EditorIconsImpl LUMIX_FINAL : public EditorIcons
 	}
 
 
-	void render() override
+	void getRenderData(Array<RenderData>* data)
 	{
 		static const float MIN_SCALE_FACTOR = 10;
 		static const float MAX_SCALE_FACTOR = 60;
-
-		auto* render_interface = m_editor.getRenderInterface();
-		if(!render_interface) return;
 
 		const Universe& universe = *m_editor.getUniverse();
 		const Viewport& vp = m_editor.getViewport();
@@ -289,7 +286,7 @@ struct EditorIconsImpl LUMIX_FINAL : public EditorIcons
 			icon.scale = tan(vp.fov * 0.5f) * distance / scale_factor;
 			
 			Matrix icon_mtx = getIconMatrix(icon, camera_mtx, vp.is_ortho, vp.ortho_size);
-			render_interface->renderModel(m_models[(int)icon.type], icon_mtx);
+			data->push({icon_mtx, m_models[(int)icon.type]});
 		}
 	}
 

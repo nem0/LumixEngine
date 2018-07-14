@@ -1,5 +1,6 @@
 #include "scene_view.h"
 #include "editor/asset_browser.h"
+#include "editor/editor_icon.h"
 #include "editor/gizmo.h"
 #include "editor/log_ui.h"
 #include "editor/prefab_system.h"
@@ -188,9 +189,38 @@ void SceneView::update(float)
 
 void SceneView::renderIcons()
 {
-	ffr::pushDebugGroup("icons");
-	m_editor.renderIcons();
-	ffr::popDebugGroup();
+	struct Cmd : Renderer::RenderCommandBase
+	{
+		Cmd(IAllocator& allocator)
+			: data(allocator)
+		{}
+
+		void setup() override
+		{
+			view->m_editor.getIcons().getRenderData(&data);
+		}
+
+		void execute() override
+		{
+			ffr::pushDebugGroup("icons");
+			RenderInterface* ri = view->m_editor.getRenderInterface();
+			for(const EditorIcons::RenderData& i : data) {
+				ri->renderModel(i.model, i.mtx);
+			}
+			ffr::popDebugGroup();
+		}
+
+		Array<EditorIcons::RenderData> data;
+		SceneView* view;
+	};
+
+	Engine& engine = m_editor.getEngine();
+	Renderer* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
+
+	IAllocator& allocator = renderer->getAllocator();
+	Cmd* cmd = LUMIX_NEW(allocator, Cmd)(allocator);
+	cmd->view = this;
+	renderer->push(cmd);
 }
 
 
@@ -219,10 +249,42 @@ void SceneView::renderSelection()
 
 void SceneView::renderGizmos()
 {
-	ffr::pushDebugGroup("gizmos");
-	auto& entities = m_editor.getSelectedEntities();
-	m_editor.getGizmo().render();
-	ffr::popDebugGroup();
+	struct Cmd : Renderer::RenderCommandBase
+	{
+		Cmd(IAllocator& allocator)
+			: data(allocator)
+		{}
+
+		void setup() override
+		{
+			viewport = view->m_editor.getViewport();
+			view->m_editor.getGizmo().getRenderData(&data);
+		}
+
+		void execute() override
+		{
+			Engine& engine = view->m_editor.getEngine();
+			Renderer* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
+
+			renderer->beginProfileBlock("gizmos");
+			ffr::pushDebugGroup("gizmos");
+			view->m_editor.getGizmo().render(data, viewport);
+			ffr::popDebugGroup();
+			renderer->endProfileBlock();
+		}
+
+		Array<Gizmo::RenderData> data;
+		Viewport viewport;
+		SceneView* view;
+	};
+
+	Engine& engine = m_editor.getEngine();
+	Renderer* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
+
+	IAllocator& allocator = renderer->getAllocator();
+	Cmd* cmd = LUMIX_NEW(allocator, Cmd)(allocator);
+	cmd->view = this;
+	renderer->push(cmd);
 }
 
 

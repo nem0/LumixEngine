@@ -538,7 +538,6 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 		}
 
 		struct Cmd : RenderCommandBase {
-			const char* getName() const override { return "load_texture"; }
 			void setup() override {}
 			void execute() override {
 				ffr::loadTexture(handle, memory.data, memory.size, flags, nullptr);
@@ -565,7 +564,6 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 		if(!handle.isValid()) return handle;
 
 		struct Cmd : RenderCommandBase {
-			const char* getName() const override { return "create_buffer"; }
 			void setup() override {}
 			void execute() override {
 				ffr::createBuffer(handle, memory.size, memory.data);
@@ -588,7 +586,6 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	void destroy(ffr::BufferHandle buffer) override
 	{
 		struct Cmd : RenderCommandBase {
-			const char* getName() const override { return "destroy_buffer"; }
 			void setup() override {}
 			void execute() override { ffr::destroy(buffer); }
 
@@ -609,7 +606,6 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 		if(!handle.isValid()) return handle;
 
 		struct Cmd : RenderCommandBase {
-			const char* getName() const override { return "create_texture"; }
 			void setup() override {}
 			void execute() override { ffr::createTexture(handle, w, h, format, 0, memory.data); }
 
@@ -635,7 +631,6 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	void destroy(ffr::TextureHandle tex)
 	{
 		struct Cmd : RenderCommandBase {
-			const char* getName() const override { return "destroy_texture"; }
 			void setup() override {}
 			void execute() override { ffr::destroy(texture); }
 
@@ -790,7 +785,6 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	void pushSetGlobalStateCommand()
 	{
 		struct Cmd : RenderCommandBase {
-			const char* getName() const override { return "push_global_state"; }
 			void setup() override {}
 			void execute() override { 
 				ffr::update(renderer->m_render_task.m_global_state_uniforms, &state, 0, sizeof(state));
@@ -808,7 +802,6 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	void pushSwapCommand()
 	{
 		struct SwapCmd : RenderCommandBase {
-			const char* getName() const override { return "swap_buffers"; }
 			void setup() override {}
 			void execute() override { 
 				PROFILE_FUNCTION();

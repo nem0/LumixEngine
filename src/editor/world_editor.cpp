@@ -3037,9 +3037,9 @@ public:
 	Gizmo& getGizmo() override { return *m_gizmo; }
 
 
-	void renderIcons() override
+	EditorIcons& getIcons() override
 	{
-		if(m_editor_icons) m_editor_icons->render();
+		return *m_editor_icons;
 	}
 
 

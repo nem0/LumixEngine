@@ -648,7 +648,6 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 	{
 		PROFILE_FUNCTION();
 		struct Cmd : Renderer::RenderCommandBase {
-			const char* getName() const override { return "draw_array"; }
 			void setup() override {}
 			void execute() override 
 			{
@@ -992,9 +991,6 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 
 	struct SetRenderTargetsCommand : Renderer::RenderCommandBase
 	{
-		const char* getName() const override { return "set_render_targets"; }
-
-
 		void setup() override { }
 
 
@@ -1061,7 +1057,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 
 	void renderModel(Model& model, const Matrix& mtx) override
 	{
-		/*for(int i = 0; i < model.getMeshCount(); ++i) {
+		for(int i = 0; i < model.getMeshCount(); ++i) {
 
 			const Mesh& mesh = model.getMesh(i);
 			const Universe& universe = m_scene->getUniverse();
@@ -1093,22 +1089,16 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 			dc.shader = prog.handle;
 			dc.textures = textures;
 			dc.textures_count = textures_count;
-			dc.tex_buffers_count = 0;
 			dc.vertex_buffer = mesh.vertex_buffer_handle;
 			dc.vertex_buffer_offset = 0;
 			dc.vertex_decl = &mesh.vertex_decl;
 			ffr::draw(dc);
-		}*/
-		// TODO 
-		ASSERT(false);
+		}
 	}
 
 
 	struct RenderMeshesCommand : Renderer::RenderCommandBase
 	{
-		const char* getName() const override { return "render_meshes"; }
-
-
 		void setup() override
 		{
 			if(!pipeline->m_scene) return;
@@ -1262,7 +1252,6 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 	void viewport(int x, int y, int w, int h)
 	{
 		struct Cmd : Renderer::RenderCommandBase {
-			const char* getName() const override { return "viewport"; }
 			void setup() override {}
 			void execute() override { ffr::viewport(x, y, w, h); }
 			int x, y, w, h;
@@ -1282,7 +1271,6 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 	{
 		struct Cmd : Renderer::RenderCommandBase
 		{
-			const char* getName() const override { return "end_block"; }
 			void setup() override {}
 			void execute() override 
 			{
@@ -1303,7 +1291,6 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 	{
 		struct Cmd : Renderer::RenderCommandBase
 		{
-			const char* getName() const override { return "end_block"; }
 			void setup() override {}
 			void execute() override
 			{

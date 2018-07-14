@@ -94,7 +94,7 @@ public:
 	virtual IAllocator& getAllocator() = 0;
 	virtual const Viewport& getViewport() const = 0;
 	virtual void setViewport(const Viewport& viewport) = 0;
-	virtual void renderIcons() = 0;
+	virtual class EditorIcons& getIcons() = 0;
 	virtual class Gizmo& getGizmo() = 0;
 	virtual bool canUndo() const = 0;
 	virtual bool canRedo() const = 0;

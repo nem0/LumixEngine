@@ -2662,9 +2662,6 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 		{
 		}
 
-
-		const char* getName() const override { return "render_editor_ui"; }
-
 		void setup() override
 		{
 			PluginManager& plugin_manager = plugin->m_engine.getPluginManager();
@@ -2808,6 +2805,7 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 				plugin->m_program = ffr::createProgram(srcs, types, 2, nullptr, 0, "imgui shader");
 			}
 
+			ffr::pushDebugGroup("imgui");
 			ffr::setFramebuffer(ffr::INVALID_FRAMEBUFFER, false);
 
 			const float clear_color[] = {0.2f, 0.2f, 0.2f, 1.f};
@@ -2817,7 +2815,6 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 			const float canvas_size[] = {(float)width, (float)height};
 			ffr::setUniform2f(plugin->m_program, "u_canvas_size", 1, canvas_size);
 
-			ffr::pushDebugGroup("imgui");
 			ffr::setUniform1i(plugin->m_program, "u_texture", 0);
 
 			vb_offset = 0;
@@ -2918,7 +2915,6 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 		
 		renderer->push(cmd);
 		renderer->frame(false);
-		//SDL_GL_SwapWindow(m_app.getWindow());
 	}
 
 
