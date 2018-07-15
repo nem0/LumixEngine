@@ -12,6 +12,7 @@
 #include "renderer/renderer.h"
 #include "renderer/shader.h"
 #include "renderer/texture.h"
+#include "ffr/ffr.h"
 
 namespace Lumix
 {
@@ -523,10 +524,10 @@ void Material::setShader(Shader* shader)
 }
 
 
-const char* Material::getTextureUniform(int i) const
+ffr::UniformHandle Material::getTextureUniform(int i) const
 {
-	if (i < m_shader->m_texture_slot_count) return m_shader->m_texture_slots[i].uniform;
-	return "";
+	if (i < m_shader->m_texture_slot_count) return m_shader->m_texture_slots[i].uniform_handle;
+	return ffr::INVALID_UNIFORM;
 }
 
 
@@ -564,27 +565,18 @@ void Material::setAlphaRef(float value)
 
 void Material::enableBackfaceCulling(bool enable)
 {
-		// TODO
-	ASSERT(false);
-/*
-if (enable)
-	{
-		m_render_states |= BGFX_STATE_CULL_CW;
+	if (enable) {
+		m_render_states |= (u64)ffr::StateFlags::CULL_BACK;
 	}
-	else
-	{
-		m_render_states &= ~BGFX_STATE_CULL_MASK;
-	}*/
+	else {
+		m_render_states &= ~(u64)ffr::StateFlags::CULL_BACK;
+	}
 }
 
 
 bool Material::isBackfaceCulling() const
 {
-		// TODO
-	ASSERT(false);
-/*
-return (m_render_states & BGFX_STATE_CULL_MASK) != 0;*/
-	return true;
+	return (m_render_states & (u64)ffr::StateFlags::CULL_BACK) != 0;
 }
 
 

@@ -41,8 +41,10 @@ Quat::Quat(const Vec3& axis, float angle)
 }
 
 
-Quat Quat::vec3ToVec3(const Vec3& a, const Vec3& b)
+Quat Quat::vec3ToVec3(const Vec3& v0, const Vec3& v1)
 {
+	const Vec3 a = v0.normalized();
+	const Vec3 b = v1.normalized();
 	float angle = acosf(dotProduct(a, b));
 	Vec3 normal = crossProduct(a, b);
 	float normal_len = normal.length();

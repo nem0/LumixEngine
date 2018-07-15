@@ -138,10 +138,7 @@ struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		bool b = material->isBackfaceCulling();
 		if (ImGui::Checkbox("Backface culling", &b)) material->enableBackfaceCulling(b);
 
-		// TODO
-				ASSERT(false);
-				/*
-		if (material->hasDefine(alpha_cutout_define))
+		/*if (material->hasDefine(alpha_cutout_define))
 		{
 			b = material->isDefined(alpha_cutout_define);
 			if (ImGui::Checkbox("Is alpha cutout", &b)) material->setDefine(alpha_cutout_define, b);
@@ -154,6 +151,7 @@ struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 				}
 			}
 		}*/
+		// TODO
 
 		Vec4 color = material->getColor();
 		if (ImGui::ColorEdit4("Color", &color.x))
@@ -215,9 +213,6 @@ struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 			if (is_node_open)
 			{
 				ImGui::Image(&texture->handle, ImVec2(96, 96));
-				// TODO
-				ASSERT(false);
-				/*
 				if (ImGui::CollapsingHeader("Advanced"))
 				{
 					static const struct
@@ -225,25 +220,26 @@ struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 						const char* name;
 						u32 value;
 						u32 unset_flag;
-					} FLAGS[] = {{"SRGB", BGFX_TEXTURE_SRGB, 0},
+					} FLAGS[] = {{"SRGB", (u32)Texture::Flags::SRGB, 0}/*,
 						{"u clamp", BGFX_TEXTURE_U_CLAMP, 0},
 						{"v clamp", BGFX_TEXTURE_V_CLAMP, 0},
 						{"Min point", BGFX_TEXTURE_MIN_POINT, BGFX_TEXTURE_MIN_ANISOTROPIC},
 						{"Mag point", BGFX_TEXTURE_MAG_POINT, BGFX_TEXTURE_MAG_ANISOTROPIC},
 						{"Min anisotropic", BGFX_TEXTURE_MIN_ANISOTROPIC, BGFX_TEXTURE_MIN_POINT},
-						{"Mag anisotropic", BGFX_TEXTURE_MAG_ANISOTROPIC, BGFX_TEXTURE_MAG_POINT}};
+						{"Mag anisotropic", BGFX_TEXTURE_MAG_ANISOTROPIC, BGFX_TEXTURE_MAG_POINT}*/
+					};
 
 					for (int i = 0; i < lengthOf(FLAGS); ++i)
 					{
 						auto& flag = FLAGS[i];
-						bool b = (texture->bgfx_flags & flag.value) != 0;
+						bool b = (texture->flags & flag.value) != 0;
 						if (ImGui::Checkbox(flag.name, &b))
 						{
-							if (flag.unset_flag) texture->setFlag(flag.unset_flag, false);
-							texture->setFlag(flag.value, b);
+							if (flag.unset_flag) texture->setFlag((Texture::Flags)flag.unset_flag, false);
+							texture->setFlag((Texture::Flags)flag.value, b);
 						}
 					}
-				}*/
+				}
 				ImGui::TreePop();
 			}
 		}
@@ -252,7 +248,6 @@ struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		if (shader && material->isReady())
 		{
 						// TODO
-				ASSERT(false);
 				/*
 	for (int i = 0; i < shader->m_uniforms.size(); ++i)
 			{
@@ -301,7 +296,6 @@ struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 				material->setLayersCount(layers_count);
 			}
 			// TODO
-				ASSERT(false);
 				/*
 			if (ImGui::CollapsingHeader("Defines"))
 			{
@@ -363,9 +357,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		, m_pipeline(nullptr)
 		, m_universe(nullptr)
 		, m_is_mouse_captured(false)
-			// TODO
-			/*
-		, m_tile(app.getWorldEditor().getAllocator())*/
+		, m_tile(app.getWorldEditor().getAllocator())
 		, m_texture_tile_creator(app.getWorldEditor().getAllocator())
 	{
 		app.getAssetBrowser().registerExtension("msh", Model::TYPE);
@@ -390,10 +382,8 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		auto& engine = m_app.getWorldEditor().getEngine();
 		engine.destroyUniverse(*m_universe);
 		Pipeline::destroy(m_pipeline);
-			// TODO
-			/*
 		engine.destroyUniverse(*m_tile.universe);
-		Pipeline::destroy(m_tile.pipeline);*/
+		Pipeline::destroy(m_tile.pipeline);
 	}
 
 
@@ -485,8 +475,6 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 	void createTileUniverse()
 	{
 		Engine& engine = m_app.getWorldEditor().getEngine();
-			// TODO
-			/*
 		m_tile.universe = &engine.createUniverse(false);
 		Renderer* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
 		m_tile.pipeline = Pipeline::create(*renderer, Path("pipelines/main.pln"), "", engine.getAllocator());
@@ -501,11 +489,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		render_scene->setGlobalLightIntensity(light_entity, 1);
 		render_scene->setGlobalLightIndirectIntensity(light_entity, 1);
 
-		m_tile.camera_entity = m_tile.universe->createEntity({0, 0, 0}, {0, 0, 0, 1});
-		m_tile.universe->createComponent(CAMERA_TYPE, m_tile.camera_entity);
-		render_scene->setCameraSlot(m_tile.camera_entity, "editor");
-
-		m_tile.pipeline->setScene(render_scene);*/
+		m_tile.pipeline->setScene(render_scene);
 	}
 
 
@@ -514,7 +498,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		auto& engine = m_app.getWorldEditor().getEngine();
 		m_universe = &engine.createUniverse(false);
 		auto* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
-		m_pipeline = Pipeline::create(*renderer, Path("pipelines/main.pln"), "",  engine.getAllocator());
+		m_pipeline = Pipeline::create(*renderer, Path("pipelines/main.pln"), "PREVIEW",  engine.getAllocator());
 		m_pipeline->load();
 
 		auto mesh_entity = m_universe->createEntity({0, 0, 0}, {0, 0, 0, 1});
@@ -551,8 +535,8 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		m_viewport.h = (int)image_size.y;
 		m_pipeline->setViewport(m_viewport);
 		m_pipeline->render();
-
-		ImGui::Image(&m_pipeline->getOutput(), image_size);
+		m_preview = m_pipeline->getOutput();
+		ImGui::Image(&m_preview, image_size);
 		bool mouse_down = ImGui::IsMouseDown(0) || ImGui::IsMouseDown(1);
 		if (m_is_mouse_captured && !mouse_down)
 		{
@@ -755,55 +739,43 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 
 	void pushTileQueue(const Path& path)
 	{
-			// TODO
-			ASSERT(false);
-			/*
 		ASSERT(!m_tile.queue.full());
 		WorldEditor& editor = m_app.getWorldEditor();
 		Engine& engine = editor.getEngine();
 		ResourceManager& resource_manager = engine.getResourceManager();
 
 		ResourceManagerBase* manager;
-		if (PathUtils::hasExtension(path.c_str(), "fab"))
-		{
+		if (PathUtils::hasExtension(path.c_str(), "fab")) {
 			manager = resource_manager.get(PrefabResource::TYPE);
 		}
-		else
-		{
+		else {
 			manager = resource_manager.get(Model::TYPE);
 		}
 		Resource* resource = manager->load(path);
-		m_tile.queue.push(resource);*/
+		m_tile.queue.push(resource);
 	}
 
 
 	void popTileQueue()
 	{
-					// TODO
-			ASSERT(false);
-			/*
-m_tile.queue.pop();
+		m_tile.queue.pop();
 		if (m_tile.paths.empty()) return;
 
 		Path path = m_tile.paths.back();
 		m_tile.paths.pop();
-		pushTileQueue(path);*/
+		pushTileQueue(path);
 	}
 
 
 	void update() override
 	{
-					// TODO
-			/*
-if (m_tile.frame_countdown >= 0)
-		{
+		if (m_tile.frame_countdown >= 0) {
 			--m_tile.frame_countdown;
-			if (m_tile.frame_countdown == -1)
-			{
+			if (m_tile.frame_countdown == -1) {
 				StaticString<MAX_PATH_LENGTH> path(".lumix/asset_tiles/", m_tile.path_hash, ".dds");
 				saveAsDDS(path, &m_tile.data[0], AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE);
 
-				bgfx::destroy(m_tile.texture);
+				ffr::destroy(m_tile.texture);
 			}
 			return;
 		}
@@ -812,8 +784,7 @@ if (m_tile.frame_countdown >= 0)
 		if (m_tile.queue.empty()) return;
 
 		Resource* resource = m_tile.queue.front();
-		if (resource->isFailure())
-		{
+		if (resource->isFailure()) {
 			g_log_error.log("Editor") << "Failed to load " << resource->getPath();
 			popTileQueue();
 			return;
@@ -822,27 +793,21 @@ if (m_tile.frame_countdown >= 0)
 
 		popTileQueue();
 
-		if (resource->getType() == Model::TYPE)
-		{
+		if (resource->getType() == Model::TYPE) {
 			renderTile((Model*)resource, nullptr);
 		}
-		else if (resource->getType() == PrefabResource::TYPE)
-		{
+		else if (resource->getType() == PrefabResource::TYPE) {
 			renderTile((PrefabResource*)resource);
 		}
-		else
-		{
+		else {
 			ASSERT(false);
-		}*/
+		}
 	}
 
 
 	void renderTile(PrefabResource* prefab)
 	{
-					// TODO
-			ASSERT(false);
-			/*
-Engine& engine = m_app.getWorldEditor().getEngine();
+		Engine& engine = m_app.getWorldEditor().getEngine();
 		RenderScene* render_scene = (RenderScene*)m_tile.universe->getScene(MODEL_INSTANCE_TYPE);
 		if (!render_scene) return;
 
@@ -860,7 +825,7 @@ Engine& engine = m_app.getWorldEditor().getEngine();
 		m_tile.path_hash = prefab->getPath().getHash();
 		prefab->getResourceManager().unload(*prefab);
 		m_tile.m_entity_in_fly = mesh_entity;
-		model->onLoaded<ModelPlugin, &ModelPlugin::renderPrefabSecondStage>(this);*/
+		model->onLoaded<ModelPlugin, &ModelPlugin::renderPrefabSecondStage>(this);
 	}
 
 
@@ -915,10 +880,7 @@ bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK); renderer->viewCounterAdd();
 
 	void renderTile(Model* model, const Matrix* in_mtx)
 	{
-		// TODO
-		ASSERT(false);
-		/*
-Engine& engine = m_app.getWorldEditor().getEngine();
+		Engine& engine = m_app.getWorldEditor().getEngine();
 		RenderScene* render_scene = (RenderScene*)m_tile.universe->getScene(MODEL_INSTANCE_TYPE);
 		if (!render_scene) return;
 
@@ -936,43 +898,53 @@ Engine& engine = m_app.getWorldEditor().getEngine();
 		Vec3 eye = center + Vec3(1, 1, 1) * (aabb.max - aabb.min).length() / Math::SQRT2;
 		mtx.lookAt(eye, center, Vec3(-1, 1, -1).normalized());
 		mtx.inverse();
-		if (in_mtx)
-		{
+		if (in_mtx) {
 			mtx = *in_mtx;
 		}
-		m_tile.universe->setMatrix(m_tile.camera_entity, mtx);
-
-		m_tile.pipeline->resize(AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE);
+		Viewport viewport;
+		viewport.is_ortho = false;
+		viewport.far = 10000.f;
+		viewport.near = 0.1f;
+		viewport.fov = Math::degreesToRadians(60.f);
+		viewport.h = AssetBrowser::TILE_SIZE;
+		viewport.w = AssetBrowser::TILE_SIZE;
+		viewport.pos = eye;
+		viewport.rot = mtx.getRotation();
+		m_tile.pipeline->setViewport(viewport);
 		m_tile.pipeline->render();
 
-		m_tile.texture =
-			bgfx::createTexture2D(AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, false, 1,
-bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK); renderer->viewCounterAdd();
-		bgfx::touch(renderer->getViewCounter());
-		bgfx::setViewName(renderer->getViewCounter(), "billboard_blit");
-		bgfx::TextureHandle color_renderbuffer = m_tile.pipeline->getRenderbuffer("default", 0);
-		bgfx::blit(renderer->getViewCounter(), m_tile.texture, 0, 0, color_renderbuffer);
+		struct Cmd : Renderer::RenderCommandBase
+		{
+			void setup() override {}
+			void execute() override
+			{
+				ffr::getTextureImage(texture, mem.size, mem.data);
+			}
 
-		renderer->viewCounterAdd();
-		bgfx::setViewName(renderer->getViewCounter(), "billboard_read");
+			Renderer::MemRef mem;
+			ffr::TextureHandle texture;
+		};
+
+		m_tile.texture = ffr::allocTextureHandle(); 
+		
+
+		Cmd* cmd = LUMIX_NEW(renderer->getAllocator(), Cmd);
+		cmd->texture = m_tile.pipeline->getOutput();
 		m_tile.data.resize(AssetBrowser::TILE_SIZE * AssetBrowser::TILE_SIZE * 4);
-		bgfx::readTexture(m_tile.texture, &m_tile.data[0]);
-		bgfx::touch(renderer->getViewCounter());
+		cmd->mem.data = &m_tile.data[0];
+		cmd->mem.size = m_tile.data.size() * sizeof(&m_tile.data[0]);
+		cmd->mem.own = false;
+		renderer->push(cmd);
 		m_tile.universe->destroyEntity(mesh_entity);
-
 		m_tile.frame_countdown = 2;
 		m_tile.path_hash = model->getPath().getHash();
-		model->getResourceManager().unload(*model);*/
+		model->getResourceManager().unload(*model);
 	}
 
 
 	bool createTile(const char* in_path, const char* out_path, ResourceType type) override
 	{
-					// TODO
-			ASSERT(false);
-			/*
-if (type == Texture::TYPE)
-		{
+		if (type == Texture::TYPE) {
 			MT::SpinLock lock(m_texture_tile_creator.lock);
 			m_texture_tile_creator.tiles.emplace(in_path);
 			MT::atomicDecrement(&m_texture_tile_creator.count);
@@ -991,12 +963,10 @@ if (type == Texture::TYPE)
 			return true;
 		}
 
-		m_tile.paths.push(path);*/
+		m_tile.paths.push(path);
 		return true;
 	}
 
-				// TODO
-			/*
 
 	struct TileData
 	{
@@ -1010,17 +980,17 @@ if (type == Texture::TYPE)
 		Universe* universe = nullptr;
 		Pipeline* pipeline = nullptr;
 		Entity m_entity_in_fly = INVALID_ENTITY;
-		Entity camera_entity = INVALID_ENTITY;
 		int frame_countdown = -1;
 		u32 path_hash;
 		Array<u8> data;
-		bgfx::TextureHandle texture = BGFX_INVALID_HANDLE;
+		ffr::TextureHandle texture = ffr::INVALID_TEXTURE;
 		Queue<Resource*, 8> queue;
 		Array<Path> paths;
 	} m_tile;
-	*/
+	
 
 	StudioApp& m_app;
+	ffr::TextureHandle m_preview;
 	Universe* m_universe;
 	Viewport m_viewport;
 	Pipeline* m_pipeline;
@@ -2099,6 +2069,8 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 
 		editor.universeCreated().bind<RenderInterfaceImpl, &RenderInterfaceImpl::onUniverseCreated>(this);
 		editor.universeDestroyed().bind<RenderInterfaceImpl, &RenderInterfaceImpl::onUniverseDestroyed>(this);
+
+		m_model_uniform = ffr::allocUniform("u_model", ffr::UniformType::MAT4, 1);
 	}
 
 
@@ -2418,20 +2390,14 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 		const ffr::BufferHandle vertex_buffer = ffr::allocBufferHandle();
 		ffr::createBuffer(vertex_buffer, vertices_count * sizeof(Vertex), vertices);
 
-		ffr::DrawCall dc;
-		dc.index_buffer = index_buffer;
-		dc.indices_count = indices_count;
-		dc.indices_offset = 0;
-		dc.primitive_type = lines ? ffr::PrimitiveType::LINES : ffr::PrimitiveType::TRIANGLES;
-		dc.shader = m_shader->getProgram(0).handle;
-		dc.textures_count = 0;
-		dc.vertex_buffer = vertex_buffer;
-		dc.vertex_buffer_offset = 0;
-		dc.vertex_decl = &vertex_decl;
-		dc.state = u64(ffr::StateFlags::DEPTH_TEST);
-		dc.attribute_map = nullptr;
-		ffr::setUniformMatrix4f(dc.shader, "u_model", 1, &mtx.m11);
-		ffr::draw(dc);
+		ffr::ProgramHandle prg = m_shader->getProgram(0).handle;
+		ffr::setUniformMatrix4x3f(m_model_uniform, &mtx.m11);
+		ffr::useProgram(prg);
+		ffr::setVertexBuffer(&vertex_decl, vertex_buffer, 0, nullptr);
+		ffr::setIndexBuffer(index_buffer);
+		ffr::setState(u64(ffr::StateFlags::DEPTH_TEST));
+		const ffr::PrimitiveType primitive_type = lines ? ffr::PrimitiveType::LINES : ffr::PrimitiveType::TRIANGLES;
+		ffr::drawElements(0, indices_count, primitive_type);
 
 		ffr::destroy(index_buffer);
 		ffr::destroy(vertex_buffer);
@@ -2470,6 +2436,7 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 	Shader* m_shader;
 	RenderScene* m_render_scene;
 	Pipeline& m_pipeline;
+	ffr::UniformHandle m_model_uniform;
 	HashMap<int, Model*> m_models;
 	HashMap<void*, Texture*> m_textures;
 	int m_model_index;
@@ -2698,7 +2665,6 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 			PluginManager& plugin_manager = plugin->m_engine.getPluginManager();	
 			Renderer* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
 
-
 			ffr::update(plugin->m_index_buffer
 				, cmd_list.idx_buffer.data
 				, ib_offset * sizeof(u16)
@@ -2712,6 +2678,14 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 			u32 elem_offset = 0;
 			const ImDrawCmd* pcmd_begin = cmd_list.commands.begin();
 			const ImDrawCmd* pcmd_end = cmd_list.commands.end();
+			ffr::useProgram(plugin->m_program);
+			ffr::setState((u64)ffr::StateFlags::SCISSOR_TEST);
+			ffr::VertexDecl decl;
+			decl.addAttribute(2, ffr::AttributeType::FLOAT, false, false);
+			decl.addAttribute(2, ffr::AttributeType::FLOAT, false, false);
+			decl.addAttribute(4, ffr::AttributeType::U8, true, false);
+			ffr::setVertexBuffer(&decl, plugin->m_vertex_buffer, vb_offset * sizeof(ImDrawVert), nullptr);
+			ffr::setIndexBuffer(plugin->m_index_buffer);
 			for (const ImDrawCmd* pcmd = pcmd_begin; pcmd != pcmd_end; pcmd++)
 			{
 				ASSERT(!pcmd->UserCallback);
@@ -2727,28 +2701,10 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 				*/
 
 				const u32 first_index = elem_offset + ib_offset;
-				
-				ffr::VertexDecl decl;
-				decl.addAttribute(2, ffr::AttributeType::FLOAT, false, false);
-				decl.addAttribute(2, ffr::AttributeType::FLOAT, false, false);
-				decl.addAttribute(4, ffr::AttributeType::U8, true, false);
-
-				ffr::DrawCall dc;
-				dc.attribute_map = nullptr;
-				dc.state = (u64)ffr::StateFlags::SCISSOR_TEST;
-				dc.index_buffer = plugin->m_index_buffer;
-				dc.primitive_type = ffr::PrimitiveType::TRIANGLES;
-				dc.shader = plugin->m_program;
-				dc.indices_offset = first_index;
-				dc.indices_count = pcmd->ElemCount;
 
 				const ffr::TextureHandle* tex = pcmd->TextureId ? (ffr::TextureHandle*)pcmd->TextureId : default_texture;
 				if (!tex->isValid()) tex = default_texture;
-				dc.textures = tex;
-				dc.textures_count = 1;
-				dc.vertex_decl = &decl;
-				dc.vertex_buffer = plugin->m_vertex_buffer;
-				dc.vertex_buffer_offset = vb_offset * sizeof(ImDrawVert);
+				ffr::bindTexture(0, *tex);
 
 				ffr::scissor(uint(Math::maximum(pcmd->ClipRect.x, 0.0f)),
 					uint(Math::maximum(pcmd->ClipRect.y, 0.0f)),
@@ -2756,7 +2712,7 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 					uint(Math::minimum(pcmd->ClipRect.w, 65535.0f) - Math::maximum(pcmd->ClipRect.y, 0.0f)));
 				ffr::blending(1); //dc.textures[0].value != m_scene_view.getTextureHandle().value);
 
-				ffr::draw(dc);
+				ffr::drawElements(first_index, pcmd->ElemCount, ffr::PrimitiveType::TRIANGLES);
 		
 				elem_offset += pcmd->ElemCount;
 			}
@@ -2814,9 +2770,8 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 
 			ffr::viewport(0, 0, width, height);
 			const float canvas_size[] = {(float)width, (float)height};
-			ffr::setUniform2f(plugin->m_program, "u_canvas_size", 1, canvas_size);
-
-			ffr::setUniform1i(plugin->m_program, "u_texture", 0);
+			ffr::setUniform2f(plugin->m_canvas_size_uniform, canvas_size);
+			ffr::setUniform1i(plugin->m_texture_uniform, 0);
 
 			vb_offset = 0;
 			ib_offset = 0;
@@ -2871,6 +2826,8 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 			LUMIX_NEW(allocator, RenderInterfaceImpl)(editor, *scene_view.getPipeline());
 		editor.setRenderInterface(render_interface);
 
+		m_canvas_size_uniform = ffr::allocUniform("u_canvas_size", ffr::UniformType::VEC2, 1);
+		m_texture_uniform = ffr::allocUniform("u_texture", ffr::UniformType::INT, 1);
 	}
 
 
@@ -2929,6 +2886,8 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 	ffr::BufferHandle m_index_buffer;
 	ffr::BufferHandle m_vertex_buffer;
 	ffr::ProgramHandle m_program;
+	ffr::UniformHandle m_texture_uniform;
+	ffr::UniformHandle m_canvas_size_uniform;
 };
 
 

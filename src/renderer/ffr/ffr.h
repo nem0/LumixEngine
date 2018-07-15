@@ -15,6 +15,7 @@ struct ProgramHandle { uint value; bool isValid() const { return value != 0xFFff
 struct FramebufferHandle { uint value; bool isValid() const { return value != 0xFFffFFff; } };
 struct TextureHandle { uint value; bool isValid() const { return value != 0xFFffFFff; } };
 struct QueryHandle { uint value; bool isValid() const { return value != 0xFFffFFff; } };
+struct UniformHandle { uint value; bool isValid() const { return value != 0xFFffFFff; } };
 
 
 const BufferHandle INVALID_BUFFER = { 0xffFFffFF };
@@ -22,6 +23,7 @@ const ProgramHandle INVALID_PROGRAM = { 0xffFFffFF };
 const TextureHandle INVALID_TEXTURE = { 0xffFFffFF };
 const FramebufferHandle INVALID_FRAMEBUFFER = { 0xffFFffFF };
 const QueryHandle INVALID_QUERY = { 0xffFFffFF };
+const UniformHandle INVALID_UNIFORM = { 0xffFFffFF };
 
 
 enum class LogLevel : uint {
@@ -80,6 +82,17 @@ enum class TextureFormat : uint {
 	SRGBA
 };
 
+enum class UniformType : uint {
+	INT,
+	FLOAT,
+	VEC2,
+	VEC3,
+	VEC4,
+	MAT4,
+	MAT4X3,
+	MAT3X4
+};
+
 
 enum class TextureFlags : uint {
 	SRGB = 1 << 0
@@ -106,21 +119,6 @@ struct VertexDecl {
 };
 
 
-struct DrawCall {
-	ProgramHandle shader;
-	PrimitiveType primitive_type;
-	uint textures_count;
-	const TextureHandle* textures;
-	uint indices_offset;
-	uint indices_count;
-	BufferHandle index_buffer;
-	BufferHandle vertex_buffer;
-	uint vertex_buffer_offset;
-	const VertexDecl* vertex_decl;
-	const int* attribute_map;
-	u64 state;
-};
-
 struct TextureInfo {
 	int width;
 	int height;
@@ -146,15 +144,19 @@ void blending(int mode);
 
 TextureHandle allocTextureHandle();
 BufferHandle allocBufferHandle();
+UniformHandle allocUniform(const char* name, UniformType type, int count);
 
+void setState(u64 state);
 ProgramHandle createProgram(const char** srcs, const ShaderType* types, int num, const char** prefixes, int prefixes_count, const char* name);
+void useProgram(ProgramHandle prg);
 void createBuffer(BufferHandle handle, size_t size, const void* data);
 bool createTexture(TextureHandle handle, uint w, uint h, TextureFormat format, uint flags, const void* data);
 bool loadTexture(TextureHandle handle, const void* data, int size, uint flags, TextureInfo* info);
 FramebufferHandle createFramebuffer(uint renderbuffers_count, const TextureHandle* renderbuffers);
 QueryHandle createQuery();
 
-void setState(u32 flags);
+void setVertexBuffer(const VertexDecl* decl, BufferHandle vertex_buffer, uint buffer_offset_bytes, const int* attribute_map);
+void bindTexture(uint unit, TextureHandle handle);
 void uniformBlockBinding(ProgramHandle program, const char* block_name, uint binding);
 void update(FramebufferHandle fb, uint renderbuffers_count, const TextureHandle* renderbuffers);
 void update(BufferHandle buffer, const void* data, size_t offset, size_t size);
@@ -170,16 +172,26 @@ void destroy(BufferHandle buffer);
 void destroy(TextureHandle texture);
 void destroy(FramebufferHandle fb);
 void destroy(QueryHandle query);
+void destroy(UniformHandle query);
 
-void draw(const DrawCall& draw_call);
+void setIndexBuffer(BufferHandle handle);
+void drawTriangles(uint indices_count);
+void drawElements(uint offset, uint count, PrimitiveType type);
+void drawArrays(uint offset, uint count, PrimitiveType type);
 
 void pushDebugGroup(const char* msg);
 void popDebugGroup();
 int getAttribLocation(ProgramHandle program, const char* uniform_name);
-void setUniform1i(ProgramHandle program, const char* uniform_name, int value);
-void setUniform2f(ProgramHandle program, const char* uniform_name, uint count, const float* value);
-void setUniform4f(ProgramHandle program, const char* uniform_name, uint count, const float* value);
-void setUniformMatrix4f(ProgramHandle program, const char* uniform_name, uint count, const float* value);
+void setUniform1i(UniformHandle uniform, int value);
+void setUniform2f(UniformHandle uniform, const float* value);
+void setUniform4f(UniformHandle uniform, const float* value);
+void setUniformMatrix3x4f(UniformHandle uniform, const float* value);
+void setUniformMatrix4f(UniformHandle uniform, const float* value);
+void setUniformMatrix4x3f(UniformHandle uniform, const float* value);
+int getUniformLocation(ProgramHandle program_handle, UniformHandle uniform);
+void applyUniformMatrix3x4f(int location, const float* value);
+void applyUniformMatrix4f(int location, const float* value);
+void applyUniformMatrix4x3f(int location, const float* value);
 
 void setFramebuffer(FramebufferHandle fb, bool srgb);
 

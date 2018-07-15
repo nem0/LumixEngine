@@ -4,9 +4,11 @@
 #include "engine/array.h"
 #include "engine/resource.h"
 #include "engine/vec.h"
+#include "ffr/ffr.h"
 
 
 struct lua_State;
+
 
 namespace Lumix
 {
@@ -70,7 +72,7 @@ public:
 
 	int getTextureCount() const { return m_texture_count; }
 	Texture* getTexture(int i) const { return i < m_texture_count ? m_textures[i] : nullptr; }
-	const char* getTextureUniform(int i) const;
+	ffr::UniformHandle getTextureUniform(int i) const;
 	Texture* getTextureByUniform(const char* uniform) const;
 	bool isTextureDefine(u8 define_idx) const;
 	void setTexture(int i, Texture* texture);
@@ -119,7 +121,7 @@ private:
 	Texture* m_textures[MAX_TEXTURE_COUNT];
 	int m_texture_count;
 	u32 m_define_mask;
-	u32 m_render_states;
+	u64 m_render_states;
 	
 	Array<Uniform> m_uniforms;
 	u32 m_custom_flags;
