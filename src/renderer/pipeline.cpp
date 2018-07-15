@@ -1207,7 +1207,6 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 						if (!prog.handle.isValid()) continue;
 
 						program = &prog;
-						ffr::useProgram(prog.handle);
 						model_uniform_loc = ffr::getUniformLocation(prog.handle, pipeline->m_model_uniform);
 						int textures_count = material->getTextureCount();
 						for (int i = 0; i < textures_count; ++i) {
@@ -1225,6 +1224,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 						prev_material = material;
 
 						ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | mesh.mesh->material->getRenderStates());
+						ffr::useProgram(prog.handle);
 					}
 
 					prev_mesh = mesh.mesh;
