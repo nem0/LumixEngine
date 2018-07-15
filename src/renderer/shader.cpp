@@ -141,49 +141,6 @@ static Renderer& getRendererGlobal(lua_State* L)
 }
 
 
-static void default_texture(lua_State* state, const char* path)
-{
-	// TODO
-	ASSERT(false);
-	/*
-	Shader* shader = getShader(state);
-	if (!shader) return;
-	if (shader->m_texture_slot_count == 0) return;
-	Shader::TextureSlot& slot = shader->m_texture_slots[shader->m_texture_slot_count - 1];
-	ResourceManagerBase* texture_manager = shader->getResourceManager().getOwner().get(Texture::TYPE);
-	slot.default_texture = (Texture*)texture_manager->load(Path(path));*/
-}
-
-
-static void texture_slot(lua_State* state, const char* name, const char* uniform)
-{
-		// TODO
-	ASSERT(false);
-	/*
-Shader* shader = getShader(state);
-	if (!shader) return;
-	Shader::TextureSlot& slot = shader->m_texture_slots[shader->m_texture_slot_count];
-	copyString(slot.name, name);
-	slot.uniform_handle = bgfx::createUniform(uniform, bgfx::UniformType::Int1);
-	copyString(slot.uniform, uniform);
-	++shader->m_texture_slot_count;*/
-}
-
-
-static void texture_define(lua_State* L, const char* define)
-{
-		// TODO
-	ASSERT(false);
-	/*
-Shader* shader = getShader(L);
-	if (!shader) return;
-	Renderer& renderer = shader->getRenderer();
-
-	auto& slot = shader->m_texture_slots[shader->m_texture_slot_count - 1];
-	slot.define_idx = renderer.getShaderDefineIdx(lua_tostring(L, -1));*/
-}
-
-
 static void uniform(lua_State* L, const char* name, const char* type)
 {
 	// TODO
@@ -329,7 +286,9 @@ int texture_slot(lua_State* L)
 	}
 
 	Shader::TextureSlot& slot = shader->m_texture_slots[shader->m_texture_slot_count];
-	LuaWrapper::getOptionalStringField(L, -1, "uniform", slot.uniform, lengthOf(slot.uniform));
+	if(LuaWrapper::getOptionalStringField(L, -1, "uniform", slot.uniform, lengthOf(slot.uniform))) {
+		slot.uniform_handle = ffr::allocUniform(slot.uniform, ffr::UniformType::INT, 1);
+	}
 
 	char tmp[MAX_PATH_LENGTH];
 	if(LuaWrapper::getOptionalStringField(L, -1, "default_texture", tmp, lengthOf(tmp))) {

@@ -30,16 +30,16 @@ public:
 	{
 		TextureSlot()
 		{
-			name[0] = uniform[0] = '\0';
+			name[0] = '\0';
+			uniform[0] = '\0';
 			define_idx = -1;
-			//uniform_handle = BGFX_INVALID_HANDLE;
+			uniform_handle = ffr::INVALID_UNIFORM;
 			default_texture = nullptr;
 		}
 
-		// TODO
-		//bgfx::UniformHandle uniform_handle;
-		char name[30];
-		char uniform[30];
+		char name[32];
+		char uniform[32];
+		ffr::UniformHandle uniform_handle;
 		int define_idx = -1;
 		Texture* default_texture = nullptr;
 	};
