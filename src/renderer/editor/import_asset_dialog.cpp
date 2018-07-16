@@ -1222,6 +1222,7 @@ struct FBXImporter
 	{
 		const ofbx::Geometry* geom = mesh->getGeometry();
 		skinning.resize(geom->getVertexCount());
+		setMemory(&skinning[0], 0, skinning.size() * sizeof(skinning[0]));
 
 		auto* skin = mesh->getGeometry()->getSkin();
 		for (int i = 0, c = skin->getClusterCount(); i < c; ++i)

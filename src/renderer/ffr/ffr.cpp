@@ -107,7 +107,7 @@ struct Pool
 };
 
 static struct {
-	RENDERDOC_API_1_1_2* rdoc_api;
+	RENDERDOC_API_1_0_2* rdoc_api;
 	GLuint vao;
 	GLuint tex_buffers[32];
 	IAllocator* allocator;
@@ -546,7 +546,7 @@ static void try_load_renderdoc()
 	if (!lib) return;
 	pRENDERDOC_GetAPI RENDERDOC_GetAPI = (pRENDERDOC_GetAPI)GetProcAddress(lib, "RENDERDOC_GetAPI");
 	if (RENDERDOC_GetAPI) {
-		RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_1_2, (void **)&g_ffr.rdoc_api);
+		RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_0_2, (void **)&g_ffr.rdoc_api);
 		g_ffr.rdoc_api->MaskOverlayBits(~RENDERDOC_OverlayBits::eRENDERDOC_Overlay_Enabled, 0);
 	}
 	/**/
@@ -678,6 +678,11 @@ void applyUniformMatrix4f(int location, const float* value)
 	glUniformMatrix4fv(location, 1, false, value);
 }
 
+void applyUniformMatrix4fv(int location, uint count, const float* value)
+{
+	glUniformMatrix4fv(location, count, false, value);
+}
+
 void applyUniformMatrix4x3f(int location, const float* value)
 {
 	glUniformMatrix4x3fv(location, 1, false, value);
@@ -743,6 +748,30 @@ void bindTexture(uint unit, TextureHandle handle)
 }
 
 
+void setInstanceBuffer(const VertexDecl& decl, BufferHandle instance_buffer, int byte_offset, int location_offset)
+{
+	checkThread();
+	const GLuint ib = g_ffr.buffers[instance_buffer.value].handle;
+	CHECK_GL(glBindBuffer(GL_ARRAY_BUFFER, ib));
+	const GLsizei stride = decl.size;
+
+	for (uint i = 0; i < decl.attributes_count; ++i) {
+		const Attribute* attr = &decl.attributes[i];
+		const void* offset = (void*)(intptr_t)(attr->offset + byte_offset);
+		GLenum gl_attr_type;
+		switch (attr->type) {
+			case AttributeType::I16: gl_attr_type = GL_SHORT; break;
+			case AttributeType::FLOAT: gl_attr_type = GL_FLOAT; break;
+			case AttributeType::U8: gl_attr_type = GL_UNSIGNED_BYTE; break;
+		}
+
+		const int index = location_offset + i;
+		CHECK_GL(glEnableVertexAttribArray(index));
+		CHECK_GL(glVertexAttribPointer(index, attr->components_num, gl_attr_type, attr->normalized, stride, offset));
+		CHECK_GL(glVertexAttribDivisor(index, 1));  
+	}
+}
+
 void setVertexBuffer(const VertexDecl* decl, BufferHandle vertex_buffer, uint buffer_offset_bytes, const int* attribute_map)
 {
 	if (decl) {
@@ -783,6 +812,7 @@ void setVertexBuffer(const VertexDecl* decl, BufferHandle vertex_buffer, uint bu
 
 void setState(u64 state)
 {
+	checkThread();
 	if (state & u64(StateFlags::DEPTH_TEST)) CHECK_GL(glEnable(GL_DEPTH_TEST));
 	else CHECK_GL(glDisable(GL_DEPTH_TEST));
 	/*
@@ -809,6 +839,7 @@ void setState(u64 state)
 
 void setIndexBuffer(BufferHandle handle)
 {
+	checkThread();
 	if(handle.isValid()) {	
 		const GLuint ib = g_ffr.buffers[handle.value].handle;
 		CHECK_GL(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ib));
@@ -832,6 +863,12 @@ void drawElements(uint offset, uint count, PrimitiveType type)
 	}
 
 	CHECK_GL(glDrawElements(pt, count, GL_UNSIGNED_SHORT, (void*)(intptr_t)(offset * sizeof(short))));
+}
+
+void drawTrianglesInstanced(uint indices_count, uint instances_count)
+{
+	checkThread();
+	glDrawElementsInstanced(GL_TRIANGLES, indices_count, GL_UNSIGNED_SHORT, nullptr, instances_count);
 }
 
 
@@ -1391,6 +1428,9 @@ ProgramHandle createProgram(const char** srcs, const ShaderType* types, int num,
 			default: ASSERT(false); ffr_type = UniformType::VEC4; break;
 		}
 
+		if (size > 1) {
+			name[stringLength(name) - 3] = '\0';
+		}
 		const int loc = glGetUniformLocation(prg, name);
 
 		if(loc >= 0) {

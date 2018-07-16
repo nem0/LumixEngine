@@ -1,5 +1,6 @@
 #include "engine/blob.h"
 #include "engine/string.h"
+#include <cstring>
 
 
 namespace Lumix
@@ -29,7 +30,7 @@ namespace Lumix
 		if (blob.m_size > 0)
 		{
 			m_data = allocator.allocate(blob.m_size);
-			copyMemory(m_data, blob.m_data, blob.m_size);
+			memcpy(m_data, blob.m_data, blob.m_size);
 			m_size = blob.m_size;
 		}
 		else
@@ -47,7 +48,7 @@ namespace Lumix
 		if (blob.getSize() > 0)
 		{
 			m_data = allocator.allocate(blob.getSize());
-			copyMemory(m_data, blob.getData(), blob.getSize());
+			memcpy(m_data, blob.getData(), blob.getSize());
 			m_size = blob.getSize();
 		}
 		else
@@ -123,7 +124,7 @@ namespace Lumix
 		if (rhs.m_size > 0)
 		{
 			m_data = m_allocator->allocate(rhs.m_size);
-			copyMemory(m_data, rhs.m_data, rhs.m_size);
+			memcpy(m_data, rhs.m_data, rhs.m_size);
 			m_size = rhs.m_size;
 		}
 		else
@@ -144,7 +145,7 @@ namespace Lumix
 		if (rhs.m_size > 0)
 		{
 			m_data = m_allocator->allocate(rhs.m_size);
-			copyMemory(m_data, rhs.m_data, rhs.m_size);
+			memcpy(m_data, rhs.m_data, rhs.m_size);
 			m_size = rhs.m_size;
 		}
 		else
@@ -169,7 +170,7 @@ namespace Lumix
 		{
 			reserve((m_pos + size) << 1);
 		}
-		copyMemory((u8*)m_data + m_pos, data, size);
+		memcpy((u8*)m_data + m_pos, data, size);
 		m_pos += size;
 	}
 
@@ -201,7 +202,7 @@ namespace Lumix
 
 		ASSERT(m_allocator);
 		u8* tmp = (u8*)m_allocator->allocate(size);
-		copyMemory(tmp, m_data, m_size);
+		memcpy(tmp, m_data, m_size);
 		m_allocator->deallocate(m_data);
 		m_data = tmp;
 		m_size = size;
@@ -215,7 +216,7 @@ namespace Lumix
 
 		ASSERT(m_allocator);
 		u8* tmp = (u8*)m_allocator->allocate(size);
-		copyMemory(tmp, m_data, m_size);
+		memcpy(tmp, m_data, m_size);
 		m_allocator->deallocate(m_data);
 		m_data = tmp;
 		m_size = size;
@@ -260,7 +261,7 @@ namespace Lumix
 		}
 		if (size)
 		{
-			copyMemory(data, ((char*)m_data) + m_pos, size);
+			memcpy(data, ((char*)m_data) + m_pos, size);
 		}
 		m_pos += size;
 		return true;

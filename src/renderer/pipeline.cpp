@@ -1,5 +1,6 @@
 #include "draw2d.h"
 #include "ffr/ffr.h"
+#include "engine/blob.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/fs/disk_file_device.h"
@@ -17,6 +18,7 @@
 #include "material.h"
 #include "model.h"
 #include "pipeline.h"
+#include "pose.h"
 #include "renderer.h"
 #include "render_scene.h"
 #include "shader.h"
@@ -64,6 +66,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		m_draw2d.PushTextureID(font_atlas.TexID);
 
 		m_model_uniform = ffr::allocUniform("u_model", ffr::UniformType::MAT4, 1);
+		m_bones_uniform = ffr::allocUniform("u_bones", ffr::UniformType::MAT4, 196);
 		m_canvas_size_uniform = ffr::allocUniform("u_canvas_size", ffr::UniformType::VEC2, 1);
 		m_texture_uniform = ffr::allocUniform("u_texture", ffr::UniformType::INT, 1);
 		m_irradiance_map_uniform = ffr::allocUniform("u_irradiancemap", ffr::UniformType::INT, 1);
@@ -1129,6 +1132,13 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 
 	struct RenderMeshesCommand : Renderer::RenderCommandBase
 	{
+		struct Mesh {
+			Matrix mtx;
+			Lumix::Mesh* mesh; // TODO
+			Entity owner;
+		};
+
+
 		void setup() override
 		{
 			if(!pipeline->m_scene) return;
@@ -1154,6 +1164,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 					auto& m = this->meshes[meshes_count];
 					m.mtx = universe.getMatrix(mesh.owner);
 					m.mesh = mesh.mesh;
+					m.owner = mesh.owner;
 					++meshes_count;
 				}
 			}
@@ -1171,6 +1182,27 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 				irradiance_map = pipeline->m_default_cubemap->handle;
 				radiance_map = pipeline->m_default_cubemap->handle;
 			}
+		}
+
+		
+		void renderSkinnedMesh(const Mesh& mesh, const Pose& pose, const Model& model, int model_uniform_loc, int bones_uniform_loc) const
+		{
+			Matrix bone_mtx[196];
+
+			const Vec3* poss = pose.positions;
+			const Quat* rots = pose.rotations;
+
+			ASSERT(pose.count <= lengthOf(bone_mtx));
+			for (int bone_index = 0, bone_count = pose.count; bone_index < bone_count; ++bone_index)
+			{
+				auto& bone = model.getBone(bone_index);
+				RigidTransform tmp = {poss[bone_index], rots[bone_index]};
+				bone_mtx[bone_index] = (tmp * bone.inv_bind_transform).toMatrix();
+			}
+
+			ffr::applyUniformMatrix4fv(bones_uniform_loc, pose.count, &bone_mtx[0].m11);
+			ffr::applyUniformMatrix4f(model_uniform_loc, &mesh.mtx.m11);
+			ffr::drawTriangles(mesh.mesh->indices_count);
 		}
 
 
@@ -1195,19 +1227,64 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 			const Lumix::Mesh* prev_mesh = nullptr;
 			const Shader::Program* program = nullptr;
 			int model_uniform_loc = -1;
+			int bones_uniform_loc = -1;
+			u8* instance_data = (u8*)pipeline->m_allocator.allocate(4 * 1024 * 1024);
+			int instance_offset = 0;
+			const Lumix::Mesh* instance_mesh = nullptr;
+
+			ffr::VertexDecl instance_decl;
+			instance_decl.addAttribute(4, ffr::AttributeType::FLOAT, false, false);
+			instance_decl.addAttribute(4, ffr::AttributeType::FLOAT, false, false);
+			instance_decl.addAttribute(4, ffr::AttributeType::FLOAT, false, false);
+			instance_decl.addAttribute(4, ffr::AttributeType::FLOAT, false, false);
+
+			auto finish_instances = [&](){
+				PROFILE_BLOCK("finish_instances");
+				const ffr::BufferHandle instance_buffer = pipeline->m_renderer.getTransientBuffer();
+				ffr::update(instance_buffer, instance_data, 0, instance_offset);
+				{
+					PROFILE_BLOCK("isntance");
+					ffr::setInstanceBuffer(instance_decl, instance_buffer, 0, instance_mesh->vertex_decl.attributes_count);
+					{
+						PROFILE_BLOCK("draw");
+						ffr::drawTrianglesInstanced(instance_mesh->indices_count, instance_offset / sizeof(Matrix));
+						instance_mesh = nullptr;
+						instance_offset = 0;
+					}
+				}
+			};
+
+			Renderer& renderer = pipeline->m_renderer;
+			const u32 instanced_define_mask = 1 << renderer.getShaderDefineIdx("INSTANCED");
+			const u32 skinned_define_mask = 1 << renderer.getShaderDefineIdx("SKINNED");
+
+			const ModelInstance* model_instances = pipeline->m_scene->getModelInstances();
+
 			for (int i = 0, c = meshes_count; i < c; ++i) {
 				const Mesh& mesh = meshes[i];
 
 				if(mesh.mesh != prev_mesh) {
+					if(instance_mesh) {
+						finish_instances();
+					}
+					if (mesh.mesh->type == Lumix::Mesh::RIGID_INSTANCED) {
+						instance_mesh = mesh.mesh;
+					}
+
 					const Material* material = mesh.mesh->material;
 					if (!material->isReady()) continue;
 					if(material != prev_material) {
-						const u32 final_define_mask = material->getDefineMask() | define_mask;
+						u32 final_define_mask = material->getDefineMask() | define_mask;
+						if(mesh.mesh->type == Lumix::Mesh::RIGID_INSTANCED) {
+							final_define_mask |= instanced_define_mask;
+						}
+						
 						const Shader::Program& prog = material->getShader()->getProgram(final_define_mask);
 						if (!prog.handle.isValid()) continue;
 
 						program = &prog;
 						model_uniform_loc = ffr::getUniformLocation(prog.handle, pipeline->m_model_uniform);
+						bones_uniform_loc = ffr::getUniformLocation(prog.handle, pipeline->m_bones_uniform);
 						int textures_count = material->getTextureCount();
 						for (int i = 0; i < textures_count; ++i) {
 							ffr::bindTexture(i + 2 + global_textures_count, material->getTexture(i)->handle);
@@ -1235,11 +1312,33 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 				
 					ffr::setVertexBuffer(&mesh.mesh->vertex_decl, mesh.mesh->vertex_buffer_handle, 0, program->use_semantics ? attribute_map : nullptr);
 					ffr::setIndexBuffer(mesh.mesh->index_buffer_handle);
+				
 				}
 
-				ffr::applyUniformMatrix4f(model_uniform_loc, &mesh.mtx.m11);
-				ffr::drawTriangles(mesh.mesh->indices_count);
+				switch(mesh.mesh->type) {
+					case Lumix::Mesh::RIGID_INSTANCED:
+						memcpy(instance_data + instance_offset, &mesh.mtx, sizeof(mesh.mtx));
+						instance_offset += sizeof(mesh.mtx);
+						break;
+					case Lumix::Mesh::RIGID:
+						ffr::applyUniformMatrix4f(model_uniform_loc, &mesh.mtx.m11);
+						ffr::drawTriangles(mesh.mesh->indices_count);
+						break;
+					case Lumix::Mesh::SKINNED: {
+						const ModelInstance& model_instance = model_instances[mesh.owner.index];
+						renderSkinnedMesh(mesh, *model_instance.pose, *model_instance.model, model_uniform_loc, bones_uniform_loc);
+						break;
+					}
+					default:
+						ASSERT(false);
+						break;
+				}
 			}
+			if(instance_mesh) {
+				finish_instances();
+			}
+
+			pipeline->m_allocator.deallocate(instance_data);
 			pipeline->m_renderer.free(meshes_mem);
 			ffr::popDebugGroup();
 		}
@@ -1249,10 +1348,6 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		PipelineImpl* pipeline;
 		ffr::TextureHandle irradiance_map;
 		ffr::TextureHandle radiance_map;
-		struct Mesh {
-			Matrix mtx;
-			Lumix::Mesh* mesh; // TODO
-		};
 		Mesh* meshes;
 		int meshes_count;
 		Renderer::MemRef meshes_mem;
@@ -1487,6 +1582,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 	Array<ShaderRef> m_shaders;
 
 	ffr::UniformHandle m_model_uniform;
+	ffr::UniformHandle m_bones_uniform;
 	ffr::UniformHandle m_canvas_size_uniform;
 	ffr::UniformHandle m_texture_uniform;
 	ffr::UniformHandle m_irradiance_map_uniform;

@@ -95,6 +95,7 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 		virtual MemRef copy(const void* data, uint size) = 0 ;
 		virtual void free(const MemRef& memory) = 0;
 		
+		virtual ffr::BufferHandle getTransientBuffer() = 0;
 		virtual ffr::BufferHandle createBuffer(const MemRef& memory) = 0;
 		virtual void destroy(ffr::BufferHandle buffer) = 0;
 		
