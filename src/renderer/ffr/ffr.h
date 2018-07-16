@@ -156,6 +156,7 @@ FramebufferHandle createFramebuffer(uint renderbuffers_count, const TextureHandl
 QueryHandle createQuery();
 
 void setVertexBuffer(const VertexDecl* decl, BufferHandle vertex_buffer, uint buffer_offset_bytes, const int* attribute_map);
+void setInstanceBuffer(const VertexDecl& decl, BufferHandle instance_buffer, int byte_offset, int location_offset);
 void bindTexture(uint unit, TextureHandle handle);
 void uniformBlockBinding(ProgramHandle program, const char* block_name, uint binding);
 void update(FramebufferHandle fb, uint renderbuffers_count, const TextureHandle* renderbuffers);
@@ -176,6 +177,7 @@ void destroy(UniformHandle query);
 
 void setIndexBuffer(BufferHandle handle);
 void drawTriangles(uint indices_count);
+void drawTrianglesInstanced(uint indices_count, uint instances_count);
 void drawElements(uint offset, uint count, PrimitiveType type);
 void drawArrays(uint offset, uint count, PrimitiveType type);
 
@@ -191,6 +193,7 @@ void setUniformMatrix4x3f(UniformHandle uniform, const float* value);
 int getUniformLocation(ProgramHandle program_handle, UniformHandle uniform);
 void applyUniformMatrix3x4f(int location, const float* value);
 void applyUniformMatrix4f(int location, const float* value);
+void applyUniformMatrix4fv(int location, uint count, const float* value);
 void applyUniformMatrix4x3f(int location, const float* value);
 
 void setFramebuffer(FramebufferHandle fb, bool srgb);

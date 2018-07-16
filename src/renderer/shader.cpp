@@ -418,6 +418,10 @@ bool Shader::load(FS::IFile& file)
 	lua_setglobal(L, "SEMANTICS_TEXCOORD0");
 	lua_pushinteger(L, (int)Mesh::AttributeSemantic::NORMAL);
 	lua_setglobal(L, "SEMANTICS_NORMAL");
+	lua_pushinteger(L, (int)Mesh::AttributeSemantic::WEIGHTS);
+	lua_setglobal(L, "SEMANTICS_WEIGHTS");
+	lua_pushinteger(L, (int)Mesh::AttributeSemantic::INDICES);
+	lua_setglobal(L, "SEMANTICS_INDICES");
 
 	const StringView content((const char*)file.getBuffer(), (int)file.size());
 	if (!LuaWrapper::execute(L, content, getPath().c_str(), 0)) {

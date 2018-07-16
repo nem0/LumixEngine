@@ -311,7 +311,7 @@ public:
 		}
 		for (int i = m_size; i < size; ++i)
 		{
-			new (NewPlaceholder(), (char*)(m_data + i)) T();
+			new (NewPlaceholder(), (char*)(m_data + i)) T;
 		}
 		callDestructors(m_data + size, m_data + m_size);
 		m_size = size;

@@ -181,6 +181,7 @@ struct RenderTask : MT::Task
 	ffr::BufferHandle m_global_state_uniforms;
 	MT::Semaphore m_finished_semaphore;
 	bool m_shutdown_requested = false;
+	ffr::BufferHandle m_transient_buffer;
 	
 	struct PreparedCommand
 	{
@@ -583,6 +584,12 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	}
 
 
+	ffr::BufferHandle getTransientBuffer() override
+	{
+		return m_render_task.m_transient_buffer;
+	}
+
+
 	ffr::BufferHandle createBuffer(const MemRef& memory) override
 	{
 		ffr::BufferHandle handle = ffr::allocBufferHandle();
@@ -688,9 +695,6 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 		volatile int counter;
 		RendererImpl* renderer;
 	};
-
-
-	RenderCommandSetupJobData* m_last_job = nullptr;
 
 
 	void push(RenderCommandBase* cmd) override
@@ -890,6 +894,8 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	Pipeline* m_main_pipeline;
 	RenderTask m_render_task;
 	GlobalState m_global_state;
+	ffr::BufferHandle m_transient_buffer;
+	RenderCommandSetupJobData* m_last_job = nullptr;
 };
 
 
@@ -914,6 +920,8 @@ int RenderTask::task()
 	m_global_state_uniforms = ffr::allocBufferHandle();
 	ffr::createBuffer(m_global_state_uniforms, sizeof(Renderer::GlobalState), nullptr); 
 	ffr::bindUniformBuffer(0, m_global_state_uniforms, 0, sizeof(Renderer::GlobalState));
+	m_transient_buffer = ffr::allocBufferHandle();
+	ffr::createBuffer(m_transient_buffer, 4 *1024 * 1024, nullptr);
 	while (!m_shutdown_requested || !m_commands.isEmpty()) {
 		Renderer::RenderCommandBase** rt_cmd = m_commands.pop(true);
 		Renderer::RenderCommandBase* cmd = *rt_cmd;
@@ -923,6 +931,7 @@ int RenderTask::task()
 		cmd->execute();
 		LUMIX_DELETE(m_renderer.getAllocator(), cmd);
 	}
+	ffr::destroy(m_transient_buffer);
 	m_profiler.clear();
 	ffr::shutdown();
 	m_finished_semaphore.signal();
