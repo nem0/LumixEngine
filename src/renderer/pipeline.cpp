@@ -389,17 +389,15 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 
 				ffr::setUniformMatrix4f(pipeline->m_model_uniform, &Matrix::IDENTITY.m11);
 
-				// TODO do not create every frame
-				
 				ffr::setState(0);
 				ffr::useProgram(shader.handle);
-				const ffr::BufferHandle vb = ffr::allocBufferHandle();
-				ffr::createBuffer(vb, vertices.size() * sizeof(vertices[0]), &vertices[0]);
-				ffr::setVertexBuffer(&vertex_decl, vb, 0, nullptr);
+
+				const Renderer::TransientSlice vb = pipeline->m_renderer.allocTransient(vertices.byte_size());
+				ffr::update(vb.buffer, vertices.begin(), vb.offset, vb.size);
+				
+				ffr::setVertexBuffer(&vertex_decl, vb.buffer, vb.offset, nullptr);
 				ffr::setIndexBuffer(ffr::INVALID_BUFFER);
 				ffr::drawArrays(0, lines.size() * 2, ffr::PrimitiveType::LINES);
-
-				ffr::destroy(vb);
 			}
 
 			Array<DebugLine> lines;
@@ -834,7 +832,12 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		const int indices_offset = LuaWrapper::checkArg<int>(L, 1);
 		const int indices_count = LuaWrapper::checkArg<int>(L, 2);
 		int shader_id = LuaWrapper::checkArg<int>(L, 3);
-		LuaWrapper::checkTableArg(L, 4);
+		if(lua_gettop(L) > 3) {
+			LuaWrapper::checkTableArg(L, 4);
+		}
+		if(lua_gettop(L) > 4) {
+			LuaWrapper::checkTableArg(L, 5);
+		}
 
 		Shader* shader = nullptr;
 		for (const ShaderRef& s : pipeline->m_shaders) {
@@ -855,73 +858,76 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		if (!shader->isReady()) return 0;
 
 		Cmd* cmd = LUMIX_NEW(pipeline->m_renderer.getAllocator(), Cmd);
-		lua_pushnil(L);
-		while (lua_next(L, 4) != 0) {
-			if(lua_type(L, -1) != LUA_TNUMBER) {
-				g_log_error.log("Renderer") << "Incorrect texture arguments of drawArrays";
-				LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
-				lua_pop(L, 2);
-				return 0;
-			}
-
-			if(lua_type(L, -2) != LUA_TSTRING) {
-				g_log_error.log("Renderer") << "Incorrect texture arguments of drawArrays";
-				LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
-				lua_pop(L, 2);
-				return 0;
-			}
-
-			if (cmd->m_textures_count > lengthOf(cmd->m_textures)) {
-				g_log_error.log("Renderer") << "Too many texture in drawArray call";
-				LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
-				lua_pop(L, 2);
-				return 0;
-			}
-
-			const char* uniform_name = lua_tostring(L, -2);
-			cmd->m_textures[cmd->m_textures_count].uniform = ffr::allocUniform(uniform_name, ffr::UniformType::INT, 1);
-
-			const int rb_idx = (int)lua_tointeger(L, -1);
-			cmd->m_textures[cmd->m_textures_count].handle = pipeline->m_renderbuffers[rb_idx].handle;
-			++cmd->m_textures_count;
-
-			lua_pop(L, 1);
-		}
-		
-		if (lua_istable(L, 5)) {
+		if(lua_gettop(L) > 3) {
 			lua_pushnil(L);
-			while (lua_next(L, 5) != 0) {
-				if(lua_type(L, -1) != LUA_TTABLE) {
-					g_log_error.log("Renderer") << "Incorrect uniform arguments of drawArrays";
+			while (lua_next(L, 4) != 0) {
+				if(lua_type(L, -1) != LUA_TNUMBER) {
+					g_log_error.log("Renderer") << "Incorrect texture arguments of drawArrays";
 					LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
 					lua_pop(L, 2);
 					return 0;
 				}
 
 				if(lua_type(L, -2) != LUA_TSTRING) {
-					g_log_error.log("Renderer") << "Incorrect uniform arguments of drawArrays";
+					g_log_error.log("Renderer") << "Incorrect texture arguments of drawArrays";
+					LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
+					lua_pop(L, 2);
+					return 0;
+				}
+
+				if (cmd->m_textures_count > lengthOf(cmd->m_textures)) {
+					g_log_error.log("Renderer") << "Too many texture in drawArray call";
 					LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
 					lua_pop(L, 2);
 					return 0;
 				}
 
 				const char* uniform_name = lua_tostring(L, -2);
-				cmd->m_uniforms[cmd->m_uniforms_count].handle = ffr::allocUniform(uniform_name, ffr::UniformType::VEC4, 1);
-				float* value = &cmd->m_uniforms[cmd->m_uniforms_count].value.x;
-				for(int i = 0; i < 4; ++i) {
-					lua_rawgeti(L, -1, 1 + i);
-					if (lua_type(L, -1) != LUA_TNUMBER) {
-						g_log_error.log("Renderer") << "Incorrect uniform arguments of drawArrays. Uniforms can only be Vec4.";
+				cmd->m_textures[cmd->m_textures_count].uniform = ffr::allocUniform(uniform_name, ffr::UniformType::INT, 1);
+
+				const int rb_idx = (int)lua_tointeger(L, -1);
+				cmd->m_textures[cmd->m_textures_count].handle = pipeline->m_renderbuffers[rb_idx].handle;
+				++cmd->m_textures_count;
+
+				lua_pop(L, 1);
+			}
+		
+		
+			if (lua_istable(L, 5)) {
+				lua_pushnil(L);
+				while (lua_next(L, 5) != 0) {
+					if(lua_type(L, -1) != LUA_TTABLE) {
+						g_log_error.log("Renderer") << "Incorrect uniform arguments of drawArrays";
 						LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
-						lua_pop(L, 3);
+						lua_pop(L, 2);
 						return 0;
 					}
-					value[i] = (float)lua_tonumber(L, -1);
+
+					if(lua_type(L, -2) != LUA_TSTRING) {
+						g_log_error.log("Renderer") << "Incorrect uniform arguments of drawArrays";
+						LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
+						lua_pop(L, 2);
+						return 0;
+					}
+
+					const char* uniform_name = lua_tostring(L, -2);
+					cmd->m_uniforms[cmd->m_uniforms_count].handle = ffr::allocUniform(uniform_name, ffr::UniformType::VEC4, 1);
+					float* value = &cmd->m_uniforms[cmd->m_uniforms_count].value.x;
+					for(int i = 0; i < 4; ++i) {
+						lua_rawgeti(L, -1, 1 + i);
+						if (lua_type(L, -1) != LUA_TNUMBER) {
+							g_log_error.log("Renderer") << "Incorrect uniform arguments of drawArrays. Uniforms can only be Vec4.";
+							LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
+							lua_pop(L, 3);
+							return 0;
+						}
+						value[i] = (float)lua_tonumber(L, -1);
+						lua_pop(L, 1);
+					}
+
+					++cmd->m_uniforms_count;
 					lua_pop(L, 1);
 				}
-
-				++cmd->m_uniforms_count;
-				lua_pop(L, 1);
 			}
 		}
 
@@ -1185,7 +1191,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		cmd->h = pipeline->m_viewport.h;
 		pipeline->m_renderer.push(cmd);
 
-		return 1;
+		return 0;
 	}
 
 
@@ -1503,6 +1509,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 			const Matrix* LUMIX_RESTRICT matrices = m_meshes.matrices; 
 			const Entity* LUMIX_RESTRICT owners = m_meshes.owners; 
 			int start_instance = -1;
+			ffr::blending(0);
 
 			for (int batch = 0, c = m_meshes.count; batch < c; batch += 8 * 1024) {
 				const Material* prev_material = nullptr;
@@ -1693,6 +1700,37 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 	}
 
 
+	void setStencil(uint write_mask, uint func, int ref, uint mask, uint sfail, uint zfail, uint zpass) 
+	{
+		struct Cmd : Renderer::RenderCommandBase
+		{
+			void setup() {}
+			void execute() override 
+			{
+				ffr::setStencil(write_mask, (ffr::StencilFuncs)func, ref, mask, (ffr::StencilOps)sfail, (ffr::StencilOps)zfail, (ffr::StencilOps)zpass);
+			}
+
+			uint write_mask;
+			uint func;
+			int ref;
+			uint mask;
+			uint sfail;
+			uint zfail;
+			uint zpass;
+		};
+
+		IAllocator& allocator = m_renderer.getAllocator();
+		Cmd* cmd = LUMIX_NEW(allocator, Cmd);
+		cmd->write_mask = write_mask;
+		cmd->func = func;
+		cmd->ref = ref;
+		cmd->mask = mask;
+		cmd->sfail = sfail;
+		cmd->zfail = zfail;
+		cmd->zpass = zpass;
+		m_renderer.push(cmd);
+	}
+	
 	void setOutput(int rb_index) 
 	{
 		m_output = rb_index;
@@ -1775,10 +1813,19 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		REGISTER_FUNCTION(render2D);
 		REGISTER_FUNCTION(renderDebugShapes);
 		REGISTER_FUNCTION(setOutput);
+		REGISTER_FUNCTION(setStencil);
 		REGISTER_FUNCTION(viewport);
 
 		registerConst("CLEAR_DEPTH", (uint)ffr::ClearFlags::DEPTH);
-		registerConst("CLEAR_ALL", (uint)ffr::ClearFlags::COLOR | (uint)ffr::ClearFlags::DEPTH);
+		registerConst("CLEAR_COLOR", (uint)ffr::ClearFlags::COLOR);
+		registerConst("CLEAR_ALL", (uint)ffr::ClearFlags::COLOR | (uint)ffr::ClearFlags::DEPTH | (uint)ffr::ClearFlags::STENCIL);
+
+		registerConst("STENCIL_ALWAYS", (uint)ffr::StencilFuncs::ALWAYS);
+		registerConst("STENCIL_EQUAL", (uint)ffr::StencilFuncs::EQUAL);
+		registerConst("STENCIL_NOT_EQUAL", (uint)ffr::StencilFuncs::NOT_EQUAL);
+		registerConst("STENCIL_DISABLE", (uint)ffr::StencilFuncs::DISABLE);
+		registerConst("STENCIL_KEEP", (uint)ffr::StencilOps::KEEP);
+		registerConst("STENCIL_REPLACE", (uint)ffr::StencilOps::REPLACE);
 
 		registerCFunction("drawArray", PipelineImpl::drawArray);
 		registerCFunction("getCameraParams", PipelineImpl::getCameraParams);

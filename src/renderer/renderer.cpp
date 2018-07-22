@@ -589,6 +589,7 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 
 	TransientSlice allocTransient(uint size) override
 	{
+		ffr::checkThread();
 		TransientSlice slice;
 		slice.buffer = m_render_task.m_transient_buffer;
 		slice.offset = m_render_task.m_transient_buffer_offset;
@@ -924,7 +925,7 @@ int RenderTask::task()
 	PROFILE_FUNCTION();
 	void* window_handle = m_renderer.getEngine().getPlatformData().window_handle;
 	ffr::init(window_handle);
-	m_framebuffer = ffr::createFramebuffer(0, nullptr);
+	m_framebuffer = ffr::createFramebuffer();
 	m_global_state_uniforms = ffr::allocBufferHandle();
 	ffr::createBuffer(m_global_state_uniforms, sizeof(Renderer::GlobalState), nullptr); 
 	ffr::bindUniformBuffer(0, m_global_state_uniforms, 0, sizeof(Renderer::GlobalState));

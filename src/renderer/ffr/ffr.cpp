@@ -469,6 +469,15 @@ static LoadInfo* getDXT10LoadInfo(const Header& hdr, const DXT10Header& dxt10_hd
 		case DxgiFormat::R8G8B8A8_UNORM:
 			return &loadInfoRGBA8;
 			break;
+		case DxgiFormat::BC1_UNORM:
+			return &loadInfoDXT1;
+			break;
+		case DxgiFormat::BC2_UNORM:
+			return &loadInfoDXT3;
+			break;
+		case DxgiFormat::BC3_UNORM:
+			return &loadInfoDXT5;
+			break;
 		default:
 			ASSERT(false);
 			return nullptr;
@@ -691,7 +700,7 @@ static void flipCompressedTexture(int w, int h, int format, void* surface)
 			GLenum err = glGetError(); \
 			if (err != GL_NO_ERROR) { \
 				g_log_error.log("Renderer") << "OpenGL error " << err; \
-				ASSERT(false);/**/ \
+			/*	ASSERT(false);/**/ \
 			} \
 		} while(false)
 #else
@@ -802,6 +811,34 @@ void viewport(uint x,uint y,uint w,uint h)
 {
 	checkThread();
 	glViewport(x, y, w, h);
+}
+
+
+void setStencil(uint write_mask, StencilFuncs func, int ref, uint mask, StencilOps sfail, StencilOps zfail, StencilOps zpass)
+{
+	glStencilMask(write_mask);
+	if (func == StencilFuncs::DISABLE) {
+		glDisable(GL_STENCIL_TEST);
+	}
+	else {
+		glEnable(GL_STENCIL_TEST);
+		GLenum gl_func;
+		switch(func) {
+			case StencilFuncs::ALWAYS: gl_func = GL_ALWAYS; break;
+			case StencilFuncs::EQUAL: gl_func = GL_EQUAL; break;
+			case StencilFuncs::NOT_EQUAL: gl_func = GL_NOTEQUAL; break;
+			default: ASSERT(false); break;
+		}
+		glStencilFunc(gl_func, ref, mask);
+		auto toGLOp = [](StencilOps op) {
+			switch(op) {
+				case StencilOps::KEEP: return GL_KEEP;
+				case StencilOps::REPLACE: return GL_REPLACE;
+				default: ASSERT(false); return GL_REPLACE;
+			}
+		};
+		glStencilOp(toGLOp(sfail), toGLOp(zfail), toGLOp(zpass));
+	}
 }
 
 
@@ -1133,7 +1170,7 @@ void createBuffer(BufferHandle buffer, size_t size, const void* data)
 	GLuint buf;
 	CHECK_GL(glGenBuffers(1, &buf));
 	CHECK_GL(glBindBuffer(GL_UNIFORM_BUFFER, buf));
-	CHECK_GL(glBufferData(GL_UNIFORM_BUFFER, size, data, GL_STATIC_DRAW));
+	CHECK_GL(glBufferData(GL_UNIFORM_BUFFER, size, data, GL_DYNAMIC_DRAW));
 	CHECK_GL(glBindBuffer(GL_UNIFORM_BUFFER, 0));
 
 	g_ffr.buffers[buffer.value].handle = buf;
@@ -1320,17 +1357,17 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, uint f
 				Array<uint> unpacked(*g_ffr.allocator);
 				unpacked.resize(size);
 				blob.read(palette, 4 * 256);
-				for (uint ix = 0; ix < mipMapCount; ++ix) {
+				for (uint mip = 0; mip < mipMapCount; ++mip) {
 					blob.read(&data[0], size);
 					for (uint zz = 0; zz < size; ++zz) {
 						unpacked[zz] = palette[data[zz]];
 					}
 					//glPixelStorei(GL_UNPACK_ROW_LENGTH, height);
 					if(layers > 1) {
-						CHECK_GL(glTextureSubImage3D(tex_img_target, ix, internal_format, width, height, layer, 0, li->externalFormat, li->type, &unpacked[0]));
+						CHECK_GL(glTextureSubImage3D(texture, mip, 0, 0, layer, width, height, 1, li->externalFormat, li->type, &unpacked[0]));
 					}
 					else {
-						CHECK_GL(glTextureSubImage2D(tex_img_target, ix, internal_format, width, height, 0, li->externalFormat, li->type, &unpacked[0]));
+						CHECK_GL(glTextureSubImage2D(texture, mip, 0, 0, width, height, li->externalFormat, li->type, &unpacked[0]));
 					}
 					width = Math::maximum(1, width >> 1);
 					height = Math::maximum(1, height >> 1);
@@ -1485,6 +1522,9 @@ void clear(uint flags, const float* color, float depth)
 	if (flags & (uint)ClearFlags::DEPTH) {
 		CHECK_GL(glClearDepth(depth));
 		gl_flags |= GL_DEPTH_BUFFER_BIT;
+	}
+	if (flags & (uint)ClearFlags::STENCIL) {
+		gl_flags |= GL_STENCIL_BUFFER_BIT;
 	}
 	CHECK_GL(glUseProgram(0));
 	CHECK_GL(glClear(gl_flags));
@@ -1838,6 +1878,9 @@ void update(FramebufferHandle fb, uint renderbuffers_count, const TextureHandle*
 		CHECK_GL(glBindTexture(GL_TEXTURE_2D, 0));
 		switch(internal_format) {
 			case GL_DEPTH24_STENCIL8:
+				CHECK_GL(glNamedFramebufferTexture(fb.value, GL_DEPTH_STENCIL_ATTACHMENT, t, 0));
+				depth_bound = true;
+				break;
 			case GL_DEPTH_COMPONENT24:
 			case GL_DEPTH_COMPONENT32:
 				CHECK_GL(glNamedFramebufferTexture(fb.value, GL_DEPTH_ATTACHMENT, t, 0));
@@ -1857,7 +1900,13 @@ void update(FramebufferHandle fb, uint renderbuffers_count, const TextureHandle*
 	}
 	if (!depth_bound) {
 		glNamedFramebufferRenderbuffer(fb.value, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, 0);
+		glNamedFramebufferRenderbuffer(fb.value, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, 0);
 	}
+
+	glBindFramebuffer(GL_FRAMEBUFFER, fb.value);
+	auto xx = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+	ASSERT(xx == GL_FRAMEBUFFER_COMPLETE);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 
@@ -1889,23 +1938,11 @@ void queryTimestamp(QueryHandle query)
 }
 
 
-FramebufferHandle createFramebuffer(uint renderbuffers_count, const TextureHandle* renderbuffers)
+FramebufferHandle createFramebuffer()
 {
 	checkThread();
 	GLuint fb;
-	CHECK_GL(glGenFramebuffers(1, &fb));
-	CHECK_GL(glBindFramebuffer(GL_FRAMEBUFFER, fb));
-	CHECK_GL(glBindFramebuffer(GL_FRAMEBUFFER, 0));
-
-	update({fb}, renderbuffers_count, renderbuffers);
-
-	GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-	CHECK_GL(glBindFramebuffer(GL_FRAMEBUFFER, 0));
-	if (status != GL_FRAMEBUFFER_COMPLETE) {
-		CHECK_GL(glDeleteFramebuffers(1, &fb));
-		return INVALID_FRAMEBUFFER;
-	}
-
+	CHECK_GL(glCreateFramebuffers(1, &fb));
 	return {fb};
 }
 
