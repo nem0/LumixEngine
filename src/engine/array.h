@@ -342,6 +342,7 @@ public:
 		return m_data[index];
 	}
 
+	int byte_size() const { return m_size * sizeof(T); }
 	int size() const { return m_size; }
 	int capacity() const { return m_capacity; }
 

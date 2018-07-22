@@ -28,7 +28,7 @@ static const float GRASS_QUAD_SIZE = 10.0f;
 static const float GRASS_QUAD_RADIUS = GRASS_QUAD_SIZE * 0.7072f;
 static const int GRID_SIZE = 16;
 static const ComponentType TERRAIN_HASH = Reflection::getComponentType("terrain");
-static const char* TEX_COLOR_UNIFORM = "u_texColor";
+static const char* TEX_COLOR_UNIFORM = "u_detail_albedomap";
 
 struct Sample
 {
@@ -874,7 +874,7 @@ RayCastModelHit Terrain::castRay(const Vec3& origin, const Vec3& dir)
 }
 
 
-static void generateSubgrid(Array<Sample>& samples, Array<short>& indices, int& indices_offset, int start_x, int start_y)
+static void generateSubgrid(Array<Sample>& samples, Array<u16>& indices, int& indices_offset, int start_x, int start_y)
 {
 	for (int j = start_y; j < start_y + 8; ++j)
 	{
@@ -907,11 +907,11 @@ static void generateSubgrid(Array<Sample>& samples, Array<short>& indices, int& 
 
 void Terrain::generateGeometry()
 {
-	/*LUMIX_DELETE(m_allocator, m_mesh);
+	LUMIX_DELETE(m_allocator, m_mesh);
 	m_mesh = nullptr;
 	Array<Sample> points(m_allocator);
 	points.resize(GRID_SIZE * GRID_SIZE * 4);
-	Array<short> indices(m_allocator);
+	Array<u16> indices(m_allocator);
 	indices.resize(GRID_SIZE * GRID_SIZE * 6);
 	int indices_offset = 0;
 	generateSubgrid(points, indices, indices_offset, 0, 0);
@@ -919,20 +919,20 @@ void Terrain::generateGeometry()
 	generateSubgrid(points, indices, indices_offset, 0, 8);
 	generateSubgrid(points, indices, indices_offset, 8, 8);
 
-	bgfx::VertexDecl vertex_def;
-	vertex_def.begin()
-		.add(bgfx::Attrib::Position, 3, bgfx::AttribType::Float)
-		.add(bgfx::Attrib::TexCoord0, 2, bgfx::AttribType::Float)
-		.end();
-	m_mesh = LUMIX_NEW(m_allocator, Mesh)(m_material, vertex_def, "terrain", m_allocator);
-	m_mesh->vertex_buffer_handle = bgfx::createVertexBuffer(bgfx::copy(&points[0], sizeof(points[0]) * points.size()), vertex_def);
-	auto* indices_mem = bgfx::copy(&indices[0], sizeof(indices[0]) * indices.size());
-	m_mesh->index_buffer_handle = bgfx::createIndexBuffer(indices_mem);
+	ffr::VertexDecl vertex_def;
+	vertex_def.addAttribute(3, ffr::AttributeType::FLOAT, false, false);
+	vertex_def.addAttribute(2, ffr::AttributeType::FLOAT, false, false);
+
+	const Mesh::AttributeSemantic semantics[] = { Mesh::AttributeSemantic::POSITION, Mesh::AttributeSemantic::TEXCOORD0 };
+	m_mesh = LUMIX_NEW(m_allocator, Mesh)(m_material, vertex_def, "terrain", semantics, m_allocator);
+
+	const Renderer::MemRef vb_data = m_renderer.copy(&points[0], points.byte_size());
+	m_mesh->vertex_buffer_handle = m_renderer.createBuffer(vb_data);
+	
+	const Renderer::MemRef ib_data = m_renderer.copy(&indices[0], indices.byte_size());
+	m_mesh->index_buffer_handle = m_renderer.createBuffer(ib_data);
 	m_mesh->indices_count = indices.size();
 	m_mesh->flags.set(Mesh::Flags::INDICES_16_BIT);
-	*/
-	// TODO
-	ASSERT(false);
 }
 
 TerrainQuad* Terrain::generateQuadTree(float size)
@@ -953,21 +953,21 @@ void Terrain::onMaterialLoaded(Resource::State, Resource::State new_state, Resou
 	{
 		m_detail_texture = m_material->getTextureByUniform(TEX_COLOR_UNIFORM);
 
-		m_heightmap = m_material->getTextureByUniform("u_texHeightmap");
+		m_heightmap = m_material->getTextureByUniform("u_heightmap");
 		bool is_data_ready = true;
 		if (m_heightmap && m_heightmap->getData() == nullptr)
 		{
 			m_heightmap->addDataReference();
 			is_data_ready = false;
 		}
-		m_splatmap = m_material->getTextureByUniform("u_texSplatmap");
+		m_splatmap = m_material->getTextureByUniform("u_splatmap");
 		if (m_splatmap && m_splatmap->getData() == nullptr)
 		{
 			m_splatmap->addDataReference();
 			is_data_ready = false;
 		}
 
-		Texture* colormap = m_material->getTextureByUniform("u_texColormap");
+		Texture* colormap = m_material->getTextureByUniform("u_colormap");
 		if (colormap && colormap->getData() == nullptr)
 		{
 			colormap->addDataReference();

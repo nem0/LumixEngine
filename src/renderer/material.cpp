@@ -651,11 +651,16 @@ int texture(lua_State* L)
 			return 0;
 		}
 		lua_pop(L, 1);
+		
+
+		Texture* texture = material->getTexture(material->getTextureCount() - 1);
+		bool keep_data = false;
+		LuaWrapper::getOptionalField(L, 1, "keep_data", &keep_data);
+		if (keep_data) texture->addDataReference();
 
 		lua_getfield(L, 1, "srgb");
 		if (lua_isboolean(L, -1)) {
 			const bool srgb = lua_toboolean(L, -1);
-			Texture* texture = material->getTexture(material->getTextureCount() - 1);
 			texture->setSRGB(srgb);
 		}
 		else if (!lua_isnil(L, -1)) {

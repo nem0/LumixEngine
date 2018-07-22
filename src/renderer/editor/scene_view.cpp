@@ -268,6 +268,7 @@ void SceneView::renderGizmos()
 
 			renderer->beginProfileBlock("gizmos");
 			ffr::pushDebugGroup("gizmos");
+			ffr::blending(0);
 			view->m_editor.getGizmo().render(data, viewport);
 			ffr::popDebugGroup();
 			renderer->endProfileBlock();

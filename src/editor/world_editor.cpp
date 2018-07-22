@@ -3076,7 +3076,7 @@ public:
 		m_viewport.h = -1;
 		m_viewport.fov = Math::degreesToRadians(60.f);
 		m_viewport.near = 0.1f;
-		m_viewport.far = 10000.f;
+		m_viewport.far = 100000.f;
 
 		for (auto& i : m_is_mouse_down) i = false;
 		for (auto& i : m_is_mouse_click) i = false;

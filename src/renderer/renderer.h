@@ -67,6 +67,13 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 			bool is_end;
 		};
 
+		struct TransientSlice
+		{
+			ffr::BufferHandle buffer;
+			uint offset;
+			uint size;
+		};
+
 		enum { MAX_SHADER_DEFINES = 32 };
 	public:
 		virtual ~Renderer() {}
@@ -95,7 +102,7 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 		virtual MemRef copy(const void* data, uint size) = 0 ;
 		virtual void free(const MemRef& memory) = 0;
 		
-		virtual ffr::BufferHandle getTransientBuffer() = 0;
+		virtual TransientSlice allocTransient(uint size) = 0;
 		virtual ffr::BufferHandle createBuffer(const MemRef& memory) = 0;
 		virtual void destroy(ffr::BufferHandle buffer) = 0;
 		

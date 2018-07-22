@@ -316,7 +316,7 @@ void Texture::onDataUpdated(int x, int y, int w, int h)
 
 bool loadRaw(Texture& texture, FS::IFile& file, IAllocator& allocator)
 {
-/*	PROFILE_FUNCTION();
+	PROFILE_FUNCTION();
 	size_t size = file.size();
 	texture.bytes_per_pixel = 2;
 	texture.width = (int)sqrt(size / texture.bytes_per_pixel);
@@ -337,15 +337,13 @@ bool loadRaw(Texture& texture, FS::IFile& file, IAllocator& allocator)
 		dst_mem[i] = src_mem[i] / 65535.0f;
 	}
 
-	texture.handle = ffr::createTexture(texture.width, texture.height, ffr::TextureFormat::R32F, texture.getFFRFlags(), &dst_mem[0]);
+	const Renderer::MemRef mem = texture.renderer.copy(dst_mem.begin(), dst_mem.byte_size());
+	texture.handle = texture.renderer.createTexture(texture.width, texture.height, ffr::TextureFormat::R32F, texture.getFFRFlags(), mem);
 	texture.depth = 1;
 	texture.layers = 1;
 	texture.mips = 1;
 	texture.is_cubemap = false;
-	return texture.handle.isValid();*/
-	// TODO
-	ASSERT(false);
-	return false;
+	return texture.handle.isValid();
 }
 
 

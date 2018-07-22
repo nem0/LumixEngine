@@ -151,7 +151,7 @@ ProgramHandle createProgram(const char** srcs, const ShaderType* types, int num,
 void useProgram(ProgramHandle prg);
 void createBuffer(BufferHandle handle, size_t size, const void* data);
 bool createTexture(TextureHandle handle, uint w, uint h, TextureFormat format, uint flags, const void* data);
-bool loadTexture(TextureHandle handle, const void* data, int size, uint flags, TextureInfo* info);
+bool loadTexture(TextureHandle handle, const void* data, int size, uint flags);
 FramebufferHandle createFramebuffer(uint renderbuffers_count, const TextureHandle* renderbuffers);
 QueryHandle createQuery();
 
@@ -161,12 +161,13 @@ void bindTexture(uint unit, TextureHandle handle);
 void uniformBlockBinding(ProgramHandle program, const char* block_name, uint binding);
 void update(FramebufferHandle fb, uint renderbuffers_count, const TextureHandle* renderbuffers);
 void update(BufferHandle buffer, const void* data, size_t offset, size_t size);
+void* map(BufferHandle buffer);
+void unmap(BufferHandle buffer);
 void bindUniformBuffer(uint index, BufferHandle buffer, size_t offset, size_t size);
 void getTextureImage(ffr::TextureHandle texture, uint size, void* buf);
 TextureInfo getTextureInfo(const void* data);
 void queryTimestamp(QueryHandle query);
 u64 getQueryResult(QueryHandle query);
-
 
 void destroy(ProgramHandle program);
 void destroy(BufferHandle buffer);
@@ -177,7 +178,7 @@ void destroy(UniformHandle query);
 
 void setIndexBuffer(BufferHandle handle);
 void drawTriangles(uint indices_count);
-void drawTrianglesInstanced(uint indices_count, uint instances_count);
+void drawTrianglesInstanced(uint indices_offset_bytes, uint indices_count, uint instances_count);
 void drawElements(uint offset, uint count, PrimitiveType type);
 void drawArrays(uint offset, uint count, PrimitiveType type);
 

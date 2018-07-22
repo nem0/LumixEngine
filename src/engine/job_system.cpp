@@ -242,7 +242,7 @@ bool init(IAllocator& allocator)
 	g_system = LUMIX_NEW(allocator, System)(allocator);
 	g_system->m_work_signal.reset();
 
-	int count = Math::maximum(1, int(MT::getCPUsCount() - 1));
+	int count = Math::maximum(1, int(MT::getCPUsCount() - 0));
 	for (int i = 0; i < count; ++i)
 	{
 		WorkerTask* task = LUMIX_NEW(allocator, WorkerTask)(*g_system);
