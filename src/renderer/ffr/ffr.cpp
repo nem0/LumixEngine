@@ -49,7 +49,7 @@ struct Texture
 	enum { MAX_COUNT = 4096 };
 
 	GLuint handle;
-	bool cubemap;
+	GLenum target;
 };
 
 
@@ -119,6 +119,9 @@ static struct {
 	HashMap<u32, uint>* uniforms_hash_map;
 	MT::SpinMutex handle_mutex {false};
 	DWORD thread;
+	int vertex_attributes = 0;
+	int instance_attributes = 0;
+	int max_vertex_attributes = 16;
 } g_ffr;
 
 
@@ -156,6 +159,130 @@ static const uint D3DFMT_DXT2 = '2TXD';
 static const uint D3DFMT_DXT3 = '3TXD';
 static const uint D3DFMT_DXT4 = '4TXD';
 static const uint D3DFMT_DXT5 = '5TXD';
+static const uint D3DFMT_DX10 = '01XD';
+
+enum class DxgiFormat : uint {
+  UNKNOWN                     ,
+  R32G32B32A32_TYPELESS       ,
+  R32G32B32A32_FLOAT          ,
+  R32G32B32A32_UINT           ,
+  R32G32B32A32_SINT           ,
+  R32G32B32_TYPELESS          ,
+  R32G32B32_FLOAT             ,
+  R32G32B32_UINT              ,
+  R32G32B32_SINT              ,
+  R16G16B16A16_TYPELESS       ,
+  R16G16B16A16_FLOAT          ,
+  R16G16B16A16_UNORM          ,
+  R16G16B16A16_UINT           ,
+  R16G16B16A16_SNORM          ,
+  R16G16B16A16_SINT           ,
+  R32G32_TYPELESS             ,
+  R32G32_FLOAT                ,
+  R32G32_UINT                 ,
+  R32G32_SINT                 ,
+  R32G8X24_TYPELESS           ,
+  D32_FLOAT_S8X24_UINT        ,
+  R32_FLOAT_X8X24_TYPELESS    ,
+  X32_TYPELESS_G8X24_UINT     ,
+  R10G10B10A2_TYPELESS        ,
+  R10G10B10A2_UNORM           ,
+  R10G10B10A2_UINT            ,
+  R11G11B10_FLOAT             ,
+  R8G8B8A8_TYPELESS           ,
+  R8G8B8A8_UNORM              ,
+  R8G8B8A8_UNORM_SRGB         ,
+  R8G8B8A8_UINT               ,
+  R8G8B8A8_SNORM              ,
+  R8G8B8A8_SINT               ,
+  R16G16_TYPELESS             ,
+  R16G16_FLOAT                ,
+  R16G16_UNORM                ,
+  R16G16_UINT                 ,
+  R16G16_SNORM                ,
+  R16G16_SINT                 ,
+  R32_TYPELESS                ,
+  D32_FLOAT                   ,
+  R32_FLOAT                   ,
+  R32_UINT                    ,
+  R32_SINT                    ,
+  R24G8_TYPELESS              ,
+  D24_UNORM_S8_UINT           ,
+  R24_UNORM_X8_TYPELESS       ,
+  X24_TYPELESS_G8_UINT        ,
+  R8G8_TYPELESS               ,
+  R8G8_UNORM                  ,
+  R8G8_UINT                   ,
+  R8G8_SNORM                  ,
+  R8G8_SINT                   ,
+  R16_TYPELESS                ,
+  R16_FLOAT                   ,
+  D16_UNORM                   ,
+  R16_UNORM                   ,
+  R16_UINT                    ,
+  R16_SNORM                   ,
+  R16_SINT                    ,
+  R8_TYPELESS                 ,
+  R8_UNORM                    ,
+  R8_UINT                     ,
+  R8_SNORM                    ,
+  R8_SINT                     ,
+  A8_UNORM                    ,
+  R1_UNORM                    ,
+  R9G9B9E5_SHAREDEXP          ,
+  R8G8_B8G8_UNORM             ,
+  G8R8_G8B8_UNORM             ,
+  BC1_TYPELESS                ,
+  BC1_UNORM                   ,
+  BC1_UNORM_SRGB              ,
+  BC2_TYPELESS                ,
+  BC2_UNORM                   ,
+  BC2_UNORM_SRGB              ,
+  BC3_TYPELESS                ,
+  BC3_UNORM                   ,
+  BC3_UNORM_SRGB              ,
+  BC4_TYPELESS                ,
+  BC4_UNORM                   ,
+  BC4_SNORM                   ,
+  BC5_TYPELESS                ,
+  BC5_UNORM                   ,
+  BC5_SNORM                   ,
+  B5G6R5_UNORM                ,
+  B5G5R5A1_UNORM              ,
+  B8G8R8A8_UNORM              ,
+  B8G8R8X8_UNORM              ,
+  R10G10B10_XR_BIAS_A2_UNORM  ,
+  B8G8R8A8_TYPELESS           ,
+  B8G8R8A8_UNORM_SRGB         ,
+  B8G8R8X8_TYPELESS           ,
+  B8G8R8X8_UNORM_SRGB         ,
+  BC6H_TYPELESS               ,
+  BC6H_UF16                   ,
+  BC6H_SF16                   ,
+  BC7_TYPELESS                ,
+  BC7_UNORM                   ,
+  BC7_UNORM_SRGB              ,
+  AYUV                        ,
+  Y410                        ,
+  Y416                        ,
+  NV12                        ,
+  P010                        ,
+  P016                        ,
+  OPAQUE_420                  ,
+  YUY2                        ,
+  Y210                        ,
+  Y216                        ,
+  NV11                        ,
+  AI44                        ,
+  IA44                        ,
+  P8                          ,
+  A8P8                        ,
+  B4G4R4A4_UNORM              ,
+  P208                        ,
+  V208                        ,
+  V408                        ,
+  FORCE_UINT
+} ;
 
 struct PixelFormat {
 	uint dwSize;
@@ -192,6 +319,15 @@ struct Header {
 	uint dwReserved2;
 };
 
+struct DXT10Header
+{
+	DxgiFormat dxgi_format;
+	uint resource_dimension;
+	uint misc_flag;
+	uint array_size;
+	uint misc_flags2;
+};
+
 struct LoadInfo {
 	bool compressed;
 	bool swap;
@@ -209,33 +345,38 @@ static uint sizeDXTC(uint w, uint h, GLuint format) {
 	return ((w + 3) / 4) * ((h + 3) / 4) * (is_dxt1 || is_ati ? 8 : 16);
 }
 
-static bool isDXT1(PixelFormat& pf)
+static bool isDXT1(const PixelFormat& pf)
 {
 	return ((pf.dwFlags & DDPF_FOURCC) && (pf.dwFourCC == D3DFMT_DXT1));
 }
 
-static bool isATI1(PixelFormat& pf)
+static bool isDXT10(const PixelFormat& pf)
+{
+	return ((pf.dwFlags & DDPF_FOURCC) && (pf.dwFourCC == D3DFMT_DX10));
+}
+
+static bool isATI1(const PixelFormat& pf)
 {
 	return ((pf.dwFlags & DDPF_FOURCC) && (pf.dwFourCC == D3DFMT_ATI1));
 }
 
-static bool isATI2(PixelFormat& pf)
+static bool isATI2(const PixelFormat& pf)
 {
 	return ((pf.dwFlags & DDPF_FOURCC) && (pf.dwFourCC == D3DFMT_ATI2));
 }
 
-static bool isDXT3(PixelFormat& pf)
+static bool isDXT3(const PixelFormat& pf)
 {
 	return ((pf.dwFlags & DDPF_FOURCC) && (pf.dwFourCC == D3DFMT_DXT3));
 
 }
 
-static bool isDXT5(PixelFormat& pf)
+static bool isDXT5(const PixelFormat& pf)
 {
 	return ((pf.dwFlags & DDPF_FOURCC) && (pf.dwFourCC == D3DFMT_DXT5));
 }
 
-static bool isBGRA8(PixelFormat& pf)
+static bool isBGRA8(const PixelFormat& pf)
 {
 	return ((pf.dwFlags & DDPF_RGB)
 		&& (pf.dwFlags & DDPF_ALPHAPIXELS)
@@ -246,7 +387,7 @@ static bool isBGRA8(PixelFormat& pf)
 		&& (pf.dwAlphaBitMask == 0xff000000U));
 }
 
-static bool isBGR8(PixelFormat& pf)
+static bool isBGR8(const PixelFormat& pf)
 {
 	return ((pf.dwFlags & DDPF_ALPHAPIXELS)
 		&& !(pf.dwFlags & DDPF_ALPHAPIXELS)
@@ -256,7 +397,7 @@ static bool isBGR8(PixelFormat& pf)
 		&& (pf.dwBBitMask == 0xff));
 }
 
-static bool isBGR5A1(PixelFormat& pf)
+static bool isBGR5A1(const PixelFormat& pf)
 {
 	return ((pf.dwFlags & DDPF_RGB)
 		&& (pf.dwFlags & DDPF_ALPHAPIXELS)
@@ -267,7 +408,7 @@ static bool isBGR5A1(PixelFormat& pf)
 		&& (pf.dwAlphaBitMask == 0x00008000));
 }
 
-static bool isBGR565(PixelFormat& pf)
+static bool isBGR565(const PixelFormat& pf)
 {
 	return ((pf.dwFlags & DDPF_RGB)
 		&& !(pf.dwFlags & DDPF_ALPHAPIXELS)
@@ -277,7 +418,7 @@ static bool isBGR565(PixelFormat& pf)
 		&& (pf.dwBBitMask == 0x0000001f));
 }
 
-static bool isINDEX8(PixelFormat& pf)
+static bool isINDEX8(const PixelFormat& pf)
 {
 	return ((pf.dwFlags & DDPF_INDEXED) && (pf.dwRGBBitCount == 8));
 }
@@ -300,6 +441,9 @@ static LoadInfo loadInfoATI2 = {
 static LoadInfo loadInfoBGRA8 = {
 	false, false, false, 4, GL_RGBA8, GL_SRGB8_ALPHA8, GL_BGRA, GL_UNSIGNED_BYTE
 };
+static LoadInfo loadInfoRGBA8 = {
+	false, false, false, 4, GL_RGBA8, GL_SRGB8_ALPHA8, GL_RGBA, GL_UNSIGNED_BYTE
+};
 static LoadInfo loadInfoBGR8 = {
 	false, false, false, 3, GL_RGB8, GL_SRGB8, GL_BGR, GL_UNSIGNED_BYTE
 };
@@ -312,6 +456,25 @@ static LoadInfo loadInfoBGR565 = {
 static LoadInfo loadInfoIndex8 = {
 	false, false, true, 1, GL_RGB8, GL_SRGB8, GL_BGRA, GL_UNSIGNED_BYTE
 };
+
+static LoadInfo* getDXT10LoadInfo(const Header& hdr, const DXT10Header& dxt10_hdr)
+{
+	switch(dxt10_hdr.dxgi_format) {
+		case DxgiFormat::B8G8R8A8_UNORM_SRGB:
+			return &loadInfoBGRA8;
+			break;
+		case DxgiFormat::B8G8R8A8_UNORM:
+			return &loadInfoBGRA8;
+			break;
+		case DxgiFormat::R8G8B8A8_UNORM:
+			return &loadInfoRGBA8;
+			break;
+		default:
+			ASSERT(false);
+			return nullptr;
+			break;
+	}
+}
 
 struct DXTColBlock
 {
@@ -528,6 +691,7 @@ static void flipCompressedTexture(int w, int h, int format, void* surface)
 			GLenum err = glGetError(); \
 			if (err != GL_NO_ERROR) { \
 				g_log_error.log("Renderer") << "OpenGL error " << err; \
+				ASSERT(false);/**/ \
 			} \
 		} while(false)
 #else
@@ -739,7 +903,7 @@ void bindTexture(uint unit, TextureHandle handle)
 	if(handle.isValid()) {
 		const Texture& t = g_ffr.textures[handle.value];
 		CHECK_GL(glActiveTexture(GL_TEXTURE0 + unit));
-		CHECK_GL(glBindTexture(t.cubemap ? GL_TEXTURE_CUBE_MAP : GL_TEXTURE_2D, t.handle));
+		CHECK_GL(glBindTexture(t.target, t.handle));
 	}
 	else {
 		CHECK_GL(glActiveTexture(GL_TEXTURE0 + unit));
@@ -752,9 +916,9 @@ void setInstanceBuffer(const VertexDecl& decl, BufferHandle instance_buffer, int
 {
 	checkThread();
 	const GLuint ib = g_ffr.buffers[instance_buffer.value].handle;
-	CHECK_GL(glBindBuffer(GL_ARRAY_BUFFER, ib));
 	const GLsizei stride = decl.size;
 
+	g_ffr.instance_attributes = decl.attributes_count;
 	for (uint i = 0; i < decl.attributes_count; ++i) {
 		const Attribute* attr = &decl.attributes[i];
 		const void* offset = (void*)(intptr_t)(attr->offset + byte_offset);
@@ -766,20 +930,23 @@ void setInstanceBuffer(const VertexDecl& decl, BufferHandle instance_buffer, int
 		}
 
 		const int index = location_offset + i;
-		CHECK_GL(glEnableVertexAttribArray(index));
+		CHECK_GL(glBindBuffer(GL_ARRAY_BUFFER, ib));
 		CHECK_GL(glVertexAttribPointer(index, attr->components_num, gl_attr_type, attr->normalized, stride, offset));
 		CHECK_GL(glVertexAttribDivisor(index, 1));  
+		CHECK_GL(glEnableVertexAttribArray(index));
 	}
 }
 
 void setVertexBuffer(const VertexDecl* decl, BufferHandle vertex_buffer, uint buffer_offset_bytes, const int* attribute_map)
 {
+	for (int i = 0; i < g_ffr.max_vertex_attributes; ++i) {
+		glDisableVertexAttribArray(i);
+	}
 	if (decl) {
 		const GLsizei stride = decl->size;
 		const GLuint vb = g_ffr.buffers[vertex_buffer.value].handle;
 		const uint vb_offset = buffer_offset_bytes;
-		CHECK_GL(glBindBuffer(GL_ARRAY_BUFFER, vb));
-
+		g_ffr.vertex_attributes = decl->attributes_count;
 		for (uint i = 0; i < decl->attributes_count; ++i) {
 			const Attribute* attr = &decl->attributes[i];
 			const void* offset = (void*)(intptr_t)(attr->offset + vb_offset);
@@ -792,18 +959,18 @@ void setVertexBuffer(const VertexDecl* decl, BufferHandle vertex_buffer, uint bu
 			const int index = attribute_map ? attribute_map[i] : i;
 
 			if(index >= 0) {
-				CHECK_GL(glEnableVertexAttribArray(index));
+				CHECK_GL(glBindBuffer(GL_ARRAY_BUFFER, vb));
 				CHECK_GL(glVertexAttribPointer(index, attr->components_num, gl_attr_type, attr->normalized, stride, offset));
+				CHECK_GL(glVertexAttribDivisor(index, 0));  
+				CHECK_GL(glEnableVertexAttribArray(index));
 			}
 			else {
-				glDisableVertexAttribArray(i);
+				CHECK_GL(glDisableVertexAttribArray(i));
 			}
 		}
 	}
 	else {
-		GLint n;
-		glGetIntegerv(GL_MAX_VERTEX_ATTRIBS, &n);
-		for (int i = 0; i < n; ++i) {
+		for (int i = 0; i < g_ffr.max_vertex_attributes; ++i) {
 			glDisableVertexAttribArray(i);
 		}
 	}
@@ -849,6 +1016,16 @@ void setIndexBuffer(BufferHandle handle)
 	CHECK_GL(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
 }
 
+void resetInstanceBuffer()
+{
+	if (g_ffr.instance_attributes == 0) return;
+
+	for (int i = g_ffr.vertex_attributes; i < g_ffr.max_vertex_attributes; ++i) {
+		glDisableVertexAttribArray(i);
+	}
+	g_ffr.instance_attributes = 0;
+}
+
 
 void drawElements(uint offset, uint count, PrimitiveType type)
 {
@@ -862,19 +1039,22 @@ void drawElements(uint offset, uint count, PrimitiveType type)
 		default: ASSERT(0); break;
 	}
 
+	resetInstanceBuffer();
 	CHECK_GL(glDrawElements(pt, count, GL_UNSIGNED_SHORT, (void*)(intptr_t)(offset * sizeof(short))));
 }
 
-void drawTrianglesInstanced(uint indices_count, uint instances_count)
+void drawTrianglesInstanced(uint indices_offset, uint indices_count, uint instances_count)
 {
 	checkThread();
-	glDrawElementsInstanced(GL_TRIANGLES, indices_count, GL_UNSIGNED_SHORT, nullptr, instances_count);
+	CHECK_GL(glDrawElementsInstanced(GL_TRIANGLES, indices_count, GL_UNSIGNED_SHORT, (const void*)(intptr_t)indices_offset, instances_count));
 }
 
 
 void drawTriangles(uint indices_count)
 {
 	checkThread();
+
+	resetInstanceBuffer();
 	CHECK_GL(glDrawElements(GL_TRIANGLES, indices_count, GL_UNSIGNED_SHORT, 0));
 }
 
@@ -891,6 +1071,7 @@ void drawArrays(uint offset, uint count, PrimitiveType type)
 		default: ASSERT(0); break;
 	}
 
+	resetInstanceBuffer();
 	CHECK_GL(glDrawArrays(pt, offset, count));
 }
 
@@ -909,6 +1090,22 @@ void bindUniformBuffer(uint index, BufferHandle buffer, size_t offset, size_t si
 	checkThread();
 	const GLuint buf = g_ffr.buffers[buffer.value].handle;
 	glBindBufferRange(GL_UNIFORM_BUFFER, index, buf, offset, size);
+}
+
+
+void* map(BufferHandle buffer)
+{
+	checkThread();
+	const GLuint buf = g_ffr.buffers[buffer.value].handle;
+	return glMapNamedBuffer(buf, GL_WRITE_ONLY);
+}
+
+
+void unmap(BufferHandle buffer)
+{
+	checkThread();
+	const GLuint buf = g_ffr.buffers[buffer.value].handle;
+	glUnmapNamedBuffer(buf);
 }
 
 
@@ -974,21 +1171,28 @@ static struct {
 
 TextureInfo getTextureInfo(const void* data)
 {
-	const DDS::Header* hdr = (const DDS::Header*)data;
-	const uint mips = (hdr->dwFlags & DDS::DDSD_MIPMAPCOUNT) ? hdr->dwMipMapCount : 1;
-	const bool is_cubemap = (hdr->caps2.dwCaps2 & DDS::DDSCAPS2_CUBEMAP) != 0;
 	TextureInfo info;
+
+	const DDS::Header* hdr = (const DDS::Header*)data;
 	info.width = hdr->dwWidth;
 	info.height = hdr->dwHeight;
-	info.depth = 1;
-	info.layers = 1;
-	info.mips = mips;
-	info.is_cubemap = is_cubemap;
+	info.is_cubemap = (hdr->caps2.dwCaps2 & DDS::DDSCAPS2_CUBEMAP) != 0;
+	info.mips = (hdr->dwFlags & DDS::DDSD_MIPMAPCOUNT) ? hdr->dwMipMapCount : 1;
+	info.depth = (hdr->dwFlags & DDS::DDSD_DEPTH) ? hdr->dwDepth : 1;
+	
+	if (isDXT10(hdr->pixelFormat)) {
+		const DDS::DXT10Header* hdr_dxt10 = (const DDS::DXT10Header*)((const u8*)data + sizeof(DDS::Header));
+		info.layers = hdr_dxt10->array_size;
+	}
+	else {
+		info.layers = 1;
+	}
+	
 	return info;
 }
 
 
-bool loadTexture(TextureHandle handle, const void* input, int input_size, uint flags, TextureInfo* info)
+bool loadTexture(TextureHandle handle, const void* input, int input_size, uint flags)
 {
 	checkThread();
 	DDS::Header hdr;
@@ -1004,6 +1208,7 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, uint f
 	}
 
 	DDS::LoadInfo* li;
+	int layers = 1;
 
 	if (isDXT1(hdr.pixelFormat)) {
 		li = &DDS::loadInfoDXT1;
@@ -1035,110 +1240,132 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, uint f
 	else if (isINDEX8(hdr.pixelFormat)) {
 		li = &DDS::loadInfoIndex8;
 	}
+	else if (isDXT10(hdr.pixelFormat)) {
+		DDS::DXT10Header dxt10_hdr;
+		blob.read(dxt10_hdr);
+		li = DDS::getDXT10LoadInfo(hdr, dxt10_hdr);
+		layers = dxt10_hdr.array_size;
+	}
 	else {
+		ASSERT(false);
 		return false;
 	}
 
 	const bool is_cubemap = (hdr.caps2.dwCaps2 & DDS::DDSCAPS2_CUBEMAP) != 0;
 
+	const GLenum texture_target = is_cubemap ? GL_TEXTURE_CUBE_MAP : layers > 1 ? GL_TEXTURE_2D_ARRAY : GL_TEXTURE_2D;
+	const bool is_srgb = flags & (u32)TextureFlags::SRGB;
+	const GLenum internal_format = is_srgb ? li->internalSRGBFormat : li->internalFormat;
+	const uint mipMapCount = (hdr.dwFlags & DDS::DDSD_MIPMAPCOUNT) ? hdr.dwMipMapCount : 1;
+
 	GLuint texture;
-	glGenTextures(1, &texture);
+	CHECK_GL(glCreateTextures(texture_target, 1, &texture));
 	if (texture == 0) {
 		return false;
 	}
-
-	const bool is_srgb = flags & (u32)TextureFlags::SRGB;
-	const GLenum internal_format = is_srgb ? li->internalSRGBFormat : li->internalFormat;
-
-	const uint mipMapCount = (hdr.dwFlags & DDS::DDSD_MIPMAPCOUNT) ? hdr.dwMipMapCount : 1;
-	for(int side = 0; side < (is_cubemap ? 6 : 1); ++side) {
-
-		uint width = hdr.dwWidth;
-		uint height = hdr.dwHeight;
-
-		const GLenum tex_img_target =  is_cubemap ? GL_TEXTURE_CUBE_MAP_POSITIVE_X + side : GL_TEXTURE_2D;
-		const GLenum texture_target = is_cubemap ? GL_TEXTURE_CUBE_MAP : GL_TEXTURE_2D;
-		CHECK_GL(glBindTexture(texture_target, texture));
-
-		if (li->compressed) {
-			uint size = DDS::sizeDXTC(width, height, internal_format);
-			if (size != hdr.dwPitchOrLinearSize || (hdr.dwFlags & DDS::DDSD_LINEARSIZE) == 0) {
-				CHECK_GL(glDeleteTextures(1, &texture));
-				return false;
-			}
-			Array<u8> data(*g_ffr.allocator);
-			data.resize(size);
-			for (uint ix = 0; ix < mipMapCount; ++ix) {
-				blob.read(&data[0], size);
-				//DDS::flipCompressedTexture(width, height, internal_format, &data[0]);
-				CHECK_GL(glCompressedTexImage2D(tex_img_target, ix, internal_format, width, height, 0, size, &data[0]));
-				CHECK_GL(glTexParameteri(texture_target, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR));
-				CHECK_GL(glTexParameteri(texture_target, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
-				width = Math::maximum(1, width >> 1);
-				height = Math::maximum(1, height >> 1);
-				size = DDS::sizeDXTC(width, height, internal_format);
-			}
-		}
-		else if (li->palette) {
-			if ((hdr.dwFlags & DDS::DDSD_PITCH) == 0 || hdr.pixelFormat.dwRGBBitCount != 8) {
-				CHECK_GL(glDeleteTextures(1, &texture));
-				return false;
-			}
-			uint size = hdr.dwPitchOrLinearSize * height;
-			if (size != width * height * li->blockBytes) {
-				CHECK_GL(glDeleteTextures(1, &texture));
-				return false;
-			}
-			Array<u8> data(*g_ffr.allocator);
-			data.resize(size);
-			uint palette[256];
-			Array<uint> unpacked(*g_ffr.allocator);
-			unpacked.resize(size);
-			blob.read(palette, 4 * 256);
-			for (uint ix = 0; ix < mipMapCount; ++ix) {
-				blob.read(&data[0], size);
-				for (uint zz = 0; zz < size; ++zz) {
-					unpacked[zz] = palette[data[zz]];
-				}
-				//glPixelStorei(GL_UNPACK_ROW_LENGTH, height);
-				CHECK_GL(glTexImage2D(tex_img_target, ix, internal_format, width, height, 0, li->externalFormat, li->type, &unpacked[0]));
-				width = Math::maximum(1, width >> 1);
-				height = Math::maximum(1, height >> 1);
-				size = width * height * li->blockBytes;
-			}
-		}
-		else {
-			if (li->swap) {
-				CHECK_GL(glPixelStorei(GL_UNPACK_SWAP_BYTES, GL_TRUE));
-			}
-			uint size = width * height * li->blockBytes;
-			Array<u8> data(*g_ffr.allocator);
-			data.resize(size);
-			for (uint ix = 0; ix < mipMapCount; ++ix) {
-				blob.read(&data[0], size);
-				//glPixelStorei(GL_UNPACK_ROW_LENGTH, height);
-				CHECK_GL(glTexImage2D(tex_img_target, ix, internal_format, width, height, 0, li->externalFormat, li->type, &data[0]));
-				width = Math::maximum(1, width >> 1);
-				height = Math::maximum(1, height >> 1);
-				size = width * height * li->blockBytes;
-			}
-			CHECK_GL(glPixelStorei(GL_UNPACK_SWAP_BYTES, GL_FALSE));
-		}
-		CHECK_GL(glTexParameteri(texture_target, GL_TEXTURE_MAX_LEVEL, mipMapCount - 1));
+	if(layers > 1) {
+		CHECK_GL(glTextureStorage3D(texture, mipMapCount, internal_format, hdr.dwWidth, hdr.dwHeight, layers));
+	}
+	else {
+		CHECK_GL(glTextureStorage2D(texture, mipMapCount, internal_format, hdr.dwWidth, hdr.dwHeight));
 	}
 
-	if(info) {
-		info->width = hdr.dwWidth;
-		info->height = hdr.dwHeight;
-		info->depth = 1;
-		info->layers = 1;
-		info->mips = mipMapCount;
-		info->is_cubemap = is_cubemap;
+	for (int layer = 0; layer < layers; ++layer) {
+		for(int side = 0; side < (is_cubemap ? 6 : 1); ++side) {
+			const GLenum tex_img_target =  is_cubemap ? GL_TEXTURE_CUBE_MAP_POSITIVE_X + side : layers > 1 ? GL_TEXTURE_2D_ARRAY : GL_TEXTURE_2D;
+			uint width = hdr.dwWidth;
+			uint height = hdr.dwHeight;
+
+			if (li->compressed) {
+				uint size = DDS::sizeDXTC(width, height, internal_format);
+				if (size != hdr.dwPitchOrLinearSize || (hdr.dwFlags & DDS::DDSD_LINEARSIZE) == 0) {
+					CHECK_GL(glDeleteTextures(1, &texture));
+					return false;
+				}
+				Array<u8> data(*g_ffr.allocator);
+				data.resize(size);
+				for (uint mip = 0; mip < mipMapCount; ++mip) {
+					blob.read(&data[0], size);
+					//DDS::flipCompressedTexture(width, height, internal_format, &data[0]);
+					if(layers > 1) {
+						CHECK_GL(glCompressedTextureSubImage3D(texture, mip, 0, 0, layer, width, height, 1, internal_format, size, &data[0]));
+					}
+					else if (is_cubemap) {
+						ASSERT(layer == 0);
+						CHECK_GL(glCompressedTextureSubImage3D(texture, mip, 0, 0, side, width, height, 1, internal_format, size, &data[0]));
+					}
+					else {
+						CHECK_GL(glCompressedTextureSubImage2D(texture, mip, 0, 0, width, height, internal_format, size, &data[0]));
+					}
+					CHECK_GL(glTextureParameteri(texture, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR));
+					CHECK_GL(glTextureParameteri(texture, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
+					width = Math::maximum(1, width >> 1);
+					height = Math::maximum(1, height >> 1);
+					size = DDS::sizeDXTC(width, height, internal_format);
+				}
+			}
+			else if (li->palette) {
+				if ((hdr.dwFlags & DDS::DDSD_PITCH) == 0 || hdr.pixelFormat.dwRGBBitCount != 8) {
+					CHECK_GL(glDeleteTextures(1, &texture));
+					return false;
+				}
+				uint size = hdr.dwPitchOrLinearSize * height;
+				if (size != width * height * li->blockBytes) {
+					CHECK_GL(glDeleteTextures(1, &texture));
+					return false;
+				}
+				Array<u8> data(*g_ffr.allocator);
+				data.resize(size);
+				uint palette[256];
+				Array<uint> unpacked(*g_ffr.allocator);
+				unpacked.resize(size);
+				blob.read(palette, 4 * 256);
+				for (uint ix = 0; ix < mipMapCount; ++ix) {
+					blob.read(&data[0], size);
+					for (uint zz = 0; zz < size; ++zz) {
+						unpacked[zz] = palette[data[zz]];
+					}
+					//glPixelStorei(GL_UNPACK_ROW_LENGTH, height);
+					if(layers > 1) {
+						CHECK_GL(glTextureSubImage3D(tex_img_target, ix, internal_format, width, height, layer, 0, li->externalFormat, li->type, &unpacked[0]));
+					}
+					else {
+						CHECK_GL(glTextureSubImage2D(tex_img_target, ix, internal_format, width, height, 0, li->externalFormat, li->type, &unpacked[0]));
+					}
+					width = Math::maximum(1, width >> 1);
+					height = Math::maximum(1, height >> 1);
+					size = width * height * li->blockBytes;
+				}
+			}
+			else {
+				if (li->swap) {
+					CHECK_GL(glPixelStorei(GL_UNPACK_SWAP_BYTES, GL_TRUE));
+				}
+				uint size = width * height * li->blockBytes;
+				Array<u8> data(*g_ffr.allocator);
+				data.resize(size);
+				for (uint mip = 0; mip < mipMapCount; ++mip) {
+					blob.read(&data[0], size);
+					//glPixelStorei(GL_UNPACK_ROW_LENGTH, height);
+					if (layers > 1) {
+						CHECK_GL(glTextureSubImage3D(texture, mip, 0, 0, layer, width, height, 1, li->externalFormat, li->type, &data[0]));
+					}
+					else {
+						CHECK_GL(glTextureSubImage2D(texture, mip, 0, 0, width, height, li->externalFormat, li->type, &data[0]));
+					}
+					width = Math::maximum(1, width >> 1);
+					height = Math::maximum(1, height >> 1);
+					size = width * height * li->blockBytes;
+				}
+				CHECK_GL(glPixelStorei(GL_UNPACK_SWAP_BYTES, GL_FALSE));
+			}
+			CHECK_GL(glTextureParameteri(texture, GL_TEXTURE_MAX_LEVEL, mipMapCount - 1));
+		}
 	}
 
 	Texture& t = g_ffr.textures[handle.value];
 	t.handle = texture;
-	t.cubemap = is_cubemap;
+	t.target = is_cubemap ? GL_TEXTURE_CUBE_MAP : layers > 1 ? GL_TEXTURE_2D_ARRAY : GL_TEXTURE_2D;
 	return true;
 }
 
@@ -1215,7 +1442,7 @@ bool createTexture(TextureHandle handle, uint w,uint h, TextureFormat format, ui
 
 	Texture& t = g_ffr.textures[handle.value];
 	t.handle = texture;
-	t.cubemap = false;
+	t.target = GL_TEXTURE_2D;
 
 	return true;
 }
@@ -1416,6 +1643,7 @@ ProgramHandle createProgram(const char** srcs, const ShaderType* types, int num,
 		glGetActiveUniform(prg, i, sizeof(name), nullptr, &size, &type, name);
 		switch(type) {
 			case GL_SAMPLER_CUBE:
+			case GL_SAMPLER_2D_ARRAY:
 			case GL_SAMPLER_2D:
 			case GL_INT: ffr_type = UniformType::INT; break;
 			case GL_FLOAT: ffr_type = UniformType::FLOAT; break;
@@ -1475,6 +1703,8 @@ bool init(void* window_handle)
 	g_ffr.thread = GetCurrentThreadId();
 
 	if (!load_gl(g_ffr.device_context)) return false;
+
+	glGetIntegerv(GL_MAX_VERTEX_ATTRIBS, &g_ffr.max_vertex_attributes);
 
 /*	int extensions_count;
 	glGetIntegerv(GL_NUM_EXTENSIONS, &extensions_count);

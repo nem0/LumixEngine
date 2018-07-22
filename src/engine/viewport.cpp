@@ -37,6 +37,14 @@ Matrix Viewport::getView() const
 }
 
 
+Matrix Viewport::getViewRotation() const
+{
+	Matrix view = rot.toMatrix();
+	view.fastInverse();
+	return view;
+}
+
+
 void Viewport::getRay(const Vec2& screen_pos, Vec3& origin, Vec3& dir) const
 {
 	origin = pos;

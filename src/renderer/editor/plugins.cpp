@@ -2391,7 +2391,7 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 		ffr::createBuffer(vertex_buffer, vertices_count * sizeof(Vertex), vertices);
 
 		ffr::ProgramHandle prg = m_shader->getProgram(0).handle;
-		ffr::setUniformMatrix4x3f(m_model_uniform, &mtx.m11);
+		ffr::setUniformMatrix4f(m_model_uniform, &mtx.m11);
 		ffr::useProgram(prg);
 		ffr::setVertexBuffer(&vertex_decl, vertex_buffer, 0, nullptr);
 		ffr::setIndexBuffer(index_buffer);

@@ -37,10 +37,10 @@ namespace Lumix
 static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("renderable");
 static const ComponentType TERRAIN_TYPE = Reflection::getComponentType("terrain");
 static const ComponentType HEIGHTFIELD_TYPE = Reflection::getComponentType("physical_heightfield");
-static const char* HEIGHTMAP_UNIFORM = "u_texHeightmap";
-static const char* SPLATMAP_UNIFORM = "u_texSplatmap";
-static const char* COLORMAP_UNIFORM = "u_texColormap";
-static const char* TEX_COLOR_UNIFORM = "u_texColor";
+static const char* HEIGHTMAP_UNIFORM = "u_heightmap";
+static const char* SPLATMAP_UNIFORM = "u_splatmap";
+static const char* COLORMAP_UNIFORM = "u_colormap";
+static const char* TEX_COLOR_UNIFORM = "u_detail_albedomap";
 static const float MIN_BRUSH_SIZE = 0.5f;
 
 

@@ -58,6 +58,8 @@ namespace Lumix
 
 static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("renderable");
 
+enum { TRANSIENT_BUFFER_SIZE = 32 * 1024 * 1024 };
+
 
 struct GPUProfiler
 {
@@ -182,6 +184,7 @@ struct RenderTask : MT::Task
 	MT::Semaphore m_finished_semaphore;
 	bool m_shutdown_requested = false;
 	ffr::BufferHandle m_transient_buffer;
+	uint m_transient_buffer_offset;
 	
 	struct PreparedCommand
 	{
@@ -561,7 +564,7 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 		struct Cmd : RenderCommandBase {
 			void setup() override {}
 			void execute() override {
-				ffr::loadTexture(handle, memory.data, memory.size, flags, nullptr);
+				ffr::loadTexture(handle, memory.data, memory.size, flags);
 				if(memory.own) {
 					renderer->free(memory);
 				}
@@ -584,9 +587,13 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	}
 
 
-	ffr::BufferHandle getTransientBuffer() override
+	TransientSlice allocTransient(uint size) override
 	{
-		return m_render_task.m_transient_buffer;
+		TransientSlice slice;
+		slice.buffer = m_render_task.m_transient_buffer;
+		slice.offset = m_render_task.m_transient_buffer_offset;
+		slice.size = m_render_task.m_transient_buffer_offset + size > TRANSIENT_BUFFER_SIZE ? 0 : size;
+		return slice;
 	}
 
 
@@ -850,6 +857,7 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 				renderer->m_frame_semaphore.signal();
 				ffr::swapBuffers(); 
 				renderer->m_render_task.m_profiler.frame();
+				renderer->m_render_task.m_transient_buffer_offset = 0;
 			}
 			RendererImpl* renderer;
 		};
@@ -921,7 +929,8 @@ int RenderTask::task()
 	ffr::createBuffer(m_global_state_uniforms, sizeof(Renderer::GlobalState), nullptr); 
 	ffr::bindUniformBuffer(0, m_global_state_uniforms, 0, sizeof(Renderer::GlobalState));
 	m_transient_buffer = ffr::allocBufferHandle();
-	ffr::createBuffer(m_transient_buffer, 4 *1024 * 1024, nullptr);
+	m_transient_buffer_offset = 0;
+	ffr::createBuffer(m_transient_buffer, TRANSIENT_BUFFER_SIZE, nullptr);
 	while (!m_shutdown_requested || !m_commands.isEmpty()) {
 		Renderer::RenderCommandBase** rt_cmd = m_commands.pop(true);
 		Renderer::RenderCommandBase* cmd = *rt_cmd;

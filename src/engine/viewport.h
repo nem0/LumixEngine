@@ -16,6 +16,7 @@ struct LUMIX_ENGINE_API Viewport
 {
 	Matrix getProjection(bool homogenous_depth) const;
 	Matrix getView() const;
+	Matrix getViewRotation() const;
 	Frustum getFrustum() const;
 	Frustum getFrustum(const Vec2& viewport_min_px, const Vec2& viewport_max_px) const;
 	Vec2 worldToScreenPixels(const Vec3& world) const;

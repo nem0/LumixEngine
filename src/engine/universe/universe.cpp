@@ -222,6 +222,16 @@ Transform Universe::getTransform(Entity entity) const
 }
 
 
+Matrix Universe::getRelativeMatrix(Entity entity, const Vec3& base_pos) const
+{
+	auto& transform = m_entities[entity.index];
+	Matrix mtx = transform.rotation.toMatrix();
+	mtx.setTranslation(transform.position - base_pos);
+	mtx.multiply3x3(transform.scale);
+	return mtx;
+}
+
+
 Matrix Universe::getMatrix(Entity entity) const
 {
 	auto& transform = m_entities[entity.index];

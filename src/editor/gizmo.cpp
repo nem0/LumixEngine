@@ -1106,7 +1106,8 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 		transform();
 
 		for (int i = 0; i < m_count; ++i) {
-			const Matrix gizmo_mtx = getMatrix(m_entities[i]);
+			Matrix gizmo_mtx = getMatrix(m_entities[i]);
+			gizmo_mtx.translate(-vp.pos);
 			data->push({gizmo_mtx, m_active == i});
 		}
 
