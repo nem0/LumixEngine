@@ -2384,23 +2384,23 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 		vertex_decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false);
 		vertex_decl.addAttribute(4, ffr::AttributeType::U8, true, false);
 
-		// TODO do not create each frame
-		const ffr::BufferHandle index_buffer = ffr::allocBufferHandle();
-		ffr::createBuffer(index_buffer, indices_count * sizeof(u16), indices);
-		const ffr::BufferHandle vertex_buffer = ffr::allocBufferHandle();
-		ffr::createBuffer(vertex_buffer, vertices_count * sizeof(Vertex), vertices);
+			
+		Renderer& renderer = static_cast<Renderer&>(m_render_scene->getPlugin());
+
+		Renderer::TransientSlice ib = renderer.allocTransient(indices_count * sizeof(u16));
+		Renderer::TransientSlice vb = renderer.allocTransient(vertices_count * sizeof(Vertex));
+		
+		ffr::update(ib.buffer, indices, ib.offset, ib.size);
+		ffr::update(vb.buffer, vertices, vb.offset, vb.size);
 
 		ffr::ProgramHandle prg = m_shader->getProgram(0).handle;
 		ffr::setUniformMatrix4f(m_model_uniform, &mtx.m11);
 		ffr::useProgram(prg);
-		ffr::setVertexBuffer(&vertex_decl, vertex_buffer, 0, nullptr);
-		ffr::setIndexBuffer(index_buffer);
+		ffr::setVertexBuffer(&vertex_decl, vb.buffer, vb.offset, nullptr);
+		ffr::setIndexBuffer(ib.buffer);
 		ffr::setState(u64(ffr::StateFlags::DEPTH_TEST));
 		const ffr::PrimitiveType primitive_type = lines ? ffr::PrimitiveType::LINES : ffr::PrimitiveType::TRIANGLES;
-		ffr::drawElements(0, indices_count, primitive_type);
-
-		ffr::destroy(index_buffer);
-		ffr::destroy(vertex_buffer);
+		ffr::drawElements(ib.offset / sizeof(indices[0]), indices_count, primitive_type);
 	}
 
 

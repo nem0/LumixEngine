@@ -194,11 +194,10 @@ struct EditorIconsImpl LUMIX_FINAL : public EditorIcons
 
 		const Viewport& vp = m_editor.getViewport();
 		Matrix camera_mtx = vp.rot.toMatrix();
-		camera_mtx.setTranslation(vp.pos);
 
 		for(auto& icon : m_icons)
 		{
-			Matrix icon_matrix = getIconMatrix(icon, camera_mtx, vp.is_ortho, vp.ortho_size);
+			Matrix icon_matrix = getIconMatrix(icon, camera_mtx, vp.pos, vp.is_ortho, vp.ortho_size);
 			
 			float t = m_editor.getRenderInterface()->castRay(m_models[(int)icon.type], origin, dir, icon_matrix, nullptr);
 			if(t >= 0 && (t < hit.t || hit.t < 0))
@@ -245,17 +244,17 @@ struct EditorIconsImpl LUMIX_FINAL : public EditorIcons
 	}
 
 
-	Matrix getIconMatrix(const Icon& icon, const Matrix& camera_matrix, bool is_ortho, float ortho_size) const
+	Matrix getIconMatrix(const Icon& icon, const Matrix& camera_matrix, const Vec3& vp_pos, bool is_ortho, float ortho_size) const
 	{
 		Matrix ret;
 		if (m_is_3d[(int)icon.type])
 		{
-			ret = m_editor.getUniverse()->getMatrix(icon.entity);
+			ret = m_editor.getUniverse()->getRelativeMatrix(icon.entity, vp_pos);
 		}
 		else
 		{
 			ret = camera_matrix;
-			ret.setTranslation(m_editor.getUniverse()->getPosition(icon.entity));
+			ret.setTranslation(m_editor.getUniverse()->getPosition(icon.entity) - vp_pos);
 		}
 		if (is_ortho)
 		{
@@ -276,7 +275,7 @@ struct EditorIconsImpl LUMIX_FINAL : public EditorIcons
 
 		const Universe& universe = *m_editor.getUniverse();
 		const Viewport& vp = m_editor.getViewport();
-		Matrix camera_mtx(vp.pos, vp.rot);
+		Matrix camera_mtx({0, 0, 0}, vp.rot);
 
 		for(auto& icon : m_icons) {
 			const Vec3 position = universe.getPosition(icon.entity);
@@ -285,7 +284,7 @@ struct EditorIconsImpl LUMIX_FINAL : public EditorIcons
 			scale_factor = Math::clamp(scale_factor, MIN_SCALE_FACTOR, MAX_SCALE_FACTOR);
 			icon.scale = tan(vp.fov * 0.5f) * distance / scale_factor;
 			
-			Matrix icon_mtx = getIconMatrix(icon, camera_mtx, vp.is_ortho, vp.ortho_size);
+			Matrix icon_mtx = getIconMatrix(icon, camera_mtx, vp.pos, vp.is_ortho, vp.ortho_size);
 			data->push({icon_mtx, m_models[(int)icon.type]});
 		}
 	}

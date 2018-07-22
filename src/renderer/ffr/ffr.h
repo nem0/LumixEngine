@@ -58,7 +58,21 @@ enum class ShaderType : uint {
 
 enum class ClearFlags : uint {
 	COLOR = 1 << 0,
-	DEPTH = 1 << 1
+	DEPTH = 1 << 1,
+	STENCIL = 1 << 2
+};
+
+
+enum class StencilFuncs : uint {
+	DISABLE = 1 << 0,
+	ALWAYS = 1 << 1,
+	EQUAL = 1 << 2,
+	NOT_EQUAL = 1 << 3,
+};
+
+enum class StencilOps : uint {
+	KEEP = 1 << 0,
+	REPLACE = 1 << 1
 };
 
 
@@ -134,6 +148,7 @@ bool init(void* window_handle);
 void swapBuffers();
 bool isHomogenousDepth();
 bool isOriginBottomLeft();
+void checkThread();
 void shutdown();
 
 void clear(uint flags, const float* color, float depth);
@@ -141,6 +156,7 @@ void clear(uint flags, const float* color, float depth);
 void scissor(uint x, uint y, uint w, uint h);
 void viewport(uint x, uint y, uint w, uint h);
 void blending(int mode);
+void setStencil(uint write_mask, StencilFuncs func, int ref, uint mask, StencilOps sfail, StencilOps dpfail, StencilOps dppass);
 
 TextureHandle allocTextureHandle();
 BufferHandle allocBufferHandle();
@@ -152,7 +168,7 @@ void useProgram(ProgramHandle prg);
 void createBuffer(BufferHandle handle, size_t size, const void* data);
 bool createTexture(TextureHandle handle, uint w, uint h, TextureFormat format, uint flags, const void* data);
 bool loadTexture(TextureHandle handle, const void* data, int size, uint flags);
-FramebufferHandle createFramebuffer(uint renderbuffers_count, const TextureHandle* renderbuffers);
+FramebufferHandle createFramebuffer();
 QueryHandle createQuery();
 
 void setVertexBuffer(const VertexDecl* decl, BufferHandle vertex_buffer, uint buffer_offset_bytes, const int* attribute_map);
