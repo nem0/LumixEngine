@@ -318,6 +318,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		const Matrix projection = m_viewport.getProjection(ffr::isHomogenousDepth());
 		state.camera_projection = projection;
 		state.camera_view = view;
+		state.camera_inv_view = view.fastInverted();
 		state.camera_view_projection = projection * view;
 		state.camera_inv_view_projection = state.camera_view_projection;
 		state.camera_inv_view_projection.inverse();
@@ -791,6 +792,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 			void setup() override {}
 			void execute() override 
 			{
+				if (!m_shader->isReady()) return;
 				ffr::ProgramHandle prg = m_shader->getProgram(0).handle;
 				
 				for(int i = 0; i < m_textures_count; ++i) {

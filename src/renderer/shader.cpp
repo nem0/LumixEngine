@@ -57,6 +57,7 @@ const Shader::Program& Shader::getProgram(u32 defines)
 			"	mat4 u_shadowmap_matrices[4];\n"
 			"	mat4 u_camera_projection;\n"
 			"	mat4 u_camera_view;\n"
+			"	mat4 u_camera_inv_view;\n"
 			"	mat4 u_camera_view_projection;\n"
 			"	mat4 u_camera_inv_view_projection;\n"
 			"	vec3 u_camera_pos;\n"

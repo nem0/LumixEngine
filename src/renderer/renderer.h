@@ -49,6 +49,7 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 			Matrix shadowmap_matrices[4];
 			Matrix camera_projection;
 			Matrix camera_view;
+			Matrix camera_inv_view;
 			Matrix camera_view_projection;
 			Matrix camera_inv_view_projection;
 			Vec4 camera_pos;
