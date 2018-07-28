@@ -78,6 +78,8 @@ struct LUMIX_RENDERER_API Mesh
 		MULTILAYER_RIGID,
 		MULTILAYER_SKINNED,
 		RIGID,
+
+		LAST_TYPE
 	};
 
 	enum Flags : u8
