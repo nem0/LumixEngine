@@ -1429,6 +1429,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 					const u32 skinned_define_mask = 1 << renderer.getShaderDefineIdx("SKINNED");
 
 					JobSystem::fromLambda([idx, this, &meshes, &universe, camera_pos, offset, define_mask, instanced_define_mask, skinned_define_mask](){
+						PROFILE_BLOCK("render meshes - setup");
 						const ModelInstance* model_instances = pipeline->m_scene->getModelInstances();
 						const auto& submeshes = meshes[idx];
 						OutputBlob& stream = m_streams[idx];
@@ -1467,7 +1468,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 									const int start = i;
 									const int start_midx = midx;
 									while(i < c && submeshes[i].mesh == mesh.mesh) {
-										matrices[midx] = universe.getRelativeMatrix(mesh.owner, camera_pos);
+										matrices[midx] = universe.getRelativeMatrix(submeshes[i].owner, camera_pos);
 										++i;
 										++midx;
 									}
