@@ -739,7 +739,8 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 			luaL_error(L, "Missing position in camera params");
 		}
 
-		RenderMeshesCommand* cmd = LUMIX_NEW(pipeline->m_renderer.getAllocator(), RenderMeshesCommand);
+		IAllocator& allocator = pipeline->m_renderer.getAllocator();
+		RenderMeshesCommand* cmd = LUMIX_NEW(allocator, RenderMeshesCommand)(allocator);
 
 		if (lua_gettop(L) > 4 && lua_istable(L, 4)) {
 			lua_pushnil(L);
@@ -1388,12 +1389,16 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 
 	struct RenderMeshesCommand : Renderer::RenderCommandBase
 	{
+		RenderMeshesCommand(IAllocator& allocator) 
+			: m_streams(allocator) 
+		{}
+
 		void setup() override
 		{
 			if(!pipeline->m_scene) return;
 
 			Renderer& renderer = pipeline->m_renderer;
-			define_mask = shader_define.empty() 
+			const u32 define_mask = shader_define.empty() 
 				? 0
 				: 1 << renderer.getShaderDefineIdx(shader_define);
 			RenderScene* scene = pipeline->getScene();
@@ -1405,10 +1410,8 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 			scene->getModelInstanceInfos(frustum, camera_pos, lod_multiplier, layer_mask, meshes);
 			int count = 0;
 			for(const auto& submeshes : meshes) count += submeshes.size();
-			m_meshes_mem = renderer.allocate((sizeof(Matrix) + sizeof(Mesh*) + sizeof(Entity)) * count);
+			m_meshes_mem = renderer.allocate(sizeof(Matrix) * count);
 			m_meshes.matrices = (Matrix*)m_meshes_mem.data;
-			m_meshes.meshes = (Mesh**)&m_meshes.matrices[count];
-			m_meshes.owners = (Entity*)&m_meshes.meshes[count];
 			m_meshes.count = 0;
 
 			JobSystem::JobDecl jobs[64];
@@ -1421,19 +1424,84 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 				for(const auto& submeshes : meshes) {
 					const int idx = int(&submeshes - &meshes[0]);
 					const int offset = m_meshes.count;
-					JobSystem::fromLambda([idx, this, &meshes, &universe, camera_pos, offset](){
-						const auto& submeshes = meshes[idx];
-						int midx = 0;
-						Mesh** LUMIX_RESTRICT meshes = &m_meshes.meshes[offset];
-						Matrix* LUMIX_RESTRICT matrices = &m_meshes.matrices[offset];
-						Entity* LUMIX_RESTRICT owners = &m_meshes.owners[offset];
+					m_streams.emplace(renderer.getAllocator());
+					const u32 instanced_define_mask = 1 << renderer.getShaderDefineIdx("INSTANCED");
+					const u32 skinned_define_mask = 1 << renderer.getShaderDefineIdx("SKINNED");
 
-						for(const auto& mesh : submeshes) {
-							matrices[midx] = universe.getRelativeMatrix(mesh.owner, camera_pos);
-							meshes[midx] = mesh.mesh;
-							owners[midx] = mesh.owner;
-							++midx;
+					JobSystem::fromLambda([idx, this, &meshes, &universe, camera_pos, offset, define_mask, instanced_define_mask, skinned_define_mask](){
+						const ModelInstance* model_instances = pipeline->m_scene->getModelInstances();
+						const auto& submeshes = meshes[idx];
+						OutputBlob& stream = m_streams[idx];
+						int midx = 0;
+						Matrix* LUMIX_RESTRICT matrices = &m_meshes.matrices[offset];
+
+						for(int i = 0, c = submeshes.size(); i < c; ++i) {
+							const auto& mesh = submeshes[i];
+							stream.write(mesh.mesh->type);
+
+							const Material* material = mesh.mesh->material;
+							ASSERT(material->isReady());
+							ASSERT(material->getShader());
+							stream.write(mesh.mesh->vertex_buffer_handle);
+							stream.write(mesh.mesh->index_buffer_handle);
+							stream.write(mesh.mesh->indices_count);
+							stream.write(mesh.mesh->vertex_decl);
+							
+							u32 final_define_mask = material->getDefineMask() | define_mask;
+							if(mesh.mesh->type == Mesh::RIGID_INSTANCED) final_define_mask |= instanced_define_mask;
+							stream.write(final_define_mask);
+
+							stream.write(material->getShader()); // TODO
+							stream.write(material->getRenderStates());
+							stream.write(material->getRoughness());
+							stream.write(material->getMetallic());
+							stream.write(mesh.mesh->attributes_semantic, sizeof(mesh.mesh->attributes_semantic[0]) * mesh.mesh->vertex_decl.attributes_count);
+							stream.write(material->getTextureCount());
+							for(int i = 0, c = material->getTextureCount(); i < c; ++i) {
+								stream.write(material->getTexture(i)->handle);
+								stream.write(material->getTextureUniform(i));
+							}
+
+							switch(mesh.mesh->type) {
+								case Mesh::RIGID_INSTANCED: {
+									const int start = i;
+									const int start_midx = midx;
+									while(i < c && submeshes[i].mesh == mesh.mesh) {
+										matrices[midx] = universe.getRelativeMatrix(mesh.owner, camera_pos);
+										++i;
+										++midx;
+									}
+									stream.write(start_midx + offset);
+									stream.write(i - start);
+									break;
+								}
+								case Mesh::SKINNED: {
+									const ModelInstance& model_instance = model_instances[mesh.owner.index];
+							
+									const Pose& pose = *model_instance.pose;
+									const Model& model = *model_instance.model;
+									stream.write(pose.count);
+									Matrix bone_mtx[196];
+
+									const Vec3* poss = pose.positions;
+									const Quat* rots = pose.rotations;
+
+									ASSERT(pose.count <= lengthOf(bone_mtx));
+									for (int bone_index = 0, bone_count = pose.count; bone_index < bone_count; ++bone_index)
+									{
+										auto& bone = model.getBone(bone_index);
+										RigidTransform tmp = {poss[bone_index], rots[bone_index]};
+										bone_mtx[bone_index] = (tmp * bone.inv_bind_transform).toMatrix();
+									}
+
+									stream.write(bone_mtx, sizeof(Matrix) * pose.count);
+									stream.write(model_instance.matrix);
+									break;
+								}
+								default: ASSERT(false); break;
+							}
 						}
+						stream.write(Mesh::LAST_TYPE);
 					}, &job_storage[idx], &jobs[idx], nullptr);
 					m_meshes.count += submeshes.size();
 				}
@@ -1481,7 +1549,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		void execute() override
 		{
 			PROFILE_FUNCTION();
-
+			
 			ffr::pushDebugGroup(shader_define.empty() ? "meshes" : shader_define);
 			ffr::setUniform1i(pipeline->m_irradiance_map_uniform, 0);
 			ffr::setUniform1i(pipeline->m_radiance_map_uniform, 1);
@@ -1502,17 +1570,88 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 			instance_decl.addAttribute(4, ffr::AttributeType::FLOAT, false, false);
 
 			Renderer& renderer = pipeline->m_renderer;
-			const u32 instanced_define_mask = 1 << renderer.getShaderDefineIdx("INSTANCED");
-			const u32 skinned_define_mask = 1 << renderer.getShaderDefineIdx("SKINNED");
 
 			const ModelInstance* model_instances = pipeline->m_scene->getModelInstances();
 
-			Mesh** LUMIX_RESTRICT meshes = m_meshes.meshes; 
 			const Matrix* LUMIX_RESTRICT matrices = m_meshes.matrices; 
-			const Entity* LUMIX_RESTRICT owners = m_meshes.owners; 
-			int start_instance = -1;
 			ffr::blending(0);
 
+			for (OutputBlob& blob : m_streams) {
+				InputBlob stream(blob);
+				Mesh::Type type;
+				stream.read(type);
+				while(type != Mesh::LAST_TYPE) {
+					const ffr::BufferHandle vb = stream.read<ffr::BufferHandle>();
+					const ffr::BufferHandle ib = stream.read<ffr::BufferHandle>();
+					const int indices_count = stream.read<int>();
+					const ffr::VertexDecl decl = stream.read<ffr::VertexDecl>();
+					const u32 define_mask = stream.read<u32>();
+					Shader* shader = stream.read<Shader*>();
+					const u64 render_states = stream.read<u64>();
+					const Vec4 material_params = Vec4(
+						stream.read<float>(), // roughness
+						stream.read<float>(), // metallic
+						0, 0);
+					Mesh::AttributeSemantic attributes_semantic[16];
+					if(decl.attributes_count > 0) {
+						stream.read(attributes_semantic, sizeof(attributes_semantic[0]) * decl.attributes_count);
+					}
+					const int textures_count = stream.read<int>();
+
+					for (int i = 0; i < textures_count; ++i) {
+						const ffr::TextureHandle handle = stream.read<ffr::TextureHandle>();
+						const ffr::UniformHandle uniform = stream.read<ffr::UniformHandle>();
+						ffr::bindTexture(i + 2 + global_textures_count, handle);
+						ffr::setUniform1i(uniform, i + 2 + global_textures_count);
+					}
+
+					const Shader::Program& prog = shader->getProgram(define_mask);
+
+					ffr::setUniform4f(pipeline->m_material_params_uniform, &material_params.x);
+					ffr::setState(render_states);
+					if(prog.handle.isValid()) {
+						ffr::useProgram(prog.handle);
+						int attribute_map[16];
+						for (uint i = 0; i < decl.attributes_count; ++i) {
+							attribute_map[i] = prog.attribute_by_semantics[(int)attributes_semantic[i]];
+						}
+						ffr::setVertexBuffer(&decl,	vb, 0, prog.use_semantics ? attribute_map : nullptr);
+						ffr::setIndexBuffer(ib);
+					}
+				
+					switch(type) {
+						case Mesh::RIGID_INSTANCED: {
+							uint start, instances_count;
+							stream.read(start);
+							stream.read(instances_count);
+							if(prog.handle.isValid()) {
+								const Renderer::TransientSlice instance_buffer = pipeline->m_renderer.allocTransient(instances_count * sizeof(Matrix));
+								ffr::update(instance_buffer.buffer, matrices + start, instance_buffer.offset, instance_buffer.size);
+								ffr::setInstanceBuffer(instance_decl, instance_buffer.buffer, instance_buffer.offset, decl.attributes_count);
+								ffr::drawTrianglesInstanced(0, indices_count, instances_count);
+							}
+							break;
+						}
+						case Mesh::SKINNED: {
+							const int model_uniform_loc = ffr::getUniformLocation(prog.handle, pipeline->m_model_uniform);
+							const int bones_uniform_loc = ffr::getUniformLocation(prog.handle, pipeline->m_bones_uniform);
+							const int mtx_count = stream.read<int>();
+							Matrix bone_mtx[196];
+							ASSERT(mtx_count <= lengthOf(bone_mtx));
+							stream.read(bone_mtx, sizeof(Matrix) * mtx_count);
+							const Matrix model_mtx = stream.read<Matrix>();
+
+							ffr::applyUniformMatrix4fv(bones_uniform_loc, mtx_count, &bone_mtx[0].m11);
+							ffr::applyUniformMatrix4f(model_uniform_loc, &model_mtx.m11);
+							ffr::drawTriangles(indices_count);
+							break;
+						}
+						default: ASSERT(false); break;
+					}
+					stream.read(type);
+				}
+			}
+			/*
 			for (int batch = 0, c = m_meshes.count; batch < c; batch += 8 * 1024) {
 				const Material* prev_material = nullptr;
 				const Lumix::Mesh* prev_mesh = nullptr;
@@ -1600,7 +1739,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 					}
 				}
 			}
-
+			/**/
 			pipeline->m_renderer.free(m_meshes_mem);
 			ffr::popDebugGroup();
 		}
@@ -1611,14 +1750,12 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		ffr::TextureHandle irradiance_map;
 		ffr::TextureHandle radiance_map;
 		struct {
-			Entity* owners;
 			Matrix* matrices;
-			Mesh** meshes;
 			int count;
 		} m_meshes;
+		Array<OutputBlob> m_streams;
 		Renderer::MemRef m_meshes_mem;
 		StaticString<32> shader_define;
-		u32 define_mask;
 		u64 layer_mask;
 		struct {
 			ffr::TextureHandle texture;
