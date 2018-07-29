@@ -23,6 +23,9 @@ namespace Lumix
 {
 
 
+u32 Mesh::s_last_sort_key = 0;
+
+
 Mesh::Mesh(Material* mat,
 	const ffr::VertexDecl& vertex_decl,
 	const char* name,
@@ -36,6 +39,8 @@ Mesh::Mesh(Material* mat,
 	, uvs(allocator)
 	, skin(allocator)
 {
+	sort_key = s_last_sort_key;
+	++s_last_sort_key;
 	vertex_buffer_handle = ffr::INVALID_BUFFER;
 	index_buffer_handle = ffr::INVALID_BUFFER;
 	for(AttributeSemantic& attr : attributes_semantic) {
@@ -90,13 +95,8 @@ void Mesh::setMaterial(Material* new_material, Model& model, Renderer& renderer)
 {
 	if (material) material->getResourceManager().unload(*material);
 	material = new_material;
-	static const int transparent_layer = renderer.getLayer("transparent");
 	layer_mask = material->getRenderLayerMask();
-	if (material->getRenderLayer() == transparent_layer)
-	{
-		type = Mesh::RIGID;
-	}
-	else if (material->getLayersCount() > 0)
+	if (material->getLayersCount() > 0)
 	{
 		if (model.getBoneCount() > 0)
 		{
@@ -330,15 +330,10 @@ static bool parseVertexDecl(FS::IFile& file, ffr::VertexDecl* vertex_decl, Mesh:
 
 void Model::onBeforeReady()
 {
-	static const int transparent_layer = m_renderer.getLayer("transparent");
 	for (Mesh& mesh : m_meshes)
 	{
 		mesh.layer_mask = mesh.material->getRenderLayerMask();
-		if (mesh.material->getRenderLayer() == transparent_layer)
-		{
-			mesh.type = Mesh::RIGID;
-		}
-		else if (mesh.material->getLayersCount() > 0)
+		if (mesh.material->getLayersCount() > 0)
 		{
 			if (getBoneCount() > 0)
 			{

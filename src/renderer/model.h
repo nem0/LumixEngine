@@ -77,7 +77,6 @@ struct LUMIX_RENDERER_API Mesh
 		SKINNED,
 		MULTILAYER_RIGID,
 		MULTILAYER_SKINNED,
-		RIGID,
 
 		LAST_TYPE
 	};
@@ -106,6 +105,7 @@ struct LUMIX_RENDERER_API Mesh
 	Array<Skin> skin;
 	FlagSet<Flags, u8> flags;
 	u64 layer_mask;
+	u32 sort_key;
 	int indices_count;
 	ffr::VertexDecl vertex_decl;
 	AttributeSemantic attributes_semantic[ffr::VertexDecl::MAX_ATTRIBUTES];
@@ -113,6 +113,8 @@ struct LUMIX_RENDERER_API Mesh
 	ffr::BufferHandle index_buffer_handle;
 	string name;
 	Material* material;
+
+	static u32 s_last_sort_key;
 };
 
 

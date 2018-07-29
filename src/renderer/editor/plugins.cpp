@@ -2417,16 +2417,11 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 		bool is_ortho) override
 	{
 		const float lod_multiplier = m_render_scene->getCameraLODMultiplier(fov, is_ortho);
-		Array<Array<MeshInstance>> meshes(m_render_scene->getAllocator());
+		Array<MeshInstance> meshes(m_render_scene->getAllocator());
 		m_render_scene->getModelInstanceInfos(frustum, lod_ref_point, lod_multiplier, ~0ULL, meshes);
-		for (auto& sub : meshes)
-		{
-			for (MeshInstance m : sub)
-			{
-				if (entities.indexOf(m.owner) < 0)
-				{
-					entities.push(m.owner);
-				}
+		for (MeshInstance m : meshes) {
+			if (entities.indexOf(m.owner) < 0) {
+				entities.push(m.owner);
 			}
 		}
 	}
