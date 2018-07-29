@@ -257,6 +257,20 @@ namespace Lumix
 					bool enabled = script.m_flags.isSet(ScriptInstance::ENABLED);
 					m_scene.setEnableProperty(m_entity, scr_index, script, enabled);
 
+					lua_rawgeti(script.m_state, LUA_REGISTRYINDEX, script.m_environment);
+					lua_getfield(script.m_state, -1, "awake");
+					if (lua_type(script.m_state, -1) != LUA_TFUNCTION)
+					{
+						lua_pop(script.m_state, 2);
+					}
+					else {
+						if (lua_pcall(script.m_state, 0, 0, 0) != 0) {
+							g_log_error.log("Lua Script") << lua_tostring(script.m_state, -1);
+							lua_pop(script.m_state, 1);
+						}
+					}
+					lua_pop(script.m_state, 1);
+
 					if (m_scene.m_is_game_running) m_scene.startScript(script, is_reload);
 				}
 			}
@@ -1099,7 +1113,7 @@ namespace Lumix
 
 			if (!is_restart)
 			{
-				lua_getfield(instance.m_state, -1, "init");
+				lua_getfield(instance.m_state, -1, "start");
 				if (lua_type(instance.m_state, -1) != LUA_TFUNCTION)
 				{
 					lua_pop(instance.m_state, 2);
@@ -1156,7 +1170,7 @@ namespace Lumix
 				m_gui_scene->rectHoveredOut().unbind<LuaScriptSceneImpl, &LuaScriptSceneImpl::onRectHoveredOut>(this);
 			}
 			m_gui_scene = nullptr;
-			m_scripts_init_called = false;
+			m_scripts_start_called = false;
 			m_is_game_running = false;
 			m_updates.clear();
 			m_input_handlers.clear();
@@ -1467,18 +1481,16 @@ namespace Lumix
 		IPlugin& getPlugin() const override { return m_system; }
 
 
-		void initScripts()
+		void startScripts()
 		{
-			ASSERT(!m_scripts_init_called && m_is_game_running);
+			ASSERT(!m_scripts_start_called && m_is_game_running);
 			// copy m_scripts to tmp, because scripts can create other scripts -> m_scripts is not const
 			Array<ScriptComponent*> tmp(m_system.m_allocator);
 			tmp.reserve(m_scripts.size());
 			for (auto* scr : m_scripts) tmp.push(scr);
 
-			for (auto* scr : tmp)
-			{
-				for (int j = 0; j < scr->m_scripts.size(); ++j)
-				{
+			for (auto* scr : tmp) {
+				for (int j = 0; j < scr->m_scripts.size(); ++j) {
 					auto& instance = scr->m_scripts[j];
 					if (!instance.m_script) continue;
 					if (!instance.m_script->isReady()) continue;
@@ -1487,7 +1499,7 @@ namespace Lumix
 					startScript(instance, false);
 				}
 			}
-			m_scripts_init_called = true;
+			m_scripts_start_called = true;
 		}
 
 
@@ -1626,7 +1638,7 @@ namespace Lumix
 			PROFILE_FUNCTION();
 
 			if (!m_is_game_running) return;
-			if (!m_scripts_init_called) initScripts();
+			if (!m_scripts_start_called) startScripts();
 
 			if (paused) return;
 
@@ -1872,7 +1884,7 @@ namespace Lumix
 		Array<TimerData> m_timers;
 		FunctionCall m_function_call;
 		ScriptInstance* m_current_script_instance;
-		bool m_scripts_init_called = false;
+		bool m_scripts_start_called = false;
 		bool m_is_api_registered = false;
 		bool m_is_game_running = false;
 		GUIScene* m_gui_scene = nullptr;

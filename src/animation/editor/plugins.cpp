@@ -28,7 +28,7 @@ using namespace Lumix;
 static const ComponentType ANIMABLE_TYPE = Reflection::getComponentType("animable");
 static const ComponentType PROPERTY_ANIMATOR_TYPE = Reflection::getComponentType("property_animator");
 static const ComponentType CONTROLLER_TYPE = Reflection::getComponentType("anim_controller");
-static const ComponentType RENDERABLE_TYPE = Reflection::getComponentType("renderable");
+static const ComponentType RENDERABLE_TYPE = Reflection::getComponentType("model_instance");
 
 
 namespace

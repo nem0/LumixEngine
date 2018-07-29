@@ -759,7 +759,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 					return 0;
 				}
 			
-				if (cmd->global_textures_count > lengthOf(cmd->global_textures)) {
+				if (cmd->m_global_textures_count > lengthOf(cmd->m_global_textures)) {
 					g_log_error.log("Renderer") << "Too many textures in renderMeshes call";
 					LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
 					lua_pop(L, 2);
@@ -768,19 +768,19 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 
 				const char* uniform = lua_tostring(L, -2);
 				const int rb_idx = (int)lua_tointeger(L, -1);
-				auto& t = cmd->global_textures[cmd->global_textures_count]; 
+				auto& t = cmd->m_global_textures[cmd->m_global_textures_count]; 
 				t.texture = pipeline->m_renderbuffers[rb_idx].handle;
 				t.uniform = ffr::allocUniform(uniform, ffr::UniformType::INT, 1);
-				++cmd->global_textures_count;
+				++cmd->m_global_textures_count;
 
 				lua_pop(L, 1);
 			}
 		}
 
-		cmd->camera_params = cp;
-		cmd->pipeline = pipeline;
-		cmd->layer_mask = layer_mask;
-		cmd->shader_define = define;
+		cmd->m_camera_params = cp;
+		cmd->m_pipeline = pipeline;
+		cmd->m_layer_mask = layer_mask;
+		cmd->m_shader_define = define;
 		pipeline->m_renderer.push(cmd);
 		return 0;
 	}
@@ -1390,176 +1390,262 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 	struct RenderMeshesCommand : Renderer::RenderCommandBase
 	{
 		RenderMeshesCommand(IAllocator& allocator) 
-			: m_streams(allocator) 
+			: m_allocator(allocator)
+			, m_streams(allocator)
+			, m_matrices(allocator)
 		{}
+
+
+		void radixSort(u64* _keys, MeshInstance* _values, int size)
+		{
+			// from https://github.com/bkaradzic/bx
+			enum {
+				RADIXSORT_BITS = 11,
+				RADIXSORT_HISTOGRAM_SIZE = 1 << RADIXSORT_BITS,
+				RADIXSORT_BIT_MASK = RADIXSORT_HISTOGRAM_SIZE - 1
+			};
+
+			Array<u64> tmp_keys(m_allocator); // TODO more suitable allocator
+			Array<MeshInstance> tmp_values(m_allocator);
+			tmp_keys.resize(size);
+			tmp_values.resize(size);
+
+			u64* keys = _keys;
+			u64* tempKeys = tmp_keys.begin();
+			MeshInstance* values = _values;
+			MeshInstance* tempValues = tmp_values.begin();
+
+			u32 histogram[RADIXSORT_HISTOGRAM_SIZE];
+			u16 shift = 0;
+			for (int pass = 0; pass < 6; ++pass) {
+				memset(histogram, 0, sizeof(u32) * RADIXSORT_HISTOGRAM_SIZE);
+
+				bool sorted = true;
+				u64 key = keys[0];
+				u64 prevKey = key;
+				for (int i = 0; i < size; ++i, prevKey = key) {
+					key = keys[i];
+					const u16 index = (key >> shift) & RADIXSORT_BIT_MASK;
+					++histogram[index];
+					sorted &= prevKey <= key;
+				}
+
+				if (sorted) {
+					if (pass & 1) {
+						// Odd number of passes needs to do copy to the destination.
+						memcpy(_keys, tmp_keys.begin(), tmp_keys.byte_size());
+						memcpy(_values, tmp_values.begin(), tmp_values.byte_size());
+					}
+					return;
+				}
+
+				u32 offset = 0;
+				for (int i = 0; i < RADIXSORT_HISTOGRAM_SIZE; ++i) {
+					const u32 count = histogram[i];
+					histogram[i] = offset;
+					offset += count;
+				}
+
+				for (int i = 0; i < size; ++i) {
+					const u64 key = keys[i];
+					const u16 index = (key >> shift) & RADIXSORT_BIT_MASK;
+					const u32 dest = histogram[index]++;
+					tempKeys[dest] = key;
+					tempValues[dest] = values[i];
+				}
+
+				u64* const swapKeys = tempKeys;
+				tempKeys = keys;
+				keys = swapKeys;
+
+				MeshInstance* const swapValues = tempValues;
+				tempValues = values;
+				values = swapValues;
+
+				shift += RADIXSORT_BITS;
+			}
+		}
+
+
+
+		void sort(Array<MeshInstance>& meshes)
+		{
+			PROFILE_BLOCK("Sort");
+			if(meshes.empty()) return;
+
+			MeshInstance* const LUMIX_RESTRICT begin = &meshes[0];
+			MeshInstance* const LUMIX_RESTRICT end = begin + meshes.size();
+
+			Array<u64> keys(m_allocator);
+			keys.resize(meshes.size());
+			for(int i = 0, c = meshes.size(); i < c; ++i) {
+				keys[i] = (u64)meshes[i].mesh;
+			}
+			
+			radixSort(&keys[0], &meshes[0], keys.size());
+		}
+
+
+		void writeMesh(OutputBlob& stream, const MeshInstance& mesh, u32 define_mask, u32 instanced_define_mask) const
+		{
+			stream.write(mesh.mesh->type);
+
+			const Material* material = mesh.mesh->material;
+			ASSERT(material->isReady());
+			ASSERT(material->getShader());
+			stream.write(mesh.mesh->vertex_buffer_handle);
+			stream.write(mesh.mesh->index_buffer_handle);
+			stream.write(mesh.mesh->indices_count);
+			stream.write(mesh.mesh->vertex_decl);
+							
+			u32 final_define_mask = material->getDefineMask() | define_mask;
+			if(mesh.mesh->type == Mesh::RIGID_INSTANCED) final_define_mask |= instanced_define_mask;
+			stream.write(final_define_mask);
+
+			stream.write(material->getShader()); // TODO
+			stream.write(material->getRenderStates() | u64(ffr::StateFlags::DEPTH_TEST));
+			stream.write(material->getRoughness());
+			stream.write(material->getMetallic());
+			stream.write(mesh.mesh->attributes_semantic, sizeof(mesh.mesh->attributes_semantic[0]) * mesh.mesh->vertex_decl.attributes_count);
+			stream.write(material->getTextureCount());
+			for(int i = 0, c = material->getTextureCount(); i < c; ++i) {
+				stream.write(material->getTexture(i)->handle);
+				stream.write(material->getTextureUniform(i));
+			}
+		}
+
 
 		void setup() override
 		{
-			if(!pipeline->m_scene) return;
+			if(!m_pipeline->m_scene) return;
 
-			Renderer& renderer = pipeline->m_renderer;
-			const u32 define_mask = shader_define.empty() 
+			Renderer& renderer = m_pipeline->m_renderer;
+			const u32 define_mask = m_shader_define.empty() 
 				? 0
-				: 1 << renderer.getShaderDefineIdx(shader_define);
-			RenderScene* scene = pipeline->getScene();
-			const Universe& universe = scene->getUniverse();
-			const Frustum frustum = camera_params.frustum;;
-			const Vec3 camera_pos = camera_params.pos;
-			const float lod_multiplier = camera_params.lod_multiplier;
+				: 1 << renderer.getShaderDefineIdx(m_shader_define);
+			const RenderScene* scene = m_pipeline->getScene();
 			Array<Array<MeshInstance>> meshes(renderer.getAllocator());
-			scene->getModelInstanceInfos(frustum, camera_pos, lod_multiplier, layer_mask, meshes);
+			scene->getModelInstanceInfos(m_camera_params.frustum
+				, m_camera_params.pos
+				, m_camera_params.lod_multiplier
+				, m_layer_mask
+				, meshes);
+			if (meshes.empty()) return;
+			
 			int count = 0;
 			for(const auto& submeshes : meshes) count += submeshes.size();
-			m_meshes_mem = renderer.allocate(sizeof(Matrix) * count);
-			m_meshes.matrices = (Matrix*)m_meshes_mem.data;
-			m_meshes.count = 0;
+			m_matrices.resize(count);
 
 			JobSystem::JobDecl jobs[64];
 			JobSystem::LambdaJob job_storage[64];
 			
 			ASSERT(meshes.size() < lengthOf(jobs));
 
-			if (!meshes.empty()) {
-				volatile int counter = 0;
-				for(const auto& submeshes : meshes) {
-					const int idx = int(&submeshes - &meshes[0]);
-					const int offset = m_meshes.count;
-					m_streams.emplace(renderer.getAllocator());
-					const u32 instanced_define_mask = 1 << renderer.getShaderDefineIdx("INSTANCED");
-					const u32 skinned_define_mask = 1 << renderer.getShaderDefineIdx("SKINNED");
+			volatile int counter = 0;
+			int meshes_count = 0;
 
-					JobSystem::fromLambda([idx, this, &meshes, &universe, camera_pos, offset, define_mask, instanced_define_mask, skinned_define_mask](){
-						PROFILE_BLOCK("render meshes - setup");
-						const ModelInstance* model_instances = pipeline->m_scene->getModelInstances();
-						const auto& submeshes = meshes[idx];
-						OutputBlob& stream = m_streams[idx];
-						int midx = 0;
-						Matrix* LUMIX_RESTRICT matrices = &m_meshes.matrices[offset];
+			for(const auto& submeshes : meshes) {
+				const int idx = int(&submeshes - &meshes[0]);
+				m_streams.emplace(renderer.getAllocator());
+				const u32 instanced_define_mask = 1 << renderer.getShaderDefineIdx("INSTANCED");
 
-						for(int i = 0, c = submeshes.size(); i < c; ++i) {
-							const auto& mesh = submeshes[i];
-							stream.write(mesh.mesh->type);
+				JobSystem::fromLambda([idx, this, &meshes, meshes_count, define_mask, instanced_define_mask](){
+					PROFILE_BLOCK("render meshes - setup");
+					PROFILE_INT("meshes count", meshes[idx].size());
+					
+					if(meshes[idx].empty()) return;
 
-							const Material* material = mesh.mesh->material;
-							ASSERT(material->isReady());
-							ASSERT(material->getShader());
-							stream.write(mesh.mesh->vertex_buffer_handle);
-							stream.write(mesh.mesh->index_buffer_handle);
-							stream.write(mesh.mesh->indices_count);
-							stream.write(mesh.mesh->vertex_decl);
-							
-							u32 final_define_mask = material->getDefineMask() | define_mask;
-							if(mesh.mesh->type == Mesh::RIGID_INSTANCED) final_define_mask |= instanced_define_mask;
-							stream.write(final_define_mask);
+					sort(meshes[idx]);
 
-							stream.write(material->getShader()); // TODO
-							stream.write(material->getRenderStates());
-							stream.write(material->getRoughness());
-							stream.write(material->getMetallic());
-							stream.write(mesh.mesh->attributes_semantic, sizeof(mesh.mesh->attributes_semantic[0]) * mesh.mesh->vertex_decl.attributes_count);
-							stream.write(material->getTextureCount());
-							for(int i = 0, c = material->getTextureCount(); i < c; ++i) {
-								stream.write(material->getTexture(i)->handle);
-								stream.write(material->getTextureUniform(i));
-							}
+					const Vec3 camera_pos = m_camera_params.pos;
+					const ModelInstance* LUMIX_RESTRICT model_instances = m_pipeline->m_scene->getModelInstances();
+					const auto& LUMIX_RESTRICT submeshes = meshes[idx];
+					Matrix* LUMIX_RESTRICT matrices = &m_matrices[meshes_count];
+					OutputBlob& stream = m_streams[idx];
+					int midx = 0;
 
-							switch(mesh.mesh->type) {
-								case Mesh::RIGID_INSTANCED: {
-									const int start = i;
-									const int start_midx = midx;
-									while(i < c && submeshes[i].mesh == mesh.mesh) {
-										matrices[midx] = universe.getRelativeMatrix(submeshes[i].owner, camera_pos);
-										++i;
-										++midx;
-									}
-									stream.write(start_midx + offset);
-									stream.write(i - start);
-									break;
+					for(int i = 0, c = submeshes.size(); i < c; ++i) {
+						const auto& mesh = submeshes[i];
+						writeMesh(stream, mesh, define_mask, instanced_define_mask);
+
+						switch(mesh.mesh->type) {
+							case Mesh::RIGID_INSTANCED: {
+								const int start = i;
+								const int start_midx = midx;
+								while(i < c && submeshes[i].mesh == mesh.mesh) {
+									Matrix mtx = model_instances[submeshes[i].owner.index].matrix;
+									mtx.translate(-camera_pos);
+									matrices[midx] = mtx;
+									++i;
+									++midx;
 								}
-								case Mesh::SKINNED: {
-									const ModelInstance& model_instance = model_instances[mesh.owner.index];
-							
-									const Pose& pose = *model_instance.pose;
-									const Model& model = *model_instance.model;
-									stream.write(pose.count);
-									Matrix bone_mtx[196];
-
-									const Vec3* poss = pose.positions;
-									const Quat* rots = pose.rotations;
-
-									ASSERT(pose.count <= lengthOf(bone_mtx));
-									for (int bone_index = 0, bone_count = pose.count; bone_index < bone_count; ++bone_index)
-									{
-										auto& bone = model.getBone(bone_index);
-										RigidTransform tmp = {poss[bone_index], rots[bone_index]};
-										bone_mtx[bone_index] = (tmp * bone.inv_bind_transform).toMatrix();
-									}
-
-									stream.write(bone_mtx, sizeof(Matrix) * pose.count);
-									stream.write(model_instance.matrix);
-									break;
-								}
-								default: ASSERT(false); break;
+								stream.write(start_midx + meshes_count);
+								stream.write(i - start);
+								--i;
+								break;
 							}
+							case Mesh::SKINNED: {
+								const ModelInstance& model_instance = model_instances[mesh.owner.index];
+							
+								const Pose& pose = *model_instance.pose;
+								const Model& model = *model_instance.model;
+								stream.write(pose.count);
+								Matrix bone_mtx[196];
+
+								const Vec3* poss = pose.positions;
+								const Quat* rots = pose.rotations;
+
+								ASSERT(pose.count <= lengthOf(bone_mtx));
+								for (int bone_index = 0, bone_count = pose.count; bone_index < bone_count; ++bone_index) {
+									auto& bone = model.getBone(bone_index);
+									RigidTransform tmp = {poss[bone_index], rots[bone_index]};
+									bone_mtx[bone_index] = (tmp * bone.inv_bind_transform).toMatrix();
+								}
+
+								stream.write(bone_mtx, sizeof(Matrix) * pose.count);
+								stream.write(model_instance.matrix);
+								break;
+							}
+							default: ASSERT(false); break;
 						}
-						stream.write(Mesh::LAST_TYPE);
-					}, &job_storage[idx], &jobs[idx], nullptr);
-					m_meshes.count += submeshes.size();
-				}
-				JobSystem::runJobs(jobs, meshes.size(), &counter);
-				JobSystem::wait(&counter);
+					}
+					stream.write(Mesh::LAST_TYPE);
+				}, &job_storage[idx], &jobs[idx], nullptr);
+				meshes_count += submeshes.size();
 			}
+			JobSystem::runJobs(jobs, meshes.size(), &counter);
+			JobSystem::wait(&counter);
 
-			MT::atomicAdd(&pipeline->m_stats.draw_call_count, m_meshes.count);
+			MT::atomicAdd(&m_pipeline->m_stats.draw_call_count, meshes_count);
 
-			const Entity probe = scene->getNearestEnvironmentProbe(pipeline->m_viewport.pos);
+			const Entity probe = scene->getNearestEnvironmentProbe(m_pipeline->m_viewport.pos);
 			if (probe.isValid()) {
-				const Texture* irradiance = pipeline->m_scene->getEnvironmentProbeIrradiance(probe);
-				const Texture* radiance = pipeline->m_scene->getEnvironmentProbeRadiance(probe);
-				irradiance_map = irradiance->handle;
-				radiance_map = radiance->handle;
+				const Texture* irradiance = scene->getEnvironmentProbeIrradiance(probe);
+				const Texture* radiance = scene->getEnvironmentProbeRadiance(probe);
+				m_irradiance_map = irradiance->handle;
+				m_radiance_map = radiance->handle;
 			}
 			else {
-				irradiance_map = pipeline->m_default_cubemap->handle;
-				radiance_map = pipeline->m_default_cubemap->handle;
+				m_irradiance_map = m_pipeline->m_default_cubemap->handle;
+				m_radiance_map = m_pipeline->m_default_cubemap->handle;
 			}
-		}
-
-		
-		void renderSkinnedMesh(const Matrix& matrix, const Mesh& mesh, const Pose& pose, const Model& model, int model_uniform_loc, int bones_uniform_loc) const
-		{
-			Matrix bone_mtx[196];
-
-			const Vec3* poss = pose.positions;
-			const Quat* rots = pose.rotations;
-
-			ASSERT(pose.count <= lengthOf(bone_mtx));
-			for (int bone_index = 0, bone_count = pose.count; bone_index < bone_count; ++bone_index)
-			{
-				auto& bone = model.getBone(bone_index);
-				RigidTransform tmp = {poss[bone_index], rots[bone_index]};
-				bone_mtx[bone_index] = (tmp * bone.inv_bind_transform).toMatrix();
-			}
-
-			ffr::applyUniformMatrix4fv(bones_uniform_loc, pose.count, &bone_mtx[0].m11);
-			ffr::applyUniformMatrix4f(model_uniform_loc, &matrix.m11);
-			ffr::drawTriangles(mesh.indices_count);
 		}
 
 
 		void execute() override
 		{
 			PROFILE_FUNCTION();
-			
-			ffr::pushDebugGroup(shader_define.empty() ? "meshes" : shader_define);
-			ffr::setUniform1i(pipeline->m_irradiance_map_uniform, 0);
-			ffr::setUniform1i(pipeline->m_radiance_map_uniform, 1);
+			if(m_streams.empty()) return;
 
-			ffr::bindTexture(0, irradiance_map);
-			ffr::bindTexture(1, radiance_map);
+			ffr::pushDebugGroup(m_shader_define.empty() ? "meshes" : m_shader_define);
+			ffr::setUniform1i(m_pipeline->m_irradiance_map_uniform, 0);
+			ffr::setUniform1i(m_pipeline->m_radiance_map_uniform, 1);
 
-			for (int i = 0; i < global_textures_count; ++i) {
-				const auto& t = global_textures[i];
+			ffr::bindTexture(0, m_irradiance_map);
+			ffr::bindTexture(1, m_radiance_map);
+
+			for (int i = 0; i < m_global_textures_count; ++i) {
+				const auto& t = m_global_textures[i];
 				ffr::bindTexture(2 + i, t.texture);
 				ffr::setUniform1i(t.uniform, 2 + i);
 			}
@@ -1570,18 +1656,21 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 			instance_decl.addAttribute(4, ffr::AttributeType::FLOAT, false, false);
 			instance_decl.addAttribute(4, ffr::AttributeType::FLOAT, false, false);
 
-			Renderer& renderer = pipeline->m_renderer;
+			Renderer& renderer = m_pipeline->m_renderer;
 
-			const ModelInstance* model_instances = pipeline->m_scene->getModelInstances();
+			const ModelInstance* model_instances = m_pipeline->m_scene->getModelInstances();
 
-			const Matrix* LUMIX_RESTRICT matrices = m_meshes.matrices; 
+			const Matrix* LUMIX_RESTRICT matrices = m_matrices.begin(); 
 			ffr::blending(0);
 
+			int drawcalls_count = 0;
 			for (OutputBlob& blob : m_streams) {
+				if(blob.getPos() == 0) continue;
 				InputBlob stream(blob);
 				Mesh::Type type;
 				stream.read(type);
 				while(type != Mesh::LAST_TYPE) {
+					++drawcalls_count;
 					const ffr::BufferHandle vb = stream.read<ffr::BufferHandle>();
 					const ffr::BufferHandle ib = stream.read<ffr::BufferHandle>();
 					const int indices_count = stream.read<int>();
@@ -1602,13 +1691,13 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 					for (int i = 0; i < textures_count; ++i) {
 						const ffr::TextureHandle handle = stream.read<ffr::TextureHandle>();
 						const ffr::UniformHandle uniform = stream.read<ffr::UniformHandle>();
-						ffr::bindTexture(i + 2 + global_textures_count, handle);
-						ffr::setUniform1i(uniform, i + 2 + global_textures_count);
+						ffr::bindTexture(i + 2 + m_global_textures_count, handle);
+						ffr::setUniform1i(uniform, i + 2 + m_global_textures_count);
 					}
 
 					const Shader::Program& prog = shader->getProgram(define_mask);
 
-					ffr::setUniform4f(pipeline->m_material_params_uniform, &material_params.x);
+					ffr::setUniform4f(m_pipeline->m_material_params_uniform, &material_params.x);
 					ffr::setState(render_states);
 					if(prog.handle.isValid()) {
 						ffr::useProgram(prog.handle);
@@ -1626,7 +1715,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 							stream.read(start);
 							stream.read(instances_count);
 							if(prog.handle.isValid()) {
-								const Renderer::TransientSlice instance_buffer = pipeline->m_renderer.allocTransient(instances_count * sizeof(Matrix));
+								const Renderer::TransientSlice instance_buffer = m_pipeline->m_renderer.allocTransient(instances_count * sizeof(Matrix));
 								ffr::update(instance_buffer.buffer, matrices + start, instance_buffer.offset, instance_buffer.size);
 								ffr::setInstanceBuffer(instance_decl, instance_buffer.buffer, instance_buffer.offset, decl.attributes_count);
 								ffr::drawTrianglesInstanced(0, indices_count, instances_count);
@@ -1634,17 +1723,19 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 							break;
 						}
 						case Mesh::SKINNED: {
-							const int model_uniform_loc = ffr::getUniformLocation(prog.handle, pipeline->m_model_uniform);
-							const int bones_uniform_loc = ffr::getUniformLocation(prog.handle, pipeline->m_bones_uniform);
 							const int mtx_count = stream.read<int>();
 							Matrix bone_mtx[196];
 							ASSERT(mtx_count <= lengthOf(bone_mtx));
 							stream.read(bone_mtx, sizeof(Matrix) * mtx_count);
 							const Matrix model_mtx = stream.read<Matrix>();
 
-							ffr::applyUniformMatrix4fv(bones_uniform_loc, mtx_count, &bone_mtx[0].m11);
-							ffr::applyUniformMatrix4f(model_uniform_loc, &model_mtx.m11);
-							ffr::drawTriangles(indices_count);
+							if(prog.handle.isValid()) {
+								const int model_uniform_loc = ffr::getUniformLocation(prog.handle, m_pipeline->m_model_uniform);
+								const int bones_uniform_loc = ffr::getUniformLocation(prog.handle, m_pipeline->m_bones_uniform);
+								ffr::applyUniformMatrix4fv(bones_uniform_loc, mtx_count, &bone_mtx[0].m11);
+								ffr::applyUniformMatrix4f(model_uniform_loc, &model_mtx.m11);
+								ffr::drawTriangles(indices_count);
+							}
 							break;
 						}
 						default: ASSERT(false); break;
@@ -1652,117 +1743,25 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 					stream.read(type);
 				}
 			}
-			/*
-			for (int batch = 0, c = m_meshes.count; batch < c; batch += 8 * 1024) {
-				const Material* prev_material = nullptr;
-				const Lumix::Mesh* prev_mesh = nullptr;
-				const Shader::Program* program = nullptr;
-				int model_uniform_loc = -1;
-				int bones_uniform_loc = -1;
-
-				for (int i = batch, c = Math::minimum(batch + 8 * 1024, m_meshes.count); i < c; ++i) {
-					const Mesh* mesh = meshes[i];
-
-					if(mesh != prev_mesh) {
-						const Material* material = mesh->material;
-						if (!material->isReady()) continue;
-						if(material != prev_material) {
-							u32 final_define_mask = material->getDefineMask() | define_mask;
-							if(mesh->type == Mesh::RIGID_INSTANCED) {
-								final_define_mask |= instanced_define_mask;
-							}
-						
-							const Shader::Program& prog = material->getShader()->getProgram(final_define_mask);
-							if (!prog.handle.isValid()) continue;
-
-							program = &prog;
-							model_uniform_loc = ffr::getUniformLocation(prog.handle, pipeline->m_model_uniform);
-							bones_uniform_loc = ffr::getUniformLocation(prog.handle, pipeline->m_bones_uniform);
-							const int textures_count = material->getTextureCount();
-							for (int i = 0; i < textures_count; ++i) {
-								ffr::bindTexture(i + 2 + global_textures_count, material->getTexture(i)->handle);
-								ffr::setUniform1i(material->getTextureUniform(i), i + 2 + global_textures_count);
-							}
-
-							const Vec4 material_params(material->getRoughness()
-								, material->getMetallic()
-								, 0
-								, 1
-							);
-
-							ffr::setUniform4f(pipeline->m_material_params_uniform, &material_params.x);
-							prev_material = material;
-
-							ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | mesh->material->getRenderStates());
-							ffr::useProgram(prog.handle);
-						}
-
-						prev_mesh = mesh;
-						int attribute_map[16];
-						for (uint i = 0; i < mesh->vertex_decl.attributes_count; ++i) {
-							attribute_map[i] = program->attribute_by_semantics[(int)mesh->attributes_semantic[i]];
-						}
-				
-						ffr::setVertexBuffer(&mesh->vertex_decl, mesh->vertex_buffer_handle, 0, program->use_semantics ? attribute_map : nullptr);
-						ffr::setIndexBuffer(mesh->index_buffer_handle);
-					}
-
-					switch(mesh->type) {
-						case Mesh::RIGID_INSTANCED: {
-							const int start = i;
-							const Mesh* const instance_mesh = meshes[start];
-							++i;
-							while (meshes[i] == instance_mesh && i < c) {
-								++i;
-							}
-							const int instances_count = i - start;
-
-							PROFILE_BLOCK("finish_instances");
-							const Renderer::TransientSlice instance_buffer = pipeline->m_renderer.allocTransient(instances_count * sizeof(Matrix));
-				
-							ffr::update(instance_buffer.buffer, matrices + start, instance_buffer.offset, instance_buffer.size);
-							ffr::setInstanceBuffer(instance_decl, instance_buffer.buffer, instance_buffer.offset, instance_mesh->vertex_decl.attributes_count);
-							ffr::drawTrianglesInstanced(0, instance_mesh->indices_count, instances_count);
-							break;
-						}
-						case Mesh::RIGID:
-							ffr::applyUniformMatrix4f(model_uniform_loc, &matrices[i].m11);
-							ffr::drawTriangles(mesh->indices_count);
-							break;
-						case Mesh::SKINNED: {
-							const ModelInstance& model_instance = model_instances[owners[i].index];
-							renderSkinnedMesh(matrices[i], *mesh, *model_instance.pose, *model_instance.model, model_uniform_loc, bones_uniform_loc);
-							break;
-						}
-						default:
-							ASSERT(false);
-							break;
-					}
-				}
-			}
-			/**/
-			pipeline->m_renderer.free(m_meshes_mem);
+			PROFILE_INT("drawcalls", drawcalls_count);
 			ffr::popDebugGroup();
 		}
 
 
-		CameraParams camera_params;
-		PipelineImpl* pipeline;
-		ffr::TextureHandle irradiance_map;
-		ffr::TextureHandle radiance_map;
-		struct {
-			Matrix* matrices;
-			int count;
-		} m_meshes;
+		IAllocator& m_allocator;
+		CameraParams m_camera_params;
+		PipelineImpl* m_pipeline;
+		ffr::TextureHandle m_irradiance_map;
+		ffr::TextureHandle m_radiance_map;
+		Array<Matrix> m_matrices;
 		Array<OutputBlob> m_streams;
-		Renderer::MemRef m_meshes_mem;
-		StaticString<32> shader_define;
-		u64 layer_mask;
+		StaticString<32> m_shader_define;
+		u64 m_layer_mask;
 		struct {
 			ffr::TextureHandle texture;
 			ffr::UniformHandle uniform;
-		} global_textures[16];
-		int global_textures_count = 0;
+		} m_global_textures[16];
+		int m_global_textures_count = 0;
 	};
 
 

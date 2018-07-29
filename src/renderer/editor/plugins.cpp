@@ -65,7 +65,7 @@ static const ComponentType CAMERA_TYPE = Reflection::getComponentType("camera");
 static const ComponentType DECAL_TYPE = Reflection::getComponentType("decal");
 static const ComponentType POINT_LIGHT_TYPE = Reflection::getComponentType("point_light");
 static const ComponentType GLOBAL_LIGHT_TYPE = Reflection::getComponentType("global_light");
-static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("renderable");
+static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("model_instance");
 static const ComponentType TEXT_MESH_TYPE = Reflection::getComponentType("text_mesh");
 static const ComponentType ENVIRONMENT_PROBE_TYPE = Reflection::getComponentType("environment_probe");
 
@@ -3148,7 +3148,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		app.registerComponent("global_light", "Render/Global light");
 
 		app.registerComponentWithResource(
-			"renderable", "Render/Mesh", Model::TYPE, *Reflection::getProperty(MODEL_INSTANCE_TYPE, "Source"));
+			"model_instance", "Render/Mesh", Model::TYPE, *Reflection::getProperty(MODEL_INSTANCE_TYPE, "Source"));
 		app.registerComponentWithResource("particle_emitter",
 			"Render/Particle emitter/Emitter",
 			Material::TYPE,

@@ -31,7 +31,7 @@ namespace Lumix
 
 
 static const ComponentType LUA_SCRIPT_TYPE = Reflection::getComponentType("lua_script");
-static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("renderable");
+static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("model_instance");
 static const ComponentType RIGID_ACTOR_TYPE = Reflection::getComponentType("rigid_actor");
 static const ComponentType BOX_ACTOR_TYPE = Reflection::getComponentType("box_rigid_actor");
 static const ComponentType RAGDOLL_TYPE = Reflection::getComponentType("ragdoll");

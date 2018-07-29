@@ -82,7 +82,7 @@ struct ModelInstance
 struct MeshInstance
 {
 	Entity owner;
-	Mesh* mesh;
+	const Mesh* mesh;
 	float depth;
 };
 
@@ -320,7 +320,7 @@ public:
 		const Vec3& lod_ref_point,
 		float lod_multiplier,
 		u64 layer_mask,
-		Array<Array<MeshInstance>>& result) = 0;
+		Array<Array<MeshInstance>>& result) const = 0;
 	virtual void getModelInstanceEntities(const Frustum& frustum, Array<Entity>& entities) = 0;
 	virtual Entity getFirstModelInstance() = 0;
 	virtual Entity getNextModelInstance(Entity entity) = 0;

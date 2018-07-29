@@ -56,7 +56,7 @@ namespace Lumix
 {
 
 
-static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("renderable");
+static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("model_instance");
 
 enum { TRANSIENT_BUFFER_SIZE = 32 * 1024 * 1024 };
 
@@ -345,7 +345,7 @@ static void registerProperties(IAllocator& allocator)
 			property("Far", LUMIX_PROP(RenderScene, CameraFarPlane), 
 				MinAttribute(0))
 		),
-		component("renderable",
+		component("model_instance",
 			property("Enabled", LUMIX_PROP_FULL(RenderScene, isModelInstanceEnabled, enableModelInstance)),
 			property("Source", LUMIX_PROP(RenderScene, ModelInstancePath),
 				ResourceAttribute("Mesh (*.msh)", Model::TYPE)),
@@ -594,6 +594,7 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 		slice.buffer = m_render_task.m_transient_buffer;
 		slice.offset = m_render_task.m_transient_buffer_offset;
 		slice.size = m_render_task.m_transient_buffer_offset + size > TRANSIENT_BUFFER_SIZE ? 0 : size;
+		 m_render_task.m_transient_buffer_offset += slice.size;
 		return slice;
 	}
 
