@@ -48,6 +48,7 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 			Matrix shadow_view_projection;
 			Matrix shadowmap_matrices[4];
 			Matrix camera_projection;
+			Matrix camera_inv_projection;
 			Matrix camera_view;
 			Matrix camera_inv_view;
 			Matrix camera_view_projection;
@@ -57,6 +58,7 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 			Vec3 light_color;
 			float light_intensity;
 			float light_indirect_intensity;
+			float time;
 			Int2 framebuffer_size;
 		};
 
