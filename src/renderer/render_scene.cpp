@@ -55,7 +55,7 @@ enum class RenderSceneVersion : int
 };
 
 
-static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("renderable");
+static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("model_instance");
 static const ComponentType DECAL_TYPE = Reflection::getComponentType("decal");
 static const ComponentType POINT_LIGHT_TYPE = Reflection::getComponentType("point_light");
 static const ComponentType PARTICLE_EMITTER_TYPE = Reflection::getComponentType("particle_emitter");
@@ -3503,94 +3503,11 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-
-	// TODO
-	enum { 
-		BX_RADIXSORT_BITS = 11,
-		BX_RADIXSORT_HISTOGRAM_SIZE = 1 << BX_RADIXSORT_BITS, 
-		BX_RADIXSORT_BIT_MASK = BX_RADIXSORT_HISTOGRAM_SIZE - 1
-	};
-
-
-	template <typename Ty>
-	inline void radixSort(uint64_t* _keys, uint64_t* _tempKeys, Ty* _values, Ty* _tempValues, uint32_t _size)
-	{
-		uint64_t* keys = _keys;
-		uint64_t* tempKeys = _tempKeys;
-		Ty* values = _values;
-		Ty* tempValues = _tempValues;
-
-		uint32_t histogram[BX_RADIXSORT_HISTOGRAM_SIZE];
-		uint16_t shift = 0;
-		uint32_t pass = 0;
-		for (; pass < 6; ++pass)
-		{
-			memset(histogram, 0, sizeof(uint32_t)*BX_RADIXSORT_HISTOGRAM_SIZE);
-
-			bool sorted = true;
-			{
-				uint64_t key = keys[0];
-				uint64_t prevKey = key;
-				for (uint32_t ii = 0; ii < _size; ++ii, prevKey = key)
-				{
-					key = keys[ii];
-					uint16_t index = (key>>shift)&BX_RADIXSORT_BIT_MASK;
-					++histogram[index];
-					sorted &= prevKey <= key;
-				}
-			}
-
-			if (sorted)
-			{
-				goto done;
-			}
-
-			uint32_t offset = 0;
-			for (uint32_t ii = 0; ii < BX_RADIXSORT_HISTOGRAM_SIZE; ++ii)
-			{
-				uint32_t count = histogram[ii];
-				histogram[ii] = offset;
-				offset += count;
-			}
-
-			for (uint32_t ii = 0; ii < _size; ++ii)
-			{
-				uint64_t key = keys[ii];
-				uint16_t index = (key>>shift)&BX_RADIXSORT_BIT_MASK;
-				uint32_t dest = histogram[index]++;
-				tempKeys[dest] = key;
-				tempValues[dest] = values[ii];
-			}
-
-			uint64_t* swapKeys = tempKeys;
-			tempKeys = keys;
-			keys = swapKeys;
-
-			Ty* swapValues = tempValues;
-			tempValues = values;
-			values = swapValues;
-
-			shift += BX_RADIXSORT_BITS;
-		}
-
-done:
-		if (0 != (pass&1) )
-		{
-			// Odd number of passes needs to do copy to the destination.
-			memcpy(_keys, _tempKeys, _size*sizeof(uint64_t) );
-			for (uint32_t ii = 0; ii < _size; ++ii)
-			{
-				_values[ii] = _tempValues[ii];
-			}
-		}
-	}
-
-
 	void getModelInstanceInfos(const Frustum& frustum,
 		const Vec3& lod_ref_point,
 		float lod_multiplier,
 		u64 layer_mask,
-		Array<Array<MeshInstance>>& result) override
+		Array<Array<MeshInstance>>& result) const override
 	{
 		CullingSystem::Results cull_results(m_allocator);
 		m_culling_system->cull(frustum, layer_mask, cull_results);
@@ -3605,8 +3522,7 @@ done:
 		ASSERT(cull_results.size() <= lengthOf(jobs));
 
 		volatile int counter = 0;
-		for (int subresult_index = 0; subresult_index < cull_results.size(); ++subresult_index)
-		{
+		for (int subresult_index = 0; subresult_index < cull_results.size(); ++subresult_index) {
 			Array<MeshInstance>& subinfos = result[subresult_index];
 			subinfos.clear();
 
@@ -3615,21 +3531,19 @@ done:
 				PROFILE_INT("ModelInstance count", cull_results[subresult_index].size());
 				if (cull_results[subresult_index].empty()) return;
 
-				Vec3 ref_point = lod_ref_point;
-				float final_lod_multiplier = m_lod_multiplier * lod_multiplier;
+				const Vec3 ref_point = lod_ref_point;
+				const float final_lod_multiplier = m_lod_multiplier * lod_multiplier;
 				const Entity* LUMIX_RESTRICT raw_subresults = &cull_results[subresult_index][0];
-				ModelInstance* LUMIX_RESTRICT model_instances = &m_model_instances[0];
-				for (int i = 0, c = cull_results[subresult_index].size(); i < c; ++i)
-				{
+				const ModelInstance* LUMIX_RESTRICT model_instances = &m_model_instances[0];
+				for (int i = 0, c = cull_results[subresult_index].size(); i < c; ++i) {
 					const ModelInstance* LUMIX_RESTRICT model_instance = &model_instances[raw_subresults[i].index];
 					float squared_distance = (model_instance->matrix.getTranslation() - ref_point).squaredLength();
 					squared_distance *= final_lod_multiplier;
 
 					const Model* LUMIX_RESTRICT model = model_instance->model;
-					LODMeshIndices lod = model->getLODMeshIndices(squared_distance);
-					for (int j = lod.from, c = lod.to; j <= c; ++j)
-					{
-						Mesh& mesh = model_instance->meshes[j];
+					const LODMeshIndices lod = model->getLODMeshIndices(squared_distance);
+					for (int j = lod.from, c = lod.to; j <= c; ++j) {
+						const Mesh& mesh = model_instance->meshes[j];
 						if ((mesh.layer_mask & layer_mask) == 0) continue;
 						
 						MeshInstance& info = subinfos.emplace();
@@ -3637,31 +3551,6 @@ done:
 						info.mesh = &mesh;
 						info.depth = squared_distance;
 					}
-				}
-				if (!subinfos.empty())
-				{
-					PROFILE_BLOCK("Sort");
-					MeshInstance* const LUMIX_RESTRICT begin = &subinfos[0];
-					MeshInstance* const LUMIX_RESTRICT end = begin + subinfos.size();
-
-					Array<u64> keys(m_allocator);
-					Array<u64> tmpkeys(m_allocator);
-					keys.resize(subinfos.size());
-					tmpkeys.resize(subinfos.size());
-					for(int i = 0, c = subinfos.size(); i < c; ++i) {
-						keys[i] = (u64)subinfos[i].mesh;
-					}
-
-					Array<MeshInstance> tmpinfos(m_allocator);
-					tmpinfos.resize(subinfos.size());
-
-					radixSort(&keys[0], &tmpkeys[0], &subinfos[0], &tmpinfos[0], keys.size());
-/*
-					auto cmp = [](const MeshInstance& a, const MeshInstance& b) -> bool {
-						if (a.mesh != b.mesh) return a.mesh < b.mesh;
-						return (a.depth < b.depth);
-					};
-					std::sort(begin, end, cmp);*/
 				}
 			}, &job_storage[subresult_index], &jobs[subresult_index], nullptr);
 		}

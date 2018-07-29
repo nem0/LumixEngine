@@ -3077,7 +3077,7 @@ auto& engine = dialog.getEditor().getEngine();
 	while (engine.getFileSystem().hasWork()) engine.getFileSystem().updateAsyncTransactions();
 
 	auto mesh_entity = universe.createEntity({0, 0, 0}, {0, 0, 0, 0});
-	static const auto MODEL_INSTANCE_TYPE = Reflection::getComponentType("renderable");
+	static const auto MODEL_INSTANCE_TYPE = Reflection::getComponentType("model_instance");
 	universe.createComponent(MODEL_INSTANCE_TYPE, mesh_entity);
 	render_scene->setModelInstancePath(mesh_entity, mesh_path);
 

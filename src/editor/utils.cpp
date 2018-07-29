@@ -139,7 +139,7 @@ void getEntityListDisplayName(WorldEditor& editor, char* buf, int max_size, Enti
 		return;
 	}
 	const char* name = editor.getUniverse()->getEntityName(entity);
-	static const auto MODEL_INSTANCE_TYPE = Reflection::getComponentType("renderable");
+	static const auto MODEL_INSTANCE_TYPE = Reflection::getComponentType("model_instance");
 	if (editor.getUniverse()->hasComponent(entity, MODEL_INSTANCE_TYPE))
 	{
 		auto* render_interface = editor.getRenderInterface();

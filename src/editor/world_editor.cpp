@@ -41,7 +41,7 @@ namespace Lumix
 {
 
 
-static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("renderable");
+static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("model_instance");
 static const ComponentType CAMERA_TYPE = Reflection::getComponentType("camera");
 
 

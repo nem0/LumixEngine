@@ -35,7 +35,7 @@ enum class AnimationSceneVersion
 };
 
 
-static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("renderable");
+static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("model_instance");
 static const ComponentType ANIMABLE_TYPE = Reflection::getComponentType("animable");
 static const ComponentType PROPERTY_ANIMATOR_TYPE = Reflection::getComponentType("property_animator");
 static const ComponentType CONTROLLER_TYPE = Reflection::getComponentType("anim_controller");

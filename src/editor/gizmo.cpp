@@ -153,6 +153,7 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 
 		Vec3 to_entity_dir = is_ortho ? camera_dir : camera_pos - entity_pos;
 		Matrix mtx = gizmo_mtx * scale_mtx;
+		mtx.translate(-camera_pos);
 
 		RenderInterface::Vertex vertices[9];
 		u16 indices[9];
@@ -226,7 +227,6 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 	}
 
 
-
 	void renderScaleGizmo(const Matrix& gizmo_mtx,
 		bool is_active,
 		const Vec3& camera_pos,
@@ -241,6 +241,7 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 		scale_mtx.m11 = scale_mtx.m22 = scale_mtx.m33 = scale;
 
 		Matrix mtx = gizmo_mtx * scale_mtx;
+		mtx.translate(-camera_pos);
 
 		RenderInterface::Vertex vertices[9];
 		u16 indices[12];
@@ -431,6 +432,7 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 
 		Vec3 to_entity_dir = is_ortho ? camera_dir : camera_pos - entity_pos;
 		Matrix mtx = gizmo_mtx * scale_mtx;
+		mtx.translate(-camera_pos);
 
 		Vec3 right(1, 0, 0);
 		Vec3 up(0, 1, 0);
@@ -1106,8 +1108,7 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 		transform();
 
 		for (int i = 0; i < m_count; ++i) {
-			Matrix gizmo_mtx = getMatrix(m_entities[i]);
-			gizmo_mtx.translate(-vp.pos);
+			const Matrix gizmo_mtx = getMatrix(m_entities[i]);
 			data->push({gizmo_mtx, m_active == i});
 		}
 

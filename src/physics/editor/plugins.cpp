@@ -28,7 +28,7 @@ namespace
 {
 
 
-const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("renderable");
+const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("model_instance");
 const ComponentType RAGDOLL_TYPE = Reflection::getComponentType("ragdoll");
 const ComponentType BOX_ACTOR_TYPE = Reflection::getComponentType("box_rigid_actor");
 const ComponentType SPHERE_ACTOR_TYPE = Reflection::getComponentType("sphere_rigid_actor");

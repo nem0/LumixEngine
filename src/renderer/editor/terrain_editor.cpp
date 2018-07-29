@@ -34,7 +34,7 @@ namespace Lumix
 {
 
 
-static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("renderable");
+static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("model_instance");
 static const ComponentType TERRAIN_TYPE = Reflection::getComponentType("terrain");
 static const ComponentType HEIGHTFIELD_TYPE = Reflection::getComponentType("physical_heightfield");
 static const char* HEIGHTMAP_UNIFORM = "u_heightmap";
