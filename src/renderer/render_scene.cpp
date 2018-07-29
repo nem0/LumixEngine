@@ -3507,14 +3507,15 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		const Vec3& lod_ref_point,
 		float lod_multiplier,
 		u64 layer_mask,
-		Array<Array<MeshInstance>>& result) const override
+		Array<MeshInstance>& result) const override
 	{
 		CullingSystem::Results cull_results(m_allocator);
 		m_culling_system->cull(frustum, layer_mask, cull_results);
 		if (cull_results.empty()) return;
 
-		while (result.size() < cull_results.size()) {
-			result.emplace(m_allocator);
+		Array<Array<MeshInstance>> tmp(m_allocator);
+		for (auto& r : cull_results) {
+			tmp.emplace(m_allocator).reserve(r.size());
 		}
 
 		JobSystem::JobDecl jobs[64];
@@ -3523,7 +3524,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 
 		volatile int counter = 0;
 		for (int subresult_index = 0; subresult_index < cull_results.size(); ++subresult_index) {
-			Array<MeshInstance>& subinfos = result[subresult_index];
+			Array<MeshInstance>& subinfos = tmp[subresult_index];
 			subinfos.clear();
 
 			JobSystem::fromLambda([&layer_mask, &subinfos, this, &cull_results, subresult_index, lod_ref_point, lod_multiplier]() {
@@ -3556,6 +3557,20 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		}
 		JobSystem::runJobs(jobs, cull_results.size(), &counter);
 		JobSystem::wait(&counter);
+
+		uint count = 0;
+		for (auto& i : tmp) {
+			count += i.size();
+		}
+
+		result.resize(count);
+		uint offset = 0;
+		PROFILE_BLOCK("merge temporary infos");
+		PROFILE_INT("count", count);
+		for (auto& i : tmp) {
+			memcpy(result.begin() + offset, i.begin(), i.byte_size());
+			offset += i.size();
+		}
 	}
 
 
