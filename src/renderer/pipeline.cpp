@@ -14,6 +14,7 @@
 #include "engine/mt/atomic.h"
 #include "engine/path.h"
 #include "engine/profiler.h"
+#include "engine/timer.h"
 #include "engine/universe/universe.h"
 #include "engine/viewport.h"
 #include "font_manager.h"
@@ -57,6 +58,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		, m_renderbuffers(allocator)
 		, m_shaders(allocator)
 	{
+		m_timer = Timer::create(m_allocator);
 		m_viewport.w = m_viewport.h = 800;
 		ShaderManager& shader_manager = renderer.getShaderManager();
 		m_draw2d_shader = (Shader*)shader_manager.load(Path("pipelines/draw2d.shd"));
@@ -94,6 +96,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		for(ShaderRef& shader : m_shaders) {
 			shader.res->getResourceManager().unload(*shader.res);
 		}
+		Timer::destroy(m_timer);
 	}
 
 
@@ -319,11 +322,14 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		const Matrix view = m_viewport.getViewRotation();
 		const Matrix projection = m_viewport.getProjection(ffr::isHomogenousDepth());
 		state.camera_projection = projection;
+		state.camera_inv_projection = projection;
+		state.camera_inv_projection.inverse();
 		state.camera_view = view;
 		state.camera_inv_view = view.fastInverted();
 		state.camera_view_projection = projection * view;
 		state.camera_inv_view_projection = state.camera_view_projection;
 		state.camera_inv_view_projection.inverse();
+		state.time = m_timer->getTimeSinceStart();
 
 		const Entity global_light = m_scene->getActiveGlobalLight();
 		if(global_light.isValid()) {
@@ -796,7 +802,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 			void execute() override 
 			{
 				if (!m_shader->isReady()) return;
-				ffr::ProgramHandle prg = m_shader->getProgram(0).handle;
+				ffr::ProgramHandle prg = m_shader->getProgram(m_define_mask).handle;
 				
 				for(int i = 0; i < m_textures_count; ++i) {
 					ffr::bindTexture(i, m_textures[i].handle);
@@ -827,6 +833,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 			Shader* m_shader;
 			int m_indices_count;
 			int m_indices_offset;
+			u32 m_define_mask = 0;
 		};
 
 		const int pipeline_idx = lua_upvalueindex(1);
@@ -934,6 +941,26 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 					lua_pop(L, 1);
 				}
 			}
+
+			if (lua_isstring(L, 6)) {
+				const char* define = lua_tostring(L, 6);
+				cmd->m_define_mask = 1 << pipeline->m_renderer.getShaderDefineIdx(define);
+			}
+			else if (lua_istable(L, 6)) {
+				lua_pushnil(L);
+				while (lua_next(L, 6) != 0) {
+					if(lua_type(L, -1) != LUA_TSTRING) {
+						g_log_error.log("Renderer") << "Incorrect uniform arguments of drawArrays";
+						LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
+						lua_pop(L, 2);
+						return 0;
+					}
+					const char* define = lua_tostring(L, -1);
+					cmd->m_define_mask |= 1 << pipeline->m_renderer.getShaderDefineIdx(define);
+					lua_pop(L, 1);
+				}
+			}
+
 		}
 
 		const Vec3 camera_pos = pipeline->m_viewport.pos;
@@ -1516,6 +1543,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 			stream.write(material->getRenderStates() | u64(ffr::StateFlags::DEPTH_TEST));
 			stream.write(material->getRoughness());
 			stream.write(material->getMetallic());
+			stream.write(material->getEmission());
 			stream.write(material->getColor());
 			stream.write(mesh.mesh->attributes_semantic, sizeof(mesh.mesh->attributes_semantic[0]) * mesh.mesh->vertex_decl.attributes_count);
 			stream.write(material->getTextureCount());
@@ -1689,7 +1717,8 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 					const Vec4 material_params = Vec4(
 						stream.read<float>(), // roughness
 						stream.read<float>(), // metallic
-						0, 0);
+						stream.read<float>(), // emission
+						0);
 					const Vec4 material_color = stream.read<Vec4>();
 					Mesh::AttributeSemantic attributes_semantic[16];
 					if(decl.attributes_count > 0) {
@@ -2003,7 +2032,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 
 	Draw2D& getDraw2D() override { return m_draw2d; }
 	ffr::TextureHandle getOutput() override { 
-		if (m_output < 0) return ffr::INVALID_TEXTURE;
+		if (m_output < 0 || m_output >= m_renderbuffers.size()) return ffr::INVALID_TEXTURE;
 		return m_renderbuffers[m_output].handle;
 	}
 
@@ -2042,6 +2071,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 	Array<CustomCommandHandler> m_custom_commands_handlers;
 	Array<Renderbuffer> m_renderbuffers;
 	Array<ShaderRef> m_shaders;
+	Timer* m_timer;
 
 	ffr::UniformHandle m_terrain_params_uniform;
 	ffr::UniformHandle m_rel_camera_pos_uniform;

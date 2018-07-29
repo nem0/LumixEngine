@@ -14,6 +14,7 @@ typedef Array<u64> LayerMasks;
 typedef Array<int> ModelInstancetoSphereMap;
 typedef Array<Entity> SphereToModelInstanceMap;
 
+
 static void doCulling(int start_index,
 	const Sphere* LUMIX_RESTRICT start,
 	const Sphere* LUMIX_RESTRICT end,
@@ -60,6 +61,7 @@ static void doCulling(int start_index,
 		if(layer_masks[i] & layer_mask) results.push(sphere_to_model_instance_map[i]);
 	}
 }
+
 
 struct CullingJobData
 {
