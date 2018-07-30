@@ -1714,11 +1714,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 					const u32 define_mask = stream.read<u32>();
 					Shader* shader = stream.read<Shader*>();
 					const u64 render_states = stream.read<u64>();
-					const Vec4 material_params = Vec4(
-						stream.read<float>(), // roughness
-						stream.read<float>(), // metallic
-						stream.read<float>(), // emission
-						0);
+					const Vec4 material_params = Vec4(stream.read<Vec3>(), 0); // roughness, metallic, emission
 					const Vec4 material_color = stream.read<Vec4>();
 					Mesh::AttributeSemantic attributes_semantic[16];
 					if(decl.attributes_count > 0) {
