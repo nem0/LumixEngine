@@ -462,7 +462,6 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 		m_font_manager = LUMIX_NEW(m_allocator, FontManager)(*this, m_allocator);
 		m_font_manager->create(FontResource::TYPE, manager);
 
-		m_default_shader = static_cast<Shader*>(m_shader_manager.load(Path("pipelines/standard.shd")));
 		RenderScene::registerLuaAPI(m_engine.getState());
 		m_layers.emplace("default");
 		m_layers.emplace("transparent");
@@ -475,7 +474,6 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 
 	~RendererImpl()
 	{
-		m_shader_manager.unload(*m_default_shader);
 		m_texture_manager.destroy();
 		m_model_manager.destroy();
 		m_material_manager.destroy();
@@ -810,7 +808,6 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	*/
 	void makeScreenshot(const Path& filename) override {  }
 	void resize(int w, int h) override {  }
-	Shader* getDefaultShader() override { return m_default_shader; }
 
 
 	u8 getShaderDefineIdx(const char* define) override
@@ -900,7 +897,6 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	ShaderManager m_shader_manager;
 	ModelManager m_model_manager;
 	bool m_vsync;
-	Shader* m_default_shader;
 	Pipeline* m_main_pipeline;
 	RenderTask m_render_task;
 	GlobalState m_global_state;

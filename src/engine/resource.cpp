@@ -138,7 +138,11 @@ void Resource::doLoad()
 	FS::FileSystem& fs = m_resource_manager.getOwner().getFileSystem();
 	FS::ReadCallback cb;
 	cb.bind<Resource, &Resource::fileLoaded>(this);
-	m_async_op = fs.openAsync(fs.getDefaultDevice(), m_path, FS::Mode::OPEN_AND_READ, cb);
+
+	const u32 hash = m_path.getHash();
+	const StaticString<MAX_PATH_LENGTH> res_path(".lumix/assets/", hash, ".res");
+
+	m_async_op = fs.openAsync(fs.getDefaultDevice(), Path(res_path), FS::Mode::OPEN_AND_READ, cb);
 }
 
 

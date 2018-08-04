@@ -586,7 +586,6 @@ struct FBXImporter
 		for (int mesh_idx = 0; mesh_idx < meshes.size(); ++mesh_idx)
 		{
 			ImportMesh& import_mesh = meshes[mesh_idx];
-			dialog.setImportMessage("Processing meshes...", (mesh_idx / (float)meshes.size()) * 0.4f);
 			import_mesh.vertex_data.clear();
 			import_mesh.indices.clear();
 
@@ -743,9 +742,8 @@ struct FBXImporter
 	}
 
 
-	FBXImporter(StudioApp& _app, ImportAssetDialog& _dialog)
+	FBXImporter(StudioApp& _app)
 		: app(_app)
-		, dialog(_dialog)
 		, scenes(_app.getWorldEditor().getAllocator())
 		, materials(_app.getWorldEditor().getAllocator())
 		, meshes(_app.getWorldEditor().getAllocator())
@@ -836,12 +834,13 @@ struct FBXImporter
 	}
 
 
-	bool writeBillboardMaterial(const char* output_dir, const char* texture_output_dir, const char* mesh_output_filename)
-	{
+	bool writeBillboardMaterial(const char* output_dir, const char* src)
+	{/*
 		if (!create_billboard_lod) return true;
 
 		FS::OsFile file;
-		PathBuilder output_material_name(output_dir, "/", mesh_output_filename, "_billboard.mat");
+		const u32 hash = continueCrc32(mesh_hash, "||billboard");
+		PathBuilder output_material_name(output_dir, hash, ".res");
 		if (!file.open(output_material_name, FS::Mode::CREATE_AND_WRITE))
 		{
 			g_log_error.log("FBX") << "Failed to create " << output_material_name;
@@ -852,49 +851,35 @@ struct FBXImporter
 		file << "\t, \"texture\" : {\n\t\t\"source\" : \"";
 
 		WorldEditor& editor = app.getWorldEditor();
-		if (texture_output_dir[0])
-		{
-			char from_root_path[MAX_PATH_LENGTH];
-			getRelativePath(editor, from_root_path, lengthOf(from_root_path), texture_output_dir);
-			PathBuilder relative_texture_path(from_root_path, mesh_output_filename, "_billboard.dds");
-			PathBuilder texture_path(texture_output_dir, mesh_output_filename, "_billboard.dds");
-			copyFile("models/utils/cube/default.dds", texture_path);
-			file << "/" << relative_texture_path << "\"}\n\t, \"texture\" : {\n\t\t\"source\" : \"";
+		file << mesh_output_filename << "_billboard.dds\"}\n\t, \"texture\" : {\n\t\t\"source\" : \"";
+		PathBuilder texture_path(output_dir, "/", mesh_output_filename, "_billboard.dds");
+		copyFile("models/utils/cube/default.dds", texture_path);
 
-			PathBuilder relative_normal_path_n(from_root_path, mesh_output_filename, "_billboard_normal.dds");
-			PathBuilder normal_path(texture_output_dir, mesh_output_filename, "_billboard_normal.dds");
-			copyFile("models/utils/cube/default.dds", normal_path);
-			file << "/" << relative_normal_path_n;
-
-		}
-		else
-		{
-			file << mesh_output_filename << "_billboard.dds\"}\n\t, \"texture\" : {\n\t\t\"source\" : \"";
-			PathBuilder texture_path(output_dir, "/", mesh_output_filename, "_billboard.dds");
-			copyFile("models/utils/cube/default.dds", texture_path);
-
-			file << mesh_output_filename << "_billboard_normal.dds";
-			PathBuilder normal_path(output_dir, "/", mesh_output_filename, "_billboard_normal.dds");
-			copyFile("models/utils/cube/default.dds", normal_path);
-		}
+		file << mesh_output_filename << "_billboard_normal.dds";
+		PathBuilder normal_path(output_dir, "/", mesh_output_filename, "_billboard_normal.dds");
+		copyFile("models/utils/cube/default.dds", normal_path);
 
 		file << "\"}\n}";
-		file.close();
+		file.close();*/
+		// TODO
 		return true;
 	}
 
 
-	void writeMaterials(const char* output_dir, const char* texture_output_dir, const char* mesh_output_filename)
+	void writeMaterials(const char* output_dir, const char* src)
 	{
-		dialog.setImportMessage("Writing materials...", 0.9f);
-
 		for (const ImportMaterial& material : materials)
 		{
 			if (!material.import) continue;
 
 			char mat_name[128];
 			getMaterialName(material.fbx, mat_name);
-			StaticString<MAX_PATH_LENGTH> path(output_dir, mat_name, ".mat");
+			makeLowercase(mat_name, (int)strlen(mat_name), mat_name);
+			
+			const StaticString<MAX_PATH_LENGTH + 128> mat_id(src, "|", mat_name, ".mat");
+			const u32 hash = crc32(mat_id);
+
+			const StaticString<MAX_PATH_LENGTH> path(output_dir, hash, ".res");
 			if (!out_file.open(path, FS::Mode::CREATE_AND_WRITE))
 			{
 				g_log_error.log("FBX") << "Failed to create " << path;
@@ -903,12 +888,11 @@ struct FBXImporter
 
 			writeString("shader \"pipelines/standard.shd\"\n");
 			if (material.alpha_cutout) writeString("defines {\"ALPHA_CUTOUT\"}\n");
-			auto writeTexture = [this, texture_output_dir](const ImportTexture& texture, bool srgb) {
+			auto writeTexture = [this](const ImportTexture& texture, bool srgb) {
 				if (texture.fbx)
 				{
 					writeString("texture \"");
 					PathUtils::FileInfo info(texture.src);
-					writeString(texture_output_dir);
 					writeString(info.m_basename);
 					writeString(".");
 					writeString(texture.to_dds ? "dds" : info.m_extension);
@@ -932,7 +916,7 @@ struct FBXImporter
 
 			out_file.close();
 		}
-		writeBillboardMaterial(output_dir, texture_output_dir,  mesh_output_filename);
+		writeBillboardMaterial(output_dir, src);
 	}
 
 
@@ -1076,7 +1060,6 @@ struct FBXImporter
 		for (int anim_idx = 0; anim_idx < animations.size(); ++anim_idx)
 		{
 			ImportAnimation& anim = animations[anim_idx];
-			dialog.setImportMessage("Writing animation...", 0.6f + 0.2f * (anim_idx / (float)animations.size()));
 			if (!anim.import) continue;
 			const ofbx::AnimationStack* stack = anim.fbx;
 			const ofbx::IScene& scene = *anim.scene;
@@ -1488,7 +1471,7 @@ struct FBXImporter
 	}
 
 
-	void writeMeshes(const char* mesh_output_filename)
+	void writeMeshes(const char* mesh_output_filename, const char* src)
 	{
 		i32 mesh_count = 0;
 		for (ImportMesh& mesh : meshes)
@@ -1541,9 +1524,11 @@ struct FBXImporter
 			const ofbx::Material* material = import_mesh.fbx_mat;
 			char mat[128];
 			getMaterialName(material, mat);
-			i32 mat_len = (i32)strlen(mat);
-			write(mat_len);
-			write(mat, strlen(mat));
+			makeLowercase(mat, (int)strlen(mat), mat);
+			StaticString<MAX_PATH_LENGTH + 128> mat_id(src, "|", mat, ".mat");
+			const i32 len = stringLength(mat_id.data);
+			write(len);
+			write(mat_id.data, len);
 
 			const char* name = getImportMeshName(import_mesh);
 			i32 name_len = (i32)strlen(name);
@@ -1697,7 +1682,7 @@ struct FBXImporter
 	}
 
 
-	bool writePhysics()
+	bool writePhysics(const char* basename, const char* output_dir)
 	{
 		bool any = false;
 		for (const ImportMesh& m : meshes)
@@ -1711,10 +1696,9 @@ struct FBXImporter
 
 		if (!any) return true;
 
-		dialog.setImportMessage("Importing physics...", -1);
-		PathBuilder phy_path(dialog.m_output_dir);
+		PathBuilder phy_path(output_dir);
 		PlatformInterface::makePath(phy_path);
-		phy_path << "/" << dialog.m_mesh_output_filename << ".phy";
+		phy_path << "/" << basename << ".phy";
 		FS::OsFile file;
 		if (!file.open(phy_path, FS::Mode::CREATE_AND_WRITE))
 		{
@@ -1748,23 +1732,12 @@ struct FBXImporter
 
 		if (!make_convex) writePhysicsTriMesh(file);
 		file.close();
-
+		
 		return true;
 	}
 
 
-	bool save(const char* output_dir, const char* output_mesh_filename, const char* texture_output_dir)
-	{
-		writeModel(output_dir, output_mesh_filename);
-		writeAnimations(output_dir);
-		writeMaterials(output_dir, texture_output_dir, output_mesh_filename);
-		writePhysics();
-
-		return true;
-	}
-
-
-	void writeModel(const char* output_dir, const char* output_mesh_filename)
+	void writeModel(const char* output_dir, const char* output_mesh_filename, const char* ext, const char* src)
 	{
 		postprocessMeshes();
 
@@ -1782,7 +1755,7 @@ struct FBXImporter
 		if (!import_any_mesh) return;
 
 		qsort(&meshes[0], meshes.size(), sizeof(meshes[0]), cmpMeshes);
-		StaticString<MAX_PATH_LENGTH> out_path(output_dir, output_mesh_filename, ".msh");
+		StaticString<MAX_PATH_LENGTH> out_path(output_dir, output_mesh_filename, ext);
 		PlatformInterface::makePath(output_dir);
 		if (!out_file.open(out_path, FS::Mode::CREATE_AND_WRITE))
 		{
@@ -1790,9 +1763,8 @@ struct FBXImporter
 			return;
 		}
 
-		dialog.setImportMessage("Writing model...", 0.5f);
 		writeModelHeader();
-		writeMeshes(output_mesh_filename);
+		writeMeshes(output_mesh_filename, src);
 		writeGeometry();
 		writeSkeleton();
 		writeLODs();
@@ -1827,7 +1799,6 @@ struct FBXImporter
 
 
 	StudioApp& app;
-	ImportAssetDialog& dialog;
 	bool open = false;
 	Array<ImportMaterial> materials;
 	Array<ImportMesh> meshes;
@@ -2399,7 +2370,7 @@ ImportAssetDialog::ImportAssetDialog(StudioApp& app)
 	, m_sources(app.getWorldEditor().getAllocator())
 {
 	IAllocator& allocator = app.getWorldEditor().getAllocator();
-	m_fbx_importer = LUMIX_NEW(allocator, FBXImporter)(app, *this);
+	m_fbx_importer = LUMIX_NEW(allocator, FBXImporter)(app);
 
 	s_default_comp_params.m_file_type = cCRNFileTypeDDS;
 	s_default_comp_params.m_quality_level = cCRNMaxQualityLevel;
@@ -2546,6 +2517,19 @@ void ImportAssetDialog::setMessage(const char* message)
 {
 	MT::SpinLock lock(m_mutex);
 	copyString(m_message, message);
+}
+
+
+void ImportAssetDialog::importFBX(const char* src, const char* dst_dir)
+{
+	const PathUtils::FileInfo src_info(src);
+	m_fbx_importer->clearSources();
+	m_fbx_importer->addSource(src);
+	const u32 hash = crc32(src);
+	const StaticString<32> hash_str("", hash);
+	m_fbx_importer->writeModel(dst_dir, hash_str, ".res", src);
+	m_fbx_importer->writeMaterials(dst_dir, src);
+	m_fbx_importer->writeAnimations(dst_dir);
 }
 
 
@@ -3183,7 +3167,7 @@ auto& engine = dialog.getEditor().getEngine();
 
 void ImportAssetDialog::convert(bool use_ui)
 {
-	ASSERT(!m_task);
+	/*ASSERT(!m_task);
 	
 	if (m_sources.empty())
 	{
@@ -3321,7 +3305,7 @@ void ImportAssetDialog::convert(bool use_ui)
 		},
 		allocator);
 	m_task->create("ConvertTask");
-
+	*/
 }
 
 

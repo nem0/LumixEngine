@@ -317,7 +317,7 @@ void Texture::onDataUpdated(int x, int y, int w, int h)
 bool loadRaw(Texture& texture, FS::IFile& file, IAllocator& allocator)
 {
 	PROFILE_FUNCTION();
-	size_t size = file.size();
+	size_t size = file.size() - 3;
 	texture.bytes_per_pixel = 2;
 	texture.width = (int)sqrt(size / texture.bytes_per_pixel);
 	texture.height = texture.width;
@@ -328,7 +328,9 @@ bool loadRaw(Texture& texture, FS::IFile& file, IAllocator& allocator)
 		file.read(&texture.data[0], size);
 	}
 
-	const u16* src_mem = (const u16*)file.getBuffer();
+	const u8* data = (const u8*)file.getBuffer();
+
+	const u16* src_mem = (const u16*)(data + 3);
 	Array<float> dst_mem(allocator);
 	dst_mem.resize(texture.width * texture.height * sizeof(float));
 
@@ -599,7 +601,8 @@ void Texture::removeDataReference()
 static bool loadDDS(Texture& texture, FS::IFile& file)
 {
 	ffr::TextureInfo info;
-	Renderer::MemRef mem = texture.renderer.copy(file.getBuffer(), (int)file.size());
+	const u8* data = (const u8*)file.getBuffer();
+	Renderer::MemRef mem = texture.renderer.copy(data + 3, (int)file.size() - 3);
 	texture.handle = texture.renderer.loadTexture(mem, texture.getFFRFlags(), &info);
 	if (texture.handle.isValid()) {
 		texture.width = info.width;
@@ -628,28 +631,25 @@ u32 Texture::getFFRFlags() const
 bool Texture::load(FS::IFile& file)
 {
 	PROFILE_FUNCTION();
-	const char* path = getPath().c_str();
-	size_t len = getPath().length();
+	char ext[4] = {};
+	if (!file.read(ext, 3)) return false;
+
 	bool loaded = false;
-	if (len > 3 && (equalStrings(path + len - 4, ".dds")))
-	{
+	if (equalStrings(ext, "dds")) {
 		loaded = loadDDS(*this, file);
 	}
-	else if (len > 3 && equalStrings(path + len - 4, ".raw"))
-	{
+	else if (equalStrings(ext, ".raw")) {
 		loaded = loadRaw(*this, file, allocator);
 	}
-	else
-	{
+	else {
 		loaded = loadTGA(file);
 	}
-	if (!loaded)
-	{
-		g_log_warning.log("Renderer") << "Error loading texture " << path;
+	if (!loaded) {
+		g_log_warning.log("Renderer") << "Error loading texture " << getPath();
 		return false;
 	}
 
-	m_size = file.size();
+	m_size = file.size() - 3;
 	return true;
 }
 

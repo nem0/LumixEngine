@@ -9,6 +9,7 @@ namespace Lumix
 		: m_resource_managers(allocator)
 		, m_allocator(allocator)
 		, m_file_system(nullptr)
+		, m_load_hook(nullptr)
 	{
 	}
 
@@ -27,6 +28,25 @@ namespace Lumix
 	ResourceManagerBase* ResourceManager::get(ResourceType type)
 	{
 		return m_resource_managers[type.type]; 
+	}
+
+	void ResourceManager::LoadHook::continueLoad(Resource& resource)
+	{
+		ASSERT(resource.isEmpty());
+		resource.remRef(); // release from hook
+		resource.m_desired_state = Resource::State::EMPTY;
+		resource.doLoad();
+	}
+
+	void ResourceManager::setLoadHook(LoadHook* hook)
+	{
+		ASSERT(!m_load_hook || !hook);
+		m_load_hook = hook;
+	}
+
+	bool ResourceManager::onBeforeLoad(Resource& resource) const
+	{
+		return m_load_hook ? m_load_hook->onBeforeLoad(resource) : false;
 	}
 
 	void ResourceManager::add(ResourceType type, ResourceManagerBase* rm)

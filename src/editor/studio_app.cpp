@@ -2,6 +2,7 @@
 #include "asset_browser.h"
 #include "audio/audio_scene.h"
 #include "audio/clip_manager.h"
+#include "editor/asset_compiler.h"
 #include "editor/file_system_watcher.h"
 #include "editor/gizmo.h"
 #include "editor/prefab_system.h"
@@ -146,6 +147,7 @@ public:
 		, m_deferred_game_mode_exit(false)
 		, m_profiler_ui(nullptr)
 		, m_asset_browser(nullptr)
+		, m_asset_compiler(nullptr)
 		, m_property_grid(nullptr)
 		, m_actions(m_allocator)
 		, m_window_actions(m_allocator)
@@ -208,6 +210,7 @@ public:
 		loadUserPlugins();
 		addActions();
 
+		m_asset_compiler = AssetCompiler::create(*this);
 		m_asset_browser = LUMIX_NEW(m_allocator, AssetBrowser)(*this);
 		m_property_grid = LUMIX_NEW(m_allocator, PropertyGrid)(*this);
 		m_profiler_ui = ProfilerUI::create(*m_engine);
@@ -278,6 +281,7 @@ public:
 		LUMIX_DELETE(m_allocator, m_asset_browser);
 		LUMIX_DELETE(m_allocator, m_property_grid);
 		LUMIX_DELETE(m_allocator, m_log_ui);
+		AssetCompiler::destroy(*m_asset_compiler);
 		WorldEditor::destroy(m_editor, m_allocator);
 		Engine::destroy(m_engine, m_allocator);
 		m_engine = nullptr;
@@ -858,6 +862,7 @@ public:
 	bool isAssetBrowserOpen() const { return m_asset_browser->m_is_open; }
 	int getExitCode() const override { return m_exit_code; }
 	AssetBrowser& getAssetBrowser() override { ASSERT(m_asset_browser); return *m_asset_browser; }
+	AssetCompiler& getAssetCompiler() override { ASSERT(m_asset_compiler); return *m_asset_compiler; }
 	PropertyGrid& getPropertyGrid() override { ASSERT(m_property_grid); return *m_property_grid; }
 	Metadata& getMetadata() override { return m_metadata; }
 	LogUI& getLogUI() override { ASSERT(m_log_ui); return *m_log_ui; }
@@ -2734,6 +2739,7 @@ public:
 	bool m_confirm_new;
 	char m_universe_to_load[MAX_PATH_LENGTH];
 	AssetBrowser* m_asset_browser;
+	AssetCompiler* m_asset_compiler;
 	PropertyGrid* m_property_grid;
 	LogUI* m_log_ui;
 	ProfilerUI* m_profiler_ui;

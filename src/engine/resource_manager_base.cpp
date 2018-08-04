@@ -10,15 +10,6 @@ namespace Lumix
 {
 
 
-void ResourceManagerBase::LoadHook::continueLoad(Resource& resource)
-{
-	ASSERT(resource.isEmpty());
-	resource.remRef(); // release from hook
-	resource.m_desired_state = Resource::State::EMPTY;
-	resource.doLoad();
-}
-
-
 void ResourceManagerBase::create(ResourceType type, ResourceManager& owner)
 {
 	owner.add(type, this);
@@ -64,7 +55,7 @@ Resource* ResourceManagerBase::load(const Path& path)
 
 	if(resource->isEmpty() && resource->m_desired_state == Resource::State::EMPTY)
 	{
-		if (m_load_hook && m_load_hook->onBeforeLoad(*resource))
+		if (m_owner->onBeforeLoad(*resource))
 		{
 			resource->m_desired_state = Resource::State::READY;
 			resource->addRef(); // for hook
@@ -99,7 +90,7 @@ void ResourceManagerBase::load(Resource& resource)
 {
 	if(resource.isEmpty() && resource.m_desired_state == Resource::State::EMPTY)
 	{
-		if (m_load_hook && m_load_hook->onBeforeLoad(resource))
+		if (m_owner->onBeforeLoad(resource))
 		{
 			resource.addRef(); // for hook
 			return;
@@ -152,18 +143,11 @@ void ResourceManagerBase::enableUnload(bool enable)
 	}
 }
 
-void ResourceManagerBase::setLoadHook(LoadHook& load_hook)
-{
-	ASSERT(!m_load_hook);
-	m_load_hook = &load_hook;
-}
-
 ResourceManagerBase::ResourceManagerBase(IAllocator& allocator)
 	: m_resources(allocator)
 	, m_allocator(allocator)
 	, m_owner(nullptr)
 	, m_is_unload_enabled(true)
-	, m_load_hook(nullptr)
 { }
 
 ResourceManagerBase::~ResourceManagerBase()

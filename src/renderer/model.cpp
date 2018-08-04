@@ -475,22 +475,17 @@ bool Model::parseMeshes(FS::IFile& file, FileVersion version)
 		for(auto& i : semantics) i = Mesh::AttributeSemantic::NONE;
 		if (!parseVertexDecl(file, &vertex_decl, semantics)) return false;
 
-		i32 str_size;
-		file.read(&str_size, sizeof(str_size));
-		char material_name[MAX_PATH_LENGTH];
-		file.read(material_name, str_size);
-		if (str_size >= MAX_PATH_LENGTH) return false;
-
-		material_name[str_size] = 0;
-
-		char material_path[MAX_PATH_LENGTH];
-		copyString(material_path, model_dir);
-		catString(material_path, material_name);
-		catString(material_path, ".mat");
-
-		auto* material_manager = m_resource_manager.getOwner().get(Material::TYPE);
-		Material* material = static_cast<Material*>(material_manager->load(Path(material_path)));
+		i32 mat_path_length;
+		char mat_path[MAX_PATH_LENGTH + 128];
+		file.read(&mat_path_length, sizeof(mat_path_length));
+		if (mat_path_length + 1 > lengthOf(mat_path)) return false;
+		file.read(mat_path, mat_path_length);
+		mat_path[mat_path_length] = '\0';
 		
+		auto* material_manager = m_resource_manager.getOwner().get(Material::TYPE);
+		Material* material = static_cast<Material*>(material_manager->load(Path(mat_path)));
+	
+		i32 str_size;
 		file.read(&str_size, sizeof(str_size));
 		char mesh_name[MAX_PATH_LENGTH];
 		mesh_name[str_size] = 0;

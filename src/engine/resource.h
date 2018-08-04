@@ -31,6 +31,7 @@ class LUMIX_ENGINE_API Resource
 {
 public:
 	friend class ResourceManagerBase;
+	friend class ResourceManager;
 
 	enum class State : u32
 	{
