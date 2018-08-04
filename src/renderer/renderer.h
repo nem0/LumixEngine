@@ -91,7 +91,6 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 		virtual ShaderManager& getShaderManager() = 0;
 		virtual ModelManager& getModelManager() = 0;
 		virtual TextureManager& getTextureManager() = 0;
-		virtual Shader* getDefaultShader() = 0;
 		virtual int getLayersCount() const = 0;
 		virtual int getLayer(const char* name) = 0;
 		virtual const char* getLayerName(int idx) const = 0;

@@ -96,6 +96,7 @@ public:
 	virtual class PropertyGrid& getPropertyGrid() = 0;
 	virtual class LogUI& getLogUI() = 0;
 	virtual class AssetBrowser& getAssetBrowser() = 0;
+	virtual struct AssetCompiler& getAssetCompiler() = 0;
 	virtual WorldEditor& getWorldEditor() = 0;
 	virtual void addPlugin(IPlugin& plugin) = 0;
 	virtual void addPlugin(GUIPlugin& plugin) = 0;

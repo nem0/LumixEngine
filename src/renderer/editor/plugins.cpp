@@ -1,5 +1,6 @@
 #include "../ffr/ffr.h"
 #include "editor/asset_browser.h"
+#include "editor/asset_compiler.h"
 #include "editor/platform_interface.h"
 #include "editor/property_grid.h"
 #include "editor/render_interface.h"
@@ -82,12 +83,24 @@ struct FontPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 };
 
 
-struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
+struct MaterialPlugin LUMIX_FINAL : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 {
 	explicit MaterialPlugin(StudioApp& app)
 		: m_app(app)
 	{
 		app.getAssetBrowser().registerExtension("mat", Material::TYPE);
+	}
+
+
+	bool compile(const Path& src) override
+	{
+		const char* dst_dir = m_app.getAssetCompiler().getCompiledDir();
+		const u32 hash = crc32(src.c_str());
+
+		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
+
+		copyFile(src.c_str(), dst);
+		return false;
 	}
 
 
@@ -349,7 +362,7 @@ struct MaterialPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 };
 
 
-struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
+struct ModelPlugin LUMIX_FINAL : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 {
 	explicit ModelPlugin(StudioApp& app)
 		: m_app(app)
@@ -360,7 +373,7 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		, m_tile(app.getWorldEditor().getAllocator())
 		, m_texture_tile_creator(app.getWorldEditor().getAllocator())
 	{
-		app.getAssetBrowser().registerExtension("msh", Model::TYPE);
+		app.getAssetBrowser().registerExtension("fbx", Model::TYPE);
 		JobSystem::JobDecl job;
 		job.data = this;
 		job.task = [](void* data) { ((ModelPlugin*)data)->createTextureTileTask(); };
@@ -384,6 +397,25 @@ struct ModelPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		Pipeline::destroy(m_pipeline);
 		engine.destroyUniverse(*m_tile.universe);
 		Pipeline::destroy(m_tile.pipeline);
+	}
+
+
+	bool compile(const Path& src) override
+	{
+		if (PathUtils::hasExtension(src.c_str(), "fbx")) {
+			const char* dst_dir = m_app.getAssetCompiler().getCompiledDir();
+
+			m_import_asset_dialog->importFBX(src.c_str(), dst_dir); // TODO
+			return true;
+		}
+
+		const char* dst_dir = m_app.getAssetCompiler().getCompiledDir();
+		const u32 hash = crc32(src.c_str());
+
+		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
+
+		copyFile(src.c_str(), dst);
+		return false;
 	}
 
 
@@ -1015,10 +1047,11 @@ bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK); renderer->viewCounterAdd();
 		MT::SpinMutex lock;
 		Array<StaticString<MAX_PATH_LENGTH>> tiles;
 	} m_texture_tile_creator;
+	ImportAssetDialog* m_import_asset_dialog = nullptr;
 };
 
 
-struct TexturePlugin LUMIX_FINAL : public AssetBrowser::IPlugin
+struct TexturePlugin LUMIX_FINAL : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 {
 	explicit TexturePlugin(StudioApp& app)
 		: m_app(app)
@@ -1026,6 +1059,38 @@ struct TexturePlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 		app.getAssetBrowser().registerExtension("tga", Texture::TYPE);
 		app.getAssetBrowser().registerExtension("dds", Texture::TYPE);
 		app.getAssetBrowser().registerExtension("raw", Texture::TYPE);
+	}
+
+
+	bool compile(const Path& src) override
+	{
+		const char* dst_dir = m_app.getAssetCompiler().getCompiledDir();
+		const u32 hash = crc32(src.c_str());
+
+		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
+
+		FS::OsFile srcf;
+		FS::OsFile dstf;
+		if (!srcf.open(src.c_str(), FS::Mode::OPEN_AND_READ)) return false;
+		if (!dstf.open(dst, FS::Mode::CREATE_AND_WRITE)) {
+			srcf.close();
+			return false;
+		}
+		
+		Array<u8> buffer(m_app.getWorldEditor().getAllocator());
+		buffer.resize((int)srcf.size());
+
+		srcf.read(buffer.begin(), buffer.byte_size());
+		srcf.close();
+
+		char ext[4] = {};
+		PathUtils::getExtension(ext, lengthOf(ext), src.c_str());
+
+		dstf.write(ext, sizeof(ext) - 1);
+		dstf.write(buffer.begin(), buffer.byte_size());
+		dstf.close();
+
+		return false;
 	}
 
 
@@ -1070,12 +1135,23 @@ struct TexturePlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 };
 
 
-struct ShaderPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
+struct ShaderPlugin LUMIX_FINAL : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 {
 	explicit ShaderPlugin(StudioApp& app)
 		: m_app(app)
 	{
 		app.getAssetBrowser().registerExtension("shd", Shader::TYPE);
+	}
+
+
+	bool compile(const Path& src) override
+	{
+		const char* dst_dir = m_app.getAssetCompiler().getCompiledDir();
+		const u32 hash = crc32(src.c_str());
+
+		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
+
+		return copyFile(src.c_str(), dst);
 	}
 
 
@@ -3171,16 +3247,29 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_add_terrain_plugin = LUMIX_NEW(allocator, AddTerrainComponentPlugin)(app);
 		app.registerComponent("terrain", *m_add_terrain_plugin);
 
-		m_model_plugin = LUMIX_NEW(allocator, ModelPlugin)(app);
-		m_material_plugin = LUMIX_NEW(allocator, MaterialPlugin)(app);
-		m_font_plugin = LUMIX_NEW(allocator, FontPlugin)(app);
-		m_texture_plugin = LUMIX_NEW(allocator, TexturePlugin)(app);
+		AssetCompiler& asset_compiler = app.getAssetCompiler();
+
 		m_shader_plugin = LUMIX_NEW(allocator, ShaderPlugin)(app);
+		const char* shader_exts[] = {"shd", nullptr};
+		asset_compiler.addPlugin(*m_shader_plugin, shader_exts);
+
+		m_texture_plugin = LUMIX_NEW(allocator, TexturePlugin)(app);
+		const char* texture_exts[] = {"dds", "tga", "raw", nullptr};
+		asset_compiler.addPlugin(*m_texture_plugin, texture_exts);
+
+		m_material_plugin = LUMIX_NEW(allocator, MaterialPlugin)(app);
+		const char* material_exts[] = {"mat", nullptr};
+		asset_compiler.addPlugin(*m_material_plugin, material_exts);
+
+		m_model_plugin = LUMIX_NEW(allocator, ModelPlugin)(app);
+		const char* model_exts[] = {"fbx", nullptr};
+		asset_compiler.addPlugin(*m_model_plugin, model_exts);
+
+		m_font_plugin = LUMIX_NEW(allocator, FontPlugin)(app);
 		AssetBrowser& asset_browser = app.getAssetBrowser();
 		asset_browser.addPlugin(*m_model_plugin);
 		asset_browser.addPlugin(*m_material_plugin);
 		asset_browser.addPlugin(*m_font_plugin);
-		asset_browser.addPlugin(*m_texture_plugin);
 		asset_browser.addPlugin(*m_shader_plugin);
 
 		m_emitter_plugin = LUMIX_NEW(allocator, EmitterPlugin)(app);
@@ -3194,6 +3283,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_scene_view = LUMIX_NEW(allocator, SceneView)(app);
 		m_game_view = LUMIX_NEW(allocator, GameView)(app);
 		m_import_asset_dialog = LUMIX_NEW(allocator, ImportAssetDialog)(app);
+		m_model_plugin->m_import_asset_dialog = m_import_asset_dialog;
 		m_editor_ui_render_plugin = LUMIX_NEW(allocator, EditorUIRenderPlugin)(app, *m_scene_view, *m_game_view);
 		m_fur_painter_plugin = LUMIX_NEW(allocator, FurPainterPlugin)(app);
 		m_render_stats_plugin = LUMIX_NEW(allocator, RenderStatsPlugin)(app);
@@ -3221,6 +3311,12 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		asset_browser.removePlugin(*m_font_plugin);
 		asset_browser.removePlugin(*m_texture_plugin);
 		asset_browser.removePlugin(*m_shader_plugin);
+
+		AssetCompiler& asset_compiler = m_app.getAssetCompiler();
+		asset_compiler.removePlugin(*m_shader_plugin);
+		asset_compiler.removePlugin(*m_texture_plugin);
+		asset_compiler.removePlugin(*m_model_plugin);
+		asset_compiler.removePlugin(*m_material_plugin);
 
 		LUMIX_DELETE(allocator, m_model_plugin);
 		LUMIX_DELETE(allocator, m_material_plugin);

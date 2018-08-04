@@ -46,6 +46,7 @@ class ImportAssetDialog LUMIX_FINAL : public StudioApp::GUIPlugin
 		DDSConvertCallbackData& getDDSConvertCallbackData() { return m_dds_convert_callback; }
 		const char* getName() const override { return "import_asset"; }
 		bool onDropFile(const char* file) override;
+		void importFBX(const char* src, const char* dst);
 
 	public:
 		bool m_is_open;

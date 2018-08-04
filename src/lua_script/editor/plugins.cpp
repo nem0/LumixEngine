@@ -1,5 +1,6 @@
 #include "animation/editor/animation_editor.h"
 #include "editor/asset_browser.h"
+#include "editor/asset_compiler.h"
 #include "editor/ieditor_command.h"
 #include "editor/platform_interface.h"
 #include "editor/property_grid.h"
@@ -529,13 +530,25 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 };
 
 
-struct AssetBrowserPlugin : AssetBrowser::IPlugin
+struct AssetPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 {
-	explicit AssetBrowserPlugin(StudioApp& app)
+	explicit AssetPlugin(StudioApp& app)
 		: m_app(app)
 	{
 		app.getAssetBrowser().registerExtension("lua", LuaScript::TYPE);
 		m_text_buffer[0] = 0;
+	}
+
+
+	bool compile(const Path& src) override
+	{
+		const char* dst_dir = m_app.getAssetCompiler().getCompiledDir();
+		const u32 hash = crc32(src.c_str());
+
+		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
+
+		copyFile(src.c_str(), dst);
+		return false;
 	}
 
 	
@@ -982,8 +995,10 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_prop_grid_plugin = LUMIX_NEW(allocator, PropertyGridPlugin)(app);
 		app.getPropertyGrid().addPlugin(*m_prop_grid_plugin);
 
-		m_asset_browser_plugin = LUMIX_NEW(allocator, AssetBrowserPlugin)(app);
-		app.getAssetBrowser().addPlugin(*m_asset_browser_plugin);
+		m_asset_plugin = LUMIX_NEW(allocator, AssetPlugin)(app);
+		app.getAssetBrowser().addPlugin(*m_asset_plugin);
+		const char* exts[] = { "lua", nullptr };
+		app.getAssetCompiler().addPlugin(*m_asset_plugin, exts);
 
 		m_console_plugin = LUMIX_NEW(allocator, ConsolePlugin)(app);
 		app.addPlugin(*m_console_plugin);
@@ -1000,8 +1015,9 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_app.getPropertyGrid().removePlugin(*m_prop_grid_plugin);
 		LUMIX_DELETE(allocator, m_prop_grid_plugin);
 
-		m_app.getAssetBrowser().removePlugin(*m_asset_browser_plugin);
-		LUMIX_DELETE(allocator, m_asset_browser_plugin);
+		m_app.getAssetCompiler().removePlugin(*m_asset_plugin);
+		m_app.getAssetBrowser().removePlugin(*m_asset_plugin);
+		LUMIX_DELETE(allocator, m_asset_plugin);
 
 		m_app.removePlugin(*m_console_plugin);
 		LUMIX_DELETE(allocator, m_console_plugin);
@@ -1012,7 +1028,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	AddComponentPlugin* m_add_component_plugin;
 	GizmoPlugin* m_gizmo_plugin;
 	PropertyGridPlugin* m_prop_grid_plugin;
-	AssetBrowserPlugin* m_asset_browser_plugin;
+	AssetPlugin* m_asset_plugin;
 	ConsolePlugin* m_console_plugin;
 };
 

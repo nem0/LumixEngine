@@ -26,22 +26,10 @@ class LUMIX_ENGINE_API ResourceManagerBase
 public:
 	typedef HashMap<u32, Resource*> ResourceTable;
 
-	struct LUMIX_ENGINE_API LoadHook
-	{
-		explicit LoadHook(ResourceManagerBase& manager) : m_manager(manager) {}
-
-		virtual ~LoadHook() {}
-		virtual bool onBeforeLoad(Resource& resource) = 0;
-		void continueLoad(Resource& resource);
-
-		ResourceManagerBase& m_manager;
-	};
-
 public:
 	void create(ResourceType type, ResourceManager& owner);
 	void destroy();
 
-	void setLoadHook(LoadHook& load_hook);
 	void enableUnload(bool enable);
 
 	Resource* load(const Path& path);
@@ -66,7 +54,6 @@ protected:
 
 private:
 	IAllocator& m_allocator;
-	LoadHook* m_load_hook;
 	ResourceTable m_resources;
 	ResourceManager* m_owner;
 	bool m_is_unload_enabled;
