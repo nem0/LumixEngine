@@ -149,7 +149,7 @@ public:
 		m_file_system->setDefaultDevice("memory:disk:pack");
 		m_file_system->setSaveGameDevice("memory:disk");
 
-		m_engine = Engine::create(current_dir, "", m_file_system, m_allocator);
+		m_engine = Engine::create(current_dir, m_file_system, m_allocator);
 		m_window = SDL_CreateWindow("Lumix App", 0, 0, 600, 400, flags);
 		if (!m_window_mode) SDL_SetWindowFullscreen(m_window, SDL_WINDOW_FULLSCREEN_DESKTOP);
 		SDL_SysWMinfo window_info;

@@ -145,38 +145,43 @@ void Material::unload()
 }
 
 
-bool Material::save(OutputBlob& blob)
+bool Material::save(FS::IFile& file)
 {
-		// TODO
-	ASSERT(false);
-/*
 	if(!isReady()) return false;
 	if(!m_shader) return false;
+	
+	Renderer& renderer = static_cast<MaterialManager&>(m_resource_manager).getRenderer();
+	
+	file << "shader \"" << (m_shader ? m_shader->getPath().c_str(): "") << "\"\n";
 
-	auto& renderer = static_cast<MaterialManager&>(m_resource_manager).getRenderer();
+	char tmp[64];
+	toCString(m_metallic, tmp, lengthOf(tmp), 9);
+	file << "metallic(" <<  tmp << ")\n";
+	toCString(m_roughness, tmp, lengthOf(tmp), 9);
+	file << "roughness(" <<  tmp << ")\n";
 
-	serializer.beginObject();
-	serializer.serialize("render_layer", renderer.getLayerName(m_render_layer));
-	serializer.serialize("layers_count", m_layers_count);
-	serializer.serialize("shader", m_shader ? m_shader->getPath() : Path(""));
-	serializer.serialize("backface_culling", isBackfaceCulling());
-	for (int i = 0; i < m_texture_count; ++i)
-	{
+	file << "defines {";
+	for (int i = 0; i < sizeof(m_define_mask) * 8; ++i) {
+		if ((m_define_mask & (1 << i)) == 0) continue;
+		const char* def = renderer.getShaderDefine(i);
+		if (equalStrings("SKINNED", def)) continue;
+		if (i < 0) file << ", ";
+		file << "\"" << def << "\"";
+	}
+	file << "}\n";
+
+	for (int i = 0; i < m_texture_count; ++i) {
 		char path[MAX_PATH_LENGTH];
-		int flags = 0;
-		if (m_textures[i] && m_textures[i] != m_shader->m_texture_slots[i].default_texture)
-		{
-			flags = m_textures[i]->bgfx_flags;
-			path[0] = '/';
-			copyString(path + 1, MAX_PATH_LENGTH - 1, m_textures[i]->getPath().c_str());
+		if (m_textures[i] && m_textures[i] != m_shader->m_texture_slots[i].default_texture) {
+			copyString(path, MAX_PATH_LENGTH, m_textures[i]->getPath().c_str());
 		}
-		else
-		{
+		else {
 			path[0] = '\0';
 		}
-		serializer.beginObject("texture");
+		file << "texture \"/" << path << "\"\n";
+		
+			/*serializer.beginObject("texture");
 		serializer.serialize("source", path);
-		if (flags & BGFX_TEXTURE_SRGB) serializer.serialize("srgb", true);
 		if (flags & BGFX_TEXTURE_U_CLAMP) serializer.serialize("u_clamp", true);
 		if (flags & BGFX_TEXTURE_V_CLAMP) serializer.serialize("v_clamp", true);
 		if (flags & BGFX_TEXTURE_W_CLAMP) serializer.serialize("w_clamp", true);
@@ -185,8 +190,17 @@ bool Material::save(OutputBlob& blob)
 		if (flags & BGFX_TEXTURE_MAG_POINT) serializer.serialize("mag_filter", "point");
 		if (flags & BGFX_TEXTURE_MAG_ANISOTROPIC) serializer.serialize("mag_filter", "anisotropic");
 		if (m_textures[i] && m_textures[i]->getData()) serializer.serialize("keep_data", true);
-		serializer.endObject();
+		serializer.endObject();*/
 	}
+
+	// TODO
+	/*
+
+	serializer.beginObject();
+	serializer.serialize("render_layer", renderer.getLayerName(m_render_layer));
+	serializer.serialize("layers_count", m_layers_count);
+	serializer.serialize("backface_culling", isBackfaceCulling());
+	
 
 	if (m_custom_flags != 0)
 	{
@@ -197,16 +211,6 @@ bool Material::save(OutputBlob& blob)
 		}
 		serializer.endArray();
 	}
-
-	serializer.beginArray("defines");
-	for (int i = 0; i < sizeof(m_define_mask) * 8; ++i)
-	{
-		if ((m_define_mask & (1 << i)) == 0) continue;
-		const char* def = renderer.getShaderDefine(i);
-		if (equalStrings("SKINNED", def)) continue;
-		serializer.serializeArrayItem(def);
-	}
-	serializer.endArray();
 
 	serializer.beginArray("uniforms");
 	for (int i = 0; i < m_shader->m_uniforms.size(); ++i)
@@ -269,8 +273,6 @@ bool Material::save(OutputBlob& blob)
 		serializer.endObject();
 	}
 	serializer.endArray();
-	serializer.serialize("metallic", m_metallic);
-	serializer.serialize("roughness", m_roughness);
 	serializer.serialize("emission", m_emission);
 	serializer.serialize("alpha_ref", m_alpha_ref);
 	serializer.beginArray("color");
@@ -584,6 +586,30 @@ namespace LuaAPI
 {
 
 
+int roughness(lua_State* L)
+{
+	const float r = LuaWrapper::checkArg<float>(L, 1);
+	lua_getfield(L, LUA_GLOBALSINDEX, "this");
+	Material* material = (Material*)lua_touserdata(L, -1);
+	lua_pop(L, 1);
+
+	material->setRoughness(r);
+	return 0;
+}
+
+
+int metallic(lua_State* L)
+{
+	const float m = LuaWrapper::checkArg<float>(L, 1);
+	lua_getfield(L, LUA_GLOBALSINDEX, "this");
+	Material* material = (Material*)lua_touserdata(L, -1);
+	lua_pop(L, 1);
+
+	material->setMetallic(m);
+	return 0;
+}
+
+
 int defines(lua_State* L)
 {
 	lua_getfield(L, LUA_GLOBALSINDEX, "this");
@@ -658,16 +684,6 @@ int texture(lua_State* L)
 		LuaWrapper::getOptionalField(L, 1, "keep_data", &keep_data);
 		if (keep_data) texture->addDataReference();
 
-		lua_getfield(L, 1, "srgb");
-		if (lua_isboolean(L, -1)) {
-			const bool srgb = lua_toboolean(L, -1);
-			texture->setSRGB(srgb);
-		}
-		else if (!lua_isnil(L, -1)) {
-			g_log_error.log("Renderer") << material->getPath() << " texture's srgb flag is not a boolean.";
-		}
-		lua_pop(L, 1);
-
 		return 0;
 	}
 	
@@ -697,6 +713,7 @@ bool Material::load(FS::IFile& file)
 {
 	PROFILE_FUNCTION();
 
+	// TODO reuse state
 	lua_State* L = luaL_newstate();
 	lua_pushlightuserdata(L, this);
 	lua_setfield(L, LUA_GLOBALSINDEX, "this");
@@ -706,6 +723,10 @@ bool Material::load(FS::IFile& file)
 	lua_setfield(L, LUA_GLOBALSINDEX, "texture");
 	lua_pushcclosure(L, LuaAPI::defines, 0);
 	lua_setfield(L, LUA_GLOBALSINDEX, "defines");
+	lua_pushcclosure(L, LuaAPI::roughness, 0);
+	lua_setfield(L, LUA_GLOBALSINDEX, "roughness");
+	lua_pushcclosure(L, LuaAPI::metallic, 0);
+	lua_setfield(L, LUA_GLOBALSINDEX, "metallic");
 	
 	setAlphaRef(DEFAULT_ALPHA_REF_VALUE);
 

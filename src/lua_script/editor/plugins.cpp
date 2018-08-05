@@ -547,8 +547,7 @@ struct AssetPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
 
-		copyFile(src.c_str(), dst);
-		return false;
+		return copyFile(src.c_str(), dst);
 	}
 
 	

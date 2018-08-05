@@ -158,7 +158,6 @@ Settings::Settings(StudioApp& app)
 	, m_mouse_sensitivity(80.0f, 80.0f)
 	, m_font_size(13)
 {
-	m_data_dir[0] = '\0';
 	m_filter[0] = 0;
 	m_window.x = m_window.y = 0;
 	m_window.w = m_window.h = -1;
@@ -216,14 +215,6 @@ bool Settings::load()
 	m_mouse_sensitivity.x = getFloat(L, "mouse_sensitivity_x", 200.0f);
 	m_mouse_sensitivity.y = getFloat(L, "mouse_sensitivity_y", 200.0f);
 	m_font_size = getInteger(L, "font_size", 13);
-
-	if (!m_editor->getEngine().getPatchFileDevice())
-	{
-		lua_getglobal(L, "data_dir");
-		if (lua_type(L, -1) == LUA_TSTRING) copyString(m_data_dir, lua_tostring(L, -1));
-		lua_pop(L, 1);
-		m_editor->getEngine().setPatchPath(m_data_dir);
-	}
 
 	auto& actions = m_app.getActions();
 	lua_getglobal(L, "actions");
@@ -345,16 +336,6 @@ bool Settings::save()
 	file << "asset_browser_left_column_width = " << m_asset_browser_left_column_width << "\n";
 	
 	saveStyle(file);
-
-	file << "data_dir = \"";
-	const char* c = m_data_dir;
-	while (*c)
-	{
-		if (*c == '\\') file << "\\\\";
-		else file << *c;
-		++c;
-	}
-	file << "\"\n";
 
 	file << "custom = {\n";
 	lua_getglobal(m_state, "custom");
@@ -521,26 +502,6 @@ void Settings::onGUI()
 				}
 			}
 			ImGui::DragFloat2("Mouse sensitivity", &m_mouse_sensitivity.x, 0.1f, 500.0f);
-
-			ImGui::AlignTextToFramePadding();
-			ImGui::Text("%s", m_data_dir[0] != '\0' ? m_data_dir : "Not set");
-			ImGui::SameLine();
-			if (m_data_dir[0] != '\0')
-			{
-				if (ImGui::Button("Clear"))
-				{
-					m_data_dir[0] = '\0';
-					m_editor->getEngine().setPatchPath(nullptr);
-				}
-				ImGui::SameLine();
-			}
-			if (ImGui::Button("Set data directory"))
-			{
-				if (PlatformInterface::getOpenDirectory(m_data_dir, sizeof(m_data_dir), nullptr))
-				{
-					m_editor->getEngine().setPatchPath(m_data_dir);
-				}
-			}
 		}
 
 		if (ImGui::CollapsingHeader("Shortcuts")) showShortcutSettings();

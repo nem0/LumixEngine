@@ -30,8 +30,8 @@
 #include "engine/system.h"
 #include "engine/universe/universe.h"
 #include "engine/viewport.h"
+#include "fbx_importer.h"
 #include "game_view.h"
-#include "import_asset_dialog.h"
 #include "renderer/draw2d.h"
 #include "renderer/ffr/ffr.h"
 #include "renderer/font_manager.h"
@@ -100,27 +100,21 @@ struct MaterialPlugin LUMIX_FINAL : AssetBrowser::IPlugin, AssetCompiler::IPlugi
 		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
 
 		copyFile(src.c_str(), dst);
-		return false;
+		return true;
 	}
 
 
 	void saveMaterial(Material* material)
 	{
-		// TODO
-			ASSERT(false);
-			/*
-		if (FS::IFile* file = m_app.getAssetBrowser().beginSaveResource(*material))
-		{
-			JsonSerializer serializer(*file, material->getPath());
+		if (FS::IFile* file = m_app.getAssetBrowser().beginSaveResource(*material)) {
 			bool success = true;
-			if (!material->save(serializer))
+			if (!material->save(*file))
 			{
 				success = false;
 				g_log_error.log("Editor") << "Could not save file " << material->getPath().c_str();
 			}
 			m_app.getAssetBrowser().endSaveResource(*material, *file, success);
 		}
-		*/
 	}
 
 
@@ -226,20 +220,21 @@ struct MaterialPlugin LUMIX_FINAL : AssetBrowser::IPlugin, AssetCompiler::IPlugi
 			if (is_node_open)
 			{
 				ImGui::Image(&texture->handle, ImVec2(96, 96));
-				if (ImGui::CollapsingHeader("Advanced"))
+				// TODO
+				/*if (ImGui::CollapsingHeader("Advanced"))
 				{
 					static const struct
 					{
 						const char* name;
 						u32 value;
 						u32 unset_flag;
-					} FLAGS[] = {{"SRGB", (u32)Texture::Flags::SRGB, 0}/*,
+					} FLAGS[] = {
 						{"u clamp", BGFX_TEXTURE_U_CLAMP, 0},
 						{"v clamp", BGFX_TEXTURE_V_CLAMP, 0},
 						{"Min point", BGFX_TEXTURE_MIN_POINT, BGFX_TEXTURE_MIN_ANISOTROPIC},
 						{"Mag point", BGFX_TEXTURE_MAG_POINT, BGFX_TEXTURE_MAG_ANISOTROPIC},
 						{"Min anisotropic", BGFX_TEXTURE_MIN_ANISOTROPIC, BGFX_TEXTURE_MIN_POINT},
-						{"Mag anisotropic", BGFX_TEXTURE_MAG_ANISOTROPIC, BGFX_TEXTURE_MAG_POINT}*/
+						{"Mag anisotropic", BGFX_TEXTURE_MAG_ANISOTROPIC, BGFX_TEXTURE_MAG_POINT}
 					};
 
 					for (int i = 0; i < lengthOf(FLAGS); ++i)
@@ -252,7 +247,7 @@ struct MaterialPlugin LUMIX_FINAL : AssetBrowser::IPlugin, AssetCompiler::IPlugi
 							texture->setFlag((Texture::Flags)flag.value, b);
 						}
 					}
-				}
+				}*/
 				ImGui::TreePop();
 			}
 		}
@@ -372,6 +367,7 @@ struct ModelPlugin LUMIX_FINAL : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		, m_is_mouse_captured(false)
 		, m_tile(app.getWorldEditor().getAllocator())
 		, m_texture_tile_creator(app.getWorldEditor().getAllocator())
+		, m_fbx_importer(app.getWorldEditor().getAllocator())
 	{
 		app.getAssetBrowser().registerExtension("fbx", Model::TYPE);
 		JobSystem::JobDecl job;
@@ -403,9 +399,20 @@ struct ModelPlugin LUMIX_FINAL : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	bool compile(const Path& src) override
 	{
 		if (PathUtils::hasExtension(src.c_str(), "fbx")) {
-			const char* dst_dir = m_app.getAssetCompiler().getCompiledDir();
-
-			m_import_asset_dialog->importFBX(src.c_str(), dst_dir); // TODO
+			FBXImporter::ImportConfig cfg;
+			cfg.output_dir = m_app.getAssetCompiler().getCompiledDir();
+			Meta meta;
+			if (m_app.getAssetCompiler().getMeta(src, &meta, sizeof(meta)) == sizeof(meta)) {
+				cfg.mesh_scale = meta.scale;
+			}
+			const PathUtils::FileInfo src_info(src.c_str());
+			m_fbx_importer.setSource(src.c_str());
+			const u32 hash = crc32(src.c_str());
+			const StaticString<32> hash_str("", hash);
+			m_fbx_importer.writeModel(hash_str, ".res", src.c_str(), cfg);
+			m_fbx_importer.writeMaterials(src.c_str(), cfg);
+			m_fbx_importer.writeAnimations(cfg);
+			m_fbx_importer.writeTextures(src.c_str(), cfg);
 			return true;
 		}
 
@@ -415,7 +422,7 @@ struct ModelPlugin LUMIX_FINAL : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
 
 		copyFile(src.c_str(), dst);
-		return false;
+		return true;
 	}
 
 
@@ -723,9 +730,31 @@ struct ModelPlugin LUMIX_FINAL : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			}
 		}
 
+		if (ImGui::CollapsingHeader("Import")) {
+			AssetCompiler& compiler = m_app.getAssetCompiler();
+			if(m_meta_res != resource->getPath().getHash()) {
+				if (!compiler.getMeta(resource->getPath(), &m_meta, sizeof(m_meta))) {
+					m_meta = Meta{};
+				}
+				m_meta_res = resource->getPath().getHash();
+			}
+			ImGui::InputFloat("Scale", &m_meta.scale);
+			if (ImGui::Button("Apply")) {
+				compiler.updateMeta(resource->getPath(), &m_meta, sizeof(m_meta));
+				if (compiler.compile(resource->getPath())) {
+					resource->getResourceManager().reload(*resource);
+				}
+			}
+		}
+
 		showPreview(*model);
 	}
 
+	struct Meta
+	{
+		float scale = 1;
+	} m_meta;
+	u32 m_meta_res = 0;
 
 	void onResourceUnloaded(Resource* resource) override {}
 	const char* getName() const override { return "Model"; }
@@ -1030,6 +1059,8 @@ bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK); renderer->viewCounterAdd();
 	bool m_is_mouse_captured;
 	int m_captured_mouse_x;
 	int m_captured_mouse_y;
+	FBXImporter m_fbx_importer;
+
 
 	struct TextureTileCreator
 	{
@@ -1047,23 +1078,77 @@ bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK); renderer->viewCounterAdd();
 		MT::SpinMutex lock;
 		Array<StaticString<MAX_PATH_LENGTH>> tiles;
 	} m_texture_tile_creator;
-	ImportAssetDialog* m_import_asset_dialog = nullptr;
 };
 
 
 struct TexturePlugin LUMIX_FINAL : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 {
+	struct Meta
+	{
+		bool srgb = false;
+		bool is_normalmap = false;
+	};
+
 	explicit TexturePlugin(StudioApp& app)
 		: m_app(app)
 	{
+		app.getAssetBrowser().registerExtension("jpg", Texture::TYPE);
 		app.getAssetBrowser().registerExtension("tga", Texture::TYPE);
 		app.getAssetBrowser().registerExtension("dds", Texture::TYPE);
 		app.getAssetBrowser().registerExtension("raw", Texture::TYPE);
 	}
 
 
+	bool compileJPEG(FS::OsFile& src, FS::OsFile& dst, const Meta& meta)
+	{
+		Array<u8> tmp(m_app.getWorldEditor().getAllocator());
+		tmp.resize((int)src.size());
+		if (!src.read(tmp.begin(), tmp.byte_size())) return false;
+
+		int w, h, comps;
+		stbi_uc* data = stbi_load_from_memory(tmp.begin(), tmp.byte_size(), &w, &h, &comps, 4);
+		if (!data) return false;
+
+		crn_comp_params comp_params;
+		comp_params.m_file_type = cCRNFileTypeDDS;
+		comp_params.m_quality_level = cCRNMaxQualityLevel;
+		comp_params.m_dxt_quality = cCRNDXTQualityNormal;
+		comp_params.m_dxt_compressor_type = cCRNDXTCompressorCRN;
+		comp_params.m_pProgress_func = nullptr;
+		comp_params.m_pProgress_func_data = nullptr;
+		comp_params.m_num_helper_threads = 3;
+		comp_params.m_width = w;
+		comp_params.m_height = h;
+		const bool has_alpha = comps == 4;
+		comp_params.m_format = meta.is_normalmap ? cCRNFmtDXN_YX : (has_alpha ? cCRNFmtDXT5 : cCRNFmtDXT1);
+		comp_params.m_pImages[0][0] = (u32*)data;
+		crn_mipmap_params mipmap_params;
+		mipmap_params.m_mode = cCRNMipModeGenerateMips;
+
+		u32 compressed_size;
+		void* compressed = crn_compress(comp_params, mipmap_params, compressed_size);
+		if(!compressed) {
+			stbi_image_free(data);
+			return false;
+		}
+
+		dst.write("dds", 3);
+		const u32 flags = meta.srgb ? (u32)Texture::Flags::SRGB : 0;
+		dst.write(&flags, sizeof(flags));
+		dst.write(compressed, compressed_size);
+
+		stbi_image_free(data);
+		crn_free_block(compressed);
+
+		return true;
+	}
+
+
 	bool compile(const Path& src) override
 	{
+		char ext[4] = {};
+		PathUtils::getExtension(ext, lengthOf(ext), src.c_str());
+
 		const char* dst_dir = m_app.getAssetCompiler().getCompiledDir();
 		const u32 hash = crc32(src.c_str());
 
@@ -1077,20 +1162,31 @@ struct TexturePlugin LUMIX_FINAL : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			return false;
 		}
 		
-		Array<u8> buffer(m_app.getWorldEditor().getAllocator());
-		buffer.resize((int)srcf.size());
+		Meta meta;
+		m_app.getAssetCompiler().getMeta(src, &meta, sizeof(meta));
 
-		srcf.read(buffer.begin(), buffer.byte_size());
+		if (equalStrings(ext, "dds") || equalStrings(ext, "raw") || equalStrings(ext, "tga")) {
+			Array<u8> buffer(m_app.getWorldEditor().getAllocator());
+			buffer.resize((int)srcf.size());
+
+			srcf.read(buffer.begin(), buffer.byte_size());
+
+			dstf.write(ext, sizeof(ext) - 1);
+			const u32 flags = meta.srgb ? (u32)Texture::Flags::SRGB : 0;
+			dstf.write(&flags, sizeof(flags));
+			dstf.write(buffer.begin(), buffer.byte_size());
+		}
+		else if(equalStrings(ext, "jpg")) {
+			compileJPEG(srcf, dstf, meta);
+		}
+		else {
+			ASSERT(false);
+		}
+
 		srcf.close();
-
-		char ext[4] = {};
-		PathUtils::getExtension(ext, lengthOf(ext), src.c_str());
-
-		dstf.write(ext, sizeof(ext) - 1);
-		dstf.write(buffer.begin(), buffer.byte_size());
 		dstf.close();
 
-		return false;
+		return true;
 	}
 
 
@@ -1101,14 +1197,10 @@ struct TexturePlugin LUMIX_FINAL : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		ImGui::LabelText("Size", "%dx%d", texture->width, texture->height);
 		ImGui::LabelText("Mips", "%d", texture->mips);
 		if (texture->bytes_per_pixel > 0) ImGui::LabelText("BPP", "%d", texture->bytes_per_pixel);
-		if (texture->is_cubemap)
-		{
+		if (texture->is_cubemap) {
 			ImGui::Text("Cubemap");
-			return;
 		}
-
-		if (texture->handle.isValid())
-		{
+		else if (texture->handle.isValid()) {
 			ImVec2 texture_size(200, 200);
 			if (texture->width > texture->height)
 			{
@@ -1123,6 +1215,27 @@ struct TexturePlugin LUMIX_FINAL : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 			if (ImGui::Button("Open")) m_app.getAssetBrowser().openInExternalEditor(resource);
 		}
+
+		if (ImGui::CollapsingHeader("Import")) {
+			AssetCompiler& compiler = m_app.getAssetCompiler();
+			
+			if(texture->getPath().getHash() != m_meta_res) {
+				if (!compiler.getMeta(resource->getPath(), &m_meta, sizeof(m_meta))) {
+					m_meta = Meta{};
+				}
+				m_meta_res = texture->getPath().getHash();
+			}
+			
+			ImGui::Checkbox("SRGB", &m_meta.srgb);
+			ImGui::Checkbox("Is normalmap", &m_meta.is_normalmap);
+
+			if (ImGui::Button("Apply")) {
+				compiler.updateMeta(resource->getPath(), &m_meta, sizeof(m_meta));
+				if (compiler.compile(resource->getPath())) {
+					resource->getResourceManager().reload(*resource);
+				}
+			}
+		}
 	}
 
 
@@ -1132,6 +1245,8 @@ struct TexturePlugin LUMIX_FINAL : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 
 	StudioApp& m_app;
+	Meta m_meta;
+	u32 m_meta_res = 0;
 };
 
 
@@ -3134,8 +3249,8 @@ struct AddTerrainComponentPlugin LUMIX_FINAL : public StudioApp::IAddComponentPl
 			\"texture\" : {\"source\" : \"/models/utils/white.tga\", \
 			\"u_clamp\" : true, \"v_clamp\" : true, \
 			\"min_filter\" : \"point\", \"mag_filter\" : \"point\", \"keep_data\" : true}, \
-			\"texture\" : {\"source\" : \"\", \"srgb\" : true}, \
-			\"texture\" : {\"source\" : \"\", \"srgb\" : true, \"keep_data\" : true}, \
+			\"texture\" : {\"source\" : \"\" }, \
+			\"texture\" : {\"source\" : \"\", \"keep_data\" : true}, \
 			\"texture\" : {\"source\" : \"/models/utils/white.tga\", \"srgb\" : true}, \
 			\"texture\" : {\"source\" : \"\"}, \
 			\"uniforms\" : [\
@@ -3254,7 +3369,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		asset_compiler.addPlugin(*m_shader_plugin, shader_exts);
 
 		m_texture_plugin = LUMIX_NEW(allocator, TexturePlugin)(app);
-		const char* texture_exts[] = {"dds", "tga", "raw", nullptr};
+		const char* texture_exts[] = { "jpg", "dds", "tga", "raw", nullptr};
 		asset_compiler.addPlugin(*m_texture_plugin, texture_exts);
 
 		m_material_plugin = LUMIX_NEW(allocator, MaterialPlugin)(app);
@@ -3271,6 +3386,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		asset_browser.addPlugin(*m_material_plugin);
 		asset_browser.addPlugin(*m_font_plugin);
 		asset_browser.addPlugin(*m_shader_plugin);
+		asset_browser.addPlugin(*m_texture_plugin);
 
 		m_emitter_plugin = LUMIX_NEW(allocator, EmitterPlugin)(app);
 		m_env_probe_plugin = LUMIX_NEW(allocator, EnvironmentProbePlugin)(app);
@@ -3282,15 +3398,12 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 		m_scene_view = LUMIX_NEW(allocator, SceneView)(app);
 		m_game_view = LUMIX_NEW(allocator, GameView)(app);
-		m_import_asset_dialog = LUMIX_NEW(allocator, ImportAssetDialog)(app);
-		m_model_plugin->m_import_asset_dialog = m_import_asset_dialog;
 		m_editor_ui_render_plugin = LUMIX_NEW(allocator, EditorUIRenderPlugin)(app, *m_scene_view, *m_game_view);
 		m_fur_painter_plugin = LUMIX_NEW(allocator, FurPainterPlugin)(app);
 		m_render_stats_plugin = LUMIX_NEW(allocator, RenderStatsPlugin)(app);
 		m_shader_editor_plugin = LUMIX_NEW(allocator, ShaderEditorPlugin)(app);
 		app.addPlugin(*m_scene_view);
 		app.addPlugin(*m_game_view);
-		app.addPlugin(*m_import_asset_dialog);
 		app.addPlugin(*m_editor_ui_render_plugin);
 		app.addPlugin(*m_fur_painter_plugin);
 		app.addPlugin(*m_render_stats_plugin);
@@ -3336,7 +3449,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 		m_app.removePlugin(*m_scene_view);
 		m_app.removePlugin(*m_game_view);
-		m_app.removePlugin(*m_import_asset_dialog);
 		m_app.removePlugin(*m_editor_ui_render_plugin);
 		m_app.removePlugin(*m_fur_painter_plugin);
 		m_app.removePlugin(*m_render_stats_plugin);
@@ -3344,7 +3456,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 		LUMIX_DELETE(allocator, m_scene_view);
 		LUMIX_DELETE(allocator, m_game_view);
-		LUMIX_DELETE(allocator, m_import_asset_dialog);
 		LUMIX_DELETE(allocator, m_editor_ui_render_plugin);
 		LUMIX_DELETE(allocator, m_fur_painter_plugin);
 		LUMIX_DELETE(allocator, m_render_stats_plugin);
@@ -3367,7 +3478,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	TerrainPlugin* m_terrain_plugin;
 	SceneView* m_scene_view;
 	GameView* m_game_view;
-	ImportAssetDialog* m_import_asset_dialog;
 	EditorUIRenderPlugin* m_editor_ui_render_plugin;
 	FurPainterPlugin* m_fur_painter_plugin;
 	RenderStatsPlugin* m_render_stats_plugin;

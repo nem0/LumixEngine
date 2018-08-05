@@ -12,9 +12,7 @@
 #include "engine/resource_manager.h"
 #include "engine/resource_manager_base.h"
 #include "engine/string.h"
-#include "file_system_watcher.h"
 #include "imgui/imgui.h"
-#include "metadata.h"
 #include "platform_interface.h"
 #include "utils.h"
 
@@ -46,7 +44,6 @@ ResourceType AssetBrowser::getResourceType(const char* path) const
 
 AssetBrowser::AssetBrowser(StudioApp& app)
 	: m_editor(app.getWorldEditor())
-	, m_metadata(app.getMetadata())
 	, m_resources(app.getWorldEditor().getAllocator())
 	, m_selected_resource(nullptr)
 	, m_autoreload_changed_resource(true)
@@ -78,19 +75,6 @@ AssetBrowser::AssetBrowser(StudioApp& app)
 	PlatformInterface::makePath(path);
 	path << "/asset_tiles";
 	PlatformInterface::makePath(path);
-
-	m_watchers[0] = FileSystemWatcher::create(base_path, allocator);
-	m_watchers[0]->getCallback().bind<AssetBrowser, &AssetBrowser::onFileChanged>(this);
-	if (m_editor.getEngine().getPatchFileDevice())
-	{
-		base_path = m_editor.getEngine().getPatchFileDevice()->getBasePath();
-		m_watchers[1] = FileSystemWatcher::create(base_path, allocator);
-		m_watchers[1]->getCallback().bind<AssetBrowser, &AssetBrowser::onFileChanged>(this);
-	}
-	else
-	{
-		m_watchers[1] = nullptr;
-	}
 
 	m_auto_reload_action = LUMIX_NEW(allocator, Action)("Auto-reload", "Auto-reload assets", "autoReload");
 	m_auto_reload_action->is_global = false;
@@ -129,9 +113,6 @@ AssetBrowser::~AssetBrowser()
 	m_file_infos.clear();
 
 	ASSERT(m_plugins.size() == 0);
-
-	FileSystemWatcher::destroy(m_watchers[0]);
-	FileSystemWatcher::destroy(m_watchers[1]);
 }
 
 
@@ -165,12 +146,6 @@ void AssetBrowser::update()
 
 	for (auto* plugin : m_plugins) plugin->update();
 
-	auto* patch = m_editor.getEngine().getPatchFileDevice();
-	if ((patch && !equalStrings(patch->getBasePath(), m_patch_base_path)) ||
-		(!patch && m_patch_base_path[0] != '\0'))
-	{
-		findResources();
-	}
 	if (!m_is_update_enabled) return;
 	bool is_empty;
 	{
@@ -199,22 +174,13 @@ void AssetBrowser::update()
 		if (m_autoreload_changed_resource) m_editor.getEngine().getResourceManager().reload(path);
 
 		char tmp_path[MAX_PATH_LENGTH];
-		if (m_editor.getEngine().getPatchFileDevice())
-		{
-			copyString(tmp_path, m_editor.getEngine().getPatchFileDevice()->getBasePath());
-			catString(tmp_path, path.c_str());
-		}
+		copyString(tmp_path, m_editor.getEngine().getDiskFileDevice()->getBasePath());
+		catString(tmp_path, path.c_str());
 
-		if (!m_editor.getEngine().getPatchFileDevice() || !PlatformInterface::fileExists(tmp_path))
+		if (!PlatformInterface::fileExists(tmp_path))
 		{
-			copyString(tmp_path, m_editor.getEngine().getDiskFileDevice()->getBasePath());
-			catString(tmp_path, path.c_str());
-
-			if (!PlatformInterface::fileExists(tmp_path))
-			{
-				m_resources[resource_type].eraseItemFast(path);
-				continue;
-			}
+			m_resources[resource_type].eraseItemFast(path);
+			continue;
 		}
 
 		char dir[MAX_PATH_LENGTH];
@@ -517,11 +483,6 @@ void AssetBrowser::detailsGUI()
 		ImGui::LabelText("Selected resource", "%s", path);
 		ImGui::Separator();
 
-		char source[MAX_PATH_LENGTH];
-		if (m_metadata.getString(m_selected_resource->getPath().getHash(), SOURCE_HASH, source, lengthOf(source)))
-		{
-			ImGui::LabelText("Source", "%s", source);
-		}
 		ImGui::LabelText("Status", "%s", m_selected_resource->isFailure() ? "failure" : (m_selected_resource->isReady() ? "Ready" : "Not ready"));
 
 		ResourceType resource_type = getResourceType(path);
@@ -766,18 +727,10 @@ void AssetBrowser::endSaveResource(Resource& resource, FS::IFile& file, bool suc
 	StaticString<MAX_PATH_LENGTH> src_full_path;
 	StaticString<MAX_PATH_LENGTH> dest_full_path;
 	StaticString<MAX_PATH_LENGTH> tmp_path(resource.getPath().c_str(), ".tmp");
-	if (engine.getPatchFileDevice())
-	{
-		src_full_path << engine.getPatchFileDevice()->getBasePath() << tmp_path;
-		dest_full_path << engine.getPatchFileDevice()->getBasePath() << resource.getPath().c_str();
-	}
-	if (!engine.getPatchFileDevice() || !PlatformInterface::fileExists(src_full_path))
-	{
-		src_full_path.data[0] = 0;
-		dest_full_path.data[0] = 0;
-		src_full_path << engine.getDiskFileDevice()->getBasePath() << tmp_path;
-		dest_full_path << engine.getDiskFileDevice()->getBasePath() << resource.getPath().c_str();
-	}
+	src_full_path.data[0] = 0;
+	dest_full_path.data[0] = 0;
+	src_full_path << engine.getDiskFileDevice()->getBasePath() << tmp_path;
+	dest_full_path << engine.getDiskFileDevice()->getBasePath() << resource.getPath().c_str();
 
 	PlatformInterface::deleteFile(dest_full_path);
 
@@ -829,17 +782,6 @@ void AssetBrowser::openInExternalEditor(Resource* resource) const
 
 void AssetBrowser::openInExternalEditor(const char* path) const
 {
-	if (m_editor.getEngine().getPatchFileDevice())
-	{
-		StaticString<MAX_PATH_LENGTH> full_path(m_editor.getEngine().getPatchFileDevice()->getBasePath());
-		full_path << path;
-		if (PlatformInterface::fileExists(full_path))
-		{
-			PlatformInterface::shellExecuteOpen(full_path, nullptr);
-			return;
-		}
-	}
-
 	StaticString<MAX_PATH_LENGTH> full_path(m_editor.getEngine().getDiskFileDevice()->getBasePath());
 	full_path << path;
 	PlatformInterface::shellExecuteOpen(full_path, nullptr);
@@ -927,16 +869,6 @@ void AssetBrowser::findResources()
 
 	const char* base_path = m_editor.getEngine().getDiskFileDevice()->getBasePath();
 	processDir(base_path, stringLength(base_path));
-	auto* patch_device = m_editor.getEngine().getPatchFileDevice();
-	if (patch_device)
-	{
-		processDir(patch_device->getBasePath(), stringLength(patch_device->getBasePath()));
-		copyString(m_patch_base_path, patch_device->getBasePath());
-	}
-	else
-	{
-		m_patch_base_path[0] = '\0';
-	}
 }
 
 

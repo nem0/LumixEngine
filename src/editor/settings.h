@@ -43,7 +43,6 @@ struct LUMIX_EDITOR_API Settings
 	float m_asset_browser_left_column_width;
 	Vec2 m_mouse_sensitivity;
 	float m_mouse_sensitivity_y;
-	char m_data_dir[MAX_PATH_LENGTH];
 	int m_font_size = 13;
 	WorldEditor* m_editor;
 
