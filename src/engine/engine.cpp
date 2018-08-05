@@ -445,7 +445,7 @@ public:
 	void operator=(const EngineImpl&) = delete;
 	EngineImpl(const EngineImpl&) = delete;
 
-	EngineImpl(const char* working_dir, const char* base_path1, FS::FileSystem* fs, IAllocator& allocator)
+	EngineImpl(const char* working_dir, FS::FileSystem* fs, IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_prefab_resource_manager(m_allocator)
 		, m_resource_manager(m_allocator)
@@ -490,20 +490,8 @@ public:
 			m_file_system->mount(m_mem_file_device);
 			m_file_system->mount(m_resource_file_device);
 			m_file_system->mount(m_disk_file_device);
-			bool is_patching = base_path1[0] != 0 && !equalStrings(working_dir, base_path1);
-			if (is_patching)
-			{
-				m_patch_file_device = LUMIX_NEW(m_allocator, FS::DiskFileDevice)("patch", base_path1, m_allocator);
-				m_file_system->mount(m_patch_file_device);
-				m_file_system->setDefaultDevice("memory:patch:disk:resource");
-				m_file_system->setSaveGameDevice("memory:disk:resource");
-			}
-			else
-			{
-				m_patch_file_device = nullptr;
-				m_file_system->setDefaultDevice("memory:disk:resource");
-				m_file_system->setSaveGameDevice("memory:disk:resource");
-			}
+			m_file_system->setDefaultDevice("memory:disk:resource");
+			m_file_system->setSaveGameDevice("memory:disk:resource");
 		}
 		else
 		{
@@ -511,7 +499,6 @@ public:
 			m_mem_file_device = nullptr;
 			m_resource_file_device = nullptr;
 			m_disk_file_device = nullptr;
-			m_patch_file_device = nullptr;
 		}
 
 		m_resource_manager.create(*m_file_system);
@@ -1232,7 +1219,6 @@ public:
 			LUMIX_DELETE(m_allocator, m_mem_file_device);
 			LUMIX_DELETE(m_allocator, m_resource_file_device);
 			LUMIX_DELETE(m_allocator, m_disk_file_device);
-			LUMIX_DELETE(m_allocator, m_patch_file_device);
 		}
 
 		m_prefab_resource_manager.destroy();
@@ -1241,35 +1227,6 @@ public:
 		lua_close(m_state);
 
 		g_error_file.close();
-	}
-
-
-	void setPatchPath(const char* path) override
-	{
-		if (!path || path[0] == '\0')
-		{
-			if(m_patch_file_device)
-			{
-				m_file_system->setDefaultDevice("memory:disk:resource");
-				m_file_system->unMount(m_patch_file_device);
-				LUMIX_DELETE(m_allocator, m_patch_file_device);
-				m_patch_file_device = nullptr;
-			}
-
-			return;
-		}
-
-		if (!m_patch_file_device)
-		{
-			m_patch_file_device = LUMIX_NEW(m_allocator, FS::DiskFileDevice)("patch", path, m_allocator);
-			m_file_system->mount(m_patch_file_device);
-			m_file_system->setDefaultDevice("memory:patch:disk:resource");
-			m_file_system->setSaveGameDevice("memory:disk:resource");
-		}
-		else
-		{
-			m_patch_file_device->setBasePath(path);
-		}
 	}
 
 
@@ -1344,7 +1301,6 @@ public:
 
 	FS::FileSystem& getFileSystem() override { return *m_file_system; }
 	FS::DiskFileDevice* getDiskFileDevice() override { return m_disk_file_device; }
-	FS::DiskFileDevice* getPatchFileDevice() override { return m_patch_file_device; }
 	FS::ResourceFileDevice* getResourceFileDevice() override { return m_resource_file_device; }
 
 	void startGame(Universe& context) override
@@ -1660,7 +1616,6 @@ private:
 	FS::MemoryFileDevice* m_mem_file_device;
 	FS::ResourceFileDevice* m_resource_file_device;
 	FS::DiskFileDevice* m_disk_file_device;
-	FS::DiskFileDevice* m_patch_file_device;
 
 	ResourceManager m_resource_manager;
 	
@@ -1686,12 +1641,11 @@ private:
 };
 
 
-Engine* Engine::create(const char* base_path0,
-	const char* base_path1,
+Engine* Engine::create(const char* working_dir,
 	FS::FileSystem* fs,
 	IAllocator& allocator)
 {
-	return LUMIX_NEW(allocator, EngineImpl)(base_path0, base_path1, fs, allocator);
+	return LUMIX_NEW(allocator, EngineImpl)(working_dir, fs, allocator);
 }
 
 

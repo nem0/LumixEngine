@@ -77,7 +77,7 @@ public:
 	bool isTextureDefine(u8 define_idx) const;
 	void setTexture(int i, Texture* texture);
 	void setTexturePath(int i, const Path& path);
-	bool save(OutputBlob& blob);
+	bool save(FS::IFile& file);
 	int getUniformCount() const { return m_uniforms.size(); }
 	Uniform& getUniform(int index) { return m_uniforms[index]; }
 	const Uniform& getUniform(int index) const { return m_uniforms[index]; }

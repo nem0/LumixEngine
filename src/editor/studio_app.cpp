@@ -31,7 +31,6 @@
 #include "engine/universe/universe.h"
 #include "imgui/imgui.h"
 #include "log_ui.h"
-#include "metadata.h"
 #include "platform_interface.h"
 #include "profiler_ui.h"
 #include "property_grid.h"
@@ -152,7 +151,6 @@ public:
 		, m_actions(m_allocator)
 		, m_window_actions(m_allocator)
 		, m_toolbar_actions(m_allocator)
-		, m_metadata(m_allocator)
 		, m_is_welcome_screen_open(true)
 		, m_is_pack_data_dialog_open(false)
 		, m_editor(nullptr)
@@ -182,7 +180,7 @@ public:
 
 		char data_dir_path[MAX_PATH_LENGTH] = {};
 		checkDataDirCommandLine(data_dir_path, lengthOf(data_dir_path));
-		m_engine = Engine::create(current_dir, data_dir_path, nullptr, m_allocator);
+		m_engine = Engine::create(current_dir, nullptr, m_allocator);
 		createLua();
 
 		ffr::preinit(m_allocator);
@@ -227,8 +225,6 @@ public:
 			"Set Custom Pivot", "Set Custom Pivot", "set_custom_pivot", SDLK_v, -1, -1);
 		m_custom_pivot_action->is_global = false;
 		addAction(m_custom_pivot_action);
-
-		if (!m_metadata.load()) g_log_info.log("Editor") << "Could not load metadata";
 
 		setStudioApp();
 		loadIcons();
@@ -598,6 +594,7 @@ public:
 	void update()
 	{
 		PROFILE_FUNCTION();
+		m_asset_compiler->update();
 		if (m_watched_plugin.reload_request) tryReloadPlugin();
 
 		guiBeginFrame();
@@ -864,7 +861,6 @@ public:
 	AssetBrowser& getAssetBrowser() override { ASSERT(m_asset_browser); return *m_asset_browser; }
 	AssetCompiler& getAssetCompiler() override { ASSERT(m_asset_compiler); return *m_asset_compiler; }
 	PropertyGrid& getPropertyGrid() override { ASSERT(m_property_grid); return *m_property_grid; }
-	Metadata& getMetadata() override { return m_metadata; }
 	LogUI& getLogUI() override { ASSERT(m_log_ui); return *m_log_ui; }
 	void toggleGameMode() { m_editor->toggleGameMode(); }
 	void setTranslateGizmoMode() { m_editor->getGizmo().setTranslateMode(); }
@@ -902,15 +898,7 @@ public:
 			}
 			else
 			{
-				base_path = m_engine->getPatchFileDevice() ? m_engine->getPatchFileDevice()->getBasePath() : nullptr;
-				if (base_path && startsWith(filename, base_path))
-				{
-					m_editor->getPrefabSystem().savePrefab(Path(filename + stringLength(base_path)));
-				}
-				else
-				{
-					m_editor->getPrefabSystem().savePrefab(Path(filename));
-				}
+				m_editor->getPrefabSystem().savePrefab(Path(filename));
 			}
 		}
 	}
@@ -1419,11 +1407,6 @@ public:
 		m_settings.m_mouse_sensitivity.y = m_editor->getMouseSensitivity().y;
 
 		m_settings.save();
-
-		if (!m_metadata.save())
-		{
-			g_log_warning.log("Editor") << "Could not save metadata";
-		}
 	}
 
 
@@ -2744,7 +2727,6 @@ public:
 	LogUI* m_log_ui;
 	ProfilerUI* m_profiler_ui;
 	Settings m_settings;
-	Metadata m_metadata;
 	Array<SDL_Event> m_events;
 	Vec2 m_mouse_move;
 	char m_template_name[100];

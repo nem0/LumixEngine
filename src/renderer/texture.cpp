@@ -39,13 +39,17 @@ Texture::~Texture()
 }
 
 
+bool Texture::getFlag(Flags flag)
+{
+	return flags & u32(flag);
+}
+
+
 void Texture::setFlag(Flags flag, bool value)
 {
 	u32 new_flags = flags & ~u32(flag);
 	new_flags |= value ? u32(flag) : 0;
 	flags = new_flags;
-
-	m_resource_manager.reload(*this);
 }
 
 
@@ -602,7 +606,7 @@ static bool loadDDS(Texture& texture, FS::IFile& file)
 {
 	ffr::TextureInfo info;
 	const u8* data = (const u8*)file.getBuffer();
-	Renderer::MemRef mem = texture.renderer.copy(data + 3, (int)file.size() - 3);
+	Renderer::MemRef mem = texture.renderer.copy(data + 7, (int)file.size() - 7);
 	texture.handle = texture.renderer.loadTexture(mem, texture.getFFRFlags(), &info);
 	if (texture.handle.isValid()) {
 		texture.width = info.width;
@@ -633,12 +637,15 @@ bool Texture::load(FS::IFile& file)
 	PROFILE_FUNCTION();
 	char ext[4] = {};
 	if (!file.read(ext, 3)) return false;
+	u32 flags;
+	if (!file.read(&flags, sizeof(flags))) return false;
+	setSRGB(flags & (u32)Flags::SRGB);
 
 	bool loaded = false;
 	if (equalStrings(ext, "dds")) {
 		loaded = loadDDS(*this, file);
 	}
-	else if (equalStrings(ext, ".raw")) {
+	else if (equalStrings(ext, "raw")) {
 		loaded = loadRaw(*this, file, allocator);
 	}
 	else {

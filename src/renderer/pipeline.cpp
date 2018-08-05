@@ -796,7 +796,6 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 
 	static int drawArray(lua_State* L)
 	{
-		PROFILE_FUNCTION();
 		struct Cmd : Renderer::RenderCommandBase {
 			void setup() override {}
 			void execute() override 
@@ -859,13 +858,11 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 			}
 		}
 		if (!shader) {
-			g_log_error.log("Renderer") << "Unknown shader id " << shader_id << " in drawArrays.";
-			return 0;
+			return luaL_error(L, "Unknown shader id %d in drawArrays.", shader_id);
 		}
 
 		if (shader->isFailure()) {
-			g_log_error.log("Renderer") << "Shader " << shader->getPath() << " failed to load. `drawArrays` has no effect.";
-			return 0;
+			return luaL_error(L, "Shader %s  failed to load. `drawArrays` has no effect.", shader->getPath().c_str());
 		}
 		if (!shader->isReady()) return 0;
 
@@ -874,24 +871,18 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 			lua_pushnil(L);
 			while (lua_next(L, 4) != 0) {
 				if(lua_type(L, -1) != LUA_TNUMBER) {
-					g_log_error.log("Renderer") << "Incorrect texture arguments of drawArrays";
 					LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
-					lua_pop(L, 2);
-					return 0;
+					return luaL_error(L, "%s", "Incorrect texture arguments of drawArrays");
 				}
 
 				if(lua_type(L, -2) != LUA_TSTRING) {
-					g_log_error.log("Renderer") << "Incorrect texture arguments of drawArrays";
 					LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
-					lua_pop(L, 2);
-					return 0;
+					return luaL_error(L, "%s", "Incorrect texture arguments of drawArrays");
 				}
 
 				if (cmd->m_textures_count > lengthOf(cmd->m_textures)) {
-					g_log_error.log("Renderer") << "Too many texture in drawArray call";
 					LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
-					lua_pop(L, 2);
-					return 0;
+					return luaL_error(L, "%s", "Too many texture in drawArray call");
 				}
 
 				const char* uniform_name = lua_tostring(L, -2);
@@ -909,17 +900,13 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 				lua_pushnil(L);
 				while (lua_next(L, 5) != 0) {
 					if(lua_type(L, -1) != LUA_TTABLE) {
-						g_log_error.log("Renderer") << "Incorrect uniform arguments of drawArrays";
 						LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
-						lua_pop(L, 2);
-						return 0;
+						return luaL_error(L, "%s", "Incorrect uniform arguments of drawArrays");
 					}
 
 					if(lua_type(L, -2) != LUA_TSTRING) {
-						g_log_error.log("Renderer") << "Incorrect uniform arguments of drawArrays";
 						LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
-						lua_pop(L, 2);
-						return 0;
+						return luaL_error(L, "%s", "Incorrect uniform arguments of drawArrays");
 					}
 
 					const char* uniform_name = lua_tostring(L, -2);
@@ -928,10 +915,8 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 					for(int i = 0; i < 4; ++i) {
 						lua_rawgeti(L, -1, 1 + i);
 						if (lua_type(L, -1) != LUA_TNUMBER) {
-							g_log_error.log("Renderer") << "Incorrect uniform arguments of drawArrays. Uniforms can only be Vec4.";
 							LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
-							lua_pop(L, 3);
-							return 0;
+							return luaL_error(L, "%s", "Incorrect uniform arguments of drawArrays. Uniforms can only be Vec4.");
 						}
 						value[i] = (float)lua_tonumber(L, -1);
 						lua_pop(L, 1);
@@ -950,10 +935,8 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 				lua_pushnil(L);
 				while (lua_next(L, 6) != 0) {
 					if(lua_type(L, -1) != LUA_TSTRING) {
-						g_log_error.log("Renderer") << "Incorrect uniform arguments of drawArrays";
 						LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
-						lua_pop(L, 2);
-						return 0;
+						return luaL_error(L, "%s", "Incorrect uniform arguments of drawArrays");
 					}
 					const char* define = lua_tostring(L, -1);
 					cmd->m_define_mask |= 1 << pipeline->m_renderer.getShaderDefineIdx(define);

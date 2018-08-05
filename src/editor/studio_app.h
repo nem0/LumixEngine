@@ -92,7 +92,6 @@ public:
 	static StudioApp* create();
 	static void destroy(StudioApp& app);
 
-	virtual class Metadata& getMetadata() = 0;
 	virtual class PropertyGrid& getPropertyGrid() = 0;
 	virtual class LogUI& getLogUI() = 0;
 	virtual class AssetBrowser& getAssetBrowser() = 0;

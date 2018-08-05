@@ -42,7 +42,6 @@ public:
 	virtual ~Engine() {}
 
 	static Engine* create(const char* working_dir,
-		const char* base_path1,
 		FS::FileSystem* fs,
 		IAllocator& allocator);
 	static void destroy(Engine* engine, IAllocator& allocator);
@@ -53,10 +52,8 @@ public:
 	virtual void setPlatformData(const PlatformData& data) = 0;
 	virtual const PlatformData& getPlatformData() = 0;
 
-	virtual void setPatchPath(const char* path) = 0;
 	virtual FS::FileSystem& getFileSystem() = 0;
 	virtual FS::DiskFileDevice* getDiskFileDevice() = 0;
-	virtual FS::DiskFileDevice* getPatchFileDevice() = 0;
 	virtual FS::ResourceFileDevice* getResourceFileDevice() = 0;
 	virtual InputSystem& getInputSystem() = 0;
 	virtual PluginManager& getPluginManager() = 0;

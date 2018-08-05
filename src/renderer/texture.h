@@ -56,6 +56,7 @@ class LUMIX_RENDERER_API Texture LUMIX_FINAL : public Resource
 		void save();
 		void setSRGB(bool enable) { setFlags(enable ? flags | u32(Flags::SRGB) : flags & ~u32(Flags::SRGB)); }
 		void setFlags(u32 flags);
+		bool getFlag(Flags flag);
 		void setFlag(Flags flag, bool value);
 		u32 getPixelNearest(int x, int y) const;
 		u32 getPixel(float x, float y) const;
