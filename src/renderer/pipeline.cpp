@@ -1635,7 +1635,9 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 								}
 
 								stream.write(bone_mtx, sizeof(Matrix) * pose.count);
-								stream.write(model_instance.matrix);
+								Matrix mtx = model_instance.matrix;
+								mtx.translate(-camera_pos);
+								stream.write(mtx);
 								break;
 							}
 							default: ASSERT(false); break;
