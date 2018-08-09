@@ -402,9 +402,8 @@ struct ModelPlugin LUMIX_FINAL : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			FBXImporter::ImportConfig cfg;
 			cfg.output_dir = m_app.getAssetCompiler().getCompiledDir();
 			Meta meta;
-			if (m_app.getAssetCompiler().getMeta(src, &meta, sizeof(meta)) == sizeof(meta)) {
-				cfg.mesh_scale = meta.scale;
-			}
+			m_app.getAssetCompiler().getMeta(src, &meta, sizeof(meta));
+			cfg.mesh_scale = meta.scale;
 			const PathUtils::FileInfo src_info(src.c_str());
 			m_fbx_importer.setSource(src.c_str());
 			const u32 hash = crc32(src.c_str());
@@ -2253,7 +2252,7 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 		, m_models(editor.getAllocator())
 		, m_textures(editor.getAllocator())
 	{
-		m_model_index = -1;
+		m_model_index = 0;
 		auto& rm = m_editor.getEngine().getResourceManager();
 		Path shader_path("pipelines/debug_shape.shd");
 		m_shader = static_cast<Shader*>(rm.get(Shader::TYPE)->load(shader_path));
@@ -2584,7 +2583,7 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 		ffr::update(ib.buffer, indices, ib.offset, ib.size);
 		ffr::update(vb.buffer, vertices, vb.offset, vb.size);
 
-		ffr::ProgramHandle prg = m_shader->getProgram(0).handle;
+		const ffr::ProgramHandle prg = Shader::getProgram(m_shader->m_render_data, 0).handle;
 		ffr::setUniformMatrix4f(m_model_uniform, &mtx.m11);
 		ffr::useProgram(prg);
 		ffr::setVertexBuffer(&vertex_decl, vb.buffer, vb.offset, nullptr);

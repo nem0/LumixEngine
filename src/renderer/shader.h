@@ -86,6 +86,22 @@ public:
 
 public:
 	static const int MAX_TEXTURE_SLOT_COUNT = 16;
+	struct RenderData {
+		RenderData(Renderer& renderer, IAllocator& allocator) 
+			: allocator(allocator)
+			, renderer(renderer)
+			, programs(allocator) 
+			, include(allocator)
+			, sources(allocator)
+			, attributes(allocator)
+		{}
+		IAllocator& allocator;
+		Renderer& renderer;
+		HashMap<u32, Program> programs;
+		Array<Source> sources;
+		Array<u8> include;
+		Array<AttributeInfo> attributes;
+	}* m_render_data;
 
 public:
 	Shader(const Path& path, ResourceManagerBase& resource_manager, Renderer& renderer, IAllocator& allocator);
@@ -93,7 +109,7 @@ public:
 
 	ResourceType getType() const override { return TYPE; }
 
-	const Program& getProgram(u32 defines);
+	static const Program& getProgram(RenderData* rd, u32 defines);
 
 	IAllocator& m_allocator;
 	Renderer& m_renderer;
@@ -102,10 +118,6 @@ public:
 	TextureSlot m_texture_slots[MAX_TEXTURE_SLOT_COUNT];
 	int m_texture_slot_count;
 	Array<Uniform> m_uniforms;
-	Array<Source> m_sources;
-	Array<u8> m_include;
-	Array<AttributeInfo> m_attributes;
-	HashMap<u32, Program> m_programs;
 
 	static const ResourceType TYPE;
 

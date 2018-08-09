@@ -733,8 +733,11 @@ static int load_gl(void* device_contex)
 	const HGLRC dummy_context = wglCreateContext(hdc);
 	wglMakeCurrent(hdc, dummy_context);
 
+	typedef BOOL (WINAPI * PFNWGLSWAPINTERVALEXTPROC) (int interval);
 	typedef HGLRC (WINAPI * PFNWGLCREATECONTEXTATTRIBSARBPROC) (HDC hDC, HGLRC hShareContext, const int *attribList);
 	PFNWGLCREATECONTEXTATTRIBSARBPROC wglCreateContextAttribsARB = (PFNWGLCREATECONTEXTATTRIBSARBPROC)wglGetProcAddress("wglCreateContextAttribsARB");
+	PFNWGLSWAPINTERVALEXTPROC wglSwapIntervalEXT = (PFNWGLSWAPINTERVALEXTPROC)wglGetProcAddress("wglSwapIntervalEXT");
+	
 	#define WGL_CONTEXT_DEBUG_BIT_ARB 0x00000001
 	#define WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB 0x00000002
 	#define WGL_CONTEXT_MAJOR_VERSION_ARB 0x2091
@@ -756,6 +759,7 @@ static int load_gl(void* device_contex)
 	HGLRC hglrc = wglCreateContextAttribsARB(hdc, 0, contextAttrs);
 	wglMakeCurrent(hdc, hglrc);
 	wglDeleteContext(dummy_context);
+	// wglSwapIntervalEXT(0); // no vsync
 
 	#define FFR_GL_IMPORT(prototype, name) \
 		do { \
@@ -1001,14 +1005,6 @@ void setVertexBuffer(const VertexDecl* decl, BufferHandle vertex_buffer, uint bu
 				CHECK_GL(glVertexAttribDivisor(index, 0));  
 				CHECK_GL(glEnableVertexAttribArray(index));
 			}
-			else {
-				CHECK_GL(glDisableVertexAttribArray(i));
-			}
-		}
-	}
-	else {
-		for (int i = 0; i < g_ffr.max_vertex_attributes; ++i) {
-			glDisableVertexAttribArray(i);
 		}
 	}
 }
@@ -1180,9 +1176,13 @@ void createBuffer(BufferHandle buffer, size_t size, const void* data)
 void destroy(ProgramHandle program)
 {
 	checkThread();
-	if (program.isValid()) {
-		glDeleteProgram(program.value);
-	}
+	
+	Program& p = g_ffr.programs[program.value];
+	const GLuint handle = p.handle;
+	CHECK_GL(glDeleteProgram(handle));
+
+	MT::SpinLock lock(g_ffr.handle_mutex);
+	g_ffr.programs.dealloc(program.value);
 }
 
 static struct {
@@ -1507,7 +1507,6 @@ void destroy(BufferHandle buffer)
 
 	MT::SpinLock lock(g_ffr.handle_mutex);
 	g_ffr.buffers.dealloc(buffer.value);
-
 }
 
 

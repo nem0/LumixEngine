@@ -370,11 +370,13 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 				const Array<DebugLine>& src_lines = pipeline->m_scene->getDebugLines();
 				lines.resize(src_lines.size());
 				copyMemory(&lines[0], &src_lines[0], lines.size() * sizeof(lines[0]));
+				render_data = pipeline->m_debug_shape_shader->m_render_data;
 			}
 
 
 			void execute() override {
-				const Shader::Program& shader = pipeline->m_debug_shape_shader->getProgram(0);
+				ffr::pushDebugGroup("debug lines");
+				const Shader::Program& shader = Shader::getProgram(render_data, 0);
 				struct BaseVertex {
 					Vec3 pos;
 					u32 color;
@@ -386,10 +388,10 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 					const DebugLine& line = lines[j];
 
 					vertices[j * 2].color = line.color;
-					vertices[j * 2].pos = line.from;
+					vertices[j * 2].pos = line.from - viewport_pos;
 
 					vertices[j * 2 + 1].color = line.color;
-					vertices[j * 2 + 1].pos = line.to;
+					vertices[j * 2 + 1].pos = line.to - viewport_pos;
 				}
 
 				ffr::VertexDecl vertex_decl;
@@ -407,10 +409,13 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 				ffr::setVertexBuffer(&vertex_decl, vb.buffer, vb.offset, nullptr);
 				ffr::setIndexBuffer(ffr::INVALID_BUFFER);
 				ffr::drawArrays(0, lines.size() * 2, ffr::PrimitiveType::LINES);
+				ffr::popDebugGroup();
 			}
 
 			Array<DebugLine> lines;
 			PipelineImpl* pipeline;
+			Vec3 viewport_pos;
+			Shader::RenderData* render_data;
 		};
 
 
@@ -420,6 +425,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		IAllocator& allocator = m_renderer.getAllocator();
 		Cmd* cmd = LUMIX_NEW(allocator, Cmd)(allocator);
 		cmd->pipeline = this;
+		cmd->viewport_pos = m_viewport.pos;
 		m_renderer.push(cmd);
 	}
 
@@ -481,6 +487,8 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 				FontAtlas& atlas = pipeline->m_renderer.getFontManager().getFontAtlas();
 				draw2d.FontTexUvWhitePixel = atlas.TexUvWhitePixel;
 				draw2d.PushTextureID(atlas.TexID);
+
+				shader = pipeline->m_draw2d_shader->m_render_data;
 			}
 
 			void execute()
@@ -499,7 +507,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 				pipeline->m_renderer.free(vtx_buffer_mem);
 
 				ffr::pushDebugGroup("draw2d");
-				ffr::ProgramHandle prg = pipeline->m_draw2d_shader->getProgram(0).handle;
+				ffr::ProgramHandle prg = Shader::getProgram(shader, 0).handle;
 				ffr::setUniform2f(pipeline->m_canvas_size_uniform, &size.x);
 				ffr::setVertexBuffer(&vertex_decl, vb, 0, nullptr);
 				ffr::setIndexBuffer(ib);
@@ -539,6 +547,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 
 			Vec2 size;
 			PipelineImpl* pipeline;
+			Shader::RenderData* shader;
 		};
 
 		IAllocator& allocator = m_renderer.getAllocator();
@@ -797,11 +806,11 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 	static int drawArray(lua_State* L)
 	{
 		struct Cmd : Renderer::RenderCommandBase {
-			void setup() override {}
+			void setup() override { m_render_data = m_shader->isReady() ? m_shader->m_render_data : nullptr; }
 			void execute() override 
 			{
-				if (!m_shader->isReady()) return;
-				ffr::ProgramHandle prg = m_shader->getProgram(m_define_mask).handle;
+				if (!m_render_data) return;
+				ffr::ProgramHandle prg = Shader::getProgram(m_render_data, m_define_mask).handle;
 				
 				for(int i = 0; i < m_textures_count; ++i) {
 					ffr::bindTexture(i, m_textures[i].handle);
@@ -833,6 +842,8 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 			int m_indices_count;
 			int m_indices_offset;
 			u32 m_define_mask = 0;
+			Shader::RenderData* m_render_data = nullptr;
+
 		};
 
 		const int pipeline_idx = lua_upvalueindex(1);
@@ -1215,9 +1226,9 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		for(int i = 0; i < model.getMeshCount(); ++i) {
 
 			const Mesh& mesh = model.getMesh(i);
-			const Universe& universe = m_scene->getUniverse();
 			const Material* material = mesh.material;
-			const Shader::Program& prog = material->getShader()->getProgram(0); // TODO define
+			Shader::RenderData* rd = material->getShader()->m_render_data;
+			const Shader::Program& prog = Shader::getProgram(rd, 0); // TODO define
 			const int textures_count = material->getTextureCount();
 
 			if(!prog.handle.isValid()) continue;
@@ -1277,7 +1288,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 					if (prev_terrain) {
 						Batch& b = m_batches.emplace();
 						b.terrain = prev_terrain;
-						b.shader = infos[prev_idx].m_shader;
+						b.shader = infos[prev_idx].m_shader->m_render_data;
 						b.matrix = infos[prev_idx].m_world_matrix;
 						b.matrix.setTranslation(b.matrix.getTranslation() - m_camera_params.pos);
 						b.submesh = infos[prev_idx].m_index;
@@ -1294,7 +1305,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 			}
 			Batch& b = m_batches.emplace();
 			b.terrain = prev_terrain;
-			b.shader = infos[prev_idx].m_shader;
+			b.shader = infos[prev_idx].m_shader->m_render_data;
 			b.matrix = infos[prev_idx].m_world_matrix;
 			b.matrix.setTranslation(b.matrix.getTranslation() - m_camera_params.pos);
 			b.submesh = infos[prev_idx].m_index;
@@ -1339,7 +1350,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 				ffr::setUniform4f(m_pipeline->m_terrain_scale_uniform, &terrain_scale.x);
 				ffr::setUniformMatrix4f(m_pipeline->m_terrain_matrix_uniform, &batch.matrix.m11);
 
-				const ffr::ProgramHandle prg = batch.shader->getProgram(m_define_mask).handle;
+				const ffr::ProgramHandle prg = Shader::getProgram(batch.shader, m_define_mask).handle;
 				ffr::useProgram(prg);
 				/*
 				for (int i = 0; i < m_global_textures_count; ++i) {
@@ -1376,7 +1387,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		struct Batch
 		{
 			Terrain* terrain;
-			Shader* shader;
+			Shader::RenderData* shader;
 			Matrix matrix;
 			uint submesh;
 			uint from;
@@ -1522,7 +1533,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 			if(mesh.mesh->type == Mesh::RIGID_INSTANCED) final_define_mask |= instanced_define_mask;
 			stream.write(final_define_mask);
 
-			stream.write(material->getShader()); // TODO
+			stream.write(material->getShader()->m_render_data);
 			stream.write(material->getRenderStates() | u64(ffr::StateFlags::DEPTH_TEST));
 			stream.write(material->getRoughness());
 			stream.write(material->getMetallic());
@@ -1678,8 +1689,6 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 
 			Renderer& renderer = m_pipeline->m_renderer;
 
-			const ModelInstance* model_instances = m_pipeline->m_scene->getModelInstances();
-
 			const Matrix* LUMIX_RESTRICT matrices = m_matrices.begin(); 
 
 			int drawcalls_count = 0;
@@ -1695,7 +1704,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 					const int indices_count = stream.read<int>();
 					const ffr::VertexDecl decl = stream.read<ffr::VertexDecl>();
 					const u32 define_mask = stream.read<u32>();
-					Shader* shader = stream.read<Shader*>();
+					Shader::RenderData* shader = stream.read<Shader::RenderData*>();
 					const u64 render_states = stream.read<u64>();
 					const Vec4 material_params = Vec4(stream.read<Vec3>(), 0); // roughness, metallic, emission
 					const Vec4 material_color = stream.read<Vec4>();
@@ -1712,7 +1721,7 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 						ffr::setUniform1i(uniform, i + 2 + m_global_textures_count);
 					}
 
-					const Shader::Program& prog = shader->getProgram(define_mask);
+					const Shader::Program& prog = Shader::getProgram(shader, define_mask);
 
 					ffr::setUniform4f(m_pipeline->m_material_params_uniform, &material_params.x);
 					ffr::setUniform4f(m_pipeline->m_material_color_uniform, &material_color.x);

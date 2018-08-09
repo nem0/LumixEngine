@@ -152,7 +152,9 @@ void Resource::addDependency(Resource& dependent_resource)
 
 	dependent_resource.m_cb.bind<Resource, &Resource::onStateChanged>(this);
 	if (dependent_resource.isEmpty()) ++m_empty_dep_count;
-	if (dependent_resource.isFailure()) ++m_failed_dep_count;
+	if (dependent_resource.isFailure()) {
+		++m_failed_dep_count;
+	}
 
 	checkState();
 }
