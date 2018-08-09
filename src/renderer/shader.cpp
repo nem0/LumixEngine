@@ -30,10 +30,7 @@ Shader::Shader(const Path& path, ResourceManagerBase& resource_manager, Renderer
 	, m_uniforms(m_allocator)
 	, m_render_states(0)
 	, m_all_defines_mask(0)
-	, m_sources(m_allocator)
-	, m_programs(m_allocator)
-	, m_attributes(m_allocator)
-	, m_include(m_allocator)
+	, m_render_data(nullptr)
 {
 }
 
@@ -44,9 +41,9 @@ Shader::~Shader()
 }
 
 
-const Shader::Program& Shader::getProgram(u32 defines)
+const Shader::Program& Shader::getProgram(RenderData* rd, u32 defines)
 {
-	auto iter = m_programs.find(defines);
+	auto iter = rd->programs.find(defines);
 	if (!iter.isValid()) {
 		PROFILE_BLOCK("compile_shader");
 		static const char* shader_code_prefix = 
@@ -74,20 +71,21 @@ const Shader::Program& Shader::getProgram(u32 defines)
 
 		const char* codes[64];
 		ffr::ShaderType types[64];
-		ASSERT(lengthOf(types) >= m_sources.size());
-		for (int i = 0; i < m_sources.size(); ++i) {
-			codes[i] = &m_sources[i].code[0];
-			types[i] = m_sources[i].type;
+		ASSERT(lengthOf(types) >= rd->sources.size());
+		for (int i = 0; i < rd->sources.size(); ++i) {
+			codes[i] = &rd->sources[i].code[0];
+			types[i] = rd->sources[i].type;
 		}
 		const char* prefixes[34];
 		StaticString<128> defines_code[32];
 		int defines_count = 0;
 		prefixes[0] = shader_code_prefix;
-		prefixes[1] = m_include.empty() ? "" : (const char*)&m_include[0];
+		prefixes[1] = rd->include.empty() ? "" : (const char*)&rd->include[0];
 		if (defines != 0) {
 			for(int i = 0; i < sizeof(defines) * 8; ++i) {
 				if((defines & (1 << i)) == 0) continue;
-				defines_code[defines_count] << "#define " << m_renderer.getShaderDefine(i) << "\n";
+				// TODO getShaderDefine is not threadsafe
+				defines_code[defines_count] << "#define " << rd->renderer.getShaderDefine(i) << "\n";
 				prefixes[2 + defines_count] = defines_code[defines_count];
 				++defines_count;
 			}
@@ -96,11 +94,12 @@ const Shader::Program& Shader::getProgram(u32 defines)
 		Program program;
 
 		for(int& i : program.attribute_by_semantics) i = -1;
-		program.handle = ffr::createProgram(codes, types, m_sources.size(), prefixes, 2 + defines_count, getPath().c_str());
+		// TODO shader path - last argument
+		program.handle = ffr::createProgram(codes, types, rd->sources.size(), prefixes, 2 + defines_count, "TODO");
 		program.use_semantics = false;
-		if(program.handle.isValid()) {
+		if (program.handle.isValid()) {
 			ffr::uniformBlockBinding(program.handle, "GlobalState", 0);
-			for(const AttributeInfo& attr : m_attributes) {
+			for(const AttributeInfo& attr : rd->attributes) {
 				program.use_semantics = true;
 				const int loc = ffr::getAttribLocation(program.handle, attr.name);
 				if(loc >= 0) {
@@ -108,8 +107,8 @@ const Shader::Program& Shader::getProgram(u32 defines)
 				}
 			}
 		}
-		m_programs.insert(defines, program);
-		iter = m_programs.find(defines);
+		rd->programs.insert(defines, program);
+		iter = rd->programs.find(defines);
 	}
 	return iter.value();
 }
@@ -258,7 +257,7 @@ int attribute(lua_State* L)
 	Shader* shader = (Shader*)lua_touserdata(L, -1);
 	lua_pop(L, 1);
 
-	Shader::AttributeInfo& info = shader->m_attributes.emplace();
+	Shader::AttributeInfo& info = shader->m_render_data->attributes.emplace();
 	lua_getfield(L, 1, "name");
 	if (lua_isstring(L, -1)) {
 		info.name = lua_tostring(L, -1);
@@ -322,7 +321,7 @@ static void source(lua_State* L, ffr::ShaderType shader_type)
 	lua_getfield(L, LUA_GLOBALSINDEX, "this");
 	Shader* shader = (Shader*)lua_touserdata(L, -1);
 	lua_pop(L, 1);
-	Shader::Source& srcobj = shader->m_sources.emplace(shader->m_allocator);
+	Shader::Source& srcobj = shader->m_render_data->sources.emplace(shader->m_allocator);
 	srcobj.type = shader_type;
 
 	lua_Debug ar;
@@ -363,7 +362,7 @@ int include(lua_State* L)
 	Shader* shader = (Shader*)lua_touserdata(L, -1);
 	lua_pop(L, 1);
 
-	if (!shader->m_include.empty()) {
+	if (!shader->m_render_data->include.empty()) {
 		g_log_error.log("Renderer") << "More than 1 include in " << shader->getPath() << ". Max is 1.";
 		return 0;
 	}
@@ -375,11 +374,11 @@ int include(lua_State* L)
 		return 0;
 	}
 
-	shader->m_include.resize((int)file->size() + 2);
-	if (!shader->m_include.empty()) {
-		file->read(&shader->m_include[0], shader->m_include.size() - 1);
-		shader->m_include[shader->m_include.size() - 2] = '\n';
-		shader->m_include.back() = '\0';
+	shader->m_render_data->include.resize((int)file->size() + 2);
+	if (!shader->m_render_data->include.empty()) {
+		file->read(&shader->m_render_data->include[0], shader->m_render_data->include.size() - 1);
+		shader->m_render_data->include[shader->m_render_data->include.size() - 2] = '\n';
+		shader->m_render_data->include.back() = '\0';
 	}
 
 	fs.close(*file);
@@ -395,10 +394,10 @@ bool Shader::load(FS::IFile& file)
 	lua_State* L = luaL_newstate();
 	luaL_openlibs(L);
 
-	ASSERT(m_include.empty());
-	ASSERT(m_programs.empty());
-	ASSERT(m_attributes.empty());
-	ASSERT(m_sources.empty());
+	ASSERT(!m_render_data);
+
+	IAllocator& allocator = m_renderer.getAllocator();
+	m_render_data = LUMIX_NEW(allocator, RenderData)(m_renderer, allocator);
 
 	lua_pushlightuserdata(L, this);
 	lua_setfield(L, LUA_GLOBALSINDEX, "this");
@@ -443,14 +442,14 @@ bool Shader::load(FS::IFile& file)
 
 void Shader::unload()
 {
-	m_include.clear();
-	m_attributes.clear();
-	m_sources.clear();
-	for(const Program& prg : m_programs) {
-	// TODO
-		//	ffr::destroy(prg.handle);
-	}
-	m_programs.clear();
+	m_renderer.runInRenderThread(m_render_data, [](void* ptr){
+		RenderData* rd = (RenderData*)ptr;
+		for(const Program& prg : rd->programs) {
+			ffr::destroy(prg.handle);
+		}
+		LUMIX_DELETE(rd->allocator, rd);
+	});
+	m_render_data = nullptr;
 		// TODO
 	/*
 	for (auto& uniform : m_uniforms)

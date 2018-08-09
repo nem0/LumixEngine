@@ -627,6 +627,40 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 	}
 
 
+	void runInRenderThread(void* user_ptr, void (*fnc)(void*)) override
+	{
+		struct Cmd : RenderCommandBase {
+			void setup() override {}
+			void execute() override { fnc(ptr); }
+
+			void* ptr;
+			void (*fnc)(void*);
+		};
+
+		Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
+		cmd->fnc = fnc;
+		cmd->ptr = user_ptr;
+		push(cmd);
+	}
+
+	
+	void destroy(ffr::ProgramHandle program) override
+	{
+		struct Cmd : RenderCommandBase {
+			void setup() override {}
+			void execute() override { ffr::destroy(program); }
+
+			ffr::ProgramHandle program;
+			RendererImpl* renderer;
+		};
+
+		Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
+		cmd->program = program;
+		cmd->renderer = this;
+		push(cmd);
+	}
+
+
 	void destroy(ffr::BufferHandle buffer) override
 	{
 		struct Cmd : RenderCommandBase {

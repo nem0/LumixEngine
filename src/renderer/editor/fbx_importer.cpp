@@ -548,12 +548,12 @@ bool FBXImporter::setSource(const char* filename)
 {
 	if(scene) {
 		scene->destroy();
+		scene = nullptr;	
 		meshes.clear();
 		materials.clear();
 		animations.clear();
 		bones.clear();
 	}
-
 
 	FS::OsFile file;
 	if (!file.open(filename, FS::Mode::OPEN_AND_READ)) return false;

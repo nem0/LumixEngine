@@ -204,6 +204,7 @@ void SceneView::renderIcons()
 		{
 			ffr::pushDebugGroup("icons");
 			RenderInterface* ri = view->m_editor.getRenderInterface();
+			
 			for(const EditorIcons::RenderData& i : data) {
 				ri->renderModel(i.model, i.mtx);
 			}

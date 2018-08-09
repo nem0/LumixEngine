@@ -108,6 +108,8 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 		virtual ffr::BufferHandle createBuffer(const MemRef& memory) = 0;
 		virtual void destroy(ffr::BufferHandle buffer) = 0;
 		
+		virtual void destroy(ffr::ProgramHandle program) = 0;
+		
 		virtual ffr::TextureHandle createTexture(uint w, uint h, ffr::TextureFormat format, u32 flags, const MemRef& memory) = 0;
 		virtual ffr::TextureHandle loadTexture(const MemRef& memory, u32 flags, ffr::TextureInfo* info) = 0;
 		virtual void destroy(ffr::TextureHandle tex) = 0;
@@ -118,6 +120,7 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 		virtual bool getGPUTimings(Array<GPUProfilerQuery>* results) = 0;
 		virtual void beginProfileBlock(const char* name) = 0;
 		virtual void endProfileBlock() = 0;
+		virtual void runInRenderThread(void* user_ptr, void (*fnc)(void*)) = 0;
 
 		virtual Engine& getEngine() = 0;
 }; 
