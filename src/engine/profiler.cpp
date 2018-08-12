@@ -156,6 +156,7 @@ struct Instance
 				LUMIX_DELETE(allocator, i);
 			}
 		}
+		LUMIX_DELETE(allocator, main_thread.root_block);
 		threads.clear();
 	}
 
