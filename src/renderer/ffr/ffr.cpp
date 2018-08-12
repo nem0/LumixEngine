@@ -1969,6 +1969,9 @@ void shutdown()
 	checkThread();
 	g_ffr.textures.destroy(*g_ffr.allocator);
 	g_ffr.buffers.destroy(*g_ffr.allocator);
+	for (uint u : *g_ffr.uniforms_hash_map) {
+		g_ffr.allocator->deallocate(g_ffr.uniforms[u].data);
+	}
 	g_ffr.uniforms.destroy(*g_ffr.allocator);
 	g_ffr.programs.destroy(*g_ffr.allocator);
 	LUMIX_DELETE(*g_ffr.allocator, g_ffr.uniforms_hash_map);

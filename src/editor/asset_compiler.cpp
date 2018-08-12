@@ -80,9 +80,13 @@ struct AssetCompilerImpl : AssetCompiler
 
 	~AssetCompilerImpl()
 	{
+		m_task.m_finished = true;
+		m_to_compile.emplace().resource = nullptr;
+		m_semaphore.signal();
 		m_task.destroy();
 		ResourceManager& rm = m_app.getWorldEditor().getEngine().getResourceManager();
 		rm.setLoadHook(nullptr);
+		FileSystemWatcher::destroy(m_watcher);
 	}
 
 
@@ -254,12 +258,14 @@ int AssetCompilerTask::task()
 		}();
 		if (e.resource) {
 			m_compiler.compile(e.resource->getPath());
+			MT::SpinLock lock(m_compiler.m_compiled_mutex);
+			m_compiler.m_compiled.push(e);
 		}
-		else {
+		else if(e.path.isValid()) {
 			m_compiler.compile(e.path);
+			MT::SpinLock lock(m_compiler.m_compiled_mutex);
+			m_compiler.m_compiled.push(e);
 		}
-		MT::SpinLock lock(m_compiler.m_compiled_mutex);
-		m_compiler.m_compiled.push(e);
 	}
 	return 0;
 }

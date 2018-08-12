@@ -139,7 +139,7 @@ struct Instance
 	Instance()
 		: threads(allocator)
 		, frame_listeners(allocator)
-		, m_mutex(false)
+		, mutex(false)
 	{
 		threads.insert(MT::getCurrentThreadID(), &main_thread);
 		timer = Timer::create(allocator);
@@ -151,8 +151,12 @@ struct Instance
 		Timer::destroy(timer);
 		for (auto* i : threads)
 		{
-			if (i != &main_thread) LUMIX_DELETE(allocator, i);
+			if (i != &main_thread) {
+				LUMIX_DELETE(allocator, i->root_block);
+				LUMIX_DELETE(allocator, i);
+			}
 		}
+		threads.clear();
 	}
 
 
@@ -161,7 +165,7 @@ struct Instance
 	HashMap<MT::ThreadID, ThreadData*> threads;
 	ThreadData main_thread;
 	Timer* timer;
-	MT::SpinMutex m_mutex;
+	MT::SpinMutex mutex;
 };
 
 
@@ -191,7 +195,7 @@ static BlockInfo getBlock(const char* name)
 
 	ThreadData* thread_data;
 	{
-		MT::SpinLock lock(g_instance.m_mutex);
+		MT::SpinLock lock(g_instance.mutex);
 		auto iter = g_instance.threads.find(thread_id);
 		if (iter == g_instance.threads.end())
 		{
@@ -282,7 +286,7 @@ const char* getThreadName(MT::ThreadID thread_id)
 
 void setThreadName(const char* name)
 {
-	MT::SpinLock lock(g_instance.m_mutex);
+	MT::SpinLock lock(g_instance.mutex);
 	MT::ThreadID thread_id = MT::getCurrentThreadID();
 	auto iter = g_instance.threads.find(thread_id);
 	if (iter == g_instance.threads.end())
@@ -349,7 +353,7 @@ Block* getCurrentBlock()
 
 	ThreadData* thread_data;
 	{
-		MT::SpinLock lock(g_instance.m_mutex);
+		MT::SpinLock lock(g_instance.mutex);
 		auto iter = g_instance.threads.find(thread_id);
 		ASSERT(iter.isValid());
 		thread_data = iter.value();
@@ -365,7 +369,7 @@ void* endBlock()
 
 	ThreadData* thread_data;
 	{
-		MT::SpinLock lock(g_instance.m_mutex);
+		MT::SpinLock lock(g_instance.mutex);
 		auto iter = g_instance.threads.find(thread_id);
 		ASSERT(iter.isValid());
 		thread_data = iter.value();
@@ -384,7 +388,7 @@ void frame()
 {
 	PROFILE_FUNCTION();
 
-	MT::SpinLock lock(g_instance.m_mutex);
+	MT::SpinLock lock(g_instance.mutex);
 	g_instance.frame_listeners.invoke();
 	u64 now = g_instance.timer->getRawTimeSinceStart();
 
