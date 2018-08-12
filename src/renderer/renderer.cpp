@@ -941,12 +941,6 @@ struct RendererImpl LUMIX_FINAL : public Renderer
 
 void RenderTask::shutdown()
 {
-	struct Cmd : Renderer::RenderCommandBase {
-		void setup() override {}
-		void execute() override {}
-	};
-	Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
-	m_renderer.push(cmd);
 	m_shutdown_requested = true;
 }
 
