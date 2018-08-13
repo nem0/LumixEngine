@@ -4,10 +4,12 @@
 #include "animation/property_animation.h"
 #include "animation/editor/animation_editor.h"
 #include "editor/asset_browser.h"
+#include "editor/asset_compiler.h"
 #include "editor/platform_interface.h"
 #include "editor/property_grid.h"
 #include "editor/studio_app.h"
 #include "editor/world_editor.h"
+#include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/fs/os_file.h"
 #include "engine/hash_map.h"
@@ -35,12 +37,23 @@ namespace
 {
 
 
-struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin
+struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 {
 	explicit AnimationAssetBrowserPlugin(StudioApp& app)
 		: m_app(app)
 	{
 		app.getAssetBrowser().registerExtension("ani", Animation::TYPE);
+	}
+
+
+	bool compile(const Path& src) override
+	{
+		const char* dst_dir = m_app.getAssetCompiler().getCompiledDir();
+		const u32 hash = crc32(src.c_str());
+
+		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
+
+		return copyFile(src.c_str(), dst);
 	}
 
 
@@ -381,6 +394,9 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_prop_anim_plugin = LUMIX_NEW(allocator, PropertyAnimationAssetBrowserPlugin)(app);
 		m_anim_ctrl_plugin = LUMIX_NEW(allocator, AnimControllerAssetBrowserPlugin)(app);
 		
+		const char* exts[] = { "ani", nullptr };
+		app.getAssetCompiler().addPlugin(*m_animtion_plugin, exts);
+
 		AssetBrowser& asset_browser = app.getAssetBrowser();
 		asset_browser.addPlugin(*m_animtion_plugin);
 		asset_browser.addPlugin(*m_prop_anim_plugin);
@@ -396,6 +412,8 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 	~StudioAppPlugin()
 	{
+		m_app.getAssetCompiler().removePlugin(*m_animtion_plugin);
+
 		AssetBrowser& asset_browser = m_app.getAssetBrowser();
 		asset_browser.removePlugin(*m_animtion_plugin);
 		asset_browser.removePlugin(*m_prop_anim_plugin);

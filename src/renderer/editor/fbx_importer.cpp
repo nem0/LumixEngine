@@ -716,6 +716,15 @@ void FBXImporter::writeTextures(const char* fbx_path, const ImportConfig& cfg)
 			if (!tex.fbx) continue;
 			if (!tex.import) continue;
 
+			PathUtils::FileInfo tex_info(tex.src);
+			makeLowercase(tex_info.m_basename, lengthOf(tex_info.m_basename), tex_info.m_basename);
+
+			const StaticString<MAX_PATH_LENGTH> tex_path(fbx_path, "|", tex_info.m_basename, ".tex");
+			const u32 hash = crc32(tex_path);
+			const StaticString<MAX_PATH_LENGTH> dst_path(cfg.output_dir, hash, ".res");
+
+			if (PlatformInterface::fileExists(dst_path)) continue;
+
 			int image_width, image_height, image_comp;
 			stbi_uc* data = stbi_load(tex.src, &image_width, &image_height, &image_comp, 4);
 			if (!data) {
@@ -724,13 +733,7 @@ void FBXImporter::writeTextures(const char* fbx_path, const ImportConfig& cfg)
 			}
 			
 			const bool is_normal_map = i == FBXImporter::ImportTexture::NORMAL;
-			
-			PathUtils::FileInfo tex_info(tex.src);
-			makeLowercase(tex_info.m_basename, lengthOf(tex_info.m_basename), tex_info.m_basename);
 
-			const StaticString<MAX_PATH_LENGTH> tex_path(fbx_path, "|", tex_info.m_basename, ".tex");
-			const u32 hash = crc32(tex_path);
-			const StaticString<MAX_PATH_LENGTH> dst_path(cfg.output_dir, hash, ".res");
 			saveAsDDS(data, image_width, image_height, image_comp == 4, is_normal_map, dst_path);
 			stbi_image_free(data);
 		}
@@ -929,8 +932,10 @@ static int getDepth(const ofbx::Object* bone)
 }
 
 
-void FBXImporter::writeAnimations(const ImportConfig& cfg)
+void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 {
+	const PathUtils::FileInfo src_info(src);
+
 	for (int anim_idx = 0; anim_idx < animations.size(); ++anim_idx)
 	{
 		ImportAnimation& anim = animations[anim_idx];
@@ -969,7 +974,7 @@ void FBXImporter::writeAnimations(const ImportConfig& cfg)
 
 			int frame_count = split->to_frame - split->from_frame;
 
-			StaticString<MAX_PATH_LENGTH> tmp(cfg.output_dir, anim.output_filename, split->name, ".ani");
+			StaticString<MAX_PATH_LENGTH> tmp(src_info.m_dir, anim.output_filename, split->name, ".ani");
 			if (!out_file.open(tmp, FS::Mode::CREATE_AND_WRITE))
 			{
 				g_log_error.log("FBX") << "Failed to create " << tmp;

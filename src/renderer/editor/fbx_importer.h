@@ -129,7 +129,7 @@ struct FBXImporter
 	~FBXImporter();
 	bool setSource(const char* filename);
 	void writeMaterials(const char* src, const ImportConfig& cfg);
-	void writeAnimations(const ImportConfig& cfg);
+	void writeAnimations(const char* src, const ImportConfig& cfg);
 	void writeModel(const char* output_mesh_filename, const char* ext, const char* src, const ImportConfig& cfg);
 	void writeTextures(const char* fbx_path, const ImportConfig& cfg);
 

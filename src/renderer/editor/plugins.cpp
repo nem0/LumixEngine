@@ -410,7 +410,7 @@ struct ModelPlugin LUMIX_FINAL : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			const StaticString<32> hash_str("", hash);
 			m_fbx_importer.writeModel(hash_str, ".res", src.c_str(), cfg);
 			m_fbx_importer.writeMaterials(src.c_str(), cfg);
-			m_fbx_importer.writeAnimations(cfg);
+			m_fbx_importer.writeAnimations(src.c_str(), cfg);
 			m_fbx_importer.writeTextures(src.c_str(), cfg);
 			return true;
 		}
