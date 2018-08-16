@@ -1,5 +1,7 @@
 #pragma once
 
+struct lua_State;
+
 namespace Lumix
 {
 
@@ -26,8 +28,15 @@ struct AssetCompiler
 	virtual void removePlugin(IPlugin& plugin) = 0;
 	virtual bool compile(const Path& path) = 0;
 	virtual const char* getCompiledDir() const = 0;
-	virtual int getMeta(const Path& res, void* buf, int size) const = 0;
-	virtual void updateMeta(const Path& res, const void* meta, int size) const = 0;
+	virtual bool getMeta(const Path& res, void* user_ptr, void (*callback)(void*, lua_State*)) const = 0;
+	virtual void updateMeta(const Path& res, const char* src) const = 0;
+
+	template <typename T>
+	bool getMeta(const Path& path, T callback) {
+		return getMeta(path, &callback, [](void* user_ptr, lua_State* L){
+			return (*(T*)user_ptr)(L);
+		});
+	}
 };
 
 
