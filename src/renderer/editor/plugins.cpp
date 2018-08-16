@@ -359,6 +359,11 @@ struct MaterialPlugin LUMIX_FINAL : AssetBrowser::IPlugin, AssetCompiler::IPlugi
 
 struct ModelPlugin LUMIX_FINAL : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 {
+	struct Meta
+	{
+		float scale = 1;
+	};
+
 	explicit ModelPlugin(StudioApp& app)
 		: m_app(app)
 		, m_mesh(INVALID_ENTITY)
@@ -396,15 +401,22 @@ struct ModelPlugin LUMIX_FINAL : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	}
 
 
+	Meta getMeta(const Path& path) const
+	{
+		Meta meta;
+		m_app.getAssetCompiler().getMeta(path, [&](lua_State* L){
+			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "scale", &meta.scale);
+		});
+		return meta;
+	}
+
+
 	bool compile(const Path& src) override
 	{
 		if (PathUtils::hasExtension(src.c_str(), "fbx")) {
 			FBXImporter::ImportConfig cfg;
 			cfg.output_dir = m_app.getAssetCompiler().getCompiledDir();
-			Meta meta;
-			m_app.getAssetCompiler().getMeta(src, [&](lua_State* L){
-				LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "scale", &meta.scale);
-			});
+			const Meta meta = getMeta(src);
 			cfg.mesh_scale = meta.scale;
 			const PathUtils::FileInfo src_info(src.c_str());
 			m_fbx_importer.setSource(src.c_str());
@@ -734,10 +746,7 @@ struct ModelPlugin LUMIX_FINAL : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		if (ImGui::CollapsingHeader("Import")) {
 			AssetCompiler& compiler = m_app.getAssetCompiler();
 			if(m_meta_res != resource->getPath().getHash()) {
-				const bool has_meta = compiler.getMeta(resource->getPath(), [this](lua_State* L){
-					LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "scale", &m_meta.scale);
-				});
-				if (!has_meta) m_meta = Meta{};
+				m_meta = getMeta(resource->getPath());
 				m_meta_res = resource->getPath().getHash();
 			}
 			ImGui::InputFloat("Scale", &m_meta.scale);
@@ -753,10 +762,7 @@ struct ModelPlugin LUMIX_FINAL : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		showPreview(*model);
 	}
 
-	struct Meta
-	{
-		float scale = 1;
-	} m_meta;
+	Meta m_meta;
 	u32 m_meta_res = 0;
 
 	void onResourceUnloaded(Resource* resource) override {}
@@ -1148,6 +1154,17 @@ struct TexturePlugin LUMIX_FINAL : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	}
 
 
+	Meta getMeta(const Path& path) const
+	{
+		Meta meta;
+		m_app.getAssetCompiler().getMeta(path, [&meta](lua_State* L){
+			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "srgb", &meta.srgb);
+			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "normalmap", &meta.is_normalmap);
+		});
+		return meta;
+	}
+
+
 	bool compile(const Path& src) override
 	{
 		char ext[4] = {};
@@ -1166,12 +1183,7 @@ struct TexturePlugin LUMIX_FINAL : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			return false;
 		}
 		
-		Meta meta;
-		m_app.getAssetCompiler().getMeta(src, [&meta](lua_State* L){
-			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "srgb", &meta.srgb);
-			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "normalmap", &meta.is_normalmap);
-		});
-
+		Meta meta = getMeta(src);
 		if (equalStrings(ext, "dds") || equalStrings(ext, "raw") || equalStrings(ext, "tga")) {
 			Array<u8> buffer(m_app.getWorldEditor().getAllocator());
 			buffer.resize((int)srcf.size());
@@ -1227,11 +1239,7 @@ struct TexturePlugin LUMIX_FINAL : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			AssetCompiler& compiler = m_app.getAssetCompiler();
 			
 			if(texture->getPath().getHash() != m_meta_res) {
-				const bool has_meta = compiler.getMeta(resource->getPath(), [this](lua_State* L){
-					LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "srgb", &m_meta.srgb);
-					LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "normalmap", &m_meta.is_normalmap);
-				});
-				if (!has_meta) m_meta = Meta{};
+				m_meta = getMeta(resource->getPath());
 				m_meta_res = texture->getPath().getHash();
 			}
 			
