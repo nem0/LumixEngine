@@ -8,6 +8,7 @@
 #include "engine/fs/disk_file_device.h"
 #include "engine/fs/os_file.h"
 #include "engine/log.h"
+#include "engine/lua_wrapper.h"
 #include "engine/mt/sync.h"
 #include "engine/mt/task.h"
 #include "engine/path_utils.h"
@@ -80,6 +81,7 @@ struct AssetCompilerImpl : AssetCompiler
 
 	~AssetCompilerImpl()
 	{
+		ASSERT(m_plugins.empty());
 		m_task.m_finished = true;
 		m_to_compile.emplace().resource = nullptr;
 		m_semaphore.signal();
@@ -111,24 +113,46 @@ struct AssetCompilerImpl : AssetCompiler
 		m_semaphore.signal();
 	}
 
-
-	int getMeta(const Path& res, void* buf, int size) const override
+	bool getMeta(const Path& res, void* user_ptr, void (*callback)(void*, lua_State*)) const override
 	{
 		const PathUtils::FileInfo info(res.c_str());
 		FS::OsFile file;
 		const StaticString<MAX_PATH_LENGTH> meta_path(info.m_dir, info.m_basename, ".meta");
 		
-		if (!file.open(meta_path, FS::Mode::OPEN_AND_READ)) return -1;
-		
-		const int read_size = Math::minimum(size, (int)file.size());
-		const bool success = file.read(buf, read_size);
-		file.close();
+		if (!file.open(meta_path, FS::Mode::OPEN_AND_READ)) return nullptr;
 
-		return success ? read_size : -1;
+		Array<char> buf(m_app.getWorldEditor().getAllocator());
+		buf.resize((int)file.size());
+		const bool read_all = file.read(buf.begin(), buf.byte_size());
+		file.close();
+		if (!read_all) {
+			return false;
+		}
+
+		lua_State* engine_L = m_app.getWorldEditor().getEngine().getState();
+		lua_State* L = lua_newthread(engine_L);
+		if (luaL_loadbuffer(L, buf.begin(), buf.byte_size(), meta_path) != 0) {
+			g_log_error.log("Editor") << meta_path << ": " << lua_tostring(L, -1);
+			lua_pop(L, 1);
+			lua_close(L);
+			return false;
+		}
+
+		if (lua_pcall(L, 0, 0, 0) != 0) {
+			g_log_error.log("Engine") << meta_path << ": " << lua_tostring(L, -1);
+			lua_pop(L, 1);
+			lua_close(L);
+			return false;
+		}
+
+		callback(user_ptr, L);
+
+		lua_pop(engine_L, 1);
+		return true;
 	}
 
 
-	void updateMeta(const Path& res, const void* meta, int size) const override
+	void updateMeta(const Path& res, const char* src) const override
 	{
 		const PathUtils::FileInfo info(res.c_str());
 		FS::OsFile file;
@@ -139,7 +163,7 @@ struct AssetCompilerImpl : AssetCompiler
 			return;
 		}
 
-		file.write(meta, size);
+		file.write(src, stringLength(src));
 		file.close();
 	}
 
@@ -213,9 +237,18 @@ struct AssetCompilerImpl : AssetCompiler
 
 	void removePlugin(IPlugin& plugin) override
 	{
-		// TODO
-		// do not forget that the task can be using the plugin, needs mutex
-		ASSERT(false);
+		MT::SpinLock lock(m_plugin_mutex);
+		bool removed;
+		do {
+			removed = false;
+			for(auto iter = m_plugins.begin(), end = m_plugins.end(); iter != end; ++iter) {
+				if (iter.value() == &plugin) {
+					m_plugins.erase(iter);
+					removed = true;
+					break;
+				}
+			}
+		} while(removed);
 	}
 
 	const char* getCompiledDir() const override { return ".lumix/assets/"; }

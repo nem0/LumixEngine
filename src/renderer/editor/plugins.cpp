@@ -402,7 +402,9 @@ struct ModelPlugin LUMIX_FINAL : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			FBXImporter::ImportConfig cfg;
 			cfg.output_dir = m_app.getAssetCompiler().getCompiledDir();
 			Meta meta;
-			m_app.getAssetCompiler().getMeta(src, &meta, sizeof(meta));
+			m_app.getAssetCompiler().getMeta(src, [&](lua_State* L){
+				LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "scale", &meta.scale);
+			});
 			cfg.mesh_scale = meta.scale;
 			const PathUtils::FileInfo src_info(src.c_str());
 			m_fbx_importer.setSource(src.c_str());
@@ -732,14 +734,16 @@ struct ModelPlugin LUMIX_FINAL : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		if (ImGui::CollapsingHeader("Import")) {
 			AssetCompiler& compiler = m_app.getAssetCompiler();
 			if(m_meta_res != resource->getPath().getHash()) {
-				if (!compiler.getMeta(resource->getPath(), &m_meta, sizeof(m_meta))) {
-					m_meta = Meta{};
-				}
+				const bool has_meta = compiler.getMeta(resource->getPath(), [this](lua_State* L){
+					LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "scale", &m_meta.scale);
+				});
+				if (!has_meta) m_meta = Meta{};
 				m_meta_res = resource->getPath().getHash();
 			}
 			ImGui::InputFloat("Scale", &m_meta.scale);
 			if (ImGui::Button("Apply")) {
-				compiler.updateMeta(resource->getPath(), &m_meta, sizeof(m_meta));
+				const StaticString<256> src("scale = ", m_meta.scale);
+				compiler.updateMeta(resource->getPath(), src);
 				if (compiler.compile(resource->getPath())) {
 					resource->getResourceManager().reload(*resource);
 				}
@@ -834,8 +838,9 @@ struct ModelPlugin LUMIX_FINAL : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			if (m_tile.frame_countdown == -1) {
 				StaticString<MAX_PATH_LENGTH> path(".lumix/asset_tiles/", m_tile.path_hash, ".dds");
 				saveAsDDS(path, &m_tile.data[0], AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE);
-
-				ffr::destroy(m_tile.texture);
+				Engine& engine = m_app.getWorldEditor().getEngine();
+				Renderer* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
+				renderer->destroy(m_tile.texture);
 			}
 			return;
 		}
@@ -1162,7 +1167,10 @@ struct TexturePlugin LUMIX_FINAL : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		}
 		
 		Meta meta;
-		m_app.getAssetCompiler().getMeta(src, &meta, sizeof(meta));
+		m_app.getAssetCompiler().getMeta(src, [&meta](lua_State* L){
+			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "srgb", &meta.srgb);
+			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "normalmap", &meta.is_normalmap);
+		});
 
 		if (equalStrings(ext, "dds") || equalStrings(ext, "raw") || equalStrings(ext, "tga")) {
 			Array<u8> buffer(m_app.getWorldEditor().getAllocator());
@@ -1219,9 +1227,11 @@ struct TexturePlugin LUMIX_FINAL : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			AssetCompiler& compiler = m_app.getAssetCompiler();
 			
 			if(texture->getPath().getHash() != m_meta_res) {
-				if (!compiler.getMeta(resource->getPath(), &m_meta, sizeof(m_meta))) {
-					m_meta = Meta{};
-				}
+				const bool has_meta = compiler.getMeta(resource->getPath(), [this](lua_State* L){
+					LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "srgb", &m_meta.srgb);
+					LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "normalmap", &m_meta.is_normalmap);
+				});
+				if (!has_meta) m_meta = Meta{};
 				m_meta_res = texture->getPath().getHash();
 			}
 			
@@ -1229,7 +1239,8 @@ struct TexturePlugin LUMIX_FINAL : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			ImGui::Checkbox("Is normalmap", &m_meta.is_normalmap);
 
 			if (ImGui::Button("Apply")) {
-				compiler.updateMeta(resource->getPath(), &m_meta, sizeof(m_meta));
+				const StaticString<256> src("srgb = ", m_meta.srgb ? "true" : "false", "\nnormalmap = ", m_meta.is_normalmap ? "true" : "false");
+				compiler.updateMeta(resource->getPath(), src);
 				if (compiler.compile(resource->getPath())) {
 					resource->getResourceManager().reload(*resource);
 				}
