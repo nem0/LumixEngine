@@ -408,6 +408,7 @@ function forceLink(name)
 end
 
 solution "LumixEngine"
+	flags { "Cpp17" }
 	if _ACTION == "gmake" then
 		configuration { "android-*" }
 			flags {
