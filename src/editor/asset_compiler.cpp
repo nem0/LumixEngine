@@ -99,12 +99,6 @@ struct AssetCompilerImpl : AssetCompiler
 		char ext[16];
 		PathUtils::getExtension(ext, lengthOf(ext), path);
 
-		{
-			MT::SpinLock lock(m_plugin_mutex);
-			auto iter = m_plugins.find(crc32(ext));
-			if(!iter.isValid()) return;
-		}
-		
 		MT::SpinLock lock(m_to_compile_mutex);
 		
 		CompileEntry& e = m_to_compile.emplace();
@@ -173,17 +167,13 @@ struct AssetCompilerImpl : AssetCompiler
 		char ext[16];
 		PathUtils::getExtension(ext, lengthOf(ext), src.c_str());
 		const u32 hash = crc32(ext);
-		IPlugin* plugin;
-		{
-			MT::SpinLock lock(m_plugin_mutex);
-			auto iter = m_plugins.find(hash);
-			if (!iter.isValid()) {
-				g_log_error.log("Editor") << "Asset compiler does not know how to compile " << src;
-				return false;
-			}
-			plugin = iter.value();
+		MT::SpinLock lock(m_plugin_mutex);
+		auto iter = m_plugins.find(hash);
+		if (!iter.isValid()) {
+			g_log_error.log("Editor") << "Asset compiler does not know how to compile " << src;
+			return false;
 		}
-		return plugin->compile(src);
+		return iter.value()->compile(src);
 	}
 
 
