@@ -704,7 +704,7 @@ struct GizmoImpl final : public Gizmo
 		m_active = -1;
 		for (int i = 0; i < m_count; ++i)
 		{
-			Matrix gizmo_mtx = getMatrix(m_entities[i]);
+			Matrix gizmo_mtx = getMatrix((EntityRef)m_entities[i]);
 
 			Axis axis = Axis::NONE;
 			switch (m_mode)

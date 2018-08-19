@@ -418,7 +418,7 @@ void Material::setRenderLayer(int layer)
 void Material::setTexture(int i, Texture* texture)
 {
 	Texture* old_texture = i < m_texture_count ? m_textures[i] : nullptr;
-	if (!texture && m_shader && m_shader->m_texture_slots[i].default_texture)
+	if (!texture && m_shader && m_shader->isReady() && m_shader->m_texture_slots[i].default_texture)
 	{
 		texture = m_shader->m_texture_slots[i].default_texture;
 	}
@@ -508,6 +508,11 @@ void Material::onBeforeReady()
 			}
 		}
 	}
+
+	for (int i = m_shader->m_texture_slot_count; i < m_texture_count; ++i) {
+		setTexture(i, nullptr);
+	}
+	m_texture_count = Math::minimum(m_texture_count, m_shader->m_texture_slot_count);
 }
 
 

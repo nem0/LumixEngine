@@ -268,12 +268,6 @@ void Dummy(float w, float h)
 }
 
 
-void Image(void* texture_id, float w, float h)
-{
-	ImGui::Image(texture_id, ImVec2(w, h));
-}
-
-
 bool IsItemHovered()
 {
 	return ImGui::IsItemHovered();
@@ -1084,7 +1078,6 @@ public:
 		LuaImGui::registerCFunction(m_state, "GetWindowWidth", &LuaImGui::GetWindowWidth);
 		LuaImGui::registerCFunction(m_state, "GetWindowHeight", &LuaImGui::GetWindowHeight);
 		LuaImGui::registerCFunction(m_state, "GetWindowPos", &LuaImGui::GetWindowPos);
-		LuaImGui::registerCFunction(m_state, "Image", &LuaWrapper::wrap<decltype(&LuaImGui::Image), &LuaImGui::Image>);
 		LuaImGui::registerCFunction(m_state, "Indent", &LuaWrapper::wrap<decltype(&ImGui::Indent), &ImGui::Indent>);
 		LuaImGui::registerCFunction(m_state, "InputTextMultiline", &LuaImGui::InputTextMultiline);
 		LuaImGui::registerCFunction(m_state, "IsItemHovered", &LuaWrapper::wrap<decltype(&LuaImGui::IsItemHovered), &LuaImGui::IsItemHovered>);

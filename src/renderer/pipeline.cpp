@@ -275,7 +275,7 @@ struct PipelineImpl final : Pipeline
 		}
 
 		for(int i = m_renderbuffers.size() - 1; i >= 0; --i) {
-			if(m_renderbuffers[i].frame_counter > 1) {
+			if (m_renderbuffers[i].frame_counter > 1) {
 				m_renderer.destroy(m_renderbuffers[i].handle);
 				m_renderbuffers.eraseFast(i);
 			}
@@ -283,7 +283,10 @@ struct PipelineImpl final : Pipeline
 	}
 
 
-	virtual void setViewport(const Viewport& viewport) override { m_viewport = viewport; }
+	virtual void setViewport(const Viewport& viewport) override 
+	{
+		m_viewport = viewport;
+	}
 
 
 	bool render() override 
@@ -303,6 +306,7 @@ struct PipelineImpl final : Pipeline
 		}
 
 		m_stats = {};
+		clearBuffers();
 
 		for(Renderbuffer& rb : m_renderbuffers) {
 			if(!rb.use_realtive_size) continue;
@@ -355,7 +359,6 @@ struct PipelineImpl final : Pipeline
 			lua_pop(m_lua_state, 1);
 		}
 
-		clearBuffers();
 		return true;
 	}
 

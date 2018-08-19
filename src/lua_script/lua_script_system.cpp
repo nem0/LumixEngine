@@ -99,10 +99,10 @@ namespace Lumix
 
 		struct ScriptComponent
 		{
-			ScriptComponent(LuaScriptSceneImpl& scene, IAllocator& allocator)
+			ScriptComponent(LuaScriptSceneImpl& scene, EntityRef entity, IAllocator& allocator)
 				: m_scripts(allocator)
 				, m_scene(scene)
-				, m_entity(INVALID_ENTITY)
+				, m_entity(entity)
 			{
 			}
 
@@ -1182,8 +1182,7 @@ namespace Lumix
 		void createLuaScriptComponent(EntityRef entity)
 		{
 			auto& allocator = m_system.m_allocator;
-			ScriptComponent* script = LUMIX_NEW(allocator, ScriptComponent)(*this, allocator);
-			script->m_entity = entity;
+			ScriptComponent* script = LUMIX_NEW(allocator, ScriptComponent)(*this, entity, allocator);
 			m_scripts.insert(entity, script);
 			m_universe.onComponentCreated(entity, LUA_SCRIPT_TYPE, this);
 		}
@@ -1344,7 +1343,7 @@ namespace Lumix
 		void deserializeLuaScript(IDeserializer& serializer, EntityRef entity, int scene_version)
 		{
 			auto& allocator = m_system.m_allocator;
-			ScriptComponent* script = LUMIX_NEW(allocator, ScriptComponent)(*this, allocator);
+			ScriptComponent* script = LUMIX_NEW(allocator, ScriptComponent)(*this, entity, allocator);
 			script->m_entity = entity;
 			m_scripts.insert(entity, script);
 			
@@ -1444,9 +1443,10 @@ namespace Lumix
 			for (int i = 0; i < len; ++i)
 			{
 				auto& allocator = m_system.m_allocator;
-				ScriptComponent* script = LUMIX_NEW(allocator, ScriptComponent)(*this, allocator);
+				EntityRef entity;
+				serializer.read(entity);
+				ScriptComponent* script = LUMIX_NEW(allocator, ScriptComponent)(*this, entity, allocator);
 
-				serializer.read(script->m_entity);
 				m_scripts.insert(script->m_entity, script);
 				int scr_count;
 				serializer.read(scr_count);

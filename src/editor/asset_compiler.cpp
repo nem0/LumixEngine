@@ -220,6 +220,9 @@ struct AssetCompilerImpl : AssetCompiler
 			log.setNotificationTime(m_log_id, 3.f);
 			if (m_task.m_to_compile_count == 0) m_log_id = -1;
 		}
+		if(m_task.m_to_compile_count == 0) {
+			m_log_id = -1;
+		}
 
 		for(;;) {
 			CompileEntry e = popCompiledResource();
@@ -292,13 +295,17 @@ int AssetCompilerTask::task()
 			return e;
 		}();
 		if (e.resource) {
-			m_compiler.compile(e.resource->getPath());
+			const bool compiled = m_compiler.compile(e.resource->getPath());
 			MT::atomicDecrement(&m_to_compile_count);
-			MT::SpinLock lock(m_compiler.m_compiled_mutex);
-			m_compiler.m_compiled.push(e);
+			if(compiled) {
+				MT::SpinLock lock(m_compiler.m_compiled_mutex);
+				m_compiler.m_compiled.push(e);
+			}
 		}
 		else if(e.path.isValid()) {
-			if(m_compiler.compile(e.path)) {
+			const bool compiled = m_compiler.compile(e.path);
+			MT::atomicDecrement(&m_to_compile_count);
+			if (compiled) {
 				MT::SpinLock lock(m_compiler.m_compiled_mutex);
 				m_compiler.m_compiled.push(e);
 			}

@@ -450,7 +450,8 @@ void SceneView::onToolbar()
 	pos.y -= offset;
 	ImGui::SetCursorPos(pos);
 	ImVec4 tint_color = ImGui::GetStyle().Colors[ImGuiCol_Text];
-	ImGui::Image(mode_action->icon, ImVec2(24, 24), ImVec2(0, 0), ImVec2(1, 1), tint_color);
+	const ffr::TextureHandle t = *(ffr::TextureHandle*)mode_action->icon;
+	ImGui::Image((void*)(uintptr_t)t.value, ImVec2(24, 24), ImVec2(0, 0), ImVec2(1, 1), tint_color);
 	if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Snap amount");
 
 	ImGui::SameLine();
@@ -498,6 +499,12 @@ void SceneView::onWindowGUI()
 		m_is_open = true;
 		onToolbar();
 		auto size = ImGui::GetContentRegionAvail();
+		Viewport vp = m_editor.getViewport();
+		vp.w = (int)size.x;
+		vp.h = (int)size.y;
+		m_editor.setViewport(vp);
+		m_pipeline->setViewport(vp);
+		m_pipeline->render();
 		m_texture_handle = m_pipeline->getOutput();
 		if (size.x > 0 && size.y > 0)
 		{
@@ -508,15 +515,13 @@ void SceneView::onWindowGUI()
 			m_height = int(size.y);
 			auto content_min = ImGui::GetCursorScreenPos();
 			if(m_texture_handle.isValid()) {
-				// TODO
-				//if (bgfx::getCaps()->originBottomLeft)
-				{
-					ImGui::Image(&m_texture_handle, size, ImVec2(0, 1), ImVec2(1, 0));
+				void* t = (void*)(uintptr_t)m_texture_handle.value;
+				if (ffr::isOriginBottomLeft()) {
+					ImGui::Image(t, size, ImVec2(0, 1), ImVec2(1, 0));
+				} 
+				else {
+					ImGui::Image(t, size);
 				}
-				/*else
-				{
-					ImGui::Image(&m_texture_handle, size);
-				}*/
 			}
 			if (ImGui::BeginDragDropTarget())
 			{
@@ -569,13 +574,6 @@ void SceneView::onWindowGUI()
 					}
 				}
 			}
-
-			Viewport vp = m_editor.getViewport();
-			vp.w = (int)size.x;
-			vp.h = (int)size.y;
-			m_editor.setViewport(vp);
-			m_pipeline->setViewport(vp);
-			m_pipeline->render();
 		}
 	}
 
