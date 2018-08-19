@@ -4,7 +4,7 @@
 
 namespace Lumix
 {
-	class LUMIX_RENDERER_API TextureManager LUMIX_FINAL : public ResourceManagerBase
+	class LUMIX_RENDERER_API TextureManager final : public ResourceManagerBase
 	{
 	public:
 		explicit TextureManager(class Renderer& renderer, IAllocator& allocator);

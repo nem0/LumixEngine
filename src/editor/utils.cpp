@@ -131,19 +131,21 @@ bool Action::isActive()
 }
 
 
-void getEntityListDisplayName(WorldEditor& editor, char* buf, int max_size, Entity entity)
+void getEntityListDisplayName(WorldEditor& editor, char* buf, int max_size, EntityPtr entity)
 {
 	if (!entity.isValid())
 	{
 		*buf = '\0';
 		return;
 	}
-	const char* name = editor.getUniverse()->getEntityName(entity);
+
+	EntityRef e = (EntityRef)entity;
+	const char* name = editor.getUniverse()->getEntityName(e);
 	static const auto MODEL_INSTANCE_TYPE = Reflection::getComponentType("model_instance");
-	if (editor.getUniverse()->hasComponent(entity, MODEL_INSTANCE_TYPE))
+	if (editor.getUniverse()->hasComponent(e, MODEL_INSTANCE_TYPE))
 	{
 		auto* render_interface = editor.getRenderInterface();
-		auto path = render_interface->getModelInstancePath(entity);
+		auto path = render_interface->getModelInstancePath(e);
 		if (path.isValid())
 		{
 			char basename[MAX_PATH_LENGTH];

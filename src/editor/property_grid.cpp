@@ -42,9 +42,9 @@ PropertyGrid::~PropertyGrid()
 }
 
 
-struct GridUIVisitor LUMIX_FINAL : Reflection::IPropertyVisitor
+struct GridUIVisitor final : Reflection::IPropertyVisitor
 {
-	GridUIVisitor(StudioApp& app, int index, const Array<Entity>& entities, ComponentType cmp_type, WorldEditor& editor)
+	GridUIVisitor(StudioApp& app, int index, const Array<EntityRef>& entities, ComponentType cmp_type, WorldEditor& editor)
 		: m_entities(entities)
 		, m_cmp_type(cmp_type)
 		, m_editor(editor)
@@ -145,10 +145,10 @@ struct GridUIVisitor LUMIX_FINAL : Reflection::IPropertyVisitor
 	}
 
 
-	void visit(const Reflection::Property<Entity>& prop) override
+	void visit(const Reflection::Property<EntityPtr>& prop) override
 	{
 		ComponentUID cmp = getComponent();
-		Entity entity;
+		EntityPtr entity;
 		OutputBlob blob(&entity, sizeof(entity));
 		prop.getValue(cmp, m_index, blob);
 
@@ -184,7 +184,7 @@ struct GridUIVisitor LUMIX_FINAL : Reflection::IPropertyVisitor
 
 			static char entity_filter[32] = {};
 			ImGui::LabellessInputText("Filter", entity_filter, sizeof(entity_filter));
-			for (auto i = universe.getFirstEntity(); i.isValid(); i = universe.getNextEntity(i))
+			for (EntityPtr i = universe.getFirstEntity(); i.isValid(); i = universe.getNextEntity((EntityRef)i))
 			{
 				getEntityListDisplayName(m_editor, buf, lengthOf(buf), i);
 				bool show = entity_filter[0] == '\0' || stristr(buf, entity_filter) != 0;
@@ -502,7 +502,9 @@ struct GridUIVisitor LUMIX_FINAL : Reflection::IPropertyVisitor
 		if (ImGui::Combo(prop.name, &idx, getter, &data, count))
 		{
 			value = prop.getEnumValue(cmp, idx);
-			m_editor.setProperty(cmp.type, m_index, prop, &cmp.entity, 1, &value, sizeof(value));
+			ASSERT(cmp.isValid());
+			const EntityRef e = (EntityRef)cmp.entity;
+			m_editor.setProperty(cmp.type, m_index, prop, &e, 1, &value, sizeof(value));
 		}
 	}
 
@@ -510,13 +512,13 @@ struct GridUIVisitor LUMIX_FINAL : Reflection::IPropertyVisitor
 	StudioApp& m_app;
 	WorldEditor& m_editor;
 	ComponentType m_cmp_type;
-	const Array<Entity>& m_entities;
+	const Array<EntityRef>& m_entities;
 	int m_index;
 	PropertyGrid& m_grid;
 };
 
 
-static bool componentTreeNode(StudioApp& app, ComponentType cmp_type, const Entity* entities, int entities_count)
+static bool componentTreeNode(StudioApp& app, ComponentType cmp_type, const EntityRef* entities, int entities_count)
 {
 	static const u32 ENABLED_HASH = crc32("Enabled");
 	const Reflection::PropertyBase* enabled_prop = Reflection::getProperty(cmp_type, ENABLED_HASH);
@@ -551,7 +553,7 @@ static bool componentTreeNode(StudioApp& app, ComponentType cmp_type, const Enti
 }
 
 
-void PropertyGrid::showComponentProperties(const Array<Entity>& entities, ComponentType cmp_type)
+void PropertyGrid::showComponentProperties(const Array<EntityRef>& entities, ComponentType cmp_type)
 {
 	bool is_open = componentTreeNode(m_app, cmp_type, &entities[0], entities.size());
 	ImGuiStyle& style = ImGui::GetStyle();
@@ -571,7 +573,8 @@ void PropertyGrid::showComponentProperties(const Array<Entity>& entities, Compon
 
 	if (m_deferred_select.isValid())
 	{
-		m_editor.selectEntities(&m_deferred_select, 1, false);
+		const EntityRef e = (EntityRef)m_deferred_select;
+		m_editor.selectEntities(&e, 1, false);
 		m_deferred_select = INVALID_ENTITY;
 	}
 
@@ -590,7 +593,7 @@ void PropertyGrid::showComponentProperties(const Array<Entity>& entities, Compon
 }
 
 
-bool PropertyGrid::entityInput(const char* label, const char* str_id, Entity& entity)
+bool PropertyGrid::entityInput(const char* label, const char* str_id, EntityPtr& entity)
 {
 	const auto& style = ImGui::GetStyle();
 	float item_w = ImGui::CalcItemWidth();
@@ -610,7 +613,7 @@ bool PropertyGrid::entityInput(const char* label, const char* str_id, Entity& en
 	{
 		if (auto* payload = ImGui::AcceptDragDropPayload("entity"))
 		{
-			entity = *(Entity*)payload->Data;
+			entity = *(EntityRef*)payload->Data;
 			ImGui::EndDragDropTarget();
 			return true;
 		}
@@ -642,7 +645,7 @@ bool PropertyGrid::entityInput(const char* label, const char* str_id, Entity& en
 		{
 			if (entity_filter[0])
 			{
-				for (auto i = universe->getFirstEntity(); i.isValid(); i = universe->getNextEntity(i))
+				for (EntityPtr i = universe->getFirstEntity(); i.isValid(); i = universe->getNextEntity((EntityRef)i))
 				{
 					getEntityListDisplayName(m_editor, buf, lengthOf(buf), i);
 					if (stristr(buf, entity_filter) == nullptr) continue;
@@ -658,7 +661,7 @@ bool PropertyGrid::entityInput(const char* label, const char* str_id, Entity& en
 			}
 			else
 			{
-				for (auto i = universe->getFirstEntity(); i.isValid(); i = universe->getNextEntity(i))
+				for (EntityPtr i = universe->getFirstEntity(); i.isValid(); i = universe->getNextEntity((EntityRef)i))
 				{
 					getEntityListDisplayName(m_editor, buf, lengthOf(buf), i);
 					if (ImGui::Selectable(buf))
@@ -680,7 +683,7 @@ bool PropertyGrid::entityInput(const char* label, const char* str_id, Entity& en
 }
 
 
-void PropertyGrid::showCoreProperties(const Array<Entity>& entities) const
+void PropertyGrid::showCoreProperties(const Array<EntityRef>& entities) const
 {
 	char name[256];
 	const char* tmp = m_editor.getUniverse()->getEntityName(entities[0]);
@@ -718,7 +721,7 @@ void PropertyGrid::showCoreProperties(const Array<Entity>& entities) const
 			ImGui::Text("ID: %d, GUID: %s", entities[0].index, guid_str);
 		}
 
-		Entity parent = m_editor.getUniverse()->getParent(entities[0]);
+		EntityPtr parent = m_editor.getUniverse()->getParent(entities[0]);
 		if (parent.isValid())
 		{
 			getEntityListDisplayName(m_editor, name, lengthOf(name), parent);
@@ -773,7 +776,7 @@ void PropertyGrid::showCoreProperties(const Array<Entity>& entities) const
 		rot.fromEuler(euler);
 		
 		Array<Quat> rots(m_editor.getAllocator());
-		for (Entity entity : entities)
+		for (EntityRef entity : entities)
 		{
 			Vec3 tmp = universe->getRotation(entity).toEuler();
 			

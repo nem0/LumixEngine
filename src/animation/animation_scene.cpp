@@ -54,21 +54,21 @@ class JsonSerializer;
 class Universe;
 
 
-struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
+struct AnimationSceneImpl final : public AnimationScene
 {
 	friend struct AnimationSystemImpl;
 
 	struct SharedController
 	{
-		Entity entity;
-		Entity parent;
+		EntityRef entity;
+		EntityPtr parent;
 	};
 
 	struct Controller
 	{
 		explicit Controller(IAllocator& allocator) : input(allocator), animations(allocator) {}
 
-		Entity entity;
+		EntityRef entity;
 		Anim::ControllerResource* resource = nullptr;
 		Anim::ComponentInstance* root = nullptr;
 		u32 default_set = 0;
@@ -119,7 +119,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		float time_scale;
 		float start_time;
 		Animation* animation;
-		Entity entity;
+		EntityRef entity;
 	};
 
 
@@ -164,23 +164,23 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
-	void serializeSharedController(ISerializer& serializer, Entity entity)
+	void serializeSharedController(ISerializer& serializer, EntityRef entity)
 	{
 		SharedController& ctrl = m_shared_controllers[entity];
 		serializer.write("parent", ctrl.parent);
 	}
 
 
-	void deserializeSharedController(IDeserializer& serializer, Entity entity, int /*scene_version*/)
+	void deserializeSharedController(IDeserializer& serializer, EntityRef entity, int /*scene_version*/)
 	{
-		Entity parent;
+		EntityRef parent;
 		serializer.read(&parent);
 		m_shared_controllers.insert(entity, {entity, parent});
 		m_universe.onComponentCreated(entity, SHARED_CONTROLLER_TYPE, this);
 	}
 
 
-	void serializePropertyAnimator(ISerializer& serializer, Entity entity)
+	void serializePropertyAnimator(ISerializer& serializer, EntityRef entity)
 	{
 		int idx = m_property_animators.find(entity);
 		PropertyAnimator& animator = m_property_animators.at(idx);
@@ -189,7 +189,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 		
 
-	void deserializePropertyAnimator(IDeserializer& serializer, Entity entity, int /*scene_version*/)
+	void deserializePropertyAnimator(IDeserializer& serializer, EntityRef entity, int /*scene_version*/)
 	{
 		PropertyAnimator& animator = m_property_animators.emplace(entity, m_allocator);
 		animator.time = 0;
@@ -201,7 +201,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
-	void serializeAnimable(ISerializer& serializer, Entity entity)
+	void serializeAnimable(ISerializer& serializer, EntityRef entity)
 	{
 		Animable& animable = m_animables[entity];
 		serializer.write("time_scale", animable.time_scale);
@@ -210,7 +210,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
-	void deserializeAnimable(IDeserializer& serializer, Entity entity, int /*scene_version*/)
+	void deserializeAnimable(IDeserializer& serializer, EntityRef entity, int /*scene_version*/)
 	{
 		Animable& animable = m_animables.insert(entity);
 		animable.entity = entity;
@@ -224,7 +224,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
-	void serializeController(ISerializer& serializer, Entity entity)
+	void serializeController(ISerializer& serializer, EntityRef entity)
 	{
 		Controller& controller = m_controllers.get(entity);
 		serializer.write("source", controller.resource ? controller.resource->getPath().c_str() : "");
@@ -235,7 +235,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	int getVersion() const override { return (int)AnimationSceneVersion::LATEST; }
 
 
-	void deserializeController(IDeserializer& serializer, Entity entity, int scene_version)
+	void deserializeController(IDeserializer& serializer, EntityRef entity, int scene_version)
 	{
 		Controller& controller = m_controllers.emplace(entity, m_allocator);
 		controller.entity = entity;
@@ -283,7 +283,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	static int setIK(lua_State* L)
 	{
 		AnimationSceneImpl* scene = LuaWrapper::checkArg<AnimationSceneImpl*>(L, 1);
-		Entity entity = LuaWrapper::checkArg<Entity>(L, 2);
+		EntityRef entity = LuaWrapper::checkArg<EntityRef>(L, 2);
 		Controller& controller = scene->m_controllers.get(entity);
 		int index = LuaWrapper::checkArg<int>(L, 3);
 		Controller::IK& ik = controller.inverse_kinematics[index];
@@ -306,7 +306,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
-	int getControllerInputIndex(Entity entity, const char* name) const override
+	int getControllerInputIndex(EntityRef entity, const char* name) const override
 	{
 		const Controller& controller = m_controllers[entity];
 		Anim::InputDecl& decl = controller.resource->m_input_decl;
@@ -318,7 +318,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
-	void setControllerFloatInput(Entity entity, int input_idx, float value)
+	void setControllerFloatInput(EntityRef entity, int input_idx, float value)
 	{
 		Controller& controller = m_controllers.get(entity);
 		if (!controller.root)
@@ -339,7 +339,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
-	void setControllerIntInput(Entity entity, int input_idx, int value)
+	void setControllerIntInput(EntityRef entity, int input_idx, int value)
 	{
 		Controller& controller = m_controllers.get(entity);
 		if (!controller.root)
@@ -359,7 +359,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
-	void setControllerBoolInput(Entity entity, int input_idx, bool value)
+	void setControllerBoolInput(EntityRef entity, int input_idx, bool value)
 	{
 		Controller& controller = m_controllers.get(entity);
 		if (!controller.root)
@@ -387,19 +387,19 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
-	float getAnimableTime(Entity entity) override
+	float getAnimableTime(EntityRef entity) override
 	{
 		return m_animables[entity].time;
 	}
 
 
-	void setAnimableTime(Entity entity, float time) override
+	void setAnimableTime(EntityRef entity, float time) override
 	{
 		m_animables[entity].time = time;
 	}
 
 
-	Animation* getAnimableAnimation(Entity entity) override
+	Animation* getAnimableAnimation(EntityRef entity) override
 	{
 		return m_animables[entity].animation;
 	}
@@ -476,7 +476,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
-	void destroyPropertyAnimator(Entity entity)
+	void destroyPropertyAnimator(EntityRef entity)
 	{
 		int idx = m_property_animators.find(entity);
 		auto& animator = m_property_animators.at(idx);
@@ -486,7 +486,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
-	void destroyAnimable(Entity entity)
+	void destroyAnimable(EntityRef entity)
 	{
 		auto& animable = m_animables[entity];
 		unloadResource(animable.animation);
@@ -495,7 +495,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
-	void destroyController(Entity entity)
+	void destroyController(EntityRef entity)
 	{
 		auto& controller = m_controllers.get(entity);
 		unloadResource(controller.resource);
@@ -505,7 +505,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
-	void destroySharedController(Entity entity)
+	void destroySharedController(EntityRef entity)
 	{
 		m_shared_controllers.erase(entity);
 		m_universe.onComponentDestroyed(entity, SHARED_CONTROLLER_TYPE, this);
@@ -527,7 +527,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		for (int i = 0, n = m_property_animators.size(); i < n; ++i)
 		{
 			const PropertyAnimator& animator = m_property_animators.at(i);
-			Entity entity = m_property_animators.getKey(i);
+			EntityRef entity = m_property_animators.getKey(i);
 			serializer.write(entity);
 			serializer.writeString(animator.animation ? animator.animation->getPath().c_str() : "");
 			serializer.write(animator.flags.base);
@@ -574,7 +574,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		m_property_animators.reserve(count);
 		for (int i = 0; i < count; ++i)
 		{
-			Entity entity;
+			EntityRef entity;
 			serializer.read(entity);
 
 			PropertyAnimator& animator = m_property_animators.emplace(entity, m_allocator);
@@ -614,22 +614,22 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
-	void setSharedControllerParent(Entity entity, Entity parent) override
+	void setSharedControllerParent(EntityRef entity, EntityRef parent) override
 	{
 		m_shared_controllers[entity].parent = parent;
 	}
 
 
-	Entity getSharedControllerParent(Entity entity) override { return m_shared_controllers[entity].parent; }
+	EntityPtr getSharedControllerParent(EntityRef entity) override { return m_shared_controllers[entity].parent; }
 
 
-	float getAnimableTimeScale(Entity entity) override { return m_animables[entity].time_scale; }
-	void setAnimableTimeScale(Entity entity, float time_scale) override { m_animables[entity].time_scale = time_scale; }
-	float getAnimableStartTime(Entity entity) override { return m_animables[entity].start_time; }
-	void setAnimableStartTime(Entity entity, float time) override { m_animables[entity].start_time = time; }
+	float getAnimableTimeScale(EntityRef entity) override { return m_animables[entity].time_scale; }
+	void setAnimableTimeScale(EntityRef entity, float time_scale) override { m_animables[entity].time_scale = time_scale; }
+	float getAnimableStartTime(EntityRef entity) override { return m_animables[entity].start_time; }
+	void setAnimableStartTime(EntityRef entity, float time) override { m_animables[entity].start_time = time; }
 
 
-	void setControllerSource(Entity entity, const Path& path) override
+	void setControllerSource(EntityRef entity, const Path& path) override
 	{
 		auto& controller = m_controllers.get(entity);
 		unloadResource(controller.resource);
@@ -641,19 +641,19 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
-	Path getControllerSource(Entity entity) override
+	Path getControllerSource(EntityRef entity) override
 	{
 		const auto& controller = m_controllers.get(entity);
 		return controller.resource ? controller.resource->getPath() : Path("");
 	}
 
-	bool isPropertyAnimatorEnabled(Entity entity) override
+	bool isPropertyAnimatorEnabled(EntityRef entity) override
 	{
 		return !m_property_animators.get(entity).flags.isSet(PropertyAnimator::DISABLED);
 	}
 
 
-	void enablePropertyAnimator(Entity entity, bool enabled) override
+	void enablePropertyAnimator(EntityRef entity, bool enabled) override
 	{
 		PropertyAnimator& animator = m_property_animators.get(entity);
 		animator.flags.set(PropertyAnimator::DISABLED, !enabled);
@@ -665,14 +665,14 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
-	Path getPropertyAnimation(Entity entity) override
+	Path getPropertyAnimation(EntityRef entity) override
 	{
 		const auto& animator = m_property_animators.get(entity);
 		return animator.animation ? animator.animation->getPath() : Path("");
 	}
 	
 	
-	void setPropertyAnimation(Entity entity, const Path& path) override
+	void setPropertyAnimation(EntityRef entity, const Path& path) override
 	{
 		auto& animator = m_property_animators.get(entity);
 		animator.time = 0;
@@ -681,14 +681,14 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
-	Path getAnimation(Entity entity) override
+	Path getAnimation(EntityRef entity) override
 	{
 		const auto& animable = m_animables[entity];
 		return animable.animation ? animable.animation->getPath() : Path("");
 	}
 
 
-	void setAnimation(Entity entity, const Path& path) override
+	void setAnimation(EntityRef entity, const Path& path) override
 	{
 		auto& animable = m_animables[entity];
 		unloadResource(animable.animation);
@@ -700,7 +700,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	void updateAnimable(Animable& animable, float time_delta) const
 	{
 		if (!animable.animation || !animable.animation->isReady()) return;
-		Entity entity = animable.entity;
+		EntityRef entity = animable.entity;
 		if (!m_universe.hasComponent(entity, MODEL_INSTANCE_TYPE)) return;
 
 		Model* model = m_render_scene->getModelInstanceModel(entity);
@@ -722,14 +722,14 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
-	void updateAnimable(Entity entity, float time_delta) override
+	void updateAnimable(EntityRef entity, float time_delta) override
 	{
 		Animable& animable = m_animables[entity];
 		updateAnimable(animable, time_delta);
 	}
 
 
-	void updateController(Entity entity, float time_delta) override
+	void updateController(EntityRef entity, float time_delta) override
 	{
 		Controller& controller = m_controllers.get(entity);
 		updateController(controller, time_delta);
@@ -738,7 +738,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
-	void setControllerInput(Entity entity, int input_idx, float value) override
+	void setControllerInput(EntityRef entity, int input_idx, float value) override
 	{
 		Controller& ctrl = m_controllers.get(entity);
 		Anim::InputDecl& decl = ctrl.resource->m_input_decl;
@@ -749,7 +749,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
-	void setControllerInput(Entity entity, int input_idx, bool value) override
+	void setControllerInput(EntityRef entity, int input_idx, bool value) override
 	{
 		Controller& ctrl = m_controllers.get(entity);
 		Anim::InputDecl& decl = ctrl.resource->m_input_decl;
@@ -760,7 +760,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
-	void setControllerInput(Entity entity, int input_idx, int value) override
+	void setControllerInput(EntityRef entity, int input_idx, int value) override
 	{
 		Controller& ctrl = m_controllers.get(entity);
 		Anim::InputDecl& decl = ctrl.resource->m_input_decl;
@@ -771,27 +771,27 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
-	Anim::ComponentInstance* getControllerRoot(Entity entity) override
+	Anim::ComponentInstance* getControllerRoot(EntityRef entity) override
 	{
 		return m_controllers.get(entity).root;
 	}
 
 
-	RigidTransform getControllerRootMotion(Entity entity) override
+	RigidTransform getControllerRootMotion(EntityRef entity) override
 	{
 		Controller& ctrl = m_controllers.get(entity);
 		return ctrl.root ? ctrl.root->getRootMotion() : RigidTransform({0, 0, 0}, {0, 0, 0, 1});
 	}
 
 	
-	u8* getControllerInput(Entity entity) override
+	u8* getControllerInput(EntityRef entity) override
 	{
 		auto& input = m_controllers.get(entity).input;
 		return input.empty() ? nullptr : &input[0];
 	}
 
 
-	void applyControllerSet(Entity entity, const char* set_name) override
+	void applyControllerSet(EntityRef entity, const char* set_name) override
 	{
 		Controller& ctrl = m_controllers.get(entity);
 		u32 set_name_hash = crc32(set_name);
@@ -809,14 +809,14 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
-	void setControllerDefaultSet(Entity entity, int set) override
+	void setControllerDefaultSet(EntityRef entity, int set) override
 	{
 		Controller& ctrl = m_controllers.get(entity);
 		ctrl.default_set = ctrl.resource ? crc32(ctrl.resource->m_sets_names[set]) : 0;
 	}
 
 
-	int getControllerDefaultSet(Entity entity) override
+	int getControllerDefaultSet(EntityRef entity) override
 	{
 		Controller& ctrl = m_controllers.get(entity);
 		auto is_default_set = [&ctrl](const StaticString<32>& val) {
@@ -828,7 +828,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
-	Anim::ControllerResource* getControllerResource(Entity entity) override
+	Anim::ControllerResource* getControllerResource(EntityRef entity) override
 	{
 		return m_controllers.get(entity).resource;
 	}
@@ -872,13 +872,13 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	{
 		if (!controller.parent.isValid()) return;
 
-		int parent_controller_idx = m_controllers.find(controller.parent);
+		int parent_controller_idx = m_controllers.find((EntityRef)controller.parent);
 		if (parent_controller_idx < 0) return;
 
 		Controller& parent_controller = m_controllers.at(parent_controller_idx);
 		if (!parent_controller.root) return;
 
-		Entity entity = controller.entity;
+		EntityRef entity = controller.entity;
 		if (!m_universe.hasComponent(entity, MODEL_INSTANCE_TYPE)) return;
 
 		Pose* pose = m_render_scene->lockPose(entity);
@@ -917,7 +917,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		rc.controller = {controller.entity.index};
 		controller.root = controller.root->update(rc, true);
 
-		Entity entity = controller.entity;
+		EntityRef entity = controller.entity;
 		if (!m_universe.hasComponent(entity, MODEL_INSTANCE_TYPE)) return;
 
 		Model* model = m_render_scene->getModelInstanceModel(entity);
@@ -1057,7 +1057,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
-	void applyPropertyAnimator(Entity entity, PropertyAnimator& animator)
+	void applyPropertyAnimator(EntityRef entity, PropertyAnimator& animator)
 	{
 		const PropertyAnimation* animation = animator.animation;
 		int frame = int(animator.time * animation->fps + 0.5f);
@@ -1089,7 +1089,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		PROFILE_FUNCTION();
 		for (int anim_idx = 0, c = m_property_animators.size(); anim_idx < c; ++anim_idx)
 		{
-			Entity entity = m_property_animators.getKey(anim_idx);
+			EntityRef entity = m_property_animators.getKey(anim_idx);
 			PropertyAnimator& animator = m_property_animators.at(anim_idx);
 			const PropertyAnimation* animation = animator.animation;
 			if (!animation || !animation->isReady()) continue;
@@ -1167,7 +1167,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 		{
 			u32 type;
 			u8 size;
-			Entity entity;
+			EntityRef entity;
 			blob.read(type);
 			blob.read(entity);
 			blob.read(size);
@@ -1219,7 +1219,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
-	void createPropertyAnimator(Entity entity)
+	void createPropertyAnimator(EntityRef entity)
 	{
 		PropertyAnimator& animator = m_property_animators.emplace(entity, m_allocator);
 		animator.animation = nullptr;
@@ -1228,7 +1228,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
-	void createAnimable(Entity entity)
+	void createAnimable(EntityRef entity)
 	{
 		Animable& animable = m_animables.insert(entity);
 		animable.time = 0;
@@ -1241,7 +1241,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
-	void createController(Entity entity)
+	void createController(EntityRef entity)
 	{
 		Controller& controller = m_controllers.emplace(entity, m_allocator);
 		controller.entity = entity;
@@ -1250,7 +1250,7 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	}
 
 
-	void createSharedController(Entity entity)
+	void createSharedController(EntityRef entity)
 	{
 		m_shared_controllers.insert(entity, {entity, INVALID_ENTITY});
 
@@ -1265,10 +1265,10 @@ struct AnimationSceneImpl LUMIX_FINAL : public AnimationScene
 	Universe& m_universe;
 	IPlugin& m_anim_system;
 	Engine& m_engine;
-	AssociativeArray<Entity, Animable> m_animables;
-	AssociativeArray<Entity, PropertyAnimator> m_property_animators;
-	AssociativeArray<Entity, Controller> m_controllers;
-	AssociativeArray<Entity, SharedController> m_shared_controllers;
+	AssociativeArray<EntityRef, Animable> m_animables;
+	AssociativeArray<EntityRef, PropertyAnimator> m_property_animators;
+	AssociativeArray<EntityRef, Controller> m_controllers;
+	AssociativeArray<EntityRef, SharedController> m_shared_controllers;
 	RenderScene* m_render_scene;
 	bool m_is_game_running;
 	OutputBlob m_event_stream;

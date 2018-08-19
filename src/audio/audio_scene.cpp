@@ -34,20 +34,20 @@ enum class AudioSceneVersion : int
 
 struct Listener
 {
-	Entity entity;
+	EntityPtr entity;
 };
 
 
 struct EchoZone
 {
-	Entity entity;
+	EntityRef entity;
 	float radius;
 	float delay;
 };
 
 struct ChorusZone
 {
-	Entity entity;
+	EntityRef entity;
 	float radius;
 	float delay;
 	float wet_dry_mix;
@@ -59,7 +59,7 @@ struct ChorusZone
 
 struct AmbientSound
 {
-	Entity entity;
+	EntityRef entity;
 	AudioScene::ClipInfo* clip;
 	bool is_3d;
 	int playing_sound;
@@ -69,13 +69,13 @@ struct AmbientSound
 struct PlayingSound
 {
 	AudioDevice::BufferHandle buffer_id;
-	Entity entity;
+	EntityPtr entity;
 	AudioScene::ClipInfo* clip;
 	bool is_3d;
 };
 
 
-struct AudioSceneImpl LUMIX_FINAL : public AudioScene
+struct AudioSceneImpl final : public AudioScene
 {
 	AudioSceneImpl(AudioSystem& system, Universe& context, IAllocator& allocator)
 		: m_allocator(allocator)
@@ -164,7 +164,7 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 	}
 
 
-	void serializeEchoZone(ISerializer& serializer, Entity entity)
+	void serializeEchoZone(ISerializer& serializer, EntityRef entity)
 	{
 		EchoZone& zone = m_echo_zones[entity];
 		serializer.write("radius", zone.radius);
@@ -172,7 +172,7 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 	}
 
 
-	void deserializeEchoZone(IDeserializer& serializer, Entity entity, int /*scene_version*/)
+	void deserializeEchoZone(IDeserializer& serializer, EntityRef entity, int /*scene_version*/)
 	{
 		EchoZone& zone = m_echo_zones.insert(entity);
 		zone.entity = entity;
@@ -181,7 +181,7 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 		m_universe.onComponentCreated(entity, ECHO_ZONE_TYPE, this);
 	}
 
-	void serializeChorusZone(ISerializer& serializer, Entity entity)
+	void serializeChorusZone(ISerializer& serializer, EntityRef entity)
 	{
 		ChorusZone& zone = m_chorus_zones[entity];
 		serializer.write("radius", zone.radius);
@@ -194,7 +194,7 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 	}
 
 
-	void deserializeChorusZone(IDeserializer& serializer, Entity entity, int /*scene_version*/)
+	void deserializeChorusZone(IDeserializer& serializer, EntityRef entity, int /*scene_version*/)
 	{
 		ChorusZone& zone = m_chorus_zones.insert(entity);
 		zone.entity = entity;
@@ -208,7 +208,7 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 		m_universe.onComponentCreated(entity, CHORUS_ZONE_TYPE, this);
 	}
 
-	void serializeAmbientSound(ISerializer& serializer, Entity entity)
+	void serializeAmbientSound(ISerializer& serializer, EntityRef entity)
 	{
 		AmbientSound& sound = m_ambient_sounds[entity];
 		serializer.write("clip", m_clips.indexOf(sound.clip));
@@ -216,7 +216,7 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 	}
 
 
-	void deserializeAmbientSound(IDeserializer& serializer, Entity entity, int /*scene_version*/)
+	void deserializeAmbientSound(IDeserializer& serializer, EntityRef entity, int /*scene_version*/)
 	{
 		AmbientSound& sound = m_ambient_sounds.insert(entity);
 		sound.playing_sound = -1;
@@ -229,10 +229,10 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 	}
 
 
-	void serializeListener(ISerializer&, Entity) {}
+	void serializeListener(ISerializer&, EntityRef) {}
 
 
-	void deserializeListener(IDeserializer&, Entity entity, int /*scene_version*/)
+	void deserializeListener(IDeserializer&, EntityRef entity, int /*scene_version*/)
 	{
 		m_listener.entity = entity;
 		m_universe.onComponentCreated(entity, LISTENER_TYPE, this);
@@ -256,7 +256,7 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 	}
 
 
-	int playSound(Entity entity, const char* clip_name, bool is_3d)
+	int playSound(EntityRef entity, const char* clip_name, bool is_3d)
 	{
 		auto* clip = getClipInfo(clip_name);
 		if (clip) return play(entity, clip, is_3d);
@@ -274,7 +274,7 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 		{
 			u32 type;
 			u8 size;
-			Entity entity;
+			EntityRef entity;
 			blob.read(type);
 			blob.read(entity);
 			blob.read(size);
@@ -297,13 +297,14 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 
 	void update(float time_delta, bool paused) override
 	{
-		if (m_listener.entity != INVALID_ENTITY)
+		if (m_listener.entity.isValid())
 		{
-			auto pos = m_universe.getPosition(m_listener.entity);
+			const EntityRef listener = (EntityRef) m_listener.entity;
+			const Vec3 pos = m_universe.getPosition(listener);
 			m_device.setListenerPosition(pos.x, pos.y, pos.z);
-			Matrix orientation = m_universe.getRotation(m_listener.entity).toMatrix();
-			auto front = orientation.getZVector();
-			auto up = orientation.getYVector();
+			const Matrix orientation = m_universe.getRotation(listener).toMatrix();
+			const Vec3 front = orientation.getZVector();
+			const Vec3 up = orientation.getYVector();
 			m_device.setListenerOrientation(front.x, front.y, front.z, up.x, up.y, up.z);
 		}
 
@@ -311,10 +312,11 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 		{
 			auto& sound = m_playing_sounds[i];
 			if (sound.buffer_id == AudioDevice::INVALID_BUFFER_HANDLE) continue;
+			if (!sound.entity.isValid()) continue;
 
 			if (sound.is_3d)
 			{
-				auto pos = m_universe.getPosition(sound.entity);
+				auto pos = m_universe.getPosition((EntityRef)sound.entity);
 				m_device.setSourcePosition(sound.buffer_id, pos.x, pos.y, pos.z);
 			}
 
@@ -331,13 +333,13 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 	}
 
 
-	bool isAmbientSound3D(Entity entity) override
+	bool isAmbientSound3D(EntityRef entity) override
 	{
 		return m_ambient_sounds[entity].is_3d;
 	}
 
 
-	void setAmbientSound3D(Entity entity, bool is_3d) override
+	void setAmbientSound3D(EntityRef entity, bool is_3d) override
 	{
 		m_ambient_sounds[entity].is_3d = is_3d;
 	}
@@ -372,14 +374,14 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 	}
 
 
-	void createListener(Entity entity)
+	void createListener(EntityRef entity)
 	{
 		m_listener.entity = entity;
 		m_universe.onComponentCreated(entity, LISTENER_TYPE, this);
 	}
 
 
-	ClipInfo* getAmbientSoundClip(Entity entity) override
+	ClipInfo* getAmbientSoundClip(EntityRef entity) override
 	{
 		return m_ambient_sounds[entity].clip;
 	}
@@ -395,25 +397,25 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 	}
 
 
-	int getAmbientSoundClipIndex(Entity entity) override
+	int getAmbientSoundClipIndex(EntityRef entity) override
 	{
 		return m_clips.indexOf(m_ambient_sounds[entity].clip);
 	}
 
 
-	void setAmbientSoundClipIndex(Entity entity, int index) override
+	void setAmbientSoundClipIndex(EntityRef entity, int index) override
 	{
 		m_ambient_sounds[entity].clip = m_clips[index];
 	}
 
 
-	void setAmbientSoundClip(Entity entity, ClipInfo* clip) override
+	void setAmbientSoundClip(EntityRef entity, ClipInfo* clip) override
 	{
 		m_ambient_sounds[entity].clip = clip;
 	}
 
 
-	void createEchoZone(Entity entity)
+	void createEchoZone(EntityRef entity)
 	{
 		EchoZone& zone = m_echo_zones.insert(entity);
 		zone.entity = entity;
@@ -423,38 +425,38 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 	}
 
 
-	float getEchoZoneDelay(Entity entity) override
+	float getEchoZoneDelay(EntityRef entity) override
 	{
 		return m_echo_zones[entity].delay;
 	}
 
 
-	void setEchoZoneDelay(Entity entity, float delay) override
+	void setEchoZoneDelay(EntityRef entity, float delay) override
 	{
 		m_echo_zones[entity].delay = delay;
 	}
 
 
-	float getEchoZoneRadius(Entity entity) override
+	float getEchoZoneRadius(EntityRef entity) override
 	{
 		return m_echo_zones[entity].radius;
 	}
 	
 	
-	void setEchoZoneRadius(Entity entity, float radius) override
+	void setEchoZoneRadius(EntityRef entity, float radius) override
 	{
 		m_echo_zones[entity].radius = radius;
 	}
 
 
-	void destroyEchoZone(Entity entity)
+	void destroyEchoZone(EntityRef entity)
 	{
 		int idx = m_echo_zones.find(entity);
 		m_echo_zones.eraseAt(idx);
 		m_universe.onComponentDestroyed(entity, ECHO_ZONE_TYPE, this);
 	}
 
-	void createChorusZone(Entity entity)
+	void createChorusZone(EntityRef entity)
 	{
 		ChorusZone& zone = m_chorus_zones.insert(entity);
 		zone.entity = entity;
@@ -469,31 +471,31 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 	}
 
 
-	float getChorusZoneDelay(Entity entity) override
+	float getChorusZoneDelay(EntityRef entity) override
 	{
 		return m_chorus_zones[entity].delay;
 	}
 
 
-	void setChorusZoneDelay(Entity entity, float delay) override
+	void setChorusZoneDelay(EntityRef entity, float delay) override
 	{
 		m_chorus_zones[entity].delay = delay;
 	}
 
 
-	float getChorusZoneRadius(Entity entity) override
+	float getChorusZoneRadius(EntityRef entity) override
 	{
 		return m_chorus_zones[entity].radius;
 	}
 
 
-	void setChorusZoneRadius(Entity entity, float radius) override
+	void setChorusZoneRadius(EntityRef entity, float radius) override
 	{
 		m_chorus_zones[entity].radius = radius;
 	}
 
 
-	void destroyChorusZone(Entity entity)
+	void destroyChorusZone(EntityRef entity)
 	{
 		int idx = m_chorus_zones.find(entity);
 		m_chorus_zones.eraseAt(idx);
@@ -501,7 +503,7 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 	}
 
 
-	void createAmbientSound(Entity entity)
+	void createAmbientSound(EntityRef entity)
 	{
 		AmbientSound& sound = m_ambient_sounds.insert(entity);
 		sound.entity = entity;
@@ -511,14 +513,14 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 	}
 
 
-	void destroyListener(Entity entity)
+	void destroyListener(EntityRef entity)
 	{
 		m_listener.entity = INVALID_ENTITY;
 		m_universe.onComponentDestroyed(entity, LISTENER_TYPE, this);
 	}
 
 
-	void destroyAmbientSound(Entity entity)
+	void destroyAmbientSound(EntityRef entity)
 	{
 		m_ambient_sounds.erase(entity);
 		m_universe.onComponentDestroyed(entity, AMBIENT_SOUND_TYPE, this);
@@ -567,20 +569,17 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 		clear();
 
 		serializer.read(m_listener.entity);
-		if (m_listener.entity != INVALID_ENTITY)
-		{
-			m_universe.onComponentCreated(m_listener.entity, LISTENER_TYPE, this);
+		if (m_listener.entity.isValid()) {
+			m_universe.onComponentCreated((EntityRef)m_listener.entity, LISTENER_TYPE, this);
 		}
 
 		int count = 0;
 		serializer.read(count);
 		m_clips.resize(count);
-		for (int i = 0; i < count; ++i)
-		{
+		for (int i = 0; i < count; ++i) {
 			bool is_valid;
 			serializer.read(is_valid);
-			if (!is_valid)
-			{
+			if (!is_valid) {
 				m_clips[i] = nullptr;
 				continue;
 			}
@@ -599,8 +598,7 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 		}
 
 		serializer.read(count);
-		for (int i = 0; i < count; ++i)
-		{
+		for (int i = 0; i < count; ++i) {
 			AmbientSound sound;
 			int clip_idx;
 			serializer.read(clip_idx);
@@ -614,8 +612,7 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 
 		serializer.read(count);
 
-		for (int i = 0; i < count; ++i)
-		{
+		for (int i = 0; i < count; ++i) {
 			EchoZone zone;
 			serializer.read(zone);
 
@@ -625,8 +622,7 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 
 		serializer.read(count);
 
-		for (int i = 0; i < count; ++i)
-		{
+		for (int i = 0; i < count; ++i) {
 			ChorusZone zone;
 			serializer.read(zone);
 
@@ -726,7 +722,7 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 	}
 
 
-	SoundHandle play(Entity entity, ClipInfo* clip_info, bool is_3d) override
+	SoundHandle play(EntityRef entity, ClipInfo* clip_info, bool is_3d) override
 	{
 		for (int i = 0; i < lengthOf(m_playing_sounds); ++i)
 		{
@@ -808,9 +804,9 @@ struct AudioSceneImpl LUMIX_FINAL : public AudioScene
 	Universe& getUniverse() override { return m_universe; }
 	IPlugin& getPlugin() const override { return m_system; }
 
-	AssociativeArray<Entity, AmbientSound> m_ambient_sounds;
-	AssociativeArray<Entity, EchoZone> m_echo_zones;
-	AssociativeArray<Entity, ChorusZone> m_chorus_zones;
+	AssociativeArray<EntityRef, AmbientSound> m_ambient_sounds;
+	AssociativeArray<EntityRef, EchoZone> m_echo_zones;
+	AssociativeArray<EntityRef, ChorusZone> m_chorus_zones;
 	AudioDevice& m_device;
 	Listener m_listener;
 	IAllocator& m_allocator;

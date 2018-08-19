@@ -89,7 +89,7 @@ namespace AnimEditor
 {
 
 
-struct BeginGroupCommand LUMIX_FINAL : IEditorCommand
+struct BeginGroupCommand final : IEditorCommand
 {
 	BeginGroupCommand() = default;
 	explicit BeginGroupCommand(WorldEditor&) {}
@@ -103,7 +103,7 @@ struct BeginGroupCommand LUMIX_FINAL : IEditorCommand
 };
 
 
-struct EndGroupCommand LUMIX_FINAL : IEditorCommand
+struct EndGroupCommand final : IEditorCommand
 {
 	EndGroupCommand() = default;
 	EndGroupCommand(WorldEditor&) {}

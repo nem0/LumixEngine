@@ -33,7 +33,7 @@ public:
 	virtual Vec3 getOffset() const = 0;
 	virtual void setOffset(const Vec3& offset) = 0;
 	virtual bool isActive() const = 0;
-	virtual void add(Entity entity) = 0;
+	virtual void add(EntityRef entity) = 0;
 	virtual void getRenderData(Array<RenderData>* data) = 0;
 	virtual void render(const Array<RenderData>& data, const Viewport& vp) const = 0;
 	virtual void setTranslateMode() = 0;

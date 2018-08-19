@@ -1,5 +1,6 @@
 #include "asset_compiler.h"
 #include "editor/file_system_watcher.h"
+#include "editor/log_ui.h"
 #include "editor/platform_interface.h"
 #include "editor/studio_app.h"
 #include "editor/world_editor.h"
@@ -9,6 +10,7 @@
 #include "engine/fs/os_file.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
+#include "engine/mt/atomic.h"
 #include "engine/mt/sync.h"
 #include "engine/mt/task.h"
 #include "engine/path_utils.h"
@@ -31,6 +33,7 @@ struct AssetCompilerTask : MT::Task
 
 	int task() override;
 
+	volatile int m_to_compile_count = 0;
 	AssetCompilerImpl& m_compiler;
 	volatile bool m_finished = false;
 };
@@ -101,6 +104,7 @@ struct AssetCompilerImpl : AssetCompiler
 
 		MT::SpinLock lock(m_to_compile_mutex);
 		
+		MT::atomicIncrement(&m_task.m_to_compile_count);
 		CompileEntry& e = m_to_compile.emplace();
 		e.resource = nullptr;
 		e.path = path;
@@ -169,10 +173,7 @@ struct AssetCompilerImpl : AssetCompiler
 		const u32 hash = crc32(ext);
 		MT::SpinLock lock(m_plugin_mutex);
 		auto iter = m_plugins.find(hash);
-		if (!iter.isValid()) {
-			g_log_error.log("Editor") << "Asset compiler does not know how to compile " << src;
-			return false;
-		}
+		if (!iter.isValid()) return false;
 		return iter.value()->compile(src);
 	}
 
@@ -191,6 +192,7 @@ struct AssetCompilerImpl : AssetCompiler
 			)
 		{
 			MT::SpinLock lock(m_to_compile_mutex);
+			MT::atomicIncrement(&m_task.m_to_compile_count);
 			CompileEntry& e = m_to_compile.emplace();
 			e.resource = &res;
 			m_semaphore.signal();
@@ -210,6 +212,15 @@ struct AssetCompilerImpl : AssetCompiler
 	
 	void update() override
 	{
+		LogUI& log = m_app.getLogUI();
+		if (m_log_id == -1 && m_task.m_to_compile_count > 0) {
+			m_log_id = log.addNotification("Compiling resources...");
+		}
+		if(m_log_id != -1) {
+			log.setNotificationTime(m_log_id, 3.f);
+			if (m_task.m_to_compile_count == 0) m_log_id = -1;
+		}
+
 		for(;;) {
 			CompileEntry e = popCompiledResource();
 			if(e.resource) {
@@ -266,6 +277,7 @@ struct AssetCompilerImpl : AssetCompiler
 	HashMap<u32, IPlugin*> m_plugins;
 	AssetCompilerTask m_task;
 	FileSystemWatcher* m_watcher;
+	int m_log_id = -1;
 };
 
 
@@ -281,13 +293,15 @@ int AssetCompilerTask::task()
 		}();
 		if (e.resource) {
 			m_compiler.compile(e.resource->getPath());
+			MT::atomicDecrement(&m_to_compile_count);
 			MT::SpinLock lock(m_compiler.m_compiled_mutex);
 			m_compiler.m_compiled.push(e);
 		}
 		else if(e.path.isValid()) {
-			m_compiler.compile(e.path);
-			MT::SpinLock lock(m_compiler.m_compiled_mutex);
-			m_compiler.m_compiled.push(e);
+			if(m_compiler.compile(e.path)) {
+				MT::SpinLock lock(m_compiler.m_compiled_mutex);
+				m_compiler.m_compiled.push(e);
+			}
 		}
 	}
 	return 0;

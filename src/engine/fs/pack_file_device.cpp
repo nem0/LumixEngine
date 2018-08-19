@@ -10,7 +10,7 @@ namespace FS
 {
 
 
-class PackFile LUMIX_FINAL : public IFile
+class PackFile final : public IFile
 {
 public:
 	PackFile(PackFileDevice& device, IAllocator& allocator)

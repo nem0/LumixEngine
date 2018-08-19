@@ -41,7 +41,7 @@ private:
 };
 
 
-class LUMIX_ENGINE_API Allocator LUMIX_FINAL : public IAllocator
+class LUMIX_ENGINE_API Allocator final : public IAllocator
 {
 public:
 	struct AllocationInfo

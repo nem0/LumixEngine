@@ -41,7 +41,7 @@ static const float SHADOW_CAM_NEAR = 50.0f;
 static const float SHADOW_CAM_FAR = 5000.0f;
 
 
-struct PipelineImpl LUMIX_FINAL : Pipeline
+struct PipelineImpl final : Pipeline
 {
 	PipelineImpl(Renderer& renderer, const Path& path, const char* define, IAllocator& allocator)
 		: m_allocator(allocator)
@@ -331,12 +331,13 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		state.camera_inv_view_projection.inverse();
 		state.time = m_timer->getTimeSinceStart();
 
-		const Entity global_light = m_scene->getActiveGlobalLight();
+		const EntityPtr global_light = m_scene->getActiveGlobalLight();
 		if(global_light.isValid()) {
-			state.light_direction = Vec4(m_scene->getUniverse().getRotation(global_light).rotate(Vec3(0, 0, -1)), 456); 
-			state.light_color = m_scene->getGlobalLightColor(global_light);
-			state.light_intensity = m_scene->getGlobalLightIntensity(global_light);
-			state.light_indirect_intensity = m_scene->getGlobalLightIndirectIntensity(global_light);
+			EntityRef gl = (EntityRef)global_light;
+			state.light_direction = Vec4(m_scene->getUniverse().getRotation(gl).rotate(Vec3(0, 0, -1)), 456); 
+			state.light_color = m_scene->getGlobalLightColor(gl);
+			state.light_intensity = m_scene->getGlobalLightIntensity(gl);
+			state.light_indirect_intensity = m_scene->getGlobalLightIndirectIntensity(gl);
 		}
 
 		m_renderer.setGlobalState(state);
@@ -958,11 +959,11 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		}
 
 		const Vec3 camera_pos = pipeline->m_viewport.pos;
-		const Entity probe = pipeline->m_scene->getNearestEnvironmentProbe(camera_pos);
+		const EntityPtr probe = pipeline->m_scene->getNearestEnvironmentProbe(camera_pos);
 		
 		if (probe.isValid()) {
-			Texture* irradiance = pipeline->m_scene->getEnvironmentProbeIrradiance(probe);
-			Texture* radiance = pipeline->m_scene->getEnvironmentProbeRadiance(probe);
+			Texture* irradiance = pipeline->m_scene->getEnvironmentProbeIrradiance((EntityRef)probe);
+			Texture* radiance = pipeline->m_scene->getEnvironmentProbeRadiance((EntityRef)probe);
 			cmd->m_textures[cmd->m_textures_count + 0].handle = irradiance->handle;
 			cmd->m_textures[cmd->m_textures_count + 1].handle = radiance->handle;
 		}
@@ -1092,9 +1093,9 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 		RenderScene* scene = pipeline->m_scene;
 		
 		const Universe& universe = scene->getUniverse();
-		const Entity light = scene->getActiveGlobalLight();
-		const Vec4 cascades = light.isValid() ? scene->getShadowmapCascades(light) : Vec4(3, 10, 60, 150);
-		const Matrix light_mtx = light.isValid() ? universe.getMatrix(light) : Matrix::IDENTITY;
+		const EntityPtr light = scene->getActiveGlobalLight();
+		const Vec4 cascades = light.isValid() ? scene->getShadowmapCascades((EntityRef)light) : Vec4(3, 10, 60, 150);
+		const Matrix light_mtx = light.isValid() ? universe.getMatrix((EntityRef)light) : Matrix::IDENTITY;
 
 		const float camera_height = (float)pipeline->m_viewport.h;
 		const float camera_fov = pipeline->m_viewport.fov;
@@ -1651,10 +1652,10 @@ struct PipelineImpl LUMIX_FINAL : Pipeline
 
 			MT::atomicAdd(&m_pipeline->m_stats.draw_call_count, meshes.size());
 
-			const Entity probe = scene->getNearestEnvironmentProbe(m_pipeline->m_viewport.pos);
+			const EntityPtr probe = scene->getNearestEnvironmentProbe(m_pipeline->m_viewport.pos);
 			if (probe.isValid()) {
-				const Texture* irradiance = scene->getEnvironmentProbeIrradiance(probe);
-				const Texture* radiance = scene->getEnvironmentProbeRadiance(probe);
+				const Texture* irradiance = scene->getEnvironmentProbeIrradiance((EntityRef)probe);
+				const Texture* radiance = scene->getEnvironmentProbeRadiance((EntityRef)probe);
 				m_irradiance_map = irradiance->handle;
 				m_radiance_map = radiance->handle;
 			}

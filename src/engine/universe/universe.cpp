@@ -74,19 +74,19 @@ void Universe::removeScene(IScene* scene)
 }
 
 
-const Vec3& Universe::getPosition(Entity entity) const
+const Vec3& Universe::getPosition(EntityRef entity) const
 {
 	return m_entities[entity.index].position;
 }
 
 
-const Quat& Universe::getRotation(Entity entity) const
+const Quat& Universe::getRotation(EntityRef entity) const
 {
 	return m_entities[entity.index].rotation;
 }
 
 
-void Universe::transformEntity(Entity entity, bool update_local)
+void Universe::transformEntity(EntityRef entity, bool update_local)
 {
 	int hierarchy_idx = m_entities[entity.index].hierarchy;
 	entityTransformed().invoke(entity);
@@ -96,11 +96,11 @@ void Universe::transformEntity(Entity entity, bool update_local)
 		Transform my_transform = getTransform(entity);
 		if (update_local && h.parent.isValid())
 		{
-			Transform parent_tr = getTransform(h.parent);
+			Transform parent_tr = getTransform((EntityRef)h.parent);
 			h.local_transform = (parent_tr.inverted() * my_transform);
 		}
 
-		Entity child = h.first_child;
+		EntityPtr child = h.first_child;
 		while (child.isValid())
 		{
 			Hierarchy& child_h = m_hierarchy[m_entities[child.index].hierarchy];
@@ -109,7 +109,7 @@ void Universe::transformEntity(Entity entity, bool update_local)
 			child_data.position = abs_tr.pos;
 			child_data.rotation = abs_tr.rot;
 			child_data.scale = abs_tr.scale;
-			transformEntity(child, false);
+			transformEntity((EntityRef)child, false);
 
 			child = child_h.next_sibling;
 		}
@@ -117,27 +117,27 @@ void Universe::transformEntity(Entity entity, bool update_local)
 }
 
 
-void Universe::setRotation(Entity entity, const Quat& rot)
+void Universe::setRotation(EntityRef entity, const Quat& rot)
 {
 	m_entities[entity.index].rotation = rot;
 	transformEntity(entity, true);
 }
 
 
-void Universe::setRotation(Entity entity, float x, float y, float z, float w)
+void Universe::setRotation(EntityRef entity, float x, float y, float z, float w)
 {
 	m_entities[entity.index].rotation.set(x, y, z, w);
 	transformEntity(entity, true);
 }
 
 
-bool Universe::hasEntity(Entity entity) const
+bool Universe::hasEntity(EntityRef entity) const
 {
 	return entity.index >= 0 && entity.index < m_entities.size() && m_entities[entity.index].valid;
 }
 
 
-void Universe::setMatrix(Entity entity, const Matrix& mtx)
+void Universe::setMatrix(EntityRef entity, const Matrix& mtx)
 {
 	EntityData& out = m_entities[entity.index];
 	mtx.decompose(out.position, out.rotation, out.scale);
@@ -145,7 +145,7 @@ void Universe::setMatrix(Entity entity, const Matrix& mtx)
 }
 
 
-Matrix Universe::getPositionAndRotation(Entity entity) const
+Matrix Universe::getPositionAndRotation(EntityRef entity) const
 {
 	auto& transform = m_entities[entity.index];
 	Matrix mtx = transform.rotation.toMatrix();
@@ -154,7 +154,7 @@ Matrix Universe::getPositionAndRotation(Entity entity) const
 }
 
 
-void Universe::setTransformKeepChildren(Entity entity, const Transform& transform)
+void Universe::setTransformKeepChildren(EntityRef entity, const Transform& transform)
 {
 	auto& tmp = m_entities[entity.index];
 	tmp.position = transform.pos;
@@ -169,16 +169,16 @@ void Universe::setTransformKeepChildren(Entity entity, const Transform& transfor
 		Transform my_transform = getTransform(entity);
 		if (h.parent.isValid())
 		{
-			Transform parent_tr = getTransform(h.parent);
+			Transform parent_tr = getTransform((EntityRef)h.parent);
 			h.local_transform = parent_tr.inverted() * my_transform;
 		}
 
-		Entity child = h.first_child;
+		EntityPtr child = h.first_child;
 		while (child.isValid())
 		{
 			Hierarchy& child_h = m_hierarchy[m_entities[child.index].hierarchy];
 
-			child_h.local_transform = my_transform.inverted() * getTransform(child);
+			child_h.local_transform = my_transform.inverted() * getTransform((EntityRef)child);
 			child = child_h.next_sibling;
 		}
 	}
@@ -186,7 +186,7 @@ void Universe::setTransformKeepChildren(Entity entity, const Transform& transfor
 }
 
 
-void Universe::setTransform(Entity entity, const Transform& transform)
+void Universe::setTransform(EntityRef entity, const Transform& transform)
 {
 	auto& tmp = m_entities[entity.index];
 	tmp.position = transform.pos;
@@ -196,7 +196,7 @@ void Universe::setTransform(Entity entity, const Transform& transform)
 }
 
 
-void Universe::setTransform(Entity entity, const RigidTransform& transform)
+void Universe::setTransform(EntityRef entity, const RigidTransform& transform)
 {
 	auto& tmp = m_entities[entity.index];
 	tmp.position = transform.pos;
@@ -205,7 +205,7 @@ void Universe::setTransform(Entity entity, const RigidTransform& transform)
 }
 
 
-void Universe::setTransform(Entity entity, const Vec3& pos, const Quat& rot, float scale)
+void Universe::setTransform(EntityRef entity, const Vec3& pos, const Quat& rot, float scale)
 {
 	auto& tmp = m_entities[entity.index];
 	tmp.position = pos;
@@ -215,14 +215,14 @@ void Universe::setTransform(Entity entity, const Vec3& pos, const Quat& rot, flo
 }
 
 
-Transform Universe::getTransform(Entity entity) const
+Transform Universe::getTransform(EntityRef entity) const
 {
 	auto& transform = m_entities[entity.index];
 	return {transform.position, transform.rotation, transform.scale};
 }
 
 
-Matrix Universe::getRelativeMatrix(Entity entity, const Vec3& base_pos) const
+Matrix Universe::getRelativeMatrix(EntityRef entity, const Vec3& base_pos) const
 {
 	auto& transform = m_entities[entity.index];
 	Matrix mtx = transform.rotation.toMatrix();
@@ -232,7 +232,7 @@ Matrix Universe::getRelativeMatrix(Entity entity, const Vec3& base_pos) const
 }
 
 
-Matrix Universe::getMatrix(Entity entity) const
+Matrix Universe::getMatrix(EntityRef entity) const
 {
 	auto& transform = m_entities[entity.index];
 	Matrix mtx = transform.rotation.toMatrix();
@@ -242,7 +242,7 @@ Matrix Universe::getMatrix(Entity entity) const
 }
 
 
-void Universe::setPosition(Entity entity, float x, float y, float z)
+void Universe::setPosition(EntityRef entity, float x, float y, float z)
 {
 	auto& transform = m_entities[entity.index];
 	transform.position.set(x, y, z);
@@ -250,7 +250,7 @@ void Universe::setPosition(Entity entity, float x, float y, float z)
 }
 
 
-void Universe::setPosition(Entity entity, const Vec3& pos)
+void Universe::setPosition(EntityRef entity, const Vec3& pos)
 {
 	auto& transform = m_entities[entity.index];
 	transform.position = pos;
@@ -258,7 +258,7 @@ void Universe::setPosition(Entity entity, const Vec3& pos)
 }
 
 
-void Universe::setEntityName(Entity entity, const char* name)
+void Universe::setEntityName(EntityRef entity, const char* name)
 {
 	int name_idx = m_entities[entity.index].name;
 	if (name_idx < 0)
@@ -276,7 +276,7 @@ void Universe::setEntityName(Entity entity, const char* name)
 }
 
 
-const char* Universe::getEntityName(Entity entity) const
+const char* Universe::getEntityName(EntityRef entity) const
 {
 	int name_idx = m_entities[entity.index].name;
 	if (name_idx < 0) return "";
@@ -284,20 +284,17 @@ const char* Universe::getEntityName(Entity entity) const
 }
 
 
-Entity Universe::findByName(Entity parent, const char* name)
+EntityPtr Universe::findByName(EntityPtr parent, const char* name)
 {
-	if (parent.isValid())
-	{
+	if (parent.isValid()) {
 		int h_idx = m_entities[parent.index].hierarchy;
 		if (h_idx < 0) return INVALID_ENTITY;
 
-		Entity e = m_hierarchy[h_idx].first_child;
-		while (e.isValid())
-		{
+		EntityPtr e = m_hierarchy[h_idx].first_child;
+		while (e.isValid()) {
 			const EntityData& data = m_entities[e.index];
 			int name_idx = data.name;
-			if (name_idx >= 0)
-			{
+			if (name_idx >= 0) {
 				if (equalStrings(m_names[name_idx].name, name)) return e;
 			}
 			e = m_hierarchy[data.hierarchy].next_sibling;
@@ -305,10 +302,8 @@ Entity Universe::findByName(Entity parent, const char* name)
 	}
 	else
 	{
-		for (int i = 0, c = m_names.size(); i < c; ++i)
-		{
-			if (equalStrings(m_names[i].name, name))
-			{
+		for (int i = 0, c = m_names.size(); i < c; ++i) {
+			if (equalStrings(m_names[i].name, name)) {
 				const EntityData& data = m_entities[m_names[i].entity.index];
 				if (data.hierarchy < 0) return m_names[i].entity;
 				if (!m_hierarchy[data.hierarchy].parent.isValid()) return m_names[i].entity;
@@ -320,7 +315,7 @@ Entity Universe::findByName(Entity parent, const char* name)
 }
 
 
-void Universe::emplaceEntity(Entity entity)
+void Universe::emplaceEntity(EntityRef entity)
 {
 	while (m_entities.size() <= entity.index)
 	{
@@ -361,11 +356,11 @@ void Universe::emplaceEntity(Entity entity)
 }
 
 
-Entity Universe::cloneEntity(Entity entity)
+EntityRef Universe::cloneEntity(EntityRef entity)
 {
 	Transform tr = getTransform(entity);
-	Entity parent = getParent(entity);
-	Entity clone = createEntity(tr.pos, tr.rot);
+	EntityPtr parent = getParent(entity);
+	EntityRef clone = createEntity(tr.pos, tr.rot);
 	setScale(clone, tr.scale);
 	setParent(parent, clone);
 
@@ -376,7 +371,7 @@ Entity Universe::cloneEntity(Entity entity)
 		blob_out.clear();
 		struct : ISaveEntityGUIDMap
 		{
-			EntityGUID get(Entity entity) override { return { (u64)entity.index }; }
+			EntityGUID get(EntityPtr entity) override { return { (u64)entity.index }; }
 		} save_map;
 		TextSerializer serializer(blob_out, save_map);
 		serializeComponent(serializer, cmp.type, entity);
@@ -384,7 +379,7 @@ Entity Universe::cloneEntity(Entity entity)
 		InputBlob blob_in(blob_out);
 		struct : ILoadEntityGUIDMap
 		{
-			Entity get(EntityGUID guid) override { return { (int)guid.value }; }
+			EntityPtr get(EntityGUID guid) override { return { (int)guid.value }; }
 		} load_map;
 		TextDeserializer deserializer(blob_in, load_map);
 		deserializeComponent(deserializer, clone, cmp.type, cmp.scene->getVersion());
@@ -393,10 +388,10 @@ Entity Universe::cloneEntity(Entity entity)
 }
 
 
-Entity Universe::createEntity(const Vec3& position, const Quat& rotation)
+EntityRef Universe::createEntity(const Vec3& position, const Quat& rotation)
 {
 	EntityData* data;
-	Entity entity;
+	EntityRef entity;
 	if (m_first_free_slot >= 0)
 	{
 		data = &m_entities[m_first_free_slot];
@@ -422,15 +417,13 @@ Entity Universe::createEntity(const Vec3& position, const Quat& rotation)
 }
 
 
-void Universe::destroyEntity(Entity entity)
+void Universe::destroyEntity(EntityRef entity)
 {
-	if (!entity.isValid()) return;
-	
 	EntityData& entity_data = m_entities[entity.index];
 	ASSERT(entity_data.valid);
-	for (Entity first_child = getFirstChild(entity); first_child.isValid(); first_child = getFirstChild(entity))
+	for (EntityPtr first_child = getFirstChild(entity); first_child.isValid(); first_child = getFirstChild(entity))
 	{
-		setParent(INVALID_ENTITY, first_child);
+		setParent(INVALID_ENTITY, (EntityRef)first_child);
 	}
 	setParent(INVALID_ENTITY, entity);
 	
@@ -471,7 +464,7 @@ void Universe::destroyEntity(Entity entity)
 }
 
 
-Entity Universe::getFirstEntity() const
+EntityPtr Universe::getFirstEntity() const
 {
 	for (int i = 0; i < m_entities.size(); ++i)
 	{
@@ -481,7 +474,7 @@ Entity Universe::getFirstEntity() const
 }
 
 
-Entity Universe::getNextEntity(Entity entity) const
+EntityPtr Universe::getNextEntity(EntityRef entity) const
 {
 	for (int i = entity.index + 1; i < m_entities.size(); ++i)
 	{
@@ -491,7 +484,7 @@ Entity Universe::getNextEntity(Entity entity) const
 }
 
 
-Entity Universe::getParent(Entity entity) const
+EntityPtr Universe::getParent(EntityRef entity) const
 {
 	int idx = m_entities[entity.index].hierarchy;
 	if (idx < 0) return INVALID_ENTITY;
@@ -499,7 +492,7 @@ Entity Universe::getParent(Entity entity) const
 }
 
 
-Entity Universe::getFirstChild(Entity entity) const
+EntityPtr Universe::getFirstChild(EntityRef entity) const
 {
 	int idx = m_entities[entity.index].hierarchy;
 	if (idx < 0) return INVALID_ENTITY;
@@ -507,7 +500,7 @@ Entity Universe::getFirstChild(Entity entity) const
 }
 
 
-Entity Universe::getNextSibling(Entity entity) const
+EntityPtr Universe::getNextSibling(EntityRef entity) const
 {
 	int idx = m_entities[entity.index].hierarchy;
 	if (idx < 0) return INVALID_ENTITY;
@@ -515,29 +508,28 @@ Entity Universe::getNextSibling(Entity entity) const
 }
 
 
-bool Universe::isDescendant(Entity ancestor, Entity descendant) const
+bool Universe::isDescendant(EntityRef ancestor, EntityRef descendant) const
 {
-	if (!ancestor.isValid()) return false;
-	for(Entity e = getFirstChild(ancestor); e.isValid(); e = getNextSibling(e))
+	for(EntityPtr e = getFirstChild(ancestor); e.isValid(); e = getNextSibling((EntityRef)e))
 	{
 		if (e == descendant) return true;
-		if (isDescendant(e, descendant)) return true;
+		if (isDescendant((EntityRef)e, descendant)) return true;
 	}
 
 	return false;
 }
 
 
-void Universe::setParent(Entity new_parent, Entity child)
+void Universe::setParent(EntityPtr new_parent, EntityRef child)
 {
-	bool would_create_cycle = isDescendant(child, new_parent);
+	bool would_create_cycle = new_parent.isValid() && isDescendant(child, (EntityRef)new_parent);
 	if (would_create_cycle)
 	{
 		g_log_error.log("Engine") << "Hierarchy can not contains a cycle.";
 		return;
 	}
 
-	auto collectGarbage = [this](Entity entity) {
+	auto collectGarbage = [this](EntityRef entity) {
 		Hierarchy& h = m_hierarchy[m_entities[entity.index].hierarchy];
 		if (h.parent.isValid()) return;
 		if (h.first_child.isValid()) return;
@@ -553,12 +545,12 @@ void Universe::setParent(Entity new_parent, Entity child)
 	
 	if (child_idx >= 0)
 	{
-		Entity old_parent = m_hierarchy[child_idx].parent;
+		EntityPtr old_parent = m_hierarchy[child_idx].parent;
 
 		if (old_parent.isValid())
 		{
 			Hierarchy& old_parent_h = m_hierarchy[m_entities[old_parent.index].hierarchy];
-			Entity* x = &old_parent_h.first_child;
+			EntityPtr* x = &old_parent_h.first_child;
 			while (x->isValid())
 			{
 				if (*x == child)
@@ -570,7 +562,7 @@ void Universe::setParent(Entity new_parent, Entity child)
 			}
 			m_hierarchy[child_idx].parent = INVALID_ENTITY;
 			m_hierarchy[child_idx].next_sibling = INVALID_ENTITY;
-			collectGarbage(old_parent);
+			collectGarbage((EntityRef)old_parent);
 			child_idx = m_entities[child.index].hierarchy;
 		}
 	}
@@ -593,14 +585,14 @@ void Universe::setParent(Entity new_parent, Entity child)
 			new_parent_idx = m_hierarchy.size();
 			m_entities[new_parent.index].hierarchy = new_parent_idx;
 			Hierarchy& h = m_hierarchy.emplace();
-			h.entity = new_parent;
+			h.entity = (EntityRef)new_parent;
 			h.parent = INVALID_ENTITY;
 			h.first_child = INVALID_ENTITY;
 			h.next_sibling = INVALID_ENTITY;
 		}
 
 		m_hierarchy[child_idx].parent = new_parent;
-		Transform parent_tr = getTransform(new_parent);
+		Transform parent_tr = getTransform((EntityRef)new_parent);
 		Transform child_tr = getTransform(child);
 		m_hierarchy[child_idx].local_transform = parent_tr.inverted() * child_tr;
 		m_hierarchy[child_idx].next_sibling = m_hierarchy[new_parent_idx].first_child;
@@ -613,17 +605,18 @@ void Universe::setParent(Entity new_parent, Entity child)
 }
 
 
-void Universe::updateGlobalTransform(Entity entity)
+void Universe::updateGlobalTransform(EntityRef entity)
 {
 	const Hierarchy& h = m_hierarchy[m_entities[entity.index].hierarchy];
-	Transform parent_tr = getTransform(h.parent);
+	ASSERT(h.parent.isValid());
+	Transform parent_tr = getTransform((EntityRef)h.parent);
 	
 	Transform new_tr = parent_tr * h.local_transform;
 	setTransform(entity, new_tr);
 }
 
 
-void Universe::setLocalPosition(Entity entity, const Vec3& pos)
+void Universe::setLocalPosition(EntityRef entity, const Vec3& pos)
 {
 	int hierarchy_idx = m_entities[entity.index].hierarchy;
 	if (hierarchy_idx < 0)
@@ -637,7 +630,7 @@ void Universe::setLocalPosition(Entity entity, const Vec3& pos)
 }
 
 
-void Universe::setLocalRotation(Entity entity, const Quat& rot)
+void Universe::setLocalRotation(EntityRef entity, const Quat& rot)
 {
 	int hierarchy_idx = m_entities[entity.index].hierarchy;
 	if (hierarchy_idx < 0)
@@ -650,14 +643,14 @@ void Universe::setLocalRotation(Entity entity, const Quat& rot)
 }
 
 
-Transform Universe::computeLocalTransform(Entity parent, const Transform& global_transform) const
+Transform Universe::computeLocalTransform(EntityRef parent, const Transform& global_transform) const
 {
 	Transform parent_tr = getTransform(parent);
 	return parent_tr.inverted() * global_transform;
 }
 
 
-void Universe::setLocalTransform(Entity entity, const Transform& transform)
+void Universe::setLocalTransform(EntityRef entity, const Transform& transform)
 {
 	int hierarchy_idx = m_entities[entity.index].hierarchy;
 	if (hierarchy_idx < 0)
@@ -672,7 +665,7 @@ void Universe::setLocalTransform(Entity entity, const Transform& transform)
 }
 
 
-Transform Universe::getLocalTransform(Entity entity) const
+Transform Universe::getLocalTransform(EntityRef entity) const
 {
 	int hierarchy_idx = m_entities[entity.index].hierarchy;
 	if (hierarchy_idx < 0)
@@ -684,7 +677,7 @@ Transform Universe::getLocalTransform(Entity entity) const
 }
 
 
-float Universe::getLocalScale(Entity entity) const
+float Universe::getLocalScale(EntityRef entity) const
 {
 	int hierarchy_idx = m_entities[entity.index].hierarchy;
 	if (hierarchy_idx < 0)
@@ -697,7 +690,7 @@ float Universe::getLocalScale(Entity entity) const
 
 
 
-void Universe::serializeComponent(ISerializer& serializer, ComponentType type, Entity entity)
+void Universe::serializeComponent(ISerializer& serializer, ComponentType type, EntityRef entity)
 {
 	auto* scene = m_component_type_map[type.index].scene;
 	auto& method = m_component_type_map[type.index].serialize;
@@ -705,7 +698,7 @@ void Universe::serializeComponent(ISerializer& serializer, ComponentType type, E
 }
 
 
-void Universe::deserializeComponent(IDeserializer& serializer, Entity entity, ComponentType type, int scene_version)
+void Universe::deserializeComponent(IDeserializer& serializer, EntityRef entity, ComponentType type, int scene_version)
 {
 	auto* scene = m_component_type_map[type.index].scene;
 	auto& method = m_component_type_map[type.index].deserialize;
@@ -757,30 +750,30 @@ void Universe::deserialize(InputBlob& serializer)
 
 struct PrefabEntityGUIDMap : public ILoadEntityGUIDMap
 {
-	explicit PrefabEntityGUIDMap(const Array<Entity>& _entities)
+	explicit PrefabEntityGUIDMap(const Array<EntityRef>& _entities)
 		: entities(_entities)
 	{
 	}
 
 
-	Entity get(EntityGUID guid) override
+	EntityPtr get(EntityGUID guid) override
 	{
 		if (guid.value >= entities.size()) return INVALID_ENTITY;
 		return entities[(int)guid.value];
 	}
 
 
-	const Array<Entity>& entities;
+	const Array<EntityRef>& entities;
 };
 
 
-Entity Universe::instantiatePrefab(const PrefabResource& prefab,
+EntityPtr Universe::instantiatePrefab(const PrefabResource& prefab,
 	const Vec3& pos,
 	const Quat& rot,
 	float scale)
 {
 	InputBlob blob(prefab.blob.getData(), prefab.blob.getPos());
-	Array<Entity> entities(m_allocator);
+	Array<EntityRef> entities(m_allocator);
 	PrefabEntityGUIDMap entity_map(entities);
 	TextDeserializer deserializer(blob, entity_map);
 	u32 version;
@@ -802,11 +795,11 @@ Entity Universe::instantiatePrefab(const PrefabResource& prefab,
 	{
 		u64 prefab;
 		deserializer.read(&prefab);
-		Entity entity = entities[entity_idx];
+		EntityRef entity = entities[entity_idx];
 		setTransform(entity, {pos, rot, scale});
 		if (version > (int)PrefabVersion::WITH_HIERARCHY)
 		{
-			Entity parent;
+			EntityPtr parent;
 
 			deserializer.read(&parent);
 			if (parent.isValid())
@@ -835,7 +828,7 @@ Entity Universe::instantiatePrefab(const PrefabResource& prefab,
 }
 
 
-void Universe::setScale(Entity entity, float scale)
+void Universe::setScale(EntityRef entity, float scale)
 {
 	auto& transform = m_entities[entity.index];
 	transform.scale = scale;
@@ -843,14 +836,14 @@ void Universe::setScale(Entity entity, float scale)
 }
 
 
-float Universe::getScale(Entity entity) const
+float Universe::getScale(EntityRef entity) const
 {
 	auto& transform = m_entities[entity.index];
 	return transform.scale;
 }
 
 
-ComponentUID Universe::getFirstComponent(Entity entity) const
+ComponentUID Universe::getFirstComponent(EntityRef entity) const
 {
 	u64 mask = m_entities[entity.index].components;
 	for (int i = 0; i < ComponentType::MAX_TYPES_COUNT; ++i)
@@ -880,7 +873,7 @@ ComponentUID Universe::getNextComponent(const ComponentUID& cmp) const
 }
 
 
-ComponentUID Universe::getComponent(Entity entity, ComponentType component_type) const
+ComponentUID Universe::getComponent(EntityRef entity, ComponentType component_type) const
 {
 	u64 mask = m_entities[entity.index].components;
 	if ((mask & (u64(1) << component_type.index)) == 0) return ComponentUID::INVALID;
@@ -889,14 +882,14 @@ ComponentUID Universe::getComponent(Entity entity, ComponentType component_type)
 }
 
 
-bool Universe::hasComponent(Entity entity, ComponentType component_type) const
+bool Universe::hasComponent(EntityRef entity, ComponentType component_type) const
 {
 	u64 mask = m_entities[entity.index].components;
 	return (mask & (u64(1) << component_type.index)) != 0;
 }
 
 
-void Universe::onComponentDestroyed(Entity entity, ComponentType component_type, IScene* scene)
+void Universe::onComponentDestroyed(EntityRef entity, ComponentType component_type, IScene* scene)
 {
 	auto mask = m_entities[entity.index].components;
 	auto old_mask = mask;
@@ -907,7 +900,7 @@ void Universe::onComponentDestroyed(Entity entity, ComponentType component_type,
 }
 
 
-void Universe::createComponent(ComponentType type, Entity entity)
+void Universe::createComponent(ComponentType type, EntityRef entity)
 {
 	IScene* scene = m_component_type_map[type.index].scene;
 	auto& create_method = m_component_type_map[type.index].create;
@@ -915,7 +908,7 @@ void Universe::createComponent(ComponentType type, Entity entity)
 }
 
 
-void Universe::destroyComponent(Entity entity, ComponentType type)
+void Universe::destroyComponent(EntityRef entity, ComponentType type)
 {
 	IScene* scene = m_component_type_map[type.index].scene;
 	auto& destroy_method = m_component_type_map[type.index].destroy;
@@ -923,7 +916,7 @@ void Universe::destroyComponent(Entity entity, ComponentType type)
 }
 
 
-void Universe::onComponentCreated(Entity entity, ComponentType component_type, IScene* scene)
+void Universe::onComponentCreated(EntityRef entity, ComponentType component_type, IScene* scene)
 {
 	ComponentUID cmp(entity, component_type, scene);
 	m_entities[entity.index].components |= (u64)1 << component_type.index;

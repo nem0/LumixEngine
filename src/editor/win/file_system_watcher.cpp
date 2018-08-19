@@ -20,7 +20,7 @@ static const DWORD READ_DIR_CHANGE_FILTER =
 	FILE_NOTIFY_CHANGE_DIR_NAME | FILE_NOTIFY_CHANGE_FILE_NAME;
 
 
-struct FileSystemWatcherTask LUMIX_FINAL : public MT::Task
+struct FileSystemWatcherTask final : public MT::Task
 {
 	FileSystemWatcherTask(const char* path,
 		FileSystemWatcherPC& watcher,
@@ -44,7 +44,7 @@ struct FileSystemWatcherTask LUMIX_FINAL : public MT::Task
 };
 
 
-class FileSystemWatcherPC LUMIX_FINAL : public FileSystemWatcher
+class FileSystemWatcherPC final : public FileSystemWatcher
 {
 public:
 	explicit FileSystemWatcherPC(IAllocator& allocator)

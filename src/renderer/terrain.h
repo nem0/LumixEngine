@@ -82,14 +82,14 @@ class Terrain
 		};
 
 	public:
-		Terrain(Renderer& renderer, Entity entity, RenderScene& scene, IAllocator& allocator);
+		Terrain(Renderer& renderer, EntityPtr entity, RenderScene& scene, IAllocator& allocator);
 		~Terrain();
 
 		Material* getMaterial() const { return m_material; }
 		Texture* getDetailTexture() const { return m_detail_texture; }
 		Texture* getSplatmap() const { return m_splatmap; }
 		i64 getLayerMask() const { return m_layer_mask; }
-		Entity getEntity() const { return m_entity; }
+		EntityRef getEntity() const { return m_entity; }
 		float getRootSize() const;
 		Vec3 getNormal(float x, float z);
 		float getHeight(float x, float z) const;
@@ -118,7 +118,7 @@ class Terrain
 		void setMaterial(Material* material);
 
 		void getInfos(Array<TerrainInfo>& infos, const Frustum& frustum, const Vec3& lod_ref_point);
-		void getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, Entity camera);
+		void getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, EntityRef camera);
 
 		RayCastModelHit castRay(const Vec3& origin, const Vec3& dir);
 		void serialize(OutputBlob& serializer);
@@ -129,9 +129,9 @@ class Terrain
 		void forceGrassUpdate();
 
 	private: 
-		Array<Terrain::GrassQuad*>& getQuads(Entity camera);
+		Array<Terrain::GrassQuad*>& getQuads(EntityRef camera);
 		TerrainQuad* generateQuadTree(float size);
-		void updateGrass(Entity camera);
+		void updateGrass(EntityRef camera);
 		void generateGrassTypeQuad(GrassPatch& patch, const RigidTransform& terrain_tr, const Vec2& quad_pos_hm_space);
 		void generateGeometry();
 		void onMaterialLoaded(Resource::State, Resource::State new_state, Resource&);
@@ -145,15 +145,15 @@ class Terrain
 		i32 m_height;
 		i64 m_layer_mask;
 		Vec3 m_scale;
-		Entity m_entity;
+		EntityRef m_entity;
 		Material* m_material;
 		Texture* m_heightmap;
 		Texture* m_splatmap;
 		Texture* m_detail_texture;
 		RenderScene& m_scene;
 		Array<GrassType> m_grass_types;
-		AssociativeArray<Entity, Array<GrassQuad*> > m_grass_quads;
-		AssociativeArray<Entity, Vec3> m_last_camera_position;
+		AssociativeArray<EntityRef, Array<GrassQuad*> > m_grass_quads;
+		AssociativeArray<EntityRef, Vec3> m_last_camera_position;
 		bool m_force_grass_update;
 		Renderer& m_renderer;
 };

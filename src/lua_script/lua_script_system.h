@@ -58,29 +58,29 @@ public:
 	typedef int (*lua_CFunction) (lua_State *L);
 
 public:
-	virtual Path getScriptPath(Entity entity, int scr_index) = 0;	
-	virtual void setScriptPath(Entity entity, int scr_index, const Path& path) = 0;
-	virtual int getEnvironment(Entity entity, int scr_index) = 0;
-	virtual IFunctionCall* beginFunctionCall(Entity entity, int scr_index, const char* function) = 0;
+	virtual Path getScriptPath(EntityRef entity, int scr_index) = 0;	
+	virtual void setScriptPath(EntityRef entity, int scr_index, const Path& path) = 0;
+	virtual int getEnvironment(EntityRef entity, int scr_index) = 0;
+	virtual IFunctionCall* beginFunctionCall(EntityRef entity, int scr_index, const char* function) = 0;
 	virtual void endFunctionCall() = 0;
-	virtual int getScriptCount(Entity entity) = 0;
-	virtual lua_State* getState(Entity entity, int scr_index) = 0;
-	virtual void insertScript(Entity entity, int idx) = 0;
-	virtual int addScript(Entity entity) = 0;
-	virtual void removeScript(Entity entity, int scr_index) = 0;
-	virtual void enableScript(Entity entity, int scr_index, bool enable) = 0;
-	virtual bool isScriptEnabled(Entity entity, int scr_index) const = 0;
-	virtual void moveScript(Entity entity, int scr_index, bool up) = 0;
-	virtual void serializeScript(Entity entity, int scr_index, OutputBlob& blob) = 0;
-	virtual void deserializeScript(Entity entity, int scr_index, InputBlob& blob) = 0;
-	virtual void setPropertyValue(Entity entity, int scr_index, const char* name, const char* value) = 0;
-	virtual void getPropertyValue(Entity entity, int scr_index, const char* property_name, char* out, int max_size) = 0;
-	virtual int getPropertyCount(Entity entity, int scr_index) = 0;
-	virtual const char* getPropertyName(Entity entity, int scr_index, int prop_index) = 0;
-	virtual Property::Type getPropertyType(Entity entity, int scr_index, int prop_index) = 0;
-	virtual ResourceType getPropertyResourceType(Entity entity, int scr_index, int prop_index) = 0;
-	virtual void getScriptData(Entity entity, OutputBlob& blob) = 0;
-	virtual void setScriptData(Entity entity, InputBlob& blob) = 0;
+	virtual int getScriptCount(EntityRef entity) = 0;
+	virtual lua_State* getState(EntityRef entity, int scr_index) = 0;
+	virtual void insertScript(EntityRef entity, int idx) = 0;
+	virtual int addScript(EntityRef entity) = 0;
+	virtual void removeScript(EntityRef entity, int scr_index) = 0;
+	virtual void enableScript(EntityRef entity, int scr_index, bool enable) = 0;
+	virtual bool isScriptEnabled(EntityRef entity, int scr_index) const = 0;
+	virtual void moveScript(EntityRef entity, int scr_index, bool up) = 0;
+	virtual void serializeScript(EntityRef entity, int scr_index, OutputBlob& blob) = 0;
+	virtual void deserializeScript(EntityRef entity, int scr_index, InputBlob& blob) = 0;
+	virtual void setPropertyValue(EntityRef entity, int scr_index, const char* name, const char* value) = 0;
+	virtual void getPropertyValue(EntityRef entity, int scr_index, const char* property_name, char* out, int max_size) = 0;
+	virtual int getPropertyCount(EntityRef entity, int scr_index) = 0;
+	virtual const char* getPropertyName(EntityRef entity, int scr_index, int prop_index) = 0;
+	virtual Property::Type getPropertyType(EntityRef entity, int scr_index, int prop_index) = 0;
+	virtual ResourceType getPropertyResourceType(EntityRef entity, int scr_index, int prop_index) = 0;
+	virtual void getScriptData(EntityRef entity, OutputBlob& blob) = 0;
+	virtual void setScriptData(EntityRef entity, InputBlob& blob) = 0;
 };
 
 

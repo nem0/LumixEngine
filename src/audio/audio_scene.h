@@ -55,24 +55,24 @@ public:
 	virtual void removeClip(ClipInfo* clip) = 0;
 	virtual void setClip(int clip_id, const Path& path) = 0;
 
-	virtual float getEchoZoneRadius(Entity entity) = 0;
-	virtual void setEchoZoneRadius(Entity entity, float radius) = 0;
-	virtual float getEchoZoneDelay(Entity entity) = 0;
-	virtual void setEchoZoneDelay(Entity entity, float delay) = 0;
+	virtual float getEchoZoneRadius(EntityRef entity) = 0;
+	virtual void setEchoZoneRadius(EntityRef entity, float radius) = 0;
+	virtual float getEchoZoneDelay(EntityRef entity) = 0;
+	virtual void setEchoZoneDelay(EntityRef entity, float delay) = 0;
 
-	virtual float getChorusZoneDelay(Entity entity) = 0;
-	virtual void setChorusZoneDelay(Entity entity, float delay) = 0;
-	virtual float getChorusZoneRadius(Entity entity) = 0;
-	virtual void setChorusZoneRadius(Entity entity, float radius) = 0;
+	virtual float getChorusZoneDelay(EntityRef entity) = 0;
+	virtual void setChorusZoneDelay(EntityRef entity, float delay) = 0;
+	virtual float getChorusZoneRadius(EntityRef entity) = 0;
+	virtual void setChorusZoneRadius(EntityRef entity, float radius) = 0;
 
-	virtual ClipInfo* getAmbientSoundClip(Entity entity) = 0;
-	virtual int getAmbientSoundClipIndex(Entity entity) = 0;
-	virtual void setAmbientSoundClipIndex(Entity entity, int index) = 0;
-	virtual void setAmbientSoundClip(Entity entity, ClipInfo* clip) = 0;
-	virtual bool isAmbientSound3D(Entity entity) = 0;
-	virtual void setAmbientSound3D(Entity entity, bool is_3d) = 0;
+	virtual ClipInfo* getAmbientSoundClip(EntityRef entity) = 0;
+	virtual int getAmbientSoundClipIndex(EntityRef entity) = 0;
+	virtual void setAmbientSoundClipIndex(EntityRef entity, int index) = 0;
+	virtual void setAmbientSoundClip(EntityRef entity, ClipInfo* clip) = 0;
+	virtual bool isAmbientSound3D(EntityRef entity) = 0;
+	virtual void setAmbientSound3D(EntityRef entity, bool is_3d) = 0;
 
-	virtual SoundHandle play(Entity entity, ClipInfo* clip, bool is_3d) = 0;
+	virtual SoundHandle play(EntityRef entity, ClipInfo* clip, bool is_3d) = 0;
 	virtual void stop(SoundHandle sound_id) = 0;
 	virtual void setVolume(SoundHandle sound_id, float volume) = 0;
 

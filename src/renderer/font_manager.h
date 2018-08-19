@@ -16,7 +16,7 @@ class Renderer;
 class Texture;
 
 
-class LUMIX_RENDERER_API FontResource LUMIX_FINAL : public Resource
+class LUMIX_RENDERER_API FontResource final : public Resource
 {
 public:
 	FontResource(const Path& path, ResourceManagerBase& manager, IAllocator& allocator);
@@ -42,7 +42,7 @@ private:
 };
 
 
-class LUMIX_RENDERER_API FontManager LUMIX_FINAL : public ResourceManagerBase
+class LUMIX_RENDERER_API FontManager final : public ResourceManagerBase
 {
 friend class FontResource;
 public:

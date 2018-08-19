@@ -13,7 +13,7 @@ namespace FS
 {
 struct IFile;
 
-class LUMIX_ENGINE_API ResourceFileDevice LUMIX_FINAL : public IFileDevice
+class LUMIX_ENGINE_API ResourceFileDevice final : public IFileDevice
 {
 public:
 	explicit ResourceFileDevice(IAllocator& allocator)

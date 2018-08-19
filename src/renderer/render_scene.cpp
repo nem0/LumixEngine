@@ -84,7 +84,7 @@ static const ComponentType TEXT_MESH_TYPE = Reflection::getComponentType("text_m
 
 struct Decal : public DecalInfo
 {
-	Entity entity;
+	EntityRef entity;
 	Vec3 scale;
 };
 
@@ -95,7 +95,7 @@ struct PointLight
 	Vec3 m_specular_color;
 	float m_diffuse_intensity;
 	float m_specular_intensity;
-	Entity m_entity;
+	EntityRef m_entity;
 	float m_fov;
 	float m_attenuation_param;
 	float m_range;
@@ -112,16 +112,14 @@ struct GlobalLight
 	float m_fog_density;
 	float m_fog_bottom;
 	float m_fog_height;
-	Entity m_entity;
+	EntityRef m_entity;
 	Vec4 m_cascades;
 };
 
 
 struct Camera
 {
-	static const int MAX_SLOT_LENGTH = 30;
-
-	Entity entity;
+	EntityRef entity;
 	float fov;
 	float aspect;
 	float near;
@@ -130,7 +128,6 @@ struct Camera
 	float screen_width;
 	float screen_height;
 	bool is_ortho;
-	char slot[MAX_SLOT_LENGTH + 1];
 };
 
 
@@ -155,8 +152,8 @@ struct EnvironmentProbe
 
 struct BoneAttachment
 {
-	Entity entity;
-	Entity parent_entity;
+	EntityRef entity;
+	EntityPtr parent_entity;
 	int bone_index;
 	RigidTransform relative_transform;
 };
@@ -226,7 +223,7 @@ private:
 };
 
 
-class RenderSceneImpl LUMIX_FINAL : public RenderScene
+class RenderSceneImpl final : public RenderScene
 {
 private:
 	struct ModelLoadedCallback
@@ -304,11 +301,6 @@ public:
 		}
 		m_terrains.clear();
 
-		for (auto* emitter : m_particle_emitters)
-		{
-			LUMIX_DELETE(m_allocator, emitter);
-		}
-		m_particle_emitters.clear();
 		for (auto* emitter : m_scripted_particle_emitters)
 		{
 			LUMIX_DELETE(m_allocator, emitter);
@@ -337,50 +329,13 @@ public:
 	}
 
 
-	void resetParticleEmitter(Entity entity) override
-	{
-		m_particle_emitters[entity]->reset();
-	}
-
-
-	ParticleEmitter* getParticleEmitter(Entity entity) override
-	{
-		return m_particle_emitters[entity];
-	}
-
-
-	void updateEmitter(Entity entity, float time_delta) override
-	{
-		m_particle_emitters[entity]->update(time_delta);
-	}
-
-
 	Universe& getUniverse() override { return m_universe; }
 
 
 	IPlugin& getPlugin() const override { return m_renderer; }
 
 
-	Int2 getParticleEmitterSpawnCount(Entity entity) override
-	{
-		Int2 ret;
-		ParticleEmitter* emitter = m_particle_emitters[entity];
-		ret.x = emitter->m_spawn_count.from;
-		ret.y = emitter->m_spawn_count.to;
-		return ret;
-	}
-
-
-	void setParticleEmitterSpawnCount(Entity entity, const Int2& value) override
-	{
-		ParticleEmitter* emitter = m_particle_emitters[entity];
-		emitter->m_spawn_count.from = value.x;
-		emitter->m_spawn_count.to = Math::maximum(value.x, value.y);
-	}
-
-
-
-	void getRay(Entity camera_entity,
+	void getRay(EntityRef camera_entity,
 		const Vec2& screen_pos,
 		Vec3& origin,
 		Vec3& dir) override
@@ -431,14 +386,14 @@ public:
 	}
 
 
-	float getCameraLODMultiplier(Entity entity) const override
+	float getCameraLODMultiplier(EntityRef entity) const override
 	{
 		const Camera& camera = m_cameras[entity];
 		return getCameraLODMultiplier(camera.fov, camera.is_ortho);
 	}
 
 
-	Frustum getCameraFrustum(Entity entity) const override
+	Frustum getCameraFrustum(EntityRef entity) const override
 	{
 		const Camera& camera = m_cameras[entity];
 		Matrix mtx = m_universe.getMatrix(entity);
@@ -467,7 +422,7 @@ public:
 	}
 
 
-	Frustum getCameraFrustum(Entity entity, const Vec2& viewport_min_px, const Vec2& viewport_max_px) const override
+	Frustum getCameraFrustum(EntityRef entity, const Vec2& viewport_min_px, const Vec2& viewport_max_px) const override
 	{
 		const Camera& camera = m_cameras[entity];
 		Matrix mtx = m_universe.getMatrix(entity);
@@ -505,16 +460,17 @@ public:
 	void updateBoneAttachment(const BoneAttachment& bone_attachment)
 	{
 		if (!bone_attachment.parent_entity.isValid()) return;
-		Entity model_instance = bone_attachment.parent_entity;
-		if (!model_instance.isValid()) return;
+		const EntityPtr model_instance_ptr = bone_attachment.parent_entity;
+		if (!model_instance_ptr.isValid()) return;
+
+		const EntityRef model_instance = (EntityRef)model_instance_ptr;
 		if (!m_universe.hasComponent(model_instance, MODEL_INSTANCE_TYPE)) return;
 		const Pose* parent_pose = lockPose(model_instance);
 		if (!parent_pose) return;
 
-		Transform parent_entity_transform = m_universe.getTransform(bone_attachment.parent_entity);
+		Transform parent_entity_transform = m_universe.getTransform((EntityRef)bone_attachment.parent_entity);
 		int idx = bone_attachment.bone_index;
-		if (idx < 0 || idx > parent_pose->count)
-		{
+		if (idx < 0 || idx > parent_pose->count) {
 			unlockPose(model_instance, false);
 			return;
 		}
@@ -528,7 +484,7 @@ public:
 	}
 
 
-	Entity getBoneAttachmentParent(Entity entity) override
+	EntityPtr getBoneAttachmentParent(EntityRef entity) override
 	{
 		return m_bone_attachments[entity].parent_entity;
 	}
@@ -536,13 +492,15 @@ public:
 
 	void updateRelativeMatrix(BoneAttachment& attachment)
 	{
-		if (attachment.parent_entity == INVALID_ENTITY) return;
+		if (!attachment.parent_entity.isValid()) return;
 		if (attachment.bone_index < 0) return;
-		Entity model_instance = attachment.parent_entity;
-		if (!model_instance.isValid()) return;
+		const EntityPtr model_instance_ptr = attachment.parent_entity;
+		if (!model_instance_ptr.isValid()) return;
+		const EntityRef model_instance = (EntityRef)model_instance_ptr;
 		if (!m_universe.hasComponent(model_instance, MODEL_INSTANCE_TYPE)) return;
 		const Pose* pose = lockPose(model_instance);
 		if (!pose) return;
+
 		ASSERT(pose->is_absolute);
 		if (attachment.bone_index >= pose->count)
 		{
@@ -551,7 +509,8 @@ public:
 		}
 		Transform bone_transform = {pose->positions[attachment.bone_index], pose->rotations[attachment.bone_index], 1.0f};
 
-		Transform inv_parent_transform = m_universe.getTransform(attachment.parent_entity) * bone_transform;
+		const EntityRef parent = (EntityRef)attachment.parent_entity;
+		Transform inv_parent_transform = m_universe.getTransform(parent) * bone_transform;
 		inv_parent_transform = inv_parent_transform.inverted();
 		Transform child_transform = m_universe.getTransform(attachment.entity);
 		Transform res = inv_parent_transform * child_transform;
@@ -560,13 +519,13 @@ public:
 	}
 
 
-	Vec3 getBoneAttachmentPosition(Entity entity) override
+	Vec3 getBoneAttachmentPosition(EntityRef entity) override
 	{
 		return m_bone_attachments[entity].relative_transform.pos;
 	}
 
 
-	void setBoneAttachmentPosition(Entity entity, const Vec3& pos) override
+	void setBoneAttachmentPosition(EntityRef entity, const Vec3& pos) override
 	{
 		BoneAttachment& attachment = m_bone_attachments[entity];
 		attachment.relative_transform.pos = pos;
@@ -576,13 +535,13 @@ public:
 	}
 
 
-	Vec3 getBoneAttachmentRotation(Entity entity) override
+	Vec3 getBoneAttachmentRotation(EntityRef entity) override
 	{
 		return m_bone_attachments[entity].relative_transform.rot.toEuler();
 	}
 
 
-	void setBoneAttachmentRotation(Entity entity, const Vec3& rot) override
+	void setBoneAttachmentRotation(EntityRef entity, const Vec3& rot) override
 	{
 		BoneAttachment& attachment = m_bone_attachments[entity];
 		Vec3 euler = rot;
@@ -594,7 +553,7 @@ public:
 	}
 
 
-	void setBoneAttachmentRotationQuat(Entity entity, const Quat& rot) override
+	void setBoneAttachmentRotationQuat(EntityRef entity, const Quat& rot) override
 	{
 		BoneAttachment& attachment = m_bone_attachments[entity];
 		attachment.relative_transform.rot = rot;
@@ -604,13 +563,13 @@ public:
 	}
 
 
-	int getBoneAttachmentBone(Entity entity) override
+	int getBoneAttachmentBone(EntityRef entity) override
 	{
 		return m_bone_attachments[entity].bone_index;
 	}
 
 
-	void setBoneAttachmentBone(Entity entity, int value) override
+	void setBoneAttachmentBone(EntityRef entity, int value) override
 	{
 		BoneAttachment& ba = m_bone_attachments[entity];
 		ba.bone_index = value;
@@ -618,7 +577,7 @@ public:
 	}
 
 
-	void setBoneAttachmentParent(Entity entity, Entity parent) override
+	void setBoneAttachmentParent(EntityRef entity, EntityPtr parent) override
 	{
 		BoneAttachment& ba = m_bone_attachments[entity];
 		ba.parent_entity = parent;
@@ -692,10 +651,6 @@ public:
 
 		if (m_is_game_running && !paused)
 		{
-			for (auto* emitter : m_particle_emitters)
-			{
-				if (emitter->m_is_valid) emitter->update(dt);
-			}
 			for (auto* emitter : m_scripted_particle_emitters)
 			{
 				emitter->update(dt);
@@ -704,7 +659,7 @@ public:
 	}
 
 
-	void serializeModelInstance(ISerializer& serialize, Entity entity)
+	void serializeModelInstance(ISerializer& serialize, EntityRef entity)
 	{
 		ModelInstance& r = m_model_instances[entity.index];
 		ASSERT(r.entity != INVALID_ENTITY);
@@ -729,7 +684,7 @@ public:
 	}
 
 
-	void deserializeModelInstance(IDeserializer& serializer, Entity entity, int scene_version)
+	void deserializeModelInstance(IDeserializer& serializer, EntityRef entity, int scene_version)
 	{
 		while (entity.index >= m_model_instances.size())
 		{
@@ -749,7 +704,7 @@ public:
 		r.meshes = nullptr;
 		r.mesh_count = 0;
 
-		r.matrix = m_universe.getMatrix(r.entity);
+		r.matrix = m_universe.getMatrix(entity);
 
 		char path[MAX_PATH_LENGTH];
 		serializer.read(path, lengthOf(path));
@@ -767,7 +722,7 @@ public:
 		if (path[0] != 0)
 		{
 			auto* model = static_cast<Model*>(m_engine.getResourceManager().get(Model::TYPE)->load(Path(path)));
-			setModel(r.entity, model);
+			setModel(entity, model);
 		}
 
 		int material_count;
@@ -779,15 +734,15 @@ public:
 			{
 				char path[MAX_PATH_LENGTH];
 				serializer.read(path, lengthOf(path));
-				setModelInstanceMaterial(r.entity, j, Path(path));
+				setModelInstanceMaterial(entity, j, Path(path));
 			}
 		}
 
-		m_universe.onComponentCreated(r.entity, MODEL_INSTANCE_TYPE, this);
+		m_universe.onComponentCreated(entity, MODEL_INSTANCE_TYPE, this);
 	}
 
 
-	void serializeGlobalLight(ISerializer& serializer, Entity entity)
+	void serializeGlobalLight(ISerializer& serializer, EntityRef entity)
 	{
 		GlobalLight& light = m_global_lights[entity];
 		serializer.write("cascades", light.m_cascades);
@@ -801,7 +756,7 @@ public:
 	}
 
 
-	void deserializeGlobalLight(IDeserializer& serializer, Entity entity, int scene_version)
+	void deserializeGlobalLight(IDeserializer& serializer, EntityRef entity, int scene_version)
 	{
 		GlobalLight light;
 		light.m_entity = entity;
@@ -831,7 +786,7 @@ public:
 	}
 	
 	
-	void serializePointLight(ISerializer& serializer, Entity entity)
+	void serializePointLight(ISerializer& serializer, EntityRef entity)
 	{
 		PointLight& light = m_point_lights[m_point_lights_map[entity]];
 		serializer.write("attenuation", light.m_attenuation_param);
@@ -845,7 +800,7 @@ public:
 	}
 
 
-	void deserializePointLight(IDeserializer& serializer, Entity entity, int scene_version)
+	void deserializePointLight(IDeserializer& serializer, EntityRef entity, int scene_version)
 	{
 		m_light_influenced_geometry.emplace(m_allocator);
 		PointLight& light = m_point_lights.emplace();
@@ -870,7 +825,7 @@ public:
 	}
 
 
-	void serializeDecal(ISerializer& serializer, Entity entity)
+	void serializeDecal(ISerializer& serializer, EntityRef entity)
 	{
 		const Decal& decal = m_decals[entity];
 		serializer.write("scale", decal.scale);
@@ -878,7 +833,7 @@ public:
 	}
 
 
-	void deserializeDecal(IDeserializer& serializer, Entity entity, int /*scene_version*/)
+	void deserializeDecal(IDeserializer& serializer, EntityRef entity, int /*scene_version*/)
 	{
 		ResourceManagerBase* material_manager = m_engine.getResourceManager().get(Material::TYPE);
 		Decal& decal = m_decals.insert(entity);
@@ -892,7 +847,7 @@ public:
 	}
 
 
-	void serializeTextMesh(ISerializer& serializer, Entity entity)
+	void serializeTextMesh(ISerializer& serializer, EntityRef entity)
 	{
 		TextMesh& text = *m_text_meshes.get(entity);
 		serializer.write("font", text.getFontResource() ? text.getFontResource()->getPath().c_str() : "");
@@ -902,40 +857,40 @@ public:
 	}
 
 
-	void setTextMeshText(Entity entity, const char* text) override
+	void setTextMeshText(EntityRef entity, const char* text) override
 	{
 		m_text_meshes.get(entity)->text = text;
 	}
 
 
-	const char* getTextMeshText(Entity entity) override
+	const char* getTextMeshText(EntityRef entity) override
 	{
 		return m_text_meshes.get(entity)->text.c_str();
 	}
 
 
-	bool isTextMeshCameraOriented(Entity entity) override
+	bool isTextMeshCameraOriented(EntityRef entity) override
 	{
 		TextMesh& text = *m_text_meshes.get(entity);
 		return text.m_flags.isSet(TextMesh::CAMERA_ORIENTED);
 	}
 
 
-	void setTextMeshCameraOriented(Entity entity, bool is_oriented) override
+	void setTextMeshCameraOriented(EntityRef entity, bool is_oriented) override
 	{
 		TextMesh& text = *m_text_meshes.get(entity);
 		text.m_flags.set(TextMesh::CAMERA_ORIENTED, is_oriented);
 	}
 
 
-	void setTextMeshFontSize(Entity entity, int value) override
+	void setTextMeshFontSize(EntityRef entity, int value) override
 	{
 		TextMesh& text = *m_text_meshes.get(entity);
 		text.setFontSize(value);
 	}
 
 
-	int getTextMeshFontSize(Entity entity) override
+	int getTextMeshFontSize(EntityRef entity) override
 	{
 		return m_text_meshes.get(entity)->getFontSize();
 	}
@@ -963,26 +918,26 @@ public:
 	}
 
 
-	Vec4 getTextMeshColorRGBA(Entity entity) override
+	Vec4 getTextMeshColorRGBA(EntityRef entity) override
 	{
 		return ABGRu32ToRGBAVec4(m_text_meshes.get(entity)->color);
 	}
 
 
-	void setTextMeshColorRGBA(Entity entity, const Vec4& color) override
+	void setTextMeshColorRGBA(EntityRef entity, const Vec4& color) override
 	{
 		m_text_meshes.get(entity)->color = RGBAVec4ToABGRu32(color);
 	}
 
 
-	Path getTextMeshFontPath(Entity entity) override
+	Path getTextMeshFontPath(EntityRef entity) override
 	{
 		TextMesh& text = *m_text_meshes.get(entity);
 		return text.getFontResource() == nullptr ? Path() : text.getFontResource()->getPath();
 	}
 
 
-	void getTextMeshesVertices(Array<TextMeshVertex>& vertices, Entity camera) override
+	void getTextMeshesVertices(Array<TextMeshVertex>& vertices, EntityRef camera) override
 	{
 		Matrix camera_mtx = m_universe.getMatrix(camera);
 		Vec3 cam_right = camera_mtx.getXVector();
@@ -992,7 +947,7 @@ public:
 			TextMesh& text = *m_text_meshes.at(j);
 			Font* font = text.getFont();
 			if (!font) font = m_renderer.getFontManager().getDefaultFont();
-			Entity entity = m_text_meshes.getKey(j);
+			EntityRef entity = m_text_meshes.getKey(j);
 			const char* str = text.text.c_str();
 			Vec3 base = m_universe.getPosition(entity);
 			Quat rot = m_universe.getRotation(entity);
@@ -1033,7 +988,7 @@ public:
 	}
 
 
-	void setTextMeshFontPath(Entity entity, const Path& path) override
+	void setTextMeshFontPath(EntityRef entity, const Path& path) override
 	{
 		TextMesh& text = *m_text_meshes.get(entity);
 		FontManager& manager = m_renderer.getFontManager();
@@ -1042,7 +997,7 @@ public:
 	}
 
 	
-	void deserializeTextMesh(IDeserializer& serializer, Entity entity, int /*scene_version*/)
+	void deserializeTextMesh(IDeserializer& serializer, EntityRef entity, int /*scene_version*/)
 	{
 		TextMesh& text = *LUMIX_NEW(m_allocator, TextMesh)(m_allocator);
 		m_text_meshes.insert(entity, &text);
@@ -1061,7 +1016,7 @@ public:
 	}
 
 
-	void serializeCamera(ISerializer& serialize, Entity entity)
+	void serializeCamera(ISerializer& serialize, EntityRef entity)
 	{
 		Camera& camera = m_cameras[entity];
 		serialize.write("far", camera.far);
@@ -1069,11 +1024,10 @@ public:
 		serialize.write("is_ortho", camera.is_ortho);
 		serialize.write("ortho_size", camera.ortho_size);
 		serialize.write("near", camera.near);
-		serialize.write("slot", camera.slot);
 	}
 
 
-	void deserializeCamera(IDeserializer& serializer, Entity entity, int /*scene_version*/)
+	void deserializeCamera(IDeserializer& serializer, EntityRef entity, int /*scene_version*/)
 	{
 		Camera camera;
 		camera.entity = entity;
@@ -1082,13 +1036,12 @@ public:
 		serializer.read(&camera.is_ortho);
 		serializer.read(&camera.ortho_size);
 		serializer.read(&camera.near);
-		serializer.read(camera.slot, lengthOf(camera.slot));
 		m_cameras.insert(camera.entity, camera);
 		m_universe.onComponentCreated(camera.entity, CAMERA_TYPE, this);
 	}
 
 
-	void serializeBoneAttachment(ISerializer& serializer, Entity entity) 
+	void serializeBoneAttachment(ISerializer& serializer, EntityRef entity) 
 	{
 		BoneAttachment& attachment = m_bone_attachments[entity];
 		serializer.write("bone_index", attachment.bone_index);
@@ -1097,7 +1050,7 @@ public:
 	}
 
 
-	void deserializeBoneAttachment(IDeserializer& serializer, Entity entity, int /*scene_version*/)
+	void deserializeBoneAttachment(IDeserializer& serializer, EntityRef entity, int /*scene_version*/)
 	{
 		BoneAttachment& bone_attachment = m_bone_attachments.emplace(entity);
 		bone_attachment.entity = entity;
@@ -1105,7 +1058,7 @@ public:
 		serializer.read(&bone_attachment.parent_entity);
 		serializer.read(&bone_attachment.relative_transform);
 		m_universe.onComponentCreated(bone_attachment.entity, BONE_ATTACHMENT_TYPE, this);
-		Entity parent_entity = bone_attachment.parent_entity;
+		EntityPtr parent_entity = bone_attachment.parent_entity;
 		if (parent_entity.isValid() && parent_entity.index < m_model_instances.size())
 		{
 			ModelInstance& mi = m_model_instances[parent_entity.index];
@@ -1114,7 +1067,7 @@ public:
 	}
 
 
-	void serializeTerrain(ISerializer& serializer, Entity entity)
+	void serializeTerrain(ISerializer& serializer, EntityRef entity)
 	{
 		Terrain* terrain = m_terrains[entity];
 		serializer.write("layer_mask", terrain->m_layer_mask);
@@ -1130,7 +1083,7 @@ public:
 		}
 	}
 
-	void deserializeTerrain(IDeserializer& serializer, Entity entity, int version)
+	void deserializeTerrain(IDeserializer& serializer, EntityRef entity, int version)
 	{
 		Terrain* terrain = LUMIX_NEW(m_allocator, Terrain)(m_renderer, entity, *this, m_allocator);
 		m_terrains.insert(entity, terrain);
@@ -1162,7 +1115,7 @@ public:
 		m_universe.onComponentCreated(entity, TERRAIN_TYPE, this);
 	}
 
-	void serializeEnvironmentProbe(ISerializer& serializer, Entity entity) 
+	void serializeEnvironmentProbe(ISerializer& serializer, EntityRef entity) 
 	{
 		EnvironmentProbe& probe = m_environment_probes[entity];
 		serializer.write("guid", probe.guid);
@@ -1176,7 +1129,7 @@ public:
 	int getVersion() const override { return (int)RenderSceneVersion::LATEST; }
 
 
-	void deserializeEnvironmentProbe(IDeserializer& serializer, Entity entity, int scene_version)
+	void deserializeEnvironmentProbe(IDeserializer& serializer, EntityRef entity, int scene_version)
 	{
 		auto* texture_manager = m_engine.getResourceManager().get(Texture::TYPE);
 		StaticString<MAX_PATH_LENGTH> probe_dir("universes/", m_universe.getName(), "/probes/");
@@ -1214,7 +1167,7 @@ public:
 	}
 
 
-	void serializeScriptedParticleEmitter(ISerializer& serializer, Entity entity)
+	void serializeScriptedParticleEmitter(ISerializer& serializer, EntityRef entity)
 	{
 		ScriptedParticleEmitter* emitter = m_scripted_particle_emitters[entity];
 		const Material* material = emitter->getMaterial();
@@ -1222,7 +1175,7 @@ public:
 	}
 
 
-	void deserializeScriptedParticleEmitter(IDeserializer& serializer, Entity entity, int scene_version)
+	void deserializeScriptedParticleEmitter(IDeserializer& serializer, EntityRef entity, int scene_version)
 	{
 		ScriptedParticleEmitter* emitter = LUMIX_NEW(m_allocator, ScriptedParticleEmitter)(entity, m_allocator);
 		emitter->m_entity = entity;
@@ -1235,283 +1188,6 @@ public:
 
 		m_scripted_particle_emitters.insert(entity, emitter);
 		m_universe.onComponentCreated(entity, SCRIPTED_PARTICLE_EMITTER_TYPE, this);
-	}
-
-
-	void serializeParticleEmitter(ISerializer& serializer, Entity entity)
-	{
-		ParticleEmitter* emitter = m_particle_emitters[entity];
-		serializer.write("autoemit", emitter->m_autoemit);
-		serializer.write("local_space", emitter->m_local_space);
-		serializer.write("spawn_period_from", emitter->m_spawn_period.from);
-		serializer.write("spawn_period_to", emitter->m_spawn_period.to);
-		serializer.write("initial_life_from", emitter->m_initial_life.from);
-		serializer.write("initial_life_to", emitter->m_initial_life.to);
-		serializer.write("initial_size_from", emitter->m_initial_size.from);
-		serializer.write("initial_size_to", emitter->m_initial_size.to);
-		serializer.write("spawn_count_from", emitter->m_spawn_count.from);
-		serializer.write("spawn_count_to", emitter->m_spawn_count.to);
-		const Material* material = emitter->getMaterial();
-		serializer.write("material", material ? material->getPath().c_str() : "");
-	}
-
-
-	void deserializeParticleEmitter(IDeserializer& serializer, Entity entity, int scene_version)
-	{
-		ParticleEmitter* emitter = LUMIX_NEW(m_allocator, ParticleEmitter)(entity, m_universe, m_allocator);
-		emitter->m_entity = entity;
-		serializer.read(&emitter->m_autoemit);
-		serializer.read(&emitter->m_local_space);
-		serializer.read(&emitter->m_spawn_period.from);
-		serializer.read(&emitter->m_spawn_period.to);
-		serializer.read(&emitter->m_initial_life.from);
-		serializer.read(&emitter->m_initial_life.to);
-		serializer.read(&emitter->m_initial_size.from);
-		serializer.read(&emitter->m_initial_size.to);
-		serializer.read(&emitter->m_spawn_count.from);
-		serializer.read(&emitter->m_spawn_count.to);
-		if (scene_version > (int)RenderSceneVersion::EMITTER_MATERIAL)
-		{
-			char tmp[MAX_PATH_LENGTH];
-			serializer.read(tmp, lengthOf(tmp));
-			ResourceManagerBase* material_manager = m_engine.getResourceManager().get(Material::TYPE);
-			Material* material = (Material*)material_manager->load(Path(tmp));
-			emitter->setMaterial(material);
-		}
-
-		m_particle_emitters.insert(entity, emitter);
-		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_TYPE, this);
-	}
-
-	void serializeParticleEmitterAlpha(ISerializer& serializer, Entity entity)
-	{
-		ParticleEmitter* emitter = m_particle_emitters[entity];
-		auto* module = (ParticleEmitter::AlphaModule*)emitter->getModule(PARTICLE_EMITTER_ALPHA_TYPE);
-		serializer.write("count", module->m_values.size());
-		for (Vec2 v : module->m_values)
-		{
-			serializer.write("", v.x);
-			serializer.write("", v.y);
-		}
-	}
-	
-	
-	void deserializeParticleEmitterAlpha(IDeserializer& serializer, Entity entity, int /*scene_version*/)
-	{
-		int index = allocateParticleEmitter(entity);
-		ParticleEmitter* emitter = m_particle_emitters.at(index);
-		auto* module = LUMIX_NEW(m_allocator, ParticleEmitter::AlphaModule)(*emitter);
-		int count;
-		serializer.read(&count);
-		module->m_values.clear();
-		for (int i = 0; i < count; ++i)
-		{
-			Vec2& v = module->m_values.emplace();
-			serializer.read(&v.x);
-			serializer.read(&v.y);
-		}
-		module->sample();
-		emitter->addModule(module);
-		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_ALPHA_TYPE, this);
-	}
-
-
-	void serializeParticleEmitterAttractor(ISerializer& serializer, Entity entity)
-	{
-		ParticleEmitter* emitter = m_particle_emitters[entity];
-		auto* module = (ParticleEmitter::AttractorModule*)emitter->getModule(PARTICLE_EMITTER_ATTRACTOR_TYPE);
-		serializer.write("force", module->m_force);
-		serializer.write("count", module->m_count);
-		for (int i = 0; i < module->m_count; ++i)
-		{
-			serializer.write("", module->m_entities[i]);
-		}
-	}
-
-
-	void deserializeParticleEmitterAttractor(IDeserializer& serializer, Entity entity, int /*scene_version*/)
-	{
-		int index = allocateParticleEmitter(entity);
-		ParticleEmitter* emitter = m_particle_emitters.at(index);
-
-		auto* module = LUMIX_NEW(m_allocator, ParticleEmitter::AttractorModule)(*emitter);
-		serializer.read(&module->m_force);
-		serializer.read(&module->m_count);
-		for (int i = 0; i < module->m_count; ++i)
-		{
-			serializer.read(&module->m_entities[i]);
-		}
-		emitter->addModule(module);
-		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_ATTRACTOR_TYPE, this);
-	}
-
-	void serializeParticleEmitterForce(ISerializer& serializer, Entity entity)
-	{
-		ParticleEmitter* emitter = m_particle_emitters[entity];
-		auto* module = (ParticleEmitter::ForceModule*)emitter->getModule(PARTICLE_EMITTER_FORCE_HASH);
-		serializer.write("acceleration", module->m_acceleration);
-	}
-
-
-	void deserializeParticleEmitterForce(IDeserializer& serializer, Entity entity, int /*scene_version*/)
-	{
-		int index = allocateParticleEmitter(entity);
-		ParticleEmitter* emitter = m_particle_emitters.at(index);
-
-		auto* module = LUMIX_NEW(m_allocator, ParticleEmitter::ForceModule)(*emitter);
-		serializer.read(&module->m_acceleration);
-		emitter->addModule(module);
-		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_FORCE_HASH, this);
-	}
-
-
-	void serializeParticleEmitterLinearMovement(ISerializer& serializer, Entity entity)
-	{
-		ParticleEmitter* emitter = m_particle_emitters[entity];
-		auto* module = (ParticleEmitter::LinearMovementModule*)emitter->getModule(PARTICLE_EMITTER_LINEAR_MOVEMENT_TYPE);
-		serializer.write("x_from", module->m_x.from);
-		serializer.write("x_to", module->m_x.to);
-		serializer.write("y_from", module->m_y.from);
-		serializer.write("y_to", module->m_y.to);
-		serializer.write("z_from", module->m_z.from);
-		serializer.write("z_to", module->m_z.to);
-	}
-
-
-	void deserializeParticleEmitterLinearMovement(IDeserializer& serializer, Entity entity, int /*scene_version*/)
-	{
-		int index = allocateParticleEmitter(entity);
-		ParticleEmitter* emitter = m_particle_emitters.at(index);
-
-		auto* module = LUMIX_NEW(m_allocator, ParticleEmitter::LinearMovementModule)(*emitter);
-		serializer.read(&module->m_x.from);
-		serializer.read(&module->m_x.to);
-		serializer.read(&module->m_y.from);
-		serializer.read(&module->m_y.to);
-		serializer.read(&module->m_z.from);
-		serializer.read(&module->m_z.to);
-		emitter->addModule(module);
-		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_LINEAR_MOVEMENT_TYPE, this);
-	}
-
-
-	void serializeParticleEmitterPlane(ISerializer& serializer, Entity entity)
-	{
-		ParticleEmitter* emitter = m_particle_emitters[entity];
-		auto* module = (ParticleEmitter::PlaneModule*)emitter->getModule(PARTICLE_EMITTER_PLANE_TYPE);
-		serializer.write("bounce", module->m_bounce);
-		serializer.write("entities_count", module->m_count);
-		for (int i = 0; i < module->m_count; ++i)
-		{
-			serializer.write("", module->m_entities[i]);
-		}
-	}
-
-
-	void deserializeParticleEmitterPlane(IDeserializer& serializer, Entity entity, int /*scene_version*/)
-	{
-		int index = allocateParticleEmitter(entity);
-		ParticleEmitter* emitter = m_particle_emitters.at(index);
-
-		auto* module = LUMIX_NEW(m_allocator, ParticleEmitter::PlaneModule)(*emitter);
-		serializer.read(&module->m_bounce);
-		serializer.read(&module->m_count);
-		for (int i = 0; i < module->m_count; ++i)
-		{
-			serializer.read(&module->m_entities[i]);
-		}
-		emitter->addModule(module);
-		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_PLANE_TYPE, this);
-	}
-
-	void serializeParticleEmitterSpawnShape(ISerializer& serializer, Entity entity)
-	{
-		ParticleEmitter* emitter = m_particle_emitters[entity];
-		auto* module = (ParticleEmitter::SpawnShapeModule*)emitter->getModule(PARTICLE_EMITTER_SPAWN_SHAPE_TYPE);
-		serializer.write("shape", (u8)module->m_shape);
-		serializer.write("radius", module->m_radius);
-	}
-
-
-	void deserializeParticleEmitterSpawnShape(IDeserializer& serializer, Entity entity, int /*scene_version*/)
-	{
-		int index = allocateParticleEmitter(entity);
-		ParticleEmitter* emitter = m_particle_emitters.at(index);
-
-		auto* module = LUMIX_NEW(m_allocator, ParticleEmitter::SpawnShapeModule)(*emitter);
-		serializer.read((u8*)&module->m_shape);
-		serializer.read(&module->m_radius);
-		emitter->addModule(module);
-		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_SPAWN_SHAPE_TYPE, this);
-	}
-
-	void serializeParticleEmitterSize(ISerializer& serializer, Entity entity)
-	{
-		ParticleEmitter* emitter = m_particle_emitters[entity];
-		auto* module = (ParticleEmitter::SizeModule*)emitter->getModule(PARTICLE_EMITTER_SIZE_TYPE);
-		serializer.write("count", module->m_values.size());
-		for (Vec2 v : module->m_values)
-		{
-			serializer.write("", v.x);
-			serializer.write("", v.y);
-		}
-	}
-
-
-	void deserializeParticleEmitterSize(IDeserializer& serializer, Entity entity, int /*scene_version*/)
-	{
-		int index = allocateParticleEmitter(entity);
-		ParticleEmitter* emitter = m_particle_emitters.at(index);
-
-		auto* module = LUMIX_NEW(m_allocator, ParticleEmitter::SizeModule)(*emitter);
-		int count;
-		serializer.read(&count);
-		module->m_values.clear();
-		for (int i = 0; i < count; ++i)
-		{
-			Vec2& v = module->m_values.emplace();
-			serializer.read(&v.x);
-			serializer.read(&v.y);
-		}
-		module->sample();
-		emitter->addModule(module);
-		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_SIZE_TYPE, this);
-	}
-
-
-	void serializeParticleEmitterRandomRotation(ISerializer& serialize, Entity entity) {}
-
-
-	void deserializeParticleEmitterRandomRotation(IDeserializer& serialize, Entity entity, int /*scene_version*/)
-	{
-		int index = allocateParticleEmitter(entity);
-		ParticleEmitter* emitter = m_particle_emitters.at(index);
-
-		auto* module = LUMIX_NEW(m_allocator, ParticleEmitter::RandomRotationModule)(*emitter);
-		emitter->addModule(module);
-		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_RANDOM_ROTATION_TYPE, this);
-	}
-
-
-	void serializeParticleEmitterSubimage(ISerializer& serializer, Entity entity)
-	{
-		ParticleEmitter* emitter = m_particle_emitters[entity];
-		auto* module = (ParticleEmitter::SubimageModule*)emitter->getModule(PARTICLE_EMITTER_SUBIMAGE_TYPE);
-		serializer.write("rows", module->rows);
-		serializer.write("cols", module->cols);
-	}
-
-
-	void deserializeParticleEmitterSubimage(IDeserializer& serializer, Entity entity, int /*scene_version*/)
-	{
-		int index = allocateParticleEmitter(entity);
-		ParticleEmitter* emitter = m_particle_emitters.at(index);
-
-		auto* module = LUMIX_NEW(m_allocator, ParticleEmitter::SubimageModule)(*emitter);
-		serializer.read(&module->rows);
-		serializer.read(&module->cols);
-		emitter->addModule(module);
-		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_SUBIMAGE_TYPE, this);
 	}
 
 
@@ -1538,7 +1214,6 @@ public:
 			serializer.write(camera.is_ortho);
 			serializer.write(camera.ortho_size);
 			serializer.write(camera.near);
-			serializer.writeString(camera.slot);
 		}
 	}
 
@@ -1597,7 +1272,7 @@ public:
 		for (int i = 0, n = m_text_meshes.size(); i < n; ++i)
 		{
 			TextMesh& text = *m_text_meshes.at(i);
-			Entity e = m_text_meshes.getKey(i);
+			EntityRef e = m_text_meshes.getKey(i);
 			serializer.write(e);
 			serializer.writeString(text.getFontResource() ? text.getFontResource()->getPath().c_str() : "");
 			serializer.write(text.color);
@@ -1613,7 +1288,7 @@ public:
 		FontManager& manager = m_renderer.getFontManager();
 		for (int i = 0; i < count; ++i)
 		{
-			Entity e;
+			EntityRef e;
 			serializer.read(e);
 			TextMesh& text = *LUMIX_NEW(m_allocator, TextMesh)(m_allocator);
 			m_text_meshes.insert(e, &text);
@@ -1670,7 +1345,7 @@ public:
 		serializer.write(count);
 		for (int i = 0; i < count; ++i)
 		{
-			Entity entity = m_environment_probes.getKey(i);
+			EntityRef entity = m_environment_probes.getKey(i);
 			serializer.write(entity);
 			const EnvironmentProbe& probe = m_environment_probes.at(i);
 			serializer.write(probe.guid);
@@ -1691,7 +1366,7 @@ public:
 		StaticString<MAX_PATH_LENGTH> probe_dir("universes/", m_universe.getName(), "/probes/");
 		for (int i = 0; i < count; ++i)
 		{
-			Entity entity;
+			EntityRef entity;
 			serializer.read(entity);
 			EnvironmentProbe& probe = m_environment_probes.insert(entity);
 			serializer.read(probe.guid);
@@ -1744,88 +1419,24 @@ public:
 
 	void deserializeParticleEmitters(InputBlob& serializer)
 	{
-		int count;
-		serializer.read(count);
-		m_particle_emitters.reserve(count);
-		for(int i = 0; i < count; ++i)
-		{
-			ParticleEmitter* emitter = LUMIX_NEW(m_allocator, ParticleEmitter)(INVALID_ENTITY, m_universe, m_allocator);
-			serializer.read(emitter->m_is_valid);
-			if (emitter->m_is_valid)
-			{
-				emitter->deserialize(serializer, m_engine.getResourceManager());
-				if (emitter->m_is_valid) m_universe.onComponentCreated(emitter->m_entity, PARTICLE_EMITTER_TYPE, this);
-				for (auto* module : emitter->m_modules)
-				{
-					if (module->getType() == ParticleEmitter::AlphaModule::s_type)
-					{
-						m_universe.onComponentCreated(emitter->m_entity, PARTICLE_EMITTER_ALPHA_TYPE, this);
-					}
-					else if (module->getType() == ParticleEmitter::ForceModule::s_type)
-					{
-						m_universe.onComponentCreated(emitter->m_entity, PARTICLE_EMITTER_FORCE_HASH, this);
-					}
-					else if (module->getType() == ParticleEmitter::SubimageModule::s_type)
-					{
-						m_universe.onComponentCreated(emitter->m_entity, PARTICLE_EMITTER_SUBIMAGE_TYPE, this);
-					}
-					else if (module->getType() == ParticleEmitter::SpawnShapeModule::s_type)
-					{
-						m_universe.onComponentCreated(emitter->m_entity, PARTICLE_EMITTER_SPAWN_SHAPE_TYPE, this);
-					}
-					else if (module->getType() == ParticleEmitter::AttractorModule::s_type)
-					{
-						m_universe.onComponentCreated(emitter->m_entity, PARTICLE_EMITTER_ATTRACTOR_TYPE, this);
-					}
-					else if (module->getType() == ParticleEmitter::LinearMovementModule::s_type)
-					{
-						m_universe.onComponentCreated(emitter->m_entity, PARTICLE_EMITTER_LINEAR_MOVEMENT_TYPE, this);
-					}
-					else if (module->getType() == ParticleEmitter::PlaneModule::s_type)
-					{
-						m_universe.onComponentCreated(emitter->m_entity, PARTICLE_EMITTER_PLANE_TYPE, this);
-					}
-					else if (module->getType() == ParticleEmitter::RandomRotationModule::s_type)
-					{
-						m_universe.onComponentCreated(emitter->m_entity, PARTICLE_EMITTER_RANDOM_ROTATION_TYPE, this);
-					}
-					else if (module->getType() == ParticleEmitter::SizeModule::s_type)
-					{
-						m_universe.onComponentCreated(emitter->m_entity, PARTICLE_EMITTER_SIZE_TYPE, this);
-					}
-				}
-			}
-			if (!emitter->m_is_valid && emitter->m_modules.empty())
-			{
-				LUMIX_DELETE(m_allocator, emitter);
-			}
-			else
-			{
-				m_particle_emitters.insert(emitter->m_entity, emitter);
-			}
-		}
-
-		serializer.read(count);
+		const int count = serializer.read<int>();
 		m_scripted_particle_emitters.reserve(count);
-		for (int i = 0; i < count; ++i)
-		{
+		for (int i = 0; i < count; ++i) {
 			ScriptedParticleEmitter* emitter = LUMIX_NEW(m_allocator, ScriptedParticleEmitter)(INVALID_ENTITY, m_allocator);
 			emitter->deserialize(serializer, m_engine.getResourceManager());
-			m_scripted_particle_emitters.insert(emitter->m_entity, emitter);
-			m_universe.onComponentCreated(emitter->m_entity, SCRIPTED_PARTICLE_EMITTER_TYPE, this);
+			if(emitter->m_entity.isValid()) {
+				m_scripted_particle_emitters.insert((EntityRef)emitter->m_entity, emitter);
+				m_universe.onComponentCreated((EntityRef)emitter->m_entity, SCRIPTED_PARTICLE_EMITTER_TYPE, this);
+			}
+			else {
+				LUMIX_DELETE(m_allocator, emitter);
+			}
 		}
 	}
 
 
 	void serializeParticleEmitters(OutputBlob& serializer)
 	{
-		serializer.write(m_particle_emitters.size());
-		for (auto* emitter : m_particle_emitters)
-		{
-			serializer.write(emitter->m_is_valid);
-			emitter->serialize(serializer);
-		}
-
 		serializer.write(m_scripted_particle_emitters.size());
 		for (auto* emitter : m_scripted_particle_emitters)
 		{
@@ -1862,7 +1473,6 @@ public:
 			serializer.read(camera.is_ortho);
 			serializer.read(camera.ortho_size);
 			serializer.read(camera.near);
-			serializer.readString(camera.slot, lengthOf(camera.slot));
 
 			m_cameras.insert(camera.entity, camera);
 			m_universe.onComponentCreated(camera.entity, CAMERA_TYPE, this);
@@ -1886,9 +1496,10 @@ public:
 			r.meshes = nullptr;
 			r.mesh_count = 0;
 
-			if(r.entity != INVALID_ENTITY)
+			if(r.entity.isValid())
 			{
-				r.matrix = m_universe.getMatrix(r.entity);
+				const EntityRef e = (EntityRef)r.entity;
+				r.matrix = m_universe.getMatrix(e);
 
 				u32 path;
 				serializer.read(path);
@@ -1896,7 +1507,7 @@ public:
 				if (path != 0)
 				{
 					auto* model = static_cast<Model*>(m_engine.getResourceManager().get(Model::TYPE)->load(Path(path)));
-					setModel(r.entity, model);
+					setModel(e, model);
 				}
 
 				int material_count;
@@ -1908,11 +1519,11 @@ public:
 					{
 						char path[MAX_PATH_LENGTH];
 						serializer.readString(path, lengthOf(path));
-						setModelInstanceMaterial(r.entity, j, Path(path));
+						setModelInstanceMaterial(e, j, Path(path));
 					}
 				}
 
-				m_universe.onComponentCreated(r.entity, MODEL_INSTANCE_TYPE, this);
+				m_universe.onComponentCreated(e, MODEL_INSTANCE_TYPE, this);
 			}
 		}
 	}
@@ -1970,10 +1581,10 @@ public:
 	}
 
 
-	void destroyBoneAttachment(Entity entity)
+	void destroyBoneAttachment(EntityRef entity)
 	{
 		const BoneAttachment& bone_attachment = m_bone_attachments[entity];
-		Entity parent_entity = bone_attachment.parent_entity;
+		const EntityPtr parent_entity = bone_attachment.parent_entity;
 		if (parent_entity.isValid() && parent_entity.index < m_model_instances.size())
 		{
 			ModelInstance& mi = m_model_instances[bone_attachment.parent_entity.index];
@@ -1984,7 +1595,7 @@ public:
 	}
 
 
-	void destroyEnvironmentProbe(Entity entity)
+	void destroyEnvironmentProbe(EntityRef entity)
 	{
 		auto& probe = m_environment_probes[entity];
 		if (probe.texture) probe.texture->getResourceManager().unload(*probe.texture);
@@ -1995,11 +1606,11 @@ public:
 	}
 
 
-	void destroyModelInstance(Entity entity)
+	void destroyModelInstance(EntityRef entity)
 	{
 		for (int i = 0; i < m_light_influenced_geometry.size(); ++i)
 		{
-			Array<Entity>& influenced_geometry = m_light_influenced_geometry[i];
+			Array<EntityRef>& influenced_geometry = m_light_influenced_geometry[i];
 			for (int j = 0; j < influenced_geometry.size(); ++j)
 			{
 				if (influenced_geometry[j] == entity)
@@ -2019,11 +1630,11 @@ public:
 	}
 
 
-	void destroyGlobalLight(Entity entity)
+	void destroyGlobalLight(EntityRef entity)
 	{
 		m_universe.onComponentDestroyed(entity, GLOBAL_LIGHT_TYPE, this);
 
-		if (entity == m_active_global_light_entity)
+		if ((EntityPtr)entity == m_active_global_light_entity)
 		{
 			m_active_global_light_entity = INVALID_ENTITY;
 		}
@@ -2031,14 +1642,14 @@ public:
 	}
 
 
-	void destroyDecal(Entity entity)
+	void destroyDecal(EntityRef entity)
 	{
 		m_decals.erase(entity);
 		m_universe.onComponentDestroyed(entity, DECAL_TYPE, this);
 	}
 
 
-	void destroyPointLight(Entity entity)
+	void destroyPointLight(EntityRef entity)
 	{
 		int index = m_point_lights_map[entity];
 		m_point_lights.eraseFast(index);
@@ -2052,7 +1663,7 @@ public:
 	}
 
 
-	void destroyTextMesh(Entity entity)
+	void destroyTextMesh(EntityRef entity)
 	{
 		TextMesh* text = m_text_meshes[entity];
 		LUMIX_DELETE(m_allocator, text);
@@ -2061,14 +1672,14 @@ public:
 	}
 
 
-	void destroyCamera(Entity entity)
+	void destroyCamera(EntityRef entity)
 	{
 		m_cameras.erase(entity);
 		m_universe.onComponentDestroyed(entity, CAMERA_TYPE, this);
 	}
 
 
-	void destroyTerrain(Entity entity)
+	void destroyTerrain(EntityRef entity)
 	{
 		LUMIX_DELETE(m_allocator, m_terrains[entity]);
 		m_terrains.erase(entity);
@@ -2076,462 +1687,16 @@ public:
 	}
 
 
-	void destroyParticleEmitter(Entity entity)
-	{
-		auto* emitter = m_particle_emitters[entity];
-		emitter->reset();
-		emitter->m_is_valid = false;
-		m_universe.onComponentDestroyed(emitter->m_entity, PARTICLE_EMITTER_TYPE, this);
-		cleanup(emitter);
-	}
-
-
-	void destroyScriptedParticleEmitter(Entity entity)
+	void destroyScriptedParticleEmitter(EntityRef entity)
 	{
 		auto* emitter = m_scripted_particle_emitters[entity];
-		m_universe.onComponentDestroyed(emitter->m_entity, SCRIPTED_PARTICLE_EMITTER_TYPE, this);
-		m_scripted_particle_emitters.erase(emitter->m_entity);
+		m_universe.onComponentDestroyed((EntityRef)emitter->m_entity, SCRIPTED_PARTICLE_EMITTER_TYPE, this);
+		m_scripted_particle_emitters.erase((EntityRef)emitter->m_entity);
 		LUMIX_DELETE(m_allocator, emitter);
 	}
 
 
-	void cleanup(ParticleEmitter* emitter)
-	{
-		if (emitter->m_is_valid) return;
-		if (!emitter->m_modules.empty()) return;
-
-		m_particle_emitters.erase(emitter->m_entity);
-		LUMIX_DELETE(m_allocator, emitter);
-	}
-
-
-	void destroyParticleEmitterAlpha(Entity entity)
-	{
-		auto* emitter = m_particle_emitters[entity];
-		auto* module = emitter->getModule(PARTICLE_EMITTER_ALPHA_TYPE);
-		ASSERT(module);
-
-		LUMIX_DELETE(m_allocator, module);
-		emitter->m_modules.eraseItem(module);
-		m_universe.onComponentDestroyed(emitter->m_entity, PARTICLE_EMITTER_ALPHA_TYPE, this);
-		cleanup(emitter);
-	}
-
-
-	void destroyParticleEmitterForce(Entity entity)
-	{
-		auto* emitter = m_particle_emitters[entity];
-		auto* module = emitter->getModule(PARTICLE_EMITTER_FORCE_HASH);
-
-		ASSERT(module);
-
-		LUMIX_DELETE(m_allocator, module);
-		emitter->m_modules.eraseItem(module);
-		m_universe.onComponentDestroyed(emitter->m_entity, PARTICLE_EMITTER_FORCE_HASH, this);
-		cleanup(emitter);
-	}
-
-
-	void destroyParticleEmitterSubimage(Entity entity)
-	{
-		auto* emitter = m_particle_emitters[entity];
-		auto* module = emitter->getModule(PARTICLE_EMITTER_SUBIMAGE_TYPE);
-
-		ASSERT(module);
-
-		LUMIX_DELETE(m_allocator, module);
-		emitter->m_modules.eraseItem(module);
-		emitter->m_subimage_module = nullptr;
-		m_universe.onComponentDestroyed(emitter->m_entity, PARTICLE_EMITTER_SUBIMAGE_TYPE, this);
-		cleanup(emitter);
-	}
-
-
-	void destroyParticleEmitterAttractor(Entity entity)
-	{
-		auto* emitter = m_particle_emitters[entity];
-		auto* module = emitter->getModule(PARTICLE_EMITTER_ATTRACTOR_TYPE);
-
-		ASSERT(module);
-
-		LUMIX_DELETE(m_allocator, module);
-		emitter->m_modules.eraseItem(module);
-		m_universe.onComponentDestroyed(emitter->m_entity, PARTICLE_EMITTER_ATTRACTOR_TYPE, this);
-		cleanup(emitter);
-	}
-
-
-	void destroyParticleEmitterSize(Entity entity)
-	{
-		auto* emitter = m_particle_emitters[entity];
-		auto* module = emitter->getModule(PARTICLE_EMITTER_SIZE_TYPE);
-
-		ASSERT(module);
-
-		LUMIX_DELETE(m_allocator, module);
-		emitter->m_modules.eraseItem(module);
-		m_universe.onComponentDestroyed(emitter->m_entity, PARTICLE_EMITTER_SIZE_TYPE, this);
-		cleanup(emitter);
-
-	}
-
-
-	float getParticleEmitterPlaneBounce(Entity entity) override
-	{
-		auto* emitter = m_particle_emitters[entity];
-		for(auto* module : emitter->m_modules)
-		{
-			if(module->getType() == ParticleEmitter::PlaneModule::s_type)
-			{
-				return static_cast<ParticleEmitter::PlaneModule*>(module)->m_bounce;
-			}
-		}
-		return 0;
-	}
-
-
-	void setParticleEmitterPlaneBounce(Entity entity, float value) override
-	{
-		auto* emitter = m_particle_emitters[entity];
-		for (auto* module : emitter->m_modules)
-		{
-			if (module->getType() == ParticleEmitter::PlaneModule::s_type)
-			{
-				static_cast<ParticleEmitter::PlaneModule*>(module)->m_bounce = value;
-				break;
-			}
-		}
-	}
-
-
-	float getParticleEmitterAttractorForce(Entity entity) override
-	{
-		auto* emitter = m_particle_emitters[entity];
-		for (auto* module : emitter->m_modules)
-		{
-			if (module->getType() == ParticleEmitter::AttractorModule::s_type)
-			{
-				return static_cast<ParticleEmitter::AttractorModule*>(module)->m_force;
-			}
-		}
-		return 0;
-	}
-
-
-	void setParticleEmitterAttractorForce(Entity entity, float value) override
-	{
-		auto* emitter = m_particle_emitters[entity];
-		for (auto* module : emitter->m_modules)
-		{
-			if (module->getType() == ParticleEmitter::AttractorModule::s_type)
-			{
-				static_cast<ParticleEmitter::AttractorModule*>(module)->m_force = value;
-				break;
-			}
-		}
-	}
-
-
-	void destroyParticleEmitterPlane(Entity entity)
-	{
-		auto* emitter = m_particle_emitters[entity];
-		auto* module = emitter->getModule(PARTICLE_EMITTER_PLANE_TYPE);
-
-		ASSERT(module);
-
-		LUMIX_DELETE(m_allocator, module);
-		emitter->m_modules.eraseItem(module);
-		m_universe.onComponentDestroyed(emitter->m_entity, PARTICLE_EMITTER_PLANE_TYPE, this);
-		cleanup(emitter);
-	}
-
-
-	void destroyParticleEmitterLinearMovement(Entity entity)
-	{
-		auto* emitter = m_particle_emitters[entity];
-		auto* module = emitter->getModule(PARTICLE_EMITTER_LINEAR_MOVEMENT_TYPE);
-
-		ASSERT(module);
-
-		LUMIX_DELETE(m_allocator, module);
-		emitter->m_modules.eraseItem(module);
-		m_universe.onComponentDestroyed(emitter->m_entity, PARTICLE_EMITTER_LINEAR_MOVEMENT_TYPE, this);
-		cleanup(emitter);
-	}
-
-
-	void destroyParticleEmitterSpawnShape(Entity entity)
-	{
-		auto* emitter = m_particle_emitters[entity];
-		auto* module = emitter->getModule(PARTICLE_EMITTER_SPAWN_SHAPE_TYPE);
-
-		ASSERT(module);
-
-		LUMIX_DELETE(m_allocator, module);
-		emitter->m_modules.eraseItem(module);
-		m_universe.onComponentDestroyed(emitter->m_entity, PARTICLE_EMITTER_SPAWN_SHAPE_TYPE, this);
-		cleanup(emitter);
-
-	}
-
-
-	void destroyParticleEmitterRandomRotation(Entity entity)
-	{
-		auto* emitter = m_particle_emitters[entity];
-		auto* module = emitter->getModule(PARTICLE_EMITTER_RANDOM_ROTATION_TYPE);
-
-		ASSERT(module);
-
-		LUMIX_DELETE(m_allocator, module);
-		emitter->m_modules.eraseItem(module);
-		m_universe.onComponentDestroyed(emitter->m_entity, PARTICLE_EMITTER_RANDOM_ROTATION_TYPE, this);
-		cleanup(emitter);
-
-	}
-
-
-	void setParticleEmitterAlpha(Entity entity, const Vec2* values, int count) override
-	{
-		ASSERT(count > 0);
-		ASSERT(values[1].x < 0.001f);
-		ASSERT(values[count - 2].x > 0.999f);
-
-		auto* alpha_module = getEmitterModule<ParticleEmitter::AlphaModule>(entity);
-		if (!alpha_module) return;
-
-		alpha_module->m_values.resize(count);
-		for (int i = 0; i < count; ++i)
-		{
-			alpha_module->m_values[i] = values[i];
-		}
-		alpha_module->sample();
-	}
-
-
-	void setParticleEmitterSubimageRows(Entity entity, const int& value) override
-	{
-		auto* module = getEmitterModule<ParticleEmitter::SubimageModule>(entity);
-		if (module) module->rows = value;
-	}
-
-
-	void setParticleEmitterSubimageCols(Entity entity, const int& value) override
-	{
-		auto* module = getEmitterModule<ParticleEmitter::SubimageModule>(entity);
-		if (module) module->cols = value;
-	}
-
-
-	int getParticleEmitterSubimageRows(Entity entity) override
-	{
-		auto* module = getEmitterModule<ParticleEmitter::SubimageModule>(entity);
-		return module ? module->rows : 1;
-	}
-
-
-	int getParticleEmitterSubimageCols(Entity entity) override
-	{
-		auto* module = getEmitterModule<ParticleEmitter::SubimageModule>(entity);
-		return module ? module->cols : 1;
-	}
-
-
-	void setParticleEmitterAcceleration(Entity entity, const Vec3& value) override
-	{
-		auto* module = getEmitterModule<ParticleEmitter::ForceModule>(entity);
-		if (module) module->m_acceleration = value;
-	}
-
-
-	void setParticleEmitterAutoemit(Entity entity, bool autoemit) override
-	{
-		m_particle_emitters[entity]->m_autoemit = autoemit;
-	}
-
-
-	bool getParticleEmitterAutoemit(Entity entity) override
-	{
-		return m_particle_emitters[entity]->m_autoemit;
-	}
-
-
-	void setParticleEmitterLocalSpace(Entity entity, bool local_space) override
-	{
-		m_particle_emitters[entity]->m_local_space = local_space;
-	}
-
-
-	bool getParticleEmitterLocalSpace(Entity entity) override
-	{
-		return m_particle_emitters[entity]->m_local_space;
-	}
-
-
-	Vec3 getParticleEmitterAcceleration(Entity entity) override
-	{
-		auto* module = getEmitterModule<ParticleEmitter::ForceModule>(entity);
-		return module ? module->m_acceleration : Vec3();
-	}
-
-
-	int getParticleEmitterSizeCount(Entity entity) override
-	{
-		auto* module = getEmitterModule<ParticleEmitter::SizeModule>(entity);
-		return module ? module->m_values.size() : 0; 
-	}
-
-
-	const Vec2* getParticleEmitterSize(Entity entity) override
-	{
-		auto* module = getEmitterModule<ParticleEmitter::SizeModule>(entity);
-		return module ? &module->m_values[0] : nullptr;
-	}
-
-
-	void setParticleEmitterSize(Entity entity, const Vec2* values, int count) override
-	{
-		ASSERT(count > 0);
-		ASSERT(values[0].x < 0.001f);
-		ASSERT(values[count-1].x > 0.999f);
-
-		auto* module = getEmitterModule<ParticleEmitter::SizeModule>(entity);
-		if (!module) return;
-
-		auto size_module = static_cast<ParticleEmitter::SizeModule*>(module);
-		size_module->m_values.resize(count);
-		for (int i = 0; i < count; ++i)
-		{
-			size_module->m_values[i] = values[i];
-		}
-		size_module->sample();
-	}
-
-
-	template <typename T>
-	T* getEmitterModule(Entity entity) const
-	{
-		auto& modules = m_particle_emitters[entity]->m_modules;
-		for (auto* module : modules)
-		{
-			if (module->getType() == T::s_type)
-			{
-				return static_cast<T*>(module);
-			}
-		}
-		return nullptr;
-	}
-
-
-	int getParticleEmitterAlphaCount(Entity entity) override 
-	{
-		auto* module = getEmitterModule<ParticleEmitter::AlphaModule>(entity);
-		return module ? module->m_values.size() : 0;
-	}
-
-
-	const Vec2* getParticleEmitterAlpha(Entity entity) override
-	{
-		auto* module = getEmitterModule<ParticleEmitter::AlphaModule>(entity);
-		return module ? &module->m_values[0] : 0;
-	}
-
-
-	Vec2 getParticleEmitterLinearMovementX(Entity entity) override
-	{
-		auto* module = getEmitterModule<ParticleEmitter::LinearMovementModule>(entity);
-		return module ? Vec2(module->m_x.from, module->m_x.to) : Vec2(0, 0);
-	}
-
-
-	void setParticleEmitterLinearMovementX(Entity entity, const Vec2& value) override
-	{
-		auto* module = getEmitterModule<ParticleEmitter::LinearMovementModule>(entity);
-		if (module)
-		{
-			module->m_x = value;
-			module->m_x.check();
-		}
-	}
-
-
-	Vec2 getParticleEmitterLinearMovementY(Entity entity) override
-	{
-		auto* module = getEmitterModule<ParticleEmitter::LinearMovementModule>(entity);
-		return module ? Vec2(module->m_y.from, module->m_y.to) : Vec2(0, 0);
-	}
-
-
-	void setParticleEmitterLinearMovementY(Entity entity, const Vec2& value) override
-	{
-		auto* module = getEmitterModule<ParticleEmitter::LinearMovementModule>(entity);
-		if (module)
-		{
-			module->m_y = value;
-			module->m_y.check();
-		}
-	}
-
-
-	Vec2 getParticleEmitterLinearMovementZ(Entity entity) override
-	{
-		auto* module = getEmitterModule<ParticleEmitter::LinearMovementModule>(entity);
-		return module ? Vec2(module->m_z.from, module->m_z.to) : Vec2(0, 0);
-	}
-
-
-	void setParticleEmitterLinearMovementZ(Entity entity, const Vec2& value) override
-	{
-		auto* module = getEmitterModule<ParticleEmitter::LinearMovementModule>(entity);
-		if (module)
-		{
-			module->m_z = value;
-			module->m_z.check();
-		}
-	}
-
-
-	Vec2 getParticleEmitterInitialLife(Entity entity) override
-	{
-		return m_particle_emitters[entity]->m_initial_life;
-	}
-
-
-	Vec2 getParticleEmitterSpawnPeriod(Entity entity) override
-	{
-		return m_particle_emitters[entity]->m_spawn_period;
-	}
-
-
-	void setParticleEmitterInitialLife(Entity entity, const Vec2& value) override
-	{
-		m_particle_emitters[entity]->m_initial_life = value;
-		m_particle_emitters[entity]->m_initial_life.checkZero();
-	}
-
-
-	void setParticleEmitterInitialSize(Entity entity, const Vec2& value) override
-	{
-		m_particle_emitters[entity]->m_initial_size = value;
-		m_particle_emitters[entity]->m_initial_size.checkZero();
-	}
-
-
-	Vec2 getParticleEmitterInitialSize(Entity entity) override
-	{
-		return m_particle_emitters[entity]->m_initial_size;
-	}
-
-
-	void setParticleEmitterSpawnPeriod(Entity entity, const Vec2& value) override
-	{
-		auto* emitter = m_particle_emitters[entity];
-		emitter->m_spawn_period = value;
-		emitter->m_spawn_period.from = Math::maximum(0.01f, emitter->m_spawn_period.from);
-		emitter->m_spawn_period.checkZero();
-	}
-
-
-	void createTextMesh(Entity entity)
+	void createTextMesh(EntityRef entity)
 	{
 		TextMesh* text = LUMIX_NEW(m_allocator, TextMesh)(m_allocator);
 		m_text_meshes.insert(entity, text);
@@ -2539,7 +1704,7 @@ public:
 	}
 
 
-	void createCamera(Entity entity)
+	void createCamera(EntityRef entity)
 	{
 		Camera camera;
 		camera.is_ortho = false;
@@ -2551,14 +1716,12 @@ public:
 		camera.aspect = 800.0f / 600.0f;
 		camera.near = 0.1f;
 		camera.far = 10000.0f;
-		camera.slot[0] = '\0';
-		if (!getCameraInSlot("main").isValid()) copyString(camera.slot, "main");
 		m_cameras.insert(entity, camera);
 		m_universe.onComponentCreated(entity, CAMERA_TYPE, this);
 	}
 
 
-	void createTerrain(Entity entity)
+	void createTerrain(EntityRef entity)
 	{
 		Terrain* terrain = LUMIX_NEW(m_allocator, Terrain)(m_renderer, entity, *this, m_allocator);
 		m_terrains.insert(entity, terrain);
@@ -2566,117 +1729,10 @@ public:
 	}
 
 
-	void createParticleEmitterRandomRotation(Entity entity)
-	{
-		int index = allocateParticleEmitter(entity);
-		auto* emitter = m_particle_emitters.at(index);
-		auto module = LUMIX_NEW(m_allocator, ParticleEmitter::RandomRotationModule)(*emitter);
-		emitter->addModule(module);
-		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_RANDOM_ROTATION_TYPE, this);
-	}
-
-
-	void createParticleEmitterPlane(Entity entity)
-	{
-		int index = allocateParticleEmitter(entity);
-		auto* emitter = m_particle_emitters.at(index);
-		auto module = LUMIX_NEW(m_allocator, ParticleEmitter::PlaneModule)(*emitter);
-		emitter->addModule(module);
-		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_PLANE_TYPE, this);
-	}
-
-
-	void createParticleEmitterLinearMovement(Entity entity)
-	{
-		int index = allocateParticleEmitter(entity);
-		auto* emitter = m_particle_emitters.at(index);
-		auto module = LUMIX_NEW(m_allocator, ParticleEmitter::LinearMovementModule)(*emitter);
-		emitter->addModule(module);
-		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_LINEAR_MOVEMENT_TYPE, this);
-	}
-
-
-	void createParticleEmitterSpawnShape(Entity entity)
-	{
-		int index = allocateParticleEmitter(entity);
-		auto* emitter = m_particle_emitters.at(index);
-		auto module = LUMIX_NEW(m_allocator, ParticleEmitter::SpawnShapeModule)(*emitter);
-		emitter->addModule(module);
-		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_SPAWN_SHAPE_TYPE, this);
-	}
-
-
-	void createParticleEmitterAlpha(Entity entity)
-	{
-		int index = allocateParticleEmitter(entity);
-		auto* emitter = m_particle_emitters.at(index);
-		auto module = LUMIX_NEW(m_allocator, ParticleEmitter::AlphaModule)(*emitter);
-		emitter->addModule(module);
-		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_ALPHA_TYPE, this);
-	}
-
-
-	void createParticleEmitterForce(Entity entity)
-	{
-		int index = allocateParticleEmitter(entity);
-		auto* emitter = m_particle_emitters.at(index);
-		auto module = LUMIX_NEW(m_allocator, ParticleEmitter::ForceModule)(*emitter);
-		emitter->addModule(module);
-		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_FORCE_HASH, this);
-	}
-
-
-	void createParticleEmitterSubimage(Entity entity)
-	{
-		int index = allocateParticleEmitter(entity);
-		auto* emitter = m_particle_emitters.at(index);
-		auto module = LUMIX_NEW(m_allocator, ParticleEmitter::SubimageModule)(*emitter);
-		emitter->addModule(module);
-		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_SUBIMAGE_TYPE, this);
-	}
-
-
-	void createParticleEmitterAttractor(Entity entity)
-	{
-		int index = allocateParticleEmitter(entity);
-		auto* emitter = m_particle_emitters.at(index);
-		auto module = LUMIX_NEW(m_allocator, ParticleEmitter::AttractorModule)(*emitter);
-		emitter->addModule(module);
-		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_ATTRACTOR_TYPE, this);
-	}
-
-
-	void createParticleEmitterSize(Entity entity)
-	{
-		int index = allocateParticleEmitter(entity);
-		auto* emitter = m_particle_emitters.at(index);
-		auto module = LUMIX_NEW(m_allocator, ParticleEmitter::SizeModule)(*emitter);
-		emitter->addModule(module);
-		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_SIZE_TYPE, this);
-	}
-
-
-	void createScriptedParticleEmitter(Entity entity)
+	void createScriptedParticleEmitter(EntityRef entity)
 	{
 		m_scripted_particle_emitters.insert(entity, LUMIX_NEW(m_allocator, ScriptedParticleEmitter)(entity, m_allocator));
 		m_universe.onComponentCreated(entity, SCRIPTED_PARTICLE_EMITTER_TYPE, this);
-	}
-
-
-	void createParticleEmitter(Entity entity)
-	{
-		int index = allocateParticleEmitter(entity);
-		m_particle_emitters.at(index)->init();
-
-		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_TYPE, this);
-	}
-
-
-	int allocateParticleEmitter(Entity entity)
-	{
-		int index = m_particle_emitters.find(entity);
-		if (index >= 0) return index;
-		return m_particle_emitters.insert(entity, LUMIX_NEW(m_allocator, ParticleEmitter)(entity, m_universe, m_allocator));
 	}
 
 
@@ -2686,13 +1742,13 @@ public:
 	}
 
 
-	ModelInstance* getModelInstance(Entity entity) override
+	ModelInstance* getModelInstance(EntityRef entity) override
 	{
 		return &m_model_instances[entity.index];
 	}
 
 
-	Vec3 getPoseBonePosition(Entity model_instance, int bone_index)
+	Vec3 getPoseBonePosition(EntityRef model_instance, int bone_index)
 	{
 		Pose* pose = m_model_instances[model_instance.index].pose;
 		return pose->positions[bone_index];
@@ -2715,7 +1771,7 @@ public:
 	}
 
 
-	void onEntityDestroyed(Entity entity)
+	void onEntityDestroyed(EntityRef entity)
 	{
 		for (auto& i : m_bone_attachments)
 		{
@@ -2728,7 +1784,7 @@ public:
 	}
 
 
-	void onEntityMoved(Entity entity)
+	void onEntityMoved(EntityRef entity)
 	{
 		int index = entity.index;
 
@@ -2756,7 +1812,7 @@ public:
 					}
 				}
 
-				Vec3 pos = m_universe.getPosition(r.entity);
+				Vec3 pos = m_universe.getPosition(entity);
 				Frustum frustum = getPointLightFrustum(light_idx);
 				if(frustum.isSphereInside(pos, bounding_radius))
 				{
@@ -2806,20 +1862,14 @@ public:
 	Engine& getEngine() const override { return m_engine; }
 
 
-	Entity getTerrainEntity(Entity entity) override
-	{
-		return entity;
-	}
-
-
-	Vec2 getTerrainResolution(Entity entity) override
+	Vec2 getTerrainResolution(EntityRef entity) override
 	{
 		auto* terrain = m_terrains[entity];
 		return Vec2((float)terrain->getWidth(), (float)terrain->getHeight());
 	}
 
 
-	Entity getFirstTerrain() override
+	EntityPtr getFirstTerrain() override
 	{
 		if (m_terrains.empty()) return INVALID_ENTITY;
 		auto iter = m_terrains.begin();
@@ -2827,7 +1877,7 @@ public:
 	}
 
 
-	Entity getNextTerrain(Entity entity) override
+	EntityPtr getNextTerrain(EntityRef entity) override
 	{
 		auto iter = m_terrains.find(entity);
 		++iter;
@@ -2836,31 +1886,31 @@ public:
 	}
 
 
-	Vec3 getTerrainNormalAt(Entity entity, float x, float z) override
+	Vec3 getTerrainNormalAt(EntityRef entity, float x, float z) override
 	{
 		return m_terrains[entity]->getNormal(x, z);
 	}
 
 
-	float getTerrainHeightAt(Entity entity, float x, float z) override
+	float getTerrainHeightAt(EntityRef entity, float x, float z) override
 	{
 		return m_terrains[entity]->getHeight(x, z);
 	}
 
 
-	AABB getTerrainAABB(Entity entity) override
+	AABB getTerrainAABB(EntityRef entity) override
 	{
 		return m_terrains[entity]->getAABB();
 	}
 
 
-	Vec2 getTerrainSize(Entity entity) override
+	Vec2 getTerrainSize(EntityRef entity) override
 	{
 		return m_terrains[entity]->getSize();
 	}
 
 
-	void setTerrainMaterialPath(Entity entity, const Path& path) override
+	void setTerrainMaterialPath(EntityRef entity, const Path& path) override
 	{
 		if (path.isValid())
 		{
@@ -2874,10 +1924,10 @@ public:
 	}
 
 
-	Material* getTerrainMaterial(Entity entity) override { return m_terrains[entity]->getMaterial(); }
+	Material* getTerrainMaterial(EntityRef entity) override { return m_terrains[entity]->getMaterial(); }
 
 
-	void setDecalScale(Entity entity, const Vec3& value) override
+	void setDecalScale(EntityRef entity, const Vec3& value) override
 	{
 		Decal& decal = m_decals[entity];
 		decal.scale = value;
@@ -2885,7 +1935,7 @@ public:
 	}
 
 
-	Vec3 getDecalScale(Entity entity) override
+	Vec3 getDecalScale(EntityRef entity) override
 	{
 		return m_decals[entity].scale;
 	}
@@ -2902,7 +1952,7 @@ public:
 	}
 
 
-	void setDecalMaterialPath(Entity entity, const Path& path) override
+	void setDecalMaterialPath(EntityRef entity, const Path& path) override
 	{
 		ResourceManagerBase* material_manager = m_engine.getResourceManager().get(Material::TYPE);
 		Decal& decal = m_decals[entity];
@@ -2921,14 +1971,14 @@ public:
 	}
 
 
-	Path getDecalMaterialPath(Entity entity) override
+	Path getDecalMaterialPath(EntityRef entity) override
 	{
 		Decal& decal = m_decals[entity];
 		return decal.material ? decal.material->getPath() : Path("");
 	}
 
 
-	Path getTerrainMaterialPath(Entity entity) override
+	Path getTerrainMaterialPath(EntityRef entity) override
 	{
 		Terrain* terrain = m_terrains[entity];
 		if (terrain->getMaterial())
@@ -2942,24 +1992,24 @@ public:
 	}
 
 
-	void setTerrainXZScale(Entity entity, float scale) override
+	void setTerrainXZScale(EntityRef entity, float scale) override
 	{
 		m_terrains[entity]->setXZScale(scale);
 	}
 
-	float getTerrainXZScale(Entity entity) override { return m_terrains[entity]->getXZScale(); }
+	float getTerrainXZScale(EntityRef entity) override { return m_terrains[entity]->getXZScale(); }
 
 
-	void setTerrainYScale(Entity entity, float scale) override
+	void setTerrainYScale(EntityRef entity, float scale) override
 	{
 		m_terrains[entity]->setYScale(scale);
 	}
 
-	float getTerrainYScale(Entity entity) override { return m_terrains[entity]->getYScale(); }
+	float getTerrainYScale(EntityRef entity) override { return m_terrains[entity]->getYScale(); }
 
 
-	Pose* lockPose(Entity entity) override { return m_model_instances[entity.index].pose; }
-	void unlockPose(Entity entity, bool changed) override
+	Pose* lockPose(EntityRef entity) override { return m_model_instances[entity.index].pose; }
+	void unlockPose(EntityRef entity, bool changed) override
 	{
 		if (!changed) return;
 		if (entity.index < m_model_instances.size()
@@ -2968,7 +2018,7 @@ public:
 			return;
 		}
 
-		Entity parent = entity;
+		EntityRef parent = entity;
 		for (BoneAttachment& ba : m_bone_attachments)
 		{
 			if (ba.parent_entity != parent) continue;
@@ -2979,7 +2029,7 @@ public:
 	}
 
 
-	Model* getModelInstanceModel(Entity entity) override { return m_model_instances[entity.index].model; }
+	Model* getModelInstanceModel(EntityRef entity) override { return m_model_instances[entity.index].model; }
 
 
 	static u64 getLayerMask(ModelInstance& model_instance)
@@ -2995,14 +2045,14 @@ public:
 	}
 
 
-	bool isModelInstanceEnabled(Entity entity) override
+	bool isModelInstanceEnabled(EntityRef entity) override
 	{
 		ModelInstance& model_instance = m_model_instances[entity.index];
 		return model_instance.flags.isSet(ModelInstance::ENABLED);
 	}
 
 
-	void enableModelInstance(Entity entity, bool enable) override
+	void enableModelInstance(EntityRef entity, bool enable) override
 	{
 		ModelInstance& model_instance = m_model_instances[entity.index];
 		model_instance.flags.set(ModelInstance::ENABLED, enable);
@@ -3010,7 +2060,7 @@ public:
 		{
 			if (!model_instance.model || !model_instance.model->isReady()) return;
 
-			Sphere sphere(m_universe.getPosition(model_instance.entity), model_instance.model->getBoundingRadius());
+			Sphere sphere(m_universe.getPosition((EntityRef)model_instance.entity), model_instance.model->getBoundingRadius());
 			u64 layer_mask = getLayerMask(model_instance);
 			if (!m_culling_system->isAdded(entity)) m_culling_system->addStatic(entity, sphere, layer_mask);
 		}
@@ -3021,19 +2071,19 @@ public:
 	}
 
 
-	Path getModelInstancePath(Entity entity) override
+	Path getModelInstancePath(EntityRef entity) override
 	{
 		return m_model_instances[entity.index].model ? m_model_instances[entity.index].model->getPath() : Path("");
 	}
 
 
-	int getModelInstanceMaterialsCount(Entity entity) override
+	int getModelInstanceMaterialsCount(EntityRef entity) override
 	{
 		return m_model_instances[entity.index].model ? m_model_instances[entity.index].mesh_count : 0;
 	}
 
 
-	void setModelInstancePath(Entity entity, const Path& path) override
+	void setModelInstancePath(EntityRef entity, const Path& path) override
 	{
 		ModelInstance& r = m_model_instances[entity.index];
 
@@ -3047,11 +2097,11 @@ public:
 		{
 			setModel(entity, nullptr);
 		}
-		r.matrix = m_universe.getMatrix(r.entity);
+		r.matrix = m_universe.getMatrix(entity);
 	}
 
 
-	void forceGrassUpdate(Entity entity) override { m_terrains[entity]->forceGrassUpdate(); }
+	void forceGrassUpdate(EntityRef entity) override { m_terrains[entity]->forceGrassUpdate(); }
 
 
 	void getTerrainInfos(const Frustum& frustum, const Vec3& lod_ref_point, Array<TerrainInfo>& infos) override
@@ -3065,7 +2115,7 @@ public:
 	}
 
 
-	void getGrassInfos(const Frustum& frustum, Entity camera, Array<GrassInfo>& infos) override
+	void getGrassInfos(const Frustum& frustum, EntityRef camera, Array<GrassInfo>& infos) override
 	{
 		PROFILE_FUNCTION();
 
@@ -3081,8 +2131,7 @@ public:
 	static int LUA_castCameraRay(lua_State* L)
 	{
 		auto* scene = LuaWrapper::checkArg<RenderSceneImpl*>(L, 1);
-		Entity camera_entity = LuaWrapper::checkArg<Entity>(L, 2);
-		if (!camera_entity.isValid()) return 0;
+		EntityRef camera_entity = LuaWrapper::checkArg<EntityRef>(L, 2);
 		float x, y;
 		if (lua_gettop(L) > 3) {
 			x = LuaWrapper::checkArg<float>(L, 3);
@@ -3104,21 +2153,13 @@ public:
 	}
 
 
-	static float LUA_getTerrainHeightAt(RenderSceneImpl* render_scene, Entity entity, int x, int z)
+	static float LUA_getTerrainHeightAt(RenderSceneImpl* render_scene, EntityRef entity, int x, int z)
 	{
 		return render_scene->m_terrains[entity]->getHeight(x, z);
 	}
 
 
-	static void LUA_emitParticle(RenderSceneImpl* render_scene, Entity emitter)
-	{
-		int idx = render_scene->m_particle_emitters.find(emitter);
-		if (idx < 0) return;
-		return render_scene->m_particle_emitters.at(idx)->emit();
-	}
-
-
-	void setTerrainHeightAt(Entity entity, int x, int z, float height)
+	void setTerrainHeightAt(EntityRef entity, int x, int z, float height)
 	{
 		m_terrains[entity]->setHeight(x, z, height);
 	}
@@ -3220,7 +2261,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 
 
 	static void LUA_setModelInstanceMaterial(RenderScene* scene,
-		Entity entity,
+		EntityRef entity,
 		int index,
 		const char* path)
 	{
@@ -3234,25 +2275,25 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	int getGrassRotationMode(Entity entity, int index) override
+	int getGrassRotationMode(EntityRef entity, int index) override
 	{
 		return (int)m_terrains[entity]->getGrassTypeRotationMode(index);
 	}
 
 
-	void setGrassRotationMode(Entity entity, int index, int value) override
+	void setGrassRotationMode(EntityRef entity, int index, int value) override
 	{
 		m_terrains[entity]->setGrassTypeRotationMode(index, (Terrain::GrassType::RotationMode)value);
 	}
 
 
-	float getGrassDistance(Entity entity, int index) override
+	float getGrassDistance(EntityRef entity, int index) override
 	{
 		return m_terrains[entity]->getGrassTypeDistance(index);
 	}
 
 
-	void setGrassDistance(Entity entity, int index, float value) override
+	void setGrassDistance(EntityRef entity, int index, float value) override
 	{
 		m_terrains[entity]->setGrassTypeDistance(index, value);
 	}
@@ -3261,55 +2302,55 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	void enableGrass(bool enabled) override { m_is_grass_enabled = enabled; }
 
 
-	void setGrassDensity(Entity entity, int index, int density) override
+	void setGrassDensity(EntityRef entity, int index, int density) override
 	{
 		m_terrains[entity]->setGrassTypeDensity(index, density);
 	}
 
 
-	int getGrassDensity(Entity entity, int index) override
+	int getGrassDensity(EntityRef entity, int index) override
 	{
 		return m_terrains[entity]->getGrassTypeDensity(index);
 	}
 
 
-	void setGrassPath(Entity entity, int index, const Path& path) override
+	void setGrassPath(EntityRef entity, int index, const Path& path) override
 	{
 		m_terrains[entity]->setGrassTypePath(index, path);
 	}
 
 
-	Path getGrassPath(Entity entity, int index) override
+	Path getGrassPath(EntityRef entity, int index) override
 	{
 		return m_terrains[entity]->getGrassTypePath(index);
 	}
 
 
-	int getGrassCount(Entity entity) override
+	int getGrassCount(EntityRef entity) override
 	{
 		return m_terrains[entity]->getGrassTypeCount();
 	}
 
 
-	void addGrass(Entity entity, int index) override
+	void addGrass(EntityRef entity, int index) override
 	{
 		m_terrains[entity]->addGrassType(index);
 	}
 
 
-	void removeGrass(Entity entity, int index) override
+	void removeGrass(EntityRef entity, int index) override
 	{
 		m_terrains[entity]->removeGrassType(index);
 	}
 
 
-	Entity getFirstModelInstance() override
+	EntityPtr getFirstModelInstance() override
 	{
 		return getNextModelInstance(INVALID_ENTITY);
 	}
 
 
-	Entity getNextModelInstance(Entity entity) override
+	EntityPtr getNextModelInstance(EntityPtr entity) override
 	{
 		for(int i = entity.index + 1; i < m_model_instances.size(); ++i)
 		{
@@ -3320,7 +2361,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 
 	
 	int getClosestPointLights(const Vec3& reference_pos,
-		Entity* lights,
+		EntityRef* lights,
 		int max_lights) override
 	{
 
@@ -3344,7 +2385,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 				dists[i] = dists[i - 1];
 				dists[i - 1] = tmp;
 
-				Entity tmp2 = lights[i];
+				EntityRef tmp2 = lights[i];
 				lights[i] = lights[i - 1];
 				lights[i - 1] = tmp2;
 			}
@@ -3373,7 +2414,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 					dists[i] = dists[i - 1];
 					dists[i - 1] = tmp;
 
-					Entity tmp2 = lights[i];
+					EntityRef tmp2 = lights[i];
 					lights[i] = lights[i - 1];
 					lights[i - 1] = tmp2;
 				}
@@ -3384,7 +2425,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	void getPointLights(const Frustum& frustum, Array<Entity>& lights) override
+	void getPointLights(const Frustum& frustum, Array<EntityRef>& lights) override
 	{
 		for (int i = 0, ci = m_point_lights.size(); i < ci; ++i)
 		{
@@ -3398,20 +2439,20 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	void setLightCastShadows(Entity entity, bool cast_shadows) override
+	void setLightCastShadows(EntityRef entity, bool cast_shadows) override
 	{
 		m_point_lights[m_point_lights_map[entity]].m_cast_shadows = cast_shadows;
 	}
 
 
-	bool getLightCastShadows(Entity entity) override
+	bool getLightCastShadows(EntityRef entity) override
 	{
 		return m_point_lights[m_point_lights_map[entity]].m_cast_shadows;
 	}
 
 
-	void getPointLightInfluencedGeometry(Entity light,
-		Entity camera,
+	void getPointLightInfluencedGeometry(EntityRef light,
+		EntityRef camera,
 		const Vec3& lod_ref_point,
 		const Frustum& frustum,
 		Array<MeshInstance>& infos) override
@@ -3423,7 +2464,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		float final_lod_multiplier = m_lod_multiplier * lod_multiplier;
 		for (int j = 0, cj = m_light_influenced_geometry[light_index].size(); j < cj; ++j)
 		{
-			Entity model_instance_entity = m_light_influenced_geometry[light_index][j];
+			EntityRef model_instance_entity = m_light_influenced_geometry[light_index][j];
 			ModelInstance& model_instance = m_model_instances[model_instance_entity.index];
 			const Sphere& sphere = m_culling_system->getSphere(model_instance_entity);
 			float squared_distance = (model_instance.matrix.getTranslation() - lod_ref_point).squaredLength();
@@ -3443,8 +2484,8 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	void getPointLightInfluencedGeometry(Entity light, 
-		Entity camera, 
+	void getPointLightInfluencedGeometry(EntityRef light, 
+		EntityRef camera, 
 		const Vec3& lod_ref_point,
 		Array<MeshInstance>& infos) override
 	{
@@ -3470,7 +2511,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	void getModelInstanceEntities(const Frustum& frustum, Array<Entity>& entities) override
+	void getModelInstanceEntities(const Frustum& frustum, Array<EntityRef>& entities) override
 	{
 		PROFILE_FUNCTION();
 
@@ -3479,7 +2520,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 
 		for (auto& subresults : results)
 		{
-			for (Entity model_instance : subresults)
+			for (EntityRef model_instance : subresults)
 			{
 				entities.push(model_instance);
 			}
@@ -3487,7 +2528,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	float getCameraLODMultiplier(Entity camera)
+	float getCameraLODMultiplier(EntityRef camera)
 	{
 		float lod_multiplier;
 		if (isCameraOrtho(camera))
@@ -3534,7 +2575,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 
 				const Vec3 ref_point = lod_ref_point;
 				const float final_lod_multiplier = m_lod_multiplier * lod_multiplier;
-				const Entity* LUMIX_RESTRICT raw_subresults = &cull_results[subresult_index][0];
+				const EntityRef* LUMIX_RESTRICT raw_subresults = &cull_results[subresult_index][0];
 				const ModelInstance* LUMIX_RESTRICT model_instances = &m_model_instances[0];
 				for (int i = 0, c = cull_results[subresult_index].size(); i < c; ++i) {
 					const ModelInstance* LUMIX_RESTRICT model_instance = &model_instances[raw_subresults[i].index];
@@ -3574,21 +2615,21 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	float getCameraFOV(Entity camera) override { return m_cameras[camera].fov; }
-	void setCameraFOV(Entity camera, float fov) override { m_cameras[camera].fov = fov; }
-	void setCameraNearPlane(Entity camera, float near_plane) override { m_cameras[camera].near = Math::maximum(near_plane, 0.00001f); }
-	float getCameraNearPlane(Entity camera) override { return m_cameras[camera].near; }
-	void setCameraFarPlane(Entity camera, float far_plane) override { m_cameras[camera].far = far_plane; }
-	float getCameraFarPlane(Entity camera) override { return m_cameras[camera].far; }
-	float getCameraScreenWidth(Entity camera) override { return m_cameras[camera].screen_width; }
-	float getCameraScreenHeight(Entity camera) override { return m_cameras[camera].screen_height; }
+	float getCameraFOV(EntityRef camera) override { return m_cameras[camera].fov; }
+	void setCameraFOV(EntityRef camera, float fov) override { m_cameras[camera].fov = fov; }
+	void setCameraNearPlane(EntityRef camera, float near_plane) override { m_cameras[camera].near = Math::maximum(near_plane, 0.00001f); }
+	float getCameraNearPlane(EntityRef camera) override { return m_cameras[camera].near; }
+	void setCameraFarPlane(EntityRef camera, float far_plane) override { m_cameras[camera].far = far_plane; }
+	float getCameraFarPlane(EntityRef camera) override { return m_cameras[camera].far; }
+	float getCameraScreenWidth(EntityRef camera) override { return m_cameras[camera].screen_width; }
+	float getCameraScreenHeight(EntityRef camera) override { return m_cameras[camera].screen_height; }
 
 
 	void setGlobalLODMultiplier(float multiplier) { m_lod_multiplier = multiplier; }
 	float getGlobalLODMultiplier() const { return m_lod_multiplier; }
 
 
-	Matrix getCameraViewProjection(Entity entity) override
+	Matrix getCameraViewProjection(EntityRef entity) override
 	{
 		Matrix view = m_universe.getMatrix(entity);
 		view.fastInverse();
@@ -3596,7 +2637,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	Matrix getCameraProjection(Entity entity) override
+	Matrix getCameraProjection(EntityRef entity) override
 	{
 		const Camera& camera = m_cameras[entity];
 		Matrix mtx;
@@ -3619,7 +2660,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	void setCameraScreenSize(Entity camera, int w, int h) override
+	void setCameraScreenSize(EntityRef camera, int w, int h) override
 	{
 		auto& cam = m_cameras[{camera.index}];
 		cam.screen_width = (float)w;
@@ -3628,17 +2669,17 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	Vec2 getCameraScreenSize(Entity camera) override
+	Vec2 getCameraScreenSize(EntityRef camera) override
 	{
 		auto& cam = m_cameras[{camera.index}];
 		return Vec2(cam.screen_width, cam.screen_height);
 	}
 
 
-	float getCameraOrthoSize(Entity camera) override { return m_cameras[{camera.index}].ortho_size; }
-	void setCameraOrthoSize(Entity camera, float value) override { m_cameras[{camera.index}].ortho_size = value; }
-	bool isCameraOrtho(Entity camera) override { return m_cameras[{camera.index}].is_ortho; }
-	void setCameraOrtho(Entity camera, bool is_ortho) override { m_cameras[{camera.index}].is_ortho = is_ortho; }
+	float getCameraOrthoSize(EntityRef camera) override { return m_cameras[{camera.index}].ortho_size; }
+	void setCameraOrthoSize(EntityRef camera, float value) override { m_cameras[{camera.index}].ortho_size = value; }
+	bool isCameraOrtho(EntityRef camera) override { return m_cameras[{camera.index}].is_ortho; }
+	void setCameraOrtho(EntityRef camera, bool is_ortho) override { m_cameras[{camera.index}].is_ortho = is_ortho; }
 
 
 	const Array<DebugTriangle>& getDebugTriangles() const override { return m_debug_triangles; }
@@ -4139,7 +3180,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	RayCastModelHit castRayTerrain(Entity entity, const Vec3& origin, const Vec3& dir) override
+	RayCastModelHit castRayTerrain(EntityRef entity, const Vec3& origin, const Vec3& dir) override
 	{
 		RayCastModelHit hit;
 		hit.m_is_hit = false;
@@ -4154,7 +3195,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, Entity ignored_model_instance) override
+	RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, EntityPtr ignored_model_instance) override
 	{
 		PROFILE_FUNCTION();
 		RayCastModelHit hit;
@@ -4169,8 +3210,9 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 			if (ignored_model_instance.index == i || !r.model) continue;
 			if (!r.flags.isSet(ModelInstance::ENABLED)) continue;
 
+			const EntityRef entity = (EntityRef)r.entity;
 			const Vec3& pos = r.matrix.getTranslation();
-			float scale = universe.getScale(r.entity);
+			float scale = universe.getScale(entity);
 			float radius = r.model->getBoundingRadius() * scale;
 			float dist = (pos - origin).length();
 			if (dist - radius > cur_dist) continue;
@@ -4181,7 +3223,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 				RayCastModelHit new_hit = r.model->castRay(origin, dir, r.matrix, r.pose);
 				if (new_hit.m_is_hit && (!hit.m_is_hit || new_hit.m_t < hit.m_t))
 				{
-					new_hit.m_entity = r.entity;
+					new_hit.m_entity = entity;
 					new_hit.m_component_type = MODEL_INSTANCE_TYPE;
 					hit = new_hit;
 					hit.m_is_hit = true;
@@ -4206,13 +3248,13 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 	
-	Vec4 getShadowmapCascades(Entity entity) override
+	Vec4 getShadowmapCascades(EntityRef entity) override
 	{
 		return m_global_lights[entity].m_cascades;
 	}
 
 
-	void setShadowmapCascades(Entity entity, const Vec4& value) override
+	void setShadowmapCascades(EntityRef entity, const Vec4& value) override
 	{
 		Vec4 valid_value = value;
 		valid_value.x = Math::maximum(valid_value.x, 0.02f);
@@ -4224,188 +3266,188 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	void setFogDensity(Entity entity, float density) override
+	void setFogDensity(EntityRef entity, float density) override
 	{
 		m_global_lights[entity].m_fog_density = density;
 	}
 
 
-	void setFogColor(Entity entity, const Vec3& color) override
+	void setFogColor(EntityRef entity, const Vec3& color) override
 	{
 		m_global_lights[entity].m_fog_color = color;
 	}
 
 
-	float getFogDensity(Entity entity) override
+	float getFogDensity(EntityRef entity) override
 	{
 		return m_global_lights[entity].m_fog_density;
 	}
 
 
-	float getFogBottom(Entity entity) override
+	float getFogBottom(EntityRef entity) override
 	{
 		return m_global_lights[entity].m_fog_bottom;
 	}
 
 
-	void setFogBottom(Entity entity, float bottom) override
+	void setFogBottom(EntityRef entity, float bottom) override
 	{
 		m_global_lights[entity].m_fog_bottom = bottom;
 	}
 
 
-	float getFogHeight(Entity entity) override
+	float getFogHeight(EntityRef entity) override
 	{
 		return m_global_lights[entity].m_fog_height;
 	}
 
 
-	void setFogHeight(Entity entity, float height) override
+	void setFogHeight(EntityRef entity, float height) override
 	{
 		m_global_lights[entity].m_fog_height = height;
 	}
 
 
-	Vec3 getFogColor(Entity entity) override
+	Vec3 getFogColor(EntityRef entity) override
 	{
 		return m_global_lights[entity].m_fog_color;
 	}
 
 
-	float getLightAttenuation(Entity entity) override
+	float getLightAttenuation(EntityRef entity) override
 	{
 		return m_point_lights[m_point_lights_map[entity]].m_attenuation_param;
 	}
 
 
-	void setLightAttenuation(Entity entity, float attenuation) override
+	void setLightAttenuation(EntityRef entity, float attenuation) override
 	{
 		int index = m_point_lights_map[entity];
 		m_point_lights[index].m_attenuation_param = attenuation;
 	}
 
 
-	float getLightRange(Entity entity) override
+	float getLightRange(EntityRef entity) override
 	{
 		return m_point_lights[m_point_lights_map[entity]].m_range;
 	}
 
 
-	void setLightRange(Entity entity, float value) override
+	void setLightRange(EntityRef entity, float value) override
 	{
 		m_point_lights[m_point_lights_map[entity]].m_range = value;
 	}
 
 
-	void setPointLightIntensity(Entity entity, float intensity) override
+	void setPointLightIntensity(EntityRef entity, float intensity) override
 	{
 		m_point_lights[m_point_lights_map[entity]].m_diffuse_intensity = intensity;
 	}
 
 
-	void setGlobalLightIntensity(Entity entity, float intensity) override
+	void setGlobalLightIntensity(EntityRef entity, float intensity) override
 	{
 		m_global_lights[entity].m_diffuse_intensity = intensity;
 	}
 
 
-	void setGlobalLightIndirectIntensity(Entity entity, float intensity) override
+	void setGlobalLightIndirectIntensity(EntityRef entity, float intensity) override
 	{
 		m_global_lights[entity].m_indirect_intensity = intensity;
 	}
 
 
-	void setPointLightColor(Entity entity, const Vec3& color) override
+	void setPointLightColor(EntityRef entity, const Vec3& color) override
 	{
 		m_point_lights[m_point_lights_map[entity]].m_diffuse_color = color;
 	}
 
 
-	void setGlobalLightColor(Entity entity, const Vec3& color) override
+	void setGlobalLightColor(EntityRef entity, const Vec3& color) override
 	{
 		m_global_lights[entity].m_diffuse_color = color;
 	}
 
 	
-	float getPointLightIntensity(Entity entity) override
+	float getPointLightIntensity(EntityRef entity) override
 	{
 		return m_point_lights[m_point_lights_map[entity]].m_diffuse_intensity;
 	}
 
 
-	float getGlobalLightIntensity(Entity entity) override
+	float getGlobalLightIntensity(EntityRef entity) override
 	{
 		return m_global_lights[entity].m_diffuse_intensity;
 	}
 
 
-	float getGlobalLightIndirectIntensity(Entity entity) override
+	float getGlobalLightIndirectIntensity(EntityRef entity) override
 	{
 		return m_global_lights[entity].m_indirect_intensity;
 	}
 
 
-	Vec3 getPointLightColor(Entity entity) override
+	Vec3 getPointLightColor(EntityRef entity) override
 	{
 		return m_point_lights[m_point_lights_map[entity]].m_diffuse_color;
 	}
 
 
-	void setPointLightSpecularColor(Entity entity, const Vec3& color) override
+	void setPointLightSpecularColor(EntityRef entity, const Vec3& color) override
 	{
 		m_point_lights[m_point_lights_map[entity]].m_specular_color = color;
 	}
 
 
-	Vec3 getPointLightSpecularColor(Entity entity) override
+	Vec3 getPointLightSpecularColor(EntityRef entity) override
 	{
 		return m_point_lights[m_point_lights_map[entity]].m_specular_color;
 	}
 
 
-	void setPointLightSpecularIntensity(Entity entity, float intensity) override
+	void setPointLightSpecularIntensity(EntityRef entity, float intensity) override
 	{
 		m_point_lights[m_point_lights_map[entity]].m_specular_intensity = intensity;
 	}
 
 
-	float getPointLightSpecularIntensity(Entity entity) override
+	float getPointLightSpecularIntensity(EntityRef entity) override
 	{
 		return m_point_lights[m_point_lights_map[entity]].m_specular_intensity;
 	}
 
 
-	Vec3 getGlobalLightColor(Entity entity) override
+	Vec3 getGlobalLightColor(EntityRef entity) override
 	{
 		return m_global_lights[entity].m_diffuse_color;
 	}
 
 
-	void setActiveGlobalLight(Entity entity) override
+	void setActiveGlobalLight(EntityRef entity) override
 	{
 		m_active_global_light_entity = entity;
 	}
 
 
-	Entity getActiveGlobalLight() override
+	EntityPtr getActiveGlobalLight() override
 	{
 		return m_active_global_light_entity;
 	}
 
 
-	Entity getPointLightEntity(Entity entity) const override
+	EntityRef getPointLightEntity(EntityRef entity) const override
 	{
 		return m_point_lights[m_point_lights_map[entity]].m_entity;
 	}
 
 
-	Entity getGlobalLightEntity(Entity entity) const override
+	EntityRef getGlobalLightEntity(EntityRef entity) const override
 	{
 		return m_global_lights[entity].m_entity;
 	}
 
 
-	void reloadEnvironmentProbe(Entity entity) override
+	void reloadEnvironmentProbe(EntityRef entity) override
 	{
 	// TODO
 	ASSERT(false);
@@ -4436,13 +3478,13 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	Entity getNearestEnvironmentProbe(const Vec3& pos) const override
+	EntityPtr getNearestEnvironmentProbe(const Vec3& pos) const override
 	{
 		float nearest_dist_squared = FLT_MAX;
-		Entity nearest = INVALID_ENTITY;
+		EntityPtr nearest = INVALID_ENTITY;
 		for (int i = 0, c = m_environment_probes.size(); i < c; ++i)
 		{
-			Entity probe_entity = m_environment_probes.getKey(i);
+			EntityRef probe_entity = m_environment_probes.getKey(i);
 			Vec3 probe_pos = m_universe.getPosition(probe_entity);
 			float dist_squared = (pos - probe_pos).squaredLength();
 			if (dist_squared < nearest_dist_squared)
@@ -4456,107 +3498,94 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	int getEnvironmentProbeIrradianceSize(Entity entity)
+	int getEnvironmentProbeIrradianceSize(EntityRef entity)
 	{
 		return m_environment_probes[entity].irradiance_size;
 	}
 
 
-	void setEnvironmentProbeIrradianceSize(Entity entity, int size)
+	void setEnvironmentProbeIrradianceSize(EntityRef entity, int size)
 	{
 		m_environment_probes[entity].irradiance_size = size;
 	}
 
 
-	int getEnvironmentProbeRadianceSize(Entity entity)
+	int getEnvironmentProbeRadianceSize(EntityRef entity)
 	{
 		return m_environment_probes[entity].radiance_size;
 	}
 
 
-	void setEnvironmentProbeRadianceSize(Entity entity, int size)
+	void setEnvironmentProbeRadianceSize(EntityRef entity, int size)
 	{
 		m_environment_probes[entity].radiance_size = size;
 	}
 
 
-	int getEnvironmentProbeReflectionSize(Entity entity)
+	int getEnvironmentProbeReflectionSize(EntityRef entity)
 	{
 		return m_environment_probes[entity].reflection_size;
 	}
 
 
-	void setEnvironmentProbeReflectionSize(Entity entity, int size)
+	void setEnvironmentProbeReflectionSize(EntityRef entity, int size)
 	{
 		m_environment_probes[entity].reflection_size = size;
 	}
 
 
-	bool isEnvironmentProbeCustomSize(Entity entity) override
+	bool isEnvironmentProbeCustomSize(EntityRef entity) override
 	{
 		return m_environment_probes[entity].flags.isSet(EnvironmentProbe::OVERRIDE_GLOBAL_SIZE);
 	}
 
 
-	void enableEnvironmentProbeCustomSize(Entity entity, bool enable) override
+	void enableEnvironmentProbeCustomSize(EntityRef entity, bool enable) override
 	{
 		m_environment_probes[entity].flags.set(EnvironmentProbe::OVERRIDE_GLOBAL_SIZE, enable);
 	}
 
 
-	bool isEnvironmentProbeReflectionEnabled(Entity entity) override
+	bool isEnvironmentProbeReflectionEnabled(EntityRef entity) override
 	{
 		return m_environment_probes[entity].flags.isSet(EnvironmentProbe::REFLECTION);
 	}
 
 
-	void enableEnvironmentProbeReflection(Entity entity, bool enable) override
+	void enableEnvironmentProbeReflection(EntityRef entity, bool enable) override
 	{
 		m_environment_probes[entity].flags.set(EnvironmentProbe::REFLECTION, enable);
 	}
 
 
-	Texture* getEnvironmentProbeTexture(Entity entity) const override
+	Texture* getEnvironmentProbeTexture(EntityRef entity) const override
 	{
 		return m_environment_probes[entity].texture;
 	}
 
 
-	Texture* getEnvironmentProbeIrradiance(Entity entity) const override
+	Texture* getEnvironmentProbeIrradiance(EntityRef entity) const override
 	{
 		return m_environment_probes[entity].irradiance;
 	}
 
 
-	Texture* getEnvironmentProbeRadiance(Entity entity) const override
+	Texture* getEnvironmentProbeRadiance(EntityRef entity) const override
 	{
 		return m_environment_probes[entity].radiance;
 	}
 
 
-	u64 getEnvironmentProbeGUID(Entity entity) const override
+	u64 getEnvironmentProbeGUID(EntityRef entity) const override
 	{
 		return m_environment_probes[entity].guid;
-	}
-
-
-	Entity getCameraInSlot(const char* slot) const override
-	{
-		for (const auto& camera : m_cameras)
-		{
-			if (equalStrings(camera.slot, slot))
-			{
-				return camera.entity;
-			}
-		}
-		return INVALID_ENTITY;
 	}
 
 
 	float getTime() const override { return m_time; }
 
 
-	void modelUnloaded(Model*, Entity entity)
+	void modelUnloaded(Model*, EntityRef entity)
 	{
 		auto& r = m_model_instances[entity.index];
 		if (!hasCustomMeshes(r))
@@ -4590,7 +3619,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	void modelLoaded(Model* model, Entity entity)
+	void modelLoaded(Model* model, EntityRef entity)
 	{
 		auto& rm = m_engine.getResourceManager();
 		auto* material_manager = static_cast<MaterialManager*>(rm.get(Material::TYPE));
@@ -4598,7 +3627,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		auto& r = m_model_instances[entity.index];
 
 		float bounding_radius = r.model->getBoundingRadius();
-		float scale = m_universe.getScale(r.entity);
+		float scale = m_universe.getScale(entity);
 		Sphere sphere(r.matrix.getTranslation(), bounding_radius * scale);
 		if(r.flags.isSet(ModelInstance::ENABLED)) m_culling_system->addStatic(entity, sphere, getLayerMask(r));
 		ASSERT(!r.pose);
@@ -4614,7 +3643,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 				mesh.material->setDefine(skinned_define_idx, !mesh.skin.empty());
 			}
 		}
-		r.matrix = m_universe.getMatrix(r.entity);
+		r.matrix = m_universe.getMatrix(entity);
 		ASSERT(!r.meshes || hasCustomMeshes(r));
 		if (r.meshes)
 		{
@@ -4638,7 +3667,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 
 		if (r.flags.isSet(ModelInstance::IS_BONE_ATTACHMENT_PARENT))
 		{
-			updateBoneAttachment(m_bone_attachments[r.entity]);
+			updateBoneAttachment(m_bone_attachments[entity]);
 		}
 
 		for (int i = 0; i < m_point_lights.size(); ++i)
@@ -4737,7 +3766,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	void setModelInstanceMaterial(Entity entity, int index, const Path& path) override
+	void setModelInstanceMaterial(EntityRef entity, int index, const Path& path) override
 	{
 		auto& r = m_model_instances[entity.index];
 		if (r.meshes && r.mesh_count > index && r.meshes[index].material && path == r.meshes[index].material->getPath()) return;
@@ -4754,7 +3783,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	Path getModelInstanceMaterial(Entity entity, int index) override
+	Path getModelInstanceMaterial(EntityRef entity, int index) override
 	{
 		auto& r = m_model_instances[entity.index];
 		if (!r.meshes) return Path("");
@@ -4763,7 +3792,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	void setModel(Entity entity, Model* model)
+	void setModel(EntityRef entity, Model* model)
 	{
 		auto& model_instance = m_model_instances[entity.index];
 		ASSERT(model_instance.entity.isValid());
@@ -4812,7 +3841,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	IAllocator& getAllocator() override { return m_allocator; }
 
 
-	void detectLightInfluencedGeometry(Entity entity)
+	void detectLightInfluencedGeometry(EntityRef entity)
 	{
 		const int light_idx = m_point_lights_map[entity];
 		const Frustum frustum = getPointLightFrustum(light_idx);
@@ -4832,149 +3861,19 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	int getParticleEmitterAttractorCount(Entity entity) override
-	{
-		auto* module = getEmitterModule<ParticleEmitter::AttractorModule>(entity);
-		return module ? module->m_count : 0;
-	}
-
-
-	void addParticleEmitterAttractor(Entity entity, int index) override
-	{
-		auto* module = getEmitterModule<ParticleEmitter::AttractorModule>(entity);
-		if (!module) return;
-
-		auto* plane_module = static_cast<ParticleEmitter::AttractorModule*>(module);
-		if (plane_module->m_count == lengthOf(plane_module->m_entities)) return;
-
-		if (index < 0)
-		{
-			plane_module->m_entities[plane_module->m_count] = INVALID_ENTITY;
-			++plane_module->m_count;
-			return;
-		}
-
-		for (int i = plane_module->m_count - 1; i > index; --i)
-		{
-			plane_module->m_entities[i] = plane_module->m_entities[i - 1];
-		}
-		plane_module->m_entities[index] = INVALID_ENTITY;
-		++plane_module->m_count;
-	}
-
-
-	void removeParticleEmitterAttractor(Entity entity, int index) override
-	{
-		auto* module = getEmitterModule<ParticleEmitter::AttractorModule>(entity);
-		if (!module) return;
-
-		for (int i = index; i < module->m_count - 1; ++i)
-		{
-			module->m_entities[i] = module->m_entities[i + 1];
-		}
-		--module->m_count;
-	}
-
-
-	Entity getParticleEmitterAttractorEntity(Entity entity, int index) override
-	{
-		auto* module = getEmitterModule<ParticleEmitter::AttractorModule>(entity);
-		return module ? module->m_entities[index] : INVALID_ENTITY;
-	}
-
-
-	void setParticleEmitterAttractorEntity(Entity module_entity, int index, Entity entity) override
-	{
-		auto* module = getEmitterModule<ParticleEmitter::AttractorModule>(module_entity);
-		if(module) module->m_entities[index] = entity;
-	}
-
-
-	float getParticleEmitterShapeRadius(Entity entity) override
-	{
-		auto* module = getEmitterModule<ParticleEmitter::SpawnShapeModule>(entity);
-		return module ? module->m_radius : 0.0f;
-	}
-
-
-	void setParticleEmitterShapeRadius(Entity entity, float value) override
-	{
-		auto* module = getEmitterModule<ParticleEmitter::SpawnShapeModule>(entity);
-		if (module) module->m_radius = value;
-	}
-
-
-	int getParticleEmitterPlaneCount(Entity entity) override
-	{
-		auto* module = getEmitterModule<ParticleEmitter::PlaneModule>(entity);
-		return module ? module->m_count : 0;
-	}
-
-
-	void addParticleEmitterPlane(Entity entity, int index) override
-	{
-		auto* plane_module = getEmitterModule<ParticleEmitter::PlaneModule>(entity);
-		if (!plane_module) return;
-
-		if (plane_module->m_count == lengthOf(plane_module->m_entities)) return;
-
-		if (index < 0)
-		{
-			plane_module->m_entities[plane_module->m_count] = INVALID_ENTITY;
-			++plane_module->m_count;
-			return;
-		}
-
-		for (int i = plane_module->m_count - 1; i > index; --i)
-		{
-			plane_module->m_entities[i] = plane_module->m_entities[i - 1];
-		}
-		plane_module->m_entities[index] = INVALID_ENTITY;
-		++plane_module->m_count;
-			
-	}
-
-
-	void removeParticleEmitterPlane(Entity entity, int index) override
-	{
-		auto* plane_module = getEmitterModule<ParticleEmitter::PlaneModule>(entity);
-		if (!plane_module) return;
-
-		for (int i = index; i < plane_module->m_count - 1; ++i)
-		{
-			plane_module->m_entities[i] = plane_module->m_entities[i + 1];
-		}
-		--plane_module->m_count;
-	}
-
-
-	Entity getParticleEmitterPlaneEntity(Entity entity, int index) override
-	{
-		auto* module = getEmitterModule<ParticleEmitter::PlaneModule>(entity);
-		return module ? module->m_entities[index] : INVALID_ENTITY;
-	}
-
-
-	void setParticleEmitterPlaneEntity(Entity module_entity, int index, Entity entity) override
-	{
-		auto* module = getEmitterModule<ParticleEmitter::PlaneModule>(module_entity);
-		if (module) module->m_entities[index] = entity;
-	}
-
-
-	float getLightFOV(Entity entity) override
+	float getLightFOV(EntityRef entity) override
 	{
 		return m_point_lights[m_point_lights_map[entity]].m_fov;
 	}
 
 
-	void setLightFOV(Entity entity, float fov) override
+	void setLightFOV(EntityRef entity, float fov) override
 	{
 		m_point_lights[m_point_lights_map[entity]].m_fov = fov;
 	}
 
 
-	void createGlobalLight(Entity entity)
+	void createGlobalLight(EntityRef entity)
 	{
 		GlobalLight light;
 		light.m_entity = entity;
@@ -4994,7 +3893,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	void createPointLight(Entity entity)
+	void createPointLight(EntityRef entity)
 	{
 		PointLight& light = m_point_lights.emplace();
 		m_light_influenced_geometry.emplace(m_allocator);
@@ -5028,7 +3927,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	void createDecal(Entity entity)
+	void createDecal(EntityRef entity)
 	{
 		Decal& decal = m_decals.insert(entity);
 		decal.material = nullptr;
@@ -5040,7 +3939,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	void createEnvironmentProbe(Entity entity)
+	void createEnvironmentProbe(EntityRef entity)
 	{
 		EnvironmentProbe& probe = m_environment_probes.insert(entity);
 		auto* texture_manager = m_engine.getResourceManager().get(Texture::TYPE);
@@ -5056,7 +3955,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	void createBoneAttachment(Entity entity)
+	void createBoneAttachment(EntityRef entity)
 	{
 		BoneAttachment& attachment = m_bone_attachments.emplace(entity);
 		attachment.entity = entity;
@@ -5067,7 +3966,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	void createModelInstance(Entity entity)
+	void createModelInstance(EntityRef entity)
 	{
 		while(entity.index >= m_model_instances.size())
 		{
@@ -5089,7 +3988,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	void setScriptedParticleEmitterMaterialPath(Entity entity, const Path& path) override
+	void setScriptedParticleEmitterMaterialPath(EntityRef entity, const Path& path) override
 	{
 		if (!m_scripted_particle_emitters[entity]) return;
 
@@ -5099,7 +3998,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	Path getScriptedParticleEmitterMaterialPath(Entity entity) override
+	Path getScriptedParticleEmitterMaterialPath(EntityRef entity) override
 	{
 		ScriptedParticleEmitter* emitter = m_scripted_particle_emitters[entity];
 		if (!emitter) return Path("");
@@ -5108,32 +4007,8 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		return emitter->getMaterial()->getPath();
 	}
 
-	void setParticleEmitterMaterialPath(Entity entity, const Path& path) override
-	{
-		if (!m_particle_emitters[entity]) return;
 
-		auto* manager = m_engine.getResourceManager().get(Material::TYPE);
-		Material* material = static_cast<Material*>(manager->load(path));
-		m_particle_emitters[entity]->setMaterial(material);
-	}
-
-
-	Path getParticleEmitterMaterialPath(Entity entity) override
-	{
-		ParticleEmitter* emitter = m_particle_emitters[entity];
-		if (!emitter) return Path("");
-		if (!emitter->getMaterial()) return Path("");
-
-		return emitter->getMaterial()->getPath();
-	}
-
-
-	const AssociativeArray<Entity, ParticleEmitter*>& getParticleEmitters() const override
-	{
-		return m_particle_emitters;
-	}
-
-	const AssociativeArray<Entity, ScriptedParticleEmitter*>& getScriptedParticleEmitters() const override
+	const AssociativeArray<EntityRef, ScriptedParticleEmitter*>& getScriptedParticleEmitters() const override
 	{
 		return m_scripted_particle_emitters;
 	}
@@ -5145,21 +4020,20 @@ private:
 	Engine& m_engine;
 	CullingSystem* m_culling_system;
 
-	Array<Array<Entity>> m_light_influenced_geometry;
-	Entity m_active_global_light_entity;
-	HashMap<Entity, int> m_point_lights_map;
+	Array<Array<EntityRef>> m_light_influenced_geometry;
+	EntityPtr m_active_global_light_entity;
+	HashMap<EntityRef, int> m_point_lights_map;
 
-	AssociativeArray<Entity, Decal> m_decals;
+	AssociativeArray<EntityRef, Decal> m_decals;
 	Array<ModelInstance> m_model_instances;
-	HashMap<Entity, GlobalLight> m_global_lights;
+	HashMap<EntityRef, GlobalLight> m_global_lights;
 	Array<PointLight> m_point_lights;
-	HashMap<Entity, Camera> m_cameras;
-	AssociativeArray<Entity, TextMesh*> m_text_meshes;
-	AssociativeArray<Entity, BoneAttachment> m_bone_attachments;
-	AssociativeArray<Entity, EnvironmentProbe> m_environment_probes;
-	HashMap<Entity, Terrain*> m_terrains;
-	AssociativeArray<Entity, ParticleEmitter*> m_particle_emitters;
-	AssociativeArray<Entity, ScriptedParticleEmitter*> m_scripted_particle_emitters;
+	HashMap<EntityRef, Camera> m_cameras;
+	AssociativeArray<EntityRef, TextMesh*> m_text_meshes;
+	AssociativeArray<EntityRef, BoneAttachment> m_bone_attachments;
+	AssociativeArray<EntityRef, EnvironmentProbe> m_environment_probes;
+	HashMap<EntityRef, Terrain*> m_terrains;
+	AssociativeArray<EntityRef, ScriptedParticleEmitter*> m_scripted_particle_emitters;
 
 	Array<DebugTriangle> m_debug_triangles;
 	Array<DebugLine> m_debug_lines;
@@ -5190,8 +4064,8 @@ static struct
 	ComponentType type;
 	Universe::Serialize serialize;
 	Universe::Deserialize deserialize;
-	void (RenderSceneImpl::*creator)(Entity);
-	void (RenderSceneImpl::*destroyer)(Entity);
+	void (RenderSceneImpl::*creator)(EntityRef);
+	void (RenderSceneImpl::*destroyer)(EntityRef);
 } COMPONENT_INFOS[] = {
 	COMPONENT_TYPE(MODEL_INSTANCE_TYPE, ModelInstance),
 	COMPONENT_TYPE(GLOBAL_LIGHT_TYPE, GlobalLight),
@@ -5201,17 +4075,7 @@ static struct
 	COMPONENT_TYPE(TERRAIN_TYPE, Terrain),
 	COMPONENT_TYPE(BONE_ATTACHMENT_TYPE, BoneAttachment),
 	COMPONENT_TYPE(ENVIRONMENT_PROBE_TYPE, EnvironmentProbe),
-	COMPONENT_TYPE(PARTICLE_EMITTER_TYPE, ParticleEmitter),
 	COMPONENT_TYPE(SCRIPTED_PARTICLE_EMITTER_TYPE, ScriptedParticleEmitter),
-	COMPONENT_TYPE(PARTICLE_EMITTER_ALPHA_TYPE, ParticleEmitterAlpha),
-	COMPONENT_TYPE(PARTICLE_EMITTER_ATTRACTOR_TYPE, ParticleEmitterAttractor),
-	COMPONENT_TYPE(PARTICLE_EMITTER_FORCE_HASH, ParticleEmitterForce),
-	COMPONENT_TYPE(PARTICLE_EMITTER_LINEAR_MOVEMENT_TYPE, ParticleEmitterLinearMovement),
-	COMPONENT_TYPE(PARTICLE_EMITTER_PLANE_TYPE, ParticleEmitterPlane),
-	COMPONENT_TYPE(PARTICLE_EMITTER_RANDOM_ROTATION_TYPE, ParticleEmitterRandomRotation),
-	COMPONENT_TYPE(PARTICLE_EMITTER_SIZE_TYPE, ParticleEmitterSize),
-	COMPONENT_TYPE(PARTICLE_EMITTER_SPAWN_SHAPE_TYPE, ParticleEmitterSpawnShape),
-	COMPONENT_TYPE(PARTICLE_EMITTER_SUBIMAGE_TYPE, ParticleEmitterSubimage),
 	COMPONENT_TYPE(TEXT_MESH_TYPE, TextMesh)
 };
 
@@ -5240,7 +4104,6 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	, m_active_global_light_entity(INVALID_ENTITY)
 	, m_is_grass_enabled(true)
 	, m_is_game_running(false)
-	, m_particle_emitters(m_allocator)
 	, m_scripted_particle_emitters(m_allocator)
 	, m_point_lights_map(m_allocator)
 	, m_bone_attachments(m_allocator)
@@ -5293,7 +4156,6 @@ void RenderScene::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(getCameraViewProjection);
 	REGISTER_FUNCTION(getGlobalLightEntity);
 	REGISTER_FUNCTION(getActiveGlobalLight);
-	REGISTER_FUNCTION(getCameraInSlot);
 	REGISTER_FUNCTION(getModelInstanceModel);
 	REGISTER_FUNCTION(addDebugCross);
 	REGISTER_FUNCTION(addDebugLine);
@@ -5326,7 +4188,6 @@ void RenderScene::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(makeScreenshot);
 	REGISTER_FUNCTION(compareTGA);
 	REGISTER_FUNCTION(getTerrainHeightAt);
-	REGISTER_FUNCTION(emitParticle);
 
 	LuaWrapper::createSystemFunction(L, "Renderer", "castCameraRay", &RenderSceneImpl::LUA_castCameraRay);
 

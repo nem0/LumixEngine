@@ -42,7 +42,7 @@ enum MemoryColumn
 };
 
 
-struct ProfilerUIImpl LUMIX_FINAL : public ProfilerUI
+struct ProfilerUIImpl final : public ProfilerUI
 {
 	ProfilerUIImpl(Debug::Allocator& allocator, Engine& engine)
 		: m_main_allocator(allocator)

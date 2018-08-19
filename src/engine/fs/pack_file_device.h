@@ -15,7 +15,7 @@ namespace FS
 struct IFile;
 
 
-class LUMIX_ENGINE_API PackFileDevice LUMIX_FINAL : public IFileDevice
+class LUMIX_ENGINE_API PackFileDevice final : public IFileDevice
 {
 	friend class PackFile;
 public:

@@ -218,7 +218,7 @@ namespace Lumix
 	};
 
 
-	struct PhysicsSystemImpl LUMIX_FINAL : public PhysicsSystem
+	struct PhysicsSystemImpl final : public PhysicsSystem
 	{
 		explicit PhysicsSystemImpl(Engine& engine)
 			: m_allocator(engine.getAllocator())

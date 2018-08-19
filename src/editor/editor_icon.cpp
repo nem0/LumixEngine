@@ -51,11 +51,11 @@ const char* ICONS[(int)IconType::COUNT] =
 static const float ORTHO_SIZE_SCALE = 1 / 20.0f;
 
 
-struct EditorIconsImpl LUMIX_FINAL : public EditorIcons
+struct EditorIconsImpl final : public EditorIcons
 {
 	struct Icon
 	{
-		Entity entity;
+		EntityRef entity;
 		IconType type;
 		float scale;
 	};
@@ -100,13 +100,13 @@ struct EditorIconsImpl LUMIX_FINAL : public EditorIcons
 	}
 
 
-	void onEntityCreated(Entity entity)
+	void onEntityCreated(EntityRef entity)
 	{
 		createIcon(entity);
 	}
 
 
-	void destroyIcon(Entity entity)
+	void destroyIcon(EntityRef entity)
 	{
 		for(int i = 0, c = m_icons.size(); i < c; ++i)
 		{
@@ -121,15 +121,14 @@ struct EditorIconsImpl LUMIX_FINAL : public EditorIcons
 
 	void refreshIcon(const ComponentUID& cmp)
 	{
-		destroyIcon(cmp.entity);
-		createIcon(cmp.entity);
+		ASSERT(cmp.isValid());
+		destroyIcon((EntityRef)cmp.entity);
+		createIcon((EntityRef)cmp.entity);
 	}
 
 
-	void createIcon(Entity entity)
+	void createIcon(EntityRef entity)
 	{
-		if (!entity.isValid()) return;
-
 		Universe& universe = *m_editor.getUniverse();
 		
 		if (universe.getComponent(entity, MODEL_INSTANCE_TYPE).isValid()) return;
@@ -173,9 +172,9 @@ struct EditorIconsImpl LUMIX_FINAL : public EditorIcons
 	{
 		clear();
 		auto& universe = *m_editor.getUniverse();
-		for (Entity entity = universe.getFirstEntity(); entity.isValid(); entity = universe.getNextEntity(entity))
+		for (EntityPtr entity = universe.getFirstEntity(); entity.isValid(); entity = universe.getNextEntity((EntityRef)entity))
 		{
-			createIcon(entity);
+			createIcon((EntityRef)entity);
 		}
 	}
 

@@ -71,7 +71,7 @@ static const ComponentType TEXT_MESH_TYPE = Reflection::getComponentType("text_m
 static const ComponentType ENVIRONMENT_PROBE_TYPE = Reflection::getComponentType("environment_probe");
 
 
-struct FontPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
+struct FontPlugin final : public AssetBrowser::IPlugin
 {
 	FontPlugin(StudioApp& app) { app.getAssetBrowser().registerExtension("ttf", FontResource::TYPE); }
 
@@ -83,7 +83,7 @@ struct FontPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 };
 
 
-struct MaterialPlugin LUMIX_FINAL : AssetBrowser::IPlugin, AssetCompiler::IPlugin
+struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 {
 	explicit MaterialPlugin(StudioApp& app)
 		: m_app(app)
@@ -357,7 +357,7 @@ struct MaterialPlugin LUMIX_FINAL : AssetBrowser::IPlugin, AssetCompiler::IPlugi
 };
 
 
-struct ModelPlugin LUMIX_FINAL : AssetBrowser::IPlugin, AssetCompiler::IPlugin
+struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 {
 	struct Meta
 	{
@@ -534,7 +534,7 @@ struct ModelPlugin LUMIX_FINAL : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 		Matrix mtx;
 		mtx.lookAt({10, 10, 10}, Vec3::ZERO, {0, 1, 0});
-		Entity light_entity = m_tile.universe->createEntity({0, 0, 0}, {0, 0, 0, 1});
+		EntityRef light_entity = m_tile.universe->createEntity({0, 0, 0}, {0, 0, 0, 1});
 		m_tile.universe->setMatrix(light_entity, mtx);
 		RenderScene* render_scene = (RenderScene*)m_tile.universe->getScene(MODEL_INSTANCE_TYPE);
 		m_tile.universe->createComponent(GLOBAL_LIGHT_TYPE, light_entity);
@@ -571,10 +571,11 @@ struct ModelPlugin LUMIX_FINAL : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		auto* render_scene = static_cast<RenderScene*>(m_universe->getScene(MODEL_INSTANCE_TYPE));
 		if (!render_scene) return;
 		if (!model.isReady()) return;
+		if (!m_mesh.isValid()) return;
 
-		if (render_scene->getModelInstanceModel(m_mesh) != &model)
+		if (render_scene->getModelInstanceModel((EntityRef)m_mesh) != &model)
 		{
-			render_scene->setModelInstancePath(m_mesh, model.getPath());
+			render_scene->setModelInstancePath((EntityRef)m_mesh, model.getPath());
 			AABB aabb = model.getAABB();
 
 			const Vec3 center = (aabb.max + aabb.min) * 0.5f;
@@ -885,12 +886,12 @@ struct ModelPlugin LUMIX_FINAL : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		Renderer* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
 		if (!renderer) return;
 
-		Entity mesh_entity = m_tile.universe->instantiatePrefab(*prefab, Vec3::ZERO, Quat::IDENTITY, 1);
+		EntityPtr mesh_entity = m_tile.universe->instantiatePrefab(*prefab, Vec3::ZERO, Quat::IDENTITY, 1);
 		if (!mesh_entity.isValid()) return;
 
-		if (!render_scene->getUniverse().hasComponent(mesh_entity, MODEL_INSTANCE_TYPE)) return;
+		if (!render_scene->getUniverse().hasComponent((EntityRef)mesh_entity, MODEL_INSTANCE_TYPE)) return;
 
-		Model* model = render_scene->getModelInstanceModel(mesh_entity);
+		Model* model = render_scene->getModelInstanceModel((EntityRef)mesh_entity);
 		if (!model) return;
 
 		m_tile.path_hash = prefab->getPath().getHash();
@@ -958,7 +959,7 @@ bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK); renderer->viewCounterAdd();
 		Renderer* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
 		if (!renderer) return;
 
-		Entity mesh_entity = m_tile.universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
+		EntityRef mesh_entity = m_tile.universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
 		m_tile.universe->createComponent(MODEL_INSTANCE_TYPE, mesh_entity);
 
 		render_scene->setModelInstancePath(mesh_entity, model->getPath());
@@ -1050,7 +1051,7 @@ bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK); renderer->viewCounterAdd();
 
 		Universe* universe = nullptr;
 		Pipeline* pipeline = nullptr;
-		Entity m_entity_in_fly = INVALID_ENTITY;
+		EntityPtr m_entity_in_fly = INVALID_ENTITY;
 		int frame_countdown = -1;
 		u32 path_hash;
 		Array<u8> data;
@@ -1065,7 +1066,7 @@ bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK); renderer->viewCounterAdd();
 	Universe* m_universe;
 	Viewport m_viewport;
 	Pipeline* m_pipeline;
-	Entity m_mesh;
+	EntityPtr m_mesh = INVALID_ENTITY;
 	bool m_is_mouse_captured;
 	int m_captured_mouse_x;
 	int m_captured_mouse_y;
@@ -1091,7 +1092,7 @@ bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK); renderer->viewCounterAdd();
 };
 
 
-struct TexturePlugin LUMIX_FINAL : AssetBrowser::IPlugin, AssetCompiler::IPlugin
+struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 {
 	struct Meta
 	{
@@ -1268,7 +1269,7 @@ struct TexturePlugin LUMIX_FINAL : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 };
 
 
-struct ShaderPlugin LUMIX_FINAL : AssetBrowser::IPlugin, AssetCompiler::IPlugin
+struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 {
 	explicit ShaderPlugin(StudioApp& app)
 		: m_app(app)
@@ -1372,7 +1373,7 @@ auto* shader = static_cast<Shader*>(resource);
 };
 
 
-struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
+struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 {
 	explicit EnvironmentProbePlugin(StudioApp& app)
 		: m_app(app)
@@ -1441,7 +1442,7 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		{
 			g_log_error.log("Editor") << "Failed to create " << path;
 		}
-		u64 probe_guid = ((RenderScene*)cmp.scene)->getEnvironmentProbeGUID(cmp.entity);
+		u64 probe_guid = ((RenderScene*)cmp.scene)->getEnvironmentProbeGUID((EntityRef)cmp.entity);
 		path << probe_guid << postfix << ".dds";
 		if (!file.open(path, FS::Mode::CREATE_AND_WRITE))
 		{
@@ -1488,7 +1489,8 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 
 	void generateCubemap(ComponentUID cmp)
 	{
-		static const int TEXTURE_SIZE = 1024;
+		// TODO
+		/*static const int TEXTURE_SIZE = 1024;
 
 		Universe* universe = m_app.getWorldEditor().getUniverse();
 		if (universe->getName()[0] == '\0')
@@ -1502,9 +1504,9 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		auto& plugin_manager = engine.getPluginManager();
 		IAllocator& allocator = engine.getAllocator();
 
-		Vec3 probe_position = universe->getPosition(cmp.entity);
+		Vec3 probe_position = universe->getPosition((EntityRef)cmp.entity);
 		auto* scene = static_cast<RenderScene*>(universe->getScene(CAMERA_TYPE));
-		Entity camera_entity = scene->getCameraInSlot("probe");
+		EntityRef camera_entity = scene->getCameraInSlot("probe");
 		if (!camera_entity.isValid())
 		{
 			g_log_error.log("Renderer") << "No camera in slot 'probe'.";
@@ -1606,7 +1608,7 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		ffr::destroy(texture);
 		
 
-		scene->reloadEnvironmentProbe(cmp.entity);
+		scene->reloadEnvironmentProbe(cmp.entity);*/
 	}
 
 
@@ -1614,20 +1616,21 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 	{
 		if (cmp.type != ENVIRONMENT_PROBE_TYPE) return;
 
+		const EntityRef e = (EntityRef)cmp.entity;
 		auto* scene = static_cast<RenderScene*>(cmp.scene);
-		auto* texture = scene->getEnvironmentProbeTexture(cmp.entity);
+		auto* texture = scene->getEnvironmentProbeTexture(e);
 		if (texture)
 		{
 			ImGui::LabelText("Reflection path", "%s", texture->getPath().c_str());
 			if (ImGui::Button("View reflection")) m_app.getAssetBrowser().selectResource(texture->getPath(), true);
 		}
-		texture = scene->getEnvironmentProbeIrradiance(cmp.entity);
+		texture = scene->getEnvironmentProbeIrradiance(e);
 		if (texture)
 		{
 			ImGui::LabelText("Irradiance path", "%s", texture->getPath().c_str());
 			if (ImGui::Button("View irradiance")) m_app.getAssetBrowser().selectResource(texture->getPath(), true);
 		}
-		texture = scene->getEnvironmentProbeRadiance(cmp.entity);
+		texture = scene->getEnvironmentProbeRadiance(e);
 		if (texture)
 		{
 			ImGui::LabelText("Radiance path", "%s", texture->getPath().c_str());
@@ -1644,43 +1647,7 @@ struct EnvironmentProbePlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 };
 
 
-struct EmitterPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
-{
-	explicit EmitterPlugin(StudioApp& app)
-		: m_app(app)
-	{
-		m_particle_emitter_updating = true;
-		m_particle_emitter_timescale = 1.0f;
-	}
-
-
-	void onGUI(PropertyGrid& grid, ComponentUID cmp) override
-	{
-		if (cmp.type != PARTICLE_EMITTER_TYPE) return;
-
-		ImGui::Separator();
-		ImGui::Checkbox("Update", &m_particle_emitter_updating);
-		auto* scene = static_cast<RenderScene*>(cmp.scene);
-		ImGui::SameLine();
-		if (ImGui::Button("Reset")) scene->resetParticleEmitter(cmp.entity);
-
-		if (m_particle_emitter_updating)
-		{
-			ImGui::DragFloat("Timescale", &m_particle_emitter_timescale, 0.01f, 0.01f, 10000.0f);
-			float time_delta = m_app.getWorldEditor().getEngine().getLastTimeDelta();
-			scene->updateEmitter(cmp.entity, time_delta * m_particle_emitter_timescale);
-			scene->getParticleEmitter(cmp.entity)->drawGizmo(m_app.getWorldEditor(), *scene);
-		}
-	}
-
-
-	StudioApp& m_app;
-	float m_particle_emitter_timescale;
-	bool m_particle_emitter_updating;
-};
-
-
-struct TerrainPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
+struct TerrainPlugin final : public PropertyGrid::IPlugin
 {
 	explicit TerrainPlugin(StudioApp& app)
 		: m_app(app)
@@ -1707,7 +1674,7 @@ struct TerrainPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 };
 
 
-struct FurPainter LUMIX_FINAL : public WorldEditor::Plugin
+struct FurPainter final : public WorldEditor::Plugin
 {
 	explicit FurPainter(StudioApp& _app)
 		: app(_app)
@@ -1729,7 +1696,7 @@ struct FurPainter LUMIX_FINAL : public WorldEditor::Plugin
 		if (!model_instance.isValid()) return;
 
 		RenderScene* scene = static_cast<RenderScene*>(model_instance.scene);
-		Model* model = scene->getModelInstanceModel(model_instance.entity);
+		Model* model = scene->getModelInstanceModel((EntityRef)model_instance.entity);
 
 		if (!model || !model->isReady()) return;
 
@@ -1775,7 +1742,7 @@ struct FurPainter LUMIX_FINAL : public WorldEditor::Plugin
 		if (!model_instance.isValid()) return;
 
 		RenderScene* scene = static_cast<RenderScene*>(model_instance.scene);
-		Model* model = scene->getModelInstanceModel(model_instance.entity);
+		Model* model = scene->getModelInstanceModel((EntityRef)model_instance.entity);
 
 		if (!model || !model->isReady() || model->getMeshCount() < 1) return;
 		if (!model->getMesh(0).material) return;
@@ -2050,7 +2017,7 @@ struct FurPainter LUMIX_FINAL : public WorldEditor::Plugin
 		if (!hit.entity.isValid()) return false;
 		auto& ents = app.getWorldEditor().getSelectedEntities();
 
-		if (enabled && ents.size() == 1 && ents[0] == hit.entity)
+		if (enabled && ents.size() == 1 && (EntityPtr)ents[0] == hit.entity)
 		{
 			onMouseMove(x, y, 0, 0);
 			return true;
@@ -2070,8 +2037,9 @@ struct FurPainter LUMIX_FINAL : public WorldEditor::Plugin
 		ComponentUID model_instance = universe->getComponent(entities[0], MODEL_INSTANCE_TYPE);
 		if (!model_instance.isValid()) return;
 
+		const EntityRef entity = (EntityRef)model_instance.entity;
 		RenderScene* scene = static_cast<RenderScene*>(model_instance.scene);
-		Model* model = scene->getModelInstanceModel(model_instance.entity);
+		Model* model = scene->getModelInstanceModel(entity);
 
 		if (!model || !model->isReady() || model->getMeshCount() < 1) return;
 		if (!model->getMesh(0).material) return;
@@ -2079,7 +2047,7 @@ struct FurPainter LUMIX_FINAL : public WorldEditor::Plugin
 		Texture* texture = model->getMesh(0).material->getTexture(0);
 		if (!texture || texture->data.empty()) return;
 
-		const Pose* pose = scene->lockPose(model_instance.entity);
+		const Pose* pose = scene->lockPose(entity);
 		if (!pose) return;
 
 		Vec3 origin, dir;
@@ -2087,7 +2055,7 @@ struct FurPainter LUMIX_FINAL : public WorldEditor::Plugin
 		RayCastModelHit hit = model->castRay(origin, dir, universe->getMatrix(entities[0]), pose);
 		if (!hit.m_is_hit)
 		{
-			scene->unlockPose(model_instance.entity, false);
+			scene->unlockPose(entity, false);
 			return;
 		}
 
@@ -2095,7 +2063,7 @@ struct FurPainter LUMIX_FINAL : public WorldEditor::Plugin
 		hit_pos = universe->getTransform(entities[0]).inverted().transform(hit_pos);
 
 		paint(texture, model, hit_pos);
-		scene->unlockPose(model_instance.entity, false);
+		scene->unlockPose(entity, false);
 	}
 
 
@@ -2106,164 +2074,7 @@ struct FurPainter LUMIX_FINAL : public WorldEditor::Plugin
 };
 
 
-struct FurPainterPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
-{
-	explicit FurPainterPlugin(StudioApp& _app)
-		: app(_app)
-		, is_open(false)
-	{
-		fur_painter = LUMIX_NEW(app.getWorldEditor().getAllocator(), FurPainter)(_app);
-		Action* action =
-			LUMIX_NEW(app.getWorldEditor().getAllocator(), Action)("Fur Painter", "Toggle fur painter", "fur_painter");
-		action->func.bind<FurPainterPlugin, &FurPainterPlugin::onAction>(this);
-		action->is_selected.bind<FurPainterPlugin, &FurPainterPlugin::isOpen>(this);
-		app.addWindowAction(action);
-	}
-
-
-	~FurPainterPlugin()
-	{
-		app.getWorldEditor().removePlugin(*fur_painter);
-		LUMIX_DELETE(app.getWorldEditor().getAllocator(), fur_painter);
-	}
-
-
-	const char* getName() const override { return "fur_painter"; }
-
-
-	bool isOpen() const { return is_open; }
-	void onAction() { is_open = !is_open; }
-
-
-	void onWindowGUI() override
-	{
-		if (ImGui::BeginDock("Fur painter", &is_open))
-		{
-			ImGui::Checkbox("Enabled", &fur_painter->enabled);
-			if (!fur_painter->enabled) goto end;
-
-
-			WorldEditor& editor = app.getWorldEditor();
-			const auto& entities = editor.getSelectedEntities();
-			if (entities.empty())
-			{
-				ImGui::Text("No entity selected.");
-				goto end;
-			}
-			Universe* universe = editor.getUniverse();
-			RenderScene* scene = static_cast<RenderScene*>(universe->getScene(MODEL_INSTANCE_TYPE));
-			ComponentUID model_instance = universe->getComponent(entities[0], MODEL_INSTANCE_TYPE);
-
-			if (!model_instance.isValid())
-			{
-				ImGui::Text("Entity does not have model_instance component.");
-				goto end;
-			}
-
-			Model* model = scene->getModelInstanceModel(model_instance.entity);
-			if (!model)
-			{
-				ImGui::Text("Entity does not have model.");
-				goto end;
-			}
-
-			if (model->isFailure())
-			{
-				ImGui::Text("Model failed to load.");
-				goto end;
-			}
-			else if (model->isEmpty())
-			{
-				ImGui::Text("Model is not loaded.");
-				goto end;
-			}
-
-			if (model->getMeshCount() < 1 || !model->getMesh(0).material)
-			{
-				ImGui::Text("Model file is invalid.");
-				goto end;
-			}
-
-			Texture* texture = model->getMesh(0).material->getTexture(0);
-			if (!texture)
-			{
-				ImGui::Text("Missing texture.");
-				goto end;
-			}
-
-			if (!endsWith(texture->getPath().c_str(), ".tga"))
-			{
-				ImGui::Text("Only TGA can be painted");
-				goto end;
-			}
-
-			if (texture->data.empty())
-			{
-				texture->addDataReference();
-				texture->getResourceManager().reload(*texture);
-				goto end;
-			}
-
-			ImGui::DragFloat("Brush radius", &fur_painter->brush_radius);
-			ImGui::DragFloat("Brush strength", &fur_painter->brush_strength, 0.01f, 0.0f, 1.0f);
-			if (ImGui::Button("Save texture")) fur_painter->saveTexture();
-			ImGui::SameLine();
-			if (ImGui::Button("Postprocess")) fur_painter->postprocess();
-
-			drawGizmo();
-		}
-
-	end:
-		ImGui::EndDock();
-	}
-
-
-	void drawGizmo()
-	{
-		if (!fur_painter->enabled) return;
-
-		WorldEditor& editor = app.getWorldEditor();
-		auto& entities = editor.getSelectedEntities();
-		if (entities.empty()) return;
-
-		ComponentUID model_instance = editor.getUniverse()->getComponent(entities[0], MODEL_INSTANCE_TYPE);
-		if (!model_instance.isValid()) return;
-
-		RenderScene* scene = static_cast<RenderScene*>(model_instance.scene);
-		Model* model = scene->getModelInstanceModel(model_instance.entity);
-
-		if (!model || !model->isReady() || model->getMeshCount() < 1) return;
-		if (!model->getMesh(0).material) return;
-
-		Texture* texture = model->getMesh(0).material->getTexture(0);
-		if (!texture || texture->data.empty()) return;
-
-		const Pose* pose = scene->lockPose(model_instance.entity);
-		if (!pose) return;
-
-		Vec3 origin, dir;
-		
-		editor.getViewport().getRay(editor.getMousePos(), origin, dir);
-		RayCastModelHit hit = model->castRay(origin, dir, editor.getUniverse()->getMatrix(entities[0]), pose);
-		if (!hit.m_is_hit)
-		{
-			scene->unlockPose(model_instance.entity, false);
-			return;
-		}
-
-		Vec3 hit_pos = hit.m_origin + hit.m_t * hit.m_dir;
-		scene->addDebugSphere(hit_pos, fur_painter->brush_radius, 0xffffFFFF, 0);
-		scene->unlockPose(model_instance.entity, false);
-	}
-
-
-	FurPainter* fur_painter;
-	bool is_open;
-	StudioApp& app;
-};
-
-
-struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
+struct RenderInterfaceImpl final : public RenderInterface
 {
 	RenderInterfaceImpl(WorldEditor& editor, Pipeline& pipeline)
 		: m_pipeline(pipeline)
@@ -2310,7 +2121,7 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 	}
 
 
-	Vec3 getClosestVertex(Universe* universe, Entity entity, const Vec3& wpos) override
+	Vec3 getClosestVertex(Universe* universe, EntityRef entity, const Vec3& wpos) override
 	{
 		Matrix mtx = universe->getMatrix(entity);
 		Matrix inv_mtx = mtx;
@@ -2475,7 +2286,7 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 	}
 
 
-	WorldEditor::RayHit castRay(const Vec3& origin, const Vec3& dir, Entity ignored) override
+	WorldEditor::RayHit castRay(const Vec3& origin, const Vec3& dir, EntityPtr ignored) override
 	{
 		auto hit = m_render_scene->castRay(origin, dir, ignored);
 
@@ -2483,7 +2294,7 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 	}
 
 
-	void getRay(Entity camera, const Vec2& screen_pos, Vec3& origin, Vec3& dir) override
+	void getRay(EntityRef camera, const Vec2& screen_pos, Vec3& origin, Vec3& dir) override
 	{
 		m_render_scene->getRay(camera, screen_pos, origin, dir);
 	}
@@ -2501,7 +2312,7 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 	}
 
 
-	AABB getEntityAABB(Universe& universe, Entity entity) override
+	AABB getEntityAABB(Universe& universe, EntityRef entity) override
 	{
 		AABB aabb;
 
@@ -2531,16 +2342,16 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 	}
 
 
-	Vec2 getCameraScreenSize(Entity entity) override { return m_render_scene->getCameraScreenSize(entity); }
+	Vec2 getCameraScreenSize(EntityRef entity) override { return m_render_scene->getCameraScreenSize(entity); }
 
 
-	float getCameraOrthoSize(Entity entity) override { return m_render_scene->getCameraOrthoSize(entity); }
+	float getCameraOrthoSize(EntityRef entity) override { return m_render_scene->getCameraOrthoSize(entity); }
 
 
-	bool isCameraOrtho(Entity entity) override { return m_render_scene->isCameraOrtho(entity); }
+	bool isCameraOrtho(EntityRef entity) override { return m_render_scene->isCameraOrtho(entity); }
 
 
-	float getCameraFOV(Entity entity) override { return m_render_scene->getCameraFOV(entity); }
+	float getCameraFOV(EntityRef entity) override { return m_render_scene->getCameraFOV(entity); }
 
 
 	float castRay(ModelHandle model, const Vec3& origin, const Vec3& dir, const Matrix& mtx, const Pose* pose) override
@@ -2567,7 +2378,7 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 	void onUniverseDestroyed() { m_render_scene = nullptr; }
 
 
-	Vec3 getModelCenter(Entity entity) override
+	Vec3 getModelCenter(EntityRef entity) override
 	{
 		if (!m_render_scene->getUniverse().hasComponent(entity, MODEL_INSTANCE_TYPE)) return Vec3::ZERO;
 		Model* model = m_render_scene->getModelInstanceModel(entity);
@@ -2576,7 +2387,7 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 	}
 
 
-	Path getModelInstancePath(Entity entity) override { return m_render_scene->getModelInstancePath(entity); }
+	Path getModelInstancePath(EntityRef entity) override { return m_render_scene->getModelInstancePath(entity); }
 
 
 	void render(const Matrix& mtx
@@ -2613,13 +2424,13 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 	}
 
 
-	Frustum getFrustum(Entity camera, const Vec2& viewport_min, const Vec2& viewport_max) override
+	Frustum getFrustum(EntityRef camera, const Vec2& viewport_min, const Vec2& viewport_max) override
 	{
 		return m_render_scene->getCameraFrustum(camera, viewport_min, viewport_max);
 	}
 
 
-	void getModelInstaces(Array<Entity>& entities,
+	void getModelInstaces(Array<EntityRef>& entities,
 		const Frustum& frustum,
 		const Vec3& lod_ref_point,
 		float fov,
@@ -2647,7 +2458,7 @@ struct RenderInterfaceImpl LUMIX_FINAL : public RenderInterface
 };
 
 
-struct RenderStatsPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
+struct RenderStatsPlugin final : public StudioApp::GUIPlugin
 {
 	struct ProfileTree
 	{
@@ -2811,7 +2622,7 @@ struct RenderStatsPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 };
 
 
-struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
+struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 {
 	struct RenderCommand : Renderer::RenderCommandBase
 	{
@@ -3095,7 +2906,7 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 };
 
 
-struct ShaderEditorPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
+struct ShaderEditorPlugin final : public StudioApp::GUIPlugin
 {
 	explicit ShaderEditorPlugin(StudioApp& app)
 		: m_shader_editor(app.getWorldEditor().getAllocator())
@@ -3121,16 +2932,16 @@ struct ShaderEditorPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 };
 
 
-struct GizmoPlugin LUMIX_FINAL : public WorldEditor::Plugin
+struct GizmoPlugin final : public WorldEditor::Plugin
 {
 	void showPointLightGizmo(ComponentUID light)
 	{
 		RenderScene* scene = static_cast<RenderScene*>(light.scene);
 		Universe& universe = scene->getUniverse();
 
-		float range = scene->getLightRange(light.entity);
+		float range = scene->getLightRange((EntityRef)light.entity);
 
-		Vec3 pos = universe.getPosition(light.entity);
+		Vec3 pos = universe.getPosition((EntityRef)light.entity);
 		scene->addDebugSphere(pos, range, 0xff0000ff, 0);
 	}
 
@@ -3150,12 +2961,13 @@ struct GizmoPlugin LUMIX_FINAL : public WorldEditor::Plugin
 	void showGlobalLightGizmo(ComponentUID light)
 	{
 		RenderScene* scene = static_cast<RenderScene*>(light.scene);
-		Universe& universe = scene->getUniverse();
-		Vec3 pos = universe.getPosition(light.entity);
+		const Universe& universe = scene->getUniverse();
+		const EntityRef entity = (EntityRef)light.entity;
+		Vec3 pos = universe.getPosition(entity);
 
-		Vec3 dir = universe.getRotation(light.entity).rotate(Vec3(0, 0, 1));
-		Vec3 right = universe.getRotation(light.entity).rotate(Vec3(1, 0, 0));
-		Vec3 up = universe.getRotation(light.entity).rotate(Vec3(0, 1, 0));
+		Vec3 dir = universe.getRotation(entity).rotate(Vec3(0, 0, 1));
+		Vec3 right = universe.getRotation(entity).rotate(Vec3(1, 0, 0));
+		Vec3 up = universe.getRotation(entity).rotate(Vec3(0, 1, 0));
 
 		scene->addDebugLine(pos, pos + dir, 0xff0000ff, 0);
 		scene->addDebugLine(pos + right, pos + dir + right, 0xff0000ff, 0);
@@ -3176,8 +2988,8 @@ struct GizmoPlugin LUMIX_FINAL : public WorldEditor::Plugin
 	{
 		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
 		Universe& universe = scene->getUniverse();
-		Vec3 scale = scene->getDecalScale(cmp.entity);
-		Matrix mtx = universe.getMatrix(cmp.entity);
+		Vec3 scale = scene->getDecalScale((EntityRef)cmp.entity);
+		Matrix mtx = universe.getMatrix((EntityRef)cmp.entity);
 		scene->addDebugCube(mtx.getTranslation(),
 			mtx.getXVector() * scale.x,
 			mtx.getYVector() * scale.y,
@@ -3191,7 +3003,7 @@ struct GizmoPlugin LUMIX_FINAL : public WorldEditor::Plugin
 	{
 		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
 
-		scene->addDebugFrustum(scene->getCameraFrustum(cmp.entity), 0xffff0000, 0);
+		scene->addDebugFrustum(scene->getCameraFrustum((EntityRef)cmp.entity), 0xffff0000, 0);
 	}
 
 
@@ -3222,7 +3034,7 @@ struct GizmoPlugin LUMIX_FINAL : public WorldEditor::Plugin
 };
 
 
-struct AddTerrainComponentPlugin LUMIX_FINAL : public StudioApp::IAddComponentPlugin
+struct AddTerrainComponentPlugin final : public StudioApp::IAddComponentPlugin
 {
 	explicit AddTerrainComponentPlugin(StudioApp& _app)
 		: app(_app)
@@ -3311,11 +3123,11 @@ struct AddTerrainComponentPlugin LUMIX_FINAL : public StudioApp::IAddComponentPl
 		{
 			if (create_entity)
 			{
-				Entity entity = editor.addEntity();
+				EntityRef entity = editor.addEntity();
 				editor.selectEntities(&entity, 1, false);
 			}
 			if (editor.getSelectedEntities().empty()) return;
-			Entity entity = editor.getSelectedEntities()[0];
+			EntityRef entity = editor.getSelectedEntities()[0];
 
 			if (!editor.getUniverse()->hasComponent(entity, TERRAIN_TYPE))
 			{
@@ -3406,24 +3218,20 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		asset_browser.addPlugin(*m_shader_plugin);
 		asset_browser.addPlugin(*m_texture_plugin);
 
-		m_emitter_plugin = LUMIX_NEW(allocator, EmitterPlugin)(app);
 		m_env_probe_plugin = LUMIX_NEW(allocator, EnvironmentProbePlugin)(app);
 		m_terrain_plugin = LUMIX_NEW(allocator, TerrainPlugin)(app);
 		PropertyGrid& property_grid = app.getPropertyGrid();
-		property_grid.addPlugin(*m_emitter_plugin);
 		property_grid.addPlugin(*m_env_probe_plugin);
 		property_grid.addPlugin(*m_terrain_plugin);
 
 		m_scene_view = LUMIX_NEW(allocator, SceneView)(app);
 		m_game_view = LUMIX_NEW(allocator, GameView)(app);
 		m_editor_ui_render_plugin = LUMIX_NEW(allocator, EditorUIRenderPlugin)(app, *m_scene_view, *m_game_view);
-		m_fur_painter_plugin = LUMIX_NEW(allocator, FurPainterPlugin)(app);
 		m_render_stats_plugin = LUMIX_NEW(allocator, RenderStatsPlugin)(app);
 		m_shader_editor_plugin = LUMIX_NEW(allocator, ShaderEditorPlugin)(app);
 		app.addPlugin(*m_scene_view);
 		app.addPlugin(*m_game_view);
 		app.addPlugin(*m_editor_ui_render_plugin);
-		app.addPlugin(*m_fur_painter_plugin);
 		app.addPlugin(*m_render_stats_plugin);
 		app.addPlugin(*m_shader_editor_plugin);
 
@@ -3457,25 +3265,21 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 		PropertyGrid& property_grid = m_app.getPropertyGrid();
 
-		property_grid.removePlugin(*m_emitter_plugin);
 		property_grid.removePlugin(*m_env_probe_plugin);
 		property_grid.removePlugin(*m_terrain_plugin);
 
-		LUMIX_DELETE(allocator, m_emitter_plugin);
 		LUMIX_DELETE(allocator, m_env_probe_plugin);
 		LUMIX_DELETE(allocator, m_terrain_plugin);
 
 		m_app.removePlugin(*m_scene_view);
 		m_app.removePlugin(*m_game_view);
 		m_app.removePlugin(*m_editor_ui_render_plugin);
-		m_app.removePlugin(*m_fur_painter_plugin);
 		m_app.removePlugin(*m_render_stats_plugin);
 		m_app.removePlugin(*m_shader_editor_plugin);
 
 		LUMIX_DELETE(allocator, m_scene_view);
 		LUMIX_DELETE(allocator, m_game_view);
 		LUMIX_DELETE(allocator, m_editor_ui_render_plugin);
-		LUMIX_DELETE(allocator, m_fur_painter_plugin);
 		LUMIX_DELETE(allocator, m_render_stats_plugin);
 		LUMIX_DELETE(allocator, m_shader_editor_plugin);
 
@@ -3491,13 +3295,11 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	FontPlugin* m_font_plugin;
 	TexturePlugin* m_texture_plugin;
 	ShaderPlugin* m_shader_plugin;
-	EmitterPlugin* m_emitter_plugin;
 	EnvironmentProbePlugin* m_env_probe_plugin;
 	TerrainPlugin* m_terrain_plugin;
 	SceneView* m_scene_view;
 	GameView* m_game_view;
 	EditorUIRenderPlugin* m_editor_ui_render_plugin;
-	FurPainterPlugin* m_fur_painter_plugin;
 	RenderStatsPlugin* m_render_stats_plugin;
 	ShaderEditorPlugin* m_shader_editor_plugin;
 	GizmoPlugin* m_gizmo_plugin;

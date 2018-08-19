@@ -28,7 +28,7 @@ struct KeyboardDevice : InputSystem::Device
 };
 
 
-struct InputSystemImpl LUMIX_FINAL : public InputSystem
+struct InputSystemImpl final : public InputSystem
 {
 	explicit InputSystemImpl(Engine& engine)
 		: m_engine(engine)

@@ -7,7 +7,7 @@ namespace Lumix
 
 	class Renderer;
 
-	class LUMIX_RENDERER_API ShaderManager LUMIX_FINAL : public ResourceManagerBase
+	class LUMIX_RENDERER_API ShaderManager final : public ResourceManagerBase
 	{
 	public:
 		ShaderManager(Renderer& renderer, IAllocator& allocator);

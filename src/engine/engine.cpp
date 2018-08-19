@@ -439,7 +439,7 @@ static void logErrorToFile(const char*, const char* message)
 }
 
 
-class EngineImpl LUMIX_FINAL : public Engine
+class EngineImpl final : public Engine
 {
 public:
 	void operator=(const EngineImpl&) = delete;
@@ -534,7 +534,7 @@ public:
 	}
 
 
-	static bool LUA_createComponent(Universe* universe, Entity entity, const char* type)
+	static bool LUA_createComponent(Universe* universe, EntityRef entity, const char* type)
 	{
 		if (!universe) return false;
 		ComponentType cmp_type = Reflection::getComponentType(type);
@@ -551,7 +551,7 @@ public:
 	}
 
 
-	static Entity LUA_createEntity(Universe* univ)
+	static EntityRef LUA_createEntity(Universe* univ)
 	{
 		return univ->createEntity(Vec3(0, 0, 0), Quat(0, 0, 0, 1));
 	}
@@ -584,7 +584,7 @@ public:
 		}
 
 
-		void visit(const Reflection::Property<Entity>& prop) override
+		void visit(const Reflection::Property<EntityPtr>& prop) override
 		{
 			if (!equalStrings(property_name, prop.name)) return;
 			if (lua_isnumber(L, -1))
@@ -729,13 +729,13 @@ public:
 		auto* ctx = LuaWrapper::checkArg<Universe*>(L, 2);
 		LuaWrapper::checkTableArg(L, 3);
 
-		Entity e = ctx->createEntity(Vec3(0, 0, 0), Quat(0, 0, 0, 1));
+		EntityRef e = ctx->createEntity(Vec3(0, 0, 0), Quat(0, 0, 0, 1));
 
 		lua_pushvalue(L, 3);
 		lua_getfield(L, -1, "parent");
 		if (lua_type(L, -1) != LUA_TNIL)
 		{
-			Entity parent = LuaWrapper::toType<Entity>(L, -1);
+			EntityRef parent = LuaWrapper::toType<EntityRef>(L, -1);
 			ctx->setParent(parent, e);
 		}
 		lua_pop(L, 1);
@@ -827,25 +827,23 @@ public:
 	}
 
 
-	static void LUA_setEntityLocalRotation(Universe* universe, Entity entity, const Quat& rotation)
+	static void LUA_setEntityLocalRotation(Universe* universe, EntityRef entity, const Quat& rotation)
 	{
-		if (!entity.isValid()) return;
 		if (!universe->getParent(entity).isValid()) return;
 
 		universe->setLocalRotation(entity, rotation);
 	}
 
 
-	static void LUA_setEntityLocalPosition(Universe* universe, Entity entity, const Vec3& position)
+	static void LUA_setEntityLocalPosition(Universe* universe, EntityRef entity, const Vec3& position)
 	{
-		if (!entity.isValid()) return;
 		if (!universe->getParent(entity).isValid()) return;
 
 		universe->setLocalPosition(entity, position);
 	}
 
 
-	static void LUA_setEntityPosition(Universe* univ, Entity entity, Vec3 pos) { univ->setPosition(entity, pos); }
+	static void LUA_setEntityPosition(Universe* univ, EntityRef entity, Vec3 pos) { univ->setPosition(entity, pos); }
 	static void LUA_unloadResource(EngineImpl* engine, int resource_idx) { engine->unloadLuaResource(resource_idx); }
 	static Universe* LUA_createUniverse(EngineImpl* engine) { return &engine->createUniverse(false); }
 	static void LUA_destroyUniverse(EngineImpl* engine, Universe* universe) { engine->destroyUniverse(*universe); }
@@ -958,29 +956,19 @@ public:
 	}
 
 
-	static Vec3 LUA_getEntityPosition(Universe* universe, Entity entity)
+	static Vec3 LUA_getEntityPosition(Universe* universe, EntityRef entity)
 	{
-		if (!entity.isValid())
-		{
-			g_log_warning.log("Engine") << "Requesting position on invalid entity";
-			return Vec3(0, 0, 0);
-		}
 		return universe->getPosition(entity);
 	}
 
 
-	static Quat LUA_getEntityRotation(Universe* universe, Entity entity)
+	static Quat LUA_getEntityRotation(Universe* universe, EntityRef entity)
 	{
-		if (!entity.isValid())
-		{
-			g_log_warning.log("Engine") << "Requesting rotation on invalid entity";
-			return Quat(0, 0, 0, 1);
-		}
 		return universe->getRotation(entity);
 	}
 
 
-	static Vec3 LUA_getEntityDirection(Universe* universe, Entity entity)
+	static Vec3 LUA_getEntityDirection(Universe* universe, EntityRef entity)
 	{
 		Quat rot = universe->getRotation(entity);
 		return rot.rotate(Vec3(0, 0, 1));
@@ -1518,7 +1506,7 @@ public:
 	}
 
 
-	ComponentUID createComponent(Universe& universe, Entity entity, ComponentType type) override
+	ComponentUID createComponent(Universe& universe, EntityRef entity, ComponentType type) override
 	{
 		IScene* scene = universe.getScene(type);
 		if (!scene) return ComponentUID::INVALID;
@@ -1545,7 +1533,7 @@ public:
 			g_log_error.log("Editor") << "Prefab " << prefab->getPath().c_str() << " is not ready, preload it.";
 			return 0;
 		}
-		Entity entity = universe->instantiatePrefab(*prefab, position, {0, 0, 0, 1}, 1);
+		EntityPtr entity = universe->instantiatePrefab(*prefab, position, {0, 0, 0, 1}, 1);
 
 		LuaWrapper::push(L, entity);
 		return 1;

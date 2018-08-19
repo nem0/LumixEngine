@@ -11,7 +11,7 @@ namespace FS
 {
 	struct IFile;
 
-	class LUMIX_ENGINE_API DiskFileDevice LUMIX_FINAL : public IFileDevice
+	class LUMIX_ENGINE_API DiskFileDevice final : public IFileDevice
 	{
 	public:
 		DiskFileDevice(const char* name, const char* base_path, IAllocator& allocator);

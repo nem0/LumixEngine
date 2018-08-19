@@ -24,7 +24,7 @@ namespace
 {
 
 
-struct AssetBrowserPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
+struct AssetBrowserPlugin final : public AssetBrowser::IPlugin
 {
 	explicit AssetBrowserPlugin(StudioApp& app)
 		: m_app(app)
@@ -105,7 +105,7 @@ struct AssetBrowserPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 };
 
 
-struct ClipManagerUI LUMIX_FINAL : public StudioApp::GUIPlugin
+struct ClipManagerUI final : public StudioApp::GUIPlugin
 {
 	explicit ClipManagerUI(StudioApp& app)
 		: m_app(app)
@@ -221,7 +221,7 @@ struct ClipManagerUI LUMIX_FINAL : public StudioApp::GUIPlugin
 };
 
 
-struct GizmoPlugin LUMIX_FINAL : public WorldEditor::Plugin
+struct GizmoPlugin final : public WorldEditor::Plugin
 {
 	explicit GizmoPlugin(WorldEditor& editor)
 		: m_editor(editor)
@@ -233,12 +233,13 @@ struct GizmoPlugin LUMIX_FINAL : public WorldEditor::Plugin
 		static const ComponentType ECHO_ZONE_TYPE = Reflection::getComponentType("echo_zone");
 		static const ComponentType CHORUS_ZONE_TYPE = Reflection::getComponentType("chorus_zone");
 
+		const EntityRef entity = (EntityRef)cmp.entity;
 		if (cmp.type == ECHO_ZONE_TYPE)
 		{
 			auto* audio_scene = static_cast<AudioScene*>(cmp.scene);
-			float radius = audio_scene->getEchoZoneRadius(cmp.entity);
+			float radius = audio_scene->getEchoZoneRadius(entity);
 			Universe& universe = audio_scene->getUniverse();
-			Vec3 pos = universe.getPosition(cmp.entity);
+			Vec3 pos = universe.getPosition(entity);
 
 			auto* scene = static_cast<RenderScene*>(universe.getScene(crc32("renderer")));
 			if (!scene) return true;
@@ -248,9 +249,9 @@ struct GizmoPlugin LUMIX_FINAL : public WorldEditor::Plugin
 		else if (cmp.type == CHORUS_ZONE_TYPE)
 		{
 			auto* audio_scene = static_cast<AudioScene*>(cmp.scene);
-			float radius = audio_scene->getChorusZoneRadius(cmp.entity);
+			float radius = audio_scene->getChorusZoneRadius(entity);
 			Universe& universe = audio_scene->getUniverse();
-			Vec3 pos = universe.getPosition(cmp.entity);
+			Vec3 pos = universe.getPosition(entity);
 
 			auto* scene = static_cast<RenderScene*>(universe.getScene(crc32("renderer")));
 			if (!scene) return true;

@@ -44,7 +44,7 @@ static const char* TEX_COLOR_UNIFORM = "u_detail_albedomap";
 static const float MIN_BRUSH_SIZE = 0.5f;
 
 
-struct PaintTerrainCommand LUMIX_FINAL : public IEditorCommand
+struct PaintTerrainCommand final : public IEditorCommand
 {
 	struct Rectangle
 	{
@@ -88,6 +88,8 @@ struct PaintTerrainCommand LUMIX_FINAL : public IEditorCommand
 		, m_mask(editor.getAllocator())
 		, m_flat_height(flat_height)
 	{
+		ASSERT(terrain.isValid());
+		
 		m_mask.resize(mask.size());
 		for (int i = 0; i < mask.size(); ++i)
 		{
@@ -95,10 +97,10 @@ struct PaintTerrainCommand LUMIX_FINAL : public IEditorCommand
 		}
 
 		m_width = m_height = m_x = m_y = -1;
-		Matrix entity_mtx = editor.getUniverse()->getMatrix(terrain.entity);
+		Matrix entity_mtx = editor.getUniverse()->getMatrix((EntityRef)terrain.entity);
 		entity_mtx.fastInverse();
 		Vec3 local_pos = entity_mtx.transformPoint(hit_pos);
-		float terrain_size = static_cast<RenderScene*>(terrain.scene)->getTerrainSize(terrain.entity).x;
+		float terrain_size = static_cast<RenderScene*>(terrain.scene)->getTerrainSize((EntityRef)terrain.entity).x;
 		local_pos = local_pos / terrain_size;
 		local_pos.y = -1;
 
@@ -234,7 +236,7 @@ private:
 	Material* getMaterial()
 	{
 		auto* scene = static_cast<RenderScene*>(m_terrain.scene);
-		return scene->getTerrainMaterial(m_terrain.entity);
+		return m_terrain.entity.isValid() ? scene->getTerrainMaterial((EntityRef)m_terrain.entity) : nullptr;
 	}
 
 
@@ -559,6 +561,8 @@ private:
 
 	void applyData(Array<u8>& data)
 	{
+		if (!m_terrain.isValid()) return;
+
 		auto texture = getDestinationTexture();
 		int bpp = texture->bytes_per_pixel;
 
@@ -574,7 +578,8 @@ private:
 			}
 		}
 		texture->onDataUpdated(m_x, m_y, m_width, m_height);
-		static_cast<RenderScene*>(m_terrain.scene)->forceGrassUpdate(m_terrain.entity);
+		const EntityRef e = (EntityRef)m_terrain.entity;
+		static_cast<RenderScene*>(m_terrain.scene)->forceGrassUpdate(e);
 
 		if (m_action_type != TerrainEditor::LAYER && m_action_type != TerrainEditor::COLOR &&
 			m_action_type != TerrainEditor::ADD_GRASS && m_action_type != TerrainEditor::REMOVE_GRASS)
@@ -583,9 +588,9 @@ private:
 			if (!scene) return;
 
 			auto* phy_scene = static_cast<PhysicsScene*>(scene);
-			if (!scene->getUniverse().hasComponent(m_terrain.entity, HEIGHTFIELD_TYPE)) return;
+			if (!scene->getUniverse().hasComponent(e, HEIGHTFIELD_TYPE)) return;
 
-			phy_scene->updateHeighfieldData(m_terrain.entity, m_x, m_y, m_width, m_height, &data[0], bpp);
+			phy_scene->updateHeighfieldData(e, m_x, m_y, m_width, m_height, &data[0], bpp);
 		}
 	}
 
@@ -771,7 +776,7 @@ TerrainEditor::TerrainEditor(WorldEditor& editor, StudioApp& app)
 void TerrainEditor::splitSplatmap(const char* dir)
 {
 	auto* render_scene = (RenderScene*)m_component.scene;
-	Material* material = render_scene->getTerrainMaterial(m_component.entity);
+	Material* material = getMaterial();
 	if (!material)
 	{
 		g_log_error.log("Renderer") << "Terrain has no material";
@@ -818,7 +823,7 @@ void TerrainEditor::splitSplatmap(const char* dir)
 		fs.close(*file);
 	}
 
-	int grasses_count = render_scene->getGrassCount(m_component.entity);
+	int grasses_count = render_scene->getGrassCount((EntityRef)m_component.entity);
 	for (int i = 0; i < grasses_count; ++i)
 	{
 		StaticString<MAX_PATH_LENGTH> out_path_str(dir, "//grass", i, ".tga");
@@ -845,7 +850,7 @@ void TerrainEditor::splitSplatmap(const char* dir)
 void TerrainEditor::mergeSplatmap(const char* dir)
 {
 	auto* render_scene = (RenderScene*)m_component.scene;
-	Material* material = render_scene->getTerrainMaterial(m_component.entity);
+	Material* material = getMaterial();
 	if (!material)
 	{
 		g_log_error.log("Renderer") << "Terrain has no material";
@@ -966,13 +971,10 @@ void TerrainEditor::mergeSplatmap(const char* dir)
 
 void TerrainEditor::nextTerrainTexture()
 {
-	auto* scene = static_cast<RenderScene*>(m_component.scene);
-	auto* material = scene->getTerrainMaterial(m_component.entity);
+	Material* material = getMaterial();
+	if (!material) return;
 	Texture* tex = material->getTextureByUniform(TEX_COLOR_UNIFORM);
-	if (tex)
-	{
-		m_texture_idx = Math::minimum(tex->layers - 1, m_texture_idx + 1);
-	}
+	if (tex) m_texture_idx = Math::minimum(tex->layers - 1, m_texture_idx + 1);
 }
 
 
@@ -1004,7 +1006,7 @@ void TerrainEditor::decreaseBrushSize()
 }
 
 
-void TerrainEditor::drawCursor(RenderScene& scene, Entity terrain, const Vec3& center)
+void TerrainEditor::drawCursor(RenderScene& scene, EntityRef terrain, const Vec3& center)
 {
 	PROFILE_FUNCTION();
 	static const int SLICE_COUNT = 30;
@@ -1016,7 +1018,7 @@ void TerrainEditor::drawCursor(RenderScene& scene, Entity terrain, const Vec3& c
 
 	float brush_size = m_terrain_brush_size;
 	Vec3 local_center = getRelativePosition(center);
-	Matrix terrain_matrix = m_world_editor.getUniverse()->getMatrix(m_component.entity);
+	Matrix terrain_matrix = m_world_editor.getUniverse()->getMatrix((EntityRef)m_component.entity);
 
 	for (int i = 0; i < SLICE_COUNT + 1; ++i)
 	{
@@ -1087,7 +1089,7 @@ void TerrainEditor::detectModifiers()
 
 Vec3 TerrainEditor::getRelativePosition(const Vec3& world_pos) const
 {
-	Matrix terrain_matrix = m_world_editor.getUniverse()->getMatrix(m_component.entity);
+	Matrix terrain_matrix = m_world_editor.getUniverse()->getMatrix((EntityRef)m_component.entity);
 	Matrix inv_terrain_matrix = terrain_matrix;
 	inv_terrain_matrix.inverse();
 
@@ -1109,7 +1111,7 @@ u16 TerrainEditor::getHeight(const Vec3& world_pos)
 
 	auto* data = (u16*)heightmap->getData();
 	auto* scene = (RenderScene*)m_component.scene;
-	float scale = scene->getTerrainXZScale(m_component.entity);
+	float scale = scene->getTerrainXZScale((EntityRef)m_component.entity);
 	return data[int(rel_pos.x / scale) + int(rel_pos.z / scale) * heightmap->width];
 }
 
@@ -1127,7 +1129,7 @@ bool TerrainEditor::onMouseDown(const WorldEditor::RayHit& hit, int, int)
 
 	detectModifiers();
 
-	if (selected_entities[0] == hit.entity && m_component.isValid())
+	if ((EntityPtr)selected_entities[0] == hit.entity && m_component.isValid())
 	{
 		Vec3 hit_pos = hit.pos;
 		switch (m_action_type)
@@ -1179,18 +1181,18 @@ void TerrainEditor::removeEntities(const Vec3& hit_pos)
 		-m_terrain_brush_size,
 		m_terrain_brush_size);
 
-	Array<Entity> entities(m_world_editor.getAllocator());
+	Array<EntityRef> entities(m_world_editor.getAllocator());
 	scene->getModelInstanceEntities(frustum, entities);
 	if (m_selected_prefabs.empty())
 	{
-		for (Entity entity : entities)
+		for (EntityRef entity : entities)
 		{
 			if (prefab_system.getPrefab(entity)) m_world_editor.destroyEntities(&entity, 1);
 		}
 	}
 	else
 	{
-		for (Entity entity : entities)
+		for (EntityRef entity : entities)
 		{
 			for (auto* res : m_selected_prefabs)
 			{
@@ -1337,7 +1339,7 @@ void TerrainEditor::paintEntities(const Vec3& hit_pos)
 			-m_terrain_brush_size,
 			m_terrain_brush_size);
 		ComponentUID camera = m_world_editor.getEditCamera();
-		Entity camera_entity = camera.entity;
+		EntityRef camera_entity = camera.entity;
 		Vec3 camera_pos = scene->getUniverse().getPosition(camera_entity);
 		
 		auto& meshes = scene->getModelInstanceInfos(frustum, camera_pos, camera.entity, ~0ULL);
@@ -1394,7 +1396,7 @@ void TerrainEditor::paintEntities(const Vec3& hit_pos)
 				float size = Math::randFloat(m_size_spread.x, m_size_spread.y);
 				int random_idx = Math::rand(0, m_selected_prefabs.size() - 1);
 				if (!m_selected_prefabs[random_idx]) continue;
-				Entity entity = prefab_system.instantiatePrefab(*m_selected_prefabs[random_idx], pos, rot, size);
+				EntityRef entity = prefab_system.instantiatePrefab(*m_selected_prefabs[random_idx], pos, rot, size);
 				if (entity.isValid())
 				{
 					if (scene->getUniverse().hasComponent(entity, MODEL_INSTANCE_TYPE))
@@ -1422,10 +1424,10 @@ void TerrainEditor::onMouseMove(int x, int y, int, int)
 	RenderScene* scene = static_cast<RenderScene*>(m_component.scene);
 	Vec3 origin, dir;
 	m_world_editor.getViewport().getRay({(float)x, (float)y}, origin, dir);
-	RayCastModelHit hit = scene->castRayTerrain(m_component.entity, origin, dir);
+	RayCastModelHit hit = scene->castRayTerrain((EntityRef)m_component.entity, origin, dir);
 	if (hit.m_is_hit)
 	{
-		bool is_terrain = m_world_editor.getUniverse()->hasComponent(hit.m_entity, TERRAIN_TYPE);
+		bool is_terrain = m_world_editor.getUniverse()->hasComponent((EntityRef)hit.m_entity, TERRAIN_TYPE);
 		if (!is_terrain) return;
 
 		switch (m_action_type)
@@ -1453,8 +1455,9 @@ void TerrainEditor::onMouseUp(int, int, MouseButton::Value)
 
 Material* TerrainEditor::getMaterial()
 {
+	if (!m_component.isValid()) return nullptr;
 	auto* scene = static_cast<RenderScene*>(m_component.scene);
-	return scene->getTerrainMaterial(m_component.entity);
+	return scene->getTerrainMaterial((EntityRef)m_component.entity);
 }
 
 
@@ -1606,7 +1609,7 @@ void TerrainEditor::onGUI()
 		case GRASS:
 		{
 			m_action_type = TerrainEditor::ADD_GRASS;
-			int type_count = scene->getGrassCount(m_component.entity);
+			int type_count = scene->getGrassCount((EntityRef)m_component.entity);
 			for (int i = 0; i < type_count; ++i)
 			{
 				if (i % 4 != 0) ImGui::SameLine();

@@ -74,14 +74,27 @@ static_assert(sizeof(i8) == 1, "Incorrect size of i8");
 
 const u32 MAX_PATH_LENGTH = 260;
 
-struct Entity
+struct EntityRef;
+
+struct EntityPtr
 {
 	int index;
-	bool operator==(const Entity& rhs) const { return rhs.index == index; }
-	bool operator<(const Entity& rhs) const { return rhs.index < index; }
-	bool operator>(const Entity& rhs) const { return rhs.index > index; }
-	bool operator!=(const Entity& rhs) const { return rhs.index != index; }
+	bool operator==(const EntityPtr& rhs) const { return rhs.index == index; }
+	bool operator<(const EntityPtr& rhs) const { return rhs.index < index; }
+	bool operator>(const EntityPtr& rhs) const { return rhs.index > index; }
+	bool operator!=(const EntityPtr& rhs) const { return rhs.index != index; }
 	bool isValid() const { return index >= 0; }
+	inline explicit operator EntityRef() const;
+};
+
+struct EntityRef
+{
+	int index;
+	bool operator==(const EntityRef& rhs) const { return rhs.index == index; }
+	bool operator<(const EntityRef& rhs) const { return rhs.index < index; }
+	bool operator>(const EntityRef& rhs) const { return rhs.index > index; }
+	bool operator!=(const EntityRef& rhs) const { return rhs.index != index; }
+	operator EntityPtr() const { return {index}; }
 };
 
 struct ComponentType
@@ -95,16 +108,12 @@ struct ComponentType
 	bool operator!=(const ComponentType& rhs) const { return rhs.index != index; }
 };
 const ComponentType INVALID_COMPONENT_TYPE = {-1};
-const Entity INVALID_ENTITY = {-1};
+const EntityPtr INVALID_ENTITY = {-1};
 
 template <typename T, int count> int lengthOf(const T (&)[count])
 {
 	return count;
 };
-
-
-} // namespace Lumix
-
 
 #ifndef ASSERT
 	#ifdef NDEBUG
@@ -120,14 +129,12 @@ template <typename T, int count> int lengthOf(const T (&)[count])
 #endif
 
 #ifdef _WIN32
-	#define LUMIX_FINAL final
 	#define LUMIX_LIBRARY_EXPORT __declspec(dllexport)
 	#define LUMIX_LIBRARY_IMPORT __declspec(dllimport)
 	#define LUMIX_FORCE_INLINE __forceinline
 	#define LUMIX_RESTRICT __restrict
 	#define LUMIX_ATTRIBUTE_USED
 #else 
-	#define LUMIX_FINAL final
 	#define LUMIX_LIBRARY_EXPORT __attribute__((visibility("default")))
 	#define LUMIX_LIBRARY_IMPORT 
 	#define LUMIX_FORCE_INLINE __attribute__((always_inline)) inline
@@ -159,6 +166,12 @@ template <typename T, int count> int lengthOf(const T (&)[count])
 	#define LUMIX_RENDERER_API LUMIX_LIBRARY_IMPORT
 #endif
 
+inline EntityPtr::operator EntityRef() const
+{
+	ASSERT(isValid());
+	return {index};
+}
+
 #ifdef _MSC_VER
 	#pragma warning(disable : 4251)
 	#pragma warning(disable : 4996)
@@ -166,3 +179,5 @@ template <typename T, int count> int lengthOf(const T (&)[count])
 		#pragma warning(disable : 4091)
 	#endif
 #endif
+
+} // namespace Lumix

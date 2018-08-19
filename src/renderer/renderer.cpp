@@ -208,7 +208,7 @@ struct BoneProperty : Reflection::IEnumProperty
 	void getValue(ComponentUID cmp, int index, OutputBlob& stream) const override
 	{
 		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
-		int value = scene->getBoneAttachmentBone(cmp.entity);
+		int value = scene->getBoneAttachmentBone((EntityRef)cmp.entity);
 		stream.write(value);
 	}
 
@@ -217,15 +217,15 @@ struct BoneProperty : Reflection::IEnumProperty
 	{
 		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
 		int value = stream.read<int>();
-		scene->setBoneAttachmentBone(cmp.entity, value);
+		scene->setBoneAttachmentBone((EntityRef)cmp.entity, value);
 	}
 
 
-	Entity getModelInstance(RenderScene* render_scene, Entity bone_attachment) const
+	EntityPtr getModelInstance(RenderScene* render_scene, EntityRef bone_attachment) const
 	{
-		Entity parent_entity = render_scene->getBoneAttachmentParent(bone_attachment);
-		if (parent_entity == INVALID_ENTITY) return INVALID_ENTITY;
-		return render_scene->getUniverse().hasComponent(parent_entity, MODEL_INSTANCE_TYPE) ? parent_entity : INVALID_ENTITY;
+		EntityPtr parent_entity = render_scene->getBoneAttachmentParent(bone_attachment);
+		if (!parent_entity.isValid()) return INVALID_ENTITY;
+		return render_scene->getUniverse().hasComponent((EntityRef)parent_entity, MODEL_INSTANCE_TYPE) ? parent_entity : INVALID_ENTITY;
 	}
 
 
@@ -236,10 +236,10 @@ struct BoneProperty : Reflection::IEnumProperty
 	int getEnumCount(ComponentUID cmp) const override
 	{
 		RenderScene* render_scene = static_cast<RenderScene*>(cmp.scene);
-		Entity model_instance = getModelInstance(render_scene, cmp.entity);
+		EntityPtr model_instance = getModelInstance(render_scene, (EntityRef)cmp.entity);
 		if (!model_instance.isValid()) return 0;
 
-		auto* model = render_scene->getModelInstanceModel(model_instance);
+		auto* model = render_scene->getModelInstanceModel((EntityRef)model_instance);
 		if (!model || !model->isReady()) return 0;
 
 		return model->getBoneCount();
@@ -249,10 +249,10 @@ struct BoneProperty : Reflection::IEnumProperty
 	const char* getEnumName(ComponentUID cmp, int index) const override
 	{
 		RenderScene* render_scene = static_cast<RenderScene*>(cmp.scene);
-		Entity model_instance = getModelInstance(render_scene, cmp.entity);
+		EntityPtr model_instance = getModelInstance(render_scene, (EntityRef)cmp.entity);
 		if (!model_instance.isValid()) return "";
 
-		auto* model = render_scene->getModelInstanceModel(model_instance);
+		auto* model = render_scene->getModelInstanceModel((EntityRef)model_instance);
 		if (!model) return "";
 
 		return model->getBone(index).name.c_str();
@@ -279,60 +279,15 @@ static void registerProperties(IAllocator& allocator)
 				RadiansAttribute()),
 			BoneProperty()
 		),
-		component("particle_emitter_spawn_shape",
-			property("Radius", LUMIX_PROP(RenderScene, ParticleEmitterShapeRadius))
-		),
-		component("particle_emitter_plane",
-			property("Bounce", LUMIX_PROP(RenderScene, ParticleEmitterPlaneBounce),
-				ClampAttribute(0, 1)),
-			array("Planes", &RenderScene::getParticleEmitterPlaneCount, &RenderScene::addParticleEmitterPlane, &RenderScene::removeParticleEmitterPlane, 
-				property("Entity", LUMIX_PROP(RenderScene, ParticleEmitterPlaneEntity))
-			)
-		),
-		component("particle_emitter_attractor",
-			property("Force", LUMIX_PROP(RenderScene, ParticleEmitterAttractorForce)),
-			array("Attractors", &RenderScene::getParticleEmitterAttractorCount, &RenderScene::addParticleEmitterAttractor, &RenderScene::removeParticleEmitterAttractor,
-				property("Entity", LUMIX_PROP(RenderScene, ParticleEmitterAttractorEntity))
-			)
-		),
-		component("particle_emitter_alpha",
-			sampled_func_property("Alpha", LUMIX_PROP(RenderScene, ParticleEmitterAlpha), &RenderScene::getParticleEmitterAlphaCount, 1)
-		),
-		component("particle_emitter_random_rotation"),
 		component("environment_probe",
 			property("Enabled reflection", LUMIX_PROP_FULL(RenderScene, isEnvironmentProbeReflectionEnabled, enableEnvironmentProbeReflection)),
 			property("Override global size", LUMIX_PROP_FULL(RenderScene, isEnvironmentProbeCustomSize, enableEnvironmentProbeCustomSize)),
 			property("Radiance size", LUMIX_PROP(RenderScene, EnvironmentProbeRadianceSize)),
 			property("Irradiance size", LUMIX_PROP(RenderScene, EnvironmentProbeIrradianceSize))
 		),
-		component("particle_emitter_force",
-			property("Acceleration", LUMIX_PROP(RenderScene, ParticleEmitterAcceleration))
-		),
-		component("particle_emitter_subimage",
-			property("Rows", LUMIX_PROP(RenderScene, ParticleEmitterSubimageRows)),
-			property("Columns", LUMIX_PROP(RenderScene, ParticleEmitterSubimageCols))
-		),
-		component("particle_emitter_size",
-			sampled_func_property("Size", LUMIX_PROP(RenderScene, ParticleEmitterSize), &RenderScene::getParticleEmitterSizeCount, 1)
-		),
 		component("scripted_particle_emitter",
 			property("Material", LUMIX_PROP(RenderScene, ScriptedParticleEmitterMaterialPath),
 				ResourceAttribute("Material (*.mat)", Material::TYPE))
-		),
-		component("particle_emitter",
-			property("Life", LUMIX_PROP(RenderScene, ParticleEmitterInitialLife)),
-			property("Initial size", LUMIX_PROP(RenderScene, ParticleEmitterInitialSize)),
-			property("Spawn period", LUMIX_PROP(RenderScene, ParticleEmitterSpawnPeriod)),
-			property("Autoemit", LUMIX_PROP(RenderScene, ParticleEmitterAutoemit)),
-			property("Local space", LUMIX_PROP(RenderScene, ParticleEmitterLocalSpace)),
-			property("Material", LUMIX_PROP(RenderScene, ParticleEmitterMaterialPath),
-				ResourceAttribute("Material (*.mat)", Material::TYPE)),
-			property("Spawn count", LUMIX_PROP(RenderScene, ParticleEmitterSpawnCount))
-		),
-		component("particle_emitter_linear_movement",
-			property("x", LUMIX_PROP(RenderScene, ParticleEmitterLinearMovementX)),
-			property("y", LUMIX_PROP(RenderScene, ParticleEmitterLinearMovementY)),
-			property("z", LUMIX_PROP(RenderScene, ParticleEmitterLinearMovementZ))
 		),
 		component("camera",
 			property("Orthographic size", LUMIX_PROP(RenderScene, CameraOrthoSize), 
@@ -423,7 +378,7 @@ static void registerProperties(IAllocator& allocator)
 }
 
 
-struct RendererImpl LUMIX_FINAL : public Renderer
+struct RendererImpl final : public Renderer
 {
 	explicit RendererImpl(Engine& engine)
 		: m_engine(engine)

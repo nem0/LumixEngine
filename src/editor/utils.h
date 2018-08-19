@@ -39,7 +39,7 @@ class WorldEditor;
 LUMIX_EDITOR_API void getEntityListDisplayName(WorldEditor& editor,
 	char* buf,
 	int max_size,
-	Entity entity);
+	EntityPtr entity);
 
 
 } // namespace Lumix

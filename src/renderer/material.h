@@ -24,7 +24,7 @@ class Shader;
 class Texture;
 
 
-class LUMIX_RENDERER_API Material LUMIX_FINAL : public Resource
+class LUMIX_RENDERER_API Material final : public Resource
 {
 	friend class MaterialManager;
 public:
