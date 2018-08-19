@@ -39,7 +39,7 @@ struct Agent
 		GET_ROOT_MOTION_FROM_ANIM_CONTROLLER = 1 << 1
 	};
 
-	Entity entity;
+	EntityRef entity;
 	float radius;
 	float height;
 	int agent;
@@ -52,7 +52,7 @@ struct Agent
 };
 
 
-struct NavigationSystem LUMIX_FINAL : public IPlugin
+struct NavigationSystem final : public IPlugin
 {
 	explicit NavigationSystem(Engine& engine)
 		: m_engine(engine)

@@ -41,63 +41,63 @@ public:
 
 	virtual void render(Pipeline& pipeline, const Vec2& canvas_size) = 0;
 
-	virtual bool hasGUI(Entity entity) const = 0;
-	virtual Rect getRectOnCanvas(Entity entity, const Vec2& canva_size) const = 0;
-	virtual Rect getRect(Entity entity) const = 0;
-	virtual Entity getRectAt(const Vec2& pos, const Vec2& canvas_size) const = 0;
+	virtual bool hasGUI(EntityRef EntityRef) const = 0;
+	virtual Rect getRectOnCanvas(EntityRef EntityRef, const Vec2& canva_size) const = 0;
+	virtual Rect getRect(EntityRef EntityRef) const = 0;
+	virtual EntityRef getRectAt(const Vec2& pos, const Vec2& canvas_size) const = 0;
 
-	virtual void enableRect(Entity entity, bool enable) = 0;
-	virtual bool isRectEnabled(Entity entity) = 0;
-	virtual bool getRectClip(Entity entity) = 0;
-	virtual void setRectClip(Entity entity, bool value) = 0;
-	virtual float getRectLeftPoints(Entity entity) = 0;
-	virtual void setRectLeftPoints(Entity entity, float value) = 0;
-	virtual float getRectLeftRelative(Entity entity) = 0;
-	virtual void setRectLeftRelative(Entity entity, float value) = 0;
+	virtual void enableRect(EntityRef EntityRef, bool enable) = 0;
+	virtual bool isRectEnabled(EntityRef EntityRef) = 0;
+	virtual bool getRectClip(EntityRef EntityRef) = 0;
+	virtual void setRectClip(EntityRef EntityRef, bool value) = 0;
+	virtual float getRectLeftPoints(EntityRef EntityRef) = 0;
+	virtual void setRectLeftPoints(EntityRef EntityRef, float value) = 0;
+	virtual float getRectLeftRelative(EntityRef EntityRef) = 0;
+	virtual void setRectLeftRelative(EntityRef EntityRef, float value) = 0;
 
-	virtual float getRectRightPoints(Entity entity) = 0;
-	virtual void setRectRightPoints(Entity entity, float value) = 0;
-	virtual float getRectRightRelative(Entity entity) = 0;
-	virtual void setRectRightRelative(Entity entity, float value) = 0;
+	virtual float getRectRightPoints(EntityRef EntityRef) = 0;
+	virtual void setRectRightPoints(EntityRef EntityRef, float value) = 0;
+	virtual float getRectRightRelative(EntityRef EntityRef) = 0;
+	virtual void setRectRightRelative(EntityRef EntityRef, float value) = 0;
 
-	virtual float getRectTopPoints(Entity entity) = 0;
-	virtual void setRectTopPoints(Entity entity, float value) = 0;
-	virtual float getRectTopRelative(Entity entity) = 0;
-	virtual void setRectTopRelative(Entity entity, float value) = 0;
+	virtual float getRectTopPoints(EntityRef EntityRef) = 0;
+	virtual void setRectTopPoints(EntityRef EntityRef, float value) = 0;
+	virtual float getRectTopRelative(EntityRef EntityRef) = 0;
+	virtual void setRectTopRelative(EntityRef EntityRef, float value) = 0;
 
-	virtual float getRectBottomPoints(Entity entity) = 0;
-	virtual void setRectBottomPoints(Entity entity, float value) = 0;
-	virtual float getRectBottomRelative(Entity entity) = 0;
-	virtual void setRectBottomRelative(Entity entity, float value) = 0;
+	virtual float getRectBottomPoints(EntityRef EntityRef) = 0;
+	virtual void setRectBottomPoints(EntityRef EntityRef, float value) = 0;
+	virtual float getRectBottomRelative(EntityRef EntityRef) = 0;
+	virtual void setRectBottomRelative(EntityRef EntityRef, float value) = 0;
 
-	virtual Vec4 getButtonNormalColorRGBA(Entity entity) = 0;
-	virtual void setButtonNormalColorRGBA(Entity entity, const Vec4& color) = 0;
-	virtual Vec4 getButtonHoveredColorRGBA(Entity entity) = 0;
-	virtual void setButtonHoveredColorRGBA(Entity entity, const Vec4& color) = 0;
+	virtual Vec4 getButtonNormalColorRGBA(EntityRef EntityRef) = 0;
+	virtual void setButtonNormalColorRGBA(EntityRef EntityRef, const Vec4& color) = 0;
+	virtual Vec4 getButtonHoveredColorRGBA(EntityRef EntityRef) = 0;
+	virtual void setButtonHoveredColorRGBA(EntityRef EntityRef, const Vec4& color) = 0;
 
-	virtual void enableImage(Entity entity, bool enable) = 0;
-	virtual bool isImageEnabled(Entity entity) = 0;
-	virtual Vec4 getImageColorRGBA(Entity entity) = 0;
-	virtual void setImageColorRGBA(Entity entity, const Vec4& color) = 0;
-	virtual Path getImageSprite(Entity entity) = 0;
-	virtual void setImageSprite(Entity entity, const Path& path) = 0;
+	virtual void enableImage(EntityRef EntityRef, bool enable) = 0;
+	virtual bool isImageEnabled(EntityRef EntityRef) = 0;
+	virtual Vec4 getImageColorRGBA(EntityRef EntityRef) = 0;
+	virtual void setImageColorRGBA(EntityRef EntityRef, const Vec4& color) = 0;
+	virtual Path getImageSprite(EntityRef EntityRef) = 0;
+	virtual void setImageSprite(EntityRef EntityRef, const Path& path) = 0;
 
-	virtual void setText(Entity entity, const char* text) = 0;
-	virtual const char* getText(Entity entity) = 0;
-	virtual TextHAlign getTextHAlign(Entity entity) = 0;
-	virtual void setTextHAlign(Entity entity, TextHAlign align) = 0;
-	virtual void setTextFontSize(Entity entity, int value) = 0;
-	virtual int getTextFontSize(Entity entity) = 0;
-	virtual Vec4 getTextColorRGBA(Entity entity) = 0;
-	virtual void setTextColorRGBA(Entity entity, const Vec4& color) = 0;
-	virtual Path getTextFontPath(Entity entity) = 0;
-	virtual void setTextFontPath(Entity entity, const Path& path) = 0;
+	virtual void setText(EntityRef EntityRef, const char* text) = 0;
+	virtual const char* getText(EntityRef EntityRef) = 0;
+	virtual TextHAlign getTextHAlign(EntityRef EntityRef) = 0;
+	virtual void setTextHAlign(EntityRef EntityRef, TextHAlign align) = 0;
+	virtual void setTextFontSize(EntityRef EntityRef, int value) = 0;
+	virtual int getTextFontSize(EntityRef EntityRef) = 0;
+	virtual Vec4 getTextColorRGBA(EntityRef EntityRef) = 0;
+	virtual void setTextColorRGBA(EntityRef EntityRef, const Vec4& color) = 0;
+	virtual Path getTextFontPath(EntityRef EntityRef) = 0;
+	virtual void setTextFontPath(EntityRef EntityRef, const Path& path) = 0;
 
-	virtual void setRenderTarget(Entity entity, bgfx::TextureHandle* texture_handle) = 0;
+	virtual void setRenderTarget(EntityRef EntityRef, bgfx::TextureHandle* texture_handle) = 0;
 
-	virtual DelegateList<void(Entity)>& buttonClicked() = 0;
-	virtual DelegateList<void(Entity)>& rectHovered() = 0;
-	virtual DelegateList<void(Entity)>& rectHoveredOut() = 0;
+	virtual DelegateList<void(EntityRef)>& buttonClicked() = 0;
+	virtual DelegateList<void(EntityRef)>& rectHovered() = 0;
+	virtual DelegateList<void(EntityRef)>& rectHoveredOut() = 0;
 };
 
 

@@ -21,14 +21,14 @@ struct LUMIX_ENGINE_API ComponentUID final
 		type = {-1};
 	}
 
-	ComponentUID(Entity _entity, ComponentType _type, IScene* _scene)
+	ComponentUID(EntityPtr _entity, ComponentType _type, IScene* _scene)
 		: entity(_entity)
 		, type(_type)
 		, scene(_scene)
 	{
 	}
 
-	Entity entity; 
+	EntityPtr entity; 
 	ComponentType type;
 	IScene* scene;
 

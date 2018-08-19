@@ -172,7 +172,7 @@ struct TerrainQuad
 };
 
 
-Terrain::Terrain(Renderer& renderer, Entity entity, RenderScene& scene, IAllocator& allocator)
+Terrain::Terrain(Renderer& renderer, EntityPtr entity, RenderScene& scene, IAllocator& allocator)
 	: m_mesh(nullptr)
 	, m_material(nullptr)
 	, m_root(nullptr)
@@ -363,7 +363,7 @@ void Terrain::forceGrassUpdate()
 	}
 }
 
-Array<Terrain::GrassQuad*>& Terrain::getQuads(Entity camera)
+Array<Terrain::GrassQuad*>& Terrain::getQuads(EntityRef camera)
 {
 	int quads_index = m_grass_quads.find(camera);
 	if (quads_index < 0)
@@ -455,7 +455,7 @@ void Terrain::generateGrassTypeQuad(GrassPatch& patch, const RigidTransform& ter
 }
 
 
-void Terrain::updateGrass(Entity camera)
+void Terrain::updateGrass(EntityRef camera)
 {
 	PROFILE_FUNCTION();
 	if (!m_splatmap) return;
@@ -550,7 +550,7 @@ void Terrain::grassLoaded(Resource::State, Resource::State, Resource&)
 }
 
 
-void Terrain::getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, Entity camera)
+void Terrain::getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, EntityRef camera)
 {
 	if (!m_material || !m_material->isReady()) return;
 

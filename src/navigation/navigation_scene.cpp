@@ -55,7 +55,7 @@ struct Agent
 		GET_ROOT_MOTION_FROM_ANIM_CONTROLLER = 1 << 1
 	};
 
-	Entity entity;
+	EntityRef entity;
 	float radius;
 	float height;
 	int agent;
@@ -68,7 +68,7 @@ struct Agent
 };
 
 
-struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
+struct NavigationSceneImpl final : public NavigationScene
 {
 	NavigationSceneImpl(Engine& engine, IPlugin& system, Universe& universe, IAllocator& allocator)
 		: m_allocator(allocator)
@@ -113,7 +113,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	}
 
 
-	void onEntityMoved(Entity entity)
+	void onEntityMoved(EntityRef entity)
 	{
 		auto iter = m_agents.find(entity);
 		if (!iter.isValid()) return;
@@ -182,9 +182,10 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 		auto render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
 		if (!render_scene) return;
 
-		Entity entity = render_scene->getFirstTerrain();
-		while (entity.isValid())
+		EntityPtr entity_ptr = render_scene->getFirstTerrain();
+		while (entity_ptr.isValid())
 		{
+			const EntityRef entity = (EntityRef)entity_ptr;
 			Vec3 pos = m_universe.getPosition(entity);
 			Quat rot = m_universe.getRotation(entity);
 			Vec2 res = render_scene->getTerrainResolution(entity);
@@ -228,7 +229,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 				}
 			}
 
-			entity = render_scene->getNextTerrain(entity);
+			entity_ptr = render_scene->getNextTerrain(entity);
 		}
 	}
 
@@ -243,14 +244,14 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 
 		u32 no_navigation_flag = Material::getCustomFlag("no_navigation");
 		u32 nonwalkable_flag = Material::getCustomFlag("nonwalkable");
-		for (Entity model_instance = render_scene->getFirstModelInstance(); model_instance.isValid();
+		for (EntityPtr model_instance = render_scene->getFirstModelInstance(); model_instance.isValid();
 			 model_instance = render_scene->getNextModelInstance(model_instance))
 		{
-			auto* model = render_scene->getModelInstanceModel(model_instance);
+			const EntityRef entity = (EntityRef)model_instance;
+			auto* model = render_scene->getModelInstanceModel(entity);
 			if (!model) return;
 			ASSERT(model->isReady());
 
-			Entity entity = model_instance;
 			Matrix mtx = m_universe.getMatrix(entity);
 			AABB model_aabb = model->getAABB();
 			model_aabb.transform(mtx);
@@ -314,25 +315,25 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	}
 
 
-	bool isFinished(Entity entity) override
+	bool isFinished(EntityRef entity) override
 	{
 		return m_agents[entity].is_finished;
 	}
 
 
-	float getAgentSpeed(Entity entity) override
+	float getAgentSpeed(EntityRef entity) override
 	{
 		return m_agents[entity].speed;
 	}
 
 
-	float getAgentYawDiff(Entity entity) override
+	float getAgentYawDiff(EntityRef entity) override
 	{
 		return m_agents[entity].yaw_diff;
 	}
 
 
-	void setAgentRootMotion(Entity entity, const Vec3& root_motion) override
+	void setAgentRootMotion(EntityRef entity, const Vec3& root_motion) override
 	{
 		m_agents[entity].root_motion = root_motion;
 	}
@@ -522,7 +523,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	}
 
 
-	const dtCrowdAgent* getDetourAgent(Entity entity) override
+	const dtCrowdAgent* getDetourAgent(EntityRef entity) override
 	{
 		if (!m_crowd) return nullptr;
 
@@ -535,7 +536,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	}
 
 
-	void debugDrawPath(Entity entity) override
+	void debugDrawPath(EntityRef entity) override
 	{
 		auto render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
 		if (!render_scene) return;
@@ -968,7 +969,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	}
 
 
-	void cancelNavigation(Entity entity) override
+	void cancelNavigation(EntityRef entity) override
 	{
 		auto iter = m_agents.find(entity);
 		if (iter == m_agents.end()) return;
@@ -980,10 +981,9 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	}
 
 
-	void setActorActive(Entity entity, bool active) override
+	void setActorActive(EntityRef entity, bool active) override
 	{
 		if (!m_crowd) return;
-		if (!entity.isValid()) return;
 
 		auto iter = m_agents.find(entity);
 		if (iter == m_agents.end()) return;
@@ -996,11 +996,10 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	}
 
 
-	bool navigate(Entity entity, const Vec3& dest, float speed, float stop_distance) override
+	bool navigate(EntityRef entity, const Vec3& dest, float speed, float stop_distance) override
 	{
 		if (!m_navquery) return false;
 		if (!m_crowd) return false;
-		if (entity == INVALID_ENTITY) return false;
 		auto iter = m_agents.find(entity);
 		if (iter == m_agents.end()) return false;
 		Agent& agent = iter.value();
@@ -1235,28 +1234,28 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 		auto* render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
 		if (!render_scene) return;
 
-		for (Entity model_instance = render_scene->getFirstModelInstance(); model_instance.isValid();
-			model_instance = render_scene->getNextModelInstance(model_instance))
+		for (EntityPtr model_instance = render_scene->getFirstModelInstance(); model_instance.isValid();
+			model_instance = render_scene->getNextModelInstance((EntityRef)model_instance))
 		{
-			auto* model = render_scene->getModelInstanceModel(model_instance);
+			auto* model = render_scene->getModelInstanceModel((EntityRef)model_instance);
 			if (!model) continue;
 			ASSERT(model->isReady());
 
 			AABB model_bb = model->getAABB();
-			Matrix mtx = m_universe.getMatrix(model_instance);
+			Matrix mtx = m_universe.getMatrix((EntityRef)model_instance);
 			model_bb.transform(mtx);
 			m_aabb.merge(model_bb);
 		}
 
-		Entity entity = render_scene->getFirstTerrain();
+		EntityPtr entity = render_scene->getFirstTerrain();
 		while (entity.isValid())
 		{
-			AABB terrain_aabb = render_scene->getTerrainAABB(entity);
-			Matrix mtx = m_universe.getMatrix(render_scene->getTerrainEntity(entity));
+			AABB terrain_aabb = render_scene->getTerrainAABB((EntityRef)entity);
+			Matrix mtx = m_universe.getMatrix((EntityRef)entity);
 			terrain_aabb.transform(mtx);
 			m_aabb.merge(terrain_aabb);
 
-			entity = render_scene->getNextTerrain(entity);
+			entity = render_scene->getNextTerrain((EntityRef)entity);
 		}
 	}
 
@@ -1346,7 +1345,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	}
 
 
-	void createAgent(Entity entity)
+	void createAgent(EntityRef entity)
 	{
 		Agent agent;
 		agent.entity = entity;
@@ -1361,7 +1360,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	}
 
 
-	void destroyAgent(Entity entity)
+	void destroyAgent(EntityRef entity)
 	{
 		auto iter = m_agents.find(entity);
 		const Agent& agent = iter.value();
@@ -1374,7 +1373,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	int getVersion() const override { return (int)NavigationSceneVersion::LATEST; }
 
 
-	void serializeAgent(ISerializer& serializer, Entity entity)
+	void serializeAgent(ISerializer& serializer, EntityRef entity)
 	{
 		Agent& agent = m_agents[entity];
 		serializer.write("radius", agent.radius);
@@ -1385,7 +1384,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	}
 
 
-	void deserializeAgent(IDeserializer& serializer, Entity entity, int scene_version)
+	void deserializeAgent(IDeserializer& serializer, EntityRef entity, int scene_version)
 	{
 		Agent agent;
 		agent.entity = entity;
@@ -1442,19 +1441,19 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 			agent.is_finished = true;
 			agent.agent = -1;
 			m_agents.insert(agent.entity, agent);
-			Entity entity = {agent.entity.index};
+			EntityRef entity = {agent.entity.index};
 			m_universe.onComponentCreated(agent.entity, NAVMESH_AGENT_TYPE, this);
 		}
 	}
 
 
-	bool isGettingRootMotionFromAnim(Entity entity) override
+	bool isGettingRootMotionFromAnim(EntityRef entity) override
 	{
 		return (m_agents[entity].flags & Agent::GET_ROOT_MOTION_FROM_ANIM_CONTROLLER) != 0;
 	}
 
 
-	void setIsGettingRootMotionFromAnim(Entity entity, bool is) override 
+	void setIsGettingRootMotionFromAnim(EntityRef entity, bool is) override 
 	{
 		if (is)
 			m_agents[entity].flags |= Agent::GET_ROOT_MOTION_FROM_ANIM_CONTROLLER;
@@ -1463,13 +1462,13 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	}
 
 
-	bool useAgentRootMotion(Entity entity) override
+	bool useAgentRootMotion(EntityRef entity) override
 	{
 		return (m_agents[entity].flags & Agent::USE_ROOT_MOTION) != 0;
 	}
 
 
-	void setUseAgentRootMotion(Entity entity, bool use_root_motion) override
+	void setUseAgentRootMotion(EntityRef entity, bool use_root_motion) override
 	{
 		if (use_root_motion)
 			m_agents[entity].flags |= Agent::USE_ROOT_MOTION;
@@ -1478,25 +1477,25 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	}
 
 
-	void setAgentRadius(Entity entity, float radius) override
+	void setAgentRadius(EntityRef entity, float radius) override
 	{
 		m_agents[entity].radius = radius;
 	}
 
 
-	float getAgentRadius(Entity entity) override
+	float getAgentRadius(EntityRef entity) override
 	{
 		return m_agents[entity].radius;
 	}
 
 
-	void setAgentHeight(Entity entity, float height) override
+	void setAgentHeight(EntityRef entity, float height) override
 	{
 		m_agents[entity].height = height;
 	}
 
 
-	float getAgentHeight(Entity entity) override
+	float getAgentHeight(EntityRef entity) override
 	{
 		return m_agents[entity].height;
 	}
@@ -1513,7 +1512,7 @@ struct NavigationSceneImpl LUMIX_FINAL : public NavigationScene
 	dtNavMesh* m_navmesh;
 	dtNavMeshQuery* m_navquery;
 	rcPolyMeshDetail* m_detail_mesh;
-	HashMap<Entity, Agent> m_agents;
+	HashMap<EntityRef, Agent> m_agents;
 	rcCompactHeightfield* m_debug_compact_heightfield;
 	rcHeightfield* m_debug_heightfield;
 	rcContourSet* m_debug_contours;

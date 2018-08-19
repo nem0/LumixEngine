@@ -69,7 +69,7 @@ void IFile::getContents(OutputBlob& blob)
 }
 
 
-class FSTask LUMIX_FINAL : public MT::Task
+class FSTask final : public MT::Task
 {
 public:
 	FSTask(TransQueue* queue, IAllocator& allocator)
@@ -113,7 +113,7 @@ private:
 };
 
 
-class FileSystemImpl LUMIX_FINAL : public FileSystem
+class FileSystemImpl final : public FileSystem
 {
 public:
 	explicit FileSystemImpl(IAllocator& allocator)

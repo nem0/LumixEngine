@@ -14,7 +14,7 @@ namespace Anim
 {
 
 
-class ControllerManager LUMIX_FINAL : public ResourceManagerBase
+class ControllerManager final : public ResourceManagerBase
 {
 public:
 	explicit ControllerManager(IAllocator& allocator)

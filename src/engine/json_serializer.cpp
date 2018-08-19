@@ -87,7 +87,7 @@ JsonDeserializer::~JsonDeserializer()
 #pragma region serialization
 
 
-void JsonSerializer::serialize(const char* label, Entity value)
+void JsonSerializer::serialize(const char* label, EntityPtr value)
 {
 	serialize(label, value.index);
 }
@@ -251,7 +251,7 @@ void JsonSerializer::serializeArrayItem(unsigned int value)
 }
 
 
-void JsonSerializer::serializeArrayItem(Entity value)
+void JsonSerializer::serializeArrayItem(EntityPtr value)
 {
 	serializeArrayItem(value.index);
 }
@@ -309,7 +309,7 @@ bool JsonDeserializer::isNextBoolean() const
 }
 
 
-void JsonDeserializer::deserialize(const char* label, Entity& value, Entity default_value)
+void JsonDeserializer::deserialize(const char* label, EntityPtr& value, EntityPtr default_value)
 {
 	deserialize(label, value.index, default_value.index);
 }
@@ -578,7 +578,7 @@ void JsonDeserializer::deserializeArrayItem(char* value, int max_length, const c
 }
 
 
-void JsonDeserializer::deserializeArrayItem(Entity& value, Entity default_value)
+void JsonDeserializer::deserializeArrayItem(EntityPtr& value, EntityPtr default_value)
 {
 	deserializeArrayItem(value.index, default_value.index);
 }

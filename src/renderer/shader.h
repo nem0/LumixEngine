@@ -23,7 +23,7 @@ class Shader;
 class Texture;
 
 
-class LUMIX_RENDERER_API Shader LUMIX_FINAL : public Resource
+class LUMIX_RENDERER_API Shader final : public Resource
 {
 public:
 	struct TextureSlot

@@ -19,7 +19,7 @@ struct Quat;
 struct Vec3;
 
 
-class AnimationManager LUMIX_FINAL : public ResourceManagerBase
+class AnimationManager final : public ResourceManagerBase
 {
 public:
 	explicit AnimationManager(IAllocator& allocator)
@@ -46,7 +46,7 @@ struct BoneMask
 };
 
 
-class Animation LUMIX_FINAL : public Resource
+class Animation final : public Resource
 {
 	public:
 		static const u32 HEADER_MAGIC = 0x5f4c4146; // '_LAF'

@@ -136,7 +136,7 @@ struct LuaPlugin : public StudioApp::GUIPlugin
 };
 
 
-class StudioAppImpl LUMIX_FINAL : public StudioApp
+class StudioAppImpl final : public StudioApp
 {
 public:
 	StudioAppImpl()
@@ -387,7 +387,7 @@ public:
 		ResourceType resource_type,
 		const Reflection::PropertyBase& property) override
 	{
-		struct Plugin LUMIX_FINAL : public IAddComponentPlugin
+		struct Plugin final : public IAddComponentPlugin
 		{
 			void onGUI(bool create_entity, bool from_filter) override
 			{
@@ -400,7 +400,7 @@ public:
 				{
 					if (create_entity)
 					{
-						Entity entity = editor->addEntity();
+						EntityRef entity = editor->addEntity();
 						editor->selectEntities(&entity, 1, false);
 					}
 
@@ -459,7 +459,7 @@ public:
 
 	void registerComponent(const char* type, const char* label) override
 	{
-		struct Plugin LUMIX_FINAL : public IAddComponentPlugin
+		struct Plugin final : public IAddComponentPlugin
 		{
 			void onGUI(bool create_entity, bool from_filter) override
 			{
@@ -468,7 +468,7 @@ public:
 				{
 					if (create_entity)
 					{
-						Entity entity = editor->addEntity();
+						EntityRef entity = editor->addEntity();
 						editor->selectEntities(&entity, 1, false);
 					}
 
@@ -1045,7 +1045,7 @@ public:
 	
 	void entityMenu()
 	{
-		if (!ImGui::BeginMenu("Entity")) return;
+		if (!ImGui::BeginMenu("EntityRef")) return;
 
 		const auto& selected_entities = m_editor->getSelectedEntities();
 		bool is_any_entity_selected = !selected_entities.empty();
@@ -1262,7 +1262,7 @@ public:
 	}
 
 
-	void showHierarchy(Entity entity, const Array<Entity>& selected_entities)
+	void showHierarchy(EntityRef entity, const Array<EntityRef>& selected_entities)
 	{
 		char buffer[1024];
 		Universe* universe = m_editor->getUniverse();
@@ -1281,7 +1281,7 @@ public:
 			if (ImGui::MenuItem("Create child"))
 			{
 				m_editor->beginCommandGroup(crc32("create_child_entity"));
-				Entity child = m_editor->addEntity();
+				EntityRef child = m_editor->addEntity();
 				m_editor->makeParent(entity, child);
 				Vec3 pos = m_editor->getUniverse()->getPosition(entity);
 				m_editor->setEntitiesPositions(&child, &pos, 1);
@@ -1300,7 +1300,7 @@ public:
 		{
 			if (auto* payload = ImGui::AcceptDragDropPayload("entity"))
 			{
-				Entity dropped_entity = *(Entity*)payload->Data;
+				EntityRef dropped_entity = *(EntityRef*)payload->Data;
 				if (dropped_entity != entity)
 				{
 					m_editor->makeParent(entity, dropped_entity);
@@ -1314,9 +1314,9 @@ public:
 
 		if (node_open)
 		{
-			for (Entity e = universe->getFirstChild(entity); e.isValid(); e = universe->getNextSibling(e))
+			for (EntityPtr e_ptr = universe->getFirstChild(entity); e_ptr.isValid(); e_ptr = universe->getNextSibling((EntityRef)e_ptr))
 			{
-				showHierarchy(e, selected_entities);
+				showHierarchy((EntityRef)e_ptr, selected_entities);
 			}
 			ImGui::TreePop();
 		}
@@ -1326,9 +1326,9 @@ public:
 	void onEntityListGUI()
 	{
 		PROFILE_FUNCTION();
-		const Array<Entity>& entities = m_editor->getSelectedEntities();
+		const Array<EntityRef>& entities = m_editor->getSelectedEntities();
 		static char filter[64] = "";
-		if (ImGui::BeginDock("Entity List", &m_is_entity_list_open))
+		if (ImGui::BeginDock("EntityRef List", &m_is_entity_list_open))
 		{
 			auto* universe = m_editor->getUniverse();
 			ImGui::LabellessInputText("Filter", filter, sizeof(filter));
@@ -1338,26 +1338,28 @@ public:
 				ImGui::PushItemWidth(ImGui::GetContentRegionAvailWidth() - ImGui::GetStyle().FramePadding.x);
 				if (filter[0] == '\0')
 				{
-					for (Entity e = universe->getFirstEntity(); e.isValid(); e = universe->getNextEntity(e))
+					for (EntityPtr e = universe->getFirstEntity(); e.isValid(); e = universe->getNextEntity((EntityRef)e))
 					{
-						if (!universe->getParent(e).isValid())
+						const EntityRef e_ref = (EntityRef)e;
+						if (!universe->getParent(e_ref).isValid())
 						{
-							showHierarchy(e, entities);
+							showHierarchy(e_ref, entities);
 						}
 					}
 				}
 				else
 				{
-					for (Entity e = universe->getFirstEntity(); e.isValid(); e = universe->getNextEntity(e))
+					for (EntityPtr e = universe->getFirstEntity(); e.isValid(); e = universe->getNextEntity((EntityRef)e))
 					{
 						char buffer[1024];
 						getEntityListDisplayName(*m_editor, buffer, sizeof(buffer), e);
 						if (stristr(buffer, filter) == nullptr) continue;
 						ImGui::PushID(e.index);
-						bool selected = entities.indexOf(e) >= 0;
+						const EntityRef e_ref = (EntityRef)e;
+						bool selected = entities.indexOf(e_ref) >= 0;
 						if (ImGui::Selectable(buffer, &selected))
 						{
-							m_editor->selectEntities(&e, 1, true);
+							m_editor->selectEntities(&e_ref, 1, true);
 						}
 						if (ImGui::BeginDragDropSource())
 						{
@@ -1376,7 +1378,7 @@ public:
 			{
 				if (auto* payload = ImGui::AcceptDragDropPayload("entity"))
 				{
-					Entity dropped_entity = *(Entity*)payload->Data;
+					EntityRef dropped_entity = *(EntityRef*)payload->Data;
 					m_editor->makeParent(INVALID_ENTITY, dropped_entity);
 				}
 				ImGui::EndDragDropTarget();
@@ -1533,7 +1535,7 @@ public:
 		addAction<&StudioAppImpl::lookAtSelected>("Look at selected", "Look at selected entity", "lookAtSelected");
 		addAction<&StudioAppImpl::toggleAssetBrowser>("Asset Browser", "Toggle asset browser", "assetBrowser")
 			.is_selected.bind<StudioAppImpl, &StudioAppImpl::isAssetBrowserOpen>(this);
-		addAction<&StudioAppImpl::toggleEntityList>("Entity List", "Toggle entity list", "entityList")
+		addAction<&StudioAppImpl::toggleEntityList>("EntityRef List", "Toggle entity list", "entityList")
 			.is_selected.bind<StudioAppImpl, &StudioAppImpl::isEntityListOpen>(this);
 		addAction<&StudioAppImpl::toggleSettings>("Settings", "Toggle settings UI", "settings")
 			.is_selected.bind<StudioAppImpl, &StudioAppImpl::areSettingsOpen>(this);
@@ -1830,24 +1832,24 @@ public:
 	}
 
 
-	void destroyEntity(Entity e)
+	void destroyEntity(EntityRef e)
 	{
 		m_editor->destroyEntities(&e, 1);
 	}
 
 
-	void selectEntity(Entity e)
+	void selectEntity(EntityRef e)
 	{
 		m_editor->selectEntities(&e, 1, false);
 	}
 
 
-	Entity createEntity()
+	EntityRef createEntity()
 	{
 		return m_editor->addEntity();
 	}
 
-	void createComponent(Entity e, int type)
+	void createComponent(EntityRef e, int type)
 	{
 		m_editor->selectEntities(&e, 1, false);
 		m_editor->addComponent({type});
@@ -1874,13 +1876,13 @@ public:
 			if (!lua_isnumber(L, -1)) return;
 
 			int val = (int)lua_tointeger(L, -1);
-			editor->setProperty(cmp.type, 0, prop, &cmp.entity, 1, &val, sizeof(val));
+			editor->setProperty(cmp_type, 0, prop, &entity, 1, &val, sizeof(val));
 		}
 
 
 		// TODO 
 		void visit(const Reflection::Property<float>& prop) override { notSupported(prop); }
-		void visit(const Reflection::Property<Entity>& prop) override { notSupported(prop); }
+		void visit(const Reflection::Property<EntityPtr>& prop) override { notSupported(prop); }
 		void visit(const Reflection::Property<Int2>& prop) override { notSupported(prop); }
 		void visit(const Reflection::Property<Vec2>& prop) override { notSupported(prop); }
 		void visit(const Reflection::Property<Vec3>& prop) override { notSupported(prop); }
@@ -1893,7 +1895,7 @@ public:
 			if (!lua_isstring(L, -1)) return;
 
 			const char* str = lua_tostring(L, -1);
-			editor->setProperty(cmp.type, 0, prop, &cmp.entity, 1, str, stringLength(str) + 1);
+			editor->setProperty(cmp_type, 0, prop, &entity, 1, str, stringLength(str) + 1);
 		}
 
 
@@ -1903,7 +1905,7 @@ public:
 			if (!lua_isstring(L, -1)) return;
 
 			const char* str = lua_tostring(L, -1);
-			editor->setProperty(cmp.type, 0, prop, &cmp.entity, 1, str, stringLength(str) + 1);
+			editor->setProperty(cmp_type, 0, prop, &entity, 1, str, stringLength(str) + 1);
 		}
 
 
@@ -1913,7 +1915,7 @@ public:
 			if (!lua_isboolean(L, -1)) return;
 
 			bool val = lua_toboolean(L, -1) != 0;
-			editor->setProperty(cmp.type, 0, prop, &cmp.entity, 1, &val, sizeof(val));
+			editor->setProperty(cmp_type, 0, prop, &entity, 1, &val, sizeof(val));
 		}
 
 		void visit(const Reflection::IArrayProperty& prop) override { notSupported(prop); }
@@ -1930,7 +1932,8 @@ public:
 
 
 		lua_State* L;
-		ComponentUID cmp;
+		EntityRef entity;
+		ComponentType cmp_type;
 		const char* property_name;
 		WorldEditor* editor;
 	};
@@ -1943,7 +1946,7 @@ public:
 
 		WorldEditor& editor = *studio->m_editor;
 		editor.beginCommandGroup(crc32("createEntityEx"));
-		Entity e = editor.addEntity();
+		EntityRef e = editor.addEntity();
 		editor.selectEntities(&e, 1, false);
 
 		lua_pushvalue(L, 2);
@@ -1980,7 +1983,8 @@ public:
 							const char* property_name = luaL_checkstring(L, -2);
 							SetPropertyVisitor v;
 							v.property_name = property_name;
-							v.cmp = cmp;
+							v.entity = (EntityRef)cmp.entity;
+							v.cmp_type = cmp.type;
 							v.L = L;
 							v.editor = &editor;
 							cmp_des->visit(v);

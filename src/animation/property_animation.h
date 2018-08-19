@@ -23,7 +23,7 @@ namespace Reflection
 class JsonSerializer;
 
 
-class PropertyAnimationManager LUMIX_FINAL : public ResourceManagerBase
+class PropertyAnimationManager final : public ResourceManagerBase
 {
 public:
 	explicit PropertyAnimationManager(IAllocator& allocator)
@@ -42,7 +42,7 @@ private:
 };
 
 
-class PropertyAnimation LUMIX_FINAL : public Resource
+class PropertyAnimation final : public Resource
 {
 public:
 	struct Curve

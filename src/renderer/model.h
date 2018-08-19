@@ -42,7 +42,7 @@ struct LUMIX_RENDERER_API RayCastModelHit
 	Vec3 m_origin;
 	Vec3 m_dir;
 	Mesh* m_mesh;
-	Entity m_entity;
+	EntityPtr m_entity;
 	ComponentType m_component_type;
 };
 
@@ -125,7 +125,7 @@ struct LODMeshIndices
 };
 
 
-class LUMIX_RENDERER_API Model LUMIX_FINAL : public Resource
+class LUMIX_RENDERER_API Model final : public Resource
 {
 public:
 	typedef HashMap<u32, int> BoneMap;

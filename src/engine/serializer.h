@@ -30,14 +30,14 @@ inline bool isValid(EntityGUID guid) { return guid.value != INVALID_ENTITY_GUID.
 struct ISaveEntityGUIDMap
 {
 	virtual ~ISaveEntityGUIDMap() {}
-	virtual EntityGUID get(Entity entity) = 0;
+	virtual EntityGUID get(EntityPtr entity) = 0;
 };
 
 
 struct ILoadEntityGUIDMap
 {
 	virtual ~ILoadEntityGUIDMap() {}
-	virtual Entity get(EntityGUID guid) = 0;
+	virtual EntityPtr get(EntityGUID guid) = 0;
 };
 
 
@@ -45,7 +45,8 @@ struct LUMIX_ENGINE_API ISerializer
 {
 	virtual ~ISerializer() {}
 
-	virtual void write(const char* label, Entity entity) = 0;
+	virtual void write(const char* label, EntityPtr entity) = 0;
+	virtual void write(const char* label, EntityRef entity) = 0;
 	virtual void write(const char* label, const Transform& value) = 0;
 	virtual void write(const char* label, const RigidTransform& value) = 0;
 	virtual void write(const char* label, const Vec4& value) = 0;
@@ -61,7 +62,7 @@ struct LUMIX_ENGINE_API ISerializer
 	virtual void write(const char* label, i8 value) = 0;
 	virtual void write(const char* label, u8 value) = 0;
 	virtual void write(const char* label, const char* value) = 0;
-	virtual EntityGUID getGUID(Entity entity) = 0;
+	virtual EntityGUID getGUID(EntityRef entity) = 0;
 };
 
 
@@ -69,7 +70,8 @@ struct LUMIX_ENGINE_API IDeserializer
 {
 	virtual ~IDeserializer() {}
 
-	virtual void read(Entity* entity) = 0;
+	virtual void read(EntityPtr* entity) = 0;
+	virtual void read(EntityRef* entity) = 0;
 	virtual void read(Transform* value) = 0;
 	virtual void read(RigidTransform* value) = 0;
 	virtual void read(Vec4* value) = 0;
@@ -86,11 +88,11 @@ struct LUMIX_ENGINE_API IDeserializer
 	virtual void read(i8* value) = 0;
 	virtual void read(char* value, int max_size) = 0;
 	virtual void read(string* value) = 0;
-	virtual Entity getEntity(EntityGUID guid) = 0;
+	virtual EntityPtr getEntity(EntityGUID guid) = 0;
 };
 
 
-struct LUMIX_ENGINE_API TextSerializer LUMIX_FINAL : public ISerializer
+struct LUMIX_ENGINE_API TextSerializer final : public ISerializer
 {
 	TextSerializer(OutputBlob& _blob, ISaveEntityGUIDMap& _entity_map)
 		: blob(_blob)
@@ -98,7 +100,8 @@ struct LUMIX_ENGINE_API TextSerializer LUMIX_FINAL : public ISerializer
 	{
 	}
 
-	void write(const char* label, Entity entity)  override;
+	void write(const char* label, EntityPtr entity)  override;
+	void write(const char* label, EntityRef entity)  override;
 	void write(const char* label, const RigidTransform& value)  override;
 	void write(const char* label, const Transform& value)  override;
 	void write(const char* label, const Vec4& value)  override;
@@ -114,14 +117,14 @@ struct LUMIX_ENGINE_API TextSerializer LUMIX_FINAL : public ISerializer
 	void write(const char* label, i8 value)  override;
 	void write(const char* label, u8 value)  override;
 	void write(const char* label, const char* value)  override;
-	EntityGUID getGUID(Entity entity) override;
+	EntityGUID getGUID(EntityRef entity) override;
 
 	OutputBlob& blob;
 	ISaveEntityGUIDMap& entity_map;
 };
 
 
-struct LUMIX_ENGINE_API TextDeserializer LUMIX_FINAL : public IDeserializer
+struct LUMIX_ENGINE_API TextDeserializer final : public IDeserializer
 {
 	TextDeserializer(InputBlob& _blob, ILoadEntityGUIDMap& _entity_map)
 		: blob(_blob)
@@ -129,7 +132,8 @@ struct LUMIX_ENGINE_API TextDeserializer LUMIX_FINAL : public IDeserializer
 	{
 	}
 
-	void read(Entity* entity)  override;
+	void read(EntityPtr* entity)  override;
+	void read(EntityRef* entity)  override;
 	void read(RigidTransform* value)  override;
 	void read(Transform* value)  override;
 	void read(Vec4* value)  override;
@@ -146,7 +150,7 @@ struct LUMIX_ENGINE_API TextDeserializer LUMIX_FINAL : public IDeserializer
 	void read(i8* value)  override;
 	void read(char* value, int max_size)  override;
 	void read(string* value)  override;
-	Entity getEntity(EntityGUID guid) override;
+	EntityPtr getEntity(EntityGUID guid) override;
 
 	void skip();
 	u32 readU32();

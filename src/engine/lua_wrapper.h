@@ -89,7 +89,11 @@ template <> inline u16 toType(lua_State* L, int index)
 {
 	return (u16)lua_tointeger(L, index);
 }
-template <> inline Entity toType(lua_State* L, int index)
+template <> inline EntityRef toType(lua_State* L, int index)
+{
+	return {(int)lua_tointeger(L, index)};
+}
+template <> inline EntityPtr toType(lua_State* L, int index)
 {
 	return {(int)lua_tointeger(L, index)};
 }
@@ -220,7 +224,7 @@ template <> inline const char* typeToString<u16>()
 {
 	return "number|u16";
 }
-template <> inline const char* typeToString<Entity>()
+template <> inline const char* typeToString<EntityRef>()
 {
 	return "entity";
 }
@@ -259,7 +263,11 @@ template <> inline bool isType<u16>(lua_State* L, int index)
 {
 	return lua_isnumber(L, index) != 0;
 }
-template <> inline bool isType<Entity>(lua_State* L, int index)
+template <> inline bool isType<EntityRef>(lua_State* L, int index)
+{
+	return lua_isnumber(L, index) != 0;
+}
+template <> inline bool isType<EntityPtr>(lua_State* L, int index)
 {
 	return lua_isnumber(L, index) != 0;
 }
@@ -334,7 +342,11 @@ template <typename T> inline void push(lua_State* L, const T* value)
 {
 	lua_pushlightuserdata(L, (T*)value);
 }
-template <> inline void push(lua_State* L, Entity value)
+template <> inline void push(lua_State* L, EntityRef value)
+{
+	lua_pushinteger(L, value.index);
+}
+template <> inline void push(lua_State* L, EntityPtr value)
 {
 	lua_pushinteger(L, value.index);
 }

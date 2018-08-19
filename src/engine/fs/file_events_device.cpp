@@ -9,7 +9,7 @@ namespace Lumix
 {
 	namespace FS
 	{
-		class EventsFile LUMIX_FINAL : public IFile
+		class EventsFile final : public IFile
 		{
 		public:
 			EventsFile& operator= (const EventsFile& rhs) = delete;

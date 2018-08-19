@@ -37,7 +37,7 @@ namespace Lumix
 	};
 
 
-	class LuaScriptSystemImpl LUMIX_FINAL : public IPlugin
+	class LuaScriptSystemImpl final : public IPlugin
 	{
 	public:
 		explicit LuaScriptSystemImpl(Engine& engine);
@@ -54,7 +54,7 @@ namespace Lumix
 	};
 
 
-	struct LuaScriptSceneImpl LUMIX_FINAL : public LuaScriptScene
+	struct LuaScriptSceneImpl final : public LuaScriptScene
 	{
 		struct TimerData
 		{
@@ -278,7 +278,7 @@ namespace Lumix
 
 			Array<ScriptInstance> m_scripts;
 			LuaScriptSceneImpl& m_scene;
-			Entity m_entity;
+			EntityRef m_entity;
 		};
 
 
@@ -356,7 +356,7 @@ namespace Lumix
 		int getVersion() const override { return (int)LuaSceneVersion::LATEST; }
 
 
-		IFunctionCall* beginFunctionCall(Entity entity, int scr_index, const char* function) override
+		IFunctionCall* beginFunctionCall(EntityRef entity, int scr_index, const char* function) override
 		{
 			ASSERT(!m_function_call.is_in_progress);
 
@@ -401,31 +401,31 @@ namespace Lumix
 		}
 
 
-		int getPropertyCount(Entity entity, int scr_index) override
+		int getPropertyCount(EntityRef entity, int scr_index) override
 		{
 			return m_scripts[entity]->m_scripts[scr_index].m_properties.size();
 		}
 
 
-		const char* getPropertyName(Entity entity, int scr_index, int prop_index) override
+		const char* getPropertyName(EntityRef entity, int scr_index, int prop_index) override
 		{
 			return getPropertyName(m_scripts[entity]->m_scripts[scr_index].m_properties[prop_index].name_hash);
 		}
 
 
-		ResourceType getPropertyResourceType(Entity entity, int scr_index, int prop_index) override
+		ResourceType getPropertyResourceType(EntityRef entity, int scr_index, int prop_index) override
 		{
 			return m_scripts[entity]->m_scripts[scr_index].m_properties[prop_index].resource_type;
 		}
 
 
-		Property::Type getPropertyType(Entity entity, int scr_index, int prop_index) override
+		Property::Type getPropertyType(EntityRef entity, int scr_index, int prop_index) override
 		{
 			return m_scripts[entity]->m_scripts[scr_index].m_properties[prop_index].type;
 		}
 
 
-		void getScriptData(Entity entity, OutputBlob& blob) override
+		void getScriptData(EntityRef entity, OutputBlob& blob) override
 		{
 			auto* scr = m_scripts[entity];
 			blob.write(scr->m_scripts.size());
@@ -449,7 +449,7 @@ namespace Lumix
 		}
 
 
-		void setScriptData(Entity entity, InputBlob& blob) override
+		void setScriptData(EntityRef entity, InputBlob& blob) override
 		{
 			auto* scr = m_scripts[entity];
 			int count;
@@ -504,7 +504,7 @@ namespace Lumix
 		}
 
 
-		lua_State* getState(Entity entity, int scr_index) override
+		lua_State* getState(EntityRef entity, int scr_index) override
 		{
 			return m_scripts[entity]->m_scripts[scr_index].m_state;
 		}
@@ -564,10 +564,10 @@ namespace Lumix
 		static int getEnvironment(lua_State* L)
 		{
 			auto* scene = LuaWrapper::checkArg<LuaScriptScene*>(L, 1);
-			Entity entity = LuaWrapper::checkArg<Entity>(L, 2);
+			EntityRef entity = LuaWrapper::checkArg<EntityRef>(L, 2);
 			int scr_index = LuaWrapper::checkArg<int>(L, 3);
 
-			if (!entity.isValid() || !scene->getUniverse().hasComponent(entity, LUA_SCRIPT_TYPE))
+			if (!scene->getUniverse().hasComponent(entity, LUA_SCRIPT_TYPE))
 			{
 				lua_pushnil(L);
 				return 1;
@@ -593,7 +593,7 @@ namespace Lumix
 		}
 
 
-		struct GetPropertyVisitor LUMIX_FINAL : Reflection::IPropertyVisitor
+		struct GetPropertyVisitor final : Reflection::IPropertyVisitor
 		{
 			template <typename T>
 			LUMIX_FORCE_INLINE void get(const Reflection::Property<T>& prop)
@@ -611,7 +611,7 @@ namespace Lumix
 			void visit(const Reflection::Property<Vec2>& prop) override { get(prop); }
 			void visit(const Reflection::Property<Vec3>& prop) override { get(prop); }
 			void visit(const Reflection::Property<Vec4>& prop) override { get(prop); }
-			void visit(const Reflection::Property<Entity>& prop) override { get(prop); }
+			void visit(const Reflection::Property<EntityPtr>& prop) override { get(prop); }
 
 			void visit(const Reflection::Property<Path>& prop) override
 			{
@@ -647,13 +647,13 @@ namespace Lumix
 			visitor.L = L;
 			visitor.cmp.type = { LuaWrapper::toType<int>(L, lua_upvalueindex(2)) };
 			visitor.cmp.scene = LuaWrapper::checkArg<IScene*>(L, 1);
-			visitor.cmp.entity = LuaWrapper::checkArg<Entity>(L, 2);
+			visitor.cmp.entity = LuaWrapper::checkArg<EntityRef>(L, 2);
 			visitor.visit(*prop);
 			return 1;
 		}
 
 
-		struct SetPropertyVisitor LUMIX_FINAL : Reflection::IPropertyVisitor
+		struct SetPropertyVisitor final : Reflection::IPropertyVisitor
 		{
 			template <typename T>
 			LUMIX_FORCE_INLINE void set(const Reflection::Property<T>& prop)
@@ -670,7 +670,7 @@ namespace Lumix
 			void visit(const Reflection::Property<Vec2>& prop) override { set(prop); }
 			void visit(const Reflection::Property<Vec3>& prop) override { set(prop); }
 			void visit(const Reflection::Property<Vec4>& prop) override { set(prop); }
-			void visit(const Reflection::Property<Entity>& prop) override { set(prop); }
+			void visit(const Reflection::Property<EntityPtr>& prop) override { set(prop); }
 
 			void visit(const Reflection::Property<Path>& prop) override
 			{
@@ -705,7 +705,7 @@ namespace Lumix
 			visitor.L = L;
 			visitor.cmp.scene = LuaWrapper::checkArg<IScene*>(L, 1);
 			visitor.cmp.type = type;
-			visitor.cmp.entity = LuaWrapper::checkArg<Entity>(L, 2);
+			visitor.cmp.entity = LuaWrapper::checkArg<EntityRef>(L, 2);
 			visitor.visit(*prop);
 
 			return 0;
@@ -766,7 +766,7 @@ namespace Lumix
 
 			void visit(const Reflection::Property<float>& prop) override { set(prop); }
 			void visit(const Reflection::Property<int>& prop) override { set(prop); }
-			void visit(const Reflection::Property<Entity>& prop) override { set(prop); }
+			void visit(const Reflection::Property<EntityPtr>& prop) override { set(prop); }
 			void visit(const Reflection::Property<Int2>& prop) override { set(prop); }
 			void visit(const Reflection::Property<Vec2>& prop) override { set(prop); }
 			void visit(const Reflection::Property<Vec3>& prop) override { set(prop); }
@@ -840,7 +840,7 @@ namespace Lumix
 		}
 
 
-		void setScriptSource(Entity entity, int scr_index, const char* path)
+		void setScriptSource(EntityRef entity, int scr_index, const char* path)
 		{
 			setScriptPath(entity, scr_index, Path(path));
 		}
@@ -878,7 +878,7 @@ namespace Lumix
 		}
 
 
-		int getEnvironment(Entity entity, int scr_index) override
+		int getEnvironment(EntityRef entity, int scr_index) override
 		{
 			return m_scripts[entity]->m_scripts[scr_index].m_environment;
 		}
@@ -948,7 +948,7 @@ namespace Lumix
 		}
 
 
-		void setPropertyValue(Entity entity,
+		void setPropertyValue(EntityRef entity,
 			int scr_index,
 			const char* name,
 			const char* value) override
@@ -966,7 +966,7 @@ namespace Lumix
 		}
 
 
-		const char* getPropertyName(Entity entity, int scr_index, int index) const
+		const char* getPropertyName(EntityRef entity, int scr_index, int index) const
 		{
 			auto& script = m_scripts[entity]->m_scripts[scr_index];
 
@@ -974,7 +974,7 @@ namespace Lumix
 		}
 
 
-		int getPropertyCount(Entity entity, int scr_index) const
+		int getPropertyCount(EntityRef entity, int scr_index) const
 		{
 			auto& script = m_scripts[entity]->m_scripts[scr_index];
 
@@ -1130,12 +1130,12 @@ namespace Lumix
 		}
 
 
-		void onButtonClicked(Entity e) { onGUIEvent(e, "onButtonClicked"); }
-		void onRectHovered(Entity e) { onGUIEvent(e, "onRectHovered"); }
-		void onRectHoveredOut(Entity e) { onGUIEvent(e, "onRectHoveredOut"); }
+		void onButtonClicked(EntityRef e) { onGUIEvent(e, "onButtonClicked"); }
+		void onRectHovered(EntityRef e) { onGUIEvent(e, "onRectHovered"); }
+		void onRectHoveredOut(EntityRef e) { onGUIEvent(e, "onRectHoveredOut"); }
 
 
-		LUMIX_FORCE_INLINE void onGUIEvent(Entity e, const char* event)
+		LUMIX_FORCE_INLINE void onGUIEvent(EntityRef e, const char* event)
 		{
 			if (!m_universe.hasComponent(e, LUA_SCRIPT_TYPE)) return;
 
@@ -1179,7 +1179,7 @@ namespace Lumix
 		}
 
 
-		void createLuaScriptComponent(Entity entity)
+		void createLuaScriptComponent(EntityRef entity)
 		{
 			auto& allocator = m_system.m_allocator;
 			ScriptComponent* script = LUMIX_NEW(allocator, ScriptComponent)(*this, allocator);
@@ -1189,7 +1189,7 @@ namespace Lumix
 		}
 
 
-		void destroyLuaScriptComponent(Entity entity)
+		void destroyLuaScriptComponent(EntityRef entity)
 		{
 			auto* script = m_scripts[entity];
 			for (auto& scr : script->m_scripts)
@@ -1208,7 +1208,7 @@ namespace Lumix
 		}
 
 
-		void getPropertyValue(Entity entity,
+		void getPropertyValue(EntityRef entity,
 			int scr_index,
 			const char* property_name,
 			char* out,
@@ -1267,7 +1267,7 @@ namespace Lumix
 				break;
 				case Property::ENTITY:
 				{
-					Entity val = { (int)lua_tointeger(scr.m_state, -1) };
+					EntityRef val = { (int)lua_tointeger(scr.m_state, -1) };
 					toCString(val.index, out, max_size);
 				}
 				break;
@@ -1289,7 +1289,7 @@ namespace Lumix
 		}
 
 
-		void serializeLuaScript(ISerializer& serializer, Entity entity)
+		void serializeLuaScript(ISerializer& serializer, EntityRef entity)
 		{
 			ScriptComponent* script = m_scripts[entity];
 			serializer.write("count", script->m_scripts.size());
@@ -1317,7 +1317,7 @@ namespace Lumix
 							}
 							else
 							{
-								Entity val = {(int)lua_tointeger(inst.m_state, -1)};
+								EntityRef val = {(int)lua_tointeger(inst.m_state, -1)};
 								EntityGUID guid = serializer.getGUID(val);
 								char tmp[128];
 								toCString(guid.value, tmp, lengthOf(tmp));
@@ -1341,7 +1341,7 @@ namespace Lumix
 		}
 
 
-		void deserializeLuaScript(IDeserializer& serializer, Entity entity, int scene_version)
+		void deserializeLuaScript(IDeserializer& serializer, EntityRef entity, int scene_version)
 		{
 			auto& allocator = m_system.m_allocator;
 			ScriptComponent* script = LUMIX_NEW(allocator, ScriptComponent)(*this, allocator);
@@ -1391,7 +1391,7 @@ namespace Lumix
 					{
 						u64 guid;
 						fromCString(tmp, lengthOf(tmp), &guid);
-						Entity entity = serializer.getEntity({guid});
+						const EntityPtr entity = serializer.getEntity({guid});
 						toCString(entity.index, tmp, lengthOf(tmp));
 					}
 					prop->stored_value = tmp;
@@ -1683,7 +1683,7 @@ namespace Lumix
 			{
 				u32 type;
 				u8 size;
-				Entity entity;
+				EntityRef entity;
 				blob.read(type);
 				blob.read(entity);
 				blob.read(size);
@@ -1714,7 +1714,7 @@ namespace Lumix
 		}
 
 
-		Property& getScriptProperty(Entity entity, int scr_index, const char* name)
+		Property& getScriptProperty(EntityRef entity, int scr_index, const char* name)
 		{
 			u32 name_hash = crc32(name);
 			ScriptComponent* script_cmp = m_scripts[entity];
@@ -1733,14 +1733,14 @@ namespace Lumix
 		}
 
 
-		Path getScriptPath(Entity entity, int scr_index) override
+		Path getScriptPath(EntityRef entity, int scr_index) override
 		{
 			auto& tmp = m_scripts[entity]->m_scripts[scr_index];
 			return tmp.m_script ? tmp.m_script->getPath() : Path("");
 		}
 
 
-		void setScriptPath(Entity entity, int scr_index, const Path& path) override
+		void setScriptPath(EntityRef entity, int scr_index, const Path& path) override
 		{
 			auto* script_cmp = m_scripts[entity];
 			if (script_cmp->m_scripts.size() <= scr_index) return;
@@ -1748,19 +1748,19 @@ namespace Lumix
 		}
 
 
-		int getScriptCount(Entity entity) override
+		int getScriptCount(EntityRef entity) override
 		{
 			return m_scripts[entity]->m_scripts.size();
 		}
 
 
-		void insertScript(Entity entity, int idx) override
+		void insertScript(EntityRef entity, int idx) override
 		{
 			m_scripts[entity]->m_scripts.emplaceAt(idx, m_system.m_allocator);
 		}
 
 
-		int addScript(Entity entity) override
+		int addScript(EntityRef entity) override
 		{
 			ScriptComponent* script_cmp = m_scripts[entity];
 			script_cmp->m_scripts.emplace(m_system.m_allocator);
@@ -1768,7 +1768,7 @@ namespace Lumix
 		}
 
 
-		void moveScript(Entity entity, int scr_index, bool up) override
+		void moveScript(EntityRef entity, int scr_index, bool up) override
 		{
 			auto* script_cmp = m_scripts[entity];
 			if (!up && scr_index > script_cmp->m_scripts.size() - 2) return;
@@ -1780,7 +1780,7 @@ namespace Lumix
 		}
 
 
-		void setEnableProperty(Entity entity, int scr_index, ScriptInstance& inst, bool enabled)
+		void setEnableProperty(EntityRef entity, int scr_index, ScriptInstance& inst, bool enabled)
 		{
 			if (!inst.m_state) return;
 
@@ -1795,7 +1795,7 @@ namespace Lumix
 		}
 
 
-		void enableScript(Entity entity, int scr_index, bool enable) override
+		void enableScript(EntityRef entity, int scr_index, bool enable) override
 		{
 			ScriptInstance& inst = m_scripts[entity]->m_scripts[scr_index];
 			if (inst.m_flags.isSet(ScriptInstance::ENABLED) == enable) return;
@@ -1815,20 +1815,20 @@ namespace Lumix
 		}
 
 
-		bool isScriptEnabled(Entity entity, int scr_index) const override
+		bool isScriptEnabled(EntityRef entity, int scr_index) const override
 		{
 			return m_scripts[entity]->m_scripts[scr_index].m_flags.isSet(ScriptInstance::ENABLED);
 		}
 
 
-		void removeScript(Entity entity, int scr_index) override
+		void removeScript(EntityRef entity, int scr_index) override
 		{
 			setScriptPath(entity, scr_index, Path());
 			m_scripts[entity]->m_scripts.eraseFast(scr_index);
 		}
 
 
-		void serializeScript(Entity entity, int scr_index, OutputBlob& blob) override
+		void serializeScript(EntityRef entity, int scr_index, OutputBlob& blob) override
 		{
 			auto& scr = m_scripts[entity]->m_scripts[scr_index];
 			blob.writeString(scr.m_script ? scr.m_script->getPath().c_str() : "");
@@ -1852,7 +1852,7 @@ namespace Lumix
 		}
 
 
-		void deserializeScript(Entity entity, int scr_index, InputBlob& blob) override
+		void deserializeScript(EntityRef entity, int scr_index, InputBlob& blob) override
 		{
 			auto& scr = m_scripts[entity]->m_scripts[scr_index];
 			int count;
@@ -1876,7 +1876,7 @@ namespace Lumix
 
 
 		LuaScriptSystemImpl& m_system;
-		HashMap<Entity, ScriptComponent*> m_scripts;
+		HashMap<EntityRef, ScriptComponent*> m_scripts;
 		AssociativeArray<u32, string> m_property_names;
 		Array<CallbackData> m_input_handlers;
 		Universe& m_universe;

@@ -13,7 +13,7 @@ namespace FS
 {
 
 
-class LUMIX_ENGINE_API ResourceFile LUMIX_FINAL : public IFile
+class LUMIX_ENGINE_API ResourceFile final : public IFile
 {
 public:
 	ResourceFile(IFile* file, ResourceFileDevice& device, IAllocator& allocator)

@@ -63,7 +63,7 @@ public:
 	{
 		bool is_hit;
 		float t;
-		Entity entity;
+		EntityPtr entity;
 		Vec3 pos;
 	};
 
@@ -103,39 +103,39 @@ public:
 	virtual void loadUniverse(const char* basename) = 0;
 	virtual void saveUniverse(const char* basename, bool save_path) = 0;
 	virtual void newUniverse() = 0;
-	virtual void copyEntities(const Entity* entities, int count, ISerializer& serializer) = 0;
+	virtual void copyEntities(const EntityRef* entities, int count, ISerializer& serializer) = 0;
 	virtual void copyEntities() = 0;
 	virtual bool canPasteEntities() const = 0;
 	virtual void pasteEntities() = 0;
     virtual void duplicateEntities() = 0;
 	virtual void addComponent(ComponentType type) = 0;
-	virtual void cloneComponent(const ComponentUID& src, Entity entity) = 0;
-	virtual void destroyComponent(const Entity* entities, int count, ComponentType cmp_type) = 0;
-	virtual void createEntityGUID(Entity entity) = 0;
-	virtual void destroyEntityGUID(Entity entity) = 0;
-	virtual EntityGUID getEntityGUID(Entity entity) = 0;
-	virtual Entity addEntity() = 0;
-	virtual void destroyEntities(const Entity* entities, int count) = 0;
-	virtual void selectEntities(const Entity* entities, int count, bool toggle) = 0;
-	virtual Entity addEntityAt(int camera_x, int camera_y) = 0;
-	virtual void setEntitiesPositions(const Entity* entities, const Vec3* positions, int count) = 0;
-	virtual void setEntitiesCoordinate(const Entity* entities, int count, float value, Coordinate coord) = 0;
-	virtual void setEntitiesLocalCoordinate(const Entity* entities, int count, float value, Coordinate coord) = 0;
-	virtual void setEntitiesScale(const Entity* entities, int count, float scale) = 0;
-	virtual void setEntitiesScales(const Entity* entities, const float* scales, int count) = 0;
-	virtual void setEntitiesRotations(const Entity* entity, const Quat* rotations, int count) = 0;
-	virtual void setEntitiesPositionsAndRotations(const Entity* entity,
+	virtual void cloneComponent(const ComponentUID& src, EntityRef entity) = 0;
+	virtual void destroyComponent(const EntityRef* entities, int count, ComponentType cmp_type) = 0;
+	virtual void createEntityGUID(EntityRef entity) = 0;
+	virtual void destroyEntityGUID(EntityRef entity) = 0;
+	virtual EntityGUID getEntityGUID(EntityRef entity) = 0;
+	virtual EntityRef addEntity() = 0;
+	virtual void destroyEntities(const EntityRef* entities, int count) = 0;
+	virtual void selectEntities(const EntityRef* entities, int count, bool toggle) = 0;
+	virtual EntityRef addEntityAt(int camera_x, int camera_y) = 0;
+	virtual void setEntitiesPositions(const EntityRef* entities, const Vec3* positions, int count) = 0;
+	virtual void setEntitiesCoordinate(const EntityRef* entities, int count, float value, Coordinate coord) = 0;
+	virtual void setEntitiesLocalCoordinate(const EntityRef* entities, int count, float value, Coordinate coord) = 0;
+	virtual void setEntitiesScale(const EntityRef* entities, int count, float scale) = 0;
+	virtual void setEntitiesScales(const EntityRef* entities, const float* scales, int count) = 0;
+	virtual void setEntitiesRotations(const EntityRef* entity, const Quat* rotations, int count) = 0;
+	virtual void setEntitiesPositionsAndRotations(const EntityRef* entity,
 		const Vec3* position,
 		const Quat* rotation,
 		int count) = 0;
-	virtual void setEntityName(Entity entity, const char* name) = 0;
+	virtual void setEntityName(EntityRef entity, const char* name) = 0;
 	virtual void snapDown() = 0;
 	virtual void toggleGameMode() = 0;
 	virtual void navigate(float forward, float right, float up, float speed) = 0;
 	virtual void setProperty(ComponentType component,
 		int index,
 		const Reflection::PropertyBase& property,
-		const Entity* entities,
+		const EntityRef* entities,
 		int count,
 		const void* data,
 		int size) = 0;
@@ -156,11 +156,11 @@ public:
 	virtual void lookAtSelected() = 0;
 	virtual bool isOrbitCamera() const = 0;
 	virtual void setOrbitCamera(bool enable) = 0;
-	virtual const Array<Entity>& getSelectedEntities() const = 0;
-	virtual bool isEntitySelected(Entity entity) const = 0;
-	virtual void makeParent(Entity parent, Entity child) = 0;
+	virtual const Array<EntityRef>& getSelectedEntities() const = 0;
+	virtual bool isEntitySelected(EntityRef entity) const = 0;
+	virtual void makeParent(EntityPtr parent, EntityRef child) = 0;
 
-	virtual DelegateList<void(const Array<Entity>&)>& entitySelected() = 0;
+	virtual DelegateList<void(const Array<EntityRef>&)>& entitySelected() = 0;
 	virtual DelegateList<void()>& universeCreated() = 0;
 	virtual DelegateList<void()>& universeDestroyed() = 0;
 

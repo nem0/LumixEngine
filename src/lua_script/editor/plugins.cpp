@@ -37,9 +37,9 @@ namespace
 {
 
 
-struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
+struct PropertyGridPlugin final : public PropertyGrid::IPlugin
 {
-	struct AddLuaScriptCommand LUMIX_FINAL : public IEditorCommand
+	struct AddLuaScriptCommand final : public IEditorCommand
 	{
 		explicit AddLuaScriptCommand(WorldEditor& _editor)
 			: editor(_editor)
@@ -50,7 +50,7 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		bool execute() override
 		{
 			auto* scene = static_cast<LuaScriptScene*>(editor.getUniverse()->getScene(crc32("lua_script")));
-			scr_index = scene->addScript(entity);
+			if (entity.isValid()) scr_index = scene->addScript((EntityRef)entity);
 			return true;
 		}
 
@@ -58,7 +58,7 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		void undo() override
 		{
 			auto* scene = static_cast<LuaScriptScene*>(editor.getUniverse()->getScene(crc32("lua_script")));
-			scene->removeScript(entity, scr_index);
+			if (entity.isValid()) scene->removeScript((EntityRef)entity, scr_index);
 		}
 
 
@@ -78,12 +78,12 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 
 
 		WorldEditor& editor;
-		Entity entity;
+		EntityPtr entity;
 		int scr_index;
 	};
 
 
-	struct MoveScriptCommand LUMIX_FINAL : public IEditorCommand
+	struct MoveScriptCommand final : public IEditorCommand
 	{
 		explicit MoveScriptCommand(WorldEditor& editor)
 			: blob(editor.getAllocator())
@@ -107,14 +107,14 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 
 		bool execute() override
 		{
-			scene->moveScript(entity, scr_index, up);
+			if (entity.isValid()) scene->moveScript((EntityRef)entity, scr_index, up);
 			return true;
 		}
 
 
 		void undo() override
 		{
-			scene->moveScript(entity, up ? scr_index - 1 : scr_index + 1, !up);
+			if (entity.isValid()) scene->moveScript((EntityRef)entity, up ? scr_index - 1 : scr_index + 1, !up);
 		}
 
 
@@ -142,13 +142,13 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 
 		OutputBlob blob;
 		LuaScriptScene* scene;
-		Entity entity;
+		EntityPtr entity;
 		int scr_index;
 		bool up;
 	};
 
 
-	struct RemoveScriptCommand LUMIX_FINAL : public IEditorCommand
+	struct RemoveScriptCommand final : public IEditorCommand
 	{
 		explicit RemoveScriptCommand(WorldEditor& editor)
 			: blob(editor.getAllocator())
@@ -170,17 +170,21 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 
 		bool execute() override
 		{
-			scene->serializeScript(entity, scr_index, blob);
-			scene->removeScript(entity, scr_index);
+			if (entity.isValid()) {
+				scene->serializeScript((EntityRef)entity, scr_index, blob);
+				scene->removeScript((EntityRef)entity, scr_index);
+			}
 			return true;
 		}
 
 
 		void undo() override
 		{
-			scene->insertScript(entity, scr_index);
-			InputBlob input(blob);
-			scene->deserializeScript(entity, scr_index, input);
+			if (entity.isValid()) {
+				scene->insertScript((EntityRef)entity, scr_index);
+				InputBlob input(blob);
+				scene->deserializeScript((EntityRef)entity, scr_index, input);
+			}
 		}
 
 
@@ -205,12 +209,12 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 
 		OutputBlob blob;
 		LuaScriptScene* scene;
-		Entity entity;
+		EntityPtr entity;
 		int scr_index;
 	};
 
 
-	struct SetPropertyCommand LUMIX_FINAL : public IEditorCommand
+	struct SetPropertyCommand final : public IEditorCommand
 	{
 		explicit SetPropertyCommand(WorldEditor& _editor)
 			: property_name(_editor.getAllocator())
@@ -222,7 +226,7 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 
 
 		SetPropertyCommand(WorldEditor& _editor,
-			Entity entity,
+			EntityRef entity,
 			int scr_index,
 			const char* property_name,
 			const char* val,
@@ -252,14 +256,15 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 
 		bool execute() override
 		{
+			if (!entity.isValid()) return false;
 			auto* scene = static_cast<LuaScriptScene*>(editor.getUniverse()->getScene(crc32("lua_script")));
 			if (property_name.length() > 0 && property_name[0] == '-')
 			{
-				scene->setScriptPath(entity, script_index, Path(value.c_str()));
+				scene->setScriptPath((EntityRef)entity, script_index, Path(value.c_str()));
 			}
 			else
 			{
-				scene->setPropertyValue(entity, script_index, property_name.c_str(), value.c_str());
+				scene->setPropertyValue((EntityRef)entity, script_index, property_name.c_str(), value.c_str());
 			}
 			return true;
 		}
@@ -267,14 +272,15 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 
 		void undo() override
 		{
+			if (!entity.isValid()) return;
 			auto* scene = static_cast<LuaScriptScene*>(editor.getUniverse()->getScene(crc32("lua_script")));
 			if (property_name.length() > 0 && property_name[0] == '-')
 			{
-				scene->setScriptPath(entity, script_index, Path(old_value.c_str()));
+				scene->setScriptPath((EntityRef)entity, script_index, Path(old_value.c_str()));
 			}
 			else
 			{
-				scene->setPropertyValue(entity, script_index, property_name.c_str(), old_value.c_str());
+				scene->setPropertyValue((EntityRef)entity, script_index, property_name.c_str(), old_value.c_str());
 			}
 		}
 
@@ -323,7 +329,7 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 		string property_name;
 		string value;
 		string old_value;
-		Entity entity;
+		EntityPtr entity;
 		int script_index;
 	};
 
@@ -341,7 +347,7 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 	};
 
 
-	static void getSortedProperties(Array<SortedProperty>& props, LuaScriptScene& scene, Entity entity, int script_index)
+	static void getSortedProperties(Array<SortedProperty>& props, LuaScriptScene& scene, EntityRef entity, int script_index)
 	{
 		int property_count = scene.getPropertyCount(entity, script_index);
 		props.resize(property_count);
@@ -370,6 +376,7 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 	{
 		if (cmp.type != LUA_SCRIPT_TYPE) return;
 
+		const EntityRef entity = (EntityRef)cmp.entity;
 		auto* scene = (LuaScriptScene*)cmp.scene;
 		WorldEditor& editor = m_app.getWorldEditor();
 		IAllocator& allocator = editor.getAllocator();
@@ -381,20 +388,20 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 			editor.executeCommand(cmd);
 		}
 
-		for (int j = 0; j < scene->getScriptCount(cmp.entity); ++j)
+		for (int j = 0; j < scene->getScriptCount(entity); ++j)
 		{
 			char buf[MAX_PATH_LENGTH];
-			copyString(buf, scene->getScriptPath(cmp.entity, j).c_str());
+			copyString(buf, scene->getScriptPath(entity, j).c_str());
 			StaticString<MAX_PATH_LENGTH + 20> header;
 			PathUtils::getBasename(header.data, lengthOf(header.data), buf);
 			if (header.empty()) header << j;
 			ImGui::Unindent();
 			bool open = ImGui::TreeNodeEx(StaticString<32>("###", j), ImGuiTreeNodeFlags_AllowItemOverlap);
-			bool enabled = scene->isScriptEnabled(cmp.entity, j);
+			bool enabled = scene->isScriptEnabled(entity, j);
 			ImGui::SameLine();
 			if (ImGui::Checkbox(header, &enabled))
 			{
-				scene->enableScript(cmp.entity, j, enabled);
+				scene->enableScript(entity, j, enabled);
 			}
 
 			if (open)
@@ -440,21 +447,21 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 				if (m_app.getAssetBrowser().resourceInput(
 						"Source", "src", buf, lengthOf(buf), LuaScript::TYPE))
 				{
-					auto* cmd = LUMIX_NEW(allocator, SetPropertyCommand)(editor, cmp.entity, j, "-source", buf, allocator);
+					auto* cmd = LUMIX_NEW(allocator, SetPropertyCommand)(editor, entity, j, "-source", buf, allocator);
 					editor.executeCommand(cmd);
 				}
 
 				Array<SortedProperty> sorted_props(editor.getEngine().getLIFOAllocator());
-				getSortedProperties(sorted_props, *scene, cmp.entity, j);
+				getSortedProperties(sorted_props, *scene, entity, j);
 
 				for (const SortedProperty& sorted_prop : sorted_props)
 				{
 					int k = sorted_prop.index;
 					char buf[256];
-					const char* property_name = scene->getPropertyName(cmp.entity, j, k);
+					const char* property_name = scene->getPropertyName(entity, j, k);
 					if (!property_name) continue;
-					scene->getPropertyValue(cmp.entity, j, property_name, buf, lengthOf(buf));
-					switch (scene->getPropertyType(cmp.entity, j, k))
+					scene->getPropertyValue(entity, j, property_name, buf, lengthOf(buf));
+					switch (scene->getPropertyType(entity, j, k))
 					{
 						case LuaScriptScene::Property::BOOLEAN:
 						{
@@ -462,7 +469,7 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 							if (ImGui::Checkbox(property_name, &b))
 							{
 								auto* cmd = LUMIX_NEW(allocator, SetPropertyCommand)(
-									editor, cmp.entity, j, property_name, b ? "true" : "false", allocator);
+									editor, entity, j, property_name, b ? "true" : "false", allocator);
 								editor.executeCommand(cmd);
 							}
 						}
@@ -474,20 +481,20 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 							{
 								toCString(f, buf, sizeof(buf), 5);
 								auto* cmd = LUMIX_NEW(allocator, SetPropertyCommand)(
-									editor, cmp.entity, j, property_name, buf, allocator);
+									editor, entity, j, property_name, buf, allocator);
 								editor.executeCommand(cmd);
 							}
 						}
 						break;
 						case LuaScriptScene::Property::ENTITY:
 						{
-							Entity e;
+							EntityPtr e;
 							fromCString(buf, sizeof(buf), &e.index);
-							if (grid.entityInput(property_name, StaticString<50>(property_name, cmp.entity.index), e))
+							if (grid.entityInput(property_name, StaticString<50>(property_name, entity.index), e))
 							{
 								toCString(e.index, buf, sizeof(buf));
 								auto* cmd = LUMIX_NEW(allocator, SetPropertyCommand)(
-									editor, cmp.entity, j, property_name, buf, allocator);
+									editor, entity, j, property_name, buf, allocator);
 								editor.executeCommand(cmd);
 							}
 						}
@@ -497,18 +504,18 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 							if (ImGui::InputText(property_name, buf, sizeof(buf)))
 							{
 								auto* cmd = LUMIX_NEW(allocator, SetPropertyCommand)(
-									editor, cmp.entity, j, property_name, buf, allocator);
+									editor, entity, j, property_name, buf, allocator);
 								editor.executeCommand(cmd);
 							}
 							break;
 						case LuaScriptScene::Property::RESOURCE:
 						{
-							ResourceType res_type = scene->getPropertyResourceType(cmp.entity, j, k);
+							ResourceType res_type = scene->getPropertyResourceType(entity, j, k);
 							if (m_app.getAssetBrowser().resourceInput(
 									property_name, property_name, buf, lengthOf(buf), res_type))
 							{
 								auto* cmd = LUMIX_NEW(allocator, SetPropertyCommand)(
-									editor, cmp.entity, j, property_name, buf, allocator);
+									editor, entity, j, property_name, buf, allocator);
 								editor.executeCommand(cmd);
 							}
 						}
@@ -516,7 +523,7 @@ struct PropertyGridPlugin LUMIX_FINAL : public PropertyGrid::IPlugin
 						default: ASSERT(false); break;
 					}
 				}
-				if (scene->beginFunctionCall(cmp.entity, j, "onGUI"))
+				if (scene->beginFunctionCall(entity, j, "onGUI"))
 				{
 					scene->endFunctionCall();
 				}
@@ -604,7 +611,7 @@ struct AssetPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 };
 
 
-struct ConsolePlugin LUMIX_FINAL : public StudioApp::GUIPlugin
+struct ConsolePlugin final : public StudioApp::GUIPlugin
 {
 	explicit ConsolePlugin(StudioApp& _app)
 		: app(_app)
@@ -860,7 +867,7 @@ IEditorCommand* createRemoveScriptCommand(WorldEditor& editor)
 }
 
 
-struct AddComponentPlugin LUMIX_FINAL : public StudioApp::IAddComponentPlugin
+struct AddComponentPlugin final : public StudioApp::IAddComponentPlugin
 {
 	explicit AddComponentPlugin(StudioApp& _app)
 		: app(_app)
@@ -901,11 +908,11 @@ struct AddComponentPlugin LUMIX_FINAL : public StudioApp::IAddComponentPlugin
 			WorldEditor& editor = app.getWorldEditor();
 			if (create_entity)
 			{
-				Entity entity = editor.addEntity();
+				EntityRef entity = editor.addEntity();
 				editor.selectEntities(&entity, 1, false);
 			}
 			if (editor.getSelectedEntities().empty()) return;
-			Entity entity = editor.getSelectedEntities()[0];
+			EntityRef entity = editor.getSelectedEntities()[0];
 
 			if (!editor.getUniverse()->hasComponent(entity, LUA_SCRIPT_TYPE))
 			{
@@ -956,10 +963,10 @@ struct GizmoPlugin : public WorldEditor::Plugin
 		if (cmp.type == LUA_SCRIPT_TYPE)
 		{
 			auto* scene = static_cast<LuaScriptScene*>(cmp.scene);
-			int count = scene->getScriptCount(cmp.entity);
+			int count = scene->getScriptCount((EntityRef)cmp.entity);
 			for (int i = 0; i < count; ++i)
 			{
-				if (scene->beginFunctionCall(cmp.entity, i, "onDrawGizmo"))
+				if (scene->beginFunctionCall((EntityRef)cmp.entity, i, "onDrawGizmo"))
 				{
 					scene->endFunctionCall();
 				}

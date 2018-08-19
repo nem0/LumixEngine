@@ -32,7 +32,7 @@ struct TGAHeader
 #pragma pack()
 
 
-class LUMIX_RENDERER_API Texture LUMIX_FINAL : public Resource
+class LUMIX_RENDERER_API Texture final : public Resource
 {
 	public: 
 		enum class Flags : u32 {

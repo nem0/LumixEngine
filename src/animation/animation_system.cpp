@@ -38,7 +38,7 @@ struct AnimSetProperty : public Reflection::IEnumProperty
 	void getValue(ComponentUID cmp, int index, OutputBlob& stream) const override
 	{
 		AnimationScene* scene = static_cast<AnimationScene*>(cmp.scene);
-		int value = scene->getControllerDefaultSet(cmp.entity);
+		int value = scene->getControllerDefaultSet((EntityRef)cmp.entity);
 		stream.write(value);
 	}
 
@@ -47,7 +47,7 @@ struct AnimSetProperty : public Reflection::IEnumProperty
 	{
 		AnimationScene* scene = static_cast<AnimationScene*>(cmp.scene);
 		int value = stream.read<int>();
-		scene->setControllerDefaultSet(cmp.entity, value);
+		scene->setControllerDefaultSet((EntityRef)cmp.entity, value);
 	}
 
 
@@ -57,14 +57,14 @@ struct AnimSetProperty : public Reflection::IEnumProperty
 
 	int getEnumCount(ComponentUID cmp) const override
 	{
-		Anim::ControllerResource* res = static_cast<AnimationScene*>(cmp.scene)->getControllerResource(cmp.entity);
+		Anim::ControllerResource* res = static_cast<AnimationScene*>(cmp.scene)->getControllerResource((EntityRef)cmp.entity);
 		return res ? res->m_sets_names.size() : 0;
 	}
 
 
 	const char* getEnumName(ComponentUID cmp, int index) const override
 	{
-		Anim::ControllerResource* res = static_cast<AnimationScene*>(cmp.scene)->getControllerResource(cmp.entity);
+		Anim::ControllerResource* res = static_cast<AnimationScene*>(cmp.scene)->getControllerResource((EntityRef)cmp.entity);
 		return res->m_sets_names[index];
 	}
 };
@@ -82,7 +82,7 @@ class JsonSerializer;
 class Universe;
 
 
-struct AnimationSystemImpl LUMIX_FINAL : public IPlugin
+struct AnimationSystemImpl final : public IPlugin
 {
 	void operator=(const AnimationSystemImpl&) = delete;
 	AnimationSystemImpl(const AnimationSystemImpl&) = delete;

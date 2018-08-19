@@ -27,7 +27,7 @@ namespace Lumix
 {
 
 
-class AssetBrowserPlugin LUMIX_FINAL : public AssetBrowser::IPlugin
+class AssetBrowserPlugin final : public AssetBrowser::IPlugin
 {
 public:
 	AssetBrowserPlugin(StudioApp& app, PrefabSystem& system)
@@ -42,7 +42,7 @@ public:
 	{
 		if (ImGui::Button("instantiate"))
 		{
-			Array<Entity> entities(editor.getAllocator());
+			Array<EntityRef> entities(editor.getAllocator());
 			system.instantiatePrefab(*(PrefabResource*)resource, editor.getCameraRaycastHit(), {0, 0, 0, 1}, 1);
 		}
 	}
@@ -58,9 +58,9 @@ public:
 };
 
 
-class PrefabSystemImpl LUMIX_FINAL : public PrefabSystem
+class PrefabSystemImpl final : public PrefabSystem
 {
-	struct InstantiatePrefabCommand LUMIX_FINAL : public IEditorCommand
+	struct InstantiatePrefabCommand final : public IEditorCommand
 	{
 		InstantiatePrefabCommand(WorldEditor& editor)
 			: editor(editor)
@@ -74,28 +74,30 @@ class PrefabSystemImpl LUMIX_FINAL : public PrefabSystem
 		}
 
 
-		void createEntityGUIDRecursive(Entity entity) const
+		void createEntityGUIDRecursive(EntityPtr entity) const
 		{
 			if (!entity.isValid()) return;
 
-			editor.createEntityGUID(entity);
+			EntityRef e = (EntityRef)entity;
+			editor.createEntityGUID(e);
 			
 			Universe& universe = *editor.getUniverse();
-			createEntityGUIDRecursive(universe.getFirstChild(entity));
-			createEntityGUIDRecursive(universe.getNextSibling(entity));
+			createEntityGUIDRecursive(universe.getFirstChild(e));
+			createEntityGUIDRecursive(universe.getNextSibling(e));
 		}
 
 
-		void destroyEntityRecursive(Entity entity) const
+		void destroyEntityRecursive(EntityPtr entity) const
 		{
 			if (!entity.isValid()) return;
-
+			
+			EntityRef e = (EntityRef)entity;
 			Universe& universe = *editor.getUniverse();
-			destroyEntityRecursive(universe.getFirstChild(entity));
-			destroyEntityRecursive(universe.getNextSibling(entity));
+			destroyEntityRecursive(universe.getFirstChild(e));
+			destroyEntityRecursive(universe.getNextSibling(e));
 
-			universe.destroyEntity(entity);
-			editor.destroyEntityGUID(entity);
+			universe.destroyEntity(e);
+			editor.destroyEntityGUID(e);
 
 		}
 
@@ -107,19 +109,25 @@ class PrefabSystemImpl LUMIX_FINAL : public PrefabSystem
 			auto& system = (PrefabSystemImpl&)editor.getPrefabSystem();
 
 			entity = system.doInstantiatePrefab(*prefab, position, rotation, scale);
-			editor.createEntityGUID(entity);
-			createEntityGUIDRecursive(editor.getUniverse()->getFirstChild(entity));
-			return true;
+			if (entity.isValid()) {
+				editor.createEntityGUID((EntityRef)entity);
+				createEntityGUIDRecursive(editor.getUniverse()->getFirstChild((EntityRef)entity));
+				return true;
+			}
+			return false;
 		}
 
 
 		void undo() override
 		{
+			if (!entity.isValid()) return;
+
 			Universe& universe = *editor.getUniverse();
 
-			destroyEntityRecursive(universe.getFirstChild(entity));
-			universe.destroyEntity(entity);
-			editor.destroyEntityGUID(entity);
+			EntityRef e = (EntityRef)entity;
+			destroyEntityRecursive(universe.getFirstChild(e));
+			universe.destroyEntity(e);
+			editor.destroyEntityGUID(e);
 		}
 
 
@@ -166,7 +174,7 @@ class PrefabSystemImpl LUMIX_FINAL : public PrefabSystem
 		Quat rotation;
 		float scale;
 		WorldEditor& editor;
-		Entity entity;
+		EntityPtr entity;
 	};
 
 public:
@@ -247,14 +255,14 @@ public:
 	}
 
 
-	void link(Entity entity, u64 prefab)
+	void link(EntityRef entity, u64 prefab)
 	{
 		ASSERT(prefab != 0);
 		int idx = m_instances.find(prefab);
 		m_prefabs[entity.index].prev = INVALID_ENTITY;
 		if (idx >= 0)
 		{
-			Entity e = m_instances.at(idx);
+			EntityRef e = m_instances.at(idx);
 			m_prefabs[e.index].prev = entity;
 			m_prefabs[entity.index].next = e;
 		}
@@ -266,14 +274,14 @@ public:
 	}
 
 
-	void unlink(Entity entity)
+	void unlink(EntityRef entity)
 	{
 		EntityPrefab& p = m_prefabs[entity.index];
 		if (p.prefab == 0) return;
 		if (m_instances[p.prefab] == entity)
 		{
 			if (m_prefabs[entity.index].next.isValid())
-				m_instances[p.prefab] = m_prefabs[entity.index].next;
+				m_instances[p.prefab] = (EntityRef)m_prefabs[entity.index].next;
 			else
 				m_instances.erase(p.prefab);
 		}
@@ -282,7 +290,7 @@ public:
 	}
 
 
-	void onEntityDestroyed(Entity entity)
+	void onEntityDestroyed(EntityRef entity)
 	{
 		if (entity.index >= m_prefabs.size()) return;
 		unlink(entity);
@@ -290,7 +298,7 @@ public:
 	}
 
 
-	void setPrefab(Entity entity, u64 prefab) override
+	void setPrefab(EntityRef entity, u64 prefab) override
 	{
 		reserve(entity);
 		m_prefabs[entity.index].prefab = prefab;
@@ -298,7 +306,7 @@ public:
 	}
 
 
-	PrefabResource* getPrefabResource(Entity entity) override
+	PrefabResource* getPrefabResource(EntityRef entity) override
 	{
 		if (entity.index >= m_prefabs.size()) return nullptr;
 		u32 hash = u32(m_prefabs[entity.index].prefab & 0xffffFFFF);
@@ -308,7 +316,7 @@ public:
 	}
 
 
-	u64 getPrefab(Entity entity) const override
+	u64 getPrefab(EntityRef entity) const override
 	{
 		if (entity.index >= m_prefabs.size()) return 0;
 		return m_prefabs[entity.index].prefab;
@@ -321,7 +329,7 @@ public:
 	}
 
 
-	Entity getFirstInstance(u64 prefab) override
+	EntityPtr getFirstInstance(u64 prefab) override
 	{
 		int instances_index = m_instances.find(prefab);
 		if (instances_index >= 0) return m_instances.at(instances_index);
@@ -329,13 +337,13 @@ public:
 	}
 
 
-	Entity getNextInstance(Entity entity) override
+	EntityPtr getNextInstance(EntityRef entity) override
 	{
 		return m_prefabs[entity.index].next;
 	}
 
 
-	void reserve(Entity entity)
+	void reserve(EntityRef entity)
 	{
 		while (entity.index >= m_prefabs.size())
 		{
@@ -347,44 +355,45 @@ public:
 
 	struct LoadEntityGUIDMap : public ILoadEntityGUIDMap
 	{
-		explicit LoadEntityGUIDMap(const Array<Entity>& entities)
+		explicit LoadEntityGUIDMap(const Array<EntityRef>& entities)
 			: entities(entities)
 		{
 		}
 
 
-		Entity get(EntityGUID guid) override
+		EntityPtr get(EntityGUID guid) override
 		{
 			if (guid.value >= entities.size()) return INVALID_ENTITY;
 			return entities[(int)guid.value];
 		}
 
 
-		const Array<Entity>& entities;
+		const Array<EntityRef>& entities;
 	};
 
 
 	struct SaveEntityGUIDMap : public ISaveEntityGUIDMap
 	{
-		explicit SaveEntityGUIDMap(const Array<Entity>& entities)
+		explicit SaveEntityGUIDMap(const Array<EntityRef>& entities)
 			: entities(entities)
 		{
 		}
 
 
-		EntityGUID get(Entity entity) override
+		EntityGUID get(EntityPtr entity) override
 		{
-			int idx = entities.indexOf(entity);
+			if (!entity.isValid()) return INVALID_ENTITY_GUID;
+			int idx = entities.indexOf((EntityRef)entity);
 			if (idx < 0) return INVALID_ENTITY_GUID;
 			return {(u64)idx};
 		}
 
 
-		const Array<Entity>& entities;
+		const Array<EntityRef>& entities;
 	};
 
 
-	Entity doInstantiatePrefab(PrefabResource& prefab_res, const Vec3& pos, const Quat& rot, float scale)
+	EntityPtr doInstantiatePrefab(PrefabResource& prefab_res, const Vec3& pos, const Quat& rot, float scale)
 	{
 		if (!prefab_res.isReady()) return INVALID_ENTITY;
 		if (!m_resources.find(prefab_res.getPath().getHash()).isValid())
@@ -393,7 +402,7 @@ public:
 			prefab_res.getResourceManager().load(prefab_res);
 		}
 		InputBlob blob(prefab_res.blob.getData(), prefab_res.blob.getPos());
-		Array<Entity> entities(m_editor.getAllocator());
+		Array<EntityRef> entities(m_editor.getAllocator());
 		LoadEntityGUIDMap entity_map(entities);
 		TextDeserializer deserializer(blob, entity_map);
 		u32 version;
@@ -416,7 +425,7 @@ public:
 		{
 			u64 prefab;
 			deserializer.read(&prefab);
-			Entity entity = entities[entity_idx];
+			EntityRef entity = entities[entity_idx];
 			m_universe->setTransform(entity, {pos, rot, scale});
 			reserve(entity);
 			m_prefabs[entity.index].prefab = prefab;
@@ -424,7 +433,7 @@ public:
 			
 			if (version > (int)PrefabVersion::WITH_HIERARCHY)
 			{
-				Entity parent;
+				EntityPtr parent;
 				deserializer.read(&parent);
 				if (parent.isValid())
 				{
@@ -452,7 +461,7 @@ public:
 	}
 
 
-	Entity instantiatePrefab(PrefabResource& prefab, const Vec3& pos, const Quat& rot, float scale) override
+	EntityPtr instantiatePrefab(PrefabResource& prefab, const Vec3& pos, const Quat& rot, float scale) override
 	{
 		InstantiatePrefabCommand* cmd = LUMIX_NEW(m_editor.getAllocator(), InstantiatePrefabCommand)(m_editor);
 		cmd->position = pos;
@@ -465,11 +474,11 @@ public:
 	}
 
 
-	static int countHierarchy(Universe* universe, Entity entity)
+	static int countHierarchy(Universe* universe, EntityPtr entity)
 	{
 		if (!entity.isValid()) return 0;
-		int children_count = countHierarchy(universe, universe->getFirstChild(entity));
-		int siblings_count = countHierarchy(universe, universe->getNextSibling(entity));
+		int children_count = countHierarchy(universe, universe->getFirstChild((EntityRef)entity));
+		int siblings_count = countHierarchy(universe, universe->getNextSibling((EntityRef)entity));
 		return 1 + children_count + siblings_count;
 	}
 
@@ -478,22 +487,23 @@ public:
 		int& index,
 		TextSerializer& serializer,
 		Universe* universe,
-		Entity entity,
+		EntityPtr entity,
 		bool is_root)
 	{
 		if (!entity.isValid()) return;
 
+		const EntityRef entity_ref = (EntityRef)entity;
 		prefab |= ((u64)index) << 32;
 		++index;
 		serializer.write("prefab", prefab);
-		Entity parent = is_root ? INVALID_ENTITY : universe->getParent(entity);
+		EntityPtr parent = is_root ? INVALID_ENTITY : universe->getParent(entity_ref);
 		serializer.write("parent", parent);
 		if (parent.isValid())
 		{
-			serializer.write("local_transform", universe->getLocalTransform(entity).getRigidPart());
-			serializer.write("local_scale", universe->getLocalScale(entity));
+			serializer.write("local_transform", universe->getLocalTransform(entity_ref).getRigidPart());
+			serializer.write("local_scale", universe->getLocalScale(entity_ref));
 		}
-		for (ComponentUID cmp = universe->getFirstComponent(entity); cmp.isValid();
+		for (ComponentUID cmp = universe->getFirstComponent(entity_ref); cmp.isValid();
 			cmp = universe->getNextComponent(cmp))
 		{
 			const char* cmp_name = Reflection::getComponentTypeID(cmp.type.index);
@@ -501,21 +511,22 @@ public:
 			serializer.write(cmp_name, type_hash);
 			int scene_version = universe->getScene(cmp.type)->getVersion();
 			serializer.write("scene_version", scene_version);
-			universe->serializeComponent(serializer, cmp.type, cmp.entity);
+			ASSERT(cmp.entity.isValid());
+			universe->serializeComponent(serializer, cmp.type, (EntityRef)cmp.entity);
 		}
 		serializer.write("cmp_end", 0);
 
-		serializePrefabEntity(prefab, index, serializer, universe, universe->getFirstChild(entity), false);
+		serializePrefabEntity(prefab, index, serializer, universe, universe->getFirstChild(entity_ref), false);
 		if (!is_root)
 		{
-			serializePrefabEntity(prefab, index, serializer, universe, universe->getNextSibling(entity), false);
+			serializePrefabEntity(prefab, index, serializer, universe, universe->getNextSibling(entity_ref), false);
 		}
 	}
 
 
 
 	static void serializePrefab(Universe* universe,
-		Entity root,
+		EntityRef root,
 		const Path& path,
 		TextSerializer& serializer)
 	{
@@ -528,26 +539,27 @@ public:
 	}
 
 
-	Entity getPrefabRoot(Entity entity) const
+	EntityRef getPrefabRoot(EntityRef entity) const
 	{
-		Entity root = entity;
-		Entity parent = m_universe->getParent(root);
-		while (parent.isValid() && getPrefab(parent) != 0)
+		EntityRef root = entity;
+		EntityPtr parent = m_universe->getParent(root);
+		while (parent.isValid() && getPrefab((EntityRef)parent) != 0)
 		{
-			root = parent;
+			root = (EntityRef)parent;
 			parent = m_universe->getParent(root);
 		}
 		return root;
 	}
 
 
-	void gatherHierarchy(Entity entity, bool is_root, Array<Entity>& out) const
+	void gatherHierarchy(EntityPtr entity, bool is_root, Array<EntityRef>& out) const
 	{
 		if (!entity.isValid()) return;
 
-		out.push(entity);
-		gatherHierarchy(m_universe->getFirstChild(entity), false, out);
-		gatherHierarchy(m_universe->getNextSibling(entity), false, out);
+		const EntityRef e = (EntityRef)entity;
+		out.push(e);
+		gatherHierarchy(m_universe->getFirstChild(e), false, out);
+		gatherHierarchy(m_universe->getNextSibling(e), false, out);
 	}
 
 
@@ -556,7 +568,7 @@ public:
 		auto& selected_entities = m_editor.getSelectedEntities();
 		if (selected_entities.size() != 1) return;
 
-		Entity entity = selected_entities[0];
+		EntityRef entity = selected_entities[0];
 		u64 prefab = getPrefab(entity);
 		if (prefab != 0) entity = getPrefabRoot(entity);
 
@@ -567,7 +579,7 @@ public:
 			return;
 		}
 
-		Array<Entity> entities(m_editor.getAllocator());
+		Array<EntityRef> entities(m_editor.getAllocator());
 		gatherHierarchy(entity, true, entities);
 		OutputBlob blob(m_editor.getAllocator());
 		SaveEntityGUIDMap entity_map(entities);
@@ -625,7 +637,7 @@ public:
 		for (int i = 0; i < count; ++i)
 		{
 			u64 key;
-			Entity value;
+			EntityRef value;
 			serializer.read(key);
 			serializer.read(value);
 			m_instances.insert(key, value);
@@ -656,13 +668,14 @@ public:
 		{
 			u64 prefab = m_instances.getKey(i);
 			if ((prefab & 0xffffFFFF) != prefab) continue;
-			Entity entity = m_instances.at(i);
+			EntityPtr entity = m_instances.at(i);
 			while(entity.isValid())
 			{
+				const EntityRef e = (EntityRef)entity;
 				serializer.write("prefab", (u32)prefab);
-				serializer.write("pos", m_universe->getPosition(entity));
-				serializer.write("rot", m_universe->getRotation(entity));
-				serializer.write("scale", m_universe->getScale(entity));
+				serializer.write("pos", m_universe->getPosition(e));
+				serializer.write("rot", m_universe->getRotation(e));
+				serializer.write("scale", m_universe->getScale(e));
 				entity = m_prefabs[entity.index].next;
 			}
 		}
@@ -710,11 +723,11 @@ private:
 	struct EntityPrefab
 	{
 		u64 prefab;
-		Entity next;
-		Entity prev;
+		EntityPtr next;
+		EntityPtr prev;
 	};
 	Array<EntityPrefab> m_prefabs;
-	AssociativeArray<u64, Entity> m_instances;
+	AssociativeArray<u64, EntityRef> m_instances;
 	HashMap<u32, PrefabResource*> m_resources;
 	Universe* m_universe;
 	WorldEditor& m_editor;

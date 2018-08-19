@@ -123,10 +123,10 @@ template <> LUMIX_ENGINE_API void writeToStream<const char*>(OutputBlob& stream,
 template <typename Getter> struct GetterProxy;
 
 template <typename R, typename C>
-struct GetterProxy<R(C::*)(Entity, int)>
+struct GetterProxy<R(C::*)(EntityRef, int)>
 {
-	using Getter = R(C::*)(Entity, int);
-	static void invoke(OutputBlob& stream, C* inst, Getter getter, Entity entity, int index)
+	using Getter = R(C::*)(EntityRef, int);
+	static void invoke(OutputBlob& stream, C* inst, Getter getter, EntityRef entity, int index)
 	{
 		R value = (inst->*getter)(entity, index);
 		writeToStream(stream, value);
@@ -134,10 +134,10 @@ struct GetterProxy<R(C::*)(Entity, int)>
 };
 
 template <typename R, typename C>
-struct GetterProxy<R(C::*)(Entity)>
+struct GetterProxy<R(C::*)(EntityRef)>
 {
-	using Getter = R(C::*)(Entity);
-	static void invoke(OutputBlob& stream, C* inst, Getter getter, Entity entity, int index)
+	using Getter = R(C::*)(EntityRef);
+	static void invoke(OutputBlob& stream, C* inst, Getter getter, EntityRef entity, int index)
 	{
 		R value = (inst->*getter)(entity);
 		writeToStream(stream, value);
@@ -148,10 +148,10 @@ struct GetterProxy<R(C::*)(Entity)>
 template <typename Setter> struct SetterProxy;
 
 template <typename C, typename A>
-struct SetterProxy<void (C::*)(Entity, int, A)>
+struct SetterProxy<void (C::*)(EntityRef, int, A)>
 {
-	using Setter = void (C::*)(Entity, int, A);
-	static void invoke(InputBlob& stream, C* inst, Setter setter, Entity entity, int index)
+	using Setter = void (C::*)(EntityRef, int, A);
+	static void invoke(InputBlob& stream, C* inst, Setter setter, EntityRef entity, int index)
 	{
 		using Value = RemoveCR<A>;
 		auto value = readFromStream<Value>(stream);
@@ -160,10 +160,10 @@ struct SetterProxy<void (C::*)(Entity, int, A)>
 };
 
 template <typename C, typename A>
-struct SetterProxy<void (C::*)(Entity, A)>
+struct SetterProxy<void (C::*)(EntityRef, A)>
 {
-	using Setter = void (C::*)(Entity, A);
-	static void invoke(InputBlob& stream, C* inst, Setter setter, Entity entity, int index)
+	using Setter = void (C::*)(EntityRef, A);
+	static void invoke(InputBlob& stream, C* inst, Setter setter, EntityRef entity, int index)
 	{
 		using Value = RemoveCR<A>;
 		auto value = readFromStream<Value>(stream);
@@ -261,7 +261,7 @@ struct IPropertyVisitor
 	virtual void begin(const ComponentBase&) {}
 	virtual void visit(const Property<float>& prop) = 0;
 	virtual void visit(const Property<int>& prop) = 0;
-	virtual void visit(const Property<Entity>& prop) = 0;
+	virtual void visit(const Property<EntityPtr>& prop) = 0;
 	virtual void visit(const Property<Int2>& prop) = 0;
 	virtual void visit(const Property<Vec2>& prop) = 0;
 	virtual void visit(const Property<Vec3>& prop) = 0;
@@ -283,7 +283,7 @@ struct ISimpleComponentVisitor : IPropertyVisitor
 
 	void visit(const Property<float>& prop) override { visitProperty(prop); }
 	void visit(const Property<int>& prop) override { visitProperty(prop); }
-	void visit(const Property<Entity>& prop) override { visitProperty(prop); }
+	void visit(const Property<EntityPtr>& prop) override { visitProperty(prop); }
 	void visit(const Property<Int2>& prop) override { visitProperty(prop); }
 	void visit(const Property<Vec2>& prop) override { visitProperty(prop); }
 	void visit(const Property<Vec3>& prop) override { visitProperty(prop); }
@@ -327,7 +327,7 @@ struct EnumProperty : IEnumProperty
 		using C = typename ClassOf<Getter>::Type;
 		C* inst = static_cast<C*>(cmp.scene);
 		static_assert(4 == sizeof(typename ResultOf<Getter>::Type), "enum must have 4 bytes");
-		detail::GetterProxy<Getter>::invoke(stream, inst, getter, cmp.entity, index);
+		detail::GetterProxy<Getter>::invoke(stream, inst, getter, (EntityRef)cmp.entity, index);
 	}
 
 	void setValue(ComponentUID cmp, int index, InputBlob& stream) const override
@@ -336,7 +336,7 @@ struct EnumProperty : IEnumProperty
 		C* inst = static_cast<C*>(cmp.scene);
 
 		static_assert(4 == sizeof(typename ResultOf<Getter>::Type), "enum must have 4 bytes");
-		detail::SetterProxy<Setter>::invoke(stream, inst, setter, cmp.entity, index);
+		detail::SetterProxy<Setter>::invoke(stream, inst, setter, (EntityRef)cmp.entity, index);
 	}
 
 
@@ -382,7 +382,7 @@ struct DynEnumProperty : IEnumProperty
 		using C = typename ClassOf<Getter>::Type;
 		C* inst = static_cast<C*>(cmp.scene);
 		static_assert(4 == sizeof(typename ResultOf<Getter>::Type), "enum must have 4 bytes");
-		detail::GetterProxy<Getter>::invoke(stream, inst, getter, cmp.entity, index);
+		detail::GetterProxy<Getter>::invoke(stream, inst, getter, (EntityRef)cmp.entity, index);
 	}
 
 	void setValue(ComponentUID cmp, int index, InputBlob& stream) const override
@@ -391,7 +391,7 @@ struct DynEnumProperty : IEnumProperty
 		C* inst = static_cast<C*>(cmp.scene);
 
 		static_assert(4 == sizeof(typename ResultOf<Getter>::Type), "enum must have 4 bytes");
-		detail::SetterProxy<Setter>::invoke(stream, inst, setter, cmp.entity, index);
+		detail::SetterProxy<Setter>::invoke(stream, inst, setter, (EntityRef)cmp.entity, index);
 	}
 
 	int getEnumValueIndex(ComponentUID cmp, int value) const override { return value; }
@@ -462,14 +462,14 @@ struct BlobProperty : IBlobProperty
 	{
 		using C = typename ClassOf<Getter>::Type;
 		C* inst = static_cast<C*>(cmp.scene);
-		(inst->*getter)(cmp.entity, stream);
+		(inst->*getter)((EntityRef)cmp.entity, stream);
 	}
 
 	void setValue(ComponentUID cmp, int index, InputBlob& stream) const override
 	{
 		using C = typename ClassOf<Getter>::Type;
 		C* inst = static_cast<C*>(cmp.scene);
-		(inst->*setter)(cmp.entity, stream);
+		(inst->*setter)((EntityRef)cmp.entity, stream);
 	}
 
 	void visit(IAttributeVisitor& visitor) const override {
@@ -494,14 +494,14 @@ struct CommonProperty : Property<T>
 	{
 		using C = typename ClassOf<Getter>::Type;
 		C* inst = static_cast<C*>(cmp.scene);
-		detail::GetterProxy<Getter>::invoke(stream, inst, getter, cmp.entity, index);
+		detail::GetterProxy<Getter>::invoke(stream, inst, getter, (EntityRef)cmp.entity, index);
 	}
 
 	void setValue(ComponentUID cmp, int index, InputBlob& stream) const override
 	{
 		using C = typename ClassOf<Getter>::Type;
 		C* inst = static_cast<C*>(cmp.scene);
-		detail::SetterProxy<Setter>::invoke(stream, inst, setter, cmp.entity, index);
+		detail::SetterProxy<Setter>::invoke(stream, inst, setter, (EntityRef)cmp.entity, index);
 	}
 
 
@@ -587,7 +587,7 @@ struct ArrayProperty : IArrayProperty
 	{
 		using C = typename ClassOf<Counter>::Type;
 		C* inst = static_cast<C*>(cmp.scene);
-		(inst->*adder)(cmp.entity, index);
+		(inst->*adder)((EntityRef)cmp.entity, index);
 	}
 
 
@@ -595,7 +595,7 @@ struct ArrayProperty : IArrayProperty
 	{
 		using C = typename ClassOf<Counter>::Type;
 		C* inst = static_cast<C*>(cmp.scene);
-		(inst->*remover)(cmp.entity, index);
+		(inst->*remover)((EntityRef)cmp.entity, index);
 	}
 
 
@@ -603,7 +603,7 @@ struct ArrayProperty : IArrayProperty
 	{ 
 		using C = typename ClassOf<Counter>::Type;
 		C* inst = static_cast<C*>(cmp.scene);
-		return (inst->*counter)(cmp.entity);
+		return (inst->*counter)((EntityRef)cmp.entity);
 	}
 
 
@@ -697,7 +697,7 @@ struct ConstArrayProperty : IArrayProperty
 	{
 		using C = typename ClassOf<Counter>::Type;
 		C* inst = static_cast<C*>(cmp.scene);
-		return (inst->*counter)(cmp.entity);
+		return (inst->*counter)((EntityRef)cmp.entity);
 	}
 
 

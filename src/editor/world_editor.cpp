@@ -64,7 +64,7 @@ static void load(ComponentUID cmp, int index, InputBlob& blob)
 }
 
 
-struct BeginGroupCommand LUMIX_FINAL : public IEditorCommand
+struct BeginGroupCommand final : public IEditorCommand
 {
 	BeginGroupCommand() = default;
 	explicit BeginGroupCommand(WorldEditor&) {}
@@ -78,7 +78,7 @@ struct BeginGroupCommand LUMIX_FINAL : public IEditorCommand
 };
 
 
-struct EndGroupCommand LUMIX_FINAL : public IEditorCommand
+struct EndGroupCommand final : public IEditorCommand
 {
 	EndGroupCommand() = default;
 	EndGroupCommand(WorldEditor&) {}
@@ -94,7 +94,7 @@ struct EndGroupCommand LUMIX_FINAL : public IEditorCommand
 };
 
 
-class SetEntityNameCommand LUMIX_FINAL : public IEditorCommand
+class SetEntityNameCommand final : public IEditorCommand
 {
 public:
 	explicit SetEntityNameCommand(WorldEditor& editor)
@@ -104,7 +104,7 @@ public:
 	{
 	}
 
-	SetEntityNameCommand(WorldEditor& editor, Entity entity, const char* name)
+	SetEntityNameCommand(WorldEditor& editor, EntityRef entity, const char* name)
 		: m_entity(entity)
 		, m_new_name(name, editor.getAllocator())
 		, m_old_name(editor.getUniverse()->getEntityName(entity),
@@ -127,20 +127,30 @@ public:
 		serializer.deserialize("name", name, sizeof(name), "");
 		m_new_name = name;
 		serializer.deserialize("entity", m_entity, INVALID_ENTITY);
-		m_old_name = m_editor.getUniverse()->getEntityName(m_entity);
+		if (m_entity.isValid()) {
+			m_old_name = m_editor.getUniverse()->getEntityName((EntityRef)m_entity);
+		}
+		else {
+			m_old_name = "";
+		}
 	}
 
 
 	bool execute() override
 	{
-		m_editor.getUniverse()->setEntityName(m_entity, m_new_name.c_str());
-		return true;
+		if (m_entity.isValid()) {
+			m_editor.getUniverse()->setEntityName((EntityRef)m_entity, m_new_name.c_str());
+			return true;
+		}
+		return false;
 	}
 
 
 	void undo() override
 	{
-		m_editor.getUniverse()->setEntityName(m_entity, m_old_name.c_str());
+		if (m_entity.isValid()) {
+			m_editor.getUniverse()->setEntityName((EntityRef)m_entity, m_old_name.c_str());
+		}
 	}
 
 
@@ -163,13 +173,13 @@ public:
 
 private:
 	WorldEditor& m_editor;
-	Entity m_entity;
+	EntityPtr m_entity;
 	string m_new_name;
 	string m_old_name;
 };
 
 
-class MoveEntityCommand LUMIX_FINAL : public IEditorCommand
+class MoveEntityCommand final : public IEditorCommand
 {
 public:
 	explicit MoveEntityCommand(WorldEditor& editor)
@@ -184,7 +194,7 @@ public:
 
 
 	MoveEntityCommand(WorldEditor& editor,
-		const Entity* entities,
+		const EntityRef* entities,
 		const Vec3* new_positions,
 		const Quat* new_rotations,
 		int count,
@@ -207,22 +217,25 @@ public:
 		for (int i = count - 1; i >= 0; --i)
 		{
 			u64 prefab = prefab_system.getPrefab(entities[i]);
-			Entity parent = universe->getParent(entities[i]);
-			if (prefab != 0 && parent.isValid() && (prefab_system.getPrefab(parent) & 0xffffFFFF) == (prefab & 0xffffFFFF))
+			EntityPtr parent = universe->getParent(entities[i]);
+			if (prefab != 0 && parent.isValid() && (prefab_system.getPrefab((EntityRef)parent) & 0xffffFFFF) == (prefab & 0xffffFFFF))
 			{
 				float scale = universe->getScale(entities[i]);
-				Transform new_local_tr = universe->computeLocalTransform(parent, { new_positions[i], new_rotations[i], scale });
-				Entity instance = prefab_system.getFirstInstance(prefab);
+				Transform new_local_tr = universe->computeLocalTransform((EntityRef)parent, { new_positions[i], new_rotations[i], scale });
+				EntityPtr instance = prefab_system.getFirstInstance(prefab);
 				while (instance.isValid())
 				{
-					m_entities.push(instance);
-					Transform new_tr = universe->getTransform(universe->getParent(instance));
+					EntityRef instance_ref = (EntityRef)instance;
+					m_entities.push(instance_ref);
+					const EntityPtr inst_parent_ptr = universe->getParent(instance_ref);
+					ASSERT(inst_parent_ptr.isValid());
+					Transform new_tr = universe->getTransform((EntityRef)inst_parent_ptr);
 					new_tr = new_tr * new_local_tr;
 					m_new_positions.push(new_tr.pos);
 					m_new_rotations.push(new_tr.rot);
-					m_old_positions.push(universe->getPosition(instance));
-					m_old_rotations.push(universe->getRotation(instance));
-					instance = prefab_system.getNextInstance(instance);
+					m_old_positions.push(universe->getPosition(instance_ref));
+					m_old_rotations.push(universe->getRotation(instance_ref));
+					instance = prefab_system.getNextInstance(instance_ref);
 				}
 			}
 			else
@@ -277,8 +290,10 @@ public:
 			serializer.deserializeArrayItem(m_new_rotations[i].y, 0);
 			serializer.deserializeArrayItem(m_new_rotations[i].z, 0);
 			serializer.deserializeArrayItem(m_new_rotations[i].w, 0);
-			m_old_positions[i] = universe->getPosition(m_entities[i]);
-			m_old_rotations[i] = universe->getRotation(m_entities[i]);
+			if(m_entities[i].isValid()) {
+				m_old_positions[i] = universe->getPosition((EntityRef)m_entities[i]);
+				m_old_rotations[i] = universe->getRotation((EntityRef)m_entities[i]);
+			}
 		}
 		serializer.deserializeArrayEnd();
 	}
@@ -287,11 +302,12 @@ public:
 	bool execute() override
 	{
 		Universe* universe = m_editor.getUniverse();
-		for (int i = 0, c = m_entities.size(); i < c; ++i)
-		{
-			Entity entity = m_entities[i];
-			universe->setPosition(entity, m_new_positions[i]);
-			universe->setRotation(entity, m_new_rotations[i]);
+		for (int i = 0, c = m_entities.size(); i < c; ++i) {
+			if(m_entities[i].isValid()) {
+				const EntityRef entity = (EntityRef)m_entities[i];
+				universe->setPosition(entity, m_new_positions[i]);
+				universe->setRotation(entity, m_new_rotations[i]);
+			}
 		}
 		return true;
 	}
@@ -300,11 +316,12 @@ public:
 	void undo() override
 	{
 		Universe* universe = m_editor.getUniverse();
-		for (int i = 0, c = m_entities.size(); i < c; ++i)
-		{
-			Entity entity = m_entities[i];
-			universe->setPosition(entity, m_old_positions[i]);
-			universe->setRotation(entity, m_old_rotations[i]);
+		for (int i = 0, c = m_entities.size(); i < c; ++i) {
+			if(m_entities[i].isValid()) {
+				EntityRef entity = (EntityRef)m_entities[i];
+				universe->setPosition(entity, m_old_positions[i]);
+				universe->setRotation(entity, m_old_rotations[i]);
+			}
 		}
 	}
 
@@ -340,7 +357,7 @@ public:
 
 private:
 	WorldEditor& m_editor;
-	Array<Entity> m_entities;
+	Array<EntityPtr> m_entities;
 	Array<Vec3> m_new_positions;
 	Array<Quat> m_new_rotations;
 	Array<Vec3> m_old_positions;
@@ -348,7 +365,7 @@ private:
 };
 
 
-class LocalMoveEntityCommand LUMIX_FINAL : public IEditorCommand
+class LocalMoveEntityCommand final : public IEditorCommand
 {
 public:
 	explicit LocalMoveEntityCommand(WorldEditor& editor)
@@ -361,7 +378,7 @@ public:
 
 
 	LocalMoveEntityCommand(WorldEditor& editor,
-		const Entity* entities,
+		const EntityRef* entities,
 		const Vec3* new_positions,
 		int count,
 		IAllocator& allocator)
@@ -379,16 +396,17 @@ public:
 		for (int i = count - 1; i >= 0; --i)
 		{
 			u64 prefab = prefab_system.getPrefab(entities[i]);
-			Entity parent = universe->getParent(entities[i]);
-			if (prefab != 0 && parent.isValid() && (prefab_system.getPrefab(parent) & 0xffffFFFF) == (prefab & 0xffffFFFF))
+			EntityPtr parent = universe->getParent(entities[i]);
+			if (prefab != 0 && parent.isValid() && (prefab_system.getPrefab((EntityRef)parent) & 0xffffFFFF) == (prefab & 0xffffFFFF))
 			{
-				Entity instance = prefab_system.getFirstInstance(prefab);
+				EntityPtr instance = prefab_system.getFirstInstance(prefab);
 				while (instance.isValid())
 				{
-					m_entities.push(instance);
+					EntityRef e = (EntityRef)instance;
+					m_entities.push(e);
 					m_new_positions.push(new_positions[i]);
-					m_old_positions.push(universe->getPosition(instance));
-					instance = prefab_system.getNextInstance(instance);
+					m_old_positions.push(universe->getPosition(e));
+					instance = prefab_system.getNextInstance(e);
 				}
 			}
 			else
@@ -431,7 +449,12 @@ public:
 			serializer.deserializeArrayItem(m_new_positions[i].x, 0);
 			serializer.deserializeArrayItem(m_new_positions[i].y, 0);
 			serializer.deserializeArrayItem(m_new_positions[i].z, 0);
-			m_old_positions[i] = universe->getPosition(m_entities[i]);
+			if (m_entities[i].isValid()) {
+				m_old_positions[i] = universe->getPosition((EntityRef)m_entities[i]);
+			}
+			else {
+				m_old_positions[i].set(0, 0, 0);
+			}
 		}
 		serializer.deserializeArrayEnd();
 	}
@@ -440,10 +463,11 @@ public:
 	bool execute() override
 	{
 		Universe* universe = m_editor.getUniverse();
-		for (int i = 0, c = m_entities.size(); i < c; ++i)
-		{
-			Entity entity = m_entities[i];
-			universe->setLocalPosition(entity, m_new_positions[i]);
+		for (int i = 0, c = m_entities.size(); i < c; ++i) {
+			if (m_entities[i].isValid()) {
+				EntityRef entity = (EntityRef)m_entities[i];
+				universe->setLocalPosition(entity, m_new_positions[i]);
+			}
 		}
 		return true;
 	}
@@ -452,10 +476,11 @@ public:
 	void undo() override
 	{
 		Universe* universe = m_editor.getUniverse();
-		for (int i = 0, c = m_entities.size(); i < c; ++i)
-		{
-			Entity entity = m_entities[i];
-			universe->setLocalPosition(entity, m_old_positions[i]);
+		for (int i = 0, c = m_entities.size(); i < c; ++i) {
+			if (m_entities[i].isValid()) {
+				EntityRef entity = (EntityRef)m_entities[i];
+				universe->setLocalPosition(entity, m_old_positions[i]);
+			}
 		}
 	}
 
@@ -490,13 +515,13 @@ public:
 
 private:
 	WorldEditor& m_editor;
-	Array<Entity> m_entities;
+	Array<EntityPtr> m_entities;
 	Array<Vec3> m_new_positions;
 	Array<Vec3> m_old_positions;
 };
 
 
-class ScaleEntityCommand LUMIX_FINAL : public IEditorCommand
+class ScaleEntityCommand final : public IEditorCommand
 {
 public:
 	explicit ScaleEntityCommand(WorldEditor& editor)
@@ -509,7 +534,7 @@ public:
 
 
 	ScaleEntityCommand(WorldEditor& editor,
-		const Entity* entities,
+		const EntityRef* entities,
 		int count,
 		float scale,
 		IAllocator& allocator)
@@ -529,7 +554,7 @@ public:
 
 
 	ScaleEntityCommand(WorldEditor& editor,
-		const Entity* entities,
+		const EntityRef* entities,
 		const float* scales,
 		int count,
 		IAllocator& allocator)
@@ -579,10 +604,15 @@ public:
 		serializer.deserializeArrayBegin("entities");
 		while (!serializer.isArrayEnd())
 		{
-			Entity entity;
+			EntityPtr entity;
 			serializer.deserializeArrayItem(entity, INVALID_ENTITY);
 			m_entities.push(entity);
-			m_old_scales.push(universe->getScale(entity));
+			if (entity.isValid()) {
+				m_old_scales.push(universe->getScale((EntityRef)entity));
+			}
+			else {
+				m_old_scales.push(1);
+			}
 		}
 		serializer.deserializeArrayEnd();
 	}
@@ -591,10 +621,11 @@ public:
 	bool execute() override
 	{
 		Universe* universe = m_editor.getUniverse();
-		for (int i = 0, c = m_entities.size(); i < c; ++i)
-		{
-			Entity entity = m_entities[i];
-			universe->setScale(entity, m_new_scales[i]);
+		for (int i = 0, c = m_entities.size(); i < c; ++i) {
+			if (m_entities[i].isValid()) {
+				EntityRef entity = (EntityRef)m_entities[i];
+				universe->setScale(entity, m_new_scales[i]);
+			}
 		}
 		return true;
 	}
@@ -603,10 +634,11 @@ public:
 	void undo() override
 	{
 		Universe* universe = m_editor.getUniverse();
-		for (int i = 0, c = m_entities.size(); i < c; ++i)
-		{
-			Entity entity = m_entities[i];
-			universe->setScale(entity, m_old_scales[i]);
+		for (int i = 0, c = m_entities.size(); i < c; ++i) {
+			if (m_entities[i].isValid()) {
+				EntityRef entity = (EntityRef)m_entities[i];
+				universe->setScale(entity, m_old_scales[i]);
+			}
 		}
 	}
 
@@ -641,7 +673,7 @@ public:
 
 private:
 	WorldEditor& m_editor;
-	Array<Entity> m_entities;
+	Array<EntityPtr> m_entities;
 	Array<float> m_new_scales;
 	Array<float> m_old_scales;
 };
@@ -706,7 +738,7 @@ struct SaveVisitor : Reflection::ISimpleComponentVisitor
 };
 
 
-class RemoveArrayPropertyItemCommand LUMIX_FINAL : public IEditorCommand
+class RemoveArrayPropertyItemCommand final : public IEditorCommand
 {
 
 public:
@@ -787,7 +819,7 @@ private:
 };
 
 
-class AddArrayPropertyItemCommand LUMIX_FINAL : public IEditorCommand
+class AddArrayPropertyItemCommand final : public IEditorCommand
 {
 
 public:
@@ -857,7 +889,7 @@ private:
 };
 
 
-class SetPropertyCommand LUMIX_FINAL : public IEditorCommand
+class SetPropertyCommand final : public IEditorCommand
 {
 public:
 	explicit SetPropertyCommand(WorldEditor& editor)
@@ -870,7 +902,7 @@ public:
 
 
 	SetPropertyCommand(WorldEditor& editor,
-		const Entity* entities,
+		const EntityRef* entities,
 		int count,
 		ComponentType component_type,
 		int index,
@@ -899,13 +931,14 @@ public:
 			}
 			else
 			{
-				Entity instance = prefab_system.getFirstInstance(prefab);
+				EntityPtr instance = prefab_system.getFirstInstance(prefab);
 				while(instance.isValid())
 				{
-					ComponentUID component = m_editor.getUniverse()->getComponent(instance, component_type);
+					EntityRef inst_ref = (EntityRef)instance;
+					ComponentUID component = m_editor.getUniverse()->getComponent(inst_ref, component_type);
 					m_property->getValue(component, index, m_old_value);
-					m_entities.push(instance);
-					instance = prefab_system.getNextInstance(instance);
+					m_entities.push(inst_ref);
+					instance = prefab_system.getNextInstance(inst_ref);
 				}
 			}
 		}
@@ -919,7 +952,7 @@ public:
 	{
 		serializer.serialize("index", m_index);
 		serializer.beginArray("entities");
-		for (Entity entity : m_entities)
+		for (EntityPtr entity : m_entities)
 		{
 			serializer.serializeArrayItem(entity);
 		}
@@ -941,7 +974,7 @@ public:
 		serializer.deserializeArrayBegin("entities");
 		while (!serializer.isArrayEnd())
 		{
-			Entity entity;
+			EntityPtr entity;
 			serializer.deserializeArrayItem(entity, INVALID_ENTITY);
 			m_entities.push(entity);
 		}
@@ -967,11 +1000,12 @@ public:
 	bool execute() override
 	{
 		InputBlob blob(m_new_value);
-		for (Entity entity : m_entities)
-		{
-			ComponentUID component = m_editor.getUniverse()->getComponent(entity, m_component_type);
-			blob.rewind();
-			m_property->setValue(component, m_index, blob);
+		for (EntityPtr entity : m_entities) {
+			if(entity.isValid()) {
+				ComponentUID component = m_editor.getUniverse()->getComponent((EntityRef)entity, m_component_type);
+				blob.rewind();
+				m_property->setValue(component, m_index, blob);
+			}
 		}
 		return true;
 	}
@@ -980,10 +1014,11 @@ public:
 	void undo() override
 	{
 		InputBlob blob(m_old_value);
-		for (Entity entity : m_entities)
-		{
-			ComponentUID component = m_editor.getUniverse()->getComponent(entity, m_component_type);
-			m_property->setValue(component, m_index, blob);
+		for (EntityPtr entity : m_entities) {
+			if (entity.isValid()) {
+				ComponentUID component = m_editor.getUniverse()->getComponent((EntityRef)entity, m_component_type);
+				m_property->setValue(component, m_index, blob);
+			}
 		}
 	}
 
@@ -1014,7 +1049,7 @@ public:
 private:
 	WorldEditor& m_editor;
 	ComponentType m_component_type;
-	Array<Entity> m_entities;
+	Array<EntityPtr> m_entities;
 	OutputBlob m_new_value;
 	OutputBlob m_old_value;
 	int m_index;
@@ -1024,11 +1059,11 @@ private:
 class PasteEntityCommand;
 
 
-struct WorldEditorImpl LUMIX_FINAL : public WorldEditor
+struct WorldEditorImpl final : public WorldEditor
 {
 	friend class PasteEntityCommand;
 private:
-	class AddComponentCommand LUMIX_FINAL : public IEditorCommand
+	class AddComponentCommand final : public IEditorCommand
 	{
 	public:
 		explicit AddComponentCommand(WorldEditor& editor)
@@ -1038,7 +1073,7 @@ private:
 		}
 
 		AddComponentCommand(WorldEditorImpl& editor,
-							const Array<Entity>& entities,
+							const Array<EntityRef>& entities,
 							ComponentType type)
 			: m_editor(editor)
 			, m_entities(editor.getAllocator())
@@ -1056,11 +1091,12 @@ private:
 					}
 					else
 					{
-						Entity instance = editor.getPrefabSystem().getFirstInstance(prefab);
+						EntityPtr instance = editor.getPrefabSystem().getFirstInstance(prefab);
 						while(instance.isValid())
 						{
-							m_entities.push(instance);
-							instance = editor.getPrefabSystem().getNextInstance(instance);
+							const EntityRef e = (EntityRef)instance;
+							m_entities.push(e);
+							instance = editor.getPrefabSystem().getNextInstance(e);
 						}
 					}
 				}
@@ -1089,8 +1125,11 @@ private:
 			serializer.deserializeArrayBegin("entities");
 			while (!serializer.isArrayEnd())
 			{
-				Entity& entity = m_entities.emplace();
-				serializer.deserializeArrayItem(entity, INVALID_ENTITY);
+				EntityPtr e;
+				serializer.deserializeArrayItem(e, INVALID_ENTITY);
+				if (e.isValid()) {
+					m_entities.push((EntityRef)e);
+				}
 			}
 			serializer.deserializeArrayEnd();
 		}
@@ -1124,19 +1163,21 @@ private:
 			for (int i = 0; i < m_entities.size(); ++i)
 			{
 				const ComponentUID& cmp = m_editor.getUniverse()->getComponent(m_entities[i], m_type);
-				m_editor.getUniverse()->destroyComponent(cmp.entity, cmp.type);
+				if (cmp.isValid()) {
+					m_editor.getUniverse()->destroyComponent((EntityRef)cmp.entity, cmp.type);
+				}
 			}
 		}
 
 
 	private:
 		ComponentType m_type;
-		Array<Entity> m_entities;
+		Array<EntityRef> m_entities;
 		WorldEditorImpl& m_editor;
 	};
 
 
-	class MakeParentCommand LUMIX_FINAL : public IEditorCommand
+	class MakeParentCommand final : public IEditorCommand
 	{
 	public:
 		explicit MakeParentCommand(WorldEditor& editor)
@@ -1145,7 +1186,7 @@ private:
 		}
 
 
-		MakeParentCommand(WorldEditorImpl& editor, Entity parent, Entity child)
+		MakeParentCommand(WorldEditorImpl& editor, EntityPtr parent, EntityRef child)
 			: m_editor(static_cast<WorldEditorImpl&>(editor))
 			, m_parent(parent)
 			, m_child(child)
@@ -1181,26 +1222,31 @@ private:
 
 		bool execute() override
 		{
-			m_old_parent = m_editor.getUniverse()->getParent(m_child);
-			m_editor.getUniverse()->setParent(m_parent, m_child);
+			if(m_child.isValid()) {
+				const EntityRef e = (EntityRef)m_child;
+				m_old_parent = m_editor.getUniverse()->getParent(e);
+				m_editor.getUniverse()->setParent(m_parent, e);
+			}
 			return true;
 		}
 
 
 		void undo() override
 		{
-			m_editor.getUniverse()->setParent(m_old_parent, m_child);
+			if(m_child.isValid()) {
+				m_editor.getUniverse()->setParent(m_old_parent, (EntityRef)m_child);
+			}
 		}
 
 	private:
 		WorldEditor& m_editor;
-		Entity m_parent;
-		Entity m_old_parent;
-		Entity m_child;
+		EntityPtr m_parent;
+		EntityPtr m_old_parent;
+		EntityPtr m_child;
 	};
 
 
-	class DestroyEntitiesCommand LUMIX_FINAL : public IEditorCommand
+	class DestroyEntitiesCommand final : public IEditorCommand
 	{
 	public:
 		explicit DestroyEntitiesCommand(WorldEditor& editor)
@@ -1213,7 +1259,7 @@ private:
 		}
 
 
-		DestroyEntitiesCommand(WorldEditorImpl& editor, const Entity* entities, int count)
+		DestroyEntitiesCommand(WorldEditorImpl& editor, const EntityRef* entities, int count)
 			: m_editor(editor)
 			, m_entities(editor.getAllocator())
 			, m_transformations(editor.getAllocator())
@@ -1240,13 +1286,13 @@ private:
 		}
 
 
-		void pushChildren(Entity entity)
+		void pushChildren(EntityRef entity)
 		{
 			Universe* universe = m_editor.getUniverse();
-			for (Entity e = universe->getFirstChild(entity); e.isValid(); e = universe->getNextSibling(e))
+			for (EntityPtr e = universe->getFirstChild(entity); e.isValid(); e = universe->getNextSibling((EntityRef)e))
 			{
-				m_entities.push(e);
-				pushChildren(e);
+				m_entities.push((EntityRef)e);
+				pushChildren((EntityRef)e);
 			}
 		}
 
@@ -1276,25 +1322,29 @@ private:
 			int count;
 			serializer.deserialize("count", count, 0);
 			serializer.deserializeArrayBegin("entities");
-			m_entities.resize(count);
-			m_transformations.resize(count);
-			for (int i = 0; i < count; ++i)
-			{
-				serializer.deserializeArrayItem(m_entities[i], INVALID_ENTITY);
-				serializer.deserializeArrayItem(m_transformations[i].pos.x, 0);
-				serializer.deserializeArrayItem(m_transformations[i].pos.y, 0);
-				serializer.deserializeArrayItem(m_transformations[i].pos.z, 0);
-				serializer.deserializeArrayItem(m_transformations[i].rot.x, 0);
-				serializer.deserializeArrayItem(m_transformations[i].rot.y, 0);
-				serializer.deserializeArrayItem(m_transformations[i].rot.z, 0);
-				serializer.deserializeArrayItem(m_transformations[i].rot.w, 1);
-				if (serializer.isArrayEnd())
-				{
-					m_transformations[i].scale = 1;
-				}
-				else
-				{
-					serializer.deserializeArrayItem(m_transformations[i].scale, 1);
+			m_entities.reserve(count);
+			m_transformations.reserve(count);
+			for (int i = 0; i < count; ++i) {
+				EntityPtr e;
+				serializer.deserializeArrayItem(e, INVALID_ENTITY);
+				if(e.isValid()) {
+					m_entities.push((EntityRef)e);
+					Transform tr = m_transformations.emplace();
+					serializer.deserializeArrayItem(tr.pos.x, 0);
+					serializer.deserializeArrayItem(tr.pos.y, 0);
+					serializer.deserializeArrayItem(tr.pos.z, 0);
+					serializer.deserializeArrayItem(tr.rot.x, 0);
+					serializer.deserializeArrayItem(tr.rot.y, 0);
+					serializer.deserializeArrayItem(tr.rot.z, 0);
+					serializer.deserializeArrayItem(tr.rot.w, 1);
+					if (serializer.isArrayEnd())
+					{
+						tr.scale = 1;
+					}
+					else
+					{
+						serializer.deserializeArrayItem(tr.scale, 1);
+					}
 				}
 			}
 			serializer.deserializeArrayEnd();
@@ -1320,17 +1370,17 @@ private:
 				EntityGUID guid = m_editor.m_entity_map.get(m_entities[i]);
 				m_old_values.write(guid.value);
 				m_old_values.writeString(universe->getEntityName(m_entities[i]));
-				Entity parent = universe->getParent(m_entities[i]);
+				EntityPtr parent = universe->getParent(m_entities[i]);
 				m_old_values.write(parent);
 				if (parent.isValid())
 				{
 					Transform local_tr = universe->getLocalTransform(m_entities[i]);
 					m_old_values.write(local_tr);
 				}
-				for (Entity child = universe->getFirstChild(m_entities[i]); child.isValid(); child = universe->getNextSibling(child))
+				for (EntityPtr child = universe->getFirstChild(m_entities[i]); child.isValid(); child = universe->getNextSibling((EntityRef)child))
 				{
 					m_old_values.write(child);
-					Transform local_tr = universe->getLocalTransform(child);
+					Transform local_tr = universe->getLocalTransform((EntityRef)child);
 					m_old_values.write(local_tr);
 				}
 				m_old_values.write(INVALID_ENTITY);
@@ -1358,7 +1408,7 @@ private:
 				u64 prefab = m_editor.getPrefabSystem().getPrefab(m_entities[i]);
 				m_old_values.write(prefab);
 			}
-			for (Entity e : m_entities)
+			for (EntityRef e : m_entities)
 			{
 				universe->destroyEntity(e);
 				m_editor.m_entity_map.erase(e);
@@ -1380,7 +1430,7 @@ private:
 			}
 			for (int i = 0; i < m_entities.size(); ++i)
 			{
-				Entity new_entity = m_entities[i];
+				EntityRef new_entity = m_entities[i];
 				universe->setTransform(new_entity, m_transformations[i]);
 				int cmps_count;
 				EntityGUID guid;
@@ -1389,7 +1439,7 @@ private:
 				char name[Universe::ENTITY_NAME_MAX_LENGTH];
 				blob.readString(name, lengthOf(name));
 				universe->setEntityName(new_entity, name);
-				Entity parent;
+				EntityPtr parent;
 				blob.read(parent);
 				if (parent.isValid())
 				{
@@ -1398,13 +1448,13 @@ private:
 					universe->setParent(parent, new_entity);
 					universe->setLocalTransform(new_entity, local_tr);
 				}
-				Entity child;
+				EntityPtr child;
 				for(blob.read(child); child.isValid(); blob.read(child))
 				{
 					Transform local_tr;
 					blob.read(local_tr);
-					universe->setParent(new_entity, child);
-					universe->setLocalTransform(child, local_tr);
+					universe->setParent(new_entity, (EntityRef)child);
+					universe->setLocalTransform((EntityRef)child, local_tr);
 				}
 
 				blob.read(cmps_count);
@@ -1434,14 +1484,14 @@ private:
 
 	private:
 		WorldEditorImpl& m_editor;
-		Array<Entity> m_entities;
+		Array<EntityRef> m_entities;
 		Array<Transform> m_transformations;
 		OutputBlob m_old_values;
 		Array<Resource*> m_resources;
 	};
 
 
-	class DestroyComponentCommand LUMIX_FINAL : public IEditorCommand
+	class DestroyComponentCommand final : public IEditorCommand
 	{
 	public:
 		explicit DestroyComponentCommand(WorldEditor& editor)
@@ -1454,7 +1504,7 @@ private:
 		}
 
 
-		DestroyComponentCommand(WorldEditorImpl& editor, const Entity* entities, int count, ComponentType cmp_type)
+		DestroyComponentCommand(WorldEditorImpl& editor, const EntityRef* entities, int count, ComponentType cmp_type)
 			: m_cmp_type(cmp_type)
 			, m_editor(editor)
 			, m_old_values(editor.getAllocator())
@@ -1472,11 +1522,11 @@ private:
 				}
 				else
 				{
-					Entity instance = editor.getPrefabSystem().getFirstInstance(prefab);
+					EntityPtr instance = editor.getPrefabSystem().getFirstInstance(prefab);
 					while(instance.isValid())
 					{
-						m_entities.push(instance);
-						instance = editor.getPrefabSystem().getNextInstance(instance);
+						m_entities.push((EntityRef)instance);
+						instance = editor.getPrefabSystem().getNextInstance((EntityRef)instance);
 					}
 				}
 			}
@@ -1495,7 +1545,7 @@ private:
 		void serialize(JsonSerializer& serializer) override 
 		{
 			serializer.beginArray("entities");
-			for (Entity entity : m_entities)
+			for (EntityRef entity : m_entities)
 			{
 				serializer.serializeArrayItem(entity);
 			}
@@ -1509,9 +1559,11 @@ private:
 			serializer.deserializeArrayBegin("entities");
 			while (!serializer.isArrayEnd())
 			{
-				Entity entity;
+				EntityPtr entity;
 				serializer.deserializeArrayItem(entity, INVALID_ENTITY);
-				m_entities.push(entity);
+				if(entity.isValid()) {
+					m_entities.push((EntityRef)entity);
+				}
 			}
 			serializer.deserializeArrayEnd();
 
@@ -1529,10 +1581,10 @@ private:
 			cmp.type = m_cmp_type;
 			ASSERT(cmp.scene);
 			InputBlob blob(m_old_values);
-			for (Entity entity : m_entities)
+			for (EntityRef entity : m_entities)
 			{
 				cmp.entity = entity;
-				universe->createComponent(cmp.type, cmp.entity);
+				universe->createComponent(cmp.type, entity);
 				::Lumix::load(cmp, -1, blob);
 			}
 		}
@@ -1554,7 +1606,7 @@ private:
 			if (!cmp.scene) return false;
 			ResourceManager& resource_manager = m_editor.getEngine().getResourceManager();
 
-			for (Entity entity : m_entities)
+			for (EntityRef entity : m_entities)
 			{
 				cmp.entity = entity;
 				SaveVisitor save;
@@ -1569,13 +1621,13 @@ private:
 				gather.resource_manager = &resource_manager;
 				cmp_desc->visit(gather);
 
-				m_editor.getUniverse()->destroyComponent(cmp.entity, m_cmp_type);
+				m_editor.getUniverse()->destroyComponent(entity, m_cmp_type);
 			}
 			return true;
 		}
 
 	private:
-		Array<Entity> m_entities;
+		Array<EntityRef> m_entities;
 		ComponentType m_cmp_type;
 		WorldEditorImpl& m_editor;
 		OutputBlob m_old_values;
@@ -1583,7 +1635,7 @@ private:
 	};
 
 
-	class AddEntityCommand LUMIX_FINAL : public IEditorCommand
+	class AddEntityCommand final : public IEditorCommand
 	{
 	public:
 		explicit AddEntityCommand(WorldEditor& editor)
@@ -1603,17 +1655,18 @@ private:
 
 		bool execute() override
 		{
-			if (!m_entity.isValid())
+			if (m_entity.isValid())
 			{
-				m_entity = m_editor.getUniverse()->createEntity(m_position, Quat(0, 0, 0, 1));
+				m_editor.getUniverse()->emplaceEntity((EntityRef)m_entity);
+				m_editor.getUniverse()->setPosition((EntityRef)m_entity, m_position);
 			}
 			else
 			{
-				m_editor.getUniverse()->emplaceEntity(m_entity);
-				m_editor.getUniverse()->setPosition(m_entity, m_position);
+				m_entity = m_editor.getUniverse()->createEntity(m_position, Quat(0, 0, 0, 1));
 			}
-			((WorldEditorImpl&)m_editor).m_entity_map.create(m_entity);
-			m_editor.selectEntities(&m_entity, 1, false);
+			const EntityRef e = (EntityRef)m_entity;
+			((WorldEditorImpl&)m_editor).m_entity_map.create(e);
+			m_editor.selectEntities(&e, 1, false);
 			return true;
 		}
 
@@ -1636,8 +1689,11 @@ private:
 
 		void undo() override
 		{
-			m_editor.getUniverse()->destroyEntity(m_entity);
-			m_editor.m_entity_map.erase(m_entity);
+			if(m_entity.isValid()) {
+				const EntityRef e = (EntityRef)m_entity;
+				m_editor.getUniverse()->destroyEntity(e);
+				m_editor.m_entity_map.erase(e);
+			}
 		}
 
 
@@ -1647,12 +1703,12 @@ private:
 		const char* getType() override { return "add_entity"; }
 
 
-		Entity getEntity() const { return m_entity; }
+		EntityPtr getEntity() const { return m_entity; }
 
 
 	private:
 		WorldEditorImpl& m_editor;
-		Entity m_entity;
+		EntityPtr m_entity;
 		Vec3 m_position;
 	};
 
@@ -1744,7 +1800,7 @@ public:
 
 		Vec3 origin, dir;
 		m_viewport.getRay(m_mouse_pos, origin, dir);
-		auto hit = m_render_interface->castRay(origin, dir, INVALID_ENTITY);
+		RayHit hit = m_render_interface->castRay(origin, dir, INVALID_ENTITY);
 		//if (m_gizmo->isActive()) return;
 		if (!hit.is_hit) return;
 
@@ -1862,7 +1918,7 @@ public:
 	Vec3 getClosestVertex(const RayHit& hit)
 	{
 		ASSERT(hit.is_hit);
-		return m_render_interface->getClosestVertex(m_universe, hit.entity, hit.pos);
+		return m_render_interface->getClosestVertex(m_universe, (EntityRef)hit.entity, hit.pos);
 	}
 
 
@@ -1940,7 +1996,7 @@ public:
 
 	void rectSelect()
 	{
-		Array<Entity> entities(m_allocator);
+		Array<EntityRef> entities(m_allocator);
 
 		Vec2 min = m_rect_selection_start;
 		Vec2 max = m_mouse_pos;
@@ -1981,13 +2037,17 @@ public:
 					auto icon_hit = m_editor_icons->raycast(origin, dir);
 					if (icon_hit.entity != INVALID_ENTITY)
 					{
-						Entity e = icon_hit.entity;
-						selectEntities(&e, 1, true);
+						if(icon_hit.entity.isValid()) {
+							EntityRef e = (EntityRef)icon_hit.entity;
+							selectEntities(&e, 1, true);
+						}
 					}
 					else if (hit.is_hit)
 					{
-						Entity entity = hit.entity;
-						selectEntities(&entity, 1, true);
+						if(hit.entity.isValid()) {
+							EntityRef entity = (EntityRef)hit.entity;
+							selectEntities(&entity, 1, true);
+						}
 					}
 				}
 			}
@@ -2049,15 +2109,14 @@ public:
 		}
 
 
-		void create(Entity entity)
+		void create(EntityRef entity)
 		{
-			ASSERT(entity.isValid());
 			EntityGUID guid = { is_random ? Math::randGUID() : ++nonrandom_guid };
 			insert(guid, entity);
 		}
 
 
-		void erase(Entity entity)
+		void erase(EntityRef entity)
 		{
 			EntityGUID guid = entity_to_guid[entity.index];
 			if (!isValid(guid)) return;
@@ -2066,7 +2125,7 @@ public:
 		}
 
 
-		void insert(EntityGUID guid, Entity entity)
+		void insert(EntityGUID guid, EntityRef entity)
 		{
 			guid_to_entity.insert(guid.value, entity);
 			while (entity.index >= entity_to_guid.size())
@@ -2077,7 +2136,7 @@ public:
 		}
 
 
-		Entity get(EntityGUID guid) override
+		EntityPtr get(EntityGUID guid) override
 		{
 			auto iter = guid_to_entity.find(guid.value);
 			if (iter.isValid()) return iter.value();
@@ -2085,7 +2144,7 @@ public:
 		}
 
 
-		EntityGUID get(Entity entity) override
+		EntityGUID get(EntityPtr entity) override
 		{
 			if (!entity.isValid()) return INVALID_ENTITY_GUID;
 			if (entity.index >= entity_to_guid.size()) return INVALID_ENTITY_GUID;
@@ -2100,7 +2159,7 @@ public:
 		}
 
 
-		HashMap<u64, Entity> guid_to_entity;
+		HashMap<u64, EntityRef> guid_to_entity;
 		Array<EntityGUID> entity_to_guid;
 		u64 nonrandom_guid = 0;
 		bool is_random = true;
@@ -2181,7 +2240,7 @@ public:
 			PathUtils::getBasename(tmp, lengthOf(tmp), filepath);
 			EntityGUID guid;
 			fromCString(tmp, lengthOf(tmp), &guid.value);
-			Entity entity = universe.createEntity({0, 0, 0}, {0, 0, 0, 1});
+			EntityRef entity = universe.createEntity({0, 0, 0}, {0, 0, 0, 1});
 			entity_map.insert(guid, entity);
 		}
 		PlatformInterface::destroyFileIterator(file_iter);
@@ -2206,9 +2265,10 @@ public:
 				float scale;
 				deserializer.read(&scale);
 
-				Entity entity = entity_map.get(guid);
+				const EntityPtr e = entity_map.get(guid);
+				const EntityRef entity = (EntityRef)e;
 
-				Entity parent;
+				EntityPtr parent;
 				deserializer.read(&parent);
 				if (parent.isValid()) universe.setParent(parent, entity);
 
@@ -2271,24 +2331,25 @@ public:
 		StaticString<MAX_PATH_LENGTH> system_file_path(dir, "systems/templates.sys");
 		saveFile(system_file_path);
 
-		for (Entity entity = m_universe->getFirstEntity(); entity.isValid(); entity = m_universe->getNextEntity(entity))
+		for (EntityPtr entity = m_universe->getFirstEntity(); entity.isValid(); entity = m_universe->getNextEntity((EntityRef)entity))
 		{
-			if (m_prefab_system->getPrefab(entity) != 0) continue;
+			const EntityRef e = (EntityRef)entity;
+			if (m_prefab_system->getPrefab(e) != 0) continue;
 			blob.clear();
-			serializer.write("name", m_universe->getEntityName(entity));
-			serializer.write("transform", m_universe->getTransform(entity).getRigidPart());
-			serializer.write("scale", m_universe->getScale(entity));
-			Entity parent = m_universe->getParent(entity);
+			serializer.write("name", m_universe->getEntityName(e));
+			serializer.write("transform", m_universe->getTransform(e).getRigidPart());
+			serializer.write("scale", m_universe->getScale(e));
+			EntityPtr parent = m_universe->getParent(e);
 			serializer.write("parent", parent);
 			EntityGUID guid = m_entity_map.get(entity);
 			StaticString<MAX_PATH_LENGTH> entity_file_path(dir, guid.value, ".ent");
-			for (ComponentUID cmp = m_universe->getFirstComponent(entity); cmp.entity.isValid();
+			for (ComponentUID cmp = m_universe->getFirstComponent(e); cmp.entity.isValid();
 				 cmp = m_universe->getNextComponent(cmp))
 			{
 				const char* cmp_name = Reflection::getComponentTypeID(cmp.type.index);
 				u32 type_hash = Reflection::getComponentTypeHash(cmp.type);
 				serializer.write(cmp_name, type_hash);
-				m_universe->serializeComponent(serializer, cmp.type, cmp.entity);
+				m_universe->serializeComponent(serializer, cmp.type, (EntityRef)cmp.entity);
 			}
 			serializer.write("cmp_end", (u32)0);
 			saveFile(entity_file_path);
@@ -2383,7 +2444,7 @@ public:
 
 		for (int i = 0; i < m_selected_entities.size(); ++i)
 		{
-			Entity entity = m_selected_entities[i];
+			EntityRef entity = m_selected_entities[i];
 
 			Vec3 origin = universe->getPosition(entity);
 			auto hit = m_render_interface->castRay(origin, Vec3(0, -1, 0), m_selected_entities[i]);
@@ -2408,33 +2469,33 @@ public:
 	}
 
 
-	void makeParent(Entity parent, Entity child) override
+	void makeParent(EntityPtr parent, EntityRef child) override
 	{
 		MakeParentCommand* command = LUMIX_NEW(m_allocator, MakeParentCommand)(*this, parent, child);
 		executeCommand(command);
 	}
 
 
-	void destroyEntities(const Entity* entities, int count) override
+	void destroyEntities(const EntityRef* entities, int count) override
 	{
 		DestroyEntitiesCommand* command = LUMIX_NEW(m_allocator, DestroyEntitiesCommand)(*this, entities, count);
 		executeCommand(command);
 	}
 
 
-	void createEntityGUID(Entity entity) override
+	void createEntityGUID(EntityRef entity) override
 	{
 		m_entity_map.create(entity);
 	}
 
 
-	void destroyEntityGUID(Entity entity) override
+	void destroyEntityGUID(EntityRef entity) override
 	{
 		m_entity_map.erase(entity);
 	}
 
 
-	EntityGUID getEntityGUID(Entity entity) override
+	EntityGUID getEntityGUID(EntityRef entity) override
 	{
 		return m_entity_map.get(entity);
 	}
@@ -2470,13 +2531,13 @@ public:
 	}
 
 
-	Entity addEntity() override
+	EntityRef addEntity() override
 	{
 		return addEntityAt(m_viewport.w >> 1, m_viewport.h >> 1);
 	}
 
 
-	Entity addEntityAt(int camera_x, int camera_y) override
+	EntityRef addEntityAt(int camera_x, int camera_y) override
 	{
 		Universe* universe = getUniverse();
 		Vec3 origin;
@@ -2496,7 +2557,7 @@ public:
 		AddEntityCommand* command = LUMIX_NEW(m_allocator, AddEntityCommand)(*this, pos);
 		executeCommand(command);
 
-		return command->getEntity();
+		return (EntityRef)command->getEntity();
 	}
 
 
@@ -2523,7 +2584,7 @@ public:
 
 
 
-	void setEntitiesScales(const Entity* entities, const float* scales, int count) override
+	void setEntitiesScales(const EntityRef* entities, const float* scales, int count) override
 	{
 		if (count <= 0) return;
 
@@ -2533,7 +2594,7 @@ public:
 	}
 
 
-	void setEntitiesScale(const Entity* entities, int count, float scale) override
+	void setEntitiesScale(const EntityRef* entities, int count, float scale) override
 	{
 		if (count <= 0) return;
 
@@ -2543,7 +2604,7 @@ public:
 	}
 
 
-	void setEntitiesRotations(const Entity* entities, const Quat* rotations, int count) override
+	void setEntitiesRotations(const EntityRef* entities, const Quat* rotations, int count) override
 	{
 		ASSERT(entities && rotations);
 		if (count <= 0) return;
@@ -2560,7 +2621,7 @@ public:
 	}
 
 
-	void setEntitiesCoordinate(const Entity* entities, int count, float value, Coordinate coord) override
+	void setEntitiesCoordinate(const EntityRef* entities, int count, float value, Coordinate coord) override
 	{
 		ASSERT(entities);
 		if (count <= 0) return;
@@ -2582,7 +2643,7 @@ public:
 	}
 
 
-	void setEntitiesLocalCoordinate(const Entity* entities, int count, float value, Coordinate coord) override
+	void setEntitiesLocalCoordinate(const EntityRef* entities, int count, float value, Coordinate coord) override
 	{
 		ASSERT(entities);
 		if (count <= 0) return;
@@ -2601,7 +2662,7 @@ public:
 	}
 
 
-	void setEntitiesPositions(const Entity* entities, const Vec3* positions, int count) override
+	void setEntitiesPositions(const EntityRef* entities, const Vec3* positions, int count) override
 	{
 		ASSERT(entities && positions);
 		if (count <= 0) return;
@@ -2617,7 +2678,7 @@ public:
 		executeCommand(command);
 	}
 
-	void setEntitiesPositionsAndRotations(const Entity* entities,
+	void setEntitiesPositionsAndRotations(const EntityRef* entities,
 		const Vec3* positions,
 		const Quat* rotations,
 		int count) override
@@ -2629,13 +2690,10 @@ public:
 	}
 
 
-	void setEntityName(Entity entity, const char* name) override
+	void setEntityName(EntityRef entity, const char* name) override
 	{
-		if (entity.isValid())
-		{
-			IEditorCommand* command = LUMIX_NEW(m_allocator, SetEntityNameCommand)(*this, entity, name);
-			executeCommand(command);
-		}
+		IEditorCommand* command = LUMIX_NEW(m_allocator, SetEntityNameCommand)(*this, entity, name);
+		executeCommand(command);
 	}
 
 
@@ -2779,7 +2837,10 @@ public:
 		}
 		m_engine->getFileSystem().close(*m_game_mode_file);
 		m_game_mode_file = nullptr;
-		if(m_selected_entity_on_game_mode.isValid()) selectEntities(&m_selected_entity_on_game_mode, 1, false);
+		if(m_selected_entity_on_game_mode.isValid()) {
+			EntityRef e = (EntityRef)m_selected_entity_on_game_mode;
+			selectEntities(&e, 1, false);
+		}
 		m_engine->getResourceManager().enableUnload(true);
 	}
 
@@ -2790,12 +2851,12 @@ public:
 	}
 
 
-	void copyEntities(const Entity* entities, int count, ISerializer& serializer) override
+	void copyEntities(const EntityRef* entities, int count, ISerializer& serializer) override
 	{
 		serializer.write("count", count);
 		for (int i = 0; i < count; ++i)
 		{
-			Entity entity = entities[i];
+			EntityRef entity = entities[i];
 			Transform tr = m_universe->getTransform(entity);
 			serializer.write("transform", tr);
 			serializer.write("parent", m_universe->getParent(entity));
@@ -2816,7 +2877,7 @@ public:
 				serializer.write("cmp_type", cmp_type);
 				const Reflection::ComponentBase* cmp_desc = Reflection::getComponent(cmp.type);
 				
-				m_universe->serializeComponent(serializer, cmp.type, cmp.entity);
+				m_universe->serializeComponent(serializer, cmp.type, (EntityRef)cmp.entity);
 			}
 		}
 	}
@@ -2829,10 +2890,10 @@ public:
 		m_copy_buffer.clear();
 
 		struct : ISaveEntityGUIDMap {
-			EntityGUID get(Entity entity) override {
+			EntityGUID get(EntityPtr entity) override {
 				if (!entity.isValid()) return INVALID_ENTITY_GUID;
 				
-				int idx = editor->m_selected_entities.indexOf(entity);
+				int idx = editor->m_selected_entities.indexOf((EntityRef)entity);
 				if (idx >= 0) {
 					return { (u64)idx };
 				}
@@ -2845,15 +2906,14 @@ public:
 
 		TextSerializer serializer(m_copy_buffer, map);
 
-		Array<Entity> entities(m_allocator);
-		entities.reserve(m_selected_entities.size());
-		for (Entity e : m_selected_entities) {
-			entities.push(e);
-		}
-		for (int i = 0; i < entities.size(); ++i) {
-			Entity e = entities[i];
-			for (Entity child = m_universe->getFirstChild(e); child.isValid(); child = m_universe->getNextSibling(child)) {
-				if(entities.indexOf(child) < 0) entities.push(child);
+		Array<EntityRef> entities(m_allocator);
+		entities = m_selected_entities;
+		for (EntityRef e : entities) {
+			for (EntityPtr child = m_universe->getFirstChild(e); 
+				child.isValid(); 
+				child = m_universe->getNextSibling((EntityRef)child)) 
+			{
+				if(entities.indexOf((EntityRef)child) < 0) entities.push((EntityRef)child);
 			}
 		}
 		copyEntities(&entities[0], entities.size(), serializer);
@@ -2870,7 +2930,7 @@ public:
 	void duplicateEntities() override;
 
 
-	void cloneComponent(const ComponentUID& src, Entity entity) override
+	void cloneComponent(const ComponentUID& src, EntityRef entity) override
 	{
 		IScene* scene = m_universe->getScene(src.type);
 		m_universe->createComponent(src.type, entity);
@@ -2889,7 +2949,7 @@ public:
 	}
 
 
-	void destroyComponent(const Entity* entities, int count, ComponentType cmp_type) override
+	void destroyComponent(const EntityRef* entities, int count, ComponentType cmp_type) override
 	{
 		ASSERT(count > 0);
 		IEditorCommand* command = LUMIX_NEW(m_allocator, DestroyComponentCommand)(*this, entities, count, cmp_type);
@@ -3147,13 +3207,13 @@ public:
 	}
 
 
-	bool isEntitySelected(Entity entity) const override
+	bool isEntitySelected(EntityRef entity) const override
 	{
 		return m_selected_entities.indexOf(entity) >= 0;
 	}
 
 
-	const Array<Entity>& getSelectedEntities() const override
+	const Array<EntityRef>& getSelectedEntities() const override
 	{
 		return m_selected_entities;
 	}
@@ -3193,7 +3253,7 @@ public:
 	void setProperty(ComponentType component_type,
 		int index,
 		const Reflection::PropertyBase& property,
-		const Entity* entities,
+		const EntityRef* entities,
 		int count,
 		const void* data,
 		int size) override
@@ -3279,7 +3339,7 @@ public:
 	}
 
 
-	void selectEntities(const Entity* entities, int count, bool toggle) override
+	void selectEntities(const EntityRef* entities, int count, bool toggle) override
 	{
 		if (!toggle || !m_is_toggle_selection)
 		{
@@ -3311,7 +3371,7 @@ public:
 	}
 
 
-	void onEntityDestroyed(Entity entity)
+	void onEntityDestroyed(EntityRef entity)
 	{
 		m_selected_entities.eraseItemFast(entity);
 	}
@@ -3338,7 +3398,7 @@ public:
 	}
 
 
-	DelegateList<void(const Array<Entity>&)>& entitySelected() override
+	DelegateList<void(const Array<EntityRef>&)>& entitySelected() override
 	{
 		return m_entity_selected;
 	}
@@ -3609,7 +3669,7 @@ public:
 	static int getEntitiesCount(Universe& universe)
 	{
 		int count = 0;
-		for (Entity e = universe.getFirstEntity(); e.isValid(); e = universe.getNextEntity(e)) ++count;
+		for (EntityPtr e = universe.getFirstEntity(); e.isValid(); e = universe.getNextEntity((EntityRef)e)) ++count;
 		return count;
 	}
 
@@ -3635,16 +3695,18 @@ public:
 			goto end;
 		}
 
-		for (Entity e = tpl_universe.getFirstEntity(); e.isValid(); e = tpl_universe.getNextEntity(e))
+		for (EntityPtr e_ptr = tpl_universe.getFirstEntity(); e_ptr.isValid(); e_ptr = tpl_universe.getNextEntity((EntityRef)e_ptr))
 		{
+			const EntityRef e = (EntityRef)e_ptr;
 			EntityGUID guid = entity_guid_map.get(e);
-			Entity other_entity = m_entity_map.get(guid);
-			if (!other_entity.isValid())
+			EntityPtr other_entity_ptr = m_entity_map.get(guid);
+			if (!other_entity_ptr.isValid())
 			{
 				is_same = false;
 				goto end;
 			}
 
+			EntityRef other_entity = (EntityRef)other_entity_ptr;
 			for (ComponentUID cmp = tpl_universe.getFirstComponent(e); cmp.isValid(); cmp = tpl_universe.getNextComponent(cmp))
 			{
 				if (!m_universe->hasComponent(other_entity, cmp.type))
@@ -3726,7 +3788,7 @@ private:
 	IAllocator& m_allocator;
 	GoToParameters m_go_to_parameters;
 	Gizmo* m_gizmo;
-	Array<Entity> m_selected_entities;
+	Array<EntityRef> m_selected_entities;
 	MouseMode m_mouse_mode;
 	Vec2 m_rect_selection_start;
 	EditorIcons* m_editor_icons;
@@ -3742,10 +3804,10 @@ private:
 	SnapMode m_snap_mode;
 	FS::IFile* m_game_mode_file;
 	Engine* m_engine;
-	Entity m_selected_entity_on_game_mode;
+	EntityPtr m_selected_entity_on_game_mode;
 	DelegateList<void()> m_universe_destroyed;
 	DelegateList<void()> m_universe_created;
-	DelegateList<void(const Array<Entity>&)> m_entity_selected;
+	DelegateList<void(const Array<EntityRef>&)> m_entity_selected;
 	bool m_is_mouse_down[MouseButton::RIGHT + 1];
 	bool m_is_mouse_click[3];
 
@@ -3768,7 +3830,7 @@ private:
 };
 
 
-class PasteEntityCommand LUMIX_FINAL : public IEditorCommand
+class PasteEntityCommand final : public IEditorCommand
 {
 public:
 	explicit PasteEntityCommand(WorldEditor& editor)
@@ -3842,7 +3904,7 @@ public:
 		struct Map : ILoadEntityGUIDMap {
 			Map(IAllocator& allocator) : entities(allocator) {}
 
-			Entity get(EntityGUID guid) override 
+			EntityPtr get(EntityGUID guid) override 
 			{
 				if (guid == INVALID_ENTITY_GUID) return INVALID_ENTITY;
 
@@ -3851,7 +3913,7 @@ public:
 				return entities[(int)guid.value];
 			}
 
-			Array<Entity> entities;
+			Array<EntityRef> entities;
 		} map(m_editor.getAllocator());
 		InputBlob input_blob(m_copy_buffer);
 		TextDeserializer deserializer(input_blob, map);
@@ -3883,7 +3945,7 @@ public:
 			Transform tr;
 			deserializer.read(&tr);
 			Matrix mtx = tr.toMatrix();
-			Entity parent;
+			EntityPtr parent;
 			deserializer.read(&parent);
 
 			if (!m_identity)
@@ -3902,7 +3964,7 @@ public:
 				}
 			}
 
-			const Entity new_entity = map.entities[i];
+			const EntityRef new_entity = map.entities[i];
 			((WorldEditorImpl&)m_editor).m_entity_map.create(new_entity);
 			if (!is_redo) m_entities.push(new_entity);
 			universe.setMatrix(new_entity, mtx);
@@ -3942,14 +4004,14 @@ public:
 	}
 
 
-	const Array<Entity>& getEntities() { return m_entities; }
+	const Array<EntityRef>& getEntities() { return m_entities; }
 
 
 private:
 	OutputBlob m_copy_buffer;
 	WorldEditor& m_editor;
 	Vec3 m_position;
-	Array<Entity> m_entities;
+	Array<EntityRef> m_entities;
 	bool m_identity;
 };
 

@@ -56,7 +56,7 @@ enum class CoordSystem
 };
 
 
-struct GizmoImpl LUMIX_FINAL : public Gizmo
+struct GizmoImpl final : public Gizmo
 {
 	static const int MAX_GIZMOS = 16;
 	static const int MAX_IMMEDIATE = 16;
@@ -97,7 +97,7 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 	}
 
 
-	Matrix getMatrix(Entity entity) const
+	Matrix getMatrix(EntityRef entity) const
 	{
 		Matrix mtx;
 		auto* universe = m_editor.getUniverse();
@@ -1145,7 +1145,7 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 	}
 
 
-	void add(Entity entity) override
+	void add(EntityRef entity) override
 	{
 		if (m_count >= MAX_GIZMOS) return;
 
@@ -1204,7 +1204,7 @@ struct GizmoImpl LUMIX_FINAL : public Gizmo
 	Vec2 m_rel_accum;
 	bool m_is_step;
 	int m_count;
-	Entity m_entities[MAX_GIZMOS];
+	EntityRef m_entities[MAX_GIZMOS];
 	Transform m_immediate_frames[MAX_IMMEDIATE];
 	int m_immediate_count;
 	Vec3 m_offset;

@@ -26,17 +26,17 @@ struct PrefabResource;
 class LUMIX_ENGINE_API Universe
 {
 public:
-	typedef void (IScene::*Create)(Entity);
-	typedef void (IScene::*Destroy)(Entity);
-	typedef void (IScene::*Serialize)(ISerializer&, Entity);
-	typedef void (IScene::*Deserialize)(IDeserializer&, Entity, int);
+	typedef void (IScene::*Create)(EntityRef);
+	typedef void (IScene::*Destroy)(EntityRef);
+	typedef void (IScene::*Serialize)(ISerializer&, EntityRef);
+	typedef void (IScene::*Deserialize)(IDeserializer&, EntityRef, int);
 	struct ComponentTypeEntry
 	{
 		IScene* scene = nullptr;
-		void (IScene::*create)(Entity);
-		void (IScene::*destroy)(Entity);
-		void (IScene::*serialize)(ISerializer&, Entity);
-		void (IScene::*deserialize)(IDeserializer&, Entity, int);
+		void (IScene::*create)(EntityRef);
+		void (IScene::*destroy)(EntityRef);
+		void (IScene::*serialize)(ISerializer&, EntityRef);
+		void (IScene::*deserialize)(IDeserializer&, EntityRef, int);
 	};
 
 	enum { ENTITY_NAME_MAX_LENGTH = 32 };
@@ -46,17 +46,17 @@ public:
 	~Universe();
 
 	IAllocator& getAllocator() { return m_allocator; }
-	void emplaceEntity(Entity entity);
-	Entity createEntity(const Vec3& position, const Quat& rotation);
-	Entity cloneEntity(Entity entity);
-	void destroyEntity(Entity entity);
-	void createComponent(ComponentType type, Entity entity);
-	void destroyComponent(Entity entity, ComponentType type);
-	void onComponentCreated(Entity entity, ComponentType component_type, IScene* scene);
-	void onComponentDestroyed(Entity entity, ComponentType component_type, IScene* scene);
-	bool hasComponent(Entity entity, ComponentType component_type) const;
-	ComponentUID getComponent(Entity entity, ComponentType type) const;
-	ComponentUID getFirstComponent(Entity entity) const;
+	void emplaceEntity(EntityRef entity);
+	EntityRef createEntity(const Vec3& position, const Quat& rotation);
+	EntityRef cloneEntity(EntityRef entity);
+	void destroyEntity(EntityRef entity);
+	void createComponent(ComponentType type, EntityRef entity);
+	void destroyComponent(EntityRef entity, ComponentType type);
+	void onComponentCreated(EntityRef entity, ComponentType component_type, IScene* scene);
+	void onComponentDestroyed(EntityRef entity, ComponentType component_type, IScene* scene);
+	bool hasComponent(EntityRef entity, ComponentType component_type) const;
+	ComponentUID getComponent(EntityRef entity, ComponentType type) const;
+	ComponentUID getFirstComponent(EntityRef entity) const;
 	ComponentUID getNextComponent(const ComponentUID& cmp) const;
 	ComponentTypeEntry& registerComponentType(ComponentType type) { return m_component_type_map[type.index]; }
 	template <typename T1, typename T2, typename T3, typename T4>
@@ -69,60 +69,60 @@ public:
 		m_component_type_map[type.index].deserialize = static_cast<Deserialize>(deserialize);
 	}
 
-	Entity getFirstEntity() const;
-	Entity getNextEntity(Entity entity) const;
-	const char* getEntityName(Entity entity) const;
-	Entity findByName(Entity parent, const char* name);
-	void setEntityName(Entity entity, const char* name);
-	bool hasEntity(Entity entity) const;
+	EntityPtr getFirstEntity() const;
+	EntityPtr getNextEntity(EntityRef entity) const;
+	const char* getEntityName(EntityRef entity) const;
+	EntityPtr findByName(EntityPtr parent, const char* name);
+	void setEntityName(EntityRef entity, const char* name);
+	bool hasEntity(EntityRef entity) const;
 
-	bool isDescendant(Entity ancestor, Entity descendant) const;
-	Entity getParent(Entity entity) const;
-	Entity getFirstChild(Entity entity) const;
-	Entity getNextSibling(Entity entity) const;
-	Transform getLocalTransform(Entity entity) const;
-	float getLocalScale(Entity entity) const;
-	void setParent(Entity parent, Entity child);
-	void setLocalPosition(Entity entity, const Vec3& pos);
-	void setLocalRotation(Entity entity, const Quat& rot);
-	void setLocalTransform(Entity entity, const Transform& transform);
-	Transform computeLocalTransform(Entity parent, const Transform& global_transform) const;
+	bool isDescendant(EntityRef ancestor, EntityRef descendant) const;
+	EntityPtr getParent(EntityRef entity) const;
+	EntityPtr getFirstChild(EntityRef entity) const;
+	EntityPtr getNextSibling(EntityRef entity) const;
+	Transform getLocalTransform(EntityRef entity) const;
+	float getLocalScale(EntityRef entity) const;
+	void setParent(EntityPtr parent, EntityRef child);
+	void setLocalPosition(EntityRef entity, const Vec3& pos);
+	void setLocalRotation(EntityRef entity, const Quat& rot);
+	void setLocalTransform(EntityRef entity, const Transform& transform);
+	Transform computeLocalTransform(EntityRef parent, const Transform& global_transform) const;
 
-	void setMatrix(Entity entity, const Matrix& mtx);
-	Matrix getPositionAndRotation(Entity entity) const;
-	Matrix getMatrix(Entity entity) const;
-	Matrix getRelativeMatrix(Entity entity, const Vec3& base_pos) const;
-	void setTransform(Entity entity, const RigidTransform& transform);
-	void setTransform(Entity entity, const Transform& transform);
-	void setTransformKeepChildren(Entity entity, const Transform& transform);
-	void setTransform(Entity entity, const Vec3& pos, const Quat& rot, float scale);
-	Transform getTransform(Entity entity) const;
-	void setRotation(Entity entity, float x, float y, float z, float w);
-	void setRotation(Entity entity, const Quat& rot);
-	void setPosition(Entity entity, float x, float y, float z);
-	void setPosition(Entity entity, const Vec3& pos);
-	void setScale(Entity entity, float scale);
-	Entity instantiatePrefab(const PrefabResource& prefab,
+	void setMatrix(EntityRef entity, const Matrix& mtx);
+	Matrix getPositionAndRotation(EntityRef entity) const;
+	Matrix getMatrix(EntityRef entity) const;
+	Matrix getRelativeMatrix(EntityRef entity, const Vec3& base_pos) const;
+	void setTransform(EntityRef entity, const RigidTransform& transform);
+	void setTransform(EntityRef entity, const Transform& transform);
+	void setTransformKeepChildren(EntityRef entity, const Transform& transform);
+	void setTransform(EntityRef entity, const Vec3& pos, const Quat& rot, float scale);
+	Transform getTransform(EntityRef entity) const;
+	void setRotation(EntityRef entity, float x, float y, float z, float w);
+	void setRotation(EntityRef entity, const Quat& rot);
+	void setPosition(EntityRef entity, float x, float y, float z);
+	void setPosition(EntityRef entity, const Vec3& pos);
+	void setScale(EntityRef entity, float scale);
+	EntityPtr instantiatePrefab(const PrefabResource& prefab,
 		const Vec3& pos,
 		const Quat& rot,
 		float scale);
-	float getScale(Entity entity) const;
-	const Vec3& getPosition(Entity entity) const;
-	const Quat& getRotation(Entity entity) const;
+	float getScale(EntityRef entity) const;
+	const Vec3& getPosition(EntityRef entity) const;
+	const Quat& getRotation(EntityRef entity) const;
 	const char* getName() const { return m_name; }
 	void setName(const char* name) 
 	{ 
 		m_name = name; 
 	}
 
-	DelegateList<void(Entity)>& entityTransformed() { return m_entity_moved; }
-	DelegateList<void(Entity)>& entityCreated() { return m_entity_created; }
-	DelegateList<void(Entity)>& entityDestroyed() { return m_entity_destroyed; }
+	DelegateList<void(EntityRef)>& entityTransformed() { return m_entity_moved; }
+	DelegateList<void(EntityRef)>& entityCreated() { return m_entity_created; }
+	DelegateList<void(EntityRef)>& entityDestroyed() { return m_entity_destroyed; }
 	DelegateList<void(const ComponentUID&)>& componentDestroyed() { return m_component_destroyed; }
 	DelegateList<void(const ComponentUID&)>& componentAdded() { return m_component_added; }
 
-	void serializeComponent(ISerializer& serializer, ComponentType type, Entity entity);
-	void deserializeComponent(IDeserializer& serializer, Entity entity, ComponentType type, int scene_version);
+	void serializeComponent(ISerializer& serializer, ComponentType type, EntityRef entity);
+	void deserializeComponent(IDeserializer& serializer, EntityRef entity, ComponentType type, int scene_version);
 	void serialize(OutputBlob& serializer);
 	void deserialize(InputBlob& serializer);
 
@@ -133,15 +133,15 @@ public:
 	void removeScene(IScene* scene);
 
 private:
-	void transformEntity(Entity entity, bool update_local);
-	void updateGlobalTransform(Entity entity);
+	void transformEntity(EntityRef entity, bool update_local);
+	void updateGlobalTransform(EntityRef entity);
 
 	struct Hierarchy
 	{
-		Entity entity;
-		Entity parent;
-		Entity first_child;
-		Entity next_sibling;
+		EntityRef entity;
+		EntityPtr parent;
+		EntityPtr first_child;
+		EntityPtr next_sibling;
 
 		Transform local_transform;
 	};
@@ -175,7 +175,7 @@ private:
 
 	struct EntityName
 	{
-		Entity entity;
+		EntityRef entity;
 		char name[ENTITY_NAME_MAX_LENGTH];
 	};
 
@@ -186,9 +186,9 @@ private:
 	Array<EntityData> m_entities;
 	Array<Hierarchy> m_hierarchy;
 	Array<EntityName> m_names;
-	DelegateList<void(Entity)> m_entity_moved;
-	DelegateList<void(Entity)> m_entity_created;
-	DelegateList<void(Entity)> m_entity_destroyed;
+	DelegateList<void(EntityRef)> m_entity_moved;
+	DelegateList<void(EntityRef)> m_entity_created;
+	DelegateList<void(EntityRef)> m_entity_destroyed;
 	DelegateList<void(const ComponentUID&)> m_component_destroyed;
 	DelegateList<void(const ComponentUID&)> m_component_added;
 	int m_first_free_slot;

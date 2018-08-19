@@ -25,7 +25,7 @@ class LUMIX_ENGINE_API JsonSerializer
 		void operator=(const JsonSerializer&) = delete;
 		JsonSerializer(const JsonSerializer&) = delete;
 
-		void serialize(const char* label, Entity value);
+		void serialize(const char* label, EntityPtr value);
 		void serialize(const char* label, u32 value);
 		void serialize(const char* label, u16 value);
 		void serialize(const char* label, float value);
@@ -39,7 +39,7 @@ class LUMIX_ENGINE_API JsonSerializer
 		void beginArray();
 		void beginArray(const char* label);
 		void endArray();
-		void serializeArrayItem(Entity value);
+		void serializeArrayItem(EntityPtr value);
 		void serializeArrayItem(u32 value);
 		void serializeArrayItem(i32 value);
 		void serializeArrayItem(i64 value);
@@ -67,7 +67,7 @@ public:
 	JsonDeserializer(const JsonDeserializer&) = delete;
 	~JsonDeserializer();
 
-	void deserialize(const char* label, Entity& value, Entity default_value);
+	void deserialize(const char* label, EntityPtr& value, EntityPtr default_value);
 	void deserialize(const char* label, u32& value, u32 default_value);
 	void deserialize(const char* label, u16& value, u16 default_value);
 	void deserialize(const char* label, float& value, float default_value);
@@ -84,7 +84,7 @@ public:
 	void deserializeArrayBegin();
 	void deserializeArrayEnd();
 	bool isArrayEnd();
-	void deserializeArrayItem(Entity& value, Entity default_value);
+	void deserializeArrayItem(EntityPtr& value, EntityPtr default_value);
 	void deserializeArrayItem(u32& value, u32 default_value);
 	void deserializeArrayItem(i32& value, i32 default_value);
 	void deserializeArrayItem(i64& value, i64 default_value);

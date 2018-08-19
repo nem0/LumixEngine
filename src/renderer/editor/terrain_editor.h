@@ -18,7 +18,7 @@ class RenderScene;
 class Texture;
 
 
-class TerrainEditor LUMIX_FINAL : public WorldEditor::Plugin
+class TerrainEditor final : public WorldEditor::Plugin
 {
 public:
 	enum ActionType
@@ -50,7 +50,7 @@ private:
 	void mergeSplatmap(const char* dir);
 	void onUniverseDestroyed();
 	void detectModifiers();
-	void drawCursor(RenderScene& scene, Entity terrain, const Vec3& center);
+	void drawCursor(RenderScene& scene, EntityRef terrain, const Vec3& center);
 	Material* getMaterial();
 	void paint(const Vec3& hit, TerrainEditor::ActionType action_type, bool new_stroke);
 

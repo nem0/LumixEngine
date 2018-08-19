@@ -21,7 +21,7 @@ class EditorIcons
 	public:
 		struct Hit
 		{
-			Entity entity;
+			EntityPtr entity;
 			float t;
 		};
 

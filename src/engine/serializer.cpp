@@ -19,17 +19,25 @@ static float asFloat(u32 v)
 }
 
 
-EntityGUID TextSerializer::getGUID(Entity entity)
+EntityGUID TextSerializer::getGUID(EntityRef entity)
 {
 	return entity_map.get(entity);
 }
 
 
-void TextSerializer::write(const char* label, Entity entity)
+void TextSerializer::write(const char* label, EntityPtr entity)
 {
 	EntityGUID guid = entity_map.get(entity);
 	blob << "#" << label << "\n\t" << guid.value << "\n";
 }
+
+
+void TextSerializer::write(const char* label, EntityRef entity)
+{
+	EntityGUID guid = entity_map.get(entity);
+	blob << "#" << label << "\n\t" << guid.value << "\n";
+}
+
 
 void TextSerializer::write(const char* label, const RigidTransform& value)
 {
@@ -117,19 +125,26 @@ void TextSerializer::write(const char* label, u8 value)
 }
 
 
-Entity TextDeserializer::getEntity(EntityGUID guid)
+EntityPtr TextDeserializer::getEntity(EntityGUID guid)
 {
 	return entity_map.get(guid);
 }
 
 
-void TextDeserializer::read(Entity* entity)
+void TextDeserializer::read(EntityPtr* entity)
 {
 	EntityGUID guid;
 	read(&guid.value);
 	*entity = entity_map.get(guid);
 }
 
+
+void TextDeserializer::read(EntityRef* entity)
+{
+	EntityGUID guid;
+	read(&guid.value);
+	*entity = (EntityRef)entity_map.get(guid);
+}
 
 void TextDeserializer::read(RigidTransform* value)
 {

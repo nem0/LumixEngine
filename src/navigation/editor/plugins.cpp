@@ -15,7 +15,7 @@ namespace
 {
 
 
-struct NavmeshEditorPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
+struct NavmeshEditorPlugin final : public StudioApp::GUIPlugin
 {
 	explicit NavmeshEditorPlugin(StudioApp& _app)
 		: app(_app)
