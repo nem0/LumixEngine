@@ -1535,8 +1535,8 @@ void TerrainEditor::onGUI()
 	{
 		if (m_brush_texture)
 		{
-			static auto th = m_brush_texture->handle;
-			ImGui::Image(&th, ImVec2(100, 100));
+			const ffr::TextureHandle th = m_brush_texture->handle;
+			ImGui::Image((void*)(uintptr_t)th.value, ImVec2(100, 100));
 			if (ImGui::Button("Clear mask"))
 			{
 				m_brush_texture->destroy();

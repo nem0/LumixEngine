@@ -219,7 +219,7 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 			if (is_node_open)
 			{
-				ImGui::Image(&texture->handle, ImVec2(96, 96));
+				ImGui::Image((void*)(uintptr_t)texture->handle.value, ImVec2(96, 96));
 				// TODO
 				/*if (ImGui::CollapsingHeader("Advanced"))
 				{
@@ -589,7 +589,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		m_pipeline->setViewport(m_viewport);
 		m_pipeline->render();
 		m_preview = m_pipeline->getOutput();
-		ImGui::Image(&m_preview, image_size);
+		ImGui::Image((void*)(uintptr_t)m_preview.value, image_size);
 		bool mouse_down = ImGui::IsMouseDown(0) || ImGui::IsMouseDown(1);
 		if (m_is_mouse_captured && !mouse_down)
 		{
@@ -1231,7 +1231,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				texture_size.x = texture_size.y * texture->width / texture->height;
 			}
 
-			ImGui::Image(&texture->handle, texture_size);
+			ImGui::Image((void*)(uintptr_t)texture->handle.value, texture_size);
 
 			if (ImGui::Button("Open")) m_app.getAssetBrowser().openInExternalEditor(resource);
 		}
@@ -1291,8 +1291,7 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 	void onGUI(Resource* resource) override
 	{
-					// TODO
-			ASSERT(false);
+		ASSERT(false);
 			/*
 auto* shader = static_cast<Shader*>(resource);
 		char basename[MAX_PATH_LENGTH];
@@ -2574,39 +2573,6 @@ struct RenderStatsPlugin final : public StudioApp::GUIPlugin
 				timingsUI(0);
 			}
 			ImGui::Columns();
-			// TODO
-			/*
-			ImGui::Columns(3);
-			ImGui::Text("%s", "View name");
-			ImGui::NextColumn();
-			ImGui::Text("%s", "GPU time (ms)");
-			ImGui::NextColumn();
-			ImGui::Text("%s", "CPU time (ms)");
-			ImGui::NextColumn();
-			ImGui::Separator();
-			const bgfx::Stats* stats = bgfx::getStats();
-			for (int i = 0; i < stats->numViews; ++i)
-			{
-				auto& view_stat = stats->viewStats[i];
-				ImGui::Text("%s", view_stat.name);
-				ImGui::NextColumn();
-				double gpu_time = 1000.0f * view_stat.gpuTimeElapsed / (double)stats->gpuTimerFreq;
-				ImGui::Text("%f", gpu_time);
-				ImGui::NextColumn();
-				double cpu_time = 1000.0f * view_stat.cpuTimeElapsed / (double)stats->cpuTimerFreq;
-				ImGui::Text("%f", cpu_time);
-				ImGui::NextColumn();
-				total_cpu += cpu_time;
-				total_gpu += gpu_time;
-			}
-			ImGui::Separator();
-			ImGui::Text("%s", "Total");
-			ImGui::NextColumn();
-			ImGui::Text("%f", total_gpu);
-			ImGui::NextColumn();
-			ImGui::Text("%f", total_cpu);
-			ImGui::NextColumn();
-			ImGui::Columns();*/
 		}
 		ImGui::EndDock();
 	}
@@ -2717,14 +2683,15 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 
 				const u32 first_index = elem_offset + ib_offset;
 
-				const ffr::TextureHandle* tex = pcmd->TextureId ? (ffr::TextureHandle*)pcmd->TextureId : default_texture;
-				if (!tex->isValid()) tex = default_texture;
-				ffr::bindTexture(0, *tex);
+				ffr::TextureHandle tex = pcmd->TextureId ? ffr::TextureHandle{(uint)(intptr_t)pcmd->TextureId} : *default_texture;
+				if (!tex.isValid()) tex = *default_texture;
+				ffr::bindTexture(0, tex);
 
 				ffr::scissor(uint(Math::maximum(pcmd->ClipRect.x, 0.0f)),
 					uint(Math::maximum(pcmd->ClipRect.y, 0.0f)),
 					uint(Math::minimum(pcmd->ClipRect.z, 65535.0f) - Math::maximum(pcmd->ClipRect.x, 0.0f)),
 					uint(Math::minimum(pcmd->ClipRect.w, 65535.0f) - Math::maximum(pcmd->ClipRect.y, 0.0f)));
+				// TODO
 				ffr::blending(1); //dc.textures[0].value != m_scene_view.getTextureHandle().value);
 
 				ffr::drawElements(first_index, pcmd->ElemCount, ffr::PrimitiveType::TRIANGLES);

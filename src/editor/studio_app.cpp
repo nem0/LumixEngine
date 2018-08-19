@@ -1328,7 +1328,7 @@ public:
 		PROFILE_FUNCTION();
 		const Array<EntityRef>& entities = m_editor->getSelectedEntities();
 		static char filter[64] = "";
-		if (ImGui::BeginDock("EntityRef List", &m_is_entity_list_open))
+		if (ImGui::BeginDock("Entity List", &m_is_entity_list_open))
 		{
 			auto* universe = m_editor->getUniverse();
 			ImGui::LabellessInputText("Filter", filter, sizeof(filter));
@@ -1535,7 +1535,7 @@ public:
 		addAction<&StudioAppImpl::lookAtSelected>("Look at selected", "Look at selected entity", "lookAtSelected");
 		addAction<&StudioAppImpl::toggleAssetBrowser>("Asset Browser", "Toggle asset browser", "assetBrowser")
 			.is_selected.bind<StudioAppImpl, &StudioAppImpl::isAssetBrowserOpen>(this);
-		addAction<&StudioAppImpl::toggleEntityList>("EntityRef List", "Toggle entity list", "entityList")
+		addAction<&StudioAppImpl::toggleEntityList>("Entity List", "Toggle entity list", "entityList")
 			.is_selected.bind<StudioAppImpl, &StudioAppImpl::isEntityListOpen>(this);
 		addAction<&StudioAppImpl::toggleSettings>("Settings", "Toggle settings UI", "settings")
 			.is_selected.bind<StudioAppImpl, &StudioAppImpl::areSettingsOpen>(this);
@@ -2605,7 +2605,7 @@ public:
 
 	void loadIcons()
 	{
-		auto& render_interface = *m_editor->getRenderInterface();
+		RenderInterface& render_interface = *m_editor->getRenderInterface();
 		for (auto* action : m_actions)
 		{
 			char tmp[MAX_PATH_LENGTH];

@@ -56,7 +56,8 @@ bool Action::toolbarButton()
 
 	ImVec4 col_active = ImGui::GetStyle().Colors[ImGuiCol_ButtonActive];
 	ImVec4 bg_color = is_selected.invoke() ? col_active : ImVec4(0, 0, 0, 0);
-	if (ImGui::ToolbarButton(icon, bg_color, label_long))
+	int* t = (int*)icon; 
+	if (ImGui::ToolbarButton((void*)(uintptr_t)*t, bg_color, label_long))
 	{
 		func.invoke();
 		return true;

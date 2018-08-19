@@ -370,7 +370,8 @@ void AssetBrowser::thumbnail(FileInfo& tile)
 	if (tile.tex)
 	{
 		if(ri->isValid(tile.tex)) {
-			ImGui::Image(tile.tex, img_size);
+			int* th = (int*)tile.tex;
+			ImGui::Image((void*)(uintptr_t)*th, img_size);
 		}
 	}
 	else
