@@ -1,10 +1,10 @@
 #pragma once
 
-#include "engine/resource_manager_base.h"
+#include "engine/resource_manager.h"
 
 namespace Lumix
 {
-	class LUMIX_RENDERER_API TextureManager final : public ResourceManagerBase
+	class LUMIX_RENDERER_API TextureManager final : public ResourceManager
 	{
 	public:
 		explicit TextureManager(class Renderer& renderer, IAllocator& allocator);

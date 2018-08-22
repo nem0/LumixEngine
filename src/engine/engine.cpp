@@ -495,7 +495,7 @@ public:
 			m_disk_file_device = nullptr;
 		}
 
-		m_resource_manager.create(*m_file_system);
+		m_resource_manager.init(*m_file_system);
 		m_prefab_resource_manager.create(PrefabResource::TYPE, m_resource_manager);
 
 		m_timer = Timer::create(m_allocator);
@@ -812,9 +812,8 @@ public:
 
 	static int LUA_loadResource(EngineImpl* engine, const char* path, const char* type)
 	{
-		ResourceManagerBase* res_manager = engine->getResourceManager().get(ResourceType(type));
-		if (!res_manager) return -1;
-		Resource* res = res_manager->load(Path(path));
+		Resource* res = engine->getResourceManager().load(ResourceType(type), Path(path));
+		if(!res) return -1;
 		++engine->m_last_lua_resource_idx;
 		engine->m_lua_resources.insert(engine->m_last_lua_resource_idx, res);
 		return engine->m_last_lua_resource_idx;
@@ -1203,7 +1202,6 @@ public:
 		}
 
 		m_prefab_resource_manager.destroy();
-		m_resource_manager.destroy();
 		JobSystem::shutdown();
 		lua_close(m_state);
 
@@ -1378,7 +1376,7 @@ public:
 	InputSystem& getInputSystem() override { return *m_input_system; }
 
 
-	ResourceManager& getResourceManager() override
+	ResourceManagerHub& getResourceManager() override
 	{
 		return m_resource_manager;
 	}
@@ -1544,9 +1542,8 @@ public:
 
 	int addLuaResource(const Path& path, ResourceType type) override
 	{
-		ResourceManagerBase* manager = m_resource_manager.get(type);
-		if (!manager) return -1;
-		Resource* res = manager->load(path);
+		Resource* res = m_resource_manager.load(type, path);
+		if (!res) return -1;
 		++m_last_lua_resource_idx;
 		m_lua_resources.insert(m_last_lua_resource_idx, res);
 		return m_last_lua_resource_idx;
@@ -1598,7 +1595,7 @@ private:
 	FS::ResourceFileDevice* m_resource_file_device;
 	FS::DiskFileDevice* m_disk_file_device;
 
-	ResourceManager m_resource_manager;
+	ResourceManagerHub m_resource_manager;
 	
 	PluginManager* m_plugin_manager;
 	PrefabResourceManager m_prefab_resource_manager;

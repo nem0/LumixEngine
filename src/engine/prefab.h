@@ -3,7 +3,7 @@
 
 #include "engine/blob.h"
 #include "engine/resource.h"
-#include "engine/resource_manager_base.h"
+#include "engine/resource_manager.h"
 
 
 namespace Lumix
@@ -21,7 +21,7 @@ enum class PrefabVersion : u32
 
 struct LUMIX_ENGINE_API PrefabResource final : public Resource
 {
-	PrefabResource(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator)
+	PrefabResource(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
 		: Resource(path, resource_manager, allocator)
 		, blob(allocator)
 	{
@@ -48,12 +48,12 @@ struct LUMIX_ENGINE_API PrefabResource final : public Resource
 };
 
 
-class PrefabResourceManager final : public ResourceManagerBase
+class PrefabResourceManager final : public ResourceManager
 {
 public:
 	explicit PrefabResourceManager(IAllocator& allocator)
 		: m_allocator(allocator)
-		, ResourceManagerBase(allocator)
+		, ResourceManager(allocator)
 	{
 	}
 

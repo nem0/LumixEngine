@@ -15,7 +15,6 @@
 #include "engine/profiler.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
-#include "engine/resource_manager_base.h"
 #include "engine/string.h"
 #include "engine/universe/component.h"
 #include "engine/universe/universe.h"
@@ -352,8 +351,8 @@ void SceneView::handleDrop(const char* path, float x, float y)
 	{
 		DeferredPrefabInsert defer;
 		defer.pos = hit.m_origin + (hit.m_is_hit ? hit.m_t : 1) * hit.m_dir;
-		ResourceManagerBase* prefab_manager = m_editor.getEngine().getResourceManager().get(PrefabResource::TYPE);
-		defer.prefab = (PrefabResource*)prefab_manager->load(Path(path));
+		ResourceManagerHub& manager = m_editor.getEngine().getResourceManager();
+		defer.prefab = manager.load<PrefabResource>(Path(path));
 		m_deferred_prefab_inserts.push(defer);
 	}
 	else if (PathUtils::hasExtension(path, "phy"))

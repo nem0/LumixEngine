@@ -2,7 +2,7 @@
 
 #include "engine/matrix.h"
 #include "engine/resource.h"
-#include "engine/resource_manager_base.h"
+#include "engine/resource_manager.h"
 
 namespace Lumix
 {
@@ -23,11 +23,11 @@ namespace Reflection
 class JsonSerializer;
 
 
-class PropertyAnimationManager final : public ResourceManagerBase
+class PropertyAnimationManager final : public ResourceManager
 {
 public:
 	explicit PropertyAnimationManager(IAllocator& allocator)
-		: ResourceManagerBase(allocator)
+		: ResourceManager(allocator)
 		, m_allocator(allocator)
 	{}
 	~PropertyAnimationManager() {}
@@ -56,7 +56,7 @@ public:
 		Array<float> values;
 	};
 
-	PropertyAnimation(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
+	PropertyAnimation(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
 
 	ResourceType getType() const override { return TYPE; }
 	Curve& addCurve();

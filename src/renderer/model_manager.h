@@ -1,6 +1,6 @@
 #pragma once
 
-#include "engine/resource_manager_base.h"
+#include "engine/resource_manager.h"
 
 namespace Lumix
 {
@@ -8,11 +8,11 @@ namespace Lumix
 	class Renderer;
 
 
-	class LUMIX_RENDERER_API ModelManager final : public ResourceManagerBase
+	class LUMIX_RENDERER_API ModelManager final : public ResourceManager
 	{
 	public:
 		ModelManager(Renderer& renderer, IAllocator& allocator)
-			: ResourceManagerBase(allocator)
+			: ResourceManager(allocator)
 			, m_allocator(allocator)
 			, m_renderer(renderer)
 		{}

@@ -2,7 +2,7 @@
 
 #include "engine/matrix.h"
 #include "engine/resource.h"
-#include "engine/resource_manager_base.h"
+#include "engine/resource_manager.h"
 
 namespace Lumix
 {
@@ -19,11 +19,11 @@ struct Quat;
 struct Vec3;
 
 
-class AnimationManager final : public ResourceManagerBase
+class AnimationManager final : public ResourceManager
 {
 public:
 	explicit AnimationManager(IAllocator& allocator)
-		: ResourceManagerBase(allocator)
+		: ResourceManager(allocator)
 		, m_allocator(allocator)
 	{}
 	~AnimationManager() {}
@@ -61,7 +61,7 @@ class Animation final : public Resource
 		};
 
 	public:
-		Animation(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
+		Animation(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
 
 		ResourceType getType() const override { return TYPE; }
 

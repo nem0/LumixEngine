@@ -9,7 +9,7 @@ namespace Lumix
 
 
 ShaderManager::ShaderManager(Renderer& renderer, IAllocator& allocator)
-	: ResourceManagerBase(allocator)
+	: ResourceManager(allocator)
 	, m_allocator(allocator)
 	, m_renderer(renderer)
 {

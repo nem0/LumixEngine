@@ -10,8 +10,8 @@ namespace Lumix
 {
 
 
+class ResourceManagerHub;
 class ResourceManager;
-class ResourceManagerBase;
 
 
 struct LUMIX_ENGINE_API ResourceType
@@ -30,8 +30,8 @@ const ResourceType INVALID_RESOURCE_TYPE("");
 class LUMIX_ENGINE_API Resource
 {
 public:
-	friend class ResourceManagerBase;
 	friend class ResourceManager;
+	friend class ResourceManagerHub;
 
 	enum class State : u32
 	{
@@ -53,7 +53,7 @@ public:
 	ObserverCallback& getObserverCb() { return m_cb; }
 	size_t size() const { return m_size; }
 	const Path& getPath() const { return m_path; }
-	ResourceManagerBase& getResourceManager() { return m_resource_manager; }
+	ResourceManager& getResourceManager() { return m_resource_manager; }
 
 	template <typename C, void (C::*Function)(State, State, Resource&)> void onLoaded(C* instance)
 	{
@@ -65,7 +65,7 @@ public:
 	}
 
 protected:
-	Resource(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
+	Resource(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
 	virtual ~Resource();
 
 	virtual void onBeforeReady() {}
@@ -83,7 +83,7 @@ protected:
 	State m_desired_state;
 	u16 m_empty_dep_count;
 	size_t m_size;
-	ResourceManagerBase& m_resource_manager;
+	ResourceManager& m_resource_manager;
 
 protected:
 	void checkState();

@@ -26,7 +26,6 @@
 #include "engine/queue.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
-#include "engine/resource_manager_base.h"
 #include "engine/system.h"
 #include "engine/universe/universe.h"
 #include "engine/viewport.h"
@@ -842,16 +841,15 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		ASSERT(!m_tile.queue.full());
 		WorldEditor& editor = m_app.getWorldEditor();
 		Engine& engine = editor.getEngine();
-		ResourceManager& resource_manager = engine.getResourceManager();
+		ResourceManagerHub& resource_manager = engine.getResourceManager();
 
-		ResourceManagerBase* manager;
+		Resource* resource;
 		if (PathUtils::hasExtension(path.c_str(), "fab")) {
-			manager = resource_manager.get(PrefabResource::TYPE);
+			resource = resource_manager.load<PrefabResource>(path);
 		}
 		else {
-			manager = resource_manager.get(Model::TYPE);
+			resource = resource_manager.load<Model>(path);
 		}
-		Resource* resource = manager->load(path);
 		m_tile.queue.push(resource);
 	}
 
@@ -2113,7 +2111,7 @@ struct RenderInterfaceImpl final : public RenderInterface
 		m_model_index = 0;
 		auto& rm = m_editor.getEngine().getResourceManager();
 		Path shader_path("pipelines/debug_shape.shd");
-		m_shader = static_cast<Shader*>(rm.get(Shader::TYPE)->load(shader_path));
+		m_shader = rm.load<Shader>(shader_path);
 
 		editor.universeCreated().bind<RenderInterfaceImpl, &RenderInterfaceImpl::onUniverseCreated>(this);
 		editor.universeDestroyed().bind<RenderInterfaceImpl, &RenderInterfaceImpl::onUniverseDestroyed>(this);
@@ -2207,9 +2205,7 @@ struct RenderInterfaceImpl final : public RenderInterface
 		unsigned char* pixels;
 		int width, height;
 		ImGui::GetIO().Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
-		auto* material_manager = engine.getResourceManager().get(Material::TYPE);
-		Resource* resource = material_manager->load(Path("pipelines/imgui/imgui.mat"));
-		Material* material = (Material*)resource;
+		Material* material = engine.getResourceManager().load<Material>(Path("pipelines/imgui/imgui.mat"));
 
 		Texture* old_texture = material->getTexture(0);
 		PluginManager& plugin_manager = engine.getPluginManager();
@@ -2231,8 +2227,7 @@ struct RenderInterfaceImpl final : public RenderInterface
 
 	ModelHandle loadModel(Path& path) override
 	{
-		auto& rm = m_editor.getEngine().getResourceManager();
-		m_models.insert(m_model_index, static_cast<Model*>(rm.get(Model::TYPE)->load(path)));
+		m_models.insert(m_model_index, m_editor.getEngine().getResourceManager().load<Model>(path));
 		++m_model_index;
 		return m_model_index - 1;
 	}
@@ -2292,7 +2287,7 @@ struct RenderInterfaceImpl final : public RenderInterface
 	ImTextureID loadTexture(const Path& path) override
 	{
 		auto& rm = m_editor.getEngine().getResourceManager();
-		auto* texture = static_cast<Texture*>(rm.get(Texture::TYPE)->load(path));
+		auto* texture = rm.load<Texture>(path);
 		m_textures.insert(&texture->handle, texture);
 		return &texture->handle;
 	}

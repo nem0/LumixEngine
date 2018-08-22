@@ -9,7 +9,6 @@
 #include "engine/profiler.h"
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
-#include "engine/resource_manager_base.h"
 #include "engine/timer.h"
 #include "engine/debug/debug.h"
 #include "engine/engine.h"
@@ -442,7 +441,7 @@ struct ProfilerUIImpl final : public ProfilerUI
 	Array<Thread> m_threads;
 	Block* m_current_block;
 	Debug::Allocator& m_main_allocator;
-	ResourceManager& m_resource_manager;
+	ResourceManagerHub& m_resource_manager;
 	AllocationStackNode* m_allocation_root;
 	int m_allocation_size_from;
 	int m_allocation_size_to;

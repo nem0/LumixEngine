@@ -157,7 +157,7 @@ class PrefabSystemImpl final : public PrefabSystem
 			serializer.deserialize("scale", scale, 0);
 			char path[MAX_PATH_LENGTH];
 			serializer.deserialize("path_hash", path, lengthOf(path), "");
-			prefab = (PrefabResource*)editor.getEngine().getResourceManager().get(PrefabResource::TYPE)->load(Path(path));
+			prefab = editor.getEngine().getResourceManager().load<PrefabResource>(Path(path));
 		}
 
 
@@ -597,8 +597,7 @@ public:
 
 			Transform tr = m_universe->getTransform(entity);
 			m_editor.destroyEntities(&entities[0], entities.size());
-			auto* resource_manager = m_editor.getEngine().getResourceManager().get(PrefabResource::TYPE);
-			auto* res = (PrefabResource*)resource_manager->load(path);
+			auto* res = m_editor.getEngine().getResourceManager().load<PrefabResource>(path);
 			FS::FileSystem& fs = m_editor.getEngine().getFileSystem();
 			while (fs.hasWork()) fs.updateAsyncTransactions();
 			instantiatePrefab(*res, tr.pos, tr.rot, tr.scale);
@@ -643,12 +642,12 @@ public:
 			m_instances.insert(key, value);
 		}
 		serializer.read(count);
-		auto* resource_manager = m_editor.getEngine().getResourceManager().get(PrefabResource::TYPE);
+		ResourceManagerHub& resource_manager = m_editor.getEngine().getResourceManager();
 		for (int i = 0; i < count; ++i)
 		{
 			char tmp[MAX_PATH_LENGTH];
 			serializer.readString(tmp, lengthOf(tmp));
-			auto* res = (PrefabResource*)resource_manager->load(Path(tmp));
+			auto* res = resource_manager.load<PrefabResource>(Path(tmp));
 			m_resources.insert(res->getPath().getHash(), res);
 		}
 	}
@@ -689,13 +688,13 @@ public:
 		serializer.read(&count);
 		reserve({count-1});
 		
-		auto* mng = m_editor.getEngine().getResourceManager().get(PrefabResource::TYPE);
+		auto& mng = m_editor.getEngine().getResourceManager();
 		for (;;)
 		{
 			char tmp[MAX_PATH_LENGTH];
 			serializer.read(tmp, lengthOf(tmp));
 			if (tmp[0] == 0) break;
-			auto* res = (PrefabResource*)mng->load(Path(tmp));
+			auto* res = mng.load<PrefabResource>(Path(tmp));
 			m_resources.insert(res->getPath().getHash(), res);
 		}
 

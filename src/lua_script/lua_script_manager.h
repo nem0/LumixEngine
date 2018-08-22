@@ -2,7 +2,7 @@
 
 
 #include "engine/resource.h"
-#include "engine/resource_manager_base.h"
+#include "engine/resource_manager.h"
 #include "engine/string.h"
 
 
@@ -13,7 +13,7 @@ namespace Lumix
 class LuaScript final : public Resource
 {
 public:
-	LuaScript(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
+	LuaScript(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
 	virtual ~LuaScript();
 
 	ResourceType getType() const override { return TYPE; }
@@ -29,7 +29,7 @@ private:
 };
 
 
-class LuaScriptManager final : public ResourceManagerBase
+class LuaScriptManager final : public ResourceManager
 {
 public:
 	explicit LuaScriptManager(IAllocator& allocator);

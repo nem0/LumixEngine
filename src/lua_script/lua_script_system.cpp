@@ -14,6 +14,7 @@
 #include "engine/lua_wrapper.h"
 #include "engine/profiler.h"
 #include "engine/reflection.h"
+#include "engine/resource_manager.h"
 #include "engine/serializer.h"
 #include "engine/string.h"
 #include "engine/universe/universe.h"
@@ -1068,9 +1069,10 @@ namespace Lumix
 				inst.m_properties.clear();
 				auto& cb = inst.m_script->getObserverCb();
 				cb.unbind<ScriptComponent, &ScriptComponent::onScriptLoaded>(&cmp);
-				m_system.getScriptManager().unload(*inst.m_script);
+				inst.m_script->getResourceManager().unload(*inst.m_script);
 			}
-			inst.m_script = path.isValid() ? static_cast<LuaScript*>(m_system.getScriptManager().load(path)) : nullptr;
+			ResourceManagerHub& rm = m_system.m_engine.getResourceManager();
+			inst.m_script = path.isValid() ? rm.load<LuaScript>(path) : nullptr;
 			if (inst.m_script)
 			{
 				inst.m_script->onLoaded<ScriptComponent, &ScriptComponent::onScriptLoaded>(&cmp);

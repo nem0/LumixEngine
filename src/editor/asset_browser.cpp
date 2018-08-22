@@ -10,7 +10,6 @@
 #include "engine/profiler.h"
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
-#include "engine/resource_manager_base.h"
 #include "engine/string.h"
 #include "imgui/imgui.h"
 #include "platform_interface.h"
@@ -597,15 +596,16 @@ void AssetBrowser::addPlugin(IPlugin& plugin)
 }
 
 
-void AssetBrowser::selectResource(const Path& resource, bool record_history)
+void AssetBrowser::selectResource(const Path& path, bool record_history)
 {
 	m_activate = true;
 	char ext[30];
-	PathUtils::getExtension(ext, lengthOf(ext), resource.c_str());
+	PathUtils::getExtension(ext, lengthOf(ext), path.c_str());
 
 	auto& manager = m_editor.getEngine().getResourceManager();
-	auto* resource_manager = manager.get(getResourceType(resource.c_str()));
-	if (resource_manager) selectResource(resource_manager->load(resource), record_history);
+	const ResourceType type = getResourceType(path.c_str());
+	Resource* res = manager.load(type, path);
+	if (res) selectResource(res, record_history);
 }
 
 

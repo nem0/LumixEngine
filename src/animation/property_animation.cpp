@@ -25,7 +25,7 @@ void PropertyAnimationManager::destroyResource(Resource& resource)
 const ResourceType PropertyAnimation::TYPE("property_animation");
 
 
-PropertyAnimation::PropertyAnimation(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator)
+PropertyAnimation::PropertyAnimation(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
 	: Resource(path, resource_manager, allocator)
 	, fps(30)
 	, curves(allocator)

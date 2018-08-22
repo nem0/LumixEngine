@@ -1,13 +1,13 @@
 #pragma once
 
-#include "engine/resource_manager_base.h"
+#include "engine/resource_manager.h"
 
 namespace Lumix
 {
 
 	class Renderer;
 
-	class LUMIX_RENDERER_API ShaderManager final : public ResourceManagerBase
+	class LUMIX_RENDERER_API ShaderManager final : public ResourceManager
 	{
 	public:
 		ShaderManager(Renderer& renderer, IAllocator& allocator);

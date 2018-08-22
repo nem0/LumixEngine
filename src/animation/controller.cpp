@@ -3,7 +3,6 @@
 #include "engine/blob.h"
 #include "engine/log.h"
 #include "engine/resource_manager.h"
-#include "engine/resource_manager_base.h"
 
 
 namespace Lumix
@@ -26,7 +25,7 @@ struct Header
 const ResourceType ControllerResource::TYPE("anim_controller");
 
 
-ControllerResource::ControllerResource(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator)
+ControllerResource::ControllerResource(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
 	: Resource(path, resource_manager, allocator)
 	, m_root(nullptr)
 	, m_allocator(allocator)
@@ -122,7 +121,7 @@ bool ControllerResource::deserialize(InputBlob& blob, int& version)
 	}
 
 	clearAnimationSets();
-	auto* manager = m_resource_manager.getOwner().get(Animation::TYPE);
+	auto& manager = m_resource_manager.getOwner();
 
 	int count = blob.read<int>();
 	m_animation_set.reserve(count);
@@ -133,7 +132,7 @@ bool ControllerResource::deserialize(InputBlob& blob, int& version)
 		u32 key = blob.read<u32>();
 		char path[MAX_PATH_LENGTH];
 		blob.readString(path, lengthOf(path));
-		Animation* anim = path[0] ? (Animation*)manager->load(Path(path)) : nullptr;
+		Animation* anim = path[0] ? manager.load<Animation>(Path(path)) : nullptr;
 		addAnimation(set, key, anim);
 	}
 	if (header.version > (int)Version::ANIMATION_SETS)

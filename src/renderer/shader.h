@@ -104,7 +104,7 @@ public:
 	}* m_render_data;
 
 public:
-	Shader(const Path& path, ResourceManagerBase& resource_manager, Renderer& renderer, IAllocator& allocator);
+	Shader(const Path& path, ResourceManager& resource_manager, Renderer& renderer, IAllocator& allocator);
 	~Shader();
 
 	ResourceType getType() const override { return TYPE; }

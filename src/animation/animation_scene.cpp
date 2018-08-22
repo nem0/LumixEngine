@@ -218,7 +218,7 @@ struct AnimationSceneImpl final : public AnimationScene
 		serializer.read(&animable.start_time);
 		char tmp[MAX_PATH_LENGTH];
 		serializer.read(tmp, lengthOf(tmp));
-		auto* res = tmp[0] ? m_engine.getResourceManager().get(Animation::TYPE)->load(Path(tmp)) : nullptr;
+		auto* res = tmp[0] ? m_engine.getResourceManager().load<Animation>(Path(tmp)) : nullptr;
 		animable.animation = (Animation*)res;
 		m_universe.onComponentCreated(entity, ANIMABLE_TYPE, this);
 	}
@@ -245,7 +245,7 @@ struct AnimationSceneImpl final : public AnimationScene
 		{
 			serializer.read(&controller.default_set);
 		}
-		auto* res = tmp[0] ? m_engine.getResourceManager().get(Anim::ControllerResource::TYPE)->load(Path(tmp)) : nullptr;
+		auto* res = tmp[0] ? m_engine.getResourceManager().load<Anim::ControllerResource>(Path(tmp)) : nullptr;
 		setControllerResource(controller, (Anim::ControllerResource*)res);
 		m_universe.onComponentCreated(entity, CONTROLLER_TYPE, this);
 	}
@@ -1200,22 +1200,22 @@ struct AnimationSceneImpl final : public AnimationScene
 	PropertyAnimation* loadPropertyAnimation(const Path& path) const
 	{
 		if (!path.isValid()) return nullptr;
-		ResourceManager& rm = m_engine.getResourceManager();
-		return static_cast<PropertyAnimation*>(rm.get(PropertyAnimation::TYPE)->load(path));
+		ResourceManagerHub& rm = m_engine.getResourceManager();
+		return rm.load<PropertyAnimation>(path);
 	}
 
 
 	Animation* loadAnimation(const Path& path) const
 	{
-		ResourceManager& rm = m_engine.getResourceManager();
-		return static_cast<Animation*>(rm.get(Animation::TYPE)->load(path));
+		ResourceManagerHub& rm = m_engine.getResourceManager();
+		return rm.load<Animation>(path);
 	}
 
 
 	Anim::ControllerResource* loadController(const Path& path) const
 	{
-		ResourceManager& rm = m_engine.getResourceManager();
-		return static_cast<Anim::ControllerResource*>(rm.get(Anim::ControllerResource::TYPE)->load(path));
+		ResourceManagerHub& rm = m_engine.getResourceManager();
+		return rm.load<Anim::ControllerResource>(path);
 	}
 
 

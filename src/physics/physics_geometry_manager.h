@@ -3,7 +3,7 @@
 
 #include "engine/lumix.h"
 #include "engine/resource.h"
-#include "engine/resource_manager_base.h"
+#include "engine/resource_manager.h"
 
 
 namespace physx
@@ -20,11 +20,11 @@ namespace Lumix
 class PhysicsSystem;
 
 
-class PhysicsGeometryManager final : public ResourceManagerBase
+class PhysicsGeometryManager final : public ResourceManager
 {
 	public:
 		PhysicsGeometryManager(PhysicsSystem& system, IAllocator& allocator)
-			: ResourceManagerBase(allocator)
+			: ResourceManager(allocator)
 			, m_allocator(allocator)
 			, m_system(system)
 		{}
@@ -62,7 +62,7 @@ class PhysicsGeometry final : public Resource
 		};
 
 	public:
-		PhysicsGeometry(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
+		PhysicsGeometry(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
 		~PhysicsGeometry();
 
 		ResourceType getType() const override { return TYPE; }

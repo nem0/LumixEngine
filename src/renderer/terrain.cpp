@@ -8,7 +8,6 @@
 #include "engine/profiler.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
-#include "engine/resource_manager_base.h"
 #include "engine/engine.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
@@ -343,7 +342,7 @@ void Terrain::setGrassTypePath(int index, const Path& path)
 	}
 	if (path.isValid())
 	{
-		type.m_grass_model = static_cast<Model*>(m_scene.getEngine().getResourceManager().get(Model::TYPE)->load(path));
+		type.m_grass_model = m_scene.getEngine().getResourceManager().load<Model>(path);
 		type.m_grass_model->onLoaded<Terrain, &Terrain::grassLoaded>(this);
 	}
 }
@@ -616,7 +615,7 @@ void Terrain::deserialize(InputBlob& serializer, Universe& universe, RenderScene
 	serializer.read(m_scale.x);
 	serializer.read(m_scale.y);
 	m_scale.z = m_scale.x;
-	setMaterial(static_cast<Material*>(scene.getEngine().getResourceManager().get(Material::TYPE)->load(Path(path))));
+	setMaterial(scene.getEngine().getResourceManager().load<Material>(Path(path)));
 	i32 count;
 	serializer.read(count);
 	while(m_grass_types.size() > count)

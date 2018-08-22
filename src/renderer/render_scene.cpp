@@ -14,7 +14,6 @@
 #include "engine/profiler.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
-#include "engine/resource_manager_base.h"
 #include "engine/serializer.h"
 #include "engine/universe/universe.h"
 #include "engine/viewport.h"
@@ -716,7 +715,7 @@ public:
 
 		if (path[0] != 0)
 		{
-			auto* model = static_cast<Model*>(m_engine.getResourceManager().get(Model::TYPE)->load(Path(path)));
+			auto* model = m_engine.getResourceManager().load<Model>(Path(path));
 			setModel(entity, model);
 		}
 
@@ -812,13 +811,13 @@ public:
 
 	void deserializeDecal(IDeserializer& serializer, EntityRef entity, int /*scene_version*/)
 	{
-		ResourceManagerBase* material_manager = m_engine.getResourceManager().get(Material::TYPE);
+		ResourceManagerHub& manager = m_engine.getResourceManager();
 		Decal& decal = m_decals.insert(entity);
 		char tmp[MAX_PATH_LENGTH];
 		decal.entity = entity;
 		serializer.read(&decal.scale);
 		serializer.read(tmp, lengthOf(tmp));
-		decal.material = tmp[0] == '\0' ? nullptr : static_cast<Material*>(material_manager->load(Path(tmp)));
+		decal.material = tmp[0] == '\0' ? nullptr : manager.load<Material>(Path(tmp));
 		updateDecalInfo(decal);
 		m_universe.onComponentCreated(decal.entity, DECAL_TYPE, this);
 	}
@@ -968,8 +967,8 @@ public:
 	void setTextMeshFontPath(EntityRef entity, const Path& path) override
 	{
 		TextMesh& text = *m_text_meshes.get(entity);
-		FontManager& manager = m_renderer.getFontManager();
-		FontResource* res = path.isValid() ? (FontResource*)manager.load(path) : nullptr;
+		ResourceManagerHub& manager = m_renderer.getEngine().getResourceManager();
+		FontResource* res = path.isValid() ? manager.load<FontResource>(path) : nullptr;
 		text.setFontResource(res);
 	}
 
@@ -986,8 +985,8 @@ public:
 		serializer.read(&font_size);
 		text.setFontSize(font_size);
 		serializer.read(&text.text);
-		FontManager& manager = m_renderer.getFontManager();
-		FontResource* res = tmp[0] ? (FontResource*)manager.load(Path(tmp)) : nullptr;
+		ResourceManagerHub& manager = m_renderer.getEngine().getResourceManager();
+		FontResource* res = tmp[0] ? manager.load<FontResource>(Path(tmp)) : nullptr;
 		text.setFontResource(res);
 		m_universe.onComponentCreated(entity, TEXT_MESH_TYPE, this);
 	}
@@ -1069,8 +1068,8 @@ public:
 		serializer.read(&terrain->m_scale);
 		char tmp[MAX_PATH_LENGTH];
 		serializer.read(tmp, lengthOf(tmp));
-		auto* material = tmp[0] ? m_engine.getResourceManager().get(Material::TYPE)->load(Path(tmp)) : nullptr;
-		terrain->setMaterial((Material*)material);
+		auto* material = tmp[0] ? m_engine.getResourceManager().load<Material>(Path(tmp)) : nullptr;
+		terrain->setMaterial(material);
 
 		int count;
 		serializer.read(&count);
@@ -1105,7 +1104,7 @@ public:
 
 	void deserializeEnvironmentProbe(IDeserializer& serializer, EntityRef entity, int scene_version)
 	{
-		auto* texture_manager = m_engine.getResourceManager().get(Texture::TYPE);
+		ResourceManagerHub& manager = m_engine.getResourceManager();
 		StaticString<MAX_PATH_LENGTH> probe_dir("universes/", m_universe.getName(), "/probes/");
 		EnvironmentProbe& probe = m_environment_probes.insert(entity);
 		serializer.read(&probe.guid);
@@ -1118,18 +1117,18 @@ public:
 		
 		probe.texture = nullptr;
 		if (probe.flags.isSet(EnvironmentProbe::REFLECTION)) {
-			probe.texture = static_cast<Texture*>(texture_manager->load(Path(path_str)));
+			probe.texture = manager.load<Texture>(Path(path_str));
 			probe.texture->setFlag(Texture::Flags::SRGB, true);
 		}
 		
 		StaticString<MAX_PATH_LENGTH> irr_path_str(probe_dir, probe.guid, "_irradiance.dds");
-		probe.irradiance = static_cast<Texture*>(texture_manager->load(Path(irr_path_str)));
+		probe.irradiance = manager.load<Texture>(Path(irr_path_str));
 		probe.irradiance->setFlag(Texture::Flags::SRGB, true);
 		// TODO
 		//probe.irradiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
 		//probe.irradiance->setFlag(BGFX_TEXTURE_MAG_ANISOTROPIC, true);
 		StaticString<MAX_PATH_LENGTH> r_path_str(probe_dir, probe.guid, "_radiance.dds");
-		probe.radiance = static_cast<Texture*>(texture_manager->load(Path(r_path_str)));
+		probe.radiance = manager.load<Texture>(Path(r_path_str));
 		probe.radiance->setFlag(Texture::Flags::SRGB, true);
 		// TODO
 		//probe.radiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
@@ -1154,8 +1153,8 @@ public:
 
 		char tmp[MAX_PATH_LENGTH];
 		serializer.read(tmp, lengthOf(tmp));
-		ResourceManagerBase* material_manager = m_engine.getResourceManager().get(ParticleEmitterResource::TYPE);
-		ParticleEmitterResource* res = (ParticleEmitterResource*)material_manager->load(Path(tmp));
+		ResourceManagerHub& manager = m_engine.getResourceManager();
+		ParticleEmitterResource* res = manager.load<ParticleEmitterResource>(Path(tmp));
 		emitter->setResource(res);
 
 		m_particle_emitters.insert(entity, emitter);
@@ -1257,9 +1256,9 @@ public:
 	{
 		int count;
 		serializer.read(count);
-		FontManager& manager = m_renderer.getFontManager();
-		for (int i = 0; i < count; ++i)
-		{
+		ResourceManagerHub& manager = m_renderer.getEngine().getResourceManager();
+		
+		for (int i = 0; i < count; ++i) {
 			EntityRef e;
 			serializer.read(e);
 			TextMesh& text = *LUMIX_NEW(m_allocator, TextMesh)(m_allocator);
@@ -1271,7 +1270,7 @@ public:
 			serializer.read(font_size);
 			text.setFontSize(font_size);
 			serializer.read(text.text);
-			FontResource* res = tmp[0] ? (FontResource*)manager.load(Path(tmp)) : nullptr;
+			FontResource* res = tmp[0] ? manager.load<FontResource>(Path(tmp)) : nullptr;
 			text.setFontResource(res);
 			m_universe.onComponentCreated(e, TEXT_MESH_TYPE, this);
 		}
@@ -1280,7 +1279,7 @@ public:
 
 	void deserializeDecals(InputBlob& serializer)
 	{
-		ResourceManagerBase* material_manager = m_engine.getResourceManager().get(Material::TYPE);
+		ResourceManagerHub& manager = m_engine.getResourceManager();
 		int count;
 		serializer.read(count);
 		m_decals.reserve(count);
@@ -1291,7 +1290,7 @@ public:
 			serializer.read(decal.entity);
 			serializer.read(decal.scale);
 			serializer.readString(tmp, lengthOf(tmp));
-			decal.material = tmp[0] == '\0' ? nullptr : static_cast<Material*>(material_manager->load(Path(tmp)));
+			decal.material = tmp[0] == '\0' ? nullptr : manager.load<Material>(Path(tmp));
 			updateDecalInfo(decal);
 			m_decals.insert(decal.entity, decal);
 			m_universe.onComponentCreated(decal.entity, DECAL_TYPE, this);
@@ -1334,7 +1333,7 @@ public:
 		i32 count;
 		serializer.read(count);
 		m_environment_probes.reserve(count);
-		auto* texture_manager = m_engine.getResourceManager().get(Texture::TYPE);
+		ResourceManagerHub& manager = m_engine.getResourceManager();
 		StaticString<MAX_PATH_LENGTH> probe_dir("universes/", m_universe.getName(), "/probes/");
 		for (int i = 0; i < count; ++i)
 		{
@@ -1350,17 +1349,17 @@ public:
 			if (probe.flags.isSet(EnvironmentProbe::REFLECTION))
 			{
 				StaticString<MAX_PATH_LENGTH> path_str(probe_dir, probe.guid, ".dds");
-				probe.texture = static_cast<Texture*>(texture_manager->load(Path(path_str)));
+				probe.texture = manager.load<Texture>(Path(path_str));
 				probe.texture->setFlag(Texture::Flags::SRGB, true);
 			}
 			StaticString<MAX_PATH_LENGTH> irr_path_str(probe_dir, probe.guid, "_irradiance.dds");
-			probe.irradiance = static_cast<Texture*>(texture_manager->load(Path(irr_path_str)));
+			probe.irradiance = manager.load<Texture>(Path(irr_path_str));
 			probe.irradiance->setFlag(Texture::Flags::SRGB, true);
 			// TODO
 			//probe.irradiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
 			//probe.irradiance->setFlag(BGFX_TEXTURE_MAG_ANISOTROPIC, true);
 			StaticString<MAX_PATH_LENGTH> r_path_str(probe_dir, probe.guid, "_radiance.dds");
-			probe.radiance = static_cast<Texture*>(texture_manager->load(Path(r_path_str)));
+			probe.radiance = manager.load<Texture>(Path(r_path_str));
 			probe.radiance->setFlag(Texture::Flags::SRGB, true);
 			// TODO//probe.radiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
 			//probe.radiance->setFlag(BGFX_TEXTURE_MAG_ANISOTROPIC, true);
@@ -1478,7 +1477,7 @@ public:
 
 				if (path != 0)
 				{
-					auto* model = static_cast<Model*>(m_engine.getResourceManager().get(Model::TYPE)->load(Path(path)));
+					auto* model = m_engine.getResourceManager().load<Model>(Path(path));
 					setModel(e, model);
 				}
 
@@ -1889,7 +1888,7 @@ public:
 	{
 		if (path.isValid())
 		{
-			Material* material = static_cast<Material*>(m_engine.getResourceManager().get(Material::TYPE)->load(path));
+			Material* material = m_engine.getResourceManager().load<Material>(path);
 			m_terrains[entity]->setMaterial(material);
 		}
 		else
@@ -1929,18 +1928,15 @@ public:
 
 	void setDecalMaterialPath(EntityRef entity, const Path& path) override
 	{
-		ResourceManagerBase* material_manager = m_engine.getResourceManager().get(Material::TYPE);
 		Decal& decal = m_decals[entity];
-		if (decal.material)
-		{
-			material_manager->unload(*decal.material);
+		if (decal.material) {
+			decal.material->getResourceManager().unload(*decal.material);
 		}
-		if (path.isValid())
-		{
-			decal.material = static_cast<Material*>(material_manager->load(path));
+
+		if (path.isValid()) {
+			decal.material = m_engine.getResourceManager().load<Material>(path);
 		}
-		else
-		{
+		else {
 			decal.material = nullptr;
 		}
 	}
@@ -2062,14 +2058,11 @@ public:
 	{
 		ModelInstance& r = m_model_instances[entity.index];
 
-		auto* manager = m_engine.getResourceManager().get(Model::TYPE);
-		if (path.isValid())
-		{
-			Model* model = static_cast<Model*>(manager->load(path));
+		if (path.isValid()) {
+			Model* model = m_engine.getResourceManager().load<Model>(path);
 			setModel(entity, model);
 		}
-		else
-		{
+		else {
 			setModel(entity, nullptr);
 		}
 		r.matrix = m_universe.getMatrix(entity);
@@ -3746,14 +3739,13 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		auto& r = m_model_instances[entity.index];
 		if (r.meshes && r.mesh_count > index && r.meshes[index].material && path == r.meshes[index].material->getPath()) return;
 
-		auto& rm = r.model->getResourceManager();
-		auto* material_manager = static_cast<MaterialManager*>(rm.getOwner().get(Material::TYPE));
+		auto& rm = r.model->getResourceManager().getOwner();
 
 		int new_count = Math::maximum(i8(index + 1), r.mesh_count);
 		allocateCustomMeshes(r, new_count);
 		ASSERT(r.meshes);
 
-		auto* new_material = static_cast<Material*>(material_manager->load(path));
+		auto* new_material = rm.load<Material>(path);
 		r.meshes[index].setMaterial(new_material, *r.model, m_renderer);
 	}
 
@@ -3917,12 +3909,12 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	void createEnvironmentProbe(EntityRef entity)
 	{
 		EnvironmentProbe& probe = m_environment_probes.insert(entity);
-		auto* texture_manager = m_engine.getResourceManager().get(Texture::TYPE);
-		probe.texture = static_cast<Texture*>(texture_manager->load(Path("models/common/default_probe.dds")));
+		ResourceManagerHub& rm = m_engine.getResourceManager();
+		probe.texture = rm.load<Texture>(Path("models/common/default_probe.dds"));
 		probe.texture->setFlag(Texture::Flags::SRGB, true);
-		probe.irradiance = static_cast<Texture*>(texture_manager->load(Path("models/common/default_probe.dds")));
+		probe.irradiance = rm.load<Texture>(Path("models/common/default_probe.dds"));
 		probe.irradiance->setFlag(Texture::Flags::SRGB, true);
-		probe.radiance = static_cast<Texture*>(texture_manager->load(Path("models/common/default_probe.dds")));
+		probe.radiance = rm.load<Texture>(Path("models/common/default_probe.dds"));
 		probe.radiance->setFlag(Texture::Flags::SRGB, true);
 		probe.guid = Math::randGUID();
 
@@ -3967,8 +3959,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	{
 		if (!m_particle_emitters[entity]) return;
 
-		auto* manager = m_engine.getResourceManager().get(ParticleEmitterResource::TYPE);
-		ParticleEmitterResource* res = static_cast<ParticleEmitterResource*>(manager->load(path));
+		ParticleEmitterResource* res = m_engine.getResourceManager().load<ParticleEmitterResource>(path);
 		m_particle_emitters[entity]->setResource(res);
 	}
 
