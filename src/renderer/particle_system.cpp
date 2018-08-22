@@ -1,6 +1,7 @@
 #include "particle_system.h"
 #include "engine/blob.h"
 #include "engine/crc32.h"
+#include "engine/lua_wrapper.h"
 #include "engine/math_utils.h"
 #include "engine/profiler.h"
 #include "engine/reflection.h"
@@ -13,10 +14,39 @@
 #include "renderer/render_scene.h"
 #include "engine/universe/universe.h"
 #include <cmath>
+#include <cstring>
 
 
 namespace Lumix
 {
+
+
+Resource* ParticleEmitterResourceManager::createResource(const Path& path)
+{
+	return LUMIX_NEW(m_allocator, ParticleEmitterResource)(path, *this, m_allocator);
+}
+
+
+void ParticleEmitterResourceManager::destroyResource(Resource& resource)
+{
+	LUMIX_DELETE(m_allocator, static_cast<ParticleEmitterResource*>(&resource));
+}
+
+
+const ResourceType ParticleEmitterResource::TYPE = ResourceType("particle_emitter");
+
+
+ParticleEmitterResource::ParticleEmitterResource(const Path& path, ResourceManagerBase& manager, IAllocator& allocator)
+	: Resource(path, manager, allocator)
+	, m_bytecode(allocator)
+{
+}
+
+
+void ParticleEmitterResource::unload()
+{
+	m_bytecode.clear();
+}
 
 
 enum class InstructionArgType : u8
@@ -32,15 +62,17 @@ enum class Instructions : u8
 {
 	END,
 	ADD,
+	COS,
+	SIN,
 	ADD_CONST,
 	SUB,
 	SUB_CONST,
+	MUL,
 	MULTIPLY_ADD,
 	MULTIPLY_CONST_ADD,
 	LT,
 	OUTPUT,
 	OUTPUT_CONST,
-	MOV_CONST,
 	MOV,
 	RAND,
 	KILL,
@@ -48,112 +80,325 @@ enum class Instructions : u8
 };
 
 
-ScriptedParticleEmitter::ScriptedParticleEmitter(EntityPtr entity, IAllocator& allocator)
+struct Compiler
+{
+	struct DataStream
+	{
+		enum Type : u8 {
+			CHANNEL,
+			CONST,
+			REGISTER,
+			LITERAL
+		};
+
+		Type type;
+		u8 index; // in the group of the same typed streams
+		float value;
+	};
+
+	Compiler(OutputBlob& bytecode) 
+		: m_bytecode(bytecode) 
+	{
+		m_streams[0].type = DataStream::CONST;
+		m_streams[0].index = 0;
+		++m_streams_count;
+		++m_constants_count;
+	}
+
+	static Compiler* getCompiler(lua_State* L)
+	{
+		lua_getfield(L, LUA_GLOBALSINDEX, "this");
+		Compiler* compiler = (Compiler*)lua_touserdata(L, -1);
+		lua_pop(L, 1);
+		return compiler;
+	}
+
+	DataStream getDataStream(lua_State* L, int index) const
+	{
+		const int ds_idx = LuaWrapper::checkArg<int>(L, index);
+		return m_streams[ds_idx];
+	}
+
+	static int newChannel(lua_State* L)
+	{
+		Compiler* c = getCompiler(L);
+
+		c->m_streams[c->m_streams_count].type = DataStream::CHANNEL;
+		c->m_streams[c->m_streams_count].index = c->m_channels_count;
+
+		lua_pushinteger(L, c->m_streams_count);
+
+		++c->m_channels_count;
+		++c->m_streams_count;
+
+		return 1;
+	}
+	
+
+	static int newRegister(lua_State* L)
+	{
+		Compiler* c = getCompiler(L);
+
+		c->m_streams[c->m_streams_count].type = DataStream::REGISTER;
+		c->m_streams[c->m_streams_count].index = c->m_registers_count;
+
+		lua_pushinteger(L, c->m_streams_count);
+		
+		++c->m_registers_count;
+		++c->m_streams_count;
+
+		return 1;
+	}
+	
+
+	static int newLiteral(lua_State* L)
+	{
+		Compiler* c = getCompiler(L);
+		const float value = LuaWrapper::checkArg<float>(L, 1);
+
+		c->m_streams[c->m_streams_count].type = DataStream::LITERAL;
+		c->m_streams[c->m_streams_count].index = c->m_literals_count;
+		c->m_streams[c->m_streams_count].value = value;
+
+		lua_pushinteger(L, c->m_streams_count);
+		
+		++c->m_literals_count;
+		++c->m_streams_count;
+
+		return 1;
+	}
+	
+	
+	static void writeUnaryInstruction(Instructions instruction, lua_State* L)
+	{
+		Compiler* c = getCompiler(L);
+		c->m_bytecode.write(instruction);
+		
+		const DataStream dst = c->getDataStream(L, 1);
+		const DataStream arg = c->getDataStream(L, 2);
+
+		c->m_bytecode.write(dst.type);
+		c->m_bytecode.write(dst.index);
+		c->m_bytecode.write(arg.type);
+		c->m_bytecode.write(arg.index);
+	}
+	
+	
+	static void writeBinaryInstruction(Instructions instruction, lua_State* L)
+	{
+		Compiler* c = getCompiler(L);
+		c->m_bytecode.write(instruction);
+		
+		const DataStream dst = c->getDataStream(L, 1);
+		const DataStream arg0 = c->getDataStream(L, 2);
+		const DataStream arg1 = c->getDataStream(L, 3);
+
+		c->m_bytecode.write(dst.type);
+		c->m_bytecode.write(dst.index);
+		c->m_bytecode.write(arg0.type);
+		c->m_bytecode.write(arg0.index);
+		c->m_bytecode.write(arg1.type);
+		c->m_bytecode.write(arg1.index);
+	}
+
+	static int sin(lua_State* L)
+	{
+		writeUnaryInstruction(Instructions::SIN, L);
+		return 0;
+	}
+
+
+	static int cos(lua_State* L)
+	{
+		writeUnaryInstruction(Instructions::COS, L);
+		return 0;
+	}
+
+
+	static int mul(lua_State* L)
+	{
+		writeBinaryInstruction(Instructions::MUL, L);
+		return 0;
+	}
+
+
+	static int mov(lua_State* L)
+	{
+		writeUnaryInstruction(Instructions::MOV, L);
+		return 0;
+	}
+
+
+	static int add(lua_State* L)
+	{
+		writeBinaryInstruction(Instructions::ADD, L);
+		return 0;
+	}
+
+
+	static int out(lua_State* L)
+	{
+		Compiler* c = getCompiler(L);
+		c->m_bytecode.write(Instructions::OUTPUT);
+		const DataStream src = c->getDataStream(L, 1);
+		c->m_bytecode.write(src.type);
+		c->m_bytecode.write(src.index);
+		++c->m_outputs_count;
+		return 0;
+	}
+
+
+	DataStream m_streams[64];
+	int m_streams_count = 0;
+	int m_channels_count = 0;
+	int m_registers_count = 0;
+	int m_literals_count = 0;
+	int m_constants_count = 0;
+	int m_outputs_count = 0;
+	int m_bytecode_offset = 0;
+	OutputBlob& m_bytecode;
+	bool m_error = false;
+};
+
+
+bool ParticleEmitterResource::load(FS::IFile& file)
+{
+	// TODO reuse state
+	lua_State* L = luaL_newstate();
+
+	Compiler compiler(m_bytecode);
+
+	lua_pushlightuserdata(L, &compiler);
+	lua_setfield(L, LUA_GLOBALSINDEX, "this");
+
+	#define DEFINE_LUA_FUNC(name) \
+		lua_pushcclosure(L, Compiler::name, 0); \
+		lua_setfield(L, LUA_GLOBALSINDEX, #name);
+
+	DEFINE_LUA_FUNC(newChannel);
+	DEFINE_LUA_FUNC(newRegister);
+	DEFINE_LUA_FUNC(newLiteral);
+
+	DEFINE_LUA_FUNC(mov);
+
+	DEFINE_LUA_FUNC(add);
+	DEFINE_LUA_FUNC(mul);
+	DEFINE_LUA_FUNC(cos);
+	DEFINE_LUA_FUNC(sin);
+
+	DEFINE_LUA_FUNC(out);
+
+	#undef DEFINE_LUA_FUNC
+
+	if(luaL_loadbuffer(L, (const char*)file.getBuffer(), file.size(), getPath().c_str()) != 0) {
+		g_log_error.log("Renderer") << lua_tostring(L, -1);
+		lua_pop(L, 1);
+		lua_close(L);
+		return false;
+	}
+
+	if (lua_pcall(L, 0, 0, 0) != 0) {
+		g_log_error.log("Renderer") << lua_tostring(L, -1);
+		lua_pop(L, 1);
+		lua_close(L);
+		return false;
+	}
+
+	lua_getfield(L, LUA_GLOBALSINDEX, "update");
+	if(lua_isfunction(L, -1)) {
+		lua_pushinteger(L, 0);
+		if(lua_pcall(L, 1, 0, 0) != 0) {
+			g_log_error.log("Renderer") << lua_tostring(L, -1);
+			lua_pop(L, 1);
+			lua_close(L);
+			return false;
+		}
+	}
+	lua_pop(L, 1);
+	compiler.m_bytecode.write(Instructions::END);
+	m_emit_byte_offset = compiler.m_bytecode.getPos();
+
+	lua_getfield(L, LUA_GLOBALSINDEX, "emit");
+	if(lua_isfunction(L, -1)) {
+		if(lua_pcall(L, 0, 0, 0) != 0) {
+			g_log_error.log("Renderer") << lua_tostring(L, -1);
+			lua_pop(L, 1);
+			lua_close(L);
+			return false;
+		}
+	}
+	lua_pop(L, 1);
+	compiler.m_bytecode.write(Instructions::END);
+	m_channels_count = compiler.m_channels_count;
+	m_registers_count = compiler.m_registers_count;
+	m_outputs_count = compiler.m_outputs_count;
+
+	int num_literals = 0;
+	for(int i = 0; i < compiler.m_streams_count; ++i) {
+		if(compiler.m_streams[i].type == Compiler::DataStream::LITERAL) {
+			m_literals[num_literals] = compiler.m_streams[i].value;
+			++num_literals;
+		}
+	}
+	
+	lua_close(L);
+	return true;
+}
+
+
+
+ParticleEmitter::ParticleEmitter(EntityPtr entity, IAllocator& allocator)
 	: m_allocator(allocator)
-	, m_bytecode(allocator)
 	, m_entity(entity)
 	, m_emit_buffer(allocator)
+	, m_instance_data(allocator)
 {
-	compile(
-		"constants {"
-		"	 gravity_times_td -0.16\n"
-		"}\n"
-
-		"channels {"
-		"	pos_x\n"
-		"	pos_y\n"
-		"	pos_z\n"
-		"	vel_x\n"
-		"	vel_y\n"
-		"	vel_z\n"
-		"}\n"
-
-		"emit {\n"
-		"	mov pos_x 0\n"
-		"	mov pos_y 0\n"
-		"	mov pos_z 0\n"
-		"	rand vel_x -10 10\n"
-		"	mov vel_y 20\n"
-		"	rand vel_z -10 10\n"
-		"	add pos_x pos_x $0\n"
-		"	add pos_y pos_y $1\n"
-		"	add pos_z pos_z $2\n"
-		"}\n"
-
-		"update {\n"
-		"	add vel_y vel_y gravity_times_td\n"
-		"	madd pos_x vel_x time_delta pos_x\n"
-		"	madd pos_y vel_y time_delta pos_y\n"
-		"	madd pos_z vel_z time_delta pos_z\n"
-		"	lt pos_y {\n"
-		"		doemit { pos_x pos_y pos_z }\n"
-		"		doemit { pos_x pos_y pos_z }\n"
-		"		doemit { pos_x pos_y pos_z }\n"
-		"		doemit { pos_x pos_y pos_z }\n"
-		"		doemit { pos_x pos_y pos_z }\n"
-		"		dokill\n"
-		"	}\n"
-		"}\n"
-
-		"output {"
-		"	pos_x\n"
-		"	pos_y\n"
-		"	pos_z\n"
-		"	1.0\n"
-		"	1.0\n"
-		"	0.0\n"
-		"}\n"
-	);
-	
-	float tmp[] = { 0, 0, 0 };
-	for(int i = 0; i < 10; ++i)
-		emit(tmp);
 }
 
 
-ScriptedParticleEmitter::~ScriptedParticleEmitter()
+ParticleEmitter::~ParticleEmitter()
 {
-	for (int i = 0; i < m_channels_count; ++i)
-	{
-		m_allocator.deallocate_aligned(m_channels[i].data);
+	for (const Channel& c : m_channels) {
+		m_allocator.deallocate_aligned(c.data);
 	}
 }
 
 
-void ScriptedParticleEmitter::setMaterial(Material* material)
+void ParticleEmitter::setResource(ParticleEmitterResource* res)
 {
-	if (m_material)
-	{
-		m_material->getResourceManager().unload(*m_material);
+	if (m_resource) {
+		m_resource->getResourceManager().unload(*m_resource);
 	}
-	m_material = material;
+	m_resource = res;
 }
 
 
-void ScriptedParticleEmitter::emit(const float* args)
+void ParticleEmitter::emit(const float* args)
 {
+	const int channels_count = m_resource->getChannelsCount();
 	if (m_particles_count == m_capacity)
 	{
 		int new_capacity = Math::maximum(16, m_capacity << 1);
-		for (int i = 0; i < m_channels_count; ++i)
+		for (int i = 0; i < channels_count; ++i)
 		{
 			m_channels[i].data = (float*)m_allocator.reallocate_aligned(m_channels[i].data, new_capacity * sizeof(float), 16);
 		}
 		m_capacity = new_capacity;
 	}
 
-	InputBlob blob(&m_bytecode[m_emit_bytecode_offset], m_bytecode.size() - m_emit_bytecode_offset);
+
+	const OutputBlob& bytecode = m_resource->getBytecode();
+	const u8* emit_bytecode = (const u8*)bytecode.getData() + m_resource->getEmitByteOffset();
+	InputBlob blob(emit_bytecode, bytecode.getPos() - m_resource->getEmitByteOffset());
 	for (;;)
 	{
-		u8 instruction = blob.read<u8>();
-		u8 flag = blob.read<u8>();
+		const u8 instruction = blob.read<u8>();
 		switch((Instructions)instruction)
 		{
 			case Instructions::END:
 				++m_particles_count;
 				return;
-			case Instructions::ADD:
-			{
+			/*case Instructions::ADD: {
 				ASSERT((flag & 3) == (u8)InstructionArgType::CHANNEL);
 				ASSERT(((flag >> 2) & 3) == (u8)InstructionArgType::CHANNEL);
 				ASSERT(((flag >> 4) & 3) == (u8)InstructionArgType::REGISTER);
@@ -162,18 +407,19 @@ void ScriptedParticleEmitter::emit(const float* args)
 				u8 arg_idx = blob.read<u8>();
 				m_channels[result_ch].data[m_particles_count] = m_channels[op1_ch].data[m_particles_count] + args[arg_idx];
 				break;
-			}
-			case Instructions::MOV:
-			{
-				ASSERT((flag & 3) == (u8)InstructionArgType::CHANNEL);
-				ASSERT(((flag >> 2) & 3) == (u8)InstructionArgType::LITERAL);
-				u8 ch = blob.read<u8>();
-				float value = blob.read<float>();
-				m_channels[ch].data[m_particles_count] = value;
+			}*/
+			case Instructions::MOV: {
+				const auto dst_type = blob.read<Compiler::DataStream::Type>();
+				u8 dst_idx = blob.read<u8>();
+				const auto src_type = blob.read<Compiler::DataStream::Type>();
+				u8 src_idx = blob.read<u8>();
+				ASSERT(src_type == Compiler::DataStream::LITERAL);
+				ASSERT(dst_type == Compiler::DataStream::CHANNEL);
+				const float value = m_resource->getLiteralValue(src_idx);
+				m_channels[dst_idx].data[m_particles_count] = value;
 				break;
 			}
-			case Instructions::RAND:
-			{
+			/*case Instructions::RAND: {
 				ASSERT((flag & 3) == (u8)InstructionArgType::CHANNEL);
 				ASSERT(((flag >> 2) & 3) == (u8)InstructionArgType::LITERAL);
 				ASSERT(((flag >> 4) & 3) == (u8)InstructionArgType::LITERAL);
@@ -182,7 +428,7 @@ void ScriptedParticleEmitter::emit(const float* args)
 				float to = blob.read<float>();
 				m_channels[ch].data[m_particles_count] = Math::randFloat(from, to);
 				break;
-			}
+			}*/
 			default:
 				ASSERT(false);
 				break;
@@ -193,290 +439,30 @@ void ScriptedParticleEmitter::emit(const float* args)
 static bool isWhitespace(char c) { return c == ' ' || c == '\n' || c == '\r' || c == '\t'; }
 
 
-int ScriptedParticleEmitter::getChannel(const char* name) const
-{
-	u32 hash = crc32(name);
-	for (int i = 0; i < m_channels_count; ++i)
-	{
-		if (m_channels[i].name == hash) return i;
-	}
-	return -1;
-}
-
-
-int ScriptedParticleEmitter::getConstant(const char* name) const
-{
-	u32 hash = crc32(name);
-	for (int i = 0; i < m_constants_count; ++i)
-	{
-		if (m_constants[i].name == hash) return i;
-	}
-	return -1;
-}
-
-
-void ScriptedParticleEmitter::serialize(OutputBlob& blob)
+void ParticleEmitter::serialize(OutputBlob& blob)
 {
 	blob.write(m_entity);
-	blob.writeString(m_material ? m_material->getPath().c_str() : "");
+	blob.writeString(m_resource ? m_resource->getPath().c_str() : "");
 }
 
 
-void ScriptedParticleEmitter::deserialize(InputBlob& blob, ResourceManager& manager)
+void ParticleEmitter::deserialize(InputBlob& blob, ResourceManager& manager)
 {
 	blob.read(m_entity);
 	char path[MAX_PATH_LENGTH];
 	blob.readString(path, lengthOf(path));
-	auto material_manager = manager.get(Material::TYPE);
-	auto material = static_cast<Material*>(material_manager->load(Path(path)));
-	setMaterial(material);
+	ResourceManagerBase* material_manager = manager.get(ParticleEmitterResource::TYPE);
+	auto res = static_cast<ParticleEmitterResource*>(material_manager->load(Path(path)));
+	setResource(res);
 }
 
 
-struct ParseContext
-{
-	OutputBlob* current_blob;
-	OutputBlob* output_blob;
-	OutputBlob* update_blob;
-	OutputBlob* emit_blob;
-	const char* in;
-};
-
-
-static void getWord(ParseContext& ctx, char(&out)[32])
-{
-	while (*ctx.in && isWhitespace(*ctx.in)) ++ctx.in;
-	char* o = out;
-	while (*ctx.in && !isWhitespace(*ctx.in) && o - out < lengthOf(out) - 1)
-	{
-		*o = *ctx.in;
-		++o;
-		++ctx.in;
-	}
-	*o = '\0';
-}
-
-struct {
-	const char* instruction;
-	Instructions opcode;
-	int params_count;
-	bool is_compound;
-	bool is_variadic;
-} INSTRUCTIONS[] = {
-	{ "madd", Instructions::MULTIPLY_ADD, 4, false, false },
-	{ "add", Instructions::ADD, 3, false, false },
-	{ "sub", Instructions::SUB, 3, false, false },
-	{ "dokill", Instructions::KILL, 0, false, false },
-	{ "mov", Instructions::MOV, 2, false, false },
-	{ "rand", Instructions::RAND, 3, false, false },
-	{ "lt", Instructions::LT, 1, true, false },
-	{ "doemit", Instructions::EMIT, 0, false, true }
-};
-
-
-void ScriptedParticleEmitter::parseInstruction(const char* instruction, ParseContext& ctx)
-{
-	for (const auto& instr : INSTRUCTIONS)
-	{
-		ASSERT(instr.params_count <= 4); // flags are big enough only for 4 params
-		if (equalIStrings(instruction, instr.instruction))
-		{
-			ctx.current_blob->write(instr.opcode);
-			int flags_offset = ctx.current_blob->getPos();
-			ctx.current_blob->write((u8)0);
-			u8 flags = 0;
-			char tmp[32];
-			for (int i = 0; i < instr.params_count; ++i)
-			{
-				getWord(ctx, tmp);
-				int ch = getChannel(tmp);
-				int constant = getConstant(tmp);
-				if (ch >= 0)
-				{
-					flags |= ((u8)InstructionArgType::CHANNEL) << (i * 2);
-					ctx.current_blob->write((u8)ch);
-				}
-				else if (constant >= 0)
-				{
-					flags |= ((u8)InstructionArgType::CONSTANT) << (i * 2);
-					ctx.current_blob->write((u8)constant);
-				}
-				else if (tmp[0] == '$')
-				{
-					flags |= ((u8)InstructionArgType::REGISTER) << (i * 2);
-					ctx.current_blob->write(tmp[1] - '0');
-				}
-				else if ((tmp[0] >= '0' && tmp[0] <= '9') || tmp[0] == '-')
-				{
-					flags |= ((u8)InstructionArgType::LITERAL) << (i * 2);
-					float f = (float)atof(tmp);
-					ctx.current_blob->write(f);
-				}
-			}
-			*((u8*)ctx.current_blob->getMutableData() + flags_offset) = flags;
-			if (instr.is_compound)
-			{
-				int size_pos = ctx.current_blob->getPos();
-				ctx.current_blob->write((u8)0);
-				getWord(ctx, tmp);
-				ASSERT(equalStrings(tmp, "{"));
-				getWord(ctx, tmp);
-				while (!equalStrings(tmp, "}"))
-				{
-					parseInstruction(tmp, ctx);
-					getWord(ctx, tmp);
-				}
-				ctx.current_blob->write(Instructions::END);
-				ctx.current_blob->write((u8)0);
-				*((u8*)ctx.current_blob->getMutableData() + size_pos) = u8(ctx.current_blob->getPos() - size_pos - 1);
-			}
-			if (instr.is_variadic)
-			{
-				int count_pos = ctx.current_blob->getPos();
-				ctx.current_blob->write((u8)0);
-				getWord(ctx, tmp);
-				ASSERT(equalStrings(tmp, "{"));
-				getWord(ctx, tmp);
-				int count = 0;
-				while (!equalStrings(tmp, "}"))
-				{
-					ctx.current_blob->write((u8)getChannel(tmp));
-					++count;
-					getWord(ctx, tmp);
-				}
-				*((u8*)ctx.current_blob->getMutableData() + count_pos) = count;
-			}
-			return;
-		}
-	}
-}
-
-
-void ScriptedParticleEmitter::compile(const char* code)
-{
-	m_constants_count = 1;
-	m_constants[0].name = crc32("time_delta");
-
-	OutputBlob update_blob(m_allocator);
-	OutputBlob output_blob(m_allocator);
-	OutputBlob emit_blob(m_allocator);
-
-	ParseContext ctx;
-	ctx.in = code;
-	ctx.update_blob = &update_blob;
-	ctx.output_blob = &output_blob;
-	ctx.emit_blob = &emit_blob;
-
-	while (*ctx.in)
-	{
-		char instruction[32];
-		getWord(ctx, instruction);
-		if (equalStrings(instruction, "constants"))
-		{
-			char tmp[32];
-			getWord(ctx, tmp);
-			ASSERT(equalStrings(tmp, "{"));
-
-			getWord(ctx, tmp);
-			while (!equalStrings(tmp, "}"))
-			{
-				m_constants[m_constants_count].name = crc32(tmp);
-				getWord(ctx, tmp);
-				m_constants[m_constants_count].value = (float)atof(tmp);
-				++m_constants_count;
-				getWord(ctx, tmp);
-			}
-		}
-		else if (equalStrings(instruction, "channels"))
-		{
-			char tmp[32];
-			getWord(ctx, tmp);
-			ASSERT(equalStrings(tmp, "{"));
-
-			getWord(ctx, tmp);
-			while (!equalStrings(tmp, "}"))
-			{
-				m_channels[m_channels_count].name = crc32(tmp);
-				++m_channels_count;
-				getWord(ctx, tmp);
-			}
-		}
-		else if (equalStrings(instruction, "output"))
-		{
-			char tmp[32];
-			getWord(ctx, tmp);
-			ASSERT(equalStrings(tmp, "{"));
-
-			getWord(ctx, tmp);
-			while (!equalStrings(tmp, "}"))
-			{
-				int idx = getChannel(tmp);
-				++m_outputs_per_particle;
-				if (idx < 0)
-				{
-					float constant = (float)atof(tmp);
-					ctx.output_blob->write(Instructions::OUTPUT_CONST);
-					ctx.output_blob->write(constant);
-				}
-				else
-				{
-					ctx.output_blob->write(Instructions::OUTPUT);
-					ctx.output_blob->write((u8)idx);
-				}
-				getWord(ctx, tmp);
-			}
-		}
-		else if (equalStrings(instruction, "update"))
-		{
-			ctx.current_blob = ctx.update_blob;
-			getWord(ctx, instruction);
-			ASSERT(equalStrings(instruction, "{"));
-
-			getWord(ctx, instruction);
-			while (!equalStrings(instruction, "}"))
-			{
-				parseInstruction(instruction, ctx);
-				getWord(ctx, instruction);
-			}
-		}
-		else if (equalStrings(instruction, "emit"))
-		{
-			ctx.current_blob = ctx.emit_blob;
-
-			getWord(ctx, instruction);
-			ASSERT(equalStrings(instruction, "{"));
-
-			getWord(ctx, instruction);
-			while (!equalStrings(instruction, "}"))
-			{
-				parseInstruction(instruction, ctx);
-				getWord(ctx, instruction);
-			}
-		}
-	}
-	
-	update_blob.write(Instructions::END);
-	update_blob.write((u8)0);
-	output_blob.write(Instructions::END);
-	output_blob.write((u8)0);
-	emit_blob.write(Instructions::END);
-	emit_blob.write((u8)0);
-
-	m_bytecode.resize(update_blob.getPos() + output_blob.getPos() + emit_blob.getPos());
-	m_output_bytecode_offset = update_blob.getPos();
-	m_emit_bytecode_offset = m_output_bytecode_offset + output_blob.getPos();
-	copyMemory(&m_bytecode[0], ctx.update_blob->getData(), ctx.update_blob->getPos());
-	copyMemory(&m_bytecode[m_output_bytecode_offset], output_blob.getData(), output_blob.getPos());
-	copyMemory(&m_bytecode[m_emit_bytecode_offset], emit_blob.getData(), emit_blob.getPos());
-}
-
-
-void ScriptedParticleEmitter::kill(int particle_index)
+void ParticleEmitter::kill(int particle_index)
 {
 	if (particle_index >= m_particles_count) return;
+	const int channels_count = m_resource->getChannelsCount();
 	int last = m_particles_count - 1;
-	for (int i = 0; i < m_channels_count; ++i)
-	{
+	for (int i = 0; i < channels_count; ++i) {
 		float* data = m_channels[i].data;
 		data[particle_index] = data[last];
 	}
@@ -484,7 +470,7 @@ void ScriptedParticleEmitter::kill(int particle_index)
 }
 
 
-void ScriptedParticleEmitter::execute(InputBlob& blob, int particle_index)
+void ParticleEmitter::execute(InputBlob& blob, int particle_index)
 {
 	if (particle_index >= m_particles_count) return;
 	for (;;)
@@ -521,120 +507,113 @@ void ScriptedParticleEmitter::execute(InputBlob& blob, int particle_index)
 }
 
 
-void ScriptedParticleEmitter::update(float dt)
+static float4* getStream(ParticleEmitter& emitter
+	, Compiler::DataStream::Type type
+	, int idx
+	, int particles_count
+	, float4* register_mem)
 {
+	switch(type) {
+		case Compiler::DataStream::CHANNEL: return (float4*)emitter.getChannelData(idx);
+		case Compiler::DataStream::REGISTER: return register_mem + particles_count * idx;
+		default: ASSERT(false); return nullptr;
+	}
+}
+
+
+void ParticleEmitter::update(float dt)
+{
+	if (!m_resource || !m_resource->isReady()) return;
+
+	emit(nullptr); // TODO remove
+
 	PROFILE_FUNCTION();
 	PROFILE_INT("particle count", m_particles_count);
 	if (m_particles_count == 0) return;
 
 	m_emit_buffer.clear();
 	m_constants[0].value = dt;
-	InputBlob blob(&m_bytecode[0], m_bytecode.size());
+	const OutputBlob& bytecode = m_resource->getBytecode();
+	InputBlob blob(bytecode.getData(), bytecode.getPos());
+	// TODO
+	Array<float4> reg_mem(m_allocator);
+	reg_mem.resize(m_resource->getRegistersCount() * ((m_particles_count + 3) >> 2));
+	m_instance_data.resize(m_particles_count * m_resource->getOutputsCount() * 4);
+	int output_idx = 0;
 
 	for (;;)
 	{
 		u8 instruction = blob.read<u8>();
-		u8 flag = blob.read<u8>();
 		switch ((Instructions)instruction)
 		{
 			case Instructions::END:
 				goto end;
-			case Instructions::LT:
-			{
-				ASSERT(((flag >> 0) & 3) == (u8)InstructionArgType::CHANNEL);
-				u8 ch = blob.read<u8>();
-				u8 size = blob.read<u8>();
-				const float4* iter = (float4*)m_channels[ch].data;
-				const float4* end = iter + ((m_particles_count + 3) >> 2);
-				InputBlob subblob((u8*)blob.getData() + blob.getPosition(), blob.getSize() - blob.getPosition());
-				for (; iter != end; ++iter)
-				{
-					int m = f4MoveMask(*iter);
-					if (m) 
-					{
-						for (int i = 0; i < 4; ++i)
-						{
-							float f = *((float*)iter + i);
-							if (f < 0)
-							{
-								subblob.rewind();
-								execute(subblob, int(((float*)iter - m_channels[ch].data) + i));
-							}
-						}
-					}
+			case Instructions::MUL: {
+				const auto dst_type = blob.read<Compiler::DataStream::Type>();
+				const u8 dst_idx = blob.read<u8>();
+				const auto arg0_type = blob.read<Compiler::DataStream::Type>();
+				const u8 arg0_idx = blob.read<u8>();
+				const auto arg1_type = blob.read<Compiler::DataStream::Type>();
+				const u8 arg1_idx = blob.read<u8>();
+				
+				// TODO
+				ASSERT(arg1_type == Compiler::DataStream::LITERAL);
+				const float4 arg1 = f4Splat(m_resource->getLiteralValue(arg1_idx));
+
+				const float4* arg0 = getStream(*this, arg0_type, arg0_idx, m_particles_count, reg_mem.begin());
+				float4* result = getStream(*this, dst_type, dst_idx, m_particles_count, reg_mem.begin());
+				const float4* const end = result + ((m_particles_count + 3) >> 2);
+
+				for (; result != end; ++result, ++arg0) {
+					*result = f4Mul(*arg0, arg1);
 				}
-				blob.skip(size);
+
 				break;
 			}
-			case Instructions::MULTIPLY_ADD:
-			{
-				ASSERT(((flag >> 0) & 3) == (u8)InstructionArgType::CHANNEL);
-				ASSERT(((flag >> 2) & 3) == (u8)InstructionArgType::CHANNEL);
-				ASSERT(((flag >> 4) & 3) == (u8)InstructionArgType::CONSTANT);
-				ASSERT(((flag >> 6) & 3) == (u8)InstructionArgType::CHANNEL);
-				u8 result_channel_idx = blob.read<u8>();
-				u8 multiply_channel_idx = blob.read<u8>();
-				u8 constant_index = blob.read<u8>();
-				u8 add_channel_idx = blob.read<u8>();
+			case Instructions::ADD: {
+				const auto dst_type = blob.read<Compiler::DataStream::Type>();
+				const u8 dst_idx = blob.read<u8>();
+				const auto arg0_type = blob.read<Compiler::DataStream::Type>();
+				const u8 arg0_idx = blob.read<u8>();
+				const auto arg1_type = blob.read<Compiler::DataStream::Type>();
+				const u8 arg1_idx = blob.read<u8>();
+				
+				// TODO
+				ASSERT(arg1_type == Compiler::DataStream::CONST && arg1_idx == 0);
+				const float4 arg1 = f4Splat(dt);
 
-				float4* result = (float4*)m_channels[result_channel_idx].data;
-				const float4* end = result + ((m_particles_count + 3) >> 2);
-				const float4* multiply = (float4*)m_channels[multiply_channel_idx].data;
-				const float4* add = (float4*)m_channels[add_channel_idx].data;
-				const float4 constant = f4Splat(m_constants[constant_index].value);
-				for (; result != end; ++result, ++multiply, ++add)
-				{
-					float4 r = f4Mul(*multiply, constant);
-					*result = f4Add(r, *add);
+				const float4* arg0 = getStream(*this, arg0_type, arg0_idx, m_particles_count, reg_mem.begin());
+				float4* result = getStream(*this, dst_type, dst_idx, m_particles_count, reg_mem.begin());
+				const float4* const end = result + ((m_particles_count + 3) >> 2);
+
+				for (; result != end; ++result, ++arg0) {
+					*result = f4Add(*arg0, arg1);
 				}
+
 				break;
 			}
-			case Instructions::ADD:
-			{
-				ASSERT(((flag >> 0) & 3) == (u8)InstructionArgType::CHANNEL);
-				ASSERT(((flag >> 2) & 3) == (u8)InstructionArgType::CHANNEL);
-				u8 result_channel_idx = blob.read<u8>();
-				u8 op1_index = blob.read<u8>();
+			case Instructions::COS: {
+				const auto dst_type = blob.read<Compiler::DataStream::Type>();
+				const u8 dst_idx = blob.read<u8>();
+				const auto arg_type = blob.read<Compiler::DataStream::Type>();
+				const u8 arg_idx = blob.read<u8>();
+				
+				const float* arg = (float*)getStream(*this, arg_type, arg_idx, m_particles_count, reg_mem.begin());
+				float* result = (float*)getStream(*this, dst_type, dst_idx, m_particles_count, reg_mem.begin());
+				const float* const end = result + ((m_particles_count + 3) & ~3);
 
-				float4* result = (float4*)m_channels[result_channel_idx].data;
-				const float4* end = result + ((m_particles_count + 3) >> 2);
-				const float4* op1 = (float4*)m_channels[op1_index].data;
-				u8 op2_index = blob.read<u8>();
-				if (((flag >> 4) & 0x3) == (u8)InstructionArgType::CONSTANT)
-				{
-					const float4 constant = f4Splat(m_constants[op2_index].value);
-					for (; result != end; ++result, ++op1)
-					{
-						*result = f4Add(*op1, constant);
-					}
-				}
-				else
-				{
-					const float4* op2 = (float4*)m_channels[op2_index].data;
-					for (; result != end; ++result, ++op1, ++op2)
-					{
-						*result = f4Add(*op1, *op2);
-					}
+				for (; result != end; ++result, ++arg) {
+					*result = cosf(*arg);
 				}
 				break;
 			}
-			case Instructions::SUB:
-			{
-				ASSERT(((flag >> 0) & 3) == (u8)InstructionArgType::CHANNEL);
-				ASSERT(((flag >> 2) & 3) == (u8)InstructionArgType::CHANNEL);
-				ASSERT(((flag >> 4) & 3) == (u8)InstructionArgType::CONSTANT);
-				u8 result_channel_idx = blob.read<u8>();
-				u8 op1_channel_idx = blob.read<u8>();
-				u8 constant_index = blob.read<u8>();
-
-				float4* result = (float4*)m_channels[result_channel_idx].data;
-				const float4* end = result + ((m_particles_count + 3) >> 2);
-				const float4* multiply = (float4*)m_channels[op1_channel_idx].data;
-				const float4 constant = f4Splat(m_constants[constant_index].value);
-				for (; result != end; ++result, ++multiply)
-				{
-					*result = f4Sub(*multiply, constant);
-				}
+			case Instructions::OUTPUT: {
+				const auto arg_type = blob.read<Compiler::DataStream::Type>();
+				const u8 arg_idx = blob.read<u8>();
+				const float4* arg = getStream(*this, arg_type, arg_idx, m_particles_count, reg_mem.begin());
+				float* dst = m_instance_data.begin() + m_particles_count * 4 * output_idx;
+				++output_idx;
+				memcpy(dst, arg, m_particles_count * 4 * sizeof(float));
 				break;
 			}
 			default:
@@ -657,7 +636,7 @@ void ScriptedParticleEmitter::update(float dt)
 
 // TODO
 /*
-bgfx::InstanceDataBuffer ScriptedParticleEmitter::generateInstanceBuffer() const
+bgfx::InstanceDataBuffer ParticleEmitter::generateInstanceBuffer() const
 {
 	bgfx::InstanceDataBuffer buffer;
 	buffer.size = 0;

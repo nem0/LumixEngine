@@ -96,18 +96,7 @@ void Mesh::setMaterial(Material* new_material, Model& model, Renderer& renderer)
 	if (material) material->getResourceManager().unload(*material);
 	material = new_material;
 	layer_mask = material->getRenderLayerMask();
-	if (material->getLayersCount() > 0)
-	{
-		if (model.getBoneCount() > 0)
-		{
-			type = Mesh::MULTILAYER_SKINNED;
-		}
-		else
-		{
-			type = Mesh::MULTILAYER_RIGID;
-		}
-	}
-	else if (model.getBoneCount() > 0)
+	if (model.getBoneCount() > 0)
 	{
 		type = skin.empty() ? Mesh::RIGID_INSTANCED : Mesh::SKINNED;
 	}
@@ -330,25 +319,9 @@ static bool parseVertexDecl(FS::IFile& file, ffr::VertexDecl* vertex_decl, Mesh:
 
 void Model::onBeforeReady()
 {
-	for (Mesh& mesh : m_meshes)
-	{
+	for (Mesh& mesh : m_meshes) {
 		mesh.layer_mask = mesh.material->getRenderLayerMask();
-		if (mesh.material->getLayersCount() > 0)
-		{
-			if (getBoneCount() > 0)
-			{
-				mesh.type = Mesh::MULTILAYER_SKINNED;
-			}
-			else
-			{
-				mesh.type = Mesh::MULTILAYER_RIGID;
-			}
-		}
-		else if (getBoneCount() > 0)
-		{
-			mesh.type = mesh.skin.empty() ? Mesh::RIGID_INSTANCED : Mesh::SKINNED;
-		}
-		else mesh.type = Mesh::RIGID_INSTANCED;
+		mesh.type = getBoneCount() == 0 || mesh.skin.empty() ? Mesh::RIGID_INSTANCED : Mesh::SKINNED;
 	}
 }
 

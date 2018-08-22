@@ -26,6 +26,7 @@
 #include "renderer/model.h"
 #include "renderer/model_manager.h"
 #include "renderer/pipeline.h"
+#include "renderer/particle_system.h"
 #include "renderer/render_scene.h"
 #include "renderer/shader.h"
 #include "renderer/shader_manager.h"
@@ -285,9 +286,9 @@ static void registerProperties(IAllocator& allocator)
 			property("Radiance size", LUMIX_PROP(RenderScene, EnvironmentProbeRadianceSize)),
 			property("Irradiance size", LUMIX_PROP(RenderScene, EnvironmentProbeIrradianceSize))
 		),
-		component("scripted_particle_emitter",
-			property("Material", LUMIX_PROP(RenderScene, ScriptedParticleEmitterMaterialPath),
-				ResourceAttribute("Material (*.mat)", Material::TYPE))
+		component("particle_emitter",
+			property("Resource", LUMIX_PROP(RenderScene, ParticleEmitterPath),
+				ResourceAttribute("Particle emitter (*.par)", ParticleEmitterResource::TYPE))
 		),
 		component("camera",
 			property("Orthographic size", LUMIX_PROP(RenderScene, CameraOrthoSize), 
@@ -385,6 +386,7 @@ struct RendererImpl final : public Renderer
 		, m_allocator(engine.getAllocator())
 		, m_texture_manager(*this, m_allocator)
 		, m_model_manager(*this, m_allocator)
+		, m_particle_emitter_manager(m_allocator)
 		, m_material_manager(*this, m_allocator)
 		, m_shader_manager(*this, m_allocator)
 		, m_font_manager(nullptr)
@@ -413,6 +415,7 @@ struct RendererImpl final : public Renderer
 		m_texture_manager.create(Texture::TYPE, manager);
 		m_model_manager.create(Model::TYPE, manager);
 		m_material_manager.create(Material::TYPE, manager);
+		m_particle_emitter_manager.create(ParticleEmitterResource::TYPE, manager);
 		m_shader_manager.create(Shader::TYPE, manager);
 		m_font_manager = LUMIX_NEW(m_allocator, FontManager)(*this, m_allocator);
 		m_font_manager->create(FontResource::TYPE, manager);
@@ -429,6 +432,7 @@ struct RendererImpl final : public Renderer
 
 	~RendererImpl()
 	{
+		m_particle_emitter_manager.destroy();
 		m_texture_manager.destroy();
 		m_model_manager.destroy();
 		m_material_manager.destroy();
@@ -881,6 +885,7 @@ struct RendererImpl final : public Renderer
 	Array<ShaderDefine> m_shader_defines;
 	Array<Layer> m_layers;
 	TextureManager m_texture_manager;
+	ParticleEmitterResourceManager m_particle_emitter_manager;
 	MaterialManager m_material_manager;
 	FontManager* m_font_manager;
 	ShaderManager m_shader_manager;

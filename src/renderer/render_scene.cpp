@@ -17,6 +17,7 @@
 #include "engine/resource_manager_base.h"
 #include "engine/serializer.h"
 #include "engine/universe/universe.h"
+#include "engine/viewport.h"
 #include "lua_script/lua_script_system.h"
 #include "renderer/culling_system.h"
 #include "renderer/font_manager.h"
@@ -40,16 +41,6 @@ namespace Lumix
 
 enum class RenderSceneVersion : int
 {
-	GRASS_ROTATION_MODE,
-	GLOBAL_LIGHT_REFACTOR,
-	EMITTER_MATERIAL,
-	BONE_ATTACHMENT_TRANSFORM,
-	MODEL_INSTNACE_FLAGS,
-	INDIRECT_INTENSITY,
-	SCRIPTED_PARTICLES,
-	POINT_LIGHT_NO_COMPONENT,
-	MODEL_INSTANCE_ENABLE,
-	ENVIRONMENT_PROBE_FLAGS,
 
 	LATEST
 };
@@ -59,21 +50,6 @@ static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("m
 static const ComponentType DECAL_TYPE = Reflection::getComponentType("decal");
 static const ComponentType POINT_LIGHT_TYPE = Reflection::getComponentType("point_light");
 static const ComponentType PARTICLE_EMITTER_TYPE = Reflection::getComponentType("particle_emitter");
-static const ComponentType SCRIPTED_PARTICLE_EMITTER_TYPE = Reflection::getComponentType("scripted_particle_emitter");
-static const ComponentType PARTICLE_EMITTER_ALPHA_TYPE = Reflection::getComponentType("particle_emitter_alpha");
-static const ComponentType PARTICLE_EMITTER_FORCE_HASH = Reflection::getComponentType("particle_emitter_force");
-static const ComponentType PARTICLE_EMITTER_ATTRACTOR_TYPE =
-	Reflection::getComponentType("particle_emitter_attractor");
-static const ComponentType PARTICLE_EMITTER_SUBIMAGE_TYPE =
-	Reflection::getComponentType("particle_emitter_subimage");
-static const ComponentType PARTICLE_EMITTER_LINEAR_MOVEMENT_TYPE =
-	Reflection::getComponentType("particle_emitter_linear_movement");
-static const ComponentType PARTICLE_EMITTER_SPAWN_SHAPE_TYPE =
-	Reflection::getComponentType("particle_emitter_spawn_shape");
-static const ComponentType PARTICLE_EMITTER_PLANE_TYPE = Reflection::getComponentType("particle_emitter_plane");
-static const ComponentType PARTICLE_EMITTER_RANDOM_ROTATION_TYPE =
-	Reflection::getComponentType("particle_emitter_random_rotation");
-static const ComponentType PARTICLE_EMITTER_SIZE_TYPE = Reflection::getComponentType("particle_emitter_size");
 static const ComponentType GLOBAL_LIGHT_TYPE = Reflection::getComponentType("global_light");
 static const ComponentType CAMERA_TYPE = Reflection::getComponentType("camera");
 static const ComponentType TERRAIN_TYPE = Reflection::getComponentType("terrain");
@@ -301,11 +277,11 @@ public:
 		}
 		m_terrains.clear();
 
-		for (auto* emitter : m_scripted_particle_emitters)
+		for (auto* emitter : m_particle_emitters)
 		{
 			LUMIX_DELETE(m_allocator, emitter);
 		}
-		m_scripted_particle_emitters.clear();
+		m_particle_emitters.clear();
 
 		for (auto& i : m_model_instances)
 		{
@@ -374,6 +350,33 @@ public:
 		p1 *= 1 / p1.w;
 		dir = (p1 - p0).xyz();
 		dir.normalize();
+	}
+
+	
+	EntityPtr getActiveCamera() const override
+	{
+		return m_active_camera;
+	}
+
+
+	Viewport getCameraViewport(EntityRef entity) const override
+	{
+		Viewport vp;
+		const Camera& cam = m_cameras[entity];
+		vp.far = cam.far;
+		vp.near = cam.near;
+		vp.is_ortho = cam.is_ortho;
+		vp.h = (int)cam.screen_height;
+		vp.w = (int)cam.screen_width;
+		if(vp.is_ortho) {
+			vp.ortho_size = cam.ortho_size;
+		}
+		else {
+			vp.fov = cam.fov;
+		}
+		vp.pos = m_universe.getPosition(entity);
+		vp.rot = m_universe.getRotation(entity);
+		return vp;
 	}
 
 
@@ -651,7 +654,7 @@ public:
 
 		if (m_is_game_running && !paused)
 		{
-			for (auto* emitter : m_scripted_particle_emitters)
+			for (auto* emitter : m_particle_emitters)
 			{
 				emitter->update(dt);
 			}
@@ -708,16 +711,8 @@ public:
 
 		char path[MAX_PATH_LENGTH];
 		serializer.read(path, lengthOf(path));
-		if (scene_version > (int)RenderSceneVersion::MODEL_INSTNACE_FLAGS)
-		{
-			serializer.read(&r.flags.base);
-			r.flags.base &= ModelInstance::PERSISTENT_FLAGS;
-
-			if (scene_version <= (int)RenderSceneVersion::MODEL_INSTANCE_ENABLE)
-			{
-				r.flags.set(ModelInstance::ENABLED);
-			}
-		}
+		serializer.read(&r.flags.base);
+		r.flags.base &= ModelInstance::PERSISTENT_FLAGS;
 
 		if (path[0] != 0)
 		{
@@ -761,21 +756,9 @@ public:
 		GlobalLight light;
 		light.m_entity = entity;
 		serializer.read(&light.m_cascades);
-		if (scene_version <= (int)RenderSceneVersion::GLOBAL_LIGHT_REFACTOR)
-		{
-			int dummy;
-			serializer.read(&dummy);
-		}
 		serializer.read(&light.m_diffuse_color);
 		serializer.read(&light.m_diffuse_intensity);
-		if (scene_version > (int)RenderSceneVersion::INDIRECT_INTENSITY)
-		{
-			serializer.read(&light.m_indirect_intensity);
-		}
-		else
-		{
-			light.m_indirect_intensity = 1;
-		}
+		serializer.read(&light.m_indirect_intensity);
 		serializer.read(&light.m_fog_bottom);
 		serializer.read(&light.m_fog_color);
 		serializer.read(&light.m_fog_density);
@@ -807,12 +790,6 @@ public:
 		light.m_entity = entity;
 		serializer.read(&light.m_attenuation_param);
 		serializer.read(&light.m_cast_shadows);
-		
-		if (scene_version <= (int)RenderSceneVersion::POINT_LIGHT_NO_COMPONENT)
-		{
-			int dummy;
-			serializer.read(&dummy);
-		}
 		serializer.read(&light.m_diffuse_color);
 		serializer.read(&light.m_diffuse_intensity);
 		serializer.read(&light.m_fov);
@@ -1102,10 +1079,7 @@ public:
 			Terrain::GrassType type(*terrain);
 			serializer.read(&type.m_density);
 			serializer.read(&type.m_distance);
-			if (version >= (int)RenderSceneVersion::GRASS_ROTATION_MODE)
-			{
-				serializer.read((int*)&type.m_rotation_mode);
-			}
+			serializer.read((int*)&type.m_rotation_mode);
 			type.m_idx = i;
 			serializer.read(tmp, lengthOf(tmp));
 			terrain->m_grass_types.push(type);
@@ -1135,12 +1109,10 @@ public:
 		StaticString<MAX_PATH_LENGTH> probe_dir("universes/", m_universe.getName(), "/probes/");
 		EnvironmentProbe& probe = m_environment_probes.insert(entity);
 		serializer.read(&probe.guid);
-		if (scene_version > (int)RenderSceneVersion::ENVIRONMENT_PROBE_FLAGS) {
-			serializer.read(&probe.flags.base);
-			serializer.read(&probe.radiance_size);
-			serializer.read(&probe.irradiance_size);
-			serializer.read(&probe.reflection_size);
-		}
+		serializer.read(&probe.flags.base);
+		serializer.read(&probe.radiance_size);
+		serializer.read(&probe.irradiance_size);
+		serializer.read(&probe.reflection_size);
 
 		StaticString<MAX_PATH_LENGTH> path_str(probe_dir, probe.guid, ".dds");
 		
@@ -1167,27 +1139,27 @@ public:
 	}
 
 
-	void serializeScriptedParticleEmitter(ISerializer& serializer, EntityRef entity)
+	void serializeParticleEmitter(ISerializer& serializer, EntityRef entity)
 	{
-		ScriptedParticleEmitter* emitter = m_scripted_particle_emitters[entity];
-		const Material* material = emitter->getMaterial();
-		serializer.write("material", material ? material->getPath().c_str() : "");
+		ParticleEmitter* emitter = m_particle_emitters[entity];
+		const ParticleEmitterResource* res = emitter->getResource();
+		serializer.write("resource", res ? res->getPath().c_str() : "");
 	}
 
 
-	void deserializeScriptedParticleEmitter(IDeserializer& serializer, EntityRef entity, int scene_version)
+	void deserializeParticleEmitter(IDeserializer& serializer, EntityRef entity, int scene_version)
 	{
-		ScriptedParticleEmitter* emitter = LUMIX_NEW(m_allocator, ScriptedParticleEmitter)(entity, m_allocator);
+		ParticleEmitter* emitter = LUMIX_NEW(m_allocator, ParticleEmitter)(entity, m_allocator);
 		emitter->m_entity = entity;
 
 		char tmp[MAX_PATH_LENGTH];
 		serializer.read(tmp, lengthOf(tmp));
-		ResourceManagerBase* material_manager = m_engine.getResourceManager().get(Material::TYPE);
-		Material* material = (Material*)material_manager->load(Path(tmp));
-		emitter->setMaterial(material);
+		ResourceManagerBase* material_manager = m_engine.getResourceManager().get(ParticleEmitterResource::TYPE);
+		ParticleEmitterResource* res = (ParticleEmitterResource*)material_manager->load(Path(tmp));
+		emitter->setResource(res);
 
-		m_scripted_particle_emitters.insert(entity, emitter);
-		m_universe.onComponentCreated(entity, SCRIPTED_PARTICLE_EMITTER_TYPE, this);
+		m_particle_emitters.insert(entity, emitter);
+		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_TYPE, this);
 	}
 
 
@@ -1420,13 +1392,13 @@ public:
 	void deserializeParticleEmitters(InputBlob& serializer)
 	{
 		const int count = serializer.read<int>();
-		m_scripted_particle_emitters.reserve(count);
+		m_particle_emitters.reserve(count);
 		for (int i = 0; i < count; ++i) {
-			ScriptedParticleEmitter* emitter = LUMIX_NEW(m_allocator, ScriptedParticleEmitter)(INVALID_ENTITY, m_allocator);
+			ParticleEmitter* emitter = LUMIX_NEW(m_allocator, ParticleEmitter)(INVALID_ENTITY, m_allocator);
 			emitter->deserialize(serializer, m_engine.getResourceManager());
 			if(emitter->m_entity.isValid()) {
-				m_scripted_particle_emitters.insert((EntityRef)emitter->m_entity, emitter);
-				m_universe.onComponentCreated((EntityRef)emitter->m_entity, SCRIPTED_PARTICLE_EMITTER_TYPE, this);
+				m_particle_emitters.insert((EntityRef)emitter->m_entity, emitter);
+				m_universe.onComponentCreated((EntityRef)emitter->m_entity, PARTICLE_EMITTER_TYPE, this);
 			}
 			else {
 				LUMIX_DELETE(m_allocator, emitter);
@@ -1437,8 +1409,8 @@ public:
 
 	void serializeParticleEmitters(OutputBlob& serializer)
 	{
-		serializer.write(m_scripted_particle_emitters.size());
-		for (auto* emitter : m_scripted_particle_emitters)
+		serializer.write(m_particle_emitters.size());
+		for (auto* emitter : m_particle_emitters)
 		{
 			emitter->serialize(serializer);
 		}
@@ -1676,6 +1648,7 @@ public:
 	{
 		m_cameras.erase(entity);
 		m_universe.onComponentDestroyed(entity, CAMERA_TYPE, this);
+		if (m_active_camera == entity) m_active_camera = INVALID_ENTITY;
 	}
 
 
@@ -1687,11 +1660,11 @@ public:
 	}
 
 
-	void destroyScriptedParticleEmitter(EntityRef entity)
+	void destroyParticleEmitter(EntityRef entity)
 	{
-		auto* emitter = m_scripted_particle_emitters[entity];
-		m_universe.onComponentDestroyed((EntityRef)emitter->m_entity, SCRIPTED_PARTICLE_EMITTER_TYPE, this);
-		m_scripted_particle_emitters.erase((EntityRef)emitter->m_entity);
+		auto* emitter = m_particle_emitters[entity];
+		m_universe.onComponentDestroyed((EntityRef)emitter->m_entity, PARTICLE_EMITTER_TYPE, this);
+		m_particle_emitters.erase((EntityRef)emitter->m_entity);
 		LUMIX_DELETE(m_allocator, emitter);
 	}
 
@@ -1718,6 +1691,8 @@ public:
 		camera.far = 10000.0f;
 		m_cameras.insert(entity, camera);
 		m_universe.onComponentCreated(entity, CAMERA_TYPE, this);
+
+		if (!m_active_camera.isValid()) m_active_camera = entity;
 	}
 
 
@@ -1729,10 +1704,10 @@ public:
 	}
 
 
-	void createScriptedParticleEmitter(EntityRef entity)
+	void createParticleEmitter(EntityRef entity)
 	{
-		m_scripted_particle_emitters.insert(entity, LUMIX_NEW(m_allocator, ScriptedParticleEmitter)(entity, m_allocator));
-		m_universe.onComponentCreated(entity, SCRIPTED_PARTICLE_EMITTER_TYPE, this);
+		m_particle_emitters.insert(entity, LUMIX_NEW(m_allocator, ParticleEmitter)(entity, m_allocator));
+		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_TYPE, this);
 	}
 
 
@@ -3988,29 +3963,29 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	void setScriptedParticleEmitterMaterialPath(EntityRef entity, const Path& path) override
+	void setParticleEmitterPath(EntityRef entity, const Path& path) override
 	{
-		if (!m_scripted_particle_emitters[entity]) return;
+		if (!m_particle_emitters[entity]) return;
 
-		auto* manager = m_engine.getResourceManager().get(Material::TYPE);
-		Material* material = static_cast<Material*>(manager->load(path));
-		m_scripted_particle_emitters[entity]->setMaterial(material);
+		auto* manager = m_engine.getResourceManager().get(ParticleEmitterResource::TYPE);
+		ParticleEmitterResource* res = static_cast<ParticleEmitterResource*>(manager->load(path));
+		m_particle_emitters[entity]->setResource(res);
 	}
 
 
-	Path getScriptedParticleEmitterMaterialPath(EntityRef entity) override
+	Path getParticleEmitterPath(EntityRef entity) override
 	{
-		ScriptedParticleEmitter* emitter = m_scripted_particle_emitters[entity];
+		ParticleEmitter* emitter = m_particle_emitters[entity];
 		if (!emitter) return Path("");
-		if (!emitter->getMaterial()) return Path("");
+		if (!emitter->getResource()) return Path("");
 
-		return emitter->getMaterial()->getPath();
+		return emitter->getResource()->getPath();
 	}
 
 
-	const AssociativeArray<EntityRef, ScriptedParticleEmitter*>& getScriptedParticleEmitters() const override
+	const AssociativeArray<EntityRef, ParticleEmitter*>& getParticleEmitters() const override
 	{
-		return m_scripted_particle_emitters;
+		return m_particle_emitters;
 	}
 
 private:
@@ -4029,11 +4004,12 @@ private:
 	HashMap<EntityRef, GlobalLight> m_global_lights;
 	Array<PointLight> m_point_lights;
 	HashMap<EntityRef, Camera> m_cameras;
+	EntityPtr m_active_camera;
 	AssociativeArray<EntityRef, TextMesh*> m_text_meshes;
 	AssociativeArray<EntityRef, BoneAttachment> m_bone_attachments;
 	AssociativeArray<EntityRef, EnvironmentProbe> m_environment_probes;
 	HashMap<EntityRef, Terrain*> m_terrains;
-	AssociativeArray<EntityRef, ScriptedParticleEmitter*> m_scripted_particle_emitters;
+	AssociativeArray<EntityRef, ParticleEmitter*> m_particle_emitters;
 
 	Array<DebugTriangle> m_debug_triangles;
 	Array<DebugLine> m_debug_lines;
@@ -4075,7 +4051,7 @@ static struct
 	COMPONENT_TYPE(TERRAIN_TYPE, Terrain),
 	COMPONENT_TYPE(BONE_ATTACHMENT_TYPE, BoneAttachment),
 	COMPONENT_TYPE(ENVIRONMENT_PROBE_TYPE, EnvironmentProbe),
-	COMPONENT_TYPE(SCRIPTED_PARTICLE_EMITTER_TYPE, ScriptedParticleEmitter),
+	COMPONENT_TYPE(PARTICLE_EMITTER_TYPE, ParticleEmitter),
 	COMPONENT_TYPE(TEXT_MESH_TYPE, TextMesh)
 };
 
@@ -4102,9 +4078,10 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	, m_debug_lines(m_allocator)
 	, m_debug_points(m_allocator)
 	, m_active_global_light_entity(INVALID_ENTITY)
+	, m_active_camera(INVALID_ENTITY)
 	, m_is_grass_enabled(true)
 	, m_is_game_running(false)
-	, m_scripted_particle_emitters(m_allocator)
+	, m_particle_emitters(m_allocator)
 	, m_point_lights_map(m_allocator)
 	, m_bone_attachments(m_allocator)
 	, m_environment_probes(m_allocator)

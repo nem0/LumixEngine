@@ -12,8 +12,10 @@
 #include "engine/profiler.h"
 #include "engine/resource_manager.h"
 #include "engine/universe/universe.h"
+#include "engine/viewport.h"
 #include "gui/gui_system.h"
 #include "imgui/imgui.h"
+#include "renderer/ffr/ffr.h"
 #include "renderer/pipeline.h"
 #include "renderer/render_scene.h"
 #include "renderer/renderer.h"
@@ -165,10 +167,7 @@ void GameView::captureMouse(bool capture)
 
 void GameView::onFullscreenGUI()
 {
-				// TODO
-			ASSERT(false);
-			/*
-processInputEvents();
+	processInputEvents();
 
 	ImGuiIO& io = ImGui::GetIO();
 	bool open = true;
@@ -184,29 +183,38 @@ processInputEvents();
 		return;
 	}
 
-	m_pipeline->resize(int(size.x), int(size.y));
-
-	m_texture_handle = m_pipeline->getOutput();
-	if (bgfx::getCaps()->originBottomLeft)
-	{
-		ImGui::Image(&m_texture_handle, size, ImVec2(0, 1), ImVec2(1, 0));
+	EntityPtr camera = m_pipeline->getScene()->getActiveCamera();
+	if (camera.isValid()) {
+		Viewport vp = m_pipeline->getScene()->getCameraViewport((EntityRef)camera);
+		vp.w = (int)size.x;
+		vp.h = (int)size.y;
+		m_pipeline->getScene()->setCameraScreenSize((EntityRef)camera, vp.w, vp.h);
+		m_pipeline->setViewport(vp);
+		m_pipeline->render();
+		m_texture_handle = m_pipeline->getOutput();
+		if (ffr::isOriginBottomLeft())
+		{
+			ImGui::Image((void*)(uintptr_t)m_texture_handle.value, size, ImVec2(0, 1), ImVec2(1, 0));
+		}
+		else
+		{
+			ImGui::Image((void*)(uintptr_t)m_texture_handle.value, size);
+		}
 	}
-	else
-	{
-		ImGui::Image(&m_texture_handle, size);
+	else {
+		ImGui::Rect(size.x, size.y, 0xff0000FF);
 	}
 	m_pos.x = ImGui::GetItemRectMin().x;
 	m_pos.y = ImGui::GetItemRectMin().y;
 	m_size.x = ImGui::GetItemRectSize().x;
 	m_size.y = ImGui::GetItemRectSize().y;
 
-	m_pipeline->render();
 	ImGui::End();
 
 	if (m_is_fullscreen && (io.KeysDown[ImGui::GetKeyIndex(ImGuiKey_Escape)] || !m_editor.isGameMode()))
 	{
 		setFullscreen(false);
-	}*/
+	}
 }
 
 
@@ -227,11 +235,11 @@ void GameView::setFullscreen(bool fullscreen)
 
 void GameView::onStatsGUI(const ImVec2& view_pos)
 {
+	if (!m_show_stats || !m_is_open) return;
+	
 			// TODO
 			ASSERT(false);
 			/*
-	if (!m_show_stats || !m_is_open) return;
-	
 	float toolbar_height = 24 + ImGui::GetStyle().FramePadding.y * 2;
 	ImVec2 v = view_pos;
 	v.x += ImGui::GetStyle().FramePadding.x;
@@ -368,9 +376,7 @@ void GameView::processInputEvents()
 
 void GameView::onWindowGUI()
 {
-				// TODO
-			/*
-PROFILE_FUNCTION();
+	PROFILE_FUNCTION();
 	if (!m_pipeline->isReady()) return;
 
 	auto& io = ImGui::GetIO();
@@ -385,16 +391,15 @@ PROFILE_FUNCTION();
 	const char* window_name = "Game View###game_view";
 	if (m_is_mouse_captured) window_name = "Game View (mouse captured)###game_view";
 	
-	if (m_is_fullscreen)
-	{
+	if (m_is_fullscreen) {
 		onFullscreenGUI();
 		return;
 	}
 	ImVec2 view_pos;
 	bool is_game_view_visible = false;
-	if (ImGui::BeginDock(window_name, &m_is_open, ImGuiWindowFlags_NoNavInputs))
-	{
+	if (ImGui::BeginDock(window_name, &m_is_open, ImGuiWindowFlags_NoNavInputs)) {
 		is_game_view_visible = true;
+		view_pos = ImGui::GetCursorScreenPos();
 		m_is_mouse_hovering_window = ImGui::IsWindowHovered();
 
 		auto content_min = ImGui::GetCursorScreenPos();
@@ -402,60 +407,58 @@ PROFILE_FUNCTION();
 		size.y -= ImGui::GetTextLineHeightWithSpacing();
 		ImVec2 content_max(content_min.x + size.x, content_min.y + size.y);
 		if (m_forced_viewport.enabled) size = { (float)m_forced_viewport.width, (float)m_forced_viewport.height };
-		if (size.x > 0 && size.y > 0)
-		{
-			m_pipeline->resize(int(size.x), int(size.y));
-			m_pipeline->render();
-			m_texture_handle = m_pipeline->getOutput();
+		if (size.x > 0 && size.y > 0) {
+			const EntityPtr camera = m_pipeline->getScene()->getActiveCamera();
+			if (camera.isValid()) {
+				Viewport vp = m_pipeline->getScene()->getCameraViewport((EntityRef)camera);
+				vp.w = (int)size.x;
+				vp.h = (int)size.y;
+				m_pipeline->getScene()->setCameraScreenSize((EntityRef)camera, vp.w, vp.h);
+				m_pipeline->setViewport(vp);
+				m_pipeline->render();
+				m_texture_handle = m_pipeline->getOutput();
 
-			view_pos = ImGui::GetCursorScreenPos();
-			if (bgfx::getCaps()->originBottomLeft)
-			{
-				ImGui::Image(&m_texture_handle, size, ImVec2(0, 1), ImVec2(1, 0));
+				if(m_texture_handle.isValid()) {
+					if (ffr::isOriginBottomLeft()) {
+						ImGui::Image((void*)(uintptr_t)m_texture_handle.value, size, ImVec2(0, 1), ImVec2(1, 0));
+					}
+					else {
+						ImGui::Image((void*)(uintptr_t)m_texture_handle.value, size);
+					}
+				}
+				else {
+					ImGui::Rect(size.x, size.y, 0xffFF00FF);
+				}
 			}
-			else
-			{
-				ImGui::Image(&m_texture_handle, size);
+			else {
+				ImGui::Rect(size.x, size.y, 0xffFF00FF);
 			}
 			m_pos.x = ImGui::GetItemRectMin().x;
 			m_pos.y = ImGui::GetItemRectMin().y;
 			m_size.x = ImGui::GetItemRectSize().x;
 			m_size.y = ImGui::GetItemRectSize().y;
 
-			if (m_is_mouse_captured && m_is_ingame_cursor)
-			{
+			if (m_is_mouse_captured && m_is_ingame_cursor) {
 				ImVec2 pos = ImGui::GetItemRectMin();
 				PlatformInterface::clipCursor((int)pos.x, (int)pos.y, (int)m_size.x, (int)m_size.y);
 			}
 
 			processInputEvents();
 
-			if (ImGui::Checkbox("Pause", &m_paused))
-			{
-				m_editor.getEngine().pause(m_paused);
-			}
-			if (m_paused)
-			{
+			if (ImGui::Checkbox("Pause", &m_paused)) m_editor.getEngine().pause(m_paused);
+			if (m_paused) {
 				ImGui::SameLine();
-				if (ImGui::Button("Next frame"))
-				{
-					m_editor.getEngine().nextFrame();
-				}
+				if (ImGui::Button("Next frame")) m_editor.getEngine().nextFrame();
 			}
 			ImGui::SameLine();
 			ImGui::PushItemWidth(50);
-			if (ImGui::DragFloat("Time multiplier", &m_time_multiplier, 0.01f, 0.01f, 30.0f))
-			{
+			if (ImGui::DragFloat("Time multiplier", &m_time_multiplier, 0.01f, 0.01f, 30.0f)) {
 				m_editor.getEngine().setTimeMultiplier(m_time_multiplier);
 			}
 			ImGui::PopItemWidth();
-			if(m_editor.isGameMode())
-			{
+			if(m_editor.isGameMode()) {
 				ImGui::SameLine();
-				if (ImGui::Button("Fullscreen"))
-				{
-					setFullscreen(true);
-				}
+				if (ImGui::Button("Fullscreen")) setFullscreen(true);
 			}
 			ImGui::SameLine();
 			ImGui::Checkbox("Stats", &m_show_stats);
@@ -464,8 +467,7 @@ PROFILE_FUNCTION();
 		}
 
 		
-		if (m_is_mouse_captured && (io.KeysDown[ImGui::GetKeyIndex(ImGuiKey_Escape)] || !m_editor.isGameMode()))
-		{
+		if (m_is_mouse_captured && (io.KeysDown[ImGui::GetKeyIndex(ImGuiKey_Escape)] || !m_editor.isGameMode())) {
 			captureMouse(false);
 		}
 
@@ -476,7 +478,7 @@ PROFILE_FUNCTION();
 		}
 	}
 	ImGui::EndDock();
-	if(is_game_view_visible) onStatsGUI(view_pos);*/
+	if(is_game_view_visible) onStatsGUI(view_pos);
 }
 
 

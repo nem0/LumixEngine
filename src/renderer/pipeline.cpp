@@ -288,6 +288,19 @@ struct PipelineImpl final : Pipeline
 		m_viewport = viewport;
 	}
 
+	
+	void resetState()
+	{
+		struct Cmd : Renderer::RenderCommandBase {
+			void setup() override {}
+			void execute() override { 
+				ffr::setStencil(0xff, ffr::StencilFuncs::DISABLE, 0, 0, ffr::StencilOps::KEEP, ffr::StencilOps::KEEP, ffr::StencilOps::KEEP);
+			}
+		};
+		Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
+		m_renderer.push(cmd);
+	}
+
 
 	bool render() override 
 	{ 
@@ -344,6 +357,7 @@ struct PipelineImpl final : Pipeline
 			state.light_indirect_intensity = m_scene->getGlobalLightIndirectIntensity(gl);
 		}
 
+		resetState();
 		m_renderer.setGlobalState(state);
 		
 		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
