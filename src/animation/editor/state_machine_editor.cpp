@@ -11,7 +11,6 @@
 #include "engine/log.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
-#include "engine/resource_manager_base.h"
 #include "engine/universe/universe.h"
 #include "ui_builder.h"
 #include <cmath>
@@ -1733,7 +1732,7 @@ void StateMachine::dropSlot(const char* name, u32 slot, const ImVec2& canvas_scr
 
 
 ControllerResource::ControllerResource(IAnimationEditor& editor,
-	ResourceManagerBase& manager,
+	ResourceManager& manager,
 	IAllocator& allocator)
 	: m_animation_slots(allocator)
 	, m_allocator(allocator)
@@ -1931,9 +1930,9 @@ void ControllerResource::AnimationSlot::Value::set(const Path& new_path)
 	if (anim) anim->getResourceManager().unload(*anim);
 
 	StudioApp& app = slot.controller.m_editor.getApp();
-	auto* manager = app.getWorldEditor().getEngine().getResourceManager().get(Animation::TYPE);
+	ResourceManagerHub& manager = app.getWorldEditor().getEngine().getResourceManager();
 
-	anim = new_path.isValid() ? (Animation*)manager->load(new_path) : nullptr;
+	anim = new_path.isValid() ? manager.load<Animation>(new_path) : nullptr;
 
 	u32 hash = crc32(slot.name);
 	int set_idx = slot.values.find([this](auto& iter) { return &iter == this; });
@@ -1976,9 +1975,9 @@ void ControllerResource::AnimationSet::Value::setValue(const Path& new_path)
 	if (anim) anim->getResourceManager().unload(*anim);
 
 	StudioApp& app = set.controller.m_editor.getApp();
-	auto* manager = app.getWorldEditor().getEngine().getResourceManager().get(Animation::TYPE);
+	ResourceManagerHub& manager = app.getWorldEditor().getEngine().getResourceManager();
 
-	anim = new_path.isValid() ? (Animation*)manager->load(new_path) : nullptr;
+	anim = new_path.isValid() ? manager.load<Animation>(new_path) : nullptr;
 
 	int slot_idx = set.values.find([this](auto& iter) { return &iter == this; });
 	u32 hash = crc32(set.controller.m_animation_slots[slot_idx].name);

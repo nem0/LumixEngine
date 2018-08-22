@@ -27,7 +27,6 @@
 #include "engine/reflection.h"
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
-#include "engine/resource_manager_base.h"
 #include "engine/serializer.h"
 #include "engine/system.h"
 #include "engine/timer.h"
@@ -704,11 +703,11 @@ struct GatherResourcesVisitor : Reflection::ISimpleComponentVisitor
 		OutputBlob tmp(editor->getAllocator());
 		prop.getValue(cmp, index, tmp);
 		Path path((const char*)tmp.getData());
-		Resource* resource = resource_manager->get(resource_attr->type)->load(path);
+		Resource* resource = resource_manager->load(resource_attr->type, path);
 		if(resource) resources->push(resource);
 	}
 
-	ResourceManager* resource_manager;
+	ResourceManagerHub* resource_manager;
 	ComponentUID cmp;
 	int index = -1;
 	WorldEditor* editor;
@@ -1356,7 +1355,7 @@ private:
 			Universe* universe = m_editor.getUniverse();
 			m_transformations.clear();
 			m_old_values.clear();
-			ResourceManager& resource_manager = m_editor.getEngine().getResourceManager();
+			ResourceManagerHub& resource_manager = m_editor.getEngine().getResourceManager();
 			for (int i = 0; i < m_entities.size(); ++i)
 			{
 				m_transformations.emplace(universe->getTransform(m_entities[i]));
@@ -1604,7 +1603,7 @@ private:
 			cmp.scene = m_editor.getUniverse()->getScene(m_cmp_type);
 			if (m_entities.empty()) return false;
 			if (!cmp.scene) return false;
-			ResourceManager& resource_manager = m_editor.getEngine().getResourceManager();
+			ResourceManagerHub& resource_manager = m_editor.getEngine().getResourceManager();
 
 			for (EntityRef entity : m_entities)
 			{

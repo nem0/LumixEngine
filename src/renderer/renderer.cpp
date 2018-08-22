@@ -411,7 +411,7 @@ struct RendererImpl final : public Renderer
 			}
 		}
 
-		ResourceManager& manager = engine.getResourceManager();
+		ResourceManagerHub& manager = engine.getResourceManager();
 		m_texture_manager.create(Texture::TYPE, manager);
 		m_model_manager.create(Model::TYPE, manager);
 		m_material_manager.create(Material::TYPE, manager);

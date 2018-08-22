@@ -9,7 +9,6 @@
 #include "engine/path_utils.h"
 #include "engine/profiler.h"
 #include "engine/resource_manager.h"
-#include "engine/resource_manager_base.h"
 #include "engine/vec.h"
 #include "renderer/material.h"
 #include "renderer/pose.h"
@@ -107,7 +106,7 @@ void Mesh::setMaterial(Material* new_material, Model& model, Renderer& renderer)
 const ResourceType Model::TYPE("model");
 
 
-Model::Model(const Path& path, ResourceManagerBase& resource_manager, Renderer& renderer, IAllocator& allocator)
+Model::Model(const Path& path, ResourceManager& resource_manager, Renderer& renderer, IAllocator& allocator)
 	: Resource(path, resource_manager, allocator)
 	, m_bounding_radius()
 	, m_allocator(allocator)
@@ -455,8 +454,7 @@ bool Model::parseMeshes(FS::IFile& file, FileVersion version)
 		file.read(mat_path, mat_path_length);
 		mat_path[mat_path_length] = '\0';
 		
-		auto* material_manager = m_resource_manager.getOwner().get(Material::TYPE);
-		Material* material = static_cast<Material*>(material_manager->load(Path(mat_path)));
+		Material* material = m_resource_manager.getOwner().load<Material>(Path(mat_path));
 	
 		i32 str_size;
 		file.read(&str_size, sizeof(str_size));

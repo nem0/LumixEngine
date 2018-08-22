@@ -47,7 +47,7 @@ struct AssetCompilerImpl : AssetCompiler
 		Resource* resource;
 	};
 
-	struct LoadHook : ResourceManager::LoadHook
+	struct LoadHook : ResourceManagerHub::LoadHook
 	{
 		LoadHook(AssetCompilerImpl& compiler) : compiler(compiler) {}
 
@@ -78,7 +78,7 @@ struct AssetCompilerImpl : AssetCompiler
 		const char* base_path = m_app.getWorldEditor().getEngine().getDiskFileDevice()->getBasePath();
 		StaticString<MAX_PATH_LENGTH> path(base_path, ".lumix/assets");
 		PlatformInterface::makePath(path);
-		ResourceManager& rm = app.getWorldEditor().getEngine().getResourceManager();
+		ResourceManagerHub& rm = app.getWorldEditor().getEngine().getResourceManager();
 		rm.setLoadHook(&m_load_hook);
 	}
 
@@ -89,7 +89,7 @@ struct AssetCompilerImpl : AssetCompiler
 		m_to_compile.emplace().resource = nullptr;
 		m_semaphore.signal();
 		m_task.destroy();
-		ResourceManager& rm = m_app.getWorldEditor().getEngine().getResourceManager();
+		ResourceManagerHub& rm = m_app.getWorldEditor().getEngine().getResourceManager();
 		rm.setLoadHook(nullptr);
 		FileSystemWatcher::destroy(m_watcher);
 	}

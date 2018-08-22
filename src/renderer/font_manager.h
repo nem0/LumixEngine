@@ -4,7 +4,7 @@
 #include "engine/hash_map.h"
 #include "engine/delegate_list.h"
 #include "engine/resource.h"
-#include "engine/resource_manager_base.h"
+#include "engine/resource_manager.h"
 #include "renderer/draw2d.h"
 
 
@@ -19,7 +19,7 @@ class Texture;
 class LUMIX_RENDERER_API FontResource final : public Resource
 {
 public:
-	FontResource(const Path& path, ResourceManagerBase& manager, IAllocator& allocator);
+	FontResource(const Path& path, ResourceManager& manager, IAllocator& allocator);
 
 	ResourceType getType() const override { return TYPE; }
 
@@ -42,7 +42,7 @@ private:
 };
 
 
-class LUMIX_RENDERER_API FontManager final : public ResourceManagerBase
+class LUMIX_RENDERER_API FontManager final : public ResourceManager
 {
 friend class FontResource;
 public:

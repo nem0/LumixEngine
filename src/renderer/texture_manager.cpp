@@ -7,7 +7,7 @@
 namespace Lumix
 {
 	TextureManager::TextureManager(Renderer& renderer, IAllocator& allocator)
-		: ResourceManagerBase(allocator)
+		: ResourceManager(allocator)
 		, m_allocator(allocator)
 		, m_renderer(renderer)
 	{

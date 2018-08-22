@@ -25,7 +25,7 @@ struct Mesh;
 class Model;
 struct Pose;
 class Renderer;
-class ResourceManager;
+class ResourceManagerHub;
 
 
 namespace FS
@@ -175,7 +175,7 @@ public:
 	static const ResourceType TYPE;
 
 public:
-	Model(const Path& path, ResourceManagerBase& resource_manager, Renderer& renderer, IAllocator& allocator);
+	Model(const Path& path, ResourceManager& resource_manager, Renderer& renderer, IAllocator& allocator);
 	~Model();
 
 	ResourceType getType() const override { return TYPE; }

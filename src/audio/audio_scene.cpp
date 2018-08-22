@@ -5,11 +5,12 @@
 #include "clip_manager.h"
 #include "engine/blob.h"
 #include "engine/crc32.h"
+#include "engine/engine.h"
 #include "engine/iallocator.h"
 #include "engine/lua_wrapper.h"
 #include "engine/matrix.h"
 #include "engine/reflection.h"
-#include "engine/resource_manager_base.h"
+#include "engine/resource_manager.h"
 #include "engine/serializer.h"
 #include "engine/universe/universe.h"
 #include "lua_script/lua_script_system.h"
@@ -159,7 +160,8 @@ struct AudioSceneImpl final : public AudioScene
 			clip->name_hash = crc32(clip->name);
 			char path[MAX_PATH_LENGTH];
 			serializer.read(path, lengthOf(path));
-			clip->clip = path[0] ? static_cast<Clip*>(m_system.getClipManager().load(Path(path))) : nullptr;
+			
+			clip->clip = path[0] ? m_system.getEngine().getResourceManager().load<Clip>(Path(path)) : nullptr;
 		}
 	}
 
@@ -594,7 +596,7 @@ struct AudioSceneImpl final : public AudioScene
 			char path[MAX_PATH_LENGTH];
 			serializer.readString(path, lengthOf(path));
 
-			clip->clip = static_cast<Clip*>(m_system.getClipManager().load(Path(path)));
+			clip->clip = m_system.getEngine().getResourceManager().load<Clip>(Path(path));
 		}
 
 		serializer.read(count);
@@ -643,7 +645,7 @@ struct AudioSceneImpl final : public AudioScene
 		auto* clip = LUMIX_NEW(m_allocator, ClipInfo);
 		copyString(clip->name, name);
 		clip->name_hash = crc32(name);
-		clip->clip = static_cast<Clip*>(m_system.getClipManager().load(path));
+		clip->clip = m_system.getEngine().getResourceManager().load<Clip>(path);
 		clip->looped = false;
 		clip->volume = 1;
 		m_clips.push(clip);
@@ -717,7 +719,7 @@ struct AudioSceneImpl final : public AudioScene
 		{
 			clip->getResourceManager().unload(*clip);
 		}
-		auto* new_res = m_system.getClipManager().load(path);
+		auto* new_res = m_system.getEngine().getResourceManager().load<Clip>(path);
 		m_clips[clip_id]->clip = static_cast<Clip*>(new_res);
 	}
 

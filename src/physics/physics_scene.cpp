@@ -9,7 +9,6 @@
 #include "engine/profiler.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
-#include "engine/resource_manager_base.h"
 #include "engine/serializer.h"
 #include "engine/universe/universe.h"
 #include "lua_script/lua_script_system.h"
@@ -1485,14 +1484,14 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		auto* old_hm = terrain.m_heightmap;
 		if (old_hm)
 		{
-			resource_manager.get(Texture::TYPE)->unload(*old_hm);
+			old_hm->getResourceManager().unload(*old_hm);
 			auto& cb = old_hm->getObserverCb();
 			cb.unbind<Heightfield, &Heightfield::heightmapLoaded>(&terrain);
 		}
-		auto* texture_manager = resource_manager.get(Texture::TYPE);
+
 		if (str.isValid())
 		{
-			auto* new_hm = static_cast<Texture*>(texture_manager->load(str));
+			auto* new_hm = resource_manager.load<Texture>(str);
 			terrain.m_heightmap = new_hm;
 			new_hm->onLoaded<Heightfield, &Heightfield::heightmapLoaded>(&terrain);
 			new_hm->addDataReference();
@@ -1523,8 +1522,8 @@ struct PhysicsSceneImpl final : public PhysicsScene
 			if (actor.dynamic_type == DynamicType::STATIC && actor.physx_actor->isRigidStatic()) return;
 		}
 
-		ResourceManagerBase* manager = m_engine->getResourceManager().get(PhysicsGeometry::TYPE);
-		PhysicsGeometry* geom_res = static_cast<PhysicsGeometry*>(manager->load(str));
+		ResourceManagerHub& manager = m_engine->getResourceManager();
+		PhysicsGeometry* geom_res = manager.load<PhysicsGeometry>(str);
 
 		actor.setPhysxActor(nullptr);
 		actor.setResource(geom_res);
@@ -3574,8 +3573,8 @@ struct PhysicsSceneImpl final : public PhysicsScene
 
 		char tmp[MAX_PATH_LENGTH];
 		serializer.read(tmp, sizeof(tmp));
-		ResourceManagerBase* manager = m_engine->getResourceManager().get(PhysicsGeometry::TYPE);
-		auto* geometry = manager->load(Path(tmp));
+		ResourceManagerHub& manager = m_engine->getResourceManager();
+		auto* geometry = manager.load<PhysicsGeometry>(Path(tmp));
 		actor->setResource(static_cast<PhysicsGeometry*>(geometry));
 
 		m_universe.onComponentCreated(actor->entity, MESH_ACTOR_TYPE, this);
@@ -4018,9 +4017,9 @@ struct PhysicsSceneImpl final : public PhysicsScene
 			{
 				char tmp[MAX_PATH_LENGTH];
 				serializer.readString(tmp, sizeof(tmp));
-				ResourceManagerBase* manager = m_engine->getResourceManager().get(PhysicsGeometry::TYPE);
-				auto* geometry = manager->load(Path(tmp));
-				actor->setResource(static_cast<PhysicsGeometry*>(geometry));
+				ResourceManagerHub& manager = m_engine->getResourceManager();
+				auto* geometry = manager.load<PhysicsGeometry>(Path(tmp));
+				actor->setResource(geometry);
 				m_universe.onComponentCreated(actor->entity, MESH_ACTOR_TYPE, this);
 			}
 			break;

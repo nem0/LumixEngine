@@ -6,7 +6,6 @@
 #include "engine/profiler.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
-#include "engine/resource_manager_base.h"
 #include "engine/simd.h"
 #include "editor/gizmo.h"
 #include "editor/world_editor.h"
@@ -36,7 +35,7 @@ void ParticleEmitterResourceManager::destroyResource(Resource& resource)
 const ResourceType ParticleEmitterResource::TYPE = ResourceType("particle_emitter");
 
 
-ParticleEmitterResource::ParticleEmitterResource(const Path& path, ResourceManagerBase& manager, IAllocator& allocator)
+ParticleEmitterResource::ParticleEmitterResource(const Path& path, ResourceManager& manager, IAllocator& allocator)
 	: Resource(path, manager, allocator)
 	, m_bytecode(allocator)
 {
@@ -446,13 +445,13 @@ void ParticleEmitter::serialize(OutputBlob& blob)
 }
 
 
-void ParticleEmitter::deserialize(InputBlob& blob, ResourceManager& manager)
+void ParticleEmitter::deserialize(InputBlob& blob, ResourceManagerHub& manager)
 {
 	blob.read(m_entity);
 	char path[MAX_PATH_LENGTH];
 	blob.readString(path, lengthOf(path));
-	ResourceManagerBase* material_manager = manager.get(ParticleEmitterResource::TYPE);
-	auto res = static_cast<ParticleEmitterResource*>(material_manager->load(Path(path)));
+	ResourceManager* material_manager = manager.get(ParticleEmitterResource::TYPE);
+	auto* res = manager.load<ParticleEmitterResource>(Path(path));
 	setResource(res);
 }
 

@@ -11,7 +11,7 @@ namespace Lumix
 const ResourceType LuaScript::TYPE("lua_script");
 
 
-LuaScript::LuaScript(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator)
+LuaScript::LuaScript(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
 	: Resource(path, resource_manager, allocator)
 	, m_source_code(allocator)
 {
@@ -36,7 +36,7 @@ bool LuaScript::load(FS::IFile& file)
 
 
 LuaScriptManager::LuaScriptManager(IAllocator& allocator)
-	: ResourceManagerBase(allocator)
+	: ResourceManager(allocator)
 	, m_allocator(allocator)
 {
 }

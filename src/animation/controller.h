@@ -2,7 +2,7 @@
 
 
 #include "engine/resource.h"
-#include "engine/resource_manager_base.h"
+#include "engine/resource_manager.h"
 #include "state_machine.h"
 
 
@@ -14,11 +14,11 @@ namespace Anim
 {
 
 
-class ControllerManager final : public ResourceManagerBase
+class ControllerManager final : public ResourceManager
 {
 public:
 	explicit ControllerManager(IAllocator& allocator)
-		: ResourceManagerBase(allocator)
+		: ResourceManager(allocator)
 		, m_allocator(allocator)
 	{}
 	~ControllerManager() {}
@@ -51,7 +51,7 @@ public:
 	};
 
 public:
-	ControllerResource(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator);
+	ControllerResource(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
 	~ControllerResource();
 
 	ResourceType getType() const override { return TYPE; }

@@ -4,7 +4,6 @@
 #include "engine/path_utils.h"
 #include "engine/profiler.h"
 #include "engine/resource_manager.h"
-#include "engine/resource_manager_base.h"
 #include "renderer/renderer.h"
 #include "renderer/texture.h"
 #include "renderer/texture_manager.h"
@@ -17,7 +16,7 @@ namespace Lumix
 const ResourceType Texture::TYPE("texture");
 
 
-Texture::Texture(const Path& path, Renderer& renderer, ResourceManagerBase& resource_manager, IAllocator& _allocator)
+Texture::Texture(const Path& path, Renderer& renderer, ResourceManager& resource_manager, IAllocator& _allocator)
 	: Resource(path, resource_manager, _allocator)
 	, data_reference(0)
 	, allocator(_allocator)

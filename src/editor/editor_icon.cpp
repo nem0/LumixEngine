@@ -3,7 +3,7 @@
 #include "engine/math_utils.h"
 #include "engine/matrix.h"
 #include "engine/reflection.h"
-#include "engine/resource_manager_base.h"
+#include "engine/resource_manager.h"
 #include "engine/universe/universe.h"
 #include "engine/viewport.h"
 #include "render_interface.h"

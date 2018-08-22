@@ -6,7 +6,6 @@
 #include "engine/path_utils.h"
 #include "engine/profiler.h"
 #include "engine/resource_manager.h"
-#include "engine/resource_manager_base.h"
 #include "renderer/material_manager.h"
 #include "renderer/pipeline.h"
 #include "renderer/renderer.h"
@@ -31,7 +30,7 @@ static struct CustomFlags
 const ResourceType Material::TYPE("material");
 
 
-Material::Material(const Path& path, ResourceManagerBase& resource_manager, Renderer& renderer, IAllocator& allocator)
+Material::Material(const Path& path, ResourceManager& resource_manager, Renderer& renderer, IAllocator& allocator)
 	: Resource(path, resource_manager, allocator)
 	, m_shader(nullptr)
 	, m_uniforms(allocator)
@@ -116,7 +115,7 @@ void Material::unload()
 /*
 	m_uniforms.clear();
 	*/
-	ResourceManagerBase* texture_manager = m_resource_manager.getOwner().get(Texture::TYPE);
+	ResourceManager* texture_manager = m_resource_manager.getOwner().get(Texture::TYPE);
 	for (int i = 0; i < m_texture_count; i++) {
 		if (m_textures[i] && (!m_shader || m_textures[i] != m_shader->m_texture_slots[i].default_texture)) {
 			removeDependency(*m_textures[i]);
@@ -369,7 +368,7 @@ void Material::setTexturePath(int i, const Path& path)
 	}
 	else
 	{
-		Texture* texture = static_cast<Texture*>(m_resource_manager.getOwner().get(Texture::TYPE)->load(path));
+		Texture* texture = m_resource_manager.getOwner().load<Texture>(path);
 		setTexture(i, texture);
 	}
 }
@@ -422,7 +421,7 @@ void Material::setTexture(int i, Texture* texture)
 
 void Material::setShader(const Path& path)
 {
-	Shader* shader = static_cast<Shader*>(m_resource_manager.getOwner().get(Shader::TYPE)->load(path));
+	Shader* shader = m_resource_manager.getOwner().load<Shader>(path);
 	setShader(shader);
 }
 

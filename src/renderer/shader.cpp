@@ -7,7 +7,6 @@
 #include "engine/path_utils.h"
 #include "engine/profiler.h"
 #include "engine/resource_manager.h"
-#include "engine/resource_manager_base.h"
 #include "renderer/renderer.h"
 #include "renderer/shader_manager.h"
 #include "renderer/texture.h"
@@ -22,7 +21,7 @@ namespace Lumix
 const ResourceType Shader::TYPE("shader");
 
 
-Shader::Shader(const Path& path, ResourceManagerBase& resource_manager, Renderer& renderer, IAllocator& allocator)
+Shader::Shader(const Path& path, ResourceManager& resource_manager, Renderer& renderer, IAllocator& allocator)
 	: Resource(path, resource_manager, allocator)
 	, m_allocator(allocator)
 	, m_renderer(renderer)
@@ -294,8 +293,8 @@ int texture_slot(lua_State* L)
 
 	char tmp[MAX_PATH_LENGTH];
 	if(LuaWrapper::getOptionalStringField(L, -1, "default_texture", tmp, lengthOf(tmp))) {
-		ResourceManagerBase* texture_manager = shader->getResourceManager().getOwner().get(Texture::TYPE);
-		slot.default_texture = (Texture*)texture_manager->load(Path(tmp));
+		ResourceManagerHub& manager = shader->getResourceManager().getOwner();
+		slot.default_texture = manager.load<Texture>(Path(tmp));
 	}
 
 	++shader->m_texture_slot_count;

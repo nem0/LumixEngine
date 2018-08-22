@@ -40,7 +40,7 @@ class LUMIX_RENDERER_API Texture final : public Resource
 		};
 
 	public:
-		Texture(const Path& path, Renderer& renderer, ResourceManagerBase& resource_manager, IAllocator& allocator);
+		Texture(const Path& path, Renderer& renderer, ResourceManager& resource_manager, IAllocator& allocator);
 		~Texture();
 
 		ResourceType getType() const override { return TYPE; }

@@ -96,7 +96,7 @@ void PhysicsGeometryManager::destroyResource(Resource& resource)
 const ResourceType PhysicsGeometry::TYPE("physics");
 
 
-PhysicsGeometry::PhysicsGeometry(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator)
+PhysicsGeometry::PhysicsGeometry(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
 	: Resource(path, resource_manager, allocator)
 	, convex_mesh(nullptr)
 	, tri_mesh(nullptr)

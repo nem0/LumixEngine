@@ -5,7 +5,6 @@
 #include "engine/lumix.h"
 #include "engine/path.h"
 #include "engine/resource_manager.h"
-#include "engine/resource_manager_base.h"
 
 
 namespace Lumix
@@ -19,7 +18,7 @@ ResourceType::ResourceType(const char* type_name)
 }
 
 
-Resource::Resource(const Path& path, ResourceManagerBase& resource_manager, IAllocator& allocator)
+Resource::Resource(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
 	: m_ref_count()
 	, m_empty_dep_count(1)
 	, m_failed_dep_count(0)

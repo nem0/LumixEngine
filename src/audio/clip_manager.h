@@ -3,7 +3,7 @@
 
 #include "engine/array.h"
 #include "engine/resource.h"
-#include "engine/resource_manager_base.h"
+#include "engine/resource_manager.h"
 
 
 namespace Lumix
@@ -13,7 +13,7 @@ namespace Lumix
 class Clip final : public Resource
 {
 public:
-	Clip(const Path& path, ResourceManagerBase& manager, IAllocator& allocator)
+	Clip(const Path& path, ResourceManager& manager, IAllocator& allocator)
 		: Resource(path, manager, allocator)
 		, m_data(allocator)
 	{
@@ -38,11 +38,11 @@ private:
 };
 
 
-class ClipManager final : public ResourceManagerBase
+class ClipManager final : public ResourceManager
 {
 public:
 	explicit ClipManager(IAllocator& allocator)
-		: ResourceManagerBase(allocator)
+		: ResourceManager(allocator)
 		, m_allocator(allocator)
 	{
 	}

@@ -14,6 +14,7 @@
 #include "engine/mt/atomic.h"
 #include "engine/path.h"
 #include "engine/profiler.h"
+#include "engine/resource_manager.h"
 #include "engine/timer.h"
 #include "engine/universe/universe.h"
 #include "engine/viewport.h"
@@ -60,11 +61,11 @@ struct PipelineImpl final : Pipeline
 	{
 		m_timer = Timer::create(m_allocator);
 		m_viewport.w = m_viewport.h = 800;
-		ShaderManager& shader_manager = renderer.getShaderManager();
-		m_draw2d_shader = (Shader*)shader_manager.load(Path("pipelines/draw2d.shd"));
-		m_debug_shape_shader = (Shader*)shader_manager.load(Path("pipelines/debug_shape.shd"));
+		ResourceManagerHub& rm = renderer.getEngine().getResourceManager();
+		m_draw2d_shader = rm.load<Shader>(Path("pipelines/draw2d.shd"));
+		m_debug_shape_shader = rm.load<Shader>(Path("pipelines/debug_shape.shd"));
 		TextureManager& texture_manager = renderer.getTextureManager();
-		m_default_cubemap = (Texture*)texture_manager.load(Path("models/common/default_probe.dds"));
+		m_default_cubemap = rm.load<Texture>(Path("models/common/default_probe.dds"));
 
 		FontAtlas& font_atlas = m_renderer.getFontManager().getFontAtlas();
 		m_draw2d.FontTexUvWhitePixel = font_atlas.TexUvWhitePixel;
@@ -1933,9 +1934,9 @@ struct PipelineImpl final : Pipeline
 
 	int preloadShader(const char* path)
 	{
-		ShaderManager& sm = m_renderer.getShaderManager();
+		ResourceManagerHub& rm = m_renderer.getEngine().getResourceManager();
 		ShaderRef s;
-		s.res = (Shader*)sm.load(Path(path));
+		s.res = rm.load<Shader>(Path(path));
 		s.id = 0;
 		for(ShaderRef& i : m_shaders) {
 			if(i.id >= s.id) {

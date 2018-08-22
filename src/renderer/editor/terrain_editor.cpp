@@ -16,7 +16,6 @@
 #include "engine/profiler.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
-#include "engine/resource_manager_base.h"
 #include "engine/universe/universe.h"
 #include "engine/viewport.h"
 #include "imgui/imgui.h"
@@ -1671,8 +1670,8 @@ void TerrainEditor::onGUI()
 				{
 					if (selected)
 					{
-						ResourceManagerBase* prefab_manager = m_world_editor.getEngine().getResourceManager().get(PrefabResource::TYPE);
-						PrefabResource* prefab = (PrefabResource*)prefab_manager->load(all_prefabs[i]);
+						ResourceManagerHub& manager = m_world_editor.getEngine().getResourceManager();
+						PrefabResource* prefab = manager.load<PrefabResource>(all_prefabs[i]);
 						m_selected_prefabs.push(prefab);
 					}
 					else

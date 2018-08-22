@@ -5,18 +5,18 @@
 #include "engine/array.h"
 #include "engine/blob.h"
 #include "engine/resource.h"
-#include "engine/resource_manager_base.h"
+#include "engine/resource_manager.h"
 
 
 namespace Lumix
 {
 
 
-class ParticleEmitterResourceManager final : public ResourceManagerBase
+class ParticleEmitterResourceManager final : public ResourceManager
 {
 public:
 	ParticleEmitterResourceManager(IAllocator& allocator) 
-		: ResourceManagerBase(allocator)
+		: ResourceManager(allocator)
 		, m_allocator(allocator) {}
 
 	Resource* createResource(const Path& path) override;
@@ -31,7 +31,7 @@ class ParticleEmitterResource final : public Resource
 public:
 	static const ResourceType TYPE;
 
-	ParticleEmitterResource(const Path& path, ResourceManagerBase& manager, IAllocator& allocator);
+	ParticleEmitterResource(const Path& path, ResourceManager& manager, IAllocator& allocator);
 
 	ResourceType getType() const override { return TYPE; }
 	void unload() override;
@@ -54,7 +54,7 @@ private:
 
 
 class Material;
-class ResourceManager;
+class ResourceManagerHub;
 
 
 class LUMIX_RENDERER_API ParticleEmitter
@@ -64,7 +64,7 @@ public:
 	~ParticleEmitter();
 
 	void serialize(OutputBlob& blob);
-	void deserialize(InputBlob& blob, ResourceManager& manager);
+	void deserialize(InputBlob& blob, ResourceManagerHub& manager);
 	void update(float dt);
 	void emit(const float* args);
 	const float* getInstanceData() const { return m_instance_data.begin(); }

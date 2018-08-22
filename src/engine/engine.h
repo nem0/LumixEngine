@@ -24,7 +24,7 @@ class OutputBlob;
 class Path;
 class PathManager;
 class PluginManager;
-class ResourceManager;
+class ResourceManagerHub;
 class Universe;
 template <typename T> class Array;
 
@@ -57,7 +57,7 @@ public:
 	virtual FS::ResourceFileDevice* getResourceFileDevice() = 0;
 	virtual InputSystem& getInputSystem() = 0;
 	virtual PluginManager& getPluginManager() = 0;
-	virtual ResourceManager& getResourceManager() = 0;
+	virtual ResourceManagerHub& getResourceManager() = 0;
 	virtual IAllocator& getAllocator() = 0;
 
 	virtual void startGame(Universe& context) = 0;

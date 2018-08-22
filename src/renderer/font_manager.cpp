@@ -11,7 +11,7 @@ namespace Lumix
 const ResourceType FontResource::TYPE("font");
 
 
-FontResource::FontResource(const Path& path, ResourceManagerBase& manager, IAllocator& allocator)
+FontResource::FontResource(const Path& path, ResourceManager& manager, IAllocator& allocator)
 	: Resource(path, manager, allocator)
 	, m_fonts(allocator)
 	, m_file_data(allocator)
@@ -61,7 +61,7 @@ void FontResource::removeRef(Font& font)
 
 
 FontManager::FontManager(Renderer& renderer, IAllocator& allocator)
-	: ResourceManagerBase(allocator)
+	: ResourceManager(allocator)
 	, m_allocator(allocator)
 	, m_renderer(renderer)
 	, m_font_atlas(allocator)

@@ -2196,7 +2196,7 @@ public:
 
 	void packDataScanResources(AssociativeArray<u32, PackFileInfo>& infos)
 	{
-		ResourceManager& rm = m_editor->getEngine().getResourceManager();
+		ResourceManagerHub& rm = m_editor->getEngine().getResourceManager();
 		for (auto iter = rm.getAll().begin(), end = rm.getAll().end(); iter != end; ++iter)
 		{
 			const auto& resources = iter.value()->getResourceTable();

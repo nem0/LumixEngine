@@ -19,7 +19,7 @@ namespace FS
 }
 
 class Renderer;
-class ResourceManager;
+class ResourceManagerHub;
 class Shader;
 class Texture;
 
@@ -45,7 +45,7 @@ public:
 	static const ResourceType TYPE;
 
 public:
-	Material(const Path& path, ResourceManagerBase& resource_manager, Renderer& renderer, IAllocator& allocator);
+	Material(const Path& path, ResourceManager& resource_manager, Renderer& renderer, IAllocator& allocator);
 	~Material();
 
 	ResourceType getType() const override { return TYPE; }

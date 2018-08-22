@@ -12,7 +12,7 @@
 namespace Lumix
 {
 
-class ResourceManagerBase;
+class ResourceManager;
 namespace Anim
 {
 	class ControllerResource;
@@ -565,7 +565,7 @@ public:
 
 public:
 	ControllerResource(IAnimationEditor& editor,
-		ResourceManagerBase& manager,
+		ResourceManager& manager,
 		IAllocator& allocator);
 	~ControllerResource();
 
