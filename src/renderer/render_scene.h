@@ -151,6 +151,8 @@ public:
 	virtual RayCastModelHit castRayTerrain(EntityRef entity, const Vec3& origin, const Vec3& dir) = 0;
 	virtual void getRay(EntityRef entity, const Vec2& screen_pos, Vec3& origin, Vec3& dir) = 0;
 
+	virtual EntityPtr getActiveCamera() const = 0;
+	virtual	struct Viewport getCameraViewport(EntityRef camera) const = 0;
 	virtual float getCameraLODMultiplier(float fov, bool is_ortho) const = 0;
 	virtual float getCameraLODMultiplier(EntityRef entity) const = 0;
 	virtual Frustum getCameraFrustum(EntityRef entity) const = 0;
@@ -246,9 +248,9 @@ public:
 	virtual void setCameraOrthoSize(EntityRef entity, float value) = 0;
 	virtual Vec2 getCameraScreenSize(EntityRef entity) = 0;
 
-	virtual void setScriptedParticleEmitterMaterialPath(EntityRef entity, const Path& path) = 0;
-	virtual Path getScriptedParticleEmitterMaterialPath(EntityRef entity) = 0;
-	virtual const AssociativeArray<EntityRef, class ScriptedParticleEmitter*>& getScriptedParticleEmitters() const = 0;
+	virtual void setParticleEmitterPath(EntityRef entity, const Path& path) = 0;
+	virtual Path getParticleEmitterPath(EntityRef entity) = 0;
+	virtual const AssociativeArray<EntityRef, class ParticleEmitter*>& getParticleEmitters() const = 0;
 
 	virtual void enableModelInstance(EntityRef entity, bool enable) = 0;
 	virtual bool isModelInstanceEnabled(EntityRef entity) = 0;

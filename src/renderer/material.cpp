@@ -47,7 +47,6 @@ Material::Material(const Path& path, ResourceManagerBase& resource_manager, Rend
 	, m_custom_flags(0)
 	, m_render_layer(0)
 	, m_render_layer_mask(1)
-	, m_layers_count(0)
 {
 	setAlphaRef(DEFAULT_ALPHA_REF_VALUE);
 	for (int i = 0; i < MAX_TEXTURE_COUNT; ++i)
@@ -135,7 +134,6 @@ void Material::unload()
 	m_color.set(1, 1, 1, 1);
 	m_custom_flags = 0;
 	m_define_mask = 0;
-	m_layers_count = 0;
 	m_metallic = 0.0f;
 	m_render_layer = 0;
 	m_render_layer_mask = 1;
@@ -286,23 +284,6 @@ bool Material::save(FS::IFile& file)
 }
 
 
-void Material::deserializeCustomFlags(lua_State* L)
-{
-		// TODO
-	ASSERT(false);
-/*
-	m_custom_flags = 0;
-	serializer.deserializeArrayBegin();
-	while (!serializer.isArrayEnd())
-	{
-		char tmp[32];
-		serializer.deserializeArrayItem(tmp, lengthOf(tmp), "");
-		setCustomFlag(getCustomFlag(tmp));
-	}
-	serializer.deserializeArrayEnd();*/
-}
-
-
 void Material::deserializeUniforms(lua_State* L)
 {
 			// TODO
@@ -394,16 +375,6 @@ void Material::setTexturePath(int i, const Path& path)
 }
 
 
-void Material::setLayersCount(int layers)
-{
-	++m_empty_dep_count;
-	checkState();
-	m_layers_count = layers;
-	--m_empty_dep_count;
-	checkState();
-}
-
-
 void Material::setRenderLayer(int layer)
 {
 	++m_empty_dep_count;
@@ -458,8 +429,6 @@ void Material::setShader(const Path& path)
 
 void Material::onBeforeReady()
 {
-	// TODO
-/*
 	if (!m_shader) return;
 
 	for(int i = 0; i < m_shader->m_uniforms.size(); ++i)
@@ -489,10 +458,6 @@ void Material::onBeforeReady()
 		m_uniforms[i].name_hash = shader_uniform.name_hash;
 	}
 
-	u8 alpha_ref = u8(m_alpha_ref * 255.0f);
-	m_render_states = (m_render_states & ~BGFX_STATE_ALPHA_REF_MASK) | BGFX_STATE_ALPHA_REF(alpha_ref);
-	m_render_states |= m_shader->m_render_states;
-	*/
 	for(int i = 0; i < m_shader->m_texture_slot_count; ++i) {
 		if (!m_textures[i] && m_shader->m_texture_slots[i].default_texture) {
 			m_textures[i] = m_shader->m_texture_slots[i].default_texture;
@@ -586,6 +551,21 @@ bool Material::isBackfaceCulling() const
 	return (m_render_states & (u64)ffr::StateFlags::CULL_BACK) != 0;
 }
 
+int Material::LUA_layer(lua_State* L)
+{
+	const float r = LuaWrapper::checkArg<float>(L, 1);
+	lua_getfield(L, LUA_GLOBALSINDEX, "this");
+	Material* material = (Material*)lua_touserdata(L, -1);
+	lua_pop(L, 1);
+
+	const char* tmp = LuaWrapper::checkArg<const char*>(L, 1);
+
+	Renderer& renderer = material->getRenderer();
+	material->m_render_layer = renderer.getLayer(tmp);
+	material->m_render_layer_mask = ((u64)1) << (u64)material->m_render_layer;
+	return 0;
+}
+
 
 namespace LuaAPI
 {
@@ -603,6 +583,46 @@ int roughness(lua_State* L)
 }
 
 
+int alpha_ref(lua_State* L)
+{
+	const float r = LuaWrapper::checkArg<float>(L, 1);
+	lua_getfield(L, LUA_GLOBALSINDEX, "this");
+	Material* material = (Material*)lua_touserdata(L, -1);
+	lua_pop(L, 1);
+
+	material->setAlphaRef(r);
+	return 0;
+}
+
+
+int color(lua_State* L)
+{
+	const Vec4 c = LuaWrapper::checkArg<Vec4>(L, 1);
+	lua_getfield(L, LUA_GLOBALSINDEX, "this");
+	Material* material = (Material*)lua_touserdata(L, -1);
+	lua_pop(L, 1);
+
+	material->setColor(c);
+	return 0;
+}
+
+
+int custom_flag(lua_State* L)
+{
+	const float m = LuaWrapper::checkArg<float>(L, 1);
+	lua_getfield(L, LUA_GLOBALSINDEX, "this");
+	Material* material = (Material*)lua_touserdata(L, -1);
+	lua_pop(L, 1);
+
+	const char* flag_name = LuaWrapper::checkArg<const char*>(L, 1);
+
+	const u32 flag = material->getCustomFlag(flag_name);
+	material->setCustomFlag(flag);
+
+	return 0;
+}
+
+
 int metallic(lua_State* L)
 {
 	const float m = LuaWrapper::checkArg<float>(L, 1);
@@ -611,6 +631,18 @@ int metallic(lua_State* L)
 	lua_pop(L, 1);
 
 	material->setMetallic(m);
+	return 0;
+}
+
+
+int emission(lua_State* L)
+{
+	const float m = LuaWrapper::checkArg<float>(L, 1);
+	lua_getfield(L, LUA_GLOBALSINDEX, "this");
+	Material* material = (Material*)lua_touserdata(L, -1);
+	lua_pop(L, 1);
+
+	material->setEmission(m);
 	return 0;
 }
 
@@ -722,18 +754,29 @@ bool Material::load(FS::IFile& file)
 	lua_State* L = luaL_newstate();
 	lua_pushlightuserdata(L, this);
 	lua_setfield(L, LUA_GLOBALSINDEX, "this");
-	lua_pushcclosure(L, LuaAPI::shader, 0);
-	lua_setfield(L, LUA_GLOBALSINDEX, "shader");
-	lua_pushcclosure(L, LuaAPI::texture, 0);
-	lua_setfield(L, LUA_GLOBALSINDEX, "texture");
-	lua_pushcclosure(L, LuaAPI::defines, 0);
-	lua_setfield(L, LUA_GLOBALSINDEX, "defines");
-	lua_pushcclosure(L, LuaAPI::roughness, 0);
-	lua_setfield(L, LUA_GLOBALSINDEX, "roughness");
-	lua_pushcclosure(L, LuaAPI::metallic, 0);
-	lua_setfield(L, LUA_GLOBALSINDEX, "metallic");
 	
+	#define DEFINE_LUA_FUNC(func) \
+		lua_pushcclosure(L, LuaAPI::func, 0); \
+		lua_setfield(L, LUA_GLOBALSINDEX, #func); 
+	
+	DEFINE_LUA_FUNC(shader);
+	DEFINE_LUA_FUNC(texture);
+	DEFINE_LUA_FUNC(defines);
+	DEFINE_LUA_FUNC(roughness);
+	DEFINE_LUA_FUNC(metallic);
+	DEFINE_LUA_FUNC(emission);
+	DEFINE_LUA_FUNC(custom_flag);
+	DEFINE_LUA_FUNC(color);
+	DEFINE_LUA_FUNC(alpha_ref);
+	
+	#undef DEFINE_LUA_FUNC
+
+	lua_setfield(L, LUA_GLOBALSINDEX, "layer"); \
+	lua_pushcclosure(L, &Material::LUA_layer, 0);
+
 	setAlphaRef(DEFAULT_ALPHA_REF_VALUE);
+
+	m_custom_flags = 0;
 
 	const StringView content((const char*)file.getBuffer(), (int)file.size());
 	if (!LuaWrapper::execute(L, content, getPath().c_str(), 0)) {
@@ -758,40 +801,12 @@ bool Material::load(FS::IFile& file)
 	while (!serializer.isObjectEnd())
 	{
 		serializer.deserializeLabel(label, 255);
-		if (equalStrings(label, "defines"))
-		{
-			deserializeDefines(serializer);
-		}
-		else if (equalStrings(label, "custom_flags"))
-		{
-			deserializeCustomFlags(serializer);
-		}
-		else if (equalStrings(label, "layers_count"))
-		{
-			serializer.deserialize(m_layers_count, 0);
-		}
 		else if (equalStrings(label, "render_layer"))
 		{
-			char tmp[32];
-			auto& renderer = static_cast<MaterialManager&>(m_resource_manager).getRenderer();
-			serializer.deserialize(tmp, lengthOf(tmp), "default");
-			m_render_layer = renderer.getLayer(tmp);
-			m_render_layer_mask = 1ULL << (u64)m_render_layer;
 		}
 		else if (equalStrings(label, "uniforms"))
 		{
 			deserializeUniforms(serializer);
-		}
-		else if (equalStrings(label, "texture"))
-		{
-			if (!deserializeTexture(serializer, material_dir))
-			{
-				return false;
-			}
-		}
-		else if (equalStrings(label, "alpha_ref"))
-		{
-			serializer.deserialize(m_alpha_ref, 0.3f);
 		}
 		else if (equalStrings(label, "backface_culling"))
 		{
@@ -805,41 +820,6 @@ bool Material::load(FS::IFile& file)
 			{
 				m_render_states &= ~BGFX_STATE_CULL_MASK;
 			}
-		}
-		else if (equalStrings(label, "color"))
-		{
-			serializer.deserializeArrayBegin();
-			serializer.deserializeArrayItem(m_color.x, 1.0f);
-			serializer.deserializeArrayItem(m_color.y, 1.0f);
-			serializer.deserializeArrayItem(m_color.z, 1.0f);
-			if (!serializer.isArrayEnd())
-			{
-				serializer.deserializeArrayItem(m_color.w, 1.0f);
-			}
-			else
-			{
-				m_color.w = 1;
-			}
-			serializer.deserializeArrayEnd();
-		}
-		else if (equalStrings(label, "metallic"))
-		{
-			serializer.deserialize(m_metallic, 0.0f);
-		}
-		else if (equalStrings(label, "roughness"))
-		{
-			serializer.deserialize(m_roughness, 1.0f);
-		}
-		else if (equalStrings(label, "emission"))
-		{
-			serializer.deserialize(m_emission, 0.0f);
-		}
-		else if (equalStrings(label, "shader"))
-		{
-			Path path;
-			serializer.deserialize(path, Path(""));
-			auto* manager = m_resource_manager.getOwner().get(Shader::TYPE);
-			setShader(static_cast<Shader*>(manager->load(Path(path))));
 		}
 		else
 		{

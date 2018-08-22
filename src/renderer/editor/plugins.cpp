@@ -60,7 +60,6 @@ using namespace Lumix;
 
 
 static const ComponentType PARTICLE_EMITTER_TYPE = Reflection::getComponentType("particle_emitter");
-static const ComponentType SCRIPTED_PARTICLE_EMITTER_TYPE = Reflection::getComponentType("scripted_particle_emitter");
 static const ComponentType TERRAIN_TYPE = Reflection::getComponentType("terrain");
 static const ComponentType CAMERA_TYPE = Reflection::getComponentType("camera");
 static const ComponentType DECAL_TYPE = Reflection::getComponentType("decal");
@@ -80,6 +79,41 @@ struct FontPlugin final : public AssetBrowser::IPlugin
 	const char* getName() const override { return "Font"; }
 
 	ResourceType getResourceType() const override { return FontResource::TYPE; }
+};
+
+
+struct ParticleEmitterPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
+{
+	explicit ParticleEmitterPlugin(StudioApp& app)
+		: m_app(app)
+	{
+		app.getAssetBrowser().registerExtension("par", ParticleEmitterResource::TYPE);
+	}
+
+
+	bool compile(const Path& src) override
+	{
+		const char* dst_dir = m_app.getAssetCompiler().getCompiledDir();
+		const u32 hash = crc32(src.c_str());
+
+		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
+
+		copyFile(src.c_str(), dst);
+		return true;
+	}
+	
+	
+	void onGUI(Resource* resource) override
+	{
+	}
+
+
+	void onResourceUnloaded(Resource* resource) override {}
+	const char* getName() const override { return "Particle Emitter"; }
+	ResourceType getResourceType() const override { return ParticleEmitterResource::TYPE; }
+
+
+	StudioApp& m_app;
 };
 
 
@@ -298,11 +332,6 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				}
 			}
 			*/
-			int layers_count = material->getLayersCount();
-			if (ImGui::DragInt("Layers count", &layers_count, 1, 0, 256))
-			{
-				material->setLayersCount(layers_count);
-			}
 			// TODO
 				/*
 			if (ImGui::CollapsingHeader("Defines"))
@@ -3133,22 +3162,9 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		app.registerComponentWithResource(
 			"model_instance", "Render/Mesh", Model::TYPE, *Reflection::getProperty(MODEL_INSTANCE_TYPE, "Source"));
 		app.registerComponentWithResource("particle_emitter",
-			"Render/Particle emitter/Emitter",
-			Material::TYPE,
-			*Reflection::getProperty(PARTICLE_EMITTER_TYPE, "Material"));
-		app.registerComponentWithResource("scripted_particle_emitter",
-			"Render/Particle emitter/DO NOT USE YET! Scripted Emitter",
-			Material::TYPE,
-			*Reflection::getProperty(SCRIPTED_PARTICLE_EMITTER_TYPE, "Material"));
-		app.registerComponent("particle_emitter_spawn_shape", "Render/Particle emitter/Spawn shape");
-		app.registerComponent("particle_emitter_alpha", "Render/Particle emitter/Alpha");
-		app.registerComponent("particle_emitter_plane", "Render/Particle emitter/Plane");
-		app.registerComponent("particle_emitter_force", "Render/Particle emitter/Force");
-		app.registerComponent("particle_emitter_attractor", "Render/Particle emitter/Attractor");
-		app.registerComponent("particle_emitter_subimage", "Render/Particle emitter/Subimage");
-		app.registerComponent("particle_emitter_linear_movement", "Render/Particle emitter/Linear movement");
-		app.registerComponent("particle_emitter_random_rotation", "Render/Particle emitter/Random rotation");
-		app.registerComponent("particle_emitter_size", "Render/Particle emitter/Size");
+			"Render/Particle emitter",
+			ParticleEmitterResource::TYPE,
+			*Reflection::getProperty(PARTICLE_EMITTER_TYPE, "Resource"));
 		app.registerComponent("point_light", "Render/Point light");
 		app.registerComponent("decal", "Render/Decal");
 		app.registerComponent("bone_attachment", "Render/Bone attachment");
@@ -3169,6 +3185,10 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		const char* texture_exts[] = { "jpg", "dds", "tga", "raw", nullptr};
 		asset_compiler.addPlugin(*m_texture_plugin, texture_exts);
 
+		m_particle_emitter_plugin = LUMIX_NEW(allocator, ParticleEmitterPlugin)(app);
+		const char* particle_emitter_exts[] = {"par", nullptr};
+		asset_compiler.addPlugin(*m_particle_emitter_plugin, particle_emitter_exts);
+
 		m_material_plugin = LUMIX_NEW(allocator, MaterialPlugin)(app);
 		const char* material_exts[] = {"mat", nullptr};
 		asset_compiler.addPlugin(*m_material_plugin, material_exts);
@@ -3180,6 +3200,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_font_plugin = LUMIX_NEW(allocator, FontPlugin)(app);
 		AssetBrowser& asset_browser = app.getAssetBrowser();
 		asset_browser.addPlugin(*m_model_plugin);
+		asset_browser.addPlugin(*m_particle_emitter_plugin);
 		asset_browser.addPlugin(*m_material_plugin);
 		asset_browser.addPlugin(*m_font_plugin);
 		asset_browser.addPlugin(*m_shader_plugin);
@@ -3213,6 +3234,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 		AssetBrowser& asset_browser = m_app.getAssetBrowser();
 		asset_browser.removePlugin(*m_model_plugin);
+		asset_browser.removePlugin(*m_particle_emitter_plugin);
 		asset_browser.removePlugin(*m_material_plugin);
 		asset_browser.removePlugin(*m_font_plugin);
 		asset_browser.removePlugin(*m_texture_plugin);
@@ -3223,9 +3245,11 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		asset_compiler.removePlugin(*m_texture_plugin);
 		asset_compiler.removePlugin(*m_model_plugin);
 		asset_compiler.removePlugin(*m_material_plugin);
+		asset_compiler.removePlugin(*m_particle_emitter_plugin);
 
 		LUMIX_DELETE(allocator, m_model_plugin);
 		LUMIX_DELETE(allocator, m_material_plugin);
+		LUMIX_DELETE(allocator, m_particle_emitter_plugin);
 		LUMIX_DELETE(allocator, m_font_plugin);
 		LUMIX_DELETE(allocator, m_texture_plugin);
 		LUMIX_DELETE(allocator, m_shader_plugin);
@@ -3259,6 +3283,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	AddTerrainComponentPlugin* m_add_terrain_plugin;
 	ModelPlugin* m_model_plugin;
 	MaterialPlugin* m_material_plugin;
+	ParticleEmitterPlugin* m_particle_emitter_plugin;
 	FontPlugin* m_font_plugin;
 	TexturePlugin* m_texture_plugin;
 	ShaderPlugin* m_shader_plugin;

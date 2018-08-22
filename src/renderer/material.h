@@ -84,8 +84,6 @@ public:
 	int getRenderLayer() const { return m_render_layer; }
 	void setRenderLayer(int layer);
 	u64 getRenderLayerMask() const { return m_render_layer_mask; }
-	int getLayersCount() const { return m_layers_count; }
-	void setLayersCount(int layers);
 
 	void setDefine(u8 define_idx, bool enabled);
 	bool isDefined(u8 define_idx) const;
@@ -100,12 +98,13 @@ public:
 	static int getCustomFlagCount();
 
 private:
+	static int LUA_layer(lua_State* L);
+
 	void onBeforeReady() override;
 	void unload() override;
 	bool load(FS::IFile& file) override;
 
 	void deserializeUniforms(lua_State* L);
-	void deserializeCustomFlags(lua_State* L);
 
 private:
 	static const int MAX_TEXTURE_COUNT = 16;
@@ -127,7 +126,6 @@ private:
 	u32 m_custom_flags;
 	int m_render_layer;
 	u64 m_render_layer_mask;
-	int m_layers_count;
 };
 
 } // namespace Lumix
