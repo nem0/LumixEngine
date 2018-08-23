@@ -6,10 +6,14 @@
 #include "engine/blob.h"
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
+#include "engine/simd.h"
 
 
 namespace Lumix
 {
+
+
+class Material;
 
 
 class ParticleEmitterResourceManager final : public ResourceManager
@@ -42,6 +46,9 @@ public:
 	int getRegistersCount() const { return m_registers_count; }
 	int getOutputsCount() const { return m_outputs_count; }
 	float getLiteralValue(int idx) const { ASSERT(idx < lengthOf(m_literals)); return m_literals[idx]; }
+	Material* getMaterial() const { return m_material; }
+	void setMaterial(const Path& path);
+
 private:
 	OutputBlob m_bytecode;
 	float m_literals[16];
@@ -49,6 +56,7 @@ private:
 	int m_channels_count;
 	int m_registers_count;
 	int m_outputs_count;
+	Material* m_material;
 };
 
 
@@ -68,9 +76,10 @@ public:
 	void update(float dt);
 	void emit(const float* args);
 	const float* getInstanceData() const { return m_instance_data.begin(); }
-	int getInstanceDataSize() const { return m_instance_data.size(); }
+	int getInstanceDataSizeBytes() const { return m_instance_data.byte_size(); }
 	ParticleEmitterResource* getResource() const { return m_resource; }
 	void setResource(ParticleEmitterResource* res);
+	int getInstancesCount() const { return m_instances_count; }
 	float* getChannelData(int idx) const { return m_channels[idx].data; }
 	
 	EntityPtr m_entity;
@@ -99,6 +108,7 @@ private:
 	int m_capacity = 0;
 	int m_outputs_per_particle = 0;
 	int m_particles_count = 0;
+	int m_instances_count = 0;
 	ParticleEmitterResource* m_resource = nullptr;
 	Array<float> m_instance_data;
 };

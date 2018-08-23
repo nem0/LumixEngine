@@ -1069,6 +1069,7 @@ void drawElements(uint offset, uint count, PrimitiveType type)
 		case PrimitiveType::TRIANGLES: pt = GL_TRIANGLES; break;
 		case PrimitiveType::TRIANGLE_STRIP: pt = GL_TRIANGLE_STRIP; break;
 		case PrimitiveType::LINES: pt = GL_LINES; break;
+		case PrimitiveType::POINTS: pt = GL_POINTS; break;
 		default: ASSERT(0); break;
 	}
 
@@ -1101,6 +1102,7 @@ void drawArrays(uint offset, uint count, PrimitiveType type)
 		case PrimitiveType::TRIANGLES: pt = GL_TRIANGLES; break;
 		case PrimitiveType::TRIANGLE_STRIP: pt = GL_TRIANGLE_STRIP; break;
 		case PrimitiveType::LINES: pt = GL_LINES; break;
+		case PrimitiveType::POINTS: pt = GL_POINTS; break;
 		default: ASSERT(0); break;
 	}
 

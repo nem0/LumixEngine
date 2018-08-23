@@ -90,7 +90,6 @@ public:
 	}
 
 	Resource* load(ResourceType type, const Path& path);
-	Resource* load(ResourceManager& manager, const Path& path);
 
 	void setLoadHook(LoadHook* hook);
 	bool onBeforeLoad(Resource& resource) const;
@@ -103,6 +102,7 @@ public:
 	FS::FileSystem& getFileSystem() { return *m_file_system; }
 
 private:
+	Resource* load(ResourceManager& manager, const Path& path);
 	IAllocator& m_allocator;
 	ResourceManagerTable m_resource_managers;
 	FS::FileSystem* m_file_system;
