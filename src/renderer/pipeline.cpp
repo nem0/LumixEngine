@@ -15,12 +15,14 @@
 #include "engine/path.h"
 #include "engine/profiler.h"
 #include "engine/resource_manager.h"
+#include "engine/simd.h"
 #include "engine/timer.h"
 #include "engine/universe/universe.h"
 #include "engine/viewport.h"
 #include "font_manager.h"
 #include "material.h"
 #include "model.h"
+#include "particle_system.h"
 #include "pipeline.h"
 #include "pose.h"
 #include "renderer.h"
@@ -662,33 +664,8 @@ struct PipelineImpl final : Pipeline
 		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
 		const char* define = LuaWrapper::checkArg<const char*>(L, 1);
 
-		CameraParams cp;
-
-		lua_getfield(L, 2, "frustum");
-		if (!lua_istable(L, -1)) {
-			lua_pop(L, 1);
-			luaL_error(L, "Frustum is not a table");
-		}
-		float* points = cp.frustum.xs;
-		for (int i = 0; i < 32 + 24; ++i) {
-			lua_rawgeti(L, -1, i + 1);
-			if(!LuaWrapper::isType<float>(L, -1)) {
-				lua_pop(L, 2);
-				luaL_error(L, "Frustum must contain exactly 24 floats");
-			}
-			points[i] = LuaWrapper::toType<float>(L, -1);
-			lua_pop(L, 1);
-		}
-		cp.frustum.setPlanesFromPoints();
-		
-		if(!LuaWrapper::checkField(L, 2, "lod_multiplier", &cp.lod_multiplier)) {
-			luaL_error(L, "Missing lod_multiplier in camera params");
-		}
-
-		if(!LuaWrapper::checkField(L, 2, "position", &cp.pos)) {
-			luaL_error(L, "Missing position in camera params");
-		}
-		
+		const CameraParams cp = checkCameraParams(L, 2);
+ 		
 		IAllocator& allocator = pipeline->m_renderer.getAllocator();
 		RenderTerrainsCommand* cmd = LUMIX_NEW(allocator, RenderTerrainsCommand)(allocator);
 
@@ -734,8 +711,8 @@ struct PipelineImpl final : Pipeline
 		return 0;
 	}
 	
-	
-	static int renderMeshes(lua_State* L)
+
+	static int renderParticles(lua_State* L)
 	{
 		PROFILE_FUNCTION();
 		const int pipeline_idx = lua_upvalueindex(1);
@@ -744,13 +721,85 @@ struct PipelineImpl final : Pipeline
 		}
 		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
 
-		const u64 layer_mask = LuaWrapper::checkArg<u64>(L, 1);
-		const char* define = LuaWrapper::checkArg<const char*>(L, 2);
-		LuaWrapper::checkTableArg(L, 3);
+		struct Cmd : Renderer::RenderCommandBase
+		{
+			Cmd(IAllocator& allocator) 
+				: m_data(allocator) 
+			{}
 
+			void setup() override
+			{
+				const auto& emitters = m_pipeline->m_scene->getParticleEmitters();
+
+				int byte_size = 0;
+				for (ParticleEmitter* emitter : emitters) {
+					byte_size += emitter->getInstanceDataSizeBytes();
+				}
+
+				m_data.reserve(sizeof(int) * emitters.size() + byte_size);
+
+				for (ParticleEmitter* emitter : emitters) {
+					if (!emitter->getResource() || !emitter->getResource()->isReady()) continue;
+					const Material* material = emitter->getResource()->getMaterial();
+					m_data.write(material->getShader()->m_render_data);
+					m_data.write(emitter->getInstanceDataSizeBytes());
+					m_data.write(emitter->getInstancesCount());
+					m_data.write(emitter->getInstanceData(), emitter->getInstanceDataSizeBytes());
+				}
+			}
+
+			void execute() override
+			{
+				InputBlob blob(m_data);
+				ffr::VertexDecl instance_decl;
+				instance_decl.addAttribute(2, ffr::AttributeType::FLOAT, false, false);
+
+				while(blob.getPosition() < blob.getSize()) {
+					Shader::RenderData* shader_data = blob.read<Shader::RenderData*>();
+					const int byte_size = blob.read<int>();
+					const int instances_count = blob.read<int>();
+					const Renderer::TransientSlice transient = m_pipeline->m_renderer.allocTransient(byte_size);
+					if ((int)transient.size < byte_size) break;
+
+					const void* mem = blob.skip(byte_size);
+					ffr::update(transient.buffer, mem, transient.offset, byte_size);
+
+					const Shader::Program& prog = Shader::getProgram(shader_data, 0);
+					
+					ffr::useProgram(prog.handle);
+					ffr::setInstanceBuffer(instance_decl, transient.buffer, transient.offset, 0);
+#error todo
+					// TODO
+					//					ffr::setIndexBuffer(m_pipeline->getParticlesIndexBuffer());
+					ffr::drawTrianglesInstanced(0, 6, instances_count);
+				}
+			}
+
+			OutputBlob m_data;
+			PipelineImpl* m_pipeline;
+		};
+
+		Cmd* cmd = LUMIX_NEW(pipeline->m_allocator, Cmd)(pipeline->m_allocator);
+		cmd->m_pipeline = pipeline;
+		pipeline->m_renderer.push(cmd);
+
+		return 0;
+	}
+
+
+	struct CameraParams
+	{
+		Frustum frustum;
+		Vec3 pos;
+		float lod_multiplier;
+	};
+	
+
+	static CameraParams checkCameraParams(lua_State* L, int idx)
+	{
 		CameraParams cp;
 
-		lua_getfield(L, 3, "frustum");
+		lua_getfield(L, idx, "frustum");
 		if (!lua_istable(L, -1)) {
 			lua_pop(L, 1);
 			luaL_error(L, "Frustum is not a table");
@@ -767,13 +816,32 @@ struct PipelineImpl final : Pipeline
 		}
 		cp.frustum.setPlanesFromPoints();
 		
-		if(!LuaWrapper::checkField(L, 3, "lod_multiplier", &cp.lod_multiplier)) {
+		if(!LuaWrapper::checkField(L, idx, "lod_multiplier", &cp.lod_multiplier)) {
 			luaL_error(L, "Missing lod_multiplier in camera params");
 		}
 
-		if(!LuaWrapper::checkField(L, 3, "position", &cp.pos)) {
+		if(!LuaWrapper::checkField(L, idx, "position", &cp.pos)) {
 			luaL_error(L, "Missing position in camera params");
 		}
+
+		return cp;
+	}
+
+	
+	static int renderMeshes(lua_State* L)
+	{
+		PROFILE_FUNCTION();
+		const int pipeline_idx = lua_upvalueindex(1);
+		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
+			LuaWrapper::argError<PipelineImpl*>(L, pipeline_idx);
+		}
+		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
+
+		const u64 layer_mask = LuaWrapper::checkArg<u64>(L, 1);
+		const char* define = LuaWrapper::checkArg<const char*>(L, 2);
+		LuaWrapper::checkTableArg(L, 3);
+
+		const CameraParams cp = checkCameraParams(L ,3);
 
 		IAllocator& allocator = pipeline->m_renderer.getAllocator();
 		RenderMeshesCommand* cmd = LUMIX_NEW(allocator, RenderMeshesCommand)(allocator);
@@ -1001,14 +1069,6 @@ struct PipelineImpl final : Pipeline
 
 		return 0;
 	}
-	
-
-	struct CameraParams
-	{
-		Frustum frustum;
-		Vec3 pos;
-		float lod_multiplier;
-	};
 	
 
 	static void pushCameraParams(lua_State* L, const CameraParams& params)
@@ -2026,6 +2086,7 @@ struct PipelineImpl final : Pipeline
 		registerCFunction("getCameraParams", PipelineImpl::getCameraParams);
 		registerCFunction("getShadowCameraParams", PipelineImpl::getShadowCameraParams);
 		registerCFunction("renderMeshes", PipelineImpl::renderMeshes);
+		registerCFunction("renderParticles", PipelineImpl::renderParticles);
 		registerCFunction("renderTerrains", PipelineImpl::renderTerrains);
 		registerCFunction("setRenderTargets", PipelineImpl::setRenderTargets);
 

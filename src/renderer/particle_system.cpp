@@ -38,6 +38,7 @@ const ResourceType ParticleEmitterResource::TYPE = ResourceType("particle_emitte
 ParticleEmitterResource::ParticleEmitterResource(const Path& path, ResourceManager& manager, IAllocator& allocator)
 	: Resource(path, manager, allocator)
 	, m_bytecode(allocator)
+	, m_material(nullptr)
 {
 }
 
@@ -116,6 +117,18 @@ struct Compiler
 	{
 		const int ds_idx = LuaWrapper::checkArg<int>(L, index);
 		return m_streams[ds_idx];
+	}
+
+	static int material(lua_State* L)
+	{
+		lua_getfield(L, LUA_GLOBALSINDEX, "emitter");
+		ParticleEmitterResource* res = (ParticleEmitterResource*)lua_touserdata(L, -1);
+		lua_pop(L, 1);
+		
+		const char* path = LuaWrapper::checkArg<const char*>(L, 1);
+		res->setMaterial(Path(path));
+
+		return 0;
 	}
 
 	static int newChannel(lua_State* L)
@@ -260,6 +273,22 @@ struct Compiler
 };
 
 
+void ParticleEmitterResource::setMaterial(const Path& path)
+{
+	Material* material = m_resource_manager.getOwner().load<Material>(path);
+	if (m_material) {
+		Material* material = m_material;
+		m_material = nullptr;
+		removeDependency(*m_material);
+		m_material->getResourceManager().unload(*m_material);
+	}
+	m_material = material;
+	if (m_material) {
+		addDependency(*m_material);
+	}
+}
+
+
 bool ParticleEmitterResource::load(FS::IFile& file)
 {
 	// TODO reuse state
@@ -269,11 +298,14 @@ bool ParticleEmitterResource::load(FS::IFile& file)
 
 	lua_pushlightuserdata(L, &compiler);
 	lua_setfield(L, LUA_GLOBALSINDEX, "this");
+	lua_pushlightuserdata(L, this);
+	lua_setfield(L, LUA_GLOBALSINDEX, "emitter");
 
 	#define DEFINE_LUA_FUNC(name) \
 		lua_pushcclosure(L, Compiler::name, 0); \
 		lua_setfield(L, LUA_GLOBALSINDEX, #name);
 
+	DEFINE_LUA_FUNC(material);
 	DEFINE_LUA_FUNC(newChannel);
 	DEFINE_LUA_FUNC(newRegister);
 	DEFINE_LUA_FUNC(newLiteral);
@@ -341,6 +373,8 @@ bool ParticleEmitterResource::load(FS::IFile& file)
 	}
 	
 	lua_close(L);
+
+	if (!m_material) return false;
 	return true;
 }
 
@@ -537,6 +571,7 @@ void ParticleEmitter::update(float dt)
 	// TODO
 	Array<float4> reg_mem(m_allocator);
 	reg_mem.resize(m_resource->getRegistersCount() * ((m_particles_count + 3) >> 2));
+	m_instances_count = m_particles_count;
 	m_instance_data.resize(m_particles_count * m_resource->getOutputsCount() * 4);
 	int output_idx = 0;
 
@@ -606,13 +641,31 @@ void ParticleEmitter::update(float dt)
 				}
 				break;
 			}
+			case Instructions::SIN: {
+				const auto dst_type = blob.read<Compiler::DataStream::Type>();
+				const u8 dst_idx = blob.read<u8>();
+				const auto arg_type = blob.read<Compiler::DataStream::Type>();
+				const u8 arg_idx = blob.read<u8>();
+				
+				const float* arg = (float*)getStream(*this, arg_type, arg_idx, m_particles_count, reg_mem.begin());
+				float* result = (float*)getStream(*this, dst_type, dst_idx, m_particles_count, reg_mem.begin());
+				const float* const end = result + ((m_particles_count + 3) & ~3);
+
+				for (; result != end; ++result, ++arg) {
+					*result = sinf(*arg);
+				}
+				break;
+			}
 			case Instructions::OUTPUT: {
 				const auto arg_type = blob.read<Compiler::DataStream::Type>();
 				const u8 arg_idx = blob.read<u8>();
-				const float4* arg = getStream(*this, arg_type, arg_idx, m_particles_count, reg_mem.begin());
-				float* dst = m_instance_data.begin() + m_particles_count * 4 * output_idx;
+				const float* arg = (float*)getStream(*this, arg_type, arg_idx, m_particles_count, reg_mem.begin());
+				float* dst = m_instance_data.begin() + output_idx;
 				++output_idx;
-				memcpy(dst, arg, m_particles_count * 4 * sizeof(float));
+				const int stride = m_resource->getOutputsCount();
+				for (int i = 0; i < m_particles_count; ++i) {
+					dst[i * stride] =  arg[i];
+				}
 				break;
 			}
 			default:

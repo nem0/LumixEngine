@@ -46,7 +46,8 @@ enum class StateFlags : u64 {
 enum class PrimitiveType : uint {
 	TRIANGLES,
 	TRIANGLE_STRIP,
-	LINES
+	LINES,
+	POINTS
 };
 
 
