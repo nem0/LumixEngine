@@ -101,6 +101,12 @@ struct Compiler
 	{
 		m_streams[0].type = DataStream::CONST;
 		m_streams[0].index = 0;
+		m_streams[1].type = DataStream::CONST;
+		m_streams[1].index = 1;
+		m_streams[2].type = DataStream::CONST;
+		m_streams[2].index = 2;
+		m_streams[3].type = DataStream::CONST;
+		m_streams[3].index = 3;
 		++m_streams_count;
 		++m_constants_count;
 	}
@@ -248,6 +254,13 @@ struct Compiler
 	}
 
 
+	static int sub(lua_State* L)
+	{
+		writeBinaryInstruction(Instructions::SUB, L);
+		return 0;
+	}
+
+
 	static int out(lua_State* L)
 	{
 		Compiler* c = getCompiler(L);
@@ -313,6 +326,7 @@ bool ParticleEmitterResource::load(FS::IFile& file)
 	DEFINE_LUA_FUNC(mov);
 
 	DEFINE_LUA_FUNC(add);
+	DEFINE_LUA_FUNC(sub);
 	DEFINE_LUA_FUNC(mul);
 	DEFINE_LUA_FUNC(cos);
 	DEFINE_LUA_FUNC(sin);
@@ -351,6 +365,22 @@ bool ParticleEmitterResource::load(FS::IFile& file)
 
 	lua_getfield(L, LUA_GLOBALSINDEX, "emit");
 	if(lua_isfunction(L, -1)) {
+		lua_pushinteger(L, 1);
+		lua_pushinteger(L, 2);
+		lua_pushinteger(L, 3);
+		if(lua_pcall(L, 3, 0, 0) != 0) {
+			g_log_error.log("Renderer") << lua_tostring(L, -1);
+			lua_pop(L, 1);
+			lua_close(L);
+			return false;
+		}
+	}
+	lua_pop(L, 1);
+	compiler.m_bytecode.write(Instructions::END);
+
+	m_output_byte_offset = compiler.m_bytecode.getPos();
+	lua_getfield(L, LUA_GLOBALSINDEX, "output");
+	if(lua_isfunction(L, -1)) {
 		if(lua_pcall(L, 0, 0, 0) != 0) {
 			g_log_error.log("Renderer") << lua_tostring(L, -1);
 			lua_pop(L, 1);
@@ -360,6 +390,7 @@ bool ParticleEmitterResource::load(FS::IFile& file)
 	}
 	lua_pop(L, 1);
 	compiler.m_bytecode.write(Instructions::END);
+
 	m_channels_count = compiler.m_channels_count;
 	m_registers_count = compiler.m_registers_count;
 	m_outputs_count = compiler.m_outputs_count;
@@ -374,7 +405,10 @@ bool ParticleEmitterResource::load(FS::IFile& file)
 	
 	lua_close(L);
 
-	if (!m_material) return false;
+	if (!m_material) {
+		g_log_error.log("Renderer") << getPath() << " has no material.";
+		return false;
+	}
 	return true;
 }
 
@@ -384,7 +418,6 @@ ParticleEmitter::ParticleEmitter(EntityPtr entity, IAllocator& allocator)
 	: m_allocator(allocator)
 	, m_entity(entity)
 	, m_emit_buffer(allocator)
-	, m_instance_data(allocator)
 {
 }
 
@@ -540,7 +573,7 @@ void ParticleEmitter::execute(InputBlob& blob, int particle_index)
 }
 
 
-static float4* getStream(ParticleEmitter& emitter
+static float4* getStream(const ParticleEmitter& emitter
 	, Compiler::DataStream::Type type
 	, int idx
 	, int particles_count
@@ -572,7 +605,6 @@ void ParticleEmitter::update(float dt)
 	Array<float4> reg_mem(m_allocator);
 	reg_mem.resize(m_resource->getRegistersCount() * ((m_particles_count + 3) >> 2));
 	m_instances_count = m_particles_count;
-	m_instance_data.resize(m_particles_count * m_resource->getOutputsCount() * 4);
 	int output_idx = 0;
 
 	for (;;)
@@ -657,7 +689,7 @@ void ParticleEmitter::update(float dt)
 				break;
 			}
 			case Instructions::OUTPUT: {
-				const auto arg_type = blob.read<Compiler::DataStream::Type>();
+/*				const auto arg_type = blob.read<Compiler::DataStream::Type>();
 				const u8 arg_idx = blob.read<u8>();
 				const float* arg = (float*)getStream(*this, arg_type, arg_idx, m_particles_count, reg_mem.begin());
 				float* dst = m_instance_data.begin() + output_idx;
@@ -665,7 +697,7 @@ void ParticleEmitter::update(float dt)
 				const int stride = m_resource->getOutputsCount();
 				for (int i = 0; i < m_particles_count; ++i) {
 					dst[i * stride] =  arg[i];
-				}
+				}*/
 				break;
 			}
 			default:
@@ -684,6 +716,68 @@ void ParticleEmitter::update(float dt)
 			emit_buffer.read(args, sizeof(args[0]) * count);
 			emit(args);
 		}
+}
+
+
+int ParticleEmitter::getInstanceDataSizeBytes() const
+{
+	return ((m_particles_count + 3) & ~3) * m_resource->getOutputsCount() * sizeof(float);
+}
+
+
+void ParticleEmitter::fillInstanceData(const Vec3& cam_pos, float* data)
+{
+	const OutputBlob& bytecode = m_resource->getBytecode();
+	const int offset = m_resource->getOutputByteOffset();
+	InputBlob blob((u8*)bytecode.getData() + offset, bytecode.getPos());
+	
+	// TODO
+	m_constants[1].value = cam_pos.x;
+	m_constants[2].value = cam_pos.y;
+	m_constants[3].value = cam_pos.z;
+	// TODO
+	Array<float4> reg_mem(m_allocator);
+	reg_mem.resize(m_resource->getRegistersCount() * ((m_particles_count + 3) >> 2));
+	int output_idx = 0;
+	for (;;)
+	{
+		u8 instruction = blob.read<u8>();
+		switch ((Instructions)instruction)
+		{
+			case Instructions::END:
+				return;
+			case Instructions::SIN: {
+				const auto dst_type = blob.read<Compiler::DataStream::Type>();
+				const u8 dst_idx = blob.read<u8>();
+				const auto arg_type = blob.read<Compiler::DataStream::Type>();
+				const u8 arg_idx = blob.read<u8>();
+				
+				const float* arg = (float*)getStream(*this, arg_type, arg_idx, m_particles_count, reg_mem.begin());
+				float* result = (float*)getStream(*this, dst_type, dst_idx, m_particles_count, reg_mem.begin());
+				const float* const end = result + ((m_particles_count + 3) & ~3);
+
+				for (; result != end; ++result, ++arg) {
+					*result = sinf(*arg);
+				}
+				break;
+			}
+			case Instructions::OUTPUT: {
+				const auto arg_type = blob.read<Compiler::DataStream::Type>();
+				const u8 arg_idx = blob.read<u8>();
+				const float* arg = (float*)getStream(*this, arg_type, arg_idx, m_particles_count, reg_mem.begin());
+				float* dst = data + output_idx;
+				++output_idx;
+				const int stride = m_resource->getOutputsCount();
+				for (int i = 0; i < m_particles_count; ++i) {
+					dst[i * stride] =  arg[i];
+				}
+				break;
+			}
+			default:
+				ASSERT(false);
+				break;
+		}
+	}
 }
 
 // TODO

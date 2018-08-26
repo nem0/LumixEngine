@@ -32,6 +32,7 @@ namespace Lumix
 			void writeString(const char* string);
 			template <class T> void write(const T& value);
 			void clear();
+			void* skip(int size);
 
 			OutputBlob& operator << (const char* str);
 			OutputBlob& operator << (u64 value);
