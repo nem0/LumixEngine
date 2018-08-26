@@ -162,6 +162,20 @@ namespace Lumix
 	}
 
 
+	void* OutputBlob::skip(int size)
+	{
+		ASSERT(size > 0);
+
+		if (m_pos + size > m_size)
+		{
+			reserve((m_pos + size) << 1);
+		}
+		void* ret = (u8*)m_data + m_pos;
+		m_pos += size;
+		return ret;
+	}
+
+
 	void OutputBlob::write(const void* data, int size)
 	{
 		if (!size) return;

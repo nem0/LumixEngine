@@ -84,8 +84,7 @@ void Resource::fileLoaded(FS::IFile& file, bool success)
 		return;
 	}
 
-	if (!load(file))
-	{
+	if (!load(file)) {
 		++m_failed_dep_count;
 	}
 

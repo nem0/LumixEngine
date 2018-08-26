@@ -719,6 +719,7 @@ struct PipelineImpl final : Pipeline
 		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
 			LuaWrapper::argError<PipelineImpl*>(L, pipeline_idx);
 		}
+		const CameraParams cp = checkCameraParams(L ,3);
 		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
 
 		struct Cmd : Renderer::RenderCommandBase
@@ -740,47 +741,57 @@ struct PipelineImpl final : Pipeline
 
 				for (ParticleEmitter* emitter : emitters) {
 					if (!emitter->getResource() || !emitter->getResource()->isReady()) continue;
+					const int instances_count = emitter->getInstancesCount();
+					if (instances_count == 0) continue;
+
 					const Material* material = emitter->getResource()->getMaterial();
 					m_data.write(material->getShader()->m_render_data);
 					m_data.write(emitter->getInstanceDataSizeBytes());
-					m_data.write(emitter->getInstancesCount());
-					m_data.write(emitter->getInstanceData(), emitter->getInstanceDataSizeBytes());
+					m_data.write(instances_count);
+					const int size = emitter->getInstanceDataSizeBytes();
+					float* instance_data = (float*)m_data.skip(size);
+					emitter->fillInstanceData(m_camera_params.pos, instance_data);
 				}
 			}
 
 			void execute() override
 			{
+				ffr::pushDebugGroup("particles");
 				InputBlob blob(m_data);
 				ffr::VertexDecl instance_decl;
-				instance_decl.addAttribute(2, ffr::AttributeType::FLOAT, false, false);
+				instance_decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false);
 
 				while(blob.getPosition() < blob.getSize()) {
 					Shader::RenderData* shader_data = blob.read<Shader::RenderData*>();
 					const int byte_size = blob.read<int>();
 					const int instances_count = blob.read<int>();
 					const Renderer::TransientSlice transient = m_pipeline->m_renderer.allocTransient(byte_size);
-					if ((int)transient.size < byte_size) break;
+					if ((int)transient.size < byte_size) {
+						g_log_warning.log("Renderer") << "Not enough memory reserved to render all particles.";
+						break;
+					}
 
 					const void* mem = blob.skip(byte_size);
 					ffr::update(transient.buffer, mem, transient.offset, byte_size);
 
 					const Shader::Program& prog = Shader::getProgram(shader_data, 0);
-					
+					ffr::blending(0);
 					ffr::useProgram(prog.handle);
 					ffr::setInstanceBuffer(instance_decl, transient.buffer, transient.offset, 0);
-#error todo
-					// TODO
-					//					ffr::setIndexBuffer(m_pipeline->getParticlesIndexBuffer());
-					ffr::drawTrianglesInstanced(0, 6, instances_count);
+					ffr::drawTriangleStripArraysInstanced(0, 4, instances_count);
 				}
+				ffr::popDebugGroup();
 			}
 
 			OutputBlob m_data;
 			PipelineImpl* m_pipeline;
+			CameraParams m_camera_params;
 		};
 
 		Cmd* cmd = LUMIX_NEW(pipeline->m_allocator, Cmd)(pipeline->m_allocator);
 		cmd->m_pipeline = pipeline;
+		cmd->m_camera_params = cp;
+
 		pipeline->m_renderer.push(cmd);
 
 		return 0;

@@ -441,14 +441,16 @@ bool Shader::load(FS::IFile& file)
 
 void Shader::unload()
 {
-	m_renderer.runInRenderThread(m_render_data, [](void* ptr){
-		RenderData* rd = (RenderData*)ptr;
-		for(const Program& prg : rd->programs) {
-			ffr::destroy(prg.handle);
-		}
-		LUMIX_DELETE(rd->allocator, rd);
-	});
-	m_render_data = nullptr;
+	if (m_render_data) {
+		m_renderer.runInRenderThread(m_render_data, [](void* ptr){
+			RenderData* rd = (RenderData*)ptr;
+			for(const Program& prg : rd->programs) {
+				if (prg.handle.isValid()) ffr::destroy(prg.handle);
+			}
+			LUMIX_DELETE(rd->allocator, rd);
+		});
+		m_render_data = nullptr;
+	}
 		// TODO
 	/*
 	for (auto& uniform : m_uniforms)

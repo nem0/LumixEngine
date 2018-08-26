@@ -198,6 +198,7 @@ void drawTriangles(uint indices_count);
 void drawTrianglesInstanced(uint indices_offset_bytes, uint indices_count, uint instances_count);
 void drawElements(uint offset, uint count, PrimitiveType type);
 void drawArrays(uint offset, uint count, PrimitiveType type);
+void drawTriangleStripArraysInstanced(uint offset, uint indices_count, uint instances_count);
 
 void pushDebugGroup(const char* msg);
 void popDebugGroup();

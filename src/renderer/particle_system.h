@@ -42,6 +42,7 @@ public:
 	bool load(FS::IFile& file) override;
 	const OutputBlob& getBytecode() const { return m_bytecode; }
 	int getEmitByteOffset() const { return m_emit_byte_offset; }
+	int getOutputByteOffset() const { return m_output_byte_offset; }
 	int getChannelsCount() const { return m_channels_count; }
 	int getRegistersCount() const { return m_registers_count; }
 	int getOutputsCount() const { return m_outputs_count; }
@@ -53,6 +54,7 @@ private:
 	OutputBlob m_bytecode;
 	float m_literals[16];
 	int m_emit_byte_offset;
+	int m_output_byte_offset;
 	int m_channels_count;
 	int m_registers_count;
 	int m_outputs_count;
@@ -75,8 +77,8 @@ public:
 	void deserialize(InputBlob& blob, ResourceManagerHub& manager);
 	void update(float dt);
 	void emit(const float* args);
-	const float* getInstanceData() const { return m_instance_data.begin(); }
-	int getInstanceDataSizeBytes() const { return m_instance_data.byte_size(); }
+	void fillInstanceData(const Vec3& cam_pos, float* data);
+	int getInstanceDataSizeBytes() const;
 	ParticleEmitterResource* getResource() const { return m_resource; }
 	void setResource(ParticleEmitterResource* res);
 	int getInstancesCount() const { return m_instances_count; }
@@ -110,7 +112,6 @@ private:
 	int m_particles_count = 0;
 	int m_instances_count = 0;
 	ParticleEmitterResource* m_resource = nullptr;
-	Array<float> m_instance_data;
 };
 
 

@@ -1093,6 +1093,12 @@ void drawTriangles(uint indices_count)
 }
 
 
+void drawTriangleStripArraysInstanced(uint offset, uint indices_count, uint instances_count)
+{
+	glDrawArraysInstanced(GL_TRIANGLE_STRIP, offset, indices_count, instances_count);
+}
+
+
 void drawArrays(uint offset, uint count, PrimitiveType type)
 {
 	checkThread();
