@@ -365,17 +365,13 @@ struct PipelineImpl final : Pipeline
 		
 		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
 		lua_getfield(m_lua_state, -1, "main");
-		if (lua_type(m_lua_state, -1) == LUA_TFUNCTION) {
-			lua_pushlightuserdata(m_lua_state, this);
-			if (lua_pcall(m_lua_state, 1, 0, 0) != 0) {
-				g_log_warning.log("Renderer") << lua_tostring(m_lua_state, -1);
-				lua_pop(m_lua_state, 1);
-			}
-		}
-		else {
-			lua_pop(m_lua_state, 1);
+		if (lua_type(m_lua_state, -1) != LUA_TFUNCTION) {
+			lua_pop(m_lua_state, 2);
+			return false;
 		}
 
+		LuaWrapper::pcall(m_lua_state, 0);
+		lua_pop(m_lua_state, 1);
 		return true;
 	}
 
@@ -714,14 +710,14 @@ struct PipelineImpl final : Pipeline
 
 	static int renderParticles(lua_State* L)
 	{
-		PROFILE_FUNCTION();
 		const int pipeline_idx = lua_upvalueindex(1);
 		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
 			LuaWrapper::argError<PipelineImpl*>(L, pipeline_idx);
 		}
-		const CameraParams cp = checkCameraParams(L ,3);
+		const CameraParams cp = checkCameraParams(L ,1);
 		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
 
+		PROFILE_FUNCTION();
 		struct Cmd : Renderer::RenderCommandBase
 		{
 			Cmd(IAllocator& allocator) 
@@ -741,14 +737,14 @@ struct PipelineImpl final : Pipeline
 
 				for (ParticleEmitter* emitter : emitters) {
 					if (!emitter->getResource() || !emitter->getResource()->isReady()) continue;
-					const int instances_count = emitter->getInstancesCount();
-					if (instances_count == 0) continue;
+					
+					const int size = emitter->getInstanceDataSizeBytes();
+					if (size == 0) continue;
 
 					const Material* material = emitter->getResource()->getMaterial();
 					m_data.write(material->getShader()->m_render_data);
-					m_data.write(emitter->getInstanceDataSizeBytes());
-					m_data.write(instances_count);
-					const int size = emitter->getInstanceDataSizeBytes();
+					m_data.write(size);
+					m_data.write(emitter->getInstancesCount());
 					float* instance_data = (float*)m_data.skip(size);
 					emitter->fillInstanceData(m_camera_params.pos, instance_data);
 				}

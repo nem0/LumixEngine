@@ -46,13 +46,11 @@ public:
 	int getChannelsCount() const { return m_channels_count; }
 	int getRegistersCount() const { return m_registers_count; }
 	int getOutputsCount() const { return m_outputs_count; }
-	float getLiteralValue(int idx) const { ASSERT(idx < lengthOf(m_literals)); return m_literals[idx]; }
 	Material* getMaterial() const { return m_material; }
 	void setMaterial(const Path& path);
 
 private:
 	OutputBlob m_bytecode;
-	float m_literals[16];
 	int m_emit_byte_offset;
 	int m_output_byte_offset;
 	int m_channels_count;
@@ -101,6 +99,7 @@ private:
 
 	void execute(InputBlob& blob, int particle_index);
 	void kill(int particle_index);
+	float readSingleValue(InputBlob& blob) const;
 
 	IAllocator& m_allocator;
 	OutputBlob m_emit_buffer;
