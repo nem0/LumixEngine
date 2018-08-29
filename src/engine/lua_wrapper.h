@@ -37,6 +37,20 @@ inline int traceback (lua_State *L) {
 }
 
 
+inline bool pcall(lua_State* L, int nargs)
+{
+	lua_pushcfunction(L, traceback);
+	lua_insert(L, -2 - nargs);
+	if (lua_pcall(L, nargs, 0, -2 - nargs) != 0) {
+		g_log_error.log("Engine") << lua_tostring(L, -1);
+		lua_pop(L, 2);
+		return false;
+	}
+	lua_pop(L, 1);
+	return true;
+}
+
+
 inline bool execute(lua_State* L
 	, StringView content
 	, const char* name
@@ -764,6 +778,7 @@ template <typename C, typename T, T t> int wrapMethod(lua_State* L)
 	auto* inst = checkArg<C*>(L, 1);
 	return details::Caller<indices>::callMethod(inst, t, L);
 }
+
 
 
 template <typename C, typename T, T t> int wrapMethodClosure(lua_State* L)
