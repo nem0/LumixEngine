@@ -363,6 +363,7 @@ struct PipelineImpl final : Pipeline
 		resetState();
 		m_renderer.setGlobalState(state);
 		
+		LuaWrapper::DebugGuard lua_debug_guard(m_lua_state);
 		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
 		lua_getfield(m_lua_state, -1, "main");
 		if (lua_type(m_lua_state, -1) != LUA_TFUNCTION) {

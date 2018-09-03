@@ -132,14 +132,14 @@ struct AssetCompilerImpl : AssetCompiler
 		if (luaL_loadbuffer(L, buf.begin(), buf.byte_size(), meta_path) != 0) {
 			g_log_error.log("Editor") << meta_path << ": " << lua_tostring(L, -1);
 			lua_pop(L, 1);
-			lua_close(L);
+			lua_pop(engine_L, 1);
 			return false;
 		}
 
 		if (lua_pcall(L, 0, 0, 0) != 0) {
 			g_log_error.log("Engine") << meta_path << ": " << lua_tostring(L, -1);
 			lua_pop(L, 1);
-			lua_close(L);
+			lua_pop(engine_L, 1);
 			return false;
 		}
 

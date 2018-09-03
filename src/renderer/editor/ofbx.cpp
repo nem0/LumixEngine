@@ -565,17 +565,18 @@ static void deleteElement(Element* el)
 {
 	if (!el) return;
 
-	delete el->first_property;
-	deleteElement(el->child);
 	Element* iter = el;
-	// do not use recursion to avoid stack overflow
+	// do not use recursion to delete siblings to avoid stack overflow
 	do
 	{
 		Element* next = iter->sibling;
+		delete iter->first_property;
+		deleteElement(iter->child);
 		delete iter;
 		iter = next;
 	} while (iter);
 }
+
 
 
 static OptionalError<u64> readElementOffset(Cursor* cursor, u16 version)
@@ -1396,6 +1397,7 @@ struct Scene : IScene
 	int getAnimationStackCount() const override { return (int)m_animation_stacks.size(); }
 	int getMeshCount() const override { return (int)m_meshes.size(); }
 	float getSceneFrameRate() const override { return m_scene_frame_rate; }
+	const GlobalSettings* getGlobalSettings() const override { return &m_settings; }
 
 	const Object* const* getAllObjects() const override { return m_all_objects.empty() ? nullptr : &m_all_objects[0]; }
 
@@ -1450,6 +1452,7 @@ struct Scene : IScene
 	Element* m_root_element = nullptr;
 	Root* m_root = nullptr;
 	float m_scene_frame_rate = -1;
+	GlobalSettings m_settings;
 	std::unordered_map<u64, ObjectPair> m_object_map;
 	std::vector<Object*> m_all_objects;
 	std::vector<Mesh*> m_meshes;
@@ -2350,28 +2353,7 @@ static bool parseTakes(Scene* scene)
 }
 
 
-// http://docs.autodesk.com/FBX/2014/ENU/FBX-SDK-Documentation/index.html?url=cpp_ref/class_fbx_time.html,topicNumber=cpp_ref_class_fbx_time_html29087af6-8c2c-4e9d-aede-7dc5a1c2436c,hash=a837590fd5310ff5df56ffcf7c394787e
-enum FrameRate 
-{
-	FrameRate_DEFAULT = 0,
-	FrameRate_120 = 1,
-	FrameRate_100 = 2,
-	FrameRate_60 = 3,
-	FrameRate_50 = 4,
-	FrameRate_48 = 5,
-	FrameRate_30 = 6,
-	FrameRate_30_DROP = 7,
-	FrameRate_NTSC_DROP_FRAME = 8,
-	FrameRate_NTSC_FULL_FRAME = 9,
-	FrameRate_PAL = 10,
-	FrameRate_CINEMA = 11,
-	FrameRate_1000 = 12,
-	FrameRate_CINEMA_ND = 13,
-	FrameRate_CUSTOM = 14,
-};
-
-
-static float getFramerateFromTimeMode(int time_mode)
+static float getFramerateFromTimeMode(FrameRate time_mode, float custom_frame_rate)
 {
 	switch (time_mode)
 	{
@@ -2389,7 +2371,7 @@ static float getFramerateFromTimeMode(int time_mode)
 		case FrameRate_CINEMA: return 24;
 		case FrameRate_1000: return 1000;
 		case FrameRate_CINEMA_ND: return 23.976f;
-		case FrameRate_CUSTOM: return -2;
+		case FrameRate_CUSTOM: return custom_frame_rate;
 	}
 	return -1;
 }
@@ -2405,19 +2387,39 @@ static void parseGlobalSettings(const Element& root, Scene* scene)
 			{
 				if (props70->id == "Properties70")
 				{
-					for (ofbx::Element* time_mode = props70->child; time_mode; time_mode = time_mode->sibling)
+					for (ofbx::Element* node = props70->child; node; node = node->sibling)
 					{
-						if (time_mode->first_property && time_mode->first_property->value == "TimeMode")
-						{
-							ofbx::IElementProperty* prop = time_mode->getProperty(4);
-							if (prop)
-							{
-								ofbx::DataView value = prop->getValue();
-								int time_mode = *(int*)value.begin;
-								scene->m_scene_frame_rate = getFramerateFromTimeMode(time_mode);
-							}
-							break;
+						if (!node->first_property)
+							continue;
+
+#define get_property(name, field, type) if(node->first_property->value == name) \
+						{ \
+							ofbx::IElementProperty* prop = node->getProperty(4); \
+							if (prop) \
+							{ \
+								ofbx::DataView value = prop->getValue(); \
+								scene->m_settings.field = *(type*)value.begin; \
+							} \
 						}
+
+						get_property("UpAxis", UpAxis, UpVector);
+						get_property("UpAxisSign", UpAxisSign, int);
+						get_property("FrontAxis", FrontAxis, FrontVector);
+						get_property("FrontAxisSign", FrontAxisSign, int);
+						get_property("CoordAxis", CoordAxis, CoordSystem);
+						get_property("CoordAxisSign", CoordAxisSign, int);
+						get_property("OriginalUpAxis", OriginalUpAxis, int);
+						get_property("OriginalUpAxisSign", OriginalUpAxisSign, int);
+						get_property("UnitScaleFactor", UnitScaleFactor, float);
+						get_property("OriginalUnitScaleFactor", OriginalUnitScaleFactor, float);
+						get_property("TimeSpanStart", TimeSpanStart, u64);
+						get_property("TimeSpanStop", TimeSpanStop, u64);
+						get_property("TimeMode", TimeMode, FrameRate);
+						get_property("CustomFrameRate", CustomFrameRate, float);
+
+#undef get_property
+
+						scene->m_scene_frame_rate = getFramerateFromTimeMode(scene->m_settings.TimeMode, scene->m_settings.CustomFrameRate);
 					}
 					break;
 				}
@@ -2622,6 +2624,7 @@ static bool parseObjects(const Element& root, Scene* scene)
 
 					if (mat->textures[type])
 					{
+						break;// This may happen for some models (eg. 2 normal maps in use)
 						Error::s_message = "Invalid material";
 						return false;
 					}
@@ -2747,7 +2750,12 @@ Vec3 Object::getScalingPivot() const
 
 Matrix Object::evalLocal(const Vec3& translation, const Vec3& rotation) const
 {
-	Vec3 scaling = getLocalScaling();
+	return evalLocal(translation, rotation, getLocalScaling());
+}
+
+
+Matrix Object::evalLocal(const Vec3& translation, const Vec3& rotation, const Vec3& scaling) const
+{
 	Vec3 rotation_pivot = getRotationPivot();
 	Vec3 scaling_pivot = getScalingPivot();
 	RotationOrder rotation_order = getRotationOrder();
@@ -2817,6 +2825,12 @@ Matrix Object::getGlobalTransform() const
 	if (!parent) return evalLocal(getLocalTranslation(), getLocalRotation());
 
 	return parent->getGlobalTransform() * evalLocal(getLocalTranslation(), getLocalRotation());
+}
+
+
+Matrix Object::getLocalTransform() const
+{
+    return evalLocal(getLocalTranslation(), getLocalRotation(), getLocalScaling());
 }
 
 
