@@ -6,7 +6,6 @@
 #include "engine/fs/file_system.h"
 #include "engine/fs/memory_file_device.h"
 #include "engine/fs/os_file.h"
-#include "engine/fs/resource_file_device.h"
 #include "engine/input_system.h"
 #include "engine/iplugin.h"
 #include "engine/job_system.h"
@@ -478,20 +477,17 @@ public:
 			m_file_system = FS::FileSystem::create(m_allocator);
 
 			m_mem_file_device = LUMIX_NEW(m_allocator, FS::MemoryFileDevice)(m_allocator);
-			m_resource_file_device = LUMIX_NEW(m_allocator, FS::ResourceFileDevice)(m_allocator);
 			m_disk_file_device = LUMIX_NEW(m_allocator, FS::DiskFileDevice)("disk", working_dir, m_allocator);
 
 			m_file_system->mount(m_mem_file_device);
-			m_file_system->mount(m_resource_file_device);
 			m_file_system->mount(m_disk_file_device);
-			m_file_system->setDefaultDevice("memory:disk:resource");
-			m_file_system->setSaveGameDevice("memory:disk:resource");
+			m_file_system->setDefaultDevice("memory:disk");
+			m_file_system->setSaveGameDevice("memory:disk");
 		}
 		else
 		{
 			m_file_system = fs;
 			m_mem_file_device = nullptr;
-			m_resource_file_device = nullptr;
 			m_disk_file_device = nullptr;
 		}
 
@@ -1197,7 +1193,6 @@ public:
 		{
 			FS::FileSystem::destroy(m_file_system);
 			LUMIX_DELETE(m_allocator, m_mem_file_device);
-			LUMIX_DELETE(m_allocator, m_resource_file_device);
 			LUMIX_DELETE(m_allocator, m_disk_file_device);
 		}
 
@@ -1280,7 +1275,6 @@ public:
 
 	FS::FileSystem& getFileSystem() override { return *m_file_system; }
 	FS::DiskFileDevice* getDiskFileDevice() override { return m_disk_file_device; }
-	FS::ResourceFileDevice* getResourceFileDevice() override { return m_resource_file_device; }
 
 	void startGame(Universe& context) override
 	{
@@ -1592,7 +1586,6 @@ private:
 
 	FS::FileSystem* m_file_system;
 	FS::MemoryFileDevice* m_mem_file_device;
-	FS::ResourceFileDevice* m_resource_file_device;
 	FS::DiskFileDevice* m_disk_file_device;
 
 	ResourceManagerHub m_resource_manager;

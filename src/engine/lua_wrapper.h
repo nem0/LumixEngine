@@ -14,6 +14,28 @@ namespace LuaWrapper
 {
 
 
+#ifdef _DEBUG
+	struct DebugGuard
+	{
+		DebugGuard(lua_State* L)
+			: L(L) 
+		{
+			top = lua_gettop(L);
+		}
+
+		DebugGuard()
+		{
+			ASSERT(lua_gettop(L) == top);
+		}
+	private:
+		lua_State* L;
+		int top;
+	};
+#else
+	struct DebugGuard { DebugGuard(lua_State* L) {} };
+#endif
+
+
 inline int traceback (lua_State *L) {
 	if (!lua_isstring(L, 1)) return 1;
 	

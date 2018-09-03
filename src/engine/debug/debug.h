@@ -65,6 +65,7 @@ public:
 	void* reallocate_aligned(void* ptr, size_t size, size_t align) override;
 	size_t getTotalSize() const { return m_total_size; }
 	void checkGuards();
+	void checkLeaks();
 
 	IAllocator& getSourceAllocator() { return m_source; }
 	AllocationInfo* getFirstAllocationInfo() const { return m_root; }

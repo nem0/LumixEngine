@@ -10,13 +10,14 @@
 #include <mapi.h>
 #include <cstdlib>
 #include <cstdio>
-
+#include "engine/default_allocator.h"
 
 
 #pragma comment(lib, "DbgHelp.lib")
 
 
 static bool g_is_crash_reporting_enabled = true;
+static Lumix::DefaultAllocator xxallocator;
 
 
 namespace Lumix
@@ -47,13 +48,13 @@ class StackNode
 public:
 	~StackNode()
 	{
-		delete m_next;
-		delete m_first_child;
+		LUMIX_DELETE(xxallocator, m_next);
+		LUMIX_DELETE(xxallocator, m_first_child);
 	}
 
 	void* m_instruction;
-	StackNode* m_next;
-	StackNode* m_first_child;
+	StackNode* m_next = nullptr;
+	StackNode* m_first_child = nullptr;
 	StackNode* m_parent;
 };
 
@@ -71,7 +72,7 @@ StackTree::StackTree()
 
 StackTree::~StackTree()
 {
-	delete m_root;
+	LUMIX_DELETE(xxallocator, m_root);
 	if (MT::atomicDecrement(&s_instances) == 0)
 	{
 		HANDLE process = GetCurrentProcess();
@@ -173,7 +174,7 @@ StackNode* StackTree::insertChildren(StackNode* root_node, void** instruction, v
 	StackNode* node = root_node;
 	while (instruction >= stack)
 	{
-		StackNode* new_node = new StackNode();
+		StackNode* new_node = LUMIX_NEW(xxallocator, StackNode)();
 		node->m_first_child = new_node;
 		new_node->m_parent = node;
 		new_node->m_next = nullptr;
@@ -195,7 +196,7 @@ StackNode* StackTree::record()
 	void** ptr = stack + captured_frames_count - 1;
 	if (!m_root)
 	{
-		m_root = new StackNode();
+		m_root = LUMIX_NEW(xxallocator, StackNode)();
 		m_root->m_instruction = *ptr;
 		m_root->m_first_child = nullptr;
 		m_root->m_next = nullptr;
@@ -213,7 +214,7 @@ StackNode* StackTree::record()
 		}
 		if (node->m_instruction != *ptr)
 		{
-			node->m_next = new StackNode;
+			node->m_next = LUMIX_NEW(xxallocator, StackNode);
 			node->m_next->m_parent = node->m_parent;
 			node->m_next->m_instruction = *ptr;
 			node->m_next->m_next = nullptr;
@@ -271,7 +272,7 @@ Allocator::Allocator(IAllocator& source)
 }
 
 
-Allocator::~Allocator()
+void Allocator::checkLeaks()
 {
 	AllocationInfo* last_sentinel = &m_sentinels[1];
 	if (m_root != last_sentinel)
@@ -288,6 +289,12 @@ Allocator::~Allocator()
 		}
 		ASSERT(false);
 	}
+}
+
+
+Allocator::~Allocator()
+{
+	checkLeaks();
 }
 
 
