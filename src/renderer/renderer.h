@@ -80,7 +80,9 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 		enum { MAX_SHADER_DEFINES = 32 };
 	public:
 		virtual ~Renderer() {}
-		virtual void frame(bool capture) = 0;
+		virtual void startCapture() = 0;
+		virtual void stopCapture() = 0;
+		virtual void frame() = 0;
 		virtual void resize(int width, int height) = 0;
 		virtual void makeScreenshot(const Path& filename) = 0;
 		virtual u8 getShaderDefineIdx(const char* define) = 0;
@@ -112,6 +114,7 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 		
 		virtual ffr::TextureHandle createTexture(uint w, uint h, ffr::TextureFormat format, u32 flags, const MemRef& memory) = 0;
 		virtual ffr::TextureHandle loadTexture(const MemRef& memory, u32 flags, ffr::TextureInfo* info) = 0;
+		virtual void getTextureImage(ffr::TextureHandle texture, int size, void* data) = 0;
 		virtual void destroy(ffr::TextureHandle tex) = 0;
 		
 		virtual void push(RenderCommandBase* cmd) = 0;

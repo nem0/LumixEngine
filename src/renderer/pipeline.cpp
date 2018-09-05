@@ -75,6 +75,7 @@ struct PipelineImpl final : Pipeline
 		m_draw2d.PushClipRectFullScreen();
 		m_draw2d.PushTextureID(font_atlas.TexID);
 
+		m_position_radius_uniform = ffr::allocUniform("u_pos_radius", ffr::UniformType::VEC4, 1);
 		m_terrain_params_uniform = ffr::allocUniform("u_terrain_params", ffr::UniformType::VEC4, 1);
 		m_rel_camera_pos_uniform = ffr::allocUniform("u_rel_camera_pos", ffr::UniformType::VEC4, 1);
 		m_terrain_scale_uniform = ffr::allocUniform("u_terrain_scale", ffr::UniformType::VEC4, 1);
@@ -87,6 +88,37 @@ struct PipelineImpl final : Pipeline
 		m_radiance_map_uniform = ffr::allocUniform("u_radiancemap", ffr::UniformType::INT, 1);
 		m_material_params_uniform = ffr::allocUniform("u_material_params", ffr::UniformType::VEC4, 1);
 		m_material_color_uniform = ffr::allocUniform("u_material_color", ffr::UniformType::VEC4, 1);
+
+		float cube_verts[] = {
+			-1, -1, -1,
+			1, -1, -1,
+			1, -1, 1,
+			-1, -1, 1,
+			-1, 1, -1,
+			1, 1, -1,
+			1, 1, 1,
+			-1, 1, 1
+		};
+		const Renderer::MemRef vb_mem = m_renderer.copy(cube_verts, sizeof(cube_verts));
+		m_cube_vb = m_renderer.createBuffer(vb_mem);
+
+		u16 cube_indices[] = {
+			0, 1, 2,
+			0, 2, 3,
+			4, 6, 5,
+			4, 7, 6,
+			0, 4, 5,
+			0, 5, 1,
+			2, 6, 7,
+			2, 7, 3,
+			0, 3, 7,
+			0, 7, 4,
+			1, 2, 6,
+			1, 6, 5
+		};
+
+		const Renderer::MemRef ib_mem = m_renderer.copy(cube_indices, sizeof(cube_indices));
+		m_cube_ib = m_renderer.createBuffer(ib_mem);
 	}
 
 
@@ -350,6 +382,8 @@ struct PipelineImpl final : Pipeline
 		state.camera_inv_view_projection = state.camera_view_projection;
 		state.camera_inv_view_projection.inverse();
 		state.time = m_timer->getTimeSinceStart();
+		state.framebuffer_size.x = m_viewport.w;
+		state.framebuffer_size.y = m_viewport.h;
 
 		const EntityPtr global_light = m_scene->getActiveGlobalLight();
 		if(global_light.isValid()) {
@@ -516,7 +550,6 @@ struct PipelineImpl final : Pipeline
 				vertex_decl.addAttribute(2, ffr::AttributeType::FLOAT, false, false);
 				vertex_decl.addAttribute(4, ffr::AttributeType::U8, true, false);
 				
-
 				ffr::BufferHandle vb = ffr::allocBufferHandle();
 				ffr::BufferHandle ib = ffr::allocBufferHandle();
 				ffr::createBuffer(vb, vtx_buffer_mem.size, vtx_buffer_mem.data);
@@ -833,6 +866,168 @@ struct PipelineImpl final : Pipeline
 		}
 
 		return cp;
+	}
+
+
+	static int bindTextures(lua_State* L)
+	{
+		struct Cmd : Renderer::RenderCommandBase {
+			void setup() override {}
+			void execute() override 
+			{
+				for(int i = 0; i < m_textures_count; ++i) {
+					ffr::bindTexture(m_offset + i, m_textures[i].handle);
+					ffr::setUniform1i(m_textures[i].uniform, i + m_offset);
+				}
+			}
+
+			struct { 
+				ffr::TextureHandle handle;
+				ffr::UniformHandle uniform;
+			} m_textures[16];
+			int m_offset = 0;
+			int m_textures_count = 0;
+		};
+
+		const int pipeline_idx = lua_upvalueindex(1);
+		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
+			LuaWrapper::argError<PipelineImpl*>(L, pipeline_idx);
+		}
+		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
+		LuaWrapper::checkTableArg(L, 1);
+
+		const int offset = lua_gettop(L) > 1 ? LuaWrapper::checkArg<int>(L, 2) : 0;
+
+		Cmd* cmd = LUMIX_NEW(pipeline->m_renderer.getAllocator(), Cmd);
+		cmd->m_offset = offset;
+		lua_pushnil(L);
+		while (lua_next(L, 1) != 0) {
+			if(lua_type(L, -1) != LUA_TNUMBER) {
+				LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
+				return luaL_error(L, "%s", "Incorrect texture arguments of bindTextures");
+			}
+
+			if(lua_type(L, -2) != LUA_TSTRING) {
+				LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
+				return luaL_error(L, "%s", "Incorrect texture arguments of bindTextures");
+			}
+
+			if (cmd->m_textures_count > lengthOf(cmd->m_textures)) {
+				LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
+				return luaL_error(L, "%s", "Too many texture in bindTextures call");
+			}
+
+			const char* uniform_name = lua_tostring(L, -2);
+			cmd->m_textures[cmd->m_textures_count].uniform = ffr::allocUniform(uniform_name, ffr::UniformType::INT, 1);
+
+			const int rb_idx = (int)lua_tointeger(L, -1);
+			cmd->m_textures[cmd->m_textures_count].handle = pipeline->m_renderbuffers[rb_idx].handle;
+			++cmd->m_textures_count;
+
+			lua_pop(L, 1);
+		}
+
+		pipeline->m_renderer.push(cmd);
+
+		return 0;
+	};
+
+
+	static int renderEnvProbeVolumes(lua_State* L)
+	{
+		const int pipeline_idx = lua_upvalueindex(1);
+		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
+			LuaWrapper::argError<PipelineImpl*>(L, pipeline_idx);
+		}
+		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
+		const int shader_id = LuaWrapper::checkArg<int>(L, 1);
+		const Shader* shader = [&] {
+			for (const ShaderRef& s : pipeline->m_shaders) {
+				if(s.id == shader_id) {
+					return s.res;
+				}
+			}
+			return (Shader*)nullptr;
+		}();
+		if (!shader) {
+			return luaL_error(L, "Unknown shader id %d in renderEnvProbeVolumes.", shader_id);
+		}
+		const CameraParams cp = checkCameraParams(L, 2);
+		
+		struct Cmd : public Renderer::RenderCommandBase
+		{
+			struct Probe
+			{
+				Vec3 pos;
+				ffr::TextureHandle texture;
+			};
+
+			Cmd(IAllocator& allocator) : m_probes(allocator) {}
+
+			void setup() override
+			{
+				m_pipeline->getScene()->getEnvironmentProbes(m_probes);
+			}
+
+
+			void execute() override
+			{
+				PROFILE_FUNCTION();
+				if(m_probes.empty()) return;
+
+				ffr::pushDebugGroup("environment");
+				const Shader::Program& prog = Shader::getProgram(m_shader, 0);
+				if(!prog.handle.isValid()) return;
+
+				const int pos_radius_uniform_loc = ffr::getUniformLocation(prog.handle, m_pos_radius_uniform);
+
+				ffr::VertexDecl decl;
+				decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false);
+
+				ffr::setVertexBuffer(&decl, m_vb, 0, nullptr);
+				ffr::setIndexBuffer(m_ib);
+				ffr::useProgram(prog.handle);
+				ffr::setState(0);
+				const int irradiance_map_loc = ffr::getUniformLocation(prog.handle, m_irradiance_map_uniform);
+				const int radiance_map_loc = ffr::getUniformLocation(prog.handle, m_radiance_map_uniform);
+				const Vec3 cam_pos = m_camera_params.pos;
+				for (const EnvProbeInfo& probe : m_probes) {
+					const Vec4 pos_radius(probe.position - cam_pos, probe.radius);
+					ffr::bindTexture(0, probe.radiance);
+					ffr::applyUniform1i(irradiance_map_loc, 0);
+					ffr::bindTexture(1, probe.radiance);
+					ffr::applyUniform1i(radiance_map_loc, 1);
+					ffr::applyUniform4f(pos_radius_uniform_loc, &pos_radius.x);
+					ffr::drawTriangles(36);
+				}
+				ffr::popDebugGroup();
+			}
+
+			ffr::BufferHandle m_ib;
+			ffr::BufferHandle m_vb;
+			ffr::UniformHandle m_pos_radius_uniform;
+			ffr::UniformHandle m_irradiance_map_uniform;
+			ffr::UniformHandle m_radiance_map_uniform;
+			CameraParams m_camera_params;
+			PipelineImpl* m_pipeline;
+			Array<EnvProbeInfo> m_probes;
+			Shader::RenderData* m_shader;
+		};
+
+		if(shader->isReady()) {
+			IAllocator& allocator = pipeline->m_renderer.getAllocator();
+			Cmd* cmd = LUMIX_NEW(allocator, Cmd)(allocator);
+			cmd->m_pipeline = pipeline;
+			cmd->m_shader = shader->m_render_data;
+			cmd->m_ib = pipeline->m_cube_ib;
+			cmd->m_vb = pipeline->m_cube_vb;
+			cmd->m_camera_params = cp;
+			cmd->m_irradiance_map_uniform = pipeline->m_irradiance_map_uniform;
+			cmd->m_radiance_map_uniform = pipeline->m_radiance_map_uniform;
+			cmd->m_pos_radius_uniform = pipeline->m_position_radius_uniform;
+			pipeline->m_renderer.push(cmd);
+		}
+		return 0;
 	}
 
 	
@@ -2090,9 +2285,11 @@ struct PipelineImpl final : Pipeline
 		registerConst("STENCIL_KEEP", (uint)ffr::StencilOps::KEEP);
 		registerConst("STENCIL_REPLACE", (uint)ffr::StencilOps::REPLACE);
 
+		registerCFunction("bindTextures", PipelineImpl::bindTextures);
 		registerCFunction("drawArray", PipelineImpl::drawArray);
 		registerCFunction("getCameraParams", PipelineImpl::getCameraParams);
 		registerCFunction("getShadowCameraParams", PipelineImpl::getShadowCameraParams);
+		registerCFunction("renderEnvProbeVolumes", PipelineImpl::renderEnvProbeVolumes);
 		registerCFunction("renderMeshes", PipelineImpl::renderMeshes);
 		registerCFunction("renderParticles", PipelineImpl::renderParticles);
 		registerCFunction("renderTerrains", PipelineImpl::renderTerrains);
@@ -2151,6 +2348,7 @@ struct PipelineImpl final : Pipeline
 	Array<ShaderRef> m_shaders;
 	Timer* m_timer;
 
+	ffr::UniformHandle m_position_radius_uniform;
 	ffr::UniformHandle m_terrain_params_uniform;
 	ffr::UniformHandle m_rel_camera_pos_uniform;
 	ffr::UniformHandle m_terrain_scale_uniform;
@@ -2163,6 +2361,8 @@ struct PipelineImpl final : Pipeline
 	ffr::UniformHandle m_radiance_map_uniform;
 	ffr::UniformHandle m_material_params_uniform;
 	ffr::UniformHandle m_material_color_uniform;
+	ffr::BufferHandle m_cube_vb;
+	ffr::BufferHandle m_cube_ib;
 };
 
 

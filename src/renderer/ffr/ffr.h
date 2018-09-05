@@ -103,6 +103,7 @@ enum class UniformType : uint {
 	VEC2,
 	VEC3,
 	VEC4,
+	IVEC2,
 	MAT4,
 	MAT4X3,
 	MAT3X4
@@ -151,6 +152,8 @@ bool isHomogenousDepth();
 bool isOriginBottomLeft();
 void checkThread();
 void shutdown();
+void startCapture();
+void stopCapture();
 
 void clear(uint flags, const float* color, float depth);
 
@@ -210,6 +213,8 @@ void setUniformMatrix3x4f(UniformHandle uniform, const float* value);
 void setUniformMatrix4f(UniformHandle uniform, const float* value);
 void setUniformMatrix4x3f(UniformHandle uniform, const float* value);
 int getUniformLocation(ProgramHandle program_handle, UniformHandle uniform);
+void applyUniform1i(int location, int value);
+void applyUniform4f(int location, const float* value);
 void applyUniformMatrix3x4f(int location, const float* value);
 void applyUniformMatrix4f(int location, const float* value);
 void applyUniformMatrix4fv(int location, uint count, const float* value);
