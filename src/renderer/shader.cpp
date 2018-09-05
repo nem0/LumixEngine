@@ -63,6 +63,7 @@ const Shader::Program& Shader::getProgram(RenderData* rd, u32 defines)
 			"	float u_light_intensity;\n"
 			"	float u_light_indirect_intensity;\n"
 			"	float u_time;\n"
+			"	ivec2 u_framebuffer_size;\n"
 			"};\n"
 			"uniform samplerCube u_irradiancemap;\n"
 			"uniform samplerCube u_radiancemap;\n"
@@ -94,7 +95,7 @@ const Shader::Program& Shader::getProgram(RenderData* rd, u32 defines)
 
 		for(int& i : program.attribute_by_semantics) i = -1;
 		// TODO shader path - last argument
-		program.handle = ffr::createProgram(codes, types, rd->sources.size(), prefixes, 2 + defines_count, "TODO");
+		program.handle = ffr::createProgram(codes, types, rd->sources.size(), prefixes, 2 + defines_count, rd->path.c_str());
 		program.use_semantics = false;
 		if (program.handle.isValid()) {
 			ffr::uniformBlockBinding(program.handle, "GlobalState", 0);
@@ -397,6 +398,7 @@ bool Shader::load(FS::IFile& file)
 
 	IAllocator& allocator = m_renderer.getAllocator();
 	m_render_data = LUMIX_NEW(allocator, RenderData)(m_renderer, allocator);
+	m_render_data->path = getPath();
 
 	lua_pushlightuserdata(L, this);
 	lua_setfield(L, LUA_GLOBALSINDEX, "this");

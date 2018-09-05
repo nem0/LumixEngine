@@ -117,6 +117,7 @@ struct EnvironmentProbe
 	Texture* texture;
 	Texture* irradiance;
 	Texture* radiance;
+	float radius;
 	u64 guid;
 	FlagSet<Flags, u32> flags;
 	u16 radiance_size = 128;
@@ -1093,6 +1094,7 @@ public:
 		EnvironmentProbe& probe = m_environment_probes[entity];
 		serializer.write("guid", probe.guid);
 		serializer.write("flags", probe.flags.base);
+		serializer.write("radius", probe.radius);
 		serializer.write("radiance_size", probe.radiance_size);
 		serializer.write("irradiance_size", probe.irradiance_size);
 		serializer.write("reflection_size", probe.reflection_size);
@@ -1109,6 +1111,7 @@ public:
 		EnvironmentProbe& probe = m_environment_probes.insert(entity);
 		serializer.read(&probe.guid);
 		serializer.read(&probe.flags.base);
+		serializer.read(&probe.radius);
 		serializer.read(&probe.radiance_size);
 		serializer.read(&probe.irradiance_size);
 		serializer.read(&probe.reflection_size);
@@ -1319,6 +1322,7 @@ public:
 			EntityRef entity = m_environment_probes.getKey(i);
 			serializer.write(entity);
 			const EnvironmentProbe& probe = m_environment_probes.at(i);
+			serializer.write(probe.radius);
 			serializer.write(probe.guid);
 			serializer.write(probe.flags.base);
 			serializer.write(probe.radiance_size);
@@ -3417,32 +3421,31 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 
 	void reloadEnvironmentProbe(EntityRef entity) override
 	{
-	// TODO
-	ASSERT(false);
-	/*
 		auto& probe = m_environment_probes[entity];
-		auto* texture_manager = m_engine.getResourceManager().get(Texture::TYPE);
-		if (probe.texture) texture_manager->unload(*probe.texture);
+		ResourceManagerHub& rm = m_engine.getResourceManager();
+		if (probe.texture) probe.texture->getResourceManager().unload(*probe.texture);
 		probe.texture = nullptr;
 		StaticString<MAX_PATH_LENGTH> path;
-		if (probe.flags.isSet(EnvironmentProbe::REFLECTION))
-		{
+		if (probe.flags.isSet(EnvironmentProbe::REFLECTION)) {
 			path  << "universes/" << m_universe.getName() << "/probes/" << probe.guid << ".dds";
-			probe.texture = static_cast<Texture*>(texture_manager->load(Path(path)));
-			probe.texture->setFlag(BGFX_TEXTURE_SRGB, true);
+			probe.texture = rm.load<Texture>(Path(path));
+			// TODO
+			//probe.texture->setFlag(BGFX_TEXTURE_SRGB, true);
 		}
 		path = "universes/";
 		path << m_universe.getName() << "/probes/" << probe.guid << "_irradiance.dds";
-		probe.irradiance = static_cast<Texture*>(texture_manager->load(Path(path)));
-		probe.irradiance->setFlag(BGFX_TEXTURE_SRGB, true);
-		probe.irradiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
-		probe.irradiance->setFlag(BGFX_TEXTURE_MAG_ANISOTROPIC, true);
+		if(probe.irradiance) probe.irradiance->getResourceManager().unload(*probe.irradiance);
+		probe.irradiance = rm.load<Texture>(Path(path));
+		//probe.irradiance->setFlag(BGFX_TEXTURE_SRGB, true);
+		//probe.irradiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
+		//probe.irradiance->setFlag(BGFX_TEXTURE_MAG_ANISOTROPIC, true);
 		path = "universes/";
 		path << m_universe.getName() << "/probes/" << probe.guid << "_radiance.dds";
-		probe.radiance = static_cast<Texture*>(texture_manager->load(Path(path)));
-		probe.radiance->setFlag(BGFX_TEXTURE_SRGB, true);
-		probe.radiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
-		probe.radiance->setFlag(BGFX_TEXTURE_MAG_ANISOTROPIC, true);*/
+		if (probe.radiance) probe.irradiance->getResourceManager().unload(*probe.radiance);
+		probe.radiance = rm.load<Texture>(Path(path));
+		//probe.radiance->setFlag(BGFX_TEXTURE_SRGB, true);
+		//probe.radiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
+		//probe.radiance->setFlag(BGFX_TEXTURE_MAG_ANISOTROPIC, true);
 	}
 
 
@@ -3465,38 +3468,67 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		return nearest;
 	}
 
+	
+	void getEnvironmentProbes(Array<EnvProbeInfo>& probes) override
+	{
+		PROFILE_FUNCTION();
+		probes.resize(m_environment_probes.size());
+		for (int i = 0; i < m_environment_probes.size(); ++i) {
+			const EnvironmentProbe& probe = m_environment_probes.at(i);
+			const EntityRef entity = m_environment_probes.getKey(i);
+			EnvProbeInfo& out = probes[i];
+			out.radius = probe.radius;
+			out.position = m_universe.getPosition(entity);
+			out.radiance = probe.radiance && probe.radiance->isReady() ? probe.radiance->handle : ffr::INVALID_TEXTURE;
+			out.irradiance = probe.irradiance && probe.irradiance->isReady() ? probe.irradiance->handle : ffr::INVALID_TEXTURE;
+			out.reflection = probe.texture && probe.texture->isReady() ? probe.texture->handle : ffr::INVALID_TEXTURE;
+		}
+	}
 
-	int getEnvironmentProbeIrradianceSize(EntityRef entity)
+
+	int getEnvironmentProbeIrradianceSize(EntityRef entity) override
 	{
 		return m_environment_probes[entity].irradiance_size;
 	}
 
 
-	void setEnvironmentProbeIrradianceSize(EntityRef entity, int size)
+	void setEnvironmentProbeIrradianceSize(EntityRef entity, int size) override
 	{
 		m_environment_probes[entity].irradiance_size = size;
 	}
 
 
-	int getEnvironmentProbeRadianceSize(EntityRef entity)
+	float getEnvironmentProbeRadius(EntityRef entity) override
+	{
+		return m_environment_probes[entity].radius;
+	}
+
+
+	void setEnvironmentProbeRadius(EntityRef entity, float radius) override
+	{
+		m_environment_probes[entity].radius = radius;
+	}
+
+
+	int getEnvironmentProbeRadianceSize(EntityRef entity) override
 	{
 		return m_environment_probes[entity].radiance_size;
 	}
 
 
-	void setEnvironmentProbeRadianceSize(EntityRef entity, int size)
+	void setEnvironmentProbeRadianceSize(EntityRef entity, int size) override
 	{
 		m_environment_probes[entity].radiance_size = size;
 	}
 
 
-	int getEnvironmentProbeReflectionSize(EntityRef entity)
+	int getEnvironmentProbeReflectionSize(EntityRef entity) override
 	{
 		return m_environment_probes[entity].reflection_size;
 	}
 
 
-	void setEnvironmentProbeReflectionSize(EntityRef entity, int size)
+	void setEnvironmentProbeReflectionSize(EntityRef entity, int size) override
 	{
 		m_environment_probes[entity].reflection_size = size;
 	}
@@ -3916,6 +3948,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		probe.irradiance->setFlag(Texture::Flags::SRGB, true);
 		probe.radiance = rm.load<Texture>(Path("models/common/default_probe.dds"));
 		probe.radiance->setFlag(Texture::Flags::SRGB, true);
+		probe.radius = 1;
 		probe.guid = Math::randGUID();
 
 		m_universe.onComponentCreated(entity, ENVIRONMENT_PROBE_TYPE, this);

@@ -281,6 +281,7 @@ static void registerProperties(IAllocator& allocator)
 			BoneProperty()
 		),
 		component("environment_probe",
+			property("Radius", LUMIX_PROP(RenderScene, EnvironmentProbeRadius)),
 			property("Enabled reflection", LUMIX_PROP_FULL(RenderScene, isEnvironmentProbeReflectionEnabled, enableEnvironmentProbeReflection)),
 			property("Override global size", LUMIX_PROP_FULL(RenderScene, isEnvironmentProbeCustomSize, enableEnvironmentProbeCustomSize)),
 			property("Radiance size", LUMIX_PROP(RenderScene, EnvironmentProbeRadianceSize)),
@@ -503,6 +504,29 @@ struct RendererImpl final : public Renderer
 	ffr::FramebufferHandle getFramebuffer() const override
 	{
 		return m_render_task.m_framebuffer;
+	}
+
+
+	void getTextureImage(ffr::TextureHandle texture, int size, void* data) override
+	{
+		struct Cmd : RenderCommandBase {
+			void setup() override {}
+			void execute() override {
+				ffr::pushDebugGroup("get image data");
+				ffr::getTextureImage(handle, size, buf);
+				ffr::popDebugGroup();
+			}
+
+			ffr::TextureHandle handle;
+			uint size;
+			void* buf;
+		};
+
+		Cmd* cmd = LUMIX_NEW(m_render_task.m_allocator, Cmd);
+		cmd->handle = texture;
+		cmd->size = size;
+		cmd->buf = data;
+		push(cmd);
 	}
 
 
@@ -840,6 +864,34 @@ struct RendererImpl final : public Renderer
 	}
 
 
+	void startCapture() override
+	{
+		struct Cmd : RenderCommandBase {
+			void setup() override {}
+			void execute() override { 
+				PROFILE_FUNCTION();
+				ffr::startCapture();
+			}
+		};
+		Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
+		push(cmd);
+	}
+
+
+	void stopCapture() override
+	{
+		struct Cmd : RenderCommandBase {
+			void setup() override {}
+			void execute() override { 
+				PROFILE_FUNCTION();
+				ffr::stopCapture();
+			}
+		};
+		Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
+		push(cmd);
+	}
+
+
 	void pushSwapCommand()
 	{
 		struct SwapCmd : RenderCommandBase {
@@ -852,6 +904,7 @@ struct RendererImpl final : public Renderer
 				renderer->m_render_task.m_transient_buffer_offset = 0;
 			}
 			RendererImpl* renderer;
+			bool capture;
 		};
 		SwapCmd* swap_cmd = LUMIX_NEW(m_allocator, SwapCmd);
 		swap_cmd->renderer = this;
@@ -859,7 +912,7 @@ struct RendererImpl final : public Renderer
 	}
 
 
-	void frame(bool capture) override
+	void frame() override
 	{
 		PROFILE_FUNCTION();
 		pushSwapCommand();

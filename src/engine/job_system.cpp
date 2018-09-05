@@ -65,8 +65,8 @@ struct System
 	MT::Event m_work_signal;
 	Array<MT::Task*> m_workers;
 	Array<Job> m_job_queue;
-	FiberDecl m_fiber_pool[256];
-	int m_free_fibers_indices[256];
+	FiberDecl m_fiber_pool[512];
+	int m_free_fibers_indices[512];
 	int m_num_free_fibers;
 	Array<SleepingFiber> m_sleeping_fibers;
 	IAllocator& m_allocator;
