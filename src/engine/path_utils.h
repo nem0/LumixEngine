@@ -38,9 +38,11 @@ namespace PathUtils
 	{
 		explicit FileInfo(const char* path)
 		{
-			getExtension(m_extension, sizeof(m_extension), path);
-			getBasename(m_basename, sizeof(m_basename), path);
-			getDir(m_dir, sizeof(m_dir), path);
+			char tmp[MAX_PATH_LENGTH];
+			normalize(path, tmp, lengthOf(tmp));
+			getExtension(m_extension, sizeof(m_extension), tmp);
+			getBasename(m_basename, sizeof(m_basename), tmp);
+			getDir(m_dir, sizeof(m_dir), tmp);
 		}
 
 		char m_extension[10];

@@ -65,8 +65,8 @@ struct System
 	MT::Event m_work_signal;
 	Array<MT::Task*> m_workers;
 	Array<Job> m_job_queue;
-	FiberDecl m_fiber_pool[256];
-	int m_free_fibers_indices[256];
+	FiberDecl m_fiber_pool[512];
+	int m_free_fibers_indices[512];
 	int m_num_free_fibers;
 	Array<SleepingFiber> m_sleeping_fibers;
 	IAllocator& m_allocator;
@@ -101,12 +101,16 @@ static bool getReadyJob(System& system, Job* out)
 
 	if (system.m_job_queue.empty()) return false;
 
-	Job job = system.m_job_queue.back();
-	system.m_job_queue.pop();
-	if (system.m_job_queue.empty()) system.m_work_signal.reset();
-	*out = job;
-
-	return true;
+	for (int i = system.m_job_queue.size() - 1; i >= 0; --i) {
+		Job job = system.m_job_queue[i];
+		if(!job.decl.depends_on || *job.decl.depends_on == 0) {
+			system.m_job_queue.eraseFast(i);
+			if (system.m_job_queue.empty()) system.m_work_signal.reset();
+			*out = job;
+			return true;
+		}
+	}
+	return false;
 }
 
 

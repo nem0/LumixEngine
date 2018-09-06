@@ -16,8 +16,6 @@
 	#else
 		#define PLATFORM32
 	#endif
-#elif defined(__EMSCRIPTEN__)
-	#define PLATFORM32
 #else
 	#error Platform not supported
 #endif
@@ -43,11 +41,6 @@ typedef unsigned int uint;
 	typedef unsigned long long u64;
 	#define LUMIX_ALIGN_BEGIN(_align) __declspec(align(_align))
 	#define LUMIX_ALIGN_END(_align)
-#elif defined __EMSCRIPTEN__
-	typedef long long i64;
-	typedef unsigned long long u64;
-	#define LUMIX_ALIGN_BEGIN(_align)
-	#define LUMIX_ALIGN_END(_align) __attribute__( (aligned(_align) ) )
 #else
 	#ifdef PLATFORM64
 		typedef long i64;

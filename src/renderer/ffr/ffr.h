@@ -77,7 +77,7 @@ enum class StencilOps : uint {
 };
 
 
-enum class AttributeType : uint {
+enum class AttributeType : u8 {
 	U8,
 	FLOAT,
 	I16
@@ -115,21 +115,25 @@ enum class TextureFlags : uint {
 
 
 struct Attribute {
-	uint components_num;
-	uint offset;
-	bool normalized;
-	bool as_int;
+	enum Flags {
+		NORMALIZED = 1 << 0,
+		AS_INT = 1 << 1
+	};
+	u8 components_num;
+	u8 offset;
 	AttributeType type;
+	u8 flags;
 };
 
 
 struct VertexDecl {
 	enum { MAX_ATTRIBUTES = 16 };
 
-	void addAttribute(uint components_num, AttributeType type, bool normalized, bool as_int);
+	void addAttribute(u8 components_num, AttributeType type, bool normalized, bool as_int);
 
-	uint size = 0;
-	uint attributes_count = 0;
+	u16 size = 0;
+	u16 attributes_count = 0;
+	u32 hash = 0;
 	Attribute attributes[MAX_ATTRIBUTES];
 };
 
@@ -212,6 +216,8 @@ void setUniformMatrix4x3f(UniformHandle uniform, const float* value);
 int getUniformLocation(ProgramHandle program_handle, UniformHandle uniform);
 void applyUniformMatrix3x4f(int location, const float* value);
 void applyUniformMatrix4f(int location, const float* value);
+void applyUniform4f(int location, const float* value);
+void applyUniform1i(int location, int value);
 void applyUniformMatrix4fv(int location, uint count, const float* value);
 void applyUniformMatrix4x3f(int location, const float* value);
 

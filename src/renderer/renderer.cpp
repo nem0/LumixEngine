@@ -440,9 +440,8 @@ struct RendererImpl final : public Renderer
 		m_font_manager->destroy();
 		LUMIX_DELETE(m_allocator, m_font_manager);
 		m_render_task.shutdown();
-		JobSystem::wait(&m_last_job->counter);
 		if (m_last_job) {
-			JobSystem::wait(&m_last_job->counter);
+			JobSystem::wait(&m_last_job->exec_counter);
 			LUMIX_DELETE(m_allocator, m_last_job);
 			m_last_job = nullptr;
 		}
@@ -551,7 +550,7 @@ struct RendererImpl final : public Renderer
 		slice.buffer = m_render_task.m_transient_buffer;
 		slice.offset = m_render_task.m_transient_buffer_offset;
 		slice.size = m_render_task.m_transient_buffer_offset + size > TRANSIENT_BUFFER_SIZE ? 0 : size;
-		 m_render_task.m_transient_buffer_offset += slice.size;
+		m_render_task.m_transient_buffer_offset += slice.size;
 		return slice;
 	}
 
@@ -692,7 +691,8 @@ struct RendererImpl final : public Renderer
 	struct RenderCommandSetupJobData {
 		RenderCommandBase* cmd;
 		RenderCommandSetupJobData* prev;
-		volatile int counter;
+		volatile int setup_counter;
+		volatile int exec_counter;
 		RendererImpl* renderer;
 	};
 
@@ -703,7 +703,8 @@ struct RendererImpl final : public Renderer
 		RenderCommandSetupJobData* data = LUMIX_NEW(m_allocator, RenderCommandSetupJobData);
 		data->cmd = cmd;
 		data->prev = m_last_job;
-		data->counter = 0;
+		data->setup_counter = 0;
+		data->exec_counter = 0;
 		data->renderer = this;
 
 		JobSystem::JobDecl job;
@@ -711,12 +712,22 @@ struct RendererImpl final : public Renderer
 		job.task = [](void* data){
 			RenderCommandSetupJobData* job_data = (RenderCommandSetupJobData*)data;
 			RenderCommandBase* cmd = job_data->cmd;
-			RendererImpl* renderer = job_data->renderer;
 
 			cmd->setup();
+		};
+		JobSystem::runJobs(&job, 1, &data->setup_counter);
 
+		JobSystem::JobDecl exec_job;
+		exec_job.data = data;
+		exec_job.depends_on = data->prev ? &data->prev->exec_counter : nullptr;
+		exec_job.task = [](void* data){
+			RenderCommandSetupJobData* job_data = (RenderCommandSetupJobData*)data;
+			RenderCommandBase* cmd = job_data->cmd;
+			RendererImpl* renderer = job_data->renderer;
+
+			JobSystem::wait(&job_data->setup_counter);
 			if (job_data->prev) {
-				JobSystem::wait(&job_data->prev->counter);
+				JobSystem::wait(&job_data->prev->exec_counter);
 				LUMIX_DELETE(renderer->m_allocator, job_data->prev);
 			}
 
@@ -725,7 +736,7 @@ struct RendererImpl final : public Renderer
 			renderer->m_render_task.m_commands.push(rt_cmd, true);
 		};
 
-		JobSystem::runJobs(&job, 1, &data->counter);
+		JobSystem::runJobs(&exec_job, 1, &data->exec_counter);
 		m_last_job = data;
 	}
 
@@ -849,7 +860,7 @@ struct RendererImpl final : public Renderer
 				renderer->m_frame_semaphore.signal();
 				ffr::swapBuffers(); 
 				renderer->m_render_task.m_profiler.frame();
-				renderer->m_render_task.m_transient_buffer_offset = 0;
+				renderer->m_render_task.m_transient_buffer_offset = 0; // TODO this is accessed from different threads
 			}
 			RendererImpl* renderer;
 		};
@@ -868,7 +879,7 @@ struct RendererImpl final : public Renderer
 			m_frame_semaphore.wait();
 		}
 		if (m_last_job) {
-			JobSystem::wait(&m_last_job->counter);
+			JobSystem::wait(&m_last_job->exec_counter);
 			LUMIX_DELETE(m_allocator, m_last_job);
 			m_last_job = nullptr;
 		}

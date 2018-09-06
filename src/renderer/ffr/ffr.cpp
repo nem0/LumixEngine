@@ -25,7 +25,7 @@ namespace ffr {
 
 struct Buffer
 {
-	enum { MAX_COUNT = 4096 };
+	enum { MAX_COUNT = 8192 };
 	
 	GLuint handle;
 };
@@ -33,7 +33,7 @@ struct Buffer
 
 struct Uniform
 {
-	enum { MAX_COUNT = 256 };
+	enum { MAX_COUNT = 512 };
 
 	UniformType type;
 	uint count;
@@ -46,7 +46,7 @@ struct Uniform
 
 struct Texture
 {
-	enum { MAX_COUNT = 4096 };
+	enum { MAX_COUNT = 8192 };
 
 	GLuint handle;
 	GLenum target;
@@ -55,7 +55,7 @@ struct Texture
 
 struct Program
 {
-	enum { MAX_COUNT = 1024 };
+	enum { MAX_COUNT = 2048 };
 	GLuint handle;
 
 	struct {
@@ -122,6 +122,7 @@ static struct {
 	int vertex_attributes = 0;
 	int instance_attributes = 0;
 	int max_vertex_attributes = 16;
+	ProgramHandle last_program = INVALID_PROGRAM;
 } g_ffr;
 
 
@@ -789,7 +790,7 @@ static int getSize(AttributeType type)
 }
 
 
-void VertexDecl::addAttribute(uint components_num, AttributeType type, bool normalized, bool as_int)
+void VertexDecl::addAttribute(u8 components_num, AttributeType type, bool normalized, bool as_int)
 {
 	if((int)attributes_count >= lengthOf(attributes)) {
 		ASSERT(false);
@@ -798,8 +799,8 @@ void VertexDecl::addAttribute(uint components_num, AttributeType type, bool norm
 
 	Attribute& attr = attributes[attributes_count];
 	attr.components_num = components_num;
-	attr.as_int = as_int;
-	attr.normalized = normalized;
+	attr.flags = as_int ? Attribute::AS_INT : 0;
+	attr.flags |= normalized ? Attribute::NORMALIZED : 0;
 	attr.type = type;
 	attr.offset = 0;
 	if(attributes_count > 0) {
@@ -807,6 +808,7 @@ void VertexDecl::addAttribute(uint components_num, AttributeType type, bool norm
 		attr.offset = prev.offset + prev.components_num * getSize(prev.type);
 	}
 	size = attr.offset + attr.components_num * getSize(attr.type);
+	hash = crc32(attributes, sizeof(Attribute) * attributes_count);
 	++attributes_count;
 }
 
@@ -878,6 +880,16 @@ int getUniformLocation(ProgramHandle program_handle, UniformHandle uniform)
 	return -1;
 }
 
+void applyUniform4f(int location, const float* value)
+{
+	glUniform4fv(location, 1, value);
+}
+
+void applyUniform1i(int location, int value)
+{
+	glUniform1i(location, value);
+}
+
 void applyUniformMatrix4f(int location, const float* value)
 {
 	glUniformMatrix4fv(location, 1, false, value);
@@ -903,7 +915,10 @@ void useProgram(ProgramHandle handle)
 	if (!handle.isValid()) return;
 
 	const Program& prg = g_ffr.programs.values[handle.value];
-	CHECK_GL(glUseProgram(prg.handle));
+	if(g_ffr.last_program.value != handle.value) {
+		g_ffr.last_program = handle;
+		CHECK_GL(glUseProgram(prg.handle));
+	}
 	
 	for(int i = 0; i < prg.uniforms_count; ++i) {
 		const auto& pu = prg.uniforms[i];
@@ -972,7 +987,7 @@ void setInstanceBuffer(const VertexDecl& decl, BufferHandle instance_buffer, int
 
 		const int index = location_offset + i;
 		CHECK_GL(glBindBuffer(GL_ARRAY_BUFFER, ib));
-		CHECK_GL(glVertexAttribPointer(index, attr->components_num, gl_attr_type, attr->normalized, stride, offset));
+		CHECK_GL(glVertexAttribPointer(index, attr->components_num, gl_attr_type, attr->flags & Attribute::NORMALIZED, stride, offset));
 		CHECK_GL(glVertexAttribDivisor(index, 1));  
 		CHECK_GL(glEnableVertexAttribArray(index));
 	}
@@ -1001,7 +1016,7 @@ void setVertexBuffer(const VertexDecl* decl, BufferHandle vertex_buffer, uint bu
 
 			if(index >= 0) {
 				CHECK_GL(glBindBuffer(GL_ARRAY_BUFFER, vb));
-				CHECK_GL(glVertexAttribPointer(index, attr->components_num, gl_attr_type, attr->normalized, stride, offset));
+				CHECK_GL(glVertexAttribPointer(index, attr->components_num, gl_attr_type, attr->flags & Attribute::NORMALIZED, stride, offset));
 				CHECK_GL(glVertexAttribDivisor(index, 0));  
 				CHECK_GL(glEnableVertexAttribArray(index));
 			}
@@ -1154,9 +1169,7 @@ void update(BufferHandle buffer, const void* data, size_t offset, size_t size)
 {
 	checkThread();
 	const GLuint buf = g_ffr.buffers[buffer.value].handle;
-	CHECK_GL(glBindBuffer(GL_UNIFORM_BUFFER, buf));
-	CHECK_GL(glBufferSubData(GL_UNIFORM_BUFFER, offset, size, data));
-	CHECK_GL(glBindBuffer(GL_UNIFORM_BUFFER, 0));
+	CHECK_GL(glNamedBufferSubData(buf, offset, size, data));
 }
 
 
@@ -1534,6 +1547,7 @@ void clear(uint flags, const float* color, float depth)
 		gl_flags |= GL_STENCIL_BUFFER_BIT;
 	}
 	CHECK_GL(glUseProgram(0));
+	g_ffr.last_program = INVALID_PROGRAM;
 	CHECK_GL(glClear(gl_flags));
 }
 

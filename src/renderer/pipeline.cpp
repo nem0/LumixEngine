@@ -1498,6 +1498,19 @@ struct PipelineImpl final : Pipeline
 
 	struct RenderMeshesCommand : Renderer::RenderCommandBase
 	{
+		struct MeshRenderData {
+			ffr::BufferHandle vb;
+			ffr::BufferHandle ib;
+			int indices_count;
+			ffr::VertexDecl decl;
+			u32 define_mask;
+			Shader::RenderData* shader;
+			u64 render_states;
+			Vec3 material_params;
+			Vec4 material_color;
+		};
+
+
 		RenderMeshesCommand(IAllocator& allocator) 
 			: m_allocator(allocator)
 			, m_streams(allocator)
@@ -1610,21 +1623,22 @@ struct PipelineImpl final : Pipeline
 			const Material* material = mesh.mesh->material;
 			ASSERT(material->isReady());
 			ASSERT(material->getShader());
-			stream.write(mesh.mesh->vertex_buffer_handle);
-			stream.write(mesh.mesh->index_buffer_handle);
-			stream.write(mesh.mesh->indices_count);
-			stream.write(mesh.mesh->vertex_decl);
+			MeshRenderData rd;
+			rd.vb = mesh.mesh->vertex_buffer_handle;
+			rd.ib = mesh.mesh->index_buffer_handle;
+			rd.indices_count = mesh.mesh->indices_count;
+			rd.decl = mesh.mesh->vertex_decl;
 							
-			u32 final_define_mask = material->getDefineMask() | define_mask;
-			if(mesh.mesh->type == Mesh::RIGID_INSTANCED) final_define_mask |= instanced_define_mask;
-			stream.write(final_define_mask);
+			rd.define_mask = material->getDefineMask() | define_mask;
+			if(mesh.mesh->type == Mesh::RIGID_INSTANCED) rd.define_mask |= instanced_define_mask;
 
-			stream.write(material->getShader()->m_render_data);
-			stream.write(material->getRenderStates() | u64(ffr::StateFlags::DEPTH_TEST));
-			stream.write(material->getRoughness());
-			stream.write(material->getMetallic());
-			stream.write(material->getEmission());
-			stream.write(material->getColor());
+			rd.shader = material->getShader()->m_render_data;
+			rd.render_states = material->getRenderStates() | u64(ffr::StateFlags::DEPTH_TEST);
+			rd.material_params.x = material->getRoughness();
+			rd.material_params.y = material->getMetallic();
+			rd.material_params.z = material->getEmission();
+			rd.material_color = material->getColor();
+			stream.write(rd);
 			stream.write(mesh.mesh->attributes_semantic, sizeof(mesh.mesh->attributes_semantic[0]) * mesh.mesh->vertex_decl.attributes_count);
 			stream.write(material->getTextureCount());
 			for(int i = 0, c = material->getTextureCount(); i < c; ++i) {
@@ -1780,6 +1794,9 @@ struct PipelineImpl final : Pipeline
 			const Matrix* LUMIX_RESTRICT matrices = m_matrices.begin(); 
 
 			int drawcalls_count = 0;
+			
+			ffr::BufferHandle last_vb = ffr::INVALID_BUFFER;
+			
 			for (OutputBlob& blob : m_streams) {
 				if(blob.getPos() == 0) continue;
 				InputBlob stream(blob);
@@ -1787,18 +1804,11 @@ struct PipelineImpl final : Pipeline
 				stream.read(type);
 				while(type != Mesh::LAST_TYPE) {
 					++drawcalls_count;
-					const ffr::BufferHandle vb = stream.read<ffr::BufferHandle>();
-					const ffr::BufferHandle ib = stream.read<ffr::BufferHandle>();
-					const int indices_count = stream.read<int>();
-					const ffr::VertexDecl decl = stream.read<ffr::VertexDecl>();
-					const u32 define_mask = stream.read<u32>();
-					Shader::RenderData* shader = stream.read<Shader::RenderData*>();
-					const u64 render_states = stream.read<u64>();
-					const Vec4 material_params = Vec4(stream.read<Vec3>(), 0); // roughness, metallic, emission
-					const Vec4 material_color = stream.read<Vec4>();
+					const MeshRenderData mesh = stream.read<MeshRenderData>();
+
 					Mesh::AttributeSemantic attributes_semantic[16];
-					if(decl.attributes_count > 0) {
-						stream.read(attributes_semantic, sizeof(attributes_semantic[0]) * decl.attributes_count);
+					if(mesh.decl.attributes_count > 0) {
+						stream.read(attributes_semantic, sizeof(attributes_semantic[0]) * mesh.decl.attributes_count);
 					}
 					const int textures_count = stream.read<int>();
 
@@ -1809,31 +1819,36 @@ struct PipelineImpl final : Pipeline
 						ffr::setUniform1i(uniform, i + 2 + m_global_textures_count);
 					}
 
-					const Shader::Program& prog = Shader::getProgram(shader, define_mask);
+					const Shader::Program& prog = Shader::getProgram(mesh.shader, mesh.define_mask);
 
-					ffr::setUniform4f(m_pipeline->m_material_params_uniform, &material_params.x);
-					ffr::setUniform4f(m_pipeline->m_material_color_uniform, &material_color.x);
-					ffr::setState(render_states);
+					const Vec4 params(mesh.material_params, 0);
+					ffr::setUniform4f(m_pipeline->m_material_params_uniform, &params.x);
+					ffr::setUniform4f(m_pipeline->m_material_color_uniform, &mesh.material_color.x);
+					ffr::setState(mesh.render_states);
+					
 					if(prog.handle.isValid()) {
 						ffr::useProgram(prog.handle);
+
 						int attribute_map[16];
-						for (uint i = 0; i < decl.attributes_count; ++i) {
+						for (uint i = 0; i < mesh.decl.attributes_count; ++i) {
 							attribute_map[i] = prog.attribute_by_semantics[(int)attributes_semantic[i]];
 						}
-						ffr::setVertexBuffer(&decl,	vb, 0, prog.use_semantics ? attribute_map : nullptr);
-						ffr::setIndexBuffer(ib);
+						if(last_vb.value != mesh.vb.value) {
+							last_vb = mesh.vb;
+							ffr::setVertexBuffer(&mesh.decl, mesh.vb, 0, prog.use_semantics ? attribute_map : nullptr);
+						}
+						ffr::setIndexBuffer(mesh.ib);
 					}
 				
 					switch(type) {
 						case Mesh::RIGID_INSTANCED: {
-							uint start, instances_count;
-							stream.read(start);
-							stream.read(instances_count);
+							struct Inst { uint start, count; } inst;
+							stream.read(inst);
 							if(prog.handle.isValid()) {
-								const Renderer::TransientSlice instance_buffer = m_pipeline->m_renderer.allocTransient(instances_count * sizeof(Matrix));
-								ffr::update(instance_buffer.buffer, matrices + start, instance_buffer.offset, instance_buffer.size);
-								ffr::setInstanceBuffer(instance_decl, instance_buffer.buffer, instance_buffer.offset, decl.attributes_count);
-								ffr::drawTrianglesInstanced(0, indices_count, instances_count);
+								const Renderer::TransientSlice instance_buffer = m_pipeline->m_renderer.allocTransient(inst.count * sizeof(Matrix));
+								ffr::update(instance_buffer.buffer, matrices + inst.start, instance_buffer.offset, instance_buffer.size);
+								ffr::setInstanceBuffer(instance_decl, instance_buffer.buffer, instance_buffer.offset, mesh.decl.attributes_count);
+								ffr::drawTrianglesInstanced(0, mesh.indices_count, inst.count);
 							}
 							break;
 						}
@@ -1849,7 +1864,7 @@ struct PipelineImpl final : Pipeline
 								const int bones_uniform_loc = ffr::getUniformLocation(prog.handle, m_pipeline->m_bones_uniform);
 								ffr::applyUniformMatrix4fv(bones_uniform_loc, mtx_count, &bone_mtx[0].m11);
 								ffr::applyUniformMatrix4f(model_uniform_loc, &model_mtx.m11);
-								ffr::drawTriangles(indices_count);
+								ffr::drawTriangles(mesh.indices_count);
 							}
 							break;
 						}
