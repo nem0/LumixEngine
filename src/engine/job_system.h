@@ -16,6 +16,7 @@ struct LUMIX_ENGINE_API JobDecl
 {
 	void (*task)(void*);
 	void* data;
+	const volatile int* depends_on = nullptr;
 };
 
 

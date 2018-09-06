@@ -2426,7 +2426,6 @@ struct RenderInterfaceImpl final : public RenderInterface
 		ffr::VertexDecl vertex_decl;
 		vertex_decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false);
 		vertex_decl.addAttribute(4, ffr::AttributeType::U8, true, false);
-
 			
 		Renderer& renderer = static_cast<Renderer&>(m_render_scene->getPlugin());
 

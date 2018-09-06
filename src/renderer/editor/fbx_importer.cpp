@@ -768,8 +768,10 @@ void FBXImporter::writeMaterials(const char* src, const ImportConfig& cfg)
 		auto writeTexture = [this](const ImportTexture& texture) {
 			if (texture.fbx)
 			{
-				writeString("texture \"");
+				writeString("texture \"/");
 				PathUtils::FileInfo info(texture.src);
+				writeString(info.m_dir);
+				writeString("/");
 				writeString(info.m_basename);
 				writeString(".");
 				writeString(texture.to_dds ? "dds" : info.m_extension);
