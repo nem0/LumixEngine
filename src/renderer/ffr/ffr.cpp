@@ -880,16 +880,6 @@ int getUniformLocation(ProgramHandle program_handle, UniformHandle uniform)
 	return -1;
 }
 
-void applyUniform4f(int location, const float* value)
-{
-	glUniform4fv(location, 1, value);
-}
-
-void applyUniform1i(int location, int value)
-{
-	glUniform1i(location, value);
-}
-
 void applyUniformMatrix4f(int location, const float* value)
 {
 	glUniformMatrix4fv(location, 1, false, value);

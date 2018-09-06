@@ -221,8 +221,6 @@ void applyUniform1i(int location, int value);
 void applyUniform4f(int location, const float* value);
 void applyUniformMatrix3x4f(int location, const float* value);
 void applyUniformMatrix4f(int location, const float* value);
-void applyUniform4f(int location, const float* value);
-void applyUniform1i(int location, int value);
 void applyUniformMatrix4fv(int location, uint count, const float* value);
 void applyUniformMatrix4x3f(int location, const float* value);
 
