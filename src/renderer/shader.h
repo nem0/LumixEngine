@@ -101,6 +101,7 @@ public:
 		Array<Source> sources;
 		Array<u8> include;
 		Array<AttributeInfo> attributes;
+		Path path;
 	}* m_render_data;
 
 public:
