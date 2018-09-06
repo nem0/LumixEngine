@@ -905,6 +905,16 @@ void applyUniformMatrix4x3f(int location, const float* value)
 	glUniformMatrix4x3fv(location, 1, false, value);
 }
 
+void applyUniform1i(int location, int value)
+{
+	glUniform1i(location, value);
+}
+
+void applyUniform4f(int location, const float* value)
+{
+	glUniform4fv(location, 1, value);
+}
+
 void applyUniformMatrix3x4f(int location, const float* value)
 {
 	glUniformMatrix3x4fv(location, 1, false, value);
@@ -947,6 +957,9 @@ void useProgram(ProgramHandle handle)
 				break;
 			case UniformType::INT:
 				glUniform1i(pu.loc, *(int*)u.data);
+				break;
+			case UniformType::IVEC2:
+				glUniform2iv(pu.loc, u.count, (int*)u.data);
 				break;
 			default: ASSERT(false); break;
 		}
@@ -1170,6 +1183,22 @@ void update(BufferHandle buffer, const void* data, size_t offset, size_t size)
 	checkThread();
 	const GLuint buf = g_ffr.buffers[buffer.value].handle;
 	CHECK_GL(glNamedBufferSubData(buf, offset, size, data));
+}
+
+
+void startCapture()
+{
+	if (g_ffr.rdoc_api) {
+		g_ffr.rdoc_api->StartFrameCapture(nullptr, nullptr);
+	}
+}
+
+
+void stopCapture()
+{
+	if (g_ffr.rdoc_api) {
+		g_ffr.rdoc_api->EndFrameCapture(nullptr, nullptr);
+	}
 }
 
 
@@ -1567,6 +1596,7 @@ static uint getSize(UniformType type)
 	{
 	case UniformType::INT: return sizeof(int);
 	case UniformType::FLOAT: return sizeof(float);
+	case UniformType::IVEC2: return sizeof(int) * 2;
 	case UniformType::VEC2: return sizeof(float) * 2;
 	case UniformType::VEC3: return sizeof(float) * 3;
 	case UniformType::VEC4: return sizeof(float) * 4;
@@ -1714,6 +1744,7 @@ ProgramHandle createProgram(const char** srcs, const ShaderType* types, int num,
 			case GL_FLOAT_MAT4: ffr_type = UniformType::MAT4; break;
 			case GL_FLOAT_MAT4x3: ffr_type = UniformType::MAT4X3; break;
 			case GL_FLOAT_MAT3x4: ffr_type = UniformType::MAT3X4; break;
+			case GL_INT_VEC2: ffr_type = UniformType::IVEC2; break;
 			default: ASSERT(false); ffr_type = UniformType::VEC4; break;
 		}
 

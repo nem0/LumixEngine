@@ -1515,12 +1515,13 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 
 	void generateCubemap(ComponentUID cmp)
 	{
-		// TODO
-		/*static const int TEXTURE_SIZE = 1024;
+		ASSERT(cmp.isValid());
+		const EntityRef entity = (EntityRef)cmp.entity;
+
+		static const int TEXTURE_SIZE = 1024;
 
 		Universe* universe = m_app.getWorldEditor().getUniverse();
-		if (universe->getName()[0] == '\0')
-		{
+		if (universe->getName()[0] == '\0') {
 			g_log_error.log("Editor") << "Universe must be saved before environment probe can be generated.";
 			return;
 		}
@@ -1532,46 +1533,40 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 
 		Vec3 probe_position = universe->getPosition((EntityRef)cmp.entity);
 		auto* scene = static_cast<RenderScene*>(universe->getScene(CAMERA_TYPE));
-		EntityRef camera_entity = scene->getCameraInSlot("probe");
-		if (!camera_entity.isValid())
-		{
-			g_log_error.log("Renderer") << "No camera in slot 'probe'.";
-			return;
-		}
-
-		scene->setCameraFOV(camera_entity, Math::degreesToRadians(90));
+		Viewport viewport;
+		viewport.is_ortho = false;
+		viewport.fov = Math::degreesToRadians(90.f);
+		viewport.near = 0.1f;
+		viewport.far = 10000.f;
+		viewport.w = TEXTURE_SIZE;
+		viewport.h = TEXTURE_SIZE;
 
 		m_pipeline->setScene(scene);
-		// TODO
-		//m_pipeline->resize(TEXTURE_SIZE, TEXTURE_SIZE);
+		m_pipeline->setViewport(viewport);
 
 		Renderer* renderer = static_cast<Renderer*>(plugin_manager.getPlugin("renderer"));
-
 		Vec3 dirs[] = {{-1, 0, 0}, {1, 0, 0}, {0, -1, 0}, {0, 1, 0}, {0, 0, -1}, {0, 0, 1}};
 		Vec3 ups[] = {{0, 1, 0}, {0, 1, 0}, {0, 0, 1}, {0, 0, -1}, {0, 1, 0}, {0, 1, 0}};
 		Vec3 ups_opengl[] = { { 0, -1, 0 },{ 0, -1, 0 },{ 0, 0, 1 },{ 0, 0, -1 },{ 0, -1, 0 },{ 0, -1, 0 } };
 
 		Array<u8> data(allocator);
 		data.resize(6 * TEXTURE_SIZE * TEXTURE_SIZE * 4);
-		ffr::TextureHandle texture = ffr::allocTextureHandle();
-		ffr::createTexture(texture, TEXTURE_SIZE, TEXTURE_SIZE, ffr::TextureFormat::RGBA8, 0, nullptr);
-		renderer->frame(false); // submit 
-		renderer->frame(false); // wait for gpu
 
-		for (int i = 0; i < 6; ++i)
-		{
-			Matrix mtx = Matrix::IDENTITY;
-			mtx.setTranslation(probe_position);
+		renderer->startCapture();
+		for (int i = 0; i < 6; ++i) {
 			const bool ndc_bottom_left = ffr::isOriginBottomLeft();
 			Vec3 side = crossProduct(ndc_bottom_left ? ups_opengl[i] : ups[i], dirs[i]);
+			Matrix mtx = Matrix::IDENTITY;
 			mtx.setZVector(dirs[i]);
 			mtx.setYVector(ndc_bottom_left ? ups_opengl[i] : ups[i]);
 			mtx.setXVector(side);
-			universe->setMatrix(camera_entity, mtx);
+			viewport.pos = probe_position;
+			viewport.rot = mtx.getRotation();
+			m_pipeline->setViewport(viewport);
 			m_pipeline->render();
 
 			const ffr::TextureHandle res = m_pipeline->getOutput();
-			ffr::getTextureImage(res, TEXTURE_SIZE * TEXTURE_SIZE * 4, &data[i * TEXTURE_SIZE * TEXTURE_SIZE * 4]);
+			renderer->getTextureImage(res, TEXTURE_SIZE * TEXTURE_SIZE * 4, &data[i * TEXTURE_SIZE * TEXTURE_SIZE * 4]);
 
 			if (ndc_bottom_left) continue;
 
@@ -1585,6 +1580,10 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 				flipX(tmp, TEXTURE_SIZE);
 			}
 		}
+		renderer->stopCapture();
+		renderer->frame();
+		renderer->frame();
+
 		cmft::Image image;
 		cmft::Image irradiance;
 
@@ -1612,29 +1611,38 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 		cmft::imageFromRgba32f(image, cmft::TextureFormat::RGBA8);
 		cmft::imageFromRgba32f(irradiance, cmft::TextureFormat::RGBA8);
 
-
-
 		int irradiance_size = 32;
 		int radiance_size = 128;
 		int reflection_size = TEXTURE_SIZE;
 
-		if (scene->isEnvironmentProbeCustomSize(cmp.entity))
-		{
-			irradiance_size = scene->getEnvironmentProbeIrradianceSize(cmp.entity);
-			radiance_size = scene->getEnvironmentProbeRadianceSize(cmp.entity);
-			reflection_size = scene->getEnvironmentProbeReflectionSize(cmp.entity);
+		if (scene->isEnvironmentProbeCustomSize(entity)) {
+			irradiance_size = scene->getEnvironmentProbeIrradianceSize(entity);
+			radiance_size = scene->getEnvironmentProbeRadianceSize(entity);
+			reflection_size = scene->getEnvironmentProbeReflectionSize(entity);
 		}
 
+		for (int i = 3; i < data.size(); i += 4) data[i] = 0xff; 
 		saveCubemap(cmp, (u8*)irradiance.m_data, irradiance_size, "_irradiance");
 		saveCubemap(cmp, (u8*)image.m_data, radiance_size, "_radiance");
-		if (scene->isEnvironmentProbeReflectionEnabled(cmp.entity))
-		{
+		if (scene->isEnvironmentProbeReflectionEnabled(entity)) {
+			auto& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+			for(int i = 0; i < 6; ++i) {
+				const char* pp[] = {
+				"test0.tga",
+				"test1.tga",
+				"test2.tga",
+				"test3.tga",
+				"test4.tga",
+				"test5.tga",
+				};
+				auto* f = fs.open(fs.getDefaultDevice(), Path(pp[i]), FS::Mode::CREATE_AND_WRITE);
+				Lumix::Texture::saveTGA(f, TEXTURE_SIZE, TEXTURE_SIZE, 4, data.begin() + 4 * TEXTURE_SIZE * TEXTURE_SIZE * i, Path(pp[i]), m_app.getWorldEditor().getAllocator());
+				fs.close(*f);
+			}
 			saveCubemap(cmp, &data[0], reflection_size, "");
 		}
-		ffr::destroy(texture);
-		
 
-		scene->reloadEnvironmentProbe(cmp.entity);*/
+		scene->reloadEnvironmentProbe(entity);
 	}
 
 
@@ -2877,7 +2885,7 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 		cmd->plugin = this;
 		
 		renderer->push(cmd);
-		renderer->frame(false);
+		renderer->frame();
 	}
 
 

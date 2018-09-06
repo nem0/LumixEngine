@@ -5,6 +5,7 @@
 #include "engine/flag_set.h"
 #include "engine/matrix.h"
 #include "engine/iplugin.h"
+#include "ffr/ffr.h"
 
 
 struct lua_State;
@@ -99,6 +100,16 @@ struct GrassInfo
 	const InstanceData* instance_data;
 	int instance_count;
 	float type_distance;
+};
+
+
+struct EnvProbeInfo
+{
+	Vec3 position;
+	float radius;
+	ffr::TextureHandle reflection;
+	ffr::TextureHandle radiance;
+	ffr::TextureHandle irradiance;
 };
 
 
@@ -355,6 +366,7 @@ public:
 	virtual float getPointLightSpecularIntensity(EntityRef entity) = 0;
 	virtual void setPointLightSpecularIntensity(EntityRef entity, float color) = 0;
 
+	virtual void getEnvironmentProbes(Array<EnvProbeInfo>& probes) = 0;
 	virtual int getEnvironmentProbeIrradianceSize(EntityRef entity) = 0;
 	virtual void setEnvironmentProbeIrradianceSize(EntityRef entity, int size) = 0;
 	virtual int getEnvironmentProbeRadianceSize(EntityRef entity) = 0;
@@ -371,6 +383,8 @@ public:
 	virtual void reloadEnvironmentProbe(EntityRef entity) = 0;
 	virtual EntityPtr getNearestEnvironmentProbe(const Vec3& pos) const = 0;
 	virtual u64 getEnvironmentProbeGUID(EntityRef entity) const = 0;
+	virtual float getEnvironmentProbeRadius(EntityRef entity) = 0;
+	virtual void setEnvironmentProbeRadius(EntityRef entity, float radius) = 0;
 
 	virtual void setTextMeshText(EntityRef entity, const char* text) = 0;
 	virtual const char* getTextMeshText(EntityRef entity) = 0;

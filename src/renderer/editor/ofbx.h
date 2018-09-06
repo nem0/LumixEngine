@@ -180,7 +180,9 @@ struct Object
 	Vec3 getLocalRotation() const;
 	Vec3 getLocalScaling() const;
 	Matrix getGlobalTransform() const;
+	Matrix getLocalTransform() const;
 	Matrix evalLocal(const Vec3& translation, const Vec3& rotation) const;
+	Matrix evalLocal(const Vec3& translation, const Vec3& rotation, const Vec3& scaling) const;
 	bool isNode() const { return is_node; }
 
 
@@ -352,6 +354,71 @@ struct TakeInfo
 };
 
 
+// Specifies which canonical axis represents up in the system (typically Y or Z).
+enum UpVector
+{
+	UpVector_AxisX = 1,
+	UpVector_AxisY = 2,
+	UpVector_AxisZ = 3
+};
+
+
+// Vector with origin at the screen pointing toward the camera.
+enum FrontVector
+{
+	FrontVector_ParityEven = 1,
+	FrontVector_ParityOdd = 2
+};
+
+
+// Specifies the third vector of the system.
+enum CoordSystem
+{
+	CoordSystem_RightHanded = 0,
+	CoordSystem_LeftHanded = 1
+};
+
+
+// http://docs.autodesk.com/FBX/2014/ENU/FBX-SDK-Documentation/index.html?url=cpp_ref/class_fbx_time.html,topicNumber=cpp_ref_class_fbx_time_html29087af6-8c2c-4e9d-aede-7dc5a1c2436c,hash=a837590fd5310ff5df56ffcf7c394787e
+enum FrameRate
+{
+	FrameRate_DEFAULT = 0,
+	FrameRate_120 = 1,
+	FrameRate_100 = 2,
+	FrameRate_60 = 3,
+	FrameRate_50 = 4,
+	FrameRate_48 = 5,
+	FrameRate_30 = 6,
+	FrameRate_30_DROP = 7,
+	FrameRate_NTSC_DROP_FRAME = 8,
+	FrameRate_NTSC_FULL_FRAME = 9,
+	FrameRate_PAL = 10,
+	FrameRate_CINEMA = 11,
+	FrameRate_1000 = 12,
+	FrameRate_CINEMA_ND = 13,
+	FrameRate_CUSTOM = 14,
+};
+
+
+struct GlobalSettings
+{
+	UpVector UpAxis = UpVector_AxisX;
+	int UpAxisSign = 1;
+	FrontVector FrontAxis = FrontVector_ParityOdd;
+	int FrontAxisSign = 1;
+	CoordSystem CoordAxis = CoordSystem_RightHanded;
+	int CoordAxisSign = 1;
+	int OriginalUpAxis = 0;
+	int OriginalUpAxisSign = 1;
+	float UnitScaleFactor = 1;
+	float OriginalUnitScaleFactor = 1;
+	u64 TimeSpanStart = 0L;
+	u64 TimeSpanStop = 0L;
+	FrameRate TimeMode = FrameRate_DEFAULT;
+	float CustomFrameRate = -1.0f;
+};
+
+
 struct IScene
 {
 	virtual void destroy() = 0;
@@ -360,6 +427,7 @@ struct IScene
 	virtual const TakeInfo* getTakeInfo(const char* name) const = 0;
 	virtual int getMeshCount() const = 0;
 	virtual float getSceneFrameRate() const = 0;
+	virtual const GlobalSettings* getGlobalSettings() const = 0;
 	virtual const Mesh* getMesh(int index) const = 0;
 	virtual int getAnimationStackCount() const = 0;
 	virtual const AnimationStack* getAnimationStack(int index) const = 0;

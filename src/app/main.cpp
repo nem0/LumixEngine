@@ -475,7 +475,7 @@ public:
 		m_engine->update(*m_universe);
 		m_pipeline->render();
 		auto* renderer = m_engine->getPluginManager().getPlugin("renderer");
-		static_cast<Renderer*>(renderer)->frame(false);
+		static_cast<Renderer*>(renderer)->frame();
 		m_engine->getFileSystem().updateAsyncTransactions();
 		if (frame_time < 1 / 60.0f)
 		{
