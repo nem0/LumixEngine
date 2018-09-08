@@ -2794,7 +2794,7 @@ static void* alignPtr(void* _ptr, size_t _align)
 StudioApp* StudioApp::create()
 {
 	static char buf[sizeof(StudioAppImpl) * 2];
-	return new (NewPlaceholder(), alignPtr(buf, ALIGN_OF(StudioAppImpl))) StudioAppImpl;
+	return new (NewPlaceholder(), alignPtr(buf, alignof(StudioAppImpl))) StudioAppImpl;
 }
 
 

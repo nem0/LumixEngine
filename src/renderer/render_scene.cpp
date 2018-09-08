@@ -255,7 +255,7 @@ public:
 		auto& rm = m_engine.getResourceManager();
 		auto* material_manager = static_cast<MaterialManager*>(rm.get(Material::TYPE));
 
-		m_entity_model_map.clear();
+		m_model_entity_map.clear();
 		
 		for (TextMesh* text_mesh : m_text_meshes)
 		{
@@ -3698,7 +3698,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 
 	void modelLoaded(Model* model)
 	{
-		auto map_iter = m_entity_model_map.find(model);
+		auto map_iter = m_model_entity_map.find(model);
 		EntityPtr e = map_iter.value();
 		while(e.isValid()) {
 			modelLoaded(model, (EntityRef)e);
@@ -3780,24 +3780,24 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 	
-	void addToEntityModelMap(Model* model, EntityRef entity)
+	void addToModelEntityMap(Model* model, EntityRef entity)
 	{
 		ModelInstance& r = m_model_instances[entity.index];
 		r.prev_model = INVALID_ENTITY;
-		auto map_iter = m_entity_model_map.find(model);
+		auto map_iter = m_model_entity_map.find(model);
 		if(map_iter.isValid()) {
 			r.next_model = map_iter.value();
-			m_entity_model_map[model] = entity;
+			m_model_entity_map[model] = entity;
 		}
 		else {
 			r.next_model = INVALID_ENTITY;
-			m_entity_model_map.insert(model, entity);
+			m_model_entity_map.insert(model, entity);
 			model->getObserverCb().bind<RenderSceneImpl, &RenderSceneImpl::modelStateChanged>(this);
 		}
 	}
 
 
-	void removeFromEntityModelMap(Model* model, EntityRef entity)
+	void removeFromModelEntityMap(Model* model, EntityRef entity)
 	{
 		ModelInstance& r = m_model_instances[entity.index];
 		if(r.prev_model.isValid()) {
@@ -3806,13 +3806,13 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		if(r.next_model.isValid()) {
 			m_model_instances[r.next_model.index].prev_model = r.prev_model;
 		}
-		auto map_iter = m_entity_model_map.find(model);
+		auto map_iter = m_model_entity_map.find(model);
 		if(map_iter.value() == entity) {
 			if(r.next_model.isValid()) {
-				m_entity_model_map[model] = (EntityRef)r.next_model;
+				m_model_entity_map[model] = (EntityRef)r.next_model;
 			}
 			else {
-				m_entity_model_map.erase(model);
+				m_model_entity_map.erase(model);
 				model->getObserverCb().unbind<RenderSceneImpl, &RenderSceneImpl::modelStateChanged>(this);
 			}
 		}
@@ -3836,7 +3836,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 			auto* material_manager = static_cast<MaterialManager*>(rm.getOwner().get(Material::TYPE));
 			freeCustomMeshes(model_instance, material_manager);
 			
-			removeFromEntityModelMap(old_model, entity);
+			removeFromModelEntityMap(old_model, entity);
 
 			if (old_model->isReady())
 			{
@@ -3851,7 +3851,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		model_instance.pose = nullptr;
 		if (model)
 		{
-			addToEntityModelMap(model, entity);
+			addToModelEntityMap(model, entity);
 
 			if (model->isReady())
 			{
@@ -4068,7 +4068,7 @@ private:
 	bool m_is_grass_enabled;
 	bool m_is_game_running;
 
-	HashMap<Model*, EntityRef> m_entity_model_map;
+	HashMap<Model*, EntityRef> m_model_entity_map;
 };
 
 
@@ -4112,7 +4112,7 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	, m_universe(universe)
 	, m_renderer(renderer)
 	, m_allocator(allocator)
-	, m_entity_model_map(m_allocator)
+	, m_model_entity_map(m_allocator)
 	, m_model_instances(m_allocator)
 	, m_cameras(m_allocator)
 	, m_text_meshes(m_allocator)

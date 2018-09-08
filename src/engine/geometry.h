@@ -39,7 +39,7 @@ struct Sphere
 };
 
 
-LUMIX_ALIGN_BEGIN(16) struct LUMIX_ENGINE_API Frustum
+struct alignas(16) LUMIX_ENGINE_API Frustum
 {
 	Frustum();
 
@@ -132,7 +132,7 @@ LUMIX_ALIGN_BEGIN(16) struct LUMIX_ENGINE_API Frustum
 	float ds[(int)Planes::COUNT];
 
 	Vec3 points[8];
-} LUMIX_ALIGN_END(16);
+};
 
 
 struct LUMIX_ENGINE_API AABB

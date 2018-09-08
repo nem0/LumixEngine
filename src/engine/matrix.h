@@ -123,7 +123,7 @@ Transform RigidTransform::toScaled(float scale) const
 }
 
 
-LUMIX_ALIGN_BEGIN(16) struct LUMIX_ENGINE_API Matrix
+struct alignas(16) LUMIX_ENGINE_API Matrix
 {
 	static Matrix rotationX(float angle);
 	static Matrix rotationY(float angle);
@@ -392,7 +392,7 @@ LUMIX_ALIGN_BEGIN(16) struct LUMIX_ENGINE_API Matrix
 	float m41, m42, m43, m44;
 
 	static const Matrix IDENTITY;
-} LUMIX_ALIGN_END(16);
+};
 
 
 } // namespace Lumix
