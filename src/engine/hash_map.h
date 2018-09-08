@@ -98,8 +98,8 @@ namespace Lumix
 		}
 	};
 
-	template<>
-	struct HashFunc<void*>
+	template<typename T>
+	struct HashFunc<T*>
 	{
 		static u32 get(const void* key)
 		{

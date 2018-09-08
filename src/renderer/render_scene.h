@@ -74,9 +74,11 @@ struct ModelInstance
 	Model* model;
 	Pose* pose;
 	EntityPtr entity;
+	EntityPtr next_model = INVALID_ENTITY;
+	EntityPtr prev_model = INVALID_ENTITY;
 	Mesh* meshes;
 	FlagSet<Flags, u8> flags;
-	i8 mesh_count;
+	u8 mesh_count;
 };
 
 
