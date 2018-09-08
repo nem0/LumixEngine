@@ -1,6 +1,5 @@
 #include "culling_system.h"
 #include "engine/array.h"
-#include "engine/free_list.h"
 #include "engine/geometry.h"
 #include "engine/job_system.h"
 #include "engine/lumix.h"
@@ -80,7 +79,6 @@ class CullingSystemImpl final : public CullingSystem
 public:
 	explicit CullingSystemImpl(IAllocator& allocator)
 		: m_allocator(allocator)
-		, m_job_allocator(allocator)
 		, m_spheres(allocator)
 		, m_layer_masks(m_allocator)
 		, m_sphere_to_model_instance_map(m_allocator)
@@ -247,7 +245,6 @@ public:
 
 private:
 	IAllocator& m_allocator;
-	FreeList<CullingJobData, 16> m_job_allocator;
 	InputSpheres m_spheres;
 	LayerMasks m_layer_masks;
 	ModelInstancetoSphereMap m_model_instance_to_sphere_map;
