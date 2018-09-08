@@ -3718,10 +3718,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 
 	void allocateCustomMeshes(ModelInstance& r, int count)
 	{
-		// TODO
-	ASSERT(false);
-	/*
-	if (hasCustomMeshes(r) && r.mesh_count == count) return;
+		if (hasCustomMeshes(r) && r.mesh_count == count) return;
 
 		ASSERT(r.model);
 		auto& rm = r.model->getResourceManager();
@@ -3758,11 +3755,12 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 
 		for (int i = r.mesh_count; i < count; ++i)
 		{
-			new (NewPlaceholder(), new_meshes + i) Mesh(nullptr, bgfx::VertexDecl(), "", m_allocator);
+			ffr::VertexDecl decl;
+			new (NewPlaceholder(), new_meshes + i) Mesh(nullptr, decl, "", nullptr, m_allocator);
 		}
 		r.meshes = new_meshes;
 		r.mesh_count = count;
-		r.flags.set(ModelInstance::CUSTOM_MESHES);*/
+		r.flags.set(ModelInstance::CUSTOM_MESHES);
 	}
 
 

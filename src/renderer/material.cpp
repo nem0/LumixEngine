@@ -167,6 +167,9 @@ bool Material::save(FS::IFile& file)
 	}
 	file << "}\n";
 
+	StaticString<1024> color_tmp("", m_color.x, ", ", m_color.y, ", ", m_color.z, ", ", m_color.w);
+	file << "color { " << color_tmp << " }\n";
+
 	for (int i = 0; i < m_texture_count; ++i) {
 		char path[MAX_PATH_LENGTH];
 		if (m_textures[i] && m_textures[i] != m_shader->m_texture_slots[i].default_texture) {

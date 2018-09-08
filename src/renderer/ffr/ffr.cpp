@@ -1812,6 +1812,8 @@ bool init(void* window_handle)
 	CHECK_GL(glBindVertexArray(g_ffr.vao));
 	CHECK_GL(glGenTextures(_countof(g_ffr.tex_buffers), g_ffr.tex_buffers));
 
+	CHECK_GL(glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS));
+
 	return true;
 }
 
@@ -1825,21 +1827,25 @@ bool isOriginBottomLeft() { return true; }
 void getTextureImage(ffr::TextureHandle texture, uint size, void* buf)
 {
 	checkThread();
-	glGetTextureImage(texture.value, 0, GL_RGBA, GL_UNSIGNED_BYTE, size, buf);
+
+	Texture& t = g_ffr.textures[texture.value];
+	const GLuint handle = t.handle;
+
+	CHECK_GL(glGetTextureImage(handle, 0, GL_RGBA, GL_UNSIGNED_BYTE, size, buf));
 }
 
 
 void popDebugGroup()
 {
 	checkThread();
-	glPopDebugGroup();
+	CHECK_GL(glPopDebugGroup());
 }
 
 
 void pushDebugGroup(const char* msg)
 {
 	checkThread();
-	glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, msg);
+	CHECK_GL(glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, msg));
 }
 
 
