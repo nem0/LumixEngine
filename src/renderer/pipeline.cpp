@@ -926,7 +926,6 @@ struct PipelineImpl final : Pipeline
 
 			lua_pop(L, 1);
 		}
-
 		pipeline->m_renderer.push(cmd);
 
 		return 0;

@@ -491,8 +491,6 @@ void SceneView::onWindowGUI()
 		title = "Scene View | errors in log###Scene View";
 	}
 
-	m_editor.inputFrame();
-
 	if (ImGui::BeginDock(title, nullptr, ImGuiWindowFlags_NoScrollWithMouse))
 	{
 		m_is_open = true;
@@ -504,6 +502,8 @@ void SceneView::onWindowGUI()
 		m_editor.setViewport(vp);
 		m_pipeline->setViewport(vp);
 		m_pipeline->render();
+		m_editor.inputFrame();
+
 		m_texture_handle = m_pipeline->getOutput();
 		if (size.x > 0 && size.y > 0)
 		{
@@ -574,6 +574,9 @@ void SceneView::onWindowGUI()
 				}
 			}
 		}
+	}
+	else {
+		m_editor.inputFrame();
 	}
 
 	ImGui::EndDock();

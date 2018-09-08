@@ -1566,6 +1566,7 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 			m_pipeline->render();
 
 			const ffr::TextureHandle res = m_pipeline->getOutput();
+			ASSERT(res.isValid());
 			renderer->getTextureImage(res, TEXTURE_SIZE * TEXTURE_SIZE * 4, &data[i * TEXTURE_SIZE * TEXTURE_SIZE * 4]);
 
 			if (ndc_bottom_left) continue;
@@ -1625,20 +1626,6 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 		saveCubemap(cmp, (u8*)irradiance.m_data, irradiance_size, "_irradiance");
 		saveCubemap(cmp, (u8*)image.m_data, radiance_size, "_radiance");
 		if (scene->isEnvironmentProbeReflectionEnabled(entity)) {
-			auto& fs = m_app.getWorldEditor().getEngine().getFileSystem();
-			for(int i = 0; i < 6; ++i) {
-				const char* pp[] = {
-				"test0.tga",
-				"test1.tga",
-				"test2.tga",
-				"test3.tga",
-				"test4.tga",
-				"test5.tga",
-				};
-				auto* f = fs.open(fs.getDefaultDevice(), Path(pp[i]), FS::Mode::CREATE_AND_WRITE);
-				Lumix::Texture::saveTGA(f, TEXTURE_SIZE, TEXTURE_SIZE, 4, data.begin() + 4 * TEXTURE_SIZE * TEXTURE_SIZE * i, Path(pp[i]), m_app.getWorldEditor().getAllocator());
-				fs.close(*f);
-			}
 			saveCubemap(cmp, &data[0], reflection_size, "");
 		}
 

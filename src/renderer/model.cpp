@@ -45,8 +45,10 @@ Mesh::Mesh(Material* mat,
 	for(AttributeSemantic& attr : attributes_semantic) {
 		attr = AttributeSemantic::NONE;
 	}
-	for(uint i = 0; i < vertex_decl.attributes_count; ++i) {
-		attributes_semantic[i] = semantics[i];
+	if(semantics) {
+		for(uint i = 0; i < vertex_decl.attributes_count; ++i) {
+			attributes_semantic[i] = semantics[i];
+		}
 	}
 }
 
@@ -95,11 +97,7 @@ void Mesh::setMaterial(Material* new_material, Model& model, Renderer& renderer)
 	if (material) material->getResourceManager().unload(*material);
 	material = new_material;
 	layer_mask = material->getRenderLayerMask();
-	if (model.getBoneCount() > 0)
-	{
-		type = skin.empty() ? Mesh::RIGID_INSTANCED : Mesh::SKINNED;
-	}
-	else type = Mesh::RIGID_INSTANCED;
+	type = model.getBoneCount() > 0 && skin.empty() ? Mesh::RIGID_INSTANCED : Mesh::SKINNED;
 }
 
 
