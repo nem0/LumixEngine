@@ -537,8 +537,9 @@ namespace Lumix
 		{
 			ASSERT(Math::isPowOfTwo(ids_count));
 			m_table = (node_type*)m_allocator.allocate(sizeof(node_type) * ids_count);
-			for(node_type* i = m_table; i < &m_table[ids_count]; ++i)
-				construct(i, m_sentinel);
+			for(node_type* i = m_table; i < &m_table[ids_count]; ++i) {
+				i->m_next = m_sentinel;
+			}
 
 			m_mask = (ids_count - 1);
 			m_max_id = ids_count;
@@ -595,12 +596,6 @@ namespace Lumix
 			return new(NewPlaceholder(), where) node_type(key, val);
 		}
 
-		node_type* construct(node_type* where, node_type* node)
-		{
-			where->m_next = node;
-			return where;
-		}
-
 		node_type* construct(node_type* where, const node_type& node)
 		{
 			return new(NewPlaceholder(), where) node_type(node);
@@ -618,11 +613,6 @@ namespace Lumix
 			m_sentinel->m_next = m_sentinel;
 		}
 
-		void copyUninitialized(node_type* src, node_type* dst)
-		{
-			construct(dst, src->m_key, src->m_value);
-		}
-
 		node_type* getEmptyNode(size_type pos)
 		{
 			node_type* node = &m_table[pos];
@@ -631,8 +621,15 @@ namespace Lumix
 				node = node->m_next;
 			}
 
-			node->m_next = (nullptr == node->m_next ? construct(reinterpret_cast<node_type*>(m_allocator.allocate(sizeof(node_type))), m_sentinel) : node);
-			return node->m_next;
+			if (node->m_next == m_sentinel) {
+				node->m_next = nullptr;
+				return node;
+			}
+
+			node_type* new_node = (node_type*)m_allocator.allocate(sizeof(node_type));
+			new_node->m_next = m_sentinel;
+			node->m_next = new_node;
+			return new_node;
 		}
 
 		node_type* first() const
@@ -683,10 +680,14 @@ namespace Lumix
 			{
 				node_type* next = n->m_next;
 				destruct(n);
-				construct(n, next ? *next : *m_sentinel);
+				
 				if (next)
 				{
+					construct(n, *next);
 					destruct(next);
+				}
+				else {
+					n->m_next = m_sentinel;
 				}
 				m_allocator.deallocate(next);
 			}
@@ -708,7 +709,7 @@ namespace Lumix
 				{
 					size_type pos = getPosition(n->m_key);
 					node_type* new_node = getEmptyNode(pos);
-					copyUninitialized(n, new_node);
+					construct(new_node, n->m_key, n->m_value);
 					new_node->m_next = nullptr;
 					n = n->m_next;
 				}

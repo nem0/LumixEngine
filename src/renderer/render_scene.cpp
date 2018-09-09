@@ -202,6 +202,30 @@ private:
 class RenderSceneImpl final : public RenderScene
 {
 private:
+	struct CustomMeshCallback
+	{
+		//CustomMeshCallback(CustomMeshCallback&& rhs) = default;
+		//CustomMeshCallback(const CustomMeshCallback&) = delete;
+
+
+		CustomMeshCallback(RenderSceneImpl& scene, Material* material, IAllocator& allocator)
+			: m_entities(allocator)
+			, m_material(material)
+			, m_scene(scene)
+		{
+			m_material->getObserverCb().bind<RenderSceneImpl, &RenderSceneImpl::materialStateChanged>(&scene);
+		}
+
+		~CustomMeshCallback()
+		{
+			m_material->getObserverCb().unbind<RenderSceneImpl, &RenderSceneImpl::materialStateChanged>(&m_scene);
+		}
+
+		RenderSceneImpl& m_scene;
+		Material* m_material;
+		Array<EntityRef> m_entities;
+	};
+
 	struct ModelLoadedCallback
 	{
 		ModelLoadedCallback(RenderSceneImpl& scene, Model* model)
@@ -236,6 +260,11 @@ public:
 	}
 
 
+	void materialStateChanged(Resource::State old_state, Resource::State new_state, Resource& resource)
+	{
+	}
+
+
 	void modelStateChanged(Resource::State old_state, Resource::State new_state, Resource& resource)
 	{
 		Model* model = static_cast<Model*>(&resource);
@@ -256,6 +285,7 @@ public:
 		auto* material_manager = static_cast<MaterialManager*>(rm.get(Material::TYPE));
 
 		m_model_entity_map.clear();
+		m_custom_mesh_callbacks.clear();
 		
 		for (TextMesh* text_mesh : m_text_meshes)
 		{
@@ -2560,10 +2590,12 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 						const Mesh& mesh = model_instance->meshes[j];
 						if ((mesh.layer_mask & layer_mask) == 0) continue;
 						
-						MeshInstance& info = subinfos.emplace();
-						info.owner = raw_subresults[i];
-						info.mesh = &mesh;
-						info.depth = squared_distance;
+						if (mesh.material->isReady()) {
+							MeshInstance& info = subinfos.emplace();
+							info.owner = raw_subresults[i];
+							info.mesh = &mesh;
+							info.depth = squared_distance;
+						}
 					}
 				}
 			}, &job_storage[subresult_index], &jobs[subresult_index], nullptr);
@@ -3754,10 +3786,38 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		r.flags.set(ModelInstance::CUSTOM_MESHES);
 	}
 
+	void removeFromCustomMeshCallbacks(Material* material, EntityRef entity)
+	{
+		auto iter = m_custom_mesh_callbacks.find(material);
+		auto& entities = iter.value().m_entities;
+		for(int i = 0, c = entities.size(); i < c; ++i) {
+			if (entities[i] == entity) {
+				entities.eraseFast(i);
+				break;
+			}
+		}
+		if(entities.empty()) {
+			m_custom_mesh_callbacks.erase(material);
+		}
+	}
+
+	void addToCustomMeshCallbacks(Material* material, EntityRef entity)
+	{
+		auto iter = m_custom_mesh_callbacks.find(material);
+		if(!iter.isValid()) {
+			CustomMeshCallback cb(*this, material, m_allocator);
+			//m_custom_mesh_callbacks.insert(material, cb);
+			iter = m_custom_mesh_callbacks.find(material);
+		}
+
+		iter.value().m_entities.push(entity);
+	}
+
 
 	void setModelInstanceMaterial(EntityRef entity, int index, const Path& path) override
 	{
 		auto& r = m_model_instances[entity.index];
+		const bool had_custom_meshes = hasCustomMeshes(r);
 		if (r.meshes && r.mesh_count > index && r.meshes[index].material && path == r.meshes[index].material->getPath()) return;
 
 		auto& rm = r.model->getResourceManager().getOwner();
@@ -3766,8 +3826,15 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		allocateCustomMeshes(r, new_count);
 		ASSERT(r.meshes);
 
+		Material* old_material = r.meshes[index].material;
 		auto* new_material = rm.load<Material>(path);
+		if(old_material && had_custom_meshes) {
+			removeFromCustomMeshCallbacks(old_material, entity);
+		}
+
 		r.meshes[index].setMaterial(new_material, *r.model, m_renderer);
+
+		addToCustomMeshCallbacks(new_material, entity);
 	}
 
 
@@ -4069,6 +4136,7 @@ private:
 	bool m_is_game_running;
 
 	HashMap<Model*, EntityRef> m_model_entity_map;
+	HashMap<Material*, CustomMeshCallback> m_custom_mesh_callbacks;
 };
 
 
@@ -4113,6 +4181,7 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	, m_renderer(renderer)
 	, m_allocator(allocator)
 	, m_model_entity_map(m_allocator)
+	, m_custom_mesh_callbacks(m_allocator)
 	, m_model_instances(m_allocator)
 	, m_cameras(m_allocator)
 	, m_text_meshes(m_allocator)

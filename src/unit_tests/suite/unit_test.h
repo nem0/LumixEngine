@@ -59,7 +59,7 @@ namespace Lumix
 
 
 			template<int C>
-			static void getOperand(char(&str)[C], Entity value)
+			static void getOperand(char(&str)[C], EntityRef value)
 			{
 				char tmp[20];
 				toCString(value.index, tmp, C);
