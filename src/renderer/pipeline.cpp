@@ -44,14 +44,51 @@ static const float SHADOW_CAM_NEAR = 50.0f;
 static const float SHADOW_CAM_FAR = 5000.0f;
 
 
+ResourceType PipelineResource::TYPE("pipeline");
+
+
+void PipelineResource::unload()
+{
+	content.clear();
+}
+
+
+bool PipelineResource::load(FS::IFile& file)
+{
+	content.resize((int)file.size());
+	file.read(content.begin(), content.size());
+	return true;
+}
+
+
+PipelineResourceManager::PipelineResourceManager(IAllocator& allocator)
+	: ResourceManager(allocator)
+	, m_allocator(allocator)
+{}
+
+
+Resource* PipelineResourceManager::createResource(const Path& path)
+{
+	return LUMIX_NEW(m_allocator, PipelineResource)(path, *this, m_allocator);
+}
+
+
+void PipelineResourceManager::destroyResource(Resource& resource)
+{
+	return LUMIX_DELETE(m_allocator, static_cast<PipelineResource*>(&resource));
+}
+
+PipelineResource::PipelineResource(const Path& path, ResourceManager& owner, IAllocator& allocator)
+	: Resource(path, owner, allocator)
+	, content(allocator) 
+{}
 struct PipelineImpl final : Pipeline
 {
-	PipelineImpl(Renderer& renderer, const Path& path, const char* define, IAllocator& allocator)
+	PipelineImpl(Renderer& renderer, PipelineResource* resource, const char* define, IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_renderer(renderer)
-		, m_path(path)
+		, m_resource(resource)
 		, m_lua_state(nullptr)
-		, m_is_ready(false)
 		, m_custom_commands_handlers(allocator)
 		, m_define(define)
 		, m_scene(nullptr)
@@ -119,6 +156,8 @@ struct PipelineImpl final : Pipeline
 
 		const Renderer::MemRef ib_mem = m_renderer.copy(cube_indices, sizeof(cube_indices));
 		m_cube_ib = m_renderer.createBuffer(ib_mem);
+
+		m_resource->onLoaded<PipelineImpl, &PipelineImpl::onStateChanged>(this);
 	}
 
 
@@ -155,14 +194,6 @@ struct PipelineImpl final : Pipeline
 	}
 
 
-	void load() override 
-	{
-		auto& fs = m_renderer.getEngine().getFileSystem();
-		Delegate<void(FS::IFile&, bool)> cb;
-		cb.bind<PipelineImpl, &PipelineImpl::onFileLoaded>(this);
-		fs.openAsync(fs.getDefaultDevice(), m_path, FS::Mode::OPEN_AND_READ, cb);
-	}
-
 	
 	void cleanup()
 	{
@@ -180,10 +211,10 @@ struct PipelineImpl final : Pipeline
 		if (m_define == "") return;
 		StaticString<256> tmp(m_define, " = true");
 
-		bool errors = luaL_loadbuffer(m_lua_state, tmp, stringLength(tmp.data), m_path.c_str()) != 0;
+		bool errors = luaL_loadbuffer(m_lua_state, tmp, stringLength(tmp.data), m_resource->getPath().c_str()) != 0;
 		if (errors)
 		{
-			g_log_error.log("Renderer") << m_path.c_str() << ": " << lua_tostring(m_lua_state, -1);
+			g_log_error.log("Renderer") << m_resource->getPath().c_str() << ": " << lua_tostring(m_lua_state, -1);
 			lua_pop(m_lua_state, 1);
 			return;
 		}
@@ -193,7 +224,7 @@ struct PipelineImpl final : Pipeline
 		errors = lua_pcall(m_lua_state, 0, 0, 0) != 0;
 		if (errors)
 		{
-			g_log_error.log("Renderer") << m_path.c_str() << ": " << lua_tostring(m_lua_state, -1);
+			g_log_error.log("Renderer") << m_resource->getPath().c_str() << ": " << lua_tostring(m_lua_state, -1);
 			lua_pop(m_lua_state, 1);
 		}
 	}
@@ -236,14 +267,10 @@ struct PipelineImpl final : Pipeline
 		}
 	}
 
-
-	void onFileLoaded(FS::IFile& file, bool success)
+	
+	void onStateChanged(Resource::State, Resource::State new_state, Resource&)
 	{
-		if (!success)
-		{
-			g_log_error.log("Renderer") << "Failed to load " << m_path;
-			return;
-		}
+		if (new_state != Resource::State::READY) return;
 
 		cleanup();
 
@@ -277,11 +304,13 @@ struct PipelineImpl final : Pipeline
 
 		setDefine();
 
+		const char* content = m_resource->content.begin();
+		const int content_size = m_resource->content.size();
 		bool errors =
-			luaL_loadbuffer(m_lua_state, (const char*)file.getBuffer(), file.size(), m_path.c_str()) != 0;
+			luaL_loadbuffer(m_lua_state, content, content_size, m_resource->getPath().c_str()) != 0;
 		if (errors)
 		{
-			g_log_error.log("Renderer") << m_path.c_str() << ": " << lua_tostring(m_lua_state, -1);
+			g_log_error.log("Renderer") << m_resource->getPath().c_str() << ": " << lua_tostring(m_lua_state, -1);
 			lua_pop(m_lua_state, 1);
 			return;
 		}
@@ -291,15 +320,13 @@ struct PipelineImpl final : Pipeline
 		errors = lua_pcall(m_lua_state, 0, 0, 0) != 0;
 		if (errors)
 		{
-			g_log_error.log("Renderer") << m_path.c_str() << ": " << lua_tostring(m_lua_state, -1);
+			g_log_error.log("Renderer") << m_resource->getPath().c_str() << ": " << lua_tostring(m_lua_state, -1);
 			lua_pop(m_lua_state, 1);
 			return;
 		}
 
 		m_viewport.w = m_viewport.h = 800;
 		if (m_scene) callInitScene();
-		
-		m_is_ready = true;
 	}
 
 
@@ -2315,9 +2342,9 @@ struct PipelineImpl final : Pipeline
 	}
 
 
-	bool isReady() const override { return m_is_ready; }
+	bool isReady() const override { return m_resource->isReady(); }
 	const Stats& getStats() const override { return m_stats; }
-	Path& getPath() override { return m_path; }
+	const Path& getPath() override { return m_resource->getPath(); }
 
 	Draw2D& getDraw2D() override { return m_draw2d; }
 	ffr::TextureHandle getOutput() override { 
@@ -2342,11 +2369,10 @@ struct PipelineImpl final : Pipeline
 
 	IAllocator& m_allocator;
 	Renderer& m_renderer;
-	Path m_path;
+	PipelineResource* m_resource;
 	lua_State* m_lua_state;
 	int m_lua_thread_ref;
 	int m_lua_env;
-	bool m_is_ready;
 	bool m_is_first_render;
 	StaticString<32> m_define;
 	RenderScene* m_scene;
@@ -2380,9 +2406,9 @@ struct PipelineImpl final : Pipeline
 };
 
 
-Pipeline* Pipeline::create(Renderer& renderer, const Path& path, const char* define, IAllocator& allocator)
+Pipeline* Pipeline::create(Renderer& renderer, PipelineResource* resource, const char* define, IAllocator& allocator)
 {
-	return LUMIX_NEW(allocator, PipelineImpl)(renderer, path, define, allocator);
+	return LUMIX_NEW(allocator, PipelineImpl)(renderer, resource, define, allocator);
 }
 
 

@@ -1,5 +1,6 @@
 #include "game_view.h"
 #include "editor/asset_browser.h"
+#include "editor/asset_compiler.h"
 #include "editor/platform_interface.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
@@ -78,9 +79,8 @@ GameView::GameView(StudioApp& app)
 	app.addAction(fullscreen_action);
 
 	auto* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
-	Path path("pipelines/main.pln");
-	m_pipeline = Pipeline::create(*renderer, path, "GAME_VIEW", engine.getAllocator());
-	m_pipeline->load();
+	PipelineResource* pres = engine.getResourceManager().load<PipelineResource>(Path("pipelines/main.pln"));
+	m_pipeline = Pipeline::create(*renderer, pres, "GAME_VIEW", engine.getAllocator());
 	renderer->setMainPipeline(m_pipeline);
 
 	editor.universeCreated().bind<GameView, &GameView::onUniverseCreated>(this);
@@ -93,20 +93,11 @@ GameView::GameView(StudioApp& app)
 		m_gui_interface = LUMIX_NEW(engine.getAllocator(), GUIInterface)(*this);
 		gui->setInterface(m_gui_interface);
 	}
-
-	app.getAssetBrowser().resourceChanged().bind<GameView, &GameView::onResourceChanged>(this);
-}
-
-
-void GameView::onResourceChanged(const Path& path, const char* /*ext*/)
-{
-	if (m_pipeline->getPath() == path) m_pipeline->load();
 }
 
 
 GameView::~GameView()
 {
-	m_studio_app.getAssetBrowser().resourceChanged().unbind<GameView, &GameView::onResourceChanged>(this);
 	m_editor.universeCreated().unbind<GameView, &GameView::onUniverseCreated>(this);
 	m_editor.universeDestroyed().unbind<GameView, &GameView::onUniverseDestroyed>(this);
 	auto* gui = static_cast<GUISystem*>(m_editor.getEngine().getPluginManager().getPlugin("gui"));

@@ -182,8 +182,8 @@ public:
 		#endif
 		m_engine->getInputSystem().enable(true);
 		Renderer* renderer = static_cast<Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
-		m_pipeline = Pipeline::create(*renderer, Path(m_pipeline_path), m_pipeline_define, m_engine->getAllocator());
-		m_pipeline->load();
+		PipelineResource* pres = m_engine->getResourceManager().load<PipelineResource>(Path(m_pipeline_path));
+		m_pipeline = Pipeline::create(*renderer, pres, m_pipeline_define, m_engine->getAllocator());
 		renderer->setMainPipeline(m_pipeline);
 
 		while (m_engine->getFileSystem().hasWork())

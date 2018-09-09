@@ -67,6 +67,7 @@ struct AssetCompilerImpl : AssetCompiler
 		, m_task(*this, app.getWorldEditor().getAllocator())
 		, m_to_compile(app.getWorldEditor().getAllocator())
 		, m_compiled(app.getWorldEditor().getAllocator())
+		, m_on_resource_changed(app.getWorldEditor().getAllocator())
 		, m_to_compile_mutex(false)
 		, m_compiled_mutex(false)
 		, m_plugin_mutex(false)
@@ -228,9 +229,11 @@ struct AssetCompilerImpl : AssetCompiler
 			CompileEntry e = popCompiledResource();
 			if(e.resource) {
 				m_load_hook.continueLoad(*e.resource);
+				m_on_resource_changed.invoke(e.resource->getPath());
 			}
 			else if (e.path.isValid()) {
 				m_app.getWorldEditor().getEngine().getResourceManager().reload(e.path);
+				m_on_resource_changed.invoke(e.path);
 			}
 			else {
 				break;
@@ -269,6 +272,12 @@ struct AssetCompilerImpl : AssetCompiler
 		}
 	}
 
+	OnResourceChanged& resourceChanged() override
+	{
+		return m_on_resource_changed;
+	}
+
+	OnResourceChanged m_on_resource_changed;
 	MT::Semaphore m_semaphore;
 	MT::SpinMutex m_to_compile_mutex;
 	MT::SpinMutex m_compiled_mutex;

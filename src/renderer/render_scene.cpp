@@ -2211,9 +2211,8 @@ public:
 	static Pipeline* LUA_createPipeline(Engine* engine, const char* path)
 	{
 		Renderer& renderer = *static_cast<Renderer*>(engine->getPluginManager().getPlugin("renderer"));
-		Pipeline* pipeline = Pipeline::create(renderer, Path(path), "", renderer.getEngine().getAllocator());
-		pipeline->load();
-		return pipeline;
+		PipelineResource* pres = engine->getResourceManager().load<PipelineResource>(Path(path));
+		return Pipeline::create(renderer, pres, "", renderer.getEngine().getAllocator());
 	}
 
 

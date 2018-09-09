@@ -65,7 +65,6 @@ public:
 	void openInExternalEditor(Resource* resource) const;
 	void openInExternalEditor(const char* path) const;
 	void enableUpdate(bool enable) { m_is_update_enabled = enable; }
-	OnResourceChanged& resourceChanged() { return m_on_resource_changed; }
 	bool resourceList(char* buf, int max_size, ResourceType type, float height) const;
 	FS::IFile* beginSaveResource(Resource& resource);
 	void endSaveResource(Resource& resource, FS::IFile& file, bool success);
@@ -117,7 +116,6 @@ private:
 	Array<StaticString<MAX_PATH_LENGTH> > m_subdirs;
 	Array<FileInfo> m_file_infos;
 	Array<int> m_filtered_file_infos;
-	OnResourceChanged m_on_resource_changed;
 	Array<Path> m_history;
 	int m_history_index;
 	AssociativeArray<ResourceType, IPlugin*> m_plugins;
