@@ -143,7 +143,6 @@ public:
 
 	enum class LoadingFlags : u32
 	{
-		KEEP_SKIN_DEPRECATED = 1 << 0
 	};
 
 	struct LOD
@@ -230,7 +229,6 @@ private:
 	float m_bounding_radius;
 	BoneMap m_bone_map;
 	AABB m_aabb;
-	FlagSet<LoadingFlags, u32> m_loading_flags;
 	int m_first_nonroot_bone_index;
 };
 

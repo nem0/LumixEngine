@@ -96,8 +96,8 @@ void Mesh::setMaterial(Material* new_material, Model& model, Renderer& renderer)
 {
 	if (material) material->getResourceManager().unload(*material);
 	material = new_material;
-	layer_mask = material->getRenderLayerMask();
-	type = model.getBoneCount() > 0 && skin.empty() ? Mesh::RIGID_INSTANCED : Mesh::SKINNED;
+	layer_mask = material->isReady() ? material->getRenderLayerMask() : 0;
+	type = model.getBoneCount() == 0 || skin.empty() ? Mesh::RIGID_INSTANCED : Mesh::SKINNED;
 }
 
 

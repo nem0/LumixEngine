@@ -2097,11 +2097,12 @@ struct FurPainter final : public WorldEditor::Plugin
 
 struct RenderInterfaceImpl final : public RenderInterface
 {
-	RenderInterfaceImpl(WorldEditor& editor, Pipeline& pipeline)
+	RenderInterfaceImpl(WorldEditor& editor, Pipeline& pipeline, Renderer& renderer)
 		: m_pipeline(pipeline)
 		, m_editor(editor)
 		, m_models(editor.getAllocator())
 		, m_textures(editor.getAllocator())
+		, m_renderer(renderer)
 	{
 		m_model_index = 0;
 		auto& rm = m_editor.getEngine().getResourceManager();
@@ -2127,8 +2128,7 @@ struct RenderInterfaceImpl final : public RenderInterface
 
 	void addText2D(float x, float y, float font_size, u32 color, const char* text) override
 	{
-		auto& renderer = static_cast<Renderer&>(m_render_scene->getPlugin());
-		Font* font = renderer.getFontManager().getDefaultFont();
+		Font* font = m_renderer.getFontManager().getDefaultFont();
 		m_pipeline.getDraw2D().AddText(font, font_size, {x, y}, color, text);
 	}
 
@@ -2204,9 +2204,8 @@ struct RenderInterfaceImpl final : public RenderInterface
 
 		Texture* old_texture = material->getTexture(0);
 		PluginManager& plugin_manager = engine.getPluginManager();
-		Renderer* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
 		Texture* texture = LUMIX_NEW(engine.getAllocator(), Texture)(
-			Path("font"), *renderer, *engine.getResourceManager().get(Texture::TYPE), engine.getAllocator());
+			Path("font"), m_renderer, *engine.getResourceManager().get(Texture::TYPE), engine.getAllocator());
 
 		texture->create(width, height, pixels, width * height * 4);
 		material->setTexture(0, texture);
@@ -2251,10 +2250,8 @@ struct RenderInterfaceImpl final : public RenderInterface
 		Engine& engine = m_editor.getEngine();
 		auto& rm = engine.getResourceManager();
 		auto& allocator = m_editor.getAllocator();
-		PluginManager& plugin_manager = engine.getPluginManager();
-		Renderer* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
 
-		Texture* texture = LUMIX_NEW(allocator, Texture)(Path(name), *renderer, *rm.get(Texture::TYPE), allocator);
+		Texture* texture = LUMIX_NEW(allocator, Texture)(Path(name), m_renderer, *rm.get(Texture::TYPE), allocator);
 		texture->create(w, h, pixels, w * h * 4);
 		m_textures.insert(&texture->handle, texture);
 		return &texture->handle;
@@ -2422,10 +2419,8 @@ struct RenderInterfaceImpl final : public RenderInterface
 		vertex_decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false);
 		vertex_decl.addAttribute(4, ffr::AttributeType::U8, true, false);
 			
-		Renderer& renderer = static_cast<Renderer&>(m_render_scene->getPlugin());
-
-		Renderer::TransientSlice ib = renderer.allocTransient(indices_count * sizeof(u16));
-		Renderer::TransientSlice vb = renderer.allocTransient(vertices_count * sizeof(Vertex));
+		Renderer::TransientSlice ib = m_renderer.allocTransient(indices_count * sizeof(u16));
+		Renderer::TransientSlice vb = m_renderer.allocTransient(vertices_count * sizeof(Vertex));
 		
 		ffr::update(ib.buffer, indices, ib.offset, ib.size);
 		ffr::update(vb.buffer, vertices, vb.offset, vb.size);
@@ -2467,6 +2462,7 @@ struct RenderInterfaceImpl final : public RenderInterface
 	WorldEditor& m_editor;
 	Shader* m_shader;
 	RenderScene* m_render_scene;
+	Renderer& m_renderer;
 	Pipeline& m_pipeline;
 	ffr::UniformHandle m_model_uniform;
 	HashMap<int, Model*> m_models;
@@ -2823,7 +2819,7 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 
 		IAllocator& allocator = editor.getAllocator();
 		RenderInterface* render_interface =
-			LUMIX_NEW(allocator, RenderInterfaceImpl)(editor, *scene_view.getPipeline());
+			LUMIX_NEW(allocator, RenderInterfaceImpl)(editor, *scene_view.getPipeline(), *renderer);
 		editor.setRenderInterface(render_interface);
 
 		m_canvas_size_uniform = ffr::allocUniform("u_canvas_size", ffr::UniformType::VEC2, 1);
