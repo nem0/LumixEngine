@@ -597,7 +597,7 @@ struct AnimationSceneImpl final : public AnimationScene
 			char tmp[MAX_PATH_LENGTH];
 			serializer.readString(tmp, lengthOf(tmp));
 			setControllerResource(controller, tmp[0] ? loadController(Path(tmp)) : nullptr);
-			m_controllers.insert(controller.entity, controller);
+			m_controllers.insert(controller.entity, Move(controller));
 			m_universe.onComponentCreated(controller.entity, CONTROLLER_TYPE, this);
 		}
 

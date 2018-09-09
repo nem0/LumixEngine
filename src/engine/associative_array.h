@@ -2,6 +2,7 @@
 
 
 #include "engine/iallocator.h"
+#include "engine/metaprogramming.h"
 #include "engine/string.h"
 
 
@@ -81,6 +82,25 @@ namespace Lumix
 				++m_size;
 
 				return m_values[i];
+			}
+
+
+			int insert(const Key& key, Value&& value)
+			{
+				if (m_capacity == m_size) reserve(m_capacity < 4 ? 4 : m_capacity * 2);
+
+				int i = index(key);
+				if (i >= 0 && ((i < m_size && m_keys[i] != key) || i == m_size))
+				{
+					moveMemory(m_keys + i + 1, m_keys + i, sizeof(Key) * (m_size - i));
+					moveMemory(m_values + i + 1, m_values + i, sizeof(Value) * (m_size - i));
+					new (NewPlaceholder(), &m_values[i]) Value(Move(value));
+					new (NewPlaceholder(), &m_keys[i]) Key(key);
+					++m_size;
+
+					return i;
+				}
+				return -1;
 			}
 
 

@@ -14,10 +14,10 @@ namespace
 		PathManager path_manager(allocator);
 		Universe universe(allocator);
 
-		Entity e0 = universe.createEntity({0, 0, 0}, {0, 0, 0, 1});
-		Entity e1 = universe.createEntity({0, 0, 0}, {0, 0, 0, 1});
-		Entity e2 = universe.createEntity({0, 0, 0}, {0, 0, 0, 1});
-		Entity e3 = universe.createEntity({0, 0, 0}, {0, 0, 0, 1});
+		EntityRef e0 = universe.createEntity({0, 0, 0}, {0, 0, 0, 1});
+		EntityRef e1 = universe.createEntity({0, 0, 0}, {0, 0, 0, 1});
+		EntityRef e2 = universe.createEntity({0, 0, 0}, {0, 0, 0, 1});
+		EntityRef e3 = universe.createEntity({0, 0, 0}, {0, 0, 0, 1});
 
 		LUMIX_EXPECT(!universe.getParent(e0).isValid());
 		LUMIX_EXPECT(!universe.getParent(e1).isValid());
@@ -131,10 +131,10 @@ namespace
 		PathManager path_manager(allocator);
 		Universe universe(allocator);
 
-		Entity e0 = universe.createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
-		Entity e1 = universe.createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
-		Entity e2 = universe.createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
-		Entity e3 = universe.createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
+		EntityRef e0 = universe.createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
+		EntityRef e1 = universe.createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
+		EntityRef e2 = universe.createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
+		EntityRef e3 = universe.createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
 
 		universe.setParent(e0, e1);
 		universe.setParent(e0, e2);
@@ -153,10 +153,10 @@ namespace
 		PathManager path_manager(allocator);
 		Universe universe(allocator);
 
-		Entity e0 = universe.createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
-		Entity e1 = universe.createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
-		Entity e2 = universe.createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
-		Entity e3 = universe.createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
+		EntityRef e0 = universe.createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
+		EntityRef e1 = universe.createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
+		EntityRef e2 = universe.createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
+		EntityRef e3 = universe.createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
 
 		universe.setParent(e0, e1);
 		universe.setParent(e0, e2);
@@ -178,7 +178,7 @@ namespace
 		PathManager path_manager(allocator);
 		Universe universe(allocator);
 
-		Entity e0 = universe.createEntity({0, 0, 0}, {0, 0, 0, 1});
+		EntityRef e0 = universe.createEntity({0, 0, 0}, {0, 0, 0, 1});
 
 		universe.setLocalPosition(e0, {1, 2, 3});
 		LUMIX_EXPECT_CLOSE_EQ(universe.getPosition(e0).x, 1, 0.001f);
@@ -215,7 +215,6 @@ namespace
 		DefaultAllocator allocator;
 		PathManager path_manager(allocator);
 		Universe universe(allocator);
-		LUMIX_EXPECT(!universe.hasEntity(INVALID_ENTITY));
 		LUMIX_EXPECT(!universe.hasEntity({0}));
 		LUMIX_EXPECT(!universe.hasEntity({1}));
 		LUMIX_EXPECT(!universe.hasEntity({100}));
@@ -224,7 +223,7 @@ namespace
 
 		Vec3 p(0, 0, 0);
 		Quat r(0, 0, 0, 1);
-		Entity entities[ENTITY_COUNT];
+		EntityRef entities[ENTITY_COUNT];
 		for (int i = 0; i < ENTITY_COUNT; ++i)
 		{
 			entities[i] = universe.createEntity(p, r);
@@ -245,7 +244,6 @@ namespace
 		entities[3] = universe.createEntity(p, r);
 		entities[4] = universe.createEntity(p, r);
 
-		universe.destroyEntity(entities[0]);
 		universe.destroyEntity(entities[0]);
 		entities[0] = universe.createEntity(p, r);
 

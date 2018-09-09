@@ -17,8 +17,8 @@ namespace
 		PathManager path_manager(allocator);
 
 		FS::DiskFileDevice disk_file_device("disk", "", allocator);
-		FS::IFile* file1 = disk_file_device.createFile(NULL);
-		FS::IFile* file2 = disk_file_device.createFile(NULL);
+		FS::IFile* file1 = disk_file_device.createFile(nullptr);
+		FS::IFile* file2 = disk_file_device.createFile(nullptr);
 
 		// if it fails somewhere here, check whether you have set working directory
 		LUMIX_EXPECT(file1->open(Path("unit_tests/texture/1.tga"), FS::Mode::OPEN_AND_READ));

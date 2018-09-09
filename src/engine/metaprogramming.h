@@ -14,6 +14,9 @@ template <class T> struct RemoveVolatile { using Type = T; };
 template <class T> struct RemoveVolatile<volatile T> { using Type = T; };
 template <class T> using RemoveCR = typename RemoveConst<typename RemoveReference<T>::Type>::Type;
 template <class T> using RemoveCVR = typename RemoveVolatile<RemoveCR<T>>::Type;
+template< class T > typename constexpr RemoveReference<T>::Type&& Move(T&& t) { 
+	return static_cast<RemoveReference<T>::Type&&>(t);
+}
 
 
 template<bool B, class T = void>
