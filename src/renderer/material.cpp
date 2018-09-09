@@ -150,6 +150,7 @@ bool Material::save(FS::IFile& file)
 	Renderer& renderer = static_cast<MaterialManager&>(m_resource_manager).getRenderer();
 	
 	file << "shader \"" << (m_shader ? m_shader->getPath().c_str(): "") << "\"\n";
+	file << "backface_culling(" << (isBackfaceCulling() ? "true" : "false") << ")\n";
 
 	char tmp[64];
 	toCString(m_metallic, tmp, lengthOf(tmp), 9);
@@ -597,6 +598,19 @@ int alpha_ref(lua_State* L)
 }
 
 
+int backface_culling(lua_State* L)
+{
+	const bool enable = LuaWrapper::checkArg<bool>(L, 1);
+	
+	lua_getfield(L, LUA_GLOBALSINDEX, "this");
+	Material* material = (Material*)lua_touserdata(L, -1);
+	lua_pop(L, 1);
+
+	material->enableBackfaceCulling(enable);
+	return 0;
+}
+
+
 int color(lua_State* L)
 {
 	const Vec4 c = LuaWrapper::checkArg<Vec4>(L, 1);
@@ -769,6 +783,7 @@ bool Material::load(FS::IFile& file)
 	DEFINE_LUA_FUNC(emission);
 	DEFINE_LUA_FUNC(custom_flag);
 	DEFINE_LUA_FUNC(color);
+	DEFINE_LUA_FUNC(backface_culling);
 	DEFINE_LUA_FUNC(alpha_ref);
 	
 	#undef DEFINE_LUA_FUNC
