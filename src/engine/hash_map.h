@@ -3,6 +3,7 @@
 
 #include "engine/iallocator.h"
 #include "engine/lumix.h"
+#include "engine/metaprogramming.h"
 #include "engine/math_utils.h"
 #include "engine/string.h"
 
@@ -14,15 +15,23 @@ namespace Lumix
 	{
 		typedef HashNode<K, V> my_node;
 
+		HashNode(const K& key, V&& value)
+			: m_key(key)
+			, m_value(Move(value))
+			, m_next(nullptr)
+		{}
+
 		HashNode(const K& key, const V& value)
 			: m_key(key)
 			, m_value(value)
 			, m_next(nullptr)
 		{}
 
-		explicit HashNode(const my_node& src)
+		HashNode(const my_node& src) = delete;
+
+		explicit HashNode(my_node&& src)
 			: m_key(src.m_key)
-			, m_value(src.m_value)
+			, m_value(Move(src.m_value))
 			, m_next(src.m_next)
 		{}
 
@@ -422,6 +431,14 @@ namespace Lumix
 			checkSize();
 		}
 
+		void insert(const key_type& key, value_type&& val)
+		{
+			size_type pos = getPosition(key);
+			construct(getEmptyNode(pos), key, Move(val));
+			m_size++;
+			checkSize();
+		}
+
 		iterator erase(iterator it)
 		{
 			ASSERT(it.isValid());
@@ -591,14 +608,14 @@ namespace Lumix
 			m_allocator.deallocate(old);
 		}
 
+		node_type* construct(node_type* where, const key_type& key, value_type&& val)
+		{
+			return new(NewPlaceholder(), where) node_type(key, Move(val));
+		}
+
 		node_type* construct(node_type* where, const key_type& key, const value_type& val)
 		{
 			return new(NewPlaceholder(), where) node_type(key, val);
-		}
-
-		node_type* construct(node_type* where, const node_type& node)
-		{
-			return new(NewPlaceholder(), where) node_type(node);
 		}
 
 		void destruct(node_type* n)
@@ -681,9 +698,8 @@ namespace Lumix
 				node_type* next = n->m_next;
 				destruct(n);
 				
-				if (next)
-				{
-					construct(n, *next);
+				if (next) {
+					new (NewPlaceholder(), n) node_type(Move(*next));
 					destruct(next);
 				}
 				else {

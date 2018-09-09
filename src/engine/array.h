@@ -29,6 +29,16 @@ public:
 		*this = rhs;
 	}
 
+	explicit Array(Array&& rhs)
+		: m_allocator(rhs.m_allocator)
+	{
+		m_data = nullptr;
+		m_capacity = 0;
+		m_size = 0;
+		
+		swap(rhs);
+	}
+
 
 	T* begin() const { return m_data; }
 

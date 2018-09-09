@@ -204,9 +204,15 @@ class RenderSceneImpl final : public RenderScene
 private:
 	struct CustomMeshCallback
 	{
-		//CustomMeshCallback(CustomMeshCallback&& rhs) = default;
-		//CustomMeshCallback(const CustomMeshCallback&) = delete;
+		CustomMeshCallback(CustomMeshCallback&& rhs)
+			: m_entities(Move(rhs.m_entities))
+			, m_scene(rhs.m_scene)
+			, m_material(rhs.m_material)
+		{
+			rhs.m_material = nullptr;
+		}
 
+		CustomMeshCallback(const CustomMeshCallback&) = delete;
 
 		CustomMeshCallback(RenderSceneImpl& scene, Material* material, IAllocator& allocator)
 			: m_entities(allocator)
@@ -218,7 +224,9 @@ private:
 
 		~CustomMeshCallback()
 		{
-			m_material->getObserverCb().unbind<RenderSceneImpl, &RenderSceneImpl::materialStateChanged>(&m_scene);
+			if(m_material) {
+				m_material->getObserverCb().unbind<RenderSceneImpl, &RenderSceneImpl::materialStateChanged>(&m_scene);
+			}
 		}
 
 		RenderSceneImpl& m_scene;
@@ -262,6 +270,20 @@ public:
 
 	void materialStateChanged(Resource::State old_state, Resource::State new_state, Resource& resource)
 	{
+		Material& material = (Material&)resource;
+		const u64 layer_mask = new_state == Resource::State::READY ? material.getRenderLayerMask() : 0;
+		auto iter = m_custom_mesh_callbacks.find(&material);
+		const auto& entities = iter.value().m_entities;
+		for(EntityRef e : entities) {
+			ModelInstance& r = m_model_instances[e.index];
+			ASSERT(hasCustomMeshes(r));
+			for(int i = 0; i < r.mesh_count; ++i) {
+				Mesh& m = r.meshes[i];
+				if (m.material == &material) {
+					m.layer_mask = layer_mask;
+				}
+			}
+		}
 	}
 
 
@@ -284,8 +306,6 @@ public:
 		auto& rm = m_engine.getResourceManager();
 		auto* material_manager = static_cast<MaterialManager*>(rm.get(Material::TYPE));
 
-		m_model_entity_map.clear();
-		m_custom_mesh_callbacks.clear();
 		
 		for (TextMesh* text_mesh : m_text_meshes)
 		{
@@ -323,6 +343,12 @@ public:
 			}
 		}
 		m_model_instances.clear();
+		for(auto iter = m_model_entity_map.begin(), end = m_model_entity_map.end(); iter != end; ++iter) {
+			Model* model = iter.key();
+			model->getObserverCb().unbind<RenderSceneImpl, &RenderSceneImpl::modelStateChanged>(this);
+		}
+		m_model_entity_map.clear();
+
 		m_culling_system->clear();
 
 		for (auto& probe : m_environment_probes)
@@ -332,6 +358,8 @@ public:
 			if (probe.irradiance) probe.irradiance->getResourceManager().unload(*probe.irradiance);
 		}
 		m_environment_probes.clear();
+		
+		ASSERT(m_custom_mesh_callbacks.empty());
 	}
 
 
@@ -3641,6 +3669,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		if (!hasCustomMeshes(r)) return;
 		for (int i = 0; i < r.mesh_count; ++i)
 		{
+			removeFromCustomMeshCallbacks(r.meshes[i].material, (EntityRef)r.entity);
 			manager->unload(*r.meshes[i].material);
 			r.meshes[i].~Mesh();
 		}
@@ -3772,6 +3801,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 				for (int i = 0; i < r.mesh_count; ++i)
 				{
 					material_manager->load(*r.meshes[i].material);
+					addToCustomMeshCallbacks(r.meshes[i].material, (EntityRef)r.entity);
 				}
 			}
 		}
@@ -3789,6 +3819,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	void removeFromCustomMeshCallbacks(Material* material, EntityRef entity)
 	{
 		auto iter = m_custom_mesh_callbacks.find(material);
+		ASSERT(iter.isValid());
 		auto& entities = iter.value().m_entities;
 		for(int i = 0, c = entities.size(); i < c; ++i) {
 			if (entities[i] == entity) {
@@ -3806,7 +3837,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		auto iter = m_custom_mesh_callbacks.find(material);
 		if(!iter.isValid()) {
 			CustomMeshCallback cb(*this, material, m_allocator);
-			//m_custom_mesh_callbacks.insert(material, cb);
+			m_custom_mesh_callbacks.insert(material, Move(cb));
 			iter = m_custom_mesh_callbacks.find(material);
 		}
 
@@ -3828,7 +3859,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 
 		Material* old_material = r.meshes[index].material;
 		auto* new_material = rm.load<Material>(path);
-		if(old_material && had_custom_meshes) {
+		if(old_material) {
 			removeFromCustomMeshCallbacks(old_material, entity);
 		}
 
