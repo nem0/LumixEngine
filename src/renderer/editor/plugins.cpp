@@ -81,6 +81,27 @@ struct FontPlugin final : public AssetBrowser::IPlugin
 };
 
 
+struct PipelinePlugin final : AssetCompiler::IPlugin
+{
+	explicit PipelinePlugin(StudioApp& app)
+		: m_app(app)
+	{}
+
+	bool compile(const Path& src) override
+	{
+		const char* dst_dir = m_app.getAssetCompiler().getCompiledDir();
+		const u32 hash = crc32(src.c_str());
+
+		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
+
+		copyFile(src.c_str(), dst);
+		return true;
+	}
+
+	StudioApp& m_app;
+};
+
+
 struct ParticleEmitterPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 {
 	explicit ParticleEmitterPlugin(StudioApp& app)
@@ -557,8 +578,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		Engine& engine = m_app.getWorldEditor().getEngine();
 		m_tile.universe = &engine.createUniverse(false);
 		Renderer* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
-		m_tile.pipeline = Pipeline::create(*renderer, Path("pipelines/main.pln"), "", engine.getAllocator());
-		m_tile.pipeline->load();
+		PipelineResource* pres = engine.getResourceManager().load<PipelineResource>(Path("pipelines/main.pln"));
+		m_tile.pipeline = Pipeline::create(*renderer, pres, "", engine.getAllocator());
 
 		Matrix mtx;
 		mtx.lookAt({10, 10, 10}, Vec3::ZERO, {0, 1, 0});
@@ -578,8 +599,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		auto& engine = m_app.getWorldEditor().getEngine();
 		m_universe = &engine.createUniverse(false);
 		auto* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
-		m_pipeline = Pipeline::create(*renderer, Path("pipelines/main.pln"), "PREVIEW",  engine.getAllocator());
-		m_pipeline->load();
+		PipelineResource* pres = engine.getResourceManager().load<PipelineResource>(Path("pipelines/main.pln"));
+		m_pipeline = Pipeline::create(*renderer, pres, "PREVIEW",  engine.getAllocator());
 
 		auto mesh_entity = m_universe->createEntity({0, 0, 0}, {0, 0, 0, 1});
 		auto* render_scene = static_cast<RenderScene*>(m_universe->getScene(MODEL_INSTANCE_TYPE));
@@ -1405,12 +1426,12 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 		: m_app(app)
 	{
 		WorldEditor& world_editor = app.getWorldEditor();
-		PluginManager& plugin_manager = world_editor.getEngine().getPluginManager();
+		Engine& engine = world_editor.getEngine();
+		PluginManager& plugin_manager = engine.getPluginManager();
 		Renderer* renderer = static_cast<Renderer*>(plugin_manager.getPlugin("renderer"));
 		IAllocator& allocator = world_editor.getAllocator();
-		Path pipeline_path("pipelines/main.pln");
-		m_pipeline = Pipeline::create(*renderer, pipeline_path, "PROBE", allocator);
-		m_pipeline->load();
+		PipelineResource* pres = engine.getResourceManager().load<PipelineResource>(Path("pipelines/main.pln"));
+		m_pipeline = Pipeline::create(*renderer, pres, "PROBE", allocator);
 
 		m_cl_context = nullptr; // cmft::clLoad() > 0 ? cmft::clInit() : nullptr;
 	}
@@ -3170,6 +3191,10 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		const char* texture_exts[] = { "jpg", "dds", "tga", "raw", nullptr};
 		asset_compiler.addPlugin(*m_texture_plugin, texture_exts);
 
+		m_pipeline_plugin = LUMIX_NEW(allocator, PipelinePlugin)(app);
+		const char* pipeline_exts[] = {"pln", nullptr};
+		asset_compiler.addPlugin(*m_pipeline_plugin, pipeline_exts);
+
 		m_particle_emitter_plugin = LUMIX_NEW(allocator, ParticleEmitterPlugin)(app);
 		const char* particle_emitter_exts[] = {"par", nullptr};
 		asset_compiler.addPlugin(*m_particle_emitter_plugin, particle_emitter_exts);
@@ -3231,10 +3256,12 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		asset_compiler.removePlugin(*m_model_plugin);
 		asset_compiler.removePlugin(*m_material_plugin);
 		asset_compiler.removePlugin(*m_particle_emitter_plugin);
+		asset_compiler.removePlugin(*m_pipeline_plugin);
 
 		LUMIX_DELETE(allocator, m_model_plugin);
 		LUMIX_DELETE(allocator, m_material_plugin);
 		LUMIX_DELETE(allocator, m_particle_emitter_plugin);
+		LUMIX_DELETE(allocator, m_pipeline_plugin);
 		LUMIX_DELETE(allocator, m_font_plugin);
 		LUMIX_DELETE(allocator, m_texture_plugin);
 		LUMIX_DELETE(allocator, m_shader_plugin);
@@ -3269,6 +3296,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	ModelPlugin* m_model_plugin;
 	MaterialPlugin* m_material_plugin;
 	ParticleEmitterPlugin* m_particle_emitter_plugin;
+	PipelinePlugin* m_pipeline_plugin;
 	FontPlugin* m_font_plugin;
 	TexturePlugin* m_texture_plugin;
 	ShaderPlugin* m_shader_plugin;

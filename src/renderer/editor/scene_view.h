@@ -47,7 +47,6 @@ class SceneView : public StudioApp::GUIPlugin
 		void handleDrop(const char* path, float x, float y);
 		void onToolbar();
 		void resetCameraSpeed();
-		void onResourceChanged(const Path& path, const char* /*ext*/);
 
 	private:
 		StudioApp& m_app;

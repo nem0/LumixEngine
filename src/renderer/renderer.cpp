@@ -386,6 +386,7 @@ struct RendererImpl final : public Renderer
 		: m_engine(engine)
 		, m_allocator(engine.getAllocator())
 		, m_texture_manager(*this, m_allocator)
+		, m_pipeline_manager(m_allocator)
 		, m_model_manager(*this, m_allocator)
 		, m_particle_emitter_manager(m_allocator)
 		, m_material_manager(*this, m_allocator)
@@ -413,6 +414,7 @@ struct RendererImpl final : public Renderer
 		}
 
 		ResourceManagerHub& manager = engine.getResourceManager();
+		m_pipeline_manager.create(PipelineResource::TYPE, manager);
 		m_texture_manager.create(Texture::TYPE, manager);
 		m_model_manager.create(Model::TYPE, manager);
 		m_material_manager.create(Material::TYPE, manager);
@@ -434,6 +436,7 @@ struct RendererImpl final : public Renderer
 	~RendererImpl()
 	{
 		m_particle_emitter_manager.destroy();
+		m_pipeline_manager.destroy();
 		m_texture_manager.destroy();
 		m_model_manager.destroy();
 		m_material_manager.destroy();
@@ -949,6 +952,7 @@ struct RendererImpl final : public Renderer
 	Array<ShaderDefine> m_shader_defines;
 	Array<Layer> m_layers;
 	TextureManager m_texture_manager;
+	PipelineResourceManager m_pipeline_manager;
 	ParticleEmitterResourceManager m_particle_emitter_manager;
 	MaterialManager m_material_manager;
 	FontManager* m_font_manager;

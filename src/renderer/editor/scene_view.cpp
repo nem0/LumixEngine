@@ -1,5 +1,6 @@
 #include "scene_view.h"
 #include "editor/asset_browser.h"
+#include "editor/asset_compiler.h"
 #include "editor/editor_icon.h"
 #include "editor/gizmo.h"
 #include "editor/log_ui.h"
@@ -7,6 +8,7 @@
 #include "editor/render_interface.h"
 #include "editor/studio_app.h"
 #include "engine/crc32.h"
+#include "engine/delegate_list.h"
 #include "engine/engine.h"
 #include "engine/path.h"
 #include "engine/path_utils.h"
@@ -49,9 +51,8 @@ SceneView::SceneView(StudioApp& app)
 	Engine& engine = m_editor.getEngine();
 	IAllocator& allocator = engine.getAllocator();
 	auto* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
-	Path path("pipelines/main.pln");
-	m_pipeline = Pipeline::create(*renderer, path, "SCENE_VIEW", engine.getAllocator());
-	m_pipeline->load();
+	PipelineResource* pres = engine.getResourceManager().load<PipelineResource>(Path("pipelines/main.pln"));
+	m_pipeline = Pipeline::create(*renderer, pres, "SCENE_VIEW", engine.getAllocator());
 	m_pipeline->addCustomCommandHandler("renderSelection").callback.bind<SceneView, &SceneView::renderSelection>(this);
 	m_pipeline->addCustomCommandHandler("renderGizmos").callback.bind<SceneView, &SceneView::renderGizmos>(this);
 	m_pipeline->addCustomCommandHandler("renderIcons").callback.bind<SceneView, &SceneView::renderIcons>(this);
@@ -96,13 +97,6 @@ SceneView::SceneView(StudioApp& app)
 	AssetBrowser& asset_browser = m_app.getAssetBrowser();
 	const ResourceType pipeline_type("pipeline");
 	asset_browser.registerExtension("pln", pipeline_type); 
-	asset_browser.resourceChanged().bind<SceneView, &SceneView::onResourceChanged>(this);
-}
-
-
-void SceneView::onResourceChanged(const Path& path, const char* /*ext*/)
-{
-	if (getPipeline()->getPath() == path) getPipeline()->load();
 }
 
 
@@ -114,7 +108,6 @@ void SceneView::resetCameraSpeed()
 
 SceneView::~SceneView()
 {
-	m_app.getAssetBrowser().resourceChanged().unbind<SceneView, &SceneView::onResourceChanged>(this);
 	m_editor.universeCreated().unbind<SceneView, &SceneView::onUniverseCreated>(this);
 	m_editor.universeDestroyed().unbind<SceneView, &SceneView::onUniverseDestroyed>(this);
 	Pipeline::destroy(m_pipeline);

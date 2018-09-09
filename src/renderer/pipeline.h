@@ -3,6 +3,8 @@
 
 #include "engine/delegate.h"
 #include "engine/matrix.h"
+#include "engine/resource.h"
+#include "engine/resource_manager.h"
 
 
 struct lua_State;
@@ -20,6 +22,31 @@ class Renderer;
 class RenderScene;
 struct Viewport;
 template <typename T> class Delegate;
+
+
+struct PipelineResource : Resource
+{
+	static ResourceType TYPE;
+
+	PipelineResource(const Path& path, ResourceManager& owner, IAllocator& allocator);
+
+	void unload() override;
+	bool load(FS::IFile& file) override;
+	ResourceType getType() const override { return TYPE; }
+
+	Array<char> content;
+};
+
+
+struct PipelineResourceManager : ResourceManager
+{
+	PipelineResourceManager(IAllocator& allocator);
+
+	Resource* createResource(const Path& path) override;
+	void destroyResource(Resource& resource) override;
+
+	IAllocator& m_allocator;
+};
 
 
 class LUMIX_RENDERER_API Pipeline
@@ -40,12 +67,11 @@ public:
 	};
 
 public:
-	static Pipeline* create(Renderer& renderer, const Path& path, const char* define, IAllocator& allocator);
+	static Pipeline* create(Renderer& renderer, PipelineResource* resource, const char* define, IAllocator& allocator);
 	static void destroy(Pipeline* pipeline);
 
 	virtual ~Pipeline() {}
 
-	virtual void load() = 0;
 	virtual bool render() = 0;
 	virtual void setScene(RenderScene* scene) = 0;
 	virtual RenderScene* getScene() const = 0;
@@ -53,7 +79,7 @@ public:
 	virtual void setWindowHandle(void* data) = 0;
 	virtual bool isReady() const = 0;
 	virtual const Stats& getStats() const = 0;
-	virtual Path& getPath() = 0;
+	virtual const Path& getPath() = 0;
 	virtual void callLuaFunction(const char* func) = 0;
 	virtual void renderModel(class Model& model, const Matrix& mtx) = 0;
 	virtual void setViewport(const Viewport& viewport) = 0;

@@ -44,7 +44,6 @@ public:
 private:
 	void toggleFullscreen();
 	void processInputEvents();
-	void onResourceChanged(const Path& path, const char* /*ext*/);
 	void onUniverseCreated();
 	void onUniverseDestroyed();
 	void onFullscreenGUI();

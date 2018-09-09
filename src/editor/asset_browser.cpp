@@ -51,7 +51,6 @@ AssetBrowser::AssetBrowser(StudioApp& app)
 	, m_changed_files_mutex(false)
 	, m_history(app.getWorldEditor().getAllocator())
 	, m_plugins(app.getWorldEditor().getAllocator())
-	, m_on_resource_changed(app.getWorldEditor().getAllocator())
 	, m_app(app)
 	, m_is_update_enabled(true)
 	, m_current_type(0)
@@ -165,11 +164,11 @@ void AssetBrowser::update()
 
 		char ext[10];
 		PathUtils::getExtension(ext, lengthOf(ext), path.c_str());
-		m_on_resource_changed.invoke(path, ext);
 
 		ResourceType resource_type = getResourceType(path.c_str());
 		if (!isValid(resource_type)) continue;
 
+		// TODO remove reload from asset browser, it's handled by asset compiler
 		if (m_autoreload_changed_resource) m_editor.getEngine().getResourceManager().reload(path);
 
 		char tmp_path[MAX_PATH_LENGTH];
