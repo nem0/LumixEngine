@@ -281,6 +281,7 @@ static void registerProperties(IAllocator& allocator)
 			BoneProperty()
 		),
 		component("environment_probe",
+			property("Enabled", LUMIX_PROP_FULL(RenderScene, isEnvironmentProbeEnabled, enableEnvironmentProbe)),
 			property("Radius", LUMIX_PROP(RenderScene, EnvironmentProbeRadius)),
 			property("Enabled reflection", LUMIX_PROP_FULL(RenderScene, isEnvironmentProbeReflectionEnabled, enableEnvironmentProbeReflection)),
 			property("Override global size", LUMIX_PROP_FULL(RenderScene, isEnvironmentProbeCustomSize, enableEnvironmentProbeCustomSize)),

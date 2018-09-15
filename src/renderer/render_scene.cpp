@@ -111,7 +111,8 @@ struct EnvironmentProbe
 	enum Flags
 	{
 		REFLECTION = 1 << 0,
-		OVERRIDE_GLOBAL_SIZE = 1 << 1
+		OVERRIDE_GLOBAL_SIZE = 1 << 1,
+		ENABLED = 1 << 2
 	};
 
 	Texture* texture;
@@ -3531,17 +3532,31 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	void getEnvironmentProbes(Array<EnvProbeInfo>& probes) override
 	{
 		PROFILE_FUNCTION();
-		probes.resize(m_environment_probes.size());
+		probes.reserve(m_environment_probes.size());
 		for (int i = 0; i < m_environment_probes.size(); ++i) {
 			const EnvironmentProbe& probe = m_environment_probes.at(i);
 			const EntityRef entity = m_environment_probes.getKey(i);
-			EnvProbeInfo& out = probes[i];
+			if(!probe.flags.isSet(EnvironmentProbe::ENABLED)) continue;
+			
+			EnvProbeInfo& out = probes.emplace();
 			out.radius = probe.radius;
 			out.position = m_universe.getPosition(entity);
 			out.radiance = probe.radiance && probe.radiance->isReady() ? probe.radiance->handle : ffr::INVALID_TEXTURE;
 			out.irradiance = probe.irradiance && probe.irradiance->isReady() ? probe.irradiance->handle : ffr::INVALID_TEXTURE;
 			out.reflection = probe.texture && probe.texture->isReady() ? probe.texture->handle : ffr::INVALID_TEXTURE;
 		}
+	}
+		
+	
+	void enableEnvironmentProbe(EntityRef entity, bool enable) override
+	{
+		return m_environment_probes[entity].flags.set(EnvironmentProbe::ENABLED, enable);
+	}
+
+
+	bool isEnvironmentProbeEnabled(EntityRef entity) override
+	{
+		return m_environment_probes[entity].flags.isSet(EnvironmentProbe::ENABLED);
 	}
 
 
@@ -4069,6 +4084,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		probe.radiance = rm.load<Texture>(Path("models/common/default_probe.dds"));
 		probe.radiance->setFlag(Texture::Flags::SRGB, true);
 		probe.radius = 1;
+		probe.flags.set(EnvironmentProbe::ENABLED);
 		probe.guid = Math::randGUID();
 
 		m_universe.onComponentCreated(entity, ENVIRONMENT_PROBE_TYPE, this);

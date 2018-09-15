@@ -368,6 +368,8 @@ public:
 	virtual float getPointLightSpecularIntensity(EntityRef entity) = 0;
 	virtual void setPointLightSpecularIntensity(EntityRef entity, float color) = 0;
 
+	virtual void enableEnvironmentProbe(EntityRef entity, bool enable) = 0;
+	virtual bool isEnvironmentProbeEnabled(EntityRef entity) = 0;
 	virtual void getEnvironmentProbes(Array<EnvProbeInfo>& probes) = 0;
 	virtual int getEnvironmentProbeIrradianceSize(EntityRef entity) = 0;
 	virtual void setEnvironmentProbeIrradianceSize(EntityRef entity, int size) = 0;
