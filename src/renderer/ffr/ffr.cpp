@@ -857,7 +857,15 @@ void blending(int mode)
 	else {
 		glDisable(GL_BLEND);
 	}
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	switch(mode) {
+		case 2:
+			glBlendFuncSeparate(GL_ONE_MINUS_DST_ALPHA, GL_ONE, GL_SRC_ALPHA, GL_DST_ALPHA);
+			//glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+			break;
+		default:
+			glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+			break;
+	}
 }
 
 
@@ -1033,6 +1041,8 @@ void setState(u64 state)
 	checkThread();
 	if (state & u64(StateFlags::DEPTH_TEST)) CHECK_GL(glEnable(GL_DEPTH_TEST));
 	else CHECK_GL(glDisable(GL_DEPTH_TEST));
+	
+	CHECK_GL(glDepthMask((state & u64(StateFlags::DEPTH_WRITE)) != 0));
 	/*
 	if( dc.state & u64(StateFlags::SCISSOR_TEST)) CHECK_GL(glEnable(GL_SCISSOR_TEST));
 	else CHECK_GL(glDisable(GL_SCISSOR_TEST));

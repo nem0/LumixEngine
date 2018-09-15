@@ -39,7 +39,8 @@ enum class StateFlags : u64 {
 	DEPTH_TEST = 1 << 1,
 	CULL_FRONT = 1 << 2,
 	CULL_BACK = 1 << 3,
-	SCISSOR_TEST = 1 << 4
+	SCISSOR_TEST = 1 << 4,
+	DEPTH_WRITE = 1 << 5
 };
 
 

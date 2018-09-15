@@ -150,8 +150,8 @@ struct PipelineImpl final : Pipeline
 			2, 7, 3,
 			0, 3, 7,
 			0, 7, 4,
-			1, 2, 6,
-			1, 6, 5
+			1, 6, 2,
+			1, 5, 6
 		};
 
 		const Renderer::MemRef ib_mem = m_renderer.copy(cube_indices, sizeof(cube_indices));
@@ -1013,7 +1013,8 @@ struct PipelineImpl final : Pipeline
 				ffr::setVertexBuffer(&decl, m_vb, 0, nullptr);
 				ffr::setIndexBuffer(m_ib);
 				ffr::useProgram(prog.handle);
-				ffr::setState(0);
+				ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::CULL_BACK));
+				ffr::blending(2);
 				const int irradiance_map_loc = ffr::getUniformLocation(prog.handle, m_irradiance_map_uniform);
 				const int radiance_map_loc = ffr::getUniformLocation(prog.handle, m_radiance_map_uniform);
 				const Vec3 cam_pos = m_camera_params.pos;
@@ -1026,6 +1027,7 @@ struct PipelineImpl final : Pipeline
 					ffr::applyUniform4f(pos_radius_uniform_loc, &pos_radius.x);
 					ffr::drawTriangles(36);
 				}
+				ffr::blending(0);
 				ffr::popDebugGroup();
 			}
 
@@ -1474,7 +1476,7 @@ struct PipelineImpl final : Pipeline
 		}
 		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
 
-		const int rb_count = lua_gettop(L) - 1;
+		const int rb_count = lua_gettop(L);
 		int rbs[16];
 		if(rb_count > lengthOf(rbs)) {
 			g_log_error.log("Renderer") << "Too many render buffers in " << pipeline->getPath();	
@@ -1497,11 +1499,6 @@ struct PipelineImpl final : Pipeline
 				ffr::update(fb, count, rbs);
 				ffr::setFramebuffer(fb, true);
 				ffr::viewport(0, 0, w, h);
-		
-				if(clear_flags) {
-					const float c[] = { 0, 0, 0, 1 };
-					ffr::clear(clear_flags, c, 0);
-				}
 			}
 
 			PipelineImpl* pipeline;
@@ -1509,13 +1506,11 @@ struct PipelineImpl final : Pipeline
 			uint count;
 			uint w;
 			uint h;
-			u32 clear_flags;
 		};
 
 		Cmd* cmd = LUMIX_NEW(pipeline->m_renderer.getAllocator(), Cmd);
-		cmd->clear_flags = LuaWrapper::checkArg<u32>(L, 1);
 		for(int i = 0; i < rb_count; ++i) {
-			const int rb_idx = LuaWrapper::checkArg<int>(L, i + 2);
+			const int rb_idx = LuaWrapper::checkArg<int>(L, i + 1);
 			cmd->rbs[i] = pipeline->m_renderbuffers[rb_idx].handle;
 		}
 
@@ -1555,7 +1550,7 @@ struct PipelineImpl final : Pipeline
 			ffr::useProgram(prog.handle);
 			ffr::setVertexBuffer(&mesh.vertex_decl, mesh.vertex_buffer_handle, 0, prog.use_semantics ? attribute_map : nullptr);
 			ffr::setIndexBuffer(mesh.index_buffer_handle);
-			ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | material->getRenderStates());
+			ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE) | material->getRenderStates());
 			ffr::drawTriangles(mesh.indices_count);
 		}
 	}
@@ -1678,7 +1673,7 @@ struct PipelineImpl final : Pipeline
 				ffr::setVertexBuffer(&decl, mesh.vertex_buffer_handle, 0, nullptr);
 				ffr::setInstanceBuffer(instance_decl, instance_buffer.buffer, instance_buffer.offset + batch.from * sizeof(m_instance_data[0]), 2);
 				ffr::setIndexBuffer(mesh.index_buffer_handle);
-				ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | batch.terrain->m_material->getRenderStates());
+				ffr::setState(u64(ffr::StateFlags::DEPTH_WRITE) | u64(ffr::StateFlags::DEPTH_TEST) | batch.terrain->m_material->getRenderStates());
 				const int submesh_indices_count = mesh.indices_count / 4;
 				ffr::drawTrianglesInstanced(batch.submesh * submesh_indices_count * sizeof(u16), submesh_indices_count , 1 + batch.to - batch.from);
 			}
@@ -1855,7 +1850,7 @@ struct PipelineImpl final : Pipeline
 			if(mesh.mesh->type == Mesh::RIGID_INSTANCED) rd.define_mask |= instanced_define_mask;
 
 			rd.shader = material->getShader()->m_render_data;
-			rd.render_states = material->getRenderStates() | u64(ffr::StateFlags::DEPTH_TEST);
+			rd.render_states = material->getRenderStates() | u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE);
 			rd.material_params.x = material->getRoughness();
 			rd.material_params.y = material->getMetallic();
 			rd.material_params.z = material->getEmission();
@@ -2138,8 +2133,21 @@ struct PipelineImpl final : Pipeline
 
 	void clear(u32 flags, float r, float g, float b, float a, float depth)
 	{
-		const float c[] = { r, g, b, a };
-		ffr::clear(flags, c, depth);
+		struct Cmd : Renderer::RenderCommandBase {
+			void setup() override {}
+			void execute() override {
+				ffr::clear(flags, &color.x, depth);
+			}
+			Vec4 color;
+			float depth;
+			u32 flags;
+		};
+
+		Cmd* cmd = LUMIX_NEW(m_renderer.getAllocator(), Cmd);
+		cmd->color.set(r, g, b, a);
+		cmd->flags = flags;
+		cmd->depth = depth;
+		m_renderer.push(cmd);
 	}
 
 

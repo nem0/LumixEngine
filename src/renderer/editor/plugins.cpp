@@ -2451,7 +2451,7 @@ struct RenderInterfaceImpl final : public RenderInterface
 		ffr::useProgram(prg);
 		ffr::setVertexBuffer(&vertex_decl, vb.buffer, vb.offset, nullptr);
 		ffr::setIndexBuffer(ib.buffer);
-		ffr::setState(u64(ffr::StateFlags::DEPTH_TEST));
+		ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE));
 		const ffr::PrimitiveType primitive_type = lines ? ffr::PrimitiveType::LINES : ffr::PrimitiveType::TRIANGLES;
 		ffr::drawElements(ib.offset / sizeof(indices[0]), indices_count, primitive_type);
 	}
