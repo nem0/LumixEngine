@@ -232,6 +232,22 @@ struct LUMIX_ENGINE_API Vec3
 };
 
 
+struct DVec3
+{
+	DVec3() {}
+	DVec3(float a) : x(a), y(a), z(a) {}
+	DVec3(double x, double y, double z) : x(x), y(y), z(z) {}
+	DVec3(const DVec3& rhs) = default;
+
+	DVec3 operator-(const DVec3& rhs) const { return {x - rhs.x, y - rhs.y, z - rhs.z }; }
+	DVec3 operator+(const DVec3& rhs) const { return {x + rhs.x, y + rhs.y, z + rhs.z }; }
+	DVec3 operator+(const Vec3& rhs) const { return {x + rhs.x, y + rhs.y, z + rhs.z }; }
+	Vec3 toFloat() const { return {(float)x, (float)y, (float)z}; }
+
+	double x, y, z;
+};
+
+
 inline Vec3 operator *(float f, const Vec3& v)
 {
 	return Vec3(f * v.x, f * v.y, f * v.z);
