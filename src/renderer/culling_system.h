@@ -7,6 +7,7 @@
 namespace Lumix
 {
 	template <typename T> class Array;
+	struct DVec3;
 	struct IAllocator;
 	struct Sphere;
 	struct Vec3;
@@ -31,16 +32,15 @@ namespace Lumix
 
 		virtual void cull(const Frustum& frustum, u64 layer_mask, Results& result) = 0;
 
-		virtual bool isAdded(EntityRef model_instance) = 0;
-		virtual void addStatic(EntityRef model_instance, const Sphere& sphere, u64 layer_mask) = 0;
-		virtual void removeStatic(EntityRef model_instance) = 0;
+		virtual bool isAdded(EntityRef entity) = 0;
+		virtual void add(EntityRef entity, const DVec3& pos, float radius, u64 layer_mask) = 0;
+		virtual void remove(EntityRef entity) = 0;
 
-		virtual void setLayerMask(EntityRef model_instance, u64 layer) = 0;
-		virtual u64 getLayerMask(EntityRef model_instance) = 0;
+		virtual void setLayerMask(EntityRef entity, u64 layer) = 0;
 
-		virtual void updateBoundingSphere(const Sphere& sphere, EntityRef model_instance) = 0;
+		virtual void setPosition(EntityRef entity, const DVec3& pos) = 0;
+		virtual void setRadius(EntityRef entity, float radius) = 0;
 
-		virtual void insert(const InputSpheres& spheres, const Array<EntityRef>& model_instances) = 0;
-		virtual const Sphere& getSphere(EntityRef model_instance) = 0;
+		virtual float getRadius(EntityRef entity) = 0;
 	};
 } // namespace Lux

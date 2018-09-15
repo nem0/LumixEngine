@@ -1834,7 +1834,8 @@ public:
 			{
 				float radius = m_universe.getScale(entity) * r.model->getBoundingRadius();
 				Vec3 position = m_universe.getPosition(entity);
-				m_culling_system->updateBoundingSphere({position, radius}, entity);
+				m_culling_system->setRadius(entity, radius);
+				m_culling_system->setPosition(entity, DVec3(position.x, position.y, position.z));
 			}
 
 			float bounding_radius = r.model ? r.model->getBoundingRadius() : 1;
@@ -2094,13 +2095,14 @@ public:
 		{
 			if (!model_instance.model || !model_instance.model->isReady()) return;
 
-			Sphere sphere(m_universe.getPosition((EntityRef)model_instance.entity), model_instance.model->getBoundingRadius());
+			const Vec3 pos = m_universe.getPosition((EntityRef)model_instance.entity);
+			const float radius = model_instance.model->getBoundingRadius();
 			u64 layer_mask = getLayerMask(model_instance);
-			if (!m_culling_system->isAdded(entity)) m_culling_system->addStatic(entity, sphere, layer_mask);
+			if (!m_culling_system->isAdded(entity)) m_culling_system->add(entity, DVec3(pos.x, pos.y, pos.z), radius, layer_mask);
 		}
 		else
 		{
-			m_culling_system->removeStatic(entity);
+			m_culling_system->remove(entity);
 		}
 	}
 
@@ -2478,66 +2480,6 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	bool getLightCastShadows(EntityRef entity) override
 	{
 		return m_point_lights[m_point_lights_map[entity]].m_cast_shadows;
-	}
-
-
-	void getPointLightInfluencedGeometry(EntityRef light,
-		EntityRef camera,
-		const Vec3& lod_ref_point,
-		const Frustum& frustum,
-		Array<MeshInstance>& infos) override
-	{
-		PROFILE_FUNCTION();
-
-		int light_index = m_point_lights_map[light];
-		float lod_multiplier = getCameraLODMultiplier(camera);
-		float final_lod_multiplier = m_lod_multiplier * lod_multiplier;
-		for (int j = 0, cj = m_light_influenced_geometry[light_index].size(); j < cj; ++j)
-		{
-			EntityRef model_instance_entity = m_light_influenced_geometry[light_index][j];
-			ModelInstance& model_instance = m_model_instances[model_instance_entity.index];
-			const Sphere& sphere = m_culling_system->getSphere(model_instance_entity);
-			float squared_distance = (model_instance.matrix.getTranslation() - lod_ref_point).squaredLength();
-			squared_distance *= final_lod_multiplier;
-
-			if (frustum.isSphereInside(sphere.position, sphere.radius))
-			{
-				LODMeshIndices lod = model_instance.model->getLODMeshIndices(squared_distance);
-				for (int k = lod.from, c = lod.to; k <= c; ++k)
-				{
-					auto& info = infos.emplace();
-					info.mesh = &model_instance.model->getMesh(k);
-					info.owner = model_instance_entity;
-				}
-			}
-		}
-	}
-
-
-	void getPointLightInfluencedGeometry(EntityRef light, 
-		EntityRef camera, 
-		const Vec3& lod_ref_point,
-		Array<MeshInstance>& infos) override
-	{
-		PROFILE_FUNCTION();
-
-		int light_index = m_point_lights_map[light];
-		auto& geoms = m_light_influenced_geometry[light_index];
-		float lod_multiplier = getCameraLODMultiplier(camera);
-		float final_lod_multiplier = m_lod_multiplier * lod_multiplier;
-		for (int j = 0, cj = geoms.size(); j < cj; ++j)
-		{
-			const ModelInstance& model_instance = m_model_instances[geoms[j].index];
-			float squared_distance = (model_instance.matrix.getTranslation() - lod_ref_point).squaredLength();
-			squared_distance *= final_lod_multiplier;
-			LODMeshIndices lod = model_instance.model->getLODMeshIndices(squared_distance);
-			for (int k = lod.from, kc = lod.to; k <= kc; ++k)
-			{
-				auto& info = infos.emplace();
-				info.mesh = &model_instance.model->getMesh(k);
-				info.owner = geoms[j];
-			}
-		}
 	}
 
 
@@ -3674,7 +3616,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		{
 			m_light_influenced_geometry[i].eraseItemFast(entity);
 		}
-		m_culling_system->removeStatic(entity);
+		m_culling_system->remove(entity);
 	}
 
 
@@ -3703,8 +3645,9 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 
 		float bounding_radius = r.model->getBoundingRadius();
 		float scale = m_universe.getScale(entity);
-		Sphere sphere(r.matrix.getTranslation(), bounding_radius * scale);
-		if(r.flags.isSet(ModelInstance::ENABLED)) m_culling_system->addStatic(entity, sphere, getLayerMask(r));
+		const Vec3 pos = r.matrix.getTranslation();
+		const float radius = bounding_radius * scale;
+		if(r.flags.isSet(ModelInstance::ENABLED)) m_culling_system->add(entity, DVec3(pos.x, pos.y, pos.z), radius, getLayerMask(r));
 		ASSERT(!r.pose);
 		if (model->getBoneCount() > 0)
 		{
@@ -3952,7 +3895,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 
 			if (old_model->isReady())
 			{
-				m_culling_system->removeStatic(entity);
+				m_culling_system->remove(entity);
 			}
 			old_model->getResourceManager().unload(*old_model);
 		}

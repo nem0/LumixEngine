@@ -326,15 +326,6 @@ public:
 
 	virtual int getClosestPointLights(const Vec3& pos, EntityRef* lights, int max_lights) = 0;
 	virtual void getPointLights(const Frustum& frustum, Array<EntityRef>& lights) = 0;
-	virtual void getPointLightInfluencedGeometry(EntityRef light,
-		EntityRef camera,
-		const Vec3& lod_ref_point, 
-		Array<MeshInstance>& infos) = 0;
-	virtual void getPointLightInfluencedGeometry(EntityRef light,
-		EntityRef camera,
-		const Vec3& lod_ref_point,
-		const Frustum& frustum,
-		Array<MeshInstance>& infos) = 0;
 	virtual void setLightCastShadows(EntityRef entity, bool cast_shadows) = 0;
 	virtual bool getLightCastShadows(EntityRef entity) = 0;
 	virtual float getLightAttenuation(EntityRef entity) = 0;

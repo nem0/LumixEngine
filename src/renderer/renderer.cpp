@@ -59,7 +59,7 @@ namespace Lumix
 
 static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("model_instance");
 
-enum { TRANSIENT_BUFFER_SIZE = 32 * 1024 * 1024 };
+enum { TRANSIENT_BUFFER_SIZE = 64 * 1024 * 1024 };
 
 
 struct GPUProfiler

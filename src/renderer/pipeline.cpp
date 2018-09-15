@@ -1737,6 +1737,7 @@ struct PipelineImpl final : Pipeline
 
 		void radixSort(u64* _keys, MeshInstance* _values, int size)
 		{
+			PROFILE_FUNCTION();
 			// from https://github.com/bkaradzic/bx
 			enum {
 				RADIXSORT_BITS = 11,
@@ -1756,7 +1757,7 @@ struct PipelineImpl final : Pipeline
 
 			u32 histogram[RADIXSORT_HISTOGRAM_SIZE];
 			u16 shift = 0;
-			for (int pass = 0; pass < 6; ++pass) {
+			for (int pass = 0; pass < 5; ++pass) {
 				memset(histogram, 0, sizeof(u32) * RADIXSORT_HISTOGRAM_SIZE);
 
 				bool sorted = true;
@@ -1809,6 +1810,7 @@ struct PipelineImpl final : Pipeline
 		void sort(Array<MeshInstance>& meshes, bool transparent)
 		{
 			PROFILE_FUNCTION();
+			PROFILE_INT("mesh count", meshes.size());
 			if(meshes.empty()) return;
 
 			MeshInstance* const LUMIX_RESTRICT begin = &meshes[0];

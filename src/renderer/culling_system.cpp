@@ -1,6 +1,7 @@
 #include "culling_system.h"
 #include "engine/array.h"
 #include "engine/geometry.h"
+#include "engine/hash_map.h"
 #include "engine/job_system.h"
 #include "engine/lumix.h"
 #include "engine/math_utils.h"
@@ -9,10 +10,52 @@
 
 namespace Lumix
 {
+
 typedef Array<u64> LayerMasks;
 typedef Array<int> ModelInstancetoSphereMap;
 typedef Array<EntityRef> SphereToModelInstanceMap;
 
+struct CellIndices
+{
+	CellIndices() {}
+	CellIndices(const DVec3& pos, float cell_size)
+		: i(int(pos.x / cell_size))
+		, j(int(pos.y / cell_size))
+		, k(int(pos.z / cell_size))
+	{}
+
+	bool operator==(const CellIndices& rhs) const
+	{
+		return i == rhs.i && j == rhs.j && k == rhs.k;
+	}
+
+	int i, j, k;
+};
+
+struct CellIndicesHasher
+{
+	// http://www.beosil.com/download/CollisionDetectionHashing_VMV03.pdf
+	// TODO check collisions
+	static u32 get(const CellIndices& indices) {
+		return (u32)indices.i * 73856093 + (u32)indices.j * 19349663 + (u32)indices.k * 83492791; 
+	}
+};
+
+struct Cell
+{
+	Cell(IAllocator& allocator) 
+		: spheres(allocator)
+		, entities(allocator)
+		, masks(allocator)
+	{}
+
+	DVec3 origin;
+	CellIndices indices;
+
+	Array<Sphere> spheres; 
+	Array<EntityRef> entities;
+	Array<u64> masks;
+};
 
 static void doCulling(int start_index,
 	const Sphere* LUMIX_RESTRICT start,
@@ -74,6 +117,237 @@ struct CullingJobData
 	const Frustum* frustum;
 };
 
+
+struct CullingSystemImpl final : public CullingSystem
+{
+	CullingSystemImpl(IAllocator& allocator) 
+		: m_allocator(allocator)
+		, m_cells(allocator)
+		, m_cell_map(allocator)
+		, m_entity_to_cell(allocator)
+		, m_cell_size(300.0f)
+		, m_big_object_cell(allocator)
+	{
+		m_big_object_cell.origin = {0, 0, 0};
+		m_big_object_cell.indices = CellIndices(DVec3(0), m_cell_size);
+	}
+	
+	~CullingSystemImpl()
+	{
+		for(Cell* cell : m_cells) {
+			LUMIX_DELETE(m_allocator, cell);
+		}
+	}
+
+	u32 addToCell(Cell& cell, EntityRef entity, const DVec3& pos, float radius, u64 mask)
+	{
+		const Vec3 rel_pos = (pos - cell.origin).toFloat();
+		cell.spheres.push({rel_pos, radius});
+		cell.masks.push(mask);
+		cell.entities.push(entity);
+		return cell.entities.size() - 1;
+	}
+
+	Cell& getCell(const DVec3& pos)
+	{
+		const CellIndices i(pos, m_cell_size);
+
+		auto iter = m_cell_map.find(i);
+		if (!iter.isValid()) {
+			Cell* new_cell = LUMIX_NEW(m_allocator, Cell)(m_allocator);
+			new_cell->origin.x = i.i * m_cell_size;
+			new_cell->origin.y = i.j * m_cell_size;
+			new_cell->origin.z = i.k * m_cell_size;
+			new_cell->indices = i;
+			m_cells.push(new_cell);
+			m_cell_map.insert(i, new_cell);
+			iter = m_cell_map.find(i);
+		}
+		return *iter.value();
+	}
+
+	void add(EntityRef entity, const DVec3& pos, float radius, u64 layer_mask) override
+	{
+		if(m_entity_to_cell.size() <= entity.index) {
+			m_entity_to_cell.reserve(entity.index);
+			while(m_entity_to_cell.size() <= entity.index) {
+				m_entity_to_cell.push({nullptr, 0});
+			}
+		}
+		
+		if (radius > m_cell_size) {
+			const u32 idx = addToCell(m_big_object_cell, entity, pos, radius, layer_mask);
+			m_entity_to_cell[entity.index] = {&m_big_object_cell, idx};
+			return;
+		}
+
+		Cell& cell = getCell(pos);
+		const u32 idx = addToCell(cell, entity, pos, radius, layer_mask);
+		m_entity_to_cell[entity.index] = {&cell, idx}; 
+		return;
+	}
+
+	void remove(EntityRef entity) override
+	{
+		const EntityLoc loc = m_entity_to_cell[entity.index];
+		Cell& cell = *loc.cell;
+		const EntityRef last = cell.entities.back();
+		m_entity_to_cell[last.index] = loc;
+		cell.entities.eraseFast(loc.idx);
+		cell.masks.eraseFast(loc.idx);
+		cell.spheres.eraseFast(loc.idx);
+
+		if(cell.spheres.empty() && &cell != &m_big_object_cell) {
+			m_cells.eraseItem(&cell);
+			m_cell_map.erase(cell.indices);
+			LUMIX_DELETE(m_allocator, &cell);
+		}
+	}
+
+	void setPosition(EntityRef entity, const DVec3& pos) override
+	{
+		const EntityLoc loc = m_entity_to_cell[entity.index];
+		Cell& cell = *loc.cell;
+		if (&cell == &m_big_object_cell) {
+			cell.spheres[loc.idx].position = (pos - cell.origin).toFloat();
+			return;
+		}
+
+		const CellIndices new_indices(pos, m_cell_size);
+		const CellIndices old_indices = cell.indices;
+
+		if(old_indices == new_indices) {
+			cell.spheres[loc.idx].position = (pos - cell.origin).toFloat();
+			return;
+		}
+
+		const float radius = cell.spheres[loc.idx].radius;
+		const u64 layer_mask = cell.masks[loc.idx];
+		remove(entity);
+		add(entity, pos, radius, layer_mask);
+	}
+
+	float getRadius(EntityRef entity) override
+	{
+		const EntityLoc loc = m_entity_to_cell[entity.index];
+		const Cell& cell = *loc.cell;
+		return cell.spheres[loc.idx].radius;
+	}
+
+	void setRadius(EntityRef entity, float radius) override
+	{
+		const EntityLoc loc = m_entity_to_cell[entity.index];
+		Cell& cell = *loc.cell;
+		
+		const bool was_big = &cell == &m_big_object_cell;
+		const bool is_big = radius > m_cell_size;
+
+		if (was_big == is_big) {
+			cell.spheres[loc.idx].radius = radius;
+			return;
+		}
+
+		const DVec3 pos = cell.origin + cell.spheres[loc.idx].position;
+		const u64 layer_mask = cell.masks[loc.idx];
+
+		remove(entity);
+		add(entity, pos, radius, layer_mask);
+	}
+	
+	void setLayerMask(EntityRef entity, u64 layer) override
+	{
+		const EntityLoc loc = m_entity_to_cell[entity.index];
+		Cell& cell = *loc.cell;
+		cell.masks[loc.idx] = layer;
+	}
+
+	void clear() override
+	{
+		for(Cell* cell : m_cells) {
+			LUMIX_DELETE(m_allocator, cell);
+		}
+		m_cells.clear();
+		m_cell_map.clear();
+		m_entity_to_cell.clear();
+		
+		m_big_object_cell.spheres.clear();
+		m_big_object_cell.masks.clear();
+		m_big_object_cell.entities.clear();
+	}
+
+	void cull(const Frustum& frustum, u64 layer_mask, Results& result) override
+	{
+		ASSERT(result.empty());
+		PROFILE_FUNCTION();
+		if(m_cells.empty() && m_big_object_cell.entities.empty()) return;
+
+		const int buckets_count = MT::getCPUsCount() * 4;
+		while(result.size() < buckets_count) result.emplace(m_allocator);
+
+		for (Cell* cell : m_cells) {
+/*			const AABB aabb(Vec3(0), Vec3(m_cell_size));
+			if (frustum.intersectAABB(aabb)) {
+				
+			}*/
+
+			for(EntityRef e : cell->entities) {
+				result[0].push(e);
+			}
+		}
+		for(EntityRef e : m_big_object_cell.entities) {
+			result[0].push(e);
+		}
+/*
+		int step = count / result.size();
+		
+		// TODO allocate on stack
+		Array<CullingJobData> job_data(m_allocator);
+		Array<JobSystem::JobDecl> jobs(m_allocator);
+		job_data.resize(result.size());
+		jobs.resize(result.size());
+	
+		for (int i = 0; i < result.size(); i++) {
+			result[i].clear();
+			job_data[i] = {
+				&m_spheres,
+				&result[i],
+				&m_layer_masks,
+				&m_sphere_to_model_instance_map,
+				layer_mask,
+				i * step,
+				i == result.size() - 1 ? count - 1 : (i + 1) * step - 1,
+				&frustum
+			};
+			jobs[i].data = &job_data[i];
+			jobs[i].task = &cullTask;
+		}
+		volatile int job_counter = 0;
+		JobSystem::runJobs(&jobs[0], result.size(), &job_counter);
+		JobSystem::wait(&job_counter);*/
+	}
+	
+
+	bool isAdded(EntityRef entity) override
+	{
+		return m_entity_to_cell[entity.index].cell != nullptr;
+	}
+
+
+	struct EntityLoc
+	{
+		Cell* cell;
+		u32 idx;
+	};
+
+	IAllocator& m_allocator;
+	Array<Cell*> m_cells;
+	HashMap<CellIndices, Cell*, CellIndicesHasher> m_cell_map;
+	Cell m_big_object_cell;
+	Array<EntityLoc> m_entity_to_cell;
+	float m_cell_size;
+};
+
+/*
 class CullingSystemImpl final : public CullingSystem
 {
 public:
@@ -221,22 +495,6 @@ public:
 	}
 
 
-	void insert(const InputSpheres& spheres, const Array<EntityRef>& model_instances) override
-	{
-		for (int i = 0; i < spheres.size(); i++)
-		{
-			m_spheres.push(spheres[i]);
-			while(m_model_instance_to_sphere_map.size() <= model_instances[i].index)
-			{
-				m_model_instance_to_sphere_map.push(-1);
-			}
-			m_model_instance_to_sphere_map[model_instances[i].index] = m_spheres.size() - 1;
-			m_sphere_to_model_instance_map.push(model_instances[i]);
-			m_layer_masks.push(1);
-		}
-	}
-
-
 	const Sphere& getSphere(EntityRef model_instance) override
 	{
 		return m_spheres[m_model_instance_to_sphere_map[model_instance.index]];
@@ -250,7 +508,7 @@ private:
 	ModelInstancetoSphereMap m_model_instance_to_sphere_map;
 	SphereToModelInstanceMap m_sphere_to_model_instance_map;
 };
-
+*/
 
 CullingSystem* CullingSystem::create(IAllocator& allocator)
 {
@@ -260,6 +518,6 @@ CullingSystem* CullingSystem::create(IAllocator& allocator)
 
 void CullingSystem::destroy(CullingSystem& culling_system)
 {
-	LUMIX_DELETE(static_cast<CullingSystemImpl&>(culling_system).getAllocator(), &culling_system);
+	LUMIX_DELETE(static_cast<CullingSystemImpl&>(culling_system).m_allocator, &culling_system);
 }
 }
