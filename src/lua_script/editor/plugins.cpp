@@ -655,7 +655,7 @@ struct ConsolePlugin final : public StudioApp::GUIPlugin
 	void toggleOpen() { open = !open; }
 
 
-	void autocompleteSubstep(lua_State* L, const char* str, ImGuiTextEditCallbackData *data)
+	void autocompleteSubstep(lua_State* L, const char* str, ImGuiInputTextCallbackData *data)
 	{
 		char item[128];
 		const char* next = str;
@@ -700,7 +700,7 @@ struct ConsolePlugin final : public StudioApp::GUIPlugin
 	}
 
 
-	static int autocompleteCallback(ImGuiTextEditCallbackData *data)
+	static int autocompleteCallback(ImGuiInputTextCallbackData *data)
 	{
 		auto* that = (ConsolePlugin*)data->UserData;
 		if (data->EventFlag == ImGuiInputTextFlags_CallbackCompletion)

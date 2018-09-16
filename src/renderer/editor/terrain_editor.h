@@ -54,7 +54,7 @@ private:
 	Material* getMaterial();
 	void paint(const Vec3& hit, TerrainEditor::ActionType action_type, bool new_stroke);
 
-	void removeEntities(const Vec3& hit);
+	void removeEntities(const DVec3& hit);
 	void paintEntities(const Vec3& hit);
 	void increaseBrushSize();
 	void decreaseBrushSize();

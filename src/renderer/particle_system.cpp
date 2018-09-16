@@ -760,8 +760,11 @@ int ParticleEmitter::getInstanceDataSizeBytes() const
 }
 
 
-void ParticleEmitter::fillInstanceData(const Vec3& cam_pos, float* data)
+void ParticleEmitter::fillInstanceData(const DVec3& cam_pos, float* data)
 {
+		// TODO
+	ASSERT(false);
+/*
 	const OutputBlob& bytecode = m_resource->getBytecode();
 	const int offset = m_resource->getOutputByteOffset();
 	InputBlob blob((u8*)bytecode.getData() + offset, bytecode.getPos());
@@ -855,7 +858,7 @@ void ParticleEmitter::fillInstanceData(const Vec3& cam_pos, float* data)
 				ASSERT(false);
 				break;
 		}
-	}
+	}*/
 }
 
 // TODO

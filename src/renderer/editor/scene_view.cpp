@@ -299,7 +299,7 @@ RayCastModelHit SceneView::castRay(float x, float y)
 	ASSERT(scene);
 	
 	const Viewport& vp = m_editor.getViewport();
-	Vec3 origin;
+	DVec3 origin;
 	Vec3 dir;
 	vp.getRay({x * vp.w, y * vp.h}, origin, dir);
 	return scene->castRay(origin, dir, INVALID_ENTITY);
@@ -329,7 +329,7 @@ void SceneView::handleDrop(const char* path, float x, float y)
 
 	if (PathUtils::hasExtension(path, "msh"))
 	{
-		Vec3 pos = hit.m_origin + (hit.m_is_hit ? hit.m_t : 1) * hit.m_dir;
+		const DVec3 pos = hit.m_origin + (hit.m_is_hit ? hit.m_t : 1) * hit.m_dir;
 
 		m_editor.beginCommandGroup(crc32("insert_mesh"));
 		EntityRef entity = m_editor.addEntity();
@@ -362,7 +362,7 @@ void SceneView::handleDrop(const char* path, float x, float y)
 		}
 		else
 		{
-			Vec3 pos = hit.m_origin + (hit.m_is_hit ? hit.m_t : 1) * hit.m_dir;
+			const DVec3 pos = hit.m_origin + (hit.m_is_hit ? hit.m_t : 1) * hit.m_dir;
 			m_editor.beginCommandGroup(crc32("insert_phy"));
 			EntityRef entity = m_editor.addEntity();
 			m_editor.setEntitiesPositions(&entity, &pos, 1);

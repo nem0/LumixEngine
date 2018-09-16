@@ -39,7 +39,7 @@ struct LUMIX_RENDERER_API RayCastModelHit
 {
 	bool m_is_hit;
 	float m_t;
-	Vec3 m_origin;
+	DVec3 m_origin;
 	Vec3 m_dir;
 	Mesh* m_mesh;
 	EntityPtr m_entity;
@@ -165,9 +165,9 @@ public:
 
 		string name;
 		string parent;
-		RigidTransform transform;
-		RigidTransform relative_transform;
-		RigidTransform inv_bind_transform;
+		LocalRigidTransform transform;
+		LocalRigidTransform relative_transform;
+		LocalRigidTransform inv_bind_transform;
 		int parent_idx;
 	};
 
@@ -197,7 +197,7 @@ public:
 	void getPose(Pose& pose);
 	void getRelativePose(Pose& pose);
 	float getBoundingRadius() const { return m_bounding_radius; }
-	RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, const Matrix& model_transform, const Pose* pose);
+	RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, const Pose* pose);
 	const AABB& getAABB() const { return m_aabb; }
 	LOD* getLODs() { return m_lods; }
 	void onBeforeReady() override;

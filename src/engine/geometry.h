@@ -135,6 +135,40 @@ struct alignas(16) LUMIX_ENGINE_API Frustum
 };
 
 
+struct alignas(16) LUMIX_ENGINE_API ShiftedFrustum
+{
+	void computeOrtho(const DVec3& position,
+		const Vec3& direction,
+		const Vec3& up,
+		float width,
+		float height,
+		float near_distance,
+		float far_distance);
+	
+	void computePerspective(const DVec3& position,
+		const Vec3& direction,
+		const Vec3& up,
+		float fov,
+		float ratio,
+		float near_distance,
+		float far_distance);
+
+	float xs[(int)Frustum::Planes::COUNT];
+	float ys[(int)Frustum::Planes::COUNT];
+	float zs[(int)Frustum::Planes::COUNT];
+	float ds[(int)Frustum::Planes::COUNT];
+
+	bool containsAABB(const DVec3& pos, const Vec3& size) const;
+	bool intersectsAABB(const DVec3& pos, const Vec3& size) const;
+	Frustum getRelative(const DVec3& origin) const;
+
+	void setPlanesFromPoints();
+	void setPlane(Frustum::Planes side, const Vec3& normal, const Vec3& point);
+
+	Vec3 points[8];
+	DVec3 origin;
+};
+
 struct LUMIX_ENGINE_API AABB
 {
 	AABB() {}

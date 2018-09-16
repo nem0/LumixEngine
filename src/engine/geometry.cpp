@@ -3,6 +3,7 @@
 #include "engine/matrix.h"
 #include "engine/simd.h"
 #include <cmath>
+#include <cstring>
 
 
 namespace Lumix
@@ -27,6 +28,63 @@ bool Frustum::intersectAABB(const AABB& aabb) const
 		int px = (int)(xs[i] > 0.0f);
 		int py = (int)(ys[i] > 0.0f);
 		int pz = (int)(zs[i] > 0.0f);
+
+		float dp =
+			(xs[i] * box[px].x) +
+			(ys[i] * box[py].y) +
+			(zs[i] * box[pz].z);
+
+		if (dp < -ds[i]) { return false; }
+	}
+	return true;
+}
+
+
+bool ShiftedFrustum::containsAABB(const DVec3& pos, const Vec3& size) const
+{
+	const Vec3 rel_pos = (pos - origin).toFloat();
+	Vec3 box[] = { rel_pos, rel_pos + size };
+
+	for (int i = 0; i < 6; ++i)
+	{
+		int px = int(xs[i] < 0.0f);
+		int py = int(ys[i] < 0.0f);
+		int pz = int(zs[i] < 0.0f);
+
+		float dp =
+			(xs[i] * box[px].x) +
+			(ys[i] * box[py].y) +
+			(zs[i] * box[pz].z);
+
+		if (dp < -ds[i]) { return false; }
+	}
+	return true;
+}
+
+
+Frustum ShiftedFrustum::getRelative(const DVec3& origin) const
+{
+	Frustum res;
+	const Vec3 offset = (this->origin - origin).toFloat();
+	memcpy(res.points, points, sizeof(points));
+	for(Vec3& p : res.points) {
+		p += offset;
+	}
+	res.setPlanesFromPoints();
+	return res;
+}
+
+
+bool ShiftedFrustum::intersectsAABB(const DVec3& pos, const Vec3& size) const
+{
+	const Vec3 rel_pos = (pos - origin).toFloat();
+	Vec3 box[] = { rel_pos, rel_pos + size };
+
+	for (int i = 0; i < 6; ++i)
+	{
+		int px = int(xs[i] > 0.0f);
+		int py = int(ys[i] > 0.0f);
+		int pz = int(zs[i] > 0.0f);
 
 		float dp =
 			(xs[i] * box[px].x) +
@@ -147,7 +205,23 @@ void Frustum::setPlanesFromPoints()
 }
 
 
-static void setPoints(Frustum& frustum
+void ShiftedFrustum::setPlanesFromPoints()
+{
+	Vec3 normal_near = -crossProduct(points[0] - points[1], points[0] - points[2]).normalized();
+	Vec3 normal_far = crossProduct(points[4] - points[5], points[4] - points[6]).normalized();
+	setPlane(Frustum::Planes::EXTRA0, normal_near, points[0]);
+	setPlane(Frustum::Planes::EXTRA1, normal_near, points[0]);
+	setPlane(Frustum::Planes::NEAR, normal_near, points[0]);
+	setPlane(Frustum::Planes::FAR, normal_far, points[4]);
+
+	setPlane(Frustum::Planes::LEFT, crossProduct(points[1] - points[2], points[1] - points[5]).normalized(), points[1]);
+	setPlane(Frustum::Planes::RIGHT, -crossProduct(points[0] - points[3], points[0] - points[4]).normalized(), points[0]);
+	setPlane(Frustum::Planes::TOP, crossProduct(points[0] - points[1], points[0] - points[4]).normalized(), points[0]);
+	setPlane(Frustum::Planes::BOTTOM, crossProduct(points[2] - points[3], points[2] - points[6]).normalized(), points[2]);
+}
+
+template <typename T>
+static void setPoints(T& frustum
 	, const Vec3& near_center
 	, const Vec3& far_center
 	, const Vec3& right_near
@@ -198,7 +272,37 @@ void Frustum::computeOrtho(const Vec3& position,
 }
 
 
+void ShiftedFrustum::computeOrtho(const DVec3& position,
+	const Vec3& direction,
+	const Vec3& up,
+	float width,
+	float height,
+	float near_distance,
+	float far_distance)
+{
+	Vec3 z = direction;
+	z.normalize();
+	origin = position;
+	Vec3 near_center = - z * near_distance;
+	Vec3 far_center = - z * far_distance;
+
+	Vec3 x = crossProduct(up, z).normalized() * width;
+	Vec3 y = crossProduct(z, x).normalized() * height;
+
+	setPoints(*this, near_center, far_center, x, y, x, y, {-1, -1}, {1, 1});
+}
+
+
 void Frustum::setPlane(Planes side, const Vec3& normal, const Vec3& point)
+{
+	xs[(u32)side] = normal.x;
+	ys[(u32)side] = normal.y;
+	zs[(u32)side] = normal.z;
+	ds[(u32)side] = -dotProduct(point, normal);
+}
+
+
+void ShiftedFrustum::setPlane(Frustum::Planes side, const Vec3& normal, const Vec3& point)
 {
 	xs[(u32)side] = normal.x;
 	ys[(u32)side] = normal.y;
@@ -246,6 +350,35 @@ void Frustum::computePerspective(const Vec3& position,
 	setPoints(*this, near_center, far_center, right_near, up_near, right_far, up_far, viewport_min, viewport_max);
 }
 
+
+void ShiftedFrustum::computePerspective(const DVec3& position,
+	const Vec3& direction,
+	const Vec3& up,
+	float fov,
+	float ratio,
+	float near_distance,
+	float far_distance)
+{
+	ASSERT(near_distance > 0);
+	ASSERT(far_distance > 0);
+	ASSERT(near_distance < far_distance);
+	ASSERT(fov > 0);
+	ASSERT(ratio > 0);
+	float scale = (float)tan(fov * 0.5f);
+	Vec3 right = crossProduct(direction, up);
+	Vec3 up_near = up * near_distance * scale;
+	Vec3 right_near = right * (near_distance * scale * ratio);
+	Vec3 up_far = up * far_distance * scale;
+	Vec3 right_far = right * (far_distance * scale * ratio);
+
+	Vec3 z = direction.normalized();
+
+	Vec3 near_center = z * near_distance;
+	Vec3 far_center = z * far_distance;
+	origin = position;
+
+	setPoints(*this, near_center, far_center, right_near, up_near, right_far, up_far, {-1, -1}, {1, 1});
+}
 
 void Frustum::computePerspective(const Vec3& position,
 	const Vec3& direction,

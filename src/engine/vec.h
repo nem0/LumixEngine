@@ -239,10 +239,20 @@ struct DVec3
 	DVec3(double x, double y, double z) : x(x), y(y), z(z) {}
 	DVec3(const DVec3& rhs) = default;
 
+	DVec3 operator-() const { return {-x, -y, -z}; }
+	DVec3 operator*(float rhs) const { return {x * rhs, y * rhs, z * rhs}; }
+	DVec3 operator/(float rhs) const { return {x / rhs, y / rhs, z / rhs}; }
 	DVec3 operator-(const DVec3& rhs) const { return {x - rhs.x, y - rhs.y, z - rhs.z }; }
 	DVec3 operator+(const DVec3& rhs) const { return {x + rhs.x, y + rhs.y, z + rhs.z }; }
+	DVec3 operator-(const Vec3& rhs) const { return {x - rhs.x, y - rhs.y, z - rhs.z }; }
 	DVec3 operator+(const Vec3& rhs) const { return {x + rhs.x, y + rhs.y, z + rhs.z }; }
+	double length() const;
+	double squaredLength() const;
+	void operator*=(const double& rhs) { x *= rhs; y *= rhs; z *= rhs; }
+	void operator+=(const Vec3& rhs) { x += rhs.x; y += rhs.y; z += rhs.z; }
+	void operator-=(const Vec3& rhs) { x -= rhs.x; y -= rhs.y; z -= rhs.z; }
 	Vec3 toFloat() const { return {(float)x, (float)y, (float)z}; }
+	void fromFloat(const Vec3& v) { x = v.x; y = v.y; z = v.z; }
 
 	double x, y, z;
 };
@@ -475,7 +485,21 @@ inline Vec3 crossProduct(const Vec3& op1, const Vec3& op2)
 }
 
 
+inline DVec3 crossProduct(const DVec3& op1, const DVec3& op2)
+{
+	return DVec3(op1.y * op2.z - op1.z * op2.y, op1.z * op2.x - op1.x * op2.z, op1.x * op2.y - op1.y * op2.x);
+}
+
 inline void lerp(const Vec3& op1, const Vec3& op2, Vec3* out, float t)
+{
+	const float invt = 1.0f - t;
+	out->x = op1.x * invt + op2.x * t;
+	out->y = op1.y * invt + op2.y * t;
+	out->z = op1.z * invt + op2.z * t;
+}
+
+
+inline void lerp(const DVec3& op1, const DVec3& op2, DVec3* out, float t)
 {
 	const float invt = 1.0f - t;
 	out->x = op1.x * invt + op2.x * t;

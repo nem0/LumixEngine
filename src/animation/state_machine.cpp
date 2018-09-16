@@ -58,7 +58,7 @@ struct EdgeInstance : public ComponentInstance
 	}
 
 
-	RigidTransform getRootMotion() const override
+	LocalRigidTransform getRootMotion() const override
 	{
 		return from->getRootMotion().interpolate(to->getRootMotion(), time / edge.length);
 	}
@@ -256,9 +256,9 @@ void Blend1DNodeInstance::fillPose(Engine& engine, Pose& pose, Model& model, flo
 }
 
 
-RigidTransform Blend1DNodeInstance::getRootMotion() const
+LocalRigidTransform Blend1DNodeInstance::getRootMotion() const
 {
-	if(!a0) return RigidTransform({0, 0, 0}, {0, 0, 0, 1});
+	if(!a0) return {{0, 0, 0}, {0, 0, 0, 1}};
 	return a0->getRootMotion().interpolate(a1->getRootMotion(), current_weight);
 }
 
@@ -348,7 +348,7 @@ LayersNodeInstance::LayersNodeInstance(LayersNode& _node)
 }
 
 
-RigidTransform LayersNodeInstance::getRootMotion() const
+LocalRigidTransform LayersNodeInstance::getRootMotion() const
 {
 	if (layers_count == 0) return {{0, 0, 0}, {0, 0, 0, 1}};
 	return layers[0]->getRootMotion();
@@ -645,7 +645,7 @@ struct AnimationNodeInstance : public NodeInstance
 	}
 
 
-	RigidTransform getRootMotion() const override { return root_motion; }
+	LocalRigidTransform getRootMotion() const override { return root_motion; }
 
 
 	void onAnimationSetUpdated(AnimSet& anim_set) override
@@ -697,20 +697,20 @@ struct AnimationNodeInstance : public NodeInstance
 		int bone_idx = resource->getRootMotionBoneIdx();
 		if (bone_idx >= 0)
 		{
-			RigidTransform before = resource->getBoneTransform(old_time, bone_idx);
+			LocalRigidTransform before = resource->getBoneTransform(old_time, bone_idx);
 			if (time < old_time)
 			{
 				float anim_end_time = resource->getLength();
-				RigidTransform end_anim = resource->getBoneTransform(anim_end_time, bone_idx);
-				RigidTransform start_anim = resource->getBoneTransform(0, bone_idx);
+				LocalRigidTransform end_anim = resource->getBoneTransform(anim_end_time, bone_idx);
+				LocalRigidTransform start_anim = resource->getBoneTransform(0, bone_idx);
 				float time_to_end = anim_end_time - old_time;
-				RigidTransform after = resource->getBoneTransform(time - time_to_end, bone_idx);
+				LocalRigidTransform after = resource->getBoneTransform(time - time_to_end, bone_idx);
 				root_motion.pos = end_anim.pos - before.pos + after.pos - start_anim.pos;
 				root_motion.rot = end_anim.rot * before.rot.conjugated() * (after.rot * start_anim.rot.conjugated());
 			}
 			else
 			{
-				RigidTransform after = resource->getBoneTransform(time, bone_idx);
+				LocalRigidTransform after = resource->getBoneTransform(time, bone_idx);
 				root_motion.pos = after.pos - before.pos;
 				root_motion.rot = before.rot.conjugated() * after.rot;
 			}
@@ -749,7 +749,7 @@ struct AnimationNodeInstance : public NodeInstance
 
 	Animation* resource;
 	AnimationNode& node;
-	RigidTransform root_motion;
+	LocalRigidTransform root_motion;
 	float time;
 };
 
@@ -775,9 +775,9 @@ StateMachineInstance::~StateMachineInstance()
 }
 
 
-RigidTransform StateMachineInstance::getRootMotion() const
+LocalRigidTransform StateMachineInstance::getRootMotion() const
 {
-	return current ? current->getRootMotion() : RigidTransform({ 0, 0, 0 }, { 0, 0, 0, 1 });
+	return current ? current->getRootMotion() : LocalRigidTransform{{ 0, 0, 0 }, { 0, 0, 0, 1 }};
 }
 
 

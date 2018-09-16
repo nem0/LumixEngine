@@ -25,6 +25,15 @@ namespace Lumix
 u32 Mesh::s_last_sort_key = 0;
 
 
+static LocalRigidTransform invert(const LocalRigidTransform& tr)
+{
+	LocalRigidTransform result;
+	result.rot = tr.rot.conjugated();
+	result.pos = result.rot.rotate(-tr.pos);
+	return result;
+}
+
+
 Mesh::Mesh(Material* mat,
 	const ffr::VertexDecl& vertex_decl,
 	const char* name,
@@ -141,22 +150,17 @@ static void computeSkinMatrices(const Pose& pose, const Model& model, Matrix* ma
 	for (int i = 0; i < pose.count; ++i)
 	{
 		auto& bone = model.getBone(i);
-		RigidTransform tmp = { pose.positions[i], pose.rotations[i] };
+		LocalRigidTransform tmp = { pose.positions[i], pose.rotations[i] };
 		matrices[i] = (tmp * bone.inv_bind_transform).toMatrix();
 	}
 }
 
 
-RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Matrix& model_transform, const Pose* pose)
+RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Pose* pose)
 {
 	RayCastModelHit hit;
 	hit.m_is_hit = false;
 	if (!isReady()) return hit;
-
-	Matrix inv = model_transform;
-	inv.inverse();
-	Vec3 local_origin = inv.transformPoint(origin);
-	Vec3 local_dir = (inv * Vec4(dir.x, dir.y, dir.z, 0)).xyz();
 
 	Matrix matrices[256];
 	ASSERT(!pose || pose->count <= lengthOf(matrices));
@@ -209,14 +213,14 @@ RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Matrix
 
 
 			Vec3 normal = crossProduct(p1 - p0, p2 - p0);
-			float q = dotProduct(normal, local_dir);
+			float q = dotProduct(normal, dir);
 			if (q == 0)	continue;
 
 			float d = -dotProduct(normal, p0);
-			float t = -(dotProduct(normal, local_origin) + d) / q;
+			float t = -(dotProduct(normal, origin) + d) / q;
 			if (t < 0) continue;
 
-			Vec3 hit_point = local_origin + local_dir * t;
+			Vec3 hit_point = origin + dir * t;
 
 			Vec3 edge0 = p1 - p0;
 			Vec3 VP0 = hit_point - p0;
@@ -238,7 +242,7 @@ RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Matrix
 			}
 		}
 	}
-	hit.m_origin = origin;
+	hit.m_origin = DVec3(origin.x, origin.y, origin.z);
 	hit.m_dir = dir;
 	return hit;
 }
@@ -397,9 +401,9 @@ bool Model::parseBones(FS::IFile& file)
 
 	for (int i = 0; i < m_bones.size(); ++i)
 	{
-		m_bones[i].inv_bind_transform = m_bones[i].transform.inverted();
+			m_bones[i].inv_bind_transform = invert(m_bones[i].transform);
 	}
-
+	
 	for (int i = 0; i < m_bones.size(); ++i)
 	{
 		int p = m_bones[i].parent_idx;
@@ -579,7 +583,10 @@ bool Model::load(FS::IFile& file)
 
 static Vec3 getBonePosition(Model* model, int bone_index)
 {
-	return model->getBone(bone_index).transform.pos;
+		// TODO
+	ASSERT(false);
+	return {};
+	//return model->getBone(bone_index).transform.pos;
 }
 
 

@@ -149,13 +149,16 @@ struct TerrainQuad
 			if (!m_children[i] || !m_children[i]->getInfos(infos, lod_ref_point, terrain, world_matrix, rel_frustum))
 			{
 				TerrainInfo& data = infos.emplace();
-				data.m_morph_const = morph_const;
-				data.m_index = i;
-				data.m_terrain = terrain;
-				data.m_size = m_size;
-				data.m_min = m_min;
-				data.m_shader = &shader;
-				data.m_world_matrix = world_matrix;
+				data.morph_const = morph_const;
+				data.index = i;
+				data.terrain = terrain;
+				data.size = m_size;
+				data.min = m_min;
+				data.shader = &shader;
+				// TODO
+				ASSERT(false);
+
+				//data.world_matrix = world_matrix;
 			}
 		}
 		return true;
@@ -445,10 +448,12 @@ void Terrain::generateGrassTypeQuad(GrassPatch& patch, const RigidTransform& ter
 			}
 
 			GrassPatch::InstanceData& instance_data = patch.instance_data.emplace();
-			const Vec3 instance_pos = terrain_tr.pos + terrain_tr.rot * instance_rel_pos;
+			/*const DVec3 instance_pos = terrain_tr.pos + terrain_tr.rot * instance_rel_pos;
 			instance_data.pos_scale.set(instance_pos, Math::randFloat(0.9f, 1.1f));
 			instance_data.rot = terrain_tr.rot * instance_rel_rot;
-			instance_data.normal = Vec4(getNormal(x, z), 0);
+			instance_data.normal = Vec4(getNormal(x, z), 0);*/
+			// TODO
+			ASSERT(false);
 		}
 	}
 }
@@ -460,16 +465,14 @@ void Terrain::updateGrass(EntityRef camera)
 	if (!m_splatmap) return;
 
 	Universe& universe = m_scene.getUniverse();
-	Vec3 camera_pos = universe.getPosition(camera);
+	const DVec3 camera_pos = universe.getPosition(camera);
 
 	if ((m_last_camera_position[camera] - camera_pos).length() <= FLT_MIN && !m_force_grass_update) return;
 	m_last_camera_position[camera] = camera_pos;
 
 	m_force_grass_update = false;
 	const RigidTransform terrain_tr = universe.getTransform(m_entity).getRigidPart();
-	Matrix inv_mtx = universe.getMatrix(m_entity);
-	inv_mtx.fastInverse();
-	Vec3 local_camera_pos = inv_mtx.transformPoint(camera_pos);
+	const Vec3 local_camera_pos = terrain_tr.rot.conjugated() * (camera_pos - terrain_tr.pos).toFloat();
 	float cx = (int)(local_camera_pos.x / (GRASS_QUAD_SIZE)) * GRASS_QUAD_SIZE;
 	float cz = (int)(local_camera_pos.z / (GRASS_QUAD_SIZE)) * GRASS_QUAD_SIZE;
 	int grass_distance = 0;
@@ -551,18 +554,17 @@ void Terrain::grassLoaded(Resource::State, Resource::State, Resource&)
 
 void Terrain::getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, EntityRef camera)
 {
-	if (!m_material || !m_material->isReady()) return;
+	/*if (!m_material || !m_material->isReady()) return;
 
 	Universe& universe = m_scene.getUniverse();
-	Vec3 camera_pos = universe.getPosition(camera);
+	const DVec3 camera_pos = universe.getPosition(camera);
 	updateGrass(camera);
 	Array<GrassQuad*>& quads = getQuads(camera);
 	
-	Matrix mtx = universe.getMatrix(m_entity);
+	const RigidTransform tr = universe.getTransform(m_entity).getRigidPart();
 	for (GrassQuad* quad : quads)
 	{
-		Vec3 quad_center(quad->pos.x + GRASS_QUAD_SIZE * 0.5f, quad->pos.y, quad->pos.z + GRASS_QUAD_SIZE * 0.5f);
-		quad_center = mtx.transformPoint(quad_center);
+		const Vec3 quad_center(quad->pos.x + GRASS_QUAD_SIZE * 0.5f, quad->pos.y, quad->pos.z + GRASS_QUAD_SIZE * 0.5f);
 		if (!frustum.isSphereInside(quad_center, quad->radius)) continue;
 
 		float dist2 = (quad_center - camera_pos).squaredLength();
@@ -578,7 +580,9 @@ void Terrain::getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, Ent
 			info.model = patch.m_type->m_grass_model;
 			info.type_distance = patch.m_type->m_distance;
 		}
-	}
+	}*/
+	// TODO
+	ASSERT(false);
 }
 
 
@@ -658,9 +662,9 @@ void Terrain::serialize(OutputBlob& serializer)
 }
 
 
-void Terrain::getInfos(Array<TerrainInfo>& infos, const Frustum& frustum, const Vec3& lod_ref_point)
+void Terrain::getInfos(Array<TerrainInfo>& infos, const Frustum& frustum, const DVec3& lod_ref_point)
 {
-	if (!m_root) return;
+	/*if (!m_root) return;
 	if (!m_material || !m_material->isReady()) return;
 
 	Matrix matrix = m_scene.getUniverse().getMatrix(m_entity);
@@ -673,7 +677,9 @@ void Terrain::getInfos(Array<TerrainInfo>& infos, const Frustum& frustum, const 
 
 	Frustum rel_frustum = frustum;
 	rel_frustum.transform(inv_matrix);
-	m_root->getInfos(infos, local_lod_ref_point, this, matrix, rel_frustum);
+	m_root->getInfos(infos, local_lod_ref_point, this, matrix, rel_frustum);*/
+	// TODO
+	ASSERT(false);
 }
 
 
@@ -802,15 +808,15 @@ bool getRayTriangleIntersection(const Vec3& local_origin, const Vec3& local_dir,
 }
 
 
-RayCastModelHit Terrain::castRay(const Vec3& origin, const Vec3& dir)
+RayCastModelHit Terrain::castRay(const DVec3& origin, const Vec3& dir)
 {
 	RayCastModelHit hit;
 	hit.m_is_hit = false;
 	if (m_root)
 	{
-		Matrix mtx = m_scene.getUniverse().getMatrix(m_entity);
+		Matrix mtx = m_scene.getUniverse().getRelativeMatrix(m_entity, origin);
 		mtx.fastInverse();
-		Vec3 rel_origin = mtx.transformPoint(origin);
+		Vec3 rel_origin = -mtx.getTranslation();
 		Vec3 rel_dir = (mtx * Vec4(dir, 0)).xyz();
 		Vec3 start;
 		Vec3 size(m_root->m_size * m_scale.x, m_scale.y * 65535.0f, m_root->m_size * m_scale.x);

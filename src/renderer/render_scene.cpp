@@ -372,10 +372,10 @@ public:
 
 	void getRay(EntityRef camera_entity,
 		const Vec2& screen_pos,
-		Vec3& origin,
+		DVec3& origin,
 		Vec3& dir) override
 	{
-		Camera& camera = m_cameras[camera_entity];
+		/*Camera& camera = m_cameras[camera_entity];
 		origin = m_universe.getPosition(camera_entity);
 
 		float width = camera.screen_width;
@@ -389,7 +389,7 @@ public:
 		float nx = 2 * (screen_pos.x / width) - 1;
 		float ny = 2 * ((height - screen_pos.y) / height) - 1;
 
-		Matrix projection_matrix = getCameraProjection(camera_entity);
+		const Matrix projection_matrix = getCameraProjection(camera_entity);
 		Matrix view_matrix = m_universe.getMatrix(camera_entity);
 
 		if (camera.is_ortho)
@@ -408,7 +408,10 @@ public:
 		p0 *= 1 / p0.w;
 		p1 *= 1 / p1.w;
 		dir = (p1 - p0).xyz();
-		dir.normalize();
+		dir.normalize();*/
+
+		// TODO
+		ASSERT(false);
 	}
 
 	
@@ -457,7 +460,7 @@ public:
 
 	Frustum getCameraFrustum(EntityRef entity) const override
 	{
-		const Camera& camera = m_cameras[entity];
+		/*const Camera& camera = m_cameras[entity];
 		Matrix mtx = m_universe.getMatrix(entity);
 		Frustum ret;
 		float ratio = camera.screen_height > 0 ? camera.screen_width / camera.screen_height : 1;
@@ -480,12 +483,19 @@ public:
 			camera.near,
 			camera.far);
 
-		return ret;
+		return ret;*/
+				// TODO
+		ASSERT(false);
+		return {};
 	}
 
 
 	Frustum getCameraFrustum(EntityRef entity, const Vec2& viewport_min_px, const Vec2& viewport_max_px) const override
 	{
+				// TODO
+		ASSERT(false);
+		return {};
+		/*
 		const Camera& camera = m_cameras[entity];
 		Matrix mtx = m_universe.getMatrix(entity);
 		Frustum ret;
@@ -515,12 +525,15 @@ public:
 			viewport_min,
 			viewport_max);
 
-		return ret;
+		return ret;*/
 	}
 
 
 	void updateBoneAttachment(const BoneAttachment& bone_attachment)
 	{
+				// TODO
+		ASSERT(false);
+		/*
 		if (!bone_attachment.parent_entity.isValid()) return;
 		const EntityPtr model_instance_ptr = bone_attachment.parent_entity;
 		if (!model_instance_ptr.isValid()) return;
@@ -542,7 +555,7 @@ public:
 		Transform result = parent_entity_transform * bone_transform * relative_transform;
 		result.scale = original_scale;
 		m_universe.setTransform(bone_attachment.entity, result);
-		unlockPose(model_instance, false);
+		unlockPose(model_instance, false);*/
 	}
 
 
@@ -554,6 +567,9 @@ public:
 
 	void updateRelativeMatrix(BoneAttachment& attachment)
 	{
+				// TODO
+		ASSERT(false);
+		/*
 		if (!attachment.parent_entity.isValid()) return;
 		if (attachment.bone_index < 0) return;
 		const EntityPtr model_instance_ptr = attachment.parent_entity;
@@ -577,23 +593,31 @@ public:
 		Transform child_transform = m_universe.getTransform(attachment.entity);
 		Transform res = inv_parent_transform * child_transform;
 		attachment.relative_transform = {res.pos, res.rot};
-		unlockPose(model_instance, false);
+		unlockPose(model_instance, false);*/
 	}
 
 
 	Vec3 getBoneAttachmentPosition(EntityRef entity) override
 	{
-		return m_bone_attachments[entity].relative_transform.pos;
+		// TODO
+		ASSERT(false);
+		return {};
+		//return m_bone_attachments[entity].relative_transform.pos;
+		
 	}
 
 
 	void setBoneAttachmentPosition(EntityRef entity, const Vec3& pos) override
 	{
+				// TODO
+		ASSERT(false);
+
+		/*
 		BoneAttachment& attachment = m_bone_attachments[entity];
 		attachment.relative_transform.pos = pos;
 		m_is_updating_attachments = true;
 		updateBoneAttachment(attachment);
-		m_is_updating_attachments = false;
+		m_is_updating_attachments = false;*/
 	}
 
 
@@ -766,8 +790,6 @@ public:
 		r.meshes = nullptr;
 		r.mesh_count = 0;
 
-		r.matrix = m_universe.getMatrix(entity);
-
 		char path[MAX_PATH_LENGTH];
 		serializer.read(path, lengthOf(path));
 		serializer.read(&r.flags.base);
@@ -844,7 +866,6 @@ public:
 
 	void deserializePointLight(IDeserializer& serializer, EntityRef entity, int scene_version)
 	{
-		m_light_influenced_geometry.emplace(m_allocator);
 		PointLight& light = m_point_lights.emplace();
 		light.m_entity = entity;
 		serializer.read(&light.m_attenuation_param);
@@ -975,6 +996,9 @@ public:
 
 	void getTextMeshesVertices(Array<TextMeshVertex>& vertices, EntityRef camera) override
 	{
+				// TODO
+		ASSERT(false);
+		/*
 		Matrix camera_mtx = m_universe.getMatrix(camera);
 		Vec3 cam_right = camera_mtx.getXVector();
 		Vec3 cam_up = -camera_mtx.getYVector();
@@ -1020,7 +1044,7 @@ public:
 				base += right * glyph->XAdvance;
 			}
 
-		}
+		}*/
 	}
 
 
@@ -1515,7 +1539,10 @@ public:
 
 	void deserializeModelInstances(InputBlob& serializer)
 	{
-		i32 size = 0;
+				// TODO
+		ASSERT(false);
+		/*
+i32 size = 0;
 		serializer.read(size);
 		m_model_instances.reserve(size);
 		for (int i = 0; i < size; ++i)
@@ -1559,7 +1586,7 @@ public:
 
 				m_universe.onComponentCreated(e, MODEL_INSTANCE_TYPE, this);
 			}
-		}
+		}*/
 	}
 
 	void deserializeLights(InputBlob& serializer)
@@ -1569,7 +1596,6 @@ public:
 		m_point_lights.resize(size);
 		for (int i = 0; i < size; ++i)
 		{
-			m_light_influenced_geometry.emplace(m_allocator);
 			PointLight& light = m_point_lights[i];
 			serializer.read(light);
 			m_point_lights_map.insert(light.m_entity, i);
@@ -1642,19 +1668,6 @@ public:
 
 	void destroyModelInstance(EntityRef entity)
 	{
-		for (int i = 0; i < m_light_influenced_geometry.size(); ++i)
-		{
-			Array<EntityRef>& influenced_geometry = m_light_influenced_geometry[i];
-			for (int j = 0; j < influenced_geometry.size(); ++j)
-			{
-				if (influenced_geometry[j] == entity)
-				{
-					influenced_geometry.erase(j);
-					break;
-				}
-			}
-		}
-
 		setModel(entity, nullptr);
 		auto& model_instance = m_model_instances[entity.index];
 		LUMIX_DELETE(m_allocator, model_instance.pose);
@@ -1688,7 +1701,6 @@ public:
 		int index = m_point_lights_map[entity];
 		m_point_lights.eraseFast(index);
 		m_point_lights_map.erase(entity);
-		m_light_influenced_geometry.eraseFast(index);
 		if (index < m_point_lights.size())
 		{
 			m_point_lights_map[{m_point_lights[index].m_entity.index}] = index;
@@ -1792,22 +1804,6 @@ public:
 	}
 
 
-	Frustum getPointLightFrustum(int light_idx) const
-	{
-		const PointLight& light = m_point_lights[light_idx];
-		Frustum frustum;
-		frustum.computeOrtho(m_universe.getPosition(light.m_entity),
-			Vec3(1, 0, 0),
-			Vec3(0, 1, 0),
-			light.m_range,
-			light.m_range,
-			-light.m_range,
-			light.m_range);
-
-		return frustum;
-	}
-
-
 	void onEntityDestroyed(EntityRef entity)
 	{
 		for (auto& i : m_bone_attachments)
@@ -1829,33 +1825,12 @@ public:
 			m_model_instances[index].model && m_model_instances[index].model->isReady())
 		{
 			ModelInstance& r = m_model_instances[index];
-			r.matrix = m_universe.getMatrix(entity);
 			if (r.model && r.model->isReady())
 			{
 				float radius = m_universe.getScale(entity) * r.model->getBoundingRadius();
-				Vec3 position = m_universe.getPosition(entity);
+				DVec3 position = m_universe.getPosition(entity);
 				m_culling_system->setRadius(entity, radius);
-				m_culling_system->setPosition(entity, DVec3(position.x, position.y, position.z));
-			}
-
-			float bounding_radius = r.model ? r.model->getBoundingRadius() : 1;
-			for (int light_idx = 0, c = m_point_lights.size(); light_idx < c; ++light_idx)
-			{
-				for (int j = 0, c2 = m_light_influenced_geometry[light_idx].size(); j < c2; ++j)
-				{
-					if(m_light_influenced_geometry[light_idx][j] == entity)
-					{
-						m_light_influenced_geometry[light_idx].eraseFast(j);
-						break;
-					}
-				}
-
-				Vec3 pos = m_universe.getPosition(entity);
-				Frustum frustum = getPointLightFrustum(light_idx);
-				if(frustum.isSphereInside(pos, bounding_radius))
-				{
-					m_light_influenced_geometry[light_idx].push(entity);
-				}
+				m_culling_system->setPosition(entity, position);
 			}
 		}
 
@@ -1863,15 +1838,6 @@ public:
 		if (decal_idx >= 0)
 		{
 			updateDecalInfo(m_decals.at(decal_idx));
-		}
-
-		for (int i = 0, c = m_point_lights.size(); i < c; ++i)
-		{
-			if (m_point_lights[i].m_entity == entity)
-			{
-				detectLightInfluencedGeometry({ m_point_lights[i].m_entity.index });
-				break;
-			}
 		}
 
 		bool was_updating = m_is_updating_attachments;
@@ -1981,12 +1947,14 @@ public:
 
 	void getDecals(const Frustum& frustum, Array<DecalInfo>& decals) override
 	{
-		decals.reserve(m_decals.size());
+		/*decals.reserve(m_decals.size());
 		for (const Decal& decal : m_decals)
 		{
 			if (!decal.material || !decal.material->isReady()) continue;
 			if (frustum.isSphereInside(decal.position, decal.radius)) decals.push(decal);
-		}
+		}*/
+		// TODO
+		ASSERT(false);
 	}
 
 
@@ -2095,10 +2063,10 @@ public:
 		{
 			if (!model_instance.model || !model_instance.model->isReady()) return;
 
-			const Vec3 pos = m_universe.getPosition((EntityRef)model_instance.entity);
+			const DVec3 pos = m_universe.getPosition((EntityRef)model_instance.entity);
 			const float radius = model_instance.model->getBoundingRadius();
 			u64 layer_mask = getLayerMask(model_instance);
-			if (!m_culling_system->isAdded(entity)) m_culling_system->add(entity, DVec3(pos.x, pos.y, pos.z), radius, layer_mask);
+			if (!m_culling_system->isAdded(entity)) m_culling_system->add(entity, pos, radius, layer_mask);
 		}
 		else
 		{
@@ -2130,14 +2098,13 @@ public:
 		else {
 			setModel(entity, nullptr);
 		}
-		r.matrix = m_universe.getMatrix(entity);
 	}
 
 
 	void forceGrassUpdate(EntityRef entity) override { m_terrains[entity]->forceGrassUpdate(); }
 
 
-	void getTerrainInfos(const Frustum& frustum, const Vec3& lod_ref_point, Array<TerrainInfo>& infos) override
+	void getTerrainInfos(const Frustum& frustum, const DVec3& lod_ref_point, Array<TerrainInfo>& infos) override
 	{
 		PROFILE_FUNCTION();
 		infos.reserve(m_terrains.size());
@@ -2175,12 +2142,13 @@ public:
 			y = scene->getCameraScreenHeight(camera_entity) * 0.5f;
 		}
 
-		Vec3 origin, dir;
+		DVec3 origin;
+		Vec3 dir;
 		scene->getRay(camera_entity, {x, y}, origin, dir);
 
 		RayCastModelHit hit = scene->castRay(origin, dir, INVALID_ENTITY);
 		LuaWrapper::push(L, hit.m_is_hit);
-		LuaWrapper::push(L, hit.m_is_hit ? hit.m_origin + hit.m_dir * hit.m_t : Vec3(0, 0, 0));
+		LuaWrapper::push(L, hit.m_is_hit ? hit.m_origin + hit.m_dir * hit.m_t : DVec3(0));
 
 		return 2;
 	}
@@ -2391,75 +2359,10 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		return INVALID_ENTITY;
 	}
 
-	
-	int getClosestPointLights(const Vec3& reference_pos,
-		EntityRef* lights,
-		int max_lights) override
-	{
-
-		float dists[16];
-		ASSERT(max_lights <= lengthOf(dists));
-		ASSERT(max_lights > 0);
-		if (m_point_lights.empty()) return 0;
-
-		int light_count = 0;
-		for (auto light : m_point_lights)
-		{
-			Vec3 light_pos = m_universe.getPosition(light.m_entity);
-			float dist_squared = (reference_pos - light_pos).squaredLength();
-
-			dists[light_count] = dist_squared;
-			lights[light_count] = { light.m_entity.index };
-
-			for (int i = light_count; i > 0 && dists[i - 1] > dists[i]; --i)
-			{
-				float tmp = dists[i];
-				dists[i] = dists[i - 1];
-				dists[i - 1] = tmp;
-
-				EntityRef tmp2 = lights[i];
-				lights[i] = lights[i - 1];
-				lights[i - 1] = tmp2;
-			}
-			++light_count;
-			if (light_count == max_lights)
-			{
-				break;
-			}
-		}
-
-		for (int i = max_lights; i < m_point_lights.size(); ++i)
-		{
-			PointLight& light = m_point_lights[i];
-			Vec3 light_pos = m_universe.getPosition(light.m_entity);
-			float dist_squared = (reference_pos - light_pos).squaredLength();
-
-			if (dist_squared < dists[max_lights - 1])
-			{
-				dists[max_lights - 1] = dist_squared;
-				lights[max_lights - 1] = { light.m_entity.index };
-
-				for (int i = max_lights - 1; i > 0 && dists[i - 1] > dists[i];
-					 --i)
-				{
-					float tmp = dists[i];
-					dists[i] = dists[i - 1];
-					dists[i - 1] = tmp;
-
-					EntityRef tmp2 = lights[i];
-					lights[i] = lights[i - 1];
-					lights[i - 1] = tmp2;
-				}
-			}
-		}
-
-		return light_count;
-	}
-
 
 	void getPointLights(const Frustum& frustum, Array<EntityRef>& lights) override
 	{
-		for (int i = 0, ci = m_point_lights.size(); i < ci; ++i)
+		/*for (int i = 0, ci = m_point_lights.size(); i < ci; ++i)
 		{
 			PointLight& light = m_point_lights[i];
 
@@ -2467,7 +2370,9 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 			{
 				lights.push(light.m_entity);
 			}
-		}
+		}*/
+		// TODO
+		ASSERT(false);
 	}
 
 
@@ -2483,7 +2388,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	void getModelInstanceEntities(const Frustum& frustum, Array<EntityRef>& entities) override
+	void getModelInstanceEntities(const ShiftedFrustum& frustum, Array<EntityRef>& entities) override
 	{
 		PROFILE_FUNCTION();
 
@@ -2516,8 +2421,8 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	void getModelInstanceInfos(const Frustum& frustum,
-		const Vec3& lod_ref_point,
+	void getModelInstanceInfos(const ShiftedFrustum& frustum,
+		const DVec3& lod_ref_point,
 		float lod_multiplier,
 		u64 layer_mask,
 		Array<MeshInstance>& result) const override
@@ -2525,10 +2430,11 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		CullingSystem::Results cull_results(m_allocator);
 		m_culling_system->cull(frustum, layer_mask, cull_results);
 		if (cull_results.empty()) return;
-
+		
 		Array<Array<MeshInstance>> tmp(m_allocator);
+		tmp.reserve(cull_results.size());
 		for (auto& r : cull_results) {
-			tmp.emplace(m_allocator).reserve(r.size());
+			tmp.emplace(m_allocator);
 		}
 
 		JobSystem::JobDecl jobs[64];
@@ -2538,20 +2444,23 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		volatile int counter = 0;
 		for (int subresult_index = 0; subresult_index < cull_results.size(); ++subresult_index) {
 			Array<MeshInstance>& subinfos = tmp[subresult_index];
-			subinfos.clear();
+			subinfos.reserve(cull_results[subresult_index].size());
 
 			JobSystem::fromLambda([&layer_mask, &subinfos, this, &cull_results, subresult_index, lod_ref_point, lod_multiplier]() {
 				PROFILE_BLOCK("Temporary Info Job");
 				PROFILE_INT("ModelInstance count", cull_results[subresult_index].size());
 				if (cull_results[subresult_index].empty()) return;
 
-				const Vec3 ref_point = lod_ref_point;
+				const Universe& universe = m_universe;
+				const DVec3 ref_point = lod_ref_point;
 				const float final_lod_multiplier = m_lod_multiplier * lod_multiplier;
 				const EntityRef* LUMIX_RESTRICT raw_subresults = &cull_results[subresult_index][0];
 				const ModelInstance* LUMIX_RESTRICT model_instances = &m_model_instances[0];
 				for (int i = 0, c = cull_results[subresult_index].size(); i < c; ++i) {
-					const ModelInstance* LUMIX_RESTRICT model_instance = &model_instances[raw_subresults[i].index];
-					float squared_distance = (model_instance->matrix.getTranslation() - ref_point).squaredLength();
+					const EntityRef e = raw_subresults[i];
+					const ModelInstance* LUMIX_RESTRICT model_instance = &model_instances[e.index];
+					
+					float squared_distance = float((universe.getPosition(e) - ref_point).squaredLength());
 					squared_distance *= final_lod_multiplier;
 
 					const Model* LUMIX_RESTRICT model = model_instance->model;
@@ -2568,7 +2477,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 						}
 					}
 				}
-			}, &job_storage[subresult_index], &jobs[subresult_index], nullptr);
+			}, &job_storage[subresult_index], &jobs[subresult_index], &m_allocator);
 		}
 		JobSystem::runJobs(jobs, cull_results.size(), &counter);
 		JobSystem::wait(&counter);
@@ -2605,9 +2514,12 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 
 	Matrix getCameraViewProjection(EntityRef entity) override
 	{
-		Matrix view = m_universe.getMatrix(entity);
+		/*Matrix view = m_universe.getMatrix(entity);
 		view.fastInverse();
-		return getCameraProjection(entity) * view;
+		return getCameraProjection(entity) * view;*/
+		// TODO
+		ASSERT(false);
+		return {};
 	}
 
 
@@ -2661,7 +2573,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	const Array<DebugPoint>& getDebugPoints() const override { return m_debug_points; }
 
 
-	void addDebugSphere(const Vec3& center,
+	void addDebugSphere(const DVec3& center,
 		float radius,
 		u32 color,
 		float life) override
@@ -2684,26 +2596,26 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 			{
 				float ci = cos(i * STEP);
 				float si = sin(i * STEP);
-				addDebugLine(Vec3(center.x + radius * ci * cy,
+				addDebugLine(DVec3(center.x + radius * ci * cy,
 								  center.y + radius * sy,
 								  center.z + radius * si * cy),
-							 Vec3(center.x + radius * ci * cy1,
+							 DVec3(center.x + radius * ci * cy1,
 								  center.y + radius * sy1,
 								  center.z + radius * si * cy1),
 							 color,
 							 life);
-				addDebugLine(Vec3(center.x + radius * ci * cy,
+				addDebugLine(DVec3(center.x + radius * ci * cy,
 								  center.y + radius * sy,
 								  center.z + radius * si * cy),
-							 Vec3(center.x + radius * prev_ci * cy,
+							 DVec3(center.x + radius * prev_ci * cy,
 								  center.y + radius * sy,
 								  center.z + radius * prev_si * cy),
 							 color,
 							 life);
-				addDebugLine(Vec3(center.x + radius * prev_ci * cy1,
+				addDebugLine(DVec3(center.x + radius * prev_ci * cy1,
 								  center.y + radius * sy1,
 								  center.z + radius * prev_si * cy1),
-							 Vec3(center.x + radius * ci * cy1,
+							 DVec3(center.x + radius * ci * cy1,
 								  center.y + radius * sy1,
 								  center.z + radius * si * cy1),
 							 color,
@@ -2715,13 +2627,12 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	void addDebugHalfSphere(const Matrix& transform, float radius, bool top, u32 color, float life)
+	void addDebugHalfSphere(const RigidTransform& transform, float radius, bool top, u32 color, float life)
 	{
-		Vec3 center = transform.getTranslation();
-		Vec3 x_vec = transform.getXVector();
-		Vec3 y_vec = transform.getYVector();
-		if (!top) y_vec *= -1;
-		Vec3 z_vec = transform.getZVector();
+		const DVec3 center = transform.pos;
+		const Vec3 x_vec = transform.rot * Vec3(1, 0, 0);
+		const Vec3 y_vec = transform.rot * Vec3(0, top ? 1.f : -1.f, 0);
+		const Vec3 z_vec = transform.rot * Vec3(0, 0, 1);
 		static const int COLS = 36;
 		static const int ROWS = COLS >> 1;
 		static const float STEP = Math::degreesToRadians(360.0f) / COLS;
@@ -2759,7 +2670,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	void addDebugHalfSphere(const Vec3& center, float radius, bool top, u32 color, float life)
+	void addDebugHalfSphere(const DVec3& center, float radius, bool top, u32 color, float life)
 	{
 		static const int COLS = 36;
 		static const int ROWS = COLS >> 1;
@@ -2780,26 +2691,26 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 			{
 				float ci = cos(i * STEP);
 				float si = sin(i * STEP);
-				addDebugLine(Vec3(center.x + radius * ci * cy,
+				addDebugLine(DVec3(center.x + radius * ci * cy,
 					center.y + radius * sy,
 					center.z + radius * si * cy),
-					Vec3(center.x + radius * ci * cy1,
+					DVec3(center.x + radius * ci * cy1,
 					center.y + radius * sy1,
 					center.z + radius * si * cy1),
 					color,
 					life);
-				addDebugLine(Vec3(center.x + radius * ci * cy,
+				addDebugLine(DVec3(center.x + radius * ci * cy,
 					center.y + radius * sy,
 					center.z + radius * si * cy),
-					Vec3(center.x + radius * prev_ci * cy,
+					DVec3(center.x + radius * prev_ci * cy,
 					center.y + radius * sy,
 					center.z + radius * prev_si * cy),
 					color,
 					life);
-				addDebugLine(Vec3(center.x + radius * prev_ci * cy1,
+				addDebugLine(DVec3(center.x + radius * prev_ci * cy1,
 					center.y + radius * sy1,
 					center.z + radius * prev_si * cy1),
-					Vec3(center.x + radius * ci * cy1,
+					DVec3(center.x + radius * ci * cy1,
 					center.y + radius * sy1,
 					center.z + radius * si * cy1),
 					color,
@@ -2811,9 +2722,9 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	void addDebugTriangle(const Vec3& p0,
-		const Vec3& p1,
-		const Vec3& p2,
+	void addDebugTriangle(const DVec3& p0,
+		const DVec3& p1,
+		const DVec3& p2,
 		u32 color,
 		float life) override
 	{
@@ -2826,7 +2737,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	void addDebugCapsule(const Vec3& position,
+	void addDebugCapsule(const DVec3& position,
 		float height,
 		float radius,
 		u32 color,
@@ -2839,13 +2750,13 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		Vec3 x_vec(1.0f, 0, 0);
 		z_vec.normalize();
 		x_vec.normalize();
-		Vec3 bottom = position + Vec3(0, radius, 0);
-		Vec3 top = bottom + Vec3(0, height, 0);
+		const DVec3 bottom = position + Vec3(0, radius, 0);
+		const DVec3 top = bottom + Vec3(0, height, 0);
 		for (int i = 1; i <= 32; ++i)
 		{
-			float a = i / 32.0f * 2 * Math::PI;
-			float x = cosf(a) * radius;
-			float z = sinf(a) * radius;
+			const float a = i / 32.0f * 2 * Math::PI;
+			const float x = cosf(a) * radius;
+			const float z = sinf(a) * radius;
 			addDebugLine(bottom + x_vec * x + z_vec * z,
 				top + x_vec * x + z_vec * z,
 				color,
@@ -2860,7 +2771,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		u32 color,
 		float life) override
 	{
-		Vec3 x_vec = transform.getXVector();
+		/*Vec3 x_vec = transform.getXVector();
 		Vec3 y_vec = transform.getYVector();
 		Vec3 z_vec = transform.getZVector();
 		Vec3 position = transform.getTranslation();
@@ -2879,12 +2790,14 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 			float x = cosf(a) * radius;
 			float z = sinf(a) * radius;
 			addDebugLine(bottom + x_vec * x + z_vec * z, top + x_vec * x + z_vec * z, color, life);
-		}
+		}*/
+		// TODO
+		ASSERT(false);
 	}
 
 
 
-	void addDebugCylinder(const Vec3& position,
+	void addDebugCylinder(const DVec3& position,
 								  const Vec3& up,
 								  float radius,
 								  u32 color,
@@ -2896,7 +2809,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		float prevz = 0;
 		z_vec.normalize();
 		x_vec.normalize();
-		Vec3 top = position + up;
+		const DVec3 top = position + up;
 		for (int i = 1; i <= 32; ++i)
 		{
 			float a = i / 32.0f * 2 * Math::PI;
@@ -2920,7 +2833,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	void addDebugCube(const Vec3& pos,
+	void addDebugCube(const DVec3& pos,
 		const Vec3& dir,
 		const Vec3& up,
 		const Vec3& right,
@@ -2945,14 +2858,14 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	void addDebugCubeSolid(const Vec3& min,
-		const Vec3& max,
+	void addDebugCubeSolid(const DVec3& min,
+		const DVec3& max,
 		u32 color,
 		float life) override
 	{
-		Vec3 a = min;
-		Vec3 b = min;
-		Vec3 c = max;
+		DVec3 a = min;
+		DVec3 b = min;
+		DVec3 c = max;
 
 		b.x = max.x;
 		c.z = min.z;
@@ -3013,20 +2926,20 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 
 
 
-	void addDebugCube(const Vec3& min,
-							  const Vec3& max,
-							  u32 color,
-							  float life) override
+	void addDebugCube(const DVec3& min,
+		const DVec3& max,
+		u32 color,
+		float life) override
 	{
-		Vec3 a = min;
-		Vec3 b = min;
+		DVec3 a = min;
+		DVec3 b = min;
 		b.x = max.x;
 		addDebugLine(a, b, color, life);
-		a.set(b.x, b.y, max.z);
+		a = DVec3(b.x, b.y, max.z);
 		addDebugLine(a, b, color, life);
-		b.set(min.x, a.y, a.z);
+		b = DVec3(min.x, a.y, a.z);
 		addDebugLine(a, b, color, life);
-		a.set(b.x, b.y, min.z);
+		a = DVec3(b.x, b.y, min.z);
 		addDebugLine(a, b, color, life);
 
 		a = min;
@@ -3034,11 +2947,11 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		b = a;
 		b.x = max.x;
 		addDebugLine(a, b, color, life);
-		a.set(b.x, b.y, max.z);
+		a = DVec3(b.x, b.y, max.z);
 		addDebugLine(a, b, color, life);
-		b.set(min.x, a.y, a.z);
+		b = DVec3(min.x, a.y, a.z);
 		addDebugLine(a, b, color, life);
-		a.set(b.x, b.y, min.z);
+		a = DVec3(b.x, b.y, min.z);
 		addDebugLine(a, b, color, life);
 
 		a = min;
@@ -3059,7 +2972,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 
 	void addDebugFrustum(const Frustum& frustum, u32 color, float life) override
 	{
-		addDebugLine(frustum.points[0], frustum.points[1], color, life);
+		/*addDebugLine(frustum.points[0], frustum.points[1], color, life);
 		addDebugLine(frustum.points[1], frustum.points[2], color, life);
 		addDebugLine(frustum.points[2], frustum.points[3], color, life);
 		addDebugLine(frustum.points[3], frustum.points[0], color, life);
@@ -3072,11 +2985,13 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		addDebugLine(frustum.points[0], frustum.points[4], color, life);
 		addDebugLine(frustum.points[1], frustum.points[5], color, life);
 		addDebugLine(frustum.points[2], frustum.points[6], color, life);
-		addDebugLine(frustum.points[3], frustum.points[7], color, life);
+		addDebugLine(frustum.points[3], frustum.points[7], color, life);*/
+		// TODO
+		ASSERT(false);
 	}
 
 
-	void addDebugCircle(const Vec3& center, const Vec3& up, float radius, u32 color, float life) override
+	void addDebugCircle(const DVec3& center, const Vec3& up, float radius, u32 color, float life) override
 	{
 		Vec3 z_vec(-up.y, up.x, 0);
 		Vec3 x_vec = crossProduct(up, z_vec);
@@ -3096,18 +3011,18 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	void addDebugCross(const Vec3& center, float size, u32 color, float life) override
+	void addDebugCross(const DVec3& center, float size, u32 color, float life) override
 	{
-		addDebugLine(center, Vec3(center.x - size, center.y, center.z), color, life);
-		addDebugLine(center, Vec3(center.x + size, center.y, center.z), color, life);
-		addDebugLine(center, Vec3(center.x, center.y - size, center.z), color, life);
-		addDebugLine(center, Vec3(center.x, center.y + size, center.z), color, life);
-		addDebugLine(center, Vec3(center.x, center.y, center.z - size), color, life);
-		addDebugLine(center, Vec3(center.x, center.y, center.z + size), color, life);
+		addDebugLine(center, DVec3(center.x - size, center.y, center.z), color, life);
+		addDebugLine(center, DVec3(center.x + size, center.y, center.z), color, life);
+		addDebugLine(center, DVec3(center.x, center.y - size, center.z), color, life);
+		addDebugLine(center, DVec3(center.x, center.y + size, center.z), color, life);
+		addDebugLine(center, DVec3(center.x, center.y, center.z - size), color, life);
+		addDebugLine(center, DVec3(center.x, center.y, center.z + size), color, life);
 	}
 
 
-	void addDebugPoint(const Vec3& pos, u32 color, float life) override
+	void addDebugPoint(const DVec3& pos, u32 color, float life) override
 	{
 		DebugPoint& point = m_debug_points.emplace();
 		point.pos = pos;
@@ -3116,21 +3031,21 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	void addDebugCone(const Vec3& vertex,
+	void addDebugCone(const DVec3& vertex,
 		const Vec3& dir,
 		const Vec3& axis0,
 		const Vec3& axis1,
 		u32 color,
 		float life) override
 	{
-		Vec3 base_center = vertex + dir;
-		Vec3 prev_p = base_center + axis0;
+		const DVec3 base_center = vertex + dir;
+		DVec3 prev_p = base_center + axis0;
 		for (int i = 1; i <= 32; ++i)
 		{
 			float angle = i / 32.0f * 2 * Math::PI;
-			Vec3 x = cosf(angle) * axis0;
-			Vec3 z = sinf(angle) * axis1;
-			Vec3 p = base_center + x + z;
+			const Vec3 x = cosf(angle) * axis0;
+			const Vec3 z = sinf(angle) * axis1;
+			const DVec3 p = base_center + x + z;
 			addDebugLine(p, prev_p, color, life);
 			addDebugLine(vertex, p, color, life);
 			prev_p = p;
@@ -3144,7 +3059,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	void addDebugLine(const Vec3& from, const Vec3& to, u32 color, float life) override
+	void addDebugLine(const DVec3& from, const DVec3& to, u32 color, float life) override
 	{
 		DebugLine& line = m_debug_lines.emplace();
 		line.from = from;
@@ -3154,7 +3069,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	RayCastModelHit castRayTerrain(EntityRef entity, const Vec3& origin, const Vec3& dir) override
+	RayCastModelHit castRayTerrain(EntityRef entity, const DVec3& origin, const Vec3& dir) override
 	{
 		RayCastModelHit hit;
 		hit.m_is_hit = false;
@@ -3169,9 +3084,9 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, EntityPtr ignored_model_instance) override
+	RayCastModelHit castRay(const DVec3& origin, const Vec3& dir, EntityPtr ignored_model_instance) override
 	{
-		PROFILE_FUNCTION();
+		/*PROFILE_FUNCTION();
 		RayCastModelHit hit;
 		hit.m_is_hit = false;
 		hit.m_origin = origin;
@@ -3218,7 +3133,10 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 			}
 		}
 
-		return hit;
+		return hit;*/
+		// TODO
+		//ASSERT(false);
+		return {};
 	}
 
 	
@@ -3450,26 +3368,6 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		//probe.radiance->setFlag(BGFX_TEXTURE_MAG_ANISOTROPIC, true);
 	}
 
-
-	EntityPtr getNearestEnvironmentProbe(const Vec3& pos) const override
-	{
-		float nearest_dist_squared = FLT_MAX;
-		EntityPtr nearest = INVALID_ENTITY;
-		for (int i = 0, c = m_environment_probes.size(); i < c; ++i)
-		{
-			EntityRef probe_entity = m_environment_probes.getKey(i);
-			Vec3 probe_pos = m_universe.getPosition(probe_entity);
-			float dist_squared = (pos - probe_pos).squaredLength();
-			if (dist_squared < nearest_dist_squared)
-			{
-				nearest = probe_entity;
-				nearest_dist_squared = dist_squared;
-			}
-		}
-		if (!nearest.isValid()) return INVALID_ENTITY;
-		return nearest;
-	}
-
 	
 	void getEnvironmentProbes(Array<EnvProbeInfo>& probes) override
 	{
@@ -3612,10 +3510,6 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		LUMIX_DELETE(m_allocator, r.pose);
 		r.pose = nullptr;
 
-		for (int i = 0; i < m_point_lights.size(); ++i)
-		{
-			m_light_influenced_geometry[i].eraseItemFast(entity);
-		}
 		m_culling_system->remove(entity);
 	}
 
@@ -3645,9 +3539,9 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 
 		float bounding_radius = r.model->getBoundingRadius();
 		float scale = m_universe.getScale(entity);
-		const Vec3 pos = r.matrix.getTranslation();
+		const DVec3 pos = m_universe.getPosition(entity);
 		const float radius = bounding_radius * scale;
-		if(r.flags.isSet(ModelInstance::ENABLED)) m_culling_system->add(entity, DVec3(pos.x, pos.y, pos.z), radius, getLayerMask(r));
+		if(r.flags.isSet(ModelInstance::ENABLED)) m_culling_system->add(entity, pos, radius, getLayerMask(r));
 		ASSERT(!r.pose);
 		if (model->getBoneCount() > 0)
 		{
@@ -3661,7 +3555,6 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 				mesh.material->setDefine(skinned_define_idx, !mesh.skin.empty());
 			}
 		}
-		r.matrix = m_universe.getMatrix(entity);
 		ASSERT(!r.meshes || hasCustomMeshes(r));
 		if (r.meshes)
 		{
@@ -3686,18 +3579,6 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		if (r.flags.isSet(ModelInstance::IS_BONE_ATTACHMENT_PARENT))
 		{
 			updateBoneAttachment(m_bone_attachments[entity]);
-		}
-
-		for (int i = 0; i < m_point_lights.size(); ++i)
-		{
-			PointLight& light = m_point_lights[i];
-			Vec3 t = r.matrix.getTranslation();
-			float radius = r.model->getBoundingRadius();
-			if ((t - m_universe.getPosition(light.m_entity)).squaredLength() <
-				(radius + light.m_range) * (radius + light.m_range))
-			{
-				m_light_influenced_geometry[i].push(entity);
-			}
 		}
 	}
 
@@ -3918,26 +3799,6 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	IAllocator& getAllocator() override { return m_allocator; }
 
 
-	void detectLightInfluencedGeometry(EntityRef entity)
-	{
-		const int light_idx = m_point_lights_map[entity];
-		const Frustum frustum = getPointLightFrustum(light_idx);
-		CullingSystem::Results results(m_allocator);
-		m_culling_system->cull(frustum, ~0ULL, results);
-		auto& influenced_geometry = m_light_influenced_geometry[light_idx];
-		influenced_geometry.clear();
-		for (int i = 0; i < results.size(); ++i)
-		{
-			const CullingSystem::Subresults& subresult = results[i];
-			influenced_geometry.reserve(influenced_geometry.size() + subresult.size());
-			for (int j = 0, c = subresult.size(); j < c; ++j)
-			{
-				influenced_geometry.push(subresult[j]);
-			}
-		}
-	}
-
-
 	float getLightFOV(EntityRef entity) override
 	{
 		return m_point_lights[m_point_lights_map[entity]].m_fov;
@@ -3973,7 +3834,6 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	void createPointLight(EntityRef entity)
 	{
 		PointLight& light = m_point_lights.emplace();
-		m_light_influenced_geometry.emplace(m_allocator);
 		light.m_entity = entity;
 		light.m_diffuse_color.set(1, 1, 1);
 		light.m_diffuse_intensity = 1;
@@ -3986,21 +3846,21 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		m_point_lights_map.insert(entity, m_point_lights.size() - 1);
 
 		m_universe.onComponentCreated(entity, POINT_LIGHT_TYPE, this);
-
-		detectLightInfluencedGeometry(entity);
 	}
 
 
 	void updateDecalInfo(Decal& decal) const
 	{
-		decal.position = m_universe.getPosition(decal.entity);
+		/*decal.position = m_universe.getPosition(decal.entity);
 		decal.radius = decal.scale.length();
 		decal.mtx = m_universe.getMatrix(decal.entity);
 		decal.mtx.setXVector(decal.mtx.getXVector() * decal.scale.x);
 		decal.mtx.setYVector(decal.mtx.getYVector() * decal.scale.y);
 		decal.mtx.setZVector(decal.mtx.getZVector() * decal.scale.z);
 		decal.inv_mtx = decal.mtx;
-		decal.inv_mtx.inverse();
+		decal.inv_mtx.inverse();*/
+		// TODO
+		ASSERT(false);
 	}
 
 
@@ -4062,7 +3922,6 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		r.flags.clear();
 		r.flags.set(ModelInstance::ENABLED);
 		r.mesh_count = 0;
-		r.matrix = m_universe.getMatrix(entity);
 		m_universe.onComponentCreated(entity, MODEL_INSTANCE_TYPE, this);
 	}
 
@@ -4098,7 +3957,6 @@ private:
 	Engine& m_engine;
 	CullingSystem* m_culling_system;
 
-	Array<Array<EntityRef>> m_light_influenced_geometry;
 	EntityPtr m_active_global_light_entity;
 	HashMap<EntityRef, int> m_point_lights_map;
 
@@ -4176,7 +4034,6 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	, m_text_meshes(m_allocator)
 	, m_terrains(m_allocator)
 	, m_point_lights(m_allocator)
-	, m_light_influenced_geometry(m_allocator)
 	, m_global_lights(m_allocator)
 	, m_decals(m_allocator)
 	, m_debug_triangles(m_allocator)

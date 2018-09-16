@@ -76,7 +76,7 @@ class SceneView : public StudioApp::GUIPlugin
 
 		struct DeferredPrefabInsert
 		{
-			Vec3 pos;
+			DVec3 pos;
 			struct PrefabResource* prefab;
 		};
 

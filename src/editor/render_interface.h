@@ -30,13 +30,13 @@ public:
 public:
 	virtual ~RenderInterface() {}
 
-	virtual AABB getEntityAABB(Universe& universe, EntityRef entity) = 0;
+	virtual AABB getEntityAABB(Universe& universe, EntityRef entity, const DVec3& base) = 0;
 	virtual float getCameraFOV(EntityRef entity) = 0;
 	virtual bool isCameraOrtho(EntityRef entity) = 0;
 	virtual float getCameraOrthoSize(EntityRef entity) = 0;
 	virtual Vec2 getCameraScreenSize(EntityRef entity) = 0;
-	virtual void getRay(EntityRef entity, const Vec2& screen_pos, Vec3& origin, Vec3& dir) = 0;
-	virtual float castRay(ModelHandle model, const Vec3& origin, const Vec3& dir, const Matrix& mtx, const Pose* pose) = 0;
+	virtual void getRay(EntityRef entity, const Vec2& screen_pos, DVec3& origin, Vec3& dir) = 0;
+	virtual float castRay(ModelHandle model, const Vec3& origin, const Vec3& dir, const Pose* pose) = 0;
 	virtual void renderModel(ModelHandle model, const Matrix& mtx) = 0;
 	virtual ModelHandle loadModel(Path& path) = 0;
 	virtual void unloadModel(ModelHandle handle) = 0;
@@ -47,10 +47,10 @@ public:
 	virtual ImTextureID loadTexture(const Path& path) = 0;
 	virtual bool isValid(ImTextureID texture) = 0;
 	virtual void unloadTexture(ImTextureID handle) = 0;
-	virtual void addDebugCube(const Vec3& minimum, const Vec3& maximum, u32 color, float life) = 0;
-	virtual void addDebugCross(const Vec3& pos, float size, u32 color, float life) = 0;
-	virtual void addDebugLine(const Vec3& from, const Vec3& to, u32 color, float life) = 0;
-	virtual WorldEditor::RayHit castRay(const Vec3& origin, const Vec3& dir, EntityPtr ignored) = 0;
+	virtual void addDebugCube(const DVec3& minimum, const DVec3& maximum, u32 color, float life) = 0;
+	virtual void addDebugCross(const DVec3& pos, float size, u32 color, float life) = 0;
+	virtual void addDebugLine(const DVec3& from, const DVec3& to, u32 color, float life) = 0;
+	virtual WorldEditor::RayHit castRay(const DVec3& origin, const Vec3& dir, EntityPtr ignored) = 0;
 	virtual Path getModelInstancePath(EntityRef entity) = 0;
 	virtual void render(const Matrix& mtx,
 		u16* indices,
@@ -59,11 +59,11 @@ public:
 		int vertices_count,
 		bool lines) = 0;
 	virtual ImFont* addFont(const char* filename, int size) = 0;
-	virtual Vec3 getClosestVertex(Universe* universe, EntityRef entity, const Vec3& pos) = 0;
+	virtual DVec3 getClosestVertex(Universe* universe, EntityRef entity, const DVec3& pos) = 0;
 	virtual void addText2D(float x, float y, float font_size, u32 color, const char* text) = 0;
 	virtual void addRect2D(const Vec2& a, const Vec2& b, u32 color) = 0;
 	virtual void addRectFilled2D(const Vec2& a, const Vec2& b, u32 color) = 0;
-	virtual void getModelInstaces(Array<EntityRef>& entity, const Frustum& frustum, const Vec3& lod_ref_point, float fov, bool is_ortho) = 0;
+	virtual void getModelInstaces(Array<EntityRef>& entity, const ShiftedFrustum& frustum, const DVec3& lod_ref_point, float fov, bool is_ortho) = 0;
 	virtual Frustum getFrustum(EntityRef camera, const Vec2& a, const Vec2& b) = 0;
 };
 

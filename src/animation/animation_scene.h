@@ -48,7 +48,7 @@ struct AnimationScene : public IScene
 	virtual void setControllerInput(EntityRef entity, int input_idx, int value) = 0;
 	virtual void setControllerInput(EntityRef entity, int input_idx, float value) = 0;
 	virtual void setControllerInput(EntityRef entity, int input_idx, bool value) = 0;
-	virtual struct RigidTransform getControllerRootMotion(EntityRef entity) = 0;
+	virtual struct LocalRigidTransform getControllerRootMotion(EntityRef entity) = 0;
 	virtual void setControllerSource(EntityRef entity, const Path& path) = 0;
 	virtual class Path getControllerSource(EntityRef entity) = 0;
 	virtual Anim::ComponentInstance* getControllerRoot(EntityRef entity) = 0;

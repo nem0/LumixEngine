@@ -583,8 +583,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 		Matrix mtx;
 		mtx.lookAt({10, 10, 10}, Vec3::ZERO, {0, 1, 0});
-		EntityRef light_entity = m_tile.universe->createEntity({0, 0, 0}, {0, 0, 0, 1});
-		m_tile.universe->setMatrix(light_entity, mtx);
+		const EntityRef light_entity = m_tile.universe->createEntity({10, 10, 10}, mtx.getRotation());
 		RenderScene* render_scene = (RenderScene*)m_tile.universe->getScene(MODEL_INSTANCE_TYPE);
 		m_tile.universe->createComponent(GLOBAL_LIGHT_TYPE, light_entity);
 		render_scene->setGlobalLightIntensity(light_entity, 1);
@@ -617,7 +616,9 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 	void showPreview(Model& model)
 	{
-		auto* render_scene = static_cast<RenderScene*>(m_universe->getScene(MODEL_INSTANCE_TYPE));
+				// TODO
+	ASSERT(false);
+/*auto* render_scene = static_cast<RenderScene*>(m_universe->getScene(MODEL_INSTANCE_TYPE));
 		if (!render_scene) return;
 		if (!model.isReady()) return;
 		if (!m_mesh.isValid()) return;
@@ -700,7 +701,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				m_viewport.rot = rot;
 				m_viewport.pos = pos;
 			}
-		}
+		}*/
 	}
 
 
@@ -776,7 +777,9 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			}
 		}
 
-		ImGui::LabelText("Bone count", "%d", model->getBoneCount());
+				// TODO
+	ASSERT(false);
+/*ImGui::LabelText("Bone count", "%d", model->getBoneCount());
 		if (model->getBoneCount() > 0 && ImGui::CollapsingHeader("Bones"))
 		{
 			ImGui::Columns(3);
@@ -791,7 +794,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				ImGui::Text("%f; %f; %f; %f", rot.x, rot.y, rot.z, rot.w);
 				ImGui::NextColumn();
 			}
-		}
+		}*/
 
 		if (ImGui::CollapsingHeader("Import")) {
 			AssetCompiler& compiler = m_app.getAssetCompiler();
@@ -927,7 +930,9 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 	void renderTile(PrefabResource* prefab)
 	{
-		Engine& engine = m_app.getWorldEditor().getEngine();
+				// TODO
+	ASSERT(false);
+/*Engine& engine = m_app.getWorldEditor().getEngine();
 		RenderScene* render_scene = (RenderScene*)m_tile.universe->getScene(MODEL_INSTANCE_TYPE);
 		if (!render_scene) return;
 
@@ -945,7 +950,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		m_tile.path_hash = prefab->getPath().getHash();
 		prefab->getResourceManager().unload(*prefab);
 		m_tile.m_entity_in_fly = mesh_entity;
-		model->onLoaded<ModelPlugin, &ModelPlugin::renderPrefabSecondStage>(this);
+		model->onLoaded<ModelPlugin, &ModelPlugin::renderPrefabSecondStage>(this);*/
 	}
 
 
@@ -1021,7 +1026,9 @@ bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK); renderer->viewCounterAdd();
 		if (in_mtx) {
 			mtx = *in_mtx;
 		}
-		Viewport viewport;
+				// TODO
+	ASSERT(false);
+/*Viewport viewport;
 		viewport.is_ortho = false;
 		viewport.far = 10000.f;
 		viewport.near = 0.1f;
@@ -1058,7 +1065,7 @@ bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK); renderer->viewCounterAdd();
 		m_tile.universe->destroyEntity(mesh_entity);
 		m_tile.frame_countdown = 2;
 		m_tile.path_hash = model->getPath().getHash();
-		model->getResourceManager().unload(*model);
+		model->getResourceManager().unload(*model);*/
 	}
 
 
@@ -1552,7 +1559,7 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 		auto& plugin_manager = engine.getPluginManager();
 		IAllocator& allocator = engine.getAllocator();
 
-		Vec3 probe_position = universe->getPosition((EntityRef)cmp.entity);
+		const DVec3 probe_position = universe->getPosition((EntityRef)cmp.entity);
 		auto* scene = static_cast<RenderScene*>(universe->getScene(CAMERA_TYPE));
 		Viewport viewport;
 		viewport.is_ortho = false;
@@ -2070,7 +2077,9 @@ struct FurPainter final : public WorldEditor::Plugin
 
 	void onMouseMove(int x, int y, int, int) override
 	{
-		WorldEditor& editor = app.getWorldEditor();
+				// TODO
+	ASSERT(false);
+/*WorldEditor& editor = app.getWorldEditor();
 		Universe* universe = editor.getUniverse();
 		auto& entities = editor.getSelectedEntities();
 		if (entities.empty()) return;
@@ -2105,7 +2114,7 @@ struct FurPainter final : public WorldEditor::Plugin
 		hit_pos = universe->getTransform(entities[0]).inverted().transform(hit_pos);
 
 		paint(texture, model, hit_pos);
-		scene->unlockPose(entity, false);
+		scene->unlockPose(entity, false);*/
 	}
 
 
@@ -2163,8 +2172,9 @@ struct RenderInterfaceImpl final : public RenderInterface
 	}
 
 
-	Vec3 getClosestVertex(Universe* universe, EntityRef entity, const Vec3& wpos) override
+	DVec3 getClosestVertex(Universe* universe, EntityRef entity, const DVec3& wpos) override
 	{
+		/*
 		Matrix mtx = universe->getMatrix(entity);
 		Matrix inv_mtx = mtx;
 		inv_mtx.inverse();
@@ -2208,7 +2218,10 @@ struct RenderInterfaceImpl final : public RenderInterface
 				}
 			}
 		}
-		return mtx.transformPoint(closest_vertex);
+		return mtx.transformPoint(closest_vertex);*/
+				// TODO
+	ASSERT(false);
+	return {};
 	}
 
 
@@ -2316,13 +2329,13 @@ struct RenderInterfaceImpl final : public RenderInterface
 	}
 
 
-	void addDebugCross(const Vec3& pos, float size, u32 color, float life) override
+	void addDebugCross(const DVec3& pos, float size, u32 color, float life) override
 	{
 		m_render_scene->addDebugCross(pos, size, color, life);
 	}
 
 
-	WorldEditor::RayHit castRay(const Vec3& origin, const Vec3& dir, EntityPtr ignored) override
+	WorldEditor::RayHit castRay(const DVec3& origin, const Vec3& dir, EntityPtr ignored) override
 	{
 		auto hit = m_render_scene->castRay(origin, dir, ignored);
 
@@ -2330,27 +2343,29 @@ struct RenderInterfaceImpl final : public RenderInterface
 	}
 
 
-	void getRay(EntityRef camera, const Vec2& screen_pos, Vec3& origin, Vec3& dir) override
+	void getRay(EntityRef camera, const Vec2& screen_pos, DVec3& origin, Vec3& dir) override
 	{
 		m_render_scene->getRay(camera, screen_pos, origin, dir);
 	}
 
 
-	void addDebugLine(const Vec3& from, const Vec3& to, u32 color, float life) override
+	void addDebugLine(const DVec3& from, const DVec3& to, u32 color, float life) override
 	{
 		m_render_scene->addDebugLine(from, to, color, life);
 	}
 
 
-	void addDebugCube(const Vec3& minimum, const Vec3& maximum, u32 color, float life) override
+	void addDebugCube(const DVec3& minimum, const DVec3& maximum, u32 color, float life) override
 	{
 		m_render_scene->addDebugCube(minimum, maximum, color, life);
 	}
 
 
-	AABB getEntityAABB(Universe& universe, EntityRef entity) override
+	AABB getEntityAABB(Universe& universe, EntityRef entity, const DVec3& base) override
 	{
-		AABB aabb;
+				// TODO
+	ASSERT(false);
+/*AABB aabb;
 
 		if (universe.hasComponent(entity, MODEL_INSTANCE_TYPE))
 		{
@@ -2366,7 +2381,8 @@ struct RenderInterfaceImpl final : public RenderInterface
 		Vec3 pos = universe.getPosition(entity);
 		aabb.set(pos, pos);
 
-		return aabb;
+		return aabb;*/
+	return {};
 	}
 
 
@@ -2390,9 +2406,9 @@ struct RenderInterfaceImpl final : public RenderInterface
 	float getCameraFOV(EntityRef entity) override { return m_render_scene->getCameraFOV(entity); }
 
 
-	float castRay(ModelHandle model, const Vec3& origin, const Vec3& dir, const Matrix& mtx, const Pose* pose) override
+	float castRay(ModelHandle model, const Vec3& origin, const Vec3& dir, const Pose* pose) override
 	{
-		RayCastModelHit hit = m_models[model]->castRay(origin, dir, mtx, pose);
+		RayCastModelHit hit = m_models[model]->castRay(origin, dir, pose);
 		return hit.m_is_hit ? hit.m_t : -1;
 	}
 
@@ -2464,8 +2480,8 @@ struct RenderInterfaceImpl final : public RenderInterface
 
 
 	void getModelInstaces(Array<EntityRef>& entities,
-		const Frustum& frustum,
-		const Vec3& lod_ref_point,
+		const ShiftedFrustum& frustum,
+		const DVec3& lod_ref_point,
 		float fov,
 		bool is_ortho) override
 	{
@@ -2941,9 +2957,9 @@ struct GizmoPlugin final : public WorldEditor::Plugin
 		RenderScene* scene = static_cast<RenderScene*>(light.scene);
 		Universe& universe = scene->getUniverse();
 
-		float range = scene->getLightRange((EntityRef)light.entity);
+		const float range = scene->getLightRange((EntityRef)light.entity);
 
-		Vec3 pos = universe.getPosition((EntityRef)light.entity);
+		const DVec3 pos = universe.getPosition((EntityRef)light.entity);
 		scene->addDebugSphere(pos, range, 0xff0000ff, 0);
 	}
 
@@ -2965,11 +2981,11 @@ struct GizmoPlugin final : public WorldEditor::Plugin
 		RenderScene* scene = static_cast<RenderScene*>(light.scene);
 		const Universe& universe = scene->getUniverse();
 		const EntityRef entity = (EntityRef)light.entity;
-		Vec3 pos = universe.getPosition(entity);
+		const DVec3 pos = universe.getPosition(entity);
 
-		Vec3 dir = universe.getRotation(entity).rotate(Vec3(0, 0, 1));
-		Vec3 right = universe.getRotation(entity).rotate(Vec3(1, 0, 0));
-		Vec3 up = universe.getRotation(entity).rotate(Vec3(0, 1, 0));
+		const Vec3 dir = universe.getRotation(entity).rotate(Vec3(0, 0, 1));
+		const Vec3 right = universe.getRotation(entity).rotate(Vec3(1, 0, 0));
+		const Vec3 up = universe.getRotation(entity).rotate(Vec3(0, 1, 0));
 
 		scene->addDebugLine(pos, pos + dir, 0xff0000ff, 0);
 		scene->addDebugLine(pos + right, pos + dir + right, 0xff0000ff, 0);
@@ -2991,11 +3007,11 @@ struct GizmoPlugin final : public WorldEditor::Plugin
 		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
 		Universe& universe = scene->getUniverse();
 		Vec3 scale = scene->getDecalScale((EntityRef)cmp.entity);
-		Matrix mtx = universe.getMatrix((EntityRef)cmp.entity);
-		scene->addDebugCube(mtx.getTranslation(),
-			mtx.getXVector() * scale.x,
-			mtx.getYVector() * scale.y,
-			mtx.getZVector() * scale.z,
+		const RigidTransform tr = universe.getTransform((EntityRef)cmp.entity).getRigidPart();
+		scene->addDebugCube(tr.pos,
+			tr.rot * Vec3(1, 0, 0) * scale.x,
+			tr.rot * Vec3(0, 1, 0) * scale.y,
+			tr.rot * Vec3(0, 0, 1) * scale.z,
 			0xff0000ff,
 			0);
 	}

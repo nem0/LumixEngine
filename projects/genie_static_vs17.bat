@@ -1,1 +1,1 @@
-genie.exe --static-plugins --no-gui vs2017
+genie.exe --static-plugins --no-physics --no-audio --no-navigation --no-gui vs2017

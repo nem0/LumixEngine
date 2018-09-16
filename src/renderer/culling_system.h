@@ -8,12 +8,12 @@ namespace Lumix
 {
 	template <typename T> class Array;
 	struct DVec3;
+	struct Frustum;
 	struct IAllocator;
+	struct ShiftedFrustum;
 	struct Sphere;
 	struct Vec3;
 
-
-	struct Frustum;
 
 	class LUMIX_RENDERER_API CullingSystem
 	{
@@ -30,7 +30,7 @@ namespace Lumix
 
 		virtual void clear() = 0;
 
-		virtual void cull(const Frustum& frustum, u64 layer_mask, Results& result) = 0;
+		virtual void cull(const ShiftedFrustum& frustum, u64 layer_mask, Results& result) = 0;
 
 		virtual bool isAdded(EntityRef entity) = 0;
 		virtual void add(EntityRef entity, const DVec3& pos, float radius, u64 layer_mask) = 0;

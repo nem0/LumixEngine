@@ -194,7 +194,7 @@ public:
 
 	MoveEntityCommand(WorldEditor& editor,
 		const EntityRef* entities,
-		const Vec3* new_positions,
+		const DVec3* new_positions,
 		const Quat* new_rotations,
 		int count,
 		IAllocator& allocator)
@@ -219,6 +219,9 @@ public:
 			EntityPtr parent = universe->getParent(entities[i]);
 			if (prefab != 0 && parent.isValid() && (prefab_system.getPrefab((EntityRef)parent) & 0xffffFFFF) == (prefab & 0xffffFFFF))
 			{
+						// TODO 
+		ASSERT(false);
+/*
 				float scale = universe->getScale(entities[i]);
 				Transform new_local_tr = universe->computeLocalTransform((EntityRef)parent, { new_positions[i], new_rotations[i], scale });
 				EntityPtr instance = prefab_system.getFirstInstance(prefab);
@@ -235,7 +238,7 @@ public:
 					m_old_positions.push(universe->getPosition(instance_ref));
 					m_old_rotations.push(universe->getRotation(instance_ref));
 					instance = prefab_system.getNextInstance(instance_ref);
-				}
+				}*/
 			}
 			else
 			{
@@ -357,9 +360,9 @@ public:
 private:
 	WorldEditor& m_editor;
 	Array<EntityPtr> m_entities;
-	Array<Vec3> m_new_positions;
+	Array<DVec3> m_new_positions;
 	Array<Quat> m_new_rotations;
-	Array<Vec3> m_old_positions;
+	Array<DVec3> m_old_positions;
 	Array<Quat> m_old_rotations;
 };
 
@@ -378,7 +381,7 @@ public:
 
 	LocalMoveEntityCommand(WorldEditor& editor,
 		const EntityRef* entities,
-		const Vec3* new_positions,
+		const DVec3* new_positions,
 		int count,
 		IAllocator& allocator)
 		: m_new_positions(allocator)
@@ -452,7 +455,7 @@ public:
 				m_old_positions[i] = universe->getPosition((EntityRef)m_entities[i]);
 			}
 			else {
-				m_old_positions[i].set(0, 0, 0);
+				m_old_positions[i] = DVec3(0);
 			}
 		}
 		serializer.deserializeArrayEnd();
@@ -515,8 +518,8 @@ public:
 private:
 	WorldEditor& m_editor;
 	Array<EntityPtr> m_entities;
-	Array<Vec3> m_new_positions;
-	Array<Vec3> m_old_positions;
+	Array<DVec3> m_new_positions;
+	Array<DVec3> m_old_positions;
 };
 
 
@@ -1644,7 +1647,7 @@ private:
 		}
 
 
-		AddEntityCommand(WorldEditorImpl& editor, const Vec3& position)
+		AddEntityCommand(WorldEditorImpl& editor, const DVec3& position)
 			: m_editor(editor)
 			, m_position(position)
 		{
@@ -1708,7 +1711,7 @@ private:
 	private:
 		WorldEditorImpl& m_editor;
 		EntityPtr m_entity;
-		Vec3 m_position;
+		DVec3 m_position;
 	};
 
 public:
@@ -1736,14 +1739,14 @@ public:
 
 		if (m_selected_entities.size() > 1)
 		{
-			AABB aabb = m_render_interface->getEntityAABB(*universe, m_selected_entities[0]);
+			AABB aabb = m_render_interface->getEntityAABB(*universe, m_selected_entities[0], m_viewport.pos);
 			for (int i = 1; i < m_selected_entities.size(); ++i)
 			{
-				AABB entity_aabb = m_render_interface->getEntityAABB(*universe, m_selected_entities[i]);
+				AABB entity_aabb = m_render_interface->getEntityAABB(*universe, m_selected_entities[i], m_viewport.pos);
 				aabb.merge(entity_aabb);
 			}
 
-			m_render_interface->addDebugCube(aabb.min, aabb.max, 0xffffff00, 0);
+			m_render_interface->addDebugCube(m_viewport.pos + aabb.min, m_viewport.pos + aabb.max, 0xffffff00, 0);
 			return;
 		}
 
@@ -1773,7 +1776,7 @@ public:
 
 		float t = Math::easeInOut(m_go_to_parameters.m_t);
 		m_go_to_parameters.m_t += m_engine->getLastTimeDelta() * m_go_to_parameters.m_speed;
-		Vec3 pos = m_go_to_parameters.m_from * (1 - t) + m_go_to_parameters.m_to * t;
+		DVec3 pos = m_go_to_parameters.m_from * (1 - t) + m_go_to_parameters.m_to * t;
 		Quat rot;
 		nlerp(m_go_to_parameters.m_from_rot, m_go_to_parameters.m_to_rot, &rot, t);
 		if (m_go_to_parameters.m_t >= 1)
@@ -1797,13 +1800,14 @@ public:
 	{
 		if (m_snap_mode != SnapMode::VERTEX) return;
 
-		Vec3 origin, dir;
+		DVec3 origin;
+		Vec3 dir;
 		m_viewport.getRay(m_mouse_pos, origin, dir);
-		RayHit hit = m_render_interface->castRay(origin, dir, INVALID_ENTITY);
+		const RayHit hit = m_render_interface->castRay(origin, dir, INVALID_ENTITY);
 		//if (m_gizmo->isActive()) return;
 		if (!hit.is_hit) return;
 
-		Vec3 snap_pos = getClosestVertex(hit);
+		const DVec3 snap_pos = getClosestVertex(hit);
 		m_render_interface->addDebugCross(snap_pos, 1, 0xfff00fff, 0);
 		// TODO
 	}
@@ -1867,9 +1871,9 @@ public:
 	}
 
 
-	void snapEntities(const Vec3& hit_pos)
+	void snapEntities(const DVec3& hit_pos)
 	{
-		Array<Vec3> positions(m_allocator);
+		Array<DVec3> positions(m_allocator);
 		Array<Quat> rotations(m_allocator);
 		if(m_gizmo->isTranslateMode())
 		{
@@ -1883,8 +1887,8 @@ public:
 		{
 			for(auto e : m_selected_entities)
 			{
-				auto pos = m_universe->getPosition(e);
-				auto dir = pos - hit_pos;
+				const DVec3 pos = m_universe->getPosition(e);
+				Vec3 dir = (pos - hit_pos).toFloat();
 				dir.normalize();
 				Matrix mtx = Matrix::IDENTITY;
 				Vec3 y(0, 1, 0);
@@ -1914,7 +1918,7 @@ public:
 	}
 
 
-	Vec3 getClosestVertex(const RayHit& hit)
+	DVec3 getClosestVertex(const RayHit& hit)
 	{
 		ASSERT(hit.is_hit);
 		return m_render_interface->getClosestVertex(m_universe, (EntityRef)hit.entity, hit.pos);
@@ -1935,7 +1939,8 @@ public:
 		}
 		else if (button == MouseButton::LEFT)
 		{
-			Vec3 origin, dir;
+			DVec3 origin;
+			Vec3 dir;
 			m_viewport.getRay({(float)x, (float)y}, origin, dir);
 			auto hit = m_render_interface->castRay(origin, dir, INVALID_ENTITY);
 			if (m_gizmo->isActive()) return;
@@ -1995,7 +2000,7 @@ public:
 
 	void rectSelect()
 	{
-		Array<EntityRef> entities(m_allocator);
+		/*Array<EntityRef> entities(m_allocator);
 
 		Vec2 min = m_rect_selection_start;
 		Vec2 max = m_mouse_pos;
@@ -2003,7 +2008,9 @@ public:
 		if (min.y > max.y) Math::swap(min.y, max.y);
 		Frustum frustum = m_viewport.getFrustum(min, max);
 		m_render_interface->getModelInstaces(entities, frustum, m_viewport.pos, m_viewport.fov, m_viewport.is_ortho);
-		selectEntities(entities.empty() ? nullptr : &entities[0], entities.size(), false);
+		selectEntities(entities.empty() ? nullptr : &entities[0], entities.size(), false);*/
+		// TODO
+		ASSERT(false);
 	}
 
 
@@ -2018,17 +2025,17 @@ public:
 			}
 			else
 			{
-				Vec3 origin, dir;
+				DVec3 origin;
+				Vec3 dir;
 				m_viewport.getRay(m_mouse_pos, origin, dir);
 				auto hit = m_render_interface->castRay(origin, dir, INVALID_ENTITY);
 
 				if (m_snap_mode != SnapMode::NONE && !m_selected_entities.empty() && hit.is_hit)
 				{
-					Vec3 snap_pos = origin + dir * hit.t;
+					DVec3 snap_pos = origin + dir * hit.t;
 					if (m_snap_mode == SnapMode::VERTEX) snap_pos = getClosestVertex(hit);
-					Vec3 offset = m_gizmo->getOffset();
-					Quat rot = m_universe->getRotation(m_selected_entities[0]);
-					offset = rot.rotate(offset);
+					const Quat rot = m_universe->getRotation(m_selected_entities[0]);
+					const Vec3 offset = rot.rotate(m_gizmo->getOffset());
 					snapEntities(snap_pos - offset);
 				}
 				else
@@ -2419,18 +2426,21 @@ public:
 
 	void setCustomPivot() override
 	{
-		if (m_selected_entities.empty()) return;
+		/*if (m_selected_entities.empty()) return;
 
-		Vec3 origin, dir;		
+		DVec3 origin;
+		Vec3 dir;		
 		m_viewport.getRay(m_mouse_pos, origin, dir);
 		auto hit = m_render_interface->castRay(origin, dir, INVALID_ENTITY);
 		if (!hit.is_hit || hit.entity != m_selected_entities[0]) return;
 
-		Vec3 snap_pos = getClosestVertex(hit);
+		const DVec3 snap_pos = getClosestVertex(hit);
 
 		Matrix mtx = m_universe->getMatrix(m_selected_entities[0]);
 		mtx.inverse();
-		m_gizmo->setOffset(mtx.transformPoint(snap_pos));
+		m_gizmo->setOffset(mtx.transformPoint(snap_pos));*/
+		// TODO
+		ASSERT(false);
 	}
 
 
@@ -2438,14 +2448,14 @@ public:
 	{
 		if (m_selected_entities.empty()) return;
 
-		Array<Vec3> new_positions(m_allocator);
+		Array<DVec3> new_positions(m_allocator);
 		Universe* universe = getUniverse();
 
 		for (int i = 0; i < m_selected_entities.size(); ++i)
 		{
 			EntityRef entity = m_selected_entities[i];
 
-			Vec3 origin = universe->getPosition(entity);
+			DVec3 origin = universe->getPosition(entity);
 			auto hit = m_render_interface->castRay(origin, Vec3(0, -1, 0), m_selected_entities[i]);
 			if (hit.is_hit)
 			{
@@ -2538,19 +2548,16 @@ public:
 
 	EntityRef addEntityAt(int camera_x, int camera_y) override
 	{
-		Universe* universe = getUniverse();
-		Vec3 origin;
+		DVec3 origin;
 		Vec3 dir;
 
 		m_viewport.getRay({(float)camera_x, (float)camera_y}, origin, dir);
 		auto hit = m_render_interface->castRay(origin, dir, INVALID_ENTITY);
-		Vec3 pos;
-		if (hit.is_hit)
-		{
+		DVec3 pos;
+		if (hit.is_hit) {
 			pos = origin + dir * hit.t;
 		}
-		else
-		{
+		else {
 			pos = m_viewport.pos + m_viewport.rot.rotate(Vec3(0, 0, -2));
 		}
 		AddEntityCommand* command = LUMIX_NEW(m_allocator, AddEntityCommand)(*this, pos);
@@ -2560,27 +2567,23 @@ public:
 	}
 
 
-	Vec3 getCameraRaycastHit() override
+	DVec3 getCameraRaycastHit() override
 	{
-		Universe* universe = getUniverse();
 		const Vec2 center(float(m_viewport.w >> 1), float(m_viewport.h >> 1));
 
-		Vec3 origin;
+		DVec3 origin;
 		Vec3 dir;
 		m_viewport.getRay(center, origin, dir);
 		auto hit = m_render_interface->castRay(origin, dir, INVALID_ENTITY);
-		Vec3 pos;
-		if (hit.is_hit)
-		{
+		DVec3 pos;
+		if (hit.is_hit) {
 			pos = origin + dir * hit.t;
 		}
-		else
-		{
+		else {
 			pos = m_viewport.pos + m_viewport.rot.rotate(Vec3(0, 0, -2));
 		}
 		return pos;
 	}
-
 
 
 	void setEntitiesScales(const EntityRef* entities, const float* scales, int count) override
@@ -2609,7 +2612,7 @@ public:
 		if (count <= 0) return;
 
 		Universe* universe = getUniverse();
-		Array<Vec3> positions(m_allocator);
+		Array<DVec3> positions(m_allocator);
 		for (int i = 0; i < count; ++i)
 		{
 			positions.push(universe->getPosition(entities[i]));
@@ -2620,14 +2623,14 @@ public:
 	}
 
 
-	void setEntitiesCoordinate(const EntityRef* entities, int count, float value, Coordinate coord) override
+	void setEntitiesCoordinate(const EntityRef* entities, int count, double value, Coordinate coord) override
 	{
 		ASSERT(entities);
 		if (count <= 0) return;
 
 		Universe* universe = getUniverse();
 		Array<Quat> rots(m_allocator);
-		Array<Vec3> poss(m_allocator);
+		Array<DVec3> poss(m_allocator);
 		rots.reserve(count);
 		poss.reserve(count);
 		for (int i = 0; i < count; ++i)
@@ -2642,13 +2645,13 @@ public:
 	}
 
 
-	void setEntitiesLocalCoordinate(const EntityRef* entities, int count, float value, Coordinate coord) override
+	void setEntitiesLocalCoordinate(const EntityRef* entities, int count, double value, Coordinate coord) override
 	{
 		ASSERT(entities);
 		if (count <= 0) return;
 
 		Universe* universe = getUniverse();
-		Array<Vec3> poss(m_allocator);
+		Array<DVec3> poss(m_allocator);
 		poss.reserve(count);
 		for (int i = 0; i < count; ++i)
 		{
@@ -2661,7 +2664,7 @@ public:
 	}
 
 
-	void setEntitiesPositions(const EntityRef* entities, const Vec3* positions, int count) override
+	void setEntitiesPositions(const EntityRef* entities, const DVec3* positions, int count) override
 	{
 		ASSERT(entities && positions);
 		if (count <= 0) return;
@@ -2678,7 +2681,7 @@ public:
 	}
 
 	void setEntitiesPositionsAndRotations(const EntityRef* entities,
-		const Vec3* positions,
+		const DVec3* positions,
 		const Quat* rotations,
 		int count) override
 	{
@@ -2976,8 +2979,8 @@ public:
 		m_go_to_parameters.m_from = m_viewport.pos;
 		const Vec3 dir = m_viewport.rot.rotate(Vec3(0, 0, 1));
 		m_go_to_parameters.m_to = universe->getPosition(m_selected_entities[0]) + dir * 10;
-		float len = (m_go_to_parameters.m_to - m_go_to_parameters.m_from).length();
-		m_go_to_parameters.m_speed = Math::maximum(100.0f / (len > 0 ? len : 1), 2.0f);
+		const double len = (m_go_to_parameters.m_to - m_go_to_parameters.m_from).length();
+		m_go_to_parameters.m_speed = Math::maximum(100.0f / (len > 0 ? float(len) : 1), 2.0f);
 		m_go_to_parameters.m_from_rot = m_go_to_parameters.m_to_rot = m_viewport.rot;
 	}
 
@@ -3118,7 +3121,7 @@ public:
 		, m_is_guid_pseudorandom(false)
 	{
 		m_viewport.is_ortho = false;
-		m_viewport.pos.set(0, 0, 0);
+		m_viewport.pos = DVec3(0);
 		m_viewport.rot.set(0, 0, 0, 1);
 		m_viewport.w = -1;
 		m_viewport.h = -1;
@@ -3303,9 +3306,9 @@ public:
 	void rotateCamera(int x, int y)
 	{
 		const Universe* universe = getUniverse();
-		Vec3 pos = m_viewport.pos;
+		DVec3 pos = m_viewport.pos;
 		Quat rot = m_viewport.rot;
-		Quat old_rot = rot;
+		const Quat old_rot = rot;
 
 		float yaw = -Math::signum(x) * (Math::pow(Math::abs((float)x / m_mouse_sensitivity.x), 1.2f));
 		Quat yaw_rot(Vec3(0, 1, 0), yaw);
@@ -3314,20 +3317,20 @@ public:
 
 		Vec3 pitch_axis = rot.rotate(Vec3(1, 0, 0));
 		float pitch = -Math::signum(y) * (Math::pow(Math::abs((float)y / m_mouse_sensitivity.y), 1.2f));
-		Quat pitch_rot(pitch_axis, pitch);
+		const Quat pitch_rot(pitch_axis, pitch);
 		rot = pitch_rot * rot;
 		rot.normalize();
 
 		if (m_is_orbit && !m_selected_entities.empty())
 		{
-			Vec3 dir = rot.rotate(Vec3(0, 0, 1));
-			Vec3 entity_pos = universe->getPosition(m_selected_entities[0]);
-			Vec3 nondelta_pos = pos;
+			const Vec3 dir = rot.rotate(Vec3(0, 0, 1));
+			const DVec3 entity_pos = universe->getPosition(m_selected_entities[0]);
+			DVec3 nondelta_pos = pos;
 
 			nondelta_pos -= old_rot.rotate(Vec3(0, -1, 0)) * m_orbit_delta.y;
 			nondelta_pos -= old_rot.rotate(Vec3(1, 0, 0)) * m_orbit_delta.x;
 
-			float dist = (entity_pos - nondelta_pos).length();
+			const float dist = float((entity_pos - nondelta_pos).length());
 			pos = entity_pos + dir * dist;
 			pos += rot.rotate(Vec3(1, 0, 0)) * m_orbit_delta.x;
 			pos += rot.rotate(Vec3(0, -1, 0)) * m_orbit_delta.y;
@@ -3511,7 +3514,7 @@ public:
 	}
 
 
-	float getMeasuredDistance() const override
+	double getMeasuredDistance() const override
 	{
 		return m_measure_tool->getDistance();
 	}
@@ -3776,8 +3779,8 @@ private:
 	struct GoToParameters
 	{
 		bool m_is_active;
-		Vec3 m_from;
-		Vec3 m_to;
+		DVec3 m_from;
+		DVec3 m_to;
 		Quat m_from_rot;
 		Quat m_to_rot;
 		float m_t;
@@ -3851,7 +3854,7 @@ public:
 	}
 
 
-	PasteEntityCommand(WorldEditor& editor, const Vec3& pos, const OutputBlob& copy_buffer, bool identity = false)
+	PasteEntityCommand(WorldEditor& editor, const DVec3& pos, const OutputBlob& copy_buffer, bool identity = false)
 		: m_copy_buffer(copy_buffer)
 		, m_editor(editor)
 		, m_position(pos)
@@ -3931,42 +3934,46 @@ public:
 			}
 			else
 			{
-				map.entities[i] = universe.createEntity(Vec3(0, 0, 0), Quat(0, 0, 0, 1));
+				map.entities[i] = universe.createEntity(DVec3(0), Quat(0, 0, 0, 1));
 			}
 		}
 
 		m_entities.reserve(entity_count);
 
-		Matrix base_matrix = Matrix::IDENTITY;
-		base_matrix.setTranslation(m_position);
+		Transform base_tr;
+		base_tr.pos = m_position;
+		base_tr.scale = 1;
+		base_tr.rot = Quat(0, 0, 0, 1);
 		for (int i = 0; i < entity_count; ++i)
 		{
 			Transform tr;
 			deserializer.read(&tr);
-			Matrix mtx = tr.toMatrix();
 			EntityPtr parent;
 			deserializer.read(&parent);
 
 			if (!m_identity)
 			{
-				if (i == 0)
+				/*if (i == 0)
 				{
-					Matrix inv = mtx;
+					Matrix inv = tr;
 					inv.inverse();
-					base_matrix.copy3x3(mtx);
-					base_matrix = base_matrix * inv;
-					mtx.setTranslation(m_position);
+					base_tr.rot = tr.rot;
+					base_tr.scale = tr.scale;
+					base_tr = base_tr * inv;
+					tr.pos = m_position;
 				}
 				else
 				{
-					mtx = base_matrix * mtx;
-				}
+					tr = base_tr * tr;
+				}*/
+				ASSERT(false);
+				// TODO
 			}
 
 			const EntityRef new_entity = map.entities[i];
 			((WorldEditorImpl&)m_editor).m_entity_map.create(new_entity);
 			if (!is_redo) m_entities.push(new_entity);
-			universe.setMatrix(new_entity, mtx);
+			universe.setTransform(new_entity, tr);
 			universe.setParent(parent, new_entity);
 			i32 count;
 			deserializer.read(&count);
@@ -4009,7 +4016,7 @@ public:
 private:
 	OutputBlob m_copy_buffer;
 	WorldEditor& m_editor;
-	Vec3 m_position;
+	DVec3 m_position;
 	Array<EntityRef> m_entities;
 	bool m_identity;
 };

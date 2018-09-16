@@ -87,6 +87,9 @@ struct PaintTerrainCommand final : public IEditorCommand
 		, m_mask(editor.getAllocator())
 		, m_flat_height(flat_height)
 	{
+			// TODO
+	ASSERT(false);
+/*
 		ASSERT(terrain.isValid());
 		
 		m_mask.resize(mask.size());
@@ -107,7 +110,7 @@ struct PaintTerrainCommand final : public IEditorCommand
 		item.m_local_pos = local_pos;
 		item.m_radius = radius / terrain_size;
 		item.m_amount = rel_amount;
-		item.m_color = color;
+		item.m_color = color;*/
 	}
 
 
@@ -1007,7 +1010,9 @@ void TerrainEditor::decreaseBrushSize()
 
 void TerrainEditor::drawCursor(RenderScene& scene, EntityRef terrain, const Vec3& center)
 {
-	PROFILE_FUNCTION();
+		// TODO
+	ASSERT(false);
+/*PROFILE_FUNCTION();
 	static const int SLICE_COUNT = 30;
 	if (m_action_type == TerrainEditor::FLAT_HEIGHT && ImGui::GetIO().KeyCtrl)
 	{
@@ -1035,7 +1040,7 @@ void TerrainEditor::drawCursor(RenderScene& scene, EntityRef terrain, const Vec3
 		Vec3 from = terrain_matrix.transformPoint(local_from);
 		Vec3 to = terrain_matrix.transformPoint(local_to);
 		scene.addDebugLine(from, to, 0xffff0000, 0);
-	}
+	}*/
 }
 
 
@@ -1088,11 +1093,14 @@ void TerrainEditor::detectModifiers()
 
 Vec3 TerrainEditor::getRelativePosition(const Vec3& world_pos) const
 {
-	Matrix terrain_matrix = m_world_editor.getUniverse()->getMatrix((EntityRef)m_component.entity);
+		// TODO
+	ASSERT(false);
+/*Matrix terrain_matrix = m_world_editor.getUniverse()->getMatrix((EntityRef)m_component.entity);
 	Matrix inv_terrain_matrix = terrain_matrix;
 	inv_terrain_matrix.inverse();
 
-	return inv_terrain_matrix.transformPoint(world_pos);
+	return inv_terrain_matrix.transformPoint(world_pos);*/
+	return {};
 }
 
 
@@ -1117,6 +1125,7 @@ u16 TerrainEditor::getHeight(const Vec3& world_pos)
 
 bool TerrainEditor::onMouseDown(const WorldEditor::RayHit& hit, int, int)
 {
+
 	if (!m_is_enabled) return false;
 	if (!hit.is_hit) return false;
 	if (!hit.entity.isValid()) return false;
@@ -1126,11 +1135,13 @@ bool TerrainEditor::onMouseDown(const WorldEditor::RayHit& hit, int, int)
 	if (!is_terrain) return false;
 	if (m_action_type == NOT_SET || !m_component.isValid()) return false;
 
-	detectModifiers();
+		// TODO
+	ASSERT(false);
+	/*detectModifiers();
 
 	if ((EntityPtr)selected_entities[0] == hit.entity && m_component.isValid())
 	{
-		Vec3 hit_pos = hit.pos;
+		const DVec3 hit_pos = hit.pos;
 		switch (m_action_type)
 		{
 			case FLAT_HEIGHT:
@@ -1155,12 +1166,12 @@ bool TerrainEditor::onMouseDown(const WorldEditor::RayHit& hit, int, int)
 			default: ASSERT(false); break;
 		}
 		return true;
-	}
+	}*/
 	return true;
 }
 
 
-void TerrainEditor::removeEntities(const Vec3& hit_pos)
+void TerrainEditor::removeEntities(const DVec3& hit_pos)
 {
 	if (m_selected_prefabs.empty()) return;
 	auto& prefab_system = m_world_editor.getPrefabSystem();
@@ -1171,7 +1182,7 @@ void TerrainEditor::removeEntities(const Vec3& hit_pos)
 	m_world_editor.beginCommandGroup(REMOVE_ENTITIES_HASH);
 
 	RenderScene* scene = static_cast<RenderScene*>(m_component.scene);
-	Frustum frustum;
+	ShiftedFrustum frustum;
 	frustum.computeOrtho(hit_pos,
 		Vec3(0, 0, 1),
 		Vec3(0, 1, 0),
@@ -1288,7 +1299,9 @@ static bool isOBBCollision(RenderScene& scene,
 	Model* model,
 	float scale)
 {
-	float radius_a_squared = model->getBoundingRadius();
+			// TODO
+	ASSERT(false);
+/*float radius_a_squared = model->getBoundingRadius();
 	radius_a_squared = radius_a_squared * radius_a_squared;
 	for(auto& submeshes : meshes)
 	{
@@ -1308,7 +1321,7 @@ static bool isOBBCollision(RenderScene& scene,
 				}
 			}
 		}
-	}
+	}*/
 	return false;
 }
 
@@ -1416,7 +1429,9 @@ void TerrainEditor::paintEntities(const Vec3& hit_pos)
 
 void TerrainEditor::onMouseMove(int x, int y, int, int)
 {
-	if (!m_is_enabled) return;
+			// TODO
+	ASSERT(false);
+/*if (!m_is_enabled) return;
 
 	detectModifiers();
 
@@ -1443,7 +1458,7 @@ void TerrainEditor::onMouseMove(int x, int y, int, int)
 			case REMOVE_ENTITY: removeEntities(hit.m_origin + hit.m_dir * hit.m_t); break;
 			default: ASSERT(false); break;
 		}
-	}
+	}*/
 }
 
 
@@ -1765,7 +1780,9 @@ void TerrainEditor::onGUI()
 
 	float mouse_x = m_world_editor.getMousePos().x;
 	float mouse_y = m_world_editor.getMousePos().y;
-
+			// TODO
+	ASSERT(false);
+/*
 	for(auto entity : m_world_editor.getSelectedEntities())
 	{
 		if (!m_world_editor.getUniverse()->hasComponent(entity, TERRAIN_TYPE)) continue;
@@ -1783,7 +1800,7 @@ void TerrainEditor::onGUI()
 			ImGui::Indent();
 			return;
 		}
-	}
+	}*/
 	ImGui::TreePop();
 	ImGui::Indent();
 }

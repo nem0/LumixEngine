@@ -97,63 +97,59 @@ struct GizmoImpl final : public Gizmo
 	}
 
 
-	Matrix getMatrix(EntityRef entity) const
+	RigidTransform getTransform(EntityRef entity) const
 	{
-		Matrix mtx;
-		auto* universe = m_editor.getUniverse();
-		if (m_pivot == Pivot::OBJECT_PIVOT)
-		{
-			mtx = universe->getPositionAndRotation(entity);
-			mtx.translate(mtx.getRotation().rotate(m_offset));
-		}
-		else if (m_pivot == Pivot::CENTER)
-		{
-			mtx = universe->getPositionAndRotation(entity);
-			float scale = universe->getScale(entity);
-			Matrix scale_mtx = Matrix::IDENTITY;
-			scale_mtx.m11 = scale_mtx.m22 = scale_mtx.m33 = scale;
-			Vec3 center = m_editor.getRenderInterface()->getModelCenter(entity);
-			mtx.setTranslation((mtx * scale_mtx).transformPoint(center));
-		}
-		else
-		{
-			ASSERT(false);
+		RigidTransform res;
+		const Universe* universe = m_editor.getUniverse();
+		switch (m_pivot) {
+			case Pivot::OBJECT_PIVOT :
+				res = universe->getTransform(entity).getRigidPart();
+				res.pos += res.rot * m_offset;
+				break;
+		
+			case Pivot::CENTER: {
+				const Transform tr = universe->getTransform(entity);
+				const Vec3 center = m_editor.getRenderInterface()->getModelCenter(entity);
+				res = tr.getRigidPart();
+				res.pos = res.pos + res.rot * (center * tr.scale);
+				break;
+			}
+			default:
+				ASSERT(false);
+				break;
 		}
 
-		if (m_coord_system == CoordSystem::WORLD)
-		{
-			Vec3 pos = mtx.getTranslation();
-			mtx = Matrix::IDENTITY;
-			mtx.setTranslation(pos);
+		if (m_coord_system == CoordSystem::WORLD) {
+			res.rot.set(0, 0, 0, 0);
 		}
-		return mtx;
+		return res;
 	}
 
 
-	static float getScale(const Vec3& camera_pos, float fov, const Vec3& pos, float entity_scale, bool is_ortho)
+	static float getScale(const DVec3& camera_pos, float fov, const DVec3& pos, bool is_ortho)
 	{
 		if (is_ortho) return 2;
-		float scale = tanf(fov * 0.5f) * (pos - camera_pos).length() * 2;
-		return scale / (10 / entity_scale);
+		float scale = tanf(fov * 0.5f) * (pos - camera_pos).toFloat().length() * 2;
+		return scale / 10;
 	}
 
 
-	void renderTranslateGizmo(const Matrix& gizmo_mtx,
+	void renderTranslateGizmo(const RigidTransform& gizmo_transform,
 		bool is_active,
-		const Vec3& camera_pos,
+		const DVec3& camera_pos,
 		const Vec3& camera_dir,
 		float fov,
 		bool is_ortho) const
 	{
 		Axis transform_axis = is_active ? m_transform_axis : Axis::NONE;
 		Matrix scale_mtx = Matrix::IDENTITY;
-		auto entity_pos = gizmo_mtx.getTranslation();
-		float scale = getScale(camera_pos, fov, entity_pos, gizmo_mtx.getXVector().length(), is_ortho);
+		DVec3 entity_pos = gizmo_transform.pos;
+		float scale = getScale(camera_pos, fov, entity_pos, is_ortho);
 		scale_mtx.m11 = scale_mtx.m22 = scale_mtx.m33 = scale;
 
-		Vec3 to_entity_dir = is_ortho ? camera_dir : camera_pos - entity_pos;
-		Matrix mtx = gizmo_mtx * scale_mtx;
-		mtx.translate(-camera_pos);
+		Vec3 to_entity_dir = is_ortho ? camera_dir : (camera_pos - entity_pos).toFloat();
+		Matrix mtx = gizmo_transform.rot.toMatrix() * scale_mtx;
+		mtx.translate((gizmo_transform.pos - camera_pos).toFloat());
 
 		RenderInterface::Vertex vertices[9];
 		u16 indices[9];
@@ -178,9 +174,9 @@ struct GizmoImpl final : public Gizmo
 
 		m_editor.getRenderInterface()->render(mtx, indices, 6, vertices, 6, true);
 
-		if (dotProduct(gizmo_mtx.getXVector(), to_entity_dir) < 0) mtx.setXVector(-mtx.getXVector());
-		if (dotProduct(gizmo_mtx.getYVector(), to_entity_dir) < 0) mtx.setYVector(-mtx.getYVector());
-		if (dotProduct(gizmo_mtx.getZVector(), to_entity_dir) < 0) mtx.setZVector(-mtx.getZVector());
+		if (dotProduct(mtx.getXVector(), to_entity_dir) < 0) mtx.setXVector(-mtx.getXVector());
+		if (dotProduct(mtx.getYVector(), to_entity_dir) < 0) mtx.setYVector(-mtx.getYVector());
+		if (dotProduct(mtx.getZVector(), to_entity_dir) < 0) mtx.setZVector(-mtx.getZVector());
 
 		vertices[0].position = Vec3(0, 0, 0);
 		vertices[0].color = transform_axis == Axis::XY ? SELECTED_COLOR : Z_COLOR;
@@ -216,8 +212,8 @@ struct GizmoImpl final : public Gizmo
 		ri->render(mtx, indices, 9, vertices, 9, false);
 		if (m_is_dragging)
 		{
-			Vec3 intersection = getMousePlaneIntersection(m_editor.getMousePos(), gizmo_mtx, m_transform_axis);
-			Vec3 delta_vec = intersection - m_start_axis_point;
+			const DVec3 intersection = getMousePlaneIntersection(m_editor.getMousePos(), gizmo_transform, m_transform_axis);
+			const Vec3 delta_vec = (intersection - m_start_axis_point).toFloat();
 
 			const Vec2 p = m_editor.getViewport().worldToScreenPixels(entity_pos);
 			StaticString<128> tmp("", delta_vec.x, "; ", delta_vec.y, "; ", delta_vec.z);
@@ -227,21 +223,20 @@ struct GizmoImpl final : public Gizmo
 	}
 
 
-	void renderScaleGizmo(const Matrix& gizmo_mtx,
+	void renderScaleGizmo(const RigidTransform& gizmo_tr,
 		bool is_active,
-		const Vec3& camera_pos,
+		const DVec3& camera_pos,
 		const Vec3& camera_dir,
 		float fov,
 		bool is_ortho) const
 	{
 		Axis transform_axis = is_active ? m_transform_axis : Axis::NONE;
 		Matrix scale_mtx = Matrix::IDENTITY;
-		auto entity_pos = gizmo_mtx.getTranslation();
-		float scale = getScale(camera_pos, fov, entity_pos, gizmo_mtx.getXVector().length(), is_ortho);
+		const float scale = getScale(camera_pos, fov, gizmo_tr.pos, is_ortho);
 		scale_mtx.m11 = scale_mtx.m22 = scale_mtx.m33 = scale;
 
-		Matrix mtx = gizmo_mtx * scale_mtx;
-		mtx.translate(-camera_pos);
+		Matrix mtx = gizmo_tr.rot.toMatrix() * scale_mtx;
+		mtx.translate((gizmo_tr.pos - camera_pos).toFloat());
 
 		RenderInterface::Vertex vertices[9];
 		u16 indices[12];
@@ -417,30 +412,29 @@ struct GizmoImpl final : public Gizmo
 	}
 
 
-	void renderRotateGizmo(const Matrix& gizmo_mtx,
+	void renderRotateGizmo(const RigidTransform& gizmo_tr,
 		bool is_active,
-		const Vec3& camera_pos,
+		const DVec3& camera_pos,
 		const Vec3& camera_dir,
 		float fov,
 		bool is_ortho) const
 	{
 		Axis transform_axis = is_active ? m_transform_axis : Axis::NONE;
 		Matrix scale_mtx = Matrix::IDENTITY;
-		Vec3 entity_pos = gizmo_mtx.getTranslation();
-		float scale = getScale(camera_pos, fov, entity_pos, gizmo_mtx.getXVector().length(), is_ortho);
+		float scale = getScale(camera_pos, fov, gizmo_tr.pos, is_ortho);
 		scale_mtx.m11 = scale_mtx.m22 = scale_mtx.m33 = scale;
 
-		Vec3 to_entity_dir = is_ortho ? camera_dir : camera_pos - entity_pos;
-		Matrix mtx = gizmo_mtx * scale_mtx;
-		mtx.translate(-camera_pos);
+		Vec3 to_entity_dir = is_ortho ? camera_dir : (camera_pos - gizmo_tr.pos).toFloat();
+		Matrix mtx = gizmo_tr.rot.toMatrix() * scale_mtx;
+		mtx.translate((gizmo_tr.pos - camera_pos).toFloat());
 
 		Vec3 right(1, 0, 0);
 		Vec3 up(0, 1, 0);
 		Vec3 dir(0, 0, 1);
 
-		if (dotProduct(gizmo_mtx.getXVector(), to_entity_dir) < 0) right = -right;
-		if (dotProduct(gizmo_mtx.getYVector(), to_entity_dir) < 0) up = -up;
-		if (dotProduct(gizmo_mtx.getZVector(), to_entity_dir) < 0) dir = -dir;
+		if (dotProduct(mtx.getXVector(), to_entity_dir) < 0) right = -right;
+		if (dotProduct(mtx.getYVector(), to_entity_dir) < 0) up = -up;
+		if (dotProduct(mtx.getZVector(), to_entity_dir) < 0) dir = -dir;
 
 		if (!m_is_dragging || !is_active)
 		{
@@ -455,17 +449,17 @@ struct GizmoImpl final : public Gizmo
 			switch (transform_axis)
 			{
 				case Axis::X:
-					n = gizmo_mtx.getXVector();
+					n = mtx.getXVector();
 					axis1 = up;
 					axis2 = dir;
 					break;
 				case Axis::Y:
-					n = gizmo_mtx.getYVector();
+					n = mtx.getYVector();
 					axis1 = right;
 					axis2 = dir;
 					break;
 				case Axis::Z:
-					n = gizmo_mtx.getZVector();
+					n = mtx.getZVector();
 					axis1 = right;
 					axis2 = up;
 					break;
@@ -477,11 +471,11 @@ struct GizmoImpl final : public Gizmo
 			renderQuarterRing(mtx, axis1, -axis2, SELECTED_COLOR);
 			RenderInterface* ri = m_editor.getRenderInterface();
 
-			Vec3 origin = (m_start_plane_point - entity_pos).normalized();
-			renderArc(entity_pos, n * scale, origin * scale, m_angle_accum, 0x8800a5ff);
+			const Vec3 origin = (m_start_plane_point - gizmo_tr.pos).toFloat().normalized();
+			renderArc((gizmo_tr.pos - camera_pos).toFloat(), n * scale, origin * scale, m_angle_accum, 0x8800a5ff);
 			float angle_degrees = Math::radiansToDegrees(m_angle_accum);
 			
-			const Vec2 p = m_editor.getViewport().worldToScreenPixels(entity_pos);
+			const Vec2 p = m_editor.getViewport().worldToScreenPixels(gizmo_tr.pos);
 			StaticString<128> tmp("", angle_degrees, " deg");
 			Vec2 screen_delta = (m_start_mouse_pos - p).normalized();
 			Vec2 text_pos = m_start_mouse_pos + screen_delta * 15;
@@ -506,46 +500,46 @@ struct GizmoImpl final : public Gizmo
 	}
 
 
-	Axis collideTranslate(const Matrix& gizmo_mtx,
-		const Vec3& camera_pos,
+	Axis collideTranslate(const RigidTransform& gizmo_tr,
+		const DVec3& camera_pos,
 		const Vec3& camera_dir,
 		float fov,
 		bool is_ortho,
-		const Vec3& origin,
+		const DVec3& origin,
 		const Vec3& dir) const
 	{
 		Matrix scale_mtx = Matrix::IDENTITY;
-		Vec3 entity_pos = gizmo_mtx.getTranslation();
-		float scale = getScale(camera_pos, fov, entity_pos, gizmo_mtx.getXVector().length(), is_ortho);
+		const float scale = getScale(camera_pos, fov, gizmo_tr.pos, is_ortho);
 		scale_mtx.m11 = scale_mtx.m22 = scale_mtx.m33 = scale;
 
-		Vec3 to_entity_dir = is_ortho ? camera_dir : camera_pos - entity_pos;
-		Matrix mtx = gizmo_mtx * scale_mtx;
-		Vec3 pos = mtx.getTranslation();
+		const Vec3 to_entity_dir = is_ortho ? camera_dir : (camera_pos - gizmo_tr.pos).toFloat();
+		const Matrix mtx = gizmo_tr.rot.toMatrix() * scale_mtx;
+		const Vec3 pos = (gizmo_tr.pos - camera_pos).toFloat();
 
 		Vec3 x = mtx.getXVector() * 0.5f;
 		Vec3 y = mtx.getYVector() * 0.5f;
 		Vec3 z = mtx.getZVector() * 0.5f;
 
-		if (dotProduct(gizmo_mtx.getXVector(), to_entity_dir) < 0) x = -x;
-		if (dotProduct(gizmo_mtx.getYVector(), to_entity_dir) < 0) y = -y;
-		if (dotProduct(gizmo_mtx.getZVector(), to_entity_dir) < 0) z = -z;
+		if (dotProduct(mtx.getXVector(), to_entity_dir) < 0) x = -x;
+		if (dotProduct(mtx.getYVector(), to_entity_dir) < 0) y = -y;
+		if (dotProduct(mtx.getZVector(), to_entity_dir) < 0) z = -z;
 
+		const Vec3 rel_origin = (origin - camera_pos).toFloat();
 		float t, tmin = FLT_MAX;
-		bool hit = Math::getRayTriangleIntersection(origin, dir, pos, pos + x, pos + y, &t);
+		bool hit = Math::getRayTriangleIntersection(rel_origin, dir, pos, pos + x, pos + y, &t);
 		Axis transform_axis = Axis::NONE;
 		if (hit)
 		{
 			tmin = t;
 			transform_axis = Axis::XY;
 		}
-		hit = Math::getRayTriangleIntersection(origin, dir, pos, pos + y, pos + z, &t);
+		hit = Math::getRayTriangleIntersection(rel_origin, dir, pos, pos + y, pos + z, &t);
 		if (hit && t < tmin)
 		{
 			tmin = t;
 			transform_axis = Axis::YZ;
 		}
-		hit = Math::getRayTriangleIntersection(origin, dir, pos, pos + x, pos + z, &t);
+		hit = Math::getRayTriangleIntersection(rel_origin, dir, pos, pos + x, pos + z, &t);
 		if (hit && t < tmin)
 		{
 			transform_axis = Axis::XZ;
@@ -556,9 +550,9 @@ struct GizmoImpl final : public Gizmo
 			return transform_axis;
 		}
 
-		float x_dist = Math::getLineSegmentDistance(origin, dir, pos, pos + mtx.getXVector());
-		float y_dist = Math::getLineSegmentDistance(origin, dir, pos, pos + mtx.getYVector());
-		float z_dist = Math::getLineSegmentDistance(origin, dir, pos, pos + mtx.getZVector());
+		float x_dist = Math::getLineSegmentDistance(rel_origin, dir, pos, pos + mtx.getXVector());
+		float y_dist = Math::getLineSegmentDistance(rel_origin, dir, pos, pos + mtx.getYVector());
+		float z_dist = Math::getLineSegmentDistance(rel_origin, dir, pos, pos + mtx.getZVector());
 
 		float influenced_dist = scale * INFLUENCE_DISTANCE;
 		if (x_dist > influenced_dist && y_dist > influenced_dist && z_dist > influenced_dist)
@@ -574,26 +568,24 @@ struct GizmoImpl final : public Gizmo
 	}
 
 
-	static Axis collideScale(const Matrix& gizmo_mtx,
-		const Vec3& camera_pos,
+	static Axis collideScale(const RigidTransform& gizmo_tr,
+		const DVec3& camera_pos,
 		const Vec3& camera_dir,
 		float fov,
 		bool is_ortho,
-		const Vec3& origin,
+		const DVec3& origin,
 		const Vec3& dir)
 	{
 		Matrix scale_mtx = Matrix::IDENTITY;
-		Vec3 entity_pos = gizmo_mtx.getTranslation();
-		float scale = getScale(camera_pos, fov, entity_pos, gizmo_mtx.getXVector().length(), is_ortho);
+		const float scale = getScale(camera_pos, fov, gizmo_tr.pos, is_ortho);
 		scale_mtx.m11 = scale_mtx.m22 = scale_mtx.m33 = scale;
 
-		Vec3 to_entity_dir = is_ortho ? camera_dir : camera_pos - entity_pos;
-		Matrix mtx = gizmo_mtx * scale_mtx;
-		Vec3 pos = mtx.getTranslation();
-
-		float x_dist = Math::getLineSegmentDistance(origin, dir, pos, pos + mtx.getXVector());
-		float y_dist = Math::getLineSegmentDistance(origin, dir, pos, pos + mtx.getYVector());
-		float z_dist = Math::getLineSegmentDistance(origin, dir, pos, pos + mtx.getZVector());
+		const Matrix mtx = gizmo_tr.rot.toMatrix() * scale_mtx;
+		const Vec3 pos = (gizmo_tr.pos - camera_pos).toFloat();
+		const Vec3 rel_origin = (origin - camera_pos).toFloat();
+		const float x_dist = Math::getLineSegmentDistance(rel_origin, dir, pos, pos + mtx.getXVector());
+		const float y_dist = Math::getLineSegmentDistance(rel_origin, dir, pos, pos + mtx.getYVector());
+		const float z_dist = Math::getLineSegmentDistance(rel_origin, dir, pos, pos + mtx.getZVector());
 
 		float influenced_dist = scale * INFLUENCE_DISTANCE;
 		if (x_dist > influenced_dist && y_dist > influenced_dist && z_dist > influenced_dist)
@@ -609,27 +601,28 @@ struct GizmoImpl final : public Gizmo
 	}
 
 
-	Axis collideRotate(const Matrix& gizmo_mtx,
-		const Vec3& camera_pos,
+	Axis collideRotate(const RigidTransform& gizmo_tr,
+		const DVec3& camera_pos,
 		const Vec3& camera_dir,
 		float fov,
 		bool is_ortho,
-		const Vec3& origin,
+		const DVec3& origin,
 		const Vec3& dir) const
 	{
-		Vec3 pos = gizmo_mtx.getTranslation();
-		float scale = getScale(camera_pos, fov, pos, gizmo_mtx.getXVector().length(), is_ortho);
+		const Vec3 pos = (gizmo_tr.pos - camera_pos).toFloat();
+		const float scale = getScale(camera_pos, fov, gizmo_tr.pos, is_ortho);
+		const Vec3 rel_origin = (origin - camera_pos).toFloat();
+
 		Vec3 hit;
-		if (Math::getRaySphereIntersection(origin, dir, pos, scale, hit))
-		{
-			Vec3 x = gizmo_mtx.getXVector();
-			float x_dist = fabs(dotProduct(hit, x) - dotProduct(x, pos));
+		if (Math::getRaySphereIntersection(rel_origin, dir, pos, scale, hit)) {
+			const Vec3 x = gizmo_tr.rot * Vec3(1, 0, 0);
+			const float x_dist = fabs(dotProduct(hit, x) - dotProduct(x, pos));
 
-			Vec3 y = gizmo_mtx.getYVector();
-			float y_dist = fabs(dotProduct(hit, y) - dotProduct(y, pos));
+			const Vec3 y = gizmo_tr.rot * Vec3(0, 1, 0);
+			const float y_dist = fabs(dotProduct(hit, y) - dotProduct(y, pos));
 
-			Vec3 z = gizmo_mtx.getZVector();
-			float z_dist = fabs(dotProduct(hit, z) - dotProduct(z, pos));
+			const Vec3 z = gizmo_tr.rot * Vec3(0, 0, 1);
+			const float z_dist = fabs(dotProduct(hit, z) - dotProduct(z, pos));
 
 			float influence_dist = scale * 0.15f;
 			if (x_dist > influence_dist && y_dist > influence_dist && z_dist > influence_dist)
@@ -651,8 +644,7 @@ struct GizmoImpl final : public Gizmo
 	bool immediate(Transform& frame) override
 	{
 		ASSERT(m_immediate_count < MAX_IMMEDIATE);
-		Matrix mtx = frame.toMatrix();
-		collide(mtx);
+		collide(frame.getRigidPart());
 		bool ret = transform(frame);
 		m_immediate_frames[m_immediate_count] = frame;
 		++m_immediate_count;
@@ -660,26 +652,27 @@ struct GizmoImpl final : public Gizmo
 	}
 
 
-	void collide(const Matrix& gizmo_mtx)
+	void collide(const RigidTransform& gizmo_tr)
 	{
 		if (m_is_dragging) return;
 
 		const Viewport& vp = m_editor.getViewport();
 		const Vec3 vp_dir = vp.rot * Vec3(0, 0, -1);
-		Vec3 origin, cursor_dir;
+		DVec3 origin;
+		Vec3 cursor_dir;
 		vp.getRay(m_editor.getMousePos(), origin, cursor_dir);
 		
 		Axis axis = Axis::NONE;
 		switch(m_mode)
 		{
 			case Mode::TRANSLATE:
-				axis = collideTranslate(gizmo_mtx, vp.pos, vp_dir, vp.fov, vp.is_ortho, origin, cursor_dir);
+				axis = collideTranslate(gizmo_tr, vp.pos, vp_dir, vp.fov, vp.is_ortho, origin, cursor_dir);
 				break;
 			case Mode::ROTATE:
-				axis = collideRotate(gizmo_mtx, vp.pos, vp_dir, vp.fov, vp.is_ortho, origin, cursor_dir);
+				axis = collideRotate(gizmo_tr, vp.pos, vp_dir, vp.fov, vp.is_ortho, origin, cursor_dir);
 				break;
 			case Mode::SCALE:
-				axis = collideScale(gizmo_mtx, vp.pos, vp_dir, vp.fov, vp.is_ortho, origin, cursor_dir);
+				axis = collideScale(gizmo_tr, vp.pos, vp_dir, vp.fov, vp.is_ortho, origin, cursor_dir);
 				break;
 			default:
 				ASSERT(false);
@@ -693,30 +686,31 @@ struct GizmoImpl final : public Gizmo
 	}
 
 
-	void collide(const Vec3& camera_pos, const Vec3& camera_dir, float fov, bool is_ortho)
+	void collide(const DVec3& camera_pos, const Vec3& camera_dir, float fov, bool is_ortho)
 	{
 		if (m_is_dragging) return;
 
-		Vec3 origin, cursor_dir;
+		DVec3 origin;
+		Vec3 cursor_dir;
 		m_editor.getViewport().getRay(m_editor.getMousePos(), origin, cursor_dir);
 
 		m_transform_axis = Axis::NONE;
 		m_active = -1;
 		for (int i = 0; i < m_count; ++i)
 		{
-			Matrix gizmo_mtx = getMatrix((EntityRef)m_entities[i]);
+			const RigidTransform gizmo_tr = getTransform((EntityRef)m_entities[i]);
 
 			Axis axis = Axis::NONE;
 			switch (m_mode)
 			{
 				case Mode::TRANSLATE:
-					axis = collideTranslate(gizmo_mtx, camera_pos, camera_dir, fov, is_ortho, origin, cursor_dir);
+					axis = collideTranslate(gizmo_tr, camera_pos, camera_dir, fov, is_ortho, origin, cursor_dir);
 					break;
 				case Mode::ROTATE:
-					axis = collideRotate(gizmo_mtx, camera_pos, camera_dir, fov, is_ortho, origin, cursor_dir);
+					axis = collideRotate(gizmo_tr, camera_pos, camera_dir, fov, is_ortho, origin, cursor_dir);
 					break;
 				case Mode::SCALE:
-					axis = collideScale(gizmo_mtx, camera_pos, camera_dir, fov, is_ortho, origin, cursor_dir);
+					axis = collideScale(gizmo_tr, camera_pos, camera_dir, fov, is_ortho, origin, cursor_dir);
 					break;
 				default:
 					ASSERT(false);
@@ -732,10 +726,11 @@ struct GizmoImpl final : public Gizmo
 	}
 
 
-	Vec3 getMousePlaneIntersection(const Vec2& mouse_pos, const Matrix& gizmo_mtx, Axis transform_axis) const
+	DVec3 getMousePlaneIntersection(const Vec2& mouse_pos, const RigidTransform& gizmo_tr, Axis transform_axis) const
 	{
 		const Viewport& vp = m_editor.getViewport();
-		Vec3 origin, dir;
+		DVec3 origin;
+		Vec3 dir;
 		vp.getRay(mouse_pos, origin, dir);
 		bool is_two_axed = transform_axis == Axis::XZ || transform_axis == Axis::XY || transform_axis == Axis::YZ;
 		if (is_two_axed)
@@ -743,13 +738,14 @@ struct GizmoImpl final : public Gizmo
 			Vec3 plane_normal;
 			switch (transform_axis)
 			{
-				case Axis::XZ: plane_normal = gizmo_mtx.getYVector(); break;
-				case Axis::XY: plane_normal = gizmo_mtx.getZVector(); break;
-				case Axis::YZ: plane_normal = gizmo_mtx.getXVector(); break;
+				case Axis::XZ: plane_normal = gizmo_tr.rot * Vec3(0, 1, 0); break;
+				case Axis::XY: plane_normal = gizmo_tr.rot * Vec3(0, 0, 1); break;
+				case Axis::YZ: plane_normal = gizmo_tr.rot * Vec3(1, 0, 0); break;
 				default: ASSERT(false); break;
 			}
 			float t;
-			if (Math::getRayPlaneIntersecion(origin, dir, gizmo_mtx.getTranslation(), plane_normal, t))
+			const Vec3 rel_origin = (origin - gizmo_tr.pos).toFloat();
+			if (Math::getRayPlaneIntersecion(rel_origin, dir, Vec3(0), plane_normal, t))
 			{
 				return origin + dir * t;
 			}
@@ -758,15 +754,15 @@ struct GizmoImpl final : public Gizmo
 		Vec3 axis;
 		switch (transform_axis)
 		{
-			case Axis::X: axis = gizmo_mtx.getXVector(); break;
-			case Axis::Y: axis = gizmo_mtx.getYVector(); break;
-			case Axis::Z: axis = gizmo_mtx.getZVector(); break;
-			default: ASSERT(false); return Vec3::ZERO;
+			case Axis::X: axis = gizmo_tr.rot * Vec3(1, 0, 0);; break;
+			case Axis::Y: axis = gizmo_tr.rot * Vec3(0, 1, 0);; break;
+			case Axis::Z: axis = gizmo_tr.rot * Vec3(0, 0, 1);; break;
+			default: ASSERT(false); return DVec3(0);
 		}
-		Vec3 pos = gizmo_mtx.getTranslation();
+		DVec3 pos = gizmo_tr.pos;
 		Vec3 normal = crossProduct(crossProduct(dir, axis), dir);
-		float d = dotProduct(origin - pos, normal) / dotProduct(axis, normal);
-		return axis * d + pos;
+		float d = dotProduct((origin - pos).toFloat(), normal) / dotProduct(axis, normal);
+		return pos + axis * d;
 	}
 
 
@@ -774,26 +770,26 @@ struct GizmoImpl final : public Gizmo
 	{
 		if (relx == 0 && rely == 0) return 0;
 
-		Matrix mtx = getMatrix(m_entities[m_active]);
+		const RigidTransform tr = getTransform(m_entities[m_active]);
 		Axis plane;
 		Vec3 axis;
 		switch (m_transform_axis)
 		{
-			case Axis::X: plane = Axis::YZ; axis = mtx.getXVector(); break;
-			case Axis::Y: plane = Axis::XZ; axis = mtx.getYVector(); break;
-			case Axis::Z: plane = Axis::XY; axis = mtx.getZVector(); break;
+			case Axis::X: plane = Axis::YZ; axis = tr.rot * Vec3(1, 0, 0); break;
+			case Axis::Y: plane = Axis::XZ; axis = tr.rot * Vec3(0, 1, 0); break;
+			case Axis::Z: plane = Axis::XY; axis = tr.rot * Vec3(0, 0, 1); break;
 			default: ASSERT(false); return 0;
 		}
 
-		Vec3 pos = getMousePlaneIntersection(m_editor.getMousePos(), mtx, plane);
-		Vec3 start_pos = getMousePlaneIntersection(m_mouse_pos, mtx, plane);
-		Vec3 delta = (pos - mtx.getTranslation()).normalized();
-		Vec3 start_delta = (start_pos - mtx.getTranslation()).normalized();
+		const DVec3 pos = getMousePlaneIntersection(m_editor.getMousePos(), tr, plane);
+		const DVec3 start_pos = getMousePlaneIntersection(m_mouse_pos, tr, plane);
+		const Vec3 delta = (pos - tr.pos).toFloat().normalized();
+		const Vec3 start_delta = (start_pos - tr.pos).toFloat().normalized();
 		
-		Vec3 side = crossProduct(axis, start_delta);
+		const Vec3 side = crossProduct(axis, start_delta);
 
-		float y = Math::clamp(dotProduct(delta, start_delta), -1.0f, 1.0f);
-		float x = Math::clamp(dotProduct(delta, side), -1.0f, 1.0f);
+		const float y = Math::clamp(dotProduct(delta, start_delta), -1.0f, 1.0f);
+		const float x = Math::clamp(dotProduct(delta, side), -1.0f, 1.0f);
 
 		return atan2(x, y);
 		/*
@@ -839,9 +835,9 @@ struct GizmoImpl final : public Gizmo
 		if (m_editor.isMouseClick(MouseButton::LEFT))
 		{
 			m_is_dragging = true;
-			m_transform_point = getMousePlaneIntersection(m_editor.getMousePos(), frame.toMatrix(), m_transform_axis);
+			m_transform_point = getMousePlaneIntersection(m_editor.getMousePos(), frame.getRigidPart(), m_transform_axis);
 			m_start_axis_point = m_transform_point;
-			m_start_plane_point = getMousePlaneIntersection(m_editor.getMousePos(), frame.toMatrix(), getPlane(m_transform_axis));
+			m_start_plane_point = getMousePlaneIntersection(m_editor.getMousePos(), frame.getRigidPart(), getPlane(m_transform_axis));
 			m_start_mouse_pos = m_editor.getMousePos();
 			m_angle_accum = 0;
 			m_active = -1;
@@ -858,11 +854,11 @@ struct GizmoImpl final : public Gizmo
 	bool scale(Transform& frame) const
 	{
 		Vec2 mouse_pos = m_editor.getMousePos();
-		Matrix frame_mtx = frame.toMatrix();
-		Vec3 intersection = getMousePlaneIntersection(mouse_pos, frame_mtx, m_transform_axis);
-		Vec2 old_mouse_pos = { mouse_pos.x - m_editor.getMouseRelX(),mouse_pos.y - m_editor.getMouseRelY() };
-		Vec3 old_intersection = getMousePlaneIntersection(old_mouse_pos, frame_mtx, m_transform_axis);
-		Vec3 delta = intersection - old_intersection;
+		const RigidTransform rigid_tr = frame.getRigidPart();
+		const DVec3 intersection = getMousePlaneIntersection(mouse_pos, rigid_tr, m_transform_axis);
+		const Vec2 old_mouse_pos = { mouse_pos.x - m_editor.getMouseRelX(),mouse_pos.y - m_editor.getMouseRelY() };
+		const DVec3 old_intersection = getMousePlaneIntersection(old_mouse_pos, rigid_tr, m_transform_axis);
+		Vec3 delta = (intersection - old_intersection).toFloat();
 		if (!m_is_step || delta.length() > float(getStep()))
 		{
 			if (m_is_step) delta = delta.normalized() * float(getStep());
@@ -878,11 +874,11 @@ struct GizmoImpl final : public Gizmo
 	bool translate(Transform& frame) const
 	{
 		Vec2 mouse_pos = m_editor.getMousePos();
-		Matrix frame_mtx = frame.toMatrix();
-		Vec3 intersection = getMousePlaneIntersection(mouse_pos, frame_mtx, m_transform_axis);
-		Vec2 old_mouse_pos = {mouse_pos.x - m_editor.getMouseRelX(),mouse_pos.y - m_editor.getMouseRelY()};
-		Vec3 old_intersection = getMousePlaneIntersection(old_mouse_pos, frame_mtx, m_transform_axis);
-		Vec3 delta = intersection - old_intersection;
+		const RigidTransform rigid_tr = frame.getRigidPart();
+		const DVec3 intersection = getMousePlaneIntersection(mouse_pos, rigid_tr, m_transform_axis);
+		const Vec2 old_mouse_pos = {mouse_pos.x - m_editor.getMouseRelX(),mouse_pos.y - m_editor.getMouseRelY()};
+		const DVec3 old_intersection = getMousePlaneIntersection(old_mouse_pos, rigid_tr, m_transform_axis);
+		Vec3 delta = (intersection - old_intersection).toFloat();
 		if (!m_is_step || delta.length() > float(getStep()))
 		{
 			if (m_is_step) delta = delta.normalized() * float(getStep());
@@ -928,17 +924,17 @@ struct GizmoImpl final : public Gizmo
 		float relx = m_editor.getMousePos().x - m_mouse_pos.x;
 		float rely = m_editor.getMousePos().y - m_mouse_pos.y;
 
-		Universe* universe = m_editor.getUniverse();
-		Array<Vec3> new_positions(m_editor.getAllocator());
+		const Universe* universe = m_editor.getUniverse();
+		Array<DVec3> new_positions(m_editor.getAllocator());
 		Array<Quat> new_rotations(m_editor.getAllocator());
-		auto mtx = getMatrix(m_entities[m_active]);
+		const RigidTransform tr = getTransform(m_entities[m_active]);
 
 		Vec3 axis;
 		switch (m_transform_axis)
 		{
-			case Axis::X: axis = mtx.getXVector(); break;
-			case Axis::Y: axis = mtx.getYVector(); break;
-			case Axis::Z: axis = mtx.getZVector(); break;
+			case Axis::X: axis = tr.rot * Vec3(1, 0, 0); break;
+			case Axis::Y: axis = tr.rot * Vec3(0, 1, 0); break;
+			case Axis::Z: axis = tr.rot * Vec3(0, 0, 1); break;
 			default: ASSERT(false); break;
 		}
 		float angle = computeRotateAngle((int)relx, (int)rely);
@@ -949,16 +945,14 @@ struct GizmoImpl final : public Gizmo
 		{
 			for (int i = 0, c = m_editor.getSelectedEntities().size(); i < c; ++i)
 			{
-				Vec3 pos = universe->getPosition(m_editor.getSelectedEntities()[i]);
-				Quat old_rot = universe->getRotation(m_editor.getSelectedEntities()[i]);
+				DVec3 pos = universe->getPosition(m_editor.getSelectedEntities()[i]);
+				const Quat old_rot = universe->getRotation(m_editor.getSelectedEntities()[i]);
 				Quat new_rot = Quat(axis, angle) * old_rot;
 				new_rot.normalize();
 				new_rotations.push(new_rot);
-				Vec3 pdif = mtx.getTranslation() - pos;
-				old_rot.conjugate();
-				pos = -pdif;
-				pos = new_rot.rotate(old_rot.rotate(pos));
-				pos += mtx.getTranslation();
+				Vec3 pdif = (pos - tr.pos).toFloat();
+				pdif = new_rot.rotate(old_rot.conjugated().rotate(pdif));
+				pos = tr.pos + pdif;
 
 				new_positions.push(pos);
 			}
@@ -980,11 +974,11 @@ struct GizmoImpl final : public Gizmo
 
 	void scale()
 	{
-		Matrix gizmo_mtx = getMatrix(m_entities[m_active]);
-		Vec3 intersection = getMousePlaneIntersection(m_editor.getMousePos(), gizmo_mtx, m_transform_axis);
-		Vec3 delta_vec = intersection - m_transform_point;
+		RigidTransform gizmo_tr = getTransform(m_entities[m_active]);
+		const DVec3 intersection = getMousePlaneIntersection(m_editor.getMousePos(), gizmo_tr, m_transform_axis);
+		const Vec3 delta_vec = (intersection - m_transform_point).toFloat();
 		float delta = delta_vec.length();
-		Vec3 entity_to_intersection = intersection - gizmo_mtx.getTranslation();
+		const Vec3 entity_to_intersection = (intersection - gizmo_tr.pos).toFloat();
 		if (dotProduct(delta_vec, entity_to_intersection) < 0) delta = -delta;
 		if (!m_is_step || delta > float(getStep()))
 		{
@@ -1016,19 +1010,19 @@ struct GizmoImpl final : public Gizmo
 
 	void translate()
 	{
-		Matrix mtx = getMatrix(m_entities[m_active]);
-		Vec3 intersection = getMousePlaneIntersection(m_editor.getMousePos(), mtx, m_transform_axis);
-		Vec3 delta = intersection - m_transform_point;
+		const RigidTransform tr = getTransform(m_entities[m_active]);
+		const DVec3 intersection = getMousePlaneIntersection(m_editor.getMousePos(), tr, m_transform_axis);
+		Vec3 delta = (intersection - m_transform_point).toFloat();
 		if (!m_is_step || delta.length() > float(getStep()))
 		{
 			if (m_is_step) delta = delta.normalized() * float(getStep());
 
-			Array<Vec3> new_positions(m_editor.getAllocator());
+			Array<DVec3> new_positions(m_editor.getAllocator());
 			if (m_entities[m_active] == m_editor.getSelectedEntities()[0])
 			{
 				for (int i = 0, ci = m_editor.getSelectedEntities().size(); i < ci; ++i)
 				{
-					Vec3 pos = m_editor.getUniverse()->getPosition(m_editor.getSelectedEntities()[i]);
+					DVec3 pos = m_editor.getUniverse()->getPosition(m_editor.getSelectedEntities()[i]);
 					pos += delta;
 					new_positions.push(pos);
 				}
@@ -1038,7 +1032,7 @@ struct GizmoImpl final : public Gizmo
 			}
 			else
 			{
-				Vec3 pos = m_editor.getUniverse()->getPosition(m_entities[m_active]);
+				DVec3 pos = m_editor.getUniverse()->getPosition(m_entities[m_active]);
 				pos += delta;
 				new_positions.push(pos);
 				m_editor.setEntitiesPositions(&m_entities[m_active], &new_positions[0], 1);
@@ -1053,10 +1047,10 @@ struct GizmoImpl final : public Gizmo
 	{
 		if (m_active >= 0 && m_editor.isMouseClick(MouseButton::LEFT))
 		{
-			Matrix gizmo_mtx = getMatrix(m_entities[m_active]);
-			m_transform_point = getMousePlaneIntersection(m_editor.getMousePos(), gizmo_mtx, m_transform_axis);
+			const RigidTransform gizmo_tr = getTransform(m_entities[m_active]);
+			m_transform_point = getMousePlaneIntersection(m_editor.getMousePos(), gizmo_tr, m_transform_axis);
 			m_start_axis_point = m_transform_point;
-			m_start_plane_point = getMousePlaneIntersection(m_editor.getMousePos(), gizmo_mtx, getPlane(m_transform_axis));
+			m_start_plane_point = getMousePlaneIntersection(m_editor.getMousePos(), gizmo_tr, getPlane(m_transform_axis));
 			m_start_mouse_pos = m_editor.getMousePos();
 			m_angle_accum = 0;
 			m_is_dragging = true;
@@ -1077,20 +1071,20 @@ struct GizmoImpl final : public Gizmo
 	}
 
 
-	void render(const Matrix& gizmo_mtx, bool is_active, const Viewport& vp) const
+	void render(const RigidTransform& gizmo_tr, bool is_active, const Viewport& vp) const
 	{
 		const Vec3 vp_dir = vp.rot * Vec3(0, 0, -1);
 
 		switch (m_mode)
 		{
 			case Mode::TRANSLATE:
-				renderTranslateGizmo(gizmo_mtx, is_active, vp.pos, vp_dir, vp.fov, vp.is_ortho);
+				renderTranslateGizmo(gizmo_tr, is_active, vp.pos, vp_dir, vp.fov, vp.is_ortho);
 				break;
 			case Mode::ROTATE:
-				renderRotateGizmo(gizmo_mtx, is_active, vp.pos, vp_dir, vp.fov, vp.is_ortho);
+				renderRotateGizmo(gizmo_tr, is_active, vp.pos, vp_dir, vp.fov, vp.is_ortho);
 				break;
 			case Mode::SCALE:
-				renderScaleGizmo(gizmo_mtx, is_active, vp.pos, vp_dir, vp.fov, vp.is_ortho);
+				renderScaleGizmo(gizmo_tr, is_active, vp.pos, vp_dir, vp.fov, vp.is_ortho);
 				break;
 			default:
 				ASSERT(false);
@@ -1108,12 +1102,16 @@ struct GizmoImpl final : public Gizmo
 		transform();
 
 		for (int i = 0; i < m_count; ++i) {
-			const Matrix gizmo_mtx = getMatrix(m_entities[i]);
-			data->push({gizmo_mtx, m_active == i});
+			const RigidTransform gizmo_tr = getTransform(m_entities[i]);
+			RenderData& rd = data->emplace();;
+			rd.tr = gizmo_tr;
+			rd.active = m_active == i;
 		}
 
 		for (int i = 0; i < m_immediate_count; ++i) {
-			data->push({m_immediate_frames[i].toMatrix(), m_active == i});
+			RenderData& rd = data->emplace();;
+			rd.tr = m_immediate_frames[i].getRigidPart();
+			rd.active = m_active == i;
 		}
 
 		m_immediate_count = 0;
@@ -1127,7 +1125,7 @@ struct GizmoImpl final : public Gizmo
 	void render(const Array<RenderData>& data, const Viewport& vp) const override
 	{
 		for (const RenderData& i : data) {
-			render(i.mtx, i.active, vp);
+			render(i.tr, i.active, vp);
 		}
 	}
 
@@ -1193,9 +1191,9 @@ struct GizmoImpl final : public Gizmo
 	Axis m_transform_axis;
 	bool m_is_autosnap_down;
 	WorldEditor& m_editor;
-	Vec3 m_transform_point;
-	Vec3 m_start_axis_point;
-	Vec3 m_start_plane_point;
+	DVec3 m_transform_point;
+	DVec3 m_start_axis_point;
+	DVec3 m_start_plane_point;
 	Vec2 m_start_mouse_pos;
 	float m_angle_accum;
 	bool m_is_dragging;

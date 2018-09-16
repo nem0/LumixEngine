@@ -57,7 +57,6 @@ const Shader::Program& Shader::getProgram(RenderData* rd, u32 defines)
 			"	mat4 u_camera_inv_view;\n"
 			"	mat4 u_camera_view_projection;\n"
 			"	mat4 u_camera_inv_view_projection;\n"
-			"	vec3 u_camera_pos;\n"
 			"	vec3 u_light_direction;\n"
 			"	vec3 u_light_color;\n"
 			"	float u_light_intensity;\n"

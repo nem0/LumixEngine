@@ -14,18 +14,28 @@ struct Quat;
 struct Transform;
 
 
+struct LocalRigidTransform {
+	Vec3 pos;
+	Quat rot;
+
+	LocalRigidTransform operator*(const LocalRigidTransform& rhs) const;
+	Matrix toMatrix() const;
+	LocalRigidTransform interpolate(const LocalRigidTransform& rhs, float t) const;
+};
+
+
 struct LUMIX_ENGINE_API RigidTransform
 {
 	RigidTransform() {}
 
 
-	RigidTransform(const Vec3& _pos, const Quat& _rot)
-		: pos(_pos)
-		, rot(_rot)
+	RigidTransform(const DVec3& pos, const Quat& rot)
+		: pos(pos)
+		, rot(rot)
 	{
 	}
 
-
+	/*
 	RigidTransform inverted() const
 	{
 		RigidTransform result;
@@ -45,7 +55,7 @@ struct LUMIX_ENGINE_API RigidTransform
 	{
 		return pos + rot.rotate(value);
 	}
-
+	
 
 	RigidTransform interpolate(const RigidTransform& rhs, float t)
 	{
@@ -55,15 +65,15 @@ struct LUMIX_ENGINE_API RigidTransform
 		return ret;
 	}
 
-
+	
 	inline Transform toScaled(float scale) const;
 
 
 	Matrix toMatrix() const;
-
+	*/
 
 	Quat rot;
-	Vec3 pos;
+	DVec3 pos;
 };
 
 
@@ -72,14 +82,14 @@ struct LUMIX_ENGINE_API Transform
 	Transform() {}
 
 
-	Transform(const Vec3& _pos, const Quat& _rot, float _scale)
+	Transform(const DVec3& _pos, const Quat& _rot, float _scale)
 		: pos(_pos)
 		, rot(_rot)
 		, scale(_scale)
 	{
 	}
 
-
+	
 	Transform inverted() const
 	{
 		Transform result;
@@ -96,7 +106,13 @@ struct LUMIX_ENGINE_API Transform
 	}
 
 
-	Vec3 transform(const Vec3& value) const
+	DVec3 transform(const Vec3& value) const
+	{
+		return pos + rot.rotate(value) * scale;
+	}
+
+
+	DVec3 transform(const DVec3& value) const
 	{
 		return pos + rot.rotate(value) * scale;
 	}
@@ -108,19 +124,10 @@ struct LUMIX_ENGINE_API Transform
 	}
 
 
-	Matrix toMatrix() const;
-
-
+	DVec3 pos;
 	Quat rot;
-	Vec3 pos;
 	float scale;
 };
-
-
-Transform RigidTransform::toScaled(float scale) const
-{
-	return {pos, rot, scale};
-}
 
 
 struct alignas(16) LUMIX_ENGINE_API Matrix
@@ -378,7 +385,6 @@ struct alignas(16) LUMIX_ENGINE_API Matrix
 		return Vec3(m41, m42, m43);
 	}
 
-	RigidTransform toTransform() { return {getTranslation(), getRotation()}; }
 	Quat getRotation() const;
 	void transpose();
 	Vec3 transformPoint(const Vec3& pos) const;

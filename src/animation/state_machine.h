@@ -2,9 +2,9 @@
 
 
 #include "condition.h"
-#include "events.h"
 #include "engine/array.h"
 #include "engine/lumix.h"
+#include "events.h"
 
 
 namespace Lumix
@@ -15,12 +15,12 @@ class Animation;
 struct AnimationSystem;
 class Engine;
 class InputBlob;
+struct LocalRigidTransform;
 struct BoneMask;
 class Model;
 class OutputBlob;
 struct Pose;
 class Path;
-struct RigidTransform;
 
 
 namespace Anim
@@ -43,7 +43,7 @@ struct ComponentInstance
 
 	virtual ~ComponentInstance() {}
 	virtual ComponentInstance* update(RunningContext& rc, bool check_edges) = 0;
-	virtual RigidTransform getRootMotion() const = 0;
+	virtual LocalRigidTransform getRootMotion() const = 0;
 	virtual void fillPose(Engine& engine, Pose& pose, Model& model, float weight, BoneMask* mask) = 0;
 	virtual void enter(RunningContext& rc, ComponentInstance* from) = 0;
 	virtual float getTime() const = 0;
@@ -160,7 +160,7 @@ struct Blend1DNodeInstance : public NodeInstance
 {
 	explicit Blend1DNodeInstance(Blend1DNode& _node);
 
-	RigidTransform getRootMotion() const override;
+	LocalRigidTransform getRootMotion() const override;
 	float getTime() const override { return time; }
 	float getLength() const override { return a0 ? a0->getLength() : 0; }
 	void fillPose(Engine& engine, Pose& pose, Model& model, float weight, BoneMask* mask) override;
@@ -200,7 +200,7 @@ struct LayersNodeInstance : public NodeInstance
 {
 	explicit LayersNodeInstance(LayersNode& _node);
 
-	RigidTransform getRootMotion() const override;
+	LocalRigidTransform getRootMotion() const override;
 	float getTime() const override;
 	float getLength() const override;
 	void fillPose(Engine& engine, Pose& pose, Model& model, float weight, BoneMask* mask) override;
@@ -237,7 +237,7 @@ struct StateMachineInstance : public NodeInstance
 	void enter(RunningContext& rc, ComponentInstance* from) override;
 	float getTime() const override { return current ? current->getTime() : 0; }
 	float getLength() const override { return current ? current->getLength() : 0; }
-	RigidTransform getRootMotion() const override;
+	LocalRigidTransform getRootMotion() const override;
 	void onAnimationSetUpdated(AnimSet& anim_set) override;
 
 	StateMachine& source;

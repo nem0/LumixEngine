@@ -414,22 +414,22 @@ void* Allocator::allocate_aligned(size_t size, size_t align)
 	u8* user_ptr;
 
 	size_t system_size = getNeededMemory(size, align);
-	{
-		MT::SpinLock lock(m_mutex);
-		system_ptr = m_source.allocate_aligned(system_size, align);
-		user_ptr = getUserFromSystem(system_ptr, align);
-		info = new (NewPlaceholder(), getAllocationInfoFromUser(user_ptr)) AllocationInfo();
 
-		info->previous = m_root->previous;
-		m_root->previous->next = info;
+	m_mutex.lock();
+	system_ptr = m_source.allocate_aligned(system_size, align);
+	user_ptr = getUserFromSystem(system_ptr, align);
+	info = new (NewPlaceholder(), getAllocationInfoFromUser(user_ptr)) AllocationInfo();
 
-		info->next = m_root;
-		m_root->previous = info;
+	info->previous = m_root->previous;
+	m_root->previous->next = info;
 
-		m_root = info;
+	info->next = m_root;
+	m_root->previous = info;
 
-		m_total_size += size;
-	} // because of the SpinLock
+	m_root = info;
+
+	m_total_size += size;
+	m_mutex.unlock();
 
 	info->align = u16(align);
 	info->stack_leaf = m_stack_tree.record();

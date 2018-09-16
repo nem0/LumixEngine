@@ -728,8 +728,8 @@ void PropertyGrid::showCoreProperties(const Array<EntityRef>& entities) const
 			ImGui::LabelText("Parent", "%s", name);
 
 			Transform tr = m_editor.getUniverse()->getLocalTransform(entities[0]);
-			Vec3 old_pos = tr.pos;
-			if (ImGui::DragFloat3("Local position", &tr.pos.x))
+			DVec3 old_pos = tr.pos;
+			if (ImGui::DragScalarN("Local position", ImGuiDataType_Double, &tr.pos.x, 3, 1.f))
 			{
 				WorldEditor::Coordinate coord = WorldEditor::Coordinate::NONE;
 				if (tr.pos.x != old_pos.x) coord = WorldEditor::Coordinate::X;
@@ -749,9 +749,9 @@ void PropertyGrid::showCoreProperties(const Array<EntityRef>& entities) const
 	}
 
 
-	Vec3 pos = m_editor.getUniverse()->getPosition(entities[0]);
-	Vec3 old_pos = pos;
-	if (ImGui::DragFloat3("Position", &pos.x))
+	DVec3 pos = m_editor.getUniverse()->getPosition(entities[0]);
+	DVec3 old_pos = pos;
+	if (ImGui::DragScalarN("Position", ImGuiDataType_Double, &pos.x, 3, 1.f))
 	{
 		WorldEditor::Coordinate coord = WorldEditor::Coordinate::NONE;
 		if (pos.x != old_pos.x) coord = WorldEditor::Coordinate::X;

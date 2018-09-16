@@ -74,41 +74,37 @@ void Universe::removeScene(IScene* scene)
 }
 
 
-const Vec3& Universe::getPosition(EntityRef entity) const
+const DVec3& Universe::getPosition(EntityRef entity) const
 {
-	return m_entities[entity.index].position;
+	return m_entities[entity.index].transform.pos;
 }
 
 
 const Quat& Universe::getRotation(EntityRef entity) const
 {
-	return m_entities[entity.index].rotation;
+	return m_entities[entity.index].transform.rot;
 }
 
 
 void Universe::transformEntity(EntityRef entity, bool update_local)
 {
-	int hierarchy_idx = m_entities[entity.index].hierarchy;
+	const int hierarchy_idx = m_entities[entity.index].hierarchy;
 	entityTransformed().invoke(entity);
-	if (hierarchy_idx >= 0)
-	{
+	if (hierarchy_idx >= 0) {
 		Hierarchy& h = m_hierarchy[hierarchy_idx];
-		Transform my_transform = getTransform(entity);
-		if (update_local && h.parent.isValid())
-		{
-			Transform parent_tr = getTransform((EntityRef)h.parent);
+		const Transform my_transform = getTransform(entity);
+		if (update_local && h.parent.isValid()) {
+			const Transform parent_tr = getTransform((EntityRef)h.parent);
 			h.local_transform = (parent_tr.inverted() * my_transform);
 		}
 
 		EntityPtr child = h.first_child;
 		while (child.isValid())
 		{
-			Hierarchy& child_h = m_hierarchy[m_entities[child.index].hierarchy];
-			Transform abs_tr = my_transform * child_h.local_transform;
+			const Hierarchy& child_h = m_hierarchy[m_entities[child.index].hierarchy];
+			const Transform abs_tr = my_transform * child_h.local_transform;
 			EntityData& child_data = m_entities[child.index];
-			child_data.position = abs_tr.pos;
-			child_data.rotation = abs_tr.rot;
-			child_data.scale = abs_tr.scale;
+			child_data.transform = abs_tr;
 			transformEntity((EntityRef)child, false);
 
 			child = child_h.next_sibling;
@@ -119,14 +115,14 @@ void Universe::transformEntity(EntityRef entity, bool update_local)
 
 void Universe::setRotation(EntityRef entity, const Quat& rot)
 {
-	m_entities[entity.index].rotation = rot;
+	m_entities[entity.index].transform.rot = rot;
 	transformEntity(entity, true);
 }
 
 
 void Universe::setRotation(EntityRef entity, float x, float y, float z, float w)
 {
-	m_entities[entity.index].rotation.set(x, y, z, w);
+	m_entities[entity.index].transform.rot.set(x, y, z, w);
 	transformEntity(entity, true);
 }
 
@@ -137,29 +133,10 @@ bool Universe::hasEntity(EntityRef entity) const
 }
 
 
-void Universe::setMatrix(EntityRef entity, const Matrix& mtx)
-{
-	EntityData& out = m_entities[entity.index];
-	mtx.decompose(out.position, out.rotation, out.scale);
-	transformEntity(entity, true);
-}
-
-
-Matrix Universe::getPositionAndRotation(EntityRef entity) const
-{
-	auto& transform = m_entities[entity.index];
-	Matrix mtx = transform.rotation.toMatrix();
-	mtx.setTranslation(transform.position);
-	return mtx;
-}
-
-
 void Universe::setTransformKeepChildren(EntityRef entity, const Transform& transform)
 {
-	auto& tmp = m_entities[entity.index];
-	tmp.position = transform.pos;
-	tmp.rotation = transform.rot;
-	tmp.scale = transform.scale;
+	EntityData& tmp = m_entities[entity.index];
+	tmp.transform = transform;
 	
 	int hierarchy_idx = m_entities[entity.index].hierarchy;
 	entityTransformed().invoke(entity);
@@ -182,16 +159,13 @@ void Universe::setTransformKeepChildren(EntityRef entity, const Transform& trans
 			child = child_h.next_sibling;
 		}
 	}
-
 }
 
 
 void Universe::setTransform(EntityRef entity, const Transform& transform)
 {
-	auto& tmp = m_entities[entity.index];
-	tmp.position = transform.pos;
-	tmp.rotation = transform.rot;
-	tmp.scale = transform.scale;
+	EntityData& tmp = m_entities[entity.index];
+	tmp.transform = transform;
 	transformEntity(entity, true);
 }
 
@@ -199,61 +173,47 @@ void Universe::setTransform(EntityRef entity, const Transform& transform)
 void Universe::setTransform(EntityRef entity, const RigidTransform& transform)
 {
 	auto& tmp = m_entities[entity.index];
-	tmp.position = transform.pos;
-	tmp.rotation = transform.rot;
+	tmp.transform.pos = transform.pos;
+	tmp.transform.rot = transform.rot;
 	transformEntity(entity, true);
 }
 
 
-void Universe::setTransform(EntityRef entity, const Vec3& pos, const Quat& rot, float scale)
+void Universe::setTransform(EntityRef entity, const DVec3& pos, const Quat& rot, float scale)
 {
 	auto& tmp = m_entities[entity.index];
-	tmp.position = pos;
-	tmp.rotation = rot;
-	tmp.scale = scale;
+	tmp.transform.pos = pos;
+	tmp.transform.rot = rot;
+	tmp.transform.scale = scale;
 	transformEntity(entity, true);
 }
 
 
-Transform Universe::getTransform(EntityRef entity) const
+const Transform& Universe::getTransform(EntityRef entity) const
 {
-	auto& transform = m_entities[entity.index];
-	return {transform.position, transform.rotation, transform.scale};
+	return m_entities[entity.index].transform;
 }
 
 
-Matrix Universe::getRelativeMatrix(EntityRef entity, const Vec3& base_pos) const
+Matrix Universe::getRelativeMatrix(EntityRef entity, const DVec3& base_pos) const
 {
-	auto& transform = m_entities[entity.index];
-	Matrix mtx = transform.rotation.toMatrix();
-	mtx.setTranslation(transform.position - base_pos);
+	const Transform& transform = m_entities[entity.index].transform;
+	Matrix mtx = transform.rot.toMatrix();
+	mtx.setTranslation((transform.pos - base_pos).toFloat());
 	mtx.multiply3x3(transform.scale);
 	return mtx;
 }
 
 
-Matrix Universe::getMatrix(EntityRef entity) const
+void Universe::setPosition(EntityRef entity, double x, double y, double z)
 {
-	auto& transform = m_entities[entity.index];
-	Matrix mtx = transform.rotation.toMatrix();
-	mtx.setTranslation(transform.position);
-	mtx.multiply3x3(transform.scale);
-	return mtx;
+	setPosition(entity, DVec3(x, y, z));
 }
 
 
-void Universe::setPosition(EntityRef entity, float x, float y, float z)
+void Universe::setPosition(EntityRef entity, const DVec3& pos)
 {
-	auto& transform = m_entities[entity.index];
-	transform.position.set(x, y, z);
-	transformEntity(entity, true);
-}
-
-
-void Universe::setPosition(EntityRef entity, const Vec3& pos)
-{
-	auto& transform = m_entities[entity.index];
-	transform.position = pos;
+	m_entities[entity.index].transform.pos = pos;
 	transformEntity(entity, true);
 }
 
@@ -325,7 +285,7 @@ void Universe::emplaceEntity(EntityRef entity)
 		data.name = -1;
 		data.hierarchy = -1;
 		data.next = m_first_free_slot;
-		data.scale = -1;
+		data.transform.scale = -1;
 		if (m_first_free_slot >= 0)
 		{
 			m_entities[m_first_free_slot].prev = m_entities.size() - 1;
@@ -345,9 +305,9 @@ void Universe::emplaceEntity(EntityRef entity)
 		m_entities[m_entities[entity.index].next].prev= m_entities[entity.index].prev;
 	}
 	EntityData& data = m_entities[entity.index];
-	data.position.set(0, 0, 0);
-	data.rotation.set(0, 0, 0, 1);
-	data.scale = 1;
+	data.transform.pos = DVec3(0, 0, 0);
+	data.transform.rot.set(0, 0, 0, 1);
+	data.transform.scale = 1;
 	data.name = -1;
 	data.hierarchy = -1;
 	data.components = 0;
@@ -388,7 +348,7 @@ EntityRef Universe::cloneEntity(EntityRef entity)
 }
 
 
-EntityRef Universe::createEntity(const Vec3& position, const Quat& rotation)
+EntityRef Universe::createEntity(const DVec3& position, const Quat& rotation)
 {
 	EntityData* data;
 	EntityRef entity;
@@ -404,9 +364,9 @@ EntityRef Universe::createEntity(const Vec3& position, const Quat& rotation)
 		entity.index = m_entities.size();
 		data = &m_entities.emplace();
 	}
-	data->position = position;
-	data->rotation = rotation;
-	data->scale = 1;
+	data->transform.pos = position;
+	data->transform.rot = rotation;
+	data->transform.scale = 1;
 	data->name = -1;
 	data->hierarchy = -1;
 	data->components = 0;
@@ -616,7 +576,7 @@ void Universe::updateGlobalTransform(EntityRef entity)
 }
 
 
-void Universe::setLocalPosition(EntityRef entity, const Vec3& pos)
+void Universe::setLocalPosition(EntityRef entity, const DVec3& pos)
 {
 	int hierarchy_idx = m_entities[entity.index].hierarchy;
 	if (hierarchy_idx < 0)
@@ -645,8 +605,11 @@ void Universe::setLocalRotation(EntityRef entity, const Quat& rot)
 
 Transform Universe::computeLocalTransform(EntityRef parent, const Transform& global_transform) const
 {
-	Transform parent_tr = getTransform(parent);
-	return parent_tr.inverted() * global_transform;
+	/*Transform parent_tr = getTransform(parent);
+	return parent_tr.inverted() * global_transform;*/
+	ASSERT(false);
+	// TODO
+	return {};
 }
 
 
@@ -768,7 +731,7 @@ struct PrefabEntityGUIDMap : public ILoadEntityGUIDMap
 
 
 EntityPtr Universe::instantiatePrefab(const PrefabResource& prefab,
-	const Vec3& pos,
+	const DVec3& pos,
 	const Quat& rot,
 	float scale)
 {
@@ -830,16 +793,14 @@ EntityPtr Universe::instantiatePrefab(const PrefabResource& prefab,
 
 void Universe::setScale(EntityRef entity, float scale)
 {
-	auto& transform = m_entities[entity.index];
-	transform.scale = scale;
+	m_entities[entity.index].transform.scale = scale;
 	transformEntity(entity, true);
 }
 
 
 float Universe::getScale(EntityRef entity) const
 {
-	auto& transform = m_entities[entity.index];
-	return transform.scale;
+	return m_entities[entity.index].transform.scale;
 }
 
 

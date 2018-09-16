@@ -57,8 +57,7 @@ struct Cell
 	Array<u64> masks;
 };
 
-static void doCulling(int start_index,
-	const Sphere* LUMIX_RESTRICT start,
+static void doCulling(const Sphere* LUMIX_RESTRICT start,
 	const Sphere* LUMIX_RESTRICT end,
 	const Frustum* LUMIX_RESTRICT frustum,
 	const u64* LUMIX_RESTRICT layer_masks,
@@ -67,8 +66,6 @@ static void doCulling(int start_index,
 	CullingSystem::Subresults& results)
 {
 	PROFILE_FUNCTION();
-	int i = start_index;
-	ASSERT(results.empty());
 	PROFILE_INT("objects", int(end - start));
 	float4 px = f4Load(frustum->xs);
 	float4 py = f4Load(frustum->ys);
@@ -79,6 +76,7 @@ static void doCulling(int start_index,
 	float4 pz2 = f4Load(&frustum->zs[4]);
 	float4 pd2 = f4Load(&frustum->ds[4]);
 	
+	int i = 0;
 	for (const Sphere *sphere = start; sphere <= end; sphere++, ++i)
 	{
 		float4 cx = f4Splat(sphere->position.x);
@@ -275,27 +273,123 @@ struct CullingSystemImpl final : public CullingSystem
 		m_big_object_cell.entities.clear();
 	}
 
-	void cull(const Frustum& frustum, u64 layer_mask, Results& result) override
+	void cull(const ShiftedFrustum& frustum, u64 layer_mask, Results& result) override
 	{
 		ASSERT(result.empty());
-		PROFILE_FUNCTION();
 		if(m_cells.empty() && m_big_object_cell.entities.empty()) return;
 
-		const int buckets_count = MT::getCPUsCount() * 4;
-		while(result.size() < buckets_count) result.emplace(m_allocator);
+		const uint buckets_count = MT::getCPUsCount() * 4;
+		while(result.size() < (int)buckets_count) result.emplace(m_allocator);
 
+		Array<Cell*> partial(m_allocator);
+		const Vec3 v3_cell_size(m_cell_size);
+		const Vec3 v3_2_cell_size(2 * m_cell_size);
+		uint counter = 0;
+		uint partial_entities = 0;
 		for (Cell* cell : m_cells) {
-/*			const AABB aabb(Vec3(0), Vec3(m_cell_size));
-			if (frustum.intersectAABB(aabb)) {
-				
-			}*/
-
-			for(EntityRef e : cell->entities) {
-				result[0].push(e);
+			if (frustum.containsAABB(cell->origin + v3_cell_size, -v3_cell_size)) {
+				for(EntityRef e : cell->entities) {
+					result[counter].push(e);
+					counter = (counter + 1) % buckets_count;
+				}
+			}
+			else if (frustum.intersectsAABB(cell->origin - v3_cell_size, v3_2_cell_size)) {
+				partial_entities += cell->entities.size();
+				partial.push(cell);
 			}
 		}
-		for(EntityRef e : m_big_object_cell.entities) {
-			result[0].push(e);
+		
+		if(!m_big_object_cell.entities.empty()) {
+			partial_entities += m_big_object_cell.entities.size();
+			partial.push(&m_big_object_cell);
+		}
+
+		struct Job {
+			Job(Subresults& result) 
+				: result(result)
+			{
+				decl.data = this;
+				decl.task = [](void* data){
+					Job* that = (Job*)data;
+
+					{
+						Cell* cell = *that->cells;
+						const Frustum rel_frustum = that->frustum.getRelative(cell->origin);
+						doCulling(cell->spheres.begin() + that->entity_start_offset
+							, (that->cells == that->cells_end ? cell->spheres.begin() + that->entity_end_offset : cell->spheres.end())
+							, &rel_frustum
+							, cell->masks.begin() + that->entity_start_offset
+							, cell->entities.begin() + that->entity_start_offset
+							, that->layer_mask
+							, that->result);
+					}
+
+					for(Cell** i = that->cells + 1; i <= that->cells_end - 1; ++i) {
+						Cell* cell = *i;
+						const Frustum rel_frustum = that->frustum.getRelative(cell->origin);
+						doCulling(cell->spheres.begin()
+							, cell->spheres.end()
+							, &rel_frustum
+							, cell->masks.begin()
+							, cell->entities.begin()
+							, that->layer_mask
+							, that->result);
+					}
+
+					if (that->cells != that->cells_end) {
+						Cell* cell = *that->cells_end - 1;
+						const Frustum rel_frustum = that->frustum.getRelative(cell->origin);
+						doCulling(cell->spheres.begin()
+							, cell->spheres.begin() + that->entity_end_offset
+							, &rel_frustum
+							, cell->masks.begin()
+							, cell->entities.begin()
+							, that->layer_mask
+							, that->result);
+					}
+				};
+			}
+
+			JobSystem::JobDecl decl;
+			Cell** cells;
+			Cell** cells_end;
+			uint entity_start_offset;
+			uint entity_end_offset;
+			u64 layer_mask;
+			ShiftedFrustum frustum;
+			Subresults& result;
+		};
+		
+		Array<Job> jobs(m_allocator);
+		jobs.reserve(Math::minimum(buckets_count, partial_entities));
+		if (jobs.capacity() > 0) {
+			volatile int job_counter = 0;
+			const uint step = (partial_entities + jobs.capacity() - 1) / jobs.capacity();
+			Cell** cell_iter = partial.begin();
+			uint entity_offset = 0;
+			for(int i = 0; i < jobs.capacity(); ++i) {
+				Job& job = jobs.emplace(result[i]);
+				
+				uint job_entities = step;
+				job.cells = cell_iter;
+				job.entity_start_offset = entity_offset;
+				while(job_entities > (uint)(*cell_iter)->entities.size() && cell_iter + 1 != partial.end()) {
+					job_entities -= (uint)(*cell_iter)->entities.size();
+					++cell_iter;
+				}
+				job.cells_end = cell_iter;
+				job.entity_end_offset = job_entities - 1;
+				entity_offset = job_entities;
+				if( job.cells_end == job.cells) {
+					job.entity_end_offset += job.entity_start_offset;
+					entity_offset = job.entity_end_offset + 1;
+				}
+				job.entity_end_offset = Math::minimum(job.entity_end_offset, (*job.cells_end)->entities.size() - 1);
+				job.layer_mask = layer_mask;
+				job.frustum = frustum;
+				JobSystem::runJobs(&job.decl, 1, &job_counter);
+			}
+			JobSystem::wait(&job_counter);
 		}
 /*
 		int step = count / result.size();
@@ -347,168 +441,7 @@ struct CullingSystemImpl final : public CullingSystem
 	float m_cell_size;
 };
 
-/*
-class CullingSystemImpl final : public CullingSystem
-{
-public:
-	explicit CullingSystemImpl(IAllocator& allocator)
-		: m_allocator(allocator)
-		, m_spheres(allocator)
-		, m_layer_masks(m_allocator)
-		, m_sphere_to_model_instance_map(m_allocator)
-		, m_model_instance_to_sphere_map(m_allocator)
-	{
-		m_model_instance_to_sphere_map.reserve(5000);
-		m_sphere_to_model_instance_map.reserve(5000);
-		m_spheres.reserve(5000);
-	}
 
-
-	void clear() override
-	{
-		m_spheres.clear();
-		m_layer_masks.clear();
-		m_model_instance_to_sphere_map.clear();
-		m_sphere_to_model_instance_map.clear();
-	}
-
-
-	IAllocator& getAllocator() { return m_allocator; }
-
-
-	static void cullTask(void* data)
-	{
-		CullingJobData* cull_data = (CullingJobData*)data;
-		if (cull_data->end < cull_data->start) return;
-		doCulling(cull_data->start
-			, &(*cull_data->spheres)[cull_data->start]
-			, &(*cull_data->spheres)[cull_data->end]
-			, cull_data->frustum
-			, &(*cull_data->layer_masks)[0]
-			, &(*cull_data->sphere_to_model_instance_map)[0]
-			, cull_data->layer_mask
-			, *cull_data->results);
-	}
-
-
-	void cull(const Frustum& frustum, u64 layer_mask, Results& result) override
-	{
-		const int count = m_spheres.size();
-		if(count == 0) return;
-
-		if (result.empty()) {
-			const int cpus_count = MT::getCPUsCount();
-			const int buckets_count = Math::minimum(cpus_count * 4, count);
-			while(result.size() < buckets_count) result.emplace(m_allocator);
-		}
-
-		int step = count / result.size();
-		
-		// TODO allocate on stack
-		Array<CullingJobData> job_data(m_allocator);
-		Array<JobSystem::JobDecl> jobs(m_allocator);
-		job_data.resize(result.size());
-		jobs.resize(result.size());
-	
-		for (int i = 0; i < result.size(); i++) {
-			result[i].clear();
-			job_data[i] = {
-				&m_spheres,
-				&result[i],
-				&m_layer_masks,
-				&m_sphere_to_model_instance_map,
-				layer_mask,
-				i * step,
-				i == result.size() - 1 ? count - 1 : (i + 1) * step - 1,
-				&frustum
-			};
-			jobs[i].data = &job_data[i];
-			jobs[i].task = &cullTask;
-		}
-		volatile int job_counter = 0;
-		JobSystem::runJobs(&jobs[0], result.size(), &job_counter);
-		JobSystem::wait(&job_counter);
-	}
-
-
-	void setLayerMask(EntityRef model_instance, u64 layer) override
-	{
-		m_layer_masks[m_model_instance_to_sphere_map[model_instance.index]] = layer;
-	}
-
-
-	u64 getLayerMask(EntityRef model_instance) override
-	{
-		return m_layer_masks[m_model_instance_to_sphere_map[model_instance.index]];
-	}
-
-
-	bool isAdded(EntityRef model_instance) override
-	{
-		return model_instance.index < m_model_instance_to_sphere_map.size() && m_model_instance_to_sphere_map[model_instance.index] != -1;
-	}
-
-
-	void addStatic(EntityRef model_instance, const Sphere& sphere, u64 layer_mask) override
-	{
-		if (model_instance.index < m_model_instance_to_sphere_map.size() &&
-			m_model_instance_to_sphere_map[model_instance.index] != -1)
-		{
-			ASSERT(false);
-			return;
-		}
-
-		m_spheres.push(sphere);
-		m_sphere_to_model_instance_map.push(model_instance);
-		while(model_instance.index >= m_model_instance_to_sphere_map.size())
-		{
-			m_model_instance_to_sphere_map.push(-1);
-		}
-		m_model_instance_to_sphere_map[model_instance.index] = m_spheres.size() - 1;
-		m_layer_masks.push(layer_mask);
-	}
-
-
-	void removeStatic(EntityRef model_instance) override
-	{
-		if (model_instance.index >= m_model_instance_to_sphere_map.size()) return;
-		int index = m_model_instance_to_sphere_map[model_instance.index];
-		if (index < 0) return;
-		ASSERT(index < m_spheres.size());
-
-		m_model_instance_to_sphere_map[m_sphere_to_model_instance_map.back().index] = index;
-		m_spheres[index] = m_spheres.back();
-		m_sphere_to_model_instance_map[index] = m_sphere_to_model_instance_map.back();
-		m_layer_masks[index] = m_layer_masks.back();
-
-		m_spheres.pop();
-		m_sphere_to_model_instance_map.pop();
-		m_layer_masks.pop();
-		m_model_instance_to_sphere_map[model_instance.index] = -1;
-	}
-
-
-	void updateBoundingSphere(const Sphere& sphere, EntityRef model_instance) override
-	{
-		int idx = m_model_instance_to_sphere_map[model_instance.index];
-		if (idx >= 0) m_spheres[idx] = sphere;
-	}
-
-
-	const Sphere& getSphere(EntityRef model_instance) override
-	{
-		return m_spheres[m_model_instance_to_sphere_map[model_instance.index]];
-	}
-
-
-private:
-	IAllocator& m_allocator;
-	InputSpheres m_spheres;
-	LayerMasks m_layer_masks;
-	ModelInstancetoSphereMap m_model_instance_to_sphere_map;
-	SphereToModelInstanceMap m_sphere_to_model_instance_map;
-};
-*/
 
 CullingSystem* CullingSystem::create(IAllocator& allocator)
 {

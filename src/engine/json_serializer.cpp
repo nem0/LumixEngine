@@ -129,6 +129,18 @@ void JsonSerializer::serialize(const char* label, float value)
 }
 
 
+void JsonSerializer::serialize(const char* label, double value)
+{
+	writeBlockComma();
+	char tmp[20];
+	writeString(label);
+	toCString(value, tmp, 40, 16);
+	m_file.write(" : ", stringLength(" : "));
+	m_file.write(tmp, stringLength(tmp));
+	m_is_first_in_block = false;
+}
+
+
 void JsonSerializer::serialize(const char* label, int value)
 {
 	writeBlockComma();
@@ -287,6 +299,16 @@ void JsonSerializer::serializeArrayItem(float value)
 }
 
 
+void JsonSerializer::serializeArrayItem(double value)
+{
+	writeBlockComma();
+	char tmp[20];
+	toCString(value, tmp, 40, 16);
+	m_file.write(tmp, stringLength(tmp));
+	m_is_first_in_block = false;
+}
+
+
 void JsonSerializer::serializeArrayItem(bool value)
 {
 	writeBlockComma();
@@ -328,6 +350,20 @@ void JsonDeserializer::deserialize(float& value, float default_value)
 	if (!m_is_string_token)
 	{
 		value = tokenToFloat();
+	}
+	else
+	{
+		value = default_value;
+	}
+	deserializeToken();
+}
+
+
+void JsonDeserializer::deserialize(double& value, double default_value)
+{
+	if (!m_is_string_token)
+	{
+		value = tokenToDouble();
 	}
 	else
 	{
@@ -406,6 +442,21 @@ void JsonDeserializer::deserialize(const char* label, float& value, float defaul
 	if (!m_is_string_token)
 	{
 		value = tokenToFloat();
+		deserializeToken();
+	}
+	else
+	{
+		value = default_value;
+	}
+}
+
+
+void JsonDeserializer::deserialize(const char* label, double& value, double default_value)
+{
+	deserializeLabel(label);
+	if (!m_is_string_token)
+	{
+		value = tokenToDouble();
 		deserializeToken();
 	}
 	else
@@ -632,6 +683,20 @@ void JsonDeserializer::deserializeArrayItem(float& value, float default_value)
 }
 
 
+void JsonDeserializer::deserializeArrayItem(double& value, double default_value)
+{
+	deserializeArrayComma();
+	if (m_is_string_token)
+	{
+		value = default_value;
+	}
+	else
+	{
+		value = tokenToDouble();
+	}
+	deserializeToken();
+}
+
 void JsonDeserializer::deserializeArrayItem(bool& value, bool default_value)
 {
 	deserializeArrayComma();
@@ -845,6 +910,16 @@ void JsonDeserializer::deserializeLabel(const char* label)
 
 
 float JsonDeserializer::tokenToFloat()
+{
+	char tmp[64];
+	int size = Math::minimum((int)sizeof(tmp) - 1, m_token_size);
+	copyMemory(tmp, m_token, size);
+	tmp[size] = '\0';
+	return (float)atof(tmp);
+}
+
+
+float JsonDeserializer::tokenToDouble()
 {
 	char tmp[64];
 	int size = Math::minimum((int)sizeof(tmp) - 1, m_token_size);
