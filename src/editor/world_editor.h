@@ -64,7 +64,7 @@ public:
 		bool is_hit;
 		float t;
 		EntityPtr entity;
-		Vec3 pos;
+		DVec3 pos;
 	};
 
 	struct LUMIX_EDITOR_API Plugin
@@ -118,14 +118,14 @@ public:
 	virtual void destroyEntities(const EntityRef* entities, int count) = 0;
 	virtual void selectEntities(const EntityRef* entities, int count, bool toggle) = 0;
 	virtual EntityRef addEntityAt(int camera_x, int camera_y) = 0;
-	virtual void setEntitiesPositions(const EntityRef* entities, const Vec3* positions, int count) = 0;
-	virtual void setEntitiesCoordinate(const EntityRef* entities, int count, float value, Coordinate coord) = 0;
-	virtual void setEntitiesLocalCoordinate(const EntityRef* entities, int count, float value, Coordinate coord) = 0;
+	virtual void setEntitiesPositions(const EntityRef* entities, const DVec3* positions, int count) = 0;
+	virtual void setEntitiesCoordinate(const EntityRef* entities, int count, double value, Coordinate coord) = 0;
+	virtual void setEntitiesLocalCoordinate(const EntityRef* entities, int count, double value, Coordinate coord) = 0;
 	virtual void setEntitiesScale(const EntityRef* entities, int count, float scale) = 0;
 	virtual void setEntitiesScales(const EntityRef* entities, const float* scales, int count) = 0;
 	virtual void setEntitiesRotations(const EntityRef* entity, const Quat* rotations, int count) = 0;
 	virtual void setEntitiesPositionsAndRotations(const EntityRef* entity,
-		const Vec3* position,
+		const DVec3* position,
 		const Quat* rotation,
 		int count) = 0;
 	virtual void setEntityName(EntityRef entity, const char* name) = 0;
@@ -167,9 +167,9 @@ public:
 	virtual void addPlugin(Plugin& plugin) = 0;
 	virtual void removePlugin(Plugin& plugin) = 0;
 	virtual PrefabSystem& getPrefabSystem() = 0;
-	virtual Vec3 getCameraRaycastHit() = 0;
+	virtual DVec3 getCameraRaycastHit() = 0;
 	virtual bool isMeasureToolActive() const = 0;
-	virtual float getMeasuredDistance() const = 0;
+	virtual double getMeasuredDistance() const = 0;
 	virtual void toggleMeasure() = 0;
 	virtual void setTopView() = 0;
 	virtual void setFrontView() = 0;

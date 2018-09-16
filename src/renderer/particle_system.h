@@ -13,6 +13,7 @@ namespace Lumix
 {
 
 
+struct DVec3;
 class Material;
 
 
@@ -75,7 +76,7 @@ public:
 	void deserialize(InputBlob& blob, ResourceManagerHub& manager);
 	void update(float dt);
 	void emit(const float* args);
-	void fillInstanceData(const Vec3& cam_pos, float* data);
+	void fillInstanceData(const DVec3& cam_pos, float* data);
 	int getInstanceDataSizeBytes() const;
 	ParticleEmitterResource* getResource() const { return m_resource; }
 	void setResource(ParticleEmitterResource* res);

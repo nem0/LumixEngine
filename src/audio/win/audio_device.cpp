@@ -1,6 +1,7 @@
 #include "audio_device.h"
 #include "engine/engine.h"
 #include "engine/log.h"
+#include "engine/vec.h"
 #include <cmath>
 #include <dsound.h>
 
@@ -538,10 +539,10 @@ struct AudioDeviceImpl final : public AudioDevice
 	}
 
 
-	void setSourcePosition(BufferHandle handle, float x, float y, float z) override
+	void setSourcePosition(BufferHandle handle, const DVec3& pos) override
 	{
 		auto buffer = m_buffers[m_buffer_map[handle]].handle_3d;
-		if (buffer) buffer->SetPosition(x, y, z, DS3D_DEFERRED);
+		if (buffer) buffer->SetPosition((float)pos.x, (float)pos.y, (float)pos.z, DS3D_DEFERRED);
 	}
 
 
@@ -556,9 +557,9 @@ struct AudioDeviceImpl final : public AudioDevice
 	}
 
 
-	void setListenerPosition(float x, float y, float z) override
+	void setListenerPosition(const DVec3& pos) override
 	{
-		m_listener->SetPosition(x, y, z, DS3D_DEFERRED);
+		m_listener->SetPosition((float)pos.x, (float)pos.y, (float)pos.z, DS3D_DEFERRED);
 	}
 };
 
@@ -598,14 +599,14 @@ public:
 	void setFrequency(BufferHandle buffer, float frequency) override {}
 	void setCurrentTime(BufferHandle buffer, float time_seconds) override {}
 	float getCurrentTime(BufferHandle buffer) override { return -1; }
-	void setListenerPosition(float x, float y, float z) override {}
+	void setListenerPosition(const DVec3& pos) override {}
 	void setListenerOrientation(float front_x,
 		float front_y,
 		float front_z,
 		float up_x,
 		float up_y,
 		float up_z) override {}
-	void setSourcePosition(BufferHandle buffer, float x, float y, float z) override {}
+	void setSourcePosition(BufferHandle buffer, const DVec3& pos) override {}
 	void update(float time_delta) override {}
 };
 

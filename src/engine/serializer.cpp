@@ -6,6 +6,12 @@
 namespace Lumix
 {
 
+	
+static u64 asU64(double v)
+{
+	return *(u64*)&v;
+}
+
 
 static u32 asU32(float v)
 {
@@ -16,6 +22,12 @@ static u32 asU32(float v)
 static float asFloat(u32 v)
 {
 	return *(float*)&v;
+}
+
+
+static double asDouble(u64 v)
+{
+	return *(double*)&v;
 }
 
 
@@ -43,7 +55,7 @@ void TextSerializer::write(const char* label, const RigidTransform& value)
 {
 	blob << "#" << label << " (" << value.pos.x << ", " << value.pos.y << ", " << value.pos.z << ") "
 		<< " (" << value.rot.x << ", " << value.rot.y << ", " << value.rot.z << ", " << value.rot.w << ")\n\t"
-		<< asU32(value.pos.x) << "\n\t" << asU32(value.pos.y) << "\n\t" << asU32(value.pos.z) << "\n\t"
+		<< asU64(value.pos.x) << "\n\t" << asU64(value.pos.y) << "\n\t" << asU64(value.pos.z) << "\n\t"
 		<< asU32(value.rot.x) << "\n\t" << asU32(value.rot.y) << "\n\t" << asU32(value.rot.z) << "\n\t"
 		<< asU32(value.rot.w) << "\n";
 }
@@ -52,7 +64,7 @@ void TextSerializer::write(const char* label, const Transform& value)
 {
 	blob << "#" << label << " (" << value.pos.x << ", " << value.pos.y << ", " << value.pos.z << ") "
 		<< " (" << value.rot.x << ", " << value.rot.y << ", " << value.rot.z << ", " << value.rot.w << ") " << value.scale <<  "\n\t"
-		<< asU32(value.pos.x) << "\n\t" << asU32(value.pos.y) << "\n\t" << asU32(value.pos.z) << "\n\t"
+		<< asU64(value.pos.x) << "\n\t" << asU64(value.pos.y) << "\n\t" << asU64(value.pos.z) << "\n\t"
 		<< asU32(value.rot.x) << "\n\t" << asU32(value.rot.y) << "\n\t" << asU32(value.rot.z) << "\n\t"
 		<< asU32(value.rot.w) << "\n\t" << asU32(value.scale) << "\n";
 }
@@ -60,6 +72,12 @@ void TextSerializer::write(const char* label, const Vec3& value)
 {
 	blob << "#" << label << " (" << value.x << ", " << value.y << ", " << value.z << ")\n\t" << asU32(value.x) << "\n\t"
 		 << asU32(value.y) << "\n\t" << asU32(value.z) << "\n";
+}
+
+void TextSerializer::write(const char* label, const DVec3& value)
+{
+	blob << "#" << label << " (" << value.x << ", " << value.y << ", " << value.z << ")\n\t" << asU64(value.x) << "\n\t"
+		 << asU64(value.y) << "\n\t" << asU64(value.z) << "\n";
 }
 
 void TextSerializer::write(const char* label, const Vec4& value)
@@ -77,6 +95,11 @@ void TextSerializer::write(const char* label, const Quat& value)
 void TextSerializer::write(const char* label, float value)
 {
 	blob << "#" << label << " " << value << "\n\t" << asU32(value) << "\n";
+}
+
+void TextSerializer::write(const char* label, double value)
+{
+	blob << "#" << label << " " << value << "\n\t" << asU64(value) << "\n";
 }
 
 void TextSerializer::write(const char* label, bool value)
@@ -149,11 +172,11 @@ void TextDeserializer::read(EntityRef* entity)
 void TextDeserializer::read(RigidTransform* value)
 {
 	skip();
-	value->pos.x = asFloat(readU32());
+	value->pos.x = asDouble(readU64());
 	skip();
-	value->pos.y = asFloat(readU32());
+	value->pos.y = asDouble(readU64());
 	skip();
-	value->pos.z = asFloat(readU32());
+	value->pos.z = asDouble(readU64());
 	skip();
 	value->rot.x = asFloat(readU32());
 	skip();
@@ -168,11 +191,11 @@ void TextDeserializer::read(RigidTransform* value)
 void TextDeserializer::read(Transform* value)
 {
 	skip();
-	value->pos.x = asFloat(readU32());
+	value->pos.x = asDouble(readU64());
 	skip();
-	value->pos.y = asFloat(readU32());
+	value->pos.y = asDouble(readU64());
 	skip();
-	value->pos.z = asFloat(readU32());
+	value->pos.z = asDouble(readU64());
 	skip();
 	value->rot.x = asFloat(readU32());
 	skip();
@@ -194,6 +217,17 @@ void TextDeserializer::read(Vec3* value)
 	value->y = asFloat(readU32());
 	skip();
 	value->z = asFloat(readU32());
+}
+
+
+void TextDeserializer::read(DVec3* value)
+{
+	skip();
+	value->x = asDouble(readU64());
+	skip();
+	value->y = asDouble(readU64());
+	skip();
+	value->z = asDouble(readU64());
 }
 
 
@@ -227,6 +261,13 @@ void TextDeserializer::read(float* value)
 {
 	skip();
 	*value = asFloat(readU32());
+}
+
+
+void TextDeserializer::read(double* value)
+{
+	skip();
+	*value = asDouble(readU64());
 }
 
 
@@ -394,6 +435,22 @@ u32 TextDeserializer::readU32()
 	}
 	*c = 0;
 	u32 v;
+	fromCString(tmp, lengthOf(tmp), &v);
+	return v;
+}
+
+u64 TextDeserializer::readU64()
+{
+	char tmp[40];
+	char* c = tmp;
+	*c = blob.readChar();
+	while (*c >= '0' && *c <= '9' && (c - tmp) < lengthOf(tmp))
+	{
+		++c;
+		*c = blob.readChar();
+	}
+	*c = 0;
+	u64 v;
 	fromCString(tmp, lengthOf(tmp), &v);
 	return v;
 }

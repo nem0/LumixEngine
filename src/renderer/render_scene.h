@@ -27,6 +27,7 @@ struct Pose;
 struct RayCastModelHit;
 class Renderer;
 class Shader;
+struct ShiftedFrustum;
 class Terrain;
 class Texture;
 class Universe;
@@ -37,13 +38,14 @@ template <typename T> class DelegateList;
 
 struct TerrainInfo
 {
-	Matrix m_world_matrix;
-	Shader* m_shader;
-	Terrain* m_terrain;
-	Vec3 m_morph_const;
-	float m_size;
-	Vec3 m_min;
-	int m_index;
+	DVec3 position;
+	Quat rot;
+	Shader* shader;
+	Terrain* terrain;
+	Vec3 morph_const;
+	float size;
+	Vec3 min;
+	int index;
 };
 
 
@@ -70,7 +72,6 @@ struct ModelInstance
 		PERSISTENT_FLAGS = u8(~RUNTIME_FLAGS)
 	};
 
-	Matrix matrix;
 	Model* model;
 	Pose* pose;
 	EntityPtr entity;
@@ -107,7 +108,7 @@ struct GrassInfo
 
 struct EnvProbeInfo
 {
-	Vec3 position;
+	DVec3 position;
 	float radius;
 	ffr::TextureHandle reflection;
 	ffr::TextureHandle radiance;
@@ -117,9 +118,9 @@ struct EnvProbeInfo
 
 struct DebugTriangle
 {
-	Vec3 p0;
-	Vec3 p1;
-	Vec3 p2;
+	DVec3 p0;
+	DVec3 p1;
+	DVec3 p2;
 	u32 color;
 	float life;
 };
@@ -127,8 +128,8 @@ struct DebugTriangle
 
 struct DebugLine
 {
-	Vec3 from;
-	Vec3 to;
+	DVec3 from;
+	DVec3 to;
 	u32 color;
 	float life;
 };
@@ -136,7 +137,7 @@ struct DebugLine
 
 struct DebugPoint
 {
-	Vec3 pos;
+	DVec3 pos;
 	u32 color;
 	float life;
 };
@@ -160,9 +161,9 @@ public:
 	static void destroyInstance(RenderScene* scene);
 	static void registerLuaAPI(lua_State* L);
 
-	virtual RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, EntityPtr ignore) = 0;
-	virtual RayCastModelHit castRayTerrain(EntityRef entity, const Vec3& origin, const Vec3& dir) = 0;
-	virtual void getRay(EntityRef entity, const Vec2& screen_pos, Vec3& origin, Vec3& dir) = 0;
+	virtual RayCastModelHit castRay(const DVec3& origin, const Vec3& dir, EntityPtr ignore) = 0;
+	virtual RayCastModelHit castRayTerrain(EntityRef entity, const DVec3& origin, const Vec3& dir) = 0;
+	virtual void getRay(EntityRef entity, const Vec2& screen_pos, DVec3& origin, Vec3& dir) = 0;
 
 	virtual EntityPtr getActiveCamera() const = 0;
 	virtual	struct Viewport getCameraViewport(EntityRef camera) const = 0;
@@ -181,38 +182,38 @@ public:
 	virtual Vec4 getShadowmapCascades(EntityRef entity) = 0;
 	virtual void setShadowmapCascades(EntityRef entity, const Vec4& value) = 0;
 
-	virtual void addDebugTriangle(const Vec3& p0,
-		const Vec3& p1,
-		const Vec3& p2,
+	virtual void addDebugTriangle(const DVec3& p0,
+		const DVec3& p1,
+		const DVec3& p2,
 		u32 color,
 		float life) = 0;
-	virtual void addDebugPoint(const Vec3& pos, u32 color, float life) = 0;
-	virtual void addDebugCone(const Vec3& vertex,
+	virtual void addDebugPoint(const DVec3& pos, u32 color, float life) = 0;
+	virtual void addDebugCone(const DVec3& vertex,
 		const Vec3& dir,
 		const Vec3& axis0,
 		const Vec3& axis1,
 		u32 color,
 		float life) = 0;
 
-	virtual void addDebugLine(const Vec3& from, const Vec3& to, u32 color, float life) = 0;
-	virtual void addDebugCross(const Vec3& center, float size, u32 color, float life) = 0;
-	virtual void addDebugCube(const Vec3& pos,
+	virtual void addDebugLine(const DVec3& from, const DVec3& to, u32 color, float life) = 0;
+	virtual void addDebugCross(const DVec3& center, float size, u32 color, float life) = 0;
+	virtual void addDebugCube(const DVec3& pos,
 		const Vec3& dir,
 		const Vec3& up,
 		const Vec3& right,
 		u32 color,
 		float life) = 0;
-	virtual void addDebugCube(const Vec3& from, const Vec3& max, u32 color, float life) = 0;
-	virtual void addDebugCubeSolid(const Vec3& from, const Vec3& max, u32 color, float life) = 0;
-	virtual void addDebugCircle(const Vec3& center,
+	virtual void addDebugCube(const DVec3& from, const DVec3& max, u32 color, float life) = 0;
+	virtual void addDebugCubeSolid(const DVec3& from, const DVec3& max, u32 color, float life) = 0;
+	virtual void addDebugCircle(const DVec3& center,
 		const Vec3& up,
 		float radius,
 		u32 color,
 		float life) = 0;
-	virtual void addDebugSphere(const Vec3& center, float radius, u32 color, float life) = 0;
+	virtual void addDebugSphere(const DVec3& center, float radius, u32 color, float life) = 0;
 	virtual void addDebugFrustum(const Frustum& frustum, u32 color, float life) = 0;
 
-	virtual void addDebugCapsule(const Vec3& position,
+	virtual void addDebugCapsule(const DVec3& position,
 		float height,
 		float radius,
 		u32 color,
@@ -224,7 +225,7 @@ public:
 		u32 color,
 		float life) = 0;
 
-	virtual void addDebugCylinder(const Vec3& position,
+	virtual void addDebugCylinder(const DVec3& position,
 		const Vec3& up,
 		float radius,
 		u32 color,
@@ -274,12 +275,12 @@ public:
 	virtual Path getModelInstanceMaterial(EntityRef entity, int index) = 0;
 	virtual int getModelInstanceMaterialsCount(EntityRef entity) = 0;
 	virtual void setModelInstancePath(EntityRef entity, const Path& path) = 0;
-	virtual void getModelInstanceInfos(const Frustum& frustum,
-		const Vec3& lod_ref_point,
+	virtual void getModelInstanceInfos(const ShiftedFrustum& frustum,
+		const DVec3& lod_ref_point,
 		float lod_multiplier,
 		u64 layer_mask,
 		Array<MeshInstance>& result) const = 0;
-	virtual void getModelInstanceEntities(const Frustum& frustum, Array<EntityRef>& entities) = 0;
+	virtual void getModelInstanceEntities(const ShiftedFrustum& frustum, Array<EntityRef>& entities) = 0;
 	virtual EntityPtr getFirstModelInstance() = 0;
 	virtual EntityPtr getNextModelInstance(EntityPtr entity) = 0;
 	virtual Model* getModelInstanceModel(EntityRef entity) = 0;
@@ -294,7 +295,7 @@ public:
 		EntityRef entity,
 		Array<GrassInfo>& infos) = 0;
 	virtual void forceGrassUpdate(EntityRef entity) = 0;
-	virtual void getTerrainInfos(const Frustum& frustum, const Vec3& lod_ref_point, Array<TerrainInfo>& infos) = 0;
+	virtual void getTerrainInfos(const Frustum& frustum, const DVec3& lod_ref_point, Array<TerrainInfo>& infos) = 0;
 	virtual float getTerrainHeightAt(EntityRef entity, float x, float z) = 0;
 	virtual Vec3 getTerrainNormalAt(EntityRef entity, float x, float z) = 0;
 	virtual void setTerrainMaterialPath(EntityRef entity, const Path& path) = 0;
@@ -324,7 +325,6 @@ public:
 	virtual void addGrass(EntityRef entity, int index) = 0;
 	virtual void removeGrass(EntityRef entity, int index) = 0;
 
-	virtual int getClosestPointLights(const Vec3& pos, EntityRef* lights, int max_lights) = 0;
 	virtual void getPointLights(const Frustum& frustum, Array<EntityRef>& lights) = 0;
 	virtual void setLightCastShadows(EntityRef entity, bool cast_shadows) = 0;
 	virtual bool getLightCastShadows(EntityRef entity) = 0;
@@ -376,7 +376,6 @@ public:
 	virtual Texture* getEnvironmentProbeIrradiance(EntityRef entity) const = 0;
 	virtual Texture* getEnvironmentProbeRadiance(EntityRef entity) const = 0;
 	virtual void reloadEnvironmentProbe(EntityRef entity) = 0;
-	virtual EntityPtr getNearestEnvironmentProbe(const Vec3& pos) const = 0;
 	virtual u64 getEnvironmentProbeGUID(EntityRef entity) const = 0;
 	virtual float getEnvironmentProbeRadius(EntityRef entity) = 0;
 	virtual void setEnvironmentProbeRadius(EntityRef entity, float radius) = 0;

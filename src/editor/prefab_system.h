@@ -8,6 +8,7 @@ namespace Lumix
 {
 
 
+struct DVec3;
 struct IDeserializer;
 class InputBlob;
 struct ISerializer;
@@ -33,7 +34,7 @@ public:
 	virtual void deserialize(InputBlob& serializer) = 0;
 	virtual void serialize(ISerializer& serializer) = 0;
 	virtual void deserialize(IDeserializer& serializer) = 0;
-	virtual EntityPtr instantiatePrefab(PrefabResource& prefab, const Vec3& pos, const Quat& rot, float scale) = 0;
+	virtual EntityPtr instantiatePrefab(PrefabResource& prefab, const DVec3& pos, const Quat& rot, float scale) = 0;
 	virtual u64 getPrefab(EntityRef entity) const = 0;
 	virtual int getMaxEntityIndex() const = 0;
 	virtual void setPrefab(EntityRef entity, u64 prefab) = 0;

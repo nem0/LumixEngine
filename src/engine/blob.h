@@ -40,6 +40,7 @@ namespace Lumix
 			OutputBlob& operator << (i32 value);
 			OutputBlob& operator << (u32 value);
 			OutputBlob& operator << (float value);
+			OutputBlob& operator << (double value);
 
 		private:
 			void* m_data;

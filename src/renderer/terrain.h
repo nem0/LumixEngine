@@ -117,10 +117,10 @@ class Terrain
 		void setGrassTypeRotationMode(int index, GrassType::RotationMode mode);
 		void setMaterial(Material* material);
 
-		void getInfos(Array<TerrainInfo>& infos, const Frustum& frustum, const Vec3& lod_ref_point);
+		void getInfos(Array<TerrainInfo>& infos, const Frustum& frustum, const DVec3& lod_ref_point);
 		void getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, EntityRef camera);
 
-		RayCastModelHit castRay(const Vec3& origin, const Vec3& dir);
+		RayCastModelHit castRay(const DVec3& origin, const Vec3& dir);
 		void serialize(OutputBlob& serializer);
 		void deserialize(InputBlob& serializer, Universe& universe, RenderScene& scene);
 
@@ -153,7 +153,7 @@ class Terrain
 		RenderScene& m_scene;
 		Array<GrassType> m_grass_types;
 		AssociativeArray<EntityRef, Array<GrassQuad*> > m_grass_quads;
-		AssociativeArray<EntityRef, Vec3> m_last_camera_position;
+		AssociativeArray<EntityRef, DVec3> m_last_camera_position;
 		bool m_force_grass_update;
 		Renderer& m_renderer;
 };

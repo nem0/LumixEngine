@@ -29,6 +29,7 @@ class LUMIX_ENGINE_API JsonSerializer
 		void serialize(const char* label, u32 value);
 		void serialize(const char* label, u16 value);
 		void serialize(const char* label, float value);
+		void serialize(const char* label, double value);
 		void serialize(const char* label, i32 value);
 		void serialize(const char* label, const char* value);
 		void serialize(const char* label, const Path& value);
@@ -44,11 +45,13 @@ class LUMIX_ENGINE_API JsonSerializer
 		void serializeArrayItem(i32 value);
 		void serializeArrayItem(i64 value);
 		void serializeArrayItem(float value);
+		void serializeArrayItem(double value);
 		void serializeArrayItem(bool value);
 		void serializeArrayItem(const char* value);
 
 	private:
 		float tokenToFloat();
+		float tokenToDouble();
 		void writeString(const char* str);
 		void writeBlockComma();
 
@@ -71,6 +74,7 @@ public:
 	void deserialize(const char* label, u32& value, u32 default_value);
 	void deserialize(const char* label, u16& value, u16 default_value);
 	void deserialize(const char* label, float& value, float default_value);
+	void deserialize(const char* label, double& value, double default_value);
 	void deserialize(const char* label, i32& value, i32 default_value);
 	void deserialize(const char* label, char* value, int max_length, const char* default_value);
 	void deserialize(const char* label, Path& value, const Path& default_value);
@@ -79,6 +83,7 @@ public:
 	void deserialize(Path& path, const Path& default_value);
 	void deserialize(bool& value, bool default_value);
 	void deserialize(float& value, float default_value);
+	void deserialize(double& value, double default_value);
 	void deserialize(i32& value, i32 default_value);
 	void deserializeArrayBegin(const char* label);
 	void deserializeArrayBegin();
@@ -89,6 +94,7 @@ public:
 	void deserializeArrayItem(i32& value, i32 default_value);
 	void deserializeArrayItem(i64& value, i64 default_value);
 	void deserializeArrayItem(float& value, float default_value);
+	void deserializeArrayItem(double& value, double default_value);
 	void deserializeArrayItem(bool& value, bool default_value);
 	void deserializeArrayItem(char* value, int max_length, const char* default_value);
 	void deserializeObjectBegin();
@@ -106,6 +112,7 @@ private:
 	void deserializeToken();
 	void deserializeArrayComma();
 	float tokenToFloat();
+	float tokenToDouble();
 	void expectToken(char expected_token);
 
 private:

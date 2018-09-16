@@ -126,7 +126,7 @@ namespace ImGui
 
 	ImVec2 GetOsImePosRequest()
 	{
-		return ImGui::GetCurrentContext()->OsImePosRequest;
+		return ImGui::GetCurrentContext()->PlatformImePos;
 	}
 
 
@@ -579,7 +579,7 @@ namespace ImGui
 
 		ImVec2 beg_pos = GetCursorScreenPos();
 
-		const ImRect inner_bb = window->InnerRect;
+		const ImRect inner_bb = window->InnerClipRect;
 		const ImRect frame_bb(inner_bb.Min - style.FramePadding, inner_bb.Max + style.FramePadding);
 
 		auto transform = [&](const ImVec2& pos) -> ImVec2

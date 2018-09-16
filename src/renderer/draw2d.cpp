@@ -6,7 +6,7 @@
 #define STBRP_STATIC
 #define STB_RECT_PACK_IMPLEMENTATION
 #endif
-#include "imgui/stb_rect_pack.h"
+#include "imgui/imstb_rectpack.h"
 
 #define STBTT_malloc(x,u)  ((void)(u), ImGui::MemAlloc(x))
 #define STBTT_free(x,u)    ((void)(u), ImGui::MemFree(x))
@@ -17,7 +17,7 @@
 #else
 #define STBTT_DEF extern
 #endif
-#include "imgui/stb_truetype.h"
+#include "imgui/imstb_truetype.h"
 #include <cstdio>
 #include <malloc.h>
 

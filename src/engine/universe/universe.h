@@ -47,7 +47,7 @@ public:
 
 	IAllocator& getAllocator() { return m_allocator; }
 	void emplaceEntity(EntityRef entity);
-	EntityRef createEntity(const Vec3& position, const Quat& rotation);
+	EntityRef createEntity(const DVec3& position, const Quat& rotation);
 	EntityRef cloneEntity(EntityRef entity);
 	void destroyEntity(EntityRef entity);
 	void createComponent(ComponentType type, EntityRef entity);
@@ -83,31 +83,28 @@ public:
 	Transform getLocalTransform(EntityRef entity) const;
 	float getLocalScale(EntityRef entity) const;
 	void setParent(EntityPtr parent, EntityRef child);
-	void setLocalPosition(EntityRef entity, const Vec3& pos);
+	void setLocalPosition(EntityRef entity, const DVec3& pos);
 	void setLocalRotation(EntityRef entity, const Quat& rot);
 	void setLocalTransform(EntityRef entity, const Transform& transform);
 	Transform computeLocalTransform(EntityRef parent, const Transform& global_transform) const;
 
-	void setMatrix(EntityRef entity, const Matrix& mtx);
-	Matrix getPositionAndRotation(EntityRef entity) const;
-	Matrix getMatrix(EntityRef entity) const;
-	Matrix getRelativeMatrix(EntityRef entity, const Vec3& base_pos) const;
+	Matrix getRelativeMatrix(EntityRef entity, const DVec3& base_pos) const;
 	void setTransform(EntityRef entity, const RigidTransform& transform);
 	void setTransform(EntityRef entity, const Transform& transform);
 	void setTransformKeepChildren(EntityRef entity, const Transform& transform);
-	void setTransform(EntityRef entity, const Vec3& pos, const Quat& rot, float scale);
-	Transform getTransform(EntityRef entity) const;
+	void setTransform(EntityRef entity, const DVec3& pos, const Quat& rot, float scale);
+	const Transform& getTransform(EntityRef entity) const;
 	void setRotation(EntityRef entity, float x, float y, float z, float w);
 	void setRotation(EntityRef entity, const Quat& rot);
-	void setPosition(EntityRef entity, float x, float y, float z);
-	void setPosition(EntityRef entity, const Vec3& pos);
+	void setPosition(EntityRef entity, double x, double y, double z);
+	void setPosition(EntityRef entity, const DVec3& pos);
 	void setScale(EntityRef entity, float scale);
 	EntityPtr instantiatePrefab(const PrefabResource& prefab,
-		const Vec3& pos,
+		const DVec3& pos,
 		const Quat& rot,
 		float scale);
 	float getScale(EntityRef entity) const;
-	const Vec3& getPosition(EntityRef entity) const;
+	const DVec3& getPosition(EntityRef entity) const;
 	const Quat& getRotation(EntityRef entity) const;
 	const char* getName() const { return m_name; }
 	void setName(const char* name) 
@@ -151,8 +148,7 @@ private:
 	{
 		EntityData() {}
 
-		Vec3 position;
-		Quat rotation;
+		Transform transform;
 		
 		int hierarchy;
 		int name;
@@ -161,7 +157,6 @@ private:
 		{
 			struct 
 			{
-				float scale;
 				u64 components;
 			};
 			struct

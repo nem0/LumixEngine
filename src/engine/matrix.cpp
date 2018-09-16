@@ -8,21 +8,25 @@
 namespace Lumix
 {
 
-
-Matrix RigidTransform::toMatrix() const
+	
+Matrix LocalRigidTransform::toMatrix() const
 {
-	Matrix mtx = rot.toMatrix();
-	mtx.setTranslation(pos);
-	return mtx;
+	return Matrix(pos, rot);
 }
 
 
-Matrix Transform::toMatrix() const
+LocalRigidTransform LocalRigidTransform::operator*(const LocalRigidTransform& rhs) const
 {
-	Matrix mtx = rot.toMatrix();
-	mtx.setTranslation(pos);
-	mtx.multiply3x3(scale);
-	return mtx;
+	return{ rot.rotate(rhs.pos) + pos, rot * rhs.rot };
+}
+
+
+LocalRigidTransform LocalRigidTransform::interpolate(const LocalRigidTransform& rhs, float t) const
+{
+	LocalRigidTransform ret;
+	lerp(pos, rhs.pos, &ret.pos, t);
+	nlerp(rot, rhs.rot, &ret.rot, t);
+	return ret;
 }
 
 

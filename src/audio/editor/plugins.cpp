@@ -239,7 +239,7 @@ struct GizmoPlugin final : public WorldEditor::Plugin
 			auto* audio_scene = static_cast<AudioScene*>(cmp.scene);
 			float radius = audio_scene->getEchoZoneRadius(entity);
 			Universe& universe = audio_scene->getUniverse();
-			Vec3 pos = universe.getPosition(entity);
+			const DVec3 pos = universe.getPosition(entity);
 
 			auto* scene = static_cast<RenderScene*>(universe.getScene(crc32("renderer")));
 			if (!scene) return true;
@@ -251,7 +251,7 @@ struct GizmoPlugin final : public WorldEditor::Plugin
 			auto* audio_scene = static_cast<AudioScene*>(cmp.scene);
 			float radius = audio_scene->getChorusZoneRadius(entity);
 			Universe& universe = audio_scene->getUniverse();
-			Vec3 pos = universe.getPosition(entity);
+			const DVec3 pos = universe.getPosition(entity);
 
 			auto* scene = static_cast<RenderScene*>(universe.getScene(crc32("renderer")));
 			if (!scene) return true;

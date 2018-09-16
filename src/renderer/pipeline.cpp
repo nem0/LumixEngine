@@ -396,7 +396,6 @@ struct PipelineImpl final : Pipeline
 		}
 
 		Renderer::GlobalState state;
-		state.camera_pos = Vec4(m_viewport.pos, 1);
 
 		const Matrix view = m_viewport.getViewRotation();
 		const Matrix projection = m_viewport.getProjection(ffr::isHomogenousDepth());
@@ -467,10 +466,10 @@ struct PipelineImpl final : Pipeline
 					const DebugLine& line = lines[j];
 
 					vertices[j * 2].color = line.color;
-					vertices[j * 2].pos = line.from - viewport_pos;
+					vertices[j * 2].pos = (line.from - viewport_pos).toFloat();
 
 					vertices[j * 2 + 1].color = line.color;
-					vertices[j * 2 + 1].pos = line.to - viewport_pos;
+					vertices[j * 2 + 1].pos = (line.to - viewport_pos).toFloat();
 				}
 
 				ffr::VertexDecl vertex_decl;
@@ -493,7 +492,7 @@ struct PipelineImpl final : Pipeline
 
 			Array<DebugLine> lines;
 			PipelineImpl* pipeline;
-			Vec3 viewport_pos;
+			DVec3 viewport_pos;
 			Shader::RenderData* render_data;
 		};
 
@@ -857,8 +856,8 @@ struct PipelineImpl final : Pipeline
 
 	struct CameraParams
 	{
-		Frustum frustum;
-		Vec3 pos;
+		ShiftedFrustum frustum;
+		DVec3 pos;
 		float lod_multiplier;
 	};
 	
@@ -873,6 +872,10 @@ struct PipelineImpl final : Pipeline
 			luaL_error(L, "Frustum is not a table");
 		}
 		float* points = cp.frustum.xs;
+		if(!LuaWrapper::checkField(L, -1, "origin", &cp.frustum.origin)) {
+				lua_pop(L, 1);
+				luaL_error(L, "Frustum without origin");
+		}
 		for (int i = 0; i < 32 + 24; ++i) {
 			lua_rawgeti(L, -1, i + 1);
 			if(!LuaWrapper::isType<float>(L, -1)) {
@@ -1017,9 +1020,9 @@ struct PipelineImpl final : Pipeline
 				ffr::blending(2);
 				const int irradiance_map_loc = ffr::getUniformLocation(prog.handle, m_irradiance_map_uniform);
 				const int radiance_map_loc = ffr::getUniformLocation(prog.handle, m_radiance_map_uniform);
-				const Vec3 cam_pos = m_camera_params.pos;
+				const DVec3 cam_pos = m_camera_params.pos;
 				for (const EnvProbeInfo& probe : m_probes) {
-					const Vec4 pos_radius(probe.position - cam_pos, probe.radius);
+					const Vec4 pos_radius((probe.position - cam_pos).toFloat(), probe.radius);
 					ffr::bindTexture(0, probe.radiance);
 					ffr::applyUniform1i(irradiance_map_loc, 0);
 					ffr::bindTexture(1, probe.radiance);
@@ -1274,25 +1277,7 @@ struct PipelineImpl final : Pipeline
 			}
 
 		}
-
-		const Vec3 camera_pos = pipeline->m_viewport.pos;
-		const EntityPtr probe = pipeline->m_scene->getNearestEnvironmentProbe(camera_pos);
-		
-		if (probe.isValid()) {
-			Texture* irradiance = pipeline->m_scene->getEnvironmentProbeIrradiance((EntityRef)probe);
-			Texture* radiance = pipeline->m_scene->getEnvironmentProbeRadiance((EntityRef)probe);
-			cmd->m_textures[cmd->m_textures_count + 0].handle = irradiance->handle;
-			cmd->m_textures[cmd->m_textures_count + 1].handle = radiance->handle;
-		}
-		else {
-			cmd->m_textures[cmd->m_textures_count + 0].handle = pipeline->m_default_cubemap->handle;
-			cmd->m_textures[cmd->m_textures_count + 1].handle = pipeline->m_default_cubemap->handle;
-		}
-
-		cmd->m_textures[cmd->m_textures_count + 0].uniform = pipeline->m_irradiance_map_uniform;
-		cmd->m_textures[cmd->m_textures_count + 1].uniform = pipeline->m_radiance_map_uniform;
-		cmd->m_textures_count += 2;
-
+	
 		cmd->m_shader = shader;
 		cmd->m_indices_count = indices_count;
 		cmd->m_indices_offset = indices_offset;
@@ -1312,7 +1297,8 @@ struct PipelineImpl final : Pipeline
 			LuaWrapper::push(L, frustum[i]);
 			lua_rawseti(L, -2, i + 1);
 		}
-
+		LuaWrapper::push(L, params.frustum.origin);
+		lua_setfield(L, -2, "origin");
 		lua_setfield(L, -2, "frustum");
 
 		LuaWrapper::setField(L, -2, "position", params.pos);
@@ -1341,9 +1327,9 @@ struct PipelineImpl final : Pipeline
 	}
 
 
-	static void findExtraShadowcasterPlanes(const Vec3& light_forward, const Frustum& camera_frustum, const Vec3& camera_position, Frustum* shadow_camera_frustum)
+	static void findExtraShadowcasterPlanes(const Vec3& light_forward, const Frustum& camera_frustum, const DVec3& camera_position, Frustum* shadow_camera_frustum)
 	{
-		static const Frustum::Planes planes[] = {
+		/*static const Frustum::Planes planes[] = {
 			Frustum::Planes::LEFT, Frustum::Planes::TOP, Frustum::Planes::RIGHT, Frustum::Planes::BOTTOM };
 		bool prev_side = dotProduct(light_forward, camera_frustum.getNormal(planes[lengthOf(planes) - 1])) < 0;
 		int out_plane = (int)Frustum::Planes::EXTRA0;
@@ -1368,7 +1354,9 @@ struct PipelineImpl final : Pipeline
 				if (out_plane >(int)Frustum::Planes::EXTRA1) break;
 			}
 			prev_side = side;
-		}
+		}*/
+		// TODO
+		ASSERT(false);
 	}
 
 
@@ -1390,7 +1378,7 @@ struct PipelineImpl final : Pipeline
 
 	static int getShadowCameraParams(lua_State* L)
 	{
-		const int pipeline_idx = lua_upvalueindex(1);
+		/*const int pipeline_idx = lua_upvalueindex(1);
 		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
 			LuaWrapper::argError<PipelineImpl*>(L, pipeline_idx);
 		}
@@ -1461,7 +1449,11 @@ struct PipelineImpl final : Pipeline
 		findExtraShadowcasterPlanes(light_forward, camera_frustum, pipeline->m_viewport.pos, &cp.frustum);
 
 		pushCameraParams(L, cp);
-		return 1;
+		return 1;*/
+
+		// TODO
+		ASSERT(false);
+		return 0;
 	}
 
 
@@ -1566,7 +1558,7 @@ struct PipelineImpl final : Pipeline
 
 		void setup() override
 		{
-			PROFILE_FUNCTION();
+			/*PROFILE_FUNCTION();
 			Array<TerrainInfo> infos(m_allocator);
 			m_pipeline->m_scene->getTerrainInfos(m_camera_params.frustum, m_camera_params.pos, infos);
 
@@ -1577,8 +1569,8 @@ struct PipelineImpl final : Pipeline
 				: 1 << m_pipeline->m_renderer.getShaderDefineIdx(m_shader_define);
 
 			std::sort(infos.begin(), infos.end(), [](const TerrainInfo& a, const TerrainInfo& b) {
-				if (a.m_terrain == b.m_terrain) return a.m_index < b.m_index;
-				return a.m_terrain < b.m_terrain;
+				if (a.terrain == b.terrain) return a.index < b.index;
+				return a.terrain < b.terrain;
 			});
 
 			m_instance_data.resize(infos.size());
@@ -1587,38 +1579,40 @@ struct PipelineImpl final : Pipeline
 			int prev_submesh = -1;
 			for (int i = 0, c = infos.size(); i < c; ++i) {
 				const TerrainInfo& info = infos[i];
-				if (info.m_terrain != prev_terrain || prev_submesh != info.m_index) {
+				if (info.terrain != prev_terrain || prev_submesh != info.index) {
 					if (prev_terrain) {
 						Batch& b = m_batches.emplace();
 						b.terrain = prev_terrain;
-						b.shader = infos[prev_idx].m_shader->m_render_data;
-						b.matrix = infos[prev_idx].m_world_matrix;
-						b.matrix.setTranslation(b.matrix.getTranslation() - m_camera_params.pos);
-						b.submesh = infos[prev_idx].m_index;
+						b.shader = infos[prev_idx].shader->m_render_data;
+						b.matrix = infos[prev_idx].rot.toMatrix();
+						b.matrix.setTranslation((infos[prev_idx].position - m_camera_params.pos).toFloat());
+						b.submesh = infos[prev_idx].index;
 						b.from = prev_idx;
 						b.to = i - 1;
 					}
 					prev_idx = i;
-					prev_terrain = info.m_terrain;
-					prev_submesh = info.m_index;
+					prev_terrain = info.terrain;
+					prev_submesh = info.index;
 				}
-				m_instance_data[i].size = info.m_size;
-				m_instance_data[i].quad_min = info.m_min;
-				m_instance_data[i].morph_consts = info.m_morph_const;
+				m_instance_data[i].size = info.size;
+				m_instance_data[i].quad_min = info.min;
+				m_instance_data[i].morph_consts = info.morph_const;
 			}
 			Batch& b = m_batches.emplace();
 			b.terrain = prev_terrain;
-			b.shader = infos[prev_idx].m_shader->m_render_data;
-			b.matrix = infos[prev_idx].m_world_matrix;
-			b.matrix.setTranslation(b.matrix.getTranslation() - m_camera_params.pos);
-			b.submesh = infos[prev_idx].m_index;
+			b.shader = infos[prev_idx].shader->m_render_data;
+			b.matrix = infos[prev_idx].rot.toMatrix();
+			b.matrix.setTranslation((infos[prev_idx].position - m_camera_params.pos).toFloat());
+			b.submesh = infos[prev_idx].index;
 			b.from = prev_idx;
-			b.to = infos.size() - 1;
+			b.to = infos.size() - 1;*/
+			// TODO
+			//ASSERT(false);
 		}
 
 		void execute() override
 		{
-			if(m_instance_data.empty()) return;
+			/*if(m_instance_data.empty()) return;
 
 			ffr::pushDebugGroup("terrains");
 			Renderer::TransientSlice instance_buffer = m_pipeline->m_renderer.allocTransient(m_instance_data.byte_size());
@@ -1633,7 +1627,7 @@ struct PipelineImpl final : Pipeline
 			instance_decl.addAttribute(1, ffr::AttributeType::FLOAT, false, false);
 			instance_decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false);
 
-			const Vec3 camera_pos = m_camera_params.pos;
+			const DVec3 camera_pos = m_camera_params.pos;
 
 			for (const Batch& batch : m_batches) {
 				Texture* detail_texture = batch.terrain->getDetailTexture();
@@ -1661,7 +1655,7 @@ struct PipelineImpl final : Pipeline
 					ffr::bindTexture(i, t.texture);
 					ffr::setUniform1i(t.uniform, i);
 				}
-				*/
+				*//*
 				const Material* material = batch.terrain->m_material;
 				const int textures_count = material->getTextureCount();
 				for (int i = 0; i < textures_count; ++i) {
@@ -1677,7 +1671,9 @@ struct PipelineImpl final : Pipeline
 				const int submesh_indices_count = mesh.indices_count / 4;
 				ffr::drawTrianglesInstanced(batch.submesh * submesh_indices_count * sizeof(u16), submesh_indices_count , 1 + batch.to - batch.from);
 			}
-			ffr::popDebugGroup();
+			ffr::popDebugGroup();*/
+			// TODO
+			//ASSERT(false);
 		}
 
 		struct InstanceData
@@ -1908,11 +1904,12 @@ struct PipelineImpl final : Pipeline
 					
 					if(count == 0) return;
 
-					const Vec3 camera_pos = m_camera_params.pos;
+					const DVec3 camera_pos = m_camera_params.pos;
 					const ModelInstance* LUMIX_RESTRICT model_instances = m_pipeline->m_scene->getModelInstances();
 					const auto& LUMIX_RESTRICT submeshes = &meshes[offset];
 					Matrix* LUMIX_RESTRICT matrices = &m_matrices[offset];
 					OutputBlob& stream = m_streams[job_idx];
+					const Universe& universe = m_pipeline->m_scene->getUniverse();
 					int midx = 0;
 
 					for(uint i = 0; i < count; ++i) {
@@ -1924,9 +1921,7 @@ struct PipelineImpl final : Pipeline
 								const int start = i;
 								const int start_midx = midx;
 								while(i < count && submeshes[i].mesh == mesh.mesh) {
-									Matrix mtx = model_instances[submeshes[i].owner.index].matrix;
-									mtx.translate(-camera_pos);
-									matrices[midx] = mtx;
+									matrices[midx] = universe.getRelativeMatrix(submeshes[i].owner, camera_pos);
 									++i;
 									++midx;
 								}
@@ -1949,13 +1944,12 @@ struct PipelineImpl final : Pipeline
 								ASSERT(pose.count <= lengthOf(bone_mtx));
 								for (int bone_index = 0, bone_count = pose.count; bone_index < bone_count; ++bone_index) {
 									auto& bone = model.getBone(bone_index);
-									RigidTransform tmp = {poss[bone_index], rots[bone_index]};
+									const LocalRigidTransform tmp = {poss[bone_index], rots[bone_index]};
 									bone_mtx[bone_index] = (tmp * bone.inv_bind_transform).toMatrix();
 								}
 
 								stream.write(bone_mtx, sizeof(Matrix) * pose.count);
-								Matrix mtx = model_instance.matrix;
-								mtx.translate(-camera_pos);
+								const Matrix mtx = universe.getRelativeMatrix((EntityRef)model_instance.entity, camera_pos);
 								stream.write(mtx);
 								break;
 							}
@@ -1969,7 +1963,8 @@ struct PipelineImpl final : Pipeline
 			JobSystem::wait(&counter);
 
 			MT::atomicAdd(&m_pipeline->m_stats.draw_call_count, meshes.size());
-
+			// TODO
+			/*
 			const EntityPtr probe = scene->getNearestEnvironmentProbe(m_pipeline->m_viewport.pos);
 			if (probe.isValid()) {
 				const Texture* irradiance = scene->getEnvironmentProbeIrradiance((EntityRef)probe);
@@ -1980,7 +1975,9 @@ struct PipelineImpl final : Pipeline
 			else {
 				m_irradiance_map = m_pipeline->m_default_cubemap->handle;
 				m_radiance_map = m_pipeline->m_default_cubemap->handle;
-			}
+			}*/
+			m_irradiance_map = m_pipeline->m_default_cubemap->handle;
+			m_radiance_map = m_pipeline->m_default_cubemap->handle;
 		}
 
 

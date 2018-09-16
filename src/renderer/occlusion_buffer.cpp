@@ -29,9 +29,11 @@ OcclusionBuffer::OcclusionBuffer(IAllocator& allocator)
 }
 
 
-void OcclusionBuffer::setCamera(const Matrix& view, const Matrix& projection)
+void OcclusionBuffer::setCamera(const DVec3& pos, const Quat& rot, const Matrix& projection)
 {
-	m_view_projection_matrix = projection * view;
+	m_projection_matrix = projection;
+	m_camera_pos = pos;
+	m_camera_rot = rot;
 }
 
 
@@ -54,9 +56,9 @@ LUMIX_FORCE_INLINE static Vec3 transform(const Matrix& mtx, const Vec3& rhs)
 }
 
 
-bool OcclusionBuffer::isOccluded(const Matrix& world_transform, const AABB& aabb)
+bool OcclusionBuffer::isOccluded(const Transform& world_transform, const AABB& aabb)
 {
-	Matrix mtx = m_view_projection_matrix * world_transform;
+	/*Matrix mtx = m_view_projection_matrix * world_transform;
 	Vec3 vertices[] = {
 		transform(mtx, aabb.min),
 		transform(mtx, Vec3(aabb.min.x, aabb.min.y, aabb.max.z)),
@@ -102,7 +104,9 @@ bool OcclusionBuffer::isOccluded(const Matrix& world_transform, const AABB& aabb
 			if (depth[i + j * WIDTH] > z) return false;
 		}
 	}
-
+	*/
+	// TODO
+	ASSERT(false);
 	return true;
 }
 
@@ -373,12 +377,12 @@ static void rasterizeOccludingTriangles(const Mesh* mesh, const Matrix& mvp_mtx,
 void OcclusionBuffer::rasterize(Universe* universe, const Array<MeshInstance>& meshes)
 {
 	PROFILE_FUNCTION();
-	if (m_mips.empty()) init();
+	/*if (m_mips.empty()) init();
 	int* depth = &m_mips[0][0];
 	for (const MeshInstance& mesh_instance : meshes)
 	{
 		const Mesh* mesh = mesh_instance.mesh;
-		Matrix mtx = m_view_projection_matrix * universe->getMatrix(mesh_instance.owner);
+		Matrix mtx = m_view_projection_matrix * universe->getRelativeMatrix(mesh_instance.owner, m_camera_pos);
 		if (mesh->flags.isSet(Mesh::INDICES_16_BIT))
 		{
 			rasterizeOccludingTriangles<u16>(mesh, mtx, depth);
@@ -387,7 +391,9 @@ void OcclusionBuffer::rasterize(Universe* universe, const Array<MeshInstance>& m
 		{
 			rasterizeOccludingTriangles<u32>(mesh, mtx, depth);
 		}
-	}
+	}*/
+	// TODO 
+	ASSERT(false);
 }
 
 

@@ -53,7 +53,6 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 			Matrix camera_inv_view;
 			Matrix camera_view_projection;
 			Matrix camera_inv_view_projection;
-			Vec4 camera_pos;
 			Vec4 light_direction;
 			Vec3 light_color;
 			float light_intensity;

@@ -66,7 +66,7 @@ class Animation final : public Resource
 		ResourceType getType() const override { return TYPE; }
 
 		int getRootMotionBoneIdx() const { return m_root_motion_bone_idx; }
-		RigidTransform getBoneTransform(float time, int bone_idx) const;
+		LocalRigidTransform getBoneTransform(float time, int bone_idx) const;
 		void getRelativePose(float time, Pose& pose, Model& model, BoneMask* mask) const;
 		void getRelativePose(float time, Pose& pose, Model& model, float weight, BoneMask* mask) const;
 		int getFrameCount() const { return m_frame_count; }

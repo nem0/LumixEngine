@@ -22,9 +22,9 @@ class OcclusionBuffer
 public:
 	OcclusionBuffer(IAllocator& allocator);
 
-	bool isOccluded(const Matrix& world_transform, const AABB& aabb);
+	bool isOccluded(const Transform& world_transform, const AABB& aabb);
 	void clear();
-	void setCamera(const Matrix& view, const Matrix& projection);
+	void setCamera(const DVec3& pos, const Quat& rot, const Matrix& projection);
 	void rasterize(Universe* universe, const Array<MeshInstance>& meshes);
 	void buildHierarchy();
 	const int* getMip(int level) { return &m_mips[level][0]; }
@@ -36,7 +36,9 @@ private:
 
 	IAllocator& m_allocator;
 	Array<Mip> m_mips;
-	Matrix m_view_projection_matrix;
+	Matrix m_projection_matrix;
+	DVec3 m_camera_pos;
+	Quat m_camera_rot;
 };
 
 

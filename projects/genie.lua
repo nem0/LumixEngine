@@ -822,8 +822,6 @@ if build_app then
 			end
 					
 			if build_studio then
-				forceLink("setStudioApp_audio")
-				forceLink("setStudioApp_lua_script")
 				for _, plugin in ipairs(plugins) do
 					forceLink("setStudioApp_" .. plugin)
 				end

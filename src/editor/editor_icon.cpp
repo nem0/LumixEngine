@@ -185,7 +185,7 @@ struct EditorIconsImpl final : public EditorIcons
 	}
 
 
-	Hit raycast(const Vec3& origin, const Vec3& dir) override
+	Hit raycast(const DVec3& origin, const Vec3& dir) override
 	{
 		Hit hit;
 		hit.t = -1;
@@ -194,13 +194,13 @@ struct EditorIconsImpl final : public EditorIcons
 		const Viewport& vp = m_editor.getViewport();
 		Matrix camera_mtx = vp.rot.toMatrix();
 
-		for(auto& icon : m_icons)
-		{
-			Matrix icon_matrix = getIconMatrix(icon, camera_mtx, vp.pos, vp.is_ortho, vp.ortho_size);
+		for(auto& icon : m_icons) {
+			const Transform icon_tr = getIconTransform(icon, vp.rot, vp.is_ortho, vp.ortho_size);
 			
-			float t = m_editor.getRenderInterface()->castRay(m_models[(int)icon.type], origin, dir, icon_matrix, nullptr);
-			if(t >= 0 && (t < hit.t || hit.t < 0))
-			{
+			const Vec3 rel_origin = (origin - icon_tr.pos).toFloat();
+			const Vec3 rel_dir = icon_tr.rot.conjugated() * dir;
+			float t = m_editor.getRenderInterface()->castRay(m_models[(int)icon.type], rel_origin, rel_dir, nullptr);
+			if (t >= 0 && (t < hit.t || hit.t < 0)) {
 				hit.t = t;
 				hit.entity = icon.entity;
 			}
@@ -243,7 +243,23 @@ struct EditorIconsImpl final : public EditorIcons
 	}
 
 
-	Matrix getIconMatrix(const Icon& icon, const Matrix& camera_matrix, const Vec3& vp_pos, bool is_ortho, float ortho_size) const
+	Transform getIconTransform(const Icon& icon, const Quat& camera_rot, bool is_ortho, float ortho_size)
+	{
+		Transform ret = m_editor.getUniverse()->getTransform(icon.entity);
+		if (!m_is_3d[(int)icon.type]) {
+			ret.rot = camera_rot;
+		}
+		if (is_ortho) {
+			ret.scale = ortho_size * ORTHO_SIZE_SCALE;
+		}
+		else {
+			ret.scale = icon.scale > 0 ? icon.scale : 1;
+		}
+		return ret;
+	}
+
+
+	Matrix getIconMatrix(const Icon& icon, const Matrix& camera_matrix, const DVec3& vp_pos, bool is_ortho, float ortho_size) const
 	{
 		Matrix ret;
 		if (m_is_3d[(int)icon.type])
@@ -253,7 +269,7 @@ struct EditorIconsImpl final : public EditorIcons
 		else
 		{
 			ret = camera_matrix;
-			ret.setTranslation(m_editor.getUniverse()->getPosition(icon.entity) - vp_pos);
+			ret.setTranslation((m_editor.getUniverse()->getPosition(icon.entity) - vp_pos).toFloat());
 		}
 		if (is_ortho)
 		{
@@ -277,8 +293,8 @@ struct EditorIconsImpl final : public EditorIcons
 		Matrix camera_mtx({0, 0, 0}, vp.rot);
 
 		for(auto& icon : m_icons) {
-			const Vec3 position = universe.getPosition(icon.entity);
-			const float distance = (position - vp.pos).length();
+			const DVec3 position = universe.getPosition(icon.entity);
+			const float distance = (position - vp.pos).toFloat().length();
 			float scale_factor = MIN_SCALE_FACTOR + distance;
 			scale_factor = Math::clamp(scale_factor, MIN_SCALE_FACTOR, MAX_SCALE_FACTOR);
 			icon.scale = tan(vp.fov * 0.5f) * distance / scale_factor;

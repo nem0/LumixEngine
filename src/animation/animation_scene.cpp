@@ -82,7 +82,7 @@ struct AnimationSceneImpl final : public AnimationScene
 			i16 max_iterations = 5;
 			i16 bones_count = 4;
 			u32 bones[MAX_BONES_COUNT];
-			Vec3 target;
+			DVec3 target;
 		} inverse_kinematics[4];
 	};
 
@@ -282,13 +282,13 @@ struct AnimationSceneImpl final : public AnimationScene
 
 	static int setIK(lua_State* L)
 	{
-		AnimationSceneImpl* scene = LuaWrapper::checkArg<AnimationSceneImpl*>(L, 1);
+		/*AnimationSceneImpl* scene = LuaWrapper::checkArg<AnimationSceneImpl*>(L, 1);
 		EntityRef entity = LuaWrapper::checkArg<EntityRef>(L, 2);
 		Controller& controller = scene->m_controllers.get(entity);
 		int index = LuaWrapper::checkArg<int>(L, 3);
 		Controller::IK& ik = controller.inverse_kinematics[index];
 		ik.weight = LuaWrapper::checkArg<float>(L, 4);
-		ik.target = LuaWrapper::checkArg<Vec3>(L, 5);
+		ik.target = LuaWrapper::checkArg<DVec3>(L, 5);
 		Transform tr = scene->m_universe.getTransform(controller.entity);
 		ik.target = tr.inverted().transform(ik.target);
 
@@ -301,7 +301,9 @@ struct AnimationSceneImpl final : public AnimationScene
 		{
 			const char* bone = LuaWrapper::checkArg<const char*>(L, i + 6);
 			ik.bones[i] = crc32(bone);
-		}
+		}*/
+		// TODO
+		ASSERT(false);
 		return 0;
 	}
 
@@ -777,10 +779,10 @@ struct AnimationSceneImpl final : public AnimationScene
 	}
 
 
-	RigidTransform getControllerRootMotion(EntityRef entity) override
+	LocalRigidTransform getControllerRootMotion(EntityRef entity) override
 	{
 		Controller& ctrl = m_controllers.get(entity);
-		return ctrl.root ? ctrl.root->getRootMotion() : RigidTransform({0, 0, 0}, {0, 0, 0, 1});
+		return ctrl.root ? ctrl.root->getRootMotion() : LocalRigidTransform{{0, 0, 0}, {0, 0, 0, 1}};
 	}
 
 	
@@ -941,11 +943,11 @@ struct AnimationSceneImpl final : public AnimationScene
 		m_render_scene->unlockPose(entity, true);
 	}
 
-	static RigidTransform getAbsolutePosition(const Pose& pose, const Model& model, int bone_index)
+	static LocalRigidTransform getAbsolutePosition(const Pose& pose, const Model& model, int bone_index)
 	{
-		RigidTransform t(Vec3::ZERO, Quat::IDENTITY);
+		LocalRigidTransform t{Vec3::ZERO, Quat::IDENTITY};
 		const Model::Bone& bone = model.getBone(bone_index);
-		RigidTransform bone_transform(pose.positions[bone_index], pose.rotations[bone_index]);
+		LocalRigidTransform bone_transform{pose.positions[bone_index], pose.rotations[bone_index]};
 		if (bone.parent_idx < 0)
 		{
 			return bone_transform;
@@ -956,8 +958,8 @@ struct AnimationSceneImpl final : public AnimationScene
 
 	static void updateIK(Controller::IK& ik, Pose& pose, Model& model)
 	{
-		int indices[Controller::IK::MAX_BONES_COUNT];
-		RigidTransform transforms[Controller::IK::MAX_BONES_COUNT];
+		/*int indices[Controller::IK::MAX_BONES_COUNT];
+		LocalRigidTransform transforms[Controller::IK::MAX_BONES_COUNT];
 		Vec3 old_pos[Controller::IK::MAX_BONES_COUNT];
 		float len[Controller::IK::MAX_BONES_COUNT - 1];
 		float len_sum = 0;
@@ -971,7 +973,7 @@ struct AnimationSceneImpl final : public AnimationScene
 
 		// convert from bone space to object space
 		const Model::Bone& first_bone = model.getBone(indices[0]);
-		RigidTransform roots_parent;
+		LocalRigidTransform roots_parent;
 		if (first_bone.parent_idx >= 0)
 		{
 			roots_parent = getAbsolutePosition(pose, model, first_bone.parent_idx);
@@ -982,10 +984,10 @@ struct AnimationSceneImpl final : public AnimationScene
 			roots_parent.rot = Quat::IDENTITY;
 		}
 
-		RigidTransform parent_tr = roots_parent;
+		LocalRigidTransform parent_tr = roots_parent;
 		for (int i = 0; i < ik.bones_count; ++i)
 		{
-			RigidTransform tr(pose.positions[indices[i]], pose.rotations[indices[i]]);
+			LocalRigidTransform tr{pose.positions[indices[i]], pose.rotations[indices[i]]};
 			transforms[i] = parent_tr * tr;
 			old_pos[i] = transforms[i].pos;
 			if (i > 0)
@@ -1053,7 +1055,9 @@ struct AnimationSceneImpl final : public AnimationScene
 		else
 		{
 			pose.rotations[indices[0]] = transforms[0].rot;
-		}
+		}*/
+		// TODO
+		ASSERT(false);
 	}
 
 

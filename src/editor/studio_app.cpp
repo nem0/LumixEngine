@@ -1283,7 +1283,7 @@ public:
 				m_editor->beginCommandGroup(crc32("create_child_entity"));
 				EntityRef child = m_editor->addEntity();
 				m_editor->makeParent(entity, child);
-				Vec3 pos = m_editor->getUniverse()->getPosition(entity);
+				const DVec3 pos = m_editor->getUniverse()->getPosition(entity);
 				m_editor->setEntitiesPositions(&child, &pos, 1);
 				m_editor->endCommandGroup();
 			}
@@ -1956,12 +1956,12 @@ public:
 			const char* parameter_name = luaL_checkstring(L, -2);
 			if (equalStrings(parameter_name, "position"))
 			{
-				auto pos = LuaWrapper::toType<Vec3>(L, -1);
+				const DVec3 pos = LuaWrapper::toType<DVec3>(L, -1);
 				editor.setEntitiesPositions(&e, &pos, 1);
 			}
 			else if (equalStrings(parameter_name, "rotation"))
 			{
-				auto rot = LuaWrapper::toType<Quat>(L, -1);
+				const Quat rot = LuaWrapper::toType<Quat>(L, -1);
 				editor.setEntitiesRotations(&e, &rot, 1);
 			}
 			else

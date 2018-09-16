@@ -21,7 +21,7 @@ class LUMIX_EDITOR_API Gizmo
 public:
 	struct RenderData
 	{
-		Matrix mtx;
+		RigidTransform tr;
 		bool active;
 	};
 

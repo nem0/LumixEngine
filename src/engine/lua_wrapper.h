@@ -151,6 +151,20 @@ template <> inline Vec3 toType(lua_State* L, int index)
 	lua_pop(L, 1);
 	return v;
 }
+template <> inline DVec3 toType(lua_State* L, int index)
+{
+	DVec3 v;
+	lua_rawgeti(L, index, 1);
+	v.x = (double)lua_tonumber(L, -1);
+	lua_pop(L, 1);
+	lua_rawgeti(L, index, 2);
+	v.y = (double)lua_tonumber(L, -1);
+	lua_pop(L, 1);
+	lua_rawgeti(L, index, 3);
+	v.z = (double)lua_tonumber(L, -1);
+	lua_pop(L, 1);
+	return v;
+}
 template <> inline Vec4 toType(lua_State* L, int index)
 {
 	Vec4 v;
@@ -315,6 +329,10 @@ template <> inline bool isType<Vec3>(lua_State* L, int index)
 {
 	return lua_istable(L, index) != 0 && lua_objlen(L, index) == 3;
 }
+template <> inline bool isType<DVec3>(lua_State* L, int index)
+{
+	return lua_istable(L, index) != 0 && lua_objlen(L, index) == 3;
+}
 template <> inline bool isType<Vec4>(lua_State* L, int index)
 {
 	return lua_istable(L, index) != 0 && lua_objlen(L, index) == 4;
@@ -421,6 +439,19 @@ inline void push(lua_State* L, const Int2& value)
 	lua_rawseti(L, -2, 2);
 }
 inline void push(lua_State* L, const Vec3& value)
+{
+	lua_createtable(L, 3, 0);
+
+	lua_pushnumber(L, value.x);
+	lua_rawseti(L, -2, 1);
+
+	lua_pushnumber(L, value.y);
+	lua_rawseti(L, -2, 2);
+
+	lua_pushnumber(L, value.z);
+	lua_rawseti(L, -2, 3);
+}
+inline void push(lua_State* L, const DVec3& value)
 {
 	lua_createtable(L, 3, 0);
 

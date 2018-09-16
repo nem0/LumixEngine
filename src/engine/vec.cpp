@@ -76,7 +76,7 @@ Vec3 Vec3::normalized() const
 	float x = this->x;
 	float y = this->y;
 	float z = this->z;
-	float inv_len = 1 / sqrt(x * x + y * y + z * z);
+	const float inv_len = 1 / sqrt(x * x + y * y + z * z);
 	x *= inv_len;
 	y *= inv_len;
 	z *= inv_len;
@@ -84,11 +84,28 @@ Vec3 Vec3::normalized() const
 }
 
 
+double DVec3::length() const
+{
+	const double x = this->x;
+	const double y = this->y;
+	const double z = this->z;
+	return sqrt(x * x + y * y + z * z);
+}
+
+
+double DVec3::squaredLength() const
+{
+	const double x = this->x;
+	const double y = this->y;
+	const double z = this->z;
+	return x * x + y * y + z * z;
+}
+
 float Vec3::length() const
 {
-	float x = this->x;
-	float y = this->y;
-	float z = this->z;
+	const float x = this->x;
+	const float y = this->y;
+	const float z = this->z;
 	return sqrt(x * x + y * y + z * z);
 }
 

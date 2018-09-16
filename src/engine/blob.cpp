@@ -117,6 +117,15 @@ namespace Lumix
 	}
 
 
+	OutputBlob& OutputBlob::operator << (double value)
+	{
+		char tmp[40];
+		toCString(value, tmp, lengthOf(tmp), 12);
+		write(tmp, stringLength(tmp));
+		return *this;
+	}
+
+
 	OutputBlob::OutputBlob(const OutputBlob& rhs)
 	{
 		m_allocator = rhs.m_allocator;

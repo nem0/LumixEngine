@@ -28,10 +28,10 @@ Matrix Viewport::getProjection(bool is_homogenous_depth) const
 }
 
 
-Matrix Viewport::getView() const
+Matrix Viewport::getView(const DVec3& origin) const
 {
 	Matrix view = rot.toMatrix();
-	view.setTranslation(pos);
+	view.setTranslation((pos - origin).toFloat());
 	view.fastInverse();
 	return view;
 }
@@ -45,7 +45,7 @@ Matrix Viewport::getViewRotation() const
 }
 
 
-void Viewport::getRay(const Vec2& screen_pos, Vec3& origin, Vec3& dir) const
+void Viewport::getRay(const Vec2& screen_pos, DVec3& origin, Vec3& dir) const
 {
 	origin = pos;
 
@@ -67,7 +67,7 @@ void Viewport::getRay(const Vec2& screen_pos, Vec3& origin, Vec3& dir) const
 			+ y * ny * ortho_size;
 	}
 
-	const Matrix view_matrix = getView();
+	const Matrix view_matrix = getView(origin);
 	Matrix inverted = (projection_matrix * view_matrix);
 	inverted.inverse();
 
@@ -80,17 +80,17 @@ void Viewport::getRay(const Vec2& screen_pos, Vec3& origin, Vec3& dir) const
 }
 
 
-Vec2 Viewport::worldToScreenPixels(const Vec3& world) const
+Vec2 Viewport::worldToScreenPixels(const DVec3& world) const
 {
-	const Matrix mtx = getProjection(true) * getView();
-	const Vec4 pos = mtx * Vec4(world, 1);
+	const Matrix mtx = getProjection(true) * getView(world);
+	const Vec4 pos = mtx * Vec4(0, 0, 0, 1);
 	const float inv = 1 / pos.w;
 	const Vec2 screen_size((float)w, (float)h);
 	const Vec2 screen_pos = { 0.5f * pos.x * inv + 0.5f, 1.0f - (0.5f * pos.y * inv + 0.5f) };
 	return screen_pos * screen_size;
 }
 
-
+/*
 Frustum Viewport::getFrustum(const Vec2& viewport_min_px, const Vec2& viewport_max_px) const
 {
 	const Matrix mtx(pos, rot);
@@ -121,30 +121,32 @@ Frustum Viewport::getFrustum(const Vec2& viewport_min_px, const Vec2& viewport_m
 		viewport_max);
 	return ret;
 }
+*/
 
-
-Frustum Viewport::getFrustum() const
+ShiftedFrustum Viewport::getFrustum() const
 {
-	Frustum ret;
+	ShiftedFrustum ret;
 	const float ratio = h > 0 ? w / (float)h : 1;
 	if (is_ortho) {
-		ret.computeOrtho(pos,
+		ret.computeOrtho({0, 0, 0},
 			rot * Vec3(0, 0, 1),
 			rot * Vec3(0, 1, 0),
 			ortho_size * ratio,
 			ortho_size,
 			near,
 			far);
+		ret.origin = pos;
 		return ret;
 	}
 
-	ret.computePerspective(pos,
+	ret.computePerspective({0, 0, 0},
 		rot * Vec3(0, 0, -1),
 		rot * Vec3(0, 1, 0),
 		fov,
 		ratio,
 		near,
 		far);
+	ret.origin = pos;
 	return ret;
 }
 

@@ -18,6 +18,7 @@ namespace Lumix
 
 
 class Clip;
+struct DVec3;
 class Engine;
 struct IAllocator;
 class Path;
@@ -66,14 +67,14 @@ public:
 	virtual void setFrequency(BufferHandle buffer, float frequency) = 0;
 	virtual void setCurrentTime(BufferHandle buffer, float time_seconds) = 0;
 	virtual float getCurrentTime(BufferHandle buffer) = 0;
-	virtual void setListenerPosition(float x, float y, float z) = 0;
+	virtual void setListenerPosition(const DVec3& pos) = 0;
 	virtual void setListenerOrientation(float front_x,
 		float front_y,
 		float front_z,
 		float up_x,
 		float up_y,
 		float up_z) = 0;
-	virtual void setSourcePosition(BufferHandle buffer, float x, float y, float z) = 0;
+	virtual void setSourcePosition(BufferHandle buffer, const DVec3& pos) = 0;
 	virtual void update(float time_delta) = 0;
 };
 

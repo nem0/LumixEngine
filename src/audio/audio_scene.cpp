@@ -302,8 +302,8 @@ struct AudioSceneImpl final : public AudioScene
 		if (m_listener.entity.isValid())
 		{
 			const EntityRef listener = (EntityRef) m_listener.entity;
-			const Vec3 pos = m_universe.getPosition(listener);
-			m_device.setListenerPosition(pos.x, pos.y, pos.z);
+			const DVec3 pos = m_universe.getPosition(listener);
+			m_device.setListenerPosition(pos);
 			const Matrix orientation = m_universe.getRotation(listener).toMatrix();
 			const Vec3 front = orientation.getZVector();
 			const Vec3 up = orientation.getYVector();
@@ -319,7 +319,7 @@ struct AudioSceneImpl final : public AudioScene
 			if (sound.is_3d)
 			{
 				auto pos = m_universe.getPosition((EntityRef)sound.entity);
-				m_device.setSourcePosition(sound.buffer_id, pos.x, pos.y, pos.z);
+				m_device.setSourcePosition(sound.buffer_id, pos);
 			}
 
 			auto* clip_info = sound.clip;
@@ -740,8 +740,8 @@ struct AudioSceneImpl final : public AudioScene
 				m_device.play(buffer, clip_info->looped);
 				m_device.setVolume(buffer, clip_info->volume);
 
-				Vec3 pos = m_universe.getPosition(entity);
-				m_device.setSourcePosition(buffer, pos.x, pos.y, pos.z);
+				const DVec3 pos = m_universe.getPosition(entity);
+				m_device.setSourcePosition(buffer, pos);
 
 				auto& sound = m_playing_sounds[i];
 				sound.is_3d = is_3d;
@@ -751,19 +751,19 @@ struct AudioSceneImpl final : public AudioScene
 
 				for (const EchoZone& zone : m_echo_zones)
 				{
-					float dist2 = (pos - m_universe.getPosition(zone.entity)).squaredLength();
-					float r2 = zone.radius * zone.radius;
+					const double dist2 = (pos - m_universe.getPosition(zone.entity)).squaredLength();
+					const double r2 = zone.radius * zone.radius;
 					if (dist2 > r2) continue;
 
-					float w = dist2 / r2;
+					const float w = float(dist2 / r2);
 					m_device.setEcho(buffer, 1, 1 - w, zone.delay, zone.delay);
 					break;
 				}
 
 				for (const ChorusZone& zone : m_chorus_zones)
 				{
-					float dist2 = (pos - m_universe.getPosition(zone.entity)).squaredLength();
-					float r2 = zone.radius * zone.radius;
+					const double dist2 = (pos - m_universe.getPosition(zone.entity)).squaredLength();
+					double r2 = zone.radius * zone.radius;
 					if (dist2 > r2) continue;
 
 					m_device.setChorus(buffer, 1, 1, 0, 1, zone.delay, 0);

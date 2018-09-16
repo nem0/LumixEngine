@@ -46,7 +46,19 @@ struct LUMIX_ENGINE_API Quat
 
 		return v + uv + uuv;
 	}
+	
+	DVec3 rotate(const DVec3& v) const
+	{
+		// nVidia SDK implementation
 
+		const DVec3 qvec(x, y, z);
+		DVec3 uv = crossProduct(qvec, v);
+		DVec3 uuv = crossProduct(qvec, uv);
+		uv *= (2.0 * w);
+		uuv *= 2.0;
+
+		return v + uv + uuv;
+	}
 	Quat operator*(const Quat& q) const;
 	Quat operator-() const;
 	Quat operator+(const Quat& q) const;

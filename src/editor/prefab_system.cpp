@@ -170,7 +170,7 @@ class PrefabSystemImpl final : public PrefabSystem
 		bool merge(IEditorCommand& command) override { return false; }
 
 		PrefabResource* prefab;
-		Vec3 position;
+		DVec3 position;
 		Quat rotation;
 		float scale;
 		WorldEditor& editor;
@@ -393,7 +393,7 @@ public:
 	};
 
 
-	EntityPtr doInstantiatePrefab(PrefabResource& prefab_res, const Vec3& pos, const Quat& rot, float scale)
+	EntityPtr doInstantiatePrefab(PrefabResource& prefab_res, const DVec3& pos, const Quat& rot, float scale)
 	{
 		if (!prefab_res.isReady()) return INVALID_ENTITY;
 		if (!m_resources.find(prefab_res.getPath().getHash()).isValid())
@@ -461,7 +461,7 @@ public:
 	}
 
 
-	EntityPtr instantiatePrefab(PrefabResource& prefab, const Vec3& pos, const Quat& rot, float scale) override
+	EntityPtr instantiatePrefab(PrefabResource& prefab, const DVec3& pos, const Quat& rot, float scale) override
 	{
 		InstantiatePrefabCommand* cmd = LUMIX_NEW(m_editor.getAllocator(), InstantiatePrefabCommand)(m_editor);
 		cmd->position = pos;
@@ -707,7 +707,7 @@ public:
 			serializer.read(&res_hash);
 			if (res_hash == 0) break;
 			
-			Vec3 pos;
+			DVec3 pos;
 			serializer.read(&pos);
 			Quat rot;
 			serializer.read(&rot);

@@ -930,6 +930,76 @@ bool toCString(float value, char* output, int length, int after_point)
 }
 
 
+bool toCString(double value, char* output, int length, int after_point)
+{
+	if (length < 2)
+	{
+		return false;
+	}
+	if (value < 0)
+	{
+		*output = '-';
+		++output;
+		value = -value;
+		--length;
+	}
+	// int part
+	int exponent = value == 0 ? 0 : (int)log10(value);
+	double num = value;
+	char* c = output;
+	if (num  < 1 && num > -1 && length > 1)
+	{
+		*c = '0';
+		++c;
+		--length;
+	}
+	else
+	{
+		while ((num >= 1 || exponent >= 0) && length > 1)
+		{
+			double power = (double)pow(10, exponent);
+			char digit = (char)floor(num / power);
+			num -= digit * power;
+			*c = digit + '0';
+			--exponent;
+			--length;
+			++c;
+		}
+	}
+	// decimal part
+	double dec_part = num;
+	if (length > 1 && after_point > 0)
+	{
+		*c = '.';
+		++c;
+		--length;
+	}
+	else if (length > 0 && after_point == 0)
+	{
+		*c = 0;
+		return true;
+	}
+	else
+	{
+		return false;
+	}
+	while (length > 1 && after_point > 0)
+	{
+		dec_part *= 10;
+		char tmp = (char)dec_part;
+		*c = tmp + '0';
+		dec_part -= tmp;
+		++c;
+		--length;
+		--after_point;
+	}
+	*c = 0;
+	if ((int)(dec_part + 0.5f))
+		increment(output, c - 1, length > 1);
+	return true;
+}
+
+
 char* trimmed(char* str)
 {
 	while (*str && (*str == '\t' || *str == ' '))

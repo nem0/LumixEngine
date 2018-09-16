@@ -543,7 +543,7 @@ public:
 
 	static EntityRef LUA_createEntity(Universe* univ)
 	{
-		return univ->createEntity(Vec3(0, 0, 0), Quat(0, 0, 0, 1));
+		return univ->createEntity(DVec3(0, 0, 0), Quat(0, 0, 0, 1));
 	}
 
 
@@ -719,7 +719,7 @@ public:
 		auto* ctx = LuaWrapper::checkArg<Universe*>(L, 2);
 		LuaWrapper::checkTableArg(L, 3);
 
-		EntityRef e = ctx->createEntity(Vec3(0, 0, 0), Quat(0, 0, 0, 1));
+		EntityRef e = ctx->createEntity(DVec3(0, 0, 0), Quat(0, 0, 0, 1));
 
 		lua_pushvalue(L, 3);
 		lua_getfield(L, -1, "parent");
@@ -736,7 +736,7 @@ public:
 			const char* parameter_name = luaL_checkstring(L, -2);
 			if (equalStrings(parameter_name, "position"))
 			{
-				auto pos = LuaWrapper::toType<Vec3>(L, -1);
+				auto pos = LuaWrapper::toType<DVec3>(L, -1);
 				ctx->setPosition(e, pos);
 			}
 			else if (equalStrings(parameter_name, "rotation"))
@@ -824,7 +824,7 @@ public:
 	}
 
 
-	static void LUA_setEntityLocalPosition(Universe* universe, EntityRef entity, const Vec3& position)
+	static void LUA_setEntityLocalPosition(Universe* universe, EntityRef entity, const DVec3& position)
 	{
 		if (!universe->getParent(entity).isValid()) return;
 
@@ -832,7 +832,7 @@ public:
 	}
 
 
-	static void LUA_setEntityPosition(Universe* univ, EntityRef entity, Vec3 pos) { univ->setPosition(entity, pos); }
+	static void LUA_setEntityPosition(Universe* univ, EntityRef entity, const DVec3& pos) { univ->setPosition(entity, pos); }
 	static void LUA_unloadResource(EngineImpl* engine, int resource_idx) { engine->unloadLuaResource(resource_idx); }
 	static Universe* LUA_createUniverse(EngineImpl* engine) { return &engine->createUniverse(false); }
 	static void LUA_destroyUniverse(EngineImpl* engine, Universe* universe) { engine->destroyUniverse(*universe); }
@@ -945,7 +945,7 @@ public:
 	}
 
 
-	static Vec3 LUA_getEntityPosition(Universe* universe, EntityRef entity)
+	static DVec3 LUA_getEntityPosition(Universe* universe, EntityRef entity)
 	{
 		return universe->getPosition(entity);
 	}
@@ -1505,7 +1505,7 @@ public:
 	{
 		auto* engine = LuaWrapper::checkArg<EngineImpl*>(L, 1);
 		auto* universe = LuaWrapper::checkArg<Universe*>(L, 2);
-		Vec3 position = LuaWrapper::checkArg<Vec3>(L, 3);
+		DVec3 position = LuaWrapper::checkArg<DVec3>(L, 3);
 		int prefab_id = LuaWrapper::checkArg<int>(L, 4);
 		PrefabResource* prefab = static_cast<PrefabResource*>(engine->getLuaResource(prefab_id));
 		if (!prefab)
