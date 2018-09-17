@@ -848,7 +848,7 @@ if build_app then
 		if build_studio then
 			linkLib "crnlib"
 			linkLib "cmft"
-			links {"shaderc"}
+			links { "renderer", "shaderc" }
 		end
 		
 		linkLib "bgfx"
