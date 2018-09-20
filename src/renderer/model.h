@@ -37,13 +37,13 @@ struct IFile;
 
 struct LUMIX_RENDERER_API RayCastModelHit
 {
-	bool m_is_hit;
-	float m_t;
-	DVec3 m_origin;
-	Vec3 m_dir;
-	Mesh* m_mesh;
-	EntityPtr m_entity;
-	ComponentType m_component_type;
+	bool is_hit;
+	float t;
+	DVec3 origin;
+	Vec3 dir;
+	Mesh* mesh;
+	EntityPtr entity;
+	ComponentType component_type;
 };
 
 

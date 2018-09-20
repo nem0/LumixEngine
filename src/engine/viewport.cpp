@@ -90,16 +90,16 @@ Vec2 Viewport::worldToScreenPixels(const DVec3& world) const
 	return screen_pos * screen_size;
 }
 
-/*
-Frustum Viewport::getFrustum(const Vec2& viewport_min_px, const Vec2& viewport_max_px) const
+
+ShiftedFrustum Viewport::getFrustum(const Vec2& viewport_min_px, const Vec2& viewport_max_px) const
 {
-	const Matrix mtx(pos, rot);
-	Frustum ret;
-	float ratio = h > 0 ? w / (float)h : 1;
-	Vec2 viewport_min = { viewport_min_px.x / w * 2 - 1, (1 - viewport_max_px.y / h) * 2 - 1 };
-	Vec2 viewport_max = { viewport_max_px.x / w * 2 - 1, (1 - viewport_min_px.y / h) * 2 - 1 };
+	const Matrix mtx = rot.toMatrix();
+	ShiftedFrustum ret;
+	const float ratio = h > 0 ? w / (float)h : 1;
+	const Vec2 viewport_min = { viewport_min_px.x / w * 2 - 1, (1 - viewport_max_px.y / h) * 2 - 1 };
+	const Vec2 viewport_max = { viewport_max_px.x / w * 2 - 1, (1 - viewport_min_px.y / h) * 2 - 1 };
 	if (is_ortho) {
-		ret.computeOrtho(mtx.getTranslation(),
+		ret.computeOrtho({0, 0, 0},
 			mtx.getZVector(),
 			mtx.getYVector(),
 			ortho_size * ratio,
@@ -108,9 +108,10 @@ Frustum Viewport::getFrustum(const Vec2& viewport_min_px, const Vec2& viewport_m
 			far,
 			viewport_min,
 			viewport_max);
+		ret.origin = pos;
 		return ret;
 	}
-	ret.computePerspective(mtx.getTranslation(),
+	ret.computePerspective({0, 0, 0},
 		-mtx.getZVector(),
 		mtx.getYVector(),
 		fov,
@@ -119,9 +120,10 @@ Frustum Viewport::getFrustum(const Vec2& viewport_min_px, const Vec2& viewport_m
 		far,
 		viewport_min,
 		viewport_max);
+	ret.origin = pos;
 	return ret;
 }
-*/
+
 
 ShiftedFrustum Viewport::getFrustum() const
 {

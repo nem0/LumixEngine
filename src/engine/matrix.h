@@ -105,6 +105,10 @@ struct LUMIX_ENGINE_API Transform
 		return {rot.rotate(rhs.pos * scale) + pos, rot * rhs.rot, scale * rhs.scale};
 	}
 
+	Transform operator*(const LocalRigidTransform& rhs) const
+	{
+		return {pos + rot.rotate(rhs.pos * scale), rot * rhs.rot, scale};
+	}
 
 	DVec3 transform(const Vec3& value) const
 	{

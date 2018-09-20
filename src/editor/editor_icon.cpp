@@ -192,14 +192,14 @@ struct EditorIconsImpl final : public EditorIcons
 		hit.entity = INVALID_ENTITY;
 
 		const Viewport& vp = m_editor.getViewport();
-		Matrix camera_mtx = vp.rot.toMatrix();
 
 		for(auto& icon : m_icons) {
 			const Transform icon_tr = getIconTransform(icon, vp.rot, vp.is_ortho, vp.ortho_size);
 			
-			const Vec3 rel_origin = (origin - icon_tr.pos).toFloat();
+			const Vec3 rel_origin = icon_tr.rot.conjugated() * (origin - icon_tr.pos).toFloat();
 			const Vec3 rel_dir = icon_tr.rot.conjugated() * dir;
-			float t = m_editor.getRenderInterface()->castRay(m_models[(int)icon.type], rel_origin, rel_dir, nullptr);
+			RenderInterface* ri = m_editor.getRenderInterface();
+			const float t = ri->castRay(m_models[(int)icon.type], rel_origin, rel_dir, nullptr);
 			if (t >= 0 && (t < hit.t || hit.t < 0)) {
 				hit.t = t;
 				hit.entity = icon.entity;

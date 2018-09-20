@@ -159,7 +159,7 @@ static void computeSkinMatrices(const Pose& pose, const Model& model, Matrix* ma
 RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Pose* pose)
 {
 	RayCastModelHit hit;
-	hit.m_is_hit = false;
+	hit.is_hit = false;
 	if (!isReady()) return hit;
 
 	Matrix matrices[256];
@@ -234,16 +234,16 @@ RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Pose* 
 			Vec3 VP2 = hit_point - p2;
 			if (dotProduct(normal, crossProduct(edge2, VP2)) < 0) continue;
 
-			if (!hit.m_is_hit || hit.m_t > t)
+			if (!hit.is_hit || hit.t > t)
 			{
-				hit.m_is_hit = true;
-				hit.m_t = t;
-				hit.m_mesh = &m_meshes[mesh_index];
+				hit.is_hit = true;
+				hit.t = t;
+				hit.mesh = &m_meshes[mesh_index];
 			}
 		}
 	}
-	hit.m_origin = DVec3(origin.x, origin.y, origin.z);
-	hit.m_dir = dir;
+	hit.origin = DVec3(origin.x, origin.y, origin.z);
+	hit.dir = dir;
 	return hit;
 }
 
@@ -583,10 +583,7 @@ bool Model::load(FS::IFile& file)
 
 static Vec3 getBonePosition(Model* model, int bone_index)
 {
-		// TODO
-	ASSERT(false);
-	return {};
-	//return model->getBone(bone_index).transform.pos;
+	return model->getBone(bone_index).transform.pos;
 }
 
 

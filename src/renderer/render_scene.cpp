@@ -132,7 +132,7 @@ struct BoneAttachment
 	EntityRef entity;
 	EntityPtr parent_entity;
 	int bone_index;
-	RigidTransform relative_transform;
+	LocalRigidTransform relative_transform;
 };
 
 
@@ -375,7 +375,7 @@ public:
 		DVec3& origin,
 		Vec3& dir) override
 	{
-		/*Camera& camera = m_cameras[camera_entity];
+		Camera& camera = m_cameras[camera_entity];
 		origin = m_universe.getPosition(camera_entity);
 
 		float width = camera.screen_width;
@@ -390,28 +390,24 @@ public:
 		float ny = 2 * ((height - screen_pos.y) / height) - 1;
 
 		const Matrix projection_matrix = getCameraProjection(camera_entity);
-		Matrix view_matrix = m_universe.getMatrix(camera_entity);
+		const Transform view = m_universe.getTransform(camera_entity);
 
-		if (camera.is_ortho)
-		{
-			float ratio = camera.screen_height > 0 ? camera.screen_width / camera.screen_height : 1;
-			origin += view_matrix.getXVector() * nx * camera.ortho_size * ratio
-				+ view_matrix.getYVector() * ny * camera.ortho_size;
+		if (camera.is_ortho) {
+			const float ratio = camera.screen_height > 0 ? camera.screen_width / camera.screen_height : 1;
+			origin += view.rot * Vec3(1, 0, 0) * nx * camera.ortho_size * ratio
+				+ view.rot * Vec3(0, 1, 0) * ny * camera.ortho_size;
 		}
 
-		view_matrix.inverse();
-		Matrix inverted = (projection_matrix * view_matrix);
-		inverted.inverse();
+		Matrix inv_projection = projection_matrix;
+		inv_projection.inverse();
 
-		Vec4 p0 = inverted * Vec4(nx, ny, -1, 1);
-		Vec4 p1 = inverted * Vec4(nx, ny, 1, 1);
+		Vec4 p0 = inv_projection * Vec4(nx, ny, -1, 1);
+		Vec4 p1 = inv_projection * Vec4(nx, ny, 1, 1);
 		p0 *= 1 / p0.w;
 		p1 *= 1 / p1.w;
 		dir = (p1 - p0).xyz();
-		dir.normalize();*/
-
-		// TODO
-		ASSERT(false);
+		dir.normalize();
+		dir = view.rot * dir;
 	}
 
 	
@@ -458,55 +454,46 @@ public:
 	}
 
 
-	Frustum getCameraFrustum(EntityRef entity) const override
+	ShiftedFrustum getCameraFrustum(EntityRef entity) const override
 	{
-		/*const Camera& camera = m_cameras[entity];
-		Matrix mtx = m_universe.getMatrix(entity);
-		Frustum ret;
+		ShiftedFrustum ret;
+		const Camera& camera = m_cameras[entity];
+		const Transform tr = m_universe.getTransform(entity);
 		float ratio = camera.screen_height > 0 ? camera.screen_width / camera.screen_height : 1;
-		if (camera.is_ortho)
-		{
-			ret.computeOrtho(mtx.getTranslation(),
-				mtx.getZVector(),
-				mtx.getYVector(),
+		if (camera.is_ortho) {
+			ret.computeOrtho(tr.pos,
+				tr.rot * Vec3(0, 0, 1),
+				tr.rot * Vec3(0, 1, 0),
 				camera.ortho_size * ratio,
 				camera.ortho_size,
 				camera.near,
 				camera.far);
 			return ret;
 		}
-		ret.computePerspective(mtx.getTranslation(),
-			-mtx.getZVector(),
-			mtx.getYVector(),
+
+		ret.computePerspective(tr.pos,
+			tr.rot * Vec3(0, 0, -1),
+			tr.rot * Vec3(0, 1, 0),
 			camera.fov,
 			ratio,
 			camera.near,
 			camera.far);
-
-		return ret;*/
-				// TODO
-		ASSERT(false);
-		return {};
+		return ret;
 	}
 
 
-	Frustum getCameraFrustum(EntityRef entity, const Vec2& viewport_min_px, const Vec2& viewport_max_px) const override
+	ShiftedFrustum getCameraFrustum(EntityRef entity, const Vec2& viewport_min_px, const Vec2& viewport_max_px) const override
 	{
-				// TODO
-		ASSERT(false);
-		return {};
-		/*
+		ShiftedFrustum ret;
 		const Camera& camera = m_cameras[entity];
-		Matrix mtx = m_universe.getMatrix(entity);
-		Frustum ret;
+		const Transform tr = m_universe.getTransform(entity);
 		float ratio = camera.screen_height > 0 ? camera.screen_width / camera.screen_height : 1;
 		Vec2 viewport_min = { viewport_min_px.x / camera.screen_width * 2 - 1, (1 - viewport_max_px.y / camera.screen_height) * 2 - 1 };
 		Vec2 viewport_max = { viewport_max_px.x / camera.screen_width * 2 - 1, (1 - viewport_min_px.y / camera.screen_height) * 2 - 1 };
-		if (camera.is_ortho)
-		{
-			ret.computeOrtho(mtx.getTranslation(),
-				mtx.getZVector(),
-				mtx.getYVector(),
+		if (camera.is_ortho) {
+			ret.computeOrtho(tr.pos,
+				tr.rot * Vec3(0, 0, 1),
+				tr.rot * Vec3(0, 1, 0),
 				camera.ortho_size * ratio,
 				camera.ortho_size,
 				camera.near,
@@ -515,25 +502,22 @@ public:
 				viewport_max);
 			return ret;
 		}
-		ret.computePerspective(mtx.getTranslation(),
-			-mtx.getZVector(),
-			mtx.getYVector(),
+
+		ret.computePerspective(tr.pos,
+			tr.rot * Vec3(0, 0, -1),
+			tr.rot * Vec3(0, 1, 0),
 			camera.fov,
 			ratio,
 			camera.near,
 			camera.far,
 			viewport_min,
 			viewport_max);
-
-		return ret;*/
+		return ret;
 	}
 
 
 	void updateBoneAttachment(const BoneAttachment& bone_attachment)
 	{
-				// TODO
-		ASSERT(false);
-		/*
 		if (!bone_attachment.parent_entity.isValid()) return;
 		const EntityPtr model_instance_ptr = bone_attachment.parent_entity;
 		if (!model_instance_ptr.isValid()) return;
@@ -550,12 +534,12 @@ public:
 			return;
 		}
 		float original_scale = m_universe.getScale(bone_attachment.entity);
-		Transform bone_transform = {parent_pose->positions[idx], parent_pose->rotations[idx], 1.0f};
-		Transform relative_transform = { bone_attachment.relative_transform.pos, bone_attachment.relative_transform.rot, 1.0f};
+		const LocalRigidTransform bone_transform = {parent_pose->positions[idx], parent_pose->rotations[idx] };
+		const LocalRigidTransform relative_transform = { bone_attachment.relative_transform.pos, bone_attachment.relative_transform.rot };
 		Transform result = parent_entity_transform * bone_transform * relative_transform;
 		result.scale = original_scale;
 		m_universe.setTransform(bone_attachment.entity, result);
-		unlockPose(model_instance, false);*/
+		unlockPose(model_instance, false);
 	}
 
 
@@ -567,9 +551,6 @@ public:
 
 	void updateRelativeMatrix(BoneAttachment& attachment)
 	{
-				// TODO
-		ASSERT(false);
-		/*
 		if (!attachment.parent_entity.isValid()) return;
 		if (attachment.bone_index < 0) return;
 		const EntityPtr model_instance_ptr = attachment.parent_entity;
@@ -580,44 +561,36 @@ public:
 		if (!pose) return;
 
 		ASSERT(pose->is_absolute);
-		if (attachment.bone_index >= pose->count)
-		{
+		if (attachment.bone_index >= pose->count) {
 			unlockPose(model_instance, false);
 			return;
 		}
-		Transform bone_transform = {pose->positions[attachment.bone_index], pose->rotations[attachment.bone_index], 1.0f};
+		const LocalRigidTransform bone_transform = {pose->positions[attachment.bone_index], pose->rotations[attachment.bone_index]};
 
 		const EntityRef parent = (EntityRef)attachment.parent_entity;
 		Transform inv_parent_transform = m_universe.getTransform(parent) * bone_transform;
 		inv_parent_transform = inv_parent_transform.inverted();
-		Transform child_transform = m_universe.getTransform(attachment.entity);
-		Transform res = inv_parent_transform * child_transform;
-		attachment.relative_transform = {res.pos, res.rot};
-		unlockPose(model_instance, false);*/
+		const Transform child_transform = m_universe.getTransform(attachment.entity);
+		const Transform res = inv_parent_transform * child_transform;
+		attachment.relative_transform = {res.pos.toFloat(), res.rot};
+		unlockPose(model_instance, false);
 	}
 
 
 	Vec3 getBoneAttachmentPosition(EntityRef entity) override
 	{
-		// TODO
-		ASSERT(false);
-		return {};
-		//return m_bone_attachments[entity].relative_transform.pos;
+		return m_bone_attachments[entity].relative_transform.pos;
 		
 	}
 
 
 	void setBoneAttachmentPosition(EntityRef entity, const Vec3& pos) override
 	{
-				// TODO
-		ASSERT(false);
-
-		/*
 		BoneAttachment& attachment = m_bone_attachments[entity];
 		attachment.relative_transform.pos = pos;
 		m_is_updating_attachments = true;
 		updateBoneAttachment(attachment);
-		m_is_updating_attachments = false;*/
+		m_is_updating_attachments = false;
 	}
 
 
@@ -2147,8 +2120,8 @@ i32 size = 0;
 		scene->getRay(camera_entity, {x, y}, origin, dir);
 
 		RayCastModelHit hit = scene->castRay(origin, dir, INVALID_ENTITY);
-		LuaWrapper::push(L, hit.m_is_hit);
-		LuaWrapper::push(L, hit.m_is_hit ? hit.m_origin + hit.m_dir * hit.m_t : DVec3(0));
+		LuaWrapper::push(L, hit.is_hit);
+		LuaWrapper::push(L, hit.is_hit ? hit.origin + hit.dir * hit.t : DVec3(0));
 
 		return 2;
 	}
@@ -2970,24 +2943,23 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	void addDebugFrustum(const Frustum& frustum, u32 color, float life) override
+	void addDebugFrustum(const ShiftedFrustum& frustum, u32 color, float life) override
 	{
-		/*addDebugLine(frustum.points[0], frustum.points[1], color, life);
-		addDebugLine(frustum.points[1], frustum.points[2], color, life);
-		addDebugLine(frustum.points[2], frustum.points[3], color, life);
-		addDebugLine(frustum.points[3], frustum.points[0], color, life);
+		const DVec3 o = frustum.origin;
+		addDebugLine(o + frustum.points[0], o + frustum.points[1], color, life);
+		addDebugLine(o + frustum.points[1], o + frustum.points[2], color, life);
+		addDebugLine(o + frustum.points[2], o + frustum.points[3], color, life);
+		addDebugLine(o + frustum.points[3], o + frustum.points[0], color, life);
 
-		addDebugLine(frustum.points[4], frustum.points[5], color, life);
-		addDebugLine(frustum.points[5], frustum.points[6], color, life);
-		addDebugLine(frustum.points[6], frustum.points[7], color, life);
-		addDebugLine(frustum.points[7], frustum.points[4], color, life);
+		addDebugLine(o + frustum.points[4], o + frustum.points[5], color, life);
+		addDebugLine(o + frustum.points[5], o + frustum.points[6], color, life);
+		addDebugLine(o + frustum.points[6], o + frustum.points[7], color, life);
+		addDebugLine(o + frustum.points[7], o + frustum.points[4], color, life);
 
-		addDebugLine(frustum.points[0], frustum.points[4], color, life);
-		addDebugLine(frustum.points[1], frustum.points[5], color, life);
-		addDebugLine(frustum.points[2], frustum.points[6], color, life);
-		addDebugLine(frustum.points[3], frustum.points[7], color, life);*/
-		// TODO
-		ASSERT(false);
+		addDebugLine(o + frustum.points[0], o + frustum.points[4], color, life);
+		addDebugLine(o + frustum.points[1], o + frustum.points[5], color, life);
+		addDebugLine(o + frustum.points[2], o + frustum.points[6], color, life);
+		addDebugLine(o + frustum.points[3], o + frustum.points[7], color, life);
 	}
 
 
@@ -3072,71 +3044,64 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	RayCastModelHit castRayTerrain(EntityRef entity, const DVec3& origin, const Vec3& dir) override
 	{
 		RayCastModelHit hit;
-		hit.m_is_hit = false;
+		hit.is_hit = false;
 		auto iter = m_terrains.find(entity);
 		if (!iter.isValid()) return hit;
 
-		auto* terrain = iter.value();
+		Terrain* terrain = iter.value();
 		hit = terrain->castRay(origin, dir);
-		hit.m_component_type = TERRAIN_TYPE;
-		hit.m_entity = terrain->getEntity();
+		hit.component_type = TERRAIN_TYPE;
+		hit.entity = terrain->getEntity();
 		return hit;
 	}
 
 
 	RayCastModelHit castRay(const DVec3& origin, const Vec3& dir, EntityPtr ignored_model_instance) override
 	{
-		/*PROFILE_FUNCTION();
+		PROFILE_FUNCTION();
 		RayCastModelHit hit;
-		hit.m_is_hit = false;
-		hit.m_origin = origin;
-		hit.m_dir = dir;
-		float cur_dist = FLT_MAX;
-		Universe& universe = getUniverse();
-		for (int i = 0; i < m_model_instances.size(); ++i)
-		{
+		hit.is_hit = false;
+		hit.origin = origin;
+		hit.dir = dir;
+		double cur_dist = DBL_MAX;
+		const Universe& universe = getUniverse();
+		for (int i = 0; i < m_model_instances.size(); ++i) {
 			auto& r = m_model_instances[i];
 			if (ignored_model_instance.index == i || !r.model) continue;
 			if (!r.flags.isSet(ModelInstance::ENABLED)) continue;
 
 			const EntityRef entity = (EntityRef)r.entity;
-			const Vec3& pos = r.matrix.getTranslation();
+			const DVec3& pos = universe.getPosition(entity);
 			float scale = universe.getScale(entity);
 			float radius = r.model->getBoundingRadius() * scale;
-			float dist = (pos - origin).length();
+			const double dist = (pos - origin).length();
 			if (dist - radius > cur_dist) continue;
 			
 			Vec3 intersection;
-			if (Math::getRaySphereIntersection(origin, dir, pos, radius, intersection))
-			{
-				RayCastModelHit new_hit = r.model->castRay(origin, dir, r.matrix, r.pose);
-				if (new_hit.m_is_hit && (!hit.m_is_hit || new_hit.m_t < hit.m_t))
-				{
-					new_hit.m_entity = entity;
-					new_hit.m_component_type = MODEL_INSTANCE_TYPE;
+			const Vec3 rel_pos = (origin - pos).toFloat();
+			if (Math::getRaySphereIntersection(rel_pos, dir, Vec3::ZERO, radius, intersection)) {
+				RayCastModelHit new_hit = r.model->castRay(rel_pos, dir, r.pose);
+				if (new_hit.is_hit && (!hit.is_hit || new_hit.t < hit.t)) {
+					new_hit.entity = entity;
+					new_hit.component_type = MODEL_INSTANCE_TYPE;
 					hit = new_hit;
-					hit.m_is_hit = true;
-					cur_dist = dir.length() * hit.m_t;
+					hit.is_hit = true;
+					cur_dist = dir.length() * hit.t;
 				}
 			}
 		}
 
-		for (auto* terrain : m_terrains)
-		{
+		for (auto* terrain : m_terrains) {
 			RayCastModelHit terrain_hit = terrain->castRay(origin, dir);
-			if (terrain_hit.m_is_hit && (!hit.m_is_hit || terrain_hit.m_t < hit.m_t))
-			{
-				terrain_hit.m_component_type = TERRAIN_TYPE;
-				terrain_hit.m_entity = terrain->getEntity();
-				terrain_hit.m_mesh = nullptr;
+			if (terrain_hit.is_hit && (!hit.is_hit || terrain_hit.t < hit.t)) {
+				terrain_hit.component_type = TERRAIN_TYPE;
+				terrain_hit.entity = terrain->getEntity();
+				terrain_hit.mesh = nullptr;
 				hit = terrain_hit;
 			}
 		}
 
-		return hit;*/
-		// TODO
-		//ASSERT(false);
-		return {};
+		return hit;
 	}
 
 	
