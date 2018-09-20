@@ -1942,7 +1942,7 @@ public:
 			DVec3 origin;
 			Vec3 dir;
 			m_viewport.getRay({(float)x, (float)y}, origin, dir);
-			auto hit = m_render_interface->castRay(origin, dir, INVALID_ENTITY);
+			const RayHit hit = m_render_interface->castRay(origin, dir, INVALID_ENTITY);
 			if (m_gizmo->isActive()) return;
 
 			for (int i = 0; i < m_plugins.size(); ++i)
@@ -2000,17 +2000,15 @@ public:
 
 	void rectSelect()
 	{
-		/*Array<EntityRef> entities(m_allocator);
+		Array<EntityRef> entities(m_allocator);
 
 		Vec2 min = m_rect_selection_start;
 		Vec2 max = m_mouse_pos;
 		if (min.x > max.x) Math::swap(min.x, max.x);
 		if (min.y > max.y) Math::swap(min.y, max.y);
-		Frustum frustum = m_viewport.getFrustum(min, max);
+		const ShiftedFrustum frustum = m_viewport.getFrustum(min, max);
 		m_render_interface->getModelInstaces(entities, frustum, m_viewport.pos, m_viewport.fov, m_viewport.is_ortho);
-		selectEntities(entities.empty() ? nullptr : &entities[0], entities.size(), false);*/
-		// TODO
-		ASSERT(false);
+		selectEntities(entities.empty() ? nullptr : &entities[0], entities.size(), false);
 	}
 
 
@@ -2426,7 +2424,7 @@ public:
 
 	void setCustomPivot() override
 	{
-		/*if (m_selected_entities.empty()) return;
+		if (m_selected_entities.empty()) return;
 
 		DVec3 origin;
 		Vec3 dir;		
@@ -2436,11 +2434,8 @@ public:
 
 		const DVec3 snap_pos = getClosestVertex(hit);
 
-		Matrix mtx = m_universe->getMatrix(m_selected_entities[0]);
-		mtx.inverse();
-		m_gizmo->setOffset(mtx.transformPoint(snap_pos));*/
-		// TODO
-		ASSERT(false);
+		const Transform tr = m_universe->getTransform(m_selected_entities[0]);
+		m_gizmo->setOffset(tr.rot.conjugated() * (snap_pos - tr.pos).toFloat());
 	}
 
 
@@ -3953,10 +3948,9 @@ public:
 
 			if (!m_identity)
 			{
-				/*if (i == 0)
+				if (i == 0)
 				{
-					Matrix inv = tr;
-					inv.inverse();
+					const Transform inv = tr.inverted();
 					base_tr.rot = tr.rot;
 					base_tr.scale = tr.scale;
 					base_tr = base_tr * inv;
@@ -3965,9 +3959,7 @@ public:
 				else
 				{
 					tr = base_tr * tr;
-				}*/
-				ASSERT(false);
-				// TODO
+				}
 			}
 
 			const EntityRef new_entity = map.entities[i];
@@ -4024,6 +4016,7 @@ private:
 
 void WorldEditorImpl::pasteEntities()
 {
+	if (!canPasteEntities()) return;
 	PasteEntityCommand* command = LUMIX_NEW(m_allocator, PasteEntityCommand)(*this, m_copy_buffer);
 	executeCommand(command);
 }

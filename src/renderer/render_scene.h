@@ -54,7 +54,7 @@ struct DecalInfo
 	Matrix mtx;
 	Matrix inv_mtx;
 	Material* material;
-	Vec3 position;
+	Transform transform;
 	float radius;
 };
 
@@ -169,8 +169,8 @@ public:
 	virtual	struct Viewport getCameraViewport(EntityRef camera) const = 0;
 	virtual float getCameraLODMultiplier(float fov, bool is_ortho) const = 0;
 	virtual float getCameraLODMultiplier(EntityRef entity) const = 0;
-	virtual Frustum getCameraFrustum(EntityRef entity) const = 0;
-	virtual Frustum getCameraFrustum(EntityRef entity, const Vec2& a, const Vec2& b) const = 0;
+	virtual ShiftedFrustum getCameraFrustum(EntityRef entity) const = 0;
+	virtual ShiftedFrustum getCameraFrustum(EntityRef entity, const Vec2& a, const Vec2& b) const = 0;
 	virtual float getTime() const = 0;
 	virtual Engine& getEngine() const = 0;
 	virtual IAllocator& getAllocator() = 0;
@@ -211,7 +211,7 @@ public:
 		u32 color,
 		float life) = 0;
 	virtual void addDebugSphere(const DVec3& center, float radius, u32 color, float life) = 0;
-	virtual void addDebugFrustum(const Frustum& frustum, u32 color, float life) = 0;
+	virtual void addDebugFrustum(const ShiftedFrustum& frustum, u32 color, float life) = 0;
 
 	virtual void addDebugCapsule(const DVec3& position,
 		float height,

@@ -1026,16 +1026,14 @@ bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK); renderer->viewCounterAdd();
 		if (in_mtx) {
 			mtx = *in_mtx;
 		}
-				// TODO
-	ASSERT(false);
-/*Viewport viewport;
+		Viewport viewport;
 		viewport.is_ortho = false;
 		viewport.far = 10000.f;
 		viewport.near = 0.1f;
 		viewport.fov = Math::degreesToRadians(60.f);
 		viewport.h = AssetBrowser::TILE_SIZE;
 		viewport.w = AssetBrowser::TILE_SIZE;
-		viewport.pos = eye;
+		viewport.pos = DVec3(eye.x, eye.y, eye.z);
 		viewport.rot = mtx.getRotation();
 		m_tile.pipeline->setViewport(viewport);
 		m_tile.pipeline->render();
@@ -1065,7 +1063,7 @@ bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK); renderer->viewCounterAdd();
 		m_tile.universe->destroyEntity(mesh_entity);
 		m_tile.frame_countdown = 2;
 		m_tile.path_hash = model->getPath().getHash();
-		model->getResourceManager().unload(*model);*/
+		model->getResourceManager().unload(*model);
 	}
 
 
@@ -2174,11 +2172,8 @@ struct RenderInterfaceImpl final : public RenderInterface
 
 	DVec3 getClosestVertex(Universe* universe, EntityRef entity, const DVec3& wpos) override
 	{
-		/*
-		Matrix mtx = universe->getMatrix(entity);
-		Matrix inv_mtx = mtx;
-		inv_mtx.inverse();
-		Vec3 lpos = inv_mtx.transformPoint(wpos);
+		const Transform tr = universe->getTransform(entity);
+		const Vec3 lpos = tr.rot.conjugated() * (wpos - tr.pos).toFloat();
 		auto* scene = (RenderScene*)universe->getScene(MODEL_INSTANCE_TYPE);
 		if (!universe->hasComponent(entity, MODEL_INSTANCE_TYPE)) return wpos;
 
@@ -2218,10 +2213,7 @@ struct RenderInterfaceImpl final : public RenderInterface
 				}
 			}
 		}
-		return mtx.transformPoint(closest_vertex);*/
-				// TODO
-	ASSERT(false);
-	return {};
+		return tr.pos + tr.rot * closest_vertex;
 	}
 
 
@@ -2337,15 +2329,9 @@ struct RenderInterfaceImpl final : public RenderInterface
 
 	WorldEditor::RayHit castRay(const DVec3& origin, const Vec3& dir, EntityPtr ignored) override
 	{
-		auto hit = m_render_scene->castRay(origin, dir, ignored);
+		const RayCastModelHit hit = m_render_scene->castRay(origin, dir, ignored);
 
-		return {hit.m_is_hit, hit.m_t, hit.m_entity, hit.m_origin + hit.m_dir * hit.m_t};
-	}
-
-
-	void getRay(EntityRef camera, const Vec2& screen_pos, DVec3& origin, Vec3& dir) override
-	{
-		m_render_scene->getRay(camera, screen_pos, origin, dir);
+		return {hit.is_hit, hit.t, hit.entity, hit.origin + hit.dir * hit.t};
 	}
 
 
@@ -2409,7 +2395,7 @@ struct RenderInterfaceImpl final : public RenderInterface
 	float castRay(ModelHandle model, const Vec3& origin, const Vec3& dir, const Pose* pose) override
 	{
 		RayCastModelHit hit = m_models[model]->castRay(origin, dir, pose);
-		return hit.m_is_hit ? hit.m_t : -1;
+		return hit.is_hit ? hit.t : -1;
 	}
 
 
@@ -2473,7 +2459,7 @@ struct RenderInterfaceImpl final : public RenderInterface
 	}
 
 
-	Frustum getFrustum(EntityRef camera, const Vec2& viewport_min, const Vec2& viewport_max) override
+	ShiftedFrustum getFrustum(EntityRef camera, const Vec2& viewport_min, const Vec2& viewport_max) override
 	{
 		return m_render_scene->getCameraFrustum(camera, viewport_min, viewport_max);
 	}

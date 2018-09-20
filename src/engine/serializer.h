@@ -9,6 +9,7 @@ namespace Lumix
 
 struct DVec3;
 class InputBlob;
+struct LocalRigidTransform;
 class OutputBlob;
 struct Quat;
 struct RigidTransform;
@@ -50,6 +51,7 @@ struct LUMIX_ENGINE_API ISerializer
 	virtual void write(const char* label, EntityRef entity) = 0;
 	virtual void write(const char* label, const Transform& value) = 0;
 	virtual void write(const char* label, const RigidTransform& value) = 0;
+	virtual void write(const char* label, const LocalRigidTransform& value) = 0;
 	virtual void write(const char* label, const Vec4& value) = 0;
 	virtual void write(const char* label, const DVec3& value) = 0;
 	virtual void write(const char* label, const Vec3& value) = 0;
@@ -77,6 +79,7 @@ struct LUMIX_ENGINE_API IDeserializer
 	virtual void read(EntityRef* entity) = 0;
 	virtual void read(Transform* value) = 0;
 	virtual void read(RigidTransform* value) = 0;
+	virtual void read(LocalRigidTransform* value) = 0;
 	virtual void read(Vec4* value) = 0;
 	virtual void read(DVec3* value) = 0;
 	virtual void read(Vec3* value) = 0;
@@ -108,6 +111,7 @@ struct LUMIX_ENGINE_API TextSerializer final : public ISerializer
 	void write(const char* label, EntityPtr entity)  override;
 	void write(const char* label, EntityRef entity)  override;
 	void write(const char* label, const RigidTransform& value)  override;
+	void write(const char* label, const LocalRigidTransform& value)  override;
 	void write(const char* label, const Transform& value)  override;
 	void write(const char* label, const Vec4& value)  override;
 	void write(const char* label, const DVec3& value)  override;
@@ -142,6 +146,7 @@ struct LUMIX_ENGINE_API TextDeserializer final : public IDeserializer
 	void read(EntityPtr* entity)  override;
 	void read(EntityRef* entity)  override;
 	void read(RigidTransform* value)  override;
+	void read(LocalRigidTransform* value)  override;
 	void read(Transform* value)  override;
 	void read(Vec4* value)  override;
 	void read(DVec3* value)  override;

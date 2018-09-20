@@ -811,7 +811,7 @@ bool getRayTriangleIntersection(const Vec3& local_origin, const Vec3& local_dir,
 RayCastModelHit Terrain::castRay(const DVec3& origin, const Vec3& dir)
 {
 	RayCastModelHit hit;
-	hit.m_is_hit = false;
+	hit.is_hit = false;
 	if (m_root)
 	{
 		Matrix mtx = m_scene.getUniverse().getRelativeMatrix(m_entity, origin);
@@ -844,18 +844,18 @@ RayCastModelHit Terrain::castRay(const DVec3& origin, const Vec3& dir)
 				Vec3 p3(x, getHeight(x, z + m_scale.x), z + m_scale.x);
 				if (getRayTriangleIntersection(rel_origin, rel_dir, p0, p1, p2, t))
 				{
-					hit.m_is_hit = true;
-					hit.m_origin = origin;
-					hit.m_dir = dir;
-					hit.m_t = t;
+					hit.is_hit = true;
+					hit.origin = origin;
+					hit.dir = dir;
+					hit.t = t;
 					return hit;
 				}
 				if (getRayTriangleIntersection(rel_origin, rel_dir, p0, p2, p3, t))
 				{
-					hit.m_is_hit = true;
-					hit.m_origin = origin;
-					hit.m_dir = dir;
-					hit.m_t = t;
+					hit.is_hit = true;
+					hit.origin = origin;
+					hit.dir = dir;
+					hit.t = t;
 					return hit;
 				}
 				if (next_x < next_z)

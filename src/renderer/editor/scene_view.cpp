@@ -329,7 +329,7 @@ void SceneView::handleDrop(const char* path, float x, float y)
 
 	if (PathUtils::hasExtension(path, "msh"))
 	{
-		const DVec3 pos = hit.m_origin + (hit.m_is_hit ? hit.m_t : 1) * hit.m_dir;
+		const DVec3 pos = hit.origin + (hit.is_hit ? hit.t : 1) * hit.dir;
 
 		m_editor.beginCommandGroup(crc32("insert_mesh"));
 		EntityRef entity = m_editor.addEntity();
@@ -343,17 +343,17 @@ void SceneView::handleDrop(const char* path, float x, float y)
 	else if (PathUtils::hasExtension(path, "fab"))
 	{
 		DeferredPrefabInsert defer;
-		defer.pos = hit.m_origin + (hit.m_is_hit ? hit.m_t : 1) * hit.m_dir;
+		defer.pos = hit.origin + (hit.is_hit ? hit.t : 1) * hit.dir;
 		ResourceManagerHub& manager = m_editor.getEngine().getResourceManager();
 		defer.prefab = manager.load<PrefabResource>(Path(path));
 		m_deferred_prefab_inserts.push(defer);
 	}
 	else if (PathUtils::hasExtension(path, "phy"))
 	{
-		if (hit.m_is_hit && hit.m_entity.isValid())
+		if (hit.is_hit && hit.entity.isValid())
 		{
 			m_editor.beginCommandGroup(crc32("insert_phy_component"));
-			const EntityRef e = (EntityRef)hit.m_entity;
+			const EntityRef e = (EntityRef)hit.entity;
 			m_editor.selectEntities(&e, 1, false);
 			m_editor.addComponent(MESH_ACTOR_TYPE);
 			auto* prop = Reflection::getProperty(MESH_ACTOR_TYPE, "Source");
@@ -362,7 +362,7 @@ void SceneView::handleDrop(const char* path, float x, float y)
 		}
 		else
 		{
-			const DVec3 pos = hit.m_origin + (hit.m_is_hit ? hit.m_t : 1) * hit.m_dir;
+			const DVec3 pos = hit.origin + (hit.is_hit ? hit.t : 1) * hit.dir;
 			m_editor.beginCommandGroup(crc32("insert_phy"));
 			EntityRef entity = m_editor.addEntity();
 			m_editor.setEntitiesPositions(&entity, &pos, 1);
@@ -373,16 +373,16 @@ void SceneView::handleDrop(const char* path, float x, float y)
 			m_editor.endCommandGroup();
 		}
 	}
-	else if (hit.m_is_hit && PathUtils::hasExtension(path, "mat") && hit.m_mesh)
+	else if (hit.is_hit && PathUtils::hasExtension(path, "mat") && hit.mesh)
 	{
-		const EntityRef e = (EntityRef)hit.m_entity;
+		const EntityRef e = (EntityRef)hit.entity;
 		m_editor.selectEntities(&e, 1, false);
 		RenderScene* scene = m_pipeline->getScene();
 		Model* model = scene->getModelInstanceModel(e);
 		int mesh_index = 0;
 		for (int i = 0; i < model->getMeshCount(); ++i)
 		{
-			if (&model->getMesh(i) == hit.m_mesh)
+			if (&model->getMesh(i) == hit.mesh)
 			{
 				mesh_index = i;
 				break;

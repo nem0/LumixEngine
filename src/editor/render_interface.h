@@ -35,7 +35,6 @@ public:
 	virtual bool isCameraOrtho(EntityRef entity) = 0;
 	virtual float getCameraOrthoSize(EntityRef entity) = 0;
 	virtual Vec2 getCameraScreenSize(EntityRef entity) = 0;
-	virtual void getRay(EntityRef entity, const Vec2& screen_pos, DVec3& origin, Vec3& dir) = 0;
 	virtual float castRay(ModelHandle model, const Vec3& origin, const Vec3& dir, const Pose* pose) = 0;
 	virtual void renderModel(ModelHandle model, const Matrix& mtx) = 0;
 	virtual ModelHandle loadModel(Path& path) = 0;
@@ -64,7 +63,7 @@ public:
 	virtual void addRect2D(const Vec2& a, const Vec2& b, u32 color) = 0;
 	virtual void addRectFilled2D(const Vec2& a, const Vec2& b, u32 color) = 0;
 	virtual void getModelInstaces(Array<EntityRef>& entity, const ShiftedFrustum& frustum, const DVec3& lod_ref_point, float fov, bool is_ortho) = 0;
-	virtual Frustum getFrustum(EntityRef camera, const Vec2& a, const Vec2& b) = 0;
+	virtual ShiftedFrustum getFrustum(EntityRef camera, const Vec2& a, const Vec2& b) = 0;
 };
 
 

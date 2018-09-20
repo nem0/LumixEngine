@@ -1562,6 +1562,7 @@ void destroy(BufferHandle buffer)
 
 void clear(uint flags, const float* color, float depth)
 {
+	CHECK_GL(glDisable(GL_BLEND));
 	checkThread();
 	GLbitfield gl_flags = 0;
 	if (flags & (uint)ClearFlags::COLOR) {
@@ -1569,6 +1570,7 @@ void clear(uint flags, const float* color, float depth)
 		gl_flags |= GL_COLOR_BUFFER_BIT;
 	}
 	if (flags & (uint)ClearFlags::DEPTH) {
+		CHECK_GL(glDepthMask(GL_TRUE));
 		CHECK_GL(glClearDepth(depth));
 		gl_flags |= GL_DEPTH_BUFFER_BIT;
 	}

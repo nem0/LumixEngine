@@ -143,6 +143,26 @@ struct alignas(16) LUMIX_ENGINE_API ShiftedFrustum
 		float width,
 		float height,
 		float near_distance,
+		float far_distance,
+		const Vec2& viewport_min,
+		const Vec2& viewport_max);
+	
+	void computePerspective(const DVec3& position,
+		const Vec3& direction,
+		const Vec3& up,
+		float fov,
+		float ratio,
+		float near_distance,
+		float far_distance,
+		const Vec2& viewport_min,
+		const Vec2& viewport_max);
+	
+	void computeOrtho(const DVec3& position,
+		const Vec3& direction,
+		const Vec3& up,
+		float width,
+		float height,
+		float near_distance,
 		float far_distance);
 	
 	void computePerspective(const DVec3& position,
@@ -153,11 +173,6 @@ struct alignas(16) LUMIX_ENGINE_API ShiftedFrustum
 		float near_distance,
 		float far_distance);
 
-	float xs[(int)Frustum::Planes::COUNT];
-	float ys[(int)Frustum::Planes::COUNT];
-	float zs[(int)Frustum::Planes::COUNT];
-	float ds[(int)Frustum::Planes::COUNT];
-
 	bool containsAABB(const DVec3& pos, const Vec3& size) const;
 	bool intersectsAABB(const DVec3& pos, const Vec3& size) const;
 	Frustum getRelative(const DVec3& origin) const;
@@ -165,6 +180,10 @@ struct alignas(16) LUMIX_ENGINE_API ShiftedFrustum
 	void setPlanesFromPoints();
 	void setPlane(Frustum::Planes side, const Vec3& normal, const Vec3& point);
 
+	float xs[(int)Frustum::Planes::COUNT];
+	float ys[(int)Frustum::Planes::COUNT];
+	float zs[(int)Frustum::Planes::COUNT];
+	float ds[(int)Frustum::Planes::COUNT];
 	Vec3 points[8];
 	DVec3 origin;
 };
