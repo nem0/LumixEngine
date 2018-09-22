@@ -1512,10 +1512,7 @@ public:
 
 	void deserializeModelInstances(InputBlob& serializer)
 	{
-				// TODO
-		ASSERT(false);
-		/*
-i32 size = 0;
+        i32 size = 0;
 		serializer.read(size);
 		m_model_instances.reserve(size);
 		for (int i = 0; i < size; ++i)
@@ -1533,7 +1530,6 @@ i32 size = 0;
 			if(r.entity.isValid())
 			{
 				const EntityRef e = (EntityRef)r.entity;
-				r.matrix = m_universe.getMatrix(e);
 
 				u32 path;
 				serializer.read(path);
@@ -1559,7 +1555,7 @@ i32 size = 0;
 
 				m_universe.onComponentCreated(e, MODEL_INSTANCE_TYPE, this);
 			}
-		}*/
+		}
 	}
 
 	void deserializeLights(InputBlob& serializer)
