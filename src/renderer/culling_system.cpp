@@ -11,9 +11,10 @@
 namespace Lumix
 {
 
-typedef Array<u64> LayerMasks;
-typedef Array<int> ModelInstancetoSphereMap;
-typedef Array<EntityRef> SphereToModelInstanceMap;
+enum {
+	ID_ENTITY_BITMASK = 0x00ffFFff,
+	ID_TYPE_BITMASK = 0xff000000
+};
 
 struct CellIndices
 {
@@ -45,24 +46,20 @@ struct Cell
 {
 	Cell(IAllocator& allocator) 
 		: spheres(allocator)
-		, entities(allocator)
-		, masks(allocator)
+		, ids(allocator)
 	{}
 
 	DVec3 origin;
 	CellIndices indices;
 
 	Array<Sphere> spheres; 
-	Array<EntityRef> entities;
-	Array<u64> masks;
+	Array<u32> ids;
 };
 
 static void doCulling(const Sphere* LUMIX_RESTRICT start,
 	const Sphere* LUMIX_RESTRICT end,
 	const Frustum* LUMIX_RESTRICT frustum,
-	const u64* LUMIX_RESTRICT layer_masks,
-	const EntityRef* LUMIX_RESTRICT sphere_to_model_instance_map,
-	u64 layer_mask,
+	const u32* LUMIX_RESTRICT sphere_to_id_map,
 	CullingSystem::Subresults& results)
 {
 	PROFILE_FUNCTION();
@@ -98,7 +95,7 @@ static void doCulling(const Sphere* LUMIX_RESTRICT start,
 		t = f4Sub(t, r);
 		if (f4MoveMask(t)) continue;
 
-		if(layer_masks[i] & layer_mask) results.push(sphere_to_model_instance_map[i]);
+		results.push(sphere_to_id_map[i]);
 	}
 }
 
@@ -107,9 +104,7 @@ struct CullingJobData
 {
 	const CullingSystem::InputSpheres* spheres;
 	CullingSystem::Subresults* results;
-	const LayerMasks* layer_masks;
-	const SphereToModelInstanceMap* sphere_to_model_instance_map;
-	u64 layer_mask;
+	const Array<u32>* sphere_to_renderable_map;
 	int start;
 	int end;
 	const Frustum* frustum;
@@ -137,13 +132,12 @@ struct CullingSystemImpl final : public CullingSystem
 		}
 	}
 
-	u32 addToCell(Cell& cell, EntityRef entity, const DVec3& pos, float radius, u64 mask)
+	u32 addToCell(Cell& cell, u32 id, const DVec3& pos, float radius)
 	{
 		const Vec3 rel_pos = (pos - cell.origin).toFloat();
 		cell.spheres.push({rel_pos, radius});
-		cell.masks.push(mask);
-		cell.entities.push(entity);
-		return cell.entities.size() - 1;
+		cell.ids.push(id);
+		return cell.ids.size() - 1;
 	}
 
 	Cell& getCell(const DVec3& pos)
@@ -164,7 +158,7 @@ struct CullingSystemImpl final : public CullingSystem
 		return *iter.value();
 	}
 
-	void add(EntityRef entity, const DVec3& pos, float radius, u64 layer_mask) override
+	void add(EntityRef entity, u8 type, const DVec3& pos, float radius) override
 	{
 		if(m_entity_to_cell.size() <= entity.index) {
 			m_entity_to_cell.reserve(entity.index);
@@ -173,14 +167,16 @@ struct CullingSystemImpl final : public CullingSystem
 			}
 		}
 		
+		ASSERT((entity.index & ID_TYPE_BITMASK) == 0);
+		const u32 id = type << 24 | (entity.index & 0xffFFff);
 		if (radius > m_cell_size) {
-			const u32 idx = addToCell(m_big_object_cell, entity, pos, radius, layer_mask);
+			const u32 idx = addToCell(m_big_object_cell, id, pos, radius);
 			m_entity_to_cell[entity.index] = {&m_big_object_cell, idx};
 			return;
 		}
 
 		Cell& cell = getCell(pos);
-		const u32 idx = addToCell(cell, entity, pos, radius, layer_mask);
+		const u32 idx = addToCell(cell, id, pos, radius);
 		m_entity_to_cell[entity.index] = {&cell, idx}; 
 		return;
 	}
@@ -189,10 +185,9 @@ struct CullingSystemImpl final : public CullingSystem
 	{
 		const EntityLoc loc = m_entity_to_cell[entity.index];
 		Cell& cell = *loc.cell;
-		const EntityRef last = cell.entities.back();
-		m_entity_to_cell[last.index] = loc;
-		cell.entities.eraseFast(loc.idx);
-		cell.masks.eraseFast(loc.idx);
+		const u32 last = cell.ids.back();
+		m_entity_to_cell[last & ID_ENTITY_BITMASK] = loc;
+		cell.ids.eraseFast(loc.idx);
 		cell.spheres.eraseFast(loc.idx);
 
 		if(cell.spheres.empty() && &cell != &m_big_object_cell) {
@@ -220,9 +215,9 @@ struct CullingSystemImpl final : public CullingSystem
 		}
 
 		const float radius = cell.spheres[loc.idx].radius;
-		const u64 layer_mask = cell.masks[loc.idx];
+		const u32 id = cell.ids[loc.idx];
 		remove(entity);
-		add(entity, pos, radius, layer_mask);
+		add(entity, (id & ID_TYPE_BITMASK) >> 24, pos, radius);
 	}
 
 	float getRadius(EntityRef entity) override
@@ -246,18 +241,12 @@ struct CullingSystemImpl final : public CullingSystem
 		}
 
 		const DVec3 pos = cell.origin + cell.spheres[loc.idx].position;
-		const u64 layer_mask = cell.masks[loc.idx];
+		const u32 id = cell.ids[loc.idx];
 
 		remove(entity);
-		add(entity, pos, radius, layer_mask);
+		add(entity, (id & ID_TYPE_BITMASK) >> 24, pos, radius);
 	}
-	
-	void setLayerMask(EntityRef entity, u64 layer) override
-	{
-		const EntityLoc loc = m_entity_to_cell[entity.index];
-		Cell& cell = *loc.cell;
-		cell.masks[loc.idx] = layer;
-	}
+
 
 	void clear() override
 	{
@@ -269,14 +258,13 @@ struct CullingSystemImpl final : public CullingSystem
 		m_entity_to_cell.clear();
 		
 		m_big_object_cell.spheres.clear();
-		m_big_object_cell.masks.clear();
-		m_big_object_cell.entities.clear();
+		m_big_object_cell.ids.clear();
 	}
 
-	void cull(const ShiftedFrustum& frustum, u64 layer_mask, Results& result) override
+	void cull(const ShiftedFrustum& frustum, Results& result) override
 	{
 		ASSERT(result.empty());
-		if(m_cells.empty() && m_big_object_cell.entities.empty()) return;
+		if(m_cells.empty() && m_big_object_cell.ids.empty()) return;
 
 		const uint buckets_count = MT::getCPUsCount() * 4;
 		while(result.size() < (int)buckets_count) result.emplace(m_allocator);
@@ -288,19 +276,19 @@ struct CullingSystemImpl final : public CullingSystem
 		uint partial_entities = 0;
 		for (Cell* cell : m_cells) {
 			if (frustum.containsAABB(cell->origin + v3_cell_size, -v3_cell_size)) {
-				for(EntityRef e : cell->entities) {
-					result[counter].push(e);
+				for(u32 id : cell->ids) {
+					result[counter].push(id);
 					counter = (counter + 1) % buckets_count;
 				}
 			}
 			else if (frustum.intersectsAABB(cell->origin - v3_cell_size, v3_2_cell_size)) {
-				partial_entities += cell->entities.size();
+				partial_entities += cell->ids.size();
 				partial.push(cell);
 			}
 		}
 		
-		if(!m_big_object_cell.entities.empty()) {
-			partial_entities += m_big_object_cell.entities.size();
+		if(!m_big_object_cell.ids.empty()) {
+			partial_entities += m_big_object_cell.ids.size();
 			partial.push(&m_big_object_cell);
 		}
 
@@ -318,9 +306,7 @@ struct CullingSystemImpl final : public CullingSystem
 						doCulling(cell->spheres.begin() + that->entity_start_offset
 							, (that->cells == that->cells_end ? cell->spheres.begin() + that->entity_end_offset : cell->spheres.end())
 							, &rel_frustum
-							, cell->masks.begin() + that->entity_start_offset
-							, cell->entities.begin() + that->entity_start_offset
-							, that->layer_mask
+							, cell->ids.begin() + that->entity_start_offset
 							, that->result);
 					}
 
@@ -330,9 +316,7 @@ struct CullingSystemImpl final : public CullingSystem
 						doCulling(cell->spheres.begin()
 							, cell->spheres.end()
 							, &rel_frustum
-							, cell->masks.begin()
-							, cell->entities.begin()
-							, that->layer_mask
+							, cell->ids.begin()
 							, that->result);
 					}
 
@@ -342,9 +326,7 @@ struct CullingSystemImpl final : public CullingSystem
 						doCulling(cell->spheres.begin()
 							, cell->spheres.begin() + that->entity_end_offset
 							, &rel_frustum
-							, cell->masks.begin()
-							, cell->entities.begin()
-							, that->layer_mask
+							, cell->ids.begin()
 							, that->result);
 					}
 				};
@@ -355,7 +337,6 @@ struct CullingSystemImpl final : public CullingSystem
 			Cell** cells_end;
 			uint entity_start_offset;
 			uint entity_end_offset;
-			u64 layer_mask;
 			ShiftedFrustum frustum;
 			Subresults& result;
 		};
@@ -373,8 +354,8 @@ struct CullingSystemImpl final : public CullingSystem
 				uint job_entities = step;
 				job.cells = cell_iter;
 				job.entity_start_offset = entity_offset;
-				while(job_entities > (uint)(*cell_iter)->entities.size() && cell_iter + 1 != partial.end()) {
-					job_entities -= (uint)(*cell_iter)->entities.size();
+				while(job_entities > (uint)(*cell_iter)->ids.size() && cell_iter + 1 != partial.end()) {
+					job_entities -= (uint)(*cell_iter)->ids.size();
 					++cell_iter;
 				}
 				job.cells_end = cell_iter;
@@ -384,40 +365,12 @@ struct CullingSystemImpl final : public CullingSystem
 					job.entity_end_offset += job.entity_start_offset;
 					entity_offset = job.entity_end_offset + 1;
 				}
-				job.entity_end_offset = Math::minimum(job.entity_end_offset, (*job.cells_end)->entities.size() - 1);
-				job.layer_mask = layer_mask;
+				job.entity_end_offset = Math::minimum(job.entity_end_offset, (*job.cells_end)->ids.size() - 1);
 				job.frustum = frustum;
 				JobSystem::runJobs(&job.decl, 1, &job_counter);
 			}
 			JobSystem::wait(&job_counter);
 		}
-/*
-		int step = count / result.size();
-		
-		// TODO allocate on stack
-		Array<CullingJobData> job_data(m_allocator);
-		Array<JobSystem::JobDecl> jobs(m_allocator);
-		job_data.resize(result.size());
-		jobs.resize(result.size());
-	
-		for (int i = 0; i < result.size(); i++) {
-			result[i].clear();
-			job_data[i] = {
-				&m_spheres,
-				&result[i],
-				&m_layer_masks,
-				&m_sphere_to_model_instance_map,
-				layer_mask,
-				i * step,
-				i == result.size() - 1 ? count - 1 : (i + 1) * step - 1,
-				&frustum
-			};
-			jobs[i].data = &job_data[i];
-			jobs[i].task = &cullTask;
-		}
-		volatile int job_counter = 0;
-		JobSystem::runJobs(&jobs[0], result.size(), &job_counter);
-		JobSystem::wait(&job_counter);*/
 	}
 	
 

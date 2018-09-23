@@ -40,7 +40,6 @@ namespace Lumix
 
 enum class RenderSceneVersion : int
 {
-
 	LATEST
 };
 
@@ -1754,7 +1753,7 @@ public:
 	}
 
 
-	ModelInstance* getModelInstances() override
+	const ModelInstance* getModelInstances() const override
 	{
 		return m_model_instances.empty() ? nullptr : &m_model_instances[0];
 	}
@@ -2004,19 +2003,6 @@ public:
 	Model* getModelInstanceModel(EntityRef entity) override { return m_model_instances[entity.index].model; }
 
 
-	static u64 getLayerMask(ModelInstance& model_instance)
-	{
-		Model* model = model_instance.model;
-		if (!model->isReady()) return 1;
-		u64 layer_mask = 0;
-		for(int i = 0; i < model->getMeshCount(); ++i)
-		{ 
-			layer_mask |= model->getMesh(i).material->getRenderLayerMask();
-		}
-		return layer_mask;
-	}
-
-
 	bool isModelInstanceEnabled(EntityRef entity) override
 	{
 		ModelInstance& model_instance = m_model_instances[entity.index];
@@ -2034,8 +2020,10 @@ public:
 
 			const DVec3 pos = m_universe.getPosition((EntityRef)model_instance.entity);
 			const float radius = model_instance.model->getBoundingRadius();
-			u64 layer_mask = getLayerMask(model_instance);
-			if (!m_culling_system->isAdded(entity)) m_culling_system->add(entity, pos, radius, layer_mask);
+			if (!m_culling_system->isAdded(entity)) {
+				RenderableTypes type = model_instance.model->getMeshCount() == 1 ? RenderableTypes::MESH : RenderableTypes::MESH_GROUP;
+				m_culling_system->add(entity, (u8)type, pos, radius);
+			}
 		}
 		else
 		{
@@ -2359,18 +2347,20 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 
 	void getModelInstanceEntities(const ShiftedFrustum& frustum, Array<EntityRef>& entities) override
 	{
-		PROFILE_FUNCTION();
+		/*PROFILE_FUNCTION();
 
 		CullingSystem::Results results(m_allocator);
-		m_culling_system->cull(frustum, ~0ULL, results);
+		m_culling_system->cull(frustum, results);
 
 		for (auto& subresults : results)
 		{
-			for (EntityRef model_instance : subresults)
+			for (u32 renderable: subresults)
 			{
 				entities.push(model_instance);
 			}
-		}
+		}*/
+		// TODO
+		ASSERT(false);
 	}
 
 
@@ -2390,80 +2380,9 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	void getModelInstanceInfos(const ShiftedFrustum& frustum,
-		const DVec3& lod_ref_point,
-		float lod_multiplier,
-		u64 layer_mask,
-		Array<MeshInstance>& result) const override
+	void getRenderables(const ShiftedFrustum& frustum, Array<Array<u32>>& result) const override
 	{
-		CullingSystem::Results cull_results(m_allocator);
-		m_culling_system->cull(frustum, layer_mask, cull_results);
-		if (cull_results.empty()) return;
-		
-		Array<Array<MeshInstance>> tmp(m_allocator);
-		tmp.reserve(cull_results.size());
-		for (auto& r : cull_results) {
-			tmp.emplace(m_allocator);
-		}
-
-		JobSystem::JobDecl jobs[64];
-		JobSystem::LambdaJob job_storage[64];
-		ASSERT(cull_results.size() <= lengthOf(jobs));
-
-		volatile int counter = 0;
-		for (int subresult_index = 0; subresult_index < cull_results.size(); ++subresult_index) {
-			Array<MeshInstance>& subinfos = tmp[subresult_index];
-			subinfos.reserve(cull_results[subresult_index].size());
-
-			JobSystem::fromLambda([&layer_mask, &subinfos, this, &cull_results, subresult_index, lod_ref_point, lod_multiplier]() {
-				PROFILE_BLOCK("Temporary Info Job");
-				PROFILE_INT("ModelInstance count", cull_results[subresult_index].size());
-				if (cull_results[subresult_index].empty()) return;
-
-				const Universe& universe = m_universe;
-				const DVec3 ref_point = lod_ref_point;
-				const float final_lod_multiplier = m_lod_multiplier * lod_multiplier;
-				const EntityRef* LUMIX_RESTRICT raw_subresults = &cull_results[subresult_index][0];
-				const ModelInstance* LUMIX_RESTRICT model_instances = &m_model_instances[0];
-				for (int i = 0, c = cull_results[subresult_index].size(); i < c; ++i) {
-					const EntityRef e = raw_subresults[i];
-					const ModelInstance* LUMIX_RESTRICT model_instance = &model_instances[e.index];
-					
-					float squared_distance = float((universe.getPosition(e) - ref_point).squaredLength());
-					squared_distance *= final_lod_multiplier;
-
-					const Model* LUMIX_RESTRICT model = model_instance->model;
-					const LODMeshIndices lod = model->getLODMeshIndices(squared_distance);
-					for (int j = lod.from, c = lod.to; j <= c; ++j) {
-						const Mesh& mesh = model_instance->meshes[j];
-						if ((mesh.layer_mask & layer_mask) == 0) continue;
-						
-						if (mesh.material->isReady()) {
-							MeshInstance& info = subinfos.emplace();
-							info.owner = raw_subresults[i];
-							info.mesh = &mesh;
-							info.depth = squared_distance;
-						}
-					}
-				}
-			}, &job_storage[subresult_index], &jobs[subresult_index], &m_allocator);
-		}
-		JobSystem::runJobs(jobs, cull_results.size(), &counter);
-		JobSystem::wait(&counter);
-
-		uint count = 0;
-		for (auto& i : tmp) {
-			count += i.size();
-		}
-
-		result.resize(count);
-		uint offset = 0;
-		PROFILE_BLOCK("merge temporary infos");
-		PROFILE_INT("count", count);
-		for (auto& i : tmp) {
-			memcpy(result.begin() + offset, i.begin(), i.byte_size());
-			offset += i.size();
-		}
+		m_culling_system->cull(frustum, result);
 	}
 
 
@@ -3502,7 +3421,10 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		float scale = m_universe.getScale(entity);
 		const DVec3 pos = m_universe.getPosition(entity);
 		const float radius = bounding_radius * scale;
-		if(r.flags.isSet(ModelInstance::ENABLED)) m_culling_system->add(entity, pos, radius, getLayerMask(r));
+		if(r.flags.isSet(ModelInstance::ENABLED)) {
+			RenderableTypes type = model->getMeshCount() == 1 ? RenderableTypes::MESH : RenderableTypes::MESH_GROUP;
+			m_culling_system->add(entity, (u8)type, pos, radius);
+		}
 		ASSERT(!r.pose);
 		if (model->getBoneCount() > 0)
 		{

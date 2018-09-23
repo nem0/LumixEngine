@@ -777,11 +777,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			}
 		}
 
-				// TODO
-	ASSERT(false);
-/*ImGui::LabelText("Bone count", "%d", model->getBoneCount());
-		if (model->getBoneCount() > 0 && ImGui::CollapsingHeader("Bones"))
-		{
+		ImGui::LabelText("Bone count", "%d", model->getBoneCount());
+		if (model->getBoneCount() > 0 && ImGui::CollapsingHeader("Bones")) {
 			ImGui::Columns(3);
 			for (int i = 0; i < model->getBoneCount(); ++i)
 			{
@@ -794,7 +791,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				ImGui::Text("%f; %f; %f; %f", rot.x, rot.y, rot.z, rot.w);
 				ImGui::NextColumn();
 			}
-		}*/
+		}
 
 		if (ImGui::CollapsingHeader("Import")) {
 			AssetCompiler& compiler = m_app.getAssetCompiler();
@@ -2471,14 +2468,16 @@ struct RenderInterfaceImpl final : public RenderInterface
 		float fov,
 		bool is_ortho) override
 	{
-		const float lod_multiplier = m_render_scene->getCameraLODMultiplier(fov, is_ortho);
+		/*const float lod_multiplier = m_render_scene->getCameraLODMultiplier(fov, is_ortho);
 		Array<MeshInstance> meshes(m_render_scene->getAllocator());
-		m_render_scene->getModelInstanceInfos(frustum, lod_ref_point, lod_multiplier, ~0ULL, meshes);
+		m_render_scene->getModelInstanceInfos(frustum, lod_ref_point, lod_multiplier, meshes);
 		for (MeshInstance m : meshes) {
 			if (entities.indexOf(m.owner) < 0) {
 				entities.push(m.owner);
 			}
-		}
+		}*/
+		ASSERT(false);
+		// TODO
 	}
 
 

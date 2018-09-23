@@ -19,7 +19,7 @@ namespace Lumix
 	{
 	public:
 		typedef Array<Sphere> InputSpheres;
-		typedef Array<EntityRef> Subresults;
+		typedef Array<u32> Subresults; // {type:8, entity:24}
 		typedef Array<Subresults> Results;
 
 		CullingSystem() { }
@@ -30,13 +30,11 @@ namespace Lumix
 
 		virtual void clear() = 0;
 
-		virtual void cull(const ShiftedFrustum& frustum, u64 layer_mask, Results& result) = 0;
+		virtual void cull(const ShiftedFrustum& frustum, Results& result) = 0;
 
 		virtual bool isAdded(EntityRef entity) = 0;
-		virtual void add(EntityRef entity, const DVec3& pos, float radius, u64 layer_mask) = 0;
+		virtual void add(EntityRef entity, u8 type, const DVec3& pos, float radius) = 0;
 		virtual void remove(EntityRef entity) = 0;
-
-		virtual void setLayerMask(EntityRef entity, u64 layer) = 0;
 
 		virtual void setPosition(EntityRef entity, const DVec3& pos) = 0;
 		virtual void setRadius(EntityRef entity, float radius) = 0;
