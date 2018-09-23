@@ -142,6 +142,10 @@ struct DebugPoint
 	float life;
 };
 
+enum class RenderableTypes : u8 {
+	MESH_GROUP,
+	MESH
+};
 
 struct TextMeshVertex
 {
@@ -269,17 +273,13 @@ public:
 	virtual void enableModelInstance(EntityRef entity, bool enable) = 0;
 	virtual bool isModelInstanceEnabled(EntityRef entity) = 0;
 	virtual ModelInstance* getModelInstance(EntityRef entity) = 0;
-	virtual ModelInstance* getModelInstances() = 0;
+	virtual const ModelInstance* getModelInstances() const = 0;
 	virtual Path getModelInstancePath(EntityRef entity) = 0;
 	virtual void setModelInstanceMaterial(EntityRef entity, int index, const Path& path) = 0;
 	virtual Path getModelInstanceMaterial(EntityRef entity, int index) = 0;
 	virtual int getModelInstanceMaterialsCount(EntityRef entity) = 0;
 	virtual void setModelInstancePath(EntityRef entity, const Path& path) = 0;
-	virtual void getModelInstanceInfos(const ShiftedFrustum& frustum,
-		const DVec3& lod_ref_point,
-		float lod_multiplier,
-		u64 layer_mask,
-		Array<MeshInstance>& result) const = 0;
+	virtual void getRenderables(const ShiftedFrustum& frustum, Array<Array<u32>>& result) const = 0;
 	virtual void getModelInstanceEntities(const ShiftedFrustum& frustum, Array<EntityRef>& entities) = 0;
 	virtual EntityPtr getFirstModelInstance() = 0;
 	virtual EntityPtr getNextModelInstance(EntityPtr entity) = 0;

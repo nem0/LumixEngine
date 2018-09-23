@@ -99,7 +99,7 @@ struct ComponentType
 const ComponentType INVALID_COMPONENT_TYPE = {-1};
 const EntityPtr INVALID_ENTITY = {-1};
 
-template <typename T, int count> int lengthOf(const T (&)[count])
+template <typename T, int count> constexpr int lengthOf(const T (&)[count])
 {
 	return count;
 };
