@@ -41,11 +41,36 @@ public:
 
 	enum { ENTITY_NAME_MAX_LENGTH = 32 };
 
+	struct EntityData
+	{
+		EntityData() {}
+
+		Transform transform;
+		
+		int hierarchy;
+		int name;
+
+		union
+		{
+			struct 
+			{
+				u64 components;
+			};
+			struct
+			{
+				int prev;
+				int next;
+			};
+		};
+		bool valid;
+	};
+
 public:
 	explicit Universe(IAllocator& allocator);
 	~Universe();
 
 	IAllocator& getAllocator() { return m_allocator; }
+	const EntityData* getEntityData() const { return m_entities.begin(); }
 	void emplaceEntity(EntityRef entity);
 	EntityRef createEntity(const DVec3& position, const Quat& rotation);
 	EntityRef cloneEntity(EntityRef entity);
@@ -141,31 +166,6 @@ private:
 		EntityPtr next_sibling;
 
 		Transform local_transform;
-	};
-
-
-	struct EntityData
-	{
-		EntityData() {}
-
-		Transform transform;
-		
-		int hierarchy;
-		int name;
-
-		union
-		{
-			struct 
-			{
-				u64 components;
-			};
-			struct
-			{
-				int prev;
-				int next;
-			};
-		};
-		bool valid;
 	};
 
 	struct EntityName
