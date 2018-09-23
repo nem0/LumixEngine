@@ -1725,7 +1725,6 @@ struct PipelineImpl final : Pipeline
 
 		RenderMeshesCommand(IAllocator& allocator) 
 			: m_allocator(allocator)
-			, m_offsets(allocator)
 			, m_cmds(allocator)
 		{}
 
@@ -1836,125 +1835,148 @@ struct PipelineImpl final : Pipeline
 		}
 
 
-		void fillCommands(const Array<Array<u32>>& renderables
-			, Array<u64>& sort_keys
-			, Array<u32>& stream_offsets
-			, Array<Array<u8>>& cmds)
+		void fillCommands(const Array<Array<u32>>& renderables, Array<Array<u8>>& cmds)
 		{
-			struct Context {
-				Context(RenderMeshesCommand& cmd
-					, Array<u8>& blob
-					, const Array<u32>& renderables
-					, u8 stream_idx
-					, const DVec3& camera_pos
-					, IAllocator& allocator
-				) 
-					: blob(blob)
-					, cmd(cmd)
-					, sort_keys(allocator)
-					, stream_offsets(allocator)
-					, renderables(renderables)
-					, stream_idx(stream_idx)
-					, camera_pos(camera_pos)
-				{
+			int renderables_count = 0;
+			for (const auto& r : renderables) {
+				renderables_count += r.size();
+			}
+
+			if(renderables_count == 0) return;
+
+			struct CreateSortKeys {
+				CreateSortKeys() {
 					job.data = this;
 					job.task = [](void* data){
-						Context* ctx = (Context*)data;
-						PROFILE_BLOCK("fill_commands");
-						PROFILE_INT("count", ctx->renderables.size());
-						Array<u8>& blob = ctx->blob;
-						blob.reserve(ctx->renderables.size() * 100);
-						u8* LUMIX_RESTRICT stream = blob.begin();
-						const u8* const LUMIX_RESTRICT stream_begin = stream;
-						int stream_offset = 0;
-						ctx->sort_keys.resize(ctx->renderables.size());
-						ctx->stream_offsets.resize(ctx->renderables.size());
-						RenderScene* scene = ctx->cmd.m_pipeline->m_scene;
-						const Universe& universe = scene->getUniverse();
-						const ModelInstance* LUMIX_RESTRICT model_instances = scene->getModelInstances();
-						const u32* LUMIX_RESTRICT renderables = ctx->renderables.begin();
-						const u8 stream_idx = ctx->stream_idx;
-						const DVec3 camera_pos = ctx->camera_pos;
-						u64* sort_keys = ctx->sort_keys.begin();
-						u32* stream_offsets = ctx->stream_offsets.begin();
+						PROFILE_BLOCK("sort_keys");
+						CreateSortKeys* ctx = (CreateSortKeys*)data;
+						PROFILE_INT("num", ctx->count);
 
-						for(int i = 0, c = ctx->renderables.size(); i < c; ++i) {
-							const u32 renderable = renderables[i];
-							const RenderableTypes type = RenderableTypes(renderable >> 24);
-							const EntityRef e{int(renderable & 0x00ffFFff)};
-
-							const uint stream_offset = uint(stream - stream_begin);
-							memcpy(stream, &type, sizeof(type));
-							stream += sizeof(type);
-
-							switch (type) {
-								case RenderableTypes::MESH_GROUP: {
-									break;
-								}
-								case RenderableTypes::MESH: {
-									const Mesh* mesh = &model_instances[e.index].meshes[0];
-									memcpy(stream, &mesh, sizeof(mesh));
-									stream += sizeof(mesh);
-
-									const Transform& tr = universe.getTransform(e);
-									const Vec3 pos = (tr.pos - camera_pos).toFloat();
-									Matrix mtx = tr.rot.toMatrix();
-									mtx.setTranslation(pos);
-									mtx.multiply3x3(tr.scale);
-									memcpy(stream, &mtx, sizeof(mtx));
-									stream += sizeof(mtx);
-									const float squared_dist = pos.squaredLength();
-									const u32 dist_u32 = Math::floatFlip(*(u32*)&squared_dist);
-									sort_keys[i] = ((u64)mesh->sort_key << 32) | dist_u32;
-									stream_offsets[i] = stream_offset | (stream_idx << 24);
-									break;
-								}
-								default:
-									ASSERT(false);
-									break;
-							}
+						const RenderScene* scene = ctx->cmd->m_pipeline->m_scene;
+						const ModelInstance* model_instances = scene->getModelInstances();
+						const u32* renderables = ctx->renderables;
+						u64* sort_keys = ctx->sort_keys;
+						for (int i = 0, c = ctx->count; i < c; ++i) {
+							const EntityRef e = {int(renderables[i] & 0x00ffFFff)};
+							const ModelInstance& mi = model_instances[e.index];
+							sort_keys[i] = mi.meshes[0].sort_key;
 						}
 					};
 				}
-				
-				RenderMeshesCommand& cmd;
-				const Array<u32>& renderables; 
-				Array<u64> sort_keys;
-				Array<u32> stream_offsets;
-				Array<u8>& blob;
+				u64* sort_keys;
+				u32* renderables;
+				int count;
 				JobSystem::JobDecl job;
-				u8 stream_idx;
-				DVec3 camera_pos;
+				RenderMeshesCommand* cmd;
 			};
-			
-			Array<Context> contexts(m_allocator);
-			contexts.reserve(renderables.size());
-			cmds.reserve(renderables.size());
 
-			volatile int counter = 0;
-			for(int i = 0; i < renderables.size(); ++i) {
-				const Context& ctx = contexts.emplace(*this
-					, cmds.emplace(m_allocator)
-					, renderables[i]
-					, i
-					, m_camera_params.pos
-					, m_allocator);
-				JobSystem::runJobs(&ctx.job, 1, &counter);
-			}
-			JobSystem::wait(&counter);
+			Array<u64> sort_keys(m_allocator);
+			sort_keys.resize(renderables_count);
 
-			int sort_keys_count = 0;
-			for(const Context& ctx : contexts) {
-				sort_keys_count += ctx.sort_keys.size();
+			{
+				Array<CreateSortKeys> create_sort_keys(m_allocator);
+				create_sort_keys.reserve(renderables.size());
+				volatile int sort_counter = 0;
+				int sort_offset = 0;
+				for(int i = 0; i < renderables.size(); ++i) {
+					if (renderables.empty()) continue;
+					CreateSortKeys& ctx = create_sort_keys.emplace();
+					ctx.renderables = renderables[i].begin();
+					ctx.sort_keys = sort_keys.begin() + sort_offset;
+					ctx.count = renderables[i].size();
+					ctx.cmd = this;
+					sort_offset += renderables[i].size();
+					JobSystem::runJobs(&ctx.job, 1, &sort_counter);
+				}
+				JobSystem::wait(&sort_counter);
 			}
-			sort_keys.resize(sort_keys_count);
-			stream_offsets.resize(sort_keys_count);
+
+			{
+				Array<u32> merged_renderables(m_allocator);
+				merged_renderables.resize(renderables_count);
+
+				{
+					PROFILE_BLOCK("merge & sort")
+					int sort_offset = 0;
+					for(int i = 0; i < renderables.size(); ++i) {
+						memcpy(merged_renderables.begin() + sort_offset, renderables[i].begin(), renderables[i].byte_size());
+						sort_offset += renderables[i].size();
+					}
+
+					radixSort(sort_keys.begin(), merged_renderables.begin(), sort_keys.size());
+				}
+
+				struct CreateCommands {
+					CreateCommands()
+					{
+						job.data = this;
+						job.task = [](void* data){
+							PROFILE_BLOCK("create cmds");
+							CreateCommands* ctx = (CreateCommands*)data;
+							PROFILE_INT("num", ctx->count);
+							const Universe& universe = ctx->cmd->m_pipeline->m_scene->getUniverse();
+							ctx->output->resize(ctx->count * (sizeof(Matrix) + sizeof(Mesh*) + sizeof(u16)));
+							u8* out = ctx->output->begin();
+							const u32* LUMIX_RESTRICT renderables = ctx->renderables;
+							const u64* LUMIX_RESTRICT sort_keys = ctx->sort_keys;
+							const ModelInstance* LUMIX_RESTRICT model_instances = ctx->cmd->m_pipeline->m_scene->getModelInstances();
+							const Universe::EntityData* LUMIX_RESTRICT entity_data = universe.getEntityData(); 
+							const DVec3 camera_pos = ctx->camera_pos;
+							for (int i = 0, c = ctx->count; i < c; ++i) {
+								const EntityRef e = {int(renderables[i] & 0x00ffFFff)};
+								const ModelInstance* LUMIX_RESTRICT mi = &model_instances[e.index];
+								*(Mesh**)out = mi->meshes;
+								out += sizeof(Mesh*);
+								u16* instance_count = (u16*)out;
+								int start_i = i;
+								out += sizeof(*instance_count);
+								const u64 key = sort_keys[i];
+								while (i < c && sort_keys[i] == key) {
+									const EntityRef e = {int(renderables[i] & 0x00ffFFff)};
+									const Transform& tr = entity_data[e.index].transform;
+									Matrix mtx = tr.rot.toMatrix();
+									mtx.multiply3x3(tr.scale);
+									mtx.setTranslation((tr.pos - camera_pos).toFloat());
+									memcpy(out, &mtx, sizeof(mtx));
+									out += sizeof(mtx);
+									++i;
+								}
+								*instance_count = u16(i - start_i);
+								--i;
+							}
+						};
+					}
+
+					u32* renderables;
+					u64* sort_keys;
+					Array<u8>* output;
+					DVec3 camera_pos;
+					int count;
+					RenderMeshesCommand* cmd;
+					JobSystem::JobDecl job;
+				};
 			
-			int offset = 0;
-			for(const Context& ctx : contexts) {
-				memcpy(sort_keys.begin() + offset, ctx.sort_keys.begin(), ctx.sort_keys.byte_size());
-				memcpy(stream_offsets.begin() + offset, ctx.stream_offsets.begin(), ctx.stream_offsets.byte_size());
-				offset += ctx.sort_keys.size();
+				{
+					Array<CreateCommands> create_commands(m_allocator);
+					const int job_count = Math::minimum(merged_renderables.size(), 16);
+					create_commands.reserve(job_count);
+					volatile int counter = 0;
+					int offset = 0;
+					const int step = (merged_renderables.size() + job_count - 1) / job_count;
+					cmds.reserve(job_count);
+					for(int i = 0; i < job_count; ++i) {
+						CreateCommands& ctx = create_commands.emplace();
+						ctx.renderables = merged_renderables.begin() + offset;
+						ctx.sort_keys = sort_keys.begin() + offset;
+						ctx.count = Math::minimum(step, merged_renderables.size() - offset);
+						ctx.cmd = this;
+						ctx.camera_pos = m_camera_params.pos;
+						ctx.output = &cmds.emplace(m_allocator);
+						offset += step;
+						JobSystem::runJobs(&ctx.job, 1, &counter);
+					}
+					JobSystem::wait(&counter);
+				}
 			}
 		}
 
@@ -1972,11 +1994,10 @@ struct PipelineImpl final : Pipeline
 			if (renderables.empty()) return;
 			
 			Array<u64> sort_keys(m_allocator);
-
 			
-			fillCommands(renderables, sort_keys, m_offsets, m_cmds);
+			fillCommands(renderables, m_cmds);
 
-			radixSort(sort_keys.begin(), m_offsets.begin(), sort_keys.size());
+//			radixSort(sort_keys.begin(), m_offsets.begin(), sort_keys.size());
 
 			// TODO
 			/*MT::atomicAdd(&m_pipeline->m_stats.draw_call_count, meshes.size());
@@ -2024,154 +2045,43 @@ struct PipelineImpl final : Pipeline
 
 			int drawcalls_count = 0;
 			
-			Matrix instances[2048];
-			int instances_count = 0;
-			Array<u8>* cmds = m_cmds.begin(); 
-			u32* offsets = m_offsets.begin();
+			for (Array<u8>& cmds : m_cmds) {
+				const u8* cmd = cmds.begin();
+				Mesh* mesh = *(Mesh**)cmd;
+				cmd += sizeof(mesh);
+				u16 instances_count = *(u16*)cmd;
+				cmd += sizeof(instances_count);
+				float* matrices = (float*)cmd;
+				cmd += sizeof(Matrix) * instances_count;
 
-			ffr::BufferHandle last_vb = ffr::INVALID_BUFFER;
-			const Mesh* last_mesh = nullptr;
-			for (int i = 0, c = m_offsets.size(); i < c; ++i) {
-				const u32 offset = offsets[i];
-				
-				const u8* cmd = cmds[offset >> 24].begin() + (offset & 0x00ffFFff);
-				const RenderableTypes* type = (RenderableTypes*)cmd; 
-				switch(*type) {
-					case RenderableTypes::MESH: {
-						last_mesh = *(Mesh**)(cmd + sizeof(*type));
-						Material* material = last_mesh->material;
-						for (int i = 0; i < material->getTextureCount(); ++i) {
-							const ffr::TextureHandle handle = material->getTexture(i)->handle;
-							const ffr::UniformHandle uniform = material->getTextureUniform(i);
-							ffr::bindTexture(i + 2 + m_global_textures_count, handle);
-							ffr::setUniform1i(uniform, i + 2 + m_global_textures_count);
-						}
-						ffr::setState(material->getRenderStates());
-						u32 define_mask = 1 << m_pipeline->m_renderer.getShaderDefineIdx("INSTANCED"); // TODO
-						const Shader::Program& prog = Shader::getProgram(material->getShader()->m_render_data, define_mask);
-						if(prog.handle.isValid()) {
-							ffr::useProgram(prog.handle);
+				Material* material = mesh->material;
+				for (int i = 0; i < material->getTextureCount(); ++i) {
+					const ffr::TextureHandle handle = material->getTexture(i)->handle;
+					const ffr::UniformHandle uniform = material->getTextureUniform(i);
+					ffr::bindTexture(i + 2 + m_global_textures_count, handle);
+					ffr::setUniform1i(uniform, i + 2 + m_global_textures_count);
+				}
+				ffr::setState(material->getRenderStates());
+				u32 define_mask = 1 << m_pipeline->m_renderer.getShaderDefineIdx("INSTANCED"); // TODO
+				const Shader::Program& prog = Shader::getProgram(material->getShader()->m_render_data, define_mask);
+				if(prog.handle.isValid()) {
+					ffr::useProgram(prog.handle);
 
-							int attribute_map[16];
-							for (uint i = 0; i < last_mesh->vertex_decl.attributes_count; ++i) {
-								attribute_map[i] = prog.attribute_by_semantics[(int)last_mesh->attributes_semantic[i]];
-							}
-							ffr::setVertexBuffer(&last_mesh->vertex_decl, last_mesh->vertex_buffer_handle, 0, prog.use_semantics ? attribute_map : nullptr);
-							ffr::setIndexBuffer(last_mesh->index_buffer_handle);
-						}
+					int attribute_map[16];
+					for (uint i = 0; i < mesh->vertex_decl.attributes_count; ++i) {
+						attribute_map[i] = prog.attribute_by_semantics[(int)mesh->attributes_semantic[i]];
+					}
+					ffr::setVertexBuffer(&mesh->vertex_decl, mesh->vertex_buffer_handle, 0, prog.use_semantics ? attribute_map : nullptr);
+					ffr::setIndexBuffer(mesh->index_buffer_handle);
 
-						instances_count = 0;
-						int ic = Math::minimum(c, i + 2048);
-						while(i < ic) {
-							const u32 offset = offsets[i];
-							cmd = cmds[offset >> 24].begin() + (offset & 0x00ffFFff);
-							const RenderableTypes* type = (RenderableTypes*)cmd; 
-							if (*type != RenderableTypes::MESH) break;
-
-							struct T {
-								Mesh* mesh;
-								float mtx[16];
-/*								Vec3 pos;
-								Quat rot;
-								float scale;*/
-							};
-
-							T& t = *(T*)(cmd + sizeof(*type));
-							if(t.mesh != last_mesh) break;
-
-							memcpy(&instances[instances_count], t.mtx, sizeof(t.mtx));
-							++instances_count;
-
-							++i;
-						}
-
-						const Renderer::TransientSlice instance_buffer = m_pipeline->m_renderer.allocTransient(instances_count * sizeof(instances[0]));
+					const Renderer::TransientSlice instance_buffer = m_pipeline->m_renderer.allocTransient(instances_count * sizeof(Matrix));
 	
-						ffr::update(instance_buffer.buffer, instances, instance_buffer.offset, instance_buffer.size);
-						ffr::setInstanceBuffer(instance_decl, instance_buffer.buffer, instance_buffer.offset, last_mesh->vertex_decl.attributes_count);
-						ffr::drawTrianglesInstanced(0, last_mesh->indices_count, instances_count);
-						break;
-					}
-					default: ASSERT(false); break;
+					ffr::update(instance_buffer.buffer, matrices, instance_buffer.offset, instance_buffer.size);
+					ffr::setInstanceBuffer(instance_decl, instance_buffer.buffer, instance_buffer.offset, mesh->vertex_decl.attributes_count);
+					ffr::drawTrianglesInstanced(0, mesh->indices_count, instances_count);
 				}
-#if 0
-				if(blob.getPos() == 0) continue;
-				InputBlob stream(blob);
-				Mesh::Type type;
-				stream.read(type);
-				while(type != Mesh::LAST_TYPE) {
-					++drawcalls_count;
-					const MeshRenderData mesh = stream.read<MeshRenderData>();
-
-					Mesh::AttributeSemantic attributes_semantic[16];
-					if(mesh.decl.attributes_count > 0) {
-						stream.read(attributes_semantic, sizeof(attributes_semantic[0]) * mesh.decl.attributes_count);
-					}
-					const int textures_count = stream.read<int>();
-
-					for (int i = 0; i < textures_count; ++i) {
-						const ffr::TextureHandle handle = stream.read<ffr::TextureHandle>();
-						const ffr::UniformHandle uniform = stream.read<ffr::UniformHandle>();
-						ffr::bindTexture(i + 2 + m_global_textures_count, handle);
-						ffr::setUniform1i(uniform, i + 2 + m_global_textures_count);
-					}
-
-					const Shader::Program& prog = Shader::getProgram(mesh.shader, mesh.define_mask);
-
-					const Vec4 params(mesh.material_params, 0);
-					ffr::setUniform4f(m_pipeline->m_material_params_uniform, &params.x);
-					ffr::setUniform4f(m_pipeline->m_material_color_uniform, &mesh.material_color.x);
-					ffr::setState(mesh.render_states);
-					
-					if(prog.handle.isValid()) {
-						ffr::useProgram(prog.handle);
-
-						int attribute_map[16];
-						for (uint i = 0; i < mesh.decl.attributes_count; ++i) {
-							attribute_map[i] = prog.attribute_by_semantics[(int)attributes_semantic[i]];
-						}
-						if(last_vb.value != mesh.vb.value) {
-							last_vb = mesh.vb;
-							ffr::setVertexBuffer(&mesh.decl, mesh.vb, 0, prog.use_semantics ? attribute_map : nullptr);
-						}
-						ffr::setIndexBuffer(mesh.ib);
-					}
-				
-					switch(type) {
-						case Mesh::RIGID_INSTANCED: {
-							struct Inst { uint start, count; } inst;
-							stream.read(inst);
-							if(prog.handle.isValid()) {
-								const Renderer::TransientSlice instance_buffer = m_pipeline->m_renderer.allocTransient(inst.count * sizeof(Matrix));
-								ffr::update(instance_buffer.buffer, matrices + inst.start, instance_buffer.offset, instance_buffer.size);
-								ffr::setInstanceBuffer(instance_decl, instance_buffer.buffer, instance_buffer.offset, mesh.decl.attributes_count);
-								ffr::drawTrianglesInstanced(0, mesh.indices_count, inst.count);
-							}
-							break;
-						}
-						case Mesh::SKINNED: {
-							const int mtx_count = stream.read<int>();
-							Matrix bone_mtx[196];
-							ASSERT(mtx_count <= lengthOf(bone_mtx));
-							stream.read(bone_mtx, sizeof(Matrix) * mtx_count);
-							const Matrix model_mtx = stream.read<Matrix>();
-
-							if(prog.handle.isValid()) {
-								const int model_uniform_loc = ffr::getUniformLocation(prog.handle, m_pipeline->m_model_uniform);
-								const int bones_uniform_loc = ffr::getUniformLocation(prog.handle, m_pipeline->m_bones_uniform);
-								ffr::applyUniformMatrix4fv(bones_uniform_loc, mtx_count, &bone_mtx[0].m11);
-								ffr::applyUniformMatrix4f(model_uniform_loc, &model_mtx.m11);
-								ffr::drawTriangles(mesh.indices_count);
-							}
-							break;
-						}
-						default: ASSERT(false); break;
-					}
-					stream.read(type);
-				}
-#endif
 			}
-			PROFILE_INT("drawcalls", drawcalls_count);
+//			PROFILE_INT("drawcalls", drawcalls_count);
 			ffr::popDebugGroup();
 		}
 
@@ -2179,7 +2089,6 @@ struct PipelineImpl final : Pipeline
 		IAllocator& m_allocator;
 		CameraParams m_camera_params;
 		PipelineImpl* m_pipeline;
-		Array<u32> m_offsets;
 		Array<Array<u8>> m_cmds;
 		ffr::TextureHandle m_irradiance_map;
 		ffr::TextureHandle m_radiance_map;
