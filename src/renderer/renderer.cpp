@@ -727,7 +727,6 @@ struct RendererImpl final : public Renderer
 
 	void push(RenderCommandBase* cmd) override
 	{
-		PROFILE_FUNCTION();
 		RenderCommandSetupJobData* data = LUMIX_NEW(m_allocator, RenderCommandSetupJobData);
 		data->cmd = cmd;
 		data->prev = m_last_job;

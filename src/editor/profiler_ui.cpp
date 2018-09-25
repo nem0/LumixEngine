@@ -50,16 +50,12 @@ struct ProfilerUIImpl final : public ProfilerUI
 		, m_open_files(allocator)
 		, m_device(allocator)
 		, m_engine(engine)
-		, m_threads(allocator)
 	{
 		m_allocation_size_from = 0;
 		m_allocation_size_to = 1024 * 1024;
 		m_current_frame = -1;
 		m_is_open = false;
 		m_is_paused = true;
-		m_current_block = nullptr;
-		m_frame_start = m_frame_end = 0;
-		Profiler::getFrameListeners().bind<ProfilerUIImpl, &ProfilerUIImpl::onFrame>(this);
 		m_allocation_root = LUMIX_NEW(m_allocator, AllocationStackNode)(nullptr, 0, m_allocator);
 		m_filter[0] = 0;
 		m_resource_filter[0] = 0;
@@ -113,7 +109,6 @@ struct ProfilerUIImpl final : public ProfilerUI
 
 		m_allocation_root->clear(m_allocator);
 		LUMIX_DELETE(m_allocator, m_allocation_root);
-		Profiler::getFrameListeners().unbind<ProfilerUIImpl, &ProfilerUIImpl::onFrame>(this);
 		Timer::destroy(m_timer);
 	}
 
@@ -357,28 +352,6 @@ struct ProfilerUIImpl final : public ProfilerUI
 	};
 
 
-	struct Block
-	{
-		explicit Block(IAllocator& allocator);
-		~Block() = default;
-
-		const char* m_name;
-		Block* m_parent;
-		Block* m_first_child;
-		Block* m_next;
-		bool m_is_open;
-		Profiler::BlockType m_type;
-		Array<float> m_frames;
-		struct Hit
-		{
-			unsigned long long start;
-			unsigned long long length;
-		};
-		Array<Hit> m_hits;
-		Array<int> m_int_values; // hit count in case of m_type == TIME
-	};
-
-
 	struct AllocationStackNode
 	{
 		explicit AllocationStackNode(Debug::StackNode* stack_node,
@@ -422,8 +395,6 @@ struct ProfilerUIImpl final : public ProfilerUI
 	void onGUIMemoryProfiler();
 	void onGUIResources();
 	void onFrame();
-	void showProfileBlock(Block* block, int column);
-	void cloneBlock(Block* my_block, Profiler::Block* remote_block);
 	void addToTree(Debug::Allocator::AllocationInfo* info);
 	void refreshAllocations();
 	void showAllocationTree(AllocationStackNode* node, int column) const;
@@ -431,15 +402,7 @@ struct ProfilerUIImpl final : public ProfilerUI
 		Debug::StackNode* external_node, size_t size);
 	void saveResourceList() const;
 
-	struct Thread
-	{
-		Block* root;
-		bool open;
-	};
-
 	DefaultAllocator m_allocator;
-	Array<Thread> m_threads;
-	Block* m_current_block;
 	Debug::Allocator& m_main_allocator;
 	ResourceManagerHub& m_resource_manager;
 	AllocationStackNode* m_allocation_root;
@@ -447,6 +410,9 @@ struct ProfilerUIImpl final : public ProfilerUI
 	int m_allocation_size_to;
 	int m_current_frame;
 	bool m_is_paused;
+	u64 m_paused_time;
+	i64 m_view_offset = 0;
+	u64 m_zoom = 100'000;
 	char m_filter[100];
 	char m_resource_filter[100];
 	Array<OpenedFile> m_open_files;
@@ -461,286 +427,6 @@ struct ProfilerUIImpl final : public ProfilerUI
 	float m_next_transfer_rate_time;
 	SortOrder m_sort_order;
 };
-
-
-void ProfilerUIImpl::cloneBlock(Block* my_block, Profiler::Block* remote_block)
-{
-	ASSERT(my_block->m_name == Profiler::getBlockName(remote_block));
-	my_block->m_hits.clear();
-	my_block->m_type = Profiler::getBlockType(remote_block);
-	switch (my_block->m_type)
-	{
-		case Profiler::BlockType::TIME:
-			my_block->m_frames.push(Profiler::getBlockLength(remote_block));
-			my_block->m_int_values.push(Profiler::getBlockHitCount(remote_block));
-			break;
-		case Profiler::BlockType::INT:
-			my_block->m_int_values.push(Profiler::getBlockInt(remote_block));
-			break;
-		default:
-			ASSERT(false);
-			break;
-	}
-	my_block->m_hits.resize(Profiler::getBlockHitCount(remote_block));
-	for(int i = 0, c = my_block->m_hits.size(); i < c; ++i)
-	{
-		auto& hit = my_block->m_hits[i];
-		hit.start = Profiler::getBlockHitStart(remote_block, i);
-		hit.length = Profiler::getBlockHitLength(remote_block, i);
-	}
-
-	if (my_block->m_frames.size() > MAX_FRAMES)
-	{
-		my_block->m_frames.erase(0);
-	}
-	if (my_block->m_int_values.size() > MAX_FRAMES)
-	{
-		my_block->m_int_values.erase(0);
-	}
-
-	auto* remote_child = Profiler::getBlockFirstChild(remote_block);
-	if (!my_block->m_first_child && remote_child)
-	{
-		Block* my_child = new Block(m_allocator);
-		my_child->m_name = Profiler::getBlockName(remote_child);
-		my_child->m_parent = my_block;
-		my_child->m_next = nullptr;
-		my_child->m_first_child = nullptr;
-		my_block->m_first_child = my_child;
-		cloneBlock(my_child, remote_child);
-	}
-	else if (my_block->m_first_child)
-	{
-		Block* my_child = my_block->m_first_child;
-		if (my_child->m_name != Profiler::getBlockName(remote_child))
-		{
-			Block* my_new_child = new Block(m_allocator);
-			my_new_child->m_name = Profiler::getBlockName(remote_child);
-			my_new_child->m_parent = my_block;
-			my_new_child->m_next = my_child;
-			my_new_child->m_first_child = nullptr;
-			my_block->m_first_child = my_new_child;
-			my_child = my_new_child;
-		}
-		cloneBlock(my_child, remote_child);
-	}
-
-	auto* remote_next = Profiler::getBlockNext(remote_block);
-	if (!my_block->m_next && remote_next)
-	{
-		Block* my_next = new Block(m_allocator);
-		my_next->m_name = Profiler::getBlockName(remote_next);
-		my_next->m_parent = my_block->m_parent;
-		my_next->m_next = nullptr;
-		my_next->m_first_child = nullptr;
-		my_block->m_next = my_next;
-		cloneBlock(my_next, remote_next);
-	}
-	else if (my_block->m_next)
-	{
-		if (my_block->m_next->m_name != Profiler::getBlockName(remote_next))
-		{
-			Block* my_next = new Block(m_allocator);
-			my_next->m_name = Profiler::getBlockName(remote_next);
-			my_next->m_parent = my_block->m_parent;
-			my_next->m_next = my_block->m_next;
-			my_next->m_first_child = nullptr;
-			my_block->m_next = my_next;
-		}
-		cloneBlock(my_block->m_next, remote_next);
-	}
-}
-
-
-void ProfilerUIImpl::onFrame()
-{
-	if (!m_is_open) return;
-	if (m_is_paused) return;
-
-	m_frame_start = m_frame_end;
-	m_frame_end = Profiler::now();
-	int thread_count = Profiler::getThreadCount();
-	for (int i = 0; i < thread_count; ++i)
-	{
-		u32 thread_id = Profiler::getThreadID(i);
-		auto* root = Profiler::getRootBlock(thread_id);
-		if (m_threads.size() <= i)
-		{
-			if (!root)
-			{
-				auto& thread = m_threads.emplace();
-				thread.root = nullptr;
-				thread.open = false;
-			}
-			else
-			{
-				auto* my_root = new Block(m_allocator);
-				my_root->m_name = Profiler::getBlockName(root);
-				my_root->m_parent = nullptr;
-				my_root->m_next = nullptr;
-				my_root->m_first_child = nullptr;
-				auto& thread = m_threads.emplace();
-				thread.root = my_root;
-				thread.open = false;
-			}
-		}
-		if (!m_threads[i].root && root)
-		{
-			auto* my_root = new Block(m_allocator);
-			my_root->m_name = Profiler::getBlockName(root);
-			my_root->m_parent = nullptr;
-			my_root->m_next = nullptr;
-			my_root->m_first_child = nullptr;
-			m_threads[i].root = my_root;
-		}
-		ASSERT(!root || m_threads[i].root->m_name == Profiler::getBlockName(root));
-
-		if (m_threads[i].root) cloneBlock(m_threads[i].root, root);
-	}
-}
-
-
-void ProfilerUIImpl::showProfileBlock(Block* block, int column)
-{
-	if (!block) return;
-
-	switch(column)
-	{
-		case NAME:
-			while (block)
-			{
-				if (ImGui::TreeNode(block->m_name))
-				{
-					block->m_is_open = true;
-					showProfileBlock(block->m_first_child, column);
-					ImGui::TreePop();
-				}
-				else
-				{
-					block->m_is_open = false;
-				}
-
-				block = block->m_next;
-			}
-			return;
-		case TIME:
-			while (block)
-			{
-				switch (block->m_type)
-				{
-					case Profiler::BlockType::TIME:
-					{
-						auto frame = m_current_frame < 0 ? block->m_frames.back() : block->m_frames[m_current_frame];
-						if (ImGui::Selectable(StaticString<50>("") << frame * 1000.0f << "###t" << (i64)block,
-								m_current_block == block))
-						{
-							m_current_block = block;
-						}
-						if (block->m_is_open)
-						{
-							showProfileBlock(block->m_first_child, column);
-						}
-					}
-					break;
-					case Profiler::BlockType::INT:
-					{
-						int int_value =
-							m_current_frame < 0 ? block->m_int_values.back() : block->m_int_values[m_current_frame];
-						if (ImGui::Selectable(StaticString<50>("") << int_value << "###c" << (i64)block,
-								m_current_block == block,
-								ImGuiSelectableFlags_SpanAllColumns))
-						{
-							m_current_block = block;
-						}
-					}
-					break;
-					default: ASSERT(false); break;
-				}
-
-				block = block->m_next;
-			}
-			return;
-		case EXCLUSIVE_TIME:
-			while (block)
-			{
-				switch (block->m_type)
-				{
-					case Profiler::BlockType::TIME:
-					{
-						auto frame = m_current_frame < 0 ? block->m_frames.back() : block->m_frames[m_current_frame];
-						auto* child = block->m_first_child;
-						while (child)
-						{
-							if (child->m_type == Profiler::BlockType::TIME)
-							{
-								frame -= m_current_frame < 0 ? child->m_frames.back() : child->m_frames[m_current_frame];
-							}
-							child = child->m_next;
-						}
-
-						if (ImGui::Selectable(
-								StaticString<50>("") << frame * 1000.0f << "###t" << (i64)block,
-								m_current_block == block))
-						{
-							m_current_block = block;
-						}
-						if (block->m_is_open)
-						{
-							showProfileBlock(block->m_first_child, column);
-						}
-					}
-					break;
-					case Profiler::BlockType::INT: ImGui::NewLine(); break;
-					default: ASSERT(false); break;
-				}
-
-				block = block->m_next;
-			}
-			return;
-		case HIT_COUNT:
-			while (block)
-			{
-				if (block->m_type == Profiler::BlockType::TIME)
-				{
-					int hit_count =
-						m_current_frame < 0 ? block->m_int_values.back() : block->m_int_values[m_current_frame];
-
-					ImGui::Text("%d", hit_count);
-				}
-				else
-				{
-					ImGui::Text("%s", "-");
-				}
-				if (block->m_is_open)
-				{
-					showProfileBlock(block->m_first_child, column);
-				}
-
-				block = block->m_next;
-			}
-			return;
-		case HITS:
-			while(block)
-			{
-				if (block->m_hits.empty())
-				{
-					ImGui::Dummy(ImVec2(10, ImGui::GetTextLineHeight()));
-				}
-				else
-				{
-					ImGui::IntervalGraph(&block->m_hits[0].start, block->m_hits.size(), m_frame_start, m_frame_end);
-				}
-				if(block->m_is_open)
-				{
-					showProfileBlock(block->m_first_child, column);
-				}
-
-				block = block->m_next;
-			}
-			return;
-		default: ASSERT(false); return;
-	}
-}
 
 
 static const char* getResourceStateString(Resource::State state)
@@ -1013,37 +699,19 @@ void ProfilerUIImpl::onGUIMemoryProfiler()
 	ImGui::Columns(1);
 }
 
-
-static void showThreadColumn(ProfilerUIImpl& profiler, Column column)
+template <typename T>
+static void read(Profiler::ThreadContext& ctx, uint p, T& value)
 {
-	for (int i = 0; i < profiler.m_threads.size(); ++i)
-	{
-		auto* root = profiler.m_threads[i].root;
-		u32 thread_id = Profiler::getThreadID(i);
-		const char* thread_name = Profiler::getThreadName(thread_id);
-		if (column != NAME)
-		{
-			ImGui::Dummy(ImVec2(10, ImGui::GetTextLineHeight()));
-			if (profiler.m_threads[i].open)
-			{
-				profiler.showProfileBlock(root, column);
-			}
-		}
-		else
-		{
-			if (ImGui::TreeNode(root, "%s", thread_name))
-			{
-				profiler.m_threads[i].open = true;
-				profiler.showProfileBlock(root, column);
-				ImGui::TreePop();
-			}
-			else
-			{
-				profiler.m_threads[i].open = false;
-			}
-		}
+	u8* buf = ctx.buffer.begin();
+	const uint buf_size = ctx.buffer.size();
+	const uint l = p % buf_size;
+	if (l + sizeof(value) <= buf_size) {
+		memcpy(&value, buf + l, sizeof(value));
+		return;
 	}
-	ImGui::NextColumn();
+
+	memcpy(&value, buf + l, buf_size - l);
+	memcpy((u8*)&value + (buf_size - l), buf, sizeof(value) - (buf_size - l));
 }
 
 
@@ -1051,8 +719,118 @@ void ProfilerUIImpl::onGUICPUProfiler()
 {
 	if (!ImGui::CollapsingHeader("CPU")) return;
 
-	ImGui::Checkbox("Pause", &m_is_paused);
+	if(ImGui::Checkbox("Pause", &m_is_paused)) {
+		Profiler::pause(m_is_paused);
+		m_paused_time = Profiler::now();
+	}
 
+	auto& contexts = Profiler::lockContexts();
+	
+	const u64 view_end = m_is_paused ? m_paused_time + m_view_offset : Profiler::now();
+	const u64 view_start = view_end - m_zoom;
+	for(Profiler::ThreadContext* ctx : contexts) {
+		MT::SpinLock lock(ctx->mutex);
+		if (!ImGui::TreeNodeEx(ctx, 0, "%s", ctx->name)) continue;
+		ImDrawList* dl = ImGui::GetWindowDrawList();
+		ImGui::InvisibleButton("x", ImVec2(-1, 120));
+		const ImVec2 a = ImGui::GetItemRectMin();
+		const ImVec2 b = ImGui::GetItemRectMax();
+		const u64 cursor = u64(((ImGui::GetMousePos().x - a.x) / (b.x - a.x)) * m_zoom) + view_start;
+		u64 cursor_to_end = view_end - cursor;
+		if (ImGui::IsItemHovered()) {
+			if (ImGui::IsMouseDragging()) {
+				m_view_offset -= i64((ImGui::GetIO().MouseDelta.x / (b.x - a.x)) * m_zoom);
+			}
+			if (ImGui::GetIO().KeyCtrl) {
+				if (ImGui::GetIO().MouseWheel > 0) {
+					m_zoom >>= 1;
+					cursor_to_end >>= 1;
+				}
+				else if (ImGui::GetIO().MouseWheel < 0) {
+					m_zoom <<= 1;
+					cursor_to_end <<= 1;
+				}
+				m_view_offset = cursor + cursor_to_end - m_paused_time;
+			}
+		}
+
+		uint open_blocks[64];
+		int level = -1;
+		uint p = ctx->begin;
+		const uint end = ctx->end;
+
+		auto draw_block = [&](u64 from, u64 to, const char* name, u32 color) {
+			if(from <= view_end && to >= view_start) {
+				const float t_start = float(int(from - view_start) / double(view_end - view_start));
+				const float t_end = float(int(to - view_start) / double(view_end - view_start));
+				const float x_start = a.x * (1 - t_start) + b.x * t_start;
+				const float x_end = a.x * (1 - t_end) + b.x * t_end;
+				const float y = level * 20.f;
+				const float w = ImGui::CalcTextSize(name).x;
+							
+				const ImVec2 ra(x_start, a.y + y);
+				const ImVec2 rb(x_end, a.y + y + 19);
+				dl->AddRectFilled(ra, rb, color);
+				dl->AddRect(ra, rb, ImGui::GetColorU32(ImGuiCol_Border));
+				if (w + 2 < x_end - x_start) {
+					dl->AddText(ImVec2(x_start + 2, a.y + y), 0xff000000, name);
+				}
+				if(ImGui::IsMouseHoveringRect(ra, rb)) {
+					const u64 freq = Profiler::frequency();
+					const float t = 1000 * float((to - from) / double(freq));
+					ImGui::SetTooltip("%s (%.2f ms)", name, t);
+				}
+			}
+		};
+
+		while(p != end) {
+			Profiler::EventHeader header;
+			read(*ctx, p, header);
+			switch(header.type) {
+				case Profiler::EventType::BEGIN_BLOCK:
+					++level;
+					ASSERT(level < lengthOf(open_blocks));
+					open_blocks[level] = p;
+					break;
+				case Profiler::EventType::END_BLOCK:
+					if (level >= 0) {
+						Profiler::EventHeader start_header;
+						read(*ctx, open_blocks[level], start_header);
+						const char* name;
+						read(*ctx, open_blocks[level] + sizeof(Profiler::EventHeader), name);
+						u32 color;
+						read(*ctx, open_blocks[level] + sizeof(Profiler::EventHeader) + sizeof(name), color);
+						draw_block(start_header.time, header.time, name, color);
+						--level;
+					}
+					break;
+				case Profiler::EventType::FRAME: {
+					if (header.time >= view_start && header.time <= view_end) {
+						const float t = float((header.time - view_start) / double(view_end - view_start));
+						const float x = a.x * (1 - t) + b.x * t;
+						dl->AddLine(ImVec2(x, a.y), ImVec2(x, b.y), 0xffff0000);
+					}
+					break;
+				}
+				default: ASSERT(false); break;
+			}
+			p+= header.size;
+		}
+		while(level >= 0) {
+			Profiler::EventHeader start_header;
+			read(*ctx, open_blocks[level], start_header);
+			const char* name;
+			read(*ctx, open_blocks[level] + sizeof(Profiler::EventHeader), name);
+			draw_block(start_header.time, m_paused_time, name, ImGui::GetColorU32(ImGuiCol_PlotHistogram));
+			--level;
+		}
+
+		ImGui::TreePop();
+	}
+
+	Profiler::unlockContexts();
+
+	/*
 	auto thread_getter = [](void* data, int index, const char** out) -> bool {
 		auto id = Profiler::getThreadID(index);
 		*out = Profiler::getThreadName(id);
@@ -1113,17 +891,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 		FLT_MAX,
 		ImVec2(width, 100),
 		m_current_frame - offset);
-	if (i != -1) m_current_frame = i + offset;
-}
-
-
-
-ProfilerUIImpl::Block::Block(IAllocator& allocator)
-	: m_frames(allocator)
-	, m_hits(allocator)
-	, m_int_values(allocator)
-	, m_is_open(false)
-{
+	if (i != -1) m_current_frame = i + offset;*/
 }
 
 

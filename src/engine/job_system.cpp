@@ -181,11 +181,9 @@ struct WorkerTask : MT::Task
 			{
 				ready_sleeping_fiber.fiber->worker_task = that;
 				ready_sleeping_fiber.fiber->switch_state = nullptr;
-				PROFILE_BLOCK("work");
 				that->m_current_fiber = ready_sleeping_fiber.fiber;
 				Fiber::switchTo(&that->m_primary_fiber, ready_sleeping_fiber.fiber->fiber);
 				that->m_current_fiber = nullptr;
-				ASSERT(Profiler::getCurrentBlock() == Profiler::getRootBlock(MT::getCurrentThreadID()));
 				handleSwitch(*ready_sleeping_fiber.fiber);
 				continue;
 			}
@@ -197,16 +195,14 @@ struct WorkerTask : MT::Task
 				fiber_decl.worker_task = that;
 				fiber_decl.current_job = job;
 				fiber_decl.switch_state = nullptr;
-				PROFILE_BLOCK("work");
 				that->m_current_fiber = &fiber_decl;
 				Fiber::switchTo(&that->m_primary_fiber, fiber_decl.fiber);
 				that->m_current_fiber = nullptr;
-				ASSERT(Profiler::getCurrentBlock() == Profiler::getRootBlock(MT::getCurrentThreadID()));
 				handleSwitch(fiber_decl);
 			}
 			else 
 			{
-				PROFILE_BLOCK("wait");
+				PROFILE_BLOCK_COLORED("wait", 0xff, 0, 0);
 				g_system->m_work_signal.waitTimeout(1);
 			}
 		}

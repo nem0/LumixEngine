@@ -33,6 +33,8 @@
 	#endif
 #endif
 
+#define ImDrawIdx unsigned int
+
 //---- Include imgui_user.inl at the end of imgui.cpp so you can include code that extends ImGui using its private data/functions.
 #define IMGUI_INCLUDE_IMGUI_USER_INL
 
