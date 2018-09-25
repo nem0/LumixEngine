@@ -40,7 +40,7 @@ Shader::~Shader()
 }
 
 
-const Shader::Program& Shader::getProgram(RenderData* rd, u32 defines)
+const Shader::Program& Shader::getProgram(ShaderRenderData* rd, u32 defines)
 {
 	auto iter = rd->programs.find(defines);
 	if (!iter.isValid()) {
@@ -290,6 +290,7 @@ int texture_slot(lua_State* L)
 	if(LuaWrapper::getOptionalStringField(L, -1, "uniform", slot.uniform, lengthOf(slot.uniform))) {
 		slot.uniform_handle = ffr::allocUniform(slot.uniform, ffr::UniformType::INT, 1);
 	}
+	shader->m_render_data->texture_uniforms[shader->m_texture_slot_count] = slot.uniform_handle;
 
 	char tmp[MAX_PATH_LENGTH];
 	if(LuaWrapper::getOptionalStringField(L, -1, "default_texture", tmp, lengthOf(tmp))) {
@@ -396,7 +397,7 @@ bool Shader::load(FS::IFile& file)
 	ASSERT(!m_render_data);
 
 	IAllocator& allocator = m_renderer.getAllocator();
-	m_render_data = LUMIX_NEW(allocator, RenderData)(m_renderer, allocator);
+	m_render_data = LUMIX_NEW(allocator, ShaderRenderData)(m_renderer, allocator);
 	m_render_data->path = getPath();
 
 	lua_pushlightuserdata(L, this);
@@ -443,8 +444,8 @@ bool Shader::load(FS::IFile& file)
 void Shader::unload()
 {
 	if (m_render_data) {
-		m_renderer.runInRenderThread(m_render_data, [](void* ptr){
-			RenderData* rd = (RenderData*)ptr;
+		m_renderer.runInRenderThread(m_render_data, [](Renderer& renderer, void* ptr){
+			ShaderRenderData* rd = (ShaderRenderData*)ptr;
 			for(const Program& prg : rd->programs) {
 				if (prg.handle.isValid()) ffr::destroy(prg.handle);
 			}

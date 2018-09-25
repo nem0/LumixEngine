@@ -38,30 +38,34 @@ Mesh::Mesh(Material* mat,
 	const ffr::VertexDecl& vertex_decl,
 	const char* name,
 	const AttributeSemantic* semantics,
+	Renderer& renderer,
 	IAllocator& allocator)
 	: name(name, allocator)
-	, vertex_decl(vertex_decl)
 	, material(mat)
 	, indices(allocator)
 	, vertices(allocator)
 	, uvs(allocator)
 	, skin(allocator)
 {
-	sort_key = s_last_sort_key;
-	++s_last_sort_key;
-	vertex_buffer_handle = ffr::INVALID_BUFFER;
-	index_buffer_handle = ffr::INVALID_BUFFER;
-	for(AttributeSemantic& attr : attributes_semantic) {
+	render_data = LUMIX_NEW(renderer.getAllocator(), RenderData);
+	render_data->vertex_decl = vertex_decl;
+	render_data->vertex_buffer_handle = ffr::INVALID_BUFFER;
+	render_data->index_buffer_handle = ffr::INVALID_BUFFER;
+	for(AttributeSemantic& attr : render_data->attributes_semantic) {
 		attr = AttributeSemantic::NONE;
 	}
 	if(semantics) {
 		for(uint i = 0; i < vertex_decl.attributes_count; ++i) {
-			attributes_semantic[i] = semantics[i];
+			render_data->attributes_semantic[i] = semantics[i];
 		}
 	}
+
+	sort_key = s_last_sort_key;
+	++s_last_sort_key;
 }
 
-
+// TODO remove?
+/*
 void Mesh::set(const Mesh& rhs)
 {
 	type = rhs.type;
@@ -78,23 +82,12 @@ void Mesh::set(const Mesh& rhs)
 	name = rhs.name;
 	copyMemory(attributes_semantic, rhs.attributes_semantic, sizeof(attributes_semantic));
 	// all except material
-}
+}*/
 
 
-int Mesh::getAttributeOffset(AttributeSemantic attr) const
+static bool hasAttribute(Mesh& mesh, Mesh::AttributeSemantic attribute)
 {
-	for (int i = 0; i < lengthOf(attributes_semantic); ++i) {
-		if(attributes_semantic[i] == attr) {
-			return vertex_decl.attributes[i].offset;
-		}
-	}
-	return -1;
-}
-
-
-bool Mesh::hasAttribute(AttributeSemantic attribute) const
-{
-	for(const AttributeSemantic& attr :  attributes_semantic) {
+	for(const Mesh::AttributeSemantic& attr : mesh.render_data->attributes_semantic) {
 		if(attr == attribute) return true;
 	}
 	return false;
@@ -105,7 +98,6 @@ void Mesh::setMaterial(Material* new_material, Model& model, Renderer& renderer)
 {
 	if (material) material->getResourceManager().unload(*material);
 	material = new_material;
-	layer_mask = material->isReady() ? material->getRenderLayerMask() : 0;
 	type = model.getBoneCount() == 0 || skin.empty() ? Mesh::RIGID_INSTANCED : Mesh::SKINNED;
 }
 
@@ -321,7 +313,6 @@ static bool parseVertexDecl(FS::IFile& file, ffr::VertexDecl* vertex_decl, Mesh:
 void Model::onBeforeReady()
 {
 	for (Mesh& mesh : m_meshes) {
-		mesh.layer_mask = mesh.material->getRenderLayerMask();
 		mesh.type = getBoneCount() == 0 || mesh.skin.empty() ? Mesh::RIGID_INSTANCED : Mesh::SKINNED;
 	}
 }
@@ -432,6 +423,17 @@ int Model::getBoneIdx(const char* name)
 }
 
 
+static int getAttributeOffset(Mesh& mesh, Mesh::AttributeSemantic attr)
+{
+	for (int i = 0; i < lengthOf(mesh.render_data->attributes_semantic); ++i) {
+		if(mesh.render_data->attributes_semantic[i] == attr) {
+			return mesh.render_data->vertex_decl.attributes[i].offset;
+		}
+	}
+	return -1;
+}
+
+
 bool Model::parseMeshes(FS::IFile& file, FileVersion version)
 {
 	int object_count = 0;
@@ -464,7 +466,7 @@ bool Model::parseMeshes(FS::IFile& file, FileVersion version)
 		mesh_name[str_size] = 0;
 		file.read(mesh_name, str_size);
 
-		m_meshes.emplace(material, vertex_decl, mesh_name, semantics, m_allocator);
+		m_meshes.emplace(material, vertex_decl, mesh_name, semantics, m_renderer, m_allocator);
 		addDependency(*material);
 	}
 
@@ -478,13 +480,13 @@ bool Model::parseMeshes(FS::IFile& file, FileVersion version)
 		file.read(&indices_count, sizeof(indices_count));
 		if (indices_count <= 0) return false;
 		mesh.indices.resize(index_size * indices_count);
+		mesh.render_data->indices_count = indices_count;
 		file.read(&mesh.indices[0], mesh.indices.size());
 
 		if (index_size == 2) mesh.flags.set(Mesh::Flags::INDICES_16_BIT);
-		mesh.indices_count = indices_count;
 		// TODO do not copy, allocate in advance
 		const Renderer::MemRef mem = m_renderer.copy(&mesh.indices[0], mesh.indices.size());
-		mesh.index_buffer_handle = m_renderer.createBuffer(mem);
+		mesh.render_data->index_buffer_handle = m_renderer.createBuffer(mem);
 	}
 
 	for (int i = 0; i < object_count; ++i)
@@ -496,14 +498,14 @@ bool Model::parseMeshes(FS::IFile& file, FileVersion version)
 		vertices_mem.resize(data_size);
 		file.read(&vertices_mem[0], data_size);
 
-		int position_attribute_offset = mesh.getAttributeOffset(Mesh::AttributeSemantic::POSITION);
-		int uv_attribute_offset = mesh.getAttributeOffset(Mesh::AttributeSemantic::TEXCOORD0);
-		int weights_attribute_offset = mesh.getAttributeOffset(Mesh::AttributeSemantic::WEIGHTS);
-		int bone_indices_attribute_offset = mesh.getAttributeOffset(Mesh::AttributeSemantic::INDICES);
-		bool keep_skin = mesh.hasAttribute(Mesh::AttributeSemantic::WEIGHTS) && mesh.hasAttribute(Mesh::AttributeSemantic::INDICES);
+		int position_attribute_offset = getAttributeOffset(mesh, Mesh::AttributeSemantic::POSITION);
+		int uv_attribute_offset = getAttributeOffset(mesh, Mesh::AttributeSemantic::TEXCOORD0);
+		int weights_attribute_offset = getAttributeOffset(mesh, Mesh::AttributeSemantic::WEIGHTS);
+		int bone_indices_attribute_offset = getAttributeOffset(mesh, Mesh::AttributeSemantic::INDICES);
+		bool keep_skin = hasAttribute(mesh, Mesh::AttributeSemantic::WEIGHTS) && hasAttribute(mesh, Mesh::AttributeSemantic::INDICES);
 
-		int vertex_size = mesh.vertex_decl.size;
-		int mesh_vertex_count = vertices_mem.size() / mesh.vertex_decl.size;
+		int vertex_size = mesh.render_data->vertex_decl.size;
+		int mesh_vertex_count = vertices_mem.size() / mesh.render_data->vertex_decl.size;
 		mesh.vertices.resize(mesh_vertex_count);
 		mesh.uvs.resize(mesh_vertex_count);
 		if (keep_skin) mesh.skin.resize(mesh_vertex_count);
@@ -523,7 +525,7 @@ bool Model::parseMeshes(FS::IFile& file, FileVersion version)
 		}
 		// TODO do not copy, allocate in advance
 		const Renderer::MemRef mem = m_renderer.copy(&vertices_mem[0], vertices_mem.size());
-		mesh.vertex_buffer_handle = m_renderer.createBuffer(mem);
+		mesh.render_data->vertex_buffer_handle = m_renderer.createBuffer(mem);
 	}
 	file.read(&m_bounding_radius, sizeof(m_bounding_radius));
 	file.read(&m_aabb, sizeof(m_aabb));
@@ -622,15 +624,18 @@ void Model::registerLuaAPI(lua_State* L)
 void Model::unload()
 {
 	auto* material_manager = m_resource_manager.getOwner().get(Material::TYPE);
-	for (int i = 0; i < m_meshes.size(); ++i)
-	{
+	for (int i = 0; i < m_meshes.size(); ++i) {
 		removeDependency(*m_meshes[i].material);
 		material_manager->unload(*m_meshes[i].material);
 	}
-	for (Mesh& mesh : m_meshes)
-	{
-		if (mesh.index_buffer_handle.isValid()) m_renderer.destroy(mesh.index_buffer_handle);
-		if (mesh.vertex_buffer_handle.isValid()) m_renderer.destroy(mesh.vertex_buffer_handle);
+
+	for (Mesh& mesh : m_meshes) {
+		m_renderer.runInRenderThread(mesh.render_data, [](Renderer& renderer, void* ptr){
+			Mesh::RenderData* rd = (Mesh::RenderData*)ptr;
+			if (rd->index_buffer_handle.isValid()) ffr::destroy(rd->index_buffer_handle);
+			if (rd->vertex_buffer_handle.isValid()) ffr::destroy(rd->vertex_buffer_handle);
+			LUMIX_DELETE(renderer.getAllocator(), rd); 
+		});
 	}
 	m_meshes.clear();
 	m_bones.clear();

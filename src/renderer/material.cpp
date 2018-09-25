@@ -44,8 +44,7 @@ Material::Material(const Path& path, ResourceManager& resource_manager, Renderer
 	, m_emission(0.0f)
 	, m_define_mask(0)
 	, m_custom_flags(0)
-	, m_render_layer(0)
-	, m_render_layer_mask(1)
+	, m_render_data(nullptr)
 {
 	setAlphaRef(DEFAULT_ALPHA_REF_VALUE);
 	for (int i = 0; i < MAX_TEXTURE_COUNT; ++i)
@@ -127,6 +126,11 @@ void Material::unload()
 		tex = nullptr;
 	}
 	
+	m_renderer.runInRenderThread(m_render_data, [](Renderer& renderer, void* ptr){
+		LUMIX_DELETE(renderer.getAllocator(), (RenderData*)ptr);
+	});
+	m_render_data = nullptr;
+
 	setShader(nullptr);
 
 	m_alpha_ref = 0.3f;
@@ -134,8 +138,6 @@ void Material::unload()
 	m_custom_flags = 0;
 	m_define_mask = 0;
 	m_metallic = 0.0f;
-	m_render_layer = 0;
-	m_render_layer_mask = 1;
 	m_roughness = 1.0f;
 	m_emission = 0.0f;
 	m_render_states = u64(ffr::StateFlags::CULL_BACK);
@@ -378,17 +380,6 @@ void Material::setTexturePath(int i, const Path& path)
 }
 
 
-void Material::setRenderLayer(int layer)
-{
-	++m_empty_dep_count;
-	checkState();
-	m_render_layer = layer;
-	m_render_layer_mask = 1ULL << (u64)layer;
-	--m_empty_dep_count;
-	checkState();
-}
-
-
 void Material::setTexture(int i, Texture* texture)
 {
 	Texture* old_texture = i < m_texture_count ? m_textures[i] : nullptr;
@@ -433,6 +424,20 @@ void Material::setShader(const Path& path)
 void Material::onBeforeReady()
 {
 	if (!m_shader) return;
+
+	if(m_shader != nullptr) {
+		m_render_data = LUMIX_NEW(m_renderer.getAllocator(), RenderData);
+		m_render_data->color = m_color;
+		m_render_data->emission = m_emission;
+		m_render_data->metallic = m_metallic;
+		m_render_data->render_states = m_render_states;
+		m_render_data->roughness = m_roughness;
+		m_render_data->shader = m_shader->m_render_data;
+		m_render_data->textures_count = m_texture_count;
+		for(int i = 0; i < m_texture_count; ++i) {
+			m_render_data->textures[i] = m_textures[i] ? m_textures[i]->handle : ffr::INVALID_TEXTURE;
+		}
+	}
 
 	for(int i = 0; i < m_shader->m_uniforms.size(); ++i)
 	{
@@ -552,21 +557,6 @@ void Material::enableBackfaceCulling(bool enable)
 bool Material::isBackfaceCulling() const
 {
 	return (m_render_states & (u64)ffr::StateFlags::CULL_BACK) != 0;
-}
-
-int Material::LUA_layer(lua_State* L)
-{
-	const float r = LuaWrapper::checkArg<float>(L, 1);
-	lua_getfield(L, LUA_GLOBALSINDEX, "this");
-	Material* material = (Material*)lua_touserdata(L, -1);
-	lua_pop(L, 1);
-
-	const char* tmp = LuaWrapper::checkArg<const char*>(L, 1);
-
-	Renderer& renderer = material->getRenderer();
-	material->m_render_layer = renderer.getLayer(tmp);
-	material->m_render_layer_mask = ((u64)1) << (u64)material->m_render_layer;
-	return 0;
 }
 
 
@@ -787,9 +777,6 @@ bool Material::load(FS::IFile& file)
 	DEFINE_LUA_FUNC(alpha_ref);
 	
 	#undef DEFINE_LUA_FUNC
-
-	lua_setfield(L, LUA_GLOBALSINDEX, "layer"); \
-	lua_pushcclosure(L, &Material::LUA_layer, 0);
 
 	setAlphaRef(DEFAULT_ALPHA_REF_VALUE);
 

@@ -19,7 +19,7 @@ struct IFile;
 }
 
 class Renderer;
-class Shader;
+struct ShaderRenderData;
 class Texture;
 
 
@@ -86,23 +86,7 @@ public:
 
 public:
 	static const int MAX_TEXTURE_SLOT_COUNT = 16;
-	struct RenderData {
-		RenderData(Renderer& renderer, IAllocator& allocator) 
-			: allocator(allocator)
-			, renderer(renderer)
-			, programs(allocator) 
-			, include(allocator)
-			, sources(allocator)
-			, attributes(allocator)
-		{}
-		IAllocator& allocator;
-		Renderer& renderer;
-		HashMap<u32, Program> programs;
-		Array<Source> sources;
-		Array<u8> include;
-		Array<AttributeInfo> attributes;
-		Path path;
-	}* m_render_data;
+	ShaderRenderData* m_render_data;
 
 public:
 	Shader(const Path& path, ResourceManager& resource_manager, Renderer& renderer, IAllocator& allocator);
@@ -110,7 +94,7 @@ public:
 
 	ResourceType getType() const override { return TYPE; }
 
-	static const Program& getProgram(RenderData* rd, u32 defines);
+	static const Program& getProgram(ShaderRenderData* rd, u32 defines);
 
 	IAllocator& m_allocator;
 	Renderer& m_renderer;
@@ -127,6 +111,27 @@ private:
 
 	void unload() override;
 	bool load(FS::IFile& file) override;
+};
+
+
+struct ShaderRenderData 
+{
+	ShaderRenderData(Renderer& renderer, IAllocator& allocator) 
+		: allocator(allocator)
+		, renderer(renderer)
+		, programs(allocator) 
+		, include(allocator)
+		, sources(allocator)
+		, attributes(allocator)
+	{}
+	ffr::UniformHandle texture_uniforms[Shader::MAX_TEXTURE_SLOT_COUNT];
+	IAllocator& allocator;
+	Renderer& renderer;
+	HashMap<u32, Shader::Program> programs;
+	Array<Shader::Source> sources;
+	Array<u8> include;
+	Array<Shader::AttributeInfo> attributes;
+	Path path;
 };
 
 } // namespace Lumix
