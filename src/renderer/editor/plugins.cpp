@@ -2452,7 +2452,7 @@ struct RenderInterfaceImpl final : public RenderInterface
 		ffr::setIndexBuffer(ib.buffer);
 		ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE));
 		const ffr::PrimitiveType primitive_type = lines ? ffr::PrimitiveType::LINES : ffr::PrimitiveType::TRIANGLES;
-		ffr::drawElements(ib.offset / sizeof(indices[0]), indices_count, primitive_type);
+		ffr::drawElements(ib.offset / sizeof(indices[0]), indices_count, primitive_type, ffr::DataType::UINT16);
 	}
 
 
@@ -2673,19 +2673,19 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 
 		void draw(const CmdList& cmd_list)
 		{
-			const uint num_indices = cmd_list.idx_buffer.size / sizeof(u16);
+			const uint num_indices = cmd_list.idx_buffer.size / sizeof(ImDrawIdx);
 			const uint num_vertices = cmd_list.vtx_buffer.size / sizeof(ImDrawVert);
 
 			if ((vb_offset + num_vertices) * sizeof(ImDrawVert) > 1024 * 1024) return;
-			if ((ib_offset + num_indices) * sizeof(ImDrawVert) > 1024 * 1024) return;
+			if ((ib_offset + num_indices) * sizeof(ImDrawIdx) > 1024 * 1024) return;
 
 			PluginManager& plugin_manager = plugin->m_engine.getPluginManager();	
 			Renderer* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
 
 			ffr::update(plugin->m_index_buffer
 				, cmd_list.idx_buffer.data
-				, ib_offset * sizeof(u16)
-				, num_indices * sizeof(u16));
+				, ib_offset * sizeof(ImDrawIdx)
+				, num_indices * sizeof(ImDrawIdx));
 			ffr::update(plugin->m_vertex_buffer
 				, cmd_list.vtx_buffer.data
 				, vb_offset * sizeof(ImDrawVert)
@@ -2723,14 +2723,16 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 				if (!tex.isValid()) tex = *default_texture;
 				ffr::bindTexture(0, tex);
 
+				const uint h = uint(Math::minimum(pcmd->ClipRect.w, 65535.0f) - Math::maximum(pcmd->ClipRect.y, 0.0f));
+
 				ffr::scissor(uint(Math::maximum(pcmd->ClipRect.x, 0.0f)),
-					uint(Math::maximum(pcmd->ClipRect.y, 0.0f)),
+					height - uint(Math::maximum(pcmd->ClipRect.y, 0.0f)) - h,
 					uint(Math::minimum(pcmd->ClipRect.z, 65535.0f) - Math::maximum(pcmd->ClipRect.x, 0.0f)),
 					uint(Math::minimum(pcmd->ClipRect.w, 65535.0f) - Math::maximum(pcmd->ClipRect.y, 0.0f)));
 				// TODO
 				ffr::blending(1); //dc.textures[0].value != m_scene_view.getTextureHandle().value);
 
-				ffr::drawElements(first_index, pcmd->ElemCount, ffr::PrimitiveType::TRIANGLES);
+				ffr::drawElements(first_index, pcmd->ElemCount, ffr::PrimitiveType::TRIANGLES, ffr::DataType::UINT32);
 		
 				elem_offset += pcmd->ElemCount;
 			}

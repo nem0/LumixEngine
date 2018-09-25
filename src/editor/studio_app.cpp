@@ -2450,6 +2450,7 @@ public:
 
 	void processSystemEvents()
 	{
+		PROFILE_FUNCTION();
 		m_mouse_move.set(0, 0);
 		m_events.clear();
 		SDL_Event event;
@@ -2546,10 +2547,8 @@ public:
 		{
 			{
 				timer->tick();
-				PROFILE_BLOCK("all");
 				float frame_time;
 				{
-					PROFILE_BLOCK("tick");
 					processSystemEvents();
 					if (!m_finished) update();
 					frame_time = timer->tick();

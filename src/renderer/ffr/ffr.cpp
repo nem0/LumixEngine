@@ -1043,10 +1043,10 @@ void setState(u64 state)
 	else CHECK_GL(glDisable(GL_DEPTH_TEST));
 	
 	CHECK_GL(glDepthMask((state & u64(StateFlags::DEPTH_WRITE)) != 0));
-	/*
-	if( dc.state & u64(StateFlags::SCISSOR_TEST)) CHECK_GL(glEnable(GL_SCISSOR_TEST));
+	
+	if (state & u64(StateFlags::SCISSOR_TEST)) CHECK_GL(glEnable(GL_SCISSOR_TEST));
 	else CHECK_GL(glDisable(GL_SCISSOR_TEST));
-	*/
+	
 	// TODO
 	if (state & u64(StateFlags::CULL_BACK)) {
 		CHECK_GL(glEnable(GL_CULL_FACE));
@@ -1088,12 +1088,12 @@ void resetInstanceBuffer()
 }
 
 
-void drawElements(uint offset, uint count, PrimitiveType type)
+void drawElements(uint offset, uint count, PrimitiveType primitive_type, DataType type)
 {
 	checkThread();
 	
 	GLuint pt;
-	switch (type) {
+	switch (primitive_type) {
 		case PrimitiveType::TRIANGLES: pt = GL_TRIANGLES; break;
 		case PrimitiveType::TRIANGLE_STRIP: pt = GL_TRIANGLE_STRIP; break;
 		case PrimitiveType::LINES: pt = GL_LINES; break;
@@ -1101,8 +1101,16 @@ void drawElements(uint offset, uint count, PrimitiveType type)
 		default: ASSERT(0); break;
 	}
 
+	GLenum t;
+	int ts;
+	switch(type) {
+		case DataType::UINT16: t = GL_UNSIGNED_SHORT; ts = sizeof(u16); break;
+		case DataType::UINT32: t = GL_UNSIGNED_INT; ts = sizeof(u32); break;
+		default: ASSERT(0); break;
+	}
+
 	resetInstanceBuffer();
-	CHECK_GL(glDrawElements(pt, count, GL_UNSIGNED_SHORT, (void*)(intptr_t)(offset * sizeof(short))));
+	CHECK_GL(glDrawElements(pt, count, t, (void*)(intptr_t)(offset * ts)));
 }
 
 void drawTrianglesInstanced(uint indices_offset, uint indices_count, uint instances_count)
@@ -1562,6 +1570,7 @@ void destroy(BufferHandle buffer)
 
 void clear(uint flags, const float* color, float depth)
 {
+	CHECK_GL(glDisable(GL_SCISSOR_TEST));
 	CHECK_GL(glDisable(GL_BLEND));
 	checkThread();
 	GLbitfield gl_flags = 0;
