@@ -21,6 +21,7 @@ namespace FS
 class Renderer;
 class ResourceManagerHub;
 class Shader;
+struct ShaderRenderData;
 class Texture;
 
 
@@ -28,6 +29,19 @@ class LUMIX_RENDERER_API Material final : public Resource
 {
 	friend class MaterialManager;
 public:
+	static const int MAX_TEXTURE_COUNT = 16;
+
+	struct RenderData {
+		ffr::TextureHandle textures[MAX_TEXTURE_COUNT];
+		int textures_count;
+		u64 render_states;
+		Vec4 color;
+		float roughness;
+		float metallic;
+		float emission;
+		ShaderRenderData* shader;
+	};
+
 	struct Uniform
 	{
 		u32 name_hash;
@@ -51,6 +65,7 @@ public:
 	ResourceType getType() const override { return TYPE; }
 
 	Renderer& getRenderer() { return m_renderer; }
+	RenderData* getRenderData() const { return m_render_data; }
 
 	float getMetallic() const { return m_metallic; }
 	void setMetallic(float value) { m_metallic = value; }
@@ -81,9 +96,6 @@ public:
 	int getUniformCount() const { return m_uniforms.size(); }
 	Uniform& getUniform(int index) { return m_uniforms[index]; }
 	const Uniform& getUniform(int index) const { return m_uniforms[index]; }
-	int getRenderLayer() const { return m_render_layer; }
-	void setRenderLayer(int layer);
-	u64 getRenderLayerMask() const { return m_render_layer_mask; }
 
 	void setDefine(u8 define_idx, bool enabled);
 	bool isDefined(u8 define_idx) const;
@@ -107,7 +119,6 @@ private:
 	void deserializeUniforms(lua_State* L);
 
 private:
-	static const int MAX_TEXTURE_COUNT = 16;
 
 	IAllocator& m_allocator;
 	Renderer& m_renderer;
@@ -121,11 +132,10 @@ private:
 	int m_texture_count;
 	u32 m_define_mask;
 	u64 m_render_states;
+	RenderData* m_render_data;
 	
 	Array<Uniform> m_uniforms;
 	u32 m_custom_flags;
-	int m_render_layer;
-	u64 m_render_layer_mask;
 };
 
 } // namespace Lumix

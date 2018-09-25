@@ -65,6 +65,15 @@ struct LUMIX_RENDERER_API Mesh
 		NONE = 0xff
 	};
 
+	struct RenderData
+	{
+		ffr::VertexDecl vertex_decl;
+		AttributeSemantic attributes_semantic[ffr::VertexDecl::MAX_ATTRIBUTES];
+		ffr::BufferHandle vertex_buffer_handle;
+		ffr::BufferHandle index_buffer_handle;
+		int indices_count;
+	};
+
 	struct Skin
 	{
 		Vec4 weights;
@@ -88,13 +97,12 @@ struct LUMIX_RENDERER_API Mesh
 		const ffr::VertexDecl& vertex_decl,
 		const char* name,
 		const AttributeSemantic* semantics,
+		Renderer& renderer,
 		IAllocator& allocator);
 
-	void set(const Mesh& rhs);
+	//void set(const Mesh& rhs);
 	void setMaterial(Material* material, Model& model, Renderer& renderer);
 	bool areIndices16() const { return flags.isSet(Flags::INDICES_16_BIT); }
-	int getAttributeOffset(AttributeSemantic attr) const;
-	bool hasAttribute(AttributeSemantic attr) const;
 
 	Type type;
 	Array<u8> indices;
@@ -102,16 +110,10 @@ struct LUMIX_RENDERER_API Mesh
 	Array<Vec2> uvs;
 	Array<Skin> skin;
 	FlagSet<Flags, u8> flags;
-	u64 layer_mask;
 	u32 sort_key;
-	int indices_count;
-	ffr::VertexDecl vertex_decl;
-	AttributeSemantic attributes_semantic[ffr::VertexDecl::MAX_ATTRIBUTES];
-	ffr::BufferHandle vertex_buffer_handle;
-	ffr::BufferHandle index_buffer_handle;
 	string name;
 	Material* material;
-
+	RenderData* render_data;
 	static u32 s_last_sort_key;
 };
 

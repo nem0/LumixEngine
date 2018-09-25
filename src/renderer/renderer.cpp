@@ -306,11 +306,7 @@ static void registerProperties(IAllocator& allocator)
 		component("model_instance",
 			property("Enabled", LUMIX_PROP_FULL(RenderScene, isModelInstanceEnabled, enableModelInstance)),
 			property("Source", LUMIX_PROP(RenderScene, ModelInstancePath),
-				ResourceAttribute("Mesh (*.msh)", Model::TYPE)),
-			const_array("Materials", &RenderScene::getModelInstanceMaterialsCount, 
-				property("Source", LUMIX_PROP(RenderScene, ModelInstanceMaterial),
-					ResourceAttribute("Material (*.mat)", Material::TYPE))
-			)
+				ResourceAttribute("Mesh (*.msh)", Model::TYPE))
 		),
 		component("global_light",
 			property("Color", LUMIX_PROP(RenderScene, GlobalLightColor),
@@ -394,7 +390,6 @@ struct RendererImpl final : public Renderer
 		, m_shader_manager(*this, m_allocator)
 		, m_font_manager(nullptr)
 		, m_shader_defines(m_allocator)
-		, m_layers(m_allocator)
 		, m_vsync(true)
 		, m_main_pipeline(nullptr)
 		, m_render_task(*this, m_allocator)
@@ -425,10 +420,6 @@ struct RendererImpl final : public Renderer
 		m_font_manager->create(FontResource::TYPE, manager);
 
 		RenderScene::registerLuaAPI(m_engine.getState());
-		m_layers.emplace("default");
-		m_layers.emplace("transparent");
-		m_layers.emplace("water");
-		m_layers.emplace("fur");
 
 		m_render_task.create("render task");
 	}
@@ -613,19 +604,22 @@ struct RendererImpl final : public Renderer
 	}
 
 
-	void runInRenderThread(void* user_ptr, void (*fnc)(void*)) override
+	void runInRenderThread(void* user_ptr, void (*fnc)(Renderer& renderer, void*)) override
 	{
 		struct Cmd : RenderCommandBase {
 			void setup() override {}
-			void execute() override { fnc(ptr); }
+			void execute() override { fnc(*renderer, ptr); }
 
 			void* ptr;
-			void (*fnc)(void*);
+			void (*fnc)(Renderer&, void*);
+			Renderer* renderer;
+
 		};
 
 		Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
 		cmd->fnc = fnc;
 		cmd->ptr = user_ptr;
+		cmd->renderer = this;
 		push(cmd);
 	}
 
@@ -793,22 +787,6 @@ struct RendererImpl final : public Renderer
 	}
 
 
-	int getLayer(const char* name) override
-	{
-		for (int i = 0; i < m_layers.size(); ++i)
-		{
-			if (m_layers[i] == name) return i;
-		}
-		ASSERT(m_layers.size() < 64);
-		m_layers.emplace() = name;
-		return m_layers.size() - 1;
-	}
-
-
-	int getLayersCount() const override { return m_layers.size(); }
-	const char* getLayerName(int idx) const override { return m_layers[idx]; }
-
-
 	ModelManager& getModelManager() override { return m_model_manager; }
 	MaterialManager& getMaterialManager() override { return m_material_manager; }
 	ShaderManager& getShaderManager() override { return m_shader_manager; }
@@ -931,7 +909,7 @@ struct RendererImpl final : public Renderer
 		PROFILE_FUNCTION();
 		pushSwapCommand();
 		{
-			PROFILE_BLOCK("wait for render thread");
+			PROFILE_BLOCK_COLORED("wait for render thread", 0xff, 0, 0);
 			m_frame_semaphore.wait();
 		}
 		if (m_last_job) {
@@ -950,7 +928,6 @@ struct RendererImpl final : public Renderer
 	IAllocator& m_allocator;
 	MT::Semaphore m_frame_semaphore;
 	Array<ShaderDefine> m_shader_defines;
-	Array<Layer> m_layers;
 	TextureManager m_texture_manager;
 	PipelineResourceManager m_pipeline_manager;
 	ParticleEmitterResourceManager m_particle_emitter_manager;

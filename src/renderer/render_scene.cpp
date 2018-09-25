@@ -202,38 +202,6 @@ private:
 class RenderSceneImpl final : public RenderScene
 {
 private:
-	struct CustomMeshCallback
-	{
-		CustomMeshCallback(CustomMeshCallback&& rhs)
-			: m_entities(Move(rhs.m_entities))
-			, m_scene(rhs.m_scene)
-			, m_material(rhs.m_material)
-		{
-			rhs.m_material = nullptr;
-		}
-
-		CustomMeshCallback(const CustomMeshCallback&) = delete;
-
-		CustomMeshCallback(RenderSceneImpl& scene, Material* material, IAllocator& allocator)
-			: m_entities(allocator)
-			, m_material(material)
-			, m_scene(scene)
-		{
-			m_material->getObserverCb().bind<RenderSceneImpl, &RenderSceneImpl::materialStateChanged>(&scene);
-		}
-
-		~CustomMeshCallback()
-		{
-			if(m_material) {
-				m_material->getObserverCb().unbind<RenderSceneImpl, &RenderSceneImpl::materialStateChanged>(&m_scene);
-			}
-		}
-
-		RenderSceneImpl& m_scene;
-		Material* m_material;
-		Array<EntityRef> m_entities;
-	};
-
 	struct ModelLoadedCallback
 	{
 		ModelLoadedCallback(RenderSceneImpl& scene, Model* model)
@@ -265,25 +233,6 @@ public:
 		m_universe.entityTransformed().unbind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
 		m_universe.entityDestroyed().unbind<RenderSceneImpl, &RenderSceneImpl::onEntityDestroyed>(this);
 		CullingSystem::destroy(*m_culling_system);
-	}
-
-
-	void materialStateChanged(Resource::State old_state, Resource::State new_state, Resource& resource)
-	{
-		Material& material = (Material&)resource;
-		const u64 layer_mask = new_state == Resource::State::READY ? material.getRenderLayerMask() : 0;
-		auto iter = m_custom_mesh_callbacks.find(&material);
-		const auto& entities = iter.value().m_entities;
-		for(EntityRef e : entities) {
-			ModelInstance& r = m_model_instances[e.index];
-			ASSERT(hasCustomMeshes(r));
-			for(int i = 0; i < r.mesh_count; ++i) {
-				Mesh& m = r.meshes[i];
-				if (m.material == &material) {
-					m.layer_mask = layer_mask;
-				}
-			}
-		}
 	}
 
 
@@ -337,7 +286,6 @@ public:
 		{
 			if (i.entity != INVALID_ENTITY && i.model)
 			{
-				freeCustomMeshes(i, material_manager);
 				i.model->getResourceManager().unload(*i.model);
 				LUMIX_DELETE(m_allocator, i.pose);
 			}
@@ -358,8 +306,6 @@ public:
 			if (probe.irradiance) probe.irradiance->getResourceManager().unload(*probe.irradiance);
 		}
 		m_environment_probes.clear();
-		
-		ASSERT(m_custom_mesh_callbacks.empty());
 	}
 
 
@@ -771,19 +717,6 @@ public:
 		{
 			auto* model = m_engine.getResourceManager().load<Model>(Path(path));
 			setModel(entity, model);
-		}
-
-		int material_count;
-		serializer.read(&material_count);
-		if (material_count > 0)
-		{
-			allocateCustomMeshes(r, material_count);
-			for (int j = 0; j < material_count; ++j)
-			{
-				char path[MAX_PATH_LENGTH];
-				serializer.read(path, lengthOf(path));
-				setModelInstanceMaterial(entity, j, Path(path));
-			}
 		}
 
 		m_universe.onComponentCreated(entity, MODEL_INSTANCE_TYPE, this);
@@ -1539,19 +1472,6 @@ public:
 					setModel(e, model);
 				}
 
-				int material_count;
-				serializer.read(material_count);
-				if (material_count > 0)
-				{
-					allocateCustomMeshes(r, material_count);
-					for (int j = 0; j < material_count; ++j)
-					{
-						char path[MAX_PATH_LENGTH];
-						serializer.readString(path, lengthOf(path));
-						setModelInstanceMaterial(e, j, Path(path));
-					}
-				}
-
 				m_universe.onComponentCreated(e, MODEL_INSTANCE_TYPE, this);
 			}
 		}
@@ -2038,12 +1958,6 @@ public:
 	}
 
 
-	int getModelInstanceMaterialsCount(EntityRef entity) override
-	{
-		return m_model_instances[entity.index].model ? m_model_instances[entity.index].mesh_count : 0;
-	}
-
-
 	void setModelInstancePath(EntityRef entity, const Path& path) override
 	{
 		ModelInstance& r = m_model_instances[entity.index];
@@ -2214,15 +2128,6 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	static void LUA_makeScreenshot(RenderSceneImpl* scene, const char* path)
 	{
 		scene->m_renderer.makeScreenshot(Path(path));
-	}
-
-
-	static void LUA_setModelInstanceMaterial(RenderScene* scene,
-		EntityRef entity,
-		int index,
-		const char* path)
-	{
-		scene->setModelInstanceMaterial(entity, index, Path(path));
 	}
 
 
@@ -3394,22 +3299,6 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	void freeCustomMeshes(ModelInstance& r, MaterialManager* manager)
-	{
-		if (!hasCustomMeshes(r)) return;
-		for (int i = 0; i < r.mesh_count; ++i)
-		{
-			removeFromCustomMeshCallbacks(r.meshes[i].material, (EntityRef)r.entity);
-			manager->unload(*r.meshes[i].material);
-			r.meshes[i].~Mesh();
-		}
-		m_allocator.deallocate(r.meshes);
-		r.meshes = nullptr;
-		r.flags.unset(ModelInstance::CUSTOM_MESHES);
-		r.mesh_count = 0;
-	}
-
-
 	void modelLoaded(Model* model, EntityRef entity)
 	{
 		auto& rm = m_engine.getResourceManager();
@@ -3438,26 +3327,8 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 				mesh.material->setDefine(skinned_define_idx, !mesh.skin.empty());
 			}
 		}
-		ASSERT(!r.meshes || hasCustomMeshes(r));
-		if (r.meshes)
-		{
-			allocateCustomMeshes(r, model->getMeshCount());
-			for (int i = 0; i < r.mesh_count; ++i)
-			{
-				auto& src = model->getMesh(i);
-				if (!r.meshes[i].material)
-				{
-					material_manager->load(*src.material);
-					r.meshes[i].material = src.material;
-				}
-				r.meshes[i].set(src);
-			}
-		}
-		else
-		{
-			r.meshes = &r.model->getMesh(0);
-			r.mesh_count = r.model->getMeshCount();
-		}
+		r.meshes = &r.model->getMesh(0);
+		r.mesh_count = r.model->getMeshCount();
 
 		if (r.flags.isSet(ModelInstance::IS_BONE_ATTACHMENT_PARENT))
 		{
@@ -3522,7 +3393,6 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 				for (int i = 0; i < r.mesh_count; ++i)
 				{
 					material_manager->load(*r.meshes[i].material);
-					addToCustomMeshCallbacks(r.meshes[i].material, (EntityRef)r.entity);
 				}
 			}
 		}
@@ -3530,72 +3400,11 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		for (int i = r.mesh_count; i < count; ++i)
 		{
 			ffr::VertexDecl decl;
-			new (NewPlaceholder(), new_meshes + i) Mesh(nullptr, decl, "", nullptr, m_allocator);
+			new (NewPlaceholder(), new_meshes + i) Mesh(nullptr, decl, "", nullptr, m_renderer, m_allocator);
 		}
 		r.meshes = new_meshes;
 		r.mesh_count = count;
 		r.flags.set(ModelInstance::CUSTOM_MESHES);
-	}
-
-	void removeFromCustomMeshCallbacks(Material* material, EntityRef entity)
-	{
-		auto iter = m_custom_mesh_callbacks.find(material);
-		ASSERT(iter.isValid());
-		auto& entities = iter.value().m_entities;
-		for(int i = 0, c = entities.size(); i < c; ++i) {
-			if (entities[i] == entity) {
-				entities.eraseFast(i);
-				break;
-			}
-		}
-		if(entities.empty()) {
-			m_custom_mesh_callbacks.erase(material);
-		}
-	}
-
-	void addToCustomMeshCallbacks(Material* material, EntityRef entity)
-	{
-		auto iter = m_custom_mesh_callbacks.find(material);
-		if(!iter.isValid()) {
-			CustomMeshCallback cb(*this, material, m_allocator);
-			m_custom_mesh_callbacks.insert(material, Move(cb));
-			iter = m_custom_mesh_callbacks.find(material);
-		}
-
-		iter.value().m_entities.push(entity);
-	}
-
-
-	void setModelInstanceMaterial(EntityRef entity, int index, const Path& path) override
-	{
-		auto& r = m_model_instances[entity.index];
-		const bool had_custom_meshes = hasCustomMeshes(r);
-		if (r.meshes && r.mesh_count > index && r.meshes[index].material && path == r.meshes[index].material->getPath()) return;
-
-		auto& rm = r.model->getResourceManager().getOwner();
-
-		int new_count = Math::maximum(i8(index + 1), r.mesh_count);
-		allocateCustomMeshes(r, new_count);
-		ASSERT(r.meshes);
-
-		Material* old_material = r.meshes[index].material;
-		auto* new_material = rm.load<Material>(path);
-		if(old_material) {
-			removeFromCustomMeshCallbacks(old_material, entity);
-		}
-
-		r.meshes[index].setMaterial(new_material, *r.model, m_renderer);
-
-		addToCustomMeshCallbacks(new_material, entity);
-	}
-
-
-	Path getModelInstanceMaterial(EntityRef entity, int index) override
-	{
-		auto& r = m_model_instances[entity.index];
-		if (!r.meshes) return Path("");
-
-		return r.meshes[index].material->getPath();
 	}
 
 	
@@ -3653,7 +3462,6 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		{
 			auto& rm = old_model->getResourceManager();
 			auto* material_manager = static_cast<MaterialManager*>(rm.getOwner().get(Material::TYPE));
-			freeCustomMeshes(model_instance, material_manager);
 			
 			removeFromModelEntityMap(old_model, entity);
 
@@ -3866,7 +3674,6 @@ private:
 	bool m_is_game_running;
 
 	HashMap<Model*, EntityRef> m_model_entity_map;
-	HashMap<Material*, CustomMeshCallback> m_custom_mesh_callbacks;
 };
 
 
@@ -3911,7 +3718,6 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	, m_renderer(renderer)
 	, m_allocator(allocator)
 	, m_model_entity_map(m_allocator)
-	, m_custom_mesh_callbacks(m_allocator)
 	, m_model_instances(m_allocator)
 	, m_cameras(m_allocator)
 	, m_text_meshes(m_allocator)
@@ -4004,7 +3810,6 @@ void RenderScene::registerLuaAPI(lua_State* L)
 	// TODO
 	/*REGISTER_FUNCTION(pipelineRender);
 	REGISTER_FUNCTION(getRenderBuffer);*/
-	REGISTER_FUNCTION(setModelInstanceMaterial);
 	REGISTER_FUNCTION(setModelInstancePath);
 	REGISTER_FUNCTION(getModelBoneIndex);
 	REGISTER_FUNCTION(makeScreenshot);

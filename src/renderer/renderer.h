@@ -92,9 +92,6 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 		virtual ShaderManager& getShaderManager() = 0;
 		virtual ModelManager& getModelManager() = 0;
 		virtual TextureManager& getTextureManager() = 0;
-		virtual int getLayersCount() const = 0;
-		virtual int getLayer(const char* name) = 0;
-		virtual const char* getLayerName(int idx) const = 0;
 		virtual void setMainPipeline(Pipeline* pipeline) = 0;
 		virtual Pipeline* getMainPipeline() = 0;
 		virtual GlobalState getGlobalState() const = 0;
@@ -122,7 +119,7 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 		virtual bool getGPUTimings(Array<GPUProfilerQuery>* results) = 0;
 		virtual void beginProfileBlock(const char* name) = 0;
 		virtual void endProfileBlock() = 0;
-		virtual void runInRenderThread(void* user_ptr, void (*fnc)(void*)) = 0;
+		virtual void runInRenderThread(void* user_ptr, void (*fnc)(Renderer& renderer, void*)) = 0;
 
 		virtual Engine& getEngine() = 0;
 }; 

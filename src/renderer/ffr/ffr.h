@@ -90,6 +90,7 @@ enum class TextureFormat : uint {
 	D24,
 	D24S8,
 	RGBA8,
+	RGBA16,
 	RGBA16F,
 	R16F,
 	R16,
