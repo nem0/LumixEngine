@@ -1117,7 +1117,7 @@ struct PipelineImpl final : Pipeline
 
 		cmd->m_camera_params = cp;
 		cmd->m_pipeline = pipeline;
-		cmd->m_shader_define = define;
+		cmd->m_define_mask = 1 << pipeline->m_renderer.getShaderDefineIdx(define);
 		pipeline->m_renderer.push(cmd);
 		return 0;
 	}
@@ -1943,19 +1943,11 @@ struct PipelineImpl final : Pipeline
 			if(!m_pipeline->m_scene) return;
 
 			Renderer& renderer = m_pipeline->m_renderer;
-			const u32 define_mask = m_shader_define.empty() 
-				? 0
-				: 1 << renderer.getShaderDefineIdx(m_shader_define);
 			const RenderScene* scene = m_pipeline->getScene();
 			Array<Array<u32>> renderables(renderer.getAllocator());
 			scene->getRenderables(m_camera_params.frustum, renderables);
 			if (renderables.empty()) return;
-			
-			Array<u64> sort_keys(m_allocator);
-			
 			fillCommands(renderables, m_cmds);
-
-//			radixSort(sort_keys.begin(), m_offsets.begin(), sort_keys.size());
 
 			// TODO
 			/*MT::atomicAdd(&m_pipeline->m_stats.draw_call_count, meshes.size());
@@ -1980,7 +1972,6 @@ struct PipelineImpl final : Pipeline
 			PROFILE_FUNCTION();
 			if(m_cmds.empty()) return;
 
-			ffr::pushDebugGroup(m_shader_define.empty() ? "meshes" : m_shader_define);
 			ffr::setUniform1i(m_pipeline->m_irradiance_map_uniform, 0);
 			ffr::setUniform1i(m_pipeline->m_radiance_map_uniform, 1);
 
@@ -2003,6 +1994,8 @@ struct PipelineImpl final : Pipeline
 
 			int drawcalls_count = 0;
 			
+			const u32 base_mask = m_define_mask | (1 << m_pipeline->m_renderer.getShaderDefineIdx("INSTANCED"));
+
 			for (Array<u8>& cmds : m_cmds) {
 				const u8* cmd = cmds.begin();
 				Mesh::RenderData* mesh = *(Mesh::RenderData**)cmd;
@@ -2023,9 +2016,7 @@ struct PipelineImpl final : Pipeline
 				}
 
 				ffr::setState(material->render_states | u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE)); // TODO
-				const u32 define_mask = 1 << m_pipeline->m_renderer.getShaderDefineIdx("INSTANCED")
-					| 1 << m_pipeline->m_renderer.getShaderDefineIdx("DEFERRED"); // TODO
-				const Shader::Program& prog = Shader::getProgram(shader, define_mask);
+				const Shader::Program& prog = Shader::getProgram(shader, base_mask);
 				if(prog.handle.isValid()) {
 					const Vec4 params(material->roughness, material->metallic, material->emission, 0);
 					ffr::setUniform4f(m_pipeline->m_material_params_uniform, &params.x);
@@ -2046,8 +2037,6 @@ struct PipelineImpl final : Pipeline
 					ffr::drawTrianglesInstanced(0, mesh->indices_count, instances_count);
 				}
 			}
-//			PROFILE_INT("drawcalls", drawcalls_count);
-			ffr::popDebugGroup();
 		}
 
 
@@ -2057,7 +2046,7 @@ struct PipelineImpl final : Pipeline
 		Array<Array<u8>> m_cmds;
 		ffr::TextureHandle m_irradiance_map;
 		ffr::TextureHandle m_radiance_map;
-		StaticString<32> m_shader_define;
+		u32 m_define_mask;
 		struct {
 			ffr::TextureHandle texture;
 			ffr::UniformHandle uniform;
