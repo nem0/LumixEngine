@@ -670,7 +670,7 @@ public:
 		ASSERT(r.entity != INVALID_ENTITY);
 
 		serialize.write("source", r.model ? r.model->getPath().c_str() : "");
-		serialize.write("flags", u8(r.flags.base & ModelInstance::PERSISTENT_FLAGS));
+		serialize.write("flags", u8(r.flags.base));
 		bool has_changed_materials = r.model && r.model->isReady() && r.meshes != &r.model->getMesh(0);
 		serialize.write("custom_materials", has_changed_materials ? r.mesh_count : 0);
 		if (has_changed_materials)
@@ -680,12 +680,6 @@ public:
 				serialize.write("", r.meshes[i].material->getPath().c_str());
 			}
 		}
-	}
-
-
-	static bool hasCustomMeshes(ModelInstance& r)
-	{
-		return r.flags.isSet(ModelInstance::CUSTOM_MESHES);
 	}
 
 
@@ -712,7 +706,6 @@ public:
 		char path[MAX_PATH_LENGTH];
 		serializer.read(path, lengthOf(path));
 		serializer.read(&r.flags.base);
-		r.flags.base &= ModelInstance::PERSISTENT_FLAGS;
 
 		if (path[0] != 0)
 		{
@@ -1202,7 +1195,7 @@ public:
 		for (auto& r : m_model_instances)
 		{
 			serializer.write(r.entity);
-			serializer.write(u8(r.flags.base & ModelInstance::PERSISTENT_FLAGS));
+			serializer.write(u8(r.flags.base));
 			if(r.entity != INVALID_ENTITY)
 			{
 				serializer.write(r.model ? r.model->getPath().getHash() : 0);
@@ -1453,7 +1446,6 @@ public:
 			auto& r = m_model_instances.emplace();
 			serializer.read(r.entity);
 			serializer.read(r.flags);
-			r.flags.base &= ModelInstance::PERSISTENT_FLAGS;
 			ASSERT(r.entity.index == i || !r.entity.isValid());
 			r.model = nullptr;
 			r.pose = nullptr;
@@ -3289,11 +3281,8 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	void modelUnloaded(Model*, EntityRef entity)
 	{
 		auto& r = m_model_instances[entity.index];
-		if (!hasCustomMeshes(r))
-		{
-			r.meshes = nullptr;
-			r.mesh_count = 0;
-		}
+		r.meshes = nullptr;
+		r.mesh_count = 0;
 		LUMIX_DELETE(m_allocator, r.pose);
 		r.pose = nullptr;
 
@@ -3359,54 +3348,6 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 			modelLoaded(model, (EntityRef)e);
 			e = m_model_instances[e.index].next_model;
 		}
-	}
-
-
-	void allocateCustomMeshes(ModelInstance& r, int count)
-	{
-		if (hasCustomMeshes(r) && r.mesh_count == count) return;
-
-		ASSERT(r.model);
-		auto& rm = r.model->getResourceManager();
-		auto* material_manager = static_cast<MaterialManager*>(rm.getOwner().get(Material::TYPE));
-
-		auto* new_meshes = (Mesh*)m_allocator.allocate(count * sizeof(Mesh));
-		if (r.meshes)
-		{
-			for (int i = 0; i < r.mesh_count; ++i)
-			{
-				new (NewPlaceholder(), new_meshes + i) Mesh(r.meshes[i]);
-			}
-
-			if (hasCustomMeshes(r))
-			{
-				for (int i = count; i < r.mesh_count; ++i)
-				{
-					material_manager->unload(*r.meshes[i].material);
-				}
-				for (int i = 0; i < r.mesh_count; ++i)
-				{
-					r.meshes[i].~Mesh();
-				}
-				m_allocator.deallocate(r.meshes);
-			}
-			else
-			{
-				for (int i = 0; i < r.mesh_count; ++i)
-				{
-					material_manager->load(*r.meshes[i].material);
-				}
-			}
-		}
-
-		for (int i = r.mesh_count; i < count; ++i)
-		{
-			ffr::VertexDecl decl;
-			new (NewPlaceholder(), new_meshes + i) Mesh(nullptr, decl, "", nullptr, m_renderer, m_allocator);
-		}
-		r.meshes = new_meshes;
-		r.mesh_count = count;
-		r.flags.set(ModelInstance::CUSTOM_MESHES);
 	}
 
 	

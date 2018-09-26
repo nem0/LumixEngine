@@ -63,13 +63,8 @@ struct ModelInstance
 {
 	enum Flags : u8
 	{
-		CUSTOM_MESHES = 1 << 0,
-		KEEP_SKIN_DEPRECATED = 1 << 1,
-		IS_BONE_ATTACHMENT_PARENT = 1 << 2,
-		ENABLED = 1 << 3,
-
-		RUNTIME_FLAGS = CUSTOM_MESHES,
-		PERSISTENT_FLAGS = u8(~RUNTIME_FLAGS)
+		IS_BONE_ATTACHMENT_PARENT = 1 << 0,
+		ENABLED = 1 << 1,
 	};
 
 	Model* model;
