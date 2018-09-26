@@ -324,6 +324,7 @@ void wait(int volatile* counter)
 	if (*counter <= 0) return;
 	if (g_worker)
 	{
+		PROFILE_BLOCK_COLORED("waiting", 0xff, 0, 0);
 		//ASSERT(Profiler::getCurrentBlock() == Profiler::getRootBlock(MT::getCurrentThreadID()));
 		FiberDecl* fiber_decl = ((WorkerTask*)g_worker)->m_current_fiber;
 		fiber_decl->switch_state = (void*)counter;

@@ -593,6 +593,7 @@ public:
 		updateRelativeMatrix(ba);
 	}
 
+
 	void startGame() override
 	{
 		m_is_game_running = true;
@@ -1707,7 +1708,7 @@ public:
 
 	void onEntityMoved(EntityRef entity)
 	{
-		int index = entity.index;
+		const int index = entity.index;
 
 		if (index < m_model_instances.size() && m_model_instances[index].entity.isValid() &&
 			m_model_instances[index].model && m_model_instances[index].model->isReady())
@@ -1715,16 +1716,15 @@ public:
 			ModelInstance& r = m_model_instances[index];
 			if (r.model && r.model->isReady())
 			{
-				float radius = m_universe.getScale(entity) * r.model->getBoundingRadius();
-				DVec3 position = m_universe.getPosition(entity);
+				const float radius = m_universe.getScale(entity) * r.model->getBoundingRadius();
+				const DVec3 position = m_universe.getPosition(entity);
 				m_culling_system->setRadius(entity, radius);
 				m_culling_system->setPosition(entity, position);
 			}
 		}
 
-		int decal_idx = m_decals.find(entity);
-		if (decal_idx >= 0)
-		{
+		if(m_universe.hasComponent(entity, DECAL_TYPE)) {
+			const int decal_idx = m_decals.find(entity);
 			updateDecalInfo(m_decals.at(decal_idx));
 		}
 
@@ -1740,15 +1740,17 @@ public:
 		m_is_updating_attachments = was_updating;
 
 		if (m_is_updating_attachments || m_is_game_running) return;
-		for (auto& attachment : m_bone_attachments)
-		{
-			if (attachment.entity == entity)
+		
+		if(m_universe.hasComponent(entity, BONE_ATTACHMENT_TYPE)) {
+			for (auto& attachment : m_bone_attachments)
 			{
-				updateRelativeMatrix(attachment);
-				break;
+				if (attachment.entity == entity)
+				{
+					updateRelativeMatrix(attachment);
+					break;
+				}
 			}
 		}
-
 	}
 
 	Engine& getEngine() const override { return m_engine; }
