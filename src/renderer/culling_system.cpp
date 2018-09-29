@@ -376,7 +376,7 @@ struct CullingSystemImpl final : public CullingSystem
 
 	bool isAdded(EntityRef entity) override
 	{
-		return m_entity_to_cell[entity.index].cell != nullptr;
+		return entity.index < m_entity_to_cell.size() && m_entity_to_cell[entity.index].cell != nullptr;
 	}
 
 

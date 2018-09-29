@@ -199,6 +199,15 @@ private:
 };
 
 
+static RenderableTypes getRenderableType(const Model& model)
+{
+	ASSERT(model.isReady());
+	if (model.isSkinned()) return RenderableTypes::SKINNED;
+	if (model.getMeshCount() > 1) return RenderableTypes::MESH_GROUP;
+	return RenderableTypes::MESH;
+}
+
+
 class RenderSceneImpl final : public RenderScene
 {
 private:
@@ -1935,7 +1944,7 @@ public:
 			const DVec3 pos = m_universe.getPosition((EntityRef)model_instance.entity);
 			const float radius = model_instance.model->getBoundingRadius();
 			if (!m_culling_system->isAdded(entity)) {
-				RenderableTypes type = model_instance.model->getMeshCount() == 1 ? RenderableTypes::MESH : RenderableTypes::MESH_GROUP;
+				const RenderableTypes type = getRenderableType(*model_instance.model);
 				m_culling_system->add(entity, (u8)type, pos, radius);
 			}
 		}
@@ -3302,7 +3311,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		const DVec3 pos = m_universe.getPosition(entity);
 		const float radius = bounding_radius * scale;
 		if(r.flags.isSet(ModelInstance::ENABLED)) {
-			RenderableTypes type = model->getMeshCount() == 1 ? RenderableTypes::MESH : RenderableTypes::MESH_GROUP;
+			const RenderableTypes type = getRenderableType(*model);
 			m_culling_system->add(entity, (u8)type, pos, radius);
 		}
 		ASSERT(!r.pose);
