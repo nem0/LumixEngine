@@ -203,6 +203,7 @@ public:
 	const AABB& getAABB() const { return m_aabb; }
 	LOD* getLODs() { return m_lods; }
 	void onBeforeReady() override;
+	bool isSkinned() const;
 
 	static void registerLuaAPI(lua_State* L);
 

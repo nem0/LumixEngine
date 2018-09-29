@@ -139,7 +139,8 @@ struct DebugPoint
 
 enum class RenderableTypes : u8 {
 	MESH_GROUP,
-	MESH
+	MESH,
+	SKINNED
 };
 
 struct TextMeshVertex
