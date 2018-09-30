@@ -963,9 +963,13 @@ int RenderTask::task()
 	m_transient_buffer_offset = 0;
 	ffr::createBuffer(m_transient_buffer, TRANSIENT_BUFFER_SIZE, nullptr);
 	while (!m_shutdown_requested || !m_commands.isEmpty()) {
-		Renderer::RenderCommandBase** rt_cmd = m_commands.pop(true);
-		Renderer::RenderCommandBase* cmd = *rt_cmd;
-		m_commands.dealoc(rt_cmd);
+		Renderer::RenderCommandBase* cmd = nullptr;
+		{
+			PROFILE_BLOCK_COLORED("wait for cmd", 0xff, 0, 0);
+			Renderer::RenderCommandBase** rt_cmd = m_commands.pop(true);
+			cmd = *rt_cmd;
+			m_commands.dealoc(rt_cmd);
+		}
 	
 		PROFILE_BLOCK("executeCommand");
 		cmd->execute();

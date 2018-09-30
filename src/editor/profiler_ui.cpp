@@ -715,6 +715,42 @@ static void read(Profiler::ThreadContext& ctx, uint p, T& value)
 }
 
 
+static inline ImVec2 operator+(const ImVec2& lhs, const ImVec2& rhs)            { return ImVec2(lhs.x+rhs.x, lhs.y+rhs.y); }
+
+
+static void renderArrow(ImVec2 p_min, ImGuiDir dir, float scale, ImDrawList* dl)
+{
+    const float h = ImGui::GetFontSize() * 1.00f;
+    float r = h * 0.40f * scale;
+    ImVec2 center = ImVec2(p_min.x + h * 0.50f, p_min.y + h * 0.50f * scale);
+
+    ImVec2 a, b, c;
+    switch (dir)
+    {
+    case ImGuiDir_Up:
+    case ImGuiDir_Down:
+        if (dir == ImGuiDir_Up) r = -r;
+        a = ImVec2(+0.000f * r,+0.750f * r);
+        b = ImVec2(-0.866f * r,-0.750f * r);
+        c = ImVec2(+0.866f * r,-0.750f * r);
+        break;
+    case ImGuiDir_Left:
+    case ImGuiDir_Right:
+        if (dir == ImGuiDir_Left) r = -r;
+        a = ImVec2(+0.750f * r,+0.000f * r);
+        b = ImVec2(-0.750f * r,+0.866f * r);
+        c = ImVec2(-0.750f * r,-0.866f * r);
+        break;
+    case ImGuiDir_None:
+    case ImGuiDir_COUNT:
+        IM_ASSERT(0);
+        break;
+    }
+
+    dl->AddTriangleFilled(center + a, center + b, center + c, ImGui::GetColorU32(ImGuiCol_Text));
+}
+
+
 void ProfilerUIImpl::onGUICPUProfiler()
 {
 	if (!ImGui::CollapsingHeader("CPU")) return;
@@ -728,31 +764,51 @@ void ProfilerUIImpl::onGUICPUProfiler()
 	
 	const u64 view_end = m_is_paused ? m_paused_time + m_view_offset : Profiler::now();
 	const u64 view_start = view_end - m_zoom;
+	float h = 0;
+	for(Profiler::ThreadContext* ctx : contexts) {
+		h += ctx->rows * 20 + 20;
+	}
+	ImGui::InvisibleButton("x", ImVec2(-1, h));
+	ImDrawList* dl = ImGui::GetWindowDrawList();
+	const ImVec2 a = ImGui::GetItemRectMin();
+	const ImVec2 b = ImGui::GetItemRectMax();
+	float y = a.y;
+
+	const u64 cursor = u64(((ImGui::GetMousePos().x - a.x) / (b.x - a.x)) * m_zoom) + view_start;
+	u64 cursor_to_end = view_end - cursor;
+
+	if (ImGui::IsItemHovered()) {
+		if (ImGui::IsMouseDragging()) {
+			m_view_offset -= i64((ImGui::GetIO().MouseDelta.x / (b.x - a.x)) * m_zoom);
+		}
+		if (ImGui::GetIO().KeyCtrl) {
+			if (ImGui::GetIO().MouseWheel > 0 && m_zoom > 1) {
+				m_zoom >>= 1;
+				cursor_to_end >>= 1;
+			}
+			else if (ImGui::GetIO().MouseWheel < 0) {
+				m_zoom <<= 1;
+				cursor_to_end <<= 1;
+			}
+			m_view_offset = cursor + cursor_to_end - m_paused_time;
+		}
+	}
+
+	dl->ChannelsSplit(2);
+
 	for(Profiler::ThreadContext* ctx : contexts) {
 		MT::SpinLock lock(ctx->mutex);
-		if (!ImGui::TreeNodeEx(ctx, 0, "%s", ctx->name)) continue;
-		ImDrawList* dl = ImGui::GetWindowDrawList();
-		ImGui::InvisibleButton("x", ImVec2(-1, 120));
-		const ImVec2 a = ImGui::GetItemRectMin();
-		const ImVec2 b = ImGui::GetItemRectMax();
-		const u64 cursor = u64(((ImGui::GetMousePos().x - a.x) / (b.x - a.x)) * m_zoom) + view_start;
-		u64 cursor_to_end = view_end - cursor;
-		if (ImGui::IsItemHovered()) {
-			if (ImGui::IsMouseDragging()) {
-				m_view_offset -= i64((ImGui::GetIO().MouseDelta.x / (b.x - a.x)) * m_zoom);
-			}
-			if (ImGui::GetIO().KeyCtrl) {
-				if (ImGui::GetIO().MouseWheel > 0) {
-					m_zoom >>= 1;
-					cursor_to_end >>= 1;
-				}
-				else if (ImGui::GetIO().MouseWheel < 0) {
-					m_zoom <<= 1;
-					cursor_to_end <<= 1;
-				}
-				m_view_offset = cursor + cursor_to_end - m_paused_time;
-			}
+		renderArrow(ImVec2(a.x, y), ctx->open ? ImGuiDir_Down : ImGuiDir_Right, 1, dl);
+		dl->AddText(ImVec2(a.x + 20, y), ImGui::GetColorU32(ImGuiCol_Text), ctx->name);
+		if (ImGui::IsMouseClicked(0) && ImGui::IsMouseHoveringRect(ImVec2(a.x, y), ImVec2(a.x + 20, y+20))){
+			ctx->open = !ctx->open;
 		}
+		y += 20;
+		if (!ctx->open) continue;
+
+		float h = Math::maximum(20.f, ctx->rows * 20.f);
+		StaticString<256> name(ctx->name, (u64)ctx);
+		ctx->rows = 0;
 
 		uint open_blocks[64];
 		int level = -1;
@@ -764,16 +820,19 @@ void ProfilerUIImpl::onGUICPUProfiler()
 				const float t_start = float(int(from - view_start) / double(view_end - view_start));
 				const float t_end = float(int(to - view_start) / double(view_end - view_start));
 				const float x_start = a.x * (1 - t_start) + b.x * t_start;
-				const float x_end = a.x * (1 - t_end) + b.x * t_end;
-				const float y = level * 20.f;
+				float x_end = a.x * (1 - t_end) + b.x * t_end;
+				if (int(x_end) == int(x_start)) ++x_end;
+				const float block_y = level * 20.f + y;
 				const float w = ImGui::CalcTextSize(name).x;
 							
-				const ImVec2 ra(x_start, a.y + y);
-				const ImVec2 rb(x_end, a.y + y + 19);
+				const ImVec2 ra(x_start, block_y);
+				const ImVec2 rb(x_end, block_y + 19);
 				dl->AddRectFilled(ra, rb, color);
-				dl->AddRect(ra, rb, ImGui::GetColorU32(ImGuiCol_Border));
+				if(x_end - x_start > 2) {
+					dl->AddRect(ra, rb, ImGui::GetColorU32(ImGuiCol_Border));
+				}
 				if (w + 2 < x_end - x_start) {
-					dl->AddText(ImVec2(x_start + 2, a.y + y), 0xff000000, name);
+					dl->AddText(ImVec2(x_start + 2, block_y), 0xff000000, name);
 				}
 				if(ImGui::IsMouseHoveringRect(ra, rb)) {
 					const u64 freq = Profiler::frequency();
@@ -794,6 +853,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 					break;
 				case Profiler::EventType::END_BLOCK:
 					if (level >= 0) {
+						ctx->rows = Math::maximum(ctx->rows, level + 1);
 						Profiler::EventHeader start_header;
 						read(*ctx, open_blocks[level], start_header);
 						const char* name;
@@ -808,7 +868,9 @@ void ProfilerUIImpl::onGUICPUProfiler()
 					if (header.time >= view_start && header.time <= view_end) {
 						const float t = float((header.time - view_start) / double(view_end - view_start));
 						const float x = a.x * (1 - t) + b.x * t;
+						dl->ChannelsSetCurrent(1);
 						dl->AddLine(ImVec2(x, a.y), ImVec2(x, b.y), 0xffff0000);
+						dl->ChannelsSetCurrent(0);
 					}
 					break;
 				}
@@ -816,6 +878,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 			}
 			p+= header.size;
 		}
+		ctx->rows = Math::maximum(ctx->rows, level + 1);
 		while(level >= 0) {
 			Profiler::EventHeader start_header;
 			read(*ctx, open_blocks[level], start_header);
@@ -824,10 +887,10 @@ void ProfilerUIImpl::onGUICPUProfiler()
 			draw_block(start_header.time, m_paused_time, name, ImGui::GetColorU32(ImGuiCol_PlotHistogram));
 			--level;
 		}
-
-		ImGui::TreePop();
+		y += ctx->rows * 20;
 	}
 
+	dl->ChannelsMerge();
 	Profiler::unlockContexts();
 
 	/*

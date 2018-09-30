@@ -2268,20 +2268,39 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 			const uint num_indices = cmd_list.idx_buffer.size / sizeof(ImDrawIdx);
 			const uint num_vertices = cmd_list.vtx_buffer.size / sizeof(ImDrawVert);
 
-			if ((vb_offset + num_vertices) * sizeof(ImDrawVert) > 1024 * 1024) return;
-			if ((ib_offset + num_indices) * sizeof(ImDrawIdx) > 1024 * 1024) return;
+			ffr::VertexDecl decl;
+			decl.addAttribute(2, ffr::AttributeType::FLOAT, false, false);
+			decl.addAttribute(2, ffr::AttributeType::FLOAT, false, false);
+			decl.addAttribute(4, ffr::AttributeType::U8, true, false);
 
 			PluginManager& plugin_manager = plugin->m_engine.getPluginManager();	
 			Renderer* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
+			
+			const bool use_big_buffers = (vb_offset + num_vertices) * sizeof(ImDrawVert) > 1024 * 1024 ||
+				(ib_offset + num_indices) * sizeof(ImDrawIdx) > 1024 * 1024;
 
-			ffr::update(plugin->m_index_buffer
-				, cmd_list.idx_buffer.data
-				, ib_offset * sizeof(ImDrawIdx)
-				, num_indices * sizeof(ImDrawIdx));
-			ffr::update(plugin->m_vertex_buffer
-				, cmd_list.vtx_buffer.data
-				, vb_offset * sizeof(ImDrawVert)
-				, num_vertices * sizeof(ImDrawVert));
+			ffr::BufferHandle big_ib, big_vb;
+			if (use_big_buffers) {
+				big_vb = ffr::allocBufferHandle();
+				big_ib = ffr::allocBufferHandle();
+				ffr::createBuffer(big_vb, num_vertices * sizeof(ImDrawVert), cmd_list.vtx_buffer.data);
+				ffr::createBuffer(big_ib, num_indices * sizeof(ImDrawIdx), cmd_list.idx_buffer.data);
+				ffr::setVertexBuffer(&decl, big_vb, 0, nullptr);
+				ffr::setIndexBuffer(big_ib);
+			}
+			else {
+				ffr::update(plugin->m_index_buffer
+					, cmd_list.idx_buffer.data
+					, ib_offset * sizeof(ImDrawIdx)
+					, num_indices * sizeof(ImDrawIdx));
+				ffr::update(plugin->m_vertex_buffer
+					, cmd_list.vtx_buffer.data
+					, vb_offset * sizeof(ImDrawVert)
+					, num_vertices * sizeof(ImDrawVert));
+
+				ffr::setVertexBuffer(&decl, plugin->m_vertex_buffer, vb_offset * sizeof(ImDrawVert), nullptr);
+				ffr::setIndexBuffer(plugin->m_index_buffer);
+			}
 			renderer->free(cmd_list.vtx_buffer);
 			renderer->free(cmd_list.idx_buffer);
 			u32 elem_offset = 0;
@@ -2289,12 +2308,6 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 			const ImDrawCmd* pcmd_end = cmd_list.commands.end();
 			ffr::useProgram(plugin->m_program);
 			ffr::setState((u64)ffr::StateFlags::SCISSOR_TEST);
-			ffr::VertexDecl decl;
-			decl.addAttribute(2, ffr::AttributeType::FLOAT, false, false);
-			decl.addAttribute(2, ffr::AttributeType::FLOAT, false, false);
-			decl.addAttribute(4, ffr::AttributeType::U8, true, false);
-			ffr::setVertexBuffer(&decl, plugin->m_vertex_buffer, vb_offset * sizeof(ImDrawVert), nullptr);
-			ffr::setIndexBuffer(plugin->m_index_buffer);
 			for (const ImDrawCmd* pcmd = pcmd_begin; pcmd != pcmd_end; pcmd++)
 			{
 				ASSERT(!pcmd->UserCallback);
@@ -2309,7 +2322,7 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 							}
 				*/
 
-				const u32 first_index = elem_offset + ib_offset;
+				const u32 first_index = elem_offset + (use_big_buffers ? 0 : ib_offset);
 
 				ffr::TextureHandle tex = pcmd->TextureId ? ffr::TextureHandle{(uint)(intptr_t)pcmd->TextureId} : *default_texture;
 				if (!tex.isValid()) tex = *default_texture;
@@ -2328,8 +2341,14 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 		
 				elem_offset += pcmd->ElemCount;
 			}
-			ib_offset += num_indices;
-			vb_offset += num_vertices;
+			if(use_big_buffers) {
+				ffr::destroy(big_ib);
+				ffr::destroy(big_vb);
+			}
+			else {
+				ib_offset += num_indices;
+				vb_offset += num_vertices;
+			}
 		}
 
 

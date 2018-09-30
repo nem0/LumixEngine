@@ -95,13 +95,28 @@ void beginBlock(const char* name, u32 color)
 		const char* name;
 		u32 color;
 	} v{name, color};
+	++ctx->open_blocks_count;
 	write(*ctx, EventType::BEGIN_BLOCK, v);
+}
+
+
+void beginFiberSwitch()
+{
+	ThreadContext* ctx = g_instance.getThreadContext();
+	while(ctx->open_blocks_count > 0) {
+		write(*ctx, EventType::END_BLOCK, 0);
+		--ctx->open_blocks_count;
+	}
 }
 
 
 void endBlock()
 {
 	ThreadContext* ctx = g_instance.getThreadContext();
+	--ctx->open_blocks_count;
+	if(ctx->open_blocks_count < 0) {
+		ctx->open_blocks_count = 0;
+	}
 	write(*ctx, EventType::END_BLOCK, 0);
 }
 
