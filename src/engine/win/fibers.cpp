@@ -1,6 +1,6 @@
 #include "engine/fibers.h"
+#include "engine/profiler.h"
 #include <Windows.h>
-
 
 namespace Lumix
 {
@@ -31,6 +31,7 @@ void destroy(Handle fiber)
 
 void switchTo(Handle* from, Handle fiber)
 {
+	Profiler::beginFiberSwitch();
 	SwitchToFiber(fiber);
 }
 

@@ -27,9 +27,12 @@ struct ThreadContext
 		buffer.resize(1024 * 512);
 	}
 
+	int open_blocks_count = 0;
 	Array<u8> buffer;
 	uint begin = 0;
 	uint end = 0;
+	uint rows = 0;
+	bool open = false;
 	MT::SpinMutex mutex;
 	StaticString<64> name;
 };
@@ -62,6 +65,8 @@ LUMIX_ENGINE_API void pause(bool paused);
 LUMIX_ENGINE_API void beginBlock(const char* name, u32 color);
 LUMIX_ENGINE_API void endBlock();
 LUMIX_ENGINE_API void frame();
+
+LUMIX_ENGINE_API void beginFiberSwitch();
 
 LUMIX_ENGINE_API Array<ThreadContext*>& lockContexts();
 LUMIX_ENGINE_API void unlockContexts();

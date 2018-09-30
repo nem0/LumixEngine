@@ -183,6 +183,7 @@ struct CullingSystemImpl final : public CullingSystem
 
 	void remove(EntityRef entity) override
 	{
+		if(m_entity_to_cell.size() >= entity.index) return;
 		const EntityLoc loc = m_entity_to_cell[entity.index];
 		Cell& cell = *loc.cell;
 		const u32 last = cell.ids.back();
@@ -263,6 +264,7 @@ struct CullingSystemImpl final : public CullingSystem
 
 	void cull(const ShiftedFrustum& frustum, Results& result) override
 	{
+		PROFILE_FUNCTION();
 		ASSERT(result.empty());
 		if(m_cells.empty() && m_big_object_cell.ids.empty()) return;
 
