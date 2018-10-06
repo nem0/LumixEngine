@@ -113,10 +113,9 @@ void LogUI::showNotifications()
 	if (m_notifications.empty()) return;
 
 	ImGui::SetNextWindowPos(ImVec2(10, 30));
-	bool open;
 	ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings;
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1);
-	if (!ImGui::Begin("Notifications", &open, flags)) goto end;
+	if (!ImGui::Begin("Notifications", nullptr, flags)) goto end;
 
 	m_are_notifications_hovered = ImGui::IsWindowHovered();
 
@@ -164,7 +163,8 @@ void LogUI::onGUI()
 	MT::SpinLock lock(m_guard);
 	showNotifications();
 
-	if (ImGui::BeginDock("Log", &m_is_open))
+	if (!m_is_open) return;
+	if (ImGui::Begin("Log", &m_is_open))
 	{
 		const char* labels[] = { "Info", "Warning", "Error" };
 		for (int i = 0; i < lengthOf(labels); ++i)
@@ -245,7 +245,7 @@ void LogUI::onGUI()
 			ImGui::EndPopup();
 		}
 	}
-	ImGui::EndDock();
+	ImGui::End();
 }
 
 

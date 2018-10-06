@@ -314,14 +314,15 @@ struct ProfilerUIImpl final : public ProfilerUI
 			m_bytes_read = 0;
 		}
 
-		if (ImGui::BeginDock("Profiler", &m_is_open))
+		if (!m_is_open) return;
+		if (ImGui::Begin("Profiler", &m_is_open))
 		{
 			onGUICPUProfiler();
 			onGUIMemoryProfiler();
 			onGUIResources();
 			onGUIFileSystem();
 		}
-		ImGui::EndDock();
+		ImGui::End();
 	}
 
 

@@ -1141,5 +1141,3 @@ namespace ImGui
 
 } // namespace ImGui
 
-
-#include "imgui_dock.inl"

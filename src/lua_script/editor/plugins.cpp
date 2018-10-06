@@ -752,7 +752,8 @@ struct ConsolePlugin final : public StudioApp::GUIPlugin
 
 	void onWindowGUI() override
 	{
-		if (ImGui::BeginDock("Script console", &open))
+		if (!open) return;
+		if (ImGui::Begin("Script console", &open))
 		{
 			if (ImGui::Button("Execute"))
 			{
@@ -835,7 +836,7 @@ struct ConsolePlugin final : public StudioApp::GUIPlugin
 				ImGui::EndPopup();
 			}
 		}
-		ImGui::EndDock();
+		ImGui::End();
 	}
 
 

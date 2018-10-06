@@ -218,7 +218,8 @@ public:
 		loadSettings();
 		initIMGUI();
 		#ifdef _WIN32
-			ImGui::GetIO().ImeWindowHandle = window_info.info.win.window;
+		// TODO
+		//			ImGui::GetPlatformIO().ImeWindowHandle = window_info.info.win.window;
 		#endif
 
 		m_custom_pivot_action = LUMIX_NEW(m_editor->getAllocator(), Action)(
@@ -561,14 +562,25 @@ public:
 		}
 		else
 		{
-			float menu_height = showMainMenu();
-			float toolbar_bottom = showMainToolbar(menu_height);
 			if (ImGui::GetIO().DisplaySize.y > 0)
 			{
-				auto pos = ImVec2(0, toolbar_bottom);
+				auto pos = ImVec2(0, 0);
 				auto size = ImGui::GetIO().DisplaySize;
 				size.y -= pos.y;
-				ImGui::RootDock(pos, size);
+				ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+										 ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
+										 ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
+				ImGui::SetNextWindowSize(size);
+				ImGui::SetNextWindowPos({ 0, 0 }, ImGuiCond_FirstUseEver);
+				if (ImGui::Begin("MainDockspace", nullptr, flags)) {
+					float menu_height = showMainMenu();
+					showMainToolbar(menu_height);
+					ImGui::DockSpace(1);
+				}
+				ImGui::End();
+
+				// TODO
+				//ImGui::RootDock(pos, size);
 			}
 			m_profiler_ui->onGUI();
 			m_asset_browser->onGUI();
@@ -1328,7 +1340,8 @@ public:
 		PROFILE_FUNCTION();
 		const Array<EntityRef>& entities = m_editor->getSelectedEntities();
 		static char filter[64] = "";
-		if (ImGui::BeginDock("Entity List", &m_is_entity_list_open))
+		if (!m_is_entity_list_open) return;
+		if (ImGui::Begin("Entity List", &m_is_entity_list_open))
 		{
 			auto* universe = m_editor->getUniverse();
 			ImGui::LabellessInputText("Filter", filter, sizeof(filter));
@@ -1384,7 +1397,7 @@ public:
 				ImGui::EndDragDropTarget();
 			}*/
 		}
-		ImGui::EndDock();
+		ImGui::End();
 	}
 
 
@@ -1415,7 +1428,7 @@ public:
 	void initIMGUI()
 	{
 		ImGuiIO& io = ImGui::GetIO();
-		io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+		io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard | ImGuiConfigFlags_DockingEnable;
 		float ddpi;
 		float font_scale = 1;
 		if (SDL_GetDisplayDPI(0, &ddpi, nullptr, nullptr) == 0) font_scale = ddpi / 96;
@@ -2234,7 +2247,8 @@ public:
 
 	void onPackDataGUI()
 	{
-		if (ImGui::BeginDock("Pack data", &m_is_pack_data_dialog_open))
+		if (!m_is_pack_data_dialog_open) return;
+		if (ImGui::Begin("Pack data", &m_is_pack_data_dialog_open))
 		{
 			ImGui::LabelText("Destination dir", "%s", m_pack.dest_dir.data);
 			ImGui::SameLine();
@@ -2250,7 +2264,7 @@ public:
 
 			if (ImGui::Button("Pack")) packData();
 		}
-		ImGui::EndDock();
+		ImGui::End();
 	}
 
 

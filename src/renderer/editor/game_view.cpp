@@ -388,7 +388,7 @@ void GameView::onWindowGUI()
 	}
 	ImVec2 view_pos;
 	bool is_game_view_visible = false;
-	if (ImGui::BeginDock(window_name, &m_is_open, ImGuiWindowFlags_NoNavInputs)) {
+	if (ImGui::Begin(window_name, &m_is_open, ImGuiWindowFlags_NoNavInputs)) {
 		is_game_view_visible = true;
 		view_pos = ImGui::GetCursorScreenPos();
 		m_is_mouse_hovering_window = ImGui::IsWindowHovered();
@@ -468,7 +468,7 @@ void GameView::onWindowGUI()
 			captureMouse(true);
 		}
 	}
-	ImGui::EndDock();
+	ImGui::End();
 	if(is_game_view_visible) onStatsGUI(view_pos);
 }
 
