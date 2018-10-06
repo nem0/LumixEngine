@@ -24,6 +24,7 @@ class OutputBlob;
 struct RayCastModelHit;
 class Renderer;
 class RenderScene;
+struct ShiftedFrustum;
 struct TerrainQuad;
 struct TerrainInfo;
 class Texture;
@@ -117,7 +118,7 @@ class Terrain
 		void setGrassTypeRotationMode(int index, GrassType::RotationMode mode);
 		void setMaterial(Material* material);
 
-		void getInfos(Array<TerrainInfo>& infos, const Frustum& frustum, const DVec3& lod_ref_point);
+		void getInfos(Array<TerrainInfo>& infos, const ShiftedFrustum& frustum, const DVec3& lod_ref_point);
 		void getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, EntityRef camera);
 
 		RayCastModelHit castRay(const DVec3& origin, const Vec3& dir);

@@ -354,6 +354,13 @@ int fragment_shader(lua_State* L)
 }
 
 
+int geometry_shader(lua_State* L)
+{
+	source(L, ffr::ShaderType::GEOMETRY);
+	return 0;
+}
+
+
 int include(lua_State* L)
 {
 	const char* path = LuaWrapper::checkArg<const char*>(L, 1);
@@ -406,6 +413,8 @@ bool Shader::load(FS::IFile& file)
 	lua_setfield(L, LUA_GLOBALSINDEX, "vertex_shader");
 	lua_pushcclosure(L, LuaAPI::fragment_shader, 0);
 	lua_setfield(L, LUA_GLOBALSINDEX, "fragment_shader");
+	lua_pushcclosure(L, LuaAPI::geometry_shader, 0);
+	lua_setfield(L, LUA_GLOBALSINDEX, "geometry_shader");
 	lua_pushcclosure(L, LuaAPI::include, 0);
 	lua_setfield(L, LUA_GLOBALSINDEX, "include");
 	lua_pushcclosure(L, LuaAPI::texture_slot, 0);

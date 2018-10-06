@@ -1978,7 +1978,7 @@ public:
 	void forceGrassUpdate(EntityRef entity) override { m_terrains[entity]->forceGrassUpdate(); }
 
 
-	void getTerrainInfos(const Frustum& frustum, const DVec3& lod_ref_point, Array<TerrainInfo>& infos) override
+	void getTerrainInfos(const ShiftedFrustum& frustum, const DVec3& lod_ref_point, Array<TerrainInfo>& infos) override
 	{
 		PROFILE_FUNCTION();
 		infos.reserve(m_terrains.size());

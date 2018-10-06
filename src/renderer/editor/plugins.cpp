@@ -1869,7 +1869,7 @@ struct RenderInterfaceImpl final : public RenderInterface
 		Texture* texture = LUMIX_NEW(allocator, Texture)(Path(name), m_renderer, *rm.get(Texture::TYPE), allocator);
 		texture->create(w, h, pixels, w * h * 4);
 		m_textures.insert(&texture->handle, texture);
-		return &texture->handle;
+		return (ImTextureID)(uintptr_t)texture->handle.value;
 	}
 
 
@@ -2239,6 +2239,7 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 
 		void setup() override
 		{
+			PROFILE_FUNCTION();
 			PluginManager& plugin_manager = plugin->m_engine.getPluginManager();
 			Renderer& renderer = *(Renderer*)plugin_manager.getPlugin("renderer");
 

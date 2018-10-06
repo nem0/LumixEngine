@@ -186,9 +186,11 @@ struct PipelineImpl final : Pipeline
 		m_draw2d.PushClipRectFullScreen();
 		m_draw2d.PushTextureID(font_atlas.TexID);
 
+		m_position_uniform = ffr::allocUniform("u_position", ffr::UniformType::VEC3, 1);
+		m_lod_uniform = ffr::allocUniform("u_lod", ffr::UniformType::INT, 1);
 		m_position_radius_uniform = ffr::allocUniform("u_pos_radius", ffr::UniformType::VEC4, 1);
 		m_terrain_params_uniform = ffr::allocUniform("u_terrain_params", ffr::UniformType::VEC4, 1);
-		m_rel_camera_pos_uniform = ffr::allocUniform("u_rel_camera_pos", ffr::UniformType::VEC4, 1);
+		m_rel_camera_pos_uniform = ffr::allocUniform("u_rel_camera_pos", ffr::UniformType::VEC3, 1);
 		m_terrain_scale_uniform = ffr::allocUniform("u_terrain_scale", ffr::UniformType::VEC4, 1);
 		m_terrain_matrix_uniform = ffr::allocUniform("u_terrain_matrix", ffr::UniformType::MAT4, 1);
 		m_model_uniform = ffr::allocUniform("u_model", ffr::UniformType::MAT4, 1);
@@ -1686,6 +1688,56 @@ struct PipelineImpl final : Pipeline
 
 		void execute() override
 		{
+			Array<TerrainInfo> infos(m_allocator);
+			m_pipeline->m_scene->getTerrainInfos(m_camera_params.frustum, m_camera_params.pos, infos);
+
+			if(infos.empty()) return;
+
+			auto* rd = infos[0].shader->m_render_data;
+
+			const u32 deferred_define_mask = 1 << m_pipeline->m_renderer.getShaderDefineIdx("DEFERRED");
+			const u8 edge_define_idx = m_pipeline->m_renderer.getShaderDefineIdx("EDGE");
+			auto& p = Shader::getProgram(rd, deferred_define_mask);
+			auto& p_edge = Shader::getProgram(rd, deferred_define_mask | (1 << edge_define_idx));
+
+			const Vec3 pos = (infos[0].position - m_camera_params.pos).toFloat();
+			Vec3 lpos = (m_camera_params.pos - infos[0].position).toFloat();
+			lpos = infos[0].rot.conjugated().rotate(lpos);
+
+			ffr::setUniform3f(m_pipeline->m_position_uniform, &pos.x);
+			ffr::setUniform3f(m_pipeline->m_rel_camera_pos_uniform, &lpos.x);
+			ffr::blending(0);
+
+			for(int i = 0; i < infos[0].terrain->m_material->getTextureCount(); ++i) {
+				Texture* t = infos[0].terrain->m_material->getTexture(i);
+				if (t) {
+					ffr::UniformHandle uniform = infos[0].terrain->m_material->getTextureUniform(i);
+					ffr::bindTexture(i, t->handle);
+					ffr::setUniform1i(uniform, i);
+				}
+			}
+			static u64 state = (u64)ffr::StateFlags::DEPTH_TEST | (u64)ffr::StateFlags::DEPTH_WRITE;
+			if(p.handle.isValid()) {
+				ffr::useProgram(p.handle);
+				ffr::setState(state);
+
+				const int loc = ffr::getUniformLocation(p.handle, m_pipeline->m_lod_uniform);
+				for(int i = 0; i < 6; ++i) {
+					ffr::applyUniform1i(loc, i);
+					ffr::drawArrays(0, 126 * 126, ffr::PrimitiveType::POINTS);
+				}
+			}
+			if (p_edge.handle.isValid()) {
+				ffr::useProgram(p_edge.handle);
+				ffr::setState(state);
+				const int loc = ffr::getUniformLocation(p_edge.handle, m_pipeline->m_lod_uniform);
+				for(int i = 0; i < 6; ++i) {
+					ffr::applyUniform1i(loc, i);
+					ffr::drawArrays(0, 64, ffr::PrimitiveType::POINTS);
+				}
+				
+			}
+
 			/*if(m_instance_data.empty()) return;
 
 			ffr::pushDebugGroup("terrains");
@@ -2037,6 +2089,7 @@ struct PipelineImpl final : Pipeline
 
 		void setup() override
 		{
+			PROFILE_FUNCTION();
 			if(!m_pipeline->m_scene) return;
 
 			Renderer& renderer = m_pipeline->m_renderer;
@@ -2050,8 +2103,11 @@ struct PipelineImpl final : Pipeline
 			Array<u64> sort_keys_linear(m_allocator);
 			Array<u64> subrenderables_linear(m_allocator);
 			createSortKeys(renderables, sort_keys, subrenderables);
-			sort_keys.merge(sort_keys_linear);
-			subrenderables.merge(subrenderables_linear);
+			{
+				PROFILE_BLOCK("merge");
+				sort_keys.merge(sort_keys_linear);
+				subrenderables.merge(subrenderables_linear);
+			}
 
 			if (!subrenderables_linear.empty()) {
 				radixSort(sort_keys_linear.begin(), subrenderables_linear.begin(), sort_keys_linear.size());
@@ -2502,6 +2558,8 @@ struct PipelineImpl final : Pipeline
 	Timer* m_timer;
 
 	ffr::UniformHandle m_position_radius_uniform;
+	ffr::UniformHandle m_position_uniform;
+	ffr::UniformHandle m_lod_uniform;
 	ffr::UniformHandle m_terrain_params_uniform;
 	ffr::UniformHandle m_rel_camera_pos_uniform;
 	ffr::UniformHandle m_terrain_scale_uniform;

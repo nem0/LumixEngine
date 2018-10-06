@@ -1595,6 +1595,7 @@ void clear(uint flags, const float* color, float depth)
 static const char* shaderTypeToString(ShaderType type)
 {
 	switch(type) {
+		case ShaderType::GEOMETRY: return "geometry shader";		
 		case ShaderType::FRAGMENT: return "fragment shader";
 		case ShaderType::VERTEX: return "vertex shader";
 		default: return "unknown shader type";
@@ -1674,6 +1675,7 @@ ProgramHandle createProgram(const char** srcs, const ShaderType* types, int num,
 	for (int i = 0; i < num; ++i) {
 		GLenum shader_type;
 		switch (types[i]) {
+			case ShaderType::GEOMETRY: shader_type = GL_GEOMETRY_SHADER; break;
 			case ShaderType::FRAGMENT: shader_type = GL_FRAGMENT_SHADER; break;
 			case ShaderType::VERTEX: shader_type = GL_VERTEX_SHADER; break;
 			default: ASSERT(0); break;
@@ -1906,6 +1908,14 @@ void setUniform4f(UniformHandle uniform, const float* value)
 	checkThread();
 	ASSERT(g_ffr.uniforms[uniform.value].type == UniformType::VEC4);
 	memcpy(g_ffr.uniforms[uniform.value].data, value, sizeof(value[0]) * 4); 
+}
+
+
+void setUniform3f(UniformHandle uniform, const float* value)
+{
+	checkThread();
+	ASSERT(g_ffr.uniforms[uniform.value].type == UniformType::VEC3);
+	memcpy(g_ffr.uniforms[uniform.value].data, value, sizeof(value[0]) * 3); 
 }
 
 

@@ -332,7 +332,7 @@ void wait(int volatile* counter)
 	}
 	else
 	{
-		PROFILE_BLOCK("not a job waiting");
+		PROFILE_BLOCK_COLORED("not a job waiting", 0xff, 0, 0);
 
 		//ASSERT(g_system->m_event_outside_job.poll());
 		g_system->m_event_outside_job.reset();

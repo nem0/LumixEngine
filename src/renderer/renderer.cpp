@@ -734,6 +734,7 @@ struct RendererImpl final : public Renderer
 			RenderCommandSetupJobData* job_data = (RenderCommandSetupJobData*)data;
 			RenderCommandBase* cmd = job_data->cmd;
 
+			PROFILE_BLOCK("setup command");
 			cmd->setup();
 		};
 		JobSystem::runJobs(&job, 1, &data->setup_counter);
