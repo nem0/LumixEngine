@@ -662,11 +662,18 @@ void Terrain::serialize(OutputBlob& serializer)
 }
 
 
-void Terrain::getInfos(Array<TerrainInfo>& infos, const Frustum& frustum, const DVec3& lod_ref_point)
+void Terrain::getInfos(Array<TerrainInfo>& infos, const ShiftedFrustum& frustum, const DVec3& lod_ref_point)
 {
-	/*if (!m_root) return;
+	//if (!m_root) return;
 	if (!m_material || !m_material->isReady()) return;
-
+	
+	TerrainInfo& info = infos.emplace();
+	info.shader = m_material->getShader();
+	info.position = m_scene.getUniverse().getPosition(m_entity);
+	info.rot = m_scene.getUniverse().getRotation(m_entity);
+	info.terrain = this;
+		
+	/*
 	Matrix matrix = m_scene.getUniverse().getMatrix(m_entity);
 	Matrix inv_matrix = matrix;
 	inv_matrix.fastInverse();
@@ -679,7 +686,7 @@ void Terrain::getInfos(Array<TerrainInfo>& infos, const Frustum& frustum, const 
 	rel_frustum.transform(inv_matrix);
 	m_root->getInfos(infos, local_lod_ref_point, this, matrix, rel_frustum);*/
 	// TODO
-	ASSERT(false);
+	//ASSERT(false);
 }
 
 
@@ -913,7 +920,7 @@ static void generateSubgrid(Array<Sample>& samples, Array<u16>& indices, int& in
 void Terrain::generateGeometry()
 {
 	// TODO
-	ASSERT(false);
+	//ASSERT(false);
 	/*LUMIX_DELETE(m_allocator, m_mesh);
 	m_mesh = nullptr;
 	Array<Sample> points(m_allocator);

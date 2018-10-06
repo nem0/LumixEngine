@@ -113,11 +113,10 @@ void beginFiberSwitch()
 void endBlock()
 {
 	ThreadContext* ctx = g_instance.getThreadContext();
-	--ctx->open_blocks_count;
-	if(ctx->open_blocks_count < 0) {
-		ctx->open_blocks_count = 0;
+	if(ctx->open_blocks_count > 0) {
+		--ctx->open_blocks_count;
+		write(*ctx, EventType::END_BLOCK, 0);
 	}
-	write(*ctx, EventType::END_BLOCK, 0);
 }
 
 

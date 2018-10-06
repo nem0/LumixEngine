@@ -55,6 +55,7 @@ enum class PrimitiveType : uint {
 enum class ShaderType : uint {
 	VERTEX,
 	FRAGMENT,
+	GEOMETRY
 };
 
 
@@ -220,6 +221,7 @@ void popDebugGroup();
 int getAttribLocation(ProgramHandle program, const char* uniform_name);
 void setUniform1i(UniformHandle uniform, int value);
 void setUniform2f(UniformHandle uniform, const float* value);
+void setUniform3f(UniformHandle uniform, const float* value);
 void setUniform4f(UniformHandle uniform, const float* value);
 void setUniformMatrix3x4f(UniformHandle uniform, const float* value);
 void setUniformMatrix4f(UniformHandle uniform, const float* value);

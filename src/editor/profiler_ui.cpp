@@ -412,6 +412,7 @@ struct ProfilerUIImpl final : public ProfilerUI
 	bool m_is_paused;
 	u64 m_paused_time;
 	i64 m_view_offset = 0;
+	char m_cpu_block_filter[256] = {};
 	u64 m_zoom = 100'000;
 	char m_filter[100];
 	char m_resource_filter[100];
@@ -751,6 +752,12 @@ static void renderArrow(ImVec2 p_min, ImGuiDir dir, float scale, ImDrawList* dl)
 }
 
 
+struct VisibleBlock
+{
+	const char* name;
+};
+
+
 void ProfilerUIImpl::onGUICPUProfiler()
 {
 	if (!ImGui::CollapsingHeader("CPU")) return;
@@ -796,10 +803,13 @@ void ProfilerUIImpl::onGUICPUProfiler()
 
 	dl->ChannelsSplit(2);
 
+	HashMap<const char*, const char*> visible_blocks(1024, m_allocator);
+
 	for(Profiler::ThreadContext* ctx : contexts) {
 		MT::SpinLock lock(ctx->mutex);
 		renderArrow(ImVec2(a.x, y), ctx->open ? ImGuiDir_Down : ImGuiDir_Right, 1, dl);
 		dl->AddText(ImVec2(a.x + 20, y), ImGui::GetColorU32(ImGuiCol_Text), ctx->name);
+		dl->AddLine(ImVec2(a.x, y + 20), ImVec2(b.x, y + 20), ImGui::GetColorU32(ImGuiCol_Border));
 		if (ImGui::IsMouseClicked(0) && ImGui::IsMouseHoveringRect(ImVec2(a.x, y), ImVec2(a.x + 20, y+20))){
 			ctx->open = !ctx->open;
 		}
@@ -860,7 +870,12 @@ void ProfilerUIImpl::onGUICPUProfiler()
 						read(*ctx, open_blocks[level] + sizeof(Profiler::EventHeader), name);
 						u32 color;
 						read(*ctx, open_blocks[level] + sizeof(Profiler::EventHeader) + sizeof(name), color);
-						draw_block(start_header.time, header.time, name, color);
+						if (!m_cpu_block_filter[0] || stristr(name, m_cpu_block_filter)) {
+							draw_block(start_header.time, header.time, name, color);
+							if (!visible_blocks.find(name).isValid()) {
+								visible_blocks.insert(name, name);
+							}
+						}
 						--level;
 					}
 					break;
@@ -884,7 +899,9 @@ void ProfilerUIImpl::onGUICPUProfiler()
 			read(*ctx, open_blocks[level], start_header);
 			const char* name;
 			read(*ctx, open_blocks[level] + sizeof(Profiler::EventHeader), name);
-			draw_block(start_header.time, m_paused_time, name, ImGui::GetColorU32(ImGuiCol_PlotHistogram));
+			if (!m_cpu_block_filter[0] || stristr(name, m_cpu_block_filter)) {
+				draw_block(start_header.time, m_paused_time, name, ImGui::GetColorU32(ImGuiCol_PlotHistogram));
+			}
 			--level;
 		}
 		y += ctx->rows * 20;
@@ -892,6 +909,19 @@ void ProfilerUIImpl::onGUICPUProfiler()
 
 	dl->ChannelsMerge();
 	Profiler::unlockContexts();
+
+	if (ImGui::CollapsingHeader("Visible blocks")) {
+		ImGui::LabellessInputText("Filter", m_cpu_block_filter, sizeof(m_cpu_block_filter));
+		int dummy = -1;
+		if (ImGui::BeginChild("Visible blocks", ImVec2(0, 150))) {
+			for (const char* b : visible_blocks) {
+				if (!m_cpu_block_filter[0] || stristr(b, m_cpu_block_filter) != nullptr) {
+					ImGui::Text("%s", b);
+				}
+			}
+		}
+		ImGui::EndChild();
+	}
 
 	/*
 	auto thread_getter = [](void* data, int index, const char** out) -> bool {

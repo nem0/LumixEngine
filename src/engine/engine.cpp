@@ -329,15 +329,6 @@ int BeginChildFrame(lua_State* L)
 }
 
 
-int BeginDock(lua_State* L)
-{
-	auto* label = LuaWrapper::checkArg<const char*>(L, 1);
-	bool res = ImGui::BeginDock(label);
-	lua_pushboolean(L, res);
-	return 1;
-}
-
-
 int BeginPopup(lua_State* L)
 {
 	auto* label = LuaWrapper::checkArg<const char*>(L, 1);
@@ -1054,7 +1045,6 @@ public:
 		LuaImGui::registerCFunction(m_state, "AlignTextToFramePadding", &LuaImGui::AlignTextToFramePadding);
 		LuaImGui::registerCFunction(m_state, "Begin", &LuaImGui::Begin);
 		LuaImGui::registerCFunction(m_state, "BeginChildFrame", &LuaImGui::BeginChildFrame);
-		LuaImGui::registerCFunction(m_state, "BeginDock", LuaImGui::BeginDock);
 		LuaImGui::registerCFunction(m_state, "BeginPopup", LuaImGui::BeginPopup);
 		LuaImGui::registerCFunction(m_state, "Button", &LuaImGui::Button);
 		LuaImGui::registerCFunction(m_state, "CalcTextSize", &LuaImGui::CalcTextSize);
@@ -1065,7 +1055,6 @@ public:
 		LuaImGui::registerCFunction(m_state, "Dummy", &LuaWrapper::wrap<decltype(&LuaImGui::Dummy), &LuaImGui::Dummy>);
 		LuaImGui::registerCFunction(m_state, "End", &LuaWrapper::wrap<decltype(&ImGui::End), &ImGui::End>);
 		LuaImGui::registerCFunction(m_state, "EndChildFrame", &LuaWrapper::wrap<decltype(&ImGui::EndChildFrame), &ImGui::EndChildFrame>);
-		LuaImGui::registerCFunction(m_state, "EndDock", &LuaWrapper::wrap<decltype(&ImGui::EndDock), &ImGui::EndDock>);
 		LuaImGui::registerCFunction(m_state, "EndPopup", &LuaWrapper::wrap<decltype(&ImGui::EndPopup), &ImGui::EndPopup>);
 		LuaImGui::registerCFunction(m_state, "GetColumnWidth", &LuaWrapper::wrap<decltype(&ImGui::GetColumnWidth), &ImGui::GetColumnWidth>);
 		LuaImGui::registerCFunction(m_state, "GetDisplayWidth", &LuaImGui::GetDisplayWidth);

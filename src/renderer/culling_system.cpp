@@ -300,6 +300,7 @@ struct CullingSystemImpl final : public CullingSystem
 			{
 				decl.data = this;
 				decl.task = [](void* data){
+					PROFILE_BLOCK("cull job");
 					Job* that = (Job*)data;
 
 					{
@@ -345,6 +346,7 @@ struct CullingSystemImpl final : public CullingSystem
 		
 		Array<Job> jobs(m_allocator);
 		jobs.reserve(Math::minimum(buckets_count, partial_entities));
+		PROFILE_INT("jobs", jobs.capacity());
 		if (jobs.capacity() > 0) {
 			volatile int job_counter = 0;
 			const uint step = (partial_entities + jobs.capacity() - 1) / jobs.capacity();
