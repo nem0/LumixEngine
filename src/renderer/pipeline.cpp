@@ -442,7 +442,6 @@ struct PipelineImpl final : Pipeline
 
 	bool render() override 
 	{ 
-		return false;
 		PROFILE_FUNCTION();
 
 		if (!isReady() || !m_scene || m_viewport.w < 0 || m_viewport.h < 0) {
