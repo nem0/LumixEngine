@@ -1006,7 +1006,8 @@ void AnimationEditor::update(float time_delta)
 
 void AnimationEditor::editorGUI()
 {
-	if (ImGui::BeginDock("Animation Editor", &m_editor_open, ImGuiWindowFlags_MenuBar))
+	if (!m_editor_open) return;
+	if (ImGui::Begin("Animation Editor", &m_editor_open, ImGuiWindowFlags_MenuBar))
 	{
 		m_is_focused = ImGui::IsFocusedHierarchy();
 		menuGUI();
@@ -1021,20 +1022,21 @@ void AnimationEditor::editorGUI()
 	{
 		m_is_focused = false;
 	}
-	ImGui::EndDock();
+	ImGui::End();
 }
 
 
 void AnimationEditor::inputsGUI()
 {
-	if (ImGui::BeginDock("Animation inputs", &m_inputs_open))
+	if (!m_inputs_open) return;
+	if (ImGui::Begin("Animation inputs", &m_inputs_open))
 	{
 		IAllocator& allocator = m_app.getWorldEditor().getAllocator();
 		auto root_getter = [&]() -> auto& { return *m_resource; };
 		buildUI(m_resource->getEditor(), root_getter);
 		animationSlotsGUI();
 	}
-	ImGui::EndDock();
+	ImGui::End();
 }
 
 

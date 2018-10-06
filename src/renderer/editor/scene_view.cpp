@@ -484,7 +484,7 @@ void SceneView::onWindowGUI()
 		title = "Scene View | errors in log###Scene View";
 	}
 
-	if (ImGui::BeginDock(title, nullptr, ImGuiWindowFlags_NoScrollWithMouse))
+	if (ImGui::Begin(title, nullptr, ImGuiWindowFlags_NoScrollWithMouse))
 	{
 		m_is_open = true;
 		onToolbar();
@@ -572,7 +572,7 @@ void SceneView::onWindowGUI()
 		m_editor.inputFrame();
 	}
 
-	ImGui::EndDock();
+	ImGui::End();
 
 			// TODO
 			/*

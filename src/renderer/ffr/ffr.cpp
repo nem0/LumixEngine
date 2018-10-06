@@ -1983,7 +1983,7 @@ void update(FramebufferHandle fb, uint renderbuffers_count, const TextureHandle*
 	
 	glBindFramebuffer(GL_FRAMEBUFFER, fb.value);
 	auto xx = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-	ASSERT(xx == GL_FRAMEBUFFER_COMPLETE);
+	//ASSERT(xx == GL_FRAMEBUFFER_COMPLETE);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 

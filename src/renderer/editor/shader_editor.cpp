@@ -2217,10 +2217,11 @@ void ShaderEditor::onGUIMenu()
 
 void ShaderEditor::onGUI()
 {
+	if (!m_is_open) return;
 	StaticString<MAX_PATH_LENGTH + 25> title("Shader Editor");
 	if (m_path.isValid()) title << " - " << m_path.c_str();
 	title << "###Shader Editor";
-	if (ImGui::BeginDock(title, &m_is_open, ImGuiWindowFlags_MenuBar))
+	if (ImGui::Begin(title, &m_is_open, ImGuiWindowFlags_MenuBar))
 	{
 		m_is_focused = ImGui::IsFocusedHierarchy();
 
@@ -2233,7 +2234,7 @@ void ShaderEditor::onGUI()
 	{
 		m_is_focused = false;
 	}
-	ImGui::EndDock();
+	ImGui::End();
 }
 
 

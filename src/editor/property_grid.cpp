@@ -828,8 +828,10 @@ static void showAddComponentNode(const StudioApp::AddCmpTreeNode* node, const ch
 
 void PropertyGrid::onGUI()
 {
+	if (!m_is_open) return;
+
 	auto& ents = m_editor.getSelectedEntities();
-	if (ImGui::BeginDock("Properties", &m_is_open) && !ents.empty())
+	if (ImGui::Begin("Properties", &m_is_open) && !ents.empty())
 	{
 		if (ImGui::Button("Add component"))
 		{
@@ -851,7 +853,7 @@ void PropertyGrid::onGUI()
 			showComponentProperties(ents, cmp.type);
 		}
 	}
-	ImGui::EndDock();
+	ImGui::End();
 }
 
 

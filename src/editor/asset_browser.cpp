@@ -459,7 +459,8 @@ void AssetBrowser::fileColumn()
 
 void AssetBrowser::detailsGUI()
 {
-	if (ImGui::BeginDock("Asset properties", &m_is_open))
+	if (!m_is_open) return;
+	if (ImGui::Begin("Asset properties", &m_is_open))
 	{
 		ImVec2 pos = ImGui::GetCursorScreenPos();
 		if (ImGui::BeginToolbar("asset_browser_toolbar", pos, ImVec2(0, 24)))
@@ -473,7 +474,7 @@ void AssetBrowser::detailsGUI()
 
 		if (!m_selected_resource)
 		{
-			ImGui::EndDock();
+			ImGui::End();
 			return;
 		}
 
@@ -488,9 +489,9 @@ void AssetBrowser::detailsGUI()
 		IPlugin* plugin = m_plugins.get(resource_type);
 		if (m_selected_resource->isReady()) plugin->onGUI(m_selected_resource);
 	}
-	if (m_activate) ImGui::SetDockActive();
+	//if (m_activate) ImGui::SetDockActive(); // TODO
 	m_activate = false;
-	ImGui::EndDock();
+	ImGui::End();
 }
 
 
@@ -506,44 +507,48 @@ void AssetBrowser::onGUI()
 
 	m_is_open = m_is_open || m_activate;
 
-	if (!ImGui::BeginDock("Assets", &m_is_open))
-	{
-		if (m_activate) ImGui::SetDockActive();
-		ImGui::EndDock();
-		detailsGUI();
-		return;
-	}
-	if (m_is_focus_requested)
-	{
-		m_is_focus_requested = false;
-		ImGui::SetWindowFocus();
-	}
-	if (m_activate) ImGui::SetDockActive();
+	if(m_is_open) {
+		if (!ImGui::Begin("Assets", &m_is_open))
+		{
+			// TODO
+			//if (m_activate) ImGui::SetDockActive();
+			ImGui::End();
+			detailsGUI();
+			return;
+		}
+		if (m_is_focus_requested)
+		{
+			m_is_focus_requested = false;
+			ImGui::SetWindowFocus();
+		}
+		// TODO
+		//if (m_activate) ImGui::SetDockActive();
 
-	float checkbox_w = ImGui::GetCursorPosX();
-	ImGui::Checkbox("Thumbnails", &m_show_thumbnails);
-	ImGui::SameLine();
-	checkbox_w = ImGui::GetCursorPosX() - checkbox_w;
-	if (ImGui::LabellessInputText("Filter", m_filter, sizeof(m_filter), 100)) doFilter();
-	ImGui::SameLine(130 + checkbox_w);
-	breadcrumbs();
-	ImGui::Separator();
+		float checkbox_w = ImGui::GetCursorPosX();
+		ImGui::Checkbox("Thumbnails", &m_show_thumbnails);
+		ImGui::SameLine();
+		checkbox_w = ImGui::GetCursorPosX() - checkbox_w;
+		if (ImGui::LabellessInputText("Filter", m_filter, sizeof(m_filter), 100)) doFilter();
+		ImGui::SameLine(130 + checkbox_w);
+		breadcrumbs();
+		ImGui::Separator();
 
-	float content_w = ImGui::GetContentRegionAvailWidth();
-	ImVec2 left_size(m_left_column_width, 0);
-	if (left_size.x < 10) left_size.x = 10;
-	if (left_size.x > content_w - 10) left_size.x = content_w - 10;
+		float content_w = ImGui::GetContentRegionAvailWidth();
+		ImVec2 left_size(m_left_column_width, 0);
+		if (left_size.x < 10) left_size.x = 10;
+		if (left_size.x > content_w - 10) left_size.x = content_w - 10;
 	
-	dirColumn();
+		dirColumn();
 
-	ImGui::SameLine();
-	ImGui::VSplitter("vsplit1", &left_size);
-	m_left_column_width = left_size.x;
-	ImGui::SameLine();
+		ImGui::SameLine();
+		ImGui::VSplitter("vsplit1", &left_size);
+		m_left_column_width = left_size.x;
+		ImGui::SameLine();
 
-	fileColumn();
+		fileColumn();
 
-	ImGui::EndDock();
+		ImGui::End();
+	}
 	
 	detailsGUI();
 }

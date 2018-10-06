@@ -2187,10 +2187,8 @@ struct RenderStatsPlugin final : public StudioApp::GUIPlugin
 
 	void onWindowGUI() override
 	{
-		double total_cpu = 0;
-		double total_gpu = 0;
-		if (ImGui::BeginDock("Renderer Stats", &m_is_open))
-		{
+		if (!m_is_open) return;
+		if (ImGui::Begin("Renderer Stats", &m_is_open)) {
 			Renderer& renderer = *(Renderer*)m_app.getWorldEditor().getEngine().getPluginManager().getPlugin("renderer");
 			Array<Renderer::GPUProfilerQuery> timings(renderer.getAllocator());
 			renderer.getGPUTimings(&timings);
@@ -2202,7 +2200,7 @@ struct RenderStatsPlugin final : public StudioApp::GUIPlugin
 			}
 			ImGui::Columns();
 		}
-		ImGui::EndDock();
+		ImGui::End();
 	}
 
 
@@ -2480,7 +2478,6 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 
 	void shutdownImGui()
 	{
-		ImGui::ShutdownDock();
 		ImGui::DestroyContext();
 	}
 
