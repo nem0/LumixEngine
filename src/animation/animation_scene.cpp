@@ -1112,7 +1112,7 @@ struct AnimationSceneImpl final : public AnimationScene
 	{
 		PROFILE_FUNCTION();
 		if (m_animables.size() == 0) return;
-
+		/*
 		JobSystem::JobDecl jobs[16];
 		JobSystem::LambdaJob job_storage[16];
 
@@ -1134,7 +1134,9 @@ struct AnimationSceneImpl final : public AnimationScene
 			}, &job_storage[i], &jobs[i], nullptr);
 		}
 		JobSystem::runJobs(jobs, job_count, &counter);
-		JobSystem::wait(&counter);
+		JobSystem::wait(&counter);*/
+		ASSERT(false);
+		// TODO
 	}
 
 

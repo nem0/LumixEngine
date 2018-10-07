@@ -444,7 +444,7 @@ struct PipelineImpl final : Pipeline
 	{ 
 		PROFILE_FUNCTION();
 
-		if (!isReady() || !m_scene || m_viewport.w < 0 || m_viewport.h < 0) {
+		if (!isReady() || !m_scene || m_viewport.w <= 0 || m_viewport.h <= 0) {
 			m_is_first_render = true;
 			return false;
 		}
@@ -1918,44 +1918,41 @@ struct PipelineImpl final : Pipeline
 
 		struct CreateSortKeys 
 		{
-			CreateSortKeys() 
+			static void execute(void* data)
 			{
-				job.data = this;
-				job.task = [](void* data){
-					PROFILE_BLOCK("sort_keys");
-					CreateSortKeys* ctx = (CreateSortKeys*)data;
-					PROFILE_INT("num", ctx->count);
+				PROFILE_BLOCK("sort_keys");
+				CreateSortKeys* ctx = (CreateSortKeys*)data;
+				PROFILE_INT("num", ctx->count);
 
-					RenderScene* scene = ctx->cmd->m_pipeline->m_scene;
-					const ModelInstance* model_instances = scene->getModelInstances();
-					const u32* renderables = ctx->renderables;
-					MTBucketArray<u64>::Accessor sort_keys = ctx->sort_keys;
-					MTBucketArray<u64>::Accessor subrenderables = ctx->subrenderables;
-					const Universe::EntityData* entity_data = scene->getUniverse().getEntityData();
-					const DVec3 camera_pos = ctx->camera_pos;
-					for (int i = 0, c = ctx->count; i < c; ++i) {
-						const EntityRef e = {int(renderables[i] & 0x00ffFFff)};
-						const DVec3 pos = entity_data[e.index].transform.pos;
-						const float squared_length = float((pos - camera_pos).squaredLength());
-						const ModelInstance& mi = model_instances[e.index];
-						const RenderableTypes type = RenderableTypes(renderables[i] >> 24);
-						switch (type) {
-							case RenderableTypes::MESH:
-								sort_keys.push(mi.meshes[0].sort_key);
-								subrenderables.push(renderables[i]);
-								break;
-							case RenderableTypes::SKINNED:
-							case RenderableTypes::MESH_GROUP:
-								LODMeshIndices lod = mi.model->getLODMeshIndices(squared_length);
-								for(int mesh_idx = lod.from; mesh_idx <= lod.to; ++mesh_idx) {
-									sort_keys.push(mi.meshes[mesh_idx].sort_key);
-									subrenderables.push(renderables[i] | ((u64)mesh_idx << 32));
-								}
-								break;
-							default: ASSERT(false); break;
-						}
+				RenderScene* scene = ctx->cmd->m_pipeline->m_scene;
+				const ModelInstance* model_instances = scene->getModelInstances();
+				const u32* renderables = ctx->renderables;
+				MTBucketArray<u64>::Accessor sort_keys = ctx->sort_keys;
+				MTBucketArray<u64>::Accessor subrenderables = ctx->subrenderables;
+				const Universe::EntityData* entity_data = scene->getUniverse().getEntityData();
+				const DVec3 camera_pos = ctx->camera_pos;
+				for (int i = 0, c = ctx->count; i < c; ++i) {
+					const EntityRef e = {int(renderables[i] & 0x00ffFFff)};
+					const DVec3 pos = entity_data[e.index].transform.pos;
+					const float squared_length = float((pos - camera_pos).squaredLength());
+					const ModelInstance& mi = model_instances[e.index];
+					const RenderableTypes type = RenderableTypes(renderables[i] >> 24);
+					switch (type) {
+						case RenderableTypes::MESH:
+							sort_keys.push(mi.meshes[0].sort_key);
+							subrenderables.push(renderables[i]);
+							break;
+						case RenderableTypes::SKINNED:
+						case RenderableTypes::MESH_GROUP:
+							LODMeshIndices lod = mi.model->getLODMeshIndices(squared_length);
+							for(int mesh_idx = lod.from; mesh_idx <= lod.to; ++mesh_idx) {
+								sort_keys.push(mi.meshes[mesh_idx].sort_key);
+								subrenderables.push(renderables[i] | ((u64)mesh_idx << 32));
+							}
+							break;
+						default: ASSERT(false); break;
 					}
-				};
+				}
 			}
 
 			MTBucketArray<u64>::Accessor sort_keys;
@@ -1963,67 +1960,44 @@ struct PipelineImpl final : Pipeline
 			DVec3 camera_pos;
 			u32* renderables;
 			int count;
-			JobSystem::JobDecl job;
 			RenderMeshesCommand* cmd;
 		};
 
 
 		struct CreateCommands 
 		{
-			CreateCommands()
+			static void execute(void* data)
 			{
-				job.data = this;
-				job.task = [](void* data){
-					PROFILE_BLOCK("create cmds");
-					CreateCommands* ctx = (CreateCommands*)data;
-					PROFILE_INT("num", ctx->count);
-					const Universe& universe = ctx->cmd->m_pipeline->m_scene->getUniverse();
-					ctx->output->resize(ctx->count * (sizeof(RenderableTypes) + sizeof(Matrix) + sizeof(Mesh*) + sizeof(Material) + sizeof(u16)));
-					u8* out = ctx->output->begin();
-					const u64* LUMIX_RESTRICT renderables = ctx->renderables;
-					const u64* LUMIX_RESTRICT sort_keys = ctx->sort_keys;
-					const ModelInstance* LUMIX_RESTRICT model_instances = ctx->cmd->m_pipeline->m_scene->getModelInstances();
-					const Universe::EntityData* LUMIX_RESTRICT entity_data = universe.getEntityData(); 
-					const DVec3 camera_pos = ctx->camera_pos;
-					for (int i = 0, c = ctx->count; i < c; ++i) {
-						const EntityRef e = {int(renderables[i] & 0x00ffFFff)};
-						const RenderableTypes type = RenderableTypes((renderables[i] >> 24) & 0xff);
-						*(RenderableTypes*)out = type;
-						out += sizeof(type);
-						switch(type) {
-							case RenderableTypes::MESH_GROUP: 
-							case RenderableTypes::MESH: {
-								const u32 mesh_idx = renderables[i] >> 32;
-								const ModelInstance* LUMIX_RESTRICT mi = &model_instances[e.index];
-								*(Mesh::RenderData**)out = mi->meshes[mesh_idx].render_data;
-								out += sizeof(Mesh::RenderData*);
-								*(Material::RenderData**)out = mi->meshes[mesh_idx].material->getRenderData();
-								out += sizeof(Material::RenderData*);
-								u16* instance_count = (u16*)out;
-								int start_i = i;
-								out += sizeof(*instance_count);
-								const u64 key = sort_keys[i];
-								while (i < c && sort_keys[i] == key) {
-									const EntityRef e = {int(renderables[i] & 0x00ffFFff)};
-									const Transform& tr = entity_data[e.index].transform;
-									Matrix mtx = tr.rot.toMatrix();
-									mtx.multiply3x3(tr.scale);
-									mtx.setTranslation((tr.pos - camera_pos).toFloat());
-									memcpy(out, &mtx, sizeof(mtx));
-									out += sizeof(mtx);
-									++i;
-								}
-								*instance_count = u16(i - start_i);
-								--i;
-								break;
-							}
-							case RenderableTypes::SKINNED: {
-								const u32 mesh_idx = renderables[i] >> 32;
-								const ModelInstance* LUMIX_RESTRICT mi = &model_instances[e.index];
-								*(Mesh::RenderData**)out = mi->meshes[mesh_idx].render_data;
-								out += sizeof(Mesh::RenderData*);
-								*(Material::RenderData**)out = mi->meshes[mesh_idx].material->getRenderData();
-								out += sizeof(Material::RenderData*);
+				PROFILE_BLOCK("create cmds");
+				CreateCommands* ctx = (CreateCommands*)data;
+				PROFILE_INT("num", ctx->count);
+				const Universe& universe = ctx->cmd->m_pipeline->m_scene->getUniverse();
+				ctx->output->resize(ctx->count * (sizeof(RenderableTypes) + sizeof(Matrix) + sizeof(Mesh*) + sizeof(Material) + sizeof(u16)));
+				u8* out = ctx->output->begin();
+				const u64* LUMIX_RESTRICT renderables = ctx->renderables;
+				const u64* LUMIX_RESTRICT sort_keys = ctx->sort_keys;
+				const ModelInstance* LUMIX_RESTRICT model_instances = ctx->cmd->m_pipeline->m_scene->getModelInstances();
+				const Universe::EntityData* LUMIX_RESTRICT entity_data = universe.getEntityData(); 
+				const DVec3 camera_pos = ctx->camera_pos;
+				for (int i = 0, c = ctx->count; i < c; ++i) {
+					const EntityRef e = {int(renderables[i] & 0x00ffFFff)};
+					const RenderableTypes type = RenderableTypes((renderables[i] >> 24) & 0xff);
+					*(RenderableTypes*)out = type;
+					out += sizeof(type);
+					switch(type) {
+						case RenderableTypes::MESH_GROUP: 
+						case RenderableTypes::MESH: {
+							const u32 mesh_idx = renderables[i] >> 32;
+							const ModelInstance* LUMIX_RESTRICT mi = &model_instances[e.index];
+							*(Mesh::RenderData**)out = mi->meshes[mesh_idx].render_data;
+							out += sizeof(Mesh::RenderData*);
+							*(Material::RenderData**)out = mi->meshes[mesh_idx].material->getRenderData();
+							out += sizeof(Material::RenderData*);
+							u16* instance_count = (u16*)out;
+							int start_i = i;
+							out += sizeof(*instance_count);
+							const u64 key = sort_keys[i];
+							while (i < c && sort_keys[i] == key) {
 								const EntityRef e = {int(renderables[i] & 0x00ffFFff)};
 								const Transform& tr = entity_data[e.index].transform;
 								Matrix mtx = tr.rot.toMatrix();
@@ -2031,30 +2005,49 @@ struct PipelineImpl final : Pipeline
 								mtx.setTranslation((tr.pos - camera_pos).toFloat());
 								memcpy(out, &mtx, sizeof(mtx));
 								out += sizeof(mtx);
-
-								*(int*)out = mi->pose->count;
-								out += sizeof(int);
-								const uint out_offset = uint(out - ctx->output->begin());
-								ctx->output->resize(ctx->output->size() +  mi->pose->count * sizeof(Matrix));
-								out = ctx->output->begin() + out_offset;
-								const Quat* rotations = mi->pose->rotations;
-								const Vec3* positions = mi->pose->positions;
-
-								Model& model = *mi->model;
-								for(int j = 0, c = mi->pose->count; j < c; ++j) {
-									const Model::Bone& bone = model.getBone(j);
-									const LocalRigidTransform tmp = {positions[j], rotations[j]};
-									Matrix m = (tmp * bone.inv_bind_transform).toMatrix();
-									memcpy(out, &m, sizeof(m));
-									out += sizeof(m);
-								}
-								break;
+								++i;
 							}
-							default: ASSERT(false); break;
+							*instance_count = u16(i - start_i);
+							--i;
+							break;
 						}
+						case RenderableTypes::SKINNED: {
+							const u32 mesh_idx = renderables[i] >> 32;
+							const ModelInstance* LUMIX_RESTRICT mi = &model_instances[e.index];
+							*(Mesh::RenderData**)out = mi->meshes[mesh_idx].render_data;
+							out += sizeof(Mesh::RenderData*);
+							*(Material::RenderData**)out = mi->meshes[mesh_idx].material->getRenderData();
+							out += sizeof(Material::RenderData*);
+							const EntityRef e = {int(renderables[i] & 0x00ffFFff)};
+							const Transform& tr = entity_data[e.index].transform;
+							Matrix mtx = tr.rot.toMatrix();
+							mtx.multiply3x3(tr.scale);
+							mtx.setTranslation((tr.pos - camera_pos).toFloat());
+							memcpy(out, &mtx, sizeof(mtx));
+							out += sizeof(mtx);
+
+							*(int*)out = mi->pose->count;
+							out += sizeof(int);
+							const uint out_offset = uint(out - ctx->output->begin());
+							ctx->output->resize(ctx->output->size() +  mi->pose->count * sizeof(Matrix));
+							out = ctx->output->begin() + out_offset;
+							const Quat* rotations = mi->pose->rotations;
+							const Vec3* positions = mi->pose->positions;
+
+							Model& model = *mi->model;
+							for(int j = 0, c = mi->pose->count; j < c; ++j) {
+								const Model::Bone& bone = model.getBone(j);
+								const LocalRigidTransform tmp = {positions[j], rotations[j]};
+								Matrix m = (tmp * bone.inv_bind_transform).toMatrix();
+								memcpy(out, &m, sizeof(m));
+								out += sizeof(m);
+							}
+							break;
+						}
+						default: ASSERT(false); break;
 					}
-					ctx->output->resize(int(out - ctx->output->begin()));
-				};
+				}
+				ctx->output->resize(int(out - ctx->output->begin()));
 			}
 
 			u64* renderables;
@@ -2063,7 +2056,6 @@ struct PipelineImpl final : Pipeline
 			DVec3 camera_pos;
 			int count;
 			RenderMeshesCommand* cmd;
-			JobSystem::JobDecl job;
 		};
 
 
@@ -2071,9 +2063,8 @@ struct PipelineImpl final : Pipeline
 		{
 			Array<CreateSortKeys> create_sort_keys(m_allocator);
 			create_sort_keys.reserve(renderables.size());
-			volatile int sort_counter = 0;
 			for(int i = 0; i < renderables.size(); ++i) {
-				if (renderables.empty()) continue;
+				if (renderables[i].empty()) continue;
 				CreateSortKeys& ctx = create_sort_keys.emplace();
 				ctx.renderables = renderables[i].begin();
 				ctx.sort_keys = sort_keys.begin();
@@ -2081,9 +2072,9 @@ struct PipelineImpl final : Pipeline
 				ctx.count = renderables[i].size();
 				ctx.camera_pos = m_pipeline->m_viewport.pos;
 				ctx.cmd = this;
-				JobSystem::runJobs(&ctx.job, 1, &sort_counter);
 			}
-			JobSystem::wait(&sort_counter);
+			JobSystem::CounterHandle counter = JobSystem::runMany(create_sort_keys.begin(), &CreateSortKeys::execute, create_sort_keys.size(), sizeof(CreateSortKeys));
+			JobSystem::wait(counter);
 		}
 
 
@@ -2121,7 +2112,6 @@ struct PipelineImpl final : Pipeline
 			Array<CreateCommands> create_commands(m_allocator);
 			const int job_count = Math::minimum(renderables.size(), 16);
 			create_commands.reserve(job_count);
-			volatile int counter = 0;
 			int offset = 0;
 			const int step = (renderables.size() + job_count - 1) / job_count;
 			m_cmds.reserve(job_count);
@@ -2134,9 +2124,9 @@ struct PipelineImpl final : Pipeline
 				ctx.camera_pos = m_camera_params.pos;
 				ctx.output = &m_cmds.emplace(m_allocator);
 				offset += step;
-				JobSystem::runJobs(&ctx.job, 1, &counter);
 			}
-			JobSystem::wait(&counter);
+			JobSystem::CounterHandle counter = JobSystem::runMany(create_commands.begin(), &CreateCommands::execute, create_commands.size(), sizeof(CreateCommands));
+			JobSystem::wait(counter);
 		}
 
 
