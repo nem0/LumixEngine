@@ -436,10 +436,9 @@ struct RendererImpl final : public Renderer
 		m_font_manager->destroy();
 		LUMIX_DELETE(m_allocator, m_font_manager);
 		m_render_task.shutdown();
-		if (m_last_job) {
-			JobSystem::wait(&m_last_job->exec_counter);
-			LUMIX_DELETE(m_allocator, m_last_job);
-			m_last_job = nullptr;
+		if (JobSystem::isValid(m_last_exec_job)) {
+			JobSystem::wait(m_last_exec_job);
+			m_last_exec_job = JobSystem::INVALID_HANDLE;
 		}
 		m_render_task.m_finished_semaphore.wait();
 		m_render_task.destroy();
@@ -712,9 +711,7 @@ struct RendererImpl final : public Renderer
 
 	struct RenderCommandSetupJobData {
 		RenderCommandBase* cmd;
-		RenderCommandSetupJobData* prev;
-		volatile int setup_counter;
-		volatile int exec_counter;
+		JobSystem::CounterHandle prev;
 		RendererImpl* renderer;
 	};
 
@@ -723,43 +720,34 @@ struct RendererImpl final : public Renderer
 	{
 		RenderCommandSetupJobData* data = LUMIX_NEW(m_allocator, RenderCommandSetupJobData);
 		data->cmd = cmd;
-		data->prev = m_last_job;
-		data->setup_counter = 0;
-		data->exec_counter = 0;
+		data->prev = m_last_exec_job;
 		data->renderer = this;
 
-		JobSystem::JobDecl job;
-		job.data = data;
-		job.task = [](void* data){
+		JobSystem::CounterHandle setup_counter = JobSystem::run(data, [](void* data){
 			RenderCommandSetupJobData* job_data = (RenderCommandSetupJobData*)data;
 			RenderCommandBase* cmd = job_data->cmd;
 
 			PROFILE_BLOCK("setup command");
 			cmd->setup();
-		};
-		JobSystem::runJobs(&job, 1, &data->setup_counter);
+		});
 
-		JobSystem::JobDecl exec_job;
-		exec_job.data = data;
-		exec_job.depends_on = data->prev ? &data->prev->exec_counter : nullptr;
-		exec_job.task = [](void* data){
+		JobSystem::CounterHandle counters[] = {setup_counter, m_last_exec_job};
+		JobSystem::CounterHandle preconditions = JobSystem::isValid(m_last_exec_job) 
+			? JobSystem::mergeCounters(counters, 2)
+			: setup_counter;
+
+		JobSystem::CounterHandle exec_counter = JobSystem::runAfter(data, [](void* data){
 			RenderCommandSetupJobData* job_data = (RenderCommandSetupJobData*)data;
 			RenderCommandBase* cmd = job_data->cmd;
 			RendererImpl* renderer = job_data->renderer;
 
-			JobSystem::wait(&job_data->setup_counter);
-			if (job_data->prev) {
-				JobSystem::wait(&job_data->prev->exec_counter);
-				LUMIX_DELETE(renderer->m_allocator, job_data->prev);
-			}
-
 			Renderer::RenderCommandBase** rt_cmd = renderer->m_render_task.m_commands.alloc(true);
 			*rt_cmd = cmd;
 			renderer->m_render_task.m_commands.push(rt_cmd, true);
-		};
+			LUMIX_DELETE(renderer->m_allocator, job_data);
+		}, preconditions);
 
-		JobSystem::runJobs(&exec_job, 1, &data->exec_counter);
-		m_last_job = data;
+		m_last_exec_job = exec_counter;
 	}
 
 
@@ -913,11 +901,8 @@ struct RendererImpl final : public Renderer
 			PROFILE_BLOCK_COLORED("wait for render thread", 0xff, 0, 0);
 			m_frame_semaphore.wait();
 		}
-		if (m_last_job) {
-			JobSystem::wait(&m_last_job->exec_counter);
-			LUMIX_DELETE(m_allocator, m_last_job);
-			m_last_job = nullptr;
-		}
+		JobSystem::wait(m_last_exec_job);
+		m_last_exec_job = JobSystem::INVALID_HANDLE;
 	}
 
 
@@ -941,7 +926,7 @@ struct RendererImpl final : public Renderer
 	RenderTask m_render_task;
 	GlobalState m_global_state;
 	ffr::BufferHandle m_transient_buffer;
-	RenderCommandSetupJobData* m_last_job = nullptr;
+	JobSystem::CounterHandle m_last_exec_job = JobSystem::INVALID_HANDLE;
 };
 
 

@@ -413,10 +413,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		, m_fbx_importer(app.getWorldEditor().getAllocator())
 	{
 		app.getAssetBrowser().registerExtension("fbx", Model::TYPE);
-		JobSystem::JobDecl job;
-		job.data = this;
-		job.task = [](void* data) { ((ModelPlugin*)data)->createTextureTileTask(); };
-		JobSystem::runJobs(&job, 1, nullptr);
+		JobSystem::run(this, [](void* data) { ((ModelPlugin*)data)->createTextureTileTask(); });
 		createPreviewUniverse();
 		createTileUniverse();
 		m_viewport.is_ortho = false;
@@ -479,7 +476,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 	void createTextureTileTask()
 	{
-		while (!m_texture_tile_creator.shutdown)
+		/*while (!m_texture_tile_creator.shutdown)
 		{
 			JobSystem::wait(&m_texture_tile_creator.count);
 			if (m_texture_tile_creator.shutdown) break;
@@ -558,7 +555,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				g_log_error.log("Editor") << "Failed to save " << out_path;
 			}
 		}
-		m_texture_tile_creator.shutdown_event.trigger();
+		m_texture_tile_creator.shutdown_event.trigger();*/
+		// TODO
 	}
 
 
@@ -2242,6 +2240,7 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 			Renderer& renderer = *(Renderer*)plugin_manager.getPlugin("renderer");
 
 			const ImDrawData* draw_data = ImGui::GetDrawData();
+			if (!draw_data) return;
 
 			command_lists.reserve(draw_data->CmdListsCount);
 			for (int i = 0; i < draw_data->CmdListsCount; ++i) {

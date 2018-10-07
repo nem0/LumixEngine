@@ -295,66 +295,62 @@ struct CullingSystemImpl final : public CullingSystem
 		}
 
 		struct Job {
-			Job(Subresults& result) 
-				: result(result)
+			static void execute(void* data)
 			{
-				decl.data = this;
-				decl.task = [](void* data){
-					PROFILE_BLOCK("cull job");
-					Job* that = (Job*)data;
+				PROFILE_BLOCK("cull job");
+				Job* that = (Job*)data;
 
-					{
-						Cell* cell = *that->cells;
-						const Frustum rel_frustum = that->frustum.getRelative(cell->origin);
-						doCulling(cell->spheres.begin() + that->entity_start_offset
-							, (that->cells == that->cells_end ? cell->spheres.begin() + that->entity_end_offset : cell->spheres.end())
-							, &rel_frustum
-							, cell->ids.begin() + that->entity_start_offset
-							, that->result);
-					}
+				{
+					Cell* cell = *that->cells;
+					const Frustum rel_frustum = that->frustum.getRelative(cell->origin);
+					doCulling(cell->spheres.begin() + that->entity_start_offset
+						, (that->cells == that->cells_end ? cell->spheres.begin() + that->entity_end_offset : cell->spheres.end())
+						, &rel_frustum
+						, cell->ids.begin() + that->entity_start_offset
+						, *that->result);
+				}
 
-					for(Cell** i = that->cells + 1; i <= that->cells_end - 1; ++i) {
-						Cell* cell = *i;
-						const Frustum rel_frustum = that->frustum.getRelative(cell->origin);
-						doCulling(cell->spheres.begin()
-							, cell->spheres.end()
-							, &rel_frustum
-							, cell->ids.begin()
-							, that->result);
-					}
+				for(Cell** i = that->cells + 1; i <= that->cells_end - 1; ++i) {
+					Cell* cell = *i;
+					const Frustum rel_frustum = that->frustum.getRelative(cell->origin);
+					doCulling(cell->spheres.begin()
+						, cell->spheres.end()
+						, &rel_frustum
+						, cell->ids.begin()
+						, *that->result);
+				}
 
-					if (that->cells != that->cells_end) {
-						Cell* cell = *that->cells_end - 1;
-						const Frustum rel_frustum = that->frustum.getRelative(cell->origin);
-						doCulling(cell->spheres.begin()
-							, cell->spheres.begin() + that->entity_end_offset
-							, &rel_frustum
-							, cell->ids.begin()
-							, that->result);
-					}
-				};
+				if (that->cells != that->cells_end) {
+					Cell* cell = *that->cells_end - 1;
+					const Frustum rel_frustum = that->frustum.getRelative(cell->origin);
+					doCulling(cell->spheres.begin()
+						, cell->spheres.begin() + that->entity_end_offset
+						, &rel_frustum
+						, cell->ids.begin()
+						, *that->result);
+				}
 			}
 
-			JobSystem::JobDecl decl;
+
 			Cell** cells;
 			Cell** cells_end;
 			uint entity_start_offset;
 			uint entity_end_offset;
 			ShiftedFrustum frustum;
-			Subresults& result;
+			Subresults* result;
 		};
 		
 		Array<Job> jobs(m_allocator);
 		jobs.reserve(Math::minimum(buckets_count, partial_entities));
 		PROFILE_INT("jobs", jobs.capacity());
 		if (jobs.capacity() > 0) {
-			volatile int job_counter = 0;
 			const uint step = (partial_entities + jobs.capacity() - 1) / jobs.capacity();
 			Cell** cell_iter = partial.begin();
 			uint entity_offset = 0;
 			for(int i = 0; i < jobs.capacity(); ++i) {
-				Job& job = jobs.emplace(result[i]);
+				Job& job = jobs.emplace();
 				
+				job.result = &result[i];
 				uint job_entities = step;
 				job.cells = cell_iter;
 				job.entity_start_offset = entity_offset;
@@ -371,9 +367,9 @@ struct CullingSystemImpl final : public CullingSystem
 				}
 				job.entity_end_offset = Math::minimum(job.entity_end_offset, (*job.cells_end)->ids.size() - 1);
 				job.frustum = frustum;
-				JobSystem::runJobs(&job.decl, 1, &job_counter);
 			}
-			JobSystem::wait(&job_counter);
+			JobSystem::CounterHandle counter = JobSystem::runMany(jobs.begin(), &Job::execute, jobs.size(), sizeof(Job));
+			JobSystem::wait(counter);
 		}
 	}
 	

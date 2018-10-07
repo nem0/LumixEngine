@@ -6,6 +6,7 @@
 #include "engine/log.h"
 #include "engine/math_utils.h"
 #include "engine/mt/atomic.h"
+#include "engine/mt/lock_free_fixed_queue.h"
 #include "engine/mt/sync.h"
 #include "engine/mt/task.h"
 #include "engine/mt/thread.h"
@@ -18,11 +19,24 @@ namespace Lumix
 namespace JobSystem
 {
 
+enum { 
+	HANDLE_ID_MASK = 0xffFF,
+	HANDLE_GENERATION_MASK = 0xffFF0000 
+};
+
 
 struct Job
 {
-	JobDecl decl;
-	volatile int* counter;
+	void (*task)(void*) = nullptr;
+	void* data = nullptr;
+	CounterHandle counter;
+};
+
+
+struct Counter {
+	volatile int value;
+	u32 generation;
+	Job next_job;
 };
 
 
@@ -31,17 +45,9 @@ struct FiberDecl
 	int idx;
 	Fiber::Handle fiber;
 	Job current_job;
+	bool job_finished;
 	struct WorkerTask* worker_task;
-	void* switch_state;
 };
-
-
-struct SleepingFiber
-{
-	volatile int* waiting_condition;
-	FiberDecl* fiber;
-};
-
 
 
 struct System
@@ -50,13 +56,21 @@ struct System
 		: m_allocator(allocator)
 		, m_workers(allocator)
 		, m_job_queue(allocator)
-		, m_sleeping_fibers(allocator)
+		, m_ready_fibers(allocator)
+		, m_counter_pool(allocator)
 		, m_sync(false)
 		, m_work_signal(true)
 		, m_event_outside_job(true)
+		, m_free_queue(allocator)
 	{
+		m_counter_pool.resize(4096);
+		m_free_queue.resize(4096);
 		m_event_outside_job.trigger();
 		m_work_signal.reset();
+		for(int i = 0; i < 4096; ++i) {
+			m_free_queue[i] = i;
+			m_counter_pool[i].generation = 0;
+		}
 	}
 
 
@@ -65,52 +79,43 @@ struct System
 	MT::Event m_work_signal;
 	Array<MT::Task*> m_workers;
 	Array<Job> m_job_queue;
+	Array<Counter> m_counter_pool;
 	FiberDecl m_fiber_pool[512];
 	int m_free_fibers_indices[512];
 	int m_num_free_fibers;
-	Array<SleepingFiber> m_sleeping_fibers;
+	Array<FiberDecl*> m_ready_fibers;
 	IAllocator& m_allocator;
+	Array<u32> m_free_queue;
 };
 
 
 static System* g_system = nullptr;
 
 
-static bool getReadySleepingFiber(System& system, SleepingFiber* out)
+static FiberDecl* getReadyFiber(System& system)
 {
 	MT::SpinLock lock(system.m_sync);
 
-	int count = system.m_sleeping_fibers.size();
-	for (int i = 0; i < count; ++i)
-	{
-		SleepingFiber job = system.m_sleeping_fibers[i];
-		if (*job.waiting_condition <= 0)
-		{
-			system.m_sleeping_fibers.eraseFast(i);
-			*out = job;
-			return true;
-		}
-	}
-	return false;
+	if(system.m_ready_fibers.empty()) return nullptr;
+	FiberDecl* fiber = system.m_ready_fibers.back();
+	system.m_ready_fibers.pop();
+	return fiber;
 }
 
 
-static bool getReadyJob(System& system, Job* out)
+static Job getReadyJob(System& system)
 {
 	MT::SpinLock lock(system.m_sync);
 
-	if (system.m_job_queue.empty()) return false;
+	if (system.m_job_queue.empty()) return {nullptr, nullptr};
 
 	for (int i = system.m_job_queue.size() - 1; i >= 0; --i) {
 		Job job = system.m_job_queue[i];
-		if(!job.decl.depends_on || *job.decl.depends_on == 0) {
-			system.m_job_queue.eraseFast(i);
-			if (system.m_job_queue.empty()) system.m_work_signal.reset();
-			*out = job;
-			return true;
-		}
+		system.m_job_queue.eraseFast(i);
+		if (system.m_job_queue.empty()) system.m_work_signal.reset();
+		return job;
 	}
-	return false;
+	return {nullptr, nullptr};
 }
 
 
@@ -140,21 +145,13 @@ struct WorkerTask : MT::Task
 
 	static void handleSwitch(FiberDecl& fiber)
 	{
+		if (!fiber.job_finished) g_system->m_sync.unlock();
 		MT::SpinLock lock(g_system->m_sync);
 
-		if (!fiber.switch_state)
-		{
+		if (fiber.job_finished) {
 			g_system->m_free_fibers_indices[g_system->m_num_free_fibers] = fiber.idx;
 			++g_system->m_num_free_fibers;
-			return;
 		}
-
-		volatile int* counter = (volatile int*)fiber.switch_state;
-		SleepingFiber sleeping_fiber;
-		sleeping_fiber.fiber = &fiber;
-		sleeping_fiber.waiting_condition = counter;
-
-		g_system->m_sleeping_fibers.push(sleeping_fiber);
 	}
 
 
@@ -176,25 +173,24 @@ struct WorkerTask : MT::Task
 		that->m_finished = false;
 		while (!that->m_finished)
 		{
-			SleepingFiber ready_sleeping_fiber;
-			if (getReadySleepingFiber(*g_system, &ready_sleeping_fiber))
-			{
-				ready_sleeping_fiber.fiber->worker_task = that;
-				ready_sleeping_fiber.fiber->switch_state = nullptr;
-				that->m_current_fiber = ready_sleeping_fiber.fiber;
-				Fiber::switchTo(&that->m_primary_fiber, ready_sleeping_fiber.fiber->fiber);
+			FiberDecl* fiber = getReadyFiber(*g_system);
+			if (fiber) {
+				fiber->worker_task = that;
+				that->m_current_fiber = fiber;
+				fiber->job_finished = false;
+				Fiber::switchTo(&that->m_primary_fiber, fiber->fiber);
+				
 				that->m_current_fiber = nullptr;
-				handleSwitch(*ready_sleeping_fiber.fiber);
+				handleSwitch(*fiber);
 				continue;
 			}
 
-			Job job;
-			if (getReadyJob(*g_system, &job))
-			{
+			Job job = getReadyJob(*g_system);
+			if (job.task) {
 				FiberDecl& fiber_decl = getFreeFiber();
 				fiber_decl.worker_task = that;
 				fiber_decl.current_job = job;
-				fiber_decl.switch_state = nullptr;
+				fiber_decl.job_finished = false;
 				that->m_current_fiber = &fiber_decl;
 				Fiber::switchTo(&that->m_primary_fiber, fiber_decl.fiber);
 				that->m_current_fiber = nullptr;
@@ -216,6 +212,75 @@ struct WorkerTask : MT::Task
 };
 
 
+static CounterHandle allocateCounter()
+{
+	const u32 handle = g_system->m_free_queue.back();
+	g_system->m_counter_pool[handle & HANDLE_ID_MASK].value = 1;
+	g_system->m_free_queue.pop();
+
+	return handle;
+}
+
+
+static bool isCounterZero(CounterHandle handle, bool lock)
+{
+	const u32 gen = handle & HANDLE_GENERATION_MASK;
+	const u32 id = handle & HANDLE_ID_MASK;
+	
+	if (lock) g_system->m_sync.lock();
+	Counter& counter = g_system->m_counter_pool[id];
+	bool is_zero = counter.generation != gen || counter.value == 0;
+	if (lock) g_system->m_sync.unlock();
+	return is_zero;
+}
+
+
+CounterHandle runAfter(void* data, void (*task)(void*), CounterHandle counter_handle)
+{
+	Job j;
+	j.data = data;
+	j.task = task;
+
+	MT::SpinLock lock(g_system->m_sync);
+	j.counter = allocateCounter();
+
+	if (isCounterZero(counter_handle, false)) {
+		g_system->m_work_signal.trigger();
+		g_system->m_job_queue.push(j);
+	}
+	else {
+		Counter& counter = g_system->m_counter_pool[counter_handle & HANDLE_ID_MASK];
+		ASSERT(counter.next_job.task == nullptr);
+		counter.next_job = j;
+	}
+
+	return j.counter;
+}
+
+
+static void finishJob(const Job& job)
+{
+	Job next_job = {nullptr, nullptr};
+	if (isValid(job.counter)) {
+		MT::SpinLock lock(g_system->m_sync);
+		const u32 id = job.counter & HANDLE_ID_MASK;
+		Counter& counter = g_system->m_counter_pool[id];
+		--counter.value;
+		if (counter.value == 0) {
+			next_job = counter.next_job;
+			counter.generation = ((counter.generation + 1) % 0xffff) << 16;
+			counter.next_job.task = nullptr;
+			g_system->m_free_queue.push(id | counter.generation);
+		}
+	}
+	if(next_job.task) {
+		MT::SpinLock lock(g_system->m_sync);
+		g_system->m_work_signal.trigger();
+		g_system->m_job_queue.push(next_job);
+	}
+}
+
+
 #ifdef _WIN32
 static void __stdcall fiberProc(void* data)
 #else
@@ -226,10 +291,10 @@ static void fiberProc(void* data)
 	for (;;)
 	{
 		Job job = fiber_decl->current_job;
-		job.decl.task(job.decl.data);
-		if(job.counter) MT::atomicDecrement(job.counter);
+		job.task(job.data);
+		finishJob(job);
+		fiber_decl->job_finished = true;
 
-		fiber_decl->switch_state = nullptr;
 		Fiber::switchTo(&fiber_decl->fiber, fiber_decl->worker_task->m_primary_fiber);
 	}
 }
@@ -301,52 +366,115 @@ void shutdown()
 }
 
 
-void runJobs(const JobDecl* jobs, int count, int volatile* counter)
+CounterHandle runMany(void* data, void (*task)(void*), int count, int stride)
 {
-	ASSERT(g_system);
-	ASSERT(count > 0);
-
 	MT::SpinLock lock(g_system->m_sync);
 	g_system->m_work_signal.trigger();
-	if (counter) MT::atomicAdd(counter, count);
-	for (int i = 0; i < count; ++i)
-	{
+	CounterHandle handle = allocateCounter();
+	Counter& counter = g_system->m_counter_pool[handle & HANDLE_ID_MASK];
+	counter.value = count;
+	for(int i = 0; i < count; ++i) {
 		Job job;
-		job.decl = jobs[i];
-		job.counter = counter;
+		job.data = (u8*)data + i * stride;
+		job.task = task;
+		job.counter = handle;
 		g_system->m_job_queue.push(job);
 	}
+	return handle;
 }
 
 
-void wait(int volatile* counter)
+LUMIX_ENGINE_API CounterHandle mergeCounters(const CounterHandle* counters, int count)
 {
-	if (*counter <= 0) return;
-	if (g_worker)
-	{
+	ASSERT(count > 0);
+	if (count == 1) return counters[0];
+
+	MT::SpinLock lock(g_system->m_sync);
+	const CounterHandle handle = allocateCounter();
+	Counter& counter = g_system->m_counter_pool[handle & HANDLE_ID_MASK];
+	for (int i = 0; i < count; ++i) {
+		const u32 id = counters[i] & HANDLE_ID_MASK;
+		const u32 gen = counters[i] & HANDLE_GENERATION_MASK;
+		Counter& c = g_system->m_counter_pool[id];
+		if (c.generation == gen && c.value > 0) {
+			++counter.value;
+			ASSERT(c.next_job.task == nullptr);
+			c.next_job.data = (void*)(uintptr)handle;
+			c.next_job.task = [](void* data){};
+			c.next_job.counter = handle;
+		}
+	}
+	if(--counter.value == 0) {
+		counter.generation = ((counter.generation + 1) % 0xffff) << 16;
+		counter.next_job.task = nullptr;
+		const u32 id = handle & HANDLE_ID_MASK;
+		g_system->m_free_queue.push(id | counter.generation);
+	}
+	return handle;
+}
+
+
+CounterHandle run(void* data, void (*task)(void*))
+{
+	MT::SpinLock lock(g_system->m_sync);
+	g_system->m_work_signal.trigger();
+	Job job;
+	job.data = data;
+	job.task = task;
+	job.counter = allocateCounter();
+	g_system->m_job_queue.push(job);
+	return job.counter;
+}
+
+
+void wait(CounterHandle handle)
+{
+	g_system->m_sync.lock();
+	if (isCounterZero(handle, false)) {
+		g_system->m_sync.unlock();
+		return;
+	}
+	
+	Counter& counter = g_system->m_counter_pool[handle & HANDLE_ID_MASK];
+	if (g_worker) {
 		PROFILE_BLOCK_COLORED("waiting", 0xff, 0, 0);
-		//ASSERT(Profiler::getCurrentBlock() == Profiler::getRootBlock(MT::getCurrentThreadID()));
 		FiberDecl* fiber_decl = ((WorkerTask*)g_worker)->m_current_fiber;
-		fiber_decl->switch_state = (void*)counter;
+
+		Job job;
+		job.data = fiber_decl;
+		job.task = [](void* data){
+			g_system->m_ready_fibers.push((FiberDecl*)data);
+		};
+		job.counter = INVALID_HANDLE;
+		ASSERT(counter.next_job.task == nullptr);
+		counter.next_job = job;
+		fiber_decl->job_finished = false;
+
 		Fiber::switchTo(&fiber_decl->fiber, fiber_decl->worker_task->m_primary_fiber);
 	}
 	else
 	{
 		PROFILE_BLOCK_COLORED("not a job waiting", 0xff, 0, 0);
 
-		//ASSERT(g_system->m_event_outside_job.poll());
 		g_system->m_event_outside_job.reset();
 
-		JobDecl job;
-		job.data = (void*)counter;
+		Job job;
+		job.data = (void*)(uintptr)handle;
 		job.task = [](void* data) {
-			JobSystem::wait((volatile int*)data);
+			wait((CounterHandle)(uintptr)data);
 			g_system->m_event_outside_job.trigger();
 		};
-		runJobs(&job, 1, nullptr);
-		MT::yield();
-		while (*counter > 0)
+		job.counter = INVALID_HANDLE;
+
 		{
+			g_system->m_work_signal.trigger();
+			g_system->m_job_queue.push(job);
+		}
+
+		g_system->m_sync.unlock();
+
+		MT::yield();
+		while (!isCounterZero(handle, true)) {
 			g_system->m_event_outside_job.waitTimeout(1);
 		}
 	}
