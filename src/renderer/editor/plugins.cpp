@@ -1138,8 +1138,13 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 {
 	struct Meta
 	{
+		enum WrapMode : int {
+			REPEAT,
+			CLAMP
+		};
 		bool srgb = false;
 		bool is_normalmap = false;
+		WrapMode wrap_mode = WrapMode::REPEAT;
 	};
 
 	explicit TexturePlugin(StudioApp& app)
@@ -1186,7 +1191,8 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		}
 
 		dst.write("dds", 3);
-		const u32 flags = meta.srgb ? (u32)Texture::Flags::SRGB : 0;
+		u32 flags = meta.srgb ? (u32)Texture::Flags::SRGB : 0;
+		flags |= meta.wrap_mode == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP : 0;
 		dst.write(&flags, sizeof(flags));
 		dst.write(compressed, compressed_size);
 
@@ -1203,6 +1209,10 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		m_app.getAssetCompiler().getMeta(path, [&meta](lua_State* L){
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "srgb", &meta.srgb);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "normalmap", &meta.is_normalmap);
+			char tmp[32];
+			if(LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "wrap_mode", tmp, lengthOf(tmp))) {
+				meta.wrap_mode = stricmp(tmp, "repeat") == 0 ? Meta::WrapMode::REPEAT : Meta::WrapMode::CLAMP;
+			}
 		});
 		return meta;
 	}
@@ -1234,7 +1244,8 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			srcf.read(buffer.begin(), buffer.byte_size());
 
 			dstf.write(ext, sizeof(ext) - 1);
-			const u32 flags = meta.srgb ? (u32)Texture::Flags::SRGB : 0;
+			u32 flags = meta.srgb ? (u32)Texture::Flags::SRGB : 0;
+			flags |= meta.wrap_mode == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP : 0;
 			dstf.write(&flags, sizeof(flags));
 			dstf.write(buffer.begin(), buffer.byte_size());
 		}
@@ -1288,9 +1299,12 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			
 			ImGui::Checkbox("SRGB", &m_meta.srgb);
 			ImGui::Checkbox("Is normalmap", &m_meta.is_normalmap);
+			ImGui::Combo("Wrap mode", (int*)&m_meta.wrap_mode, "Repeat\0Clamp\0");
 
 			if (ImGui::Button("Apply")) {
-				const StaticString<256> src("srgb = ", m_meta.srgb ? "true" : "false", "\nnormalmap = ", m_meta.is_normalmap ? "true" : "false");
+				const StaticString<256> src("srgb = ", m_meta.srgb ? "true" : "false"
+					, "\nnormalmap = ", m_meta.is_normalmap ? "true" : "false"
+					, "\nwrap_mode = \"", m_meta.wrap_mode == Meta::WrapMode::REPEAT ? "repeat\"" : "clamp\"");
 				compiler.updateMeta(resource->getPath(), src);
 				if (compiler.compile(resource->getPath())) {
 					resource->getResourceManager().reload(*resource);

@@ -278,8 +278,14 @@ struct CullingSystemImpl final : public CullingSystem
 		uint partial_entities = 0;
 		for (Cell* cell : m_cells) {
 			if (frustum.containsAABB(cell->origin + v3_cell_size, -v3_cell_size)) {
-				for(u32 id : cell->ids) {
-					result[counter].push(id);
+				for(int i = 0; i < cell->ids.size(); i += 1024) {
+					const int end = Math::minimum(i + 1024, cell->ids.size());
+					const u32* ids = cell->ids.begin();
+					Subresults& subresult = result[counter];
+					subresult.reserve(result[counter].size() + end - i);
+					for(int j = i; j < end; ++j) {
+						subresult.push(ids[j]);
+					}
 					counter = (counter + 1) % buckets_count;
 				}
 			}
