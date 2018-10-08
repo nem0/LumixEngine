@@ -260,21 +260,20 @@ CounterHandle runAfter(void* data, void (*task)(void*), CounterHandle counter_ha
 
 static void finishJob(const Job& job)
 {
+	if (!isValid(job.counter)) return;
+
 	Job next_job = {nullptr, nullptr};
-	if (isValid(job.counter)) {
-		MT::SpinLock lock(g_system->m_sync);
-		const u32 id = job.counter & HANDLE_ID_MASK;
-		Counter& counter = g_system->m_counter_pool[id];
-		--counter.value;
-		if (counter.value == 0) {
-			next_job = counter.next_job;
-			counter.generation = ((counter.generation + 1) % 0xffff) << 16;
-			counter.next_job.task = nullptr;
-			g_system->m_free_queue.push(id | counter.generation);
-		}
+	MT::SpinLock lock(g_system->m_sync);
+	const u32 id = job.counter & HANDLE_ID_MASK;
+	Counter& counter = g_system->m_counter_pool[id];
+	--counter.value;
+	if (counter.value == 0) {
+		next_job = counter.next_job;
+		counter.generation = ((counter.generation + 1) % 0xffff) << 16;
+		counter.next_job.task = nullptr;
+		g_system->m_free_queue.push(id | counter.generation);
 	}
 	if(next_job.task) {
-		MT::SpinLock lock(g_system->m_sync);
 		g_system->m_work_signal.trigger();
 		g_system->m_job_queue.push(next_job);
 	}

@@ -626,6 +626,9 @@ u32 Texture::getFFRFlags() const
 	if(flags & (u32)Flags::SRGB) {
 		ffr_flags  |= (u32)ffr::TextureFlags::SRGB;
 	}
+	if (flags & (u32)Flags::CLAMP) {
+		ffr_flags |= (u32)ffr::TextureFlags::CLAMP;
+	}
 
 	return ffr_flags ;
 }
@@ -639,6 +642,7 @@ bool Texture::load(FS::IFile& file)
 	u32 flags;
 	if (!file.read(&flags, sizeof(flags))) return false;
 	setSRGB(flags & (u32)Flags::SRGB);
+	setFlag(Flags::CLAMP, flags & (u32)Flags::CLAMP);
 
 	bool loaded = false;
 	if (equalStrings(ext, "dds")) {

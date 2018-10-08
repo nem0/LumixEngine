@@ -1459,6 +1459,10 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, uint f
 		}
 	}
 
+	const GLint wrap = (flags & (u32)TextureFlags::CLAMP) ? GL_CLAMP : GL_REPEAT;
+	CHECK_GL(glTextureParameteri(texture, GL_TEXTURE_WRAP_S, wrap));
+	CHECK_GL(glTextureParameteri(texture, GL_TEXTURE_WRAP_T, wrap));
+
 	Texture& t = g_ffr.textures[handle.value];
 	t.handle = texture;
 	t.target = is_cubemap ? GL_TEXTURE_CUBE_MAP : layers > 1 ? GL_TEXTURE_2D_ARRAY : GL_TEXTURE_2D;
@@ -1529,8 +1533,10 @@ bool createTexture(TextureHandle handle, uint w,uint h, TextureFormat format, ui
 	}
 
 	CHECK_GL(glGenerateMipmap(GL_TEXTURE_2D));
-	CHECK_GL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT));
-	CHECK_GL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT));
+	
+	const GLint wrap = (flags & (u32)TextureFlags::CLAMP) ? GL_CLAMP : GL_REPEAT;
+	CHECK_GL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap));
+	CHECK_GL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap));
 	CHECK_GL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
 	CHECK_GL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR));
 

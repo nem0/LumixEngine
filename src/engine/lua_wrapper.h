@@ -23,7 +23,14 @@ namespace LuaWrapper
 			top = lua_gettop(L);
 		}
 
-		DebugGuard()
+		DebugGuard(lua_State* L, int offset)
+			: L(L) 
+		{
+			top = lua_gettop(L) + offset;
+		}
+
+
+		~DebugGuard()
 		{
 			ASSERT(lua_gettop(L) == top);
 		}
@@ -32,7 +39,11 @@ namespace LuaWrapper
 		int top;
 	};
 #else
-	struct DebugGuard { DebugGuard(lua_State* L) {} };
+	struct DebugGuard
+	{ 
+		DebugGuard(lua_State* L) {} 
+		DebugGuard(lua_State* L, int offset) {} 
+	};
 #endif
 
 

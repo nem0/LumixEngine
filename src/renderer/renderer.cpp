@@ -666,7 +666,7 @@ struct RendererImpl final : public Renderer
 			void setup() override {}
 			void execute() override
 			{
-				ffr::createTexture(handle, w, h, format, 0, memory.data);
+				ffr::createTexture(handle, w, h, format, flags, memory.data);
 				if (memory.own) {
 					renderer->free(memory);
 				}
@@ -678,12 +678,14 @@ struct RendererImpl final : public Renderer
 			uint h;
 			ffr::TextureFormat format;
 			Renderer* renderer;
+			u32 flags;
 		};
 
 		Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
 		cmd->handle = handle;
 		cmd->memory = memory;
 		cmd->format = format;
+		cmd->flags = flags;
 		cmd->w = w;
 		cmd->h = h;
 		cmd->renderer = this;
