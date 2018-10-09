@@ -39,6 +39,7 @@ struct GUIInterface : GUISystem::Interface
 
 	Pipeline* getPipeline() override { return pipeline; }
 	Vec2 getPos() const override { return Vec2(0, 0); }
+	Vec2 getSize() const override { return size; }
 
 	void enableCursor(bool enable) override
 	{
@@ -47,6 +48,7 @@ struct GUIInterface : GUISystem::Interface
 	}
 
 
+	Vec2 size;
 	Pipeline* pipeline;
 };
 
@@ -82,6 +84,7 @@ public:
 		SDL_GetWindowSize(m_window, &w, &h);
 		// TODO
 		//m_pipeline->resize(w, h);
+		m_gui_interface->size.set((float)w, (float)h);
 		Renderer* renderer = (Renderer*)m_engine->getPluginManager().getPlugin("renderer");
 		renderer->resize(w, h);
 	}

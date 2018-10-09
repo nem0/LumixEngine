@@ -109,13 +109,10 @@ static Job getReadyJob(System& system)
 
 	if (system.m_job_queue.empty()) return {nullptr, nullptr};
 
-	for (int i = system.m_job_queue.size() - 1; i >= 0; --i) {
-		Job job = system.m_job_queue[i];
-		system.m_job_queue.eraseFast(i);
-		if (system.m_job_queue.empty()) system.m_work_signal.reset();
-		return job;
-	}
-	return {nullptr, nullptr};
+	Job job = system.m_job_queue.back();
+	system.m_job_queue.pop();
+	if (system.m_job_queue.empty()) system.m_work_signal.reset();
+	return job;
 }
 
 

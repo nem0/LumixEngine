@@ -37,6 +37,7 @@ struct GUIInterface : GUISystem::Interface
 
 	Pipeline* getPipeline() override { return m_game_view.m_pipeline; }
 	Vec2 getPos() const override { return m_game_view.m_pos; }
+	Vec2 getSize() const override { return m_game_view.m_size; }
 
 	
 	void enableCursor(bool enable) override
