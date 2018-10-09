@@ -21,7 +21,6 @@
 #include "renderer/render_scene.h"
 #include "renderer/shader.h"
 #include "renderer/texture.h"
-#include <bgfx/bgfx.h>
 #include <imgui/imgui.h>
 
 
@@ -32,7 +31,7 @@ namespace Lumix
 struct GUISystemImpl;
 
 
-struct GUISystemImpl LUMIX_FINAL : public GUISystem
+struct GUISystemImpl final : public GUISystem
 {
 	static const char* getTextHAlignName(int index)
 	{
@@ -130,7 +129,7 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 	static int LUA_GUIRect_getScreenRect(lua_State* L)
 	{
 		GUIScene* scene = LuaWrapper::checkArg<GUIScene*>(L, 1);
-		Entity e = LuaWrapper::checkArg<Entity>(L, 2);
+		EntityRef e = LuaWrapper::checkArg<EntityRef>(L, 2);
 		GUIScene::Rect rect = scene->getRect(e);
 		lua_newtable(L);
 		LuaWrapper::push(L, rect.x);
@@ -189,9 +188,8 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 		if (!m_interface) return;
 
 		Pipeline* pipeline = m_interface->getPipeline();
-		Draw2D& draw2d = pipeline->getDraw2D();
 		auto* scene = (GUIScene*)pipeline->getScene()->getUniverse().getScene(crc32("gui"));
-		Vec2 size = { (float)pipeline->getWidth(), (float)pipeline->getHeight() };
+		Vec2 size = m_interface->getSize();
 		scene->render(*pipeline, size);
 	}
 
@@ -199,9 +197,8 @@ struct GUISystemImpl LUMIX_FINAL : public GUISystem
 	void renderNewUI()
 	{
 		Pipeline* pipeline = m_interface->getPipeline();
-		Draw2D& draw2d = pipeline->getDraw2D();
 		auto* scene = (GUIScene*)pipeline->getScene()->getUniverse().getScene(crc32("gui"));
-		Vec2 size = {(float)pipeline->getWidth(), (float)pipeline->getHeight()};
+		Vec2 size =  m_interface->getSize();
 		scene->render(*pipeline, size);
 	}
 

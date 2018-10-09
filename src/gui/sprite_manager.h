@@ -2,7 +2,7 @@
 
 
 #include "engine/resource.h"
-#include "engine/resource_manager_base.h"
+#include "engine/resource_manager.h"
 
 
 namespace Lumix
@@ -14,7 +14,7 @@ class Renderer;
 class Texture;
 
 
-class Sprite LUMIX_FINAL : public Resource
+class Sprite final : public Resource
 {
 public:
 	enum Type
@@ -23,7 +23,7 @@ public:
 		SIMPLE
 	};
 
-	Sprite(const Path& path, ResourceManagerBase& manager, IAllocator& allocator);
+	Sprite(const Path& path, ResourceManager& manager, IAllocator& allocator);
 
 	ResourceType getType() const override { return TYPE; }
 
@@ -47,7 +47,7 @@ private:
 };
 
 
-class SpriteManager LUMIX_FINAL : public ResourceManagerBase
+class SpriteManager final : public ResourceManager
 {
 friend class Sprite;
 public:

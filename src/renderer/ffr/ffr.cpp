@@ -1987,6 +1987,11 @@ void update(FramebufferHandle fb, uint renderbuffers_count, const TextureHandle*
 		glNamedFramebufferRenderbuffer(fb.value, GL_COLOR_ATTACHMENT0 + i, GL_RENDERBUFFER, 0);
 	}
 	
+	if (!depth_bound) {
+		glNamedFramebufferRenderbuffer(fb.value, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, 0);
+		glNamedFramebufferRenderbuffer(fb.value, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, 0);
+	}
+
 	glBindFramebuffer(GL_FRAMEBUFFER, fb.value);
 	auto xx = glCheckFramebufferStatus(GL_FRAMEBUFFER);
 	ASSERT(xx == GL_FRAMEBUFFER_COMPLETE);

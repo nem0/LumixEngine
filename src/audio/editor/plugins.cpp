@@ -159,7 +159,7 @@ struct ClipManagerUI final : public StudioApp::GUIPlugin
 
 	void onWindowGUI() override
 	{
-		if (ImGui::BeginDock("Clip Manager", &m_is_open))
+		if (ImGui::Begin("Clip Manager", &m_is_open))
 		{
 			ImGui::InputText("Filter", m_filter, lengthOf(m_filter));
 
@@ -211,7 +211,7 @@ struct ClipManagerUI final : public StudioApp::GUIPlugin
 				audio_scene->addClip("test", Path("test.ogg"));
 			}
 		}
-		ImGui::EndDock();
+		ImGui::End();
 	}
 
 

@@ -14,14 +14,15 @@
 #include "engine/plugin_manager.h"
 #include "engine/reflection.h"
 #include "engine/universe/universe.h"
+#include "engine/viewport.h"
 #include "gui/gui_scene.h"
 #include "gui/sprite_manager.h"
 #include "imgui/imgui.h"
 #include "renderer/draw2d.h"
+#include "renderer/ffr/ffr.h"
 #include "renderer/pipeline.h"
 #include "renderer/renderer.h"
 #include "renderer/texture.h"
-
 
 using namespace Lumix;
 
@@ -37,7 +38,7 @@ static const ComponentType GUI_BUTTON_TYPE = Reflection::getComponentType("gui_b
 static const ComponentType GUI_RENDER_TARGET_TYPE = Reflection::getComponentType("gui_render_target");
 
 
-struct SpritePlugin LUMIX_FINAL : public AssetBrowser::IPlugin
+struct SpritePlugin final : public AssetBrowser::IPlugin
 {
 	SpritePlugin(StudioApp& app) 
 		: app(app) 
@@ -204,7 +205,7 @@ struct SpritePlugin LUMIX_FINAL : public AssetBrowser::IPlugin
 };
 
 
-class GUIEditor LUMIX_FINAL : public StudioApp::GUIPlugin
+class GUIEditor final : public StudioApp::GUIPlugin
 {
 enum class EdgeMask
 {
@@ -231,8 +232,8 @@ public:
 
 		m_editor = &app.getWorldEditor();
 		Renderer& renderer = *static_cast<Renderer*>(m_editor->getEngine().getPluginManager().getPlugin("renderer"));
-		m_pipeline = Pipeline::create(renderer, Path("pipelines/draw2d.lua"), "", allocator);
-		m_pipeline->load();
+		PipelineResource* pres = m_editor->getEngine().getResourceManager().load<PipelineResource>(Path("pipelines/gui_editor.pln"));
+		m_pipeline = Pipeline::create(renderer, pres, "", allocator);
 
 		m_editor->universeCreated().bind<GUIEditor, &GUIEditor::onUniverseChanged>(this);
 		m_editor->universeDestroyed().bind<GUIEditor, &GUIEditor::onUniverseChanged>(this);
@@ -278,7 +279,7 @@ private:
 		auto& selected_entities = m_editor->getSelectedEntities();
 		if (selected_entities.size() != 1) return MouseMode::NONE;
 
-		Entity e = selected_entities[0];
+		EntityRef e = selected_entities[0];
 		if (!scene.hasGUI(e)) return MouseMode::NONE;
 
 		GUIScene::Rect& rect = scene.getRectOnCanvas(e, canvas_size);
@@ -329,7 +330,7 @@ private:
 		const Reflection::PropertyBase* prop = nullptr;
 		float value;
 
-		void set(GUIScene* scene, Entity e, const char* prop_name)
+		void set(GUIScene* scene, EntityRef e, const char* prop_name)
 		{
 			prop = Reflection::getProperty(GUI_RECT_TYPE, prop_name);
 			OutputBlob blob(&value, sizeof(value));
@@ -339,7 +340,7 @@ private:
 	
 	int m_copy_position_buffer_count = 0;
 
-	void copy(Entity e, u8 mask)
+	void copy(EntityRef e, u8 mask)
 	{
 		GUIScene* scene = (GUIScene*)m_editor->getUniverse()->getScene(crc32("gui"));
 		m_copy_position_buffer_count = 0;
@@ -374,7 +375,7 @@ private:
 	}
 
 
-	void paste(Entity e)
+	void paste(EntityRef e)
 	{
 		m_editor->beginCommandGroup(crc32("gui_editor_paste"));
 		GUIScene* scene = (GUIScene*)m_editor->getUniverse()->getScene(crc32("gui"));
@@ -389,14 +390,17 @@ private:
 
 	void onWindowGUI() override
 	{
-		if (ImGui::BeginDock("GUIEditor", &m_is_window_open))
+		if (ImGui::Begin("GUIEditor", &m_is_window_open))
 		{
 			ImVec2 mouse_canvas_pos = ImGui::GetMousePos();
 			mouse_canvas_pos.x -= ImGui::GetCursorScreenPos().x;
 			mouse_canvas_pos.y -= ImGui::GetCursorScreenPos().y;
 			
-			if (!m_pipeline->isReady()) return;
 			ImVec2 size = ImGui::GetContentRegionAvail();
+			if (!m_pipeline->isReady() || size.x == 0 || size.y == 0) {
+				ImGui::End();
+				return;
+			}
 			GUIScene* scene = (GUIScene*)m_editor->getUniverse()->getScene(crc32("gui"));
 			scene->render(*m_pipeline, { size.x, size.y });
 			
@@ -406,7 +410,7 @@ private:
 			
 			if (m_editor->getSelectedEntities().size() == 1)
 			{
-				Entity e = m_editor->getSelectedEntities()[0];
+				EntityRef e = m_editor->getSelectedEntities()[0];
 				switch (m_mouse_mode)
 				{
 					case MouseMode::RESIZE:
@@ -433,15 +437,32 @@ private:
 				}
 			}
 
-			m_pipeline->resize(int(size.x), int(size.y));
-			m_pipeline->render();
-			m_texture_handle = m_pipeline->getRenderbuffer("default", 0);
-			ImGui::Image(&m_texture_handle, size);
+			Viewport vp;
+			vp.w = (int)size.x;
+			vp.h = (int)size.y;
+			m_pipeline->setViewport(vp);
+			
+			if (m_pipeline->render()) {
+				m_texture_handle = m_pipeline->getOutput();
+
+				if(m_texture_handle.isValid()) {
+					const ImTextureID img = (ImTextureID)(uintptr)m_texture_handle.value;
+					if (ffr::isOriginBottomLeft()) {
+						ImGui::Image(img, size, ImVec2(0, 1), ImVec2(1, 0));
+					}
+					else {
+						ImGui::Image(img, size);
+					}
+				}
+			}
 
 			if (ImGui::IsMouseClicked(0) && ImGui::IsItemHovered() && m_mouse_mode == MouseMode::NONE)
 			{
-				Entity e = scene->getRectAt(toLumix(mouse_canvas_pos), toLumix(size));
-				if (e.isValid()) m_editor->selectEntities(&e, 1, false);
+				EntityPtr e = scene->getRectAt(toLumix(mouse_canvas_pos), toLumix(size));
+				if (e.isValid()) {
+					EntityRef r = (EntityRef)e;
+					m_editor->selectEntities(&r, 1, false);
+				}
 			}
 
 			bool has_rect = false;
@@ -451,7 +472,7 @@ private:
 			}
 			if (has_rect && ImGui::BeginPopupContextItem("context"))
 			{
-				Entity e = m_editor->getSelectedEntities()[0];
+				EntityRef e = m_editor->getSelectedEntities()[0];
 				if (ImGui::BeginMenu("Make relative"))
 				{
 					if (ImGui::MenuItem("All")) makeRelative(e, toLumix(size), (u8)EdgeMask::ALL);
@@ -519,14 +540,14 @@ private:
 			}
 		}
 
-		ImGui::EndDock();
+		ImGui::End();
 	}
 
 
-	void createChild(Entity entity, ComponentType child_type)
+	void createChild(EntityRef entity, ComponentType child_type)
 	{
 		m_editor->beginCommandGroup(crc32("create_gui_rect_child"));
-		Entity child = m_editor->addEntity();
+		EntityRef child = m_editor->addEntity();
 		m_editor->makeParent(entity, child);
 		m_editor->selectEntities(&child, 1, false);
 		m_editor->addComponent(child_type);
@@ -534,7 +555,7 @@ private:
 	}
 
 
-	void setRectProperty(Entity e, const char* prop_name, float value)
+	void setRectProperty(EntityRef e, const char* prop_name, float value)
 	{
 		const Reflection::PropertyBase* prop = Reflection::getProperty(GUI_RECT_TYPE, crc32(prop_name));
 		ASSERT(prop);
@@ -542,11 +563,11 @@ private:
 	}
 
 
-	void makeAbsolute(Entity entity, const Vec2& canvas_size, u8 mask)
+	void makeAbsolute(EntityRef entity, const Vec2& canvas_size, u8 mask)
 	{
 		GUIScene* scene = (GUIScene*)m_editor->getUniverse()->getScene(crc32("gui"));
 
-		Entity parent = scene->getUniverse().getParent(entity);
+		EntityRef parent = (EntityRef)scene->getUniverse().getParent(entity);
 		GUIScene::Rect parent_rect = scene->getRectOnCanvas(parent, canvas_size);
 		GUIScene::Rect child_rect = scene->getRectOnCanvas(entity, canvas_size);
 
@@ -580,7 +601,7 @@ private:
 	}
 
 
-	void align(Entity entity, u8 mask)
+	void align(EntityRef entity, u8 mask)
 	{
 		GUIScene* scene = (GUIScene*)m_editor->getUniverse()->getScene(crc32("gui"));
 
@@ -646,7 +667,7 @@ private:
 		m_editor->endCommandGroup();
 	}
 
-	void expand(Entity entity, u8 mask)
+	void expand(EntityRef entity, u8 mask)
 	{
 		GUIScene* scene = (GUIScene*)m_editor->getUniverse()->getScene(crc32("gui"));
 		m_editor->beginCommandGroup(crc32("expand_gui_rect"));
@@ -680,12 +701,12 @@ private:
 	}
 
 
-	void makeRelative(Entity entity, const Vec2& canvas_size, u8 mask)
+	void makeRelative(EntityRef entity, const Vec2& canvas_size, u8 mask)
 	{
 		GUIScene* scene = (GUIScene*)m_editor->getUniverse()->getScene(crc32("gui"));
 		
-		Entity parent = scene->getUniverse().getParent(entity);
-		GUIScene::Rect parent_rect = scene->getRectOnCanvas(parent, canvas_size);
+		EntityPtr parent = scene->getUniverse().getParent(entity);
+		GUIScene::Rect parent_rect = scene->getRectOnCanvas((EntityRef)parent, canvas_size);
 		GUIScene::Rect child_rect = scene->getRectOnCanvas(entity, canvas_size);
 
 		m_editor->beginCommandGroup(crc32("make_gui_rect_relative"));
@@ -727,7 +748,7 @@ private:
 	Pipeline* m_pipeline = nullptr;
 	WorldEditor* m_editor = nullptr;
 	bool m_is_window_open = false;
-	bgfx::TextureHandle m_texture_handle;
+	ffr::TextureHandle m_texture_handle;
 	MouseMode m_mouse_mode = MouseMode::NONE;
 	Vec2 m_bottom_right_start_transform;
 	Vec2 m_top_left_start_move;
