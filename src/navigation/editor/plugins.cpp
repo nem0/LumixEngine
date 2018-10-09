@@ -49,7 +49,7 @@ struct NavmeshEditorPlugin final : public StudioApp::GUIPlugin
 		auto* scene = static_cast<NavigationScene*>(app.getWorldEditor().getUniverse()->getScene(crc32("navigation")));
 		if (!scene) return;
 
-		if (ImGui::BeginDock("Navigation", &is_open, ImGuiWindowFlags_NoScrollWithMouse))
+		if (ImGui::Begin("Navigation", &is_open, ImGuiWindowFlags_NoScrollWithMouse))
 		{
 			if (ImGui::Button("Generate")) scene->generateNavmesh();
 			ImGui::SameLine();
@@ -75,7 +75,7 @@ struct NavmeshEditorPlugin final : public StudioApp::GUIPlugin
 				ImGui::SameLine();
 				if (ImGui::Button("Debug tile"))
 				{
-					Vec3 camera_hit = app.getWorldEditor().getCameraRaycastHit();
+					DVec3 camera_hit = app.getWorldEditor().getCameraRaycastHit();
 					scene->generateTileAt(camera_hit, true);
 				}
 
@@ -148,7 +148,7 @@ struct NavmeshEditorPlugin final : public StudioApp::GUIPlugin
 				}
 			}
 		}
-		ImGui::EndDock();
+		ImGui::End();
 	}
 
 
