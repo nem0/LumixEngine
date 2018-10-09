@@ -44,73 +44,94 @@ namespace Lumix
 template <typename T>
 struct MTBucketArray
 {
-	enum { BUCKET_SIZE = 4096 }; 
+	enum { 
+		BUCKET_SIZE = 16384,  
+		MAX_COUNT = BUCKET_SIZE / sizeof(T)
+	}; 
 	struct Bucket {
-		T values[BUCKET_SIZE];
+		T* values;
 		int count = 0;
-	};
+		MTBucketArray* array;
 
-	struct Accessor
-	{
-		MTBucketArray<T>* array;
-		Bucket* bucket;
+		void end() { array->end(*this); }
 
-		LUMIX_FORCE_INLINE void push(const T& value)
+		void push(const T& value)
 		{
-			int c = bucket->count;
-			if(c == BUCKET_SIZE) {
-				Bucket* new_bucket = LUMIX_NEW(array->allocator, Bucket);
-				MT::SpinLock lock(array->mutex);
-				array->buckets.push(new_bucket);
-				bucket = new_bucket;
-				c = 0;
+			values[count] = value;
+			++count;
+			if (count == MAX_COUNT) {
+				array->end(*this); 
+				*this = array->begin();
 			}
-			bucket->values[c] = value;
-			++bucket->count;
 		}
 	};
 
 	MTBucketArray(IAllocator& allocator) 
-		: buckets(allocator) 
-		, allocator(allocator)
-		, mutex(false)
+		: m_counts(allocator) 
+		, m_mutex(false)
 	{
+		m_mem = (u8*)VirtualAlloc(nullptr, 1024 * 1024 * 8, MEM_RESERVE, PAGE_READWRITE);
+		m_end = m_mem;
+		m_counts.reserve(1024 * 1024 * 8 / BUCKET_SIZE);
 	}
 
 	~MTBucketArray()
 	{
-		for(Bucket* b : buckets) {
-			LUMIX_DELETE(allocator, b);
-		}
+		VirtualFree(m_mem, 0, MEM_RELEASE);
 	}
 
-	Accessor begin()
+	Bucket begin()
 	{
-		Bucket* bucket = LUMIX_NEW(allocator, Bucket);
-		MT::SpinLock lock(mutex);
-		buckets.push(bucket);
-
-		return {this, bucket};
+		Bucket b;
+		b.array = this;
+		
+		m_mutex.lock();
+		m_counts.emplace();
+		b.values = (T*)m_end;
+		m_end += BUCKET_SIZE;
+		m_mutex.unlock();
+		// TODO make sure BUCKET_SIZE is multiple of page size
+		VirtualAlloc(b.values, BUCKET_SIZE, MEM_COMMIT, PAGE_READWRITE);
+		return b;
 	}
 
-	void merge(Array<T>& out) const
+	void end(const Bucket& bucket)
 	{
-		int c = 0;
-		for(Bucket* b : buckets) {
-			c += b->count;
-		}
-		out.resize(c);
+		const int bucket_idx = int(((u8*)bucket.values - m_mem) / BUCKET_SIZE);
+		MT::SpinLock lock(m_mutex);
+		m_counts[bucket_idx] = bucket.count;
+	}
 
-		int offset = 0;
-		for(Bucket* b : buckets) {
-			memcpy(out.begin() + offset, b->values, sizeof(T) * b->count);
-			offset += b->count;
+	void merge()
+	{
+		int b = 0, e = int((m_end - m_mem) / BUCKET_SIZE) - 1;
+		if (m_end == m_mem) return;
+
+		for(;;) {
+			while (b != e && m_counts[b] == MAX_COUNT) { 
+				++b;  
+			}
+			if (b == e) {
+				for(int i = 0; i <= e; ++i) m_total_count += m_counts[i];
+				break;
+			}
+			
+			const int s = Math::minimum(m_counts[e], MAX_COUNT - m_counts[b]);
+			memcpy(&m_mem[b * BUCKET_SIZE + m_counts[b] * sizeof(T)], &m_mem[e * BUCKET_SIZE + (m_counts[e] - s) * sizeof(T)], s * sizeof(T));
+			m_counts[b] += s;
+			m_counts[e] -= s;
+			if (m_counts[e] == 0) --e;
 		}
 	}
 
-	IAllocator& allocator;
-	MT::SpinMutex mutex;
-	Array<Bucket*> buckets;
+	int size() const { return m_total_count; }
+	T* ptr() const { return (T*)m_mem; }
+
+	MT::SpinMutex m_mutex;
+	u8* m_mem;
+	u8* m_end;
+	Array<int> m_counts;
+	int m_total_count = 0;
 };
 
 
@@ -1867,7 +1888,7 @@ struct PipelineImpl final : Pipeline
 
 			u32 histogram[RADIXSORT_HISTOGRAM_SIZE];
 			u16 shift = 0;
-			for (int pass = 0; pass < 5; ++pass) {
+			for (int pass = 0; pass < 6; ++pass) {
 				memset(histogram, 0, sizeof(u32) * RADIXSORT_HISTOGRAM_SIZE);
 
 				bool sorted = true;
@@ -1927,8 +1948,8 @@ struct PipelineImpl final : Pipeline
 				RenderScene* scene = ctx->cmd->m_pipeline->m_scene;
 				const ModelInstance* model_instances = scene->getModelInstances();
 				const u32* renderables = ctx->renderables;
-				MTBucketArray<u64>::Accessor sort_keys = ctx->sort_keys;
-				MTBucketArray<u64>::Accessor subrenderables = ctx->subrenderables;
+				MTBucketArray<u64>::Bucket sort_keys = ctx->sort_keys;
+				MTBucketArray<u64>::Bucket subrenderables = ctx->subrenderables;
 				const Universe::EntityData* entity_data = scene->getUniverse().getEntityData();
 				const DVec3 camera_pos = ctx->camera_pos;
 				for (int i = 0, c = ctx->count; i < c; ++i) {
@@ -1953,10 +1974,12 @@ struct PipelineImpl final : Pipeline
 						default: ASSERT(false); break;
 					}
 				}
+				sort_keys.end();
+				subrenderables.end();
 			}
 
-			MTBucketArray<u64>::Accessor sort_keys;
-			MTBucketArray<u64>::Accessor subrenderables;
+			MTBucketArray<u64>::Bucket sort_keys;
+			MTBucketArray<u64>::Bucket subrenderables;
 			DVec3 camera_pos;
 			u32* renderables;
 			int count;
@@ -2075,6 +2098,8 @@ struct PipelineImpl final : Pipeline
 			}
 			JobSystem::CounterHandle counter = JobSystem::runMany(create_sort_keys.begin(), &CreateSortKeys::execute, create_sort_keys.size(), sizeof(CreateSortKeys));
 			JobSystem::wait(counter);
+			sort_keys.merge();
+			subrenderables.merge();
 		}
 
 
@@ -2091,35 +2116,28 @@ struct PipelineImpl final : Pipeline
 
 			MTBucketArray<u64> sort_keys(m_allocator);
 			MTBucketArray<u64> subrenderables(m_allocator);
-			Array<u64> sort_keys_linear(m_allocator);
-			Array<u64> subrenderables_linear(m_allocator);
 			createSortKeys(renderables, sort_keys, subrenderables);
-			{
-				PROFILE_BLOCK("merge");
-				sort_keys.merge(sort_keys_linear);
-				subrenderables.merge(subrenderables_linear);
-			}
 
-			if (!subrenderables_linear.empty()) {
-				radixSort(sort_keys_linear.begin(), subrenderables_linear.begin(), sort_keys_linear.size());
-				createCommands(subrenderables_linear, sort_keys_linear);
+			if (subrenderables.size() > 0) {
+				radixSort(sort_keys.ptr(), subrenderables.ptr(), sort_keys.size());
+				createCommands(subrenderables.ptr(), sort_keys.ptr(), subrenderables.size());
 			}
 		}
 
 
-		void createCommands(const Array<u64>& renderables, const Array<u64>& sort_keys)
+		void createCommands(u64* renderables, u64* sort_keys, int size)
 		{
 			Array<CreateCommands> create_commands(m_allocator);
-			const int job_count = Math::minimum(renderables.size(), 16);
+			const int job_count = Math::minimum(size, 16);
 			create_commands.reserve(job_count);
 			int offset = 0;
-			const int step = (renderables.size() + job_count - 1) / job_count;
+			const int step = (size + job_count - 1) / job_count;
 			m_cmds.reserve(job_count);
 			for(int i = 0; i < job_count; ++i) {
 				CreateCommands& ctx = create_commands.emplace();
-				ctx.renderables = renderables.begin() + offset;
-				ctx.sort_keys = sort_keys.begin() + offset;
-				ctx.count = Math::minimum(step, renderables.size() - offset);
+				ctx.renderables = renderables + offset;
+				ctx.sort_keys = sort_keys + offset;
+				ctx.count = Math::minimum(step, size - offset);
 				ctx.cmd = this;
 				ctx.camera_pos = m_camera_params.pos;
 				ctx.output = &m_cmds.emplace(m_allocator);

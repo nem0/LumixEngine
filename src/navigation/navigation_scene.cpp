@@ -119,7 +119,7 @@ struct NavigationSceneImpl final : public NavigationScene
 		if (!iter.isValid()) return;
 		if (iter.value().agent < 0) return;
 		const Agent& agent = iter.value();
-		Vec3 pos = m_universe.getPosition(iter.key());
+		const DVec3 pos = m_universe.getPosition(iter.key());
 		const dtCrowdAgent* dt_agent = m_crowd->getAgent(agent.agent);
 		if ((pos - *(Vec3*)dt_agent->npos).squaredLength() > 0.1f)
 		{
