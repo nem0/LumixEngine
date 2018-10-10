@@ -209,13 +209,56 @@ struct WorkerTask : MT::Task
 };
 
 
-static CounterHandle allocateCounter()
+static CounterHandle allocateCounterInternal()
 {
 	const u32 handle = g_system->m_free_queue.back();
 	g_system->m_counter_pool[handle & HANDLE_ID_MASK].value = 1;
 	g_system->m_free_queue.pop();
 
 	return handle;
+}
+
+
+CounterHandle allocateCounter()
+{
+	MT::SpinLock lock(g_system->m_sync);
+	return allocateCounterInternal();
+}
+
+
+void decCounter(CounterHandle handle)
+{
+	Job next_job = {nullptr, nullptr};
+
+	MT::SpinLock lock(g_system->m_sync);
+	
+	const u32 id = handle & HANDLE_ID_MASK;
+	Counter& counter = g_system->m_counter_pool[id];
+	--counter.value;
+	if (counter.value == 0) {
+		next_job = counter.next_job;
+		counter.generation = ((counter.generation + 1) % 0xffff) << 16;
+		counter.next_job.task = nullptr;
+		g_system->m_free_queue.push(id | counter.generation);
+	}
+	if(next_job.task) {
+		g_system->m_work_signal.trigger();
+		g_system->m_job_queue.push(next_job);
+	}
+}
+
+
+void run(CounterHandle counter, void* data, void (*task)(void*))
+{
+	MT::SpinLock lock(g_system->m_sync);
+	g_system->m_work_signal.trigger();
+	const u32 id = counter & HANDLE_ID_MASK;
+	++g_system->m_counter_pool[id].value;
+	Job job;
+	job.data = data;
+	job.task = task;
+	job.counter = counter;
+	g_system->m_job_queue.push(job);
 }
 
 
@@ -239,7 +282,7 @@ CounterHandle runAfter(void* data, void (*task)(void*), CounterHandle counter_ha
 	j.task = task;
 
 	MT::SpinLock lock(g_system->m_sync);
-	j.counter = allocateCounter();
+	j.counter = allocateCounterInternal();
 
 	if (isCounterZero(counter_handle, false)) {
 		g_system->m_work_signal.trigger();
@@ -259,21 +302,7 @@ static void finishJob(const Job& job)
 {
 	if (!isValid(job.counter)) return;
 
-	Job next_job = {nullptr, nullptr};
-	MT::SpinLock lock(g_system->m_sync);
-	const u32 id = job.counter & HANDLE_ID_MASK;
-	Counter& counter = g_system->m_counter_pool[id];
-	--counter.value;
-	if (counter.value == 0) {
-		next_job = counter.next_job;
-		counter.generation = ((counter.generation + 1) % 0xffff) << 16;
-		counter.next_job.task = nullptr;
-		g_system->m_free_queue.push(id | counter.generation);
-	}
-	if(next_job.task) {
-		g_system->m_work_signal.trigger();
-		g_system->m_job_queue.push(next_job);
-	}
+	decCounter(job.counter);
 }
 
 
@@ -366,7 +395,7 @@ CounterHandle runMany(void* data, void (*task)(void*), int count, int stride)
 {
 	MT::SpinLock lock(g_system->m_sync);
 	g_system->m_work_signal.trigger();
-	CounterHandle handle = allocateCounter();
+	CounterHandle handle = allocateCounterInternal();
 	Counter& counter = g_system->m_counter_pool[handle & HANDLE_ID_MASK];
 	counter.value = count;
 	for(int i = 0; i < count; ++i) {
@@ -386,7 +415,7 @@ LUMIX_ENGINE_API CounterHandle mergeCounters(const CounterHandle* counters, int 
 	if (count == 1) return counters[0];
 
 	MT::SpinLock lock(g_system->m_sync);
-	const CounterHandle handle = allocateCounter();
+	const CounterHandle handle = allocateCounterInternal();
 	Counter& counter = g_system->m_counter_pool[handle & HANDLE_ID_MASK];
 	for (int i = 0; i < count; ++i) {
 		const u32 id = counters[i] & HANDLE_ID_MASK;
@@ -417,7 +446,7 @@ CounterHandle run(void* data, void (*task)(void*))
 	Job job;
 	job.data = data;
 	job.task = task;
-	job.counter = allocateCounter();
+	job.counter = allocateCounterInternal();
 	g_system->m_job_queue.push(job);
 	return job.counter;
 }

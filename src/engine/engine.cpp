@@ -443,7 +443,6 @@ public:
 		, m_time_multiplier(1.0f)
 		, m_paused(false)
 		, m_next_frame(false)
-		, m_lifo_allocator(m_allocator, 10 * 1024 * 1024)
 		, m_working_dir(working_dir)
 	{
 		g_log_info.log("Core") << "Creating engine...";
@@ -1541,12 +1540,6 @@ public:
 	}
 
 
-	IAllocator& getLIFOAllocator() override
-	{
-		return m_lifo_allocator;
-	}
-
-
 	void runScript(const char* src, int src_length, const char* path) override
 	{
 		if (luaL_loadbuffer(m_state, src, src_length, path) != 0)
@@ -1571,7 +1564,6 @@ public:
 
 private:
 	IAllocator& m_allocator;
-	LIFOAllocator m_lifo_allocator;
 
 	FS::FileSystem* m_file_system;
 	FS::MemoryFileDevice* m_mem_file_device;

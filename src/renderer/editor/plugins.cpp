@@ -2615,14 +2615,12 @@ struct GizmoPlugin final : public WorldEditor::Plugin
 	{
 		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
 		Universe& universe = scene->getUniverse();
-		Vec3 scale = scene->getDecalScale((EntityRef)cmp.entity);
+		Vec3 half_extents = scene->getDecalHalfExtents((EntityRef)cmp.entity);
 		const RigidTransform tr = universe.getTransform((EntityRef)cmp.entity).getRigidPart();
-		scene->addDebugCube(tr.pos,
-			tr.rot * Vec3(1, 0, 0) * scale.x,
-			tr.rot * Vec3(0, 1, 0) * scale.y,
-			tr.rot * Vec3(0, 0, 1) * scale.z,
-			0xff0000ff,
-			0);
+		const Vec3 x = tr.rot * Vec3(1, 0, 0) * half_extents.x;
+		const Vec3 y = tr.rot * Vec3(0, 1, 0) * half_extents.y;
+		const Vec3 z = tr.rot * Vec3(0, 0, 1) * half_extents.z;
+		scene->addDebugCube(tr.pos, x, y, z, 0xff0000ff, 0);
 	}
 
 

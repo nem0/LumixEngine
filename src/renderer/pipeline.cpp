@@ -1971,6 +1971,10 @@ struct PipelineImpl final : Pipeline
 								subrenderables.push(renderables[i] | ((u64)mesh_idx << 32));
 							}
 							break;
+						case RenderableTypes::DECAL:
+							sort_keys.push(renderables[i]);
+							subrenderables.push(renderables[i]);
+							break;
 						default: ASSERT(false); break;
 					}
 				}
@@ -2069,6 +2073,9 @@ struct PipelineImpl final : Pipeline
 							}
 							break;
 						}
+						case RenderableTypes::DECAL:
+							ASSERT(false);
+							break;
 						default: ASSERT(false); break;
 					}
 				}
@@ -2215,7 +2222,6 @@ struct PipelineImpl final : Pipeline
 								ffr::setIndexBuffer(mesh->index_buffer_handle);
 
 								const Renderer::TransientSlice instance_buffer = m_pipeline->m_renderer.allocTransient(instances_count * sizeof(Vec4) * 2);
-	
 								ffr::update(instance_buffer.buffer, instance_data, instance_buffer.offset, instance_buffer.size);
 								ffr::setInstanceBuffer(instance_decl, instance_buffer.buffer, instance_buffer.offset, mesh->vertex_decl.attributes_count);
 								ffr::drawTrianglesInstanced(0, mesh->indices_count, instances_count);

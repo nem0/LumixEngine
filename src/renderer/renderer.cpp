@@ -353,7 +353,7 @@ static void registerProperties(IAllocator& allocator)
 		component("decal",
 			property("Material", LUMIX_PROP(RenderScene, DecalMaterialPath),
 				ResourceAttribute("Material (*.mat)", Material::TYPE)),
-			property("Scale", LUMIX_PROP(RenderScene, DecalScale), 
+			property("Half extents", LUMIX_PROP(RenderScene, DecalHalfExtents), 
 				MinAttribute(0))
 		),
 		component("terrain",

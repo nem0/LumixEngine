@@ -451,7 +451,7 @@ struct PropertyGridPlugin final : public PropertyGrid::IPlugin
 					editor.executeCommand(cmd);
 				}
 
-				Array<SortedProperty> sorted_props(editor.getEngine().getLIFOAllocator());
+				Array<SortedProperty> sorted_props(allocator);
 				getSortedProperties(sorted_props, *scene, entity, j);
 
 				for (const SortedProperty& sorted_prop : sorted_props)
