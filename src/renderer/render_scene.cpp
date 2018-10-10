@@ -59,7 +59,7 @@ static const ComponentType TEXT_MESH_TYPE = Reflection::getComponentType("text_m
 struct Decal : public DecalInfo
 {
 	EntityRef entity;
-	Vec3 scale;
+	Vec3 half_extents;
 };
 
 
@@ -793,7 +793,7 @@ public:
 	void serializeDecal(ISerializer& serializer, EntityRef entity)
 	{
 		const Decal& decal = m_decals[entity];
-		serializer.write("scale", decal.scale);
+		serializer.write("half_extents", decal.half_extents);
 		serializer.write("material", decal.material ? decal.material->getPath().c_str() : "");
 	}
 
@@ -804,10 +804,12 @@ public:
 		Decal& decal = m_decals.insert(entity);
 		char tmp[MAX_PATH_LENGTH];
 		decal.entity = entity;
-		serializer.read(&decal.scale);
+		serializer.read(&decal.half_extents);
 		serializer.read(tmp, lengthOf(tmp));
 		decal.material = tmp[0] == '\0' ? nullptr : manager.load<Material>(Path(tmp));
 		updateDecalInfo(decal);
+		const DVec3 pos = m_universe.getPosition(entity);
+		m_culling_system->add(entity, (u8)RenderableTypes::DECAL, pos, decal.half_extents.length());
 		m_universe.onComponentCreated(decal.entity, DECAL_TYPE, this);
 	}
 
@@ -1282,11 +1284,13 @@ public:
 			char tmp[MAX_PATH_LENGTH];
 			Decal decal;
 			serializer.read(decal.entity);
-			serializer.read(decal.scale);
+			serializer.read(decal.half_extents);
 			serializer.readString(tmp, lengthOf(tmp));
 			decal.material = tmp[0] == '\0' ? nullptr : manager.load<Material>(Path(tmp));
 			updateDecalInfo(decal);
 			m_decals.insert(decal.entity, decal);
+			const DVec3 pos = m_universe.getPosition(decal.entity);
+			m_culling_system->add(decal.entity, (u8)RenderableTypes::DECAL, pos, decal.half_extents.length());
 			m_universe.onComponentCreated(decal.entity, DECAL_TYPE, this);
 		}
 	}
@@ -1298,7 +1302,7 @@ public:
 		for (auto& decal : m_decals)
 		{
 			serializer.write(decal.entity);
-			serializer.write(decal.scale);
+			serializer.write(decal.half_extents);
 			serializer.writeString(decal.material ? decal.material->getPath().c_str() : "");
 		}
 	}
@@ -1581,6 +1585,7 @@ public:
 
 	void destroyDecal(EntityRef entity)
 	{
+		m_culling_system->remove(entity);
 		m_decals.erase(entity);
 		m_universe.onComponentDestroyed(entity, DECAL_TYPE, this);
 	}
@@ -1727,6 +1732,8 @@ public:
 		if(m_universe.hasComponent(entity, DECAL_TYPE)) {
 			const int decal_idx = m_decals.find(entity);
 			updateDecalInfo(m_decals.at(decal_idx));
+			const DVec3 position = m_universe.getPosition(entity);
+			m_culling_system->setPosition(entity, position);
 		}
 
 		bool was_updating = m_is_updating_attachments;
@@ -1822,30 +1829,18 @@ public:
 	Material* getTerrainMaterial(EntityRef entity) override { return m_terrains[entity]->getMaterial(); }
 
 
-	void setDecalScale(EntityRef entity, const Vec3& value) override
+	void setDecalHalfExtents(EntityRef entity, const Vec3& value) override
 	{
 		Decal& decal = m_decals[entity];
-		decal.scale = value;
+		decal.half_extents = value;
+		m_culling_system->setRadius(entity, value.length());
 		updateDecalInfo(decal);
 	}
 
 
-	Vec3 getDecalScale(EntityRef entity) override
+	Vec3 getDecalHalfExtents(EntityRef entity) override
 	{
-		return m_decals[entity].scale;
-	}
-
-
-	void getDecals(const Frustum& frustum, Array<DecalInfo>& decals) override
-	{
-		/*decals.reserve(m_decals.size());
-		for (const Decal& decal : m_decals)
-		{
-			if (!decal.material || !decal.material->isReady()) continue;
-			if (frustum.isSphereInside(decal.position, decal.radius)) decals.push(decal);
-		}*/
-		// TODO
-		ASSERT(false);
+		return m_decals[entity].half_extents;
 	}
 
 
@@ -3494,16 +3489,8 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 
 	void updateDecalInfo(Decal& decal) const
 	{
-		/*decal.position = m_universe.getPosition(decal.entity);
-		decal.radius = decal.scale.length();
-		decal.mtx = m_universe.getMatrix(decal.entity);
-		decal.mtx.setXVector(decal.mtx.getXVector() * decal.scale.x);
-		decal.mtx.setYVector(decal.mtx.getYVector() * decal.scale.y);
-		decal.mtx.setZVector(decal.mtx.getZVector() * decal.scale.z);
-		decal.inv_mtx = decal.mtx;
-		decal.inv_mtx.inverse();*/
-		// TODO
-		ASSERT(false);
+		decal.radius = decal.half_extents.length();
+		decal.transform = m_universe.getTransform(decal.entity);
 	}
 
 
@@ -3512,8 +3499,10 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		Decal& decal = m_decals.insert(entity);
 		decal.material = nullptr;
 		decal.entity = entity;
-		decal.scale.set(1, 1, 1);
+		decal.half_extents.set(1, 1, 1);
 		updateDecalInfo(decal);
+		const DVec3 pos = m_universe.getPosition(entity);
+		m_culling_system->add(entity, (u8)RenderableTypes::DECAL, pos, decal.half_extents.length());
 
 		m_universe.onComponentCreated(entity, DECAL_TYPE, this);
 	}

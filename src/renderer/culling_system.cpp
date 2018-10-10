@@ -7,6 +7,7 @@
 #include "engine/math_utils.h"
 #include "engine/profiler.h"
 #include "engine/simd.h"
+#include <cstring>
 
 namespace Lumix
 {
@@ -262,6 +263,40 @@ struct CullingSystemImpl final : public CullingSystem
 		m_big_object_cell.ids.clear();
 	}
 
+	static void pushWhole(Cell* cell, uint buckets_count, int counter, Results& result)
+	{
+		PROFILE_FUNCTION();
+		if(cell->ids.size() < int(buckets_count * 128)) {
+			Subresults& subresult = result[counter];
+			const int old_size = result[counter].size();
+			subresult.resize(result[counter].size() + cell->ids.size());
+			memcpy(subresult.begin() + old_size, cell->ids.begin(), cell->ids.byte_size());
+			return;
+		}
+		JobSystem::CounterHandle job_counter = JobSystem::allocateCounter();
+		struct Job {
+			void* src;
+			void* dst;
+			int size;
+		};
+		Job* jobs = (Job*)alloca(buckets_count * sizeof(Job));
+		const int per_bucket = (cell->ids.size() + buckets_count - 1) / buckets_count;
+		for (uint b = 0; b < buckets_count; ++b) {
+			const int size = Math::minimum(per_bucket, cell->ids.size() - b * per_bucket);;
+			const int old_size = result[b].size();
+			result[b].resize(result[b].size() + size);
+			jobs[b].dst = &result[b][old_size]; 
+			jobs[b].src = &cell->ids[b * per_bucket];
+			jobs[b].size = size * sizeof(cell->ids[0]);
+			JobSystem::run(job_counter, &jobs[b], [](void* data){
+				Job* j = (Job*)data;
+				memcpy(j->dst, j->src, j->size);
+			});
+		}
+		JobSystem::decCounter(job_counter);
+		JobSystem::wait(job_counter);
+	}
+
 	void cull(const ShiftedFrustum& frustum, Results& result) override
 	{
 		PROFILE_FUNCTION();
@@ -278,16 +313,8 @@ struct CullingSystemImpl final : public CullingSystem
 		uint partial_entities = 0;
 		for (Cell* cell : m_cells) {
 			if (frustum.containsAABB(cell->origin + v3_cell_size, -v3_cell_size)) {
-				for(int i = 0; i < cell->ids.size(); i += 1024) {
-					const int end = Math::minimum(i + 1024, cell->ids.size());
-					const u32* ids = cell->ids.begin();
-					Subresults& subresult = result[counter];
-					subresult.reserve(result[counter].size() + end - i);
-					for(int j = i; j < end; ++j) {
-						subresult.push(ids[j]);
-					}
-					counter = (counter + 1) % buckets_count;
-				}
+				pushWhole(cell, buckets_count, counter, result);
+				counter = (counter + 1) % buckets_count;
 			}
 			else if (frustum.intersectsAABB(cell->origin - v3_cell_size, v3_2_cell_size)) {
 				partial_entities += cell->ids.size();

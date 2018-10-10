@@ -51,8 +51,6 @@ struct TerrainInfo
 
 struct DecalInfo
 {
-	Matrix mtx;
-	Matrix inv_mtx;
 	Material* material;
 	Transform transform;
 	float radius;
@@ -140,7 +138,8 @@ struct DebugPoint
 enum class RenderableTypes : u8 {
 	MESH_GROUP,
 	MESH,
-	SKINNED
+	SKINNED,
+	DECAL,
 };
 
 struct TextMeshVertex
@@ -280,9 +279,8 @@ public:
 
 	virtual void setDecalMaterialPath(EntityRef entity, const Path& path) = 0;
 	virtual Path getDecalMaterialPath(EntityRef entity) = 0;
-	virtual void setDecalScale(EntityRef entity, const Vec3& value) = 0;
-	virtual Vec3 getDecalScale(EntityRef entity) = 0;
-	virtual void getDecals(const Frustum& frustum, Array<DecalInfo>& decals) = 0;
+	virtual void setDecalHalfExtents(EntityRef entity, const Vec3& value) = 0;
+	virtual Vec3 getDecalHalfExtents(EntityRef entity) = 0;
 
 	virtual void getGrassInfos(const Frustum& frustum,
 		EntityRef entity,

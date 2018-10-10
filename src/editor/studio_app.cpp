@@ -2382,15 +2382,15 @@ public:
 
 		if (file.open(path, FS::Mode::OPEN_AND_READ))
 		{
-			auto size = file.size();
-			auto* src = (char*)m_engine->getLIFOAllocator().allocate(size + 1);
-			file.read(src, size);
+			const int size = (int)file.size();
+			Array<u8> src(m_engine->getAllocator());
+			src.resize(size + 1);
+			file.read(src.begin(), size);
 			src[size] = 0;
 			
-			LuaPlugin* plugin = LUMIX_NEW(m_editor->getAllocator(), LuaPlugin)(*this, src, filename);
+			LuaPlugin* plugin = LUMIX_NEW(m_editor->getAllocator(), LuaPlugin)(*this, (const char*)src.begin(), filename);
 			addPlugin(*plugin);
 
-			m_engine->getLIFOAllocator().deallocate(src);
 			file.close();
 		}
 		else

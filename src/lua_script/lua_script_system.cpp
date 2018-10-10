@@ -126,8 +126,8 @@ namespace Lumix
 				lua_rawgeti(L, LUA_REGISTRYINDEX, inst.m_environment); // [env]
 				ASSERT(lua_type(L, -1) == LUA_TTABLE);
 				lua_pushnil(L); // [env, nil]
-				auto& allocator = m_scene.m_system.m_allocator;
-				BinaryArray valid_properties(m_scene.m_system.m_engine.getLIFOAllocator());
+				IAllocator& allocator = m_scene.m_system.m_allocator;
+				BinaryArray valid_properties(allocator);
 				valid_properties.resize(inst.m_properties.size());
 				valid_properties.setAllZeros();
 
