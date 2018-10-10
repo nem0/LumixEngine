@@ -961,7 +961,10 @@ int RenderTask::task()
 	
 		PROFILE_BLOCK("executeCommand");
 		cmd->execute();
-		LUMIX_DELETE(m_renderer.getAllocator(), cmd);
+		{
+			PROFILE_BLOCK("executeCommand - free");
+			LUMIX_DELETE(m_renderer.getAllocator(), cmd);
+		}
 	}
 	ffr::destroy(m_transient_buffer);
 	m_profiler.clear();
