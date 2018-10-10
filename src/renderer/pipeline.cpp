@@ -1995,7 +1995,7 @@ struct PipelineImpl final : Pipeline
 				CreateCommands* ctx = (CreateCommands*)data;
 				PROFILE_INT("num", ctx->count);
 				const Universe& universe = ctx->cmd->m_pipeline->m_scene->getUniverse();
-				ctx->output->resize(ctx->count * (sizeof(RenderableTypes) + sizeof(Matrix) + sizeof(Mesh*) + sizeof(Material) + sizeof(u16)));
+				ctx->output->resize(ctx->count * (sizeof(RenderableTypes) + sizeof(Quat) + sizeof(float) + sizeof(Vec3) + sizeof(Mesh*) + sizeof(Material) + sizeof(u16)));
 				u8* out = ctx->output->begin();
 				const u64* LUMIX_RESTRICT renderables = ctx->renderables;
 				const u64* LUMIX_RESTRICT sort_keys = ctx->sort_keys;
@@ -2023,11 +2023,13 @@ struct PipelineImpl final : Pipeline
 							while (i < c && sort_keys[i] == key) {
 								const EntityRef e = {int(renderables[i] & 0x00ffFFff)};
 								const Transform& tr = entity_data[e.index].transform;
-								Matrix mtx = tr.rot.toMatrix();
-								mtx.multiply3x3(tr.scale);
-								mtx.setTranslation((tr.pos - camera_pos).toFloat());
-								memcpy(out, &mtx, sizeof(mtx));
-								out += sizeof(mtx);
+								const Vec3 lpos = (tr.pos - camera_pos).toFloat();
+								memcpy(out, &tr.rot, sizeof(tr.rot));
+								out += sizeof(tr.rot);
+								memcpy(out, &lpos, sizeof(lpos));
+								out += sizeof(lpos);
+								memcpy(out, &tr.scale, sizeof(tr.scale));
+								out += sizeof(tr.scale);
 								++i;
 							}
 							*instance_count = u16(i - start_i);
@@ -2162,8 +2164,6 @@ struct PipelineImpl final : Pipeline
 			ffr::VertexDecl instance_decl;
 			instance_decl.addAttribute(4, ffr::AttributeType::FLOAT, false, false);
 			instance_decl.addAttribute(4, ffr::AttributeType::FLOAT, false, false);
-			instance_decl.addAttribute(4, ffr::AttributeType::FLOAT, false, false);
-			instance_decl.addAttribute(4, ffr::AttributeType::FLOAT, false, false);
 
 			Renderer& renderer = m_pipeline->m_renderer;
 
@@ -2187,8 +2187,8 @@ struct PipelineImpl final : Pipeline
 							cmd += sizeof(mesh);
 							const u16 instances_count = *(u16*)cmd;
 							cmd += sizeof(instances_count);
-							const float* matrices = (const float*)cmd;
-							cmd += sizeof(Matrix) * instances_count;
+							const float* instance_data = (const float*)cmd;
+							cmd += sizeof(Vec4) * 2 * instances_count;
 
 							ShaderRenderData* shader = material->shader;
 							for (int i = 0; i < material->textures_count; ++i) {
@@ -2214,9 +2214,9 @@ struct PipelineImpl final : Pipeline
 								ffr::setVertexBuffer(&mesh->vertex_decl, mesh->vertex_buffer_handle, 0, prog.use_semantics ? attribute_map : nullptr);
 								ffr::setIndexBuffer(mesh->index_buffer_handle);
 
-								const Renderer::TransientSlice instance_buffer = m_pipeline->m_renderer.allocTransient(instances_count * sizeof(Matrix));
+								const Renderer::TransientSlice instance_buffer = m_pipeline->m_renderer.allocTransient(instances_count * sizeof(Vec4) * 2);
 	
-								ffr::update(instance_buffer.buffer, matrices, instance_buffer.offset, instance_buffer.size);
+								ffr::update(instance_buffer.buffer, instance_data, instance_buffer.offset, instance_buffer.size);
 								ffr::setInstanceBuffer(instance_decl, instance_buffer.buffer, instance_buffer.offset, mesh->vertex_decl.attributes_count);
 								ffr::drawTrianglesInstanced(0, mesh->indices_count, instances_count);
 							}
