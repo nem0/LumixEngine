@@ -391,24 +391,6 @@ void shutdown()
 }
 
 
-CounterHandle runMany(void* data, void (*task)(void*), int count, int stride)
-{
-	MT::SpinLock lock(g_system->m_sync);
-	g_system->m_work_signal.trigger();
-	CounterHandle handle = allocateCounterInternal();
-	Counter& counter = g_system->m_counter_pool[handle & HANDLE_ID_MASK];
-	counter.value = count;
-	for(int i = 0; i < count; ++i) {
-		Job job;
-		job.data = (u8*)data + i * stride;
-		job.task = task;
-		job.counter = handle;
-		g_system->m_job_queue.push(job);
-	}
-	return handle;
-}
-
-
 LUMIX_ENGINE_API CounterHandle mergeCounters(const CounterHandle* counters, int count)
 {
 	ASSERT(count > 0);

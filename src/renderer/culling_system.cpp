@@ -377,6 +377,7 @@ struct CullingSystemImpl final : public CullingSystem
 		jobs.reserve(Math::minimum(buckets_count, partial_entities));
 		PROFILE_INT("jobs", jobs.capacity());
 		if (jobs.capacity() > 0) {
+			JobSystem::CounterHandle counter = JobSystem::allocateCounter();
 			const uint step = (partial_entities + jobs.capacity() - 1) / jobs.capacity();
 			Cell** cell_iter = partial.begin();
 			uint entity_offset = 0;
@@ -400,8 +401,9 @@ struct CullingSystemImpl final : public CullingSystem
 				}
 				job.entity_end_offset = Math::minimum(job.entity_end_offset, (*job.cells_end)->ids.size() - 1);
 				job.frustum = frustum;
+				JobSystem::run(counter, &job, &Job::execute);
 			}
-			JobSystem::CounterHandle counter = JobSystem::runMany(jobs.begin(), &Job::execute, jobs.size(), sizeof(Job));
+			JobSystem::decCounter(counter);
 			JobSystem::wait(counter);
 		}
 	}

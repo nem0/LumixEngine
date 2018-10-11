@@ -2095,6 +2095,7 @@ struct PipelineImpl final : Pipeline
 		{
 			Array<CreateSortKeys> create_sort_keys(m_allocator);
 			create_sort_keys.reserve(renderables.size());
+			JobSystem::CounterHandle counter = JobSystem::allocateCounter();
 			for(int i = 0; i < renderables.size(); ++i) {
 				if (renderables[i].empty()) continue;
 				CreateSortKeys& ctx = create_sort_keys.emplace();
@@ -2104,8 +2105,9 @@ struct PipelineImpl final : Pipeline
 				ctx.count = renderables[i].size();
 				ctx.camera_pos = m_pipeline->m_viewport.pos;
 				ctx.cmd = this;
+				JobSystem::run(counter, &ctx, &CreateSortKeys::execute);
 			}
-			JobSystem::CounterHandle counter = JobSystem::runMany(create_sort_keys.begin(), &CreateSortKeys::execute, create_sort_keys.size(), sizeof(CreateSortKeys));
+			JobSystem::decCounter(counter);
 			JobSystem::wait(counter);
 			sort_keys.merge();
 			subrenderables.merge();
@@ -2142,6 +2144,7 @@ struct PipelineImpl final : Pipeline
 			int offset = 0;
 			const int step = (size + job_count - 1) / job_count;
 			m_cmds.reserve(job_count);
+			JobSystem::CounterHandle counter = JobSystem::allocateCounter();
 			for(int i = 0; i < job_count; ++i) {
 				CreateCommands& ctx = create_commands.emplace();
 				ctx.renderables = renderables + offset;
@@ -2151,8 +2154,9 @@ struct PipelineImpl final : Pipeline
 				ctx.camera_pos = m_camera_params.pos;
 				ctx.output = &m_cmds.emplace(m_allocator);
 				offset += step;
+				JobSystem::run(counter, &ctx, &CreateCommands::execute);
 			}
-			JobSystem::CounterHandle counter = JobSystem::runMany(create_commands.begin(), &CreateCommands::execute, create_commands.size(), sizeof(CreateCommands));
+			JobSystem::decCounter(counter);
 			JobSystem::wait(counter);
 		}
 
