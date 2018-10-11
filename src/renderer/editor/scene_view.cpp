@@ -181,7 +181,7 @@ void SceneView::update(float)
 
 void SceneView::renderIcons()
 {
-	struct Cmd : Renderer::RenderCommandBase
+	struct Cmd : Renderer::RenderJob
 	{
 		Cmd(IAllocator& allocator)
 			: data(allocator)
@@ -242,7 +242,7 @@ void SceneView::renderSelection()
 
 void SceneView::renderGizmos()
 {
-	struct Cmd : Renderer::RenderCommandBase
+	struct Cmd : Renderer::RenderJob
 	{
 		Cmd(IAllocator& allocator)
 			: data(allocator)

@@ -189,10 +189,10 @@ struct RenderTask : MT::Task
 	
 	struct PreparedCommand
 	{
-		Renderer::RenderCommandBase* cmd;
+		Renderer::RenderJob* cmd;
 		Renderer::MemRef data;
 	};
-	MT::LockFreeFixedQueue<Renderer::RenderCommandBase*, 256> m_commands;
+	MT::LockFreeFixedQueue<Renderer::RenderJob*, 256> m_commands;
 	GPUProfiler m_profiler;
 };
 
@@ -502,7 +502,7 @@ struct RendererImpl final : public Renderer
 
 	void getTextureImage(ffr::TextureHandle texture, int size, void* data) override
 	{
-		struct Cmd : RenderCommandBase {
+		struct Cmd : RenderJob {
 			void setup() override {}
 			void execute() override {
 				ffr::pushDebugGroup("get image data");
@@ -535,7 +535,7 @@ struct RendererImpl final : public Renderer
 			*info = tmp_info;
 		}
 
-		struct Cmd : RenderCommandBase {
+		struct Cmd : RenderJob {
 			void setup() override {}
 			void execute() override {
 				ffr::loadTexture(handle, memory.data, memory.size, flags);
@@ -578,7 +578,7 @@ struct RendererImpl final : public Renderer
 		ffr::BufferHandle handle = ffr::allocBufferHandle();
 		if(!handle.isValid()) return handle;
 
-		struct Cmd : RenderCommandBase {
+		struct Cmd : RenderJob {
 			void setup() override {}
 			void execute() override {
 				ffr::createBuffer(handle, memory.size, memory.data);
@@ -605,7 +605,7 @@ struct RendererImpl final : public Renderer
 
 	void runInRenderThread(void* user_ptr, void (*fnc)(Renderer& renderer, void*)) override
 	{
-		struct Cmd : RenderCommandBase {
+		struct Cmd : RenderJob {
 			void setup() override {}
 			void execute() override { fnc(*renderer, ptr); }
 
@@ -625,7 +625,7 @@ struct RendererImpl final : public Renderer
 	
 	void destroy(ffr::ProgramHandle program) override
 	{
-		struct Cmd : RenderCommandBase {
+		struct Cmd : RenderJob {
 			void setup() override {}
 			void execute() override { ffr::destroy(program); }
 
@@ -642,7 +642,7 @@ struct RendererImpl final : public Renderer
 
 	void destroy(ffr::BufferHandle buffer) override
 	{
-		struct Cmd : RenderCommandBase {
+		struct Cmd : RenderJob {
 			void setup() override {}
 			void execute() override { ffr::destroy(buffer); }
 
@@ -662,7 +662,7 @@ struct RendererImpl final : public Renderer
 		ffr::TextureHandle handle = ffr::allocTextureHandle();
 		if(!handle.isValid()) return handle;
 
-		struct Cmd : RenderCommandBase {
+		struct Cmd : RenderJob {
 			void setup() override {}
 			void execute() override
 			{
@@ -697,7 +697,7 @@ struct RendererImpl final : public Renderer
 
 	void destroy(ffr::TextureHandle tex)
 	{
-		struct Cmd : RenderCommandBase {
+		struct Cmd : RenderJob {
 			void setup() override {}
 			void execute() override { ffr::destroy(texture); }
 
@@ -711,23 +711,23 @@ struct RendererImpl final : public Renderer
 		push(cmd);
 	}
 
-	struct RenderCommandSetupJobData {
-		RenderCommandBase* cmd;
+	struct RenderJobSetupData {
+		RenderJob* cmd;
 		JobSystem::CounterHandle prev;
 		RendererImpl* renderer;
 	};
 
 
-	void push(RenderCommandBase* cmd) override
+	void push(RenderJob* cmd) override
 	{
-		RenderCommandSetupJobData* data = LUMIX_NEW(m_allocator, RenderCommandSetupJobData);
+		RenderJobSetupData* data = LUMIX_NEW(m_allocator, RenderJobSetupData);
 		data->cmd = cmd;
 		data->prev = m_last_exec_job;
 		data->renderer = this;
 
 		JobSystem::CounterHandle setup_counter = JobSystem::run(data, [](void* data){
-			RenderCommandSetupJobData* job_data = (RenderCommandSetupJobData*)data;
-			RenderCommandBase* cmd = job_data->cmd;
+			RenderJobSetupData* job_data = (RenderJobSetupData*)data;
+			RenderJob* cmd = job_data->cmd;
 
 			PROFILE_BLOCK("setup command");
 			cmd->setup();
@@ -739,11 +739,11 @@ struct RendererImpl final : public Renderer
 			: setup_counter;
 
 		JobSystem::CounterHandle exec_counter = JobSystem::runAfter(data, [](void* data){
-			RenderCommandSetupJobData* job_data = (RenderCommandSetupJobData*)data;
-			RenderCommandBase* cmd = job_data->cmd;
+			RenderJobSetupData* job_data = (RenderJobSetupData*)data;
+			RenderJob* cmd = job_data->cmd;
 			RendererImpl* renderer = job_data->renderer;
 
-			Renderer::RenderCommandBase** rt_cmd = renderer->m_render_task.m_commands.alloc(true);
+			Renderer::RenderJob** rt_cmd = renderer->m_render_task.m_commands.alloc(true);
 			*rt_cmd = cmd;
 			renderer->m_render_task.m_commands.push(rt_cmd, true);
 			LUMIX_DELETE(renderer->m_allocator, job_data);
@@ -832,7 +832,7 @@ struct RendererImpl final : public Renderer
 
 	void pushSetGlobalStateCommand()
 	{
-		struct Cmd : RenderCommandBase {
+		struct Cmd : RenderJob {
 			void setup() override {}
 			void execute() override { 
 				ffr::update(renderer->m_render_task.m_global_state_uniforms, &state, 0, sizeof(state));
@@ -849,7 +849,7 @@ struct RendererImpl final : public Renderer
 
 	void startCapture() override
 	{
-		struct Cmd : RenderCommandBase {
+		struct Cmd : RenderJob {
 			void setup() override {}
 			void execute() override { 
 				PROFILE_FUNCTION();
@@ -863,7 +863,7 @@ struct RendererImpl final : public Renderer
 
 	void stopCapture() override
 	{
-		struct Cmd : RenderCommandBase {
+		struct Cmd : RenderJob {
 			void setup() override {}
 			void execute() override { 
 				PROFILE_FUNCTION();
@@ -877,7 +877,7 @@ struct RendererImpl final : public Renderer
 
 	void pushSwapCommand()
 	{
-		struct SwapCmd : RenderCommandBase {
+		struct SwapCmd : RenderJob {
 			void setup() override {}
 			void execute() override { 
 				PROFILE_FUNCTION();
@@ -951,10 +951,10 @@ int RenderTask::task()
 	m_transient_buffer_offset = 0;
 	ffr::createBuffer(m_transient_buffer, TRANSIENT_BUFFER_SIZE, nullptr);
 	while (!m_shutdown_requested || !m_commands.isEmpty()) {
-		Renderer::RenderCommandBase* cmd = nullptr;
+		Renderer::RenderJob* cmd = nullptr;
 		{
 			PROFILE_BLOCK_COLORED("wait for cmd", 0xff, 0, 0);
-			Renderer::RenderCommandBase** rt_cmd = m_commands.pop(true);
+			Renderer::RenderJob** rt_cmd = m_commands.pop(true);
 			cmd = *rt_cmd;
 			m_commands.dealoc(rt_cmd);
 		}
