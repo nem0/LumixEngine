@@ -140,6 +140,8 @@ enum class RenderableTypes : u8 {
 	MESH,
 	SKINNED,
 	DECAL,
+
+	COUNT
 };
 
 struct TextMeshVertex

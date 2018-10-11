@@ -1027,7 +1027,7 @@ bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK); renderer->viewCounterAdd();
 		m_tile.pipeline->setViewport(viewport);
 		m_tile.pipeline->render();
 
-		struct Cmd : Renderer::RenderCommandBase
+		struct Cmd : Renderer::RenderJob
 		{
 			void setup() override {}
 			void execute() override
@@ -2228,7 +2228,7 @@ struct RenderStatsPlugin final : public StudioApp::GUIPlugin
 
 struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 {
-	struct RenderCommand : Renderer::RenderCommandBase
+	struct RenderCommand : Renderer::RenderJob
 	{
 		struct CmdList
 		{

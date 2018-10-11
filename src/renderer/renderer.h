@@ -36,9 +36,9 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 			bool own = false;
 		};
 
-		struct RenderCommandBase
+		struct RenderJob
 		{
-			virtual ~RenderCommandBase() {}
+			virtual ~RenderJob() {}
 			virtual void setup() = 0;
 			virtual void execute() = 0;
 		};
@@ -113,7 +113,7 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 		virtual void getTextureImage(ffr::TextureHandle texture, int size, void* data) = 0;
 		virtual void destroy(ffr::TextureHandle tex) = 0;
 		
-		virtual void push(RenderCommandBase* cmd) = 0;
+		virtual void push(RenderJob* cmd) = 0;
 		virtual ffr::FramebufferHandle getFramebuffer() const = 0;
 
 		virtual bool getGPUTimings(Array<GPUProfilerQuery>* results) = 0;
