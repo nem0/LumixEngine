@@ -9,7 +9,6 @@ end
 
 local LOCATION = "tmp/" .. ide_dir
 local BINARY_DIR = LOCATION .. "/bin/"
-local build_unit_tests = false
 local build_app = true
 local build_studio = true
 local build_game = false
@@ -173,9 +172,6 @@ if _OPTIONS["no-studio"] then
 	build_studio = false
 end
 
-if _OPTIONS["with-unit-tests"] then
-	build_unit_tests = true
-end
 
 if _OPTIONS["no-app"] then
 	build_app = false
@@ -720,25 +716,6 @@ if has_plugin("lua_script") then
 		useLua()
 		defaultConfigurations()
 end
-		
-if build_unit_tests then
-	project "unit_tests"
-		kind "ConsoleApp"
-		debugdir "../../LumixEngine_data"
-
-		files { "../src/unit_tests/**.h", "../src/unit_tests/**.cpp" }
-		includedirs { "../src", "../src/unit_tests" }
-		links { "animation", "engine", "renderer" }
-		if _OPTIONS["static-plugins"] then	
-			configuration { "vs*" }
-				links { "winmm", "psapi" }
-			configuration {} 
-		end
-
-		useLua()
-		defaultConfigurations()
-end
-
 
 if build_app then
 	project "app"
