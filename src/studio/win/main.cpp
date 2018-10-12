@@ -2,8 +2,6 @@
 #include <Winuser.h>
 #include <ShellScalingAPI.h>
 #include "editor/studio_app.h"
-#define MF_RESOURCE_DONT_INCLUDE_WINDOWS_H
-#include "stb/mf_resource.h"
 
 INT WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, INT)
 {
