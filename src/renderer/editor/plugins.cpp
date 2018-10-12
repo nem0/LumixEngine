@@ -69,6 +69,44 @@ static const ComponentType TEXT_MESH_TYPE = Reflection::getComponentType("text_m
 static const ComponentType ENVIRONMENT_PROBE_TYPE = Reflection::getComponentType("environment_probe");
 
 
+static bool saveAsDDS(const char* path, const u8* image_data, int image_width, int image_height)
+{
+	ASSERT(image_data);
+
+	crn_uint32 size;
+	crn_comp_params comp_params;
+	comp_params.m_file_type = cCRNFileTypeDDS;
+	comp_params.m_quality_level = cCRNMaxQualityLevel;
+	comp_params.m_dxt_quality = cCRNDXTQualityNormal;
+	comp_params.m_dxt_compressor_type = cCRNDXTCompressorCRN;
+	comp_params.m_pProgress_func = nullptr;
+	comp_params.m_pProgress_func_data = nullptr;
+	comp_params.m_num_helper_threads = 3;
+	comp_params.m_width = image_width;
+	comp_params.m_height = image_height;
+	comp_params.m_format = cCRNFmtDXT5;
+	comp_params.m_pImages[0][0] = (u32*)image_data;
+	crn_mipmap_params mipmap_params;
+	mipmap_params.m_mode = cCRNMipModeGenerateMips;
+
+	void* data = crn_compress(comp_params, mipmap_params, size);
+	if (!data) return false;
+
+	FS::OsFile file;
+	if (file.open(path, FS::Mode::CREATE_AND_WRITE))
+	{
+		file.write(data, size);
+		file.close();
+		crn_free_block(data);
+		return true;
+	}
+
+	crn_free_block(data);
+	return false;
+}
+
+
+
 struct FontPlugin final : public AssetBrowser::IPlugin
 {
 	FontPlugin(StudioApp& app) { app.getAssetBrowser().registerExtension("ttf", FontResource::TYPE); }
@@ -409,11 +447,9 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		, m_universe(nullptr)
 		, m_is_mouse_captured(false)
 		, m_tile(app.getWorldEditor().getAllocator())
-		, m_texture_tile_creator(app.getWorldEditor().getAllocator())
 		, m_fbx_importer(app.getWorldEditor().getAllocator())
 	{
 		app.getAssetBrowser().registerExtension("fbx", Model::TYPE);
-		JobSystem::run(this, [](void* data) { ((ModelPlugin*)data)->createTextureTileTask(); });
 		createPreviewUniverse();
 		createTileUniverse();
 		m_viewport.is_ortho = false;
@@ -425,9 +461,6 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 	~ModelPlugin()
 	{
-		m_texture_tile_creator.shutdown = true;
-		m_texture_tile_creator.count = 0;
-		m_texture_tile_creator.shutdown_event.wait();
 		auto& engine = m_app.getWorldEditor().getEngine();
 		engine.destroyUniverse(*m_universe);
 		Pipeline::destroy(m_pipeline);
@@ -471,92 +504,6 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 		copyFile(src.c_str(), dst);
 		return true;
-	}
-
-
-	void createTextureTileTask()
-	{
-		/*while (!m_texture_tile_creator.shutdown)
-		{
-			JobSystem::wait(&m_texture_tile_creator.count);
-			if (m_texture_tile_creator.shutdown) break;
-			MT::SpinLock lock(m_texture_tile_creator.lock);
-
-			StaticString<MAX_PATH_LENGTH> tile = m_texture_tile_creator.tiles.back();
-			m_texture_tile_creator.tiles.pop();
-			MT::atomicIncrement(&m_texture_tile_creator.count);
-
-			IAllocator& allocator = m_app.getWorldEditor().getAllocator();
-
-			int image_width, image_height;
-			u32 hash = crc32(tile);
-			StaticString<MAX_PATH_LENGTH> out_path(".lumix/asset_tiles/", hash, ".dds");
-			Array<u8> resized_data(allocator);
-			resized_data.resize(AssetBrowser::TILE_SIZE * AssetBrowser::TILE_SIZE * 4);
-			if (PathUtils::hasExtension(tile, "dds"))
-			{
-				FS::OsFile file;
-				if (!file.open(tile, FS::Mode::OPEN_AND_READ))
-				{
-					copyFile("models/editor/tile_texture.dds", out_path);
-					g_log_error.log("Editor") << "Failed to load " << tile;
-					continue;
-				}
-				Array<u8> data(allocator);
-				data.resize((int)file.size());
-				file.read(&data[0], data.size());
-				file.close();
-
-				crn_uint32* raw_img[cCRNMaxFaces * cCRNMaxLevels];
-				crn_texture_desc desc;
-				bool success = crn_decompress_dds_to_images(&data[0], data.size(), raw_img, desc);
-				if (!success)
-				{
-					copyFile("models/editor/tile_texture.dds", out_path);
-					continue;
-				}
-				image_width = desc.m_width;
-				image_height = desc.m_height;
-				stbir_resize_uint8((u8*)raw_img[0],
-					image_width,
-					image_height,
-					0,
-					&resized_data[0],
-					AssetBrowser::TILE_SIZE,
-					AssetBrowser::TILE_SIZE,
-					0,
-					4);
-				crn_free_all_images(raw_img, desc);
-			}
-			else
-			{
-				int image_comp;
-				auto data = stbi_load(tile, &image_width, &image_height, &image_comp, 4);
-				if (!data)
-				{
-					g_log_error.log("Editor") << "Failed to load " << tile;
-					copyFile("models/editor/tile_texture.dds", out_path);
-					continue;
-				}
-				stbir_resize_uint8(data,
-					image_width,
-					image_height,
-					0,
-					&resized_data[0],
-					AssetBrowser::TILE_SIZE,
-					AssetBrowser::TILE_SIZE,
-					0,
-					4);
-				stbi_image_free(data);
-			}
-
-			if (!saveAsDDS(out_path, &resized_data[0], AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE))
-			{
-				g_log_error.log("Editor") << "Failed to save " << out_path;
-			}
-		}
-		m_texture_tile_creator.shutdown_event.trigger();*/
-		// TODO
 	}
 
 
@@ -812,43 +759,6 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	ResourceType getResourceType() const override { return Model::TYPE; }
 
 
-	bool saveAsDDS(const char* path, const u8* image_data, int image_width, int image_height) const
-	{
-		ASSERT(image_data);
-
-		crn_uint32 size;
-		crn_comp_params comp_params;
-		comp_params.m_file_type = cCRNFileTypeDDS;
-		comp_params.m_quality_level = cCRNMaxQualityLevel;
-		comp_params.m_dxt_quality = cCRNDXTQualityNormal;
-		comp_params.m_dxt_compressor_type = cCRNDXTCompressorCRN;
-		comp_params.m_pProgress_func = nullptr;
-		comp_params.m_pProgress_func_data = nullptr;
-		comp_params.m_num_helper_threads = 3;
-		comp_params.m_width = image_width;
-		comp_params.m_height = image_height;
-		comp_params.m_format = cCRNFmtDXT5;
-		comp_params.m_pImages[0][0] = (u32*)image_data;
-		crn_mipmap_params mipmap_params;
-		mipmap_params.m_mode = cCRNMipModeGenerateMips;
-
-		void* data = crn_compress(comp_params, mipmap_params, size);
-		if (!data) return false;
-
-		FS::OsFile file;
-		if (file.open(path, FS::Mode::CREATE_AND_WRITE))
-		{
-			file.write(data, size);
-			file.close();
-			crn_free_block(data);
-			return true;
-		}
-
-		crn_free_block(data);
-		return false;
-	}
-
-
 	void pushTileQueue(const Path& path)
 	{
 		ASSERT(!m_tile.queue.full());
@@ -1058,12 +968,6 @@ bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK); renderer->viewCounterAdd();
 
 	bool createTile(const char* in_path, const char* out_path, ResourceType type) override
 	{
-		if (type == Texture::TYPE) {
-			MT::SpinLock lock(m_texture_tile_creator.lock);
-			m_texture_tile_creator.tiles.emplace(in_path);
-			MT::atomicDecrement(&m_texture_tile_creator.count);
-			return true;
-		}
 		if (type == Material::TYPE) return copyFile("models/editor/tile_material.dds", out_path);
 		if (type == Shader::TYPE) return copyFile("models/editor/tile_shader.dds", out_path);
 
@@ -1113,24 +1017,6 @@ bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK); renderer->viewCounterAdd();
 	int m_captured_mouse_x;
 	int m_captured_mouse_y;
 	FBXImporter m_fbx_importer;
-
-
-	struct TextureTileCreator
-	{
-		explicit TextureTileCreator(IAllocator& allocator)
-			: tiles(allocator)
-			, lock(false)
-			, shutdown_event(true)
-		{
-			shutdown_event.reset();
-		}
-
-		volatile int count = 1;
-		volatile bool shutdown = false;
-		MT::Event shutdown_event;
-		MT::SpinMutex lock;
-		Array<StaticString<MAX_PATH_LENGTH>> tiles;
-	} m_texture_tile_creator;
 };
 
 
@@ -1154,6 +1040,107 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		app.getAssetBrowser().registerExtension("tga", Texture::TYPE);
 		app.getAssetBrowser().registerExtension("dds", Texture::TYPE);
 		app.getAssetBrowser().registerExtension("raw", Texture::TYPE);
+	}
+
+
+	struct TextureTileJob
+	{
+		TextureTileJob(IAllocator& allocator) : m_allocator(allocator) {}
+
+		void execute() {
+			IAllocator& allocator = m_allocator;
+
+			int image_width, image_height;
+			u32 hash = crc32(m_in_path);
+			StaticString<MAX_PATH_LENGTH> out_path(".lumix/asset_tiles/", hash, ".dds");
+			Array<u8> resized_data(allocator);
+			resized_data.resize(AssetBrowser::TILE_SIZE * AssetBrowser::TILE_SIZE * 4);
+			if (PathUtils::hasExtension(m_in_path, "dds"))
+			{
+				FS::OsFile file;
+				if (!file.open(m_in_path, FS::Mode::OPEN_AND_READ))
+				{
+					copyFile("models/editor/tile_texture.dds", out_path);
+					g_log_error.log("Editor") << "Failed to load " << m_in_path;
+					return;
+				}
+				Array<u8> data(allocator);
+				data.resize((int)file.size());
+				file.read(&data[0], data.size());
+				file.close();
+
+				crn_uint32* raw_img[cCRNMaxFaces * cCRNMaxLevels];
+				crn_texture_desc desc;
+				bool success = crn_decompress_dds_to_images(&data[0], data.size(), raw_img, desc);
+				if (!success)
+				{
+					copyFile("models/editor/tile_texture.dds", out_path);
+					return;
+				}
+				image_width = desc.m_width;
+				image_height = desc.m_height;
+				stbir_resize_uint8((u8*)raw_img[0],
+					image_width,
+					image_height,
+					0,
+					&resized_data[0],
+					AssetBrowser::TILE_SIZE,
+					AssetBrowser::TILE_SIZE,
+					0,
+					4);
+				crn_free_all_images(raw_img, desc);
+			}
+			else
+			{
+				int image_comp;
+				auto data = stbi_load(m_in_path, &image_width, &image_height, &image_comp, 4);
+				if (!data)
+				{
+					g_log_error.log("Editor") << "Failed to load " << m_in_path;
+					copyFile("models/editor/tile_texture.dds", out_path);
+					return;
+				}
+				stbir_resize_uint8(data,
+					image_width,
+					image_height,
+					0,
+					&resized_data[0],
+					AssetBrowser::TILE_SIZE,
+					AssetBrowser::TILE_SIZE,
+					0,
+					4);
+				stbi_image_free(data);
+			}
+
+			if (!saveAsDDS(m_out_path, &resized_data[0], AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE))
+			{
+				g_log_error.log("Editor") << "Failed to save " << m_out_path;
+			}
+		}
+
+		static void execute(void* data) {
+			TextureTileJob* that = (TextureTileJob*)data;
+			that->execute();
+			LUMIX_DELETE(that->m_allocator, that);
+		}
+
+		IAllocator& m_allocator;
+		StaticString<MAX_PATH_LENGTH> m_in_path; 
+		StaticString<MAX_PATH_LENGTH> m_out_path; 
+	};
+
+
+	bool createTile(const char* in_path, const char* out_path, ResourceType type) override
+	{
+		if (type == Texture::TYPE) {
+			IAllocator& allocator = m_app.getWorldEditor().getAllocator();
+			auto* job = LUMIX_NEW(allocator, TextureTileJob)(allocator);
+			job->m_in_path = in_path;
+			job->m_out_path = out_path;
+			JobSystem::run(job, &TextureTileJob::execute);
+			return true;
+		}
+		return false;
 	}
 
 
