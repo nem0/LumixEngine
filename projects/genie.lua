@@ -12,7 +12,6 @@ local BINARY_DIR = LOCATION .. "/bin/"
 local build_unit_tests = false
 local build_app = true
 local build_studio = true
-local build_steam = false
 local build_game = false
 local working_dir = nil
 local debug_args = nil
@@ -78,11 +77,6 @@ newoption {
 }
 
 newoption {
-	trigger = "with-steam",
-	description = "Build Steam plugin."
-}
-
-newoption {
 	trigger = "no-gui",
 	description = "Do not build ingame GUI plugin."
 }
@@ -124,10 +118,6 @@ newoption {
 
 if _OPTIONS["plugins"] then
 	plugins = string.explode( _OPTIONS["plugins"], ",")
-end
-	
-if _OPTIONS["with-steam"] then
-	build_steam = true
 end
 
 if _OPTIONS["embed-resources"] then
@@ -650,21 +640,6 @@ for _, plugin in ipairs(plugins) do
 	end
 end
 	
-if build_steam then
-	project "steam"
-		libType()
-		files { 
-			"../src/steam/**.cpp",
-			"../src/steam/**.h"
-		}
-		includedirs { "../src", "../src/steam", "../../steamworks_sdk/public/steam" }
-		libdirs { "../../steamworks_sdk/redistributable_bin/win64" }
-		defines { "BUILDING_STEAM" }
-		links { "engine", "steam_api64" }
-		useLua()
-		defaultConfigurations()
-end
-	
 if has_plugin("audio") then
 	project "audio"
 		libType()
@@ -920,12 +895,6 @@ if build_studio then
 		includedirs { "../src" }
 
 		if _OPTIONS["static-plugins"] then	
-			if build_steam then
-				forceLink("s_steam_plugin_register")
-				links { "steam", "steam_api64" }
-				libdirs { "../../steamworks_sdk/redistributable_bin/win64" }
-			end
-
 			for _, plugin in ipairs(plugins) do
 				forceLink("s_" .. plugin .. "_plugin_register")
 				forceLink("setStudioApp_" .. plugin)
