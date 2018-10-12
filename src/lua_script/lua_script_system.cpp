@@ -746,6 +746,7 @@ namespace Lumix
 			template <typename T>
 			void set(T& prop)
 			{
+				LuaWrapper::DebugGuard guard(L);
 				char tmp[50];
 				char setter[50];
 				char getter[50];
