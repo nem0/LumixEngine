@@ -3512,11 +3512,11 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	{
 		EnvironmentProbe& probe = m_environment_probes.insert(entity);
 		ResourceManagerHub& rm = m_engine.getResourceManager();
-		probe.texture = rm.load<Texture>(Path("models/common/default_probe.dds"));
+		probe.texture = rm.load<Texture>(Path("textures/common/default_probe.dds"));
 		probe.texture->setFlag(Texture::Flags::SRGB, true);
-		probe.irradiance = rm.load<Texture>(Path("models/common/default_probe.dds"));
+		probe.irradiance = rm.load<Texture>(Path("textures/common/default_probe.dds"));
 		probe.irradiance->setFlag(Texture::Flags::SRGB, true);
-		probe.radiance = rm.load<Texture>(Path("models/common/default_probe.dds"));
+		probe.radiance = rm.load<Texture>(Path("textures/common/default_probe.dds"));
 		probe.radiance->setFlag(Texture::Flags::SRGB, true);
 		probe.radius = 1;
 		probe.flags.set(EnvironmentProbe::ENABLED);
