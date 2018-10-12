@@ -3,13 +3,13 @@ include "pipelines/common.glsl"
 texture_slot {
 	name = "Heightmap",
 	uniform = "u_hm",
-	default_texture = "models/common/white.tga"
+	default_texture = "textures/common/white.tga"
 }
 
 texture_slot {
 	name = "Satellite map",
 	uniform = "u_satellite",
-	default_texture = "models/common/white.tga"
+	default_texture = "textures/common/white.tga"
 }
 
 

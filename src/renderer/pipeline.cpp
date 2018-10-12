@@ -212,7 +212,7 @@ struct PipelineImpl final : Pipeline
 		m_draw2d_shader = rm.load<Shader>(Path("pipelines/draw2d.shd"));
 		m_debug_shape_shader = rm.load<Shader>(Path("pipelines/debug_shape.shd"));
 		TextureManager& texture_manager = renderer.getTextureManager();
-		m_default_cubemap = rm.load<Texture>(Path("models/common/default_probe.dds"));
+		m_default_cubemap = rm.load<Texture>(Path("textures/common/default_probe.dds"));
 
 		FontAtlas& font_atlas = m_renderer.getFontManager().getFontAtlas();
 		m_draw2d.FontTexUvWhitePixel = font_atlas.TexUvWhitePixel;

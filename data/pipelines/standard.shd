@@ -1,25 +1,25 @@
 texture_slot {
 	name = "Albedo",
 	uniform = "u_albedomap",
-	default_texture = "models/common/white.tga"
+	default_texture = "textures/common/white.tga"
 }
 
 texture_slot {
 	name = "Normal",
 	uniform = "u_normalmap",
-	default_texture = "models/common/default_normal.tga"
+	default_texture = "textures/common/default_normal.tga"
 }
 
 texture_slot {
 	name = "Roughness",
 	uniform = "u_roughnessmap",
-	default_texture = "models/common/white.tga"
+	default_texture = "textures/common/white.tga"
 }
 
 texture_slot {
 	name = "Metallic",
 	uniform = "u_metallicmap",
-	default_texture = "models/common/white.tga"
+	default_texture = "textures/common/white.tga"
 }
 
 attribute { name = "a_position", semantic = SEMANTICS_POSITION }
