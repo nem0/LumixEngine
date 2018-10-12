@@ -1,0 +1,28 @@
+vertex_shader [[
+	layout(location = 0) in vec2 a_position;
+	layout(location = 1) in vec2 a_uv;
+	layout(location = 2) in vec4 a_color;
+	
+	uniform vec2 u_canvas_size;
+	out vec4 v_color;
+	out vec2 v_uv;
+	
+	void main() {
+		v_color = a_color;
+		vec2 pos = a_position / u_canvas_size * 2 - 1;
+		pos.y = - pos.y;
+		v_uv = a_uv;
+		gl_Position = vec4(pos, 0, 1);
+	}
+]]
+
+
+fragment_shader [[
+	uniform sampler2D u_texture;
+	in vec4 v_color;
+	in vec2 v_uv;
+	out vec4 o_color;
+	void main() {
+		o_color = v_color * texture(u_texture, v_uv);
+	}
+]]

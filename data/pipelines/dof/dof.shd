@@ -1,0 +1,22 @@
+vertex_shader [[
+	out vec2 v_uv;
+	void main() {
+		v_uv = vec2(gl_VertexID & 1, (gl_VertexID & 2) * 0.5);
+		vec4 pos = vec4((gl_VertexID & 1) * 2 - 1, (gl_VertexID & 2) - 1, 0, 1);
+		gl_Position = pos;
+	}
+]]
+
+
+fragment_shader [[
+	uniform sampler2D u_source;
+
+	in vec2 v_uv;
+	out vec4 o_color;
+
+	void main() {
+		o_color.rgb = texture(u_source, v_uv).rgb;
+		o_color.rgb = vec3(texture(u_source, v_uv).a);
+		o_color.w = 1;
+	}
+]]

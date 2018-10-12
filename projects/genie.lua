@@ -275,29 +275,12 @@ newaction {
 	end
 }
 
-
-function strip()
-
-	configuration { "android-x86", "Release" }
-		postbuildcommands {
-			"$(SILENT) echo Stripping symbols.",
-			"$(SILENT) $(ANDROID_NDK_X86)/bin/i686-linux-android-strip -s \"$(TARGET)\""
-		}
-
-	configuration {}
-end
-
 		
 function defaultConfigurations()
 	configuration "Debug"
 		targetdir(BINARY_DIR .. "Debug")
 		defines { "DEBUG", "_DEBUG" }
 		flags { "Symbols", "WinMain" }
-
-	configuration "Release"
-		targetdir(BINARY_DIR .. "Release")
-		defines { "NDEBUG" }
-		flags { "Optimize", "WinMain" }
 
 	configuration "RelWithDebInfo"
 		targetdir(BINARY_DIR .. "RelWithDebInfo")
@@ -320,16 +303,12 @@ end
 function linkLib(lib)
 	links {lib}
 
-	for conf,conf_dir in pairs({Debug="debug", Release="release", RelWithDebInfo="release"}) do
+	for conf,conf_dir in pairs({Debug="debug", RelWithDebInfo="release"}) do
 		for platform,target_platform in pairs({win="windows", linux="linux", }) do
 			configuration { "x64", conf, target_platform }
 				libdirs {"../external/" .. lib .. "/lib/" .. platform .. "64" .. "_" .. ide_dir .. "/" .. conf_dir}
 				libdirs {"../external/" .. lib .. "/dll/" .. platform .. "64" .. "_" .. ide_dir .. "/" .. conf_dir}
 		end
-	end
-	for conf,conf_dir in pairs({Debug="debug", Release="release", RelWithDebInfo="release"}) do
-		configuration { "android-x86", conf }
-			libdirs {"../external/" .. lib .. "/lib/android-x86_gmake/" .. conf_dir}
 	end
 	configuration {}
 end
@@ -389,8 +368,6 @@ function linkPhysX()
 
 		configuration { "Debug" }
 			links { "PhysX3ExtensionsDEBUG", "PhysXVisualDebuggerSDKDEBUG" }
-		configuration { "Release" }
-			links { "PhysX3ExtensionsCHECKED", "PhysXVisualDebuggerSDKCHECKED" }
 		configuration { "RelWithDebInfo" }
 			links { "PhysX3ExtensionsCHECKED", "PhysXVisualDebuggerSDKCHECKED" }
 
@@ -541,7 +518,7 @@ solution "LumixEngine"
 
 	configuration {}
 	
-	configurations { "Debug", "Release", "RelWithDebInfo" }
+	configurations { "Debug", "RelWithDebInfo" }
 	platforms { "x64" }
 	flags { 
 		"FatalWarnings", 
@@ -795,7 +772,7 @@ if build_app then
 		elseif working_dir then
 			debugdir ("../../" .. working_dir)
 		else 
-			debugdir "../../LumixEngine_data"
+			debugdir "../data"
 		end
 
 		kind "ConsoleApp"
@@ -871,7 +848,6 @@ if build_app then
 		
 		useLua()
 		defaultConfigurations()
-		strip()
 end
 
 
@@ -936,7 +912,7 @@ if build_studio then
 		elseif working_dir then
 			debugdir ("../../" .. working_dir)
 		else
-			debugdir "../../LumixEngine_data"
+			debugdir "../data"
 		end
 
 
@@ -998,7 +974,6 @@ if build_studio then
 		
 		if _ACTION == "vs2017" then
 			copyDlls("Debug", "win64", "Debug")
-			copyDlls("Release", "win64", "Release")
 			copyDlls("Release", "win64", "RelWithDebInfo")
 		end
 		

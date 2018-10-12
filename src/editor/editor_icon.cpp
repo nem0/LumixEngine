@@ -224,7 +224,7 @@ struct EditorIconsImpl final : public EditorIcons
 		{
 			for (int i = 0; i < lengthOf(ICONS); ++i)
 			{
-				StaticString<MAX_PATH_LENGTH> tmp("models/editor/", ICONS[i], "_3d.fbx");
+				StaticString<MAX_PATH_LENGTH> tmp("editor/models/", ICONS[i], "_3d.fbx");
 				m_is_3d[i] = PlatformInterface::fileExists(tmp);
 				if (m_is_3d[i])
 				{
@@ -234,7 +234,7 @@ struct EditorIconsImpl final : public EditorIcons
 				else
 				{
 					tmp.data[0] = '\0';
-					tmp << "models/editor/" << ICONS[i] << ".fbx";
+					tmp << "editor/models/" << ICONS[i] << ".fbx";
 					Path path(tmp);
 					m_models[i] = m_render_interface->loadModel(path);
 				}

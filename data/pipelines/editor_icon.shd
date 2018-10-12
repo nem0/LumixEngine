@@ -1,0 +1,42 @@
+texture_slot {
+	name = "Albedo",
+	uniform = "u_albedomap",
+	default_texture = "models/common/white.tga"
+}
+
+attribute { name = "a_position", semantic = SEMANTICS_POSITION }
+attribute { name = "a_uv", semantic = SEMANTICS_TEXCOORD0 }
+
+------------------
+
+vertex_shader [[
+	uniform mat4 u_model;
+	layout(location = 0) in vec3 a_position;
+	layout(location = 1) in vec2 a_uv;
+	out vec2 v_uv;
+	
+	void main() {
+		v_uv = a_uv;
+		gl_Position = u_camera_projection * u_camera_view * u_model * vec4(a_position,  1);
+	}
+]]
+
+---------------------
+
+fragment_shader [[
+	uniform sampler2D u_albedomap;
+	in vec2 v_uv;
+	in vec3 v_normal;
+	
+	layout(location = 0) out vec4 o_color;
+
+	
+	void main() {
+		vec4 albedo = texture(u_albedomap, v_uv);
+		#ifdef ALPHA_CUTOUT
+			if(albedo.a < 0.5) discard;
+		#endif
+		o_color.rgb = albedo.rgb;
+		o_color.w = 1;
+	}
+]]

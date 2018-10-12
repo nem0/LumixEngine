@@ -8,3 +8,6 @@ obj/
 *.nvuser
 *.orig
 .vscode
+data/.lumix
+data/error.log
+data/studio.ini

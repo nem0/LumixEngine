@@ -535,7 +535,10 @@ public:
 
 	float showMainToolbar(float menu_height)
 	{
-		if (m_toolbar_actions.empty()) return menu_height;
+		if (m_toolbar_actions.empty()) {
+			ImGui::SetCursorPosY(menu_height);
+			return menu_height;
+		}
 
 		auto frame_padding = ImGui::GetStyle().FramePadding;
 		float padding = frame_padding.y * 2;
@@ -1432,8 +1435,8 @@ public:
 		float ddpi;
 		float font_scale = 1;
 		if (SDL_GetDisplayDPI(0, &ddpi, nullptr, nullptr) == 0) font_scale = ddpi / 96;
-		m_font = io.Fonts->AddFontFromFileTTF("ui/fonts/OpenSans-Regular.ttf", (float)m_settings.m_font_size * font_scale);
-		m_bold_font = io.Fonts->AddFontFromFileTTF("ui/fonts/OpenSans-Bold.ttf", (float)m_settings.m_font_size * font_scale);
+		m_font = io.Fonts->AddFontFromFileTTF("editor/fonts/OpenSans-Regular.ttf", (float)m_settings.m_font_size * font_scale);
+		m_bold_font = io.Fonts->AddFontFromFileTTF("editor/fonts/OpenSans-Bold.ttf", (float)m_settings.m_font_size * font_scale);
 
 		m_font->DisplayOffset.y = 0;
 		m_bold_font->DisplayOffset.y = 0;
