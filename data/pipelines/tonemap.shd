@@ -1,0 +1,48 @@
+vertex_shader [[
+	uniform vec4 u_offset_scale;
+	out vec2 v_uv;
+	void main() {
+		v_uv = vec2(gl_VertexID & 1, (gl_VertexID & 2) * 0.5);
+		vec4 pos = vec4((gl_VertexID & 1) * 2 - 1, (gl_VertexID & 2) - 1, 0, 1);
+		gl_Position = pos;
+	}
+]]
+
+
+fragment_shader [[
+	vec3 luma(vec3 _rgb)
+	{
+		float yy = dot(vec3(0.2126729, 0.7151522, 0.0721750), _rgb);
+		return vec3(yy);
+	}
+
+	float Uncharted2Tonemap(float x)
+	{
+		const float A = 0.15;
+		const float B = 0.50;
+		const float C = 0.10;
+		const float D = 0.20;
+		const float E = 0.02;
+		const float F = 0.30;
+		return ((x * (A * x + C * B) + D * E) / (x * (A * x + B) + D * F)) - E / F;
+	}
+
+	vec3 tonemap(vec3 in_color)
+	{
+		float midgray = 0.18;
+		float avg_loglum = 0.3;
+		float lum = luma(in_color).x;
+		float map_middle = (midgray / (avg_loglum + 0.001)) * lum;
+		float ld = Uncharted2Tonemap(map_middle) / Uncharted2Tonemap(11.0);
+		return (in_color / max(0.00001, lum)) * ld;
+	}
+
+	uniform sampler2D u_hdrbuffer;
+	in vec2 v_uv;
+	out vec4 o_color;
+	void main() {
+		const float exposure = 10;
+		o_color.rgb = tonemap(texture(u_hdrbuffer, v_uv, 0).rgb * exposure);
+		o_color.w = 1;
+	}
+]]

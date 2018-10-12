@@ -68,7 +68,7 @@ bool Action::toolbarButton()
 
 void Action::getIconPath(char* path, int max_size)
 {
-	copyString(path, max_size, "models/editor/icon_"); 
+	copyString(path, max_size, "editor/icons/icon_"); 
 		
 	char tmp[1024];
 	const char* c = name;

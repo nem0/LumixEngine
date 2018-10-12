@@ -1,0 +1,170 @@
+local deferred_shader = preloadShader("pipelines/deferred.shd")
+local textured_quad_shader = preloadShader("pipelines/textured_quad.shd")
+local tonemap_shader = preloadShader("pipelines/tonemap.shd")
+local environment_shader =  preloadShader("pipelines/environment.shd")
+local debug_shadowmap = false
+
+function transparentPass(colorbuffer, dsbuffer)
+	beginBlock("transparent_pass")
+	
+	setRenderTargets(colorbuffer, dsbuffer)
+	
+	local view_params = getCameraParams()
+	blending("add")
+	--renderMeshes("", view_params)
+	renderParticles(view_params)
+	endBlock()
+	blending("")
+end
+
+function geomPass()
+	beginBlock("geom_pass")
+	local gbuffer0 = createRenderbuffer(1, 1, true, "rgba8")
+	local gbuffer1 = createRenderbuffer(1, 1, true, "rgba16")
+	local gbuffer2 = createRenderbuffer(1, 1, true, "rgba8")
+	local dsbuffer = createRenderbuffer(1, 1, true, "depth24stencil8")
+	
+	setRenderTargets(gbuffer0, gbuffer1, gbuffer2, dsbuffer)
+	clear(CLEAR_ALL, 0, 0, 0, 1, 0)
+	blending("")
+	local view_params = getCameraParams()
+	setStencil(0xff, STENCIL_ALWAYS, 1, 0xff, STENCIL_REPLACE, STENCIL_REPLACE, STENCIL_REPLACE);
+	renderTerrains("DEFERRED", view_params)
+	local cmd_set = prepareCommands(view_params, { default = 0, skinned = 1, decal = -1 })
+	renderBucket("DEFERRED", cmd_set, 0)
+	renderBucket("DEFERRED", cmd_set, 1)
+--	renderMeshes("DEFERRED", view_params)
+	setStencil(0xff, STENCIL_DISABLE, 0, 0, STENCIL_KEEP, STENCIL_KEEP, STENCIL_KEEP);
+	endBlock()
+	
+	return gbuffer0, gbuffer1, gbuffer2, dsbuffer
+end
+
+function lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
+	beginBlock("light_pass")
+	local hdr_rb = createRenderbuffer(1, 1, true, "rgba16f")
+	setRenderTargets(hdr_rb, gbuffer_depth)
+	clear(CLEAR_COLOR, 0, 0, 0, 0, 0)
+	
+	drawArray(0, 4, deferred_shader,
+	{
+		u_gbuffer0 = gbuffer0,
+		u_gbuffer1 = gbuffer1,
+		u_gbuffer2 = gbuffer2,
+		u_gbuffer_depth = gbuffer_depth,
+		u_shadowmap = shadowmap
+	})
+	local view_params = getCameraParams()
+	bindTextures({
+		u_gbuffer0 = gbuffer0,
+		u_gbuffer1 = gbuffer1,
+		u_gbuffer2 = gbuffer2,
+		u_gbuffer_depth = gbuffer_depth,
+		u_shadowmap = shadowmap
+	}, 2)
+	renderEnvProbeVolumes(environment_shader, view_params)
+	
+	
+	endBlock()
+	return hdr_rb
+end
+
+function debugRenderbuffer(rb, output)
+	setRenderTargets(output)
+	
+	drawArray(0, 4, textured_quad_shader
+		, { u_texture = rb }
+		, { u_offset_scale = { 0.5, 0.5, 0.5, 0.5 } });
+end
+
+function shadowPass()
+	beginBlock("shadows")
+	local rb = createRenderbuffer(4096, 1024, false, "depth24")
+	setRenderTargets(rb)
+	clear(CLEAR_DEPTH, 0, 0, 0, 1, 0)
+	
+	for slice = 0, 3 do 
+		local view_params = getShadowCameraParams(slice, 4096)
+		viewport(slice * 1024, 0, 1024, 1024)
+		beginBlock("slice " .. tostring(slice + 1))
+		--renderMeshes("DEPTH", view_params)
+		endBlock()
+	end
+	endBlock()
+	return rb
+end
+
+function postprocess(phase, hdr_buffer, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
+	local prev = hdr_buffer
+	if _G["postprocesses"] ~= nil then
+		for _, value in ipairs(_G["postprocesses"]) do
+			prev = value(getfenv(1), phase, prev, gbuffer0, gbuffer1, gbuffer_depth, shadowmap)
+		end
+	end
+	return prev
+end
+
+function tonemap(hdr_buffer)
+	beginBlock("tonemap")
+	local rb = createRenderbuffer(1, 1, true, "rgba8")
+	setRenderTargets(rb)
+	drawArray(0, 4, tonemap_shader
+		, { u_hdrbuffer = hdr_buffer }
+	)
+	endBlock()
+	return rb
+end
+
+function debugPass(output, shadowmap)
+	if debug_shadowmap then
+		debugRenderbuffer(shadowmap, output)
+	end
+end
+
+
+function main()
+	local shadowmap = createRenderbuffer(4096, 1024, false, "depth24") --shadowPass()
+	local gbuffer0, gbuffer1, gbuffer2, gbuffer_depth = geomPass()
+	local hdr_buffer = lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
+
+	local res = hdr_buffer		
+	if PREVIEW == nil then
+		res = postprocess("pre", hdr_buffer, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
+	end
+	
+	--transparentPass(res, gbuffer_depth)
+
+	if PREVIEW == nil then
+		res = postprocess("post", res, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
+	end
+	
+	res = tonemap(res)
+
+	if PREVIEW == nil then
+		res = postprocess("post_tonemap", res, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
+	end
+
+	debugPass(res, shadowmap)
+		
+	if renderGizmos ~= nil then
+		setRenderTargets(res, gbuffer_depth)
+		clear(CLEAR_DEPTH, 0, 0, 0, 1, 0)
+		renderGizmos()
+		render2D()
+		renderIcons()
+		renderDebugShapes()
+	end
+
+	setOutput(res)
+end
+
+function onGUI()
+	if ImGui.Button("Debug") then
+		ImGui.OpenPopup("debug_popup")
+	end
+
+	if ImGui.BeginPopup("debug_popup") then
+		changed, debug_shadowmap = ImGui.Checkbox("Shadowmap", debug_shadowmap)
+		ImGui.EndPopup()
+	end
+end

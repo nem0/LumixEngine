@@ -1,0 +1,75 @@
+vertex_shader [[
+	uniform sampler2D u_source;
+	uniform vec4 u_offset_scale;
+	
+	out vec2 v_uv0;
+	out vec4 v_uv1;
+	out vec4 v_uv2;
+	void main() {
+		vec2 ts = 1.0/textureSize(u_source, 0);
+		v_uv0 = vec2(gl_VertexID & 1, (gl_VertexID & 2) * 0.5);
+		#ifdef HBLUR
+			v_uv1 = vec4(
+				v_uv0.x + 1.3846153846 * ts.x, v_uv0.y, 
+				v_uv0.x + 3.2307692308 * ts.x, v_uv0.y
+			);
+			v_uv2 = vec4(
+				v_uv0.x - 1.3846153846 * ts.x, v_uv0.y, 
+				v_uv0.x - 3.2307692308 * ts.x, v_uv0.y
+			);
+		#else
+			v_uv1 = vec4(
+				v_uv0.x, v_uv0.y + 1.3846153846 * ts.y, 
+				v_uv0.x, v_uv0.y + 3.2307692308 * ts.y
+			);
+			v_uv2 = vec4(
+				v_uv0.x, v_uv0.y - 1.3846153846 * ts.y, 
+				v_uv0.x, v_uv0.y - 3.2307692308 * ts.y
+			);
+		#endif
+		vec4 pos = vec4((gl_VertexID & 1) * 2 - 1, (gl_VertexID & 2) - 1, 0, 1);
+		gl_Position = pos;
+	}
+]]
+
+
+fragment_shader [[
+	float toLinearDepth(float ndc_depth)
+	{
+		vec4 pos_proj = vec4(0, 0, ndc_depth, 1.0);
+		
+		vec4 view_pos = u_camera_inv_projection * pos_proj;
+		
+		return -view_pos.z / view_pos.w;
+	}
+
+	uniform sampler2D u_source;
+	uniform sampler2D u_depth;
+	
+	in vec2 v_uv0;
+	in vec4 v_uv1;
+	in vec4 v_uv2;
+	out vec4 o_color;
+
+	void main() {
+		float DOF_NEAR_BLUR = 1;
+		float DOF_NEAR_SHARP = 3;
+		float DOF_FAR_SHARP = 10;
+		float DOF_FAR_BLUR = 15;
+	
+		vec4 color = texture2D(u_source, v_uv0.xy) * 0.2270270270
+		+ texture2D(u_source, v_uv1.xy) * 0.3162162162
+		+ texture2D(u_source, v_uv1.zw) * 0.0702702703
+		+ texture2D(u_source, v_uv2.xy) * 0.3162162162
+		+ texture2D(u_source, v_uv2.zw) * 0.0702702703;
+
+		float depth = texture2D(u_depth, v_uv0.xy).r;
+		float linear_depth = toLinearDepth(depth);
+		#ifdef NEAR
+			color.a = 1 - smoothstep(DOF_NEAR_BLUR, DOF_NEAR_SHARP, linear_depth);
+		#else
+			color.a = smoothstep(DOF_FAR_SHARP, DOF_FAR_BLUR, linear_depth);
+		#endif
+		o_color = color;
+	}
+]]

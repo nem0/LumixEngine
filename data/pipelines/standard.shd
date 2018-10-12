@@ -1,0 +1,155 @@
+texture_slot {
+	name = "Albedo",
+	uniform = "u_albedomap",
+	default_texture = "models/common/white.tga"
+}
+
+texture_slot {
+	name = "Normal",
+	uniform = "u_normalmap",
+	default_texture = "models/common/default_normal.tga"
+}
+
+texture_slot {
+	name = "Roughness",
+	uniform = "u_roughnessmap",
+	default_texture = "models/common/white.tga"
+}
+
+texture_slot {
+	name = "Metallic",
+	uniform = "u_metallicmap",
+	default_texture = "models/common/white.tga"
+}
+
+attribute { name = "a_position", semantic = SEMANTICS_POSITION }
+attribute { name = "a_color", semantic = SEMANTICS_COLOR0 }
+attribute { name = "a_uv", semantic = SEMANTICS_TEXCOORD0 }
+attribute { name = "a_normal", semantic = SEMANTICS_NORMAL }
+attribute { name = "a_indices", semantic = SEMANTICS_INDICES }
+attribute { name = "a_weights", semantic = SEMANTICS_WEIGHTS }
+
+include "pipelines/common.glsl"
+
+------------------
+
+vertex_shader [[
+	layout(location = 0) in vec3 a_position;
+	layout(location = 1) in vec2 a_uv;
+	layout(location = 2) in vec3 a_normal;
+	#ifdef SKINNED
+		layout(location = 3) in vec4 a_indices;
+		layout(location = 4) in vec4 a_weights;
+		uniform mat4 u_bones[196];
+	#elif defined INSTANCED
+		layout(location = 3) in vec4 i_rot_quat;
+		layout(location = 4) in vec4 i_pos_scale;
+	#endif
+	uniform mat4 u_model;
+	out vec2 v_uv;
+	out vec3 v_normal;
+	out vec4 v_wpos;
+	
+	void main() {
+		v_uv = a_uv;
+		#ifdef INSTANCED
+			v_normal = rotateByQuat(i_rot_quat, a_normal * 2 - 1);
+			v_wpos = vec4(i_pos_scale.xyz + rotateByQuat(i_rot_quat, a_position * i_pos_scale.w), 1);
+
+		#elif defined SKINNED
+			mat4 model_mtx = u_model * (a_weights.x * u_bones[int(a_indices.x)] + 
+			a_weights.y * u_bones[int(a_indices.y)] +
+			a_weights.z * u_bones[int(a_indices.z)] +
+			a_weights.w * u_bones[int(a_indices.w)]);
+			v_normal = mat3(model_mtx) * (a_normal * 2 - 1);
+			v_wpos = model_mtx * vec4(a_position,  1);
+		#else 
+			mat4 model_mtx = u_model;
+			v_normal = mat3(model_mtx) * (a_normal * 2 - 1);
+			v_wpos = model_mtx * vec4(a_position,  1);
+		#endif
+		
+		#ifdef DEPTH
+			gl_Position = u_shadow_view_projection * v_wpos;		
+		#else
+			gl_Position = u_camera_view_projection * v_wpos;
+		#endif
+	}
+]]
+
+---------------------
+
+fragment_shader [[
+	uniform sampler2D u_albedomap;
+	uniform sampler2D u_normalmap;
+	uniform sampler2D u_roughnessmap;
+	uniform sampler2D u_metallicmap;
+	uniform sampler2D u_shadowmap;
+	uniform vec4 u_material_params;
+	uniform vec4 u_material_color;
+	in vec2 v_uv;
+	in vec3 v_normal;
+	in vec4 v_wpos;
+	
+	#ifdef DEFERRED
+		layout(location = 0) out vec4 o_gbuffer0;
+		layout(location = 1) out vec4 o_gbuffer1;
+		layout(location = 2) out vec4 o_gbuffer2;
+	#else
+		layout(location = 0) out vec4 o_color;
+	#endif
+
+	void getData()
+	{
+		data.albedo = texture(u_albedomap, v_uv) * u_material_color;
+		#ifdef ALPHA_CUTOUT
+			if(data.albedo.a < 0.5) discard;
+		#endif
+		data.wpos = v_wpos.xyz;
+		data.roughness = texture(u_roughnessmap, v_uv).r;
+		data.metallic  = texture(u_metallicmap, v_uv).r;
+		data.normal = normalize(v_normal);
+		data.emission = packEmission(u_material_params.z);
+	}
+	
+	#ifdef DEPTH
+		void main()
+		{
+			#ifdef ALPHA_CUTOUT
+				data.albedo = texture(u_albedomap, v_uv);
+				if(data.albedo.a < 0.5) discard;
+			#endif
+		}
+	#elif defined DEFERRED
+		void main()
+		{
+			getData();
+			o_gbuffer0 = vec4(data.albedo.rgb, data.roughness);
+			o_gbuffer1 = vec4(data.normal * 0.5 + 0.5, data.metallic);
+			o_gbuffer2 = vec4(data.emission, 0, 0, 1);
+		}
+	#else 
+		void main()
+		{
+			getData();
+			
+			vec3 V = normalize(-data.wpos);
+			vec3 L = normalize(u_light_direction);
+		
+			float shadow = getShadow(u_shadowmap, data.wpos);
+		
+			o_color.rgb = pbr(data.albedo.rgb
+				, data.roughness
+				, data.metallic
+				, data.emission
+				, data.normal
+				, V
+				, L
+				, shadow
+				, u_light_color * u_light_intensity
+				, u_light_indirect_intensity);
+			
+			o_color.w = data.albedo.a;
+		}
+	#endif
+]]
