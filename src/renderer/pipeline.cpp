@@ -2281,6 +2281,10 @@ struct PipelineImpl final : Pipeline
 						case RenderableTypes::SKINNED: {
 							const u32 mesh_idx = renderables[i] >> 32;
 							const ModelInstance* LUMIX_RESTRICT mi = &model_instances[e.index];
+							const uint out_offset = uint(out - ctx->output->begin());
+							ctx->output->resize(ctx->output->size() +  mi->pose->count * sizeof(Matrix) + sizeof(Matrix));
+							out = ctx->output->begin() + out_offset;
+
 							WRITE(mi->meshes[mesh_idx].render_data);
 							WRITE_FN(mi->meshes[mesh_idx].material->getRenderData());
 							const EntityRef e = {int(renderables[i] & 0x00ffFFff)};
@@ -2292,9 +2296,6 @@ struct PipelineImpl final : Pipeline
 
 							*(int*)out = mi->pose->count;
 							out += sizeof(int);
-							const uint out_offset = uint(out - ctx->output->begin());
-							ctx->output->resize(ctx->output->size() +  mi->pose->count * sizeof(Matrix));
-							out = ctx->output->begin() + out_offset;
 							const Quat* rotations = mi->pose->rotations;
 							const Vec3* positions = mi->pose->positions;
 
@@ -2408,6 +2409,7 @@ struct PipelineImpl final : Pipeline
 				m_command_sets[bucket]->cmds.reserve(job_count);
 				int bucket_size;
 				for(bucket_size = bucket_offset; bucket_size < size && (sort_keys[bucket_size] >> 56) == bucket; ++bucket_size);
+				bucket_size -= bucket_offset;
 				int job_offset = 0;
 				const int step = (bucket_size + job_count - 1) / job_count;
 				for(int i = 0; i < job_count; ++i) {
@@ -2423,6 +2425,7 @@ struct PipelineImpl final : Pipeline
 					job_offset += step;
 					JobSystem::run(counter, &ctx, &CreateCommands::execute);
 				}
+				bucket_offset += bucket_size;
 			}
 			JobSystem::decCounter(counter);
 			JobSystem::wait(counter);
