@@ -46,6 +46,7 @@ Material::Material(const Path& path, ResourceManager& resource_manager, Renderer
 	, m_custom_flags(0)
 	, m_render_data(nullptr)
 {
+	m_layer = m_renderer.getLayerIdx("default");
 	setAlphaRef(DEFAULT_ALPHA_REF_VALUE);
 	for (int i = 0; i < MAX_TEXTURE_COUNT; ++i)
 	{
@@ -564,6 +565,19 @@ namespace LuaAPI
 {
 
 
+int layer(lua_State* L)
+{
+	const char* layer_name = LuaWrapper::checkArg<const char*>(L, 1);
+	lua_getfield(L, LUA_GLOBALSINDEX, "this");
+	Material* material = (Material*)lua_touserdata(L, -1);
+	lua_pop(L, 1);
+
+	const int layer = material->getRenderer().getLayerIdx(layer_name);
+	material->setLayer(layer);
+	return 0;
+}
+
+
 int roughness(lua_State* L)
 {
 	const float r = LuaWrapper::checkArg<float>(L, 1);
@@ -765,16 +779,17 @@ bool Material::load(FS::IFile& file)
 		lua_pushcclosure(L, LuaAPI::func, 0); \
 		lua_setfield(L, LUA_GLOBALSINDEX, #func); 
 	
+	DEFINE_LUA_FUNC(alpha_ref);
+	DEFINE_LUA_FUNC(backface_culling);
+	DEFINE_LUA_FUNC(color);
+	DEFINE_LUA_FUNC(custom_flag);
+	DEFINE_LUA_FUNC(defines);
+	DEFINE_LUA_FUNC(emission);
+	DEFINE_LUA_FUNC(layer);
+	DEFINE_LUA_FUNC(metallic);
+	DEFINE_LUA_FUNC(roughness);
 	DEFINE_LUA_FUNC(shader);
 	DEFINE_LUA_FUNC(texture);
-	DEFINE_LUA_FUNC(defines);
-	DEFINE_LUA_FUNC(roughness);
-	DEFINE_LUA_FUNC(metallic);
-	DEFINE_LUA_FUNC(emission);
-	DEFINE_LUA_FUNC(custom_flag);
-	DEFINE_LUA_FUNC(color);
-	DEFINE_LUA_FUNC(backface_culling);
-	DEFINE_LUA_FUNC(alpha_ref);
 	
 	#undef DEFINE_LUA_FUNC
 

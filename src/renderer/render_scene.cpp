@@ -59,6 +59,8 @@ static const ComponentType TEXT_MESH_TYPE = Reflection::getComponentType("text_m
 struct Decal : public DecalInfo
 {
 	EntityRef entity;
+	EntityPtr prev_decal = INVALID_ENTITY;
+	EntityPtr next_decal = INVALID_ENTITY;
 	Vec3 half_extents;
 };
 
@@ -210,27 +212,6 @@ static RenderableTypes getRenderableType(const Model& model)
 
 class RenderSceneImpl final : public RenderScene
 {
-private:
-	struct ModelLoadedCallback
-	{
-		ModelLoadedCallback(RenderSceneImpl& scene, Model* model)
-			: m_scene(scene)
-			, m_ref_count(0)
-			, m_model(model)
-		{
-			m_model->getObserverCb().bind<RenderSceneImpl, &RenderSceneImpl::modelStateChanged>(&scene);
-		}
-
-		~ModelLoadedCallback()
-		{
-			m_model->getObserverCb().unbind<RenderSceneImpl, &RenderSceneImpl::modelStateChanged>(&m_scene);
-		}
-
-		Model* m_model;
-		int m_ref_count;
-		RenderSceneImpl& m_scene;
-	};
-
 public:
 	RenderSceneImpl(Renderer& renderer,
 		Engine& engine,
@@ -242,6 +223,33 @@ public:
 		m_universe.entityTransformed().unbind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
 		m_universe.entityDestroyed().unbind<RenderSceneImpl, &RenderSceneImpl::onEntityDestroyed>(this);
 		CullingSystem::destroy(*m_culling_system);
+	}
+
+
+	void decalMaterialStateChanged(Resource::State old_state, Resource::State new_state, Resource& resource)
+	{
+		Material& material = static_cast<Material&>(resource);
+		
+		if (new_state == Resource::State::READY) {
+			auto map_iter = m_material_decal_map.find(&material);
+			EntityPtr e = map_iter.value();
+			while(e.isValid()) {
+				const float radius = m_decals[(EntityRef)e].half_extents.length();
+				const DVec3 pos = m_universe.getPosition((EntityRef)e);
+				m_culling_system->add((EntityRef)e, (u8)RenderableTypes::DECAL, pos, radius);
+				e = m_decals[(EntityRef)e].next_decal;
+			}
+			return;
+		}
+		
+		if (old_state == Resource::State::READY && new_state != Resource::State::READY) {
+			auto map_iter = m_material_decal_map.find(&material);
+			EntityPtr e = map_iter.value();
+			while(e.isValid()) {
+				m_culling_system->remove((EntityRef)e);
+				e = m_decals[(EntityRef)e].next_decal;
+			}
+		}
 	}
 
 
@@ -305,6 +313,12 @@ public:
 			model->getObserverCb().unbind<RenderSceneImpl, &RenderSceneImpl::modelStateChanged>(this);
 		}
 		m_model_entity_map.clear();
+
+		for(auto iter = m_material_decal_map.begin(), end = m_material_decal_map.end(); iter != end; ++iter) {
+			Material* mat = iter.key();
+			mat->getObserverCb().unbind<RenderSceneImpl, &RenderSceneImpl::decalMaterialStateChanged>(this);
+		}
+		m_material_decal_map.clear();
 
 		m_culling_system->clear();
 
@@ -801,15 +815,15 @@ public:
 	void deserializeDecal(IDeserializer& serializer, EntityRef entity, int /*scene_version*/)
 	{
 		ResourceManagerHub& manager = m_engine.getResourceManager();
-		Decal& decal = m_decals.insert(entity);
+		m_decals.insert(entity, Decal());
+		Decal& decal = m_decals[entity];
 		char tmp[MAX_PATH_LENGTH];
 		decal.entity = entity;
 		serializer.read(&decal.half_extents);
 		serializer.read(tmp, lengthOf(tmp));
-		decal.material = tmp[0] == '\0' ? nullptr : manager.load<Material>(Path(tmp));
+		setDecalMaterialPath(entity, Path(tmp));
 		updateDecalInfo(decal);
 		const DVec3 pos = m_universe.getPosition(entity);
-		m_culling_system->add(entity, (u8)RenderableTypes::DECAL, pos, decal.half_extents.length());
 		m_universe.onComponentCreated(decal.entity, DECAL_TYPE, this);
 	}
 
@@ -1278,7 +1292,7 @@ public:
 		ResourceManagerHub& manager = m_engine.getResourceManager();
 		int count;
 		serializer.read(count);
-		m_decals.reserve(count);
+		m_decals.rehash(count);
 		for (int i = 0; i < count; ++i)
 		{
 			char tmp[MAX_PATH_LENGTH];
@@ -1286,11 +1300,10 @@ public:
 			serializer.read(decal.entity);
 			serializer.read(decal.half_extents);
 			serializer.readString(tmp, lengthOf(tmp));
-			decal.material = tmp[0] == '\0' ? nullptr : manager.load<Material>(Path(tmp));
 			updateDecalInfo(decal);
 			m_decals.insert(decal.entity, decal);
+			setDecalMaterialPath(decal.entity, Path(tmp));
 			const DVec3 pos = m_universe.getPosition(decal.entity);
-			m_culling_system->add(decal.entity, (u8)RenderableTypes::DECAL, pos, decal.half_extents.length());
 			m_universe.onComponentCreated(decal.entity, DECAL_TYPE, this);
 		}
 	}
@@ -1730,8 +1743,8 @@ public:
 		}
 
 		if(m_universe.hasComponent(entity, DECAL_TYPE)) {
-			const int decal_idx = m_decals.find(entity);
-			updateDecalInfo(m_decals.at(decal_idx));
+			auto iter = m_decals.find(entity);
+			updateDecalInfo(iter.value());
 			const DVec3 position = m_universe.getPosition(entity);
 			m_culling_system->setPosition(entity, position);
 		}
@@ -1848,17 +1861,24 @@ public:
 	{
 		Decal& decal = m_decals[entity];
 		if (decal.material) {
+			removeFromMaterialDecalMap(decal.material, entity);
 			decal.material->getResourceManager().unload(*decal.material);
 		}
 
 		if (path.isValid()) {
 			decal.material = m_engine.getResourceManager().load<Material>(path);
+			addToMaterialDecalMap(decal.material, entity);
 		}
 		else {
 			decal.material = nullptr;
 		}
 	}
 
+	Material* getDecalMaterial(EntityRef entity) const override
+	{
+		auto iter = m_decals.find(entity);
+		return iter.value().material;
+	}
 
 	Path getDecalMaterialPath(EntityRef entity) override
 	{
@@ -3355,6 +3375,23 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 	
+	void addToMaterialDecalMap(Material* material, EntityRef entity)
+	{
+		Decal& d = m_decals[entity];
+		d.prev_decal = INVALID_ENTITY;
+		auto map_iter = m_material_decal_map.find(material);
+		if(map_iter.isValid()) {
+			d.next_decal = map_iter.value();
+			m_material_decal_map[material] = entity;
+		}
+		else {
+			d.next_decal = INVALID_ENTITY;
+			m_material_decal_map.insert(material, entity);
+			material->getObserverCb().bind<RenderSceneImpl, &RenderSceneImpl::decalMaterialStateChanged>(this);
+		}
+	}
+
+	
 	void addToModelEntityMap(Model* model, EntityRef entity)
 	{
 		ModelInstance& r = m_model_instances[entity.index];
@@ -3392,7 +3429,28 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 			}
 		}
 	}
+	
 
+	void removeFromMaterialDecalMap(Material* material, EntityRef entity)
+	{
+		Decal& d = m_decals[entity];
+		if(d.prev_decal.isValid()) {
+			m_decals[(EntityRef)d.prev_decal].next_decal = d.next_decal;
+		}
+		if(d.next_decal.isValid()) {
+			m_decals[(EntityRef)d.next_decal].prev_decal = d.prev_decal;
+		}
+		auto map_iter = m_material_decal_map.find(material);
+		if(map_iter.value() == entity) {
+			if(d.next_decal.isValid()) {
+				m_material_decal_map[material] = (EntityRef)d.next_decal;
+			}
+			else {
+				m_material_decal_map.erase(material);
+				material->getObserverCb().unbind<RenderSceneImpl, &RenderSceneImpl::decalMaterialStateChanged>(this);
+			}
+		}
+	}
 
 	void setModel(EntityRef entity, Model* model)
 	{
@@ -3496,13 +3554,13 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 
 	void createDecal(EntityRef entity)
 	{
-		Decal& decal = m_decals.insert(entity);
+		m_decals.insert(entity, Decal());
+		Decal& decal = m_decals[entity];
 		decal.material = nullptr;
 		decal.entity = entity;
 		decal.half_extents.set(1, 1, 1);
 		updateDecalInfo(decal);
 		const DVec3 pos = m_universe.getPosition(entity);
-		m_culling_system->add(entity, (u8)RenderableTypes::DECAL, pos, decal.half_extents.length());
 
 		m_universe.onComponentCreated(entity, DECAL_TYPE, this);
 	}
@@ -3592,7 +3650,7 @@ private:
 	EntityPtr m_active_global_light_entity;
 	HashMap<EntityRef, int> m_point_lights_map;
 
-	AssociativeArray<EntityRef, Decal> m_decals;
+	HashMap<EntityRef, Decal> m_decals;
 	Array<ModelInstance> m_model_instances;
 	HashMap<EntityRef, GlobalLight> m_global_lights;
 	Array<PointLight> m_point_lights;
@@ -3615,6 +3673,7 @@ private:
 	bool m_is_game_running;
 
 	HashMap<Model*, EntityRef> m_model_entity_map;
+	HashMap<Material*, EntityRef> m_material_decal_map;
 };
 
 
@@ -3680,6 +3739,7 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	, m_lod_multiplier(1.0f)
 	, m_time(0)
 	, m_is_updating_attachments(false)
+	, m_material_decal_map(m_allocator)
 {
 	m_universe.entityTransformed().bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
 	m_universe.entityDestroyed().bind<RenderSceneImpl, &RenderSceneImpl::onEntityDestroyed>(this);

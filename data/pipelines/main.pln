@@ -30,11 +30,13 @@ function geomPass()
 	local view_params = getCameraParams()
 	setStencil(0xff, STENCIL_ALWAYS, 1, 0xff, STENCIL_REPLACE, STENCIL_REPLACE, STENCIL_REPLACE);
 	renderTerrains("DEFERRED", view_params)
-	local cmd_set = prepareCommands(view_params, { default = 0, skinned = 1, decal = -1 })
-	renderBucket("DEFERRED", cmd_set, 0)
-	renderBucket("DEFERRED", cmd_set, 1)
---	renderMeshes("DEFERRED", view_params)
+	local default_set, decal_set = prepareCommands(view_params, { default = 0, decal = 1})
+	renderBucket("DEFERRED", default_set)
 	setStencil(0xff, STENCIL_DISABLE, 0, 0, STENCIL_KEEP, STENCIL_KEEP, STENCIL_KEEP);
+	bindTextures({
+		u_gbuffer_depth = gbuffer_depth,
+	}, 0)
+	renderBucket("", decal_set)
 	endBlock()
 	
 	return gbuffer0, gbuffer1, gbuffer2, dsbuffer

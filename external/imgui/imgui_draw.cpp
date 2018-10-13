@@ -211,7 +211,7 @@ void ImGui::StyleColorsDark(ImGuiStyle* dst)
     colors[ImGuiCol_TabUnfocusedActive]     = ImLerp(colors[ImGuiCol_TabActive],    colors[ImGuiCol_TitleBg], 0.40f);
     colors[ImGuiCol_TabHovered]             = colors[ImGuiCol_HeaderHovered];
     colors[ImGuiCol_DockingPreview]         = colors[ImGuiCol_HeaderActive] * ImVec4(1.0f, 1.0f, 1.0f, 0.7f);
-    colors[ImGuiCol_DockingBg]              = ImVec4(0.20f, 0.20f, 0.20f, 1.00f);;
+    colors[ImGuiCol_DockingEmptyBg]         = ImVec4(0.20f, 0.20f, 0.20f, 1.00f);;
     colors[ImGuiCol_PlotLines]              = ImVec4(0.61f, 0.61f, 0.61f, 1.00f);
     colors[ImGuiCol_PlotLinesHovered]       = ImVec4(1.00f, 0.43f, 0.35f, 1.00f);
     colors[ImGuiCol_PlotHistogram]          = ImVec4(0.90f, 0.70f, 0.00f, 1.00f);
@@ -268,7 +268,7 @@ void ImGui::StyleColorsClassic(ImGuiStyle* dst)
     colors[ImGuiCol_TabUnfocusedActive]     = ImLerp(colors[ImGuiCol_TabActive],    colors[ImGuiCol_TitleBg], 0.40f);
     colors[ImGuiCol_TabHovered]             = colors[ImGuiCol_HeaderHovered];
     colors[ImGuiCol_DockingPreview]         = colors[ImGuiCol_Header] * ImVec4(1.0f, 1.0f, 1.0f, 0.7f);
-    colors[ImGuiCol_DockingBg]              = ImVec4(0.20f, 0.20f, 0.20f, 1.00f);;
+    colors[ImGuiCol_DockingEmptyBg]         = ImVec4(0.20f, 0.20f, 0.20f, 1.00f);;
     colors[ImGuiCol_PlotLines]              = ImVec4(1.00f, 1.00f, 1.00f, 1.00f);
     colors[ImGuiCol_PlotLinesHovered]       = ImVec4(0.90f, 0.70f, 0.00f, 1.00f);
     colors[ImGuiCol_PlotHistogram]          = ImVec4(0.90f, 0.70f, 0.00f, 1.00f);
@@ -326,7 +326,7 @@ void ImGui::StyleColorsLight(ImGuiStyle* dst)
     colors[ImGuiCol_TabUnfocusedActive]     = ImLerp(colors[ImGuiCol_TabActive],    colors[ImGuiCol_TitleBg], 0.40f);
     colors[ImGuiCol_TabHovered]             = colors[ImGuiCol_HeaderHovered];
     colors[ImGuiCol_DockingPreview]         = colors[ImGuiCol_Header] * ImVec4(1.0f, 1.0f, 1.0f, 0.7f);
-    colors[ImGuiCol_DockingBg]              = ImVec4(0.20f, 0.20f, 0.20f, 1.00f);;
+    colors[ImGuiCol_DockingEmptyBg]         = ImVec4(0.20f, 0.20f, 0.20f, 1.00f);;
     colors[ImGuiCol_PlotLines]              = ImVec4(0.39f, 0.39f, 0.39f, 1.00f);
     colors[ImGuiCol_PlotLinesHovered]       = ImVec4(1.00f, 0.43f, 0.35f, 1.00f);
     colors[ImGuiCol_PlotHistogram]          = ImVec4(0.90f, 0.70f, 0.00f, 1.00f);
@@ -2667,11 +2667,10 @@ void ImFont::RenderText(ImDrawList* draw_list, float size, ImVec2 pos, ImU32 col
     // Fast-forward to first visible line
     const char* s = text_begin;
     if (y + line_height < clip_rect.y && !word_wrap_enabled)
-        while (y + line_height < clip_rect.y)
+        while (y + line_height < clip_rect.y && s < text_end)
         {
-            while (s < text_end)
-                if (*s++ == '\n')
-                    break;
+            s = (const char*)memchr(s, '\n', text_end - s);
+            s = s ? s + 1 : text_end;
             y += line_height;
         }
 
@@ -2681,15 +2680,16 @@ void ImFont::RenderText(ImDrawList* draw_list, float size, ImVec2 pos, ImU32 col
     {
         const char* s_end = s;
         float y_end = y;
-        while (y_end < clip_rect.w)
+        while (y_end < clip_rect.w && s_end < text_end)
         {
-            while (s_end < text_end)
-                if (*s_end++ == '\n')
-                    break;
+            s_end = (const char*)memchr(s_end, '\n', text_end - s_end);
+            s = s ? s + 1 : text_end;
             y_end += line_height;
         }
         text_end = s_end;
     }
+    if (s == text_end)
+        return;
 
     // Reserve vertices for remaining worse case (over-reserving is useful and easily amortized)
     const int vtx_count_max = (int)(text_end - s) * 4;

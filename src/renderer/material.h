@@ -105,6 +105,9 @@ public:
 	void unsetCustomFlag(u32 flag) { m_custom_flags &= ~flag; }
 	bool isCustomFlag(u32 flag) const { return (m_custom_flags & flag) == flag; }
 
+	u8 getLayer() const { return m_layer; }
+	void setLayer(u8 layer) { m_layer = layer; }
+
 	static u32 getCustomFlag(const char* flag_name);
 	static const char* getCustomFlagName(int index);
 	static int getCustomFlagCount();
@@ -133,6 +136,7 @@ private:
 	u32 m_define_mask;
 	u64 m_render_states;
 	RenderData* m_render_data;
+	u8 m_layer;
 	
 	Array<Uniform> m_uniforms;
 	u32 m_custom_flags;

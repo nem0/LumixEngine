@@ -324,6 +324,7 @@ void Model::onBeforeReady()
 {
 	for (Mesh& mesh : m_meshes) {
 		mesh.type = getBoneCount() == 0 || mesh.skin.empty() ? Mesh::RIGID_INSTANCED : Mesh::SKINNED;
+		mesh.layer = mesh.material->getLayer();
 	}
 }
 

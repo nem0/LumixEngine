@@ -561,6 +561,8 @@ public:
 	{
 		if (m_is_welcome_screen_open)
 		{
+			ImGuiID dockspace_id = ImGui::GetID("MyDockspace");
+			ImGui::DockSpace(dockspace_id, ImVec2(0, 0), ImGuiDockNodeFlags_KeepAliveOnly);
 			showWelcomeScreen();
 		}
 		else
@@ -578,7 +580,8 @@ public:
 				if (ImGui::Begin("MainDockspace", nullptr, flags)) {
 					float menu_height = showMainMenu();
 					showMainToolbar(menu_height);
-					ImGui::DockSpace(1);
+					ImGuiID dockspace_id = ImGui::GetID("MyDockspace");
+					ImGui::DockSpace(dockspace_id, ImVec2(0, 0));
 				}
 				ImGui::End();
 
