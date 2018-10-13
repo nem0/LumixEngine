@@ -22,7 +22,6 @@ struct ThreadContext
 {
 	ThreadContext(IAllocator& allocator) 
 		: buffer(allocator)
-		, mutex(false)
 	{
 		buffer.resize(1024 * 512);
 	}

@@ -19,7 +19,6 @@ static struct Instance
 {
 	Instance()
 		: contexts(allocator)
-		, mutex(false)
 		, timer(Timer::create(allocator))
 	{}
 

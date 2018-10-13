@@ -58,7 +58,6 @@ struct System
 		, m_job_queue(allocator)
 		, m_ready_fibers(allocator)
 		, m_counter_pool(allocator)
-		, m_sync(false)
 		, m_work_signal(true)
 		, m_event_outside_job(true)
 		, m_free_queue(allocator)
@@ -228,6 +227,7 @@ CounterHandle allocateCounter()
 
 void decCounter(CounterHandle handle)
 {
+	ASSERT((handle & HANDLE_ID_MASK) < 4096);
 	Job next_job = {nullptr, nullptr};
 
 	MT::SpinLock lock(g_system->m_sync);

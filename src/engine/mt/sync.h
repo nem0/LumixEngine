@@ -14,7 +14,7 @@ namespace MT
 	typedef void* SemaphoreHandle;
 	typedef void* MutexHandle;
 	typedef void* EventHandle;
-	typedef volatile i32 SpinMutexHandle;
+	typedef volatile long SpinMutexHandle;
 #elif defined __linux__
 	struct SemaphoreHandle
 	{
@@ -72,7 +72,7 @@ private:
 class LUMIX_ENGINE_API SpinMutex
 {
 public:
-	explicit SpinMutex(bool locked);
+	explicit SpinMutex();
 	~SpinMutex();
 
 	void lock();

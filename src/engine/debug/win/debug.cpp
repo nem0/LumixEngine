@@ -251,7 +251,6 @@ static const u32 ALLOCATION_GUARD = 0xFDFDFDFD;
 Allocator::Allocator(IAllocator& source)
 	: m_source(source)
 	, m_root(nullptr)
-	, m_mutex(false)
 	, m_total_size(0)
 	, m_is_fill_enabled(true)
 	, m_are_guards_enabled(true)

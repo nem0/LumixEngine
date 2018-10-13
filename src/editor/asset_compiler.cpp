@@ -68,9 +68,6 @@ struct AssetCompilerImpl : AssetCompiler
 		, m_to_compile(app.getWorldEditor().getAllocator())
 		, m_compiled(app.getWorldEditor().getAllocator())
 		, m_on_resource_changed(app.getWorldEditor().getAllocator())
-		, m_to_compile_mutex(false)
-		, m_compiled_mutex(false)
-		, m_plugin_mutex(false)
 		, m_semaphore(0, 0x7fFFffFF)
 	{
 		m_watcher = FileSystemWatcher::create(".", app.getWorldEditor().getAllocator());

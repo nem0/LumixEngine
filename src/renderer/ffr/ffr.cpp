@@ -117,7 +117,7 @@ static struct {
 	Pool<Uniform, Uniform::MAX_COUNT> uniforms;
 	Pool<Program, Program::MAX_COUNT> programs;
 	HashMap<u32, uint>* uniforms_hash_map;
-	MT::SpinMutex handle_mutex {false};
+	MT::SpinMutex handle_mutex;
 	DWORD thread;
 	int vertex_attributes = 0;
 	int instance_attributes = 0;

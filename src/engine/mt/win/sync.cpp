@@ -2,8 +2,7 @@
 #include "engine/mt/atomic.h"
 #include "engine/mt/thread.h"
 #include "engine/win/simple_win.h"
-
-
+#include <intrin.h>
 
 namespace Lumix
 {
@@ -73,49 +72,26 @@ bool Event::poll()
 }
 
 
-SpinMutex::SpinMutex(bool locked)
-	: m_id(0)
-{
-	if (locked)
-	{
-		lock();
-	}
-}
+SpinMutex::SpinMutex() : m_id(0) {}
 
 SpinMutex::~SpinMutex() = default;
 
-
 void SpinMutex::lock()
 {
-	for (;;)
-	{
-		if (compareAndExchange(&m_id, 1, 0))
-		{
-			memoryBarrier();
-			return;
-		}
-
-		while (m_id)
-		{
-			yield();
-		}
+	for (;;) {
+		if(m_id == 0 &&  _interlockedbittestandset(&m_id, 0) == 0) break;
+		_mm_pause();
 	}
 }
 
 bool SpinMutex::poll()
 {
-	if (compareAndExchange(&m_id, 1, 0))
-	{
-		memoryBarrier();
-		return true;
-	}
-	return false;
+	return m_id == 0 && _interlockedbittestandset(&m_id, 0) == 0;
 }
 
 void SpinMutex::unlock()
 {
-	memoryBarrier();
-	m_id = 0;
+	_interlockedbittestandreset(&m_id, 0);
 }
 
 
