@@ -43,7 +43,7 @@ public:
 	T* begin() const { return m_data; }
 
 
-	T* end() const { return m_data + m_size; }
+	T* end() const { return m_data ? m_data + m_size : nullptr; }
 
 
 	void swap(Array<T>& rhs)

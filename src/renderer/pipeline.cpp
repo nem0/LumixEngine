@@ -214,8 +214,6 @@ struct PipelineImpl final : Pipeline
 		m_draw2d.PushTextureID(font_atlas.TexID);
 
 		m_position_uniform = ffr::allocUniform("u_position", ffr::UniformType::VEC3, 1);
-		m_rotation_uniform = ffr::allocUniform("u_rotation", ffr::UniformType::VEC4, 1);
-		m_half_extents_uniform = ffr::allocUniform("u_half_extents", ffr::UniformType::VEC3, 1);
 		m_lod_uniform = ffr::allocUniform("u_lod", ffr::UniformType::INT, 1);
 		m_position_radius_uniform = ffr::allocUniform("u_pos_radius", ffr::UniformType::VEC4, 1);
 		m_terrain_params_uniform = ffr::allocUniform("u_terrain_params", ffr::UniformType::VEC4, 1);
@@ -1534,6 +1532,11 @@ struct PipelineImpl final : Pipeline
 				ffr::VertexDecl decal_decl;
 				decal_decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false);
 
+				ffr::VertexDecl decal_instance_decl;
+				decal_instance_decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false);
+				decal_instance_decl.addAttribute(4, ffr::AttributeType::FLOAT, false, false);
+				decal_instance_decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false);
+
 				Renderer& renderer = m_pipeline->m_renderer;
 
 				int drawcalls_count = 0;
@@ -1585,6 +1588,7 @@ struct PipelineImpl final : Pipeline
 									ffr::update(instance_buffer.buffer, instance_data, instance_buffer.offset, instance_buffer.size);
 									ffr::setInstanceBuffer(instance_decl, instance_buffer.buffer, instance_buffer.offset, mesh->vertex_decl.attributes_count);
 									ffr::drawTrianglesInstanced(0, mesh->indices_count, instances_count);
+									++drawcalls_count;
 								}
 								break;
 							}
@@ -1628,26 +1632,38 @@ struct PipelineImpl final : Pipeline
 									ffr::setVertexBuffer(&mesh->vertex_decl, mesh->vertex_buffer_handle, 0, prog.use_semantics ? attribute_map : nullptr);
 									ffr::setIndexBuffer(mesh->index_buffer_handle);
 									ffr::drawTriangles(mesh->indices_count);
+									++drawcalls_count;
 								}
 								break;
 							}
 							case RenderableTypes::DECAL: {
-								READ(Vec3, half_extents);
 								READ(Material::RenderData*, material);
-								READ(Vec3, pos);
-								READ(Quat, rot);
+								READ(u16, instances_count);
 
-								const Shader::Program& prog = Shader::getProgram(material->shader, m_define_mask);
-								ffr::setUniform3f(m_pipeline->m_position_uniform, &pos.x);
-								ffr::setUniform4f(m_pipeline->m_rotation_uniform, &rot.x);
-								ffr::setUniform3f(m_pipeline->m_half_extents_uniform, &half_extents.x);
+								ShaderRenderData* shader = material->shader;
+								for (int i = 0; i < material->textures_count; ++i) {
+									const ffr::TextureHandle handle = material->textures[i];
+									const ffr::UniformHandle uniform = shader->texture_uniforms[i];
+									ffr::bindTexture(i, handle);
+									ffr::setUniform1i(uniform, i);
+								}
+
+								const u8* instance_data = cmd;
+								cmd += decal_instance_decl.size * instances_count;
+
+								const Shader::Program& prog = Shader::getProgram(shader, m_define_mask);
 								if (prog.handle.isValid()) {
 									ffr::blending(0);
 									ffr::useProgram(prog.handle);
-									ffr::setState(material->render_states);
+									ffr::setState(material->render_states | (u64)ffr::StateFlags::DEPTH_TEST);
 									ffr::setIndexBuffer(m_pipeline->m_cube_ib);
 									ffr::setVertexBuffer(&decal_decl, m_pipeline->m_cube_vb, 0, nullptr);
-									ffr::drawTriangles(36);
+
+									const Renderer::TransientSlice instance_buffer = m_pipeline->m_renderer.allocTransient(instances_count * decal_instance_decl.size);
+									ffr::update(instance_buffer.buffer, instance_data, instance_buffer.offset, instance_buffer.size);
+									ffr::setInstanceBuffer(decal_instance_decl, instance_buffer.buffer, instance_buffer.offset, 1);
+									ffr::drawTrianglesInstanced(0, 36, instances_count);
+									++drawcalls_count;
 								}
 
 								break;
@@ -2171,16 +2187,24 @@ struct PipelineImpl final : Pipeline
 						}
 						case RenderableTypes::SKINNED:
 						case RenderableTypes::MESH_GROUP:
+							// TODO bucket
 							const LODMeshIndices lod = mi.model->getLODMeshIndices(squared_length);
 							for(int mesh_idx = lod.from; mesh_idx <= lod.to; ++mesh_idx) {
 								sort_keys.push(mi.meshes[mesh_idx].sort_key);
 								subrenderables.push(renderables[i] | ((u64)mesh_idx << 32));
 							}
 							break;
-						case RenderableTypes::DECAL:
-							sort_keys.push(renderables[i]);
-							subrenderables.push(renderables[i]);
+						case RenderableTypes::DECAL: {
+							const Material* material = scene->getDecalMaterial(e);
+							const int layer = material->getLayer();
+							const u8 bucket = bucket_map[layer];
+							if (bucket < 0xff) {
+								// TODO material can have the same sort key as mesh
+								sort_keys.push(material->getSortKey() | ((u64)bucket << 56));
+								subrenderables.push(renderables[i]);
+							}
 							break;
+						}
 						default: ASSERT(false); break;
 					}
 				}
@@ -2217,7 +2241,7 @@ struct PipelineImpl final : Pipeline
 				CreateCommands* ctx = (CreateCommands*)data;
 				PROFILE_INT("num", ctx->count);
 				const Universe& universe = ctx->cmd->m_pipeline->m_scene->getUniverse();
-				ctx->output->resize(ctx->count * (sizeof(RenderableTypes) + sizeof(Quat) + sizeof(float) + sizeof(Vec3) + sizeof(Mesh*) + sizeof(Material) + sizeof(u16)));
+				ctx->output->resize(ctx->count * (sizeof(RenderableTypes) + sizeof(Mesh::RenderData*) + sizeof(Material::RenderData*) + sizeof(Vec3) + sizeof(Quat) + sizeof(Vec3) + sizeof(u16) + sizeof(float)));
 				u8* out = ctx->output->begin();
 				const u64* LUMIX_RESTRICT renderables = ctx->renderables;
 				const u64* LUMIX_RESTRICT sort_keys = ctx->sort_keys;
@@ -2287,19 +2311,33 @@ struct PipelineImpl final : Pipeline
 							const Material* material = scene->getDecalMaterial(e);
 							const Vec3 half_extents = scene->getDecalHalfExtents(e);
 
-							WRITE(half_extents);
+							const uint out_offset = uint(out - ctx->output->begin());
+							ctx->output->resize(ctx->output->size() +  sizeof(Vec3) + sizeof(void*) + sizeof(Vec3) + sizeof(Quat));
+							out = ctx->output->begin() + out_offset;
 							WRITE_FN(material->getRenderData());
 
-							const Vec3 lpos = (entity_data[e.index].transform.pos - camera_pos).toFloat();
-							WRITE(lpos);
-							WRITE(entity_data[e.index].transform.rot);
-
+							u16* instance_count = (u16*)out;
+							int start_i = i;
+							out += sizeof(*instance_count);
+							const u64 key = sort_keys[i];
+							while (i < c && sort_keys[i] == key) {
+								const EntityRef e = {int(renderables[i] & 0x00ffFFff)};
+								const Transform& tr = entity_data[e.index].transform;
+								const Vec3 lpos = (tr.pos - camera_pos).toFloat();
+								WRITE(lpos);
+								WRITE(tr.rot);
+								const Vec3 half_extents = scene->getDecalHalfExtents(e);
+								WRITE(half_extents);
+								++i;
+							}
+							*instance_count = u16(i - start_i);
+							--i;
 							break;
 						}
 						default: ASSERT(false); break;
 					}
 				}
-				ctx->output->resize(int(out - ctx->output->begin()));
+				if (ctx->count > 0) ctx->output->resize(int(out - ctx->output->begin()));
 				#undef WRITE
 				#undef WRITE_FN
 			}
@@ -2373,10 +2411,12 @@ struct PipelineImpl final : Pipeline
 				int job_offset = 0;
 				const int step = (bucket_size + job_count - 1) / job_count;
 				for(int i = 0; i < job_count; ++i) {
+					const int count = Math::minimum(step, bucket_size - job_offset);
+					if (count < 0) break;
 					CreateCommands& ctx = create_commands.emplace();
 					ctx.renderables = renderables + bucket_offset + job_offset;
 					ctx.sort_keys = sort_keys + bucket_offset + job_offset;
-					ctx.count = Math::minimum(step, bucket_size - job_offset);
+					ctx.count = count;
 					ctx.cmd = this;
 					ctx.camera_pos = m_camera_params.pos;
 					ctx.output = &m_command_sets[bucket]->cmds.emplace(m_allocator);
@@ -2700,8 +2740,6 @@ struct PipelineImpl final : Pipeline
 
 	ffr::UniformHandle m_position_radius_uniform;
 	ffr::UniformHandle m_position_uniform;
-	ffr::UniformHandle m_rotation_uniform;
-	ffr::UniformHandle m_half_extents_uniform;
 	ffr::UniformHandle m_lod_uniform;
 	ffr::UniformHandle m_terrain_params_uniform;
 	ffr::UniformHandle m_rel_camera_pos_uniform;

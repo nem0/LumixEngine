@@ -1846,7 +1846,9 @@ public:
 	{
 		Decal& decal = m_decals[entity];
 		decal.half_extents = value;
-		m_culling_system->setRadius(entity, value.length());
+		if (decal.material && decal.material->isReady()) {
+			m_culling_system->setRadius(entity, value.length());
+		}
 		updateDecalInfo(decal);
 	}
 
@@ -1868,6 +1870,12 @@ public:
 		if (path.isValid()) {
 			decal.material = m_engine.getResourceManager().load<Material>(path);
 			addToMaterialDecalMap(decal.material, entity);
+
+			if (decal.material->isReady()) {
+				const float radius = m_decals[entity].half_extents.length();
+				const DVec3 pos = m_universe.getPosition(entity);
+				m_culling_system->add(entity, (u8)RenderableTypes::DECAL, pos, radius);
+			}
 		}
 		else {
 			decal.material = nullptr;

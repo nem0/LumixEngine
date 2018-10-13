@@ -36,6 +36,8 @@ function geomPass()
 	bindTextures({
 		u_gbuffer_depth = gbuffer_depth,
 	}, 0)
+	endBlock()
+	beginBlock("decals")
 	renderBucket("", decal_set)
 	endBlock()
 	
@@ -153,7 +155,7 @@ function main()
 		clear(CLEAR_DEPTH, 0, 0, 0, 1, 0)
 		renderGizmos()
 		render2D()
-		renderIcons()
+		--renderIcons()
 		renderDebugShapes()
 	end
 

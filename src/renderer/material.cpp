@@ -46,6 +46,8 @@ Material::Material(const Path& path, ResourceManager& resource_manager, Renderer
 	, m_custom_flags(0)
 	, m_render_data(nullptr)
 {
+	static u32 last_sort_key = 0;
+	m_sort_key = ++last_sort_key;
 	m_layer = m_renderer.getLayerIdx("default");
 	setAlphaRef(DEFAULT_ALPHA_REF_VALUE);
 	for (int i = 0; i < MAX_TEXTURE_COUNT; ++i)

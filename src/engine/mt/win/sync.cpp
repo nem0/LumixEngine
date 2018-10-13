@@ -84,11 +84,6 @@ void SpinMutex::lock()
 	}
 }
 
-bool SpinMutex::poll()
-{
-	return m_id == 0 && _interlockedbittestandset(&m_id, 0) == 0;
-}
-
 void SpinMutex::unlock()
 {
 	_interlockedbittestandreset(&m_id, 0);
