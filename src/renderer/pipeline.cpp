@@ -183,12 +183,6 @@ struct PipelineImpl final : Pipeline
 	{
 		CommandSet(IAllocator& allocator) : cmds(allocator) {}
 		Array<Array<u8>> cmds;
-		struct {
-			int array = 0;
-			int cmd = 0;
-			int bucket = -1;
-		} last_cmd;
-		u8 bucket_map[(int)RenderableTypes::COUNT];
 	};
 
 	PipelineImpl(Renderer& renderer, PipelineResource* resource, const char* define, IAllocator& allocator)
@@ -221,6 +215,8 @@ struct PipelineImpl final : Pipeline
 		m_draw2d.PushTextureID(font_atlas.TexID);
 
 		m_position_uniform = ffr::allocUniform("u_position", ffr::UniformType::VEC3, 1);
+		m_rotation_uniform = ffr::allocUniform("u_rotation", ffr::UniformType::VEC4, 1);
+		m_half_extents_uniform = ffr::allocUniform("u_half_extents", ffr::UniformType::VEC3, 1);
 		m_lod_uniform = ffr::allocUniform("u_lod", ffr::UniformType::INT, 1);
 		m_position_radius_uniform = ffr::allocUniform("u_pos_radius", ffr::UniformType::VEC4, 1);
 		m_terrain_params_uniform = ffr::allocUniform("u_terrain_params", ffr::UniformType::VEC4, 1);
@@ -1179,7 +1175,6 @@ struct PipelineImpl final : Pipeline
 	
 	static int prepareCommands(lua_State* L)
 	{
-		LuaWrapper::DebugGuard guard(L, 1);
 		PROFILE_FUNCTION();
 		const int pipeline_idx = lua_upvalueindex(1);
 		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
@@ -1191,53 +1186,28 @@ struct PipelineImpl final : Pipeline
 		const CameraParams cp = checkCameraParams(L, 1);
 
 		IAllocator& allocator = pipeline->m_renderer.getAllocator();
-		CommandSet* cmd_set = LUMIX_NEW(allocator, CommandSet)(allocator);
+		PrepareCommandsRenderJob* cmd = LUMIX_NEW(allocator, PrepareCommandsRenderJob)(allocator);
 
 		LuaWrapper::checkTableArg(L, 2);
-		lua_getfield(L, 2, "default");
-		if(lua_isnumber(L, -1)) {
-			const int value = (int)lua_tointeger(L, -1);
-			for(int i = 0; i < (int)RenderableTypes::COUNT; ++i) cmd_set->bucket_map[i] = value;
-		}
-		lua_pop(L, 1);
 
 		lua_pushnil(L);
+		cmd->m_bucket_count = 0;
 		while (lua_next(L, 2) != 0) {
 			if(lua_type(L, -1) != LUA_TNUMBER || lua_type(L, -2) != LUA_TSTRING) {
-				LUMIX_DELETE(allocator, cmd_set);
+				LUMIX_DELETE(allocator, cmd);
 				luaL_argerror(L, 3, "Incorrect view mapping");
 			}
 
 			const char* key = lua_tostring(L, -2);
-			if (!equalIStrings(key, "default")) {
-				const int value = (int)lua_tointeger(L, -1);
+			const int value = (int)lua_tointeger(L, -1);
 
-				static const struct {
-					const char* name;
-					RenderableTypes type;
-				} renderable_type_map[] = {
-					{ "mesh", RenderableTypes::MESH },
-					{ "mesh_group", RenderableTypes::MESH_GROUP },
-					{ "skinned", RenderableTypes::SKINNED },
-					{ "decal", RenderableTypes::DECAL }
-				};
-				bool found = false;
-				for (auto& i : renderable_type_map) {
-					if (equalStrings(i.name, key)) {
-						found = true;
-						cmd_set->bucket_map[(int)i.type] = value;
-						break;
-					}
-				}
-				if (!found) {
-					LUMIX_DELETE(allocator, cmd_set);
-					luaL_argerror(L, 3, "Unknown renderable type");
-				}
-			}
+			const int layer = pipeline->m_renderer.getLayerIdx(key);
+			cmd->m_bucket_map[layer] = value;
+			cmd->m_bucket_count = Math::maximum(value + 1, cmd->m_bucket_count); 
+			
 			lua_pop(L, 1);
 		}
 
-		PrepareCommandsRenderJob* cmd = LUMIX_NEW(allocator, PrepareCommandsRenderJob)(allocator);
 /*
 		if (lua_gettop(L) > 4 && lua_istable(L, 4)) {
 			lua_pushnil(L);
@@ -1273,15 +1243,19 @@ struct PipelineImpl final : Pipeline
 				lua_pop(L, 1);
 			}
 		}*/
+		for(int i = 0; i < cmd->m_bucket_count; ++i) {
+			CommandSet* cmd_set = LUMIX_NEW(allocator, CommandSet)(allocator);
 
-		pipeline->m_command_sets.push(cmd_set);
-		cmd->m_command_set = cmd_set;
+			pipeline->m_command_sets.push(cmd_set);
+			cmd->m_command_sets[i] = cmd_set;
+			LuaWrapper::push(L, cmd_set);
+		}
 		cmd->m_camera_params = cp;
 		cmd->m_pipeline = pipeline;
+		const int num_cmd_sets = cmd->m_bucket_count;
 		pipeline->m_renderer.push(cmd);
 
-		LuaWrapper::push(L, cmd_set);
-		return 1;
+		return num_cmd_sets;
 	}
 
 
@@ -1537,7 +1511,7 @@ struct PipelineImpl final : Pipeline
 	}
 
 
-	void renderBucket(const char* define, CommandSet* cmd_set, int bucket)
+	void renderBucket(const char* define, CommandSet* cmd_set)
 	{
 		struct RenderJob : Renderer::RenderJob
 		{
@@ -1545,14 +1519,21 @@ struct PipelineImpl final : Pipeline
 
 			void execute() override
 			{
-				++m_cmd_set->last_cmd.bucket;
-				ASSERT(m_bucket == m_cmd_set->last_cmd.bucket);
+				// inline in debug
+				#define READ(T, N) \
+					T N = *(T*)cmd; \
+					cmd += sizeof(T); \
+					do {} while(false)
+
 				PROFILE_FUNCTION();
 				if(m_cmd_set->cmds.empty()) return;
 
 				ffr::VertexDecl instance_decl;
 				instance_decl.addAttribute(4, ffr::AttributeType::FLOAT, false, false);
 				instance_decl.addAttribute(4, ffr::AttributeType::FLOAT, false, false);
+
+				ffr::VertexDecl decal_decl;
+				decal_decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false);
 
 				Renderer& renderer = m_pipeline->m_renderer;
 
@@ -1561,29 +1542,19 @@ struct PipelineImpl final : Pipeline
 				const u32 instanced_mask = m_define_mask | (1 << m_pipeline->m_renderer.getShaderDefineIdx("INSTANCED"));
 				const u32 skinned_mask = m_define_mask | (1 << m_pipeline->m_renderer.getShaderDefineIdx("SKINNED"));
 
-				const u8* bucket_map = m_cmd_set->bucket_map;
-				const int bucket = m_bucket;
-				for (int array_i = m_cmd_set->last_cmd.array; array_i < m_cmd_set->cmds.size(); ++array_i) {
-					const Array<u8>& cmds = m_cmd_set->cmds[array_i];
-					const u8* cmd = cmds.begin() + (array_i == m_cmd_set->last_cmd.array ?  m_cmd_set->last_cmd.cmd : 0);
+				for (const Array<u8>& cmds : m_cmd_set->cmds) {
+					const u8* cmd = cmds.begin();
 					const u8* cmd_end = cmds.end();
 					while (cmd != cmd_end) {
 						const RenderableTypes type = *(RenderableTypes*)cmd;
 						cmd += sizeof(type);
-						if (bucket_map[(int)type] != bucket) {
-							m_cmd_set->last_cmd.array = array_i;
-							m_cmd_set->last_cmd.cmd = int(cmd - cmds.begin() - sizeof(type));
-							return;
-						}
 						switch(type) {
 							case RenderableTypes::MESH:
 							case RenderableTypes::MESH_GROUP: {
-								const Mesh::RenderData* mesh = *(const Mesh::RenderData**)cmd;
-								cmd += sizeof(mesh);
-								const Material::RenderData* material = *(const Material::RenderData**)cmd;
-								cmd += sizeof(mesh);
-								const u16 instances_count = *(u16*)cmd;
-								cmd += sizeof(instances_count);
+								READ(const Mesh::RenderData*, mesh);
+								READ(const Material::RenderData*, material);
+								READ(const u16, instances_count);
+
 								const float* instance_data = (const float*)cmd;
 								cmd += sizeof(Vec4) * 2 * instances_count;
 
@@ -1619,14 +1590,14 @@ struct PipelineImpl final : Pipeline
 								break;
 							}
 							case RenderableTypes::SKINNED: {
-								const Mesh::RenderData* mesh = *(const Mesh::RenderData**)cmd;
-								cmd += sizeof(mesh);
-								const Material::RenderData* material = *(const Material::RenderData**)cmd;
-								cmd += sizeof(mesh);
+								READ(const Mesh::RenderData*, mesh);
+								READ(const Material::RenderData*, material);
+
 								const float* model_mtx = (const float*)cmd;
 								cmd += sizeof(Matrix);
-								const int bones_count = *(const int*)cmd;
-								cmd += sizeof(int);
+
+								READ(const int, bones_count);
+
 								const float* bones = (const float*)cmd;
 								cmd += sizeof(Matrix) * bones_count;
 
@@ -1661,23 +1632,43 @@ struct PipelineImpl final : Pipeline
 								}
 								break;
 							}
+							case RenderableTypes::DECAL: {
+								READ(Vec3, half_extents);
+								READ(Material::RenderData*, material);
+								READ(Vec3, pos);
+								READ(Quat, rot);
+
+								const Shader::Program& prog = Shader::getProgram(material->shader, m_define_mask);
+								ffr::setUniform3f(m_pipeline->m_position_uniform, &pos.x);
+								ffr::setUniform4f(m_pipeline->m_rotation_uniform, &rot.x);
+								ffr::setUniform3f(m_pipeline->m_half_extents_uniform, &half_extents.x);
+								if (prog.handle.isValid()) {
+									ffr::blending(0);
+									ffr::useProgram(prog.handle);
+									ffr::setState(material->render_states);
+									ffr::setIndexBuffer(m_pipeline->m_cube_ib);
+									ffr::setVertexBuffer(&decal_decl, m_pipeline->m_cube_vb, 0, nullptr);
+									ffr::drawTriangles(36);
+								}
+
+								break;
+							}
 							default: ASSERT(false); break;
 						}
 					}
 				}
+				#undef READ
 			}
 
 			u32 m_define_mask;
 			PipelineImpl* m_pipeline;
 			CommandSet* m_cmd_set;
-			int m_bucket;
 		};
 
 		RenderJob* job = LUMIX_NEW(m_renderer.getAllocator(), RenderJob);
 		job->m_define_mask = define[0] ? 1 << m_renderer.getShaderDefineIdx(define) : 0;
 		job->m_pipeline = this;
 		job->m_cmd_set = cmd_set;
-		job->m_bucket = bucket;
 		m_renderer.push(job);
 	}
 
@@ -2070,7 +2061,9 @@ struct PipelineImpl final : Pipeline
 	{
 		PrepareCommandsRenderJob(IAllocator& allocator) 
 			: m_allocator(allocator)
-		{}
+		{
+			memset(m_bucket_map, 0xff, sizeof(m_bucket_map));
+		}
 
 
 		void radixSort(u64* _keys, u64* _values, int size)
@@ -2153,7 +2146,7 @@ struct PipelineImpl final : Pipeline
 				PROFILE_BLOCK("sort_keys");
 				CreateSortKeys* ctx = (CreateSortKeys*)data;
 				PROFILE_INT("num", ctx->count);
-
+				const u8* bucket_map = ctx->cmd->m_bucket_map;
 				RenderScene* scene = ctx->cmd->m_pipeline->m_scene;
 				const ModelInstance* model_instances = scene->getModelInstances();
 				const u32* renderables = ctx->renderables;
@@ -2168,13 +2161,18 @@ struct PipelineImpl final : Pipeline
 					const ModelInstance& mi = model_instances[e.index];
 					const RenderableTypes type = RenderableTypes(renderables[i] >> 24);
 					switch (type) {
-						case RenderableTypes::MESH:
-							sort_keys.push(mi.meshes[0].sort_key);
-							subrenderables.push(renderables[i]);
+						case RenderableTypes::MESH: {
+							const Mesh& mesh = mi.meshes[0];
+							const u8 bucket = bucket_map[mesh.layer];
+							if (bucket < 0xff) {
+								sort_keys.push(mesh.sort_key | ((u64)bucket << 56));
+								subrenderables.push(renderables[i]);
+							}
 							break;
+						}
 						case RenderableTypes::SKINNED:
 						case RenderableTypes::MESH_GROUP:
-							LODMeshIndices lod = mi.model->getLODMeshIndices(squared_length);
+							const LODMeshIndices lod = mi.model->getLODMeshIndices(squared_length);
 							for(int mesh_idx = lod.from; mesh_idx <= lod.to; ++mesh_idx) {
 								sort_keys.push(mi.meshes[mesh_idx].sort_key);
 								subrenderables.push(renderables[i] | ((u64)mesh_idx << 32));
@@ -2204,6 +2202,18 @@ struct PipelineImpl final : Pipeline
 		{
 			static void execute(void* data)
 			{
+				// because of inlining in debug
+				#define WRITE(x) do { \
+					memcpy(out, &(x), sizeof(x)); \
+					out += sizeof(x); \
+				} while(false)
+				
+				#define WRITE_FN(x) do { \
+					auto* p = x; \
+					memcpy(out, &p, sizeof(p)); \
+					out += sizeof(p); \
+				} while(false)
+
 				PROFILE_BLOCK("create cmds");
 				CreateCommands* ctx = (CreateCommands*)data;
 				PROFILE_INT("num", ctx->count);
@@ -2212,7 +2222,8 @@ struct PipelineImpl final : Pipeline
 				u8* out = ctx->output->begin();
 				const u64* LUMIX_RESTRICT renderables = ctx->renderables;
 				const u64* LUMIX_RESTRICT sort_keys = ctx->sort_keys;
-				const ModelInstance* LUMIX_RESTRICT model_instances = ctx->cmd->m_pipeline->m_scene->getModelInstances();
+				RenderScene* scene = ctx->cmd->m_pipeline->m_scene;
+				const ModelInstance* LUMIX_RESTRICT model_instances = scene->getModelInstances();
 				const Universe::EntityData* LUMIX_RESTRICT entity_data = universe.getEntityData(); 
 				const DVec3 camera_pos = ctx->camera_pos;
 				for (int i = 0, c = ctx->count; i < c; ++i) {
@@ -2225,10 +2236,8 @@ struct PipelineImpl final : Pipeline
 						case RenderableTypes::MESH: {
 							const u32 mesh_idx = renderables[i] >> 32;
 							const ModelInstance* LUMIX_RESTRICT mi = &model_instances[e.index];
-							*(Mesh::RenderData**)out = mi->meshes[mesh_idx].render_data;
-							out += sizeof(Mesh::RenderData*);
-							*(Material::RenderData**)out = mi->meshes[mesh_idx].material->getRenderData();
-							out += sizeof(Material::RenderData*);
+							WRITE(mi->meshes[mesh_idx].render_data);
+							WRITE_FN(mi->meshes[mesh_idx].material->getRenderData());
 							u16* instance_count = (u16*)out;
 							int start_i = i;
 							out += sizeof(*instance_count);
@@ -2237,12 +2246,9 @@ struct PipelineImpl final : Pipeline
 								const EntityRef e = {int(renderables[i] & 0x00ffFFff)};
 								const Transform& tr = entity_data[e.index].transform;
 								const Vec3 lpos = (tr.pos - camera_pos).toFloat();
-								memcpy(out, &tr.rot, sizeof(tr.rot));
-								out += sizeof(tr.rot);
-								memcpy(out, &lpos, sizeof(lpos));
-								out += sizeof(lpos);
-								memcpy(out, &tr.scale, sizeof(tr.scale));
-								out += sizeof(tr.scale);
+								WRITE(tr.rot);
+								WRITE(lpos);
+								WRITE(tr.scale);
 								++i;
 							}
 							*instance_count = u16(i - start_i);
@@ -2252,17 +2258,14 @@ struct PipelineImpl final : Pipeline
 						case RenderableTypes::SKINNED: {
 							const u32 mesh_idx = renderables[i] >> 32;
 							const ModelInstance* LUMIX_RESTRICT mi = &model_instances[e.index];
-							*(Mesh::RenderData**)out = mi->meshes[mesh_idx].render_data;
-							out += sizeof(Mesh::RenderData*);
-							*(Material::RenderData**)out = mi->meshes[mesh_idx].material->getRenderData();
-							out += sizeof(Material::RenderData*);
+							WRITE(mi->meshes[mesh_idx].render_data);
+							WRITE_FN(mi->meshes[mesh_idx].material->getRenderData());
 							const EntityRef e = {int(renderables[i] & 0x00ffFFff)};
 							const Transform& tr = entity_data[e.index].transform;
 							Matrix mtx = tr.rot.toMatrix();
 							mtx.multiply3x3(tr.scale);
 							mtx.setTranslation((tr.pos - camera_pos).toFloat());
-							memcpy(out, &mtx, sizeof(mtx));
-							out += sizeof(mtx);
+							WRITE(mtx);
 
 							*(int*)out = mi->pose->count;
 							out += sizeof(int);
@@ -2277,23 +2280,35 @@ struct PipelineImpl final : Pipeline
 								const Model::Bone& bone = model.getBone(j);
 								const LocalRigidTransform tmp = {positions[j], rotations[j]};
 								Matrix m = (tmp * bone.inv_bind_transform).toMatrix();
-								memcpy(out, &m, sizeof(m));
-								out += sizeof(m);
+								WRITE(m);
 							}
 							break;
 						}
-						case RenderableTypes::DECAL:
-							ASSERT(false);
+						case RenderableTypes::DECAL: {
+							const Material* material = scene->getDecalMaterial(e);
+							const Vec3 half_extents = scene->getDecalHalfExtents(e);
+
+							WRITE(half_extents);
+							WRITE_FN(material->getRenderData());
+
+							const Vec3 lpos = (entity_data[e.index].transform.pos - camera_pos).toFloat();
+							WRITE(lpos);
+							WRITE(entity_data[e.index].transform.rot);
+
 							break;
+						}
 						default: ASSERT(false); break;
 					}
 				}
 				ctx->output->resize(int(out - ctx->output->begin()));
+				#undef WRITE
+				#undef WRITE_FN
 			}
 
 			u64* renderables;
 			u64* sort_keys;
 			Array<u8>* output;
+			int idx;
 			DVec3 camera_pos;
 			int count;
 			PrepareCommandsRenderJob* cmd;
@@ -2349,21 +2364,26 @@ struct PipelineImpl final : Pipeline
 		{
 			Array<CreateCommands> create_commands(m_allocator);
 			const int job_count = Math::minimum(size, 16);
-			create_commands.reserve(job_count);
-			int offset = 0;
-			const int step = (size + job_count - 1) / job_count;
-			m_command_set->cmds.reserve(job_count);
+			create_commands.reserve(job_count * m_bucket_count);
 			JobSystem::CounterHandle counter = JobSystem::allocateCounter();
-			for(int i = 0; i < job_count; ++i) {
-				CreateCommands& ctx = create_commands.emplace();
-				ctx.renderables = renderables + offset;
-				ctx.sort_keys = sort_keys + offset;
-				ctx.count = Math::minimum(step, size - offset);
-				ctx.cmd = this;
-				ctx.camera_pos = m_camera_params.pos;
-				ctx.output = &m_command_set->cmds.emplace(m_allocator);
-				offset += step;
-				JobSystem::run(counter, &ctx, &CreateCommands::execute);
+			int bucket_offset = 0;
+			for(u8 bucket = 0; bucket < m_bucket_count; ++bucket) {
+				m_command_sets[bucket]->cmds.reserve(job_count);
+				int bucket_size;
+				for(bucket_size = bucket_offset; bucket_size < size && (sort_keys[bucket_size] >> 56) == bucket; ++bucket_size);
+				int job_offset = 0;
+				const int step = (bucket_size + job_count - 1) / job_count;
+				for(int i = 0; i < job_count; ++i) {
+					CreateCommands& ctx = create_commands.emplace();
+					ctx.renderables = renderables + bucket_offset + job_offset;
+					ctx.sort_keys = sort_keys + bucket_offset + job_offset;
+					ctx.count = Math::minimum(step, bucket_size - job_offset);
+					ctx.cmd = this;
+					ctx.camera_pos = m_camera_params.pos;
+					ctx.output = &m_command_sets[bucket]->cmds.emplace(m_allocator);
+					job_offset += step;
+					JobSystem::run(counter, &ctx, &CreateCommands::execute);
+				}
 			}
 			JobSystem::decCounter(counter);
 			JobSystem::wait(counter);
@@ -2382,7 +2402,9 @@ struct PipelineImpl final : Pipeline
 			ffr::UniformHandle uniform;
 		} m_global_textures[16];
 		int m_global_textures_count = 0;
-		CommandSet* m_command_set;
+		CommandSet* m_command_sets[255];
+		u8 m_bucket_map[255];
+		u8 m_bucket_count;
 	};
 
 
@@ -2679,6 +2701,8 @@ struct PipelineImpl final : Pipeline
 
 	ffr::UniformHandle m_position_radius_uniform;
 	ffr::UniformHandle m_position_uniform;
+	ffr::UniformHandle m_rotation_uniform;
+	ffr::UniformHandle m_half_extents_uniform;
 	ffr::UniformHandle m_lod_uniform;
 	ffr::UniformHandle m_terrain_params_uniform;
 	ffr::UniformHandle m_rel_camera_pos_uniform;

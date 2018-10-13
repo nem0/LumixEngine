@@ -111,6 +111,7 @@ struct LUMIX_RENDERER_API Mesh
 	Array<Skin> skin;
 	FlagSet<Flags, u8> flags;
 	u32 sort_key;
+	u8 layer;
 	string name;
 	Material* material;
 	RenderData* render_data;

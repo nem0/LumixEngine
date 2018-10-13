@@ -1,0 +1,44 @@
+include "pipelines/common.glsl"
+
+------------------
+
+vertex_shader [[
+	uniform vec3 u_position;
+	uniform vec4 u_rotation;
+	uniform vec3 u_half_extents;
+	in vec3 a_position;
+	out vec3 v_uv;
+	void main()
+	{
+		v_uv = a_position;
+		vec3 pos = rotateByQuat(u_rotation, a_position * u_half_extents);
+		pos += u_position;
+		gl_Position = u_camera_projection * u_camera_view * vec4(pos, 1);
+	}
+]]
+
+---------------------
+
+
+fragment_shader [[
+	in vec3 v_uv;
+	out vec4 o_color;
+	uniform sampler2D u_gbuffer_depth;
+	
+	uniform vec3 u_position;
+	uniform vec4 u_rotation;
+	uniform vec3 u_half_extents;
+
+	void main()
+	{
+		vec2 screen_uv = gl_FragCoord.xy / u_framebuffer_size;
+		vec3 wpos = getViewPosition(u_gbuffer_depth, u_camera_inv_view_projection, screen_uv);
+		
+		vec4 r = u_rotation;
+		r.w = -r.w;
+		vec3 lpos = rotateByQuad(r, wpos - u_position);
+		if (any(greaterThan(lpos, u_half_extents))) discard;
+		
+		o_color = vec4(1, 0, 0, 1);
+	}
+]]

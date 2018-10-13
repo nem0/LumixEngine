@@ -394,6 +394,7 @@ struct RendererImpl final : public Renderer
 		, m_main_pipeline(nullptr)
 		, m_render_task(*this, m_allocator)
 		, m_frame_semaphore(2, 2)
+		, m_layers(m_allocator)
 	{
 		registerProperties(engine.getAllocator());
 		char cmd_line[4096];
@@ -600,6 +601,16 @@ struct RendererImpl final : public Renderer
 		push(cmd);
 
 		return handle;
+	}
+
+
+	u8 getLayerIdx(const char* name) override
+	{
+		for(int i = 0; i < m_layers.size(); ++i) {
+			if(m_layers[i] == name) return i;
+		}
+		m_layers.emplace(name);
+		return m_layers.size() - 1;
 	}
 
 
@@ -916,6 +927,7 @@ struct RendererImpl final : public Renderer
 	IAllocator& m_allocator;
 	MT::Semaphore m_frame_semaphore;
 	Array<ShaderDefine> m_shader_defines;
+	Array<StaticString<32>> m_layers;
 	TextureManager m_texture_manager;
 	PipelineResourceManager m_pipeline_manager;
 	ParticleEmitterResourceManager m_particle_emitter_manager;

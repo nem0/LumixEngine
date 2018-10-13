@@ -283,6 +283,7 @@ public:
 	virtual Path getDecalMaterialPath(EntityRef entity) = 0;
 	virtual void setDecalHalfExtents(EntityRef entity, const Vec3& value) = 0;
 	virtual Vec3 getDecalHalfExtents(EntityRef entity) = 0;
+	virtual Material* getDecalMaterial(EntityRef entity) const = 0;
 
 	virtual void getGrassInfos(const Frustum& frustum,
 		EntityRef entity,
