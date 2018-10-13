@@ -729,6 +729,12 @@ public:
 				auto pos = LuaWrapper::toType<DVec3>(L, -1);
 				ctx->setPosition(e, pos);
 			}
+			else if (equalStrings(parameter_name, "pitch"))
+			{
+				const float angle = LuaWrapper::toType<float>(L, -1);
+				const Quat rot(Vec3(1, 0, 0), Math::degreesToRadians(angle)); 
+				ctx->setRotation(e, rot);
+			}
 			else if (equalStrings(parameter_name, "rotation"))
 			{
 				auto rot = LuaWrapper::toType<Quat>(L, -1);

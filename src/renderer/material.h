@@ -107,6 +107,7 @@ public:
 
 	u8 getLayer() const { return m_layer; }
 	void setLayer(u8 layer) { m_layer = layer; }
+	u32 getSortKey() const { return m_sort_key; }
 
 	static u32 getCustomFlag(const char* flag_name);
 	static const char* getCustomFlagName(int index);
@@ -137,7 +138,8 @@ private:
 	u64 m_render_states;
 	RenderData* m_render_data;
 	u8 m_layer;
-	
+	u32 m_sort_key;
+
 	Array<Uniform> m_uniforms;
 	u32 m_custom_flags;
 };

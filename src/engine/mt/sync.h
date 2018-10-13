@@ -76,12 +76,11 @@ public:
 	~SpinMutex();
 
 	void lock();
-	bool poll();
 
 	void unlock();
 
 private:
-	SpinMutexHandle m_id;
+	alignas(64) SpinMutexHandle m_id;
 };
 
 
