@@ -550,9 +550,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 	void showPreview(Model& model)
 	{
-				// TODO
-	ASSERT(false);
-/*auto* render_scene = static_cast<RenderScene*>(m_universe->getScene(MODEL_INSTANCE_TYPE));
+		auto* render_scene = static_cast<RenderScene*>(m_universe->getScene(MODEL_INSTANCE_TYPE));
 		if (!render_scene) return;
 		if (!model.isReady()) return;
 		if (!m_mesh.isValid()) return;
@@ -563,7 +561,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			AABB aabb = model.getAABB();
 
 			const Vec3 center = (aabb.max + aabb.min) * 0.5f;
-			m_viewport.pos = center + Vec3(1, 1, 1) * (aabb.max - aabb.min).length();
+			m_viewport.pos = DVec3(0)  + center + Vec3(1, 1, 1) * (aabb.max - aabb.min).length();
 			m_viewport.rot = Quat::vec3ToVec3({0, 0, 1}, {1, 1, 1});
 		}
 		ImVec2 image_size(ImGui::GetContentRegionAvailWidth(), ImGui::GetContentRegionAvailWidth());
@@ -589,9 +587,11 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		{
 			if (ImGui::Selectable("Save preview"))
 			{
-				const Matrix mtx(m_viewport.pos, m_viewport.rot);
+				// TODO 
+				ASSERT(false);
+				/*const Matrix mtx(m_viewport.pos, m_viewport.rot);
 				model.getResourceManager().load(model);
-				renderTile(&model, &mtx);
+				renderTile(&model, &mtx);*/
 			}
 			ImGui::EndPopup();
 		}
@@ -611,7 +611,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			if (delta.x != 0 || delta.y != 0)
 			{
 				const Vec2 MOUSE_SENSITIVITY(50, 50);
-				Vec3 pos = m_viewport.pos;
+				DVec3 pos = m_viewport.pos;
 				Quat rot = m_viewport.rot;
 
 				float yaw = -Math::signum(delta.x) * (Math::pow(Math::abs((float)delta.x / MOUSE_SENSITIVITY.x), 1.2f));
@@ -629,13 +629,13 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				Vec3 dir = rot.rotate(Vec3(0, 0, 1));
 				Vec3 origin = (model.getAABB().max + model.getAABB().min) * 0.5f;
 
-				float dist = (origin - pos).length();
-				pos = origin + dir * dist;
+				float dist = (origin - pos.toFloat()).length();
+				pos = DVec3(0) + origin + dir * dist;
 
 				m_viewport.rot = rot;
 				m_viewport.pos = pos;
 			}
-		}*/
+		}
 	}
 
 

@@ -68,7 +68,6 @@ struct MTBucketArray
 
 	MTBucketArray(IAllocator& allocator) 
 		: m_counts(allocator) 
-		, m_mutex(false)
 	{
 		m_mem = (u8*)VirtualAlloc(nullptr, 1024 * 1024 * 8, MEM_RESERVE, PAGE_READWRITE);
 		m_end = m_mem;
