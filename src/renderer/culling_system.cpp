@@ -184,7 +184,7 @@ struct CullingSystemImpl final : public CullingSystem
 
 	void remove(EntityRef entity) override
 	{
-		if(m_entity_to_cell.size() >= entity.index) return;
+		if(m_entity_to_cell.size() <= entity.index) return;
 		const EntityLoc loc = m_entity_to_cell[entity.index];
 		Cell& cell = *loc.cell;
 		const u32 last = cell.ids.back();
