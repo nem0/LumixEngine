@@ -20,6 +20,7 @@
 #include "engine/resource_manager.h"
 #include "engine/serializer.h"
 #include "engine/string.h"
+#include "engine/system.h"
 #include "engine/universe/universe.h"
 #include "imgui/imgui.h"
 #include <cstdlib>
@@ -28,12 +29,13 @@ namespace Lumix
 {
 
 
-class AssetBrowserPlugin final : public AssetBrowser::IPlugin
+class AssetBrowserPlugin final : public AssetBrowser::IPlugin, public AssetCompiler::IPlugin
 {
 public:
 	AssetBrowserPlugin(StudioApp& app, PrefabSystem& system)
 		: system(system)
-		, editor(editor)
+		, editor(app.getWorldEditor())
+		, app(app)
 	{
 		app.getAssetCompiler().registerExtension("fab", PrefabResource::TYPE);
 	}
@@ -47,6 +49,18 @@ public:
 			system.instantiatePrefab(*(PrefabResource*)resource, editor.getCameraRaycastHit(), {0, 0, 0, 1}, 1);
 		}
 	}
+	
+	
+	bool compile(const Path& src) override
+	{
+		const char* dst_dir = app.getAssetCompiler().getCompiledDir();
+		const u32 hash = crc32(src.c_str());
+
+		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
+
+		copyFile(src.c_str(), dst);
+		return true;
+	}
 
 
 	void onResourceUnloaded(Resource* resource) override {}
@@ -56,6 +70,7 @@ public:
 
 	PrefabSystem& system;
 	WorldEditor& editor;
+	StudioApp& app;
 };
 
 
@@ -751,16 +766,19 @@ void PrefabSystem::destroy(PrefabSystem* system)
 static AssetBrowserPlugin* ab_plugin = nullptr;
 
 
-void PrefabSystem::createAssetBrowserPlugin(StudioApp& app, PrefabSystem& system)
+void PrefabSystem::createEditorPlugins(StudioApp& app, PrefabSystem& system)
 {
 	ab_plugin = LUMIX_NEW(app.getWorldEditor().getAllocator(), AssetBrowserPlugin)(app, system);
 	app.getAssetBrowser().addPlugin(*ab_plugin);
+	const char* extensions[] = { "fab", nullptr };
+	app.getAssetCompiler().addPlugin(*ab_plugin, extensions);
 }
 
 
-void PrefabSystem::destroyAssetBrowserPlugin(StudioApp& app)
+void PrefabSystem::destroyEditorPlugins(StudioApp& app)
 {
 	app.getAssetBrowser().removePlugin(*ab_plugin);
+	app.getAssetCompiler().removePlugin(*ab_plugin);
 	LUMIX_DELETE(app.getWorldEditor().getAllocator(), ab_plugin);
 	ab_plugin = nullptr;
 }
