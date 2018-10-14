@@ -4,6 +4,7 @@
 #include "audio_system.h"
 #include "clip_manager.h"
 #include "editor/asset_browser.h"
+#include "editor/asset_compiler.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
@@ -31,7 +32,7 @@ struct AssetBrowserPlugin final : public AssetBrowser::IPlugin
 		, m_browser(app.getAssetBrowser())
 		, m_playing_clip(-1)
 	{
-		app.getAssetBrowser().registerExtension("ogg", Clip::TYPE);
+		app.getAssetCompiler().registerExtension("ogg", Clip::TYPE);
 	}
 
 

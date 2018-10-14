@@ -42,7 +42,7 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlug
 	explicit AnimationAssetBrowserPlugin(StudioApp& app)
 		: m_app(app)
 	{
-		app.getAssetBrowser().registerExtension("ani", Animation::TYPE);
+		app.getAssetCompiler().registerExtension("ani", Animation::TYPE);
 	}
 
 
@@ -90,7 +90,7 @@ struct PropertyAnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 	explicit PropertyAnimationAssetBrowserPlugin(StudioApp& app)
 		: m_app(app)
 	{
-		app.getAssetBrowser().registerExtension("anp", PropertyAnimation::TYPE);
+		app.getAssetCompiler().registerExtension("anp", PropertyAnimation::TYPE);
 	}
 
 
@@ -292,7 +292,7 @@ struct AnimControllerAssetBrowserPlugin : AssetBrowser::IPlugin
 	explicit AnimControllerAssetBrowserPlugin(StudioApp& app)
 		: m_app(app)
 	{
-		app.getAssetBrowser().registerExtension("act", Anim::ControllerResource::TYPE);
+		app.getAssetCompiler().registerExtension("act", Anim::ControllerResource::TYPE);
 	}
 
 

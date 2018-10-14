@@ -109,7 +109,7 @@ static bool saveAsDDS(const char* path, const u8* image_data, int image_width, i
 
 struct FontPlugin final : public AssetBrowser::IPlugin
 {
-	FontPlugin(StudioApp& app) { app.getAssetBrowser().registerExtension("ttf", FontResource::TYPE); }
+	FontPlugin(StudioApp& app) { app.getAssetCompiler().registerExtension("ttf", FontResource::TYPE); }
 
 	void onGUI(Resource* resource) override {}
 	void onResourceUnloaded(Resource* resource) override {}
@@ -145,7 +145,7 @@ struct ParticleEmitterPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlug
 	explicit ParticleEmitterPlugin(StudioApp& app)
 		: m_app(app)
 	{
-		app.getAssetBrowser().registerExtension("par", ParticleEmitterResource::TYPE);
+		app.getAssetCompiler().registerExtension("par", ParticleEmitterResource::TYPE);
 	}
 
 
@@ -180,7 +180,7 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	explicit MaterialPlugin(StudioApp& app)
 		: m_app(app)
 	{
-		app.getAssetBrowser().registerExtension("mat", Material::TYPE);
+		app.getAssetCompiler().registerExtension("mat", Material::TYPE);
 	}
 
 
@@ -438,6 +438,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	struct Meta
 	{
 		float scale = 1;
+		bool split = false;
 	};
 
 	explicit ModelPlugin(StudioApp& app)
@@ -449,7 +450,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		, m_tile(app.getWorldEditor().getAllocator())
 		, m_fbx_importer(app.getWorldEditor().getAllocator())
 	{
-		app.getAssetBrowser().registerExtension("fbx", Model::TYPE);
+		app.getAssetCompiler().registerExtension("fbx", Model::TYPE);
 		createPreviewUniverse();
 		createTileUniverse();
 		m_viewport.is_ortho = false;
@@ -474,26 +475,69 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		Meta meta;
 		m_app.getAssetCompiler().getMeta(path, [&](lua_State* L){
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "scale", &meta.scale);
+			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "split", &meta.split);
 		});
 		return meta;
 	}
 
 
+	void addSubresources(AssetCompiler& compiler, const char* path, HashMap<ResourceType, Array<Path>, HashFunc<ResourceType>>& subresources)
+	{
+		const Meta meta = getMeta(Path(path));
+		auto iter = subresources.find(Model::TYPE);
+		if (!iter.isValid()) return;
+		
+		const Path path_obj(path);
+		if (iter.value().indexOf(path_obj) >= 0) return;
+
+		iter.value().push(path_obj);
+
+		if(meta.split) {
+			m_fbx_importer.setSource(path[0] == '/' ? path + 1 : path);
+			const Array<FBXImporter::ImportMesh>& meshes = m_fbx_importer.getMeshes();
+			for (int i = 0; i < meshes.size(); ++i) {
+				const char* mesh_name = m_fbx_importer.getImportMeshName(meshes[i]);
+				StaticString<MAX_PATH_LENGTH> tmp(mesh_name, ":", (path[0] == '/' ? path + 1: path));
+				Path subpath_obj(tmp);
+				if (iter.value().indexOf(subpath_obj) < 0) iter.value().push(subpath_obj);
+			}
+		}
+		else {
+			const Path path_obj(path);
+			if (iter.value().indexOf(path_obj) < 0) iter.value().push(path_obj);
+		}
+	}
+
+
+	static const char* getResourceFilePath(const char* str)
+	{
+		const char* c = str;
+		while (*c && *c != ':') ++c;
+		return *c != ':' ? str : c + 1;
+	}
+
 	bool compile(const Path& src) override
 	{
 		if (PathUtils::hasExtension(src.c_str(), "fbx")) {
+			const char* filepath = getResourceFilePath(src.c_str());
 			FBXImporter::ImportConfig cfg;
 			cfg.output_dir = m_app.getAssetCompiler().getCompiledDir();
-			const Meta meta = getMeta(src);
+			const Meta meta = getMeta(Path(filepath));
 			cfg.mesh_scale = meta.scale;
-			const PathUtils::FileInfo src_info(src.c_str());
-			m_fbx_importer.setSource(src.c_str());
-			const u32 hash = crc32(src.c_str());
-			const StaticString<32> hash_str("", hash);
-			m_fbx_importer.writeModel(hash_str, ".res", src.c_str(), cfg);
-			m_fbx_importer.writeMaterials(src.c_str(), cfg);
-			m_fbx_importer.writeAnimations(src.c_str(), cfg);
-			m_fbx_importer.writeTextures(src.c_str(), cfg);
+			const PathUtils::FileInfo src_info(filepath);
+			m_fbx_importer.setSource(filepath);
+			const StaticString<32> hash_str("", src.getHash());
+			if (meta.split) {
+				cfg.origin = FBXImporter::ImportConfig::Origin::CENTER;
+				const Array<FBXImporter::ImportMesh>& meshes = m_fbx_importer.getMeshes();
+				m_fbx_importer.writeSubmodels(filepath, cfg);
+			}
+			else {
+				m_fbx_importer.writeModel(hash_str, ".res", src.c_str(), cfg);
+			}
+			m_fbx_importer.writeMaterials(filepath, cfg);
+			m_fbx_importer.writeAnimations(filepath, cfg);
+			m_fbx_importer.writeTextures(filepath, cfg);
 			return true;
 		}
 
@@ -642,93 +686,96 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	void onGUI(Resource* resource) override
 	{
 		auto* model = static_cast<Model*>(resource);
-		ImGui::LabelText("Bounding radius", "%f", model->getBoundingRadius());
 
-		auto* lods = model->getLODs();
-		if (lods[0].to_mesh >= 0 && !model->isFailure())
-		{
-			ImGui::Separator();
-			ImGui::Columns(4);
-			ImGui::Text("LOD");
-			ImGui::NextColumn();
-			ImGui::Text("Distance");
-			ImGui::NextColumn();
-			ImGui::Text("# of meshes");
-			ImGui::NextColumn();
-			ImGui::Text("# of triangles");
-			ImGui::NextColumn();
-			ImGui::Separator();
-			int lod_count = 1;
-			for (int i = 0; i < Model::MAX_LOD_COUNT && lods[i].to_mesh >= 0; ++i)
+		if (resource->isReady()) {
+			ImGui::LabelText("Bounding radius", "%f", model->getBoundingRadius());
+
+			auto* lods = model->getLODs();
+			if (lods[0].to_mesh >= 0 && !model->isFailure())
 			{
-				ImGui::PushID(i);
-				ImGui::Text("%d", i);
+				ImGui::Separator();
+				ImGui::Columns(4);
+				ImGui::Text("LOD");
 				ImGui::NextColumn();
-				if (lods[i].distance == FLT_MAX)
+				ImGui::Text("Distance");
+				ImGui::NextColumn();
+				ImGui::Text("# of meshes");
+				ImGui::NextColumn();
+				ImGui::Text("# of triangles");
+				ImGui::NextColumn();
+				ImGui::Separator();
+				int lod_count = 1;
+				for (int i = 0; i < Model::MAX_LOD_COUNT && lods[i].to_mesh >= 0; ++i)
 				{
-					ImGui::Text("Infinite");
-				}
-				else
-				{
-					float dist = sqrt(lods[i].distance);
-					if (ImGui::DragFloat("", &dist))
+					ImGui::PushID(i);
+					ImGui::Text("%d", i);
+					ImGui::NextColumn();
+					if (lods[i].distance == FLT_MAX)
 					{
-						lods[i].distance = dist * dist;
+						ImGui::Text("Infinite");
 					}
-				}
-				ImGui::NextColumn();
-				ImGui::Text("%d", lods[i].to_mesh - lods[i].from_mesh + 1);
-				ImGui::NextColumn();
-				int tri_count = 0;
-				for (int j = lods[i].from_mesh; j <= lods[i].to_mesh; ++j)
-				{
-					int indices_count = model->getMesh(j).indices.size() >> 1;
-					if (!model->getMesh(j).flags.isSet(Mesh::Flags::INDICES_16_BIT)) {
-						indices_count >>= 1;
+					else
+					{
+						float dist = sqrt(lods[i].distance);
+						if (ImGui::DragFloat("", &dist))
+						{
+							lods[i].distance = dist * dist;
+						}
 					}
-					tri_count += indices_count / 3;
+					ImGui::NextColumn();
+					ImGui::Text("%d", lods[i].to_mesh - lods[i].from_mesh + 1);
+					ImGui::NextColumn();
+					int tri_count = 0;
+					for (int j = lods[i].from_mesh; j <= lods[i].to_mesh; ++j)
+					{
+						int indices_count = model->getMesh(j).indices.size() >> 1;
+						if (!model->getMesh(j).flags.isSet(Mesh::Flags::INDICES_16_BIT)) {
+							indices_count >>= 1;
+						}
+						tri_count += indices_count / 3;
 
+					}
+
+					ImGui::Text("%d", tri_count);
+					ImGui::NextColumn();
+					++lod_count;
+					ImGui::PopID();
 				}
 
-				ImGui::Text("%d", tri_count);
-				ImGui::NextColumn();
-				++lod_count;
-				ImGui::PopID();
+				ImGui::Columns(1);
 			}
 
-			ImGui::Columns(1);
-		}
-
-		ImGui::Separator();
-		for (int i = 0; i < model->getMeshCount(); ++i)
-		{
-			auto& mesh = model->getMesh(i);
-			if (ImGui::TreeNode(&mesh, "%s", mesh.name.length() > 0 ? mesh.name.c_str() : "N/A"))
+			ImGui::Separator();
+			for (int i = 0; i < model->getMeshCount(); ++i)
 			{
-				ImGui::LabelText("Triangle count", "%d", (mesh.indices.size() >> (mesh.areIndices16() ? 1 : 2))/ 3);
-				ImGui::LabelText("Material", "%s", mesh.material->getPath().c_str());
-				ImGui::SameLine();
-				if (ImGui::Button("->"))
+				auto& mesh = model->getMesh(i);
+				if (ImGui::TreeNode(&mesh, "%s", mesh.name.length() > 0 ? mesh.name.c_str() : "N/A"))
 				{
-					m_app.getAssetBrowser().selectResource(mesh.material->getPath(), true);
+					ImGui::LabelText("Triangle count", "%d", (mesh.indices.size() >> (mesh.areIndices16() ? 1 : 2))/ 3);
+					ImGui::LabelText("Material", "%s", mesh.material->getPath().c_str());
+					ImGui::SameLine();
+					if (ImGui::Button("->"))
+					{
+						m_app.getAssetBrowser().selectResource(mesh.material->getPath(), true);
+					}
+					ImGui::TreePop();
 				}
-				ImGui::TreePop();
 			}
-		}
 
-		ImGui::LabelText("Bone count", "%d", model->getBoneCount());
-		if (model->getBoneCount() > 0 && ImGui::CollapsingHeader("Bones")) {
-			ImGui::Columns(3);
-			for (int i = 0; i < model->getBoneCount(); ++i)
-			{
-				ImGui::Text("%s", model->getBone(i).name.c_str());
-				ImGui::NextColumn();
-				Vec3 pos = model->getBone(i).transform.pos;
-				ImGui::Text("%f; %f; %f", pos.x, pos.y, pos.z);
-				ImGui::NextColumn();
-				Quat rot = model->getBone(i).transform.rot;
-				ImGui::Text("%f; %f; %f; %f", rot.x, rot.y, rot.z, rot.w);
-				ImGui::NextColumn();
+			ImGui::LabelText("Bone count", "%d", model->getBoneCount());
+			if (model->getBoneCount() > 0 && ImGui::CollapsingHeader("Bones")) {
+				ImGui::Columns(3);
+				for (int i = 0; i < model->getBoneCount(); ++i)
+				{
+					ImGui::Text("%s", model->getBone(i).name.c_str());
+					ImGui::NextColumn();
+					Vec3 pos = model->getBone(i).transform.pos;
+					ImGui::Text("%f; %f; %f", pos.x, pos.y, pos.z);
+					ImGui::NextColumn();
+					Quat rot = model->getBone(i).transform.rot;
+					ImGui::Text("%f; %f; %f; %f", rot.x, rot.y, rot.z, rot.w);
+					ImGui::NextColumn();
+				}
 			}
 		}
 
@@ -739,8 +786,9 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				m_meta_res = resource->getPath().getHash();
 			}
 			ImGui::InputFloat("Scale", &m_meta.scale);
+			ImGui::Checkbox("Split", &m_meta.split);
 			if (ImGui::Button("Apply")) {
-				const StaticString<256> src("scale = ", m_meta.scale);
+				StaticString<256> src("scale = ", m_meta.scale, "\nsplit = ", m_meta.split ? "true\n" : "false\n");
 				compiler.updateMeta(resource->getPath(), src);
 				if (compiler.compile(resource->getPath())) {
 					resource->getResourceManager().reload(*resource);
@@ -1036,10 +1084,11 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	explicit TexturePlugin(StudioApp& app)
 		: m_app(app)
 	{
-		app.getAssetBrowser().registerExtension("jpg", Texture::TYPE);
-		app.getAssetBrowser().registerExtension("tga", Texture::TYPE);
-		app.getAssetBrowser().registerExtension("dds", Texture::TYPE);
-		app.getAssetBrowser().registerExtension("raw", Texture::TYPE);
+		app.getAssetCompiler().registerExtension("png", Texture::TYPE);
+		app.getAssetCompiler().registerExtension("jpg", Texture::TYPE);
+		app.getAssetCompiler().registerExtension("tga", Texture::TYPE);
+		app.getAssetCompiler().registerExtension("dds", Texture::TYPE);
+		app.getAssetCompiler().registerExtension("raw", Texture::TYPE);
 	}
 
 
@@ -1239,6 +1288,10 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		else if(equalStrings(ext, "jpg")) {
 			compileJPEG(srcf, dstf, meta);
 		}
+		else if(equalStrings(ext, "png")) {
+			// TODO rename
+			compileJPEG(srcf, dstf, meta);
+		}
 		else {
 			ASSERT(false);
 		}
@@ -1317,7 +1370,7 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	explicit ShaderPlugin(StudioApp& app)
 		: m_app(app)
 	{
-		app.getAssetBrowser().registerExtension("shd", Shader::TYPE);
+		app.getAssetCompiler().registerExtension("shd", Shader::TYPE);
 	}
 
 
@@ -2064,7 +2117,7 @@ struct RenderInterfaceImpl final : public RenderInterface
 		m_render_scene->getModelInstanceInfos(frustum, lod_ref_point, lod_multiplier, meshes);
 		for (MeshInstance m : meshes) {
 			if (entities.indexOf(m.owner) < 0) {
-				entities.push(m.owner);
+				entities.push(m.owner);s
 			}
 		}*/
 		ASSERT(false);
@@ -2798,7 +2851,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		asset_compiler.addPlugin(*m_shader_plugin, shader_exts);
 
 		m_texture_plugin = LUMIX_NEW(allocator, TexturePlugin)(app);
-		const char* texture_exts[] = { "jpg", "dds", "tga", "raw", nullptr};
+		const char* texture_exts[] = { "png", "jpg", "dds", "tga", "raw", nullptr};
 		asset_compiler.addPlugin(*m_texture_plugin, texture_exts);
 
 		m_pipeline_plugin = LUMIX_NEW(allocator, PipelinePlugin)(app);

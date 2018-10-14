@@ -94,9 +94,8 @@ SceneView::SceneView(StudioApp& app)
 	m_camera_speed_action->func.bind<SceneView, &SceneView::resetCameraSpeed>(this);
 	m_app.addAction(m_camera_speed_action);
 
-	AssetBrowser& asset_browser = m_app.getAssetBrowser();
 	const ResourceType pipeline_type("pipeline");
-	asset_browser.registerExtension("pln", pipeline_type); 
+	m_app.getAssetCompiler().registerExtension("pln", pipeline_type); 
 }
 
 

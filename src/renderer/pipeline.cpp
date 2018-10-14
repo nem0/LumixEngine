@@ -940,7 +940,7 @@ struct PipelineImpl final : Pipeline
 					const Shader::Program& prog = Shader::getProgram(shader_data, 0);
 					ffr::blending(0);
 					ffr::useProgram(prog.handle);
-					ffr::setInstanceBuffer(instance_decl, transient.buffer, transient.offset, 0);
+					ffr::setInstanceBuffer(instance_decl, transient.buffer, transient.offset, 0, nullptr);
 					ffr::drawTriangleStripArraysInstanced(0, 4, instances_count);
 				}
 				ffr::popDebugGroup();
@@ -1586,7 +1586,13 @@ struct PipelineImpl final : Pipeline
 
 									const Renderer::TransientSlice instance_buffer = m_pipeline->m_renderer.allocTransient(instances_count * sizeof(Vec4) * 2);
 									ffr::update(instance_buffer.buffer, instance_data, instance_buffer.offset, instance_buffer.size);
-									ffr::setInstanceBuffer(instance_decl, instance_buffer.buffer, instance_buffer.offset, mesh->vertex_decl.attributes_count);
+
+									int instance_map[16];
+									for (uint i = 0; i < instance_decl.attributes_count; ++i) {
+										instance_map[i] = prog.attribute_by_semantics[(int)Mesh::AttributeSemantic::INSTANCE0 + i];
+									}
+
+									ffr::setInstanceBuffer(instance_decl, instance_buffer.buffer, instance_buffer.offset, mesh->vertex_decl.attributes_count, instance_map);
 									ffr::drawTrianglesInstanced(0, mesh->indices_count, instances_count);
 									++drawcalls_count;
 								}
@@ -1661,7 +1667,7 @@ struct PipelineImpl final : Pipeline
 
 									const Renderer::TransientSlice instance_buffer = m_pipeline->m_renderer.allocTransient(instances_count * decal_instance_decl.size);
 									ffr::update(instance_buffer.buffer, instance_data, instance_buffer.offset, instance_buffer.size);
-									ffr::setInstanceBuffer(decal_instance_decl, instance_buffer.buffer, instance_buffer.offset, 1);
+									ffr::setInstanceBuffer(decal_instance_decl, instance_buffer.buffer, instance_buffer.offset, 1, nullptr);
 									ffr::drawTrianglesInstanced(0, 36, instances_count);
 									++drawcalls_count;
 								}

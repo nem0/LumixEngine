@@ -1,4 +1,5 @@
 #include "editor/asset_browser.h"
+#include "editor/asset_compiler.h"
 #include "editor/platform_interface.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
@@ -43,7 +44,7 @@ struct SpritePlugin final : public AssetBrowser::IPlugin
 	SpritePlugin(StudioApp& app) 
 		: app(app) 
 	{
-		app.getAssetBrowser().registerExtension("spr", Sprite::TYPE);
+		app.getAssetCompiler().registerExtension("spr", Sprite::TYPE);
 	}
 
 

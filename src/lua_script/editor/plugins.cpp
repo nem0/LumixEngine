@@ -542,7 +542,7 @@ struct AssetPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	explicit AssetPlugin(StudioApp& app)
 		: m_app(app)
 	{
-		app.getAssetBrowser().registerExtension("lua", LuaScript::TYPE);
+		app.getAssetCompiler().registerExtension("lua", LuaScript::TYPE);
 		m_text_buffer[0] = 0;
 	}
 

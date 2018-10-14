@@ -39,6 +39,18 @@ struct AssetCompilerTask : MT::Task
 };
 
 
+void AssetCompiler::IPlugin::addSubresources(AssetCompiler& compiler, const char* path, HashMap<ResourceType, Array<Path>, HashFunc<ResourceType>>& subresources)
+{
+	const ResourceType type = compiler.getResourceType(path);
+	if (type == INVALID_RESOURCE_TYPE) return;
+	
+	const Path path_obj(path);
+	auto iter = subresources.find(type);
+	if (!iter.isValid()) return;
+	if (iter.value().indexOf(path_obj) < 0) iter.value().push(path_obj);
+}
+
+
 struct AssetCompilerImpl : AssetCompiler
 {
 	struct CompileEntry
@@ -69,6 +81,8 @@ struct AssetCompilerImpl : AssetCompiler
 		, m_compiled(app.getWorldEditor().getAllocator())
 		, m_on_resource_changed(app.getWorldEditor().getAllocator())
 		, m_semaphore(0, 0x7fFFffFF)
+		, m_registered_extensions(app.getWorldEditor().getAllocator())
+		, m_resources(app.getWorldEditor().getAllocator())
 	{
 		m_watcher = FileSystemWatcher::create(".", app.getWorldEditor().getAllocator());
 		m_watcher->getCallback().bind<AssetCompilerImpl, &AssetCompilerImpl::onFileChanged>(this);
@@ -82,6 +96,22 @@ struct AssetCompilerImpl : AssetCompiler
 
 	~AssetCompilerImpl()
 	{
+		FS::OsFile file;
+		// TODO make this safe - i.e. handle case when program gets interrupted while writing the file
+		if (file.open(".lumix/assets/_list.txt", FS::Mode::CREATE_AND_WRITE)) {
+			file << "resources = {\n";
+			for (auto& i : m_resources) {
+				for (const Path& j : i) {
+					file << "\"" << j.c_str() << "\",\n";
+				}
+			}
+			file << "}\n";
+			file.close();	
+		}
+		else {
+			g_log_error.log("Editor") << "Could not save .lumix/assets/_list.txt";
+		}
+
 		ASSERT(m_plugins.empty());
 		m_task.m_finished = true;
 		m_to_compile.emplace().resource = nullptr;
@@ -90,6 +120,136 @@ struct AssetCompilerImpl : AssetCompiler
 		ResourceManagerHub& rm = m_app.getWorldEditor().getEngine().getResourceManager();
 		rm.setLoadHook(nullptr);
 		FileSystemWatcher::destroy(m_watcher);
+	}
+
+
+	ResourceType getResourceType(const char* path) const override
+	{
+		char ext[16];
+		PathUtils::getExtension(ext, lengthOf(ext), path);
+
+		auto iter = m_registered_extensions.find(crc32(ext));
+		if (iter.isValid()) return iter.value();
+
+		return INVALID_RESOURCE_TYPE;
+	}
+
+
+	bool acceptExtension(const char* ext, ResourceType type) const override
+	{
+		auto iter = m_registered_extensions.find(crc32(ext));
+		if (!iter.isValid()) return false;
+		return iter.value() == type;
+	}
+
+	
+	void registerExtension(const char* extension, ResourceType type) override
+	{
+		const u32 hash = crc32(extension);
+		ASSERT(!m_registered_extensions.find(hash).isValid());
+
+		m_registered_extensions.insert(hash, type);
+
+		IAllocator& allocator = m_app.getWorldEditor().getAllocator();
+		if (!m_resources.find(type).isValid()) {
+			m_resources.insert(type, Array<Path>(allocator));
+		}
+	}
+
+
+	void addResource(const char* path, const char* filename)
+	{
+		char ext[10];
+		PathUtils::getExtension(ext, sizeof(ext), filename);
+		makeLowercase(ext, lengthOf(ext), ext);
+
+		char fullpath[MAX_PATH_LENGTH];
+		copyString(fullpath, path);
+		catString(fullpath, "/");
+		catString(fullpath, filename);
+	
+		auto iter = m_plugins.find(crc32(ext));
+		if (!iter.isValid()) return;
+
+		iter.value()->addSubresources(*this, fullpath, m_resources);
+	}
+
+	
+	void processDir(const char* dir, int base_length)
+	{
+		auto* iter = PlatformInterface::createFileIterator(dir, m_app.getWorldEditor().getAllocator());
+		PlatformInterface::FileInfo info;
+		while (getNextFile(iter, &info))
+		{
+			if (info.filename[0] == '.') continue;
+
+			if (info.is_directory)
+			{
+				char child_path[MAX_PATH_LENGTH];
+				copyString(child_path, dir);
+				catString(child_path, "/");
+				catString(child_path, info.filename);
+				processDir(child_path, base_length);
+			}
+			else
+			{
+				addResource(dir + base_length, info.filename);
+			}
+		}
+
+		destroyFileIterator(iter);
+	}
+
+
+	void onInitFinished() override
+	{
+		FS::OsFile file;
+		const char* list_path = ".lumix/assets/_list.txt";
+		if(file.open(list_path, FS::Mode::OPEN_AND_READ)) {
+			Array<char> content(m_app.getWorldEditor().getAllocator());
+			content.resize((int)file.size());
+			file.read(content.begin(), content.byte_size());
+			file.close();
+
+			lua_State* L = luaL_newstate();
+			[&](){
+				if (luaL_loadbuffer(L, content.begin(), content.byte_size(), "lumix_asset_list") != 0) {
+					g_log_error.log("Editor") << list_path << ": " << lua_tostring(L, -1);
+					return;
+				}
+
+				if (lua_pcall(L, 0, 0, 0) != 0) {
+					g_log_error.log("Editor") << list_path << ": " << lua_tostring(L, -1);
+					return;
+				}
+
+				lua_getglobal(L, "resources");
+				if (lua_type(L, -1) != LUA_TTABLE) return;
+
+				const int len = (int)lua_objlen(L, -1);
+				for (int i = 0; i < len; ++i) {
+					lua_rawgeti(L, -1, i + 1);
+					if (lua_isstring(L, -1)) {
+						const char* str = lua_tostring(L, -1);
+						
+						const ResourceType type = getResourceType(str);
+						if (type != INVALID_RESOURCE_TYPE) {
+							const Path path_obj(str);
+							auto iter = m_resources.find(type);
+							if (iter.isValid() && iter.value().indexOf(path_obj) < 0) {
+								iter.value().push(path_obj);
+							}
+						}						
+					}
+					lua_pop(L, 1);
+				}
+			}();
+		
+			lua_close(L);
+		}
+
+		const char* base_path = m_app.getWorldEditor().getEngine().getDiskFileDevice()->getBasePath();
+		processDir(base_path, stringLength(base_path));
 	}
 
 
@@ -125,25 +285,22 @@ struct AssetCompilerImpl : AssetCompiler
 			return false;
 		}
 
-		lua_State* engine_L = m_app.getWorldEditor().getEngine().getState();
-		lua_State* L = lua_newthread(engine_L);
+		lua_State* L = luaL_newstate();
 		if (luaL_loadbuffer(L, buf.begin(), buf.byte_size(), meta_path) != 0) {
 			g_log_error.log("Editor") << meta_path << ": " << lua_tostring(L, -1);
-			lua_pop(L, 1);
-			lua_pop(engine_L, 1);
+			lua_close(L);
 			return false;
 		}
 
 		if (lua_pcall(L, 0, 0, 0) != 0) {
 			g_log_error.log("Engine") << meta_path << ": " << lua_tostring(L, -1);
-			lua_pop(L, 1);
-			lua_pop(engine_L, 1);
+			lua_close(L);
 			return false;
 		}
 
 		callback(user_ptr, L);
 
-		lua_pop(engine_L, 1);
+		lua_close(L);
 		return true;
 	}
 
@@ -174,11 +331,21 @@ struct AssetCompilerImpl : AssetCompiler
 		if (!iter.isValid()) return false;
 		return iter.value()->compile(src);
 	}
+	
+
+	static const char* getResourceFilePath(const char* str)
+	{
+		const char* c = str;
+		while (*c && *c != ':') ++c;
+		return *c != ':' ? str : c + 1;
+	}
 
 
 	bool onBeforeLoad(Resource& res)
 	{
-		if (!PlatformInterface::fileExists(res.getPath().c_str())) return false;
+		const char* filepath = getResourceFilePath(res.getPath().c_str());
+
+		if (!PlatformInterface::fileExists(filepath)) return false;
 		const u32 hash = res.getPath().getHash();
 		const StaticString<MAX_PATH_LENGTH> dst_path(".lumix/assets/", hash, ".res");
 		const PathUtils::FileInfo info(res.getPath().c_str());
@@ -269,6 +436,13 @@ struct AssetCompilerImpl : AssetCompiler
 		}
 	}
 
+
+	const Array<Path>& getResources(ResourceType type) const override
+	{
+		return m_resources[type];
+	}
+
+
 	OnResourceChanged& resourceChanged() override
 	{
 		return m_on_resource_changed;
@@ -286,6 +460,8 @@ struct AssetCompilerImpl : AssetCompiler
 	HashMap<u32, IPlugin*> m_plugins;
 	AssetCompilerTask m_task;
 	FileSystemWatcher* m_watcher;
+	HashMap<ResourceType, Array<Path>> m_resources;
+	HashMap<u32, ResourceType> m_registered_extensions;
 	int m_log_id = -1;
 };
 

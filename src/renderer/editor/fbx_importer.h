@@ -18,16 +18,17 @@ struct FBXImporter
 {
 	struct ImportConfig 
 	{
+		enum class Origin : int
+		{
+			SOURCE,
+			CENTER,
+			BOTTOM
+		};
 		const char* output_dir;
 		float mesh_scale;
+		Origin origin = Origin::SOURCE;
 	};
 
-	enum class Origin : int
-	{
-		SOURCE,
-		CENTER,
-		BOTTOM
-	};
 
 	enum class Orientation
 	{
@@ -130,8 +131,12 @@ struct FBXImporter
 	bool setSource(const char* filename);
 	void writeMaterials(const char* src, const ImportConfig& cfg);
 	void writeAnimations(const char* src, const ImportConfig& cfg);
+	void writeSubmodels(const char* src, const ImportConfig& cfg);
 	void writeModel(const char* output_mesh_filename, const char* ext, const char* src, const ImportConfig& cfg);
 	void writeTextures(const char* fbx_path, const ImportConfig& cfg);
+
+	const Array<ImportMesh>& getMeshes() const { return meshes; }
+	static const char* FBXImporter::getImportMeshName(const FBXImporter::ImportMesh& mesh);
 
 private:
 	const ofbx::Mesh* getAnyMeshFromBone(const ofbx::Object* node) const;
@@ -157,8 +162,9 @@ private:
 	Quat fixOrientation(const Quat& v) const;
 	void writeBillboardVertices(const AABB& aabb);
 	void writeGeometry();
+	void writeGeometry(int mesh_idx);
 	void writeBillboardMesh(i32 attribute_array_offset, i32 indices_offset, const char* mesh_output_filename);
-	void writeMeshes(const char* mesh_output_filename, const char* src);
+	void writeMeshes(const char* mesh_output_filename, const char* src, int mesh_idx);
 	void writeSkeleton(const ImportConfig& cfg);
 	void writeLODs();
 	int getAttributeCount(const ofbx::Mesh& mesh) const;
@@ -189,7 +195,6 @@ private:
 	bool create_billboard_lod = false;
 	Orientation orientation = Orientation::Y_UP;
 	Orientation root_orientation = Orientation::Y_UP;
-	Origin origin = Origin::SOURCE;
 };
 
 
