@@ -5,6 +5,7 @@
 #include "engine/blob.h"
 #include "engine/fs/os_file.h"
 #include "engine/geometry.h"
+#include "engine/matrix.h"
 #include "engine/quat.h"
 #include "engine/string.h"
 #include "ofbx.h"
@@ -124,6 +125,7 @@ struct FBXImporter
 		Array<int> indices;
 		AABB aabb;
 		float radius_squared;
+		Matrix transform_matrix = Matrix::IDENTITY;
 	};
 
 	FBXImporter(IAllocator& allocator);
@@ -132,6 +134,7 @@ struct FBXImporter
 	void writeMaterials(const char* src, const ImportConfig& cfg);
 	void writeAnimations(const char* src, const ImportConfig& cfg);
 	void writeSubmodels(const char* src, const ImportConfig& cfg);
+	void writePrefab(const char* src, const ImportConfig& cfg);
 	void writeModel(const char* output_mesh_filename, const char* ext, const char* src, const ImportConfig& cfg);
 	void writeTextures(const char* fbx_path, const ImportConfig& cfg);
 

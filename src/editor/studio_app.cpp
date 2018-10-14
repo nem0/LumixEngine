@@ -259,7 +259,7 @@ public:
 			LUMIX_DELETE(m_editor->getAllocator(), i);
 		}
 		m_plugins.clear();
-		PrefabSystem::destroyAssetBrowserPlugin(*this);
+		PrefabSystem::destroyEditorPlugins(*this);
 		ASSERT(m_gui_plugins.empty());
 
 		for (auto* i : m_add_cmp_plugins)
@@ -1827,7 +1827,7 @@ public:
 				}
 			}
 		#endif
-		PrefabSystem::createAssetBrowserPlugin(*this, m_editor->getPrefabSystem());
+		PrefabSystem::createEditorPlugins(*this, m_editor->getPrefabSystem());
 	}
 
 

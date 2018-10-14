@@ -238,6 +238,7 @@ struct DVec3
 	DVec3(float a) : x(a), y(a), z(a) {}
 	DVec3(double x, double y, double z) : x(x), y(y), z(z) {}
 	DVec3(const DVec3& rhs) = default;
+	explicit DVec3(const Vec3& rhs) : x(rhs.x), y(rhs.y), z(rhs.z) {}
 
 	DVec3 operator-() const { return {-x, -y, -z}; }
 	DVec3 operator*(float rhs) const { return {x * rhs, y * rhs, z * rhs}; }

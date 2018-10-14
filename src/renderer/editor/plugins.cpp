@@ -528,9 +528,10 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			m_fbx_importer.setSource(filepath);
 			const StaticString<32> hash_str("", src.getHash());
 			if (meta.split) {
-				cfg.origin = FBXImporter::ImportConfig::Origin::CENTER;
+				//cfg.origin = FBXImporter::ImportConfig::Origin::CENTER;
 				const Array<FBXImporter::ImportMesh>& meshes = m_fbx_importer.getMeshes();
 				m_fbx_importer.writeSubmodels(filepath, cfg);
+				m_fbx_importer.writePrefab(filepath, cfg);
 			}
 			else {
 				m_fbx_importer.writeModel(hash_str, ".res", src.c_str(), cfg);
@@ -878,7 +879,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	void renderTile(PrefabResource* prefab)
 	{
 				// TODO
-	ASSERT(false);
+	//ASSERT(false);
 /*Engine& engine = m_app.getWorldEditor().getEngine();
 		RenderScene* render_scene = (RenderScene*)m_tile.universe->getScene(MODEL_INSTANCE_TYPE);
 		if (!render_scene) return;

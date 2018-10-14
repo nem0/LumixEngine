@@ -5,6 +5,9 @@
 #include "engine/matrix.h"
 #include "engine/math_utils.h"
 #include "engine/path_utils.h"
+#include "engine/prefab.h"
+#include "engine/reflection.h"
+#include "engine/serializer.h"
 #include "engine/system.h"
 #include "editor/platform_interface.h"
 #include "physics/physics_geometry_manager.h"
@@ -407,6 +410,8 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg)
 		if (cfg.origin != ImportConfig::Origin::SOURCE) {
 			centerMesh(vertices, vertex_count, cfg.origin, &transform_matrix);
 		}
+		import_mesh.transform_matrix = transform_matrix;
+		import_mesh.transform_matrix.inverse();
 
 		OutputBlob blob(allocator);
 		int vertex_size = getVertexSize(mesh);
@@ -1731,6 +1736,61 @@ bool FBXImporter::writePhysics(const char* basename, const char* output_dir)
 	file.close();
 		
 	return true;
+}
+
+
+void FBXImporter::writePrefab(const char* src, const ImportConfig& cfg)
+{
+	struct SaveEntityGUIDMap : public ISaveEntityGUIDMap
+	{
+		EntityGUID get(EntityPtr entity) override { return {(u64)entity.index}; }
+	};
+	FS::OsFile file;
+	PathUtils::FileInfo file_info(src);
+	StaticString<MAX_PATH_LENGTH> tmp(file_info.m_dir, "/", file_info.m_basename, ".fab");
+	if (!file.open(tmp, FS::Mode::CREATE_AND_WRITE)) return;
+
+	OutputBlob blob(allocator);
+	SaveEntityGUIDMap entity_map;
+	TextSerializer serializer(blob, entity_map);
+
+	serializer.write("version", (u32)PrefabVersion::LAST);
+	const int count = meshes.size();
+	serializer.write("entity_count", count + 1);
+	const u64 prefab = crc32(src);
+
+	serializer.write("prefab", prefab);
+	serializer.write("parent", INVALID_ENTITY);
+	serializer.write("cmp_end", 0);
+
+	for(int i  = 0; i < meshes.size(); ++i) {
+		serializer.write("prefab", prefab | ((u64)(i + 1) << 32));
+		const EntityRef root = {0};		
+		serializer.write("parent", root);
+		static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("model_instance");
+
+		RigidTransform tr;
+		//tr.rot = meshes[i].transform_matrix.getRotation();
+		//tr.pos = DVec3(meshes[i].transform_matrix.getTranslation());
+		tr.pos = DVec3(0);
+		tr.rot = Quat::IDENTITY;
+		const float scale = 1;
+		serializer.write("transform", tr);
+		serializer.write("scale", scale);
+
+		const char* cmp_name = Reflection::getComponentTypeID(MODEL_INSTANCE_TYPE.index);
+		const u32 type_hash = Reflection::getComponentTypeHash(MODEL_INSTANCE_TYPE);
+		serializer.write(cmp_name, type_hash);
+		serializer.write("scene_version", (int)0);
+		
+		StaticString<MAX_PATH_LENGTH> mesh_path(getImportMeshName(meshes[i]), ":", src);
+		serializer.write("source", (const char*)mesh_path);
+		serializer.write("flags", u8(2 /*enabled*/));
+		serializer.write("cmp_end", 0);
+	}
+
+	file.write(blob.getData(), blob.getPos());
+	file.close();
 }
 
 
