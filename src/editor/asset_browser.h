@@ -21,16 +21,6 @@ class FileSystemWatcher;
 class StudioApp;
 
 
-template<>
-struct HashFunc<ResourceType>
-{
-	static u32 get(const ResourceType& key)
-	{
-		return HashFunc<u32>::get(key.type);
-	}
-};
-
-
 class LUMIX_EDITOR_API AssetBrowser
 {
 public:
@@ -55,11 +45,9 @@ public:
 	~AssetBrowser();
 	void onGUI();
 	void update();
-	const Array<Path>& getResources(ResourceType type) const;
 	int getTypeIndex(ResourceType type) const;
 	void selectResource(const Path& resource, bool record_history);
 	bool resourceInput(const char* label, const char* str_id, char* buf, int max_size, ResourceType type);
-	void onInitFinished();
 	void addPlugin(IPlugin& plugin);
 	void removePlugin(IPlugin& plugin);
 	void openInExternalEditor(Resource* resource) const;
@@ -68,7 +56,6 @@ public:
 	bool resourceList(char* buf, int max_size, ResourceType type, float height) const;
 	FS::IFile* beginSaveResource(Resource& resource);
 	void endSaveResource(Resource& resource, FS::IFile& file, bool success);
-	void registerExtension(const char* extension, ResourceType type);
 
 public:
 	bool m_is_open;
@@ -96,18 +83,13 @@ private:
 	void breadcrumbs();
 	void changeDir(const char* path);
 	void onFileChanged(const char* path);
-	void findResources();
-	void processDir(const char* path, int base_length);
-	void addResource(const char* path, const char* filename);
 	void unloadResource();
 	void selectResource(Resource* resource, bool record_history);
-	bool acceptExtension(const char* ext, ResourceType type);
 	void goBack();
 	void goForward();
 	void toggleAutoreload();
 	bool isAutoreload() const { return m_autoreload_changed_resource; }
 
-	ResourceType getResourceType(const char* path) const;
 
 private:
 	StudioApp& m_app;
@@ -119,9 +101,7 @@ private:
 	Array<Path> m_history;
 	int m_history_index;
 	AssociativeArray<ResourceType, IPlugin*> m_plugins;
-	HashMap<u32, ResourceType> m_registered_extensions;
 	MT::SpinMutex m_changed_files_mutex;
-	HashMap<ResourceType, Array<Path>> m_resources;
 	Resource* m_selected_resource;
 	WorldEditor& m_editor;
 	int m_current_type;
@@ -131,12 +111,10 @@ private:
 	bool m_is_focus_requested;
 	bool m_activate;
 	bool m_is_update_enabled;
-	bool m_is_init_finished;
 	bool m_show_thumbnails;
 	Action* m_auto_reload_action;
 	Action* m_back_action;
 	Action* m_forward_action;
-	Action* m_refresh_action;
 };
 
 

@@ -46,7 +46,7 @@ static void getMaterialName(const ofbx::Material* material, char (&out)[128])
 }
 
 
-static const char* getImportMeshName(const FBXImporter::ImportMesh& mesh)
+const char* FBXImporter::getImportMeshName(const FBXImporter::ImportMesh& mesh)
 {
 	const char* name = mesh.fbx->name;
 	const ofbx::Material* material = mesh.fbx_mat;
@@ -352,7 +352,7 @@ static int getMaterialIndex(const ofbx::Mesh& mesh, const ofbx::Material& materi
 }
 
 
-static void centerMesh(const ofbx::Vec3* vertices, int vertices_count, FBXImporter::Origin origin, Matrix* transform)
+static void centerMesh(const ofbx::Vec3* vertices, int vertices_count, FBXImporter::ImportConfig::Origin origin, Matrix* transform)
 {
 	if (vertices_count <= 0) return;
 
@@ -377,7 +377,7 @@ static void centerMesh(const ofbx::Vec3* vertices, int vertices_count, FBXImport
 	center.y = float(min.y + max.y) * 0.5f;
 	center.z = float(min.z + max.z) * 0.5f;
 		
-	if (origin == FBXImporter::Origin::BOTTOM) center.y = (float)min.y;
+	if (origin == FBXImporter::ImportConfig::Origin::BOTTOM) center.y = (float)min.y;
 
 	transform->setTranslation(-center);
 }
@@ -404,7 +404,9 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg)
 		Matrix geometry_matrix = toLumix(mesh.getGeometricMatrix());
 		transform_matrix = toLumix(mesh.getGlobalTransform()) * geometry_matrix;
 		if (cancel_mesh_transforms) transform_matrix.setTranslation({0, 0, 0});
-		if (origin != Origin::SOURCE) centerMesh(vertices, vertex_count, origin, &transform_matrix);
+		if (cfg.origin != ImportConfig::Origin::SOURCE) {
+			centerMesh(vertices, vertex_count, cfg.origin, &transform_matrix);
+		}
 
 		OutputBlob blob(allocator);
 		int vertex_size = getVertexSize(mesh);
@@ -485,7 +487,7 @@ static int detectMeshLOD(const FBXImporter::ImportMesh& mesh)
 	const char* lod_str = stristr(node_name, "_LOD");
 	if (!lod_str)
 	{
-		const char* mesh_name = getImportMeshName(mesh);
+		const char* mesh_name = FBXImporter::getImportMeshName(mesh);
 		if (!mesh_name) return 0;
 
 		const char* lod_str = stristr(mesh_name, "_LOD");
@@ -1321,6 +1323,46 @@ void FBXImporter::writeBillboardVertices(const AABB& aabb)
 }
 
 
+void FBXImporter::writeGeometry(int mesh_idx)
+{
+	AABB aabb = {{0, 0, 0}, {0, 0, 0}};
+	float radius_squared = 0;
+	OutputBlob vertices_blob(allocator);
+	const ImportMesh& import_mesh = meshes[mesh_idx];
+	
+	bool are_indices_16_bit = areIndices16Bit(import_mesh);
+	if (are_indices_16_bit)
+	{
+		int index_size = sizeof(u16);
+		write(index_size);
+		write(import_mesh.indices.size());
+		for (int i : import_mesh.indices)
+		{
+			ASSERT(i <= (1 << 16));
+			u16 index = (u16)i;
+			write(index);
+		}
+	}
+	else
+	{
+		int index_size = sizeof(import_mesh.indices[0]);
+		write(index_size);
+		write(import_mesh.indices.size());
+		write(&import_mesh.indices[0], sizeof(import_mesh.indices[0]) * import_mesh.indices.size());
+	}
+	aabb.merge(import_mesh.aabb);
+	radius_squared = Math::maximum(radius_squared, import_mesh.radius_squared);
+
+	write(import_mesh.vertex_data.getPos());
+	write(import_mesh.vertex_data.getData(), import_mesh.vertex_data.getPos());
+
+	write(sqrtf(radius_squared) * bounding_shape_scale);
+	aabb.min *= bounding_shape_scale;
+	aabb.max *= bounding_shape_scale;
+	write(aabb);
+}
+
+
 void FBXImporter::writeGeometry()
 {
 	AABB aabb = {{0, 0, 0}, {0, 0, 0}};
@@ -1410,20 +1452,25 @@ void FBXImporter::writeBillboardMesh(i32 attribute_array_offset, i32 indices_off
 }
 
 
-void FBXImporter::writeMeshes(const char* mesh_output_filename, const char* src)
+void FBXImporter::writeMeshes(const char* mesh_output_filename, const char* src, int mesh_idx)
 {
 	const PathUtils::FileInfo src_info(src);
 	i32 mesh_count = 0;
-	for (ImportMesh& mesh : meshes)
-		if (mesh.import) ++mesh_count;
-	if (create_billboard_lod) ++mesh_count;
+	if (mesh_idx >= 0) {
+		mesh_count = 1;
+	}
+	else {
+		for (ImportMesh& mesh : meshes)
+			if (mesh.import) ++mesh_count;
+		if (create_billboard_lod) ++mesh_count;
+	}
 	write(mesh_count);
 
 	i32 attr_offset = 0;
 	i32 indices_offset = 0;
-	for (ImportMesh& import_mesh : meshes)
-	{
-		if (!import_mesh.import) continue;
+	
+	
+	auto writeMesh = [&](const ImportMesh& import_mesh ) {
 			
 		const ofbx::Mesh& mesh = *import_mesh.fbx;
 
@@ -1473,9 +1520,20 @@ void FBXImporter::writeMeshes(const char* mesh_output_filename, const char* src)
 		i32 name_len = (i32)stringLength(name);
 		write(name_len);
 		write(name, stringLength(name));
+	};
+
+	if(mesh_idx >= 0) {
+		writeMesh(meshes[mesh_idx]);
+	}
+	else {
+		for (ImportMesh& import_mesh : meshes) {
+			if (import_mesh.import) writeMesh(import_mesh);
+		}
 	}
 
-	writeBillboardMesh(attr_offset, indices_offset, mesh_output_filename);
+	if (mesh_idx < 0) {
+		writeBillboardMesh(attr_offset, indices_offset, mesh_output_filename);
+	}
 }
 
 
@@ -1676,6 +1734,44 @@ bool FBXImporter::writePhysics(const char* basename, const char* output_dir)
 }
 
 
+void FBXImporter::writeSubmodels(const char* src, const ImportConfig& cfg)
+{
+	postprocessMeshes(cfg);
+
+	for (int i = 0; i < meshes.size(); ++i) {
+		const char* name = getImportMeshName(meshes[i]);
+		StaticString<MAX_PATH_LENGTH> hash_str(name, ":", src);
+		makeLowercase(hash_str.data, stringLength(hash_str), hash_str);
+		const StaticString<MAX_PATH_LENGTH> out_path(cfg.output_dir, crc32(hash_str), ".res");
+		PlatformInterface::makePath(cfg.output_dir);
+		if (!out_file.open(out_path, FS::Mode::CREATE_AND_WRITE)) {
+			g_log_error.log("FBX") << "Failed to create " << out_path;
+			return;
+		}
+
+		writeModelHeader();
+		writeMeshes("", src, i);
+		writeGeometry(i);
+		const ofbx::Skin* skin = meshes[i].fbx->getGeometry()->getSkin();
+		if (!skin) {
+			write((int)0);
+		}
+		else {
+			writeSkeleton(cfg);
+		}
+
+		// lods
+		const i32 lod_count = 1;
+		const i32 to_mesh = 0;
+		const float factor = FLT_MAX;
+		write(lod_count);
+		write(to_mesh);
+		write(factor);
+		out_file.close();
+	}
+}
+
+
 void FBXImporter::writeModel(const char* output_mesh_filename, const char* ext, const char* src, const ImportConfig& cfg)
 {
 	postprocessMeshes(cfg);
@@ -1687,8 +1783,7 @@ void FBXImporter::writeModel(const char* output_mesh_filename, const char* ext, 
 	};
 
 	bool import_any_mesh = false;
-	for (const ImportMesh& m : meshes)
-	{
+	for (const ImportMesh& m : meshes) {
 		if (m.import) import_any_mesh = true;
 	}
 	if (!import_any_mesh) return;
@@ -1703,7 +1798,7 @@ void FBXImporter::writeModel(const char* output_mesh_filename, const char* ext, 
 	}
 
 	writeModelHeader();
-	writeMeshes(output_mesh_filename, src);
+	writeMeshes(output_mesh_filename, src, -1);
 	writeGeometry();
 	writeSkeleton(cfg);
 	writeLODs();

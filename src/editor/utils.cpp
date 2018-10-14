@@ -149,6 +149,13 @@ void getEntityListDisplayName(WorldEditor& editor, char* buf, int max_size, Enti
 		auto path = render_interface->getModelInstancePath(e);
 		if (path.isValid())
 		{
+			const char* c = path.c_str();
+			while (*c && *c != ':') ++c;
+			if (*c == ':') {
+				copyString(buf, Math::minimum(max_size, int(c - path.c_str() + 1)), path.c_str());
+				return;
+			}
+
 			char basename[MAX_PATH_LENGTH];
 			copyString(buf, max_size, path.c_str());
 			PathUtils::getBasename(basename, MAX_PATH_LENGTH, path.c_str());

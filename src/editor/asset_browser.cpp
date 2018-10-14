@@ -1,4 +1,5 @@
 #include "asset_browser.h"
+#include "editor/asset_compiler.h"
 #include "editor/render_interface.h"
 #include "editor/studio_app.h"
 #include "editor/world_editor.h"
@@ -29,21 +30,8 @@ bool AssetBrowser::IPlugin::createTile(const char* in_path, const char* out_path
 }
 
 
-ResourceType AssetBrowser::getResourceType(const char* path) const
-{
-	char ext[10];
-	PathUtils::getExtension(ext, sizeof(ext), path);
-
-	auto iter = m_registered_extensions.find(crc32(ext));
-	if (iter.isValid()) return iter.value();
-
-	return INVALID_RESOURCE_TYPE;
-}
-
-
 AssetBrowser::AssetBrowser(StudioApp& app)
 	: m_editor(app.getWorldEditor())
-	, m_resources(app.getWorldEditor().getAllocator())
 	, m_selected_resource(nullptr)
 	, m_autoreload_changed_resource(true)
 	, m_changed_files(app.getWorldEditor().getAllocator())
@@ -55,13 +43,11 @@ AssetBrowser::AssetBrowser(StudioApp& app)
 	, m_current_type(0)
 	, m_is_open(false)
 	, m_activate(false)
-	, m_is_init_finished(false)
 	, m_show_thumbnails(true)
 	, m_history_index(-1)
 	, m_file_infos(app.getWorldEditor().getAllocator())
 	, m_filtered_file_infos(app.getWorldEditor().getAllocator())
 	, m_subdirs(app.getWorldEditor().getAllocator())
-	, m_registered_extensions(app.getWorldEditor().getAllocator())
 {
 	IAllocator& allocator = m_editor.getAllocator();
 	m_filter[0] = '\0';
@@ -83,13 +69,9 @@ AssetBrowser::AssetBrowser(StudioApp& app)
 	m_forward_action = LUMIX_NEW(allocator, Action)("Forward", "Forward in asset history", "forward");
 	m_forward_action->is_global = false;
 	m_forward_action->func.bind<AssetBrowser, &AssetBrowser::goForward>(this);
-	m_refresh_action = LUMIX_NEW(allocator, Action)("Refresh", "Refresh assets", "refresh");
-	m_refresh_action->is_global = false;
-	m_refresh_action->func.bind<AssetBrowser, &AssetBrowser::findResources>(this);
 	m_app.addAction(m_auto_reload_action);
 	m_app.addAction(m_back_action);
 	m_app.addAction(m_forward_action);
-	m_app.addAction(m_refresh_action);
 }
 
 
@@ -115,11 +97,13 @@ AssetBrowser::~AssetBrowser()
 
 void AssetBrowser::onFileChanged(const char* path)
 {
-	ResourceType resource_type = getResourceType(path);
+	ASSERT(false);
+	// TODO
+	/*ResourceType resource_type = getResourceType(path);
 	if (!isValid(resource_type)) return;
 
 	MT::SpinLock lock(m_changed_files_mutex);
-	m_changed_files.push(Path(path));
+	m_changed_files.push(Path(path));*/
 }
 
 
@@ -144,7 +128,7 @@ void AssetBrowser::update()
 	for (auto* plugin : m_plugins) plugin->update();
 
 	if (!m_is_update_enabled) return;
-	bool is_empty;
+/*	bool is_empty;
 	{
 		MT::SpinLock lock(m_changed_files_mutex);
 		is_empty = m_changed_files.empty();
@@ -186,7 +170,8 @@ void AssetBrowser::update()
 		PathUtils::getFilename(filename, sizeof(filename), path.c_str());
 		addResource(dir, filename);
 	}
-	m_changed_files.clear();
+	m_changed_files.clear();*/
+	// TODO
 }
 
 
@@ -230,6 +215,7 @@ void AssetBrowser::changeDir(const char* path)
 	PlatformInterface::FileIterator* iter = PlatformInterface::createFileIterator(m_dir, allocator);
 	PlatformInterface::FileInfo info;
 
+	const AssetCompiler& compiler = m_app.getAssetCompiler();
 	m_subdirs.clear();
 	while (PlatformInterface::getNextFile(iter, &info))
 	{
@@ -241,7 +227,7 @@ void AssetBrowser::changeDir(const char* path)
 
 		StaticString<MAX_PATH_LENGTH> file_path_str(m_dir, "/", info.filename);
 		Path filepath(file_path_str);
-		ResourceType type = getResourceType(filepath.c_str());
+		ResourceType type = compiler.getResourceType(filepath.c_str());
 
 		if (type == INVALID_RESOURCE_TYPE) continue;
 
@@ -351,9 +337,9 @@ void AssetBrowser::createTile(FileInfo& tile, const char* out_path)
 {
 	if (tile.create_called) return;
 	tile.create_called = true;
-	for (IPlugin* plugin : m_plugins)
-	{
-		ResourceType type = getResourceType(tile.filepath);
+	const AssetCompiler& compiler = m_app.getAssetCompiler();
+	for (IPlugin* plugin : m_plugins) {
+		ResourceType type = compiler.getResourceType(tile.filepath);
 		if (plugin->createTile(tile.filepath, out_path, type)) break;
 	}
 }
@@ -467,7 +453,6 @@ void AssetBrowser::detailsGUI()
 			if (m_history_index > 0) m_back_action->toolbarButton();
 			if (m_history_index < m_history.size() - 1) m_forward_action->toolbarButton();
 			m_auto_reload_action->toolbarButton();
-			m_refresh_action->toolbarButton();
 		}
 		ImGui::EndToolbar();
 
@@ -484,9 +469,10 @@ void AssetBrowser::detailsGUI()
 
 		ImGui::LabelText("Status", "%s", m_selected_resource->isFailure() ? "failure" : (m_selected_resource->isReady() ? "Ready" : "Not ready"));
 
-		ResourceType resource_type = getResourceType(path);
+		const AssetCompiler& compiler = m_app.getAssetCompiler();
+		ResourceType resource_type = compiler.getResourceType(path);
 		IPlugin* plugin = m_plugins.get(resource_type);
-		if (m_selected_resource->isReady()) plugin->onGUI(m_selected_resource);
+		plugin->onGUI(m_selected_resource);
 	}
 	//if (m_activate) ImGui::SetDockActive(); // TODO
 	m_activate = false;
@@ -578,24 +564,15 @@ void AssetBrowser::selectResource(Resource* resource, bool record_history)
 }
 
 
-void AssetBrowser::onInitFinished()
-{
-	m_is_init_finished = true;
-	findResources();
-}
-
-
 void AssetBrowser::removePlugin(IPlugin& plugin)
 {
 	m_plugins.erase(plugin.getResourceType());
-	if (m_is_init_finished) findResources();
 }
 
 
 void AssetBrowser::addPlugin(IPlugin& plugin)
 {
 	m_plugins.insert(plugin.getResourceType(), &plugin);
-	if(m_is_init_finished) findResources();
 }
 
 
@@ -606,17 +583,10 @@ void AssetBrowser::selectResource(const Path& path, bool record_history)
 	PathUtils::getExtension(ext, lengthOf(ext), path.c_str());
 
 	auto& manager = m_editor.getEngine().getResourceManager();
-	const ResourceType type = getResourceType(path.c_str());
+	const AssetCompiler& compiler = m_app.getAssetCompiler();
+	const ResourceType type = compiler.getResourceType(path.c_str());
 	Resource* res = manager.load(type, path);
 	if (res) selectResource(res, record_history);
-}
-
-
-bool AssetBrowser::acceptExtension(const char* ext, ResourceType type)
-{
-	auto iter = m_registered_extensions.find(crc32(ext));
-	if (!iter.isValid()) return false;
-	return iter.value() == type;
 }
 
 
@@ -628,16 +598,26 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* bu
 	float text_width = Math::maximum(
 		50.0f, item_w - ImGui::CalcTextSize(" ... ").x - style.FramePadding.x * 2);
 
-	char* c = buf + stringLength(buf);
-	while (c > buf && *c != '/' && *c != '\\') --c;
-	if (*c == '/' || *c == '\\') ++c;
 	
 	auto pos = ImGui::GetCursorPos();
 	pos.x += text_width;
 	ImGui::BeginGroup();
 	ImGui::AlignTextToFramePadding();
 	ImGui::PushTextWrapPos(pos.x);
-	ImGui::Text("%s", c);
+
+	char* c = buf;
+	while (*c && c - buf < max_size && *c != ':') ++c;
+	if(*c == ':') {
+		char tmp[64];
+		copyString(tmp, Math::minimum(lengthOf(tmp), int(c - buf) + 1), buf); 
+		ImGui::Text("%s", tmp);
+	}
+	else {
+		char* c = buf + stringLength(buf);
+		while (c > buf && *c != '/' && *c != '\\') --c;
+		if (*c == '/' || *c == '\\') ++c;
+		ImGui::Text("%s", c);
+	}
 	ImGui::PopTextWrapPos();
 	ImGui::SameLine();
 	ImGui::SetCursorPos(pos);
@@ -653,7 +633,8 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* bu
 			char ext[10];
 			const char* path = (const char*)payload->Data;
 			PathUtils::getExtension(ext, lengthOf(ext), path);
-			if (acceptExtension(ext, type))
+			const AssetCompiler& compiler = m_app.getAssetCompiler();
+			if (compiler.acceptExtension(ext, type))
 			{
 				copyString(buf, max_size, path);
 				ImGui::EndDragDropTarget();
@@ -691,17 +672,6 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* bu
 	}
 	ImGui::PopID();
 	return false;
-}
-
-
-void AssetBrowser::registerExtension(const char* extension, ResourceType type)
-{
-	u32 hash = crc32(extension);
-	ASSERT(!m_registered_extensions.find(hash).isValid());
-
-	m_registered_extensions.insert(hash, type);
-
-	if (!m_resources.find(type).isValid()) m_resources.insert(type, Array<Path>(m_editor.getAllocator()));
 }
 
 
@@ -762,7 +732,8 @@ bool AssetBrowser::resourceList(char* buf, int max_size, ResourceType type, floa
 	ImGui::LabellessInputText("Filter", filter, sizeof(filter));
 
 	ImGui::BeginChild("Resources", ImVec2(0, height), false, ImGuiWindowFlags_HorizontalScrollbar);
-	for (auto& res : getResources(type))
+	const AssetCompiler& compiler = m_app.getAssetCompiler();
+	for (const auto& res : compiler.getResources(type))
 	{
 		if (filter[0] != '\0' && strstr(res.c_str(), filter) == nullptr) continue;
 
@@ -804,75 +775,6 @@ void AssetBrowser::goForward()
 {
 	m_history_index = Math::minimum(m_history_index + 1, m_history.size() - 1);
 	selectResource(m_history[m_history_index], false);
-}
-
-
-const Array<Path>& AssetBrowser::getResources(ResourceType type) const
-{
-	return m_resources[type];
-}
-
-
-void AssetBrowser::addResource(const char* path, const char* filename)
-{
-	char ext[10];
-	PathUtils::getExtension(ext, sizeof(ext), filename);
-	makeLowercase(ext, lengthOf(ext), ext);
-
-	char fullpath[MAX_PATH_LENGTH];
-	copyString(fullpath, path);
-	catString(fullpath, "/");
-	catString(fullpath, filename);
-	
-	ResourceType type = getResourceType(fullpath);
-
-	if (startsWith(path, "/unit_tests") != 0) return;
-	if (type == INVALID_RESOURCE_TYPE) return;
-
-	Path path_obj(fullpath);
-	Array<Path>& resources = m_resources[type];
-	if (resources.indexOf(path_obj) == -1)
-	{
-		resources.push(path_obj);
-	}
-}
-
-
-void AssetBrowser::processDir(const char* dir, int base_length)
-{
-	auto* iter = PlatformInterface::createFileIterator(dir, m_editor.getAllocator());
-	PlatformInterface::FileInfo info;
-	while (getNextFile(iter, &info))
-	{
-		if (info.filename[0] == '.') continue;
-
-		if (info.is_directory)
-		{
-			char child_path[MAX_PATH_LENGTH];
-			copyString(child_path, dir);
-			catString(child_path, "/");
-			catString(child_path, info.filename);
-			processDir(child_path, base_length);
-		}
-		else
-		{
-			addResource(dir + base_length, info.filename);
-		}
-	}
-
-	destroyFileIterator(iter);
-}
-
-
-void AssetBrowser::findResources()
-{
-	for (auto& resources : m_resources)
-	{
-		resources.clear();
-	}
-
-	const char* base_path = m_editor.getEngine().getDiskFileDevice()->getBasePath();
-	processDir(base_path, stringLength(base_path));
 }
 
 

@@ -1,5 +1,5 @@
 #include "terrain_editor.h"
-#include "editor/asset_browser.h"
+#include "editor/asset_compiler.h"
 #include "editor/ieditor_command.h"
 #include "editor/platform_interface.h"
 #include "editor/prefab_system.h"
@@ -1673,7 +1673,7 @@ void TerrainEditor::onGUI()
 			static ImVec2 size(-1, 100);
 			ImGui::LabellessInputText("Filter", filter, sizeof(filter));
 			ImGui::ListBoxHeader("Prefabs", size);
-			auto& all_prefabs = m_app.getAssetBrowser().getResources(PrefabResource::TYPE);
+			auto& all_prefabs = m_app.getAssetCompiler().getResources(PrefabResource::TYPE);
 			for(int i = 0; i < all_prefabs.size(); ++i)
 			{
 				if (filter[0] != 0 && stristr(all_prefabs[i].c_str(), filter) == nullptr) continue;

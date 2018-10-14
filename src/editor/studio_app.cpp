@@ -233,7 +233,7 @@ public:
 		loadUniverseFromCommandLine();
 		findLuaPlugins("plugins/lua/");
 
-		m_asset_browser->onInitFinished();
+		m_asset_compiler->onInitFinished();
 		m_sleep_when_inactive = shouldSleepWhenInactive();
 	}
 
@@ -2029,9 +2029,9 @@ public:
 		auto* studio = LuaWrapper::checkArg<StudioAppImpl*>(L, 1);
 		auto* type = LuaWrapper::checkArg<const char*>(L, 2);
 
-		AssetBrowser& browser = studio->getAssetBrowser();
+		AssetCompiler& compiler = studio->getAssetCompiler();
 		if (ResourceType(type) == INVALID_RESOURCE_TYPE) return 0;
-		auto& resources_paths = browser.getResources(ResourceType(type));
+		auto& resources_paths = compiler.getResources(ResourceType(type));
 
 		lua_createtable(L, resources_paths.size(), 0);
 		int i = 0;

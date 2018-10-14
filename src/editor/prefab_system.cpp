@@ -1,5 +1,6 @@
 #include "prefab_system.h"
 #include "editor/asset_browser.h"
+#include "editor/asset_compiler.h"
 #include "editor/ieditor_command.h"
 #include "editor/studio_app.h"
 #include "editor/world_editor.h"
@@ -34,7 +35,7 @@ public:
 		: system(system)
 		, editor(editor)
 	{
-		app.getAssetBrowser().registerExtension("fab", PrefabResource::TYPE);
+		app.getAssetCompiler().registerExtension("fab", PrefabResource::TYPE);
 	}
 
 

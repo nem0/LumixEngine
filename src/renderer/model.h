@@ -62,6 +62,9 @@ struct LUMIX_RENDERER_API Mesh
 		TEXCOORD0,
 		TEXCOORD1,
 
+		INSTANCE0,
+		INSTANCE1,
+
 		NONE = 0xff
 	};
 
