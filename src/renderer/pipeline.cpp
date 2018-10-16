@@ -1564,8 +1564,10 @@ struct PipelineImpl final : Pipeline
 								for (int i = 0; i < material->textures_count; ++i) {
 									const ffr::TextureHandle handle = material->textures[i];
 									const ffr::UniformHandle uniform = shader->texture_uniforms[i];
-									ffr::bindTexture(i, handle);
-									ffr::setUniform1i(uniform, i);
+									if (handle.isValid()) {
+										ffr::bindTexture(i, handle);
+										ffr::setUniform1i(uniform, i);
+									}
 								}
 
 								const Shader::Program& prog = Shader::getProgram(shader, instanced_mask);

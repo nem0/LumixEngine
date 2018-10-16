@@ -213,6 +213,7 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	void onGUI(Resource* resource) override
 	{
 		Material* material = static_cast<Material*>(resource);
+		if (!material->isReady()) return;
 
 		if (ImGui::Button("Save")) saveMaterial(material);
 		ImGui::SameLine();
@@ -1991,26 +1992,22 @@ struct RenderInterfaceImpl final : public RenderInterface
 
 	AABB getEntityAABB(Universe& universe, EntityRef entity, const DVec3& base) override
 	{
-				// TODO
-	ASSERT(false);
-/*AABB aabb;
+		AABB aabb;
 
-		if (universe.hasComponent(entity, MODEL_INSTANCE_TYPE))
-		{
+		if (universe.hasComponent(entity, MODEL_INSTANCE_TYPE)) {
 			Model* model = m_render_scene->getModelInstanceModel(entity);
 			if (!model) return aabb;
 
 			aabb = model->getAABB();
-			aabb.transform(universe.getMatrix(entity));
+			aabb.transform(universe.getRelativeMatrix(entity, base));
 
 			return aabb;
 		}
 
-		Vec3 pos = universe.getPosition(entity);
+		Vec3 pos = (universe.getPosition(entity) - base).toFloat();
 		aabb.set(pos, pos);
 
-		return aabb;*/
-	return {};
+		return aabb;
 	}
 
 
@@ -2107,22 +2104,15 @@ struct RenderInterfaceImpl final : public RenderInterface
 	}
 
 
-	void getModelInstaces(Array<EntityRef>& entities,
-		const ShiftedFrustum& frustum,
-		const DVec3& lod_ref_point,
-		float fov,
-		bool is_ortho) override
+	void getRenderables(Array<EntityRef>& entities, const ShiftedFrustum& frustum) override
 	{
-		/*const float lod_multiplier = m_render_scene->getCameraLODMultiplier(fov, is_ortho);
-		Array<MeshInstance> meshes(m_render_scene->getAllocator());
-		m_render_scene->getModelInstanceInfos(frustum, lod_ref_point, lod_multiplier, meshes);
-		for (MeshInstance m : meshes) {
-			if (entities.indexOf(m.owner) < 0) {
-				entities.push(m.owner);s
+		Array<Array<u32>> renderables(m_render_scene->getAllocator());
+		m_render_scene->getRenderables(frustum, renderables);
+		for (const Array<u32>& a : renderables) {
+			for (u32 b : a) {
+				entities.push({int(b & 0x00ffFFff)});
 			}
-		}*/
-		ASSERT(false);
-		// TODO
+		}
 	}
 
 
