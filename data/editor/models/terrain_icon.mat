@@ -1,3 +1,2 @@
-shader "pipelines/standard.shd"
-texture ""
-texture ""
+shader "pipelines/editor_icon.shd"
+texture "/editor/models/terrain_icon.dds"
