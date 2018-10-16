@@ -1788,6 +1788,25 @@ public:
 	}
 
 
+	void initPlugins() override
+	{
+		for (int i = 1, c = m_plugins.size(); i < c; ++i) {
+			for(int j = 0; j < i; ++j) {
+				IPlugin* p = m_plugins[i];
+				if (m_plugins[j]->dependsOn(*p)) {
+					m_plugins.erase(i);
+					--i;
+					m_plugins.insert(j, p);
+				}
+			}
+		}
+
+		for (IPlugin* plugin : m_plugins) {
+			plugin->init();
+		}
+	}
+
+
 	void addPlugin(IPlugin& plugin) override
 	{
 		m_plugins.push(&plugin);
@@ -2844,6 +2863,7 @@ void StudioApp::StaticPluginRegister::create(StudioApp& app)
 		app.addPlugin(*plugin);
 		i = i->next;
 	}
+	app.initPlugins();
 }
 
 

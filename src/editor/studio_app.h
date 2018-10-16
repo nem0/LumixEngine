@@ -45,6 +45,9 @@ public:
 	struct IPlugin
 	{
 		virtual ~IPlugin() {}
+		virtual void init() = 0;
+		virtual bool dependsOn(IPlugin& plugin) const { return false; }
+		virtual const char* getName() const = 0;
 	};
 
 	struct GUIPlugin
@@ -97,6 +100,7 @@ public:
 	virtual class AssetBrowser& getAssetBrowser() = 0;
 	virtual struct AssetCompiler& getAssetCompiler() = 0;
 	virtual WorldEditor& getWorldEditor() = 0;
+	virtual void initPlugins() = 0;
 	virtual void addPlugin(IPlugin& plugin) = 0;
 	virtual void addPlugin(GUIPlugin& plugin) = 0;
 	virtual void removePlugin(GUIPlugin& plugin) = 0;

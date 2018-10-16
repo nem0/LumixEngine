@@ -385,29 +385,37 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	explicit StudioAppPlugin(StudioApp& app)
 		: m_app(app)
 	{
-		app.registerComponentWithResource("property_animator", "Animation/Property animator", PropertyAnimation::TYPE, *Reflection::getProperty(PROPERTY_ANIMATOR_TYPE, "Animation"));
-		app.registerComponentWithResource("animable", "Animation/Animable", Animation::TYPE, *Reflection::getProperty(ANIMABLE_TYPE, "Animation"));
-		app.registerComponentWithResource("anim_controller", "Animation/Controller", Anim::ControllerResource::TYPE, *Reflection::getProperty(CONTROLLER_TYPE, "Source"));
-		app.registerComponent("shared_anim_controller", "Animation/Shared controller");
+	}
 
-		IAllocator& allocator = app.getWorldEditor().getAllocator();
-		m_animtion_plugin = LUMIX_NEW(allocator, AnimationAssetBrowserPlugin)(app);
-		m_prop_anim_plugin = LUMIX_NEW(allocator, PropertyAnimationAssetBrowserPlugin)(app);
-		m_anim_ctrl_plugin = LUMIX_NEW(allocator, AnimControllerAssetBrowserPlugin)(app);
+
+	const char* getName() const override { return "animation"; }
+
+
+	void init() override
+	{
+		m_app.registerComponentWithResource("property_animator", "Animation/Property animator", PropertyAnimation::TYPE, *Reflection::getProperty(PROPERTY_ANIMATOR_TYPE, "Animation"));
+		m_app.registerComponentWithResource("animable", "Animation/Animable", Animation::TYPE, *Reflection::getProperty(ANIMABLE_TYPE, "Animation"));
+		m_app.registerComponentWithResource("anim_controller", "Animation/Controller", Anim::ControllerResource::TYPE, *Reflection::getProperty(CONTROLLER_TYPE, "Source"));
+		m_app.registerComponent("shared_anim_controller", "Animation/Shared controller");
+
+		IAllocator& allocator = m_app.getWorldEditor().getAllocator();
+		m_animtion_plugin = LUMIX_NEW(allocator, AnimationAssetBrowserPlugin)(m_app);
+		m_prop_anim_plugin = LUMIX_NEW(allocator, PropertyAnimationAssetBrowserPlugin)(m_app);
+		m_anim_ctrl_plugin = LUMIX_NEW(allocator, AnimControllerAssetBrowserPlugin)(m_app);
 		
 		const char* exts[] = { "ani", nullptr };
-		app.getAssetCompiler().addPlugin(*m_animtion_plugin, exts);
+		m_app.getAssetCompiler().addPlugin(*m_animtion_plugin, exts);
 
-		AssetBrowser& asset_browser = app.getAssetBrowser();
+		AssetBrowser& asset_browser = m_app.getAssetBrowser();
 		asset_browser.addPlugin(*m_animtion_plugin);
 		asset_browser.addPlugin(*m_prop_anim_plugin);
 		asset_browser.addPlugin(*m_anim_ctrl_plugin);
 
-		m_animable_plugin = LUMIX_NEW(allocator, AnimablePropertyGridPlugin)(app);
-		app.getPropertyGrid().addPlugin(*m_animable_plugin);
+		m_animable_plugin = LUMIX_NEW(allocator, AnimablePropertyGridPlugin)(m_app);
+		m_app.getPropertyGrid().addPlugin(*m_animable_plugin);
 		
-		m_anim_editor = AnimEditor::IAnimationEditor::create(allocator, app);
-		app.addPlugin(*m_anim_editor);
+		m_anim_editor = AnimEditor::IAnimationEditor::create(allocator, m_app);
+		m_app.addPlugin(*m_anim_editor);
 	}
 
 

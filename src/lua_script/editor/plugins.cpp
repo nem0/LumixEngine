@@ -987,11 +987,17 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	StudioAppPlugin(StudioApp& app)
 		: m_app(app)
 	{
-		WorldEditor& editor = app.getWorldEditor();
+	}
+
+	const char* getName() const override { return "lua_script"; }
+
+	void init() override
+	{
+		WorldEditor& editor = m_app.getWorldEditor();
 		IAllocator& allocator = editor.getAllocator();
 
-		m_add_component_plugin = LUMIX_NEW(allocator, AddComponentPlugin)(app);
-		app.registerComponent("lua_script", *m_add_component_plugin);
+		m_add_component_plugin = LUMIX_NEW(allocator, AddComponentPlugin)(m_app);
+		m_app.registerComponent("lua_script", *m_add_component_plugin);
 
 		editor.registerEditorCommandCreator("add_script", createAddLuaScriptCommand);
 		editor.registerEditorCommandCreator("remove_script", createRemoveScriptCommand);
@@ -999,16 +1005,16 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_gizmo_plugin = LUMIX_NEW(allocator, GizmoPlugin)(editor);
 		editor.addPlugin(*m_gizmo_plugin);
 
-		m_prop_grid_plugin = LUMIX_NEW(allocator, PropertyGridPlugin)(app);
-		app.getPropertyGrid().addPlugin(*m_prop_grid_plugin);
+		m_prop_grid_plugin = LUMIX_NEW(allocator, PropertyGridPlugin)(m_app);
+		m_app.getPropertyGrid().addPlugin(*m_prop_grid_plugin);
 
-		m_asset_plugin = LUMIX_NEW(allocator, AssetPlugin)(app);
-		app.getAssetBrowser().addPlugin(*m_asset_plugin);
+		m_asset_plugin = LUMIX_NEW(allocator, AssetPlugin)(m_app);
+		m_app.getAssetBrowser().addPlugin(*m_asset_plugin);
 		const char* exts[] = { "lua", nullptr };
-		app.getAssetCompiler().addPlugin(*m_asset_plugin, exts);
+		m_app.getAssetCompiler().addPlugin(*m_asset_plugin, exts);
 
-		m_console_plugin = LUMIX_NEW(allocator, ConsolePlugin)(app);
-		app.addPlugin(*m_console_plugin);
+		m_console_plugin = LUMIX_NEW(allocator, ConsolePlugin)(m_app);
+		m_app.addPlugin(*m_console_plugin);
 	}
 
 
