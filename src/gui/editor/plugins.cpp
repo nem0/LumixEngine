@@ -391,6 +391,7 @@ private:
 
 	void onWindowGUI() override
 	{
+		if (!m_is_window_open) return;
 		if (ImGui::Begin("GUIEditor", &m_is_window_open))
 		{
 			ImVec2 mouse_canvas_pos = ImGui::GetMousePos();
@@ -761,19 +762,28 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	StudioAppPlugin(StudioApp& app)
 		: m_app(app)
 	{
-		app.registerComponent("gui_button", "GUI/Button");
-		app.registerComponentWithResource("gui_image", "GUI/Image", Sprite::TYPE, *Reflection::getProperty(GUI_IMAGE_TYPE, "Sprite"));
-		app.registerComponent("gui_input_field", "GUI/Input field");
-		app.registerComponent("gui_rect", "GUI/Rect");
-		app.registerComponent("gui_render_target", "GUI/Render target");
-		app.registerComponent("gui_text", "GUI/Text");
+	}
 
-		IAllocator& allocator = app.getWorldEditor().getAllocator();
-		m_gui_editor = LUMIX_NEW(allocator, GUIEditor)(app);
-		app.addPlugin(*m_gui_editor);
 
-		m_sprite_plugin = LUMIX_NEW(allocator, SpritePlugin)(app);
-		app.getAssetBrowser().addPlugin(*m_sprite_plugin);
+	const char* getName() const override { return "gui"; }
+	bool dependsOn(IPlugin& plugin) const override { return equalStrings(plugin.getName(), "renderer"); }
+
+
+	void init() override
+	{
+		m_app.registerComponent("gui_button", "GUI/Button");
+		m_app.registerComponentWithResource("gui_image", "GUI/Image", Sprite::TYPE, *Reflection::getProperty(GUI_IMAGE_TYPE, "Sprite"));
+		m_app.registerComponent("gui_input_field", "GUI/Input field");
+		m_app.registerComponent("gui_rect", "GUI/Rect");
+		m_app.registerComponent("gui_render_target", "GUI/Render target");
+		m_app.registerComponent("gui_text", "GUI/Text");
+
+		IAllocator& allocator = m_app.getWorldEditor().getAllocator();
+		m_gui_editor = LUMIX_NEW(allocator, GUIEditor)(m_app);
+		m_app.addPlugin(*m_gui_editor);
+
+		m_sprite_plugin = LUMIX_NEW(allocator, SpritePlugin)(m_app);
+		m_app.getAssetBrowser().addPlugin(*m_sprite_plugin);
 	}
 
 

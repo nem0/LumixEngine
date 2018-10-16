@@ -389,6 +389,7 @@ void GameView::onWindowGUI()
 	}
 	ImVec2 view_pos;
 	bool is_game_view_visible = false;
+	if (!m_is_open) return;
 	if (ImGui::Begin(window_name, &m_is_open, ImGuiWindowFlags_NoNavInputs)) {
 		is_game_view_visible = true;
 		view_pos = ImGui::GetCursorScreenPos();

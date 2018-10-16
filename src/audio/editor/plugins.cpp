@@ -160,6 +160,7 @@ struct ClipManagerUI final : public StudioApp::GUIPlugin
 
 	void onWindowGUI() override
 	{
+		if (!m_is_open) return; 
 		if (ImGui::Begin("Clip Manager", &m_is_open))
 		{
 			ImGui::InputText("Filter", m_filter, lengthOf(m_filter));
@@ -272,19 +273,27 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	explicit StudioAppPlugin(StudioApp& app)
 		: m_app(app)
 	{
-		app.registerComponent("ambient_sound", "Audio/Ambient sound");
-		app.registerComponent("audio_listener", "Audio/Listener");
-		app.registerComponent("echo_zone", "Audio/Echo zone");
-		app.registerComponent("chorus_zone", "Audio/Chorus zone");
+	}
 
-		WorldEditor& editor = app.getWorldEditor();
+
+	const char* getName() const override { return "audio"; }
+
+
+	void init() override 
+	{
+		m_app.registerComponent("ambient_sound", "Audio/Ambient sound");
+		m_app.registerComponent("audio_listener", "Audio/Listener");
+		m_app.registerComponent("echo_zone", "Audio/Echo zone");
+		m_app.registerComponent("chorus_zone", "Audio/Chorus zone");
+
+		WorldEditor& editor = m_app.getWorldEditor();
 		IAllocator& allocator = editor.getAllocator();
 
-		m_asset_browser_plugin = LUMIX_NEW(allocator, AssetBrowserPlugin)(app);
-		app.getAssetBrowser().addPlugin(*m_asset_browser_plugin);
+		m_asset_browser_plugin = LUMIX_NEW(allocator, AssetBrowserPlugin)(m_app);
+		m_app.getAssetBrowser().addPlugin(*m_asset_browser_plugin);
 
-		m_clip_manager_ui = LUMIX_NEW(allocator, ClipManagerUI)(app);
-		app.addPlugin(*m_clip_manager_ui);
+		m_clip_manager_ui = LUMIX_NEW(allocator, ClipManagerUI)(m_app);
+		m_app.addPlugin(*m_clip_manager_ui);
 
 		m_gizmo_plugin = LUMIX_NEW(allocator, GizmoPlugin)(editor);
 		editor.addPlugin(*m_gizmo_plugin);

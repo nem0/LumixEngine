@@ -2824,55 +2824,63 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	StudioAppPlugin(StudioApp& app)
 		: m_app(app)
 	{
-		IAllocator& allocator = app.getWorldEditor().getAllocator();
+	}
 
-		app.registerComponent("camera", "Render/Camera");
-		app.registerComponent("global_light", "Render/Global light");
 
-		app.registerComponentWithResource(
+	const char* getName() const override { return "renderer"; }
+
+
+	void init() override
+	{
+		IAllocator& allocator = m_app.getWorldEditor().getAllocator();
+
+		m_app.registerComponent("camera", "Render/Camera");
+		m_app.registerComponent("global_light", "Render/Global light");
+
+		m_app.registerComponentWithResource(
 			"model_instance", "Render/Mesh", Model::TYPE, *Reflection::getProperty(MODEL_INSTANCE_TYPE, "Source"));
-		app.registerComponentWithResource("particle_emitter",
+		m_app.registerComponentWithResource("particle_emitter",
 			"Render/Particle emitter",
 			ParticleEmitterResource::TYPE,
 			*Reflection::getProperty(PARTICLE_EMITTER_TYPE, "Resource"));
-		app.registerComponent("point_light", "Render/Point light");
-		app.registerComponent("decal", "Render/Decal");
-		app.registerComponent("bone_attachment", "Render/Bone attachment");
-		app.registerComponent("environment_probe", "Render/Environment probe");
-		app.registerComponentWithResource(
+		m_app.registerComponent("point_light", "Render/Point light");
+		m_app.registerComponent("decal", "Render/Decal");
+		m_app.registerComponent("bone_attachment", "Render/Bone attachment");
+		m_app.registerComponent("environment_probe", "Render/Environment probe");
+		m_app.registerComponentWithResource(
 			"text_mesh", "Render/Text 3D", FontResource::TYPE, *Reflection::getProperty(TEXT_MESH_TYPE, "Font"));
 
-		m_add_terrain_plugin = LUMIX_NEW(allocator, AddTerrainComponentPlugin)(app);
-		app.registerComponent("terrain", *m_add_terrain_plugin);
+		m_add_terrain_plugin = LUMIX_NEW(allocator, AddTerrainComponentPlugin)(m_app);
+		m_app.registerComponent("terrain", *m_add_terrain_plugin);
 
-		AssetCompiler& asset_compiler = app.getAssetCompiler();
+		AssetCompiler& asset_compiler = m_app.getAssetCompiler();
 
-		m_shader_plugin = LUMIX_NEW(allocator, ShaderPlugin)(app);
+		m_shader_plugin = LUMIX_NEW(allocator, ShaderPlugin)(m_app);
 		const char* shader_exts[] = {"shd", nullptr};
 		asset_compiler.addPlugin(*m_shader_plugin, shader_exts);
 
-		m_texture_plugin = LUMIX_NEW(allocator, TexturePlugin)(app);
+		m_texture_plugin = LUMIX_NEW(allocator, TexturePlugin)(m_app);
 		const char* texture_exts[] = { "png", "jpg", "dds", "tga", "raw", nullptr};
 		asset_compiler.addPlugin(*m_texture_plugin, texture_exts);
 
-		m_pipeline_plugin = LUMIX_NEW(allocator, PipelinePlugin)(app);
+		m_pipeline_plugin = LUMIX_NEW(allocator, PipelinePlugin)(m_app);
 		const char* pipeline_exts[] = {"pln", nullptr};
 		asset_compiler.addPlugin(*m_pipeline_plugin, pipeline_exts);
 
-		m_particle_emitter_plugin = LUMIX_NEW(allocator, ParticleEmitterPlugin)(app);
+		m_particle_emitter_plugin = LUMIX_NEW(allocator, ParticleEmitterPlugin)(m_app);
 		const char* particle_emitter_exts[] = {"par", nullptr};
 		asset_compiler.addPlugin(*m_particle_emitter_plugin, particle_emitter_exts);
 
-		m_material_plugin = LUMIX_NEW(allocator, MaterialPlugin)(app);
+		m_material_plugin = LUMIX_NEW(allocator, MaterialPlugin)(m_app);
 		const char* material_exts[] = {"mat", nullptr};
 		asset_compiler.addPlugin(*m_material_plugin, material_exts);
 
-		m_model_plugin = LUMIX_NEW(allocator, ModelPlugin)(app);
+		m_model_plugin = LUMIX_NEW(allocator, ModelPlugin)(m_app);
 		const char* model_exts[] = {"fbx", nullptr};
 		asset_compiler.addPlugin(*m_model_plugin, model_exts);
 
-		m_font_plugin = LUMIX_NEW(allocator, FontPlugin)(app);
-		AssetBrowser& asset_browser = app.getAssetBrowser();
+		m_font_plugin = LUMIX_NEW(allocator, FontPlugin)(m_app);
+		AssetBrowser& asset_browser = m_app.getAssetBrowser();
 		asset_browser.addPlugin(*m_model_plugin);
 		asset_browser.addPlugin(*m_particle_emitter_plugin);
 		asset_browser.addPlugin(*m_material_plugin);
@@ -2880,25 +2888,25 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		asset_browser.addPlugin(*m_shader_plugin);
 		asset_browser.addPlugin(*m_texture_plugin);
 
-		m_env_probe_plugin = LUMIX_NEW(allocator, EnvironmentProbePlugin)(app);
-		m_terrain_plugin = LUMIX_NEW(allocator, TerrainPlugin)(app);
-		PropertyGrid& property_grid = app.getPropertyGrid();
+		m_env_probe_plugin = LUMIX_NEW(allocator, EnvironmentProbePlugin)(m_app);
+		m_terrain_plugin = LUMIX_NEW(allocator, TerrainPlugin)(m_app);
+		PropertyGrid& property_grid = m_app.getPropertyGrid();
 		property_grid.addPlugin(*m_env_probe_plugin);
 		property_grid.addPlugin(*m_terrain_plugin);
 
-		m_scene_view = LUMIX_NEW(allocator, SceneView)(app);
-		m_game_view = LUMIX_NEW(allocator, GameView)(app);
-		m_editor_ui_render_plugin = LUMIX_NEW(allocator, EditorUIRenderPlugin)(app, *m_scene_view, *m_game_view);
-		m_render_stats_plugin = LUMIX_NEW(allocator, RenderStatsPlugin)(app);
-		m_shader_editor_plugin = LUMIX_NEW(allocator, ShaderEditorPlugin)(app);
-		app.addPlugin(*m_scene_view);
-		app.addPlugin(*m_game_view);
-		app.addPlugin(*m_editor_ui_render_plugin);
-		app.addPlugin(*m_render_stats_plugin);
-		app.addPlugin(*m_shader_editor_plugin);
+		m_scene_view = LUMIX_NEW(allocator, SceneView)(m_app);
+		m_game_view = LUMIX_NEW(allocator, GameView)(m_app);
+		m_editor_ui_render_plugin = LUMIX_NEW(allocator, EditorUIRenderPlugin)(m_app, *m_scene_view, *m_game_view);
+		m_render_stats_plugin = LUMIX_NEW(allocator, RenderStatsPlugin)(m_app);
+		m_shader_editor_plugin = LUMIX_NEW(allocator, ShaderEditorPlugin)(m_app);
+		m_app.addPlugin(*m_scene_view);
+		m_app.addPlugin(*m_game_view);
+		m_app.addPlugin(*m_editor_ui_render_plugin);
+		m_app.addPlugin(*m_render_stats_plugin);
+		m_app.addPlugin(*m_shader_editor_plugin);
 
 		m_gizmo_plugin = LUMIX_NEW(allocator, GizmoPlugin)();
-		app.getWorldEditor().addPlugin(*m_gizmo_plugin);
+		m_app.getWorldEditor().addPlugin(*m_gizmo_plugin);
 	}
 
 
