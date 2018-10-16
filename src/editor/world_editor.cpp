@@ -2007,7 +2007,7 @@ public:
 		if (min.x > max.x) Math::swap(min.x, max.x);
 		if (min.y > max.y) Math::swap(min.y, max.y);
 		const ShiftedFrustum frustum = m_viewport.getFrustum(min, max);
-		m_render_interface->getModelInstaces(entities, frustum, m_viewport.pos, m_viewport.fov, m_viewport.is_ortho);
+		m_render_interface->getRenderables(entities, frustum);
 		selectEntities(entities.empty() ? nullptr : &entities[0], entities.size(), false);
 	}
 
