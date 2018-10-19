@@ -137,6 +137,8 @@ function main()
 	end
 	
 	--transparentPass(res, gbuffer_depth)
+	setRenderTargets(hdr_buffer, gbuffer_depth)
+	renderTextMeshes()
 
 	if PREVIEW == nil then
 		res = postprocess("post", res, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
