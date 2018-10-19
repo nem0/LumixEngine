@@ -204,6 +204,7 @@ struct PipelineImpl final : Pipeline
 		ResourceManagerHub& rm = renderer.getEngine().getResourceManager();
 		m_draw2d_shader = rm.load<Shader>(Path("pipelines/draw2d.shd"));
 		m_debug_shape_shader = rm.load<Shader>(Path("pipelines/debug_shape.shd"));
+		m_text_mesh_shader = rm.load<Shader>(Path("pipelines/text_mesh.shd"));
 		TextureManager& texture_manager = renderer.getTextureManager();
 		m_default_cubemap = rm.load<Texture>(Path("textures/common/default_probe.dds"));
 
@@ -270,6 +271,7 @@ struct PipelineImpl final : Pipeline
 
 		m_draw2d_shader->getResourceManager().unload(*m_draw2d_shader);
 		m_debug_shape_shader->getResourceManager().unload(*m_debug_shape_shader);
+		m_text_mesh_shader->getResourceManager().unload(*m_text_mesh_shader);
 		m_default_cubemap->getResourceManager().unload(*m_default_cubemap);
 
 		for(ShaderRef& shader : m_shaders) {
@@ -1508,6 +1510,88 @@ struct PipelineImpl final : Pipeline
 	}
 
 
+	void renderTextMeshes()
+	{
+		if (!m_text_mesh_shader->isReady()) return;
+		if (m_text_mesh_shader->m_texture_slot_count < 1) return;
+
+		struct RenderJob : Renderer::RenderJob
+		{
+			RenderJob(IAllocator& allocator) : m_vertices(allocator) {}
+
+
+			void setup() override
+			{
+				const Quat& rot = m_pipeline->m_viewport.rot;
+				const DVec3& pos = m_pipeline->m_viewport.pos;
+				m_pipeline->m_scene->getTextMeshesVertices(m_vertices, pos, rot);
+				Renderer& renderer = m_pipeline->m_renderer;
+				Texture* atlas = renderer.getFontManager().getAtlasTexture();
+				m_atlas = atlas ? atlas->handle : ffr::INVALID_TEXTURE;
+			}
+
+
+			void execute() override
+			{
+				const Shader::Program& p = Shader::getProgram(m_shader, 0);
+				if(!p.handle.isValid()) return;
+
+				Renderer& renderer = m_pipeline->m_renderer;
+				const Renderer::TransientSlice transient = renderer.allocTransient(m_vertices.byte_size());
+				ffr::update(transient.buffer, m_vertices.begin(), transient.offset, transient.size);
+				ffr::setUniform1i(m_texture_uniform, 0);
+				ffr::useProgram(p.handle);
+				ffr::VertexDecl decl;
+				ffr::blending(1);
+				ffr::setState((u64)ffr::StateFlags::DEPTH_WRITE | (u64)ffr::StateFlags::DEPTH_TEST);
+				ffr::bindTexture(0, m_atlas);
+				decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false);
+				decl.addAttribute(4, ffr::AttributeType::U8, true, false);
+				decl.addAttribute(2, ffr::AttributeType::FLOAT, false, false);
+				ffr::setVertexBuffer(&decl, transient.buffer, transient.offset, nullptr);
+				ffr::drawArrays(0, m_vertices.size(), ffr::PrimitiveType::TRIANGLES);
+			}
+
+
+			ffr::TextureHandle m_atlas;
+			ShaderRenderData* m_shader;
+			PipelineImpl* m_pipeline;
+			ffr::UniformHandle m_texture_uniform;
+			Array<TextMeshVertex> m_vertices;
+		};
+
+
+		IAllocator& allocator = m_renderer.getAllocator();
+		RenderJob* job = LUMIX_NEW(allocator, RenderJob)(allocator);
+		job->m_pipeline = this;
+		job->m_shader = m_text_mesh_shader->m_render_data;
+		job->m_texture_uniform = m_text_mesh_shader->m_texture_slots[0].uniform_handle;
+		m_renderer.push(job);
+
+/*		if (!m_text_mesh_shader->isReady()) return;
+
+		IAllocator& allocator = m_renderer.getEngine().getLIFOAllocator();
+		Array<TextMeshVertex> vertices(allocator);
+		vertices.reserve(1024);
+		m_scene->getTextMeshesVertices(vertices, m_applied_camera);
+
+		const bgfx::VertexDecl& decl = m_renderer.getBasicVertexDecl();
+		bgfx::TransientVertexBuffer vertex_buffer;
+		if (vertices.empty()) return;
+		if (bgfx::getAvailTransientVertexBuffer(vertices.size(), decl) < (u32)vertices.size()) return;
+
+		bgfx::allocTransientVertexBuffer(&vertex_buffer, vertices.size(), decl);
+		copyMemory(vertex_buffer.data, &vertices[0], vertices.size() * sizeof(vertices[0]));
+
+		Texture* atlas_texture = m_renderer.getFontManager().getAtlasTexture();
+		bgfx::UniformHandle texture_uniform = m_text_mesh_shader->m_texture_slots[0].uniform_handle;
+		setTexture(0, atlas_texture->handle, texture_uniform);
+		ShaderInstance& shader_instance = m_text_mesh_shader->getInstance(0);
+		u64 state = m_text_mesh_shader->m_render_states & ~BGFX_STATE_CULL_MASK;
+		render(vertex_buffer, vertices.size(), state, shader_instance);*/
+	}
+
+
 	void renderBucket(const char* define, CommandSet* cmd_set)
 	{
 		struct RenderJob : Renderer::RenderJob
@@ -2662,6 +2746,7 @@ struct PipelineImpl final : Pipeline
 		REGISTER_FUNCTION(render2D);
 		REGISTER_FUNCTION(renderBucket);
 		REGISTER_FUNCTION(renderDebugShapes);
+		REGISTER_FUNCTION(renderTextMeshes);
 		REGISTER_FUNCTION(setOutput);
 		REGISTER_FUNCTION(setStencil);
 		REGISTER_FUNCTION(viewport);
@@ -2742,6 +2827,7 @@ struct PipelineImpl final : Pipeline
 	Viewport m_viewport;
 	int m_output;
 	Shader* m_debug_shape_shader;
+	Shader* m_text_mesh_shader;
 	Texture* m_default_cubemap;
 	Array<CommandSet*> m_command_sets;
 	Array<CustomCommandHandler> m_custom_commands_handlers;
