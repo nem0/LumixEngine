@@ -107,15 +107,31 @@ static bool saveAsDDS(const char* path, const u8* image_data, int image_width, i
 
 
 
-struct FontPlugin final : public AssetBrowser::IPlugin
+struct FontPlugin final : public AssetBrowser::IPlugin, AssetCompiler::IPlugin
 {
-	FontPlugin(StudioApp& app) { app.getAssetCompiler().registerExtension("ttf", FontResource::TYPE); }
+	FontPlugin(StudioApp& app) : app(app) 
+	{ 
+		app.getAssetCompiler().registerExtension("ttf", FontResource::TYPE); 
+	}
+	
+	bool compile(const Path& src) override
+	{
+		const char* dst_dir = app.getAssetCompiler().getCompiledDir();
+		const u32 hash = crc32(src.c_str());
+
+		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
+
+		copyFile(src.c_str(), dst);
+		return true;
+	}
 
 	void onGUI(Resource* resource) override {}
 	void onResourceUnloaded(Resource* resource) override {}
 	const char* getName() const override { return "Font"; }
 
 	ResourceType getResourceType() const override { return FontResource::TYPE; }
+
+	StudioApp& app;
 };
 
 
@@ -2870,6 +2886,9 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		asset_compiler.addPlugin(*m_model_plugin, model_exts);
 
 		m_font_plugin = LUMIX_NEW(allocator, FontPlugin)(m_app);
+		const char* fonts_exts[] = {"ttf", nullptr};
+		asset_compiler.addPlugin(*m_font_plugin, fonts_exts);
+		
 		AssetBrowser& asset_browser = m_app.getAssetBrowser();
 		asset_browser.addPlugin(*m_model_plugin);
 		asset_browser.addPlugin(*m_particle_emitter_plugin);
@@ -2913,6 +2932,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		asset_browser.removePlugin(*m_shader_plugin);
 
 		AssetCompiler& asset_compiler = m_app.getAssetCompiler();
+		asset_compiler.removePlugin(*m_font_plugin);
 		asset_compiler.removePlugin(*m_shader_plugin);
 		asset_compiler.removePlugin(*m_texture_plugin);
 		asset_compiler.removePlugin(*m_model_plugin);

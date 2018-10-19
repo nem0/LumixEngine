@@ -918,44 +918,37 @@ public:
 	}
 
 
-	void getTextMeshesVertices(Array<TextMeshVertex>& vertices, EntityRef camera) override
+	void getTextMeshesVertices(Array<TextMeshVertex>& vertices, const DVec3& cam_pos, const Quat& cam_rot) override
 	{
-				// TODO
-		ASSERT(false);
-		/*
-		Matrix camera_mtx = m_universe.getMatrix(camera);
-		Vec3 cam_right = camera_mtx.getXVector();
-		Vec3 cam_up = -camera_mtx.getYVector();
-		for (int j = 0, nj = m_text_meshes.size(); j < nj; ++j)
-		{
-			TextMesh& text = *m_text_meshes.at(j);
-			Font* font = text.getFont();
+		const Vec3 cam_right = cam_rot * Vec3(1, 0, 0);
+		const Vec3 cam_up = cam_rot * Vec3(0, -1, 0);
+		for (int j = 0, nj = m_text_meshes.size(); j < nj; ++j) {
+			const TextMesh& text = *m_text_meshes.at(j);
+			const Font* font = text.getFont();
 			if (!font) font = m_renderer.getFontManager().getDefaultFont();
-			EntityRef entity = m_text_meshes.getKey(j);
+			const EntityRef entity = m_text_meshes.getKey(j);
 			const char* str = text.text.c_str();
-			Vec3 base = m_universe.getPosition(entity);
-			Quat rot = m_universe.getRotation(entity);
-			float scale = m_universe.getScale(entity);
-			Vec3 right = rot.rotate({ 1, 0, 0 }) * scale;
-			Vec3 up = rot.rotate({ 0, -1, 0 }) * scale;
-			if (text.m_flags.isSet(TextMesh::CAMERA_ORIENTED))
-			{
+			Vec3 base = (m_universe.getPosition(entity) - cam_pos).toFloat();
+			const Quat rot = m_universe.getRotation(entity);
+			const float scale = m_universe.getScale(entity);
+			Vec3 right = rot.rotate(Vec3(1, 0, 0)) * scale;
+			Vec3 up = rot.rotate(Vec3(0, -1, 0)) * scale;
+			if (text.m_flags.isSet(TextMesh::CAMERA_ORIENTED)) {
 				right = cam_right * scale;
 				up = cam_up * scale;
 			}
 			u32 color = text.color;
-			Vec2 text_size = font->CalcTextSizeA((float)text.getFontSize(), FLT_MAX, 0, str);
+			const Vec2 text_size = font->CalcTextSizeA((float)text.getFontSize(), FLT_MAX, 0, str);
 			base += right * text_size.x * -0.5f;
 			base += up * text_size.y * -0.5f;
-			for (int i = 0, n = text.text.length(); i < n; ++i)
-			{
+			for (int i = 0, n = text.text.length(); i < n; ++i) {
 				const Font::Glyph* glyph = font->FindGlyph(str[i]);
 				if (!glyph) continue;
 
-				Vec3 x0y0 = base + right * glyph->X0 + up * glyph->Y0;
-				Vec3 x1y0 = base + right * glyph->X1 + up * glyph->Y0;
-				Vec3 x1y1 = base + right * glyph->X1 + up * glyph->Y1;
-				Vec3 x0y1 = base + right * glyph->X0 + up * glyph->Y1;
+				const Vec3 x0y0 = base + right * glyph->X0 + up * glyph->Y0;
+				const Vec3 x1y0 = base + right * glyph->X1 + up * glyph->Y0;
+				const Vec3 x1y1 = base + right * glyph->X1 + up * glyph->Y1;
+				const Vec3 x0y1 = base + right * glyph->X0 + up * glyph->Y1;
 
 				vertices.push({ x0y0, color, { glyph->U0, glyph->V0 } });
 				vertices.push({ x1y0, color, { glyph->U1, glyph->V0 } });
@@ -967,8 +960,7 @@ public:
 				
 				base += right * glyph->XAdvance;
 			}
-
-		}*/
+		}
 	}
 
 
