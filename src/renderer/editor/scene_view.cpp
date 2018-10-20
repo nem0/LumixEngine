@@ -218,24 +218,50 @@ void SceneView::renderIcons()
 
 void SceneView::renderSelection()
 {
-	/*const Array<EntityRef>& entities = m_editor.getSelectedEntities();
-	RenderScene* scene = m_pipeline->getScene();
-	Universe& universe = scene->getUniverse();
-	for (EntityRef e : entities)
+	struct RenderJob : Renderer::RenderJob
 	{
-		if (!scene->getUniverse().hasComponent(e, MODEL_INSTANCE_TYPE)) continue;
+		RenderJob(IAllocator& allocator) : m_items(allocator) {}
 
-		Model* model = scene->getModelInstanceModel(e);
-		Matrix mtx = universe.getMatrix(e);
-		if (model)
+		void setup() override
 		{
-			Pose* pose = scene->lockPose(e);
-			m_pipeline->renderModel(*model, pose, mtx);
-			scene->unlockPose(e, false);
+			const Array<EntityRef>& entities = m_editor->getSelectedEntities();
+			RenderScene* scene = m_pipeline->getScene();
+			const Universe& universe = scene->getUniverse();
+			for (EntityRef e : entities) {
+				if (!scene->getUniverse().hasComponent(e, MODEL_INSTANCE_TYPE)) continue;
+
+				Item item;
+				item.model = scene->getModelInstanceModel(e);
+				item.mtx = universe.getRelativeMatrix(e, m_editor->getViewport().pos);
+
+				if (item.model && item.model->isReady()) m_items.push(item);
+			}
 		}
-	}*/
-	ASSERT(false);
-	// TODO
+
+		void execute() override
+		{
+			for (const Item& item : m_items) {
+				m_pipeline->renderModel(*item.model, item.mtx);
+			}
+		}
+
+		struct Item {
+			Model* model;
+			Matrix mtx;
+		};
+
+		Array<Item> m_items;
+		Pipeline* m_pipeline;
+		WorldEditor* m_editor;
+	};
+
+	Engine& engine = m_editor.getEngine();
+	Renderer* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
+	IAllocator& allocator = renderer->getAllocator();
+	RenderJob* job = LUMIX_NEW(allocator, RenderJob)(allocator);
+	job->m_pipeline = m_pipeline;
+	job->m_editor = &m_editor;
+	renderer->push(job);
 }
 
 

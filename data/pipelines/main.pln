@@ -2,6 +2,7 @@ local deferred_shader = preloadShader("pipelines/deferred.shd")
 local textured_quad_shader = preloadShader("pipelines/textured_quad.shd")
 local tonemap_shader = preloadShader("pipelines/tonemap.shd")
 local environment_shader =  preloadShader("pipelines/environment.shd")
+local selection_outline_shader = preloadShader("pipelines/selection_outline.shd")
 local debug_shadowmap = false
 
 function transparentPass(colorbuffer, dsbuffer)
@@ -126,6 +127,20 @@ function debugPass(output, shadowmap)
 end
 
 
+function renderSelectionOutline(output)
+	local selection_mask = createRenderbuffer(1, 1, true, "rgba8")
+	setRenderTargets(selection_mask)
+	clear(CLEAR_COLOR, 0, 0, 0, 0, 0)
+	renderSelection()
+	
+	setRenderTargets(output)
+	drawArray(0, 4, selection_outline_shader
+		, { u_mask = selection_mask }
+	)
+	
+end
+
+
 function main()
 	local shadowmap = createRenderbuffer(4096, 1024, false, "depth24") --shadowPass()
 	local gbuffer0, gbuffer1, gbuffer2, gbuffer_depth = geomPass()
@@ -159,6 +174,7 @@ function main()
 		render2D()
 		--renderIcons()
 		renderDebugShapes()
+		renderSelectionOutline(res)
 	end
 
 	setOutput(res)
