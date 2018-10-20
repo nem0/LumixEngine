@@ -140,6 +140,7 @@ enum class RenderableTypes : u8 {
 	MESH,
 	SKINNED,
 	DECAL,
+	LOCAL_LIGHT,
 
 	COUNT
 };
@@ -319,7 +320,6 @@ public:
 	virtual void addGrass(EntityRef entity, int index) = 0;
 	virtual void removeGrass(EntityRef entity, int index) = 0;
 
-	virtual void getPointLights(const Frustum& frustum, Array<EntityRef>& lights) = 0;
 	virtual void setLightCastShadows(EntityRef entity, bool cast_shadows) = 0;
 	virtual bool getLightCastShadows(EntityRef entity) = 0;
 	virtual float getLightAttenuation(EntityRef entity) = 0;

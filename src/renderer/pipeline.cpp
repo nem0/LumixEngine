@@ -1567,30 +1567,95 @@ struct PipelineImpl final : Pipeline
 		job->m_shader = m_text_mesh_shader->m_render_data;
 		job->m_texture_uniform = m_text_mesh_shader->m_texture_slots[0].uniform_handle;
 		m_renderer.push(job);
-
-/*		if (!m_text_mesh_shader->isReady()) return;
-
-		IAllocator& allocator = m_renderer.getEngine().getLIFOAllocator();
-		Array<TextMeshVertex> vertices(allocator);
-		vertices.reserve(1024);
-		m_scene->getTextMeshesVertices(vertices, m_applied_camera);
-
-		const bgfx::VertexDecl& decl = m_renderer.getBasicVertexDecl();
-		bgfx::TransientVertexBuffer vertex_buffer;
-		if (vertices.empty()) return;
-		if (bgfx::getAvailTransientVertexBuffer(vertices.size(), decl) < (u32)vertices.size()) return;
-
-		bgfx::allocTransientVertexBuffer(&vertex_buffer, vertices.size(), decl);
-		copyMemory(vertex_buffer.data, &vertices[0], vertices.size() * sizeof(vertices[0]));
-
-		Texture* atlas_texture = m_renderer.getFontManager().getAtlasTexture();
-		bgfx::UniformHandle texture_uniform = m_text_mesh_shader->m_texture_slots[0].uniform_handle;
-		setTexture(0, atlas_texture->handle, texture_uniform);
-		ShaderInstance& shader_instance = m_text_mesh_shader->getInstance(0);
-		u64 state = m_text_mesh_shader->m_render_states & ~BGFX_STATE_CULL_MASK;
-		render(vertex_buffer, vertices.size(), state, shader_instance);*/
 	}
 
+
+	void renderLocalLights(const char* define, int shader_idx, CommandSet* cmd_set)
+	{
+		struct RenderJob : Renderer::RenderJob
+		{
+			void setup() override {}
+
+			void execute() override
+			{
+				// inline in debug
+				#define READ(T, N) \
+					T N = *(T*)cmd; \
+					cmd += sizeof(T); \
+					do {} while(false)
+
+				PROFILE_FUNCTION();
+				if(m_cmd_set->cmds.empty()) return;
+				
+				ffr::VertexDecl instance_decl;
+				instance_decl.addAttribute(4, ffr::AttributeType::FLOAT, false, false);
+				instance_decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false);
+				instance_decl.addAttribute(1, ffr::AttributeType::FLOAT, false, false);
+
+				ffr::VertexDecl decl;
+				decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false);
+
+				for (const Array<u8>& cmds : m_cmd_set->cmds) {
+					const u8* cmd = cmds.begin();
+					const u8* cmd_end = cmds.end();
+					while (cmd != cmd_end) {
+						const RenderableTypes type = *(RenderableTypes*)cmd;
+						cmd += sizeof(type);
+						switch(type) {
+							case RenderableTypes::LOCAL_LIGHT: {
+								READ(u16, instances_count);
+
+								const u8* instance_data = cmd;
+								cmd += instance_decl.size * instances_count;
+
+								const Shader::Program& prog = Shader::getProgram(m_shader, m_define_mask);
+								if (prog.handle.isValid()) {
+									ffr::blending(0);
+									ffr::useProgram(prog.handle);
+									ffr::setState((u64)ffr::StateFlags::DEPTH_TEST);
+									ffr::setIndexBuffer(m_pipeline->m_cube_ib);
+									ffr::setVertexBuffer(&decl, m_pipeline->m_cube_vb, 0, nullptr);
+
+									const Renderer::TransientSlice instance_buffer = m_pipeline->m_renderer.allocTransient(instances_count * instance_decl.size);
+									ffr::update(instance_buffer.buffer, instance_data, instance_buffer.offset, instance_buffer.size);
+									ffr::setInstanceBuffer(instance_decl, instance_buffer.buffer, instance_buffer.offset, 1, nullptr);
+									ffr::drawTrianglesInstanced(0, 36, instances_count);
+								}
+								break;
+							}
+							default: ASSERT(false); return;
+						}
+					}
+				}
+				#undef READ
+			}
+
+			ShaderRenderData* m_shader;
+			PipelineImpl* m_pipeline;
+			CommandSet* m_cmd_set;
+			u32 m_define_mask;
+		};
+
+		ShaderRenderData* shader = [&]() -> ShaderRenderData* {
+			for (const ShaderRef& s : m_shaders) {
+				if(s.id == shader_idx) {
+					return ((Shader*)s.res)->m_render_data;
+				}
+			}
+			return nullptr;
+		}();
+
+		if(!shader) return;
+
+		RenderJob* job = LUMIX_NEW(m_renderer.getAllocator(), RenderJob);
+		job->m_define_mask = define[0] ? 1 << m_renderer.getShaderDefineIdx(define) : 0;
+		job->m_pipeline = this;
+		job->m_cmd_set = cmd_set;
+		job->m_shader = shader;
+		m_renderer.push(job);
+
+	}
+	
 
 	void renderBucket(const char* define, CommandSet* cmd_set)
 	{
@@ -2287,12 +2352,21 @@ struct PipelineImpl final : Pipeline
 							}
 							break;
 						case RenderableTypes::DECAL: {
+							// TODO camera inside decal volume
 							const Material* material = scene->getDecalMaterial(e);
 							const int layer = material->getLayer();
 							const u8 bucket = bucket_map[layer];
 							if (bucket < 0xff) {
 								// TODO material can have the same sort key as mesh
 								sort_keys.push(material->getSortKey() | ((u64)bucket << 56));
+								subrenderables.push(renderables[i]);
+							}
+							break;
+						}
+						case RenderableTypes::LOCAL_LIGHT: {
+							// TODO camera inside light volume
+							if(ctx->local_light_bucket < 0xff) {
+								sort_keys.push(((u64)ctx->local_light_bucket << 56));
 								subrenderables.push(renderables[i]);
 							}
 							break;
@@ -2308,6 +2382,7 @@ struct PipelineImpl final : Pipeline
 			MTBucketArray<u64>::Bucket subrenderables;
 			DVec3 camera_pos;
 			u32* renderables;
+			u8 local_light_bucket;
 			int count;
 			PrepareCommandsRenderJob* cmd;
 		};
@@ -2427,6 +2502,26 @@ struct PipelineImpl final : Pipeline
 							--i;
 							break;
 						}
+						case RenderableTypes::LOCAL_LIGHT: {
+							u16* instance_count = (u16*)out;
+							int start_i = i;
+							out += sizeof(*instance_count);
+							const u64 key = sort_keys[i];
+							while (i < c && sort_keys[i] == key) {
+								const EntityRef e = {int(renderables[i] & 0x00ffFFff)};
+								const Transform& tr = entity_data[e.index].transform;
+								const Vec3 lpos = (tr.pos - camera_pos).toFloat();
+								const float range = scene->getLightRange(e);
+								WRITE(tr.rot);
+								WRITE(lpos);
+								WRITE(range);
+								// TODO color, attn, ...
+								++i;
+							}
+							*instance_count = u16(i - start_i);
+							--i;
+							break;
+						}
 						default: ASSERT(false); break;
 					}
 				}
@@ -2450,9 +2545,12 @@ struct PipelineImpl final : Pipeline
 			Array<CreateSortKeys> create_sort_keys(m_allocator);
 			create_sort_keys.reserve(renderables.size());
 			JobSystem::CounterHandle counter = JobSystem::allocateCounter();
+			const u8 local_light_layer = m_pipeline->m_renderer.getLayerIdx("local_light");
+			const u8 local_light_bucket = m_bucket_map[local_light_layer];
 			for(int i = 0; i < renderables.size(); ++i) {
 				if (renderables[i].empty()) continue;
 				CreateSortKeys& ctx = create_sort_keys.emplace();
+				ctx.local_light_bucket = local_light_bucket;
 				ctx.renderables = renderables[i].begin();
 				ctx.sort_keys = sort_keys.begin();
 				ctx.subrenderables = subrenderables.begin();
@@ -2746,6 +2844,7 @@ struct PipelineImpl final : Pipeline
 		REGISTER_FUNCTION(render2D);
 		REGISTER_FUNCTION(renderBucket);
 		REGISTER_FUNCTION(renderDebugShapes);
+		REGISTER_FUNCTION(renderLocalLights);
 		REGISTER_FUNCTION(renderTextMeshes);
 		REGISTER_FUNCTION(setOutput);
 		REGISTER_FUNCTION(setStencil);

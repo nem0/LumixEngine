@@ -1,0 +1,53 @@
+include "pipelines/common.glsl"
+
+
+------------------
+
+vertex_shader [[
+	layout(location = 0) in vec3 a_position;
+	layout(location = 1) in vec4 i_rot;
+	layout(location = 2) in vec3 i_pos;
+	layout(location = 3) in float i_radius;
+	out float v_radius;
+	out vec3 v_center;
+	out vec4 v_rot;
+	void main()
+	{
+		v_center = i_pos;
+		v_rot = i_rot;
+		v_radius = i_radius;
+		vec3 pos = rotateByQuat(i_rot, a_position * i_radius);
+		pos += i_pos;
+		gl_Position = u_camera_projection * u_camera_view * vec4(pos, 1);
+	}
+]]
+
+---------------------
+
+
+fragment_shader [[
+	out vec4 o_color;
+	
+	in float v_radius;
+	in vec3 v_center;
+	in vec4 v_rot;
+	
+	uniform sampler2D u_gbuffer_depth;
+		
+	void main()
+	{
+		
+		vec2 screen_uv = gl_FragCoord.xy / u_framebuffer_size;
+		vec3 wpos = getViewPosition(u_gbuffer_depth, u_camera_inv_view_projection, screen_uv);
+		
+		vec4 r = v_rot;
+		r.w = -r.w;
+		vec3 lpos = rotateByQuat(r, wpos - v_center);
+		
+		float dist = length(lpos);
+		float attn = pow(max(0, 1 - dist / v_radius), 2);		
+		if (dist > v_radius) discard;
+		
+		o_color = vec4(attn, 0, 0, 1);
+	}
+]]
