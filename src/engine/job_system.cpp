@@ -61,6 +61,7 @@ struct System
 		, m_work_signal(true)
 		, m_event_outside_job(true)
 		, m_free_queue(allocator)
+		, m_free_fibers(allocator)
 	{
 		m_counter_pool.resize(4096);
 		m_free_queue.resize(4096);
@@ -80,8 +81,7 @@ struct System
 	Array<Job> m_job_queue;
 	Array<Counter> m_counter_pool;
 	FiberDecl m_fiber_pool[512];
-	int m_free_fibers_indices[512];
-	int m_num_free_fibers;
+	Array<FiberDecl*> m_free_fibers;
 	Array<FiberDecl*> m_ready_fibers;
 	IAllocator& m_allocator;
 	Array<u32> m_free_queue;
@@ -131,11 +131,11 @@ struct WorkerTask : MT::Task
 	{
 		MT::SpinLock lock(g_system->m_sync);
 		
-		ASSERT(g_system->m_num_free_fibers > 0);
-		--g_system->m_num_free_fibers;
-		int free_fiber_idx = g_system->m_free_fibers_indices[g_system->m_num_free_fibers];
+		ASSERT(!g_system->m_free_fibers.empty());
+		FiberDecl* decl = g_system->m_free_fibers.back();
+		g_system->m_free_fibers.pop();
 
-		return g_system->m_fiber_pool[free_fiber_idx];
+		return *decl;
 	}
 
 
@@ -145,8 +145,7 @@ struct WorkerTask : MT::Task
 		MT::SpinLock lock(g_system->m_sync);
 
 		if (fiber.job_finished) {
-			g_system->m_free_fibers_indices[g_system->m_num_free_fibers] = fiber.idx;
-			++g_system->m_num_free_fibers;
+			g_system->m_free_fibers.push(&fiber);
 		}
 	}
 
@@ -333,30 +332,29 @@ bool init(IAllocator& allocator)
 	g_system->m_work_signal.reset();
 
 	int count = Math::maximum(1, int(MT::getCPUsCount() - 0));
-	for (int i = 0; i < count; ++i)
-	{
+	for (int i = 0; i < count; ++i) {
 		WorkerTask* task = LUMIX_NEW(allocator, WorkerTask)(*g_system);
-		if (task->create("Job system worker"))
-		{
+		if (task->create("Job system worker")) {
 			g_system->m_workers.push(task);
 			task->setAffinityMask((u64)1 << i);
 		}
-		else
-		{
+		else {
 			g_log_error.log("Engine") << "Job system worker failed to initialize.";
 			LUMIX_DELETE(allocator, task);
 		}
 	}
 
-	int fiber_num = lengthOf(g_system->m_fiber_pool);
-	g_system->m_num_free_fibers = fiber_num;
-	for(int i = 0; i < fiber_num; ++i)
-	{ 
+	g_system->m_free_fibers.reserve(lengthOf(g_system->m_fiber_pool));
+	for (FiberDecl& fiber : g_system->m_fiber_pool) {
+		g_system->m_free_fibers.push(&fiber);
+	}
+
+	const int fiber_num = lengthOf(g_system->m_fiber_pool);
+	for(int i = 0; i < fiber_num; ++i) { 
 		FiberDecl& decl = g_system->m_fiber_pool[i];
 		decl.fiber = Fiber::create(64 * 1024, fiberProc, &g_system->m_fiber_pool[i]);
 		decl.idx = i;
 		decl.worker_task = nullptr;
-		g_system->m_free_fibers_indices[i] = i;
 	}
 
 	return !g_system->m_workers.empty();
