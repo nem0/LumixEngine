@@ -3,6 +3,7 @@ local textured_quad_shader = preloadShader("pipelines/textured_quad.shd")
 local tonemap_shader = preloadShader("pipelines/tonemap.shd")
 local environment_shader =  preloadShader("pipelines/environment.shd")
 local selection_outline_shader = preloadShader("pipelines/selection_outline.shd")
+local local_light_shader = preloadShader("pipelines/local_light.shd")
 local debug_shadowmap = false
 
 function transparentPass(colorbuffer, dsbuffer)
@@ -18,7 +19,7 @@ function transparentPass(colorbuffer, dsbuffer)
 	blending("")
 end
 
-function geomPass()
+function geomPass(default_set, decal_set)
 	beginBlock("geom_pass")
 	local gbuffer0 = createRenderbuffer(1, 1, true, "rgba8")
 	local gbuffer1 = createRenderbuffer(1, 1, true, "rgba16")
@@ -31,7 +32,6 @@ function geomPass()
 	local view_params = getCameraParams()
 	setStencil(0xff, STENCIL_ALWAYS, 1, 0xff, STENCIL_REPLACE, STENCIL_REPLACE, STENCIL_REPLACE);
 	renderTerrains("DEFERRED", view_params)
-	local default_set, decal_set = prepareCommands(view_params, { default = 0, decal = 1})
 	renderBucket("DEFERRED", default_set)
 	setStencil(0xff, STENCIL_DISABLE, 0, 0, STENCIL_KEEP, STENCIL_KEEP, STENCIL_KEEP);
 	bindTextures({
@@ -45,7 +45,7 @@ function geomPass()
 	return gbuffer0, gbuffer1, gbuffer2, dsbuffer
 end
 
-function lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
+function lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap, local_light_set)
 	beginBlock("light_pass")
 	local hdr_rb = createRenderbuffer(1, 1, true, "rgba16f")
 	setRenderTargets(hdr_rb, gbuffer_depth)
@@ -69,8 +69,12 @@ function lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
 	}, 2)
 	renderEnvProbeVolumes(environment_shader, view_params)
 	
-	
 	endBlock()
+	
+	beginBlock("local_lights")
+	renderLocalLights("", local_light_shader, local_light_set)
+	endBlock()
+
 	return hdr_rb
 end
 
@@ -142,10 +146,14 @@ end
 
 
 function main()
-	local shadowmap = createRenderbuffer(4096, 1024, false, "depth24") --shadowPass()
-	local gbuffer0, gbuffer1, gbuffer2, gbuffer_depth = geomPass()
-	local hdr_buffer = lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
+	local view_params = getCameraParams()
+	local default_set, decal_set, local_light_set = prepareCommands(view_params, { default = 0, decal = 1, local_light = 2})
 
+	
+	local shadowmap = createRenderbuffer(4096, 1024, false, "depth24") --shadowPass()
+	local gbuffer0, gbuffer1, gbuffer2, gbuffer_depth = geomPass(default_set, decal_set)
+	local hdr_buffer = lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap, local_light_set)
+	
 	local res = hdr_buffer		
 	if PREVIEW == nil then
 		res = postprocess("pre", hdr_buffer, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)

@@ -774,7 +774,7 @@ public:
 	
 	void serializePointLight(ISerializer& serializer, EntityRef entity)
 	{
-		PointLight& light = m_point_lights[m_point_lights_map[entity]];
+		PointLight& light = m_point_lights[entity];
 		serializer.write("attenuation", light.m_attenuation_param);
 		serializer.write("cast_shadow", light.m_cast_shadows);
 		serializer.write("diffuse_color", light.m_diffuse_color);
@@ -788,7 +788,7 @@ public:
 
 	void deserializePointLight(IDeserializer& serializer, EntityRef entity, int scene_version)
 	{
-		PointLight& light = m_point_lights.emplace();
+		PointLight light;
 		light.m_entity = entity;
 		serializer.read(&light.m_attenuation_param);
 		serializer.read(&light.m_cast_shadows);
@@ -798,7 +798,7 @@ public:
 		serializer.read(&light.m_range);
 		serializer.read(&light.m_specular_color);
 		serializer.read(&light.m_specular_intensity);
-		m_point_lights_map.insert(light.m_entity, m_point_lights.size() - 1);
+		m_point_lights.insert(entity, light);
 
 		m_universe.onComponentCreated(light.m_entity, POINT_LIGHT_TYPE, this);
 	}
@@ -1193,9 +1193,8 @@ public:
 	void serializeLights(OutputBlob& serializer)
 	{
 		serializer.write((i32)m_point_lights.size());
-		for (int i = 0, c = m_point_lights.size(); i < c; ++i)
-		{
-			serializer.write(m_point_lights[i]);
+		for (const PointLight& pl : m_point_lights) {
+			serializer.write(pl);
 		}
 
 		serializer.write((i32)m_global_lights.size());
@@ -1492,19 +1491,17 @@ public:
 	{
 		i32 size = 0;
 		serializer.read(size);
-		m_point_lights.resize(size);
-		for (int i = 0; i < size; ++i)
-		{
-			PointLight& light = m_point_lights[i];
+		m_point_lights.rehash(size);
+		for (int i = 0; i < size; ++i) {
+			PointLight light;
 			serializer.read(light);
-			m_point_lights_map.insert(light.m_entity, i);
+			m_point_lights.insert(light.m_entity, light);
 
 			m_universe.onComponentCreated(light.m_entity, POINT_LIGHT_TYPE, this);
 		}
 
 		serializer.read(size);
-		for (int i = 0; i < size; ++i)
-		{
+		for (int i = 0; i < size; ++i) {
 			GlobalLight light;
 			serializer.read(light);
 			m_global_lights.insert(light.m_entity, light);
@@ -1598,13 +1595,8 @@ public:
 
 	void destroyPointLight(EntityRef entity)
 	{
-		int index = m_point_lights_map[entity];
-		m_point_lights.eraseFast(index);
-		m_point_lights_map.erase(entity);
-		if (index < m_point_lights.size())
-		{
-			m_point_lights_map[{m_point_lights[index].m_entity.index}] = index;
-		}
+		m_point_lights.erase(entity);
+		m_culling_system->remove(entity);
 		m_universe.onComponentDestroyed(entity, POINT_LIGHT_TYPE, this);
 	}
 
@@ -2240,31 +2232,15 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	void getPointLights(const Frustum& frustum, Array<EntityRef>& lights) override
-	{
-		/*for (int i = 0, ci = m_point_lights.size(); i < ci; ++i)
-		{
-			PointLight& light = m_point_lights[i];
-
-			if (frustum.isSphereInside(m_universe.getPosition(light.m_entity), light.m_range))
-			{
-				lights.push(light.m_entity);
-			}
-		}*/
-		// TODO
-		ASSERT(false);
-	}
-
-
 	void setLightCastShadows(EntityRef entity, bool cast_shadows) override
 	{
-		m_point_lights[m_point_lights_map[entity]].m_cast_shadows = cast_shadows;
+		m_point_lights[entity].m_cast_shadows = cast_shadows;
 	}
 
 
 	bool getLightCastShadows(EntityRef entity) override
 	{
-		return m_point_lights[m_point_lights_map[entity]].m_cast_shadows;
+		return m_point_lights[entity].m_cast_shadows;
 	}
 
 
@@ -3011,32 +2987,32 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 
 	float getLightAttenuation(EntityRef entity) override
 	{
-		return m_point_lights[m_point_lights_map[entity]].m_attenuation_param;
+		return m_point_lights[entity].m_attenuation_param;
 	}
 
 
 	void setLightAttenuation(EntityRef entity, float attenuation) override
 	{
-		int index = m_point_lights_map[entity];
-		m_point_lights[index].m_attenuation_param = attenuation;
+		m_point_lights[entity].m_attenuation_param = attenuation;
 	}
 
 
 	float getLightRange(EntityRef entity) override
 	{
-		return m_point_lights[m_point_lights_map[entity]].m_range;
+		return m_point_lights[entity].m_range;
 	}
 
 
 	void setLightRange(EntityRef entity, float value) override
 	{
-		m_point_lights[m_point_lights_map[entity]].m_range = value;
+		m_point_lights[entity].m_range = value;
+		m_culling_system->setRadius(entity, value);
 	}
 
 
 	void setPointLightIntensity(EntityRef entity, float intensity) override
 	{
-		m_point_lights[m_point_lights_map[entity]].m_diffuse_intensity = intensity;
+		m_point_lights[entity].m_diffuse_intensity = intensity;
 	}
 
 
@@ -3054,7 +3030,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 
 	void setPointLightColor(EntityRef entity, const Vec3& color) override
 	{
-		m_point_lights[m_point_lights_map[entity]].m_diffuse_color = color;
+		m_point_lights[entity].m_diffuse_color = color;
 	}
 
 
@@ -3066,7 +3042,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	
 	float getPointLightIntensity(EntityRef entity) override
 	{
-		return m_point_lights[m_point_lights_map[entity]].m_diffuse_intensity;
+		return m_point_lights[entity].m_diffuse_intensity;
 	}
 
 
@@ -3084,31 +3060,31 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 
 	Vec3 getPointLightColor(EntityRef entity) override
 	{
-		return m_point_lights[m_point_lights_map[entity]].m_diffuse_color;
+		return m_point_lights[entity].m_diffuse_color;
 	}
 
 
 	void setPointLightSpecularColor(EntityRef entity, const Vec3& color) override
 	{
-		m_point_lights[m_point_lights_map[entity]].m_specular_color = color;
+		m_point_lights[entity].m_specular_color = color;
 	}
 
 
 	Vec3 getPointLightSpecularColor(EntityRef entity) override
 	{
-		return m_point_lights[m_point_lights_map[entity]].m_specular_color;
+		return m_point_lights[entity].m_specular_color;
 	}
 
 
 	void setPointLightSpecularIntensity(EntityRef entity, float intensity) override
 	{
-		m_point_lights[m_point_lights_map[entity]].m_specular_intensity = intensity;
+		m_point_lights[entity].m_specular_intensity = intensity;
 	}
 
 
 	float getPointLightSpecularIntensity(EntityRef entity) override
 	{
-		return m_point_lights[m_point_lights_map[entity]].m_specular_intensity;
+		return m_point_lights[entity].m_specular_intensity;
 	}
 
 
@@ -3132,7 +3108,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 
 	EntityRef getPointLightEntity(EntityRef entity) const override
 	{
-		return m_point_lights[m_point_lights_map[entity]].m_entity;
+		return m_point_lights[entity].m_entity;
 	}
 
 
@@ -3497,13 +3473,13 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 
 	float getLightFOV(EntityRef entity) override
 	{
-		return m_point_lights[m_point_lights_map[entity]].m_fov;
+		return m_point_lights[entity].m_fov;
 	}
 
 
 	void setLightFOV(EntityRef entity, float fov) override
 	{
-		m_point_lights[m_point_lights_map[entity]].m_fov = fov;
+		m_point_lights[entity].m_fov = fov;
 	}
 
 
@@ -3529,7 +3505,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 
 	void createPointLight(EntityRef entity)
 	{
-		PointLight& light = m_point_lights.emplace();
+		PointLight light;
 		light.m_entity = entity;
 		light.m_diffuse_color.set(1, 1, 1);
 		light.m_diffuse_intensity = 1;
@@ -3539,7 +3515,9 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		light.m_cast_shadows = false;
 		light.m_attenuation_param = 2;
 		light.m_range = 10;
-		m_point_lights_map.insert(entity, m_point_lights.size() - 1);
+		const DVec3 pos = m_universe.getPosition(entity);
+		m_point_lights.insert(entity, light);
+		m_culling_system->add(entity, (u8)RenderableTypes::LOCAL_LIGHT, pos, light.m_range);
 
 		m_universe.onComponentCreated(entity, POINT_LIGHT_TYPE, this);
 	}
@@ -3648,12 +3626,11 @@ private:
 	CullingSystem* m_culling_system;
 
 	EntityPtr m_active_global_light_entity;
-	HashMap<EntityRef, int> m_point_lights_map;
+	HashMap<EntityRef, PointLight> m_point_lights;
 
 	HashMap<EntityRef, Decal> m_decals;
 	Array<ModelInstance> m_model_instances;
 	HashMap<EntityRef, GlobalLight> m_global_lights;
-	Array<PointLight> m_point_lights;
 	HashMap<EntityRef, Camera> m_cameras;
 	EntityPtr m_active_camera;
 	AssociativeArray<EntityRef, TextMesh*> m_text_meshes;
@@ -3733,7 +3710,6 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	, m_is_grass_enabled(true)
 	, m_is_game_running(false)
 	, m_particle_emitters(m_allocator)
-	, m_point_lights_map(m_allocator)
 	, m_bone_attachments(m_allocator)
 	, m_environment_probes(m_allocator)
 	, m_lod_multiplier(1.0f)
