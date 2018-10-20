@@ -997,10 +997,12 @@ void setInstanceBuffer(const VertexDecl& decl, BufferHandle instance_buffer, int
 		}
 
 		const int index = attributes_map ? attributes_map[i] : location_offset + i;
-		CHECK_GL(glBindBuffer(GL_ARRAY_BUFFER, ib));
-		CHECK_GL(glVertexAttribPointer(index, attr->components_num, gl_attr_type, attr->flags & Attribute::NORMALIZED, stride, offset));
-		CHECK_GL(glVertexAttribDivisor(index, 1));  
-		CHECK_GL(glEnableVertexAttribArray(index));
+		if(index >= 0) {
+			CHECK_GL(glBindBuffer(GL_ARRAY_BUFFER, ib));
+			CHECK_GL(glVertexAttribPointer(index, attr->components_num, gl_attr_type, attr->flags & Attribute::NORMALIZED, stride, offset));
+			CHECK_GL(glVertexAttribDivisor(index, 1));  
+			CHECK_GL(glEnableVertexAttribArray(index));
+		}
 	}
 }
 
