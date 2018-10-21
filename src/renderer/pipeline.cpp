@@ -214,6 +214,8 @@ struct PipelineImpl final : Pipeline
 		m_draw2d.PushClipRectFullScreen();
 		m_draw2d.PushTextureID(font_atlas.TexID);
 
+		m_splatmap_uniform = ffr::allocUniform("u_splatmap", ffr::UniformType::INT, 1);
+		m_detail_textures_uniform = ffr::allocUniform("u_detail_textures", ffr::UniformType::INT, 1);
 		m_position_uniform = ffr::allocUniform("u_position", ffr::UniformType::VEC3, 1);
 		m_lod_uniform = ffr::allocUniform("u_lod", ffr::UniformType::INT, 1);
 		m_position_radius_uniform = ffr::allocUniform("u_pos_radius", ffr::UniformType::VEC4, 1);
@@ -498,7 +500,7 @@ struct PipelineImpl final : Pipeline
 				rb.width = w;
 				rb.height = h;
 				m_renderer.destroy(rb.handle);
-				rb.handle = m_renderer.createTexture(w, h, rb.format, 0, {0, 0});
+				rb.handle = m_renderer.createTexture(w, h, 1, rb.format, 0, {0, 0});
 			}
 		}
 
@@ -813,7 +815,7 @@ struct PipelineImpl final : Pipeline
 		rb.width = rb_w;
 		rb.height = rb_h;
 		rb.format = format;
-		rb.handle = m_renderer.createTexture(rb_w, rb_h, format, 0, {0, 0});
+		rb.handle = m_renderer.createTexture(rb_w, rb_h, 1, format, 0, {0, 0});
 
 		return m_renderbuffers.size() - 1;
 	}
@@ -872,6 +874,7 @@ struct PipelineImpl final : Pipeline
 		cmd->m_pipeline = pipeline;
 		cmd->m_camera_params = cp;
 		cmd->m_shader_define = define;
+
 		pipeline->m_renderer.push(cmd);
 		return 0;
 	}
@@ -1985,6 +1988,95 @@ struct PipelineImpl final : Pipeline
 	}
 
 
+	void prepareTerrainTextures(int shader_idx)
+	{
+		struct RenderJob : Renderer::RenderJob
+		{
+			void setup() override
+			{
+				Terrain* terrain = m_pipeline->m_scene->getTerrain(m_entity);
+				m_framebuffer = ffr::INVALID_FRAMEBUFFER;
+				
+				if (!terrain) return;
+				if (!terrain->getSplatmap()) return;
+				if (!terrain->getDetailTexture()) return;
+
+				m_framebuffer = m_pipeline->m_renderer.getFramebuffer();
+
+				m_rel_camera_pos_uniform = m_pipeline->m_rel_camera_pos_uniform;
+				m_splatmap = terrain->getSplatmap()->handle;
+				m_detail_textures = terrain->getDetailTexture()->handle;
+				m_output = terrain->m_textures;
+				m_splatmap_uniform = m_pipeline->m_splatmap_uniform;
+				m_lod_uniform = m_pipeline->m_lod_uniform;
+				m_detail_textures_uniform = m_pipeline->m_detail_textures_uniform;
+				Universe& universe = m_pipeline->m_scene->getUniverse();
+				m_rel_cam_pos = universe.getRotation(m_entity).rotate((m_pipeline->m_viewport.pos - universe.getPosition(m_entity)).toFloat());
+			}
+			
+			void execute() override
+			{
+				if (!m_framebuffer.isValid()) return;
+
+				const Shader::Program& p = Shader::getProgram(m_shader, 0);
+				if (!p.handle.isValid()) return;
+
+				for (int i = 0; i < Terrain::TEXTURES_COUNT; ++i) {
+					ffr::bindLayer(m_framebuffer, m_output, i);
+					ffr::setFramebuffer(m_framebuffer, true);
+					const float clear_color[] = { 0, 0, 0, 0};
+					ffr::viewport(0, 0, 1024, 1024);
+					ffr::clear((uint)ffr::ClearFlags::COLOR, clear_color, 0);
+
+					ffr::setUniform3f(m_rel_camera_pos_uniform, &m_rel_cam_pos.x);
+					ffr::bindTexture(0, m_splatmap);
+					ffr::bindTexture(1, m_detail_textures);
+					ffr::setUniform1i(m_splatmap_uniform, 0);
+					ffr::setUniform1i(m_detail_textures_uniform, 1);
+					ffr::setUniform1i(m_lod_uniform, i);
+					ffr::useProgram(p.handle);
+					
+					ffr::drawArrays(0, 4, ffr::PrimitiveType::TRIANGLE_STRIP);
+				}
+
+				ffr::generateMipmaps(m_output);
+			}
+
+			ffr::FramebufferHandle m_framebuffer;
+			ffr::TextureHandle m_splatmap;
+			ffr::TextureHandle m_detail_textures;
+			ffr::UniformHandle m_splatmap_uniform;
+			ffr::UniformHandle m_detail_textures_uniform;
+			ffr::UniformHandle m_rel_camera_pos_uniform;
+			ffr::UniformHandle m_lod_uniform;
+			ffr::TextureHandle m_output;
+			Vec3 m_rel_cam_pos;
+
+			EntityRef m_entity;
+			ShaderRenderData* m_shader;
+			PipelineImpl* m_pipeline;
+		};
+		
+		const Shader* shader = [&] {
+			for (const ShaderRef& s : m_shaders) {
+				if(s.id == shader_idx) return s.res;
+			}
+			return (Shader*)nullptr;
+		}();
+
+		if (!shader || !shader->isReady()) return;
+
+		const EntityPtr e = m_scene->getFirstTerrain();
+		if (!e.isValid()) return;
+
+		RenderJob* job = LUMIX_NEW(m_renderer.getAllocator(), RenderJob);
+		job->m_pipeline = this;
+		job->m_shader = shader->m_render_data;
+		job->m_entity = (EntityRef)e;
+		m_renderer.push(job);
+	}
+
+
 	void renderModel(Model& model, const Matrix& mtx) override
 	{
 		for(int i = 0; i < model.getMeshCount(); ++i) {
@@ -2102,34 +2194,45 @@ struct PipelineImpl final : Pipeline
 			ffr::setUniform3f(m_pipeline->m_rel_camera_pos_uniform, &lpos.x);
 			ffr::blending(0);
 
-			for(int i = 0; i < infos[0].terrain->m_material->getTextureCount(); ++i) {
+			/*for(int i = 0; i < infos[0].terrain->m_material->getTextureCount(); ++i) {
 				Texture* t = infos[0].terrain->m_material->getTexture(i);
 				if (t) {
 					ffr::UniformHandle uniform = infos[0].terrain->m_material->getTextureUniform(i);
 					ffr::bindTexture(i, t->handle);
 					ffr::setUniform1i(uniform, i);
 				}
-			}
-			static u64 state = (u64)ffr::StateFlags::DEPTH_TEST | (u64)ffr::StateFlags::DEPTH_WRITE;
-			if(p.handle.isValid()) {
-				ffr::useProgram(p.handle);
-				ffr::setState(state);
+			}*/
 
-				const int loc = ffr::getUniformLocation(p.handle, m_pipeline->m_lod_uniform);
-				for(int i = 0; i < 6; ++i) {
-					ffr::applyUniform1i(loc, i);
-					ffr::drawArrays(0, 126 * 126, ffr::PrimitiveType::POINTS);
+			Material* material = infos[0].terrain->m_material;
+			Texture* texture = infos[0].terrain->m_heightmap;
+			if (texture && texture->isReady()) {  
+				ffr::bindTexture(1, infos[0].terrain->m_textures);
+				ffr::bindTexture(0, infos[0].terrain->m_heightmap->handle);
+				ffr::setUniform1i(ffr::allocUniform("u_satellite", ffr::UniformType::INT, 1), 1);
+				ffr::setUniform1i(ffr::allocUniform("u_hm", ffr::UniformType::INT, 1), 0);
+
+				u64 state = (u64)ffr::StateFlags::DEPTH_TEST | (u64)ffr::StateFlags::DEPTH_WRITE;
+				static bool wireframe = false;
+				if (wireframe) state |= (u64)ffr::StateFlags::WIREFRAME;
+				if(p.handle.isValid()) {
+					ffr::useProgram(p.handle);
+					ffr::setState(state);
+
+					const int loc = ffr::getUniformLocation(p.handle, m_pipeline->m_lod_uniform);
+					for(int i = 0; i < 6; ++i) {
+						ffr::applyUniform1i(loc, i);
+						ffr::drawArrays(0, 126 * 126, ffr::PrimitiveType::POINTS);
+					}
 				}
-			}
-			if (p_edge.handle.isValid()) {
-				ffr::useProgram(p_edge.handle);
-				ffr::setState(state);
-				const int loc = ffr::getUniformLocation(p_edge.handle, m_pipeline->m_lod_uniform);
-				for(int i = 0; i < 6; ++i) {
-					ffr::applyUniform1i(loc, i);
-					ffr::drawArrays(0, 64, ffr::PrimitiveType::POINTS);
+				if (p_edge.handle.isValid()) {
+					ffr::useProgram(p_edge.handle);
+					ffr::setState(state);
+					const int loc = ffr::getUniformLocation(p_edge.handle, m_pipeline->m_lod_uniform);
+					for(int i = 0; i < 6; ++i) {
+						ffr::applyUniform1i(loc, i);
+						ffr::drawArrays(0, 64, ffr::PrimitiveType::POINTS);
+					}
 				}
-				
 			}
 
 			/*if(m_instance_data.empty()) return;
@@ -2841,6 +2944,7 @@ struct PipelineImpl final : Pipeline
 		REGISTER_FUNCTION(endBlock);
 		REGISTER_FUNCTION(executeCustomCommand);
 		REGISTER_FUNCTION(preloadShader);
+		REGISTER_FUNCTION(prepareTerrainTextures);
 		REGISTER_FUNCTION(render2D);
 		REGISTER_FUNCTION(renderBucket);
 		REGISTER_FUNCTION(renderDebugShapes);
@@ -2949,6 +3053,8 @@ struct PipelineImpl final : Pipeline
 	ffr::UniformHandle m_radiance_map_uniform;
 	ffr::UniformHandle m_material_params_uniform;
 	ffr::UniformHandle m_material_color_uniform;
+	ffr::UniformHandle m_splatmap_uniform;
+	ffr::UniformHandle m_detail_textures_uniform;
 	ffr::BufferHandle m_cube_vb;
 	ffr::BufferHandle m_cube_ib;
 };

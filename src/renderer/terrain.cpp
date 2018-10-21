@@ -195,6 +195,11 @@ Terrain::Terrain(Renderer& renderer, EntityPtr entity, RenderScene& scene, IAllo
 	, m_force_grass_update(false)
 {
 	generateGeometry();
+	Renderer::MemRef mem;
+	mem.data = false;
+	mem.own = false;
+	mem.size = 0;
+	m_textures = renderer.createTexture(1024, 1024, TEXTURES_COUNT, ffr::TextureFormat::RGBA8, (u32)ffr::TextureFlags::CLAMP, mem);
 }
 
 Terrain::GrassType::~GrassType()
@@ -461,6 +466,8 @@ void Terrain::generateGrassTypeQuad(GrassPatch& patch, const RigidTransform& ter
 
 void Terrain::updateGrass(EntityRef camera)
 {
+	// TODO
+	return;
 	PROFILE_FUNCTION();
 	if (!m_splatmap) return;
 
@@ -586,6 +593,24 @@ void Terrain::getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, Ent
 }
 
 
+void Terrain::setSplatmap(Texture* texture)
+{
+	 m_splatmap = texture;
+}
+
+
+void Terrain::setHeightmap(Texture* texture)
+{
+	 m_heightmap = texture;
+}
+
+
+void Terrain::setDetailTextures(Texture* texture)
+{
+	m_detail_texture = texture;
+}
+
+
 void Terrain::setMaterial(Material* material)
 {
 	if (material != m_material)
@@ -596,8 +621,6 @@ void Terrain::setMaterial(Material* material)
 			m_material->getObserverCb().unbind<Terrain, &Terrain::onMaterialLoaded>(this);
 		}
 		m_material = material;
-		m_splatmap = nullptr;
-		m_heightmap = nullptr;
 		if (m_mesh && m_material)
 		{
 			m_mesh->material = m_material;
@@ -965,19 +988,11 @@ void Terrain::onMaterialLoaded(Resource::State, Resource::State new_state, Resou
 	PROFILE_FUNCTION();
 	if (new_state == Resource::State::READY)
 	{
-		m_detail_texture = m_material->getTextureByUniform(TEX_COLOR_UNIFORM);
-
-		m_heightmap = m_material->getTextureByUniform("u_heightmap");
+		/*m_heightmap = m_material->getTextureByUniform("u_heightmap");
 		bool is_data_ready = true;
 		if (m_heightmap && m_heightmap->getData() == nullptr)
 		{
 			m_heightmap->addDataReference();
-			is_data_ready = false;
-		}
-		m_splatmap = m_material->getTextureByUniform("u_splatmap");
-		if (m_splatmap && m_splatmap->getData() == nullptr)
-		{
-			m_splatmap->addDataReference();
 			is_data_ready = false;
 		}
 
@@ -991,18 +1006,18 @@ void Terrain::onMaterialLoaded(Resource::State, Resource::State new_state, Resou
 		if (is_data_ready)
 		{
 			LUMIX_DELETE(m_allocator, m_root);
-			if (m_heightmap && m_splatmap)
+			if (m_heightmap)
 			{
 				m_width = m_heightmap->width;
 				m_height = m_heightmap->height;
 				m_root = generateQuadTree((float)m_width);
 			}
-		}
+		}*/
 	}
 	else
 	{
-		LUMIX_DELETE(m_allocator, m_root);
-		m_root = nullptr;
+		//LUMIX_DELETE(m_allocator, m_root);
+		//m_root = nullptr;
 	}
 }
 

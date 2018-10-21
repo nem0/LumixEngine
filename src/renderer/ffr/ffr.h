@@ -184,7 +184,7 @@ void setState(u64 state);
 ProgramHandle createProgram(const char** srcs, const ShaderType* types, int num, const char** prefixes, int prefixes_count, const char* name);
 void useProgram(ProgramHandle prg);
 void createBuffer(BufferHandle handle, size_t size, const void* data);
-bool createTexture(TextureHandle handle, uint w, uint h, TextureFormat format, uint flags, const void* data);
+bool createTexture(TextureHandle handle, uint w, uint h, uint depth, TextureFormat format, uint flags, const void* data);
 bool loadTexture(TextureHandle handle, const void* data, int size, uint flags);
 FramebufferHandle createFramebuffer();
 QueryHandle createQuery();
@@ -194,6 +194,7 @@ void setInstanceBuffer(const VertexDecl& decl, BufferHandle instance_buffer, int
 void bindTexture(uint unit, TextureHandle handle);
 void uniformBlockBinding(ProgramHandle program, const char* block_name, uint binding);
 void update(FramebufferHandle fb, uint renderbuffers_count, const TextureHandle* renderbuffers);
+void bindLayer(FramebufferHandle fb, TextureHandle rb, uint layer);
 void update(BufferHandle buffer, const void* data, size_t offset, size_t size);
 void* map(BufferHandle buffer);
 void unmap(BufferHandle buffer);
@@ -202,6 +203,7 @@ void getTextureImage(ffr::TextureHandle texture, uint size, void* buf);
 TextureInfo getTextureInfo(const void* data);
 void queryTimestamp(QueryHandle query);
 u64 getQueryResult(QueryHandle query);
+void generateMipmaps(TextureHandle texture);
 
 void destroy(ProgramHandle program);
 void destroy(BufferHandle buffer);

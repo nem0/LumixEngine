@@ -1761,6 +1761,12 @@ public:
 	Engine& getEngine() const override { return m_engine; }
 
 
+	Terrain* getTerrain(EntityRef entity) override
+	{
+		return m_terrains[entity];
+	}
+
+
 	Vec2 getTerrainResolution(EntityRef entity) override
 	{
 		auto* terrain = m_terrains[entity];
@@ -1806,6 +1812,41 @@ public:
 	Vec2 getTerrainSize(EntityRef entity) override
 	{
 		return m_terrains[entity]->getSize();
+	}
+
+	
+	void setTerrainSplatmapPath(EntityRef entity, const Path& path) override
+	{
+		if (path.isValid()) {
+			Texture* tex = m_engine.getResourceManager().load<Texture>(path);
+			m_terrains[entity]->setSplatmap(tex);
+		}
+		else {
+			m_terrains[entity]->setSplatmap(nullptr);
+		}
+	}
+
+	
+	void setTerrainHeightmapPath(EntityRef entity, const Path& path) override
+	{
+		if (path.isValid()) {
+			Texture* tex = m_engine.getResourceManager().load<Texture>(path);
+			m_terrains[entity]->setHeightmap(tex);
+		}
+		else {
+			m_terrains[entity]->setHeightmap(nullptr);
+		}
+	}
+
+	void setTerrainDetailTexturesPath(EntityRef entity, const Path& path) override
+	{
+		if (path.isValid()) {
+			Texture* tex = m_engine.getResourceManager().load<Texture>(path);
+			m_terrains[entity]->setDetailTextures(tex);
+		}
+		else {
+			m_terrains[entity]->setSplatmap(nullptr);
+		}
 	}
 
 
@@ -1891,7 +1932,48 @@ public:
 			return Path("");
 		}
 	}
+	
 
+	Path getTerrainHeightmapPath(EntityRef entity) override
+	{
+		Terrain* terrain = m_terrains[entity];
+		if (terrain->getHeightmap())
+		{
+			return terrain->getHeightmap()->getPath();
+		}
+		else
+		{
+			return Path("");
+		}
+	}
+
+
+	Path getTerrainSplatmapPath(EntityRef entity) override
+	{
+		Terrain* terrain = m_terrains[entity];
+		if (terrain->getSplatmap())
+		{
+			return terrain->getSplatmap()->getPath();
+		}
+		else
+		{
+			return Path("");
+		}
+	}
+
+
+	Path getTerrainDetailTexturesPath(EntityRef entity) override
+	{
+		Terrain* terrain = m_terrains[entity];
+		if (terrain->getDetailTexture())
+		{
+			return terrain->getDetailTexture()->getPath();
+		}
+		else
+		{
+			return Path("");
+		}
+	}
 
 	void setTerrainXZScale(EntityRef entity, float scale) override
 	{

@@ -73,7 +73,7 @@ void Texture::destroy()
 bool Texture::create(int w, int h, const void* data, uint size)
 {
 	Renderer::MemRef memory = renderer.copy(data, size);
-	handle = renderer.createTexture(w, h, ffr::TextureFormat::RGBA8, getFFRFlags(), memory);
+	handle = renderer.createTexture(w, h, 1, ffr::TextureFormat::RGBA8, getFFRFlags(), memory);
 	mips = 1;
 	width = w;
 	height = h;
@@ -343,7 +343,7 @@ bool loadRaw(Texture& texture, FS::IFile& file, IAllocator& allocator)
 	}
 
 	const Renderer::MemRef mem = texture.renderer.copy(dst_mem.begin(), dst_mem.byte_size());
-	texture.handle = texture.renderer.createTexture(texture.width, texture.height, ffr::TextureFormat::R32F, texture.getFFRFlags(), mem);
+	texture.handle = texture.renderer.createTexture(texture.width, texture.height, 1, ffr::TextureFormat::R32F, texture.getFFRFlags(), mem);
 	texture.depth = 1;
 	texture.layers = 1;
 	texture.mips = 1;
@@ -574,7 +574,7 @@ bool Texture::loadTGA(FS::IFile& file)
 	bytes_per_pixel = 4;
 	mips = 1;
 	Renderer::MemRef mem = renderer.copy(image_dest, image_size);
-	handle = renderer.createTexture(header.width, header.height, ffr::TextureFormat::RGBA8, getFFRFlags(), mem);
+	handle = renderer.createTexture(header.width, header.height, 1, ffr::TextureFormat::RGBA8, getFFRFlags(), mem);
 	depth = 1;
 	layers = 1;
 	return handle.isValid();
