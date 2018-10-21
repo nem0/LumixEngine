@@ -970,6 +970,7 @@ void bindTexture(uint unit, TextureHandle handle)
 	if(handle.isValid()) {
 		const Texture& t = g_ffr.textures[handle.value];
 		CHECK_GL(glActiveTexture(GL_TEXTURE0 + unit));
+		CHECK_GL(glBindTexture(GL_TEXTURE_2D, 0));
 		CHECK_GL(glBindTexture(t.target, t.handle));
 	}
 	else {
@@ -1502,51 +1503,74 @@ TextureHandle allocTextureHandle()
 }
 
 
-bool createTexture(TextureHandle handle, uint w,uint h, TextureFormat format, uint flags, const void* data)
+bool createTexture(TextureHandle handle, uint w, uint h, uint depth, TextureFormat format, uint flags, const void* data)
 {
 	checkThread();
 	const bool is_srgb = flags & (u32)TextureFlags::SRGB;
 	ASSERT(!is_srgb); // use format argument to enable srgb
 
 	GLuint texture;
-	CHECK_GL(glGenTextures(1, &texture));
-	CHECK_GL(glBindTexture(GL_TEXTURE_2D, texture));
 	int found_format = 0;
-	for (int i = 0; i < sizeof(s_texture_formats) / sizeof(s_texture_formats[0]); ++i) {
-		if(s_texture_formats[i].format == format) {
-			CHECK_GL(glTexImage2D(GL_TEXTURE_2D
-				, 0
-				, s_texture_formats[i].gl_internal
-				, w
-				, h
-				, 0
-				, s_texture_formats[i].gl_format
-				, s_texture_formats[i].type
-				, data));
-			found_format = 1;
-			break;
+	const GLenum target = depth <= 1 ? GL_TEXTURE_2D : GL_TEXTURE_2D_ARRAY;
+	if(depth <= 1) {
+		CHECK_GL(glGenTextures(1, &texture));
+		CHECK_GL(glBindTexture(target, texture));
+		for (int i = 0; i < sizeof(s_texture_formats) / sizeof(s_texture_formats[0]); ++i) {
+			if(s_texture_formats[i].format == format) {
+				CHECK_GL(glTexImage2D(target
+					, 0
+					, s_texture_formats[i].gl_internal
+					, w
+					, h
+					, 0
+					, s_texture_formats[i].gl_format
+					, s_texture_formats[i].type
+					, data));
+				found_format = 1;
+				break;
+			}
+		}
+	}
+	else {
+		CHECK_GL(glGenTextures(1, &texture));
+		CHECK_GL(glBindTexture(target, texture));
+		for (int i = 0; i < sizeof(s_texture_formats) / sizeof(s_texture_formats[0]); ++i) {
+			if(s_texture_formats[i].format == format) {
+				CHECK_GL(glTexImage3D(target
+					, 0
+					, s_texture_formats[i].gl_internal
+					, w
+					, h
+					, depth
+					, 0
+					, s_texture_formats[i].gl_format
+					, s_texture_formats[i].type
+					, data));
+				found_format = 1;
+				break;
+			}
 		}
 	}
 
 	if(!found_format) {
-		CHECK_GL(glBindTexture(GL_TEXTURE_2D, 0));
+		CHECK_GL(glBindTexture(target, 0));
 		CHECK_GL(glDeleteTextures(1, &texture));
 		return false;	
 	}
 
-	CHECK_GL(glGenerateMipmap(GL_TEXTURE_2D));
+	CHECK_GL(glGenerateMipmap(target));
 	
-	const GLint wrap = (flags & (u32)TextureFlags::CLAMP) ? GL_CLAMP : GL_REPEAT;
-	CHECK_GL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap));
-	CHECK_GL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap));
-	CHECK_GL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
-	CHECK_GL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR));
+	const GLint wrap = (flags & (u32)TextureFlags::CLAMP) ? GL_CLAMP_TO_EDGE : GL_REPEAT;
+	CHECK_GL(glTexParameteri(target, GL_TEXTURE_WRAP_S, wrap));
+	CHECK_GL(glTexParameteri(target, GL_TEXTURE_WRAP_T, wrap));
+	CHECK_GL(glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
+	CHECK_GL(glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR));
 
-	CHECK_GL(glBindTexture(GL_TEXTURE_2D, 0));
+	CHECK_GL(glBindTexture(target, 0));
 
 	Texture& t = g_ffr.textures[handle.value];
 	t.handle = texture;
-	t.target = GL_TEXTURE_2D;
+	t.target = target;
 
 	return true;
 }
@@ -1758,6 +1782,7 @@ ProgramHandle createProgram(const char** srcs, const ShaderType* types, int num,
 			case GL_SAMPLER_CUBE:
 			case GL_SAMPLER_2D_ARRAY:
 			case GL_SAMPLER_2D:
+			case GL_SAMPLER_3D:
 			case GL_INT: ffr_type = UniformType::INT; break;
 			case GL_FLOAT: ffr_type = UniformType::FLOAT; break;
 			case GL_FLOAT_VEC2: ffr_type = UniformType::VEC2; break;
@@ -1856,6 +1881,17 @@ bool isHomogenousDepth() { return false; }
 bool isOriginBottomLeft() { return true; }
 
 
+void generateMipmaps(ffr::TextureHandle texture)
+{
+	checkThread();
+
+	Texture& t = g_ffr.textures[texture.value];
+	const GLuint handle = t.handle;
+
+	glGenerateTextureMipmap(handle);
+}
+
+
 void getTextureImage(ffr::TextureHandle texture, uint size, void* buf)
 {
 	checkThread();
@@ -1950,6 +1986,52 @@ void setUniformMatrix3x4f(UniformHandle uniform, const float* value)
 	memcpy(g_ffr.uniforms[uniform.value].data, value, sizeof(value[0]) * 12); 
 }
 
+void bindLayer(FramebufferHandle fb, TextureHandle rb, uint layer)
+{
+	checkThread();
+
+	int color_attachment_idx = 0;
+	bool depth_bound = false;
+	const GLuint t = g_ffr.textures[rb.value].handle;
+	CHECK_GL(glBindTexture(GL_TEXTURE_2D_ARRAY, t));
+	GLint internal_format;
+	CHECK_GL(glGetTexLevelParameteriv(GL_TEXTURE_2D_ARRAY, 0, GL_TEXTURE_INTERNAL_FORMAT, &internal_format));
+
+	CHECK_GL(glBindTexture(GL_TEXTURE_2D_ARRAY, 0));
+	switch(internal_format) {
+		case GL_DEPTH24_STENCIL8:
+			CHECK_GL(glNamedFramebufferRenderbuffer(fb.value, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, 0));
+			CHECK_GL(glNamedFramebufferTextureLayer(fb.value, GL_DEPTH_STENCIL_ATTACHMENT, t, 0, layer));
+			depth_bound = true;
+			break;
+		case GL_DEPTH_COMPONENT24:
+		case GL_DEPTH_COMPONENT32:
+			CHECK_GL(glNamedFramebufferRenderbuffer(fb.value, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, 0));
+			CHECK_GL(glNamedFramebufferTextureLayer(fb.value, GL_DEPTH_ATTACHMENT, t, 0, layer));
+			depth_bound = true;
+			break;
+		default:
+			CHECK_GL(glNamedFramebufferTextureLayer(fb.value, GL_COLOR_ATTACHMENT0 + color_attachment_idx, t, 0, layer));
+			++color_attachment_idx;
+			break;
+	}
+
+	GLint max_attachments = 0;
+	glGetIntegerv(GL_MAX_COLOR_ATTACHMENTS, &max_attachments);
+	for(int i = color_attachment_idx; i < max_attachments; ++i) {
+		glNamedFramebufferRenderbuffer(fb.value, GL_COLOR_ATTACHMENT0 + i, GL_RENDERBUFFER, 0);
+	}
+	
+	if (!depth_bound) {
+		glNamedFramebufferRenderbuffer(fb.value, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, 0);
+		glNamedFramebufferRenderbuffer(fb.value, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, 0);
+	}
+
+	glBindFramebuffer(GL_FRAMEBUFFER, fb.value);
+	auto xx = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+	ASSERT(xx == GL_FRAMEBUFFER_COMPLETE);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
 
 void update(FramebufferHandle fb, uint renderbuffers_count, const TextureHandle* renderbuffers)
 {

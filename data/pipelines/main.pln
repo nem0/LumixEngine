@@ -4,6 +4,7 @@ local tonemap_shader = preloadShader("pipelines/tonemap.shd")
 local environment_shader =  preloadShader("pipelines/environment.shd")
 local selection_outline_shader = preloadShader("pipelines/selection_outline.shd")
 local local_light_shader = preloadShader("pipelines/local_light.shd")
+local prepare_terrain_shader = preloadShader("pipelines/prepare_terrain.shd")
 local debug_shadowmap = false
 
 function transparentPass(colorbuffer, dsbuffer)
@@ -20,6 +21,8 @@ function transparentPass(colorbuffer, dsbuffer)
 end
 
 function geomPass(default_set, decal_set)
+	prepareTerrainTextures(prepare_terrain_shader)
+
 	beginBlock("geom_pass")
 	local gbuffer0 = createRenderbuffer(1, 1, true, "rgba8")
 	local gbuffer1 = createRenderbuffer(1, 1, true, "rgba16")

@@ -2509,7 +2509,7 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 		ImGui::GetIO().Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
 
 		const Renderer::MemRef mem = renderer->copy(pixels, width * height * 4);
-		m_texture = renderer->createTexture(width, height, ffr::TextureFormat::RGBA8, 0, mem);
+		m_texture = renderer->createTexture(width, height, 1, ffr::TextureFormat::RGBA8, 0, mem);
 
 		IAllocator& allocator = editor.getAllocator();
 		RenderInterface* render_interface =

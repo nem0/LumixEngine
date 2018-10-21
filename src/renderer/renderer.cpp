@@ -359,6 +359,12 @@ static void registerProperties(IAllocator& allocator)
 		component("terrain",
 			property("Material", LUMIX_PROP(RenderScene, TerrainMaterialPath),
 				ResourceAttribute("Material (*.mat)", Material::TYPE)),
+			property("Heightmap", LUMIX_PROP(RenderScene, TerrainHeightmapPath),
+				ResourceAttribute("Texture (*.raw)", Texture::TYPE)),
+			property("Splatmap", LUMIX_PROP(RenderScene, TerrainSplatmapPath),
+				ResourceAttribute("Texture (*.dds)", Texture::TYPE)),
+			property("Detail", LUMIX_PROP(RenderScene, TerrainDetailTexturesPath),
+				ResourceAttribute("Texture (*.dds)", Texture::TYPE)),
 			property("XZ scale", LUMIX_PROP(RenderScene, TerrainXZScale), 
 				MinAttribute(0)),
 			property("Height scale", LUMIX_PROP(RenderScene, TerrainYScale), 
@@ -668,7 +674,7 @@ struct RendererImpl final : public Renderer
 	}
 
 
-	ffr::TextureHandle createTexture(uint w, uint h, ffr::TextureFormat format, u32 flags, const MemRef& memory) override
+	ffr::TextureHandle createTexture(uint w, uint h, uint depth, ffr::TextureFormat format, u32 flags, const MemRef& memory) override
 	{
 		ffr::TextureHandle handle = ffr::allocTextureHandle();
 		if(!handle.isValid()) return handle;
@@ -677,16 +683,15 @@ struct RendererImpl final : public Renderer
 			void setup() override {}
 			void execute() override
 			{
-				ffr::createTexture(handle, w, h, format, flags, memory.data);
-				if (memory.own) {
-					renderer->free(memory);
-				}
+				ffr::createTexture(handle, w, h, depth, format, flags, memory.data);
+				if (memory.own) renderer->free(memory);
 			}
 
 			ffr::TextureHandle handle;
 			MemRef memory;
 			uint w;
 			uint h;
+			uint depth;
 			ffr::TextureFormat format;
 			Renderer* renderer;
 			u32 flags;
@@ -699,6 +704,7 @@ struct RendererImpl final : public Renderer
 		cmd->flags = flags;
 		cmd->w = w;
 		cmd->h = h;
+		cmd->depth = depth;
 		cmd->renderer = this;
 		push(cmd);
 

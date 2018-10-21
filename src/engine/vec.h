@@ -10,6 +10,10 @@ namespace Lumix
 
 struct Int2
 {
+	Int2() {}
+	Int2(int x, int y) : x(x), y(y) {}
+	Int2 operator -(const Int2& v) const { return Int2(x - v.x, y - v.y); }
+
 	int x;
 	int y;
 };
@@ -220,6 +224,8 @@ struct LUMIX_ENGINE_API Vec3
 		return x * x + y * y + z * z;
 	}
 	
+	Vec2 xz() const { return {x, z}; }
+
 	union
 	{
 		struct { float x, y, z; };

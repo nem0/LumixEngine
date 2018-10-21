@@ -1,0 +1,36 @@
+include "pipelines/common.glsl"
+
+vertex_shader [[
+	out vec2 v_uv;
+	void main()
+	{
+		v_uv = vec2(gl_VertexID & 1, (gl_VertexID & 2) * 0.5);
+		gl_Position = vec4((gl_VertexID & 1) * 2 - 1, (gl_VertexID & 2) - 1, 0, 1);
+	}
+]]
+
+
+
+fragment_shader [[
+
+	uniform sampler2D u_splatmap;
+	uniform sampler2DArray u_detail_textures;
+	uniform vec3 u_rel_camera_pos;
+	uniform int u_lod;
+	in vec2 v_uv;
+	
+	out vec4 o_color;
+
+	void main()
+	{
+		float s = pow(2, u_lod);
+		ivec2 ij = ivec2(trunc(trunc(u_rel_camera_pos.xz / s / 2) * s * 2) - ivec2(64 * s, 64 * s));
+		
+		vec2 splat_uv = (ij / 2048.0 + v_uv / 1024.0 * 64 * s);
+		splat_uv.y = 1 - splat_uv.y;
+		vec4 splat = texture(u_splatmap, splat_uv);
+		vec4 c2 = texture(u_detail_textures, vec3(splat_uv * 1024, 0.5 + splat.x * 256));
+		o_color = vec4(c2.rgb, 1);
+		//o_color = vec4(splat.rgb, 1);
+	}
+]]

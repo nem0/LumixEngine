@@ -6,6 +6,7 @@
 #include "engine/matrix.h"
 #include "engine/resource.h"
 #include "engine/vec.h"
+#include "ffr/ffr.h"
 
 
 namespace Lumix
@@ -34,6 +35,8 @@ class Universe;
 class Terrain
 {
 	public:
+		enum { TEXTURES_COUNT = 6 };
+
 		struct GrassType
 		{
 			explicit GrassType(Terrain& terrain);
@@ -89,6 +92,7 @@ class Terrain
 		Material* getMaterial() const { return m_material; }
 		Texture* getDetailTexture() const { return m_detail_texture; }
 		Texture* getSplatmap() const { return m_splatmap; }
+		Texture* getHeightmap() const { return m_heightmap; }
 		i64 getLayerMask() const { return m_layer_mask; }
 		EntityRef getEntity() const { return m_entity; }
 		float getRootSize() const;
@@ -117,6 +121,9 @@ class Terrain
 		void setGrassTypeDistance(int index, float value);
 		void setGrassTypeRotationMode(int index, GrassType::RotationMode mode);
 		void setMaterial(Material* material);
+		void setHeightmap(Texture* texture);
+		void setSplatmap(Texture* texture);
+		void setDetailTextures(Texture* texture);
 
 		void getInfos(Array<TerrainInfo>& infos, const ShiftedFrustum& frustum, const DVec3& lod_ref_point);
 		void getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, EntityRef camera);
@@ -157,6 +164,7 @@ class Terrain
 		AssociativeArray<EntityRef, DVec3> m_last_camera_position;
 		bool m_force_grass_update;
 		Renderer& m_renderer;
+		ffr::TextureHandle m_textures;
 };
 
 
