@@ -33,13 +33,10 @@ bool AssetBrowser::IPlugin::createTile(const char* in_path, const char* out_path
 AssetBrowser::AssetBrowser(StudioApp& app)
 	: m_editor(app.getWorldEditor())
 	, m_selected_resource(nullptr)
-	, m_autoreload_changed_resource(true)
-	, m_changed_files(app.getWorldEditor().getAllocator())
 	, m_is_focus_requested(false)
 	, m_history(app.getWorldEditor().getAllocator())
 	, m_plugins(app.getWorldEditor().getAllocator())
 	, m_app(app)
-	, m_is_update_enabled(true)
 	, m_current_type(0)
 	, m_is_open(false)
 	, m_activate(false)
@@ -59,25 +56,14 @@ AssetBrowser::AssetBrowser(StudioApp& app)
 	path << "/asset_tiles";
 	PlatformInterface::makePath(path);
 
-	m_auto_reload_action = LUMIX_NEW(allocator, Action)("Auto-reload", "Auto-reload assets", "autoReload");
-	m_auto_reload_action->is_global = false;
-	m_auto_reload_action->func.bind<AssetBrowser, &AssetBrowser::toggleAutoreload>(this);
-	m_auto_reload_action->is_selected.bind<AssetBrowser, &AssetBrowser::isAutoreload>(this);
 	m_back_action = LUMIX_NEW(allocator, Action)("Back", "Back in asset history", "back");
 	m_back_action->is_global = false;
 	m_back_action->func.bind<AssetBrowser, &AssetBrowser::goBack>(this);
 	m_forward_action = LUMIX_NEW(allocator, Action)("Forward", "Forward in asset history", "forward");
 	m_forward_action->is_global = false;
 	m_forward_action->func.bind<AssetBrowser, &AssetBrowser::goForward>(this);
-	m_app.addAction(m_auto_reload_action);
 	m_app.addAction(m_back_action);
 	m_app.addAction(m_forward_action);
-}
-
-
-void AssetBrowser::toggleAutoreload()
-{
-	m_autoreload_changed_resource = !m_autoreload_changed_resource;
 }
 
 
@@ -92,18 +78,6 @@ AssetBrowser::~AssetBrowser()
 	m_file_infos.clear();
 
 	ASSERT(m_plugins.size() == 0);
-}
-
-
-void AssetBrowser::onFileChanged(const char* path)
-{
-	ASSERT(false);
-	// TODO
-	/*ResourceType resource_type = getResourceType(path);
-	if (!isValid(resource_type)) return;
-
-	MT::SpinLock lock(m_changed_files_mutex);
-	m_changed_files.push(Path(path));*/
 }
 
 
@@ -126,52 +100,6 @@ void AssetBrowser::update()
 	PROFILE_FUNCTION();
 
 	for (auto* plugin : m_plugins) plugin->update();
-
-	if (!m_is_update_enabled) return;
-/*	bool is_empty;
-	{
-		MT::SpinLock lock(m_changed_files_mutex);
-		is_empty = m_changed_files.empty();
-	}
-
-	while (!is_empty)
-	{
-		Path path;
-		{
-			MT::SpinLock lock(m_changed_files_mutex);
-			
-			path = m_changed_files.back();
-			m_changed_files.pop();
-			is_empty = m_changed_files.empty();
-		}
-
-		char ext[10];
-		PathUtils::getExtension(ext, lengthOf(ext), path.c_str());
-
-		ResourceType resource_type = getResourceType(path.c_str());
-		if (!isValid(resource_type)) continue;
-
-		// TODO remove reload from asset browser, it's handled by asset compiler
-		if (m_autoreload_changed_resource) m_editor.getEngine().getResourceManager().reload(path);
-
-		char tmp_path[MAX_PATH_LENGTH];
-		copyString(tmp_path, m_editor.getEngine().getDiskFileDevice()->getBasePath());
-		catString(tmp_path, path.c_str());
-
-		if (!PlatformInterface::fileExists(tmp_path))
-		{
-			m_resources[resource_type].eraseItemFast(path);
-			continue;
-		}
-
-		char dir[MAX_PATH_LENGTH];
-		char filename[MAX_PATH_LENGTH];
-		PathUtils::getDir(dir, sizeof(dir), path.c_str());
-		PathUtils::getFilename(filename, sizeof(filename), path.c_str());
-		addResource(dir, filename);
-	}
-	m_changed_files.clear();*/
-	// TODO
 }
 
 
@@ -452,7 +380,6 @@ void AssetBrowser::detailsGUI()
 		{
 			if (m_history_index > 0) m_back_action->toolbarButton();
 			if (m_history_index < m_history.size() - 1) m_forward_action->toolbarButton();
-			m_auto_reload_action->toolbarButton();
 		}
 		ImGui::EndToolbar();
 
