@@ -280,6 +280,7 @@ struct PipelineImpl final : Pipeline
 			shader.res->getResourceManager().unload(*shader.res);
 		}
 		Timer::destroy(m_timer);
+		if (m_resource) m_resource->getResourceManager().unload(*m_resource);
 	}
 
 
