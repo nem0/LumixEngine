@@ -52,7 +52,6 @@ public:
 	void removePlugin(IPlugin& plugin);
 	void openInExternalEditor(Resource* resource) const;
 	void openInExternalEditor(const char* path) const;
-	void enableUpdate(bool enable) { m_is_update_enabled = enable; }
 	bool resourceList(char* buf, int max_size, ResourceType type, float height) const;
 	FS::IFile* beginSaveResource(Resource& resource);
 	void endSaveResource(Resource& resource, FS::IFile& file, bool success);
@@ -82,18 +81,14 @@ private:
 	void doFilter();
 	void breadcrumbs();
 	void changeDir(const char* path);
-	void onFileChanged(const char* path);
 	void unloadResource();
 	void selectResource(Resource* resource, bool record_history);
 	void goBack();
 	void goForward();
-	void toggleAutoreload();
-	bool isAutoreload() const { return m_autoreload_changed_resource; }
 
 
 private:
 	StudioApp& m_app;
-	Array<Path> m_changed_files;
 	StaticString<MAX_PATH_LENGTH> m_dir;
 	Array<StaticString<MAX_PATH_LENGTH> > m_subdirs;
 	Array<FileInfo> m_file_infos;
@@ -101,18 +96,14 @@ private:
 	Array<Path> m_history;
 	int m_history_index;
 	AssociativeArray<ResourceType, IPlugin*> m_plugins;
-	MT::SpinMutex m_changed_files_mutex;
 	Resource* m_selected_resource;
 	WorldEditor& m_editor;
 	int m_current_type;
 	char m_filter[128];
 	Path m_wanted_resource;
-	bool m_autoreload_changed_resource;
 	bool m_is_focus_requested;
 	bool m_activate;
-	bool m_is_update_enabled;
 	bool m_show_thumbnails;
-	Action* m_auto_reload_action;
 	Action* m_back_action;
 	Action* m_forward_action;
 };
