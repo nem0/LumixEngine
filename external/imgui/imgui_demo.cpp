@@ -170,6 +170,7 @@ void ImGui::ShowUserGuide()
 // You may execute this function to experiment with the UI and understand what it does. You may then search for keywords in the code when you are interested by a specific feature.
 void ImGui::ShowDemoWindow(bool* p_open)
 {
+#if 0
     // Examples Apps (accessible from the "Examples" menu)
     static bool show_app_dockspace = false;
     static bool show_app_documents = false;
@@ -2536,6 +2537,7 @@ void ImGui::ShowDemoWindow(bool* p_open)
 
     // End of ShowDemoWindow()
     ImGui::End();
+#endif
 }
 
 //-----------------------------------------------------------------------------
