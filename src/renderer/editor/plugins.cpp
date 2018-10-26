@@ -859,6 +859,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		if (m_tile.frame_countdown >= 0) {
 			--m_tile.frame_countdown;
 			if (m_tile.frame_countdown == -1) {
+				m_tile.universe->destroyEntity((EntityRef)m_tile.mesh_entity);
 				StaticString<MAX_PATH_LENGTH> path(".lumix/asset_tiles/", m_tile.path_hash, ".dds");
 				saveAsDDS(path, &m_tile.data[0], AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE);
 				Engine& engine = m_app.getWorldEditor().getEngine();
@@ -1025,7 +1026,7 @@ bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK); renderer->viewCounterAdd();
 		cmd->mem.size = m_tile.data.size() * sizeof(&m_tile.data[0]);
 		cmd->mem.own = false;
 		renderer->push(cmd);
-		m_tile.universe->destroyEntity(mesh_entity);
+		m_tile.mesh_entity = mesh_entity;
 		m_tile.frame_countdown = 2;
 		m_tile.path_hash = model->getPath().getHash();
 		model->getResourceManager().unload(*model);
@@ -1062,6 +1063,7 @@ bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK); renderer->viewCounterAdd();
 		}
 
 		Universe* universe = nullptr;
+		EntityPtr mesh_entity = INVALID_ENTITY;
 		Pipeline* pipeline = nullptr;
 		EntityPtr m_entity_in_fly = INVALID_ENTITY;
 		int frame_countdown = -1;
