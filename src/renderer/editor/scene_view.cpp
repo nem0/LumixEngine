@@ -23,6 +23,7 @@
 #include "engine/viewport.h"
 #include "imgui/imgui.h"
 #include "renderer/ffr/ffr.h"
+#include "renderer/material.h"
 #include "renderer/model.h"
 #include "renderer/pipeline.h"
 #include "renderer/render_scene.h"
@@ -236,23 +237,46 @@ void SceneView::renderSelection()
 			for (EntityRef e : entities) {
 				if (!scene->getUniverse().hasComponent(e, MODEL_INSTANCE_TYPE)) continue;
 
-				Item item;
-				item.model = scene->getModelInstanceModel(e);
-				item.mtx = universe.getRelativeMatrix(e, m_editor->getViewport().pos);
+				const Model* model = scene->getModelInstanceModel(e);
+				if (!model || !model->isReady()) continue;
 
-				if (item.model && item.model->isReady()) m_items.push(item);
+				for (int i = 0; i < model->getMeshCount(); ++i) {
+					const Mesh& mesh = model->getMesh(i);
+					Item item;
+					item.mesh = mesh.render_data;
+					item.shader = mesh.material->getShader()->m_render_data;
+					item.mtx = universe.getRelativeMatrix(e, m_editor->getViewport().pos);
+					item.material_render_states = mesh.material->getRenderStates();
+				}
 			}
 		}
 
 		void execute() override
 		{
 			for (const Item& item : m_items) {
-				Pipeline::renderModel(*item.model, item.mtx, m_mtx_uniform);
+				const Shader::Program& prog = Shader::getProgram(item.shader, 0); // TODO define
+
+				if(!prog.handle.isValid()) continue;
+
+				int attribute_map[16];
+				const Mesh::RenderData* rd = item.mesh;
+				for(uint i = 0; i < rd->vertex_decl.attributes_count; ++i) {
+					attribute_map[i] = prog.attribute_by_semantics[(int)rd->attributes_semantic[i]];
+				}
+			
+				ffr::setUniformMatrix4f(m_mtx_uniform, &item.mtx.m11);
+				ffr::useProgram(prog.handle);
+				ffr::setVertexBuffer(&rd->vertex_decl, rd->vertex_buffer_handle, 0, prog.use_semantics ? attribute_map : nullptr);
+				ffr::setIndexBuffer(rd->index_buffer_handle);
+				ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE) | item.material_render_states);
+				ffr::drawTriangles(rd->indices_count);
 			}
 		}
 
 		struct Item {
-			Model* model;
+			ShaderRenderData* shader;
+			Mesh::RenderData* mesh;
+			u64 material_render_states;
 			Matrix mtx;
 		};
 
