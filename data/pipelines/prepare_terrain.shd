@@ -29,7 +29,7 @@ fragment_shader [[
 		vec2 splat_uv = (ij / 2048.0 + v_uv / 1024.0 * 64 * s);
 		splat_uv.y = 1 - splat_uv.y;
 		vec4 splat = texture(u_splatmap, splat_uv);
-		vec4 c2 = texture(u_detail_textures, vec3(splat_uv * 1024, 0.5 + splat.x * 256));
+		vec4 c2 = texture(u_detail_textures, vec3(splat_uv * 128, 0.5 + splat.x * 256));
 		o_color = vec4(c2.rgb, 1);
 		//o_color = vec4(splat.rgb, 1);
 	}
