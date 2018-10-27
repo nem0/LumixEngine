@@ -429,6 +429,7 @@ struct RendererImpl final : public Renderer
 		RenderScene::registerLuaAPI(m_engine.getState());
 
 		m_render_task.create("render task");
+		m_layers.emplace("default");
 	}
 
 
@@ -609,6 +610,18 @@ struct RendererImpl final : public Renderer
 		push(cmd);
 
 		return handle;
+	}
+
+	
+	u8 getLayersCount() const override
+	{
+		return (u8)m_layers.size();
+	}
+
+
+	const char* getLayerName(u8 layer) const override
+	{
+		return m_layers[layer];
 	}
 
 

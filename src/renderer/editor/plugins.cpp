@@ -289,6 +289,17 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			material->setShader(Path(buf));
 		}
 
+		const char* current_layer_name = renderer->getLayerName(material->getLayer());
+		if (ImGui::BeginCombo("Layer", current_layer_name)) {
+			for(u8 i = 0, c = renderer->getLayersCount(); i < c; ++i) {
+				const char* name = renderer->getLayerName(i);
+				if(ImGui::Selectable(name)) {
+					material->setLayer(i);
+				}
+			}
+			ImGui::EndCombo();
+		}
+
 		for (int i = 0; i < material->getShader()->m_texture_slot_count; ++i)
 		{
 			auto& slot = material->getShader()->m_texture_slots[i];

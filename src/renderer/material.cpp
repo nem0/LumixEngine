@@ -152,10 +152,9 @@ bool Material::save(FS::IFile& file)
 	if(!isReady()) return false;
 	if(!m_shader) return false;
 	
-	Renderer& renderer = static_cast<MaterialManager&>(m_resource_manager).getRenderer();
-	
 	file << "shader \"" << (m_shader ? m_shader->getPath().c_str(): "") << "\"\n";
 	file << "backface_culling(" << (isBackfaceCulling() ? "true" : "false") << ")\n";
+	file << "layer \"" << m_renderer.getLayerName(m_layer) << "\"\n";
 
 	char tmp[64];
 	toCString(m_metallic, tmp, lengthOf(tmp), 9);
@@ -166,7 +165,7 @@ bool Material::save(FS::IFile& file)
 	file << "defines {";
 	for (int i = 0; i < sizeof(m_define_mask) * 8; ++i) {
 		if ((m_define_mask & (1 << i)) == 0) continue;
-		const char* def = renderer.getShaderDefine(i);
+		const char* def = m_renderer.getShaderDefine(i);
 		if (equalStrings("SKINNED", def)) continue;
 		if (i < 0) file << ", ";
 		file << "\"" << def << "\"";
