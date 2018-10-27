@@ -136,6 +136,10 @@ template <> inline u16 toType(lua_State* L, int index)
 {
 	return (u16)lua_tointeger(L, index);
 }
+template <> inline u8 toType(lua_State* L, int index)
+{
+	return (u8)lua_tointeger(L, index);
+}
 template <> inline EntityRef toType(lua_State* L, int index)
 {
 	return {(int)lua_tointeger(L, index)};
@@ -285,6 +289,10 @@ template <> inline const char* typeToString<u16>()
 {
 	return "number|u16";
 }
+template <> inline const char* typeToString<u8>()
+{
+	return "number|u8";
+}
 template <> inline const char* typeToString<EntityRef>()
 {
 	return "entity";
@@ -321,6 +329,10 @@ template <> inline bool isType<int>(lua_State* L, int index)
 	return lua_isnumber(L, index) != 0;
 }
 template <> inline bool isType<u16>(lua_State* L, int index)
+{
+	return lua_isnumber(L, index) != 0;
+}
+template <> inline bool isType<u8>(lua_State* L, int index)
 {
 	return lua_isnumber(L, index) != 0;
 }
@@ -524,6 +536,10 @@ template <> inline void push(lua_State* L, int value)
 	lua_pushinteger(L, value);
 }
 template <> inline void push(lua_State* L, u16 value)
+{
+	lua_pushinteger(L, value);
+}
+template <> inline void push(lua_State* L, u8 value)
 {
 	lua_pushinteger(L, value);
 }
