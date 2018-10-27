@@ -273,7 +273,7 @@ struct CullingSystemImpl final : public CullingSystem
 			memcpy(subresult.begin() + old_size, cell->ids.begin(), cell->ids.byte_size());
 			return;
 		}
-		JobSystem::WaitableHandle job_counter = JobSystem::allocateWaitable();
+		JobSystem::SignalHandle job_counter = JobSystem::createSignal();
 		struct Job {
 			void* src;
 			void* dst;
@@ -293,7 +293,7 @@ struct CullingSystemImpl final : public CullingSystem
 				memcpy(j->dst, j->src, j->size);
 			});
 		}
-		JobSystem::decCounter(job_counter);
+		JobSystem::trigger(job_counter);
 		JobSystem::wait(job_counter);
 	}
 
@@ -377,7 +377,7 @@ struct CullingSystemImpl final : public CullingSystem
 		jobs.reserve(Math::minimum(buckets_count, partial_entities));
 		PROFILE_INT("jobs", jobs.capacity());
 		if (jobs.capacity() > 0) {
-			JobSystem::WaitableHandle counter = JobSystem::allocateWaitable();
+			JobSystem::SignalHandle counter = JobSystem::createSignal();
 			const uint step = (partial_entities + jobs.capacity() - 1) / jobs.capacity();
 			Cell** cell_iter = partial.begin();
 			uint entity_offset = 0;
@@ -403,7 +403,7 @@ struct CullingSystemImpl final : public CullingSystem
 				job.frustum = frustum;
 				JobSystem::run(counter, &job, &Job::execute);
 			}
-			JobSystem::decCounter(counter);
+			JobSystem::trigger(counter);
 			JobSystem::wait(counter);
 		}
 	}
