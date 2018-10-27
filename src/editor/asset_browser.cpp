@@ -39,7 +39,6 @@ AssetBrowser::AssetBrowser(StudioApp& app)
 	, m_app(app)
 	, m_current_type(0)
 	, m_is_open(false)
-	, m_activate(false)
 	, m_show_thumbnails(true)
 	, m_history_index(-1)
 	, m_file_infos(app.getWorldEditor().getAllocator())
@@ -373,6 +372,8 @@ void AssetBrowser::fileColumn()
 void AssetBrowser::detailsGUI()
 {
 	if (!m_is_open) return;
+	if (m_is_focus_requested) ImGui::SetNextWindowFocus();
+	m_is_focus_requested = false;
 	if (ImGui::Begin("Asset properties", &m_is_open))
 	{
 		ImVec2 pos = ImGui::GetCursorScreenPos();
@@ -401,8 +402,6 @@ void AssetBrowser::detailsGUI()
 		IPlugin* plugin = m_plugins.get(resource_type);
 		plugin->onGUI(m_selected_resource);
 	}
-	//if (m_activate) ImGui::SetDockActive(); // TODO
-	m_activate = false;
 	ImGui::End();
 }
 
@@ -417,24 +416,15 @@ void AssetBrowser::onGUI()
 		m_wanted_resource = "";
 	}
 
-	m_is_open = m_is_open || m_activate;
+	m_is_open = m_is_open || m_is_focus_requested;
 
 	if(m_is_open) {
-		if (!ImGui::Begin("Assets", &m_is_open))
-		{
-			// TODO
-			//if (m_activate) ImGui::SetDockActive();
+		if (m_is_focus_requested) ImGui::SetNextWindowFocus();
+		if (!ImGui::Begin("Assets", &m_is_open)) {
 			ImGui::End();
 			detailsGUI();
 			return;
 		}
-		if (m_is_focus_requested)
-		{
-			m_is_focus_requested = false;
-			ImGui::SetWindowFocus();
-		}
-		// TODO
-		//if (m_activate) ImGui::SetDockActive();
 
 		float checkbox_w = ImGui::GetCursorPosX();
 		ImGui::Checkbox("Thumbnails", &m_show_thumbnails);
@@ -505,7 +495,7 @@ void AssetBrowser::addPlugin(IPlugin& plugin)
 
 void AssetBrowser::selectResource(const Path& path, bool record_history)
 {
-	m_activate = true;
+	m_is_focus_requested = true;
 	char ext[30];
 	PathUtils::getExtension(ext, lengthOf(ext), path.c_str());
 

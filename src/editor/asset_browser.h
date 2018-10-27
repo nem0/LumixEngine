@@ -102,7 +102,6 @@ private:
 	char m_filter[128];
 	Path m_wanted_resource;
 	bool m_is_focus_requested;
-	bool m_activate;
 	bool m_show_thumbnails;
 	Action* m_back_action;
 	Action* m_forward_action;
