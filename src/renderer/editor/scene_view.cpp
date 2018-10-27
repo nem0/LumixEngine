@@ -27,6 +27,7 @@
 #include "renderer/pipeline.h"
 #include "renderer/render_scene.h"
 #include "renderer/renderer.h"
+#include "renderer/shader.h"
 #include <SDL.h>
 
 
@@ -56,6 +57,9 @@ SceneView::SceneView(StudioApp& app)
 	m_pipeline->addCustomCommandHandler("renderSelection").callback.bind<SceneView, &SceneView::renderSelection>(this);
 	m_pipeline->addCustomCommandHandler("renderGizmos").callback.bind<SceneView, &SceneView::renderGizmos>(this);
 	m_pipeline->addCustomCommandHandler("renderIcons").callback.bind<SceneView, &SceneView::renderIcons>(this);
+
+	ResourceManagerHub& rm = engine.getResourceManager();
+	m_debug_shape_shader = rm.load<Shader>(Path("pipelines/debug_shape.shd"));
 
 	m_editor.universeCreated().bind<SceneView, &SceneView::onUniverseCreated>(this);
 	m_editor.universeDestroyed().bind<SceneView, &SceneView::onUniverseDestroyed>(this);
@@ -110,6 +114,7 @@ SceneView::~SceneView()
 	m_editor.universeCreated().unbind<SceneView, &SceneView::onUniverseCreated>(this);
 	m_editor.universeDestroyed().unbind<SceneView, &SceneView::onUniverseDestroyed>(this);
 	Pipeline::destroy(m_pipeline);
+	m_debug_shape_shader->getResourceManager().unload(*m_debug_shape_shader);
 	m_pipeline = nullptr;
 }
 
@@ -226,6 +231,7 @@ void SceneView::renderSelection()
 		{
 			const Array<EntityRef>& entities = m_editor->getSelectedEntities();
 			RenderScene* scene = m_pipeline->getScene();
+			m_mtx_uniform = ffr::allocUniform("u_model", ffr::UniformType::MAT4, 1);
 			const Universe& universe = scene->getUniverse();
 			for (EntityRef e : entities) {
 				if (!scene->getUniverse().hasComponent(e, MODEL_INSTANCE_TYPE)) continue;
@@ -241,7 +247,7 @@ void SceneView::renderSelection()
 		void execute() override
 		{
 			for (const Item& item : m_items) {
-				m_pipeline->renderModel(*item.model, item.mtx);
+				Pipeline::renderModel(*item.model, item.mtx, m_mtx_uniform);
 			}
 		}
 
@@ -252,6 +258,7 @@ void SceneView::renderSelection()
 
 		Array<Item> m_items;
 		Pipeline* m_pipeline;
+		ffr::UniformHandle m_mtx_uniform;
 		WorldEditor* m_editor;
 	};
 
@@ -276,32 +283,64 @@ void SceneView::renderGizmos()
 		void setup() override
 		{
 			viewport = view->m_editor.getViewport();
-			view->m_editor.getGizmo().getRenderData(&data);
+			view->m_editor.getGizmo().getRenderData(&data, viewport);
+			Engine& engine = view->m_editor.getEngine();
+			renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
+			model_uniform = ffr::allocUniform("u_model", ffr::UniformType::MAT4, 1);
 		}
 
 		void execute() override
 		{
-			Engine& engine = view->m_editor.getEngine();
-			Renderer* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
+			if (data.cmds.empty()) return;
+
+			const ffr::ProgramHandle prg = Shader::getProgram(shader, 0).handle;
+			if (!prg.isValid()) return;
+
+			ffr::VertexDecl vertex_decl;
+			vertex_decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false);
+			vertex_decl.addAttribute(4, ffr::AttributeType::U8, true, false);
 
 			renderer->beginProfileBlock("gizmos");
 			ffr::pushDebugGroup("gizmos");
 			ffr::blending(0);
-			view->m_editor.getGizmo().render(data, viewport);
+			for(Gizmo::RenderData::Cmd& cmd : data.cmds) {
+				Renderer::TransientSlice ib = renderer->allocTransient(cmd.indices_count * sizeof(u16));
+				Renderer::TransientSlice vb = renderer->allocTransient(cmd.vertices_count * sizeof(Gizmo::RenderData::Vertex));
+		
+				const u16* indices = data.indices.begin() + cmd.indices_offset;
+				const Gizmo::RenderData::Vertex* vertices = data.vertices.begin() + cmd.vertices_offset;
+
+				ffr::update(ib.buffer, indices, ib.offset, ib.size);
+				ffr::update(vb.buffer, vertices, vb.offset, vb.size);
+
+				ffr::setUniformMatrix4f(model_uniform, &cmd.mtx.m11);
+				ffr::useProgram(prg);
+				ffr::setVertexBuffer(&vertex_decl, vb.buffer, vb.offset, nullptr);
+				ffr::setIndexBuffer(ib.buffer);
+				ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE));
+				const ffr::PrimitiveType primitive_type = cmd.lines ? ffr::PrimitiveType::LINES : ffr::PrimitiveType::TRIANGLES;
+				ffr::drawElements(ib.offset / sizeof(indices[0]), cmd.indices_count, primitive_type, ffr::DataType::UINT16);
+			}
 			ffr::popDebugGroup();
 			renderer->endProfileBlock();
 		}
 
-		Array<Gizmo::RenderData> data;
+		Renderer* renderer;
+		Gizmo::RenderData data;
 		Viewport viewport;
 		SceneView* view;
+		ShaderRenderData* shader;
+		ffr::UniformHandle model_uniform;
 	};
+
+	if (!m_debug_shape_shader || !m_debug_shape_shader->isReady()) return;
 
 	Engine& engine = m_editor.getEngine();
 	Renderer* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
 
 	IAllocator& allocator = renderer->getAllocator();
 	Cmd* cmd = LUMIX_NEW(allocator, Cmd)(allocator);
+	cmd->shader = m_debug_shape_shader->m_render_data;
 	cmd->view = this;
 	renderer->push(cmd);
 }
