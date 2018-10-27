@@ -107,6 +107,10 @@ struct Pool
 };
 
 static struct {
+	struct {
+		GLenum bind_target = GL_TEXTURE_2D;
+	} texture_units[16];
+
 	RENDERDOC_API_1_0_2* rdoc_api;
 	GLuint vao;
 	GLuint tex_buffers[32];
@@ -970,12 +974,13 @@ void bindTexture(uint unit, TextureHandle handle)
 	if(handle.isValid()) {
 		const Texture& t = g_ffr.textures[handle.value];
 		CHECK_GL(glActiveTexture(GL_TEXTURE0 + unit));
-		CHECK_GL(glBindTexture(GL_TEXTURE_2D, 0));
+		CHECK_GL(glBindTexture(g_ffr.texture_units[unit].bind_target, 0));
 		CHECK_GL(glBindTexture(t.target, t.handle));
+		g_ffr.texture_units[unit].bind_target = t.target;
 	}
 	else {
 		CHECK_GL(glActiveTexture(GL_TEXTURE0 + unit));
-		CHECK_GL(glBindTexture(GL_TEXTURE_2D, 0));
+		CHECK_GL(glBindTexture(g_ffr.texture_units[unit].bind_target, 0));
 	}
 }
 
