@@ -7,17 +7,28 @@ local local_light_shader = preloadShader("pipelines/local_light.shd")
 local prepare_terrain_shader = preloadShader("pipelines/prepare_terrain.shd")
 local debug_shadowmap = false
 
-function transparentPass(colorbuffer, dsbuffer)
-	beginBlock("transparent_pass")
-	
+local decal_state = {
+	blending = "add",
+	depth_write = false
+}
+
+local transparent_state = {
+	blending = "add",
+	depth_write = false
+}
+
+local default_state = {
+	define = "DEFERRED",
+	depth_write = true
+}
+
+function transparentPass(transparent_set, colorbuffer, dsbuffer)
 	setRenderTargets(colorbuffer, dsbuffer)
-	
-	local view_params = getCameraParams()
-	blending("add")
-	--renderMeshes("", view_params)
-	renderParticles(view_params)
+
+	beginBlock("transparent_pass")
+	renderBucket(transparent_set, transparent_state)
+	--renderParticles(view_params)
 	endBlock()
-	blending("")
 end
 
 function geomPass(default_set, decal_set)
@@ -31,18 +42,18 @@ function geomPass(default_set, decal_set)
 	
 	setRenderTargets(gbuffer0, gbuffer1, gbuffer2, dsbuffer)
 	clear(CLEAR_ALL, 0, 0, 0, 1, 0)
-	blending("")
 	local view_params = getCameraParams()
 	setStencil(0xff, STENCIL_ALWAYS, 1, 0xff, STENCIL_REPLACE, STENCIL_REPLACE, STENCIL_REPLACE);
 	renderTerrains("DEFERRED", view_params)
-	renderBucket("DEFERRED", default_set)
+	renderBucket(default_set, default_state)
 	setStencil(0xff, STENCIL_DISABLE, 0, 0, STENCIL_KEEP, STENCIL_KEEP, STENCIL_KEEP);
+	endBlock()
+
+	beginBlock("decals")
 	bindTextures({
 		u_gbuffer_depth = gbuffer_depth,
 	}, 0)
-	endBlock()
-	beginBlock("decals")
-	renderBucket("", decal_set)
+	renderBucket(decal_set, decal_state)
 	endBlock()
 	
 	return gbuffer0, gbuffer1, gbuffer2, dsbuffer
@@ -150,11 +161,18 @@ end
 
 function main()
 	local view_params = getCameraParams()
-	local default_set, decal_set, local_light_set = prepareCommands(view_params, { default = 0, decal = 1, local_light = 2})
+	local default_set, decal_set, local_light_set, transparent_set = prepareCommands(view_params, 
+		{ 
+			{ layers = { "default" } },
+			{ layers = { "decal" } },
+			{ layers = { "local_light" } },
+			{ layers = { "transparent" }, sort = "depth" }
+		}
+	)
 
 	
 	local shadowmap = createRenderbuffer(4096, 1024, false, "depth24") --shadowPass()
-	local gbuffer0, gbuffer1, gbuffer2, gbuffer_depth = geomPass(default_set, decal_set)
+	local gbuffer0, gbuffer1, gbuffer2, gbuffer_depth = geomPass(default_set, decal_set, transparent_set)
 	local hdr_buffer = lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap, local_light_set)
 	
 	local res = hdr_buffer		
@@ -162,7 +180,7 @@ function main()
 		res = postprocess("pre", hdr_buffer, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
 	end
 	
-	--transparentPass(res, gbuffer_depth)
+	transparentPass(transparent_set, res, gbuffer_depth)
 	setRenderTargets(hdr_buffer, gbuffer_depth)
 	renderTextMeshes()
 
