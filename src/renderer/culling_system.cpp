@@ -273,7 +273,7 @@ struct CullingSystemImpl final : public CullingSystem
 			memcpy(subresult.begin() + old_size, cell->ids.begin(), cell->ids.byte_size());
 			return;
 		}
-		JobSystem::CounterHandle job_counter = JobSystem::allocateCounter();
+		JobSystem::WaitableHandle job_counter = JobSystem::allocateWaitable();
 		struct Job {
 			void* src;
 			void* dst;
@@ -377,7 +377,7 @@ struct CullingSystemImpl final : public CullingSystem
 		jobs.reserve(Math::minimum(buckets_count, partial_entities));
 		PROFILE_INT("jobs", jobs.capacity());
 		if (jobs.capacity() > 0) {
-			JobSystem::CounterHandle counter = JobSystem::allocateCounter();
+			JobSystem::WaitableHandle counter = JobSystem::allocateWaitable();
 			const uint step = (partial_entities + jobs.capacity() - 1) / jobs.capacity();
 			Cell** cell_iter = partial.begin();
 			uint entity_offset = 0;
