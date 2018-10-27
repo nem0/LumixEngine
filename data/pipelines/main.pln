@@ -19,7 +19,14 @@ local transparent_state = {
 
 local default_state = {
 	define = "DEFERRED",
-	depth_write = true
+	depth_write = true,
+	stencil_func = STENCIL_ALWAYS,
+	stencil_write_mask = 0xff,
+	stencil_ref = 1,
+	stencil_mask = 0xff, 
+	stencil_sfail = STENCIL_REPLACE,
+	stencil_zfail = STENCIL_REPLACE,
+	stencil_zpass = STENCIL_REPLACE,
 }
 
 function transparentPass(transparent_set, colorbuffer, dsbuffer)
@@ -43,10 +50,8 @@ function geomPass(default_set, decal_set)
 	setRenderTargets(gbuffer0, gbuffer1, gbuffer2, dsbuffer)
 	clear(CLEAR_ALL, 0, 0, 0, 1, 0)
 	local view_params = getCameraParams()
-	setStencil(0xff, STENCIL_ALWAYS, 1, 0xff, STENCIL_REPLACE, STENCIL_REPLACE, STENCIL_REPLACE);
-	renderTerrains("DEFERRED", view_params)
+	renderTerrains("DEFERRED", view_params, {}, default_state)
 	renderBucket(default_set, default_state)
-	setStencil(0xff, STENCIL_DISABLE, 0, 0, STENCIL_KEEP, STENCIL_KEEP, STENCIL_KEEP);
 	endBlock()
 
 	beginBlock("decals")

@@ -6,9 +6,17 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 		env.procedural_sky_shader = env.preloadShader("pipelines/procedural_sky.shd")
 	end
 	env.setRenderTargets(0, hdr_buffer, gbuffer_depth)
-	env.setStencil(0x0, env.STENCIL_NOT_EQUAL, 1, 0xff, env.STENCIL_KEEP, env.STENCIL_KEEP, env.STENCIL_REPLACE)
-	env.drawArray(0, 4, env.procedural_sky_shader)
-	env.setStencil(0xff, env.STENCIL_DISABLE, 1, 0xff, env.STENCIL_KEEP, env.STENCIL_KEEP, env.STENCIL_KEEP)
+	local state = {
+		stencil_write_mask = 0,
+		stencil_func = env.STENCIL_NOT_EQUAL,
+		stencil_ref = 1,
+		stencil_mask = 0xff,
+		stencil_sfail = env.STENCIL_KEEP,
+		stencil_zfail = env.STENCIL_KEEP,
+		stencil_zpass = env.STENCIL_REPLACE,
+		depth_write = false
+	}
+	env.drawArray(0, 4, env.procedural_sky_shader, {}, {}, {}, state)
 	env.endBlock()
 	return hdr_buffer
 end

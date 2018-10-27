@@ -460,19 +460,6 @@ struct PipelineImpl final : Pipeline
 		m_viewport = viewport;
 	}
 
-	
-	void resetState()
-	{
-		struct Cmd : Renderer::RenderJob {
-			void setup() override {}
-			void execute() override { 
-				ffr::setStencil(0xff, ffr::StencilFuncs::DISABLE, 0, 0, ffr::StencilOps::KEEP, ffr::StencilOps::KEEP, ffr::StencilOps::KEEP);
-			}
-		};
-		Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
-		m_renderer.push(cmd);
-	}
-
 
 	bool render() override 
 	{ 
@@ -530,7 +517,6 @@ struct PipelineImpl final : Pipeline
 			state.light_indirect_intensity = m_scene->getGlobalLightIndirectIntensity(gl);
 		}
 
-		resetState();
 		m_renderer.setGlobalState(state);
 		
 		LuaWrapper::DebugGuard lua_debug_guard(m_lua_state);
@@ -837,7 +823,7 @@ struct PipelineImpl final : Pipeline
 		IAllocator& allocator = pipeline->m_renderer.getAllocator();
 		RenderTerrainsCommand* cmd = LUMIX_NEW(allocator, RenderTerrainsCommand)(allocator);
 
-		if (lua_gettop(L) > 3 && lua_istable(L, 3)) {
+		if (lua_gettop(L) > 2 && lua_istable(L, 3)) {
 			lua_pushnil(L);
 			while (lua_next(L, 3) != 0) {
 				if(lua_type(L, -1) != LUA_TNUMBER) {
@@ -870,6 +856,10 @@ struct PipelineImpl final : Pipeline
 
 				lua_pop(L, 1);
 			}
+		}
+
+		if (lua_gettop(L) > 3 && lua_istable(L, 4)) {
+			cmd->m_render_state = getState(L, 4);
 		}
 
 		cmd->m_pipeline = pipeline;
@@ -1254,8 +1244,20 @@ struct PipelineImpl final : Pipeline
 			void execute() override 
 			{
 				if (!m_render_data) return;
+
 				ffr::ProgramHandle prg = Shader::getProgram(m_render_data, m_define_mask).handle;
-				
+				if(!prg.isValid()) return;
+
+				ffr::blending(m_render_state.blending);
+				ffr::setStencil(m_render_state.stencil_write_mask
+					, m_render_state.stencil_func
+					, m_render_state.stencil_ref
+					, m_render_state.stencil_mask
+					, m_render_state.stencil_sfail
+					, m_render_state.stencil_zfail
+					, m_render_state.stencil_zpass
+				);
+
 				for(int i = 0; i < m_textures_count; ++i) {
 					ffr::bindTexture(i, m_textures[i].handle);
 					ffr::setUniform1i(m_textures[i].uniform, i);
@@ -1267,7 +1269,7 @@ struct PipelineImpl final : Pipeline
 
 				ffr::setVertexBuffer(nullptr, ffr::INVALID_BUFFER, 0, nullptr);
 				ffr::useProgram(prg);
-				ffr::setState(0);
+				ffr::setState(m_render_state.depth_write ? (u64)ffr::StateFlags::DEPTH_WRITE : 0);
 				ffr::setIndexBuffer(ffr::INVALID_BUFFER);
 				ffr::drawArrays(m_indices_offset, m_indices_count, ffr::PrimitiveType::TRIANGLE_STRIP);
 			}
@@ -1286,6 +1288,7 @@ struct PipelineImpl final : Pipeline
 			int m_indices_count;
 			int m_indices_offset;
 			u32 m_define_mask = 0;
+			RenderState m_render_state;
 			ShaderRenderData* m_render_data = nullptr;
 
 		};
@@ -1304,6 +1307,13 @@ struct PipelineImpl final : Pipeline
 		if(lua_gettop(L) > 4) {
 			LuaWrapper::checkTableArg(L, 5);
 		}
+		const RenderState rs = [&](){
+			if(lua_gettop(L) > 6) {
+				LuaWrapper::checkTableArg(L, 7);
+				return getState(L, 7);
+			}
+			return RenderState();
+		}();
 
 		Shader* shader = nullptr;
 		for (const ShaderRef& s : pipeline->m_shaders) {
@@ -1401,6 +1411,7 @@ struct PipelineImpl final : Pipeline
 
 		}
 	
+		cmd->m_render_state = rs;
 		cmd->m_shader = shader;
 		cmd->m_indices_count = indices_count;
 		cmd->m_indices_offset = indices_offset;
@@ -1646,6 +1657,38 @@ struct PipelineImpl final : Pipeline
 	}
 	
 
+	struct RenderState {
+		int blending = 0;
+		bool depth_write = true;
+		ffr::StencilFuncs stencil_func = ffr::StencilFuncs::DISABLE;
+		u8 stencil_write_mask = 0xff;
+		u8 stencil_ref = 0;
+		u8 stencil_mask = 0;
+		ffr::StencilOps stencil_sfail = ffr::StencilOps::KEEP;
+		ffr::StencilOps stencil_zfail = ffr::StencilOps::KEEP;
+		ffr::StencilOps stencil_zpass = ffr::StencilOps::KEEP;
+	};
+
+
+	static RenderState getState(lua_State* L, int idx)
+	{
+		RenderState rs;
+		char tmp[64];
+		if (LuaWrapper::getOptionalStringField(L, idx, "blending", tmp, lengthOf(tmp))) {
+			rs.blending = tmp[0] ? 1 : 0;
+		}
+		LuaWrapper::getOptionalField(L, idx, "depth_write", &rs.depth_write);
+		LuaWrapper::getOptionalField(L, idx, "stencil_func", reinterpret_cast<uint*>(&rs.stencil_func));
+		LuaWrapper::getOptionalField(L, idx, "stencil_write_mask", &rs.stencil_write_mask);
+		LuaWrapper::getOptionalField(L, idx, "stencil_ref", &rs.stencil_ref);
+		LuaWrapper::getOptionalField(L, idx, "stencil_mask", &rs.stencil_mask);
+		LuaWrapper::getOptionalField(L, idx, "stencil_sfail", reinterpret_cast<uint*>(&rs.stencil_sfail));
+		LuaWrapper::getOptionalField(L, idx, "stencil_zfail", reinterpret_cast<uint*>(&rs.stencil_zfail));
+		LuaWrapper::getOptionalField(L, idx, "stencil_zpass", reinterpret_cast<uint*>(&rs.stencil_zpass));
+		return rs;
+	}
+
+
 	static int renderBucket(lua_State* L)
 	{
 		struct RenderJob : Renderer::RenderJob
@@ -1682,11 +1725,18 @@ struct PipelineImpl final : Pipeline
 				const u32 instanced_mask = m_define_mask | (1 << m_pipeline->m_renderer.getShaderDefineIdx("INSTANCED"));
 				const u32 skinned_mask = m_define_mask | (1 << m_pipeline->m_renderer.getShaderDefineIdx("SKINNED"));
 				const u64 render_states = [&](){ 
-					if (depth_write) return u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE);
+					if (m_state.depth_write) return u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE);
 					return u64(ffr::StateFlags::DEPTH_TEST);
 				}();
 
-				ffr::blending(blending);
+				ffr::blending(m_state.blending);
+				ffr::setStencil(m_state.stencil_write_mask
+					, m_state.stencil_func
+					, m_state.stencil_ref
+					, m_state.stencil_mask
+					, m_state.stencil_sfail
+					, m_state.stencil_zfail
+					, m_state.stencil_zpass);
 
 				for (const Array<u8>& cmds : m_cmd_set->cmds) {
 					const u8* cmd = cmds.begin();
@@ -1826,8 +1876,7 @@ struct PipelineImpl final : Pipeline
 			}
 
 			u32 m_define_mask = 0;
-			int blending = 0;
-			bool depth_write = true;
+			RenderState m_state;
 			PipelineImpl* m_pipeline;
 			CommandSet* m_cmd_set;
 		};
@@ -1847,10 +1896,8 @@ struct PipelineImpl final : Pipeline
 		if (LuaWrapper::getOptionalStringField(L, 2, "define", tmp, lengthOf(tmp))) {
 			job->m_define_mask = tmp[0] ? 1 << pipeline->m_renderer.getShaderDefineIdx(tmp) : 0;
 		}
-		if (LuaWrapper::getOptionalStringField(L, 2, "blending", tmp, lengthOf(tmp))) {
-			job->blending = tmp[0] ? 1 : 0;
-		}
-		LuaWrapper::getOptionalField(L, 2, "depth_write", &job->depth_write);
+
+		job->m_state = getState(L, 2);
 		job->m_pipeline = pipeline;
 		job->m_cmd_set = cmd_set;
 		pipeline->m_renderer.push(job);
@@ -2121,6 +2168,16 @@ struct PipelineImpl final : Pipeline
 			const u32 deferred_define_mask = 1 << m_pipeline->m_renderer.getShaderDefineIdx("DEFERRED");
 			const u8 edge_define_idx = m_pipeline->m_renderer.getShaderDefineIdx("EDGE");
 			
+			ffr::blending(m_render_state.blending);
+			ffr::setStencil(m_render_state.stencil_write_mask
+				, m_render_state.stencil_func
+				, m_render_state.stencil_ref
+				, m_render_state.stencil_mask
+				, m_render_state.stencil_sfail
+				, m_render_state.stencil_zfail
+				, m_render_state.stencil_zpass
+			);
+
 			for (Instance& inst : m_instances) {
 				auto& p = Shader::getProgram(inst.shader, deferred_define_mask);
 				auto& p_edge = Shader::getProgram(inst.shader, deferred_define_mask | (1 << edge_define_idx));
@@ -2140,7 +2197,10 @@ struct PipelineImpl final : Pipeline
 				ffr::setUniform1i(ffr::allocUniform("u_satellite", ffr::UniformType::INT, 1), 1);
 				ffr::setUniform1i(ffr::allocUniform("u_hm", ffr::UniformType::INT, 1), 0);
 
-				const u64 state = (u64)ffr::StateFlags::DEPTH_TEST | (u64)ffr::StateFlags::DEPTH_WRITE;
+				const u64 state = [&](){
+					if (m_render_state.depth_write) return (u64)ffr::StateFlags::DEPTH_TEST | (u64)ffr::StateFlags::DEPTH_WRITE;
+					return (u64)ffr::StateFlags::DEPTH_TEST;
+				}();
 
 				ffr::useProgram(p.handle);
 				ffr::setState(state);
@@ -2175,6 +2235,7 @@ struct PipelineImpl final : Pipeline
 		CameraParams m_camera_params;
 		StaticString<32> m_shader_define;
 		u32 m_define_mask;
+		RenderState m_render_state;
 		Array<Instance> m_instances;
 		struct {
 			ffr::TextureHandle texture;
@@ -2684,37 +2745,6 @@ struct PipelineImpl final : Pipeline
 		m_renderer.push(cmd);
 	}
 
-
-	void setStencil(uint write_mask, uint func, int ref, uint mask, uint sfail, uint zfail, uint zpass) 
-	{
-		struct Cmd : Renderer::RenderJob
-		{
-			void setup() {}
-			void execute() override 
-			{
-				ffr::setStencil(write_mask, (ffr::StencilFuncs)func, ref, mask, (ffr::StencilOps)sfail, (ffr::StencilOps)zfail, (ffr::StencilOps)zpass);
-			}
-
-			uint write_mask;
-			uint func;
-			int ref;
-			uint mask;
-			uint sfail;
-			uint zfail;
-			uint zpass;
-		};
-
-		IAllocator& allocator = m_renderer.getAllocator();
-		Cmd* cmd = LUMIX_NEW(allocator, Cmd);
-		cmd->write_mask = write_mask;
-		cmd->func = func;
-		cmd->ref = ref;
-		cmd->mask = mask;
-		cmd->sfail = sfail;
-		cmd->zfail = zfail;
-		cmd->zpass = zpass;
-		m_renderer.push(cmd);
-	}
 	
 	void setOutput(int rb_index) 
 	{
@@ -2796,7 +2826,6 @@ struct PipelineImpl final : Pipeline
 		REGISTER_FUNCTION(renderLocalLights);
 		REGISTER_FUNCTION(renderTextMeshes);
 		REGISTER_FUNCTION(setOutput);
-		REGISTER_FUNCTION(setStencil);
 		REGISTER_FUNCTION(viewport);
 
 		registerConst("CLEAR_DEPTH", (uint)ffr::ClearFlags::DEPTH);
