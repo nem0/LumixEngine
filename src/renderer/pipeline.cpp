@@ -1193,59 +1193,44 @@ struct PipelineImpl final : Pipeline
 
 		LuaWrapper::checkTableArg(L, 2);
 
-		lua_pushnil(L);
-		cmd->m_bucket_count = 0;
-		while (lua_next(L, 2) != 0) {
-			if(lua_type(L, -1) != LUA_TNUMBER || lua_type(L, -2) != LUA_TSTRING) {
+		const int table_len = (int)lua_objlen(L, 2);
+		cmd->m_bucket_count = table_len;
+		for(int i = 0; i < table_len; ++i) {
+			lua_rawgeti(L, 2, i + 1);
+			if(!lua_istable(L, -1)) {
 				LUMIX_DELETE(allocator, cmd);
-				luaL_argerror(L, 3, "Incorrect view mapping");
+				return luaL_argerror(L, 2, "Incorrect bucket configuration");
 			}
+			lua_getfield(L, -1, "layers");
+			if(!lua_istable(L, -1)) {
+				LUMIX_DELETE(allocator, cmd);
+				return luaL_argerror(L, 2, "layers is not a table");
+			}
+			const int layers_array_len = (int)lua_objlen(L, -1);
+			for(int j = 0; j < layers_array_len; ++j) {
+				lua_rawgeti(L, -1, j + 1);
+				if(!lua_isstring(L, -1)) {
+					LUMIX_DELETE(allocator, cmd);
+					return luaL_argerror(L, 2, "items in layers must be strings");
+				}
+				const char* layer_name = lua_tostring(L, -1);
+				const int layer = pipeline->m_renderer.getLayerIdx(layer_name);
+				cmd->m_bucket_map[layer] = i;
 
-			const char* key = lua_tostring(L, -2);
-			const int value = (int)lua_tointeger(L, -1);
-
-			const int layer = pipeline->m_renderer.getLayerIdx(key);
-			cmd->m_bucket_map[layer] = value;
-			cmd->m_bucket_count = Math::maximum(value + 1, cmd->m_bucket_count); 
+				lua_pop(L, 1);
+			}
+			lua_pop(L, 1);
+			
+			char tmp[64];
+			if (LuaWrapper::getOptionalStringField(L, -1, "sort", tmp, lengthOf(tmp))) {
+				cmd->m_bucket_sort_order[i] = equalIStrings(tmp, "depth") 
+					? PrepareCommandsRenderJob::SortOrder::DEPTH
+					: PrepareCommandsRenderJob::SortOrder::DEFAULT;
+			}
 			
 			lua_pop(L, 1);
 		}
 
-/*
-		if (lua_gettop(L) > 4 && lua_istable(L, 4)) {
-			lua_pushnil(L);
-			while (lua_next(L, 4) != 0) {
-				if(lua_type(L, -1) != LUA_TNUMBER) {
-					g_log_error.log("Renderer") << "Incorrect global textures arguments of renderMeshes";
-					LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
-					lua_pop(L, 2);
-					return 0;
-				}
-
-				if(lua_type(L, -2) != LUA_TSTRING) {
-					g_log_error.log("Renderer") << "Incorrect global textures arguments of renderMeshes";
-					LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
-					lua_pop(L, 2);
-					return 0;
-				}
-			
-				if (cmd->m_global_textures_count > lengthOf(cmd->m_global_textures)) {
-					g_log_error.log("Renderer") << "Too many textures in renderMeshes call";
-					LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
-					lua_pop(L, 2);
-					return 0;
-				}
-
-				const char* uniform = lua_tostring(L, -2);
-				const int rb_idx = (int)lua_tointeger(L, -1);
-				auto& t = cmd->m_global_textures[cmd->m_global_textures_count]; 
-				t.texture = pipeline->m_renderbuffers[rb_idx].handle;
-				t.uniform = ffr::allocUniform(uniform, ffr::UniformType::INT, 1);
-				++cmd->m_global_textures_count;
-
-				lua_pop(L, 1);
-			}
-		}*/
 		for(int i = 0; i < cmd->m_bucket_count; ++i) {
 			CommandSet* cmd_set = LUMIX_NEW(allocator, CommandSet)(allocator);
 
@@ -1661,7 +1646,7 @@ struct PipelineImpl final : Pipeline
 	}
 	
 
-	void renderBucket(const char* define, CommandSet* cmd_set)
+	static int renderBucket(lua_State* L)
 	{
 		struct RenderJob : Renderer::RenderJob
 		{
@@ -1696,6 +1681,12 @@ struct PipelineImpl final : Pipeline
 			
 				const u32 instanced_mask = m_define_mask | (1 << m_pipeline->m_renderer.getShaderDefineIdx("INSTANCED"));
 				const u32 skinned_mask = m_define_mask | (1 << m_pipeline->m_renderer.getShaderDefineIdx("SKINNED"));
+				const u64 render_states = [&](){ 
+					if (depth_write) return u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE);
+					return u64(ffr::StateFlags::DEPTH_TEST);
+				}();
+
+				ffr::blending(blending);
 
 				for (const Array<u8>& cmds : m_cmd_set->cmds) {
 					const u8* cmd = cmds.begin();
@@ -1712,20 +1703,18 @@ struct PipelineImpl final : Pipeline
 
 								const float* instance_data = (const float*)cmd;
 								cmd += sizeof(Vec4) * 2 * instances_count;
-
+								
 								ShaderRenderData* shader = material->shader;
 								for (int i = 0; i < material->textures_count; ++i) {
 									const ffr::TextureHandle handle = material->textures[i];
 									const ffr::UniformHandle uniform = shader->texture_uniforms[i];
-									if (handle.isValid()) {
-										ffr::bindTexture(i, handle);
-										ffr::setUniform1i(uniform, i);
-									}
+									ffr::bindTexture(i, handle);
+									ffr::setUniform1i(uniform, i);
 								}
 
 								const Shader::Program& prog = Shader::getProgram(shader, instanced_mask);
 								if(prog.handle.isValid()) {
-									ffr::setState(material->render_states | u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE));
+									ffr::setState(material->render_states | render_states);
 									const Vec4 params(material->roughness, material->metallic, material->emission, 0);
 									ffr::setUniform4f(m_pipeline->m_material_params_uniform, &params.x);
 									ffr::setUniform4f(m_pipeline->m_material_color_uniform, &material->color.x);
@@ -1775,7 +1764,7 @@ struct PipelineImpl final : Pipeline
 
 								const Shader::Program& prog = Shader::getProgram(shader, skinned_mask);
 								if(prog.handle.isValid()) {
-									ffr::setState(material->render_states | u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE));
+									ffr::setState(material->render_states | render_states);
 									const Vec4 params(material->roughness, material->metallic, material->emission, 0);
 									ffr::setUniform4f(m_pipeline->m_material_params_uniform, &params.x);
 									ffr::setUniform4f(m_pipeline->m_material_color_uniform, &material->color.x);
@@ -1816,7 +1805,7 @@ struct PipelineImpl final : Pipeline
 								if (prog.handle.isValid()) {
 									ffr::blending(0);
 									ffr::useProgram(prog.handle);
-									ffr::setState(material->render_states | (u64)ffr::StateFlags::DEPTH_TEST);
+									ffr::setState(material->render_states | render_states);
 									ffr::setIndexBuffer(m_pipeline->m_cube_ib);
 									ffr::setVertexBuffer(&decal_decl, m_pipeline->m_cube_vb, 0, nullptr);
 
@@ -1836,16 +1825,36 @@ struct PipelineImpl final : Pipeline
 				#undef READ
 			}
 
-			u32 m_define_mask;
+			u32 m_define_mask = 0;
+			int blending = 0;
+			bool depth_write = true;
 			PipelineImpl* m_pipeline;
 			CommandSet* m_cmd_set;
 		};
 
-		RenderJob* job = LUMIX_NEW(m_renderer.getAllocator(), RenderJob);
-		job->m_define_mask = define[0] ? 1 << m_renderer.getShaderDefineIdx(define) : 0;
-		job->m_pipeline = this;
+		const int pipeline_idx = lua_upvalueindex(1);
+		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
+			LuaWrapper::argError<PipelineImpl*>(L, pipeline_idx);
+		}
+		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
+
+		CommandSet* cmd_set = LuaWrapper::checkArg<CommandSet*>(L, 1);
+		LuaWrapper::checkTableArg(L, 2);
+
+		RenderJob* job = LUMIX_NEW(pipeline->m_renderer.getAllocator(), RenderJob);
+
+		char tmp[64];
+		if (LuaWrapper::getOptionalStringField(L, 2, "define", tmp, lengthOf(tmp))) {
+			job->m_define_mask = tmp[0] ? 1 << pipeline->m_renderer.getShaderDefineIdx(tmp) : 0;
+		}
+		if (LuaWrapper::getOptionalStringField(L, 2, "blending", tmp, lengthOf(tmp))) {
+			job->blending = tmp[0] ? 1 : 0;
+		}
+		LuaWrapper::getOptionalField(L, 2, "depth_write", &job->depth_write);
+		job->m_pipeline = pipeline;
 		job->m_cmd_set = cmd_set;
-		m_renderer.push(job);
+		pipeline->m_renderer.push(job);
+		return 0;
 	}
 
 
@@ -2266,6 +2275,7 @@ struct PipelineImpl final : Pipeline
 				CreateSortKeys* ctx = (CreateSortKeys*)data;
 				PROFILE_INT("num", ctx->count);
 				const u8* bucket_map = ctx->cmd->m_bucket_map;
+				const SortOrder* bucket_sort_order = ctx->cmd->m_bucket_sort_order;
 				RenderScene* scene = ctx->cmd->m_pipeline->m_scene;
 				const ModelInstance* model_instances = scene->getModelInstances();
 				const u32* renderables = ctx->renderables;
@@ -2283,8 +2293,16 @@ struct PipelineImpl final : Pipeline
 						case RenderableTypes::MESH: {
 							const Mesh& mesh = mi.meshes[0];
 							const u8 bucket = bucket_map[mesh.layer];
+							const u32 depth_bits = Math::floatFlip(*(u32*)&squared_length);
 							if (bucket < 0xff) {
-								sort_keys.push(mesh.sort_key | ((u64)bucket << 56));
+								if(bucket_sort_order[bucket] == SortOrder::DEPTH) {
+									const u64 key = mesh.sort_key | ((u64)bucket << 56) | ((u64)depth_bits << 24);
+									sort_keys.push(key);
+								}
+								else {
+									const u64 key = ((u64)mesh.sort_key << 32) | ((u64)bucket << 56) | depth_bits;
+									sort_keys.push(mesh.sort_key | ((u64)bucket << 56));
+								}
 								subrenderables.push(renderables[i]);
 							}
 							break;
@@ -2571,11 +2589,14 @@ struct PipelineImpl final : Pipeline
 
 		void execute() override {}
 
+		enum class SortOrder : u8 {
+			DEFAULT,
+			DEPTH
+		};
 
 		IAllocator& m_allocator;
 		CameraParams m_camera_params;
 		PipelineImpl* m_pipeline;
-		//u32 m_define_mask;
 		struct {
 			ffr::TextureHandle texture;
 			ffr::UniformHandle uniform;
@@ -2583,27 +2604,9 @@ struct PipelineImpl final : Pipeline
 		int m_global_textures_count = 0;
 		CommandSet* m_command_sets[255];
 		u8 m_bucket_map[255];
+		SortOrder m_bucket_sort_order[256] = {};
 		u8 m_bucket_count;
 	};
-
-
-	void blending(const char* mode)
-	{
-		struct Cmd : Renderer::RenderJob
-		{
-			void setup() override {}
-			void execute() override
-			{
-				ffr::blending(mode);
-			}
-			int mode;
-		};
-
-		Cmd* cmd = LUMIX_NEW(m_renderer.getAllocator(), Cmd);
-		cmd->mode = mode[0] ? 1 : 0;
-		m_renderer.push(cmd);
-
-	}
 
 
 	void clear(u32 flags, float r, float g, float b, float a, float depth)
@@ -2782,7 +2785,6 @@ struct PipelineImpl final : Pipeline
 			} while(false) \
 
 		REGISTER_FUNCTION(beginBlock);
-		REGISTER_FUNCTION(blending);
 		REGISTER_FUNCTION(clear);
 		REGISTER_FUNCTION(createRenderbuffer);
 		REGISTER_FUNCTION(endBlock);
@@ -2790,7 +2792,6 @@ struct PipelineImpl final : Pipeline
 		REGISTER_FUNCTION(preloadShader);
 		REGISTER_FUNCTION(prepareTerrainTextures);
 		REGISTER_FUNCTION(render2D);
-		REGISTER_FUNCTION(renderBucket);
 		REGISTER_FUNCTION(renderDebugShapes);
 		REGISTER_FUNCTION(renderLocalLights);
 		REGISTER_FUNCTION(renderTextMeshes);
@@ -2815,6 +2816,7 @@ struct PipelineImpl final : Pipeline
 		registerCFunction("getShadowCameraParams", PipelineImpl::getShadowCameraParams);
 		registerCFunction("prepareCommands", PipelineImpl::prepareCommands);
 		registerCFunction("renderEnvProbeVolumes", PipelineImpl::renderEnvProbeVolumes);
+		registerCFunction("renderBucket", PipelineImpl::renderBucket);
 		registerCFunction("renderParticles", PipelineImpl::renderParticles);
 		registerCFunction("renderTerrains", PipelineImpl::renderTerrains);
 		registerCFunction("setRenderTargets", PipelineImpl::setRenderTargets);
