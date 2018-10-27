@@ -1,6 +1,7 @@
 #pragma once
 
 
+#include "engine/array.h"
 #include "engine/lumix.h"
 #include "engine/matrix.h"
 
@@ -21,8 +22,25 @@ class LUMIX_EDITOR_API Gizmo
 public:
 	struct RenderData
 	{
-		RigidTransform tr;
-		bool active;
+		RenderData(IAllocator& allocator) 
+			: indices(allocator) 
+			, vertices(allocator) 
+			, cmds(allocator) 
+		{}
+
+		struct Vertex { Vec3 position; u32 color; };
+		struct Cmd 
+		{ 
+			Matrix mtx;
+			bool lines;
+			uint indices_offset;
+			uint indices_count;
+			uint vertices_offset;
+			uint vertices_count;
+		};
+		Array<u16> indices;
+		Array<Vertex> vertices;
+		Array<Cmd> cmds;
 	};
 
 	static Gizmo* create(WorldEditor& editor);
@@ -34,8 +52,7 @@ public:
 	virtual void setOffset(const Vec3& offset) = 0;
 	virtual bool isActive() const = 0;
 	virtual void add(EntityRef entity) = 0;
-	virtual void getRenderData(Array<RenderData>* data) = 0;
-	virtual void render(const Array<RenderData>& data, const Viewport& vp) const = 0;
+	virtual void getRenderData(RenderData* data, const Viewport& vp) = 0;
 	virtual void setTranslateMode() = 0;
 	virtual void setRotateMode() = 0;
 	virtual void setScaleMode() = 0;

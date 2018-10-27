@@ -2060,7 +2060,7 @@ struct RenderInterfaceImpl final : public RenderInterface
 	{
 		if (!m_pipeline.isReady() || !m_models[model]->isReady()) return;
 
-		m_pipeline.renderModel(*m_models[model], mtx);
+		Pipeline::renderModel(*m_models[model], mtx, m_model_uniform);
 	}
 
 

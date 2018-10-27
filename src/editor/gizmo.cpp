@@ -134,12 +134,29 @@ struct GizmoImpl final : public Gizmo
 	}
 
 
+	struct DataPtrs {
+		u16* indices;
+		RenderData::Vertex* vertices;
+	};
+
+
+	static DataPtrs reserve(RenderData* data, const Matrix& mtx, bool lines, uint vertices_count, uint indices_count)
+	{
+		data->cmds.push({mtx, lines, (uint)data->indices.size(), indices_count, (uint)data->vertices.size(), vertices_count});
+		data->vertices.resize(data->vertices.size() + vertices_count);
+		data->indices.resize(data->indices.size() + indices_count);
+
+		return { data->indices.end() - indices_count, data->vertices.end() - vertices_count };
+	}
+
+	
 	void renderTranslateGizmo(const RigidTransform& gizmo_transform,
 		bool is_active,
 		const DVec3& camera_pos,
 		const Vec3& camera_dir,
 		float fov,
-		bool is_ortho) const
+		bool is_ortho,
+		RenderData* data) const
 	{
 		Axis transform_axis = is_active ? m_transform_axis : Axis::NONE;
 		Matrix scale_mtx = Matrix::IDENTITY;
@@ -151,32 +168,38 @@ struct GizmoImpl final : public Gizmo
 		Matrix mtx = gizmo_transform.rot.toMatrix() * scale_mtx;
 		mtx.translate((gizmo_transform.pos - camera_pos).toFloat());
 
-		RenderInterface::Vertex vertices[9];
-		u16 indices[9];
-		vertices[0].position = Vec3(0, 0, 0);
-		vertices[0].color = transform_axis == Axis::X ? SELECTED_COLOR : X_COLOR;
-		indices[0] = 0;
-		vertices[1].position = Vec3(1, 0, 0);
-		vertices[1].color = transform_axis == Axis::X ? SELECTED_COLOR : X_COLOR;
-		indices[1] = 1;
-		vertices[2].position = Vec3(0, 0, 0);
-		vertices[2].color = transform_axis == Axis::Y ? SELECTED_COLOR : Y_COLOR;
-		indices[2] = 2;
-		vertices[3].position = Vec3(0, 1, 0);
-		vertices[3].color = transform_axis == Axis::Y ? SELECTED_COLOR : Y_COLOR;
-		indices[3] = 3;
-		vertices[4].position = Vec3(0, 0, 0);
-		vertices[4].color = transform_axis == Axis::Z ? SELECTED_COLOR : Z_COLOR;
-		indices[4] = 4;
-		vertices[5].position = Vec3(0, 0, 1);
-		vertices[5].color = transform_axis == Axis::Z ? SELECTED_COLOR : Z_COLOR;
-		indices[5] = 5;
+		{
+			const DataPtrs ptrs = reserve(data, mtx, true, 6, 6);
+			u16* indices = ptrs.indices;
+			RenderData::Vertex* vertices = ptrs.vertices;
 
-		m_editor.getRenderInterface()->render(mtx, indices, 6, vertices, 6, true);
+			vertices[0].position = Vec3(0, 0, 0);
+			vertices[0].color = transform_axis == Axis::X ? SELECTED_COLOR : X_COLOR;
+			indices[0] = 0;
+			vertices[1].position = Vec3(1, 0, 0);
+			vertices[1].color = transform_axis == Axis::X ? SELECTED_COLOR : X_COLOR;
+			indices[1] = 1;
+			vertices[2].position = Vec3(0, 0, 0);
+			vertices[2].color = transform_axis == Axis::Y ? SELECTED_COLOR : Y_COLOR;
+			indices[2] = 2;
+			vertices[3].position = Vec3(0, 1, 0);
+			vertices[3].color = transform_axis == Axis::Y ? SELECTED_COLOR : Y_COLOR;
+			indices[3] = 3;
+			vertices[4].position = Vec3(0, 0, 0);
+			vertices[4].color = transform_axis == Axis::Z ? SELECTED_COLOR : Z_COLOR;
+			indices[4] = 4;
+			vertices[5].position = Vec3(0, 0, 1);
+			vertices[5].color = transform_axis == Axis::Z ? SELECTED_COLOR : Z_COLOR;
+			indices[5] = 5;
+		}
 
 		if (dotProduct(mtx.getXVector(), to_entity_dir) < 0) mtx.setXVector(-mtx.getXVector());
 		if (dotProduct(mtx.getYVector(), to_entity_dir) < 0) mtx.setYVector(-mtx.getYVector());
 		if (dotProduct(mtx.getZVector(), to_entity_dir) < 0) mtx.setZVector(-mtx.getZVector());
+
+		const DataPtrs ptrs = reserve(data, mtx, false, 9, 9);
+		u16* indices = ptrs.indices;
+		RenderData::Vertex* vertices = ptrs.vertices;
 
 		vertices[0].position = Vec3(0, 0, 0);
 		vertices[0].color = transform_axis == Axis::XY ? SELECTED_COLOR : Z_COLOR;
@@ -208,10 +231,8 @@ struct GizmoImpl final : public Gizmo
 		vertices[8].color = transform_axis == Axis::XZ ? SELECTED_COLOR : Y_COLOR;
 		indices[8] = 8;
 
-		RenderInterface* ri = m_editor.getRenderInterface();
-		ri->render(mtx, indices, 9, vertices, 9, false);
-		if (m_is_dragging)
-		{
+		if (m_is_dragging) {
+			RenderInterface* ri = m_editor.getRenderInterface();
 			const DVec3 intersection = getMousePlaneIntersection(m_editor.getMousePos(), gizmo_transform, m_transform_axis);
 			const Vec3 delta_vec = (intersection - m_start_axis_point).toFloat();
 
@@ -228,7 +249,8 @@ struct GizmoImpl final : public Gizmo
 		const DVec3& camera_pos,
 		const Vec3& camera_dir,
 		float fov,
-		bool is_ortho) const
+		bool is_ortho,
+		RenderData* data) const
 	{
 		Axis transform_axis = is_active ? m_transform_axis : Axis::NONE;
 		Matrix scale_mtx = Matrix::IDENTITY;
@@ -238,32 +260,36 @@ struct GizmoImpl final : public Gizmo
 		Matrix mtx = gizmo_tr.rot.toMatrix() * scale_mtx;
 		mtx.translate((gizmo_tr.pos - camera_pos).toFloat());
 
-		RenderInterface::Vertex vertices[9];
-		u16 indices[12];
-		vertices[0].position = Vec3(0, 0, 0);
-		vertices[0].color = transform_axis == Axis::X ? SELECTED_COLOR : X_COLOR;
-		indices[0] = 0;
-		vertices[1].position = Vec3(1, 0, 0);
-		vertices[1].color = transform_axis == Axis::X ? SELECTED_COLOR : X_COLOR;
-		indices[1] = 1;
-		vertices[2].position = Vec3(0, 0, 0);
-		vertices[2].color = transform_axis == Axis::Y ? SELECTED_COLOR : Y_COLOR;
-		indices[2] = 2;
-		vertices[3].position = Vec3(0, 1, 0);
-		vertices[3].color = transform_axis == Axis::Y ? SELECTED_COLOR : Y_COLOR;
-		indices[3] = 3;
-		vertices[4].position = Vec3(0, 0, 0);
-		vertices[4].color = transform_axis == Axis::Z ? SELECTED_COLOR : Z_COLOR;
-		indices[4] = 4;
-		vertices[5].position = Vec3(0, 0, 1);
-		vertices[5].color = transform_axis == Axis::Z ? SELECTED_COLOR : Z_COLOR;
-		indices[5] = 5;
-
-		m_editor.getRenderInterface()->render(mtx, indices, 6, vertices, 6, true);
-
-		auto renderCube = [this](u32 color, const Matrix& mtx, const Vec3& pos) 
 		{
-			RenderInterface::Vertex vertices[8];
+			const DataPtrs ptrs = reserve(data, mtx, true, 6, 6);
+			u16* indices = ptrs.indices;
+			RenderData::Vertex* vertices = ptrs.vertices;
+
+			vertices[0].position = Vec3(0, 0, 0);
+			vertices[0].color = transform_axis == Axis::X ? SELECTED_COLOR : X_COLOR;
+			indices[0] = 0;
+			vertices[1].position = Vec3(1, 0, 0);
+			vertices[1].color = transform_axis == Axis::X ? SELECTED_COLOR : X_COLOR;
+			indices[1] = 1;
+			vertices[2].position = Vec3(0, 0, 0);
+			vertices[2].color = transform_axis == Axis::Y ? SELECTED_COLOR : Y_COLOR;
+			indices[2] = 2;
+			vertices[3].position = Vec3(0, 1, 0);
+			vertices[3].color = transform_axis == Axis::Y ? SELECTED_COLOR : Y_COLOR;
+			indices[3] = 3;
+			vertices[4].position = Vec3(0, 0, 0);
+			vertices[4].color = transform_axis == Axis::Z ? SELECTED_COLOR : Z_COLOR;
+			indices[4] = 4;
+			vertices[5].position = Vec3(0, 0, 1);
+			vertices[5].color = transform_axis == Axis::Z ? SELECTED_COLOR : Z_COLOR;
+			indices[5] = 5;
+		}
+
+		auto renderCube = [this](RenderData* data, u32 color, const Matrix& mtx, const Vec3& pos) 
+		{
+			const DataPtrs ptrs = reserve(data, mtx, false, 8, 36);
+			u16* indices = ptrs.indices;
+			RenderData::Vertex* vertices = ptrs.vertices;
 
 			for (int i = 0; i < 8; ++i) vertices[i].color = color;
 
@@ -277,7 +303,7 @@ struct GizmoImpl final : public Gizmo
 			vertices[6].position = pos + Vec3(0.1f, 0.1f, 0.1f);
 			vertices[7].position = pos + Vec3(-0.1f, 0.1f, 0.1f);
 
-			u16 indices[36] =
+			u16 indices_tmp[36] =
 			{
 				0, 1, 2,
 				0, 2, 3,
@@ -292,23 +318,25 @@ struct GizmoImpl final : public Gizmo
 				1, 2, 6,
 				1, 6, 5
 			};
-			m_editor.getRenderInterface()->render(mtx, indices, 36, vertices, 8, false);
+
+			memcpy(indices, indices_tmp, sizeof(indices_tmp));
 		};
-		renderCube(transform_axis == Axis::X ? SELECTED_COLOR : X_COLOR, mtx, Vec3(1, 0, 0));
-		renderCube(transform_axis == Axis::Y ? SELECTED_COLOR : Y_COLOR, mtx, Vec3(0, 1, 0));
-		renderCube(transform_axis == Axis::Z ? SELECTED_COLOR : Z_COLOR, mtx, Vec3(0, 0, 1));
+		renderCube(data, transform_axis == Axis::X ? SELECTED_COLOR : X_COLOR, mtx, Vec3(1, 0, 0));
+		renderCube(data, transform_axis == Axis::Y ? SELECTED_COLOR : Y_COLOR, mtx, Vec3(0, 1, 0));
+		renderCube(data, transform_axis == Axis::Z ? SELECTED_COLOR : Z_COLOR, mtx, Vec3(0, 0, 1));
 		
 	}
 
-	void renderQuarterRing(const Matrix& mtx, const Vec3& a, const Vec3& b, u32 color) const
+	void renderQuarterRing(RenderData* data, const Matrix& mtx, const Vec3& a, const Vec3& b, u32 color) const
 	{
-		RenderInterface::Vertex vertices[1200];
-		u16 indices[1200];
+		const DataPtrs ptrs = reserve(data, mtx, false, 25*6, 25*6);
+		u16* indices = ptrs.indices;
+		RenderData::Vertex* vertices = ptrs.vertices;
+
 		const float ANGLE_STEP = Math::degreesToRadians(1.0f / 100.0f * 360.0f);
 		Vec3 n = crossProduct(a, b) * 0.05f;
 		int offset = -1;
-		for (int i = 0; i < 25; ++i)
-		{
+		for (int i = 0; i < 25; ++i) {
 			float angle = i * ANGLE_STEP;
 			float s = sinf(angle);
 			float c = cosf(angle);
@@ -349,37 +377,38 @@ struct GizmoImpl final : public Gizmo
 			indices[offset] = offset;
 		}
 
-		m_editor.getRenderInterface()->render(mtx, indices, offset, vertices, offset, false);
-
-		const int GRID_SIZE = 5;
-		offset = -1;
-		for (int i = 0; i <= GRID_SIZE; ++i)
 		{
-			float t = 1.0f / GRID_SIZE * i;
-			float ratio = sinf(acosf(t));
+			const int GRID_SIZE = 5;
+			const DataPtrs ptrs = reserve(data, mtx, true, GRID_SIZE * 4, GRID_SIZE * 4);
+			u16* indices = ptrs.indices;
+			RenderData::Vertex* vertices = ptrs.vertices;
 
-			++offset;
-			vertices[offset].position = a * t;
-			vertices[offset].color = color;
-			indices[offset] = offset;
+			offset = -1;
+			for (int i = 0; i <= GRID_SIZE; ++i) {
+				float t = 1.0f / GRID_SIZE * i;
+				float ratio = sinf(acosf(t));
 
-			++offset;
-			vertices[offset].position = a * t + b * ratio;
-			vertices[offset].color = color;
-			indices[offset] = offset;
+				++offset;
+				vertices[offset].position = a * t;
+				vertices[offset].color = color;
+				indices[offset] = offset;
 
-			++offset;
-			vertices[offset].position = b * t + a * ratio;
-			vertices[offset].color = color;
-			indices[offset] = offset;
+				++offset;
+				vertices[offset].position = a * t + b * ratio;
+				vertices[offset].color = color;
+				indices[offset] = offset;
 
-			++offset;
-			vertices[offset].position = b * t;
-			vertices[offset].color = color;
-			indices[offset] = offset;
+				++offset;
+				vertices[offset].position = b * t + a * ratio;
+				vertices[offset].color = color;
+				indices[offset] = offset;
+
+				++offset;
+				vertices[offset].position = b * t;
+				vertices[offset].color = color;
+				indices[offset] = offset;
+			}
 		}
-
-		m_editor.getRenderInterface()->render(mtx, indices, offset, vertices, offset, true);
 	}
 
 
@@ -417,7 +446,8 @@ struct GizmoImpl final : public Gizmo
 		const DVec3& camera_pos,
 		const Vec3& camera_dir,
 		float fov,
-		bool is_ortho) const
+		bool is_ortho,
+		RenderData* data) const
 	{
 		Axis transform_axis = is_active ? m_transform_axis : Axis::NONE;
 		Matrix scale_mtx = Matrix::IDENTITY;
@@ -438,9 +468,9 @@ struct GizmoImpl final : public Gizmo
 
 		if (!m_is_dragging || !is_active)
 		{
-			renderQuarterRing(mtx, right, up, transform_axis == Axis::Z ? SELECTED_COLOR : Z_COLOR);
-			renderQuarterRing(mtx, up, dir, transform_axis == Axis::X ? SELECTED_COLOR : X_COLOR);
-			renderQuarterRing(mtx, right, dir, transform_axis == Axis::Y ? SELECTED_COLOR : Y_COLOR);
+			renderQuarterRing(data, mtx, right, up, transform_axis == Axis::Z ? SELECTED_COLOR : Z_COLOR);
+			renderQuarterRing(data, mtx, up, dir, transform_axis == Axis::X ? SELECTED_COLOR : X_COLOR);
+			renderQuarterRing(data, mtx, right, dir, transform_axis == Axis::Y ? SELECTED_COLOR : Y_COLOR);
 		}
 		else
 		{
@@ -465,10 +495,10 @@ struct GizmoImpl final : public Gizmo
 					break;
 				default: ASSERT(false); break;
 			}
-			renderQuarterRing(mtx, axis1, axis2, SELECTED_COLOR);
-			renderQuarterRing(mtx, -axis1, axis2, SELECTED_COLOR);
-			renderQuarterRing(mtx, -axis1, -axis2, SELECTED_COLOR);
-			renderQuarterRing(mtx, axis1, -axis2, SELECTED_COLOR);
+			renderQuarterRing(data, mtx, axis1, axis2, SELECTED_COLOR);
+			renderQuarterRing(data, mtx, -axis1, axis2, SELECTED_COLOR);
+			renderQuarterRing(data, mtx, -axis1, -axis2, SELECTED_COLOR);
+			renderQuarterRing(data, mtx, axis1, -axis2, SELECTED_COLOR);
 			RenderInterface* ri = m_editor.getRenderInterface();
 
 			const Vec3 origin = (m_start_plane_point - gizmo_tr.pos).toFloat().normalized();
@@ -1071,20 +1101,20 @@ struct GizmoImpl final : public Gizmo
 	}
 
 
-	void render(const RigidTransform& gizmo_tr, bool is_active, const Viewport& vp) const
+	void render(const RigidTransform& gizmo_tr, bool is_active, const Viewport& vp, RenderData* data) const
 	{
 		const Vec3 vp_dir = vp.rot * Vec3(0, 0, -1);
 
 		switch (m_mode)
 		{
 			case Mode::TRANSLATE:
-				renderTranslateGizmo(gizmo_tr, is_active, vp.pos, vp_dir, vp.fov, vp.is_ortho);
+				renderTranslateGizmo(gizmo_tr, is_active, vp.pos, vp_dir, vp.fov, vp.is_ortho, data);
 				break;
 			case Mode::ROTATE:
-				renderRotateGizmo(gizmo_tr, is_active, vp.pos, vp_dir, vp.fov, vp.is_ortho);
+				renderRotateGizmo(gizmo_tr, is_active, vp.pos, vp_dir, vp.fov, vp.is_ortho, data);
 				break;
 			case Mode::SCALE:
-				renderScaleGizmo(gizmo_tr, is_active, vp.pos, vp_dir, vp.fov, vp.is_ortho);
+				renderScaleGizmo(gizmo_tr, is_active, vp.pos, vp_dir, vp.fov, vp.is_ortho, data);
 				break;
 			default:
 				ASSERT(false);
@@ -1093,25 +1123,18 @@ struct GizmoImpl final : public Gizmo
 	}
 
 	
-	void getRenderData(Array<RenderData>* data) override
+	void getRenderData(RenderData* data, const Viewport& vp) override
 	{
-		auto* render_interface = m_editor.getRenderInterface();
-		const Viewport& vp = m_editor.getViewport();
-
 		collide(vp.pos, vp.rot * Vec3(0, 0, -1), vp.fov, vp.is_ortho);
 		transform();
 
 		for (int i = 0; i < m_count; ++i) {
 			const RigidTransform gizmo_tr = getTransform(m_entities[i]);
-			RenderData& rd = data->emplace();;
-			rd.tr = gizmo_tr;
-			rd.active = m_active == i;
+			render(gizmo_tr, m_active == i, vp, data);
 		}
 
 		for (int i = 0; i < m_immediate_count; ++i) {
-			RenderData& rd = data->emplace();;
-			rd.tr = m_immediate_frames[i].getRigidPart();
-			rd.active = m_active == i;
+			render(m_immediate_frames[i].getRigidPart(), m_active == i, vp, data);
 		}
 
 		m_immediate_count = 0;
@@ -1119,14 +1142,6 @@ struct GizmoImpl final : public Gizmo
 		m_mouse_pos.x = m_editor.getMousePos().x;
 		m_mouse_pos.y = m_editor.getMousePos().y;
 		m_count = 0;
-	}
-
-
-	void render(const Array<RenderData>& data, const Viewport& vp) const override
-	{
-		for (const RenderData& i : data) {
-			render(i.tr, i.active, vp);
-		}
 	}
 
 

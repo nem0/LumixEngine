@@ -15,6 +15,7 @@ class LogUI;
 class StudioApp;
 class Pipeline;
 class RenderScene;
+class Shader;
 
 
 class SceneView : public StudioApp::GUIPlugin
@@ -73,6 +74,7 @@ class SceneView : public StudioApp::GUIPlugin
 		bool m_show_stats;
 		LogUI& m_log_ui;
 		Array<DropHandler> m_drop_handlers;
+		Shader* m_debug_shape_shader;
 
 		struct DeferredPrefabInsert
 		{

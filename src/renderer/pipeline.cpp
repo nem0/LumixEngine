@@ -2078,243 +2078,87 @@ struct PipelineImpl final : Pipeline
 	}
 
 
-	void renderModel(Model& model, const Matrix& mtx) override
-	{
-		for(int i = 0; i < model.getMeshCount(); ++i) {
-
-			const Mesh& mesh = model.getMesh(i);
-			const Material* material = mesh.material;
-			ShaderRenderData* shader_rd = material->getShader()->m_render_data;
-			const Shader::Program& prog = Shader::getProgram(shader_rd, 0); // TODO define
-			const int textures_count = material->getTextureCount();
-
-			if(!prog.handle.isValid()) continue;
-
-			for(int i = 0; i < textures_count; ++i) {
-				ffr::bindTexture(i, material->getTexture(i)->handle);
-				ffr::setUniform1i(material->getTextureUniform(i), i);
-			}
-
-			int attribute_map[16];
-			const Mesh::RenderData* rd = mesh.render_data;
-			for(uint i = 0; i < rd->vertex_decl.attributes_count; ++i) {
-				attribute_map[i] = prog.attribute_by_semantics[(int)rd->attributes_semantic[i]];
-			}
-			
-			ffr::setUniformMatrix4f(m_model_uniform, &mtx.m11);
-			ffr::useProgram(prog.handle);
-			ffr::setVertexBuffer(&rd->vertex_decl, rd->vertex_buffer_handle, 0, prog.use_semantics ? attribute_map : nullptr);
-			ffr::setIndexBuffer(rd->index_buffer_handle);
-			ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE) | material->getRenderStates());
-			ffr::drawTriangles(rd->indices_count);
-		}
-	}
-
 	struct RenderTerrainsCommand : Renderer::RenderJob
 	{
 		RenderTerrainsCommand(IAllocator& allocator)
 			: m_allocator(allocator)
-			, m_instance_data(allocator)
-			, m_batches(allocator)
+			, m_instances(allocator)
 		{
 		}
 
 		void setup() override
 		{
-			/*PROFILE_FUNCTION();
 			Array<TerrainInfo> infos(m_allocator);
 			m_pipeline->m_scene->getTerrainInfos(m_camera_params.frustum, m_camera_params.pos, infos);
+			if(infos.empty()) return;
 
-			if (infos.empty()) return;
+			m_instances.reserve(infos.size());
+			for (TerrainInfo& info : infos) {
+				if (!info.terrain->m_heightmap) continue;
+				if (!info.terrain->m_heightmap->isReady()) continue;
 
-			m_define_mask = m_shader_define.empty() 
-				? 0
-				: 1 << m_pipeline->m_renderer.getShaderDefineIdx(m_shader_define);
-
-			std::sort(infos.begin(), infos.end(), [](const TerrainInfo& a, const TerrainInfo& b) {
-				if (a.terrain == b.terrain) return a.index < b.index;
-				return a.terrain < b.terrain;
-			});
-
-			m_instance_data.resize(infos.size());
-			Terrain* prev_terrain = nullptr;
-			int prev_idx = -1;
-			int prev_submesh = -1;
-			for (int i = 0, c = infos.size(); i < c; ++i) {
-				const TerrainInfo& info = infos[i];
-				if (info.terrain != prev_terrain || prev_submesh != info.index) {
-					if (prev_terrain) {
-						Batch& b = m_batches.emplace();
-						b.terrain = prev_terrain;
-						b.shader = infos[prev_idx].shader->m_render_data;
-						b.matrix = infos[prev_idx].rot.toMatrix();
-						b.matrix.setTranslation((infos[prev_idx].position - m_camera_params.pos).toFloat());
-						b.submesh = infos[prev_idx].index;
-						b.from = prev_idx;
-						b.to = i - 1;
-					}
-					prev_idx = i;
-					prev_terrain = info.terrain;
-					prev_submesh = info.index;
-				}
-				m_instance_data[i].size = info.size;
-				m_instance_data[i].quad_min = info.min;
-				m_instance_data[i].morph_consts = info.morph_const;
+				Instance& inst = m_instances.emplace();
+				inst.pos = (info.position - m_camera_params.pos).toFloat();
+				inst.rot = info.rot;
+				inst.shader = info.shader->m_render_data;
+				inst.material = info.terrain->m_material->getRenderData();
+				inst.heightmap = info.terrain->m_heightmap->handle;
+				inst.textures = info.terrain->m_textures;
 			}
-			Batch& b = m_batches.emplace();
-			b.terrain = prev_terrain;
-			b.shader = infos[prev_idx].shader->m_render_data;
-			b.matrix = infos[prev_idx].rot.toMatrix();
-			b.matrix.setTranslation((infos[prev_idx].position - m_camera_params.pos).toFloat());
-			b.submesh = infos[prev_idx].index;
-			b.from = prev_idx;
-			b.to = infos.size() - 1;*/
-			// TODO
-			//ASSERT(false);
 		}
 
 		void execute() override
 		{
-			Array<TerrainInfo> infos(m_allocator);
-			m_pipeline->m_scene->getTerrainInfos(m_camera_params.frustum, m_camera_params.pos, infos);
-
-			if(infos.empty()) return;
-
-			auto* rd = infos[0].shader->m_render_data;
-
 			const u32 deferred_define_mask = 1 << m_pipeline->m_renderer.getShaderDefineIdx("DEFERRED");
 			const u8 edge_define_idx = m_pipeline->m_renderer.getShaderDefineIdx("EDGE");
-			auto& p = Shader::getProgram(rd, deferred_define_mask);
-			auto& p_edge = Shader::getProgram(rd, deferred_define_mask | (1 << edge_define_idx));
+			
+			for (Instance& inst : m_instances) {
+				auto& p = Shader::getProgram(inst.shader, deferred_define_mask);
+				auto& p_edge = Shader::getProgram(inst.shader, deferred_define_mask | (1 << edge_define_idx));
+				
+				if (!p.handle.isValid()) continue;
+				if (!p_edge.handle.isValid()) continue;
 
-			const Vec3 pos = (infos[0].position - m_camera_params.pos).toFloat();
-			Vec3 lpos = (m_camera_params.pos - infos[0].position).toFloat();
-			lpos = infos[0].rot.conjugated().rotate(lpos);
+				const Vec3 pos = inst.pos;
+				const Vec3 lpos = inst.rot.conjugated().rotate(-inst.pos);
 
-			ffr::setUniform3f(m_pipeline->m_position_uniform, &pos.x);
-			ffr::setUniform3f(m_pipeline->m_rel_camera_pos_uniform, &lpos.x);
-			ffr::blending(0);
+				ffr::setUniform3f(m_pipeline->m_position_uniform, &pos.x);
+				ffr::setUniform3f(m_pipeline->m_rel_camera_pos_uniform, &lpos.x);
+				ffr::blending(0);
 
-			/*for(int i = 0; i < infos[0].terrain->m_material->getTextureCount(); ++i) {
-				Texture* t = infos[0].terrain->m_material->getTexture(i);
-				if (t) {
-					ffr::UniformHandle uniform = infos[0].terrain->m_material->getTextureUniform(i);
-					ffr::bindTexture(i, t->handle);
-					ffr::setUniform1i(uniform, i);
-				}
-			}*/
-
-			Material* material = infos[0].terrain->m_material;
-			Texture* texture = infos[0].terrain->m_heightmap;
-			if (texture && texture->isReady()) {  
-				ffr::bindTexture(1, infos[0].terrain->m_textures);
-				ffr::bindTexture(0, infos[0].terrain->m_heightmap->handle);
+				ffr::bindTexture(1, inst.textures);
+				ffr::bindTexture(0, inst.heightmap);
 				ffr::setUniform1i(ffr::allocUniform("u_satellite", ffr::UniformType::INT, 1), 1);
 				ffr::setUniform1i(ffr::allocUniform("u_hm", ffr::UniformType::INT, 1), 0);
 
-				u64 state = (u64)ffr::StateFlags::DEPTH_TEST | (u64)ffr::StateFlags::DEPTH_WRITE;
-				static bool wireframe = false;
-				if (wireframe) state |= (u64)ffr::StateFlags::WIREFRAME;
-				if(p.handle.isValid()) {
-					ffr::useProgram(p.handle);
-					ffr::setState(state);
+				const u64 state = (u64)ffr::StateFlags::DEPTH_TEST | (u64)ffr::StateFlags::DEPTH_WRITE;
 
-					const int loc = ffr::getUniformLocation(p.handle, m_pipeline->m_lod_uniform);
-					for(int i = 0; i < 6; ++i) {
-						ffr::applyUniform1i(loc, i);
-						ffr::drawArrays(0, 126 * 126, ffr::PrimitiveType::POINTS);
-					}
+				ffr::useProgram(p.handle);
+				ffr::setState(state);
+				const int loc = ffr::getUniformLocation(p.handle, m_pipeline->m_lod_uniform);
+				for(int i = 0; i < 6; ++i) {
+					ffr::applyUniform1i(loc, i);
+					ffr::drawArrays(0, 126 * 126, ffr::PrimitiveType::POINTS);
 				}
-				if (p_edge.handle.isValid()) {
-					ffr::useProgram(p_edge.handle);
-					ffr::setState(state);
-					const int loc = ffr::getUniformLocation(p_edge.handle, m_pipeline->m_lod_uniform);
-					for(int i = 0; i < 6; ++i) {
-						ffr::applyUniform1i(loc, i);
-						ffr::drawArrays(0, 64, ffr::PrimitiveType::POINTS);
-					}
+
+				ffr::useProgram(p_edge.handle);
+				ffr::setState(state);
+				const int loc_edge = ffr::getUniformLocation(p_edge.handle, m_pipeline->m_lod_uniform);
+				for(int i = 0; i < 6; ++i) {
+					ffr::applyUniform1i(loc_edge, i);
+					ffr::drawArrays(0, 64, ffr::PrimitiveType::POINTS);
 				}
 			}
-
-			/*if(m_instance_data.empty()) return;
-
-			ffr::pushDebugGroup("terrains");
-			Renderer::TransientSlice instance_buffer = m_pipeline->m_renderer.allocTransient(m_instance_data.byte_size());
-			ffr::update(instance_buffer.buffer, m_instance_data.begin(), 0, m_instance_data.byte_size());
-
-			ffr::VertexDecl decl;
-			decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false);
-			decl.addAttribute(2, ffr::AttributeType::FLOAT, false, false);
-			
-			ffr::VertexDecl instance_decl;
-			instance_decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false);
-			instance_decl.addAttribute(1, ffr::AttributeType::FLOAT, false, false);
-			instance_decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false);
-
-			const DVec3 camera_pos = m_camera_params.pos;
-
-			for (const Batch& batch : m_batches) {
-				Texture* detail_texture = batch.terrain->getDetailTexture();
-				if (!detail_texture) continue;
-				Texture* splat_texture = batch.terrain->getSplatmap();
-				if (!splat_texture) continue;
-
-				const Matrix inv_world_matrix = batch.matrix.fastInverted();
-				const Vec4 rel_cam_pos(inv_world_matrix.transformPoint(camera_pos) / batch.terrain->getXZScale(), 1);
-				const Vec4 terrain_scale(batch.terrain->getScale(), 0);
-				const Vec4 terrain_params(batch.terrain->getRootSize()
-					, (float)detail_texture->width
-					, (float)splat_texture->width
-					, 0);
-				ffr::setUniform4f(m_pipeline->m_terrain_params_uniform, &terrain_params.x);
-				ffr::setUniform4f(m_pipeline->m_rel_camera_pos_uniform, &rel_cam_pos.x);
-				ffr::setUniform4f(m_pipeline->m_terrain_scale_uniform, &terrain_scale.x);
-				ffr::setUniformMatrix4f(m_pipeline->m_terrain_matrix_uniform, &batch.matrix.m11);
-
-				const ffr::ProgramHandle prg = Shader::getProgram(batch.shader, m_define_mask).handle;
-				ffr::useProgram(prg);
-				/*
-				for (int i = 0; i < m_global_textures_count; ++i) {
-					const auto& t = m_global_textures[i];
-					ffr::bindTexture(i, t.texture);
-					ffr::setUniform1i(t.uniform, i);
-				}
-				*//*
-				const Material* material = batch.terrain->m_material;
-				const int textures_count = material->getTextureCount();
-				for (int i = 0; i < textures_count; ++i) {
-					ffr::bindTexture(i + 0, material->getTexture(i)->handle);
-					ffr::setUniform1i(material->getTextureUniform(i), i + 0);
-				}
-
-				const Mesh& mesh = *batch.terrain->getMesh();
-				ffr::setVertexBuffer(&decl, mesh.vertex_buffer_handle, 0, nullptr);
-				ffr::setInstanceBuffer(instance_decl, instance_buffer.buffer, instance_buffer.offset + batch.from * sizeof(m_instance_data[0]), 2);
-				ffr::setIndexBuffer(mesh.index_buffer_handle);
-				ffr::setState(u64(ffr::StateFlags::DEPTH_WRITE) | u64(ffr::StateFlags::DEPTH_TEST) | batch.terrain->m_material->getRenderStates());
-				const int submesh_indices_count = mesh.indices_count / 4;
-				ffr::drawTrianglesInstanced(batch.submesh * submesh_indices_count * sizeof(u16), submesh_indices_count , 1 + batch.to - batch.from);
-			}
-			ffr::popDebugGroup();*/
-			// TODO
-			//ASSERT(false);
 		}
 
-		struct InstanceData
+		struct Instance
 		{
-			Vec3 quad_min;
-			float size;
-			Vec3 morph_consts;
-		};
-
-		struct Batch
-		{
-			Terrain* terrain;
+			Vec3 pos;
+			Quat rot;
 			ShaderRenderData* shader;
-			Matrix matrix;
-			uint submesh;
-			uint from;
-			uint to;
+			Material::RenderData* material;
+			ffr::TextureHandle heightmap;
+			ffr::TextureHandle textures;
 		};
 
 		IAllocator& m_allocator;
@@ -2322,8 +2166,7 @@ struct PipelineImpl final : Pipeline
 		CameraParams m_camera_params;
 		StaticString<32> m_shader_define;
 		u32 m_define_mask;
-		Array<InstanceData> m_instance_data;
-		Array<Batch> m_batches;
+		Array<Instance> m_instances;
 		struct {
 			ffr::TextureHandle texture;
 			ffr::UniformHandle uniform;
@@ -3072,6 +2915,40 @@ void Pipeline::destroy(Pipeline* pipeline)
 	PipelineImpl* p = (PipelineImpl*)pipeline;
 	LUMIX_DELETE(p->m_allocator, p);
 }
+
+
+void Pipeline::renderModel(Model& model, const Matrix& mtx, ffr::UniformHandle mtx_uniform)
+{
+	for(int i = 0; i < model.getMeshCount(); ++i) {
+
+		const Mesh& mesh = model.getMesh(i);
+		const Material* material = mesh.material;
+		ShaderRenderData* shader_rd = material->getShader()->m_render_data;
+		const Shader::Program& prog = Shader::getProgram(shader_rd, 0); // TODO define
+		const int textures_count = material->getTextureCount();
+
+		if(!prog.handle.isValid()) continue;
+
+		for(int i = 0; i < textures_count; ++i) {
+			ffr::bindTexture(i, material->getTexture(i)->handle);
+			ffr::setUniform1i(material->getTextureUniform(i), i);
+		}
+
+		int attribute_map[16];
+		const Mesh::RenderData* rd = mesh.render_data;
+		for(uint i = 0; i < rd->vertex_decl.attributes_count; ++i) {
+			attribute_map[i] = prog.attribute_by_semantics[(int)rd->attributes_semantic[i]];
+		}
+			
+		ffr::setUniformMatrix4f(mtx_uniform, &mtx.m11);
+		ffr::useProgram(prog.handle);
+		ffr::setVertexBuffer(&rd->vertex_decl, rd->vertex_buffer_handle, 0, prog.use_semantics ? attribute_map : nullptr);
+		ffr::setIndexBuffer(rd->index_buffer_handle);
+		ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE) | material->getRenderStates());
+		ffr::drawTriangles(rd->indices_count);
+	}
+}
+
 
 
 } // namespace Lumix

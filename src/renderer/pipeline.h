@@ -13,10 +13,11 @@ struct lua_State;
 namespace Lumix
 {
 
-namespace ffr { struct TextureHandle; }
+namespace ffr { struct TextureHandle; struct UniformHandle; }
 
 struct Draw2D;
 struct IAllocator;
+class Model;
 class Path;
 class Renderer;
 class RenderScene;
@@ -69,6 +70,7 @@ public:
 public:
 	static Pipeline* create(Renderer& renderer, PipelineResource* resource, const char* define, IAllocator& allocator);
 	static void destroy(Pipeline* pipeline);
+	static void renderModel(Model& model, const Matrix& mtx, ffr::UniformHandle mtx_uniform);
 
 	virtual ~Pipeline() {}
 
@@ -81,7 +83,6 @@ public:
 	virtual const Stats& getStats() const = 0;
 	virtual const Path& getPath() = 0;
 	virtual void callLuaFunction(const char* func) = 0;
-	virtual void renderModel(class Model& model, const Matrix& mtx) = 0;
 	virtual void setViewport(const Viewport& viewport) = 0;
 
 	virtual Draw2D& getDraw2D() = 0;
