@@ -2860,7 +2860,7 @@ void StudioApp::StaticPluginRegister::create(StudioApp& app)
 	while (i)
 	{
 		StudioApp::IPlugin* plugin = i->creator(app);
-		app.addPlugin(*plugin);
+		if (plugin) app.addPlugin(*plugin);
 		i = i->next;
 	}
 	app.initPlugins();
