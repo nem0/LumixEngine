@@ -1206,7 +1206,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			auto* job = LUMIX_NEW(allocator, TextureTileJob)(allocator);
 			job->m_in_path = in_path;
 			job->m_out_path = out_path;
-			JobSystem::run(job, &TextureTileJob::execute);
+			JobSystem::run(job, &TextureTileJob::execute, JobSystem::INVALID_HANDLE);
 			return true;
 		}
 		return false;

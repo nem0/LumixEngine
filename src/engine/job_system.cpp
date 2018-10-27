@@ -29,15 +29,15 @@ struct Job
 {
 	void (*task)(void*) = nullptr;
 	void* data = nullptr;
-	WaitableHandle dec_on_finish;
+	SignalHandle dec_on_finish;
 };
 
 
-struct Waitable {
+struct Signal {
 	volatile int value;
 	u32 generation;
 	Job next_job;
-	WaitableHandle sibling;
+	SignalHandle sibling;
 };
 
 
@@ -58,20 +58,20 @@ struct System
 		, m_workers(allocator)
 		, m_job_queue(allocator)
 		, m_ready_fibers(allocator)
-		, m_waitables_pool(allocator)
+		, m_signals_pool(allocator)
 		, m_work_signal(true)
 		, m_event_outside_job(true)
 		, m_free_queue(allocator)
 		, m_free_fibers(allocator)
 	{
-		m_waitables_pool.resize(4096);
+		m_signals_pool.resize(4096);
 		m_free_queue.resize(4096);
 		m_event_outside_job.trigger();
 		m_work_signal.reset();
 		for(int i = 0; i < 4096; ++i) {
 			m_free_queue[i] = i;
-			m_waitables_pool[i].sibling = INVALID_HANDLE;
-			m_waitables_pool[i].generation = 0;
+			m_signals_pool[i].sibling = INVALID_HANDLE;
+			m_signals_pool[i].generation = 0;
 		}
 	}
 
@@ -81,7 +81,7 @@ struct System
 	MT::Event m_work_signal;
 	Array<MT::Task*> m_workers;
 	Array<Job> m_job_queue;
-	Array<Waitable> m_waitables_pool;
+	Array<Signal> m_signals_pool;
 	FiberDecl m_fiber_pool[512];
 	Array<FiberDecl*> m_free_fibers;
 	Array<FiberDecl*> m_ready_fibers;
@@ -93,7 +93,7 @@ struct System
 static System* g_system = nullptr;
 
 
-static FiberDecl* getReadyFiber(System& system)
+static LUMIX_FORCE_INLINE FiberDecl* getReadyFiber(System& system)
 {
 	MT::SpinLock lock(system.m_sync);
 
@@ -104,7 +104,7 @@ static FiberDecl* getReadyFiber(System& system)
 }
 
 
-static Job getReadyJob(System& system)
+static LUMIX_FORCE_INLINE Job getReadyJob(System& system)
 {
 	MT::SpinLock lock(system.m_sync);
 
@@ -209,10 +209,10 @@ struct WorkerTask : MT::Task
 };
 
 
-static LUMIX_FORCE_INLINE WaitableHandle allocateWaitableInternal()
+static LUMIX_FORCE_INLINE SignalHandle allocateSignal()
 {
 	const u32 handle = g_system->m_free_queue.back();
-	Waitable& w = g_system->m_waitables_pool[handle & HANDLE_ID_MASK];
+	Signal& w = g_system->m_signals_pool[handle & HANDLE_ID_MASK];
 	w.value = 1;
 	w.sibling = INVALID_HANDLE;
 	w.next_job.task = nullptr;
@@ -224,82 +224,82 @@ static LUMIX_FORCE_INLINE WaitableHandle allocateWaitableInternal()
 }
 
 
-WaitableHandle allocateWaitable()
+SignalHandle createSignal()
 {
 	MT::SpinLock lock(g_system->m_sync);
-	return allocateWaitableInternal();
+	return allocateSignal();
 }
 
 
-void decCounter(WaitableHandle handle)
+void trigger(SignalHandle handle)
 {
 	ASSERT((handle & HANDLE_ID_MASK) < 4096);
 
 	MT::SpinLock lock(g_system->m_sync);
 	
-	Waitable& counter = g_system->m_waitables_pool[handle & HANDLE_ID_MASK];
+	Signal& counter = g_system->m_signals_pool[handle & HANDLE_ID_MASK];
 	--counter.value;
 	if (counter.value > 0) return;
 
 	bool any_new_job = false;
-	WaitableHandle iter = handle;
+	SignalHandle iter = handle;
 	while (isValid(iter)) {
-		Waitable& waitable = g_system->m_waitables_pool[iter & HANDLE_ID_MASK];
-		if(waitable.next_job.task) {
-			g_system->m_job_queue.push(waitable.next_job);
+		Signal& signal = g_system->m_signals_pool[iter & HANDLE_ID_MASK];
+		if(signal.next_job.task) {
+			g_system->m_job_queue.push(signal.next_job);
 			any_new_job = true;
 		}
 		g_system->m_free_queue.push(iter);
-		waitable.next_job.task = nullptr;
-		iter = waitable.sibling;
+		signal.next_job.task = nullptr;
+		iter = signal.sibling;
 	}
 	if (any_new_job) g_system->m_work_signal.trigger();
 }
 
 
-static bool isCounterZero(WaitableHandle handle, bool lock)
+static LUMIX_FORCE_INLINE bool isSignalZero(SignalHandle handle, bool lock)
 {
 	const u32 gen = handle & HANDLE_GENERATION_MASK;
 	const u32 id = handle & HANDLE_ID_MASK;
 	
 	if (lock) g_system->m_sync.lock();
-	Waitable& counter = g_system->m_waitables_pool[id];
+	Signal& counter = g_system->m_signals_pool[id];
 	bool is_zero = counter.generation != gen || counter.value == 0;
 	if (lock) g_system->m_sync.unlock();
 	return is_zero;
 }
 
 
-static LUMIX_FORCE_INLINE WaitableHandle runInternal(void* data
+static LUMIX_FORCE_INLINE SignalHandle runInternal(void* data
 	, void (*task)(void*)
-	, WaitableHandle precondition
+	, SignalHandle precondition
 	, bool waitable
 	, bool lock
-	, WaitableHandle dec_on_finish)
+	, SignalHandle dec_on_finish)
 {
 	Job j;
 	j.data = data;
 	j.task = task;
 
 	if (lock) g_system->m_sync.lock();
-	j.dec_on_finish = [&]() -> WaitableHandle {
+	j.dec_on_finish = [&]() -> SignalHandle {
 		if (!waitable) return INVALID_HANDLE;
 		if (isValid(dec_on_finish)) {
-			++g_system->m_waitables_pool[dec_on_finish & HANDLE_ID_MASK].value;
+			++g_system->m_signals_pool[dec_on_finish & HANDLE_ID_MASK].value;
 			return dec_on_finish;
 		}
-		return allocateWaitableInternal();
+		return allocateSignal();
 	}();
 
-	if (!isValid(precondition) || isCounterZero(precondition, false)) {
+	if (!isValid(precondition) || isSignalZero(precondition, false)) {
 		g_system->m_job_queue.push(j);
 		g_system->m_work_signal.trigger();
 	}
 	else {
-		Waitable& counter = g_system->m_waitables_pool[precondition & HANDLE_ID_MASK];
+		Signal& counter = g_system->m_signals_pool[precondition & HANDLE_ID_MASK];
 		if(counter.next_job.task) {
-			const WaitableHandle ch = allocateWaitableInternal();
-			Waitable& c = g_system->m_waitables_pool[ch & HANDLE_ID_MASK];
+			const SignalHandle ch = allocateSignal();
+			Signal& c = g_system->m_signals_pool[ch & HANDLE_ID_MASK];
 			c.next_job = j;
 			c.sibling = counter.sibling;
 			counter.sibling = ch;
@@ -314,15 +314,15 @@ static LUMIX_FORCE_INLINE WaitableHandle runInternal(void* data
 }
 
 
-void run(WaitableHandle dec_on_finish, void* data, void (*task)(void*))
+void run(SignalHandle trigger_on_finish, void* data, void (*task)(void*))
 {
-	runInternal(data, task, INVALID_HANDLE, true, true, dec_on_finish);
+	runInternal(data, task, INVALID_HANDLE, true, true, trigger_on_finish);
 }
 
 
-WaitableHandle runAfter(void* data, void (*task)(void*), WaitableHandle counter_handle)
+SignalHandle run(void* data, void (*task)(void*), SignalHandle precondition)
 {
-	return runInternal(data, task, counter_handle, true, true, INVALID_HANDLE);
+	return runInternal(data, task, precondition, true, true, INVALID_HANDLE);
 }
 
 
@@ -337,7 +337,7 @@ static void fiberProc(void* data)
 	{
 		Job job = fiber_decl->current_job;
 		job.task(job.data);
-		if (isValid(job.dec_on_finish)) decCounter(job.dec_on_finish);
+		if (isValid(job.dec_on_finish)) trigger(job.dec_on_finish);
 		fiber_decl->job_finished = true;
 
 		Fiber::switchTo(&fiber_decl->fiber, fiber_decl->worker_task->m_primary_fiber);
@@ -410,17 +410,17 @@ void shutdown()
 }
 
 
-WaitableHandle mergeWaitables(const WaitableHandle* counters, int count)
+SignalHandle mergeSignals(const SignalHandle* signals, int count)
 {
 	ASSERT(count > 0);
-	if (count == 1) return counters[0];
+	if (count == 1) return signals[0];
 
 	MT::SpinLock lock(g_system->m_sync);
-	const WaitableHandle handle = allocateWaitableInternal();
+	const SignalHandle handle = allocateSignal();
 
-	Waitable& counter = g_system->m_waitables_pool[handle & HANDLE_ID_MASK];
+	Signal& counter = g_system->m_signals_pool[handle & HANDLE_ID_MASK];
 	for (int i = 0; i < count; ++i) {
-		runInternal(nullptr, [](void*){}, counters[i], true, false, handle);
+		runInternal(nullptr, [](void*){}, signals[i], true, false, handle);
 	}
 	if(--counter.value == 0) {
 		counter.next_job.task = nullptr;
@@ -431,16 +431,10 @@ WaitableHandle mergeWaitables(const WaitableHandle* counters, int count)
 }
 
 
-WaitableHandle run(void* data, void (*task)(void*))
-{
-	return runInternal(data, task, INVALID_HANDLE, true, true, INVALID_HANDLE);
-}
-
-
-void wait(WaitableHandle handle)
+void wait(SignalHandle handle)
 {
 	g_system->m_sync.lock();
-	if (isCounterZero(handle, false)) {
+	if (isSignalZero(handle, false)) {
 		g_system->m_sync.unlock();
 		return;
 	}
@@ -469,7 +463,7 @@ void wait(WaitableHandle handle)
 		g_system->m_sync.unlock();
 
 		MT::yield();
-		while (!isCounterZero(handle, true)) {
+		while (!isSignalZero(handle, true)) {
 			g_system->m_event_outside_job.waitTimeout(1);
 		}
 	}

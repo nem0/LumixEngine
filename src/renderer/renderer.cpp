@@ -730,7 +730,7 @@ struct RendererImpl final : public Renderer
 
 	struct RenderJobSetupData {
 		RenderJob* cmd;
-		JobSystem::WaitableHandle prev;
+		JobSystem::SignalHandle prev;
 		RendererImpl* renderer;
 	};
 
@@ -742,20 +742,20 @@ struct RendererImpl final : public Renderer
 		data->prev = m_last_exec_job;
 		data->renderer = this;
 
-		JobSystem::WaitableHandle setup_counter = JobSystem::run(data, [](void* data){
+		JobSystem::SignalHandle setup_counter = JobSystem::run(data, [](void* data){
 			RenderJobSetupData* job_data = (RenderJobSetupData*)data;
 			RenderJob* cmd = job_data->cmd;
 
 			PROFILE_BLOCK("setup command");
 			cmd->setup();
-		});
+		}, JobSystem::INVALID_HANDLE);
 
-		JobSystem::WaitableHandle counters[] = {setup_counter, m_last_exec_job};
-		JobSystem::WaitableHandle preconditions = JobSystem::isValid(m_last_exec_job) 
-			? JobSystem::mergeWaitables(counters, 2)
+		JobSystem::SignalHandle counters[] = {setup_counter, m_last_exec_job};
+		JobSystem::SignalHandle preconditions = JobSystem::isValid(m_last_exec_job) 
+			? JobSystem::mergeSignals(counters, 2)
 			: setup_counter;
 
-		JobSystem::WaitableHandle exec_counter = JobSystem::runAfter(data, [](void* data){
+		JobSystem::SignalHandle exec_counter = JobSystem::run(data, [](void* data){
 			RenderJobSetupData* job_data = (RenderJobSetupData*)data;
 			RenderJob* cmd = job_data->cmd;
 			RendererImpl* renderer = job_data->renderer;
@@ -946,7 +946,7 @@ struct RendererImpl final : public Renderer
 	RenderTask m_render_task;
 	GlobalState m_global_state;
 	ffr::BufferHandle m_transient_buffer;
-	JobSystem::WaitableHandle m_last_exec_job = JobSystem::INVALID_HANDLE;
+	JobSystem::SignalHandle m_last_exec_job = JobSystem::INVALID_HANDLE;
 };
 
 
