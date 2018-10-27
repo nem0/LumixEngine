@@ -2648,7 +2648,7 @@ struct PipelineImpl final : Pipeline
 		{
 			Array<CreateSortKeys> create_sort_keys(m_allocator);
 			create_sort_keys.reserve(renderables.size());
-			JobSystem::CounterHandle counter = JobSystem::allocateCounter();
+			JobSystem::WaitableHandle counter = JobSystem::allocateWaitable();
 			const u8 local_light_layer = m_pipeline->m_renderer.getLayerIdx("local_light");
 			const u8 local_light_bucket = m_bucket_map[local_light_layer];
 			for(int i = 0; i < renderables.size(); ++i) {
@@ -2697,7 +2697,7 @@ struct PipelineImpl final : Pipeline
 			Array<CreateCommands> create_commands(m_allocator);
 			const int job_count = Math::minimum(size, 16);
 			create_commands.reserve(job_count * m_bucket_count);
-			JobSystem::CounterHandle counter = JobSystem::allocateCounter();
+			JobSystem::WaitableHandle counter = JobSystem::allocateWaitable();
 			int bucket_offset = 0;
 			for(u8 bucket = 0; bucket < m_bucket_count; ++bucket) {
 				m_command_sets[bucket]->cmds.reserve(job_count);
