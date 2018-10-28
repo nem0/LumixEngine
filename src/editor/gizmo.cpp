@@ -379,7 +379,7 @@ struct GizmoImpl final : public Gizmo
 
 		{
 			const int GRID_SIZE = 5;
-			const DataPtrs ptrs = reserve(data, mtx, true, GRID_SIZE * 4, GRID_SIZE * 4);
+			const DataPtrs ptrs = reserve(data, mtx, true, (GRID_SIZE + 1) * 4, (GRID_SIZE + 1) * 4);
 			u16* indices = ptrs.indices;
 			RenderData::Vertex* vertices = ptrs.vertices;
 
@@ -412,14 +412,15 @@ struct GizmoImpl final : public Gizmo
 	}
 
 
-	void renderArc(const Vec3& pos, const Vec3& n, const Vec3& origin, float angle, u32 color) const
+	void renderArc(RenderData* data, const Vec3& pos, const Vec3& n, const Vec3& origin, float angle, u32 color) const
 	{
-		u16 indices[51 * 3];
-		RenderInterface::Vertex vertices[52];
 		
-		int count = Math::clamp(int(fabs(angle) / 0.1f), 1, 50);
+		const int count = Math::clamp(int(fabs(angle) / 0.1f), 1, 50);
+		const DataPtrs ptrs = reserve(data, Matrix::IDENTITY, false, count + 2, count * 3);
+		u16* indices = ptrs.indices;
+		RenderData::Vertex* vertices = ptrs.vertices;
 
-		Vec3 side = crossProduct(n.normalized(), origin);
+		const Vec3 side = crossProduct(n.normalized(), origin);
 
 		vertices[0] = { pos, color };
 		for (int i = 0; i <= count; ++i)
@@ -435,9 +436,6 @@ struct GizmoImpl final : public Gizmo
 			indices[i * 3 + 1] = i+1;
 			indices[i * 3 + 2] = i + 2;
 		}
-
-		RenderInterface* ri = m_editor.getRenderInterface();
-		ri->render(Matrix::IDENTITY, indices, count * 3, vertices, count + 2, false);
 	}
 
 
@@ -502,7 +500,7 @@ struct GizmoImpl final : public Gizmo
 			RenderInterface* ri = m_editor.getRenderInterface();
 
 			const Vec3 origin = (m_start_plane_point - gizmo_tr.pos).toFloat().normalized();
-			renderArc((gizmo_tr.pos - camera_pos).toFloat(), n * scale, origin * scale, m_angle_accum, 0x8800a5ff);
+			renderArc(data, (gizmo_tr.pos - camera_pos).toFloat(), n * scale, origin * scale, m_angle_accum, 0x8800a5ff);
 			float angle_degrees = Math::radiansToDegrees(m_angle_accum);
 			
 			const Vec2 p = m_editor.getViewport().worldToScreenPixels(gizmo_tr.pos);
