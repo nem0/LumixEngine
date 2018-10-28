@@ -221,29 +221,6 @@ static void alpha_blending(lua_State* L, const char* mode)
 }
 
 
-static void depth_test(lua_State* L, bool enabled)
-{
-		// TODO
-	ASSERT(false);
-	/*
-Shader* shader = nullptr;
-	if (lua_getglobal(L, "shader") == LUA_TLIGHTUSERDATA)
-	{
-		shader = LuaWrapper::toType<Shader*>(L, -1);
-	}
-	lua_pop(L, 1);
-	if (!shader) return;
-	if (enabled)
-	{
-		shader->m_render_states |= BGFX_STATE_DEPTH_TEST_GEQUAL;
-	}
-	else
-	{
-		shader->m_render_states &= ~BGFX_STATE_DEPTH_TEST_MASK;
-	}*/
-}
-
-
 namespace LuaAPI
 {
 

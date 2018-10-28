@@ -2435,6 +2435,7 @@ struct PipelineImpl final : Pipeline
 				PROFILE_INT("num", ctx->count);
 				const Universe& universe = ctx->cmd->m_pipeline->m_scene->getUniverse();
 				ctx->output->resize(ctx->count * (sizeof(RenderableTypes) + sizeof(Mesh::RenderData*) + sizeof(Material::RenderData*) + sizeof(Vec3) + sizeof(Quat) + sizeof(Vec3) + sizeof(u16) + sizeof(float)));
+				const u64 instance_key_mask = ctx->cmd->m_bucket_sort_order[ctx->bucket] == PrepareCommandsRenderJob::SortOrder::DEPTH ? 0xffFFff : 0xffFFff00000000;
 				u8* out = ctx->output->begin();
 				const u64* LUMIX_RESTRICT renderables = ctx->renderables;
 				const u64* LUMIX_RESTRICT sort_keys = ctx->sort_keys;
@@ -2457,8 +2458,8 @@ struct PipelineImpl final : Pipeline
 							u16* instance_count = (u16*)out;
 							int start_i = i;
 							out += sizeof(*instance_count);
-							const u64 key = sort_keys[i];
-							while (i < c && sort_keys[i] == key) {
+							const u64 key = sort_keys[i] & instance_key_mask;
+							while (i < c && (sort_keys[i] & instance_key_mask) == key) {
 								const EntityRef e = {int(renderables[i] & 0x00ffFFff)};
 								const Transform& tr = entity_data[e.index].transform;
 								const Vec3 lpos = (tr.pos - camera_pos).toFloat();
@@ -2560,6 +2561,7 @@ struct PipelineImpl final : Pipeline
 			u64* sort_keys;
 			Array<u8>* output;
 			int idx;
+			u8 bucket;
 			DVec3 camera_pos;
 			int count;
 			PrepareCommandsRenderJob* cmd;
@@ -2638,6 +2640,7 @@ struct PipelineImpl final : Pipeline
 					ctx.cmd = this;
 					ctx.camera_pos = m_camera_params.pos;
 					ctx.output = &m_command_sets[bucket]->cmds.emplace(m_allocator);
+					ctx.bucket = bucket;
 					job_offset += step;
 					JobSystem::run(counter, &ctx, &CreateCommands::execute);
 				}
