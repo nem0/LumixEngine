@@ -77,7 +77,7 @@ function lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap, local
 		u_gbuffer2 = gbuffer2,
 		u_gbuffer_depth = gbuffer_depth,
 		u_shadowmap = shadowmap
-	})
+	}, {}, {}, { depth_test = false })
 	local view_params = getCameraParams()
 	bindTextures({
 		u_gbuffer0 = gbuffer0,
@@ -102,7 +102,9 @@ function debugRenderbuffer(rb, output)
 	
 	drawArray(0, 4, textured_quad_shader
 		, { u_texture = rb }
-		, { u_offset_scale = { 0.5, 0.5, 0.5, 0.5 } });
+		, { u_offset_scale = { 0.5, 0.5, 0.5, 0.5 } }
+		, {}
+		, { depth_test = false });
 end
 
 function shadowPass()
@@ -138,6 +140,9 @@ function tonemap(hdr_buffer)
 	setRenderTargets(rb)
 	drawArray(0, 4, tonemap_shader
 		, { u_hdrbuffer = hdr_buffer }
+		, {}
+		, {}
+		, { depth_test = false }
 	)
 	endBlock()
 	return rb
@@ -159,6 +164,9 @@ function renderSelectionOutline(output)
 	setRenderTargets(output)
 	drawArray(0, 4, selection_outline_shader
 		, { u_mask = selection_mask }
+		, {}
+		, {}
+		, { depth_test = false }
 	)
 	
 end

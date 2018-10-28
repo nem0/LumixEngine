@@ -40,7 +40,9 @@ enum class StateFlags : u64 {
 	CULL_FRONT = 1 << 2,
 	CULL_BACK = 1 << 3,
 	SCISSOR_TEST = 1 << 4,
-	DEPTH_WRITE = 1 << 5
+	DEPTH_WRITE = 1 << 5,
+	/* 16 bits reserved for blending*/
+	/* 40 bits reserver for stencil*/ 
 };
 
 
@@ -66,16 +68,36 @@ enum class ClearFlags : uint {
 };
 
 
-enum class StencilFuncs : uint {
-	DISABLE = 1 << 0,
-	ALWAYS = 1 << 1,
-	EQUAL = 1 << 2,
-	NOT_EQUAL = 1 << 3,
+enum class StencilFuncs : u8 {
+	DISABLE,
+	ALWAYS,
+	EQUAL,
+	NOT_EQUAL,
 };
 
-enum class StencilOps : uint {
-	KEEP = 1 << 0,
-	REPLACE = 1 << 1
+enum class StencilOps : u8 {
+	KEEP,
+	ZERO,
+	REPLACE,
+	INCR,
+	INCR_WRAP,
+	DECR,
+	DECR_WRAP,
+	INVERT
+};
+
+
+enum class BlendFactors : u8 {
+	ZERO,
+	ONE,
+	SRC_COLOR,
+	ONE_MINUS_SRC_COLOR,
+	SRC_ALPHA,
+	ONE_MINUS_SRC_ALPHA,
+	DST_COLOR,
+	ONE_MINUS_DST_COLOR,
+	DST_ALPHA,
+	ONE_MINUS_DST_ALPHA,
 };
 
 
@@ -173,8 +195,16 @@ void clear(uint flags, const float* color, float depth);
 
 void scissor(uint x, uint y, uint w, uint h);
 void viewport(uint x, uint y, uint w, uint h);
-void blending(int mode);
-void setStencil(uint write_mask, StencilFuncs func, int ref, uint mask, StencilOps sfail, StencilOps dpfail, StencilOps dppass);
+
+inline u64 getBlendStateBits(BlendFactors src_rgb, BlendFactors dst_rgb, BlendFactors src_a, BlendFactors dst_a)
+{
+	return (((u64)src_rgb & 15) << 6) | (((u64)dst_rgb & 15) << 10) | (((u64)src_a & 15) << 14) | (((u64)dst_a & 15) << 18);
+}
+
+inline u64 getStencilStateBits(u8 write_mask, StencilFuncs func, u8 ref, u8 mask, StencilOps sfail, StencilOps dpfail, StencilOps dppass)
+{
+	return ((u64)write_mask << 22) | ((u64)func << 30) | ((u64)ref << 34) | ((u64)mask << 42) | ((u64)sfail << 50) | ((u64)dpfail << 54) | ((u64)dppass << 58);
+}
 
 TextureHandle allocTextureHandle();
 BufferHandle allocBufferHandle();

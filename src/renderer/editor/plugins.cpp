@@ -2379,7 +2379,9 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 			const ImDrawCmd* pcmd_begin = cmd_list.commands.begin();
 			const ImDrawCmd* pcmd_end = cmd_list.commands.end();
 			ffr::useProgram(plugin->m_program);
-			ffr::setState((u64)ffr::StateFlags::SCISSOR_TEST);
+			// TODO enable only when dc.textures[0].value != m_scene_view.getTextureHandle().value);
+			const u64 blend_state = ffr::getBlendStateBits(ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA, ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA);
+			ffr::setState((u64)ffr::StateFlags::SCISSOR_TEST | blend_state);
 			for (const ImDrawCmd* pcmd = pcmd_begin; pcmd != pcmd_end; pcmd++)
 			{
 				ASSERT(!pcmd->UserCallback);
@@ -2406,8 +2408,6 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 					height - uint(Math::maximum(pcmd->ClipRect.y, 0.0f)) - h,
 					uint(Math::minimum(pcmd->ClipRect.z, 65535.0f) - Math::maximum(pcmd->ClipRect.x, 0.0f)),
 					uint(Math::minimum(pcmd->ClipRect.w, 65535.0f) - Math::maximum(pcmd->ClipRect.y, 0.0f)));
-				// TODO
-				ffr::blending(1); //dc.textures[0].value != m_scene_view.getTextureHandle().value);
 
 				ffr::drawElements(first_index, pcmd->ElemCount, ffr::PrimitiveType::TRIANGLES, ffr::DataType::UINT32);
 		
