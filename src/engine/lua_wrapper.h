@@ -688,6 +688,18 @@ inline void getOptionalField(lua_State* L, int idx, const char* field_name, T* o
 }
 
 
+template <typename T>
+inline void getOptionalFlagField(lua_State* L, int idx, const char* field_name, T* out, T flag, bool default_value)
+{
+	bool value = default_value;
+	if (LuaWrapper::getField(L, idx, field_name) != LUA_TNIL && isType<bool>(L, -1)) {
+		value = toType<bool>(L, -1);
+	}
+	lua_pop(L, 1);
+	if (value) *out |= flag;
+	else *out &= ~flag;
+}
+
 inline bool getOptionalStringField(lua_State* L, int idx, const char* field_name, char* out, int max_size)
 {
 	bool ret = false;

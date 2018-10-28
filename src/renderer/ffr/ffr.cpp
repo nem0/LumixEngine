@@ -127,6 +127,7 @@ static struct {
 	int instance_attributes = 0;
 	int max_vertex_attributes = 16;
 	ProgramHandle last_program = INVALID_PROGRAM;
+	u64 last_state = 0;
 } g_ffr;
 
 
@@ -824,55 +825,6 @@ void viewport(uint x,uint y,uint w,uint h)
 }
 
 
-void setStencil(uint write_mask, StencilFuncs func, int ref, uint mask, StencilOps sfail, StencilOps zfail, StencilOps zpass)
-{
-	glStencilMask(write_mask);
-	if (func == StencilFuncs::DISABLE) {
-		glDisable(GL_STENCIL_TEST);
-	}
-	else {
-		glEnable(GL_STENCIL_TEST);
-		GLenum gl_func;
-		switch(func) {
-			case StencilFuncs::ALWAYS: gl_func = GL_ALWAYS; break;
-			case StencilFuncs::EQUAL: gl_func = GL_EQUAL; break;
-			case StencilFuncs::NOT_EQUAL: gl_func = GL_NOTEQUAL; break;
-			default: ASSERT(false); break;
-		}
-		glStencilFunc(gl_func, ref, mask);
-		auto toGLOp = [](StencilOps op) {
-			switch(op) {
-				case StencilOps::KEEP: return GL_KEEP;
-				case StencilOps::REPLACE: return GL_REPLACE;
-				default: ASSERT(false); return GL_REPLACE;
-			}
-		};
-		glStencilOp(toGLOp(sfail), toGLOp(zfail), toGLOp(zpass));
-	}
-}
-
-
-void blending(int mode)
-{
-	checkThread();
-	if (mode) {
-		glEnable(GL_BLEND);
-	}
-	else {
-		glDisable(GL_BLEND);
-	}
-	switch(mode) {
-		case 2:
-			glBlendFuncSeparate(GL_ONE_MINUS_DST_ALPHA, GL_ONE, GL_SRC_ALPHA, GL_DST_ALPHA);
-			//glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-			break;
-		default:
-			glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-			break;
-	}
-}
-
-
 void scissor(uint x,uint y,uint w,uint h)
 {
 	checkThread();
@@ -1047,6 +999,10 @@ void setVertexBuffer(const VertexDecl* decl, BufferHandle vertex_buffer, uint bu
 void setState(u64 state)
 {
 	checkThread();
+	
+	if(state == g_ffr.last_state) return;
+	g_ffr.last_state = state;
+
 	if (state & u64(StateFlags::DEPTH_TEST)) CHECK_GL(glEnable(GL_DEPTH_TEST));
 	else CHECK_GL(glDisable(GL_DEPTH_TEST));
 	
@@ -1069,7 +1025,72 @@ void setState(u64 state)
 	}
 
 	CHECK_GL(glPolygonMode(GL_FRONT_AND_BACK, state & u64(StateFlags::WIREFRAME) ? GL_LINE : GL_FILL));
+
+	auto to_gl = [&](BlendFactors factor) -> GLenum{
+		static const GLenum table[] = {
+			GL_ZERO,
+			GL_ONE,
+			GL_SRC_COLOR,
+			GL_ONE_MINUS_SRC_COLOR,
+			GL_SRC_ALPHA,
+			GL_ONE_MINUS_SRC_ALPHA,
+			GL_DST_COLOR,
+			GL_ONE_MINUS_DST_COLOR,
+			GL_DST_ALPHA,
+			GL_ONE_MINUS_DST_ALPHA
+		};
+		return table[(int)factor];
+	};
+
+	u16 blend_bits = u16(state >> 6);
+
+	if (blend_bits) {
+		const BlendFactors src_rgb = (BlendFactors)(blend_bits & 0xf);
+		const BlendFactors dst_rgb = (BlendFactors)((blend_bits >> 4) & 0xf);
+		const BlendFactors src_a = (BlendFactors)((blend_bits >> 8) & 0xf);
+		const BlendFactors dst_a = (BlendFactors)((blend_bits >> 12) & 0xf);
+		glEnable(GL_BLEND);
+		glBlendFuncSeparate(to_gl(src_rgb), to_gl(dst_rgb), to_gl(src_a), to_gl(dst_a));
+	}
+	else {
+		glDisable(GL_BLEND);
+	}
 	
+	glStencilMask(u8(state >> 22));
+	const StencilFuncs func = (StencilFuncs)((state >> 30) & 0xf);
+	if (func == StencilFuncs::DISABLE) {
+		glDisable(GL_STENCIL_TEST);
+	}
+	else {
+		const u8 ref = u8(state >> 34);
+		const u8 mask = u8(state >> 42);
+		glEnable(GL_STENCIL_TEST);
+		GLenum gl_func;
+		switch(func) {
+			case StencilFuncs::ALWAYS: gl_func = GL_ALWAYS; break;
+			case StencilFuncs::EQUAL: gl_func = GL_EQUAL; break;
+			case StencilFuncs::NOT_EQUAL: gl_func = GL_NOTEQUAL; break;
+			default: ASSERT(false); break;
+		}
+		glStencilFunc(gl_func, ref, mask);
+		auto toGLOp = [](StencilOps op) {
+			const GLenum table[] = {
+				GL_KEEP,
+				GL_ZERO,
+				GL_REPLACE,
+				GL_INCR,
+				GL_INCR_WRAP,
+				GL_DECR,
+				GL_DECR_WRAP,
+				GL_INVERT
+			};
+			return table[(int)op];
+		};
+		const StencilOps sfail = StencilOps((state >> 50) & 0xf);
+		const StencilOps zfail = StencilOps((state >> 54) & 0xf);
+		const StencilOps zpass = StencilOps((state >> 58) & 0xf);
+		glStencilOp(toGLOp(sfail), toGLOp(zfail), toGLOp(zpass));
+	}
 }
 
 
@@ -1610,6 +1631,7 @@ void clear(uint flags, const float* color, float depth)
 {
 	CHECK_GL(glDisable(GL_SCISSOR_TEST));
 	CHECK_GL(glDisable(GL_BLEND));
+	g_ffr.last_state &= ~u64(0xffFF << 6);
 	checkThread();
 	GLbitfield gl_flags = 0;
 	if (flags & (uint)ClearFlags::COLOR) {
@@ -1622,6 +1644,9 @@ void clear(uint flags, const float* color, float depth)
 		gl_flags |= GL_DEPTH_BUFFER_BIT;
 	}
 	if (flags & (uint)ClearFlags::STENCIL) {
+		glStencilMask(0xff);
+		g_ffr.last_state = g_ffr.last_state | (0xff << 22);
+		glClearStencil(0);
 		gl_flags |= GL_STENCIL_BUFFER_BIT;
 	}
 	CHECK_GL(glUseProgram(0));
@@ -1875,6 +1900,9 @@ bool init(void* window_handle)
 	CHECK_GL(glGenTextures(_countof(g_ffr.tex_buffers), g_ffr.tex_buffers));
 
 	CHECK_GL(glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS));
+
+	g_ffr.last_state = 1;
+	setState(0);
 
 	return true;
 }

@@ -326,7 +326,7 @@ void SceneView::renderGizmos()
 
 			renderer->beginProfileBlock("gizmos");
 			ffr::pushDebugGroup("gizmos");
-			ffr::blending(0);
+			ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE));
 			for(Gizmo::RenderData::Cmd& cmd : data.cmds) {
 				Renderer::TransientSlice ib = renderer->allocTransient(cmd.indices_count * sizeof(u16));
 				Renderer::TransientSlice vb = renderer->allocTransient(cmd.vertices_count * sizeof(Gizmo::RenderData::Vertex));
@@ -341,7 +341,6 @@ void SceneView::renderGizmos()
 				ffr::useProgram(prg);
 				ffr::setVertexBuffer(&vertex_decl, vb.buffer, vb.offset, nullptr);
 				ffr::setIndexBuffer(ib.buffer);
-				ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE));
 				const ffr::PrimitiveType primitive_type = cmd.lines ? ffr::PrimitiveType::LINES : ffr::PrimitiveType::TRIANGLES;
 				ffr::drawElements(ib.offset / sizeof(indices[0]), cmd.indices_count, primitive_type, ffr::DataType::UINT16);
 			}

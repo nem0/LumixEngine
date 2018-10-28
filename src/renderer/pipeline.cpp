@@ -689,7 +689,8 @@ struct PipelineImpl final : Pipeline
 				u32 elem_offset = 0;
 				const Draw2D::DrawCmd* pcmd_begin = cmd_buffer.begin();
 				const Draw2D::DrawCmd* pcmd_end = cmd_buffer.end();
-				ffr::setState(0);
+				const u64 blend_state = ffr::getBlendStateBits(ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA, ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA);
+				ffr::setState(blend_state);
 				ffr::setUniform1i(pipeline->m_texture_uniform, 0);
 				ffr::useProgram(prg);
 
@@ -709,7 +710,6 @@ struct PipelineImpl final : Pipeline
 
 					ffr::bindTexture(0, texture_id);
 
-					ffr::blending(1);
 					ffr::drawTriangles(num_indices);
 
 					elem_offset += pcmd->ElemCount;
@@ -919,7 +919,8 @@ struct PipelineImpl final : Pipeline
 				InputBlob blob(m_data);
 				ffr::VertexDecl instance_decl;
 				instance_decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false);
-
+				const u64 blend_state = ffr::getBlendStateBits(ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA, ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA);
+				ffr::setState(blend_state);
 				while(blob.getPosition() < blob.getSize()) {
 					ShaderRenderData* shader_data = blob.read<ShaderRenderData*>();
 					const int byte_size = blob.read<int>();
@@ -934,7 +935,6 @@ struct PipelineImpl final : Pipeline
 					ffr::update(transient.buffer, mem, transient.offset, byte_size);
 
 					const Shader::Program& prog = Shader::getProgram(shader_data, 0);
-					ffr::blending(0);
 					ffr::useProgram(prog.handle);
 					ffr::setInstanceBuffer(instance_decl, transient.buffer, transient.offset, 0, nullptr);
 					ffr::drawTriangleStripArraysInstanced(0, 4, instances_count);
@@ -1120,8 +1120,8 @@ struct PipelineImpl final : Pipeline
 				ffr::setVertexBuffer(&decl, m_vb, 0, nullptr);
 				ffr::setIndexBuffer(m_ib);
 				ffr::useProgram(prog.handle);
-				ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::CULL_BACK));
-				ffr::blending(2);
+				const u64 blend_state = ffr::getBlendStateBits(ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA, ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA);
+				ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::CULL_BACK) | blend_state);
 				const int irradiance_map_loc = ffr::getUniformLocation(prog.handle, m_irradiance_map_uniform);
 				const int radiance_map_loc = ffr::getUniformLocation(prog.handle, m_radiance_map_uniform);
 				const DVec3 cam_pos = m_camera_params.pos;
@@ -1134,7 +1134,6 @@ struct PipelineImpl final : Pipeline
 					ffr::applyUniform4f(pos_radius_uniform_loc, &pos_radius.x);
 					ffr::drawTriangles(36);
 				}
-				ffr::blending(0);
 				ffr::popDebugGroup();
 			}
 
@@ -1248,15 +1247,7 @@ struct PipelineImpl final : Pipeline
 				ffr::ProgramHandle prg = Shader::getProgram(m_render_data, m_define_mask).handle;
 				if(!prg.isValid()) return;
 
-				ffr::blending(m_render_state.blending);
-				ffr::setStencil(m_render_state.stencil_write_mask
-					, m_render_state.stencil_func
-					, m_render_state.stencil_ref
-					, m_render_state.stencil_mask
-					, m_render_state.stencil_sfail
-					, m_render_state.stencil_zfail
-					, m_render_state.stencil_zpass
-				);
+				ffr::setState(m_render_state);
 
 				for(int i = 0; i < m_textures_count; ++i) {
 					ffr::bindTexture(i, m_textures[i].handle);
@@ -1269,7 +1260,6 @@ struct PipelineImpl final : Pipeline
 
 				ffr::setVertexBuffer(nullptr, ffr::INVALID_BUFFER, 0, nullptr);
 				ffr::useProgram(prg);
-				ffr::setState(m_render_state.depth_write ? (u64)ffr::StateFlags::DEPTH_WRITE : 0);
 				ffr::setIndexBuffer(ffr::INVALID_BUFFER);
 				ffr::drawArrays(m_indices_offset, m_indices_count, ffr::PrimitiveType::TRIANGLE_STRIP);
 			}
@@ -1288,7 +1278,7 @@ struct PipelineImpl final : Pipeline
 			int m_indices_count;
 			int m_indices_offset;
 			u32 m_define_mask = 0;
-			RenderState m_render_state;
+			u64 m_render_state;
 			ShaderRenderData* m_render_data = nullptr;
 
 		};
@@ -1307,12 +1297,12 @@ struct PipelineImpl final : Pipeline
 		if(lua_gettop(L) > 4) {
 			LuaWrapper::checkTableArg(L, 5);
 		}
-		const RenderState rs = [&](){
+		const u64 rs = [&](){
 			if(lua_gettop(L) > 6) {
 				LuaWrapper::checkTableArg(L, 7);
 				return getState(L, 7);
 			}
-			return RenderState();
+			return (u64)ffr::StateFlags::DEPTH_WRITE | (u64)ffr::StateFlags::DEPTH_TEST;
 		}();
 
 		Shader* shader = nullptr;
@@ -1542,8 +1532,8 @@ struct PipelineImpl final : Pipeline
 				ffr::setUniform1i(m_texture_uniform, 0);
 				ffr::useProgram(p.handle);
 				ffr::VertexDecl decl;
-				ffr::blending(1);
-				ffr::setState((u64)ffr::StateFlags::DEPTH_WRITE | (u64)ffr::StateFlags::DEPTH_TEST);
+				const u64 blend_state = ffr::getBlendStateBits(ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA, ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA);
+				ffr::setState((u64)ffr::StateFlags::DEPTH_WRITE | (u64)ffr::StateFlags::DEPTH_TEST | blend_state);
 				ffr::bindTexture(0, m_atlas);
 				decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false);
 				decl.addAttribute(4, ffr::AttributeType::U8, true, false);
@@ -1610,7 +1600,6 @@ struct PipelineImpl final : Pipeline
 
 								const Shader::Program& prog = Shader::getProgram(m_shader, m_define_mask);
 								if (prog.handle.isValid()) {
-									ffr::blending(0);
 									ffr::useProgram(prog.handle);
 									ffr::setState((u64)ffr::StateFlags::DEPTH_TEST);
 									ffr::setIndexBuffer(m_pipeline->m_cube_ib);
@@ -1653,13 +1642,11 @@ struct PipelineImpl final : Pipeline
 		job->m_cmd_set = cmd_set;
 		job->m_shader = shader;
 		m_renderer.push(job);
-
 	}
-	
 
-	struct RenderState {
-		int blending = 0;
-		bool depth_write = true;
+
+	static u64 getState(lua_State* L, int idx)
+	{
 		ffr::StencilFuncs stencil_func = ffr::StencilFuncs::DISABLE;
 		u8 stencil_write_mask = 0xff;
 		u8 stencil_ref = 0;
@@ -1667,24 +1654,25 @@ struct PipelineImpl final : Pipeline
 		ffr::StencilOps stencil_sfail = ffr::StencilOps::KEEP;
 		ffr::StencilOps stencil_zfail = ffr::StencilOps::KEEP;
 		ffr::StencilOps stencil_zpass = ffr::StencilOps::KEEP;
-	};
 
-
-	static RenderState getState(lua_State* L, int idx)
-	{
-		RenderState rs;
+		u64 rs = (u64)ffr::StateFlags::DEPTH_TEST | (u64)ffr::StateFlags::DEPTH_WRITE;
 		char tmp[64];
 		if (LuaWrapper::getOptionalStringField(L, idx, "blending", tmp, lengthOf(tmp))) {
-			rs.blending = tmp[0] ? 1 : 0;
+			rs = tmp[0] ? ffr::getBlendStateBits(ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA, ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA) : 0;
 		}
-		LuaWrapper::getOptionalField(L, idx, "depth_write", &rs.depth_write);
-		LuaWrapper::getOptionalField(L, idx, "stencil_func", reinterpret_cast<uint*>(&rs.stencil_func));
-		LuaWrapper::getOptionalField(L, idx, "stencil_write_mask", &rs.stencil_write_mask);
-		LuaWrapper::getOptionalField(L, idx, "stencil_ref", &rs.stencil_ref);
-		LuaWrapper::getOptionalField(L, idx, "stencil_mask", &rs.stencil_mask);
-		LuaWrapper::getOptionalField(L, idx, "stencil_sfail", reinterpret_cast<uint*>(&rs.stencil_sfail));
-		LuaWrapper::getOptionalField(L, idx, "stencil_zfail", reinterpret_cast<uint*>(&rs.stencil_zfail));
-		LuaWrapper::getOptionalField(L, idx, "stencil_zpass", reinterpret_cast<uint*>(&rs.stencil_zpass));
+
+		LuaWrapper::getOptionalFlagField(L, idx, "depth_test", &rs, (u64)ffr::StateFlags::DEPTH_TEST, true);
+		LuaWrapper::getOptionalFlagField(L, idx, "depth_write", &rs, (u64)ffr::StateFlags::DEPTH_WRITE, true);
+		LuaWrapper::getOptionalField(L, idx, "stencil_func", reinterpret_cast<u8*>(&stencil_func));
+		LuaWrapper::getOptionalField(L, idx, "stencil_write_mask", &stencil_write_mask);
+		LuaWrapper::getOptionalField(L, idx, "stencil_ref", &stencil_ref);
+		LuaWrapper::getOptionalField(L, idx, "stencil_mask", &stencil_mask);
+		LuaWrapper::getOptionalField(L, idx, "stencil_sfail", reinterpret_cast<u8*>(&stencil_sfail));
+		LuaWrapper::getOptionalField(L, idx, "stencil_zfail", reinterpret_cast<u8*>(&stencil_zfail));
+		LuaWrapper::getOptionalField(L, idx, "stencil_zpass", reinterpret_cast<u8*>(&stencil_zpass));
+
+		rs |= ffr::getStencilStateBits(stencil_write_mask, stencil_func, stencil_ref, stencil_mask, stencil_sfail, stencil_zfail, stencil_zpass);
+
 		return rs;
 	}
 
@@ -1724,19 +1712,7 @@ struct PipelineImpl final : Pipeline
 			
 				const u32 instanced_mask = m_define_mask | (1 << m_pipeline->m_renderer.getShaderDefineIdx("INSTANCED"));
 				const u32 skinned_mask = m_define_mask | (1 << m_pipeline->m_renderer.getShaderDefineIdx("SKINNED"));
-				const u64 render_states = [&](){ 
-					if (m_state.depth_write) return u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE);
-					return u64(ffr::StateFlags::DEPTH_TEST);
-				}();
-
-				ffr::blending(m_state.blending);
-				ffr::setStencil(m_state.stencil_write_mask
-					, m_state.stencil_func
-					, m_state.stencil_ref
-					, m_state.stencil_mask
-					, m_state.stencil_sfail
-					, m_state.stencil_zfail
-					, m_state.stencil_zpass);
+				const u64 render_states = m_render_state;
 
 				for (const Array<u8>& cmds : m_cmd_set->cmds) {
 					const u8* cmd = cmds.begin();
@@ -1853,7 +1829,6 @@ struct PipelineImpl final : Pipeline
 
 								const Shader::Program& prog = Shader::getProgram(shader, m_define_mask);
 								if (prog.handle.isValid()) {
-									ffr::blending(0);
 									ffr::useProgram(prog.handle);
 									ffr::setState(material->render_states | render_states);
 									ffr::setIndexBuffer(m_pipeline->m_cube_ib);
@@ -1876,7 +1851,7 @@ struct PipelineImpl final : Pipeline
 			}
 
 			u32 m_define_mask = 0;
-			RenderState m_state;
+			u64 m_render_state;
 			PipelineImpl* m_pipeline;
 			CommandSet* m_cmd_set;
 		};
@@ -1897,7 +1872,7 @@ struct PipelineImpl final : Pipeline
 			job->m_define_mask = tmp[0] ? 1 << pipeline->m_renderer.getShaderDefineIdx(tmp) : 0;
 		}
 
-		job->m_state = getState(L, 2);
+		job->m_render_state = getState(L, 2);
 		job->m_pipeline = pipeline;
 		job->m_cmd_set = cmd_set;
 		pipeline->m_renderer.push(job);
@@ -2168,15 +2143,7 @@ struct PipelineImpl final : Pipeline
 			const u32 deferred_define_mask = 1 << m_pipeline->m_renderer.getShaderDefineIdx("DEFERRED");
 			const u8 edge_define_idx = m_pipeline->m_renderer.getShaderDefineIdx("EDGE");
 			
-			ffr::blending(m_render_state.blending);
-			ffr::setStencil(m_render_state.stencil_write_mask
-				, m_render_state.stencil_func
-				, m_render_state.stencil_ref
-				, m_render_state.stencil_mask
-				, m_render_state.stencil_sfail
-				, m_render_state.stencil_zfail
-				, m_render_state.stencil_zpass
-			);
+			const u64 state = m_render_state;
 
 			for (Instance& inst : m_instances) {
 				auto& p = Shader::getProgram(inst.shader, deferred_define_mask);
@@ -2190,17 +2157,11 @@ struct PipelineImpl final : Pipeline
 
 				ffr::setUniform3f(m_pipeline->m_position_uniform, &pos.x);
 				ffr::setUniform3f(m_pipeline->m_rel_camera_pos_uniform, &lpos.x);
-				ffr::blending(0);
 
 				ffr::bindTexture(1, inst.textures);
 				ffr::bindTexture(0, inst.heightmap);
 				ffr::setUniform1i(ffr::allocUniform("u_satellite", ffr::UniformType::INT, 1), 1);
 				ffr::setUniform1i(ffr::allocUniform("u_hm", ffr::UniformType::INT, 1), 0);
-
-				const u64 state = [&](){
-					if (m_render_state.depth_write) return (u64)ffr::StateFlags::DEPTH_TEST | (u64)ffr::StateFlags::DEPTH_WRITE;
-					return (u64)ffr::StateFlags::DEPTH_TEST;
-				}();
 
 				ffr::useProgram(p.handle);
 				ffr::setState(state);
@@ -2235,7 +2196,7 @@ struct PipelineImpl final : Pipeline
 		CameraParams m_camera_params;
 		StaticString<32> m_shader_define;
 		u32 m_define_mask;
-		RenderState m_render_state;
+		u64 m_render_state;
 		Array<Instance> m_instances;
 		struct {
 			ffr::TextureHandle texture;

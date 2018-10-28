@@ -14,7 +14,8 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 		stencil_sfail = env.STENCIL_KEEP,
 		stencil_zfail = env.STENCIL_KEEP,
 		stencil_zpass = env.STENCIL_REPLACE,
-		depth_write = false
+		depth_write = false,
+		depth_test = false
 	}
 	env.drawArray(0, 4, env.procedural_sky_shader, {}, {}, {}, state)
 	env.endBlock()
