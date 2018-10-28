@@ -50,7 +50,7 @@ function geomPass(default_set, decal_set)
 	setRenderTargets(gbuffer0, gbuffer1, gbuffer2, dsbuffer)
 	clear(CLEAR_ALL, 0, 0, 0, 1, 0)
 	local view_params = getCameraParams()
-	renderTerrains("DEFERRED", view_params, {}, default_state)
+	renderTerrains(view_params, {}, default_state)
 	renderBucket(default_set, default_state)
 	endBlock()
 
