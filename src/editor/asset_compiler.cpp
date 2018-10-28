@@ -157,16 +157,11 @@ struct AssetCompilerImpl : AssetCompiler
 	}
 
 
-	void addResource(const char* path, const char* filename)
+	void addResource(const char* fullpath)
 	{
 		char ext[10];
-		PathUtils::getExtension(ext, sizeof(ext), filename);
+		PathUtils::getExtension(ext, sizeof(ext), fullpath);
 		makeLowercase(ext, lengthOf(ext), ext);
-
-		char fullpath[MAX_PATH_LENGTH];
-		copyString(fullpath, path);
-		catString(fullpath, "/");
-		catString(fullpath, filename);
 	
 		auto iter = m_plugins.find(crc32(ext));
 		if (!iter.isValid()) return;
@@ -193,7 +188,12 @@ struct AssetCompilerImpl : AssetCompiler
 			}
 			else
 			{
-				addResource(dir + base_length, info.filename);
+				char fullpath[MAX_PATH_LENGTH];
+				copyString(fullpath, dir + base_length);
+				catString(fullpath, "/");
+				catString(fullpath, info.filename);
+
+				addResource(fullpath);
 			}
 		}
 
@@ -394,10 +394,12 @@ struct AssetCompilerImpl : AssetCompiler
 			if(e.resource) {
 				m_load_hook.continueLoad(*e.resource);
 				m_on_resource_changed.invoke(e.resource->getPath());
+				addResource(e.resource->getPath().c_str());
 			}
 			else if (e.path.isValid()) {
 				m_app.getWorldEditor().getEngine().getResourceManager().reload(e.path);
 				m_on_resource_changed.invoke(e.path);
+				addResource(e.path.c_str());
 			}
 			else {
 				break;
