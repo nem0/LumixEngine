@@ -1730,7 +1730,9 @@ public:
 			auto iter = m_decals.find(entity);
 			updateDecalInfo(iter.value());
 			const DVec3 position = m_universe.getPosition(entity);
-			m_culling_system->setPosition(entity, position);
+			if (m_culling_system->isAdded(entity)) {
+				m_culling_system->setPosition(entity, position);
+			}
 		}
 
 		bool was_updating = m_is_updating_attachments;
