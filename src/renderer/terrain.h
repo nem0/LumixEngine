@@ -95,7 +95,6 @@ class Terrain
 		Texture* getHeightmap() const { return m_heightmap; }
 		i64 getLayerMask() const { return m_layer_mask; }
 		EntityRef getEntity() const { return m_entity; }
-		float getRootSize() const;
 		Vec3 getNormal(float x, float z);
 		float getHeight(float x, float z) const;
 		float getXZScale() const { return m_scale.x; }
@@ -134,10 +133,8 @@ class Terrain
 
 	private: 
 		Array<Terrain::GrassQuad*>& getQuads(EntityRef camera);
-		TerrainQuad* generateQuadTree(float size);
 		void updateGrass(EntityRef camera);
 		void generateGrassTypeQuad(GrassPatch& patch, const RigidTransform& terrain_tr, const Vec2& quad_pos_hm_space);
-		void generateGeometry();
 		void onMaterialLoaded(Resource::State, Resource::State new_state, Resource&);
 		void grassLoaded(Resource::State, Resource::State, Resource&);
 
