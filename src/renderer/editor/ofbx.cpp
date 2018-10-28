@@ -2530,9 +2530,7 @@ static bool parseObjects(const Element& root, Scene* scene)
 				}
 				else if (class_prop->getValue() == "LimbNode")
 					obj = parseLimbNode(*scene, *iter.second.element);
-				else if (class_prop->getValue() == "Null")
-					obj = parse<NullImpl>(*scene, *iter.second.element);
-				else if (class_prop->getValue() == "Root")
+				else
 					obj = parse<NullImpl>(*scene, *iter.second.element);
 			}
 		}
