@@ -1,5 +1,23 @@
 include "pipelines/common.glsl"
 
+texture_slot {
+	name = "Heightmap",
+	uniform = "u_hm",
+	default_texture = "textures/common/white.tga"
+}
+
+texture_slot {
+	name = "Albedo",
+	uniform = "u_albedo",
+	default_texture = "textures/common/white.tga"
+}
+
+texture_slot {
+	name = "Splatmap",
+	uniform = "u_splatmap",
+	default_texture = "textures/common/white.tga"
+}
+
 vertex_shader [[
 	#ifdef EDGE
 		out int vertex_id;
@@ -50,7 +68,7 @@ geometry_shader [[
 	out vec2 v_uv_sub;
 	uniform vec3 u_position;
 	uniform int u_lod;
-	uniform sampler2D u_hm;
+	layout(binding = 0) uniform sampler2D u_hm;
 	uniform vec3 u_rel_camera_pos;
 
 	const float hscale = 64;
@@ -209,15 +227,14 @@ fragment_shader [[
 
 	in vec2 v_uv;
 	in vec2 v_uv_sub;
-	uniform sampler2D u_hm;
-	uniform sampler2DArray u_satellite;
+	layout(binding = 0) uniform sampler2D u_hm;
+	layout(binding = 1) uniform sampler2DArray u_slices;
 	uniform int u_lod;
 	
 	void getData()
 	{
 		data.normal = vec3(0, 1, 0);
-		data.albedo = pow(texture(u_satellite, vec3(v_uv_sub, u_lod)), vec4(2.2));
-		//data.albedo = vec4(v_uv_sub, 0, 1);
+		data.albedo = pow(texture(u_slices, vec3(v_uv_sub, u_lod)), vec4(2.2));
 		#ifdef ALPHA_CUTOUT
 			if(data.albedo.a < 0.5) discard;
 		#endif
