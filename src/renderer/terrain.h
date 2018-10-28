@@ -90,7 +90,7 @@ class Terrain
 		~Terrain();
 
 		Material* getMaterial() const { return m_material; }
-		Texture* getDetailTexture() const { return m_detail_texture; }
+		Texture* getAlbedomap() const { return m_albedomap; }
 		Texture* getSplatmap() const { return m_splatmap; }
 		Texture* getHeightmap() const { return m_heightmap; }
 		i64 getLayerMask() const { return m_layer_mask; }
@@ -100,7 +100,6 @@ class Terrain
 		float getHeight(float x, float z) const;
 		float getXZScale() const { return m_scale.x; }
 		float getYScale() const { return m_scale.y; }
-		Mesh* getMesh() { return m_mesh; }
 		Path getGrassTypePath(int index);
 		Vec3 getScale() const { return m_scale; }
 		Vec2 getSize() const { return Vec2(m_width * m_scale.x, m_height * m_scale.z); }
@@ -121,9 +120,6 @@ class Terrain
 		void setGrassTypeDistance(int index, float value);
 		void setGrassTypeRotationMode(int index, GrassType::RotationMode mode);
 		void setMaterial(Material* material);
-		void setHeightmap(Texture* texture);
-		void setSplatmap(Texture* texture);
-		void setDetailTextures(Texture* texture);
 
 		void getInfos(Array<TerrainInfo>& infos, const ShiftedFrustum& frustum, const DVec3& lod_ref_point);
 		void getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, EntityRef camera);
@@ -147,8 +143,6 @@ class Terrain
 
 	public:
 		IAllocator& m_allocator;
-		Mesh* m_mesh;
-		TerrainQuad* m_root;
 		i32 m_width;
 		i32 m_height;
 		i64 m_layer_mask;
@@ -157,7 +151,7 @@ class Terrain
 		Material* m_material;
 		Texture* m_heightmap;
 		Texture* m_splatmap;
-		Texture* m_detail_texture;
+		Texture* m_albedomap;
 		RenderScene& m_scene;
 		Array<GrassType> m_grass_types;
 		AssociativeArray<EntityRef, Array<GrassQuad*> > m_grass_quads;

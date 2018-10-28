@@ -51,12 +51,6 @@ public:
 	virtual void addDebugLine(const DVec3& from, const DVec3& to, u32 color, float life) = 0;
 	virtual WorldEditor::RayHit castRay(const DVec3& origin, const Vec3& dir, EntityPtr ignored) = 0;
 	virtual Path getModelInstancePath(EntityRef entity) = 0;
-	virtual void render(const Matrix& mtx,
-		u16* indices,
-		int indices_count,
-		Vertex* vertices,
-		int vertices_count,
-		bool lines) = 0;
 	virtual ImFont* addFont(const char* filename, int size) = 0;
 	virtual DVec3 getClosestVertex(Universe* universe, EntityRef entity, const DVec3& pos) = 0;
 	virtual void addText2D(float x, float y, float font_size, u32 color, const char* text) = 0;

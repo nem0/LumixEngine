@@ -35,150 +35,10 @@ struct Sample
 	float u, v;
 };
 
-struct TerrainQuad
-{
-	enum ChildType
-	{
-		TOP_LEFT,
-		TOP_RIGHT,
-		BOTTOM_LEFT,
-		BOTTOM_RIGHT,
-		CHILD_COUNT
-	};
-
-	explicit TerrainQuad(IAllocator& allocator)
-		: m_allocator(allocator)
-	{
-		for (int i = 0; i < CHILD_COUNT; ++i)
-		{
-			m_children[i] = nullptr;
-		}
-	}
-
-	~TerrainQuad()
-	{
-		for (int i = 0; i < CHILD_COUNT; ++i)
-		{
-			LUMIX_DELETE(m_allocator, m_children[i]);
-		}
-	}
-
-	void computeAABB(float scale)
-	{
-		m_aabb.min = Vec3(m_min.x * scale, -FLT_MAX, m_min.z * scale);
-		m_aabb.max = Vec3(m_aabb.min.x + m_size * scale, FLT_MAX, m_aabb.min.z + m_size * scale);
-		for (int i = 0; i < CHILD_COUNT; ++i)
-		{
-			if (m_children[i]) m_children[i]->computeAABB(scale);
-		}
-	}
-
-	void createChildren()
-	{
-		if (m_lod < 16 && m_size > 16)
-		{
-			for (int i = 0; i < CHILD_COUNT; ++i)
-			{
-				m_children[i] = LUMIX_NEW(m_allocator, TerrainQuad)(m_allocator);
-				m_children[i]->m_lod = m_lod + 1;
-				m_children[i]->m_size = m_size / 2;
-			}
-			m_children[TOP_LEFT]->m_min = m_min;
-			m_children[TOP_RIGHT]->m_min.set(m_min.x + m_size / 2, 0, m_min.z);
-			m_children[BOTTOM_LEFT]->m_min.set(m_min.x, 0, m_min.z + m_size / 2);
-			m_children[BOTTOM_RIGHT]->m_min.set(m_min.x + m_size / 2, 0, m_min.z + m_size / 2);
-			
-			for (int i = 0; i < CHILD_COUNT; ++i)
-			{
-				m_children[i]->createChildren();
-			}
-		}
-	}
-
-	float getSquaredDistance(const Vec3& camera_pos)
-	{
-		Vec3 _min = m_min;
-		Vec3 _max(_min.x + m_size, _min.y, _min.z + m_size);
-		float dist = 0;
-		if (camera_pos.x < _min.x)
-		{
-			float d = _min.x - camera_pos.x;
-			dist += d*d;
-		}
-		if (camera_pos.x > _max.x)
-		{
-			float d = _max.x - camera_pos.x;
-			dist += d*d;
-		}
-		if (camera_pos.z < _min.z)
-		{
-			float d = _min.z - camera_pos.z;
-			dist += d*d;
-		}
-		if (camera_pos.z > _max.z)
-		{
-			float d = _max.z - camera_pos.z;
-			dist += d*d;
-		}
-		return dist;
-	}
-
-	static float getRadiusInner(float size)
-	{
-		float lower_level_size = size * 0.5f;
-		float lower_level_diagonal = Math::SQRT2 * size * 0.5f;
-		return getRadiusOuter(lower_level_size) + lower_level_diagonal;
-	}
-
-	static float getRadiusOuter(float size)
-	{
-		return (size > 17 ? 2.25f : 1.25f) * Math::SQRT2 * size;
-	}
-
-	bool getInfos(Array<TerrainInfo>& infos, const Vec3& lod_ref_point, Terrain* terrain, const Matrix& world_matrix, const Frustum& rel_frustum)
-	{
-		float squared_dist = getSquaredDistance(lod_ref_point);
-		float r = getRadiusOuter(m_size);
-		if (squared_dist > r * r && m_lod > 1) return false;
-		if (!rel_frustum.intersectAABB(m_aabb)) return false;
-
-		Vec3 morph_const(r, getRadiusInner(m_size), 0);
-		Shader& shader = *terrain->getMesh()->material->getShader();
-		for (int i = 0; i < CHILD_COUNT; ++i)
-		{
-			if (!m_children[i] || !m_children[i]->getInfos(infos, lod_ref_point, terrain, world_matrix, rel_frustum))
-			{
-				TerrainInfo& data = infos.emplace();
-				data.morph_const = morph_const;
-				data.index = i;
-				data.terrain = terrain;
-				data.size = m_size;
-				data.min = m_min;
-				data.shader = &shader;
-				// TODO
-				ASSERT(false);
-
-				//data.world_matrix = world_matrix;
-			}
-		}
-		return true;
-	}
-
-
-	IAllocator& m_allocator;
-	TerrainQuad* m_children[CHILD_COUNT];
-	Vec3 m_min;
-	AABB m_aabb;
-	float m_size;
-	int m_lod;
-};
-
 
 Terrain::Terrain(Renderer& renderer, EntityPtr entity, RenderScene& scene, IAllocator& allocator)
-	: m_mesh(nullptr)
-	, m_material(nullptr)
-	, m_root(nullptr)
-	, m_detail_texture(nullptr)
+	: m_material(nullptr)
+	, m_albedomap(nullptr)
 	, m_heightmap(nullptr)
 	, m_splatmap(nullptr)
 	, m_width(0)
@@ -199,7 +59,7 @@ Terrain::Terrain(Renderer& renderer, EntityPtr entity, RenderScene& scene, IAllo
 	mem.data = false;
 	mem.own = false;
 	mem.size = 0;
-	m_textures = renderer.createTexture(1024, 1024, TEXTURES_COUNT, ffr::TextureFormat::RGBA8, (u32)ffr::TextureFlags::CLAMP, mem);
+	m_textures = renderer.createTexture(1024, 1024, TEXTURES_COUNT, ffr::TextureFormat::RGBA8, (u32)ffr::TextureFlags::CLAMP, mem, "terrain_textures");
 }
 
 Terrain::GrassType::~GrassType()
@@ -214,8 +74,6 @@ Terrain::GrassType::~GrassType()
 Terrain::~Terrain()
 {
 	setMaterial(nullptr);
-	LUMIX_DELETE(m_allocator, m_mesh);
-	LUMIX_DELETE(m_allocator, m_root);
 	for (int j = 0; j < m_grass_quads.size(); ++j)
 	{
 		Array<GrassQuad*>& quads = m_grass_quads.at(j);
@@ -233,12 +91,6 @@ Terrain::GrassType::GrassType(Terrain& terrain)
 	m_grass_model = nullptr;
 	m_density = 10;
 	m_distance = 50;
-}
-
-
-float Terrain::getRootSize() const 
-{
-	return m_root ? m_root->m_size : 0;
 }
 
 
@@ -593,42 +445,19 @@ void Terrain::getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, Ent
 }
 
 
-void Terrain::setSplatmap(Texture* texture)
-{
-	 m_splatmap = texture;
-}
-
-
-void Terrain::setHeightmap(Texture* texture)
-{
-	 m_heightmap = texture;
-}
-
-
-void Terrain::setDetailTextures(Texture* texture)
-{
-	m_detail_texture = texture;
-}
-
-
 void Terrain::setMaterial(Material* material)
 {
-	if (material != m_material)
-	{
-		if (m_material)
-		{
+	if (material != m_material) {
+		if (m_material) {
 			m_material->getResourceManager().unload(*m_material);
 			m_material->getObserverCb().unbind<Terrain, &Terrain::onMaterialLoaded>(this);
 		}
 		m_material = material;
-		if (m_mesh && m_material)
-		{
-			m_mesh->material = m_material;
+		if (m_material) {
 			m_material->onLoaded<Terrain, &Terrain::onMaterialLoaded>(this);
 		}
 	}
-	else if(material)
-	{
+	else if(material) {
 		material->getResourceManager().unload(*material);
 	}
 }
@@ -780,7 +609,6 @@ void Terrain::setXZScale(float scale)
 {
 	m_scale.x = scale;
 	m_scale.z = scale;
-	if (m_root) m_root->computeAABB(scale);
 }
 
 
@@ -842,69 +670,8 @@ RayCastModelHit Terrain::castRay(const DVec3& origin, const Vec3& dir)
 {
 	RayCastModelHit hit;
 	hit.is_hit = false;
-	if (m_root)
-	{
-		Matrix mtx = m_scene.getUniverse().getRelativeMatrix(m_entity, origin);
-		mtx.fastInverse();
-		Vec3 rel_origin = -mtx.getTranslation();
-		Vec3 rel_dir = (mtx * Vec4(dir, 0)).xyz();
-		Vec3 start;
-		Vec3 size(m_root->m_size * m_scale.x, m_scale.y * 65535.0f, m_root->m_size * m_scale.x);
-		if (Math::getRayAABBIntersection(rel_origin, rel_dir, m_root->m_min, size, start))
-		{
-			int hx = (int)(start.x / m_scale.x);
-			int hz = (int)(start.z / m_scale.x);
-
-			float next_x = fabs(rel_dir.x) < 0.01f ? hx : ((hx + (rel_dir.x < 0 ? 0 : 1)) * m_scale.x - rel_origin.x) / rel_dir.x;
-			float next_z = fabs(rel_dir.z) < 0.01f ? hz : ((hz + (rel_dir.z < 0 ? 0 : 1)) * m_scale.x - rel_origin.z) / rel_dir.z;
-
-			float delta_x = fabs(rel_dir.x) < 0.01f ? 0 : m_scale.x / Math::abs(rel_dir.x);
-			float delta_z = fabs(rel_dir.z) < 0.01f ? 0 : m_scale.x / Math::abs(rel_dir.z);
-			int step_x = (int)Math::signum(rel_dir.x);
-			int step_z = (int)Math::signum(rel_dir.z);
-
-			while (hx >= 0 && hz >= 0 && hx + step_x < m_width && hz + step_z < m_height)
-			{
-				float t;
-				float x = hx * m_scale.x;
-				float z = hz * m_scale.x;
-				Vec3 p0(x, getHeight(x, z), z);
-				Vec3 p1(x + m_scale.x, getHeight(x + m_scale.x, z), z);
-				Vec3 p2(x + m_scale.x, getHeight(x + m_scale.x, z + m_scale.x), z + m_scale.x);
-				Vec3 p3(x, getHeight(x, z + m_scale.x), z + m_scale.x);
-				if (getRayTriangleIntersection(rel_origin, rel_dir, p0, p1, p2, t))
-				{
-					hit.is_hit = true;
-					hit.origin = origin;
-					hit.dir = dir;
-					hit.t = t;
-					return hit;
-				}
-				if (getRayTriangleIntersection(rel_origin, rel_dir, p0, p2, p3, t))
-				{
-					hit.is_hit = true;
-					hit.origin = origin;
-					hit.dir = dir;
-					hit.t = t;
-					return hit;
-				}
-				if (next_x < next_z)
-				{
-					next_x += delta_x;
-					hx += step_x;
-				}
-				else
-				{
-					next_z += delta_z;
-					hz += step_z;
-				}
-				if (delta_x == 0 && delta_z == 0)
-				{
-					return hit;
-				}
-			}
-		}
-	}
+	ASSERT(false);
+	// TODO
 	return hit;
 }
 
@@ -972,30 +739,28 @@ void Terrain::generateGeometry()
 	m_mesh->flags.set(Mesh::Flags::INDICES_16_BIT);*/
 }
 
-TerrainQuad* Terrain::generateQuadTree(float size)
-{
-	TerrainQuad* root = LUMIX_NEW(m_allocator, TerrainQuad)(m_allocator);
-	root->m_lod = 1;
-	root->m_min.set(0, 0, 0);
-	root->m_size = size;
-	root->createChildren();
-	root->computeAABB(m_scale.x);
-	return root;
-}
-
 void Terrain::onMaterialLoaded(Resource::State, Resource::State new_state, Resource&)
 {
 	PROFILE_FUNCTION();
 	if (new_state == Resource::State::READY)
 	{
-		/*m_heightmap = m_material->getTextureByUniform("u_heightmap");
+		m_heightmap = m_material->getTextureByUniform("u_hm");
 		bool is_data_ready = true;
 		if (m_heightmap && m_heightmap->getData() == nullptr)
 		{
 			m_heightmap->addDataReference();
 			is_data_ready = false;
 		}
+		if (m_heightmap)
+		{
+			m_width = m_heightmap->width;
+			m_height = m_heightmap->height;
+		}
 
+		m_albedomap = m_material->getTextureByUniform("u_albedo");
+		m_splatmap = m_material->getTextureByUniform("u_splatmap");
+
+		/*
 		Texture* colormap = m_material->getTextureByUniform("u_colormap");
 		if (colormap && colormap->getData() == nullptr)
 		{

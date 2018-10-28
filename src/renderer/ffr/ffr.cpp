@@ -107,13 +107,8 @@ struct Pool
 };
 
 static struct {
-	struct {
-		GLenum bind_target = GL_TEXTURE_2D;
-	} texture_units[16];
-
 	RENDERDOC_API_1_0_2* rdoc_api;
 	GLuint vao;
-	GLuint tex_buffers[32];
 	IAllocator* allocator;
 	void* device_context;
 	Pool<Buffer, Buffer::MAX_COUNT> buffers;
@@ -925,14 +920,10 @@ void bindTexture(uint unit, TextureHandle handle)
 {
 	if(handle.isValid()) {
 		const Texture& t = g_ffr.textures[handle.value];
-		CHECK_GL(glActiveTexture(GL_TEXTURE0 + unit));
-		CHECK_GL(glBindTexture(g_ffr.texture_units[unit].bind_target, 0));
-		CHECK_GL(glBindTexture(t.target, t.handle));
-		g_ffr.texture_units[unit].bind_target = t.target;
+		CHECK_GL(glBindTextureUnit(unit, t.handle));
 	}
 	else {
-		CHECK_GL(glActiveTexture(GL_TEXTURE0 + unit));
-		CHECK_GL(glBindTexture(g_ffr.texture_units[unit].bind_target, 0));
+		CHECK_GL(glBindTextureUnit(unit, 0));	
 	}
 }
 
@@ -1317,8 +1308,9 @@ TextureInfo getTextureInfo(const void* data)
 }
 
 
-bool loadTexture(TextureHandle handle, const void* input, int input_size, uint flags)
+bool loadTexture(TextureHandle handle, const void* input, int input_size, uint flags, const char* debug_name)
 {
+	ASSERT(debug_name && debug_name[0]);
 	checkThread();
 	DDS::Header hdr;
 
@@ -1393,6 +1385,9 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, uint f
 	}
 	else {
 		CHECK_GL(glTextureStorage2D(texture, mipMapCount, internal_format, hdr.dwWidth, hdr.dwHeight));
+	}
+	if (debug_name && debug_name[0]) {
+		CHECK_GL(glObjectLabel(GL_TEXTURE, texture, stringLength(debug_name), debug_name));
 	}
 
 	for (int layer = 0; layer < layers; ++layer) {
@@ -1529,11 +1524,12 @@ TextureHandle allocTextureHandle()
 }
 
 
-bool createTexture(TextureHandle handle, uint w, uint h, uint depth, TextureFormat format, uint flags, const void* data)
+bool createTexture(TextureHandle handle, uint w, uint h, uint depth, TextureFormat format, uint flags, const void* data, const char* debug_name)
 {
 	checkThread();
 	const bool is_srgb = flags & (u32)TextureFlags::SRGB;
 	ASSERT(!is_srgb); // use format argument to enable srgb
+	ASSERT(debug_name && debug_name[0]);
 
 	GLuint texture;
 	int found_format = 0;
@@ -1584,6 +1580,9 @@ bool createTexture(TextureHandle handle, uint w, uint h, uint depth, TextureForm
 		return false;	
 	}
 
+	if(debug_name && debug_name[0]) {
+		CHECK_GL(glObjectLabel(GL_TEXTURE, texture, stringLength(debug_name), debug_name));
+	}
 	CHECK_GL(glGenerateMipmap(target));
 	
 	const GLint wrap = (flags & (u32)TextureFlags::CLAMP) ? GL_CLAMP_TO_EDGE : GL_REPEAT;
@@ -1897,7 +1896,6 @@ bool init(void* window_handle)
 
 	CHECK_GL(glGenVertexArrays(1, &g_ffr.vao));
 	CHECK_GL(glBindVertexArray(g_ffr.vao));
-	CHECK_GL(glGenTextures(_countof(g_ffr.tex_buffers), g_ffr.tex_buffers));
 
 	CHECK_GL(glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS));
 
