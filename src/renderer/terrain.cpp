@@ -25,7 +25,6 @@ namespace Lumix
 
 static const float GRASS_QUAD_SIZE = 10.0f;
 static const float GRASS_QUAD_RADIUS = GRASS_QUAD_SIZE * 0.7072f;
-static const int GRID_SIZE = 16;
 static const ComponentType TERRAIN_HASH = Reflection::getComponentType("terrain");
 static const char* TEX_COLOR_UNIFORM = "u_detail_albedomap";
 
@@ -54,7 +53,6 @@ Terrain::Terrain(Renderer& renderer, EntityPtr entity, RenderScene& scene, IAllo
 	, m_renderer(renderer)
 	, m_force_grass_update(false)
 {
-	generateGeometry();
 	Renderer::MemRef mem;
 	mem.data = false;
 	mem.own = false;
@@ -675,69 +673,6 @@ RayCastModelHit Terrain::castRay(const DVec3& origin, const Vec3& dir)
 	return hit;
 }
 
-
-static void generateSubgrid(Array<Sample>& samples, Array<u16>& indices, int& indices_offset, int start_x, int start_y)
-{
-	for (int j = start_y; j < start_y + 8; ++j)
-	{
-		for (int i = start_x; i < start_x + 8; ++i)
-		{
-			short idx = short(4 * (i + j * GRID_SIZE));
-			samples[idx].pos.set((float)(i) / GRID_SIZE, 0, (float)(j) / GRID_SIZE);
-			samples[idx + 1].pos.set((float)(i + 1) / GRID_SIZE, 0, (float)(j) / GRID_SIZE);
-			samples[idx + 2].pos.set((float)(i + 1) / GRID_SIZE, 0, (float)(j + 1) / GRID_SIZE);
-			samples[idx + 3].pos.set((float)(i) / GRID_SIZE, 0, (float)(j + 1) / GRID_SIZE);
-			samples[idx].u = 0;
-			samples[idx].v = 0;
-			samples[idx + 1].u = 1;
-			samples[idx + 1].v = 0;
-			samples[idx + 2].u = 1;
-			samples[idx + 2].v = 1;
-			samples[idx + 3].u = 0;
-			samples[idx + 3].v = 1;
-
-			indices[indices_offset] = idx;
-			indices[indices_offset + 1] = idx + 3;
-			indices[indices_offset + 2] = idx + 2;
-			indices[indices_offset + 3] = idx;
-			indices[indices_offset + 4] = idx + 2;
-			indices[indices_offset + 5] = idx + 1;
-			indices_offset += 6;
-		}
-	}
-}
-
-void Terrain::generateGeometry()
-{
-	// TODO
-	//ASSERT(false);
-	/*LUMIX_DELETE(m_allocator, m_mesh);
-	m_mesh = nullptr;
-	Array<Sample> points(m_allocator);
-	points.resize(GRID_SIZE * GRID_SIZE * 4);
-	Array<u16> indices(m_allocator);
-	indices.resize(GRID_SIZE * GRID_SIZE * 6);
-	int indices_offset = 0;
-	generateSubgrid(points, indices, indices_offset, 0, 0);
-	generateSubgrid(points, indices, indices_offset, 8, 0);
-	generateSubgrid(points, indices, indices_offset, 0, 8);
-	generateSubgrid(points, indices, indices_offset, 8, 8);
-
-	ffr::VertexDecl vertex_def;
-	vertex_def.addAttribute(3, ffr::AttributeType::FLOAT, false, false);
-	vertex_def.addAttribute(2, ffr::AttributeType::FLOAT, false, false);
-
-	const Mesh::AttributeSemantic semantics[] = { Mesh::AttributeSemantic::POSITION, Mesh::AttributeSemantic::TEXCOORD0 };
-	m_mesh = LUMIX_NEW(m_allocator, Mesh)(m_material, vertex_def, "terrain", semantics, m_allocator);
-
-	const Renderer::MemRef vb_data = m_renderer.copy(&points[0], points.byte_size());
-	m_mesh->vertex_buffer_handle = m_renderer.createBuffer(vb_data);
-	
-	const Renderer::MemRef ib_data = m_renderer.copy(&indices[0], indices.byte_size());
-	m_mesh->index_buffer_handle = m_renderer.createBuffer(ib_data);
-	m_mesh->indices_count = indices.size();
-	m_mesh->flags.set(Mesh::Flags::INDICES_16_BIT);*/
-}
 
 void Terrain::onMaterialLoaded(Resource::State, Resource::State new_state, Resource&)
 {
