@@ -214,8 +214,8 @@ void setState(u64 state);
 ProgramHandle createProgram(const char** srcs, const ShaderType* types, int num, const char** prefixes, int prefixes_count, const char* name);
 void useProgram(ProgramHandle prg);
 void createBuffer(BufferHandle handle, size_t size, const void* data);
-bool createTexture(TextureHandle handle, uint w, uint h, uint depth, TextureFormat format, uint flags, const void* data);
-bool loadTexture(TextureHandle handle, const void* data, int size, uint flags);
+bool createTexture(TextureHandle handle, uint w, uint h, uint depth, TextureFormat format, uint flags, const void* data, const char* debug_name);
+bool loadTexture(TextureHandle handle, const void* data, int size, uint flags, const char* debug_name);
 FramebufferHandle createFramebuffer();
 QueryHandle createQuery();
 

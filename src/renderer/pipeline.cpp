@@ -214,8 +214,6 @@ struct PipelineImpl final : Pipeline
 		m_draw2d.PushClipRectFullScreen();
 		m_draw2d.PushTextureID(font_atlas.TexID);
 
-		m_splatmap_uniform = ffr::allocUniform("u_splatmap", ffr::UniformType::INT, 1);
-		m_detail_textures_uniform = ffr::allocUniform("u_detail_textures", ffr::UniformType::INT, 1);
 		m_position_uniform = ffr::allocUniform("u_position", ffr::UniformType::VEC3, 1);
 		m_lod_uniform = ffr::allocUniform("u_lod", ffr::UniformType::INT, 1);
 		m_position_radius_uniform = ffr::allocUniform("u_pos_radius", ffr::UniformType::VEC4, 1);
@@ -488,7 +486,7 @@ struct PipelineImpl final : Pipeline
 				rb.width = w;
 				rb.height = h;
 				m_renderer.destroy(rb.handle);
-				rb.handle = m_renderer.createTexture(w, h, 1, rb.format, 0, {0, 0});
+				rb.handle = m_renderer.createTexture(w, h, 1, rb.format, 0, {0, 0}, "render_buffer");
 			}
 		}
 
@@ -802,7 +800,7 @@ struct PipelineImpl final : Pipeline
 		rb.width = rb_w;
 		rb.height = rb_h;
 		rb.format = format;
-		rb.handle = m_renderer.createTexture(rb_w, rb_h, 1, format, 0, {0, 0});
+		rb.handle = m_renderer.createTexture(rb_w, rb_h, 1, format, 0, {0, 0}, "render_buffer");
 
 		return m_renderbuffers.size() - 1;
 	}
@@ -816,16 +814,15 @@ struct PipelineImpl final : Pipeline
 			LuaWrapper::argError<PipelineImpl*>(L, pipeline_idx);
 		}
 		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
-		const char* define = LuaWrapper::checkArg<const char*>(L, 1);
 
-		const CameraParams cp = checkCameraParams(L, 2);
+		const CameraParams cp = checkCameraParams(L, 1);
  		
 		IAllocator& allocator = pipeline->m_renderer.getAllocator();
 		RenderTerrainsCommand* cmd = LUMIX_NEW(allocator, RenderTerrainsCommand)(allocator);
 
-		if (lua_gettop(L) > 2 && lua_istable(L, 3)) {
+		if (lua_gettop(L) > 1 && lua_istable(L, 2)) {
 			lua_pushnil(L);
-			while (lua_next(L, 3) != 0) {
+			while (lua_next(L, 2) != 0) {
 				if(lua_type(L, -1) != LUA_TNUMBER) {
 					g_log_error.log("Renderer") << "Incorrect global textures arguments of renderTerrains";
 					LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
@@ -858,13 +855,12 @@ struct PipelineImpl final : Pipeline
 			}
 		}
 
-		if (lua_gettop(L) > 3 && lua_istable(L, 4)) {
-			cmd->m_render_state = getState(L, 4);
+		if (lua_gettop(L) > 2 && lua_istable(L, 3)) {
+			cmd->m_render_state = getState(L, 3);
 		}
 
 		cmd->m_pipeline = pipeline;
 		cmd->m_camera_params = cp;
-		cmd->m_shader_define = define;
 
 		pipeline->m_renderer.push(cmd);
 		return 0;
@@ -1731,6 +1727,7 @@ struct PipelineImpl final : Pipeline
 								cmd += sizeof(Vec4) * 2 * instances_count;
 								
 								ShaderRenderData* shader = material->shader;
+								for (int i = 0; i < 16; ++i) ffr::bindTexture(i, ffr::INVALID_TEXTURE);
 								for (int i = 0; i < material->textures_count; ++i) {
 									const ffr::TextureHandle handle = material->textures[i];
 									const ffr::UniformHandle uniform = shader->texture_uniforms[i];
@@ -2031,17 +2028,15 @@ struct PipelineImpl final : Pipeline
 				
 				if (!terrain) return;
 				if (!terrain->getSplatmap()) return;
-				if (!terrain->getDetailTexture()) return;
+				if (!terrain->getAlbedomap()) return;
 
 				m_framebuffer = m_pipeline->m_renderer.getFramebuffer();
 
 				m_rel_camera_pos_uniform = m_pipeline->m_rel_camera_pos_uniform;
 				m_splatmap = terrain->getSplatmap()->handle;
-				m_detail_textures = terrain->getDetailTexture()->handle;
+				m_albedomap = terrain->getAlbedomap()->handle;
 				m_output = terrain->m_textures;
-				m_splatmap_uniform = m_pipeline->m_splatmap_uniform;
 				m_lod_uniform = m_pipeline->m_lod_uniform;
-				m_detail_textures_uniform = m_pipeline->m_detail_textures_uniform;
 				Universe& universe = m_pipeline->m_scene->getUniverse();
 				m_rel_cam_pos = universe.getRotation(m_entity).rotate((m_pipeline->m_viewport.pos - universe.getPosition(m_entity)).toFloat());
 			}
@@ -2062,9 +2057,9 @@ struct PipelineImpl final : Pipeline
 
 					ffr::setUniform3f(m_rel_camera_pos_uniform, &m_rel_cam_pos.x);
 					ffr::bindTexture(0, m_splatmap);
-					ffr::bindTexture(1, m_detail_textures);
-					ffr::setUniform1i(m_splatmap_uniform, 0);
-					ffr::setUniform1i(m_detail_textures_uniform, 1);
+					ffr::bindTexture(1, m_albedomap);
+					ffr::setUniform1i(ffr::allocUniform("u_splatmap", ffr::UniformType::INT, 1), 0);
+					ffr::setUniform1i(ffr::allocUniform("u_albedo", ffr::UniformType::INT, 1), 1);
 					ffr::setUniform1i(m_lod_uniform, i);
 					ffr::useProgram(p.handle);
 					
@@ -2076,9 +2071,7 @@ struct PipelineImpl final : Pipeline
 
 			ffr::FramebufferHandle m_framebuffer;
 			ffr::TextureHandle m_splatmap;
-			ffr::TextureHandle m_detail_textures;
-			ffr::UniformHandle m_splatmap_uniform;
-			ffr::UniformHandle m_detail_textures_uniform;
+			ffr::TextureHandle m_albedomap;
 			ffr::UniformHandle m_rel_camera_pos_uniform;
 			ffr::UniformHandle m_lod_uniform;
 			ffr::TextureHandle m_output;
@@ -2127,14 +2120,13 @@ struct PipelineImpl final : Pipeline
 			for (TerrainInfo& info : infos) {
 				if (!info.terrain->m_heightmap) continue;
 				if (!info.terrain->m_heightmap->isReady()) continue;
-
+				
 				Instance& inst = m_instances.emplace();
 				inst.pos = (info.position - m_camera_params.pos).toFloat();
 				inst.rot = info.rot;
 				inst.shader = info.shader->m_render_data;
-				inst.material = info.terrain->m_material->getRenderData();
 				inst.heightmap = info.terrain->m_heightmap->handle;
-				inst.textures = info.terrain->m_textures;
+				inst.slices = info.terrain->m_textures;
 			}
 		}
 
@@ -2158,10 +2150,10 @@ struct PipelineImpl final : Pipeline
 				ffr::setUniform3f(m_pipeline->m_position_uniform, &pos.x);
 				ffr::setUniform3f(m_pipeline->m_rel_camera_pos_uniform, &lpos.x);
 
-				ffr::bindTexture(1, inst.textures);
-				ffr::bindTexture(0, inst.heightmap);
-				ffr::setUniform1i(ffr::allocUniform("u_satellite", ffr::UniformType::INT, 1), 1);
 				ffr::setUniform1i(ffr::allocUniform("u_hm", ffr::UniformType::INT, 1), 0);
+				ffr::setUniform1i(ffr::allocUniform("u_slices", ffr::UniformType::INT, 1), 1);
+				ffr::bindTexture(0, inst.heightmap);
+				ffr::bindTexture(1, inst.slices);
 
 				ffr::useProgram(p.handle);
 				ffr::setState(state);
@@ -2186,16 +2178,13 @@ struct PipelineImpl final : Pipeline
 			Vec3 pos;
 			Quat rot;
 			ShaderRenderData* shader;
-			Material::RenderData* material;
 			ffr::TextureHandle heightmap;
-			ffr::TextureHandle textures;
+			ffr::TextureHandle slices;
 		};
 
 		IAllocator& m_allocator;
 		PipelineImpl* m_pipeline;
 		CameraParams m_camera_params;
-		StaticString<32> m_shader_define;
-		u32 m_define_mask;
 		u64 m_render_state;
 		Array<Instance> m_instances;
 		struct {
@@ -2892,8 +2881,6 @@ struct PipelineImpl final : Pipeline
 	ffr::UniformHandle m_radiance_map_uniform;
 	ffr::UniformHandle m_material_params_uniform;
 	ffr::UniformHandle m_material_color_uniform;
-	ffr::UniformHandle m_splatmap_uniform;
-	ffr::UniformHandle m_detail_textures_uniform;
 	ffr::BufferHandle m_cube_vb;
 	ffr::BufferHandle m_cube_ib;
 };

@@ -108,8 +108,8 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 		
 		virtual void destroy(ffr::ProgramHandle program) = 0;
 		
-		virtual ffr::TextureHandle createTexture(uint w, uint h, uint depth, ffr::TextureFormat format, u32 flags, const MemRef& memory) = 0;
-		virtual ffr::TextureHandle loadTexture(const MemRef& memory, u32 flags, ffr::TextureInfo* info) = 0;
+		virtual ffr::TextureHandle createTexture(uint w, uint h, uint depth, ffr::TextureFormat format, u32 flags, const MemRef& memory, const char* debug_name) = 0;
+		virtual ffr::TextureHandle loadTexture(const MemRef& memory, u32 flags, ffr::TextureInfo* info, const char* debug_name) = 0;
 		virtual void getTextureImage(ffr::TextureHandle texture, int size, void* data) = 0;
 		virtual void destroy(ffr::TextureHandle tex) = 0;
 		

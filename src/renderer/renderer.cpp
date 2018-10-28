@@ -359,12 +359,6 @@ static void registerProperties(IAllocator& allocator)
 		component("terrain",
 			property("Material", LUMIX_PROP(RenderScene, TerrainMaterialPath),
 				ResourceAttribute("Material (*.mat)", Material::TYPE)),
-			property("Heightmap", LUMIX_PROP(RenderScene, TerrainHeightmapPath),
-				ResourceAttribute("Texture (*.raw)", Texture::TYPE)),
-			property("Splatmap", LUMIX_PROP(RenderScene, TerrainSplatmapPath),
-				ResourceAttribute("Texture (*.dds)", Texture::TYPE)),
-			property("Detail", LUMIX_PROP(RenderScene, TerrainDetailTexturesPath),
-				ResourceAttribute("Texture (*.dds)", Texture::TYPE)),
 			property("XZ scale", LUMIX_PROP(RenderScene, TerrainXZScale), 
 				MinAttribute(0)),
 			property("Height scale", LUMIX_PROP(RenderScene, TerrainYScale), 
@@ -533,7 +527,7 @@ struct RendererImpl final : public Renderer
 	}
 
 
-	ffr::TextureHandle loadTexture(const MemRef& memory, u32 flags, ffr::TextureInfo* info) override
+	ffr::TextureHandle loadTexture(const MemRef& memory, u32 flags, ffr::TextureInfo* info, const char* debug_name) override
 	{
 		ASSERT(memory.size > 0);
 
@@ -548,12 +542,13 @@ struct RendererImpl final : public Renderer
 		struct Cmd : RenderJob {
 			void setup() override {}
 			void execute() override {
-				ffr::loadTexture(handle, memory.data, memory.size, flags);
+				ffr::loadTexture(handle, memory.data, memory.size, flags, debug_name);
 				if(memory.own) {
 					renderer->free(memory);
 				}
 			}
 
+			StaticString<MAX_PATH_LENGTH> debug_name;
 			ffr::TextureHandle handle;
 			MemRef memory;
 			u32 flags;
@@ -561,6 +556,7 @@ struct RendererImpl final : public Renderer
 		};
 
 		Cmd* cmd = LUMIX_NEW(m_render_task.m_allocator, Cmd);
+		cmd->debug_name = debug_name;
 		cmd->handle = handle;
 		cmd->memory = memory;
 		cmd->flags = flags;
@@ -689,7 +685,7 @@ struct RendererImpl final : public Renderer
 	}
 
 
-	ffr::TextureHandle createTexture(uint w, uint h, uint depth, ffr::TextureFormat format, u32 flags, const MemRef& memory) override
+	ffr::TextureHandle createTexture(uint w, uint h, uint depth, ffr::TextureFormat format, u32 flags, const MemRef& memory, const char* debug_name) override
 	{
 		ffr::TextureHandle handle = ffr::allocTextureHandle();
 		if(!handle.isValid()) return handle;
@@ -698,10 +694,11 @@ struct RendererImpl final : public Renderer
 			void setup() override {}
 			void execute() override
 			{
-				ffr::createTexture(handle, w, h, depth, format, flags, memory.data);
+				ffr::createTexture(handle, w, h, depth, format, flags, memory.data, debug_name);
 				if (memory.own) renderer->free(memory);
 			}
 
+			StaticString<MAX_PATH_LENGTH> debug_name;
 			ffr::TextureHandle handle;
 			MemRef memory;
 			uint w;
@@ -713,6 +710,7 @@ struct RendererImpl final : public Renderer
 		};
 
 		Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
+		cmd->debug_name = debug_name;
 		cmd->handle = handle;
 		cmd->memory = memory;
 		cmd->format = format;

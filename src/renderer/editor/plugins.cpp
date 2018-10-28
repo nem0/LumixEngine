@@ -2096,37 +2096,6 @@ struct RenderInterfaceImpl final : public RenderInterface
 	Path getModelInstancePath(EntityRef entity) override { return m_render_scene->getModelInstancePath(entity); }
 
 
-	void render(const Matrix& mtx
-		, u16* indices
-		, int indices_count
-		, Vertex* vertices
-		, int vertices_count
-		, bool lines)
-		override
-	{
-		if (!m_shader->isReady()) return;
-
-		ffr::VertexDecl vertex_decl;
-		vertex_decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false);
-		vertex_decl.addAttribute(4, ffr::AttributeType::U8, true, false);
-			
-		Renderer::TransientSlice ib = m_renderer.allocTransient(indices_count * sizeof(u16));
-		Renderer::TransientSlice vb = m_renderer.allocTransient(vertices_count * sizeof(Vertex));
-		
-		ffr::update(ib.buffer, indices, ib.offset, ib.size);
-		ffr::update(vb.buffer, vertices, vb.offset, vb.size);
-
-		const ffr::ProgramHandle prg = Shader::getProgram(m_shader->m_render_data, 0).handle;
-		ffr::setUniformMatrix4f(m_model_uniform, &mtx.m11);
-		ffr::useProgram(prg);
-		ffr::setVertexBuffer(&vertex_decl, vb.buffer, vb.offset, nullptr);
-		ffr::setIndexBuffer(ib.buffer);
-		ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE));
-		const ffr::PrimitiveType primitive_type = lines ? ffr::PrimitiveType::LINES : ffr::PrimitiveType::TRIANGLES;
-		ffr::drawElements(ib.offset / sizeof(indices[0]), indices_count, primitive_type, ffr::DataType::UINT16);
-	}
-
-
 	ShiftedFrustum getFrustum(EntityRef camera, const Vec2& viewport_min, const Vec2& viewport_max) override
 	{
 		return m_render_scene->getCameraFrustum(camera, viewport_min, viewport_max);
@@ -2522,7 +2491,7 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 		ImGui::GetIO().Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
 
 		const Renderer::MemRef mem = renderer->copy(pixels, width * height * 4);
-		m_texture = renderer->createTexture(width, height, 1, ffr::TextureFormat::RGBA8, 0, mem);
+		m_texture = renderer->createTexture(width, height, 1, ffr::TextureFormat::RGBA8, 0, mem, "editor_font_atlas");
 
 		IAllocator& allocator = editor.getAllocator();
 		RenderInterface* render_interface =
