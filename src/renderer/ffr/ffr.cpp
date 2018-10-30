@@ -859,6 +859,11 @@ void applyUniform1i(int location, int value)
 	glUniform1i(location, value);
 }
 
+void applyUniform4i(int location, const int* value)
+{
+	glUniform4iv(location, 1, value);
+}
+
 void applyUniform4f(int location, const float* value)
 {
 	glUniform4fv(location, 1, value);
@@ -909,6 +914,9 @@ void useProgram(ProgramHandle handle)
 				break;
 			case UniformType::IVEC2:
 				glUniform2iv(pu.loc, u.count, (int*)u.data);
+				break;
+			case UniformType::IVEC4:
+				glUniform4iv(pu.loc, u.count, (int*)u.data);
 				break;
 			default: ASSERT(false); break;
 		}
@@ -1671,6 +1679,7 @@ static uint getSize(UniformType type)
 	case UniformType::INT: return sizeof(int);
 	case UniformType::FLOAT: return sizeof(float);
 	case UniformType::IVEC2: return sizeof(int) * 2;
+	case UniformType::IVEC4: return sizeof(int) * 4;
 	case UniformType::VEC2: return sizeof(float) * 2;
 	case UniformType::VEC3: return sizeof(float) * 3;
 	case UniformType::VEC4: return sizeof(float) * 4;
@@ -1821,6 +1830,7 @@ ProgramHandle createProgram(const char** srcs, const ShaderType* types, int num,
 			case GL_FLOAT_MAT4x3: ffr_type = UniformType::MAT4X3; break;
 			case GL_FLOAT_MAT3x4: ffr_type = UniformType::MAT3X4; break;
 			case GL_INT_VEC2: ffr_type = UniformType::IVEC2; break;
+			case GL_INT_VEC4: ffr_type = UniformType::IVEC4; break;
 			default: ASSERT(false); ffr_type = UniformType::VEC4; break;
 		}
 
@@ -1982,6 +1992,14 @@ void setUniform4f(UniformHandle uniform, const float* value)
 {
 	checkThread();
 	ASSERT(g_ffr.uniforms[uniform.value].type == UniformType::VEC4);
+	memcpy(g_ffr.uniforms[uniform.value].data, value, sizeof(value[0]) * 4); 
+}
+
+
+void setUniform4i(UniformHandle uniform, const int* value)
+{
+	checkThread();
+	ASSERT(g_ffr.uniforms[uniform.value].type == UniformType::IVEC4);
 	memcpy(g_ffr.uniforms[uniform.value].data, value, sizeof(value[0]) * 4); 
 }
 

@@ -2055,12 +2055,32 @@ struct PipelineImpl final : Pipeline
 					ffr::viewport(0, 0, 1024, 1024);
 					ffr::clear((uint)ffr::ClearFlags::COLOR, clear_color, 0);
 
-					ffr::setUniform3f(m_rel_camera_pos_uniform, &m_rel_cam_pos.x);
+					const int s = 1 << i;
+					// round 
+					IVec2 from = IVec2((m_rel_cam_pos.xz() + Vec2(0.5f * s)) / float(s)) - IVec2(32);
+					from.x = from.x & ~1;
+					from.y = from.y & ~1;
+					IVec2 to = from + IVec2(64);
+					// clamp
+					const IVec2 from_unclamped = from;
+					const IVec2 to_unclamped = to;
+					
+					from.x = Math::clamp(from.x, 0, 1024 / s);
+					from.y = Math::clamp(from.y, 0, 1024 / s);
+					to.x = Math::clamp(to.x, 0, 1024 / s);
+					to.y = Math::clamp(to.y, 0, 1024 / s);
+
+					if (from.x == to.x || from.y == to.y) continue;
+
+					const IVec4 from_to(from, to);
+
 					ffr::bindTexture(0, m_splatmap);
 					ffr::bindTexture(1, m_albedomap);
 					ffr::setUniform1i(ffr::allocUniform("u_splatmap", ffr::UniformType::INT, 1), 0);
 					ffr::setUniform1i(ffr::allocUniform("u_albedo", ffr::UniformType::INT, 1), 1);
 					ffr::setUniform1i(m_lod_uniform, i);
+					ffr::setUniform4i(ffr::allocUniform("u_from_to", ffr::UniformType::IVEC4, 1), &from_to.x);
+					ffr::setUniform1i(ffr::allocUniform("u_step", ffr::UniformType::INT, 1), s);
 					ffr::useProgram(p.handle);
 					
 					ffr::drawArrays(0, 4, ffr::PrimitiveType::TRIANGLE_STRIP);
@@ -2158,18 +2178,64 @@ struct PipelineImpl final : Pipeline
 				ffr::useProgram(p.handle);
 				ffr::setState(state);
 				const int loc = ffr::getUniformLocation(p.handle, m_pipeline->m_lod_uniform);
-				for(int i = 0; i < 6; ++i) {
-					ffr::applyUniform1i(loc, i);
-					ffr::drawArrays(0, 126 * 126, ffr::PrimitiveType::POINTS);
-				}
+				const int loc2 = ffr::getUniformLocation(p.handle, ffr::allocUniform("u_from_to", ffr::UniformType::IVEC4, 1));
+				const int loc3 = ffr::getUniformLocation(p.handle, ffr::allocUniform("u_uv_from_to", ffr::UniformType::IVEC4, 1));
+				IVec4 prev_from_to;
+				for (int i = 0; ; ++i) {
+					const int s = 1 << i;
+					// round 
+					IVec2 from = IVec2((lpos.xz() + Vec2(0.5f * s)) / float(s)) - IVec2(32);
+					from.x = from.x & ~1;
+					from.y = from.y & ~1;
+					IVec2 to = from + IVec2(64);
+					// clamp
+					const IVec2 from_unclamped = from;
+					const IVec2 to_unclamped = to;
+					
+					from.x = Math::clamp(from.x, 0, 1024 / s);
+					from.y = Math::clamp(from.y, 0, 1024 / s);
+					to.x = Math::clamp(to.x, 0, 1024 / s);
+					to.y = Math::clamp(to.y, 0, 1024 / s);
 
+					
+					auto draw_rect = [loc, loc2, loc3, i, from, to](const IVec2& subfrom, const IVec2& subto){
+						if (subfrom.x >= subto.x || subfrom.y >= subto.y) return;
+						const IVec4 from_to(subfrom, subto);
+						const Vec4 uv_from_to(
+							(subfrom.x - from.x) / float(to.x - from.x),
+							(subfrom.y - from.y) / float(to.y - from.y),
+							(subto.x - from.x) / float(to.x - from.x),
+							(subto.y - from.y) / float(to.y - from.y)
+						);
+						ffr::applyUniform4f(loc3, &uv_from_to.x);
+						ffr::applyUniform4i(loc2, &from_to.x);
+						ffr::applyUniform1i(loc, i);
+						ffr::drawArrays(0, (subto.x - subfrom.x) * (subto.y - subfrom.y), ffr::PrimitiveType::POINTS);
+					};
+
+					if (i > 0) {
+						if (prev_from_to.y > from.y * 2) draw_rect(from, IVec2(to.x, prev_from_to.y / 2));
+						if (prev_from_to.w < to.y * 2) draw_rect(IVec2(from.x, prev_from_to.w / 2), to);
+						
+						if (prev_from_to.z < to.x * 2) draw_rect(IVec2(prev_from_to.z / 2, prev_from_to.y / 2), IVec2(to.x, prev_from_to.w / 2));
+						if (prev_from_to.x > from.x * 2) draw_rect(IVec2(from.x, prev_from_to.y / 2), IVec2(prev_from_to.x / 2, prev_from_to.w / 2));
+					}
+					else {
+						draw_rect(from, to);
+					}
+					
+					if (from.x <= 0 && from.y <= 0 && to.x * s >= 1024 && to.y * s >= 1024) break;
+
+					prev_from_to = IVec4(from, to);
+				}
+				/*
 				ffr::useProgram(p_edge.handle);
 				ffr::setState(state);
 				const int loc_edge = ffr::getUniformLocation(p_edge.handle, m_pipeline->m_lod_uniform);
 				for(int i = 0; i < 6; ++i) {
 					ffr::applyUniform1i(loc_edge, i);
 					ffr::drawArrays(0, 64, ffr::PrimitiveType::POINTS);
-				}
+				}*/
 			}
 		}
 

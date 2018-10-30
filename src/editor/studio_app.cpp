@@ -1921,7 +1921,7 @@ public:
 		// TODO 
 		void visit(const Reflection::Property<float>& prop) override { notSupported(prop); }
 		void visit(const Reflection::Property<EntityPtr>& prop) override { notSupported(prop); }
-		void visit(const Reflection::Property<Int2>& prop) override { notSupported(prop); }
+		void visit(const Reflection::Property<IVec2>& prop) override { notSupported(prop); }
 		void visit(const Reflection::Property<Vec2>& prop) override { notSupported(prop); }
 		void visit(const Reflection::Property<Vec3>& prop) override { notSupported(prop); }
 		void visit(const Reflection::Property<Vec4>& prop) override { notSupported(prop); }

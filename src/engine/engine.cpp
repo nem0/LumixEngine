@@ -577,12 +577,12 @@ public:
 		}
 
 
-		void visit(const Reflection::Property<Int2>& prop) override
+		void visit(const Reflection::Property<IVec2>& prop) override
 		{
 			if (!equalStrings(property_name, prop.name)) return;
 			if (lua_istable(L, -1))
 			{
-				auto v = LuaWrapper::toType<Int2>(L, -1);
+				auto v = LuaWrapper::toType<IVec2>(L, -1);
 				InputBlob input_blob(&v, sizeof(v));
 				prop.setValue(cmp, -1, input_blob);
 			}

@@ -199,11 +199,11 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 	}
 
 
-	void visit(const Reflection::Property<Int2>& prop) override
+	void visit(const Reflection::Property<IVec2>& prop) override
 	{
 		if (skipProperty(prop)) return;
 		ComponentUID cmp = getComponent();
-		Int2 value;
+		IVec2 value;
 		OutputBlob blob(&value, sizeof(value));
 		prop.getValue(cmp, m_index, blob);
 		if (ImGui::DragInt2(prop.name, &value.x))

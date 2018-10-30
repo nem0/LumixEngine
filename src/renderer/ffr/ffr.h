@@ -129,6 +129,7 @@ enum class UniformType : uint {
 	VEC3,
 	VEC4,
 	IVEC2,
+	IVEC4,
 	MAT4,
 	MAT4X3,
 	MAT3X4
@@ -253,6 +254,7 @@ void pushDebugGroup(const char* msg);
 void popDebugGroup();
 int getAttribLocation(ProgramHandle program, const char* uniform_name);
 void setUniform1i(UniformHandle uniform, int value);
+void setUniform4i(UniformHandle uniform, const int* value);
 void setUniform2f(UniformHandle uniform, const float* value);
 void setUniform3f(UniformHandle uniform, const float* value);
 void setUniform4f(UniformHandle uniform, const float* value);
@@ -261,6 +263,7 @@ void setUniformMatrix4f(UniformHandle uniform, const float* value);
 void setUniformMatrix4x3f(UniformHandle uniform, const float* value);
 int getUniformLocation(ProgramHandle program_handle, UniformHandle uniform);
 void applyUniform1i(int location, int value);
+void applyUniform4i(int location, const int* value);
 void applyUniform4f(int location, const float* value);
 void applyUniformMatrix3x4f(int location, const float* value);
 void applyUniformMatrix4f(int location, const float* value);
