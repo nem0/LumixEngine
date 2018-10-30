@@ -668,7 +668,7 @@ RayCastModelHit Terrain::castRay(const DVec3& origin, const Vec3& dir)
 {
 	RayCastModelHit hit;
 	hit.is_hit = false;
-	ASSERT(false);
+	//ASSERT(false);
 	// TODO
 	return hit;
 }

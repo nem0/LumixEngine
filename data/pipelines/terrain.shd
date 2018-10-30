@@ -22,10 +22,13 @@ vertex_shader [[
 	#ifdef EDGE
 		out int vertex_id;
 	#else
+		out vec2 v_step;
 		out vec3 v_pos;
 		out vec2 v_lod_uv;
 	#endif
 	uniform int u_lod;
+	uniform ivec4 u_from_to;
+	uniform vec4 u_uv_from_to;
 	uniform vec3 u_rel_camera_pos;
 	
 	void main()
@@ -33,21 +36,23 @@ vertex_shader [[
 		#ifdef EDGE
 			vertex_id = gl_VertexID;
 		#else 
-			float s = pow(2, u_lod);
-			ivec2 ij = ivec2(trunc(trunc(u_rel_camera_pos.xz / s / 2) * s * 2) - ivec2(63 * s, 63 * s));
+			int w = u_from_to.z - u_from_to.x;
+			int h = u_from_to.w - u_from_to.y;
+			ivec2 ij = ivec2(
+				u_from_to.x + gl_VertexID % w,
+				u_from_to.y + gl_VertexID / w
+			);
+		
+			v_step.x = 1 / float(w);
+			v_step.y = 1 / float(h);
+			v_pos = vec3(ij.x, 0.0, ij.y) * (1 << u_lod);
+		
+			v_lod_uv.x = (gl_VertexID % w) * v_step.x;
+			v_lod_uv.y = (gl_VertexID / w) * v_step.y;
 			
-			float prev_s = pow(2, u_lod - 1);
-			ivec2 prev_ij = ivec2(trunc(trunc(u_rel_camera_pos.xz / prev_s / 2) * prev_s * 2) - ivec2(64 * prev_s, 64 * prev_s));
-
-			ij.x = int((gl_VertexID % 126) * s + ij.x);
-			ij.y = int((gl_VertexID / 126) * s + ij.y);
-			if (ij.x < prev_ij.x || ij.y < prev_ij.y || ij.x >= prev_ij.x + prev_s * 128 || ij.y >= prev_ij.y + prev_s * 128 || u_lod == 0) {
-				v_pos = vec3(ij.x, 0.0, ij.y);
-			}
-			else {
-				v_pos = vec3(-10, -10, -10);
-			}
-			v_lod_uv = vec2((gl_VertexID % 126 + 1) / 128.0, (1 + trunc(gl_VertexID / 126.0)) / 128.0);
+			v_lod_uv = u_uv_from_to.xy + (u_uv_from_to.zw -  u_uv_from_to.xy) * v_lod_uv;
+			
+			v_step *= u_uv_from_to.zw - u_uv_from_to.xy;
 		#endif
 	}
 ]]
@@ -60,6 +65,7 @@ geometry_shader [[
 		in int vertex_id[];
 	#else 
 		layout (triangle_strip, max_vertices = 4) out;
+		in vec2 v_step[];
 		in vec3 v_pos[];
 		in vec2 v_lod_uv[];
 	#endif
@@ -71,7 +77,7 @@ geometry_shader [[
 	layout(binding = 0) uniform sampler2D u_hm;
 	uniform vec3 u_rel_camera_pos;
 
-	const float hscale = 64;
+	const float hscale = 128;
 
 	#ifdef EDGE
 		void emitStrip(vec3 pos, int vid, float sx, float sy, float uv_y, float uv_y_off)
@@ -190,21 +196,21 @@ geometry_shader [[
 
 				v = v_pos[0] + vec3(s, 0, 0);
 				v_uv = v.xz;
-				v_uv_sub = v_lod_uv[0] + vec2(1/126.0, 0);
+				v_uv_sub = v_lod_uv[0] + vec2(v_step[0].x, 0);
 				h = texture(u_hm, v.xz / 2048).x * hscale;
 				gl_Position = u_camera_view_projection * vec4(u_position + v + vec3(0, h, 0), 1);
 				EmitVertex();
 
 				v = v_pos[0] + vec3(0, 0, s);
 				v_uv = v.xz;
-				v_uv_sub = v_lod_uv[0] + vec2(0, 1/126.0);
+				v_uv_sub = v_lod_uv[0] + vec2(0, v_step[0].y);
 				h = texture(u_hm, v.xz / 2048).x * hscale;
 				gl_Position = u_camera_view_projection * vec4(u_position + v + vec3(0, h, 0), 1);
 				EmitVertex();
 
 				v = v_pos[0] + vec3(s, 0, s);
 				v_uv = v.xz;
-				v_uv_sub = v_lod_uv[0] + vec2(1/126.0, 1/126.0);
+				v_uv_sub = v_lod_uv[0] + vec2(v_step[0].x, v_step[0].y);
 				h = texture(u_hm, v.xz / 2048).x * hscale;
 				gl_Position = u_camera_view_projection * vec4(u_position + v + vec3(0, h, 0), 1);
 				EmitVertex();

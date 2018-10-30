@@ -58,7 +58,7 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 			float light_intensity;
 			float light_indirect_intensity;
 			float time;
-			Int2 framebuffer_size;
+			IVec2 framebuffer_size;
 		};
 
 		struct GPUProfilerQuery

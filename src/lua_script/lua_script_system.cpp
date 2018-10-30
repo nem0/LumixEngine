@@ -608,7 +608,7 @@ namespace Lumix
 			void visit(const Reflection::Property<float>& prop) override { get(prop); }
 			void visit(const Reflection::Property<int>& prop) override { get(prop); }
 			void visit(const Reflection::Property<bool>& prop) override { get(prop); }
-			void visit(const Reflection::Property<Int2>& prop) override { get(prop); }
+			void visit(const Reflection::Property<IVec2>& prop) override { get(prop); }
 			void visit(const Reflection::Property<Vec2>& prop) override { get(prop); }
 			void visit(const Reflection::Property<Vec3>& prop) override { get(prop); }
 			void visit(const Reflection::Property<Vec4>& prop) override { get(prop); }
@@ -667,7 +667,7 @@ namespace Lumix
 			void visit(const Reflection::Property<float>& prop) override { set(prop); }
 			void visit(const Reflection::Property<int>& prop) override { set(prop); }
 			void visit(const Reflection::Property<bool>& prop) override { set(prop); }
-			void visit(const Reflection::Property<Int2>& prop) override { set(prop); }
+			void visit(const Reflection::Property<IVec2>& prop) override { set(prop); }
 			void visit(const Reflection::Property<Vec2>& prop) override { set(prop); }
 			void visit(const Reflection::Property<Vec3>& prop) override { set(prop); }
 			void visit(const Reflection::Property<Vec4>& prop) override { set(prop); }
@@ -769,7 +769,7 @@ namespace Lumix
 			void visit(const Reflection::Property<float>& prop) override { set(prop); }
 			void visit(const Reflection::Property<int>& prop) override { set(prop); }
 			void visit(const Reflection::Property<EntityPtr>& prop) override { set(prop); }
-			void visit(const Reflection::Property<Int2>& prop) override { set(prop); }
+			void visit(const Reflection::Property<IVec2>& prop) override { set(prop); }
 			void visit(const Reflection::Property<Vec2>& prop) override { set(prop); }
 			void visit(const Reflection::Property<Vec3>& prop) override { set(prop); }
 			void visit(const Reflection::Property<Vec4>& prop) override { set(prop); }

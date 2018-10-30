@@ -8,20 +8,41 @@ namespace Lumix
 {
 
 
-struct Int2
+struct Vec2;
+
+
+struct LUMIX_ENGINE_API IVec2
 {
-	Int2() {}
-	Int2(int x, int y) : x(x), y(y) {}
-	Int2 operator -(const Int2& v) const { return Int2(x - v.x, y - v.y); }
+	IVec2() {}
+	explicit IVec2(int i) : x(i), y(i) {}
+	explicit inline IVec2(const Vec2& rhs);
+	IVec2(int x, int y) : x(x), y(y) {}
+	IVec2 operator +(const IVec2& v) const { return IVec2(x + v.x, y + v.y); }
+	IVec2 operator -(const IVec2& v) const { return IVec2(x - v.x, y - v.y); }
+	IVec2 operator *(int i) const { return IVec2(x * i, y * i); }
 
 	int x;
 	int y;
 };
 
 
+struct LUMIX_ENGINE_API IVec4
+{
+	IVec4() {}
+	IVec4(const IVec2& a, const IVec2& b) : x(a.x), y(a.y), z(b.x), w(b.y) {}
+	int x, y, z, w;
+};
+
+
 struct LUMIX_ENGINE_API Vec2
 {
 	Vec2() {}
+	
+	explicit Vec2(const IVec2& rhs)
+		: x(float(rhs.x))
+		, y(float(rhs.y))
+	{
+	}
 
 	explicit Vec2(float a)
 		: x(a)
@@ -265,6 +286,13 @@ struct DVec3
 };
 
 
+IVec2::IVec2(const Vec2& rhs)
+	: x(int(rhs.x))
+	, y(int(rhs.y))
+{
+}
+
+
 inline Vec3 operator *(float f, const Vec3& v)
 {
 	return Vec3(f * v.x, f * v.y, f * v.z);
@@ -307,8 +335,10 @@ struct LUMIX_ENGINE_API Vec4
 	{
 	}
 
+	Vec2 xz() const { return Vec2(x, z); }
 	Vec2 xy() const { return Vec2(x, y); }
 	Vec3 xyz() const { return Vec3(x, y, z); }
+	Vec2 yz() const { return Vec2(y, z); }
 	Vec3 rgb() const { return Vec3(x, y, z); }
 
 	template<typename L>

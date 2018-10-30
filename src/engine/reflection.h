@@ -24,7 +24,7 @@ template <typename T> class Array;
 struct IAllocator;
 class Path;
 class PropertyDescriptorBase;
-struct Int2;
+struct IVec2;
 struct Vec2;
 struct Vec3;
 struct Vec4;
@@ -262,7 +262,7 @@ struct IPropertyVisitor
 	virtual void visit(const Property<float>& prop) = 0;
 	virtual void visit(const Property<int>& prop) = 0;
 	virtual void visit(const Property<EntityPtr>& prop) = 0;
-	virtual void visit(const Property<Int2>& prop) = 0;
+	virtual void visit(const Property<IVec2>& prop) = 0;
 	virtual void visit(const Property<Vec2>& prop) = 0;
 	virtual void visit(const Property<Vec3>& prop) = 0;
 	virtual void visit(const Property<Vec4>& prop) = 0;
@@ -284,7 +284,7 @@ struct ISimpleComponentVisitor : IPropertyVisitor
 	void visit(const Property<float>& prop) override { visitProperty(prop); }
 	void visit(const Property<int>& prop) override { visitProperty(prop); }
 	void visit(const Property<EntityPtr>& prop) override { visitProperty(prop); }
-	void visit(const Property<Int2>& prop) override { visitProperty(prop); }
+	void visit(const Property<IVec2>& prop) override { visitProperty(prop); }
 	void visit(const Property<Vec2>& prop) override { visitProperty(prop); }
 	void visit(const Property<Vec3>& prop) override { visitProperty(prop); }
 	void visit(const Property<Vec4>& prop) override { visitProperty(prop); }

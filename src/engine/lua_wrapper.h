@@ -236,9 +236,9 @@ template <> inline Matrix toType(lua_State* L, int index)
 	}
 	return v;
 }
-template <> inline Int2 toType(lua_State* L, int index)
+template <> inline IVec2 toType(lua_State* L, int index)
 {
-	Int2 v;
+	IVec2 v;
 	lua_rawgeti(L, index, 1);
 	v.x = (int)lua_tointeger(L, -1);
 	lua_pop(L, 1);
@@ -451,7 +451,7 @@ inline void push(lua_State* L, const Matrix& value)
 		lua_rawseti(L, -2, i + 1);
 	}
 }
-inline void push(lua_State* L, const Int2& value)
+inline void push(lua_State* L, const IVec2& value)
 {
 	lua_createtable(L, 2, 0);
 
