@@ -1215,15 +1215,6 @@ public:
 			if(r.entity != INVALID_ENTITY)
 			{
 				serializer.write(r.model ? r.model->getPath().getHash() : 0);
-				bool has_changed_materials = r.model && r.model->isReady() && r.meshes != &r.model->getMesh(0);
-				serializer.write(has_changed_materials ? r.mesh_count : 0);
-				if (has_changed_materials)
-				{
-					for (int i = 0; i < r.mesh_count; ++i)
-					{
-						serializer.writeString(r.meshes[i].material->getPath().c_str());
-					}
-				}
 			}
 			
 		}
@@ -1234,6 +1225,7 @@ public:
 		serializer.write((i32)m_terrains.size());
 		for (auto* terrain : m_terrains)
 		{
+			serializer.write(terrain->getEntity());
 			terrain->serialize(serializer);
 		}
 	}
@@ -1343,6 +1335,7 @@ public:
 			EntityRef entity;
 			serializer.read(entity);
 			EnvironmentProbe& probe = m_environment_probes.insert(entity);
+			serializer.read(probe.radius);
 			serializer.read(probe.guid);
 			serializer.read(probe.flags.base);
 			serializer.read(probe.radiance_size);
@@ -1516,7 +1509,9 @@ public:
 		serializer.read(size);
 		for (int i = 0; i < size; ++i)
 		{
-			auto* terrain = LUMIX_NEW(m_allocator, Terrain)(m_renderer, INVALID_ENTITY, *this, m_allocator);
+			EntityRef entity;
+			serializer.read(entity);
+			auto* terrain = LUMIX_NEW(m_allocator, Terrain)(m_renderer, entity, *this, m_allocator);
 			terrain->deserialize(serializer, m_universe, *this);
 			m_terrains.insert(terrain->getEntity(), terrain);
 		}
