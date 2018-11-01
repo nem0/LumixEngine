@@ -19,204 +19,103 @@ texture_slot {
 }
 
 vertex_shader [[
-	#ifdef EDGE
-		out int vertex_id;
-	#else
-		out vec2 v_step;
-		out vec3 v_pos;
-		out vec2 v_lod_uv;
-	#endif
-	uniform int u_lod;
-	uniform ivec4 u_from_to;
-	uniform vec4 u_uv_from_to;
-	uniform vec3 u_rel_camera_pos;
+	out int v_vid;
 	
 	void main()
 	{
-		#ifdef EDGE
-			vertex_id = gl_VertexID;
-		#else 
-			int w = u_from_to.z - u_from_to.x;
-			int h = u_from_to.w - u_from_to.y;
-			ivec2 ij = ivec2(
-				u_from_to.x + gl_VertexID % w,
-				u_from_to.y + gl_VertexID / w
-			);
-		
-			v_step.x = 1 / float(w);
-			v_step.y = 1 / float(h);
-			v_pos = vec3(ij.x, 0.0, ij.y) * (1 << u_lod);
-		
-			v_lod_uv.x = (gl_VertexID % w) * v_step.x;
-			v_lod_uv.y = (gl_VertexID / w) * v_step.y;
-			
-			v_lod_uv = u_uv_from_to.xy + (u_uv_from_to.zw -  u_uv_from_to.xy) * v_lod_uv;
-			
-			v_step *= u_uv_from_to.zw - u_uv_from_to.xy;
-		#endif
+		v_vid = gl_VertexID;
 	}
 ]]
 
 
 geometry_shader [[
 	layout (points) in;
-	#ifdef EDGE
-		layout (triangle_strip, max_vertices = 20) out;
-		in int vertex_id[];
-	#else 
-		layout (triangle_strip, max_vertices = 4) out;
-		in vec2 v_step[];
-		in vec3 v_pos[];
-		in vec2 v_lod_uv[];
-	#endif
+	layout (triangle_strip, max_vertices = 4) out;
+	in int v_vid[];
 	
-	out vec2 v_uv;
 	out vec2 v_uv_sub;
+	out vec2 v_uv;
+	uniform sampler2D u_hm;
 	uniform vec3 u_position;
 	uniform int u_lod;
-	layout(binding = 0) uniform sampler2D u_hm;
 	uniform vec3 u_rel_camera_pos;
+	uniform ivec4 u_from_to;
+	uniform vec4 u_uv_from_to;
 
+	
 	const float hscale = 128;
 
-	#ifdef EDGE
-		void emitStrip(vec3 pos, int vid, float sx, float sy, float uv_y, float uv_y_off)
-		{
-			if(pos.x >= -0.5 && pos.z >= -0.5 && pos.x + sx < 2048.5 && pos.z + sy < 2048.5) {
-				vec3 v = pos + vec3(0, 0, sy * 0.5);
-				v_uv = v.xz;
-				v_uv_sub = vec2(vertex_id[0] / 64.0, uv_y + uv_y_off);
-				float h = texture(u_hm, v.xz / 2048).x * hscale;
-				gl_Position = u_camera_view_projection * vec4(u_position + v + vec3(0, h, 0), 1);
-				EmitVertex();
+	
+	void getVertex(ivec2 ij, out vec3 pos, out vec2 uv_sub)
+	{
+		pos = vec3(ij.x, 0.0, ij.y) * (1 << u_lod);
+		vec3 npos = vec3(ij.x & ~1, 0.0, ij.y & ~1) * (1 << u_lod);
 
-				v = pos;
-				v_uv = v.xz;
-				v_uv_sub = vec2(vertex_id[0] / 64.0, uv_y);
-				h = texture(u_hm, v.xz / 2048).x * hscale;
-				gl_Position = u_camera_view_projection * vec4(u_position + v + vec3(0, h, 0), 1);
-				EmitVertex();
-
-				v = pos + vec3(sx * 0.5, 0, sy * 0.5);
-				v_uv = v.xz;
-				v_uv_sub = vec2(vertex_id[0] / 64.0 + 1 / 128.0, uv_y + uv_y_off);
-				h = texture(u_hm, v.xz / 2048).x * hscale;
-				gl_Position = u_camera_view_projection * vec4(u_position + v + vec3(0, h, 0), 1);
-				EmitVertex();
-
-				v = pos + vec3(sx, 0, 0);
-				v_uv = v.xz;
-				v_uv_sub = vec2(vertex_id[0] / 64.0 + 2 / 128.0, uv_y);
-				h = texture(u_hm, v.xz / 2048).x * hscale;
-				gl_Position = u_camera_view_projection * vec4(u_position + v + vec3(0, h, 0), 1);
-				EmitVertex();
-
-				if(vid < 63) {
-					v = pos + vec3(sx, 0, sy * 0.5);
-					v_uv = v.xz;
-					v_uv_sub = vec2(vertex_id[0] / 64.0 + 2 / 128.0, uv_y + uv_y_off);
-					h = texture(u_hm, v.xz / 2048).x * hscale;
-					gl_Position = u_camera_view_projection * vec4(u_position + v + vec3(0, h, 0), 1);
-					EmitVertex();
-				}
-				EndPrimitive();
-			}
-		}
+		vec2 size = vec2(u_from_to.zw - u_from_to.xy);
+		uv_sub = (ij - u_from_to.xy) / size;
+		uv_sub = mix(u_uv_from_to.xy, u_uv_from_to.zw, uv_sub);
 		
-		void emitStripV(vec3 pos, int vid, float sx, float sy, float uv_x, float uv_x_off)
-		{
-			if(pos.x >= -0.5 && pos.z >= -0.5 && pos.x + sx * 0.5 < 2048.5 && pos.z + sy < 2048.5) {
-				vec3 v = pos + vec3(sx * 0.5, 0, 0);
-				v_uv = v.xz;
-				v_uv_sub = vec2(uv_x + uv_x_off, vertex_id[0] / 64.0);
-				float h = texture(u_hm, v.xz / 2048).x * hscale;
-				gl_Position = u_camera_view_projection * vec4(u_position + v + vec3(0, h, 0), 1);
-				EmitVertex();
-
-				v = pos;
-				v_uv = v.xz;
-				v_uv_sub = vec2(uv_x, vertex_id[0] / 64.0);
-				h = texture(u_hm, v.xz / 2048).x * hscale;
-				gl_Position = u_camera_view_projection * vec4(u_position + v + vec3(0, h, 0), 1);
-				EmitVertex();
-
-				v = pos + vec3(sx * 0.5, 0, sy * 0.5);
-				v_uv = v.xz;
-				v_uv_sub = vec2(uv_x + uv_x_off, vertex_id[0] / 64.0 + 1 / 128.0);
-				h = texture(u_hm, v.xz / 2048).x * hscale;
-				gl_Position = u_camera_view_projection * vec4(u_position + v + vec3(0, h, 0), 1);
-				EmitVertex();
-
-				v = pos + vec3(0, 0, sy);
-				v_uv = v.xz;
-				v_uv_sub = vec2(uv_x, vertex_id[0] / 64.0 + 2 / 128.0);
-				h = texture(u_hm, v.xz / 2048).x * hscale;
-				gl_Position = u_camera_view_projection * vec4(u_position + v + vec3(0, h, 0), 1);
-				EmitVertex();
-				
-				if(vid < 63) {
-					v = pos + vec3(sx * 0.5, 0, sy);
-					v_uv = v.xz;
-					v_uv_sub = vec2(uv_x + uv_x_off, vertex_id[0] / 64.0 + 2 / 128.0);
-					h = texture(u_hm, v.xz / 2048).x * hscale;
-					gl_Position = u_camera_view_projection * vec4(u_position + v + vec3(0, h, 0), 1);
-					EmitVertex();
-				}
-				EndPrimitive();
-			}
-		}
-	#endif
+		vec2 rel = saturate(abs(uv_sub - vec2(0.5)) * 10 - 4);
+		
+		pos.x = mix(pos.x, npos.x, rel.y);
+		pos.z = mix(pos.z, npos.z, rel.x);
+		
+		uv_sub = (pos.xz / float(1 << u_lod) - u_from_to.xy) / size;
+		uv_sub = mix(u_uv_from_to.xy, u_uv_from_to.zw, uv_sub);
+	}
 	
 	void main()
 	{
+		vec2 v_step;
+		ivec2 size = ivec2(u_from_to.zw - u_from_to.xy);
+		v_step = 1.0 / size;
+
+		vec2 v_rel;
+		v_rel.x = (v_vid[0] % size.x) / float(size.x);
+		v_rel.y = (v_vid[0] / size.x) / float(size.y);
+		
+		ivec2 ij = ivec2(
+			u_from_to.x + v_vid[0] % size.x,
+			u_from_to.y + v_vid[0] / size.x
+		);
+		
+		vec2 v_lod_uv;
+		v_lod_uv.x = (v_vid[0] % size.x) * v_step.x;
+		v_lod_uv.y = (v_vid[0] / size.x) * v_step.y;
+		
+		v_lod_uv = u_uv_from_to.xy + (u_uv_from_to.zw -  u_uv_from_to.xy) * v_lod_uv;
+		
+		v_step *= u_uv_from_to.zw - u_uv_from_to.xy;
+		
+		vec2 rel = saturate(abs(v_lod_uv - vec2(0.5)) * 10 - 4);
+		
 		float s = pow(2, u_lod);
-
-		#ifdef EDGE
-			ivec2 ij = ivec2(ivec2(u_rel_camera_pos.xz / s / 2) * s * 2) - ivec2(64 * s, 64 * s);
-			vec3 pos = vec3(int(vertex_id[0] * s * 2 + ij.x), 0.0, ij.y);
-			s = s * 2;
-
-			emitStrip(pos, vertex_id[0], s, s, 0, 1 / 128.0);
-			emitStrip(pos + vec3(0, 0, s * 64), vertex_id[0], s, -s, 1, -1/128.0);
 			
-			ij = ivec2(ivec2(u_rel_camera_pos.xz / s) * s) - ivec2(32 * s, 32 * s);
-			pos = vec3(ij.x, 0.0, int(vertex_id[0] * s + ij.y));
+		vec3 v;
+		getVertex(ij, v, v_uv_sub);
+		v_uv = v.xz / 2048;
+		float h = texture(u_hm, v.xz / 2048).x * hscale;
+		gl_Position = u_camera_view_projection * vec4(u_position + v + vec3(0, h, 0), 1);
+		EmitVertex();
 
-			emitStripV(pos, vertex_id[0], s, s, 0, 1 / 128.0);
-			emitStripV(pos + vec3(s * 64, 0, 0), vertex_id[0], -s, s, 1, -1/128.0);
-						
-		#else
-			if(v_pos[0].x >= -0.5 && v_pos[0].z >= -0.5 && v_pos[0].x + s < 2048.5 && v_pos[0].z + s < 2048.5) {
-				vec3 v = v_pos[0];
-				v_uv = v.xz;
-				v_uv_sub = v_lod_uv[0];
-				float h = texture(u_hm, v.xz / 2048).x * hscale;
-				gl_Position = u_camera_view_projection * vec4(u_position + v + vec3(0, h, 0), 1);
-				EmitVertex();
+		getVertex(ij + ivec2(1, 0), v, v_uv_sub);
+		v_uv = v.xz / 2048;
+		h = texture(u_hm, v.xz / 2048).x * hscale;
+		gl_Position = u_camera_view_projection * vec4(u_position + v + vec3(0, h, 0), 1);
+		EmitVertex();
 
-				v = v_pos[0] + vec3(s, 0, 0);
-				v_uv = v.xz;
-				v_uv_sub = v_lod_uv[0] + vec2(v_step[0].x, 0);
-				h = texture(u_hm, v.xz / 2048).x * hscale;
-				gl_Position = u_camera_view_projection * vec4(u_position + v + vec3(0, h, 0), 1);
-				EmitVertex();
+		getVertex(ij + ivec2(0, 1), v, v_uv_sub);
+		v_uv = v.xz / 2048;
+		h = texture(u_hm, v.xz / 2048).x * hscale;
+		gl_Position = u_camera_view_projection * vec4(u_position + v + vec3(0, h, 0), 1);
+		EmitVertex();
 
-				v = v_pos[0] + vec3(0, 0, s);
-				v_uv = v.xz;
-				v_uv_sub = v_lod_uv[0] + vec2(0, v_step[0].y);
-				h = texture(u_hm, v.xz / 2048).x * hscale;
-				gl_Position = u_camera_view_projection * vec4(u_position + v + vec3(0, h, 0), 1);
-				EmitVertex();
-
-				v = v_pos[0] + vec3(s, 0, s);
-				v_uv = v.xz;
-				v_uv_sub = v_lod_uv[0] + vec2(v_step[0].x, v_step[0].y);
-				h = texture(u_hm, v.xz / 2048).x * hscale;
-				gl_Position = u_camera_view_projection * vec4(u_position + v + vec3(0, h, 0), 1);
-				EmitVertex();
-				EndPrimitive();
-			}
-		#endif
+		getVertex(ij + ivec2(1, 1), v, v_uv_sub);
+		v_uv = v.xz / 2048;
+		h = texture(u_hm, v.xz / 2048).x * hscale;
+		gl_Position = u_camera_view_projection * vec4(u_position + v + vec3(0, h, 0), 1);
+		EmitVertex();
+		EndPrimitive();
 	}
 ]]
 
@@ -231,21 +130,35 @@ fragment_shader [[
 		layout(location = 0) out vec4 o_color;
 	#endif
 
-	in vec2 v_uv;
 	in vec2 v_uv_sub;
+	in vec2 v_uv;
 	layout(binding = 0) uniform sampler2D u_hm;
 	layout(binding = 1) uniform sampler2DArray u_slices;
 	uniform int u_lod;
+
+	const float hscale = 128;
+
+	vec3 getNormal(vec2 uv)
+	{
+		vec3 off = vec3(-1.0/2048.0, 0, 1.0/2048.0);
+		float s01 = texture2D(u_hm, uv + off.xy).x;
+		float s21 = texture2D(u_hm, uv + off.zy).x;
+		float s10 = texture2D(u_hm, uv + off.yx).x;
+		float s12 = texture2D(u_hm, uv + off.yz).x;
+		vec3 va = normalize(vec3(1.0, (s21-s01) * hscale, 0.0));
+		vec3 vb = normalize(vec3(0.0, (s12-s10) * hscale, 1.0));
+		return normalize(cross(vb,va));
+	}
 	
 	void getData()
 	{
-		data.normal = vec3(0, 1, 0);
+		data.normal = getNormal(v_uv);
 		data.albedo = pow(texture(u_slices, vec3(v_uv_sub, u_lod)), vec4(2.2));
 		#ifdef ALPHA_CUTOUT
 			if(data.albedo.a < 0.5) discard;
 		#endif
 		data.wpos = vec3(0);
-		data.roughness = 1.0;
+		data.roughness = 0.9;
 		data.metallic  = 0;
 		data.emission = 0;
 	}
