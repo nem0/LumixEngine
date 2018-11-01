@@ -2057,10 +2057,10 @@ struct PipelineImpl final : Pipeline
 
 					const int s = 1 << i;
 					// round 
-					IVec2 from = IVec2((m_rel_cam_pos.xz() + Vec2(0.5f * s)) / float(s)) - IVec2(32);
+					IVec2 from = IVec2((m_rel_cam_pos.xz() + Vec2(0.5f * s)) / float(s)) - IVec2(64);
 					from.x = from.x & ~1;
 					from.y = from.y & ~1;
-					IVec2 to = from + IVec2(64);
+					IVec2 to = from + IVec2(128);
 					// clamp
 					const IVec2 from_unclamped = from;
 					const IVec2 to_unclamped = to;
@@ -2155,7 +2155,9 @@ struct PipelineImpl final : Pipeline
 			const u32 deferred_define_mask = 1 << m_pipeline->m_renderer.getShaderDefineIdx("DEFERRED");
 			const u8 edge_define_idx = m_pipeline->m_renderer.getShaderDefineIdx("EDGE");
 			
-			const u64 state = m_render_state;
+			u64 state = m_render_state;
+			static bool b = false;
+			if (b) state |= (u64)ffr::StateFlags::WIREFRAME;
 
 			for (Instance& inst : m_instances) {
 				auto& p = Shader::getProgram(inst.shader, deferred_define_mask);
@@ -2175,7 +2177,6 @@ struct PipelineImpl final : Pipeline
 				ffr::bindTexture(0, inst.heightmap);
 				ffr::bindTexture(1, inst.slices);
 
-				ffr::useProgram(p.handle);
 				ffr::setState(state);
 				const int loc = ffr::getUniformLocation(p.handle, m_pipeline->m_lod_uniform);
 				const int loc2 = ffr::getUniformLocation(p.handle, ffr::allocUniform("u_from_to", ffr::UniformType::IVEC4, 1));
@@ -2184,10 +2185,10 @@ struct PipelineImpl final : Pipeline
 				for (int i = 0; ; ++i) {
 					const int s = 1 << i;
 					// round 
-					IVec2 from = IVec2((lpos.xz() + Vec2(0.5f * s)) / float(s)) - IVec2(32);
+					IVec2 from = IVec2((lpos.xz() + Vec2(0.5f * s)) / float(s)) - IVec2(64);
 					from.x = from.x & ~1;
 					from.y = from.y & ~1;
-					IVec2 to = from + IVec2(64);
+					IVec2 to = from + IVec2(128);
 					// clamp
 					const IVec2 from_unclamped = from;
 					const IVec2 to_unclamped = to;
@@ -2197,8 +2198,7 @@ struct PipelineImpl final : Pipeline
 					to.x = Math::clamp(to.x, 0, 1024 / s);
 					to.y = Math::clamp(to.y, 0, 1024 / s);
 
-					
-					auto draw_rect = [loc, loc2, loc3, i, from, to](const IVec2& subfrom, const IVec2& subto){
+					auto draw_rect = [&](const IVec2& subfrom, const IVec2& subto){
 						if (subfrom.x >= subto.x || subfrom.y >= subto.y) return;
 						const IVec4 from_to(subfrom, subto);
 						const Vec4 uv_from_to(
@@ -2207,6 +2207,7 @@ struct PipelineImpl final : Pipeline
 							(subto.x - from.x) / float(to.x - from.x),
 							(subto.y - from.y) / float(to.y - from.y)
 						);
+						ffr::useProgram(p.handle);
 						ffr::applyUniform4f(loc3, &uv_from_to.x);
 						ffr::applyUniform4i(loc2, &from_to.x);
 						ffr::applyUniform1i(loc, i);
@@ -2214,11 +2215,11 @@ struct PipelineImpl final : Pipeline
 					};
 
 					if (i > 0) {
-						if (prev_from_to.y > from.y * 2) draw_rect(from, IVec2(to.x, prev_from_to.y / 2));
-						if (prev_from_to.w < to.y * 2) draw_rect(IVec2(from.x, prev_from_to.w / 2), to);
+						draw_rect(from, IVec2(to.x, prev_from_to.y / 2));
+						draw_rect(IVec2(from.x, prev_from_to.w / 2), to);
 						
-						if (prev_from_to.z < to.x * 2) draw_rect(IVec2(prev_from_to.z / 2, prev_from_to.y / 2), IVec2(to.x, prev_from_to.w / 2));
-						if (prev_from_to.x > from.x * 2) draw_rect(IVec2(from.x, prev_from_to.y / 2), IVec2(prev_from_to.x / 2, prev_from_to.w / 2));
+						draw_rect(IVec2(prev_from_to.z / 2, prev_from_to.y / 2), IVec2(to.x, prev_from_to.w / 2));
+						draw_rect(IVec2(from.x, prev_from_to.y / 2), IVec2(prev_from_to.x / 2, prev_from_to.w / 2));
 					}
 					else {
 						draw_rect(from, to);
