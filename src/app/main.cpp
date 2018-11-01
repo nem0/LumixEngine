@@ -124,7 +124,7 @@ public:
 			}
 		}
 
-		u32 flags = SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI;
+		u32 flags = SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_OPENGL;
 		if (!m_window_mode) flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
 
 		g_log_info.getCallback().bind<outputToConsole>();
@@ -153,7 +153,12 @@ public:
 		m_file_system->setSaveGameDevice("memory:disk");
 
 		m_engine = Engine::create(current_dir, m_file_system, m_allocator);
+		ffr::preinit(m_allocator);
+		SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+		SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
+		SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 5);
 		m_window = SDL_CreateWindow("Lumix App", 0, 0, 600, 400, flags);
+		SDL_GL_CreateContext(m_window);
 		if (!m_window_mode) SDL_SetWindowFullscreen(m_window, SDL_WINDOW_FULLSCREEN_DESKTOP);
 		SDL_SysWMinfo window_info;
 		SDL_VERSION(&window_info.version);
@@ -169,13 +174,6 @@ public:
 		#endif
 		m_engine->setPlatformData(platform_data);
 
-		m_engine->getPluginManager().load("renderer");
-		m_engine->getPluginManager().load("animation");
-		m_engine->getPluginManager().load("audio");
-		m_engine->getPluginManager().load("navigation");
-		m_engine->getPluginManager().load("lua_script");
-		m_engine->getPluginManager().load("physics");
-		m_engine->getPluginManager().load("gui");
 		#ifdef LUMIXENGINE_PLUGINS
 			const char* plugins[] = { LUMIXENGINE_PLUGINS };
 			for (auto plugin : plugins)
