@@ -70,7 +70,7 @@ struct System
 		m_work_signal.reset();
 		for(int i = 0; i < 4096; ++i) {
 			m_free_queue[i] = i;
-			m_signals_pool[i].sibling = INVALID_HANDLE;
+			m_signals_pool[i].sibling = JobSystem::INVALID_HANDLE;
 			m_signals_pool[i].generation = 0;
 		}
 	}
@@ -214,20 +214,13 @@ static LUMIX_FORCE_INLINE SignalHandle allocateSignal()
 	const u32 handle = g_system->m_free_queue.back();
 	Signal& w = g_system->m_signals_pool[handle & HANDLE_ID_MASK];
 	w.value = 1;
-	w.sibling = INVALID_HANDLE;
+	w.sibling = JobSystem::INVALID_HANDLE;
 	w.next_job.task = nullptr;
 	g_system->m_free_queue.pop();
 
 	const u32 gen = (((handle >> 16) + 1) % 0xffFF) << 16;
 	w.generation = gen;
 	return handle & HANDLE_ID_MASK | gen;
-}
-
-
-SignalHandle createSignal()
-{
-	MT::SpinLock lock(g_system->m_sync);
-	return allocateSignal();
 }
 
 
@@ -259,6 +252,8 @@ void trigger(SignalHandle handle)
 
 static LUMIX_FORCE_INLINE bool isSignalZero(SignalHandle handle, bool lock)
 {
+	if (!isValid(handle)) return true;
+
 	const u32 gen = handle & HANDLE_GENERATION_MASK;
 	const u32 id = handle & HANDLE_ID_MASK;
 	
@@ -270,12 +265,11 @@ static LUMIX_FORCE_INLINE bool isSignalZero(SignalHandle handle, bool lock)
 }
 
 
-static LUMIX_FORCE_INLINE SignalHandle runInternal(void* data
+static LUMIX_FORCE_INLINE void runInternal(void* data
 	, void (*task)(void*)
 	, SignalHandle precondition
-	, bool waitable
 	, bool lock
-	, SignalHandle dec_on_finish)
+	, SignalHandle* on_finish)
 {
 	Job j;
 	j.data = data;
@@ -283,13 +277,14 @@ static LUMIX_FORCE_INLINE SignalHandle runInternal(void* data
 
 	if (lock) g_system->m_sync.lock();
 	j.dec_on_finish = [&]() -> SignalHandle {
-		if (!waitable) return INVALID_HANDLE;
-		if (isValid(dec_on_finish)) {
-			++g_system->m_signals_pool[dec_on_finish & HANDLE_ID_MASK].value;
-			return dec_on_finish;
+		if (!on_finish) return INVALID_HANDLE;
+		if (isValid(*on_finish) && !isSignalZero(*on_finish, false)) {
+			++g_system->m_signals_pool[*on_finish & HANDLE_ID_MASK].value;
+			return *on_finish;
 		}
 		return allocateSignal();
 	}();
+	if (on_finish) *on_finish = j.dec_on_finish;
 
 	if (!isValid(precondition) || isSignalZero(precondition, false)) {
 		g_system->m_job_queue.push(j);
@@ -310,19 +305,12 @@ static LUMIX_FORCE_INLINE SignalHandle runInternal(void* data
 	}
 
 	if (lock) g_system->m_sync.unlock();
-	return j.dec_on_finish;
 }
 
 
-void run(SignalHandle trigger_on_finish, void* data, void (*task)(void*))
+void run(void* data, void (*task)(void*), SignalHandle* on_finished, SignalHandle precondition)
 {
-	runInternal(data, task, INVALID_HANDLE, true, true, trigger_on_finish);
-}
-
-
-SignalHandle run(void* data, void (*task)(void*), SignalHandle precondition)
-{
-	return runInternal(data, task, precondition, true, true, INVALID_HANDLE);
+	runInternal(data, task, precondition, true, on_finished);
 }
 
 
@@ -410,27 +398,6 @@ void shutdown()
 }
 
 
-SignalHandle mergeSignals(const SignalHandle* signals, int count)
-{
-	ASSERT(count > 0);
-	if (count == 1) return signals[0];
-
-	MT::SpinLock lock(g_system->m_sync);
-	const SignalHandle handle = allocateSignal();
-
-	Signal& counter = g_system->m_signals_pool[handle & HANDLE_ID_MASK];
-	for (int i = 0; i < count; ++i) {
-		runInternal(nullptr, [](void*){}, signals[i], true, false, handle);
-	}
-	if(--counter.value == 0) {
-		counter.next_job.task = nullptr;
-		ASSERT(isValid(handle));
-		g_system->m_free_queue.push(handle);
-	}
-	return handle;
-}
-
-
 void wait(SignalHandle handle)
 {
 	g_system->m_sync.lock();
@@ -445,7 +412,7 @@ void wait(SignalHandle handle)
 
 		runInternal(fiber_decl, [](void* data){
 			g_system->m_ready_fibers.push((FiberDecl*)data);
-		}, handle, false, false, INVALID_HANDLE);
+		}, handle, false, nullptr);
 		fiber_decl->job_finished = false;
 
 		Fiber::switchTo(&fiber_decl->fiber, fiber_decl->worker_task->m_primary_fiber);
@@ -458,7 +425,7 @@ void wait(SignalHandle handle)
 
 		runInternal(nullptr, [](void* data) {
 			g_system->m_event_outside_job.trigger();
-		}, handle, false, false, INVALID_HANDLE);
+		}, handle, false, nullptr);
 
 		g_system->m_sync.unlock();
 

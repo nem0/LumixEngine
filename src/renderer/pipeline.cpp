@@ -2057,10 +2057,10 @@ struct PipelineImpl final : Pipeline
 
 					const int s = 1 << i;
 					// round 
-					IVec2 from = IVec2((m_rel_cam_pos.xz() + Vec2(0.5f * s)) / float(s)) - IVec2(64);
+					IVec2 from = IVec2((m_rel_cam_pos.xz() + Vec2(0.5f * s)) / float(s)) - IVec2(4);
 					from.x = from.x & ~1;
 					from.y = from.y & ~1;
-					IVec2 to = from + IVec2(128);
+					IVec2 to = from + IVec2(8);
 					// clamp
 					const IVec2 from_unclamped = from;
 					const IVec2 to_unclamped = to;
@@ -2185,10 +2185,10 @@ struct PipelineImpl final : Pipeline
 				for (int i = 0; ; ++i) {
 					const int s = 1 << i;
 					// round 
-					IVec2 from = IVec2((lpos.xz() + Vec2(0.5f * s)) / float(s)) - IVec2(64);
+					IVec2 from = IVec2((lpos.xz() + Vec2(0.5f * s)) / float(s)) - IVec2(4);
 					from.x = from.x & ~1;
 					from.y = from.y & ~1;
-					IVec2 to = from + IVec2(128);
+					IVec2 to = from + IVec2(8);
 					// clamp
 					const IVec2 from_unclamped = from;
 					const IVec2 to_unclamped = to;
@@ -2589,7 +2589,7 @@ struct PipelineImpl final : Pipeline
 		{
 			Array<CreateSortKeys> create_sort_keys(m_allocator);
 			create_sort_keys.reserve(renderables.size());
-			JobSystem::SignalHandle counter = JobSystem::createSignal();
+			JobSystem::SignalHandle counter = JobSystem::INVALID_HANDLE;
 			const u8 local_light_layer = m_pipeline->m_renderer.getLayerIdx("local_light");
 			const u8 local_light_bucket = m_bucket_map[local_light_layer];
 			for(int i = 0; i < renderables.size(); ++i) {
@@ -2602,9 +2602,8 @@ struct PipelineImpl final : Pipeline
 				ctx.count = renderables[i].size();
 				ctx.camera_pos = m_pipeline->m_viewport.pos;
 				ctx.cmd = this;
-				JobSystem::run(counter, &ctx, &CreateSortKeys::execute);
+				JobSystem::run(&ctx, &CreateSortKeys::execute, &counter, JobSystem::INVALID_HANDLE);
 			}
-			JobSystem::trigger(counter);
 			JobSystem::wait(counter);
 			sort_keys.merge();
 			subrenderables.merge();
@@ -2638,7 +2637,7 @@ struct PipelineImpl final : Pipeline
 			Array<CreateCommands> create_commands(m_allocator);
 			const int job_count = Math::minimum(size, 16);
 			create_commands.reserve(job_count * m_bucket_count);
-			JobSystem::SignalHandle counter = JobSystem::createSignal();
+			JobSystem::SignalHandle counter = JobSystem::INVALID_HANDLE;
 			int bucket_offset = 0;
 			for(u8 bucket = 0; bucket < m_bucket_count; ++bucket) {
 				m_command_sets[bucket]->cmds.reserve(job_count);
@@ -2659,11 +2658,10 @@ struct PipelineImpl final : Pipeline
 					ctx.output = &m_command_sets[bucket]->cmds.emplace(m_allocator);
 					ctx.bucket = bucket;
 					job_offset += step;
-					JobSystem::run(counter, &ctx, &CreateCommands::execute);
+					JobSystem::run(&ctx, &CreateCommands::execute, &counter, JobSystem::INVALID_HANDLE);
 				}
 				bucket_offset += bucket_size;
 			}
-			JobSystem::trigger(counter);
 			JobSystem::wait(counter);
 		}
 
