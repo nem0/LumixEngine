@@ -273,7 +273,7 @@ struct CullingSystemImpl final : public CullingSystem
 			memcpy(subresult.begin() + old_size, cell->ids.begin(), cell->ids.byte_size());
 			return;
 		}
-		JobSystem::SignalHandle job_counter = JobSystem::createSignal();
+		JobSystem::SignalHandle job_counter = JobSystem::INVALID_HANDLE;
 		struct Job {
 			void* src;
 			void* dst;
@@ -288,12 +288,11 @@ struct CullingSystemImpl final : public CullingSystem
 			jobs[b].dst = &result[b][old_size]; 
 			jobs[b].src = &cell->ids[b * per_bucket];
 			jobs[b].size = size * sizeof(cell->ids[0]);
-			JobSystem::run(job_counter, &jobs[b], [](void* data){
+			JobSystem::run(&jobs[b], [](void* data){
 				Job* j = (Job*)data;
 				memcpy(j->dst, j->src, j->size);
-			});
+			}, &job_counter, JobSystem::INVALID_HANDLE);
 		}
-		JobSystem::trigger(job_counter);
 		JobSystem::wait(job_counter);
 	}
 
@@ -377,7 +376,7 @@ struct CullingSystemImpl final : public CullingSystem
 		jobs.reserve(Math::minimum(buckets_count, partial_entities));
 		PROFILE_INT("jobs", jobs.capacity());
 		if (jobs.capacity() > 0) {
-			JobSystem::SignalHandle counter = JobSystem::createSignal();
+			JobSystem::SignalHandle counter = JobSystem::INVALID_HANDLE;
 			const uint step = (partial_entities + jobs.capacity() - 1) / jobs.capacity();
 			Cell** cell_iter = partial.begin();
 			uint entity_offset = 0;
@@ -401,9 +400,8 @@ struct CullingSystemImpl final : public CullingSystem
 				}
 				job.entity_end_offset = Math::minimum(job.entity_end_offset, (*job.cells_end)->ids.size() - 1);
 				job.frustum = frustum;
-				JobSystem::run(counter, &job, &Job::execute);
+				JobSystem::run(&job, &Job::execute, &counter, JobSystem::INVALID_HANDLE);
 			}
-			JobSystem::trigger(counter);
 			JobSystem::wait(counter);
 		}
 	}

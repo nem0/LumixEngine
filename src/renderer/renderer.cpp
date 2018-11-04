@@ -755,20 +755,17 @@ struct RendererImpl final : public Renderer
 		data->prev = m_last_exec_job;
 		data->renderer = this;
 
-		JobSystem::SignalHandle setup_counter = JobSystem::run(data, [](void* data){
+		JobSystem::SignalHandle preconditions = m_last_exec_job;
+		JobSystem::run(data, [](void* data){
 			RenderJobSetupData* job_data = (RenderJobSetupData*)data;
 			RenderJob* cmd = job_data->cmd;
 
 			PROFILE_BLOCK("setup command");
 			cmd->setup();
-		}, JobSystem::INVALID_HANDLE);
+		}, &preconditions, JobSystem::INVALID_HANDLE);
 
-		JobSystem::SignalHandle counters[] = {setup_counter, m_last_exec_job};
-		JobSystem::SignalHandle preconditions = JobSystem::isValid(m_last_exec_job) 
-			? JobSystem::mergeSignals(counters, 2)
-			: setup_counter;
-
-		JobSystem::SignalHandle exec_counter = JobSystem::run(data, [](void* data){
+		JobSystem::SignalHandle exec_counter = JobSystem::INVALID_HANDLE;
+		JobSystem::run(data, [](void* data){
 			RenderJobSetupData* job_data = (RenderJobSetupData*)data;
 			RenderJob* cmd = job_data->cmd;
 			RendererImpl* renderer = job_data->renderer;
@@ -777,7 +774,7 @@ struct RendererImpl final : public Renderer
 			*rt_cmd = cmd;
 			renderer->m_render_task.m_commands.push(rt_cmd, true);
 			LUMIX_DELETE(renderer->m_allocator, job_data);
-		}, preconditions);
+		}, &exec_counter, preconditions);
 
 		m_last_exec_job = exec_counter;
 	}
