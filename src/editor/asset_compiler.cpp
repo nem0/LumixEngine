@@ -348,11 +348,11 @@ struct AssetCompilerImpl : AssetCompiler
 		if (!PlatformInterface::fileExists(filepath)) return false;
 		const u32 hash = res.getPath().getHash();
 		const StaticString<MAX_PATH_LENGTH> dst_path(".lumix/assets/", hash, ".res");
-		const PathUtils::FileInfo info(res.getPath().c_str());
+		const PathUtils::FileInfo info(filepath);
 		const StaticString<MAX_PATH_LENGTH> meta_path(info.m_dir, info.m_basename, ".meta");
 
 		if (!PlatformInterface::fileExists(dst_path)
-			|| PlatformInterface::getLastModified(dst_path) < PlatformInterface::getLastModified(res.getPath().c_str())
+			|| PlatformInterface::getLastModified(dst_path) < PlatformInterface::getLastModified(filepath)
 			|| PlatformInterface::getLastModified(dst_path) < PlatformInterface::getLastModified(meta_path)
 			)
 		{
