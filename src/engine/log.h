@@ -6,7 +6,6 @@
 #include "engine/lumix.h"
 #include "engine/string.h"
 
-
 namespace Lumix
 {
 	class Log;
@@ -58,9 +57,14 @@ namespace Lumix
 			Callback m_callbacks;
 	};
 
+	void LUMIX_ENGINE_API fatal(bool cond, const char* msg);
+
 	extern Log LUMIX_ENGINE_API g_log_info;
 	extern Log LUMIX_ENGINE_API g_log_warning;
 	extern Log LUMIX_ENGINE_API g_log_error;
 
+	#define LUMIX_FATAL(cond) Lumix::fatal((cond), #cond);
 
 } // namespace Lumix
+
+

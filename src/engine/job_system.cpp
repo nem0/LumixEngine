@@ -133,7 +133,7 @@ struct WorkerTask : MT::Task
 	{
 		MT::SpinLock lock(g_system->m_sync);
 		
-		ASSERT(!g_system->m_free_fibers.empty());
+		LUMIX_FATAL(!g_system->m_free_fibers.empty());
 		FiberDecl* decl = g_system->m_free_fibers.back();
 		g_system->m_free_fibers.pop();
 
@@ -211,6 +211,8 @@ struct WorkerTask : MT::Task
 
 static LUMIX_FORCE_INLINE SignalHandle allocateSignal()
 {
+	LUMIX_FATAL(!g_system->m_free_queue.empty());
+
 	const u32 handle = g_system->m_free_queue.back();
 	Signal& w = g_system->m_signals_pool[handle & HANDLE_ID_MASK];
 	w.value = 1;
@@ -226,7 +228,7 @@ static LUMIX_FORCE_INLINE SignalHandle allocateSignal()
 
 void trigger(SignalHandle handle)
 {
-	ASSERT((handle & HANDLE_ID_MASK) < 4096);
+	LUMIX_FATAL((handle & HANDLE_ID_MASK) < 4096);
 
 	MT::SpinLock lock(g_system->m_sync);
 	

@@ -1,10 +1,20 @@
 #include "engine/log.h"
 #include "engine/path.h"
 #include "engine/string.h"
+#include <cstdlib>
 
 
 namespace Lumix
 {
+
+void fatal(bool cond, const char* msg)
+{
+	if (!cond) {
+		g_log_error.log("FATAL") << msg << " is false.";
+		abort();
+	}
+}
+
 
 
 Log g_log_info;
