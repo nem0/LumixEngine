@@ -140,6 +140,7 @@ struct FBXImporter
 
 	const Array<ImportMesh>& getMeshes() const { return meshes; }
 	static const char* FBXImporter::getImportMeshName(const FBXImporter::ImportMesh& mesh);
+	ofbx::IScene* getOFBXScene() { return scene; }
 
 private:
 	const ofbx::Mesh* getAnyMeshFromBone(const ofbx::Object* node) const;

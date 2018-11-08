@@ -554,6 +554,15 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			cfg.mesh_scale = meta.scale;
 			const PathUtils::FileInfo src_info(filepath);
 			m_fbx_importer.setSource(filepath);
+			if (m_fbx_importer.getMeshes().empty()) {
+				if (m_fbx_importer.getOFBXScene()->getMeshCount() > 0) {
+					g_log_error.log("Editor") << "No meshes with materials found in " << src.c_str();
+				}
+				else {
+					g_log_error.log("Editor") << "No meshes foudn in " << src.c_str();
+				}
+			}
+
 			const StaticString<32> hash_str("", src.getHash());
 			if (meta.split) {
 				//cfg.origin = FBXImporter::ImportConfig::Origin::CENTER;
@@ -561,9 +570,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				m_fbx_importer.writeSubmodels(filepath, cfg);
 				m_fbx_importer.writePrefab(filepath, cfg);
 			}
-			else {
-				m_fbx_importer.writeModel(hash_str, ".res", src.c_str(), cfg);
-			}
+			m_fbx_importer.writeModel(hash_str, ".res", src.c_str(), cfg);
 			m_fbx_importer.writeMaterials(filepath, cfg);
 			m_fbx_importer.writeAnimations(filepath, cfg);
 			m_fbx_importer.writeTextures(filepath, cfg);
