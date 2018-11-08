@@ -170,7 +170,7 @@ struct AssetCompilerImpl : AssetCompiler
 	}
 
 	
-	void processDir(const char* dir, int base_length)
+	void processDir(const char* dir, int base_length, u64 list_last_modified)
 	{
 		auto* iter = PlatformInterface::createFileIterator(dir, m_app.getWorldEditor().getAllocator());
 		PlatformInterface::FileInfo info;
@@ -184,7 +184,7 @@ struct AssetCompilerImpl : AssetCompiler
 				copyString(child_path, dir);
 				catString(child_path, "/");
 				catString(child_path, info.filename);
-				processDir(child_path, base_length);
+				processDir(child_path, base_length, list_last_modified);
 			}
 			else
 			{
@@ -193,7 +193,9 @@ struct AssetCompilerImpl : AssetCompiler
 				catString(fullpath, "/");
 				catString(fullpath, info.filename);
 
-				addResource(fullpath);
+				if (PlatformInterface::getLastModified(fullpath[0] == '/' ? fullpath + 1 : fullpath) > list_last_modified) {
+					addResource(fullpath);
+				}
 			}
 		}
 
@@ -248,8 +250,9 @@ struct AssetCompilerImpl : AssetCompiler
 			lua_close(L);
 		}
 
+		const u64 list_last_modified = PlatformInterface::getLastModified(list_path);
 		const char* base_path = m_app.getWorldEditor().getEngine().getDiskFileDevice()->getBasePath();
-		processDir(base_path, stringLength(base_path));
+		processDir(base_path, stringLength(base_path), list_last_modified);
 	}
 
 
