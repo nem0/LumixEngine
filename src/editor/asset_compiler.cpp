@@ -29,10 +29,7 @@ struct HashFunc<Path>
 {
 	static u32 get(const Path& key)
 	{
-		u32 x = ((key.getHash() >> 16) ^ key.getHash()) * 0x45d9f3b;
-		x = ((x >> 16) ^ x) * 0x45d9f3b;
-		x = ((x >> 16) ^ x);
-		return x;
+		return key.getHash();
 	}
 };
 
