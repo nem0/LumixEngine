@@ -24,6 +24,19 @@ namespace Lumix
 struct AssetCompilerImpl;
 
 
+template<>
+struct HashFunc<Path>
+{
+	static u32 get(const Path& key)
+	{
+		u32 x = ((key.getHash() >> 16) ^ key.getHash()) * 0x45d9f3b;
+		x = ((x >> 16) ^ x) * 0x45d9f3b;
+		x = ((x >> 16) ^ x);
+		return x;
+	}
+};
+
+
 struct AssetCompilerTask : MT::Task
 {
 	AssetCompilerTask(AssetCompilerImpl& compiler, IAllocator& allocator) 
@@ -79,10 +92,10 @@ struct AssetCompilerImpl : AssetCompiler
 		, m_task(*this, app.getWorldEditor().getAllocator())
 		, m_to_compile(app.getWorldEditor().getAllocator())
 		, m_compiled(app.getWorldEditor().getAllocator())
-		, m_on_resource_changed(app.getWorldEditor().getAllocator())
 		, m_semaphore(0, 0x7fFFffFF)
 		, m_registered_extensions(app.getWorldEditor().getAllocator())
 		, m_resources(app.getWorldEditor().getAllocator())
+		, m_to_compile_subresources(app.getWorldEditor().getAllocator())
 	{
 		m_watcher = FileSystemWatcher::create(".", app.getWorldEditor().getAllocator());
 		m_watcher->getCallback().bind<AssetCompilerImpl, &AssetCompilerImpl::onFileChanged>(this);
@@ -114,7 +127,7 @@ struct AssetCompilerImpl : AssetCompiler
 
 		ASSERT(m_plugins.empty());
 		m_task.m_finished = true;
-		m_to_compile.emplace().resource = nullptr;
+		m_to_compile.emplace();
 		m_semaphore.signal();
 		m_task.destroy();
 		ResourceManagerHub& rm = m_app.getWorldEditor().getEngine().getResourceManager();
@@ -259,7 +272,7 @@ struct AssetCompilerImpl : AssetCompiler
 	void onFileChanged(const char* path)
 	{
 		if (startsWith(path, ".lumix")) return;
-		
+		/*
 		char ext[16];
 		PathUtils::getExtension(ext, lengthOf(ext), path);
 
@@ -269,7 +282,10 @@ struct AssetCompilerImpl : AssetCompiler
 		CompileEntry& e = m_to_compile.emplace();
 		e.resource = nullptr;
 		e.path = path;
-		m_semaphore.signal();
+		m_semaphore.signal();*/
+
+		ASSERT(false);
+		// TODO
 	}
 
 	bool getMeta(const Path& res, void* user_ptr, void (*callback)(void*, lua_State*)) const override
@@ -361,21 +377,28 @@ struct AssetCompilerImpl : AssetCompiler
 		{
 			MT::SpinLock lock(m_to_compile_mutex);
 			MT::atomicIncrement(&m_task.m_to_compile_count);
-			CompileEntry& e = m_to_compile.emplace();
-			e.resource = &res;
-			m_semaphore.signal();
+			const Path path(filepath);
+			auto iter = m_to_compile_subresources.find(path);
+			if (!iter.isValid()) {
+				m_to_compile.push(path);
+				m_semaphore.signal();
+				IAllocator& allocator = m_app.getWorldEditor().getAllocator();
+				m_to_compile_subresources.insert(path, Array<Resource*>(allocator));
+				iter = m_to_compile_subresources.find(path);
+			}
+			iter.value().push(&res);
 			return true;
 		}
 		return false;
 	}
 
-	CompileEntry popCompiledResource()
+	Path popCompiledResource()
 	{
 		MT::SpinLock lock(m_compiled_mutex);
-		if(m_compiled.empty()) return CompileEntry{};
-		CompileEntry e = m_compiled.back();
+		if(m_compiled.empty()) return Path();
+		const Path p = m_compiled.back();
 		m_compiled.pop();
-		return e;
+		return p;
 	}
 	
 	void update() override
@@ -393,20 +416,16 @@ struct AssetCompilerImpl : AssetCompiler
 		}
 
 		for(;;) {
-			CompileEntry e = popCompiledResource();
-			if(e.resource) {
-				m_load_hook.continueLoad(*e.resource);
-				m_on_resource_changed.invoke(e.resource->getPath());
-				addResource(e.resource->getPath().c_str());
+			Path p = popCompiledResource();
+			if (!p.isValid()) break;
+
+			// this can take some time, spinmutex is probably not the best option
+			MT::SpinLock lock(m_compiled_mutex);
+
+			for (Resource* r : m_to_compile_subresources[p]) {
+				m_load_hook.continueLoad(*r);
 			}
-			else if (e.path.isValid()) {
-				m_app.getWorldEditor().getEngine().getResourceManager().reload(e.path);
-				m_on_resource_changed.invoke(e.path);
-				addResource(e.path.c_str());
-			}
-			else {
-				break;
-			}
+			m_to_compile_subresources.erase(p);
 		}
 	}
 
@@ -448,18 +467,13 @@ struct AssetCompilerImpl : AssetCompiler
 	}
 
 
-	OnResourceChanged& resourceChanged() override
-	{
-		return m_on_resource_changed;
-	}
-
-	OnResourceChanged m_on_resource_changed;
 	MT::Semaphore m_semaphore;
 	MT::SpinMutex m_to_compile_mutex;
 	MT::SpinMutex m_compiled_mutex;
 	MT::SpinMutex m_plugin_mutex;
-	Array<CompileEntry> m_to_compile;
-	Array<CompileEntry> m_compiled;
+	HashMap<Path, Array<Resource*>> m_to_compile_subresources; 
+	Array<Path> m_to_compile;
+	Array<Path> m_compiled;
 	StudioApp& m_app;
 	LoadHook m_load_hook;
 	HashMap<u32, IPlugin*> m_plugins;
@@ -475,26 +489,18 @@ int AssetCompilerTask::task()
 {
 	while (!m_finished) {
 		m_compiler.m_semaphore.wait();
-		const AssetCompilerImpl::CompileEntry e = [&]{
+		const Path p = [&]{
 			MT::SpinLock lock(m_compiler.m_to_compile_mutex);
-			AssetCompilerImpl::CompileEntry e = m_compiler.m_to_compile.back();
+			Path p = m_compiler.m_to_compile.back();
 			m_compiler.m_to_compile.pop();
-			return e;
+			return p;
 		}();
-		if (e.resource) {
-			const bool compiled = m_compiler.compile(e.resource->getPath());
-			MT::atomicDecrement(&m_to_compile_count);
-			if(compiled) {
-				MT::SpinLock lock(m_compiler.m_compiled_mutex);
-				m_compiler.m_compiled.push(e);
-			}
-		}
-		else if(e.path.isValid()) {
-			const bool compiled = m_compiler.compile(e.path);
+		if (p.isValid()) {
+			const bool compiled = m_compiler.compile(p);
 			MT::atomicDecrement(&m_to_compile_count);
 			if (compiled) {
 				MT::SpinLock lock(m_compiler.m_compiled_mutex);
-				m_compiler.m_compiled.push(e);
+				m_compiler.m_compiled.push(p);
 			}
 		}
 	}
