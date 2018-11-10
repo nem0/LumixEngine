@@ -29,8 +29,6 @@ struct HashFunc<ResourceType>
 
 struct AssetCompiler
 {
-	typedef DelegateList<void(const Path&)> OnResourceChanged;
-
 	struct IPlugin
 	{
 		virtual ~IPlugin() {}
@@ -51,7 +49,6 @@ struct AssetCompiler
 	virtual const char* getCompiledDir() const = 0;
 	virtual bool getMeta(const Path& res, void* user_ptr, void (*callback)(void*, lua_State*)) const = 0;
 	virtual void updateMeta(const Path& res, const char* src) const = 0;
-	virtual OnResourceChanged& resourceChanged() = 0;
 	virtual const Array<Path>& getResources(ResourceType) const = 0;
 
 	virtual ResourceType getResourceType(const char* path) const = 0;
