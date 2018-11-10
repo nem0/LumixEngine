@@ -266,23 +266,39 @@ struct AssetCompilerImpl : AssetCompiler
 	}
 
 
+	Array<Path> removeResource(const char* path)
+	{
+		Array<Path> res(m_app.getWorldEditor().getAllocator());
+		for (Array<Path>& tmp : m_resources) {
+			for (int i = tmp.size() - 1; i >= 0; --i) {
+				const Path& p = tmp[i];
+				if (equalStrings(getResourceFilePath(p.c_str()), path)) {
+					res.push(p);
+					tmp.erase(i);
+				}
+			}
+		}
+		return res;
+	}
+
+
+	void reloadSubresources(const Array<Path>& subresources)
+	{
+		ResourceManagerHub& rman = m_app.getWorldEditor().getEngine().getResourceManager();
+		for (const Path& p : subresources) {
+			rman.reload(p);
+		}
+	}
+
+
 	void onFileChanged(const char* path)
 	{
 		if (startsWith(path, ".lumix")) return;
-		/*
-		char ext[16];
-		PathUtils::getExtension(ext, lengthOf(ext), path);
-
-		MT::SpinLock lock(m_to_compile_mutex);
 		
-		MT::atomicIncrement(&m_task.m_to_compile_count);
-		CompileEntry& e = m_to_compile.emplace();
-		e.resource = nullptr;
-		e.path = path;
-		m_semaphore.signal();*/
-
-		ASSERT(false);
-		// TODO
+		Path path_obj(path);
+		Array<Path> removed_subresources = removeResource(path_obj.c_str());
+		addResource(path);
+		reloadSubresources(removed_subresources);
 	}
 
 	bool getMeta(const Path& res, void* user_ptr, void (*callback)(void*, lua_State*)) const override

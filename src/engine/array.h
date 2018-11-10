@@ -29,7 +29,8 @@ public:
 		*this = rhs;
 	}
 
-	explicit Array(Array&& rhs)
+
+	Array(Array&& rhs)
 		: m_allocator(rhs.m_allocator)
 	{
 		m_data = nullptr;
