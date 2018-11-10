@@ -1425,22 +1425,12 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 	void onGUI(Resource* resource) override
 	{
-		ASSERT(false);
-			/*
-auto* shader = static_cast<Shader*>(resource);
+		auto* shader = static_cast<Shader*>(resource);
 		char basename[MAX_PATH_LENGTH];
 		PathUtils::getBasename(basename, lengthOf(basename), resource->getPath().c_str());
-		StaticString<MAX_PATH_LENGTH> path("/pipelines/", basename, "/", basename);
-		if (ImGui::Button("Open vertex shader"))
+		if (ImGui::Button("Open in external editor"))
 		{
-			path << "_vs.sc";
-			m_app.getAssetBrowser().openInExternalEditor(path);
-		}
-		ImGui::SameLine();
-		if (ImGui::Button("Open fragment shader"))
-		{
-			path << "_fs.sc";
-			m_app.getAssetBrowser().openInExternalEditor(path);
+			m_app.getAssetBrowser().openInExternalEditor(resource->getPath().c_str());
 		}
 
 		if (shader->m_texture_slot_count > 0 &&
@@ -1463,7 +1453,6 @@ auto* shader = static_cast<Shader*>(resource);
 			}
 			ImGui::Columns(1);
 		}
-
 		if (!shader->m_uniforms.empty() &&
 			ImGui::CollapsingHeader("Uniforms", nullptr, ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_Framed))
 		{
@@ -1493,7 +1482,7 @@ auto* shader = static_cast<Shader*>(resource);
 				ImGui::NextColumn();
 			}
 			ImGui::Columns(1);
-		}*/
+		}
 	}
 
 
