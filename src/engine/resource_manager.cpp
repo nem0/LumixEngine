@@ -125,7 +125,15 @@ void ResourceManager::reload(const Path& path)
 void ResourceManager::reload(Resource& resource)
 {
 	resource.doUnload();
-	resource.doLoad();
+	if (m_owner->onBeforeLoad(resource))
+	{
+		resource.m_desired_state = Resource::State::READY;
+		resource.addRef(); // for hook
+		resource.addRef(); // for return value
+	}
+	else {
+		resource.doLoad();
+	}
 }
 
 void ResourceManager::enableUnload(bool enable)

@@ -429,14 +429,6 @@ struct RendererImpl final : public Renderer
 
 	~RendererImpl()
 	{
-		m_render_task.shutdown();
-		if (JobSystem::isValid(m_last_exec_job)) {
-			JobSystem::wait(m_last_exec_job);
-			m_last_exec_job = JobSystem::INVALID_HANDLE;
-		}
-		m_render_task.m_finished_semaphore.wait();
-		m_render_task.destroy();
-		
 		m_particle_emitter_manager.destroy();
 		m_pipeline_manager.destroy();
 		m_texture_manager.destroy();
@@ -445,7 +437,14 @@ struct RendererImpl final : public Renderer
 		m_shader_manager.destroy();
 		m_font_manager->destroy();
 		LUMIX_DELETE(m_allocator, m_font_manager);
-		
+
+		m_render_task.shutdown();
+		if (JobSystem::isValid(m_last_exec_job)) {
+			JobSystem::wait(m_last_exec_job);
+			m_last_exec_job = JobSystem::INVALID_HANDLE;
+		}
+		m_render_task.m_finished_semaphore.wait();
+		m_render_task.destroy();
 	}
 
 
@@ -962,8 +961,9 @@ struct RendererImpl final : public Renderer
 
 void RenderTask::shutdown()
 {
-	m_shutdown_requested = true;
-	m_renderer.runInRenderThread(nullptr, [](Renderer& renderer, void*){});
+	m_renderer.runInRenderThread(this, [](Renderer& renderer, void* data){
+		((RenderTask*)data)->m_shutdown_requested = true;
+	});
 }
 
 
