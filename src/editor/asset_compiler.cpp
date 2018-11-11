@@ -248,6 +248,7 @@ struct AssetCompilerImpl : AssetCompiler
 
 			lua_State* L = luaL_newstate();
 			[&](){
+				LuaWrapper::DebugGuard guard(L);
 				if (luaL_loadbuffer(L, content.begin(), content.byte_size(), "lumix_asset_list") != 0) {
 					g_log_error.log("Editor") << list_path << ": " << lua_tostring(L, -1);
 					return;
@@ -261,23 +262,16 @@ struct AssetCompilerImpl : AssetCompiler
 				lua_getglobal(L, "resources");
 				if (lua_type(L, -1) != LUA_TTABLE) return;
 
-				const int len = (int)lua_objlen(L, -1);
-				for (int i = 0; i < len; ++i) {
-					lua_rawgeti(L, -1, i + 1);
-					if (lua_isstring(L, -1)) {
-						const char* str = lua_tostring(L, -1);
-						
-						const ResourceType type = getResourceType(str);
-						if (type != INVALID_RESOURCE_TYPE) {
-							const Path path_obj(str);
-							auto iter = m_resources.find(type);
-							if (iter.isValid() && iter.value().indexOf(path_obj) < 0) {
-								iter.value().push(path_obj);
-							}
-						}						
-					}
-					lua_pop(L, 1);
-				}
+				LuaWrapper::forEachArrayItem<Path>(L, -1, "array of strings expected", [this](const Path& p){
+					const ResourceType type = getResourceType(p.c_str());
+					if (type != INVALID_RESOURCE_TYPE) {
+						auto iter = m_resources.find(type);
+						if (iter.isValid() && iter.value().indexOf(p) < 0) {
+							iter.value().push(p);
+						}
+					}	
+				});
+				lua_pop(L, 1);
 
 				lua_getglobal(L, "dependencies");
 				if (lua_type(L, -1) != LUA_TTABLE) return;
@@ -296,21 +290,14 @@ struct AssetCompilerImpl : AssetCompiler
 					m_dependencies.insert(key_path, Array<Path>(allocator));
 					Array<Path>& values = m_dependencies.find(key_path).value();
 
-					const int n = (int)lua_objlen(L, -1);
-					for (int i = 0; i < n; ++i) {
-						lua_rawgeti(L, -1, i + 1);
-						if (lua_isstring(L, -1)) {
-							const char* value = lua_tostring(L, -1);
-							values.push(Path(value));
-						}
-						else {
-							g_log_error.log("Editor") << "Invalid dependencies in _list.txt";
-						}
-						lua_pop(L, 1);
-					}
+					LuaWrapper::forEachArrayItem<Path>(L, -1, "array of strings expected", [&values](const Path& p){ 
+						values.push(p); 
+					});
 
 					lua_pop(L, 1);
 				}
+				lua_pop(L, 1);
+
 			}();
 		
 			lua_close(L);

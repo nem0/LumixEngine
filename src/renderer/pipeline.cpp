@@ -1187,24 +1187,16 @@ struct PipelineImpl final : Pipeline
 				return luaL_argerror(L, 2, "Incorrect bucket configuration");
 			}
 			lua_getfield(L, -1, "layers");
-			if(!lua_istable(L, -1)) {
-				LUMIX_DELETE(allocator, cmd);
-				return luaL_argerror(L, 2, "layers is not a table");
-			}
-			const int layers_array_len = (int)lua_objlen(L, -1);
-			for(int j = 0; j < layers_array_len; ++j) {
-				lua_rawgeti(L, -1, j + 1);
-				if(!lua_isstring(L, -1)) {
-					LUMIX_DELETE(allocator, cmd);
-					return luaL_argerror(L, 2, "items in layers must be strings");
-				}
-				const char* layer_name = lua_tostring(L, -1);
+			const bool ok = LuaWrapper::forEachArrayItem<const char*>(L, -1, nullptr, [&](const char* layer_name){
 				const int layer = pipeline->m_renderer.getLayerIdx(layer_name);
 				cmd->m_bucket_map[layer] = i;
-
-				lua_pop(L, 1);
-			}
+			});
 			lua_pop(L, 1);
+
+			if(!ok) {
+				LUMIX_DELETE(allocator, cmd);
+				return luaL_argerror(L, 2, "'layers' must be array of strings");
+			}
 			
 			char tmp[64];
 			if (LuaWrapper::getOptionalStringField(L, -1, "sort", tmp, lengthOf(tmp))) {

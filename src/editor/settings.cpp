@@ -4,6 +4,7 @@
 #include "engine/engine.h"
 #include "engine/fs/os_file.h"
 #include "engine/log.h"
+#include "engine/lua_wrapper.h"
 #include "engine/debug/debug.h"
 #include "imgui/imgui.h"
 #include "platform_interface.h"
@@ -244,18 +245,10 @@ bool Settings::load()
 	lua_getglobal(L, "toolbar");
 	if (lua_type(L, -1) == LUA_TTABLE)
 	{
-		int len = (int)lua_objlen(L, -1);
-		for (int i = 0; i < len; ++i)
-		{
-			lua_rawgeti(L, -1, i + 1);
-			if (lua_type(L, -1) == LUA_TSTRING)
-			{
-				const char* action_name = lua_tostring(L, -1);
-				Action* action = m_app.getAction(action_name);
-				if(action) m_app.getToolbarActions().push(action);
-			}
-			lua_pop(L, 1);
-		}
+		LuaWrapper::forEachArrayItem<const char*>(L, -1, nullptr, [this](const char* action_name){
+			Action* action = m_app.getAction(action_name);
+			if(action) m_app.getToolbarActions().push(action);
+		});
 	}
 	lua_pop(L, 1);
 
