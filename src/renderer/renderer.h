@@ -74,6 +74,7 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 			ffr::BufferHandle buffer;
 			uint offset;
 			uint size;
+			u8* ptr;
 		};
 
 		enum { MAX_SHADER_DEFINES = 32 };

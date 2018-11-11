@@ -2406,8 +2406,8 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 			if (use_big_buffers) {
 				big_vb = ffr::allocBufferHandle();
 				big_ib = ffr::allocBufferHandle();
-				ffr::createBuffer(big_vb, num_vertices * sizeof(ImDrawVert), cmd_list.vtx_buffer.data);
-				ffr::createBuffer(big_ib, num_indices * sizeof(ImDrawIdx), cmd_list.idx_buffer.data);
+				ffr::createBuffer(big_vb, (uint)ffr::BufferFlags::DYNAMIC_STORAGE, num_vertices * sizeof(ImDrawVert), cmd_list.vtx_buffer.data);
+				ffr::createBuffer(big_ib, (uint)ffr::BufferFlags::DYNAMIC_STORAGE, num_indices * sizeof(ImDrawIdx), cmd_list.idx_buffer.data);
 				ffr::setVertexBuffer(&decl, big_vb, 0, nullptr);
 				ffr::setIndexBuffer(big_ib);
 			}
@@ -2480,9 +2480,9 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 			PROFILE_FUNCTION();
 			if(!plugin->m_index_buffer.isValid()) {
 				plugin->m_index_buffer = ffr::allocBufferHandle();
-				ffr::createBuffer(plugin->m_index_buffer, 1024*1024, nullptr);
+				ffr::createBuffer(plugin->m_index_buffer, (uint)ffr::BufferFlags::DYNAMIC_STORAGE, 1024*1024, nullptr);
 				plugin->m_vertex_buffer = ffr::allocBufferHandle();
-				ffr::createBuffer(plugin->m_vertex_buffer, 1024*1024, nullptr);
+				ffr::createBuffer(plugin->m_vertex_buffer, (uint)ffr::BufferFlags::DYNAMIC_STORAGE, 1024*1024, nullptr);
 			}
 
 			if(!plugin->m_program.isValid()) {

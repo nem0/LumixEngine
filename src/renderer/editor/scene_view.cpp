@@ -334,8 +334,8 @@ void SceneView::renderGizmos()
 				const u16* indices = data.indices.begin() + cmd.indices_offset;
 				const Gizmo::RenderData::Vertex* vertices = data.vertices.begin() + cmd.vertices_offset;
 
-				ffr::update(ib.buffer, indices, ib.offset, ib.size);
-				ffr::update(vb.buffer, vertices, vb.offset, vb.size);
+				memcpy(ib.ptr, indices, ib.size);
+				memcpy(vb.ptr, vertices, vb.size);
 
 				ffr::setUniformMatrix4f(model_uniform, &cmd.mtx.m11);
 				ffr::useProgram(prg);

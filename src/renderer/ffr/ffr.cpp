@@ -1198,11 +1198,16 @@ void bindUniformBuffer(uint index, BufferHandle buffer, size_t offset, size_t si
 }
 
 
-void* map(BufferHandle buffer)
+void* map(BufferHandle buffer, size_t offset, size_t size, uint flags)
 {
 	checkThread();
 	const GLuint buf = g_ffr.buffers[buffer.value].handle;
-	return glMapNamedBuffer(buf, GL_WRITE_ONLY);
+	GLbitfield gl_flags = 0;
+	if (flags & (uint)BufferFlags::MAP_READ) gl_flags |= GL_MAP_READ_BIT;
+	if (flags & (uint)BufferFlags::MAP_WRITE) gl_flags |= GL_MAP_WRITE_BIT;
+	if (flags & (uint)BufferFlags::PERSISTENT) gl_flags |= GL_MAP_PERSISTENT_BIT;
+	if (flags & (uint)BufferFlags::COHERENT) gl_flags |= GL_MAP_COHERENT_BIT;
+	return glMapNamedBufferRange(buf, offset, size, gl_flags);
 }
 
 
@@ -1246,14 +1251,19 @@ void swapBuffers()
 }
 
 
-void createBuffer(BufferHandle buffer, size_t size, const void* data)
+void createBuffer(BufferHandle buffer, uint flags, size_t size, const void* data)
 {
 	checkThread();
 	GLuint buf;
-	CHECK_GL(glGenBuffers(1, &buf));
-	CHECK_GL(glBindBuffer(GL_UNIFORM_BUFFER, buf));
-	CHECK_GL(glBufferData(GL_UNIFORM_BUFFER, size, data, GL_DYNAMIC_DRAW));
-	CHECK_GL(glBindBuffer(GL_UNIFORM_BUFFER, 0));
+	CHECK_GL(glCreateBuffers(1, &buf));
+	
+	GLbitfield gl_flags = 0;
+	if (flags & (uint)BufferFlags::MAP_READ) gl_flags |= GL_MAP_READ_BIT;
+	if (flags & (uint)BufferFlags::MAP_WRITE) gl_flags |= GL_MAP_WRITE_BIT;
+	if (flags & (uint)BufferFlags::PERSISTENT) gl_flags |= GL_MAP_PERSISTENT_BIT;
+	if (flags & (uint)BufferFlags::COHERENT) gl_flags |= GL_MAP_COHERENT_BIT;
+	if (flags & (uint)BufferFlags::DYNAMIC_STORAGE) gl_flags |= GL_DYNAMIC_STORAGE_BIT;
+	CHECK_GL(glNamedBufferStorage(buf, size, data, gl_flags));
 
 	g_ffr.buffers[buffer.value].handle = buf;
 }
