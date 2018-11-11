@@ -577,7 +577,8 @@ struct PipelineImpl final : Pipeline
 				ffr::useProgram(shader.handle);
 
 				const Renderer::TransientSlice vb = pipeline->m_renderer.allocTransient(vertices.byte_size());
-				ffr::update(vb.buffer, vertices.begin(), vb.offset, vb.size);
+				
+				memcpy(vb.ptr, vertices.begin(), vb.size);
 				
 				ffr::setVertexBuffer(&vertex_decl, vb.buffer, vb.offset, nullptr);
 				ffr::setIndexBuffer(ffr::INVALID_BUFFER);
@@ -673,8 +674,8 @@ struct PipelineImpl final : Pipeline
 				
 				ffr::BufferHandle vb = ffr::allocBufferHandle();
 				ffr::BufferHandle ib = ffr::allocBufferHandle();
-				ffr::createBuffer(vb, vtx_buffer_mem.size, vtx_buffer_mem.data);
-				ffr::createBuffer(ib, idx_buffer_mem.size, idx_buffer_mem.data);
+				ffr::createBuffer(vb, (uint)ffr::BufferFlags::DYNAMIC_STORAGE, vtx_buffer_mem.size, vtx_buffer_mem.data);
+				ffr::createBuffer(ib, (uint)ffr::BufferFlags::DYNAMIC_STORAGE, idx_buffer_mem.size, idx_buffer_mem.data);
 				pipeline->m_renderer.free(idx_buffer_mem);
 				pipeline->m_renderer.free(vtx_buffer_mem);
 
@@ -928,7 +929,7 @@ struct PipelineImpl final : Pipeline
 					}
 
 					const void* mem = blob.skip(byte_size);
-					ffr::update(transient.buffer, mem, transient.offset, byte_size);
+					memcpy(transient.ptr, mem, byte_size);
 
 					const Shader::Program& prog = Shader::getProgram(shader_data, 0);
 					ffr::useProgram(prog.handle);
@@ -1516,7 +1517,7 @@ struct PipelineImpl final : Pipeline
 
 				Renderer& renderer = m_pipeline->m_renderer;
 				const Renderer::TransientSlice transient = renderer.allocTransient(m_vertices.byte_size());
-				ffr::update(transient.buffer, m_vertices.begin(), transient.offset, transient.size);
+				memcpy(transient.ptr, m_vertices.begin(), transient.size);
 				ffr::setUniform1i(m_texture_uniform, 0);
 				ffr::useProgram(p.handle);
 				ffr::VertexDecl decl;
@@ -1594,7 +1595,7 @@ struct PipelineImpl final : Pipeline
 									ffr::setVertexBuffer(&decl, m_pipeline->m_cube_vb, 0, nullptr);
 
 									const Renderer::TransientSlice instance_buffer = m_pipeline->m_renderer.allocTransient(instances_count * instance_decl.size);
-									ffr::update(instance_buffer.buffer, instance_data, instance_buffer.offset, instance_buffer.size);
+									memcpy(instance_buffer.ptr, instance_data, instance_buffer.size);
 									ffr::setInstanceBuffer(instance_decl, instance_buffer.buffer, instance_buffer.offset, 1, nullptr);
 									ffr::drawTrianglesInstanced(0, 36, instances_count);
 								}
@@ -1744,7 +1745,7 @@ struct PipelineImpl final : Pipeline
 									ffr::setIndexBuffer(mesh->index_buffer_handle);
 
 									const Renderer::TransientSlice instance_buffer = m_pipeline->m_renderer.allocTransient(instances_count * sizeof(Vec4) * 2);
-									ffr::update(instance_buffer.buffer, instance_data, instance_buffer.offset, instance_buffer.size);
+									memcpy(instance_buffer.ptr, instance_data, instance_buffer.size);
 
 									int instance_map[16];
 									for (uint i = 0; i < instance_decl.attributes_count; ++i) {
@@ -1824,7 +1825,7 @@ struct PipelineImpl final : Pipeline
 									ffr::setVertexBuffer(&decal_decl, m_pipeline->m_cube_vb, 0, nullptr);
 
 									const Renderer::TransientSlice instance_buffer = m_pipeline->m_renderer.allocTransient(instances_count * decal_instance_decl.size);
-									ffr::update(instance_buffer.buffer, instance_data, instance_buffer.offset, instance_buffer.size);
+									memcpy(instance_buffer.ptr, instance_data, instance_buffer.size);
 									ffr::setInstanceBuffer(decal_instance_decl, instance_buffer.buffer, instance_buffer.offset, 1, nullptr);
 									ffr::drawTrianglesInstanced(0, 36, instances_count);
 									++drawcalls_count;

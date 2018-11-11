@@ -141,6 +141,13 @@ enum class TextureFlags : uint {
 	CLAMP = 1 << 1
 };
 
+enum class BufferFlags : uint {
+	PERSISTENT = 1 << 0,
+	COHERENT = 1 << 1,
+	MAP_READ = 1 << 2,
+	MAP_WRITE = 1 << 3,
+	DYNAMIC_STORAGE = 1 << 4
+};
 
 enum class DataType {
 	UINT16,
@@ -214,7 +221,7 @@ UniformHandle allocUniform(const char* name, UniformType type, int count);
 void setState(u64 state);
 ProgramHandle createProgram(const char** srcs, const ShaderType* types, int num, const char** prefixes, int prefixes_count, const char* name);
 void useProgram(ProgramHandle prg);
-void createBuffer(BufferHandle handle, size_t size, const void* data);
+void createBuffer(BufferHandle handle, uint flags, size_t size, const void* data);
 bool createTexture(TextureHandle handle, uint w, uint h, uint depth, TextureFormat format, uint flags, const void* data, const char* debug_name);
 bool loadTexture(TextureHandle handle, const void* data, int size, uint flags, const char* debug_name);
 FramebufferHandle createFramebuffer();
@@ -227,7 +234,7 @@ void uniformBlockBinding(ProgramHandle program, const char* block_name, uint bin
 void update(FramebufferHandle fb, uint renderbuffers_count, const TextureHandle* renderbuffers);
 void bindLayer(FramebufferHandle fb, TextureHandle rb, uint layer);
 void update(BufferHandle buffer, const void* data, size_t offset, size_t size);
-void* map(BufferHandle buffer);
+void* map(BufferHandle buffer, size_t offset, size_t size, uint flags);
 void unmap(BufferHandle buffer);
 void bindUniformBuffer(uint index, BufferHandle buffer, size_t offset, size_t size);
 void getTextureImage(ffr::TextureHandle texture, uint size, void* buf);

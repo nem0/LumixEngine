@@ -186,6 +186,7 @@ struct RenderTask : MT::Task
 	bool m_shutdown_requested = false;
 	ffr::BufferHandle m_transient_buffer;
 	uint m_transient_buffer_offset;
+	u8* m_transient_buffer_ptr = nullptr;
 	
 	struct PreparedCommand
 	{
@@ -573,6 +574,7 @@ struct RendererImpl final : public Renderer
 		slice.buffer = m_render_task.m_transient_buffer;
 		slice.offset = m_render_task.m_transient_buffer_offset;
 		slice.size = m_render_task.m_transient_buffer_offset + size > TRANSIENT_BUFFER_SIZE ? 0 : size;
+		slice.ptr = slice.size > 0 ? m_render_task.m_transient_buffer_ptr + slice.offset : nullptr;
 		m_render_task.m_transient_buffer_offset += slice.size;
 		return slice;
 	}
@@ -586,7 +588,7 @@ struct RendererImpl final : public Renderer
 		struct Cmd : RenderJob {
 			void setup() override {}
 			void execute() override {
-				ffr::createBuffer(handle, memory.size, memory.data);
+				ffr::createBuffer(handle, (uint)ffr::BufferFlags::DYNAMIC_STORAGE, memory.size, memory.data);
 				if (memory.own) {
 					renderer->free(memory);
 				}
@@ -974,11 +976,15 @@ int RenderTask::task()
 	ffr::init(window_handle);
 	m_framebuffer = ffr::createFramebuffer();
 	m_global_state_uniforms = ffr::allocBufferHandle();
-	ffr::createBuffer(m_global_state_uniforms, sizeof(Renderer::GlobalState), nullptr); 
+	ffr::createBuffer(m_global_state_uniforms, (uint)ffr::BufferFlags::DYNAMIC_STORAGE, sizeof(Renderer::GlobalState), nullptr); 
 	ffr::bindUniformBuffer(0, m_global_state_uniforms, 0, sizeof(Renderer::GlobalState));
 	m_transient_buffer = ffr::allocBufferHandle();
 	m_transient_buffer_offset = 0;
-	ffr::createBuffer(m_transient_buffer, TRANSIENT_BUFFER_SIZE, nullptr);
+	const uint transient_flags = (uint)ffr::BufferFlags::PERSISTENT 
+		| (uint)ffr::BufferFlags::COHERENT
+		| (uint)ffr::BufferFlags::MAP_WRITE;
+	ffr::createBuffer(m_transient_buffer, transient_flags, TRANSIENT_BUFFER_SIZE, nullptr);
+	m_transient_buffer_ptr = (u8*)ffr::map(m_transient_buffer, 0, TRANSIENT_BUFFER_SIZE, transient_flags);
 	while (!m_shutdown_requested || !m_commands.isEmpty()) {
 		Renderer::RenderJob* cmd = nullptr;
 		{
