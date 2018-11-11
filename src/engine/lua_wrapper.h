@@ -4,6 +4,7 @@
 #include "engine/log.h"
 #include "engine/matrix.h"
 #include "engine/metaprogramming.h"
+#include "engine/path.h"
 #include <lua.hpp>
 #include <lauxlib.h> // must be after lua.hpp
 
@@ -128,6 +129,31 @@ template <typename T> inline T toType(lua_State* L, int index)
 {
 	return (T)lua_touserdata(L, index);
 }
+template <typename T, typename F> bool forEachArrayItem(lua_State* L, int index, const char* error_msg, F&& func)
+{
+	if (!lua_istable(L, index)) {
+		if (error_msg) luaL_argerror(L, index, error_msg);
+		return false;
+	}
+	
+	bool all_match = true;
+	const int n = (int)lua_objlen(L, index);
+	for (int i = 0; i < n; ++i) {
+		lua_rawgeti(L, index, i + 1);
+		if(isType<T>(L, -1)) {
+			func(toType<T>(L, -1));
+		}
+		else if (error_msg) {
+			lua_pop(L, 1);
+			luaL_argerror(L, index, error_msg);
+		}
+		else {
+			all_match = false;
+		}
+		lua_pop(L, 1);
+	}
+	return all_match;
+}
 template <> inline int toType(lua_State* L, int index)
 {
 	return (int)lua_tointeger(L, index);
@@ -135,6 +161,10 @@ template <> inline int toType(lua_State* L, int index)
 template <> inline u16 toType(lua_State* L, int index)
 {
 	return (u16)lua_tointeger(L, index);
+}
+template <> inline Path toType(lua_State* L, int index)
+{
+	return Path(lua_tostring(L, index));
 }
 template <> inline u8 toType(lua_State* L, int index)
 {
@@ -289,6 +319,10 @@ template <> inline const char* typeToString<u16>()
 {
 	return "number|u16";
 }
+template <> inline const char* typeToString<Path>()
+{
+	return "path";
+}
 template <> inline const char* typeToString<u8>()
 {
 	return "number|u8";
@@ -331,6 +365,10 @@ template <> inline bool isType<int>(lua_State* L, int index)
 template <> inline bool isType<u16>(lua_State* L, int index)
 {
 	return lua_isnumber(L, index) != 0;
+}
+template <> inline bool isType<Path>(lua_State* L, int index)
+{
+	return lua_isstring(L, index);
 }
 template <> inline bool isType<u8>(lua_State* L, int index)
 {
@@ -538,6 +576,10 @@ template <> inline void push(lua_State* L, int value)
 template <> inline void push(lua_State* L, u16 value)
 {
 	lua_pushinteger(L, value);
+}
+template <> inline void push(lua_State* L, const Path& value)
+{
+	lua_pushstring(L, value.c_str());
 }
 template <> inline void push(lua_State* L, u8 value)
 {

@@ -675,19 +675,9 @@ int defines(lua_State* L)
 	Material* material = (Material*)lua_touserdata(L, -1);
 	lua_pop(L, 1);
 
-	const size_t count = lua_objlen(L, 1);
-	for(int i = 0; i < count; ++i) {
-		lua_rawgeti(L, 1, i + 1);
-		auto rype = lua_type(L, -1);
-		if(!lua_isstring(L, -1)) {
-			g_log_error.log("Renderer") << "Define must be string, material " << material->getPath();
-			lua_pop(L, 1);
-			return 0;
-		}
-		const char* define = lua_tostring(L, -1);
-		material->setDefine(material->getRenderer().getShaderDefineIdx(define), true);
-		lua_pop(L, 1);
-	}
+	LuaWrapper::forEachArrayItem<const char*>(L, 1, "array of strings expected", [&](const char* v){
+		material->setDefine(material->getRenderer().getShaderDefineIdx(v), true);
+	});
 	return 0;
 }
 
