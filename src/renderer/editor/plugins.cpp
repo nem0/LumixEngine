@@ -509,7 +509,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	}
 
 
-	void addSubresources(AssetCompiler& compiler, const char* path, HashMap<ResourceType, Array<Path>, HashFunc<ResourceType>>& subresources)
+	void addSubresources(AssetCompiler& compiler, const char* path, HashMap<ResourceType, Array<Path>, HashFunc<ResourceType>>& subresources) override
 	{
 		const Meta meta = getMeta(Path(path));
 		auto iter = subresources.find(Model::TYPE);
@@ -1409,6 +1409,92 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		: m_app(app)
 	{
 		app.getAssetCompiler().registerExtension("shd", Shader::TYPE);
+	}
+
+
+	void findIncludes(const char* path)
+	{
+		lua_State* L = luaL_newstate();
+		luaL_openlibs(L);
+
+		FS::OsFile file;
+		if (!file.open(path[0] == '/' ? path + 1 : path, FS::Mode::OPEN_AND_READ)) return;
+		
+		IAllocator& allocator = m_app.getWorldEditor().getAllocator();
+		Array<u8> content(allocator);
+		content.resize((int)file.size());
+		file.read(content.begin(), content.byte_size());
+		file.close();
+
+		struct Context {
+			const char* path;
+			ShaderPlugin* plugin;
+			u8* content;
+			int content_len;
+			int idx;
+		} ctx = { path, this, content.begin(), content.byte_size(), 0 };
+
+		lua_pushlightuserdata(L, &ctx);
+		lua_setfield(L, LUA_GLOBALSINDEX, "this");
+
+		auto include = [](lua_State* L) -> int {
+			lua_getfield(L, LUA_GLOBALSINDEX, "this");
+			Context* that = LuaWrapper::toType<Context*>(L, -1);
+			lua_pop(L, 1);
+			const char* path = LuaWrapper::checkArg<const char*>(L, 1);
+			that->plugin->m_app.getAssetCompiler().registerDependency(Path(that->path), Path(path));
+			return 0;
+		};
+
+		lua_pushcclosure(L, include, 0);
+		lua_setfield(L, LUA_GLOBALSINDEX, "include");
+
+		static const char* preface = 
+			"local new_g = setmetatable({include = include}, {__index = function() return function() end end })\n"
+			"setfenv(1, new_g)\n";
+
+		auto reader = [](lua_State* L, void* data, size_t* size) -> const char* {
+			Context* ctx = (Context*)data;
+			++ctx->idx;
+			switch(ctx->idx) {
+				case 1: 
+					*size = stringLength(preface);
+					return preface;
+				case 2: 
+					*size = ctx->content_len;
+					return (const char*)ctx->content;
+				default:
+					*size = 0;
+					return nullptr;
+			}
+		};
+
+		if (lua_load(L, reader, &ctx, path) != 0) {
+			g_log_error.log("Engine") << path << ": " << lua_tostring(L, -1);
+			lua_pop(L, 2);
+			lua_close(L);
+			return;
+		}
+
+		if (lua_pcall(L, 0, 0, -2) != 0) {
+			g_log_error.log("Engine") << lua_tostring(L, -1);
+			lua_pop(L, 2);
+			lua_close(L);
+			return;
+		}
+		lua_pop(L, 1);
+		lua_close(L);
+	}
+
+
+	void addSubresources(AssetCompiler& compiler, const char* path, HashMap<ResourceType, Array<Path>, HashFunc<ResourceType>>& subresources) override
+	{
+		const Path path_obj(path);
+		auto iter = subresources.find(Shader::TYPE);
+		if (!iter.isValid()) return;
+		if (iter.value().indexOf(path_obj) < 0) iter.value().push(path_obj);
+
+		findIncludes(path);
 	}
 
 
