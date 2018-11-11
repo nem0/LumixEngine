@@ -50,6 +50,7 @@ struct AssetCompiler
 	virtual bool getMeta(const Path& res, void* user_ptr, void (*callback)(void*, lua_State*)) const = 0;
 	virtual void updateMeta(const Path& res, const char* src) const = 0;
 	virtual const Array<Path>& getResources(ResourceType) const = 0;
+	virtual void registerDependency(const Path& included_from, const Path& dependency) = 0;
 
 	virtual ResourceType getResourceType(const char* path) const = 0;
 	virtual void registerExtension(const char* extension, ResourceType type) = 0;

@@ -93,6 +93,7 @@ struct AssetCompilerImpl : AssetCompiler
 		, m_registered_extensions(app.getWorldEditor().getAllocator())
 		, m_resources(app.getWorldEditor().getAllocator())
 		, m_to_compile_subresources(app.getWorldEditor().getAllocator())
+		, m_dependencies(app.getWorldEditor().getAllocator())
 	{
 		m_watcher = FileSystemWatcher::create(".", app.getWorldEditor().getAllocator());
 		m_watcher->getCallback().bind<AssetCompilerImpl, &AssetCompilerImpl::onFileChanged>(this);
@@ -115,7 +116,17 @@ struct AssetCompilerImpl : AssetCompiler
 					file << "\"" << j.c_str() << "\",\n";
 				}
 			}
+			file << "}\n\n";
+			file << "dependencies = {\n";
+			for (auto iter = m_dependencies.begin(), end = m_dependencies.end(); iter != end; ++iter) {
+				file << "\t[\"" << iter.key().c_str() << "\"] = {\n";
+				for (const Path& p : iter.value()) {
+					file << "\t\t\"" << p.c_str() << "\",\n";
+				}
+				file << "\t},\n";
+			}
 			file << "}\n";
+
 			file.close();	
 		}
 		else {
@@ -213,6 +224,18 @@ struct AssetCompilerImpl : AssetCompiler
 	}
 
 
+	void registerDependency(const Path& included_from, const Path& dependency) override
+	{
+		auto iter = m_dependencies.find(dependency);
+		if (!iter.isValid()) {
+			IAllocator& allocator = m_app.getWorldEditor().getAllocator();
+			m_dependencies.insert(dependency, Array<Path>(allocator));
+			iter = m_dependencies.find(dependency);
+		}
+		iter.value().push(included_from);
+	}
+
+
 	void onInitFinished() override
 	{
 		FS::OsFile file;
@@ -255,6 +278,39 @@ struct AssetCompilerImpl : AssetCompiler
 					}
 					lua_pop(L, 1);
 				}
+
+				lua_getglobal(L, "dependencies");
+				if (lua_type(L, -1) != LUA_TTABLE) return;
+
+				lua_pushnil(L);
+				while (lua_next(L, -2) != 0) {
+					if (!lua_isstring(L, -2) || !lua_istable(L, -1)) {
+						g_log_error.log("Editor") << "Invalid dependencies in _list.txt";
+						lua_pop(L, 1);
+						continue;
+					}
+					
+					const char* key = lua_tostring(L, -2);
+					IAllocator& allocator = m_app.getWorldEditor().getAllocator();
+					const Path key_path(key);
+					m_dependencies.insert(key_path, Array<Path>(allocator));
+					Array<Path>& values = m_dependencies.find(key_path).value();
+
+					const int n = (int)lua_objlen(L, -1);
+					for (int i = 0; i < n; ++i) {
+						lua_rawgeti(L, -1, i + 1);
+						if (lua_isstring(L, -1)) {
+							const char* value = lua_tostring(L, -1);
+							values.push(Path(value));
+						}
+						else {
+							g_log_error.log("Editor") << "Invalid dependencies in _list.txt";
+						}
+						lua_pop(L, 1);
+					}
+
+					lua_pop(L, 1);
+				}
 			}();
 		
 			lua_close(L);
@@ -278,6 +334,12 @@ struct AssetCompilerImpl : AssetCompiler
 				}
 			}
 		}
+
+		const Path path_obj(path);
+		for (Array<Path>& deps : m_dependencies) {
+			deps.eraseItems([&](const Path& p){ return p == path_obj; });
+		}
+
 		return res;
 	}
 
@@ -296,9 +358,21 @@ struct AssetCompilerImpl : AssetCompiler
 		if (startsWith(path, ".lumix")) return;
 		
 		Path path_obj(path);
-		Array<Path> removed_subresources = removeResource(path_obj.c_str());
+
+		const Array<Path> removed_subresources = removeResource(path_obj.c_str());
 		addResource(path);
 		reloadSubresources(removed_subresources);
+
+		auto iter = m_dependencies.find(path_obj);
+		if (iter.isValid()) {
+			const Array<Path> tmp(iter.value());
+			m_dependencies.erase(iter);
+			for (Path& p : tmp) {
+				Array<Path> removed_subresources = removeResource(p.c_str());
+				addResource(p.c_str());
+				reloadSubresources(removed_subresources);
+			}
+		}
 	}
 
 	bool getMeta(const Path& res, void* user_ptr, void (*callback)(void*, lua_State*)) const override
@@ -485,6 +559,7 @@ struct AssetCompilerImpl : AssetCompiler
 	MT::SpinMutex m_compiled_mutex;
 	MT::SpinMutex m_plugin_mutex;
 	HashMap<Path, Array<Resource*>> m_to_compile_subresources; 
+	HashMap<Path, Array<Path>> m_dependencies;
 	Array<Path> m_to_compile;
 	Array<Path> m_compiled;
 	StudioApp& m_app;
