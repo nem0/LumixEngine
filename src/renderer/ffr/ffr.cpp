@@ -1127,7 +1127,7 @@ void drawElements(uint offset, uint count, PrimitiveType primitive_type, DataTyp
 		case PrimitiveType::LINES: pt = GL_LINES; break;
 		case PrimitiveType::POINTS: pt = GL_POINTS; break;
 		default: ASSERT(0); break;
-	}
+	} 
 
 	GLenum t;
 	int ts;
@@ -1511,6 +1511,20 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, uint f
 	return true;
 }
 
+ProgramHandle allocProgramHandle()
+{
+	MT::SpinLock lock(g_ffr.handle_mutex);
+
+	if(g_ffr.programs.isFull()) {
+		g_log_error.log("Renderer") << "FFR is out of free program slots.";
+		return INVALID_PROGRAM;
+	}
+	const int id = g_ffr.programs.alloc();
+	Program& p = g_ffr.programs[id];
+	p.handle = 0;
+	return { (uint)id };
+}
+
 
 BufferHandle allocBufferHandle()
 {
@@ -1733,13 +1747,9 @@ UniformHandle allocUniform(const char* name, UniformType type, int count)
 }
 
 
-ProgramHandle createProgram(const char** srcs, const ShaderType* types, int num, const char** prefixes, int prefixes_count, const char* name)
+bool createProgram(ProgramHandle prog, const char** srcs, const ShaderType* types, int num, const char** prefixes, int prefixes_count, const char* name)
 {
 	checkThread();
-	if(g_ffr.programs.isFull()) {
-		g_log_error.log("Renderer") << "FFR is out of free program slots.";
-		return INVALID_PROGRAM;
-	}
 
 	const char* combined_srcs[16];
 	ASSERT(prefixes_count < lengthOf(combined_srcs) - 1); 
@@ -1747,7 +1757,7 @@ ProgramHandle createProgram(const char** srcs, const ShaderType* types, int num,
 
 	if (num > MAX_SHADERS_PER_PROGRAM) {
 		g_log_error.log("Renderer") << "Too many shaders per program in " << name;
-		return INVALID_PROGRAM;
+		return false;
 	}
 
 	const GLuint prg = glCreateProgram();
@@ -1784,7 +1794,7 @@ ProgramHandle createProgram(const char** srcs, const ShaderType* types, int num,
 				g_log_error.log("Renderer") << "Failed to compile shader " << name << " - " << shaderTypeToString(types[i]);
 			}
 			CHECK_GL(glDeleteShader(shd));
-			return INVALID_PROGRAM;
+			return false;
 		}
 
 		CHECK_GL(glAttachShader(prg, shd));
@@ -1808,10 +1818,10 @@ ProgramHandle createProgram(const char** srcs, const ShaderType* types, int num,
 			g_log_error.log("Renderer") << "Failed to link program " << name;
 		}
 		CHECK_GL(glDeleteProgram(prg));
-		return INVALID_PROGRAM;
+		return false;
 	}
 
-	const int id = g_ffr.programs.alloc();
+	const int id = prog.value;
 	g_ffr.programs[id].handle = prg;
 	GLint uniforms_count;
 	CHECK_GL(glGetProgramiv(prg, GL_ACTIVE_UNIFORMS, &uniforms_count));
@@ -1857,7 +1867,7 @@ ProgramHandle createProgram(const char** srcs, const ShaderType* types, int num,
 		}
 	}
 
-	return { (uint)id };
+	return true;
 }
 
 

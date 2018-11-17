@@ -216,10 +216,11 @@ inline u64 getStencilStateBits(u8 write_mask, StencilFuncs func, u8 ref, u8 mask
 
 TextureHandle allocTextureHandle();
 BufferHandle allocBufferHandle();
+ProgramHandle allocProgramHandle();
 UniformHandle allocUniform(const char* name, UniformType type, int count);
 
 void setState(u64 state);
-ProgramHandle createProgram(const char** srcs, const ShaderType* types, int num, const char** prefixes, int prefixes_count, const char* name);
+bool createProgram(ProgramHandle program, const char** srcs, const ShaderType* types, int num, const char** prefixes, int prefixes_count, const char* name);
 void useProgram(ProgramHandle prg);
 void createBuffer(BufferHandle handle, uint flags, size_t size, const void* data);
 bool createTexture(TextureHandle handle, uint w, uint h, uint depth, TextureFormat format, uint flags, const void* data, const char* debug_name);
