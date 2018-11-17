@@ -248,7 +248,6 @@ struct AssetCompilerImpl : AssetCompiler
 
 			lua_State* L = luaL_newstate();
 			[&](){
-				LuaWrapper::DebugGuard guard(L);
 				if (luaL_loadbuffer(L, content.begin(), content.byte_size(), "lumix_asset_list") != 0) {
 					g_log_error.log("Editor") << list_path << ": " << lua_tostring(L, -1);
 					return;

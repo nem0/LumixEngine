@@ -155,7 +155,6 @@ class Terrain
 		AssociativeArray<EntityRef, DVec3> m_last_camera_position;
 		bool m_force_grass_update;
 		Renderer& m_renderer;
-		ffr::TextureHandle m_textures;
 };
 
 

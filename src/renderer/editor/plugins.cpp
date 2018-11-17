@@ -2362,7 +2362,7 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 		{
 			PROFILE_FUNCTION();
 			PluginManager& plugin_manager = plugin->m_engine.getPluginManager();
-			Renderer& renderer = *(Renderer*)plugin_manager.getPlugin("renderer");
+			renderer = (Renderer*)plugin_manager.getPlugin("renderer");
 
 			const ImDrawData* draw_data = ImGui::GetDrawData();
 			if (!draw_data) return;
@@ -2372,17 +2372,31 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 				ImDrawList* cmd_list = draw_data->CmdLists[i];
 				CmdList& out_cmd_list = command_lists.emplace(allocator);
 
-				out_cmd_list.idx_buffer = renderer.copy(&cmd_list->IdxBuffer[0], cmd_list->IdxBuffer.size() * sizeof(cmd_list->IdxBuffer[0]));
-				out_cmd_list.vtx_buffer = renderer.copy(&cmd_list->VtxBuffer[0], cmd_list->VtxBuffer.size() * sizeof(cmd_list->VtxBuffer[0]));
+				out_cmd_list.idx_buffer = renderer->copy(&cmd_list->IdxBuffer[0], cmd_list->IdxBuffer.size() * sizeof(cmd_list->IdxBuffer[0]));
+				out_cmd_list.vtx_buffer = renderer->copy(&cmd_list->VtxBuffer[0], cmd_list->VtxBuffer.size() * sizeof(cmd_list->VtxBuffer[0]));
 			
 				out_cmd_list.commands.resize(cmd_list->CmdBuffer.size());
 				for (int i = 0, c = out_cmd_list.commands.size(); i < c; ++i) {
 					out_cmd_list.commands[i] = cmd_list->CmdBuffer[i];
 				}
 			}
+			
+			init_render = !plugin->m_program.isValid();
+			
+			if (init_render) {
+				plugin->m_index_buffer = ffr::allocBufferHandle();
+				plugin->m_vertex_buffer = ffr::allocBufferHandle();
+				plugin->m_program = ffr::allocProgramHandle();
+			}
+		
 			width = plugin->m_width;
 			height = plugin->m_height;
 			default_texture = &plugin->m_texture;
+			vb = plugin->m_vertex_buffer;
+			ib = plugin->m_index_buffer;
+			canvas_size_uniform = plugin->m_canvas_size_uniform;
+			texture_uniform = plugin->m_texture_uniform;
+			program = plugin->m_program;
 		}
 
 
@@ -2396,9 +2410,6 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 			decl.addAttribute(2, ffr::AttributeType::FLOAT, false, false);
 			decl.addAttribute(4, ffr::AttributeType::U8, true, false);
 
-			PluginManager& plugin_manager = plugin->m_engine.getPluginManager();	
-			Renderer* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
-			
 			const bool use_big_buffers = (vb_offset + num_vertices) * sizeof(ImDrawVert) > 1024 * 1024 ||
 				(ib_offset + num_indices) * sizeof(ImDrawIdx) > 1024 * 1024;
 
@@ -2412,24 +2423,24 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 				ffr::setIndexBuffer(big_ib);
 			}
 			else {
-				ffr::update(plugin->m_index_buffer
+				ffr::update(ib
 					, cmd_list.idx_buffer.data
 					, ib_offset * sizeof(ImDrawIdx)
 					, num_indices * sizeof(ImDrawIdx));
-				ffr::update(plugin->m_vertex_buffer
+				ffr::update(vb
 					, cmd_list.vtx_buffer.data
 					, vb_offset * sizeof(ImDrawVert)
 					, num_vertices * sizeof(ImDrawVert));
 
-				ffr::setVertexBuffer(&decl, plugin->m_vertex_buffer, vb_offset * sizeof(ImDrawVert), nullptr);
-				ffr::setIndexBuffer(plugin->m_index_buffer);
+				ffr::setVertexBuffer(&decl, vb, vb_offset * sizeof(ImDrawVert), nullptr);
+				ffr::setIndexBuffer(ib);
 			}
 			renderer->free(cmd_list.vtx_buffer);
 			renderer->free(cmd_list.idx_buffer);
 			u32 elem_offset = 0;
 			const ImDrawCmd* pcmd_begin = cmd_list.commands.begin();
 			const ImDrawCmd* pcmd_end = cmd_list.commands.end();
-			ffr::useProgram(plugin->m_program);
+			ffr::useProgram(program);
 			// TODO enable only when dc.textures[0].value != m_scene_view.getTextureHandle().value);
 			const u64 blend_state = ffr::getBlendStateBits(ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA, ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA);
 			ffr::setState((u64)ffr::StateFlags::SCISSOR_TEST | blend_state);
@@ -2478,14 +2489,10 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 		void execute() override
 		{
 			PROFILE_FUNCTION();
-			if(!plugin->m_index_buffer.isValid()) {
-				plugin->m_index_buffer = ffr::allocBufferHandle();
-				ffr::createBuffer(plugin->m_index_buffer, (uint)ffr::BufferFlags::DYNAMIC_STORAGE, 1024*1024, nullptr);
-				plugin->m_vertex_buffer = ffr::allocBufferHandle();
-				ffr::createBuffer(plugin->m_vertex_buffer, (uint)ffr::BufferFlags::DYNAMIC_STORAGE, 1024*1024, nullptr);
-			}
 
-			if(!plugin->m_program.isValid()) {
+			if(init_render) {
+				ffr::createBuffer(ib, (uint)ffr::BufferFlags::DYNAMIC_STORAGE, 1024 * 1024, nullptr);
+				ffr::createBuffer(vb, (uint)ffr::BufferFlags::DYNAMIC_STORAGE, 1024 * 1024, nullptr);
 				const char* vs =
 					"#version 330\n"
 					"layout(location = 0) in vec2 a_pos;\n"
@@ -2513,7 +2520,7 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 					"}\n";
 				const char* srcs[] = {vs, fs};
 				ffr::ShaderType types[] = {ffr::ShaderType::VERTEX, ffr::ShaderType::FRAGMENT};
-				plugin->m_program = ffr::createProgram(srcs, types, 2, nullptr, 0, "imgui shader");
+				ffr::createProgram(program, srcs, types, 2, nullptr, 0, "imgui shader");
 			}
 
 			ffr::pushDebugGroup("imgui");
@@ -2524,8 +2531,8 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 
 			ffr::viewport(0, 0, width, height);
 			const float canvas_size[] = {(float)width, (float)height};
-			ffr::setUniform2f(plugin->m_canvas_size_uniform, canvas_size);
-			ffr::setUniform1i(plugin->m_texture_uniform, 0);
+			ffr::setUniform2f(canvas_size_uniform, canvas_size);
+			ffr::setUniform1i(texture_uniform, 0);
 
 			vb_offset = 0;
 			ib_offset = 0;
@@ -2536,12 +2543,19 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 			ffr::popDebugGroup();
 		}
 		
+		Renderer* renderer;
 		const ffr::TextureHandle* default_texture;
 		uint width, height;
 		Array<CmdList> command_lists;
 		uint ib_offset;
 		uint vb_offset;
 		IAllocator& allocator;
+		ffr::BufferHandle ib;
+		ffr::BufferHandle vb;
+		ffr::UniformHandle canvas_size_uniform;
+		ffr::UniformHandle texture_uniform;
+		ffr::ProgramHandle program;
+		bool init_render;
 		EditorUIRenderPlugin* plugin;
 	};
 

@@ -53,11 +53,6 @@ Terrain::Terrain(Renderer& renderer, EntityPtr entity, RenderScene& scene, IAllo
 	, m_renderer(renderer)
 	, m_force_grass_update(false)
 {
-	Renderer::MemRef mem;
-	mem.data = false;
-	mem.own = false;
-	mem.size = 0;
-	m_textures = renderer.createTexture(1024, 1024, TEXTURES_COUNT, ffr::TextureFormat::RGBA8, (u32)ffr::TextureFlags::CLAMP, mem, "terrain_textures");
 }
 
 Terrain::GrassType::~GrassType()

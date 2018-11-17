@@ -2010,111 +2010,6 @@ struct PipelineImpl final : Pipeline
 	}
 
 
-	void prepareTerrainTextures(int shader_idx)
-	{
-		struct RenderJob : Renderer::RenderJob
-		{
-			void setup() override
-			{
-				Terrain* terrain = m_pipeline->m_scene->getTerrain(m_entity);
-				m_framebuffer = ffr::INVALID_FRAMEBUFFER;
-				
-				if (!terrain) return;
-				if (!terrain->getSplatmap()) return;
-				if (!terrain->getAlbedomap()) return;
-
-				m_framebuffer = m_pipeline->m_renderer.getFramebuffer();
-
-				m_rel_camera_pos_uniform = m_pipeline->m_rel_camera_pos_uniform;
-				m_splatmap = terrain->getSplatmap()->handle;
-				m_albedomap = terrain->getAlbedomap()->handle;
-				m_output = terrain->m_textures;
-				m_lod_uniform = m_pipeline->m_lod_uniform;
-				Universe& universe = m_pipeline->m_scene->getUniverse();
-				m_rel_cam_pos = universe.getRotation(m_entity).rotate((m_pipeline->m_viewport.pos - universe.getPosition(m_entity)).toFloat());
-			}
-			
-			void execute() override
-			{
-				if (!m_framebuffer.isValid()) return;
-
-				const Shader::Program& p = Shader::getProgram(m_shader, 0);
-				if (!p.handle.isValid()) return;
-
-				for (int i = 0; i < Terrain::TEXTURES_COUNT; ++i) {
-					ffr::bindLayer(m_framebuffer, m_output, i);
-					ffr::setFramebuffer(m_framebuffer, true);
-					const float clear_color[] = { 0, 0, 0, 0};
-					ffr::viewport(0, 0, 1024, 1024);
-					ffr::clear((uint)ffr::ClearFlags::COLOR, clear_color, 0);
-
-					const int s = 1 << i;
-					// round 
-					IVec2 from = IVec2((m_rel_cam_pos.xz() + Vec2(0.5f * s)) / float(s)) - IVec2(4);
-					from.x = from.x & ~1;
-					from.y = from.y & ~1;
-					IVec2 to = from + IVec2(8);
-					// clamp
-					const IVec2 from_unclamped = from;
-					const IVec2 to_unclamped = to;
-					
-					from.x = Math::clamp(from.x, 0, 1024 / s);
-					from.y = Math::clamp(from.y, 0, 1024 / s);
-					to.x = Math::clamp(to.x, 0, 1024 / s);
-					to.y = Math::clamp(to.y, 0, 1024 / s);
-
-					if (from.x == to.x || from.y == to.y) continue;
-
-					const IVec4 from_to(from, to);
-
-					ffr::bindTexture(0, m_splatmap);
-					ffr::bindTexture(1, m_albedomap);
-					ffr::setUniform1i(ffr::allocUniform("u_splatmap", ffr::UniformType::INT, 1), 0);
-					ffr::setUniform1i(ffr::allocUniform("u_albedo", ffr::UniformType::INT, 1), 1);
-					ffr::setUniform1i(m_lod_uniform, i);
-					ffr::setUniform4i(ffr::allocUniform("u_from_to", ffr::UniformType::IVEC4, 1), &from_to.x);
-					ffr::setUniform1i(ffr::allocUniform("u_step", ffr::UniformType::INT, 1), s);
-					ffr::useProgram(p.handle);
-					
-					ffr::drawArrays(0, 4, ffr::PrimitiveType::TRIANGLE_STRIP);
-				}
-
-				ffr::generateMipmaps(m_output);
-			}
-
-			ffr::FramebufferHandle m_framebuffer;
-			ffr::TextureHandle m_splatmap;
-			ffr::TextureHandle m_albedomap;
-			ffr::UniformHandle m_rel_camera_pos_uniform;
-			ffr::UniformHandle m_lod_uniform;
-			ffr::TextureHandle m_output;
-			Vec3 m_rel_cam_pos;
-
-			EntityRef m_entity;
-			ShaderRenderData* m_shader;
-			PipelineImpl* m_pipeline;
-		};
-		
-		const Shader* shader = [&] {
-			for (const ShaderRef& s : m_shaders) {
-				if(s.id == shader_idx) return s.res;
-			}
-			return (Shader*)nullptr;
-		}();
-
-		if (!shader || !shader->isReady()) return;
-
-		const EntityPtr e = m_scene->getFirstTerrain();
-		if (!e.isValid()) return;
-
-		RenderJob* job = LUMIX_NEW(m_renderer.getAllocator(), RenderJob);
-		job->m_pipeline = this;
-		job->m_shader = shader->m_render_data;
-		job->m_entity = (EntityRef)e;
-		m_renderer.push(job);
-	}
-
-
 	struct RenderTerrainsCommand : Renderer::RenderJob
 	{
 		RenderTerrainsCommand(IAllocator& allocator)
@@ -2138,8 +2033,7 @@ struct PipelineImpl final : Pipeline
 				inst.pos = (info.position - m_camera_params.pos).toFloat();
 				inst.rot = info.rot;
 				inst.shader = info.shader->m_render_data;
-				inst.heightmap = info.terrain->m_heightmap->handle;
-				inst.slices = info.terrain->m_textures;
+				inst.material = info.terrain->m_material->getRenderData();
 			}
 		}
 
@@ -2149,8 +2043,11 @@ struct PipelineImpl final : Pipeline
 			const u8 edge_define_idx = m_pipeline->m_renderer.getShaderDefineIdx("EDGE");
 			
 			u64 state = m_render_state;
-			static bool b = false;
+			static bool b = false; // TODO
 			if (b) state |= (u64)ffr::StateFlags::WIREFRAME;
+
+			static int stat;
+			stat = 0;
 
 			for (Instance& inst : m_instances) {
 				auto& p = Shader::getProgram(inst.shader, deferred_define_mask);
@@ -2165,26 +2062,26 @@ struct PipelineImpl final : Pipeline
 				ffr::setUniform3f(m_pipeline->m_position_uniform, &pos.x);
 				ffr::setUniform3f(m_pipeline->m_rel_camera_pos_uniform, &lpos.x);
 
-				ffr::setUniform1i(ffr::allocUniform("u_hm", ffr::UniformType::INT, 1), 0);
-				ffr::setUniform1i(ffr::allocUniform("u_slices", ffr::UniformType::INT, 1), 1);
-				ffr::bindTexture(0, inst.heightmap);
-				ffr::bindTexture(1, inst.slices);
+				for(int i = 0; i < inst.material->textures_count; ++i) {
+					ffr::bindTexture(i, inst.material->textures[i]);
+				}
 
 				ffr::setState(state);
 				const int loc = ffr::getUniformLocation(p.handle, m_pipeline->m_lod_uniform);
 				const int loc2 = ffr::getUniformLocation(p.handle, ffr::allocUniform("u_from_to", ffr::UniformType::IVEC4, 1));
-				const int loc3 = ffr::getUniformLocation(p.handle, ffr::allocUniform("u_uv_from_to", ffr::UniformType::IVEC4, 1));
+				const int loc4 = ffr::getUniformLocation(p.handle, ffr::allocUniform("u_from_to_sup", ffr::UniformType::IVEC4, 1));
 				IVec4 prev_from_to;
 				for (int i = 0; ; ++i) {
 					const int s = 1 << i;
 					// round 
-					IVec2 from = IVec2((lpos.xz() + Vec2(0.5f * s)) / float(s)) - IVec2(4);
+					IVec2 from = IVec2((lpos.xz() + Vec2(0.5f * s)) / float(s)) - IVec2(64);
 					from.x = from.x & ~1;
 					from.y = from.y & ~1;
-					IVec2 to = from + IVec2(8);
+					IVec2 to = from + IVec2(128);
 					// clamp
 					const IVec2 from_unclamped = from;
 					const IVec2 to_unclamped = to;
+					const IVec4 from_to_sup(from_unclamped, to_unclamped);
 					
 					from.x = Math::clamp(from.x, 0, 1024 / s);
 					from.y = Math::clamp(from.y, 0, 1024 / s);
@@ -2194,17 +2091,12 @@ struct PipelineImpl final : Pipeline
 					auto draw_rect = [&](const IVec2& subfrom, const IVec2& subto){
 						if (subfrom.x >= subto.x || subfrom.y >= subto.y) return;
 						const IVec4 from_to(subfrom, subto);
-						const Vec4 uv_from_to(
-							(subfrom.x - from.x) / float(to.x - from.x),
-							(subfrom.y - from.y) / float(to.y - from.y),
-							(subto.x - from.x) / float(to.x - from.x),
-							(subto.y - from.y) / float(to.y - from.y)
-						);
 						ffr::useProgram(p.handle);
-						ffr::applyUniform4f(loc3, &uv_from_to.x);
+						ffr::applyUniform4i(loc4, &from_to_sup.x);
 						ffr::applyUniform4i(loc2, &from_to.x);
 						ffr::applyUniform1i(loc, i);
 						ffr::drawArrays(0, (subto.x - subfrom.x) * (subto.y - subfrom.y), ffr::PrimitiveType::POINTS);
+						stat += (subto.x - subfrom.x) * (subto.y - subfrom.y);
 					};
 
 					if (i > 0) {
@@ -2238,8 +2130,7 @@ struct PipelineImpl final : Pipeline
 			Vec3 pos;
 			Quat rot;
 			ShaderRenderData* shader;
-			ffr::TextureHandle heightmap;
-			ffr::TextureHandle slices;
+			Material::RenderData* material;
 		};
 
 		IAllocator& m_allocator;
@@ -2831,7 +2722,6 @@ struct PipelineImpl final : Pipeline
 		REGISTER_FUNCTION(endBlock);
 		REGISTER_FUNCTION(executeCustomCommand);
 		REGISTER_FUNCTION(preloadShader);
-		REGISTER_FUNCTION(prepareTerrainTextures);
 		REGISTER_FUNCTION(render2D);
 		REGISTER_FUNCTION(renderDebugShapes);
 		REGISTER_FUNCTION(renderLocalLights);

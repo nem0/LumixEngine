@@ -39,8 +39,6 @@ function transparentPass(transparent_set, colorbuffer, dsbuffer)
 end
 
 function geomPass(default_set, decal_set)
-	prepareTerrainTextures(prepare_terrain_shader)
-
 	beginBlock("geom_pass")
 	local gbuffer0 = createRenderbuffer(1, 1, true, "rgba8")
 	local gbuffer1 = createRenderbuffer(1, 1, true, "rgba16")

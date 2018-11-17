@@ -93,8 +93,8 @@ const Shader::Program& Shader::getProgram(ShaderRenderData* rd, u32 defines)
 		Program program;
 
 		for(int& i : program.attribute_by_semantics) i = -1;
-		// TODO shader path - last argument
-		program.handle = ffr::createProgram(codes, types, rd->sources.size(), prefixes, 2 + defines_count, rd->path.c_str());
+		program.handle = ffr::allocProgramHandle();
+		ffr::createProgram(program.handle, codes, types, rd->sources.size(), prefixes, 2 + defines_count, rd->path.c_str());
 		program.use_semantics = false;
 		if (program.handle.isValid()) {
 			ffr::uniformBlockBinding(program.handle, "GlobalState", 0);

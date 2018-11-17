@@ -33,89 +33,66 @@ geometry_shader [[
 	layout (triangle_strip, max_vertices = 4) out;
 	in int v_vid[];
 	
-	out vec2 v_uv_sub;
 	out vec2 v_uv;
-	uniform sampler2D u_hm;
+	layout (binding=0) uniform sampler2D u_hm;
 	uniform vec3 u_position;
 	uniform int u_lod;
 	uniform vec3 u_rel_camera_pos;
 	uniform ivec4 u_from_to;
-	uniform vec4 u_uv_from_to;
-
+	uniform ivec4 u_from_to_sup;
 	
 	const float hscale = 128;
-
 	
-	void getVertex(ivec2 ij, out vec3 pos, out vec2 uv_sub)
+	void getVertex(ivec2 ij, out vec3 pos)
 	{
 		pos = vec3(ij.x, 0.0, ij.y) * (1 << u_lod);
 		vec3 npos = vec3(ij.x & ~1, 0.0, ij.y & ~1) * (1 << u_lod);
 
-		vec2 size = vec2(u_from_to.zw - u_from_to.xy);
-		uv_sub = (ij - u_from_to.xy) / size;
-		uv_sub = mix(u_uv_from_to.xy, u_uv_from_to.zw, uv_sub);
+		vec2 size = vec2(u_from_to_sup.zw - u_from_to_sup.xy);
+		vec2 rel = (ij - u_from_to_sup.xy) / size;
 		
-		vec2 rel = saturate(abs(uv_sub - vec2(0.5)) * 10 - 4);
-		
-		pos.x = mix(pos.x, npos.x, rel.y);
-		pos.z = mix(pos.z, npos.z, rel.x);
-		
-		uv_sub = (pos.xz / float(1 << u_lod) - u_from_to.xy) / size;
-		uv_sub = mix(u_uv_from_to.xy, u_uv_from_to.zw, uv_sub);
+		rel = saturate(abs(rel - vec2(0.5)) * 10 - 4);
+	
+		pos.xz = mix(pos.xz, npos.xz, rel.yx);
 	}
 	
 	void main()
 	{
-		vec2 v_step;
-		ivec2 size = ivec2(u_from_to.zw - u_from_to.xy);
-		v_step = 1.0 / size;
-
-		vec2 v_rel;
-		v_rel.x = (v_vid[0] % size.x) / float(size.x);
-		v_rel.y = (v_vid[0] / size.x) / float(size.y);
+//		if (u_lod != 0) return;
 		
+		ivec2 size = u_from_to.zw - u_from_to.xy;
+	
 		ivec2 ij = ivec2(
 			u_from_to.x + v_vid[0] % size.x,
 			u_from_to.y + v_vid[0] / size.x
 		);
-		
-		vec2 v_lod_uv;
-		v_lod_uv.x = (v_vid[0] % size.x) * v_step.x;
-		v_lod_uv.y = (v_vid[0] / size.x) * v_step.y;
-		
-		v_lod_uv = u_uv_from_to.xy + (u_uv_from_to.zw -  u_uv_from_to.xy) * v_lod_uv;
-		
-		v_step *= u_uv_from_to.zw - u_uv_from_to.xy;
-		
-		vec2 rel = saturate(abs(v_lod_uv - vec2(0.5)) * 10 - 4);
-		
+	
 		float s = pow(2, u_lod);
 			
 		vec3 v;
-		getVertex(ij, v, v_uv_sub);
-		v_uv = v.xz / 2048;
-		float h = texture(u_hm, v.xz / 2048).x * hscale;
+		getVertex(ij, v);
+		v_uv = v.xz / 1024;
+		float h = texture(u_hm, v_uv).x * hscale;
 		gl_Position = u_camera_view_projection * vec4(u_position + v + vec3(0, h, 0), 1);
 		EmitVertex();
 
-		getVertex(ij + ivec2(1, 0), v, v_uv_sub);
-		v_uv = v.xz / 2048;
-		h = texture(u_hm, v.xz / 2048).x * hscale;
+		getVertex(ij + ivec2(1, 0), v);
+		v_uv = v.xz / 1024;
+		h = texture(u_hm, v_uv).x * hscale;
 		gl_Position = u_camera_view_projection * vec4(u_position + v + vec3(0, h, 0), 1);
 		EmitVertex();
 
-		getVertex(ij + ivec2(0, 1), v, v_uv_sub);
-		v_uv = v.xz / 2048;
-		h = texture(u_hm, v.xz / 2048).x * hscale;
+		getVertex(ij + ivec2(0, 1), v);
+		v_uv = v.xz / 1024;
+		h = texture(u_hm, v_uv).x * hscale;
 		gl_Position = u_camera_view_projection * vec4(u_position + v + vec3(0, h, 0), 1);
 		EmitVertex();
 
-		getVertex(ij + ivec2(1, 1), v, v_uv_sub);
-		v_uv = v.xz / 2048;
-		h = texture(u_hm, v.xz / 2048).x * hscale;
+		getVertex(ij + ivec2(1, 1), v);
+		v_uv = v.xz / 1024;
+		h = texture(u_hm, v_uv).x * hscale;
 		gl_Position = u_camera_view_projection * vec4(u_position + v + vec3(0, h, 0), 1);
 		EmitVertex();
-		EndPrimitive();
 	}
 ]]
 
@@ -130,10 +107,8 @@ fragment_shader [[
 		layout(location = 0) out vec4 o_color;
 	#endif
 
-	in vec2 v_uv_sub;
 	in vec2 v_uv;
 	layout(binding = 0) uniform sampler2D u_hm;
-	layout(binding = 1) uniform sampler2DArray u_slices;
 	uniform int u_lod;
 
 	const float hscale = 128;
@@ -153,7 +128,7 @@ fragment_shader [[
 	void getData()
 	{
 		data.normal = getNormal(v_uv);
-		data.albedo = pow(texture(u_slices, vec3(v_uv_sub, u_lod)), vec4(2.2));
+		data.albedo = texture(u_hm, v_uv);
 		#ifdef ALPHA_CUTOUT
 			if(data.albedo.a < 0.5) discard;
 		#endif
