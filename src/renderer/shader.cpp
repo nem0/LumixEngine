@@ -94,7 +94,10 @@ const Shader::Program& Shader::getProgram(ShaderRenderData* rd, u32 defines)
 
 		for(int& i : program.attribute_by_semantics) i = -1;
 		program.handle = ffr::allocProgramHandle();
-		ffr::createProgram(program.handle, codes, types, rd->sources.size(), prefixes, 2 + defines_count, rd->path.c_str());
+		if(program.handle.isValid() && !ffr::createProgram(program.handle, codes, types, rd->sources.size(), prefixes, 2 + defines_count, rd->path.c_str())) {
+			ffr::destroy(program.handle);
+			program.handle = ffr::INVALID_PROGRAM;
+		}
 		program.use_semantics = false;
 		if (program.handle.isValid()) {
 			ffr::uniformBlockBinding(program.handle, "GlobalState", 0);
