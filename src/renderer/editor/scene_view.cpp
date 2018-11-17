@@ -255,7 +255,6 @@ void SceneView::renderSelection()
 		{
 			for (const Item& item : m_items) {
 				const Shader::Program& prog = Shader::getProgram(item.shader, 0); // TODO define
-
 				if(!prog.handle.isValid()) continue;
 
 				int attribute_map[16];

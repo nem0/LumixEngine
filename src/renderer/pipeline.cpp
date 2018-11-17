@@ -548,8 +548,10 @@ struct PipelineImpl final : Pipeline
 
 
 			void execute() override {
-				ffr::pushDebugGroup("debug lines");
 				const Shader::Program& shader = Shader::getProgram(render_data, 0);
+				if(!shader.handle.isValid()) return;
+
+				ffr::pushDebugGroup("debug lines");
 				struct BaseVertex {
 					Vec3 pos;
 					u32 color;
@@ -681,38 +683,42 @@ struct PipelineImpl final : Pipeline
 
 				ffr::pushDebugGroup("draw2d");
 				ffr::ProgramHandle prg = Shader::getProgram(shader, 0).handle;
-				ffr::setUniform2f(pipeline->m_canvas_size_uniform, &size.x);
-				ffr::setVertexBuffer(&vertex_decl, vb, 0, nullptr);
-				ffr::setIndexBuffer(ib);
+				if(prg.isValid()) {
 
-				u32 elem_offset = 0;
-				const Draw2D::DrawCmd* pcmd_begin = cmd_buffer.begin();
-				const Draw2D::DrawCmd* pcmd_end = cmd_buffer.end();
-				const u64 blend_state = ffr::getBlendStateBits(ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA, ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA);
-				ffr::setState(blend_state);
-				ffr::setUniform1i(pipeline->m_texture_uniform, 0);
-				ffr::useProgram(prg);
+					ffr::setUniform2f(pipeline->m_canvas_size_uniform, &size.x);
+					ffr::setVertexBuffer(&vertex_decl, vb, 0, nullptr);
+					ffr::setIndexBuffer(ib);
 
-				ASSERT(pcmd_begin <= pcmd_end - 1); // TODO compute correct offsets
-				for (const Draw2D::DrawCmd* pcmd = pcmd_begin; pcmd != pcmd_end; pcmd++) {
-					if (0 == pcmd->ElemCount) continue;
+					u32 elem_offset = 0;
+					const Draw2D::DrawCmd* pcmd_begin = cmd_buffer.begin();
+					const Draw2D::DrawCmd* pcmd_end = cmd_buffer.end();
+					const u64 blend_state = ffr::getBlendStateBits(ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA, ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA);
+					ffr::setState(blend_state);
+					ffr::setUniform1i(pipeline->m_texture_uniform, 0);
+					ffr::useProgram(prg);
+
+					ASSERT(pcmd_begin <= pcmd_end - 1); // TODO compute correct offsets
+					for (const Draw2D::DrawCmd* pcmd = pcmd_begin; pcmd != pcmd_end; pcmd++) {
+						if (0 == pcmd->ElemCount) continue;
 			
-					ffr::scissor(uint(Math::maximum(pcmd->ClipRect.x, 0.0f)),
-						uint(Math::maximum(pcmd->ClipRect.y, 0.0f)),
-						uint(Math::minimum(pcmd->ClipRect.z, 65535.0f) - Math::maximum(pcmd->ClipRect.x, 0.0f)),
-						uint(Math::minimum(pcmd->ClipRect.w, 65535.0f) - Math::maximum(pcmd->ClipRect.y, 0.0f)));
+						ffr::scissor(uint(Math::maximum(pcmd->ClipRect.x, 0.0f)),
+							uint(Math::maximum(pcmd->ClipRect.y, 0.0f)),
+							uint(Math::minimum(pcmd->ClipRect.z, 65535.0f) - Math::maximum(pcmd->ClipRect.x, 0.0f)),
+							uint(Math::minimum(pcmd->ClipRect.w, 65535.0f) - Math::maximum(pcmd->ClipRect.y, 0.0f)));
 			
-					const Texture* atlas_texture = pipeline->m_renderer.getFontManager().getAtlasTexture();
-					ffr::TextureHandle texture_id = atlas_texture->handle;
-					if (pcmd->TextureId) texture_id = *(ffr::TextureHandle*)pcmd->TextureId;
-					if(!texture_id.isValid()) texture_id = atlas_texture->handle;
+						const Texture* atlas_texture = pipeline->m_renderer.getFontManager().getAtlasTexture();
+						ffr::TextureHandle texture_id = atlas_texture->handle;
+						if (pcmd->TextureId) texture_id = *(ffr::TextureHandle*)pcmd->TextureId;
+						if(!texture_id.isValid()) texture_id = atlas_texture->handle;
 
-					ffr::bindTexture(0, texture_id);
+						ffr::bindTexture(0, texture_id);
 
-					ffr::drawTriangles(num_indices);
+						ffr::drawTriangles(num_indices);
 
-					elem_offset += pcmd->ElemCount;
+						elem_offset += pcmd->ElemCount;
+					}
 				}
+
 				ffr::popDebugGroup();
 				ffr::destroy(vb);
 				ffr::destroy(ib);
@@ -932,9 +938,11 @@ struct PipelineImpl final : Pipeline
 					memcpy(transient.ptr, mem, byte_size);
 
 					const Shader::Program& prog = Shader::getProgram(shader_data, 0);
-					ffr::useProgram(prog.handle);
-					ffr::setInstanceBuffer(instance_decl, transient.buffer, transient.offset, 0, nullptr);
-					ffr::drawTriangleStripArraysInstanced(0, 4, instances_count);
+					if (prog.handle.isValid()) {
+						ffr::useProgram(prog.handle);
+						ffr::setInstanceBuffer(instance_decl, transient.buffer, transient.offset, 0, nullptr);
+						ffr::drawTriangleStripArraysInstanced(0, 4, instances_count);
+					}
 				}
 				ffr::popDebugGroup();
 			}
@@ -2051,10 +2059,7 @@ struct PipelineImpl final : Pipeline
 
 			for (Instance& inst : m_instances) {
 				auto& p = Shader::getProgram(inst.shader, deferred_define_mask);
-				auto& p_edge = Shader::getProgram(inst.shader, deferred_define_mask | (1 << edge_define_idx));
-				
 				if (!p.handle.isValid()) continue;
-				if (!p_edge.handle.isValid()) continue;
 
 				const Vec3 pos = inst.pos;
 				const Vec3 lpos = inst.rot.conjugated().rotate(-inst.pos);
@@ -2114,14 +2119,6 @@ struct PipelineImpl final : Pipeline
 
 					prev_from_to = IVec4(from, to);
 				}
-				/*
-				ffr::useProgram(p_edge.handle);
-				ffr::setState(state);
-				const int loc_edge = ffr::getUniformLocation(p_edge.handle, m_pipeline->m_lod_uniform);
-				for(int i = 0; i < 6; ++i) {
-					ffr::applyUniform1i(loc_edge, i);
-					ffr::drawArrays(0, 64, ffr::PrimitiveType::POINTS);
-				}*/
 			}
 		}
 
