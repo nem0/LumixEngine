@@ -46,27 +46,26 @@ const Shader::Program& Shader::getProgram(ShaderRenderData* rd, u32 defines)
 	if (!iter.isValid()) {
 		PROFILE_BLOCK("compile_shader");
 		static const char* shader_code_prefix = 
-			"#version 420\n"
-			"layout (std140) uniform GlobalState\n"
-			"{\n"
-			"	mat4 u_shadow_view_projection;\n"
-			"	mat4 u_shadowmap_matrices[4];\n"
-			"	mat4 u_camera_projection;\n"
-			"	mat4 u_camera_inv_projection;\n"
-			"	mat4 u_camera_view;\n"
-			"	mat4 u_camera_inv_view;\n"
-			"	mat4 u_camera_view_projection;\n"
-			"	mat4 u_camera_inv_view_projection;\n"
-			"	vec3 u_light_direction;\n"
-			"	vec3 u_light_color;\n"
-			"	float u_light_intensity;\n"
-			"	float u_light_indirect_intensity;\n"
-			"	float u_time;\n"
-			"	ivec2 u_framebuffer_size;\n"
-			"};\n"
-			"uniform samplerCube u_irradiancemap;\n"
-			"uniform samplerCube u_radiancemap;\n"
-			;
+			R"#(#version 420
+			layout (std140) uniform GlobalState
+			{
+				mat4 u_shadow_view_projection;
+				mat4 u_shadowmap_matrices[4];
+				mat4 u_camera_projection;
+				mat4 u_camera_inv_projection;
+				mat4 u_camera_view;
+				mat4 u_camera_inv_view;
+				mat4 u_camera_view_projection;
+				mat4 u_camera_inv_view_projection;
+				vec3 u_light_direction;
+				vec3 u_light_color;
+				float u_light_intensity;
+				float u_light_indirect_intensity;
+				float u_time;
+				ivec2 u_framebuffer_size;
+			};
+			uniform samplerCube u_irradiancemap;
+			uniform samplerCube u_radiancemap;)#";
 
 		const char* codes[64];
 		ffr::ShaderType types[64];
