@@ -65,20 +65,6 @@ struct Decal : public DecalInfo
 };
 
 
-struct PointLight
-{
-	Vec3 m_diffuse_color;
-	Vec3 m_specular_color;
-	float m_diffuse_intensity;
-	float m_specular_intensity;
-	EntityRef m_entity;
-	float m_fov;
-	float m_attenuation_param;
-	float m_range;
-	bool m_cast_shadows;
-};
-
-
 struct GlobalLight
 {
 	Vec3 m_diffuse_color;
@@ -799,6 +785,9 @@ public:
 		serializer.read(&light.m_specular_color);
 		serializer.read(&light.m_specular_intensity);
 		m_point_lights.insert(entity, light);
+		
+		const DVec3 pos = m_universe.getPosition(entity);
+		m_culling_system->add(entity, (u8)RenderableTypes::LOCAL_LIGHT, pos, light.m_range);
 
 		m_universe.onComponentCreated(light.m_entity, POINT_LIGHT_TYPE, this);
 	}
@@ -1489,7 +1478,8 @@ public:
 			PointLight light;
 			serializer.read(light);
 			m_point_lights.insert(light.m_entity, light);
-
+			const DVec3 pos = m_universe.getPosition(light.m_entity);
+			m_culling_system->add(light.m_entity, (u8)RenderableTypes::LOCAL_LIGHT, pos, light.m_range);
 			m_universe.onComponentCreated(light.m_entity, POINT_LIGHT_TYPE, this);
 		}
 
@@ -1669,6 +1659,12 @@ public:
 	{
 		m_particle_emitters.insert(entity, LUMIX_NEW(m_allocator, ParticleEmitter)(entity, m_allocator));
 		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_TYPE, this);
+	}
+
+
+	const PointLight& getPointLight(EntityRef entity) override
+	{
+		return m_point_lights[entity];
 	}
 
 

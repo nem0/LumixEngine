@@ -13,6 +13,8 @@ struct PixelData {
 
 float saturate(float a) { return clamp(a, 0, 1); }
 vec2 saturate(vec2 a) { return clamp(a, vec2(0), vec2(1)); }
+vec3 saturate(vec3 a) { return clamp(a, vec3(0), vec3(1)); }
+vec4 saturate(vec4 a) { return clamp(a, vec4(0), vec4(1)); }
 
 
 float packEmission(float emission)
