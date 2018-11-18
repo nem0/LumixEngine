@@ -65,7 +65,8 @@ const Shader::Program& Shader::getProgram(ShaderRenderData* rd, u32 defines)
 				ivec2 u_framebuffer_size;
 			};
 			uniform samplerCube u_irradiancemap;
-			uniform samplerCube u_radiancemap;)#";
+			uniform samplerCube u_radiancemap;
+			)#";
 
 		const char* codes[64];
 		ffr::ShaderType types[64];
