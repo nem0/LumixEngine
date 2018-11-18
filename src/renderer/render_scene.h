@@ -49,6 +49,20 @@ struct TerrainInfo
 };
 
 
+struct PointLight
+{
+	Vec3 m_diffuse_color;
+	Vec3 m_specular_color;
+	float m_diffuse_intensity;
+	float m_specular_intensity;
+	EntityRef m_entity;
+	float m_fov;
+	float m_attenuation_param;
+	float m_range;
+	bool m_cast_shadows;
+};
+
+
 struct DecalInfo
 {
 	Material* material;
@@ -321,6 +335,7 @@ public:
 	virtual void addGrass(EntityRef entity, int index) = 0;
 	virtual void removeGrass(EntityRef entity, int index) = 0;
 
+	virtual const PointLight& getPointLight(EntityRef entity) = 0;
 	virtual void setLightCastShadows(EntityRef entity, bool cast_shadows) = 0;
 	virtual bool getLightCastShadows(EntityRef entity) = 0;
 	virtual float getLightAttenuation(EntityRef entity) = 0;

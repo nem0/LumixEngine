@@ -109,6 +109,7 @@ fragment_shader [[
 
 	in vec2 v_uv;
 	layout(binding = 0) uniform sampler2D u_hm;
+	layout(binding = 1) uniform samplerArray u_albedo;
 	uniform int u_lod;
 
 	const float hscale = 128;
@@ -128,7 +129,7 @@ fragment_shader [[
 	void getData()
 	{
 		data.normal = getNormal(v_uv);
-		data.albedo = texture(u_hm, v_uv);
+		data.albedo = texture(u_albedo, v_uv);
 		#ifdef ALPHA_CUTOUT
 			if(data.albedo.a < 0.5) discard;
 		#endif

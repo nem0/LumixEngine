@@ -1575,9 +1575,11 @@ struct PipelineImpl final : Pipeline
 				if(m_cmd_set->cmds.empty()) return;
 				
 				ffr::VertexDecl instance_decl;
-				instance_decl.addAttribute(4, ffr::AttributeType::FLOAT, false, false);
-				instance_decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false);
-				instance_decl.addAttribute(1, ffr::AttributeType::FLOAT, false, false);
+				instance_decl.addAttribute(4, ffr::AttributeType::FLOAT, false, false); // rot
+				instance_decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false); // pos
+				instance_decl.addAttribute(1, ffr::AttributeType::FLOAT, false, false); // radius
+				instance_decl.addAttribute(1, ffr::AttributeType::FLOAT, false, false); // attn
+				instance_decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false); // color
 
 				ffr::VertexDecl decl;
 				decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false);
@@ -2444,12 +2446,15 @@ struct PipelineImpl final : Pipeline
 							const EntityRef e = {int(renderables[i] & 0x00ffFFff)};
 							const Transform& tr = entity_data[e.index].transform;
 							const Vec3 lpos = (tr.pos - camera_pos).toFloat();
-							const float range = scene->getLightRange(e);
-							*intersecting = frustum.intersectNearPlane(tr.pos, range * Math::SQRT3);
+							const PointLight& pl = scene->getPointLight(e);
+							*intersecting = frustum.intersectNearPlane(tr.pos, pl.m_range * Math::SQRT3);
 							if (*intersecting) {
 								WRITE(tr.rot);
 								WRITE(lpos);
-								WRITE(range);
+								WRITE(pl.m_range);
+								WRITE(pl.m_attenuation_param);
+								const Vec3 color = pl.m_diffuse_color * pl.m_diffuse_intensity;
+								WRITE(color);
 								++i;
 							}
 							else {
@@ -2457,11 +2462,14 @@ struct PipelineImpl final : Pipeline
 									const EntityRef e = {int(renderables[i] & 0x00ffFFff)};
 									const Transform& tr = entity_data[e.index].transform;
 									const Vec3 lpos = (tr.pos - camera_pos).toFloat();
-									const float range = scene->getLightRange(e);
+									const PointLight& pl = scene->getPointLight(e);
 
 									WRITE(tr.rot);
 									WRITE(lpos);
-									WRITE(range);
+									WRITE(pl.m_range);
+									WRITE(pl.m_attenuation_param);
+									const Vec3 color = pl.m_diffuse_color * pl.m_diffuse_intensity;
+									WRITE(color);
 									// TODO color, attn, ...
 									++i;
 								}
