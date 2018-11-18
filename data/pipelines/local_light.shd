@@ -10,12 +10,16 @@ vertex_shader [[
 	layout(location = 3) in float i_radius;
 	layout(location = 4) in float i_attn;
 	layout(location = 5) in vec3 i_color;
+	layout(location = 6) in vec3 i_dir;
+	layout(location = 7) in float i_fov;
 	
 	out float v_radius;
 	out vec3 v_center;
 	out vec4 v_rot;
 	out float v_attn;
 	out vec3 v_color;
+	out vec3 v_dir;
+	out float v_fov;
 	
 	void main()
 	{
@@ -24,6 +28,8 @@ vertex_shader [[
 		v_radius = i_radius;
 		v_attn = i_attn;
 		v_color = i_color;
+		v_dir = i_dir;
+		v_fov = i_fov;
 		vec3 pos = rotateByQuat(i_rot, a_position * i_radius);
 		pos += i_pos;
 		gl_Position = u_camera_projection * u_camera_view * vec4(pos, 1);
@@ -41,6 +47,8 @@ fragment_shader [[
 	in vec4 v_rot;
 	in float v_attn;
 	in vec3 v_color;
+	in vec3 v_dir;
+	in float v_fov;
 	
 	uniform sampler2D u_gbuffer0;
 	uniform sampler2D u_gbuffer1;
@@ -92,6 +100,15 @@ fragment_shader [[
 		vec3 lpos = v_center - wpos.xyz;
 		vec3 L = normalize(lpos);
 		vec3 direct_light = PBR_ComputeDirectLight(albedo.rgb, N, L, V, v_color.rgb, roughness, metallic);
+		float dist = length(lpos);
+		float attn = pow(max(0, 1 - dist / v_radius), v_attn);		
+		if(v_fov < 3.14159) {
+			float cosDir = dot(normalize(v_dir), normalize(L));
+			float cosCone = cos(v_fov * 0.5);
+
+			if(cosDir < cosCone) discard;
+			attn *= (cosDir - cosCone) / (1 - cosCone);	
+		}/**/
 		/*vec3 lp = v_pos_radius.xyz - wpos;
 		float dist = length(lp);
 		float attn = pow(max(0, 1 - dist / v_pos_radius.w), v_color_attn.w);		
@@ -109,8 +126,6 @@ fragment_shader [[
 		
 		o_color.xyz = attn * (diff * diffuse_color.rgb + spec * specular_color.rgb);
 		o_color.w = 1;*/
-		float dist = length(lpos);
-		float attn = pow(max(0, 1 - dist / v_radius), v_attn);		
 		
 		o_color.rgb = direct_light * attn;
 		//o_color.rgb = vec3(saturate(wpos));

@@ -1580,6 +1580,8 @@ struct PipelineImpl final : Pipeline
 				instance_decl.addAttribute(1, ffr::AttributeType::FLOAT, false, false); // radius
 				instance_decl.addAttribute(1, ffr::AttributeType::FLOAT, false, false); // attn
 				instance_decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false); // color
+				instance_decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false); // dir
+				instance_decl.addAttribute(1, ffr::AttributeType::FLOAT, false, false); // fov
 
 				ffr::VertexDecl decl;
 				decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false);
@@ -2339,7 +2341,10 @@ struct PipelineImpl final : Pipeline
 				CreateCommands* ctx = (CreateCommands*)data;
 				PROFILE_INT("num", ctx->count);
 				const Universe& universe = ctx->cmd->m_pipeline->m_scene->getUniverse();
-				ctx->output->resize(ctx->count * (sizeof(RenderableTypes) + sizeof(Mesh::RenderData*) + sizeof(Material::RenderData*) + sizeof(Vec3) + sizeof(Quat) + sizeof(Vec3) + sizeof(u16) + sizeof(float)));
+				int item_size = int(sizeof(RenderableTypes) + sizeof(Mesh::RenderData*) + sizeof(Material::RenderData*) + sizeof(Vec3) + sizeof(Quat) + sizeof(Vec3) + sizeof(u16) + sizeof(float));
+				item_size = Math::maximum(item_size, int(4 * sizeof(Vec4) + sizeof(bool) + sizeof(int)));
+				
+				ctx->output->resize(ctx->count * item_size);
 				const u64 instance_key_mask = ctx->cmd->m_bucket_sort_order[ctx->bucket] == PrepareCommandsRenderJob::SortOrder::DEPTH ? 0xffFFff : 0xffFFff00000000;
 				u8* out = ctx->output->begin();
 				const u64* LUMIX_RESTRICT renderables = ctx->renderables;
@@ -2455,6 +2460,9 @@ struct PipelineImpl final : Pipeline
 								WRITE(pl.m_attenuation_param);
 								const Vec3 color = pl.m_diffuse_color * pl.m_diffuse_intensity;
 								WRITE(color);
+								const Vec3 dir = tr.rot * Vec3(0, 0, 1);
+								WRITE(dir);
+								WRITE(pl.m_fov);
 								++i;
 							}
 							else {
@@ -2470,7 +2478,9 @@ struct PipelineImpl final : Pipeline
 									WRITE(pl.m_attenuation_param);
 									const Vec3 color = pl.m_diffuse_color * pl.m_diffuse_intensity;
 									WRITE(color);
-									// TODO color, attn, ...
+									const Vec3 dir = tr.rot * Vec3(0, 0, 1);
+									WRITE(dir);
+									WRITE(pl.m_fov);
 									++i;
 								}
 							}
