@@ -2494,30 +2494,30 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 				ffr::createBuffer(ib, (uint)ffr::BufferFlags::DYNAMIC_STORAGE, 1024 * 1024, nullptr);
 				ffr::createBuffer(vb, (uint)ffr::BufferFlags::DYNAMIC_STORAGE, 1024 * 1024, nullptr);
 				const char* vs =
-					"#version 330\n"
-					"layout(location = 0) in vec2 a_pos;\n"
-					"layout(location = 1) in vec2 a_uv;\n"
-					"layout(location = 2) in vec4 a_color;\n"
-					"out vec4 v_color;\n"
-					"out vec2 v_uv;\n"
-					"uniform vec2 u_canvas_size;\n"
-					"void main() {\n"
-					"	v_color = a_color;\n"
-					"	v_uv = a_uv;\n"
-					"	gl_Position = vec4(a_pos / u_canvas_size * 2 - 1, 0, 1);\n"
-					"	gl_Position.y = -gl_Position.y;\n"
-					"}\n";
+					R"#(#version 330
+					layout(location = 0) in vec2 a_pos;
+					layout(location = 1) in vec2 a_uv;
+					layout(location = 2) in vec4 a_color;
+					out vec4 v_color;
+					out vec2 v_uv;
+					uniform vec2 u_canvas_size;
+					void main() {
+						v_color = a_color;
+						v_uv = a_uv;
+						gl_Position = vec4(a_pos / u_canvas_size * 2 - 1, 0, 1);
+						gl_Position.y = -gl_Position.y;
+					})#";
 				const char* fs = 
-					"#version 330\n"
-					"in vec4 v_color;\n"
-					"in vec2 v_uv;\n"
-					"out vec4 o_color;\n"
-					"uniform sampler2D u_texture;\n"
-					"void main() {\n"
-					"	vec4 tc = textureLod(u_texture, v_uv, 0);\n"
-					"	o_color.rgb = pow(tc.rgb, vec3(1/2.2)) * v_color.rgb;\n"
-					"	o_color.a = v_color.a * tc.a;\n"
-					"}\n";
+					R"#(#version 330
+					in vec4 v_color;
+					in vec2 v_uv;
+					out vec4 o_color;
+					uniform sampler2D u_texture;
+					void main() {
+						vec4 tc = textureLod(u_texture, v_uv, 0);
+						o_color.rgb = pow(tc.rgb, vec3(1/2.2)) * v_color.rgb;
+						o_color.a = v_color.a * tc.a;
+					})#";
 				const char* srcs[] = {vs, fs};
 				ffr::ShaderType types[] = {ffr::ShaderType::VERTEX, ffr::ShaderType::FRAGMENT};
 				ffr::createProgram(program, srcs, types, 2, nullptr, 0, "imgui shader");
