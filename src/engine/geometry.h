@@ -179,7 +179,18 @@ struct alignas(16) LUMIX_ENGINE_API ShiftedFrustum
 
 	void setPlanesFromPoints();
 	void setPlane(Frustum::Planes side, const Vec3& normal, const Vec3& point);
-
+	
+	bool intersectNearPlane(const DVec3& center, float radius) const
+	{
+		const float x = float(center.x - origin.x);
+		const float y = float(center.y - origin.y);
+		const float z = float(center.z - origin.z);
+		const u32 i = (u32)Frustum::Planes::NEAR;
+		float distance = xs[i] * x + ys[i] * y + z * zs[i] + ds[i];
+		distance = distance < 0 ? -distance : distance;
+		return distance < radius;
+	}
+	
 	float xs[(int)Frustum::Planes::COUNT];
 	float ys[(int)Frustum::Planes::COUNT];
 	float zs[(int)Frustum::Planes::COUNT];

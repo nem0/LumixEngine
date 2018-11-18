@@ -1582,6 +1582,7 @@ struct PipelineImpl final : Pipeline
 				ffr::VertexDecl decl;
 				decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false);
 
+				const u32 define_mask = m_define_mask;
 				for (const Array<u8>& cmds : m_cmd_set->cmds) {
 					const u8* cmd = cmds.begin();
 					const u8* cmd_end = cmds.end();
@@ -1591,14 +1592,18 @@ struct PipelineImpl final : Pipeline
 						switch(type) {
 							case RenderableTypes::LOCAL_LIGHT: {
 								READ(u16, instances_count);
+								READ(bool, intersecting);
 
 								const u8* instance_data = cmd;
 								cmd += instance_decl.size * instances_count;
 
-								const Shader::Program& prog = Shader::getProgram(m_shader, m_define_mask);
+								const Shader::Program& prog = Shader::getProgram(m_shader, define_mask);
 								if (prog.handle.isValid()) {
 									ffr::useProgram(prog.handle);
-									ffr::setState((u64)ffr::StateFlags::DEPTH_TEST);
+									const u64 state = intersecting
+										? (u64)ffr::StateFlags::CULL_FRONT
+										: (u64)ffr::StateFlags::DEPTH_TEST | (u64)ffr::StateFlags::CULL_BACK;
+									ffr::setState(state);
 									ffr::setIndexBuffer(m_pipeline->m_cube_ib);
 									ffr::setVertexBuffer(&decl, m_pipeline->m_cube_vb, 0, nullptr);
 
@@ -2338,6 +2343,7 @@ struct PipelineImpl final : Pipeline
 				const u64* LUMIX_RESTRICT renderables = ctx->renderables;
 				const u64* LUMIX_RESTRICT sort_keys = ctx->sort_keys;
 				RenderScene* scene = ctx->cmd->m_pipeline->m_scene;
+				const ShiftedFrustum frustum = ctx->cmd->m_camera_params.frustum;
 				const ModelInstance* LUMIX_RESTRICT model_instances = scene->getModelInstances();
 				const Universe::EntityData* LUMIX_RESTRICT entity_data = universe.getEntityData(); 
 				const DVec3 camera_pos = ctx->camera_pos;
@@ -2431,17 +2437,34 @@ struct PipelineImpl final : Pipeline
 							u16* instance_count = (u16*)out;
 							int start_i = i;
 							out += sizeof(*instance_count);
+							bool* intersecting = (bool*)out;
+							out += sizeof(*intersecting);
 							const u64 key = sort_keys[i];
-							while (i < c && sort_keys[i] == key) {
-								const EntityRef e = {int(renderables[i] & 0x00ffFFff)};
-								const Transform& tr = entity_data[e.index].transform;
-								const Vec3 lpos = (tr.pos - camera_pos).toFloat();
-								const float range = scene->getLightRange(e);
+
+							const EntityRef e = {int(renderables[i] & 0x00ffFFff)};
+							const Transform& tr = entity_data[e.index].transform;
+							const Vec3 lpos = (tr.pos - camera_pos).toFloat();
+							const float range = scene->getLightRange(e);
+							*intersecting = frustum.intersectNearPlane(tr.pos, range * Math::SQRT3);
+							if (*intersecting) {
 								WRITE(tr.rot);
 								WRITE(lpos);
 								WRITE(range);
-								// TODO color, attn, ...
 								++i;
+							}
+							else {
+								while (i < c && sort_keys[i] == key) {
+									const EntityRef e = {int(renderables[i] & 0x00ffFFff)};
+									const Transform& tr = entity_data[e.index].transform;
+									const Vec3 lpos = (tr.pos - camera_pos).toFloat();
+									const float range = scene->getLightRange(e);
+
+									WRITE(tr.rot);
+									WRITE(lpos);
+									WRITE(range);
+									// TODO color, attn, ...
+									++i;
+								}
 							}
 							*instance_count = u16(i - start_i);
 							--i;
@@ -2866,7 +2889,7 @@ void Pipeline::renderModel(Model& model, const Matrix& mtx, ffr::UniformHandle m
 		for(uint i = 0; i < rd->vertex_decl.attributes_count; ++i) {
 			attribute_map[i] = prog.attribute_by_semantics[(int)rd->attributes_semantic[i]];
 		}
-			
+
 		ffr::setUniformMatrix4f(mtx_uniform, &mtx.m11);
 		ffr::useProgram(prog.handle);
 		ffr::setVertexBuffer(&rd->vertex_decl, rd->vertex_buffer_handle, 0, prog.use_semantics ? attribute_map : nullptr);
