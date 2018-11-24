@@ -1703,26 +1703,23 @@ public:
 	void onEntityMoved(EntityRef entity)
 	{
 		const int index = entity.index;
-
-		if (index < m_model_instances.size() && m_model_instances[index].entity.isValid() &&
-			m_model_instances[index].model && m_model_instances[index].model->isReady())
-		{
-			ModelInstance& r = m_model_instances[index];
-			if (r.model && r.model->isReady())
-			{
+		if (m_culling_system->isAdded(entity)) {
+			if (m_universe.hasComponent(entity, MODEL_INSTANCE_TYPE)) {
+				ModelInstance& r = m_model_instances[index];
 				const float radius = m_universe.getScale(entity) * r.model->getBoundingRadius();
 				const DVec3 position = m_universe.getPosition(entity);
 				m_culling_system->setRadius(entity, radius);
 				m_culling_system->setPosition(entity, position);
 			}
-		}
-
-		if(m_universe.hasComponent(entity, DECAL_TYPE)) {
-			auto iter = m_decals.find(entity);
-			updateDecalInfo(iter.value());
-			const DVec3 position = m_universe.getPosition(entity);
-			if (m_culling_system->isAdded(entity)) {
+			else if (m_universe.hasComponent(entity, DECAL_TYPE)) {
+				auto iter = m_decals.find(entity);
+				updateDecalInfo(iter.value());
+				const DVec3 position = m_universe.getPosition(entity);
 				m_culling_system->setPosition(entity, position);
+			}
+			else if (m_universe.hasComponent(entity, POINT_LIGHT_TYPE)) {
+				const DVec3 pos = m_universe.getPosition(entity);
+				m_culling_system->setPosition(entity, pos);
 			}
 		}
 
