@@ -37,7 +37,7 @@ fragment_shader [[
 		return (in_color / max(0.00001, lum)) * ld;
 	}
 
-	uniform sampler2D u_hdrbuffer;
+	layout (binding=0) uniform sampler2D u_hdrbuffer;
 	in vec2 v_uv;
 	out vec4 o_color;
 	void main() {

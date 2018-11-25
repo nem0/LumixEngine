@@ -270,11 +270,6 @@ int texture_slot(lua_State* L)
 	Shader::TextureSlot& slot = shader->m_texture_slots[shader->m_texture_slot_count];
 	LuaWrapper::getOptionalStringField(L, -1, "name", slot.name, lengthOf(slot.name));
 
-	if(LuaWrapper::getOptionalStringField(L, -1, "uniform", slot.uniform, lengthOf(slot.uniform))) {
-		slot.uniform_handle = ffr::allocUniform(slot.uniform, ffr::UniformType::INT, 1);
-	}
-	shader->m_render_data->texture_uniforms[shader->m_texture_slot_count] = slot.uniform_handle;
-
 	char tmp[MAX_PATH_LENGTH];
 	if(LuaWrapper::getOptionalStringField(L, -1, "default_texture", tmp, lengthOf(tmp))) {
 		ResourceManagerHub& manager = shader->getResourceManager().getOwner();

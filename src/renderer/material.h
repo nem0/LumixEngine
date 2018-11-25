@@ -87,8 +87,7 @@ public:
 
 	int getTextureCount() const { return m_texture_count; }
 	Texture* getTexture(int i) const { return i < m_texture_count ? m_textures[i] : nullptr; }
-	ffr::UniformHandle getTextureUniform(int i) const;
-	Texture* getTextureByUniform(const char* uniform) const;
+	Texture* getTextureByName(const char* name) const;
 	bool isTextureDefine(u8 define_idx) const;
 	void setTexture(int i, Texture* texture);
 	void setTexturePath(int i, const Path& path);

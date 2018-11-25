@@ -981,7 +981,6 @@ int RenderTask::task()
 	m_transient_buffer = ffr::allocBufferHandle();
 	m_transient_buffer_offset = 0;
 	const uint transient_flags = (uint)ffr::BufferFlags::PERSISTENT 
-		| (uint)ffr::BufferFlags::COHERENT
 		| (uint)ffr::BufferFlags::MAP_WRITE;
 	ffr::createBuffer(m_transient_buffer, transient_flags, TRANSIENT_BUFFER_SIZE, nullptr);
 	m_transient_buffer_ptr = (u8*)ffr::map(m_transient_buffer, 0, TRANSIENT_BUFFER_SIZE, transient_flags);

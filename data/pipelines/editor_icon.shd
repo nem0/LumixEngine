@@ -1,6 +1,5 @@
 texture_slot {
 	name = "Albedo",
-	uniform = "u_albedomap",
 	default_texture = "textures/common/white.tga"
 }
 
@@ -24,7 +23,7 @@ vertex_shader [[
 ---------------------
 
 fragment_shader [[
-	uniform sampler2D u_albedomap;
+	layout (binding=0) uniform sampler2D u_albedomap;
 	in vec2 v_uv;
 	in vec3 v_normal;
 	

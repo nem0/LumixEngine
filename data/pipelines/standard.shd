@@ -1,24 +1,20 @@
 texture_slot {
 	name = "Albedo",
-	uniform = "u_albedomap",
 	default_texture = "textures/common/white.tga"
 }
 
 texture_slot {
 	name = "Normal",
-	uniform = "u_normalmap",
 	default_texture = "textures/common/default_normal.tga"
 }
 
 texture_slot {
 	name = "Roughness",
-	uniform = "u_roughnessmap",
 	default_texture = "textures/common/white.tga"
 }
 
 texture_slot {
 	name = "Metallic",
-	uniform = "u_metallicmap",
 	default_texture = "textures/common/white.tga"
 }
 
@@ -82,11 +78,11 @@ vertex_shader [[
 ---------------------
 
 fragment_shader [[
-	uniform sampler2D u_albedomap;
-	uniform sampler2D u_normalmap;
-	uniform sampler2D u_roughnessmap;
-	uniform sampler2D u_metallicmap;
-	uniform sampler2D u_shadowmap;
+	layout (binding=0) uniform sampler2D u_albedomap;
+	layout (binding=1) uniform sampler2D u_normalmap;
+	layout (binding=2) uniform sampler2D u_roughnessmap;
+	layout (binding=3) uniform sampler2D u_metallicmap;
+	layout (binding=4) uniform sampler2D u_shadowmap;
 	uniform vec4 u_material_params;
 	uniform vec4 u_material_color;
 	in vec2 v_uv;

@@ -1523,21 +1523,11 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			ImGui::CollapsingHeader(
 				"Texture slots", nullptr, ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_Framed))
 		{
-			ImGui::Columns(2);
-			ImGui::Text("name");
-			ImGui::NextColumn();
-			ImGui::Text("uniform");
-			ImGui::NextColumn();
-			ImGui::Separator();
 			for (int i = 0; i < shader->m_texture_slot_count; ++i)
 			{
 				auto& slot = shader->m_texture_slots[i];
 				ImGui::Text("%s", slot.name);
-				ImGui::NextColumn();
-				ImGui::Text("%s", slot.uniform);
-				ImGui::NextColumn();
 			}
-			ImGui::Columns(1);
 		}
 		if (!shader->m_uniforms.empty() &&
 			ImGui::CollapsingHeader("Uniforms", nullptr, ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_Framed))
