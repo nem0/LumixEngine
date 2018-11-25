@@ -75,17 +75,18 @@ const Shader::Program& Shader::getProgram(ShaderRenderData* rd, u32 defines)
 			codes[i] = &rd->sources[i].code[0];
 			types[i] = rd->sources[i].type;
 		}
-		const char* prefixes[34];
+		const char* prefixes[35];
 		StaticString<128> defines_code[32];
 		int defines_count = 0;
 		prefixes[0] = shader_code_prefix;
-		prefixes[1] = rd->include.empty() ? "" : (const char*)&rd->include[0];
+		prefixes[1] = rd->include.empty() ? "" : rd->include.begin();
+		prefixes[2] = rd->common_source.empty() ? "" : rd->common_source.begin();
 		if (defines != 0) {
 			for(int i = 0; i < sizeof(defines) * 8; ++i) {
 				if((defines & (1 << i)) == 0) continue;
 				// TODO getShaderDefine is not threadsafe
 				defines_code[defines_count] << "#define " << rd->renderer.getShaderDefine(i) << "\n";
-				prefixes[2 + defines_count] = defines_code[defines_count];
+				prefixes[3 + defines_count] = defines_code[defines_count];
 				++defines_count;
 			}
 		}
@@ -94,7 +95,7 @@ const Shader::Program& Shader::getProgram(ShaderRenderData* rd, u32 defines)
 
 		for(int& i : program.attribute_by_semantics) i = -1;
 		program.handle = ffr::allocProgramHandle();
-		if(program.handle.isValid() && !ffr::createProgram(program.handle, codes, types, rd->sources.size(), prefixes, 2 + defines_count, rd->path.c_str())) {
+		if(program.handle.isValid() && !ffr::createProgram(program.handle, codes, types, rd->sources.size(), prefixes, 3 + defines_count, rd->path.c_str())) {
 			ffr::destroy(program.handle);
 			program.handle = ffr::INVALID_PROGRAM;
 		}
@@ -322,6 +323,41 @@ static void source(lua_State* L, ffr::ShaderType shader_type)
 }
 
 
+static int common(lua_State* L)
+{
+	auto countLines = [](const char* str) {
+		int count = 0;
+		const char* c = str;
+		while(*c) {
+			if(*c == '\n') ++count;
+			++c;
+		}
+		return count;
+	};
+
+	const char* src = LuaWrapper::checkArg<const char*>(L, 1);
+	
+	lua_getfield(L, LUA_GLOBALSINDEX, "this");
+	Shader* shader = (Shader*)lua_touserdata(L, -1);
+	lua_pop(L, 1);
+
+	lua_Debug ar;
+	lua_getstack(L, 1, &ar);
+	lua_getinfo(L, "nSl", &ar);
+	const int line = ar.currentline - countLines(src);
+
+	const StaticString<32> line_str("#line ", line, "\n");
+	const int line_str_len = stringLength(line_str);
+	const int src_len = stringLength(src);
+
+	shader->m_render_data->common_source.resize(line_str_len + src_len + 1);
+	copyMemory(&shader->m_render_data->common_source[0], line_str, line_str_len);
+	copyMemory(&shader->m_render_data->common_source[line_str_len], src, src_len);
+	shader->m_render_data->common_source.back() = '\0';
+	return 0;
+}
+
+
 int vertex_shader(lua_State* L)
 {
 	source(L, ffr::ShaderType::VERTEX);
@@ -391,6 +427,8 @@ bool Shader::load(FS::IFile& file)
 
 	lua_pushlightuserdata(L, this);
 	lua_setfield(L, LUA_GLOBALSINDEX, "this");
+	lua_pushcclosure(L, LuaAPI::common, 0);
+	lua_setfield(L, LUA_GLOBALSINDEX, "common");
 	lua_pushcclosure(L, LuaAPI::vertex_shader, 0);
 	lua_setfield(L, LUA_GLOBALSINDEX, "vertex_shader");
 	lua_pushcclosure(L, LuaAPI::fragment_shader, 0);
