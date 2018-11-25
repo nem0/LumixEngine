@@ -70,19 +70,19 @@ function lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap, local
 	
 	drawArray(0, 4, deferred_shader,
 	{
-		u_gbuffer0 = gbuffer0,
-		u_gbuffer1 = gbuffer1,
-		u_gbuffer2 = gbuffer2,
-		u_gbuffer_depth = gbuffer_depth,
-		u_shadowmap = shadowmap
+		gbuffer0,
+		gbuffer1,
+		gbuffer2,
+		gbuffer_depth,
+		shadowmap
 	}, {}, {}, { depth_test = false })
 	local view_params = getCameraParams()
 	bindTextures({
-		u_gbuffer0 = gbuffer0,
-		u_gbuffer1 = gbuffer1,
-		u_gbuffer2 = gbuffer2,
-		u_gbuffer_depth = gbuffer_depth,
-		u_shadowmap = shadowmap
+		gbuffer0,
+		gbuffer1,
+		gbuffer2,
+		gbuffer_depth,
+		shadowmap
 	}, 2)
 	renderEnvProbeVolumes(environment_shader, view_params)
 	
@@ -90,11 +90,11 @@ function lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap, local
 	
 	beginBlock("local_lights")
 	bindTextures({
-		u_gbuffer0 = gbuffer0,
-		u_gbuffer1 = gbuffer1,
-		u_gbuffer2 = gbuffer2,
-		u_gbuffer_depth = gbuffer_depth,
-		u_shadowmap = shadowmap
+		gbuffer0,
+		gbuffer1,
+		gbuffer2,
+		gbuffer_depth,
+		shadowmap
 	}, 0)
 	renderLocalLights("", local_light_shader, local_light_set)
 	endBlock()
@@ -106,7 +106,7 @@ function debugRenderbuffer(rb, output)
 	setRenderTargets(output)
 	
 	drawArray(0, 4, textured_quad_shader
-		, { u_texture = rb }
+		, { rb }
 		, { u_offset_scale = { 0.5, 0.5, 0.5, 0.5 } }
 		, {}
 		, { depth_test = false });
@@ -144,7 +144,7 @@ function tonemap(hdr_buffer)
 	local rb = createRenderbuffer(1, 1, true, "rgba8")
 	setRenderTargets(rb)
 	drawArray(0, 4, tonemap_shader
-		, { u_hdrbuffer = hdr_buffer }
+		, { hdr_buffer }
 		, {}
 		, {}
 		, { depth_test = false }
@@ -168,7 +168,7 @@ function renderSelectionOutline(output)
 	
 	setRenderTargets(output)
 	drawArray(0, 4, selection_outline_shader
-		, { u_mask = selection_mask }
+		, { selection_mask }
 		, {}
 		, {}
 		, { depth_test = false }
