@@ -1039,14 +1039,12 @@ struct PipelineImpl final : Pipeline
 
 		Cmd* cmd = LUMIX_NEW(pipeline->m_renderer.getAllocator(), Cmd);
 		cmd->m_offset = offset;
-		lua_pushnil(L);
-		while (lua_next(L, 1) != 0) {
+		
+		
+		const int len = (int)lua_objlen(L, 4);
+		for(int i = 0; i < len; ++i) {
+			lua_rawgeti(L, 4, i + 1);
 			if(lua_type(L, -1) != LUA_TNUMBER) {
-				LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
-				return luaL_error(L, "%s", "Incorrect texture arguments of bindTextures");
-			}
-
-			if(lua_type(L, -2) != LUA_TSTRING) {
 				LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
 				return luaL_error(L, "%s", "Incorrect texture arguments of bindTextures");
 			}
@@ -1056,15 +1054,14 @@ struct PipelineImpl final : Pipeline
 				return luaL_error(L, "%s", "Too many texture in bindTextures call");
 			}
 
-			const char* uniform_name = lua_tostring(L, -2);
-			cmd->m_textures_uniforms[cmd->m_textures_count] = ffr::allocUniform(uniform_name, ffr::UniformType::INT, 1);
-
 			const int rb_idx = (int)lua_tointeger(L, -1);
 			cmd->m_textures_handles[cmd->m_textures_count] = pipeline->m_renderbuffers[rb_idx].handle;
 			++cmd->m_textures_count;
 
 			lua_pop(L, 1);
+
 		}
+
 		pipeline->m_renderer.push(cmd);
 
 		return 0;
@@ -1243,9 +1240,6 @@ struct PipelineImpl final : Pipeline
 				ffr::setState(m_render_state);
 
 				ffr::bindTextures(m_textures_handles, m_textures_count);
-				for(int i = 0; i < m_textures_count; ++i) {
-					ffr::setUniform1i(m_textures_uniforms[i], i);
-				}
 
 				for(int i = 0; i < m_uniforms_count; ++i) {
 					ffr::setUniform4f(m_uniforms[i].handle, &m_uniforms[i].value.x);
@@ -1258,7 +1252,6 @@ struct PipelineImpl final : Pipeline
 			}
 
 			ffr::TextureHandle m_textures_handles[16];
-			ffr::UniformHandle m_textures_uniforms[16];
 			int m_textures_count = 0;
 			struct {
 				Vec4 value;
@@ -1314,14 +1307,10 @@ struct PipelineImpl final : Pipeline
 
 		Cmd* cmd = LUMIX_NEW(pipeline->m_renderer.getAllocator(), Cmd);
 		if(lua_gettop(L) > 3) {
-			lua_pushnil(L);
-			while (lua_next(L, 4) != 0) {
+			const int len = (int)lua_objlen(L, 4);
+			for(int i = 0; i < len; ++i) {
+				lua_rawgeti(L, 4, i + 1);
 				if(lua_type(L, -1) != LUA_TNUMBER) {
-					LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
-					return luaL_error(L, "%s", "Incorrect texture arguments of drawArrays");
-				}
-
-				if(lua_type(L, -2) != LUA_TSTRING) {
 					LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
 					return luaL_error(L, "%s", "Incorrect texture arguments of drawArrays");
 				}
@@ -1331,16 +1320,11 @@ struct PipelineImpl final : Pipeline
 					return luaL_error(L, "%s", "Too many texture in drawArray call");
 				}
 
-				const char* uniform_name = lua_tostring(L, -2);
-				cmd->m_textures_uniforms[cmd->m_textures_count] = ffr::allocUniform(uniform_name, ffr::UniformType::INT, 1);
-
 				const int rb_idx = (int)lua_tointeger(L, -1);
 				cmd->m_textures_handles[cmd->m_textures_count] = pipeline->m_renderbuffers[rb_idx].handle;
 				++cmd->m_textures_count;
-
 				lua_pop(L, 1);
 			}
-		
 		
 			if (lua_istable(L, 5)) {
 				lua_pushnil(L);

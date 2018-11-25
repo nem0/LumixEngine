@@ -146,7 +146,8 @@ enum class BufferFlags : uint {
 	COHERENT = 1 << 1,
 	MAP_READ = 1 << 2,
 	MAP_WRITE = 1 << 3,
-	DYNAMIC_STORAGE = 1 << 4
+	MAP_FLUSH_EXPLICIT = 1 << 4,
+	DYNAMIC_STORAGE = 1 << 5
 };
 
 enum class DataType {

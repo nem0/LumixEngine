@@ -930,7 +930,7 @@ void bindTextures(const TextureHandle* handles, int count)
 	ASSERT(count <= lengthOf(gl_handles));
 	
 	if (!handles) {
-		CHECK_GL(glBindTextures(0, count, nullptr));
+	//	CHECK_GL(glBindTextures(0, count, nullptr));
 	}
 	else {
 		for(int i = 0; i < count; ++i) {
@@ -1226,6 +1226,7 @@ void* map(BufferHandle buffer, size_t offset, size_t size, uint flags)
 	if (flags & (uint)BufferFlags::MAP_WRITE) gl_flags |= GL_MAP_WRITE_BIT;
 	if (flags & (uint)BufferFlags::PERSISTENT) gl_flags |= GL_MAP_PERSISTENT_BIT;
 	if (flags & (uint)BufferFlags::COHERENT) gl_flags |= GL_MAP_COHERENT_BIT;
+	if (flags & (uint)BufferFlags::MAP_FLUSH_EXPLICIT) gl_flags |= GL_MAP_FLUSH_EXPLICIT_BIT;
 	return glMapNamedBufferRange(buf, offset, size, gl_flags);
 }
 
@@ -1859,7 +1860,7 @@ bool createProgram(ProgramHandle prog, const char** srcs, const ShaderType* type
 			case GL_SAMPLER_CUBE:
 			case GL_SAMPLER_2D_ARRAY:
 			case GL_SAMPLER_2D:
-			case GL_SAMPLER_3D:
+			case GL_SAMPLER_3D: continue;
 			case GL_INT: ffr_type = UniformType::INT; break;
 			case GL_FLOAT: ffr_type = UniformType::FLOAT; break;
 			case GL_FLOAT_VEC2: ffr_type = UniformType::VEC2; break;
