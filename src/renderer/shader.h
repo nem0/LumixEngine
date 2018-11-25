@@ -122,6 +122,7 @@ struct ShaderRenderData
 		, programs(allocator) 
 		, include(allocator)
 		, sources(allocator)
+		, common_source(allocator)
 		, attributes(allocator)
 	{}
 	ffr::UniformHandle texture_uniforms[Shader::MAX_TEXTURE_SLOT_COUNT];
@@ -129,7 +130,8 @@ struct ShaderRenderData
 	Renderer& renderer;
 	HashMap<u32, Shader::Program> programs;
 	Array<Shader::Source> sources;
-	Array<u8> include;
+	Array<char> include;
+	Array<char> common_source;
 	Array<Shader::AttributeInfo> attributes;
 	Path path;
 };
