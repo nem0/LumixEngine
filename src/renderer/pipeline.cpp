@@ -581,6 +581,7 @@ struct PipelineImpl final : Pipeline
 				const Renderer::TransientSlice vb = pipeline->m_renderer.allocTransient(vertices.byte_size());
 				
 				memcpy(vb.ptr, vertices.begin(), vb.size);
+				ffr::flushBuffer(vb.buffer, vb.offset, vb.size);
 				
 				ffr::setVertexBuffer(&vertex_decl, vb.buffer, vb.offset, nullptr);
 				ffr::setIndexBuffer(ffr::INVALID_BUFFER);
@@ -936,6 +937,7 @@ struct PipelineImpl final : Pipeline
 
 					const void* mem = blob.skip(byte_size);
 					memcpy(transient.ptr, mem, byte_size);
+					ffr::flushBuffer(transient.buffer, transient.offset, transient.size);
 
 					const Shader::Program& prog = Shader::getProgram(shader_data, 0);
 					if (prog.handle.isValid()) {
@@ -1526,7 +1528,7 @@ struct PipelineImpl final : Pipeline
 				Renderer& renderer = m_pipeline->m_renderer;
 				const Renderer::TransientSlice transient = renderer.allocTransient(m_vertices.byte_size());
 				memcpy(transient.ptr, m_vertices.begin(), transient.size);
-				ffr::setUniform1i(m_texture_uniform, 0);
+				ffr::flushBuffer(transient.buffer, transient.offset, transient.size);
 				ffr::useProgram(p.handle);
 				ffr::VertexDecl decl;
 				const u64 blend_state = ffr::getBlendStateBits(ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA, ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA);
@@ -1543,7 +1545,6 @@ struct PipelineImpl final : Pipeline
 			ffr::TextureHandle m_atlas;
 			ShaderRenderData* m_shader;
 			PipelineImpl* m_pipeline;
-			ffr::UniformHandle m_texture_uniform;
 			Array<TextMeshVertex> m_vertices;
 		};
 
@@ -1552,7 +1553,6 @@ struct PipelineImpl final : Pipeline
 		RenderJob* job = LUMIX_NEW(allocator, RenderJob)(allocator);
 		job->m_pipeline = this;
 		job->m_shader = m_text_mesh_shader->m_render_data;
-		job->m_texture_uniform = m_text_mesh_shader->m_texture_slots[0].uniform_handle;
 		m_renderer.push(job);
 	}
 
@@ -1613,6 +1613,8 @@ struct PipelineImpl final : Pipeline
 
 									const Renderer::TransientSlice instance_buffer = m_pipeline->m_renderer.allocTransient(instances_count * instance_decl.size);
 									memcpy(instance_buffer.ptr, instance_data, instance_buffer.size);
+									ffr::flushBuffer(instance_buffer.buffer, instance_buffer.offset, instance_buffer.size);
+
 									ffr::setInstanceBuffer(instance_decl, instance_buffer.buffer, instance_buffer.offset, 1, nullptr);
 									ffr::drawTrianglesInstanced(0, 36, instances_count);
 								}
@@ -1740,9 +1742,7 @@ struct PipelineImpl final : Pipeline
 								for (int i = 0; i < 16; ++i) ffr::bindTexture(i, ffr::INVALID_TEXTURE);
 								for (int i = 0; i < material->textures_count; ++i) {
 									const ffr::TextureHandle handle = material->textures[i];
-									const ffr::UniformHandle uniform = shader->texture_uniforms[i];
 									ffr::bindTexture(i, handle);
-									ffr::setUniform1i(uniform, i);
 								}
 
 								const Shader::Program& prog = Shader::getProgram(shader, instanced_mask);
@@ -1763,6 +1763,7 @@ struct PipelineImpl final : Pipeline
 
 									const Renderer::TransientSlice instance_buffer = m_pipeline->m_renderer.allocTransient(instances_count * sizeof(Vec4) * 2);
 									memcpy(instance_buffer.ptr, instance_data, instance_buffer.size);
+									ffr::flushBuffer(instance_buffer.buffer, instance_buffer.offset, instance_buffer.size);
 
 									int instance_map[16];
 									for (uint i = 0; i < instance_decl.attributes_count; ++i) {
@@ -1790,9 +1791,7 @@ struct PipelineImpl final : Pipeline
 								ShaderRenderData* shader = material->shader;
 								for (int i = 0; i < material->textures_count; ++i) {
 									const ffr::TextureHandle handle = material->textures[i];
-									const ffr::UniformHandle uniform = shader->texture_uniforms[i];
 									ffr::bindTexture(i, handle);
-									ffr::setUniform1i(uniform, i);
 								}
 
 								const Shader::Program& prog = Shader::getProgram(shader, skinned_mask);
@@ -1826,9 +1825,7 @@ struct PipelineImpl final : Pipeline
 								ShaderRenderData* shader = material->shader;
 								for (int i = 0; i < material->textures_count; ++i) {
 									const ffr::TextureHandle handle = material->textures[i];
-									const ffr::UniformHandle uniform = shader->texture_uniforms[i];
 									ffr::bindTexture(i, handle);
-									ffr::setUniform1i(uniform, i);
 								}
 
 								const u8* instance_data = cmd;
@@ -1843,6 +1840,8 @@ struct PipelineImpl final : Pipeline
 
 									const Renderer::TransientSlice instance_buffer = m_pipeline->m_renderer.allocTransient(instances_count * decal_instance_decl.size);
 									memcpy(instance_buffer.ptr, instance_data, instance_buffer.size);
+									ffr::flushBuffer(instance_buffer.buffer, instance_buffer.offset, instance_buffer.size);
+									
 									ffr::setInstanceBuffer(decal_instance_decl, instance_buffer.buffer, instance_buffer.offset, 1, nullptr);
 									ffr::drawTrianglesInstanced(0, 36, instances_count);
 									++drawcalls_count;
@@ -2899,7 +2898,6 @@ void Pipeline::renderModel(Model& model, const Matrix& mtx, ffr::UniformHandle m
 
 		for(int i = 0; i < textures_count; ++i) {
 			ffr::bindTexture(i, material->getTexture(i)->handle);
-			ffr::setUniform1i(material->getTextureUniform(i), i);
 		}
 
 		int attribute_map[16];

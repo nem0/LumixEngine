@@ -237,6 +237,7 @@ void bindLayer(FramebufferHandle fb, TextureHandle rb, uint layer);
 void update(BufferHandle buffer, const void* data, size_t offset, size_t size);
 void* map(BufferHandle buffer, size_t offset, size_t size, uint flags);
 void unmap(BufferHandle buffer);
+void flushBuffer(BufferHandle buffer, size_t offset, size_t len);
 void bindUniformBuffer(uint index, BufferHandle buffer, size_t offset, size_t size);
 void getTextureImage(ffr::TextureHandle texture, uint size, void* buf);
 TextureInfo getTextureInfo(const void* data);

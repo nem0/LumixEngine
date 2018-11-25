@@ -1198,6 +1198,14 @@ void bindUniformBuffer(uint index, BufferHandle buffer, size_t offset, size_t si
 }
 
 
+void flushBuffer(BufferHandle buffer, size_t offset, size_t len)
+{
+	checkThread();
+	const GLuint buf = g_ffr.buffers[buffer.value].handle;
+	glFlushMappedNamedBufferRange(buf, offset, len);
+}
+
+
 void* map(BufferHandle buffer, size_t offset, size_t size, uint flags)
 {
 	checkThread();

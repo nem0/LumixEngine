@@ -335,6 +335,8 @@ void SceneView::renderGizmos()
 
 				memcpy(ib.ptr, indices, ib.size);
 				memcpy(vb.ptr, vertices, vb.size);
+				ffr::flushBuffer(ib.buffer, ib.offset, ib.size);
+				ffr::flushBuffer(vb.buffer, vb.offset, vb.size);
 
 				ffr::setUniformMatrix4f(model_uniform, &cmd.mtx.m11);
 				ffr::useProgram(prg);

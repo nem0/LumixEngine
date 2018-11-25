@@ -711,7 +711,7 @@ fragment_shader [[
 		return FxaaTexTop(tex, posM);
 	}
 
-	uniform sampler2D u_fxaa_buffer;
+	layout (binding=0) uniform sampler2D u_fxaa_buffer;
 	in vec2 v_uv;
 	out vec4 o_color;
 	

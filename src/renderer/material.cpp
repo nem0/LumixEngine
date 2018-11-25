@@ -507,19 +507,12 @@ void Material::setShader(Shader* shader)
 }
 
 
-ffr::UniformHandle Material::getTextureUniform(int i) const
-{
-	if (i < m_shader->m_texture_slot_count) return m_shader->m_texture_slots[i].uniform_handle;
-	return ffr::INVALID_UNIFORM;
-}
-
-
-Texture* Material::getTextureByUniform(const char* uniform) const
+Texture* Material::getTextureByName(const char* name) const
 {
 	if (!m_shader) return nullptr;
 
 	for (int i = 0, c = m_shader->m_texture_slot_count; i < c; ++i) {
-		if (equalStrings(m_shader->m_texture_slots[i].uniform, uniform)) {
+		if (equalStrings(m_shader->m_texture_slots[i].name, name)) {
 			return m_textures[i];
 		}
 	}

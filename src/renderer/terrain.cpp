@@ -674,7 +674,7 @@ void Terrain::onMaterialLoaded(Resource::State, Resource::State new_state, Resou
 	PROFILE_FUNCTION();
 	if (new_state == Resource::State::READY)
 	{
-		m_heightmap = m_material->getTextureByUniform("u_hm");
+		m_heightmap = m_material->getTextureByName("Heightmap");
 		bool is_data_ready = true;
 		if (m_heightmap && m_heightmap->getData() == nullptr)
 		{
@@ -687,8 +687,8 @@ void Terrain::onMaterialLoaded(Resource::State, Resource::State new_state, Resou
 			m_height = m_heightmap->height;
 		}
 
-		m_albedomap = m_material->getTextureByUniform("u_albedo");
-		m_splatmap = m_material->getTextureByUniform("u_splatmap");
+		m_albedomap = m_material->getTextureByName("Albedo");
+		m_splatmap = m_material->getTextureByName("Splatmap");
 
 		/*
 		Texture* colormap = m_material->getTextureByUniform("u_colormap");

@@ -36,10 +36,10 @@ namespace Lumix
 static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("model_instance");
 static const ComponentType TERRAIN_TYPE = Reflection::getComponentType("terrain");
 static const ComponentType HEIGHTFIELD_TYPE = Reflection::getComponentType("physical_heightfield");
-static const char* HEIGHTMAP_UNIFORM = "u_heightmap";
-static const char* SPLATMAP_UNIFORM = "u_splatmap";
-static const char* COLORMAP_UNIFORM = "u_colormap";
-static const char* TEX_COLOR_UNIFORM = "u_detail_albedomap";
+static const char* HEIGHTMAP_SLOT_NAME = "Heightmap";
+static const char* SPLATMAP_SLOT_NAME = "Splatmap";
+static const char* DETAIL_ALBEDO_SLOT_NAME = "Albedo";
+static const char* SATELLITE_SLOT_NAME = "Satellite";
 static const float MIN_BRUSH_SIZE = 0.5f;
 
 
@@ -250,17 +250,17 @@ private:
 			case TerrainEditor::REMOVE_GRASS:
 			case TerrainEditor::ADD_GRASS:
 			case TerrainEditor::LAYER:
-				uniform_name = SPLATMAP_UNIFORM;
+				uniform_name = SPLATMAP_SLOT_NAME;
 				break;
 			case TerrainEditor::COLOR:
-				uniform_name = COLORMAP_UNIFORM;
+				uniform_name = SATELLITE_SLOT_NAME;
 				break;
 			default:
-				uniform_name = HEIGHTMAP_UNIFORM;
+				uniform_name = HEIGHTMAP_SLOT_NAME;
 				break;
 		}
 
-		return getMaterial()->getTextureByUniform(uniform_name);
+		return getMaterial()->getTextureByName(uniform_name);
 	}
 
 
@@ -784,14 +784,14 @@ void TerrainEditor::splitSplatmap(const char* dir)
 		g_log_error.log("Renderer") << "Terrain has no material";
 		return;
 	}
-	Texture* splatmap = material->getTextureByUniform("u_texSplatmap");
+	Texture* splatmap = material->getTextureByName("Splatmap");
 	if (!splatmap)
 	{
 		g_log_error.log("Renderer") << "Terrain's material has no splatmap";
 		return;
 	}
 
-	Texture* diffuse = material->getTextureByUniform("u_texColor");
+	Texture* diffuse = material->getTextureByName("Albedo");
 	if (!diffuse)
 	{
 		g_log_error.log("Renderer") << "Terrain's material has no diffuse texture";
@@ -858,7 +858,7 @@ void TerrainEditor::mergeSplatmap(const char* dir)
 		g_log_error.log("Renderer") << "Terrain has no material";
 		return;
 	}
-	Texture* splatmap = material->getTextureByUniform("u_texSplatmap");
+	Texture* splatmap = material->getTextureByName("Splatmap");
 	if (!splatmap)
 	{
 		g_log_error.log("Renderer") << "Terrain's material has no splatmap";
@@ -975,7 +975,7 @@ void TerrainEditor::nextTerrainTexture()
 {
 	Material* material = getMaterial();
 	if (!material) return;
-	Texture* tex = material->getTextureByUniform(TEX_COLOR_UNIFORM);
+	Texture* tex = material->getTextureByName(DETAIL_ALBEDO_SLOT_NAME);
 	if (tex) m_texture_idx = Math::minimum(tex->layers - 1, m_texture_idx + 1);
 }
 
@@ -1106,7 +1106,7 @@ Vec3 TerrainEditor::getRelativePosition(const Vec3& world_pos) const
 
 Texture* TerrainEditor::getHeightmap()
 {
-	return getMaterial()->getTextureByUniform(HEIGHTMAP_UNIFORM);
+	return getMaterial()->getTextureByName(HEIGHTMAP_SLOT_NAME);
 }
 
 
@@ -1531,16 +1531,16 @@ void TerrainEditor::onGUI()
 	{
 		case HEIGHT:
 			if (ImGui::Button("Save heightmap"))
-				getMaterial()->getTextureByUniform(HEIGHTMAP_UNIFORM)->save();
+				getMaterial()->getTextureByName(HEIGHTMAP_SLOT_NAME)->save();
 			break;
 		case GRASS:
 		case LAYER:
 			if (ImGui::Button("Save layermap and grassmap"))
-				getMaterial()->getTextureByUniform(SPLATMAP_UNIFORM)->save();
+				getMaterial()->getTextureByName(SPLATMAP_SLOT_NAME)->save();
 			break;
 		case COLOR:
 			if (ImGui::Button("Save colormap"))
-				getMaterial()->getTextureByUniform(COLORMAP_UNIFORM)->save();
+				getMaterial()->getTextureByName(SATELLITE_SLOT_NAME)->save();
 			break;
 		case ENTITY: break;
 	}
@@ -1651,7 +1651,7 @@ void TerrainEditor::onGUI()
 		case LAYER:
 		{
 			m_action_type = TerrainEditor::LAYER;
-			Texture* tex = getMaterial()->getTextureByUniform(TEX_COLOR_UNIFORM);
+			Texture* tex = getMaterial()->getTextureByName(DETAIL_ALBEDO_SLOT_NAME);
 			if (tex)
 			{
 				for (int i = 0; i < tex->layers; ++i)
