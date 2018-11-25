@@ -348,8 +348,9 @@ u64 getLastModified(const char* file)
 {
 	FILETIME ft;
 	HANDLE handle = CreateFile(file, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-	if (GetFileTime(handle, NULL, NULL, &ft) == FALSE)
-	{
+	if (handle == INVALID_HANDLE_VALUE) return 0;
+	if (GetFileTime(handle, NULL, NULL, &ft) == FALSE) {
+		CloseHandle(handle);
 		return 0;
 	}
 	CloseHandle(handle);
