@@ -2452,7 +2452,7 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 
 				ffr::TextureHandle tex = pcmd->TextureId ? ffr::TextureHandle{(uint)(intptr_t)pcmd->TextureId} : *default_texture;
 				if (!tex.isValid()) tex = *default_texture;
-				ffr::bindTexture(0, tex);
+				ffr::bindTextures(&tex, 1);
 
 				const uint h = uint(Math::minimum(pcmd->ClipRect.w, 65535.0f) - Math::maximum(pcmd->ClipRect.y, 0.0f));
 

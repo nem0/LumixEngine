@@ -712,7 +712,7 @@ struct PipelineImpl final : Pipeline
 						if (pcmd->TextureId) texture_id = *(ffr::TextureHandle*)pcmd->TextureId;
 						if(!texture_id.isValid()) texture_id = atlas_texture->handle;
 
-						ffr::bindTexture(0, texture_id);
+						ffr::bindTextures(&texture_id, 1);
 
 						ffr::drawTriangles(num_indices);
 
@@ -1016,16 +1016,14 @@ struct PipelineImpl final : Pipeline
 			void setup() override {}
 			void execute() override 
 			{
+				ffr::bindTextures(m_textures_handles, m_textures_count);
 				for(int i = 0; i < m_textures_count; ++i) {
-					ffr::bindTexture(m_offset + i, m_textures[i].handle);
-					ffr::setUniform1i(m_textures[i].uniform, i + m_offset);
+					ffr::setUniform1i(m_textures_uniforms[i], i + m_offset);
 				}
 			}
 
-			struct { 
-				ffr::TextureHandle handle;
-				ffr::UniformHandle uniform;
-			} m_textures[16];
+			ffr::TextureHandle m_textures_handles[16];
+			ffr::UniformHandle m_textures_uniforms[16];
 			int m_offset = 0;
 			int m_textures_count = 0;
 		};
@@ -1053,16 +1051,16 @@ struct PipelineImpl final : Pipeline
 				return luaL_error(L, "%s", "Incorrect texture arguments of bindTextures");
 			}
 
-			if (cmd->m_textures_count > lengthOf(cmd->m_textures)) {
+			if (cmd->m_textures_count > lengthOf(cmd->m_textures_handles)) {
 				LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
 				return luaL_error(L, "%s", "Too many texture in bindTextures call");
 			}
 
 			const char* uniform_name = lua_tostring(L, -2);
-			cmd->m_textures[cmd->m_textures_count].uniform = ffr::allocUniform(uniform_name, ffr::UniformType::INT, 1);
+			cmd->m_textures_uniforms[cmd->m_textures_count] = ffr::allocUniform(uniform_name, ffr::UniformType::INT, 1);
 
 			const int rb_idx = (int)lua_tointeger(L, -1);
-			cmd->m_textures[cmd->m_textures_count].handle = pipeline->m_renderbuffers[rb_idx].handle;
+			cmd->m_textures_handles[cmd->m_textures_count] = pipeline->m_renderbuffers[rb_idx].handle;
 			++cmd->m_textures_count;
 
 			lua_pop(L, 1);
@@ -1129,15 +1127,11 @@ struct PipelineImpl final : Pipeline
 				ffr::useProgram(prog.handle);
 				const u64 blend_state = ffr::getBlendStateBits(ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA, ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA);
 				ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::CULL_BACK) | blend_state);
-				const int irradiance_map_loc = ffr::getUniformLocation(prog.handle, m_irradiance_map_uniform);
-				const int radiance_map_loc = ffr::getUniformLocation(prog.handle, m_radiance_map_uniform);
 				const DVec3 cam_pos = m_camera_params.pos;
 				for (const EnvProbeInfo& probe : m_probes) {
 					const Vec4 pos_radius((probe.position - cam_pos).toFloat(), probe.radius);
-					ffr::bindTexture(0, probe.radiance);
-					ffr::applyUniform1i(irradiance_map_loc, 0);
-					ffr::bindTexture(1, probe.radiance);
-					ffr::applyUniform1i(radiance_map_loc, 1);
+					ffr::TextureHandle handles[2] = { probe.radiance, probe.irradiance };
+					ffr::bindTextures(handles, 2);
 					ffr::applyUniform4f(pos_radius_uniform_loc, &pos_radius.x);
 					ffr::drawTriangles(36);
 				}
@@ -1248,9 +1242,9 @@ struct PipelineImpl final : Pipeline
 
 				ffr::setState(m_render_state);
 
+				ffr::bindTextures(m_textures_handles, m_textures_count);
 				for(int i = 0; i < m_textures_count; ++i) {
-					ffr::bindTexture(i, m_textures[i].handle);
-					ffr::setUniform1i(m_textures[i].uniform, i);
+					ffr::setUniform1i(m_textures_uniforms[i], i);
 				}
 
 				for(int i = 0; i < m_uniforms_count; ++i) {
@@ -1263,10 +1257,8 @@ struct PipelineImpl final : Pipeline
 				ffr::drawArrays(m_indices_offset, m_indices_count, ffr::PrimitiveType::TRIANGLE_STRIP);
 			}
 
-			struct { 
-				ffr::TextureHandle handle;
-				ffr::UniformHandle uniform;
-			} m_textures[16];
+			ffr::TextureHandle m_textures_handles[16];
+			ffr::UniformHandle m_textures_uniforms[16];
 			int m_textures_count = 0;
 			struct {
 				Vec4 value;
@@ -1334,16 +1326,16 @@ struct PipelineImpl final : Pipeline
 					return luaL_error(L, "%s", "Incorrect texture arguments of drawArrays");
 				}
 
-				if (cmd->m_textures_count > lengthOf(cmd->m_textures)) {
+				if (cmd->m_textures_count > lengthOf(cmd->m_textures_handles)) {
 					LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
 					return luaL_error(L, "%s", "Too many texture in drawArray call");
 				}
 
 				const char* uniform_name = lua_tostring(L, -2);
-				cmd->m_textures[cmd->m_textures_count].uniform = ffr::allocUniform(uniform_name, ffr::UniformType::INT, 1);
+				cmd->m_textures_uniforms[cmd->m_textures_count] = ffr::allocUniform(uniform_name, ffr::UniformType::INT, 1);
 
 				const int rb_idx = (int)lua_tointeger(L, -1);
-				cmd->m_textures[cmd->m_textures_count].handle = pipeline->m_renderbuffers[rb_idx].handle;
+				cmd->m_textures_handles[cmd->m_textures_count] = pipeline->m_renderbuffers[rb_idx].handle;
 				++cmd->m_textures_count;
 
 				lua_pop(L, 1);
@@ -1533,7 +1525,7 @@ struct PipelineImpl final : Pipeline
 				ffr::VertexDecl decl;
 				const u64 blend_state = ffr::getBlendStateBits(ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA, ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA);
 				ffr::setState((u64)ffr::StateFlags::DEPTH_WRITE | (u64)ffr::StateFlags::DEPTH_TEST | blend_state);
-				ffr::bindTexture(0, m_atlas);
+				ffr::bindTextures(&m_atlas, 1);
 				decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false);
 				decl.addAttribute(4, ffr::AttributeType::U8, true, false);
 				decl.addAttribute(2, ffr::AttributeType::FLOAT, false, false);
@@ -1740,11 +1732,8 @@ struct PipelineImpl final : Pipeline
 								cmd += sizeof(Vec4) * 2 * instances_count;
 								
 								ShaderRenderData* shader = material->shader;
-								for (int i = 0; i < 16; ++i) ffr::bindTexture(i, ffr::INVALID_TEXTURE);
-								for (int i = 0; i < material->textures_count; ++i) {
-									const ffr::TextureHandle handle = material->textures[i];
-									ffr::bindTexture(i, handle);
-								}
+								ffr::bindTextures(nullptr, 16);
+								ffr::bindTextures(material->textures, material->textures_count);
 
 								const Shader::Program& prog = Shader::getProgram(shader, instanced_mask);
 								if(prog.handle.isValid()) {
@@ -1790,10 +1779,7 @@ struct PipelineImpl final : Pipeline
 								cmd += sizeof(Matrix) * bones_count;
 
 								ShaderRenderData* shader = material->shader;
-								for (int i = 0; i < material->textures_count; ++i) {
-									const ffr::TextureHandle handle = material->textures[i];
-									ffr::bindTexture(i, handle);
-								}
+								ffr::bindTextures(material->textures, material->textures_count);
 
 								const Shader::Program& prog = Shader::getProgram(shader, skinned_mask);
 								if(prog.handle.isValid()) {
@@ -1824,10 +1810,7 @@ struct PipelineImpl final : Pipeline
 								READ(u16, instances_count);
 
 								ShaderRenderData* shader = material->shader;
-								for (int i = 0; i < material->textures_count; ++i) {
-									const ffr::TextureHandle handle = material->textures[i];
-									ffr::bindTexture(i, handle);
-								}
+								ffr::bindTextures(material->textures, material->textures_count);
 
 								const u8* instance_data = cmd;
 								cmd += decal_instance_decl.size * instances_count;
@@ -2076,9 +2059,7 @@ struct PipelineImpl final : Pipeline
 				ffr::setUniform3f(m_pipeline->m_position_uniform, &pos.x);
 				ffr::setUniform3f(m_pipeline->m_rel_camera_pos_uniform, &lpos.x);
 
-				for(int i = 0; i < inst.material->textures_count; ++i) {
-					ffr::bindTexture(i, inst.material->textures[i]);
-				}
+				ffr::bindTextures(inst.material->textures, inst.material->textures_count);
 
 				ffr::setState(state);
 				const int loc = ffr::getUniformLocation(p.handle, m_pipeline->m_lod_uniform);
@@ -2893,13 +2874,11 @@ void Pipeline::renderModel(Model& model, const Matrix& mtx, ffr::UniformHandle m
 		const Material* material = mesh.material;
 		ShaderRenderData* shader_rd = material->getShader()->m_render_data;
 		const Shader::Program& prog = Shader::getProgram(shader_rd, 0); // TODO define
-		const int textures_count = material->getTextureCount();
 
 		if(!prog.handle.isValid()) continue;
 
-		for(int i = 0; i < textures_count; ++i) {
-			ffr::bindTexture(i, material->getTexture(i)->handle);
-		}
+		const Material::RenderData* mat_rd = material->getRenderData();
+		ffr::bindTextures(mat_rd->textures, mat_rd->textures_count);
 
 		int attribute_map[16];
 		const Mesh::RenderData* rd = mesh.render_data;

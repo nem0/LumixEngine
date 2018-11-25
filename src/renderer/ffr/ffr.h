@@ -230,7 +230,7 @@ QueryHandle createQuery();
 
 void setVertexBuffer(const VertexDecl* decl, BufferHandle vertex_buffer, uint buffer_offset_bytes, const int* attribute_map);
 void setInstanceBuffer(const VertexDecl& decl, BufferHandle instance_buffer, int byte_offset, int location_offset, int* attributes_map);
-void bindTexture(uint unit, TextureHandle handle);
+void bindTextures(const TextureHandle* handles, int count);
 void uniformBlockBinding(ProgramHandle program, const char* block_name, uint binding);
 void update(FramebufferHandle fb, uint renderbuffers_count, const TextureHandle* renderbuffers);
 void bindLayer(FramebufferHandle fb, TextureHandle rb, uint layer);

@@ -924,14 +924,25 @@ void useProgram(ProgramHandle handle)
 }
 
 
-void bindTexture(uint unit, TextureHandle handle)
+void bindTextures(const TextureHandle* handles, int count)
 {
-	if(handle.isValid()) {
-		const Texture& t = g_ffr.textures[handle.value];
-		CHECK_GL(glBindTextureUnit(unit, t.handle));
+	GLuint gl_handles[64];
+	ASSERT(count <= lengthOf(gl_handles));
+	
+	if (!handles) {
+		CHECK_GL(glBindTextures(0, count, nullptr));
 	}
 	else {
-		CHECK_GL(glBindTextureUnit(unit, 0));	
+		for(int i = 0; i < count; ++i) {
+			if (handles[i].isValid()) {
+				gl_handles[i] = g_ffr.textures[handles[i].value].handle;
+			}
+			else {
+				gl_handles[i] = 0;
+			}
+		}
+
+		CHECK_GL(glBindTextures(0, count, gl_handles));
 	}
 }
 
