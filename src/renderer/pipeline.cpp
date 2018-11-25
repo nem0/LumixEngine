@@ -1586,6 +1586,7 @@ struct PipelineImpl final : Pipeline
 				ffr::VertexDecl decl;
 				decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false);
 
+				const u64 blend_state = ffr::getBlendStateBits(ffr::BlendFactors::ONE, ffr::BlendFactors::ONE, ffr::BlendFactors::ONE, ffr::BlendFactors::ONE);
 				const u32 define_mask = m_define_mask;
 				for (const Array<u8>& cmds : m_cmd_set->cmds) {
 					const u8* cmd = cmds.begin();
@@ -1607,7 +1608,7 @@ struct PipelineImpl final : Pipeline
 									const u64 state = intersecting
 										? (u64)ffr::StateFlags::CULL_FRONT
 										: (u64)ffr::StateFlags::DEPTH_TEST | (u64)ffr::StateFlags::CULL_BACK;
-									ffr::setState(state);
+									ffr::setState(blend_state | state);
 									ffr::setIndexBuffer(m_pipeline->m_cube_ib);
 									ffr::setVertexBuffer(&decl, m_pipeline->m_cube_vb, 0, nullptr);
 
