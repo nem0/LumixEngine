@@ -87,15 +87,63 @@ void write(ThreadContext& ctx, EventType type, const T& value)
 };
 
 
-void beginBlock(const char* name, u32 color)
+void write(ThreadContext& ctx, EventType type, const u8* data, int size)
+{
+	if(g_instance.paused) return;
+
+	EventHeader header;
+	header.type = type;
+	ASSERT(sizeof(header) + size <= 0xffff);
+	header.size = u16(sizeof(header) + size);
+	header.time = now();
+
+	MT::SpinLock lock(ctx.mutex);
+	u8* buf = ctx.buffer.begin();
+	const uint buf_size = ctx.buffer.size();
+
+	while (header.size + ctx.end - ctx.begin > buf_size) {
+		const u8 size = buf[ctx.begin % buf_size];
+		ctx.begin += size;
+	}
+
+	auto cpy = [&](const u8* ptr, uint size){
+		const uint lend = ctx.end % buf_size;
+		if (buf_size - lend >= size) {
+			memcpy(buf + lend, ptr, size);
+		}
+		else {
+			memcpy(buf + lend, ptr, buf_size - lend);
+			memcpy(buf, ((u8*)ptr) + buf_size - lend, size - (buf_size - lend));
+		}
+
+		ctx.end += size;
+	};
+
+	cpy((u8*)&header, sizeof(header));
+	cpy(data, size);
+};
+
+
+void recordString(const char* value)
 {
 	ThreadContext* ctx = g_instance.getThreadContext();
-	struct {
-		const char* name;
-		u32 color;
-	} v{name, color};
+	write(*ctx, EventType::STRING, (u8*)value, stringLength(value) + 1);
+}
+
+
+void blockColor(u8 r, u8 g, u8 b)
+{
+	const u32 color = 0xff000000 + r + (g << 8) + (b << 16);
+	ThreadContext* ctx = g_instance.getThreadContext();
+	write(*ctx, EventType::BLOCK_COLOR, color);
+}
+
+
+void beginBlock(const char* name)
+{
+	ThreadContext* ctx = g_instance.getThreadContext();
 	++ctx->open_blocks_count;
-	write(*ctx, EventType::BEGIN_BLOCK, v);
+	write(*ctx, EventType::BEGIN_BLOCK, name);
 }
 
 

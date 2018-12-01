@@ -197,7 +197,8 @@ struct WorkerTask : MT::Task
 			}
 			else 
 			{
-				PROFILE_BLOCK_COLORED("wait", 0xff, 0, 0);
+				PROFILE_BLOCK("wait");
+				Profiler::blockColor(0xff, 0, 0);
 				g_system->m_work_signal.waitTimeout(1);
 			}
 		}
@@ -414,7 +415,8 @@ void wait(SignalHandle handle)
 	}
 	
 	if (g_worker) {
-		PROFILE_BLOCK_COLORED("waiting", 0xff, 0, 0);
+		PROFILE_BLOCK("waiting");
+		Profiler::blockColor(0xff, 0, 0);
 		FiberDecl* fiber_decl = ((WorkerTask*)g_worker)->m_current_fiber;
 
 		runInternal(fiber_decl, [](void* data){
@@ -429,7 +431,8 @@ void wait(SignalHandle handle)
 	}
 	else
 	{
-		PROFILE_BLOCK_COLORED("not a job waiting", 0xff, 0, 0);
+		PROFILE_BLOCK("not a job waiting");
+		Profiler::blockColor(0xff, 0, 0);
 
 		g_system->m_event_outside_job.reset();
 

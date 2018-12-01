@@ -92,11 +92,17 @@ public:
 
 			if ((tr->data.m_flags & E_IS_OPEN) == E_IS_OPEN)
 			{
-				tr->data.m_flags |=
-					tr->data.m_file->open(Path(tr->data.m_path), tr->data.m_mode) ? E_SUCCESS : E_FAIL;
+				PROFILE_BLOCK("open");
+				Profiler::blockColor(0, 0xff, 0);
+				Profiler::recordString(tr->data.m_path);
+				const bool opened = tr->data.m_file->open(Path(tr->data.m_path), tr->data.m_mode);
+				if (!opened) Profiler::blockColor(0xff, 0, 0);
+				tr->data.m_flags |= opened ? E_SUCCESS : E_FAIL;
 			}
 			else if ((tr->data.m_flags & E_CLOSE) == E_CLOSE)
 			{
+				PROFILE_BLOCK("close");
+				Profiler::blockColor(0, 0, 0xff);
 				tr->data.m_file->close();
 				tr->data.m_file->release();
 				tr->data.m_file = nullptr;
