@@ -40,15 +40,17 @@ struct ThreadContext
 enum class EventType : u8
 {
 	BEGIN_BLOCK,
+	BLOCK_COLOR,
 	END_BLOCK,
-	FRAME
+	FRAME,
+	STRING
 };
 
 
 #pragma pack(1)
 struct EventHeader
 {
-	u8 size;
+	u16 size;
 	EventType type;
 	u64 time;
 };
@@ -61,9 +63,11 @@ LUMIX_ENGINE_API u64 now();
 LUMIX_ENGINE_API u64 frequency();
 LUMIX_ENGINE_API void pause(bool paused);
 
-LUMIX_ENGINE_API void beginBlock(const char* name, u32 color);
+LUMIX_ENGINE_API void beginBlock(const char* name);
+LUMIX_ENGINE_API void blockColor(u8 r, u8 g, u8 b);
 LUMIX_ENGINE_API void endBlock();
 LUMIX_ENGINE_API void frame();
+LUMIX_ENGINE_API void recordString(const char* value);
 
 LUMIX_ENGINE_API void beginFiberSwitch();
 
@@ -72,8 +76,7 @@ LUMIX_ENGINE_API void unlockContexts();
 
 struct Scope
 {
-	explicit Scope(const char* name) { beginBlock(name, 0xffddDDdd); }
-	explicit Scope(const char* name, u8 r, u8 g, u8 b) { beginBlock(name, 0xff000000 + r + (g << 8) + (b << 16)); }
+	explicit Scope(const char* name) { beginBlock(name); }
 	~Scope() { endBlock(); }
 };
 
@@ -84,7 +87,6 @@ struct Scope
 #define PROFILE_INT(...)
 #define PROFILE_FUNCTION() Profiler::Scope profile_scope(__FUNCTION__);
 #define PROFILE_BLOCK(name) Profiler::Scope profile_scope(name);
-#define PROFILE_BLOCK_COLORED(name, r, g, b) Profiler::Scope profile_scope(name, r, g, b);
 
 
 } // namespace Lumix

@@ -928,7 +928,8 @@ struct RendererImpl final : public Renderer
 		PROFILE_FUNCTION();
 		pushSwapCommand();
 		{
-			PROFILE_BLOCK_COLORED("wait for render thread", 0xff, 0, 0);
+			PROFILE_BLOCK("wait for render thread");
+			Profiler::blockColor(0xff, 0, 0);
 			m_frame_semaphore.wait();
 		}
 		JobSystem::wait(m_last_exec_job);
@@ -988,7 +989,8 @@ int RenderTask::task()
 	while (!m_shutdown_requested || !m_commands.isEmpty()) {
 		Renderer::RenderJob* cmd = nullptr;
 		{
-			PROFILE_BLOCK_COLORED("wait for cmd", 0xff, 0, 0);
+			PROFILE_BLOCK("wait for cmd");
+			Profiler::blockColor(0xff, 0, 0);
 			Renderer::RenderJob** rt_cmd = m_commands.pop(true);
 			cmd = *rt_cmd;
 			m_commands.dealoc(rt_cmd);

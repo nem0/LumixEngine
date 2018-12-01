@@ -15,13 +15,15 @@
 #include "imgui/imgui.h"
 #include "utils.h"
 #include <cstdlib>
+#include <cmath>
 
 
 namespace Lumix
 {
 
 
-static const int MAX_FRAMES = 200;
+static constexpr int MAX_FRAMES = 200;
+static constexpr int DEFAULT_ZOOM = 100'000;
 
 
 enum Column
@@ -414,7 +416,7 @@ struct ProfilerUIImpl final : public ProfilerUI
 	u64 m_paused_time;
 	i64 m_view_offset = 0;
 	char m_cpu_block_filter[256] = {};
-	u64 m_zoom = 100'000;
+	u64 m_zoom = DEFAULT_ZOOM;
 	char m_filter[100];
 	char m_resource_filter[100];
 	Array<OpenedFile> m_open_files;
@@ -717,6 +719,20 @@ static void read(Profiler::ThreadContext& ctx, uint p, T& value)
 }
 
 
+static void read(Profiler::ThreadContext& ctx, uint p, u8* ptr, int size)
+{
+	u8* buf = ctx.buffer.begin();
+	const uint buf_size = ctx.buffer.size();
+	const uint l = p % buf_size;
+	if (l + size <= buf_size) {
+		memcpy(ptr, buf + l, size);
+		return;
+	}
+
+	memcpy(ptr, buf + l, buf_size - l);
+	memcpy(ptr + (buf_size - l), buf, size - (buf_size - l));
+}
+
 static inline ImVec2 operator+(const ImVec2& lhs, const ImVec2& rhs)            { return ImVec2(lhs.x+rhs.x, lhs.y+rhs.y); }
 
 
@@ -765,13 +781,18 @@ void ProfilerUIImpl::onGUICPUProfiler()
 
 	if(ImGui::Checkbox("Pause", &m_is_paused)) {
 		Profiler::pause(m_is_paused);
+		m_view_offset = 0;
 		m_paused_time = Profiler::now();
 	}
+	ImGui::SameLine();
+	ImGui::Text("Zoom: %f", m_zoom / double(DEFAULT_ZOOM));
+	ImGui::SameLine();
+	if (ImGui::Button("Reset zoom")) m_zoom = DEFAULT_ZOOM;
 
 	auto& contexts = Profiler::lockContexts();
 	
 	const u64 view_end = m_is_paused ? m_paused_time + m_view_offset : Profiler::now();
-	const u64 view_start = view_end - m_zoom;
+	const u64 view_start = view_end < m_zoom ? 0 : view_end - m_zoom;
 	float h = 0;
 	for(Profiler::ThreadContext* ctx : contexts) {
 		h += ctx->rows * 20 + 20;
@@ -821,10 +842,20 @@ void ProfilerUIImpl::onGUICPUProfiler()
 		StaticString<256> name(ctx->name, (u64)ctx);
 		ctx->rows = 0;
 
-		uint open_blocks[64];
+		struct {
+			uint offset;
+			u32 color;
+		} open_blocks[64];
 		int level = -1;
 		uint p = ctx->begin;
 		const uint end = ctx->end;
+
+		struct Property {
+			Profiler::EventHeader header;
+			int level;
+			int offset;
+		} properties[64];
+		int properties_count = 0;
 
 		auto draw_block = [&](u64 from, u64 to, const char* name, u32 color) {
 			if(from <= view_end && to >= view_start) {
@@ -848,7 +879,23 @@ void ProfilerUIImpl::onGUICPUProfiler()
 				if(ImGui::IsMouseHoveringRect(ra, rb)) {
 					const u64 freq = Profiler::frequency();
 					const float t = 1000 * float((to - from) / double(freq));
-					ImGui::SetTooltip("%s (%.2f ms)", name, t);
+					ImGui::BeginTooltip();
+					ImGui::Text("%s (%.2f ms)", name, t);
+					for(int i = 0; i < properties_count; ++i) {
+						if (properties[i].level != level) continue;
+
+						switch(properties[i].header.type) {
+							case Profiler::EventType::STRING: {
+								char tmp[128];
+								const int tmp_size = properties[i].header.size - sizeof(properties[i].header);
+								read(*ctx, properties[i].offset, (u8*)tmp, tmp_size);
+								ImGui::Text("%s", tmp);
+								break;
+							}
+							default: ASSERT(false); break;
+						}
+					}
+					ImGui::EndTooltip();
 				}
 			}
 		};
@@ -860,22 +907,24 @@ void ProfilerUIImpl::onGUICPUProfiler()
 				case Profiler::EventType::BEGIN_BLOCK:
 					++level;
 					ASSERT(level < lengthOf(open_blocks));
-					open_blocks[level] = p;
+					open_blocks[level].offset = p;
+					open_blocks[level].color = 0xffDDddDD;
 					break;
 				case Profiler::EventType::END_BLOCK:
 					if (level >= 0) {
 						ctx->rows = Math::maximum(ctx->rows, level + 1);
 						Profiler::EventHeader start_header;
-						read(*ctx, open_blocks[level], start_header);
+						read(*ctx, open_blocks[level].offset, start_header);
 						const char* name;
-						read(*ctx, open_blocks[level] + sizeof(Profiler::EventHeader), name);
-						u32 color;
-						read(*ctx, open_blocks[level] + sizeof(Profiler::EventHeader) + sizeof(name), color);
+						read(*ctx, open_blocks[level].offset + sizeof(Profiler::EventHeader), name);
 						if (!m_cpu_block_filter[0] || stristr(name, m_cpu_block_filter)) {
-							draw_block(start_header.time, header.time, name, color);
+							draw_block(start_header.time, header.time, name, open_blocks[level].color);
 							if (!visible_blocks.find(name).isValid()) {
 								visible_blocks.insert(name, name);
 							}
+						}
+						while(properties_count > 0 && properties[properties_count - 1].level == level) {
+							--properties_count;
 						}
 						--level;
 					}
@@ -890,6 +939,23 @@ void ProfilerUIImpl::onGUICPUProfiler()
 					}
 					break;
 				}
+				case Profiler::EventType::STRING: {
+					if (properties_count < lengthOf(properties) && level >= 0) {
+						properties[properties_count].header = header;
+						properties[properties_count].level = level;
+						properties[properties_count].offset = sizeof(Profiler::EventHeader) + p;
+						++properties_count;
+					}
+					else {
+						ASSERT(false);
+					}
+					break;
+				}
+				case Profiler::EventType::BLOCK_COLOR:
+					if (level >= 0) {
+						read(*ctx, p + sizeof(Profiler::EventHeader), open_blocks[level].color);
+					}
+					break;
 				default: ASSERT(false); break;
 			}
 			p+= header.size;
@@ -897,9 +963,9 @@ void ProfilerUIImpl::onGUICPUProfiler()
 		ctx->rows = Math::maximum(ctx->rows, level + 1);
 		while(level >= 0) {
 			Profiler::EventHeader start_header;
-			read(*ctx, open_blocks[level], start_header);
+			read(*ctx, open_blocks[level].offset, start_header);
 			const char* name;
-			read(*ctx, open_blocks[level] + sizeof(Profiler::EventHeader), name);
+			read(*ctx, open_blocks[level].offset + sizeof(Profiler::EventHeader), name);
 			if (!m_cpu_block_filter[0] || stristr(name, m_cpu_block_filter)) {
 				draw_block(start_header.time, m_paused_time, name, ImGui::GetColorU32(ImGuiCol_PlotHistogram));
 			}
