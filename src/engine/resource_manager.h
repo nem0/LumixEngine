@@ -68,8 +68,9 @@ class LUMIX_ENGINE_API ResourceManagerHub
 public:
 	struct LoadHook
 	{
+		enum class Action { IMMEDIATE, DEFERRED };
 		virtual ~LoadHook() {}
-		virtual bool onBeforeLoad(Resource& res) = 0;
+		virtual Action onBeforeLoad(Resource& res) = 0;
 		void continueLoad(Resource& res);
 	};
 
@@ -92,7 +93,7 @@ public:
 	Resource* load(ResourceType type, const Path& path);
 
 	void setLoadHook(LoadHook* hook);
-	bool onBeforeLoad(Resource& resource) const;
+	LoadHook::Action onBeforeLoad(Resource& resource) const;
 	void add(ResourceType type, ResourceManager* rm);
 	void remove(ResourceType type);
 	void reload(const Path& path);

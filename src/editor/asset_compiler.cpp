@@ -73,7 +73,7 @@ struct AssetCompilerImpl : AssetCompiler
 	{
 		LoadHook(AssetCompilerImpl& compiler) : compiler(compiler) {}
 
-		bool onBeforeLoad(Resource& res) override
+		Action onBeforeLoad(Resource& res) override
 		{
 			return compiler.onBeforeLoad(res);
 		}
@@ -433,11 +433,11 @@ struct AssetCompilerImpl : AssetCompiler
 	}
 
 
-	bool onBeforeLoad(Resource& res)
+	ResourceManagerHub::LoadHook::Action onBeforeLoad(Resource& res)
 	{
 		const char* filepath = getResourceFilePath(res.getPath().c_str());
 
-		if (!PlatformInterface::fileExists(filepath)) return false;
+		if (!PlatformInterface::fileExists(filepath)) return ResourceManagerHub::LoadHook::Action::IMMEDIATE;
 		const u32 hash = res.getPath().getHash();
 		const StaticString<MAX_PATH_LENGTH> dst_path(".lumix/assets/", hash, ".res");
 		const PathUtils::FileInfo info(filepath);
@@ -460,9 +460,9 @@ struct AssetCompilerImpl : AssetCompiler
 				iter = m_to_compile_subresources.find(path);
 			}
 			iter.value().push(&res);
-			return true;
+			return ResourceManagerHub::LoadHook::Action::DEFERRED;
 		}
-		return false;
+		return ResourceManagerHub::LoadHook::Action::IMMEDIATE;
 	}
 
 	Path popCompiledResource()

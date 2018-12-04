@@ -54,7 +54,7 @@ Resource* ResourceManager::load(const Path& path)
 
 	if(resource->isEmpty() && resource->m_desired_state == Resource::State::EMPTY)
 	{
-		if (m_owner->onBeforeLoad(*resource))
+		if (m_owner->onBeforeLoad(*resource) == ResourceManagerHub::LoadHook::Action::DEFERRED)
 		{
 			resource->m_desired_state = Resource::State::READY;
 			resource->addRef(); // for hook
@@ -89,7 +89,7 @@ void ResourceManager::load(Resource& resource)
 {
 	if(resource.isEmpty() && resource.m_desired_state == Resource::State::EMPTY)
 	{
-		if (m_owner->onBeforeLoad(resource))
+		if (m_owner->onBeforeLoad(resource) == ResourceManagerHub::LoadHook::Action::DEFERRED)
 		{
 			resource.addRef(); // for hook
 			return;
@@ -125,7 +125,7 @@ void ResourceManager::reload(const Path& path)
 void ResourceManager::reload(Resource& resource)
 {
 	resource.doUnload();
-	if (m_owner->onBeforeLoad(resource))
+	if (m_owner->onBeforeLoad(resource) == ResourceManagerHub::LoadHook::Action::DEFERRED)
 	{
 		resource.m_desired_state = Resource::State::READY;
 		resource.addRef(); // for hook
@@ -209,9 +209,9 @@ void ResourceManagerHub::setLoadHook(LoadHook* hook)
 	m_load_hook = hook;
 }
 
-bool ResourceManagerHub::onBeforeLoad(Resource& resource) const
+ResourceManagerHub::LoadHook::Action ResourceManagerHub::onBeforeLoad(Resource& resource) const
 {
-	return m_load_hook ? m_load_hook->onBeforeLoad(resource) : false;
+	return m_load_hook ? m_load_hook->onBeforeLoad(resource) : LoadHook::Action::IMMEDIATE;
 }
 
 void ResourceManagerHub::add(ResourceType type, ResourceManager* rm)
