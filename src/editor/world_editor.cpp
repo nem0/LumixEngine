@@ -1824,7 +1824,7 @@ public:
 			m_gizmo->add(m_selected_entities[0]);
 		}
 
-		if (m_is_mouse_down[MouseButton::LEFT] && m_mouse_mode == MouseMode::SELECT)
+		if (m_is_mouse_down[(int)App::MouseButton::LEFT] && m_mouse_mode == MouseMode::SELECT)
 		{
 			m_render_interface->addRect2D(m_rect_selection_start, m_mouse_pos, 0xfffffFFF);
 			m_render_interface->addRect2D(m_rect_selection_start - Vec2(1, 1), m_mouse_pos + Vec2(1, 1), 0xff000000);
@@ -1859,15 +1859,15 @@ public:
 	}
 
 
-	bool isMouseClick(MouseButton::Value button) const override
+	bool isMouseClick(App::MouseButton button) const override
 	{
-		return m_is_mouse_click[button];
+		return m_is_mouse_click[(int)button];
 	}
 
 
-	bool isMouseDown(MouseButton::Value button) const override
+	bool isMouseDown(App::MouseButton button) const override
 	{
-		return m_is_mouse_down[button];
+		return m_is_mouse_down[(int)button];
 	}
 
 
@@ -1925,19 +1925,19 @@ public:
 	}
 
 
-	void onMouseDown(int x, int y, MouseButton::Value button) override
+	void onMouseDown(int x, int y, App::MouseButton button) override
 	{
-		m_is_mouse_click[button] = true;
-		m_is_mouse_down[button] = true;
-		if(button == MouseButton::MIDDLE)
+		m_is_mouse_click[(int)button] = true;
+		m_is_mouse_down[(int)button] = true;
+		if(button == App::MouseButton::MIDDLE)
 		{
 			m_mouse_mode = MouseMode::PAN;
 		}
-		else if (button == MouseButton::RIGHT)
+		else if (button == App::MouseButton::RIGHT)
 		{
 			m_mouse_mode = MouseMode::NAVIGATE;
 		}
-		else if (button == MouseButton::LEFT)
+		else if (button == App::MouseButton::LEFT)
 		{
 			DVec3 origin;
 			Vec3 dir;
@@ -2012,7 +2012,7 @@ public:
 	}
 
 
-	void onMouseUp(int x, int y, MouseButton::Value button) override
+	void onMouseUp(int x, int y, App::MouseButton button) override
 	{
 		m_mouse_pos = {(float)x, (float)y};
 		if (m_mouse_mode == MouseMode::SELECT)
@@ -2057,7 +2057,7 @@ public:
 			}
 		}
 
-		m_is_mouse_down[button] = false;
+		m_is_mouse_down[(int)button] = false;
 		if (m_mouse_handling_plugin)
 		{
 			m_mouse_handling_plugin->onMouseUp(x, y, button);
@@ -3805,8 +3805,8 @@ private:
 	DelegateList<void()> m_universe_destroyed;
 	DelegateList<void()> m_universe_created;
 	DelegateList<void(const Array<EntityRef>&)> m_entity_selected;
-	bool m_is_mouse_down[MouseButton::RIGHT + 1];
-	bool m_is_mouse_click[3];
+	bool m_is_mouse_down[(int)App::MouseButton::EXTENDED];
+	bool m_is_mouse_click[(int)App::MouseButton::EXTENDED];
 
 	Array<Plugin*> m_plugins;
 	MeasureTool* m_measure_tool;

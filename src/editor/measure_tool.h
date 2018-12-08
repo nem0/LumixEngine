@@ -14,7 +14,7 @@ namespace Lumix
 
 			bool onMouseDown(const WorldEditor::RayHit& hit, int x, int y) override;
 			void onMouseMove(int, int, int, int) override {}
-			void onMouseUp(int, int, MouseButton::Value) override {}
+			void onMouseUp(int, int, App::MouseButton) override {}
 			void enable(bool is_enabled) { m_is_enabled = is_enabled; m_is_from_set = false; }
 			bool isEnabled() const { return m_is_enabled; }
 			const DVec3& getFrom() const { return m_from; }

@@ -3,9 +3,7 @@
 #include "engine/path_utils.h"
 #include "engine/string.h"
 
-#include <SDL.h>
 #include <ShlObj.h>
-#include <SDL_syswm.h>
 
 
 namespace Lumix
@@ -380,21 +378,18 @@ bool makePath(const char* path)
 }
 
 
-static HWND g_window = NULL;
+static App::WindowHandle g_window = App::INVALID_WINDOW;
 
 
-void setWindow(SDL_Window* window)
+void setWindow(App::WindowHandle window)
 {
-	SDL_SysWMinfo window_info;
-	SDL_VERSION(&window_info.version);
-	SDL_GetWindowWMInfo(window, &window_info);
-	g_window = window_info.info.win.window;
+	g_window = window;
 }
 
 
 void clipCursor(int x, int y, int w, int h)
 {
-	POINT min;
+	/*POINT min;
 	POINT max;
 	min.x = LONG(x);
 	min.y = LONG(y);
@@ -408,7 +403,9 @@ void clipCursor(int x, int y, int w, int h)
 	rect.right = max.x;
 	rect.top = min.y;
 	rect.bottom = max.y;
-	ClipCursor(&rect);
+	ClipCursor(&rect);*/
+	ASSERT(false);
+	// TODO
 }
 
 

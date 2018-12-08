@@ -22,8 +22,6 @@
 #include "renderer/renderer.h"
 #include "renderer/texture.h"
 #include <cstdio>
-#include <SDL.h>
-#include <SDL_syswm.h>
 #ifdef _WIN32
 	#include <windows.h>
 #endif

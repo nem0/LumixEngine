@@ -33,8 +33,7 @@ class LUMIX_ENGINE_API Engine
 public:
 	struct PlatformData
 	{
-		void* window_handle;
-		void* display;
+		void* window_handle = nullptr;
 	};
 
 public:

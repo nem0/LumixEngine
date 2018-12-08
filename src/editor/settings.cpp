@@ -10,7 +10,6 @@
 #include "platform_interface.h"
 #include "utils.h"
 #include <lua.hpp>
-#include <SDL.h>
 
 
 namespace Lumix
@@ -65,25 +64,22 @@ static void saveStyle(FS::OsFile& file)
 }
 
 
-static void shortcutInput(int& shortcut)
+static void shortcutInput(App::Keycode& shortcut)
 {
 	StaticString<50> popup_name("");
 	popup_name << (i64)&shortcut;
 
-	StaticString<50> button_label(SDL_GetKeyName((SDL_Keycode)shortcut));
+	char tmp[32];
+	App::getKeyName(shortcut, tmp, sizeof(tmp));
+	StaticString<50> button_label(tmp);
 	button_label << "###" << (i64)&shortcut;
 
-	if (ImGui::Button(button_label, ImVec2(65, 0))) shortcut = -1;
+	if (ImGui::Button(button_label, ImVec2(65, 0))) shortcut = App::Keycode::INVALID;
 
-	int key_count;
-	auto* state = SDL_GetKeyboardState(&key_count);
-	if (ImGui::IsItemHovered())
-	{
-		for (int i = 0; i < key_count; ++i)
-		{
-			if (state[i])
-			{
-				shortcut = SDL_GetKeyFromScancode((SDL_Scancode)i);
+	if (ImGui::IsItemHovered()) {
+		for (int i = 0; i < (int)App::Keycode::MAX; ++i) {
+			if (App::isKeyDown((App::Keycode)i)) {
+				shortcut = (App::Keycode)i;
 				break;
 			}
 		}
@@ -231,7 +227,7 @@ bool Settings::load()
 					lua_rawgeti(L, -1, 1 + j);
 					if (lua_type(L, -1) == LUA_TNUMBER)
 					{
-						actions[i]->shortcut[j] = (int)lua_tointeger(L, -1);
+						actions[i]->shortcut[j] = (App::Keycode)lua_tointeger(L, -1);
 					}
 					lua_pop(L, 1);
 				}
@@ -359,9 +355,9 @@ bool Settings::save()
 	for (int i = 0; i < actions.size(); ++i)
 	{
 		file << "\t" << actions[i]->name << " = {" 
-			<< actions[i]->shortcut[0] << ", "
-			<< actions[i]->shortcut[1] << ", " 
-			<< actions[i]->shortcut[2] << "},\n";
+			<< (int)actions[i]->shortcut[0] << ", "
+			<< (int)actions[i]->shortcut[1] << ", " 
+			<< (int)actions[i]->shortcut[2] << "},\n";
 	}
 	file << "}\n";
 

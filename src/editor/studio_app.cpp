@@ -8,6 +8,7 @@
 #include "editor/prefab_system.h"
 #include "editor/render_interface.h"
 #include "editor/world_editor.h"
+#include "engine/app.h"
 #include "engine/command_line_parser.h"
 #include "engine/crc32.h"
 #include "engine/debug/debug.h"
@@ -23,8 +24,8 @@
 #include "engine/path_utils.h"
 #include "engine/plugin_manager.h"
 #include "engine/profiler.h"
-#include "engine/reflection.h"
 #include "engine/quat.h"
+#include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/system.h"
 #include "engine/timer.h"
@@ -37,8 +38,6 @@
 #include "renderer/ffr/ffr.h"
 #include "settings.h"
 #include "utils.h"
-#include <SDL.h>
-#include <SDL_syswm.h>
 
 
 namespace Lumix
@@ -50,24 +49,24 @@ struct LuaPlugin : public StudioApp::GUIPlugin
 	LuaPlugin(StudioApp& app, const char* src, const char* filename)
 		: editor(app.getWorldEditor())
 	{
-		L = lua_newthread(editor.getEngine().getState()); // [thread]
+		L = lua_newthread(editor.getEngine().getState());						 // [thread]
 		thread_ref = luaL_ref(editor.getEngine().getState(), LUA_REGISTRYINDEX); // []
 
-		lua_newtable(L); // [env]
-		 // reference environment
-		lua_pushvalue(L, -1); // [env, env]
+		lua_newtable(L);						  // [env]
+												  // reference environment
+		lua_pushvalue(L, -1);					  // [env, env]
 		env_ref = luaL_ref(L, LUA_REGISTRYINDEX); // [env]
 
 		// environment's metatable & __index
-		lua_pushvalue(L, -1); // [env, env]
+		lua_pushvalue(L, -1);	// [env, env]
 		lua_setmetatable(L, -2); // [env]
 		lua_pushvalue(L, LUA_GLOBALSINDEX);
-		lua_setfield(L, -2, "__index");  // [env]
+		lua_setfield(L, -2, "__index"); // [env]
 
 		bool errors = luaL_loadbuffer(L, src, stringLength(src), filename) != 0; // [env, func]
 
 		lua_pushvalue(L, -2); // [env, func, env]
-		lua_setfenv(L, -2); // function's environment [env, func]
+		lua_setfenv(L, -2);   // function's environment [env, func]
 
 		errors = errors || lua_pcall(L, 0, 0, 0) != 0; // [env]
 		if (errors)
@@ -104,10 +103,7 @@ struct LuaPlugin : public StudioApp::GUIPlugin
 	const char* getName() const override { return "lua_script"; }
 
 
-	void onAction()
-	{
-		m_is_open = !m_is_open;
-	}
+	void onAction() { m_is_open = !m_is_open; }
 
 
 	void onWindowGUI() override
@@ -166,15 +162,132 @@ public:
 		, m_allocator(m_main_allocator)
 		, m_universes(m_allocator)
 		, m_events(m_allocator)
+		, m_fps_timer(nullptr)
+	{
+	}
+
+
+	void onEvent(const Lumix::App::Event& event)
+	{
+		m_events.push(event);
+		switch (event.type) {
+			case App::Event::Type::MOUSE_BUTTON: {
+				ImGuiIO& io = ImGui::GetIO();
+				io.MouseDown[(int)event.mouse_button.button] = event.mouse_button.down;
+				break;
+			}
+			case App::Event::Type::MOUSE_WHEEL: {
+				ImGuiIO& io = ImGui::GetIO();
+				io.MouseWheel = event.mouse_wheel.amount;
+				break;
+			}
+			case App::Event::Type::MOUSE_MOVE: {
+				ImGuiIO& io = ImGui::GetIO();
+				InputSystem& input_system = m_editor->getEngine().getInputSystem();
+				input_system.setCursorPosition({(float)event.mouse_move.x, (float)event.mouse_move.y});
+				m_mouse_move += {(float)event.mouse_move.xrel, (float)event.mouse_move.yrel};
+				// TODO
+				//if (SDL_GetRelativeMouseMode() == SDL_FALSE)
+				{
+					io.MousePos.x = (float)event.mouse_move.x;
+					io.MousePos.y = (float)event.mouse_move.y;
+				}
+				break;
+			}
+			case App::Event::Type::WINDOW_SIZE:
+			case App::Event::Type::WINDOW_MOVE: {
+				const App::Rect rect = App::getWindowScreenRect(event.window);
+				onWindowTransformed(rect.left, rect.top, rect.width, rect.height);
+				break;
+			}
+			case App::Event::Type::WINDOW_CLOSE:
+			case App::Event::Type::QUIT:
+				exit();
+				break;
+				/*			case SDL_MOUSEBUTTONDOWN:
+								m_editor->setToggleSelection(io.KeyCtrl);
+								m_editor->setSnapMode(io.KeyShift, io.KeyCtrl);
+								switch (event.button.button)
+								{
+									case SDL_BUTTON_LEFT: io.MouseDown[0] = true; break;
+									case SDL_BUTTON_RIGHT: io.MouseDown[1] = true; break;
+									case SDL_BUTTON_MIDDLE: io.MouseDown[2] = true; break;
+								}
+								break;
+							case SDL_MOUSEBUTTONUP:
+								switch (event.button.button)
+								{
+									case SDL_BUTTON_LEFT: io.MouseDown[0] = false; break;
+									case SDL_BUTTON_RIGHT: io.MouseDown[1] = false; break;
+									case SDL_BUTTON_MIDDLE: io.MouseDown[2] = false; break;
+								}
+								break;
+							case SDL_MOUSEMOTION:
+							{
+								auto& input_system = m_editor->getEngine().getInputSystem();
+								input_system.setCursorPosition({(float)event.motion.x, (float)event.motion.y});
+								m_mouse_move += {(float)event.motion.xrel, (float)event.motion.yrel};
+								if (SDL_GetRelativeMouseMode() == SDL_FALSE)
+								{
+									io.MousePos.x = (float)event.motion.x;
+									io.MousePos.y = (float)event.motion.y;
+								}
+							}
+							break;
+							case SDL_TEXTINPUT: io.AddInputCharactersUTF8(event.text.text); break;
+							case SDL_KEYDOWN:
+							case SDL_KEYUP:
+							{
+								int scancode = event.key.keysym.scancode;
+								io.KeysDown[scancode] = (event.type == SDL_KEYDOWN);
+								if (event.key.keysym.scancode == SDL_SCANCODE_KP_ENTER)
+								{
+									io.KeysDown[SDLK_RETURN] = (event.type == SDL_KEYDOWN);
+								}
+								io.KeyShift = ((SDL_GetModState() & KMOD_SHIFT) != 0);
+								io.KeyCtrl = ((SDL_GetModState() & KMOD_CTRL) != 0);
+								io.KeyAlt = ((SDL_GetModState() & KMOD_ALT) != 0);
+								checkShortcuts();
+							}
+							break;
+							case SDL_DROPFILE:
+								for (GUIPlugin* plugin : m_gui_plugins)
+								{
+									if (plugin->onDropFile(event.drop.file)) break;
+								}
+								break;*/
+		}
+	}
+
+
+	void onIdle()
+	{
+		update();
+
+		if (m_sleep_when_inactive && App::getFocused() != m_window) {
+			const float frame_time = m_fps_timer->tick();
+			const float wanted_fps = 5.0f;
+
+			if (frame_time < 1 / wanted_fps) {
+				PROFILE_BLOCK("sleep");
+				MT::sleep(u32(1000 / wanted_fps - frame_time * 1000));
+			}
+			m_fps_timer->tick();
+		}
+
+		Profiler::frame();
+		m_events.clear();
+	}
+
+
+	void onInit() override
 	{
 		m_add_cmp_root.label[0] = '\0';
 		m_template_name[0] = '\0';
 		m_open_filter[0] = '\0';
-		SDL_SetMainReady();
-		SDL_Init(SDL_INIT_VIDEO);
 
 		checkWorkingDirector();
-		
+
 		char current_dir[MAX_PATH_LENGTH];
 		PlatformInterface::getCurrentDirectory(current_dir, lengthOf(current_dir));
 
@@ -184,22 +297,18 @@ public:
 		createLua();
 
 		ffr::preinit(m_allocator);
-		SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+		App::InitWindowArgs create_win_args;
+		create_win_args.handle_file_drops = false;
+		create_win_args.name = "Lumix Studio";
+		m_window = App::createWindow(create_win_args);
+		/*SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
 		SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
 		SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 5);
-		m_window = SDL_CreateWindow("Lumix Studio", 0, 0, 800, 600, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
-		SDL_GL_CreateContext(m_window);
+		m_window = SDL_CreateWindow("Lumix Studio", 0, 0, 800, 600, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN |
+		SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI); SDL_GL_CreateContext(m_window);*/
 		PlatformInterface::setWindow(m_window);
-		SDL_SysWMinfo window_info;
-		SDL_VERSION(&window_info.version);
-		SDL_GetWindowWMInfo(m_window, &window_info);
 		Engine::PlatformData platform_data = {};
-		#ifdef _WIN32
-			platform_data.window_handle = window_info.info.win.window;
-		#elif defined(__linux__)
-			platform_data.window_handle = (void*)(uintptr_t)window_info.info.x11.window;
-			platform_data.display = window_info.info.x11.display;
-		#endif
+		platform_data.window_handle = m_window;
 		m_engine->setPlatformData(platform_data);
 
 		m_editor = WorldEditor::create(current_dir, *m_engine, m_allocator);
@@ -217,13 +326,17 @@ public:
 		ImGui::CreateContext();
 		loadSettings();
 		initIMGUI();
-		#ifdef _WIN32
-		// TODO
-		//			ImGui::GetPlatformIO().ImeWindowHandle = window_info.info.win.window;
-		#endif
+#ifdef _WIN32
+// TODO
+// ImGui::GetPlatformIO().ImeWindowHandle = m_window;
+#endif
 
-		m_custom_pivot_action = LUMIX_NEW(m_editor->getAllocator(), Action)(
-			"Set Custom Pivot", "Set Custom Pivot", "set_custom_pivot", SDLK_v, -1, -1);
+		m_custom_pivot_action = LUMIX_NEW(m_editor->getAllocator(), Action)("Set Custom Pivot",
+			"Set Custom Pivot",
+			"set_custom_pivot",
+			App::Keycode::K,
+			App::Keycode::INVALID,
+			App::Keycode::INVALID);
 		m_custom_pivot_action->is_global = false;
 		addAction(m_custom_pivot_action);
 
@@ -235,12 +348,16 @@ public:
 
 		m_asset_compiler->onInitFinished();
 		m_sleep_when_inactive = shouldSleepWhenInactive();
+
+		checkScriptCommandLine();
+		m_fps_timer = Timer::create(m_allocator);
 	}
 
 
 	~StudioAppImpl()
 	{
-		if(m_watched_plugin.watcher) FileSystemWatcher::destroy(m_watched_plugin.watcher);
+		Timer::destroy(m_fps_timer);
+		if (m_watched_plugin.watcher) FileSystemWatcher::destroy(m_watched_plugin.watcher);
 
 		saveSettings();
 		unloadIcons();
@@ -283,9 +400,12 @@ public:
 		Engine::destroy(m_engine, m_allocator);
 		m_engine = nullptr;
 		m_editor = nullptr;
-
-		SDL_DestroyWindow(m_window);
-		SDL_Quit();
+		
+		App::destroyWindow(m_window);
+		/*
+		SDL_Quit();*/
+		ASSERT(false);
+		// TODO
 	}
 
 
@@ -422,10 +542,7 @@ public:
 			}
 
 
-			const char* getLabel() const override
-			{
-				return label;
-			}
+			const char* getLabel() const override { return label; }
 
 			PropertyGrid* property_grid;
 			AssetBrowser* asset_browser;
@@ -478,10 +595,7 @@ public:
 			}
 
 
-			const char* getLabel() const override
-			{
-				return label;
-			}
+			const char* getLabel() const override { return label; }
 
 			WorldEditor* editor;
 			PropertyGrid* property_grid;
@@ -501,18 +615,10 @@ public:
 	}
 
 
+	const Array<Action*>& getActions() override { return m_actions; }
 
 
-	const Array<Action*>& getActions() override
-	{
-		return m_actions;
-	}
-
-
-	Array<Action*>& getToolbarActions() override
-	{
-		return m_toolbar_actions;
-	}
+	Array<Action*>& getToolbarActions() override { return m_toolbar_actions; }
 
 
 	void guiBeginFrame() const
@@ -520,13 +626,13 @@ public:
 		PROFILE_FUNCTION();
 
 		ImGuiIO& io = ImGui::GetIO();
-		int w, h;
-		SDL_GetWindowSize(m_window, &w, &h);
-		io.DisplaySize = ImVec2((float)w, (float)h);
+		const App::Point size = App::getWindowClientSize(m_window);
+		io.DisplaySize = ImVec2(float(size.x), float(size.y));
 		io.DeltaTime = m_engine->getLastTimeDelta();
-		io.KeyShift = ((SDL_GetModState() & KMOD_SHIFT) != 0);
+		// TODO
+		/*io.KeyShift = ((SDL_GetModState() & KMOD_SHIFT) != 0);
 		io.KeyCtrl = ((SDL_GetModState() & KMOD_CTRL) != 0);
-		io.KeyAlt = ((SDL_GetModState() & KMOD_ALT) != 0);
+		io.KeyAlt = ((SDL_GetModState() & KMOD_ALT) != 0);*/
 
 		ImGui::NewFrame();
 		ImGui::PushFont(m_font);
@@ -535,7 +641,8 @@ public:
 
 	float showMainToolbar(float menu_height)
 	{
-		if (m_toolbar_actions.empty()) {
+		if (m_toolbar_actions.empty())
+		{
 			ImGui::SetCursorPosY(menu_height);
 			return menu_height;
 		}
@@ -576,8 +683,9 @@ public:
 										 ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
 										 ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
 				ImGui::SetNextWindowSize(size);
-				ImGui::SetNextWindowPos({ 0, 0 }, ImGuiCond_FirstUseEver);
-				if (ImGui::Begin("MainDockspace", nullptr, flags)) {
+				ImGui::SetNextWindowPos({0, 0}, ImGuiCond_FirstUseEver);
+				if (ImGui::Begin("MainDockspace", nullptr, flags))
+				{
 					float menu_height = showMainMenu();
 					showMainToolbar(menu_height);
 					ImGuiID dockspace_id = ImGui::GetID("MyDockspace");
@@ -586,7 +694,7 @@ public:
 				ImGui::End();
 
 				// TODO
-				//ImGui::RootDock(pos, size);
+				// ImGui::RootDock(pos, size);
 			}
 			m_profiler_ui->onGUI();
 			m_asset_browser->onGUI();
@@ -656,13 +764,11 @@ public:
 
 	void showWelcomeScreen()
 	{
-		ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
-								 ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings;
-		int w, h;
-		SDL_GetWindowSize(m_window, &w, &h);
-		ImVec2 size((float)w, (float)h);
-		ImGui::SetNextWindowSize(size);
-		ImGui::SetNextWindowPos({ 0, 0 }, ImGuiCond_FirstUseEver);
+		ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+								 ImGuiWindowFlags_NoSavedSettings;
+		const App::Point size = App::getWindowClientSize(m_window);
+		ImGui::SetNextWindowSize(ImVec2((float)size.x, (float)size.y));
+		ImGui::SetNextWindowPos({0, 0}, ImGuiCond_FirstUseEver);
 		if (ImGui::Begin("Welcome", nullptr, flags))
 		{
 			ImGui::Text("Welcome to Lumix Studio");
@@ -705,7 +811,8 @@ public:
 
 				if (ImGui::Button("Download new version"))
 				{
-					PlatformInterface::shellExecuteOpen("https://github.com/nem0/lumixengine_data/archive/master.zip", nullptr);
+					PlatformInterface::shellExecuteOpen(
+						"https://github.com/nem0/lumixengine_data/archive/master.zip", nullptr);
 				}
 
 				if (ImGui::Button("Show major releases"))
@@ -731,22 +838,23 @@ public:
 
 	void setTitle(const char* title) const
 	{
-		char tmp[100];
+		/*char tmp[100];
 		copyString(tmp, "Lumix Studio - ");
 		catString(tmp, title);
-		SDL_SetWindowTitle(m_window, tmp);
+		SDL_SetWindowTitle(m_window, tmp);*/
+		ASSERT(false); // TODO
 	}
 
 
 	static void getShortcut(const Action& action, char* buf, int max_size)
 	{
 		buf[0] = 0;
-		for (int i = 0; i < lengthOf(action.shortcut); ++i)
-		{
-			const char* str = SDL_GetKeyName(SDL_GetKeyFromScancode((SDL_Scancode)action.shortcut[i]));
-			if (str[0] == 0) return;
+		for (int i = 0; i < lengthOf(action.shortcut); ++i) {
+			char tmp[64];
+			App::getKeyName(action.shortcut[i], tmp, sizeof(tmp));
+			if (tmp[0] == 0) return;
 			if (i > 0) catString(buf, max_size, " - ");
-			catString(buf, max_size, str);
+			catString(buf, max_size, tmp);
 		}
 	}
 
@@ -784,7 +892,7 @@ public:
 	void onSaveAsDialogGUI()
 	{
 		if (!m_is_save_as_dialog_open) return;
-		
+
 		if (ImGui::Begin("Save Universe As", &m_is_save_as_dialog_open))
 		{
 			static char name[64] = "";
@@ -823,13 +931,14 @@ public:
 		}
 		else
 		{
+			App::quit();
 			m_finished = true;
 		}
 	}
 
 
-	void newUniverse() 
-	{ 
+	void newUniverse()
+	{
 		if (m_editor->isUniverseChanged())
 		{
 			m_confirm_new = true;
@@ -843,9 +952,9 @@ public:
 
 	GUIPlugin* getFocusedPlugin()
 	{
-		for(GUIPlugin* plugin : m_gui_plugins)
+		for (GUIPlugin* plugin : m_gui_plugins)
 		{
-			if(plugin->hasFocus()) return plugin;
+			if (plugin->hasFocus()) return plugin;
 		}
 		return nullptr;
 	}
@@ -876,10 +985,26 @@ public:
 	void toggleAssetBrowser() { m_asset_browser->m_is_open = !m_asset_browser->m_is_open; }
 	bool isAssetBrowserOpen() const { return m_asset_browser->m_is_open; }
 	int getExitCode() const override { return m_exit_code; }
-	AssetBrowser& getAssetBrowser() override { ASSERT(m_asset_browser); return *m_asset_browser; }
-	AssetCompiler& getAssetCompiler() override { ASSERT(m_asset_compiler); return *m_asset_compiler; }
-	PropertyGrid& getPropertyGrid() override { ASSERT(m_property_grid); return *m_property_grid; }
-	LogUI& getLogUI() override { ASSERT(m_log_ui); return *m_log_ui; }
+	AssetBrowser& getAssetBrowser() override
+	{
+		ASSERT(m_asset_browser);
+		return *m_asset_browser;
+	}
+	AssetCompiler& getAssetCompiler() override
+	{
+		ASSERT(m_asset_compiler);
+		return *m_asset_compiler;
+	}
+	PropertyGrid& getPropertyGrid() override
+	{
+		ASSERT(m_property_grid);
+		return *m_property_grid;
+	}
+	LogUI& getLogUI() override
+	{
+		ASSERT(m_log_ui);
+		return *m_log_ui;
+	}
 	void toggleGameMode() { m_editor->toggleGameMode(); }
 	void setTranslateGizmoMode() { m_editor->getGizmo().setTranslateMode(); }
 	void setRotateGizmoMode() { m_editor->getGizmo().setRotateMode(); }
@@ -922,7 +1047,7 @@ public:
 	}
 
 
-	void autosnapDown() 
+	void autosnapDown()
 	{
 		auto& gizmo = m_editor->getGizmo();
 		gizmo.setAutosnapDown(!gizmo.isAutosnapDown());
@@ -1004,10 +1129,15 @@ public:
 
 
 	template <void (StudioAppImpl::*Func)()>
-	void addAction(const char* label_short, const char* label_long, const char* name, int shortcut0, int shortcut1, int shortcut2)
+	void addAction(const char* label_short,
+		const char* label_long,
+		const char* name,
+		App::Keycode shortcut0,
+		App::Keycode shortcut1,
+		App::Keycode shortcut2)
 	{
-		auto* a = LUMIX_NEW(m_editor->getAllocator(), Action)(
-			label_short, label_long, name, shortcut0, shortcut1, shortcut2);
+		auto* a =
+			LUMIX_NEW(m_editor->getAllocator(), Action)(label_short, label_long, name, shortcut0, shortcut1, shortcut2);
 		a->func.bind<StudioAppImpl, Func>(this);
 		addAction(a);
 	}
@@ -1029,8 +1159,10 @@ public:
 
 		if (filter[0])
 		{
-			if (!node->plugin) showAddComponentNode(node->child, filter);
-			else if (stristr(node->plugin->getLabel(), filter)) node->plugin->onGUI(false, true);
+			if (!node->plugin)
+				showAddComponentNode(node->child, filter);
+			else if (stristr(node->plugin->getLabel(), filter))
+				node->plugin->onGUI(false, true);
 			showAddComponentNode(node->next, filter);
 			return;
 		}
@@ -1060,10 +1192,10 @@ public:
 		showAddComponentNode(m_add_cmp_root.child, m_component_filter);
 	}
 
-	
+
 	void entityMenu()
 	{
-		if (!ImGui::BeginMenu("EntityRef")) return;
+		if (!ImGui::BeginMenu("Entity")) return;
 
 		const auto& selected_entities = m_editor->getSelectedEntities();
 		bool is_any_entity_selected = !selected_entities.empty();
@@ -1075,7 +1207,8 @@ public:
 		doMenuItem(*getAction("destroyEntity"), is_any_entity_selected);
 		doMenuItem(*getAction("savePrefab"), selected_entities.size() == 1);
 		doMenuItem(*getAction("makeParent"), selected_entities.size() == 2);
-		bool can_unparent = selected_entities.size() == 1 && m_editor->getUniverse()->getParent(selected_entities[0]).isValid();
+		bool can_unparent =
+			selected_entities.size() == 1 && m_editor->getUniverse()->getParent(selected_entities[0]).isValid();
 		doMenuItem(*getAction("unparent"), can_unparent);
 		ImGui::EndMenu();
 	}
@@ -1122,8 +1255,7 @@ public:
 			ImGui::LabellessInputText("Filter", m_open_filter, sizeof(m_open_filter));
 			for (auto& univ : m_universes)
 			{
-				if ((m_open_filter[0] == '\0' || stristr(univ.data, m_open_filter)) &&
-					ImGui::MenuItem(univ.data))
+				if ((m_open_filter[0] == '\0' || stristr(univ.data, m_open_filter)) && ImGui::MenuItem(univ.data))
 				{
 					if (m_editor->isUniverseChanged())
 					{
@@ -1194,6 +1326,7 @@ public:
 			ImGui::Text("All unsaved changes will be lost, do you want to continue?");
 			if (ImGui::Button("Continue"))
 			{
+				App::quit();
 				m_finished = true;
 				ImGui::CloseCurrentPopup();
 			}
@@ -1224,7 +1357,7 @@ public:
 			ImGui::OpenPopup("Confirm");
 			m_confirm_load = false;
 		}
-		if(ImGui::BeginPopupModal("Confirm"))
+		if (ImGui::BeginPopupModal("Confirm"))
 		{
 			ImGui::Text("All unsaved changes will be lost, do you want to continue?");
 			if (ImGui::Button("Continue"))
@@ -1252,7 +1385,7 @@ public:
 			if (m_engine->getFileSystem().hasWork()) stats << "Loading... | ";
 			stats << "FPS: ";
 			stats << m_engine->getFPS();
-			if ((SDL_GetWindowFlags(m_window) & SDL_WINDOW_INPUT_FOCUS) == 0) stats << " - inactive window";
+			if (App::getFocused() != m_window) stats << " - inactive window";
 			auto stats_size = ImGui::CalcTextSize(stats);
 			ImGui::SameLine(ImGui::GetContentRegionMax().x - stats_size.x);
 			ImGui::Text("%s", (const char*)stats);
@@ -1332,7 +1465,8 @@ public:
 
 		if (node_open)
 		{
-			for (EntityPtr e_ptr = universe->getFirstChild(entity); e_ptr.isValid(); e_ptr = universe->getNextSibling((EntityRef)e_ptr))
+			for (EntityPtr e_ptr = universe->getFirstChild(entity); e_ptr.isValid();
+				 e_ptr = universe->getNextSibling((EntityRef)e_ptr))
 			{
 				showHierarchy((EntityRef)e_ptr, selected_entities);
 			}
@@ -1357,7 +1491,8 @@ public:
 				ImGui::PushItemWidth(ImGui::GetContentRegionAvailWidth() - ImGui::GetStyle().FramePadding.x);
 				if (filter[0] == '\0')
 				{
-					for (EntityPtr e = universe->getFirstEntity(); e.isValid(); e = universe->getNextEntity((EntityRef)e))
+					for (EntityPtr e = universe->getFirstEntity(); e.isValid();
+						 e = universe->getNextEntity((EntityRef)e))
 					{
 						const EntityRef e_ref = (EntityRef)e;
 						if (!universe->getParent(e_ref).isValid())
@@ -1368,7 +1503,8 @@ public:
 				}
 				else
 				{
-					for (EntityPtr e = universe->getFirstEntity(); e.isValid(); e = universe->getNextEntity((EntityRef)e))
+					for (EntityPtr e = universe->getFirstEntity(); e.isValid();
+						 e = universe->getNextEntity((EntityRef)e))
 					{
 						char buffer[1024];
 						getEntityListDisplayName(*m_editor, buffer, sizeof(buffer), e);
@@ -1412,7 +1548,8 @@ public:
 
 	void setFullscreen(bool fullscreen) override
 	{
-		SDL_SetWindowFullscreen(m_window, fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
+		ASSERT(false); // TODO
+					   // SDL_SetWindowFullscreen(m_window, fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
 	}
 
 
@@ -1435,35 +1572,36 @@ public:
 	{
 		ImGuiIO& io = ImGui::GetIO();
 		io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard | ImGuiConfigFlags_DockingEnable;
-		float ddpi;
-		float font_scale = 1;
-		if (SDL_GetDisplayDPI(0, &ddpi, nullptr, nullptr) == 0) font_scale = ddpi / 96;
-		m_font = io.Fonts->AddFontFromFileTTF("editor/fonts/OpenSans-Regular.ttf", (float)m_settings.m_font_size * font_scale);
-		m_bold_font = io.Fonts->AddFontFromFileTTF("editor/fonts/OpenSans-Bold.ttf", (float)m_settings.m_font_size * font_scale);
+		const int dpi = App::getDPI();
+		float font_scale = dpi / 96.f;
+		m_font = io.Fonts->AddFontFromFileTTF(
+			"editor/fonts/OpenSans-Regular.ttf", (float)m_settings.m_font_size * font_scale);
+		m_bold_font =
+			io.Fonts->AddFontFromFileTTF("editor/fonts/OpenSans-Bold.ttf", (float)m_settings.m_font_size * font_scale);
 
 		m_font->DisplayOffset.y = 0;
 		m_bold_font->DisplayOffset.y = 0;
 
-		io.KeyMap[ImGuiKey_Space] = SDL_SCANCODE_SPACE;
-		io.KeyMap[ImGuiKey_Tab] = SDL_SCANCODE_TAB;
-		io.KeyMap[ImGuiKey_LeftArrow] = SDL_SCANCODE_LEFT;
-		io.KeyMap[ImGuiKey_RightArrow] = SDL_SCANCODE_RIGHT;
-		io.KeyMap[ImGuiKey_UpArrow] = SDL_SCANCODE_UP;
-		io.KeyMap[ImGuiKey_DownArrow] = SDL_SCANCODE_DOWN;
-		io.KeyMap[ImGuiKey_PageUp] = SDL_SCANCODE_PAGEUP;
-		io.KeyMap[ImGuiKey_PageDown] = SDL_SCANCODE_PAGEDOWN;
-		io.KeyMap[ImGuiKey_Home] = SDL_SCANCODE_HOME;
-		io.KeyMap[ImGuiKey_End] = SDL_SCANCODE_END;
-		io.KeyMap[ImGuiKey_Delete] = SDL_SCANCODE_DELETE;
-		io.KeyMap[ImGuiKey_Backspace] = SDL_SCANCODE_BACKSPACE;
-		io.KeyMap[ImGuiKey_Enter] = SDL_SCANCODE_RETURN;
-		io.KeyMap[ImGuiKey_Escape] = SDL_SCANCODE_ESCAPE;
-		io.KeyMap[ImGuiKey_A] = SDL_SCANCODE_A;
-		io.KeyMap[ImGuiKey_C] = SDL_SCANCODE_C;
-		io.KeyMap[ImGuiKey_V] = SDL_SCANCODE_V;
-		io.KeyMap[ImGuiKey_X] = SDL_SCANCODE_X;
-		io.KeyMap[ImGuiKey_Y] = SDL_SCANCODE_Y;
-		io.KeyMap[ImGuiKey_Z] = SDL_SCANCODE_Z;
+		io.KeyMap[ImGuiKey_Space] = (int)App::Keycode::SPACE;
+		io.KeyMap[ImGuiKey_Tab] = (int)App::Keycode::TAB;
+		io.KeyMap[ImGuiKey_LeftArrow] = (int)App::Keycode::LEFT;
+		io.KeyMap[ImGuiKey_RightArrow] = (int)App::Keycode::RIGHT;
+		io.KeyMap[ImGuiKey_UpArrow] = (int)App::Keycode::UP;
+		io.KeyMap[ImGuiKey_DownArrow] = (int)App::Keycode::DOWN;
+		io.KeyMap[ImGuiKey_PageUp] = (int)App::Keycode::PAGEUP;
+		io.KeyMap[ImGuiKey_PageDown] = (int)App::Keycode::PAGEDOWN;
+		io.KeyMap[ImGuiKey_Home] = (int)App::Keycode::HOME;
+		io.KeyMap[ImGuiKey_End] = (int)App::Keycode::END;
+		io.KeyMap[ImGuiKey_Delete] = (int)App::Keycode::DEL;
+		io.KeyMap[ImGuiKey_Backspace] = (int)App::Keycode::BACKSPACE;
+		io.KeyMap[ImGuiKey_Enter] = (int)App::Keycode::RETURN;
+		io.KeyMap[ImGuiKey_Escape] = (int)App::Keycode::ESCAPE;
+		io.KeyMap[ImGuiKey_A] = (int)App::Keycode::A;
+		io.KeyMap[ImGuiKey_C] = (int)App::Keycode::C;
+		io.KeyMap[ImGuiKey_V] = (int)App::Keycode::V;
+		io.KeyMap[ImGuiKey_X] = (int)App::Keycode::X;
+		io.KeyMap[ImGuiKey_Y] = (int)App::Keycode::Y;
+		io.KeyMap[ImGuiKey_Z] = (int)App::Keycode::Z;
 
 		ImGuiStyle& style = ImGui::GetStyle();
 		style.FramePadding.y = 0;
@@ -1497,12 +1635,16 @@ public:
 
 		if (m_settings.m_is_maximized)
 		{
-			SDL_MaximizeWindow(m_window);
+			App::maximizeWindow(m_window);
 		}
 		else if (m_settings.m_window.w > 0)
 		{
-			SDL_SetWindowPosition(m_window, m_settings.m_window.x, m_settings.m_window.y);
-			SDL_SetWindowSize(m_window, m_settings.m_window.w, m_settings.m_window.h);
+			App::Rect r;
+			r.left = m_settings.m_window.x;
+			r.top = m_settings.m_window.y;
+			r.width = m_settings.m_window.w;
+			r.height = m_settings.m_window.h;
+			App::setWindowScreenRect(m_window, r);
 		}
 	}
 
@@ -1510,14 +1652,22 @@ public:
 	void addActions()
 	{
 		addAction<&StudioAppImpl::newUniverse>("New", "New universe", "newUniverse");
-		addAction<&StudioAppImpl::save>("Save", "Save universe", "save", SDLK_LCTRL, 'S', -1);
-		addAction<&StudioAppImpl::saveAs>("Save As", "Save universe as", "saveAs", SDLK_LCTRL, SDLK_LSHIFT, 'S');
-		addAction<&StudioAppImpl::exit>("Exit", "Exit Studio", "exit", SDLK_LCTRL, 'X', -1);
-		addAction<&StudioAppImpl::redo>("Redo", "Redo scene action", "redo", SDLK_LCTRL, SDLK_LSHIFT, 'Z');
-		addAction<&StudioAppImpl::undo>("Undo", "Undo scene action", "undo", SDLK_LCTRL, 'Z', -1);
-		addAction<&StudioAppImpl::copy>("Copy", "Copy entity", "copy", SDLK_LCTRL, 'C', -1);
-		addAction<&StudioAppImpl::paste>("Paste", "Paste entity", "paste", SDLK_LCTRL, 'V', -1);
-		addAction<&StudioAppImpl::duplicate>("Duplicate", "Duplicate entity", "duplicate", SDLK_LCTRL, 'D', -1);
+		addAction<&StudioAppImpl::save>(
+			"Save", "Save universe", "save", App::Keycode::LCTRL, App::Keycode::S, App::Keycode::INVALID);
+		addAction<&StudioAppImpl::saveAs>(
+			"Save As", "Save universe as", "saveAs", App::Keycode::LCTRL, App::Keycode::LSHIFT, App::Keycode::S);
+		addAction<&StudioAppImpl::exit>(
+			"Exit", "Exit Studio", "exit", App::Keycode::LCTRL, App::Keycode::X, App::Keycode::INVALID);
+		addAction<&StudioAppImpl::redo>(
+			"Redo", "Redo scene action", "redo", App::Keycode::LCTRL, App::Keycode::LSHIFT, App::Keycode::Z);
+		addAction<&StudioAppImpl::undo>(
+			"Undo", "Undo scene action", "undo", App::Keycode::LCTRL, App::Keycode::Z, App::Keycode::INVALID);
+		addAction<&StudioAppImpl::copy>(
+			"Copy", "Copy entity", "copy", App::Keycode::LCTRL, App::Keycode::C, App::Keycode::INVALID);
+		addAction<&StudioAppImpl::paste>(
+			"Paste", "Paste entity", "paste", App::Keycode::LCTRL, App::Keycode::V, App::Keycode::INVALID);
+		addAction<&StudioAppImpl::duplicate>(
+			"Duplicate", "Duplicate entity", "duplicate", App::Keycode::LCTRL, App::Keycode::D, App::Keycode::INVALID);
 		addAction<&StudioAppImpl::toggleOrbitCamera>("Orbit camera", "Orbit camera", "orbitCamera")
 			.is_selected.bind<StudioAppImpl, &StudioAppImpl::isOrbitCamera>(this);
 		addAction<&StudioAppImpl::setTranslateGizmoMode>("Translate", "Set translate mode", "setTranslateGizmoMode")
@@ -1539,7 +1689,12 @@ public:
 			.is_selected.bind<Gizmo, &Gizmo::isPivotOrigin>(&m_editor->getGizmo());
 
 		addAction<&StudioAppImpl::addEntity>("Create empty", "Create empty entity", "createEntity");
-		addAction<&StudioAppImpl::destroySelectedEntity>("Destroy", "Destroy entity", "destroyEntity", SDLK_DELETE, -1, -1);
+		addAction<&StudioAppImpl::destroySelectedEntity>("Destroy",
+			"Destroy entity",
+			"destroyEntity",
+			App::Keycode::DEL,
+			App::Keycode::INVALID,
+			App::Keycode::INVALID);
 		addAction<&StudioAppImpl::savePrefab>("Save prefab", "Save selected entities as prefab", "savePrefab");
 		addAction<&StudioAppImpl::makeParent>("Make parent", "Make entity parent", "makeParent");
 		addAction<&StudioAppImpl::unparent>("Unparent", "Unparent entity", "unparent");
@@ -1562,7 +1717,7 @@ public:
 	}
 
 
-	static bool copyPlugin(const char* src, int iteration, char(&out)[MAX_PATH_LENGTH])
+	static bool copyPlugin(const char* src, int iteration, char (&out)[MAX_PATH_LENGTH])
 	{
 		char tmp_path[MAX_PATH_LENGTH];
 		getExecutablePath(tmp_path, lengthOf(tmp_path));
@@ -1572,21 +1727,20 @@ public:
 		PlatformInterface::makePath(copy_path);
 		PathUtils::getBasename(tmp_path, lengthOf(tmp_path), src);
 		copy_path << "/" << tmp_path << "." << getPluginExtension();
-		#ifdef _WIN32
-			StaticString<MAX_PATH_LENGTH> src_pdb(src);
-			StaticString<MAX_PATH_LENGTH> dest_pdb(copy_path);
-			if (PathUtils::replaceExtension(dest_pdb.data, "pdb")
-				&& PathUtils::replaceExtension(src_pdb.data, "pda"))
+#ifdef _WIN32
+		StaticString<MAX_PATH_LENGTH> src_pdb(src);
+		StaticString<MAX_PATH_LENGTH> dest_pdb(copy_path);
+		if (PathUtils::replaceExtension(dest_pdb.data, "pdb") && PathUtils::replaceExtension(src_pdb.data, "pda"))
+		{
+			PlatformInterface::deleteFile(dest_pdb);
+			if (!copyFile(src_pdb, dest_pdb))
 			{
-				PlatformInterface::deleteFile(dest_pdb);
-				if (!copyFile(src_pdb, dest_pdb))
-				{
-					copyString(out, src);
-					return false;
-				}
+				copyString(out, src);
+				return false;
 			}
-		#endif
-		
+		}
+#endif
+
 		PlatformInterface::deleteFile(copy_path);
 		if (!copyFile(src, copy_path))
 		{
@@ -1649,13 +1803,13 @@ public:
 	static const char* getPluginExtension()
 	{
 		const char* ext =
-			#ifdef _WIN32
-				"dll";
-			#elif defined __linux__
-				"so";
-			#else 
-				#error Unknown platform
-			#endif
+#ifdef _WIN32
+			"dll";
+#elif defined __linux__
+			"so";
+#else
+#error Unknown platform
+#endif
 		return ext;
 	}
 
@@ -1664,10 +1818,11 @@ public:
 	{
 		const char* ext = getPluginExtension();
 		if (!PathUtils::hasExtension(path, ext)
-			#ifdef _WIN32
-				&& !PathUtils::hasExtension(path, "pda")
-			#endif
-		) return;
+#ifdef _WIN32
+			&& !PathUtils::hasExtension(path, "pda")
+#endif
+		)
+			return;
 
 		char basename[MAX_PATH_LENGTH];
 		PathUtils::getBasename(basename, lengthOf(basename), path);
@@ -1790,10 +1945,13 @@ public:
 
 	void initPlugins() override
 	{
-		for (int i = 1, c = m_plugins.size(); i < c; ++i) {
-			for(int j = 0; j < i; ++j) {
+		for (int i = 1, c = m_plugins.size(); i < c; ++i)
+		{
+			for (int j = 0; j < i; ++j)
+			{
 				IPlugin* p = m_plugins[i];
-				if (m_plugins[j]->dependsOn(*p)) {
+				if (m_plugins[j]->dependsOn(*p))
+				{
 					m_plugins.erase(i);
 					--i;
 					m_plugins.insert(j, p);
@@ -1801,16 +1959,14 @@ public:
 			}
 		}
 
-		for (IPlugin* plugin : m_plugins) {
+		for (IPlugin* plugin : m_plugins)
+		{
 			plugin->init();
 		}
 	}
 
 
-	void addPlugin(IPlugin& plugin) override
-	{
-		m_plugins.push(&plugin);
-	}
+	void addPlugin(IPlugin& plugin) override { m_plugins.push(&plugin); }
 
 
 	void addPlugin(GUIPlugin& plugin) override
@@ -1824,28 +1980,25 @@ public:
 	}
 
 
-	void removePlugin(GUIPlugin& plugin) override
-	{
-		m_gui_plugins.eraseItemFast(&plugin);
-	}
+	void removePlugin(GUIPlugin& plugin) override { m_gui_plugins.eraseItemFast(&plugin); }
 
 
 	void setStudioApp()
 	{
-		#ifdef STATIC_PLUGINS
-			StudioApp::StaticPluginRegister::create(*this);
-		#else
-			auto& plugin_manager = m_editor->getEngine().getPluginManager();
-			for (auto* lib : plugin_manager.getLibraries())
+#ifdef STATIC_PLUGINS
+		StudioApp::StaticPluginRegister::create(*this);
+#else
+		auto& plugin_manager = m_editor->getEngine().getPluginManager();
+		for (auto* lib : plugin_manager.getLibraries())
+		{
+			auto* f = (StudioApp::IPlugin * (*)(StudioApp&)) getLibrarySymbol(lib, "setStudioApp");
+			if (f)
 			{
-				auto* f = (StudioApp::IPlugin* (*)(StudioApp&))getLibrarySymbol(lib, "setStudioApp");
-				if (f)
-				{
-					StudioApp::IPlugin* plugin = f(*this);
-					addPlugin(*plugin);
-				}
+				StudioApp::IPlugin* plugin = f(*this);
+				addPlugin(*plugin);
 			}
-		#endif
+		}
+#endif
 		PrefabSystem::createEditorPlugins(*this, m_editor->getPrefabSystem());
 	}
 
@@ -1853,8 +2006,7 @@ public:
 	void runScript(const char* src, const char* script_name) override
 	{
 		lua_State* L = m_engine->getState();
-		bool errors =
-			luaL_loadbuffer(L, src, stringLength(src), script_name) != 0;
+		bool errors = luaL_loadbuffer(L, src, stringLength(src), script_name) != 0;
 		errors = errors || lua_pcall(L, 0, 0, 0) != 0;
 		if (errors)
 		{
@@ -1864,28 +2016,16 @@ public:
 	}
 
 
-	void savePrefabAs(const char* path)
-	{
-		m_editor->getPrefabSystem().savePrefab(Path(path));
-	}
+	void savePrefabAs(const char* path) { m_editor->getPrefabSystem().savePrefab(Path(path)); }
 
 
-	void destroyEntity(EntityRef e)
-	{
-		m_editor->destroyEntities(&e, 1);
-	}
+	void destroyEntity(EntityRef e) { m_editor->destroyEntities(&e, 1); }
 
 
-	void selectEntity(EntityRef e)
-	{
-		m_editor->selectEntities(&e, 1, false);
-	}
+	void selectEntity(EntityRef e) { m_editor->selectEntities(&e, 1, false); }
 
 
-	EntityRef createEntity()
-	{
-		return m_editor->addEntity();
-	}
+	EntityRef createEntity() { return m_editor->addEntity(); }
 
 	void createComponent(EntityRef e, int type)
 	{
@@ -1893,14 +2033,12 @@ public:
 		m_editor->addComponent({type});
 	}
 
-	void exitGameMode()
-	{
-		m_deferred_game_mode_exit = true;
-	}
+	void exitGameMode() { m_deferred_game_mode_exit = true; }
 
 
 	void exitWithCode(int exit_code)
 	{
+		App::quit();
 		m_finished = true;
 		m_exit_code = exit_code;
 	}
@@ -1908,8 +2046,8 @@ public:
 
 	struct SetPropertyVisitor : public Reflection::IPropertyVisitor
 	{
-		void visit(const Reflection::Property<int>& prop) override 
-		{ 
+		void visit(const Reflection::Property<int>& prop) override
+		{
 			if (!equalStrings(property_name, prop.name)) return;
 			if (!lua_isnumber(L, -1)) return;
 
@@ -1918,7 +2056,7 @@ public:
 		}
 
 
-		// TODO 
+		// TODO
 		void visit(const Reflection::Property<float>& prop) override { notSupported(prop); }
 		void visit(const Reflection::Property<EntityPtr>& prop) override { notSupported(prop); }
 		void visit(const Reflection::Property<IVec2>& prop) override { notSupported(prop); }
@@ -1937,8 +2075,8 @@ public:
 		}
 
 
-		void visit(const Reflection::Property<Path>& prop) override 
-		{ 
+		void visit(const Reflection::Property<Path>& prop) override
+		{
 			if (!equalStrings(property_name, prop.name)) return;
 			if (!lua_isstring(L, -1)) return;
 
@@ -1947,7 +2085,7 @@ public:
 		}
 
 
-		void visit(const Reflection::Property<bool>& prop) override 
+		void visit(const Reflection::Property<bool>& prop) override
 		{
 			if (!equalStrings(property_name, prop.name)) return;
 			if (!lua_isboolean(L, -1)) return;
@@ -2065,28 +2203,16 @@ public:
 	}
 
 
-	void executeUndoStack(const char* path)
-	{
-		m_editor->executeUndoStack(Path(path));
-	}
+	void executeUndoStack(const char* path) { m_editor->executeUndoStack(Path(path)); }
 
 
-	void saveUniverseAs(const char* basename, bool save_path)
-	{
-		m_editor->saveUniverse(basename, save_path);
-	}
+	void saveUniverseAs(const char* basename, bool save_path) { m_editor->saveUniverse(basename, save_path); }
 
 
-	void saveUniverse()
-	{
-		save();
-	}
+	void saveUniverse() { save(); }
 
 
-	bool runTest(const char* dir, const char* name)
-	{
-		return m_editor->runTest(dir, name);
-	}
+	bool runTest(const char* dir, const char* name) { return m_editor->runTest(dir, name); }
 
 
 	void createLua()
@@ -2095,11 +2221,12 @@ public:
 
 		LuaWrapper::createSystemVariable(L, "Editor", "editor", this);
 
-		#define REGISTER_FUNCTION(F) \
-			do { \
-				auto f = &LuaWrapper::wrapMethodClosure<StudioAppImpl, decltype(&StudioAppImpl::F), &StudioAppImpl::F>; \
-				LuaWrapper::createSystemClosure(L, "Editor", this, #F, f); \
-			} while(false) \
+#define REGISTER_FUNCTION(F)                                                                                    \
+	do                                                                                                          \
+	{                                                                                                           \
+		auto f = &LuaWrapper::wrapMethodClosure<StudioAppImpl, decltype(&StudioAppImpl::F), &StudioAppImpl::F>; \
+		LuaWrapper::createSystemClosure(L, "Editor", this, #F, f);                                              \
+	} while (false)
 
 
 		REGISTER_FUNCTION(savePrefabAs);
@@ -2115,7 +2242,7 @@ public:
 		REGISTER_FUNCTION(exitWithCode);
 		REGISTER_FUNCTION(exitGameMode);
 
-		#undef REGISTER_FUNCTION
+#undef REGISTER_FUNCTION
 
 		LuaWrapper::createSystemFunction(L, "Editor", "getResources", &getResources);
 		LuaWrapper::createSystemFunction(L, "Editor", "createEntityEx", &createEntityEx);
@@ -2175,7 +2302,7 @@ public:
 	}
 
 
-	#pragma pack(1)
+#pragma pack(1)
 	struct PackFileInfo
 	{
 		u32 hash;
@@ -2184,7 +2311,7 @@ public:
 
 		char path[MAX_PATH_LENGTH];
 	};
-	#pragma pack()
+#pragma pack()
 
 
 	void packDataScan(const char* dir_path, AssociativeArray<u32, PackFileInfo>& infos)
@@ -2207,10 +2334,10 @@ public:
 				continue;
 			}
 
-			if(!includeFileInPack(normalized_path)) continue;
+			if (!includeFileInPack(normalized_path)) continue;
 
 			StaticString<MAX_PATH_LENGTH> out_path;
-			if(dir_path[0] == '.')
+			if (dir_path[0] == '.')
 			{
 				copyString(out_path.data, normalized_path);
 			}
@@ -2260,14 +2387,10 @@ public:
 		out_info.hash = hash;
 		out_info.size = PlatformInterface::getFileSize(unv_path);
 		out_info.offset = ~0UL;
-		
 	}
 
 
-	void showPackDataDialog()
-	{
-		m_is_pack_data_dialog_open = true;
-	}
+	void showPackDataDialog() { m_is_pack_data_dialog_open = true; }
 
 
 	void onPackDataGUI()
@@ -2304,14 +2427,14 @@ public:
 		catString(dest, OUT_FILENAME);
 		AssociativeArray<u32, PackFileInfo> infos(m_allocator);
 		infos.reserve(10000);
-		
+
 		switch (m_pack.mode)
 		{
 			case PackConfig::Mode::ALL_FILES: packDataScan("./", infos); break;
 			case PackConfig::Mode::CURRENT_UNIVERSE: packDataScanResources(infos); break;
 			default: ASSERT(false); break;
 		}
-		
+
 		if (infos.size() == 0)
 		{
 			g_log_error.log("Editor") << "No files found while trying to create " << dest;
@@ -2368,11 +2491,7 @@ public:
 
 		file.close();
 
-		const char* bin_files[] = {
-			"app.exe",
-			"dbghelp.dll",
-			"dbgcore.dll"
-		};
+		const char* bin_files[] = {"app.exe", "dbghelp.dll", "dbgcore.dll"};
 		StaticString<MAX_PATH_LENGTH> src_dir("bin/");
 		if (!PlatformInterface::fileExists("bin/app.exe"))
 		{
@@ -2380,7 +2499,7 @@ public:
 			getExecutablePath(tmp, lengthOf(tmp));
 			PathUtils::getDir(src_dir.data, lengthOf(src_dir.data), tmp);
 		}
-		for(auto& file : bin_files)
+		for (auto& file : bin_files)
 		{
 			StaticString<MAX_PATH_LENGTH> tmp(m_pack.dest_dir, file);
 			StaticString<MAX_PATH_LENGTH> src(src_dir, file);
@@ -2412,8 +2531,9 @@ public:
 			src.resize(size + 1);
 			file.read(src.begin(), size);
 			src[size] = 0;
-			
-			LuaPlugin* plugin = LUMIX_NEW(m_editor->getAllocator(), LuaPlugin)(*this, (const char*)src.begin(), filename);
+
+			LuaPlugin* plugin =
+				LUMIX_NEW(m_editor->getAllocator(), LuaPlugin)(*this, (const char*)src.begin(), filename);
 			addPlugin(*plugin);
 
 			file.close();
@@ -2455,7 +2575,7 @@ public:
 			if (normalized_path[0] == '.') continue;
 			if (info.is_directory)
 			{
-				char dir_path[MAX_PATH_LENGTH] = { 0 };
+				char dir_path[MAX_PATH_LENGTH] = {0};
 				if (dir[0] != '.') copyString(dir_path, dir);
 				catString(dir_path, info.filename);
 				catString(dir_path, "/");
@@ -2475,10 +2595,7 @@ public:
 	}
 
 
-	const SDL_Event* getEvents() const override
-	{
-		return m_events.empty() ? nullptr : &m_events[0];
-	}
+	const App::Event* getEvents() const override { return m_events.empty() ? nullptr : &m_events[0]; }
 
 
 	int getEventsCount() const override { return m_events.size(); }
@@ -2487,127 +2604,7 @@ public:
 	Vec2 getMouseMove() const override { return m_mouse_move; }
 
 
-	void processSystemEvents()
-	{
-		PROFILE_FUNCTION();
-		m_mouse_move.set(0, 0);
-		m_events.clear();
-		SDL_Event event;
-		auto& io = ImGui::GetIO();
-		while (SDL_PollEvent(&event))
-		{
-			m_events.push(event);
-			switch (event.type)
-			{
-				case SDL_WINDOWEVENT:
-					switch (event.window.event)
-					{
-						case SDL_WINDOWEVENT_MOVED:
-						case SDL_WINDOWEVENT_SIZE_CHANGED:
-						{
-							int x, y, w, h;
-							SDL_GetWindowSize(m_window, &w, &h);
-							SDL_GetWindowPosition(m_window, &x, &y);
-							onWindowTransformed(x, y, w, h);
-						}
-						break;
-						case SDL_WINDOWEVENT_CLOSE: exit(); break;
-					}
-					break;
-				case SDL_QUIT: exit(); break;
-				case SDL_MOUSEBUTTONDOWN:
-					m_editor->setToggleSelection(io.KeyCtrl);
-					m_editor->setSnapMode(io.KeyShift, io.KeyCtrl);
-					switch (event.button.button)
-					{
-						case SDL_BUTTON_LEFT: io.MouseDown[0] = true; break;
-						case SDL_BUTTON_RIGHT: io.MouseDown[1] = true; break;
-						case SDL_BUTTON_MIDDLE: io.MouseDown[2] = true; break;
-					}
-					break;
-				case SDL_MOUSEBUTTONUP:
-					switch (event.button.button)
-					{
-						case SDL_BUTTON_LEFT: io.MouseDown[0] = false; break;
-						case SDL_BUTTON_RIGHT: io.MouseDown[1] = false; break;
-						case SDL_BUTTON_MIDDLE: io.MouseDown[2] = false; break;
-					}
-					break;
-				case SDL_MOUSEMOTION:
-				{
-					auto& input_system = m_editor->getEngine().getInputSystem();
-					input_system.setCursorPosition({(float)event.motion.x, (float)event.motion.y});
-					m_mouse_move += {(float)event.motion.xrel, (float)event.motion.yrel};
-					if (SDL_GetRelativeMouseMode() == SDL_FALSE)
-					{
-						io.MousePos.x = (float)event.motion.x;
-						io.MousePos.y = (float)event.motion.y;
-					}
-				}
-				break;
-				case SDL_TEXTINPUT: io.AddInputCharactersUTF8(event.text.text); break;
-				case SDL_KEYDOWN:
-				case SDL_KEYUP:
-				{
-					int scancode = event.key.keysym.scancode;
-					io.KeysDown[scancode] = (event.type == SDL_KEYDOWN);
-					if (event.key.keysym.scancode == SDL_SCANCODE_KP_ENTER)
-					{
-						io.KeysDown[SDLK_RETURN] = (event.type == SDL_KEYDOWN);
-					}
-					io.KeyShift = ((SDL_GetModState() & KMOD_SHIFT) != 0);
-					io.KeyCtrl = ((SDL_GetModState() & KMOD_CTRL) != 0);
-					io.KeyAlt = ((SDL_GetModState() & KMOD_ALT) != 0);
-					checkShortcuts();
-				}
-				break;
-				case SDL_DROPFILE:
-					for (GUIPlugin* plugin : m_gui_plugins)
-					{
-						if (plugin->onDropFile(event.drop.file)) break;
-					}
-					break;
-				case SDL_MOUSEWHEEL:
-				{
-					io.MouseWheel = float(event.wheel.x != 0 ? event.wheel.x : event.wheel.y);
-					break;
-				}
-			}
-		}
-	}
-
-
-	void run() override
-	{
-		checkScriptCommandLine();
-
-		Timer* timer = Timer::create(m_allocator);
-		while (!m_finished)
-		{
-			{
-				timer->tick();
-				float frame_time;
-				{
-					processSystemEvents();
-					if (!m_finished) update();
-					frame_time = timer->tick();
-				}
-
-				if (m_sleep_when_inactive && (SDL_GetWindowFlags(m_window) & SDL_WINDOW_INPUT_FOCUS) == 0)
-				{
-					float wanted_fps = 5.0f;
-					if (frame_time < 1 / wanted_fps)
-					{
-						PROFILE_BLOCK("sleep");
-						MT::sleep(u32(1000 / wanted_fps - frame_time * 1000));
-					}
-
-				}
-			}
-			Profiler::frame();
-		}
-		Timer::destroy(timer);
-	}
+	void run() override {}
 
 
 	static void checkWorkingDirector()
@@ -2662,7 +2659,7 @@ public:
 
 	void checkShortcuts()
 	{
-		if (ImGui::IsAnyItemActive()) return;
+		/*if (ImGui::IsAnyItemActive()) return;
 		GUIPlugin* plugin = getFocusedPlugin();
 
 		int key_count;
@@ -2671,7 +2668,7 @@ public:
 		for (auto* a : m_actions)
 		{
 			if (!a->is_global || a->shortcut[0] == -1) continue;
-			if (a->plugin != plugin) continue; 
+			if (a->plugin != plugin) continue;
 
 			u32 action_modifiers = 0;
 			for (int i = 0; i < lengthOf(a->shortcut) + 1; ++i)
@@ -2690,14 +2687,15 @@ public:
 
 				if (scancode >= key_count) break;
 				if (!state[scancode]) break;
-				if (a->shortcut[i] == SDLK_LCTRL) action_modifiers |= KMOD_LCTRL;
+				if (a->shortcut[i] == App::Keycode::LCTRL) action_modifiers |= KMOD_LCTRL;
 				else if (a->shortcut[i] == SDLK_LALT) action_modifiers |= KMOD_LALT;
-				else if (a->shortcut[i] == SDLK_LSHIFT) action_modifiers |= KMOD_LSHIFT;
+				else if (a->shortcut[i] == App::Keycode::LSHIFT) action_modifiers |= KMOD_LSHIFT;
 				else if (a->shortcut[i] == SDLK_RCTRL) action_modifiers |= KMOD_RCTRL;
 				else if (a->shortcut[i] == SDLK_RALT) action_modifiers |= KMOD_RALT;
 				else if (a->shortcut[i] == SDLK_RSHIFT) action_modifiers |= KMOD_RSHIFT;
 			}
-		}
+		}*/
+		ASSERT(false); // TODO
 	}
 
 
@@ -2709,7 +2707,7 @@ public:
 		m_settings.m_window.y = y;
 		m_settings.m_window.w = width;
 		m_settings.m_window.h = height;
-		m_settings.m_is_maximized = (SDL_GetWindowFlags(m_window) & SDL_WINDOW_MAXIMIZED) != 0;
+		m_settings.m_is_maximized = App::isMaximized(m_window);
 	}
 
 
@@ -2722,12 +2720,9 @@ public:
 		memset(io.KeysDown, 0, sizeof(io.KeysDown));
 		memset(io.MouseDown, 0, sizeof(io.MouseDown));
 	}
-	
 
-	SDL_Window* getWindow() override
-	{
-		return m_window;
-	}
+
+	void* getWindow() override { return m_window; }
 
 
 	WorldEditor& getWorldEditor() override
@@ -2737,16 +2732,13 @@ public:
 	}
 
 
-	ImFont* getBoldFont() override
-	{
-		return m_bold_font;
-	}
+	ImFont* getBoldFont() override { return m_bold_font; }
 
 
 	DefaultAllocator m_main_allocator;
 	Debug::Allocator m_allocator;
 	Engine* m_engine;
-	SDL_Window* m_window;
+	App::WindowHandle m_window;
 
 	Array<Action*> m_actions;
 	Array<Action*> m_window_actions;
@@ -2769,8 +2761,9 @@ public:
 	LogUI* m_log_ui;
 	ProfilerUI* m_profiler_ui;
 	Settings m_settings;
-	Array<SDL_Event> m_events;
+	Array<App::Event> m_events;
 	Vec2 m_mouse_move;
+	Timer* m_fps_timer;
 	char m_template_name[100];
 	char m_open_filter[64];
 	char m_component_filter[32];
@@ -2799,7 +2792,7 @@ public:
 	bool m_is_save_as_dialog_open;
 	ImFont* m_font;
 	ImFont* m_bold_font;
-	
+
 	struct WatchedPlugin
 	{
 		FileSystemWatcher* watcher = nullptr;
@@ -2820,7 +2813,10 @@ static size_t alignMask(size_t _value, size_t _mask)
 
 static void* alignPtr(void* _ptr, size_t _align)
 {
-	union { void* ptr; size_t addr; } un;
+	union {
+		void* ptr;
+		size_t addr;
+	} un;
 	un.ptr = _ptr;
 	size_t mask = _align - 1;
 	size_t aligned = alignMask(un.addr, mask);

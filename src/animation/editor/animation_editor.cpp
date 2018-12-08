@@ -20,7 +20,6 @@
 #include "engine/resource_manager.h"
 #include "engine/universe/universe.h"
 #include "ui_builder.h"
-#include <SDL.h>
 
 
 static ImVec2 operator+(const ImVec2& lhs, const ImVec2& rhs) { return ImVec2(lhs.x + rhs.x, lhs.y + rhs.y); }
@@ -530,13 +529,13 @@ AnimationEditor::AnimationEditor(StudioApp& app)
 	event_type.label = "Set Input";
 	event_type.editor.bind<AnimationEditor, &AnimationEditor::onSetInputGUI>(this);
 
-	Action* undo_action = LUMIX_NEW(allocator, Action)("Undo", "Animation editor - undo", "animeditor_undo", SDL_SCANCODE_LCTRL, 'Z', -1);
+	Action* undo_action = LUMIX_NEW(allocator, Action)("Undo", "Animation editor - undo", "animeditor_undo", App::Keycode::LCTRL, App::Keycode::Z, App::Keycode::INVALID);
 	undo_action->is_global = true;
 	undo_action->plugin = this;
 	undo_action->func.bind<AnimationEditor, &AnimationEditor::undo>(this);
 	app.addAction(undo_action);
 
-	Action* redo_action = LUMIX_NEW(allocator, Action)("Redo", "Animation editor - redo", "animeditor_redo", SDL_SCANCODE_LCTRL, KMOD_SHIFT, 'Z');
+	Action* redo_action = LUMIX_NEW(allocator, Action)("Redo", "Animation editor - redo", "animeditor_redo", App::Keycode::LCTRL, App::Keycode::LSHIFT, App::Keycode::Z);
 	redo_action->is_global = true;
 	redo_action->plugin = this;
 	redo_action->func.bind<AnimationEditor, &AnimationEditor::redo>(this);

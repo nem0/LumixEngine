@@ -1462,7 +1462,7 @@ void TerrainEditor::onMouseMove(int x, int y, int, int)
 }
 
 
-void TerrainEditor::onMouseUp(int, int, MouseButton::Value)
+void TerrainEditor::onMouseUp(int, int, App::MouseButton)
 {
 }
 

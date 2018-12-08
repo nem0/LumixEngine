@@ -973,7 +973,8 @@ void RenderTask::shutdown()
 int RenderTask::task()
 {
 	PROFILE_FUNCTION();
-	void* window_handle = m_renderer.getEngine().getPlatformData().window_handle;
+	Engine& engine = m_renderer.getEngine();
+	void* window_handle = engine.getPlatformData().window_handle;
 	ffr::init(window_handle);
 	m_framebuffer = ffr::createFramebuffer();
 	m_global_state_uniforms = ffr::allocBufferHandle();
