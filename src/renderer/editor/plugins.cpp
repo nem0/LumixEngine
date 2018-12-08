@@ -656,10 +656,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		{
 			m_is_mouse_captured = false;
 			App::showCursor(true);
-			/*SDL_SetRelativeMouseMode(SDL_FALSE);
-			SDL_WarpMouseInWindow(nullptr, m_captured_mouse_x, m_captured_mouse_y);*/
-			ASSERT(false);
-			// TODO
+			App::setMousePos(m_captured_mouse_x, m_captured_mouse_y);
 		}
 
 		if (ImGui::GetIO().MouseClicked[1] && ImGui::IsItemHovered()) ImGui::OpenPopup("PreviewPopup");
@@ -685,10 +682,9 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			{
 				m_is_mouse_captured = true;
 				App::showCursor(false);
-				/*SDL_SetRelativeMouseMode(SDL_TRUE);
-				SDL_GetMouseState(&m_captured_mouse_x, &m_captured_mouse_y);*/
-				// TODO
-				ASSERT(false);
+				const App::Point p = App::getMousePos();
+				m_captured_mouse_x = p.x;
+				m_captured_mouse_y = p.y;
 			}
 
 			if (delta.x != 0 || delta.y != 0)

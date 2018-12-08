@@ -672,10 +672,11 @@ void Universe::deserializeComponent(IDeserializer& serializer, EntityRef entity,
 void Universe::serialize(OutputBlob& serializer)
 {
 	serializer.write((i32)m_entities.size());
-	serializer.write(&m_entities[0], sizeof(m_entities[0]) * m_entities.size());
+	if (!m_entities.empty()) {
+		serializer.write(&m_entities[0], sizeof(m_entities[0]) * m_entities.size());
+	}
 	serializer.write((i32)m_names.size());
-	for (const EntityName& name : m_names)
-	{
+	for (const EntityName& name : m_names) {
 		serializer.write(name.entity);
 		serializer.writeString(name.name);
 	}

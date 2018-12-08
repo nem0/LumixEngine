@@ -2,10 +2,15 @@
 
 
 #include "engine/lumix.h"
+#include "engine/app.h"
 
 
 namespace Lumix
 {
+
+
+namespace App { struct Event; }
+
 
 class Engine;
 struct IAllocator;
@@ -34,7 +39,6 @@ class LUMIX_ENGINE_API InputSystem
 		struct ButtonEvent
 		{
 			u32 key_id;
-			u32 scancode;
 			float x_abs;
 			float y_abs;
 			enum : u32
@@ -63,7 +67,7 @@ class LUMIX_ENGINE_API InputSystem
 
 		struct TextEvent
 		{
-			char text[32];
+			u32 utf32;
 		};
 
 		struct Event
@@ -97,6 +101,7 @@ class LUMIX_ENGINE_API InputSystem
 		virtual void update(float dt) = 0;
 
 		virtual void injectEvent(const Event& event) = 0;
+		virtual void injectEvent(const App::Event& event) = 0;
 		virtual int getEventsCount() const = 0;
 		virtual const Event* getEvents() const = 0;
 
@@ -106,9 +111,6 @@ class LUMIX_ENGINE_API InputSystem
 		virtual Device* getKeyboardDevice() = 0;
 		virtual int getDevicesCount() const = 0;
 		virtual Device* getDevice(int index) = 0;
-
-		virtual Vec2 getCursorPosition() const = 0;
-		virtual void setCursorPosition(const Vec2& pos) = 0;
 };
 
 

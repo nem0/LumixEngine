@@ -118,9 +118,6 @@ void GameView::enableIngameCursor(bool enable)
 	if (!m_is_mouse_captured) return;
 
 	App::showCursor(m_is_ingame_cursor);
-	//SDL_SetRelativeMouseMode(m_is_ingame_cursor ? SDL_FALSE : SDL_TRUE);*/
-	ASSERT(false);
-	// TODO
 }
 
 
@@ -151,12 +148,16 @@ void GameView::captureMouse(bool capture)
 	m_is_mouse_captured = capture;
 	m_editor.getEngine().getInputSystem().enable(m_is_mouse_captured);
 	App::showCursor(!capture || m_is_ingame_cursor);
-	/*SDL_SetRelativeMouseMode(capture && !m_is_ingame_cursor ? SDL_TRUE : SDL_FALSE);
-	if (capture) SDL_GetMouseState(&m_captured_mouse_x, &m_captured_mouse_y);
-	else SDL_WarpMouseInWindow(nullptr, m_captured_mouse_x, m_captured_mouse_y);
-	if (!capture) PlatformInterface::unclipCursor();*/
-	ASSERT(false);
-	// TODO
+	
+	if (capture) {
+		const App::Point cp = App::getMousePos();
+		m_captured_mouse_x = cp.x;
+		m_captured_mouse_y = cp.y;
+	}
+	else {
+		PlatformInterface::unclipCursor();
+		App::setMousePos(m_captured_mouse_x, m_captured_mouse_y);
+	}
 }
 
 
@@ -278,96 +279,13 @@ void GameView::forceViewport(bool enable, int w, int h)
 
 void GameView::processInputEvents()
 {
-	ASSERT(false); // TODO
-	/*if (!m_is_mouse_captured) return;
+	if (!m_is_mouse_captured) return;
 	
 	InputSystem& input = m_editor.getEngine().getInputSystem();
-	const SDL_Event* events = m_studio_app.getEvents();
-	for (int i = 0, c = m_studio_app.getEventsCount(); i < c; ++i)
-	{
-		SDL_Event sdl_event = events[i];
-		switch (sdl_event.type)
-		{
-		case SDL_MOUSEBUTTONDOWN:
-		{
-			ImVec2 rel_mp = { (float)sdl_event.button.x, (float)sdl_event.button.y };
-			rel_mp.x -= m_pos.x;
-			rel_mp.y -= m_pos.y;
-			InputSystem::Event event;
-			event.type = InputSystem::Event::BUTTON;
-			event.device = input.getMouseDevice();
-			event.data.button.key_id = sdl_event.button.button;
-			event.data.button.state = InputSystem::ButtonEvent::DOWN;
-			event.data.button.x_abs = rel_mp.x;
-			event.data.button.y_abs = rel_mp.y;
-			input.injectEvent(event);
-		}
-		break;
-		case SDL_MOUSEBUTTONUP:
-		{
-			ImVec2 rel_mp = { (float)sdl_event.button.x, (float)sdl_event.button.y };
-			rel_mp.x -= m_pos.x;
-			rel_mp.y -= m_pos.y;
-			InputSystem::Event event;
-			event.type = InputSystem::Event::BUTTON;
-			event.device = input.getMouseDevice();
-			event.data.button.key_id = sdl_event.button.button;
-			event.data.button.state = InputSystem::ButtonEvent::UP;
-			event.data.button.x_abs = rel_mp.x;
-			event.data.button.y_abs = rel_mp.y;
-			input.injectEvent(event);
-		}
-		break;
-		case SDL_TEXTINPUT:
-		{
-			InputSystem::Event event;
-			event.type = InputSystem::Event::TEXT_INPUT;
-			event.device = input.getKeyboardDevice();
-			ASSERT(sizeof(event.data.text.text) >= sizeof(sdl_event.text.text));
-			copyMemory(event.data.text.text, sdl_event.text.text, sizeof(sdl_event.text.text));
-			input.injectEvent(event);
-		}
-		break;
-		case SDL_MOUSEMOTION:
-		{
-			ImVec2 rel_mp = { (float)sdl_event.motion.x, (float)sdl_event.motion.y };
-			rel_mp.x -= m_pos.x;
-			rel_mp.y -= m_pos.y;
-			InputSystem::Event event;
-			event.type = InputSystem::Event::AXIS;
-			event.device = input.getMouseDevice();
-			event.data.axis.x_abs = rel_mp.x;
-			event.data.axis.y_abs = rel_mp.y;
-			event.data.axis.x = (float)sdl_event.motion.xrel;
-			event.data.axis.y = (float)sdl_event.motion.yrel;
-			input.injectEvent(event);
-		}
-		break;
-		case SDL_KEYDOWN:
-		{
-			InputSystem::Event event;
-			event.type = InputSystem::Event::BUTTON;
-			event.device = input.getKeyboardDevice();
-			event.data.button.state = InputSystem::ButtonEvent::DOWN;
-			event.data.button.key_id = sdl_event.key.keysym.sym;
-			event.data.button.scancode = sdl_event.key.keysym.scancode;
-			input.injectEvent(event);
-		}
-		break;
-		case SDL_KEYUP:
-		{
-			InputSystem::Event event;
-			event.type = InputSystem::Event::BUTTON;
-			event.device = input.getKeyboardDevice();
-			event.data.button.state = InputSystem::ButtonEvent::UP;
-			event.data.button.key_id = sdl_event.key.keysym.sym;
-			event.data.button.scancode = sdl_event.key.keysym.scancode;
-			input.injectEvent(event);
-		}
-		break;
-		}
-	}*/
-	ASSERT(false); // TODO
+	const App::Event* events = m_studio_app.getEvents();
+	for (int i = 0, c = m_studio_app.getEventsCount(); i < c; ++i) {
+		input.injectEvent(events[i]);
+	}
 }
 
 

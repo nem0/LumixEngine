@@ -4,7 +4,6 @@
 #include "engine/iplugin.h"
 
 
-
 namespace Lumix
 {
 

@@ -389,23 +389,21 @@ void setWindow(App::WindowHandle window)
 
 void clipCursor(int x, int y, int w, int h)
 {
-	/*POINT min;
+	POINT min;
 	POINT max;
 	min.x = LONG(x);
 	min.y = LONG(y);
 	max.x = LONG(x + w);
 	max.y = LONG(y + h);
 
-	ClientToScreen(g_window, &min);
-	ClientToScreen(g_window, &max);
+	ClientToScreen((HWND)g_window, &min);
+	ClientToScreen((HWND)g_window, &max);
 	RECT rect;
 	rect.left = min.x;
 	rect.right = max.x;
 	rect.top = min.y;
 	rect.bottom = max.y;
-	ClipCursor(&rect);*/
-	ASSERT(false);
-	// TODO
+	ClipCursor(&rect);
 }
 
 

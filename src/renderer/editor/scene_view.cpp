@@ -374,8 +374,6 @@ void SceneView::captureMouse(bool capture)
 	if(m_is_mouse_captured == capture) return;
 	m_is_mouse_captured = capture;
 	App::showCursor(!m_is_mouse_captured);
-	// TODO
-	//SDL_SetRelativeMouseMode(capture ? SDL_TRUE : SDL_FALSE);
 	if (capture) {
 		const App::Point p = App::getMousePos();
 		m_captured_mouse_x = p.x;
@@ -621,18 +619,19 @@ void SceneView::onWindowGUI()
 			}
 			view_pos = content_min;
 
-			bool handle_input = ImGui::IsItemHovered();
-			if(handle_input) {
-				const App::Event* events = m_app.getEvents();
-				for (int i = 0, c = m_app.getEventsCount(); i < c; ++i) {
-					const App::Event& event = events[i];
-					switch (event.type) {
-						case App::Event::Type::MOUSE_BUTTON: {
+			const bool handle_input = ImGui::IsItemHovered();
+			const App::Event* events = m_app.getEvents();
+			for (int i = 0, c = m_app.getEventsCount(); i < c; ++i) {
+				const App::Event& event = events[i];
+				switch (event.type) {
+					case App::Event::Type::MOUSE_BUTTON: {
+						if (event.mouse_button.button == App::MouseButton::RIGHT) {
+							captureMouse(event.mouse_button.down);
+						}
+						if (handle_input) {
 							ImGui::ResetActiveID();
-							if (event.mouse_button.button == App::MouseButton::RIGHT) {
-								captureMouse(event.mouse_button.down);
-							}
-							Vec2 rel_mp = { (float)event.mouse_button.x, (float)event.mouse_button.y };
+							const App::Point cp = App::getMousePos(event.window);
+							Vec2 rel_mp = { (float)cp.x, (float)cp.y };
 							rel_mp.x -= m_screen_x;
 							rel_mp.y -= m_screen_y;
 							if (event.mouse_button.down) {
@@ -641,16 +640,18 @@ void SceneView::onWindowGUI()
 							else {
 								m_editor.onMouseUp((int)rel_mp.x, (int)rel_mp.y, event.mouse_button.button);
 							}
-							break;
 						}
-						case App::Event::Type::MOUSE_MOVE: {
-							Vec2 rel_mp = {(float)event.mouse_move.x, (float)event.mouse_move.y};
+						break;
+					}
+					case App::Event::Type::MOUSE_MOVE: 
+						if (handle_input) {
+							const App::Point cp = App::getMousePos(event.window);
+							Vec2 rel_mp = {(float)cp.x, (float)cp.y};
 							rel_mp.x -= m_screen_x;
 							rel_mp.y -= m_screen_y;
 							m_editor.onMouseMove((int)rel_mp.x, (int)rel_mp.y, (int)event.mouse_move.xrel, (int)event.mouse_move.yrel);
-							break;
 						}
-					}
+						break;
 				}
 			}
 		}

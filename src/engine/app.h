@@ -1,10 +1,13 @@
 #pragma once
 
 
+#include "lumix.h"
+
+
 namespace Lumix::App {
 
 
-enum class Keycode : unsigned char;
+enum class Keycode : u8;
 
 
 enum class MouseButton : int 
@@ -31,7 +34,6 @@ struct Rect
 
 
 using WindowHandle = void*;
-using Scancode = unsigned;
 constexpr WindowHandle INVALID_WINDOW = nullptr;
 
 
@@ -46,20 +48,22 @@ struct Event {
         WINDOW_CLOSE,
         WINDOW_SIZE,
         WINDOW_MOVE,
-        DROP_FILE
+        DROP_FILE,
+		FOCUS
     };
 
     Type type;
     WindowHandle window;
     union {
-        struct { unsigned utf32; } text_input;
+        struct { u32 utf32; } text_input;
         struct { int w, h; } win_size;
         struct { int x, y; } win_move;
-		struct { bool down; MouseButton button; int x, y; } mouse_button;
-		struct { int x, y, xrel, yrel; } mouse_move;
+		struct { bool down; MouseButton button; } mouse_button;
+		struct { int xrel, yrel; } mouse_move;
         struct { bool down; Keycode keycode; } key;
         struct { void* handle; } file_drop;
         struct { float amount; } mouse_wheel;
+		struct { bool gained; } focus;
     };
 };
 
@@ -68,6 +72,7 @@ struct InitWindowArgs
 {
     const char* name = ""; 
     bool handle_file_drops = false;
+	bool fullscreen = false;
 };
 
 
@@ -86,6 +91,7 @@ int getDropFileCount(const Event& event);
 void finishDrag(const Event& event);
 
 Point getMousePos();
+Point getMousePos(WindowHandle win);
 void setMousePos(int x, int y);
 void showCursor(bool show);
 
@@ -100,16 +106,15 @@ bool isMaximized(WindowHandle win);
 WindowHandle getFocused();
 
 bool isKeyDown(Keycode keycode);
-Scancode toScancode(Keycode keycode);
-Keycode toKeycode(Scancode scancode);
 void getKeyName(Keycode keycode, char* out, int size);
 int getDPI();
+void UTF32ToUTF8(u32 utf32, char* utf8);
 
 
 void run(Interface& iface);
 
 
-enum class Keycode : unsigned char
+enum class Keycode : u8
 {
 	LBUTTON = 0x01,
 	RBUTTON = 0x02,

@@ -173,6 +173,8 @@ public:
 		switch (event.type) {
 			case App::Event::Type::MOUSE_BUTTON: {
 				ImGuiIO& io = ImGui::GetIO();
+				m_editor->setToggleSelection(io.KeyCtrl);
+				m_editor->setSnapMode(io.KeyShift, io.KeyCtrl);
 				io.MouseDown[(int)event.mouse_button.button] = event.mouse_button.down;
 				break;
 			}
@@ -183,15 +185,10 @@ public:
 			}
 			case App::Event::Type::MOUSE_MOVE: {
 				ImGuiIO& io = ImGui::GetIO();
-				InputSystem& input_system = m_editor->getEngine().getInputSystem();
-				input_system.setCursorPosition({(float)event.mouse_move.x, (float)event.mouse_move.y});
+				const App::Point cp = App::getMousePos(event.window);
 				m_mouse_move += {(float)event.mouse_move.xrel, (float)event.mouse_move.yrel};
-				// TODO
-				//if (SDL_GetRelativeMouseMode() == SDL_FALSE)
-				{
-					io.MousePos.x = (float)event.mouse_move.x;
-					io.MousePos.y = (float)event.mouse_move.y;
-				}
+				io.MousePos.x = (float)cp.x;
+				io.MousePos.y = (float)cp.y;
 				break;
 			}
 			case App::Event::Type::WINDOW_SIZE:
@@ -204,63 +201,37 @@ public:
 			case App::Event::Type::QUIT:
 				exit();
 				break;
-				/*			case SDL_MOUSEBUTTONDOWN:
-								m_editor->setToggleSelection(io.KeyCtrl);
-								m_editor->setSnapMode(io.KeyShift, io.KeyCtrl);
-								switch (event.button.button)
-								{
-									case SDL_BUTTON_LEFT: io.MouseDown[0] = true; break;
-									case SDL_BUTTON_RIGHT: io.MouseDown[1] = true; break;
-									case SDL_BUTTON_MIDDLE: io.MouseDown[2] = true; break;
-								}
-								break;
-							case SDL_MOUSEBUTTONUP:
-								switch (event.button.button)
-								{
-									case SDL_BUTTON_LEFT: io.MouseDown[0] = false; break;
-									case SDL_BUTTON_RIGHT: io.MouseDown[1] = false; break;
-									case SDL_BUTTON_MIDDLE: io.MouseDown[2] = false; break;
-								}
-								break;
-							case SDL_MOUSEMOTION:
-							{
-								auto& input_system = m_editor->getEngine().getInputSystem();
-								input_system.setCursorPosition({(float)event.motion.x, (float)event.motion.y});
-								m_mouse_move += {(float)event.motion.xrel, (float)event.motion.yrel};
-								if (SDL_GetRelativeMouseMode() == SDL_FALSE)
-								{
-									io.MousePos.x = (float)event.motion.x;
-									io.MousePos.y = (float)event.motion.y;
-								}
-							}
-							break;
-							case SDL_TEXTINPUT: io.AddInputCharactersUTF8(event.text.text); break;
-							case SDL_KEYDOWN:
-							case SDL_KEYUP:
-							{
-								int scancode = event.key.keysym.scancode;
-								io.KeysDown[scancode] = (event.type == SDL_KEYDOWN);
-								if (event.key.keysym.scancode == SDL_SCANCODE_KP_ENTER)
-								{
-									io.KeysDown[SDLK_RETURN] = (event.type == SDL_KEYDOWN);
-								}
-								io.KeyShift = ((SDL_GetModState() & KMOD_SHIFT) != 0);
-								io.KeyCtrl = ((SDL_GetModState() & KMOD_CTRL) != 0);
-								io.KeyAlt = ((SDL_GetModState() & KMOD_ALT) != 0);
-								checkShortcuts();
-							}
-							break;
-							case SDL_DROPFILE:
-								for (GUIPlugin* plugin : m_gui_plugins)
-								{
-									if (plugin->onDropFile(event.drop.file)) break;
-								}
-								break;*/
+			case App::Event::Type::CHAR: {
+				ImGuiIO& io = ImGui::GetIO();
+				char utf8[5];
+				App::UTF32ToUTF8(event.text_input.utf32, utf8);
+				utf8[4] = 0;
+				io.AddInputCharactersUTF8(utf8);
+				break;
+			}
+			case App::Event::Type::KEY: {
+				ImGuiIO& io = ImGui::GetIO();
+				io.KeysDown[(int)event.key.keycode] = event.key.down;
+				io.KeyShift = App::isKeyDown(App::Keycode::SHIFT);
+				io.KeyCtrl = App::isKeyDown(App::Keycode::CTRL);
+				io.KeyAlt = App::isKeyDown(App::Keycode::MENU);
+				checkShortcuts();
+				break;
+			}
+			case App::Event::Type::DROP_FILE:
+				for(int i = 0, c = App::getDropFileCount(event); i < c; ++i) {
+					char tmp[MAX_PATH_LENGTH];
+					App::getDropFile(event, i, tmp, lengthOf(tmp));
+					for (GUIPlugin* plugin : m_gui_plugins) {
+						if (plugin->onDropFile(tmp)) break;
+					}
+				}
+				break;
 		}
 	}
 
 
-	void onIdle()
+	void onIdle() override
 	{
 		update();
 
@@ -300,12 +271,8 @@ public:
 		App::InitWindowArgs create_win_args;
 		create_win_args.handle_file_drops = false;
 		create_win_args.name = "Lumix Studio";
+		create_win_args.handle_file_drops = true;
 		m_window = App::createWindow(create_win_args);
-		/*SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
-		SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
-		SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 5);
-		m_window = SDL_CreateWindow("Lumix Studio", 0, 0, 800, 600, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN |
-		SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI); SDL_GL_CreateContext(m_window);*/
 		PlatformInterface::setWindow(m_window);
 		Engine::PlatformData platform_data = {};
 		platform_data.window_handle = m_window;
@@ -402,10 +369,6 @@ public:
 		m_editor = nullptr;
 		
 		App::destroyWindow(m_window);
-		/*
-		SDL_Quit();*/
-		ASSERT(false);
-		// TODO
 	}
 
 
@@ -629,11 +592,9 @@ public:
 		const App::Point size = App::getWindowClientSize(m_window);
 		io.DisplaySize = ImVec2(float(size.x), float(size.y));
 		io.DeltaTime = m_engine->getLastTimeDelta();
-		// TODO
-		/*io.KeyShift = ((SDL_GetModState() & KMOD_SHIFT) != 0);
-		io.KeyCtrl = ((SDL_GetModState() & KMOD_CTRL) != 0);
-		io.KeyAlt = ((SDL_GetModState() & KMOD_ALT) != 0);*/
-
+		io.KeyShift = App::isKeyDown(App::Keycode::SHIFT);
+		io.KeyCtrl = App::isKeyDown(App::Keycode::CTRL);
+		io.KeyAlt = App::isKeyDown(App::Keycode::MENU);
 		ImGui::NewFrame();
 		ImGui::PushFont(m_font);
 	}
@@ -838,11 +799,10 @@ public:
 
 	void setTitle(const char* title) const
 	{
-		/*char tmp[100];
+		char tmp[100];
 		copyString(tmp, "Lumix Studio - ");
 		catString(tmp, title);
-		SDL_SetWindowTitle(m_window, tmp);*/
-		ASSERT(false); // TODO
+		App::setWindowTitle(m_window, tmp);
 	}
 
 
@@ -2659,21 +2619,21 @@ public:
 
 	void checkShortcuts()
 	{
-		/*if (ImGui::IsAnyItemActive()) return;
+		if (ImGui::IsAnyItemActive()) return;
 		GUIPlugin* plugin = getFocusedPlugin();
+		u32 pressed_modifiers = 0;
+		if (App::isKeyDown(App::Keycode::SHIFT)) pressed_modifiers |= 1;
+		if (App::isKeyDown(App::Keycode::CTRL)) pressed_modifiers |= 2;
+		if (App::isKeyDown(App::Keycode::MENU)) pressed_modifiers |= 4;
 
-		int key_count;
-		auto* state = SDL_GetKeyboardState(&key_count);
-		u32 pressed_modifiers = SDL_GetModState() & (KMOD_CTRL | KMOD_ALT | KMOD_SHIFT);
-		for (auto* a : m_actions)
-		{
-			if (!a->is_global || a->shortcut[0] == -1) continue;
+		for (Action* a : m_actions) {
+			if (!a->is_global || a->shortcut[0] == App::Keycode::INVALID) continue;
 			if (a->plugin != plugin) continue;
 
 			u32 action_modifiers = 0;
 			for (int i = 0; i < lengthOf(a->shortcut) + 1; ++i)
 			{
-				if ((i == lengthOf(a->shortcut) || a->shortcut[i] == -1) &&
+				if ((i == lengthOf(a->shortcut) || a->shortcut[i] == App::Keycode::INVALID) &&
 					action_modifiers == pressed_modifiers)
 				{
 					a->func.invoke();
@@ -2681,21 +2641,14 @@ public:
 				}
 
 				if (i == lengthOf(a->shortcut)) break;
-				if (a->shortcut[i] == -1) break;
+				if (a->shortcut[i] == App::Keycode::INVALID) break;
 
-				SDL_Scancode scancode = SDL_GetScancodeFromKey(a->shortcut[i]);
-
-				if (scancode >= key_count) break;
-				if (!state[scancode]) break;
-				if (a->shortcut[i] == App::Keycode::LCTRL) action_modifiers |= KMOD_LCTRL;
-				else if (a->shortcut[i] == SDLK_LALT) action_modifiers |= KMOD_LALT;
-				else if (a->shortcut[i] == App::Keycode::LSHIFT) action_modifiers |= KMOD_LSHIFT;
-				else if (a->shortcut[i] == SDLK_RCTRL) action_modifiers |= KMOD_RCTRL;
-				else if (a->shortcut[i] == SDLK_RALT) action_modifiers |= KMOD_RALT;
-				else if (a->shortcut[i] == SDLK_RSHIFT) action_modifiers |= KMOD_RSHIFT;
+				if (!App::isKeyDown(a->shortcut[i])) break;
+				if (a->shortcut[i] == App::Keycode::CTRL) action_modifiers |= 2;
+				else if (a->shortcut[i] == App::Keycode::MENU) action_modifiers |= 4;
+				else if (a->shortcut[i] == App::Keycode::SHIFT) action_modifiers |= 1;
 			}
-		}*/
-		ASSERT(false); // TODO
+		}
 	}
 
 

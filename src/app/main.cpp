@@ -1,3 +1,4 @@
+#include "engine/app.h"
 #include "engine/blob.h"
 #include "engine/command_line_parser.h"
 #include "engine/crc32.h"
@@ -41,8 +42,7 @@ struct GUIInterface : GUISystem::Interface
 
 	void enableCursor(bool enable) override
 	{
-		SDL_ShowCursor(enable);
-		SDL_SetRelativeMouseMode(!enable ? SDL_TRUE : SDL_FALSE);
+		App::showCursor(enable);
 	}
 
 
@@ -51,16 +51,15 @@ struct GUIInterface : GUISystem::Interface
 };
 
 
-class App
+class Runner : public App::Interface
 {
 public:
-	App()
+	Runner()
 		: m_allocator(m_main_allocator)
 		, m_window_mode(false)
 		, m_universe(nullptr)
 		, m_exit_code(0)
 		, m_pipeline(nullptr)
-		, m_finished(false)
 	{
 		m_frame_timer = Timer::create(m_allocator);
 		ASSERT(!s_instance);
@@ -68,7 +67,7 @@ public:
 	}
 
 
-	~App()
+	~Runner()
 	{
 		Timer::destroy(m_frame_timer);
 		ASSERT(!m_universe);
@@ -78,17 +77,16 @@ public:
 
 	void onResize() const
 	{
-		int w, h;
-		SDL_GetWindowSize(m_window, &w, &h);
+		const App::Point p = App::getWindowClientSize(m_window);
 		// TODO
-		//m_pipeline->resize(w, h);
-		m_gui_interface->size.set((float)w, (float)h);
+		//m_pipeline->resize(p.x, p.y);
+		m_gui_interface->size.set((float)p.x, (float)p.y);
 		Renderer* renderer = (Renderer*)m_engine->getPluginManager().getPlugin("renderer");
-		renderer->resize(w, h);
+		renderer->resize(p.x, p.y);
 	}
 
 
-	void init()
+	void onInit() override
 	{
 		copyString(m_pipeline_path, "pipelines/main.pln");
 		m_pipeline_define = "APP";
@@ -122,9 +120,6 @@ public:
 			}
 		}
 
-		u32 flags = SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_OPENGL;
-		if (!m_window_mode) flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
-
 		g_log_info.getCallback().bind<outputToConsole>();
 		g_log_warning.getCallback().bind<outputToConsole>();
 		g_log_error.getCallback().bind<outputToConsole>();
@@ -152,24 +147,15 @@ public:
 
 		m_engine = Engine::create(current_dir, m_file_system, m_allocator);
 		ffr::preinit(m_allocator);
-		SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
-		SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
-		SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 5);
-		m_window = SDL_CreateWindow("Lumix App", 0, 0, 600, 400, flags);
-		SDL_GL_CreateContext(m_window);
-		if (!m_window_mode) SDL_SetWindowFullscreen(m_window, SDL_WINDOW_FULLSCREEN_DESKTOP);
-		SDL_SysWMinfo window_info;
-		SDL_VERSION(&window_info.version);
-		SDL_GetWindowWMInfo(m_window, &window_info);
+		
+		App::InitWindowArgs create_win_args = {};
+		create_win_args.fullscreen = !m_window_mode;
+		create_win_args.handle_file_drops = false;
+		create_win_args.name = "Lumix App";
+		m_window = App::createWindow(create_win_args);
+
 		Engine::PlatformData platform_data = {};
-		#ifdef _WIN32
-			platform_data.window_handle = window_info.info.win.window;
-		#elif defined(__linux__)
-			platform_data.window_handle = (void*)(uintptr_t)window_info.info.x11.window;
-			platform_data.display = window_info.info.x11.display;
-		#else
-			#error PLATFORM_NOT_SUPPORTED
-		#endif
+		platform_data.window_handle = m_window;
 		m_engine->setPlatformData(platform_data);
 
 		#ifdef LUMIXENGINE_PLUGINS
@@ -205,8 +191,7 @@ public:
 
 		gui_system->setInterface(m_gui_interface);
 		
-		SDL_ShowCursor(false);
-		SDL_SetRelativeMouseMode(SDL_TRUE);
+		App::showCursor(false);
 		onResize();
 
 		if (!runStartupScript())
@@ -238,15 +223,13 @@ public:
 
 		#define REGISTER_FUNCTION(F) \
 			do { \
-				auto* f = &LuaWrapper::wrapMethodClosure<App, decltype(&App::F), &App::F>; \
+				auto* f = &LuaWrapper::wrapMethodClosure<Runner, decltype(&Runner::F), &Runner::F>; \
 				LuaWrapper::createSystemClosure(L, "App", this, #F, f); \
 			} while(false) \
 
 		REGISTER_FUNCTION(loadUniverse);
 		REGISTER_FUNCTION(setUniverse);
-		REGISTER_FUNCTION(frame);
 		REGISTER_FUNCTION(exit);
-		REGISTER_FUNCTION(isFinished);
 
 		#undef REGISTER_FUNCTION
 
@@ -310,7 +293,7 @@ public:
 		copyString(m_universe_path, path);
 		auto& fs = m_engine->getFileSystem();
 		FS::ReadCallback file_read_cb;
-		file_read_cb.bind<App, &App::universeFileLoaded>(this);
+		file_read_cb.bind<Runner, &Runner::universeFileLoaded>(this);
 		fs.openAsync(fs.getDefaultDevice(), Path(m_universe_path), FS::Mode::OPEN_AND_READ, file_read_cb);
 	}
 
@@ -337,105 +320,24 @@ public:
 	int getExitCode() const { return m_exit_code; }
 
 
-	void handleEvents()
+	void onEvent(const App::Event& event) override
 	{
-		SDL_Event event;
 		InputSystem& input = m_engine->getInputSystem();
-		while (SDL_PollEvent(&event))
-		{
-			switch (event.type)
-			{
-			case SDL_MOUSEBUTTONDOWN:
-				{
-					Vec2 rel_mp = {(float)event.button.x, (float)event.button.y};
-					InputSystem::Event input_event;
-					input_event.type = InputSystem::Event::BUTTON;
-					input_event.device = input.getMouseDevice();
-					input_event.data.button.key_id = event.button.button;
-					input_event.data.button.state = InputSystem::ButtonEvent::DOWN;
-					input_event.data.button.x_abs = rel_mp.x;
-					input_event.data.button.y_abs = rel_mp.y;
-					input.injectEvent(input_event);
-				}
+		input.injectEvent(event);
+		switch (event.type) {
+			case App::Event::Type::QUIT:
+			case App::Event::Type::WINDOW_CLOSE: 
+				App::quit();
 				break;
-			case SDL_MOUSEBUTTONUP:
-				{
-					Vec2 rel_mp = { (float)event.button.x, (float)event.button.y };
-					InputSystem::Event input_event;
-					input_event.type = InputSystem::Event::BUTTON;
-					input_event.device = input.getMouseDevice();
-					input_event.data.button.key_id = event.button.button;
-					input_event.data.button.state = InputSystem::ButtonEvent::UP;
-					input_event.data.button.x_abs = rel_mp.x;
-					input_event.data.button.y_abs = rel_mp.y;
-					input.injectEvent(input_event);
-				}
+			case App::Event::Type::WINDOW_MOVE:
+			case App::Event::Type::WINDOW_SIZE:
+				onResize();
 				break;
-			case SDL_MOUSEMOTION:
-				{
-					Vec2 rel_mp = { (float)event.motion.x, (float)event.motion.y };
-					InputSystem::Event input_event;
-					input_event.type = InputSystem::Event::AXIS;
-					input_event.device = input.getMouseDevice();
-					input_event.data.axis.x_abs = rel_mp.x;
-					input_event.data.axis.y_abs = rel_mp.y;
-					input_event.data.axis.x = (float)event.motion.xrel;
-					input_event.data.axis.y = (float)event.motion.yrel;
-					input.injectEvent(input_event);
-				}
+			case App::Event::Type::FOCUS: 
+				m_engine->getInputSystem().enable(event.focus.gained); 
 				break;
-			case SDL_KEYDOWN:
-				{
-					InputSystem::Event input_event;
-					input_event.type = InputSystem::Event::BUTTON;
-					input_event.device = input.getKeyboardDevice();
-					input_event.data.button.state = InputSystem::ButtonEvent::DOWN;
-					input_event.data.button.key_id = event.key.keysym.sym;
-					input_event.data.button.scancode = event.key.keysym.scancode;
-					input.injectEvent(input_event);
-				}
-				break;
-			case SDL_TEXTINPUT:
-				{
-					InputSystem::Event input_event;
-					input_event.type = InputSystem::Event::TEXT_INPUT;
-					input_event.device = input.getKeyboardDevice();
-					ASSERT(sizeof(input_event.data.text.text) >= sizeof(event.text.text));
-					copyMemory(input_event.data.text.text, event.text.text, sizeof(event.text.text));
-					input.injectEvent(input_event);
-				}
-				break;
-			case SDL_KEYUP:
-				{
-					InputSystem::Event input_event;
-					input_event.type = InputSystem::Event::BUTTON;
-					input_event.device = input.getKeyboardDevice();
-					input_event.data.button.state = InputSystem::ButtonEvent::UP;
-					input_event.data.button.key_id = event.key.keysym.sym;
-					input_event.data.button.scancode = event.key.keysym.scancode;
-					input.injectEvent(input_event);
-				}
-				break;
-			case SDL_WINDOWEVENT:
-				switch (event.window.event)
-				{
-				case SDL_WINDOWEVENT_CLOSE:
-					m_finished = true;
-					break;
-				case SDL_WINDOWEVENT_RESIZED:
-				case SDL_WINDOWEVENT_SIZE_CHANGED:
-				case SDL_WINDOWEVENT_MOVED:
-					onResize();
-					break;
-				}
-				break;
-			case SDL_QUIT: m_finished = true; break;
-			case SDL_WINDOWEVENT_FOCUS_GAINED: m_engine->getInputSystem().enable(true); break;
-			case SDL_WINDOWEVENT_FOCUS_LOST: m_engine->getInputSystem().enable(false); break;
-			}
 		}
 	}
-
 
 
 	static void outputToVS(const char* system, const char* message)
@@ -460,15 +362,12 @@ public:
 
 	void exit(int exit_code)
 	{
-		m_finished = true;
 		m_exit_code = exit_code;
+		App::quit();
 	}
 
 
-	bool isFinished() const { return m_finished; }
-
-
-	void frame()
+	void onIdle() override
 	{
 		float frame_time = m_frame_timer->tick();
 		m_engine->update(*m_universe);
@@ -476,20 +375,9 @@ public:
 		auto* renderer = m_engine->getPluginManager().getPlugin("renderer");
 		static_cast<Renderer*>(renderer)->frame();
 		m_engine->getFileSystem().updateAsyncTransactions();
-		if (frame_time < 1 / 60.0f)
-		{
+		if (frame_time < 1 / 60.0f) {
 			PROFILE_BLOCK("sleep");
 			MT::sleep(u32(1000 / 60.0f - frame_time * 1000));
-		}
-		handleEvents();
-	}
-
-
-	void run()
-	{
-		while (!m_finished)
-		{
-			frame();
 		}
 	}
 
@@ -507,19 +395,18 @@ private:
 	FS::PackFileDevice* m_pack_file_device;
 	Timer* m_frame_timer;
 	GUIInterface* m_gui_interface;
-	bool m_finished;
 	bool m_window_mode;
 	int m_exit_code;
 	char m_startup_script_path[MAX_PATH_LENGTH];
 	char m_pipeline_path[MAX_PATH_LENGTH];
 	StaticString<64> m_pipeline_define;
-	SDL_Window* m_window;
+	App::WindowHandle m_window;
 
-	static App* s_instance;
+	static Runner* s_instance;
 };
 
 
-App* App::s_instance = nullptr;
+Runner* Runner::s_instance = nullptr;
 
 
 }
@@ -530,9 +417,8 @@ INT WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, INT)
 int main(int args, char* argv[])
 #endif
 {
-	Lumix::App app;
-	app.init();
-	app.run();
+	Lumix::Runner app;
+	Lumix::App::run(app);
 	app.shutdown();
 	return app.getExitCode();
 }

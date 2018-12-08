@@ -1569,8 +1569,6 @@ namespace Lumix
 				case InputSystem::Event::BUTTON:
 					LuaWrapper::push(L, (u32)event.data.button.state); // [lua_event, button.state]
 					lua_setfield(L, -2, "state"); // [lua_event]
-					LuaWrapper::push(L, event.data.button.scancode); // [lua_event, button.scancode]
-					lua_setfield(L, -2, "scancode"); // [lua_event]
 					LuaWrapper::push(L, event.data.button.key_id); // [lua_event, button.x_abs]
 					lua_setfield(L, -2, "key_id"); // [lua_event]
 					LuaWrapper::push(L, event.data.button.x_abs); // [lua_event, button.x_abs]
@@ -1589,7 +1587,7 @@ namespace Lumix
 					lua_setfield(L, -2, "y_abs"); // [lua_event]
 					break;
 				case InputSystem::Event::TEXT_INPUT:
-					LuaWrapper::push(L, event.data.text.text); // [lua_event, axis.x]
+					LuaWrapper::push(L, event.data.text.utf32); // [lua_event, utf32]
 					lua_setfield(L, -2, "text"); // [lua_event]
 					break;
 				default:
