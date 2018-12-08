@@ -860,7 +860,7 @@ struct GizmoImpl final : public Gizmo
 	{
 		if (m_active >= 0) return false;
 		if (m_transform_axis == Axis::NONE) return false;
-		if (m_editor.isMouseClick(MouseButton::LEFT))
+		if (m_editor.isMouseClick(App::MouseButton::LEFT))
 		{
 			m_is_dragging = true;
 			m_transform_point = getMousePlaneIntersection(m_editor.getMousePos(), frame.getRigidPart(), m_transform_axis);
@@ -1073,7 +1073,7 @@ struct GizmoImpl final : public Gizmo
 
 	void transform()
 	{
-		if (m_active >= 0 && m_editor.isMouseClick(MouseButton::LEFT))
+		if (m_active >= 0 && m_editor.isMouseClick(App::MouseButton::LEFT))
 		{
 			const RigidTransform gizmo_tr = getTransform(m_entities[m_active]);
 			m_transform_point = getMousePlaneIntersection(m_editor.getMousePos(), gizmo_tr, m_transform_axis);
@@ -1083,7 +1083,7 @@ struct GizmoImpl final : public Gizmo
 			m_angle_accum = 0;
 			m_is_dragging = true;
 		}
-		else if (!m_editor.isMouseDown(MouseButton::LEFT))
+		else if (!m_editor.isMouseDown(App::MouseButton::LEFT))
 		{
 			m_is_dragging = false;
 		}

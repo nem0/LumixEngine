@@ -21,7 +21,6 @@
 #include "renderer/render_scene.h"
 #include "renderer/renderer.h"
 #include "renderer/texture.h"
-#include <SDL.h>
 
 
 namespace Lumix
@@ -118,8 +117,10 @@ void GameView::enableIngameCursor(bool enable)
 	m_is_ingame_cursor = enable;
 	if (!m_is_mouse_captured) return;
 
-	SDL_ShowCursor(m_is_ingame_cursor ? 1 : 0);
-	SDL_SetRelativeMouseMode(m_is_ingame_cursor ? SDL_FALSE : SDL_TRUE);
+	App::showCursor(m_is_ingame_cursor);
+	//SDL_SetRelativeMouseMode(m_is_ingame_cursor ? SDL_FALSE : SDL_TRUE);*/
+	ASSERT(false);
+	// TODO
 }
 
 
@@ -149,11 +150,13 @@ void GameView::captureMouse(bool capture)
 
 	m_is_mouse_captured = capture;
 	m_editor.getEngine().getInputSystem().enable(m_is_mouse_captured);
-	SDL_ShowCursor(capture && !m_is_ingame_cursor ? 0 : 1);
-	SDL_SetRelativeMouseMode(capture && !m_is_ingame_cursor ? SDL_TRUE : SDL_FALSE);
+	App::showCursor(!capture || m_is_ingame_cursor);
+	/*SDL_SetRelativeMouseMode(capture && !m_is_ingame_cursor ? SDL_TRUE : SDL_FALSE);
 	if (capture) SDL_GetMouseState(&m_captured_mouse_x, &m_captured_mouse_y);
 	else SDL_WarpMouseInWindow(nullptr, m_captured_mouse_x, m_captured_mouse_y);
-	if (!capture) PlatformInterface::unclipCursor();
+	if (!capture) PlatformInterface::unclipCursor();*/
+	ASSERT(false);
+	// TODO
 }
 
 
@@ -275,7 +278,8 @@ void GameView::forceViewport(bool enable, int w, int h)
 
 void GameView::processInputEvents()
 {
-	if (!m_is_mouse_captured) return;
+	ASSERT(false); // TODO
+	/*if (!m_is_mouse_captured) return;
 	
 	InputSystem& input = m_editor.getEngine().getInputSystem();
 	const SDL_Event* events = m_studio_app.getEvents();
@@ -362,7 +366,8 @@ void GameView::processInputEvents()
 		}
 		break;
 		}
-	}
+	}*/
+	ASSERT(false); // TODO
 }
 
 
@@ -373,7 +378,7 @@ void GameView::onWindowGUI()
 
 	auto& io = ImGui::GetIO();
 
-	bool is_focus = (SDL_GetWindowFlags(m_studio_app.getWindow()) & SDL_WINDOW_INPUT_FOCUS) != 0;
+	bool is_focus = App::getFocused() == m_studio_app.getWindow();
 	if (m_is_mouse_captured &&
 		(io.KeysDown[ImGui::GetKeyIndex(ImGuiKey_Escape)] || !m_editor.isGameMode() || !is_focus))
 	{

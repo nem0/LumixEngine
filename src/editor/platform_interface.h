@@ -2,10 +2,8 @@
 
 
 #include "engine/lumix.h"
+#include "engine/app.h"
 #include "engine/engine.h"
-
-
-struct SDL_Window;
 
 
 namespace Lumix
@@ -45,7 +43,7 @@ namespace PlatformInterface
 	LUMIX_EDITOR_API u64 getLastModified(const char* file);
 	LUMIX_EDITOR_API bool makePath(const char* path);
 
-	LUMIX_EDITOR_API void setWindow(SDL_Window* window);
+	LUMIX_EDITOR_API void setWindow(App::WindowHandle window);
 	LUMIX_EDITOR_API void clipCursor(int x, int y, int w, int h);
 	LUMIX_EDITOR_API void unclipCursor();
 

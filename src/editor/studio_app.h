@@ -2,10 +2,10 @@
 
 
 #include "engine/lumix.h"
+#include "engine/app.h"
 #include "engine/array.h"
 
 
-union SDL_Event;
 struct ImFont;
 
 #ifdef STATIC_PLUGINS
@@ -19,17 +19,10 @@ struct ImFont;
 #endif
 
 
-struct SDL_Window;
-
-
 namespace Lumix
 {
 
-
-namespace Reflection
-{
-struct  PropertyBase;
-}
+namespace Reflection { struct  PropertyBase; }
 
 
 struct Action;
@@ -39,7 +32,7 @@ struct Vec2;
 class WorldEditor;
 
 
-class LUMIX_EDITOR_API StudioApp
+class LUMIX_EDITOR_API StudioApp : public App::Interface
 {
 public:
 	struct IPlugin
@@ -121,12 +114,12 @@ public:
 	virtual void removeAction(Action* action) = 0;
 	virtual void addWindowAction(Action* action) = 0;
 	virtual Action* getAction(const char* name) = 0;
-	virtual SDL_Window* getWindow() = 0;
+	virtual void* getWindow() = 0;
 	virtual void setFullscreen(bool fullscreen) = 0;
 	virtual bool makeFile(const char* path, const char* content) = 0;
 	virtual Vec2 getMouseMove() const = 0;
 
-	virtual const SDL_Event* getEvents() const = 0;
+	virtual const App::Event* getEvents() const = 0;
 	virtual int getEventsCount() const = 0;
 	virtual ~StudioApp() {}
 	virtual void run() = 0;

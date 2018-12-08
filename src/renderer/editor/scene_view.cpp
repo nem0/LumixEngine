@@ -29,7 +29,6 @@
 #include "renderer/render_scene.h"
 #include "renderer/renderer.h"
 #include "renderer/shader.h"
-#include <SDL.h>
 
 
 namespace Lumix
@@ -374,10 +373,17 @@ void SceneView::captureMouse(bool capture)
 {
 	if(m_is_mouse_captured == capture) return;
 	m_is_mouse_captured = capture;
-	SDL_ShowCursor(m_is_mouse_captured ? 0 : 1);
-	SDL_SetRelativeMouseMode(capture ? SDL_TRUE : SDL_FALSE);
-	if (capture) SDL_GetMouseState(&m_captured_mouse_x, &m_captured_mouse_y);
-	else SDL_WarpMouseInWindow(nullptr, m_captured_mouse_x, m_captured_mouse_y);
+	App::showCursor(!m_is_mouse_captured);
+	// TODO
+	//SDL_SetRelativeMouseMode(capture ? SDL_TRUE : SDL_FALSE);
+	if (capture) {
+		const App::Point p = App::getMousePos();
+		m_captured_mouse_x = p.x;
+		m_captured_mouse_y = p.y;
+	}
+	else {
+		App::setMousePos(m_captured_mouse_x, m_captured_mouse_y);
+	}
 }
 
 
@@ -616,41 +622,34 @@ void SceneView::onWindowGUI()
 			view_pos = content_min;
 
 			bool handle_input = ImGui::IsItemHovered();
-			if(handle_input)
-			{
-				const SDL_Event* events = m_app.getEvents();
-				for (int i = 0, c = m_app.getEventsCount(); i < c; ++i)
-				{
-					SDL_Event event = events[i];
-					switch (event.type)
-					{
-						case SDL_MOUSEBUTTONDOWN:
-							{
-								ImGui::ResetActiveID();
-								if (event.button.button == SDL_BUTTON_RIGHT) captureMouse(true);
-								Vec2 rel_mp = { (float)event.button.x, (float)event.button.y };
-								rel_mp.x -= m_screen_x;
-								rel_mp.y -= m_screen_y;
-								m_editor.onMouseDown((int)rel_mp.x, (int)rel_mp.y, (MouseButton::Value)event.button.button);
+			if(handle_input) {
+				const App::Event* events = m_app.getEvents();
+				for (int i = 0, c = m_app.getEventsCount(); i < c; ++i) {
+					const App::Event& event = events[i];
+					switch (event.type) {
+						case App::Event::Type::MOUSE_BUTTON: {
+							ImGui::ResetActiveID();
+							if (event.mouse_button.button == App::MouseButton::RIGHT) {
+								captureMouse(event.mouse_button.down);
+							}
+							Vec2 rel_mp = { (float)event.mouse_button.x, (float)event.mouse_button.y };
+							rel_mp.x -= m_screen_x;
+							rel_mp.y -= m_screen_y;
+							if (event.mouse_button.down) {
+								m_editor.onMouseDown((int)rel_mp.x, (int)rel_mp.y, event.mouse_button.button);
+							}
+							else {
+								m_editor.onMouseUp((int)rel_mp.x, (int)rel_mp.y, event.mouse_button.button);
 							}
 							break;
-						case SDL_MOUSEBUTTONUP:
-							{
-								if (event.button.button == SDL_BUTTON_RIGHT) captureMouse(false);
-								Vec2 rel_mp = { (float)event.button.x, (float)event.button.y };
-								rel_mp.x -= m_screen_x;
-								rel_mp.y -= m_screen_y;
-								m_editor.onMouseUp((int)rel_mp.x, (int)rel_mp.y, (MouseButton::Value)event.button.button);
-							}
+						}
+						case App::Event::Type::MOUSE_MOVE: {
+							Vec2 rel_mp = {(float)event.mouse_move.x, (float)event.mouse_move.y};
+							rel_mp.x -= m_screen_x;
+							rel_mp.y -= m_screen_y;
+							m_editor.onMouseMove((int)rel_mp.x, (int)rel_mp.y, (int)event.mouse_move.xrel, (int)event.mouse_move.yrel);
 							break;
-						case SDL_MOUSEMOTION:
-							{
-								Vec2 rel_mp = {(float)event.motion.x, (float)event.motion.y};
-								rel_mp.x -= m_screen_x;
-								rel_mp.y -= m_screen_y;
-								m_editor.onMouseMove((int)rel_mp.x, (int)rel_mp.y, (int)event.motion.xrel, (int)event.motion.yrel);
-							}
-							break;
+						}
 					}
 				}
 			}

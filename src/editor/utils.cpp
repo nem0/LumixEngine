@@ -7,7 +7,6 @@
 #include "editor/world_editor.h"
 #include "imgui/imgui.h"
 #include "engine/universe/universe.h"
-#include <SDL.h>
 
 
 namespace Lumix
@@ -25,7 +24,7 @@ Action::Action(const char* label_short, const char* label_long, const char* name
 	this->label_short = label_short;
 	this->label_long = label_long;
 	this->name = name;
-	shortcut[0] = shortcut[1] = shortcut[2] = -1;
+	shortcut[0] = shortcut[1] = shortcut[2] = App::Keycode::INVALID;
 	is_selected.bind<falseConst>();
 }
 
@@ -33,9 +32,9 @@ Action::Action(const char* label_short, const char* label_long, const char* name
 Action::Action(const char* label_short,
 	const char* label_long,
 	const char* name,
-	int shortcut0,
-	int shortcut1,
-	int shortcut2)
+	App::Keycode shortcut0,
+	App::Keycode shortcut1,
+	App::Keycode shortcut2)
 	: label_long(label_long)
 	, label_short(label_short)
 	, name(name)
@@ -94,16 +93,16 @@ bool Action::isRequested()
 
 	bool* keys_down = ImGui::GetIO().KeysDown;
 	float* keys_down_duration = ImGui::GetIO().KeysDownDuration;
-	if (shortcut[0] == -1) return false;
+	if (shortcut[0] == App::Keycode::INVALID) return false;
 
 	for (int i = 0; i < lengthOf(shortcut) + 1; ++i)
 	{
-		if (i == lengthOf(shortcut) || shortcut[i] == -1)
+		if (i == lengthOf(shortcut) || shortcut[i] == App::Keycode::INVALID)
 		{
 			return true;
 		}
 
-		if (!keys_down[shortcut[i]] || keys_down_duration[shortcut[i]] > 0) return false;
+		if (!keys_down[(int)shortcut[i]] || keys_down_duration[(int)shortcut[i]] > 0) return false;
 	}
 	return false;
 }
@@ -113,20 +112,13 @@ bool Action::isRequested()
 bool Action::isActive()
 {
 	if (ImGui::IsAnyItemFocused()) return false;
-	if (shortcut[0] == -1) return false;
+	if (shortcut[0] == App::Keycode::INVALID) return false;
 
-	int key_count;
-	auto* state = SDL_GetKeyboardState(&key_count);
-
-	for (int i = 0; i < lengthOf(shortcut) + 1; ++i)
-	{
-		if (i == lengthOf(shortcut) || shortcut[i] == -1)
-		{
+	for (int i = 0; i < lengthOf(shortcut) + 1; ++i) {
+		if (i == lengthOf(shortcut) || shortcut[i] == App::Keycode::INVALID) {
 			return true;
 		}
-		SDL_Scancode scancode = SDL_GetScancodeFromKey(shortcut[i]);
-
-		if (scancode >= key_count || !state[scancode]) return false;
+		if (!App::isKeyDown(shortcut[i])) return false;
 	}
 	return false;
 }

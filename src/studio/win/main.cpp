@@ -3,18 +3,20 @@
 #include <ShellScalingAPI.h>
 #include "editor/studio_app.h"
 
+
 INT WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, INT)
 {
+
 	SetProcessDPIAware();
 	HMODULE shcore = LoadLibrary("shcore.dll");
-	if (shcore)
-	{
+	if (shcore) {
 		auto setter = (decltype(&SetProcessDpiAwareness))GetProcAddress(shcore, "SetProcessDpiAwareness");
 		if (setter) setter(PROCESS_PER_MONITOR_DPI_AWARE);
 	}
 
 	auto* app = Lumix::StudioApp::create();
-	app->run();
+	Lumix::App::run(*app);
+	//app->run();
 	int exit_code = app->getExitCode();
 	Lumix::StudioApp::destroy(*app);
 	if(shcore) FreeLibrary(shcore);

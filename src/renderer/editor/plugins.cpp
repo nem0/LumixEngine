@@ -47,7 +47,6 @@
 #include "stb/stb_image.h"
 #include "stb/stb_image_resize.h"
 #include "terrain_editor.h"
-#include <SDL.h>
 #include <cmath>
 #include <cmft/clcontext.h>
 #include <cmft/cubemapfilter.h>
@@ -656,9 +655,11 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		if (m_is_mouse_captured && !mouse_down)
 		{
 			m_is_mouse_captured = false;
-			SDL_ShowCursor(1);
-			SDL_SetRelativeMouseMode(SDL_FALSE);
-			SDL_WarpMouseInWindow(nullptr, m_captured_mouse_x, m_captured_mouse_y);
+			App::showCursor(true);
+			/*SDL_SetRelativeMouseMode(SDL_FALSE);
+			SDL_WarpMouseInWindow(nullptr, m_captured_mouse_x, m_captured_mouse_y);*/
+			ASSERT(false);
+			// TODO
 		}
 
 		if (ImGui::GetIO().MouseClicked[1] && ImGui::IsItemHovered()) ImGui::OpenPopup("PreviewPopup");
@@ -683,9 +684,11 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			if (!m_is_mouse_captured)
 			{
 				m_is_mouse_captured = true;
-				SDL_ShowCursor(0);
-				SDL_SetRelativeMouseMode(SDL_TRUE);
-				SDL_GetMouseState(&m_captured_mouse_x, &m_captured_mouse_y);
+				App::showCursor(false);
+				/*SDL_SetRelativeMouseMode(SDL_TRUE);
+				SDL_GetMouseState(&m_captured_mouse_x, &m_captured_mouse_y);*/
+				// TODO
+				ASSERT(false);
 			}
 
 			if (delta.x != 0 || delta.y != 0)
@@ -2566,11 +2569,10 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 		PluginManager& plugin_manager = m_engine.getPluginManager();
 		Renderer* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
 
-		int w, h;
-		SDL_GetWindowSize(m_app.getWindow(), &w, &h);
-		m_width = w;
-		m_height = h;
-		renderer->resize(w, h);
+		const App::Point size = App::getWindowClientSize(m_app.getWindow());
+		m_width = size.x;
+		m_height = size.y;
+		renderer->resize(m_width, m_height);
 
 		unsigned char* pixels;
 		int width, height;
@@ -2614,11 +2616,10 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 	{
 		const ImDrawData* draw_data = ImGui::GetDrawData();
 
-		int w, h;
-		SDL_GetWindowSize(m_app.getWindow(), &w, &h);
-		if (w != m_width || h != m_height) {
-			m_width = w;
-			m_height = h;
+		const App::Point size = App::getWindowClientSize(m_app.getWindow());
+		if (size.x != m_width || size.y != m_height) {
+			m_width = size.x;
+			m_height = size.y;
 			auto& plugin_manager = m_app.getWorldEditor().getEngine().getPluginManager();
 			auto* renderer = static_cast<Renderer*>(plugin_manager.getPlugin("renderer"));
 			if (renderer) renderer->resize(m_width, m_height);

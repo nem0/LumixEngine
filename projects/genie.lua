@@ -513,7 +513,7 @@ solution "LumixEngine"
 		"NoRTTI", 
 		"NoEditAndContinue"
 	}
-	includedirs {"../src", "../external", "../external/SDL/include" }
+	includedirs {"../src", "../external" }
 	location(LOCATION)
 	language "C++"
 	startproject "studio"
@@ -789,7 +789,6 @@ if build_app then
 		
 		configuration {}
 		
-		linkLib "SDL"
 		configuration {"vs*"}
 			links { "winmm", "imm32", "version" }
 		configuration {}
@@ -836,7 +835,6 @@ if build_studio then
 		configuration {}
 
 		if not _OPTIONS["static-plugins"] then	
-			linkLib "SDL"
 			configuration {"vs*"}
 				links { "winmm", "imm32", "version" }
 			configuration {}
@@ -909,8 +907,6 @@ if build_studio then
 			callback()
 		end
 		
-		linkLib "SDL"
-
 		configuration {"vs*"}
 			links { "winmm", "imm32", "version" }
 		configuration {}
