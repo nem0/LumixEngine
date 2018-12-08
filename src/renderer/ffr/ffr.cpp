@@ -1922,7 +1922,7 @@ static void gl_debug_callback(GLenum source, GLenum type, GLuint id, GLenum seve
 		g_log_error.log("GL") << message;
 	}
 	else {
-		g_log_info.log("GL") << message;
+		//g_log_info.log("GL") << message;
 	}
 }
 

@@ -1,6 +1,7 @@
 #include "gui_scene.h"
 #include "gui_system.h"
 #include "sprite_manager.h"
+#include "engine/app.h"
 #include "engine/engine.h"
 #include "engine/flag_set.h"
 #include "engine/iallocator.h"
@@ -17,7 +18,8 @@
 #include "renderer/renderer.h"
 #include "renderer/render_scene.h"
 #include "renderer/texture.h"
-#include <SDL.h>
+#include <cmath>
+
 
 namespace Lumix
 {
@@ -925,10 +927,12 @@ struct GUISceneImpl final : public GUIScene
 
 	void handleTextInput(const InputSystem::Event& event)
 	{
-		const GUIRect* rect = getInput(m_focused_entity);
+		/*const GUIRect* rect = getInput(m_focused_entity);
 		if (!rect) return;
 		rect->text->text.insert(rect->input_field->cursor, event.data.text.text);
-		rect->input_field->cursor += stringLength(event.data.text.text);
+		rect->input_field->cursor += stringLength(event.data.text.text);*/
+		// TODO
+		ASSERT(false);
 	}
 
 
@@ -940,27 +944,27 @@ struct GUISceneImpl final : public GUIScene
 
 		rect->input_field->anim = 0;
 
-		switch (event.data.button.key_id)
+		switch ((App::Keycode)event.data.button.key_id)
 		{
-			case SDLK_HOME: rect->input_field->cursor = 0; break;
-			case SDLK_END: rect->input_field->cursor = rect->text->text.length(); break;
-			case SDLK_BACKSPACE:
+		case App::Keycode::HOME: rect->input_field->cursor = 0; break;
+			case App::Keycode::END: rect->input_field->cursor = rect->text->text.length(); break;
+			case App::Keycode::BACKSPACE:
 				if (rect->text->text.length() > 0 && rect->input_field->cursor > 0)
 				{
 					rect->text->text.eraseAt(rect->input_field->cursor - 1);
 					--rect->input_field->cursor;
 				}
 				break;
-			case SDLK_DELETE:
+			case App::Keycode::DEL:
 				if (rect->input_field->cursor < rect->text->text.length())
 				{
 					rect->text->text.eraseAt(rect->input_field->cursor);
 				}
 				break;
-			case SDLK_LEFT:
+			case App::Keycode::LEFT:
 				if (rect->input_field->cursor > 0) --rect->input_field->cursor;
 				break;
-			case SDLK_RIGHT:
+			case App::Keycode::RIGHT:
 				if (rect->input_field->cursor < rect->text->text.length()) ++rect->input_field->cursor;
 				break;
 		}

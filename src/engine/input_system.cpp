@@ -102,6 +102,54 @@ struct InputSystemImpl final : public InputSystem
 		ControllerDevice::frame(dt);
 	}
 
+
+	void injectEvent(const App::Event& event) override
+	{
+		switch (event.type) {
+			case App::Event::Type::MOUSE_BUTTON: {
+				InputSystem::Event input_event;
+				input_event.type = InputSystem::Event::BUTTON;
+				input_event.device = getMouseDevice();
+				input_event.data.button.key_id = (int)event.mouse_button.button;
+				input_event.data.button.state = event.mouse_button.down ? InputSystem::ButtonEvent::DOWN : InputSystem::ButtonEvent::UP;
+				const App::Point cp = App::getMousePos(event.window);
+				input_event.data.button.x_abs = (float)cp.x;
+				input_event.data.button.y_abs = (float)cp.y;
+				injectEvent(input_event);
+				break;
+			}
+			case App::Event::Type::MOUSE_MOVE: {
+				InputSystem::Event input_event;
+				input_event.type = InputSystem::Event::AXIS;
+				input_event.device = getMouseDevice();
+				App::Point cp = App::getMousePos(event.window);
+				input_event.data.axis.x_abs = (float)cp.x;
+				input_event.data.axis.y_abs = (float)cp.y;
+				input_event.data.axis.x = (float)event.mouse_move.xrel;
+				input_event.data.axis.y = (float)event.mouse_move.xrel;
+				injectEvent(input_event);
+				break;
+			}
+			case App::Event::Type::KEY: {
+				InputSystem::Event input_event;
+				input_event.type = InputSystem::Event::BUTTON;
+				input_event.device = getKeyboardDevice();
+				input_event.data.button.state = event.key.down ? InputSystem::ButtonEvent::DOWN : InputSystem::ButtonEvent::UP;
+				input_event.data.button.key_id = (int)event.key.keycode;
+				injectEvent(input_event);
+				break;
+			}
+			case App::Event::Type::CHAR: {
+				InputSystem::Event input_event;
+				input_event.type = InputSystem::Event::TEXT_INPUT;
+				input_event.device = getKeyboardDevice();
+				input_event.data.text.utf32 = event.text_input.utf32;
+				injectEvent(input_event);
+				break;
+			}
+		}
+	}
+
 	
 	void injectEvent(const Event& event) override
 	{
@@ -111,10 +159,6 @@ struct InputSystemImpl final : public InputSystem
 
 	int getEventsCount() const override { return m_events.size(); }
 	const Event* getEvents() const override { return m_events.empty() ? nullptr : &m_events[0]; }
-
-	Vec2 getCursorPosition() const override { return m_cursor_pos; }
-	void setCursorPosition(const Vec2& pos) override { m_cursor_pos = pos; }
-
 
 	int getDevicesCount() const override { return m_devices.size(); }
 	Device* getDevice(int index) override { return m_devices[index]; }
@@ -129,7 +173,6 @@ struct InputSystemImpl final : public InputSystem
 	KeyboardDevice* m_keyboard_device;
 	Array<Event> m_events;
 	bool m_is_enabled;
-	Vec2 m_cursor_pos;
 	Array<Device*> m_devices;
 	Array<Device*> m_to_remove;
 };
