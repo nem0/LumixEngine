@@ -2662,17 +2662,6 @@ public:
 	}
 
 
-	static void clearInputs()
-	{
-		auto& io = ImGui::GetIO();
-		io.KeyAlt = false;
-		io.KeyCtrl = false;
-		io.KeyShift = false;
-		memset(io.KeysDown, 0, sizeof(io.KeysDown));
-		memset(io.MouseDown, 0, sizeof(io.MouseDown));
-	}
-
-
 	void* getWindow() override { return m_window; }
 
 
