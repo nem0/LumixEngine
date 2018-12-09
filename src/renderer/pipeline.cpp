@@ -478,15 +478,14 @@ struct PipelineImpl final : Pipeline
 		m_stats = {};
 		clearBuffers();
 
-		for(Renderbuffer& rb : m_renderbuffers) {
+		for (int i = m_renderbuffers.size() - 1; i >= 0; --i) {
+			Renderbuffer& rb = m_renderbuffers[i];
 			if(!rb.use_realtive_size) continue;
 			const uint w = uint(rb.relative_size.x * m_viewport.w + 0.5f);
 			const uint h = uint(rb.relative_size.y * m_viewport.h + 0.5f);
 			if(rb.width != w || rb.height != h) {
-				rb.width = w;
-				rb.height = h;
 				m_renderer.destroy(rb.handle);
-				rb.handle = m_renderer.createTexture(w, h, 1, rb.format, 0, {0, 0}, "render_buffer");
+				m_renderbuffers.eraseFast(i);
 			}
 		}
 
@@ -783,7 +782,7 @@ struct PipelineImpl final : Pipeline
 	}
 
 
-	int createRenderbuffer(float w, float h, bool relative, const char* format_str)
+	int createRenderbuffer(float w, float h, bool relative, const char* format_str, const char* debug_name)
 	{
 		const uint rb_w = uint(relative ? w * m_viewport.w + 0.5f : w);
 		const uint rb_h = uint(relative ? h * m_viewport.h + 0.5f : h);
@@ -808,7 +807,7 @@ struct PipelineImpl final : Pipeline
 		rb.width = rb_w;
 		rb.height = rb_h;
 		rb.format = format;
-		rb.handle = m_renderer.createTexture(rb_w, rb_h, 1, format, 0, {0, 0}, "render_buffer");
+		rb.handle = m_renderer.createTexture(rb_w, rb_h, 1, format, 0, {0, 0}, debug_name);
 
 		return m_renderbuffers.size() - 1;
 	}
