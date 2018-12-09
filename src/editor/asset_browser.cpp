@@ -13,7 +13,6 @@
 #include "engine/resource_manager.h"
 #include "engine/string.h"
 #include "imgui/imgui.h"
-#include "platform_interface.h"
 #include "utils.h"
 
 
@@ -51,9 +50,9 @@ AssetBrowser::AssetBrowser(StudioApp& app)
 	const char* base_path = m_editor.getEngine().getDiskFileDevice()->getBasePath();
 
 	StaticString<MAX_PATH_LENGTH> path(base_path, ".lumix");
-	PlatformInterface::makePath(path);
+	OS::makePath(path);
 	path << "/asset_tiles";
-	PlatformInterface::makePath(path);
+	OS::makePath(path);
 
 	m_back_action = LUMIX_NEW(allocator, Action)("Back", "Back in asset history", "back");
 	m_back_action->is_global = false;
@@ -139,12 +138,12 @@ void AssetBrowser::changeDir(const char* path)
 
 
 	IAllocator& allocator = m_app.getWorldEditor().getAllocator();
-	PlatformInterface::FileIterator* iter = PlatformInterface::createFileIterator(m_dir, allocator);
-	PlatformInterface::FileInfo info;
+	OS::FileIterator* iter = OS::createFileIterator(m_dir, allocator);
+	OS::FileInfo info;
 
 	const AssetCompiler& compiler = m_app.getAssetCompiler();
 	m_subdirs.clear();
-	while (PlatformInterface::getNextFile(iter, &info))
+	while (OS::getNextFile(iter, &info))
 	{
 		if (info.is_directory)
 		{
@@ -172,7 +171,7 @@ void AssetBrowser::changeDir(const char* path)
 
 	doFilter();
 
-	PlatformInterface::destroyFileIterator(iter);
+	OS::destroyFileIterator(iter);
 }
 
 
@@ -288,9 +287,9 @@ void AssetBrowser::thumbnail(FileInfo& tile)
 	{
 		ImGui::Rect(img_size.x, img_size.y, 0xffffFFFF);
 		StaticString<MAX_PATH_LENGTH> path(".lumix/asset_tiles/", tile.file_path_hash, ".dds");
-		if (PlatformInterface::fileExists(path))
+		if (OS::fileExists(path))
 		{
-			if (PlatformInterface::getLastModified(path) >= PlatformInterface::getLastModified(tile.filepath))
+			if (OS::getLastModified(path) >= OS::getLastModified(tile.filepath))
 			{
 				tile.tex = ri->loadTexture(Path(path));
 			}
@@ -623,9 +622,9 @@ void AssetBrowser::endSaveResource(Resource& resource, FS::IFile& file, bool suc
 	src_full_path << engine.getDiskFileDevice()->getBasePath() << tmp_path;
 	dest_full_path << engine.getDiskFileDevice()->getBasePath() << resource.getPath().c_str();
 
-	PlatformInterface::deleteFile(dest_full_path);
+	OS::deleteFile(dest_full_path);
 
-	if (!PlatformInterface::moveFile(src_full_path, dest_full_path))
+	if (!OS::moveFile(src_full_path, dest_full_path))
 	{
 		g_log_error.log("Editor") << "Could not save file " << resource.getPath().c_str();
 	}
@@ -676,7 +675,7 @@ void AssetBrowser::openInExternalEditor(const char* path) const
 {
 	StaticString<MAX_PATH_LENGTH> full_path(m_editor.getEngine().getDiskFileDevice()->getBasePath());
 	full_path << path;
-	PlatformInterface::shellExecuteOpen(full_path, nullptr);
+	OS::shellExecuteOpen(full_path);
 }
 
 

@@ -3,7 +3,6 @@
 #include "editor/editor_icon.h"
 #include "editor/gizmo.h"
 #include "editor/measure_tool.h"
-#include "editor/platform_interface.h"
 #include "editor/prefab_system.h"
 #include "engine/array.h"
 #include "engine/associative_array.h"
@@ -1824,7 +1823,7 @@ public:
 			m_gizmo->add(m_selected_entities[0]);
 		}
 
-		if (m_is_mouse_down[(int)App::MouseButton::LEFT] && m_mouse_mode == MouseMode::SELECT)
+		if (m_is_mouse_down[(int)OS::MouseButton::LEFT] && m_mouse_mode == MouseMode::SELECT)
 		{
 			m_render_interface->addRect2D(m_rect_selection_start, m_mouse_pos, 0xfffffFFF);
 			m_render_interface->addRect2D(m_rect_selection_start - Vec2(1, 1), m_mouse_pos + Vec2(1, 1), 0xff000000);
@@ -1859,13 +1858,13 @@ public:
 	}
 
 
-	bool isMouseClick(App::MouseButton button) const override
+	bool isMouseClick(OS::MouseButton button) const override
 	{
 		return m_is_mouse_click[(int)button];
 	}
 
 
-	bool isMouseDown(App::MouseButton button) const override
+	bool isMouseDown(OS::MouseButton button) const override
 	{
 		return m_is_mouse_down[(int)button];
 	}
@@ -1925,19 +1924,19 @@ public:
 	}
 
 
-	void onMouseDown(int x, int y, App::MouseButton button) override
+	void onMouseDown(int x, int y, OS::MouseButton button) override
 	{
 		m_is_mouse_click[(int)button] = true;
 		m_is_mouse_down[(int)button] = true;
-		if(button == App::MouseButton::MIDDLE)
+		if(button == OS::MouseButton::MIDDLE)
 		{
 			m_mouse_mode = MouseMode::PAN;
 		}
-		else if (button == App::MouseButton::RIGHT)
+		else if (button == OS::MouseButton::RIGHT)
 		{
 			m_mouse_mode = MouseMode::NAVIGATE;
 		}
-		else if (button == App::MouseButton::LEFT)
+		else if (button == OS::MouseButton::LEFT)
 		{
 			DVec3 origin;
 			Vec3 dir;
@@ -2012,7 +2011,7 @@ public:
 	}
 
 
-	void onMouseUp(int x, int y, App::MouseButton button) override
+	void onMouseUp(int x, int y, OS::MouseButton button) override
 	{
 		m_mouse_pos = {(float)x, (float)y};
 		if (m_mouse_mode == MouseMode::SELECT)
@@ -2081,7 +2080,7 @@ public:
 		
 		auto& fs = m_engine->getFileSystem();
 		StaticString<MAX_PATH_LENGTH> dir(m_engine->getDiskFileDevice()->getBasePath(), "universes/");
-		PlatformInterface::makePath(dir);
+		OS::makePath(dir);
 		StaticString<MAX_PATH_LENGTH> path(dir, basename, ".unv");
 		FS::IFile* file = fs.open(fs.getDefaultDevice(), Path(path), FS::Mode::CREATE_AND_WRITE);
 		save(*file);
@@ -2181,7 +2180,7 @@ public:
 		
 		entity_map.clear();
 		StaticString<MAX_PATH_LENGTH> scn_dir(basedir, "/", basename, "/scenes/");
-		auto scn_file_iter = PlatformInterface::createFileIterator(scn_dir, allocator);
+		auto scn_file_iter = OS::createFileIterator(scn_dir, allocator);
 		Array<u8> data(allocator);
 		FS::OsFile file;
 		auto loadFile = [&file, &data, &entity_map](const char* filepath, auto callback) {
@@ -2198,9 +2197,9 @@ public:
 				file.close();
 			}
 		};
-		PlatformInterface::FileInfo info;
+		OS::FileInfo info;
 		int versions[ComponentType::MAX_TYPES_COUNT];
-		while (PlatformInterface::getNextFile(scn_file_iter, &info))
+		while (OS::getNextFile(scn_file_iter, &info))
 		{
 			if (info.is_directory) continue;
 			if (info.filename[0] == '.') continue;
@@ -2229,11 +2228,11 @@ public:
 				scene->deserialize(deserializer);
 			});
 		}
-		PlatformInterface::destroyFileIterator(scn_file_iter);
+		OS::destroyFileIterator(scn_file_iter);
 		
 		StaticString<MAX_PATH_LENGTH> dir(basedir, "/", basename, "/");
-		auto file_iter = PlatformInterface::createFileIterator(dir, allocator);
-		while (PlatformInterface::getNextFile(file_iter, &info))
+		auto file_iter = OS::createFileIterator(dir, allocator);
+		while (OS::getNextFile(file_iter, &info))
 		{
 			if (info.is_directory) continue;
 			if (info.filename[0] == '.') continue;
@@ -2247,10 +2246,10 @@ public:
 			EntityRef entity = universe.createEntity({0, 0, 0}, {0, 0, 0, 1});
 			entity_map.insert(guid, entity);
 		}
-		PlatformInterface::destroyFileIterator(file_iter);
+		OS::destroyFileIterator(file_iter);
 		
-		file_iter = PlatformInterface::createFileIterator(dir, allocator);
-		while (PlatformInterface::getNextFile(file_iter, &info))
+		file_iter = OS::createFileIterator(dir, allocator);
+		while (OS::getNextFile(file_iter, &info))
 		{
 			if (info.is_directory) continue;
 			if (info.filename[0] == '.') continue;
@@ -2288,7 +2287,7 @@ public:
 				}
 			});
 		}
-		PlatformInterface::destroyFileIterator(file_iter);
+		OS::destroyFileIterator(file_iter);
 
 		StaticString<MAX_PATH_LENGTH> filepath(basedir, "/", basename, "/systems/templates.sys");
 		loadFile(filepath, [&](TextDeserializer& deserializer) {
@@ -2306,10 +2305,10 @@ public:
 	void serialize(const char* basename)
 	{
 		StaticString<MAX_PATH_LENGTH> dir(m_engine->getDiskFileDevice()->getBasePath(), "universes/", basename, "/");
-		PlatformInterface::makePath(dir);
-		PlatformInterface::makePath(dir + "probes/");
-		PlatformInterface::makePath(dir + "scenes/");
-		PlatformInterface::makePath(dir + "systems/");
+		OS::makePath(dir);
+		OS::makePath(dir + "probes/");
+		OS::makePath(dir + "scenes/");
+		OS::makePath(dir + "systems/");
 
 		FS::OsFile file;
 		OutputBlob blob(m_allocator);
@@ -2364,9 +2363,9 @@ public:
 
 	void clearUniverseDir(const char* dir)
 	{
-		PlatformInterface::FileInfo info;
-		auto file_iter = PlatformInterface::createFileIterator(dir, m_allocator);
-		while (PlatformInterface::getNextFile(file_iter, &info))
+		OS::FileInfo info;
+		auto file_iter = OS::createFileIterator(dir, m_allocator);
+		while (OS::getNextFile(file_iter, &info))
 		{
 			if (info.is_directory) continue;
 			if (info.filename[0] == '.') continue;
@@ -2378,10 +2377,10 @@ public:
 			if (!m_entity_map.has(guid))
 			{
 				StaticString<MAX_PATH_LENGTH> filepath(dir, info.filename);
-				PlatformInterface::deleteFile(filepath);
+				OS::deleteFile(filepath);
 			}
 		}
-		PlatformInterface::destroyFileIterator(file_iter);
+		OS::destroyFileIterator(file_iter);
 	}
 
 
@@ -3805,8 +3804,8 @@ private:
 	DelegateList<void()> m_universe_destroyed;
 	DelegateList<void()> m_universe_created;
 	DelegateList<void(const Array<EntityRef>&)> m_entity_selected;
-	bool m_is_mouse_down[(int)App::MouseButton::EXTENDED];
-	bool m_is_mouse_click[(int)App::MouseButton::EXTENDED];
+	bool m_is_mouse_down[(int)OS::MouseButton::EXTENDED];
+	bool m_is_mouse_click[(int)OS::MouseButton::EXTENDED];
 
 	Array<Plugin*> m_plugins;
 	MeasureTool* m_measure_tool;

@@ -1,7 +1,6 @@
 #include "../ffr/ffr.h"
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
-#include "editor/platform_interface.h"
 #include "editor/property_grid.h"
 #include "editor/render_interface.h"
 #include "editor/studio_app.h"
@@ -655,8 +654,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		if (m_is_mouse_captured && !mouse_down)
 		{
 			m_is_mouse_captured = false;
-			App::showCursor(true);
-			App::setMousePos(m_captured_mouse_x, m_captured_mouse_y);
+			OS::showCursor(true);
+			OS::setMouseScreenPos(m_captured_mouse_x, m_captured_mouse_y);
 		}
 
 		if (ImGui::GetIO().MouseClicked[1] && ImGui::IsItemHovered()) ImGui::OpenPopup("PreviewPopup");
@@ -681,8 +680,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			if (!m_is_mouse_captured)
 			{
 				m_is_mouse_captured = true;
-				App::showCursor(false);
-				const App::Point p = App::getMousePos();
+				OS::showCursor(false);
+				const OS::Point p = OS::getMouseScreenPos();
 				m_captured_mouse_x = p.x;
 				m_captured_mouse_y = p.y;
 			}
@@ -1630,12 +1629,12 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 		FS::OsFile file;
 		const char* base_path = m_app.getWorldEditor().getEngine().getDiskFileDevice()->getBasePath();
 		StaticString<MAX_PATH_LENGTH> path(base_path, "universes/", m_app.getWorldEditor().getUniverse()->getName());
-		if (!PlatformInterface::makePath(path) && !PlatformInterface::dirExists(path))
+		if (!OS::makePath(path) && !OS::dirExists(path))
 		{
 			g_log_error.log("Editor") << "Failed to create " << path;
 		}
 		path << "/probes/";
-		if (!PlatformInterface::makePath(path) && !PlatformInterface::dirExists(path))
+		if (!OS::makePath(path) && !OS::dirExists(path))
 		{
 			g_log_error.log("Editor") << "Failed to create " << path;
 		}
@@ -2565,7 +2564,7 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 		PluginManager& plugin_manager = m_engine.getPluginManager();
 		Renderer* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
 
-		const App::Point size = App::getWindowClientSize(m_app.getWindow());
+		const OS::Point size = OS::getWindowClientSize(m_app.getWindow());
 		m_width = size.x;
 		m_height = size.y;
 		renderer->resize(m_width, m_height);
@@ -2612,7 +2611,7 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 	{
 		const ImDrawData* draw_data = ImGui::GetDrawData();
 
-		const App::Point size = App::getWindowClientSize(m_app.getWindow());
+		const OS::Point size = OS::getWindowClientSize(m_app.getWindow());
 		if (size.x != m_width || size.y != m_height) {
 			m_width = size.x;
 			m_height = size.y;
@@ -2805,7 +2804,7 @@ struct AddTerrainComponentPlugin final : public StudioApp::IAddComponentPlugin
 		if (!file.open(normalized_material_path, FS::Mode::CREATE_AND_WRITE))
 		{
 			g_log_error.log("Editor") << "Failed to create material " << normalized_material_path;
-			PlatformInterface::deleteFile(hm_path);
+			OS::deleteFile(hm_path);
 			return false;
 		}
 
@@ -2846,7 +2845,7 @@ struct AddTerrainComponentPlugin final : public StudioApp::IAddComponentPlugin
 			if (ImGui::Button("Create"))
 			{
 				char save_filename[MAX_PATH_LENGTH];
-				if (PlatformInterface::getSaveFilename(
+				if (OS::getSaveFilename(
 						save_filename, lengthOf(save_filename), "Material\0*.mat\0", "mat"))
 				{
 					editor.makeRelative(buf, lengthOf(buf), save_filename);

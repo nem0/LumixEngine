@@ -1,7 +1,6 @@
 #include "terrain_editor.h"
 #include "editor/asset_compiler.h"
 #include "editor/ieditor_command.h"
-#include "editor/platform_interface.h"
 #include "editor/prefab_system.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
@@ -887,7 +886,7 @@ void TerrainEditor::mergeSplatmap(const char* dir)
 	fs.close(*file);
 	u32* out_data = (u32*)&out_data_array[0];
 
-	using namespace PlatformInterface;
+	using namespace OS;
 	FileIterator* file_iter = createFileIterator(dir, allocator);
 	FileInfo info;
 
@@ -1462,7 +1461,7 @@ void TerrainEditor::onMouseMove(int x, int y, int, int)
 }
 
 
-void TerrainEditor::onMouseUp(int, int, App::MouseButton)
+void TerrainEditor::onMouseUp(int, int, OS::MouseButton)
 {
 }
 
@@ -1565,7 +1564,7 @@ void TerrainEditor::onGUI()
 		if (ImGui::Button("Select mask"))
 		{
 			char filename[MAX_PATH_LENGTH];
-			if (PlatformInterface::getOpenFilename(filename, lengthOf(filename), "All\0*.*\0", nullptr))
+			if (OS::getOpenFilename(filename, lengthOf(filename), "All\0*.*\0", nullptr))
 			{
 				int image_width;
 				int image_height;
@@ -1760,12 +1759,12 @@ void TerrainEditor::onGUI()
 
 	ImGui::Separator();
 	char dir[MAX_PATH_LENGTH];
-	if (ImGui::Button("Split") && PlatformInterface::getOpenDirectory(dir, lengthOf(dir), nullptr))
+	if (ImGui::Button("Split") && OS::getOpenDirectory(dir, lengthOf(dir), nullptr))
 	{
 		splitSplatmap(dir);
 	}
 	ImGui::SameLine();
-	if (ImGui::Button("Merge") && PlatformInterface::getOpenDirectory(dir, lengthOf(dir), nullptr))
+	if (ImGui::Button("Merge") && OS::getOpenDirectory(dir, lengthOf(dir), nullptr))
 	{
 		mergeSplatmap(dir);
 	}

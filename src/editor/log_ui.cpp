@@ -1,6 +1,6 @@
 #include "log_ui.h"
-#include "editor/platform_interface.h"
 #include "engine/log.h"
+#include "engine/os.h"
 #include "imgui/imgui.h"
 
 
@@ -226,7 +226,7 @@ void LogUI::onGUI()
 						}
 					}
 
-					PlatformInterface::copyToClipboard(mem);
+					OS::copyToClipboard(mem);
 					m_allocator.deallocate(mem);
 				}
 			}

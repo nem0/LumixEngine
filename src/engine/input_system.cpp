@@ -1,5 +1,5 @@
 #include "engine/input_system.h"
-#include "engine/app.h"
+#include "engine/os.h"
 #include "engine/controller_device.h"
 #include "engine/delegate.h"
 #include "engine/delegate_list.h"
@@ -103,26 +103,26 @@ struct InputSystemImpl final : public InputSystem
 	}
 
 
-	void injectEvent(const App::Event& event) override
+	void injectEvent(const OS::Event& event) override
 	{
 		switch (event.type) {
-			case App::Event::Type::MOUSE_BUTTON: {
+			case OS::Event::Type::MOUSE_BUTTON: {
 				InputSystem::Event input_event;
 				input_event.type = InputSystem::Event::BUTTON;
 				input_event.device = getMouseDevice();
 				input_event.data.button.key_id = (int)event.mouse_button.button;
 				input_event.data.button.state = event.mouse_button.down ? InputSystem::ButtonEvent::DOWN : InputSystem::ButtonEvent::UP;
-				const App::Point cp = App::getMousePos(event.window);
+				const OS::Point cp = OS::getMousePos(event.window);
 				input_event.data.button.x_abs = (float)cp.x;
 				input_event.data.button.y_abs = (float)cp.y;
 				injectEvent(input_event);
 				break;
 			}
-			case App::Event::Type::MOUSE_MOVE: {
+			case OS::Event::Type::MOUSE_MOVE: {
 				InputSystem::Event input_event;
 				input_event.type = InputSystem::Event::AXIS;
 				input_event.device = getMouseDevice();
-				App::Point cp = App::getMousePos(event.window);
+				const OS::Point cp = OS::getMousePos(event.window);
 				input_event.data.axis.x_abs = (float)cp.x;
 				input_event.data.axis.y_abs = (float)cp.y;
 				input_event.data.axis.x = (float)event.mouse_move.xrel;
@@ -130,7 +130,7 @@ struct InputSystemImpl final : public InputSystem
 				injectEvent(input_event);
 				break;
 			}
-			case App::Event::Type::KEY: {
+			case OS::Event::Type::KEY: {
 				InputSystem::Event input_event;
 				input_event.type = InputSystem::Event::BUTTON;
 				input_event.device = getKeyboardDevice();
@@ -139,7 +139,7 @@ struct InputSystemImpl final : public InputSystem
 				injectEvent(input_event);
 				break;
 			}
-			case App::Event::Type::CHAR: {
+			case OS::Event::Type::CHAR: {
 				InputSystem::Event input_event;
 				input_event.type = InputSystem::Event::TEXT_INPUT;
 				input_event.device = getKeyboardDevice();
@@ -183,7 +183,7 @@ void InputSystemImpl::registerLuaAPI()
 	lua_State* state = m_engine.getState();
 
 	#define REGISTER_KEYCODE(KEYCODE) \
-		LuaWrapper::createSystemVariable(state, "Engine", "INPUT_KEYCODE_" #KEYCODE, (int)App::Keycode::##KEYCODE);
+		LuaWrapper::createSystemVariable(state, "Engine", "INPUT_KEYCODE_" #KEYCODE, (int)OS::Keycode::##KEYCODE);
 
 		REGISTER_KEYCODE(LBUTTON); 
 		REGISTER_KEYCODE(RBUTTON); 

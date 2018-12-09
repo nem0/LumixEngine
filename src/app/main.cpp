@@ -1,4 +1,3 @@
-#include "engine/app.h"
 #include "engine/blob.h"
 #include "engine/command_line_parser.h"
 #include "engine/crc32.h"
@@ -12,6 +11,7 @@
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
 #include "engine/mt/thread.h"
+#include "engine/os.h"
 #include "engine/path_utils.h"
 #include "engine/plugin_manager.h"
 #include "engine/profiler.h"
@@ -42,7 +42,7 @@ struct GUIInterface : GUISystem::Interface
 
 	void enableCursor(bool enable) override
 	{
-		App::showCursor(enable);
+		OS::showCursor(enable);
 	}
 
 
@@ -51,7 +51,7 @@ struct GUIInterface : GUISystem::Interface
 };
 
 
-class Runner : public App::Interface
+class Runner : public OS::Interface
 {
 public:
 	Runner()
@@ -77,7 +77,7 @@ public:
 
 	void onResize() const
 	{
-		const App::Point p = App::getWindowClientSize(m_window);
+		const OS::Point p = OS::getWindowClientSize(m_window);
 		// TODO
 		//m_pipeline->resize(p.x, p.y);
 		m_gui_interface->size.set((float)p.x, (float)p.y);
@@ -148,11 +148,11 @@ public:
 		m_engine = Engine::create(current_dir, m_file_system, m_allocator);
 		ffr::preinit(m_allocator);
 		
-		App::InitWindowArgs create_win_args = {};
+		OS::InitWindowArgs create_win_args = {};
 		create_win_args.fullscreen = !m_window_mode;
 		create_win_args.handle_file_drops = false;
 		create_win_args.name = "Lumix App";
-		m_window = App::createWindow(create_win_args);
+		m_window = OS::createWindow(create_win_args);
 
 		Engine::PlatformData platform_data = {};
 		platform_data.window_handle = m_window;
@@ -191,7 +191,7 @@ public:
 
 		gui_system->setInterface(m_gui_interface);
 		
-		App::showCursor(false);
+		OS::showCursor(false);
 		onResize();
 
 		if (!runStartupScript())
@@ -320,20 +320,20 @@ public:
 	int getExitCode() const { return m_exit_code; }
 
 
-	void onEvent(const App::Event& event) override
+	void onEvent(const OS::Event& event) override
 	{
 		InputSystem& input = m_engine->getInputSystem();
 		input.injectEvent(event);
 		switch (event.type) {
-			case App::Event::Type::QUIT:
-			case App::Event::Type::WINDOW_CLOSE: 
-				App::quit();
+			case OS::Event::Type::QUIT:
+			case OS::Event::Type::WINDOW_CLOSE: 
+				OS::quit();
 				break;
-			case App::Event::Type::WINDOW_MOVE:
-			case App::Event::Type::WINDOW_SIZE:
+			case OS::Event::Type::WINDOW_MOVE:
+			case OS::Event::Type::WINDOW_SIZE:
 				onResize();
 				break;
-			case App::Event::Type::FOCUS: 
+			case OS::Event::Type::FOCUS: 
 				m_engine->getInputSystem().enable(event.focus.gained); 
 				break;
 		}
@@ -363,7 +363,7 @@ public:
 	void exit(int exit_code)
 	{
 		m_exit_code = exit_code;
-		App::quit();
+		OS::quit();
 	}
 
 
@@ -400,7 +400,7 @@ private:
 	char m_startup_script_path[MAX_PATH_LENGTH];
 	char m_pipeline_path[MAX_PATH_LENGTH];
 	StaticString<64> m_pipeline_define;
-	App::WindowHandle m_window;
+	OS::WindowHandle m_window;
 
 	static Runner* s_instance;
 };
@@ -418,7 +418,7 @@ int main(int args, char* argv[])
 #endif
 {
 	Lumix::Runner app;
-	Lumix::App::run(app);
+	Lumix::OS::run(app);
 	app.shutdown();
 	return app.getExitCode();
 }

@@ -8,7 +8,6 @@
 #include "editor/prefab_system.h"
 #include "editor/render_interface.h"
 #include "editor/world_editor.h"
-#include "engine/app.h"
 #include "engine/command_line_parser.h"
 #include "engine/crc32.h"
 #include "engine/debug/debug.h"
@@ -21,6 +20,7 @@
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
 #include "engine/mt/thread.h"
+#include "engine/os.h"
 #include "engine/path_utils.h"
 #include "engine/plugin_manager.h"
 #include "engine/profiler.h"
@@ -32,7 +32,6 @@
 #include "engine/universe/universe.h"
 #include "imgui/imgui.h"
 #include "log_ui.h"
-#include "platform_interface.h"
 #include "profiler_ui.h"
 #include "property_grid.h"
 #include "renderer/ffr/ffr.h"
@@ -167,61 +166,61 @@ public:
 	}
 
 
-	void onEvent(const Lumix::App::Event& event)
+	void onEvent(const OS::Event& event)
 	{
 		m_events.push(event);
 		switch (event.type) {
-			case App::Event::Type::MOUSE_BUTTON: {
+			case OS::Event::Type::MOUSE_BUTTON: {
 				ImGuiIO& io = ImGui::GetIO();
 				m_editor->setToggleSelection(io.KeyCtrl);
 				m_editor->setSnapMode(io.KeyShift, io.KeyCtrl);
 				io.MouseDown[(int)event.mouse_button.button] = event.mouse_button.down;
 				break;
 			}
-			case App::Event::Type::MOUSE_WHEEL: {
+			case OS::Event::Type::MOUSE_WHEEL: {
 				ImGuiIO& io = ImGui::GetIO();
 				io.MouseWheel = event.mouse_wheel.amount;
 				break;
 			}
-			case App::Event::Type::MOUSE_MOVE: {
+			case OS::Event::Type::MOUSE_MOVE: {
 				ImGuiIO& io = ImGui::GetIO();
-				const App::Point cp = App::getMousePos(event.window);
+				const OS::Point cp = OS::getMousePos(event.window);
 				m_mouse_move += {(float)event.mouse_move.xrel, (float)event.mouse_move.yrel};
 				io.MousePos.x = (float)cp.x;
 				io.MousePos.y = (float)cp.y;
 				break;
 			}
-			case App::Event::Type::WINDOW_SIZE:
-			case App::Event::Type::WINDOW_MOVE: {
-				const App::Rect rect = App::getWindowScreenRect(event.window);
+			case OS::Event::Type::WINDOW_SIZE:
+			case OS::Event::Type::WINDOW_MOVE: {
+				const OS::Rect rect = OS::getWindowScreenRect(event.window);
 				onWindowTransformed(rect.left, rect.top, rect.width, rect.height);
 				break;
 			}
-			case App::Event::Type::WINDOW_CLOSE:
-			case App::Event::Type::QUIT:
+			case OS::Event::Type::WINDOW_CLOSE:
+			case OS::Event::Type::QUIT:
 				exit();
 				break;
-			case App::Event::Type::CHAR: {
+			case OS::Event::Type::CHAR: {
 				ImGuiIO& io = ImGui::GetIO();
 				char utf8[5];
-				App::UTF32ToUTF8(event.text_input.utf32, utf8);
+				OS::UTF32ToUTF8(event.text_input.utf32, utf8);
 				utf8[4] = 0;
 				io.AddInputCharactersUTF8(utf8);
 				break;
 			}
-			case App::Event::Type::KEY: {
+			case OS::Event::Type::KEY: {
 				ImGuiIO& io = ImGui::GetIO();
 				io.KeysDown[(int)event.key.keycode] = event.key.down;
-				io.KeyShift = App::isKeyDown(App::Keycode::SHIFT);
-				io.KeyCtrl = App::isKeyDown(App::Keycode::CTRL);
-				io.KeyAlt = App::isKeyDown(App::Keycode::MENU);
+				io.KeyShift = OS::isKeyDown(OS::Keycode::SHIFT);
+				io.KeyCtrl = OS::isKeyDown(OS::Keycode::CTRL);
+				io.KeyAlt = OS::isKeyDown(OS::Keycode::MENU);
 				checkShortcuts();
 				break;
 			}
-			case App::Event::Type::DROP_FILE:
-				for(int i = 0, c = App::getDropFileCount(event); i < c; ++i) {
+			case OS::Event::Type::DROP_FILE:
+				for(int i = 0, c = OS::getDropFileCount(event); i < c; ++i) {
 					char tmp[MAX_PATH_LENGTH];
-					App::getDropFile(event, i, tmp, lengthOf(tmp));
+					OS::getDropFile(event, i, tmp, lengthOf(tmp));
 					for (GUIPlugin* plugin : m_gui_plugins) {
 						if (plugin->onDropFile(tmp)) break;
 					}
@@ -235,7 +234,7 @@ public:
 	{
 		update();
 
-		if (m_sleep_when_inactive && App::getFocused() != m_window) {
+		if (m_sleep_when_inactive && OS::getFocused() != m_window) {
 			const float frame_time = m_fps_timer->tick();
 			const float wanted_fps = 5.0f;
 
@@ -260,7 +259,7 @@ public:
 		checkWorkingDirector();
 
 		char current_dir[MAX_PATH_LENGTH];
-		PlatformInterface::getCurrentDirectory(current_dir, lengthOf(current_dir));
+		OS::getCurrentDirectory(current_dir, lengthOf(current_dir));
 
 		char data_dir_path[MAX_PATH_LENGTH] = {};
 		checkDataDirCommandLine(data_dir_path, lengthOf(data_dir_path));
@@ -268,12 +267,11 @@ public:
 		createLua();
 
 		ffr::preinit(m_allocator);
-		App::InitWindowArgs create_win_args;
+		OS::InitWindowArgs create_win_args;
 		create_win_args.handle_file_drops = false;
 		create_win_args.name = "Lumix Studio";
 		create_win_args.handle_file_drops = true;
-		m_window = App::createWindow(create_win_args);
-		PlatformInterface::setWindow(m_window);
+		m_window = OS::createWindow(create_win_args);
 		Engine::PlatformData platform_data = {};
 		platform_data.window_handle = m_window;
 		m_engine->setPlatformData(platform_data);
@@ -301,9 +299,9 @@ public:
 		m_custom_pivot_action = LUMIX_NEW(m_editor->getAllocator(), Action)("Set Custom Pivot",
 			"Set Custom Pivot",
 			"set_custom_pivot",
-			App::Keycode::K,
-			App::Keycode::INVALID,
-			App::Keycode::INVALID);
+			OS::Keycode::K,
+			OS::Keycode::INVALID,
+			OS::Keycode::INVALID);
 		m_custom_pivot_action->is_global = false;
 		addAction(m_custom_pivot_action);
 
@@ -368,7 +366,7 @@ public:
 		m_engine = nullptr;
 		m_editor = nullptr;
 		
-		App::destroyWindow(m_window);
+		OS::destroyWindow(m_window);
 	}
 
 
@@ -589,12 +587,12 @@ public:
 		PROFILE_FUNCTION();
 
 		ImGuiIO& io = ImGui::GetIO();
-		const App::Point size = App::getWindowClientSize(m_window);
+		const OS::Point size = OS::getWindowClientSize(m_window);
 		io.DisplaySize = ImVec2(float(size.x), float(size.y));
 		io.DeltaTime = m_engine->getLastTimeDelta();
-		io.KeyShift = App::isKeyDown(App::Keycode::SHIFT);
-		io.KeyCtrl = App::isKeyDown(App::Keycode::CTRL);
-		io.KeyAlt = App::isKeyDown(App::Keycode::MENU);
+		io.KeyShift = OS::isKeyDown(OS::Keycode::SHIFT);
+		io.KeyCtrl = OS::isKeyDown(OS::Keycode::CTRL);
+		io.KeyAlt = OS::isKeyDown(OS::Keycode::MENU);
 		ImGui::NewFrame();
 		ImGui::PushFont(m_font);
 	}
@@ -727,7 +725,7 @@ public:
 	{
 		ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
 								 ImGuiWindowFlags_NoSavedSettings;
-		const App::Point size = App::getWindowClientSize(m_window);
+		const OS::Point size = OS::getWindowClientSize(m_window);
 		ImGui::SetNextWindowSize(ImVec2((float)size.x, (float)size.y));
 		ImGui::SetNextWindowPos({0, 0}, ImGuiCond_FirstUseEver);
 		if (ImGui::Begin("Welcome", nullptr, flags))
@@ -767,28 +765,28 @@ public:
 
 				if (ImGui::Button("Wiki"))
 				{
-					PlatformInterface::shellExecuteOpen("https://github.com/nem0/LumixEngine/wiki", nullptr);
+					OS::shellExecuteOpen("https://github.com/nem0/LumixEngine/wiki");
 				}
 
 				if (ImGui::Button("Download new version"))
 				{
-					PlatformInterface::shellExecuteOpen(
-						"https://github.com/nem0/lumixengine_data/archive/master.zip", nullptr);
+					OS::shellExecuteOpen(
+						"https://github.com/nem0/lumixengine_data/archive/master.zip");
 				}
 
 				if (ImGui::Button("Show major releases"))
 				{
-					PlatformInterface::shellExecuteOpen("https://github.com/nem0/LumixEngine/releases", nullptr);
+					OS::shellExecuteOpen("https://github.com/nem0/LumixEngine/releases");
 				}
 
 				if (ImGui::Button("Show latest commits"))
 				{
-					PlatformInterface::shellExecuteOpen("https://github.com/nem0/LumixEngine/commits/master", nullptr);
+					OS::shellExecuteOpen("https://github.com/nem0/LumixEngine/commits/master");
 				}
 
 				if (ImGui::Button("Show issues"))
 				{
-					PlatformInterface::shellExecuteOpen("https://github.com/nem0/lumixengine/issues", nullptr);
+					OS::shellExecuteOpen("https://github.com/nem0/lumixengine/issues");
 				}
 			}
 			ImGui::EndChild();
@@ -802,7 +800,7 @@ public:
 		char tmp[100];
 		copyString(tmp, "Lumix Studio - ");
 		catString(tmp, title);
-		App::setWindowTitle(m_window, tmp);
+		OS::setWindowTitle(m_window, tmp);
 	}
 
 
@@ -811,7 +809,7 @@ public:
 		buf[0] = 0;
 		for (int i = 0; i < lengthOf(action.shortcut); ++i) {
 			char tmp[64];
-			App::getKeyName(action.shortcut[i], tmp, sizeof(tmp));
+			OS::getKeyName(action.shortcut[i], tmp, sizeof(tmp));
 			if (tmp[0] == 0) return;
 			if (i > 0) catString(buf, max_size, " - ");
 			catString(buf, max_size, tmp);
@@ -891,7 +889,7 @@ public:
 		}
 		else
 		{
-			App::quit();
+			OS::quit();
 			m_finished = true;
 		}
 	}
@@ -991,7 +989,7 @@ public:
 	{
 		char filename[MAX_PATH_LENGTH];
 		char tmp[MAX_PATH_LENGTH];
-		if (PlatformInterface::getSaveFilename(tmp, lengthOf(tmp), "Prefab files\0*.fab\0", "fab"))
+		if (OS::getSaveFilename(tmp, lengthOf(tmp), "Prefab files\0*.fab\0", "fab"))
 		{
 			PathUtils::normalize(tmp, filename, lengthOf(tmp));
 			const char* base_path = m_engine->getDiskFileDevice()->getBasePath();
@@ -1025,7 +1023,7 @@ public:
 	void loadAndExecuteCommands()
 	{
 		char filename[MAX_PATH_LENGTH];
-		if (PlatformInterface::getOpenFilename(filename, lengthOf(filename), "JSON files\0*.json\0", nullptr))
+		if (OS::getOpenFilename(filename, lengthOf(filename), "JSON files\0*.json\0", nullptr))
 		{
 			m_editor->executeUndoStack(Path(filename));
 		}
@@ -1035,7 +1033,7 @@ public:
 	void saveUndoStack()
 	{
 		char filename[MAX_PATH_LENGTH];
-		if (PlatformInterface::getSaveFilename(filename, lengthOf(filename), "JSON files\0*.json\0", "json"))
+		if (OS::getSaveFilename(filename, lengthOf(filename), "JSON files\0*.json\0", "json"))
 		{
 			m_editor->saveUndoStack(Path(filename));
 		}
@@ -1092,9 +1090,9 @@ public:
 	void addAction(const char* label_short,
 		const char* label_long,
 		const char* name,
-		App::Keycode shortcut0,
-		App::Keycode shortcut1,
-		App::Keycode shortcut2)
+		OS::Keycode shortcut0,
+		OS::Keycode shortcut1,
+		OS::Keycode shortcut2)
 	{
 		auto* a =
 			LUMIX_NEW(m_editor->getAllocator(), Action)(label_short, label_long, name, shortcut0, shortcut1, shortcut2);
@@ -1286,7 +1284,7 @@ public:
 			ImGui::Text("All unsaved changes will be lost, do you want to continue?");
 			if (ImGui::Button("Continue"))
 			{
-				App::quit();
+				OS::quit();
 				m_finished = true;
 				ImGui::CloseCurrentPopup();
 			}
@@ -1345,7 +1343,7 @@ public:
 			if (m_engine->getFileSystem().hasWork()) stats << "Loading... | ";
 			stats << "FPS: ";
 			stats << m_engine->getFPS();
-			if (App::getFocused() != m_window) stats << " - inactive window";
+			if (OS::getFocused() != m_window) stats << " - inactive window";
 			auto stats_size = ImGui::CalcTextSize(stats);
 			ImGui::SameLine(ImGui::GetContentRegionMax().x - stats_size.x);
 			ImGui::Text("%s", (const char*)stats);
@@ -1532,7 +1530,7 @@ public:
 	{
 		ImGuiIO& io = ImGui::GetIO();
 		io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard | ImGuiConfigFlags_DockingEnable;
-		const int dpi = App::getDPI();
+		const int dpi = OS::getDPI();
 		float font_scale = dpi / 96.f;
 		m_font = io.Fonts->AddFontFromFileTTF(
 			"editor/fonts/OpenSans-Regular.ttf", (float)m_settings.m_font_size * font_scale);
@@ -1542,26 +1540,26 @@ public:
 		m_font->DisplayOffset.y = 0;
 		m_bold_font->DisplayOffset.y = 0;
 
-		io.KeyMap[ImGuiKey_Space] = (int)App::Keycode::SPACE;
-		io.KeyMap[ImGuiKey_Tab] = (int)App::Keycode::TAB;
-		io.KeyMap[ImGuiKey_LeftArrow] = (int)App::Keycode::LEFT;
-		io.KeyMap[ImGuiKey_RightArrow] = (int)App::Keycode::RIGHT;
-		io.KeyMap[ImGuiKey_UpArrow] = (int)App::Keycode::UP;
-		io.KeyMap[ImGuiKey_DownArrow] = (int)App::Keycode::DOWN;
-		io.KeyMap[ImGuiKey_PageUp] = (int)App::Keycode::PAGEUP;
-		io.KeyMap[ImGuiKey_PageDown] = (int)App::Keycode::PAGEDOWN;
-		io.KeyMap[ImGuiKey_Home] = (int)App::Keycode::HOME;
-		io.KeyMap[ImGuiKey_End] = (int)App::Keycode::END;
-		io.KeyMap[ImGuiKey_Delete] = (int)App::Keycode::DEL;
-		io.KeyMap[ImGuiKey_Backspace] = (int)App::Keycode::BACKSPACE;
-		io.KeyMap[ImGuiKey_Enter] = (int)App::Keycode::RETURN;
-		io.KeyMap[ImGuiKey_Escape] = (int)App::Keycode::ESCAPE;
-		io.KeyMap[ImGuiKey_A] = (int)App::Keycode::A;
-		io.KeyMap[ImGuiKey_C] = (int)App::Keycode::C;
-		io.KeyMap[ImGuiKey_V] = (int)App::Keycode::V;
-		io.KeyMap[ImGuiKey_X] = (int)App::Keycode::X;
-		io.KeyMap[ImGuiKey_Y] = (int)App::Keycode::Y;
-		io.KeyMap[ImGuiKey_Z] = (int)App::Keycode::Z;
+		io.KeyMap[ImGuiKey_Space] = (int)OS::Keycode::SPACE;
+		io.KeyMap[ImGuiKey_Tab] = (int)OS::Keycode::TAB;
+		io.KeyMap[ImGuiKey_LeftArrow] = (int)OS::Keycode::LEFT;
+		io.KeyMap[ImGuiKey_RightArrow] = (int)OS::Keycode::RIGHT;
+		io.KeyMap[ImGuiKey_UpArrow] = (int)OS::Keycode::UP;
+		io.KeyMap[ImGuiKey_DownArrow] = (int)OS::Keycode::DOWN;
+		io.KeyMap[ImGuiKey_PageUp] = (int)OS::Keycode::PAGEUP;
+		io.KeyMap[ImGuiKey_PageDown] = (int)OS::Keycode::PAGEDOWN;
+		io.KeyMap[ImGuiKey_Home] = (int)OS::Keycode::HOME;
+		io.KeyMap[ImGuiKey_End] = (int)OS::Keycode::END;
+		io.KeyMap[ImGuiKey_Delete] = (int)OS::Keycode::DEL;
+		io.KeyMap[ImGuiKey_Backspace] = (int)OS::Keycode::BACKSPACE;
+		io.KeyMap[ImGuiKey_Enter] = (int)OS::Keycode::RETURN;
+		io.KeyMap[ImGuiKey_Escape] = (int)OS::Keycode::ESCAPE;
+		io.KeyMap[ImGuiKey_A] = (int)OS::Keycode::A;
+		io.KeyMap[ImGuiKey_C] = (int)OS::Keycode::C;
+		io.KeyMap[ImGuiKey_V] = (int)OS::Keycode::V;
+		io.KeyMap[ImGuiKey_X] = (int)OS::Keycode::X;
+		io.KeyMap[ImGuiKey_Y] = (int)OS::Keycode::Y;
+		io.KeyMap[ImGuiKey_Z] = (int)OS::Keycode::Z;
 
 		ImGuiStyle& style = ImGui::GetStyle();
 		style.FramePadding.y = 0;
@@ -1595,16 +1593,16 @@ public:
 
 		if (m_settings.m_is_maximized)
 		{
-			App::maximizeWindow(m_window);
+			OS::maximizeWindow(m_window);
 		}
 		else if (m_settings.m_window.w > 0)
 		{
-			App::Rect r;
+			OS::Rect r;
 			r.left = m_settings.m_window.x;
 			r.top = m_settings.m_window.y;
 			r.width = m_settings.m_window.w;
 			r.height = m_settings.m_window.h;
-			App::setWindowScreenRect(m_window, r);
+			OS::setWindowScreenRect(m_window, r);
 		}
 	}
 
@@ -1613,21 +1611,21 @@ public:
 	{
 		addAction<&StudioAppImpl::newUniverse>("New", "New universe", "newUniverse");
 		addAction<&StudioAppImpl::save>(
-			"Save", "Save universe", "save", App::Keycode::LCTRL, App::Keycode::S, App::Keycode::INVALID);
+			"Save", "Save universe", "save", OS::Keycode::LCTRL, OS::Keycode::S, OS::Keycode::INVALID);
 		addAction<&StudioAppImpl::saveAs>(
-			"Save As", "Save universe as", "saveAs", App::Keycode::LCTRL, App::Keycode::LSHIFT, App::Keycode::S);
+			"Save As", "Save universe as", "saveAs", OS::Keycode::LCTRL, OS::Keycode::LSHIFT, OS::Keycode::S);
 		addAction<&StudioAppImpl::exit>(
-			"Exit", "Exit Studio", "exit", App::Keycode::LCTRL, App::Keycode::X, App::Keycode::INVALID);
+			"Exit", "Exit Studio", "exit", OS::Keycode::LCTRL, OS::Keycode::X, OS::Keycode::INVALID);
 		addAction<&StudioAppImpl::redo>(
-			"Redo", "Redo scene action", "redo", App::Keycode::LCTRL, App::Keycode::LSHIFT, App::Keycode::Z);
+			"Redo", "Redo scene action", "redo", OS::Keycode::LCTRL, OS::Keycode::LSHIFT, OS::Keycode::Z);
 		addAction<&StudioAppImpl::undo>(
-			"Undo", "Undo scene action", "undo", App::Keycode::LCTRL, App::Keycode::Z, App::Keycode::INVALID);
+			"Undo", "Undo scene action", "undo", OS::Keycode::LCTRL, OS::Keycode::Z, OS::Keycode::INVALID);
 		addAction<&StudioAppImpl::copy>(
-			"Copy", "Copy entity", "copy", App::Keycode::LCTRL, App::Keycode::C, App::Keycode::INVALID);
+			"Copy", "Copy entity", "copy", OS::Keycode::LCTRL, OS::Keycode::C, OS::Keycode::INVALID);
 		addAction<&StudioAppImpl::paste>(
-			"Paste", "Paste entity", "paste", App::Keycode::LCTRL, App::Keycode::V, App::Keycode::INVALID);
+			"Paste", "Paste entity", "paste", OS::Keycode::LCTRL, OS::Keycode::V, OS::Keycode::INVALID);
 		addAction<&StudioAppImpl::duplicate>(
-			"Duplicate", "Duplicate entity", "duplicate", App::Keycode::LCTRL, App::Keycode::D, App::Keycode::INVALID);
+			"Duplicate", "Duplicate entity", "duplicate", OS::Keycode::LCTRL, OS::Keycode::D, OS::Keycode::INVALID);
 		addAction<&StudioAppImpl::toggleOrbitCamera>("Orbit camera", "Orbit camera", "orbitCamera")
 			.is_selected.bind<StudioAppImpl, &StudioAppImpl::isOrbitCamera>(this);
 		addAction<&StudioAppImpl::setTranslateGizmoMode>("Translate", "Set translate mode", "setTranslateGizmoMode")
@@ -1652,9 +1650,9 @@ public:
 		addAction<&StudioAppImpl::destroySelectedEntity>("Destroy",
 			"Destroy entity",
 			"destroyEntity",
-			App::Keycode::DEL,
-			App::Keycode::INVALID,
-			App::Keycode::INVALID);
+			OS::Keycode::DEL,
+			OS::Keycode::INVALID,
+			OS::Keycode::INVALID);
 		addAction<&StudioAppImpl::savePrefab>("Save prefab", "Save selected entities as prefab", "savePrefab");
 		addAction<&StudioAppImpl::makeParent>("Make parent", "Make entity parent", "makeParent");
 		addAction<&StudioAppImpl::unparent>("Unparent", "Unparent entity", "unparent");
@@ -1684,7 +1682,7 @@ public:
 		StaticString<MAX_PATH_LENGTH> copy_path;
 		PathUtils::getDir(copy_path.data, lengthOf(copy_path.data), tmp_path);
 		copy_path << "plugins/" << iteration;
-		PlatformInterface::makePath(copy_path);
+		OS::makePath(copy_path);
 		PathUtils::getBasename(tmp_path, lengthOf(tmp_path), src);
 		copy_path << "/" << tmp_path << "." << getPluginExtension();
 #ifdef _WIN32
@@ -1692,7 +1690,7 @@ public:
 		StaticString<MAX_PATH_LENGTH> dest_pdb(copy_path);
 		if (PathUtils::replaceExtension(dest_pdb.data, "pdb") && PathUtils::replaceExtension(src_pdb.data, "pda"))
 		{
-			PlatformInterface::deleteFile(dest_pdb);
+			OS::deleteFile(dest_pdb);
 			if (!copyFile(src_pdb, dest_pdb))
 			{
 				copyString(out, src);
@@ -1701,7 +1699,7 @@ public:
 		}
 #endif
 
-		PlatformInterface::deleteFile(copy_path);
+		OS::deleteFile(copy_path);
 		if (!copyFile(src, copy_path))
 		{
 			copyString(out, src);
@@ -1998,7 +1996,7 @@ public:
 
 	void exitWithCode(int exit_code)
 	{
-		App::quit();
+		OS::quit();
 		m_finished = true;
 		m_exit_code = exit_code;
 	}
@@ -2276,9 +2274,9 @@ public:
 
 	void packDataScan(const char* dir_path, AssociativeArray<u32, PackFileInfo>& infos)
 	{
-		auto* iter = PlatformInterface::createFileIterator(dir_path, m_allocator);
-		PlatformInterface::FileInfo info;
-		while (PlatformInterface::getNextFile(iter, &info))
+		auto* iter = OS::createFileIterator(dir_path, m_allocator);
+		OS::FileInfo info;
+		while (OS::getNextFile(iter, &info))
 		{
 			char normalized_path[MAX_PATH_LENGTH];
 			PathUtils::normalize(info.filename, normalized_path, lengthOf(normalized_path));
@@ -2312,10 +2310,10 @@ public:
 			auto& out_info = infos.emplace(hash);
 			copyString(out_info.path, out_path);
 			out_info.hash = hash;
-			out_info.size = PlatformInterface::getFileSize(out_path.data);
+			out_info.size = OS::getFileSize(out_path.data);
 			out_info.offset = ~0UL;
 		}
-		PlatformInterface::destroyFileIterator(iter);
+		OS::destroyFileIterator(iter);
 	}
 
 
@@ -2331,7 +2329,7 @@ public:
 				auto& out_info = infos.emplace(hash);
 				copyString(out_info.path, MAX_PATH_LENGTH, res->getPath().c_str());
 				out_info.hash = hash;
-				out_info.size = PlatformInterface::getFileSize(res->getPath().c_str());
+				out_info.size = OS::getFileSize(res->getPath().c_str());
 				out_info.offset = ~0UL;
 			}
 		}
@@ -2345,7 +2343,7 @@ public:
 		auto& out_info = infos.emplace(hash);
 		copyString(out_info.path, MAX_PATH_LENGTH, unv_path);
 		out_info.hash = hash;
-		out_info.size = PlatformInterface::getFileSize(unv_path);
+		out_info.size = OS::getFileSize(unv_path);
 		out_info.offset = ~0UL;
 	}
 
@@ -2362,7 +2360,7 @@ public:
 			ImGui::SameLine();
 			if (ImGui::Button("Choose dir"))
 			{
-				if (PlatformInterface::getOpenDirectory(m_pack.dest_dir.data, lengthOf(m_pack.dest_dir.data), "."))
+				if (OS::getOpenDirectory(m_pack.dest_dir.data, lengthOf(m_pack.dest_dir.data), "."))
 				{
 					m_pack.dest_dir << "/";
 				}
@@ -2427,7 +2425,7 @@ public:
 		for (auto& info : infos)
 		{
 			FS::OsFile src;
-			size_t src_size = PlatformInterface::getFileSize(info.path);
+			size_t src_size = OS::getFileSize(info.path);
 			if (!src.open(info.path, FS::Mode::OPEN_AND_READ))
 			{
 				file.close();
@@ -2453,7 +2451,7 @@ public:
 
 		const char* bin_files[] = {"app.exe", "dbghelp.dll", "dbgcore.dll"};
 		StaticString<MAX_PATH_LENGTH> src_dir("bin/");
-		if (!PlatformInterface::fileExists("bin/app.exe"))
+		if (!OS::fileExists("bin/app.exe"))
 		{
 			char tmp[MAX_PATH_LENGTH];
 			getExecutablePath(tmp, lengthOf(tmp));
@@ -2508,9 +2506,9 @@ public:
 	void scanUniverses()
 	{
 		m_universes.clear();
-		auto* iter = PlatformInterface::createFileIterator("universes/", m_allocator);
-		PlatformInterface::FileInfo info;
-		while (PlatformInterface::getNextFile(iter, &info))
+		auto* iter = OS::createFileIterator("universes/", m_allocator);
+		OS::FileInfo info;
+		while (OS::getNextFile(iter, &info))
 		{
 			if (info.filename[0] == '.') continue;
 			if (!info.is_directory) continue;
@@ -2520,15 +2518,15 @@ public:
 			PathUtils::getBasename(basename, lengthOf(basename), info.filename);
 			m_universes.emplace(basename);
 		}
-		PlatformInterface::destroyFileIterator(iter);
+		OS::destroyFileIterator(iter);
 	}
 
 
 	void findLuaPlugins(const char* dir)
 	{
-		auto* iter = PlatformInterface::createFileIterator(dir, m_allocator);
-		PlatformInterface::FileInfo info;
-		while (PlatformInterface::getNextFile(iter, &info))
+		auto* iter = OS::createFileIterator(dir, m_allocator);
+		OS::FileInfo info;
+		while (OS::getNextFile(iter, &info))
 		{
 			char normalized_path[MAX_PATH_LENGTH];
 			PathUtils::normalize(info.filename, normalized_path, lengthOf(normalized_path));
@@ -2551,11 +2549,11 @@ public:
 				}
 			}
 		}
-		PlatformInterface::destroyFileIterator(iter);
+		OS::destroyFileIterator(iter);
 	}
 
 
-	const App::Event* getEvents() const override { return m_events.empty() ? nullptr : &m_events[0]; }
+	const OS::Event* getEvents() const override { return m_events.empty() ? nullptr : &m_events[0]; }
 
 
 	int getEventsCount() const override { return m_events.size(); }
@@ -2569,19 +2567,19 @@ public:
 
 	static void checkWorkingDirector()
 	{
-		if (!PlatformInterface::fileExists("../LumixStudio.lnk")) return;
+		if (!OS::fileExists("../LumixStudio.lnk")) return;
 
-		if (!PlatformInterface::dirExists("bin") && PlatformInterface::dirExists("../bin") &&
-			PlatformInterface::dirExists("../pipelines"))
+		if (!OS::dirExists("bin") && OS::dirExists("../bin") &&
+			OS::dirExists("../pipelines"))
 		{
-			PlatformInterface::setCurrentDirectory("../");
+			OS::setCurrentDirectory("../");
 		}
 
-		if (!PlatformInterface::dirExists("bin"))
+		if (!OS::dirExists("bin"))
 		{
 			messageBox("Bin directory not found, please check working directory.");
 		}
-		else if (!PlatformInterface::dirExists("pipelines"))
+		else if (!OS::dirExists("pipelines"))
 		{
 			messageBox("Pipelines directory not found, please check working directory.");
 		}
@@ -2605,7 +2603,7 @@ public:
 		{
 			char tmp[MAX_PATH_LENGTH];
 			action->getIconPath(tmp, lengthOf(tmp));
-			if (PlatformInterface::fileExists(tmp))
+			if (OS::fileExists(tmp))
 			{
 				action->icon = render_interface.loadTexture(Path(tmp));
 			}
@@ -2622,18 +2620,18 @@ public:
 		if (ImGui::IsAnyItemActive()) return;
 		GUIPlugin* plugin = getFocusedPlugin();
 		u32 pressed_modifiers = 0;
-		if (App::isKeyDown(App::Keycode::SHIFT)) pressed_modifiers |= 1;
-		if (App::isKeyDown(App::Keycode::CTRL)) pressed_modifiers |= 2;
-		if (App::isKeyDown(App::Keycode::MENU)) pressed_modifiers |= 4;
+		if (OS::isKeyDown(OS::Keycode::SHIFT)) pressed_modifiers |= 1;
+		if (OS::isKeyDown(OS::Keycode::CTRL)) pressed_modifiers |= 2;
+		if (OS::isKeyDown(OS::Keycode::MENU)) pressed_modifiers |= 4;
 
 		for (Action* a : m_actions) {
-			if (!a->is_global || a->shortcut[0] == App::Keycode::INVALID) continue;
+			if (!a->is_global || a->shortcut[0] == OS::Keycode::INVALID) continue;
 			if (a->plugin != plugin) continue;
 
 			u32 action_modifiers = 0;
 			for (int i = 0; i < lengthOf(a->shortcut) + 1; ++i)
 			{
-				if ((i == lengthOf(a->shortcut) || a->shortcut[i] == App::Keycode::INVALID) &&
+				if ((i == lengthOf(a->shortcut) || a->shortcut[i] == OS::Keycode::INVALID) &&
 					action_modifiers == pressed_modifiers)
 				{
 					a->func.invoke();
@@ -2641,12 +2639,12 @@ public:
 				}
 
 				if (i == lengthOf(a->shortcut)) break;
-				if (a->shortcut[i] == App::Keycode::INVALID) break;
+				if (a->shortcut[i] == OS::Keycode::INVALID) break;
 
-				if (!App::isKeyDown(a->shortcut[i])) break;
-				if (a->shortcut[i] == App::Keycode::CTRL) action_modifiers |= 2;
-				else if (a->shortcut[i] == App::Keycode::MENU) action_modifiers |= 4;
-				else if (a->shortcut[i] == App::Keycode::SHIFT) action_modifiers |= 1;
+				if (!OS::isKeyDown(a->shortcut[i])) break;
+				if (a->shortcut[i] == OS::Keycode::CTRL) action_modifiers |= 2;
+				else if (a->shortcut[i] == OS::Keycode::MENU) action_modifiers |= 4;
+				else if (a->shortcut[i] == OS::Keycode::SHIFT) action_modifiers |= 1;
 			}
 		}
 	}
@@ -2660,7 +2658,7 @@ public:
 		m_settings.m_window.y = y;
 		m_settings.m_window.w = width;
 		m_settings.m_window.h = height;
-		m_settings.m_is_maximized = App::isMaximized(m_window);
+		m_settings.m_is_maximized = OS::isMaximized(m_window);
 	}
 
 
@@ -2691,7 +2689,7 @@ public:
 	DefaultAllocator m_main_allocator;
 	Debug::Allocator m_allocator;
 	Engine* m_engine;
-	App::WindowHandle m_window;
+	OS::WindowHandle m_window;
 
 	Array<Action*> m_actions;
 	Array<Action*> m_window_actions;
@@ -2714,7 +2712,7 @@ public:
 	LogUI* m_log_ui;
 	ProfilerUI* m_profiler_ui;
 	Settings m_settings;
-	Array<App::Event> m_events;
+	Array<OS::Event> m_events;
 	Vec2 m_mouse_move;
 	Timer* m_fps_timer;
 	char m_template_name[100];

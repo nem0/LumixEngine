@@ -4,12 +4,12 @@
 #include "engine/log.h"
 #include "engine/matrix.h"
 #include "engine/math_utils.h"
+#include "engine/os.h"
 #include "engine/path_utils.h"
 #include "engine/prefab.h"
 #include "engine/reflection.h"
 #include "engine/serializer.h"
 #include "engine/system.h"
-#include "editor/platform_interface.h"
 #include "physics/physics_geometry_manager.h"
 #include "renderer/model.h"
 #include <cfloat>
@@ -120,20 +120,20 @@ void FBXImporter::gatherMaterials(const ofbx::Object* node, const char* src_dir)
 			if (filename == "") filename = tex.fbx->getFileName();
 			filename.toString(tex.path.data);
 			tex.src = tex.path;
-			tex.is_valid = PlatformInterface::fileExists(tex.src);
+			tex.is_valid = OS::fileExists(tex.src);
 
 			if (!tex.is_valid)
 			{
 				PathUtils::FileInfo file_info(tex.path);
 				tex.src = src_dir;
 				tex.src << file_info.m_basename << "." << file_info.m_extension;
-				tex.is_valid = PlatformInterface::fileExists(tex.src);
+				tex.is_valid = OS::fileExists(tex.src);
 
 				if (!tex.is_valid)
 				{
 					tex.src = src_dir;
 					tex.src << tex.path;
-					tex.is_valid = PlatformInterface::fileExists(tex.src);
+					tex.is_valid = OS::fileExists(tex.src);
 				}
 			}
 
@@ -730,7 +730,7 @@ void FBXImporter::writeTextures(const char* fbx_path, const ImportConfig& cfg)
 			const u32 hash = crc32(tex_path);
 			const StaticString<MAX_PATH_LENGTH> dst_path(cfg.output_dir, hash, ".res");
 
-			if (PlatformInterface::fileExists(dst_path)) continue;
+			if (OS::fileExists(dst_path)) continue;
 
 			int image_width, image_height, image_comp;
 			stbi_uc* data = stbi_load(tex.src, &image_width, &image_height, &image_comp, 4);
@@ -759,7 +759,7 @@ void FBXImporter::writeMaterials(const char* src, const ImportConfig& cfg)
 		const PathUtils::FileInfo src_info(src);
 
 		const StaticString<MAX_PATH_LENGTH + 128> mat_src(src_info.m_dir, mat_name, ".mat");
-		if(PlatformInterface::fileExists(mat_src)) continue;
+		if(OS::fileExists(mat_src)) continue;
 		
 		const u32 hash = crc32(mat_src);
 
@@ -1699,7 +1699,7 @@ bool FBXImporter::writePhysics(const char* basename, const char* output_dir)
 	if (!any) return true;
 
 	PathBuilder phy_path(output_dir);
-	PlatformInterface::makePath(phy_path);
+	OS::makePath(phy_path);
 	phy_path << "/" << basename << ".phy";
 	FS::OsFile file;
 	if (!file.open(phy_path, FS::Mode::CREATE_AND_WRITE))
@@ -1803,7 +1803,7 @@ void FBXImporter::writeSubmodels(const char* src, const ImportConfig& cfg)
 		StaticString<MAX_PATH_LENGTH> hash_str(name, ":", src);
 		makeLowercase(hash_str.data, stringLength(hash_str), hash_str);
 		const StaticString<MAX_PATH_LENGTH> out_path(cfg.output_dir, crc32(hash_str), ".res");
-		PlatformInterface::makePath(cfg.output_dir);
+		OS::makePath(cfg.output_dir);
 		if (!out_file.open(out_path, FS::Mode::CREATE_AND_WRITE)) {
 			g_log_error.log("FBX") << "Failed to create " << out_path;
 			return;
@@ -1850,7 +1850,7 @@ void FBXImporter::writeModel(const char* output_mesh_filename, const char* ext, 
 
 	qsort(&meshes[0], meshes.size(), sizeof(meshes[0]), cmpMeshes);
 	StaticString<MAX_PATH_LENGTH> out_path(cfg.output_dir, output_mesh_filename, ext);
-	PlatformInterface::makePath(cfg.output_dir);
+	OS::makePath(cfg.output_dir);
 	if (!out_file.open(out_path, FS::Mode::CREATE_AND_WRITE))
 	{
 		g_log_error.log("FBX") << "Failed to create " << out_path;

@@ -7,7 +7,6 @@
 #include "animation/state_machine.h"
 #include "editor/asset_browser.h"
 #include "editor/ieditor_command.h"
-#include "editor/platform_interface.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
 #include "engine/blob.h"
@@ -529,13 +528,13 @@ AnimationEditor::AnimationEditor(StudioApp& app)
 	event_type.label = "Set Input";
 	event_type.editor.bind<AnimationEditor, &AnimationEditor::onSetInputGUI>(this);
 
-	Action* undo_action = LUMIX_NEW(allocator, Action)("Undo", "Animation editor - undo", "animeditor_undo", App::Keycode::LCTRL, App::Keycode::Z, App::Keycode::INVALID);
+	Action* undo_action = LUMIX_NEW(allocator, Action)("Undo", "Animation editor - undo", "animeditor_undo", OS::Keycode::LCTRL, OS::Keycode::Z, OS::Keycode::INVALID);
 	undo_action->is_global = true;
 	undo_action->plugin = this;
 	undo_action->func.bind<AnimationEditor, &AnimationEditor::undo>(this);
 	app.addAction(undo_action);
 
-	Action* redo_action = LUMIX_NEW(allocator, Action)("Redo", "Animation editor - redo", "animeditor_redo", App::Keycode::LCTRL, App::Keycode::LSHIFT, App::Keycode::Z);
+	Action* redo_action = LUMIX_NEW(allocator, Action)("Redo", "Animation editor - redo", "animeditor_redo", OS::Keycode::LCTRL, OS::Keycode::LSHIFT, OS::Keycode::Z);
 	redo_action->is_global = true;
 	redo_action->plugin = this;
 	redo_action->func.bind<AnimationEditor, &AnimationEditor::redo>(this);
@@ -774,7 +773,7 @@ void AnimationEditor::onWindowGUI()
 
 void AnimationEditor::saveAs()
 {
-	if (!PlatformInterface::getSaveFilename(m_path.data, lengthOf(m_path.data), "Animation controllers\0*.act\0", "")) return;
+	if (!OS::getSaveFilename(m_path.data, lengthOf(m_path.data), "Animation controllers\0*.act\0", "")) return;
 	save();
 }
 
@@ -782,7 +781,7 @@ void AnimationEditor::saveAs()
 void AnimationEditor::save()
 {
 	if (m_path[0] == 0 &&
-		!PlatformInterface::getSaveFilename(m_path.data, lengthOf(m_path.data), "Animation controllers\0*.act\0", ""))
+		!OS::getSaveFilename(m_path.data, lengthOf(m_path.data), "Animation controllers\0*.act\0", ""))
 		return;
 	IAllocator& allocator = m_app.getWorldEditor().getAllocator();
 	OutputBlob blob(allocator);
@@ -864,7 +863,7 @@ void AnimationEditor::load()
 void AnimationEditor::loadFromFile()
 {
 	newController();
-	if (!PlatformInterface::getOpenFilename(m_path.data, lengthOf(m_path.data), "Animation controllers\0*.act\0", "")) return;
+	if (!OS::getOpenFilename(m_path.data, lengthOf(m_path.data), "Animation controllers\0*.act\0", "")) return;
 	load();
 }
 
