@@ -1,21 +1,26 @@
-#include "../app.h"
+#include "engine/iallocator.h"
 #include "engine/lumix.h"
+#include "engine/os.h"
+#include "engine/path_utils.h"
+#include "engine/string.h"
 #define UNICODE
-#include <Windows.h>
 #include <cassert>
+#include <ShlObj.h>
+#include <Windows.h>
 
-namespace Lumix::App
+namespace Lumix::OS
 {
 
 
 static struct
 {
 	bool finished = false;
-	App::Interface* iface = nullptr;
+	Interface* iface = nullptr;
 	Point relative_mode_pos = {};
 	bool relative_mouse = false;
 	WindowHandle win = INVALID_WINDOW;
 } G;
+
 
 
 static void fromWChar(char* out, int size, const WCHAR* in)
@@ -44,6 +49,23 @@ template <int N> static void toWChar(WCHAR (&out)[N], const char* in)
 	}
 	*cout = 0;
 }
+
+
+template <int N>
+struct WCharStr
+{
+	WCharStr(const char* rhs)
+	{
+		toWChar(data, rhs);
+	}
+
+	operator const WCHAR*() const
+	{
+		return data;
+	}
+
+	WCHAR data[N];
+};
 
 
 void getDropFile(const Event& event, int idx, char* out, int max_size)
@@ -232,7 +254,7 @@ WindowHandle createWindow(const InitWindowArgs& args)
 	WNDCLASS wc = {};
 
 	auto WndProc = [](HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam) -> LRESULT {
-		App::Event e;
+		Event e;
 		e.window = hWnd;
 		switch (Msg)
 		{
@@ -240,7 +262,7 @@ WindowHandle createWindow(const InitWindowArgs& args)
 				e.type = Event::Type::WINDOW_MOVE;
 				e.win_move.x = LOWORD(lParam);
 				e.win_move.y = HIWORD(lParam);
-				App::G.iface->onEvent(e);
+				G.iface->onEvent(e);
 				return 0;
 			case WM_SIZE:
 				e.type = Event::Type::WINDOW_SIZE;
@@ -249,7 +271,7 @@ WindowHandle createWindow(const InitWindowArgs& args)
 				return 0;
 			case WM_CLOSE:
 				e.type = Event::Type::WINDOW_CLOSE;
-				App::G.iface->onEvent(e);
+				G.iface->onEvent(e);
 				return 0;
 			case WM_ACTIVATE:
 				if (wParam == WA_INACTIVE) ShowCursor(TRUE);
@@ -266,8 +288,7 @@ WindowHandle createWindow(const InitWindowArgs& args)
 	wc.hIcon = LoadIcon(NULL, IDI_APPLICATION);
 	wc.hCursor = LoadCursor(NULL, IDC_ARROW);
 	wc.hbrBackground = NULL;
-	WCHAR wname[256];
-	toWChar(wname, args.name);
+	WCharStr<MAX_PATH_LENGTH> wname(args.name);
 	wc.lpszClassName = wname;
 
 	if (!RegisterClass(&wc)) return INVALID_WINDOW;
@@ -352,8 +373,7 @@ void showCursor(bool show)
 
 void setWindowTitle(WindowHandle win, const char* title)
 {
-	WCHAR tmp[256];
-	toWChar(tmp, title);
+	WCharStr<256> tmp(title);
 	SetWindowText((HWND)win, tmp);
 }
 
@@ -380,7 +400,7 @@ void setWindowScreenRect(WindowHandle win, const Rect& rect)
 }
 
 
-void setMousePos(int x, int y)
+void setMouseScreenPos(int x, int y)
 {
 	SetCursorPos(x, y);
 }
@@ -394,7 +414,7 @@ Point getMousePos(WindowHandle win)
 	return {p.x, p.y};
 }
 
-Point getMousePos()
+Point getMouseScreenPos()
 {
 	POINT p;
 	BOOL b = GetCursorPos(&p);
@@ -441,7 +461,7 @@ void run(Interface& iface)
 	G.iface->onInit();
 	while (!G.finished)
 	{
-		App::processEvents();
+		processEvents();
 		G.iface->onIdle();
 	}
 }
@@ -452,6 +472,331 @@ int getDPI()
 	// TODO
 	return 96;
 }
+
+
+struct FileIterator
+{
+	HANDLE handle;
+	IAllocator* allocator;
+	WIN32_FIND_DATA ffd;
+	bool is_valid;
+};
+
+
+FileIterator* createFileIterator(const char* path, IAllocator& allocator)
+{
+	char tmp[MAX_PATH_LENGTH];
+	copyString(tmp, path);
+	catString(tmp, "/*");
+	
+	WCharStr<MAX_PATH_LENGTH> wtmp(tmp);
+	auto* iter = LUMIX_NEW(allocator, FileIterator);
+	iter->allocator = &allocator;
+	iter->handle = FindFirstFile(wtmp, &iter->ffd);
+	iter->is_valid = iter->handle != INVALID_HANDLE_VALUE;
+	return iter;
+}
+
+
+void destroyFileIterator(FileIterator* iterator)
+{
+	FindClose(iterator->handle);
+	LUMIX_DELETE(*iterator->allocator, iterator);
+}
+
+
+bool getNextFile(FileIterator* iterator, FileInfo* info)
+{
+	if (!iterator->is_valid) return false;
+
+	info->is_directory = (iterator->ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+	fromWChar(info->filename, lengthOf(info->filename), iterator->ffd.cFileName);
+
+	iterator->is_valid = FindNextFile(iterator->handle, &iterator->ffd) != FALSE;
+	return true;
+}
+
+
+void setCurrentDirectory(const char* path)
+{
+	WCharStr<MAX_PATH_LENGTH> tmp(path);
+	SetCurrentDirectory(tmp);
+}
+
+
+void getCurrentDirectory(char* buffer, int buffer_size)
+{
+	WCHAR tmp[MAX_PATH_LENGTH];
+	GetCurrentDirectory(lengthOf(tmp), tmp);
+	fromWChar(buffer, buffer_size, tmp);
+}
+
+
+bool getSaveFilename(char* out, int max_size, const char* filter, const char* default_extension)
+{
+	WCharStr<MAX_PATH_LENGTH> wtmp("");
+	WCharStr<MAX_PATH_LENGTH> wfilter(filter);
+	WCharStr<MAX_PATH_LENGTH> wdefault_extension(default_extension);
+	OPENFILENAME ofn;
+	ZeroMemory(&ofn, sizeof(ofn));
+	ofn.lStructSize = sizeof(ofn);
+	ofn.hwndOwner = NULL;
+	ofn.lpstrFile = wtmp.data;
+	ofn.lpstrFile[0] = '\0';
+	ofn.nMaxFile = lengthOf(wtmp.data);
+	ofn.lpstrFilter = wfilter.data;
+	ofn.nFilterIndex = 1;
+	ofn.lpstrDefExt = wdefault_extension.data;
+	ofn.lpstrFileTitle = NULL;
+	ofn.nMaxFileTitle = 0;
+	ofn.lpstrInitialDir = NULL;
+	ofn.Flags = OFN_OVERWRITEPROMPT | OFN_NOCHANGEDIR | OFN_NONETWORKBUTTON;
+
+	bool res = GetSaveFileName(&ofn) != FALSE;
+
+	char tmp[MAX_PATH_LENGTH];
+	fromWChar(tmp, lengthOf(tmp), wtmp);
+	if (res) PathUtils::normalize(tmp, out, max_size);
+	return res;
+}
+
+
+bool getOpenFilename(char* out, int max_size, const char* filter, const char* starting_file)
+{
+	OPENFILENAME ofn;
+	ZeroMemory(&ofn, sizeof(ofn));
+	ofn.lStructSize = sizeof(ofn);
+	ofn.hwndOwner = NULL;
+	if (starting_file)
+	{
+		char* to = out;
+		for (const char *from = starting_file; *from; ++from, ++to)
+		{
+			if (to - out > max_size - 1) break;
+			*to = *to == '/' ? '\\' : *from;
+		}
+		*to = '\0';
+	}
+	else
+	{
+		out[0] = '\0';
+	}
+	WCHAR wout[MAX_PATH_LENGTH];
+	WCharStr<MAX_PATH_LENGTH> wfilter(filter);
+	ofn.lpstrFile = wout;
+	ofn.nMaxFile = sizeof(wout);
+	ofn.lpstrFilter = wfilter;
+	ofn.nFilterIndex = 1;
+	ofn.lpstrFileTitle = NULL;
+	ofn.nMaxFileTitle = 0;
+	ofn.lpstrInitialDir = nullptr;
+	ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR | OFN_NONETWORKBUTTON;
+
+	const bool res = GetOpenFileName(&ofn) != FALSE;
+	if (res) {
+		fromWChar(out, max_size, wout);
+	}
+	return res;
+}
+
+
+bool getOpenDirectory(char* out, int max_size, const char* starting_dir)
+{
+	bool ret = false;
+	IFileDialog* pfd;
+	if (SUCCEEDED(CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pfd))))
+	{
+		if (starting_dir)
+		{
+			PIDLIST_ABSOLUTE pidl;
+			WCHAR wstarting_dir[MAX_PATH];
+			WCHAR* wc = wstarting_dir;
+			for (const char *c = starting_dir; *c && wc - wstarting_dir < MAX_PATH - 1; ++c, ++wc)
+			{
+				*wc = *c == '/' ? '\\' : *c;
+			}
+			*wc = 0;
+
+			HRESULT hresult = ::SHParseDisplayName(wstarting_dir, 0, &pidl, SFGAO_FOLDER, 0);
+			if (SUCCEEDED(hresult))
+			{
+				IShellItem* psi;
+				hresult = ::SHCreateShellItem(NULL, NULL, pidl, &psi);
+				if (SUCCEEDED(hresult))
+				{
+					pfd->SetFolder(psi);
+				}
+				ILFree(pidl);
+			}
+		}
+
+		DWORD dwOptions;
+		if (SUCCEEDED(pfd->GetOptions(&dwOptions)))
+		{
+			pfd->SetOptions(dwOptions | FOS_PICKFOLDERS);
+		}
+		if (SUCCEEDED(pfd->Show(NULL)))
+		{
+			IShellItem* psi;
+			if (SUCCEEDED(pfd->GetResult(&psi)))
+			{
+				WCHAR* tmp;
+				if (SUCCEEDED(psi->GetDisplayName(SIGDN_DESKTOPABSOLUTEPARSING, &tmp)))
+				{
+					char* c = out;
+					while (*tmp && c - out < max_size - 1)
+					{
+						*c = (char)*tmp;
+						++c;
+						++tmp;
+					}
+					*c = '\0';
+					if (!endsWith(out, "/") && !endsWith(out, "\\") && c - out < max_size - 1)
+					{
+						*c = '/';
+						++c;
+						*c = '\0';
+					}
+					ret = true;
+				}
+				psi->Release();
+			}
+		}
+		pfd->Release();
+	}
+	return ret;
+}
+
+
+void copyToClipboard(const char* text)
+{
+	if (!OpenClipboard(NULL)) return;
+	int len = stringLength(text);
+	HGLOBAL mem_handle = GlobalAlloc(GMEM_MOVEABLE, len * sizeof(char));
+	if (!mem_handle) return;
+
+	char* mem = (char*)GlobalLock(mem_handle);
+	copyString(mem, len, text);
+	GlobalUnlock(mem_handle);
+	EmptyClipboard();
+	SetClipboardData(CF_TEXT, mem_handle);
+	CloseClipboard();
+}
+
+
+bool shellExecuteOpen(const char* path)
+{
+	const WCharStr<MAX_PATH_LENGTH> wpath(path);
+	return (uintptr_t)ShellExecute(NULL, NULL, wpath, NULL, NULL, SW_SHOW) > 32;
+}
+
+
+bool deleteFile(const char* path)
+{
+	const WCharStr<MAX_PATH_LENGTH> wpath(path);
+	return DeleteFile(wpath) != FALSE;
+}
+
+
+bool moveFile(const char* from, const char* to)
+{
+	const WCharStr<MAX_PATH_LENGTH> wfrom(from);
+	const WCharStr<MAX_PATH_LENGTH> wto(to);
+	return MoveFile(wfrom, wto) != FALSE;
+}
+
+
+size_t getFileSize(const char* path)
+{
+	WIN32_FILE_ATTRIBUTE_DATA fad;
+	const WCharStr<MAX_PATH_LENGTH> wpath(path);
+	if (!GetFileAttributesEx(wpath, GetFileExInfoStandard, &fad)) return -1;
+	LARGE_INTEGER size;
+	size.HighPart = fad.nFileSizeHigh;
+	size.LowPart = fad.nFileSizeLow;
+	return (size_t)size.QuadPart;
+}
+
+
+bool fileExists(const char* path)
+{
+	const WCharStr<MAX_PATH_LENGTH> wpath(path);
+	DWORD dwAttrib = GetFileAttributes(wpath);
+	return (dwAttrib != INVALID_FILE_ATTRIBUTES && !(dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
+}
+
+
+bool dirExists(const char* path)
+{
+	const WCharStr<MAX_PATH_LENGTH> wpath(path);
+	DWORD dwAttrib = GetFileAttributes(wpath);
+	return (dwAttrib != INVALID_FILE_ATTRIBUTES && (dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
+}
+
+
+u64 getLastModified(const char* path)
+{
+	const WCharStr<MAX_PATH_LENGTH> wpath(path);
+	FILETIME ft;
+	HANDLE handle = CreateFile(wpath, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (handle == INVALID_HANDLE_VALUE) return 0;
+	if (GetFileTime(handle, NULL, NULL, &ft) == FALSE) {
+		CloseHandle(handle);
+		return 0;
+	}
+	CloseHandle(handle);
+
+	ULARGE_INTEGER i;
+	i.LowPart = ft.dwLowDateTime;
+	i.HighPart = ft.dwHighDateTime;
+	return i.QuadPart;
+}
+
+
+bool makePath(const char* path)
+{
+	char tmp[MAX_PATH];
+	char* out = tmp;
+	const char* in = path;
+	while (*in && out - tmp < lengthOf(tmp) - 1)
+	{
+		*out = *in == '/' ? '\\' : *in;
+		++out;
+		++in;
+	}
+	*out = '\0';
+
+	const WCharStr<MAX_PATH_LENGTH> wpath(tmp);
+	int error_code = SHCreateDirectoryEx(NULL, wpath, NULL);
+	return error_code == ERROR_SUCCESS;
+}
+
+
+void clipCursor(WindowHandle win, int x, int y, int w, int h)
+{
+	POINT min;
+	POINT max;
+	min.x = LONG(x);
+	min.y = LONG(y);
+	max.x = LONG(x + w);
+	max.y = LONG(y + h);
+
+	ClientToScreen((HWND)win, &min);
+	ClientToScreen((HWND)win, &max);
+	RECT rect;
+	rect.left = min.x;
+	rect.right = max.x;
+	rect.top = min.y;
+	rect.bottom = max.y;
+	ClipCursor(&rect);
+}
+
+
+void unclipCursor()
+{
+	ClipCursor(NULL);
+}
+
 
 
 } // namespace Lumix::App

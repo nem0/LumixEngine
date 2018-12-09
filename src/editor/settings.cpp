@@ -7,7 +7,6 @@
 #include "engine/lua_wrapper.h"
 #include "engine/debug/debug.h"
 #include "imgui/imgui.h"
-#include "platform_interface.h"
 #include "utils.h"
 #include <lua.hpp>
 
@@ -64,22 +63,22 @@ static void saveStyle(FS::OsFile& file)
 }
 
 
-static void shortcutInput(App::Keycode& shortcut)
+static void shortcutInput(OS::Keycode& shortcut)
 {
 	StaticString<50> popup_name("");
 	popup_name << (i64)&shortcut;
 
 	char tmp[32];
-	App::getKeyName(shortcut, tmp, sizeof(tmp));
+	OS::getKeyName(shortcut, tmp, sizeof(tmp));
 	StaticString<50> button_label(tmp);
 	button_label << "###" << (i64)&shortcut;
 
-	if (ImGui::Button(button_label, ImVec2(65, 0))) shortcut = App::Keycode::INVALID;
+	if (ImGui::Button(button_label, ImVec2(65, 0))) shortcut = OS::Keycode::INVALID;
 
 	if (ImGui::IsItemHovered()) {
-		for (int i = 0; i < (int)App::Keycode::MAX; ++i) {
-			if (App::isKeyDown((App::Keycode)i)) {
-				shortcut = (App::Keycode)i;
+		for (int i = 0; i < (int)OS::Keycode::MAX; ++i) {
+			if (OS::isKeyDown((OS::Keycode)i)) {
+				shortcut = (OS::Keycode)i;
 				break;
 			}
 		}
@@ -175,7 +174,7 @@ Settings::~Settings()
 bool Settings::load()
 {
 	auto L = m_state;
-	bool has_settings = PlatformInterface::fileExists(SETTINGS_PATH);
+	bool has_settings = OS::fileExists(SETTINGS_PATH);
 	bool errors = luaL_loadfile(L, has_settings ? SETTINGS_PATH : DEFAULT_SETTINGS_PATH) != 0;
 	errors = errors || lua_pcall(L, 0, 0, 0) != 0;
 	if (errors)
@@ -227,7 +226,7 @@ bool Settings::load()
 					lua_rawgeti(L, -1, 1 + j);
 					if (lua_type(L, -1) == LUA_TNUMBER)
 					{
-						actions[i]->shortcut[j] = (App::Keycode)lua_tointeger(L, -1);
+						actions[i]->shortcut[j] = (OS::Keycode)lua_tointeger(L, -1);
 					}
 					lua_pop(L, 1);
 				}

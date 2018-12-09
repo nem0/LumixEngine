@@ -15,7 +15,7 @@ INT WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, INT)
 	}
 
 	auto* app = Lumix::StudioApp::create();
-	Lumix::App::run(*app);
+	Lumix::OS::run(*app);
 	//app->run();
 	int exit_code = app->getExitCode();
 	Lumix::StudioApp::destroy(*app);

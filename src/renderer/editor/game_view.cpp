@@ -1,7 +1,6 @@
 #include "game_view.h"
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
-#include "editor/platform_interface.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
@@ -117,7 +116,7 @@ void GameView::enableIngameCursor(bool enable)
 	m_is_ingame_cursor = enable;
 	if (!m_is_mouse_captured) return;
 
-	App::showCursor(m_is_ingame_cursor);
+	OS::showCursor(m_is_ingame_cursor);
 }
 
 
@@ -147,16 +146,16 @@ void GameView::captureMouse(bool capture)
 
 	m_is_mouse_captured = capture;
 	m_editor.getEngine().getInputSystem().enable(m_is_mouse_captured);
-	App::showCursor(!capture || m_is_ingame_cursor);
+	OS::showCursor(!capture || m_is_ingame_cursor);
 	
 	if (capture) {
-		const App::Point cp = App::getMousePos();
+		const OS::Point cp = OS::getMouseScreenPos();
 		m_captured_mouse_x = cp.x;
 		m_captured_mouse_y = cp.y;
 	}
 	else {
-		PlatformInterface::unclipCursor();
-		App::setMousePos(m_captured_mouse_x, m_captured_mouse_y);
+		OS::unclipCursor();
+		OS::setMouseScreenPos(m_captured_mouse_x, m_captured_mouse_y);
 	}
 }
 
@@ -282,7 +281,7 @@ void GameView::processInputEvents()
 	if (!m_is_mouse_captured) return;
 	
 	InputSystem& input = m_editor.getEngine().getInputSystem();
-	const App::Event* events = m_studio_app.getEvents();
+	const OS::Event* events = m_studio_app.getEvents();
 	for (int i = 0, c = m_studio_app.getEventsCount(); i < c; ++i) {
 		input.injectEvent(events[i]);
 	}
@@ -296,7 +295,7 @@ void GameView::onWindowGUI()
 
 	auto& io = ImGui::GetIO();
 
-	bool is_focus = App::getFocused() == m_studio_app.getWindow();
+	bool is_focus = OS::getFocused() == m_studio_app.getWindow();
 	if (m_is_mouse_captured &&
 		(io.KeysDown[ImGui::GetKeyIndex(ImGuiKey_Escape)] || !m_editor.isGameMode() || !is_focus))
 	{
@@ -356,7 +355,7 @@ void GameView::onWindowGUI()
 
 			if (m_is_mouse_captured && m_is_ingame_cursor) {
 				ImVec2 pos = ImGui::GetItemRectMin();
-				PlatformInterface::clipCursor((int)pos.x, (int)pos.y, (int)m_size.x, (int)m_size.y);
+				OS::clipCursor(m_studio_app.getWindow(), (int)pos.x, (int)pos.y, (int)m_size.x, (int)m_size.y);
 			}
 
 			processInputEvents();

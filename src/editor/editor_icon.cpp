@@ -1,5 +1,4 @@
 #include "editor_icon.h"
-#include "editor/platform_interface.h"
 #include "engine/math_utils.h"
 #include "engine/matrix.h"
 #include "engine/reflection.h"
@@ -225,7 +224,7 @@ struct EditorIconsImpl final : public EditorIcons
 			for (int i = 0; i < lengthOf(ICONS); ++i)
 			{
 				StaticString<MAX_PATH_LENGTH> tmp("editor/models/", ICONS[i], "_3d.fbx");
-				m_is_3d[i] = PlatformInterface::fileExists(tmp);
+				m_is_3d[i] = OS::fileExists(tmp);
 				if (m_is_3d[i])
 				{
 					Path path(tmp);

@@ -2,7 +2,6 @@
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
 #include "editor/ieditor_command.h"
-#include "editor/platform_interface.h"
 #include "editor/property_grid.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
@@ -772,7 +771,7 @@ struct ConsolePlugin final : public StudioApp::GUIPlugin
 			if (ImGui::Button("Execute file"))
 			{
 				char tmp[MAX_PATH_LENGTH];
-				if (PlatformInterface::getOpenFilename(tmp, MAX_PATH_LENGTH, "Scripts\0*.lua\0", nullptr))
+				if (OS::getOpenFilename(tmp, MAX_PATH_LENGTH, "Scripts\0*.lua\0", nullptr))
 				{
 					FS::OsFile file;
 					IAllocator& allocator = app.getWorldEditor().getAllocator();
@@ -886,7 +885,7 @@ struct AddComponentPlugin final : public StudioApp::IAddComponentPlugin
 		if (ImGui::Selectable("New"))
 		{
 			char full_path[MAX_PATH_LENGTH];
-			if (PlatformInterface::getSaveFilename(full_path, lengthOf(full_path), "Lua script\0*.lua\0", "lua"))
+			if (OS::getSaveFilename(full_path, lengthOf(full_path), "Lua script\0*.lua\0", "lua"))
 			{
 				FS::OsFile file;
 				WorldEditor& editor = app.getWorldEditor();

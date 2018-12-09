@@ -5,7 +5,6 @@
 #include "animation/editor/animation_editor.h"
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
-#include "editor/platform_interface.h"
 #include "editor/property_grid.h"
 #include "editor/studio_app.h"
 #include "editor/world_editor.h"
@@ -100,7 +99,7 @@ struct PropertyAnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 	bool createResource(char* out, int max_size) override
 	{
 		char full_path[MAX_PATH_LENGTH];
-		if (!PlatformInterface::getSaveFilename(full_path, lengthOf(full_path), "Property animation\0*.anp\0", "anp")) return false;
+		if (!OS::getSaveFilename(full_path, lengthOf(full_path), "Property animation\0*.anp\0", "anp")) return false;
 
 		FS::OsFile file;
 		WorldEditor& editor = m_app.getWorldEditor();

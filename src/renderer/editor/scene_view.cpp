@@ -373,14 +373,14 @@ void SceneView::captureMouse(bool capture)
 {
 	if(m_is_mouse_captured == capture) return;
 	m_is_mouse_captured = capture;
-	App::showCursor(!m_is_mouse_captured);
+	OS::showCursor(!m_is_mouse_captured);
 	if (capture) {
-		const App::Point p = App::getMousePos();
+		const OS::Point p = OS::getMouseScreenPos();
 		m_captured_mouse_x = p.x;
 		m_captured_mouse_y = p.y;
 	}
 	else {
-		App::setMousePos(m_captured_mouse_x, m_captured_mouse_y);
+		OS::setMouseScreenPos(m_captured_mouse_x, m_captured_mouse_y);
 	}
 }
 
@@ -620,17 +620,17 @@ void SceneView::onWindowGUI()
 			view_pos = content_min;
 
 			const bool handle_input = ImGui::IsItemHovered();
-			const App::Event* events = m_app.getEvents();
+			const OS::Event* events = m_app.getEvents();
 			for (int i = 0, c = m_app.getEventsCount(); i < c; ++i) {
-				const App::Event& event = events[i];
+				const OS::Event& event = events[i];
 				switch (event.type) {
-					case App::Event::Type::MOUSE_BUTTON: {
-						if (event.mouse_button.button == App::MouseButton::RIGHT) {
+					case OS::Event::Type::MOUSE_BUTTON: {
+						if (event.mouse_button.button == OS::MouseButton::RIGHT) {
 							captureMouse(event.mouse_button.down);
 						}
 						if (handle_input) {
 							ImGui::ResetActiveID();
-							const App::Point cp = App::getMousePos(event.window);
+							const OS::Point cp = OS::getMousePos(event.window);
 							Vec2 rel_mp = { (float)cp.x, (float)cp.y };
 							rel_mp.x -= m_screen_x;
 							rel_mp.y -= m_screen_y;
@@ -643,9 +643,9 @@ void SceneView::onWindowGUI()
 						}
 						break;
 					}
-					case App::Event::Type::MOUSE_MOVE: 
+					case OS::Event::Type::MOUSE_MOVE: 
 						if (handle_input) {
-							const App::Point cp = App::getMousePos(event.window);
+							const OS::Point cp = OS::getMousePos(event.window);
 							Vec2 rel_mp = {(float)cp.x, (float)cp.y};
 							rel_mp.x -= m_screen_x;
 							rel_mp.y -= m_screen_y;

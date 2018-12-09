@@ -2,7 +2,7 @@
 
 
 #include "engine/lumix.h"
-#include "engine/app.h"
+#include "engine/os.h"
 #include "engine/array.h"
 
 
@@ -32,7 +32,7 @@ struct Vec2;
 class WorldEditor;
 
 
-class LUMIX_EDITOR_API StudioApp : public App::Interface
+class LUMIX_EDITOR_API StudioApp : public OS::Interface
 {
 public:
 	struct IPlugin
@@ -119,7 +119,7 @@ public:
 	virtual bool makeFile(const char* path, const char* content) = 0;
 	virtual Vec2 getMouseMove() const = 0;
 
-	virtual const App::Event* getEvents() const = 0;
+	virtual const OS::Event* getEvents() const = 0;
 	virtual int getEventsCount() const = 0;
 	virtual ~StudioApp() {}
 	virtual void run() = 0;

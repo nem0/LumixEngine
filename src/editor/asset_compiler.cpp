@@ -1,7 +1,6 @@
 #include "asset_compiler.h"
 #include "editor/file_system_watcher.h"
 #include "editor/log_ui.h"
-#include "editor/platform_interface.h"
 #include "editor/studio_app.h"
 #include "editor/world_editor.h"
 #include "engine/crc32.h"
@@ -100,7 +99,7 @@ struct AssetCompilerImpl : AssetCompiler
 		m_task.create("asset compiler");
 		const char* base_path = m_app.getWorldEditor().getEngine().getDiskFileDevice()->getBasePath();
 		StaticString<MAX_PATH_LENGTH> path(base_path, ".lumix/assets");
-		PlatformInterface::makePath(path);
+		OS::makePath(path);
 		ResourceManagerHub& rm = app.getWorldEditor().getEngine().getResourceManager();
 		rm.setLoadHook(&m_load_hook);
 	}
@@ -193,8 +192,8 @@ struct AssetCompilerImpl : AssetCompiler
 	
 	void processDir(const char* dir, int base_length, u64 list_last_modified)
 	{
-		auto* iter = PlatformInterface::createFileIterator(dir, m_app.getWorldEditor().getAllocator());
-		PlatformInterface::FileInfo info;
+		auto* iter = OS::createFileIterator(dir, m_app.getWorldEditor().getAllocator());
+		OS::FileInfo info;
 		while (getNextFile(iter, &info))
 		{
 			if (info.filename[0] == '.') continue;
@@ -214,7 +213,7 @@ struct AssetCompilerImpl : AssetCompiler
 				catString(fullpath, "/");
 				catString(fullpath, info.filename);
 
-				if (PlatformInterface::getLastModified(fullpath[0] == '/' ? fullpath + 1 : fullpath) > list_last_modified) {
+				if (OS::getLastModified(fullpath[0] == '/' ? fullpath + 1 : fullpath) > list_last_modified) {
 					addResource(fullpath);
 				}
 			}
@@ -302,7 +301,7 @@ struct AssetCompilerImpl : AssetCompiler
 			lua_close(L);
 		}
 
-		const u64 list_last_modified = PlatformInterface::getLastModified(list_path);
+		const u64 list_last_modified = OS::getLastModified(list_path);
 		const char* base_path = m_app.getWorldEditor().getEngine().getDiskFileDevice()->getBasePath();
 		processDir(base_path, stringLength(base_path), list_last_modified);
 	}
@@ -437,15 +436,15 @@ struct AssetCompilerImpl : AssetCompiler
 	{
 		const char* filepath = getResourceFilePath(res.getPath().c_str());
 
-		if (!PlatformInterface::fileExists(filepath)) return ResourceManagerHub::LoadHook::Action::IMMEDIATE;
+		if (!OS::fileExists(filepath)) return ResourceManagerHub::LoadHook::Action::IMMEDIATE;
 		const u32 hash = res.getPath().getHash();
 		const StaticString<MAX_PATH_LENGTH> dst_path(".lumix/assets/", hash, ".res");
 		const PathUtils::FileInfo info(filepath);
 		const StaticString<MAX_PATH_LENGTH> meta_path(info.m_dir, info.m_basename, ".meta");
 
-		if (!PlatformInterface::fileExists(dst_path)
-			|| PlatformInterface::getLastModified(dst_path) < PlatformInterface::getLastModified(filepath)
-			|| PlatformInterface::getLastModified(dst_path) < PlatformInterface::getLastModified(meta_path)
+		if (!OS::fileExists(dst_path)
+			|| OS::getLastModified(dst_path) < OS::getLastModified(filepath)
+			|| OS::getLastModified(dst_path) < OS::getLastModified(meta_path)
 			)
 		{
 			MT::SpinLock lock(m_to_compile_mutex);

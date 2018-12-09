@@ -24,7 +24,7 @@ Action::Action(const char* label_short, const char* label_long, const char* name
 	this->label_short = label_short;
 	this->label_long = label_long;
 	this->name = name;
-	shortcut[0] = shortcut[1] = shortcut[2] = App::Keycode::INVALID;
+	shortcut[0] = shortcut[1] = shortcut[2] = OS::Keycode::INVALID;
 	is_selected.bind<falseConst>();
 }
 
@@ -32,9 +32,9 @@ Action::Action(const char* label_short, const char* label_long, const char* name
 Action::Action(const char* label_short,
 	const char* label_long,
 	const char* name,
-	App::Keycode shortcut0,
-	App::Keycode shortcut1,
-	App::Keycode shortcut2)
+	OS::Keycode shortcut0,
+	OS::Keycode shortcut1,
+	OS::Keycode shortcut2)
 	: label_long(label_long)
 	, label_short(label_short)
 	, name(name)
@@ -93,11 +93,11 @@ bool Action::isRequested()
 
 	bool* keys_down = ImGui::GetIO().KeysDown;
 	float* keys_down_duration = ImGui::GetIO().KeysDownDuration;
-	if (shortcut[0] == App::Keycode::INVALID) return false;
+	if (shortcut[0] == OS::Keycode::INVALID) return false;
 
 	for (int i = 0; i < lengthOf(shortcut) + 1; ++i)
 	{
-		if (i == lengthOf(shortcut) || shortcut[i] == App::Keycode::INVALID)
+		if (i == lengthOf(shortcut) || shortcut[i] == OS::Keycode::INVALID)
 		{
 			return true;
 		}
@@ -112,13 +112,13 @@ bool Action::isRequested()
 bool Action::isActive()
 {
 	if (ImGui::IsAnyItemFocused()) return false;
-	if (shortcut[0] == App::Keycode::INVALID) return false;
+	if (shortcut[0] == OS::Keycode::INVALID) return false;
 
 	for (int i = 0; i < lengthOf(shortcut) + 1; ++i) {
-		if (i == lengthOf(shortcut) || shortcut[i] == App::Keycode::INVALID) {
+		if (i == lengthOf(shortcut) || shortcut[i] == OS::Keycode::INVALID) {
 			return true;
 		}
-		if (!App::isKeyDown(shortcut[i])) return false;
+		if (!OS::isKeyDown(shortcut[i])) return false;
 	}
 	return false;
 }

@@ -1,6 +1,5 @@
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
-#include "editor/platform_interface.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
@@ -54,7 +53,7 @@ struct SpritePlugin final : public AssetBrowser::IPlugin
 	bool createResource(char* out, int max_size) override
 	{
 		char full_path[MAX_PATH_LENGTH];
-		if (!PlatformInterface::getSaveFilename(full_path, lengthOf(full_path), "Sprite\0*.spr\0", "spr")) return false;
+		if (!OS::getSaveFilename(full_path, lengthOf(full_path), "Sprite\0*.spr\0", "spr")) return false;
 		
 		FS::OsFile file;
 		WorldEditor& editor = app.getWorldEditor();

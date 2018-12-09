@@ -1,7 +1,7 @@
 #pragma once
 
 #include "engine/lumix.h"
-#include "engine/app.h"
+#include "engine/os.h"
 #include "engine/array.h"
 #include "engine/delegate_list.h"
 #include "engine/universe/component.h"
@@ -63,7 +63,7 @@ public:
 		virtual ~Plugin() {}
 
 		virtual bool onMouseDown(const RayHit& /*hit*/, int /*x*/, int /*y*/) { return false; }
-		virtual void onMouseUp(int /*x*/, int /*y*/, App::MouseButton /*button*/) {}
+		virtual void onMouseUp(int /*x*/, int /*y*/, OS::MouseButton /*button*/) {}
 		virtual void onMouseMove(int /*x*/, int /*y*/, int /*rel_x*/, int /*rel_y*/) {}
 		virtual bool showGizmo(ComponentUID /*cmp*/) { return false; }
 	};
@@ -135,12 +135,12 @@ public:
 	virtual void setToggleSelection(bool is_toggle) = 0;
 	virtual void addArrayPropertyItem(const ComponentUID& cmp, const Reflection::IArrayProperty& property) = 0;
 	virtual void removeArrayPropertyItem(const ComponentUID& cmp, int index, const Reflection::IArrayProperty& property) = 0;
-	virtual bool isMouseDown(App::MouseButton button) const = 0;
-	virtual bool isMouseClick(App::MouseButton button) const = 0;
+	virtual bool isMouseDown(OS::MouseButton button) const = 0;
+	virtual bool isMouseClick(OS::MouseButton button) const = 0;
 	virtual void inputFrame() = 0;
-	virtual void onMouseDown(int x, int y, App::MouseButton button) = 0;
+	virtual void onMouseDown(int x, int y, OS::MouseButton button) = 0;
 	virtual void onMouseMove(int x, int y, int relx, int rely) = 0;
-	virtual void onMouseUp(int x, int y, App::MouseButton button) = 0;
+	virtual void onMouseUp(int x, int y, OS::MouseButton button) = 0;
 	virtual Vec2 getMousePos() const = 0;
 	virtual float getMouseRelX() const = 0;
 	virtual float getMouseRelY() const = 0;

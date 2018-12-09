@@ -41,7 +41,7 @@ public:
 
 	bool onMouseDown(const WorldEditor::RayHit& hit, int, int) override;
 	void onMouseMove(int x, int y, int /*rel_x*/, int /*rel_y*/) override;
-	void onMouseUp(int, int, App::MouseButton) override;
+	void onMouseUp(int, int, OS::MouseButton) override;
 	void onGUI();
 	void setComponent(ComponentUID cmp) { m_component = cmp; }
 

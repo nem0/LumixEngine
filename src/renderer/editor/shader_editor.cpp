@@ -1,5 +1,4 @@
 #include "shader_editor.h"
-#include "editor/platform_interface.h"
 #include "editor/utils.h"
 #include "engine/blob.h"
 #include "engine/crc32.h"
@@ -1788,7 +1787,7 @@ void ShaderEditor::loadNodeConnections(InputBlob& blob, Node& node)
 void ShaderEditor::load()
 {
 	char path[MAX_PATH_LENGTH];
-	if (!PlatformInterface::getOpenFilename(path, lengthOf(path), "Shader edit data\0*.sed\0", nullptr))
+	if (!OS::getOpenFilename(path, lengthOf(path), "Shader edit data\0*.sed\0", nullptr))
 	{
 		return;
 	}
@@ -1850,7 +1849,7 @@ void ShaderEditor::load()
 bool ShaderEditor::getSavePath()
 {
 	char path[MAX_PATH_LENGTH];
-	if (PlatformInterface::getSaveFilename(path, lengthOf(path), "Shader edit data\0*.sed\0", "sed"))
+	if (OS::getSaveFilename(path, lengthOf(path), "Shader edit data\0*.sed\0", "sed"))
 	{
 		m_path = path;
 		return true;

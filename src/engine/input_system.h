@@ -2,17 +2,14 @@
 
 
 #include "engine/lumix.h"
-#include "engine/app.h"
+#include "engine/os.h"
 
 
 namespace Lumix
 {
 
 
-namespace App { struct Event; }
-
-
-class Engine;
+	class Engine;
 struct IAllocator;
 struct Vec2;
 
@@ -101,7 +98,7 @@ class LUMIX_ENGINE_API InputSystem
 		virtual void update(float dt) = 0;
 
 		virtual void injectEvent(const Event& event) = 0;
-		virtual void injectEvent(const App::Event& event) = 0;
+		virtual void injectEvent(const OS::Event& event) = 0;
 		virtual int getEventsCount() const = 0;
 		virtual const Event* getEvents() const = 0;
 

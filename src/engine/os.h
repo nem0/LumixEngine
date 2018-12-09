@@ -4,11 +4,15 @@
 #include "lumix.h"
 
 
-namespace Lumix::App {
+namespace Lumix
+{
 
+struct IAllocator;
+
+namespace OS
+{
 
 enum class Keycode : u8;
-
 
 enum class MouseButton : int 
 {
@@ -20,22 +24,11 @@ enum class MouseButton : int
 	MAX = 16
 };
 
-
-struct Point
-{
-    int x, y;
-};
-
-
-struct Rect
-{
-    int left, top, width, height;
-};
-
+struct Point { int x, y; };
+struct Rect { int left, top, width, height; };
 
 using WindowHandle = void*;
 constexpr WindowHandle INVALID_WINDOW = nullptr;
-
 
 struct Event {
     enum class Type {
@@ -83,35 +76,64 @@ struct Interface
     virtual void onIdle() = 0;
 };
 
+struct FileInfo {
+	bool is_directory;
+	char filename[MAX_PATH_LENGTH];
+};
 
-void quit();
+struct FileIterator;
 
-void getDropFile(const Event& event, int idx, char* out, int max_size);
-int getDropFileCount(const Event& event);
-void finishDrag(const Event& event);
+LUMIX_ENGINE_API FileIterator* createFileIterator(const char* path, IAllocator& allocator);
+LUMIX_ENGINE_API void destroyFileIterator(FileIterator* iterator);
+LUMIX_ENGINE_API bool getNextFile(FileIterator* iterator, FileInfo* info);
 
-Point getMousePos();
-Point getMousePos(WindowHandle win);
-void setMousePos(int x, int y);
-void showCursor(bool show);
+LUMIX_ENGINE_API void setCurrentDirectory(const char* path);
+LUMIX_ENGINE_API void getCurrentDirectory(char* buffer, int buffer_size);
+LUMIX_ENGINE_API bool getOpenFilename(char* out, int max_size, const char* filter, const char* starting_file);
+LUMIX_ENGINE_API bool getSaveFilename(char* out, int max_size, const char* filter, const char* default_extension);
+LUMIX_ENGINE_API bool getOpenDirectory(char* out, int max_size, const char* starting_dir);
+LUMIX_ENGINE_API bool shellExecuteOpen(const char* path);
+LUMIX_ENGINE_API void copyToClipboard(const char* text);
 
-WindowHandle createWindow(const InitWindowArgs& args);
-void destroyWindow(WindowHandle wnd);
-Rect getWindowScreenRect(WindowHandle win);
-Point getWindowClientSize(WindowHandle win);
-void setWindowScreenRect(WindowHandle win, const Rect& rect);
-void setWindowTitle(WindowHandle win, const char* title);
-void maximizeWindow(WindowHandle win);
-bool isMaximized(WindowHandle win);
-WindowHandle getFocused();
+LUMIX_ENGINE_API bool deleteFile(const char* path);
+LUMIX_ENGINE_API bool moveFile(const char* from, const char* to);
+LUMIX_ENGINE_API size_t getFileSize(const char* path);
+LUMIX_ENGINE_API bool fileExists(const char* path);
+LUMIX_ENGINE_API bool dirExists(const char* path);
+LUMIX_ENGINE_API u64 getLastModified(const char* file);
+LUMIX_ENGINE_API bool makePath(const char* path);
 
-bool isKeyDown(Keycode keycode);
-void getKeyName(Keycode keycode, char* out, int size);
-int getDPI();
-void UTF32ToUTF8(u32 utf32, char* utf8);
+LUMIX_ENGINE_API void clipCursor(WindowHandle win, int x, int y, int w, int h);
+LUMIX_ENGINE_API void unclipCursor();
+
+LUMIX_ENGINE_API void quit();
+
+LUMIX_ENGINE_API void getDropFile(const Event& event, int idx, char* out, int max_size);
+LUMIX_ENGINE_API int getDropFileCount(const Event& event);
+LUMIX_ENGINE_API void finishDrag(const Event& event);
+
+LUMIX_ENGINE_API Point getMouseScreenPos();
+LUMIX_ENGINE_API Point getMousePos(WindowHandle win);
+LUMIX_ENGINE_API void setMouseScreenPos(int x, int y);
+LUMIX_ENGINE_API void showCursor(bool show);
+
+LUMIX_ENGINE_API WindowHandle createWindow(const InitWindowArgs& args);
+LUMIX_ENGINE_API void destroyWindow(WindowHandle wnd);
+LUMIX_ENGINE_API Rect getWindowScreenRect(WindowHandle win);
+LUMIX_ENGINE_API Point getWindowClientSize(WindowHandle win);
+LUMIX_ENGINE_API void setWindowScreenRect(WindowHandle win, const Rect& rect);
+LUMIX_ENGINE_API void setWindowTitle(WindowHandle win, const char* title);
+LUMIX_ENGINE_API void maximizeWindow(WindowHandle win);
+LUMIX_ENGINE_API bool isMaximized(WindowHandle win);
+LUMIX_ENGINE_API WindowHandle getFocused();
+
+LUMIX_ENGINE_API bool isKeyDown(Keycode keycode);
+LUMIX_ENGINE_API void getKeyName(Keycode keycode, char* out, int size);
+LUMIX_ENGINE_API int getDPI();
+LUMIX_ENGINE_API void UTF32ToUTF8(u32 utf32, char* utf8);
 
 
-void run(Interface& iface);
+LUMIX_ENGINE_API void run(Interface& iface);
 
 
 enum class Keycode : u8
@@ -290,5 +312,7 @@ enum class Keycode : u8
 };
 
 
-} // namespace Lumix::App
+} // namespace OS
+
+} // namespace Lumix
 

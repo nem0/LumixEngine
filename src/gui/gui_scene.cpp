@@ -1,12 +1,12 @@
 #include "gui_scene.h"
 #include "gui_system.h"
 #include "sprite_manager.h"
-#include "engine/app.h"
 #include "engine/engine.h"
 #include "engine/flag_set.h"
 #include "engine/iallocator.h"
 #include "engine/input_system.h"
 #include "engine/log.h"
+#include "engine/os.h"
 #include "engine/plugin_manager.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
@@ -944,27 +944,27 @@ struct GUISceneImpl final : public GUIScene
 
 		rect->input_field->anim = 0;
 
-		switch ((App::Keycode)event.data.button.key_id)
+		switch ((OS::Keycode)event.data.button.key_id)
 		{
-		case App::Keycode::HOME: rect->input_field->cursor = 0; break;
-			case App::Keycode::END: rect->input_field->cursor = rect->text->text.length(); break;
-			case App::Keycode::BACKSPACE:
+		case OS::Keycode::HOME: rect->input_field->cursor = 0; break;
+			case OS::Keycode::END: rect->input_field->cursor = rect->text->text.length(); break;
+			case OS::Keycode::BACKSPACE:
 				if (rect->text->text.length() > 0 && rect->input_field->cursor > 0)
 				{
 					rect->text->text.eraseAt(rect->input_field->cursor - 1);
 					--rect->input_field->cursor;
 				}
 				break;
-			case App::Keycode::DEL:
+			case OS::Keycode::DEL:
 				if (rect->input_field->cursor < rect->text->text.length())
 				{
 					rect->text->text.eraseAt(rect->input_field->cursor);
 				}
 				break;
-			case App::Keycode::LEFT:
+			case OS::Keycode::LEFT:
 				if (rect->input_field->cursor > 0) --rect->input_field->cursor;
 				break;
-			case App::Keycode::RIGHT:
+			case OS::Keycode::RIGHT:
 				if (rect->input_field->cursor < rect->text->text.length()) ++rect->input_field->cursor;
 				break;
 		}
