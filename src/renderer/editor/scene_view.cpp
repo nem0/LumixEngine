@@ -381,6 +381,7 @@ void SceneView::captureMouse(bool capture)
 	}
 	else {
 		OS::setMouseScreenPos(m_captured_mouse_x, m_captured_mouse_y);
+		OS::unclipCursor();
 	}
 }
 
@@ -607,6 +608,13 @@ void SceneView::onWindowGUI()
 					ImGui::Image(t, size);
 				}
 			}
+
+			if (m_is_mouse_captured) {
+				ImVec2 pos = ImGui::GetItemRectMin();
+				ImVec2 size = ImGui::GetItemRectSize();
+				OS::clipCursor(m_app.getWindow(), (int)pos.x, (int)pos.y, (int)size.x, (int)size.y);
+			}
+
 			if (ImGui::BeginDragDropTarget())
 			{
 				if (auto* payload = ImGui::AcceptDragDropPayload("path"))
