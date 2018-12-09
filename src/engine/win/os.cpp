@@ -274,7 +274,7 @@ WindowHandle createWindow(const InitWindowArgs& args)
 				G.iface->onEvent(e);
 				return 0;
 			case WM_ACTIVATE:
-				if (wParam == WA_INACTIVE) ShowCursor(TRUE);
+				if (wParam == WA_INACTIVE) showCursor(true);
 				break;
 		}
 		return DefWindowProc(hWnd, Msg, wParam, lParam);
@@ -367,7 +367,12 @@ void getKeyName(Keycode keycode, char* out, int size)
 
 void showCursor(bool show)
 {
-	ShowCursor(show);
+	if (show) {
+		while(ShowCursor(show) < 0);
+	}
+	else {
+		while(ShowCursor(show) >= 0);
+	}
 }
 
 
