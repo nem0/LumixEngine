@@ -53,6 +53,7 @@ namespace Lumix
 							m_capacity = m_size = m_file->size();
 							m_buffer = (u8*)m_allocator.allocate(sizeof(u8) * m_size);
 							m_file->read(m_buffer, m_size);
+							m_file->close();
 							m_pos = 0;
 						}
 
@@ -78,8 +79,8 @@ namespace Lumix
 					{
 						m_file->seek(SeekMode::BEGIN, 0);
 						m_file->write(m_buffer, m_size);
+						m_file->close();
 					}
-					m_file->close();
 				}
 
 				m_allocator.deallocate(m_buffer);
