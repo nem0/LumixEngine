@@ -543,7 +543,7 @@ public:
 			void onGUI(bool create_entity, bool from_filter) override
 			{
 				const char* last = reverseFind(label, nullptr, '/');
-				if (ImGui::Selectable(last && !from_filter ? last + 1 : label))
+				if (ImGui::MenuItem(last && !from_filter ? last + 1 : label))
 				{
 					if (create_entity)
 					{
