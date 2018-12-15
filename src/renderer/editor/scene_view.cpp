@@ -633,7 +633,7 @@ void SceneView::onWindowGUI()
 				const OS::Event& event = events[i];
 				switch (event.type) {
 					case OS::Event::Type::MOUSE_BUTTON: {
-						if (event.mouse_button.button == OS::MouseButton::RIGHT) {
+						if (event.mouse_button.button == OS::MouseButton::RIGHT && handle_input) {
 							captureMouse(event.mouse_button.down);
 						}
 						if (handle_input) {
