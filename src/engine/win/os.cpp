@@ -4,7 +4,7 @@
 #include "engine/path_utils.h"
 #include "engine/string.h"
 #define UNICODE
-#include <cassert>
+#include <cASSERT>
 #include <ShlObj.h>
 #include <Windows.h>
 
@@ -70,7 +70,7 @@ struct WCharStr
 
 void getDropFile(const Event& event, int idx, char* out, int max_size)
 {
-	assert(max_size > 0);
+	ASSERT(max_size > 0);
 	HDROP drop = (HDROP)event.file_drop.handle;
 	WCHAR buffer[MAX_PATH];
 	if (DragQueryFile(drop, idx, buffer, MAX_PATH))
@@ -79,7 +79,7 @@ void getDropFile(const Event& event, int idx, char* out, int max_size)
 	}
 	else
 	{
-		assert(false);
+		ASSERT(false);
 	}
 }
 
@@ -352,7 +352,7 @@ void getKeyName(Keycode keycode, char* out, int size)
 	}
 
 	WCHAR tmp[256];
-	assert(size <= 256 && size > 0);
+	ASSERT(size <= 256 && size > 0);
 	int res = GetKeyNameText(scancode << 16, tmp, size);
 	if (res == 0)
 	{
@@ -415,7 +415,7 @@ Point getMousePos(WindowHandle win)
 	POINT p;
 	BOOL b = GetCursorPos(&p);
 	ScreenToClient((HWND)win, &p);
-	assert(b);
+	ASSERT(b);
 	return {p.x, p.y};
 }
 
@@ -423,7 +423,7 @@ Point getMouseScreenPos()
 {
 	POINT p;
 	BOOL b = GetCursorPos(&p);
-	assert(b);
+	ASSERT(b);
 	return {p.x, p.y};
 }
 
@@ -436,8 +436,10 @@ WindowHandle getFocused()
 
 bool isMaximized(WindowHandle win)
 {
-	// TODO
-	return false;
+	WINDOWPLACEMENT placement;
+	BOOL res = GetWindowPlacement((HWND)win, &placement);
+	ASSERT(res);
+	return placement.showCmd == SW_SHOWMAXIMIZED;
 }
 
 
