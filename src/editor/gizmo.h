@@ -73,8 +73,7 @@ public:
 	virtual bool isPivotCenter() const = 0;
 	virtual bool isPivotOrigin() const = 0;
 	virtual void clearEntities() = 0;
-
-	virtual bool immediate(Transform& frame) = 0;
+	virtual void update(const Viewport& vp) = 0;
 };
 
 

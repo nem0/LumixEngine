@@ -59,8 +59,7 @@ enum class CoordSystem
 struct GizmoImpl final : public Gizmo
 {
 	static const int MAX_GIZMOS = 16;
-	static const int MAX_IMMEDIATE = 16;
-
+	
 
 	explicit GizmoImpl(WorldEditor& editor)
 		: m_editor(editor)
@@ -76,7 +75,6 @@ struct GizmoImpl final : public Gizmo
 		, m_is_dragging(false)
 		, m_mouse_pos(0, 0)
 		, m_offset(0, 0, 0)
-		, m_immediate_count(0)
 	{
 		m_steps[int(Mode::TRANSLATE)] = 10;
 		m_steps[int(Mode::ROTATE)] = 45;
@@ -147,6 +145,39 @@ struct GizmoImpl final : public Gizmo
 		data->indices.resize(data->indices.size() + indices_count);
 
 		return { data->indices.end() - indices_count, data->vertices.end() - vertices_count };
+	}
+
+
+	void update(const Viewport& vp) override
+	{
+		RenderInterface* ri = m_editor.getRenderInterface();
+		for (int i = 0; i < m_count; ++i) {
+			const RigidTransform gizmo_tr = getTransform(m_entities[i]);
+			const Vec2 p = m_editor.getViewport().worldToScreenPixels(gizmo_tr.pos);
+			switch (m_mode) {
+				case Mode::TRANSLATE:
+					if (m_is_dragging) {
+						const DVec3 intersection = getMousePlaneIntersection(m_editor.getMousePos(), gizmo_tr, m_transform_axis);
+						const Vec3 delta_vec = (intersection - m_start_axis_point).toFloat();
+
+						StaticString<128> tmp("", delta_vec.x, "; ", delta_vec.y, "; ", delta_vec.z);
+						ri->addText2D(p.x + 31, p.y + 31, 16, 0xff000000, tmp);
+						ri->addText2D(p.x + 30, p.y + 30, 16, 0xffffFFFF, tmp);
+					}
+
+					break;
+				case Mode::ROTATE:
+					if (m_is_dragging && m_active == i) {
+						float angle_degrees = Math::radiansToDegrees(m_angle_accum);
+						StaticString<128> tmp("", angle_degrees, " deg");
+						Vec2 screen_delta = (m_start_mouse_pos - p).normalized();
+						Vec2 text_pos = m_start_mouse_pos + screen_delta * 15;
+						ri->addText2D(text_pos.x + 1, text_pos.y + 1, 16, 0xff000000, tmp);
+						ri->addText2D(text_pos.x, text_pos.y, 16, 0xffffFFFF, tmp);
+					}
+					break;
+			}
+		}
 	}
 
 	
@@ -230,17 +261,6 @@ struct GizmoImpl final : public Gizmo
 		vertices[8].position = Vec3(0, 0, 0.5f);
 		vertices[8].color = transform_axis == Axis::XZ ? SELECTED_COLOR : Y_COLOR;
 		indices[8] = 8;
-
-		if (m_is_dragging) {
-			RenderInterface* ri = m_editor.getRenderInterface();
-			const DVec3 intersection = getMousePlaneIntersection(m_editor.getMousePos(), gizmo_transform, m_transform_axis);
-			const Vec3 delta_vec = (intersection - m_start_axis_point).toFloat();
-
-			const Vec2 p = m_editor.getViewport().worldToScreenPixels(entity_pos);
-			StaticString<128> tmp("", delta_vec.x, "; ", delta_vec.y, "; ", delta_vec.z);
-			ri->addText2D(p.x + 31, p.y + 31, 16, 0xff000000, tmp);
-			ri->addText2D(p.x + 30, p.y + 30, 16, 0xffffFFFF, tmp);
-		}
 	}
 
 
@@ -501,14 +521,6 @@ struct GizmoImpl final : public Gizmo
 
 			const Vec3 origin = (m_start_plane_point - gizmo_tr.pos).toFloat().normalized();
 			renderArc(data, (gizmo_tr.pos - camera_pos).toFloat(), n * scale, origin * scale, m_angle_accum, 0x8800a5ff);
-			float angle_degrees = Math::radiansToDegrees(m_angle_accum);
-			
-			const Vec2 p = m_editor.getViewport().worldToScreenPixels(gizmo_tr.pos);
-			StaticString<128> tmp("", angle_degrees, " deg");
-			Vec2 screen_delta = (m_start_mouse_pos - p).normalized();
-			Vec2 text_pos = m_start_mouse_pos + screen_delta * 15;
-			ri->addText2D(text_pos.x + 1, text_pos.y + 1, 16, 0xff000000, tmp);
-			ri->addText2D(text_pos.x, text_pos.y, 16, 0xffffFFFF, tmp);
 		}
 	}
 
@@ -666,17 +678,6 @@ struct GizmoImpl final : public Gizmo
 				return Axis::Z;
 		}
 		return Axis::NONE;
-	}
-
-
-	bool immediate(Transform& frame) override
-	{
-		ASSERT(m_immediate_count < MAX_IMMEDIATE);
-		collide(frame.getRigidPart());
-		bool ret = transform(frame);
-		m_immediate_frames[m_immediate_count] = frame;
-		++m_immediate_count;
-		return ret;
 	}
 
 
@@ -1131,12 +1132,6 @@ struct GizmoImpl final : public Gizmo
 			render(gizmo_tr, m_active == i, vp, data);
 		}
 
-		for (int i = 0; i < m_immediate_count; ++i) {
-			render(m_immediate_frames[i].getRigidPart(), m_active == i, vp, data);
-		}
-
-		m_immediate_count = 0;
-
 		m_mouse_pos.x = m_editor.getMousePos().x;
 		m_mouse_pos.y = m_editor.getMousePos().y;
 		m_count = 0;
@@ -1216,8 +1211,6 @@ struct GizmoImpl final : public Gizmo
 	bool m_is_step;
 	int m_count;
 	EntityRef m_entities[MAX_GIZMOS];
-	Transform m_immediate_frames[MAX_IMMEDIATE];
-	int m_immediate_count;
 	Vec3 m_offset;
 };
 
