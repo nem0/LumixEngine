@@ -112,6 +112,7 @@ void LogUI::showNotifications()
 	if (m_notifications.empty()) return;
 
 	ImGui::SetNextWindowPos(ImVec2(10, 30));
+	ImGui::SetNextWindowSizeConstraints(ImVec2(-FLT_MAX, 0), ImVec2(FLT_MAX, 200));
 	ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings;
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1);
 	if (!ImGui::Begin("Notifications", nullptr, flags)) goto end;
