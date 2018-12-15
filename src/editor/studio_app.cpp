@@ -193,7 +193,7 @@ public:
 			case OS::Event::Type::WINDOW_SIZE:
 			case OS::Event::Type::WINDOW_MOVE: {
 				const OS::Rect rect = OS::getWindowScreenRect(event.window);
-				onWindowTransformed(rect.left, rect.top, rect.width, rect.height);
+				onWindowTransformed(event.window, rect.left, rect.top, rect.width, rect.height);
 				break;
 			}
 			case OS::Event::Type::WINDOW_CLOSE:
@@ -2650,9 +2650,10 @@ public:
 	}
 
 
-	void onWindowTransformed(int x, int y, int width, int height)
+	void onWindowTransformed(OS::WindowHandle win, int x, int y, int width, int height)
 	{
 		if (height == 0) return;
+		if (win != m_window) return;
 
 		m_settings.m_window.x = x;
 		m_settings.m_window.y = y;
