@@ -1830,6 +1830,7 @@ public:
 		}
 
 		createEditorLines();
+		m_gizmo->update(m_viewport);
 	}
 
 
