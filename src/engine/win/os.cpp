@@ -476,8 +476,8 @@ void run(Interface& iface)
 
 int getDPI()
 {
-	// TODO
-	return 96;
+	const HDC hdc = GetDC(NULL);
+    return GetDeviceCaps(hdc, LOGPIXELSX);
 }
 
 
