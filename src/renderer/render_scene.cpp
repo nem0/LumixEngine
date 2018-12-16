@@ -2892,11 +2892,12 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 			Vec3 intersection;
 			const Vec3 rel_pos = (origin - pos).toFloat();
 			if (Math::getRaySphereIntersection(rel_pos, dir, Vec3::ZERO, radius, intersection)) {
-				RayCastModelHit new_hit = r.model->castRay(rel_pos, dir, r.pose);
-				if (new_hit.is_hit && (!hit.is_hit || new_hit.t < hit.t)) {
+				RayCastModelHit new_hit = r.model->castRay(rel_pos / scale, dir, r.pose);
+				if (new_hit.is_hit && (!hit.is_hit || new_hit.t * scale < hit.t)) {
 					new_hit.entity = entity;
 					new_hit.component_type = MODEL_INSTANCE_TYPE;
 					hit = new_hit;
+					hit.t *= scale;
 					hit.is_hit = true;
 					cur_dist = dir.length() * hit.t;
 				}
