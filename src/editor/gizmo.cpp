@@ -857,47 +857,6 @@ struct GizmoImpl final : public Gizmo
 	}
 
 
-
-	bool scale(Transform& frame) const
-	{
-		Vec2 mouse_pos = m_editor.getMousePos();
-		const RigidTransform rigid_tr = frame.getRigidPart();
-		const DVec3 intersection = getMousePlaneIntersection(mouse_pos, rigid_tr, m_transform_axis);
-		const Vec2 old_mouse_pos = { mouse_pos.x - m_editor.getMouseRelX(),mouse_pos.y - m_editor.getMouseRelY() };
-		const DVec3 old_intersection = getMousePlaneIntersection(old_mouse_pos, rigid_tr, m_transform_axis);
-		Vec3 delta = (intersection - old_intersection).toFloat();
-		if (!m_is_step || delta.length() > float(getStep()))
-		{
-			if (m_is_step) delta = delta.normalized() * float(getStep());
-
-			frame.scale += delta.length();
-
-			return true;
-		}
-		return false;
-	}
-
-
-	bool translate(Transform& frame) const
-	{
-		Vec2 mouse_pos = m_editor.getMousePos();
-		const RigidTransform rigid_tr = frame.getRigidPart();
-		const DVec3 intersection = getMousePlaneIntersection(mouse_pos, rigid_tr, m_transform_axis);
-		const Vec2 old_mouse_pos = {mouse_pos.x - m_editor.getMouseRelX(),mouse_pos.y - m_editor.getMouseRelY()};
-		const DVec3 old_intersection = getMousePlaneIntersection(old_mouse_pos, rigid_tr, m_transform_axis);
-		Vec3 delta = (intersection - old_intersection).toFloat();
-		if (!m_is_step || delta.length() > float(getStep()))
-		{
-			if (m_is_step) delta = delta.normalized() * float(getStep());
-
-			frame.pos += delta;
-
-			return true;
-		}
-		return false;
-	}
-
-
 	void rotate()
 	{
 		if (m_active < 0) return;
@@ -919,6 +878,8 @@ struct GizmoImpl final : public Gizmo
 			default: ASSERT(false); break;
 		}
 		float angle = computeRotateAngle((int)relx, (int)rely);
+		m_mouse_pos = m_editor.getMousePos();
+
 		m_angle_accum += angle;
 		m_angle_accum = Math::angleDiff(m_angle_accum, 0);
 
@@ -1035,6 +996,7 @@ struct GizmoImpl final : public Gizmo
 			m_start_mouse_pos = m_editor.getMousePos();
 			m_angle_accum = 0;
 			m_is_dragging = true;
+			m_mouse_pos = m_editor.getMousePos();
 		}
 		else if (!m_editor.isMouseDown(OS::MouseButton::LEFT))
 		{
@@ -1084,8 +1046,6 @@ struct GizmoImpl final : public Gizmo
 			render(gizmo_tr, m_active == i, vp, data);
 		}
 
-		m_mouse_pos.x = m_editor.getMousePos().x;
-		m_mouse_pos.y = m_editor.getMousePos().y;
 		m_count = 0;
 	}
 
