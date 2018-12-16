@@ -857,28 +857,6 @@ struct GizmoImpl final : public Gizmo
 	}
 
 
-	bool transform(Transform& frame)
-	{
-		if (m_active >= 0) return false;
-		if (m_transform_axis == Axis::NONE) return false;
-		if (m_editor.isMouseClick(OS::MouseButton::LEFT))
-		{
-			m_is_dragging = true;
-			m_transform_point = getMousePlaneIntersection(m_editor.getMousePos(), frame.getRigidPart(), m_transform_axis);
-			m_start_axis_point = m_transform_point;
-			m_start_plane_point = getMousePlaneIntersection(m_editor.getMousePos(), frame.getRigidPart(), getPlane(m_transform_axis));
-			m_start_mouse_pos = m_editor.getMousePos();
-			m_angle_accum = 0;
-			m_active = -1;
-		}
-
-		if (!m_is_dragging) return false;
-		if (m_mode == Mode::ROTATE) return rotate(frame.rot);
-		if (m_mode == Mode::TRANSLATE) return translate(frame);
-		if (m_mode == Mode::SCALE) return scale(frame);
-		return false;
-	}
-
 
 	bool scale(Transform& frame) const
 	{
@@ -917,32 +895,6 @@ struct GizmoImpl final : public Gizmo
 			return true;
 		}
 		return false;
-	}
-
-
-	bool rotate(Quat& rot)
-	{
-		float relx = m_editor.getMouseRelX();
-		float rely = m_editor.getMouseRelY();
-
-		if (relx == 0 && rely == 0) return false;
-
-		auto mtx = rot.toMatrix();
-
-		Vec3 axis;
-		switch (m_transform_axis)
-		{
-			case Axis::X: axis = mtx.getXVector(); break;
-			case Axis::Y: axis = mtx.getYVector(); break;
-			case Axis::Z: axis = mtx.getZVector(); break;
-			default: ASSERT(false); break;
-		}
-		float angle = computeRotateAngle((int)relx, (int)rely);
-		m_angle_accum += angle;
-		m_angle_accum = Math::angleDiff(m_angle_accum, 0);
-
-		rot = Quat(axis, angle) * rot;
-		return true;
 	}
 
 
