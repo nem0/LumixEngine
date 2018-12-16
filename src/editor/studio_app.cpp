@@ -30,6 +30,7 @@
 #include "engine/system.h"
 #include "engine/timer.h"
 #include "engine/universe/universe.h"
+#include "engine/viewport.h"
 #include "imgui/imgui.h"
 #include "log_ui.h"
 #include "profiler_ui.h"
@@ -660,6 +661,7 @@ public:
 			m_log_ui->onGUI();
 			m_property_grid->onGUI();
 			onEntityListGUI();
+			onEditCameraGUI();
 			onSaveAsDialogGUI();
 			for (auto* plugin : m_gui_plugins)
 			{
@@ -935,6 +937,7 @@ public:
 	void addEntity() { m_editor->addEntity(); }
 	void toggleMeasure() { m_editor->toggleMeasure(); }
 	void snapDown() { m_editor->snapDown(); }
+	void setEditCamTransform() { m_is_edit_cam_transform_ui_open = !m_is_edit_cam_transform_ui_open; }
 	void lookAtSelected() { m_editor->lookAtSelected(); }
 	void toggleSettings() { m_settings.m_is_open = !m_settings.m_is_open; }
 	bool areSettingsOpen() const { return m_settings.m_is_open; }
@@ -1241,6 +1244,7 @@ public:
 		if (!ImGui::BeginMenu("Tools")) return;
 
 		bool is_any_entity_selected = !m_editor->getSelectedEntities().empty();
+		doMenuItem(*getAction("setEditCamTransform"), true);
 		doMenuItem(*getAction("lookAtSelected"), is_any_entity_selected);
 		doMenuItem(*getAction("toggleGameMode"), true);
 		doMenuItem(*getAction("toggleMeasure"), true);
@@ -1430,6 +1434,24 @@ public:
 			}
 			ImGui::TreePop();
 		}
+	}
+
+
+	void onEditCameraGUI()
+	{
+		if (!m_is_edit_cam_transform_ui_open) return;
+		if (ImGui::Begin("Edit camera")) {
+			Viewport vp = m_editor->getViewport();
+			if (ImGui::DragScalarN("Position", ImGuiDataType_Double, &vp.pos.x, 3, 1.f)) {
+				m_editor->setViewport(vp);
+			}
+			Vec3 angles = vp.rot.toEuler();
+			if (ImGui::DragFloat3("Rotation", &angles.x, 0.01f)) {
+				vp.rot.fromEuler(angles);
+				m_editor->setViewport(vp);
+			}
+		}
+		ImGui::End();
 	}
 
 
@@ -1664,6 +1686,7 @@ public:
 		addAction<&StudioAppImpl::autosnapDown>("Autosnap down", "Toggle autosnap down", "autosnapDown")
 			.is_selected.bind<Gizmo, &Gizmo::isAutosnapDown>(&m_editor->getGizmo());
 		addAction<&StudioAppImpl::snapDown>("Snap down", "Snap entities down", "snapDown");
+		addAction<&StudioAppImpl::setEditCamTransform>("Camera transform", "Set camera transformation", "setEditCamTransform");
 		addAction<&StudioAppImpl::lookAtSelected>("Look at selected", "Look at selected entity", "lookAtSelected");
 		addAction<&StudioAppImpl::toggleAssetBrowser>("Asset Browser", "Toggle asset browser", "assetBrowser")
 			.is_selected.bind<StudioAppImpl, &StudioAppImpl::isAssetBrowserOpen>(this);
@@ -2731,6 +2754,7 @@ public:
 	bool m_is_pack_data_dialog_open;
 	bool m_is_entity_list_open;
 	bool m_is_save_as_dialog_open;
+	bool m_is_edit_cam_transform_ui_open = false;
 	ImFont* m_font;
 	ImFont* m_bold_font;
 
