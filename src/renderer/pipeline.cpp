@@ -1425,7 +1425,9 @@ struct PipelineImpl final : Pipeline
 	}
 
 
-	static void findExtraShadowcasterPlanes(const Vec3& light_forward, const Frustum& camera_frustum, const DVec3& camera_position, Frustum* shadow_camera_frustum)
+	static void findExtraShadowcasterPlanes(const Vec3& light_forward
+		, const Frustum& camera_frustum
+		, ShiftedFrustum* shadow_camera_frustum)
 	{
 		/*static const Frustum::Planes planes[] = {
 			Frustum::Planes::LEFT, Frustum::Planes::TOP, Frustum::Planes::RIGHT, Frustum::Planes::BOTTOM };
@@ -1442,8 +1444,7 @@ struct PipelineImpl final : Pipeline
 				Vec3 line_dir = crossProduct(n1, n0);
 				Vec3 n = crossProduct(light_forward, line_dir);
 				float d = -dotProduct(camera_position, n);
-				if (dotProduct(camera_frustum_center, n) + d < 0)
-				{
+				if (dotProduct(camera_frustum_center, n) + d < 0) {
 					n = -n;
 					d = -dotProduct(camera_position, n);
 				}
@@ -1454,7 +1455,6 @@ struct PipelineImpl final : Pipeline
 			prev_side = side;
 		}*/
 		// TODO
-		ASSERT(false);
 	}
 
 
@@ -1855,7 +1855,7 @@ struct PipelineImpl final : Pipeline
 
 	static int getShadowCameraParams(lua_State* L)
 	{
-		/*const int pipeline_idx = lua_upvalueindex(1);
+		const int pipeline_idx = lua_upvalueindex(1);
 		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
 			LuaWrapper::argError<PipelineImpl*>(L, pipeline_idx);
 		}
@@ -1869,7 +1869,7 @@ struct PipelineImpl final : Pipeline
 		const Universe& universe = scene->getUniverse();
 		const EntityPtr light = scene->getActiveGlobalLight();
 		const Vec4 cascades = light.isValid() ? scene->getShadowmapCascades((EntityRef)light) : Vec4(3, 10, 60, 150);
-		const Matrix light_mtx = light.isValid() ? universe.getMatrix((EntityRef)light) : Matrix::IDENTITY;
+		const Matrix light_mtx = light.isValid() ? universe.getRelativeMatrix((EntityRef)light, pipeline->m_viewport.pos) : Matrix::IDENTITY;
 
 		const float camera_height = (float)pipeline->m_viewport.h;
 		const float camera_fov = pipeline->m_viewport.fov;
@@ -1877,7 +1877,7 @@ struct PipelineImpl final : Pipeline
 		const float split_distances[] = {0.1f, cascades.x, cascades.y, cascades.z, cascades.w};
 		
 		Frustum camera_frustum;
-		camera_frustum.computePerspective(pipeline->m_viewport.pos,
+		camera_frustum.computePerspective(Vec3::ZERO,
 			pipeline->m_viewport.rot * Vec3(0, 0, -1),
 			pipeline->m_viewport.rot * Vec3(0, 1, 0),
 			camera_fov,
@@ -1915,7 +1915,7 @@ struct PipelineImpl final : Pipeline
 		CameraParams cp;
 		cp.lod_multiplier = 1;
 		cp.pos = pipeline->m_viewport.pos;
-		cp.frustum.computeOrtho(shadow_cam_pos
+		cp.frustum.computeOrtho(pipeline->m_viewport.pos + shadow_cam_pos
 			, -light_forward
 			, light_mtx.getYVector()
 			, bb_size
@@ -1923,14 +1923,11 @@ struct PipelineImpl final : Pipeline
 			, SHADOW_CAM_NEAR
 			, SHADOW_CAM_FAR);
 
-		findExtraShadowcasterPlanes(light_forward, camera_frustum, pipeline->m_viewport.pos, &cp.frustum);
+		// TODO
+		//findExtraShadowcasterPlanes(light_forward, camera_frustum, &cp.frustum);
 
 		pushCameraParams(L, cp);
-		return 1;*/
-
-		// TODO
-		ASSERT(false);
-		return 0;
+		return 1;
 	}
 
 
