@@ -478,7 +478,7 @@ public:
 				const char* last = reverseFind(label, nullptr, '/');
 				if (!ImGui::BeginMenu(last && !from_filter ? last + 1 : label)) return;
 				char buf[MAX_PATH_LENGTH];
-				bool create_empty = ImGui::Selectable("Empty", false);
+				bool create_empty = ImGui::MenuItem("Empty");
 				if (asset_browser->resourceList(buf, lengthOf(buf), resource_type, 0) || create_empty)
 				{
 					if (create_entity)
