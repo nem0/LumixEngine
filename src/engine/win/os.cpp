@@ -251,6 +251,8 @@ void UTF32ToUTF8(u32 utf32, char* utf8)
 
 WindowHandle createWindow(const InitWindowArgs& args)
 {
+
+
 	WNDCLASS wc = {};
 
 	auto WndProc = [](HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam) -> LRESULT {
@@ -279,6 +281,9 @@ WindowHandle createWindow(const InitWindowArgs& args)
 					showCursor(true);
 					unclipCursor();
 				}
+				e.type = Event::Type::FOCUS;
+				e.focus.gained = wParam != WA_INACTIVE;
+				G.iface->onEvent(e);
 				break;
 		}
 		return DefWindowProc(hWnd, Msg, wParam, lParam);
@@ -316,6 +321,17 @@ WindowHandle createWindow(const InitWindowArgs& args)
 
 	ShowWindow(hwnd, SW_SHOW);
 	UpdateWindow(hwnd);
+
+	if (!G.win) {
+		RAWINPUTDEVICE device;
+		device.usUsagePage = 0x01;
+		device.usUsage = 0x02;
+		device.dwFlags = RIDEV_INPUTSINK;
+		device.hwndTarget = hwnd;
+		BOOL status = RegisterRawInputDevices(&device, 1, sizeof(device));
+		ASSERT(status);
+	}
+
 	G.win = hwnd;
 	return hwnd;
 }
@@ -462,13 +478,6 @@ bool isRelativeMouseMode()
 
 void run(Interface& iface)
 {
-	RAWINPUTDEVICE device;
-	device.usUsagePage = 0x01;
-	device.usUsage = 0x02;
-	device.dwFlags = 0;
-	device.hwndTarget = 0;
-	RegisterRawInputDevices(&device, 1, sizeof(device));
-
 	G.iface = &iface;
 	G.iface->onInit();
 	while (!G.finished)
