@@ -192,11 +192,19 @@ public:
 				break;
 			}
 			case OS::Event::Type::WINDOW_SIZE:
-			case OS::Event::Type::WINDOW_MOVE: {
-				const OS::Rect rect = OS::getWindowScreenRect(event.window);
-				onWindowTransformed(event.window, rect.left, rect.top, rect.width, rect.height);
+				if (event.window == m_window && event.win_size.h > 0 && event.win_size.w > 0) {
+					m_settings.m_window.w = event.win_size.w;
+					m_settings.m_window.h = event.win_size.h;
+					m_settings.m_is_maximized = OS::isMaximized(m_window);
+				}
 				break;
-			}
+			case OS::Event::Type::WINDOW_MOVE:
+				if (event.window == m_window) {
+					m_settings.m_window.x = event.win_move.x;
+					m_settings.m_window.y = event.win_move.y;
+					m_settings.m_is_maximized = OS::isMaximized(m_window);
+				}
+				break;
 			case OS::Event::Type::WINDOW_CLOSE:
 			case OS::Event::Type::QUIT:
 				exit();
@@ -589,7 +597,13 @@ public:
 
 		ImGuiIO& io = ImGui::GetIO();
 		const OS::Point size = OS::getWindowClientSize(m_window);
-		io.DisplaySize = ImVec2(float(size.x), float(size.y));
+		if (size.x > 0 && size.y > 0) {
+			io.DisplaySize = ImVec2(float(size.x), float(size.y));
+		}
+		else if(io.DisplaySize.x <= 0) {
+			io.DisplaySize.x = 800;
+			io.DisplaySize.y = 600;
+		}
 		io.DeltaTime = m_engine->getLastTimeDelta();
 		io.KeyShift = OS::isKeyDown(OS::Keycode::SHIFT);
 		io.KeyCtrl = OS::isKeyDown(OS::Keycode::CTRL);
@@ -2670,19 +2684,6 @@ public:
 				else if (a->shortcut[i] == OS::Keycode::SHIFT) action_modifiers |= 1;
 			}
 		}
-	}
-
-
-	void onWindowTransformed(OS::WindowHandle win, int x, int y, int width, int height)
-	{
-		if (height == 0) return;
-		if (win != m_window) return;
-
-		m_settings.m_window.x = x;
-		m_settings.m_window.y = y;
-		m_settings.m_window.w = width;
-		m_settings.m_window.h = height;
-		m_settings.m_is_maximized = OS::isMaximized(m_window);
 	}
 
 
