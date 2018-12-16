@@ -627,6 +627,7 @@ void SceneView::onWindowGUI()
 			}
 			view_pos = content_min;
 
+			const bool h = ImGui::IsItemHovered();
 			const bool handle_input = ImGui::IsItemHovered() && OS::getFocused() == m_app.getWindow();
 			const OS::Event* events = m_app.getEvents();
 			for (int i = 0, c = m_app.getEventsCount(); i < c; ++i) {

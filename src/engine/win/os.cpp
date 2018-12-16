@@ -268,13 +268,17 @@ WindowHandle createWindow(const InitWindowArgs& args)
 				e.type = Event::Type::WINDOW_SIZE;
 				e.win_size.w = LOWORD(lParam);
 				e.win_size.h = HIWORD(lParam);
+				G.iface->onEvent(e);
 				return 0;
 			case WM_CLOSE:
 				e.type = Event::Type::WINDOW_CLOSE;
 				G.iface->onEvent(e);
 				return 0;
 			case WM_ACTIVATE:
-				if (wParam == WA_INACTIVE) showCursor(true);
+				if (wParam == WA_INACTIVE) {
+					showCursor(true);
+					unclipCursor();
+				}
 				break;
 		}
 		return DefWindowProc(hWnd, Msg, wParam, lParam);
@@ -394,7 +398,8 @@ Rect getWindowScreenRect(WindowHandle win)
 Point getWindowClientSize(WindowHandle win)
 {
 	RECT rect;
-	GetClientRect((HWND)win, &rect);
+	BOOL status = GetClientRect((HWND)win, &rect);
+	ASSERT(status);
 	return {rect.right - rect.left, rect.bottom - rect.top};
 }
 
