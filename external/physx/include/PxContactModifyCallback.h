@@ -1,12 +1,29 @@
-/*
- * Copyright (c) 2008-2015, NVIDIA CORPORATION.  All rights reserved.
- *
- * NVIDIA CORPORATION and its licensors retain all intellectual property
- * and proprietary rights in and to this software, related documentation
- * and any modifications thereto.  Any use, reproduction, disclosure or
- * distribution of this software and related documentation without an express
- * license agreement from NVIDIA CORPORATION is strictly prohibited.
- */
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
+//  * Redistributions of source code must retain the above copyright
+//    notice, this list of conditions and the following disclaimer.
+//  * Redistributions in binary form must reproduce the above copyright
+//    notice, this list of conditions and the following disclaimer in the
+//    documentation and/or other materials provided with the distribution.
+//  * Neither the name of NVIDIA CORPORATION nor the names of its
+//    contributors may be used to endorse or promote products derived
+//    from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+// PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+// CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+// PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+// OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Copyright (c) 2008-2018 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -22,8 +39,7 @@
 #include "PxContact.h"
 #include "foundation/PxTransform.h"
 
-
-#ifndef PX_DOXYGEN
+#if !PX_DOXYGEN
 namespace physx
 {
 #endif
@@ -48,26 +64,19 @@ public:
 	/**
 	\brief Get the position of a specific contact point in the set.
 
-	The contact points could be on the surface of either shape and there are currently no guarantees provided upon which shape the points lie.
-
 	@see PxModifiableContact.point
 	*/
-	PX_FORCE_INLINE		const PxVec3& getPoint(PxU32 i) const			{  return mContacts[i].contact;		}
+	PX_FORCE_INLINE		const PxVec3& getPoint(PxU32 i) const			{ return mContacts[i].contact;		}
 
 	/**
 	\brief Alter the position of a specific contact point in the set.
 
 	@see PxModifiableContact.point
 	*/
-	PX_FORCE_INLINE		void setPoint(PxU32 i, const PxVec3& p)			
-	{
-		mContacts[i].contact = p; 
-	}
+	PX_FORCE_INLINE		void setPoint(PxU32 i, const PxVec3& p)			{ mContacts[i].contact = p; }
 
 	/**
 	\brief Get the contact normal of a specific contact point in the set.
-
-	The contact normal points from the second shape to the first shape.
 
 	@see PxModifiableContact.normal
 	*/
@@ -77,19 +86,18 @@ public:
 	\brief Alter the contact normal of a specific contact point in the set.
 
 	\note Changing the normal can cause contact points to be ignored.
-	\note This must be a normalized vector.
 
 	@see PxModifiableContact.normal
 	*/
 	PX_FORCE_INLINE		void setNormal(PxU32 i, const PxVec3& n)		
 	{ 
+		PxContactPatch* patch = getPatch();
+		patch->internalFlags |= PxContactPatch::eREGENERATE_PATCHES;
 		mContacts[i].normal = n;
 	}
 
 	/**
 	\brief Get the separation of a specific contact point in the set.
-
-	This value can be either positive or negative. A negative value denotes penetration whereas a positive value denotes separation.
 
 	@see PxModifiableContact.separation
 	*/
@@ -100,10 +108,7 @@ public:
 
 	@see PxModifiableContact.separation
 	*/
-	PX_FORCE_INLINE		void setSeparation(PxU32 i, PxReal s)			
-	{
-		mContacts[i].separation = s; 
-	}
+	PX_FORCE_INLINE		void setSeparation(PxU32 i, PxReal s)			{ mContacts[i].separation = s; }
 
 	/**
 	\brief Get the target velocity of a specific contact point in the set.
@@ -111,28 +116,18 @@ public:
 	@see PxModifiableContact.targetVelocity
 
 	*/
-	PX_FORCE_INLINE		const PxVec3& getTargetVelocity(PxU32 i) const	{ return mContacts[i].targetVel;	}
+	PX_FORCE_INLINE		const PxVec3& getTargetVelocity(PxU32 i) const	{ return mContacts[i].targetVelocity;	}
 
 	/**
 	\brief Alter the target velocity of a specific contact point in the set.
 
-	The user-defined target velocity is used to complement the normal and frictional response to a contact. The actual response to a contact depends on 
-	the relative velocity, bounce threshold, mass properties and material properties.
-
-	The user-defined property should be defined as a relative velocity in the space (v0 - v1), where v0 is actor[0]'s velocity and v1 is actor[1]'s velocity.
-
-	\note Target velocity can be set in any direction and is independent of the contact normal. Any component of the target velocity that projects onto the contact normal
-	will affect normal response and may cause the bodies to either suck into each-other or separate. Any component of the target velocity that does not project onto the contact
-	normal will affect the friction response. Target velocities tangential to the contact normal can be an effective way of replicating effects like a conveyor belt.
-
 	@see PxModifiableContact.targetVelocity
 	*/
 	PX_FORCE_INLINE		void setTargetVelocity(PxU32 i, const PxVec3& v)
-	{
-		const size_t headerOffset = sizeof(PxModifyContactHeader) +  sizeof(PxContactPatchBase);
-		PxModifyContactHeader* header = reinterpret_cast<PxModifyContactHeader*>(reinterpret_cast<PxU8*>(mContacts) - headerOffset);
-		header->flags |= PxContactHeader::eHAS_TARGET_VELOCITY;
-		mContacts[i].targetVel = v;
+	{ 
+		PxContactPatch* patch = getPatch();
+		patch->internalFlags |= PxContactPatch::eHAS_TARGET_VELOCITY;
+		mContacts[i].targetVelocity = v;
 	}
 
 	/**
@@ -140,20 +135,25 @@ public:
 
 	@see PxModifiableContact.internalFaceIndex0
 	*/
-	PX_FORCE_INLINE		PxU32 getInternalFaceIndex0(PxU32 i)			{ return mContacts[i].internalFaceIndex0; }
+	PX_FORCE_INLINE		PxU32 getInternalFaceIndex0(PxU32 i)			{ PX_UNUSED(i); return PXC_CONTACT_NO_FACE_INDEX; }
 
 	/**
 	\brief Get the face index with respect to the second shape of the pair for a specific contact point in the set.
 
 	@see PxModifiableContact.internalFaceIndex1
 	*/
-	PX_FORCE_INLINE		PxU32 getInternalFaceIndex1(PxU32 i)			{ return mContacts[i].internalFaceIndex1; }
+	PX_FORCE_INLINE		PxU32 getInternalFaceIndex1(PxU32 i)
+	{
+		PxContactPatch* patch = getPatch();
+		if (patch->internalFlags & PxContactPatch::eHAS_FACE_INDICES)
+		{
+			return reinterpret_cast<PxU32*>(mContacts + mCount)[mCount + i];
+		}
+		return PXC_CONTACT_NO_FACE_INDEX;
+	}
 
 	/**
 	\brief Get the maximum impulse for a specific contact point in the set.
-
-	The value of maxImpulse is a real value in the range [0, PX_MAX_F32]. A value of 0 will disable the contact. The applied impulse will be clamped such that it
-	cannot exceed the max impulse.
 
 	@see PxModifiableContact.maxImpulse
 	*/
@@ -162,17 +162,74 @@ public:
 	/**
 	\brief Alter the maximum impulse for a specific contact point in the set.
 
-	\note Must be nonnegative. If set to zero, the contact point will be ignored, otherwise the impulse applied inside the solver will be clamped such that it cannot
-	exceed this value.
+	\note Must be nonnegative. If set to zero, the contact point will be ignored
 
 	@see PxModifiableContact.maxImpulse
 	*/
 	PX_FORCE_INLINE		void setMaxImpulse(PxU32 i, PxReal s)			
 	{
-		const size_t headerOffset = sizeof(PxModifyContactHeader) +  sizeof(PxContactPatchBase);
-		PxModifyContactHeader* header = reinterpret_cast<PxModifyContactHeader*>(reinterpret_cast<PxU8*>(mContacts) - headerOffset);
-		header->flags |= PxContactHeader::eHAS_MAX_IMPULSE;
+		PxContactPatch* patch = getPatch();
+		patch->internalFlags |= PxContactPatch::eHAS_MAX_IMPULSE;
 		mContacts[i].maxImpulse = s; 
+	}
+
+	/**
+	\brief Get the restitution coefficient for a specific contact point in the set.
+
+	@see PxModifiableContact.restitution
+	*/
+	PX_FORCE_INLINE		PxReal getRestitution(PxU32 i) const			{ return mContacts[i].restitution; }
+
+	/**
+	\brief Alter the restitution coefficient for a specific contact point in the set.
+
+	\note Valid ranges [0,1]
+
+	@see PxModifiableContact.restitution
+	*/
+	PX_FORCE_INLINE		void setRestitution(PxU32 i, PxReal r)		
+	{
+		PxContactPatch* patch = getPatch();
+		patch->internalFlags |= PxContactPatch::eREGENERATE_PATCHES;
+		mContacts[i].restitution = r; 
+	}
+
+	/**
+	\brief Get the static friction coefficient for a specific contact point in the set.
+
+	@see PxModifiableContact.staticFriction
+	*/
+	PX_FORCE_INLINE		PxReal getStaticFriction(PxU32 i) const { return mContacts[i].staticFriction; }
+
+	/**
+	\brief Alter the static friction coefficient for a specific contact point in the set.
+
+	@see PxModifiableContact.staticFriction
+	*/
+	PX_FORCE_INLINE		void setStaticFriction(PxU32 i, PxReal f) 
+	{ 
+		PxContactPatch* patch = getPatch();
+		patch->internalFlags |= PxContactPatch::eREGENERATE_PATCHES;
+		mContacts[i].staticFriction = f; 
+	}
+
+	/**
+	\brief Get the static friction coefficient for a specific contact point in the set.
+
+	@see PxModifiableContact.dynamicFriction
+	*/
+	PX_FORCE_INLINE		PxReal getDynamicFriction(PxU32 i) const { return mContacts[i].dynamicFriction; }
+
+	/**
+	\brief Alter the static dynamic coefficient for a specific contact point in the set.
+
+	@see PxModifiableContact.dynamic
+	*/
+	PX_FORCE_INLINE		void setDynamicFriction(PxU32 i, PxReal f) 
+	{
+		PxContactPatch* patch = getPatch();
+		patch->internalFlags |= PxContactPatch::eREGENERATE_PATCHES; 
+		mContacts[i].dynamicFriction = f; 
 	}
 
 	/**
@@ -190,49 +247,49 @@ public:
 	/**
 	\brief Returns the invMassScale of body 0
 
-	The scale is defaulted to 1.0, meaning that the body's true mass will be used.
+	A value < 1.0 makes this contact treat the body as if it had larger mass. A value of 0.f makes this contact
+	treat the body as if it had infinite mass. Any value > 1.f makes this contact treat the body as if it had smaller mass.
 	*/
 	PX_FORCE_INLINE		PxReal getInvMassScale0() const					
 	{ 
-		const size_t headerOffset = sizeof(PxModifyContactHeader) +  sizeof(PxContactPatchBase);
-		PxModifyContactHeader* header = reinterpret_cast<PxModifyContactHeader*>(reinterpret_cast<PxU8*>(mContacts) - headerOffset);
-		return header->invMassScale0;
+		PxContactPatch* patch = getPatch();
+		return patch->mMassModification.mInvMassScale0;
 	}
 
 	/**
 	\brief Returns the invMassScale of body 1
 
-	The scale is defaulted to 1.0, meaning that the body's true mass will be used.
+	A value < 1.0 makes this contact treat the body as if it had larger mass. A value of 0.f makes this contact
+	treat the body as if it had infinite mass. Any value > 1.f makes this contact treat the body as if it had smaller mass.
 	*/
 	PX_FORCE_INLINE		PxReal getInvMassScale1() const					
 	{ 
-		const size_t headerOffset = sizeof(PxModifyContactHeader) +  sizeof(PxContactPatchBase);
-		PxModifyContactHeader* header = reinterpret_cast<PxModifyContactHeader*>(reinterpret_cast<PxU8*>(mContacts) - headerOffset);
-		return header->invMassScale1;
+		PxContactPatch* patch = getPatch();
+		return patch->mMassModification.mInvMassScale1;
 	}
 
 	/**
 	\brief Returns the invInertiaScale of body 0
 
-	The scale is defaulted to 1.0, meaning that the body's true invInertia will be used.
+	A value < 1.0 makes this contact treat the body as if it had larger inertia. A value of 0.f makes this contact
+	treat the body as if it had infinite inertia. Any value > 1.f makes this contact treat the body as if it had smaller inertia.
 	*/
 	PX_FORCE_INLINE		PxReal getInvInertiaScale0() const					
 	{ 
-		const size_t headerOffset = sizeof(PxModifyContactHeader) +  sizeof(PxContactPatchBase);
-		PxModifyContactHeader* header = reinterpret_cast<PxModifyContactHeader*>(reinterpret_cast<PxU8*>(mContacts) - headerOffset);
-		return header->invInertiaScale0;
+		PxContactPatch* patch = getPatch();
+		return patch->mMassModification.mInvInertiaScale0;
 	}
 
 	/**
 	\brief Returns the invInertiaScale of body 1
 
-	The scale is defaulted to 1.0, meaning that the body's true invInertia will be used.
+	A value < 1.0 makes this contact treat the body as if it had larger inertia. A value of 0.f makes this contact
+	treat the body as if it had infinite inertia. Any value > 1.f makes this contact treat the body as if it had smaller inertia.
 	*/
 	PX_FORCE_INLINE		PxReal getInvInertiaScale1() const					
 	{ 
-		const size_t headerOffset = sizeof(PxModifyContactHeader) +  sizeof(PxContactPatchBase);
-		PxModifyContactHeader* header = reinterpret_cast<PxModifyContactHeader*>(reinterpret_cast<PxU8*>(mContacts) - headerOffset);
-		return header->invInertiaScale1;
+		PxContactPatch* patch = getPatch();
+		return patch->mMassModification.mInvInertiaScale1;
 	}
 
 	/**
@@ -243,10 +300,9 @@ public:
 	*/
 	PX_FORCE_INLINE		void setInvMassScale0(const PxReal scale)					
 	{ 
-		const size_t headerOffset = sizeof(PxModifyContactHeader) +  sizeof(PxContactPatchBase);
-		PxModifyContactHeader* header = reinterpret_cast<PxModifyContactHeader*>(reinterpret_cast<PxU8*>(mContacts) - headerOffset);
-		header->invMassScale0 = scale;
-		header->flags |= PxContactHeader::eHAS_MODIFIED_MASS_RATIOS;
+		PxContactPatch* patch = getPatch();
+		patch->mMassModification.mInvMassScale0 = scale;
+		patch->internalFlags |= PxContactPatch::eHAS_MODIFIED_MASS_RATIOS;
 	}
 
 	/**
@@ -257,10 +313,9 @@ public:
 	*/
 	PX_FORCE_INLINE		void setInvMassScale1(const PxReal scale)					
 	{ 
-		const size_t headerOffset = sizeof(PxModifyContactHeader) +  sizeof(PxContactPatchBase);
-		PxModifyContactHeader* header = reinterpret_cast<PxModifyContactHeader*>(reinterpret_cast<PxU8*>(mContacts) - headerOffset);
-		header->invMassScale1 = scale;
-		header->flags |= PxContactHeader::eHAS_MODIFIED_MASS_RATIOS;
+		PxContactPatch* patch = getPatch();
+		patch->mMassModification.mInvMassScale1 = scale;
+		patch->internalFlags |= PxContactPatch::eHAS_MODIFIED_MASS_RATIOS;
 	}
 
 	/**
@@ -271,10 +326,9 @@ public:
 	*/
 	PX_FORCE_INLINE		void setInvInertiaScale0(const PxReal scale)					
 	{ 
-		const size_t headerOffset = sizeof(PxModifyContactHeader) +  sizeof(PxContactPatchBase);
-		PxModifyContactHeader* header = reinterpret_cast<PxModifyContactHeader*>(reinterpret_cast<PxU8*>(mContacts) - headerOffset);
-		header->invInertiaScale0 = scale;
-		header->flags |= PxContactHeader::eHAS_MODIFIED_MASS_RATIOS;
+		PxContactPatch* patch = getPatch();
+		patch->mMassModification.mInvInertiaScale0 = scale;
+		patch->internalFlags |= PxContactPatch::eHAS_MODIFIED_MASS_RATIOS;
 	}
 
 	/**
@@ -285,13 +339,19 @@ public:
 	*/
 	PX_FORCE_INLINE		void setInvInertiaScale1(const PxReal scale)					
 	{ 
-		const size_t headerOffset = sizeof(PxModifyContactHeader) +  sizeof(PxContactPatchBase);
-		PxModifyContactHeader* header = reinterpret_cast<PxModifyContactHeader*>(reinterpret_cast<PxU8*>(mContacts) - headerOffset);
-		header->invInertiaScale1 = scale;
-		header->flags |= PxContactHeader::eHAS_MODIFIED_MASS_RATIOS;
+		PxContactPatch* patch = getPatch();
+		patch->mMassModification.mInvInertiaScale1 = scale;
+		patch->internalFlags |= PxContactPatch::eHAS_MODIFIED_MASS_RATIOS;
 	}
 
 protected:
+
+	PX_FORCE_INLINE PxContactPatch* getPatch() const
+	{
+		const size_t headerOffset = sizeof(PxContactPatch)*mCount;
+		return reinterpret_cast<PxContactPatch*>(reinterpret_cast<PxU8*>(mContacts) - headerOffset);
+	}
+
 	PxU32					mCount;			//!< Number of contact points in the set
 	PxModifiableContact*	mContacts;		//!< The contact points of the set
 };
@@ -418,7 +478,7 @@ protected:
 };
 
 
-#ifndef PX_DOXYGEN
+#if !PX_DOXYGEN
 } // namespace physx
 #endif
 

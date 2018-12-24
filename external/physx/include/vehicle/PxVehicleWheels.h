@@ -1,12 +1,29 @@
-/*
- * Copyright (c) 2008-2015, NVIDIA CORPORATION.  All rights reserved.
- *
- * NVIDIA CORPORATION and its licensors retain all intellectual property
- * and proprietary rights in and to this software, related documentation
- * and any modifications thereto.  Any use, reproduction, disclosure or
- * distribution of this software and related documentation without an express
- * license agreement from NVIDIA CORPORATION is strictly prohibited.
- */
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
+//  * Redistributions of source code must retain the above copyright
+//    notice, this list of conditions and the following disclaimer.
+//  * Redistributions in binary form must reproduce the above copyright
+//    notice, this list of conditions and the following disclaimer in the
+//    documentation and/or other materials provided with the distribution.
+//  * Neither the name of NVIDIA CORPORATION nor the names of its
+//    contributors may be used to endorse or promote products derived
+//    from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+// PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+// CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+// PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+// OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Copyright (c) 2008-2018 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -17,14 +34,13 @@
   @{
 */
 
-#include "PxFiltering.h"
 #include "foundation/PxSimpleTypes.h"
 #include "vehicle/PxVehicleShaders.h"
 #include "vehicle/PxVehicleComponents.h"
 #include "common/PxBase.h"
 #include "PxRigidDynamic.h"
 
-#ifndef PX_DOXYGEN
+#if !PX_DOXYGEN
 namespace physx
 {
 #endif
@@ -155,6 +171,25 @@ public:
 	\brief Return the scene query filter data used by the specified suspension line
 	*/
 	const PxFilterData& getSceneQueryFilterData(const PxU32 suspId) const;
+
+	/**
+	\brief Return the number of unique anti-roll bars that have been added with addAntiRollBarData
+	@see PxVehicleWheelsSimData::addAntiRollBarData
+	*/
+	PxU32 getNbAntiRollBars() const 
+	{
+		return mNbActiveAntiRollBars;
+	}
+
+	/**
+	\brief Return a specific anti-roll bar.
+	\param antiRollId is the unique id of the anti-roll bar
+	\note The return value of addAntiRollBarData is a unique id for that specific anti-roll bar 
+	and can be used as input parameter for getAntiRollBarData in order to query the same anti-roll bar.  
+	Alternatively, it is possible to iterate over all anti-roll bars by choosing antiRollId 
+	in range (0, getNbAntiRollBars()).
+	*/
+	const PxVehicleAntiRollBarData& getAntiRollBarData(const PxU32 antiRollId) const;
 	
 	/**
 	\brief Return the data that describes the filtering of the tire load to produce smoother handling at large time-steps.
@@ -254,6 +289,32 @@ public:
 	void setTireLoadFilterData(const PxVehicleTireLoadFilterData& tireLoadFilter);
 
 	/**
+	\brief Set the anti-roll suspension for a pair of wheels.
+
+	\param antiRoll is the anti-roll suspension.
+
+	\note If an anti-roll bar has already been set for the same logical wheel pair 
+	(independent of wheel index order specified by PxVehicleAntiRollBar.mWheel0 and PxVehicleAntiRollBar.mWheel0) 
+	then the existing anti-roll bar is updated with a new stiffness parameter antiRoll.mStiffness.  
+
+	\note If the wheel pair specified by antiRoll does not yet have an anti-roll bar then antiRoll is added to 
+	a list of anti-roll bars for the vehicle.
+
+	\return If antiRoll represents a new wheel pair then a unique id is assigned to the anti-roll bar and returned. 
+	If antiRoll represents an existing wheel pair then the unique id of the existing anti-roll bar is returned.
+	The return value is always in range (0, getNbAntiRollBars()).
+
+	\note The return value can be used to query the anti-roll bar with getAntiRollBarData(id).
+
+	\note The number of possible anti-roll bars is limited to half the wheel count.
+
+	\note An existing anti-roll bar can be disabled by calling antiRoll.mStiffness to zero.
+
+	@see PxVehicleWheelsSimData::getAntiRollBarData, PxVehicleAntiRollBarData
+	*/
+	PxU32 addAntiRollBarData(const PxVehicleAntiRollBarData& antiRoll);
+
+	/**
 	\brief Disable a wheel so that zero suspension forces and zero tire forces are applied to the rigid body from this wheel.
 
 	\note If the vehicle has a differential (PxVehicleNW/PxVehicle4W) then the differential (PxVehicleDifferentialNWData/PxVehicleDifferential4WData)
@@ -305,14 +366,14 @@ public:
 	
 	\note Typically, vehicles require more sub-steps at very low forward speeds.
 	
-	\note The threshold longitudinal speed has a default value of 5 metres per second.  If metres are not the chosen scale
-	then setSubStepCount will need to be called with an equivalent or modified value in the adopted scale.
-	
+	\note The threshold longitudinal speed has a default value that is the equivalent of 5 metres per second after accounting for 
+	the length scale set in PxTolerancesScale.  
+
 	\note The sub-step count below the threshold longitudinal speed has a default of 3.
 	
 	\note The sub-step count above the threshold longitudinal speed has a default of 1.
 	
-	\note Each sub-step has time advancement equal to the time-step passed to PxVhicleUpdates divided by the number of required sub-steps.
+	\note Each sub-step has time advancement equal to the time-step passed to PxVehicleUpdates divided by the number of required sub-steps.
 	
 	\note The contact planes of the most recent suspension line raycast are reused across all sub-steps.
 	
@@ -338,8 +399,7 @@ public:
 	longitudinal slip approaches infinity. A solution to this problem is to replace the denominator (|vz|) with a value that never falls below a chosen threshold. 
 	The longitudinal slip is then calculated with (w*r - vz)/PxMax(|vz|, minLongSlipDenominator).
 
-	\note The default value is 4 metres per second.  If metres are not the chosen scale	then setSubStepCount will need to be called with an equivalent or 
-	modified value in the adopted scale.
+	\note The default value is the equivalent of 4 metres per second after accounting for the length scale set in PxTolerancesScale.  
 
 	\note Adjust this value upwards if a vehicle has difficulty coming to rest.
 
@@ -372,6 +432,21 @@ private:
 	PxU32 mNbActiveWheels;
 
 	/**
+	\brief Anti-roll bars
+	*/
+	PxVehicleAntiRollBarData* mAntiRollBars;
+
+	/**
+	\brief 2 anti-rollbars allocated for each block of 4 wheels.
+	*/
+	PxU32 mNbAntiRollBars4;
+
+	/**
+	\brief Number of active anti-roll bars.
+	*/
+	PxU32 mNbActiveAntiRollBars;
+
+	/**
 	\brief Which of the mNbActiveWheels are active or disabled?
 	The default is that all mNbActiveWheels wheels are active.
 	*/
@@ -401,20 +476,27 @@ private:
 	*/
 	PxF32 mMinLongSlipDenominator;
 
-#if defined(PX_P64)
-	PxU32 mPad[3];
+#if PX_P64_FAMILY
+	PxU32 mPad[2];
+#else 
+	PxU32 mPad[1];
 #endif
-
 
 	/**
 	\brief Test if wheel simulation data has been setup with legal values.
 	*/
 	bool isValid() const;
 
+	/**
+	\brief see PxVehicleWheels::allocate
+	*/
+	static PxU32 computeByteSize(const PxU32 numWheels);
+	static PxU8* patchUpPointers(const PxU32 numWheels, PxVehicleWheelsSimData* simData, PxU8* ptrIn);
+	PxVehicleWheelsSimData(const PxU32 numWheels);
 
 //serialization
 public:
-	PxVehicleWheelsSimData(const PxEMPTY&) : mNormalisedLoadFilter(PxEmpty) {}
+	PxVehicleWheelsSimData(const PxEMPTY) : mNormalisedLoadFilter(PxEmpty) {}
 	static void getBinaryMetaData(PxOutputStream& stream);
 	PxU32 getNbWheels4() const { return mNbWheels4; }	
 	PxU32 getNbSuspensionData() const { return mNbActiveWheels; }
@@ -436,6 +518,9 @@ public:
 	void setWheelEnabledState(const PxU32 wheel, const bool state) {if(state) {enableWheel(wheel);} else {disableWheel(wheel);}}
 	bool getWheelEnabledState(const PxU32 wheel) const {return !getIsWheelDisabled(wheel);}
 	PxU32 getNbWheelEnabledState() const {return mNbActiveWheels;}
+	PxU32 getNbAntiRollBars4() const { return mNbAntiRollBars4; }	
+	PxU32 getNbAntiRollBarData() const {return mNbActiveAntiRollBars;}
+	void setAntiRollBarData(const PxU32 id, const PxVehicleAntiRollBarData& antiRoll);
 	PxVehicleWheelsSimData(){}
 	~PxVehicleWheelsSimData(){}
 //~serialization
@@ -507,7 +592,7 @@ public:
 	void setWheelRotationAngle(const PxU32 wheelIdx, const PxReal angle);
 
 	/**
-	\brief Return the rotation angle about the rolling axis for the the specified wheel.
+	\brief Return the rotation angle about the rolling axis for the specified wheel.
 	*/
 	PxReal getWheelRotationAngle(const PxU32 wheelIdx) const;
 
@@ -567,6 +652,12 @@ private:
 
 	PxU32 mPad[3];
 
+	/**
+	\brief see PxVehicleWheels::allocate
+	*/
+	static PxU32 computeByteSize(const PxU32 numWheels);
+	static PxU8* patchUpPointers(const PxU32 numWheels, PxVehicleWheelsDynData* dynData, PxU8* ptr);
+	PxVehicleWheelsDynData(const PxU32 numWheels);
 
 //serialization
 public:
@@ -648,12 +739,9 @@ protected:
 	/**
 	@see PxVehicleDrive4W::allocate, PxVehicleDriveTank::allocate
 	*/
-	static PxU32 computeByteSize(const PxU32 nbWheels4);
-
-	/**
-	@see PxVehicleDrive4W::allocate, PxVehicleDriveTank::allocate
-	*/
-	static PxU8* patchupPointers(PxVehicleWheels* veh, PxU8* ptr, const PxU32 nbWheels4, const PxU32 nbWheels, bool renew = true);
+	static PxU32 computeByteSize(const PxU32 nbWheels);
+	static PxU8* patchupPointers(const PxU32 nbWheels, PxVehicleWheels* vehWheels, PxU8* ptr);
+	virtual void init(const PxU32 numWheels);
 
 	/**
 	\brief Deallocate a PxVehicleWheels instance.
@@ -691,17 +779,17 @@ protected:
 	*/
 	PxU8 mType;
 		
-#if defined(PX_P64)
-	PxU8 mPad[14];
+#if PX_P64_FAMILY
+	PxU8 mPad0[14];
 #else
-	PxU8 mPad[14];
+	PxU8 mPad0[14];
 #endif
 
 //serialization
 public:
-	virtual		void			requires(PxProcessPxBaseCallback& c);
+	virtual		void			requiresObjects(PxProcessPxBaseCallback& c);
 	virtual		const char*		getConcreteTypeName() const				{	return "PxVehicleWheels"; }
-	virtual		bool			isKindOf(const char* name)	const		{	return !strcmp("PxVehicleWheels", name) || PxBase::isKindOf(name); }
+	virtual		bool			isKindOf(const char* name)	const		{	return !::strcmp("PxVehicleWheels", name) || PxBase::isKindOf(name); }
 	virtual		void			exportExtraData(PxSerializationContext&);	
 				void			importExtraData(PxDeserializationContext&);
 				void			resolveReferences(PxDeserializationContext&);
@@ -715,7 +803,7 @@ public:
 };
 PX_COMPILE_TIME_ASSERT(0==(sizeof(PxVehicleWheels) & 15));
 
-#ifndef PX_DOXYGEN
+#if !PX_DOXYGEN
 } // namespace physx
 #endif
 

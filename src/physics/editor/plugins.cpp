@@ -1,8 +1,8 @@
 #include <PxPhysicsAPI.h>
 
 #include "editor/asset_browser.h"
+#include "editor/asset_compiler.h"
 #include "editor/gizmo.h"
-#include "editor/platform_interface.h"
 #include "editor/property_grid.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
@@ -45,7 +45,7 @@ const u32 RENDERER_HASH = crc32("renderer");
 Vec3 fromPhysx(const physx::PxVec3& v) { return Vec3(v.x, v.y, v.z); }
 Quat fromPhysx(const physx::PxQuat& v) { return Quat(v.x, v.y, v.z, v.w); }
 physx::PxQuat toPhysx(const Quat& v) { return physx::PxQuat(v.x, v.y, v.z, v.w); }
-RigidTransform fromPhysx(const physx::PxTransform& v) { return{ fromPhysx(v.p), fromPhysx(v.q) }; }
+RigidTransform fromPhysx(const physx::PxTransform& v) { return{ DVec3(fromPhysx(v.p)), fromPhysx(v.q) }; }
 
 
 struct GizmoPlugin final : public WorldEditor::Plugin
@@ -61,52 +61,52 @@ struct GizmoPlugin final : public WorldEditor::Plugin
 		physx::PxRigidActor* actors[2];
 		joint->getActors(actors[0], actors[1]);
 
-		physx::PxTransform local_frame0 = joint->getLocalPose(physx::PxJointActorIndex::eACTOR0);
-		RigidTransform global_frame0 = global_frame * fromPhysx(local_frame0);
-		Vec3 joint_pos = global_frame0.pos;
-		Matrix mtx0 = global_frame0.toMatrix();
+		const physx::PxTransform local_frame0 = joint->getLocalPose(physx::PxJointActorIndex::eACTOR0);
+		const RigidTransform global_frame0 = global_frame * fromPhysx(local_frame0);
+		const DVec3 joint_pos = global_frame0.pos;
+		const Quat rot0 = global_frame0.rot;
 
-		render_scene.addDebugLine(joint_pos, joint_pos + mtx0.getXVector(), 0xffff0000, 0);
-		render_scene.addDebugLine(joint_pos, joint_pos + mtx0.getYVector(), 0xff00ff00, 0);
-		render_scene.addDebugLine(joint_pos, joint_pos + mtx0.getZVector(), 0xff0000ff, 0);
+		render_scene.addDebugLine(joint_pos, joint_pos + rot0 * Vec3(1, 0, 0), 0xffff0000, 0);
+		render_scene.addDebugLine(joint_pos, joint_pos + rot0 * Vec3(0, 1, 0), 0xff00ff00, 0);
+		render_scene.addDebugLine(joint_pos, joint_pos + rot0 * Vec3(0, 0, 1), 0xff0000ff, 0);
 
-		Matrix mtx1 = global_frame0.toMatrix();
-		if (actors[1])
-		{
-			physx::PxTransform local_frame1 = joint->getLocalPose(physx::PxJointActorIndex::eACTOR1);
-			RigidTransform global_frame1 = fromPhysx(actors[1]->getGlobalPose() * local_frame1);
-			mtx1 = global_frame1.toMatrix();
+		RigidTransform global_frame1 = global_frame0;
+		if (actors[1]) {
+			const physx::PxTransform local_frame1 = joint->getLocalPose(physx::PxJointActorIndex::eACTOR1);
+			const RigidTransform global_frame1 = fromPhysx(actors[1]->getGlobalPose() * local_frame1);
+			const Quat rot1 = global_frame1.rot;
 
-			render_scene.addDebugLine(joint_pos, joint_pos + mtx1.getXVector(), 0xffff0000, 0);
-			render_scene.addDebugLine(joint_pos, joint_pos + mtx1.getYVector(), 0xff00ff00, 0);
-			render_scene.addDebugLine(joint_pos, joint_pos + mtx1.getZVector(), 0xff0000ff, 0);
+			render_scene.addDebugLine(joint_pos, joint_pos + rot1 * Vec3(1, 0, 0), 0xffff0000, 0);
+			render_scene.addDebugLine(joint_pos, joint_pos + rot1 * Vec3(0, 1, 0), 0xff00ff00, 0);
+			render_scene.addDebugLine(joint_pos, joint_pos + rot1 * Vec3(0, 0, 1), 0xff0000ff, 0);
 		}
-		bool is_swing1_limited = joint->getMotion(physx::PxD6Axis::eSWING1) == physx::PxD6Motion::eLIMITED;
-		bool is_swing2_limited = joint->getMotion(physx::PxD6Axis::eSWING2) == physx::PxD6Motion::eLIMITED;
+		const bool is_swing1_limited = joint->getMotion(physx::PxD6Axis::eSWING1) == physx::PxD6Motion::eLIMITED;
+		const bool is_swing2_limited = joint->getMotion(physx::PxD6Axis::eSWING2) == physx::PxD6Motion::eLIMITED;
+		const Quat rot1 = global_frame1.rot;
 		if (is_swing1_limited && is_swing2_limited)
 		{
-			float swing1 = joint->getSwingLimit().yAngle;
-			float swing2 = joint->getSwingLimit().zAngle;
+			const float swing1 = joint->getSwingLimit().yAngle;
+			const float swing2 = joint->getSwingLimit().zAngle;
 			render_scene.addDebugCone(joint_pos,
-				mtx1.getXVector(),
-				mtx1.getYVector() * tanf(swing1),
-				mtx1.getZVector() * tanf(swing2),
+				rot1 * Vec3(1, 0, 0),
+				rot1 * Vec3(0, 1, 0) * tanf(swing1),
+				rot1 * Vec3(0, 0, 1) * tanf(swing2),
 				0xff555555,
 				0);
 		}
 		else if (is_swing1_limited)
 		{
-			Vec3 x_vec = mtx1.getXVector();
-			Vec3 z_vec = mtx1.getZVector();
+			const Vec3 x_vec = rot1 * Vec3(1, 0, 0);
+			const Vec3 z_vec = rot1 * Vec3(0, 0, 1);
 			float swing1 = joint->getSwingLimit().yAngle;
-			Vec3 prev_pos = joint_pos + z_vec * sinf(-swing1) + x_vec * cosf(-swing1);
+			DVec3 prev_pos = joint_pos + z_vec * sinf(-swing1) + x_vec * cosf(-swing1);
 			render_scene.addDebugLine(prev_pos, joint_pos, 0xff555555, 0);
 			for (int i = 1; i <= 32; ++i)
 			{
 				float angle = -swing1 + (2*swing1) * i / 32.0f;
 				float s = sinf(angle);
 				float c = cosf(angle);
-				Vec3 pos = joint_pos + z_vec * s + x_vec * c;
+				DVec3 pos = joint_pos + z_vec * s + x_vec * c;
 				render_scene.addDebugLine(pos, prev_pos, 0xff555555, 0);
 				prev_pos = pos;
 			}
@@ -114,17 +114,17 @@ struct GizmoPlugin final : public WorldEditor::Plugin
 		}
 		else if (is_swing2_limited)
 		{
-			Vec3 y_vec = mtx1.getYVector();
-			Vec3 x_vec = mtx1.getXVector();
+			Vec3 y_vec = rot1 * Vec3(1, 0, 0);
+			Vec3 x_vec = rot1 * Vec3(1, 0, 0);
 			float swing2 = joint->getSwingLimit().zAngle;
-			Vec3 prev_pos = joint_pos + y_vec * sinf(-swing2) + x_vec * cosf(-swing2);
+			DVec3 prev_pos = joint_pos + y_vec * sinf(-swing2) + x_vec * cosf(-swing2);
 			render_scene.addDebugLine(prev_pos, joint_pos, 0xff555555, 0);
 			for (int i = 1; i <= 32; ++i)
 			{
 				float angle = -swing2 + (2 * swing2) * i / 32.0f;
 				float s = sinf(angle);
 				float c = cosf(angle);
-				Vec3 pos = joint_pos + y_vec * s + x_vec * c;
+				DVec3 pos = joint_pos + y_vec * s + x_vec * c;
 				render_scene.addDebugLine(pos, prev_pos, 0xff555555, 0);
 				prev_pos = pos;
 			}
@@ -134,18 +134,18 @@ struct GizmoPlugin final : public WorldEditor::Plugin
 		bool is_twist_limited = joint->getMotion(physx::PxD6Axis::eTWIST) == physx::PxD6Motion::eLIMITED;
 		if (is_twist_limited)
 		{
-			Vec3 y_vec = mtx1.getYVector();
-			Vec3 z_vec = mtx1.getZVector();
+			Vec3 y_vec = rot1 * Vec3(0, 1, 0);
+			Vec3 z_vec = rot1 * Vec3(0, 0, 1);
 			float lower = joint->getTwistLimit().lower;
 			float upper = joint->getTwistLimit().upper;
-			Vec3 prev_pos = joint_pos + y_vec * sinf(lower) + z_vec * cosf(lower);
+			DVec3 prev_pos = joint_pos + y_vec * sinf(lower) + z_vec * cosf(lower);
 			render_scene.addDebugLine(prev_pos, joint_pos, 0xff555555, 0);
 			for (int i = 1; i <= 32; ++i)
 			{
 				float angle = lower + (upper - lower) * i / 32.0f;
 				float s = sinf(angle);
 				float c = cosf(angle);
-				Vec3 pos = joint_pos + y_vec * s + z_vec * c;
+				DVec3 pos = joint_pos + y_vec * s + z_vec * c;
 				render_scene.addDebugLine(pos, prev_pos, 0xff555555, 0);
 				prev_pos = pos;
 			}
@@ -167,36 +167,36 @@ struct GizmoPlugin final : public WorldEditor::Plugin
 
 
 		RigidTransform local_frame0 = phy_scene->getJointLocalFrame(entity);
-		RigidTransform global_frame0 = universe.getTransform(entity).getRigidPart() * local_frame0;
-		Vec3 joint_pos = global_frame0.pos;
-		Matrix mtx0 = global_frame0.toMatrix();
+		const RigidTransform global_frame0 = universe.getTransform(entity).getRigidPart() * local_frame0;
+		const DVec3 joint_pos = global_frame0.pos;
+		const Quat rot0 = global_frame0.rot;
 
-		render_scene->addDebugLine(joint_pos, joint_pos + mtx0.getXVector(), 0xffff0000, 0);
-		render_scene->addDebugLine(joint_pos, joint_pos + mtx0.getYVector(), 0xff00ff00, 0);
-		render_scene->addDebugLine(joint_pos, joint_pos + mtx0.getZVector(), 0xff0000ff, 0);
+		render_scene->addDebugLine(joint_pos, joint_pos + rot0 * Vec3(1, 0, 0), 0xffff0000, 0);
+		render_scene->addDebugLine(joint_pos, joint_pos + rot0 * Vec3(0, 1, 0), 0xff00ff00, 0);
+		render_scene->addDebugLine(joint_pos, joint_pos + rot0 * Vec3(0, 0, 1), 0xff0000ff, 0);
 
 		RigidTransform local_frame1 = phy_scene->getJointConnectedBodyLocalFrame(entity);
 		RigidTransform global_frame1 = universe.getTransform((EntityRef)other_entity).getRigidPart() * local_frame1;
-		Matrix mtx1 = global_frame1.toMatrix();
+		const Quat rot1 = global_frame1.rot;
 
 		bool use_limit = phy_scene->getSphericalJointUseLimit(entity);
 		if (use_limit)
 		{
 			Vec2 limit = phy_scene->getSphericalJointLimit(entity);
-			Vec3 other_pos = universe.getPosition((EntityRef)other_entity);
+			DVec3 other_pos = universe.getPosition((EntityRef)other_entity);
 			render_scene->addDebugLine(joint_pos, other_pos, 0xffff0000, 0);
 			render_scene->addDebugCone(joint_pos,
-				mtx1.getXVector(),
-				mtx1.getYVector() * tanf(limit.y),
-				mtx1.getZVector() * tanf(limit.x),
+				rot1 * Vec3(1, 0, 0),
+				rot1 * Vec3(0, 1, 0) * tanf(limit.y),
+				rot1 * Vec3(0, 0, 1) * tanf(limit.x),
 				0xff555555,
 				0);
 		}
 		else
 		{
-			render_scene->addDebugLine(joint_pos, joint_pos + mtx1.getXVector(), 0xffff0000, 0);
-			render_scene->addDebugLine(joint_pos, joint_pos + mtx1.getYVector(), 0xff00ff00, 0);
-			render_scene->addDebugLine(joint_pos, joint_pos + mtx1.getZVector(), 0xff0000ff, 0);
+			render_scene->addDebugLine(joint_pos, joint_pos + rot1 * Vec3(1, 0, 0), 0xffff0000, 0);
+			render_scene->addDebugLine(joint_pos, joint_pos + rot1 * Vec3(0, 1, 0), 0xff00ff00, 0);
+			render_scene->addDebugLine(joint_pos, joint_pos + rot1 * Vec3(0, 0, 1), 0xff0000ff, 0);
 		}
 	}
 
@@ -216,9 +216,9 @@ struct GizmoPlugin final : public WorldEditor::Plugin
 		if (!other_entity.isValid()) return;
 		RigidTransform local_frame = phy_scene->getJointConnectedBodyLocalFrame(entity);
 
-		Vec3 pos = universe.getPosition((EntityRef)other_entity);
-		Vec3 other_pos = (universe.getTransform((EntityRef)other_entity).getRigidPart() * local_frame).pos;
-		Vec3 dir = other_pos - pos;
+		DVec3 pos = universe.getPosition((EntityRef)other_entity);
+		DVec3 other_pos = (universe.getTransform((EntityRef)other_entity).getRigidPart() * local_frame).pos;
+		Vec3 dir = (other_pos - pos).toFloat();
 
 		dir = dir * (1.0f / SEGMENT_COUNT);
 		float dir_len = dir.length();
@@ -264,41 +264,40 @@ struct GizmoPlugin final : public WorldEditor::Plugin
 		if (!connected_body.isValid()) return;
 		RigidTransform global_frame1 = phy_scene->getJointConnectedBodyLocalFrame(entity);
 		global_frame1 = phy_scene->getUniverse().getTransform((EntityRef)connected_body).getRigidPart() * global_frame1;
-		showHingeJointGizmo(*phy_scene, limit, use_limit, global_frame1.toMatrix());
+		showHingeJointGizmo(*phy_scene, limit, use_limit, global_frame1);
 	}
 
 
 	static void showHingeJointGizmo(PhysicsScene& phy_scene,
 		const Vec2& limit,
 		bool use_limit,
-		const Matrix& global_frame1)
+		const RigidTransform& global_frame1)
 	{
 		Universe& universe = phy_scene.getUniverse();
 		auto* render_scene = static_cast<RenderScene*>(universe.getScene(RENDERER_HASH));
 		if (!render_scene) return;
-		Vec3 global_frame1_pos = global_frame1.getTranslation();
-		Vec3 y_vec = global_frame1.getYVector();
-		Vec3 z_vec = global_frame1.getZVector();
+		Vec3 y_vec = global_frame1.rot * Vec3(0, 1, 0);
+		Vec3 z_vec = global_frame1.rot * Vec3(0, 0, 1);
 
-		render_scene->addDebugLine(global_frame1_pos, global_frame1_pos + global_frame1.getXVector(), 0xffff0000, 0);
-		render_scene->addDebugLine(global_frame1_pos, global_frame1_pos + global_frame1.getYVector(), 0xff00ff00, 0);
-		render_scene->addDebugLine(global_frame1_pos, global_frame1_pos + global_frame1.getZVector(), 0xff0000ff, 0);
+		render_scene->addDebugLine(global_frame1.pos, global_frame1.pos + global_frame1.rot * Vec3(1, 0, 0), 0xffff0000, 0);
+		render_scene->addDebugLine(global_frame1.pos, global_frame1.pos + global_frame1.rot * Vec3(0, 1, 0), 0xff00ff00, 0);
+		render_scene->addDebugLine(global_frame1.pos, global_frame1.pos + global_frame1.rot * Vec3(0, 0, 1), 0xff0000ff, 0);
 
 		if (use_limit)
 		{
 			render_scene->addDebugLine(
-				global_frame1_pos, global_frame1_pos + y_vec * sinf(limit.x) + z_vec * cosf(limit.x), 0xff555555, 0);
+				global_frame1.pos, global_frame1.pos + y_vec * sinf(limit.x) + z_vec * cosf(limit.x), 0xff555555, 0);
 			render_scene->addDebugLine(
-				global_frame1_pos, global_frame1_pos + y_vec * sinf(limit.y) + z_vec * cosf(limit.y), 0xff555555, 0);
+				global_frame1.pos, global_frame1.pos + y_vec * sinf(limit.y) + z_vec * cosf(limit.y), 0xff555555, 0);
 
 			
-			Vec3 prev_pos = global_frame1_pos + y_vec * sinf(limit.x) + z_vec * cosf(limit.x);
+			DVec3 prev_pos = global_frame1.pos + y_vec * sinf(limit.x) + z_vec * cosf(limit.x);
 			for (int i = 1; i <= 32; ++i)
 			{
 				float angle = limit.x + (limit.y - limit.x) * i / 32.0f;
 				float s = sinf(angle);
 				float c = cosf(angle);
-				Vec3 pos = global_frame1_pos + y_vec * s + z_vec * c;
+				const DVec3 pos = global_frame1.pos + y_vec * s + z_vec * c;
 				render_scene->addDebugLine(pos, prev_pos, 0xff555555, 0);
 				prev_pos = pos;
 			}
@@ -313,12 +312,12 @@ struct GizmoPlugin final : public WorldEditor::Plugin
 
 		const EntityRef entity = (EntityRef)cmp.entity;
 		Vec3 extents = phy_scene->getHalfExtents(entity);
-		Matrix mtx = universe.getPositionAndRotation(entity);
+		RigidTransform tr = universe.getTransform(entity).getRigidPart();
 
-		render_scene.addDebugCube(mtx.getTranslation(),
-			mtx.getXVector() * extents.x,
-			mtx.getYVector() * extents.y,
-			mtx.getZVector() * extents.z,
+		render_scene.addDebugCube(tr.pos,
+			tr.rot * Vec3(1, 0, 0) * extents.x,
+			tr.rot * Vec3(0, 1, 0) * extents.y,
+			tr.rot * Vec3(0, 0, 1) * extents.z,
 			0xffff0000,
 			0);
 	}
@@ -329,8 +328,8 @@ struct GizmoPlugin final : public WorldEditor::Plugin
 		auto* phy_scene = static_cast<PhysicsScene*>(cmp.scene);
 		Universe& universe = phy_scene->getUniverse();
 
-		float radius = phy_scene->getSphereRadius((EntityRef)cmp.entity);
-		Vec3 pos = universe.getPosition((EntityRef)cmp.entity);
+		const float radius = phy_scene->getSphereRadius((EntityRef)cmp.entity);
+		const DVec3 pos = universe.getPosition((EntityRef)cmp.entity);
 
 		render_scene.addDebugSphere(pos, radius, 0xffff0000, 0);
 	}
@@ -338,19 +337,20 @@ struct GizmoPlugin final : public WorldEditor::Plugin
 
 	static void showCapsuleActorGizmo(ComponentUID cmp, RenderScene& render_scene)
 	{
-		auto* phy_scene = static_cast<PhysicsScene*>(cmp.scene);
+		// TODO
+		/*auto* phy_scene = static_cast<PhysicsScene*>(cmp.scene);
 		Universe& universe = phy_scene->getUniverse();
 
 		const EntityRef entity = (EntityRef)cmp.entity;
 		float radius = phy_scene->getCapsuleRadius(entity);
 		float height = phy_scene->getCapsuleHeight(entity);
-		Matrix mtx = universe.getPositionAndRotation(entity);
+		const RigidTransform tr = universe.getTransform(entity).getRigidPart();
 		Vec3 physx_capsule_up = mtx.getXVector();
 		mtx.setXVector(mtx.getYVector());
 		mtx.setYVector(physx_capsule_up);
 		Vec3 physx_capsule_center = mtx.getTranslation() - (height * 0.5f + radius) * physx_capsule_up;
 		mtx.setTranslation(physx_capsule_center);
-		render_scene.addDebugCapsule(mtx, height, radius, 0xffff0000, 0);
+		render_scene.addDebugCapsule(mtx, height, radius, 0xffff0000, 0);*/
 	}
 
 
@@ -367,7 +367,7 @@ struct GizmoPlugin final : public WorldEditor::Plugin
 			float height = phy_scene->getControllerHeight(entity);
 			float radius = phy_scene->getControllerRadius(entity);
 
-			Vec3 pos = universe.getPosition(entity);
+			const DVec3 pos = universe.getPosition(entity);
 			render_scene->addDebugCapsule(pos, height, radius, 0xff0000ff, 0);
 			return true;
 		}
@@ -453,7 +453,7 @@ struct PhysicsUIPlugin final : public StudioApp::GUIPlugin
 		{
 			PathUtils::getDir(exe_dir, lengthOf(exe_dir), exe_path);
 			StaticString<MAX_PATH_LENGTH> tmp(exe_dir, dll);
-			if (!PlatformInterface::fileExists(tmp)) return false;
+			if (!OS::fileExists(tmp)) return false;
 			StaticString<MAX_PATH_LENGTH> dest(dest_dir, dll);
 			if (!copyFile(tmp, dest))
 			{
@@ -623,7 +623,7 @@ struct PhysicsUIPlugin final : public StudioApp::GUIPlugin
 	void onVisualizationGUI()
 	{
 		auto* scene = static_cast<PhysicsScene*>(m_editor.getUniverse()->getScene(crc32("physics")));
-		Vec3 camera_pos = m_editor.getViewport().pos;
+		DVec3 camera_pos = m_editor.getViewport().pos;
 		const Vec3 extents(20, 20, 20);
 		scene->setVisualizationCullingBox(camera_pos - extents, camera_pos + extents);
 
@@ -735,7 +735,7 @@ struct PhysicsUIPlugin final : public StudioApp::GUIPlugin
 
 	void showBoneListItem(RenderScene& render_scene, const Matrix& mtx, Model& model, int bone_index, bool visualize)
 	{
-		auto& bone = model.getBone(bone_index);
+		/*auto& bone = model.getBone(bone_index);
 		if (ImGui::Selectable(bone.name.c_str(), m_selected_bone == bone_index)) m_selected_bone = bone_index;
 
 		ImGui::Indent();
@@ -752,13 +752,14 @@ struct PhysicsUIPlugin final : public StudioApp::GUIPlugin
 			}
 			showBoneListItem(render_scene, mtx, model, i, visualize);
 		}
-		ImGui::Unindent();
+		ImGui::Unindent();*/
+		// TODO
 	}
 
 
 	void renderBone(RenderScene& render_scene, PhysicsScene& phy_scene, RagdollBone* bone, RagdollBone* selected_bone)
 	{
-		if (!bone) return;
+		/*if (!bone) return;
 		bool is_selected = bone == selected_bone;
 		Matrix mtx = phy_scene.getRagdollBoneTransform(bone).toMatrix();
 		float height = phy_scene.getRagdollBoneHeight(bone);
@@ -778,15 +779,19 @@ struct PhysicsUIPlugin final : public StudioApp::GUIPlugin
 			physx::PxRigidActor* a0, *a1;
 			joint->getActors(a0, a1);
 			physx::PxTransform pose = a1->getGlobalPose() * joint->getLocalPose(physx::PxJointActorIndex::eACTOR1);
-			Matrix mtx = Quat(pose.q.x, pose.q.y, pose.q.z, pose.q.w).toMatrix();
-			mtx.setTranslation(Vec3(pose.p.x, pose.p.y, pose.p.z));
-			if(joint->is<physx::PxRevoluteJoint>())	GizmoPlugin::showHingeJointGizmo(phy_scene, Vec2(0, 0), false, mtx);
+			RigidTransform tr;
+			tr.rot = Quat(pose.q.x, pose.q.y, pose.q.z, pose.q.w);
+			tr.pos = DVec3(pose.p.x, pose.p.y, pose.p.z);
+			if(joint->is<physx::PxRevoluteJoint>())	{
+				GizmoPlugin::showHingeJointGizmo(phy_scene, Vec2(0, 0), false, tr);
+			}
 			if (joint->is<physx::PxD6Joint>())
 			{
 				GizmoPlugin::showD6JointGizmo(
 					fromPhysx(a0->getGlobalPose()), render_scene, static_cast<physx::PxD6Joint*>(joint));
 			}
-		}
+		}*/
+		// TODO
 	}
 
 
@@ -807,7 +812,7 @@ struct PhysicsUIPlugin final : public StudioApp::GUIPlugin
 
 	void onRagdollGUI()
 	{
-		if (!ImGui::CollapsingHeader("Ragdoll")) return;
+		/*if (!ImGui::CollapsingHeader("Ragdoll")) return;
 
 		if (m_editor.getSelectedEntities().size() != 1)
 		{
@@ -880,13 +885,15 @@ struct PhysicsUIPlugin final : public StudioApp::GUIPlugin
 				onBonePropertiesGUI(*phy_scene, entity, crc32(bone.name.c_str()));
 			}
 		}
-		ImGui::EndChild();
+		ImGui::EndChild();*/
+		// TODO
 	}
 
 
 	void onBonePropertiesGUI(PhysicsScene& scene, EntityRef entity, u32 bone_name_hash)
 	{
-		auto* bone_handle = scene.getRagdollBoneByName(entity, bone_name_hash);
+		// TODO
+		/*auto* bone_handle = scene.getRagdollBoneByName(entity, bone_name_hash);
 		if (!bone_handle)
 		{
 			if (ImGui::Button("Add"))
@@ -1023,13 +1030,13 @@ struct PhysicsUIPlugin final : public StudioApp::GUIPlugin
 			local_pose1 = original_pose.getInverse() * local_pose0 * local_pose1;
 			joint->setLocalPose(physx::PxJointActorIndex::eACTOR1, local_pose1);
 			joint->setLocalPose(physx::PxJointActorIndex::eACTOR0, local_pose0);
-		}
+		}*/
 	}
 
 
 	void onWindowGUI() override
 	{
-		if (ImGui::BeginDock("Physics", &m_is_window_open))
+		if (ImGui::Begin("Physics", &m_is_window_open))
 		{
 			onLayersGUI();
 			onCollisionMatrixGUI();
@@ -1037,7 +1044,7 @@ struct PhysicsUIPlugin final : public StudioApp::GUIPlugin
 			onDebugGUI();
 		}
 
-		ImGui::EndDock();
+		ImGui::End();
 	}
 
 
@@ -1053,7 +1060,7 @@ struct PhysicsGeometryPlugin final : public AssetBrowser::IPlugin
 	explicit PhysicsGeometryPlugin(StudioApp& app)
 		: m_app(app)
 	{
-		app.getAssetBrowser().registerExtension("phy", PhysicsGeometry::TYPE);
+		app.getAssetCompiler().registerExtension("phy", PhysicsGeometry::TYPE);
 	}
 
 
@@ -1074,29 +1081,33 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	StudioAppPlugin(StudioApp& app)
 		: m_app(app)
 	{
-		app.registerComponent("distance_joint", "Physics/Joints/Distance");
-		app.registerComponent("hinge_joint", "Physics/Joints/Hinge");
-		app.registerComponent("spherical_joint", "Physics/Joints/Spherical");
-		app.registerComponent("d6_joint", "Physics/Joints/D6");
-		app.registerComponent("box_rigid_actor", "Physics/Box");
-		app.registerComponent("sphere_rigid_actor", "Physics/Sphere");
-		app.registerComponent("capsule_rigid_actor", "Physics/Capsule");
-		app.registerComponent("physical_controller", "Physics/Controller");
-		app.registerComponentWithResource("mesh_rigid_actor", "Physics/Mesh", PhysicsGeometry::TYPE, *Reflection::getProperty(MESH_ACTOR_TYPE, "Source"));
-		app.registerComponent("physical_heightfield", "Physics/Heightfield");
-		app.registerComponent("ragdoll", "Physics/Ragdoll");
-		app.registerComponent("rigid_actor", "Physics/Rigid actor");
+	}
 
-		WorldEditor& editor = app.getWorldEditor();
+	void init() override
+	{
+		m_app.registerComponent("distance_joint", "Physics/Joints/Distance");
+		m_app.registerComponent("hinge_joint", "Physics/Joints/Hinge");
+		m_app.registerComponent("spherical_joint", "Physics/Joints/Spherical");
+		m_app.registerComponent("d6_joint", "Physics/Joints/D6");
+		m_app.registerComponent("box_rigid_actor", "Physics/Box");
+		m_app.registerComponent("sphere_rigid_actor", "Physics/Sphere");
+		m_app.registerComponent("capsule_rigid_actor", "Physics/Capsule");
+		m_app.registerComponent("physical_controller", "Physics/Controller");
+		m_app.registerComponentWithResource("mesh_rigid_actor", "Physics/Mesh", PhysicsGeometry::TYPE, *Reflection::getProperty(MESH_ACTOR_TYPE, "Source"));
+		m_app.registerComponent("physical_heightfield", "Physics/Heightfield");
+		m_app.registerComponent("ragdoll", "Physics/Ragdoll");
+		m_app.registerComponent("rigid_actor", "Physics/Rigid actor");
+
+		WorldEditor& editor = m_app.getWorldEditor();
 		IAllocator& allocator = editor.getAllocator();
 
-		m_ui_plugin = LUMIX_NEW(allocator, PhysicsUIPlugin)(app);
+		m_ui_plugin = LUMIX_NEW(allocator, PhysicsUIPlugin)(m_app);
 		m_gizmo_plugin = LUMIX_NEW(allocator, GizmoPlugin)(editor);
-		m_geom_plugin = LUMIX_NEW(allocator, PhysicsGeometryPlugin)(app);
+		m_geom_plugin = LUMIX_NEW(allocator, PhysicsGeometryPlugin)(m_app);
 		
-		app.addPlugin(*m_ui_plugin);
+		m_app.addPlugin(*m_ui_plugin);
 		editor.addPlugin(*m_gizmo_plugin);
-		app.getAssetBrowser().addPlugin(*m_geom_plugin);
+		m_app.getAssetBrowser().addPlugin(*m_geom_plugin);
 	}
 
 
@@ -1111,6 +1122,9 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		LUMIX_DELETE(allocator, m_gizmo_plugin);
 		LUMIX_DELETE(allocator, m_geom_plugin);
 	}
+
+
+	const char* getName() const override { return "physics"; }
 
 
 	StudioApp& m_app;

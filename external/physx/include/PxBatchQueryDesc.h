@@ -1,12 +1,29 @@
-/*
- * Copyright (c) 2008-2015, NVIDIA CORPORATION.  All rights reserved.
- *
- * NVIDIA CORPORATION and its licensors retain all intellectual property
- * and proprietary rights in and to this software, related documentation
- * and any modifications thereto.  Any use, reproduction, disclosure or
- * distribution of this software and related documentation without an express
- * license agreement from NVIDIA CORPORATION is strictly prohibited.
- */
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
+//  * Redistributions of source code must retain the above copyright
+//    notice, this list of conditions and the following disclaimer.
+//  * Redistributions in binary form must reproduce the above copyright
+//    notice, this list of conditions and the following disclaimer in the
+//    documentation and/or other materials provided with the distribution.
+//  * Neither the name of NVIDIA CORPORATION nor the names of its
+//    contributors may be used to endorse or promote products derived
+//    from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+// PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+// CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+// PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+// OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Copyright (c) 2008-2018 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -20,9 +37,9 @@
 #include "PxClient.h"
 #include "PxFiltering.h"
 #include "PxQueryFiltering.h"
-#include "PxQueryReport.h"
+#include "foundation/PxAssert.h"
 
-#ifndef PX_DOXYGEN
+#if !PX_DOXYGEN
 namespace physx
 {
 #endif
@@ -30,7 +47,12 @@ namespace physx
 struct	PxSweepHit;
 struct	PxRaycastHit;
 
-struct PxBatchQueryStatus
+/**
+\brief Batched query status.
+
+\deprecated The batched query feature has been deprecated in PhysX version 3.4
+*/
+struct PX_DEPRECATED PxBatchQueryStatus
 {
 	enum Enum
 	{
@@ -53,9 +75,11 @@ struct PxBatchQueryStatus
 
 /**
 \brief Generic struct for receiving results of single query in a batch. Gets templated on hit type PxRaycastHit, PxSweepHit or PxOverlapHit.
+
+\deprecated The batched query feature has been deprecated in PhysX version 3.4
 */
 template<typename HitType>
-struct PxBatchQueryResult
+struct PX_DEPRECATED PxBatchQueryResult
 {
 	HitType			block;			//!< Holds the closest blocking hit for a single query in a batch. Only valid if hasBlock is true.
 	HitType*		touches;		//!< This pointer will either be set to NULL for 0 nbTouches or will point
@@ -75,26 +99,27 @@ struct PxBatchQueryResult
 };
 
 /** \brief Convenience typedef for the result of a batched raycast query. */
-typedef PxBatchQueryResult<PxRaycastHit>	PxRaycastQueryResult;
+typedef PX_DEPRECATED PxBatchQueryResult<PxRaycastHit>	PxRaycastQueryResult;
 
 /** \brief Convenience typedef for the result of a batched sweep query. */
-typedef PxBatchQueryResult<PxSweepHit>		PxSweepQueryResult;
+typedef PX_DEPRECATED PxBatchQueryResult<PxSweepHit>		PxSweepQueryResult;
 
 /** \brief Convenience typedef for the result of a batched overlap query. */
-typedef PxBatchQueryResult<PxOverlapHit>	PxOverlapQueryResult;
+typedef PX_DEPRECATED PxBatchQueryResult<PxOverlapHit>	PxOverlapQueryResult;
 
 /**
 \brief Struct for #PxBatchQuery memory pointers.
+
+\deprecated The batched query feature has been deprecated in PhysX version 3.4
  
 @see PxBatchQuery PxBatchQueryDesc
 */
-struct PxBatchQueryMemory
+struct PX_DEPRECATED PxBatchQueryMemory
  {
  	/**
 	\brief The pointer to the user-allocated buffer for results of raycast queries in corresponding order of issue
  
  	\note The size should be large enough to fit the number of expected raycast queries.
- 	\note For ps3, this must be 16 bytes aligned and not on stack
  
  	@see PxRaycastQueryResult 
  	*/
@@ -104,7 +129,6 @@ struct PxBatchQueryMemory
  	\brief The pointer to the user-allocated buffer for raycast touch hits.
  	\note The size of this buffer should be large enough to store PxRaycastHit. 
  	If the buffer is too small to store hits, the related PxRaycastQueryResult.queryStatus will be set to eOVERFLOW
- 	\note For ps3, this buffer must be 16 bytes aligned and not on stack
  
  	*/
  	PxRaycastHit*					userRaycastTouchBuffer;
@@ -113,7 +137,6 @@ struct PxBatchQueryMemory
  	\brief The pointer to the user-allocated buffer for results of sweep queries in corresponding order of issue
  
  	\note The size should be large enough to fit the number of expected sweep queries.
- 	\note For ps3, this must be 16 bytes aligned and not on stack
  
  	@see PxRaycastQueryResult 
  	*/
@@ -123,7 +146,6 @@ struct PxBatchQueryMemory
  	\brief The pointer to the user-allocated buffer for sweep hits.
  	\note The size of this buffer should be large enough to store PxSweepHit. 
  	If the buffer is too small to store hits, the related PxSweepQueryResult.queryStatus will be set to eOVERFLOW
- 	\note For ps3, this buffer must be 16 bytes aligned and not on stack
  
  	*/
  	PxSweepHit*						userSweepTouchBuffer;
@@ -132,7 +154,6 @@ struct PxBatchQueryMemory
  	\brief The pointer to the user-allocated buffer for results of overlap queries in corresponding order of issue
  
  	\note The size should be large enough to fit the number of expected overlap queries.
- 	\note For ps3, this must be 16 bytes aligned and not on stack
  
  	@see PxRaycastQueryResult 
  	*/
@@ -142,8 +163,7 @@ struct PxBatchQueryMemory
  	\brief The pointer to the user-allocated buffer for overlap hits.
  	\note The size of this buffer should be large enough to store the hits returned. 
  	If the buffer is too small to store hits, the related PxOverlapQueryResult.queryStatus will be set to eABORTED
- 	\note For ps3, this buffer must be 16 bytes aligned and not on stack
- 
+
  	*/
  	PxOverlapHit*					userOverlapTouchBuffer;
  
@@ -188,16 +208,13 @@ protected:
 };
 
 /**
-\brief Maximum allowed size for combined SPU shader code and data size.
-*/
-#define PX_QUERY_SPU_SHADER_LIMIT 2048
-
-/**
 \brief Descriptor class for #PxBatchQuery.
+
+\deprecated The batched query feature has been deprecated in PhysX version 3.4
 
 @see PxBatchQuery PxSceneQueryExecuteMode
 */
-class PxBatchQueryDesc
+class PX_DEPRECATED PxBatchQueryDesc
 {
 public:
 
@@ -236,80 +253,11 @@ public:
 	PxBatchQueryPostFilterShader	postFilterShader;	
 
 	/**
-	\brief The custom spu pre filter shader to use for collision filtering.
-
-	\note This parameter is a fragment of SPU binary codes with the similar function of #PxBatchQueryPreFilterShader. 
-	The requirement of the spu function is the same as PxBatchQueryPreFilterShader::filter. To compile the shader for 
-	spu, you can reference the implementation, makefile and awk scripts in SampleVehicle. If you don't want to define 
-	your own filter shader you can just leave this variable as NULL.
-
-	<b>Platform specific:</b> Applies to PS3 only.
-
-	*/
-	void*							spuPreFilterShader;
-
-	/**
-	\brief Size (in bytes) of the spu pre filter shader codes #spuPreFilterShader
-
-	<b>Default:</b> 0
-
-	<b>Platform specific:</b> Applies to PS3 only.
-
-	\note spuPreFilterShaderSize+spuPostFilterShaderSize+filterShaderDataSize should <= PX_QUERY_SPU_SHADER_LIMIT
-
-	@see spuPreFilterShader
-	*/
-	PxU32							spuPreFilterShaderSize;
-
-	/**
-	\brief The custom spu post filter shader to use for collision filtering.
-
-	\note This parameter is a fragment of SPU binary codes with the similar function of #PxBatchQueryPostFilterShader.
-	The requirement of the spu function is the same as PxBatchQueryPreFilterShader::filter. To compile the shader for 
-	spu, you can reference the implementation, PreBuild configuration in the project file of SampleVehicle.If you don't want to define 
-	your own filter shader you can just leave this variable as NULL.
-	library.
-
-	<b>Platform specific:</b> Applies to PS3 only.
-
-	*/
-	void*							spuPostFilterShader;
-
-	/**
-	\brief Size (in bytes) of the spu post filter shader codes #spuPostFilterShader
-
-	<b>Default:</b> 0
-
-	<b>Platform specific:</b> Applies to PS3 only.
-
-	\note spuPreFilterShaderSize+spuPostFilterShaderSize+filterShaderDataSize should <= PX_QUERY_SPU_SHADER_LIMIT
-
-	@see spuPostFilterShader
-	*/
-	PxU32							spuPostFilterShaderSize;
-
-	/**
-	\brief client that creates and owns this scene query.
-
-	This value will be used as an override when PX_DEFAULT_CLIENT value is passed to the query in PxQueryFilterData.clientId.
-
-	@see PxScene::createClient()
-	*/
-	PxClientID						ownerClient;
-
-	/**
 	\brief User memory buffers for the query.
 
 	@see PxBatchQueryMemory
 	*/
 	PxBatchQueryMemory				queryMemory;	
-
-	/**
-	\brief PS3 only. Enables or disables SPU execution for this batch.
-
-	Defaults to true on PS3, ignored on other platforms.
-	*/
-	bool							runOnSpu;
 
 	/**
 	\brief Construct a batch query with specified maximum number of queries per batch.
@@ -333,13 +281,7 @@ PX_INLINE PxBatchQueryDesc::PxBatchQueryDesc(PxU32 maxRaycastsPerExecute, PxU32 
 	filterShaderDataSize	(0),
 	preFilterShader			(NULL),
 	postFilterShader		(NULL),
-	spuPreFilterShader		(NULL),
-	spuPreFilterShaderSize	(0),
-	spuPostFilterShader		(NULL),
-	spuPostFilterShaderSize	(0),
-	ownerClient				(PX_DEFAULT_CLIENT),
-	queryMemory				(maxRaycastsPerExecute, maxSweepsPerExecute, maxOverlapsPerExecute),
-	runOnSpu				(true)
+	queryMemory				(maxRaycastsPerExecute, maxSweepsPerExecute, maxOverlapsPerExecute)
 {
 }
 
@@ -350,28 +292,10 @@ PX_INLINE bool PxBatchQueryDesc::isValid() const
 		 ((filterShaderDataSize > 0) && (filterShaderData == NULL)) )
 		 return false;
 
-#if defined(PX_PS3)
-
-	if ( ((spuPreFilterShaderSize == 0)  && (spuPreFilterShader != NULL))  ||
-		 ((spuPreFilterShaderSize > 0)   && (spuPreFilterShader == NULL))  ||
-		 ((spuPostFilterShaderSize == 0) && (spuPostFilterShader != NULL)) ||
-		 ((spuPostFilterShaderSize > 0)  && (spuPostFilterShader == NULL)) )
-		 return false;
-
-	if ( ((spuPreFilterShader != NULL)  && (preFilterShader == NULL)) ||
-		 ((spuPostFilterShader != NULL) && (postFilterShader == NULL)))
-		 return false;
-
-	if ( ((spuPostFilterShaderSize + spuPreFilterShaderSize)  > 0)  &&
-		 ((filterShaderDataSize + spuPostFilterShaderSize + spuPreFilterShaderSize) > PX_QUERY_SPU_SHADER_LIMIT) )
-		 return false;
-
-#endif
-
 	return true;
 }
 
-#ifndef PX_DOXYGEN
+#if !PX_DOXYGEN
 } // namespace physx
 #endif
 

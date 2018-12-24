@@ -165,6 +165,10 @@ static PxVec3 toPhysx(const Vec3& v)
 {
 	return PxVec3(v.x, v.y, v.z);
 }
+static PxVec3 toPhysx(const DVec3& v)
+{
+	return PxVec3((float)v.x, (float)v.y, (float)v.z);
+}
 static Quat fromPhysx(const PxQuat& v)
 {
 	return Quat(v.x, v.y, v.z, v.w);
@@ -175,11 +179,11 @@ static PxQuat toPhysx(const Quat& v)
 }
 static RigidTransform fromPhysx(const PxTransform& v)
 {
-	return {fromPhysx(v.p), fromPhysx(v.q)};
+	return {DVec3(fromPhysx(v.p)), fromPhysx(v.q)};
 }
 static PxTransform toPhysx(const RigidTransform& v)
 {
-	return {toPhysx(v.pos), toPhysx(v.rot)};
+	return {toPhysx(v.pos.toFloat()), toPhysx(v.rot)};
 }
 
 
@@ -213,15 +217,12 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	{
 		void submitTask(PxBaseTask& task) override
 		{
-			JobSystem::JobDecl job;
-			job.data = &task;
-			job.task = [](void* data) {
+			JobSystem::run(&task, [](void* data) {
 				PxBaseTask* task = (PxBaseTask*)data;
 				PROFILE_FUNCTION();
 				task->run();
 				task->release();
-			};
-			JobSystem::runJobs(&job, 1, nullptr);
+			}, nullptr, JobSystem::INVALID_HANDLE);
 		}
 		PxU32 getWorkerCount() const override { return MT::getCPUsCount(); }
 	};
@@ -231,6 +232,11 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	{
 		explicit PhysxContactCallback(PhysicsSceneImpl& scene)
 			: m_scene(scene)
+		{
+		}
+
+
+		void onAdvance(const PxRigidBody*const* bodyBuffer, const PxTransform* poseBuffer, const PxU32 count) override 
 		{
 		}
 
@@ -501,7 +507,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	}
 
 
-	void setVisualizationCullingBox(const Vec3& min, const Vec3& max) override
+	void setVisualizationCullingBox(const DVec3& min, const DVec3& max) override
 	{
 		PxBounds3 box(toPhysx(min), toPhysx(max));
 		m_scene->setVisualizationCullingBox(box);
@@ -738,7 +744,6 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		hfDesc.nbRows = width;
 		hfDesc.samples.data = &heights[0];
 		hfDesc.samples.stride = sizeof(PxHeightFieldSample);
-		hfDesc.thickness = -1;
 
 		geom.heightField->modifySamples(y, x, hfDesc);
 		shape->setGeometry(geom);
@@ -1027,7 +1032,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	RigidTransform getJointConnectedBodyLocalFrame(EntityRef entity) override
 	{
 		auto& joint = m_joints[entity];
-		if (!joint.connected_body.isValid()) return {Vec3(0, 0, 0), Quat(0, 0, 0, 1)};
+		if (!joint.connected_body.isValid()) return {DVec3(0, 0, 0), Quat(0, 0, 0, 1)};
 
 		PxRigidActor *a0, *a1;
 		joint.physx->getActors(a0, a1);
@@ -1161,9 +1166,9 @@ struct PhysicsSceneImpl final : public PhysicsScene
 					if (joint.physx) joint.physx->release();
 					joint.physx = PxDistanceJointCreate(m_scene->getPhysics(),
 						m_dummy_actor,
-						PxTransform::createIdentity(),
+						PxTransform(PxIdentity),
 						nullptr,
-						PxTransform::createIdentity());
+						PxTransform(PxIdentity));
 				}
 			}
 		}
@@ -1188,9 +1193,9 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		joint.local_frame0.q = PxQuat(0, 0, 0, 1);
 		joint.physx = PxDistanceJointCreate(m_scene->getPhysics(),
 			m_dummy_actor,
-			PxTransform::createIdentity(),
+			PxTransform(PxIdentity),
 			nullptr,
-			PxTransform::createIdentity());
+			PxTransform(PxIdentity));
 		joint.physx->setConstraintFlag(PxConstraintFlag::eVISUALIZATION, true);
 		static_cast<PxDistanceJoint*>(joint.physx)->setDistanceJointFlag(PxDistanceJointFlag::eSPRING_ENABLED, true);
 
@@ -1207,9 +1212,9 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		joint.local_frame0.q = PxQuat(0, 0, 0, 1);
 		joint.physx = PxSphericalJointCreate(m_scene->getPhysics(),
 			m_dummy_actor,
-			PxTransform::createIdentity(),
+			PxTransform(PxIdentity),
 			nullptr,
-			PxTransform::createIdentity());
+			PxTransform(PxIdentity));
 		joint.physx->setConstraintFlag(PxConstraintFlag::eVISUALIZATION, true);
 
 		m_universe.onComponentCreated(entity, SPHERICAL_JOINT_TYPE, this);
@@ -1225,9 +1230,9 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		joint.local_frame0.q = PxQuat(0, 0, 0, 1);
 		joint.physx = PxD6JointCreate(m_scene->getPhysics(),
 			m_dummy_actor,
-			PxTransform::createIdentity(),
+			PxTransform(PxIdentity),
 			nullptr,
-			PxTransform::createIdentity());
+			PxTransform(PxIdentity));
 		auto* d6_joint = static_cast<PxD6Joint*>(joint.physx);
 		auto linear_limit = d6_joint->getLinearLimit();
 		linear_limit.value = 1.0f;
@@ -1247,9 +1252,9 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		joint.local_frame0.q = PxQuat(0, 0, 0, 1);
 		joint.physx = PxRevoluteJointCreate(m_scene->getPhysics(),
 			m_dummy_actor,
-			PxTransform::createIdentity(),
+			PxTransform(PxIdentity),
 			nullptr,
-			PxTransform::createIdentity());
+			PxTransform(PxIdentity));
 		joint.physx->setConstraintFlag(PxConstraintFlag::eVISUALIZATION, true);
 
 		m_universe.onComponentCreated(entity, HINGE_JOINT_TYPE, this);
@@ -1304,7 +1309,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	{
 		PxCapsuleControllerDesc cDesc;
 		initControllerDesc(cDesc);
-		Vec3 position = m_universe.getPosition(entity);
+		DVec3 position = m_universe.getPosition(entity);
 		cDesc.position.set(position.x, position.y, position.z);
 		Controller& c = m_controllers.insert(entity);
 		c.m_controller = m_controller_manager->createController(cDesc);
@@ -1359,7 +1364,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		ragdoll.entity = entity;
 		ragdoll.root = nullptr;
 		ragdoll.layer = 0;
-		ragdoll.root_transform.pos.set(0, 0, 0);
+		ragdoll.root_transform.pos = DVec3(0, 0, 0);
 		ragdoll.root_transform.rot.set(0, 0, 0, 1);
 
 		m_universe.onComponentCreated(entity, RAGDOLL_TYPE, this);
@@ -1516,10 +1521,10 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		if (actor.resource && actor.resource->getPath() == str)
 		{
 			bool is_kinematic =
-				actor.physx_actor->isRigidBody()->getRigidBodyFlags().isSet(PxRigidBodyFlag::eKINEMATIC);
+				actor.physx_actor->is<PxRigidBody>()->getRigidBodyFlags().isSet(PxRigidBodyFlag::eKINEMATIC);
 			if (actor.dynamic_type == DynamicType::KINEMATIC && is_kinematic) return;
-			if (actor.dynamic_type == DynamicType::DYNAMIC && actor.physx_actor->isRigidDynamic()) return;
-			if (actor.dynamic_type == DynamicType::STATIC && actor.physx_actor->isRigidStatic()) return;
+			if (actor.dynamic_type == DynamicType::DYNAMIC && actor.physx_actor->is<PxRigidDynamic>()) return;
+			if (actor.dynamic_type == DynamicType::STATIC && actor.physx_actor->is<PxRigidStatic>()) return;
 		}
 
 		ResourceManagerHub& manager = m_engine->getResourceManager();
@@ -1568,7 +1573,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 				const PxDebugLine& line = lines[i];
 				Vec3 from = fromPhysx(line.pos0);
 				Vec3 to = fromPhysx(line.pos1);
-				render_scene.addDebugLine(from, to, line.color0, 0);
+				render_scene.addDebugLine(DVec3(from), DVec3(to), line.color0, 0);
 			}
 		}
 		const PxU32 num_tris = rb.getNbTriangles();
@@ -1579,7 +1584,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 			{
 				const PxDebugTriangle& tri = tris[i];
 				render_scene.addDebugTriangle(
-					fromPhysx(tri.pos0), fromPhysx(tri.pos1), fromPhysx(tri.pos2), tri.color0, 0);
+					DVec3(fromPhysx(tri.pos0)), DVec3(fromPhysx(tri.pos1)), DVec3(fromPhysx(tri.pos2)), tri.color0, 0);
 			}
 		}
 	}
@@ -1847,7 +1852,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	void setRagdollBoneKinematic(RagdollBone* bone, bool is_kinematic) override
 	{
 		bone->is_kinematic = is_kinematic;
-		bone->actor->isRigidBody()->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, is_kinematic);
+		bone->actor->is<PxRigidBody>()->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, is_kinematic);
 	}
 
 
@@ -1855,7 +1860,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	{
 		if (!bone) return;
 		bone->is_kinematic = is_kinematic;
-		bone->actor->isRigidBody()->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, is_kinematic);
+		bone->actor->is<PxRigidBody>()->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, is_kinematic);
 		setRagdollBoneKinematicRecursive(bone->child, is_kinematic);
 		setRagdollBoneKinematicRecursive(bone->next, is_kinematic);
 	}
@@ -2039,7 +2044,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 
 	RigidTransform getNewBoneTransform(const Model* model, int bone_idx, float& length)
 	{
-		auto& bone = model->getBone(bone_idx);
+		/*auto& bone = model->getBone(bone_idx);
 
 		length = 0.1f;
 		for (int i = 0; i < model->getBoneCount(); ++i)
@@ -2061,7 +2066,9 @@ struct PhysicsSceneImpl final : public PhysicsScene
 			return mtx.toTransform();
 		}
 		mtx.setTranslation(mtx.getTranslation() + mtx.getXVector() * length * 0.5f);
-		return mtx.toTransform();
+		return mtx.toTransform();*/
+		// TODO
+		return {};
 	}
 
 
@@ -2099,10 +2106,10 @@ struct PhysicsSceneImpl final : public PhysicsScene
 
 		PxTransform px_transform = toPhysx(transform);
 		new_bone->actor = PxCreateDynamic(m_scene->getPhysics(), px_transform, geom, *m_default_material, 1.0f);
-		new_bone->actor->isRigidDynamic()->setMass(0.0001f);
+		new_bone->actor->is<PxRigidDynamic>()->setMass(0.0001f);
 		new_bone->actor->userData = (void*)(intptr_t)entity.index;
 		new_bone->actor->setActorFlag(PxActorFlag::eVISUALIZATION, true);
-		new_bone->actor->isRigidDynamic()->setSolverIterationCounts(8, 8);
+		new_bone->actor->is<PxRigidDynamic>()->setSolverIterationCounts(8, 8);
 		m_scene->addActor(*new_bone->actor);
 		updateFilterData(new_bone->actor, 0);
 
@@ -2123,8 +2130,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	{
 		if (!bone) return;
 
-		RigidTransform bone_transform(
-			RigidTransform(pose->positions[bone->pose_bone_idx], pose->rotations[bone->pose_bone_idx]));
+		RigidTransform bone_transform(DVec3(pose->positions[bone->pose_bone_idx]), pose->rotations[bone->pose_bone_idx]);
 		bone->actor->setGlobalPose(toPhysx(root_transform * bone_transform * bone->inv_bind_transform));
 
 		setSkeletonPose(root_transform, bone->next, pose);
@@ -2134,24 +2140,25 @@ struct PhysicsSceneImpl final : public PhysicsScene
 
 	void updateBone(const RigidTransform& root_transform, const RigidTransform& inv_root, RagdollBone* bone, Pose* pose)
 	{
-		if (!bone) return;
+		/*if (!bone) return;
 
 		if (bone->is_kinematic)
 		{
-			RigidTransform bone_transform(
-				RigidTransform(pose->positions[bone->pose_bone_idx], pose->rotations[bone->pose_bone_idx]));
+			RigidTransform bone_transform(DVec3(pose->positions[bone->pose_bone_idx]), pose->rotations[bone->pose_bone_idx]);
 			bone->actor->setKinematicTarget(toPhysx(root_transform * bone_transform * bone->inv_bind_transform));
 		}
 		else
 		{
 			PxTransform bone_pose = bone->actor->getGlobalPose();
-			auto tr = inv_root * RigidTransform(fromPhysx(bone_pose.p), fromPhysx(bone_pose.q)) * bone->bind_transform;
+			auto tr = inv_root * RigidTransform(DVec3(fromPhysx(bone_pose.p)), fromPhysx(bone_pose.q)) * bone->bind_transform;
 			pose->rotations[bone->pose_bone_idx] = tr.rot;
 			pose->positions[bone->pose_bone_idx] = tr.pos;
 		}
 
 		updateBone(root_transform, inv_root, bone->next, pose);
-		updateBone(root_transform, inv_root, bone->child, pose);
+		updateBone(root_transform, inv_root, bone->child, pose);*/
+
+		// TODO
 	}
 
 
@@ -2215,9 +2222,9 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		if (idx >= 0) actors[1] = m_actors.at(idx)->physx_actor;
 		if (!actors[0] || !actors[1]) return;
 
-		Vec3 pos0 = m_universe.getPosition(entity);
+		DVec3 pos0 = m_universe.getPosition(entity);
 		Quat rot0 = m_universe.getRotation(entity);
-		Vec3 pos1 = m_universe.getPosition((EntityRef)joint.connected_body);
+		DVec3 pos1 = m_universe.getPosition((EntityRef)joint.connected_body);
 		Quat rot1 = m_universe.getRotation((EntityRef)joint.connected_body);
 		PxTransform entity0_frame(toPhysx(pos0), toPhysx(rot0));
 		PxTransform entity1_frame(toPhysx(pos1), toPhysx(rot1));
@@ -2339,7 +2346,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		RigidActor* actor = m_actors.at(index);
 		if (!actor->physx_actor) return;
 
-		PxRigidBody* rigid_body = actor->physx_actor->isRigidBody();
+		PxRigidBody* rigid_body = actor->physx_actor->is<PxRigidBody>();
 		if (!rigid_body) return;
 
 		PxRigidBodyExt::addForceAtPos(*rigid_body, toPhysx(force), toPhysx(pos));
@@ -2422,7 +2429,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		PxVec3 unit_dir(dir.x, dir.y, dir.z);
 		PxReal max_distance = distance;
 
-		const PxHitFlags flags = PxHitFlag::eDISTANCE | PxHitFlag::ePOSITION | PxHitFlag::eNORMAL;
+		const PxHitFlags flags = PxHitFlag::ePOSITION | PxHitFlag::eNORMAL;
 		PxRaycastBuffer hit;
 
 		Filter filter;
@@ -2464,7 +2471,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		if (ctrl_idx >= 0)
 		{
 			auto& controller = m_controllers.at(ctrl_idx);
-			Vec3 pos = m_universe.getPosition(entity);
+			DVec3 pos = m_universe.getPosition(entity);
 			PxExtendedVec3 pvec(pos.x, pos.y, pos.z);
 			controller.m_controller->setFootPosition(pvec);
 		}
@@ -2558,9 +2565,8 @@ struct PhysicsSceneImpl final : public PhysicsScene
 			hfDesc.nbRows = height;
 			hfDesc.samples.data = &heights[0];
 			hfDesc.samples.stride = sizeof(PxHeightFieldSample);
-			hfDesc.thickness = -1;
 
-			PxHeightField* heightfield = m_system->getPhysics()->createHeightField(hfDesc);
+			PxHeightField* heightfield = m_system->getCooking()->createHeightField(hfDesc, m_system->getPhysics()->getPhysicsInsertionCallback());
 			float height_scale = bytes_per_pixel == 2 ? 1 / (256 * 256.0f - 1) : 1 / 255.0f;
 			PxHeightFieldGeometry hfGeom(heightfield,
 				PxMeshGeometryFlags(),
@@ -2814,7 +2820,8 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		geom.halfExtents.x = 1;
 		geom.halfExtents.y = 1;
 		geom.halfExtents.z = 1;
-		PxShape* shape = actor->createShape(geom, *m_default_material);
+		PxShape* shape = m_system->getPhysics()->createShape(geom, *m_default_material);
+		actor->attachShape(*shape);
 		shape->userData = (void*)(intptr_t)index;
 	}
 
@@ -2959,7 +2966,8 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		PxRigidActor* actor = m_actors[entity]->physx_actor;
 		PxSphereGeometry geom;
 		geom.radius = 1;
-		PxShape* shape = actor->createShape(geom, *m_default_material);
+		PxShape* shape = m_system->getPhysics()->createShape(geom, *m_default_material);
+		actor->attachShape(*shape);
 		shape->userData = (void*)(intptr_t)index;
 	}
 
@@ -3069,7 +3077,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 			case DynamicType::DYNAMIC: new_physx_actor = m_system->getPhysics()->createRigidDynamic(transform); break;
 			case DynamicType::KINEMATIC:
 				new_physx_actor = m_system->getPhysics()->createRigidDynamic(transform);
-				new_physx_actor->isRigidBody()->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, true);
+				new_physx_actor->is<PxRigidBody>()->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, true);
 				break;
 			case DynamicType::STATIC: new_physx_actor = m_system->getPhysics()->createRigidStatic(transform); break;
 		}
@@ -3079,7 +3087,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 			actor->physx_actor->getShapes(&shape, 1, i);
 			duplicateShape(shape, new_physx_actor);
 		}
-		PxRigidBodyExt::updateMassAndInertia(*new_physx_actor->isRigidBody(), 1);
+		PxRigidBodyExt::updateMassAndInertia(*new_physx_actor->is<PxRigidBody>(), 1);
 		actor->setPhysxActor(new_physx_actor);
 	}
 
@@ -3093,21 +3101,27 @@ struct PhysicsSceneImpl final : public PhysicsScene
 			{
 				PxBoxGeometry geom;
 				shape->getBoxGeometry(geom);
-				new_shape = actor->createShape(geom, *m_default_material, shape->getLocalPose());
+				new_shape = m_system->getPhysics()->createShape(geom, *m_default_material);
+				new_shape->setLocalPose(shape->getLocalPose());
+				actor->attachShape(*new_shape);
 				break;
 			}
 			case PxGeometryType::eSPHERE:
 			{
 				PxSphereGeometry geom;
 				shape->getSphereGeometry(geom);
-				new_shape = actor->createShape(geom, *m_default_material, shape->getLocalPose());
+				new_shape = m_system->getPhysics()->createShape(geom, *m_default_material);
+				new_shape->setLocalPose(shape->getLocalPose());
+				actor->attachShape(*new_shape);
 				break;
 			}
 			case PxGeometryType::eCONVEXMESH:
 			{
 				PxConvexMeshGeometry geom;
 				shape->getConvexMeshGeometry(geom);
-				new_shape = actor->createShape(geom, *m_default_material, shape->getLocalPose());
+				new_shape = m_system->getPhysics()->createShape(geom, *m_default_material);
+				new_shape->setLocalPose(shape->getLocalPose());
+				actor->attachShape(*new_shape);
 				break;
 			}
 			default: ASSERT(false); return;
@@ -3201,7 +3215,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		initControllerDesc(cDesc);
 		cDesc.height = c.m_height;
 		cDesc.radius = c.m_radius;
-		Vec3 position = m_universe.getPosition(entity);
+		DVec3 position = m_universe.getPosition(entity);
 		cDesc.position.set(position.x, position.y - cDesc.height * 0.5f, position.z);
 		c.m_controller = m_controller_manager->createController(cDesc);
 		c.m_controller->getActor()->userData = (void*)(intptr_t)entity.index;
@@ -3239,7 +3253,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		Ragdoll& ragdoll = m_ragdolls.insert(entity);
 
 		ragdoll.entity = entity;
-		ragdoll.root_transform.pos.set(0, 0, 0);
+		ragdoll.root_transform.pos = DVec3(0, 0, 0);
 		ragdoll.root_transform.rot.set(0, 0, 0, 1);
 		serializer.read(&ragdoll.layer);
 
@@ -3298,7 +3312,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		serializer.read(&tr);
 		joint.local_frame0 = toPhysx(tr);
 		auto* px_joint = PxSphericalJointCreate(
-			m_scene->getPhysics(), m_dummy_actor, joint.local_frame0, nullptr, PxTransform::createIdentity());
+			m_scene->getPhysics(), m_dummy_actor, joint.local_frame0, nullptr, PxTransform(PxIdentity));
 		joint.physx = px_joint;
 		deserializeJoint(serializer, px_joint);
 		m_universe.onComponentCreated(entity, SPHERICAL_JOINT_TYPE, this);
@@ -3354,7 +3368,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		serializer.read(&tr);
 		joint.local_frame0 = toPhysx(tr);
 		auto* px_joint = PxDistanceJointCreate(
-			m_scene->getPhysics(), m_dummy_actor, joint.local_frame0, nullptr, PxTransform::createIdentity());
+			m_scene->getPhysics(), m_dummy_actor, joint.local_frame0, nullptr, PxTransform(PxIdentity));
 		joint.physx = px_joint;
 		deserializeJoint(serializer, px_joint);
 		m_universe.onComponentCreated(entity, DISTANCE_JOINT_TYPE, this);
@@ -3463,7 +3477,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		serializer.read(&tr);
 		joint.local_frame0 = toPhysx(tr);
 		auto* px_joint = PxD6JointCreate(
-			m_scene->getPhysics(), m_dummy_actor, joint.local_frame0, nullptr, PxTransform::createIdentity());
+			m_scene->getPhysics(), m_dummy_actor, joint.local_frame0, nullptr, PxTransform(PxIdentity));
 		joint.physx = px_joint;
 
 		deserializeJoint(serializer, px_joint);
@@ -3522,7 +3536,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		serializer.read(&tr);
 		joint.local_frame0 = toPhysx(tr);
 		auto* px_joint = PxRevoluteJointCreate(
-			m_scene->getPhysics(), m_dummy_actor, joint.local_frame0, nullptr, PxTransform::createIdentity());
+			m_scene->getPhysics(), m_dummy_actor, joint.local_frame0, nullptr, PxTransform(PxIdentity));
 		joint.physx = px_joint;
 		deserializeJoint(serializer, px_joint);
 		m_universe.onComponentCreated(entity, HINGE_JOINT_TYPE, this);
@@ -3656,7 +3670,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 			case DynamicType::DYNAMIC: physx_actor = m_system->getPhysics()->createRigidDynamic(transform); break;
 			case DynamicType::KINEMATIC:
 				physx_actor = m_system->getPhysics()->createRigidDynamic(transform);
-				physx_actor->isRigidBody()->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, true);
+				physx_actor->is<PxRigidBody>()->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, true);
 				break;
 			case DynamicType::STATIC: physx_actor = m_system->getPhysics()->createRigidStatic(transform); break;
 		}
@@ -3681,14 +3695,18 @@ struct PhysicsSceneImpl final : public PhysicsScene
 					serializer.read(&geom.halfExtents.x);
 					serializer.read(&geom.halfExtents.y);
 					serializer.read(&geom.halfExtents.z);
-					shape = physx_actor->createShape(geom, *m_default_material, local_pos);
+					shape = m_system->getPhysics()->createShape(geom, *m_default_material);
+					shape->setLocalPose(local_pos);
+					physx_actor->attachShape(*shape);
 				}
 				break;
 				case PxGeometryType::eSPHERE:
 				{
 					PxSphereGeometry geom;
 					serializer.read(&geom.radius);
-					shape = physx_actor->createShape(geom, *m_default_material, local_pos);
+					shape = m_system->getPhysics()->createShape(geom, *m_default_material);
+					shape->setLocalPose(local_pos);
+					physx_actor->attachShape(*shape);
 				}
 				break;
 				default: ASSERT(false); break;
@@ -3722,7 +3740,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 				break;
 			case DynamicType::KINEMATIC:
 				physx_actor = PxCreateDynamic(*m_system->getPhysics(), transform, box_geom, *m_default_material, 1.0f);
-				physx_actor->isRigidBody()->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, true);
+				physx_actor->is<PxRigidBody>()->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, true);
 				break;
 			case DynamicType::STATIC:
 				physx_actor = PxCreateStatic(*m_system->getPhysics(), transform, box_geom, *m_default_material);
@@ -3772,7 +3790,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 			case DynamicType::KINEMATIC:
 				physx_actor =
 					PxCreateDynamic(*m_system->getPhysics(), transform, capsule_geom, *m_default_material, 1.0f);
-				physx_actor->isRigidBody()->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, true);
+				physx_actor->is<PxRigidBody>()->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, true);
 				break;
 			case DynamicType::STATIC:
 				physx_actor = PxCreateStatic(*m_system->getPhysics(), transform, capsule_geom, *m_default_material);
@@ -3820,7 +3838,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 			case DynamicType::KINEMATIC:
 				physx_actor =
 					PxCreateDynamic(*m_system->getPhysics(), transform, sphere_geom, *m_default_material, 1.0f);
-				physx_actor->isRigidBody()->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, true);
+				physx_actor->is<PxRigidBody>()->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, true);
 				break;
 			case DynamicType::STATIC:
 				physx_actor = PxCreateStatic(*m_system->getPhysics(), transform, sphere_geom, *m_default_material);
@@ -3922,7 +3940,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 			{
 				PxRigidDynamic* physx_actor =
 					PxCreateDynamic(*m_system->getPhysics(), transform, geometry, *m_default_material, 1.0f);
-				physx_actor->isRigidBody()->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, true);
+				physx_actor->is<PxRigidBody>()->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, true);
 				return physx_actor;
 			}
 			case DynamicType::STATIC:
@@ -3963,14 +3981,18 @@ struct PhysicsSceneImpl final : public PhysicsScene
 							serializer.read(box_geom.halfExtents.x);
 							serializer.read(box_geom.halfExtents.y);
 							serializer.read(box_geom.halfExtents.z);
-							shape = physx_actor->createShape(box_geom, *m_default_material, tr);
+							shape = m_system->getPhysics()->createShape(box_geom, *m_default_material);
+							shape->setLocalPose(tr);
+							physx_actor->attachShape(*shape);
 						}
 						break;
 						case PxGeometryType::eSPHERE:
 						{
 							PxSphereGeometry geom;
 							serializer.read(geom.radius);
-							shape = physx_actor->createShape(geom, *m_default_material, tr);
+							shape = m_system->getPhysics()->createShape(geom, *m_default_material);
+							shape->setLocalPose(tr);
+							physx_actor->attachShape(*shape);
 						}
 						break;
 						default: ASSERT(false); break;
@@ -4196,7 +4218,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 			serializer.write("radius", capsule_geom.radius);
 		}
 		serializer.write(
-			"is_kinematic", bone->actor->isRigidBody()->getRigidBodyFlags().isSet(PxRigidBodyFlag::eKINEMATIC));
+			"is_kinematic", bone->actor->is<PxRigidBody>()->getRigidBodyFlags().isSet(PxRigidBodyFlag::eKINEMATIC));
 
 		serializeRagdollBone(ragdoll, bone->child, serializer);
 		serializeRagdollBone(ragdoll, bone->next, serializer);
@@ -4235,7 +4257,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 			serializer.write(capsule_geom.halfHeight);
 			serializer.write(capsule_geom.radius);
 		}
-		serializer.write(bone->actor->isRigidBody()->getRigidBodyFlags().isSet(PxRigidBodyFlag::eKINEMATIC));
+		serializer.write(bone->actor->is<PxRigidBody>()->getRigidBodyFlags().isSet(PxRigidBodyFlag::eKINEMATIC));
 
 		serializeRagdollBone(ragdoll, bone->child, serializer);
 		serializeRagdollBone(ragdoll, bone->next, serializer);
@@ -4423,8 +4445,8 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		}
 		serializer.read(bone->is_kinematic);
 		bone->actor->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, bone->is_kinematic);
-		bone->actor->isRigidDynamic()->setSolverIterationCounts(8, 8);
-		bone->actor->isRigidDynamic()->setMass(0.0001f);
+		bone->actor->is<PxRigidDynamic>()->setSolverIterationCounts(8, 8);
+		bone->actor->is<PxRigidDynamic>()->setMass(0.0001f);
 		bone->actor->userData = (void*)(intptr_t)ragdoll.entity.index;
 
 		bone->actor->setActorFlag(PxActorFlag::eVISUALIZATION, true);
@@ -4486,8 +4508,8 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		}
 		serializer.read(&bone->is_kinematic);
 		bone->actor->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, bone->is_kinematic);
-		bone->actor->isRigidDynamic()->setSolverIterationCounts(8, 8);
-		bone->actor->isRigidDynamic()->setMass(0.0001f);
+		bone->actor->is<PxRigidDynamic>()->setSolverIterationCounts(8, 8);
+		bone->actor->is<PxRigidDynamic>()->setMass(0.0001f);
 		bone->actor->userData = (void*)(intptr_t)ragdoll.entity.index;
 
 		bone->actor->setActorFlag(PxActorFlag::eVISUALIZATION, true);
@@ -4619,7 +4641,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 			initControllerDesc(cDesc);
 			cDesc.height = c.m_height;
 			cDesc.radius = c.m_radius;
-			Vec3 position = m_universe.getPosition(entity);
+			DVec3 position = m_universe.getPosition(entity);
 			cDesc.position.set(position.x, position.y - cDesc.height * 0.5f, position.z);
 			c.m_controller = m_controller_manager->createController(cDesc);
 			c.m_controller->getActor()->userData = (void*)(intptr_t)entity.index;
@@ -4652,7 +4674,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 			serializer.read(entity);
 			Ragdoll& ragdoll = m_ragdolls.insert(entity);
 			ragdoll.layer = 0;
-			ragdoll.root_transform.pos.set(0, 0, 0);
+			ragdoll.root_transform.pos = DVec3(0, 0, 0);
 			ragdoll.root_transform.rot.set(0, 0, 0, 1);
 
 			serializer.read(ragdoll.layer);
@@ -4687,7 +4709,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 						m_dummy_actor,
 						joint.local_frame0,
 						nullptr,
-						PxTransform::createIdentity());
+						PxTransform(PxIdentity));
 					joint.physx = px_joint;
 					u32 flags;
 					serializer.read(flags);
@@ -4704,7 +4726,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 						m_dummy_actor,
 						joint.local_frame0,
 						nullptr,
-						PxTransform::createIdentity());
+						PxTransform(PxIdentity));
 					joint.physx = px_joint;
 					u32 flags;
 					serializer.read(flags);
@@ -4721,7 +4743,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 						m_dummy_actor,
 						joint.local_frame0,
 						nullptr,
-						PxTransform::createIdentity());
+						PxTransform(PxIdentity));
 					joint.physx = px_joint;
 					u32 flags;
 					serializer.read(flags);
@@ -4746,7 +4768,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 						m_dummy_actor,
 						joint.local_frame0,
 						nullptr,
-						PxTransform::createIdentity());
+						PxTransform(PxIdentity));
 					joint.physx = px_joint;
 					int motions[6];
 					serializer.read(motions);
@@ -5034,13 +5056,13 @@ PhysicsScene* PhysicsScene::create(PhysicsSystem& system, Universe& context, Eng
 		return nullptr;
 	}
 
-	impl->m_controller_manager = PxCreateControllerManager(*impl->m_scene);
+	//impl->m_controller_manager = PxCreateControllerManager(*impl->m_scene);
 
 	impl->m_system = &system;
 	impl->m_default_material = impl->m_system->getPhysics()->createMaterial(0.5f, 0.5f, 0.1f);
 	PxSphereGeometry geom(1);
 	impl->m_dummy_actor =
-		PxCreateDynamic(impl->m_scene->getPhysics(), PxTransform::createIdentity(), geom, *impl->m_default_material, 1);
+		PxCreateDynamic(impl->m_scene->getPhysics(), PxTransform(PxIdentity), geom, *impl->m_default_material, 1);
 	return impl;
 }
 

@@ -1,12 +1,29 @@
-/*
- * Copyright (c) 2008-2015, NVIDIA CORPORATION.  All rights reserved.
- *
- * NVIDIA CORPORATION and its licensors retain all intellectual property
- * and proprietary rights in and to this software, related documentation
- * and any modifications thereto.  Any use, reproduction, disclosure or
- * distribution of this software and related documentation without an express
- * license agreement from NVIDIA CORPORATION is strictly prohibited.
- */
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
+//  * Redistributions of source code must retain the above copyright
+//    notice, this list of conditions and the following disclaimer.
+//  * Redistributions in binary form must reproduce the above copyright
+//    notice, this list of conditions and the following disclaimer in the
+//    documentation and/or other materials provided with the distribution.
+//  * Neither the name of NVIDIA CORPORATION nor the names of its
+//    contributors may be used to endorse or promote products derived
+//    from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+// PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+// CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+// PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+// OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Copyright (c) 2008-2018 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -19,7 +36,7 @@
 #include "vehicle/PxVehicleWheels.h"
 #include "vehicle/PxVehicleComponents.h"
 
-#ifndef PX_DOXYGEN
+#if !PX_DOXYGEN
 namespace physx
 {
 #endif
@@ -141,7 +158,7 @@ protected:
 //serialization
 public:
 	PxVehicleDriveSimData() {}
-	PxVehicleDriveSimData(const PxEMPTY&) :  mEngine(PxEmpty), mGears(PxEmpty), mClutch(PxEmpty), mAutoBox(PxEmpty) {}
+	PxVehicleDriveSimData(const PxEMPTY) :  mEngine(PxEmpty), mGears(PxEmpty), mClutch(PxEmpty), mAutoBox(PxEmpty) {}
 	static void getBinaryMetaData(PxOutputStream& stream);
 //~serialization
 };
@@ -463,7 +480,7 @@ private:
 //serialization
 public:
 	PxVehicleDriveDynData();
-	PxVehicleDriveDynData(const PxEMPTY&)  {}
+	PxVehicleDriveDynData(const PxEMPTY)  {}
 	PxU32 getNbAnalogInput() const { return eMAX_NB_ANALOG_INPUTS; }
 	PX_FORCE_INLINE void setGearChange(const PxU32 gearChange) { mTargetGear= gearChange; }
 	PX_FORCE_INLINE PxU32 getGearChange() const { return mTargetGear; }
@@ -510,12 +527,9 @@ protected:
 	/**
 	@see PxVehicleDrive4W::allocate, PxVehicleDriveTank::allocate
 	*/
-	static PxU32 computeByteSize(const PxU32 nbWheels4);
-
-	/**
-	@see PxVehicleDrive4W::allocate, PxVehicleDriveTank::allocate
-	*/
-	static PxU8* patchupPointers(PxVehicleDrive* vehDrive, PxU8* ptr, const PxU32 nbWheels4, const PxU32 nbWheels);
+	static PxU32 computeByteSize(const PxU32 numWheels);
+	static PxU8* patchupPointers(const PxU32 nbWheels, PxVehicleDrive* vehDrive, PxU8* ptr);
+	virtual void init(const PxU32 numWheels);
 
 	/**
 	\brief Deallocate a PxVehicle4WDrive instance.
@@ -539,12 +553,12 @@ public:
 protected:
 	PxVehicleDrive(PxType concreteType, PxBaseFlags baseFlags) : PxVehicleWheels(concreteType, baseFlags) {}	
 	~PxVehicleDrive() {}
-	virtual bool isKindOf(const char* name)	const { return !strcmp("PxVehicleDrive", name) || PxBase::isKindOf(name); }
+	virtual bool isKindOf(const char* name)	const { return !::strcmp("PxVehicleDrive", name) || PxBase::isKindOf(name); }
 //~serialization
 };
 PX_COMPILE_TIME_ASSERT(0==(sizeof(PxVehicleDrive) & 15));
 
-#ifndef PX_DOXYGEN
+#if !PX_DOXYGEN
 } // namespace physx
 #endif
 

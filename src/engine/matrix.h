@@ -35,7 +35,7 @@ struct LUMIX_ENGINE_API RigidTransform
 	{
 	}
 
-	/*
+
 	RigidTransform inverted() const
 	{
 		RigidTransform result;
@@ -51,6 +51,12 @@ struct LUMIX_ENGINE_API RigidTransform
 	}
 
 
+	RigidTransform operator*(const LocalRigidTransform& rhs) const
+	{
+		return{ DVec3(rot.rotate(rhs.pos)) + pos, rot * rhs.rot };
+	}
+
+/*
 	Vec3 transform(const Vec3& value) const
 	{
 		return pos + rot.rotate(value);

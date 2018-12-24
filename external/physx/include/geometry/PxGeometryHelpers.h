@@ -1,12 +1,29 @@
-/*
- * Copyright (c) 2008-2015, NVIDIA CORPORATION.  All rights reserved.
- *
- * NVIDIA CORPORATION and its licensors retain all intellectual property
- * and proprietary rights in and to this software, related documentation
- * and any modifications thereto.  Any use, reproduction, disclosure or
- * distribution of this software and related documentation without an express
- * license agreement from NVIDIA CORPORATION is strictly prohibited.
- */
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
+//  * Redistributions of source code must retain the above copyright
+//    notice, this list of conditions and the following disclaimer.
+//  * Redistributions in binary form must reproduce the above copyright
+//    notice, this list of conditions and the following disclaimer in the
+//    documentation and/or other materials provided with the distribution.
+//  * Neither the name of NVIDIA CORPORATION nor the names of its
+//    contributors may be used to endorse or promote products derived
+//    from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+// PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+// CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+// PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+// OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Copyright (c) 2008-2018 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -24,13 +41,12 @@
 #include "PxCapsuleGeometry.h"
 #include "PxPlaneGeometry.h"
 #include "PxConvexMeshGeometry.h"
-#include "PxTriangleMeshGeometry.h"
 #include "PxHeightFieldGeometry.h"
 #include "foundation/PxPlane.h"
 #include "foundation/PxTransform.h"
 #include "foundation/PxUnionCast.h"
 
-#ifndef PX_DOXYGEN
+#if !PX_DOXYGEN
 namespace physx
 {
 #endif
@@ -83,7 +99,6 @@ public:
 		return get<const PxPlaneGeometry, PxGeometryType::ePLANE>();
 	}
 
-
 	PX_FORCE_INLINE PxCapsuleGeometry& capsule()
 	{
 		return get<PxCapsuleGeometry, PxGeometryType::eCAPSULE>();
@@ -93,7 +108,6 @@ public:
 	{
 		return get<const PxCapsuleGeometry, PxGeometryType::eCAPSULE>();
 	}
-
 
 	PX_FORCE_INLINE PxBoxGeometry& box()
 	{
@@ -114,7 +128,6 @@ public:
 	{
 		return get<const PxConvexMeshGeometry, PxGeometryType::eCONVEXMESH>();
 	}
-
 
 	PX_FORCE_INLINE PxTriangleMeshGeometry& triangleMesh()
 	{
@@ -138,6 +151,10 @@ public:
 
 	PX_FORCE_INLINE void storeAny(const PxGeometry& geometry)
 	{
+		PX_ASSERT_WITH_MESSAGE(	(geometry.getType() >= PxGeometryType::eSPHERE) &&
+								(geometry.getType() < PxGeometryType::eGEOMETRY_COUNT),
+								"Unexpected GeometryType in PxGeometryHolder::storeAny");
+
 		switch(geometry.getType())
 		{
 		case PxGeometryType::eSPHERE:		put<PxSphereGeometry>(geometry); break;
@@ -148,18 +165,18 @@ public:
 		case PxGeometryType::eTRIANGLEMESH: put<PxTriangleMeshGeometry>(geometry); break;
 		case PxGeometryType::eHEIGHTFIELD:	put<PxHeightFieldGeometry>(geometry); break;
 		case PxGeometryType::eGEOMETRY_COUNT:
-		case PxGeometryType::eINVALID:
-		default:
-			PX_ASSERT(0);
+		case PxGeometryType::eINVALID:		break;
 		}
 	}
+
+	PX_FORCE_INLINE	PxGeometryHolder()							{}
+	PX_FORCE_INLINE	PxGeometryHolder(const PxGeometry& geometry){ storeAny(geometry);	}
 
 	private:
 		template<typename T> void put(const PxGeometry& geometry)
 		{
 			static_cast<T&>(any()) = static_cast<const T&>(geometry);
 		}
-
 
 		template<typename T, PxGeometryType::Enum type> T& get()
 		{
@@ -172,7 +189,6 @@ public:
 			PX_ASSERT(getType() == type);
 			return static_cast<T&>(any());
 		}
-
 
 	union {
 		PxU8	geometry[sizeof(PxGeometry)];
@@ -190,7 +206,7 @@ PX_ALIGN_SUFFIX(4);
 
 
 
-#ifndef PX_DOXYGEN
+#if !PX_DOXYGEN
 } // namespace physx
 #endif
 

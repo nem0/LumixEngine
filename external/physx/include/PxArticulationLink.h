@@ -1,12 +1,29 @@
-/*
- * Copyright (c) 2008-2015, NVIDIA CORPORATION.  All rights reserved.
- *
- * NVIDIA CORPORATION and its licensors retain all intellectual property
- * and proprietary rights in and to this software, related documentation
- * and any modifications thereto.  Any use, reproduction, disclosure or
- * distribution of this software and related documentation without an express
- * license agreement from NVIDIA CORPORATION is strictly prohibited.
- */
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
+//  * Redistributions of source code must retain the above copyright
+//    notice, this list of conditions and the following disclaimer.
+//  * Redistributions in binary form must reproduce the above copyright
+//    notice, this list of conditions and the following disclaimer in the
+//    documentation and/or other materials provided with the distribution.
+//  * Neither the name of NVIDIA CORPORATION nor the names of its
+//    contributors may be used to endorse or promote products derived
+//    from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+// PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+// CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+// PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+// OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Copyright (c) 2008-2018 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -20,10 +37,12 @@
 #include "PxArticulationJoint.h"
 #include "PxRigidBody.h"
 
-#ifndef PX_DOXYGEN
+#if !PX_DOXYGEN
 namespace physx
 {
 #endif
+
+	class PxArticulationBase;
 
 /**
 \brief a component of an articulation that represents a rigid body
@@ -51,11 +70,13 @@ public:
 
 
 	/**
-	\brief get the articulation to which this articulation link belongs
+	\brief get the articulation to which this articulation link belongs. This returns the base class. The application should
+	establish which articulation implementation this actually is and upcast to that type to access non-common functionality
 
 	\return the articulation to which this link belongs
 	*/
-	virtual		PxArticulation&	getArticulation() const = 0;
+	virtual		PxArticulationBase&		getArticulation() const = 0;
+
 
 	/**
 	\brief Get the joint which connects this link to its parent.
@@ -64,7 +85,16 @@ public:
 
 	@see PxArticulationJoint
 	*/
-	virtual		PxArticulationJoint*	getInboundJoint() const = 0;
+	virtual		PxArticulationJointBase*	getInboundJoint() const = 0;
+
+	/**
+	\brief Get the degree of freedom of the joint which connects this link to its parent.
+
+	\return The degree of freeedom of the joint connecting the link to the parent. 0xffffffff for the root link.
+
+	@see PxArticulationJoint
+	*/
+	virtual		PxU32					getInboundJointDof() const = 0;
 
 	/**
 	\brief Get number of child links.
@@ -75,16 +105,25 @@ public:
 	*/
 	virtual		PxU32			getNbChildren() const = 0;
 
+
+	/**
+	\brief Get low-level link index 
+
+	\return low-level index
+	*/
+	virtual		PxU32			getLinkIndex() const = 0;
+
 	/**
 	\brief Retrieve all the child links.
 
 	\param[out] userBuffer The buffer to receive articulation link pointers.
 	\param[in] bufferSize Size of provided user buffer.
 	\return Number of articulation links written to the buffer.
+	\param[in] startIndex Index of first child pointer to be retrieved
 
 	@see getNbChildren()
 	*/
-	virtual		PxU32			getChildren(PxArticulationLink** userBuffer, PxU32 bufferSize) const = 0;
+	virtual		PxU32			getChildren(PxArticulationLink** userBuffer, PxU32 bufferSize, PxU32 startIndex=0) const = 0;
 
 	virtual		const char*		getConcreteTypeName() const					{	return "PxArticulationLink"; }
 
@@ -92,14 +131,10 @@ protected:
 	PX_INLINE					PxArticulationLink(PxType concreteType, PxBaseFlags baseFlags) : PxRigidBody(concreteType, baseFlags) {}
 	PX_INLINE					PxArticulationLink(PxBaseFlags baseFlags) : PxRigidBody(baseFlags)	{}
 	virtual						~PxArticulationLink()	{}
-	virtual		bool			isKindOf(const char* name)	const		{	return !strcmp("PxArticulationLink", name) || PxRigidBody::isKindOf(name);		}
+	virtual		bool			isKindOf(const char* name)	const		{	return !::strcmp("PxArticulationLink", name) || PxRigidBody::isKindOf(name);		}
 };
 
-PX_DEPRECATED PX_INLINE PxArticulationLink*			PxActor::isArticulationLink()			{ return is<PxArticulationLink>();	}
-PX_DEPRECATED PX_INLINE const PxArticulationLink*	PxActor::isArticulationLink()	const	{ return is<PxArticulationLink>();	}
-
-
-#ifndef PX_DOXYGEN
+#if !PX_DOXYGEN
 } // namespace physx
 #endif
 

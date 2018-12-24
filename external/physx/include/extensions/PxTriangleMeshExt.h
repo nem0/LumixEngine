@@ -1,12 +1,29 @@
-/*
- * Copyright (c) 2008-2015, NVIDIA CORPORATION.  All rights reserved.
- *
- * NVIDIA CORPORATION and its licensors retain all intellectual property
- * and proprietary rights in and to this software, related documentation
- * and any modifications thereto.  Any use, reproduction, disclosure or
- * distribution of this software and related documentation without an express
- * license agreement from NVIDIA CORPORATION is strictly prohibited.
- */
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
+//  * Redistributions of source code must retain the above copyright
+//    notice, this list of conditions and the following disclaimer.
+//  * Redistributions in binary form must reproduce the above copyright
+//    notice, this list of conditions and the following disclaimer in the
+//    documentation and/or other materials provided with the distribution.
+//  * Neither the name of NVIDIA CORPORATION nor the names of its
+//    contributors may be used to endorse or promote products derived
+//    from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+// PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+// CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+// PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+// OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Copyright (c) 2008-2018 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -20,7 +37,7 @@
 #include "PxPhysXConfig.h"
 #include "common/PxPhysXCommonConfig.h"
 
-#ifndef PX_DOXYGEN
+#if !PX_DOXYGEN
 namespace physx
 {
 #endif
@@ -86,14 +103,10 @@ class PxHeightFieldGeometry;
 
 		private:
 						PxU32*			mResultsMemory;
-						PxU32			mResults[64];
+						PxU32			mResults[256];
 						PxU32			mNbResults;
 						PxU32			mMaxNbResults;
 	};
-
-	/** \brief DEPRECATED typedef for backward compatibility with PhysX 3.2. */
-	typedef PxMeshOverlapUtil PxFindOverlapTriangleMeshUtil;
-
 
 	/**
 	\brief Computes an approximate minimum translational distance (MTD) between a geometry object and a mesh.
@@ -109,18 +122,27 @@ class PxHeightFieldGeometry;
 	maxIter = N, the code will attempt at most N iterations but it might exit earlier if depenetration has
 	been successful. Usually N = 4 gives good results.
 
-	\param[in] maxIter Max number of iterations before returning.
+	\param[out] direction Computed MTD unit direction
+	\param[out] depth Penetration depth. Always positive or zero.
 	\param[in] geom The geometry object
 	\param[in] geomPose Pose for the geometry object
 	\param[in] meshGeom The mesh geometry
 	\param[in] meshPose Pose for the mesh
-	\param[out] nb Number of depenetrations attempts performed during the call. 0 means no overlap has been detected.
+	\param[in] maxIter Max number of iterations before returning.
+	\param[out] usedIter Number of depenetrations attempts performed during the call. Will not be returned if the pointer is NULL.
 
-	\return Approximate depenetration vector
+	\return True if the MTD has successfully been computed, i.e. if objects do overlap.
 
 	@see PxGeometry PxTransform PxTriangleMeshGeometry
 	*/
-	PxVec3 PxComputeMeshPenetration(PxU32 maxIter, const PxGeometry& geom, const PxTransform& geomPose, const PxTriangleMeshGeometry& meshGeom, const PxTransform& meshPose, PxU32& nb);
+	bool PxComputeTriangleMeshPenetration(PxVec3& direction, 
+										  PxReal& depth,
+										  const PxGeometry& geom, 
+										  const PxTransform& geomPose, 
+										  const PxTriangleMeshGeometry& meshGeom, 
+										  const PxTransform& meshPose, 
+										  PxU32 maxIter,
+										  PxU32* usedIter = NULL);
 
 	/**
 	\brief Computes an approximate minimum translational distance (MTD) between a geometry object and a heightfield.
@@ -136,20 +158,29 @@ class PxHeightFieldGeometry;
 	maxIter = N, the code will attempt at most N iterations but it might exit earlier if depenetration has
 	been successful. Usually N = 4 gives good results.
 
-	\param[in] maxIter Max number of iterations before returning.
+	\param[out] direction Computed MTD unit direction
+	\param[out] depth Penetration depth. Always positive or zero.
 	\param[in] geom The geometry object
 	\param[in] geomPose Pose for the geometry object
 	\param[in] heightFieldGeom The heightfield geometry
 	\param[in] heightFieldPose Pose for the heightfield
-	\param[out] nb Number of depenetrations attempts performed during the call. 0 means no overlap has been detected.
+	\param[in] maxIter Max number of iterations before returning.
+	\param[out] usedIter Number of depenetrations attempts performed during the call. Will not be returned if the pointer is NULL.
 
-	\return Approximate depenetration vector
+	\return True if the MTD has successfully been computed, i.e. if objects do overlap.
 
 	@see PxGeometry PxTransform PxHeightFieldGeometry
 	*/
-	PxVec3 PxComputeHeightFieldPenetration(PxU32 maxIter, const PxGeometry& geom, const PxTransform& geomPose, const PxHeightFieldGeometry& heightFieldGeom, const PxTransform& heightFieldPose, PxU32& nb);
+	bool PxComputeHeightFieldPenetration(PxVec3& direction, 
+										 PxReal& depth,
+										 const PxGeometry& geom, 
+									     const PxTransform& geomPose, 
+										 const PxHeightFieldGeometry& heightFieldGeom, 
+										 const PxTransform& heightFieldPose,
+										 PxU32 maxIter, 
+										 PxU32* usedIter = NULL);
 
-#ifndef PX_DOXYGEN
+#if !PX_DOXYGEN
 } // namespace physx
 #endif
 

@@ -1,15 +1,31 @@
-/*
- * Copyright (c) 2008-2015, NVIDIA CORPORATION.  All rights reserved.
- *
- * NVIDIA CORPORATION and its licensors retain all intellectual property
- * and proprietary rights in and to this software, related documentation
- * and any modifications thereto.  Any use, reproduction, disclosure or
- * distribution of this software and related documentation without an express
- * license agreement from NVIDIA CORPORATION is strictly prohibited.
- */
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
+//  * Redistributions of source code must retain the above copyright
+//    notice, this list of conditions and the following disclaimer.
+//  * Redistributions in binary form must reproduce the above copyright
+//    notice, this list of conditions and the following disclaimer in the
+//    documentation and/or other materials provided with the distribution.
+//  * Neither the name of NVIDIA CORPORATION nor the names of its
+//    contributors may be used to endorse or promote products derived
+//    from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+// PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+// CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+// PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+// OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Copyright (c) 2008-2018 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
-
 
 #ifndef PX_REVOLUTEJOINT_H
 #define PX_REVOLUTEJOINT_H
@@ -20,7 +36,7 @@
 #include "extensions/PxJoint.h"
 #include "extensions/PxJointLimit.h"
 
-#ifndef PX_DOXYGEN
+#if !PX_DOXYGEN
 namespace physx
 {
 #endif
@@ -30,39 +46,33 @@ class PxRevoluteJoint;
 /**
 \brief Create a revolute joint.
 
- \param[in] physics the physics SDK
- \param[in] actor0 an actor to which the joint is attached. NULL may be used to attach the joint to a specific point in the world frame
- \param[in] localFrame0 the position and orientation of the joint relative to actor0
- \param[in] actor1 an actor to which the joint is attached. NULL may be used to attach the joint to a specific point in the world frame
- \param[in] localFrame1 the position and orientation of the joint relative to actor1 
+ \param[in] physics		The physics SDK
+ \param[in] actor0		An actor to which the joint is attached. NULL may be used to attach the joint to a specific point in the world frame
+ \param[in] localFrame0	The position and orientation of the joint relative to actor0
+ \param[in] actor1		An actor to which the joint is attached. NULL may be used to attach the joint to a specific point in the world frame
+ \param[in] localFrame1	The position and orientation of the joint relative to actor1 
 
 @see PxRevoluteJoint
 */
-
-PxRevoluteJoint*	PxRevoluteJointCreate(PxPhysics& physics, 
-										  PxRigidActor* actor0, const PxTransform& localFrame0, 
-										  PxRigidActor* actor1, const PxTransform& localFrame1);
-
+PxRevoluteJoint*	PxRevoluteJointCreate(PxPhysics& physics, PxRigidActor* actor0, const PxTransform& localFrame0, PxRigidActor* actor1, const PxTransform& localFrame1);
 
 /**
 \brief Flags specific to the Revolute Joint.
 
 @see PxRevoluteJoint
 */
-
 struct PxRevoluteJointFlag
 {
 	enum Enum
 	{
-		eLIMIT_ENABLED			= 1<<0,		//< enable the limit
-		eDRIVE_ENABLED			= 1<<1,		//< enable the drive
-		eDRIVE_FREESPIN			= 1<<2		//< if the existing velocity is beyond the drive velocity, do not add force
+		eLIMIT_ENABLED	= 1<<0,	//!< enable the limit
+		eDRIVE_ENABLED	= 1<<1,	//!< enable the drive
+		eDRIVE_FREESPIN	= 1<<2	//!< if the existing velocity is beyond the drive velocity, do not add force
 	};
 };
 
 typedef PxFlags<PxRevoluteJointFlag::Enum, PxU16> PxRevoluteJointFlags;
 PX_FLAGS_OPERATORS(PxRevoluteJointFlag::Enum, PxU16)
-
 
 /**
 
@@ -86,36 +96,32 @@ PX_FLAGS_OPERATORS(PxRevoluteJointFlag::Enum, PxU16)
 
  @see PxRevoluteJointCreate() PxJoint
 */
-
 class PxRevoluteJoint : public PxJoint
 {
 public:
 
 	/**
-	\brief return the angle of the joint, in the range (-Pi, Pi]
+	\brief return the angle of the joint, in the range (-2*Pi, 2*Pi]
 	*/
-	virtual PxReal getAngle()							const			= 0;
-
+	virtual PxReal getAngle()	const	= 0;
 
 	/**
 	\brief return the velocity of the joint
 	*/
-	virtual PxReal getVelocity()						const			= 0;
+	virtual PxReal getVelocity()	const	= 0;
 
 	/**
 	\brief set the joint limit parameters. 
 
 	The limit is activated using the flag PxRevoluteJointFlag::eLIMIT_ENABLED
 
-	The limit angle range is (-2*PI, 2*PI) and the extent of the limit must be strictly less than 2*PI
+	The limit angle range is (-2*Pi, 2*Pi).
 
 	\param[in] limits The joint limit parameters. 
 
-
 	@see PxJointAngularLimitPair getLimit()
 	*/
-
-	virtual void			setLimit(const PxJointAngularLimitPair& limits)			= 0;
+	virtual void			setLimit(const PxJointAngularLimitPair& limits)	= 0;
 
 	/**
 	\brief get the joint limit parameters.
@@ -124,9 +130,7 @@ public:
 
 	@see PxJointAngularLimitPair setLimit()
 	*/
-	virtual PxJointAngularLimitPair getLimit()			const			= 0;
-
-
+	virtual PxJointAngularLimitPair getLimit()	const	= 0;
 
 	/**
 	\brief set the target velocity for the drive model.
@@ -140,14 +144,14 @@ public:
 	with positive values going the same way as positive joint angles.
 
 	\param[in] velocity the drive target velocity
+	\param[in] autowake Whether to wake the joint rigids up if it is asleep.
 
 	<b>Range:</b> [0, PX_MAX_F32)<br>
 	<b>Default:</b> 0.0
 
 	@see PxRevoluteFlags::eDRIVE_FREESPIN
 	*/
-
-	virtual void			setDriveVelocity(PxReal velocity)			= 0;
+	virtual void			setDriveVelocity(PxReal velocity, bool autowake = true)	= 0;
 
 	/**
 	\brief gets the target velocity for the drive model.
@@ -156,8 +160,7 @@ public:
 
 	@see setDriveVelocity()
 	*/
-	virtual PxReal			getDriveVelocity()			const			= 0;
-
+	virtual PxReal			getDriveVelocity()	const	= 0;
 
 	/**
 	\brief sets the maximum torque the drive can exert.
@@ -171,7 +174,7 @@ public:
 
 	@see setDriveVelocity()
 	*/
-	virtual void			setDriveForceLimit(PxReal limit)			= 0;
+	virtual void			setDriveForceLimit(PxReal limit)	= 0;
 
 	/**
 	\brief gets the maximum torque the drive can exert.
@@ -180,8 +183,7 @@ public:
 
 	@see setDriveVelocity()
 	*/
-	virtual PxReal			getDriveForceLimit()		const			= 0;
-
+	virtual PxReal			getDriveForceLimit()	const	= 0;
 
 	/**
 	\brief sets the gear ratio for the drive.
@@ -196,7 +198,7 @@ public:
 
 	@see getDriveGearRatio()
 	*/
-	virtual void			setDriveGearRatio(PxReal ratio)			= 0;
+	virtual void			setDriveGearRatio(PxReal ratio)	= 0;
 
 	/**
 	\brief gets the gear ratio.
@@ -205,8 +207,7 @@ public:
 
 	@see setDriveGearRatio()
 	*/
-	virtual PxReal			getDriveGearRatio()		const			= 0;
-
+	virtual PxReal			getDriveGearRatio()		const	= 0;
 
 	/**
 	\brief sets the flags specific to the Revolute Joint.
@@ -217,8 +218,7 @@ public:
 
 	@see PxRevoluteJointFlag setFlag() getFlags()
 	*/
-
-	virtual void					setRevoluteJointFlags(PxRevoluteJointFlags flags) = 0;
+	virtual void			setRevoluteJointFlags(PxRevoluteJointFlags flags) = 0;
 
 	/**
 	\brief sets a single flag specific to a Revolute Joint.
@@ -228,8 +228,7 @@ public:
 
 	@see PxRevoluteJointFlag, getFlags() setFlags()
 	*/
-
-	virtual void					setRevoluteJointFlag(PxRevoluteJointFlag::Enum flag, bool value) = 0;
+	virtual void			setRevoluteJointFlag(PxRevoluteJointFlag::Enum flag, bool value) = 0;
 
 	/**
 	\brief gets the flags specific to the Revolute Joint.
@@ -238,8 +237,7 @@ public:
 
 	@see PxRevoluteJoint::flags, PxRevoluteJointFlag setFlag() setFlags()
 	*/
-
-	virtual PxRevoluteJointFlags	getRevoluteJointFlags(void)					const	= 0;
+	virtual PxRevoluteJointFlags	getRevoluteJointFlags()	const	= 0;
 
 	/**
 	\brief Set the linear tolerance threshold for projection. Projection is enabled if PxConstraintFlag::ePROJECTION
@@ -259,9 +257,7 @@ public:
 
 	@see getProjectionLinearTolerance() PxJoint::setConstraintFlags() PxConstraintFlag::ePROJECTION
 	*/
-
-	virtual void				setProjectionLinearTolerance(PxReal tolerance)					= 0;
-
+	virtual void				setProjectionLinearTolerance(PxReal tolerance)	= 0;
 
 	/**
 	\brief Get the linear tolerance threshold for projection.
@@ -270,8 +266,7 @@ public:
 
 	@see setProjectionLinearTolerance()
 	*/
-
-	virtual PxReal				getProjectionLinearTolerance()			const					= 0;
+	virtual PxReal				getProjectionLinearTolerance()	const	= 0;
 
 	/**
 	\brief Set the angular tolerance threshold for projection. Projection is enabled if 
@@ -291,8 +286,7 @@ public:
 
 	@see getProjectionAngularTolerance() PxJoint::setConstraintFlag() PxConstraintFlag::ePROJECTION
 	*/
-
-	virtual void				setProjectionAngularTolerance(PxReal tolerance)					= 0;
+	virtual void				setProjectionAngularTolerance(PxReal tolerance)	= 0;
 
 	/**
 	\brief gets the angular tolerance threshold for projection.
@@ -301,8 +295,7 @@ public:
 
 	@see setProjectionAngularTolerance()
 	*/
-
-	virtual PxReal				getProjectionAngularTolerance()			const					= 0;
+	virtual PxReal				getProjectionAngularTolerance()	const	= 0;
 
 	/**
 	\brief Returns string name of PxRevoluteJoint, used for serialization
@@ -326,12 +319,12 @@ protected:
 	/**
 	\brief Returns whether a given type name matches with the type of this instance
 	*/
-	virtual	bool				isKindOf(const char* name) const { return !strcmp("PxRevoluteJoint", name) || PxJoint::isKindOf(name); }
+	virtual	bool				isKindOf(const char* name) const { return !::strcmp("PxRevoluteJoint", name) || PxJoint::isKindOf(name); }
 	
 	//~serialization
 };
 
-#ifndef PX_DOXYGEN
+#if !PX_DOXYGEN
 } // namespace physx
 #endif
 
