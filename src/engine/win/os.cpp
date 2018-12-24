@@ -5,7 +5,10 @@
 #include "engine/string.h"
 #define UNICODE
 #include <cASSERT>
+#pragma warning(push)
+#pragma warning(disable : 4091)
 #include <ShlObj.h>
+#pragma warning(pop)
 #include <Windows.h>
 
 namespace Lumix::OS
@@ -819,5 +822,77 @@ void unclipCursor()
 }
 
 
+bool copyFile(const char* from, const char* to)
+{
+	WCHAR tmp_from[MAX_PATH];
+	WCHAR tmp_to[MAX_PATH];
+	toWChar(tmp_from, from);
+	toWChar(tmp_to, to);
+	
+	if (CopyFile(tmp_from, tmp_to, FALSE) == FALSE) return false;
 
-} // namespace Lumix::App
+	FILETIME ft;
+	SYSTEMTIME st;
+
+	GetSystemTime(&st);
+	SystemTimeToFileTime(&st, &ft);
+	HANDLE handle = CreateFile(tmp_to, GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	bool f = SetFileTime(handle, (LPFILETIME)NULL, (LPFILETIME)NULL, &ft) != FALSE;
+	ASSERT(f);
+	CloseHandle(handle);
+
+	return true;
+}
+
+
+void getExecutablePath(char* buffer, int buffer_size)
+{
+	WCHAR tmp[MAX_PATH];
+	toWChar(tmp, buffer);
+	GetModuleFileName(NULL, tmp, buffer_size);
+}
+
+
+void messageBox(const char* text)
+{
+	WCHAR tmp[2048];
+	toWChar(tmp, text);
+	MessageBox(NULL, tmp, L"Message", MB_OK);
+}
+
+	
+void setCommandLine(int, char**)
+{
+	ASSERT(false);
+}
+	
+
+bool getCommandLine(char* output, int max_size)
+{
+	WCHAR* cl = GetCommandLine();
+	fromWChar(output, max_size, cl);
+	return true;
+}
+
+
+void* loadLibrary(const char* path)
+{
+	WCHAR tmp[MAX_PATH];
+	toWChar(tmp, path);
+	return LoadLibrary(tmp);
+}
+
+
+void unloadLibrary(void* handle)
+{
+	FreeLibrary((HMODULE)handle);
+}
+
+
+void* getLibrarySymbol(void* handle, const char* name)
+{
+	return (void*)GetProcAddress((HMODULE)handle, name);
+}
+
+
+} // namespace Lumix::OS

@@ -9,7 +9,6 @@
 #include "engine/prefab.h"
 #include "engine/reflection.h"
 #include "engine/serializer.h"
-#include "engine/system.h"
 #include "physics/physics_geometry_manager.h"
 #include "renderer/model.h"
 #include <cfloat>
@@ -800,7 +799,7 @@ void FBXImporter::writeMaterials(const char* src, const ImportConfig& cfg)
 			<< ",1}\n";*/
 
 		out_file.close();
-		copyFile(path, mat_src);
+		OS::copyFile(path, mat_src);
 	}
 	writeBillboardMaterial(cfg.output_dir, src);
 }

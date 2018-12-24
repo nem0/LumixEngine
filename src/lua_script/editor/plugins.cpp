@@ -18,7 +18,6 @@
 #include "engine/lua_wrapper.h"
 #include "engine/path_utils.h"
 #include "engine/reflection.h"
-#include "engine/system.h"
 #include "engine/universe/universe.h"
 #include "imgui/imgui.h"
 #include "lua_script/lua_script_manager.h"
@@ -553,7 +552,7 @@ struct AssetPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
 
-		return copyFile(src.c_str(), dst);
+		return OS::copyFile(src.c_str(), dst);
 	}
 
 	
@@ -599,7 +598,7 @@ struct AssetPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	{
 		if (type == LuaScript::TYPE)
 		{
-			return copyFile("models/editor/tile_lua_script.dds", out_path);
+			return OS::copyFile("models/editor/tile_lua_script.dds", out_path);
 		}
 		return false;
 	}

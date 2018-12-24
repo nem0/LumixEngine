@@ -12,11 +12,11 @@
 #include "engine/mt/atomic.h"
 #include "engine/mt/sync.h"
 #include "engine/mt/task.h"
+#include "engine/os.h"
 #include "engine/profiler.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/string.h"
-#include "engine/system.h"
 #include "engine/universe/component.h"
 #include "engine/universe/universe.h"
 #include "renderer/draw2d.h"
@@ -399,7 +399,7 @@ struct RendererImpl final : public Renderer
 	{
 		registerProperties(engine.getAllocator());
 		char cmd_line[4096];
-		getCommandLine(cmd_line, lengthOf(cmd_line));
+		OS::getCommandLine(cmd_line, lengthOf(cmd_line));
 		CommandLineParser cmd_line_parser(cmd_line);
 		m_vsync = true;
 		while (cmd_line_parser.next())

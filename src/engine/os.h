@@ -132,9 +132,16 @@ LUMIX_ENGINE_API void getKeyName(Keycode keycode, char* out, int size);
 LUMIX_ENGINE_API int getDPI();
 LUMIX_ENGINE_API void UTF32ToUTF8(u32 utf32, char* utf8);
 
+LUMIX_ENGINE_API bool copyFile(const char* from, const char* to);
+LUMIX_ENGINE_API void getExecutablePath(char* buffer, int buffer_size);
+LUMIX_ENGINE_API void messageBox(const char* text);
+LUMIX_ENGINE_API void setCommandLine(int, char**);
+LUMIX_ENGINE_API bool getCommandLine(char* output, int max_size);
+LUMIX_ENGINE_API void* loadLibrary(const char* path);
+LUMIX_ENGINE_API void unloadLibrary(void* handle);
+LUMIX_ENGINE_API void* getLibrarySymbol(void* handle, const char* name);
 
 LUMIX_ENGINE_API void run(Interface& iface);
-
 
 enum class Keycode : u8
 {
