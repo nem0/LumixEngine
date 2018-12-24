@@ -28,13 +28,11 @@ Who is using it?
 
 [3rd party libraries](https://github.com/nem0/lumixengine_3rdparty)
 
-* [bgfx](https://github.com/bkaradzic/bgfx)
 * [lua](https://github.com/LuaDist/lua)
 * [crunch/crnlib](https://github.com/BinomialLLC/crunch)
 * [PhysX](https://developer.nvidia.com/physx-sdk)
 * [dear imgui](https://github.com/ocornut/imgui)
 * [stb](https://github.com/nothings/stb)
-* [SDL](https://www.libsdl.org/)
 * [cmft](https://github.com/dariomanesku/cmft)
 
 Project generator
