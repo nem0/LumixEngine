@@ -2508,7 +2508,7 @@ public:
 	void makeAbsolute(char* absolute, int max_size, const char* relative) const override
 	{
 		FS::DiskFileDevice* disk = m_engine->getDiskFileDevice();
-		bool is_absolute = relative[0] == '/' || relative[0] == '/';
+		bool is_absolute = relative[0] == '\\' || relative[0] == '/';
 		is_absolute = is_absolute || (relative[0] != 0 && relative[1] == ':');
 
 		if (is_absolute || !disk)

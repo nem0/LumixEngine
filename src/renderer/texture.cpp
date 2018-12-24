@@ -208,8 +208,7 @@ bool Texture::saveTGA(FS::IFile* file,
 
 	for (long y = 0; y < header.height; y++)
 	{
-		long read_index = y * header.width * 4;
-		long write_index = ((header.imageDescriptor & 32) != 0) ? read_index : y * header.width * 4;
+		long write_index = y * header.width * 4;
 		for (long x = 0; x < header.width; x++)
 		{
 			data[write_index + 0] = image_dest[write_index + 2];

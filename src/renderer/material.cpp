@@ -152,7 +152,7 @@ bool Material::save(FS::IFile& file)
 	if(!isReady()) return false;
 	if(!m_shader) return false;
 	
-	file << "shader \"" << (m_shader ? m_shader->getPath().c_str(): "") << "\"\n";
+	file << "shader \"" << m_shader->getPath().c_str() << "\"\n";
 	file << "backface_culling(" << (isBackfaceCulling() ? "true" : "false") << ")\n";
 	file << "layer \"" << m_renderer.getLayerName(m_layer) << "\"\n";
 
@@ -167,7 +167,7 @@ bool Material::save(FS::IFile& file)
 		if ((m_define_mask & (1 << i)) == 0) continue;
 		const char* def = m_renderer.getShaderDefine(i);
 		if (equalStrings("SKINNED", def)) continue;
-		if (i < 0) file << ", ";
+		if (i > 0) file << ", ";
 		file << "\"" << def << "\"";
 	}
 	file << "}\n";

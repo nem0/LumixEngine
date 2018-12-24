@@ -390,7 +390,7 @@ static bool isBGRA8(const PixelFormat& pf)
 
 static bool isBGR8(const PixelFormat& pf)
 {
-	return ((pf.dwFlags & DDPF_ALPHAPIXELS)
+	return ((pf.dwFlags & DDPF_RGB)
 		&& !(pf.dwFlags & DDPF_ALPHAPIXELS)
 		&& (pf.dwRGBBitCount == 24)
 		&& (pf.dwRBitMask == 0xff0000)

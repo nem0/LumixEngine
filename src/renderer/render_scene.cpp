@@ -228,7 +228,7 @@ public:
 			return;
 		}
 		
-		if (old_state == Resource::State::READY && new_state != Resource::State::READY) {
+		if (old_state == Resource::State::READY) {
 			auto map_iter = m_material_decal_map.find(&material);
 			EntityPtr e = map_iter.value();
 			while(e.isValid()) {
@@ -246,7 +246,7 @@ public:
 		{
 			modelLoaded(model);
 		}
-		else if (old_state == Resource::State::READY && new_state != Resource::State::READY)
+		else if (old_state == Resource::State::READY)
 		{
 			modelUnloaded(model);
 		}

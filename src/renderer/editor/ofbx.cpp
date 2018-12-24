@@ -550,7 +550,7 @@ static OptionalError<Property*> readProperty(Cursor* cursor)
 			OptionalError<u32> length = read<u32>(cursor);
 			OptionalError<u32> encoding = read<u32>(cursor);
 			OptionalError<u32> comp_len = read<u32>(cursor);
-			if (length.isError() | encoding.isError() | comp_len.isError()) return Error();
+			if (length.isError() || encoding.isError() || comp_len.isError()) return Error();
 			if (cursor->current + comp_len.getValue() > cursor->end) return Error("Reading past the end");
 			cursor->current += comp_len.getValue();
 			break;
@@ -2626,8 +2626,6 @@ static bool parseObjects(const Element& root, Scene* scene)
 					if (mat->textures[type])
 					{
 						break;// This may happen for some models (eg. 2 normal maps in use)
-						Error::s_message = "Invalid material";
-						return false;
 					}
 
 					mat->textures[type] = (Texture*)child;

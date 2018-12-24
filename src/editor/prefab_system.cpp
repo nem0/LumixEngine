@@ -486,7 +486,7 @@ public:
 		cmd->rotation = rot;
 		cmd->scale = scale;
 		m_editor.executeCommand(cmd);
-		return cmd ? cmd->entity : INVALID_ENTITY;
+		return cmd->entity;
 	}
 
 
