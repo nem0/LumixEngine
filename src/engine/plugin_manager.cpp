@@ -3,10 +3,10 @@
 #include "engine/engine.h"
 #include "engine/iplugin.h"
 #include "engine/log.h"
+#include "engine/os.h"
 #include "engine/path_utils.h"
 #include "engine/plugin_manager.h"
 #include "engine/profiler.h"
-#include "engine/system.h"
 
 
 namespace Lumix 
@@ -39,7 +39,7 @@ class PluginManagerImpl final : public PluginManager
 
 			for (int i = 0; i < m_libraries.size(); ++i)
 			{
-				unloadLibrary(m_libraries[i]);
+				OS::unloadLibrary(m_libraries[i]);
 			}
 		}
 
@@ -117,7 +117,7 @@ class PluginManagerImpl final : public PluginManager
 			int idx = m_plugins.indexOf(plugin);
 			ASSERT(idx >= 0);
 			LUMIX_DELETE(m_engine.getAllocator(), m_plugins[idx]);
-			unloadLibrary(m_libraries[idx]);
+			OS::unloadLibrary(m_libraries[idx]);
 			m_libraries.erase(idx);
 			m_plugins.erase(idx);
 		}
@@ -138,10 +138,10 @@ class PluginManagerImpl final : public PluginManager
 			if (!PathUtils::hasExtension(path, ext + 1)) catString(path_with_ext, ext);
 			g_log_info.log("Core") << "loading plugin " << path_with_ext;
 			typedef IPlugin* (*PluginCreator)(Engine&);
-			auto* lib = loadLibrary(path_with_ext);
+			auto* lib = OS::loadLibrary(path_with_ext);
 			if (lib)
 			{
-				PluginCreator creator = (PluginCreator)getLibrarySymbol(lib, "createPlugin");
+				PluginCreator creator = (PluginCreator)OS::getLibrarySymbol(lib, "createPlugin");
 				if (creator)
 				{
 					IPlugin* plugin = creator(m_engine);
@@ -165,7 +165,7 @@ class PluginManagerImpl final : public PluginManager
 				{
 					g_log_error.log("Core") << "No createPlugin function in plugin.";
 				}
-				unloadLibrary(lib);
+				OS::unloadLibrary(lib);
 			}
 			else
 			{

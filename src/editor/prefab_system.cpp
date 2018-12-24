@@ -20,7 +20,6 @@
 #include "engine/resource_manager.h"
 #include "engine/serializer.h"
 #include "engine/string.h"
-#include "engine/system.h"
 #include "engine/universe/universe.h"
 #include "imgui/imgui.h"
 #include <cstdlib>
@@ -58,7 +57,7 @@ public:
 
 		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
 
-		copyFile(src.c_str(), dst);
+		OS::copyFile(src.c_str(), dst);
 		return true;
 	}
 

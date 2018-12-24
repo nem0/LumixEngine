@@ -12,7 +12,6 @@
 #include "engine/math_utils.h"
 #include "engine/path_utils.h"
 #include "engine/reflection.h"
-#include "engine/system.h"
 #include "engine/universe/universe.h"
 #include "engine/viewport.h"
 #include "physics/physics_geometry_manager.h"
@@ -439,7 +438,7 @@ struct PhysicsUIPlugin final : public StudioApp::GUIPlugin
 	bool packData(const char* dest_dir) override
 	{
 		char exe_path[MAX_PATH_LENGTH];
-		getExecutablePath(exe_path, lengthOf(exe_path));
+		OS::getExecutablePath(exe_path, lengthOf(exe_path));
 		char exe_dir[MAX_PATH_LENGTH];
 
 		const char* physx_dlls[] = {
@@ -455,7 +454,7 @@ struct PhysicsUIPlugin final : public StudioApp::GUIPlugin
 			StaticString<MAX_PATH_LENGTH> tmp(exe_dir, dll);
 			if (!OS::fileExists(tmp)) return false;
 			StaticString<MAX_PATH_LENGTH> dest(dest_dir, dll);
-			if (!copyFile(tmp, dest))
+			if (!OS::copyFile(tmp, dest))
 			{
 				g_log_error.log("Physics") << "Failed to copy " << tmp << " to " << dest;
 				return false;

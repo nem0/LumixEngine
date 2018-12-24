@@ -27,7 +27,6 @@
 #include "engine/quat.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
-#include "engine/system.h"
 #include "engine/timer.h"
 #include "engine/universe/universe.h"
 #include "engine/viewport.h"
@@ -1606,7 +1605,7 @@ public:
 	void loadSettings()
 	{
 		char cmd_line[2048];
-		getCommandLine(cmd_line, lengthOf(cmd_line));
+		OS::getCommandLine(cmd_line, lengthOf(cmd_line));
 
 		CommandLineParser parser(cmd_line);
 		while (parser.next())
@@ -1714,7 +1713,7 @@ public:
 	static bool copyPlugin(const char* src, int iteration, char (&out)[MAX_PATH_LENGTH])
 	{
 		char tmp_path[MAX_PATH_LENGTH];
-		getExecutablePath(tmp_path, lengthOf(tmp_path));
+		OS::getExecutablePath(tmp_path, lengthOf(tmp_path));
 		StaticString<MAX_PATH_LENGTH> copy_path;
 		PathUtils::getDir(copy_path.data, lengthOf(copy_path.data), tmp_path);
 		copy_path << "plugins/" << iteration;
@@ -1727,7 +1726,7 @@ public:
 		if (PathUtils::replaceExtension(dest_pdb.data, "pdb") && PathUtils::replaceExtension(src_pdb.data, "pda"))
 		{
 			OS::deleteFile(dest_pdb);
-			if (!copyFile(src_pdb, dest_pdb))
+			if (!OS::copyFile(src_pdb, dest_pdb))
 			{
 				copyString(out, src);
 				return false;
@@ -1736,7 +1735,7 @@ public:
 #endif
 
 		OS::deleteFile(copy_path);
-		if (!copyFile(src, copy_path))
+		if (!OS::copyFile(src, copy_path))
 		{
 			copyString(out, src);
 			return false;
@@ -1749,7 +1748,7 @@ public:
 	void loadUserPlugins()
 	{
 		char cmd_line[2048];
-		getCommandLine(cmd_line, lengthOf(cmd_line));
+		OS::getCommandLine(cmd_line, lengthOf(cmd_line));
 
 		CommandLineParser parser(cmd_line);
 		auto& plugin_manager = m_editor->getEngine().getPluginManager();
@@ -1878,7 +1877,7 @@ public:
 	bool shouldSleepWhenInactive()
 	{
 		char cmd_line[2048];
-		getCommandLine(cmd_line, lengthOf(cmd_line));
+		OS::getCommandLine(cmd_line, lengthOf(cmd_line));
 
 		CommandLineParser parser(cmd_line);
 		while (parser.next())
@@ -1893,7 +1892,7 @@ public:
 	{
 		char cmd_line[2048];
 		char path[MAX_PATH_LENGTH];
-		getCommandLine(cmd_line, lengthOf(cmd_line));
+		OS::getCommandLine(cmd_line, lengthOf(cmd_line));
 
 		CommandLineParser parser(cmd_line);
 		while (parser.next())
@@ -1913,7 +1912,7 @@ public:
 	static void checkDataDirCommandLine(char* dir, int max_size)
 	{
 		char cmd_line[2048];
-		getCommandLine(cmd_line, lengthOf(cmd_line));
+		OS::getCommandLine(cmd_line, lengthOf(cmd_line));
 
 		CommandLineParser parser(cmd_line);
 		while (parser.next())
@@ -2246,7 +2245,7 @@ public:
 	void checkScriptCommandLine()
 	{
 		char command_line[1024];
-		getCommandLine(command_line, lengthOf(command_line));
+		OS::getCommandLine(command_line, lengthOf(command_line));
 		CommandLineParser parser(command_line);
 		while (parser.next())
 		{
@@ -2490,14 +2489,14 @@ public:
 		if (!OS::fileExists("bin/app.exe"))
 		{
 			char tmp[MAX_PATH_LENGTH];
-			getExecutablePath(tmp, lengthOf(tmp));
+			OS::getExecutablePath(tmp, lengthOf(tmp));
 			PathUtils::getDir(src_dir.data, lengthOf(src_dir.data), tmp);
 		}
 		for (auto& file : bin_files)
 		{
 			StaticString<MAX_PATH_LENGTH> tmp(m_pack.dest_dir, file);
 			StaticString<MAX_PATH_LENGTH> src(src_dir, file);
-			if (!copyFile(src, tmp))
+			if (!OS::copyFile(src, tmp))
 			{
 				g_log_error.log("Editor") << "Failed to copy " << src << " to " << tmp;
 			}
@@ -2613,11 +2612,11 @@ public:
 
 		if (!OS::dirExists("bin"))
 		{
-			messageBox("Bin directory not found, please check working directory.");
+			OS::messageBox("Bin directory not found, please check working directory.");
 		}
 		else if (!OS::dirExists("pipelines"))
 		{
-			messageBox("Pipelines directory not found, please check working directory.");
+			OS::messageBox("Pipelines directory not found, please check working directory.");
 		}
 	}
 

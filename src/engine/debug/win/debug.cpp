@@ -1,7 +1,7 @@
 #include "engine/debug/debug.h"
 #include "engine/mt/atomic.h"
+#include "engine/os.h"
 #include "engine/string.h"
-#include "engine/system.h"
 #include <windows.h>
 #pragma warning (push)
 #pragma warning (disable: 4091)                             // declaration of 'xx' hides previous local declaration
@@ -749,7 +749,7 @@ static LONG WINAPI unhandledExceptionHandler(LPEXCEPTION_POINTERS info)
 			message << "\nCode: " << (u32)info->ExceptionRecord->ExceptionCode;
 			message << "\nAddress: " << (uintptr)info->ExceptionRecord->ExceptionAddress;
 			message << "\nBase: " << (uintptr)base;
-			messageBox(message);
+			OS::messageBox(message);
 		}
 		else
 		{

@@ -25,7 +25,6 @@
 #include "engine/queue.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
-#include "engine/system.h"
 #include "engine/universe/universe.h"
 #include "engine/viewport.h"
 #include "fbx_importer.h"
@@ -119,7 +118,7 @@ struct FontPlugin final : public AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
 
-		copyFile(src.c_str(), dst);
+		OS::copyFile(src.c_str(), dst);
 		return true;
 	}
 
@@ -146,7 +145,7 @@ struct PipelinePlugin final : AssetCompiler::IPlugin
 
 		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
 
-		copyFile(src.c_str(), dst);
+		OS::copyFile(src.c_str(), dst);
 		return true;
 	}
 
@@ -170,7 +169,7 @@ struct ParticleEmitterPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlug
 
 		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
 
-		copyFile(src.c_str(), dst);
+		OS::copyFile(src.c_str(), dst);
 		return true;
 	}
 	
@@ -205,7 +204,7 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
 
-		copyFile(src.c_str(), dst);
+		OS::copyFile(src.c_str(), dst);
 		return true;
 	}
 
@@ -580,7 +579,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
 
-		copyFile(src.c_str(), dst);
+		OS::copyFile(src.c_str(), dst);
 		return true;
 	}
 
@@ -1051,8 +1050,8 @@ bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK); renderer->viewCounterAdd();
 
 	bool createTile(const char* in_path, const char* out_path, ResourceType type) override
 	{
-		if (type == Material::TYPE) return copyFile("models/editor/tile_material.dds", out_path);
-		if (type == Shader::TYPE) return copyFile("models/editor/tile_shader.dds", out_path);
+		if (type == Material::TYPE) return OS::copyFile("models/editor/tile_material.dds", out_path);
+		if (type == Shader::TYPE) return OS::copyFile("models/editor/tile_shader.dds", out_path);
 
 		if (type != Model::TYPE && type != PrefabResource::TYPE) return false;
 
@@ -1145,7 +1144,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				FS::OsFile file;
 				if (!file.open(m_in_path, FS::Mode::OPEN_AND_READ))
 				{
-					copyFile("models/editor/tile_texture.dds", out_path);
+					OS::copyFile("models/editor/tile_texture.dds", out_path);
 					g_log_error.log("Editor") << "Failed to load " << m_in_path;
 					return;
 				}
@@ -1159,7 +1158,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				bool success = crn_decompress_dds_to_images(&data[0], data.size(), raw_img, desc);
 				if (!success)
 				{
-					copyFile("models/editor/tile_texture.dds", out_path);
+					OS::copyFile("models/editor/tile_texture.dds", out_path);
 					return;
 				}
 				image_width = desc.m_width;
@@ -1182,7 +1181,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				if (!data)
 				{
 					g_log_error.log("Editor") << "Failed to load " << m_in_path;
-					copyFile("models/editor/tile_texture.dds", out_path);
+					OS::copyFile("models/editor/tile_texture.dds", out_path);
 					return;
 				}
 				stbir_resize_uint8(data,
@@ -1503,7 +1502,7 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
 
-		return copyFile(src.c_str(), dst);
+		return OS::copyFile(src.c_str(), dst);
 	}
 
 

@@ -15,7 +15,6 @@
 #include "engine/json_serializer.h"
 #include "engine/log.h"
 #include "engine/reflection.h"
-#include "engine/system.h"
 #include "engine/universe/universe.h"
 #include "imgui/imgui.h"
 #include "renderer/model.h"
@@ -52,7 +51,7 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlug
 
 		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
 
-		return copyFile(src.c_str(), dst);
+		return OS::copyFile(src.c_str(), dst);
 	}
 
 
@@ -76,7 +75,7 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlug
 
 	bool createTile(const char* in_path, const char* out_path, ResourceType type) override
 	{
-		if (type == Animation::TYPE) return copyFile("models/editor/tile_animation.dds", out_path);
+		if (type == Animation::TYPE) return OS::copyFile("models/editor/tile_animation.dds", out_path);
 		return false;
 	}
 
@@ -305,7 +304,7 @@ struct AnimControllerAssetBrowserPlugin : AssetBrowser::IPlugin
 
 	bool createTile(const char* in_path, const char* out_path, ResourceType type) override
 	{
-		if (type == Anim::ControllerResource::TYPE) return copyFile("models/editor/tile_animation_graph.dds", out_path);
+		if (type == Anim::ControllerResource::TYPE) return OS::copyFile("models/editor/tile_animation_graph.dds", out_path);
 		return false;
 	}
 

@@ -15,7 +15,6 @@
 #include "engine/path_utils.h"
 #include "engine/plugin_manager.h"
 #include "engine/profiler.h"
-#include "engine/system.h"
 #include "engine/timer.h"
 #include "engine/universe/universe.h"
 #include "gui/gui_system.h"
@@ -92,7 +91,7 @@ public:
 		m_pipeline_define = "APP";
 		copyString(m_startup_script_path, "startup.lua");
 		char cmd_line[1024];
-		getCommandLine(cmd_line, lengthOf(cmd_line));
+		OS::getCommandLine(cmd_line, lengthOf(cmd_line));
 		CommandLineParser parser(cmd_line);
 		while (parser.next())
 		{

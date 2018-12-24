@@ -12,7 +12,6 @@
 #include "engine/engine.h"
 #include "engine/plugin_manager.h"
 #include "engine/reflection.h"
-#include "engine/system.h"
 #include "engine/universe/universe.h"
 #include "imgui/imgui.h"
 #include "renderer/render_scene.h"
@@ -95,7 +94,7 @@ struct AssetBrowserPlugin final : public AssetBrowser::IPlugin
 
 	bool createTile(const char* in_path, const char* out_path, ResourceType type) override
 	{
-		if (type == Clip::TYPE) return copyFile("models/editor/tile_audio.dds", out_path);
+		if (type == Clip::TYPE) return OS::copyFile("models/editor/tile_audio.dds", out_path);
 		return false;
 	}
 

@@ -27,7 +27,6 @@
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
 #include "engine/serializer.h"
-#include "engine/system.h"
 #include "engine/timer.h"
 #include "engine/universe/universe.h"
 #include "engine/viewport.h"
@@ -3179,7 +3178,7 @@ public:
 		m_editor_icons = EditorIcons::create(*this);
 
 		char command_line[2048];
-		getCommandLine(command_line, lengthOf(command_line));
+		OS::getCommandLine(command_line, lengthOf(command_line));
 		CommandLineParser parser(command_line);
 		while (parser.next())
 		{
