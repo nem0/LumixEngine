@@ -277,7 +277,6 @@ public:
 
 		ffr::preinit(m_allocator);
 		OS::InitWindowArgs create_win_args;
-		create_win_args.handle_file_drops = false;
 		create_win_args.name = "Lumix Studio";
 		create_win_args.handle_file_drops = true;
 		m_window = OS::createWindow(create_win_args);
