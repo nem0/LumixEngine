@@ -1,14 +1,31 @@
-/*
- * Copyright (c) 2008-2015, NVIDIA CORPORATION.  All rights reserved.
- *
- * NVIDIA CORPORATION and its licensors retain all intellectual property
- * and proprietary rights in and to this software, related documentation
- * and any modifications thereto.  Any use, reproduction, disclosure or
- * distribution of this software and related documentation without an express
- * license agreement from NVIDIA CORPORATION is strictly prohibited.
- */
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
+//  * Redistributions of source code must retain the above copyright
+//    notice, this list of conditions and the following disclaimer.
+//  * Redistributions in binary form must reproduce the above copyright
+//    notice, this list of conditions and the following disclaimer in the
+//    documentation and/or other materials provided with the distribution.
+//  * Neither the name of NVIDIA CORPORATION nor the names of its
+//    contributors may be used to endorse or promote products derived
+//    from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+// PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+// CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+// PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+// OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Copyright (c) 2008-2018 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
-// Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
+// Copyright (c) 2001-2004 NovodeX AG. All rights reserved.
 
 
 #ifndef PX_PHYSICS_NX_SCENE_QUERY_FILTERING
@@ -22,7 +39,7 @@
 #include "PxQueryReport.h"
 #include "PxClient.h"
 
-#ifndef PX_DOXYGEN
+#if !PX_DOXYGEN
 namespace physx
 {
 #endif
@@ -64,20 +81,14 @@ PX_COMPILE_TIME_ASSERT(PxQueryFlag::eDYNAMIC==(1<<1));
 /**
 \brief Flags typedef for the set of bits defined in PxQueryFlag.
 
-@see PxSceneQueryFilter
 */
 typedef PxFlags<PxQueryFlag::Enum,PxU16> PxQueryFlags;
 PX_FLAGS_OPERATORS(PxQueryFlag::Enum,PxU16)
 
-/** \deprecated Deprecated definition for backwards compatibility with PhysX 3.2 */
-#define PxSceneQueryFilterFlag PxQueryFlag // PX_DEPRECATED
-/** \deprecated Deprecated definition for backwards compatibility with PhysX 3.2 */
-#define PxSceneQueryFilterFlags PxQueryFlags // PX_DEPRECATED
-
 /**
 \brief Classification of scene query hits (intersections).
 
- - eNONE: Returning this hit type means that the hit should not be reported. 
+ - eNONE: Returning this hit type means that the hit should not be reported.
  - eBLOCK: For all raycast, sweep and overlap queries the nearest eBLOCK type hit will always be returned in PxHitCallback::block member.
  - eTOUCH: Whenever a raycast, sweep or overlap query was called with non-zero PxHitCallback::nbTouches and PxHitCallback::touches
 		   parameters, eTOUCH type hits that are closer or same distance (touchDistance <= blockDistance condition)
@@ -104,9 +115,6 @@ struct PxQueryHitType
 	};
 };
 
-/** \deprecated Deprecated definition for backwards compatibility with PhysX 3.2 */
-#define PxSceneQueryHitType PxQueryHitType // PX_DEPRECATED
-
 /**
 \brief Scene query filtering data.
 
@@ -124,21 +132,17 @@ to type #PxQueryHitType::eBLOCK when the value of PxHitCallback::nbTouches provi
 struct PxQueryFilterData
 {
 	/** \brief default constructor */
-	explicit PX_INLINE PxQueryFilterData() : flags(PxQueryFlag::eDYNAMIC | PxQueryFlag::eSTATIC), clientId(PX_DEFAULT_CLIENT) {}
+	explicit PX_INLINE PxQueryFilterData() : flags(PxQueryFlag::eDYNAMIC | PxQueryFlag::eSTATIC)		{}
 
 	/** \brief constructor to set both filter data and filter flags */
-	explicit PX_INLINE PxQueryFilterData(const PxFilterData& fd, PxQueryFlags f) : data(fd), flags(f), clientId(PX_DEFAULT_CLIENT) {}
+	explicit PX_INLINE PxQueryFilterData(const PxFilterData& fd, PxQueryFlags f) : data(fd), flags(f)	{}
 
 	/** \brief constructor to set filter flags only */
-	explicit PX_INLINE PxQueryFilterData(PxQueryFlags f) : flags(f), clientId(PX_DEFAULT_CLIENT) {}
+	explicit PX_INLINE PxQueryFilterData(PxQueryFlags f) : flags(f)										{}
 
 	PxFilterData	data;		//!< Filter data associated with the scene query
 	PxQueryFlags	flags;		//!< Filter flags (see #PxQueryFlags)
-	PxClientID		clientId;	//!< ID of the client doing the query (see #PxScene.createClient())
 };
-
-/** \deprecated Deprecated definition for backwards compatibility with PhysX 3.2 */
-#define PxSceneQueryFilterData PxQueryFilterData // PX_DEPRECATED
 
 /**
 \brief Scene query filtering callbacks.
@@ -147,10 +151,10 @@ Custom filtering logic for scene query intersection candidates. If an intersecti
 (see #PxQueryFilterData), filtering callbacks are executed if requested (see #PxQueryFilterData.flags)
 
 \li If #PxQueryFlag::ePREFILTER is set, the preFilter function runs before exact intersection tests.
-If this function returns #PxQueryHitType::eTOUCH or #PxQueryHitType::eBLOCK, exact testing is performed to 
+If this function returns #PxQueryHitType::eTOUCH or #PxQueryHitType::eBLOCK, exact testing is performed to
 determine the intersection location.
 
-The preFilter function may overwrite the copy of queryFlags it receives as an argument to specify any of #PxHitFlag::eMODIFIABLE_FLAGS 
+The preFilter function may overwrite the copy of queryFlags it receives as an argument to specify any of #PxHitFlag::eMODIFIABLE_FLAGS
 on a per-shape basis. Changes apply only to the shape being filtered, and changes to other flags are ignored.
 
 \li If #PxQueryFlag::ePREFILTER is not set, precise intersection testing is performed using the original query's filterData.flags.
@@ -189,12 +193,9 @@ public:
 
 	/**
 	\brief virtual destructor
-	*/	
+	*/
 	virtual ~PxQueryFilterCallback() {}
 };
-
-/** \brief Deprecated define for backwards compatibility with PhysX 3.2 */
-#define PxSceneQueryFilterCallback PxQueryFilterCallback
 
 /**
 \brief Batched query pre-filter shader.
@@ -203,15 +204,17 @@ Custom filtering logic for batched query intersection candidates. If an intersec
 filtering shader runs if specified in filtering flags (see #PxQueryFilterData.flags)
 
 \li If #PxQueryFlag::ePREFILTER is set, the preFilter shader runs before exact intersection tests.
-If the shader returns #PxQueryHitType::eTOUCH or #PxQueryHitType::eBLOCK, exact testing is performed to 
+If the shader returns #PxQueryHitType::eTOUCH or #PxQueryHitType::eBLOCK, exact testing is performed to
 determine the intersection location.
 
-The preFilter shader may overwrite the copy of queryFlags it receives as an argument to specify any of #PxHitFlag::eMODIFIABLE_FLAGS 
+The preFilter shader may overwrite the copy of queryFlags it receives as an argument to specify any of #PxHitFlag::eMODIFIABLE_FLAGS
 on a per-shape basis. Changes apply only to the shape being filtered, and changes to other flags are ignored.
 
 \li If #PxQueryFlag::ePREFILTER is not set, precise intersection testing is performed using the original query's filterData.flags.
 
 Filtering calls are not guaranteed to be sorted along the ray or sweep direction.
+
+\deprecated The batched query feature has been deprecated in PhysX version 3.4
 
 @see PxBatchQueryDesc.preFilterShader PxQueryFilterCallback.preFilter PxBatchQueryPostFilterShader
 
@@ -225,9 +228,9 @@ Filtering calls are not guaranteed to be sorted along the ray or sweep direction
 \param[in,out] hitFlags Per-object modifiable hit flags (only flags from PxHitFlag::eMODIFIABLE_FLAGS mask can be modified)
 \return the updated hit type for this hit (see #PxQueryHitType)
 
-@see PxBatchQueryPostFilterShader 
+@see PxBatchQueryPostFilterShader
 */
-typedef PxQueryHitType::Enum (*PxBatchQueryPreFilterShader)(	
+typedef PX_DEPRECATED PxQueryHitType::Enum (*PxBatchQueryPreFilterShader)(
 	PxFilterData queryFilterData, PxFilterData objectFilterData,
 	const void* constantBlock, PxU32 constantBlockSize,
 	PxHitFlags& hitFlags);
@@ -244,6 +247,8 @@ This overrides any touch/block status previously returned from the preFilter fun
 Filtering shaders are not in order along the query direction, rather they are processed in the order in which
 candidate shapes for testing are found by PhysX' scene traversal algorithms.
 
+\deprecated The batched query feature has been deprecated in PhysX version 3.4
+
 @see PxBatchQueryDesc.postFilterShader PxQueryFilterCallback.postFilter PxBatchQueryPreFilterShader
 */
 
@@ -255,15 +260,15 @@ candidate shapes for testing are found by PhysX' scene traversal algorithms.
 \param[in] hit Hit data from the prior exact intersection test.
 \return the new hit type for this hit (see #PxQueryHitType)
 
-@see PxBatchQueryPreFilterShader 
+@see PxBatchQueryPreFilterShader
 */
 
-typedef PxQueryHitType::Enum (*PxBatchQueryPostFilterShader)(
+typedef PX_DEPRECATED PxQueryHitType::Enum (*PxBatchQueryPostFilterShader)(
 	PxFilterData queryFilterData, PxFilterData objectFilterData,
 	const void* constantBlock, PxU32 constantBlockSize,
 	const PxQueryHit& hit);
 
-#ifndef PX_DOXYGEN
+#if !PX_DOXYGEN
 } // namespace physx
 #endif
 

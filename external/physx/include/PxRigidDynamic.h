@@ -1,12 +1,29 @@
-/*
- * Copyright (c) 2008-2015, NVIDIA CORPORATION.  All rights reserved.
- *
- * NVIDIA CORPORATION and its licensors retain all intellectual property
- * and proprietary rights in and to this software, related documentation
- * and any modifications thereto.  Any use, reproduction, disclosure or
- * distribution of this software and related documentation without an express
- * license agreement from NVIDIA CORPORATION is strictly prohibited.
- */
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
+//  * Redistributions of source code must retain the above copyright
+//    notice, this list of conditions and the following disclaimer.
+//  * Redistributions in binary form must reproduce the above copyright
+//    notice, this list of conditions and the following disclaimer in the
+//    documentation and/or other materials provided with the distribution.
+//  * Neither the name of NVIDIA CORPORATION nor the names of its
+//    contributors may be used to endorse or promote products derived
+//    from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+// PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+// CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+// PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+// OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Copyright (c) 2008-2018 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -19,10 +36,32 @@
 
 #include "PxRigidBody.h"
 
-#ifndef PX_DOXYGEN
+#if !PX_DOXYGEN
 namespace physx
 {
 #endif
+
+
+/**
+\brief Collection of flags providing a mechanism to lock motion along/around a specific axis.
+
+@see PxRigidDynamic.setRigidDynamicLockFlag(), PxRigidBody.getRigidDynamicLockFlags()
+*/
+struct PxRigidDynamicLockFlag
+{
+	enum Enum
+	{
+		eLOCK_LINEAR_X = (1 << 0),
+		eLOCK_LINEAR_Y = (1 << 1),
+		eLOCK_LINEAR_Z = (1 << 2),
+		eLOCK_ANGULAR_X = (1 << 3),
+		eLOCK_ANGULAR_Y = (1 << 4),
+		eLOCK_ANGULAR_Z = (1 << 5)
+	};
+};
+
+typedef PxFlags<PxRigidDynamicLockFlag::Enum, PxU16> PxRigidDynamicLockFlags;
+PX_FLAGS_OPERATORS(PxRigidDynamicLockFlag::Enum, PxU16)
 
 /**
 \brief PxRigidDynamic represents a dynamic rigid simulation object in the physics SDK.
@@ -37,7 +76,6 @@ Instances of this class are created by calling #PxPhysics::createRigidDynamic() 
 \li #PxVisualizationParameter::eBODY_MASS_AXES
 \li #PxVisualizationParameter::eBODY_LIN_VELOCITY
 \li #PxVisualizationParameter::eBODY_ANG_VELOCITY
-\li #PxVisualizationParameter::eBODY_JOINT_GROUPS
 
 @see PxRigidBody  PxPhysics.createRigidDynamic()  release()
 */
@@ -86,90 +124,8 @@ public:
 
 	@see setKinematicTarget() PxRigidBodyFlag setRigidBodyFlag()
 	*/
-	virtual		bool				getKinematicTarget(PxTransform& target) = 0;
+	virtual		bool				getKinematicTarget(PxTransform& target)	const	= 0;
 
-/************************************************************************************************/
-/** @name Damping
-*/
-
-	/**
-	\brief Sets the linear damping coefficient.
-	
-	Zero represents no damping. The damping coefficient must be nonnegative.
-
-	<b>Default:</b> 0.0
-	
-	\param[in] linDamp Linear damping coefficient. <b>Range:</b> [0, PX_MAX_F32)
-
-	@see getLinearDamping() setAngularDamping()
-	*/
-	virtual		void				setLinearDamping(PxReal linDamp) = 0;
-
-	/**
-	\brief Retrieves the linear damping coefficient.
-
-	\return The linear damping coefficient associated with this actor.
-
-	@see setLinearDamping() getAngularDamping()
-	*/
-	virtual		PxReal				getLinearDamping() const = 0;
-
-	/**
-	\brief Sets the angular damping coefficient.
-	
-	Zero represents no damping.
-	
-	The angular damping coefficient must be nonnegative.
-
-	<b>Default:</b> 0.05
-
-	\param[in] angDamp Angular damping coefficient. <b>Range:</b> [0, PX_MAX_F32)
-
-	@see getAngularDamping() setLinearDamping()
-	*/
-	virtual		void				setAngularDamping(PxReal angDamp) = 0;
-
-	/**
-	\brief Retrieves the angular damping coefficient.
-
-	\return The angular damping coefficient associated with this actor.
-
-	@see setAngularDamping() getLinearDamping()
-	*/
-	virtual		PxReal				getAngularDamping() const = 0;
-
-/************************************************************************************************/
-/** @name Velocity
-*/
-
-	/**
-	\brief Lets you set the maximum angular velocity permitted for this actor.
-	
-	For various internal computations, very quickly rotating actors introduce error 
-	into the simulation, which leads to undesired results.
-
-	With this function, you can set the  maximum angular velocity permitted for this rigid body. 
-	Higher angular velocities are clamped to this value. 
-
-	Note: The angular velocity is clamped to the set value <i>before</i> the solver, which means that
-	the limit may still be momentarily exceeded.
-
-	<b>Default:</b> 7.0
-
-	\param[in] maxAngVel Max allowable angular velocity for actor. <b>Range:</b> [0, PX_MAX_F32)
-
-	@see getMaxAngularVelocity()
-	*/
-	virtual		void				setMaxAngularVelocity(PxReal maxAngVel) = 0;
-
-	/**
-	\brief Retrieves the maximum angular velocity permitted for this actor.
-
-	\return The maximum allowed angular velocity for this actor.
-
-	@see setMaxAngularVelocity
-	*/
-	virtual		PxReal				getMaxAngularVelocity()	const = 0; 
 
 /************************************************************************************************/
 /** @name Sleeping
@@ -243,7 +199,7 @@ public:
 
 	<b>Default:</b> 1e-5f * PxTolerancesScale::speed * PxTolerancesScale::speed
 
-	\param[in] threshold Energy below which an actor may participate in stabilization. <b>Range:</b> (0,inf]
+	\param[in] threshold Energy below which an actor may participate in stabilization. <b>Range:</b> [0,inf)
 
 	@see  getStabilizationThreshold() PxSceneFlag::eENABLE_STABILIZATION
 	*/
@@ -259,6 +215,35 @@ public:
 	@see setStabilizationThreshold() PxSceneFlag::eENABLE_STABILIZATION
 	*/
 	virtual		PxReal				getStabilizationThreshold() const = 0;
+
+
+	/**
+	\brief Reads the PxRigidDynamic lock flags.
+
+	See the list of flags #PxRigidDynamicLockFlag
+
+	\return The values of the PxRigidDynamicLock flags.
+
+	@see PxRigidDynamicLockFlag setRigidDynamicLockFlag()
+	*/
+	virtual		PxRigidDynamicLockFlags getRigidDynamicLockFlags() const = 0;
+
+	/**
+	\brief Raises or clears a particular rigid dynamic lock flag.
+
+	See the list of flags #PxRigidDynamicLockFlag
+
+	<b>Default:</b> no flags are set
+
+
+	\param[in] flag		The PxRigidDynamicLockBody flag to raise(set) or clear. See #PxRigidBodyFlag.
+	\param[in] value	The new boolean value for the flag.
+
+	@see PxRigidDynamicLockFlag getRigidDynamicLockFlags()
+	*/
+	virtual		void				setRigidDynamicLockFlag(PxRigidDynamicLockFlag::Enum flag, bool value) = 0;
+	virtual		void				setRigidDynamicLockFlags(PxRigidDynamicLockFlags flags) = 0;
+	
 
 
 	/**
@@ -391,15 +376,11 @@ protected:
 	PX_INLINE						PxRigidDynamic(PxType concreteType, PxBaseFlags baseFlags) : PxRigidBody(concreteType, baseFlags) {}
 	PX_INLINE						PxRigidDynamic(PxBaseFlags baseFlags) : PxRigidBody(baseFlags) {}
 	virtual							~PxRigidDynamic() {}
-	virtual		bool				isKindOf(const char* name) const { return !strcmp("PxRigidDynamic", name) || PxRigidBody::isKindOf(name); }
+	virtual		bool				isKindOf(const char* name) const { return !::strcmp("PxRigidDynamic", name) || PxRigidBody::isKindOf(name); }
 
 };
 
-PX_DEPRECATED PX_INLINE	PxRigidDynamic*			PxActor::isRigidDynamic()				{ return is<PxRigidDynamic>();		}
-PX_DEPRECATED PX_INLINE	const PxRigidDynamic*	PxActor::isRigidDynamic()		const	{ return is<PxRigidDynamic>();		}
-
-
-#ifndef PX_DOXYGEN
+#if !PX_DOXYGEN
 } // namespace physx
 #endif
 

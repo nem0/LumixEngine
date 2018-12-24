@@ -1,12 +1,29 @@
-/*
- * Copyright (c) 2008-2015, NVIDIA CORPORATION.  All rights reserved.
- *
- * NVIDIA CORPORATION and its licensors retain all intellectual property
- * and proprietary rights in and to this software, related documentation
- * and any modifications thereto.  Any use, reproduction, disclosure or
- * distribution of this software and related documentation without an express
- * license agreement from NVIDIA CORPORATION is strictly prohibited.
- */
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
+//  * Redistributions of source code must retain the above copyright
+//    notice, this list of conditions and the following disclaimer.
+//  * Redistributions in binary form must reproduce the above copyright
+//    notice, this list of conditions and the following disclaimer in the
+//    documentation and/or other materials provided with the distribution.
+//  * Neither the name of NVIDIA CORPORATION nor the names of its
+//    contributors may be used to endorse or promote products derived
+//    from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+// PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+// CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+// PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+// OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Copyright (c) 2008-2018 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -20,7 +37,7 @@
 #include "PxPhysXConfig.h"
 #include "common/PxCollection.h"
 
-#ifndef PX_DOXYGEN
+#if !PX_DOXYGEN
 namespace physx
 {
 #endif
@@ -33,14 +50,19 @@ namespace physx
 		
 		The Collection itself is not released.
 
-		It is assumed that the application holds a reference to each of the objects in the collection, with the exception of objects that are 
-		subordinate (PxBase::isSubordinate). This is for example not the case if the collection contains a shape that was created with PxRigidActor::createShape, 
-		as the application gives up the reference to the shape with this call. Objects that violate this assumption need to be removed from the collection 
-		prior to calling releaseObjects.
+		If the releaseExclusiveShapes flag is not set to true, release() will not be called on exclusive shapes.
+
+		It is assumed that the application holds a reference to each of the objects in the collection, with the exception of objects that are not releasable
+		(PxBase::isReleasable()). In general, objects that violate this assumption need to be removed from the collection prior to calling releaseObjects.
+		
+		\note when a shape is created with PxRigidActor::createShape() or PxRigidActorExt::createExclusiveShape(), the only counted reference is held by the actor. 
+		If such a shape and its actor are present in the collection, the reference count will be decremented once when the actor is released, and once when the 
+		shape is released, resulting in undefined behavior. Shape reference counts can be incremented with PxShape::acquireReference().
 
 		\param[in] collection to remove and release all object from.
+		\param[in] releaseExclusiveShapes if this parameter is set to false, release() will not be called on exclusive shapes.
 		*/
-		static void	releaseObjects(PxCollection& collection);
+		static void	releaseObjects(PxCollection& collection, bool releaseExclusiveShapes = true);
 
 		/**
 		\brief Removes objects of a given type from a collection, potentially adding them to another collection.
@@ -59,7 +81,7 @@ namespace physx
 
 		This function creates a new collection from all objects that are shareable across multiple 
 		scenes. Instances of the following types are included: PxConvexMesh, PxTriangleMesh, 
-		PxHeightField, PxShape, PxMaterial and PxClothFabric.
+		PxHeightField, PxShape and PxMaterial.
 
 		This is a helper function to ease the creation of collections for serialization. 
 
@@ -89,7 +111,7 @@ namespace physx
 		static	PxCollection*	createCollection(PxScene& scene);
 	};
 
-#ifndef PX_DOXYGEN
+#if !PX_DOXYGEN
 } // namespace physx
 #endif
 

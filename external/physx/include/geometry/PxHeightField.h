@@ -1,12 +1,29 @@
-/*
- * Copyright (c) 2008-2015, NVIDIA CORPORATION.  All rights reserved.
- *
- * NVIDIA CORPORATION and its licensors retain all intellectual property
- * and proprietary rights in and to this software, related documentation
- * and any modifications thereto.  Any use, reproduction, disclosure or
- * distribution of this software and related documentation without an express
- * license agreement from NVIDIA CORPORATION is strictly prohibited.
- */
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
+//  * Redistributions of source code must retain the above copyright
+//    notice, this list of conditions and the following disclaimer.
+//  * Redistributions in binary form must reproduce the above copyright
+//    notice, this list of conditions and the following disclaimer in the
+//    documentation and/or other materials provided with the distribution.
+//  * Neither the name of NVIDIA CORPORATION nor the names of its
+//    contributors may be used to endorse or promote products derived
+//    from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+// PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+// CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+// PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+// OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Copyright (c) 2008-2018 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.
 
@@ -18,9 +35,10 @@
 */
 
 #include "geometry/PxHeightFieldFlag.h"
+#include "geometry/PxHeightFieldSample.h"
 #include "common/PxBase.h"
 
-#ifndef PX_DOXYGEN
+#if !PX_DOXYGEN
 namespace physx
 {
 #endif
@@ -49,8 +67,9 @@ via the PxHeightFieldGeometry and PxShape classes.
 
 <h3>Creation</h3>
 
-To create an instance of this class call PxPhysics::createHeightField(),
-and release() to delete it. This is only possible
+To create an instance of this class call PxPhysics::createHeightField() or
+PxCooking::createHeightField(const PxHeightFieldDesc&, PxPhysicsInsertionCallback&).
+To delete it call release(). This is only possible
 once you have released all of its PxHeightFiedShape instances.
 
 <h3>Visualizations:</h3>
@@ -60,7 +79,7 @@ once you have released all of its PxHeightFiedShape instances.
 \li #PxVisualizationParameter::eCOLLISION_FNORMALS
 \li #PxVisualizationParameter::eCOLLISION_EDGES
 
-@see PxHeightFieldDesc PxHeightFieldGeometry PxShape PxPhysics.createHeightField()
+@see PxHeightFieldDesc PxHeightFieldGeometry PxShape PxPhysics.createHeightField() PxCooking.createHeightField()
 */
 
 class PxHeightField	: public PxBase
@@ -68,8 +87,6 @@ class PxHeightField	: public PxBase
 	public:
 	/**
 	\brief Decrements the reference count of a height field and releases it if the new reference count is zero.
-
-	The height field is destroyed when the application's reference is released and all shapes referencing the height field are destroyed.
 
 	@see PxPhysics.createHeightField() PxHeightFieldDesc PxHeightFieldGeometry PxShape
 	*/
@@ -148,15 +165,6 @@ class PxHeightField	: public PxBase
 	PX_PHYSX_COMMON_API virtual		PxU32						getSampleStride()			const = 0;
 
 	/**
-	\brief Retrieves the thickness of the height volume in the vertical direction.
-
-	\return The thickness of the height volume in the vertical direction.
-
-	@see PxHeightFieldDesc.thickness
-	*/
-	PX_PHYSX_COMMON_API virtual		PxReal						getThickness()				const = 0;
-
-	/**
 	\brief Retrieves the convex edge threshold.
 
 	\return The convex edge threshold.
@@ -192,6 +200,13 @@ class PxHeightField	: public PxBase
 	PX_PHYSX_COMMON_API virtual		PxU32						getReferenceCount()			const	= 0;
 
 	/**
+	\brief Acquires a counted reference to a heightfield.
+
+	This method increases the reference count of the heightfield by 1. Decrement the reference count by calling release()
+	*/
+	PX_PHYSX_COMMON_API virtual void							acquireReference()					= 0;
+
+	/**
 	\brief Returns material table index of given triangle
 
 	\note This function takes a post cooking triangle index.
@@ -211,16 +226,35 @@ class PxHeightField	: public PxBase
 	*/
 	PX_PHYSX_COMMON_API virtual	PxVec3					getTriangleNormal(PxTriangleID triangleIndex) const = 0;
 
+	/**
+	\brief Returns heightfield sample of given row and column	
+
+	\param[in] row Given heightfield row
+	\param[in] column Given heightfield column
+	\return Heightfield sample
+	*/
+	PX_PHYSX_COMMON_API virtual	const PxHeightFieldSample&	getSample(PxU32 row, PxU32 column) const = 0;
+
+	/**
+	\brief Returns the number of times the heightfield data has been modified
+	
+	This method returns the number of times modifySamples has been called on this heightfield, so that code that has
+	retained state that depends on the heightfield can efficiently determine whether it has been modified.
+	
+	\return the number of times the heightfield sample data has been modified.
+	*/
+	PX_PHYSX_COMMON_API virtual		PxU32						getTimestamp()			const	= 0;
+
 	PX_PHYSX_COMMON_API virtual	const char*				getConcreteTypeName() const { return "PxHeightField"; }
 
 protected:
 						PX_INLINE						PxHeightField(PxType concreteType, PxBaseFlags baseFlags) : PxBase(concreteType, baseFlags) {}
 						PX_INLINE						PxHeightField(PxBaseFlags baseFlags) : PxBase(baseFlags) {}
 	PX_PHYSX_COMMON_API virtual							~PxHeightField() {}
-	PX_PHYSX_COMMON_API virtual	bool					isKindOf(const char* name) const { return !strcmp("PxHeightField", name) || PxBase::isKindOf(name); }
+	PX_PHYSX_COMMON_API virtual	bool					isKindOf(const char* name) const { return !::strcmp("PxHeightField", name) || PxBase::isKindOf(name); }
 };
 
-#ifndef PX_DOXYGEN
+#if !PX_DOXYGEN
 } // namespace physx
 #endif
 

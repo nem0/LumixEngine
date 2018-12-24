@@ -1,12 +1,29 @@
-/*
- * Copyright (c) 2008-2015, NVIDIA CORPORATION.  All rights reserved.
- *
- * NVIDIA CORPORATION and its licensors retain all intellectual property
- * and proprietary rights in and to this software, related documentation
- * and any modifications thereto.  Any use, reproduction, disclosure or
- * distribution of this software and related documentation without an express
- * license agreement from NVIDIA CORPORATION is strictly prohibited.
- */
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
+//  * Redistributions of source code must retain the above copyright
+//    notice, this list of conditions and the following disclaimer.
+//  * Redistributions in binary form must reproduce the above copyright
+//    notice, this list of conditions and the following disclaimer in the
+//    documentation and/or other materials provided with the distribution.
+//  * Neither the name of NVIDIA CORPORATION nor the names of its
+//    contributors may be used to endorse or promote products derived
+//    from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+// PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+// CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+// PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+// OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Copyright (c) 2008-2018 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -18,10 +35,11 @@
 */
 
 #include "foundation/Px.h"
-#include "PxMetaDataFlags.h"
 #include "foundation/PxIO.h"
+#include "PxMetaDataFlags.h"
 
-#ifndef PX_DOXYGEN
+
+#if !PX_DOXYGEN
 namespace physx
 {
 #endif
@@ -45,12 +63,14 @@ namespace physx
 
 	#define PX_STORE_METADATA(stream, metaData) stream.write(&metaData, sizeof(PxMetaDataEntry))
 
+	#define PX_SIZE_OF(Class, Member)	sizeof((reinterpret_cast<Class*>(0))->Member)
+
 	/**
 	\brief specifies a binary metadata entry for a member variable of a class
 	*/
 	#define PX_DEF_BIN_METADATA_ITEM(stream, Class, type, name, flags) \
 	{ \
-		PxMetaDataEntry tmp = {	#type, #name, (PxU32)PX_OFFSET_OF(Class, name), PX_SIZE_OF(Class, name), \
+		PxMetaDataEntry tmp = {	#type, #name, PxU32(PX_OFFSET_OF_RT(Class, name)), PX_SIZE_OF(Class, name), \
 								1, 0, flags, 0}; \
 		PX_STORE_METADATA(stream, tmp); \
 	}
@@ -61,7 +81,7 @@ namespace physx
 	*/
 	#define PX_DEF_BIN_METADATA_ITEMS(stream, Class, type, name, flags, count) \
 	{ \
-		PxMetaDataEntry tmp = {	#type, #name, (PxU32)PX_OFFSET_OF(Class, name), PX_SIZE_OF(Class, name), \
+		PxMetaDataEntry tmp = {	#type, #name, PxU32(PX_OFFSET_OF_RT(Class, name)), PX_SIZE_OF(Class, name), \
 							count, 0, flags, 0}; \
 		PX_STORE_METADATA(stream, tmp); \
 	}
@@ -73,8 +93,8 @@ namespace physx
 	*/
 	#define PX_DEF_BIN_METADATA_ITEMS_AUTO(stream, Class, type, name, flags) \
 	{ \
-		PxMetaDataEntry tmp = {	#type, #name, (PxU32)PX_OFFSET_OF(Class, name), PX_SIZE_OF(Class, name), \
-							sizeof(((Class*)0)->name)/sizeof(type), 0, flags, 0}; \
+		PxMetaDataEntry tmp = {	#type, #name, PxU32(PX_OFFSET_OF_RT(Class, name)), PX_SIZE_OF(Class, name), \
+							sizeof((reinterpret_cast<Class*>(0))->name)/sizeof(type), 0, flags, 0}; \
 							PX_STORE_METADATA(stream, tmp); \
 	}
 
@@ -122,7 +142,7 @@ namespace physx
 	*/
 	#define PX_DEF_BIN_METADATA_UNION(stream, Class, name) \
 	{ \
-		PxMetaDataEntry tmp = {	#Class, 0, (PxU32)PX_OFFSET_OF(Class, name), PX_SIZE_OF(Class, name), \
+		PxMetaDataEntry tmp = {	#Class, 0, PxU32(PX_OFFSET_OF_RT(Class, name)), PX_SIZE_OF(Class, name), \
 							1, 0, PxMetaDataFlag::eUNION, 0 }; \
 		PX_STORE_METADATA(stream, tmp); \
 	}
@@ -141,7 +161,7 @@ namespace physx
 	*/
 	#define PX_DEF_BIN_METADATA_EXTRA_ITEM(stream, Class, type, control, align)	\
 	{ \
-		PxMetaDataEntry tmp = {	#type, 0, (PxU32)PX_OFFSET_OF(Class, control), sizeof(type), 0, (PxU32)PX_SIZE_OF(Class, control), \
+		PxMetaDataEntry tmp = {	#type, 0, PxU32(PX_OFFSET_OF_RT(Class, control)), sizeof(type), 0, PxU32(PX_SIZE_OF(Class, control)), \
 							PxMetaDataFlag::eEXTRA_DATA|PxMetaDataFlag::eEXTRA_ITEM, align }; \
 		PX_STORE_METADATA(stream, tmp); \
 	}
@@ -151,8 +171,8 @@ namespace physx
 	*/
 	#define PX_DEF_BIN_METADATA_EXTRA_ITEMS(stream, Class, type, control, count, flags, align)	\
 	{ \
-		PxMetaDataEntry tmp = {	#type, 0, (PxU32)PX_OFFSET_OF(Class, control), (PxU32)PX_SIZE_OF(Class, control), \
-							(PxU32)PX_OFFSET_OF(Class, count), (PxU32)PX_SIZE_OF(Class, count), \
+		PxMetaDataEntry tmp = {	#type, 0, PxU32(PX_OFFSET_OF_RT(Class, control)), PxU32(PX_SIZE_OF(Class, control)), \
+							PxU32(PX_OFFSET_OF_RT(Class, count)), PxU32(PX_SIZE_OF(Class, count)), \
 							PxMetaDataFlag::eEXTRA_DATA|PxMetaDataFlag::eEXTRA_ITEMS|flags, align }; \
 		PX_STORE_METADATA(stream, tmp); \
 	}
@@ -164,8 +184,8 @@ namespace physx
 	*/
 	#define PX_DEF_BIN_METADATA_EXTRA_ITEMS_MASKED_CONTROL(stream, Class, type, control, controlMask ,count, flags, align) \
 	{ \
-		PxMetaDataEntry tmp = {	#type, 0, (PxU32)PX_OFFSET_OF(Class, control), (PxU32)PX_SIZE_OF(Class, control), \
-							(PxU32)PX_OFFSET_OF(Class, count), (PxU32)PX_SIZE_OF(Class, count), \
+		PxMetaDataEntry tmp = {	#type, 0, PxU32(PX_OFFSET_OF_RT(Class, control)), PxU32(PX_SIZE_OF(Class, control)), \
+							PxU32(PX_OFFSET_OF_RT(Class, count)), PxU32(PX_SIZE_OF(Class, count)), \
 							PxMetaDataFlag::eCONTROL_MASK|PxMetaDataFlag::eEXTRA_DATA|PxMetaDataFlag::eEXTRA_ITEMS|flags|(controlMask & PxMetaDataFlag::eCONTROL_MASK_RANGE) << 16, \
 							align}; \
 		PX_STORE_METADATA(stream, tmp); \
@@ -177,7 +197,7 @@ namespace physx
 	*/
 	#define PX_DEF_BIN_METADATA_EXTRA_ARRAY(stream, Class, type, dyn_count, align, flags) \
 	{ \
-		PxMetaDataEntry tmp = {	#type, 0, (PxU32)PX_OFFSET_OF(Class, dyn_count), PX_SIZE_OF(Class, dyn_count), align, 0, \
+		PxMetaDataEntry tmp = {	#type, 0, PxU32(PX_OFFSET_OF_RT(Class, dyn_count)), PX_SIZE_OF(Class, dyn_count), align, 0, \
 							PxMetaDataFlag::eEXTRA_DATA|flags, align }; \
 		PX_STORE_METADATA(stream, tmp); \
 	}
@@ -200,7 +220,7 @@ namespace physx
 		PX_STORE_METADATA(stream, tmp); \
 	}
 
-#ifndef PX_DOXYGEN
+#if !PX_DOXYGEN
 } // namespace physx
 #endif
 

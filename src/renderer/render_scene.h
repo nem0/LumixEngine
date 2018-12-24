@@ -235,7 +235,7 @@ public:
 		u32 color,
 		float life) = 0;
 
-	virtual void addDebugCapsule(const Matrix& transform,
+	virtual void addDebugCapsule(const RigidTransform& transform,
 		float height,
 		float radius,
 		u32 color,

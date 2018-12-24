@@ -1,12 +1,29 @@
-/*
- * Copyright (c) 2008-2015, NVIDIA CORPORATION.  All rights reserved.
- *
- * NVIDIA CORPORATION and its licensors retain all intellectual property
- * and proprietary rights in and to this software, related documentation
- * and any modifications thereto.  Any use, reproduction, disclosure or
- * distribution of this software and related documentation without an express
- * license agreement from NVIDIA CORPORATION is strictly prohibited.
- */
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
+//  * Redistributions of source code must retain the above copyright
+//    notice, this list of conditions and the following disclaimer.
+//  * Redistributions in binary form must reproduce the above copyright
+//    notice, this list of conditions and the following disclaimer in the
+//    documentation and/or other materials provided with the distribution.
+//  * Neither the name of NVIDIA CORPORATION nor the names of its
+//    contributors may be used to endorse or promote products derived
+//    from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+// PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+// CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+// PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+// OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Copyright (c) 2008-2018 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -15,193 +32,157 @@
 #define PX_CONTACT_H
 
 #include "foundation/PxVec3.h"
+#include "foundation/PxAssert.h"
 
-#ifndef PX_DOXYGEN
+#if !PX_DOXYGEN
 namespace physx
 {
 #endif
 
-#ifdef PX_VC
+#if PX_VC
 #pragma warning(push)
 #pragma warning(disable: 4324)	// Padding was added at the end of a structure because of a __declspec(align) value.
 #endif
 
 #define PXC_CONTACT_NO_FACE_INDEX 0xffffffff
 
+PX_ALIGN_PREFIX(16)
+struct PxMassModificationProps
+{
+	PxReal mInvMassScale0;
+	PxReal mInvInertiaScale0;
+	PxReal mInvMassScale1;
+	PxReal mInvInertiaScale1;
+}
+PX_ALIGN_SUFFIX(16);
 
 /**
-\brief Base header structure for compressed contact data.
+\brief Header for contact patch where all points share same material and normal
 */
-struct PxContactHeader
+
+PX_ALIGN_PREFIX(16)
+struct PxContactPatch
 {
-	enum PxContactHeaderFlags
+	enum PxContactPatchFlags
 	{
 		eHAS_FACE_INDICES = 1,				//!< Indicates this contact stream has face indices.
 		eMODIFIABLE = 2,					//!< Indicates this contact stream is modifiable.
 		eFORCE_NO_RESPONSE = 4,				//!< Indicates this contact stream is notify-only (no contact response).
 		eHAS_MODIFIED_MASS_RATIOS = 8,		//!< Indicates this contact stream has modified mass ratios
 		eHAS_TARGET_VELOCITY = 16,			//!< Indicates this contact stream has target velocities set
-		eHAS_MAX_IMPULSE = 32				//!< Indicates this contact stream has max impulses set
+		eHAS_MAX_IMPULSE = 32,				//!< Indicates this contact stream has max impulses set
+		eREGENERATE_PATCHES = 64,		//!< Indicates this contact stream needs patches re-generated. 
+											//!< This is required if the application modified either the contact normal or the material properties
+		eCOMPRESSED_MODIFIED_CONTACT = 128
 	};
-	/**
-	\brief Total contact count for entire compressed contact stream
-	*/
-	PxU16 totalContactCount;		//2
-	/**
-	\brief The flags
-	@see PxContactHeaderFlags
-	*/
-	PxU16 flags;					//4
-};
 
-/**
-\brief Extended header structure for modifiable contacts.
-*/
-struct PxModifyContactHeader : public PxContactHeader
-{
-	/**
-	\brief Inverse mass scale for body A.
-	*/
-	PxReal invMassScale0;			//8
-	/**
-	\brief Inverse mass scale for body B.
-	*/
-	PxReal invMassScale1;			//12
-	/**
-	\brief Inverse inertia scale for body A.
-	*/
-	PxReal invInertiaScale0;		//16
-	/**
-	\brief Inverse inertia scale for body B.
-	*/
-	PxReal invInertiaScale1;		//20
-};
-
-/**
-\brief Base header for a contact patch
-*/
-struct PxContactPatchBase
-{
-	/**
-	\brief Number of contacts in this patch.
-	*/
-	PxU16	nbContacts;				//2
-	/**
-	\brief Flags for this patch.
-	*/
-	PxU16	flags;					//4
-};
-
-/**
-\brief Header for contact patch where all points share same material and normal
-*/
-struct PxContactPatch : public PxContactPatchBase
-{
+	PX_ALIGN(16, PxMassModificationProps mMassModification);			//16
 	/**
 	\brief Contact normal
 	*/
-	PxVec3	normal;					//16
-	/**
-	\brief Static friction coefficient
-	*/
-	PxReal	staticFriction;			//20
-	/**
-	\brief Dynamic friction coefficient
-	*/
-	PxReal	dynamicFriction;		//24
+	PX_ALIGN(16, PxVec3	normal);									//28
 	/**
 	\brief Restitution coefficient
 	*/
-	PxReal	restitution;			//28
-	/**
-	\brief Shape A's material index
-	*/
-	PxU16	materialIndex0;			//30
-	/**
-	\brief Shape B's material index
-	*/
-	PxU16	materialIndex1;			//32
-};
+	PxReal	restitution;											//32
+
+	PxReal	dynamicFriction;										//36
+	PxReal	staticFriction;											//40
+	PxU8	startContactIndex;										//41
+	PxU8	nbContacts;												//42  //Can be a U8
+
+	PxU8	materialFlags;											//43  //Can be a U16
+	PxU8	internalFlags;											//44  //Can be a U16
+	PxU16	materialIndex0;											//46  //Can be a U16
+	PxU16	materialIndex1;											//48  //Can be a U16
+	
+	
+}
+PX_ALIGN_SUFFIX(16);
 
 /**
-\brief Base contact point data
+\brief Contact point data including face (feature) indices
 */
-struct PxSimpleContact
+
+PX_ALIGN_PREFIX(16)
+struct PxContact
 {
 	/**
 	\brief Contact point in world space
 	*/
-	PxVec3	contact;				//12
+	PxVec3	contact;							//12
 	/**
 	\brief Separation value (negative implies penetration).
 	*/
-	PxReal	separation;				//16
-};
+	PxReal	separation;							//16
+}
+PX_ALIGN_SUFFIX(16);
 
-/**
-\brief Extended contact point data including face (feature) indices
-*/
-struct PxFeatureContact : public PxSimpleContact
-{	
+PX_ALIGN_PREFIX(16)
+struct PxExtendedContact : public PxContact
+{
 	/**
-	\brief Face index on shape A.
+	\brief Target velocity
 	*/
-	PxU32	internalFaceIndex0;		//20
+	PX_ALIGN(16, PxVec3 targetVelocity);		//28
 	/**
-	\brief Face index on shape B.
+	\brief Maximum impulse
 	*/
-	PxU32	internalFaceIndex1;		//24
-};
+	PxReal	maxImpulse;							//32
+}
+PX_ALIGN_SUFFIX(16);
 
 /**
 \brief A modifiable contact point. This has additional fields per-contact to permit modification by user.
 \note Not all fields are currently exposed to the user.
 */
-struct PxModifiableContact : public PxFeatureContact
+PX_ALIGN_PREFIX(16)
+struct PxModifiableContact : public PxExtendedContact
 {
 	/**
 	\brief Contact normal
 	*/
-	PxVec3	normal;					//36
-	/**
-	\brief Target velocity
-	*/
-	PxVec3	targetVel;				//48
-	/**
-	\brief Maximum impulse
-	*/
-	PxReal	maxImpulse;				//52
-	/**
-	\brief Static friction coefficient
-	*/
-	PxReal	staticFriction;			//56
-	/**
-	\brief Dynamic friction coefficient
-	*/
-	PxReal	dynamicFriction;		//60
+	PX_ALIGN(16, PxVec3	normal);					//44
 	/**
 	\brief Restitution coefficient
 	*/
-	PxReal	restitution;			//64
+	PxReal	restitution;							//48
+	
 	/**
-	\brief Material index on shape A
+	\brief Material Flags
 	*/
-	PxU16	materialIndex0;			//66
+	PxU32	materialFlags;							//52
+	
 	/**
-	\brief Material index on shape B
+	\brief Shape A's material index
 	*/
-	PxU16	materialIndex1;			//68
+	PxU16	materialIndex0;							//54
 	/**
-	\brief Flags
+	\brief Shape B's material index
 	*/
-	PxU32	flags;					//72
-};
+	PxU16	materialIndex1;							//56
+	/**
+	\brief static friction coefficient
+	*/
+	PxReal	staticFriction;							//60
+	/**
+	\brief dynamic friction coefficient
+	*/	
+	PxReal dynamicFriction;							//64
+}
+PX_ALIGN_SUFFIX(16);
 
 /**
 \brief A class to iterate over a compressed contact stream. This supports read-only access to the various contact formats.
 */
 struct PxContactStreamIterator
 {
+	enum StreamFormat
+	{
+		eSIMPLE_STREAM,
+		eMODIFIABLE_STREAM,
+		eCOMPRESSED_MODIFIABLE_STREAM
+	};
 	/**
 	\brief Utility zero vector to optimize functions returning zero vectors when a certain flag isn't set.
 	\note This allows us to return by reference instead of having to return by value. Returning by value will go via memory (registers -> stack -> registers), which can 
@@ -209,42 +190,42 @@ struct PxContactStreamIterator
 	*/
 	PxVec3 zero;
 	/**
-	\brief The current contact header.
+	\brief The patch headers.
 	*/
-	const PxContactHeader* header;
+	const PxContactPatch* patch;
+
 	/**
-	\brief Current pointer in the stream.
+	\brief The contacts
 	*/
-	const PxU8* currPtr;
+	const PxContact* contact;
+
 	/**
-	\brief Pointer to the end of the stream.
+	\brief The contact triangle face index
 	*/
-	const PxU8* endPtr;
+	const PxU32* faceIndice;
+
+
 	/**
-	\brief Pointer to the start of the patch.
+	\brief The total number of patches in this contact stream
 	*/
-	const PxU8* patchStart;
+	PxU32 totalPatches;
+	
 	/**
-	\brief Pointer to the end of the patch.
+	\brief The total number of contact points in this stream
 	*/
-	const PxU8* patchEnd;
+	PxU32 totalContacts;
+
 	/**
-	\brief Pointer to the first contact in the patch.
+	\brief The current contact index
 	*/
-	const PxSimpleContact* contactStart;
+	PxU32 nextContactIndex;
+	
 	/**
-	\brief Size of the stream in bytes.
+	\brief The current patch Index
 	*/
-	PxU32 streamSize;
-	/**
-	\brief Total number of contacts in the patch.
-	*/
-	PxU32 nbContactsInPatch;
-	/**
-	\brief Current contact index in the patch
-	*/
-	PxU32 currentContact;
-	/**
+	PxU32 nextPatchIndex;
+
+	/*
 	\brief Size of contact patch header 
 	\note This varies whether the patch is modifiable or not.
 	*/
@@ -255,279 +236,284 @@ struct PxContactStreamIterator
 	*/
 	PxU32 contactPointSize;
 	/**
-	\brief Indicates whether this stream carries face indices
+	\brief The stream format
 	*/
-	PxU32 hasFaceIndices;
-	/**
-	\brief Indicates whether this stream is created from modifiable contact (internal usage), the variables are still read-only
-	*/
-	PxU32 contactsWereModifiable;
+	StreamFormat mStreamFormat;
 	/**
 	\brief Indicates whether this stream is notify-only or not.
 	*/
 	PxU32 forceNoResponse;
 
+	bool pointStepped;
+
+	PxU32 hasFaceIndices;
+
 	/**
 	\brief Constructor
-	\param[in] stream Pointer to the start of the stream.
-	\param[in] size Size of the stream in bytes.
 	*/
-	PX_FORCE_INLINE PxContactStreamIterator(const PxU8* stream, PxU32 size) 
-		: zero(0.f), streamSize(size), nbContactsInPatch(0), currentContact(0)
+	PX_CUDA_CALLABLE PX_FORCE_INLINE PxContactStreamIterator(const PxU8* contactPatches, const PxU8* contactPoints, const PxU32* contactFaceIndices, PxU32 nbPatches, PxU32 nbContacts) 
+		: zero(0.f)
 	{		
-		const PxContactHeader* h = reinterpret_cast<const PxContactHeader*>(stream);
-		header = h;		
-
 		bool modify = false;
-		bool faceIndices = false;
+		bool compressedModify = false;
 		bool response = false;
-
+		bool indices = false; 
+		
 		PxU32 pointSize = 0;
-		PxU32 patchHeaderSize = 0;
-		const PxU8* start = NULL;
+		PxU32 patchHeaderSize = sizeof(PxContactPatch);
 
-		if(size > 0)
+		const PxContactPatch* patches = reinterpret_cast<const PxContactPatch*>(contactPatches);
+
+		if(patches)
 		{
-			modify = (h->flags & PxContactHeader::eMODIFIABLE) != 0;
-			faceIndices = (h->flags & PxContactHeader::eHAS_FACE_INDICES) != 0;
+			modify = (patches->internalFlags & PxContactPatch::eMODIFIABLE) != 0;
+			compressedModify = (patches->internalFlags & PxContactPatch::eCOMPRESSED_MODIFIED_CONTACT) != 0;
+			indices = (patches->internalFlags & PxContactPatch::eHAS_FACE_INDICES) != 0;
 
-			start = stream + (modify ? sizeof(PxModifyContactHeader) : sizeof(PxContactHeader));
+			patch = patches;
 
+			contact = reinterpret_cast<const PxContact*>(contactPoints);
 
-			PX_ASSERT(((PxU32)(start - stream)) < size);
-			//if(((PxU32)(start - stream)) < size)
-			{
-				patchHeaderSize = modify ? sizeof(PxContactPatchBase) : sizeof(PxContactPatch);
-				pointSize = modify ?  sizeof(PxModifiableContact) : faceIndices ? sizeof(PxFeatureContact) : sizeof(PxSimpleContact);
+			faceIndice = contactFaceIndices;
 
-				response = (header->flags & PxContactHeader::eFORCE_NO_RESPONSE) == 0;
-			}
+			pointSize = compressedModify ?  sizeof(PxExtendedContact) : modify ? sizeof(PxModifiableContact) : sizeof(PxContact);
+
+			response = (patch->internalFlags & PxContactPatch::eFORCE_NO_RESPONSE) == 0;
 		}
 
-		contactsWereModifiable = (PxU32)modify;
-		hasFaceIndices = (PxU32)faceIndices;
-		forceNoResponse = (PxU32)!response;
+
+		mStreamFormat = compressedModify ? eCOMPRESSED_MODIFIABLE_STREAM : modify ? eMODIFIABLE_STREAM : eSIMPLE_STREAM;
+		hasFaceIndices = PxU32(indices);
+		forceNoResponse = PxU32(!response);
 
 		contactPatchHeaderSize = patchHeaderSize;
 		contactPointSize = pointSize;
-
-		patchStart = start;
-		patchEnd = start;
-		currPtr = start;
+		nextPatchIndex = 0;
+		nextContactIndex = 0;
+		totalContacts = nbContacts;
+		totalPatches = nbPatches;
+		
+		pointStepped = false;
 	}
 
 	/**
 	\brief Returns whether there are more patches in this stream.
 	\return Whether there are more patches in this stream.
 	*/
-	PX_FORCE_INLINE bool hasNextPatch() const
+	PX_CUDA_CALLABLE PX_FORCE_INLINE bool hasNextPatch() const
 	{
-		return ((PxU32)(patchEnd - reinterpret_cast<const PxU8*>(header))) < streamSize;
+		return nextPatchIndex < totalPatches;
 	}
 
 	/**
 	\brief Returns the total contact count.
 	\return Total contact count.
 	*/
-	PX_FORCE_INLINE PxU32 getTotalContactCount() const
+	PX_CUDA_CALLABLE PX_FORCE_INLINE PxU32 getTotalContactCount() const
 	{
-		return header->totalContactCount;
+		return totalContacts;
+	}
+
+	PX_CUDA_CALLABLE PX_FORCE_INLINE PxU32 getTotalPatchCount() const
+	{
+		return totalPatches;
 	}
 
 	/**
 	\brief Advances iterator to next contact patch.
 	*/
-	PX_INLINE void nextPatch()
+	PX_CUDA_CALLABLE PX_INLINE void nextPatch()
 	{
-		const PxU8* start = patchEnd;
-		patchStart = start;
-
-		if(((PxU32)(start - (reinterpret_cast<const PxU8*>(header)))) < streamSize)
+		PX_ASSERT(nextPatchIndex < totalPatches);
+		if(nextPatchIndex)
 		{
-			const PxU32 numContactsInPatch = *(reinterpret_cast<const PxU16*>(patchStart));
-			nbContactsInPatch = numContactsInPatch;
-
-			patchEnd = start + contactPatchHeaderSize + numContactsInPatch * contactPointSize;
-			currPtr = start + contactPatchHeaderSize;
-			currentContact = 0;
+			if(nextContactIndex < patch->nbContacts)
+			{
+				PxU32 nbToStep = patch->nbContacts - this->nextContactIndex;
+				contact = reinterpret_cast<const PxContact*>(reinterpret_cast<const PxU8*>(contact) + contactPointSize * nbToStep);
+			}
+			patch = reinterpret_cast<const PxContactPatch*>(reinterpret_cast<const PxU8*>(patch) + contactPatchHeaderSize);
 		}
-		else
-		{
-			patchEnd = start;
-		}
+		nextPatchIndex++;
+		nextContactIndex = 0;
 	}
 
 	/**
 	\brief Returns if the current patch has more contacts.
 	\return If there are more contacts in the current patch.
 	*/
-	PX_FORCE_INLINE bool hasNextContact() const
+	PX_CUDA_CALLABLE PX_FORCE_INLINE bool hasNextContact() const
 	{
-		return currentContact < nbContactsInPatch;
+		return nextContactIndex < (patch->nbContacts);
 	}
 
 	/**
 	\brief Advances to the next contact in the patch.
 	*/
-	PX_FORCE_INLINE void nextContact()
+	PX_CUDA_CALLABLE PX_FORCE_INLINE void nextContact()
 	{
-		PX_ASSERT(currentContact < nbContactsInPatch);
-		currentContact++;
-		contactStart = reinterpret_cast<const PxSimpleContact*>(currPtr);
-		currPtr += contactPointSize;
+		PX_ASSERT(nextContactIndex < patch->nbContacts);
+		if(pointStepped)
+		{
+			contact = reinterpret_cast<const PxContact*>(reinterpret_cast<const PxU8*>(contact) + contactPointSize);
+			faceIndice++;
+		}
+		nextContactIndex++;
+		pointStepped = true;
 	}
+
 
 	/**
 	\brief Gets the current contact's normal
 	\return The current contact's normal.
 	*/
-	PX_FORCE_INLINE const PxVec3& getContactNormal() const
+	PX_CUDA_CALLABLE PX_FORCE_INLINE const PxVec3& getContactNormal() const
 	{
-		return contactsWereModifiable ? getModifiableContact().normal : getContactPatch().normal;
+		return getContactPatch().normal;
 	}
 
 	/**
 	\brief Gets the inverse mass scale for body 0.
 	\return The inverse mass scale for body 0.
 	*/
-	PX_FORCE_INLINE PxReal getInvMassScale0() const
+	PX_CUDA_CALLABLE PX_FORCE_INLINE PxReal getInvMassScale0() const
 	{
-		return contactsWereModifiable ? getModifiableContactHeader().invMassScale0 : 1.f;
+		return patch->mMassModification.mInvMassScale0;
 	}
 
 	/**
 	\brief Gets the inverse mass scale for body 1.
 	\return The inverse mass scale for body 1.
 	*/
-	PX_FORCE_INLINE PxReal getInvMassScale1() const
+	PX_CUDA_CALLABLE PX_FORCE_INLINE PxReal getInvMassScale1() const
 	{
-		return contactsWereModifiable ? getModifiableContactHeader().invMassScale1 : 1.f;
+		return patch->mMassModification.mInvMassScale1;
 	}
 
 	/**
 	\brief Gets the inverse inertia scale for body 0.
 	\return The inverse inertia scale for body 0.
 	*/
-	PX_FORCE_INLINE PxReal getInvInertiaScale0() const
+	PX_CUDA_CALLABLE PX_FORCE_INLINE PxReal getInvInertiaScale0() const
 	{
-		return contactsWereModifiable ? getModifiableContactHeader().invInertiaScale0 : 1.f;
+		return patch->mMassModification.mInvInertiaScale0;
 	}
 
 	/**
 	\brief Gets the inverse inertia scale for body 1.
 	\return The inverse inertia scale for body 1.
 	*/
-	PX_FORCE_INLINE PxReal getInvInertiaScale1() const
+	PX_CUDA_CALLABLE PX_FORCE_INLINE PxReal getInvInertiaScale1() const
 	{
-		return contactsWereModifiable ? getModifiableContactHeader().invInertiaScale1 : 1.f;
+		return patch->mMassModification.mInvInertiaScale1;
 	}
 
 	/**
 	\brief Gets the contact's max impulse.
 	\return The contact's max impulse.
 	*/
-	PX_FORCE_INLINE PxReal getMaxImpulse() const
+	PX_CUDA_CALLABLE PX_FORCE_INLINE PxReal getMaxImpulse() const
 	{
-		return contactsWereModifiable ? getModifiableContact().maxImpulse : PX_MAX_REAL;
+		return mStreamFormat != eSIMPLE_STREAM ? getExtendedContact().maxImpulse : PX_MAX_REAL;
 	}
 
 	/**
 	\brief Gets the contact's target velocity.
 	\return The contact's target velocity.
 	*/
-	PX_FORCE_INLINE const PxVec3& getTargetVel() const
+	PX_CUDA_CALLABLE PX_FORCE_INLINE const PxVec3& getTargetVel() const
 	{
-		return contactsWereModifiable ? getModifiableContact().targetVel : zero;
+		return mStreamFormat != eSIMPLE_STREAM ? getExtendedContact().targetVelocity : zero;
 	}
 
 	/**
 	\brief Gets the contact's contact point.
 	\return The contact's contact point.
 	*/
-	PX_FORCE_INLINE const PxVec3& getContactPoint() const
+	PX_CUDA_CALLABLE PX_FORCE_INLINE const PxVec3& getContactPoint() const
 	{
-		return contactStart->contact;
+		return contact->contact;
 	}
 
 	/**
 	\brief Gets the contact's separation.
 	\return The contact's separation.
 	*/
-	PX_FORCE_INLINE PxReal getSeparation() const
+	PX_CUDA_CALLABLE PX_FORCE_INLINE PxReal getSeparation() const
 	{
-		return contactStart->separation;
+		return contact->separation;
 	}
 
 	/**
 	\brief Gets the contact's face index for shape 0.
 	\return The contact's face index for shape 0.
 	*/
-	PX_FORCE_INLINE PxU32 getFaceIndex0() const
+	PX_CUDA_CALLABLE PX_FORCE_INLINE PxU32 getFaceIndex0() const
 	{
-		return hasFaceIndices ? (static_cast<const PxFeatureContact*>(contactStart))->internalFaceIndex0 : PXC_CONTACT_NO_FACE_INDEX;
+		return PXC_CONTACT_NO_FACE_INDEX;
 	}
 
 	/**
 	\brief Gets the contact's face index for shape 1.
 	\return The contact's face index for shape 1.
 	*/
-	PX_FORCE_INLINE PxU32 getFaceIndex1() const
+	PX_CUDA_CALLABLE PX_FORCE_INLINE PxU32 getFaceIndex1() const
 	{
-		return hasFaceIndices ? (static_cast<const PxFeatureContact*>(contactStart))->internalFaceIndex1 : PXC_CONTACT_NO_FACE_INDEX;
+		return hasFaceIndices ? *faceIndice : PXC_CONTACT_NO_FACE_INDEX;
 	}
 
 	/**
 	\brief Gets the contact's static friction coefficient.
 	\return The contact's static friction coefficient.
 	*/
-	PX_FORCE_INLINE PxReal getStaticFriction() const
+	PX_CUDA_CALLABLE PX_FORCE_INLINE PxReal getStaticFriction() const
 	{
-		return contactsWereModifiable ? getModifiableContact().staticFriction : getContactPatch().staticFriction;
+		return getContactPatch().staticFriction;
 	}
 
 	/**
 	\brief Gets the contact's static dynamic coefficient.
 	\return The contact's static dynamic coefficient.
 	*/
-	PX_FORCE_INLINE PxReal getDynamicFriction() const
+	PX_CUDA_CALLABLE PX_FORCE_INLINE PxReal getDynamicFriction() const
 	{
-		return contactsWereModifiable ? getModifiableContact().dynamicFriction : getContactPatch().dynamicFriction;
+		return getContactPatch().dynamicFriction;
 	}
 
 	/**
 	\brief Gets the contact's restitution coefficient.
 	\return The contact's restitution coefficient.
 	*/
-	PX_FORCE_INLINE PxReal getRestitution() const
+	PX_CUDA_CALLABLE PX_FORCE_INLINE PxReal getRestitution() const
 	{
-		return contactsWereModifiable ? getModifiableContact().restitution : getContactPatch().restitution;
+		return getContactPatch().restitution;
 	}
 
 	/**
 	\brief Gets the contact's material flags.
 	\return The contact's material flags.
 	*/
-	PX_FORCE_INLINE PxU32 getMaterialFlags() const
+	PX_CUDA_CALLABLE PX_FORCE_INLINE PxU32 getMaterialFlags() const
 	{
-		return contactsWereModifiable ? getModifiableContact().flags : getContactPatch().flags;
+		return getContactPatch().materialFlags;
 	}
 
 	/**
 	\brief Gets the contact's material index for shape 0.
 	\return The contact's material index for shape 0.
 	*/
-	PX_FORCE_INLINE PxU16 getMaterialIndex0() const
+	PX_CUDA_CALLABLE PX_FORCE_INLINE PxU16 getMaterialIndex0() const
 	{
-		return contactsWereModifiable ? getModifiableContact().materialIndex0 : getContactPatch().materialIndex0;
+		return PxU16(getContactPatch().materialIndex0);
 	}
 
 	/**
 	\brief Gets the contact's material index for shape 1.
 	\return The contact's material index for shape 1.
 	*/
-	PX_FORCE_INLINE PxU16 getMaterialIndex1() const
+	PX_CUDA_CALLABLE PX_FORCE_INLINE PxU16 getMaterialIndex1() const
 	{
-		return contactsWereModifiable ? getModifiableContact().materialIndex1 : getContactPatch().materialIndex1;
+		return PxU16(getContactPatch().materialIndex1);
 	}
 
 	/**
@@ -535,7 +521,7 @@ struct PxContactStreamIterator
 	*/
 	bool advanceToIndex(const PxU32 initialIndex)
 	{
-		PX_ASSERT(currPtr == (reinterpret_cast<const PxU8*>(header + 1)));
+		PX_ASSERT(this->nextPatchIndex == 0 && this->nextContactIndex == 0);
 	
 		PxU32 numToAdvance = initialIndex;
 
@@ -551,16 +537,12 @@ struct PxContactStreamIterator
 			while(hasNextPatch())
 			{
 				nextPatch();
-				PxU32 patchSize = nbContactsInPatch;
+				PxU32 patchSize = patch->nbContacts;
 				if(numToAdvance <= patchSize)
 				{
-					while(hasNextContact())
-					{
-						--numToAdvance;
-						if(numToAdvance == 0)
-							return true;
-						nextContact();
-					}
+					contact = reinterpret_cast<const PxContact*>(reinterpret_cast<const PxU8*>(contact) + contactPointSize * numToAdvance);
+					nextContactIndex += numToAdvance;
+					return true;
 				}
 				else
 				{
@@ -576,38 +558,25 @@ private:
 	/**
 	\brief Internal helper
 	*/
-	PX_FORCE_INLINE const PxContactPatch& getContactPatch() const
+	PX_CUDA_CALLABLE PX_FORCE_INLINE const PxContactPatch& getContactPatch() const
 	{
-		PX_ASSERT(!contactsWereModifiable);
-		return *reinterpret_cast<const PxContactPatch*>(patchStart);
+		return *static_cast<const PxContactPatch*>(patch);
 	}
 
-	/**
-	\brief Internal helper
-	*/
-	PX_FORCE_INLINE const PxModifiableContact& getModifiableContact() const
+	PX_CUDA_CALLABLE PX_FORCE_INLINE const PxExtendedContact& getExtendedContact() const
 	{
-		PX_ASSERT(contactsWereModifiable);
-		return *static_cast<const PxModifiableContact*>(contactStart);
-	}
-
-	/**
-	\brief Internal helper
-	*/
-	PX_FORCE_INLINE const PxModifyContactHeader& getModifiableContactHeader() const
-	{
-		PX_ASSERT(contactsWereModifiable);
-		return *static_cast<const PxModifyContactHeader*>(header);
+		PX_ASSERT(mStreamFormat == eMODIFIABLE_STREAM || mStreamFormat == eCOMPRESSED_MODIFIABLE_STREAM);
+		return *static_cast<const PxExtendedContact*>(contact);
 	}
 
 };
 
 
-#ifdef PX_VC
+#if PX_VC
 #pragma warning(pop)
 #endif
 
-#ifndef PX_DOXYGEN
+#if !PX_DOXYGEN
 } // namespace physx
 #endif
 

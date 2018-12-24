@@ -1,12 +1,29 @@
-/*
- * Copyright (c) 2008-2015, NVIDIA CORPORATION.  All rights reserved.
- *
- * NVIDIA CORPORATION and its licensors retain all intellectual property
- * and proprietary rights in and to this software, related documentation
- * and any modifications thereto.  Any use, reproduction, disclosure or
- * distribution of this software and related documentation without an express
- * license agreement from NVIDIA CORPORATION is strictly prohibited.
- */
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
+//  * Redistributions of source code must retain the above copyright
+//    notice, this list of conditions and the following disclaimer.
+//  * Redistributions in binary form must reproduce the above copyright
+//    notice, this list of conditions and the following disclaimer in the
+//    documentation and/or other materials provided with the distribution.
+//  * Neither the name of NVIDIA CORPORATION nor the names of its
+//    contributors may be used to endorse or promote products derived
+//    from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+// PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+// CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+// PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+// OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Copyright (c) 2008-2018 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -21,9 +38,8 @@
 #include "common/PxCoreUtilityTypes.h"
 #include "PxVehicleSDK.h"
 #include "common/PxTypeInfo.h"
-#include "foundation/PxIO.h"
 
-#ifndef PX_DOXYGEN
+#if !PX_DOXYGEN
 namespace physx
 {
 #endif
@@ -218,7 +234,7 @@ private:
 
 //serialization
 public:
-	PxVehicleEngineData(const PxEMPTY&) : mTorqueCurve(PxEmpty) {}
+	PxVehicleEngineData(const PxEMPTY) : mTorqueCurve(PxEmpty) {}
 //~serialization
 };
 PX_COMPILE_TIME_ASSERT(0==(sizeof(PxVehicleEngineData)& 0x0f));
@@ -309,7 +325,7 @@ public:
 	
 	\note Specified in seconds (s).
 
-	<b>Range:</b> [0, MAX_NB_GEAR_RATIOS)<br>
+	<b>Range:</b> [0, PX_MAX_F32)<br>
 	*/
 	PxReal mSwitchTime;
 	
@@ -321,7 +337,7 @@ private:
 
 //serialization
 public:
-	PxVehicleGearsData(const PxEMPTY&) {}
+	PxVehicleGearsData(const PxEMPTY) {}
 	PxReal getGearRatio(PxVehicleGearsData::Enum a)  const {return mRatios[a];}
 	void setGearRatio(PxVehicleGearsData::Enum a, PxReal ratio)   { mRatios[a] = ratio;}
 //~serialization
@@ -400,7 +416,7 @@ private:
 
 //serialization
 public:
-	PxVehicleAutoBoxData(const PxEMPTY&) {}
+	PxVehicleAutoBoxData(const PxEMPTY) {}
 	
 	PxReal getUpRatios(PxVehicleGearsData::Enum a)  const {return mUpRatios[a];}
 	void setUpRatios(PxVehicleGearsData::Enum a, PxReal ratio)   { mUpRatios[a] = ratio;}
@@ -511,7 +527,7 @@ private:
 
 //serialization
 public:
-	PxVehicleDifferential4WData(const PxEMPTY&) {}
+	PxVehicleDifferential4WData(const PxEMPTY) {}
 //~serialization
 };
 PX_COMPILE_TIME_ASSERT(0==(sizeof(PxVehicleDifferential4WData)& 0x0f));
@@ -555,7 +571,7 @@ private:
 
 //serialization
 public:
-	PxVehicleDifferentialNWData(const PxEMPTY&) {}
+	PxVehicleDifferentialNWData(const PxEMPTY) {}
 	PxU32 getDrivenWheelStatus() const;
 	void setDrivenWheelStatus(PxU32 status);
 //~serialization
@@ -586,7 +602,7 @@ public:
 	\note Perfect Ackermann steer correction modifies the steer angles applied to the front-left and 
 	front-right wheels so that the perpendiculars to the wheels' longitudinal directions cross the 
 	extended vector of the rear axle at the same point.  It is also applied to any steer angle applied 
-	to the the rear wheels but instead using the extended vector of the front axle.
+	to the rear wheels but instead using the extended vector of the front axle.
 	
 	\note In general, more steer correction produces better cornering behavior.
 
@@ -627,7 +643,7 @@ private:
 
 //serialization
 public:
-	PxVehicleAckermannGeometryData(const PxEMPTY&) {}
+	PxVehicleAckermannGeometryData(const PxEMPTY) {}
 //~serialization
 };
 PX_COMPILE_TIME_ASSERT(0==(sizeof(PxVehicleAckermannGeometryData)& 0x0f));
@@ -674,7 +690,7 @@ public:
 	
 	\note Specified in kilograms metres-squared per second (kg m^2 s^-1)
 
-	<b>Range:</b> (0,MAX_NB_GEAR_RATIOS)<br>
+	<b>Range:</b> [0,PX_MAX_F32)<br>
 	*/
 	PxReal mStrength;
 
@@ -715,7 +731,7 @@ private:
 
 //serialization
 public:
-	PxVehicleClutchData(const PxEMPTY&) {}
+	PxVehicleClutchData(const PxEMPTY) {}
 //~serialization
 };
 PX_COMPILE_TIME_ASSERT(0==(sizeof(PxVehicleClutchData)& 0x0f));
@@ -794,7 +810,7 @@ private:
 
 //serialization
 public:
-	PxVehicleTireLoadFilterData(const PxEMPTY&) {}
+	PxVehicleTireLoadFilterData(const PxEMPTY) {}
 //~serialization
 };
 PX_COMPILE_TIME_ASSERT(0==(sizeof(PxVehicleTireLoadFilterData)& 0x0f));
@@ -1119,6 +1135,46 @@ private:
 };
 PX_COMPILE_TIME_ASSERT(0==(sizeof(PxVehicleSuspensionData)& 0x0f));
 
+class PxVehicleAntiRollBarData
+{
+public:
+
+	friend class PxVehicleWheelsSimData;
+
+	PxVehicleAntiRollBarData()
+		: mWheel0(0xffffffff),
+		  mWheel1(0xffffffff),
+		  mStiffness(0.0f)
+	{
+	}
+
+	/*
+	\brief The anti-roll bar connects two wheels with indices mWheel0 and mWheel1
+	*/
+	PxU32 mWheel0;
+
+	/*
+	\brief The anti-roll bar connects two wheels with indices mWheel0 and mWheel1
+	*/
+	PxU32 mWheel1;
+
+	/*
+	\brief The stiffness of the anti-roll bar.
+
+	\note Specified in kilograms per second-squared (kg s^-2).
+
+	<b>Range:</b> [0, PX_MAX_F32)<br>
+	*/
+	PxF32 mStiffness;
+
+private:
+
+	PxF32 mPad[1];
+
+	bool isValid() const;
+};
+PX_COMPILE_TIME_ASSERT(0==(sizeof(PxVehicleAntiRollBarData)& 0x0f));
+
 class PxVehicleTireData
 {
 public:
@@ -1295,7 +1351,7 @@ private:
 	bool isValid() const;
 };
 PX_COMPILE_TIME_ASSERT(0==(sizeof(PxVehicleTireData)& 0x0f));
-#ifndef PX_DOXYGEN
+#if !PX_DOXYGEN
 } // namespace physx
 #endif
 

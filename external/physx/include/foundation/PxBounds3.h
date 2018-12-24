@@ -1,18 +1,34 @@
-/*
- * Copyright (c) 2008-2015, NVIDIA CORPORATION.  All rights reserved.
- *
- * NVIDIA CORPORATION and its licensors retain all intellectual property
- * and proprietary rights in and to this software, related documentation
- * and any modifications thereto.  Any use, reproduction, disclosure or
- * distribution of this software and related documentation without an express
- * license agreement from NVIDIA CORPORATION is strictly prohibited.
- */
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
+//  * Redistributions of source code must retain the above copyright
+//    notice, this list of conditions and the following disclaimer.
+//  * Redistributions in binary form must reproduce the above copyright
+//    notice, this list of conditions and the following disclaimer in the
+//    documentation and/or other materials provided with the distribution.
+//  * Neither the name of NVIDIA CORPORATION nor the names of its
+//    contributors may be used to endorse or promote products derived
+//    from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+// PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+// CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+// PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+// OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Copyright (c) 2008-2018 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
-// Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
+// Copyright (c) 2001-2004 NovodeX AG. All rights reserved.
 
-
-#ifndef PX_FOUNDATION_PX_BOUNDS3_H
-#define PX_FOUNDATION_PX_BOUNDS3_H
+#ifndef PXFOUNDATION_PXBOUNDS3_H
+#define PXFOUNDATION_PXBOUNDS3_H
 
 /** \addtogroup foundation
 @{
@@ -21,7 +37,7 @@
 #include "foundation/PxTransform.h"
 #include "foundation/PxMat33.h"
 
-#ifndef PX_DOXYGEN
+#if !PX_DOXYGEN
 namespace physx
 {
 #endif
@@ -35,18 +51,20 @@ namespace physx
 Stored as minimum and maximum extent corners. Alternate representation
 would be center and dimensions.
 May be empty or nonempty. For nonempty bounds, minimum <= maximum has to hold for all axes.
-Empty bounds have to be represented as minimum = PX_MAX_BOUNDS_EXTENTS and maximum = -PX_MAX_BOUNDS_EXTENTS for all axes.
+Empty bounds have to be represented as minimum = PX_MAX_BOUNDS_EXTENTS and maximum = -PX_MAX_BOUNDS_EXTENTS for all
+axes.
 All other representations are invalid and the behavior is undefined.
 */
 class PxBounds3
 {
-public:
-
+  public:
 	/**
 	\brief Default constructor, not performing any initialization for performance reason.
 	\remark Use empty() function below to construct empty bounds.
 	*/
-	PX_CUDA_CALLABLE PX_FORCE_INLINE PxBounds3()	{}
+	PX_CUDA_CALLABLE PX_FORCE_INLINE PxBounds3()
+	{
+	}
 
 	/**
 	\brief Construct from two bounding points
@@ -54,7 +72,7 @@ public:
 	PX_CUDA_CALLABLE PX_FORCE_INLINE PxBounds3(const PxVec3& minimum, const PxVec3& maximum);
 
 	/**
-	\brief Return empty bounds. 
+	\brief Return empty bounds.
 	*/
 	static PX_CUDA_CALLABLE PX_FORCE_INLINE PxBounds3 empty();
 
@@ -75,7 +93,8 @@ public:
 	/**
 	\brief Construct from center, extent, and (not necessarily orthogonal) basis
 	*/
-	static PX_CUDA_CALLABLE PX_INLINE PxBounds3 basisExtent(const PxVec3& center, const PxMat33& basis, const PxVec3& extent);
+	static PX_CUDA_CALLABLE PX_INLINE PxBounds3
+	basisExtent(const PxVec3& center, const PxMat33& basis, const PxVec3& extent);
 
 	/**
 	\brief Construct from pose and extent
@@ -157,7 +176,7 @@ public:
 	 \param	a		the other AABB
 	 \param	axis	the axis (0, 1, 2)
 	 */
-	PX_CUDA_CALLABLE PX_FORCE_INLINE bool intersects1D(const PxBounds3& a, PxU32 axis)	const;
+	PX_CUDA_CALLABLE PX_FORCE_INLINE bool intersects1D(const PxBounds3& a, uint32_t axis) const;
 
 	/**
 	\brief indicates if these bounds contain v.
@@ -179,12 +198,12 @@ public:
 	/**
 	\brief get component of the box's center along a given axis
 	*/
-	PX_CUDA_CALLABLE PX_FORCE_INLINE PxReal getCenter(PxU32 axis)	const;
+	PX_CUDA_CALLABLE PX_FORCE_INLINE float getCenter(uint32_t axis) const;
 
 	/**
 	\brief get component of the box's extents along a given axis
 	*/
-	PX_CUDA_CALLABLE PX_FORCE_INLINE PxReal getExtents(PxU32 axis)	const;
+	PX_CUDA_CALLABLE PX_FORCE_INLINE float getExtents(uint32_t axis) const;
 
 	/**
 	\brief returns the dimensions (width/height/depth) of this axis aligned box.
@@ -203,7 +222,7 @@ public:
 
 	\param scale Factor to scale AABB by.
 	*/
-	PX_CUDA_CALLABLE PX_FORCE_INLINE void scaleSafe(PxF32 scale);
+	PX_CUDA_CALLABLE PX_FORCE_INLINE void scaleSafe(float scale);
 
 	/**
 	\brief scales the AABB.
@@ -212,35 +231,34 @@ public:
 
 	\param scale Factor to scale AABB by.
 	*/
-	PX_CUDA_CALLABLE PX_FORCE_INLINE void scaleFast(PxF32 scale);
+	PX_CUDA_CALLABLE PX_FORCE_INLINE void scaleFast(float scale);
 
-	/** 
+	/**
 	fattens the AABB in all 3 dimensions by the given distance.
 
 	This version is safe to call for empty bounds.
 	*/
-	PX_CUDA_CALLABLE PX_FORCE_INLINE void fattenSafe(PxReal distance);
+	PX_CUDA_CALLABLE PX_FORCE_INLINE void fattenSafe(float distance);
 
-	/** 
-	fattens the AABB in all 3 dimensions by the given distance. 
+	/**
+	fattens the AABB in all 3 dimensions by the given distance.
 
 	Calling this method for empty bounds leads to undefined behavior. Use #fattenSafe() instead.
 	*/
-	PX_CUDA_CALLABLE PX_FORCE_INLINE void fattenFast(PxReal distance);
+	PX_CUDA_CALLABLE PX_FORCE_INLINE void fattenFast(float distance);
 
-	/** 
+	/**
 	checks that the AABB values are not NaN
 	*/
 	PX_CUDA_CALLABLE PX_FORCE_INLINE bool isFinite() const;
 
-	/** 
+	/**
 	checks that the AABB values describe a valid configuration.
 	*/
 	PX_CUDA_CALLABLE PX_FORCE_INLINE bool isValid() const;
 
 	PxVec3 minimum, maximum;
 };
-
 
 PX_CUDA_CALLABLE PX_FORCE_INLINE PxBounds3::PxBounds3(const PxVec3& minimum_, const PxVec3& maximum_)
 : minimum(minimum_), maximum(maximum_)
@@ -267,7 +285,8 @@ PX_CUDA_CALLABLE PX_FORCE_INLINE PxBounds3 PxBounds3::centerExtents(const PxVec3
 	return PxBounds3(center - extent, center + extent);
 }
 
-PX_CUDA_CALLABLE PX_INLINE PxBounds3 PxBounds3::basisExtent(const PxVec3& center, const PxMat33& basis, const PxVec3& extent)
+PX_CUDA_CALLABLE PX_INLINE PxBounds3
+PxBounds3::basisExtent(const PxVec3& center, const PxMat33& basis, const PxVec3& extent)
 {
 	// extended basis vectors
 	PxVec3 c0 = basis.column0 * extent.x;
@@ -323,12 +342,11 @@ PX_CUDA_CALLABLE PX_FORCE_INLINE bool PxBounds3::isEmpty() const
 PX_CUDA_CALLABLE PX_FORCE_INLINE bool PxBounds3::intersects(const PxBounds3& b) const
 {
 	PX_ASSERT(isValid() && b.isValid());
-	return !(b.minimum.x > maximum.x || minimum.x > b.maximum.x ||
-			 b.minimum.y > maximum.y || minimum.y > b.maximum.y ||
-			 b.minimum.z > maximum.z || minimum.z > b.maximum.z);
+	return !(b.minimum.x > maximum.x || minimum.x > b.maximum.x || b.minimum.y > maximum.y || minimum.y > b.maximum.y ||
+	         b.minimum.z > maximum.z || minimum.z > b.maximum.z);
 }
 
-PX_CUDA_CALLABLE PX_FORCE_INLINE bool PxBounds3::intersects1D(const PxBounds3& a, PxU32 axis)	const
+PX_CUDA_CALLABLE PX_FORCE_INLINE bool PxBounds3::intersects1D(const PxBounds3& a, uint32_t axis) const
 {
 	PX_ASSERT(isValid() && a.isValid());
 	return maximum[axis] >= a.minimum[axis] && a.maximum[axis] >= minimum[axis];
@@ -338,36 +356,41 @@ PX_CUDA_CALLABLE PX_FORCE_INLINE bool PxBounds3::contains(const PxVec3& v) const
 {
 	PX_ASSERT(isValid());
 
-	return !(v.x < minimum.x || v.x > maximum.x ||
-		v.y < minimum.y || v.y > maximum.y ||
-		v.z < minimum.z || v.z > maximum.z);
+	return !(v.x < minimum.x || v.x > maximum.x || v.y < minimum.y || v.y > maximum.y || v.z < minimum.z ||
+	         v.z > maximum.z);
 }
 
 PX_CUDA_CALLABLE PX_FORCE_INLINE bool PxBounds3::isInside(const PxBounds3& box) const
 {
 	PX_ASSERT(isValid() && box.isValid());
-	if(box.minimum.x>minimum.x)	return false;
-	if(box.minimum.y>minimum.y)	return false;
-	if(box.minimum.z>minimum.z)	return false;
-	if(box.maximum.x<maximum.x)	return false;
-	if(box.maximum.y<maximum.y)	return false;
-	if(box.maximum.z<maximum.z)	return false;
+	if(box.minimum.x > minimum.x)
+		return false;
+	if(box.minimum.y > minimum.y)
+		return false;
+	if(box.minimum.z > minimum.z)
+		return false;
+	if(box.maximum.x < maximum.x)
+		return false;
+	if(box.maximum.y < maximum.y)
+		return false;
+	if(box.maximum.z < maximum.z)
+		return false;
 	return true;
 }
 
 PX_CUDA_CALLABLE PX_FORCE_INLINE PxVec3 PxBounds3::getCenter() const
 {
 	PX_ASSERT(isValid());
-	return (minimum+maximum) * 0.5f;
+	return (minimum + maximum) * 0.5f;
 }
 
-PX_CUDA_CALLABLE PX_FORCE_INLINE PxReal PxBounds3::getCenter(PxU32 axis)	const
+PX_CUDA_CALLABLE PX_FORCE_INLINE float PxBounds3::getCenter(uint32_t axis) const
 {
 	PX_ASSERT(isValid());
 	return (minimum[axis] + maximum[axis]) * 0.5f;
 }
 
-PX_CUDA_CALLABLE PX_FORCE_INLINE PxReal PxBounds3::getExtents(PxU32 axis)	const
+PX_CUDA_CALLABLE PX_FORCE_INLINE float PxBounds3::getExtents(uint32_t axis) const
 {
 	PX_ASSERT(isValid());
 	return (maximum[axis] - minimum[axis]) * 0.5f;
@@ -385,27 +408,27 @@ PX_CUDA_CALLABLE PX_FORCE_INLINE PxVec3 PxBounds3::getExtents() const
 	return getDimensions() * 0.5f;
 }
 
-PX_CUDA_CALLABLE PX_FORCE_INLINE void PxBounds3::scaleSafe(PxF32 scale)
+PX_CUDA_CALLABLE PX_FORCE_INLINE void PxBounds3::scaleSafe(float scale)
 {
 	PX_ASSERT(isValid());
-	if (!isEmpty())
+	if(!isEmpty())
 		scaleFast(scale);
 }
 
-PX_CUDA_CALLABLE PX_FORCE_INLINE void PxBounds3::scaleFast(PxF32 scale)
+PX_CUDA_CALLABLE PX_FORCE_INLINE void PxBounds3::scaleFast(float scale)
 {
 	PX_ASSERT(isValid());
 	*this = centerExtents(getCenter(), getExtents() * scale);
 }
 
-PX_CUDA_CALLABLE PX_FORCE_INLINE void PxBounds3::fattenSafe(PxReal distance)
+PX_CUDA_CALLABLE PX_FORCE_INLINE void PxBounds3::fattenSafe(float distance)
 {
 	PX_ASSERT(isValid());
-	if (!isEmpty())
+	if(!isEmpty())
 		fattenFast(distance);
 }
 
-PX_CUDA_CALLABLE PX_FORCE_INLINE void PxBounds3::fattenFast(PxReal distance)
+PX_CUDA_CALLABLE PX_FORCE_INLINE void PxBounds3::fattenFast(float distance)
 {
 	PX_ASSERT(isValid());
 	minimum.x -= distance;
@@ -443,16 +466,15 @@ PX_CUDA_CALLABLE PX_INLINE PxBounds3 PxBounds3::transformFast(const PxTransform&
 
 PX_CUDA_CALLABLE PX_FORCE_INLINE bool PxBounds3::isValid() const
 {
-	return (isFinite() && 
-			(((minimum.x <= maximum.x) && (minimum.y <= maximum.y) && (minimum.z <= maximum.z)) ||
-			 ((minimum.x == PX_MAX_BOUNDS_EXTENTS) && (minimum.y == PX_MAX_BOUNDS_EXTENTS) && (minimum.z == PX_MAX_BOUNDS_EXTENTS) && 
-			  (maximum.x == -PX_MAX_BOUNDS_EXTENTS) && (maximum.y == -PX_MAX_BOUNDS_EXTENTS) && (maximum.z == -PX_MAX_BOUNDS_EXTENTS)))
-		);
+	return (isFinite() && (((minimum.x <= maximum.x) && (minimum.y <= maximum.y) && (minimum.z <= maximum.z)) ||
+	                       ((minimum.x == PX_MAX_BOUNDS_EXTENTS) && (minimum.y == PX_MAX_BOUNDS_EXTENTS) &&
+	                        (minimum.z == PX_MAX_BOUNDS_EXTENTS) && (maximum.x == -PX_MAX_BOUNDS_EXTENTS) &&
+	                        (maximum.y == -PX_MAX_BOUNDS_EXTENTS) && (maximum.z == -PX_MAX_BOUNDS_EXTENTS))));
 }
 
-#ifndef PX_DOXYGEN
+#if !PX_DOXYGEN
 } // namespace physx
 #endif
 
 /** @} */
-#endif // PX_FOUNDATION_PX_BOUNDS3_H
+#endif // #ifndef PXFOUNDATION_PXBOUNDS3_H

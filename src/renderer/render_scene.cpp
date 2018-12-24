@@ -2550,7 +2550,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	void addDebugCapsule(const Matrix& transform,
+	void addDebugCapsule(const RigidTransform& transform,
 		float height,
 		float radius,
 		u32 color,

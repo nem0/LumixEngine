@@ -268,7 +268,7 @@ public:
 
 	virtual u32 getDebugVisualizationFlags() const = 0;
 	virtual void setDebugVisualizationFlags(u32 flags) = 0;
-	virtual void setVisualizationCullingBox(const Vec3& min, const Vec3& max) = 0;
+	virtual void setVisualizationCullingBox(const DVec3& min, const DVec3& max) = 0;
 
 	virtual int getActorCount() const = 0;
 	virtual EntityRef getActorEntity(int index) = 0;

@@ -1,18 +1,34 @@
-/*
- * Copyright (c) 2008-2015, NVIDIA CORPORATION.  All rights reserved.
- *
- * NVIDIA CORPORATION and its licensors retain all intellectual property
- * and proprietary rights in and to this software, related documentation
- * and any modifications thereto.  Any use, reproduction, disclosure or
- * distribution of this software and related documentation without an express
- * license agreement from NVIDIA CORPORATION is strictly prohibited.
- */
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
+//  * Redistributions of source code must retain the above copyright
+//    notice, this list of conditions and the following disclaimer.
+//  * Redistributions in binary form must reproduce the above copyright
+//    notice, this list of conditions and the following disclaimer in the
+//    documentation and/or other materials provided with the distribution.
+//  * Neither the name of NVIDIA CORPORATION nor the names of its
+//    contributors may be used to endorse or promote products derived
+//    from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+// PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+// CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+// PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+// OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Copyright (c) 2008-2018 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
-// Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
+// Copyright (c) 2001-2004 NovodeX AG. All rights reserved.
 
-
-#ifndef PX_FOUNDATION_PX_PLANE_H
-#define PX_FOUNDATION_PX_PLANE_H
+#ifndef PXFOUNDATION_PXPLANE_H
+#define PXFOUNDATION_PXPLANE_H
 
 /** \addtogroup foundation
 @{
@@ -21,7 +37,7 @@
 #include "foundation/PxMath.h"
 #include "foundation/PxVec3.h"
 
-#ifndef PX_DOXYGEN
+#if !PX_DOXYGEN
 namespace physx
 {
 #endif
@@ -33,7 +49,7 @@ namespace physx
 */
 class PxPlane
 {
-public:
+  public:
 	/**
 	\brief Constructor
 	*/
@@ -44,28 +60,22 @@ public:
 	/**
 	\brief Constructor from a normal and a distance
 	*/
-	PX_CUDA_CALLABLE PX_FORCE_INLINE PxPlane(PxReal nx, PxReal ny, PxReal nz, PxReal distance)
-		: n(nx, ny, nz)
-		, d(distance)
+	PX_CUDA_CALLABLE PX_FORCE_INLINE PxPlane(float nx, float ny, float nz, float distance) : n(nx, ny, nz), d(distance)
 	{
 	}
 
 	/**
 	\brief Constructor from a normal and a distance
 	*/
-	PX_CUDA_CALLABLE PX_FORCE_INLINE PxPlane(const PxVec3& normal, PxReal distance) 
-		: n(normal)
-		, d(distance)
+	PX_CUDA_CALLABLE PX_FORCE_INLINE PxPlane(const PxVec3& normal, float distance) : n(normal), d(distance)
 	{
 	}
-
 
 	/**
 	\brief Constructor from a point on the plane and a normal
 	*/
 	PX_CUDA_CALLABLE PX_FORCE_INLINE PxPlane(const PxVec3& point, const PxVec3& normal)
-		: n(normal)		
-		, d(-point.dot(n))		// p satisfies normal.dot(p) + d = 0
+	: n(normal), d(-point.dot(n)) // p satisfies normal.dot(p) + d = 0
 	{
 	}
 
@@ -81,9 +91,12 @@ public:
 	/**
 	\brief returns true if the two planes are exactly equal
 	*/
-	PX_CUDA_CALLABLE PX_INLINE bool operator==(const PxPlane& p) const	{ return n == p.n && d == p.d; }
+	PX_CUDA_CALLABLE PX_INLINE bool operator==(const PxPlane& p) const
+	{
+		return n == p.n && d == p.d;
+	}
 
-	PX_CUDA_CALLABLE PX_FORCE_INLINE PxReal distance(const PxVec3& p) const
+	PX_CUDA_CALLABLE PX_FORCE_INLINE float distance(const PxVec3& p) const
 	{
 		return p.dot(n) + d;
 	}
@@ -96,7 +109,7 @@ public:
 	/**
 	\brief projects p into the plane
 	*/
-	PX_CUDA_CALLABLE PX_FORCE_INLINE PxVec3 project(const PxVec3 & p) const
+	PX_CUDA_CALLABLE PX_FORCE_INLINE PxVec3 project(const PxVec3& p) const
 	{
 		return p - n * distance(p);
 	}
@@ -106,7 +119,7 @@ public:
 	*/
 	PX_CUDA_CALLABLE PX_FORCE_INLINE PxVec3 pointInPlane() const
 	{
-		return -n*d;
+		return -n * d;
 	}
 
 	/**
@@ -115,20 +128,18 @@ public:
 
 	PX_CUDA_CALLABLE PX_FORCE_INLINE void normalize()
 	{
-		PxReal denom = 1.0f / n.magnitude();
+		float denom = 1.0f / n.magnitude();
 		n *= denom;
 		d *= denom;
 	}
 
-
-	PxVec3	n;			//!< The normal to the plane
-	PxReal	d;			//!< The distance from the origin
+	PxVec3 n; //!< The normal to the plane
+	float d;  //!< The distance from the origin
 };
 
-#ifndef PX_DOXYGEN
+#if !PX_DOXYGEN
 } // namespace physx
 #endif
 
 /** @} */
-#endif
-
+#endif // #ifndef PXFOUNDATION_PXPLANE_H

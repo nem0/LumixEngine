@@ -1,12 +1,29 @@
-/*
- * Copyright (c) 2008-2015, NVIDIA CORPORATION.  All rights reserved.
- *
- * NVIDIA CORPORATION and its licensors retain all intellectual property
- * and proprietary rights in and to this software, related documentation
- * and any modifications thereto.  Any use, reproduction, disclosure or
- * distribution of this software and related documentation without an express
- * license agreement from NVIDIA CORPORATION is strictly prohibited.
- */
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
+//  * Redistributions of source code must retain the above copyright
+//    notice, this list of conditions and the following disclaimer.
+//  * Redistributions in binary form must reproduce the above copyright
+//    notice, this list of conditions and the following disclaimer in the
+//    documentation and/or other materials provided with the distribution.
+//  * Neither the name of NVIDIA CORPORATION nor the names of its
+//    contributors may be used to endorse or promote products derived
+//    from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+// PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+// CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+// PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+// OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Copyright (c) 2008-2018 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -19,10 +36,9 @@
 #include "PxPhysXConfig.h"
 #include "PxShape.h"
 #include "PxBatchQueryDesc.h"
-#include "PxQueryReport.h"
 #include "PxQueryFiltering.h"
 
-#ifndef PX_DOXYGEN
+#if !PX_DOXYGEN
 namespace physx
 {
 #endif
@@ -34,9 +50,11 @@ struct PxQueryCache;
 /**
 \brief Batched queries object. This is used to perform several queries at the same time. 
 
+\deprecated The batched query feature has been deprecated in PhysX version 3.4
+
 @see PxScene, PxScene.createBatchQuery
 */
-class PxBatchQuery
+class PX_DEPRECATED PxBatchQuery
 {
 	public:
 
@@ -82,16 +100,6 @@ class PxBatchQuery
 	*/
 	virtual	PxU32							getFilterShaderDataSize() const	= 0;
 
-
-	/**
-	\brief Retrieves the client specified with PxBatchQueryDesc::ownerClient at creation time.
-
-	It is not possible to change this value after creating the scene query.
-
-	@see PxBatchQueryDesc::ownerClient
-	*/
-	virtual PxClientID						getOwnerClient() const = 0;
-
 	/**
  	\brief Sets new user memory pointers.
  
@@ -114,21 +122,6 @@ class PxBatchQuery
 	@see PxScene, PxScene.createBatchQuery
 	*/
 	virtual	void							release() = 0;
-
-
-	/**
-	\brief PS3 only. Enables or disables SPU execution for this query.
-
-	@see PxBatchQueryDesc
-	*/
-	virtual void							setRunOnSpu(bool runOnSpu) = 0;
-
-	/**
-	\brief PS3 only. Returns true if this query should run on SPU.
-
-	@see PxBatchQueryDesc
-	*/
-	virtual bool							getRunOnSpu() = 0;
 
 	/**
 	\brief Performs a raycast against objects in the scene, returns results in PxBatchQueryMemory::userRaycastResultBuffer
@@ -155,7 +148,7 @@ class PxBatchQuery
 	*/
 	virtual void raycast(
 		const PxVec3& origin, const PxVec3& unitDir, PxReal distance = PX_MAX_F32, PxU16 maxTouchHits = 0,
-		PxHitFlags hitFlags = PxHitFlag::ePOSITION|PxHitFlag::eNORMAL|PxHitFlag::eDISTANCE,
+		PxHitFlags hitFlags = PxHitFlag::eDEFAULT,
 		const PxQueryFilterData& filterData = PxQueryFilterData(),
 		void* userData = NULL, const PxQueryCache* cache = NULL) = 0;
 
@@ -215,7 +208,7 @@ class PxBatchQuery
 	*/
 	virtual void sweep(
 		const PxGeometry& geometry, const PxTransform& pose, const PxVec3& unitDir, const PxReal distance,
-		PxU16 maxTouchHits = 0, PxHitFlags hitFlags = PxHitFlag::ePOSITION|PxHitFlag::eNORMAL|PxHitFlag::eDISTANCE,
+		PxU16 maxTouchHits = 0, PxHitFlags hitFlags = PxHitFlag::eDEFAULT,
 		const PxQueryFilterData& filterData = PxQueryFilterData(), void* userData=NULL, const PxQueryCache* cache = NULL,
 		const PxReal inflation = 0.f) = 0;
 
@@ -223,7 +216,7 @@ protected:
 	virtual	~PxBatchQuery() {}
 };
 
-#ifndef PX_DOXYGEN
+#if !PX_DOXYGEN
 } // namespace physx
 #endif
 
