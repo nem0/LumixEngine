@@ -1,3 +1,4 @@
+#include "physics/physics_scene.h"
 #include "engine/blob.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
@@ -13,7 +14,6 @@
 #include "engine/universe/universe.h"
 #include "lua_script/lua_script_system.h"
 #include "physics/physics_geometry_manager.h"
-#include "physics/physics_scene.h"
 #include "physics/physics_system.h"
 #include "renderer/model.h"
 #include "renderer/pose.h"
@@ -32,28 +32,19 @@ namespace Lumix
 static const ComponentType LUA_SCRIPT_TYPE = Reflection::getComponentType("lua_script");
 static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("model_instance");
 static const ComponentType RIGID_ACTOR_TYPE = Reflection::getComponentType("rigid_actor");
-static const ComponentType BOX_ACTOR_TYPE = Reflection::getComponentType("box_rigid_actor");
 static const ComponentType RAGDOLL_TYPE = Reflection::getComponentType("ragdoll");
-static const ComponentType SPHERE_ACTOR_TYPE = Reflection::getComponentType("sphere_rigid_actor");
-static const ComponentType CAPSULE_ACTOR_TYPE = Reflection::getComponentType("capsule_rigid_actor");
-static const ComponentType MESH_ACTOR_TYPE = Reflection::getComponentType("mesh_rigid_actor");
 static const ComponentType CONTROLLER_TYPE = Reflection::getComponentType("physical_controller");
 static const ComponentType HEIGHTFIELD_TYPE = Reflection::getComponentType("physical_heightfield");
 static const ComponentType DISTANCE_JOINT_TYPE = Reflection::getComponentType("distance_joint");
 static const ComponentType HINGE_JOINT_TYPE = Reflection::getComponentType("hinge_joint");
 static const ComponentType SPHERICAL_JOINT_TYPE = Reflection::getComponentType("spherical_joint");
 static const ComponentType D6_JOINT_TYPE = Reflection::getComponentType("d6_joint");
+static const ComponentType VEHICLE_TYPE = Reflection::getComponentType("vehicle");
 static const u32 RENDERER_HASH = crc32("renderer");
 
 
 enum class PhysicsSceneVersion
 {
-	DYNAMIC_TYPE,
-	TRIGGERS,
-	RIGID_ACTOR,
-	CONTROLLER_SHAPE,
-	CONTROLLER_GRAVITY,
-
 	LATEST,
 };
 
@@ -195,6 +186,12 @@ struct Joint
 };
 
 
+struct Vehicle
+{
+	PxRigidDynamic* actor = nullptr;
+	PxVehicleDrive4W* drive = nullptr;
+};
+
 struct Heightfield
 {
 	Heightfield();
@@ -217,12 +214,15 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	{
 		void submitTask(PxBaseTask& task) override
 		{
-			JobSystem::run(&task, [](void* data) {
-				PxBaseTask* task = (PxBaseTask*)data;
-				PROFILE_FUNCTION();
-				task->run();
-				task->release();
-			}, nullptr, JobSystem::INVALID_HANDLE);
+			JobSystem::run(&task,
+				[](void* data) {
+					PxBaseTask* task = (PxBaseTask*)data;
+					PROFILE_FUNCTION();
+					task->run();
+					task->release();
+				},
+				nullptr,
+				JobSystem::INVALID_HANDLE);
 		}
 		PxU32 getWorkerCount() const override { return MT::getCPUsCount(); }
 	};
@@ -236,7 +236,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		}
 
 
-		void onAdvance(const PxRigidBody*const* bodyBuffer, const PxTransform* poseBuffer, const PxU32 count) override 
+		void onAdvance(const PxRigidBody* const* bodyBuffer, const PxTransform* poseBuffer, const PxU32 count) override
 		{
 		}
 
@@ -290,13 +290,12 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	class RigidActor
 	{
 	public:
-		RigidActor(PhysicsSceneImpl& _scene, ActorType _type)
+		RigidActor(PhysicsSceneImpl& _scene)
 			: resource(nullptr)
 			, physx_actor(nullptr)
 			, scene(_scene)
 			, layer(0)
 			, entity(INVALID_ENTITY)
-			, type(_type)
 			, dynamic_type(DynamicType::STATIC)
 			, is_trigger(false)
 			, scale(1)
@@ -319,7 +318,6 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		PxRigidActor* physx_actor;
 		PhysicsGeometry* resource;
 		PhysicsSceneImpl& scene;
-		ActorType type;
 		DynamicType dynamic_type;
 		bool is_trigger;
 
@@ -333,6 +331,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		, m_controllers(m_allocator)
 		, m_actors(m_allocator)
 		, m_ragdolls(m_allocator)
+		, m_vehicles(m_allocator)
 		, m_terrains(m_allocator)
 		, m_dynamic_actors(m_allocator)
 		, m_universe(context)
@@ -366,16 +365,13 @@ struct PhysicsSceneImpl final : public PhysicsScene
 
 
 		REGISTER_COMPONENT(RIGID_ACTOR_TYPE, RigidActor);
-		REGISTER_COMPONENT(BOX_ACTOR_TYPE, BoxActor);
-		REGISTER_COMPONENT(MESH_ACTOR_TYPE, MeshActor);
-		REGISTER_COMPONENT(CAPSULE_ACTOR_TYPE, CapsuleActor);
-		REGISTER_COMPONENT(SPHERE_ACTOR_TYPE, SphereActor);
 		REGISTER_COMPONENT(HEIGHTFIELD_TYPE, Heightfield);
 		REGISTER_COMPONENT(CONTROLLER_TYPE, Controller);
 		REGISTER_COMPONENT(DISTANCE_JOINT_TYPE, DistanceJoint);
 		REGISTER_COMPONENT(HINGE_JOINT_TYPE, HingeJoint);
 		REGISTER_COMPONENT(SPHERICAL_JOINT_TYPE, SphericalJoint);
 		REGISTER_COMPONENT(D6_JOINT_TYPE, D6Joint);
+		REGISTER_COMPONENT(VEHICLE_TYPE, Vehicle);
 		REGISTER_COMPONENT(RAGDOLL_TYPE, Ragdoll);
 
 #undef REGISTER_COMPONENT
@@ -407,6 +403,8 @@ struct PhysicsSceneImpl final : public PhysicsScene
 			destroySkeleton(ragdoll.root);
 		}
 		m_ragdolls.clear();
+
+		m_vehicles.clear();
 
 		for (auto& joint : m_joints)
 		{
@@ -582,87 +580,6 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	int getActorLayer(EntityRef entity) override { return m_actors[entity]->layer; }
 
 
-	float getSphereRadius(EntityRef entity) override
-	{
-		PxRigidActor* actor = m_actors[entity]->physx_actor;
-		PxShape* shapes;
-		ASSERT(actor->getNbShapes() == 1);
-		if (actor->getShapes(&shapes, 1) != 1) ASSERT(false);
-
-		return shapes->getGeometry().sphere().radius;
-	}
-
-
-	void setSphereRadius(EntityRef entity, float value) override
-	{
-		if (value == 0) return;
-		PxRigidActor* actor = m_actors[entity]->physx_actor;
-		PxShape* shapes;
-		if (actor->getNbShapes() == 1 && actor->getShapes(&shapes, 1))
-		{
-			PxSphereGeometry sphere;
-			bool is_sphere = shapes->getSphereGeometry(sphere);
-			ASSERT(is_sphere);
-			sphere.radius = value;
-			shapes->setGeometry(sphere);
-		}
-	}
-
-
-	float getCapsuleRadius(EntityRef entity) override
-	{
-		PxRigidActor* actor = m_actors[entity]->physx_actor;
-		PxShape* shapes;
-		ASSERT(actor->getNbShapes() == 1);
-		if (actor->getShapes(&shapes, 1) != 1) ASSERT(false);
-
-		return shapes->getGeometry().capsule().radius;
-	}
-
-
-	void setCapsuleRadius(EntityRef entity, float value) override
-	{
-		if (value <= 0) return;
-		PxRigidActor* actor = m_actors[entity]->physx_actor;
-		PxShape* shapes;
-		if (actor->getNbShapes() == 1 && actor->getShapes(&shapes, 1))
-		{
-			PxCapsuleGeometry capsule;
-			bool is_capsule = shapes->getCapsuleGeometry(capsule);
-			ASSERT(is_capsule);
-			capsule.radius = value;
-			shapes->setGeometry(capsule);
-		}
-	}
-
-
-	float getCapsuleHeight(EntityRef entity) override
-	{
-		PxRigidActor* actor = m_actors[entity]->physx_actor;
-		PxShape* shapes;
-		ASSERT(actor->getNbShapes() == 1);
-		if (actor->getShapes(&shapes, 1) != 1) ASSERT(false);
-
-		return shapes->getGeometry().capsule().halfHeight * 2;
-	}
-
-
-	void setCapsuleHeight(EntityRef entity, float value) override
-	{
-		if (value <= 0) return;
-		PxRigidActor* actor = m_actors[entity]->physx_actor;
-		PxShape* shapes;
-		if (actor->getNbShapes() == 1 && actor->getShapes(&shapes, 1))
-		{
-			PxCapsuleGeometry capsule;
-			bool is_capsule = shapes->getCapsuleGeometry(capsule);
-			ASSERT(is_capsule);
-			capsule.halfHeight = value * 0.5f;
-			shapes->setGeometry(capsule);
-		}
-	}
-
-
 	int getHeightfieldLayer(EntityRef entity) override { return m_terrains[entity].m_layer; }
 
 
@@ -754,7 +671,10 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	EntityRef getJointEntity(int index) override { return {m_joints.getKey(index).index}; }
 
 
-	PxDistanceJoint* getDistanceJoint(EntityRef entity) { return static_cast<PxDistanceJoint*>(m_joints[entity].physx); }
+	PxDistanceJoint* getDistanceJoint(EntityRef entity)
+	{
+		return static_cast<PxDistanceJoint*>(m_joints[entity].physx);
+	}
 
 
 	Vec3 getDistanceJointLinearForce(EntityRef entity) override
@@ -768,7 +688,10 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	float getDistanceJointDamping(EntityRef entity) override { return getDistanceJoint(entity)->getDamping(); }
 
 
-	void setDistanceJointDamping(EntityRef entity, float value) override { getDistanceJoint(entity)->setDamping(value); }
+	void setDistanceJointDamping(EntityRef entity, float value) override
+	{
+		getDistanceJoint(entity)->setDamping(value);
+	}
 
 
 	float getDistanceJointStiffness(EntityRef entity) override { return getDistanceJoint(entity)->getStiffness(); }
@@ -879,7 +802,10 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	}
 
 
-	D6Motion getD6JointXMotion(EntityRef entity) override { return (D6Motion)getD6Joint(entity)->getMotion(PxD6Axis::eX); }
+	D6Motion getD6JointXMotion(EntityRef entity) override
+	{
+		return (D6Motion)getD6Joint(entity)->getMotion(PxD6Axis::eX);
+	}
 
 
 	void setD6JointXMotion(EntityRef entity, D6Motion motion) override
@@ -888,7 +814,10 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	}
 
 
-	D6Motion getD6JointYMotion(EntityRef entity) override { return (D6Motion)getD6Joint(entity)->getMotion(PxD6Axis::eY); }
+	D6Motion getD6JointYMotion(EntityRef entity) override
+	{
+		return (D6Motion)getD6Joint(entity)->getMotion(PxD6Axis::eY);
+	}
 
 
 	void setD6JointYMotion(EntityRef entity, D6Motion motion) override
@@ -933,7 +862,10 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	}
 
 
-	D6Motion getD6JointZMotion(EntityRef entity) override { return (D6Motion)getD6Joint(entity)->getMotion(PxD6Axis::eZ); }
+	D6Motion getD6JointZMotion(EntityRef entity) override
+	{
+		return (D6Motion)getD6Joint(entity)->getMotion(PxD6Axis::eZ);
+	}
 
 
 	void setD6JointZMotion(EntityRef entity, D6Motion motion) override
@@ -1135,27 +1067,27 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	}
 
 
-	void destroyRigidActor(EntityRef entity) { destroyActorGeneric(entity, RIGID_ACTOR_TYPE); }
-	void destroyMeshActor(EntityRef entity) { destroyActorGeneric(entity, MESH_ACTOR_TYPE); }
-	void destroyBoxActor(EntityRef entity) { destroyActorGeneric(entity, BOX_ACTOR_TYPE); }
-	void destroySphereActor(EntityRef entity) { destroyActorGeneric(entity, SPHERE_ACTOR_TYPE); }
-	void destroyCapsuleActor(EntityRef entity) { destroyActorGeneric(entity, CAPSULE_ACTOR_TYPE); }
+	void destroyVehicle(EntityRef entity) 
+	{
+		ASSERT(false);
+		// TODO
+	}
 
 
-	void destroySphericalJoint(EntityRef entity) { destroyJointGeneric(entity, SPHERE_ACTOR_TYPE); }
-	void destroyHingeJoint(EntityRef entity) { destroyJointGeneric(entity, SPHERE_ACTOR_TYPE); }
-	void destroyD6Joint(EntityRef entity) { destroyJointGeneric(entity, SPHERE_ACTOR_TYPE); }
-	void destroyDistanceJoint(EntityRef entity) { destroyJointGeneric(entity, SPHERE_ACTOR_TYPE); }
+	void destroySphericalJoint(EntityRef entity) { destroyJointGeneric(entity, SPHERICAL_JOINT_TYPE); }
+	void destroyHingeJoint(EntityRef entity) { destroyJointGeneric(entity, HINGE_JOINT_TYPE); }
+	void destroyD6Joint(EntityRef entity) { destroyJointGeneric(entity, D6_JOINT_TYPE); }
+	void destroyDistanceJoint(EntityRef entity) { destroyJointGeneric(entity, DISTANCE_JOINT_TYPE); }
 
 
-	void destroyActorGeneric(EntityRef entity, ComponentType type)
+	void destroyRigidActor(EntityRef entity)
 	{
 		auto* actor = m_actors[entity];
 		actor->setPhysxActor(nullptr);
 		LUMIX_DELETE(m_allocator, actor);
 		m_actors.erase(entity);
 		m_dynamic_actors.eraseItem(actor);
-		m_universe.onComponentDestroyed(entity, type, this);
+		m_universe.onComponentDestroyed(entity, RIGID_ACTOR_TYPE, this);
 		if (m_is_game_running)
 		{
 			for (int i = 0, c = m_joints.size(); i < c; ++i)
@@ -1191,11 +1123,8 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		joint.connected_body = INVALID_ENTITY;
 		joint.local_frame0.p = PxVec3(0, 0, 0);
 		joint.local_frame0.q = PxQuat(0, 0, 0, 1);
-		joint.physx = PxDistanceJointCreate(m_scene->getPhysics(),
-			m_dummy_actor,
-			PxTransform(PxIdentity),
-			nullptr,
-			PxTransform(PxIdentity));
+		joint.physx = PxDistanceJointCreate(
+			m_scene->getPhysics(), m_dummy_actor, PxTransform(PxIdentity), nullptr, PxTransform(PxIdentity));
 		joint.physx->setConstraintFlag(PxConstraintFlag::eVISUALIZATION, true);
 		static_cast<PxDistanceJoint*>(joint.physx)->setDistanceJointFlag(PxDistanceJointFlag::eSPRING_ENABLED, true);
 
@@ -1210,11 +1139,8 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		joint.connected_body = INVALID_ENTITY;
 		joint.local_frame0.p = PxVec3(0, 0, 0);
 		joint.local_frame0.q = PxQuat(0, 0, 0, 1);
-		joint.physx = PxSphericalJointCreate(m_scene->getPhysics(),
-			m_dummy_actor,
-			PxTransform(PxIdentity),
-			nullptr,
-			PxTransform(PxIdentity));
+		joint.physx = PxSphericalJointCreate(
+			m_scene->getPhysics(), m_dummy_actor, PxTransform(PxIdentity), nullptr, PxTransform(PxIdentity));
 		joint.physx->setConstraintFlag(PxConstraintFlag::eVISUALIZATION, true);
 
 		m_universe.onComponentCreated(entity, SPHERICAL_JOINT_TYPE, this);
@@ -1228,11 +1154,8 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		joint.connected_body = INVALID_ENTITY;
 		joint.local_frame0.p = PxVec3(0, 0, 0);
 		joint.local_frame0.q = PxQuat(0, 0, 0, 1);
-		joint.physx = PxD6JointCreate(m_scene->getPhysics(),
-			m_dummy_actor,
-			PxTransform(PxIdentity),
-			nullptr,
-			PxTransform(PxIdentity));
+		joint.physx = PxD6JointCreate(
+			m_scene->getPhysics(), m_dummy_actor, PxTransform(PxIdentity), nullptr, PxTransform(PxIdentity));
 		auto* d6_joint = static_cast<PxD6Joint*>(joint.physx);
 		auto linear_limit = d6_joint->getLinearLimit();
 		linear_limit.value = 1.0f;
@@ -1250,11 +1173,8 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		joint.connected_body = INVALID_ENTITY;
 		joint.local_frame0.p = PxVec3(0, 0, 0);
 		joint.local_frame0.q = PxQuat(0, 0, 0, 1);
-		joint.physx = PxRevoluteJointCreate(m_scene->getPhysics(),
-			m_dummy_actor,
-			PxTransform(PxIdentity),
-			nullptr,
-			PxTransform(PxIdentity));
+		joint.physx = PxRevoluteJointCreate(
+			m_scene->getPhysics(), m_dummy_actor, PxTransform(PxIdentity), nullptr, PxTransform(PxIdentity));
 		joint.physx->setConstraintFlag(PxConstraintFlag::eVISUALIZATION, true);
 
 		m_universe.onComponentCreated(entity, HINGE_JOINT_TYPE, this);
@@ -1338,23 +1258,10 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	}
 
 
-	void createCapsuleActor(EntityRef entity)
+	void createVehicle(EntityRef enitity)
 	{
-		if (m_actors.find(entity) >= 0) return;
-		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, ActorType::CAPSULE);
-		m_actors.insert(entity, actor);
-		actor->entity = entity;
-
-		PxCapsuleGeometry geom;
-		geom.radius = 0.5f;
-		geom.halfHeight = 1;
-		Transform transform = m_universe.getTransform(entity);
-		PxTransform px_transform = toPhysx({transform.pos, transform.rot});
-
-		PxRigidStatic* physx_actor = PxCreateStatic(*m_system->getPhysics(), px_transform, geom, *m_default_material);
-		actor->setPhysxActor(physx_actor);
-
-		m_universe.onComponentCreated(entity, CAPSULE_ACTOR_TYPE, this);
+		ASSERT(false);
+		// TODO
 	}
 
 
@@ -1374,7 +1281,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	void createRigidActor(EntityRef entity)
 	{
 		if (m_actors.find(entity) >= 0) return;
-		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, ActorType::RIGID);
+		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this);
 		m_actors.insert(entity, actor);
 		actor->entity = entity;
 
@@ -1385,57 +1292,6 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		actor->setPhysxActor(physx_actor);
 
 		m_universe.onComponentCreated(entity, RIGID_ACTOR_TYPE, this);
-	}
-
-
-	void createBoxActor(EntityRef entity)
-	{
-		if (m_actors.find(entity) >= 0) return;
-		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, ActorType::BOX);
-		m_actors.insert(entity, actor);
-		actor->entity = entity;
-
-		PxBoxGeometry geom;
-		geom.halfExtents.x = 1;
-		geom.halfExtents.y = 1;
-		geom.halfExtents.z = 1;
-		Transform transform = m_universe.getTransform(entity);
-		PxTransform px_transform = toPhysx({transform.pos, transform.rot});
-
-		PxRigidStatic* physx_actor = PxCreateStatic(*m_system->getPhysics(), px_transform, geom, *m_default_material);
-		actor->setPhysxActor(physx_actor);
-
-		m_universe.onComponentCreated(entity, BOX_ACTOR_TYPE, this);
-	}
-
-
-	void createSphereActor(EntityRef entity)
-	{
-		if (m_actors.find(entity) >= 0) return;
-		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, ActorType::SPHERE);
-		m_actors.insert(entity, actor);
-		actor->entity = entity;
-
-		PxSphereGeometry geom;
-		geom.radius = 1;
-		Transform tr = m_universe.getTransform(entity);
-		PxTransform transform = toPhysx({tr.pos, tr.rot});
-
-		PxRigidStatic* physx_actor = PxCreateStatic(*m_system->getPhysics(), transform, geom, *m_default_material);
-		actor->setPhysxActor(physx_actor);
-
-		m_universe.onComponentCreated(entity, SPHERE_ACTOR_TYPE, this);
-	}
-
-
-	void createMeshActor(EntityRef entity)
-	{
-		if (m_actors.find(entity) >= 0) return;
-		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, ActorType::MESH);
-		m_actors.insert(entity, actor);
-		actor->entity = entity;
-
-		m_universe.onComponentCreated(entity, MESH_ACTOR_TYPE, this);
 	}
 
 
@@ -1537,7 +1393,6 @@ struct PhysicsSceneImpl final : public PhysicsScene
 
 	int getActorCount() const override { return m_actors.size(); }
 	EntityRef getActorEntity(int index) override { return m_actors.at(index)->entity; }
-	ActorType getActorType(int index) override { return m_actors.at(index)->type; }
 
 
 	bool isActorDebugEnabled(int index) const override
@@ -2130,7 +1985,8 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	{
 		if (!bone) return;
 
-		RigidTransform bone_transform(DVec3(pose->positions[bone->pose_bone_idx]), pose->rotations[bone->pose_bone_idx]);
+		RigidTransform bone_transform(
+			DVec3(pose->positions[bone->pose_bone_idx]), pose->rotations[bone->pose_bone_idx]);
 		bone->actor->setGlobalPose(toPhysx(root_transform * bone_transform * bone->inv_bind_transform));
 
 		setSkeletonPose(root_transform, bone->next, pose);
@@ -2144,15 +2000,16 @@ struct PhysicsSceneImpl final : public PhysicsScene
 
 		if (bone->is_kinematic)
 		{
-			RigidTransform bone_transform(DVec3(pose->positions[bone->pose_bone_idx]), pose->rotations[bone->pose_bone_idx]);
-			bone->actor->setKinematicTarget(toPhysx(root_transform * bone_transform * bone->inv_bind_transform));
+			RigidTransform bone_transform(DVec3(pose->positions[bone->pose_bone_idx]),
+		pose->rotations[bone->pose_bone_idx]); bone->actor->setKinematicTarget(toPhysx(root_transform * bone_transform *
+		bone->inv_bind_transform));
 		}
 		else
 		{
 			PxTransform bone_pose = bone->actor->getGlobalPose();
-			auto tr = inv_root * RigidTransform(DVec3(fromPhysx(bone_pose.p)), fromPhysx(bone_pose.q)) * bone->bind_transform;
-			pose->rotations[bone->pose_bone_idx] = tr.rot;
-			pose->positions[bone->pose_bone_idx] = tr.pos;
+			auto tr = inv_root * RigidTransform(DVec3(fromPhysx(bone_pose.p)), fromPhysx(bone_pose.q)) *
+		bone->bind_transform; pose->rotations[bone->pose_bone_idx] = tr.rot; pose->positions[bone->pose_bone_idx] =
+		tr.pos;
 		}
 
 		updateBone(root_transform, inv_root, bone->next, pose);
@@ -2238,6 +2095,261 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	}
 
 
+	// from physx docs
+	static void setupWheelsSimulationData(const PxF32 wheelMass, const PxF32 wheelMOI,
+		const PxF32 wheelRadius, const PxF32 wheelWidth, const PxU32 numWheels,
+		const PxVec3* wheelCenterActorOffsets, const PxVec3& chassisCMOffset,
+		const PxF32 chassisMass, PxVehicleWheelsSimData* wheelsSimData)
+	{
+		//Set up the wheels.
+		PxVehicleWheelData wheels[PX_MAX_NB_WHEELS];
+		{
+			//Set up the wheel data structures with mass, moi, radius, width.
+			for (PxU32 i = 0; i < numWheels; i++)
+			{
+				wheels[i].mMass = wheelMass;
+				wheels[i].mMOI = wheelMOI;
+				wheels[i].mRadius = wheelRadius;
+				wheels[i].mWidth = wheelWidth;
+			}
+
+			//Enable the handbrake for the rear wheels only.
+			wheels[PxVehicleDrive4WWheelOrder::eREAR_LEFT].mMaxHandBrakeTorque = 4000.0f;
+			wheels[PxVehicleDrive4WWheelOrder::eREAR_RIGHT].mMaxHandBrakeTorque = 4000.0f;
+			//Enable steering for the front wheels only.
+			wheels[PxVehicleDrive4WWheelOrder::eFRONT_LEFT].mMaxSteer = PxPi * 0.3333f;
+			wheels[PxVehicleDrive4WWheelOrder::eFRONT_RIGHT].mMaxSteer = PxPi * 0.3333f;
+		}
+
+		//Set up the tires.
+		PxVehicleTireData tires[PX_MAX_NB_WHEELS];
+		{
+			//Set up the tires.
+			for (PxU32 i = 0; i < numWheels; i++)
+			{
+				// TODO
+				// tires[i].mType = TIRE_TYPE_NORMAL;
+			}
+		}
+
+		//Set up the suspensions
+		PxVehicleSuspensionData suspensions[PX_MAX_NB_WHEELS];
+		{
+			//Compute the mass supported by each suspension spring.
+			PxF32 suspSprungMasses[PX_MAX_NB_WHEELS];
+			PxVehicleComputeSprungMasses
+			(numWheels, wheelCenterActorOffsets,
+				chassisCMOffset, chassisMass, 1, suspSprungMasses);
+
+			//Set the suspension data.
+			for (PxU32 i = 0; i < numWheels; i++)
+			{
+				suspensions[i].mMaxCompression = 0.3f;
+				suspensions[i].mMaxDroop = 0.1f;
+				suspensions[i].mSpringStrength = 35000.0f;
+				suspensions[i].mSpringDamperRate = 4500.0f;
+				suspensions[i].mSprungMass = suspSprungMasses[i];
+			}
+
+			//Set the camber angles.
+			const PxF32 camberAngleAtRest = 0.0;
+			const PxF32 camberAngleAtMaxDroop = 0.01f;
+			const PxF32 camberAngleAtMaxCompression = -0.01f;
+			for (PxU32 i = 0; i < numWheels; i += 2)
+			{
+				suspensions[i + 0].mCamberAtRest = camberAngleAtRest;
+				suspensions[i + 1].mCamberAtRest = -camberAngleAtRest;
+				suspensions[i + 0].mCamberAtMaxDroop = camberAngleAtMaxDroop;
+				suspensions[i + 1].mCamberAtMaxDroop = -camberAngleAtMaxDroop;
+				suspensions[i + 0].mCamberAtMaxCompression = camberAngleAtMaxCompression;
+				suspensions[i + 1].mCamberAtMaxCompression = -camberAngleAtMaxCompression;
+			}
+		}
+
+		//Set up the wheel geometry.
+		PxVec3 suspTravelDirections[PX_MAX_NB_WHEELS];
+		PxVec3 wheelCentreCMOffsets[PX_MAX_NB_WHEELS];
+		PxVec3 suspForceAppCMOffsets[PX_MAX_NB_WHEELS];
+		PxVec3 tireForceAppCMOffsets[PX_MAX_NB_WHEELS];
+		{
+			//Set the geometry data.
+			for (PxU32 i = 0; i < numWheels; i++)
+			{
+				//Vertical suspension travel.
+				suspTravelDirections[i] = PxVec3(0, -1, 0);
+
+				//Wheel center offset is offset from rigid body center of mass.
+				wheelCentreCMOffsets[i] =
+					wheelCenterActorOffsets[i] - chassisCMOffset;
+
+				//Suspension force application point 0.3 metres below
+				//rigid body center of mass.
+				suspForceAppCMOffsets[i] =
+					PxVec3(wheelCentreCMOffsets[i].x, -0.3f, wheelCentreCMOffsets[i].z);
+
+				//Tire force application point 0.3 metres below
+				//rigid body center of mass.
+				tireForceAppCMOffsets[i] =
+					PxVec3(wheelCentreCMOffsets[i].x, -0.3f, wheelCentreCMOffsets[i].z);
+			}
+		}
+
+		//Set up the filter data of the raycast that will be issued by each suspension.
+		PxFilterData qryFilterData;
+		// TODO
+		// setupNonDrivableSurface(qryFilterData);
+
+		//Set the wheel, tire and suspension data.
+		//Set the geometry data.
+		//Set the query filter data
+		for (PxU32 i = 0; i < numWheels; i++)
+		{
+			wheelsSimData->setWheelData(i, wheels[i]);
+			wheelsSimData->setTireData(i, tires[i]);
+			wheelsSimData->setSuspensionData(i, suspensions[i]);
+			wheelsSimData->setSuspTravelDirection(i, suspTravelDirections[i]);
+			wheelsSimData->setWheelCentreOffset(i, wheelCentreCMOffsets[i]);
+			wheelsSimData->setSuspForceAppPointOffset(i, suspForceAppCMOffsets[i]);
+			wheelsSimData->setTireForceAppPointOffset(i, tireForceAppCMOffsets[i]);
+			wheelsSimData->setSceneQueryFilterData(i, qryFilterData);
+			wheelsSimData->setWheelShapeMapping(i, i);
+		}
+	}
+
+
+	static void setupDriveSimData(const PxVehicleWheelsSimData& wheel_sim_data, PxVehicleDriveSimData4W& drive_sim_data)
+	{
+		//Diff
+		PxVehicleDifferential4WData diff;
+		diff.mType = PxVehicleDifferential4WData::eDIFF_TYPE_LS_4WD;
+		drive_sim_data.setDiffData(diff);
+
+		//Engine
+		PxVehicleEngineData engine;
+		engine.mPeakTorque = 500.0f;
+		engine.mMaxOmega = 600.0f;//approx 6000 rpm
+		drive_sim_data.setEngineData(engine);
+
+		//Gears
+		PxVehicleGearsData gears;
+		gears.mSwitchTime = 0.5f;
+		drive_sim_data.setGearsData(gears);
+
+		//Clutch
+		PxVehicleClutchData clutch;
+		clutch.mStrength = 10.0f;
+		drive_sim_data.setClutchData(clutch);
+
+		//Ackermann steer accuracy
+		PxVehicleAckermannGeometryData ackermann;
+		ackermann.mAccuracy = 1.0f;
+		ackermann.mAxleSeparation =
+			wheel_sim_data.getWheelCentreOffset(PxVehicleDrive4WWheelOrder::eFRONT_LEFT).z -
+			wheel_sim_data.getWheelCentreOffset(PxVehicleDrive4WWheelOrder::eREAR_LEFT).z;
+		ackermann.mFrontWidth =
+			wheel_sim_data.getWheelCentreOffset(PxVehicleDrive4WWheelOrder::eFRONT_RIGHT).x -
+			wheel_sim_data.getWheelCentreOffset(PxVehicleDrive4WWheelOrder::eFRONT_LEFT).x;
+		ackermann.mRearWidth =
+			wheel_sim_data.getWheelCentreOffset(PxVehicleDrive4WWheelOrder::eREAR_RIGHT).x -
+			wheel_sim_data.getWheelCentreOffset(PxVehicleDrive4WWheelOrder::eREAR_LEFT).x;
+		drive_sim_data.setAckermannGeometryData(ackermann);
+	}
+
+
+	static PxRigidDynamic* createVehicleActor(const PxVehicleChassisData& chassisData
+		, PxMaterial** wheelMaterials
+		, PxConvexMesh** wheelConvexMeshes
+		, const PxU32 numWheels
+		, const PxFilterData& wheelSimFilterData
+		, PxMaterial** chassisMaterials
+		, PxConvexMesh** chassisConvexMeshes
+		, const PxU32 numChassisMeshes
+		, const PxFilterData& chassisSimFilterData
+		, PxPhysics& physics)
+	{
+		//We need a rigid body actor for the vehicle.
+		//Don't forget to add the actor to the scene after setting up the associated vehicle.
+
+		PxRigidDynamic* vehActor = physics.createRigidDynamic(PxTransform(PxIdentity));
+
+		//Wheel and chassis query filter data.
+		//Optional: cars don't drive on other cars.
+		PxFilterData wheelQryFilterData;
+		// TODO
+		//setupNonDrivableSurface(wheelQryFilterData);
+		PxFilterData chassisQryFilterData;
+		// TODO
+		//setupNonDrivableSurface(chassisQryFilterData);
+
+		//Add all the wheel shapes to the actor.
+		for (PxU32 i = 0; i < numWheels; i++)
+		{
+			PxConvexMeshGeometry geom(wheelConvexMeshes[i]);
+			PxShape* wheelShape = PxRigidActorExt::createExclusiveShape(*vehActor, geom, *wheelMaterials[i]);
+			wheelShape->setQueryFilterData(wheelQryFilterData);
+			wheelShape->setSimulationFilterData(wheelSimFilterData);
+			wheelShape->setLocalPose(PxTransform(PxIdentity));
+		}
+
+		//Add the chassis shapes to the actor.
+		for (PxU32 i = 0; i < numChassisMeshes; i++)
+		{
+			PxShape* chassisShape = PxRigidActorExt::createExclusiveShape(*vehActor, PxConvexMeshGeometry(chassisConvexMeshes[i]), *chassisMaterials[i]);
+			chassisShape->setQueryFilterData(chassisQryFilterData);
+			chassisShape->setSimulationFilterData(chassisSimFilterData);
+			chassisShape->setLocalPose(PxTransform(PxIdentity));
+		}
+
+		vehActor->setMass(chassisData.mMass);
+		vehActor->setMassSpaceInertiaTensor(chassisData.mMOI);
+		vehActor->setCMassLocalPose(PxTransform(chassisData.mCMOffset, PxQuat(PxIdentity)));
+
+		return vehActor;
+	}
+
+	void initVehicles()
+	{
+		for (auto iter = m_vehicles.begin(), end = m_vehicles.end(); iter != end; ++iter) {
+			const EntityRef entity = iter.key();
+			Vehicle& veh = iter.value();
+
+			PxVehicleWheelsSimData* wheel_sim_data = PxVehicleWheelsSimData::allocate(4);
+			// TODO
+			PxVec3 offsets[4];
+			PxVec3 cm_offsets;
+			setupWheelsSimulationData(1, 1, 1, 1, 4, offsets, cm_offsets, 10, wheel_sim_data);
+
+			PxVehicleDriveSimData4W drive_sim_data;
+			setupDriveSimData(*wheel_sim_data, drive_sim_data);
+
+			PxVehicleChassisData chassis_data;
+			PxMaterial* wheels_materials[] = { m_default_material, m_default_material, m_default_material, m_default_material };
+			PxMaterial* chassis_materials[] = { m_default_material };
+			PxFilterData wheel_sim_filter_data;
+			PxFilterData chassis_sim_filter_data;
+			PxConvexMesh* wheels_meshes[] = { 0 };
+			PxConvexMesh* chassis_meshes[] = { 0 };
+
+			veh.actor = createVehicleActor(chassis_data
+				, wheels_materials 
+				, wheels_meshes
+				, 4
+				, wheel_sim_filter_data
+				, chassis_materials
+				, chassis_meshes
+				, 1
+				, chassis_sim_filter_data
+				, *m_system->getPhysics()
+			);
+
+			veh.drive = PxVehicleDrive4W::allocate(4);
+			veh.drive->setup(m_system->getPhysics(), veh.actor, *wheel_sim_data, drive_sim_data, 0);
+			
+			wheel_sim_data->free();
+		}
+	}
+
+
 	void initJoints()
 	{
 		for (int i = 0, c = m_joints.size(); i < c; ++i)
@@ -2256,6 +2368,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		m_is_game_running = true;
 
 		initJoints();
+		initVehicles();
 	}
 
 
@@ -2422,8 +2535,12 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	};
 
 
-	bool raycastEx(const Vec3& origin, const Vec3& dir, float distance, RaycastHit& result, EntityPtr ignored, int layer)
-		override
+	bool raycastEx(const Vec3& origin,
+		const Vec3& dir,
+		float distance,
+		RaycastHit& result,
+		EntityPtr ignored,
+		int layer) override
 	{
 		PxVec3 physx_origin(origin.x, origin.y, origin.z);
 		PxVec3 unit_dir(dir.x, dir.y, dir.z);
@@ -2566,7 +2683,8 @@ struct PhysicsSceneImpl final : public PhysicsScene
 			hfDesc.samples.data = &heights[0];
 			hfDesc.samples.stride = sizeof(PxHeightFieldSample);
 
-			PxHeightField* heightfield = m_system->getCooking()->createHeightField(hfDesc, m_system->getPhysics()->getPhysicsInsertionCallback());
+			PxHeightField* heightfield = m_system->getCooking()->createHeightField(
+				hfDesc, m_system->getPhysics()->getPhysicsInsertionCallback());
 			float height_scale = bytes_per_pixel == 2 ? 1 / (256 * 256.0f - 1) : 1 / 255.0f;
 			PxHeightFieldGeometry hfGeom(heightfield,
 				PxMeshGeometryFlags(),
@@ -2784,22 +2902,6 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	DynamicType getDynamicType(EntityRef entity) override { return m_actors[entity]->dynamic_type; }
 
 
-	Vec3 getHalfExtents(EntityRef entity) override
-	{
-		Vec3 size;
-		PxRigidActor* actor = m_actors[entity]->physx_actor;
-		PxShape* shapes;
-		if (actor->getNbShapes() == 1 && actor->getShapes(&shapes, 1))
-		{
-			PxVec3& half = shapes->getGeometry().box().halfExtents;
-			size.x = half.x;
-			size.y = half.y;
-			size.z = half.z;
-		}
-		return size;
-	}
-
-
 	void moveShapeIndices(EntityRef entity, int index, PxGeometryType::Enum type)
 	{
 		int count = getGeometryCount(entity, type);
@@ -2840,7 +2942,10 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	}
 
 
-	void removeBoxGeometry(EntityRef entity, int index) override { removeGeometry(entity, index, PxGeometryType::eBOX); }
+	void removeBoxGeometry(EntityRef entity, int index) override
+	{
+		removeGeometry(entity, index, PxGeometryType::eBOX);
+	}
 
 
 	Vec3 getBoxGeomHalfExtents(EntityRef entity, int index) override
@@ -3022,42 +3127,10 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	}
 
 
-	void setHalfExtents(EntityRef entity, const Vec3& size) override
-	{
-		PxRigidActor* actor = m_actors[entity]->physx_actor;
-		PxShape* shapes;
-		if (actor->getNbShapes() == 1 && actor->getShapes(&shapes, 1))
-		{
-			PxBoxGeometry box;
-			bool is_box = shapes->getBoxGeometry(box);
-			ASSERT(is_box);
-			PxVec3& half = box.halfExtents;
-			half.x = Math::maximum(0.01f, size.x);
-			half.y = Math::maximum(0.01f, size.y);
-			half.z = Math::maximum(0.01f, size.z);
-			shapes->setGeometry(box);
-		}
-	}
-
-
 	void setDynamicType(EntityRef entity, DynamicType new_value) override
 	{
 		RigidActor* actor = m_actors[entity];
 		if (actor->dynamic_type == new_value) return;
-
-		if (actor->type == ActorType::MESH && new_value != DynamicType::STATIC && actor->physx_actor)
-		{
-			PxShape* shape;
-			if (actor->physx_actor->getShapes(&shape, 1, 0) == 1)
-			{
-				PxTriangleMeshGeometry geom;
-				if (shape->getTriangleMeshGeometry(geom))
-				{
-					g_log_error.log("Physics") << "Triangles mesh can only be static";
-					return;
-				}
-			}
-		}
 
 		actor->dynamic_type = new_value;
 		if (new_value == DynamicType::DYNAMIC)
@@ -3200,16 +3273,8 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		serializer.read(&c.m_layer);
 		serializer.read(&c.m_radius);
 		serializer.read(&c.m_height);
-		if (scene_version > (int)PhysicsSceneVersion::CONTROLLER_GRAVITY)
-		{
-			serializer.read(&c.m_custom_gravity);
-			serializer.read(&c.m_custom_gravity_acceleration);
-		}
-		else
-		{
-			c.m_custom_gravity = false;
-			c.m_custom_gravity_acceleration = 9.8f;
-		}
+		serializer.read(&c.m_custom_gravity);
+		serializer.read(&c.m_custom_gravity_acceleration);
 
 		PxCapsuleControllerDesc cDesc;
 		initControllerDesc(cDesc);
@@ -3236,6 +3301,20 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		c.m_controller->setFootPosition({position.x, position.y, position.z});
 
 		m_universe.onComponentCreated(entity, CONTROLLER_TYPE, this);
+	}
+
+
+	void serializeVehicle(ISerializer& serialzier, EntityRef entity)
+	{
+		ASSERT(false);
+		// TODO
+	}
+
+
+	void deserializeVehicle(IDeserializer& serialzier, EntityRef entity, int /*scene_version*/)
+	{
+		ASSERT(false);
+		// TODO
 	}
 
 
@@ -3476,8 +3555,8 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		RigidTransform tr;
 		serializer.read(&tr);
 		joint.local_frame0 = toPhysx(tr);
-		auto* px_joint = PxD6JointCreate(
-			m_scene->getPhysics(), m_dummy_actor, joint.local_frame0, nullptr, PxTransform(PxIdentity));
+		auto* px_joint =
+			PxD6JointCreate(m_scene->getPhysics(), m_dummy_actor, joint.local_frame0, nullptr, PxTransform(PxIdentity));
 		joint.physx = px_joint;
 
 		deserializeJoint(serializer, px_joint);
@@ -3555,43 +3634,9 @@ struct PhysicsSceneImpl final : public PhysicsScene
 
 	void deserializeCommonRigidActorProperties(IDeserializer& serializer, RigidActor* actor, int scene_version)
 	{
-		if (scene_version <= (int)PhysicsSceneVersion::DYNAMIC_TYPE)
-		{
-			bool is_dynamic;
-			serializer.read(&is_dynamic);
-			actor->dynamic_type = is_dynamic ? DynamicType::DYNAMIC : DynamicType::STATIC;
-		}
-		else
-		{
-			serializer.read((int*)&actor->dynamic_type);
-		}
+		serializer.read((int*)&actor->dynamic_type);
 		if (actor->dynamic_type == DynamicType::DYNAMIC) m_dynamic_actors.push(actor);
-		if (scene_version > (int)PhysicsSceneVersion::TRIGGERS)
-		{
-			serializer.read(&actor->is_trigger);
-		}
-		else
-		{
-			actor->is_trigger = false;
-		}
-	}
-
-
-	void deserializeMeshActor(IDeserializer& serializer, EntityRef entity, int scene_version)
-	{
-		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, ActorType::MESH);
-		actor->entity = entity;
-		serializer.read(&actor->layer);
-		deserializeCommonRigidActorProperties(serializer, actor, scene_version);
-		m_actors.insert(actor->entity, actor);
-
-		char tmp[MAX_PATH_LENGTH];
-		serializer.read(tmp, sizeof(tmp));
-		ResourceManagerHub& manager = m_engine->getResourceManager();
-		auto* geometry = manager.load<PhysicsGeometry>(Path(tmp));
-		actor->setResource(static_cast<PhysicsGeometry*>(geometry));
-
-		m_universe.onComponentCreated(actor->entity, MESH_ACTOR_TYPE, this);
+		serializer.read(&actor->is_trigger);
 	}
 
 
@@ -3638,26 +3683,9 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	}
 
 
-	void serializeBoxActor(ISerializer& serializer, EntityRef entity)
-	{
-		RigidActor* actor = m_actors[entity];
-		serializer.write("layer", actor->layer);
-		serializer.write("dynamic_type", (int)actor->dynamic_type);
-		serializer.write("trigger", actor->is_trigger);
-		PxShape* shape;
-		ASSERT(actor->physx_actor->getNbShapes() == 1);
-		actor->physx_actor->getShapes(&shape, 1);
-		PxBoxGeometry geom;
-		if (!shape->getBoxGeometry(geom)) ASSERT(false);
-		serializer.write("x", geom.halfExtents.x);
-		serializer.write("y", geom.halfExtents.y);
-		serializer.write("z", geom.halfExtents.z);
-	}
-
-
 	void deserializeRigidActor(IDeserializer& serializer, EntityRef entity, int scene_version)
 	{
-		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, ActorType::RIGID);
+		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this);
 		actor->entity = entity;
 		serializer.read(&actor->layer);
 		deserializeCommonRigidActorProperties(serializer, actor, scene_version);
@@ -3719,214 +3747,42 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	}
 
 
-	void deserializeBoxActor(IDeserializer& serializer, EntityRef entity, int scene_version)
-	{
-		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, ActorType::BOX);
-		actor->entity = entity;
-		serializer.read(&actor->layer);
-		deserializeCommonRigidActorProperties(serializer, actor, scene_version);
-		m_actors.insert(actor->entity, actor);
-
-		PxBoxGeometry box_geom;
-		PxTransform transform = toPhysx(m_universe.getTransform(actor->entity).getRigidPart());
-		serializer.read(&box_geom.halfExtents.x);
-		serializer.read(&box_geom.halfExtents.y);
-		serializer.read(&box_geom.halfExtents.z);
-		PxRigidActor* physx_actor;
-		switch (actor->dynamic_type)
-		{
-			case DynamicType::DYNAMIC:
-				physx_actor = PxCreateDynamic(*m_system->getPhysics(), transform, box_geom, *m_default_material, 1.0f);
-				break;
-			case DynamicType::KINEMATIC:
-				physx_actor = PxCreateDynamic(*m_system->getPhysics(), transform, box_geom, *m_default_material, 1.0f);
-				physx_actor->is<PxRigidBody>()->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, true);
-				break;
-			case DynamicType::STATIC:
-				physx_actor = PxCreateStatic(*m_system->getPhysics(), transform, box_geom, *m_default_material);
-				break;
-		}
-		actor->setPhysxActor(physx_actor);
-
-		m_universe.onComponentCreated(entity, BOX_ACTOR_TYPE, this);
-	}
-
-
-	void serializeCapsuleActor(ISerializer& serializer, EntityRef entity)
-	{
-		RigidActor* actor = m_actors[entity];
-		serializer.write("layer", actor->layer);
-		serializer.write("dynamic_type", (int)actor->dynamic_type);
-		serializer.write("trigger", actor->is_trigger);
-		PxShape* shape;
-		ASSERT(actor->physx_actor->getNbShapes() == 1);
-		actor->physx_actor->getShapes(&shape, 1);
-		PxCapsuleGeometry geom;
-		if (!shape->getCapsuleGeometry(geom)) ASSERT(false);
-		serializer.write("half_height", geom.halfHeight);
-		serializer.write("radius", geom.radius);
-	}
-
-
-	void deserializeCapsuleActor(IDeserializer& serializer, EntityRef entity, int scene_version)
-	{
-		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, ActorType::CAPSULE);
-		actor->entity = entity;
-		serializer.read(&actor->layer);
-		deserializeCommonRigidActorProperties(serializer, actor, scene_version);
-		m_actors.insert(actor->entity, actor);
-
-		PxCapsuleGeometry capsule_geom;
-		PxTransform transform = toPhysx(m_universe.getTransform(actor->entity).getRigidPart());
-		serializer.read(&capsule_geom.halfHeight);
-		serializer.read(&capsule_geom.radius);
-		PxRigidActor* physx_actor;
-		switch (actor->dynamic_type)
-		{
-			case DynamicType::DYNAMIC:
-				physx_actor =
-					PxCreateDynamic(*m_system->getPhysics(), transform, capsule_geom, *m_default_material, 1.0f);
-				break;
-			case DynamicType::KINEMATIC:
-				physx_actor =
-					PxCreateDynamic(*m_system->getPhysics(), transform, capsule_geom, *m_default_material, 1.0f);
-				physx_actor->is<PxRigidBody>()->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, true);
-				break;
-			case DynamicType::STATIC:
-				physx_actor = PxCreateStatic(*m_system->getPhysics(), transform, capsule_geom, *m_default_material);
-				break;
-		}
-		actor->setPhysxActor(physx_actor);
-
-		m_universe.onComponentCreated(entity, CAPSULE_ACTOR_TYPE, this);
-	}
-
-
-	void serializeSphereActor(ISerializer& serializer, EntityRef entity)
-	{
-		RigidActor* actor = m_actors[entity];
-		serializer.write("layer", actor->layer);
-		serializer.write("dynamic_type", (int)actor->dynamic_type);
-		serializer.write("trigger", actor->is_trigger);
-		PxShape* shape;
-		ASSERT(actor->physx_actor->getNbShapes() == 1);
-		actor->physx_actor->getShapes(&shape, 1);
-		PxSphereGeometry geom;
-		if (!shape->getSphereGeometry(geom)) ASSERT(false);
-		serializer.write("radius", geom.radius);
-	}
-
-
-	void deserializeSphereActor(IDeserializer& serializer, EntityRef entity, int scene_version)
-	{
-		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, ActorType::SPHERE);
-		actor->entity = entity;
-		serializer.read(&actor->layer);
-		deserializeCommonRigidActorProperties(serializer, actor, scene_version);
-		m_actors.insert(actor->entity, actor);
-
-		PxSphereGeometry sphere_geom;
-		PxTransform transform = toPhysx(m_universe.getTransform(actor->entity).getRigidPart());
-		serializer.read(&sphere_geom.radius);
-		PxRigidActor* physx_actor;
-		switch (actor->dynamic_type)
-		{
-			case DynamicType::DYNAMIC:
-				physx_actor =
-					PxCreateDynamic(*m_system->getPhysics(), transform, sphere_geom, *m_default_material, 1.0f);
-				break;
-			case DynamicType::KINEMATIC:
-				physx_actor =
-					PxCreateDynamic(*m_system->getPhysics(), transform, sphere_geom, *m_default_material, 1.0f);
-				physx_actor->is<PxRigidBody>()->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, true);
-				break;
-			case DynamicType::STATIC:
-				physx_actor = PxCreateStatic(*m_system->getPhysics(), transform, sphere_geom, *m_default_material);
-				break;
-		}
-		actor->setPhysxActor(physx_actor);
-
-		m_universe.onComponentCreated(entity, SPHERE_ACTOR_TYPE, this);
-	}
-
-
 	void serializeActor(OutputBlob& serializer, RigidActor* actor)
 	{
 		serializer.write(actor->layer);
-		PxShape* shapes;
 		auto* px_actor = actor->physx_actor;
 		auto* resource = actor->resource;
-		serializer.write((i32)actor->type);
-		switch (actor->type)
+		PxShape* shape;
+		int shape_count = px_actor->getNbShapes();
+		serializer.write(shape_count);
+		for (int i = 0; i < shape_count; ++i)
 		{
-			case ActorType::RIGID:
+			px_actor->getShapes(&shape, 1, i);
+			int type = shape->getGeometryType();
+			serializer.write(type);
+			serializer.write((int)(intptr_t)shape->userData);
+			RigidTransform tr = fromPhysx(shape->getLocalPose());
+			serializer.write(tr);
+			switch (type)
 			{
-				PxShape* shape;
-				int shape_count = px_actor->getNbShapes();
-				serializer.write(shape_count);
-				for (int i = 0; i < shape_count; ++i)
+				case PxGeometryType::eBOX:
 				{
-					px_actor->getShapes(&shape, 1, i);
-					int type = shape->getGeometryType();
-					serializer.write(type);
-					serializer.write((int)(intptr_t)shape->userData);
-					RigidTransform tr = fromPhysx(shape->getLocalPose());
-					serializer.write(tr);
-					switch (type)
-					{
-						case PxGeometryType::eBOX:
-						{
-							PxBoxGeometry geom;
-							shape->getBoxGeometry(geom);
-							serializer.write(geom.halfExtents.x);
-							serializer.write(geom.halfExtents.y);
-							serializer.write(geom.halfExtents.z);
-						}
-						break;
-						case PxGeometryType::eSPHERE:
-						{
-							PxSphereGeometry geom;
-							shape->getSphereGeometry(geom);
-							serializer.write(geom.radius);
-						}
-						break;
-						default: ASSERT(false); break;
-					}
+					PxBoxGeometry geom;
+					shape->getBoxGeometry(geom);
+					serializer.write(geom.halfExtents.x);
+					serializer.write(geom.halfExtents.y);
+					serializer.write(geom.halfExtents.z);
 				}
 				break;
-			}
-			case ActorType::BOX:
-			{
-				ASSERT(px_actor->getNbShapes() == 1);
-				px_actor->getShapes(&shapes, 1);
-				PxBoxGeometry geom;
-				if (!shapes->getBoxGeometry(geom)) ASSERT(false);
-				serializer.write(geom.halfExtents.x);
-				serializer.write(geom.halfExtents.y);
-				serializer.write(geom.halfExtents.z);
+				case PxGeometryType::eSPHERE:
+				{
+					PxSphereGeometry geom;
+					shape->getSphereGeometry(geom);
+					serializer.write(geom.radius);
+				}
 				break;
+				default: ASSERT(false); break;
 			}
-			case ActorType::SPHERE:
-			{
-				ASSERT(px_actor->getNbShapes() == 1);
-				px_actor->getShapes(&shapes, 1);
-				PxSphereGeometry geom;
-				if (!shapes->getSphereGeometry(geom)) ASSERT(false);
-				serializer.write(geom.radius);
-				break;
-			}
-			case ActorType::CAPSULE:
-			{
-				ASSERT(px_actor->getNbShapes() == 1);
-				px_actor->getShapes(&shapes, 1);
-				PxCapsuleGeometry geom;
-				if (!shapes->getCapsuleGeometry(geom)) ASSERT(false);
-				serializer.write(geom.halfHeight);
-				serializer.write(geom.radius);
-				break;
-			}
-			case ActorType::MESH: serializer.writeString(resource ? resource->getPath().c_str() : ""); break;
-			default: ASSERT(false);
 		}
 	}
 
@@ -3947,106 +3803,6 @@ struct PhysicsSceneImpl final : public PhysicsScene
 				return PxCreateStatic(*m_system->getPhysics(), transform, geometry, *m_default_material);
 		}
 		return nullptr;
-	}
-
-
-	void deserializeActor(InputBlob& serializer, RigidActor* actor)
-	{
-		EntityRef entity = actor->entity;
-		actor->layer = 0;
-		serializer.read(actor->layer);
-
-		serializer.read((i32&)actor->type);
-
-		PxTransform transform = toPhysx(m_universe.getTransform(actor->entity).getRigidPart());
-		switch (actor->type)
-		{
-			case ActorType::RIGID:
-			{
-				PxRigidActor* physx_actor = actor->dynamic_type == DynamicType::STATIC
-												? (PxRigidActor*)m_system->getPhysics()->createRigidStatic(transform)
-												: (PxRigidActor*)m_system->getPhysics()->createRigidDynamic(transform);
-				int count = serializer.read<int>();
-				for (int i = 0; i < count; ++i)
-				{
-					int type = serializer.read<int>();
-					int index = serializer.read<int>();
-					PxTransform tr = toPhysx(serializer.read<RigidTransform>());
-					PxShape* shape = nullptr;
-					switch (type)
-					{
-						case PxGeometryType::eBOX:
-						{
-							PxBoxGeometry box_geom;
-							serializer.read(box_geom.halfExtents.x);
-							serializer.read(box_geom.halfExtents.y);
-							serializer.read(box_geom.halfExtents.z);
-							shape = m_system->getPhysics()->createShape(box_geom, *m_default_material);
-							shape->setLocalPose(tr);
-							physx_actor->attachShape(*shape);
-						}
-						break;
-						case PxGeometryType::eSPHERE:
-						{
-							PxSphereGeometry geom;
-							serializer.read(geom.radius);
-							shape = m_system->getPhysics()->createShape(geom, *m_default_material);
-							shape->setLocalPose(tr);
-							physx_actor->attachShape(*shape);
-						}
-						break;
-						default: ASSERT(false); break;
-					}
-					if (shape) shape->userData = (void*)(intptr_t)index;
-				}
-				actor->setPhysxActor(physx_actor);
-				m_universe.onComponentCreated(actor->entity, RIGID_ACTOR_TYPE, this);
-			}
-			break;
-			case ActorType::BOX:
-			{
-				PxBoxGeometry box_geom;
-				PxTransform transform = toPhysx(m_universe.getTransform(actor->entity).getRigidPart());
-				serializer.read(box_geom.halfExtents);
-				PxRigidActor* physx_actor = createPhysXActor(actor, transform, box_geom);
-
-				actor->setPhysxActor(physx_actor);
-				m_universe.onComponentCreated(actor->entity, BOX_ACTOR_TYPE, this);
-			}
-			break;
-			case ActorType::SPHERE:
-			{
-				PxSphereGeometry sphere_geom;
-				PxTransform transform = toPhysx(m_universe.getTransform(actor->entity).getRigidPart());
-				serializer.read(sphere_geom.radius);
-				PxRigidActor* physx_actor = createPhysXActor(actor, transform, sphere_geom);
-				actor->setPhysxActor(physx_actor);
-				m_universe.onComponentCreated(actor->entity, SPHERE_ACTOR_TYPE, this);
-			}
-			break;
-			case ActorType::CAPSULE:
-			{
-				PxCapsuleGeometry capsule_geom;
-				PxTransform transform = toPhysx(m_universe.getTransform(actor->entity).getRigidPart());
-				serializer.read(capsule_geom.halfHeight);
-				serializer.read(capsule_geom.radius);
-				PxRigidActor* physx_actor = createPhysXActor(actor, transform, capsule_geom);
-				actor->setPhysxActor(physx_actor);
-				m_universe.onComponentCreated(actor->entity, CAPSULE_ACTOR_TYPE, this);
-			}
-			break;
-			case ActorType::MESH:
-			{
-				char tmp[MAX_PATH_LENGTH];
-				serializer.readString(tmp, sizeof(tmp));
-				ResourceManagerHub& manager = m_engine->getResourceManager();
-				auto* geometry = manager.load<PhysicsGeometry>(Path(tmp));
-				actor->setResource(geometry);
-				m_universe.onComponentCreated(actor->entity, MESH_ACTOR_TYPE, this);
-			}
-			break;
-			default: ASSERT(false); break;
-		}
 	}
 
 
@@ -4084,6 +3840,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		}
 		serializeRagdolls(serializer);
 		serializeJoints(serializer);
+		serializeVehicles(serializer);
 	}
 
 
@@ -4541,6 +4298,13 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	}
 
 
+	void serializeVehicles(OutputBlob& serializer)
+	{
+		ASSERT(false);
+		// TODO
+	}
+
+
 	void serializeJoints(OutputBlob& serializer)
 	{
 		serializer.write(m_joints.size());
@@ -4610,13 +4374,55 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		m_actors.reserve(count);
 		for (int i = 0; i < count; ++i)
 		{
-			RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, ActorType::BOX);
+			RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this);
 			serializer.read(actor->dynamic_type);
 			serializer.read(actor->is_trigger);
 			serializer.read(actor->entity);
 			if (actor->dynamic_type == DynamicType::DYNAMIC) m_dynamic_actors.push(actor);
 			m_actors.insert(actor->entity, actor);
-			deserializeActor(serializer, actor);
+			EntityRef entity = actor->entity;
+			actor->layer = 0;
+			serializer.read(actor->layer);
+
+			PxTransform transform = toPhysx(m_universe.getTransform(actor->entity).getRigidPart());
+			PxRigidActor* physx_actor = actor->dynamic_type == DynamicType::STATIC
+				? (PxRigidActor*)m_system->getPhysics()->createRigidStatic(transform)
+				: (PxRigidActor*)m_system->getPhysics()->createRigidDynamic(transform);
+			int count = serializer.read<int>();
+			for (int i = 0; i < count; ++i)
+			{
+				int type = serializer.read<int>();
+				int index = serializer.read<int>();
+				PxTransform tr = toPhysx(serializer.read<RigidTransform>());
+				PxShape* shape = nullptr;
+				switch (type)
+				{
+				case PxGeometryType::eBOX:
+				{
+					PxBoxGeometry box_geom;
+					serializer.read(box_geom.halfExtents.x);
+					serializer.read(box_geom.halfExtents.y);
+					serializer.read(box_geom.halfExtents.z);
+					shape = m_system->getPhysics()->createShape(box_geom, *m_default_material);
+					shape->setLocalPose(tr);
+					physx_actor->attachShape(*shape);
+				}
+				break;
+				case PxGeometryType::eSPHERE:
+				{
+					PxSphereGeometry geom;
+					serializer.read(geom.radius);
+					shape = m_system->getPhysics()->createShape(geom, *m_default_material);
+					shape->setLocalPose(tr);
+					physx_actor->attachShape(*shape);
+				}
+				break;
+				default: ASSERT(false); break;
+				}
+				if (shape) shape->userData = (void*)(intptr_t)index;
+			}
+			actor->setPhysxActor(physx_actor);
+			m_universe.onComponentCreated(actor->entity, RIGID_ACTOR_TYPE, this);
 		}
 	}
 
@@ -4663,6 +4469,13 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	}
 
 
+	void deserializeVehicles(InputBlob& serializer)
+	{
+		ASSERT(false);
+		// TODO
+	}
+
+
 	void deserializeRagdolls(InputBlob& serializer)
 	{
 		int count;
@@ -4705,11 +4518,8 @@ struct PhysicsSceneImpl final : public PhysicsScene
 				case PxJointConcreteType::eSPHERICAL:
 				{
 					cmp_type = SPHERICAL_JOINT_TYPE;
-					auto* px_joint = PxSphericalJointCreate(m_scene->getPhysics(),
-						m_dummy_actor,
-						joint.local_frame0,
-						nullptr,
-						PxTransform(PxIdentity));
+					auto* px_joint = PxSphericalJointCreate(
+						m_scene->getPhysics(), m_dummy_actor, joint.local_frame0, nullptr, PxTransform(PxIdentity));
 					joint.physx = px_joint;
 					u32 flags;
 					serializer.read(flags);
@@ -4722,11 +4532,8 @@ struct PhysicsSceneImpl final : public PhysicsScene
 				case PxJointConcreteType::eREVOLUTE:
 				{
 					cmp_type = HINGE_JOINT_TYPE;
-					auto* px_joint = PxRevoluteJointCreate(m_scene->getPhysics(),
-						m_dummy_actor,
-						joint.local_frame0,
-						nullptr,
-						PxTransform(PxIdentity));
+					auto* px_joint = PxRevoluteJointCreate(
+						m_scene->getPhysics(), m_dummy_actor, joint.local_frame0, nullptr, PxTransform(PxIdentity));
 					joint.physx = px_joint;
 					u32 flags;
 					serializer.read(flags);
@@ -4739,11 +4546,8 @@ struct PhysicsSceneImpl final : public PhysicsScene
 				case PxJointConcreteType::eDISTANCE:
 				{
 					cmp_type = DISTANCE_JOINT_TYPE;
-					auto* px_joint = PxDistanceJointCreate(m_scene->getPhysics(),
-						m_dummy_actor,
-						joint.local_frame0,
-						nullptr,
-						PxTransform(PxIdentity));
+					auto* px_joint = PxDistanceJointCreate(
+						m_scene->getPhysics(), m_dummy_actor, joint.local_frame0, nullptr, PxTransform(PxIdentity));
 					joint.physx = px_joint;
 					u32 flags;
 					serializer.read(flags);
@@ -4764,11 +4568,8 @@ struct PhysicsSceneImpl final : public PhysicsScene
 				case PxJointConcreteType::eD6:
 				{
 					cmp_type = D6_JOINT_TYPE;
-					auto* px_joint = PxD6JointCreate(m_scene->getPhysics(),
-						m_dummy_actor,
-						joint.local_frame0,
-						nullptr,
-						PxTransform(PxIdentity));
+					auto* px_joint = PxD6JointCreate(
+						m_scene->getPhysics(), m_dummy_actor, joint.local_frame0, nullptr, PxTransform(PxIdentity));
 					joint.physx = px_joint;
 					int motions[6];
 					serializer.read(motions);
@@ -4834,6 +4635,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		deserializeTerrains(serializer);
 		deserializeRagdolls(serializer);
 		deserializeJoints(serializer);
+		deserializeVehicles(serializer);
 
 		updateFilterData();
 	}
@@ -5022,6 +4824,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	AssociativeArray<EntityRef, Joint> m_joints;
 	AssociativeArray<EntityRef, Controller> m_controllers;
 	AssociativeArray<EntityRef, Heightfield> m_terrains;
+	HashMap<EntityRef, Vehicle> m_vehicles;
 
 	Array<RigidActor*> m_dynamic_actors;
 	RigidActor* m_update_in_progress;
@@ -5056,7 +4859,7 @@ PhysicsScene* PhysicsScene::create(PhysicsSystem& system, Universe& context, Eng
 		return nullptr;
 	}
 
-	//impl->m_controller_manager = PxCreateControllerManager(*impl->m_scene);
+	// impl->m_controller_manager = PxCreateControllerManager(*impl->m_scene);
 
 	impl->m_system = &system;
 	impl->m_default_material = impl->m_system->getPhysics()->createMaterial(0.5f, 0.5f, 0.1f);

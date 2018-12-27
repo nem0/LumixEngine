@@ -43,30 +43,6 @@ namespace Lumix
 				blob_property("data", LUMIX_PROP(PhysicsScene, RagdollData)),
 				property("Layer", LUMIX_PROP(PhysicsScene, RagdollLayer))
 			),
-			component("sphere_rigid_actor",
-				functions(
-					function(LUMIX_FUNC(PhysicsScene::applyForceToActor)),
-					function(LUMIX_FUNC(PhysicsScene::applyImpulseToActor)),
-					function(LUMIX_FUNC(PhysicsScene::getActorVelocity))
-				),
-				property("Radius", LUMIX_PROP(PhysicsScene, SphereRadius),
-					MinAttribute(0)),
-				property("Layer", LUMIX_PROP(PhysicsScene, ActorLayer)),
-				enum_property("Dynamic", LUMIX_PROP(PhysicsScene, DynamicType), dynamicTypeDesc),
-				property("Trigger", LUMIX_PROP(PhysicsScene, IsTrigger)) 
-			),
-			component("capsule_rigid_actor",
-				functions(
-					function(LUMIX_FUNC(PhysicsScene::applyForceToActor)),
-					function(LUMIX_FUNC(PhysicsScene::applyImpulseToActor)),
-					function(LUMIX_FUNC(PhysicsScene::getActorVelocity))
-				),
-				property("Radius", LUMIX_PROP(PhysicsScene, CapsuleRadius),
-					MinAttribute(0)),
-				property("Height", LUMIX_PROP(PhysicsScene, CapsuleHeight)),
-				enum_property("Dynamic", LUMIX_PROP(PhysicsScene, DynamicType), dynamicTypeDesc),
-				property("Trigger", LUMIX_PROP(PhysicsScene, IsTrigger))
-			),
 			component("d6_joint",
 				property("Connected body", LUMIX_PROP(PhysicsScene, JointConnectedBody)),
 				property("Axis position", LUMIX_PROP(PhysicsScene, JointAxisPosition)),
@@ -146,28 +122,6 @@ namespace Lumix
 						RadiansAttribute())
 				)
 			),
-			component("box_rigid_actor",
-				functions(
-					function(LUMIX_FUNC(PhysicsScene::applyForceToActor)),
-					function(LUMIX_FUNC(PhysicsScene::applyImpulseToActor)),
-					function(LUMIX_FUNC(PhysicsScene::getActorVelocity))
-				),
-				property("Layer", LUMIX_PROP(PhysicsScene, ActorLayer)),
-				enum_property("Dynamic", LUMIX_PROP(PhysicsScene, DynamicType), dynamicTypeDesc),
-				property("Trigger", LUMIX_PROP(PhysicsScene, IsTrigger)),
-				property("Size", LUMIX_PROP(PhysicsScene, HalfExtents))
-			),
-			component("mesh_rigid_actor",
-				functions(
-					function(LUMIX_FUNC(PhysicsScene::applyForceToActor)),
-					function(LUMIX_FUNC(PhysicsScene::applyImpulseToActor)),
-					function(LUMIX_FUNC(PhysicsScene::getActorVelocity))
-				),
-				property("Layer", LUMIX_PROP(PhysicsScene, ActorLayer)),
-				enum_property("Dynamic", LUMIX_PROP(PhysicsScene, DynamicType), dynamicTypeDesc),
-				property("Source", LUMIX_PROP(PhysicsScene, ShapeSource),
-					ResourceAttribute("Physics (*.phy)", PhysicsGeometry::TYPE))
-			),
 			component("physical_heightfield",
 				property("Layer", LUMIX_PROP(PhysicsScene, HeightfieldLayer)),
 				property("Heightmap", LUMIX_PROP(PhysicsScene, HeightmapSource),
@@ -232,15 +186,24 @@ namespace Lumix
 			m_foundation = PxCreateFoundation(PX_PHYSICS_VERSION, m_physx_allocator, m_error_callback);
 
 			m_physics = PxCreatePhysics(PX_PHYSICS_VERSION, *m_foundation, physx::PxTolerancesScale());
+			LUMIX_FATAL(m_physics);
 
 			physx::PxTolerancesScale scale;
 			m_cooking = PxCreateCooking(PX_PHYSICS_VERSION, *m_foundation, physx::PxCookingParams(scale));
 			connect2VisualDebugger();
+
+
+			if (!PxInitVehicleSDK(*m_physics)) {
+				LUMIX_FATAL(false);
+			}
+			physx::PxVehicleSetBasisVectors(physx::PxVec3(0, 1, 0), physx::PxVec3(0, 0, 1));
+			physx::PxVehicleSetUpdateMode(physx::PxVehicleUpdateMode::eVELOCITY_CHANGE);
 		}
 
 
 		~PhysicsSystemImpl()
 		{
+			physx::PxCloseVehicleSDK();
 			m_cooking->release();
 			m_physics->release();
 			m_foundation->release();

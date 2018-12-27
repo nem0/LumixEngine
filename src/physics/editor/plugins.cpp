@@ -304,36 +304,6 @@ struct GizmoPlugin final : public WorldEditor::Plugin
 	}
 
 
-	static void showBoxActorGizmo(ComponentUID cmp, RenderScene& render_scene)
-	{
-		auto* phy_scene = static_cast<PhysicsScene*>(cmp.scene);
-		Universe& universe = phy_scene->getUniverse();
-
-		const EntityRef entity = (EntityRef)cmp.entity;
-		Vec3 extents = phy_scene->getHalfExtents(entity);
-		RigidTransform tr = universe.getTransform(entity).getRigidPart();
-
-		render_scene.addDebugCube(tr.pos,
-			tr.rot * Vec3(1, 0, 0) * extents.x,
-			tr.rot * Vec3(0, 1, 0) * extents.y,
-			tr.rot * Vec3(0, 0, 1) * extents.z,
-			0xffff0000,
-			0);
-	}
-
-
-	static void showSphereActorGizmo(ComponentUID cmp, RenderScene& render_scene)
-	{
-		auto* phy_scene = static_cast<PhysicsScene*>(cmp.scene);
-		Universe& universe = phy_scene->getUniverse();
-
-		const float radius = phy_scene->getSphereRadius((EntityRef)cmp.entity);
-		const DVec3 pos = universe.getPosition((EntityRef)cmp.entity);
-
-		render_scene.addDebugSphere(pos, radius, 0xffff0000, 0);
-	}
-
-
 	static void showCapsuleActorGizmo(ComponentUID cmp, RenderScene& render_scene)
 	{
 		// TODO
@@ -393,18 +363,6 @@ struct GizmoPlugin final : public WorldEditor::Plugin
 		{
 			physx::PxD6Joint* joint = static_cast<physx::PxD6Joint*>(phy_scene->getJoint(entity));
 			showD6JointGizmo(universe.getTransform(entity).getRigidPart(), *render_scene, joint);
-			return true;
-		}
-
-		if (cmp.type == BOX_ACTOR_TYPE)
-		{
-			showBoxActorGizmo(cmp, *render_scene);
-			return true;
-		}
-
-		if (cmp.type == SPHERE_ACTOR_TYPE)
-		{
-			showSphereActorGizmo(cmp, *render_scene);
 			return true;
 		}
 
@@ -666,9 +624,8 @@ struct PhysicsUIPlugin final : public StudioApp::GUIPlugin
 		if (!count) return;
 		auto* render_scene = static_cast<RenderScene*>(m_editor.getUniverse()->getScene(RENDERER_HASH));
 
-		ImGui::Columns(3);
+		ImGui::Columns(2);
 		ImGui::Text("EntityRef"); ImGui::NextColumn();
-		ImGui::Text("Type"); ImGui::NextColumn();
 		ImGui::Text("Debug visualization"); ImGui::NextColumn();
 		ImGui::Separator();
 		for (int i = 0; i < count; ++i)
@@ -682,30 +639,6 @@ struct PhysicsUIPlugin final : public StudioApp::GUIPlugin
 			getEntityListDisplayName(m_editor, tmp, lengthOf(tmp), cmp.entity);
 			bool selected = false;
 			if (ImGui::Selectable(tmp, &selected)) m_editor.selectEntities(&entity, 1, false);
-			ImGui::NextColumn();
-			auto type = scene->getActorType(i);
-			cmp.entity = scene->getActorEntity(i);
-			cmp.scene = scene;
-			switch (type)
-			{
-				case PhysicsScene::ActorType::BOX:
-					ImGui::Text("%s", "box");
-					cmp.type = BOX_ACTOR_TYPE;
-					GizmoPlugin::showBoxActorGizmo(cmp, *render_scene);
-					break;
-				case PhysicsScene::ActorType::SPHERE:
-					ImGui::Text("%s", "sphere");
-					cmp.type = SPHERE_ACTOR_TYPE;
-					GizmoPlugin::showSphereActorGizmo(cmp, *render_scene);
-					break;
-				case PhysicsScene::ActorType::MESH: ImGui::Text("%s", "mesh"); break;
-				case PhysicsScene::ActorType::CAPSULE: 
-					ImGui::Text("%s", "capsule"); 
-					cmp.type = BOX_ACTOR_TYPE;
-					GizmoPlugin::showCapsuleActorGizmo(cmp, *render_scene);
-					break;
-				default: ImGui::Text("%s", "unknown"); break;
-			}
 			ImGui::NextColumn();
 			bool is_debug_viz = scene->isActorDebugEnabled(i);
 			if (ImGui::Checkbox("", &is_debug_viz))
