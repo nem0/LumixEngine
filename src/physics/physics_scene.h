@@ -57,14 +57,6 @@ public:
 		LIMITED,
 		FREE
 	};
-	enum class ActorType
-	{
-		BOX,
-		MESH,
-		CAPSULE,
-		SPHERE,
-		RIGID
-	};
 	enum class BoneOrientation : int
 	{
 		X,
@@ -103,8 +95,6 @@ public:
 	virtual void setIsTrigger(EntityRef entity, bool is_trigger) = 0;
 	virtual DynamicType getDynamicType(EntityRef entity) = 0;
 	virtual void setDynamicType(EntityRef entity, DynamicType) = 0;
-	virtual Vec3 getHalfExtents(EntityRef entity) = 0;
-	virtual void setHalfExtents(EntityRef entity, const Vec3& size) = 0;
 	virtual Path getShapeSource(EntityRef entity) = 0;
 	virtual void setShapeSource(EntityRef entity, const Path& str) = 0;
 	virtual Path getHeightmapSource(EntityRef entity) = 0;
@@ -122,14 +112,6 @@ public:
 		int h,
 		const u8* data,
 		int bytes_per_pixel) = 0;
-
-	virtual float getCapsuleRadius(EntityRef entity) = 0;
-	virtual void setCapsuleRadius(EntityRef entity, float value) = 0;
-	virtual float getCapsuleHeight(EntityRef entity) = 0;
-	virtual void setCapsuleHeight(EntityRef entity, float value) = 0;
-
-	virtual float getSphereRadius(EntityRef entity) = 0;
-	virtual void setSphereRadius(EntityRef entity, float value) = 0;
 
 	virtual D6Motion getD6JointXMotion(EntityRef entity) = 0;
 	virtual void setD6JointXMotion(EntityRef entity, D6Motion motion) = 0;
@@ -272,7 +254,6 @@ public:
 
 	virtual int getActorCount() const = 0;
 	virtual EntityRef getActorEntity(int index) = 0;
-	virtual ActorType getActorType(int index) = 0;
 	virtual bool isActorDebugEnabled(int index) const = 0;
 	virtual void enableActorDebug(int index, bool enable) const = 0;
 };
