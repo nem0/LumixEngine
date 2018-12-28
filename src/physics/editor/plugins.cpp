@@ -29,10 +29,6 @@ namespace
 
 const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("model_instance");
 const ComponentType RAGDOLL_TYPE = Reflection::getComponentType("ragdoll");
-const ComponentType BOX_ACTOR_TYPE = Reflection::getComponentType("box_rigid_actor");
-const ComponentType SPHERE_ACTOR_TYPE = Reflection::getComponentType("sphere_rigid_actor");
-const ComponentType MESH_ACTOR_TYPE = Reflection::getComponentType("mesh_rigid_actor");
-const ComponentType CAPSULE_ACTOR_TYPE = Reflection::getComponentType("capsule_rigid_actor");
 const ComponentType CONTROLLER_TYPE = Reflection::getComponentType("physical_controller");
 const ComponentType DISTANCE_JOINT_TYPE = Reflection::getComponentType("distance_joint");
 const ComponentType HINGE_JOINT_TYPE = Reflection::getComponentType("hinge_joint");
@@ -304,25 +300,6 @@ struct GizmoPlugin final : public WorldEditor::Plugin
 	}
 
 
-	static void showCapsuleActorGizmo(ComponentUID cmp, RenderScene& render_scene)
-	{
-		// TODO
-		/*auto* phy_scene = static_cast<PhysicsScene*>(cmp.scene);
-		Universe& universe = phy_scene->getUniverse();
-
-		const EntityRef entity = (EntityRef)cmp.entity;
-		float radius = phy_scene->getCapsuleRadius(entity);
-		float height = phy_scene->getCapsuleHeight(entity);
-		const RigidTransform tr = universe.getTransform(entity).getRigidPart();
-		Vec3 physx_capsule_up = mtx.getXVector();
-		mtx.setXVector(mtx.getYVector());
-		mtx.setYVector(physx_capsule_up);
-		Vec3 physx_capsule_center = mtx.getTranslation() - (height * 0.5f + radius) * physx_capsule_up;
-		mtx.setTranslation(physx_capsule_center);
-		render_scene.addDebugCapsule(mtx, height, radius, 0xffff0000, 0);*/
-	}
-
-
 	bool showGizmo(ComponentUID cmp) override
 	{
 		auto* phy_scene = static_cast<PhysicsScene*>(cmp.scene);
@@ -363,12 +340,6 @@ struct GizmoPlugin final : public WorldEditor::Plugin
 		{
 			physx::PxD6Joint* joint = static_cast<physx::PxD6Joint*>(phy_scene->getJoint(entity));
 			showD6JointGizmo(universe.getTransform(entity).getRigidPart(), *render_scene, joint);
-			return true;
-		}
-
-		if (cmp.type == CAPSULE_ACTOR_TYPE)
-		{
-			showCapsuleActorGizmo(cmp, *render_scene);
 			return true;
 		}
 
@@ -1021,14 +992,11 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_app.registerComponent("hinge_joint", "Physics/Joints/Hinge");
 		m_app.registerComponent("spherical_joint", "Physics/Joints/Spherical");
 		m_app.registerComponent("d6_joint", "Physics/Joints/D6");
-		m_app.registerComponent("box_rigid_actor", "Physics/Box");
-		m_app.registerComponent("sphere_rigid_actor", "Physics/Sphere");
-		m_app.registerComponent("capsule_rigid_actor", "Physics/Capsule");
 		m_app.registerComponent("physical_controller", "Physics/Controller");
-		m_app.registerComponentWithResource("mesh_rigid_actor", "Physics/Mesh", PhysicsGeometry::TYPE, *Reflection::getProperty(MESH_ACTOR_TYPE, "Source"));
 		m_app.registerComponent("physical_heightfield", "Physics/Heightfield");
 		m_app.registerComponent("ragdoll", "Physics/Ragdoll");
 		m_app.registerComponent("rigid_actor", "Physics/Rigid actor");
+		m_app.registerComponent("vehicle", "Physics/Vehicle");
 
 		WorldEditor& editor = m_app.getWorldEditor();
 		IAllocator& allocator = editor.getAllocator();

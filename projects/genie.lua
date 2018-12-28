@@ -362,6 +362,7 @@ function linkPhysX()
 			libdirs {"../external/physx/lib/" .. ide_dir .. "/win64/release"}
 
 		configuration {}
+			defines {"PX_PHYSX_CHARACTER_STATIC_LIB"}
 	end
 end
 
