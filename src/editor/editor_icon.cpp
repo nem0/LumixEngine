@@ -16,7 +16,6 @@ namespace Lumix
 
 static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("model_instance");
 static const ComponentType PHYSICAL_CONTROLLER_TYPE = Reflection::getComponentType("physical_controller");
-static const ComponentType BOX_RIGID_ACTOR_TYPE = Reflection::getComponentType("box_rigid_actor");
 static const ComponentType CAMERA_TYPE = Reflection::getComponentType("camera");
 static const ComponentType GLOBAL_LIGHT_TYPE = Reflection::getComponentType("global_light");
 static const ComponentType POINT_LIGHT_TYPE = Reflection::getComponentType("point_light");
@@ -26,7 +25,6 @@ static const ComponentType TERRAIN_TYPE = Reflection::getComponentType("terrain"
 enum class IconType
 {
 	PHYSICAL_CONTROLLER,
-	PHYSICAL_BOX,
 	CAMERA,
 	LIGHT,
 	TERRAIN,
@@ -39,7 +37,6 @@ enum class IconType
 const char* ICONS[(int)IconType::COUNT] =
 {
 	"phy_controller_icon",
-	"phy_box_icon",
 	"camera_icon",
 	"directional_light_icon",
 	"terrain_icon",
@@ -140,11 +137,6 @@ struct EditorIconsImpl final : public EditorIcons
 			if(cmp.type == PHYSICAL_CONTROLLER_TYPE)
 			{
 				icon.type = IconType::PHYSICAL_CONTROLLER;
-				break;
-			}
-			if(cmp.type == BOX_RIGID_ACTOR_TYPE)
-			{
-				icon.type = IconType::PHYSICAL_BOX;
 				break;
 			}
 			if(cmp.type == CAMERA_TYPE)

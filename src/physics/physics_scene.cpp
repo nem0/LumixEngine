@@ -290,12 +290,12 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	class RigidActor
 	{
 	public:
-		RigidActor(PhysicsSceneImpl& _scene)
+		RigidActor(PhysicsSceneImpl& _scene, EntityRef entity)
 			: resource(nullptr)
 			, physx_actor(nullptr)
 			, scene(_scene)
 			, layer(0)
-			, entity(INVALID_ENTITY)
+			, entity(entity)
 			, dynamic_type(DynamicType::STATIC)
 			, is_trigger(false)
 			, scale(1)
@@ -344,6 +344,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		, m_debug_visualization_flags(0)
 		, m_is_updating_ragdoll(false)
 		, m_update_in_progress(nullptr)
+		, m_vehicle_batch_query(nullptr)
 	{
 		setMemory(m_layers_names, 0, sizeof(m_layers_names));
 		for (int i = 0; i < lengthOf(m_layers_names); ++i)
@@ -355,13 +356,13 @@ struct PhysicsSceneImpl final : public PhysicsScene
 			m_collision_filter[i] = 0xffffFFFF;
 		}
 
-#define REGISTER_COMPONENT(TYPE, COMPONENT)      \
-	context.registerComponentType(TYPE,          \
-		this,                                    \
-		&PhysicsSceneImpl::create##COMPONENT,    \
-		&PhysicsSceneImpl::destroy##COMPONENT,   \
-		&PhysicsSceneImpl::serialize##COMPONENT, \
-		&PhysicsSceneImpl::deserialize##COMPONENT);
+		#define REGISTER_COMPONENT(TYPE, COMPONENT)      \
+			context.registerComponentType(TYPE,          \
+				this,                                    \
+				&PhysicsSceneImpl::create##COMPONENT,    \
+				&PhysicsSceneImpl::destroy##COMPONENT,   \
+				&PhysicsSceneImpl::serialize##COMPONENT, \
+				&PhysicsSceneImpl::deserialize##COMPONENT);
 
 
 		REGISTER_COMPONENT(RIGID_ACTOR_TYPE, RigidActor);
@@ -374,12 +375,54 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		REGISTER_COMPONENT(VEHICLE_TYPE, Vehicle);
 		REGISTER_COMPONENT(RAGDOLL_TYPE, Ragdoll);
 
-#undef REGISTER_COMPONENT
+		#undef REGISTER_COMPONENT
+
+		m_vehicle_frictions = createFrictionPairs();
+	}
+
+
+	PxBatchQuery* createVehicleBatchQuery(u8* mem)
+	{
+		const PxU32 maxNumQueriesInBatch = 64;
+		const PxU32 maxNumHitResultsInBatch = 64;
+
+		PxBatchQueryDesc desc(maxNumQueriesInBatch, maxNumQueriesInBatch, 0);
+
+		// TODO
+
+		desc.queryMemory.userRaycastResultBuffer = (PxRaycastQueryResult*)(mem + sizeof(PxRaycastQueryResult) * 64);
+		desc.queryMemory.userRaycastTouchBuffer = (PxRaycastHit*)mem;
+		desc.queryMemory.raycastTouchBufferSize = maxNumHitResultsInBatch;
+
+		m_vehicle_results = desc.queryMemory.userRaycastResultBuffer;
+
+/*		desc.preFilterShader = vehicleSceneQueryData.mPreFilterShader;
+		desc.postFilterShader = vehicleSceneQueryData.mPostFilterShader;*/
+
+		return m_scene->createBatchQuery(desc);
+	}
+
+
+	PxVehicleDrivableSurfaceToTireFrictionPairs* createFrictionPairs() const
+	{
+		PxVehicleDrivableSurfaceType surfaceTypes[1];
+		surfaceTypes[0].mType = 0;
+
+		const PxMaterial* surfaceMaterials[1];
+		surfaceMaterials[0] = m_default_material;
+
+		auto* surfaceTirePairs = PxVehicleDrivableSurfaceToTireFrictionPairs::allocate(1, 1);
+
+		surfaceTirePairs->setup(1, 1, surfaceMaterials, surfaceTypes);
+		surfaceTirePairs->setTypePairFriction(0, 0, 1);
+		return surfaceTirePairs;
 	}
 
 
 	~PhysicsSceneImpl()
 	{
+		m_vehicle_batch_query->release();
+		m_vehicle_frictions->release();
 		m_controller_manager->release();
 		m_default_material->release();
 		m_dummy_actor->release();
@@ -1258,10 +1301,11 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	}
 
 
-	void createVehicle(EntityRef enitity)
+	void createVehicle(EntityRef entity)
 	{
-		ASSERT(false);
-		// TODO
+		m_vehicles.insert(entity, {});
+
+		m_universe.onComponentCreated(entity, VEHICLE_TYPE, this);
 	}
 
 
@@ -1281,9 +1325,8 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	void createRigidActor(EntityRef entity)
 	{
 		if (m_actors.find(entity) >= 0) return;
-		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this);
+		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, entity);
 		m_actors.insert(entity, actor);
-		actor->entity = entity;
 
 		Transform transform = m_universe.getTransform(entity);
 		PxTransform px_transform = toPhysx(transform.getRigidPart());
@@ -1455,6 +1498,11 @@ struct PhysicsSceneImpl final : public PhysicsScene
 			m_universe.setTransform(actor->entity, fromPhysx(trans));
 		}
 		m_update_in_progress = nullptr;
+
+		for (auto iter = m_vehicles.begin(), end = m_vehicles.end(); iter != end; ++iter) {
+			const PxTransform trans = iter.value().actor->getGlobalPose();
+			m_universe.setTransform(iter.key(), fromPhysx(trans));
+		}
 	}
 
 
@@ -2052,11 +2100,29 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	}
 
 
+	void updateVehicles(float time_delta)
+	{
+		PxVehicleWheels* wheels[16];
+		const int count = (int)m_vehicles.size();
+		ASSERT(count <= lengthOf(wheels)); // TODO
+
+		int i = 0;
+		for (auto iter = m_vehicles.begin(), end = m_vehicles.end(); iter != end; ++iter) {
+			wheels[i] = iter.value().drive;
+			++i;
+		}
+		PxRaycastQueryResult query_results[lengthOf(wheels) * 4];
+		PxVehicleSuspensionRaycasts(m_vehicle_batch_query, count, wheels, count * 4, query_results);
+		PxVehicleUpdates(time_delta, m_scene->getGravity(), *m_vehicle_frictions, count, wheels, nullptr);
+	}
+
+
 	void update(float time_delta, bool paused) override
 	{
 		if (!m_is_game_running || paused) return;
 
 		time_delta = Math::minimum(1 / 20.0f, time_delta);
+		updateVehicles(time_delta);
 		simulateScene(time_delta);
 		fetchResults();
 		updateRagdolls();
@@ -2256,17 +2322,10 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	}
 
 
-	static PxRigidDynamic* createVehicleActor(const PxVehicleChassisData& chassisData
-		, PxMaterial** wheelMaterials
-		, PxConvexMesh** wheelConvexMeshes
-		, const PxU32 numWheels
-		, const PxFilterData& wheelSimFilterData
-		, PxMaterial** chassisMaterials
-		, PxConvexMesh** chassisConvexMeshes
-		, const PxU32 numChassisMeshes
-		, const PxFilterData& chassisSimFilterData
-		, PxPhysics& physics)
+	PxRigidDynamic* createVehicleActor(const PxVehicleChassisData& chassisData)
 	{
+		PxPhysics& physics = *m_system->getPhysics();
+		PxCooking& cooking = *m_system->getCooking();
 		//We need a rigid body actor for the vehicle.
 		//Don't forget to add the actor to the scene after setting up the associated vehicle.
 
@@ -2282,29 +2341,68 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		//setupNonDrivableSurface(chassisQryFilterData);
 
 		//Add all the wheel shapes to the actor.
-		for (PxU32 i = 0; i < numWheels; i++)
+		// TODO
+		PxConvexMesh* wheel_mesh = createWheelMesh(1, 1, physics, cooking);
+		for (PxU32 i = 0; i < 4; i++)
 		{
-			PxConvexMeshGeometry geom(wheelConvexMeshes[i]);
-			PxShape* wheelShape = PxRigidActorExt::createExclusiveShape(*vehActor, geom, *wheelMaterials[i]);
+			PxConvexMeshGeometry geom(wheel_mesh);
+			PxShape* wheelShape = PxRigidActorExt::createExclusiveShape(*vehActor, geom, *m_default_material);
 			wheelShape->setQueryFilterData(wheelQryFilterData);
-			wheelShape->setSimulationFilterData(wheelSimFilterData);
+			//wheelShape->setSimulationFilterData(wheelSimFilterData);
 			wheelShape->setLocalPose(PxTransform(PxIdentity));
 		}
 
 		//Add the chassis shapes to the actor.
-		for (PxU32 i = 0; i < numChassisMeshes; i++)
+		/*for (PxU32 i = 0; i < numChassisMeshes; i++)
 		{
 			PxShape* chassisShape = PxRigidActorExt::createExclusiveShape(*vehActor, PxConvexMeshGeometry(chassisConvexMeshes[i]), *chassisMaterials[i]);
 			chassisShape->setQueryFilterData(chassisQryFilterData);
 			chassisShape->setSimulationFilterData(chassisSimFilterData);
 			chassisShape->setLocalPose(PxTransform(PxIdentity));
-		}
+		}*/
 
 		vehActor->setMass(chassisData.mMass);
 		vehActor->setMassSpaceInertiaTensor(chassisData.mMOI);
 		vehActor->setCMassLocalPose(PxTransform(chassisData.mCMOffset, PxQuat(PxIdentity)));
 
 		return vehActor;
+	}
+
+
+	static PxConvexMesh* createConvexMesh(const PxVec3* verts, const PxU32 numVerts, PxPhysics& physics, PxCooking& cooking)
+	{
+		PxConvexMeshDesc convexDesc;
+		convexDesc.points.count = numVerts;
+		convexDesc.points.stride = sizeof(PxVec3);
+		convexDesc.points.data = verts;
+		convexDesc.flags = PxConvexFlag::eCOMPUTE_CONVEX;
+
+		PxConvexMesh* convexMesh = NULL;
+		PxDefaultMemoryOutputStream buf;
+		if (cooking.cookConvexMesh(convexDesc, buf))
+		{
+			PxDefaultMemoryInputData id(buf.getData(), buf.getSize());
+			convexMesh = physics.createConvexMesh(id);
+		}
+
+		return convexMesh;
+	}
+
+
+	static PxConvexMesh* createWheelMesh(const PxF32 width, const PxF32 radius, PxPhysics& physics, PxCooking& cooking)
+	{
+		PxVec3 points[2 * 16];
+		for (PxU32 i = 0; i < 16; i++)
+		{
+			const PxF32 cosTheta = PxCos(i*PxPi*2.0f / 16.0f);
+			const PxF32 sinTheta = PxSin(i*PxPi*2.0f / 16.0f);
+			const PxF32 y = radius * cosTheta;
+			const PxF32 z = radius * sinTheta;
+			points[2 * i + 0] = PxVec3(-width / 2.0f, y, z);
+			points[2 * i + 1] = PxVec3(+width / 2.0f, y, z);
+		}
+
+		return createConvexMesh(points, 32, physics, cooking);
 	}
 
 	void initVehicles()
@@ -2315,32 +2413,25 @@ struct PhysicsSceneImpl final : public PhysicsScene
 
 			PxVehicleWheelsSimData* wheel_sim_data = PxVehicleWheelsSimData::allocate(4);
 			// TODO
-			PxVec3 offsets[4];
-			PxVec3 cm_offsets;
+			PxVec3 offsets[] = {
+				PxVec3(-1, -0.2f, 1),
+				PxVec3(1, -0.2f, 1),
+				PxVec3(-1, -0.2f, -1),
+				PxVec3(1, -0.2f, -1)
+			};
+			PxVec3 cm_offsets = PxVec3(0);
 			setupWheelsSimulationData(1, 1, 1, 1, 4, offsets, cm_offsets, 10, wheel_sim_data);
 
 			PxVehicleDriveSimData4W drive_sim_data;
 			setupDriveSimData(*wheel_sim_data, drive_sim_data);
 
 			PxVehicleChassisData chassis_data;
-			PxMaterial* wheels_materials[] = { m_default_material, m_default_material, m_default_material, m_default_material };
-			PxMaterial* chassis_materials[] = { m_default_material };
-			PxFilterData wheel_sim_filter_data;
-			PxFilterData chassis_sim_filter_data;
-			PxConvexMesh* wheels_meshes[] = { 0 };
-			PxConvexMesh* chassis_meshes[] = { 0 };
+			chassis_data.mMass = 10;
+			chassis_data.mMOI = PxVec3(0, 1, 0);
+			chassis_data.mCMOffset = PxVec3(0, .02f, 0);
 
-			veh.actor = createVehicleActor(chassis_data
-				, wheels_materials 
-				, wheels_meshes
-				, 4
-				, wheel_sim_filter_data
-				, chassis_materials
-				, chassis_meshes
-				, 1
-				, chassis_sim_filter_data
-				, *m_system->getPhysics()
-			);
+			veh.actor = createVehicleActor(chassis_data);
+			m_scene->addActor(*veh.actor);
 
 			veh.drive = PxVehicleDrive4W::allocate(4);
 			veh.drive->setup(m_system->getPhysics(), veh.actor, *wheel_sim_data, drive_sim_data, 0);
@@ -3685,8 +3776,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 
 	void deserializeRigidActor(IDeserializer& serializer, EntityRef entity, int scene_version)
 	{
-		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this);
-		actor->entity = entity;
+		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, entity);
 		serializer.read(&actor->layer);
 		deserializeCommonRigidActorProperties(serializer, actor, scene_version);
 		m_actors.insert(actor->entity, actor);
@@ -3814,9 +3904,9 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		serializer.write((i32)m_actors.size());
 		for (auto* actor : m_actors)
 		{
+			serializer.write(actor->entity);
 			serializer.write(actor->dynamic_type);
 			serializer.write(actor->is_trigger);
-			serializer.write(actor->entity);
 			serializeActor(serializer, actor);
 		}
 		serializer.write((i32)m_controllers.size());
@@ -4372,15 +4462,14 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		i32 count;
 		serializer.read(count);
 		m_actors.reserve(count);
-		for (int i = 0; i < count; ++i)
-		{
-			RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this);
+		for (int i = 0; i < count; ++i) {
+			EntityRef entity;
+			serializer.read(entity);
+			RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, entity);
 			serializer.read(actor->dynamic_type);
 			serializer.read(actor->is_trigger);
-			serializer.read(actor->entity);
 			if (actor->dynamic_type == DynamicType::DYNAMIC) m_dynamic_actors.push(actor);
 			m_actors.insert(actor->entity, actor);
-			EntityRef entity = actor->entity;
 			actor->layer = 0;
 			serializer.read(actor->layer);
 
@@ -4825,6 +4914,9 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	AssociativeArray<EntityRef, Controller> m_controllers;
 	AssociativeArray<EntityRef, Heightfield> m_terrains;
 	HashMap<EntityRef, Vehicle> m_vehicles;
+	PxVehicleDrivableSurfaceToTireFrictionPairs* m_vehicle_frictions;
+	PxBatchQuery* m_vehicle_batch_query;
+	PxRaycastQueryResult* m_vehicle_results;
 
 	Array<RigidActor*> m_dynamic_actors;
 	RigidActor* m_update_in_progress;
@@ -4859,13 +4951,15 @@ PhysicsScene* PhysicsScene::create(PhysicsSystem& system, Universe& context, Eng
 		return nullptr;
 	}
 
-	// impl->m_controller_manager = PxCreateControllerManager(*impl->m_scene);
+	impl->m_controller_manager = PxCreateControllerManager(*impl->m_scene);
 
 	impl->m_system = &system;
 	impl->m_default_material = impl->m_system->getPhysics()->createMaterial(0.5f, 0.5f, 0.1f);
 	PxSphereGeometry geom(1);
 	impl->m_dummy_actor =
 		PxCreateDynamic(impl->m_scene->getPhysics(), PxTransform(PxIdentity), geom, *impl->m_default_material, 1);
+	u8* mem = (u8*)impl->m_allocator.allocate(sizeof(PxRaycastQueryResult) * 64 + sizeof(PxRaycastHit) * 64);
+	impl->m_vehicle_batch_query = impl->createVehicleBatchQuery(mem);
 	return impl;
 }
 
