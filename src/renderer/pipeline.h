@@ -62,7 +62,7 @@ public:
 
 	struct CustomCommandHandler
 	{
-		Delegate<void> callback;
+		Delegate<void ()> callback;
 		char name[30];
 		u32 hash;
 	};

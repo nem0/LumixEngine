@@ -28,8 +28,8 @@ struct LUMIX_EDITOR_API Action
 	bool is_global;
 	void* plugin;
 	ImTextureID icon;
-	Delegate<void> func;
-	Delegate<bool> is_selected;
+	Delegate<void ()> func;
+	Delegate<bool ()> is_selected;
 };
 
 
