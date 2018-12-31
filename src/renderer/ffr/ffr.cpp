@@ -1805,6 +1805,9 @@ bool createProgram(ProgramHandle prog, const char** srcs, const ShaderType* type
 	}
 
 	const GLuint prg = glCreateProgram();
+	if (name && name[0]) {
+		CHECK_GL(glObjectLabel(GL_PROGRAM, prg, stringLength(name), name));
+	}
 
 	for (int i = 0; i < num; ++i) {
 		GLenum shader_type;
