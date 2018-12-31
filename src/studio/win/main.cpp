@@ -6,7 +6,6 @@
 
 INT WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, INT)
 {
-
 	SetProcessDPIAware();
 	HMODULE shcore = LoadLibrary("shcore.dll");
 	if (shcore) {
