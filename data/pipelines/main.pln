@@ -29,6 +29,10 @@ local default_state = {
 	stencil_zpass = STENCIL_REPLACE,
 }
 
+local shadow_state = {
+	define = "DEPTH"
+}
+
 function transparentPass(transparent_set, colorbuffer, dsbuffer)
 	setRenderTargets(colorbuffer, dsbuffer)
 
@@ -120,9 +124,11 @@ function shadowPass()
 	
 	for slice = 0, 3 do 
 		local view_params = getShadowCameraParams(slice, 4096)
+		local shadow_set = prepareCommands(view_params, { { layers = { "default" } } })
+		
 		viewport(slice * 1024, 0, 1024, 1024)
 		beginBlock("slice " .. tostring(slice + 1))
-		--renderMeshes("DEPTH", view_params)
+		renderBucket(shadow_set, shadow_state)
 		endBlock()
 	end
 	endBlock()
@@ -189,7 +195,7 @@ function main()
 	)
 
 	
-	local shadowmap = createRenderbuffer(4096, 1024, false, "depth24", "shadowmap") --shadowPass()
+	local shadowmap = shadowPass()
 	local gbuffer0, gbuffer1, gbuffer2, gbuffer_depth = geomPass(default_set, decal_set, transparent_set)
 	local hdr_buffer = lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap, local_light_set)
 	
