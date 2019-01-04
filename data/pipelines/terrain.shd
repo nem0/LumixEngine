@@ -15,6 +15,11 @@ texture_slot {
 	default_texture = "textures/common/white.tga"
 }
 
+texture_slot {
+	name = "Satellite",
+	default_texture = "textures/common/white.tga"
+}
+
 vertex_shader [[
 	out int v_vid;
 	
@@ -110,6 +115,8 @@ fragment_shader [[
 	in vec2 v_uv;
 	layout(binding=0) uniform sampler2D u_hm;
 	layout(binding=1) uniform sampler2DArray u_albedo;
+	layout(binding=2) uniform sampler2D u_splatmap;
+	layout(binding=3) uniform sampler2D u_satellite;
 	uniform int u_lod;
 
 	vec3 getNormal(vec2 uv)
@@ -127,7 +134,7 @@ fragment_shader [[
 	void getData()
 	{
 		data.normal = getNormal(v_uv);
-		data.albedo = texture(u_albedo, vec3(v_uv, 0));
+		data.albedo = texture(u_satellite, vec3(v_uv, 0).xy);
 		data.wpos = vec3(0);
 		data.roughness = 0.9;
 		data.metallic  = 0;

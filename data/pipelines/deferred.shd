@@ -45,7 +45,7 @@ fragment_shader [[
 			, normal
 			, L
 			, V
-			, u_light_color * u_light_intensity
+			, u_light_color * u_light_intensity * shadow
 			, roughness
 			, metallic);
 		
