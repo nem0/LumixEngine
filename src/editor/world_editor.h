@@ -1,9 +1,6 @@
 #pragma once
 
 #include "engine/lumix.h"
-#include "engine/os.h"
-#include "engine/array.h"
-#include "engine/delegate_list.h"
 #include "engine/universe/component.h"
 #include "engine/vec.h"
 
@@ -18,20 +15,25 @@ struct PropertyBase;
 struct IArrayProperty;
 }
 
+namespace OS { enum class MouseButton; }
+
+template <typename T> class DelegateList;
+template <typename T> class Array;
 class Engine;
 struct EntityGUID;
-class PrefabSystem;
 class Hierarchy;
+struct IAllocator;
 class InputBlob;
 struct IPlugin;
 struct ISerializer;
-class PropertyDescriptorBase;
 class OutputBlob;
 class Path;
 class Pipeline;
-class RenderInterface;
+class PrefabSystem;
+class PropertyDescriptorBase;
 struct Quat;
 struct RayCastModelHit;
+class RenderInterface;
 class Universe;
 struct Viewport;
 

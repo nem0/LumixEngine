@@ -997,6 +997,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_app.registerComponent("ragdoll", "Physics/Ragdoll");
 		m_app.registerComponent("rigid_actor", "Physics/Rigid actor");
 		m_app.registerComponent("vehicle", "Physics/Vehicle");
+		m_app.registerComponent("wheel", "Physics/Wheel");
 
 		WorldEditor& editor = m_app.getWorldEditor();
 		IAllocator& allocator = editor.getAllocator();

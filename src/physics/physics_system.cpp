@@ -24,15 +24,22 @@ namespace Lumix
 			LUMIX_ENUM_VALUE(PhysicsScene::DynamicType::DYNAMIC),
 			LUMIX_ENUM_VALUE(PhysicsScene::DynamicType::STATIC),
 			LUMIX_ENUM_VALUE(PhysicsScene::DynamicType::KINEMATIC)
-		);
+			);
 		registerEnum(dynamicTypeDesc);
 
 		static auto d6MotionNameDesc = enumDesciptor<PhysicsScene::D6Motion>(
 			LUMIX_ENUM_VALUE(PhysicsScene::D6Motion::LOCKED),
 			LUMIX_ENUM_VALUE(PhysicsScene::D6Motion::LIMITED),
 			LUMIX_ENUM_VALUE(PhysicsScene::D6Motion::FREE)
-		);
+			);
 		registerEnum(d6MotionNameDesc);
+		static auto wheelSlotNameDesc = enumDesciptor<PhysicsScene::WheelSlot>(
+			LUMIX_ENUM_VALUE(PhysicsScene::WheelSlot::FRONT_LEFT),
+			LUMIX_ENUM_VALUE(PhysicsScene::WheelSlot::FRONT_RIGHT),
+			LUMIX_ENUM_VALUE(PhysicsScene::WheelSlot::REAR_LEFT),
+			LUMIX_ENUM_VALUE(PhysicsScene::WheelSlot::REAR_RIGHT)
+			);
+		registerEnum(wheelSlotNameDesc);
 
 		static auto phy_scene = scene("physics",
 			functions(
@@ -88,7 +95,7 @@ namespace Lumix
 					MinAttribute(0)),
 				property("Stiffness", LUMIX_PROP(PhysicsScene, HingeJointStiffness),
 					MinAttribute(0)),
-				property("Axis position", LUMIX_PROP(PhysicsScene, JointAxisPosition)), 
+				property("Axis position", LUMIX_PROP(PhysicsScene, JointAxisPosition)),
 				property("Axis direction", LUMIX_PROP(PhysicsScene, JointAxisDirection)),
 				property("Use limit", LUMIX_PROP(PhysicsScene, HingeJointUseLimit)),
 				property("Limit", LUMIX_PROP(PhysicsScene, HingeJointLimit),
@@ -113,14 +120,21 @@ namespace Lumix
 					property("Position offset", LUMIX_PROP(PhysicsScene, BoxGeomOffsetPosition)),
 					property("Rotation offset", LUMIX_PROP(PhysicsScene, BoxGeomOffsetRotation),
 						RadiansAttribute())
-				),
+					),
 				array("Sphere geometry", &PhysicsScene::getBoxGeometryCount, &PhysicsScene::addBoxGeometry, &PhysicsScene::removeBoxGeometry,
 					property("Radius", LUMIX_PROP(PhysicsScene, SphereGeomRadius),
 						MinAttribute(0)),
 					property("Position offset", LUMIX_PROP(PhysicsScene, SphereGeomOffsetPosition)),
 					property("Rotation offset", LUMIX_PROP(PhysicsScene, SphereGeomOffsetRotation),
 						RadiansAttribute())
-				)
+					)
+			),
+			component("wheel",
+				property("Radius", LUMIX_PROP(PhysicsScene, WheelRadius), MinAttribute(0)),
+				property("Width", LUMIX_PROP(PhysicsScene, WheelWidth), MinAttribute(0)),
+				property("Mass", LUMIX_PROP(PhysicsScene, WheelMass), MinAttribute(0)),
+				property("MOI", LUMIX_PROP(PhysicsScene, WheelMOI), MinAttribute(0)),
+				enum_property("Slot", LUMIX_PROP(PhysicsScene, WheelSlot), wheelSlotNameDesc)
 			),
 			component("physical_heightfield",
 				property("Layer", LUMIX_PROP(PhysicsScene, HeightfieldLayer)),

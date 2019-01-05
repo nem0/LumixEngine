@@ -62,6 +62,13 @@ public:
 		X,
 		Y
 	};
+	enum class WheelSlot : int
+	{
+		FRONT_LEFT,
+		FRONT_RIGHT,
+		REAR_LEFT,
+		REAR_RIGHT
+	};
 	enum class DynamicType : int
 	{
 		STATIC,
@@ -239,6 +246,17 @@ public:
 	virtual bool isRagdollBoneKinematic(RagdollBone* bone) = 0;
 	virtual void setRagdollLayer(EntityRef entity, int layer) = 0;
 	virtual int getRagdollLayer(EntityRef entity) = 0;
+
+	virtual float getWheelRadius(EntityRef entity) = 0;
+	virtual void setWheelRadius(EntityRef entity, float r) = 0;
+	virtual float getWheelWidth(EntityRef entity) = 0;
+	virtual void setWheelWidth(EntityRef entity, float w) = 0;
+	virtual float getWheelMass(EntityRef entity) = 0;
+	virtual void setWheelMass(EntityRef entity, float w) = 0;
+	virtual float getWheelMOI(EntityRef entity) = 0;
+	virtual void setWheelMOI(EntityRef entity, float moi) = 0;
+	virtual WheelSlot getWheelSlot(EntityRef entity) = 0;
+	virtual void setWheelSlot(EntityRef entity, WheelSlot s) = 0;
 
 	virtual const char* getCollisionLayerName(int index) = 0;
 	virtual void setCollisionLayerName(int index, const char* name) = 0;
