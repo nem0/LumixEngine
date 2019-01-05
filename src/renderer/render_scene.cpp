@@ -680,15 +680,6 @@ public:
 
 		serialize.write("source", r.model ? r.model->getPath().c_str() : "");
 		serialize.write("flags", u8(r.flags.base));
-		bool has_changed_materials = r.model && r.model->isReady() && r.meshes != &r.model->getMesh(0);
-		serialize.write("custom_materials", has_changed_materials ? r.mesh_count : 0);
-		if (has_changed_materials)
-		{
-			for (int i = 0; i < r.mesh_count; ++i)
-			{
-				serialize.write("", r.meshes[i].material->getPath().c_str());
-			}
-		}
 	}
 
 

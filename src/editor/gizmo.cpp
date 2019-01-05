@@ -1,6 +1,7 @@
 #include "editor/gizmo.h"
 #include "engine/math_utils.h"
 #include "engine/matrix.h"
+#include "engine/os.h"
 #include "engine/quat.h"
 #include "engine/universe/universe.h"
 #include "engine/viewport.h"

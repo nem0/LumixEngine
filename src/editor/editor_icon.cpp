@@ -1,6 +1,7 @@
 #include "editor_icon.h"
 #include "engine/math_utils.h"
 #include "engine/matrix.h"
+#include "engine/os.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/universe/universe.h"

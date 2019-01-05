@@ -40,6 +40,7 @@ static const ComponentType HINGE_JOINT_TYPE = Reflection::getComponentType("hing
 static const ComponentType SPHERICAL_JOINT_TYPE = Reflection::getComponentType("spherical_joint");
 static const ComponentType D6_JOINT_TYPE = Reflection::getComponentType("d6_joint");
 static const ComponentType VEHICLE_TYPE = Reflection::getComponentType("vehicle");
+static const ComponentType WHEEL_TYPE = Reflection::getComponentType("wheel");
 static const u32 RENDERER_HASH = crc32("renderer");
 
 
@@ -190,7 +191,24 @@ struct Vehicle
 {
 	PxRigidDynamic* actor = nullptr;
 	PxVehicleDrive4W* drive = nullptr;
+	float chassis_mass = 10;
 };
+
+
+struct Wheel
+{
+	float mass = 1;
+	float radius = 1;
+	float width = 0.2f;
+	float moi = 1;
+	PhysicsScene::WheelSlot slot = PhysicsScene::WheelSlot::FRONT_LEFT;
+	
+	static_assert((int)PhysicsScene::WheelSlot::FRONT_LEFT == PxVehicleDrive4WWheelOrder::eFRONT_LEFT);
+	static_assert((int)PhysicsScene::WheelSlot::FRONT_RIGHT == PxVehicleDrive4WWheelOrder::eFRONT_RIGHT);
+	static_assert((int)PhysicsScene::WheelSlot::REAR_LEFT == PxVehicleDrive4WWheelOrder::eREAR_LEFT);
+	static_assert((int)PhysicsScene::WheelSlot::REAR_RIGHT == PxVehicleDrive4WWheelOrder::eREAR_RIGHT);
+};
+
 
 struct Heightfield
 {
@@ -332,6 +350,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		, m_actors(m_allocator)
 		, m_ragdolls(m_allocator)
 		, m_vehicles(m_allocator)
+		, m_wheels(m_allocator)
 		, m_terrains(m_allocator)
 		, m_dynamic_actors(m_allocator)
 		, m_universe(context)
@@ -373,6 +392,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		REGISTER_COMPONENT(SPHERICAL_JOINT_TYPE, SphericalJoint);
 		REGISTER_COMPONENT(D6_JOINT_TYPE, D6Joint);
 		REGISTER_COMPONENT(VEHICLE_TYPE, Vehicle);
+		REGISTER_COMPONENT(WHEEL_TYPE, Wheel);
 		REGISTER_COMPONENT(RAGDOLL_TYPE, Ragdoll);
 
 		#undef REGISTER_COMPONENT
@@ -448,6 +468,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		m_ragdolls.clear();
 
 		m_vehicles.clear();
+		m_wheels.clear();
 
 		for (auto& joint : m_joints)
 		{
@@ -622,6 +643,23 @@ struct PhysicsSceneImpl final : public PhysicsScene
 
 	int getActorLayer(EntityRef entity) override { return m_actors[entity]->layer; }
 
+	float getWheelMOI(EntityRef entity) override { return m_wheels[entity].moi; }
+	void setWheelMOI(EntityRef entity, float moi) override { m_wheels[entity].moi = moi; }
+	WheelSlot getWheelSlot(EntityRef entity) override { return m_wheels[entity].slot; }
+	void setWheelSlot(EntityRef entity, WheelSlot s) override { m_wheels[entity].slot = s; }
+	float getWheelRadius(EntityRef entity) override { return m_wheels[entity].radius; }
+	void setWheelRadius(EntityRef entity, float r) override { m_wheels[entity].radius = r; rebuildWheel(entity); }
+	float getWheelWidth(EntityRef entity) override { return m_wheels[entity].width; }
+	void setWheelWidth(EntityRef entity, float w) override { m_wheels[entity].width = w; rebuildWheel(entity); }
+	float getWheelMass(EntityRef entity) override { return m_wheels[entity].mass; }
+	void setWheelMass(EntityRef entity, float m) override { m_wheels[entity].mass = m; rebuildWheel(entity); }
+
+	void rebuildWheel(EntityRef entity)
+	{
+		if (!m_is_game_running) return;
+		// TODO
+		ASSERT(false);
+	}
 
 	int getHeightfieldLayer(EntityRef entity) override { return m_terrains[entity].m_layer; }
 
@@ -1110,6 +1148,13 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	}
 
 
+	void destroyWheel(EntityRef entity)
+	{
+		ASSERT(false);
+		// TODO
+	}
+
+
 	void destroyVehicle(EntityRef entity) 
 	{
 		ASSERT(false);
@@ -1298,6 +1343,13 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		}
 
 		m_universe.onComponentCreated(entity, CONTROLLER_TYPE, this);
+	}
+
+	void createWheel(EntityRef entity)
+	{
+		m_wheels.insert(entity, {});
+
+		m_universe.onComponentCreated(entity, WHEEL_TYPE, this);
 	}
 
 
@@ -2162,27 +2214,44 @@ struct PhysicsSceneImpl final : public PhysicsScene
 
 
 	// from physx docs
-	static void setupWheelsSimulationData(const PxF32 wheelMass, const PxF32 wheelMOI,
-		const PxF32 wheelRadius, const PxF32 wheelWidth, const PxU32 numWheels,
-		const PxVec3* wheelCenterActorOffsets, const PxVec3& chassisCMOffset,
-		const PxF32 chassisMass, PxVehicleWheelsSimData* wheelsSimData)
+	PxVehicleWheelsSimData* setupWheelsSimulationData(EntityRef entity) const
 	{
-		//Set up the wheels.
+		EntityPtr wheels_entities[4] = { INVALID_ENTITY, INVALID_ENTITY, INVALID_ENTITY, INVALID_ENTITY };
+
+		u8 mask = 0;
+		for (EntityPtr e = m_universe.getFirstChild(entity); e.isValid(); e = m_universe.getNextSibling((EntityRef)e)) {
+			if (m_universe.hasComponent((EntityRef)e, WHEEL_TYPE)) {
+				Wheel& w = m_wheels[(EntityRef)e];
+				wheels_entities[(int)w.slot] = e;
+				mask |= 1 << (int)w.slot;
+			}
+		}
+		if (mask != (1 | 2 | 4 | 8)) {
+			g_log_error.log("Physics") << "Vehicle " << entity.index << " does not have exactly one wheel in each slot.";
+			return nullptr;
+		}
+
+		PxVec3 offsets[4];
+		const Transform& chassis_tr = m_universe.getTransform(entity);
+		for (int i = 0; i < 4; ++i) {
+			const EntityRef wheel = (EntityRef)wheels_entities[i];
+			const Transform& wheel_tr = m_universe.getTransform(wheel);
+			offsets[i] = toPhysx((chassis_tr.inverted() * wheel_tr).pos);
+		}
+
 		PxVehicleWheelData wheels[PX_MAX_NB_WHEELS];
 		{
-			//Set up the wheel data structures with mass, moi, radius, width.
-			for (PxU32 i = 0; i < numWheels; i++)
-			{
-				wheels[i].mMass = wheelMass;
-				wheels[i].mMOI = wheelMOI;
-				wheels[i].mRadius = wheelRadius;
-				wheels[i].mWidth = wheelWidth;
+			for (int i = 0; i < 4; i++) {
+				const EntityRef e = (EntityRef)wheels_entities[i];
+				Wheel& wheel = m_wheels[e];
+				wheels[(int)wheel.slot].mMass = wheel.mass;
+				wheels[(int)wheel.slot].mMOI = wheel.moi;
+				wheels[(int)wheel.slot].mRadius = wheel.radius;
+				wheels[(int)wheel.slot].mWidth = wheel.width;
 			}
 
-			//Enable the handbrake for the rear wheels only.
 			wheels[PxVehicleDrive4WWheelOrder::eREAR_LEFT].mMaxHandBrakeTorque = 4000.0f;
 			wheels[PxVehicleDrive4WWheelOrder::eREAR_RIGHT].mMaxHandBrakeTorque = 4000.0f;
-			//Enable steering for the front wheels only.
 			wheels[PxVehicleDrive4WWheelOrder::eFRONT_LEFT].mMaxSteer = PxPi * 0.3333f;
 			wheels[PxVehicleDrive4WWheelOrder::eFRONT_RIGHT].mMaxSteer = PxPi * 0.3333f;
 		}
@@ -2191,7 +2260,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		PxVehicleTireData tires[PX_MAX_NB_WHEELS];
 		{
 			//Set up the tires.
-			for (PxU32 i = 0; i < numWheels; i++)
+			for (PxU32 i = 0; i < 4; i++)
 			{
 				// TODO
 				// tires[i].mType = TIRE_TYPE_NORMAL;
@@ -2201,15 +2270,11 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		//Set up the suspensions
 		PxVehicleSuspensionData suspensions[PX_MAX_NB_WHEELS];
 		{
-			//Compute the mass supported by each suspension spring.
 			PxF32 suspSprungMasses[PX_MAX_NB_WHEELS];
-			PxVehicleComputeSprungMasses
-			(numWheels, wheelCenterActorOffsets,
-				chassisCMOffset, chassisMass, 1, suspSprungMasses);
+			const float chassis_mass = m_vehicles[entity].chassis_mass;
+			PxVehicleComputeSprungMasses(4, offsets, PxVec3(0), chassis_mass, 1, suspSprungMasses);
 
-			//Set the suspension data.
-			for (PxU32 i = 0; i < numWheels; i++)
-			{
+			for (PxU32 i = 0; i < 4; i++) {
 				suspensions[i].mMaxCompression = 0.3f;
 				suspensions[i].mMaxDroop = 0.1f;
 				suspensions[i].mSpringStrength = 35000.0f;
@@ -2217,12 +2282,10 @@ struct PhysicsSceneImpl final : public PhysicsScene
 				suspensions[i].mSprungMass = suspSprungMasses[i];
 			}
 
-			//Set the camber angles.
 			const PxF32 camberAngleAtRest = 0.0;
 			const PxF32 camberAngleAtMaxDroop = 0.01f;
 			const PxF32 camberAngleAtMaxCompression = -0.01f;
-			for (PxU32 i = 0; i < numWheels; i += 2)
-			{
+			for (PxU32 i = 0; i < 4; i += 2) {
 				suspensions[i + 0].mCamberAtRest = camberAngleAtRest;
 				suspensions[i + 1].mCamberAtRest = -camberAngleAtRest;
 				suspensions[i + 0].mCamberAtMaxDroop = camberAngleAtMaxDroop;
@@ -2232,54 +2295,37 @@ struct PhysicsSceneImpl final : public PhysicsScene
 			}
 		}
 
-		//Set up the wheel geometry.
 		PxVec3 suspTravelDirections[PX_MAX_NB_WHEELS];
 		PxVec3 wheelCentreCMOffsets[PX_MAX_NB_WHEELS];
 		PxVec3 suspForceAppCMOffsets[PX_MAX_NB_WHEELS];
 		PxVec3 tireForceAppCMOffsets[PX_MAX_NB_WHEELS];
 		{
-			//Set the geometry data.
-			for (PxU32 i = 0; i < numWheels; i++)
-			{
-				//Vertical suspension travel.
+			for (PxU32 i = 0; i < 4; i++) {
 				suspTravelDirections[i] = PxVec3(0, -1, 0);
-
-				//Wheel center offset is offset from rigid body center of mass.
-				wheelCentreCMOffsets[i] =
-					wheelCenterActorOffsets[i] - chassisCMOffset;
-
-				//Suspension force application point 0.3 metres below
-				//rigid body center of mass.
-				suspForceAppCMOffsets[i] =
-					PxVec3(wheelCentreCMOffsets[i].x, -0.3f, wheelCentreCMOffsets[i].z);
-
-				//Tire force application point 0.3 metres below
-				//rigid body center of mass.
-				tireForceAppCMOffsets[i] =
-					PxVec3(wheelCentreCMOffsets[i].x, -0.3f, wheelCentreCMOffsets[i].z);
+				wheelCentreCMOffsets[i] = offsets[i];
+				suspForceAppCMOffsets[i] = PxVec3(wheelCentreCMOffsets[i].x, -0.3f, wheelCentreCMOffsets[i].z);
+				tireForceAppCMOffsets[i] = PxVec3(wheelCentreCMOffsets[i].x, -0.3f, wheelCentreCMOffsets[i].z);
 			}
 		}
 
-		//Set up the filter data of the raycast that will be issued by each suspension.
 		PxFilterData qryFilterData;
 		// TODO
 		// setupNonDrivableSurface(qryFilterData);
 
-		//Set the wheel, tire and suspension data.
-		//Set the geometry data.
-		//Set the query filter data
-		for (PxU32 i = 0; i < numWheels; i++)
-		{
-			wheelsSimData->setWheelData(i, wheels[i]);
-			wheelsSimData->setTireData(i, tires[i]);
-			wheelsSimData->setSuspensionData(i, suspensions[i]);
-			wheelsSimData->setSuspTravelDirection(i, suspTravelDirections[i]);
-			wheelsSimData->setWheelCentreOffset(i, wheelCentreCMOffsets[i]);
-			wheelsSimData->setSuspForceAppPointOffset(i, suspForceAppCMOffsets[i]);
-			wheelsSimData->setTireForceAppPointOffset(i, tireForceAppCMOffsets[i]);
-			wheelsSimData->setSceneQueryFilterData(i, qryFilterData);
-			wheelsSimData->setWheelShapeMapping(i, i);
+		PxVehicleWheelsSimData* wheel_sim_data = PxVehicleWheelsSimData::allocate(4);
+		for (PxU32 i = 0; i < 4; i++) {
+			wheel_sim_data->setWheelData(i, wheels[i]);
+			wheel_sim_data->setTireData(i, tires[i]);
+			wheel_sim_data->setSuspensionData(i, suspensions[i]);
+			wheel_sim_data->setSuspTravelDirection(i, suspTravelDirections[i]);
+			wheel_sim_data->setWheelCentreOffset(i, wheelCentreCMOffsets[i]);
+			wheel_sim_data->setSuspForceAppPointOffset(i, suspForceAppCMOffsets[i]);
+			wheel_sim_data->setTireForceAppPointOffset(i, tireForceAppCMOffsets[i]);
+			wheel_sim_data->setSceneQueryFilterData(i, qryFilterData);
+			wheel_sim_data->setWheelShapeMapping(i, i);
 		}
+
+		return wheel_sim_data;
 	}
 
 
@@ -2324,30 +2370,22 @@ struct PhysicsSceneImpl final : public PhysicsScene
 
 	PxRigidDynamic* createVehicleActor(const PxVehicleChassisData& chassisData)
 	{
+		// TODO
 		PxPhysics& physics = *m_system->getPhysics();
 		PxCooking& cooking = *m_system->getCooking();
-		//We need a rigid body actor for the vehicle.
-		//Don't forget to add the actor to the scene after setting up the associated vehicle.
 
-		PxRigidDynamic* vehActor = physics.createRigidDynamic(PxTransform(PxIdentity));
+		PxRigidDynamic* actor = physics.createRigidDynamic(PxTransform(PxIdentity));
 
-		//Wheel and chassis query filter data.
-		//Optional: cars don't drive on other cars.
-		PxFilterData wheelQryFilterData;
-		// TODO
+		//PxFilterData wheelQryFilterData;
 		//setupNonDrivableSurface(wheelQryFilterData);
-		PxFilterData chassisQryFilterData;
-		// TODO
+		//PxFilterData chassisQryFilterData;
 		//setupNonDrivableSurface(chassisQryFilterData);
 
-		//Add all the wheel shapes to the actor.
-		// TODO
 		PxConvexMesh* wheel_mesh = createWheelMesh(1, 1, physics, cooking);
-		for (PxU32 i = 0; i < 4; i++)
-		{
+		for (int i = 0; i < 4; i++) {
 			PxConvexMeshGeometry geom(wheel_mesh);
-			PxShape* wheelShape = PxRigidActorExt::createExclusiveShape(*vehActor, geom, *m_default_material);
-			wheelShape->setQueryFilterData(wheelQryFilterData);
+			PxShape* wheelShape = PxRigidActorExt::createExclusiveShape(*actor, geom, *m_default_material);
+			//wheelShape->setQueryFilterData(wheelQryFilterData);
 			//wheelShape->setSimulationFilterData(wheelSimFilterData);
 			wheelShape->setLocalPose(PxTransform(PxIdentity));
 		}
@@ -2361,11 +2399,11 @@ struct PhysicsSceneImpl final : public PhysicsScene
 			chassisShape->setLocalPose(PxTransform(PxIdentity));
 		}*/
 
-		vehActor->setMass(chassisData.mMass);
-		vehActor->setMassSpaceInertiaTensor(chassisData.mMOI);
-		vehActor->setCMassLocalPose(PxTransform(chassisData.mCMOffset, PxQuat(PxIdentity)));
+		actor->setMass(chassisData.mMass);
+		actor->setMassSpaceInertiaTensor(chassisData.mMOI);
+		actor->setCMassLocalPose(PxTransform(chassisData.mCMOffset, PxQuat(PxIdentity)));
 
-		return vehActor;
+		return actor;
 	}
 
 
@@ -2411,22 +2449,17 @@ struct PhysicsSceneImpl final : public PhysicsScene
 			const EntityRef entity = iter.key();
 			Vehicle& veh = iter.value();
 
-			PxVehicleWheelsSimData* wheel_sim_data = PxVehicleWheelsSimData::allocate(4);
-			// TODO
-			PxVec3 offsets[] = {
-				PxVec3(-1, -0.2f, 1),
-				PxVec3(1, -0.2f, 1),
-				PxVec3(-1, -0.2f, -1),
-				PxVec3(1, -0.2f, -1)
-			};
-			PxVec3 cm_offsets = PxVec3(0);
-			setupWheelsSimulationData(1, 1, 1, 1, 4, offsets, cm_offsets, 10, wheel_sim_data);
+			PxVehicleWheelsSimData* wheel_sim_data = setupWheelsSimulationData(entity);
+			if (!wheel_sim_data) {
+				g_log_error.log("Physics") << "Failed to init vehicle " << entity.index;
+				continue;
+			}
 
 			PxVehicleDriveSimData4W drive_sim_data;
 			setupDriveSimData(*wheel_sim_data, drive_sim_data);
 
 			PxVehicleChassisData chassis_data;
-			chassis_data.mMass = 10;
+			chassis_data.mMass = veh.chassis_mass;
 			chassis_data.mMOI = PxVec3(0, 1, 0);
 			chassis_data.mCMOffset = PxVec3(0, .02f, 0);
 
@@ -3395,17 +3428,46 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	}
 
 
-	void serializeVehicle(ISerializer& serialzier, EntityRef entity)
+	void serializeWheel(ISerializer& serializer, EntityRef entity)
 	{
-		ASSERT(false);
-		// TODO
+		const Wheel& wheel = m_wheels[entity];
+		serializer.write("mass", wheel.mass);
+		serializer.write("radius", wheel.radius);
+		serializer.write("mass", wheel.width);
+		serializer.write("moi", wheel.moi);
+		serializer.write("slot", (u8)wheel.slot);
 	}
 
 
-	void deserializeVehicle(IDeserializer& serialzier, EntityRef entity, int /*scene_version*/)
+	void deserializeWheel(IDeserializer& serializer, EntityRef entity, int /*scene_version*/)
 	{
-		ASSERT(false);
-		// TODO
+		m_wheels.insert(entity, {});
+		Wheel& wheel = m_wheels[entity];
+		serializer.read(&wheel.mass);
+		serializer.read(&wheel.radius);
+		serializer.read(&wheel.width);
+		serializer.read(&wheel.moi);
+		serializer.read((u8*)&wheel.slot);
+
+		m_universe.onComponentCreated(entity, WHEEL_TYPE, this);
+	}
+
+
+	void serializeVehicle(ISerializer& serializer, EntityRef entity)
+	{
+		const Vehicle& veh = m_vehicles[entity];
+		serializer.write("mass", veh.chassis_mass);
+	}
+
+
+	void deserializeVehicle(IDeserializer& serializer, EntityRef entity, int /*scene_version*/)
+	{
+		m_vehicles.insert(entity, {});
+		Vehicle& veh = m_vehicles[entity];
+		
+		serializer.read(&veh.chassis_mass);
+
+		m_universe.onComponentCreated(entity, VEHICLE_TYPE, this);
 	}
 
 
@@ -4914,6 +4976,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	AssociativeArray<EntityRef, Controller> m_controllers;
 	AssociativeArray<EntityRef, Heightfield> m_terrains;
 	HashMap<EntityRef, Vehicle> m_vehicles;
+	HashMap<EntityRef, Wheel> m_wheels;
 	PxVehicleDrivableSurfaceToTireFrictionPairs* m_vehicle_frictions;
 	PxBatchQuery* m_vehicle_batch_query;
 	PxRaycastQueryResult* m_vehicle_results;

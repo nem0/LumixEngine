@@ -1,6 +1,7 @@
 #pragma once
 
 
+#include "engine/array.h"
 #include "engine/binary_array.h"
 #include "engine/vec.h"
 #include "editor/world_editor.h"
