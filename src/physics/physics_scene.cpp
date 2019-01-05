@@ -2160,8 +2160,10 @@ struct PhysicsSceneImpl final : public PhysicsScene
 
 		int i = 0;
 		for (auto iter = m_vehicles.begin(), end = m_vehicles.end(); iter != end; ++iter) {
-			wheels[i] = iter.value().drive;
-			++i;
+			if (iter.value().drive) {
+				wheels[i] = iter.value().drive;
+				++i;
+			}
 		}
 		PxRaycastQueryResult query_results[lengthOf(wheels) * 4];
 		PxVehicleSuspensionRaycasts(m_vehicle_batch_query, count, wheels, count * 4, query_results);
@@ -2226,7 +2228,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 				mask |= 1 << (int)w.slot;
 			}
 		}
-		if (mask != (1 | 2 | 4 | 8)) {
+		if (mask != 0b1111) {
 			g_log_error.log("Physics") << "Vehicle " << entity.index << " does not have exactly one wheel in each slot.";
 			return nullptr;
 		}
@@ -3028,7 +3030,8 @@ struct PhysicsSceneImpl final : public PhysicsScene
 
 	void moveShapeIndices(EntityRef entity, int index, PxGeometryType::Enum type)
 	{
-		int count = getGeometryCount(entity, type);
+		PxRigidActor* actor = m_actors[entity]->physx_actor;
+		int count = getGeometryCount(actor, type);
 		for (int i = index; i < count; ++i)
 		{
 			PxShape* shape = getShape(entity, i, type);
@@ -3046,19 +3049,19 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		geom.halfExtents.x = 1;
 		geom.halfExtents.y = 1;
 		geom.halfExtents.z = 1;
-		PxShape* shape = m_system->getPhysics()->createShape(geom, *m_default_material);
-		actor->attachShape(*shape);
+		PxShape* shape = PxRigidActorExt::createExclusiveShape(*actor, geom, *m_default_material);
 		shape->userData = (void*)(intptr_t)index;
 	}
 
 
 	void removeGeometry(EntityRef entity, int index, PxGeometryType::Enum type)
 	{
-		int count = getGeometryCount(entity, type);
+		PxRigidActor* actor = m_actors[entity]->physx_actor;
+		int count = getGeometryCount(actor, type);
 		PxShape* shape = getShape(entity, index, type);
-		shape->getActor()->detachShape(*shape);
+		actor->detachShape(*shape);
 
-		for (int i = index + 1; i < count; ++i)
+		for (int i = index; i < count - 1; ++i)
 		{
 			PxShape* shape = getShape(entity, i, type);
 			shape->userData = (void*)(intptr_t)(i - 1);
@@ -3170,9 +3173,8 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	}
 
 
-	int getGeometryCount(EntityRef entity, PxGeometryType::Enum type)
+	int getGeometryCount(PxRigidActor* actor, PxGeometryType::Enum type)
 	{
-		PxRigidActor* actor = m_actors[entity]->physx_actor;
 		int shape_count = actor->getNbShapes();
 		PxShape* shape;
 		int count = 0;
@@ -3185,7 +3187,11 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	}
 
 
-	int getBoxGeometryCount(EntityRef entity) override { return getGeometryCount(entity, PxGeometryType::eBOX); }
+	int getBoxGeometryCount(EntityRef entity) override 
+	{ 
+		PxRigidActor* actor = m_actors[entity]->physx_actor;
+		return getGeometryCount(actor, PxGeometryType::eBOX);
+	}
 
 
 	void addSphereGeometry(EntityRef entity, int index) override
@@ -3195,8 +3201,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		PxRigidActor* actor = m_actors[entity]->physx_actor;
 		PxSphereGeometry geom;
 		geom.radius = 1;
-		PxShape* shape = m_system->getPhysics()->createShape(geom, *m_default_material);
-		actor->attachShape(*shape);
+		PxShape* shape = PxRigidActorExt::createExclusiveShape(*actor, geom, *m_default_material);
 		shape->userData = (void*)(intptr_t)index;
 	}
 
@@ -3207,7 +3212,11 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	}
 
 
-	int getSphereGeometryCount(EntityRef entity) override { return getGeometryCount(entity, PxGeometryType::eSPHERE); }
+	int getSphereGeometryCount(EntityRef entity) override 
+	{ 
+		PxRigidActor* actor = m_actors[entity]->physx_actor;
+		return getGeometryCount(actor, PxGeometryType::eSPHERE);
+	}
 
 
 	float getSphereGeomRadius(EntityRef entity, int index) override
@@ -3298,27 +3307,24 @@ struct PhysicsSceneImpl final : public PhysicsScene
 			{
 				PxBoxGeometry geom;
 				shape->getBoxGeometry(geom);
-				new_shape = m_system->getPhysics()->createShape(geom, *m_default_material);
+				new_shape = PxRigidActorExt::createExclusiveShape(*actor, geom, *m_default_material);
 				new_shape->setLocalPose(shape->getLocalPose());
-				actor->attachShape(*new_shape);
 				break;
 			}
 			case PxGeometryType::eSPHERE:
 			{
 				PxSphereGeometry geom;
 				shape->getSphereGeometry(geom);
-				new_shape = m_system->getPhysics()->createShape(geom, *m_default_material);
+				new_shape = PxRigidActorExt::createExclusiveShape(*actor, geom, *m_default_material);
 				new_shape->setLocalPose(shape->getLocalPose());
-				actor->attachShape(*new_shape);
 				break;
 			}
 			case PxGeometryType::eCONVEXMESH:
 			{
 				PxConvexMeshGeometry geom;
 				shape->getConvexMeshGeometry(geom);
-				new_shape = m_system->getPhysics()->createShape(geom, *m_default_material);
+				new_shape = PxRigidActorExt::createExclusiveShape(*actor, geom, *m_default_material);
 				new_shape->setLocalPose(shape->getLocalPose());
-				actor->attachShape(*new_shape);
 				break;
 			}
 			default: ASSERT(false); return;
@@ -3875,18 +3881,17 @@ struct PhysicsSceneImpl final : public PhysicsScene
 					serializer.read(&geom.halfExtents.x);
 					serializer.read(&geom.halfExtents.y);
 					serializer.read(&geom.halfExtents.z);
-					shape = m_system->getPhysics()->createShape(geom, *m_default_material);
+
+					shape = PxRigidActorExt::createExclusiveShape(*physx_actor, geom, *m_default_material);
 					shape->setLocalPose(local_pos);
-					physx_actor->attachShape(*shape);
 				}
 				break;
 				case PxGeometryType::eSPHERE:
 				{
 					PxSphereGeometry geom;
 					serializer.read(&geom.radius);
-					shape = m_system->getPhysics()->createShape(geom, *m_default_material);
+					shape = PxRigidActorExt::createExclusiveShape(*physx_actor, geom, *m_default_material);
 					shape->setLocalPose(local_pos);
-					physx_actor->attachShape(*shape);
 				}
 				break;
 				default: ASSERT(false); break;
@@ -4452,8 +4457,22 @@ struct PhysicsSceneImpl final : public PhysicsScene
 
 	void serializeVehicles(OutputBlob& serializer)
 	{
-		ASSERT(false);
-		// TODO
+		serializer.write(m_vehicles.size());
+		for (auto iter = m_vehicles.begin(), end = m_vehicles.end(); iter != end; ++iter) {
+			serializer.write(iter.key());
+			serializer.write(iter.value().chassis_mass);
+		}
+
+		serializer.write(m_wheels.size());
+		for (auto iter = m_wheels.begin(), end = m_wheels.end(); iter != end; ++iter) {
+			serializer.write(iter.key());
+			const Wheel& w = iter.value();
+			serializer.write(w.slot);
+			serializer.write(w.radius);
+			serializer.write(w.width);
+			serializer.write(w.mass);
+			serializer.write(w.moi);
+		}
 	}
 
 
@@ -4554,18 +4573,17 @@ struct PhysicsSceneImpl final : public PhysicsScene
 					serializer.read(box_geom.halfExtents.x);
 					serializer.read(box_geom.halfExtents.y);
 					serializer.read(box_geom.halfExtents.z);
-					shape = m_system->getPhysics()->createShape(box_geom, *m_default_material);
+
+					shape = PxRigidActorExt::createExclusiveShape(*physx_actor, box_geom, *m_default_material);
 					shape->setLocalPose(tr);
-					physx_actor->attachShape(*shape);
 				}
 				break;
 				case PxGeometryType::eSPHERE:
 				{
 					PxSphereGeometry geom;
 					serializer.read(geom.radius);
-					shape = m_system->getPhysics()->createShape(geom, *m_default_material);
+					shape = PxRigidActorExt::createExclusiveShape(*physx_actor, geom, *m_default_material);
 					shape->setLocalPose(tr);
-					physx_actor->attachShape(*shape);
 				}
 				break;
 				default: ASSERT(false); break;
@@ -4622,8 +4640,27 @@ struct PhysicsSceneImpl final : public PhysicsScene
 
 	void deserializeVehicles(InputBlob& serializer)
 	{
-		ASSERT(false);
-		// TODO
+		const int vehicles_count = serializer.read<int>();
+		m_vehicles.rehash(vehicles_count);
+		for (int i = 0; i < vehicles_count; ++i) {
+			const EntityRef e = serializer.read<EntityRef>();
+			Vehicle& v = m_vehicles.insert(e, {});
+			serializer.read(v.chassis_mass);
+			m_universe.onComponentCreated(e, VEHICLE_TYPE, this);
+		}
+
+		const int wheels_count = serializer.read<int>();
+		m_wheels.rehash(wheels_count);
+		for (int i = 0; i < wheels_count; ++i) {
+			const EntityRef e = serializer.read<EntityRef>();
+			Wheel& w = m_wheels.insert(e, {});
+			serializer.read(w.slot);
+			serializer.read(w.radius);
+			serializer.read(w.width);
+			serializer.read(w.mass);
+			serializer.read(w.moi);
+			m_universe.onComponentCreated(e, WHEEL_TYPE, this);
+		}
 	}
 
 

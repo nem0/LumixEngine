@@ -431,12 +431,13 @@ namespace Lumix
 			checkSize();
 		}
 
-		void insert(const key_type& key, value_type&& val)
+		value_type& insert(const key_type& key, value_type&& val)
 		{
 			size_type pos = getPosition(key);
-			construct(getEmptyNode(pos), key, Move(val));
+			node_type* node = construct(getEmptyNode(pos), key, Move(val));
 			m_size++;
 			checkSize();
+			return node->m_value;
 		}
 
 		iterator erase(iterator it)
