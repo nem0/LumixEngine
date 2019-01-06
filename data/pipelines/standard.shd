@@ -89,7 +89,9 @@ fragment_shader [[
 	in vec3 v_normal;
 	in vec4 v_wpos;
 	
-	#ifdef DEFERRED
+	#ifdef DEPTH
+		layout(location = 0) out float o_depth;	
+	#elif defined DEFERRED
 		layout(location = 0) out vec4 o_gbuffer0;
 		layout(location = 1) out vec4 o_gbuffer1;
 		layout(location = 2) out vec4 o_gbuffer2;
@@ -117,6 +119,7 @@ fragment_shader [[
 				data.albedo = texture(u_albedomap, v_uv);
 				if(data.albedo.a < 0.5) discard;
 			#endif
+			o_depth = gl_FragCoord.z;
 		}
 	#elif defined DEFERRED
 		void main()

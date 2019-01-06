@@ -45,9 +45,10 @@ float getShadow(sampler2D shadowmap, vec3 wpos)
 	for (int i = 0; i < 4; ++i) {
 		vec4 sc = u_shadowmap_matrices[i] * pos;
 		sc = sc / sc.w;
-		if(all(lessThan(sc.xy, vec2(0.99))) && all(greaterThan(sc.xy, vec2(0.01)))) {
-			float d = textureLod(shadowmap, vec2(sc.x * 0.25 + i * 0.25, sc.y), 0).x;
-			return sc.z >= d - 0.00001 ? 1 : 0;
+		if (all(lessThan(sc.xy, vec2(0.99))) && all(greaterThan(sc.xy, vec2(0.01)))) {
+			vec2 sm_uv = vec2(sc.x * 0.25 + i * 0.25, sc.y);
+			float occluder = textureLod(shadowmap, sm_uv, 0).r;
+			return clamp(exp(5000 * (sc.z - occluder)), 0.0, 1.0);
 		}
 	}
 
