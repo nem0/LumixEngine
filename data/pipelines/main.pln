@@ -4,6 +4,7 @@ local tonemap_shader = preloadShader("pipelines/tonemap.shd")
 local environment_shader =  preloadShader("pipelines/environment.shd")
 local selection_outline_shader = preloadShader("pipelines/selection_outline.shd")
 local local_light_shader = preloadShader("pipelines/local_light.shd")
+local blur_shader = preloadShader("pipelines/blur.shd")
 local prepare_terrain_shader = preloadShader("pipelines/prepare_terrain.shd")
 local debug_shadowmap = false
 
@@ -116,21 +117,46 @@ function debugRenderbuffer(rb, output)
 		, { depth_test = false });
 end
 
+function blur(buffer, format, w, h, tmp_rb_dbg_name) 
+	local blur_buf = createRenderbuffer(w, h, false, format, tmp_rb_dbg_name)
+	setRenderTargets(blur_buf)
+	viewport(0, 0, w, h)
+	drawArray(0, 4, blur_shader
+		, { buffer }
+		, { u_inv_sm_size = {1.0 / w, 1.0 / h, 0, 0 }}
+		, "BLUR_H"
+		, { depth_test = false, depth_write = false }
+	)
+	setRenderTargets(buffer)
+	viewport(0, 0, w, h)
+	drawArray(0, 4, blur_shader
+		, { blur_buf }
+		, { u_inv_sm_size = {1.0 / w, 1.0 / h, 0, 0 }}
+		, {}
+		, { depth_test = false, depth_write = false }
+	)
+end
+
 function shadowPass()
 	beginBlock("shadows")
-	local rb = createRenderbuffer(4096, 1024, false, "depth24", "shadowmap")
-	setRenderTargets(rb)
-	clear(CLEAR_DEPTH, 0, 0, 0, 1, 0)
-	
-	for slice = 0, 3 do 
-		local view_params = getShadowCameraParams(slice, 4096)
-		local shadow_set = prepareCommands(view_params, { { layers = { "default" } } })
+		local rb = createRenderbuffer(4096, 1024, false, "r32f", "shadowmap")
+		local depthbuf = createRenderbuffer(4096, 1024, false, "depth24", "shadowmap_depth")
+		setRenderTargets(rb, depthbuf)
+		clear(CLEAR_ALL, 0, 0, 0, 1, 0)
 		
-		viewport(slice * 1024, 0, 1024, 1024)
-		beginBlock("slice " .. tostring(slice + 1))
-		renderBucket(shadow_set, shadow_state)
-		endBlock()
-	end
+		for slice = 0, 3 do 
+			local view_params = getShadowCameraParams(slice, 4096)
+			local shadow_set = prepareCommands(view_params, { { layers = { "default" } } })
+			
+			viewport(slice * 1024, 0, 1024, 1024)
+			beginBlock("slice " .. tostring(slice + 1))
+			renderBucket(shadow_set, shadow_state)
+			endBlock()
+		end
+	endBlock()
+	
+	beginBlock("shadow_blur")
+		blur(rb, "r32f", 4096, 1024, "shadowmap_blur")
 	endBlock()
 	return rb
 end

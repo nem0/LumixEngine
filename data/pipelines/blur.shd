@@ -1,0 +1,49 @@
+vertex_shader [[
+	uniform vec4 u_inv_sm_size;
+	out vec4 v_tc0;
+	out vec4 v_tc1;
+	out vec4 v_tc2;
+	void main() {
+		vec2 uv = vec2(gl_VertexID & 1, (gl_VertexID & 2) * 0.5);
+		v_tc0 = vec4(uv, 0, 0);
+		#ifdef BLUR_H
+			v_tc1 = vec4(
+				uv.x + 1.3846153846 * u_inv_sm_size.x, uv.y, 
+				uv.x + 3.2307692308 * u_inv_sm_size.x, uv.y
+			);
+			v_tc2 = vec4(
+				uv.x - 1.3846153846 * u_inv_sm_size.x, uv.y, 
+				uv.x - 3.2307692308 * u_inv_sm_size.x, uv.y
+			);
+		#else
+			v_tc1 = vec4(
+				uv.x, uv.y + 1.3846153846 * u_inv_sm_size.y,
+				uv.x, uv.y + 3.2307692308 * u_inv_sm_size.y
+			);
+			v_tc2 = vec4(
+				uv.x, uv.y - 1.3846153846 * u_inv_sm_size.y, 
+				uv.x, uv.y - 3.2307692308 * u_inv_sm_size.y
+			);
+		#endif
+	
+		vec4 pos = vec4((gl_VertexID & 1) * 2 - 1, (gl_VertexID & 2) - 1, 0, 1);
+		gl_Position = pos;
+	}
+]]
+
+
+fragment_shader [[
+	layout (binding=0) uniform sampler2D u_input;
+	in vec4 v_tc0;
+	in vec4 v_tc1;
+	in vec4 v_tc2;
+	out vec4 o_color;
+
+	void main() {
+		o_color = texture2D(u_input, v_tc0.xy) * 0.2270270270
+		+ texture2D(u_input, v_tc1.xy) * 0.3162162162
+		+ texture2D(u_input, v_tc1.zw) * 0.0702702703
+		+ texture2D(u_input, v_tc2.xy) * 0.3162162162
+		+ texture2D(u_input, v_tc2.zw) * 0.0702702703;
+	}
+]]
