@@ -2807,21 +2807,15 @@ struct AddTerrainComponentPlugin final : public StudioApp::IAddComponentPlugin
 			return false;
 		}
 
-		file.writeText("{ \"shader\" : \"pipelines/terrain/terrain.shd\", \
-			\"texture\" : {\"source\" : \"");
+		file.writeText(R"#(
+			shader "pipelines/terrain.shd"
+			texture ")#");
 		file.writeText(info.m_basename);
-		file.writeText(".raw\", \"keep_data\" : true}, \
-			\"texture\" : {\"source\" : \"/models/utils/white.tga\", \
-			\"u_clamp\" : true, \"v_clamp\" : true, \
-			\"min_filter\" : \"point\", \"mag_filter\" : \"point\", \"keep_data\" : true}, \
-			\"texture\" : {\"source\" : \"\" }, \
-			\"texture\" : {\"source\" : \"\", \"keep_data\" : true}, \
-			\"texture\" : {\"source\" : \"/models/utils/white.tga\", \"srgb\" : true}, \
-			\"texture\" : {\"source\" : \"\"}, \
-			\"uniforms\" : [\
-				{\"name\" : \"detail_texture_distance\", \"float_value\" : 80.0}, \
-				{ \"name\" : \"texture_scale\", \"float_value\" : 1.0 }], \
-			\"metallic\" : 0.06, \"roughness\" : 0.9, \"alpha_ref\" : 0.3 }");
+		file.writeText(R"#(.raw"
+			texture "/textures/common/white.tga"
+			texture ""
+			texture ""
+		)#");
 
 		file.close();
 		return true;
