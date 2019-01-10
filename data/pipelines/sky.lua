@@ -5,7 +5,7 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 	if env.procedural_sky_shader == nil then
 		env.procedural_sky_shader = env.preloadShader("pipelines/procedural_sky.shd")
 	end
-	env.setRenderTargets(0, hdr_buffer, gbuffer_depth)
+	env.setRenderTargets(hdr_buffer, gbuffer_depth)
 	local state = {
 		stencil_write_mask = 0,
 		stencil_func = env.STENCIL_NOT_EQUAL,
