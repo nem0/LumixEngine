@@ -122,6 +122,30 @@ void Frustum::transform(const Matrix& mtx)
 	}
 }
 
+Frustum Frustum::transformed(const Matrix& mtx) const
+{
+	Frustum res;
+	for (int i = 0; i < lengthOf(points); ++i) {
+		res.points[i] = mtx.transformPoint(points[i]);
+	}
+
+	for (int i = 0; i < lengthOf(xs); ++i) {
+		Vec3 p;
+		if (xs[i] != 0) p.set(-ds[i] / xs[i], 0, 0);
+		else if (ys[i] != 0) p.set(0, -ds[i] / ys[i], 0);
+		else p.set(0, 0, -ds[i] / zs[i]);
+
+		Vec3 n = { xs[i], ys[i], zs[i] };
+		n = mtx.transformVector(n);
+		p = mtx.transformPoint(p);
+
+		res.xs[i] = n.x;
+		res.ys[i] = n.y;
+		res.zs[i] = n.z;
+		res.ds[i] = -dotProduct(p, n);
+	}
+	return res;
+}
 
 Sphere Frustum::computeBoundingSphere() const 
 {

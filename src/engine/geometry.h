@@ -97,6 +97,7 @@ struct alignas(16) LUMIX_ENGINE_API Frustum
 	bool isSphereInside(const Vec3& center, float radius) const;
 	Sphere computeBoundingSphere() const;
 	void transform(const Matrix& mtx);
+	Frustum transformed(const Matrix& mtx) const;
 
 
 	enum class Planes : u32

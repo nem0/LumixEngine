@@ -813,6 +813,121 @@ struct PipelineImpl final : Pipeline
 	}
 
 
+	static int renderGrass(lua_State* L)
+	{
+		PROFILE_FUNCTION();
+		const int pipeline_idx = lua_upvalueindex(1);
+		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
+			LuaWrapper::argError<PipelineImpl*>(L, pipeline_idx);
+		}
+		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
+		const CameraParams cp = checkCameraParams(L, 1);
+		
+		struct RenderGrassJob : Renderer::RenderJob {
+			RenderGrassJob(IAllocator& allocator) 
+				: instance_data(allocator)
+				, patches(allocator)
+			{
+			}
+
+
+			void setup() override
+			{
+				IAllocator& allocator = pipeline->m_renderer.getAllocator();
+				Array<GrassInfo> grasses(allocator);
+				// TODO 0 constant in following:
+				pipeline->getScene()->getGrassInfos(camera_params.frustum, 0, grasses);
+				if (grasses.empty()) return;
+
+				patches.resize(grasses.size());
+				int instances_count = 0;
+				const Universe& universe = pipeline->getScene()->getUniverse();
+				for (int i = 0; i < grasses.size(); ++i) {
+					const GrassInfo& grass = grasses[i];
+					patches[i].instance_count = grass.instance_count;
+					patches[i].mesh = grass.model->getMesh(0).render_data;
+					patches[i].material = grass.model->getMesh(0).material->getRenderData();
+					patches[i].mtx = universe.getRelativeMatrix(grass.entity, camera_params.pos);
+					instances_count += grass.instance_count;
+				}
+				instance_data.resize(instances_count);
+				
+				GrassInfo::InstanceData* data = instance_data.begin();
+				for (const GrassInfo& grass : grasses) {
+					memcpy(data, grass.instance_data, sizeof(data[0]) * grass.instance_count);
+					data += grass.instance_count;
+				}
+			}
+
+
+			void execute() override
+			{
+				if (instance_data.empty()) return;
+
+				const Renderer::TransientSlice transient = pipeline->m_renderer.allocTransient(instance_data.byte_size());
+				if ((int)transient.size < instance_data.byte_size()) {
+					g_log_warning.log("Renderer") << "Not enough memory reserved to render grass.";
+					return;
+				}
+
+				memcpy(transient.ptr, instance_data.begin(), transient.size);
+				ffr::flushBuffer(transient.buffer, transient.offset, transient.size);
+				ffr::VertexDecl instance_decl;
+				instance_decl.addAttribute(4, ffr::AttributeType::FLOAT, false, false);
+				instance_decl.addAttribute(4, ffr::AttributeType::FLOAT, false, false);
+				instance_decl.addAttribute(4, ffr::AttributeType::FLOAT, false, false);
+				const u32 define_mask = 1 << pipeline->m_renderer.getShaderDefineIdx("GRASS");
+
+				int offset = transient.offset;
+				for (const Patch& patch : patches) {
+					int attribute_map[16];
+					const Shader::Program& prg = Shader::getProgram(patch.material->shader, define_mask);
+					if (prg.handle.isValid()) {
+						for (uint i = 0; i < patch.mesh->vertex_decl.attributes_count; ++i) {
+							attribute_map[i] = prg.attribute_by_semantics[(int)patch.mesh->attributes_semantic[i]];
+						}
+						ffr::bindTextures(patch.material->textures, patch.material->textures_count);
+						ffr::setVertexBuffer(&patch.mesh->vertex_decl
+							, patch.mesh->vertex_buffer_handle
+							, 0
+							, attribute_map);
+						ffr::setIndexBuffer(patch.mesh->index_buffer_handle);
+						ffr::useProgram(prg.handle);
+						int instance_map[16];
+						for (uint i = 0; i < instance_decl.attributes_count; ++i) {
+							instance_map[i] = prg.attribute_by_semantics[(int)Mesh::AttributeSemantic::INSTANCE0 + i];
+						}
+						ffr::setUniformMatrix4f(pipeline->m_model_uniform, &patch.mtx.m11);
+						ffr::setInstanceBuffer(instance_decl, transient.buffer, offset, 0, instance_map);
+
+						ffr::setState(u64(ffr::StateFlags::DEPTH_TEST));
+						ffr::drawTrianglesInstanced(0, patch.mesh->indices_count, patch.instance_count);
+					}
+					offset += sizeof(GrassInfo::InstanceData) * patch.instance_count;
+				}
+			}
+			struct Patch {
+				int instance_count;
+				Mesh::RenderData* mesh;
+				Material::RenderData* material;
+				Matrix mtx;
+			};
+			Array<Patch> patches;
+			Array<GrassInfo::InstanceData> instance_data;
+			CameraParams camera_params;
+			PipelineImpl* pipeline;
+		};
+
+		IAllocator& allocator = pipeline->m_renderer.getAllocator();
+		RenderGrassJob* cmd = LUMIX_NEW(allocator, RenderGrassJob)(allocator);
+		cmd->pipeline = pipeline;
+		cmd->camera_params = cp;
+
+		pipeline->m_renderer.push(cmd);
+		return 0;
+	}
+
+
 	static int renderTerrains(lua_State* L)
 	{
 		PROFILE_FUNCTION();
@@ -2746,6 +2861,7 @@ struct PipelineImpl final : Pipeline
 		registerCFunction("prepareCommands", PipelineImpl::prepareCommands);
 		registerCFunction("renderEnvProbeVolumes", PipelineImpl::renderEnvProbeVolumes);
 		registerCFunction("renderBucket", PipelineImpl::renderBucket);
+		registerCFunction("renderGrass", PipelineImpl::renderGrass);
 		registerCFunction("renderParticles", PipelineImpl::renderParticles);
 		registerCFunction("renderTerrains", PipelineImpl::renderTerrains);
 		registerCFunction("setRenderTargets", PipelineImpl::setRenderTargets);
