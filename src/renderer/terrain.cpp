@@ -67,12 +67,9 @@ Terrain::GrassType::~GrassType()
 Terrain::~Terrain()
 {
 	setMaterial(nullptr);
-	for (int j = 0; j < m_grass_quads.size(); ++j)
-	{
-		Array<GrassQuad*>& quads = m_grass_quads.at(j);
-		for (int i = 0; i < quads.size(); ++i)
-		{
-			LUMIX_DELETE(m_allocator, quads[i]);
+	for (const Array<GrassQuad*>& quads : m_grass_quads) {
+		for (GrassQuad* quad : quads) {
+			LUMIX_DELETE(m_allocator, quad);
 		}
 	}
 }
@@ -204,34 +201,27 @@ void Terrain::setGrassTypePath(int index, const Path& path)
 void Terrain::forceGrassUpdate()
 {
 	m_force_grass_update = true;
-	for (int i = 0; i < m_grass_quads.size(); ++i)
-	{
-		Array<GrassQuad*>& quads = m_grass_quads.at(i);
-		for (GrassQuad* quad : quads)
-		{
+	for (Array<GrassQuad*>& quads : m_grass_quads) {
+		for (GrassQuad* quad : quads) {
 			LUMIX_DELETE(m_allocator, quad);
 		}
 		quads.clear();
 	}
 }
 
-Array<Terrain::GrassQuad*>& Terrain::getQuads(EntityRef camera)
+Array<Terrain::GrassQuad*>& Terrain::getQuads(int view)
 {
-	int quads_index = m_grass_quads.find(camera);
-	if (quads_index < 0)
-	{
-		m_grass_quads.emplace(camera, m_allocator);
-		quads_index = m_grass_quads.find(camera);
-	}
-	return m_grass_quads.at(quads_index);
+	while (view >= m_grass_quads.size()) m_grass_quads.emplace(m_allocator);
+	return m_grass_quads[view];
 }
 
 
 void Terrain::generateGrassTypeQuad(GrassPatch& patch, const RigidTransform& terrain_tr, const Vec2& quad_pos)
 {
+	if (m_splatmap->data.empty()) return;
+
 	ASSERT(quad_pos.x >= 0);
 	ASSERT(quad_pos.y >= 0);
-	ASSERT(!m_splatmap->data.empty());
 	ASSERT(m_splatmap->bytes_per_pixel == 4);
 
 	PROFILE_FUNCTION();
@@ -298,29 +288,25 @@ void Terrain::generateGrassTypeQuad(GrassPatch& patch, const RigidTransform& ter
 			}
 
 			GrassPatch::InstanceData& instance_data = patch.instance_data.emplace();
-			/*const DVec3 instance_pos = terrain_tr.pos + terrain_tr.rot * instance_rel_pos;
-			instance_data.pos_scale.set(instance_pos, Math::randFloat(0.9f, 1.1f));
-			instance_data.rot = terrain_tr.rot * instance_rel_rot;
-			instance_data.normal = Vec4(getNormal(x, z), 0);*/
-			// TODO
-			ASSERT(false);
+			instance_data.pos_scale.set(instance_rel_pos, Math::randFloat(0.9f, 1.1f));
+			instance_data.rot = instance_rel_rot;
+			instance_data.normal = Vec4(getNormal(x, z), 0);
 		}
 	}
 }
 
 
-void Terrain::updateGrass(EntityRef camera)
+void Terrain::updateGrass(int view, const DVec3& camera_pos)
 {
-	// TODO
-	return;
 	PROFILE_FUNCTION();
 	if (!m_splatmap) return;
 
 	Universe& universe = m_scene.getUniverse();
-	const DVec3 camera_pos = universe.getPosition(camera);
 
-	if ((m_last_camera_position[camera] - camera_pos).length() <= FLT_MIN && !m_force_grass_update) return;
-	m_last_camera_position[camera] = camera_pos;
+	while (m_last_camera_position.size() <= view) m_last_camera_position.push({ DBL_MAX, DBL_MAX, DBL_MAX });
+
+	if ((m_last_camera_position[view] - camera_pos).length() <= FLT_MIN && !m_force_grass_update) return;
+	m_last_camera_position[view] = camera_pos;
 
 	m_force_grass_update = false;
 	const RigidTransform terrain_tr = universe.getTransform(m_entity).getRigidPart();
@@ -339,7 +325,7 @@ void Terrain::updateGrass(EntityRef camera)
 	float to_quad_z = cz + grass_distance * GRASS_QUAD_SIZE;
 
 	float old_bounds[4] = {FLT_MAX, -FLT_MAX, FLT_MAX, -FLT_MAX};
-	Array<GrassQuad*>& quads = getQuads(camera);
+	Array<GrassQuad*>& quads = getQuads(view);
 	for (int i = quads.size() - 1; i >= 0; --i)
 	{
 		GrassQuad* quad = quads[i];
@@ -404,24 +390,26 @@ void Terrain::grassLoaded(Resource::State, Resource::State, Resource&)
 }
 
 
-void Terrain::getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, EntityRef camera)
+void Terrain::getGrassInfos(const ShiftedFrustum& global_frustum, int view, Array<GrassInfo>& infos)
 {
-	/*if (!m_material || !m_material->isReady()) return;
+	if (!m_material || !m_material->isReady()) return;
 
 	Universe& universe = m_scene.getUniverse();
-	const DVec3 camera_pos = universe.getPosition(camera);
-	updateGrass(camera);
-	Array<GrassQuad*>& quads = getQuads(camera);
-	
-	const RigidTransform tr = universe.getTransform(m_entity).getRigidPart();
-	for (GrassQuad* quad : quads)
-	{
-		const Vec3 quad_center(quad->pos.x + GRASS_QUAD_SIZE * 0.5f, quad->pos.y, quad->pos.z + GRASS_QUAD_SIZE * 0.5f);
-		if (!frustum.isSphereInside(quad_center, quad->radius)) continue;
 
-		float dist2 = (quad_center - camera_pos).squaredLength();
-		for (int patch_idx = 0; patch_idx < quad->m_patches.size(); ++patch_idx)
-		{
+	const RigidTransform terrain_tr = universe.getTransform(m_entity).getRigidPart();
+	const Vec3 cam_pos_terrain_space = terrain_tr.rot.conjugated() * (global_frustum.origin - terrain_tr.pos).toFloat();
+	const Matrix cam_to_terrain(cam_pos_terrain_space, terrain_tr.rot.conjugated());
+	const Frustum frustum_terrain_space = global_frustum.getRelative(global_frustum.origin).transformed(cam_to_terrain);
+
+	updateGrass(view, global_frustum.origin);
+	Array<GrassQuad*>& quads = getQuads(view);
+
+	for (GrassQuad* quad : quads) {
+		const Vec3 quad_center(quad->pos.x + GRASS_QUAD_SIZE * 0.5f, quad->pos.y, quad->pos.z + GRASS_QUAD_SIZE * 0.5f);
+		if (!frustum_terrain_space.isSphereInside(quad_center, quad->radius)) continue;
+
+		float dist2 = (quad_center - cam_pos_terrain_space).squaredLength();
+		for (int patch_idx = 0; patch_idx < quad->m_patches.size(); ++patch_idx) {
 			const GrassPatch& patch = quad->m_patches[patch_idx];
 			if (patch.m_type->m_distance * patch.m_type->m_distance < dist2) continue;
 			if (patch.instance_data.empty()) continue;
@@ -431,10 +419,9 @@ void Terrain::getGrassInfos(const Frustum& frustum, Array<GrassInfo>& infos, Ent
 			info.instance_count = patch.instance_data.size();
 			info.model = patch.m_type->m_grass_model;
 			info.type_distance = patch.m_type->m_distance;
+			info.entity = m_entity;
 		}
-	}*/
-	// TODO
-	ASSERT(false);
+	}
 }
 
 
@@ -690,6 +677,10 @@ void Terrain::onMaterialLoaded(Resource::State, Resource::State new_state, Resou
 		m_albedomap = m_material->getTextureByName("Albedo");
 		m_splatmap = m_material->getTextureByName("Splatmap");
 
+		if (m_splatmap && !m_splatmap->getData()) {
+			m_splatmap->addDataReference();
+			is_data_ready = false;
+		}
 		/*
 		Texture* colormap = m_material->getTextureByUniform("u_colormap");
 		if (colormap && colormap->getData() == nullptr)

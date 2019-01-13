@@ -1985,7 +1985,7 @@ public:
 	}
 
 
-	void getGrassInfos(const Frustum& frustum, EntityRef camera, Array<GrassInfo>& infos) override
+	void getGrassInfos(const ShiftedFrustum& frustum, int view, Array<GrassInfo>& infos) override
 	{
 		PROFILE_FUNCTION();
 
@@ -1993,7 +1993,7 @@ public:
 
 		for (auto* terrain : m_terrains)
 		{
-			terrain->getGrassInfos(frustum, infos, camera);
+			terrain->getGrassInfos(frustum, view, infos);
 		}
 	}
 
