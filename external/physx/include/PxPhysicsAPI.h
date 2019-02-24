@@ -1,12 +1,29 @@
-/*
- * Copyright (c) 2008-2015, NVIDIA CORPORATION.  All rights reserved.
- *
- * NVIDIA CORPORATION and its licensors retain all intellectual property
- * and proprietary rights in and to this software, related documentation
- * and any modifications thereto.  Any use, reproduction, disclosure or
- * distribution of this software and related documentation without an express
- * license agreement from NVIDIA CORPORATION is strictly prohibited.
- */
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
+//  * Redistributions of source code must retain the above copyright
+//    notice, this list of conditions and the following disclaimer.
+//  * Redistributions in binary form must reproduce the above copyright
+//    notice, this list of conditions and the following disclaimer in the
+//    documentation and/or other materials provided with the distribution.
+//  * Neither the name of NVIDIA CORPORATION nor the names of its
+//    contributors may be used to endorse or promote products derived
+//    from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+// PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+// CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+// PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+// OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Copyright (c) 2008-2019 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -30,32 +47,28 @@ Alternatively, one can instead directly #include a subset of the below files.
 #include "foundation/PxAssert.h"
 #include "foundation/PxBitAndData.h"
 #include "foundation/PxBounds3.h"
-#include "foundation/PxBroadcastingAllocator.h"
 #include "foundation/PxErrorCallback.h"
 #include "foundation/PxErrors.h"
 #include "foundation/PxFlags.h"
-#include "foundation/PxFoundation.h"
 #include "foundation/PxIntrinsics.h"
 #include "foundation/PxIO.h"
 #include "foundation/PxMat33.h"
 #include "foundation/PxMat44.h"
 #include "foundation/PxMath.h"
+#include "foundation/PxMathUtils.h"
 #include "foundation/PxPlane.h"
 #include "foundation/PxPreprocessor.h"
 #include "foundation/PxQuat.h"
 #include "foundation/PxSimpleTypes.h"
 #include "foundation/PxStrideIterator.h"
-#include "foundation/PxString.h"
 #include "foundation/PxTransform.h"
 #include "foundation/PxUnionCast.h"
 #include "foundation/PxVec2.h"
 #include "foundation/PxVec3.h"
 #include "foundation/PxVec4.h"
-#include "foundation/PxVersionNumber.h"
 
 //Not physics specific utilities and common code
 #include "common/PxCoreUtilityTypes.h"
-#include "common/PxMathUtils.h"
 #include "common/PxPhysXCommonConfig.h"
 #include "common/PxRenderBuffer.h"
 #include "common/PxBase.h"
@@ -68,52 +81,17 @@ Alternatively, one can instead directly #include a subset of the below files.
 #include "common/PxSerialFramework.h"
 #include "common/PxPhysicsInsertionCallback.h"
 
-//Profiling 
-#include "physxprofilesdk/PxProfileBase.h"
-#include "physxprofilesdk/PxProfileCompileTimeEventFilter.h"
-#include "physxprofilesdk/PxProfileContextProvider.h"
-#include "physxprofilesdk/PxProfileEventBufferClient.h"
-#include "physxprofilesdk/PxProfileEventBufferClientManager.h"
-#include "physxprofilesdk/PxProfileEventFilter.h"
-#include "physxprofilesdk/PxProfileEventHandler.h"
-#include "physxprofilesdk/PxProfileEventId.h"
-#include "physxprofilesdk/PxProfileEventMutex.h"
-#include "physxprofilesdk/PxProfileEventNames.h"
-#include "physxprofilesdk/PxProfileEvents.h"
-#include "physxprofilesdk/PxProfileEventSender.h"
-#include "physxprofilesdk/PxProfileEventSystem.h"
-#include "physxprofilesdk/PxProfileMemoryEventTypes.h"
-#include "physxprofilesdk/PxProfileScopedEvent.h"
-#include "physxprofilesdk/PxProfileZone.h"
-#include "physxprofilesdk/PxProfileZoneManager.h"
-
-//Connecting to Visual Debugger Directly
-#include "physxvisualdebuggersdk/PvdConnection.h"
-#include "physxvisualdebuggersdk/PvdConnectionFlags.h"
-#include "physxvisualdebuggersdk/PvdConnectionManager.h"
-#include "physxvisualdebuggersdk/PvdDataStream.h"
-#include "physxvisualdebuggersdk/PvdErrorCodes.h"
-#include "physxvisualdebuggersdk/PvdNetworkStreams.h"
-
-//Connecting the SDK to Visual Debugger
-#include "pvd/PxVisualDebugger.h"
-
 //Task Manager
-#include "pxtask/PxCpuDispatcher.h"
-#include "pxtask/PxCudaContextManager.h"
-#include "pxtask/PxCudaMemoryManager.h"
-#include "pxtask/PxGpuCopyDesc.h"
-#include "pxtask/PxGpuCopyDescQueue.h"
-#include "pxtask/PxGpuDispatcher.h"
-#include "pxtask/PxGpuTask.h"
-#include "pxtask/PxSpuDispatcher.h"
-#include "pxtask/PxSpuTask.h"
-#include "pxtask/PxTask.h"
-#include "pxtask/PxTaskManager.h"
+#include "task/PxTask.h"
 
+// Cuda Mananger
+#if PX_SUPPORT_GPU_PHYSX
+#include "gpu/PxGpu.h"
+#endif
 
 //Geometry Library
 #include "geometry/PxBoxGeometry.h"
+#include "geometry/PxBVHStructure.h"
 #include "geometry/PxCapsuleGeometry.h"
 #include "geometry/PxConvexMesh.h"
 #include "geometry/PxConvexMeshGeometry.h"
@@ -139,7 +117,9 @@ Alternatively, one can instead directly #include a subset of the below files.
 #include "PxActor.h"
 #include "PxAggregate.h"
 #include "PxArticulation.h"
+#include "PxArticulationReducedCoordinate.h"
 #include "PxArticulationJoint.h"
+#include "PxArticulationJointReducedCoordinate.h"
 #include "PxArticulationLink.h"
 #include "PxBatchQuery.h"
 #include "PxBatchQueryDesc.h"
@@ -151,9 +131,11 @@ Alternatively, one can instead directly #include a subset of the below files.
 #include "PxDeletionListener.h"
 #include "PxFiltering.h"
 #include "PxForceMode.h"
+#include "PxFoundation.h"
 #include "PxLockedData.h"
 #include "PxMaterial.h"
 #include "PxPhysics.h"
+#include "PxPhysicsVersion.h"
 #include "PxPhysXConfig.h"
 #include "PxQueryFiltering.h"
 #include "PxQueryReport.h"
@@ -167,35 +149,26 @@ Alternatively, one can instead directly #include a subset of the below files.
 #include "PxShape.h"
 #include "PxSimulationEventCallback.h"
 #include "PxSimulationStatistics.h"
-#include "PxSpatialIndex.h"
 #include "PxVisualizationParameter.h"
-#include "PxVolumeCache.h"
+#include "PxPruningStructure.h"
 
 //Character Controller
 #include "characterkinematic/PxBoxController.h"
 #include "characterkinematic/PxCapsuleController.h"
-#include "characterkinematic/PxCharacter.h"
 #include "characterkinematic/PxController.h"
 #include "characterkinematic/PxControllerBehavior.h"
 #include "characterkinematic/PxControllerManager.h"
 #include "characterkinematic/PxControllerObstacles.h"
 #include "characterkinematic/PxExtended.h"
 
-//Cloth Simulation
-#if PX_USE_CLOTH_API
-#include "cloth/PxCloth.h"
-#include "cloth/PxClothCollisionData.h"
-#include "cloth/PxClothFabric.h"
-#include "cloth/PxClothParticleData.h"
-#include "cloth/PxClothTypes.h"
-#endif
-
 //Cooking (data preprocessing)
 #include "cooking/Pxc.h"
 #include "cooking/PxConvexMeshDesc.h"
 #include "cooking/PxCooking.h"
-#include "cooking/PxGaussMapLimit.h"
 #include "cooking/PxTriangleMeshDesc.h"
+#include "cooking/PxBVH33MidphaseDesc.h"
+#include "cooking/PxBVH34MidphaseDesc.h"
+#include "cooking/PxMidphaseDesc.h"
 
 //Extensions to the SDK
 #include "extensions/PxDefaultStreams.h"
@@ -204,7 +177,6 @@ Alternatively, one can instead directly #include a subset of the below files.
 #include "extensions/PxFixedJoint.h"
 #include "extensions/PxJoint.h"
 #include "extensions/PxJointLimit.h"
-#include "extensions/PxParticleExt.h"
 #include "extensions/PxPrismaticJoint.h"
 #include "extensions/PxRevoluteJoint.h"
 #include "extensions/PxRigidBodyExt.h"
@@ -214,26 +186,12 @@ Alternatively, one can instead directly #include a subset of the below files.
 #include "extensions/PxSphericalJoint.h"
 #include "extensions/PxStringTableExt.h"
 #include "extensions/PxTriangleMeshExt.h"
-#include "extensions/PxVisualDebuggerExt.h"
-#include "extensions/PxDefaultBufferedProfiler.h"
+#include "extensions/PxConvexMeshExt.h"
 
 //Serialization
 #include "extensions/PxSerialization.h"
 #include "extensions/PxBinaryConverter.h"
 #include "extensions/PxRepXSerializer.h"
-#include "extensions/PxJointRepXSerializer.h"
-
-//Particle Simulation
-#if PX_USE_PARTICLE_SYSTEM_API
-#include "particles/PxParticleBase.h"
-#include "particles/PxParticleBaseFlag.h"
-#include "particles/PxParticleCreationData.h"
-#include "particles/PxParticleFlag.h"
-#include "particles/PxParticleFluid.h"
-#include "particles/PxParticleFluidReadData.h"
-#include "particles/PxParticleReadData.h"
-#include "particles/PxParticleSystem.h"
-#endif
 
 //Vehicle Simulation
 #include "vehicle/PxVehicleComponents.h"
@@ -251,5 +209,9 @@ Alternatively, one can instead directly #include a subset of the below files.
 #include "vehicle/PxVehicleNoDrive.h"
 #include "vehicle/PxVehicleDriveNW.h"
 
+//Connecting the SDK to Visual Debugger
+#include "pvd/PxPvdSceneClient.h"
+#include "pvd/PxPvd.h"
+#include "pvd/PxPvdTransport.h"
 /** @} */
 #endif

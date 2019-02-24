@@ -916,7 +916,7 @@ struct PhysicsUIPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 		int joint_type = 0;
 		switch (joint->getConcreteType())
 		{
-			case physx::PxJointType::eSPHERICAL:
+			case physx::PxJointConcreteType::eSPHERICAL:
 			{
 				auto* spherical = joint->is<physx::PxSphericalJoint>();
 				physx::PxJointLimitCone limit = spherical->getLimitCone();
@@ -932,8 +932,8 @@ struct PhysicsUIPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 				break;
 			}
 
-			case physx::PxJointType::eFIXED: joint_type = 1; break;
-			case physx::PxJointType::eREVOLUTE:
+			case physx::PxJointConcreteType::eFIXED: joint_type = 1; break;
+			case physx::PxJointConcreteType::eREVOLUTE:
 			{
 				auto* hinge = joint->is<physx::PxRevoluteJoint>();
 				physx::PxJointAngularLimitPair limit = hinge->getLimit();
@@ -948,7 +948,7 @@ struct PhysicsUIPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 				joint_type = 0;
 				break;
 			}
-			case physx::PxJointType::eD6:
+			case physx::PxJointConcreteType::eD6:
 			{
 				auto* d6 = joint->is<physx::PxD6Joint>();
 				auto linear_limit = d6->getLinearLimit();

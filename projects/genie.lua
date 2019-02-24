@@ -348,14 +348,13 @@ end
 function copyDlls(src_dir, platform_dir, dest_dir)
 	local physx_suffix
 	configuration { "x64", dest_dir, "windows" }
-	physx_suffix = "x64"
+	physx_suffix = "64"
 
 	postbuildcommands {
-		"xcopy /Y \"$(SolutionDir)../../../external/physx/dll/" .. ide_dir .. "/" .. platform_dir .. "\\nvToolsExt64_1.dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
-		"xcopy /Y \"$(SolutionDir)../../../external/physx/dll/" .. ide_dir .. "/" .. platform_dir .. "\\PhysX3CommonCHECKED_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
-		"xcopy /Y \"$(SolutionDir)../../../external/physx/dll/" .. ide_dir .. "/" .. platform_dir .. "\\PhysX3CookingCHECKED_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
-		"xcopy /Y \"$(SolutionDir)../../../external/physx/dll/" .. ide_dir .. "/" .. platform_dir .. "\\PhysX3CharacterKinematicCHECKED_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
-		"xcopy /Y \"$(SolutionDir)../../../external/physx/dll/" .. ide_dir .. "/" .. platform_dir .. "\\PhysX3CHECKED_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
+		"xcopy /Y \"$(SolutionDir)../../../external/physx/dll/" .. ide_dir .. "/" .. platform_dir .. "\\" .. src_dir .. "\\PhysXCommon_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
+		"xcopy /Y \"$(SolutionDir)../../../external/physx/dll/" .. ide_dir .. "/" .. platform_dir .. "\\" .. src_dir .. "\\PhysXCooking_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
+		"xcopy /Y \"$(SolutionDir)../../../external/physx/dll/" .. ide_dir .. "/" .. platform_dir .. "\\" .. src_dir .. "\\PhysXFoundation_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
+		"xcopy /Y \"$(SolutionDir)../../../external/physx/dll/" .. ide_dir .. "/" .. platform_dir .. "\\" .. src_dir .. "\\PhysX_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
 		[[xcopy /Y "$(SolutionDir)..\..\..\external\dbghelp\dbghelp.dll" "$(SolutionDir)bin\]] .. dest_dir .. "\"",
 		[[xcopy /Y "$(SolutionDir)..\..\..\external\dbghelp\dbgcore.dll" "$(SolutionDir)bin\]] .. dest_dir .. "\""
 	}
@@ -380,20 +379,32 @@ end
 function linkPhysX()
 	if has_plugin("physics") then
 		configuration { "x64", "vs20*" }
-			libdirs {"../external/physx/lib/" .. ide_dir .. "/win64"}
-			links {"PhysX3CHECKED_x64", "PhysX3CommonCHECKED_x64", "PhysX3CharacterKinematicCHECKED_x64", "PhysX3CookingCHECKED_x64" }
-		configuration { "x64", "linux-*" }
-			libdirs {"../external/physx/lib/linux64_gcc5", "../external/physx/dll/linux64_gcc5"}
-			links {"PhysX3CHECKED_x64", "PhysX3CommonCHECKED_x64", "PhysX3CharacterKinematicCHECKED_x64", "PhysX3CookingCHECKED_x64" }
+			links { 
+				"FastXml_static_64",
+				"LowLevel_static_64",
+				"LowLevelAABB_static_64",
+				"LowLevelDynamics_static_64",
+				"PhysX_64",
+				"PhysXCommon_64",
+				"PhysXCooking_64",
+				"PhysXExtensions_static_64",
+				"PhysXFoundation_64",
+				"PhysXCharacterKinematic_static_64",
+				"PhysXPvdSDK_static_64",
+				"PhysXTask_static_64",
+				"PhysXVehicle_static_64",
+				"SceneQuery_static_64",
+				"SimulationController_static_64"
+			}
 
 		configuration { "Debug" }
-			links { "PhysX3ExtensionsDEBUG", "PhysXVisualDebuggerSDKDEBUG" }
-		configuration { "Release" }
-			links { "PhysX3ExtensionsCHECKED", "PhysXVisualDebuggerSDKCHECKED" }
+			libdirs {"../external/physx/lib/" .. ide_dir .. "/win64/debug"}
+
 		configuration { "RelWithDebInfo" }
-			links { "PhysX3ExtensionsCHECKED", "PhysXVisualDebuggerSDKCHECKED" }
+			libdirs {"../external/physx/lib/" .. ide_dir .. "/win64/release"}
 
 		configuration {}
+			defines {"PX_PHYSX_CHARACTER_STATIC_LIB"}
 	end
 end
 

@@ -269,7 +269,7 @@ namespace Lumix
 
 		bool connect2VisualDebugger()
 		{
-			if (m_physics->getPvdConnectionManager() == nullptr) return false;
+			/*if (m_physics->getPvdConnectionManager() == nullptr) return false;
 
 			const char* pvd_host_ip = "127.0.0.1";
 			int port = 5425;
@@ -279,7 +279,8 @@ namespace Lumix
 
 			auto* connection = physx::PxVisualDebuggerExt::createConnection(
 				m_physics->getPvdConnectionManager(), pvd_host_ip, port, timeout, connectionFlags);
-			return connection != nullptr;
+			return connection != nullptr;*/
+			return false;
 		}
 
 		physx::PxPhysics* m_physics;

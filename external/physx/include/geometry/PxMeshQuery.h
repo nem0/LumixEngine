@@ -1,12 +1,29 @@
-/*
- * Copyright (c) 2008-2015, NVIDIA CORPORATION.  All rights reserved.
- *
- * NVIDIA CORPORATION and its licensors retain all intellectual property
- * and proprietary rights in and to this software, related documentation
- * and any modifications thereto.  Any use, reproduction, disclosure or
- * distribution of this software and related documentation without an express
- * license agreement from NVIDIA CORPORATION is strictly prohibited.
- */
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
+//  * Redistributions of source code must retain the above copyright
+//    notice, this list of conditions and the following disclaimer.
+//  * Redistributions in binary form must reproduce the above copyright
+//    notice, this list of conditions and the following disclaimer in the
+//    documentation and/or other materials provided with the distribution.
+//  * Neither the name of NVIDIA CORPORATION nor the names of its
+//    contributors may be used to endorse or promote products derived
+//    from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+// PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+// CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+// PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+// OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Copyright (c) 2008-2019 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -21,7 +38,7 @@
 #include "common/PxPhysXCommonConfig.h"
 #include "PxQueryReport.h"
 
-#ifndef PX_DOXYGEN
+#if !PX_DOXYGEN
 namespace physx
 {
 #endif
@@ -49,6 +66,8 @@ public:
 	\param[out] vertexIndices Returned vertex indices for given triangle
 	\param[out] adjacencyIndices Returned 3 triangle adjacency internal face indices (0xFFFFFFFF if no adjacency). The mesh must be cooked with cooking param buildTriangleAdjacencies enabled.
 
+	\note This function will flip the triangle normal whenever triGeom.scale.hasNegativeDeterminant() is true.
+
 	@see PxTriangle PxTriangleFlags PxTriangleID findOverlapTriangleMesh()
 	*/
 	PX_PHYSX_COMMON_API static void getTriangle(const PxTriangleMeshGeometry& triGeom, const PxTransform& transform, PxTriangleID triangleIndex, PxTriangle& triangle, PxU32* vertexIndices=NULL, PxU32* adjacencyIndices=NULL);
@@ -66,6 +85,20 @@ public:
 	\param[out] vertexIndices Returned vertex indices for given triangle
 	\param[out] adjacencyIndices Returned 3 triangle adjacency triangle indices (0xFFFFFFFF if no adjacency).
 
+	\note This function will flip the triangle normal whenever triGeom.scale.hasNegativeDeterminant() is true.
+	\note TriangleIndex is an index used in internal format, which does have an index out of the bounds in last row.
+			To traverse all tri indices in the HF, the following code can be applied:
+			for (PxU32 row = 0; row < (nbRows - 1); row++)
+			{
+				for (PxU32 col = 0; col < (nbCols - 1); col++)
+				{
+					for (PxU32 k = 0; k < 2; k++)
+					{ 
+						const PxU32 triIndex = 2 * (row*nbCols + col) + k; 
+						....
+					}
+				}
+			}
 	@see PxTriangle PxTriangleFlags PxTriangleID findOverlapHeightField()
 	*/
 	PX_PHYSX_COMMON_API static void getTriangle(const PxHeightFieldGeometry& hfGeom, const PxTransform& transform, PxTriangleID triangleIndex, PxTriangle& triangle, PxU32* vertexIndices=NULL, PxU32* adjacencyIndices=NULL);
@@ -83,7 +116,7 @@ public:
 	\param[out] results Indices of overlapping triangles
 	\param[in] maxResults Size of 'results' buffer
 	\param[in] startIndex Index of first result to be retrieved. Previous indices are skipped.
-	\param[out] overflow True if a buffer overflow occured
+	\param[out] overflow True if a buffer overflow occurred
 	\return Number of overlaps found, i.e. number of elements written to the results buffer
 
 	@see PxTriangleMeshGeometry getTriangle()
@@ -104,7 +137,7 @@ public:
 	\param[out] results Indices of overlapping triangles
 	\param[in] maxResults Size of 'results' buffer
 	\param[in] startIndex Index of first result to be retrieved. Previous indices are skipped.
-	\param[out] overflow True if a buffer overflow occured
+	\param[out] overflow True if a buffer overflow occurred
 	\return Number of overlaps found, i.e. number of elements written to the results buffer
 
 	@see PxHeightFieldGeometry getTriangle()
@@ -113,11 +146,12 @@ public:
 															const PxHeightFieldGeometry& hfGeom, const PxTransform& hfPose,
 															PxU32* results, PxU32 maxResults, PxU32 startIndex, bool& overflow);
 
+
 	/**
 	\brief Sweep a specified geometry object in space and test for collision with a set of given triangles.
 
-	This function simply sweeps input geometry against each input triangle. This is an O(N) operation with N = number of input triangles.
-	It does not use any particular acceleration structure.
+	This function simply sweeps input geometry against each input triangle, in the order they are given.
+	This is an O(N) operation with N = number of input triangles. It does not use any particular acceleration structure.
 
 	\param[in] unitDir Normalized direction of the sweep.
 	\param[in] distance Sweep distance. Needs to be larger than 0. Clamped to PX_MAX_SWEEP_DISTANCE.
@@ -126,7 +160,7 @@ public:
 	\param[in] triangleCount Number of specified triangles
 	\param[in] triangles Array of triangles to sweep against
 	\param[out] sweepHit The sweep hit information. See the notes below for limitations about returned results.
-	\param[in] hintFlags Specification of the kind of information to retrieve on hit. Combination of #PxHitFlag flags. See the notes below for limitations about supported flags.
+	\param[in] hitFlags Specification of the kind of information to retrieve on hit. Combination of #PxHitFlag flags. See the notes below for limitations about supported flags.
 	\param[in] cachedIndex Cached triangle index for subsequent calls. Cached triangle is tested first. Optional parameter.
 	\param[in] inflation This parameter creates a skin around the swept geometry which increases its extents for sweeping. The sweep will register a hit as soon as the skin touches a shape, and will return the corresponding distance and normal.
 	\param[in] doubleSided Counterpart of PxMeshGeometryFlag::eDOUBLE_SIDED for input triangles.
@@ -135,10 +169,10 @@ public:
 	\note Only the following geometry types are currently supported: PxSphereGeometry, PxCapsuleGeometry, PxBoxGeometry
 	\note If a shape from the scene is already overlapping with the query shape in its starting position, the hit is returned unless eASSUME_NO_INITIAL_OVERLAP was specified.
 	\note This function returns a single closest hit across all the input triangles. Multiple hits are not supported.
-	\note Only PxHitFlag::eASSUME_NO_INITIAL_OVERLAP, PxHitFlag::ePRECISE_SWEEP and PxHitFlag::eMESH_BOTH_SIDES are supported in hintFlags.
-	\note Unlike scene queries the validity flags in sweepHit are not set by this call and only eDISTANCE and eNORMAL fields are always defined.
+	\note Supported hitFlags are PxHitFlag::eDEFAULT, PxHitFlag::eASSUME_NO_INITIAL_OVERLAP, PxHitFlag::ePRECISE_SWEEP, PxHitFlag::eMESH_BOTH_SIDES, PxHitFlag::eMESH_ANY.
 	\note ePOSITION is only defined when there is no initial overlap (sweepHit.hadInitialOverlap() == false)
 	\note The returned normal for initially overlapping sweeps is set to -unitDir.
+	\note Otherwise the returned normal is the front normal of the triangle even if PxHitFlag::eMESH_BOTH_SIDES is set.
 	\note The returned PxSweepHit::faceIndex parameter will hold the index of the hit triangle in input array, i.e. the range is [0; triangleCount). For initially overlapping sweeps, this is the index of overlapping triangle.
 	\note The returned PxSweepHit::actor and PxSweepHit::shape pointers are not filled.
 	\note The inflation parameter is not compatible with PxHitFlag::ePRECISE_SWEEP.
@@ -152,14 +186,14 @@ public:
 							PxU32 triangleCount,
 							const PxTriangle* triangles,
 							PxSweepHit& sweepHit,
-							PxHitFlags hintFlags = PxHitFlag::eDEFAULT,
+							PxHitFlags hitFlags = PxHitFlag::eDEFAULT,
 							const PxU32* cachedIndex = NULL,
 							const PxReal inflation = 0.0f,
 							bool doubleSided = false);
 };
 
 
-#ifndef PX_DOXYGEN
+#if !PX_DOXYGEN
 }
 #endif
 

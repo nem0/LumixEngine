@@ -1,12 +1,29 @@
-/*
- * Copyright (c) 2008-2015, NVIDIA CORPORATION.  All rights reserved.
- *
- * NVIDIA CORPORATION and its licensors retain all intellectual property
- * and proprietary rights in and to this software, related documentation
- * and any modifications thereto.  Any use, reproduction, disclosure or
- * distribution of this software and related documentation without an express
- * license agreement from NVIDIA CORPORATION is strictly prohibited.
- */
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
+//  * Redistributions of source code must retain the above copyright
+//    notice, this list of conditions and the following disclaimer.
+//  * Redistributions in binary form must reproduce the above copyright
+//    notice, this list of conditions and the following disclaimer in the
+//    documentation and/or other materials provided with the distribution.
+//  * Neither the name of NVIDIA CORPORATION nor the names of its
+//    contributors may be used to endorse or promote products derived
+//    from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+// PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+// CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+// PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+// OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Copyright (c) 2008-2019 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -20,7 +37,7 @@
 #include "PxPhysXConfig.h"
 #include "foundation/PxFlags.h"
 
-#ifndef PX_DOXYGEN
+#if !PX_DOXYGEN
 namespace physx
 {
 #endif
@@ -28,6 +45,7 @@ namespace physx
 class PxActor;
 class PxShape;
 
+static const PxU32 INVALID_FILTER_PAIR_INDEX = 0xffffffff;
 
 /**
 \brief Collection of flags describing the actions to take for a collision pair.
@@ -183,10 +201,8 @@ struct PxPairFlag
 
 		\note Contacts are only responded to if eSOLVE_CONTACT is enabled.
 		*/
-
 		eDETECT_DISCRETE_CONTACT			= (1<<10),
 		
-
 		/**
 		\brief This flag is used to indicate whether this pair generates CCD contacts. 
 
@@ -199,7 +215,6 @@ struct PxPairFlag
 		@see PxRigidBodyFlag::eENABLE_CCD
 		@see PxSceneFlag::eENABLE_CCD
 		*/
-
 		eDETECT_CCD_CONTACT					= (1<<11),
 
 		/**
@@ -243,19 +258,6 @@ struct PxPairFlag
 		eCONTACT_EVENT_POSE					= (1<<14),
 
 		eNEXT_FREE							= (1<<15),        //!< For internal use only.
-
-		/**
-		\deprecated
-		\brief Provides default flag for resolving contacts
-		*/
-
-		PX_DEPRECATED eRESOLVE_CONTACTS		= eSOLVE_CONTACT | eDETECT_DISCRETE_CONTACT,
-
-		/**
-		\deprecated
-		\brief Provided default flag to enable performing linear CCD sweeps and response for this collision pair.
-		*/
-		PX_DEPRECATED eCCD_LINEAR			= eSOLVE_CONTACT | eDETECT_CCD_CONTACT,
 
 		/**
 		\brief Provided default flag to do simple contact processing for this collision pair.
@@ -309,8 +311,6 @@ struct PxFilterFlag
 
 		\li Same conditions as for killed pairs (see #eKILL)
 		\li The filter data or the filter object attributes change for one of the collision objects
-
-		\note For PxCloth objects, eSUPPRESS will be treated as eKILL.
 
 		@see PxFilterData PxFilterObjectAttributes
 		*/
@@ -372,7 +372,7 @@ struct PxFilterData
 // accordingly.
 //==================================================================================================
 
-	PX_INLINE PxFilterData(const PxEMPTY&)
+	PX_INLINE PxFilterData(const PxEMPTY)
 	{
 	}
 
@@ -385,6 +385,11 @@ struct PxFilterData
 	}
 
 	/**
+	\brief Copy constructor.
+	*/
+	PX_INLINE PxFilterData(const PxFilterData& fd) : word0(fd.word0), word1(fd.word1), word2(fd.word2), word3(fd.word3)	{}
+
+	/**
 	\brief Constructor to set filter data initially.
 	*/
 	PX_INLINE PxFilterData(PxU32 w0, PxU32 w1, PxU32 w2, PxU32 w3) : word0(w0), word1(w1), word2(w2), word3(w3) {}
@@ -395,6 +400,33 @@ struct PxFilterData
 	PX_INLINE void setToDefault()
 	{
 		*this = PxFilterData();
+	}
+
+	/**
+	\brief Assignment operator
+	*/
+	PX_INLINE void operator = (const PxFilterData& fd)
+	{
+		word0 = fd.word0;
+		word1 = fd.word1;
+		word2 = fd.word2;
+		word3 = fd.word3;
+	}
+
+	/**
+	\brief Comparison operator to allow use in Array.
+	*/
+	PX_INLINE bool operator == (const PxFilterData& a) const
+	{
+		return a.word0 == word0 && a.word1 == word1 && a.word2 == word2 && a.word3 == word3;
+	}
+
+	/**
+	\brief Comparison operator to allow use in Array.
+	*/
+	PX_INLINE bool operator != (const PxFilterData& a) const
+	{
+		return !(a == *this);
 	}
 
 	PxU32 word0;
@@ -426,28 +458,10 @@ struct PxFilterObjectType
 		eRIGID_DYNAMIC,
 
 		/**
-		\brief A particle system
-		@see PxParticleSystem
-		*/
-		ePARTICLE_SYSTEM,
-
-		/**
-		\brief A particle fluid
-		@see PxParticleFluid
-		*/
-		ePARTICLE_FLUID,
-
-		/**
 		\brief An articulation
 		@see PxArticulation
 		*/
 		eARTICULATION,
-		
-		/**
-		\brief A cloth object
-		@see PxCloth
-		*/
-		eCLOTH,
 
 		//brief internal use only!
 		eMAX_TYPE_COUNT = 16,
@@ -487,7 +501,7 @@ typedef PxU32 PxFilterObjectAttributes;
 */
 PX_INLINE PxFilterObjectType::Enum PxGetFilterObjectType(PxFilterObjectAttributes attr)
 {
-	return static_cast<PxFilterObjectType::Enum>( (attr & (PxFilterObjectType::eMAX_TYPE_COUNT-1)) );
+	return PxFilterObjectType::Enum(attr & (PxFilterObjectType::eMAX_TYPE_COUNT-1));
 }
 
 
@@ -501,7 +515,7 @@ PX_INLINE PxFilterObjectType::Enum PxGetFilterObjectType(PxFilterObjectAttribute
 */
 PX_INLINE bool PxFilterObjectIsKinematic(PxFilterObjectAttributes attr)
 {
-	return ((attr & PxFilterObjectFlag::eKINEMATIC) != 0);
+	return (attr & PxFilterObjectFlag::eKINEMATIC) != 0;
 }
 
 
@@ -515,7 +529,7 @@ PX_INLINE bool PxFilterObjectIsKinematic(PxFilterObjectAttributes attr)
 */
 PX_INLINE bool PxFilterObjectIsTrigger(PxFilterObjectAttributes attr)
 {
-	return ((attr & PxFilterObjectFlag::eTRIGGER) != 0);
+	return (attr & PxFilterObjectFlag::eTRIGGER) != 0;
 }
 
 
@@ -548,12 +562,10 @@ This methods gets called when:
 following pairs:
 
 \li Pair of static rigid actors
-\li A static rigid actor and a kinematic actor (unless one is a trigger or if explicitly enabled through #PxSceneFlag::eENABLE_KINEMATIC_STATIC_PAIRS)
-\li Two kinematic actors (unless one is a trigger or if explicitly enabled through #PxSceneFlag::eENABLE_KINEMATIC_PAIRS)
-\li Pair of particle systems
+\li A static rigid actor and a kinematic actor (unless one is a trigger or if explicitly enabled through PxSceneFlag::eENABLE_KINEMATIC_STATIC_PAIRS)
+\li Two kinematic actors (unless one is a trigger or if explicitly enabled through PxSceneFlag::eENABLE_KINEMATIC_PAIRS)
 \li Two jointed rigid bodies and the joint was defined to disable collision
 \li Two articulation links if connected through an articulation joint
-\li Cloth objects and rigid body actors
 
 \note This is a performance critical method and should be stateless. You should neither access external objects 
 from within this method nor should you call external methods that are not inlined. If you need a more complex
@@ -598,7 +610,7 @@ and performed after the simulation step.
 may have been deleted by the application earlier in the frame. It is the application's responsibility to prevent race conditions
 arising from using the SDK API in the callback while an application thread is making write calls to the scene, and to ensure that
 the callbacks are thread-safe. Return values which depend on when the callback is called during the frame will introduce nondeterminism 
-into the simulation. On PS3 use of this callback may compromise simulation performance.
+into the simulation.
 
 @see PxSceneDesc.filterCallback PxSimulationFilterShader
 */
@@ -618,11 +630,11 @@ public:
 	\param[in] attributes0 The filter attribute of the first object
 	\param[in] filterData0 The custom filter data of the first object
 	\param[in] a0 Actor pointer of the first object
-	\param[in] s0 Shape pointer of the first object (NULL if the object has no shapes, for example in the case of a particle system)
+	\param[in] s0 Shape pointer of the first object (NULL if the object has no shapes)
 	\param[in] attributes1 The filter attribute of the second object
 	\param[in] filterData1 The custom filter data of the second object
 	\param[in] a1 Actor pointer of the second object
-	\param[in] s1 Shape pointer of the second object (NULL if the object has no shapes, for example in the case of a  particle system)
+	\param[in] s1 Shape pointer of the second object (NULL if the object has no shapes)
 	\param[in,out] pairFlags In: Pair flags returned by the filter shader. Out: Additional information on how an accepted pair should get processed
 	\return Filter flags defining whether the pair should be discarded, temporarily ignored or processed and whether the pair
 	should be tracked and send a report on pair deletion through the filter callback
@@ -684,7 +696,36 @@ protected:
 	virtual						~PxSimulationFilterCallback() {}
 };
 
-#ifndef PX_DOXYGEN
+struct PxPairFilteringMode
+{
+	enum Enum
+	{
+		/**
+		Output pair from BP, potentially send to user callbacks, create regular interaction object.
+		Similar to enabling PxSceneFlag::eENABLE_KINEMATIC_STATIC_PAIRS / PxSceneFlag::eENABLE_KINEMATIC_PAIRS.
+		*/
+		eKEEP,
+
+		/**
+		Output pair from BP, create interaction marker. Can be later switched to regular interaction.
+		Similar to disabling PxSceneFlag::eENABLE_KINEMATIC_STATIC_PAIRS / PxSceneFlag::eENABLE_KINEMATIC_PAIRS.
+		*/
+		eSUPPRESS,
+
+		/**
+		Don't output pair from BP. Cannot be later switched to regular interaction, needs "resetFiltering" call.
+		*/
+		eKILL,
+
+		/**
+		Default is to ignore the mode and use PxSceneFlag::eENABLE_KINEMATIC_STATIC_PAIRS and PxSceneFlag::eENABLE_KINEMATIC_PAIRS instead (compatibility).
+		*/
+		eDEFAULT
+	};
+};
+
+
+#if !PX_DOXYGEN
 } // namespace physx
 #endif
 

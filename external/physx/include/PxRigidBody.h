@@ -1,12 +1,29 @@
-/*
- * Copyright (c) 2008-2015, NVIDIA CORPORATION.  All rights reserved.
- *
- * NVIDIA CORPORATION and its licensors retain all intellectual property
- * and proprietary rights in and to this software, related documentation
- * and any modifications thereto.  Any use, reproduction, disclosure or
- * distribution of this software and related documentation without an express
- * license agreement from NVIDIA CORPORATION is strictly prohibited.
- */
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
+//  * Redistributions of source code must retain the above copyright
+//    notice, this list of conditions and the following disclaimer.
+//  * Redistributions in binary form must reproduce the above copyright
+//    notice, this list of conditions and the following disclaimer in the
+//    documentation and/or other materials provided with the distribution.
+//  * Neither the name of NVIDIA CORPORATION nor the names of its
+//    contributors may be used to endorse or promote products derived
+//    from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+// PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+// CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+// PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+// OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Copyright (c) 2008-2019 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -20,7 +37,7 @@
 #include "PxRigidActor.h"
 #include "PxForceMode.h"
 
-#ifndef PX_DOXYGEN
+#if !PX_DOXYGEN
 namespace physx
 {
 #endif
@@ -92,18 +109,36 @@ struct PxRigidBodyFlag
 
 		\note This flag requires PxRigidBodyFlag::eENABLE_CCD to be raised to have any effect.
 		*/
-		eENABLE_CCD_FRICTION			= (1<<3)
+		eENABLE_CCD_FRICTION			= (1<<3),
+
+		/**
+		\brief Register a rigid body for reporting pose changes by the simulation at an early stage.
+
+		Sometimes it might be advantageous to get access to the new pose of a rigid body as early as possible and
+		not wait until the call to fetchResults() returns. Setting this flag will schedule the rigid body to get reported
+		in #PxSimulationEventCallback::onAdvance(). Please refer to the documentation of that callback to understand
+		the behavior and limitations of this functionality.
+
+		@see PxSimulationEventCallback::onAdvance()
+		*/
+		eENABLE_POSE_INTEGRATION_PREVIEW 	= (1 << 4),
+
+		/**
+		\brief Register a rigid body to dynamicly adjust contact offset based on velocity. This can be used to achieve a CCD effect.
+		*/
+		eENABLE_SPECULATIVE_CCD 			= (1 << 5),
+
+		/**
+		\brief Permit CCD to limit maxContactImpulse. This is useful for use-cases like a destruction system but can cause visual artefacts so is not enabled by default.
+		*/
+		eENABLE_CCD_MAX_CONTACT_IMPULSE = (1 << 6),
+
+		/**
+		\brief Carries over forces/accelerations between frames, rather than clearning them
+		*/
+		eRETAIN_ACCELERATIONS = (1<<7)
 	};
 };
-
-/**
-\deprecated
-\brief A legacy typedef. PxRigidDynamicFlag has been deprecated in favor of PxRigidBodyFlag. Retained for compatibility with old API only.
-
-@see PxRigidBodyFlag
-*/
-
-typedef PX_DEPRECATED PxRigidBodyFlag PxRigidDynamicFlag;
 
 /**
 \brief collection of set bits defined in PxRigidBodyFlag.
@@ -112,13 +147,6 @@ typedef PX_DEPRECATED PxRigidBodyFlag PxRigidDynamicFlag;
 */
 typedef PxFlags<PxRigidBodyFlag::Enum,PxU8> PxRigidBodyFlags;
 PX_FLAGS_OPERATORS(PxRigidBodyFlag::Enum,PxU8)
-
-/**
-\brief collection of set bits defined in PxRigidDynamicFlag.
-\deprecated PxRigidDynamicFlag is deprecated. Please use PxRigidBodyFlag
-*/
-typedef PxFlags<PxRigidDynamicFlag::Enum,PxU8> PxRigidDynamicFlags;
-
 
 /**
 \brief PxRigidBody is a base class shared between dynamic rigid body objects.
@@ -252,6 +280,56 @@ public:
 	*/
 	virtual		PxVec3			getMassSpaceInvInertiaTensor()			const = 0;
 
+	/************************************************************************************************/
+	/** @name Damping
+	*/
+
+	/**
+	\brief Sets the linear damping coefficient.
+
+	Zero represents no damping. The damping coefficient must be nonnegative.
+
+	<b>Default:</b> 0.0
+
+	\param[in] linDamp Linear damping coefficient. <b>Range:</b> [0, PX_MAX_F32)
+
+	@see getLinearDamping() setAngularDamping()
+	*/
+	virtual		void				setLinearDamping(PxReal linDamp) = 0;
+
+	/**
+	\brief Retrieves the linear damping coefficient.
+
+	\return The linear damping coefficient associated with this actor.
+
+	@see setLinearDamping() getAngularDamping()
+	*/
+	virtual		PxReal				getLinearDamping() const = 0;
+
+	/**
+	\brief Sets the angular damping coefficient.
+
+	Zero represents no damping.
+
+	The angular damping coefficient must be nonnegative.
+
+	<b>Default:</b> 0.05
+
+	\param[in] angDamp Angular damping coefficient. <b>Range:</b> [0, PX_MAX_F32)
+
+	@see getAngularDamping() setLinearDamping()
+	*/
+	virtual		void				setAngularDamping(PxReal angDamp) = 0;
+
+	/**
+	\brief Retrieves the angular damping coefficient.
+
+	\return The angular damping coefficient associated with this actor.
+
+	@see setAngularDamping() getLinearDamping()
+	*/
+	virtual		PxReal				getAngularDamping() const = 0;
+
 
 /************************************************************************************************/
 /** @name Velocity
@@ -321,7 +399,63 @@ public:
 	*/
 	virtual		void			setAngularVelocity(const PxVec3& angVel, bool autowake = true ) = 0;
 
-	
+	/**
+	\brief Lets you set the maximum angular velocity permitted for this actor.
+
+	For various internal computations, very quickly rotating actors introduce error
+	into the simulation, which leads to undesired results.
+
+	With this function, you can set the  maximum angular velocity permitted for this rigid body.
+	Higher angular velocities are clamped to this value.
+
+	Note: The angular velocity is clamped to the set value <i>before</i> the solver, which means that
+	the limit may still be momentarily exceeded.
+
+	<b>Default:</b> 100.0
+
+	\param[in] maxAngVel Max allowable angular velocity for actor. <b>Range:</b> [0, PX_MAX_F32)
+
+	@see getMaxAngularVelocity()
+	*/
+	virtual		void				setMaxAngularVelocity(PxReal maxAngVel) = 0;
+
+	/**
+	\brief Retrieves the maximum angular velocity permitted for this actor.
+
+	\return The maximum allowed angular velocity for this actor.
+
+	@see setMaxAngularVelocity
+	*/
+	virtual		PxReal				getMaxAngularVelocity()	const = 0;
+
+
+	/**
+	\brief Lets you set the maximum linear velocity permitted for this actor.
+
+	With this function, you can set the  maximum linear velocity permitted for this rigid body.
+	Higher angular velocities are clamped to this value.
+
+	Note: The angular velocity is clamped to the set value <i>before</i> the solver, which means that
+	the limit may still be momentarily exceeded.
+
+	<b>Default:</b> PX_MAX_F32
+
+	\param[in] maxLinVel Max allowable linear velocity for actor. <b>Range:</b> [0, PX_MAX_F32)
+
+	@see getMaxAngularVelocity()
+	*/
+	virtual		void				setMaxLinearVelocity(PxReal maxLinVel) = 0;
+
+	/**
+	\brief Retrieves the maximum angular velocity permitted for this actor.
+
+	\return The maximum allowed angular velocity for this actor.
+
+	@see setMaxLinearVelocity
+	*/
+	virtual		PxReal				getMaxLinearVelocity()	const = 0;
+
+
 /************************************************************************************************/
 /** @name Forces
 */
@@ -375,7 +509,7 @@ public:
 	
 	\note if this called on an articulation link, only the link is updated, not the entire articulation.
 
-	\note see #PxRigidBodyExt::computeVelocityDeltaFromImpulse for detatils of how to compute the change in angular velocity that 
+	\note see #PxRigidBodyExt::computeVelocityDeltaFromImpulse for details of how to compute the change in angular velocity that 
 	will arise from the application of an impulsive torque, where an impulsive torque is an applied torque multiplied by a timestep.
 
 	<b>Sleeping:</b> This call wakes the actor if it is sleeping and the autowake parameter is true (default) or the torque is non-zero.
@@ -430,25 +564,21 @@ public:
 	*/
 	virtual		void			clearTorque(PxForceMode::Enum mode = PxForceMode::eFORCE) = 0;
 
+
 	/**
-	\deprecated
-	\brief Raises or clears a particular dynamic rigid body flag.
-	
-	See the list of flags #PxRigidBodyFlag
+	\brief Sets the impulsive force and torque defined in the global coordinate frame to the actor.
 
-	<b>Default:</b> no flags are set
+	::PxForceMode determines if the cleared torque is to be conventional or impulsive.
 
-	<b>Sleeping:</b> Does <b>NOT</b> wake the actor up automatically.
+	\note The force modes PxForceMode::eIMPULSE and PxForceMode::eVELOCITY_CHANGE can not be applied to articulation links.
 
-	\param[in] flag		The PxRigidDynamic flag to raise(set) or clear. See #PxRigidDynamicFlag #PxRigidBodyFlag.
-	\param[in] value	The new boolean value for the flag.
+	\note It is invalid to use this method if the actor has not been added to a scene already or if PxActorFlag::eDISABLE_SIMULATION is set.
 
-	@see PxRigidDynamicFlag getRigidDynamicFlags() 
+	@see PxForceMode addTorque
 	*/
-	PX_DEPRECATED virtual	void	setRigidDynamicFlag(PxRigidDynamicFlag::Enum flag, bool value) = 0;
-	PX_DEPRECATED virtual	void	setRigidDynamicFlags(PxRigidDynamicFlags inFlags) = 0;
+	virtual		void			setForceAndTorque(const PxVec3& force, const PxVec3& torque, PxForceMode::Enum mode = PxForceMode::eFORCE) = 0;
 
-	  /**
+	/**
 	\brief Raises or clears a particular rigid body flag.
 	
 	See the list of flags #PxRigidBodyFlag
@@ -465,18 +595,6 @@ public:
 
 	virtual		void				setRigidBodyFlag(PxRigidBodyFlag::Enum flag, bool value) = 0;
 	virtual		void				setRigidBodyFlags(PxRigidBodyFlags inFlags) = 0;
-
-	/**
-	\deprecated
-	\brief Reads the PxRigidBody flags.
-	
-	See the list of flags #PxRigidBodyFlag
-
-	\return The values of the PxRigidBody flags.
-
-	@see PxRigidDynamicFlag setRigidDynamicFlag()
-	*/
-	PX_DEPRECATED virtual	PxRigidDynamicFlags	getRigidDynamicFlags()	const = 0;
 
 	/**
 	\brief Reads the PxRigidBody flags.
@@ -529,7 +647,7 @@ public:
 	This value controls how much velocity the solver can introduce to correct for penetrations in contacts. 
 	\param[in] biasClamp The maximum velocity to de-penetrate by <b>Range:</b> (0, PX_MAX_F32].
 	*/
-	virtual void setMaxDepenetrationVelocity(const PxReal biasClamp) = 0;
+	virtual void setMaxDepenetrationVelocity(PxReal biasClamp) = 0;
 
 	/**
 	\brief Returns the maximum depenetration velocity the solver is permitted to introduced.
@@ -539,19 +657,43 @@ public:
 	virtual PxReal getMaxDepenetrationVelocity() const = 0;
 
 
+	/**
+	\brief Sets a limit on the impulse that may be applied at a contact. The maximum impulse at a contact between two dynamic or kinematic
+	bodies will be the minimum	of the two limit values. For a collision between a static and a dynamic body, the impulse is limited
+	by the value for the dynamic body.
+
+	\param[in] maxImpulse the maximum contact impulse. <b>Range:</b> [0, PX_MAX_F32] <b>Default:</b> PX_MAX_F32
+
+	@see getMaxContactImpulse
+	*/
+	virtual void setMaxContactImpulse(PxReal maxImpulse) = 0;
+
+	/**
+	\brief Returns the maximum impulse that may be applied at a contact.
+
+	\return The maximum impulse that may be applied at a contact
+
+	@see setMaxContactImpulse
+	*/
+	virtual PxReal getMaxContactImpulse() const = 0;
+
+	/**
+	\brief Returns the island node index that only for internal use only
+
+	\return The island node index that only for internal use only
+	*/
+	virtual PxU32 getInternalIslandNodeIndex() const = 0;
+
 
 protected:
 	PX_INLINE					PxRigidBody(PxType concreteType, PxBaseFlags baseFlags) : PxRigidActor(concreteType, baseFlags) {}
 	PX_INLINE					PxRigidBody(PxBaseFlags baseFlags) : PxRigidActor(baseFlags) {}
 	virtual						~PxRigidBody()	{}
-	virtual		bool			isKindOf(const char* name)const	{	return !strcmp("PxRigidBody", name) || PxRigidActor::isKindOf(name); }
+	virtual		bool			isKindOf(const char* name)const	{	return !::strcmp("PxRigidBody", name) || PxRigidActor::isKindOf(name); }
 };
 
-PX_DEPRECATED PX_INLINE PxRigidBody*		PxActor::isRigidBody()				{ return is<PxRigidBody>();			}
-PX_DEPRECATED PX_INLINE const PxRigidBody*	PxActor::isRigidBody()		const	{ return is<PxRigidBody>();			}
 
-
-#ifndef PX_DOXYGEN
+#if !PX_DOXYGEN
 } // namespace physx
 #endif
 

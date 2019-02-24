@@ -1,12 +1,29 @@
-/*
- * Copyright (c) 2008-2015, NVIDIA CORPORATION.  All rights reserved.
- *
- * NVIDIA CORPORATION and its licensors retain all intellectual property
- * and proprietary rights in and to this software, related documentation
- * and any modifications thereto.  Any use, reproduction, disclosure or
- * distribution of this software and related documentation without an express
- * license agreement from NVIDIA CORPORATION is strictly prohibited.
- */
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
+//  * Redistributions of source code must retain the above copyright
+//    notice, this list of conditions and the following disclaimer.
+//  * Redistributions in binary form must reproduce the above copyright
+//    notice, this list of conditions and the following disclaimer in the
+//    documentation and/or other materials provided with the distribution.
+//  * Neither the name of NVIDIA CORPORATION nor the names of its
+//    contributors may be used to endorse or promote products derived
+//    from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+// PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+// CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+// PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+// OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+// Copyright (c) 2008-2019 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -18,9 +35,10 @@
 */
 
 #include "PxPhysXConfig.h"
+#include "foundation/PxAssert.h"
 #include "geometry/PxGeometry.h"
 
-#ifndef PX_DOXYGEN
+#if !PX_DOXYGEN
 namespace physx
 {
 #endif
@@ -33,32 +51,6 @@ namespace physx
 class PxSimulationStatistics
 {
 public:
-	/**
-	\brief Identifies each type of broadphase volume.
-	@see nbBroadPhaseAdds nbBroadPhaseRemoves
-	*/
-	enum VolumeType
-	{
-		/**
-		\brief A volume belonging to a rigid body object
-		@see PxRigidStatic PxRigidDynamic PxArticulationLink
-		*/
-		eRIGID_BODY,
-
-		/**
-		\brief A volume belonging to a particle system
-		@see PxParticleSystem PxParticleFluid
-		*/
-		ePARTICLE_SYSTEM,
-
-		/**
-		\brief A volume belonging to a cloth
-		@see PxCloth
-		*/
-		eCLOTH,
-
-		eVOLUME_COUNT
-	};
 
 	/**
 	\brief Different types of rigid body collision pair statistics.
@@ -136,6 +128,16 @@ public:
 
 	PxU32	nbShapes[PxGeometryType::eGEOMETRY_COUNT];
 
+	/**
+	\brief Number of aggregates in the scene.
+	*/
+	PxU32	nbAggregates;
+	
+	/**
+	\brief Number of articulations in the scene.
+	*/
+	PxU32	nbArticulations;
+
 //solver:
 	/**
 	\brief The number of 1D axis constraints(joints+contact) present in the current simulation step.
@@ -159,41 +161,23 @@ public:
 
 //broadphase:
 	/**
-	\brief Get number of broadphase volumes of a certain type added for the current simulation step.
+	\brief Get number of broadphase volumes added for the current simulation step.
 
-	\param[in] type The volume type for which to get the number
 	\return Number of broadphase volumes added.
-
-	@see VolumType
 	*/
-	PxU32 getNbBroadPhaseAdds(VolumeType type) const
+	PX_FORCE_INLINE	PxU32 getNbBroadPhaseAdds() const
 	{
-		if (type != eVOLUME_COUNT)
-			return nbBroadPhaseAdds[type];
-		else
-		{
-			PX_ASSERT(false);
-			return 0;
-		}
+		return nbBroadPhaseAdds;
 	}
 
 	/**
-	\brief Get number of broadphase volumes of a certain type removed for the current simulation step.
+	\brief Get number of broadphase volumes removed for the current simulation step.
 
-	\param[in] type The volume type for which to get the number
 	\return Number of broadphase volumes removed.
-
-	@see VolumType
 	*/
-	PxU32 getNbBroadPhaseRemoves(VolumeType type) const
+	PX_FORCE_INLINE	PxU32 getNbBroadPhaseRemoves() const
 	{
-		if (type != eVOLUME_COUNT)
-			return nbBroadPhaseRemoves[type];
-		else
-		{
-			PX_ASSERT(false);
-			return 0;
-		}
+		return nbBroadPhaseRemoves;
 	}
 
 //collisions:
@@ -212,39 +196,99 @@ public:
 	*/
 	PxU32 getRbPairStats(RbPairStatsType pairType, PxGeometryType::Enum g0, PxGeometryType::Enum g1) const
 	{
+		PX_ASSERT_WITH_MESSAGE(	(pairType >= eDISCRETE_CONTACT_PAIRS) &&
+								(pairType <= eTRIGGER_PAIRS),
+								"Invalid pairType in PxSimulationStatistics::getRbPairStats");
+
 		if (g0 >= PxGeometryType::eGEOMETRY_COUNT || g1 >= PxGeometryType::eGEOMETRY_COUNT)
 		{
 			PX_ASSERT(false);
 			return 0;
 		}
 
+		PxU32 nbPairs = 0;
 		switch(pairType)
 		{
 			case eDISCRETE_CONTACT_PAIRS:
-				return nbDiscreteContactPairs[g0][g1];
-
+				nbPairs = nbDiscreteContactPairs[g0][g1];
+				break;
 			case eCCD_PAIRS:
-				return nbCCDPairs[g0][g1];
-
+				nbPairs = nbCCDPairs[g0][g1];
+				break;
 			case eMODIFIED_CONTACT_PAIRS:
-				return nbModifiedContactPairs[g0][g1];
-
+				nbPairs = nbModifiedContactPairs[g0][g1];
+				break;
 			case eTRIGGER_PAIRS:
-				return nbTriggerPairs[g0][g1];
-
-			default:
-				PX_ASSERT(false);
-				return 0;
+				nbPairs = nbTriggerPairs[g0][g1];
+				break;
 		}
+		return nbPairs;
 	}
 
-	PxSimulationStatistics()
+	/**
+	\brief Total number of (non CCD) pairs reaching narrow phase
+	*/
+	PxU32	nbDiscreteContactPairsTotal;
+
+	/**
+	\brief Total number of (non CCD) pairs for which contacts are successfully cached (<=nbDiscreteContactPairsTotal)
+	\note This includes pairs for which no contacts are generated, it still counts as a cache hit.
+	*/
+	PxU32	nbDiscreteContactPairsWithCacheHits;
+
+	/**
+	\brief Total number of (non CCD) pairs for which at least 1 contact was generated (<=nbDiscreteContactPairsTotal)
+	*/
+	PxU32	nbDiscreteContactPairsWithContacts;
+
+	/**
+	\brief Number of new pairs found by BP this frame
+	*/
+	PxU32	nbNewPairs;
+
+	/**
+	\brief Number of lost pairs from BP this frame
+	*/
+	PxU32	nbLostPairs;
+
+	/**
+	\brief Number of new touches found by NP this frame
+	*/
+	PxU32	nbNewTouches;
+
+	/**
+	\brief Number of lost touches from NP this frame
+	*/
+	PxU32	nbLostTouches;
+
+	/**
+	\brief Number of partitions used by the solver this frame
+	*/
+	PxU32	nbPartitions;
+
+	PxSimulationStatistics() :
+		nbActiveConstraints					(0),
+		nbActiveDynamicBodies				(0),
+		nbActiveKinematicBodies				(0),
+		nbStaticBodies						(0),
+		nbDynamicBodies						(0),
+		nbAggregates						(0),
+		nbArticulations						(0),
+		nbAxisSolverConstraints				(0),
+		compressedContactSize				(0),
+		requiredContactConstraintMemory		(0),
+		peakConstraintMemory				(0),
+		nbDiscreteContactPairsTotal			(0),
+		nbDiscreteContactPairsWithCacheHits	(0),
+		nbDiscreteContactPairsWithContacts	(0),
+		nbNewPairs							(0),
+		nbLostPairs							(0),
+		nbNewTouches						(0),
+		nbLostTouches						(0),
+		nbPartitions						(0)
 	{
-		for(PxU32 i=0; i < eVOLUME_COUNT; i++)
-		{
-			nbBroadPhaseAdds[i] = 0;
-			nbBroadPhaseRemoves[i] = 0;
-		}
+		nbBroadPhaseAdds = 0;
+		nbBroadPhaseRemoves = 0;
 
 		for(PxU32 i=0; i < PxGeometryType::eGEOMETRY_COUNT; i++)
 		{
@@ -261,23 +305,6 @@ public:
 		{
 			nbShapes[i] = 0;
 		}
-
-		totalDiscreteContactPairsAnyShape = 0;
-
-		nbActiveConstraints = 0;
-		nbActiveDynamicBodies = 0;
-		nbActiveKinematicBodies = 0;
-		nbStaticBodies = 0;
-		nbDynamicBodies = 0;
-		compressedContactSize = 0;
-		requiredContactConstraintMemory = 0;
-		peakConstraintMemory = 0;
-
-		nbAxisSolverConstraints = 0;
-
-		particlesGpuMeshCacheSize = 0;
-		particlesGpuMeshCacheUsed = 0;
-		particlesGpuMeshCacheHitrate = 0.0f;
 	}
 
 
@@ -285,23 +312,17 @@ public:
 	// We advise to not access these members directly. Use the provided accessor methods instead.
 	//
 //broadphase:
-	PxU32	nbBroadPhaseAdds[eVOLUME_COUNT];
-	PxU32	nbBroadPhaseRemoves[eVOLUME_COUNT];
+	PxU32	nbBroadPhaseAdds;
+	PxU32	nbBroadPhaseRemoves;
 
 //collisions:
 	PxU32   nbDiscreteContactPairs[PxGeometryType::eGEOMETRY_COUNT][PxGeometryType::eGEOMETRY_COUNT];
 	PxU32   nbCCDPairs[PxGeometryType::eGEOMETRY_COUNT][PxGeometryType::eGEOMETRY_COUNT];
 	PxU32   nbModifiedContactPairs[PxGeometryType::eGEOMETRY_COUNT][PxGeometryType::eGEOMETRY_COUNT];
 	PxU32   nbTriggerPairs[PxGeometryType::eGEOMETRY_COUNT][PxGeometryType::eGEOMETRY_COUNT];
-	PxU32	totalDiscreteContactPairsAnyShape;
-
-//triangle mesh cache statistics
-	PxU32	particlesGpuMeshCacheSize;
-	PxU32	particlesGpuMeshCacheUsed;
-	PxReal	particlesGpuMeshCacheHitrate;
 };
 
-#ifndef PX_DOXYGEN
+#if !PX_DOXYGEN
 } // namespace physx
 #endif
 
