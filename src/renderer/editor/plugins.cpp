@@ -52,6 +52,12 @@
 #include <crnlib.h>
 #include <cstddef>
 
+namespace bx
+{
+///
+void memCopy(void* _dst, const void* _src, size_t _numBytes);
+
+}
 
 using namespace Lumix;
 
@@ -2554,15 +2560,15 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 		RenderInterface* render_interface = LUMIX_NEW(allocator, RenderInterfaceImpl)(editor, *scene_view.getPipeline());
 		editor.setRenderInterface(render_interface);
 
-		m_index_buffer = bgfx::createDynamicIndexBuffer(1024 * 256);
-		m_vertex_buffer = bgfx::createDynamicVertexBuffer(1024 * 256, renderer->getBasic2DVertexDecl());
+// 		m_index_buffer = bgfx::createDynamicIndexBuffer(1024 * 256);
+// 		m_vertex_buffer = bgfx::createDynamicVertexBuffer(1024 * 256, renderer->getBasic2DVertexDecl());
 	}
 
 
 	~EditorUIRenderPlugin()
 	{
-		bgfx::destroy(m_index_buffer);
-		bgfx::destroy(m_vertex_buffer);
+// 		bgfx::destroy(m_index_buffer);
+// 		bgfx::destroy(m_vertex_buffer);
 		WorldEditor& editor = m_app.getWorldEditor();
 		shutdownImGui();
 	}
@@ -2673,10 +2679,17 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 		int num_vertices = cmd_list->VtxBuffer.size();
 		auto& decl = renderer->getBasic2DVertexDecl();
 
-		const bgfx::Memory* mem_ib = bgfx::copy(&cmd_list->IdxBuffer[0], num_indices * sizeof(u16));
-		const bgfx::Memory* mem_vb = bgfx::copy(&cmd_list->VtxBuffer[0], num_vertices * decl.getStride());
-		bgfx::updateDynamicIndexBuffer(m_index_buffer, m_ib_offset, mem_ib);
-		bgfx::updateDynamicVertexBuffer(m_vertex_buffer, m_vb_offset, mem_vb);
+		if (bgfx::getAvailTransientIndexBuffer(num_indices) < (u32)num_indices) return;
+		if (bgfx::getAvailTransientVertexBuffer(num_vertices, decl) < (u32)num_vertices) return;
+		bgfx::TransientVertexBuffer vertex_buffer;
+		bgfx::TransientIndexBuffer index_buffer;
+		bgfx::allocTransientVertexBuffer(&vertex_buffer, num_vertices, decl);
+		bgfx::allocTransientIndexBuffer(&index_buffer, num_indices);
+		ImDrawVert* verts = (ImDrawVert*)vertex_buffer.data;
+		bx::memCopy(verts, cmd_list->VtxBuffer.begin(), num_vertices * sizeof(ImDrawVert));
+		ImDrawIdx* indices = (ImDrawIdx*)index_buffer.data;
+		bx::memCopy(indices, cmd_list->IdxBuffer.begin(), num_indices * sizeof(ImDrawIdx));
+
 		u32 elem_offset = 0;
 		const ImDrawCmd* pcmd_begin = cmd_list->CmdBuffer.begin();
 		const ImDrawCmd* pcmd_end = cmd_list->CmdBuffer.end();
@@ -2711,11 +2724,9 @@ struct EditorUIRenderPlugin LUMIX_FINAL : public StudioApp::GUIPlugin
 			ShaderInstance& shader_instance = material->getShaderInstance();
 			bgfx::setStencil(BGFX_STENCIL_NONE, BGFX_STENCIL_NONE);
 			bgfx::setState(BGFX_STATE_WRITE_RGB | BGFX_STATE_WRITE_A | BGFX_STATE_WRITE_Z | render_states);
-			bgfx::setVertexBuffer(0, m_vertex_buffer, m_vb_offset, num_vertices);
-			u32 first_index = elem_offset + m_ib_offset;
-			bgfx::setIndexBuffer(m_index_buffer, first_index, pcmd->ElemCount);
+			bgfx::setVertexBuffer(0, &vertex_buffer, 0, num_vertices);
+			bgfx::setIndexBuffer(&index_buffer, elem_offset, pcmd->ElemCount);
 			bgfx::submit(view, shader_instance.getProgramHandle(pass_idx));
-			
 
 			elem_offset += pcmd->ElemCount;
 		}
