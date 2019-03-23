@@ -397,34 +397,7 @@ struct RendererImpl final : public Renderer
 		, m_frame_semaphore(2, 2)
 		, m_layers(m_allocator)
 	{
-		registerProperties(engine.getAllocator());
-		char cmd_line[4096];
-		OS::getCommandLine(cmd_line, lengthOf(cmd_line));
-		CommandLineParser cmd_line_parser(cmd_line);
-		m_vsync = true;
-		while (cmd_line_parser.next())
-		{
-			if (cmd_line_parser.currentEquals("-no_vsync"))
-			{
-				m_vsync = false;
-				break;
-			}
-		}
-
-		ResourceManagerHub& manager = engine.getResourceManager();
-		m_pipeline_manager.create(PipelineResource::TYPE, manager);
-		m_texture_manager.create(Texture::TYPE, manager);
-		m_model_manager.create(Model::TYPE, manager);
-		m_material_manager.create(Material::TYPE, manager);
-		m_particle_emitter_manager.create(ParticleEmitterResource::TYPE, manager);
-		m_shader_manager.create(Shader::TYPE, manager);
-		m_font_manager = LUMIX_NEW(m_allocator, FontManager)(*this, m_allocator);
-		m_font_manager->create(FontResource::TYPE, manager);
-
-		RenderScene::registerLuaAPI(m_engine.getState());
-
-		m_render_task.create("render task");
-		m_layers.emplace("default");
+		ffr::preinit(m_allocator);
 	}
 
 
@@ -446,6 +419,39 @@ struct RendererImpl final : public Renderer
 		}
 		m_render_task.m_finished_semaphore.wait();
 		m_render_task.destroy();
+	}
+
+
+	void init() override
+	{
+		registerProperties(m_engine.getAllocator());
+		char cmd_line[4096];
+		OS::getCommandLine(cmd_line, lengthOf(cmd_line));
+		CommandLineParser cmd_line_parser(cmd_line);
+		m_vsync = true;
+		while (cmd_line_parser.next())
+		{
+			if (cmd_line_parser.currentEquals("-no_vsync"))
+			{
+				m_vsync = false;
+				break;
+			}
+		}
+
+		ResourceManagerHub& manager = m_engine.getResourceManager();
+		m_pipeline_manager.create(PipelineResource::TYPE, manager);
+		m_texture_manager.create(Texture::TYPE, manager);
+		m_model_manager.create(Model::TYPE, manager);
+		m_material_manager.create(Material::TYPE, manager);
+		m_particle_emitter_manager.create(ParticleEmitterResource::TYPE, manager);
+		m_shader_manager.create(Shader::TYPE, manager);
+		m_font_manager = LUMIX_NEW(m_allocator, FontManager)(*this, m_allocator);
+		m_font_manager->create(FontResource::TYPE, manager);
+
+		RenderScene::registerLuaAPI(m_engine.getState());
+
+		m_render_task.create("render task");
+		m_layers.emplace("default");
 	}
 
 

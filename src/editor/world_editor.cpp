@@ -3146,6 +3146,16 @@ public:
 			}
 		}
 
+		OS::InitWindowArgs create_win_args;
+		create_win_args.name = "Lumix Studio";
+		create_win_args.handle_file_drops = true;
+		m_window = OS::createWindow(create_win_args);
+		Engine::PlatformData platform_data = {};
+		platform_data.window_handle = m_window;
+		m_engine->setPlatformData(platform_data);
+
+		plugin_manager.initPlugins();
+
 		m_prefab_system = PrefabSystem::create(*this);
 
 		m_editor_command_creators.insert(
@@ -3189,6 +3199,12 @@ public:
 				break;
 			}
 		}
+	}
+
+
+	OS::WindowHandle getWindow() override
+	{
+		return m_window;
 	}
 
 
@@ -3801,6 +3817,7 @@ private:
 	SnapMode m_snap_mode;
 	FS::IFile* m_game_mode_file;
 	Engine* m_engine;
+	OS::WindowHandle m_window;
 	EntityPtr m_selected_entity_on_game_mode;
 	DelegateList<void()> m_universe_destroyed;
 	DelegateList<void()> m_universe_created;

@@ -15,7 +15,10 @@ struct PropertyBase;
 struct IArrayProperty;
 }
 
-namespace OS { enum class MouseButton; }
+namespace OS { 
+	enum class MouseButton; 
+	using WindowHandle = void*; 
+}
 
 template <typename T> class DelegateList;
 template <typename T> class Array;
@@ -76,6 +79,7 @@ public:
 
 	virtual void setRenderInterface(RenderInterface* interface) = 0;
 	virtual RenderInterface* getRenderInterface() = 0;
+	virtual OS::WindowHandle getWindow() = 0;
 	virtual void update() = 0;
 	virtual void updateEngine() = 0;
 	virtual void beginCommandGroup(u32 type) = 0;
