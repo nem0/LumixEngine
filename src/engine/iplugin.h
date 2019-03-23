@@ -38,6 +38,7 @@ namespace Lumix
 	{
 		virtual ~IPlugin();
 
+		virtual void init() {}
 		virtual void serialize(OutputBlob&) {}
 		virtual void deserialize(InputBlob&) {}
 		virtual void update(float) {}

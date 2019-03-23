@@ -34,7 +34,6 @@
 #include "log_ui.h"
 #include "profiler_ui.h"
 #include "property_grid.h"
-#include "renderer/ffr/ffr.h"
 #include "settings.h"
 #include "utils.h"
 
@@ -274,16 +273,8 @@ public:
 		m_engine = Engine::create(current_dir, nullptr, m_allocator);
 		createLua();
 
-		ffr::preinit(m_allocator);
-		OS::InitWindowArgs create_win_args;
-		create_win_args.name = "Lumix Studio";
-		create_win_args.handle_file_drops = true;
-		m_window = OS::createWindow(create_win_args);
-		Engine::PlatformData platform_data = {};
-		platform_data.window_handle = m_window;
-		m_engine->setPlatformData(platform_data);
-
 		m_editor = WorldEditor::create(current_dir, *m_engine, m_allocator);
+		m_window = m_editor->getWindow();
 		m_settings.m_editor = m_editor;
 		scanUniverses();
 		loadUserPlugins();

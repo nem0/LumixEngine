@@ -46,10 +46,6 @@ struct AudioSystemImpl final : public AudioSystem
 		, m_manager(engine.getAllocator())
 		, m_device(nullptr)
 	{
-		registerProperties(engine.getAllocator());
-		AudioScene::registerLuaAPI(m_engine.getState());
-		m_device = AudioDevice::create(m_engine);
-		m_manager.create(Clip::TYPE, m_engine.getResourceManager());
 	}
 
 
@@ -57,6 +53,15 @@ struct AudioSystemImpl final : public AudioSystem
 	{
 		AudioDevice::destroy(*m_device);
 		m_manager.destroy();
+	}
+
+
+	void init()
+	{
+		registerProperties(m_engine.getAllocator());
+		AudioScene::registerLuaAPI(m_engine.getState());
+		m_device = AudioDevice::create(m_engine);
+		m_manager.create(Clip::TYPE, m_engine.getResourceManager());
 	}
 
 
