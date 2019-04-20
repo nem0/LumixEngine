@@ -2668,9 +2668,21 @@ public:
 				if (a->shortcut[i] == OS::Keycode::INVALID) break;
 
 				if (!OS::isKeyDown(a->shortcut[i])) break;
-				if (a->shortcut[i] == OS::Keycode::CTRL) action_modifiers |= 2;
-				else if (a->shortcut[i] == OS::Keycode::MENU) action_modifiers |= 4;
-				else if (a->shortcut[i] == OS::Keycode::SHIFT) action_modifiers |= 1;
+				switch (a->shortcut[i]) {
+					case OS::Keycode::LSHIFT:
+					case OS::Keycode::RSHIFT:
+					case OS::Keycode::SHIFT:
+						action_modifiers |= 1;
+						break;
+					case OS::Keycode::CTRL:
+					case OS::Keycode::LCTRL:
+					case OS::Keycode::RCTRL:
+						action_modifiers |= 2; 
+						break;
+					case OS::Keycode::MENU:
+						action_modifiers |= 4;
+						break;
+				}
 			}
 		}
 	}
