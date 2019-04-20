@@ -113,7 +113,8 @@ void LogUI::showNotifications()
 
 	ImGui::SetNextWindowPos(ImVec2(10, 30));
 	ImGui::SetNextWindowSizeConstraints(ImVec2(-FLT_MAX, 0), ImVec2(FLT_MAX, 200));
-	ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings;
+	ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove |
+							 ImGuiWindowFlags_NoSavedSettings;
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1);
 	if (!ImGui::Begin("Notifications", nullptr, flags)) goto end;
 
@@ -129,9 +130,9 @@ void LogUI::showNotifications()
 		ImGui::Text("%s", m_notifications[i].message.c_str());
 	}
 
-	end:
-		ImGui::End();
-		ImGui::PopStyleVar();
+end:
+	ImGui::End();
+	ImGui::PopStyleVar();
 }
 
 
@@ -166,21 +167,23 @@ void LogUI::onGUI()
 	if (!m_is_open) return;
 	if (ImGui::Begin("Log", &m_is_open))
 	{
-		const char* labels[] = { "Info", "Warning", "Error" };
+		const char* labels[] = {"Info", "Warning", "Error"};
 		for (int i = 0; i < lengthOf(labels); ++i)
 		{
 			char label[40];
 			fillLabel(label, sizeof(label), labels[i], m_new_message_count[i]);
-			if(i > 0) ImGui::SameLine();
+			if (i > 0) ImGui::SameLine();
 			bool b = m_level_filter & (1 << i);
 			if (ImGui::Checkbox(label, &b))
 			{
-				if (b) m_level_filter |= 1 << i;
-				else m_level_filter &= ~(1 << i);
+				if (b)
+					m_level_filter |= 1 << i;
+				else
+					m_level_filter &= ~(1 << i);
 				m_new_message_count[i] = 0;
 			}
 		}
-		
+
 		ImGui::SameLine();
 		char filter[128] = "";
 		ImGui::LabellessInputText("Filter", filter, sizeof(filter));
@@ -236,9 +239,12 @@ void LogUI::onGUI()
 				Array<Message> filtered_messages(m_allocator);
 				for (int i = 0; i < m_messages.size(); ++i)
 				{
-					if ((m_level_filter & (1 << m_messages[i].type)) != 0) continue;
-					filtered_messages.emplace(m_messages[i]);
-					m_new_message_count[m_messages[i].type] = 0;
+					if ((m_level_filter & (1 << m_messages[i].type)) == 0) {
+						filtered_messages.emplace(m_messages[i]);
+					}
+					else {
+						m_new_message_count[m_messages[i].type] = 0;
+					}
 				}
 				m_messages.swap(filtered_messages);
 			}
