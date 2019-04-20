@@ -430,6 +430,7 @@ struct ProfilerUIImpl final : public ProfilerUI
 	volatile int m_bytes_read;
 	float m_next_transfer_rate_time;
 	SortOrder m_sort_order;
+	float m_autopause = -33.3333f;
 };
 
 
@@ -788,6 +789,15 @@ void ProfilerUIImpl::onGUICPUProfiler()
 	ImGui::Text("Zoom: %f", m_zoom / double(DEFAULT_ZOOM));
 	ImGui::SameLine();
 	if (ImGui::Button("Reset zoom")) m_zoom = DEFAULT_ZOOM;
+	ImGui::SameLine();
+	bool do_autopause = m_autopause > 0;
+	if (ImGui::Checkbox("Autopause enabled", &do_autopause)) {
+		m_autopause = -m_autopause;
+	}
+	if (m_autopause > 0) {
+		ImGui::SameLine();
+		ImGui::InputFloat("Autopause limit (ms)", &m_autopause, 1.f, 10.f, 2);
+	}
 
 	auto& contexts = Profiler::lockContexts();
 	
@@ -976,6 +986,13 @@ void ProfilerUIImpl::onGUICPUProfiler()
 
 	dl->ChannelsMerge();
 	Profiler::unlockContexts();
+
+	if (m_autopause > 0 && !m_is_paused && Profiler::getLastFrameDuration() * 1000.f > m_autopause) {
+		m_is_paused = true;
+		Profiler::pause(m_is_paused);
+		m_view_offset = 0;
+		m_paused_time = Profiler::now();
+	}
 
 	if (ImGui::CollapsingHeader("Visible blocks")) {
 		ImGui::LabellessInputText("Filter", m_cpu_block_filter, sizeof(m_cpu_block_filter));

@@ -46,6 +46,8 @@ static struct Instance
 	MT::SpinMutex mutex;
 	Timer* timer;
 	bool paused = false;
+	u64 last_frame_duration = 0;
+	u64 last_frame_time = 0;
 } g_instance;
 
 
@@ -147,6 +149,12 @@ void beginBlock(const char* name)
 }
 
 
+float getLastFrameDuration()
+{
+	return float(g_instance.last_frame_duration / double(frequency()));
+}
+
+
 void beginFiberSwitch()
 {
 	ThreadContext* ctx = g_instance.getThreadContext();
@@ -181,6 +189,11 @@ u64 frequency()
 
 void frame()
 {
+	const u64 n = now();
+	if (g_instance.last_frame_time != 0) {
+		g_instance.last_frame_duration = n - g_instance.last_frame_time;
+	}
+	g_instance.last_frame_time = n;
 	ThreadContext* ctx = g_instance.getThreadContext();
 	write(*ctx, EventType::FRAME, 0);
 }
