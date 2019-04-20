@@ -70,6 +70,7 @@ LUMIX_ENGINE_API void frame();
 LUMIX_ENGINE_API void recordString(const char* value);
 
 LUMIX_ENGINE_API void beginFiberSwitch();
+LUMIX_ENGINE_API float getLastFrameDuration();
 
 LUMIX_ENGINE_API Array<ThreadContext*>& lockContexts();
 LUMIX_ENGINE_API void unlockContexts();

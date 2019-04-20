@@ -440,6 +440,7 @@ struct PipelineImpl final : Pipeline
 
 	void clearBuffers()
 	{
+		PROFILE_FUNCTION();
 		for (Renderbuffer& rb : m_renderbuffers) {
 			++rb.frame_counter;
 		}
@@ -478,14 +479,17 @@ struct PipelineImpl final : Pipeline
 		m_stats = {};
 		clearBuffers();
 
-		for (int i = m_renderbuffers.size() - 1; i >= 0; --i) {
-			Renderbuffer& rb = m_renderbuffers[i];
-			if(!rb.use_realtive_size) continue;
-			const uint w = uint(rb.relative_size.x * m_viewport.w + 0.5f);
-			const uint h = uint(rb.relative_size.y * m_viewport.h + 0.5f);
-			if(rb.width != w || rb.height != h) {
-				m_renderer.destroy(rb.handle);
-				m_renderbuffers.eraseFast(i);
+		{
+			PROFILE_BLOCK("destroy renderbuffers");
+			for (int i = m_renderbuffers.size() - 1; i >= 0; --i) {
+				Renderbuffer& rb = m_renderbuffers[i];
+				if (!rb.use_realtive_size) continue;
+				const uint w = uint(rb.relative_size.x * m_viewport.w + 0.5f);
+				const uint h = uint(rb.relative_size.y * m_viewport.h + 0.5f);
+				if (rb.width != w || rb.height != h) {
+					m_renderer.destroy(rb.handle);
+					m_renderbuffers.eraseFast(i);
+				}
 			}
 		}
 
@@ -523,8 +527,10 @@ struct PipelineImpl final : Pipeline
 			lua_pop(m_lua_state, 2);
 			return false;
 		}
-
-		LuaWrapper::pcall(m_lua_state, 0);
+		{
+			PROFILE_BLOCK("lua pipeline main");
+			LuaWrapper::pcall(m_lua_state, 0);
+		}
 		lua_pop(m_lua_state, 1);
 		freeCommandSets();
 		return true;
@@ -784,6 +790,7 @@ struct PipelineImpl final : Pipeline
 
 	int createRenderbuffer(float w, float h, bool relative, const char* format_str, const char* debug_name)
 	{
+		PROFILE_FUNCTION();
 		const uint rb_w = uint(relative ? w * m_viewport.w + 0.5f : w);
 		const uint rb_h = uint(relative ? h * m_viewport.h + 0.5f : h);
 		const ffr::TextureFormat format = getFormat(format_str);
@@ -1778,6 +1785,7 @@ struct PipelineImpl final : Pipeline
 
 	static int renderBucket(lua_State* L)
 	{
+		PROFILE_FUNCTION();
 		struct RenderJob : Renderer::RenderJob
 		{
 			void setup() override {}
@@ -2051,6 +2059,7 @@ struct PipelineImpl final : Pipeline
 
 	static int setRenderTargets(lua_State* L)
 	{ 
+		PROFILE_FUNCTION();
 		const int pipeline_idx = lua_upvalueindex(1);
 		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
 			LuaWrapper::argError<PipelineImpl*>(L, pipeline_idx );
