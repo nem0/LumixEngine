@@ -18,6 +18,15 @@ namespace Profiler
 {
 
 
+struct ContextSwitchRecord
+{
+	u32 old_thread_id;
+	u32 new_thread_id;
+	u64 timestamp;
+	i8 reason;
+};
+
+
 struct ThreadContext
 {
 	ThreadContext(IAllocator& allocator) 
@@ -34,6 +43,7 @@ struct ThreadContext
 	bool open = false;
 	MT::SpinMutex mutex;
 	StaticString<64> name;
+	u32 thread_id;
 };
 
 
@@ -43,7 +53,10 @@ enum class EventType : u8
 	BLOCK_COLOR,
 	END_BLOCK,
 	FRAME,
-	STRING
+	STRING,
+	BEGIN_FIBER_SWITCH,
+	END_FIBER_SWITCH,
+	CONTEXT_SWITCH
 };
 
 
@@ -59,7 +72,6 @@ struct EventHeader
 
 LUMIX_ENGINE_API void setThreadName(const char* name);
 
-LUMIX_ENGINE_API u64 now();
 LUMIX_ENGINE_API u64 frequency();
 LUMIX_ENGINE_API void pause(bool paused);
 
@@ -69,9 +81,12 @@ LUMIX_ENGINE_API void endBlock();
 LUMIX_ENGINE_API void frame();
 LUMIX_ENGINE_API void recordString(const char* value);
 
-LUMIX_ENGINE_API void beginFiberSwitch();
+LUMIX_ENGINE_API i32 beginFiberSwitch();
+LUMIX_ENGINE_API void endFiberSwitch(i32 switch_id);
 LUMIX_ENGINE_API float getLastFrameDuration();
 
+LUMIX_ENGINE_API bool contextSwitchesEnabled();
+LUMIX_ENGINE_API ThreadContext& getGlobalContext();
 LUMIX_ENGINE_API Array<ThreadContext*>& lockContexts();
 LUMIX_ENGINE_API void unlockContexts();
 

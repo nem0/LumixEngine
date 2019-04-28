@@ -43,6 +43,53 @@ enum MemoryColumn
 };
 
 
+static const char* getContexSwitchReasonString(i8 reason)
+{
+	const char* reasons[] = {
+		"Executive"		   ,
+		"FreePage"		   ,
+		"PageIn"		   ,
+		"PoolAllocation"   ,
+		"DelayExecution"   ,
+		"Suspended"		   ,
+		"UserRequest"	   ,
+		"WrExecutive"	   ,
+		"WrFreePage"	   ,
+		"WrPageIn"		   ,
+		"WrPoolAllocation" ,
+		"WrDelayExecution" ,
+		"WrSuspended"	   ,
+		"WrUserRequest"	   ,
+		"WrEventPair"	   ,
+		"WrQueue"		   ,
+		"WrLpcReceive"	   ,
+		"WrLpcReply"	   ,
+		"WrVirtualMemory"  ,
+		"WrPageOut"		   ,
+		"WrRendezvous"	   ,
+		"WrKeyedEvent"	   ,
+		"WrTerminated"	   ,
+		"WrProcessInSwap"  ,
+		"WrCpuRateControl" ,
+		"WrCalloutStack"   ,
+		"WrKernel"		   ,
+		"WrResource"	   ,
+		"WrPushLock"	   ,
+		"WrMutex"		   ,
+		"WrQuantumEnd"	   ,
+		"WrDispatchInt"	   ,
+		"WrPreempted"	   ,
+		"WrYieldExecution" ,
+		"WrFastMutex"	   ,
+		"WrGuardedMutex"   ,
+		"WrRundown"		   ,
+		"MaximumWaitReason",
+	};
+	if (reason >= lengthOf(reasons)) return "Unknown";
+	return reasons[reason];
+}
+
+
 struct ProfilerUIImpl final : public ProfilerUI
 {
 	ProfilerUIImpl(Debug::Allocator& allocator, Engine& engine)
@@ -431,6 +478,7 @@ struct ProfilerUIImpl final : public ProfilerUI
 	float m_next_transfer_rate_time;
 	SortOrder m_sort_order;
 	float m_autopause = -33.3333f;
+	bool m_show_context_switches = true;
 };
 
 
@@ -776,6 +824,21 @@ struct VisibleBlock
 };
 
 
+struct ThreadRecord
+{
+	float y;
+};
+
+
+static const char* getThreadName(const Array<Profiler::ThreadContext*>& contexts, u32 thread_id)
+{
+	for (Profiler::ThreadContext* ctx : contexts) {
+		if (ctx->thread_id == thread_id) return ctx->name;
+	}
+	return "Unknown";
+}
+
+
 void ProfilerUIImpl::onGUICPUProfiler()
 {
 	if (!ImGui::CollapsingHeader("CPU")) return;
@@ -783,25 +846,34 @@ void ProfilerUIImpl::onGUICPUProfiler()
 	if(ImGui::Checkbox("Pause", &m_is_paused)) {
 		Profiler::pause(m_is_paused);
 		m_view_offset = 0;
-		m_paused_time = Profiler::now();
-	}
-	ImGui::SameLine();
-	ImGui::Text("Zoom: %f", m_zoom / double(DEFAULT_ZOOM));
-	ImGui::SameLine();
-	if (ImGui::Button("Reset zoom")) m_zoom = DEFAULT_ZOOM;
-	ImGui::SameLine();
-	bool do_autopause = m_autopause > 0;
-	if (ImGui::Checkbox("Autopause enabled", &do_autopause)) {
-		m_autopause = -m_autopause;
-	}
-	if (m_autopause > 0) {
-		ImGui::SameLine();
-		ImGui::InputFloat("Autopause limit (ms)", &m_autopause, 1.f, 10.f, 2);
+		m_paused_time = Timer::getRawTimestamp();
 	}
 
-	auto& contexts = Profiler::lockContexts();
+	ImGui::SameLine();
+	if (ImGui::BeginMenu("Advanced")) {
+		ImGui::Text("Zoom: %f", m_zoom / double(DEFAULT_ZOOM));
+		if (ImGui::MenuItem("Reset zoom")) m_zoom = DEFAULT_ZOOM;
+		bool do_autopause = m_autopause > 0;
+		if (ImGui::Checkbox("Autopause enabled", &do_autopause)) {
+			m_autopause = -m_autopause;
+		}
+		if (m_autopause > 0) {
+			ImGui::InputFloat("Autopause limit (ms)", &m_autopause, 1.f, 10.f, 2);
+		}
+		if (Profiler::contextSwitchesEnabled()) {
+			ImGui::Checkbox("Show context switches", &m_show_context_switches);
+		}
+		else {
+			ImGui::Separator();
+			ImGui::Text("Context switch tracing not available.");
+			ImGui::Text("Run the app as an administrator.");
+		}
+		ImGui::EndMenu();
+	}
+
+	const Array<Profiler::ThreadContext*>& contexts = Profiler::lockContexts();
 	
-	const u64 view_end = m_is_paused ? m_paused_time + m_view_offset : Profiler::now();
+	const u64 view_end = m_is_paused ? m_paused_time + m_view_offset : Timer::getRawTimestamp();
 	const u64 view_start = view_end < m_zoom ? 0 : view_end - m_zoom;
 	float h = 0;
 	for(Profiler::ThreadContext* ctx : contexts) {
@@ -833,12 +905,12 @@ void ProfilerUIImpl::onGUICPUProfiler()
 		}
 	}
 
-	dl->ChannelsSplit(2);
-
 	HashMap<const char*, const char*> visible_blocks(1024, m_allocator);
+	HashMap<u32, ThreadRecord> threads_records(64, m_allocator);
 
 	for(Profiler::ThreadContext* ctx : contexts) {
 		MT::SpinLock lock(ctx->mutex);
+		threads_records.insert(ctx->thread_id, { y });
 		renderArrow(ImVec2(a.x, y), ctx->open ? ImGuiDir_Down : ImGuiDir_Right, 1, dl);
 		dl->AddText(ImVec2(a.x + 20, y), ImGui::GetColorU32(ImGuiCol_Text), ctx->name);
 		dl->AddLine(ImVec2(a.x, y + 20), ImVec2(b.x, y + 20), ImGui::GetColorU32(ImGuiCol_Border));
@@ -854,6 +926,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 
 		struct {
 			uint offset;
+			i32 switch_id;
 			u32 color;
 		} open_blocks[64];
 		int level = -1;
@@ -914,6 +987,12 @@ void ProfilerUIImpl::onGUICPUProfiler()
 			Profiler::EventHeader header;
 			read(*ctx, p, header);
 			switch(header.type) {
+				case Profiler::EventType::END_FIBER_SWITCH:
+				case Profiler::EventType::BEGIN_FIBER_SWITCH: {
+						i32 switch_id;
+						read(*ctx, p + sizeof(Profiler::EventHeader), switch_id);
+					}
+					break;
 				case Profiler::EventType::BEGIN_BLOCK:
 					++level;
 					ASSERT(level < lengthOf(open_blocks));
@@ -939,16 +1018,10 @@ void ProfilerUIImpl::onGUICPUProfiler()
 						--level;
 					}
 					break;
-				case Profiler::EventType::FRAME: {
-					if (header.time >= view_start && header.time <= view_end) {
-						const float t = float((header.time - view_start) / double(view_end - view_start));
-						const float x = a.x * (1 - t) + b.x * t;
-						dl->ChannelsSetCurrent(1);
-						dl->AddLine(ImVec2(x, a.y), ImVec2(x, b.y), 0xffff0000);
-						dl->ChannelsSetCurrent(0);
-					}
+				case Profiler::EventType::FRAME: 
+					ASSERT(false); 
+					/*should be in global context*/ 
 					break;
-				}
 				case Profiler::EventType::STRING: {
 					if (properties_count < lengthOf(properties) && level >= 0) {
 						properties[properties_count].header = header;
@@ -984,14 +1057,98 @@ void ProfilerUIImpl::onGUICPUProfiler()
 		y += ctx->rows * 20;
 	}
 
-	dl->ChannelsMerge();
+	{
+		Profiler::ThreadContext& ctx = Profiler::getGlobalContext();
+		MT::SpinLock lock(ctx.mutex);
+		uint p = ctx.begin;
+		const uint end = ctx.end;
+		while (p != end) {
+			Profiler::EventHeader header;
+			read(ctx, p, header);
+			switch (header.type) {
+				case Profiler::EventType::FRAME:
+					if (header.time >= view_start && header.time <= view_end) {
+						const float t = float((header.time - view_start) / double(view_end - view_start));
+						const float x = a.x * (1 - t) + b.x * t;
+						dl->AddLine(ImVec2(x, a.y), ImVec2(x, b.y), 0xffff0000);
+					}
+					break;
+				case Profiler::EventType::CONTEXT_SWITCH:
+					if (m_show_context_switches && header.time >= view_start && header.time <= view_end) {
+						Profiler::ContextSwitchRecord r;
+						read(ctx, p + sizeof(Profiler::EventHeader), r);
+						auto new_iter = threads_records.find(r.new_thread_id);
+						auto old_iter = threads_records.find(r.old_thread_id);
+						const float t = float((header.time - view_start) / double(view_end - view_start));
+						const float x = a.x * (1 - t) + b.x * t;
+						if (old_iter.isValid() && new_iter.isValid()) {
+							const float oy = old_iter.value().y + 10;
+							const float ny = new_iter.value().y + 10;
+							dl->AddLine(ImVec2(x, oy)
+								, ImVec2(x, ny)
+								, 0xff0000ff);
+							const float arrow_y = ny < oy ? ny + 5 : ny - 5;
+							dl->AddLine(ImVec2(x, ny)
+								, ImVec2(x + 5, arrow_y)
+								, 0xff0000ff);
+							dl->AddLine(ImVec2(x, ny)
+								, ImVec2(x - 5, arrow_y)
+								, 0xff0000ff);
+
+							if (ImGui::IsMouseHoveringRect(ImVec2(x - 1, Math::minimum(oy, ny)), ImVec2(x + 1, Math::maximum(oy, ny)))) {
+								ImGui::BeginTooltip();
+								ImGui::Text("Context switch:");
+								ImGui::Text("  from: %s (%d)", getThreadName(contexts, r.old_thread_id), r.old_thread_id);
+								ImGui::Text("  to: %s (%d)", getThreadName(contexts, r.new_thread_id), r.new_thread_id);
+								ImGui::Text("  reason: %s", getContexSwitchReasonString(r.reason));
+								ImGui::EndTooltip();
+							}
+						}
+						else if (old_iter.isValid()) {
+							const float oy = old_iter.value().y + 10;
+							dl->AddLine(ImVec2(x - 5, oy - 5)
+								, ImVec2(x + 5, oy + 5)
+								, 0xff0000ff);
+
+							if (ImGui::IsMouseHoveringRect(ImVec2(x - 3, oy - 3), ImVec2(x + 3, oy + 3))) {
+								ImGui::BeginTooltip();
+								ImGui::Text("Context switch:");
+								ImGui::Text("  from: %s (%d)", getThreadName(contexts, r.old_thread_id), r.old_thread_id);
+								ImGui::Text("  to: %d", r.new_thread_id);
+								ImGui::Text("  reason: %s", getContexSwitchReasonString(r.reason));
+								ImGui::EndTooltip();
+							}
+						}
+						else if (new_iter.isValid()) {
+							const float ny = new_iter.value().y + 10;
+							dl->AddLine(ImVec2(x - 5, ny - 5)
+								, ImVec2(x + 5, ny + 5)
+								, 0xff00ff00);
+
+							if (ImGui::IsMouseHoveringRect(ImVec2(x - 3, ny - 3), ImVec2(x + 3, ny + 3))) {
+								ImGui::BeginTooltip();
+								ImGui::Text("Context switch:");
+								ImGui::Text("  from: %d", r.old_thread_id);
+								ImGui::Text("  to: %s (%d)", getThreadName(contexts, r.new_thread_id), r.new_thread_id);
+								ImGui::Text("  reason: %s", getContexSwitchReasonString(r.reason));
+								ImGui::EndTooltip();
+							}
+						}
+					}
+					break;
+				default: ASSERT(false); break;
+			}
+			p += header.size;
+		}
+	}
+
 	Profiler::unlockContexts();
 
 	if (m_autopause > 0 && !m_is_paused && Profiler::getLastFrameDuration() * 1000.f > m_autopause) {
 		m_is_paused = true;
 		Profiler::pause(m_is_paused);
 		m_view_offset = 0;
-		m_paused_time = Profiler::now();
+		m_paused_time = Timer::getRawTimestamp();
 	}
 
 	if (ImGui::CollapsingHeader("Visible blocks")) {
