@@ -271,6 +271,40 @@ typedef UINT_PTR SOCKET;
 typedef unsigned short WORD;
 typedef struct sockaddr_in SOCKADDR_IN;
 
+typedef struct _LIST_ENTRY {
+	struct _LIST_ENTRY *Flink;
+	struct _LIST_ENTRY *Blink;
+} LIST_ENTRY, *PLIST_ENTRY;
+
+typedef struct _RTL_CRITICAL_SECTION_DEBUG {
+	WORD   Type;
+	WORD   CreatorBackTraceIndex;
+	struct _RTL_CRITICAL_SECTION *CriticalSection;
+	LIST_ENTRY ProcessLocksList;
+	DWORD EntryCount;
+	DWORD ContentionCount;
+	DWORD Flags;
+	WORD   CreatorBackTraceIndexHigh;
+	WORD   SpareWORD;
+} RTL_CRITICAL_SECTION_DEBUG, *PRTL_CRITICAL_SECTION_DEBUG, RTL_RESOURCE_DEBUG, *PRTL_RESOURCE_DEBUG;
+
+typedef struct _RTL_CRITICAL_SECTION {
+	PRTL_CRITICAL_SECTION_DEBUG DebugInfo;
+
+	//
+	//  The following three fields control entering and exiting the critical
+	//  section for the resource
+	//
+
+	LONG LockCount;
+	LONG RecursionCount;
+	HANDLE OwningThread;        // from the thread's ClientId->UniqueThread
+	HANDLE LockSemaphore;
+	ULONG_PTR SpinCount;        // force size on 64-bit systems when packed
+} RTL_CRITICAL_SECTION, *PRTL_CRITICAL_SECTION;
+typedef PRTL_CRITICAL_SECTION LPCRITICAL_SECTION;
+typedef RTL_CRITICAL_SECTION CRITICAL_SECTION;
+
 
 typedef struct _SECURITY_ATTRIBUTES
 {
@@ -493,6 +527,13 @@ WINBASEAPI DWORD WINAPI SetFilePointer(HANDLE hFile,
 	PLONG lpDistanceToMoveHigh,
 	DWORD dwMoveMethod);
 WINBASEAPI BOOL WINAPI SetEndOfFile(HANDLE hFile);
+WINBASEAPI VOID WINAPI InitializeCriticalSection(LPCRITICAL_SECTION lpCriticalSection);
+WINBASEAPI BOOL WINAPI InitializeCriticalSectionAndSpinCount(LPCRITICAL_SECTION lpCriticalSection, DWORD dwSpinCount);
+WINBASEAPI VOID WINAPI DeleteCriticalSection(LPCRITICAL_SECTION lpCriticalSection);
+WINBASEAPI VOID WINAPI EnterCriticalSection(LPCRITICAL_SECTION lpCriticalSection);
+WINBASEAPI VOID WINAPI LeaveCriticalSection(LPCRITICAL_SECTION lpCriticalSection);
+
+
 WINBASEAPI HANDLE WINAPI CreateSemaphoreA(LPSECURITY_ATTRIBUTES lpSemaphoreAttributes,
 	LONG lInitialCount,
 	LONG lMaximumCount,
