@@ -32,7 +32,21 @@ namespace MT
 	};
 	typedef volatile i32 SpinMutexHandle;
 #endif
-	
+
+
+class alignas(8) LUMIX_ENGINE_API CriticalSection
+{
+public:
+	CriticalSection();
+	~CriticalSection();
+
+	void enter();
+	void exit();
+
+private:
+	u8 data[64];
+};
+
 
 class LUMIX_ENGINE_API Semaphore
 {
@@ -99,6 +113,24 @@ public:
 
 private:
 	SpinMutex& m_mutex;
+};
+
+
+class CriticalSectionLock
+{
+public:
+	explicit CriticalSectionLock(CriticalSection& cs)
+		: m_critical_section(cs)
+	{
+		cs.enter();
+	}
+	~CriticalSectionLock() { m_critical_section.exit(); }
+
+	CriticalSectionLock(const CriticalSectionLock&) = delete;
+	void operator=(const CriticalSectionLock&) = delete;
+
+private:
+	CriticalSection& m_critical_section;
 };
 
 

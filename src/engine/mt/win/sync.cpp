@@ -1,6 +1,7 @@
 #include "engine/mt/sync.h"
 #include "engine/mt/atomic.h"
 #include "engine/mt/thread.h"
+#include "engine/profiler.h"
 #include "engine/win/simple_win.h"
 #include <intrin.h>
 
@@ -72,6 +73,35 @@ bool Event::poll()
 }
 
 
+CriticalSection::CriticalSection()
+{
+	static_assert(sizeof(data) >= sizeof(CRITICAL_SECTION), "Size is not enough");
+	static_assert(alignof(CriticalSection) == alignof(CRITICAL_SECTION), "Alignment does not match");
+	setMemory(data, 0, sizeof(data));
+	CRITICAL_SECTION* cs = new (NewPlaceholder(), data) CRITICAL_SECTION;
+	InitializeCriticalSectionAndSpinCount(cs, 0x400);
+}
+
+CriticalSection::~CriticalSection()
+{
+	CRITICAL_SECTION* cs = (CRITICAL_SECTION*)data;
+	DeleteCriticalSection(cs);
+	cs->~CRITICAL_SECTION();
+}
+
+void CriticalSection::enter()
+{
+	CRITICAL_SECTION* cs = (CRITICAL_SECTION*)data;
+	EnterCriticalSection(cs);
+}
+
+void CriticalSection::exit()
+{
+	CRITICAL_SECTION* cs = (CRITICAL_SECTION*)data;
+	LeaveCriticalSection(cs);
+}
+
+
 SpinMutex::SpinMutex() : m_id(0) {}
 
 SpinMutex::~SpinMutex() = default;
@@ -79,7 +109,11 @@ SpinMutex::~SpinMutex() = default;
 void SpinMutex::lock()
 {
 	for (;;) {
-		if(m_id == 0 &&  _interlockedbittestandset(&m_id, 0) == 0) break;
+		for (int i = 0; i < 16; ++i) {
+			if (m_id == 0 && _interlockedbittestandset(&m_id, 0) == 0) {
+				return;
+			}
+		}
 		_mm_pause();
 	}
 }

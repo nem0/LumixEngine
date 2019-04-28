@@ -1,4 +1,5 @@
 #include "profiler_ui.h"
+#include "engine/fibers.h"
 #include "engine/fs/file_events_device.h"
 #include "engine/fs/file_system.h"
 #include "engine/fs/os_file.h"
@@ -41,6 +42,18 @@ enum MemoryColumn
 	FUNCTION,
 	SIZE
 };
+
+
+static const char* getFiberSwitchReasonString(Fiber::SwitchReason reason)
+{
+	switch (reason) {
+		case Fiber::SwitchReason::CONTINUE_JOB: return "continue job";
+		case Fiber::SwitchReason::FINISH_JOB: return "finish job";
+		case Fiber::SwitchReason::START_JOB: return "start job";
+		case Fiber::SwitchReason::USER_WAIT: return "user wait";
+		default: return "Unknown";
+	}
+}
 
 
 static const char* getContexSwitchReasonString(i8 reason)
@@ -478,7 +491,13 @@ struct ProfilerUIImpl final : public ProfilerUI
 	float m_next_transfer_rate_time;
 	SortOrder m_sort_order;
 	float m_autopause = -33.3333f;
-	bool m_show_context_switches = true;
+	bool m_show_context_switches = false;
+	bool m_show_fiber_switches = false;
+	struct {
+		i32 id = -1;
+		float x, y;
+		bool any = false;
+	} hovered_fiber_switch;
 };
 
 
@@ -860,6 +879,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 		if (m_autopause > 0) {
 			ImGui::InputFloat("Autopause limit (ms)", &m_autopause, 1.f, 10.f, 2);
 		}
+		ImGui::Checkbox("Show fiber switches", &m_show_fiber_switches);
 		if (Profiler::contextSwitchesEnabled()) {
 			ImGui::Checkbox("Show context switches", &m_show_context_switches);
 		}
@@ -907,6 +927,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 
 	HashMap<const char*, const char*> visible_blocks(1024, m_allocator);
 	HashMap<u32, ThreadRecord> threads_records(64, m_allocator);
+	hovered_fiber_switch.any = false;
 
 	for(Profiler::ThreadContext* ctx : contexts) {
 		MT::SpinLock lock(ctx->mutex);
@@ -988,9 +1009,37 @@ void ProfilerUIImpl::onGUICPUProfiler()
 			read(*ctx, p, header);
 			switch(header.type) {
 				case Profiler::EventType::END_FIBER_SWITCH:
-				case Profiler::EventType::BEGIN_FIBER_SWITCH: {
-						i32 switch_id;
-						read(*ctx, p + sizeof(Profiler::EventHeader), switch_id);
+				case Profiler::EventType::BEGIN_FIBER_SWITCH:
+					if (m_show_fiber_switches) {
+						Profiler::FiberSwitchRecord r;
+						read(*ctx, p + sizeof(Profiler::EventHeader), r);
+						if (r.id == hovered_fiber_switch.id) {
+							float t = float((header.time - view_start) / double(view_end - view_start));
+							if (header.time < view_start) {
+								t = -float((view_start - header.time) / double(view_end - view_start));
+							}
+							const float x = a.x * (1 - t) + b.x * t;
+							if (x != hovered_fiber_switch.x || y != hovered_fiber_switch.y) {
+								dl->AddLine(ImVec2(x, y + 2), ImVec2(hovered_fiber_switch.x, hovered_fiber_switch.y + 2), 0xff000000);
+							}
+						}
+						if (header.time >= view_start && header.time <= view_end) {
+							const float t = float((header.time - view_start) / double(view_end - view_start));
+							const float x = a.x * (1 - t) + b.x * t;
+							const u32 color = header.type == Profiler::EventType::END_FIBER_SWITCH ? 0xffff0000 : 0xff00ff00;
+							dl->AddRect(ImVec2(x - 2, y - 2), ImVec2(x + 2, y + 2), color);
+							if (ImGui::IsMouseHoveringRect(ImVec2(x - 2, y - 2), ImVec2(x + 2, y + 2))) {
+								hovered_fiber_switch.id = r.id;
+								hovered_fiber_switch.x = x;
+								hovered_fiber_switch.y = y;
+								hovered_fiber_switch.any = true;
+								ImGui::BeginTooltip();
+								ImGui::Text("Fiber switch");
+								ImGui::Text("  ID: %d", r.id);
+								ImGui::Text("  Reason: %s", getFiberSwitchReasonString(r.reason));
+								ImGui::EndTooltip();
+							}
+						}
 					}
 					break;
 				case Profiler::EventType::BEGIN_BLOCK:
@@ -1057,6 +1106,8 @@ void ProfilerUIImpl::onGUICPUProfiler()
 		y += ctx->rows * 20;
 	}
 
+	if (!hovered_fiber_switch.any) hovered_fiber_switch.id = -1;
+
 	{
 		Profiler::ThreadContext& ctx = Profiler::getGlobalContext();
 		MT::SpinLock lock(ctx.mutex);
@@ -1106,8 +1157,8 @@ void ProfilerUIImpl::onGUICPUProfiler()
 						}
 						else if (old_iter.isValid()) {
 							const float oy = old_iter.value().y + 10;
-							dl->AddLine(ImVec2(x - 5, oy - 5)
-								, ImVec2(x + 5, oy + 5)
+							dl->AddLine(ImVec2(x + 5, oy - 5)
+								, ImVec2(x - 5, oy + 5)
 								, 0xff0000ff);
 
 							if (ImGui::IsMouseHoveringRect(ImVec2(x - 3, oy - 3), ImVec2(x + 3, oy + 3))) {

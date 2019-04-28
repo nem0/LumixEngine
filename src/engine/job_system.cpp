@@ -76,7 +76,9 @@ struct System
 	}
 
 
-	MT::SpinMutex m_sync;
+	MT::CriticalSection m_sync;
+	MT::CriticalSection m_ready_fiber_sync;
+	MT::CriticalSection m_job_queue_sync;
 	MT::Event m_event_outside_job;
 	MT::Event m_work_signal;
 	Array<MT::Task*> m_workers;
@@ -95,7 +97,8 @@ static System* g_system = nullptr;
 
 static LUMIX_FORCE_INLINE FiberDecl* getReadyFiber(System& system)
 {
-	MT::SpinLock lock(system.m_sync);
+	PROFILE_FUNCTION();
+	MT::CriticalSectionLock lock(system.m_ready_fiber_sync);
 
 	if(system.m_ready_fibers.empty()) return nullptr;
 	FiberDecl* fiber = system.m_ready_fibers.back();
@@ -106,9 +109,10 @@ static LUMIX_FORCE_INLINE FiberDecl* getReadyFiber(System& system)
 
 static LUMIX_FORCE_INLINE Job getReadyJob(System& system)
 {
-	MT::SpinLock lock(system.m_sync);
+	PROFILE_FUNCTION();
+	MT::CriticalSectionLock lock(system.m_job_queue_sync);
 
-	if (system.m_job_queue.empty()) return {nullptr, nullptr};
+	if (system.m_job_queue.empty()) return { nullptr, nullptr };
 
 	Job job = system.m_job_queue.back();
 	system.m_job_queue.pop();
@@ -131,7 +135,7 @@ struct WorkerTask : MT::Task
 
 	static FiberDecl& getFreeFiber()
 	{
-		MT::SpinLock lock(g_system->m_sync);
+		MT::CriticalSectionLock lock(g_system->m_sync);
 		
 		LUMIX_FATAL(!g_system->m_free_fibers.empty());
 		FiberDecl* decl = g_system->m_free_fibers.back();
@@ -146,7 +150,7 @@ struct WorkerTask : MT::Task
 		if (fiber.job_finished) {
 			g_system->m_free_fibers.push(&fiber);
 		}
-		g_system->m_sync.unlock();
+		g_system->m_sync.exit();
 	}
 
 
@@ -166,6 +170,9 @@ struct WorkerTask : MT::Task
 	{
 		WorkerTask* that = (WorkerTask*)g_worker;
 		that->m_finished = false;
+		Profiler::beginBlock("job management");
+		Profiler::blockColor(0, 0, 0xff);
+		
 		while (!that->m_finished)
 		{
 			FiberDecl* fiber = getReadyFiber(*g_system);
@@ -174,9 +181,13 @@ struct WorkerTask : MT::Task
 				that->m_current_fiber = fiber;
 				fiber->job_finished = false;
 
-				g_system->m_sync.lock();
-				Fiber::switchTo(&that->m_primary_fiber, fiber->fiber);
-				
+				g_system->m_sync.enter();
+
+				Profiler::endBlock();
+				Fiber::switchTo(&that->m_primary_fiber, fiber->fiber, Fiber::SwitchReason::CONTINUE_JOB);
+				Profiler::beginBlock("job management");
+				Profiler::blockColor(0, 0, 0xff);
+
 				that->m_current_fiber = nullptr;
 				handleSwitch(*fiber);
 				continue;
@@ -189,9 +200,14 @@ struct WorkerTask : MT::Task
 				fiber_decl.current_job = job;
 				fiber_decl.job_finished = false;
 				that->m_current_fiber = &fiber_decl;
-				
-				g_system->m_sync.lock();
-				Fiber::switchTo(&that->m_primary_fiber, fiber_decl.fiber);
+
+				g_system->m_sync.enter();
+
+				Profiler::endBlock();
+				Fiber::switchTo(&that->m_primary_fiber, fiber_decl.fiber, Fiber::SwitchReason::START_JOB);
+				Profiler::beginBlock("job management");
+				Profiler::blockColor(0, 0, 0xff);
+
 				that->m_current_fiber = nullptr;
 				handleSwitch(fiber_decl);
 			}
@@ -202,6 +218,7 @@ struct WorkerTask : MT::Task
 				g_system->m_work_signal.waitTimeout(1);
 			}
 		}
+		Profiler::endBlock();
 	}
 
 
@@ -231,7 +248,7 @@ void trigger(SignalHandle handle)
 {
 	LUMIX_FATAL((handle & HANDLE_ID_MASK) < 4096);
 
-	MT::SpinLock lock(g_system->m_sync);
+	MT::CriticalSectionLock lock(g_system->m_sync);
 	
 	Signal& counter = g_system->m_signals_pool[handle & HANDLE_ID_MASK];
 	--counter.value;
@@ -242,6 +259,7 @@ void trigger(SignalHandle handle)
 	while (isValid(iter)) {
 		Signal& signal = g_system->m_signals_pool[iter & HANDLE_ID_MASK];
 		if(signal.next_job.task) {
+			MT::CriticalSectionLock lock(g_system->m_job_queue_sync);
 			g_system->m_job_queue.push(signal.next_job);
 			any_new_job = true;
 		}
@@ -261,10 +279,10 @@ static LUMIX_FORCE_INLINE bool isSignalZero(SignalHandle handle, bool lock)
 	const u32 gen = handle & HANDLE_GENERATION_MASK;
 	const u32 id = handle & HANDLE_ID_MASK;
 	
-	if (lock) g_system->m_sync.lock();
+	if (lock) g_system->m_sync.enter();
 	Signal& counter = g_system->m_signals_pool[id];
 	bool is_zero = counter.generation != gen || counter.value == 0;
-	if (lock) g_system->m_sync.unlock();
+	if (lock) g_system->m_sync.exit();
 	return is_zero;
 }
 
@@ -279,7 +297,7 @@ static LUMIX_FORCE_INLINE void runInternal(void* data
 	j.data = data;
 	j.task = task;
 
-	if (lock) g_system->m_sync.lock();
+	if (lock) g_system->m_sync.enter();
 	j.dec_on_finish = [&]() -> SignalHandle {
 		if (!on_finish) return INVALID_HANDLE;
 		if (isValid(*on_finish) && !isSignalZero(*on_finish, false)) {
@@ -291,6 +309,7 @@ static LUMIX_FORCE_INLINE void runInternal(void* data
 	if (on_finish) *on_finish = j.dec_on_finish;
 
 	if (!isValid(precondition) || isSignalZero(precondition, false)) {
+		MT::CriticalSectionLock lock(g_system->m_job_queue_sync);
 		g_system->m_job_queue.push(j);
 		g_system->m_work_signal.trigger();
 	}
@@ -308,7 +327,7 @@ static LUMIX_FORCE_INLINE void runInternal(void* data
 		}
 	}
 
-	if (lock) g_system->m_sync.unlock();
+	if (lock) g_system->m_sync.exit();
 }
 
 
@@ -324,19 +343,21 @@ static void __stdcall fiberProc(void* data)
 static void fiberProc(void* data)
 #endif
 {
-	g_system->m_sync.unlock();
+	g_system->m_sync.exit();
 
 	FiberDecl* fiber_decl = (FiberDecl*)data;
 	for (;;)
 	{
 		Job job = fiber_decl->current_job;
+		Profiler::beginBlock("Job");
 		job.task(job.data);
 		if (isValid(job.dec_on_finish)) trigger(job.dec_on_finish);
 		fiber_decl->job_finished = true;
+		Profiler::endBlock();
 
-		g_system->m_sync.lock();
-		Fiber::switchTo(&fiber_decl->fiber, fiber_decl->worker_task->m_primary_fiber);
-		g_system->m_sync.unlock();
+		g_system->m_sync.enter();
+		Fiber::switchTo(&fiber_decl->fiber, fiber_decl->worker_task->m_primary_fiber, Fiber::SwitchReason::FINISH_JOB);
+		g_system->m_sync.exit();
 	}
 }
 
@@ -408,9 +429,9 @@ void shutdown()
 
 void wait(SignalHandle handle)
 {
-	g_system->m_sync.lock();
+	g_system->m_sync.enter();
 	if (isSignalZero(handle, false)) {
-		g_system->m_sync.unlock();
+		g_system->m_sync.exit();
 		return;
 	}
 	
@@ -420,14 +441,14 @@ void wait(SignalHandle handle)
 		FiberDecl* fiber_decl = ((WorkerTask*)g_worker)->m_current_fiber;
 
 		runInternal(fiber_decl, [](void* data){
-			MT::SpinLock lock(g_system->m_sync);
+			MT::CriticalSectionLock lock(g_system->m_ready_fiber_sync);
 			g_system->m_ready_fibers.push((FiberDecl*)data);
 		}, handle, false, nullptr);
 		fiber_decl->job_finished = false;
-		Fiber::switchTo(&fiber_decl->fiber, fiber_decl->worker_task->m_primary_fiber);
+		Fiber::switchTo(&fiber_decl->fiber, fiber_decl->worker_task->m_primary_fiber, Fiber::SwitchReason::USER_WAIT);
 
 		ASSERT(isSignalZero(handle, false));
-		g_system->m_sync.unlock();
+		g_system->m_sync.exit();
 	}
 	else
 	{
@@ -440,7 +461,7 @@ void wait(SignalHandle handle)
 			g_system->m_event_outside_job.trigger();
 		}, handle, false, nullptr);
 
-		g_system->m_sync.unlock();
+		g_system->m_sync.exit();
 
 		MT::yield();
 		while (!isSignalZero(handle, true)) {

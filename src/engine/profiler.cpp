@@ -1,3 +1,4 @@
+#include "engine/fibers.h"
 #include "engine/hash_map.h"
 #include "engine/log.h"
 #include "engine/timer.h"
@@ -317,24 +318,29 @@ float getLastFrameDuration()
 }
 
 
-i32 beginFiberSwitch()
+i32 beginFiberSwitch(Fiber::SwitchReason reason)
 {
-	const i32 switch_id = MT::atomicIncrement(&g_instance.fiber_switch_id);
+	FiberSwitchRecord r;
+	r.id = MT::atomicIncrement(&g_instance.fiber_switch_id);
+	r.reason = reason;
 
 	ThreadContext* ctx = g_instance.getThreadContext();
-	write(*ctx, EventType::BEGIN_FIBER_SWITCH, switch_id);
+	write(*ctx, EventType::BEGIN_FIBER_SWITCH, r);
 	while(ctx->open_blocks_count > 0) {
 		write(*ctx, EventType::END_BLOCK, 0);
 		--ctx->open_blocks_count;
 	}
-	return switch_id;
+	return r.id;
 }
 
 
 void endFiberSwitch(i32 switch_id)
 {
+	FiberSwitchRecord r;
+	r.id = switch_id;
+	r.reason = Fiber::SwitchReason::UNKNOWN;
 	ThreadContext* ctx = g_instance.getThreadContext();
-	write(*ctx, EventType::END_FIBER_SWITCH, switch_id);
+	write(*ctx, EventType::END_FIBER_SWITCH, r);
 }
 
 

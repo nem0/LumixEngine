@@ -14,8 +14,18 @@ namespace Lumix
 template <typename T> class DelegateList;
 
 
+namespace Fiber { enum class SwitchReason; }
+
+
 namespace Profiler
 {
+
+
+struct FiberSwitchRecord
+{
+	i32 id;
+	Fiber::SwitchReason reason;
+};
 
 
 struct ContextSwitchRecord
@@ -81,7 +91,7 @@ LUMIX_ENGINE_API void endBlock();
 LUMIX_ENGINE_API void frame();
 LUMIX_ENGINE_API void recordString(const char* value);
 
-LUMIX_ENGINE_API i32 beginFiberSwitch();
+LUMIX_ENGINE_API i32 beginFiberSwitch(Fiber::SwitchReason reason);
 LUMIX_ENGINE_API void endFiberSwitch(i32 switch_id);
 LUMIX_ENGINE_API float getLastFrameDuration();
 
