@@ -67,6 +67,14 @@ struct TimerImpl final : public Timer
 };
 
 
+u64 Timer::getRawTimestamp()
+{
+	LARGE_INTEGER tick;
+	QueryPerformanceCounter(&tick);
+	return tick.QuadPart;
+}
+
+
 Timer* Timer::create(IAllocator& allocator)
 {
 	return LUMIX_NEW(allocator, TimerImpl)(allocator);

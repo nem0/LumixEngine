@@ -17,6 +17,7 @@ namespace Lumix
 			virtual u64 getRawTimeSinceStart() = 0;
 			virtual u64 getFrequency() = 0;
 
+			static u64 getRawTimestamp();
 			static Timer* create(IAllocator& allocator);
 			static void destroy(Timer* timer);
 	};

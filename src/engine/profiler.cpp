@@ -1,11 +1,19 @@
 #include "engine/hash_map.h"
 #include "engine/log.h"
 #include "engine/timer.h"
+#include "engine/mt/atomic.h"
 #include "engine/mt/sync.h"
+#include "engine/mt/task.h"
 #include "engine/mt/thread.h"
 #include "profiler.h"
 #include <cstring>
 
+#define INITGUID
+#include <Windows.h>
+#include <evntcons.h>
+#include <evntrace.h>
+#include <thread>
+#include <cassert>
 
 namespace Lumix
 {
@@ -15,17 +23,101 @@ namespace Profiler
 {
 
 
+/********/
+
+// TODO this has to be defined somewhere
+#define SWITCH_CONTEXT_OPCODE 36
+
+#pragma pack(1)
+	struct TraceProps
+	{
+		EVENT_TRACE_PROPERTIES base;
+		char name[sizeof(KERNEL_LOGGER_NAME) + 1];
+	};
+#pragma pack()
+
+
+// https://docs.microsoft.com/en-us/windows/desktop/etw/cswitch
+struct CSwitch
+{
+	uint32_t                 NewThreadId;
+	uint32_t                 OldThreadId;
+	int8_t             NewThreadPriority;
+	int8_t             OldThreadPriority;
+	uint8_t               PreviousCState;
+	int8_t                     SpareByte;
+	int8_t           OldThreadWaitReason;
+	int8_t             OldThreadWaitMode;
+	int8_t                OldThreadState;
+	int8_t   OldThreadWaitIdealProcessor;
+	uint32_t           NewThreadWaitTime;
+	uint32_t                    Reserved;
+};
+
+struct TraceTask : MT::Task {
+	TraceTask(IAllocator& allocator);
+
+	int task() override;
+	static void callback(PEVENT_RECORD event);
+
+	TRACEHANDLE open_handle;
+};
+
+
 static struct Instance
 {
 	Instance()
 		: contexts(allocator)
 		, timer(Timer::create(allocator))
-	{}
+		, trace_task(allocator)
+		, global_context(allocator)
+	{
+		startTrace();
+	}
 
 
 	~Instance()
 	{
+		CloseTrace(trace_task.open_handle);
+		trace_task.destroy();
 		Timer::destroy(timer);
+	}
+
+
+	static void startTrace()
+	{
+		static TRACEHANDLE trace_handle;
+		static TraceProps props = {};
+		props.base.Wnode.BufferSize = sizeof(props);
+		props.base.Wnode.Flags = WNODE_FLAG_TRACED_GUID;
+		props.base.Wnode.ClientContext = 1;
+		props.base.Wnode.Guid = SystemTraceControlGuid;
+		props.base.LoggerNameOffset = sizeof(props.base);
+		props.base.EnableFlags = EVENT_TRACE_FLAG_CSWITCH;
+		props.base.LogFileMode = EVENT_TRACE_REAL_TIME_MODE;
+		strcpy_s(props.name, KERNEL_LOGGER_NAME);
+
+		TraceProps tmp = props;
+		ControlTrace(NULL, KERNEL_LOGGER_NAME, &tmp.base, EVENT_TRACE_CONTROL_STOP);
+		ULONG res = StartTrace(&trace_handle, KERNEL_LOGGER_NAME, &props.base);
+		switch (res) {
+		case ERROR_ALREADY_EXISTS:
+		case ERROR_ACCESS_DENIED:
+		case ERROR_BAD_LENGTH:
+		default:
+			g_instance.context_switches_enabled = false;
+			break;
+		case ERROR_SUCCESS:
+			g_instance.context_switches_enabled = true;
+			break;
+		}
+
+		static EVENT_TRACE_LOGFILE trace = {};
+		trace.LoggerName = (char*)KERNEL_LOGGER_NAME; // TODO const cast wtf
+		trace.ProcessTraceMode = PROCESS_TRACE_MODE_RAW_TIMESTAMP | PROCESS_TRACE_MODE_REAL_TIME | PROCESS_TRACE_MODE_EVENT_RECORD | PROCESS_TRACE_MODE_RAW_TIMESTAMP;
+		trace.EventRecordCallback = TraceTask::callback;
+		g_instance.trace_task.open_handle = OpenTrace(&trace);
+		g_instance.trace_task.create("profiler_trace_task");
 	}
 
 
@@ -33,6 +125,7 @@ static struct Instance
 	{
 		thread_local ThreadContext* ctx = [&](){
 			ThreadContext* new_ctx = LUMIX_NEW(allocator, ThreadContext)(allocator);
+			new_ctx->thread_id = MT::getCurrentThreadID();
 			MT::SpinLock lock(mutex);
 			contexts.push(new_ctx);
 			return new_ctx;
@@ -41,30 +134,73 @@ static struct Instance
 		return ctx;
 	}
 
+
 	DefaultAllocator allocator;
 	Array<ThreadContext*> contexts;
 	MT::SpinMutex mutex;
 	Timer* timer;
 	bool paused = false;
+	bool context_switches_enabled = false;
+	u64 paused_time = 0;
 	u64 last_frame_duration = 0;
 	u64 last_frame_time = 0;
+	volatile i32 fiber_switch_id = 0;
+	TraceTask trace_task;
+	ThreadContext global_context;
 } g_instance;
 
 
 template <typename T>
-void write(ThreadContext& ctx, EventType type, const T& value)
+void write(ThreadContext& ctx, u64 timestamp, EventType type, const T& value)
 {
-	if(g_instance.paused) return;
+	if (g_instance.paused && timestamp > g_instance.paused_time) return;
 
-	#pragma pack(1)
+#pragma pack(1)
 	struct {
 		EventHeader header;
 		T value;
 	} v;
-	#pragma pack()
+#pragma pack()
 	v.header.type = type;
 	v.header.size = sizeof(v);
-	v.header.time = now();
+	v.header.time = timestamp;
+	v.value = value;
+
+	MT::SpinLock lock(ctx.mutex);
+	u8* buf = ctx.buffer.begin();
+	const int buf_size = ctx.buffer.size();
+
+	while (sizeof(v) + ctx.end - ctx.begin > buf_size) {
+		const u8 size = buf[ctx.begin % buf_size];
+		ctx.begin += size;
+	}
+
+	const uint lend = ctx.end % buf_size;
+	if (buf_size - lend >= sizeof(v)) {
+		memcpy(buf + lend, &v, sizeof(v));
+	}
+	else {
+		memcpy(buf + lend, &v, buf_size - lend);
+		memcpy(buf, ((u8*)&v) + buf_size - lend, sizeof(v) - (buf_size - lend));
+	}
+
+	ctx.end += sizeof(v);
+};
+
+template <typename T>
+void write(ThreadContext& ctx, EventType type, const T& value)
+{
+	if (g_instance.paused) return;
+
+#pragma pack(1)
+	struct {
+		EventHeader header;
+		T value;
+	} v;
+#pragma pack()
+	v.header.type = type;
+	v.header.size = sizeof(v);
+	v.header.time = Timer::getRawTimestamp();
 	v.value = value;
 
 	MT::SpinLock lock(ctx.mutex);
@@ -91,13 +227,13 @@ void write(ThreadContext& ctx, EventType type, const T& value)
 
 void write(ThreadContext& ctx, EventType type, const u8* data, int size)
 {
-	if(g_instance.paused) return;
+	if (g_instance.paused) return;
 
 	EventHeader header;
 	header.type = type;
 	ASSERT(sizeof(header) + size <= 0xffff);
 	header.size = u16(sizeof(header) + size);
-	header.time = now();
+	header.time = Timer::getRawTimestamp();
 
 	MT::SpinLock lock(ctx.mutex);
 	u8* buf = ctx.buffer.begin();
@@ -108,7 +244,7 @@ void write(ThreadContext& ctx, EventType type, const u8* data, int size)
 		ctx.begin += size;
 	}
 
-	auto cpy = [&](const u8* ptr, uint size){
+	auto cpy = [&](const u8* ptr, uint size) {
 		const uint lend = ctx.end % buf_size;
 		if (buf_size - lend >= size) {
 			memcpy(buf + lend, ptr, size);
@@ -123,6 +259,32 @@ void write(ThreadContext& ctx, EventType type, const u8* data, int size)
 
 	cpy((u8*)&header, sizeof(header));
 	cpy(data, size);
+};
+
+
+TraceTask::TraceTask(IAllocator& allocator)
+	: MT::Task(allocator)
+{}
+
+
+int TraceTask::task() {
+	ULONG res = ProcessTrace(&open_handle, 1, nullptr, nullptr);
+	res = res;
+	return 0;
+}
+
+
+void TraceTask::callback(PEVENT_RECORD event) {
+	if (event->EventHeader.EventDescriptor.Opcode != SWITCH_CONTEXT_OPCODE) return;
+	if (sizeof(CSwitch) != event->UserDataLength) return;
+
+	const CSwitch* cs = reinterpret_cast<CSwitch*>(event->UserData);
+	ContextSwitchRecord rec;
+	rec.timestamp = event->EventHeader.TimeStamp.QuadPart;
+	rec.new_thread_id = cs->NewThreadId;
+	rec.old_thread_id = cs->OldThreadId;
+	rec.reason = cs->OldThreadWaitReason;
+	write(g_instance.global_context, rec.timestamp, Profiler::EventType::CONTEXT_SWITCH, rec);
 };
 
 
@@ -155,13 +317,24 @@ float getLastFrameDuration()
 }
 
 
-void beginFiberSwitch()
+i32 beginFiberSwitch()
 {
+	const i32 switch_id = MT::atomicIncrement(&g_instance.fiber_switch_id);
+
 	ThreadContext* ctx = g_instance.getThreadContext();
+	write(*ctx, EventType::BEGIN_FIBER_SWITCH, switch_id);
 	while(ctx->open_blocks_count > 0) {
 		write(*ctx, EventType::END_BLOCK, 0);
 		--ctx->open_blocks_count;
 	}
+	return switch_id;
+}
+
+
+void endFiberSwitch(i32 switch_id)
+{
+	ThreadContext* ctx = g_instance.getThreadContext();
+	write(*ctx, EventType::END_FIBER_SWITCH, switch_id);
 }
 
 
@@ -175,27 +348,26 @@ void endBlock()
 }
 
 
-u64 now()
-{
-	return g_instance.timer->getRawTimeSinceStart();
-}
-
-
 u64 frequency()
 {
 	return g_instance.timer->getFrequency();
 }
 
 
+bool contextSwitchesEnabled()
+{
+	return g_instance.context_switches_enabled;
+}
+
+
 void frame()
 {
-	const u64 n = now();
+	const u64 n = Timer::getRawTimestamp();
 	if (g_instance.last_frame_time != 0) {
 		g_instance.last_frame_duration = n - g_instance.last_frame_time;
 	}
 	g_instance.last_frame_time = n;
-	ThreadContext* ctx = g_instance.getThreadContext();
-	write(*ctx, EventType::FRAME, 0);
+	write(g_instance.global_context, EventType::FRAME, 0);
 }
 
 
@@ -205,6 +377,12 @@ void setThreadName(const char* name)
 	MT::SpinLock lock(ctx->mutex);
 
 	ctx->name = name;
+}
+
+
+ThreadContext& getGlobalContext()
+{
+	return g_instance.global_context;
 }
 
 
@@ -224,6 +402,7 @@ void unlockContexts()
 void pause(bool paused)
 {
 	g_instance.paused = paused;
+	if (paused) g_instance.paused_time = Timer::getRawTimestamp();
 }
 
 
