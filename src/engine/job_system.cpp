@@ -267,7 +267,12 @@ void trigger(SignalHandle handle)
 		signal.next_job.task = nullptr;
 		iter = signal.sibling;
 	}
-	if (any_new_job) g_system->m_work_signal.trigger();
+	if (any_new_job) {
+		MT::CriticalSectionLock lock(g_system->m_job_queue_sync);
+		if (!g_system->m_job_queue.empty()) {
+			g_system->m_work_signal.trigger();
+		}
+	}
 }
 
 

@@ -137,6 +137,7 @@ struct GPUProfiler
 
 	void frame()
 	{
+		PROFILE_FUNCTION();
 		for (Query& q : m_queries) {
 			q.result = ffr::getQueryResult(q.handle);
 			m_pool.push(q.handle);
@@ -172,6 +173,7 @@ struct RenderTask : MT::Task
 		, m_renderer(renderer)
 		, m_profiler(allocator)
 		, m_finished_semaphore(0, 1)
+		, m_commands_semaphore(0, INT_MAX)
 	{}
 
 
@@ -187,13 +189,12 @@ struct RenderTask : MT::Task
 	ffr::BufferHandle m_transient_buffer;
 	uint m_transient_buffer_offset;
 	u8* m_transient_buffer_ptr = nullptr;
-	
-	struct PreparedCommand
-	{
-		Renderer::RenderJob* cmd;
-		Renderer::MemRef data;
-	};
-	MT::LockFreeFixedQueue<Renderer::RenderJob*, 256> m_commands;
+
+	MT::CriticalSection m_commands_lock;
+	MT::Semaphore m_commands_semaphore;
+	Renderer::RenderJob* m_commands_head = nullptr;
+	Renderer::RenderJob* m_commands_tail = nullptr;
+
 	GPUProfiler m_profiler;
 };
 
@@ -750,7 +751,6 @@ struct RendererImpl final : public Renderer
 
 	struct RenderJobSetupData {
 		RenderJob* cmd;
-		JobSystem::SignalHandle prev;
 		RendererImpl* renderer;
 	};
 
@@ -759,7 +759,6 @@ struct RendererImpl final : public Renderer
 	{
 		RenderJobSetupData* data = LUMIX_NEW(m_allocator, RenderJobSetupData);
 		data->cmd = cmd;
-		data->prev = m_last_exec_job;
 		data->renderer = this;
 
 		JobSystem::SignalHandle preconditions = m_last_exec_job;
@@ -778,10 +777,27 @@ struct RendererImpl final : public Renderer
 			RenderJob* cmd = job_data->cmd;
 			RendererImpl* renderer = job_data->renderer;
 
-			Renderer::RenderJob** rt_cmd = renderer->m_render_task.m_commands.alloc(true);
-			*rt_cmd = cmd;
-			renderer->m_render_task.m_commands.push(rt_cmd, true);
-			LUMIX_DELETE(renderer->m_allocator, job_data);
+			{
+				PROFILE_BLOCK("locking");
+				MT::CriticalSectionLock lock(renderer->m_render_task.m_commands_lock);
+				{
+					PROFILE_BLOCK("locked");
+					cmd->next = nullptr;
+					if (!renderer->m_render_task.m_commands_tail) {
+						renderer->m_render_task.m_commands_head = cmd;
+					}
+					else {
+						renderer->m_render_task.m_commands_tail->next = cmd;
+					}
+					renderer->m_render_task.m_commands_tail = cmd;
+				}
+			}
+			renderer->m_render_task.m_commands_semaphore.signal();
+		
+			{
+				PROFILE_BLOCK("delete");
+				LUMIX_DELETE(renderer->m_allocator, job_data);
+			}
 		}, &exec_counter, preconditions);
 
 		m_last_exec_job = exec_counter;
@@ -973,6 +989,7 @@ void RenderTask::shutdown()
 {
 	m_renderer.runInRenderThread(this, [](Renderer& renderer, void* data){
 		((RenderTask*)data)->m_shutdown_requested = true;
+		((RenderTask*)data)->m_commands_semaphore.signal();
 	});
 }
 
@@ -994,22 +1011,25 @@ int RenderTask::task()
 		| (uint)ffr::BufferFlags::MAP_FLUSH_EXPLICIT;
 	ffr::createBuffer(m_transient_buffer, transient_flags, TRANSIENT_BUFFER_SIZE, nullptr);
 	m_transient_buffer_ptr = (u8*)ffr::map(m_transient_buffer, 0, TRANSIENT_BUFFER_SIZE, transient_flags);
-	while (!m_shutdown_requested || !m_commands.isEmpty()) {
-		Renderer::RenderJob* cmd = nullptr;
-		{
-			PROFILE_BLOCK("wait for cmd");
-			Profiler::blockColor(0xff, 0, 0);
-			Renderer::RenderJob** rt_cmd = m_commands.pop(true);
-			cmd = *rt_cmd;
-			m_commands.dealoc(rt_cmd);
+	while (!m_shutdown_requested) {
+		m_commands_semaphore.wait();
+		
+		Renderer::RenderJob* cmd = [&]() {
+			MT::CriticalSectionLock lock(m_commands_lock);
+			Renderer::RenderJob* cmd = m_commands_head;
+			if (cmd) m_commands_head = cmd->next;
+			if (!m_commands_head) m_commands_tail = nullptr;
+			return cmd;
+		}();
+
+		if (!cmd) {
+			ASSERT(m_shutdown_requested);
+			break;
 		}
-	
+
 		PROFILE_BLOCK("executeCommand");
 		cmd->execute();
-		{
-			PROFILE_BLOCK("executeCommand - free");
-			LUMIX_DELETE(m_renderer.getAllocator(), cmd);
-		}
+		LUMIX_DELETE(m_renderer.getAllocator(), cmd);
 	}
 	ffr::destroy(m_transient_buffer);
 	m_profiler.clear();

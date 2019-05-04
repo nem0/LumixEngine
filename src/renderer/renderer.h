@@ -41,6 +41,8 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 			virtual ~RenderJob() {}
 			virtual void setup() = 0;
 			virtual void execute() = 0;
+
+			RenderJob* next = nullptr;
 		};
 
 		struct GlobalState 
