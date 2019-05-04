@@ -190,6 +190,8 @@ struct RenderTask : MT::Task
 	uint m_transient_buffer_offset;
 	u8* m_transient_buffer_ptr = nullptr;
 
+	// TODO maybe use http://www.1024cores.net/home/lock-free-algorithms/queues/intrusive-mpsc-node-based-queue 
+	// instead of critical section
 	MT::CriticalSection m_commands_lock;
 	MT::Semaphore m_commands_semaphore;
 	Renderer::RenderJob* m_commands_head = nullptr;

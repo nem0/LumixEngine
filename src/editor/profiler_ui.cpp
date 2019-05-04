@@ -834,6 +834,10 @@ struct VisibleBlock
 struct ThreadRecord
 {
 	float y;
+	struct {
+		u64 time;
+		bool is_enter;
+	}last_context_switch;
 };
 
 
@@ -919,7 +923,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 
 	for(Profiler::ThreadContext* ctx : contexts) {
 		MT::SpinLock lock(ctx->mutex);
-		threads_records.insert(ctx->thread_id, { y });
+		threads_records.insert(ctx->thread_id, { y, 0 });
 		renderArrow(ImVec2(a.x, y), ctx->open ? ImGuiDir_Down : ImGuiDir_Right, 1, dl);
 		dl->AddText(ImVec2(a.x + 20, y), ImGui::GetColorU32(ImGuiCol_Text), ctx->name);
 		dl->AddLine(ImVec2(a.x, y + 20), ImVec2(b.x, y + 20), ImGui::GetColorU32(ImGuiCol_Border));
@@ -1129,6 +1133,40 @@ void ProfilerUIImpl::onGUICPUProfiler()
 	if (!any_hovered_signal) hovered_signal.signal = JobSystem::INVALID_HANDLE;
 	if (!hovered_signal_current_pos) hovered_signal.is_current_pos = false;
 
+	auto get_view_x = [&](u64 time) {
+		const float t = time > view_start 
+			? float((time - view_start) / double(view_end - view_start))
+			: -float((view_start - time) / double(view_end - view_start));
+		return a.x * (1 - t) + b.x * t;
+	};
+
+	auto draw_cswitch = [&](float x, const Profiler::ContextSwitchRecord& r, ThreadRecord& tr, bool is_enter) {
+		const float y = tr.y + 10;
+		dl->AddLine(ImVec2(x, y - 5), ImVec2(x, y + 5), 0xff00ff00);
+		if (!is_enter) {
+			const u64 prev_switch = tr.last_context_switch.time;
+			if (prev_switch) {
+				float prev_x = get_view_x(prev_switch);
+				dl->AddLine(ImVec2(prev_x, y), ImVec2(x, y), 0xff00ff00);
+				dl->AddLine(ImVec2(prev_x, y - 5), ImVec2(prev_x, y + 5), 0xff00ff00);
+			}
+			else {
+				dl->AddLine(ImVec2(x, y), ImVec2(0, y), 0xff00ff00);
+			}
+		}
+
+		if (ImGui::IsMouseHoveringRect(ImVec2(x - 3, y - 3), ImVec2(x + 3, y + 3))) {
+			ImGui::BeginTooltip();
+			ImGui::Text("Context switch:");
+			ImGui::Text("  from: %s (%d)", getThreadName(contexts, r.old_thread_id), r.old_thread_id);
+			ImGui::Text("  to: %s (%d)", getThreadName(contexts, r.new_thread_id), r.new_thread_id);
+			ImGui::Text("  reason: %s", getContexSwitchReasonString(r.reason));
+			ImGui::EndTooltip();
+		}
+		tr.last_context_switch.time = r.timestamp;
+		tr.last_context_switch.is_enter = is_enter;
+	};
+
 	{
 		Profiler::ThreadContext& ctx = Profiler::getGlobalContext();
 		MT::SpinLock lock(ctx.mutex);
@@ -1151,61 +1189,10 @@ void ProfilerUIImpl::onGUICPUProfiler()
 						read(ctx, p + sizeof(Profiler::EventHeader), r);
 						auto new_iter = threads_records.find(r.new_thread_id);
 						auto old_iter = threads_records.find(r.old_thread_id);
-						const float t = float((header.time - view_start) / double(view_end - view_start));
-						const float x = a.x * (1 - t) + b.x * t;
-						if (old_iter.isValid() && new_iter.isValid()) {
-							const float oy = old_iter.value().y + 10;
-							const float ny = new_iter.value().y + 10;
-							dl->AddLine(ImVec2(x, oy)
-								, ImVec2(x, ny)
-								, 0xff0000ff);
-							const float arrow_y = ny < oy ? ny + 5 : ny - 5;
-							dl->AddLine(ImVec2(x, ny)
-								, ImVec2(x + 5, arrow_y)
-								, 0xff0000ff);
-							dl->AddLine(ImVec2(x, ny)
-								, ImVec2(x - 5, arrow_y)
-								, 0xff0000ff);
-
-							if (ImGui::IsMouseHoveringRect(ImVec2(x - 1, Math::minimum(oy, ny)), ImVec2(x + 1, Math::maximum(oy, ny)))) {
-								ImGui::BeginTooltip();
-								ImGui::Text("Context switch:");
-								ImGui::Text("  from: %s (%d)", getThreadName(contexts, r.old_thread_id), r.old_thread_id);
-								ImGui::Text("  to: %s (%d)", getThreadName(contexts, r.new_thread_id), r.new_thread_id);
-								ImGui::Text("  reason: %s", getContexSwitchReasonString(r.reason));
-								ImGui::EndTooltip();
-							}
-						}
-						else if (old_iter.isValid()) {
-							const float oy = old_iter.value().y + 10;
-							dl->AddLine(ImVec2(x + 5, oy - 5)
-								, ImVec2(x - 5, oy + 5)
-								, 0xff0000ff);
-
-							if (ImGui::IsMouseHoveringRect(ImVec2(x - 3, oy - 3), ImVec2(x + 3, oy + 3))) {
-								ImGui::BeginTooltip();
-								ImGui::Text("Context switch:");
-								ImGui::Text("  from: %s (%d)", getThreadName(contexts, r.old_thread_id), r.old_thread_id);
-								ImGui::Text("  to: %d", r.new_thread_id);
-								ImGui::Text("  reason: %s", getContexSwitchReasonString(r.reason));
-								ImGui::EndTooltip();
-							}
-						}
-						else if (new_iter.isValid()) {
-							const float ny = new_iter.value().y + 10;
-							dl->AddLine(ImVec2(x - 5, ny - 5)
-								, ImVec2(x + 5, ny + 5)
-								, 0xff00ff00);
-
-							if (ImGui::IsMouseHoveringRect(ImVec2(x - 3, ny - 3), ImVec2(x + 3, ny + 3))) {
-								ImGui::BeginTooltip();
-								ImGui::Text("Context switch:");
-								ImGui::Text("  from: %d", r.old_thread_id);
-								ImGui::Text("  to: %s (%d)", getThreadName(contexts, r.new_thread_id), r.new_thread_id);
-								ImGui::Text("  reason: %s", getContexSwitchReasonString(r.reason));
-								ImGui::EndTooltip();
-							}
-						}
+						const float x = get_view_x(header.time);
+						
+						if (new_iter.isValid()) draw_cswitch(x, r, new_iter.value(), true);
+						if (old_iter.isValid()) draw_cswitch(x, r, old_iter.value(), false);
 					}
 					break;
 				default: ASSERT(false); break;
@@ -1215,6 +1202,13 @@ void ProfilerUIImpl::onGUICPUProfiler()
 	}
 
 	Profiler::unlockContexts();
+
+	for (const ThreadRecord& tr : threads_records) {
+		if (tr.last_context_switch.is_enter) {
+			const float x = get_view_x(tr.last_context_switch.time);
+			dl->AddLine(ImVec2(b.x, tr.y + 10), ImVec2(x, tr.y + 10), 0xff00ff00);
+		}
+	}
 
 	if (m_autopause > 0 && !m_is_paused && Profiler::getLastFrameDuration() * 1000.f > m_autopause) {
 		m_is_paused = true;
