@@ -773,6 +773,7 @@ struct RendererImpl final : public Renderer
 
 		JobSystem::SignalHandle exec_counter = JobSystem::INVALID_HANDLE;
 		JobSystem::run(data, [](void* data){
+			PROFILE_BLOCK("push_to_render_thread");
 			RenderJobSetupData* job_data = (RenderJobSetupData*)data;
 			RenderJob* cmd = job_data->cmd;
 			RendererImpl* renderer = job_data->renderer;

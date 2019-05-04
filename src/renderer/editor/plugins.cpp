@@ -1203,6 +1203,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		}
 
 		static void execute(void* data) {
+			PROFILE_FUNCTION();
 			TextureTileJob* that = (TextureTileJob*)data;
 			that->execute();
 			LUMIX_DELETE(that->m_allocator, that);

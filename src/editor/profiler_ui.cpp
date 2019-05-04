@@ -3,6 +3,7 @@
 #include "engine/fs/file_events_device.h"
 #include "engine/fs/file_system.h"
 #include "engine/fs/os_file.h"
+#include "engine/job_system.h"
 #include "engine/log.h"
 #include "engine/math_utils.h"
 #include "engine/mt/atomic.h"
@@ -42,18 +43,6 @@ enum MemoryColumn
 	FUNCTION,
 	SIZE
 };
-
-
-static const char* getFiberSwitchReasonString(Fiber::SwitchReason reason)
-{
-	switch (reason) {
-		case Fiber::SwitchReason::CONTINUE_JOB: return "continue job";
-		case Fiber::SwitchReason::FINISH_JOB: return "finish job";
-		case Fiber::SwitchReason::START_JOB: return "start job";
-		case Fiber::SwitchReason::USER_WAIT: return "user wait";
-		default: return "Unknown";
-	}
-}
 
 
 static const char* getContexSwitchReasonString(i8 reason)
@@ -492,12 +481,11 @@ struct ProfilerUIImpl final : public ProfilerUI
 	SortOrder m_sort_order;
 	float m_autopause = -33.3333f;
 	bool m_show_context_switches = false;
-	bool m_show_fiber_switches = false;
 	struct {
-		i32 id = -1;
+		u32 signal;
 		float x, y;
-		bool any = false;
-	} hovered_fiber_switch;
+		bool is_current_pos = false;
+	} hovered_signal;
 };
 
 
@@ -879,7 +867,6 @@ void ProfilerUIImpl::onGUICPUProfiler()
 		if (m_autopause > 0) {
 			ImGui::InputFloat("Autopause limit (ms)", &m_autopause, 1.f, 10.f, 2);
 		}
-		ImGui::Checkbox("Show fiber switches", &m_show_fiber_switches);
 		if (Profiler::contextSwitchesEnabled()) {
 			ImGui::Checkbox("Show context switches", &m_show_context_switches);
 		}
@@ -927,7 +914,8 @@ void ProfilerUIImpl::onGUICPUProfiler()
 
 	HashMap<const char*, const char*> visible_blocks(1024, m_allocator);
 	HashMap<u32, ThreadRecord> threads_records(64, m_allocator);
-	hovered_fiber_switch.any = false;
+	bool any_hovered_signal = false;
+	bool hovered_signal_current_pos = false;
 
 	for(Profiler::ThreadContext* ctx : contexts) {
 		MT::SpinLock lock(ctx->mutex);
@@ -949,6 +937,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 			uint offset;
 			i32 switch_id;
 			u32 color;
+			u32 job_signal;
 		} open_blocks[64];
 		int level = -1;
 		uint p = ctx->begin;
@@ -960,7 +949,8 @@ void ProfilerUIImpl::onGUICPUProfiler()
 			int offset;
 		} properties[64];
 		int properties_count = 0;
-
+#error visualize job preconditions
+#error stale je obacas chyba v zelenej ciare - job continuation-e
 		auto draw_block = [&](u64 from, u64 to, const char* name, u32 color) {
 			if(from <= view_end && to >= view_start) {
 				const float t_start = float(int(from - view_start) / double(view_end - view_start));
@@ -973,6 +963,13 @@ void ProfilerUIImpl::onGUICPUProfiler()
 							
 				const ImVec2 ra(x_start, block_y);
 				const ImVec2 rb(x_end, block_y + 19);
+				if (hovered_signal.signal == open_blocks[level].job_signal 
+					&& hovered_signal.signal != JobSystem::INVALID_HANDLE
+					&& hovered_signal.is_current_pos)
+				{
+					dl->AddLine(ra, ImVec2(hovered_signal.x, hovered_signal.y - 2), 0xff0000ff);
+				}
+
 				dl->AddRectFilled(ra, rb, color);
 				if(x_end - x_start > 2) {
 					dl->AddRect(ra, rb, ImGui::GetColorU32(ImGuiCol_Border));
@@ -984,7 +981,12 @@ void ProfilerUIImpl::onGUICPUProfiler()
 					const u64 freq = Profiler::frequency();
 					const float t = 1000 * float((to - from) / double(freq));
 					ImGui::BeginTooltip();
-					ImGui::Text("%s (%.2f ms)", name, t);
+					ImGui::Text("%s (%.3f ms)", name, t);
+					if (open_blocks[level].job_signal != JobSystem::INVALID_HANDLE) {
+						any_hovered_signal = true;
+						hovered_signal.signal = open_blocks[level].job_signal;
+						ImGui::Text("Signal on finish: %d", open_blocks[level].job_signal);
+					}
 					for(int i = 0; i < properties_count; ++i) {
 						if (properties[i].level != level) continue;
 
@@ -1008,45 +1010,53 @@ void ProfilerUIImpl::onGUICPUProfiler()
 			Profiler::EventHeader header;
 			read(*ctx, p, header);
 			switch(header.type) {
-				case Profiler::EventType::END_FIBER_SWITCH:
-				case Profiler::EventType::BEGIN_FIBER_SWITCH:
-					if (m_show_fiber_switches) {
-						Profiler::FiberSwitchRecord r;
-						read(*ctx, p + sizeof(Profiler::EventHeader), r);
-						if (r.id == hovered_fiber_switch.id) {
-							float t = float((header.time - view_start) / double(view_end - view_start));
-							if (header.time < view_start) {
-								t = -float((view_start - header.time) / double(view_end - view_start));
-							}
-							const float x = a.x * (1 - t) + b.x * t;
-							if (x != hovered_fiber_switch.x || y != hovered_fiber_switch.y) {
-								dl->AddLine(ImVec2(x, y + 2), ImVec2(hovered_fiber_switch.x, hovered_fiber_switch.y + 2), 0xff000000);
-							}
+				case Profiler::EventType::END_FIBER_WAIT:
+				case Profiler::EventType::BEGIN_FIBER_WAIT:{
+					const bool is_begin = header.type == Profiler::EventType::BEGIN_FIBER_WAIT;
+					Profiler::FiberWaitRecord r;
+					read(*ctx, p + sizeof(Profiler::EventHeader), r);
+					if (r.job_system_signal == hovered_signal.signal) {
+						float t = float((header.time - view_start) / double(view_end - view_start));
+						if (header.time < view_start) {
+							t = -float((view_start - header.time) / double(view_end - view_start));
 						}
-						if (header.time >= view_start && header.time <= view_end) {
-							const float t = float((header.time - view_start) / double(view_end - view_start));
-							const float x = a.x * (1 - t) + b.x * t;
-							const u32 color = header.type == Profiler::EventType::END_FIBER_SWITCH ? 0xffff0000 : 0xff00ff00;
-							dl->AddRect(ImVec2(x - 2, y - 2), ImVec2(x + 2, y + 2), color);
-							if (ImGui::IsMouseHoveringRect(ImVec2(x - 2, y - 2), ImVec2(x + 2, y + 2))) {
-								hovered_fiber_switch.id = r.id;
-								hovered_fiber_switch.x = x;
-								hovered_fiber_switch.y = y;
-								hovered_fiber_switch.any = true;
+						const float x = a.x * (1 - t) + b.x * t;
+						if (hovered_signal.is_current_pos && (x != hovered_signal.x || y != hovered_signal.y)) {
+							dl->AddLine(ImVec2(x, y - 2), ImVec2(hovered_signal.x, hovered_signal.y - 2), 0xff00ff00);
+						}
+					}
+					if (header.time >= view_start && header.time <= view_end || is_begin && hovered_signal.signal == r.job_system_signal) {
+						const float t = view_start <= header.time 
+							? float((header.time - view_start) / double(view_end - view_start))
+							: -float((view_start - header.time) / double(view_end - view_start));
+						const float x = a.x * (1 - t) + b.x * t;
+						const u32 color = header.type == Profiler::EventType::END_FIBER_WAIT ? 0xffff0000 : 0xff00ff00;
+						dl->AddRect(ImVec2(x - 2, y - 2), ImVec2(x + 2, y + 2), color);
+						const bool mouse_hovered = ImGui::IsMouseHoveringRect(ImVec2(x - 2, y - 2), ImVec2(x + 2, y + 2));
+						if (mouse_hovered || is_begin && hovered_signal.signal == r.job_system_signal) {
+							hovered_signal.signal = r.job_system_signal;
+							hovered_signal.x = x;
+							hovered_signal.y = y;
+							hovered_signal.is_current_pos = true;
+							hovered_signal_current_pos = true;
+							if(mouse_hovered) {
+								any_hovered_signal = true;
 								ImGui::BeginTooltip();
 								ImGui::Text("Fiber switch");
-								ImGui::Text("  ID: %d", r.id);
-								ImGui::Text("  Reason: %s", getFiberSwitchReasonString(r.reason));
+								ImGui::Text("  Switch ID: %d", r.id);
+								ImGui::Text("  Waiting for signal: %d", r.job_system_signal);
 								ImGui::EndTooltip();
 							}
 						}
 					}
 					break;
+				}
 				case Profiler::EventType::BEGIN_BLOCK:
 					++level;
 					ASSERT(level < lengthOf(open_blocks));
 					open_blocks[level].offset = p;
 					open_blocks[level].color = 0xffDDddDD;
+					open_blocks[level].job_signal = JobSystem::INVALID_HANDLE;
 					break;
 				case Profiler::EventType::END_BLOCK:
 					if (level >= 0) {
@@ -1056,7 +1066,13 @@ void ProfilerUIImpl::onGUICPUProfiler()
 						const char* name;
 						read(*ctx, open_blocks[level].offset + sizeof(Profiler::EventHeader), name);
 						if (!m_cpu_block_filter[0] || stristr(name, m_cpu_block_filter)) {
-							draw_block(start_header.time, header.time, name, open_blocks[level].color);
+							u32 color = open_blocks[level].color;
+							if (open_blocks[level].job_signal != JobSystem::INVALID_HANDLE
+								&& hovered_signal.signal == open_blocks[level].job_signal) 
+							{
+								color = 0xff0000ff;
+							}
+							draw_block(start_header.time, header.time, name, color);
 							if (!visible_blocks.find(name).isValid()) {
 								visible_blocks.insert(name, name);
 							}
@@ -1083,6 +1099,11 @@ void ProfilerUIImpl::onGUICPUProfiler()
 					}
 					break;
 				}
+				case Profiler::EventType::JOB_SIGNAL:
+					if (level >= 0) {
+						read(*ctx, p + sizeof(Profiler::EventHeader), open_blocks[level].job_signal);
+					}
+					break;
 				case Profiler::EventType::BLOCK_COLOR:
 					if (level >= 0) {
 						read(*ctx, p + sizeof(Profiler::EventHeader), open_blocks[level].color);
@@ -1106,7 +1127,8 @@ void ProfilerUIImpl::onGUICPUProfiler()
 		y += ctx->rows * 20;
 	}
 
-	if (!hovered_fiber_switch.any) hovered_fiber_switch.id = -1;
+	if (!any_hovered_signal) hovered_signal.signal = JobSystem::INVALID_HANDLE;
+	if (!hovered_signal_current_pos) hovered_signal.is_current_pos = false;
 
 	{
 		Profiler::ThreadContext& ctx = Profiler::getGlobalContext();

@@ -29,11 +29,10 @@ void destroy(Handle fiber)
 }
 
 
-void switchTo(Handle* from, Handle fiber, SwitchReason reason)
+void switchTo(Handle* from, Handle fiber)
 {
-	const i32 switch_id = Profiler::beginFiberSwitch(reason);
+	Profiler::beforeFiberSwitch();
 	SwitchToFiber(fiber);
-	Profiler::endFiberSwitch(switch_id);
 }
 
 

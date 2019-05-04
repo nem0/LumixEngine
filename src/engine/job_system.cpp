@@ -11,6 +11,7 @@
 #include "engine/mt/task.h"
 #include "engine/mt/thread.h"
 #include "engine/profiler.h"
+#include <malloc.h> // TODO
 
 namespace Lumix
 {
@@ -97,7 +98,6 @@ static System* g_system = nullptr;
 
 static LUMIX_FORCE_INLINE FiberDecl* getReadyFiber(System& system)
 {
-	PROFILE_FUNCTION();
 	MT::CriticalSectionLock lock(system.m_ready_fiber_sync);
 
 	if(system.m_ready_fibers.empty()) return nullptr;
@@ -109,7 +109,6 @@ static LUMIX_FORCE_INLINE FiberDecl* getReadyFiber(System& system)
 
 static LUMIX_FORCE_INLINE Job getReadyJob(System& system)
 {
-	PROFILE_FUNCTION();
 	MT::CriticalSectionLock lock(system.m_job_queue_sync);
 
 	if (system.m_job_queue.empty()) return { nullptr, nullptr };
@@ -184,7 +183,7 @@ struct WorkerTask : MT::Task
 				g_system->m_sync.enter();
 
 				Profiler::endBlock();
-				Fiber::switchTo(&that->m_primary_fiber, fiber->fiber, Fiber::SwitchReason::CONTINUE_JOB);
+				Fiber::switchTo(&that->m_primary_fiber, fiber->fiber);
 				Profiler::beginBlock("job management");
 				Profiler::blockColor(0, 0, 0xff);
 
@@ -204,7 +203,7 @@ struct WorkerTask : MT::Task
 				g_system->m_sync.enter();
 
 				Profiler::endBlock();
-				Fiber::switchTo(&that->m_primary_fiber, fiber_decl.fiber, Fiber::SwitchReason::START_JOB);
+				Fiber::switchTo(&that->m_primary_fiber, fiber_decl.fiber);
 				Profiler::beginBlock("job management");
 				Profiler::blockColor(0, 0, 0xff);
 
@@ -213,8 +212,8 @@ struct WorkerTask : MT::Task
 			}
 			else 
 			{
-				PROFILE_BLOCK("wait");
-				Profiler::blockColor(0xff, 0, 0);
+				PROFILE_BLOCK("idle");
+				Profiler::blockColor(0xff, 0, 0xff);
 				g_system->m_work_signal.waitTimeout(1);
 			}
 		}
@@ -350,13 +349,18 @@ static void fiberProc(void* data)
 	{
 		Job job = fiber_decl->current_job;
 		Profiler::beginBlock("Job");
+		if (isValid(job.dec_on_finish)) {
+			Profiler::pushJobSignal(job.dec_on_finish);
+		}
 		job.task(job.data);
-		if (isValid(job.dec_on_finish)) trigger(job.dec_on_finish);
+		if (isValid(job.dec_on_finish)) {
+			trigger(job.dec_on_finish);
+		}
 		fiber_decl->job_finished = true;
 		Profiler::endBlock();
 
 		g_system->m_sync.enter();
-		Fiber::switchTo(&fiber_decl->fiber, fiber_decl->worker_task->m_primary_fiber, Fiber::SwitchReason::FINISH_JOB);
+		Fiber::switchTo(&fiber_decl->fiber, fiber_decl->worker_task->m_primary_fiber);
 		g_system->m_sync.exit();
 	}
 }
@@ -445,7 +449,12 @@ void wait(SignalHandle handle)
 			g_system->m_ready_fibers.push((FiberDecl*)data);
 		}, handle, false, nullptr);
 		fiber_decl->job_finished = false;
-		Fiber::switchTo(&fiber_decl->fiber, fiber_decl->worker_task->m_primary_fiber, Fiber::SwitchReason::USER_WAIT);
+		
+		const int open_size = Profiler::getOpenBlocksSize();
+		void* mem = _alloca(open_size);
+		const i32 wait_id = Profiler::beginFiberWait(handle, mem);
+		Fiber::switchTo(&fiber_decl->fiber, fiber_decl->worker_task->m_primary_fiber);
+		Profiler::endFiberWait(handle, wait_id, mem);
 
 		ASSERT(isSignalZero(handle, false));
 		g_system->m_sync.exit();
