@@ -145,7 +145,7 @@ static struct Instance
 	u64 paused_time = 0;
 	u64 last_frame_duration = 0;
 	u64 last_frame_time = 0;
-	volatile i32 fiber_switch_id = 0;
+	volatile i32 fiber_wait_id = 0;
 	TraceTask trace_task;
 	ThreadContext global_context;
 } g_instance;
@@ -308,6 +308,7 @@ void beginBlock(const char* name)
 {
 	ThreadContext* ctx = g_instance.getThreadContext();
 	++ctx->open_blocks_count;
+	ctx->open_blocks.push(name);
 	write(*ctx, EventType::BEGIN_BLOCK, name);
 }
 
@@ -318,29 +319,62 @@ float getLastFrameDuration()
 }
 
 
-i32 beginFiberSwitch(Fiber::SwitchReason reason)
+void beforeFiberSwitch()
 {
-	FiberSwitchRecord r;
-	r.id = MT::atomicIncrement(&g_instance.fiber_switch_id);
-	r.reason = reason;
-
 	ThreadContext* ctx = g_instance.getThreadContext();
-	write(*ctx, EventType::BEGIN_FIBER_SWITCH, r);
 	while(ctx->open_blocks_count > 0) {
 		write(*ctx, EventType::END_BLOCK, 0);
 		--ctx->open_blocks_count;
 	}
+}
+
+
+int getOpenBlocksSize()
+{
+	ThreadContext* ctx = g_instance.getThreadContext();
+	return ctx->open_blocks_count * sizeof(const char*) + sizeof(ctx->open_blocks_count);
+}
+
+
+void pushJobSignal(u32 signal)
+{
+	ThreadContext* ctx = g_instance.getThreadContext();
+	write(*ctx, EventType::JOB_SIGNAL, signal);
+}
+
+
+i32 beginFiberWait(u32 job_system_signal, void* open_blocks)
+{
+	FiberWaitRecord r;
+	r.id = MT::atomicIncrement(&g_instance.fiber_wait_id);
+	r.job_system_signal = job_system_signal;
+
+	ThreadContext* ctx = g_instance.getThreadContext();
+	memcpy(open_blocks, &ctx->open_blocks_count, sizeof(ctx->open_blocks_count));
+	memcpy((u8*)open_blocks + sizeof(ctx->open_blocks_count), ctx->open_blocks.begin(), ctx->open_blocks_count * sizeof(const char*));
+	write(*ctx, EventType::BEGIN_FIBER_WAIT, r);
 	return r.id;
 }
 
 
-void endFiberSwitch(i32 switch_id)
+void endFiberWait(u32 job_system_signal, i32 wait_id, const void* open_blocks)
 {
-	FiberSwitchRecord r;
-	r.id = switch_id;
-	r.reason = Fiber::SwitchReason::UNKNOWN;
 	ThreadContext* ctx = g_instance.getThreadContext();
-	write(*ctx, EventType::END_FIBER_SWITCH, r);
+	FiberWaitRecord r;
+	r.id = wait_id;
+	r.job_system_signal = job_system_signal;
+
+	write(*ctx, EventType::END_FIBER_WAIT, r);
+	decltype(ctx->open_blocks_count) count;
+	memcpy(&count, open_blocks, sizeof(count));
+	
+	u8* ptr = (u8*)open_blocks + sizeof(count);
+	for (int i = 0; i < count; ++i) {
+		const char* name;
+		memcpy(&name, ptr, sizeof(name));
+		ptr += sizeof(name);
+		beginBlock(name);
+	}
 }
 
 
@@ -348,6 +382,7 @@ void endBlock()
 {
 	ThreadContext* ctx = g_instance.getThreadContext();
 	if(ctx->open_blocks_count > 0) {
+		ctx->open_blocks.pop();
 		--ctx->open_blocks_count;
 		write(*ctx, EventType::END_BLOCK, 0);
 	}

@@ -289,6 +289,7 @@ struct CullingSystemImpl final : public CullingSystem
 			jobs[b].src = &cell->ids[b * per_bucket];
 			jobs[b].size = size * sizeof(cell->ids[0]);
 			JobSystem::run(&jobs[b], [](void* data){
+				PROFILE_BLOCK("copy");
 				Job* j = (Job*)data;
 				memcpy(j->dst, j->src, j->size);
 			}, &job_counter, JobSystem::INVALID_HANDLE);

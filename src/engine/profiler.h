@@ -21,13 +21,6 @@ namespace Profiler
 {
 
 
-struct FiberSwitchRecord
-{
-	i32 id;
-	Fiber::SwitchReason reason;
-};
-
-
 struct ContextSwitchRecord
 {
 	u32 old_thread_id;
@@ -37,15 +30,25 @@ struct ContextSwitchRecord
 };
 
 
+struct FiberWaitRecord
+{
+	i32 id;
+	u32 job_system_signal;
+};
+
+
 struct ThreadContext
 {
 	ThreadContext(IAllocator& allocator) 
 		: buffer(allocator)
+		, open_blocks(allocator)
 	{
 		buffer.resize(1024 * 512);
+		open_blocks.reserve(64);
 	}
 
 	int open_blocks_count = 0;
+	Array<const char*> open_blocks;
 	Array<u8> buffer;
 	uint begin = 0;
 	uint end = 0;
@@ -64,9 +67,10 @@ enum class EventType : u8
 	END_BLOCK,
 	FRAME,
 	STRING,
-	BEGIN_FIBER_SWITCH,
-	END_FIBER_SWITCH,
-	CONTEXT_SWITCH
+	BEGIN_FIBER_WAIT,
+	END_FIBER_WAIT,
+	CONTEXT_SWITCH,
+	JOB_SIGNAL,
 };
 
 
@@ -88,11 +92,15 @@ LUMIX_ENGINE_API void pause(bool paused);
 LUMIX_ENGINE_API void beginBlock(const char* name);
 LUMIX_ENGINE_API void blockColor(u8 r, u8 g, u8 b);
 LUMIX_ENGINE_API void endBlock();
+LUMIX_ENGINE_API void pushJobSignal(u32 signal);
 LUMIX_ENGINE_API void frame();
 LUMIX_ENGINE_API void recordString(const char* value);
 
-LUMIX_ENGINE_API i32 beginFiberSwitch(Fiber::SwitchReason reason);
-LUMIX_ENGINE_API void endFiberSwitch(i32 switch_id);
+
+LUMIX_ENGINE_API void beforeFiberSwitch();
+LUMIX_ENGINE_API int getOpenBlocksSize();
+LUMIX_ENGINE_API i32 beginFiberWait(u32 job_system_signal, void* open_blocks);
+LUMIX_ENGINE_API void endFiberWait(u32 job_system_signal, i32 wait_id, const void* open_blocks);
 LUMIX_ENGINE_API float getLastFrameDuration();
 
 LUMIX_ENGINE_API bool contextSwitchesEnabled();
