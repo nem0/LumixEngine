@@ -949,8 +949,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 			int offset;
 		} properties[64];
 		int properties_count = 0;
-#error visualize job preconditions
-#error stale je obacas chyba v zelenej ciare - job continuation-e
+
 		auto draw_block = [&](u64 from, u64 to, const char* name, u32 color) {
 			if(from <= view_end && to >= view_start) {
 				const float t_start = float(int(from - view_start) / double(view_end - view_start));

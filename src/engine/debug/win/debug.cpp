@@ -299,13 +299,13 @@ Allocator::~Allocator()
 
 void Allocator::lock()
 {
-	m_mutex.lock();
+	m_mutex.enter();
 }
 
 
 void Allocator::unlock()
 {
-	m_mutex.unlock();
+	m_mutex.exit();
 }
 
 
@@ -414,7 +414,7 @@ void* Allocator::allocate_aligned(size_t size, size_t align)
 
 	size_t system_size = getNeededMemory(size, align);
 
-	m_mutex.lock();
+	m_mutex.enter();
 	system_ptr = m_source.allocate_aligned(system_size, align);
 	user_ptr = getUserFromSystem(system_ptr, align);
 	info = new (NewPlaceholder(), getAllocationInfoFromUser(user_ptr)) AllocationInfo();
@@ -428,7 +428,7 @@ void* Allocator::allocate_aligned(size_t size, size_t align)
 	m_root = info;
 
 	m_total_size += size;
-	m_mutex.unlock();
+	m_mutex.exit();
 
 	info->align = u16(align);
 	info->stack_leaf = m_stack_tree.record();
@@ -471,7 +471,7 @@ void Allocator::deallocate_aligned(void* user_ptr)
 		}
 
 		{
-			MT::SpinLock lock(m_mutex);
+			MT::CriticalSectionLock lock(m_mutex);
 			if (info == m_root)
 			{
 				m_root = info->next;
@@ -520,7 +520,7 @@ void* Allocator::allocate(size_t size)
 	AllocationInfo* info;
 	size_t system_size = getNeededMemory(size);
 	{
-		MT::SpinLock lock(m_mutex);
+		MT::CriticalSectionLock lock(m_mutex);
 		system_ptr = m_source.allocate(system_size);
 		info = new (NewPlaceholder(), getAllocationInfoFromSystem(system_ptr)) AllocationInfo();
 
@@ -576,7 +576,7 @@ void Allocator::deallocate(void* user_ptr)
 		}
 
 		{
-			MT::SpinLock lock(m_mutex);
+			MT::CriticalSectionLock lock(m_mutex);
 			if (info == m_root)
 			{
 				m_root = info->next;
