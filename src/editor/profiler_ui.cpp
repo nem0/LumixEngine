@@ -941,7 +941,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 			uint offset;
 			i32 switch_id;
 			u32 color;
-			u32 job_signal;
+			Profiler::JobRecord job_info;
 		} open_blocks[64];
 		int level = -1;
 		uint p = ctx->begin;
@@ -966,7 +966,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 							
 				const ImVec2 ra(x_start, block_y);
 				const ImVec2 rb(x_end, block_y + 19);
-				if (hovered_signal.signal == open_blocks[level].job_signal 
+				if (hovered_signal.signal == open_blocks[level].job_info.signal_on_finish 
 					&& hovered_signal.signal != JobSystem::INVALID_HANDLE
 					&& hovered_signal.is_current_pos)
 				{
@@ -985,10 +985,13 @@ void ProfilerUIImpl::onGUICPUProfiler()
 					const float t = 1000 * float((to - from) / double(freq));
 					ImGui::BeginTooltip();
 					ImGui::Text("%s (%.3f ms)", name, t);
-					if (open_blocks[level].job_signal != JobSystem::INVALID_HANDLE) {
+					if (open_blocks[level].job_info.signal_on_finish != JobSystem::INVALID_HANDLE) {
 						any_hovered_signal = true;
-						hovered_signal.signal = open_blocks[level].job_signal;
-						ImGui::Text("Signal on finish: %d", open_blocks[level].job_signal);
+						hovered_signal.signal = open_blocks[level].job_info.signal_on_finish;
+						ImGui::Text("Signal on finish: %d", open_blocks[level].job_info.signal_on_finish);
+					}
+					if (open_blocks[level].job_info.precondition != JobSystem::INVALID_HANDLE) {
+						ImGui::Text("Precondition signal: %d", open_blocks[level].job_info.precondition);
 					}
 					for(int i = 0; i < properties_count; ++i) {
 						if (properties[i].level != level) continue;
@@ -1059,7 +1062,8 @@ void ProfilerUIImpl::onGUICPUProfiler()
 					ASSERT(level < lengthOf(open_blocks));
 					open_blocks[level].offset = p;
 					open_blocks[level].color = 0xffDDddDD;
-					open_blocks[level].job_signal = JobSystem::INVALID_HANDLE;
+					open_blocks[level].job_info.signal_on_finish = JobSystem::INVALID_HANDLE;
+					open_blocks[level].job_info.precondition = JobSystem::INVALID_HANDLE;
 					break;
 				case Profiler::EventType::END_BLOCK:
 					if (level >= 0) {
@@ -1070,8 +1074,8 @@ void ProfilerUIImpl::onGUICPUProfiler()
 						read(*ctx, open_blocks[level].offset + sizeof(Profiler::EventHeader), name);
 						if (!m_cpu_block_filter[0] || stristr(name, m_cpu_block_filter)) {
 							u32 color = open_blocks[level].color;
-							if (open_blocks[level].job_signal != JobSystem::INVALID_HANDLE
-								&& hovered_signal.signal == open_blocks[level].job_signal) 
+							if (open_blocks[level].job_info.signal_on_finish != JobSystem::INVALID_HANDLE
+								&& hovered_signal.signal == open_blocks[level].job_info.signal_on_finish)
 							{
 								color = 0xff0000ff;
 							}
@@ -1102,9 +1106,9 @@ void ProfilerUIImpl::onGUICPUProfiler()
 					}
 					break;
 				}
-				case Profiler::EventType::JOB_SIGNAL:
+				case Profiler::EventType::JOB_INFO:
 					if (level >= 0) {
-						read(*ctx, p + sizeof(Profiler::EventHeader), open_blocks[level].job_signal);
+						read(*ctx, p + sizeof(Profiler::EventHeader), open_blocks[level].job_info);
 					}
 					break;
 				case Profiler::EventType::BLOCK_COLOR:

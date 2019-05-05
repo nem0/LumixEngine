@@ -336,10 +336,13 @@ int getOpenBlocksSize()
 }
 
 
-void pushJobSignal(u32 signal)
+void pushJobInfo(u32 signal_on_finish, u32 precondition)
 {
+	JobRecord r;
+	r.signal_on_finish = signal_on_finish;
+	r.precondition = precondition;
 	ThreadContext* ctx = g_instance.getThreadContext();
-	write(*ctx, EventType::JOB_SIGNAL, signal);
+	write(*ctx, EventType::JOB_INFO, r);
 }
 
 

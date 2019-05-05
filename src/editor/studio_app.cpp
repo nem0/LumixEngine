@@ -17,6 +17,7 @@
 #include "engine/fs/file_system.h"
 #include "engine/fs/os_file.h"
 #include "engine/input_system.h"
+#include "engine/job_system.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
 #include "engine/mt/thread.h"
@@ -254,6 +255,19 @@ public:
 
 		Profiler::frame();
 		m_events.clear();
+	}
+
+
+	void run() override
+	{
+		JobSystem::init(m_allocator);
+		JobSystem::SignalHandle finished = JobSystem::INVALID_HANDLE;
+		JobSystem::run(this, [](void* data) {
+			Lumix::OS::run(*(StudioAppImpl*)data);
+		}, &finished, JobSystem::INVALID_HANDLE, 0b1);
+		Profiler::setThreadName("Main thread");
+		JobSystem::wait(finished);
+		JobSystem::shutdown();
 	}
 
 
@@ -684,6 +698,7 @@ public:
 	void update()
 	{
 		PROFILE_FUNCTION();
+		Profiler::blockColor(0x7f, 0x7f, 0x7f);
 		m_asset_compiler->update();
 		if (m_watched_plugin.reload_request) tryReloadPlugin();
 
@@ -2586,9 +2601,6 @@ public:
 
 
 	Vec2 getMouseMove() const override { return m_mouse_move; }
-
-
-	void run() override {}
 
 
 	static void checkWorkingDirector()

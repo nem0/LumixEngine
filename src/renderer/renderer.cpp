@@ -770,7 +770,7 @@ struct RendererImpl final : public Renderer
 
 			PROFILE_BLOCK("setup command");
 			cmd->setup();
-		}, &preconditions, JobSystem::INVALID_HANDLE);
+		}, &preconditions, JobSystem::INVALID_HANDLE, 0);
 
 		JobSystem::SignalHandle exec_counter = JobSystem::INVALID_HANDLE;
 		JobSystem::run(data, [](void* data){
@@ -800,7 +800,7 @@ struct RendererImpl final : public Renderer
 				PROFILE_BLOCK("delete");
 				LUMIX_DELETE(renderer->m_allocator, job_data);
 			}
-		}, &exec_counter, preconditions);
+		}, &exec_counter, preconditions, 0);
 
 		m_last_exec_job = exec_counter;
 	}
