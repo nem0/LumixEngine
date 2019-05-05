@@ -30,6 +30,13 @@ struct ContextSwitchRecord
 };
 
 
+struct JobRecord
+{
+	u32 signal_on_finish;
+	u32 precondition;
+};
+
+
 struct FiberWaitRecord
 {
 	i32 id;
@@ -70,7 +77,7 @@ enum class EventType : u8
 	BEGIN_FIBER_WAIT,
 	END_FIBER_WAIT,
 	CONTEXT_SWITCH,
-	JOB_SIGNAL,
+	JOB_INFO,
 };
 
 
@@ -92,7 +99,7 @@ LUMIX_ENGINE_API void pause(bool paused);
 LUMIX_ENGINE_API void beginBlock(const char* name);
 LUMIX_ENGINE_API void blockColor(u8 r, u8 g, u8 b);
 LUMIX_ENGINE_API void endBlock();
-LUMIX_ENGINE_API void pushJobSignal(u32 signal);
+LUMIX_ENGINE_API void pushJobInfo(u32 signal_on_finish, u32 precondition);
 LUMIX_ENGINE_API void frame();
 LUMIX_ENGINE_API void recordString(const char* value);
 

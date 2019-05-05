@@ -31,6 +31,8 @@ struct Job
 	void (*task)(void*) = nullptr;
 	void* data = nullptr;
 	SignalHandle dec_on_finish;
+	SignalHandle precondition;
+	u64 affinity;
 };
 
 
@@ -42,13 +44,16 @@ struct Signal {
 };
 
 
+struct WorkerTask;
+
+
 struct FiberDecl
 {
 	int idx;
 	Fiber::Handle fiber;
 	Job current_job;
 	bool job_finished;
-	struct WorkerTask* worker_task;
+	WorkerTask* worker_task;
 };
 
 
@@ -94,42 +99,49 @@ struct System
 
 
 static System* g_system = nullptr;
-
-
-static LUMIX_FORCE_INLINE FiberDecl* getReadyFiber(System& system)
-{
-	MT::CriticalSectionLock lock(system.m_ready_fiber_sync);
-
-	if(system.m_ready_fibers.empty()) return nullptr;
-	FiberDecl* fiber = system.m_ready_fibers.back();
-	system.m_ready_fibers.pop();
-	return fiber;
-}
-
-
-static LUMIX_FORCE_INLINE Job getReadyJob(System& system)
-{
-	MT::CriticalSectionLock lock(system.m_job_queue_sync);
-
-	if (system.m_job_queue.empty()) return { nullptr, nullptr };
-
-	Job job = system.m_job_queue.back();
-	system.m_job_queue.pop();
-	if (system.m_job_queue.empty()) system.m_work_signal.reset();
-	return job;
-}
-
-
-static thread_local MT::Task* g_worker = nullptr;
+static thread_local WorkerTask* g_worker = nullptr;
 
 
 struct WorkerTask : MT::Task
 {
-
-	WorkerTask(System& system) 
+	WorkerTask(System& system, u64 affinity) 
 		: Task(system.m_allocator)
-		, m_system(system) 
+		, m_system(system)
+		, m_affinity(affinity)
 	{}
+
+
+	Job getReadyJob(System& system) const
+	{
+		MT::CriticalSectionLock lock(system.m_job_queue_sync);
+
+		if (system.m_job_queue.empty()) return { nullptr, nullptr };
+
+		const Job job = system.m_job_queue.back();
+		system.m_job_queue.pop();
+		if (job.affinity && (job.affinity & m_affinity) == 0) {
+			system.m_job_queue.push(job);
+			return { nullptr, nullptr };
+		}
+
+		if (system.m_job_queue.empty()) system.m_work_signal.reset();
+		return job;
+	}
+
+
+	FiberDecl* getReadyFiber(System& system) const
+	{
+		MT::CriticalSectionLock lock(system.m_ready_fiber_sync);
+
+		if (system.m_ready_fibers.empty()) return nullptr;
+		FiberDecl* fiber = system.m_ready_fibers.back();
+		system.m_ready_fibers.pop();
+		if (fiber->current_job.affinity && (fiber->current_job.affinity & m_affinity) == 0) {
+			system.m_ready_fibers.push(fiber);
+			return nullptr;
+		}
+		return fiber;
+	}
 
 
 	static FiberDecl& getFreeFiber()
@@ -167,14 +179,14 @@ struct WorkerTask : MT::Task
 		static void manage(void* data)
 	#endif
 	{
-		WorkerTask* that = (WorkerTask*)g_worker;
+		WorkerTask* that = g_worker;
 		that->m_finished = false;
 		Profiler::beginBlock("job management");
 		Profiler::blockColor(0, 0, 0xff);
 		
 		while (!that->m_finished)
 		{
-			FiberDecl* fiber = getReadyFiber(*g_system);
+			FiberDecl* fiber = that->getReadyFiber(*g_system);
 			if (fiber) {
 				fiber->worker_task = that;
 				that->m_current_fiber = fiber;
@@ -192,7 +204,7 @@ struct WorkerTask : MT::Task
 				continue;
 			}
 
-			Job job = getReadyJob(*g_system);
+			Job job = that->getReadyJob(*g_system);
 			if (job.task) {
 				FiberDecl& fiber_decl = getFreeFiber();
 				fiber_decl.worker_task = that;
@@ -225,6 +237,7 @@ struct WorkerTask : MT::Task
 	FiberDecl* m_current_fiber = nullptr;
 	Fiber::Handle m_primary_fiber;
 	System& m_system;
+	u64 m_affinity;
 };
 
 
@@ -295,11 +308,14 @@ static LUMIX_FORCE_INLINE void runInternal(void* data
 	, void (*task)(void*)
 	, SignalHandle precondition
 	, bool lock
-	, SignalHandle* on_finish)
+	, SignalHandle* on_finish
+	, u64 affinity)
 {
 	Job j;
 	j.data = data;
 	j.task = task;
+	j.affinity = affinity;
+	j.precondition = precondition;
 
 	if (lock) g_system->m_sync.enter();
 	j.dec_on_finish = [&]() -> SignalHandle {
@@ -335,9 +351,9 @@ static LUMIX_FORCE_INLINE void runInternal(void* data
 }
 
 
-void run(void* data, void (*task)(void*), SignalHandle* on_finished, SignalHandle precondition)
+void run(void* data, void (*task)(void*), SignalHandle* on_finished, SignalHandle precondition, u64 affinity)
 {
-	runInternal(data, task, precondition, true, on_finished);
+	runInternal(data, task, precondition, true, on_finished, affinity);
 }
 
 
@@ -355,7 +371,7 @@ static void fiberProc(void* data)
 		Job job = fiber_decl->current_job;
 		Profiler::beginBlock("Job");
 		if (isValid(job.dec_on_finish)) {
-			Profiler::pushJobSignal(job.dec_on_finish);
+			Profiler::pushJobInfo(job.dec_on_finish, job.precondition);
 		}
 		job.task(job.data);
 		if (isValid(job.dec_on_finish)) {
@@ -378,9 +394,9 @@ bool init(IAllocator& allocator)
 	g_system = LUMIX_NEW(allocator, System)(allocator);
 	g_system->m_work_signal.reset();
 
-	int count = Math::maximum(1, int(MT::getCPUsCount() - 1));
+	int count = Math::maximum(1, int(MT::getCPUsCount()));
 	for (int i = 0; i < count; ++i) {
-		WorkerTask* task = LUMIX_NEW(allocator, WorkerTask)(*g_system);
+		WorkerTask* task = LUMIX_NEW(allocator, WorkerTask)(*g_system, i < 64 ? u64(1) << i : 0);
 		if (task->create("Job system worker")) {
 			g_system->m_workers.push(task);
 			task->setAffinityMask((u64)1 << i);
@@ -447,12 +463,12 @@ void wait(SignalHandle handle)
 	if (g_worker) {
 		PROFILE_BLOCK("waiting");
 		Profiler::blockColor(0xff, 0, 0);
-		FiberDecl* fiber_decl = ((WorkerTask*)g_worker)->m_current_fiber;
+		FiberDecl* fiber_decl = g_worker->m_current_fiber;
 
 		runInternal(fiber_decl, [](void* data){
 			MT::CriticalSectionLock lock(g_system->m_ready_fiber_sync);
 			g_system->m_ready_fibers.push((FiberDecl*)data);
-		}, handle, false, nullptr);
+		}, handle, false, nullptr, 0);
 		fiber_decl->job_finished = false;
 		
 		const int open_size = Profiler::getOpenBlocksSize();
@@ -466,6 +482,7 @@ void wait(SignalHandle handle)
 	}
 	else
 	{
+		// TODO maybe handle thi externally since main thread is no more
 		PROFILE_BLOCK("not a job waiting");
 		Profiler::blockColor(0xff, 0, 0);
 
@@ -473,13 +490,13 @@ void wait(SignalHandle handle)
 
 		runInternal(nullptr, [](void* data) {
 			g_system->m_event_outside_job.trigger();
-		}, handle, false, nullptr);
+		}, handle, false, nullptr, 0);
 
 		g_system->m_sync.exit();
 
 		MT::yield();
 		while (!isSignalZero(handle, true)) {
-			g_system->m_event_outside_job.waitTimeout(1);
+			g_system->m_event_outside_job.waitTimeout(100);
 		}
 	}
 }

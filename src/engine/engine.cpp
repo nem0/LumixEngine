@@ -446,7 +446,7 @@ public:
 		, m_working_dir(working_dir)
 	{
 		g_log_info.log("Core") << "Creating engine...";
-		Profiler::setThreadName("Main");
+		Profiler::setThreadName("Main worker");
 		installUnhandledExceptionHandler();
 
 		g_is_error_file_open = g_error_file.open("error.log", FS::Mode::CREATE_AND_WRITE);
@@ -461,7 +461,7 @@ public:
 		luaL_openlibs(m_state);
 		registerLuaAPI();
 
-		JobSystem::init(m_allocator);
+		//JobSystem::init(m_allocator);
 		if (!fs)
 		{
 			m_file_system = FS::FileSystem::create(m_allocator);
@@ -1191,7 +1191,6 @@ public:
 		}
 
 		m_prefab_resource_manager.destroy();
-		JobSystem::shutdown();
 		lua_close(m_state);
 
 		g_error_file.close();

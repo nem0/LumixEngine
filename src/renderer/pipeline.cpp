@@ -2609,7 +2609,7 @@ struct PipelineImpl final : Pipeline
 				ctx.count = renderables[i].size();
 				ctx.camera_pos = m_pipeline->m_viewport.pos;
 				ctx.cmd = this;
-				JobSystem::run(&ctx, &CreateSortKeys::execute, &counter, JobSystem::INVALID_HANDLE);
+				JobSystem::run(&ctx, &CreateSortKeys::execute, &counter, JobSystem::INVALID_HANDLE, 0);
 			}
 			JobSystem::wait(counter);
 			sort_keys.merge();
@@ -2665,7 +2665,7 @@ struct PipelineImpl final : Pipeline
 					ctx.output = &m_command_sets[bucket]->cmds.emplace(m_allocator);
 					ctx.bucket = bucket;
 					job_offset += step;
-					JobSystem::run(&ctx, &CreateCommands::execute, &counter, JobSystem::INVALID_HANDLE);
+					JobSystem::run(&ctx, &CreateCommands::execute, &counter, JobSystem::INVALID_HANDLE, 0);
 				}
 				bucket_offset += bucket_size;
 			}

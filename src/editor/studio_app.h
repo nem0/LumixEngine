@@ -88,6 +88,7 @@ public:
 	static StudioApp* create();
 	static void destroy(StudioApp& app);
 
+	virtual void run() = 0;
 	virtual class PropertyGrid& getPropertyGrid() = 0;
 	virtual class LogUI& getLogUI() = 0;
 	virtual class AssetBrowser& getAssetBrowser() = 0;
@@ -122,7 +123,6 @@ public:
 	virtual const OS::Event* getEvents() const = 0;
 	virtual int getEventsCount() const = 0;
 	virtual ~StudioApp() {}
-	virtual void run() = 0;
 	virtual ImFont* getBoldFont() = 0;
 };
 
