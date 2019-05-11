@@ -226,6 +226,7 @@ void useProgram(ProgramHandle prg);
 void createBuffer(BufferHandle handle, uint flags, size_t size, const void* data);
 bool createTexture(TextureHandle handle, uint w, uint h, uint depth, TextureFormat format, uint flags, const void* data, const char* debug_name);
 bool loadTexture(TextureHandle handle, const void* data, int size, uint flags, const char* debug_name);
+void update(TextureHandle texture, uint level, uint x, uint y, uint w, uint h, TextureFormat format, void* buf);
 FramebufferHandle createFramebuffer();
 QueryHandle createQuery();
 
@@ -275,6 +276,7 @@ int getUniformLocation(ProgramHandle program_handle, UniformHandle uniform);
 void applyUniform1i(int location, int value);
 void applyUniform4i(int location, const int* value);
 void applyUniform4f(int location, const float* value);
+void applyUniform3f(int location, const float* value);
 void applyUniformMatrix3x4f(int location, const float* value);
 void applyUniformMatrix4f(int location, const float* value);
 void applyUniformMatrix4fv(int location, uint count, const float* value);

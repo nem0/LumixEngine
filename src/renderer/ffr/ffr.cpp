@@ -893,6 +893,11 @@ void applyUniform4f(int location, const float* value)
 	glUniform4fv(location, 1, value);
 }
 
+void applyUniform3f(int location, const float* value)
+{
+	glUniform3fv(location, 1, value);
+}
+
 void applyUniformMatrix3x4f(int location, const float* value)
 {
 	glUniformMatrix3x4fv(location, 1, false, value);
@@ -1367,6 +1372,22 @@ TextureInfo getTextureInfo(const void* data)
 	}
 	
 	return info;
+}
+
+
+void update(TextureHandle texture, uint level, uint x, uint y, uint w, uint h, TextureFormat format, void* buf)
+{
+	checkThread();
+	Texture& t = g_ffr.textures[texture.value];
+	const GLuint handle = t.handle;
+	for (int i = 0; i < sizeof(s_texture_formats) / sizeof(s_texture_formats[0]); ++i) {
+		if (s_texture_formats[i].format == format) {
+			const auto& f = s_texture_formats[i];
+			CHECK_GL(glTextureSubImage2D(handle, level, x, y, w, h, f.gl_format, f.type, buf));
+			break;
+		}
+	}
+
 }
 
 

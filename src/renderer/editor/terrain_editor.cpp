@@ -66,7 +66,7 @@ struct PaintTerrainCommand final : public IEditorCommand
 	PaintTerrainCommand(WorldEditor& editor,
 		TerrainEditor::ActionType action_type,
 		int texture_idx,
-		const Vec3& hit_pos,
+		const DVec3& hit_pos,
 		BinaryArray& mask,
 		float radius,
 		float rel_amount,
@@ -86,30 +86,25 @@ struct PaintTerrainCommand final : public IEditorCommand
 		, m_mask(editor.getAllocator())
 		, m_flat_height(flat_height)
 	{
-			// TODO
-	ASSERT(false);
-/*
 		ASSERT(terrain.isValid());
 		
 		m_mask.resize(mask.size());
-		for (int i = 0; i < mask.size(); ++i)
-		{
+		for (int i = 0; i < mask.size(); ++i) {
 			m_mask[i] = mask[i];
 		}
 
 		m_width = m_height = m_x = m_y = -1;
-		Matrix entity_mtx = editor.getUniverse()->getMatrix((EntityRef)terrain.entity);
-		entity_mtx.fastInverse();
-		Vec3 local_pos = entity_mtx.transformPoint(hit_pos);
+		const Transform entity_transform = editor.getUniverse()->getTransform((EntityRef)terrain.entity).inverted();
+		DVec3 local_pos = entity_transform.transform(hit_pos);
 		float terrain_size = static_cast<RenderScene*>(terrain.scene)->getTerrainSize((EntityRef)terrain.entity).x;
 		local_pos = local_pos / terrain_size;
 		local_pos.y = -1;
 
 		Item& item = m_items.emplace();
-		item.m_local_pos = local_pos;
+		item.m_local_pos = local_pos.toFloat();
 		item.m_radius = radius / terrain_size;
 		item.m_amount = rel_amount;
-		item.m_color = color;*/
+		item.m_color = color;
 	}
 
 
@@ -1126,22 +1121,17 @@ bool TerrainEditor::onMouseDown(const WorldEditor::RayHit& hit, int, int)
 	if (!is_terrain) return false;
 	if (m_action_type == NOT_SET || !m_component.isValid()) return false;
 
-		// TODO
-	ASSERT(false);
-	/*detectModifiers();
+	detectModifiers();
 
-	if ((EntityPtr)selected_entities[0] == hit.entity && m_component.isValid())
-	{
+	if ((EntityPtr)selected_entities[0] == hit.entity && m_component.isValid()) {
 		const DVec3 hit_pos = hit.pos;
 		switch (m_action_type)
 		{
 			case FLAT_HEIGHT:
-				if (ImGui::GetIO().KeyCtrl)
-				{
+				if (ImGui::GetIO().KeyCtrl) {
 					m_flat_height = getHeight(hit_pos);
 				}
-				else
-				{
+				else {
 					paint(hit.pos, m_action_type, false);
 				}
 				break;
@@ -1157,7 +1147,7 @@ bool TerrainEditor::onMouseDown(const WorldEditor::RayHit& hit, int, int)
 			default: ASSERT(false); break;
 		}
 		return true;
-	}*/
+	}
 	return true;
 }
 
@@ -1317,7 +1307,7 @@ static bool isOBBCollision(RenderScene& scene,
 }
 
 
-void TerrainEditor::paintEntities(const Vec3& hit_pos)
+void TerrainEditor::paintEntities(const DVec3& hit_pos)
 {
 	// TODO 
 	ASSERT(false);
@@ -1420,23 +1410,21 @@ void TerrainEditor::paintEntities(const Vec3& hit_pos)
 
 void TerrainEditor::onMouseMove(int x, int y, int, int)
 {
-			// TODO
-	ASSERT(false);
-/*if (!m_is_enabled) return;
+	if (!m_is_enabled) return;
 
 	detectModifiers();
 
 	RenderScene* scene = static_cast<RenderScene*>(m_component.scene);
-	Vec3 origin, dir;
+	DVec3 origin;
+	Vec3 dir;
 	m_world_editor.getViewport().getRay({(float)x, (float)y}, origin, dir);
 	RayCastModelHit hit = scene->castRayTerrain((EntityRef)m_component.entity, origin, dir);
-	if (hit.m_is_hit)
-	{
-		bool is_terrain = m_world_editor.getUniverse()->hasComponent((EntityRef)hit.m_entity, TERRAIN_TYPE);
+	if (hit.is_hit) {
+		bool is_terrain = m_world_editor.getUniverse()->hasComponent((EntityRef)hit.entity, TERRAIN_TYPE);
 		if (!is_terrain) return;
 
-		switch (m_action_type)
-		{
+		const DVec3 hit_point = hit.origin + hit.dir * hit.t;
+		switch (m_action_type) {
 			case FLAT_HEIGHT:
 			case RAISE_HEIGHT:
 			case LOWER_HEIGHT:
@@ -1444,12 +1432,12 @@ void TerrainEditor::onMouseMove(int x, int y, int, int)
 			case REMOVE_GRASS:
 			case ADD_GRASS:
 			case COLOR:
-			case LAYER: paint(hit.m_origin + hit.m_dir * hit.m_t, m_action_type, true); break;
-			case ENTITY: paintEntities(hit.m_origin + hit.m_dir * hit.m_t); break;
-			case REMOVE_ENTITY: removeEntities(hit.m_origin + hit.m_dir * hit.m_t); break;
+			case LAYER: paint(hit_point, m_action_type, true); break;
+			case ENTITY: paintEntities(hit_point); break;
+			case REMOVE_ENTITY: removeEntities(hit_point); break;
 			default: ASSERT(false); break;
 		}
-	}*/
+	}
 }
 
 
@@ -1793,7 +1781,7 @@ void TerrainEditor::onGUI()
 }
 
 
-void TerrainEditor::paint(const Vec3& hit_pos, ActionType action_type, bool old_stroke)
+void TerrainEditor::paint(const DVec3& hit_pos, ActionType action_type, bool old_stroke)
 {
 	PaintTerrainCommand* command = LUMIX_NEW(m_world_editor.getAllocator(), PaintTerrainCommand)(m_world_editor,
 		action_type,

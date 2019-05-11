@@ -219,7 +219,7 @@ struct PipelineImpl final : Pipeline
 		m_position_radius_uniform = ffr::allocUniform("u_pos_radius", ffr::UniformType::VEC4, 1);
 		m_terrain_params_uniform = ffr::allocUniform("u_terrain_params", ffr::UniformType::VEC4, 1);
 		m_rel_camera_pos_uniform = ffr::allocUniform("u_rel_camera_pos", ffr::UniformType::VEC3, 1);
-		m_terrain_scale_uniform = ffr::allocUniform("u_terrain_scale", ffr::UniformType::VEC4, 1);
+		m_terrain_scale_uniform = ffr::allocUniform("u_terrain_scale", ffr::UniformType::VEC3, 1);
 		m_terrain_matrix_uniform = ffr::allocUniform("u_terrain_matrix", ffr::UniformType::MAT4, 1);
 		m_model_uniform = ffr::allocUniform("u_model", ffr::UniformType::MAT4, 1);
 		m_bones_uniform = ffr::allocUniform("u_bones", ffr::UniformType::MAT4, 196);
@@ -883,7 +883,8 @@ struct PipelineImpl final : Pipeline
 				instance_decl.addAttribute(4, ffr::AttributeType::FLOAT, false, false);
 				instance_decl.addAttribute(4, ffr::AttributeType::FLOAT, false, false);
 				instance_decl.addAttribute(4, ffr::AttributeType::FLOAT, false, false);
-				const u32 define_mask = 1 << pipeline->m_renderer.getShaderDefineIdx("GRASS");
+				const u32 deferred_define_mask = 1 << pipeline->m_renderer.getShaderDefineIdx("DEFERRED");
+				const u32 define_mask = (1 << pipeline->m_renderer.getShaderDefineIdx("GRASS")) | deferred_define_mask;
 
 				int offset = transient.offset;
 				for (const Patch& patch : patches) {
@@ -899,15 +900,15 @@ struct PipelineImpl final : Pipeline
 							, 0
 							, attribute_map);
 						ffr::setIndexBuffer(patch.mesh->index_buffer_handle);
+						ffr::setUniformMatrix4f(pipeline->m_model_uniform, &patch.mtx.m11);
 						ffr::useProgram(prg.handle);
 						int instance_map[16];
 						for (uint i = 0; i < instance_decl.attributes_count; ++i) {
 							instance_map[i] = prg.attribute_by_semantics[(int)Mesh::AttributeSemantic::INSTANCE0 + i];
 						}
-						ffr::setUniformMatrix4f(pipeline->m_model_uniform, &patch.mtx.m11);
 						ffr::setInstanceBuffer(instance_decl, transient.buffer, offset, 0, instance_map);
 
-						ffr::setState(u64(ffr::StateFlags::DEPTH_TEST));
+						ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE));
 						ffr::drawTrianglesInstanced(0, patch.mesh->indices_count, patch.instance_count);
 					}
 					offset += sizeof(GrassInfo::InstanceData) * patch.instance_count;
@@ -1817,8 +1818,8 @@ struct PipelineImpl final : Pipeline
 
 				int drawcalls_count = 0;
 			
-				const u32 instanced_mask = m_define_mask | (1 << m_pipeline->m_renderer.getShaderDefineIdx("INSTANCED"));
-				const u32 skinned_mask = m_define_mask | (1 << m_pipeline->m_renderer.getShaderDefineIdx("SKINNED"));
+				const u32 instanced_mask = m_define_mask | (1 << renderer.getShaderDefineIdx("INSTANCED"));
+				const u32 skinned_mask = m_define_mask | (1 << renderer.getShaderDefineIdx("SKINNED"));
 				const u64 render_states = m_render_state;
 
 				for (const Array<u8>& cmds : m_cmd_set->cmds) {
@@ -2136,6 +2137,7 @@ struct PipelineImpl final : Pipeline
 				Instance& inst = m_instances.emplace();
 				inst.pos = (info.position - m_camera_params.pos).toFloat();
 				inst.rot = info.rot;
+				inst.scale = info.terrain->getScale();
 				inst.shader = info.shader->m_render_data;
 				inst.material = info.terrain->m_material->getRenderData();
 			}
@@ -2168,6 +2170,7 @@ struct PipelineImpl final : Pipeline
 				ffr::setState(state);
 				const int loc = ffr::getUniformLocation(p.handle, m_pipeline->m_lod_uniform);
 				const int loc2 = ffr::getUniformLocation(p.handle, ffr::allocUniform("u_from_to", ffr::UniformType::IVEC4, 1));
+				const int loc3 = ffr::getUniformLocation(p.handle, m_pipeline->m_terrain_scale_uniform);
 				const int loc4 = ffr::getUniformLocation(p.handle, ffr::allocUniform("u_from_to_sup", ffr::UniformType::IVEC4, 1));
 				IVec4 prev_from_to;
 				for (int i = 0; ; ++i) {
@@ -2193,6 +2196,7 @@ struct PipelineImpl final : Pipeline
 						ffr::useProgram(p.handle);
 						ffr::applyUniform4i(loc4, &from_to_sup.x);
 						ffr::applyUniform4i(loc2, &from_to.x);
+						ffr::applyUniform3f(loc3, &inst.scale.x);
 						ffr::applyUniform1i(loc, i);
 						ffr::drawArrays(0, (subto.x - subfrom.x) * (subto.y - subfrom.y), ffr::PrimitiveType::POINTS);
 						stat += (subto.x - subfrom.x) * (subto.y - subfrom.y);
@@ -2220,6 +2224,7 @@ struct PipelineImpl final : Pipeline
 		{
 			Vec3 pos;
 			Quat rot;
+			Vec3 scale;
 			ShaderRenderData* shader;
 			Material::RenderData* material;
 		};
