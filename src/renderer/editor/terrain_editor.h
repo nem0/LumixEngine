@@ -51,8 +51,8 @@ private:
 	void mergeSplatmap(const char* dir);
 	void onUniverseDestroyed();
 	void detectModifiers();
-	void drawCursor(RenderScene& scene, EntityRef terrain, const Vec3& center);
-	Material* getMaterial();
+	void drawCursor(RenderScene& scene, EntityRef terrain, const DVec3& center);
+	Material* getMaterial() const;
 	void paint(const Vec3& hit, TerrainEditor::ActionType action_type, bool new_stroke);
 
 	void removeEntities(const DVec3& hit);
@@ -61,9 +61,9 @@ private:
 	void decreaseBrushSize();
 	void nextTerrainTexture();
 	void prevTerrainTexture();
-	u16 getHeight(const Vec3& world_pos);
-	Texture* getHeightmap();
-	Vec3 getRelativePosition(const Vec3& world_pos) const;
+	u16 getHeight(const DVec3& world_pos) const;
+	Texture* getHeightmap() const;
+	DVec3 getRelativePosition(const DVec3& world_pos) const;
 
 private:
 	WorldEditor& m_world_editor;
