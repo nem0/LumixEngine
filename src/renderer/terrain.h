@@ -113,7 +113,7 @@ class Terrain
 		float getHeight(int x, int z) const;
 		void setHeight(int x, int z, float height);
 		void setXZScale(float scale);
-		void setYScale(float scale) { m_scale.y = scale; }
+		void setYScale(float scale);
 		void setGrassTypePath(int index, const Path& path);
 		void setGrassTypeDensity(int index, int density);
 		void setGrassTypeDistance(int index, float value);

@@ -589,8 +589,15 @@ void Terrain::setXZScale(float scale)
 {
 	m_scale.x = scale;
 	m_scale.z = scale;
+	forceGrassUpdate();
 }
 
+
+void Terrain::setYScale(float scale)
+{
+	m_scale.y = scale;
+	forceGrassUpdate();
+}
 
 
 void Terrain::setHeight(int x, int z, float h)
