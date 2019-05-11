@@ -536,6 +536,41 @@ struct RendererImpl final : public Renderer
 	}
 
 
+	void updateTexture(ffr::TextureHandle handle, uint x, uint y, uint w, uint h, ffr::TextureFormat format, const MemRef& mem) override
+	{
+		ASSERT(mem.size > 0);
+		ASSERT(handle.isValid());
+
+		struct Cmd : RenderJob {
+			void setup() override {}
+			void execute() override {
+				ffr::update(handle, 0, x, y, w, h, format, mem.data);
+				if (mem.own) {
+					renderer->free(mem);
+				}
+			}
+
+			ffr::TextureHandle handle;
+			uint x, y, w, h;
+			ffr::TextureFormat format;
+			MemRef mem;
+			RendererImpl* renderer;
+		};
+
+		Cmd* cmd = LUMIX_NEW(m_render_task.m_allocator, Cmd);
+		cmd->handle = handle;
+		cmd->x = x;
+		cmd->y = y;
+		cmd->w = w;
+		cmd->h = h;
+		cmd->format = format;
+		cmd->mem = mem;
+		cmd->renderer = this;
+
+		push(cmd);
+	}
+
+
 	ffr::TextureHandle loadTexture(const MemRef& memory, u32 flags, ffr::TextureInfo* info, const char* debug_name) override
 	{
 		ASSERT(memory.size > 0);
@@ -780,26 +815,18 @@ struct RendererImpl final : public Renderer
 			RendererImpl* renderer = job_data->renderer;
 
 			{
-				PROFILE_BLOCK("locking");
 				MT::CriticalSectionLock lock(renderer->m_render_task.m_commands_lock);
-				{
-					PROFILE_BLOCK("locked");
-					cmd->next = nullptr;
-					if (!renderer->m_render_task.m_commands_tail) {
-						renderer->m_render_task.m_commands_head = cmd;
-					}
-					else {
-						renderer->m_render_task.m_commands_tail->next = cmd;
-					}
-					renderer->m_render_task.m_commands_tail = cmd;
+				cmd->next = nullptr;
+				if (!renderer->m_render_task.m_commands_tail) {
+					renderer->m_render_task.m_commands_head = cmd;
 				}
+				else {
+					renderer->m_render_task.m_commands_tail->next = cmd;
+				}
+				renderer->m_render_task.m_commands_tail = cmd;
 			}
 			renderer->m_render_task.m_commands_semaphore.signal();
-		
-			{
-				PROFILE_BLOCK("delete");
-				LUMIX_DELETE(renderer->m_allocator, job_data);
-			}
+			LUMIX_DELETE(renderer->m_allocator, job_data);
 		}, &exec_counter, preconditions, 0);
 
 		m_last_exec_job = exec_counter;

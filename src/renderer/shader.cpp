@@ -453,6 +453,8 @@ bool Shader::load(FS::IFile& file)
 	lua_setglobal(L, "SEMANTICS_INSTANCE0");
 	lua_pushinteger(L, (int)Mesh::AttributeSemantic::INSTANCE1);
 	lua_setglobal(L, "SEMANTICS_INSTANCE1");
+	lua_pushinteger(L, (int)Mesh::AttributeSemantic::INSTANCE2);
+	lua_setglobal(L, "SEMANTICS_INSTANCE2");
 
 	const StringView content((const char*)file.getBuffer(), (int)file.size());
 	if (!LuaWrapper::execute(L, content, getPath().c_str(), 0)) {

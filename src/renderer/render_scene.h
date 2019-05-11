@@ -43,7 +43,6 @@ struct TerrainInfo
 	Shader* shader;
 	Terrain* terrain;
 	Vec3 morph_const;
-	float size;
 	Vec3 min;
 	int index;
 };

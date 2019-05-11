@@ -370,7 +370,7 @@ static void fiberProc(void* data)
 	{
 		Job job = fiber_decl->current_job;
 		Profiler::beginBlock("Job");
-		if (isValid(job.dec_on_finish)) {
+		if (isValid(job.dec_on_finish) || isValid(job.precondition)) {
 			Profiler::pushJobInfo(job.dec_on_finish, job.precondition);
 		}
 		job.task(job.data);

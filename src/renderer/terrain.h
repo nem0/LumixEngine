@@ -62,8 +62,8 @@ class Terrain
 		{
 			struct InstanceData
 			{
-				Vec4 pos_scale;
 				Quat rot;
+				Vec4 pos_scale;
 				Vec4 normal;
 			};
 			explicit GrassPatch(IAllocator& allocator)

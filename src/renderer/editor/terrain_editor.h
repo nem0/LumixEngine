@@ -53,10 +53,10 @@ private:
 	void detectModifiers();
 	void drawCursor(RenderScene& scene, EntityRef terrain, const DVec3& center);
 	Material* getMaterial() const;
-	void paint(const Vec3& hit, TerrainEditor::ActionType action_type, bool new_stroke);
+	void paint(const DVec3& hit, TerrainEditor::ActionType action_type, bool new_stroke);
 
 	void removeEntities(const DVec3& hit);
-	void paintEntities(const Vec3& hit);
+	void paintEntities(const DVec3& hit);
 	void increaseBrushSize();
 	void decreaseBrushSize();
 	void nextTerrainTexture();

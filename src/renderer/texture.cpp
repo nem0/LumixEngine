@@ -277,42 +277,34 @@ void Texture::save()
 
 void Texture::onDataUpdated(int x, int y, int w, int h)
 {
-	ASSERT(false);
-	// TODO
-	/*PROFILE_FUNCTION();
+	PROFILE_FUNCTION();
 
-	const bgfx::Memory* mem;
-
-	if (bytes_per_pixel == 2)
-	{
+	if (bytes_per_pixel == 2) {
+		const Renderer::MemRef mem = renderer.allocate(w * h * sizeof(float));
 		const u16* src_mem = (const u16*)&data[0];
-		mem = bgfx::alloc(w * h * sizeof(float));
-		float* dst_mem = (float*)mem->data;
+		float* dst_mem = (float*)mem.data;
 
-		for (int j = 0; j < h; ++j)
-		{
-			for (int i = 0; i < w; ++i)
-			{
+		for (int j = 0; j < h; ++j) {
+			for (int i = 0; i < w; ++i) {
 				dst_mem[i + j * w] = src_mem[x + i + (y + j) * width] / 65535.0f;
 			}
 		}
+		renderer.updateTexture(handle, x, y, w, h, ffr::TextureFormat::R32F, mem);
+		return;
 	}
-	else
-	{
-		ASSERT(bytes_per_pixel == 4);
-		const u8* src_mem = (const u8*)&data[0];
-		mem = bgfx::alloc(w * h * bytes_per_pixel);
-		u8* dst_mem = mem->data;
 
-		for (int j = 0; j < h; ++j)
-		{
-			copyMemory(
-				&dst_mem[(j * w) * bytes_per_pixel],
-				&src_mem[(x + (y + j) * width) * bytes_per_pixel],
-				bytes_per_pixel * w);
-		}
+	ASSERT(bytes_per_pixel == 4);
+	const u8* src_mem = (const u8*)&data[0];
+	const Renderer::MemRef mem = renderer.allocate(w * h * bytes_per_pixel);
+	u8* dst_mem = (u8*)mem.data;
+
+	for (int j = 0; j < h; ++j) {
+		copyMemory(
+			&dst_mem[(j * w) * bytes_per_pixel],
+			&src_mem[(x + (y + j) * width) * bytes_per_pixel],
+			bytes_per_pixel * w);
 	}
-	bgfx::updateTexture2D(handle, 0, 0, (uint16_t)x, (uint16_t)y, (uint16_t)w, (uint16_t)h, mem);*/
+	renderer.updateTexture(handle, x, y, w, h, ffr::TextureFormat::RGBA8, mem);
 }
 
 
