@@ -1007,27 +1007,23 @@ void TerrainEditor::decreaseBrushSize()
 }
 
 
-void TerrainEditor::drawCursor(RenderScene& scene, EntityRef terrain, const Vec3& center)
+void TerrainEditor::drawCursor(RenderScene& scene, EntityRef terrain, const DVec3& center)
 {
-		// TODO
-	ASSERT(false);
-/*PROFILE_FUNCTION();
-	static const int SLICE_COUNT = 30;
-	if (m_action_type == TerrainEditor::FLAT_HEIGHT && ImGui::GetIO().KeyCtrl)
-	{
+	PROFILE_FUNCTION();
+	constexpr int SLICE_COUNT = 30;
+	constexpr float angle_step = Math::PI * 2 / SLICE_COUNT;
+	if (m_action_type == TerrainEditor::FLAT_HEIGHT && ImGui::GetIO().KeyCtrl) {
 		scene.addDebugCross(center, 1.0f, 0xff0000ff, 0);
 		return;
 	}
 
 	float brush_size = m_terrain_brush_size;
-	Vec3 local_center = getRelativePosition(center);
-	Matrix terrain_matrix = m_world_editor.getUniverse()->getMatrix((EntityRef)m_component.entity);
+	const Vec3 local_center = getRelativePosition(center).toFloat();
+	const Transform terrain_transform = m_world_editor.getUniverse()->getTransform((EntityRef)m_component.entity);
 
-	for (int i = 0; i < SLICE_COUNT + 1; ++i)
-	{
-		float angle_step = Math::PI * 2 / SLICE_COUNT;
-		float angle = i * angle_step;
-		float next_angle = i * angle_step + angle_step;
+	for (int i = 0; i < SLICE_COUNT + 1; ++i) {
+		const float angle = i * angle_step;
+		const float next_angle = i * angle_step + angle_step;
 		Vec3 local_from = local_center + Vec3(cos(angle), 0, sin(angle)) * brush_size;
 		local_from.y = scene.getTerrainHeightAt(terrain, local_from.x, local_from.z);
 		local_from.y += 0.25f;
@@ -1036,10 +1032,10 @@ void TerrainEditor::drawCursor(RenderScene& scene, EntityRef terrain, const Vec3
 		local_to.y = scene.getTerrainHeightAt(terrain, local_to.x, local_to.z);
 		local_to.y += 0.25f;
 
-		Vec3 from = terrain_matrix.transformPoint(local_from);
-		Vec3 to = terrain_matrix.transformPoint(local_to);
+		const DVec3 from = terrain_transform.transform(local_from);
+		const DVec3 to = terrain_transform.transform(local_to);
 		scene.addDebugLine(from, to, 0xffff0000, 0);
-	}*/
+	}
 }
 
 
@@ -1090,26 +1086,22 @@ void TerrainEditor::detectModifiers()
 }
 
 
-Vec3 TerrainEditor::getRelativePosition(const Vec3& world_pos) const
+DVec3 TerrainEditor::getRelativePosition(const DVec3& world_pos) const
 {
-		// TODO
-	ASSERT(false);
-/*Matrix terrain_matrix = m_world_editor.getUniverse()->getMatrix((EntityRef)m_component.entity);
-	Matrix inv_terrain_matrix = terrain_matrix;
-	inv_terrain_matrix.inverse();
+	const Transform transform = m_world_editor.getUniverse()->getTransform((EntityRef)m_component.entity);
+	const Transform inv_transform = transform.inverted();
 
-	return inv_terrain_matrix.transformPoint(world_pos);*/
-	return {};
+	return inv_transform.transform(world_pos);
 }
 
 
-Texture* TerrainEditor::getHeightmap()
+Texture* TerrainEditor::getHeightmap() const
 {
 	return getMaterial()->getTextureByName(HEIGHTMAP_SLOT_NAME);
 }
 
 
-u16 TerrainEditor::getHeight(const Vec3& world_pos)
+u16 TerrainEditor::getHeight(const DVec3& world_pos) const
 {
 	auto rel_pos = getRelativePosition(world_pos);
 	auto* heightmap = getHeightmap();
@@ -1466,7 +1458,7 @@ void TerrainEditor::onMouseUp(int, int, OS::MouseButton)
 }
 
 
-Material* TerrainEditor::getMaterial()
+Material* TerrainEditor::getMaterial() const
 {
 	if (!m_component.isValid()) return nullptr;
 	auto* scene = static_cast<RenderScene*>(m_component.scene);
@@ -1777,29 +1769,25 @@ void TerrainEditor::onGUI()
 		return;
 	}
 
-	float mouse_x = m_world_editor.getMousePos().x;
-	float mouse_y = m_world_editor.getMousePos().y;
-			// TODO
-	ASSERT(false);
-/*
-	for(auto entity : m_world_editor.getSelectedEntities())
-	{
+	const Vec2 mp = m_world_editor.getMousePos();
+
+	for(auto entity : m_world_editor.getSelectedEntities()) {
 		if (!m_world_editor.getUniverse()->hasComponent(entity, TERRAIN_TYPE)) continue;
 		
 		RenderScene* scene = static_cast<RenderScene*>(m_component.scene);
-		Vec3 origin, dir;
-		m_world_editor.getViewport().getRay({(float)mouse_x, (float)mouse_y}, origin, dir);
-		RayCastModelHit hit = scene->castRayTerrain(entity, origin, dir);
+		DVec3 origin;
+		Vec3 dir;
+		m_world_editor.getViewport().getRay(mp, origin, dir);
+		const RayCastModelHit hit = scene->castRayTerrain(entity, origin, dir);
 
-		if(hit.m_is_hit)
-		{
-			Vec3 center = hit.m_origin + hit.m_dir * hit.m_t;
+		if(hit.is_hit) {
+			DVec3 center = hit.origin + hit.dir * hit.t;
 			drawCursor(*scene, entity, center);
 			ImGui::TreePop();
 			ImGui::Indent();
 			return;
 		}
-	}*/
+	}
 	ImGui::TreePop();
 	ImGui::Indent();
 }
