@@ -390,41 +390,6 @@ void Terrain::grassLoaded(Resource::State, Resource::State, Resource&)
 }
 
 
-void Terrain::getGrassInfos(const ShiftedFrustum& global_frustum, int view, Array<GrassInfo>& infos)
-{
-	if (!m_material || !m_material->isReady()) return;
-
-	Universe& universe = m_scene.getUniverse();
-
-	const RigidTransform terrain_tr = universe.getTransform(m_entity).getRigidPart();
-	const Vec3 cam_pos_terrain_space = terrain_tr.rot.conjugated() * (global_frustum.origin - terrain_tr.pos).toFloat();
-	const Matrix cam_to_terrain(cam_pos_terrain_space, terrain_tr.rot.conjugated());
-	const Frustum frustum_terrain_space = global_frustum.getRelative(global_frustum.origin).transformed(cam_to_terrain);
-
-	updateGrass(view, global_frustum.origin);
-	Array<GrassQuad*>& quads = getQuads(view);
-
-	for (GrassQuad* quad : quads) {
-		const Vec3 quad_center(quad->pos.x + GRASS_QUAD_SIZE * 0.5f, quad->pos.y, quad->pos.z + GRASS_QUAD_SIZE * 0.5f);
-		if (!frustum_terrain_space.isSphereInside(quad_center, quad->radius)) continue;
-
-		float dist2 = (quad_center - cam_pos_terrain_space).squaredLength();
-		for (int patch_idx = 0; patch_idx < quad->m_patches.size(); ++patch_idx) {
-			const GrassPatch& patch = quad->m_patches[patch_idx];
-			if (patch.m_type->m_distance * patch.m_type->m_distance < dist2) continue;
-			if (patch.instance_data.empty()) continue;
-
-			GrassInfo& info = infos.emplace();
-			info.instance_data = (GrassInfo::InstanceData*)&patch.instance_data[0];
-			info.instance_count = patch.instance_data.size();
-			info.model = patch.m_type->m_grass_model;
-			info.type_distance = patch.m_type->m_distance;
-			info.entity = m_entity;
-		}
-	}
-}
-
-
 void Terrain::setMaterial(Material* material)
 {
 	if (material != m_material) {

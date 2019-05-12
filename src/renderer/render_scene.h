@@ -97,22 +97,6 @@ struct MeshInstance
 };
 
 
-struct GrassInfo
-{
-	struct InstanceData
-	{
-		Quat rot;
-		Vec4 pos_scale;
-		Vec4 normal;
-	};
-	Model* model;
-	const InstanceData* instance_data;
-	int instance_count;
-	float type_distance;
-	EntityRef entity;
-};
-
-
 struct EnvProbeInfo
 {
 	DVec3 position;
@@ -155,6 +139,7 @@ enum class RenderableTypes : u8 {
 	SKINNED,
 	DECAL,
 	LOCAL_LIGHT,
+	GRASS,
 
 	COUNT
 };
@@ -300,7 +285,6 @@ public:
 	virtual Vec3 getDecalHalfExtents(EntityRef entity) = 0;
 	virtual Material* getDecalMaterial(EntityRef entity) const = 0;
 
-	virtual void getGrassInfos(const ShiftedFrustum& frustum, int view, Array<GrassInfo>& infos) = 0;
 	virtual void forceGrassUpdate(EntityRef entity) = 0;
 	virtual Terrain* getTerrain(EntityRef entity) = 0;
 	virtual void getTerrainInfos(const ShiftedFrustum& frustum, const DVec3& lod_ref_point, Array<TerrainInfo>& infos) = 0;

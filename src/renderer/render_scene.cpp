@@ -1985,19 +1985,6 @@ public:
 	}
 
 
-	void getGrassInfos(const ShiftedFrustum& frustum, int view, Array<GrassInfo>& infos) override
-	{
-		PROFILE_FUNCTION();
-
-		if (!m_is_grass_enabled) return;
-
-		for (auto* terrain : m_terrains)
-		{
-			terrain->getGrassInfos(frustum, view, infos);
-		}
-	}
-
-
 	static int LUA_castCameraRay(lua_State* L)
 	{
 		auto* scene = LuaWrapper::checkArg<RenderSceneImpl*>(L, 1);
@@ -2271,6 +2258,13 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	void getRenderables(const ShiftedFrustum& frustum, Array<Array<u32>>& result) const override
 	{
 		m_culling_system->cull(frustum, result);
+		if (m_is_grass_enabled && !m_terrains.empty()) {
+			if (result.empty()) result.emplace(m_allocator);
+			for (auto* terrain : m_terrains) {
+				const u32 id = ((u32)RenderableTypes::GRASS << 24) | (terrain->m_entity.index & 0xffFFff);
+				result[0].push(id);
+			}
+		}
 	}
 
 
