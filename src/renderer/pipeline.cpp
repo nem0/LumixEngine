@@ -2344,7 +2344,7 @@ struct PipelineImpl final : Pipeline
 							Terrain* t = scene->getTerrain(e);
 							bool should_render = false;
 							for (const Terrain::GrassType& type : t->m_grass_types) {
-								if (!type.m_grass_model->isReady()) continue;
+								if (!type.m_grass_model || !type.m_grass_model->isReady()) continue;
 
 								for (int mesh_idx = 0; mesh_idx < type.m_grass_model->getMeshCount(); ++mesh_idx) {
 									const Mesh& mesh = type.m_grass_model->getMesh(mesh_idx);

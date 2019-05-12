@@ -42,6 +42,7 @@ Shader::~Shader()
 
 const Shader::Program& Shader::getProgram(ShaderRenderData* rd, u32 defines)
 {
+	// TODO this is not threadsafe
 	auto iter = rd->programs.find(defines);
 	if (!iter.isValid()) {
 		PROFILE_BLOCK("compile_shader");
