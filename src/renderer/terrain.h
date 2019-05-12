@@ -15,7 +15,6 @@ namespace Lumix
 
 struct AABB;
 struct Frustum;
-struct GrassInfo;
 struct IAllocator;
 class LIFOAllocator;
 class Material;
@@ -121,7 +120,6 @@ class Terrain
 		void setMaterial(Material* material);
 
 		void getInfos(Array<TerrainInfo>& infos, const ShiftedFrustum& frustum, const DVec3& lod_ref_point);
-		void getGrassInfos(const ShiftedFrustum& frustum, int view, Array<GrassInfo>& infos);
 
 		RayCastModelHit castRay(const DVec3& origin, const Vec3& dir);
 		void serialize(OutputBlob& serializer);
@@ -130,10 +128,10 @@ class Terrain
 		void addGrassType(int index);
 		void removeGrassType(int index);
 		void forceGrassUpdate();
+		void updateGrass(int view, const DVec3& position);
 
 	private: 
 		Array<Terrain::GrassQuad*>& getQuads(int view);
-		void updateGrass(int view, const DVec3& position);
 		void generateGrassTypeQuad(GrassPatch& patch, const RigidTransform& terrain_tr, const Vec2& quad_pos_hm_space);
 		void onMaterialLoaded(Resource::State, Resource::State new_state, Resource&);
 		void grassLoaded(Resource::State, Resource::State, Resource&);

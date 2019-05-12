@@ -820,122 +820,6 @@ struct PipelineImpl final : Pipeline
 	}
 
 
-	static int renderGrass(lua_State* L)
-	{
-		PROFILE_FUNCTION();
-		const int pipeline_idx = lua_upvalueindex(1);
-		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
-			LuaWrapper::argError<PipelineImpl*>(L, pipeline_idx);
-		}
-		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
-		const CameraParams cp = checkCameraParams(L, 1);
-		
-		struct RenderGrassJob : Renderer::RenderJob {
-			RenderGrassJob(IAllocator& allocator) 
-				: instance_data(allocator)
-				, patches(allocator)
-			{
-			}
-
-
-			void setup() override
-			{
-				IAllocator& allocator = pipeline->m_renderer.getAllocator();
-				Array<GrassInfo> grasses(allocator);
-				// TODO 0 constant in following:
-				pipeline->getScene()->getGrassInfos(camera_params.frustum, 0, grasses);
-				if (grasses.empty()) return;
-
-				patches.resize(grasses.size());
-				int instances_count = 0;
-				const Universe& universe = pipeline->getScene()->getUniverse();
-				for (int i = 0; i < grasses.size(); ++i) {
-					const GrassInfo& grass = grasses[i];
-					patches[i].instance_count = grass.instance_count;
-					patches[i].mesh = grass.model->getMesh(0).render_data;
-					patches[i].material = grass.model->getMesh(0).material->getRenderData();
-					patches[i].mtx = universe.getRelativeMatrix(grass.entity, camera_params.pos);
-					instances_count += grass.instance_count;
-				}
-				instance_data.resize(instances_count);
-				
-				GrassInfo::InstanceData* data = instance_data.begin();
-				for (const GrassInfo& grass : grasses) {
-					memcpy(data, grass.instance_data, sizeof(data[0]) * grass.instance_count);
-					data += grass.instance_count;
-				}
-			}
-
-
-			void execute() override
-			{
-				if (instance_data.empty()) return;
-
-				const Renderer::TransientSlice transient = pipeline->m_renderer.allocTransient(instance_data.byte_size());
-				if ((int)transient.size < instance_data.byte_size()) {
-					g_log_warning.log("Renderer") << "Not enough memory reserved to render grass.";
-					return;
-				}
-
-				memcpy(transient.ptr, instance_data.begin(), transient.size);
-				ffr::flushBuffer(transient.buffer, transient.offset, transient.size);
-				ffr::VertexDecl instance_decl;
-				instance_decl.addAttribute(4, ffr::AttributeType::FLOAT, false, false);
-				instance_decl.addAttribute(4, ffr::AttributeType::FLOAT, false, false);
-				instance_decl.addAttribute(4, ffr::AttributeType::FLOAT, false, false);
-				const u32 deferred_define_mask = 1 << pipeline->m_renderer.getShaderDefineIdx("DEFERRED");
-				const u32 define_mask = (1 << pipeline->m_renderer.getShaderDefineIdx("GRASS")) | deferred_define_mask;
-
-				int offset = transient.offset;
-				for (const Patch& patch : patches) {
-					int attribute_map[16];
-					const Shader::Program& prg = Shader::getProgram(patch.material->shader, define_mask);
-					if (prg.handle.isValid()) {
-						for (uint i = 0; i < patch.mesh->vertex_decl.attributes_count; ++i) {
-							attribute_map[i] = prg.attribute_by_semantics[(int)patch.mesh->attributes_semantic[i]];
-						}
-						ffr::bindTextures(patch.material->textures, patch.material->textures_count);
-						ffr::setVertexBuffer(&patch.mesh->vertex_decl
-							, patch.mesh->vertex_buffer_handle
-							, 0
-							, attribute_map);
-						ffr::setIndexBuffer(patch.mesh->index_buffer_handle);
-						ffr::setUniformMatrix4f(pipeline->m_model_uniform, &patch.mtx.m11);
-						ffr::useProgram(prg.handle);
-						int instance_map[16];
-						for (uint i = 0; i < instance_decl.attributes_count; ++i) {
-							instance_map[i] = prg.attribute_by_semantics[(int)Mesh::AttributeSemantic::INSTANCE0 + i];
-						}
-						ffr::setInstanceBuffer(instance_decl, transient.buffer, offset, 0, instance_map);
-
-						ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE));
-						ffr::drawTrianglesInstanced(0, patch.mesh->indices_count, patch.instance_count);
-					}
-					offset += sizeof(GrassInfo::InstanceData) * patch.instance_count;
-				}
-			}
-			struct Patch {
-				int instance_count;
-				Mesh::RenderData* mesh;
-				Material::RenderData* material;
-				Matrix mtx;
-			};
-			Array<Patch> patches;
-			Array<GrassInfo::InstanceData> instance_data;
-			CameraParams camera_params;
-			PipelineImpl* pipeline;
-		};
-
-		IAllocator& allocator = pipeline->m_renderer.getAllocator();
-		RenderGrassJob* cmd = LUMIX_NEW(allocator, RenderGrassJob)(allocator);
-		cmd->pipeline = pipeline;
-		cmd->camera_params = cp;
-
-		pipeline->m_renderer.push(cmd);
-		return 0;
-	}
-
-
 	static int renderTerrains(lua_State* L)
 	{
 		PROFILE_FUNCTION();
@@ -1091,6 +975,7 @@ struct PipelineImpl final : Pipeline
 		ShiftedFrustum frustum;
 		DVec3 pos;
 		float lod_multiplier;
+		bool is_shadow;
 	};
 	
 
@@ -1122,6 +1007,10 @@ struct PipelineImpl final : Pipeline
 		
 		if(!LuaWrapper::checkField(L, idx, "lod_multiplier", &cp.lod_multiplier)) {
 			luaL_error(L, "Missing lod_multiplier in camera params");
+		}
+
+		if (!LuaWrapper::checkField(L, idx, "is_shadow", &cp.is_shadow)) {
+			luaL_error(L, "Missing is_shadow in camera params");
 		}
 
 		if(!LuaWrapper::checkField(L, idx, "position", &cp.pos)) {
@@ -1522,6 +1411,7 @@ struct PipelineImpl final : Pipeline
 		lua_setfield(L, -2, "origin");
 		lua_setfield(L, -2, "frustum");
 
+		LuaWrapper::setField(L, -2, "is_shadow", params.is_shadow);
 		LuaWrapper::setField(L, -2, "position", params.pos);
 		LuaWrapper::setField(L, -2, "lod_multiplier", params.lod_multiplier);
 	}
@@ -1542,6 +1432,7 @@ struct PipelineImpl final : Pipeline
 		cp.pos = pipeline->m_viewport.pos;
 		cp.frustum = pipeline->m_viewport.getFrustum();
 		cp.lod_multiplier = scene->getCameraLODMultiplier(pipeline->m_viewport.fov, pipeline->m_viewport.is_ortho);
+		cp.is_shadow = false;
 		pushCameraParams(L, cp);
 
 		return 1;
@@ -1940,6 +1831,60 @@ struct PipelineImpl final : Pipeline
 
 								break;
 							}
+							case RenderableTypes::GRASS: {
+								READ(const Quat, rot);
+								READ(const Vec3, pos);
+								READ(const Mesh::RenderData*, mesh);
+								READ(const Material::RenderData*, material);
+								READ(const int, instances_count);
+								const u8* instance_data = cmd;
+								const int byte_size = sizeof(Terrain::GrassPatch::InstanceData) * instances_count;
+								cmd += byte_size;
+
+								const Renderer::TransientSlice transient = m_pipeline->m_renderer.allocTransient(byte_size);
+								if ((int)transient.size < byte_size) {
+									g_log_warning.log("Renderer") << "Not enough memory reserved to render grass.";
+									break;
+								}
+
+								memcpy(transient.ptr, instance_data, transient.size);
+								ffr::flushBuffer(transient.buffer, transient.offset, transient.size);
+								ffr::VertexDecl instance_decl;
+								instance_decl.addAttribute(4, ffr::AttributeType::FLOAT, false, false);
+								instance_decl.addAttribute(4, ffr::AttributeType::FLOAT, false, false);
+								instance_decl.addAttribute(4, ffr::AttributeType::FLOAT, false, false);
+								const u32 deferred_define_mask = 1 << m_pipeline->m_renderer.getShaderDefineIdx("DEFERRED");
+								const u32 define_mask = (1 << m_pipeline->m_renderer.getShaderDefineIdx("GRASS")) | deferred_define_mask;
+
+								int attribute_map[16];
+								const Shader::Program& prg = Shader::getProgram(material->shader, define_mask);
+								if (prg.handle.isValid()) {
+									for (uint i = 0; i < mesh->vertex_decl.attributes_count; ++i) {
+										attribute_map[i] = prg.attribute_by_semantics[(int)mesh->attributes_semantic[i]];
+									}
+									ffr::bindTextures(material->textures, material->textures_count);
+									ffr::setVertexBuffer(&mesh->vertex_decl
+										, mesh->vertex_buffer_handle
+										, 0
+										, attribute_map);
+									ffr::setIndexBuffer(mesh->index_buffer_handle);
+									const Vec4 params(material->roughness, material->metallic, material->emission, 0);
+									ffr::setUniform4f(m_pipeline->m_material_params_uniform, &params.x);
+									ffr::setUniform4f(m_pipeline->m_material_color_uniform, &material->color.x);
+									const Matrix mtx(pos, rot);
+									ffr::setUniformMatrix4f(m_pipeline->m_model_uniform, &mtx.m11);
+									ffr::useProgram(prg.handle);
+									int instance_map[16];
+									for (uint i = 0; i < instance_decl.attributes_count; ++i) {
+										instance_map[i] = prg.attribute_by_semantics[(int)Mesh::AttributeSemantic::INSTANCE0 + i];
+									}
+									ffr::setInstanceBuffer(instance_decl, transient.buffer, transient.offset, 0, instance_map);
+
+									ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE));
+									ffr::drawTrianglesInstanced(0, mesh->indices_count, instances_count);
+								}
+								break;
+							}
 							default: ASSERT(false); break;
 						}
 					}
@@ -2037,6 +1982,7 @@ struct PipelineImpl final : Pipeline
 		pipeline->m_renderer.setGlobalState(global_state);
 
 		CameraParams cp;
+		cp.is_shadow = true;
 		cp.lod_multiplier = 1;
 		cp.pos = pipeline->m_viewport.pos;
 		cp.frustum.computeOrtho(pipeline->m_viewport.pos + shadow_cam_pos
@@ -2340,7 +2286,7 @@ struct PipelineImpl final : Pipeline
 				MTBucketArray<u64>::Bucket sort_keys = ctx->sort_keys;
 				MTBucketArray<u64>::Bucket subrenderables = ctx->subrenderables;
 				const Universe::EntityData* entity_data = scene->getUniverse().getEntityData();
-				const DVec3 camera_pos = ctx->camera_pos;
+				const DVec3 camera_pos = ctx->camera_params.pos;
 				for (int i = 0, c = ctx->count; i < c; ++i) {
 					const EntityRef e = {int(renderables[i] & 0x00ffFFff)};
 					const DVec3 pos = entity_data[e.index].transform.pos;
@@ -2394,6 +2340,56 @@ struct PipelineImpl final : Pipeline
 							}
 							break;
 						}
+						case RenderableTypes::GRASS: {
+							Terrain* t = scene->getTerrain(e);
+							bool should_render = false;
+							for (const Terrain::GrassType& type : t->m_grass_types) {
+								if (!type.m_grass_model->isReady()) continue;
+
+								for (int mesh_idx = 0; mesh_idx < type.m_grass_model->getMeshCount(); ++mesh_idx) {
+									const Mesh& mesh = type.m_grass_model->getMesh(mesh_idx);
+									if (bucket_map[mesh.layer] < 0xff) {
+										should_render = true;
+										break;
+									}
+								}
+							}
+							if (!should_render) break;
+							if (ctx->camera_params.is_shadow) break;
+
+							// TODO 0 const in following:
+							t->updateGrass(0, ctx->camera_params.pos);
+
+							if (t->m_grass_quads.empty()) break;
+							ASSERT(t->m_grass_quads[0].size() <= 0xffff);
+							u64 quad_idx = 0;
+							// TODO 0 const in following:
+							for (const Terrain::GrassQuad* quad : t->m_grass_quads[0]) {
+								u64 patch_idx = 0;
+								ASSERT(quad->m_patches.size() <= 16);
+								for (const Terrain::GrassPatch& p : quad->m_patches) {
+									if (p.m_type->m_grass_model->isReady()) {
+										const int mesh_count = p.m_type->m_grass_model->getMeshCount();
+										ASSERT(mesh_count <= 256);
+										for (int mesh_idx = 0; mesh_idx < mesh_count; ++mesh_idx) {
+											const Mesh& mesh = p.m_type->m_grass_model->getMesh(mesh_idx);
+											const u8 bucket = bucket_map[mesh.layer];
+											if (bucket < 0xff && !p.instance_data.empty()) {
+												sort_keys.push(((u64)bucket << 56) | mesh.sort_key | ((u64)1 << 55));
+												subrenderables.push(renderables[i]
+													| (quad_idx << 32)
+													| (patch_idx << 48)
+													| ((u64)mesh_idx << 56)
+												);
+											}
+										}
+									}
+									++patch_idx;
+								}
+								++quad_idx;
+							}
+							break;
+						}
 						default: ASSERT(false); break;
 					}
 				}
@@ -2403,7 +2399,7 @@ struct PipelineImpl final : Pipeline
 
 			MTBucketArray<u64>::Bucket sort_keys;
 			MTBucketArray<u64>::Bucket subrenderables;
-			DVec3 camera_pos;
+			CameraParams camera_params;
 			u32* renderables;
 			u8 local_light_bucket;
 			int count;
@@ -2509,7 +2505,6 @@ struct PipelineImpl final : Pipeline
 
 							const uint out_offset = uint(out - ctx->output->begin());
 							ctx->output->resize(ctx->output->size() +  sizeof(Vec3) + sizeof(void*) + sizeof(Vec3) + sizeof(Quat));
-							out = ctx->output->begin() + out_offset;
 							WRITE_FN(material->getRenderData());
 
 							u16* instance_count = (u16*)out;
@@ -2578,6 +2573,29 @@ struct PipelineImpl final : Pipeline
 							--i;
 							break;
 						}
+						case RenderableTypes::GRASS: {
+							const u16 quad_idx = u16(renderables[i] >> 32);
+							const u8 patch_idx = u8(renderables[i] >> 48);
+							const u8 mesh_idx = u8(renderables[i] >> 56);
+							const Terrain* t = scene->getTerrain(e);
+							// TODO 0 const in following:
+							const Terrain::GrassPatch& p = t->m_grass_quads[0][quad_idx]->m_patches[patch_idx];
+							const Mesh& mesh = p.m_type->m_grass_model->getMesh(mesh_idx);
+							const Transform& tr = entity_data[e.index].transform;
+							const Vec3 lpos = (tr.pos - camera_pos).toFloat();
+							WRITE(tr.rot);
+							WRITE(lpos);
+							WRITE(mesh.render_data);
+							WRITE_FN(mesh.material->getRenderData());
+							const int instances_count = p.instance_data.size();
+							WRITE(instances_count);
+							const uint out_offset = uint(out - ctx->output->begin());
+							ctx->output->resize(ctx->output->size() + p.instance_data.byte_size());
+							out = ctx->output->begin() + out_offset;
+							memcpy(out, p.instance_data.begin(), p.instance_data.byte_size());
+							out += p.instance_data.byte_size();
+							break;
+						}
 						default: ASSERT(false); break;
 					}
 				}
@@ -2612,7 +2630,7 @@ struct PipelineImpl final : Pipeline
 				ctx.sort_keys = sort_keys.begin();
 				ctx.subrenderables = subrenderables.begin();
 				ctx.count = renderables[i].size();
-				ctx.camera_pos = m_pipeline->m_viewport.pos;
+				ctx.camera_params = m_camera_params;
 				ctx.cmd = this;
 				JobSystem::run(&ctx, &CreateSortKeys::execute, &counter, JobSystem::INVALID_HANDLE, 0);
 			}
@@ -2875,7 +2893,6 @@ struct PipelineImpl final : Pipeline
 		registerCFunction("prepareCommands", PipelineImpl::prepareCommands);
 		registerCFunction("renderEnvProbeVolumes", PipelineImpl::renderEnvProbeVolumes);
 		registerCFunction("renderBucket", PipelineImpl::renderBucket);
-		registerCFunction("renderGrass", PipelineImpl::renderGrass);
 		registerCFunction("renderParticles", PipelineImpl::renderParticles);
 		registerCFunction("renderTerrains", PipelineImpl::renderTerrains);
 		registerCFunction("setRenderTargets", PipelineImpl::setRenderTargets);
