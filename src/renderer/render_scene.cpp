@@ -752,35 +752,31 @@ public:
 	void serializePointLight(ISerializer& serializer, EntityRef entity)
 	{
 		PointLight& light = m_point_lights[entity];
-		serializer.write("attenuation", light.m_attenuation_param);
-		serializer.write("cast_shadow", light.m_cast_shadows);
-		serializer.write("diffuse_color", light.m_diffuse_color);
-		serializer.write("diffuse_intensity", light.m_diffuse_intensity);
-		serializer.write("fov", light.m_fov);
-		serializer.write("range", light.m_range);
-		serializer.write("specular_color", light.m_specular_color);
-		serializer.write("specular_intensity", light.m_specular_intensity);
+		serializer.write("attenuation", light.attenuation_param);
+		serializer.write("cast_shadow", light.cast_shadows);
+		serializer.write("color", light.color);
+		serializer.write("intensity", light.intensity);
+		serializer.write("fov", light.fov);
+		serializer.write("range", light.range);
 	}
 
 
 	void deserializePointLight(IDeserializer& serializer, EntityRef entity, int scene_version)
 	{
 		PointLight light;
-		light.m_entity = entity;
-		serializer.read(&light.m_attenuation_param);
-		serializer.read(&light.m_cast_shadows);
-		serializer.read(&light.m_diffuse_color);
-		serializer.read(&light.m_diffuse_intensity);
-		serializer.read(&light.m_fov);
-		serializer.read(&light.m_range);
-		serializer.read(&light.m_specular_color);
-		serializer.read(&light.m_specular_intensity);
+		light.entity = entity;
+		serializer.read(&light.attenuation_param);
+		serializer.read(&light.cast_shadows);
+		serializer.read(&light.color);
+		serializer.read(&light.intensity);
+		serializer.read(&light.fov);
+		serializer.read(&light.range);
 		m_point_lights.insert(entity, light);
 		
 		const DVec3 pos = m_universe.getPosition(entity);
-		m_culling_system->add(entity, (u8)RenderableTypes::LOCAL_LIGHT, pos, light.m_range);
+		m_culling_system->add(entity, (u8)RenderableTypes::LOCAL_LIGHT, pos, light.range);
 
-		m_universe.onComponentCreated(light.m_entity, POINT_LIGHT_TYPE, this);
+		m_universe.onComponentCreated(light.entity, POINT_LIGHT_TYPE, this);
 	}
 
 
@@ -1468,10 +1464,10 @@ public:
 		for (int i = 0; i < size; ++i) {
 			PointLight light;
 			serializer.read(light);
-			m_point_lights.insert(light.m_entity, light);
-			const DVec3 pos = m_universe.getPosition(light.m_entity);
-			m_culling_system->add(light.m_entity, (u8)RenderableTypes::LOCAL_LIGHT, pos, light.m_range);
-			m_universe.onComponentCreated(light.m_entity, POINT_LIGHT_TYPE, this);
+			m_point_lights.insert(light.entity, light);
+			const DVec3 pos = m_universe.getPosition(light.entity);
+			m_culling_system->add(light.entity, (u8)RenderableTypes::LOCAL_LIGHT, pos, light.range);
+			m_universe.onComponentCreated(light.entity, POINT_LIGHT_TYPE, this);
 		}
 
 		serializer.read(size);
@@ -2210,13 +2206,13 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 
 	void setLightCastShadows(EntityRef entity, bool cast_shadows) override
 	{
-		m_point_lights[entity].m_cast_shadows = cast_shadows;
+		m_point_lights[entity].cast_shadows = cast_shadows;
 	}
 
 
 	bool getLightCastShadows(EntityRef entity) override
 	{
-		return m_point_lights[entity].m_cast_shadows;
+		return m_point_lights[entity].cast_shadows;
 	}
 
 
@@ -2971,32 +2967,32 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 
 	float getLightAttenuation(EntityRef entity) override
 	{
-		return m_point_lights[entity].m_attenuation_param;
+		return m_point_lights[entity].attenuation_param;
 	}
 
 
 	void setLightAttenuation(EntityRef entity, float attenuation) override
 	{
-		m_point_lights[entity].m_attenuation_param = attenuation;
+		m_point_lights[entity].attenuation_param = attenuation;
 	}
 
 
 	float getLightRange(EntityRef entity) override
 	{
-		return m_point_lights[entity].m_range;
+		return m_point_lights[entity].range;
 	}
 
 
 	void setLightRange(EntityRef entity, float value) override
 	{
-		m_point_lights[entity].m_range = value;
+		m_point_lights[entity].range = value;
 		m_culling_system->setRadius(entity, value);
 	}
 
 
 	void setPointLightIntensity(EntityRef entity, float intensity) override
 	{
-		m_point_lights[entity].m_diffuse_intensity = intensity;
+		m_point_lights[entity].intensity = intensity;
 	}
 
 
@@ -3014,7 +3010,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 
 	void setPointLightColor(EntityRef entity, const Vec3& color) override
 	{
-		m_point_lights[entity].m_diffuse_color = color;
+		m_point_lights[entity].color = color;
 	}
 
 
@@ -3026,7 +3022,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	
 	float getPointLightIntensity(EntityRef entity) override
 	{
-		return m_point_lights[entity].m_diffuse_intensity;
+		return m_point_lights[entity].intensity;
 	}
 
 
@@ -3044,31 +3040,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 
 	Vec3 getPointLightColor(EntityRef entity) override
 	{
-		return m_point_lights[entity].m_diffuse_color;
-	}
-
-
-	void setPointLightSpecularColor(EntityRef entity, const Vec3& color) override
-	{
-		m_point_lights[entity].m_specular_color = color;
-	}
-
-
-	Vec3 getPointLightSpecularColor(EntityRef entity) override
-	{
-		return m_point_lights[entity].m_specular_color;
-	}
-
-
-	void setPointLightSpecularIntensity(EntityRef entity, float intensity) override
-	{
-		m_point_lights[entity].m_specular_intensity = intensity;
-	}
-
-
-	float getPointLightSpecularIntensity(EntityRef entity) override
-	{
-		return m_point_lights[entity].m_specular_intensity;
+		return m_point_lights[entity].color;
 	}
 
 
@@ -3092,7 +3064,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 
 	EntityRef getPointLightEntity(EntityRef entity) const override
 	{
-		return m_point_lights[entity].m_entity;
+		return m_point_lights[entity].entity;
 	}
 
 
@@ -3457,13 +3429,13 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 
 	float getLightFOV(EntityRef entity) override
 	{
-		return m_point_lights[entity].m_fov;
+		return m_point_lights[entity].fov;
 	}
 
 
 	void setLightFOV(EntityRef entity, float fov) override
 	{
-		m_point_lights[entity].m_fov = fov;
+		m_point_lights[entity].fov = fov;
 	}
 
 
@@ -3490,18 +3462,16 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	void createPointLight(EntityRef entity)
 	{
 		PointLight light;
-		light.m_entity = entity;
-		light.m_diffuse_color.set(1, 1, 1);
-		light.m_diffuse_intensity = 1;
-		light.m_fov = Math::degreesToRadians(360);
-		light.m_specular_color.set(1, 1, 1);
-		light.m_specular_intensity = 1;
-		light.m_cast_shadows = false;
-		light.m_attenuation_param = 2;
-		light.m_range = 10;
+		light.entity = entity;
+		light.color.set(1, 1, 1);
+		light.intensity = 1;
+		light.fov = Math::degreesToRadians(360);
+		light.cast_shadows = false;
+		light.attenuation_param = 2;
+		light.range = 10;
 		const DVec3 pos = m_universe.getPosition(entity);
 		m_point_lights.insert(entity, light);
-		m_culling_system->add(entity, (u8)RenderableTypes::LOCAL_LIGHT, pos, light.m_range);
+		m_culling_system->add(entity, (u8)RenderableTypes::LOCAL_LIGHT, pos, light.range);
 
 		m_universe.onComponentCreated(entity, POINT_LIGHT_TYPE, this);
 	}
