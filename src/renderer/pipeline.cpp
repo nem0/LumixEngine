@@ -2333,7 +2333,6 @@ struct PipelineImpl final : Pipeline
 							break;
 						}
 						case RenderableTypes::LOCAL_LIGHT: {
-							// TODO camera inside light volume
 							if(ctx->local_light_bucket < 0xff) {
 								sort_keys.push(((u64)ctx->local_light_bucket << 56));
 								subrenderables.push(renderables[i]);
@@ -2537,17 +2536,17 @@ struct PipelineImpl final : Pipeline
 							const Transform& tr = entity_data[e.index].transform;
 							const Vec3 lpos = (tr.pos - camera_pos).toFloat();
 							const PointLight& pl = scene->getPointLight(e);
-							*intersecting = frustum.intersectNearPlane(tr.pos, pl.m_range * Math::SQRT3);
+							*intersecting = frustum.intersectNearPlane(tr.pos, pl.range * Math::SQRT3);
 							if (*intersecting) {
 								WRITE(tr.rot);
 								WRITE(lpos);
-								WRITE(pl.m_range);
-								WRITE(pl.m_attenuation_param);
-								const Vec3 color = pl.m_diffuse_color * pl.m_diffuse_intensity;
+								WRITE(pl.range);
+								WRITE(pl.attenuation_param);
+								const Vec3 color = pl.color * pl.intensity;
 								WRITE(color);
 								const Vec3 dir = tr.rot * Vec3(0, 0, 1);
 								WRITE(dir);
-								WRITE(pl.m_fov);
+								WRITE(pl.fov);
 								++i;
 							}
 							else {
@@ -2559,13 +2558,13 @@ struct PipelineImpl final : Pipeline
 
 									WRITE(tr.rot);
 									WRITE(lpos);
-									WRITE(pl.m_range);
-									WRITE(pl.m_attenuation_param);
-									const Vec3 color = pl.m_diffuse_color * pl.m_diffuse_intensity;
+									WRITE(pl.range);
+									WRITE(pl.attenuation_param);
+									const Vec3 color = pl.color * pl.intensity;
 									WRITE(color);
 									const Vec3 dir = tr.rot * Vec3(0, 0, 1);
 									WRITE(dir);
-									WRITE(pl.m_fov);
+									WRITE(pl.fov);
 									++i;
 								}
 							}

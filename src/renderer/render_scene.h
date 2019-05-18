@@ -42,7 +42,6 @@ struct TerrainInfo
 	Quat rot;
 	Shader* shader;
 	Terrain* terrain;
-	Vec3 morph_const;
 	Vec3 min;
 	int index;
 };
@@ -50,15 +49,13 @@ struct TerrainInfo
 
 struct PointLight
 {
-	Vec3 m_diffuse_color;
-	Vec3 m_specular_color;
-	float m_diffuse_intensity;
-	float m_specular_intensity;
-	EntityRef m_entity;
-	float m_fov;
-	float m_attenuation_param;
-	float m_range;
-	bool m_cast_shadows;
+	Vec3 color;
+	float intensity;
+	EntityRef entity;
+	float fov;
+	float attenuation_param;
+	float range;
+	bool cast_shadows;
 };
 
 
@@ -346,10 +343,6 @@ public:
 	virtual void setFogBottom(EntityRef entity, float value) = 0;
 	virtual void setFogHeight(EntityRef entity, float value) = 0;
 	virtual Vec3 getFogColor(EntityRef entity) = 0;
-	virtual Vec3 getPointLightSpecularColor(EntityRef entity) = 0;
-	virtual void setPointLightSpecularColor(EntityRef entity, const Vec3& color) = 0;
-	virtual float getPointLightSpecularIntensity(EntityRef entity) = 0;
-	virtual void setPointLightSpecularIntensity(EntityRef entity, float color) = 0;
 
 	virtual void enableEnvironmentProbe(EntityRef entity, bool enable) = 0;
 	virtual bool isEnvironmentProbeEnabled(EntityRef entity) = 0;
