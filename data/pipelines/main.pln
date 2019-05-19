@@ -5,7 +5,6 @@ local environment_shader =  preloadShader("pipelines/environment.shd")
 local selection_outline_shader = preloadShader("pipelines/selection_outline.shd")
 local local_light_shader = preloadShader("pipelines/local_light.shd")
 local blur_shader = preloadShader("pipelines/blur.shd")
-local prepare_terrain_shader = preloadShader("pipelines/prepare_terrain.shd")
 local debug_shadowmap = false
 
 local decal_state = {
@@ -54,8 +53,8 @@ function geomPass(default_set, decal_set)
 	setRenderTargets(gbuffer0, gbuffer1, gbuffer2, dsbuffer)
 	clear(CLEAR_ALL, 0, 0, 0, 1, 0)
 	local view_params = getCameraParams()
-	renderTerrains(view_params, {}, default_state)
 	pass(view_params)
+	renderTerrains(view_params, {}, default_state)
 	renderBucket(default_set, default_state)
 	endBlock()
 

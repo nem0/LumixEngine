@@ -121,6 +121,7 @@ fragment_shader [[
 				data.albedo = texture(u_albedomap, v_uv);
 				if(data.albedo.a < 0.5) discard;
 			#endif
+			o_color = vec4(gl_FragCoord.z);
 		}
 	#elif defined DEFERRED
 		void main()

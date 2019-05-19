@@ -293,10 +293,12 @@ struct PipelineImpl final : Pipeline
 
 		m_resource->onLoaded<PipelineImpl, &PipelineImpl::onStateChanged>(this);
 
-		const Renderer::MemRef global_state_mem = m_renderer.copy(&m_global_state, sizeof(m_global_state));
+		GlobalState global_state;
+		const Renderer::MemRef global_state_mem = m_renderer.copy(&global_state, sizeof(global_state));
 		m_global_state_buffer = m_renderer.createBuffer(global_state_mem);
 		
-		const Renderer::MemRef pass_state_mem = m_renderer.copy(&m_pass_state, sizeof(m_pass_state));
+		PassState pass_state;
+		const Renderer::MemRef pass_state_mem = m_renderer.copy(&pass_state, sizeof(pass_state));
 		m_pass_state_buffer = m_renderer.createBuffer(pass_state_mem);
 	}
 
@@ -497,7 +499,7 @@ struct PipelineImpl final : Pipeline
 	}
 
 
-	void prepareShadowCameras()
+	void prepareShadowCameras(GlobalState& global_state)
 	{
 		for (int slice = 0; slice < 4; ++slice) {
 			const int shadowmap_width = 1024;
@@ -541,9 +543,9 @@ struct PipelineImpl final : Pipeline
 				0.0, 0.0, 1.0, 0.0,
 				0.5, 0.5, 0.0, 1.0);
 
-			m_global_state.shadowmap_matrices[slice] = bias_matrix * projection_matrix * view_matrix;
+			global_state.shadowmap_matrices[slice] = bias_matrix * projection_matrix * view_matrix;
 
-			m_global_state.shadow_view_projection = projection_matrix * view_matrix;
+			global_state.shadow_view_projection = projection_matrix * view_matrix;
 
 			CameraParams& cp = m_shadow_camera_params[slice];
 			cp.view = view_matrix;
@@ -600,31 +602,31 @@ struct PipelineImpl final : Pipeline
 
 		const Matrix view = m_viewport.getViewRotation();
 		const Matrix projection = m_viewport.getProjection(ffr::isHomogenousDepth());
-		m_global_state.camera_projection = projection;
-		m_global_state.camera_inv_projection = projection.inverted();
-		m_global_state.camera_view = view;
-		m_global_state.camera_inv_view = view.fastInverted();
-		m_global_state.camera_view_projection = projection * view;
-		m_global_state.camera_inv_view_projection = m_global_state.camera_view_projection.inverted();
-		m_global_state.time = m_timer->getTimeSinceStart();
-		m_global_state.framebuffer_size.x = m_viewport.w;
-		m_global_state.framebuffer_size.y = m_viewport.h;
+		GlobalState global_state;
+		global_state.camera_projection = projection;
+		global_state.camera_inv_projection = projection.inverted();
+		global_state.camera_view = view;
+		global_state.camera_inv_view = view.fastInverted();
+		global_state.camera_view_projection = projection * view;
+		global_state.camera_inv_view_projection = global_state.camera_view_projection.inverted();
+		global_state.time = m_timer->getTimeSinceStart();
+		global_state.framebuffer_size.x = m_viewport.w;
+		global_state.framebuffer_size.y = m_viewport.h;
 
 		const EntityPtr global_light = m_scene->getActiveGlobalLight();
 		if(global_light.isValid()) {
 			EntityRef gl = (EntityRef)global_light;
-			m_global_state.light_direction = Vec4(m_scene->getUniverse().getRotation(gl).rotate(Vec3(0, 0, -1)), 456); 
-			m_global_state.light_color = m_scene->getGlobalLightColor(gl);
-			m_global_state.light_intensity = m_scene->getGlobalLightIntensity(gl);
-			m_global_state.light_indirect_intensity = m_scene->getGlobalLightIndirectIntensity(gl);
+			global_state.light_direction = Vec4(m_scene->getUniverse().getRotation(gl).rotate(Vec3(0, 0, -1)), 456); 
+			global_state.light_color = m_scene->getGlobalLightColor(gl);
+			global_state.light_intensity = m_scene->getGlobalLightIntensity(gl);
+			global_state.light_indirect_intensity = m_scene->getGlobalLightIndirectIntensity(gl);
 		}
 
-		prepareShadowCameras();
+		prepareShadowCameras(global_state);
 
 		struct StartFrameCmd : Renderer::RenderJob {
 			void execute() override {
 				ffr::update(global_state_buffer, &global_state, 0, sizeof(global_state));
-				ffr::update(pass_state_buffer, &pass_state, 0, sizeof(pass_state));
 				ffr::bindUniformBuffer(0, global_state_buffer, 0, sizeof(GlobalState));
 				ffr::bindUniformBuffer(1, pass_state_buffer, 0, sizeof(PassState));
 			}
@@ -637,8 +639,7 @@ struct PipelineImpl final : Pipeline
 		};
 
 		StartFrameCmd* start_frame_cmd = LUMIX_NEW(m_renderer.getAllocator(), StartFrameCmd);
-		start_frame_cmd->global_state = m_global_state;
-		start_frame_cmd->pass_state = m_pass_state;
+		start_frame_cmd->global_state = global_state;
 		start_frame_cmd->global_state_buffer = m_global_state_buffer;
 		start_frame_cmd->pass_state_buffer = m_pass_state_buffer;
 		m_renderer.push(start_frame_cmd);
@@ -1336,19 +1337,6 @@ struct PipelineImpl final : Pipeline
 	static int pass(lua_State* L)
 	{
 		PROFILE_FUNCTION();
-		const int pipeline_idx = lua_upvalueindex(1);
-		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
-			LuaWrapper::argError<PipelineImpl*>(L, pipeline_idx);
-		}
-		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
-		const CameraParams cp = checkCameraParams(L, 1);
-		pipeline->m_pass_state.view = cp.view;
-		pipeline->m_pass_state.projection = cp.projection;
-		pipeline->m_pass_state.inv_projection = cp.projection.inverted();
-		pipeline->m_pass_state.inv_view = cp.view.fastInverted();
-		pipeline->m_pass_state.view_projection = cp.projection * cp.view;
-		pipeline->m_pass_state.inv_view_projection = pipeline->m_pass_state.view_projection.inverted();
-
 		struct PushPassStateCmd : Renderer::RenderJob {
 			void execute() override {
 				ffr::update(pass_state_buffer, &pass_state, 0, sizeof(pass_state));
@@ -1360,8 +1348,20 @@ struct PipelineImpl final : Pipeline
 			PassState pass_state;
 		};
 
+		const int pipeline_idx = lua_upvalueindex(1);
+		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
+			LuaWrapper::argError<PipelineImpl*>(L, pipeline_idx);
+		}
+		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
+		const CameraParams cp = checkCameraParams(L, 1);
 		PushPassStateCmd* cmd = LUMIX_NEW(pipeline->m_renderer.getAllocator(), PushPassStateCmd);
-		cmd->pass_state = pipeline->m_pass_state;
+		cmd->pass_state.view = cp.view;
+		cmd->pass_state.projection = cp.projection;
+		cmd->pass_state.inv_projection = cp.projection.inverted();
+		cmd->pass_state.inv_view = cp.view.fastInverted();
+		cmd->pass_state.view_projection = cp.projection * cp.view;
+		cmd->pass_state.inv_view_projection = cmd->pass_state.view_projection.inverted();
+		
 		cmd->pass_state_buffer = pipeline->m_pass_state_buffer;
 		pipeline->m_renderer.push(cmd);
 		return 0;
@@ -3171,9 +3171,7 @@ struct PipelineImpl final : Pipeline
 	Array<Renderbuffer> m_renderbuffers;
 	Array<ShaderRef> m_shaders;
 	Timer* m_timer;
-	GlobalState m_global_state;
 	ffr::BufferHandle m_global_state_buffer;
-	PassState m_pass_state;
 	ffr::BufferHandle m_pass_state_buffer;
 	CameraParams m_shadow_camera_params[4];
 
