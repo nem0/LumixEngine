@@ -189,6 +189,7 @@ struct CullingSystemImpl final : public CullingSystem
 		Cell& cell = *loc.cell;
 		const u32 last = cell.ids.back();
 		m_entity_to_cell[last & ID_ENTITY_BITMASK] = loc;
+		m_entity_to_cell[entity.index].cell = nullptr;
 		cell.ids.eraseFast(loc.idx);
 		cell.spheres.eraseFast(loc.idx);
 
