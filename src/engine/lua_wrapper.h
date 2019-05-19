@@ -442,7 +442,7 @@ template <> inline bool isType<void*>(lua_State* L, int index)
 template <typename T> inline void setField(lua_State* L, int table_idx, const char* name, T value)
 {
 	push(L, value);
-	lua_setfield(L, table_idx, name);
+	lua_setfield(L, table_idx - 1, name);
 }
 
 template <typename T> inline void push(lua_State* L, T value)

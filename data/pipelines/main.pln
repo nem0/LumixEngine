@@ -38,6 +38,7 @@ function transparentPass(transparent_set, colorbuffer, dsbuffer)
 	setRenderTargets(colorbuffer, dsbuffer)
 
 	beginBlock("transparent_pass")
+	pass(getCameraParams())
 	renderBucket(transparent_set, transparent_state)
 	--renderParticles(view_params)
 	endBlock()
@@ -54,6 +55,7 @@ function geomPass(default_set, decal_set)
 	clear(CLEAR_ALL, 0, 0, 0, 1, 0)
 	local view_params = getCameraParams()
 	renderTerrains(view_params, {}, default_state)
+	pass(view_params)
 	renderBucket(default_set, default_state)
 	endBlock()
 
@@ -150,6 +152,7 @@ function shadowPass()
 			
 			viewport(slice * 1024, 0, 1024, 1024)
 			beginBlock("slice " .. tostring(slice + 1))
+			pass(view_params)
 			renderBucket(shadow_set, shadow_state)
 			endBlock()
 		end

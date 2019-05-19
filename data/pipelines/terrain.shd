@@ -76,22 +76,22 @@ geometry_shader [[
 		vec3 v;
 		getVertex(ij, v, v_uv);
 		float h = texture(u_hm, v_uv).x * hscale;
-		gl_Position = u_camera_view_projection * vec4(u_position + v + vec3(0, h, 0), 1);
+		gl_Position = u_pass_view_projection * vec4(u_position + v + vec3(0, h, 0), 1);
 		EmitVertex();
 
 		getVertex(ij + ivec2(1, 0), v, v_uv);
 		h = texture(u_hm, v_uv).x * hscale;
-		gl_Position = u_camera_view_projection * vec4(u_position + v + vec3(0, h, 0), 1);
+		gl_Position = u_pass_view_projection * vec4(u_position + v + vec3(0, h, 0), 1);
 		EmitVertex();
 
 		getVertex(ij + ivec2(0, 1), v, v_uv);
 		h = texture(u_hm, v_uv).x * hscale;
-		gl_Position = u_camera_view_projection * vec4(u_position + v + vec3(0, h, 0), 1);
+		gl_Position = u_pass_view_projection * vec4(u_position + v + vec3(0, h, 0), 1);
 		EmitVertex();
 
 		getVertex(ij + ivec2(1, 1), v, v_uv);
 		h = texture(u_hm, v_uv).x * hscale;
-		gl_Position = u_camera_view_projection * vec4(u_position + v + vec3(0, h, 0), 1);
+		gl_Position = u_pass_view_projection * vec4(u_position + v + vec3(0, h, 0), 1);
 		EmitVertex();
 	}
 ]]

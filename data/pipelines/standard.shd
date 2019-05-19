@@ -75,11 +75,7 @@ vertex_shader [[
 			v_wpos = model_mtx * vec4(a_position,  1);
 		#endif
 		
-		#ifdef DEPTH
-			gl_Position = u_shadow_view_projection * v_wpos;		
-		#else
-			gl_Position = u_camera_view_projection * v_wpos;
-		#endif
+		gl_Position = u_pass_view_projection * v_wpos;		
 	}
 ]]
 

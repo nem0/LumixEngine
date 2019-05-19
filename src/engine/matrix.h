@@ -180,6 +180,9 @@ struct alignas(16) LUMIX_ENGINE_API Matrix
 
 	void decompose(Vec3& position, Quat& rotation, float& scale) const;
 
+	float operator [](int index) const { return (&m11)[index]; }
+	float& operator [](int index) { return (&m11)[index]; }
+
 	Matrix operator *(const Matrix& rhs) const;
 
 	Matrix operator +(const Matrix& rhs) const;
@@ -238,6 +241,13 @@ struct alignas(16) LUMIX_ENGINE_API Matrix
 			m13 * m21 * m32 * m44  -  m11 * m23 * m32 * m44  -  m12 * m21 * m33 * m44  +  m11 * m22 * m33 * m44;
 	}
 
+
+	Matrix inverted() const
+	{
+		Matrix tmp = *this;
+		tmp.inverse();
+		return tmp;
+	}
 
 	void inverse()
 	{

@@ -836,19 +836,6 @@ struct RendererImpl final : public Renderer
 	}
 
 
-	void setGlobalState(const GlobalState& state) override
-	{
-		m_global_state = state;
-		pushSetGlobalStateCommand();
-	}
-
-
-	GlobalState getGlobalState() const override
-	{
-		return m_global_state;
-	}
-
-
 	Pipeline* getMainPipeline() override
 	{
 		return m_main_pipeline;
@@ -909,7 +896,7 @@ struct RendererImpl final : public Renderer
 
 	void pushSetGlobalStateCommand()
 	{
-		struct Cmd : RenderJob {
+		/*struct Cmd : RenderJob {
 			void setup() override {}
 			void execute() override { 
 				ffr::update(renderer->m_render_task.m_global_state_uniforms, &state, 0, sizeof(state));
@@ -920,7 +907,8 @@ struct RendererImpl final : public Renderer
 		Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
 		cmd->state = m_global_state;
 		cmd->renderer = this;
-		push(cmd);
+		push(cmd);*/
+		// TODO
 	}
 
 
@@ -1005,7 +993,6 @@ struct RendererImpl final : public Renderer
 	bool m_vsync;
 	Pipeline* m_main_pipeline;
 	RenderTask m_render_task;
-	GlobalState m_global_state;
 	ffr::BufferHandle m_transient_buffer;
 	JobSystem::SignalHandle m_last_exec_job = JobSystem::INVALID_HANDLE;
 };
@@ -1027,9 +1014,6 @@ int RenderTask::task()
 	void* window_handle = engine.getPlatformData().window_handle;
 	ffr::init(window_handle);
 	m_framebuffer = ffr::createFramebuffer();
-	m_global_state_uniforms = ffr::allocBufferHandle();
-	ffr::createBuffer(m_global_state_uniforms, (uint)ffr::BufferFlags::DYNAMIC_STORAGE, sizeof(Renderer::GlobalState), nullptr); 
-	ffr::bindUniformBuffer(0, m_global_state_uniforms, 0, sizeof(Renderer::GlobalState));
 	m_transient_buffer = ffr::allocBufferHandle();
 	m_transient_buffer_offset = 0;
 	const uint transient_flags = (uint)ffr::BufferFlags::PERSISTENT 

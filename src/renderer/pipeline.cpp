@@ -41,6 +41,36 @@ namespace Lumix
 {
 
 
+struct GlobalState
+{
+	Matrix shadow_view_projection;
+	Matrix shadowmap_matrices[4];
+	Matrix camera_projection;
+	Matrix camera_inv_projection;
+	Matrix camera_view;
+	Matrix camera_inv_view;
+	Matrix camera_view_projection;
+	Matrix camera_inv_view_projection;
+	Vec4 light_direction;
+	Vec3 light_color;
+	float light_intensity;
+	float light_indirect_intensity;
+	float time;
+	IVec2 framebuffer_size;
+};
+
+
+struct PassState
+{
+	Matrix projection;
+	Matrix inv_projection;
+	Matrix view;
+	Matrix inv_view;
+	Matrix view_projection;
+	Matrix inv_view_projection;
+};
+
+
 template <typename T>
 struct MTBucketArray
 {
@@ -262,7 +292,14 @@ struct PipelineImpl final : Pipeline
 		m_cube_ib = m_renderer.createBuffer(ib_mem);
 
 		m_resource->onLoaded<PipelineImpl, &PipelineImpl::onStateChanged>(this);
+
+		const Renderer::MemRef global_state_mem = m_renderer.copy(&m_global_state, sizeof(m_global_state));
+		m_global_state_buffer = m_renderer.createBuffer(global_state_mem);
+		
+		const Renderer::MemRef pass_state_mem = m_renderer.copy(&m_pass_state, sizeof(m_pass_state));
+		m_pass_state_buffer = m_renderer.createBuffer(pass_state_mem);
 	}
+
 
 
 	~PipelineImpl()
@@ -460,6 +497,74 @@ struct PipelineImpl final : Pipeline
 	}
 
 
+	void prepareShadowCameras()
+	{
+		for (int slice = 0; slice < 4; ++slice) {
+			const int shadowmap_width = 1024;
+
+			const Universe& universe = m_scene->getUniverse();
+			const EntityPtr light = m_scene->getActiveGlobalLight();
+			const Vec4 cascades = light.isValid() ? m_scene->getShadowmapCascades((EntityRef)light) : Vec4(3, 10, 60, 150);
+			const Matrix light_mtx = light.isValid() ? universe.getRelativeMatrix((EntityRef)light, m_viewport.pos) : Matrix::IDENTITY;
+
+			const float camera_height = (float)m_viewport.h;
+			const float camera_fov = m_viewport.fov;
+			const float camera_ratio = m_viewport.w / camera_height;
+			const float split_distances[] = { 0.1f, cascades.x, cascades.y, cascades.z, cascades.w };
+
+			Frustum camera_frustum;
+			camera_frustum.computePerspective(Vec3::ZERO,
+				m_viewport.rot * Vec3(0, 0, -1),
+				m_viewport.rot * Vec3(0, 1, 0),
+				camera_fov,
+				camera_ratio,
+				split_distances[slice],
+				split_distances[slice + 1]);
+
+			const Sphere frustum_bounding_sphere = camera_frustum.computeBoundingSphere();
+			const float bb_size = frustum_bounding_sphere.radius;
+			const Vec3 light_forward = light_mtx.getZVector();
+
+			Vec3 shadow_cam_pos = frustum_bounding_sphere.position;
+			shadow_cam_pos = shadowmapTexelAlign(shadow_cam_pos, 0.5f * shadowmap_width - 2, bb_size, light_mtx);
+
+			Matrix projection_matrix;
+			projection_matrix.setOrtho(-bb_size, bb_size, -bb_size, bb_size, SHADOW_CAM_NEAR, SHADOW_CAM_FAR, ffr::isHomogenousDepth(), true);
+			shadow_cam_pos -= light_forward * SHADOW_CAM_FAR * 0.5f;
+			Matrix view_matrix;
+			view_matrix.lookAt(shadow_cam_pos, shadow_cam_pos + light_forward, light_mtx.getYVector());
+
+			const float ymul = ffr::isOriginBottomLeft() ? 0.5f : -0.5f;
+			const Matrix bias_matrix(
+				0.5, 0.0, 0.0, 0.0,
+				0.0, ymul, 0.0, 0.0,
+				0.0, 0.0, 1.0, 0.0,
+				0.5, 0.5, 0.0, 1.0);
+
+			m_global_state.shadowmap_matrices[slice] = bias_matrix * projection_matrix * view_matrix;
+
+			m_global_state.shadow_view_projection = projection_matrix * view_matrix;
+
+			CameraParams& cp = m_shadow_camera_params[slice];
+			cp.view = view_matrix;
+			cp.projection = projection_matrix;
+			cp.is_shadow = true;
+			cp.lod_multiplier = 1;
+			cp.pos = m_viewport.pos;
+			cp.frustum.computeOrtho(m_viewport.pos + shadow_cam_pos
+				, -light_forward
+				, light_mtx.getYVector()
+				, bb_size
+				, bb_size
+				, SHADOW_CAM_NEAR
+				, SHADOW_CAM_FAR);
+
+			// TODO
+			//findExtraShadowcasterPlanes(light_forward, camera_frustum, &cp.frustum);
+		}
+	}
+
+
 	bool render() override 
 	{ 
 		PROFILE_FUNCTION();
@@ -493,32 +598,50 @@ struct PipelineImpl final : Pipeline
 			}
 		}
 
-		Renderer::GlobalState state;
-
 		const Matrix view = m_viewport.getViewRotation();
 		const Matrix projection = m_viewport.getProjection(ffr::isHomogenousDepth());
-		state.camera_projection = projection;
-		state.camera_inv_projection = projection;
-		state.camera_inv_projection.inverse();
-		state.camera_view = view;
-		state.camera_inv_view = view.fastInverted();
-		state.camera_view_projection = projection * view;
-		state.camera_inv_view_projection = state.camera_view_projection;
-		state.camera_inv_view_projection.inverse();
-		state.time = m_timer->getTimeSinceStart();
-		state.framebuffer_size.x = m_viewport.w;
-		state.framebuffer_size.y = m_viewport.h;
+		m_global_state.camera_projection = projection;
+		m_global_state.camera_inv_projection = projection.inverted();
+		m_global_state.camera_view = view;
+		m_global_state.camera_inv_view = view.fastInverted();
+		m_global_state.camera_view_projection = projection * view;
+		m_global_state.camera_inv_view_projection = m_global_state.camera_view_projection.inverted();
+		m_global_state.time = m_timer->getTimeSinceStart();
+		m_global_state.framebuffer_size.x = m_viewport.w;
+		m_global_state.framebuffer_size.y = m_viewport.h;
 
 		const EntityPtr global_light = m_scene->getActiveGlobalLight();
 		if(global_light.isValid()) {
 			EntityRef gl = (EntityRef)global_light;
-			state.light_direction = Vec4(m_scene->getUniverse().getRotation(gl).rotate(Vec3(0, 0, -1)), 456); 
-			state.light_color = m_scene->getGlobalLightColor(gl);
-			state.light_intensity = m_scene->getGlobalLightIntensity(gl);
-			state.light_indirect_intensity = m_scene->getGlobalLightIndirectIntensity(gl);
+			m_global_state.light_direction = Vec4(m_scene->getUniverse().getRotation(gl).rotate(Vec3(0, 0, -1)), 456); 
+			m_global_state.light_color = m_scene->getGlobalLightColor(gl);
+			m_global_state.light_intensity = m_scene->getGlobalLightIntensity(gl);
+			m_global_state.light_indirect_intensity = m_scene->getGlobalLightIndirectIntensity(gl);
 		}
 
-		m_renderer.setGlobalState(state);
+		prepareShadowCameras();
+
+		struct StartFrameCmd : Renderer::RenderJob {
+			void execute() override {
+				ffr::update(global_state_buffer, &global_state, 0, sizeof(global_state));
+				ffr::update(pass_state_buffer, &pass_state, 0, sizeof(pass_state));
+				ffr::bindUniformBuffer(0, global_state_buffer, 0, sizeof(GlobalState));
+				ffr::bindUniformBuffer(1, pass_state_buffer, 0, sizeof(PassState));
+			}
+			void setup() override {}
+
+			ffr::BufferHandle global_state_buffer;
+			ffr::BufferHandle pass_state_buffer;
+			GlobalState global_state;
+			PassState pass_state;
+		};
+
+		StartFrameCmd* start_frame_cmd = LUMIX_NEW(m_renderer.getAllocator(), StartFrameCmd);
+		start_frame_cmd->global_state = m_global_state;
+		start_frame_cmd->pass_state = m_pass_state;
+		start_frame_cmd->global_state_buffer = m_global_state_buffer;
+		start_frame_cmd->pass_state_buffer = m_pass_state_buffer;
+		m_renderer.push(start_frame_cmd);
 		
 		LuaWrapper::DebugGuard lua_debug_guard(m_lua_state);
 		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
@@ -976,12 +1099,48 @@ struct PipelineImpl final : Pipeline
 		DVec3 pos;
 		float lod_multiplier;
 		bool is_shadow;
+		Matrix view;
+		Matrix projection;
 	};
 	
 
 	static CameraParams checkCameraParams(lua_State* L, int idx)
 	{
 		CameraParams cp;
+
+		lua_getfield(L, idx, "view");
+		if (!lua_istable(L, -1)) {
+			lua_pop(L, 1);
+			luaL_error(L, "View matrix is not a table");
+		}
+
+		for (int i = 0; i < 16; ++i) {
+			lua_rawgeti(L, -1, i + 1);
+			if (!LuaWrapper::isType<float>(L, -1)) {
+				lua_pop(L, 2);
+				luaL_error(L, "View matrix must contain exactly 16 floats");
+			}
+			cp.view[i] = LuaWrapper::toType<float>(L, -1);
+			lua_pop(L, 1);
+		}
+		lua_pop(L, 1);
+
+		lua_getfield(L, idx, "projection");
+		if (!lua_istable(L, -1)) {
+			lua_pop(L, 1);
+			luaL_error(L, "Projection matrix is not a table");
+		}
+
+		for (int i = 0; i < 16; ++i) {
+			lua_rawgeti(L, -1, i + 1);
+			if (!LuaWrapper::isType<float>(L, -1)) {
+				lua_pop(L, 2);
+				luaL_error(L, "Projection matrix must contain exactly 16 floats");
+			}
+			cp.projection[i] = LuaWrapper::toType<float>(L, -1);
+			lua_pop(L, 1);
+		}
+		lua_pop(L, 1);
 
 		lua_getfield(L, idx, "frustum");
 		if (!lua_istable(L, -1)) {
@@ -1170,6 +1329,41 @@ struct PipelineImpl final : Pipeline
 			cmd->m_pos_radius_uniform = pipeline->m_position_radius_uniform;
 			pipeline->m_renderer.push(cmd);
 		}
+		return 0;
+	}
+
+
+	static int pass(lua_State* L)
+	{
+		PROFILE_FUNCTION();
+		const int pipeline_idx = lua_upvalueindex(1);
+		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
+			LuaWrapper::argError<PipelineImpl*>(L, pipeline_idx);
+		}
+		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
+		const CameraParams cp = checkCameraParams(L, 1);
+		pipeline->m_pass_state.view = cp.view;
+		pipeline->m_pass_state.projection = cp.projection;
+		pipeline->m_pass_state.inv_projection = cp.projection.inverted();
+		pipeline->m_pass_state.inv_view = cp.view.fastInverted();
+		pipeline->m_pass_state.view_projection = cp.projection * cp.view;
+		pipeline->m_pass_state.inv_view_projection = pipeline->m_pass_state.view_projection.inverted();
+
+		struct PushPassStateCmd : Renderer::RenderJob {
+			void execute() override {
+				ffr::update(pass_state_buffer, &pass_state, 0, sizeof(pass_state));
+				ffr::bindUniformBuffer(1, pass_state_buffer, 0, sizeof(PassState));
+			}
+			void setup() override {}
+
+			ffr::BufferHandle pass_state_buffer;
+			PassState pass_state;
+		};
+
+		PushPassStateCmd* cmd = LUMIX_NEW(pipeline->m_renderer.getAllocator(), PushPassStateCmd);
+		cmd->pass_state = pipeline->m_pass_state;
+		cmd->pass_state_buffer = pipeline->m_pass_state_buffer;
+		pipeline->m_renderer.push(cmd);
 		return 0;
 	}
 
@@ -1411,9 +1605,91 @@ struct PipelineImpl final : Pipeline
 		lua_setfield(L, -2, "origin");
 		lua_setfield(L, -2, "frustum");
 
-		LuaWrapper::setField(L, -2, "is_shadow", params.is_shadow);
-		LuaWrapper::setField(L, -2, "position", params.pos);
-		LuaWrapper::setField(L, -2, "lod_multiplier", params.lod_multiplier);
+		LuaWrapper::setField(L, -1, "is_shadow", params.is_shadow);
+		LuaWrapper::setField(L, -1, "position", params.pos);
+		LuaWrapper::setField(L, -1, "lod_multiplier", params.lod_multiplier);
+
+		lua_createtable(L, 16, 0);
+		for (int i = 0; i < 16; ++i) {
+			LuaWrapper::push(L, params.view[i]);
+			lua_rawseti(L, -2, i + 1);
+		}
+		lua_setfield(L, -2, "view");
+
+		lua_createtable(L, 16, 0);
+		for (int i = 0; i < 16; ++i) {
+			LuaWrapper::push(L, params.projection[i]);
+			lua_rawseti(L, -2, i + 1);
+		}
+		lua_setfield(L, -2, "projection");
+	}
+
+
+	static int prepareShadowcastingLocalLights(lua_State* L)
+	{
+		const int pipeline_idx = lua_upvalueindex(1);
+		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
+			LuaWrapper::argError<PipelineImpl*>(L, pipeline_idx);
+		}
+		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
+		const Universe& universe = pipeline->m_scene->getUniverse();
+		const CameraParams cp = checkCameraParams(L, 1);
+		const int shadowmap_width = LuaWrapper::checkArg<int>(L, 2);
+		const int shadowmap_height = LuaWrapper::checkArg<int>(L, 3);
+		const int tile_width = LuaWrapper::checkArg<int>(L, 4);
+		const int tile_height = LuaWrapper::checkArg<int>(L, 5);
+
+		const int cols = shadowmap_width / tile_width;
+		const int rows = shadowmap_height / tile_height;
+		PointLight lights[16];
+		const int max_count = Math::maximum(lengthOf(lights), cols * rows);
+		const int count = pipeline->m_scene->getClosestShadowcastingPointLights(cp.pos, max_count, lights);
+
+		IAllocator& allocator = pipeline->m_renderer.getAllocator();
+		
+
+		lua_createtable(L, count, 0);
+		for (int i = 0; i < count; ++i) {
+			PrepareCommandsRenderJob* cmd = LUMIX_NEW(allocator, PrepareCommandsRenderJob)(allocator);
+			cmd->m_bucket_count = 1;
+
+			const bool ok = LuaWrapper::forEachArrayItem<const char*>(L, 6, nullptr, [&](const char* layer_name) {
+				const int layer = pipeline->m_renderer.getLayerIdx(layer_name);
+				cmd->m_bucket_map[layer] = 0;
+				});
+			if (!ok) {
+				LUMIX_DELETE(allocator, cmd);
+				return luaL_argerror(L, 2, "'layers' must be array of strings");
+			}
+			CommandSet* cmd_set = LUMIX_NEW(allocator, CommandSet)(allocator);
+			pipeline->m_command_sets.push(cmd_set);
+			const PointLight& pl = lights[i];
+			cmd->m_command_sets[0] = cmd_set;
+
+			lua_createtable(L, 0, 6);
+			LuaWrapper::setField(L, -1, "entity", pl.entity.index);
+			LuaWrapper::setField(L, -1, "viewport_x", (i % cols) * tile_width);
+			LuaWrapper::setField(L, -1, "viewport_y", (i / cols) * tile_height);
+			LuaWrapper::setField(L, -1, "viewport_w", tile_width);
+			LuaWrapper::setField(L, -1, "viewport_h", tile_height);
+			LuaWrapper::setField(L, -1, "bucket", cmd_set);
+			lua_rawseti(L, -2, i + 1);
+			
+			// TODO light camera params
+			CameraParams shadow_cam = cp;
+			shadow_cam.pos = universe.getPosition(pl.entity);
+			const Quat rot = universe.getRotation(pl.entity);
+			const Vec3 dir = rot.rotate(Vec3(0, 0, 1));
+			const Vec3 up = rot.rotate(Vec3(0, 1, 0));
+			shadow_cam.frustum.computePerspective(shadow_cam.pos, dir, up, pl.fov, 1, 0.1f, pl.range);
+			shadow_cam.is_shadow = true;
+			cmd->m_camera_params = shadow_cam;
+			cmd->m_pipeline = pipeline;
+			const int num_cmd_sets = cmd->m_bucket_count;
+			pipeline->m_renderer.push(cmd);
+		}
+
+		return 1;
 	}
 
 
@@ -1433,6 +1709,8 @@ struct PipelineImpl final : Pipeline
 		cp.frustum = pipeline->m_viewport.getFrustum();
 		cp.lod_multiplier = scene->getCameraLODMultiplier(pipeline->m_viewport.fov, pipeline->m_viewport.is_ortho);
 		cp.is_shadow = false;
+		cp.view = pipeline->m_viewport.getView(cp.pos);
+		cp.projection = pipeline->m_viewport.getProjection(ffr::isHomogenousDepth());
 		pushCameraParams(L, cp);
 
 		return 1;
@@ -1931,77 +2209,9 @@ struct PipelineImpl final : Pipeline
 		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
 
 		const int slice = LuaWrapper::checkArg<int>(L, 1);
-		const int shadowmap_width = LuaWrapper::checkArg<int>(L, 2);
-		
-		RenderScene* scene = pipeline->m_scene;
-		
-		const Universe& universe = scene->getUniverse();
-		const EntityPtr light = scene->getActiveGlobalLight();
-		const Vec4 cascades = light.isValid() ? scene->getShadowmapCascades((EntityRef)light) : Vec4(3, 10, 60, 150);
-		const Matrix light_mtx = light.isValid() ? universe.getRelativeMatrix((EntityRef)light, pipeline->m_viewport.pos) : Matrix::IDENTITY;
-
-		const float camera_height = (float)pipeline->m_viewport.h;
-		const float camera_fov = pipeline->m_viewport.fov;
-		const float camera_ratio = pipeline->m_viewport.w / camera_height;
-		const float split_distances[] = {0.1f, cascades.x, cascades.y, cascades.z, cascades.w};
-		
-		Frustum camera_frustum;
-		camera_frustum.computePerspective(Vec3::ZERO,
-			pipeline->m_viewport.rot * Vec3(0, 0, -1),
-			pipeline->m_viewport.rot * Vec3(0, 1, 0),
-			camera_fov,
-			camera_ratio,
-			split_distances[slice],
-			split_distances[slice + 1]);
-
-		const Sphere frustum_bounding_sphere = camera_frustum.computeBoundingSphere();
-		const float bb_size = frustum_bounding_sphere.radius;
-		const Vec3 light_forward = light_mtx.getZVector();
-		
-		Vec3 shadow_cam_pos = frustum_bounding_sphere.position;
-		shadow_cam_pos = shadowmapTexelAlign(shadow_cam_pos, 0.5f * shadowmap_width - 2, bb_size, light_mtx);
-
-		Renderer::GlobalState global_state = pipeline->m_renderer.getGlobalState();
-
-		Matrix projection_matrix;
-		projection_matrix.setOrtho(-bb_size, bb_size, -bb_size, bb_size, SHADOW_CAM_NEAR, SHADOW_CAM_FAR, ffr::isHomogenousDepth(), true);
-		shadow_cam_pos -= light_forward * SHADOW_CAM_FAR * 0.5f;
-		Matrix view_matrix;
-		view_matrix.lookAt(shadow_cam_pos, shadow_cam_pos + light_forward, light_mtx.getYVector());
-
-		const float ymul = ffr::isOriginBottomLeft() ? 0.5f : -0.5f;
-		const Matrix bias_matrix(
-			0.5, 0.0, 0.0, 0.0, 
-			0.0, ymul, 0.0, 0.0, 
-			0.0, 0.0, 1.0, 0.0, 
-			0.5, 0.5, 0.0, 1.0);
-
-		global_state.shadowmap_matrices[slice] = bias_matrix * projection_matrix * view_matrix;
-
-		global_state.shadow_view_projection = projection_matrix * view_matrix;
-		pipeline->m_renderer.setGlobalState(global_state);
-
-		CameraParams cp;
-		cp.is_shadow = true;
-		cp.lod_multiplier = 1;
-		cp.pos = pipeline->m_viewport.pos;
-		cp.frustum.computeOrtho(pipeline->m_viewport.pos + shadow_cam_pos
-			, -light_forward
-			, light_mtx.getYVector()
-			, bb_size
-			, bb_size
-			, SHADOW_CAM_NEAR
-			, SHADOW_CAM_FAR);
-
-		// TODO
-		//findExtraShadowcasterPlanes(light_forward, camera_frustum, &cp.frustum);
-
-		pushCameraParams(L, cp);
+		pushCameraParams(L, pipeline->m_shadow_camera_params[slice]);
 		return 1;
 	}
-
-
-	
 
 
 	static int setRenderTargets(lua_State* L)
@@ -2577,6 +2787,7 @@ struct PipelineImpl final : Pipeline
 							const u8 patch_idx = u8(renderables[i] >> 48);
 							const u8 mesh_idx = u8(renderables[i] >> 56);
 							const Terrain* t = scene->getTerrain(e);
+							// TODO this crashes if the shader is reloaded
 							// TODO 0 const in following:
 							const Terrain::GrassPatch& p = t->m_grass_quads[0][quad_idx]->m_patches[patch_idx];
 							const Mesh& mesh = p.m_type->m_grass_model->getMesh(mesh_idx);
@@ -2887,8 +3098,10 @@ struct PipelineImpl final : Pipeline
 
 		registerCFunction("bindTextures", PipelineImpl::bindTextures);
 		registerCFunction("drawArray", PipelineImpl::drawArray);
+		registerCFunction("prepareShadowcastingLocalLights", PipelineImpl::prepareShadowcastingLocalLights);
 		registerCFunction("getCameraParams", PipelineImpl::getCameraParams);
 		registerCFunction("getShadowCameraParams", PipelineImpl::getShadowCameraParams);
+		registerCFunction("pass", PipelineImpl::pass);
 		registerCFunction("prepareCommands", PipelineImpl::prepareCommands);
 		registerCFunction("renderEnvProbeVolumes", PipelineImpl::renderEnvProbeVolumes);
 		registerCFunction("renderBucket", PipelineImpl::renderBucket);
@@ -2958,6 +3171,11 @@ struct PipelineImpl final : Pipeline
 	Array<Renderbuffer> m_renderbuffers;
 	Array<ShaderRef> m_shaders;
 	Timer* m_timer;
+	GlobalState m_global_state;
+	ffr::BufferHandle m_global_state_buffer;
+	PassState m_pass_state;
+	ffr::BufferHandle m_pass_state_buffer;
+	CameraParams m_shadow_camera_params[4];
 
 	ffr::UniformHandle m_position_radius_uniform;
 	ffr::UniformHandle m_position_uniform;

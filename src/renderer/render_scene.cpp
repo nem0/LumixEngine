@@ -1649,6 +1649,70 @@ public:
 	}
 
 
+	int getClosestShadowcastingPointLights(const DVec3& reference_pos, int max_lights, PointLight* lights) override
+	{
+
+		float dists[16];
+		ASSERT(max_lights <= lengthOf(dists));
+		ASSERT(max_lights > 0);
+		if (m_point_lights.empty()) return 0;
+
+		int light_count = 0;
+		auto iter = m_point_lights.begin();
+		auto end = m_point_lights.end();
+		while (iter != end && light_count < max_lights) {
+			const PointLight& light = iter.value();
+			++iter;
+
+			if (!light.cast_shadows) continue;
+			const DVec3 light_pos = m_universe.getPosition(light.entity);
+			float dist_squared = float((reference_pos - light_pos).squaredLength());
+
+			dists[light_count] = dist_squared;
+			lights[light_count] = light;
+
+			for (int i = light_count; i > 0 && dists[i - 1] > dists[i]; --i) {
+				float tmp = dists[i];
+				dists[i] = dists[i - 1];
+				dists[i - 1] = tmp;
+
+				const PointLight tmp2 = lights[i];
+				lights[i] = lights[i - 1];
+				lights[i - 1] = tmp2;
+			}
+			++light_count;
+		}
+
+		while(iter != end) {
+			const PointLight& light = iter.value();
+			++iter;
+
+			if (!light.cast_shadows) continue;
+			const DVec3 light_pos = m_universe.getPosition(light.entity);
+			float dist_squared = float((reference_pos - light_pos).squaredLength());
+
+			if (dist_squared < dists[max_lights - 1]) {
+				dists[max_lights - 1] = dist_squared;
+				lights[max_lights - 1] = light;
+
+				for (int i = max_lights - 1; i > 0 && dists[i - 1] > dists[i];
+					--i)
+				{
+					float tmp = dists[i];
+					dists[i] = dists[i - 1];
+					dists[i - 1] = tmp;
+
+					const PointLight tmp2 = lights[i];
+					lights[i] = lights[i - 1];
+					lights[i - 1] = tmp2;
+				}
+			}
+		}
+
+		return light_count;
+	}
+
+
 	const PointLight& getPointLight(EntityRef entity) override
 	{
 		return m_point_lights[entity];
