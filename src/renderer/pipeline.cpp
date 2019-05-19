@@ -1995,8 +1995,7 @@ struct PipelineImpl final : Pipeline
 					const u8* cmd = cmds.begin();
 					const u8* cmd_end = cmds.end();
 					while (cmd != cmd_end) {
-						const RenderableTypes type = *(RenderableTypes*)cmd;
-						cmd += sizeof(type);
+						READ(const RenderableTypes, type);
 						switch(type) {
 							case RenderableTypes::MESH:
 							case RenderableTypes::MESH_GROUP: {
