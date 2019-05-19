@@ -45,24 +45,6 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 			RenderJob* next = nullptr;
 		};
 
-		struct GlobalState 
-		{
-			Matrix shadow_view_projection;
-			Matrix shadowmap_matrices[4];
-			Matrix camera_projection;
-			Matrix camera_inv_projection;
-			Matrix camera_view;
-			Matrix camera_inv_view;
-			Matrix camera_view_projection;
-			Matrix camera_inv_view_projection;
-			Vec4 light_direction;
-			Vec3 light_color;
-			float light_intensity;
-			float light_indirect_intensity;
-			float time;
-			IVec2 framebuffer_size;
-		};
-
 		struct GPUProfilerQuery
 		{
 			StaticString<32> name;
@@ -97,8 +79,6 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 		virtual TextureManager& getTextureManager() = 0;
 		virtual void setMainPipeline(Pipeline* pipeline) = 0;
 		virtual Pipeline* getMainPipeline() = 0;
-		virtual GlobalState getGlobalState() const = 0;
-		virtual void setGlobalState(const GlobalState& state) = 0;
 		
 		virtual IAllocator& getAllocator() = 0;
 		virtual MemRef allocate(uint size) = 0;

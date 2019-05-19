@@ -48,8 +48,7 @@ const Shader::Program& Shader::getProgram(ShaderRenderData* rd, u32 defines)
 		PROFILE_BLOCK("compile_shader");
 		static const char* shader_code_prefix = 
 			R"#(#version 420
-			layout (std140) uniform GlobalState
-			{
+			layout (std140) uniform GlobalState {
 				mat4 u_shadow_view_projection;
 				mat4 u_shadowmap_matrices[4];
 				mat4 u_camera_projection;
@@ -64,6 +63,14 @@ const Shader::Program& Shader::getProgram(ShaderRenderData* rd, u32 defines)
 				float u_light_indirect_intensity;
 				float u_time;
 				ivec2 u_framebuffer_size;
+			};
+			layout (std140) uniform PassState {
+				mat4 u_pass_projection;
+				mat4 u_pass_inv_projection;
+				mat4 u_pass_view;
+				mat4 u_pass_inv_view;
+				mat4 u_pass_view_projection;
+				mat4 u_pass_inv_view_projection;
 			};
 			uniform samplerCube u_irradiancemap;
 			uniform samplerCube u_radiancemap;
@@ -103,6 +110,7 @@ const Shader::Program& Shader::getProgram(ShaderRenderData* rd, u32 defines)
 		program.use_semantics = false;
 		if (program.handle.isValid()) {
 			ffr::uniformBlockBinding(program.handle, "GlobalState", 0);
+			ffr::uniformBlockBinding(program.handle, "PassState", 1);
 			for(const AttributeInfo& attr : rd->attributes) {
 				program.use_semantics = true;
 				const int loc = ffr::getAttribLocation(program.handle, attr.name);
