@@ -2513,7 +2513,7 @@ struct PipelineImpl final : Pipeline
 									sort_keys.push(key);
 								}
 								else {
-									const u64 key = ((u64)mesh.sort_key << 32) | ((u64)bucket << 56) | depth_bits;
+									const u64 key = ((u64)mesh.sort_key << 32) | ((u64)bucket << 56)/* | depth_bits*/;
 									sort_keys.push(key);
 								}
 								subrenderables.push(renderables[i]);
@@ -2841,7 +2841,7 @@ struct PipelineImpl final : Pipeline
 				ctx.count = renderables[i].size();
 				ctx.camera_params = m_camera_params;
 				ctx.cmd = this;
-				JobSystem::run(&ctx, &CreateSortKeys::execute, &counter, JobSystem::INVALID_HANDLE, 0);
+				JobSystem::run(&ctx, &CreateSortKeys::execute, &counter, JobSystem::INVALID_HANDLE, JobSystem::ANY_WORKER);
 			}
 			JobSystem::wait(counter);
 			sort_keys.merge();
@@ -2897,7 +2897,7 @@ struct PipelineImpl final : Pipeline
 					ctx.output = &m_command_sets[bucket]->cmds.emplace(m_allocator);
 					ctx.bucket = bucket;
 					job_offset += step;
-					JobSystem::run(&ctx, &CreateCommands::execute, &counter, JobSystem::INVALID_HANDLE, 0);
+					JobSystem::run(&ctx, &CreateCommands::execute, &counter, JobSystem::INVALID_HANDLE, JobSystem::ANY_WORKER);
 				}
 				bucket_offset += bucket_size;
 			}
