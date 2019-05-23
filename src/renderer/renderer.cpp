@@ -162,44 +162,6 @@ struct GPUProfiler
 };
 
 
-struct RendererImpl;
-
-
-struct RenderTask : MT::Task
-{
-	RenderTask(RendererImpl& renderer, IAllocator& allocator) 
-		: MT::Task(allocator)
-		, m_allocator(allocator)
-		, m_renderer(renderer)
-		, m_profiler(allocator)
-		, m_finished_semaphore(0, 1)
-		, m_commands_semaphore(0, INT_MAX)
-	{}
-
-
-	void shutdown();
-	int task() override;
-
-	IAllocator& m_allocator;
-	RendererImpl& m_renderer;
-	ffr::FramebufferHandle m_framebuffer;
-	ffr::BufferHandle m_global_state_uniforms;
-	MT::Semaphore m_finished_semaphore;
-	bool m_shutdown_requested = false;
-	ffr::BufferHandle m_transient_buffer;
-	uint m_transient_buffer_offset;
-	u8* m_transient_buffer_ptr = nullptr;
-
-	// TODO maybe use http://www.1024cores.net/home/lock-free-algorithms/queues/intrusive-mpsc-node-based-queue 
-	// instead of critical section
-	MT::CriticalSection m_commands_lock;
-	MT::Semaphore m_commands_semaphore;
-	Renderer::RenderJob* m_commands_head = nullptr;
-	Renderer::RenderJob* m_commands_tail = nullptr;
-
-	GPUProfiler m_profiler;
-};
-
 struct BoneProperty : Reflection::IEnumProperty
 {
 	BoneProperty() 
@@ -393,7 +355,7 @@ struct RendererImpl final : public Renderer
 		, m_shader_defines(m_allocator)
 		, m_vsync(true)
 		, m_main_pipeline(nullptr)
-		, m_render_task(*this, m_allocator)
+		, m_profiler(m_allocator)
 		, m_frame_semaphore(2, 2)
 		, m_layers(m_allocator)
 	{
@@ -412,13 +374,14 @@ struct RendererImpl final : public Renderer
 		m_font_manager->destroy();
 		LUMIX_DELETE(m_allocator, m_font_manager);
 
-		m_render_task.shutdown();
-		if (JobSystem::isValid(m_last_exec_job)) {
-			JobSystem::wait(m_last_exec_job);
-			m_last_exec_job = JobSystem::INVALID_HANDLE;
-		}
-		m_render_task.m_finished_semaphore.wait();
-		m_render_task.destroy();
+		JobSystem::SignalHandle signal = JobSystem::INVALID_HANDLE;
+		JobSystem::run(this, [](void* data) {
+			RendererImpl* renderer = (RendererImpl*)data;
+			ffr::destroy(renderer->m_transient_buffer);
+			renderer->m_profiler.clear();
+			ffr::shutdown();
+		}, &signal, m_last_exec_job, 1);
+		JobSystem::wait(signal);
 	}
 
 
@@ -438,6 +401,24 @@ struct RendererImpl final : public Renderer
 			}
 		}
 
+		JobSystem::SignalHandle signal = JobSystem::INVALID_HANDLE;
+		JobSystem::run(this, [](void* data) {
+			PROFILE_BLOCK("init_render");
+			RendererImpl& renderer = *(RendererImpl*)data;
+			Engine& engine = renderer.getEngine();
+			void* window_handle = engine.getPlatformData().window_handle;
+			ffr::init(window_handle);
+			renderer.m_framebuffer = ffr::createFramebuffer();
+			renderer.m_transient_buffer = ffr::allocBufferHandle();
+			renderer.m_transient_buffer_offset = 0;
+			const uint transient_flags = (uint)ffr::BufferFlags::PERSISTENT
+				| (uint)ffr::BufferFlags::MAP_WRITE
+				| (uint)ffr::BufferFlags::MAP_FLUSH_EXPLICIT;
+			ffr::createBuffer(renderer.m_transient_buffer, transient_flags, TRANSIENT_BUFFER_SIZE, nullptr);
+			renderer.m_transient_buffer_ptr = (u8*)ffr::map(renderer.m_transient_buffer, 0, TRANSIENT_BUFFER_SIZE, transient_flags);
+		}, &signal, JobSystem::INVALID_HANDLE, 1);
+		JobSystem::wait(signal);
+
 		ResourceManagerHub& manager = m_engine.getResourceManager();
 		m_pipeline_manager.create(PipelineResource::TYPE, manager);
 		m_texture_manager.create(Texture::TYPE, manager);
@@ -450,7 +431,6 @@ struct RendererImpl final : public Renderer
 
 		RenderScene::registerLuaAPI(m_engine.getState());
 
-		m_render_task.create("render task");
 		m_layers.emplace("default");
 	}
 
@@ -488,25 +468,25 @@ struct RendererImpl final : public Renderer
 
 	void beginProfileBlock(const char* name) override
 	{
-		m_render_task.m_profiler.beginQuery(name);
+		m_profiler.beginQuery(name);
 	}
 
 
 	void endProfileBlock() override
 	{
-		m_render_task.m_profiler.endQuery();
+		m_profiler.endQuery();
 	}
 
 
 	bool getGPUTimings(Array<GPUProfilerQuery>* results) override
 	{
-		return m_render_task.m_profiler.getResults(results);
+		return m_profiler.getResults(results);
 	}
 
 
 	ffr::FramebufferHandle getFramebuffer() const override
 	{
-		return m_render_task.m_framebuffer;
+		return m_framebuffer;
 	}
 
 
@@ -525,7 +505,7 @@ struct RendererImpl final : public Renderer
 			void* buf;
 		};
 
-		Cmd* cmd = LUMIX_NEW(m_render_task.m_allocator, Cmd);
+		Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
 		cmd->handle = texture;
 		cmd->size = size;
 		cmd->buf = data;
@@ -554,7 +534,7 @@ struct RendererImpl final : public Renderer
 			RendererImpl* renderer;
 		};
 
-		Cmd* cmd = LUMIX_NEW(m_render_task.m_allocator, Cmd);
+		Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
 		cmd->handle = handle;
 		cmd->x = x;
 		cmd->y = y;
@@ -596,7 +576,7 @@ struct RendererImpl final : public Renderer
 			RendererImpl* renderer; 
 		};
 
-		Cmd* cmd = LUMIX_NEW(m_render_task.m_allocator, Cmd);
+		Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
 		cmd->debug_name = debug_name;
 		cmd->handle = handle;
 		cmd->memory = memory;
@@ -612,11 +592,11 @@ struct RendererImpl final : public Renderer
 	{
 		ffr::checkThread();
 		TransientSlice slice;
-		slice.buffer = m_render_task.m_transient_buffer;
-		slice.offset = m_render_task.m_transient_buffer_offset;
-		slice.size = m_render_task.m_transient_buffer_offset + size > TRANSIENT_BUFFER_SIZE ? 0 : size;
-		slice.ptr = slice.size > 0 ? m_render_task.m_transient_buffer_ptr + slice.offset : nullptr;
-		m_render_task.m_transient_buffer_offset += slice.size;
+		slice.buffer = m_transient_buffer;
+		slice.offset = m_transient_buffer_offset;
+		slice.size = m_transient_buffer_offset + size > TRANSIENT_BUFFER_SIZE ? 0 : size;
+		slice.ptr = slice.size > 0 ? m_transient_buffer_ptr + slice.offset : nullptr;
+		m_transient_buffer_offset += slice.size;
 		return slice;
 	}
 
@@ -783,48 +763,27 @@ struct RendererImpl final : public Renderer
 		push(cmd);
 	}
 
-	struct RenderJobSetupData {
-		RenderJob* cmd;
-		RendererImpl* renderer;
-	};
-
 
 	void push(RenderJob* cmd) override
 	{
-		RenderJobSetupData* data = LUMIX_NEW(m_allocator, RenderJobSetupData);
-		data->cmd = cmd;
-		data->renderer = this;
-
+		ASSERT(!cmd->allocator);
+		cmd->allocator = &m_allocator;
+		
 		JobSystem::SignalHandle preconditions = m_last_exec_job;
-		JobSystem::run(data, [](void* data){
-			RenderJobSetupData* job_data = (RenderJobSetupData*)data;
-			RenderJob* cmd = job_data->cmd;
-
-			PROFILE_BLOCK("setup command");
+		JobSystem::run(cmd, [](void* data){
+			RenderJob* cmd = (RenderJob*)data;
+			PROFILE_BLOCK("setup_render_job");
 			cmd->setup();
-		}, &preconditions, JobSystem::INVALID_HANDLE, 0);
+		}, &preconditions, JobSystem::INVALID_HANDLE, JobSystem::ANY_WORKER);
 
 		JobSystem::SignalHandle exec_counter = JobSystem::INVALID_HANDLE;
-		JobSystem::run(data, [](void* data){
-			PROFILE_BLOCK("push_to_render_thread");
-			RenderJobSetupData* job_data = (RenderJobSetupData*)data;
-			RenderJob* cmd = job_data->cmd;
-			RendererImpl* renderer = job_data->renderer;
-
-			{
-				MT::CriticalSectionLock lock(renderer->m_render_task.m_commands_lock);
-				cmd->next = nullptr;
-				if (!renderer->m_render_task.m_commands_tail) {
-					renderer->m_render_task.m_commands_head = cmd;
-				}
-				else {
-					renderer->m_render_task.m_commands_tail->next = cmd;
-				}
-				renderer->m_render_task.m_commands_tail = cmd;
-			}
-			renderer->m_render_task.m_commands_semaphore.signal();
-			LUMIX_DELETE(renderer->m_allocator, job_data);
-		}, &exec_counter, preconditions, 0);
+		JobSystem::run(cmd, [](void* data){
+			PROFILE_BLOCK("execute_render_job");
+			Profiler::blockColor(0xaa, 0xff, 0xaa);
+			RenderJob* cmd = (RenderJob*)data;
+			cmd->execute();
+			LUMIX_DELETE(*cmd->allocator, cmd);
+		}, &exec_counter, preconditions, 1);
 
 		m_last_exec_job = exec_counter;
 	}
@@ -948,8 +907,8 @@ struct RendererImpl final : public Renderer
 				PROFILE_FUNCTION();
 				renderer->m_frame_semaphore.signal();
 				ffr::swapBuffers(); 
-				renderer->m_render_task.m_profiler.frame();
-				renderer->m_render_task.m_transient_buffer_offset = 0; // TODO this is accessed from different threads
+				renderer->m_profiler.frame();
+				renderer->m_transient_buffer_offset = 0; // TODO this is accessed from different threads
 			}
 			RendererImpl* renderer;
 			bool capture;
@@ -992,61 +951,15 @@ struct RendererImpl final : public Renderer
 	ModelManager m_model_manager;
 	bool m_vsync;
 	Pipeline* m_main_pipeline;
-	RenderTask m_render_task;
-	ffr::BufferHandle m_transient_buffer;
 	JobSystem::SignalHandle m_last_exec_job = JobSystem::INVALID_HANDLE;
+
+	ffr::FramebufferHandle m_framebuffer;
+	ffr::BufferHandle m_global_state_uniforms;
+	ffr::BufferHandle m_transient_buffer;
+	uint m_transient_buffer_offset;
+	u8* m_transient_buffer_ptr = nullptr;
+	GPUProfiler m_profiler;
 };
-
-
-void RenderTask::shutdown()
-{
-	m_renderer.runInRenderThread(this, [](Renderer& renderer, void* data){
-		((RenderTask*)data)->m_shutdown_requested = true;
-		((RenderTask*)data)->m_commands_semaphore.signal();
-	});
-}
-
-
-int RenderTask::task()
-{
-	PROFILE_FUNCTION();
-	Engine& engine = m_renderer.getEngine();
-	void* window_handle = engine.getPlatformData().window_handle;
-	ffr::init(window_handle);
-	m_framebuffer = ffr::createFramebuffer();
-	m_transient_buffer = ffr::allocBufferHandle();
-	m_transient_buffer_offset = 0;
-	const uint transient_flags = (uint)ffr::BufferFlags::PERSISTENT 
-		| (uint)ffr::BufferFlags::MAP_WRITE
-		| (uint)ffr::BufferFlags::MAP_FLUSH_EXPLICIT;
-	ffr::createBuffer(m_transient_buffer, transient_flags, TRANSIENT_BUFFER_SIZE, nullptr);
-	m_transient_buffer_ptr = (u8*)ffr::map(m_transient_buffer, 0, TRANSIENT_BUFFER_SIZE, transient_flags);
-	while (!m_shutdown_requested) {
-		m_commands_semaphore.wait();
-		
-		Renderer::RenderJob* cmd = [&]() {
-			MT::CriticalSectionLock lock(m_commands_lock);
-			Renderer::RenderJob* cmd = m_commands_head;
-			if (cmd) m_commands_head = cmd->next;
-			if (!m_commands_head) m_commands_tail = nullptr;
-			return cmd;
-		}();
-
-		if (!cmd) {
-			ASSERT(m_shutdown_requested);
-			break;
-		}
-
-		PROFILE_BLOCK("executeCommand");
-		cmd->execute();
-		LUMIX_DELETE(m_renderer.getAllocator(), cmd);
-	}
-	ffr::destroy(m_transient_buffer);
-	m_profiler.clear();
-	ffr::shutdown();
-	m_finished_semaphore.signal();
-	return 0;
-}
 
 
 extern "C"

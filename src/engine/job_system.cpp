@@ -32,7 +32,7 @@ struct Job
 	void* data = nullptr;
 	SignalHandle dec_on_finish;
 	SignalHandle precondition;
-	u64 affinity;
+	u8 worker_index;
 };
 
 
@@ -87,7 +87,7 @@ struct System
 	MT::CriticalSection m_job_queue_sync;
 	MT::Event m_event_outside_job;
 	MT::Event m_work_signal;
-	Array<MT::Task*> m_workers;
+	Array<WorkerTask*> m_workers;
 	Array<Job> m_job_queue;
 	Array<Signal> m_signals_pool;
 	FiberDecl m_fiber_pool[512];
@@ -104,42 +104,47 @@ static thread_local WorkerTask* g_worker = nullptr;
 
 struct WorkerTask : MT::Task
 {
-	WorkerTask(System& system, u64 affinity) 
+	WorkerTask(System& system, u8 worker_index) 
 		: Task(system.m_allocator)
 		, m_system(system)
-		, m_affinity(affinity)
+		, m_worker_index(worker_index)
+		, m_job_queue(system.m_allocator)
+		, m_ready_fibers(system.m_allocator)
 	{}
 
 
-	Job getReadyJob(System& system) const
+	Job getReadyJob(System& system)
 	{
 		MT::CriticalSectionLock lock(system.m_job_queue_sync);
+
+		if (!m_job_queue.empty()) {
+			const Job job = m_job_queue.back();
+			m_job_queue.pop();
+			return job;
+		}
 
 		if (system.m_job_queue.empty()) return { nullptr, nullptr };
 
 		const Job job = system.m_job_queue.back();
 		system.m_job_queue.pop();
-		if (job.affinity && (job.affinity & m_affinity) == 0) {
-			system.m_job_queue.push(job);
-			return { nullptr, nullptr };
-		}
-
 		if (system.m_job_queue.empty()) system.m_work_signal.reset();
 		return job;
 	}
 
 
-	FiberDecl* getReadyFiber(System& system) const
+	FiberDecl* getReadyFiber(System& system)
 	{
 		MT::CriticalSectionLock lock(system.m_ready_fiber_sync);
+
+		if (!m_ready_fibers.empty()) {
+			FiberDecl* fiber = m_ready_fibers.back();
+			m_ready_fibers.pop();
+			return fiber;
+		}
 
 		if (system.m_ready_fibers.empty()) return nullptr;
 		FiberDecl* fiber = system.m_ready_fibers.back();
 		system.m_ready_fibers.pop();
-		if (fiber->current_job.affinity && (fiber->current_job.affinity & m_affinity) == 0) {
-			system.m_ready_fibers.push(fiber);
-			return nullptr;
-		}
 		return fiber;
 	}
 
@@ -237,7 +242,9 @@ struct WorkerTask : MT::Task
 	FiberDecl* m_current_fiber = nullptr;
 	Fiber::Handle m_primary_fiber;
 	System& m_system;
-	u64 m_affinity;
+	Array<Job> m_job_queue;
+	Array<FiberDecl*> m_ready_fibers;
+	u8 m_worker_index;
 };
 
 
@@ -253,6 +260,16 @@ static LUMIX_FORCE_INLINE SignalHandle allocateSignal()
 	g_system->m_free_queue.pop();
 
 	return handle & HANDLE_ID_MASK | w.generation;
+}
+
+
+static void pushJob(const Job& job)
+{
+	if (job.worker_index != ANY_WORKER) {
+		g_system->m_workers[job.worker_index % g_system->m_workers.size()]->m_job_queue.push(job);
+		return;
+	}
+	g_system->m_job_queue.push(job);
 }
 
 
@@ -272,7 +289,7 @@ void trigger(SignalHandle handle)
 		Signal& signal = g_system->m_signals_pool[iter & HANDLE_ID_MASK];
 		if(signal.next_job.task) {
 			MT::CriticalSectionLock lock(g_system->m_job_queue_sync);
-			g_system->m_job_queue.push(signal.next_job);
+			pushJob(signal.next_job);
 			any_new_job = true;
 		}
 		signal.generation = (((signal.generation >> 16) + 1) & 0xffFF) << 16;
@@ -309,12 +326,12 @@ static LUMIX_FORCE_INLINE void runInternal(void* data
 	, SignalHandle precondition
 	, bool lock
 	, SignalHandle* on_finish
-	, u64 affinity)
+	, u8 worker_index)
 {
 	Job j;
 	j.data = data;
 	j.task = task;
-	j.affinity = affinity;
+	j.worker_index = worker_index;
 	j.precondition = precondition;
 
 	if (lock) g_system->m_sync.enter();
@@ -330,7 +347,7 @@ static LUMIX_FORCE_INLINE void runInternal(void* data
 
 	if (!isValid(precondition) || isSignalZero(precondition, false)) {
 		MT::CriticalSectionLock lock(g_system->m_job_queue_sync);
-		g_system->m_job_queue.push(j);
+		pushJob(j);
 		g_system->m_work_signal.trigger();
 	}
 	else {
@@ -351,9 +368,9 @@ static LUMIX_FORCE_INLINE void runInternal(void* data
 }
 
 
-void run(void* data, void (*task)(void*), SignalHandle* on_finished, SignalHandle precondition, u64 affinity)
+void run(void* data, void (*task)(void*), SignalHandle* on_finished, SignalHandle precondition, u8 worker_index)
 {
-	runInternal(data, task, precondition, true, on_finished, affinity);
+	runInternal(data, task, precondition, true, on_finished, worker_index);
 }
 
 
@@ -467,7 +484,13 @@ void wait(SignalHandle handle)
 
 		runInternal(fiber_decl, [](void* data){
 			MT::CriticalSectionLock lock(g_system->m_ready_fiber_sync);
-			g_system->m_ready_fibers.push((FiberDecl*)data);
+			FiberDecl* fiber = (FiberDecl*)data;
+			if (fiber->current_job.worker_index == ANY_WORKER) {
+				g_system->m_ready_fibers.push(fiber);
+			}
+			else {
+				g_system->m_workers[fiber->current_job.worker_index % g_system->m_workers.size()]->m_ready_fibers.push(fiber);
+			}
 		}, handle, false, nullptr, 0);
 		fiber_decl->job_finished = false;
 		

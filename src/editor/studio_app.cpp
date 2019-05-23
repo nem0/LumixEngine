@@ -264,7 +264,7 @@ public:
 		JobSystem::SignalHandle finished = JobSystem::INVALID_HANDLE;
 		JobSystem::run(this, [](void* data) {
 			Lumix::OS::run(*(StudioAppImpl*)data);
-		}, &finished, JobSystem::INVALID_HANDLE, 0b1);
+		}, &finished, JobSystem::INVALID_HANDLE, 0);
 		Profiler::setThreadName("Main thread");
 		JobSystem::wait(finished);
 		JobSystem::shutdown();
