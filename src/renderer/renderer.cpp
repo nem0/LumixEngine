@@ -853,24 +853,6 @@ struct RendererImpl final : public Renderer
 	}
 
 
-	void pushSetGlobalStateCommand()
-	{
-		/*struct Cmd : RenderJob {
-			void setup() override {}
-			void execute() override { 
-				ffr::update(renderer->m_render_task.m_global_state_uniforms, &state, 0, sizeof(state));
-			}
-			GlobalState state;
-			RendererImpl* renderer;
-		};
-		Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
-		cmd->state = m_global_state;
-		cmd->renderer = this;
-		push(cmd);*/
-		// TODO
-	}
-
-
 	void startCapture() override
 	{
 		struct Cmd : RenderJob {
@@ -954,7 +936,6 @@ struct RendererImpl final : public Renderer
 	JobSystem::SignalHandle m_last_exec_job = JobSystem::INVALID_HANDLE;
 
 	ffr::FramebufferHandle m_framebuffer;
-	ffr::BufferHandle m_global_state_uniforms;
 	ffr::BufferHandle m_transient_buffer;
 	uint m_transient_buffer_offset;
 	u8* m_transient_buffer_ptr = nullptr;
