@@ -2513,7 +2513,7 @@ struct PipelineImpl final : Pipeline
 									sort_keys.push(key);
 								}
 								else {
-									const u64 key = ((u64)mesh.sort_key << 32) | ((u64)bucket << 56)/* | depth_bits*/;
+									const u64 key = ((u64)mesh.sort_key << 32) | ((u64)bucket << 56) | depth_bits;
 									sort_keys.push(key);
 								}
 								subrenderables.push(renderables[i]);
