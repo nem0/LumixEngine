@@ -2027,9 +2027,9 @@ struct PipelineImpl final : Pipeline
 									ffr::setIndexBuffer(mesh->index_buffer_handle);
 
 									const Renderer::TransientSlice instance_buffer = m_pipeline->m_renderer.allocTransient(instances_count * sizeof(Vec4) * 2);
+									// TODO remove profile blocks
 									memcpy(instance_buffer.ptr, instance_data, instance_buffer.size);
 									ffr::flushBuffer(instance_buffer.buffer, instance_buffer.offset, instance_buffer.size);
-
 									int instance_map[16];
 									for (uint i = 0; i < instance_decl.attributes_count; ++i) {
 										instance_map[i] = prog.attribute_by_semantics[(int)Mesh::AttributeSemantic::INSTANCE0 + i];
