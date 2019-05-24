@@ -356,7 +356,6 @@ struct RendererImpl final : public Renderer
 		, m_vsync(true)
 		, m_main_pipeline(nullptr)
 		, m_profiler(m_allocator)
-		, m_frame_semaphore(2, 2)
 		, m_layers(m_allocator)
 	{
 		ffr::preinit(m_allocator);
@@ -887,7 +886,6 @@ struct RendererImpl final : public Renderer
 			void setup() override {}
 			void execute() override { 
 				PROFILE_FUNCTION();
-				renderer->m_frame_semaphore.signal();
 				ffr::swapBuffers(); 
 				renderer->m_profiler.frame();
 				renderer->m_transient_buffer_offset = 0; // TODO this is accessed from different threads
@@ -905,12 +903,8 @@ struct RendererImpl final : public Renderer
 	{
 		PROFILE_FUNCTION();
 		pushSwapCommand();
-		{
-			PROFILE_BLOCK("wait for render thread");
-			Profiler::blockColor(0xff, 0, 0);
-			m_frame_semaphore.wait();
-		}
-		JobSystem::wait(m_last_exec_job);
+		JobSystem::wait(m_prev_frame_job);
+		m_prev_frame_job = m_last_exec_job;
 		m_last_exec_job = JobSystem::INVALID_HANDLE;
 	}
 
@@ -921,7 +915,6 @@ struct RendererImpl final : public Renderer
 
 	Engine& m_engine;
 	IAllocator& m_allocator;
-	MT::Semaphore m_frame_semaphore;
 	Array<ShaderDefine> m_shader_defines;
 	Array<StaticString<32>> m_layers;
 	TextureManager m_texture_manager;
@@ -934,6 +927,7 @@ struct RendererImpl final : public Renderer
 	bool m_vsync;
 	Pipeline* m_main_pipeline;
 	JobSystem::SignalHandle m_last_exec_job = JobSystem::INVALID_HANDLE;
+	JobSystem::SignalHandle m_prev_frame_job = JobSystem::INVALID_HANDLE;
 
 	ffr::FramebufferHandle m_framebuffer;
 	ffr::BufferHandle m_transient_buffer;
