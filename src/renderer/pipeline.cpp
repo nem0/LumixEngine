@@ -1791,6 +1791,7 @@ struct PipelineImpl final : Pipeline
 			{
 				const Shader::Program& p = Shader::getProgram(m_shader, 0);
 				if(!p.handle.isValid()) return;
+				if (m_vertices.empty()) return;
 
 				Renderer& renderer = m_pipeline->m_renderer;
 				const Renderer::TransientSlice transient = renderer.allocTransient(m_vertices.byte_size());
@@ -2002,10 +2003,10 @@ struct PipelineImpl final : Pipeline
 								READ(const Mesh::RenderData*, mesh);
 								READ(const Material::RenderData*, material);
 								READ(const u16, instances_count);
+								READ(const ffr::BufferHandle, buffer);
+								READ(const uint, offset);
+								const uint size = instances_count * instance_decl.size;
 
-								const float* instance_data = (const float*)cmd;
-								cmd += sizeof(Vec4) * 2 * instances_count;
-								
 								ShaderRenderData* shader = material->shader;
 								ffr::bindTextures(nullptr, 16);
 								ffr::bindTextures(material->textures, material->textures_count);
@@ -2026,16 +2027,13 @@ struct PipelineImpl final : Pipeline
 									ffr::setVertexBuffer(&mesh->vertex_decl, mesh->vertex_buffer_handle, 0, prog.use_semantics ? attribute_map : nullptr);
 									ffr::setIndexBuffer(mesh->index_buffer_handle);
 
-									const Renderer::TransientSlice instance_buffer = m_pipeline->m_renderer.allocTransient(instances_count * sizeof(Vec4) * 2);
-									// TODO remove profile blocks
-									memcpy(instance_buffer.ptr, instance_data, instance_buffer.size);
-									ffr::flushBuffer(instance_buffer.buffer, instance_buffer.offset, instance_buffer.size);
+									ffr::flushBuffer(buffer, offset, size);
 									int instance_map[16];
 									for (uint i = 0; i < instance_decl.attributes_count; ++i) {
 										instance_map[i] = prog.attribute_by_semantics[(int)Mesh::AttributeSemantic::INSTANCE0 + i];
 									}
 
-									ffr::setInstanceBuffer(instance_decl, instance_buffer.buffer, instance_buffer.offset, mesh->vertex_decl.attributes_count, instance_map);
+									ffr::setInstanceBuffer(instance_decl, buffer, offset, mesh->vertex_decl.attributes_count, instance_map);
 									ffr::drawTrianglesInstanced(0, mesh->indices_count, instances_count);
 									++drawcalls_count;
 								}
@@ -2513,7 +2511,7 @@ struct PipelineImpl final : Pipeline
 									sort_keys.push(key);
 								}
 								else {
-									const u64 key = ((u64)mesh.sort_key << 32) | ((u64)bucket << 56) | depth_bits;
+									const u64 key = ((u64)mesh.sort_key << 32) | ((u64)bucket << 56) /*| depth_bits*/;
 									sort_keys.push(key);
 								}
 								subrenderables.push(renderables[i]);
@@ -2634,6 +2632,7 @@ struct PipelineImpl final : Pipeline
 				PROFILE_BLOCK("create cmds");
 				CreateCommands* ctx = (CreateCommands*)data;
 				PROFILE_INT("num", ctx->count);
+				Renderer& renderer = ctx->cmd->m_pipeline->m_renderer;
 				const Universe& universe = ctx->cmd->m_pipeline->m_scene->getUniverse();
 				int item_size = int(sizeof(RenderableTypes) + sizeof(Mesh::RenderData*) + sizeof(Material::RenderData*) + sizeof(Vec3) + sizeof(Quat) + sizeof(Vec3) + sizeof(u16) + sizeof(float));
 				item_size = Math::maximum(item_size, int(4 * sizeof(Vec4) + sizeof(bool) + sizeof(int)));
@@ -2662,18 +2661,28 @@ struct PipelineImpl final : Pipeline
 							WRITE_FN(mi->meshes[mesh_idx].material->getRenderData());
 							u16* instance_count = (u16*)out;
 							int start_i = i;
-							out += sizeof(*instance_count);
 							const u64 key = sort_keys[i] & instance_key_mask;
 							while (i < c && (sort_keys[i] & instance_key_mask) == key) {
-								const EntityRef e = {int(renderables[i] & 0x00ffFFff)};
-								const Transform& tr = entity_data[e.index].transform;
-								const Vec3 lpos = (tr.pos - camera_pos).toFloat();
-								WRITE(tr.rot);
-								WRITE(lpos);
-								WRITE(tr.scale);
 								++i;
 							}
-							*instance_count = u16(i - start_i);
+							const u16 count = u16(i - start_i);
+							WRITE(count);
+							const Renderer::TransientSlice slice = renderer.allocTransient(count * sizeof(Vec4) * 2);
+							u8* instance_data = slice.ptr;
+							for (int j = start_i; j < start_i + count; ++j) {
+								const EntityRef e = { int(renderables[j] & 0x00ffFFff) };
+								const Transform& tr = entity_data[e.index].transform;
+								const Vec3 lpos = (tr.pos - camera_pos).toFloat();
+								memcpy(instance_data, &tr.rot, sizeof(tr.rot));
+								instance_data += sizeof(tr.rot);
+								memcpy(instance_data, &lpos, sizeof(lpos));
+								instance_data += sizeof(lpos);
+								memcpy(instance_data, &tr.scale, sizeof(tr.scale));
+								instance_data += sizeof(tr.scale);
+							}
+							WRITE(slice.buffer);
+							WRITE(slice.offset);
+							
 							--i;
 							break;
 						}
@@ -2841,7 +2850,7 @@ struct PipelineImpl final : Pipeline
 				ctx.count = renderables[i].size();
 				ctx.camera_params = m_camera_params;
 				ctx.cmd = this;
-				JobSystem::run(&ctx, &CreateSortKeys::execute, &counter, JobSystem::INVALID_HANDLE, JobSystem::ANY_WORKER);
+				JobSystem::run(&ctx, &CreateSortKeys::execute, &counter);
 			}
 			JobSystem::wait(counter);
 			sort_keys.merge();
@@ -2897,7 +2906,7 @@ struct PipelineImpl final : Pipeline
 					ctx.output = &m_command_sets[bucket]->cmds.emplace(m_allocator);
 					ctx.bucket = bucket;
 					job_offset += step;
-					JobSystem::run(&ctx, &CreateCommands::execute, &counter, JobSystem::INVALID_HANDLE, JobSystem::ANY_WORKER);
+					JobSystem::run(&ctx, &CreateCommands::execute, &counter);
 				}
 				bucket_offset += bucket_size;
 			}

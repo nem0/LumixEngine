@@ -59,7 +59,7 @@ namespace Lumix
 
 static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("model_instance");
 
-enum { TRANSIENT_BUFFER_SIZE = 64 * 1024 * 1024 };
+enum { TRANSIENT_BUFFER_SIZE = 32 * 1024 * 1024 };
 
 
 struct GPUProfiler
@@ -374,7 +374,7 @@ struct RendererImpl final : public Renderer
 		LUMIX_DELETE(m_allocator, m_font_manager);
 
 		JobSystem::SignalHandle signal = JobSystem::INVALID_HANDLE;
-		JobSystem::run(this, [](void* data) {
+		JobSystem::runEx(this, [](void* data) {
 			RendererImpl* renderer = (RendererImpl*)data;
 			ffr::destroy(renderer->m_transient_buffer);
 			renderer->m_profiler.clear();
@@ -401,7 +401,7 @@ struct RendererImpl final : public Renderer
 		}
 
 		JobSystem::SignalHandle signal = JobSystem::INVALID_HANDLE;
-		JobSystem::run(this, [](void* data) {
+		JobSystem::runEx(this, [](void* data) {
 			PROFILE_BLOCK("init_render");
 			RendererImpl& renderer = *(RendererImpl*)data;
 			Engine& engine = renderer.getEngine();
@@ -410,11 +410,12 @@ struct RendererImpl final : public Renderer
 			renderer.m_framebuffer = ffr::createFramebuffer();
 			renderer.m_transient_buffer = ffr::allocBufferHandle();
 			renderer.m_transient_buffer_offset = 0;
+			renderer.m_transient_buffer_frame_offset = 0;
 			const uint transient_flags = (uint)ffr::BufferFlags::PERSISTENT
 				| (uint)ffr::BufferFlags::MAP_WRITE
 				| (uint)ffr::BufferFlags::MAP_FLUSH_EXPLICIT;
-			ffr::createBuffer(renderer.m_transient_buffer, transient_flags, TRANSIENT_BUFFER_SIZE, nullptr);
-			renderer.m_transient_buffer_ptr = (u8*)ffr::map(renderer.m_transient_buffer, 0, TRANSIENT_BUFFER_SIZE, transient_flags);
+			ffr::createBuffer(renderer.m_transient_buffer, transient_flags, 2 * TRANSIENT_BUFFER_SIZE, nullptr);
+			renderer.m_transient_buffer_ptr = (u8*)ffr::map(renderer.m_transient_buffer, 0, 2 * TRANSIENT_BUFFER_SIZE, transient_flags);
 		}, &signal, JobSystem::INVALID_HANDLE, 1);
 		JobSystem::wait(signal);
 
@@ -589,13 +590,21 @@ struct RendererImpl final : public Renderer
 
 	TransientSlice allocTransient(uint size) override
 	{
-		ffr::checkThread();
 		TransientSlice slice;
 		slice.buffer = m_transient_buffer;
-		slice.offset = m_transient_buffer_offset;
-		slice.size = m_transient_buffer_offset + size > TRANSIENT_BUFFER_SIZE ? 0 : size;
-		slice.ptr = slice.size > 0 ? m_transient_buffer_ptr + slice.offset : nullptr;
-		m_transient_buffer_offset += slice.size;
+		slice.offset = MT::atomicAdd(&m_transient_buffer_offset, size);
+		if (slice.offset + size > TRANSIENT_BUFFER_SIZE) {
+			g_log_error.log("Renderer") << "Out of transient memory";
+			ASSERT(false);
+			slice.size = 0;
+			slice.ptr = nullptr;
+			MT::atomicSubtract(&m_transient_buffer_offset, size);
+		}
+		else {
+			slice.size = size;
+			slice.ptr = m_transient_buffer_ptr + slice.offset + m_transient_buffer_frame_offset;
+		}
+		slice.offset += m_transient_buffer_frame_offset;
 		return slice;
 	}
 
@@ -765,23 +774,26 @@ struct RendererImpl final : public Renderer
 
 	void push(RenderJob* cmd) override
 	{
-		ASSERT(!cmd->allocator);
-		cmd->allocator = &m_allocator;
+		ASSERT(!cmd->renderer);
+		cmd->renderer = this;
 		
 		JobSystem::SignalHandle preconditions = m_last_exec_job;
+		JobSystem::incSignal(&m_setup_jobs_done);
 		JobSystem::run(cmd, [](void* data){
 			RenderJob* cmd = (RenderJob*)data;
 			PROFILE_BLOCK("setup_render_job");
 			cmd->setup();
-		}, &preconditions, JobSystem::INVALID_HANDLE, JobSystem::ANY_WORKER);
+			RendererImpl* r = (RendererImpl*)cmd->renderer;
+			JobSystem::decSignal(r->m_setup_jobs_done);
+		}, &preconditions);
 
 		JobSystem::SignalHandle exec_counter = JobSystem::INVALID_HANDLE;
-		JobSystem::run(cmd, [](void* data){
+		JobSystem::runEx(cmd, [](void* data){
 			PROFILE_BLOCK("execute_render_job");
 			Profiler::blockColor(0xaa, 0xff, 0xaa);
 			RenderJob* cmd = (RenderJob*)data;
 			cmd->execute();
-			LUMIX_DELETE(*cmd->allocator, cmd);
+			LUMIX_DELETE(cmd->renderer->getAllocator(), cmd);
 		}, &exec_counter, preconditions, 1);
 
 		m_last_exec_job = exec_counter;
@@ -880,15 +892,15 @@ struct RendererImpl final : public Renderer
 	}
 
 
-	void pushSwapCommand()
+	void frame() override
 	{
+		PROFILE_FUNCTION();
 		struct SwapCmd : RenderJob {
 			void setup() override {}
-			void execute() override { 
+			void execute() override {
 				PROFILE_FUNCTION();
-				ffr::swapBuffers(); 
+				ffr::swapBuffers();
 				renderer->m_profiler.frame();
-				renderer->m_transient_buffer_offset = 0; // TODO this is accessed from different threads
 			}
 			RendererImpl* renderer;
 			bool capture;
@@ -896,16 +908,15 @@ struct RendererImpl final : public Renderer
 		SwapCmd* swap_cmd = LUMIX_NEW(m_allocator, SwapCmd);
 		swap_cmd->renderer = this;
 		push(swap_cmd);
-	}
-
-
-	void frame() override
-	{
-		PROFILE_FUNCTION();
-		pushSwapCommand();
 		JobSystem::wait(m_prev_frame_job);
+		JobSystem::wait(m_setup_jobs_done);
+		m_setup_jobs_done = JobSystem::INVALID_HANDLE;
+
+		m_transient_buffer_frame_offset = (m_transient_buffer_frame_offset + TRANSIENT_BUFFER_SIZE) % (2 * TRANSIENT_BUFFER_SIZE);
+		m_transient_buffer_offset = 0;
+
 		m_prev_frame_job = m_last_exec_job;
-		m_last_exec_job = JobSystem::INVALID_HANDLE;
+		//m_last_exec_job = JobSystem::INVALID_HANDLE;
 	}
 
 
@@ -928,10 +939,12 @@ struct RendererImpl final : public Renderer
 	Pipeline* m_main_pipeline;
 	JobSystem::SignalHandle m_last_exec_job = JobSystem::INVALID_HANDLE;
 	JobSystem::SignalHandle m_prev_frame_job = JobSystem::INVALID_HANDLE;
+	JobSystem::SignalHandle m_setup_jobs_done = JobSystem::INVALID_HANDLE;
 
 	ffr::FramebufferHandle m_framebuffer;
 	ffr::BufferHandle m_transient_buffer;
-	uint m_transient_buffer_offset;
+	i32 m_transient_buffer_offset;
+	i32 m_transient_buffer_frame_offset;
 	u8* m_transient_buffer_ptr = nullptr;
 	GPUProfiler m_profiler;
 };

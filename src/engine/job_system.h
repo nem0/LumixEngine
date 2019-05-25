@@ -22,7 +22,11 @@ constexpr u32 INVALID_HANDLE = 0xffFFffFF;
 LUMIX_ENGINE_API bool init(IAllocator& allocator);
 LUMIX_ENGINE_API void shutdown();
 
-LUMIX_ENGINE_API void run(void* data, void (*task)(void*), SignalHandle* on_finish, SignalHandle precondition, u8 worker_index);
+LUMIX_ENGINE_API void incSignal(SignalHandle* signal);
+LUMIX_ENGINE_API void decSignal(SignalHandle signal);
+
+LUMIX_ENGINE_API void run(void* data, void(*task)(void*), SignalHandle* on_finish);
+LUMIX_ENGINE_API void runEx(void* data, void (*task)(void*), SignalHandle* on_finish, SignalHandle precondition, u8 worker_index);
 LUMIX_ENGINE_API void wait(SignalHandle waitable);
 LUMIX_ENGINE_API inline bool isValid(SignalHandle waitable) { return waitable != INVALID_HANDLE; }
 

@@ -262,7 +262,7 @@ public:
 	{
 		JobSystem::init(m_allocator);
 		JobSystem::SignalHandle finished = JobSystem::INVALID_HANDLE;
-		JobSystem::run(this, [](void* data) {
+		JobSystem::runEx(this, [](void* data) {
 			Lumix::OS::run(*(StudioAppImpl*)data);
 		}, &finished, JobSystem::INVALID_HANDLE, 0);
 		Profiler::setThreadName("Main thread");

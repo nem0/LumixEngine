@@ -239,9 +239,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 					task->run();
 					task->release();
 				},
-				nullptr,
-				JobSystem::INVALID_HANDLE,
-				JobSystem::ANY_WORKER);
+				nullptr);
 		}
 		PxU32 getWorkerCount() const override { return MT::getCPUsCount(); }
 	};
