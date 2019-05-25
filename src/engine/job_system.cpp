@@ -368,7 +368,33 @@ static LUMIX_FORCE_INLINE void runInternal(void* data
 }
 
 
-void run(void* data, void (*task)(void*), SignalHandle* on_finished, SignalHandle precondition, u8 worker_index)
+void incSignal(SignalHandle* signal)
+{
+	ASSERT(signal);
+	MT::CriticalSectionLock lock(g_system->m_sync);
+	
+	if (isValid(*signal) && !isSignalZero(*signal, false)) {
+		++g_system->m_signals_pool[*signal & HANDLE_ID_MASK].value;
+	}
+	else {
+		*signal = allocateSignal();
+	}
+}
+
+
+void decSignal(SignalHandle signal)
+{
+	trigger(signal);
+}
+
+
+void run(void* data, void(*task)(void*), SignalHandle* on_finished)
+{
+	runInternal(data, task, INVALID_HANDLE, true, on_finished, ANY_WORKER);
+}
+
+
+void runEx(void* data, void(*task)(void*), SignalHandle* on_finished, SignalHandle precondition, u8 worker_index)
 {
 	runInternal(data, task, precondition, true, on_finished, worker_index);
 }

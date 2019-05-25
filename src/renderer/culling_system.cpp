@@ -293,7 +293,7 @@ struct CullingSystemImpl final : public CullingSystem
 				PROFILE_BLOCK("copy");
 				Job* j = (Job*)data;
 				memcpy(j->dst, j->src, j->size);
-			}, &job_counter, JobSystem::INVALID_HANDLE, JobSystem::ANY_WORKER);
+			}, &job_counter);
 		}
 		JobSystem::wait(job_counter);
 	}
@@ -402,7 +402,7 @@ struct CullingSystemImpl final : public CullingSystem
 				}
 				job.entity_end_offset = Math::minimum(job.entity_end_offset, (*job.cells_end)->ids.size() - 1);
 				job.frustum = frustum;
-				JobSystem::run(&job, &Job::execute, &counter, JobSystem::INVALID_HANDLE, JobSystem::ANY_WORKER);
+				JobSystem::run(&job, &Job::execute, &counter);
 			}
 			JobSystem::wait(counter);
 		}
