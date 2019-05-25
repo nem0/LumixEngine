@@ -2663,7 +2663,6 @@ struct PipelineImpl final : Pipeline
 							const ModelInstance* LUMIX_RESTRICT mi = &model_instances[e.index];
 							WRITE(mi->meshes[mesh_idx].render_data);
 							WRITE_FN(mi->meshes[mesh_idx].material->getRenderData());
-							u16* instance_count = (u16*)out;
 							int start_i = i;
 							const u64 key = sort_keys[i] & instance_key_mask;
 							while (i < c && (sort_keys[i] & instance_key_mask) == key) {
