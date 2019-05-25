@@ -2495,17 +2495,19 @@ struct PipelineImpl final : Pipeline
 				const Universe::EntityData* entity_data = scene->getUniverse().getEntityData();
 				const DVec3 camera_pos = ctx->camera_params.pos;
 				for (int i = 0, c = ctx->count; i < c; ++i) {
-					const EntityRef e = {int(renderables[i] & 0x00ffFFff)};
+					const u32 r = renderables[i];
+					const EntityRef e = {int(r & 0x00ffFFff)};
 					const DVec3 pos = entity_data[e.index].transform.pos;
-					const float squared_length = float((pos - camera_pos).squaredLength());
 					const ModelInstance& mi = model_instances[e.index];
-					const RenderableTypes type = RenderableTypes(renderables[i] >> 24);
+					const RenderableTypes type = RenderableTypes(r >> 24);
 					switch (type) {
 						case RenderableTypes::MESH: {
 							const Mesh& mesh = mi.meshes[0];
 							const u8 bucket = bucket_map[mesh.layer];
-							const u32 depth_bits = Math::floatFlip(*(u32*)&squared_length);
 							if (bucket < 0xff) {
+								const DVec3 rel_pos = pos - camera_pos;
+								const float squared_length = float(rel_pos.x * rel_pos.x + rel_pos.y * rel_pos.y + rel_pos.z * rel_pos.z);
+								const u32 depth_bits = Math::floatFlip(*(u32*)&squared_length);
 								if(bucket_sort_order[bucket] == SortOrder::DEPTH) {
 									const u64 key = mesh.sort_key | ((u64)bucket << 56) | ((u64)depth_bits << 24);
 									sort_keys.push(key);
@@ -2519,12 +2521,14 @@ struct PipelineImpl final : Pipeline
 							break;
 						}
 						case RenderableTypes::SKINNED:
-						case RenderableTypes::MESH_GROUP:
-							// TODO bucket
-							const LODMeshIndices lod = mi.model->getLODMeshIndices(squared_length);
-							for(int mesh_idx = lod.from; mesh_idx <= lod.to; ++mesh_idx) {
-								sort_keys.push(mi.meshes[mesh_idx].sort_key);
-								subrenderables.push(renderables[i] | ((u64)mesh_idx << 32));
+						case RenderableTypes::MESH_GROUP: {
+								// TODO bucket
+								const float squared_length = float((pos - camera_pos).squaredLength());
+								const LODMeshIndices lod = mi.model->getLODMeshIndices(squared_length);
+								for (int mesh_idx = lod.from; mesh_idx <= lod.to; ++mesh_idx) {
+									sort_keys.push(mi.meshes[mesh_idx].sort_key);
+									subrenderables.push(renderables[i] | ((u64)mesh_idx << 32));
+								}
 							}
 							break;
 						case RenderableTypes::DECAL: {
