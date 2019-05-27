@@ -667,7 +667,22 @@ public:
 			g_log_error.log("Lua Script") << "Property " << prop.name << " has unsupported type";
 		}
 
-		void visit(const Reflection::IEnumProperty& prop) override { notSupported(prop); }
+
+		void visit(const Reflection::IEnumProperty& prop) override { 
+			if (!equalStrings(property_name, prop.name)) return;
+			if (lua_isstring(L, -1)) {
+				const char* str = lua_tostring(L, -1);
+				for (int i = 0, c = prop.getEnumCount(cmp); i < c; ++i) {
+					if (equalStrings(prop.getEnumName(cmp, i), str)) {
+						const int value = prop.getEnumValue(cmp, i);
+						InputBlob input_blob(&value, sizeof(value));
+						prop.setValue(cmp, -1, input_blob);
+					}
+				}
+			}
+		}
+
+
 		void visit(const Reflection::IBlobProperty& prop) override { notSupported(prop); }
 		void visit(const Reflection::ISampledFuncProperty& prop) override { notSupported(prop); }
 
