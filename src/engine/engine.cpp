@@ -664,7 +664,13 @@ public:
 		void visit(const Reflection::IArrayProperty& prop) override
 		{
 			if (!equalStrings(property_name, prop.name)) return;
-			g_log_error.log("Lua Script") << "Property " << prop.name << " has unsupported type";
+			
+			if (lua_istable(L, -1)) {
+				const int count = (int)lua_objlen(L, -1);
+				for (int i = 0; i < count; ++i) {
+					prop.addItem(cmp, prop.getCount(cmp));
+				}
+			}
 		}
 
 

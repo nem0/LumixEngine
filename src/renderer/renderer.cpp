@@ -899,7 +899,9 @@ struct RendererImpl final : public Renderer
 			void setup() override {}
 			void execute() override {
 				PROFILE_FUNCTION();
+				JobSystem::enableBackupWorker(true);
 				ffr::swapBuffers();
+				JobSystem::enableBackupWorker(false);
 				renderer->m_profiler.frame();
 			}
 			RendererImpl* renderer;
