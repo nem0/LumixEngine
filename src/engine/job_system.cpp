@@ -69,6 +69,7 @@ struct System
 		, m_event_outside_job(true)
 		, m_free_queue(allocator)
 		, m_free_fibers(allocator)
+		, m_backup_workers(allocator)
 	{
 		m_signals_pool.resize(4096);
 		m_free_queue.resize(4096);
@@ -88,6 +89,7 @@ struct System
 	MT::Event m_event_outside_job;
 	MT::Event m_work_signal;
 	Array<WorkerTask*> m_workers;
+	Array<WorkerTask*> m_backup_workers;
 	Array<Job> m_job_queue;
 	Array<Signal> m_signals_pool;
 	FiberDecl m_fiber_pool[512];
@@ -110,7 +112,10 @@ struct WorkerTask : MT::Task
 		, m_worker_index(worker_index)
 		, m_job_queue(system.m_allocator)
 		, m_ready_fibers(system.m_allocator)
-	{}
+		, m_enabled(true)
+	{
+		m_enabled.reset();
+	}
 
 
 	Job getReadyJob(System& system)
@@ -191,6 +196,12 @@ struct WorkerTask : MT::Task
 		
 		while (!that->m_finished)
 		{
+			if (that->m_is_backup) {
+				if (!that->m_enabled.poll()) {
+					PROFILE_BLOCK("disabled");
+					that->m_enabled.wait();
+				}
+			}
 			FiberDecl* fiber = that->getReadyFiber(*g_system);
 			if (fiber) {
 				fiber->worker_task = that;
@@ -245,6 +256,9 @@ struct WorkerTask : MT::Task
 	Array<Job> m_job_queue;
 	Array<FiberDecl*> m_ready_fibers;
 	u8 m_worker_index;
+	bool m_is_enabled = false;
+	bool m_is_backup = false;
+	MT::Event m_enabled;
 };
 
 
@@ -368,6 +382,39 @@ static LUMIX_FORCE_INLINE void runInternal(void* data
 }
 
 
+void enableBackupWorker(bool enable)
+{
+	MT::CriticalSectionLock lock(g_system->m_sync);
+
+	for (WorkerTask* task : g_system->m_backup_workers) {
+		if (task->m_is_enabled != enable) {
+			task->m_is_enabled = enable;
+			if (enable) {
+				task->m_enabled.trigger();
+			}
+			else {
+				task->m_enabled.reset();
+			}
+			return;
+		}
+	}
+
+	ASSERT(enable);
+	WorkerTask* task = LUMIX_NEW(g_system->m_allocator, WorkerTask)(*g_system, 0xff);
+	if (task->create("Job system backup")) {
+		g_system->m_backup_workers.push(task);
+		task->m_is_enabled = true;
+		task->m_is_backup = true;
+		task->m_enabled.trigger();
+	}
+	else {
+		g_log_error.log("Engine") << "Job system backup worker failed to initialize.";
+		LUMIX_DELETE(g_system->m_allocator, task);
+	}
+}
+
+
+
 void incSignal(SignalHandle* signal)
 {
 	ASSERT(signal);
@@ -441,6 +488,8 @@ bool init(IAllocator& allocator)
 	for (int i = 0; i < count; ++i) {
 		WorkerTask* task = LUMIX_NEW(allocator, WorkerTask)(*g_system, i < 64 ? u64(1) << i : 0);
 		if (task->create("Job system worker")) {
+			task->m_is_enabled = true;
+			task->m_enabled.trigger();
 			g_system->m_workers.push(task);
 			task->setAffinityMask((u64)1 << i);
 		}
@@ -476,6 +525,19 @@ void shutdown()
 	{
 		WorkerTask* wt = (WorkerTask*)task;
 		wt->m_finished = true;
+	}
+	for (MT::Task* task : g_system->m_backup_workers)
+	{
+		WorkerTask* wt = (WorkerTask*)task;
+		wt->m_finished = true;
+		wt->m_enabled.trigger();
+	}
+
+	for (MT::Task* task : g_system->m_backup_workers)
+	{
+		while (!task->isFinished()) g_system->m_work_signal.trigger();
+		task->destroy();
+		LUMIX_DELETE(allocator, task);
 	}
 
 	for (MT::Task* task : g_system->m_workers)

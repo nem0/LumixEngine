@@ -22,6 +22,8 @@ constexpr u32 INVALID_HANDLE = 0xffFFffFF;
 LUMIX_ENGINE_API bool init(IAllocator& allocator);
 LUMIX_ENGINE_API void shutdown();
 
+LUMIX_ENGINE_API void enableBackupWorker(bool enable);
+
 LUMIX_ENGINE_API void incSignal(SignalHandle* signal);
 LUMIX_ENGINE_API void decSignal(SignalHandle signal);
 
