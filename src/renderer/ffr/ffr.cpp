@@ -771,6 +771,7 @@ static int load_gl(void* device_contex)
 	#define WGL_CONTEXT_FLAGS_ARB 0x2094
 	#define WGL_CONTEXT_PROFILE_MASK_ARB 0x9126
 	#define WGL_CONTEXT_CORE_PROFILE_BIT_ARB 0x00000001
+	#define WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB  0x00000002
 	
 	const int32_t contextAttrs[] = {
 		WGL_CONTEXT_MAJOR_VERSION_ARB, 4,
@@ -778,7 +779,7 @@ static int load_gl(void* device_contex)
 		#ifdef _DEBUG
 			WGL_CONTEXT_FLAGS_ARB, WGL_CONTEXT_DEBUG_BIT_ARB,
 		#endif
-		WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
+		WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB ,
 		0
 	};
 	HGLRC hglrc = wglCreateContextAttribsARB(hdc, 0, contextAttrs);
@@ -1184,7 +1185,26 @@ void drawElements(uint offset, uint count, PrimitiveType primitive_type, DataTyp
 void drawTrianglesInstanced(uint indices_offset, uint indices_count, uint instances_count)
 {
 	checkThread();
-	CHECK_GL(glDrawElementsInstanced(GL_TRIANGLES, indices_count, GL_UNSIGNED_SHORT, (const void*)(intptr_t)indices_offset, instances_count));
+	if (instances_count * indices_count > 4096) {
+		struct {
+			uint  indices_count;
+			uint  instances_count;
+			uint  indices_offset;
+			uint  base_vertex;
+			uint  base_instance;
+		} mdi;
+		mdi.indices_count = indices_count;
+		mdi.instances_count = instances_count;
+		mdi.indices_offset = indices_offset;
+		mdi.base_instance = 0;
+		mdi.base_vertex = 0;
+		// we use glMultiDrawElementsIndirect because of 
+		// https://devtalk.nvidia.com/default/topic/1052728/opengl/extremely-slow-gldrawelementsinstanced-compared-to-gldrawarraysinstanced-/
+		CHECK_GL(glMultiDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_SHORT, &mdi, 1, 0));
+	}
+	else {
+		CHECK_GL(glDrawElementsInstanced(GL_TRIANGLES, indices_count, GL_UNSIGNED_SHORT, (const void*)(intptr_t)indices_offset, instances_count));
+	}
 }
 
 

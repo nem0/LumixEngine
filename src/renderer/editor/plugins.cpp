@@ -2172,13 +2172,13 @@ struct RenderInterfaceImpl final : public RenderInterface
 	}
 
 
-	void getRenderables(Array<EntityRef>& entities, const ShiftedFrustum& frustum) override
+	void getRenderables(Array<EntityRef>& entities, const ShiftedFrustum& frustum, RenderableTypes type) override
 	{
-		Array<Array<u32>> renderables(m_render_scene->getAllocator());
-		m_render_scene->getRenderables(frustum, renderables);
-		for (const Array<u32>& a : renderables) {
-			for (u32 b : a) {
-				entities.push({int(b & 0x00ffFFff)});
+		Array<Array<EntityRef>> renderables(m_render_scene->getAllocator());
+		m_render_scene->getRenderables(frustum, renderables, type);
+		for (const Array<EntityRef>& a : renderables) {
+			for (EntityRef b : a) {
+				entities.push(b);
 			}
 		}
 	}

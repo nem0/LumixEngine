@@ -18,9 +18,8 @@ namespace Lumix
 	class LUMIX_RENDERER_API CullingSystem
 	{
 	public:
-		typedef Array<Sphere> InputSpheres;
-		typedef Array<u32> Subresults; // {type:8, entity:24}
-		typedef Array<Subresults> Results;
+		using Subresults = Array<EntityRef>;
+		using Results = Array<Subresults>;
 
 		CullingSystem() { }
 		virtual ~CullingSystem() { }
@@ -30,7 +29,7 @@ namespace Lumix
 
 		virtual void clear() = 0;
 
-		virtual void cull(const ShiftedFrustum& frustum, Results& result) = 0;
+		virtual void cull(const ShiftedFrustum& frustum, u8 type, Results& result) = 0;
 
 		virtual bool isAdded(EntityRef entity) = 0;
 		virtual void add(EntityRef entity, u8 type, const DVec3& pos, float radius) = 0;

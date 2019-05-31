@@ -2315,16 +2315,18 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	void getRenderables(const ShiftedFrustum& frustum, Array<Array<u32>>& result) const override
+	void getRenderables(const ShiftedFrustum& frustum, Array<Array<EntityRef>>& result, RenderableTypes type) const override
 	{
-		m_culling_system->cull(frustum, result);
-		if (m_is_grass_enabled && !m_terrains.empty()) {
-			if (result.empty()) result.emplace(m_allocator);
-			for (auto* terrain : m_terrains) {
-				const u32 id = ((u32)RenderableTypes::GRASS << 24) | (terrain->m_entity.index & 0xffFFff);
-				result[0].push(id);
-			}
-		}
+		m_culling_system->cull(frustum, static_cast<u8>(type), result);
+
+        if(type == RenderableTypes::GRASS) {
+            if (m_is_grass_enabled && !m_terrains.empty()) {
+			    if (result.empty()) result.emplace(m_allocator);
+			    for (auto* terrain : m_terrains) {
+				    result[0].push(terrain->m_entity);
+			    }
+		    }
+        }
 	}
 
 

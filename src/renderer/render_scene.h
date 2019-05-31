@@ -76,11 +76,11 @@ struct ModelInstance
 	};
 
 	Model* model;
+	Mesh* meshes;
 	Pose* pose;
 	EntityPtr entity;
 	EntityPtr next_model = INVALID_ENTITY;
 	EntityPtr prev_model = INVALID_ENTITY;
-	Mesh* meshes;
 	FlagSet<Flags, u8> flags;
 	u8 mesh_count;
 };
@@ -270,7 +270,7 @@ public:
 	virtual const ModelInstance* getModelInstances() const = 0;
 	virtual Path getModelInstancePath(EntityRef entity) = 0;
 	virtual void setModelInstancePath(EntityRef entity, const Path& path) = 0;
-	virtual void getRenderables(const ShiftedFrustum& frustum, Array<Array<u32>>& result) const = 0;
+	virtual void getRenderables(const ShiftedFrustum& frustum, Array<Array<EntityRef>>& result, RenderableTypes type) const = 0;
 	virtual void getModelInstanceEntities(const ShiftedFrustum& frustum, Array<EntityRef>& entities) = 0;
 	virtual EntityPtr getFirstModelInstance() = 0;
 	virtual EntityPtr getNextModelInstance(EntityPtr entity) = 0;
