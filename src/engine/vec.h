@@ -9,6 +9,7 @@ namespace Lumix
 
 
 struct Vec2;
+struct DVec3;
 
 
 struct LUMIX_ENGINE_API IVec2
@@ -24,6 +25,22 @@ struct LUMIX_ENGINE_API IVec2
 
 	int x;
 	int y;
+};
+
+
+struct LUMIX_ENGINE_API IVec3
+{
+	IVec3() {}
+	explicit inline IVec3(const DVec3& rhs);
+	bool operator==(const IVec3& rhs) const
+	{
+		return x == rhs.x && y == rhs.y && z == rhs.z;
+	}
+	inline DVec3 operator *(double i) const;
+
+	int x;
+	int y;
+    int z;
 };
 
 
@@ -296,6 +313,19 @@ IVec2::IVec2(const Vec2& rhs)
 
 Vec2 IVec2::operator/(const Vec2& rhs) { return {x / rhs.x, y / rhs.y}; }
 
+
+IVec3::IVec3(const DVec3& rhs)
+	: x(int(rhs.x))
+	, y(int(rhs.y))
+	, z(int(rhs.z))
+{
+}
+
+
+DVec3 IVec3::operator *(double i) const
+{
+    return {i * x, i * y, i * z};
+}
 
 
 inline Vec3 operator *(float f, const Vec3& v)

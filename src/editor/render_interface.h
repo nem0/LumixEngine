@@ -13,6 +13,7 @@ namespace Lumix
 {
 
 
+enum class RenderableTypes : u8;
 struct Pose;
 
 
@@ -56,7 +57,7 @@ public:
 	virtual void addText2D(float x, float y, float font_size, u32 color, const char* text) = 0;
 	virtual void addRect2D(const Vec2& a, const Vec2& b, u32 color) = 0;
 	virtual void addRectFilled2D(const Vec2& a, const Vec2& b, u32 color) = 0;
-	virtual void getRenderables(Array<EntityRef>& entities, const ShiftedFrustum& frustum) = 0;
+	virtual void getRenderables(Array<EntityRef>& entities, const ShiftedFrustum& frustum, RenderableTypes type) = 0;
 	virtual ShiftedFrustum getFrustum(EntityRef camera, const Vec2& a, const Vec2& b) = 0;
 };
 
