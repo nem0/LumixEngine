@@ -163,6 +163,7 @@ public:
 		, m_events(m_allocator)
 		, m_fps_timer(nullptr)
 	{
+		JobSystem::init(m_allocator);
 	}
 
 
@@ -260,14 +261,12 @@ public:
 
 	void run() override
 	{
-		JobSystem::init(m_allocator);
 		JobSystem::SignalHandle finished = JobSystem::INVALID_HANDLE;
 		JobSystem::runEx(this, [](void* data) {
 			Lumix::OS::run(*(StudioAppImpl*)data);
 		}, &finished, JobSystem::INVALID_HANDLE, 0);
 		Profiler::setThreadName("Main thread");
 		JobSystem::wait(finished);
-		JobSystem::shutdown();
 	}
 
 
@@ -379,6 +378,7 @@ public:
 		m_editor = nullptr;
 		
 		OS::destroyWindow(m_window);
+		JobSystem::shutdown();
 	}
 
 
