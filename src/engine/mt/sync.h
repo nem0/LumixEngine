@@ -78,6 +78,8 @@ public:
 	void waitTimeout(u32 timeout_ms);
 	bool poll();
 
+	static void waitMultiple(Event& event0, Event& event1, u32 timeout_ms);
+
 private:
 	EventHandle m_id;
 };
