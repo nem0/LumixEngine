@@ -542,6 +542,12 @@ WINBASEAPI BOOL WINAPI ReleaseSemaphore(HANDLE hSemaphore,
 	LONG lReleaseCount,
 	LPLONG lpPreviousCount);
 WINBASEAPI DWORD WINAPI WaitForSingleObject(HANDLE hHandle, DWORD dwMilliseconds);
+WINBASEAPI DWORD WINAPI WaitForMultipleObjects(
+	DWORD nCount,
+	const HANDLE *lpHandles,
+	BOOL bWaitAll,
+	DWORD dwMilliseconds
+);
 WINBASEAPI HANDLE WINAPI CreateMutex(LPSECURITY_ATTRIBUTES lpMutexAttributes,
 	BOOL bInitialOwner,
 	LPCSTR lpName);

@@ -5,6 +5,7 @@
 #include "engine/win/simple_win.h"
 #include <intrin.h>
 
+
 namespace Lumix
 {
 namespace MT
@@ -56,6 +57,13 @@ void Event::trigger()
 {
 	::SetEvent(m_id);
 }
+
+void Event::waitMultiple(Event& event0, Event& event1, u32 timeout_ms)
+{
+	const HANDLE handles[2] = { event0.m_id, event1.m_id };
+	::WaitForMultipleObjects(2, handles, false, timeout_ms);
+}
+
 
 void Event::waitTimeout(u32 timeout_ms)
 {
