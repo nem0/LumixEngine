@@ -1412,7 +1412,7 @@ struct PipelineImpl final : Pipeline
 			lua_getfield(L, -1, "layers");
 			const bool ok = LuaWrapper::forEachArrayItem<const char*>(L, -1, nullptr, [&](const char* layer_name){
 				const int layer = pipeline->m_renderer.getLayerIdx(layer_name);
-				cmd->m_bucket_map[layer].id = i;
+				cmd->m_bucket_map[layer] = i;
 			});
 			lua_pop(L, 1);
 
@@ -1671,7 +1671,7 @@ struct PipelineImpl final : Pipeline
 
 			const bool ok = LuaWrapper::forEachArrayItem<const char*>(L, 6, nullptr, [&](const char* layer_name) {
 				const int layer = pipeline->m_renderer.getLayerIdx(layer_name);
-				cmd->m_bucket_map[layer].id = 0;
+				cmd->m_bucket_map[layer] = 0;
 				});
 			if (!ok) {
 				LUMIX_DELETE(allocator, cmd);
@@ -2419,11 +2419,6 @@ struct PipelineImpl final : Pipeline
 			DEPTH
 		};
 
-        struct Bucket { 
-            u8 id; 
-            SortOrder order; 
-        };
-
 
 		PrepareCommandsRenderJob(IAllocator& allocator) 
 			: m_allocator(allocator)
@@ -2527,11 +2522,12 @@ struct PipelineImpl final : Pipeline
 					        const EntityRef e = renderables[i];
 					        const ModelInstance& mi = model_instances[e.index];
 							const Mesh& mesh = mi.meshes[0];
-							const Bucket bucket = bucket_map[mesh.layer];
-							if (bucket.id < 0xff) {
+							const u8 bucket = bucket_map[mesh.layer];
+							const SortOrder sort_order = bucket_sort_order[bucket];
+							if (bucket < 0xff) {
 								const u64 subrenderable = renderables[i].index | type_mask;
-								if (bucket.order == SortOrder::DEFAULT) {
-									const u64 key = ((u64)mesh.sort_key << 32) | ((u64)bucket.id << 56);
+								if (sort_order == SortOrder::DEFAULT) {
+									const u64 key = ((u64)mesh.sort_key << 32) | ((u64)bucket << 56);
 									sort_keys.push(key, subrenderable);
 								}
 								else {
@@ -2539,7 +2535,7 @@ struct PipelineImpl final : Pipeline
 									const DVec3 rel_pos = pos - camera_pos;
 									const float squared_length = float(rel_pos.x * rel_pos.x + rel_pos.y * rel_pos.y + rel_pos.z * rel_pos.z);
 									const u32 depth_bits = Math::floatFlip(*(u32*)&squared_length);
-									const u64 key = mesh.sort_key | ((u64)bucket.id << 56) | ((u64)depth_bits << 24);
+									const u64 key = mesh.sort_key | ((u64)bucket << 56) | ((u64)depth_bits << 24);
 									sort_keys.push(key, subrenderable);
 								}
 							}
@@ -2679,7 +2675,7 @@ struct PipelineImpl final : Pipeline
 			CameraParams camera_params;
 			EntityRef* renderables;
             RenderableTypes type;
-			PrepareCommandsRenderJob::Bucket local_light_bucket;
+			u8 local_light_bucket;
 			int count;
 			PrepareCommandsRenderJob* cmd;
 		};
@@ -2909,7 +2905,7 @@ struct PipelineImpl final : Pipeline
 			create_sort_keys.reserve(renderables.size());
 			JobSystem::SignalHandle counter = JobSystem::INVALID_HANDLE;
 			const u8 local_light_layer = m_pipeline->m_renderer.getLayerIdx("local_light");
-			const Bucket local_light_bucket = m_bucket_map[local_light_layer];
+			const u8 local_light_bucket = m_bucket_map[local_light_layer];
 			for(int i = 0; i < renderables.size(); ++i) {
 				if (renderables[i].empty()) continue;
 				CreateSortKeys& ctx = create_sort_keys.emplace();
@@ -3004,7 +3000,7 @@ struct PipelineImpl final : Pipeline
 		} m_global_textures[16];
 		int m_global_textures_count = 0;
 		CommandSet* m_command_sets[255];
-        Bucket m_bucket_map[255];
+        u8 m_bucket_map[255];
 		SortOrder m_bucket_sort_order[256] = {};
 		u8 m_bucket_count;
 	};
