@@ -324,6 +324,33 @@ void beginBlock(const char* name)
 }
 
 
+void beginGPUBlock(const char* name, u64 timestamp)
+{
+	#pragma pack(1)
+	struct {
+		StaticString<32> name;
+		u64 timestamp;
+	} data;
+	#pragma pack()
+	data.timestamp = timestamp;
+	data.name = name;
+	write(g_instance.global_context, EventType::BEGIN_GPU_BLOCK, data);
+}
+
+
+void endGPUBlock(u64 timestamp)
+{
+	write(g_instance.global_context, EventType::END_GPU_BLOCK, timestamp);
+}
+
+
+void gpuFrame()
+{
+	write(g_instance.global_context, EventType::GPU_FRAME, (int)0);
+
+}
+
+
 float getLastFrameDuration()
 {
 	return float(g_instance.last_frame_duration / double(frequency()));

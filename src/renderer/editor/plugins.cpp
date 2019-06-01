@@ -2196,135 +2196,6 @@ struct RenderInterfaceImpl final : public RenderInterface
 };
 
 
-struct RenderStatsPlugin final : public StudioApp::GUIPlugin
-{
-	struct ProfileTree
-	{
-		ProfileTree(IAllocator& allocator) : m_nodes(allocator) {}
-
-		struct Node
-		{
-			StaticString<32> name;
-			float times[128];
-			u64 query_time;
-			int parent = -1;
-			int child = -1;
-			int sibling = -1;
-		};
-
-		int getChild(int parent, const char* name)
-		{
-			int tmp = 0;
-			int* child = parent < 0 ? &tmp : &m_nodes[parent].child;
-			if(!m_nodes.empty()) {
-				while(*child >= 0) {
-					Node& n = m_nodes[*child];
-					if(equalStrings(n.name, name)) return *child;
-					child = &n.sibling;
-				}
-			}
-
-			Node& n = m_nodes.emplace();
-			n.name = name;
-			n.parent = parent;
-			*child = m_nodes.size() - 1;
-			return *child;
-		}
-
-		void add(const Array<Renderer::GPUProfilerQuery>& queries)
-		{
-			if (queries.empty()) return;
-
-			for (Node& n : m_nodes) {
-				n.times[m_frame % lengthOf(n.times)] = 0;
-			}
-
-			int current = -1;
-			const int start = queries[0].is_end ? 1 : 0;
-			for(int i = start, c = queries.size() - 1; i < c; ++i) {
-				const Renderer::GPUProfilerQuery& q = queries[i];
-				if(q.is_end) {
-					Node& n = m_nodes[current];
-					const float t = float((q.result - n.query_time) / double(1'000'000));
-					n.times[m_frame % lengthOf(n.times)] += t;
-					current = m_nodes[current].parent;
-					continue;
-				}
-				
-				const int idx = getChild(current, q.name);
-				Node& n = m_nodes[idx];
-				n.query_time = q.result;
-				current = idx;
-			}
-			++m_frame;
-		}
-
-		Array<Node> m_nodes;
-		uint m_frame = 0;
-	};
-
-	explicit RenderStatsPlugin(StudioApp& app)
-		: m_app(app)
-		, m_profile_tree(app.getWorldEditor().getAllocator())
-	{
-		Action* action = LUMIX_NEW(app.getWorldEditor().getAllocator(), Action)(
-			"Render Stats", "Toggle render stats", "render_stats");
-		action->func.bind<RenderStatsPlugin, &RenderStatsPlugin::onAction>(this);
-		action->is_selected.bind<RenderStatsPlugin, &RenderStatsPlugin::isOpen>(this);
-		app.addWindowAction(action);
-	}
-
-
-	const char* getName() const override { return "render_stats"; }
-
-
-	void timingsUI(int idx)
-	{
-		if (idx == -1) return;
-		const ProfileTree::Node& n = m_profile_tree.m_nodes[idx];
-		ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_AllowItemOverlap | ImGuiTreeNodeFlags_OpenOnArrow;
-		if (n.child < 0) flags |= ImGuiTreeNodeFlags_Leaf;
-		const bool open = ImGui::TreeNodeEx(n.name, flags);
-		ImGui::NextColumn();
-		ImGui::Text("%.2f ms", n.times[(m_profile_tree.m_frame - 1) % lengthOf(n.times)]);
-		ImGui::NextColumn();
-		if (open) {
-			timingsUI(n.child);
-			ImGui::TreePop();
-		}
-		timingsUI(n.sibling);
-	}
-
-
-	void onWindowGUI() override
-	{
-		if (!m_is_open) return;
-		if (ImGui::Begin("Renderer Stats", &m_is_open)) {
-			Renderer& renderer = *(Renderer*)m_app.getWorldEditor().getEngine().getPluginManager().getPlugin("renderer");
-			Array<Renderer::GPUProfilerQuery> timings(renderer.getAllocator());
-			renderer.getGPUTimings(&timings);
-			m_profile_tree.add(timings);
-
-			ImGui::Columns(2);
-			if (!timings.empty()) {
-				timingsUI(0);
-			}
-			ImGui::Columns();
-		}
-		ImGui::End();
-	}
-
-
-	bool isOpen() const { return m_is_open; }
-	void onAction() { m_is_open = !m_is_open; }
-
-
-	StudioApp& m_app;
-	ProfileTree m_profile_tree;
-	bool m_is_open = false;
-};
-
-
 struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 {
 	struct RenderCommand : Renderer::RenderJob
@@ -2964,12 +2835,10 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_scene_view = LUMIX_NEW(allocator, SceneView)(m_app);
 		m_game_view = LUMIX_NEW(allocator, GameView)(m_app);
 		m_editor_ui_render_plugin = LUMIX_NEW(allocator, EditorUIRenderPlugin)(m_app, *m_scene_view, *m_game_view);
-		m_render_stats_plugin = LUMIX_NEW(allocator, RenderStatsPlugin)(m_app);
 		m_shader_editor_plugin = LUMIX_NEW(allocator, ShaderEditorPlugin)(m_app);
 		m_app.addPlugin(*m_scene_view);
 		m_app.addPlugin(*m_game_view);
 		m_app.addPlugin(*m_editor_ui_render_plugin);
-		m_app.addPlugin(*m_render_stats_plugin);
 		m_app.addPlugin(*m_shader_editor_plugin);
 
 		m_gizmo_plugin = LUMIX_NEW(allocator, GizmoPlugin)();
@@ -3017,13 +2886,11 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_app.removePlugin(*m_scene_view);
 		m_app.removePlugin(*m_game_view);
 		m_app.removePlugin(*m_editor_ui_render_plugin);
-		m_app.removePlugin(*m_render_stats_plugin);
 		m_app.removePlugin(*m_shader_editor_plugin);
 
 		LUMIX_DELETE(allocator, m_scene_view);
 		LUMIX_DELETE(allocator, m_game_view);
 		LUMIX_DELETE(allocator, m_editor_ui_render_plugin);
-		LUMIX_DELETE(allocator, m_render_stats_plugin);
 		LUMIX_DELETE(allocator, m_shader_editor_plugin);
 
 		m_app.getWorldEditor().removePlugin(*m_gizmo_plugin);
@@ -3045,7 +2912,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	SceneView* m_scene_view;
 	GameView* m_game_view;
 	EditorUIRenderPlugin* m_editor_ui_render_plugin;
-	RenderStatsPlugin* m_render_stats_plugin;
 	ShaderEditorPlugin* m_shader_editor_plugin;
 	GizmoPlugin* m_gizmo_plugin;
 };

@@ -2248,6 +2248,14 @@ QueryHandle createQuery()
 }
 
 
+bool isQueryReady(QueryHandle query)
+{
+	GLuint done;
+	glGetQueryObjectuiv(query.value, GL_QUERY_RESULT_AVAILABLE, &done);
+	return done;
+}
+
+
 u64 getQueryResult(QueryHandle query)
 {
 	u64 time;

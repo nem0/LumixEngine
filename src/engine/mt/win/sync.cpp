@@ -90,6 +90,7 @@ CriticalSection::CriticalSection()
 	InitializeCriticalSectionAndSpinCount(cs, 0x400);
 }
 
+
 CriticalSection::~CriticalSection()
 {
 	CRITICAL_SECTION* cs = (CRITICAL_SECTION*)data;

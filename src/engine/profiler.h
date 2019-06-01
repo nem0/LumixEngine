@@ -86,6 +86,9 @@ enum class EventType : u8
 	END_FIBER_WAIT,
 	CONTEXT_SWITCH,
 	JOB_INFO,
+	BEGIN_GPU_BLOCK,
+	END_GPU_BLOCK,
+	GPU_FRAME
 };
 
 
@@ -112,6 +115,9 @@ LUMIX_ENGINE_API void frame();
 LUMIX_ENGINE_API void recordString(const char* value);
 LUMIX_ENGINE_API void recordInt(const char* key, int value);
 
+LUMIX_ENGINE_API void beginGPUBlock(const char* name, u64 timestamp);
+LUMIX_ENGINE_API void endGPUBlock(u64 timestamp);
+LUMIX_ENGINE_API void gpuFrame();
 
 LUMIX_ENGINE_API void beforeFiberSwitch();
 LUMIX_ENGINE_API int getOpenBlocksSize();
