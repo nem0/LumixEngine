@@ -15,9 +15,9 @@ namespace Lumix
 			virtual float getTimeSinceStart() = 0;
 			virtual float getTimeSinceTick() = 0;
 			virtual u64 getRawTimeSinceStart() = 0;
-			virtual u64 getFrequency() = 0;
 
 			static u64 getRawTimestamp();
+			static u64 getFrequency();
 			static Timer* create(IAllocator& allocator);
 			static void destroy(Timer* timer);
 	};

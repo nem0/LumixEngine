@@ -37,12 +37,6 @@ struct TimerImpl final : public Timer
 	}
 
 
-	u64 getFrequency() override
-	{
-		return m_frequency.QuadPart;
-	}
-
-
 	float getTimeSinceTick() override
 	{
 		LARGE_INTEGER tick;
@@ -65,6 +59,17 @@ struct TimerImpl final : public Timer
 	LARGE_INTEGER m_last_tick;
 	LARGE_INTEGER m_first_tick;
 };
+
+
+u64 Timer::getFrequency()
+{
+	static u64 freq = []() {
+		LARGE_INTEGER f;
+		QueryPerformanceFrequency(&f);
+		return f.QuadPart;
+	}();
+	return freq;
+}
 
 
 u64 Timer::getRawTimestamp()

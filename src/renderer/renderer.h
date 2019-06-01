@@ -44,14 +44,6 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 			Renderer* renderer = nullptr;
 		};
 
-		struct GPUProfilerQuery
-		{
-			StaticString<32> name;
-			ffr::QueryHandle handle;
-			u64 result;
-			bool is_end;
-		};
-
 		struct TransientSlice
 		{
 			ffr::BufferHandle buffer;
@@ -99,7 +91,6 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 		virtual void push(RenderJob* cmd) = 0;
 		virtual ffr::FramebufferHandle getFramebuffer() const = 0;
 
-		virtual bool getGPUTimings(Array<GPUProfilerQuery>* results) = 0;
 		virtual void beginProfileBlock(const char* name) = 0;
 		virtual void endProfileBlock() = 0;
 		virtual void runInRenderThread(void* user_ptr, void (*fnc)(Renderer& renderer, void*)) = 0;

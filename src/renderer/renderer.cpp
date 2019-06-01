@@ -17,6 +17,7 @@
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/string.h"
+#include "engine/timer.h"
 #include "engine/universe/component.h"
 #include "engine/universe/universe.h"
 #include "renderer/draw2d.h"
@@ -62,18 +63,28 @@ static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("m
 enum { TRANSIENT_BUFFER_SIZE = 32 * 1024 * 1024 };
 
 
+
+
 struct GPUProfiler
 {
-	using Query = Renderer::GPUProfilerQuery;
+	struct Query
+	{
+		StaticString<32> name;
+		ffr::QueryHandle handle;
+		u64 result;
+		bool is_end;
+		bool is_frame;
+	};
+
+
+	static constexpr int BUFFER_SIZE = 4096;
+
 
 	GPUProfiler(IAllocator& allocator) 
 		: m_queries(allocator)
 		, m_pool(allocator)
-		, m_history(allocator)
+		, m_gpu_to_cpu_offset(0)
 	{
-		m_history.emplace(allocator);
-		m_history.emplace(allocator);
-		m_history.emplace(allocator);
 	}
 
 
@@ -81,6 +92,30 @@ struct GPUProfiler
 	{
 		ASSERT(m_pool.empty());
 		ASSERT(m_queries.empty());
+	}
+
+
+	u64 toCPUTimestamp(u64 gpu_timestamp) const
+	{
+		return u64(gpu_timestamp * (Timer::getFrequency() / double(1'000'000'000))) + m_gpu_to_cpu_offset;
+	}
+
+
+	void init()
+	{
+		auto tmp = [&]() {
+			ffr::QueryHandle q = ffr::createQuery();
+			ffr::queryTimestamp(q);
+			const u64 cpu_timestamp = Timer::getRawTimestamp();
+			const u64 gpu_timestamp = ffr::getQueryResult(q);
+			m_gpu_to_cpu_offset = cpu_timestamp - u64(gpu_timestamp * (Timer::getFrequency() / double(1'000'000'000)));
+			auto xx = toCPUTimestamp(gpu_timestamp);
+			ffr::destroy(q);
+		};
+		tmp();
+		tmp();
+		tmp();
+		tmp();
 	}
 
 
@@ -106,9 +141,11 @@ struct GPUProfiler
 
 	void beginQuery(const char* name)
 	{
+		MT::CriticalSectionLock lock(m_mutex);
 		Query& q = m_queries.emplace();
 		q.name = name;
 		q.is_end = false;
+		q.is_frame = false;
 		q.handle = allocQuery();
 		ffr::queryTimestamp(q.handle);
 	}
@@ -116,49 +153,50 @@ struct GPUProfiler
 
 	void endQuery()
 	{
+		MT::CriticalSectionLock lock(m_mutex);
 		Query& q = m_queries.emplace();
 		q.is_end = true;
+		q.is_frame = false;
 		q.handle = allocQuery();
 		ffr::queryTimestamp(q.handle);
-	}
-
-
-	bool getResults(Array<Query>* results)
-	{
-		if (m_history_rd == m_history_wr) {
-			return false;
-		}
-		results->clear();
-		results->swap(m_history[m_history_rd % m_history.size()]);
-		MT::atomicIncrement((volatile int*)&m_history_rd);
-		return true;
 	}
 
 
 	void frame()
 	{
 		PROFILE_FUNCTION();
-		for (Query& q : m_queries) {
-			q.result = ffr::getQueryResult(q.handle);
+		MT::CriticalSectionLock lock(m_mutex);
+		Query frame_query;
+		frame_query.is_frame = true;
+		m_queries.push(frame_query);
+		while (!m_queries.empty()) {
+			Query q = m_queries[0];
+			if (q.is_frame) {
+				Profiler::gpuFrame();
+				m_queries.erase(0);
+				continue;
+			}
+			
+			if (!ffr::isQueryReady(q.handle)) break;
+
+			if (q.is_end) {
+				const u64 timestamp = toCPUTimestamp(ffr::getQueryResult(q.handle));
+				Profiler::endGPUBlock(timestamp);
+			}
+			else {
+				const u64 timestamp = toCPUTimestamp(ffr::getQueryResult(q.handle));
+				Profiler::beginGPUBlock(q.name, timestamp);
+			}
 			m_pool.push(q.handle);
+			m_queries.erase(0);
 		}
-		if (m_history_wr < m_history_rd + m_history.size()) {
-			m_history[m_history_wr % m_history.size()].swap(m_queries);
-			MT::atomicIncrement((volatile int*)&m_history_wr);
-		}
-		m_queries.clear();
-		MT::atomicIncrement(&m_frame);
-		++m_frame;
 	}
 
 
-	volatile int m_frame = 0;
-	int m_current = -1;
-	volatile uint m_history_rd = 0;
-	volatile uint m_history_wr = 0;
-	Array<Array<Query>> m_history;
 	Array<Query> m_queries;
 	Array<ffr::QueryHandle> m_pool;
+	MT::CriticalSection m_mutex;
+	i64 m_gpu_to_cpu_offset;
 };
 
 
@@ -416,6 +454,7 @@ struct RendererImpl final : public Renderer
 				| (uint)ffr::BufferFlags::MAP_FLUSH_EXPLICIT;
 			ffr::createBuffer(renderer.m_transient_buffer, transient_flags, 2 * TRANSIENT_BUFFER_SIZE, nullptr);
 			renderer.m_transient_buffer_ptr = (u8*)ffr::map(renderer.m_transient_buffer, 0, 2 * TRANSIENT_BUFFER_SIZE, transient_flags);
+			renderer.m_profiler.init();
 		}, &signal, JobSystem::INVALID_HANDLE, 1);
 		JobSystem::wait(signal);
 
@@ -475,12 +514,6 @@ struct RendererImpl final : public Renderer
 	void endProfileBlock() override
 	{
 		m_profiler.endQuery();
-	}
-
-
-	bool getGPUTimings(Array<GPUProfilerQuery>* results) override
-	{
-		return m_profiler.getResults(results);
 	}
 
 
