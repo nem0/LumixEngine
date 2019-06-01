@@ -997,6 +997,12 @@ void ProfilerUIImpl::onGUICPUProfiler()
 						if (properties[i].level != level) continue;
 
 						switch(properties[i].header.type) {
+							case Profiler::EventType::INT: {
+								Profiler::IntRecord r;
+								read(*ctx, properties[i].offset, (u8*)&r, sizeof(r));
+								ImGui::Text("%s: %d", r.key, r.value);
+								break;
+							}
 							case Profiler::EventType::STRING: {
 								char tmp[128];
 								const int tmp_size = properties[i].header.size - sizeof(properties[i].header);
@@ -1094,6 +1100,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 					ASSERT(false); 
 					/*should be in global context*/ 
 					break;
+				case Profiler::EventType::INT:
 				case Profiler::EventType::STRING: {
 					if (properties_count < lengthOf(properties) && level >= 0) {
 						properties[properties_count].header = header;

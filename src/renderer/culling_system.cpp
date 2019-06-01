@@ -68,7 +68,7 @@ static void doCulling(const Sphere* LUMIX_RESTRICT start,
 	CullingSystem::Subresults& results)
 {
 	PROFILE_FUNCTION();
-	PROFILE_INT("objects", int(end - start));
+	Profiler::recordInt("objects", int(end - start));
 	const float4 px = f4Load(frustum->xs);
 	const float4 py = f4Load(frustum->ys);
 	const float4 pz = f4Load(frustum->zs);
@@ -335,7 +335,7 @@ struct CullingSystemImpl final : public CullingSystem
 		const uint buckets_count = MT::getCPUsCount();
 		while(result.size() < (int)buckets_count) {
             result.emplace(m_allocator);
-            result.back().reserve(100'000);
+            result.back().reserve(256 * 1024);
         }
 
         JobSystem::SignalHandle signal = JobSystem::INVALID_HANDLE;

@@ -600,7 +600,7 @@ void ParticleEmitter::update(float dt)
 	}();
 
 	PROFILE_FUNCTION();
-	PROFILE_INT("particle count", m_particles_count);
+	Profiler::recordInt("particle count", m_particles_count);
 	if (m_particles_count == 0) return;
 
 	m_emit_buffer.clear();
