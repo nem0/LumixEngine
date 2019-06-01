@@ -938,17 +938,12 @@ namespace ImGui
 
 	bool BeginResizablePopup(const char* str_id, const ImVec2& size_on_first_use)
 	{
-		if (GImGui->OpenPopupStack.Size <= GImGui->CurrentPopupStack.Size)
-		{
-			GImGui->NextWindowData.Clear();
-			return false;
-		}
 		ImGuiContext& g = *GImGui;
 		ImGuiWindow* window = g.CurrentWindow;
 		const ImGuiID id = window->GetID(str_id);
 		if (!IsPopupOpen(id))
 		{
-			GImGui->NextWindowData.Clear();
+			GImGui->NextWindowData.ClearFlags();
 			return false;
 		}
 
