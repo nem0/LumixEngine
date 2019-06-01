@@ -2430,7 +2430,7 @@ struct PipelineImpl final : Pipeline
 		void radixSort(u64* _keys, u64* _values, int size)
 		{
 			PROFILE_FUNCTION();
-			PROFILE_INT("count", size);
+			Profiler::recordInt("count", size);
 			if(size == 0) return;
 			// from https://github.com/bkaradzic/bx
 			enum {
@@ -2506,7 +2506,7 @@ struct PipelineImpl final : Pipeline
 			{
 				PROFILE_BLOCK("sort_keys");
 				CreateSortKeys* ctx = (CreateSortKeys*)data;
-				PROFILE_INT("num", ctx->count);
+				Profiler::recordInt("num", ctx->count);
 				const auto* bucket_map = ctx->cmd->m_bucket_map;
 				const SortOrder* bucket_sort_order = ctx->cmd->m_bucket_sort_order;
 				RenderScene* scene = ctx->cmd->m_pipeline->m_scene;
@@ -2699,7 +2699,7 @@ struct PipelineImpl final : Pipeline
 
 				PROFILE_BLOCK("create cmds");
 				CreateCommands* ctx = (CreateCommands*)data;
-				PROFILE_INT("num", ctx->count);
+				Profiler::recordInt("num", ctx->count);
 				Renderer& renderer = ctx->cmd->m_pipeline->m_renderer;
 				const Universe& universe = ctx->cmd->m_pipeline->m_scene->getUniverse();
 				int item_size = int(sizeof(RenderableTypes) + sizeof(Mesh::RenderData*) + sizeof(Material::RenderData*) + sizeof(Vec3) + sizeof(Quat) + sizeof(Vec3) + sizeof(u16) + sizeof(float));

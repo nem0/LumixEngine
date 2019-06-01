@@ -289,6 +289,17 @@ void TraceTask::callback(PEVENT_RECORD event) {
 };
 
 
+void recordInt(const char* key, int value)
+{
+	ThreadContext* ctx = g_instance.getThreadContext();
+	IntRecord r;
+	r.key = key;
+	r.value = value;
+	write(*ctx, EventType::INT, (u8*)&r, sizeof(r));
+}
+
+
+
 void recordString(const char* value)
 {
 	ThreadContext* ctx = g_instance.getThreadContext();

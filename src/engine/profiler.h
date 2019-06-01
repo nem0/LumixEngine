@@ -30,6 +30,13 @@ struct ContextSwitchRecord
 };
 
 
+struct IntRecord
+{
+	const char* key;
+	int value;
+};
+
+
 struct JobRecord
 {
 	u32 signal_on_finish;
@@ -74,6 +81,7 @@ enum class EventType : u8
 	END_BLOCK,
 	FRAME,
 	STRING,
+	INT,
 	BEGIN_FIBER_WAIT,
 	END_FIBER_WAIT,
 	CONTEXT_SWITCH,
@@ -102,6 +110,7 @@ LUMIX_ENGINE_API void endBlock();
 LUMIX_ENGINE_API void pushJobInfo(u32 signal_on_finish, u32 precondition);
 LUMIX_ENGINE_API void frame();
 LUMIX_ENGINE_API void recordString(const char* value);
+LUMIX_ENGINE_API void recordInt(const char* key, int value);
 
 
 LUMIX_ENGINE_API void beforeFiberSwitch();
@@ -125,7 +134,6 @@ struct Scope
 } // namespace Profiler
 
 
-#define PROFILE_INT(...)
 #define PROFILE_FUNCTION() Profiler::Scope profile_scope(__FUNCTION__);
 #define PROFILE_BLOCK(name) Profiler::Scope profile_scope(name);
 
