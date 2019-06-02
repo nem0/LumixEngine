@@ -2181,6 +2181,7 @@ struct PipelineImpl final : Pipeline
 					}
 				}
 				#undef READ
+				Profiler::recordInt("drawcalls", drawcalls_count);
 			}
 
 			u32 m_define_mask = 0;

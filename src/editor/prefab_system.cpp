@@ -273,19 +273,20 @@ public:
 	void link(EntityRef entity, u64 prefab)
 	{
 		ASSERT(prefab != 0);
-		int idx = m_instances.find(prefab);
+		auto iter = m_instances.find(prefab);
 		m_prefabs[entity.index].prev = INVALID_ENTITY;
-		if (idx >= 0)
+		if (iter.isValid())
 		{
-			EntityRef e = m_instances.at(idx);
+			EntityRef e = iter.value();
 			m_prefabs[e.index].prev = entity;
 			m_prefabs[entity.index].next = e;
+			m_instances[prefab] = entity;
 		}
 		else
 		{
 			m_prefabs[entity.index].next = INVALID_ENTITY;
+			m_instances.insert(prefab, entity);
 		}
-		m_instances[prefab] = entity;
 	}
 
 
@@ -346,8 +347,8 @@ public:
 
 	EntityPtr getFirstInstance(u64 prefab) override
 	{
-		int instances_index = m_instances.find(prefab);
-		if (instances_index >= 0) return m_instances.at(instances_index);
+		auto iter = m_instances.find(prefab);
+		if (iter.isValid()) return iter.value();
 		return INVALID_ENTITY;
 	}
 
@@ -627,10 +628,10 @@ public:
 		serializer.write(m_prefabs.size());
 		if(!m_prefabs.empty()) serializer.write(&m_prefabs[0], m_prefabs.size() * sizeof(m_prefabs[0]));
 		serializer.write(m_instances.size());
-		for (int i = 0, c = m_instances.size(); i < c; ++i)
+		for (auto iter = m_instances.begin(), end = m_instances.end(); iter != end; ++iter)
 		{
-			serializer.write(m_instances.getKey(i));
-			serializer.write(m_instances.at(i));
+			serializer.write(iter.key());
+			serializer.write(iter.value());
 		}
 		serializer.write(m_resources.size());
 		for (PrefabResource* res : m_resources)
@@ -678,11 +679,11 @@ public:
 		}
 		serializer.write("resource", "");
 
-		for (int i = 0; i < m_instances.size(); ++i)
+		for (auto iter = m_instances.begin(), end = m_instances.end(); iter != end; ++iter)
 		{
-			u64 prefab = m_instances.getKey(i);
+			u64 prefab = iter.key();
 			if ((prefab & 0xffffFFFF) != prefab) continue;
-			EntityPtr entity = m_instances.at(i);
+			EntityPtr entity = iter.value();
 			while(entity.isValid())
 			{
 				const EntityRef e = (EntityRef)entity;
@@ -741,7 +742,7 @@ private:
 		EntityPtr prev;
 	};
 	Array<EntityPrefab> m_prefabs;
-	AssociativeArray<u64, EntityRef> m_instances;
+	HashMap<u64, EntityRef> m_instances;
 	HashMap<u32, PrefabResource*> m_resources;
 	Universe* m_universe;
 	WorldEditor& m_editor;
