@@ -249,6 +249,7 @@ function main()
 	debugPass(res, shadowmap)
 		
 	if renderGizmos ~= nil then
+		pass(getCameraParams())
 		setRenderTargets(res, gbuffer_depth)
 		clear(CLEAR_DEPTH, 0, 0, 0, 1, 0)
 		renderGizmos()
