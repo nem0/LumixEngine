@@ -48,14 +48,20 @@ static void getMaterialName(const ofbx::Material* material, char (&out)[128])
 }
 
 
-const char* FBXImporter::getImportMeshName(const FBXImporter::ImportMesh& mesh)
+void FBXImporter::getImportMeshName(const ImportMesh& mesh, char (&out)[256])
 {
 	const char* name = mesh.fbx->name;
 	const ofbx::Material* material = mesh.fbx_mat;
 
 	if (name[0] == '\0' && mesh.fbx->getParent()) name = mesh.fbx->getParent()->name;
 	if (name[0] == '\0' && material) name = material->name;
-	return name;
+	copyString(out, name);
+	if(mesh.submesh >= 0) {
+		catString(out, "_");
+		char tmp[32];
+		toCString(mesh.submesh, tmp, lengthOf(tmp));
+		catString(out, tmp);
+	}
 }
 
 
@@ -491,7 +497,8 @@ static int detectMeshLOD(const FBXImporter::ImportMesh& mesh)
 	const char* lod_str = stristr(node_name, "_LOD");
 	if (!lod_str)
 	{
-		const char* mesh_name = FBXImporter::getImportMeshName(mesh);
+		char mesh_name[256];
+		FBXImporter::getImportMeshName(mesh, mesh_name);
 		if (!mesh_name) return 0;
 
 		const char* lod_str = stristr(mesh_name, "_LOD");
@@ -516,11 +523,13 @@ void FBXImporter::gatherMeshes(ofbx::IScene* scene)
 	{
 		const ofbx::Mesh* fbx_mesh = (const ofbx::Mesh*)scene->getMesh(i);
 		if (fbx_mesh->getGeometry()->getVertexCount() == 0) continue;
-		for (int j = 0; j < fbx_mesh->getMaterialCount(); ++j)
+		const int mat_count = fbx_mesh->getMaterialCount();
+		for (int j = 0; j < mat_count; ++j)
 		{
 			ImportMesh& mesh = meshes.emplace(allocator);
 			mesh.fbx = fbx_mesh;
 			mesh.fbx_mat = fbx_mesh->getMaterial(j);
+			mesh.submesh = mat_count > 1 ? j : -1;
 			mesh.lod = detectMeshLOD(mesh);
 			min_lod = Math::minimum(min_lod, mesh.lod);
 		}
@@ -1520,7 +1529,8 @@ void FBXImporter::writeMeshes(const char* mesh_output_filename, const char* src,
 		write(len);
 		write(mat_id.data, len);
 
-		const char* name = getImportMeshName(import_mesh);
+		char name[256];
+		getImportMeshName(import_mesh, name);
 		i32 name_len = (i32)stringLength(name);
 		write(name_len);
 		write(name, stringLength(name));
@@ -1756,7 +1766,9 @@ void FBXImporter::writePrefab(const char* src, const ImportConfig& cfg)
 	serializer.write("version", (u32)PrefabVersion::LAST);
 	const int count = meshes.size();
 	serializer.write("entity_count", count + 1);
-	const u64 prefab = crc32(src);
+	char normalized_tmp[MAX_PATH_LENGTH];
+	PathUtils::normalize(tmp, normalized_tmp, lengthOf(normalized_tmp));
+	const u64 prefab = crc32(normalized_tmp);
 
 	serializer.write("prefab", prefab);
 	serializer.write("parent", INVALID_ENTITY);
@@ -1782,7 +1794,9 @@ void FBXImporter::writePrefab(const char* src, const ImportConfig& cfg)
 		serializer.write(cmp_name, type_hash);
 		serializer.write("scene_version", (int)0);
 		
-		StaticString<MAX_PATH_LENGTH> mesh_path(getImportMeshName(meshes[i]), ":", src);
+		char mesh_name[256];
+		getImportMeshName(meshes[i], mesh_name);
+		StaticString<MAX_PATH_LENGTH> mesh_path(mesh_name, ":", src);
 		serializer.write("source", (const char*)mesh_path);
 		serializer.write("flags", u8(2 /*enabled*/));
 		serializer.write("cmp_end", 0);
@@ -1798,7 +1812,8 @@ void FBXImporter::writeSubmodels(const char* src, const ImportConfig& cfg)
 	postprocessMeshes(cfg);
 
 	for (int i = 0; i < meshes.size(); ++i) {
-		const char* name = getImportMeshName(meshes[i]);
+		char name[256];
+		getImportMeshName(meshes[i], name);
 		StaticString<MAX_PATH_LENGTH> hash_str(name, ":", src);
 		makeLowercase(hash_str.data, stringLength(hash_str), hash_str);
 		const StaticString<MAX_PATH_LENGTH> out_path(cfg.output_dir, crc32(hash_str), ".res");

@@ -121,6 +121,7 @@ struct FBXImporter
 		bool import = true;
 		bool import_physics = false;
 		int lod = 0;
+		int submesh = -1;
 		OutputBlob vertex_data;
 		Array<int> indices;
 		AABB aabb;
@@ -139,7 +140,7 @@ struct FBXImporter
 	void writeTextures(const char* fbx_path, const ImportConfig& cfg);
 
 	const Array<ImportMesh>& getMeshes() const { return meshes; }
-	static const char* FBXImporter::getImportMeshName(const FBXImporter::ImportMesh& mesh);
+	static void getImportMeshName(const ImportMesh& mesh, char (&name)[256]);
 	ofbx::IScene* getOFBXScene() { return scene; }
 
 private:
