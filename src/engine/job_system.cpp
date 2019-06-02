@@ -377,7 +377,7 @@ void enableBackupWorker(bool enable)
 
 	ASSERT(enable);
 	WorkerTask* task = LUMIX_NEW(g_system->m_allocator, WorkerTask)(*g_system, 0xff);
-	if (task->create("Job system backup")) {
+	if (task->create("Backup worker", false)) {
 		g_system->m_backup_workers.push(task);
 		task->m_is_enabled = true;
 		task->m_is_backup = true;
@@ -463,7 +463,7 @@ bool init(IAllocator& allocator)
 	int count = Math::maximum(1, int(MT::getCPUsCount()));
 	for (int i = 0; i < count; ++i) {
 		WorkerTask* task = LUMIX_NEW(allocator, WorkerTask)(*g_system, i < 64 ? u64(1) << i : 0);
-		if (task->create("Job system worker")) {
+		if (task->create("Worker", false)) {
 			task->m_is_enabled = true;
 			task->m_enabled.trigger();
 			g_system->m_workers.push(task);

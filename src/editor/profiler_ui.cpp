@@ -482,6 +482,7 @@ struct ProfilerUIImpl final : public ProfilerUI
 	float m_autopause = -33.3333f;
 	bool m_show_context_switches = false;
 	bool m_gpu_open = false;
+	bool m_show_extended_threads = false;
 	struct {
 		u32 signal;
 		float x, y;
@@ -861,7 +862,6 @@ void ProfilerUIImpl::onGUICPUProfiler()
 		m_paused_time = Timer::getRawTimestamp();
 	}
 
-	ImGui::SameLine();
 	if (ImGui::BeginMenu("Advanced")) {
 		ImGui::Text("Zoom: %f", m_zoom / double(DEFAULT_ZOOM));
 		if (ImGui::MenuItem("Reset zoom")) m_zoom = DEFAULT_ZOOM;
@@ -872,7 +872,9 @@ void ProfilerUIImpl::onGUICPUProfiler()
 		if (m_autopause > 0) {
 			ImGui::InputFloat("Autopause limit (ms)", &m_autopause, 1.f, 10.f, 2);
 		}
-		if (Profiler::contextSwitchesEnabled()) {
+		ImGui::Checkbox("Show all threads", &m_show_extended_threads);
+		if (Profiler::contextSwitchesEnabled())
+		{
 			ImGui::Checkbox("Show context switches", &m_show_context_switches);
 		}
 		else {
@@ -889,7 +891,9 @@ void ProfilerUIImpl::onGUICPUProfiler()
 	const u64 view_start = view_end < m_zoom ? 0 : view_end - m_zoom;
 	float h = 0;
 	for (Profiler::ThreadContext* ctx : contexts) {
-		h += ctx->rows * 20 + 20;
+		if (!ctx->is_extended || m_show_extended_threads) {
+			h += ctx->rows * 20 + 20;
+		}
 	}
 	h += 20; // gpu header
 	if (m_gpu_open) {
@@ -927,6 +931,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 	bool hovered_signal_current_pos = false;
 
 	for (Profiler::ThreadContext* ctx : contexts) {
+		if (ctx->is_extended && !m_show_extended_threads) continue;
 		MT::SpinLock lock(ctx->mutex);
 		threads_records.insert(ctx->thread_id, { y, 0 });
 		renderArrow(ImVec2(a.x, y), ctx->open ? ImGuiDir_Down : ImGuiDir_Right, 1, dl);

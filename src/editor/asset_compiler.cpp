@@ -96,7 +96,7 @@ struct AssetCompilerImpl : AssetCompiler
 	{
 		m_watcher = FileSystemWatcher::create(".", app.getWorldEditor().getAllocator());
 		m_watcher->getCallback().bind<AssetCompilerImpl, &AssetCompilerImpl::onFileChanged>(this);
-		m_task.create("asset compiler");
+		m_task.create("Asset compiler", true);
 		const char* base_path = m_app.getWorldEditor().getEngine().getDiskFileDevice()->getBasePath();
 		StaticString<MAX_PATH_LENGTH> path(base_path, ".lumix/assets");
 		OS::makePath(path);

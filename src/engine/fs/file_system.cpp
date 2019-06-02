@@ -134,7 +134,7 @@ public:
 		m_default_device.m_devices[0] = nullptr;
 		m_save_game_device.m_devices[0] = nullptr;
 		m_task = LUMIX_NEW(m_allocator, FSTask)(&m_transaction_queue, m_allocator);
-		m_task->create("FSTask");
+		m_task->create("Filesystem", true);
 	}
 
 	~FileSystemImpl()
