@@ -20,7 +20,7 @@ public:
 
 	virtual int task() = 0;
 
-	bool create(const char* name);
+	bool create(const char* name, bool is_extended);
 	bool destroy();
 
 	void setAffinityMask(u64 affinity_mask);

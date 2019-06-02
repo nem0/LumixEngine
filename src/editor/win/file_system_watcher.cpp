@@ -70,7 +70,7 @@ public:
 	bool start(LPCSTR path)
 	{
 		m_task = LUMIX_NEW(m_allocator, FileSystemWatcherTask)(path, *this, m_allocator);
-		if (!m_task->create("FileSystemWatcher"))
+		if (!m_task->create("Filesystem watcher", true))
 		{
 			LUMIX_DELETE(m_allocator, m_task);
 			m_task = nullptr;

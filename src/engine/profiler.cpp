@@ -118,7 +118,7 @@ static struct Instance
 		trace.ProcessTraceMode = PROCESS_TRACE_MODE_RAW_TIMESTAMP | PROCESS_TRACE_MODE_REAL_TIME | PROCESS_TRACE_MODE_EVENT_RECORD | PROCESS_TRACE_MODE_RAW_TIMESTAMP;
 		trace.EventRecordCallback = TraceTask::callback;
 		g_instance.trace_task.open_handle = OpenTrace(&trace);
-		g_instance.trace_task.create("profiler_trace_task");
+		g_instance.trace_task.create("Profiler trace", true);
 	}
 
 
@@ -453,12 +453,13 @@ void frame()
 }
 
 
-void setThreadName(const char* name)
+void setThreadName(const char* name, bool is_extended)
 {
 	ThreadContext* ctx = g_instance.getThreadContext();
 	MT::SpinLock lock(ctx->mutex);
 
 	ctx->name = name;
+	ctx->is_extended = is_extended;
 }
 
 
