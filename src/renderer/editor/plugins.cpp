@@ -521,7 +521,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			m_fbx_importer.setSource(path[0] == '/' ? path + 1 : path);
 			const Array<FBXImporter::ImportMesh>& meshes = m_fbx_importer.getMeshes();
 			for (int i = 0; i < meshes.size(); ++i) {
-				const char* mesh_name = m_fbx_importer.getImportMeshName(meshes[i]);
+				char mesh_name[256];
+				m_fbx_importer.getImportMeshName(meshes[i], mesh_name);
 				StaticString<MAX_PATH_LENGTH> tmp(mesh_name, ":", (path[0] == '/' ? path + 1: path));
 				Path subpath_obj(tmp);
 				if (iter.value().indexOf(subpath_obj) < 0) iter.value().push(subpath_obj);
