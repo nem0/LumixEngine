@@ -1,4 +1,4 @@
-local ide_dir = iif(_ACTION == nil, "vs2017", _ACTION)
+local ide_dir = iif(_ACTION == nil, "vs2019", _ACTION)
 if "linux-gcc" == _OPTIONS["gcc"] then
 	ide_dir = "gcc"
 elseif "linux-gcc-5" == _OPTIONS["gcc"] then
@@ -6,6 +6,7 @@ elseif "linux-gcc-5" == _OPTIONS["gcc"] then
 elseif "linux-clang" == _OPTIONS["gcc"] then
 	ide_dir = "clang"
 end
+local binary_api_dir = iif(ide_dir == "vs2019", "vs2017", ide_dir)
 
 local LOCATION = "tmp/" .. ide_dir
 local BINARY_DIR = LOCATION .. "/bin/"
@@ -156,7 +157,7 @@ if _OPTIONS["no-lua-script"] == nil then
 	table.insert(plugins, "lua_script")
 end
 
-if _OPTIONS["no-gui"] == nil or _ACTION ~= "vs2017" then
+if _OPTIONS["no-gui"] == nil or _ACTION ~= "vs2019" then
 	table.insert(plugins, "gui")
 end
 
@@ -228,7 +229,7 @@ newaction {
 	trigger = "install",
 	description = "Install in ../../LumixEngine_data/bin",
 	execute = function()
-		local src_dir = "tmp/vs2017/bin/RelWithDebInfo/"
+		local src_dir = "tmp/vs209/bin/RelWithDebInfo/"
 		local dst_dir = "../../LumixEngine_data/bin/"
 		
 		function installDll(filename)
@@ -292,8 +293,8 @@ function linkLib(lib)
 	for conf,conf_dir in pairs({Debug="debug", RelWithDebInfo="release"}) do
 		for platform,target_platform in pairs({win="windows", linux="linux", }) do
 			configuration { "x64", conf, target_platform }
-				libdirs {"../external/" .. lib .. "/lib/" .. platform .. "64" .. "_" .. ide_dir .. "/" .. conf_dir}
-				libdirs {"../external/" .. lib .. "/dll/" .. platform .. "64" .. "_" .. ide_dir .. "/" .. conf_dir}
+				libdirs {"../external/" .. lib .. "/lib/" .. platform .. "64" .. "_" .. binary_api_dir .. "/" .. conf_dir}
+				libdirs {"../external/" .. lib .. "/dll/" .. platform .. "64" .. "_" .. binary_api_dir .. "/" .. conf_dir}
 		end
 	end
 	configuration {}
@@ -317,10 +318,10 @@ function copyDlls(src_dir, platform_dir, dest_dir)
 	physx_suffix = "64"
 
 	postbuildcommands {
-		"xcopy /Y \"$(SolutionDir)../../../external/physx/dll/" .. ide_dir .. "/" .. platform_dir .. "\\" .. src_dir .. "\\PhysXCommon_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
-		"xcopy /Y \"$(SolutionDir)../../../external/physx/dll/" .. ide_dir .. "/" .. platform_dir .. "\\" .. src_dir .. "\\PhysXCooking_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
-		"xcopy /Y \"$(SolutionDir)../../../external/physx/dll/" .. ide_dir .. "/" .. platform_dir .. "\\" .. src_dir .. "\\PhysXFoundation_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
-		"xcopy /Y \"$(SolutionDir)../../../external/physx/dll/" .. ide_dir .. "/" .. platform_dir .. "\\" .. src_dir .. "\\PhysX_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
+		"xcopy /Y \"$(SolutionDir)../../../external/physx/dll/" .. binary_api_dir .. "/" .. platform_dir .. "\\" .. src_dir .. "\\PhysXCommon_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
+		"xcopy /Y \"$(SolutionDir)../../../external/physx/dll/" .. binary_api_dir .. "/" .. platform_dir .. "\\" .. src_dir .. "\\PhysXCooking_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
+		"xcopy /Y \"$(SolutionDir)../../../external/physx/dll/" .. binary_api_dir .. "/" .. platform_dir .. "\\" .. src_dir .. "\\PhysXFoundation_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
+		"xcopy /Y \"$(SolutionDir)../../../external/physx/dll/" .. binary_api_dir .. "/" .. platform_dir .. "\\" .. src_dir .. "\\PhysX_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
 		[[xcopy /Y "$(SolutionDir)..\..\..\external\dbghelp\dbghelp.dll" "$(SolutionDir)bin\]] .. dest_dir .. "\"",
 		[[xcopy /Y "$(SolutionDir)..\..\..\external\dbghelp\dbgcore.dll" "$(SolutionDir)bin\]] .. dest_dir .. "\""
 	}
@@ -356,10 +357,10 @@ function linkPhysX()
 			}
 
 		configuration { "Debug" }
-			libdirs {"../external/physx/lib/" .. ide_dir .. "/win64/debug"}
+			libdirs {"../external/physx/lib/" .. binary_api_dir .. "/win64/debug"}
 
 		configuration { "RelWithDebInfo" }
-			libdirs {"../external/physx/lib/" .. ide_dir .. "/win64/release"}
+			libdirs {"../external/physx/lib/" .. binary_api_dir .. "/win64/release"}
 
 		configuration {}
 			defines {"PX_PHYSX_CHARACTER_STATIC_LIB"}
@@ -919,7 +920,7 @@ if build_studio then
 		useLua()
 		defaultConfigurations()
 		
-		if _ACTION == "vs2017" then
+		if _ACTION == "vs2019" then
 			copyDlls("Debug", "win64", "Debug")
 			copyDlls("Release", "win64", "RelWithDebInfo")
 		end
