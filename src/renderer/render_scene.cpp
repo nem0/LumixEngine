@@ -1424,7 +1424,7 @@ public:
 
 	void deserializeModelInstances(InputBlob& serializer)
 	{
-        i32 size = 0;
+		i32 size = 0;
 		serializer.read(size);
 		m_model_instances.reserve(size);
 		for (int i = 0; i < size; ++i)
@@ -2318,17 +2318,17 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	CullResult* getRenderables(const ShiftedFrustum& frustum, RenderableTypes type) const override
 	{
 		CullResult* result = m_culling_system->cull(frustum, static_cast<u8>(type));
-        // TODO
-        //ASSERT(false);
-        return result;
-        /*if(type == RenderableTypes::GRASS) {
-            if (m_is_grass_enabled && !m_terrains.empty()) {
-			    if (result.empty()) result.emplace(m_allocator);
-			    for (auto* terrain : m_terrains) {
-				    result[0].push(terrain->m_entity);
-			    }
-		    }
-        }*/
+		// TODO
+		//ASSERT(false);
+		return result;
+		/*if(type == RenderableTypes::GRASS) {
+			if (m_is_grass_enabled && !m_terrains.empty()) {
+				if (result.empty()) result.emplace(m_allocator);
+				for (auto* terrain : m_terrains) {
+					result[0].push(terrain->m_entity);
+				}
+			}
+		}*/
 	}
 
 

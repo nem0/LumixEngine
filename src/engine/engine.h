@@ -57,7 +57,7 @@ public:
 	virtual PluginManager& getPluginManager() = 0;
 	virtual ResourceManagerHub& getResourceManager() = 0;
 	virtual IAllocator& getAllocator() = 0;
-    virtual PageAllocator& getPageAllocator() = 0;
+	virtual PageAllocator& getPageAllocator() = 0;
 
 	virtual void startGame(Universe& context) = 0;
 	virtual void stopGame(Universe& context) = 0;

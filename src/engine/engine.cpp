@@ -1592,7 +1592,7 @@ public:
 
 private:
 	IAllocator& m_allocator;
-    PageAllocator m_page_allocator;
+	PageAllocator m_page_allocator;
 
 	FS::FileSystem* m_file_system;
 	FS::MemoryFileDevice* m_mem_file_device;
