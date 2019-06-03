@@ -37,13 +37,13 @@ LUMIX_ENGINE_API inline bool isValid(SignalHandle waitable) { return waitable !=
 template <typename F>
 void runAsJobs(F& f)
 {
-    SignalHandle signal = JobSystem::INVALID_HANDLE;
-    for(int i = 0, c = getWorkersCount(); i < c; ++i) {
-        JobSystem::run(&f, [](void* data){
-            (*(F*)data)();
-        }, &signal);
-    }
-    wait(signal);
+	SignalHandle signal = JobSystem::INVALID_HANDLE;
+	for(int i = 0, c = getWorkersCount(); i < c; ++i) {
+		JobSystem::run(&f, [](void* data){
+			(*(F*)data)();
+		}, &signal);
+	}
+	wait(signal);
 }
 
 

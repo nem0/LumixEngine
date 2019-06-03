@@ -82,7 +82,7 @@ struct MTBucketArray
 	}; 
 
 	struct Bucket {
-        T* keys;
+		T* keys;
 		T* values;
 
 		int count = 0;
@@ -124,7 +124,7 @@ struct MTBucketArray
 		Bucket b;
 		b.array = this;
 		
-        // TODO get rid of mutex, atomics should be enough
+		// TODO get rid of mutex, atomics should be enough
 		m_mutex.enter();
 		m_counts.emplace();
 		b.values = (T*)m_values_end;
@@ -972,7 +972,7 @@ struct PipelineImpl final : Pipeline
 		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
 
 		const CameraParams cp = checkCameraParams(L, 1);
- 		
+		
 		IAllocator& allocator = pipeline->m_renderer.getAllocator();
 		RenderTerrainsCommand* cmd = LUMIX_NEW(allocator, RenderTerrainsCommand)(allocator);
 
@@ -2724,75 +2724,75 @@ struct PipelineImpl final : Pipeline
 
 		void createSortKeys(const CullResult* renderables, RenderableTypes type, MTBucketArray<u64>& sort_keys)
 		{
-            const u8 local_light_layer = m_pipeline->m_renderer.getLayerIdx("local_light");
+			const u8 local_light_layer = m_pipeline->m_renderer.getLayerIdx("local_light");
 			const u8 local_light_bucket = m_bucket_map[local_light_layer];
 			PagedListIterator<const CullResult> iterator(renderables);
 
-            JobSystem::runAsJobs([&](){
+			JobSystem::runAsJobs([&](){
 				PROFILE_BLOCK("sort_keys");
-                int total = 0;
+				int total = 0;
 				const auto* bucket_map = m_bucket_map;
 				const SortOrder* bucket_sort_order = m_bucket_sort_order;
 				RenderScene* scene = m_pipeline->m_scene;
 				const ModelInstance* LUMIX_RESTRICT model_instances = scene->getModelInstances();
-                MTBucketArray<u64>::Bucket result = sort_keys.begin();
+				MTBucketArray<u64>::Bucket result = sort_keys.begin();
 				const Universe::EntityData* LUMIX_RESTRICT entity_data = scene->getUniverse().getEntityData();
 				const DVec3 camera_pos = m_camera_params.pos;
-                const u64 type_mask = (u64)type << 32;
+				const u64 type_mask = (u64)type << 32;
 				
-                for(;;) {
-                    const CullResult* page = iterator.next();
-                    if(!page) break;
-                    total += page->header.count;
-                    const EntityRef* LUMIX_RESTRICT renderables = page->entities;
-                    switch(type) {
-					    case RenderableTypes::MESH: {
-                            for (int i = 0, c = page->header.count; i < c; ++i) {
-					            const EntityRef e = renderables[i];
-					            const ModelInstance& mi = model_instances[e.index];
-							    const Mesh& mesh = mi.meshes[0];
-							    const u8 bucket = bucket_map[mesh.layer];
-							    const SortOrder sort_order = bucket_sort_order[bucket];
-							    if (bucket < 0xff) {
-								    const u64 subrenderable = e.index | type_mask;
-								    if (sort_order == SortOrder::DEFAULT) {
-									    const u64 key = ((u64)mesh.sort_key << 32) | ((u64)bucket << 56);
-									    result.push(key, subrenderable);
-								    }
-								    else {
-									    const DVec3 pos = entity_data[e.index].transform.pos;
-									    const DVec3 rel_pos = pos - camera_pos;
-									    const float squared_length = float(rel_pos.x * rel_pos.x + rel_pos.y * rel_pos.y + rel_pos.z * rel_pos.z);
-									    const u32 depth_bits = Math::floatFlip(*(u32*)&squared_length);
-									    const u64 key = mesh.sort_key | ((u64)bucket << 56) | ((u64)depth_bits << 24);
-									    result.push(key, subrenderable);
-								    }
-							    }
-                            }
-                            break;
-                        }
-                        case RenderableTypes::SKINNED:
-					    case RenderableTypes::MESH_GROUP: {
-                            for (int i = 0, c = page->header.count; i < c; ++i) {
-					            const EntityRef e = renderables[i];
-					            const DVec3 pos = entity_data[e.index].transform.pos;
-					            const ModelInstance& mi = model_instances[e.index];
-							    const float squared_length = float((pos - camera_pos).squaredLength());
-							    const LODMeshIndices lod = mi.model->getLODMeshIndices(squared_length);
-							    for (int mesh_idx = lod.from; mesh_idx <= lod.to; ++mesh_idx) {
-							        // TODO bucket
-                                    // TODO type
-                                    ASSERT(false);
-                                    result.push(mi.meshes[mesh_idx].sort_key, e.index | type_mask | ((u64)mesh_idx << 40));
-							    }
-						    }
-					        break;
-                        }
-                    }
-                }
+				for(;;) {
+					const CullResult* page = iterator.next();
+					if(!page) break;
+					total += page->header.count;
+					const EntityRef* LUMIX_RESTRICT renderables = page->entities;
+					switch(type) {
+						case RenderableTypes::MESH: {
+							for (int i = 0, c = page->header.count; i < c; ++i) {
+								const EntityRef e = renderables[i];
+								const ModelInstance& mi = model_instances[e.index];
+								const Mesh& mesh = mi.meshes[0];
+								const u8 bucket = bucket_map[mesh.layer];
+								const SortOrder sort_order = bucket_sort_order[bucket];
+								if (bucket < 0xff) {
+									const u64 subrenderable = e.index | type_mask;
+									if (sort_order == SortOrder::DEFAULT) {
+										const u64 key = ((u64)mesh.sort_key << 32) | ((u64)bucket << 56);
+										result.push(key, subrenderable);
+									}
+									else {
+										const DVec3 pos = entity_data[e.index].transform.pos;
+										const DVec3 rel_pos = pos - camera_pos;
+										const float squared_length = float(rel_pos.x * rel_pos.x + rel_pos.y * rel_pos.y + rel_pos.z * rel_pos.z);
+										const u32 depth_bits = Math::floatFlip(*(u32*)&squared_length);
+										const u64 key = mesh.sort_key | ((u64)bucket << 56) | ((u64)depth_bits << 24);
+										result.push(key, subrenderable);
+									}
+								}
+							}
+							break;
+						}
+						case RenderableTypes::SKINNED:
+						case RenderableTypes::MESH_GROUP: {
+							for (int i = 0, c = page->header.count; i < c; ++i) {
+								const EntityRef e = renderables[i];
+								const DVec3 pos = entity_data[e.index].transform.pos;
+								const ModelInstance& mi = model_instances[e.index];
+								const float squared_length = float((pos - camera_pos).squaredLength());
+								const LODMeshIndices lod = mi.model->getLODMeshIndices(squared_length);
+								for (int mesh_idx = lod.from; mesh_idx <= lod.to; ++mesh_idx) {
+									// TODO bucket
+									// TODO type
+									ASSERT(false);
+									result.push(mi.meshes[mesh_idx].sort_key, e.index | type_mask | ((u64)mesh_idx << 40));
+								}
+							}
+							break;
+						}
+					}
+				}
 				result.end();
-                Profiler::recordInt("count", total);
-            });
+				Profiler::recordInt("count", total);
+			});
 		}
 
 
@@ -2806,20 +2806,20 @@ struct PipelineImpl final : Pipeline
 
 			MTBucketArray<u64> sort_keys(m_allocator);
 
-            const RenderableTypes types[] = {
-                RenderableTypes::MESH,
-                RenderableTypes::MESH_GROUP,
-                RenderableTypes::SKINNED,
-                RenderableTypes::DECAL,
-                RenderableTypes::GRASS,
-                RenderableTypes::LOCAL_LIGHT
-            };
-            for(RenderableTypes type : types) {
-                CullResult* renderables = scene->getRenderables(m_camera_params.frustum, type);
-                createSortKeys(renderables, type, sort_keys);
-                renderables->free(m_pipeline->m_renderer.getEngine().getPageAllocator());
-            }
-            sort_keys.merge();
+			const RenderableTypes types[] = {
+				RenderableTypes::MESH,
+				RenderableTypes::MESH_GROUP,
+				RenderableTypes::SKINNED,
+				RenderableTypes::DECAL,
+				RenderableTypes::GRASS,
+				RenderableTypes::LOCAL_LIGHT
+			};
+			for(RenderableTypes type : types) {
+				CullResult* renderables = scene->getRenderables(m_camera_params.frustum, type);
+				createSortKeys(renderables, type, sort_keys);
+				renderables->free(m_pipeline->m_renderer.getEngine().getPageAllocator());
+			}
+			sort_keys.merge();
 
 			if (sort_keys.size() > 0) {
 				radixSort(sort_keys.key_ptr(), sort_keys.value_ptr(), sort_keys.size());
@@ -2873,7 +2873,7 @@ struct PipelineImpl final : Pipeline
 		} m_global_textures[16];
 		int m_global_textures_count = 0;
 		CommandSet* m_command_sets[255];
-        u8 m_bucket_map[255];
+		u8 m_bucket_map[255];
 		SortOrder m_bucket_sort_order[256] = {};
 		u8 m_bucket_count;
 	};

@@ -10,20 +10,20 @@ namespace Lumix
 	struct DVec3;
 	struct Frustum;
 	struct IAllocator;
-    class PageAllocator;
+	class PageAllocator;
 	struct ShiftedFrustum;
 	struct Sphere;
 	struct Vec3;
 
-    struct CullResult {
-        void free(PageAllocator& allocator);
-        
-        struct {
-            CullResult* next = nullptr;
-            int count = 0;
-        } header;
-        EntityRef entities[(16384 - sizeof(header)) / sizeof(EntityRef)];
-    };
+	struct CullResult {
+		void free(PageAllocator& allocator);
+		
+		struct {
+			CullResult* next = nullptr;
+			int count = 0;
+		} header;
+		EntityRef entities[(16384 - sizeof(header)) / sizeof(EntityRef)];
+	};
 
 	class LUMIX_RENDERER_API CullingSystem
 	{
