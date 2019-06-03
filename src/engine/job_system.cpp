@@ -492,6 +492,12 @@ bool init(IAllocator& allocator)
 }
 
 
+int getWorkersCount()
+{
+    return g_system->m_workers.size();
+}
+
+
 void shutdown()
 {
 	if (!g_system) return;
