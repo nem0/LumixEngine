@@ -20,6 +20,7 @@ class InputBlob;
 struct IAllocator;
 class InputSystem;
 class OutputBlob;
+class PageAllocator;
 class Path;
 class PathManager;
 class PluginManager;
@@ -56,6 +57,7 @@ public:
 	virtual PluginManager& getPluginManager() = 0;
 	virtual ResourceManagerHub& getResourceManager() = 0;
 	virtual IAllocator& getAllocator() = 0;
+    virtual PageAllocator& getPageAllocator() = 0;
 
 	virtual void startGame(Universe& context) = 0;
 	virtual void stopGame(Universe& context) = 0;

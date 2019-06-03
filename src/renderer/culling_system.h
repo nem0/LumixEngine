@@ -10,26 +10,34 @@ namespace Lumix
 	struct DVec3;
 	struct Frustum;
 	struct IAllocator;
+    class PageAllocator;
 	struct ShiftedFrustum;
 	struct Sphere;
 	struct Vec3;
 
+    struct CullResult {
+        void free(PageAllocator& allocator);
+        
+        struct {
+            CullResult* next = nullptr;
+            int count = 0;
+        } header;
+        EntityRef entities[(16384 - sizeof(header)) / sizeof(EntityRef)];
+    };
 
 	class LUMIX_RENDERER_API CullingSystem
 	{
 	public:
-		using Subresults = Array<EntityRef>;
-		using Results = Array<Subresults>;
 
 		CullingSystem() { }
 		virtual ~CullingSystem() { }
 
-		static CullingSystem* create(IAllocator& allocator);
+		static CullingSystem* create(IAllocator& allocator, PageAllocator& page_allocator);
 		static void destroy(CullingSystem& culling_system);
 
 		virtual void clear() = 0;
 
-		virtual void cull(const ShiftedFrustum& frustum, u8 type, Results& result) = 0;
+		virtual CullResult* cull(const ShiftedFrustum& frustum, u8 type) = 0;
 
 		virtual bool isAdded(EntityRef entity) = 0;
 		virtual void add(EntityRef entity, u8 type, const DVec3& pos, float radius) = 0;

@@ -13,6 +13,7 @@
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
 #include "engine/math_utils.h"
+#include "engine/page_allocator.h"
 #include "engine/path.h"
 #include "engine/plugin_manager.h"
 #include "engine/prefab.h"
@@ -1232,6 +1233,7 @@ public:
 
 
 	IAllocator& getAllocator() override { return m_allocator; }
+	PageAllocator& getPageAllocator() override { return m_page_allocator; }
 
 
 	const char* getWorkingDirectory() const override { return m_working_dir; }
@@ -1590,6 +1592,7 @@ public:
 
 private:
 	IAllocator& m_allocator;
+    PageAllocator m_page_allocator;
 
 	FS::FileSystem* m_file_system;
 	FS::MemoryFileDevice* m_mem_file_device;

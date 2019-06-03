@@ -21,6 +21,7 @@ constexpr u32 INVALID_HANDLE = 0xffFFffFF;
 
 LUMIX_ENGINE_API bool init(IAllocator& allocator);
 LUMIX_ENGINE_API void shutdown();
+LUMIX_ENGINE_API int getWorkersCount();
 
 LUMIX_ENGINE_API void enableBackupWorker(bool enable);
 
@@ -31,6 +32,19 @@ LUMIX_ENGINE_API void run(void* data, void(*task)(void*), SignalHandle* on_finis
 LUMIX_ENGINE_API void runEx(void* data, void (*task)(void*), SignalHandle* on_finish, SignalHandle precondition, u8 worker_index);
 LUMIX_ENGINE_API void wait(SignalHandle waitable);
 LUMIX_ENGINE_API inline bool isValid(SignalHandle waitable) { return waitable != INVALID_HANDLE; }
+
+
+template <typename F>
+void runAsJobs(F& f)
+{
+    SignalHandle signal = JobSystem::INVALID_HANDLE;
+    for(int i = 0, c = getWorkersCount(); i < c; ++i) {
+        JobSystem::run(&f, [](void* data){
+            (*(F*)data)();
+        }, &signal);
+    }
+    wait(signal);
+}
 
 
 } // namespace JobSystem

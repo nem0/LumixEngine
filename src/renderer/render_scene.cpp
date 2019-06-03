@@ -2315,18 +2315,20 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	void getRenderables(const ShiftedFrustum& frustum, Array<Array<EntityRef>>& result, RenderableTypes type) const override
+	CullResult* getRenderables(const ShiftedFrustum& frustum, RenderableTypes type) const override
 	{
-		m_culling_system->cull(frustum, static_cast<u8>(type), result);
-
-        if(type == RenderableTypes::GRASS) {
+		CullResult* result = m_culling_system->cull(frustum, static_cast<u8>(type));
+        // TODO
+        //ASSERT(false);
+        return result;
+        /*if(type == RenderableTypes::GRASS) {
             if (m_is_grass_enabled && !m_terrains.empty()) {
 			    if (result.empty()) result.emplace(m_allocator);
 			    for (auto* terrain : m_terrains) {
 				    result[0].push(terrain->m_entity);
 			    }
 		    }
-        }
+        }*/
 	}
 
 
@@ -3739,7 +3741,7 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 {
 	m_universe.entityTransformed().bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
 	m_universe.entityDestroyed().bind<RenderSceneImpl, &RenderSceneImpl::onEntityDestroyed>(this);
-	m_culling_system = CullingSystem::create(m_allocator);
+	m_culling_system = CullingSystem::create(m_allocator, engine.getPageAllocator());
 	m_model_instances.reserve(5000);
 
 	MaterialManager& manager = m_renderer.getMaterialManager();

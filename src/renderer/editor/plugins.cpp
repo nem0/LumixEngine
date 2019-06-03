@@ -30,6 +30,7 @@
 #include "fbx_importer.h"
 #include "game_view.h"
 #include "renderer/draw2d.h"
+#include "renderer/culling_system.h"
 #include "renderer/ffr/ffr.h"
 #include "renderer/font_manager.h"
 #include "renderer/material.h"
@@ -2175,11 +2176,10 @@ struct RenderInterfaceImpl final : public RenderInterface
 
 	void getRenderables(Array<EntityRef>& entities, const ShiftedFrustum& frustum, RenderableTypes type) override
 	{
-		Array<Array<EntityRef>> renderables(m_render_scene->getAllocator());
-		m_render_scene->getRenderables(frustum, renderables, type);
-		for (const Array<EntityRef>& a : renderables) {
-			for (EntityRef b : a) {
-				entities.push(b);
+		CullResult* renderables = m_render_scene->getRenderables(frustum, type);
+		while (renderables) {
+			for (int i = 0; i < renderables->header.count; ++i) {
+				entities.push(renderables->entities[i]);
 			}
 		}
 	}
