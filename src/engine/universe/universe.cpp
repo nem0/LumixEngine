@@ -32,8 +32,10 @@ Universe::Universe(IAllocator& allocator)
 	, m_first_free_slot(-1)
 	, m_scenes(m_allocator)
 	, m_hierarchy(m_allocator)
+	, m_transforms(m_allocator)
 {
 	m_entities.reserve(RESERVED_ENTITIES_COUNT);
+	m_transforms.reserve(RESERVED_ENTITIES_COUNT);
 }
 
 
@@ -76,13 +78,13 @@ void Universe::removeScene(IScene* scene)
 
 const DVec3& Universe::getPosition(EntityRef entity) const
 {
-	return m_entities[entity.index].transform.pos;
+	return m_transforms[entity.index].pos;
 }
 
 
 const Quat& Universe::getRotation(EntityRef entity) const
 {
-	return m_entities[entity.index].transform.rot;
+	return m_transforms[entity.index].rot;
 }
 
 
@@ -103,8 +105,8 @@ void Universe::transformEntity(EntityRef entity, bool update_local)
 		{
 			const Hierarchy& child_h = m_hierarchy[m_entities[child.index].hierarchy];
 			const Transform abs_tr = my_transform * child_h.local_transform;
-			EntityData& child_data = m_entities[child.index];
-			child_data.transform = abs_tr;
+			Transform& child_data = m_transforms[child.index];
+			child_data = abs_tr;
 			transformEntity((EntityRef)child, false);
 
 			child = child_h.next_sibling;
@@ -115,14 +117,14 @@ void Universe::transformEntity(EntityRef entity, bool update_local)
 
 void Universe::setRotation(EntityRef entity, const Quat& rot)
 {
-	m_entities[entity.index].transform.rot = rot;
+	m_transforms[entity.index].rot = rot;
 	transformEntity(entity, true);
 }
 
 
 void Universe::setRotation(EntityRef entity, float x, float y, float z, float w)
 {
-	m_entities[entity.index].transform.rot.set(x, y, z, w);
+	m_transforms[entity.index].rot.set(x, y, z, w);
 	transformEntity(entity, true);
 }
 
@@ -135,8 +137,8 @@ bool Universe::hasEntity(EntityRef entity) const
 
 void Universe::setTransformKeepChildren(EntityRef entity, const Transform& transform)
 {
-	EntityData& tmp = m_entities[entity.index];
-	tmp.transform = transform;
+	Transform& tmp = m_transforms[entity.index];
+	tmp = transform;
 	
 	int hierarchy_idx = m_entities[entity.index].hierarchy;
 	entityTransformed().invoke(entity);
@@ -164,40 +166,40 @@ void Universe::setTransformKeepChildren(EntityRef entity, const Transform& trans
 
 void Universe::setTransform(EntityRef entity, const Transform& transform)
 {
-	EntityData& tmp = m_entities[entity.index];
-	tmp.transform = transform;
+	Transform& tmp = m_transforms[entity.index];
+	tmp = transform;
 	transformEntity(entity, true);
 }
 
 
 void Universe::setTransform(EntityRef entity, const RigidTransform& transform)
 {
-	auto& tmp = m_entities[entity.index];
-	tmp.transform.pos = transform.pos;
-	tmp.transform.rot = transform.rot;
+	auto& tmp = m_transforms[entity.index];
+	tmp.pos = transform.pos;
+	tmp.rot = transform.rot;
 	transformEntity(entity, true);
 }
 
 
 void Universe::setTransform(EntityRef entity, const DVec3& pos, const Quat& rot, float scale)
 {
-	auto& tmp = m_entities[entity.index];
-	tmp.transform.pos = pos;
-	tmp.transform.rot = rot;
-	tmp.transform.scale = scale;
+	auto& tmp = m_transforms[entity.index];
+	tmp.pos = pos;
+	tmp.rot = rot;
+	tmp.scale = scale;
 	transformEntity(entity, true);
 }
 
 
 const Transform& Universe::getTransform(EntityRef entity) const
 {
-	return m_entities[entity.index].transform;
+	return m_transforms[entity.index];
 }
 
 
 Matrix Universe::getRelativeMatrix(EntityRef entity, const DVec3& base_pos) const
 {
-	const Transform& transform = m_entities[entity.index].transform;
+	const Transform& transform = m_transforms[entity.index];
 	Matrix mtx = transform.rot.toMatrix();
 	mtx.setTranslation((transform.pos - base_pos).toFloat());
 	mtx.multiply3x3(transform.scale);
@@ -213,7 +215,7 @@ void Universe::setPosition(EntityRef entity, double x, double y, double z)
 
 void Universe::setPosition(EntityRef entity, const DVec3& pos)
 {
-	m_entities[entity.index].transform.pos = pos;
+	m_transforms[entity.index].pos = pos;
 	transformEntity(entity, true);
 }
 
@@ -280,12 +282,13 @@ void Universe::emplaceEntity(EntityRef entity)
 	while (m_entities.size() <= entity.index)
 	{
 		EntityData& data = m_entities.emplace();
+		Transform& tr = m_transforms.emplace();
 		data.valid = false;
 		data.prev = -1;
 		data.name = -1;
 		data.hierarchy = -1;
 		data.next = m_first_free_slot;
-		data.transform.scale = -1;
+		tr.scale = -1;
 		if (m_first_free_slot >= 0)
 		{
 			m_entities[m_first_free_slot].prev = m_entities.size() - 1;
@@ -305,9 +308,10 @@ void Universe::emplaceEntity(EntityRef entity)
 		m_entities[m_entities[entity.index].next].prev= m_entities[entity.index].prev;
 	}
 	EntityData& data = m_entities[entity.index];
-	data.transform.pos = DVec3(0, 0, 0);
-	data.transform.rot.set(0, 0, 0, 1);
-	data.transform.scale = 1;
+	Transform& tr = m_transforms[entity.index];
+	tr.pos = DVec3(0, 0, 0);
+	tr.rot.set(0, 0, 0, 1);
+	tr.scale = 1;
 	data.name = -1;
 	data.hierarchy = -1;
 	data.components = 0;
@@ -352,9 +356,11 @@ EntityRef Universe::createEntity(const DVec3& position, const Quat& rotation)
 {
 	EntityData* data;
 	EntityRef entity;
+	Transform* tr;
 	if (m_first_free_slot >= 0)
 	{
 		data = &m_entities[m_first_free_slot];
+		tr = &m_transforms[m_first_free_slot];
 		entity.index = m_first_free_slot;
 		if (data->next >= 0) m_entities[data->next].prev = -1;
 		m_first_free_slot = data->next;
@@ -363,10 +369,11 @@ EntityRef Universe::createEntity(const DVec3& position, const Quat& rotation)
 	{
 		entity.index = m_entities.size();
 		data = &m_entities.emplace();
+		tr = &m_transforms.emplace();
 	}
-	data->transform.pos = position;
-	data->transform.rot = rotation;
-	data->transform.scale = 1;
+	tr->pos = position;
+	tr->rot = rotation;
+	tr->scale = 1;
 	data->name = -1;
 	data->hierarchy = -1;
 	data->components = 0;
@@ -794,14 +801,14 @@ EntityPtr Universe::instantiatePrefab(const PrefabResource& prefab,
 
 void Universe::setScale(EntityRef entity, float scale)
 {
-	m_entities[entity.index].transform.scale = scale;
+	m_transforms[entity.index].scale = scale;
 	transformEntity(entity, true);
 }
 
 
 float Universe::getScale(EntityRef entity) const
 {
-	return m_entities[entity.index].transform.scale;
+	return m_transforms[entity.index].scale;
 }
 
 

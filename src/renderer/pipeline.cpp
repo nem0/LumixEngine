@@ -2536,7 +2536,7 @@ struct PipelineImpl final : Pipeline
 				RenderScene* scene = ctx->cmd->m_pipeline->m_scene;
 				const ShiftedFrustum frustum = ctx->cmd->m_camera_params.frustum;
 				const ModelInstance* LUMIX_RESTRICT model_instances = scene->getModelInstances();
-				const Universe::EntityData* LUMIX_RESTRICT entity_data = universe.getEntityData(); 
+				const Transform* LUMIX_RESTRICT entity_data = universe.getTransforms(); 
 				const DVec3 camera_pos = ctx->camera_pos;
 				for (int i = 0, c = ctx->count; i < c; ++i) {
 					const EntityRef e = {int(renderables[i] & 0xFFffFFff)};
@@ -2561,7 +2561,7 @@ struct PipelineImpl final : Pipeline
 							u8* instance_data = slice.ptr;
 							for (int j = start_i; j < start_i + count; ++j) {
 								const EntityRef e = { int(renderables[j] & 0xFFffFFff) };
-								const Transform& tr = entity_data[e.index].transform;
+								const Transform& tr = entity_data[e.index];
 								const Vec3 lpos = (tr.pos - camera_pos).toFloat();
 								memcpy(instance_data, &tr.rot, sizeof(tr.rot));
 								instance_data += sizeof(tr.rot);
@@ -2585,7 +2585,7 @@ struct PipelineImpl final : Pipeline
 
 							WRITE(mi->meshes[mesh_idx].render_data);
 							WRITE_FN(mi->meshes[mesh_idx].material->getRenderData());
-							const Transform& tr = entity_data[e.index].transform;
+							const Transform& tr = entity_data[e.index];
 							Matrix mtx = tr.rot.toMatrix();
 							mtx.multiply3x3(tr.scale);
 							mtx.setTranslation((tr.pos - camera_pos).toFloat());
@@ -2619,7 +2619,7 @@ struct PipelineImpl final : Pipeline
 							const u64 key = sort_keys[i];
 							while (i < c && sort_keys[i] == key) {
 								const EntityRef e = {int(renderables[i] & 0x00ffFFff)};
-								const Transform& tr = entity_data[e.index].transform;
+								const Transform& tr = entity_data[e.index];
 								const Vec3 lpos = (tr.pos - camera_pos).toFloat();
 								WRITE(lpos);
 								WRITE(tr.rot);
@@ -2640,7 +2640,7 @@ struct PipelineImpl final : Pipeline
 							const u64 key = sort_keys[i];
 
 							const EntityRef e = {int(renderables[i] & 0x00ffFFff)};
-							const Transform& tr = entity_data[e.index].transform;
+							const Transform& tr = entity_data[e.index];
 							const Vec3 lpos = (tr.pos - camera_pos).toFloat();
 							const PointLight& pl = scene->getPointLight(e);
 							*intersecting = frustum.intersectNearPlane(tr.pos, pl.range * Math::SQRT3);
@@ -2659,7 +2659,7 @@ struct PipelineImpl final : Pipeline
 							else {
 								while (i < c && sort_keys[i] == key) {
 									const EntityRef e = {int(renderables[i] & 0x00ffFFff)};
-									const Transform& tr = entity_data[e.index].transform;
+									const Transform& tr = entity_data[e.index];
 									const Vec3 lpos = (tr.pos - camera_pos).toFloat();
 									const PointLight& pl = scene->getPointLight(e);
 
@@ -2688,7 +2688,7 @@ struct PipelineImpl final : Pipeline
 							// TODO 0 const in following:
 							const Terrain::GrassPatch& p = t->m_grass_quads[0][quad_idx]->m_patches[patch_idx];
 							const Mesh& mesh = p.m_type->m_grass_model->getMesh(mesh_idx);
-							const Transform& tr = entity_data[e.index].transform;
+							const Transform& tr = entity_data[e.index];
 							const Vec3 lpos = (tr.pos - camera_pos).toFloat();
 							WRITE(tr.rot);
 							WRITE(lpos);
@@ -2736,7 +2736,7 @@ struct PipelineImpl final : Pipeline
 				RenderScene* scene = m_pipeline->m_scene;
 				const ModelInstance* LUMIX_RESTRICT model_instances = scene->getModelInstances();
 				MTBucketArray<u64>::Bucket result = sort_keys.begin();
-				const Universe::EntityData* LUMIX_RESTRICT entity_data = scene->getUniverse().getEntityData();
+				const Transform* LUMIX_RESTRICT entity_data = scene->getUniverse().getTransforms();
 				const DVec3 camera_pos = m_camera_params.pos;
 				const u64 type_mask = (u64)type << 32;
 				
@@ -2760,7 +2760,7 @@ struct PipelineImpl final : Pipeline
 										result.push(key, subrenderable);
 									}
 									else {
-										const DVec3 pos = entity_data[e.index].transform.pos;
+										const DVec3 pos = entity_data[e.index].pos;
 										const DVec3 rel_pos = pos - camera_pos;
 										const float squared_length = float(rel_pos.x * rel_pos.x + rel_pos.y * rel_pos.y + rel_pos.z * rel_pos.z);
 										const u32 depth_bits = Math::floatFlip(*(u32*)&squared_length);
@@ -2775,7 +2775,7 @@ struct PipelineImpl final : Pipeline
 						case RenderableTypes::MESH_GROUP: {
 							for (int i = 0, c = page->header.count; i < c; ++i) {
 								const EntityRef e = renderables[i];
-								const DVec3 pos = entity_data[e.index].transform.pos;
+								const DVec3 pos = entity_data[e.index].pos;
 								const ModelInstance& mi = model_instances[e.index];
 								const float squared_length = float((pos - camera_pos).squaredLength());
 								const LODMeshIndices lod = mi.model->getLODMeshIndices(squared_length);

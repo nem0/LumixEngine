@@ -45,8 +45,6 @@ public:
 	{
 		EntityData() {}
 
-		Transform transform;
-		
 		int hierarchy;
 		int name;
 
@@ -70,7 +68,7 @@ public:
 	~Universe();
 
 	IAllocator& getAllocator() { return m_allocator; }
-	const EntityData* getEntityData() const { return m_entities.begin(); }
+	const Transform* getTransforms() const { return m_transforms.begin(); }
 	void emplaceEntity(EntityRef entity);
 	EntityRef createEntity(const DVec3& position, const Quat& rotation);
 	EntityRef cloneEntity(EntityRef entity);
@@ -178,6 +176,7 @@ private:
 	IAllocator& m_allocator;
 	ComponentTypeEntry m_component_type_map[ComponentType::MAX_TYPES_COUNT];
 	Array<IScene*> m_scenes;
+	Array<Transform> m_transforms;
 	Array<EntityData> m_entities;
 	Array<Hierarchy> m_hierarchy;
 	Array<EntityName> m_names;
