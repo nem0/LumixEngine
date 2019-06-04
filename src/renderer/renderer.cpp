@@ -623,6 +623,7 @@ struct RendererImpl final : public Renderer
 
 	TransientSlice allocTransient(uint size) override
 	{
+        // TODO grow if not enough space
 		TransientSlice slice;
 		slice.buffer = m_transient_buffer;
 		slice.offset = MT::atomicAdd(&m_transient_buffer_offset, size);

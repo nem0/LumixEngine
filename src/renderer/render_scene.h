@@ -68,6 +68,13 @@ struct DecalInfo
 };
 
 
+struct MeshSortData
+{
+    u32 sort_key;
+    u8 layer;
+};
+
+
 struct ModelInstance
 {
 	enum Flags : u8
@@ -268,6 +275,7 @@ public:
 	virtual void enableModelInstance(EntityRef entity, bool enable) = 0;
 	virtual bool isModelInstanceEnabled(EntityRef entity) = 0;
 	virtual ModelInstance* getModelInstance(EntityRef entity) = 0;
+	virtual const MeshSortData* getMeshSortData() const = 0;
 	virtual const ModelInstance* getModelInstances() const = 0;
 	virtual Path getModelInstancePath(EntityRef entity) = 0;
 	virtual void setModelInstancePath(EntityRef entity, const Path& path) = 0;

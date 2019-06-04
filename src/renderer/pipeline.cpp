@@ -224,14 +224,21 @@ PipelineResource::PipelineResource(const Path& path, ResourceManager& owner, IAl
 	: Resource(path, owner, allocator)
 	, content(allocator) 
 {}
+
+
+struct alignas(4096) CmdPage
+{
+	struct {
+		CmdPage* next = nullptr;
+		int size = 0;
+		u8 bucket = 0;
+	} header;
+	u8 data[PageAllocator::PAGE_SIZE - sizeof(header)];
+};
+
+
 struct PipelineImpl final : Pipeline
 {
-	struct CommandSet
-	{
-		CommandSet(IAllocator& allocator) : cmds(allocator) {}
-		Array<Array<u8>> cmds;
-	};
-
 	PipelineImpl(Renderer& renderer, PipelineResource* resource, const char* define, IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_renderer(renderer)
@@ -245,7 +252,6 @@ struct PipelineImpl final : Pipeline
 		, m_output(-1)
 		, m_renderbuffers(allocator)
 		, m_shaders(allocator)
-		, m_command_sets(allocator)
 	{
 		m_timer = Timer::create(m_allocator);
 		m_viewport.w = m_viewport.h = 800;
@@ -324,8 +330,6 @@ struct PipelineImpl final : Pipeline
 
 	~PipelineImpl()
 	{
-		freeCommandSets();
-
 		m_draw2d_shader->getResourceManager().unload(*m_draw2d_shader);
 		m_debug_shape_shader->getResourceManager().unload(*m_debug_shape_shader);
 		m_text_mesh_shader->getResourceManager().unload(*m_text_mesh_shader);
@@ -674,7 +678,6 @@ struct PipelineImpl final : Pipeline
 			LuaWrapper::pcall(m_lua_state, 0);
 		}
 		lua_pop(m_lua_state, 1);
-		freeCommandSets();
 		return true;
 	}
 
@@ -1399,7 +1402,8 @@ struct PipelineImpl final : Pipeline
 		const CameraParams cp = checkCameraParams(L, 1);
 
 		IAllocator& allocator = pipeline->m_renderer.getAllocator();
-		PrepareCommandsRenderJob* cmd = LUMIX_NEW(allocator, PrepareCommandsRenderJob)(allocator);
+		PageAllocator& page_allocator = pipeline->m_renderer.getEngine().getPageAllocator();
+		PrepareCommandsRenderJob* cmd = LUMIX_NEW(allocator, PrepareCommandsRenderJob)(allocator, page_allocator);
 
 		LuaWrapper::checkTableArg(L, 2);
 
@@ -1411,10 +1415,21 @@ struct PipelineImpl final : Pipeline
 				LUMIX_DELETE(allocator, cmd);
 				return luaL_argerror(L, 2, "Incorrect bucket configuration");
 			}
-			lua_getfield(L, -1, "layers");
+
+            PrepareCommandsRenderJob::SortOrder order = PrepareCommandsRenderJob::SortOrder::DEFAULT;
+            char tmp[64];
+			if (LuaWrapper::getOptionalStringField(L, -1, "sort", tmp, lengthOf(tmp))) {
+				order = equalIStrings(tmp, "depth") 
+					? PrepareCommandsRenderJob::SortOrder::DEPTH
+					: PrepareCommandsRenderJob::SortOrder::DEFAULT;
+			}
+
+            cmd->m_bucket_sort_order[i] = order;
+
+            lua_getfield(L, -1, "layers");
 			const bool ok = LuaWrapper::forEachArrayItem<const char*>(L, -1, nullptr, [&](const char* layer_name){
 				const int layer = pipeline->m_renderer.getLayerIdx(layer_name);
-				cmd->m_bucket_map[layer] = i;
+				cmd->m_bucket_map[layer] = i | (order == PrepareCommandsRenderJob::SortOrder::DEPTH ? 256 : 0);
 			});
 			lua_pop(L, 1);
 
@@ -1423,22 +1438,13 @@ struct PipelineImpl final : Pipeline
 				return luaL_argerror(L, 2, "'layers' must be array of strings");
 			}
 			
-			char tmp[64];
-			if (LuaWrapper::getOptionalStringField(L, -1, "sort", tmp, lengthOf(tmp))) {
-				cmd->m_bucket_sort_order[i] = equalIStrings(tmp, "depth") 
-					? PrepareCommandsRenderJob::SortOrder::DEPTH
-					: PrepareCommandsRenderJob::SortOrder::DEFAULT;
-			}
-			
 			lua_pop(L, 1);
 		}
 
 		for(int i = 0; i < cmd->m_bucket_count; ++i) {
-			CommandSet* cmd_set = LUMIX_NEW(allocator, CommandSet)(allocator);
-
-			pipeline->m_command_sets.push(cmd_set);
-			cmd->m_command_sets[i] = cmd_set;
-			LuaWrapper::push(L, cmd_set);
+			CmdPage* page = new (NewPlaceholder(), page_allocator.allocate(true)) CmdPage;
+			cmd->m_command_sets[i] = page;
+			LuaWrapper::push(L, page);
 		}
 		cmd->m_camera_params = cp;
 		cmd->m_pipeline = pipeline;
@@ -1645,7 +1651,7 @@ struct PipelineImpl final : Pipeline
 
 	static int prepareShadowcastingLocalLights(lua_State* L)
 	{
-		const int pipeline_idx = lua_upvalueindex(1);
+		/*const int pipeline_idx = lua_upvalueindex(1);
 		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
 			LuaWrapper::argError<PipelineImpl*>(L, pipeline_idx);
 		}
@@ -1664,11 +1670,11 @@ struct PipelineImpl final : Pipeline
 		const int count = pipeline->m_scene->getClosestShadowcastingPointLights(cp.pos, max_count, lights);
 
 		IAllocator& allocator = pipeline->m_renderer.getAllocator();
-		
+		PageAllocator& page_allocator = pipeline->m_renderer.getEngine().getPageAllocator();
 
 		lua_createtable(L, count, 0);
 		for (int i = 0; i < count; ++i) {
-			PrepareCommandsRenderJob* cmd = LUMIX_NEW(allocator, PrepareCommandsRenderJob)(allocator);
+			PrepareCommandsRenderJob* cmd = LUMIX_NEW(allocator, PrepareCommandsRenderJob)(allocator, page_allocator);
 			cmd->m_bucket_count = 1;
 
 			const bool ok = LuaWrapper::forEachArrayItem<const char*>(L, 6, nullptr, [&](const char* layer_name) {
@@ -1707,7 +1713,10 @@ struct PipelineImpl final : Pipeline
 			pipeline->m_renderer.push(cmd);
 		}
 
-		return 1;
+		return 1;*/
+		ASSERT(false);
+		// TODO
+		return 0;
 	}
 
 
@@ -1843,9 +1852,9 @@ struct PipelineImpl final : Pipeline
 	}
 
 
-	void renderLocalLights(const char* define, int shader_idx, CommandSet* cmd_set)
+	void renderLocalLights(const char* define, int shader_idx, CmdPage* cmds)
 	{
-		struct RenderJob : Renderer::RenderJob
+		/*struct RenderJob : Renderer::RenderJob
 		{
 			void setup() override {}
 
@@ -1936,7 +1945,9 @@ struct PipelineImpl final : Pipeline
 		job->m_pipeline = this;
 		job->m_cmd_set = cmd_set;
 		job->m_shader = shader;
-		m_renderer.push(job);
+		m_renderer.push(job);*/
+		//ASSERT(false);
+		// TODO
 	}
 
 
@@ -1988,7 +1999,7 @@ struct PipelineImpl final : Pipeline
 					do {} while(false)
 
 				PROFILE_FUNCTION();
-				if(m_cmd_set->cmds.empty()) return;
+				if(m_cmds->header.size == 0 && !m_cmds->header.next) return;
 
 				ffr::VertexDecl instance_decl;
 				instance_decl.addAttribute(4, ffr::AttributeType::FLOAT, false, false);
@@ -2010,9 +2021,10 @@ struct PipelineImpl final : Pipeline
 				const u32 skinned_mask = m_define_mask | (1 << renderer.getShaderDefineIdx("SKINNED"));
 				const u64 render_states = m_render_state;
 
-				for (const Array<u8>& cmds : m_cmd_set->cmds) {
-					const u8* cmd = cmds.begin();
-					const u8* cmd_end = cmds.end();
+				CmdPage* page = m_cmds;
+				while (page) {
+					const u8* cmd = page->data;
+					const u8* cmd_end = page->data + page->header.size;
 					while (cmd != cmd_end) {
 						READ(const RenderableTypes, type);
 						switch(type) {
@@ -2181,6 +2193,9 @@ struct PipelineImpl final : Pipeline
 							default: ASSERT(false); break;
 						}
 					}
+					CmdPage* next = page->header.next;
+					m_pipeline->m_renderer.getEngine().getPageAllocator().deallocate(page, true);
+					page = next;
 				}
 				#undef READ
 				Profiler::recordInt("drawcalls", drawcalls_count);
@@ -2189,7 +2204,7 @@ struct PipelineImpl final : Pipeline
 			u32 m_define_mask = 0;
 			u64 m_render_state;
 			PipelineImpl* m_pipeline;
-			CommandSet* m_cmd_set;
+			CmdPage* m_cmds;
 		};
 
 		const int pipeline_idx = lua_upvalueindex(1);
@@ -2198,7 +2213,7 @@ struct PipelineImpl final : Pipeline
 		}
 		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
 
-		CommandSet* cmd_set = LuaWrapper::checkArg<CommandSet*>(L, 1);
+		CmdPage* cmd_page = LuaWrapper::checkArg<CmdPage*>(L, 1);
 		LuaWrapper::checkTableArg(L, 2);
 
 		RenderJob* job = LUMIX_NEW(pipeline->m_renderer.getAllocator(), RenderJob);
@@ -2210,7 +2225,7 @@ struct PipelineImpl final : Pipeline
 
 		job->m_render_state = getState(L, 2);
 		job->m_pipeline = pipeline;
-		job->m_cmd_set = cmd_set;
+		job->m_cmds = cmd_page;
 		pipeline->m_renderer.push(job);
 		return 0;
 	}
@@ -2423,8 +2438,9 @@ struct PipelineImpl final : Pipeline
 		};
 
 
-		PrepareCommandsRenderJob(IAllocator& allocator) 
+		PrepareCommandsRenderJob(IAllocator& allocator, PageAllocator& page_allocator) 
 			: m_allocator(allocator)
+			, m_page_allocator(page_allocator)
 		{
 			memset(m_bucket_map, 0xff, sizeof(m_bucket_map));
 		}
@@ -2504,6 +2520,9 @@ struct PipelineImpl final : Pipeline
 		}
 
 
+		static_assert(sizeof(CmdPage) == PageAllocator::PAGE_SIZE, "Wrong page size");
+
+
 		struct CreateCommands 
 		{
 			static void execute(void* data)
@@ -2525,14 +2544,24 @@ struct PipelineImpl final : Pipeline
 				Profiler::recordInt("num", ctx->count);
 				Renderer& renderer = ctx->cmd->m_pipeline->m_renderer;
 				const Universe& universe = ctx->cmd->m_pipeline->m_scene->getUniverse();
-				int item_size = int(sizeof(RenderableTypes) + sizeof(Mesh::RenderData*) + sizeof(Material::RenderData*) + sizeof(Vec3) + sizeof(Quat) + sizeof(Vec3) + sizeof(u16) + sizeof(float));
-				item_size = Math::maximum(item_size, int(4 * sizeof(Vec4) + sizeof(bool) + sizeof(int)));
 				
-				ctx->output->resize(ctx->count * item_size);
-				const u64 instance_key_mask = ctx->cmd->m_bucket_sort_order[ctx->bucket] == PrepareCommandsRenderJob::SortOrder::DEPTH ? 0xffFFff : 0xffFFff00000000;
-				u8* out = ctx->output->begin();
 				const u64* LUMIX_RESTRICT renderables = ctx->renderables;
 				const u64* LUMIX_RESTRICT sort_keys = ctx->sort_keys;
+				CmdPage* cmd_page = new (NewPlaceholder(), ctx->cmd->m_page_allocator.allocate(true)) CmdPage;
+				ctx->first_page = ctx->last_page = cmd_page;
+				cmd_page->header.bucket = sort_keys[0] >> 56;
+				u8* out = cmd_page->data;
+
+				auto new_page = [&](u8 bucket){
+					cmd_page->header.size = int(out - cmd_page->data);
+					CmdPage* new_page = new (NewPlaceholder(), ctx->cmd->m_page_allocator.allocate(true)) CmdPage;
+					cmd_page->header.next = new_page;
+					cmd_page = new_page;
+					new_page->header.bucket = bucket;
+					ctx->last_page = cmd_page;
+					out = cmd_page->data;
+				};
+
 				RenderScene* scene = ctx->cmd->m_pipeline->m_scene;
 				const ShiftedFrustum frustum = ctx->cmd->m_camera_params.frustum;
 				const ModelInstance* LUMIX_RESTRICT model_instances = scene->getModelInstances();
@@ -2541,22 +2570,24 @@ struct PipelineImpl final : Pipeline
 				for (int i = 0, c = ctx->count; i < c; ++i) {
 					const EntityRef e = {int(renderables[i] & 0xFFffFFff)};
 					const RenderableTypes type = RenderableTypes((renderables[i] >> 24) & 0xff);
-					*(RenderableTypes*)out = type;
-					out += sizeof(type);
+					const u8 bucket = sort_keys[i] >> 56;
+					if(bucket != cmd_page->header.bucket) {
+						new_page(bucket);
+					}
+
 					switch(type) {
-						case RenderableTypes::MESH_GROUP: 
+						case RenderableTypes::MESH_GROUP:
 						case RenderableTypes::MESH: {
 							const u32 mesh_idx = renderables[i] >> 40;
 							const ModelInstance* LUMIX_RESTRICT mi = &model_instances[e.index];
-							WRITE(mi->meshes[mesh_idx].render_data);
-							WRITE_FN(mi->meshes[mesh_idx].material->getRenderData());
 							int start_i = i;
+							const bool sort_depth = ctx->cmd->m_bucket_map[bucket] > 0xff;
+							const u64 instance_key_mask = sort_depth ? 0xffff'ffff'0000'0000 : 0xff00'0000'00ff'ffff;
 							const u64 key = sort_keys[i] & instance_key_mask;
 							while (i < c && (sort_keys[i] & instance_key_mask) == key) {
 								++i;
 							}
 							const u16 count = u16(i - start_i);
-							WRITE(count);
 							const Renderer::TransientSlice slice = renderer.allocTransient(count * sizeof(Vec4) * 2);
 							u8* instance_data = slice.ptr;
 							for (int j = start_i; j < start_i + count; ++j) {
@@ -2570,6 +2601,14 @@ struct PipelineImpl final : Pipeline
 								memcpy(instance_data, &tr.scale, sizeof(tr.scale));
 								instance_data += sizeof(tr.scale);
 							}
+							if ((cmd_page->data + sizeof(cmd_page->data) - out) < 30) {
+								new_page(bucket);
+							}
+
+							WRITE(type);
+							WRITE(mi->meshes[mesh_idx].render_data);
+							WRITE_FN(mi->meshes[mesh_idx].material->getRenderData());
+							WRITE(count);
 							WRITE(slice.buffer);
 							WRITE(slice.offset);
 							
@@ -2577,12 +2616,13 @@ struct PipelineImpl final : Pipeline
 							break;
 						}
 						case RenderableTypes::SKINNED: {
-							const u32 mesh_idx = renderables[i] >> 40;
+							/*const u32 mesh_idx = renderables[i] >> 40;
 							const ModelInstance* LUMIX_RESTRICT mi = &model_instances[e.index];
 							const uint out_offset = uint(out - ctx->output->begin());
 							ctx->output->resize(ctx->output->size() +  mi->pose->count * sizeof(Matrix) + sizeof(Matrix));
 							out = ctx->output->begin() + out_offset;
 
+							WRITE(type);
 							WRITE(mi->meshes[mesh_idx].render_data);
 							WRITE_FN(mi->meshes[mesh_idx].material->getRenderData());
 							const Transform& tr = entity_data[e.index];
@@ -2602,11 +2642,13 @@ struct PipelineImpl final : Pipeline
 								const LocalRigidTransform tmp = {positions[j], rotations[j]};
 								Matrix m = (tmp * bone.inv_bind_transform).toMatrix();
 								WRITE(m);
-							}
+							}*/
+							ASSERT(false);
+							// TODO
 							break;
 						}
 						case RenderableTypes::DECAL: {
-							const Material* material = scene->getDecalMaterial(e);
+							/*const Material* material = scene->getDecalMaterial(e);
 							const Vec3 half_extents = scene->getDecalHalfExtents(e);
 
 							const uint out_offset = uint(out - ctx->output->begin());
@@ -2628,11 +2670,13 @@ struct PipelineImpl final : Pipeline
 								++i;
 							}
 							*instance_count = u16(i - start_i);
-							--i;
+							--i;*/
+							ASSERT(false);
+							// TODO
 							break;
 						}
 						case RenderableTypes::LOCAL_LIGHT: {
-							u16* instance_count = (u16*)out;
+							/*u16* instance_count = (u16*)out;
 							int start_i = i;
 							out += sizeof(*instance_count);
 							bool* intersecting = (bool*)out;
@@ -2676,11 +2720,13 @@ struct PipelineImpl final : Pipeline
 								}
 							}
 							*instance_count = u16(i - start_i);
-							--i;
+							--i;*/
+							ASSERT(false);
+							// TODO
 							break;
 						}
 						case RenderableTypes::GRASS: {
-							const u16 quad_idx = u16(renderables[i] >> 32);
+							/*const u16 quad_idx = u16(renderables[i] >> 32);
 							const u8 patch_idx = u8(renderables[i] >> 48);
 							const u8 mesh_idx = u8(renderables[i] >> 56);
 							const Terrain* t = scene->getTerrain(e);
@@ -2700,41 +2746,42 @@ struct PipelineImpl final : Pipeline
 							ctx->output->resize(ctx->output->size() + p.instance_data.byte_size());
 							out = ctx->output->begin() + out_offset;
 							memcpy(out, p.instance_data.begin(), p.instance_data.byte_size());
-							out += p.instance_data.byte_size();
+							out += p.instance_data.byte_size();*/
+							ASSERT(false);
+							// TODO
+
 							break;
 						}
 						default: ASSERT(false); break;
 					}
 				}
-				if (ctx->count > 0) ctx->output->resize(int(out - ctx->output->begin()));
+				cmd_page->header.size = int(out - cmd_page->data);
 				#undef WRITE
 				#undef WRITE_FN
 			}
 
 			u64* renderables;
 			u64* sort_keys;
-			Array<u8>* output;
 			int idx;
-			u8 bucket;
 			DVec3 camera_pos;
 			int count;
 			PrepareCommandsRenderJob* cmd;
+			CmdPage* first_page = nullptr;
+			CmdPage* last_page = nullptr;
 		};
 
 
 		void createSortKeys(const CullResult* renderables, RenderableTypes type, MTBucketArray<u64>& sort_keys)
 		{
-			const u8 local_light_layer = m_pipeline->m_renderer.getLayerIdx("local_light");
-			const u8 local_light_bucket = m_bucket_map[local_light_layer];
 			PagedListIterator<const CullResult> iterator(renderables);
 
 			JobSystem::runAsJobs([&](){
 				PROFILE_BLOCK("sort_keys");
 				int total = 0;
 				const auto* bucket_map = m_bucket_map;
-				const SortOrder* bucket_sort_order = m_bucket_sort_order;
 				RenderScene* scene = m_pipeline->m_scene;
 				const ModelInstance* LUMIX_RESTRICT model_instances = scene->getModelInstances();
+				const MeshSortData* LUMIX_RESTRICT mesh_data = scene->getMeshSortData();
 				MTBucketArray<u64>::Bucket result = sort_keys.begin();
 				const Transform* LUMIX_RESTRICT entity_data = scene->getUniverse().getTransforms();
 				const DVec3 camera_pos = m_camera_params.pos;
@@ -2749,24 +2796,19 @@ struct PipelineImpl final : Pipeline
 						case RenderableTypes::MESH: {
 							for (int i = 0, c = page->header.count; i < c; ++i) {
 								const EntityRef e = renderables[i];
-								const ModelInstance& mi = model_instances[e.index];
-								const Mesh& mesh = mi.meshes[0];
-								const u8 bucket = bucket_map[mesh.layer];
-								const SortOrder sort_order = bucket_sort_order[bucket];
+								const MeshSortData& mesh = mesh_data[e.index];
+								const u32 bucket = bucket_map[mesh.layer];
+								const u64 subrenderable = e.index | type_mask;
 								if (bucket < 0xff) {
-									const u64 subrenderable = e.index | type_mask;
-									if (sort_order == SortOrder::DEFAULT) {
-										const u64 key = ((u64)mesh.sort_key << 32) | ((u64)bucket << 56);
-										result.push(key, subrenderable);
-									}
-									else {
-										const DVec3 pos = entity_data[e.index].pos;
-										const DVec3 rel_pos = pos - camera_pos;
-										const float squared_length = float(rel_pos.x * rel_pos.x + rel_pos.y * rel_pos.y + rel_pos.z * rel_pos.z);
-										const u32 depth_bits = Math::floatFlip(*(u32*)&squared_length);
-										const u64 key = mesh.sort_key | ((u64)bucket << 56) | ((u64)depth_bits << 24);
-										result.push(key, subrenderable);
-									}
+									const u64 key = ((u64)mesh.sort_key << 32) | ((u64)bucket << 56);
+									result.push(key, subrenderable);
+                                } else if (bucket < 0xffFF) {
+									const DVec3 pos = entity_data[e.index].pos;
+									const DVec3 rel_pos = pos - camera_pos;
+									const float squared_length = float(rel_pos.x * rel_pos.x + rel_pos.y * rel_pos.y + rel_pos.z * rel_pos.z);
+									const u32 depth_bits = Math::floatFlip(*(u32*)&squared_length);
+									const u64 key = mesh.sort_key | ((u64)bucket << 56) | ((u64)depth_bits << 24);
+									result.push(key, subrenderable);
 								}
 							}
 							break;
@@ -2830,41 +2872,47 @@ struct PipelineImpl final : Pipeline
 
 		void createCommands(u64* renderables, u64* sort_keys, int size)
 		{
-			Array<CreateCommands> create_commands(m_allocator);
-			const int job_count = Math::minimum(size, 16);
-			create_commands.reserve(job_count * m_bucket_count);
+			const int jobs_count = JobSystem::getWorkersCount() * 4;
+			CreateCommands* create_commands = (CreateCommands*)alloca(sizeof(CreateCommands) * jobs_count);
+			new (NewPlaceholder(), create_commands) CreateCommands[jobs_count];
+			
 			JobSystem::SignalHandle counter = JobSystem::INVALID_HANDLE;
-			int bucket_offset = 0;
-			for(u8 bucket = 0; bucket < m_bucket_count; ++bucket) {
-				m_command_sets[bucket]->cmds.reserve(job_count);
-				int bucket_size;
-				for(bucket_size = bucket_offset; bucket_size < size && (sort_keys[bucket_size] >> 56) == bucket; ++bucket_size);
-				bucket_size -= bucket_offset;
-				int job_offset = 0;
-				const int step = (bucket_size + job_count - 1) / job_count;
-				for(int i = 0; i < job_count; ++i) {
-					const int count = Math::minimum(step, bucket_size - job_offset);
-					if (count < 0) break;
-					CreateCommands& ctx = create_commands.emplace();
-					ctx.renderables = renderables + bucket_offset + job_offset;
-					ctx.sort_keys = sort_keys + bucket_offset + job_offset;
-					ctx.count = count;
-					ctx.cmd = this;
-					ctx.camera_pos = m_camera_params.pos;
-					ctx.output = &m_command_sets[bucket]->cmds.emplace(m_allocator);
-					ctx.bucket = bucket;
-					job_offset += step;
-					JobSystem::run(&ctx, &CreateCommands::execute, &counter);
-				}
-				bucket_offset += bucket_size;
+
+			const int step = (size + jobs_count - 1) / jobs_count;
+			int offset = 0;
+			for(int i = 0; i < jobs_count; ++i) {
+				const int count = Math::minimum(step, size - offset);
+				if (count <= 0) break;
+				CreateCommands& ctx = create_commands[i];
+				ctx.renderables = renderables + offset;
+				ctx.sort_keys = sort_keys + offset;
+				ctx.count = count;
+				ctx.cmd = this;
+				ctx.camera_pos = m_camera_params.pos;
+				JobSystem::run(&ctx, &CreateCommands::execute, &counter);
+				offset += count;
 			}
 			JobSystem::wait(counter);
+			CreateCommands& ctx = create_commands[0];
+			for(int i = 0; i < jobs_count; ++i) {
+				CreateCommands& cur = create_commands[i];
+				CmdPage* page = cur.first_page;
+				while(page) {
+					m_command_sets[page->header.bucket]->header.next = page;
+					m_command_sets[page->header.bucket] = page;
+					CmdPage* next = page->header.next;
+					page->header.next = nullptr;
+					page = next;
+				}
+			}
+
 		}
 
 
 		void execute() override {}
 
 		IAllocator& m_allocator;
+		PageAllocator& m_page_allocator;
 		CameraParams m_camera_params;
 		PipelineImpl* m_pipeline;
 		struct {
@@ -2872,9 +2920,9 @@ struct PipelineImpl final : Pipeline
 			ffr::UniformHandle uniform;
 		} m_global_textures[16];
 		int m_global_textures_count = 0;
-		CommandSet* m_command_sets[255];
-		u8 m_bucket_map[255];
-		SortOrder m_bucket_sort_order[256] = {};
+		CmdPage* m_command_sets[255];
+		u32 m_bucket_map[255];
+        SortOrder m_bucket_sort_order[255] = {};
 		u8 m_bucket_count;
 	};
 
@@ -3065,15 +3113,6 @@ struct PipelineImpl final : Pipeline
 		#undef REGISTER_FUNCTION
 	}
 
-	void freeCommandSets()
-	{
-		for(CommandSet* set : m_command_sets) {
-			m_renderer.runInRenderThread(set, [](Renderer& renderer, void* data){
-				LUMIX_DELETE(renderer.getAllocator(), (CommandSet*)data);
-			});
-		}
-		m_command_sets.clear();
-	}
 
 	bool isReady() const override { return m_resource->isReady(); }
 	const Stats& getStats() const override { return m_stats; }
@@ -3117,7 +3156,6 @@ struct PipelineImpl final : Pipeline
 	Shader* m_debug_shape_shader;
 	Shader* m_text_mesh_shader;
 	Texture* m_default_cubemap;
-	Array<CommandSet*> m_command_sets;
 	Array<CustomCommandHandler> m_custom_commands_handlers;
 	Array<Renderbuffer> m_renderbuffers;
 	Array<ShaderRef> m_shaders;
