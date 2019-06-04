@@ -1427,6 +1427,7 @@ public:
 		i32 size = 0;
 		serializer.read(size);
 		m_model_instances.reserve(size);
+        m_mesh_sort_data.reserve(size);
 		for (int i = 0; i < size; ++i)
 		{
 			auto& r = m_model_instances.emplace();
@@ -1717,6 +1718,12 @@ public:
 	{
 		return m_point_lights[entity];
 	}
+	
+    
+    const MeshSortData* getMeshSortData() const override
+    {
+        return m_mesh_sort_data.empty() ? nullptr : m_mesh_sort_data.begin();
+    }
 
 
 	const ModelInstance* getModelInstances() const override
@@ -3349,6 +3356,14 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		{
 			updateBoneAttachment(m_bone_attachments[entity]);
 		}
+
+        while (m_mesh_sort_data.size() < m_model_instances.size()) {
+            m_mesh_sort_data.emplace();
+        }
+        if(r.meshes) {
+            m_mesh_sort_data[entity.index].layer = r.meshes[0].layer;
+            m_mesh_sort_data[entity.index].sort_key = r.meshes[0].sort_key;
+        }
 	}
 
 
@@ -3652,6 +3667,7 @@ private:
 
 	HashMap<EntityRef, Decal> m_decals;
 	Array<ModelInstance> m_model_instances;
+    Array<MeshSortData> m_mesh_sort_data;
 	HashMap<EntityRef, GlobalLight> m_global_lights;
 	HashMap<EntityRef, Camera> m_cameras;
 	EntityPtr m_active_camera;
@@ -3738,11 +3754,13 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	, m_time(0)
 	, m_is_updating_attachments(false)
 	, m_material_decal_map(m_allocator)
+    , m_mesh_sort_data(m_allocator)
 {
 	m_universe.entityTransformed().bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
 	m_universe.entityDestroyed().bind<RenderSceneImpl, &RenderSceneImpl::onEntityDestroyed>(this);
 	m_culling_system = CullingSystem::create(m_allocator, engine.getPageAllocator());
 	m_model_instances.reserve(5000);
+	m_mesh_sort_data.reserve(5000);
 
 	MaterialManager& manager = m_renderer.getMaterialManager();
 
