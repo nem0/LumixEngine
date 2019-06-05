@@ -218,9 +218,6 @@ public:
 			EntityPtr parent = universe->getParent(entities[i]);
 			if (prefab != 0 && parent.isValid() && (prefab_system.getPrefab((EntityRef)parent) & 0xffffFFFF) == (prefab & 0xffffFFFF))
 			{
-						// TODO 
-		ASSERT(false);
-/*
 				float scale = universe->getScale(entities[i]);
 				Transform new_local_tr = universe->computeLocalTransform((EntityRef)parent, { new_positions[i], new_rotations[i], scale });
 				EntityPtr instance = prefab_system.getFirstInstance(prefab);
@@ -237,7 +234,7 @@ public:
 					m_old_positions.push(universe->getPosition(instance_ref));
 					m_old_rotations.push(universe->getRotation(instance_ref));
 					instance = prefab_system.getNextInstance(instance_ref);
-				}*/
+				}
 			}
 			else
 			{

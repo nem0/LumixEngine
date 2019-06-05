@@ -612,11 +612,8 @@ void Universe::setLocalRotation(EntityRef entity, const Quat& rot)
 
 Transform Universe::computeLocalTransform(EntityRef parent, const Transform& global_transform) const
 {
-	/*Transform parent_tr = getTransform(parent);
-	return parent_tr.inverted() * global_transform;*/
-	ASSERT(false);
-	// TODO
-	return {};
+	Transform parent_tr = getTransform(parent);
+	return parent_tr.inverted() * global_transform;
 }
 
 
