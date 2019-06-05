@@ -2015,8 +2015,8 @@ struct PipelineImpl final : Pipeline
 
 				Renderer& renderer = m_pipeline->m_renderer;
 
-				int drawcalls_count = 0;
-			
+				Stats stats = {};
+
 				const u32 instanced_mask = m_define_mask | (1 << renderer.getShaderDefineIdx("INSTANCED"));
 				const u32 skinned_mask = m_define_mask | (1 << renderer.getShaderDefineIdx("SKINNED"));
 				const u64 render_states = m_render_state;
@@ -2065,7 +2065,8 @@ struct PipelineImpl final : Pipeline
 
 									ffr::setInstanceBuffer(instance_decl, buffer, offset, mesh->vertex_decl.attributes_count, instance_map);
 									ffr::drawTrianglesInstanced(0, mesh->indices_count, instances_count);
-									++drawcalls_count;
+									++stats.draw_call_count;
+									stats.instance_count += instances_count;
 								}
 								break;
 							}
@@ -2104,7 +2105,8 @@ struct PipelineImpl final : Pipeline
 									ffr::setVertexBuffer(&mesh->vertex_decl, mesh->vertex_buffer_handle, 0, prog.use_semantics ? attribute_map : nullptr);
 									ffr::setIndexBuffer(mesh->index_buffer_handle);
 									ffr::drawTriangles(mesh->indices_count);
-									++drawcalls_count;
+									++stats.draw_call_count;
+									++stats.instance_count;
 								}
 								break;
 							}
@@ -2131,7 +2133,8 @@ struct PipelineImpl final : Pipeline
 									
 									ffr::setInstanceBuffer(decal_instance_decl, instance_buffer.buffer, instance_buffer.offset, 1, nullptr);
 									ffr::drawTrianglesInstanced(0, 36, instances_count);
-									++drawcalls_count;
+									++stats.draw_call_count;
+									stats.instance_count += instances_count;
 								}
 
 								break;
@@ -2187,6 +2190,9 @@ struct PipelineImpl final : Pipeline
 
 									ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE));
 									ffr::drawTrianglesInstanced(0, mesh->indices_count, instances_count);
+									
+									++stats.draw_call_count;
+									stats.instance_count += instances_count;
 								}
 								break;
 							}
@@ -2198,7 +2204,9 @@ struct PipelineImpl final : Pipeline
 					page = next;
 				}
 				#undef READ
-				Profiler::recordInt("drawcalls", drawcalls_count);
+				Profiler::recordInt("drawcalls", stats.draw_call_count);
+				Profiler::recordInt("instances", stats.instance_count);
+				Profiler::recordInt("triangles", stats.triangle_count);
 			}
 
 			u32 m_define_mask = 0;
@@ -2582,7 +2590,7 @@ struct PipelineImpl final : Pipeline
 							const ModelInstance* LUMIX_RESTRICT mi = &model_instances[e.index];
 							int start_i = i;
 							const bool sort_depth = ctx->cmd->m_bucket_map[bucket] > 0xff;
-							const u64 instance_key_mask = sort_depth ? 0xffff'ffff'0000'0000 : 0xff00'0000'00ff'ffff;
+							const u64 instance_key_mask = sort_depth ? 0xff00'0000'00ff'ffff : 0xffff'ffff'0000'0000;
 							const u64 key = sort_keys[i] & instance_key_mask;
 							while (i < c && (sort_keys[i] & instance_key_mask) == key) {
 								++i;
