@@ -35,12 +35,38 @@ LUMIX_ENGINE_API inline bool isValid(SignalHandle waitable) { return waitable !=
 
 
 template <typename F>
-void runAsJobs(F& f)
+void runOnWorkers(F& f)
 {
 	SignalHandle signal = JobSystem::INVALID_HANDLE;
 	for(int i = 0, c = getWorkersCount(); i < c; ++i) {
 		JobSystem::run(&f, [](void* data){
 			(*(F*)data)();
+		}, &signal);
+	}
+	wait(signal);
+}
+
+
+template <typename F>
+void forEach(uint count, F& f)
+{
+	struct Data {
+		volatile i32 offset = 0;
+		F* f;
+		uint count;
+	} data;
+	data.count = count;
+	data.f = &f;
+	
+	SignalHandle signal = JobSystem::INVALID_HANDLE;
+	for(uint i = 0; i < count; ++i) {
+		JobSystem::run(&data, [](void* ptr){
+			Data& data = *(Data*)ptr;
+			for(;;) {
+				const uint idx = MT::atomicIncrement(&data.offset) - 1;
+				if(idx >= data.count) break;
+				(*data.f)(idx);
+			}
 		}, &signal);
 	}
 	wait(signal);

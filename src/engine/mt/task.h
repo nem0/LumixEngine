@@ -25,13 +25,8 @@ public:
 
 	void setAffinityMask(u64 affinity_mask);
 
-	u64 getAffinityMask() const;
-
 	bool isRunning() const;
 	bool isFinished() const;
-	bool isForceExit() const;
-
-	void forceExit(bool wait);
 
 protected:
 	IAllocator& getAllocator();

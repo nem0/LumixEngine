@@ -2773,9 +2773,11 @@ struct PipelineImpl final : Pipeline
 
 		void createSortKeys(const CullResult* renderables, RenderableTypes type, MTBucketArray<u64>& sort_keys)
 		{
+			ASSERT(renderables);
+			if (renderables->header.count == 0 && !renderables->header.next) return;
 			PagedListIterator<const CullResult> iterator(renderables);
 
-			JobSystem::runAsJobs([&](){
+			JobSystem::runOnWorkers([&](){
 				PROFILE_BLOCK("sort_keys");
 				int total = 0;
 				const auto* bucket_map = m_bucket_map;
@@ -2856,11 +2858,13 @@ struct PipelineImpl final : Pipeline
 				RenderableTypes::GRASS,
 				RenderableTypes::LOCAL_LIGHT
 			};
-			for(RenderableTypes type : types) {
-				CullResult* renderables = scene->getRenderables(m_camera_params.frustum, type);
-				createSortKeys(renderables, type, sort_keys);
-				renderables->free(m_pipeline->m_renderer.getEngine().getPageAllocator());
-			}
+			JobSystem::forEach(lengthOf(types), [&](int idx){
+				CullResult* renderables = scene->getRenderables(m_camera_params.frustum, types[idx]);
+				if (renderables) {
+					createSortKeys(renderables, types[idx], sort_keys);
+					renderables->free(m_pipeline->m_renderer.getEngine().getPageAllocator());
+				}
+			});
 			sort_keys.merge();
 
 			if (sort_keys.size() > 0) {

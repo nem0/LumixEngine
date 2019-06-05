@@ -447,7 +447,7 @@ public:
 		, m_working_dir(working_dir)
 	{
 		g_log_info.log("Core") << "Creating engine...";
-		Profiler::setThreadName("Main worker", false);
+		Profiler::setThreadName("Worker");
 		installUnhandledExceptionHandler();
 
 		g_is_error_file_open = g_error_file.open("error.log", FS::Mode::CREATE_AND_WRITE);

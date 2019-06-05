@@ -453,13 +453,22 @@ void frame()
 }
 
 
-void setThreadName(const char* name, bool is_extended)
+void showInProfiler(bool show)
+{
+	ThreadContext* ctx = g_instance.getThreadContext();
+	MT::SpinLock lock(ctx->mutex);
+
+	ctx->show_in_profiler = show;
+}
+
+
+
+void setThreadName(const char* name)
 {
 	ThreadContext* ctx = g_instance.getThreadContext();
 	MT::SpinLock lock(ctx->mutex);
 
 	ctx->name = name;
-	ctx->is_extended = is_extended;
 }
 
 

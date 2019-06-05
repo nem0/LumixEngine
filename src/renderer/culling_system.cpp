@@ -310,17 +310,18 @@ struct CullingSystemImpl final : public CullingSystem
 		volatile i32 cell_idx = 0;
 		PagedList<CullResult> list(m_page_allocator);
 
-		JobSystem::runAsJobs([&](){
+		JobSystem::runOnWorkers([&](){
 			PROFILE_BLOCK("cull_job");
 			const Vec3 v3_cell_size(m_cell_size);
 			const Vec3 v3_2_cell_size(2 * m_cell_size);
-			CullResult* result = list.push();
+			CullResult* result = nullptr;
 			for(;;) {
 				const i32 idx = MT::atomicIncrement(&cell_idx) - 1;
 				if (idx >= m_cells.size()) return;
 
 				CellPage& cell = *m_cells[idx];
-				if(cell.header.indices.type != type) continue;
+				if (cell.header.indices.type != type) continue;
+				if (!result) result = list.push();
 
 				if (frustum.containsAABB(cell.header.origin + v3_cell_size, -v3_cell_size)) {
 					int to_cpy = cell.header.count;

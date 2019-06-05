@@ -265,7 +265,7 @@ public:
 		JobSystem::runEx(this, [](void* data) {
 			Lumix::OS::run(*(StudioAppImpl*)data);
 		}, &finished, JobSystem::INVALID_HANDLE, 0);
-		Profiler::setThreadName("Main thread", true);
+		Profiler::setThreadName("Main thread");
 		JobSystem::wait(finished);
 	}
 
