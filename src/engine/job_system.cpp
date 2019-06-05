@@ -549,7 +549,6 @@ void wait(SignalHandle handle)
 	}
 	
 	if (g_worker) {
-		PROFILE_BLOCK("waiting");
 		Profiler::blockColor(0xff, 0, 0);
 		FiberDecl* fiber_decl = g_worker->m_current_fiber;
 
