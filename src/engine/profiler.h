@@ -70,7 +70,7 @@ struct ThreadContext
 	bool open = false;
 	MT::SpinMutex mutex;
 	StaticString<64> name;
-	bool is_extended = false;
+	bool show_in_profiler = false;
 	u32 thread_id;
 };
 
@@ -103,7 +103,8 @@ struct EventHeader
 #pragma pack()
 
 
-LUMIX_ENGINE_API void setThreadName(const char* name, bool is_extended);
+LUMIX_ENGINE_API void setThreadName(const char* name);
+LUMIX_ENGINE_API void showInProfiler(bool show);
 
 LUMIX_ENGINE_API u64 frequency();
 LUMIX_ENGINE_API void pause(bool paused);

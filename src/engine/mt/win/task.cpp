@@ -26,9 +26,7 @@ struct TaskImpl
 	DWORD m_thread_id;
 	u64 m_affinity_mask;
 	u32 m_priority;
-	bool m_is_extended;
 	volatile bool m_is_running;
-	volatile bool m_force_exit;
 	volatile bool m_exited;
 	const char* m_thread_name;
 	Task* m_owner;
@@ -36,17 +34,12 @@ struct TaskImpl
 
 static DWORD WINAPI threadFunction(LPVOID ptr)
 {
-	u32 ret = 0xffffFFFF;
 	struct TaskImpl* impl = reinterpret_cast<TaskImpl*>(ptr);
 	setThreadName(impl->m_thread_id, impl->m_thread_name);
-	Profiler::setThreadName(impl->m_thread_name, impl->m_is_extended);
-	if (!impl->m_force_exit)
-	{
-		ret = impl->m_owner->task();
-	}
+	Profiler::setThreadName(impl->m_thread_name);
+	const u32 ret = impl->m_owner->task();
 	impl->m_exited = true;
 	impl->m_is_running = false;
-
 	return ret;
 }
 
@@ -57,7 +50,6 @@ Task::Task(IAllocator& allocator)
 	impl->m_affinity_mask = getThreadAffinityMask();
 	impl->m_priority = ::GetThreadPriority(GetCurrentThread());
 	impl->m_is_running = false;
-	impl->m_force_exit = false;
 	impl->m_exited = false;
 	impl->m_thread_name = "";
 	impl->m_owner = this;
@@ -81,7 +73,7 @@ bool Task::create(const char* name, bool is_extended)
 		m_implementation->m_thread_name = name;
 		m_implementation->m_handle = handle;
 		m_implementation->m_is_running = true;
-		m_implementation->m_is_extended = is_extended;
+		SetThreadAffinityMask(handle, m_implementation->m_affinity_mask);
 
 		bool success = ::ResumeThread(m_implementation->m_handle) != -1;
 		if (success)
@@ -116,11 +108,6 @@ void Task::setAffinityMask(u64 affinity_mask)
 	}
 }
 
-u64 Task::getAffinityMask() const
-{
-	return m_implementation->m_affinity_mask;
-}
-
 bool Task::isRunning() const
 {
 	return m_implementation->m_is_running;
@@ -131,26 +118,10 @@ bool Task::isFinished() const
 	return m_implementation->m_exited;
 }
 
-bool Task::isForceExit() const
-{
-	return m_implementation->m_force_exit;
-}
-
 IAllocator& Task::getAllocator()
 {
 	return m_implementation->m_allocator;
 }
-
-void Task::forceExit(bool wait)
-{
-	m_implementation->m_force_exit = true;
-
-	while (!isFinished() && wait)
-	{
-		yield();
-	}
-}
-
 
 } // namespace MT
 } // namespace Lumix

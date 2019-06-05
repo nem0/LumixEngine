@@ -130,6 +130,7 @@ struct WorkerTask : MT::Task
 
 	int task() override
 	{
+		Profiler::showInProfiler(true);
 		g_worker = this;
 		Fiber::initThread(manage, &m_primary_fiber);
 		return 0;
