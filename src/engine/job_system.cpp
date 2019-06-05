@@ -153,6 +153,7 @@ struct WorkerTask : MT::Task
 			if (that->m_is_backup) {
 				if (!that->m_enabled.poll()) {
 					PROFILE_BLOCK("disabled");
+					Profiler::blockColor(0xff, 0, 0xff);
 					that->m_enabled.wait();
 				}
 			}
