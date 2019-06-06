@@ -1122,7 +1122,7 @@ struct AnimationSceneImpl final : public AnimationScene
 		for (int i = 0; i < job_count; ++i)
 		{
 			JobSystem::fromLambda([time_delta, this, i, job_count]() {
-				PROFILE_BLOCK("Animate Job");
+				PROFILE_BLOCK("animate Job");
 				int all_count = m_animables.size();
 				int batch_count = all_count / job_count;
 				if (i == job_count - 1) batch_count = all_count - (job_count - 1) * batch_count;

@@ -1026,6 +1026,7 @@ bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK); renderer->viewCounterAdd();
 			void setup() override {}
 			void execute() override
 			{
+				PROFILE_FUNCTION();
 				ffr::getTextureImage(texture, mem.size, mem.data);
 			}
 

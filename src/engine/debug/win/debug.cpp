@@ -480,7 +480,7 @@ void Allocator::deallocate_aligned(void* user_ptr)
 			info->next->previous = info->previous;
 
 			m_total_size -= info->size;
-		} // because of the SpinLock
+		} // because of the lock
 
 		info->~AllocationInfo();
 
@@ -533,7 +533,7 @@ void* Allocator::allocate(size_t size)
 		m_root = info;
 
 		m_total_size += size;
-	} // because of the SpinLock
+	} // because of the lock
 
 	void* user_ptr = getUserFromSystem(system_ptr, 0);
 	info->stack_leaf = m_stack_tree.record();
@@ -585,7 +585,7 @@ void Allocator::deallocate(void* user_ptr)
 			info->next->previous = info->previous;
 
 			m_total_size -= info->size;
-		} // because of the SpinLock
+		} // because of the lock
 
 		info->~AllocationInfo();
 

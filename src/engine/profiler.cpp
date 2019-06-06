@@ -156,12 +156,12 @@ void write(ThreadContext& ctx, u64 timestamp, EventType type, const T& value)
 {
 	if (g_instance.paused && timestamp > g_instance.paused_time) return;
 
-#pragma pack(1)
-	struct {
-		EventHeader header;
-		T value;
-	} v;
-#pragma pack()
+	#pragma pack(1)
+		struct {
+			EventHeader header;
+			T value;
+		} v;
+	#pragma pack()
 	v.header.type = type;
 	v.header.size = sizeof(v);
 	v.header.time = timestamp;
@@ -318,7 +318,6 @@ void blockColor(u8 r, u8 g, u8 b)
 void beginBlock(const char* name)
 {
 	ThreadContext* ctx = g_instance.getThreadContext();
-	++ctx->open_blocks_count;
 	ctx->open_blocks.push(name);
 	write(*ctx, EventType::BEGIN_BLOCK, name);
 }
@@ -360,9 +359,9 @@ float getLastFrameDuration()
 void beforeFiberSwitch()
 {
 	ThreadContext* ctx = g_instance.getThreadContext();
-	while(ctx->open_blocks_count > 0) {
+	while(!ctx->open_blocks.empty()) {
 		write(*ctx, EventType::END_BLOCK, 0);
-		--ctx->open_blocks_count;
+		ctx->open_blocks.pop();
 	}
 }
 
@@ -370,7 +369,8 @@ void beforeFiberSwitch()
 int getOpenBlocksSize()
 {
 	ThreadContext* ctx = g_instance.getThreadContext();
-	return ctx->open_blocks_count * sizeof(const char*) + sizeof(ctx->open_blocks_count);
+	const int count = ctx->open_blocks.size();
+	return count * sizeof(const char*) + sizeof(count);
 }
 
 
@@ -391,8 +391,9 @@ i32 beginFiberWait(u32 job_system_signal, void* open_blocks)
 	r.job_system_signal = job_system_signal;
 
 	ThreadContext* ctx = g_instance.getThreadContext();
-	memcpy(open_blocks, &ctx->open_blocks_count, sizeof(ctx->open_blocks_count));
-	memcpy((u8*)open_blocks + sizeof(ctx->open_blocks_count), ctx->open_blocks.begin(), ctx->open_blocks_count * sizeof(const char*));
+	const int count = ctx->open_blocks.size();
+	memcpy(open_blocks, &count, sizeof(count));
+	memcpy((u8*)open_blocks + sizeof(count), ctx->open_blocks.begin(), count * sizeof(const char*));
 	write(*ctx, EventType::BEGIN_FIBER_WAIT, r);
 	return r.id;
 }
@@ -406,7 +407,7 @@ void endFiberWait(u32 job_system_signal, i32 wait_id, const void* open_blocks)
 	r.job_system_signal = job_system_signal;
 
 	write(*ctx, EventType::END_FIBER_WAIT, r);
-	decltype(ctx->open_blocks_count) count;
+	int count;
 	memcpy(&count, open_blocks, sizeof(count));
 	
 	u8* ptr = (u8*)open_blocks + sizeof(count);
@@ -422,9 +423,8 @@ void endFiberWait(u32 job_system_signal, i32 wait_id, const void* open_blocks)
 void endBlock()
 {
 	ThreadContext* ctx = g_instance.getThreadContext();
-	if(ctx->open_blocks_count > 0) {
+	if(!ctx->open_blocks.empty()) {
 		ctx->open_blocks.pop();
-		--ctx->open_blocks_count;
 		write(*ctx, EventType::END_BLOCK, 0);
 	}
 }

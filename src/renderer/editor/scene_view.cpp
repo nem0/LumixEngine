@@ -193,11 +193,13 @@ void SceneView::renderIcons()
 
 		void setup() override
 		{
+			PROFILE_FUNCTION();
 			view->m_editor.getIcons().getRenderData(&data);
 		}
 
 		void execute() override
 		{
+			PROFILE_FUNCTION();
 			ffr::pushDebugGroup("icons");
 			RenderInterface* ri = view->m_editor.getRenderInterface();
 			
@@ -229,6 +231,7 @@ void SceneView::renderSelection()
 
 		void setup() override
 		{
+			PROFILE_FUNCTION();
 			const Array<EntityRef>& entities = m_editor->getSelectedEntities();
 			RenderScene* scene = m_pipeline->getScene();
 			m_mtx_uniform = ffr::allocUniform("u_model", ffr::UniformType::MAT4, 1);
@@ -252,6 +255,7 @@ void SceneView::renderSelection()
 
 		void execute() override
 		{
+			PROFILE_FUNCTION();
 			for (const Item& item : m_items) {
 				const Shader::Program& prog = Shader::getProgram(item.shader, 0); // TODO define
 				if(!prog.handle.isValid()) continue;
@@ -304,6 +308,7 @@ void SceneView::renderGizmos()
 
 		void setup() override
 		{
+			PROFILE_FUNCTION();
 			viewport = view->m_editor.getViewport();
 			view->m_editor.getGizmo().getRenderData(&data, viewport);
 			Engine& engine = view->m_editor.getEngine();
@@ -313,6 +318,7 @@ void SceneView::renderGizmos()
 
 		void execute() override
 		{
+			PROFILE_FUNCTION();
 			if (data.cmds.empty()) return;
 
 			const ffr::ProgramHandle prg = Shader::getProgram(shader, 0).handle;
