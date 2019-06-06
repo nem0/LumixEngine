@@ -171,7 +171,7 @@ int FileSystemWatcherTask::task()
 	m_finished = false;
 	while (!m_finished)
 	{
-		PROFILE_BLOCK("Change handling");
+		PROFILE_BLOCK("change handling");
 		BOOL status = ReadDirectoryChangesW(m_handle,
 			m_info,
 			sizeof(m_info),

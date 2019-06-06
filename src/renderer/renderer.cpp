@@ -528,6 +528,7 @@ struct RendererImpl final : public Renderer
 		struct Cmd : RenderJob {
 			void setup() override {}
 			void execute() override {
+				PROFILE_FUNCTION();
 				ffr::pushDebugGroup("get image data");
 				ffr::getTextureImage(handle, size, buf);
 				ffr::popDebugGroup();
@@ -554,6 +555,7 @@ struct RendererImpl final : public Renderer
 		struct Cmd : RenderJob {
 			void setup() override {}
 			void execute() override {
+				PROFILE_FUNCTION();
 				ffr::update(handle, 0, x, y, w, h, format, mem.data);
 				if (mem.own) {
 					renderer->free(mem);
@@ -596,6 +598,7 @@ struct RendererImpl final : public Renderer
 		struct Cmd : RenderJob {
 			void setup() override {}
 			void execute() override {
+				PROFILE_FUNCTION();
 				ffr::loadTexture(handle, memory.data, memory.size, flags, debug_name);
 				if(memory.own) {
 					renderer->free(memory);
@@ -623,7 +626,7 @@ struct RendererImpl final : public Renderer
 
 	TransientSlice allocTransient(uint size) override
 	{
-        // TODO grow if not enough space
+		// TODO grow if not enough space
 		TransientSlice slice;
 		slice.buffer = m_transient_buffer;
 		slice.offset = MT::atomicAdd(&m_transient_buffer_offset, size);
@@ -651,6 +654,7 @@ struct RendererImpl final : public Renderer
 		struct Cmd : RenderJob {
 			void setup() override {}
 			void execute() override {
+				PROFILE_FUNCTION();
 				ffr::createBuffer(handle, (uint)ffr::BufferFlags::DYNAMIC_STORAGE, memory.size, memory.data);
 				if (memory.own) {
 					renderer->free(memory);
@@ -699,7 +703,10 @@ struct RendererImpl final : public Renderer
 	{
 		struct Cmd : RenderJob {
 			void setup() override {}
-			void execute() override { fnc(*renderer, ptr); }
+			void execute() override { 
+				PROFILE_FUNCTION();
+				fnc(*renderer, ptr); 
+			}
 
 			void* ptr;
 			void (*fnc)(Renderer&, void*);
@@ -719,7 +726,10 @@ struct RendererImpl final : public Renderer
 	{
 		struct Cmd : RenderJob {
 			void setup() override {}
-			void execute() override { ffr::destroy(program); }
+			void execute() override { 
+				PROFILE_FUNCTION();
+				ffr::destroy(program); 
+			}
 
 			ffr::ProgramHandle program;
 			RendererImpl* renderer;
@@ -736,7 +746,10 @@ struct RendererImpl final : public Renderer
 	{
 		struct Cmd : RenderJob {
 			void setup() override {}
-			void execute() override { ffr::destroy(buffer); }
+			void execute() override { 
+				PROFILE_FUNCTION();
+				ffr::destroy(buffer);
+			}
 
 			ffr::BufferHandle buffer;
 			RendererImpl* renderer;
@@ -758,6 +771,7 @@ struct RendererImpl final : public Renderer
 			void setup() override {}
 			void execute() override
 			{
+				PROFILE_FUNCTION();
 				ffr::createTexture(handle, w, h, depth, format, flags, memory.data, debug_name);
 				if (memory.own) renderer->free(memory);
 			}
@@ -793,7 +807,10 @@ struct RendererImpl final : public Renderer
 	{
 		struct Cmd : RenderJob {
 			void setup() override {}
-			void execute() override { ffr::destroy(texture); }
+			void execute() override { 
+				PROFILE_FUNCTION();
+				ffr::destroy(texture); 
+			}
 
 			ffr::TextureHandle texture;
 			RendererImpl* renderer;

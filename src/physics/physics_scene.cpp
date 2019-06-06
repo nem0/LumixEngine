@@ -2800,7 +2800,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		}
 
 		{ // PROFILE_BLOCK scope
-			PROFILE_BLOCK("PhysX");
+			PROFILE_BLOCK("physX");
 			PxHeightFieldDesc hfDesc;
 			hfDesc.format = PxHeightFieldFormat::eS16_TM;
 			hfDesc.nbColumns = width;

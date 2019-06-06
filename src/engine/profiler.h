@@ -61,7 +61,6 @@ struct ThreadContext
 		open_blocks.reserve(64);
 	}
 
-	int open_blocks_count = 0;
 	Array<const char*> open_blocks;
 	Array<u8> buffer;
 	uint begin = 0;

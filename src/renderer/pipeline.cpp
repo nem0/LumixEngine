@@ -648,6 +648,7 @@ struct PipelineImpl final : Pipeline
 
 		struct StartFrameCmd : Renderer::RenderJob {
 			void execute() override {
+				PROFILE_FUNCTION();
 				ffr::update(global_state_buffer, &global_state, 0, sizeof(global_state));
 				ffr::bindUniformBuffer(0, global_state_buffer, 0, sizeof(GlobalState));
 				ffr::bindUniformBuffer(1, pass_state_buffer, 0, sizeof(PassState));
@@ -690,6 +691,7 @@ struct PipelineImpl final : Pipeline
 
 			void setup() override
 			{
+				PROFILE_FUNCTION();
 				const Array<DebugLine>& src_lines = pipeline->m_scene->getDebugLines();
 				lines.resize(src_lines.size());
 				copyMemory(&lines[0], &src_lines[0], lines.size() * sizeof(lines[0]));
@@ -698,6 +700,7 @@ struct PipelineImpl final : Pipeline
 
 
 			void execute() override {
+				PROFILE_FUNCTION();
 				const Shader::Program& shader = Shader::getProgram(render_data, 0);
 				if(!shader.handle.isValid()) return;
 
@@ -797,6 +800,7 @@ struct PipelineImpl final : Pipeline
 
 			void setup()
 			{
+				PROFILE_FUNCTION();
 				size.set((float)pipeline->m_viewport.w, (float)pipeline->m_viewport.h);
 
 				Draw2D& draw2d = pipeline->m_draw2d;
@@ -820,6 +824,7 @@ struct PipelineImpl final : Pipeline
 
 			void execute()
 			{
+				PROFILE_FUNCTION();
 				ffr::VertexDecl vertex_decl;
 				vertex_decl.addAttribute(2, ffr::AttributeType::FLOAT, false, false);
 				vertex_decl.addAttribute(2, ffr::AttributeType::FLOAT, false, false);
@@ -1044,6 +1049,7 @@ struct PipelineImpl final : Pipeline
 
 			void setup() override
 			{
+				PROFILE_FUNCTION();
 				const auto& emitters = m_pipeline->m_scene->getParticleEmitters();
 
 				int byte_size = 0;
@@ -1070,6 +1076,7 @@ struct PipelineImpl final : Pipeline
 
 			void execute() override
 			{
+				PROFILE_FUNCTION();
 				ffr::pushDebugGroup("particles");
 				InputBlob blob(m_data);
 				ffr::VertexDecl instance_decl;
@@ -1208,6 +1215,7 @@ struct PipelineImpl final : Pipeline
 			void setup() override {}
 			void execute() override 
 			{
+				PROFILE_FUNCTION();
 				ffr::bindTextures(m_textures_handles, m_textures_count);
 				for(int i = 0; i < m_textures_count; ++i) {
 					ffr::setUniform1i(m_textures_uniforms[i], i + m_offset);
@@ -1360,6 +1368,7 @@ struct PipelineImpl final : Pipeline
 		PROFILE_FUNCTION();
 		struct PushPassStateCmd : Renderer::RenderJob {
 			void execute() override {
+				PROFILE_FUNCTION();
 				ffr::update(pass_state_buffer, &pass_state, 0, sizeof(pass_state));
 				ffr::bindUniformBuffer(1, pass_state_buffer, 0, sizeof(PassState));
 			}
@@ -1416,17 +1425,17 @@ struct PipelineImpl final : Pipeline
 				return luaL_argerror(L, 2, "Incorrect bucket configuration");
 			}
 
-            PrepareCommandsRenderJob::SortOrder order = PrepareCommandsRenderJob::SortOrder::DEFAULT;
-            char tmp[64];
+			PrepareCommandsRenderJob::SortOrder order = PrepareCommandsRenderJob::SortOrder::DEFAULT;
+			char tmp[64];
 			if (LuaWrapper::getOptionalStringField(L, -1, "sort", tmp, lengthOf(tmp))) {
 				order = equalIStrings(tmp, "depth") 
 					? PrepareCommandsRenderJob::SortOrder::DEPTH
 					: PrepareCommandsRenderJob::SortOrder::DEFAULT;
 			}
 
-            cmd->m_bucket_sort_order[i] = order;
+			cmd->m_bucket_sort_order[i] = order;
 
-            lua_getfield(L, -1, "layers");
+			lua_getfield(L, -1, "layers");
 			const bool ok = LuaWrapper::forEachArrayItem<const char*>(L, -1, nullptr, [&](const char* layer_name){
 				const int layer = pipeline->m_renderer.getLayerIdx(layer_name);
 				cmd->m_bucket_map[layer] = i | (order == PrepareCommandsRenderJob::SortOrder::DEPTH ? 256 : 0);
@@ -1461,6 +1470,7 @@ struct PipelineImpl final : Pipeline
 			void setup() override { m_render_data = m_shader->isReady() ? m_shader->m_render_data : nullptr; }
 			void execute() override 
 			{
+				PROFILE_FUNCTION();
 				if (!m_render_data) return;
 
 				ffr::ProgramHandle prg = Shader::getProgram(m_render_data, m_define_mask).handle;
@@ -1805,6 +1815,7 @@ struct PipelineImpl final : Pipeline
 
 			void setup() override
 			{
+				PROFILE_FUNCTION();
 				const Quat& rot = m_pipeline->m_viewport.rot;
 				const DVec3& pos = m_pipeline->m_viewport.pos;
 				m_pipeline->m_scene->getTextMeshesVertices(m_vertices, pos, rot);
@@ -1816,6 +1827,7 @@ struct PipelineImpl final : Pipeline
 
 			void execute() override
 			{
+				PROFILE_FUNCTION();
 				const Shader::Program& p = Shader::getProgram(m_shader, 0);
 				if(!p.handle.isValid()) return;
 				if (m_vertices.empty()) return;
@@ -2320,6 +2332,7 @@ struct PipelineImpl final : Pipeline
 
 		void setup() override
 		{
+			PROFILE_FUNCTION();
 			Array<TerrainInfo> infos(m_allocator);
 			m_pipeline->m_scene->getTerrainInfos(m_camera_params.frustum, m_camera_params.pos, infos);
 			if(infos.empty()) return;
@@ -2340,6 +2353,7 @@ struct PipelineImpl final : Pipeline
 
 		void execute() override
 		{
+			PROFILE_FUNCTION();
 			const u32 deferred_define_mask = 1 << m_pipeline->m_renderer.getShaderDefineIdx("DEFERRED");
 			const u8 edge_define_idx = m_pipeline->m_renderer.getShaderDefineIdx("EDGE");
 			
@@ -2812,7 +2826,7 @@ struct PipelineImpl final : Pipeline
 								if (bucket < 0xff) {
 									const u64 key = ((u64)mesh.sort_key << 32) | ((u64)bucket << 56);
 									result.push(key, subrenderable);
-                                } else if (bucket < 0xffFF) {
+								} else if (bucket < 0xffFF) {
 									const DVec3 pos = entity_data[e.index].pos;
 									const DVec3 rel_pos = pos - camera_pos;
 									const float squared_length = float(rel_pos.x * rel_pos.x + rel_pos.y * rel_pos.y + rel_pos.z * rel_pos.z);
@@ -2934,7 +2948,7 @@ struct PipelineImpl final : Pipeline
 		int m_global_textures_count = 0;
 		CmdPage* m_command_sets[255];
 		u32 m_bucket_map[255];
-        SortOrder m_bucket_sort_order[255] = {};
+		SortOrder m_bucket_sort_order[255] = {};
 		u8 m_bucket_count;
 	};
 
@@ -2944,6 +2958,7 @@ struct PipelineImpl final : Pipeline
 		struct Cmd : Renderer::RenderJob {
 			void setup() override {}
 			void execute() override {
+				PROFILE_FUNCTION();
 				ffr::clear(flags, &color.x, depth);
 			}
 			Vec4 color;
@@ -2963,7 +2978,10 @@ struct PipelineImpl final : Pipeline
 	{
 		struct Cmd : Renderer::RenderJob {
 			void setup() override {}
-			void execute() override { ffr::viewport(x, y, w, h); }
+			void execute() override { 
+				PROFILE_FUNCTION();
+				ffr::viewport(x, y, w, h); 
+			}
 			int x, y, w, h;
 		};
 
@@ -2984,6 +3002,7 @@ struct PipelineImpl final : Pipeline
 			void setup() override {}
 			void execute() override 
 			{
+				PROFILE_FUNCTION();
 				ffr::pushDebugGroup(name);
 				renderer->beginProfileBlock(name);
 			}
@@ -3004,6 +3023,7 @@ struct PipelineImpl final : Pipeline
 			void setup() override {}
 			void execute() override
 			{
+				PROFILE_FUNCTION();
 				renderer->endProfileBlock();
 				ffr::popDebugGroup();
 			}
