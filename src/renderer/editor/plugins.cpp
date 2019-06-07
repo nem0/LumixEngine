@@ -558,7 +558,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					g_log_error.log("Editor") << "No meshes with materials found in " << src.c_str();
 				}
 				else {
-					g_log_error.log("Editor") << "No meshes foudn in " << src.c_str();
+					g_log_error.log("Editor") << "No meshes found in " << src.c_str();
 				}
 			}
 
