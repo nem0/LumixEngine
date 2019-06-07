@@ -2078,6 +2078,7 @@ struct PipelineImpl final : Pipeline
 									ffr::setInstanceBuffer(instance_decl, buffer, offset, mesh->vertex_decl.attributes_count, instance_map);
 									ffr::drawTrianglesInstanced(0, mesh->indices_count, instances_count);
 									++stats.draw_call_count;
+									stats.triangle_count += instances_count * mesh->indices_count / 3;
 									stats.instance_count += instances_count;
 								}
 								break;
