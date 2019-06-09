@@ -784,12 +784,7 @@ void FBXImporter::writeMaterials(const char* src, const ImportConfig& cfg)
 			if (texture.fbx)
 			{
 				writeString("texture \"/");
-				PathUtils::FileInfo info(texture.src);
-				writeString(info.m_dir);
-				writeString("/");
-				writeString(info.m_basename);
-				writeString(".");
-				writeString(texture.to_dds ? "dds" : info.m_extension);
+				writeString(texture.src);
 				writeString("\"\n");
 			}
 			else
