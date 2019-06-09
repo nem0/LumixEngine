@@ -2110,7 +2110,6 @@ struct PipelineImpl final : Pipeline
 								
 									ffr::useProgram(prog.handle);
 
-									ffr::uniformBlockBinding(prog.handle, "Bones", 2);
 									const int bones_size = bones_count * sizeof(Matrix);
 									ffr::bindUniformBuffer(2, buffer, offset, bones_size);
 
