@@ -53,7 +53,6 @@ Animation::Animation(const Path& path, ResourceManager& resource_manager, IAlloc
 
 void Animation::getRelativePose(float time, Pose& pose, Model& model, float weight, BoneMask* mask) const
 {
-	PROFILE_FUNCTION();
 	ASSERT(!pose.is_absolute);
 
 	if (!model.isReady()) return;
@@ -167,7 +166,6 @@ int Animation::getBoneIndex(u32 name) const
 
 void Animation::getRelativePose(float time, Pose& pose, Model& model, BoneMask* mask) const
 {
-	PROFILE_FUNCTION();
 	ASSERT(!pose.is_absolute);
 
 	if (!model.isReady()) return;

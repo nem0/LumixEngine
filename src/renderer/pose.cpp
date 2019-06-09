@@ -62,7 +62,6 @@ void Pose::resize(int count)
 
 void Pose::computeAbsolute(Model& model)
 {
-	PROFILE_FUNCTION();
 	if (is_absolute) return;
 	for (int i = model.getFirstNonrootBoneIndex(); i < count; ++i)
 	{
@@ -76,7 +75,6 @@ void Pose::computeAbsolute(Model& model)
 
 void Pose::computeRelative(Model& model)
 {
-	PROFILE_FUNCTION();
 	if (!is_absolute) return;
 	for (int i = count - 1; i >= model.getFirstNonrootBoneIndex(); --i)
 	{

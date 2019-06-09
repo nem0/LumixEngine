@@ -1112,31 +1112,11 @@ struct AnimationSceneImpl final : public AnimationScene
 	{
 		PROFILE_FUNCTION();
 		if (m_animables.size() == 0) return;
-		/*
-		JobSystem::JobDecl jobs[16];
-		JobSystem::LambdaJob job_storage[16];
 
-		int job_count = Math::minimum(lengthOf(jobs), m_animables.size());
-		ASSERT(job_count > 0);
-		volatile int counter = 0;
-		for (int i = 0; i < job_count; ++i)
-		{
-			JobSystem::fromLambda([time_delta, this, i, job_count]() {
-				PROFILE_BLOCK("animate Job");
-				int all_count = m_animables.size();
-				int batch_count = all_count / job_count;
-				if (i == job_count - 1) batch_count = all_count - (job_count - 1) * batch_count;
-				for (int j = 0; j < batch_count; ++j)
-				{
-					Animable& animable = m_animables.at(j + i * all_count / job_count);
-					AnimationSceneImpl::updateAnimable(animable, time_delta);
-				}
-			}, &job_storage[i], &jobs[i], nullptr);
-		}
-		JobSystem::runJobs(jobs, job_count, &counter);
-		JobSystem::wait(&counter);*/
-		ASSERT(false);
-		// TODO
+		JobSystem::forEach(m_animables.size(), [&](int idx){
+			Animable& animable = m_animables.at(idx);
+			AnimationSceneImpl::updateAnimable(animable, time_delta);
+		});
 	}
 
 
