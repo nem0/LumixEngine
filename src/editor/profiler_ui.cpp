@@ -18,6 +18,7 @@
 #include "utils.h"
 #include <cstdlib>
 #include <cmath>
+#include <inttypes.h>
 
 
 namespace Lumix
@@ -487,6 +488,7 @@ struct ProfilerUIImpl final : public ProfilerUI
 		float x, y;
 		bool is_current_pos = false;
 	} hovered_signal;
+	i64 hovered_link = 0;
 };
 
 
@@ -932,6 +934,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 	HashMap<const char*, const char*> visible_blocks(1024, m_allocator);
 	HashMap<u32, ThreadRecord> threads_records(64, m_allocator);
 	bool any_hovered_signal = false;
+	bool any_hovered_link = false;
 	bool hovered_signal_current_pos = false;
 
 	for (Profiler::ThreadContext* ctx : contexts) {
@@ -956,6 +959,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 			uint offset;
 			i32 switch_id;
 			u32 color;
+			i64 link;
 			Profiler::JobRecord job_info;
 		} open_blocks[64];
 		int level = -1;
@@ -1000,6 +1004,12 @@ void ProfilerUIImpl::onGUICPUProfiler()
 					const float t = 1000 * float((to - from) / double(freq));
 					ImGui::BeginTooltip();
 					ImGui::Text("%s (%.3f ms)", name, t);
+					if (open_blocks[level].link) {
+						ImGui::Text("Link: %" PRId64, open_blocks[level].link);
+						
+						any_hovered_link = true;
+						hovered_link = open_blocks[level].link;
+					}
 					if (open_blocks[level].job_info.signal_on_finish != JobSystem::INVALID_HANDLE) {
 						any_hovered_signal = true;
 						hovered_signal.signal = open_blocks[level].job_info.signal_on_finish;
@@ -1078,9 +1088,15 @@ void ProfilerUIImpl::onGUICPUProfiler()
 				}
 				break;
 			}
+			case Profiler::EventType::LINK:
+				if (level >= 0) {
+					read(*ctx, p + sizeof(Profiler::EventHeader), open_blocks[level].link);
+				}
+				break;
 			case Profiler::EventType::BEGIN_BLOCK:
 				++level;
 				ASSERT(level < lengthOf(open_blocks));
+				open_blocks[level].link = 0;
 				open_blocks[level].offset = p;
 				open_blocks[level].color = 0xffDDddDD;
 				open_blocks[level].job_info.signal_on_finish = JobSystem::INVALID_HANDLE;
@@ -1096,7 +1112,9 @@ void ProfilerUIImpl::onGUICPUProfiler()
 					if (!m_cpu_block_filter[0] || stristr(name, m_cpu_block_filter)) {
 						u32 color = open_blocks[level].color;
 						if (open_blocks[level].job_info.signal_on_finish != JobSystem::INVALID_HANDLE
-							&& hovered_signal.signal == open_blocks[level].job_info.signal_on_finish)
+							&& hovered_signal.signal == open_blocks[level].job_info.signal_on_finish
+							|| hovered_link == open_blocks[level].link 
+							&& hovered_link != 0)
 						{
 							color = 0xff0000ff;
 						}
@@ -1156,6 +1174,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 		y += ctx->rows * 20;
 	}
 
+	if (!any_hovered_link) hovered_link = 0;
 	if (!any_hovered_signal) hovered_signal.signal = JobSystem::INVALID_HANDLE;
 	if (!hovered_signal_current_pos) hovered_signal.is_current_pos = false;
 
@@ -1222,12 +1241,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 					if (level >= 0 && m_gpu_open) {
 						Profiler::EventHeader start_header;
 						read(ctx, open_blocks[level], start_header);
-						#pragma pack(1)
-						struct {
-							StaticString<32> name;
-							u64 timestamp;
-						} data;
-						#pragma pack()
+						Profiler::GPUBlock data;
 						read(ctx, open_blocks[level] + sizeof(Profiler::EventHeader), data);
 						u64 to;
 						read(ctx, p + sizeof(Profiler::EventHeader), to);
@@ -1243,7 +1257,9 @@ void ProfilerUIImpl::onGUICPUProfiler()
 
 						const ImVec2 ra(x_start, block_y);
 						const ImVec2 rb(x_end, block_y + 19);
-						dl->AddRectFilled(ra, rb, 0xffDDddDD);
+						u32 color = 0xffDDddDD;
+						if(hovered_link && data.profiler_link == hovered_link) color = 0xffff0000;
+						dl->AddRectFilled(ra, rb, color);
 						if (x_end - x_start > 2) {
 							dl->AddRect(ra, rb, ImGui::GetColorU32(ImGuiCol_Border));
 						}
@@ -1255,6 +1271,11 @@ void ProfilerUIImpl::onGUICPUProfiler()
 							const float t = 1000 * float((to - from) / double(freq));
 							ImGui::BeginTooltip();
 							ImGui::Text("%s (%.3f ms)", data.name.data, t);
+							if (data.profiler_link) {
+								ImGui::Text("Link: %" PRId64, data.profiler_link);
+								any_hovered_link = true;
+								hovered_link = data.profiler_link;
+							}
 							ImGui::EndTooltip();
 						}
 					}

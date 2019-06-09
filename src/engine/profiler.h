@@ -74,6 +74,14 @@ struct ThreadContext
 };
 
 
+struct GPUBlock
+{
+	StaticString<32> name;
+	u64 timestamp;
+	i64 profiler_link;
+};
+
+
 enum class EventType : u8
 {
 	BEGIN_BLOCK,
@@ -88,9 +96,9 @@ enum class EventType : u8
 	JOB_INFO,
 	BEGIN_GPU_BLOCK,
 	END_GPU_BLOCK,
-	GPU_FRAME
+	GPU_FRAME,
+	LINK
 };
-
 
 #pragma pack(1)
 struct EventHeader
@@ -116,9 +124,12 @@ LUMIX_ENGINE_API void frame();
 LUMIX_ENGINE_API void recordString(const char* value);
 LUMIX_ENGINE_API void recordInt(const char* key, int value);
 
-LUMIX_ENGINE_API void beginGPUBlock(const char* name, u64 timestamp);
+LUMIX_ENGINE_API void beginGPUBlock(const char* name, u64 timestamp, i64 profiler_link);
 LUMIX_ENGINE_API void endGPUBlock(u64 timestamp);
 LUMIX_ENGINE_API void gpuFrame();
+LUMIX_ENGINE_API void link(i64 link);
+LUMIX_ENGINE_API i64 createNewLinkID();
+
 
 LUMIX_ENGINE_API void beforeFiberSwitch();
 LUMIX_ENGINE_API int getOpenBlocksSize();

@@ -7,6 +7,11 @@ namespace Lumix
 namespace MT
 {
 
+i64 atomicIncrement(i64 volatile* value)
+{
+	return _InterlockedIncrement64((volatile long long*)value);
+}
+
 i32 atomicIncrement(i32 volatile* value)
 {
 	return _InterlockedIncrement((volatile long*)value);

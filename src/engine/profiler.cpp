@@ -323,16 +323,12 @@ void beginBlock(const char* name)
 }
 
 
-void beginGPUBlock(const char* name, u64 timestamp)
+void beginGPUBlock(const char* name, u64 timestamp, i64 profiler_link)
 {
-	#pragma pack(1)
-	struct {
-		StaticString<32> name;
-		u64 timestamp;
-	} data;
-	#pragma pack()
+	GPUBlock data;
 	data.timestamp = timestamp;
 	data.name = name;
+	data.profiler_link = profiler_link;
 	write(g_instance.global_context, EventType::BEGIN_GPU_BLOCK, data);
 }
 
@@ -340,6 +336,20 @@ void beginGPUBlock(const char* name, u64 timestamp)
 void endGPUBlock(u64 timestamp)
 {
 	write(g_instance.global_context, EventType::END_GPU_BLOCK, timestamp);
+}
+
+
+i64 createNewLinkID()
+{
+	static i64 counter = 0;
+	return MT::atomicIncrement(&counter);
+}
+
+
+void link(i64 link)
+{
+	ThreadContext* ctx = g_instance.getThreadContext();
+	write(*ctx, EventType::LINK, link);
 }
 
 

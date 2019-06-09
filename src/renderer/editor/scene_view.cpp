@@ -219,7 +219,7 @@ void SceneView::renderIcons()
 	IAllocator& allocator = renderer->getAllocator();
 	Cmd* cmd = LUMIX_NEW(allocator, Cmd)(allocator);
 	cmd->view = this;
-	renderer->push(cmd);
+	renderer->push(cmd, 0);
 }
 
 
@@ -294,7 +294,7 @@ void SceneView::renderSelection()
 	RenderJob* job = LUMIX_NEW(allocator, RenderJob)(allocator);
 	job->m_pipeline = m_pipeline;
 	job->m_editor = &m_editor;
-	renderer->push(job);
+	renderer->push(job, 0);
 }
 
 
@@ -328,7 +328,7 @@ void SceneView::renderGizmos()
 			vertex_decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false);
 			vertex_decl.addAttribute(4, ffr::AttributeType::U8, true, false);
 
-			renderer->beginProfileBlock("gizmos");
+			renderer->beginProfileBlock("gizmos", 0);
 			ffr::pushDebugGroup("gizmos");
 			ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE));
 			for(Gizmo::RenderData::Cmd& cmd : data.cmds) {
@@ -371,7 +371,7 @@ void SceneView::renderGizmos()
 	Cmd* cmd = LUMIX_NEW(allocator, Cmd)(allocator);
 	cmd->shader = m_debug_shape_shader->m_render_data;
 	cmd->view = this;
-	renderer->push(cmd);
+	renderer->push(cmd, 0);
 }
 
 

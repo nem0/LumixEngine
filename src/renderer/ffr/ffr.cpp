@@ -2059,6 +2059,28 @@ void popDebugGroup()
 }
 
 
+FenceHandle createFence()
+{
+	return { glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0) };
+}
+
+
+void waitClient(FenceHandle fence)
+{
+	for(;;) {
+		const GLenum res = glClientWaitSync((GLsync)fence.value, GL_SYNC_FLUSH_COMMANDS_BIT, 1000000);
+		CHECK_GL(0);
+		if(res == GL_ALREADY_SIGNALED || res == GL_CONDITION_SATISFIED || res == GL_WAIT_FAILED) break;
+	} 
+}
+
+
+void destroy(FenceHandle fence)
+{
+	glDeleteSync((GLsync)fence.value);
+}
+
+
 void pushDebugGroup(const char* msg)
 {
 	checkThread();
