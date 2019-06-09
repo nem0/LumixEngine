@@ -665,7 +665,7 @@ struct PipelineImpl final : Pipeline
 		start_frame_cmd->global_state = global_state;
 		start_frame_cmd->global_state_buffer = m_global_state_buffer;
 		start_frame_cmd->pass_state_buffer = m_pass_state_buffer;
-		m_renderer.push(start_frame_cmd);
+		m_renderer.push(start_frame_cmd, 0);
 		
 		LuaWrapper::DebugGuard lua_debug_guard(m_lua_state);
 		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
@@ -756,7 +756,7 @@ struct PipelineImpl final : Pipeline
 		Cmd* cmd = LUMIX_NEW(allocator, Cmd)(allocator);
 		cmd->pipeline = this;
 		cmd->viewport_pos = m_viewport.pos;
-		m_renderer.push(cmd);
+		m_renderer.push(cmd, m_profiler_link);
 	}
 
 
@@ -888,7 +888,7 @@ struct PipelineImpl final : Pipeline
 		IAllocator& allocator = m_renderer.getAllocator();
 		Cmd* cmd = LUMIX_NEW(allocator, Cmd)(allocator);
 		cmd->pipeline = this;
-		m_renderer.push(cmd);
+		m_renderer.push(cmd, m_profiler_link);
 	}
 
 	void setScene(RenderScene* scene) override
@@ -1026,7 +1026,7 @@ struct PipelineImpl final : Pipeline
 		cmd->m_pipeline = pipeline;
 		cmd->m_camera_params = cp;
 
-		pipeline->m_renderer.push(cmd);
+		pipeline->m_renderer.push(cmd, pipeline->m_profiler_link);
 		return 0;
 	}
 	
@@ -1116,7 +1116,7 @@ struct PipelineImpl final : Pipeline
 		cmd->m_pipeline = pipeline;
 		cmd->m_camera_params = cp;
 
-		pipeline->m_renderer.push(cmd);
+		pipeline->m_renderer.push(cmd, pipeline->m_profiler_link);
 
 		return 0;
 	}
@@ -1262,7 +1262,7 @@ struct PipelineImpl final : Pipeline
 
 		}
 
-		pipeline->m_renderer.push(cmd);
+		pipeline->m_renderer.push(cmd, pipeline->m_profiler_link);
 
 		return 0;
 	};
@@ -1357,7 +1357,7 @@ struct PipelineImpl final : Pipeline
 			cmd->m_irradiance_map_uniform = pipeline->m_irradiance_map_uniform;
 			cmd->m_radiance_map_uniform = pipeline->m_radiance_map_uniform;
 			cmd->m_pos_radius_uniform = pipeline->m_position_radius_uniform;
-			pipeline->m_renderer.push(cmd);
+			pipeline->m_renderer.push(cmd, pipeline->m_profiler_link);
 		}
 		return 0;
 	}
@@ -1393,7 +1393,7 @@ struct PipelineImpl final : Pipeline
 		cmd->pass_state.inv_view_projection = cmd->pass_state.view_projection.inverted();
 		
 		cmd->pass_state_buffer = pipeline->m_pass_state_buffer;
-		pipeline->m_renderer.push(cmd);
+		pipeline->m_renderer.push(cmd, pipeline->m_profiler_link);
 		return 0;
 	}
 
@@ -1458,7 +1458,7 @@ struct PipelineImpl final : Pipeline
 		cmd->m_camera_params = cp;
 		cmd->m_pipeline = pipeline;
 		const int num_cmd_sets = cmd->m_bucket_count;
-		pipeline->m_renderer.push(cmd);
+		pipeline->m_renderer.push(cmd, pipeline->m_profiler_link);
 
 		return num_cmd_sets;
 	}
@@ -1619,7 +1619,7 @@ struct PipelineImpl final : Pipeline
 		cmd->m_shader = shader;
 		cmd->m_indices_count = indices_count;
 		cmd->m_indices_offset = indices_offset;
-		pipeline->m_renderer.push(cmd);
+		pipeline->m_renderer.push(cmd, pipeline->m_profiler_link);
 
 		return 0;
 	}
@@ -1860,7 +1860,7 @@ struct PipelineImpl final : Pipeline
 		RenderJob* job = LUMIX_NEW(allocator, RenderJob)(allocator);
 		job->m_pipeline = this;
 		job->m_shader = m_text_mesh_shader->m_render_data;
-		m_renderer.push(job);
+		m_renderer.push(job, m_profiler_link);
 	}
 
 
@@ -2009,7 +2009,6 @@ struct PipelineImpl final : Pipeline
 					T N = *(T*)cmd; \
 					cmd += sizeof(T); \
 					do {} while(false)
-
 				PROFILE_FUNCTION();
 				if(m_cmds->header.size == 0 && !m_cmds->header.next) return;
 
@@ -2251,7 +2250,7 @@ struct PipelineImpl final : Pipeline
 		job->m_render_state = getState(L, 2);
 		job->m_pipeline = pipeline;
 		job->m_cmds = cmd_page;
-		pipeline->m_renderer.push(job);
+		pipeline->m_renderer.push(job, pipeline->m_profiler_link);
 		return 0;
 	}
 
@@ -2321,7 +2320,7 @@ struct PipelineImpl final : Pipeline
 		cmd->count = rb_count;
 		cmd->w = pipeline->m_viewport.w;
 		cmd->h = pipeline->m_viewport.h;
-		pipeline->m_renderer.push(cmd);
+		pipeline->m_renderer.push(cmd, pipeline->m_profiler_link);
 
 		return 0;
 	}
@@ -2976,7 +2975,7 @@ struct PipelineImpl final : Pipeline
 		cmd->color.set(r, g, b, a);
 		cmd->flags = flags;
 		cmd->depth = depth;
-		m_renderer.push(cmd);
+		m_renderer.push(cmd, m_profiler_link);
 	}
 
 
@@ -2997,7 +2996,7 @@ struct PipelineImpl final : Pipeline
 		cmd->w = w;
 		cmd->h = h;
 
-		m_renderer.push(cmd);
+		m_renderer.push(cmd, m_profiler_link);
 	}
 
 
@@ -3010,15 +3009,18 @@ struct PipelineImpl final : Pipeline
 			{
 				PROFILE_FUNCTION();
 				ffr::pushDebugGroup(name);
-				renderer->beginProfileBlock(name);
+				renderer->beginProfileBlock(name, profiler_link);
 			}
 			StaticString<32> name;
 			Renderer* renderer;
+			i64 profiler_link;
 		};
 		Cmd* cmd = LUMIX_NEW(m_renderer.getAllocator(), Cmd);
 		cmd->name = name;
 		cmd->renderer = &m_renderer;
-		m_renderer.push(cmd);
+		m_profiler_link = Profiler::createNewLinkID();
+		cmd->profiler_link = m_profiler_link;
+		m_renderer.push(cmd, m_profiler_link);
 	}
 
 
@@ -3037,7 +3039,8 @@ struct PipelineImpl final : Pipeline
 		};
 		Cmd* cmd = LUMIX_NEW(m_renderer.getAllocator(), Cmd);
 		cmd->renderer = &m_renderer;
-		m_renderer.push(cmd);
+		m_renderer.push(cmd, m_profiler_link);
+		m_profiler_link = 0;
 	}
 
 	
@@ -3179,6 +3182,7 @@ struct PipelineImpl final : Pipeline
 
 	IAllocator& m_allocator;
 	Renderer& m_renderer;
+	i64 m_profiler_link;
 	PipelineResource* m_resource;
 	lua_State* m_lua_state;
 	int m_lua_thread_ref;

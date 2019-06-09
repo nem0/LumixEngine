@@ -8,6 +8,7 @@ namespace MT
 {
 
 
+LUMIX_ENGINE_API i64 atomicIncrement(i64 volatile* value);
 LUMIX_ENGINE_API i32 atomicIncrement(i32 volatile* value);
 LUMIX_ENGINE_API i32 atomicDecrement(i32 volatile* value);
 LUMIX_ENGINE_API i32 atomicAdd(i32 volatile* addend, i32 value);

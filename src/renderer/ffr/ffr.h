@@ -10,6 +10,7 @@ struct IAllocator;
 namespace ffr {
 
 
+struct FenceHandle { void* value; bool isValid() const { return value; } };
 struct BufferHandle { uint value; bool isValid() const { return value != 0xFFffFFff; } };
 struct ProgramHandle { uint value; bool isValid() const { return value != 0xFFffFFff; } };
 struct FramebufferHandle { uint value; bool isValid() const { return value != 0xFFffFFff; } };
@@ -24,6 +25,7 @@ const TextureHandle INVALID_TEXTURE = { 0xffFFffFF };
 const FramebufferHandle INVALID_FRAMEBUFFER = { 0xffFFffFF };
 const QueryHandle INVALID_QUERY = { 0xffFFffFF };
 const UniformHandle INVALID_UNIFORM = { 0xffFFffFF };
+const FenceHandle INVALID_FENCE = { 0 };
 
 
 enum class LogLevel : uint {
@@ -220,6 +222,9 @@ BufferHandle allocBufferHandle();
 ProgramHandle allocProgramHandle();
 UniformHandle allocUniform(const char* name, UniformType type, int count);
 
+FenceHandle createFence();
+void waitClient(FenceHandle fence);
+
 void setState(u64 state);
 bool createProgram(ProgramHandle program, const char** srcs, const ShaderType* types, int num, const char** prefixes, int prefixes_count, const char* name);
 void useProgram(ProgramHandle prg);
@@ -248,6 +253,7 @@ u64 getQueryResult(QueryHandle query);
 bool isQueryReady(QueryHandle query);
 void generateMipmaps(TextureHandle texture);
 
+void destroy(FenceHandle fence);
 void destroy(ProgramHandle program);
 void destroy(BufferHandle buffer);
 void destroy(TextureHandle texture);

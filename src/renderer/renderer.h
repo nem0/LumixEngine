@@ -42,6 +42,7 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 			virtual void setup() = 0;
 			virtual void execute() = 0;
 			Renderer* renderer = nullptr;
+			i64 profiler_link = 0;
 		};
 
 		struct TransientSlice
@@ -88,10 +89,10 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 		virtual void getTextureImage(ffr::TextureHandle texture, int size, void* data) = 0;
 		virtual void destroy(ffr::TextureHandle tex) = 0;
 		
-		virtual void push(RenderJob* cmd) = 0;
+		virtual void push(RenderJob* cmd, i64 profiler_link) = 0;
 		virtual ffr::FramebufferHandle getFramebuffer() const = 0;
 
-		virtual void beginProfileBlock(const char* name) = 0;
+		virtual void beginProfileBlock(const char* name, i64 link) = 0;
 		virtual void endProfileBlock() = 0;
 		virtual void runInRenderThread(void* user_ptr, void (*fnc)(Renderer& renderer, void*)) = 0;
 

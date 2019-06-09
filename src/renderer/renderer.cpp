@@ -72,6 +72,7 @@ struct GPUProfiler
 		StaticString<32> name;
 		ffr::QueryHandle handle;
 		u64 result;
+		i64 profiler_link;
 		bool is_end;
 		bool is_frame;
 	};
@@ -139,10 +140,11 @@ struct GPUProfiler
 	}
 
 
-	void beginQuery(const char* name)
+	void beginQuery(const char* name, i64 profiler_link)
 	{
 		MT::CriticalSectionLock lock(m_mutex);
 		Query& q = m_queries.emplace();
+		q.profiler_link = profiler_link;
 		q.name = name;
 		q.is_end = false;
 		q.is_frame = false;
@@ -185,7 +187,7 @@ struct GPUProfiler
 			}
 			else {
 				const u64 timestamp = toCPUTimestamp(ffr::getQueryResult(q.handle));
-				Profiler::beginGPUBlock(q.name, timestamp);
+				Profiler::beginGPUBlock(q.name, timestamp, q.profiler_link);
 			}
 			m_pool.push(q.handle);
 			m_queries.erase(0);
@@ -505,9 +507,9 @@ struct RendererImpl final : public Renderer
 	}
 
 
-	void beginProfileBlock(const char* name) override
+	void beginProfileBlock(const char* name, i64 link) override
 	{
-		m_profiler.beginQuery(name);
+		m_profiler.beginQuery(name, link);
 	}
 
 
@@ -543,7 +545,7 @@ struct RendererImpl final : public Renderer
 		cmd->handle = texture;
 		cmd->size = size;
 		cmd->buf = data;
-		push(cmd);
+		push(cmd, 0);
 	}
 
 
@@ -579,7 +581,7 @@ struct RendererImpl final : public Renderer
 		cmd->mem = mem;
 		cmd->renderer = this;
 
-		push(cmd);
+		push(cmd, 0);
 	}
 
 
@@ -618,7 +620,7 @@ struct RendererImpl final : public Renderer
 		cmd->memory = memory;
 		cmd->flags = flags;
 		cmd->renderer = this;
-		push(cmd);
+		push(cmd, 0);
 
 		return handle;
 	}
@@ -671,7 +673,7 @@ struct RendererImpl final : public Renderer
 		cmd->handle = handle;
 		cmd->memory = memory;
 		cmd->renderer = this;
-		push(cmd);
+		push(cmd, 0);
 
 		return handle;
 	}
@@ -718,7 +720,7 @@ struct RendererImpl final : public Renderer
 		cmd->fnc = fnc;
 		cmd->ptr = user_ptr;
 		cmd->renderer = this;
-		push(cmd);
+		push(cmd, 0);
 	}
 
 	
@@ -738,7 +740,7 @@ struct RendererImpl final : public Renderer
 		Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
 		cmd->program = program;
 		cmd->renderer = this;
-		push(cmd);
+		push(cmd, 0);
 	}
 
 
@@ -758,7 +760,7 @@ struct RendererImpl final : public Renderer
 		Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
 		cmd->buffer = buffer;
 		cmd->renderer = this;
-		push(cmd);
+		push(cmd, 0);
 	}
 
 
@@ -797,7 +799,7 @@ struct RendererImpl final : public Renderer
 		cmd->h = h;
 		cmd->depth = depth;
 		cmd->renderer = this;
-		push(cmd);
+		push(cmd, 0);
 
 		return handle;
 	}
@@ -819,14 +821,15 @@ struct RendererImpl final : public Renderer
 		Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
 		cmd->texture = tex;
 		cmd->renderer = this;
-		push(cmd);
+		push(cmd, 0);
 	}
 
 
-	void push(RenderJob* cmd) override
+	void push(RenderJob* cmd, i64 profiler_link) override
 	{
 		ASSERT(!cmd->renderer);
 		cmd->renderer = this;
+		cmd->profiler_link = profiler_link;
 		
 		JobSystem::SignalHandle preconditions = m_last_exec_job;
 		JobSystem::incSignal(&m_setup_jobs_done);
@@ -843,6 +846,7 @@ struct RendererImpl final : public Renderer
 			PROFILE_BLOCK("execute_render_job");
 			Profiler::blockColor(0xaa, 0xff, 0xaa);
 			RenderJob* cmd = (RenderJob*)data;
+			Profiler::link(cmd->profiler_link);
 			cmd->execute();
 			LUMIX_DELETE(cmd->renderer->getAllocator(), cmd);
 		}, &exec_counter, preconditions, 1);
@@ -925,7 +929,7 @@ struct RendererImpl final : public Renderer
 			}
 		};
 		Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
-		push(cmd);
+		push(cmd, 0);
 	}
 
 
@@ -939,7 +943,7 @@ struct RendererImpl final : public Renderer
 			}
 		};
 		Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
-		push(cmd);
+		push(cmd, 0);
 	}
 
 
@@ -952,6 +956,12 @@ struct RendererImpl final : public Renderer
 				PROFILE_FUNCTION();
 				JobSystem::enableBackupWorker(true);
 				ffr::swapBuffers();
+				// TODO
+				/*if(renderer->m_fence.isValid()) {
+					ffr::waitClient(renderer->m_fence);
+					ffr::destroy(renderer->m_fence);
+				}
+				renderer->m_fence = ffr::createFence();*/
 				JobSystem::enableBackupWorker(false);
 				renderer->m_profiler.frame();
 			}
@@ -960,7 +970,7 @@ struct RendererImpl final : public Renderer
 		};
 		SwapCmd* swap_cmd = LUMIX_NEW(m_allocator, SwapCmd);
 		swap_cmd->renderer = this;
-		push(swap_cmd);
+		push(swap_cmd, 0);
 		JobSystem::wait(m_prev_frame_job);
 		JobSystem::wait(m_setup_jobs_done);
 		m_setup_jobs_done = JobSystem::INVALID_HANDLE;
@@ -993,6 +1003,7 @@ struct RendererImpl final : public Renderer
 	JobSystem::SignalHandle m_last_exec_job = JobSystem::INVALID_HANDLE;
 	JobSystem::SignalHandle m_prev_frame_job = JobSystem::INVALID_HANDLE;
 	JobSystem::SignalHandle m_setup_jobs_done = JobSystem::INVALID_HANDLE;
+	ffr::FenceHandle m_fence = ffr::INVALID_FENCE;
 
 	ffr::FramebufferHandle m_framebuffer;
 	ffr::BufferHandle m_transient_buffer;
