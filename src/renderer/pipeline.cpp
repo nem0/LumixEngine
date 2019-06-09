@@ -2086,14 +2086,16 @@ struct PipelineImpl final : Pipeline
 							case RenderableTypes::SKINNED: {
 								READ(const Mesh::RenderData*, mesh);
 								READ(const Material::RenderData*, material);
+								READ(const Vec3, pos);
+								READ(const Quat, rot);
+								READ(const float, scale);
+								READ(const i32, bones_count);
 
-								const float* model_mtx = (const float*)cmd;
-								cmd += sizeof(Matrix);
+								READ(const ffr::BufferHandle, buffer);
+								READ(const uint, offset);
 
-								READ(const int, bones_count);
-
-								const float* bones = (const float*)cmd;
-								cmd += sizeof(Matrix) * bones_count;
+								Matrix model_mtx(pos, rot);
+								model_mtx.multiply3x3(scale);
 
 								ShaderRenderData* shader = material->shader;
 								ffr::bindTextures(material->textures, material->textures_count);
@@ -2104,13 +2106,15 @@ struct PipelineImpl final : Pipeline
 									const Vec4 params(material->roughness, material->metallic, material->emission, 0);
 									ffr::setUniform4f(m_pipeline->m_material_params_uniform, &params.x);
 									ffr::setUniform4f(m_pipeline->m_material_color_uniform, &material->color.x);
-									ffr::setUniformMatrix4f(m_pipeline->m_model_uniform, model_mtx);
+									ffr::setUniformMatrix4f(m_pipeline->m_model_uniform, &model_mtx.m11);
 								
 									ffr::useProgram(prog.handle);
 
-									const int loc = ffr::getUniformLocation(prog.handle, m_pipeline->m_bones_uniform);
-									if (loc >= 0) ffr::applyUniformMatrix4fv(loc, bones_count, bones);
+									ffr::uniformBlockBinding(prog.handle, "Bones", 2);
+									const int bones_size = bones_count * sizeof(Matrix);
+									ffr::bindUniformBuffer(2, buffer, offset, bones_size);
 
+									ffr::flushBuffer(buffer, offset, bones_size);
 									int attribute_map[16];
 									for (uint i = 0; i < mesh->vertex_decl.attributes_count; ++i) {
 										attribute_map[i] = prog.attribute_by_semantics[(int)mesh->attributes_semantic[i]];
@@ -2119,6 +2123,7 @@ struct PipelineImpl final : Pipeline
 									ffr::setIndexBuffer(mesh->index_buffer_handle);
 									ffr::drawTriangles(mesh->indices_count);
 									++stats.draw_call_count;
+									stats.triangle_count += mesh->indices_count / 3;
 									++stats.instance_count;
 								}
 								break;
@@ -2592,7 +2597,7 @@ struct PipelineImpl final : Pipeline
 				const DVec3 camera_pos = ctx->camera_pos;
 				for (int i = 0, c = ctx->count; i < c; ++i) {
 					const EntityRef e = {int(renderables[i] & 0xFFffFFff)};
-					const RenderableTypes type = RenderableTypes((renderables[i] >> 24) & 0xff);
+					const RenderableTypes type = RenderableTypes((renderables[i] >> 32) & 0xff);
 					const u8 bucket = sort_keys[i] >> 56;
 					if(bucket != cmd_page->header.bucket) {
 						new_page(bucket);
@@ -2639,35 +2644,34 @@ struct PipelineImpl final : Pipeline
 							break;
 						}
 						case RenderableTypes::SKINNED: {
-							/*const u32 mesh_idx = renderables[i] >> 40;
+							const u32 mesh_idx = renderables[i] >> 40;
 							const ModelInstance* LUMIX_RESTRICT mi = &model_instances[e.index];
-							const uint out_offset = uint(out - ctx->output->begin());
-							ctx->output->resize(ctx->output->size() +  mi->pose->count * sizeof(Matrix) + sizeof(Matrix));
-							out = ctx->output->begin() + out_offset;
+							const Transform& tr = entity_data[e.index];
+							const Vec3 rel_pos = (tr.pos - camera_pos).toFloat();
 
 							WRITE(type);
 							WRITE(mi->meshes[mesh_idx].render_data);
 							WRITE_FN(mi->meshes[mesh_idx].material->getRenderData());
-							const Transform& tr = entity_data[e.index];
-							Matrix mtx = tr.rot.toMatrix();
-							mtx.multiply3x3(tr.scale);
-							mtx.setTranslation((tr.pos - camera_pos).toFloat());
-							WRITE(mtx);
+							WRITE(rel_pos);
+							WRITE(tr.rot);
+							WRITE(tr.scale);
+							WRITE(mi->pose->count);
 
-							*(int*)out = mi->pose->count;
-							out += sizeof(int);
+							const Renderer::TransientSlice slice = renderer.allocTransient(mi->pose->count * sizeof(Matrix) + 256);
+							WRITE(slice.buffer);
+							uint align = 256 - slice.offset % 256; 
+							uint offset = slice.offset + align;
+							WRITE(offset);
 							const Quat* rotations = mi->pose->rotations;
 							const Vec3* positions = mi->pose->positions;
 
 							Model& model = *mi->model;
-							for(int j = 0, c = mi->pose->count; j < c; ++j) {
+							for (int j = 0, c = mi->pose->count; j < c; ++j) {
 								const Model::Bone& bone = model.getBone(j);
 								const LocalRigidTransform tmp = {positions[j], rotations[j]};
 								Matrix m = (tmp * bone.inv_bind_transform).toMatrix();
-								WRITE(m);
-							}*/
-							ASSERT(false);
-							// TODO
+								memcpy(slice.ptr + align + sizeof(Matrix) * j, &m, sizeof(Matrix));
+							}
 							break;
 						}
 						case RenderableTypes::DECAL: {
@@ -2847,10 +2851,12 @@ struct PipelineImpl final : Pipeline
 								const float squared_length = float((pos - camera_pos).squaredLength());
 								const LODMeshIndices lod = mi.model->getLODMeshIndices(squared_length);
 								for (int mesh_idx = lod.from; mesh_idx <= lod.to; ++mesh_idx) {
-									// TODO bucket
-									// TODO type
-									ASSERT(false);
-									result.push(mi.meshes[mesh_idx].sort_key, e.index | type_mask | ((u64)mesh_idx << 40));
+									const Mesh& mesh = mi.meshes[mesh_idx];
+									const u32 bucket = bucket_map[mesh.layer];
+									if (bucket < 0xffFF) {
+										// TODO sort by depth bucket
+										result.push(mi.meshes[mesh_idx].sort_key | ((u64)bucket << 56), e.index | type_mask | ((u64)mesh_idx << 40));
+									}
 								}
 							}
 							break;

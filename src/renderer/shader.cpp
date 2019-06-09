@@ -47,7 +47,7 @@ const Shader::Program& Shader::getProgram(ShaderRenderData* rd, u32 defines)
 	if (!iter.isValid()) {
 		PROFILE_BLOCK("compile_shader");
 		static const char* shader_code_prefix = 
-			R"#(#version 420
+			R"#(#version 440
 			layout (std140) uniform GlobalState {
 				mat4 u_shadow_view_projection;
 				mat4 u_shadowmap_matrices[4];

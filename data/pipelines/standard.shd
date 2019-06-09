@@ -43,7 +43,9 @@ vertex_shader [[
 	#elif defined SKINNED
 		layout(location = 3) in vec4 a_indices;
 		layout(location = 4) in vec4 a_weights;
-		uniform mat4 u_bones[196];
+		layout(std140) uniform Bones {
+			mat4 u_bones[256];
+		};
 	#elif defined INSTANCED
 		layout(location = 3) in vec4 i_rot_quat;
 		layout(location = 4) in vec4 i_pos_scale;

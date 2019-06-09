@@ -227,11 +227,11 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	void onGUI(Resource* resource) override
 	{
 		Material* material = static_cast<Material*>(resource);
+		if (ImGui::Button("Open in external editor")) m_app.getAssetBrowser().openInExternalEditor(material);
 		if (!material->isReady()) return;
 
 		if (ImGui::Button("Save")) saveMaterial(material);
 		ImGui::SameLine();
-		if (ImGui::Button("Open in external editor")) m_app.getAssetBrowser().openInExternalEditor(material);
 
 		auto* plugin = m_app.getWorldEditor().getEngine().getPluginManager().getPlugin("renderer");
 		auto* renderer = static_cast<Renderer*>(plugin);
