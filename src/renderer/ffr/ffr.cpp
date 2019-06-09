@@ -1254,7 +1254,7 @@ void bindUniformBuffer(uint index, BufferHandle buffer, size_t offset, size_t si
 {
 	checkThread();
 	const GLuint buf = g_ffr.buffers[buffer.value].handle;
-	glBindBufferRange(GL_UNIFORM_BUFFER, index, buf, offset, size);
+	CHECK_GL(glBindBufferRange(GL_UNIFORM_BUFFER, index, buf, offset, size));
 }
 
 
@@ -1262,7 +1262,7 @@ void flushBuffer(BufferHandle buffer, size_t offset, size_t len)
 {
 	checkThread();
 	const GLuint buf = g_ffr.buffers[buffer.value].handle;
-	glFlushMappedNamedBufferRange(buf, offset, len);
+	CHECK_GL(glFlushMappedNamedBufferRange(buf, offset, len));
 }
 
 
@@ -1284,7 +1284,7 @@ void unmap(BufferHandle buffer)
 {
 	checkThread();
 	const GLuint buf = g_ffr.buffers[buffer.value].handle;
-	glUnmapNamedBuffer(buf);
+	CHECK_GL(glUnmapNamedBuffer(buf));
 }
 
 
