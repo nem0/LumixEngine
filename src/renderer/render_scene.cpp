@@ -291,6 +291,7 @@ public:
 			{
 				i.model->getResourceManager().unload(*i.model);
 				LUMIX_DELETE(m_allocator, i.pose);
+				i.pose = nullptr;
 			}
 		}
 		m_model_instances.clear();
