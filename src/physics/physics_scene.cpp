@@ -364,6 +364,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		, m_update_in_progress(nullptr)
 		, m_vehicle_batch_query(nullptr)
 	{
+
 		setMemory(m_layers_names, 0, sizeof(m_layers_names));
 		for (int i = 0; i < lengthOf(m_layers_names); ++i)
 		{
@@ -374,7 +375,10 @@ struct PhysicsSceneImpl final : public PhysicsScene
 			m_collision_filter[i] = 0xffffFFFF;
 		}
 
+		m_physics_cmps_mask = 0;
+
 		#define REGISTER_COMPONENT(TYPE, COMPONENT)      \
+			m_physics_cmps_mask |= (u64)1 << TYPE.index;      \
 			context.registerComponentType(TYPE,          \
 				this,                                    \
 				&PhysicsSceneImpl::create##COMPONENT,    \
@@ -1140,9 +1144,9 @@ struct PhysicsSceneImpl final : public PhysicsScene
 
 	void destroyRagdoll(EntityRef entity)
 	{
-		int idx = m_ragdolls.find(entity);
-		destroySkeleton(m_ragdolls.at(idx).root);
-		m_ragdolls.eraseAt(idx);
+		auto iter = m_ragdolls.find(entity);
+		destroySkeleton(iter.value().root);
+		m_ragdolls.erase(iter);
 		m_universe.onComponentDestroyed(entity, RAGDOLL_TYPE, this);
 	}
 
@@ -1270,7 +1274,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 
 	void createHeightfield(EntityRef entity)
 	{
-		Heightfield& terrain = m_terrains.insert(entity);
+		Heightfield& terrain = m_terrains.insert(entity, Heightfield());
 		terrain.m_heightmap = nullptr;
 		terrain.m_scene = this;
 		terrain.m_actor = nullptr;
@@ -1362,7 +1366,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 
 	void createRagdoll(EntityRef entity)
 	{
-		Ragdoll& ragdoll = m_ragdolls.insert(entity);
+		Ragdoll& ragdoll = m_ragdolls.insert(entity, Ragdoll());
 		ragdoll.entity = entity;
 		ragdoll.root = nullptr;
 		ragdoll.layer = 0;
@@ -1375,7 +1379,10 @@ struct PhysicsSceneImpl final : public PhysicsScene
 
 	void createRigidActor(EntityRef entity)
 	{
-		if (m_actors.find(entity) >= 0) return;
+		if (m_actors.find(entity).isValid()) {
+			g_log_error.log("Physics") << "Entity " << entity.index << " already has rigid actor";
+			return;
+		}
 		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, entity);
 		m_actors.insert(entity, actor);
 
@@ -1485,11 +1492,8 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	}
 
 
-	int getActorCount() const override { return m_actors.size(); }
-	EntityRef getActorEntity(int index) override { return m_actors.at(index)->entity; }
-
-
-	bool isActorDebugEnabled(int index) const override
+	// TODO
+/*	bool isActorDebugEnabled(int index) const override
 	{
 		auto* px_actor = m_actors.at(index)->physx_actor;
 		if (!px_actor) return false;
@@ -1506,7 +1510,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		int count = px_actor->getShapes(&shape, 1);
 		ASSERT(count > 0);
 		shape->setFlag(PxShapeFlag::eVISUALIZATION, enable);
-	}
+	}*/
 
 
 	void render() override
@@ -2192,10 +2196,10 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	void initJoint(EntityRef entity, Joint& joint)
 	{
 		PxRigidActor* actors[2] = {nullptr, nullptr};
-		int idx = m_actors.find(entity);
-		if (idx >= 0) actors[0] = m_actors.at(idx)->physx_actor;
-		idx = joint.connected_body.isValid() ? m_actors.find((EntityRef)joint.connected_body) : -1;
-		if (idx >= 0) actors[1] = m_actors.at(idx)->physx_actor;
+		auto iter = m_actors.find(entity);
+		if (iter.isValid()) actors[0] = iter.value()->physx_actor;
+		iter = joint.connected_body.isValid() ? m_actors.find((EntityRef)joint.connected_body) : m_actors.end();
+		if (iter.isValid()) actors[1] = iter.value()->physx_actor;
 		if (!actors[0] || !actors[1]) return;
 
 		DVec3 pos0 = m_universe.getPosition(entity);
@@ -2578,10 +2582,10 @@ struct PhysicsSceneImpl final : public PhysicsScene
 
 	void addForceAtPos(EntityRef entity, const Vec3& force, const Vec3& pos)
 	{
-		int index = m_actors.find(entity);
-		if (index < 0) return;
+		auto iter = m_actors.find(entity);
+		if (!iter.isValid()) return;
 
-		RigidActor* actor = m_actors.at(index);
+		RigidActor* actor = iter.value();
 		if (!actor->physx_actor) return;
 
 		PxRigidBody* rigid_body = actor->physx_actor->is<PxRigidBody>();
@@ -2637,10 +2641,10 @@ struct PhysicsSceneImpl final : public PhysicsScene
 			if (layer >= 0)
 			{
 				const EntityRef hit_entity = {(int)(intptr_t)actor->userData};
-				const int idx = scene->m_actors.find(hit_entity);
-				if (idx >= 0)
+				const auto iter = scene->m_actors.find(hit_entity);
+				if (iter.isValid())
 				{
-					const RigidActor* actor = scene->m_actors.at(idx);
+					const RigidActor* actor = iter.value();
 					if (!scene->canLayersCollide(actor->layer, layer)) return PxQueryHitType::eNONE;
 				}
 			}
@@ -2709,47 +2713,56 @@ struct PhysicsSceneImpl final : public PhysicsScene
 
 	void onEntityMoved(EntityRef entity)
 	{
-		int ctrl_idx = m_controllers.find(entity);
-		if (ctrl_idx >= 0)
-		{
-			auto& controller = m_controllers.at(ctrl_idx);
-			DVec3 pos = m_universe.getPosition(entity);
-			PxExtendedVec3 pvec(pos.x, pos.y, pos.z);
-			controller.m_controller->setFootPosition(pvec);
-		}
-
-		int ragdoll_idx = m_ragdolls.find(entity);
-		if (ragdoll_idx >= 0 && !m_is_updating_ragdoll)
-		{
-			auto* render_scene = static_cast<RenderScene*>(m_universe.getScene(RENDERER_HASH));
-			if (!render_scene) return;
-			if (!m_universe.hasComponent(entity, MODEL_INSTANCE_TYPE)) return;
-
-			const Pose* pose = render_scene->lockPose(entity);
-			if (!pose) return;
-			setSkeletonPose(m_universe.getTransform(entity).getRigidPart(), m_ragdolls.at(ragdoll_idx).root, pose);
-			render_scene->unlockPose(entity, false);
-		}
-
-		int idx = m_actors.find(entity);
-		if (idx >= 0)
-		{
-			RigidActor* actor = m_actors.at(idx);
-			if (actor->physx_actor && m_update_in_progress != actor)
+		const u64 cmp_mask = m_universe.getComponentsMask(entity);
+		if ((cmp_mask & m_physics_cmps_mask) == 0) return;
+		
+		if (m_universe.hasComponent(entity, CONTROLLER_TYPE)) {
+			int ctrl_idx = m_controllers.find(entity);
+			if (ctrl_idx >= 0)
 			{
-				Transform trans = m_universe.getTransform(entity);
-				if (actor->dynamic_type == DynamicType::KINEMATIC)
+				auto& controller = m_controllers.at(ctrl_idx);
+				DVec3 pos = m_universe.getPosition(entity);
+				PxExtendedVec3 pvec(pos.x, pos.y, pos.z);
+				controller.m_controller->setFootPosition(pvec);
+			}
+		}
+
+		if (m_universe.hasComponent(entity, RAGDOLL_TYPE)) {
+			auto iter = m_ragdolls.find(entity);
+			if (iter.isValid() && !m_is_updating_ragdoll)
+			{
+				auto* render_scene = static_cast<RenderScene*>(m_universe.getScene(RENDERER_HASH));
+				if (!render_scene) return;
+				if (!m_universe.hasComponent(entity, MODEL_INSTANCE_TYPE)) return;
+
+				const Pose* pose = render_scene->lockPose(entity);
+				if (!pose) return;
+				setSkeletonPose(m_universe.getTransform(entity).getRigidPart(), iter.value().root, pose);
+				render_scene->unlockPose(entity, false);
+			}
+		}
+
+		if (m_universe.hasComponent(entity, RIGID_ACTOR_TYPE)) {
+			auto iter = m_actors.find(entity);
+			if (iter.isValid())
+			{
+				RigidActor* actor = iter.value();
+				if (actor->physx_actor && m_update_in_progress != actor)
 				{
-					auto* rigid_dynamic = (PxRigidDynamic*)actor->physx_actor;
-					rigid_dynamic->setKinematicTarget(toPhysx(trans.getRigidPart()));
-				}
-				else
-				{
-					actor->physx_actor->setGlobalPose(toPhysx(trans.getRigidPart()), false);
-				}
-				if (actor->resource && actor->scale != trans.scale)
-				{
-					actor->rescale();
+					Transform trans = m_universe.getTransform(entity);
+					if (actor->dynamic_type == DynamicType::KINEMATIC)
+					{
+						auto* rigid_dynamic = (PxRigidDynamic*)actor->physx_actor;
+						rigid_dynamic->setKinematicTarget(toPhysx(trans.getRigidPart()));
+					}
+					else
+					{
+						actor->physx_actor->setGlobalPose(toPhysx(trans.getRigidPart()), false);
+					}
+					if (actor->resource && actor->scale != trans.scale)
+					{
+						actor->rescale();
+					}
 				}
 			}
 		}
@@ -3487,7 +3500,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 
 	void deserializeRagdoll(IDeserializer& serializer, EntityRef entity, int /*scene_version*/)
 	{
-		Ragdoll& ragdoll = m_ragdolls.insert(entity);
+		Ragdoll& ragdoll = m_ragdolls.insert(entity, Ragdoll());
 
 		ragdoll.entity = entity;
 		ragdoll.root_transform.pos = DVec3(0, 0, 0);
@@ -4444,10 +4457,9 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	void serializeRagdolls(OutputBlob& serializer)
 	{
 		serializer.write(m_ragdolls.size());
-		for (int i = 0, c = m_ragdolls.size(); i < c; ++i)
+		for (const Ragdoll& ragdoll : m_ragdolls)
 		{
-			serializer.write(m_ragdolls.getKey(i));
-			const Ragdoll& ragdoll = m_ragdolls.at(i);
+			serializer.write(ragdoll.entity);
 			serializer.write(ragdoll.layer);
 			serializeRagdollBone(ragdoll, ragdoll.root, serializer);
 		}
@@ -4541,7 +4553,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	{
 		i32 count;
 		serializer.read(count);
-		m_actors.reserve(count);
+		m_actors.rehash(count);
 		for (int i = 0; i < count; ++i) {
 			EntityRef entity;
 			serializer.read(entity);
@@ -4667,12 +4679,12 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	{
 		int count;
 		serializer.read(count);
-		m_ragdolls.reserve(count);
+		m_ragdolls.rehash(count);
 		for (int i = 0; i < count; ++i)
 		{
 			EntityRef entity;
 			serializer.read(entity);
-			Ragdoll& ragdoll = m_ragdolls.insert(entity);
+			Ragdoll& ragdoll = m_ragdolls.insert(entity, Ragdoll());
 			ragdoll.layer = 0;
 			ragdoll.root_transform.pos = DVec3(0, 0, 0);
 			ragdoll.root_transform.rot.set(0, 0, 0, 1);
@@ -4863,9 +4875,9 @@ struct PhysicsSceneImpl final : public PhysicsScene
 
 	void putToSleep(EntityRef entity) override
 	{
-		int key = m_actors.find(entity);
-		if (key < 0) return;
-		RigidActor* actor = m_actors.at(key);
+		auto iter = m_actors.find(entity);
+		if (!iter.isValid()) return;
+		RigidActor* actor = iter.value();
 
 		if (actor->dynamic_type != DynamicType::DYNAMIC)
 		{
@@ -4881,9 +4893,9 @@ struct PhysicsSceneImpl final : public PhysicsScene
 
 	void applyForceToActor(EntityRef entity, const Vec3& force) override
 	{
-		int key = m_actors.find(entity);
-		if (key < 0) return;
-		RigidActor* actor = m_actors.at(key);
+		auto iter = m_actors.find(entity);
+		if (!iter.isValid()) return;
+		RigidActor* actor = iter.value();
 
 		if (actor->dynamic_type != DynamicType::DYNAMIC)
 		{
@@ -4899,9 +4911,10 @@ struct PhysicsSceneImpl final : public PhysicsScene
 
 	void applyImpulseToActor(EntityRef entity, const Vec3& impulse) override
 	{
-		int key = m_actors.find(entity);
-		if (key < 0) return;
-		RigidActor* actor = m_actors.at(key);
+		auto iter = m_actors.find(entity);
+		if (!iter.isValid()) return;
+		RigidActor* actor = iter.value();
+
 		if (actor->dynamic_type != DynamicType::DYNAMIC)
 		{
 			g_log_warning.log("Physics") << "Trying to apply force to static object #" << entity.index;
@@ -5006,16 +5019,17 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	PxControllerManager* m_controller_manager;
 	PxMaterial* m_default_material;
 
-	AssociativeArray<EntityRef, RigidActor*> m_actors;
-	AssociativeArray<EntityRef, Ragdoll> m_ragdolls;
+	HashMap<EntityRef, RigidActor*> m_actors;
+	HashMap<EntityRef, Ragdoll> m_ragdolls;
 	AssociativeArray<EntityRef, Joint> m_joints;
 	AssociativeArray<EntityRef, Controller> m_controllers;
-	AssociativeArray<EntityRef, Heightfield> m_terrains;
+	HashMap<EntityRef, Heightfield> m_terrains;
 	HashMap<EntityRef, Vehicle> m_vehicles;
 	HashMap<EntityRef, Wheel> m_wheels;
 	PxVehicleDrivableSurfaceToTireFrictionPairs* m_vehicle_frictions;
 	PxBatchQuery* m_vehicle_batch_query;
 	PxRaycastQueryResult* m_vehicle_results;
+	u64 m_physics_cmps_mask;
 
 	Array<RigidActor*> m_dynamic_actors;
 	RigidActor* m_update_in_progress;

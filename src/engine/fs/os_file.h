@@ -40,5 +40,27 @@ namespace Lumix
 		private:
 			void* m_handle;
 		};
+
+	
+		struct OSFileStream : FS::IFile 
+		{
+			bool open(const Path& path, FS::Mode mode) override;
+			void close() override;
+
+			bool read(void* buffer, size_t size) override;
+			bool write(const void* buffer, size_t size) override;
+
+			const void* getBuffer() const override;
+			size_t size() override;
+
+			bool seek(FS::SeekMode base, size_t pos) override;
+			size_t pos() override;
+	
+			FS::IFileDevice* getDevice() override;
+	
+			FS::OsFile file;
+		};
+
 	} // namespace FS
+
 } // namespace Lumix

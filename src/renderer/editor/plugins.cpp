@@ -1630,7 +1630,7 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 		}
 
 		FS::OsFile file;
-		const char* base_path = m_app.getWorldEditor().getEngine().getDiskFileDevice()->getBasePath();
+		const char* base_path = m_app.getWorldEditor().getEngine().getFileSystem().getBasePath();
 		StaticString<MAX_PATH_LENGTH> path(base_path, "universes/", m_app.getWorldEditor().getUniverse()->getName());
 		if (!OS::makePath(path) && !OS::dirExists(path))
 		{
@@ -2002,16 +2002,15 @@ struct RenderInterfaceImpl final : public RenderInterface
 	{
 		FS::FileSystem& fs = engine.getFileSystem();
 		Path path(path_cstr);
-		FS::IFile* file = fs.open(fs.getDefaultDevice(), path, FS::Mode::CREATE_AND_WRITE);
-		if (!file) return false;
+		FS::OSFileStream file;
+		if (!file.open(path, FS::Mode::CREATE_AND_WRITE)) return false;
 
-		if (!Texture::saveTGA(file, w, h, 4, (const u8*)pixels, path, engine.getAllocator()))
-		{
-			fs.close(*file);
+		if (!Texture::saveTGA(&file, w, h, 4, (const u8*)pixels, path, engine.getAllocator())) {
+			fs.close(file);
 			return false;
 		}
 
-		fs.close(*file);
+		fs.close(file);
 		return true;
 	}
 

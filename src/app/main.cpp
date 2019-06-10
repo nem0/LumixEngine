@@ -5,8 +5,7 @@
 #include "engine/engine.h"
 #include "engine/fs/disk_file_device.h"
 #include "engine/fs/file_system.h"
-#include "engine/fs/memory_file_device.h"
-#include "engine/fs/pack_file_device.h"
+#include "engine/fs/os_file.h"
 #include "engine/input_system.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
@@ -125,24 +124,14 @@ public:
 
 		enableCrashReporting(false);
 
-		m_file_system = FS::FileSystem::create(m_allocator);
 
-		m_mem_file_device = LUMIX_NEW(m_allocator, FS::MemoryFileDevice)(m_allocator);
 		char current_dir[MAX_PATH_LENGTH];
 		#ifdef _WIN32
 			GetCurrentDirectory(sizeof(current_dir), current_dir); 
 		#else
 			current_dir[0] = '\0';
 		#endif
-		m_disk_file_device = LUMIX_NEW(m_allocator, FS::DiskFileDevice)("disk", current_dir, m_allocator);
-		m_pack_file_device = LUMIX_NEW(m_allocator, FS::PackFileDevice)(m_allocator);
-
-		m_file_system->mount(m_mem_file_device);
-		m_file_system->mount(m_disk_file_device);
-		m_file_system->mount(m_pack_file_device);
-		m_pack_file_device->mount("data.pak");
-		m_file_system->setDefaultDevice("memory:disk:pack");
-		m_file_system->setSaveGameDevice("memory:disk");
+		m_file_system = FS::FileSystem::create(current_dir, m_allocator);
 
 		m_engine = Engine::create(current_dir, m_file_system, m_allocator);
 		ffr::preinit(m_allocator);
@@ -204,14 +193,15 @@ public:
 
 	bool runStartupScript() const
 	{
-		FS::FileSystem& fs = m_engine->getFileSystem();
-		FS::IFile* file = fs.open(fs.getDefaultDevice(), Path(m_startup_script_path), FS::Mode::OPEN_AND_READ);
-		if (file)
+		// TODO file->getbuffer returns nullptr in case of OSFileStream
+		ASSERT(false);
+		/*FS::OSFileStream file;
+		if (file.open(Path(m_startup_script_path), FS::Mode::OPEN_AND_READ))
 		{
 			m_engine->runScript((const char*)file->getBuffer(), (int)file->size(), m_startup_script_path);
 			fs.close(*file);
 			return true;
-		}
+		}*/
 		return false;
 	}
 
@@ -293,7 +283,7 @@ public:
 		auto& fs = m_engine->getFileSystem();
 		FS::ReadCallback file_read_cb;
 		file_read_cb.bind<Runner, &Runner::universeFileLoaded>(this);
-		fs.openAsync(fs.getDefaultDevice(), Path(m_universe_path), FS::Mode::OPEN_AND_READ, file_read_cb);
+		fs.openAsync(Path(m_universe_path), FS::Mode::OPEN_AND_READ, file_read_cb);
 	}
 
 
@@ -305,9 +295,6 @@ public:
 
 		m_engine->destroyUniverse(*m_universe);
 		FS::FileSystem::destroy(m_file_system);
-		LUMIX_DELETE(m_allocator, m_disk_file_device);
-		LUMIX_DELETE(m_allocator, m_mem_file_device);
-		LUMIX_DELETE(m_allocator, m_pack_file_device);
 		Pipeline::destroy(m_pipeline);
 		Engine::destroy(m_engine, m_allocator);
 		m_engine = nullptr;
@@ -389,9 +376,6 @@ private:
 	Universe* m_universe;
 	Pipeline* m_pipeline;
 	FS::FileSystem* m_file_system;
-	FS::MemoryFileDevice* m_mem_file_device;
-	FS::DiskFileDevice* m_disk_file_device;
-	FS::PackFileDevice* m_pack_file_device;
 	Timer* m_frame_timer;
 	GUIInterface* m_gui_interface;
 	bool m_window_mode;

@@ -2078,13 +2078,17 @@ public:
 	{
 		g_log_info.log("Editor") << "Saving universe " << basename << "...";
 		
-		auto& fs = m_engine->getFileSystem();
-		StaticString<MAX_PATH_LENGTH> dir(m_engine->getDiskFileDevice()->getBasePath(), "universes/");
+		StaticString<MAX_PATH_LENGTH> dir(m_engine->getFileSystem().getBasePath(), "universes/");
 		OS::makePath(dir);
 		StaticString<MAX_PATH_LENGTH> path(dir, basename, ".unv");
-		FS::IFile* file = fs.open(fs.getDefaultDevice(), Path(path), FS::Mode::CREATE_AND_WRITE);
-		save(*file);
-		fs.close(*file);
+		FS::OSFileStream file;
+		if (file.open(Path(path), FS::Mode::CREATE_AND_WRITE)){
+			save(file);
+			file.close();
+		}
+		else {
+			g_log_error.log("Editor") << "Failed to save universe " << basename;
+		}
 
 		serialize(basename);
 		m_is_universe_changed = false;
@@ -2304,7 +2308,7 @@ public:
 	
 	void serialize(const char* basename)
 	{
-		StaticString<MAX_PATH_LENGTH> dir(m_engine->getDiskFileDevice()->getBasePath(), "universes/", basename, "/");
+		StaticString<MAX_PATH_LENGTH> dir(m_engine->getFileSystem().getBasePath(), "universes/", basename, "/");
 		OS::makePath(dir);
 		OS::makePath(dir + "probes/");
 		OS::makePath(dir + "scenes/");
@@ -2506,29 +2510,26 @@ public:
 
 	void makeAbsolute(char* absolute, int max_size, const char* relative) const override
 	{
-		FS::DiskFileDevice* disk = m_engine->getDiskFileDevice();
 		bool is_absolute = relative[0] == '\\' || relative[0] == '/';
 		is_absolute = is_absolute || (relative[0] != 0 && relative[1] == ':');
 
-		if (is_absolute || !disk)
+		if (is_absolute)
 		{
 			copyString(absolute, max_size, relative);
 			return;
 		}
 
-		copyString(absolute, max_size, disk->getBasePath());
+		copyString(absolute, max_size, m_engine->getFileSystem().getBasePath());
 		catString(absolute, max_size, relative);
 	}
 
 
 	void makeRelative(char* relative, int max_size, const char* absolute) const override
 	{
-		FS::DiskFileDevice* disk = m_engine->getDiskFileDevice();
-		if (disk) {
-			if (startsWith(absolute, disk->getBasePath())) {
-				copyString(relative, max_size, absolute + stringLength(disk->getBasePath()));
-				return;
-			}
+		const char* base_path = m_engine->getFileSystem().getBasePath();
+		if (startsWith(absolute, base_path)) {
+			copyString(relative, max_size, absolute + stringLength(base_path));
+			return;
 		}
 		copyString(relative, max_size, absolute);
 	}
@@ -2788,6 +2789,9 @@ public:
 		}
 		else
 		{
+			ASSERT(false);
+			// TODO
+			/*
 			m_selected_entity_on_game_mode = m_selected_entities.empty() ? INVALID_ENTITY : m_selected_entities[0];
 			auto& fs = m_engine->getFileSystem();
 			m_game_mode_file = fs.open(fs.getMemoryDevice(), Path(""), FS::Mode::WRITE);
@@ -2796,7 +2800,7 @@ public:
 			beginCommandGroup(0);
 			endCommandGroup();
 			m_game_mode_commands = 2;
-			m_engine->startGame(*m_universe);
+			m_engine->startGame(*m_universe);*/
 		}
 	}
 
@@ -3546,11 +3550,10 @@ public:
 	{
 		if (m_undo_stack.empty()) return;
 
-		FS::FileSystem& fs = m_engine->getFileSystem();
-		FS::IFile* file = fs.open(fs.getDiskDevice(), path, FS::Mode::CREATE_AND_WRITE);
-		if (file)
+		FS::OSFileStream file;
+		if (file.open(path, FS::Mode::CREATE_AND_WRITE))
 		{
-			JsonSerializer serializer(*file, path);
+			JsonSerializer serializer(file, path);
 			serializer.beginObject();
 			serializer.beginArray("commands");
 			for (int i = 0; i < m_undo_stack.size(); ++i)
@@ -3562,7 +3565,7 @@ public:
 			}
 			serializer.endArray();
 			serializer.endObject();
-			fs.close(*file);
+			file.close();
 		}
 		else
 		{
@@ -3593,10 +3596,10 @@ public:
 		destroyUndoStack();
 		m_undo_index = -1;
 		FS::FileSystem& fs = m_engine->getFileSystem();
-		FS::IFile* file = fs.open(fs.getDiskDevice(), path, FS::Mode::OPEN_AND_READ);
-		if (file)
+		FS::OSFileStream file;
+		if (file.open(path, FS::Mode::OPEN_AND_READ))
 		{
-			JsonDeserializer serializer(*file, path, m_allocator);
+			JsonDeserializer serializer(file, path, m_allocator);
 			serializer.deserializeObjectBegin();
 			serializer.deserializeArrayBegin("commands");
 			while (!serializer.isArrayEnd())
@@ -3611,7 +3614,7 @@ public:
 					g_log_error.log("Editor") << "Unknown command " << type_name << " in " << path;
 					destroyUndoStack();
 					m_undo_index = -1;
-					fs.close(*file);
+					file.close();
 					return false;
 				}
 				command->deserialize(serializer);
@@ -3621,9 +3624,10 @@ public:
 			}
 			serializer.deserializeArrayEnd();
 			serializer.deserializeObjectEnd();
-			fs.close(*file);
+			file.close();
+			return true;
 		}
-		return file != nullptr;
+		return false;
 	}
 
 

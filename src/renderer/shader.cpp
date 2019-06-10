@@ -1,6 +1,7 @@
 #include "renderer/shader.h"
 #include "engine/crc32.h"
 #include "engine/fs/file_system.h"
+#include "engine/fs/os_file.h"
 #include "engine/engine.h"
 #include "engine/lua_wrapper.h"
 #include "engine/log.h"
@@ -397,20 +398,20 @@ int include(lua_State* L)
 	}
 
 	FS::FileSystem& fs = shader->m_renderer.getEngine().getFileSystem();
-	FS::IFile* file = fs.open(fs.getDefaultDevice(), Path(path), FS::Mode::OPEN_AND_READ);
-	if (!file) {
+	FS::OSFileStream file;
+	if (!file.open(Path(path), FS::Mode::OPEN_AND_READ)) {
 		g_log_error.log("Renderer") << "Failed to open include " << path << " included from " << shader->getPath();
 		return 0;
 	}
 
-	shader->m_render_data->include.resize((int)file->size() + 2);
+	shader->m_render_data->include.resize((int)file.size() + 2);
 	if (!shader->m_render_data->include.empty()) {
-		file->read(&shader->m_render_data->include[0], shader->m_render_data->include.size() - 1);
+		file.read(&shader->m_render_data->include[0], shader->m_render_data->include.size() - 1);
 		shader->m_render_data->include[shader->m_render_data->include.size() - 2] = '\n';
 		shader->m_render_data->include.back() = '\0';
 	}
 
-	fs.close(*file);
+	file.close();
 	return 0;
 }
 

@@ -1,5 +1,6 @@
 #include "engine/fs/os_file.h"
 #include "engine/lumix.h"
+#include "engine/path.h"
 #include "engine/string.h"
 #include "engine/win/simple_win.h"
 
@@ -157,6 +158,60 @@ OsFile& OsFile::operator <<(float value)
 	toCString(value, buf, lengthOf(buf), 7);
 	write(buf, stringLength(buf));
 	return *this;
+}
+
+
+bool OSFileStream::open(const Path& path, FS::Mode mode)
+{
+	return file.open(path.c_str(), mode);
+}
+
+
+void OSFileStream::close()
+{
+	file.close();
+}
+
+
+bool OSFileStream::read(void* buffer, size_t size)
+{
+	return file.read(buffer, size);
+}
+
+
+bool OSFileStream::write(const void* buffer, size_t size)
+{
+	return file.write(buffer, size);
+}
+
+
+const void* OSFileStream::getBuffer() const
+{
+	return nullptr;
+}
+
+
+size_t OSFileStream::size()
+{
+	return file.size();
+}
+
+
+bool OSFileStream::seek(FS::SeekMode base, size_t pos)
+{
+	return file.seek(base, pos);
+}
+
+
+size_t OSFileStream::pos()
+{
+	return file.pos();
+}
+
+
+FS::IFileDevice* OSFileStream::getDevice()
+{
+	return nullptr;
 }
 
 

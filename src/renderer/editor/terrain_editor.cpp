@@ -6,6 +6,7 @@
 #include "editor/utils.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
+#include "engine/fs/os_file.h"
 #include "engine/geometry.h"
 #include "engine/json_serializer.h"
 #include "engine/log.h"
@@ -814,9 +815,14 @@ void TerrainEditor::splitSplatmap(const char* dir)
 			}
 		}
 
-		FS::IFile* file = fs.open(fs.getDefaultDevice(), out_path, FS::Mode::CREATE_AND_WRITE);
-		Texture::saveTGA(file, splatmap->width, splatmap->height, 4, (u8*)&out_data[0], out_path, allocator);
-		fs.close(*file);
+		FS::OSFileStream file;
+		if (!file.open(out_path, FS::Mode::CREATE_AND_WRITE)) {
+			g_log_error.log("Renderer") << "Failed to create file " << out_path;
+		}
+		else {
+			Texture::saveTGA(&file, splatmap->width, splatmap->height, 4, (u8*)&out_data[0], out_path, allocator);
+			file.close();
+		}
 	}
 
 	int grasses_count = render_scene->getGrassCount((EntityRef)m_component.entity);
@@ -835,9 +841,14 @@ void TerrainEditor::splitSplatmap(const char* dir)
 			}
 		}
 
-		FS::IFile* file = fs.open(fs.getDefaultDevice(), out_path, FS::Mode::CREATE_AND_WRITE);
-		Texture::saveTGA(file, splatmap->width, splatmap->height, 4, (u8*)&out_data[0], out_path, allocator);
-		fs.close(*file);
+		FS::OSFileStream file;
+		if (!file.open(out_path, FS::Mode::CREATE_AND_WRITE)) {
+			g_log_error.log("Renderer") << "Failed to create file " << out_path;
+		}
+		else {
+			Texture::saveTGA(&file, splatmap->width, splatmap->height, 4, (u8*)&out_data[0], out_path, allocator);
+			file.close();
+		}
 	}
 
 }
@@ -866,19 +877,19 @@ void TerrainEditor::mergeSplatmap(const char* dir)
 	Array<u8> out_data_array(allocator);
 	TGAHeader splatmap_tga_header;
 
-	FS::IFile* file = fs.open(fs.getDefaultDevice(), out_path, FS::Mode::OPEN_AND_READ);
-	if (!file)
+	FS::OSFileStream file;
+	if (!file.open(out_path, FS::Mode::OPEN_AND_READ))
 	{
 		g_log_error.log("Renderer") << "Failed to open " << out_path;
 		return;
 	}
-	if (!Texture::loadTGA(*file, splatmap_tga_header, out_data_array, out_path.c_str()))
+	if (!Texture::loadTGA(file, splatmap_tga_header, out_data_array, out_path.c_str()))
 	{
-		fs.close(*file);
+		file.close();
 		g_log_error.log("Renderer") << "Failed to load " << out_path;
 		return;
 	}
-	fs.close(*file);
+	fs.close(file);
 	u32* out_data = (u32*)&out_data_array[0];
 
 	using namespace OS;
@@ -895,13 +906,16 @@ void TerrainEditor::mergeSplatmap(const char* dir)
 			int grass_idx;
 			fromCString(info.filename + 5, lengthOf(info.filename) - 5, &grass_idx);
 			StaticString<MAX_PATH_LENGTH> grass_path(dir, "/", info.filename);
-			FS::IFile* file = fs.open(fs.getDefaultDevice(), Path(grass_path), FS::Mode::OPEN_AND_READ);
+			FS::OSFileStream file;
 			TGAHeader header;
 			Array<u8> tmp_data(allocator);
-			if (!Texture::loadTGA(*file, header, tmp_data, grass_path))
+			if(!file.open(Path(grass_path), FS::Mode::OPEN_AND_READ)) {
+				g_log_error.log("Renderer") << "Failed to load " << grass_path;
+			}
+			else if (!Texture::loadTGA(file, header, tmp_data, grass_path))
 			{
 				g_log_error.log("Renderer") << "Failed to load " << grass_path;
-				fs.close(*file);
+				file.close();
 			}
 			else
 			{
@@ -915,24 +929,26 @@ void TerrainEditor::mergeSplatmap(const char* dir)
 						if ((tmp_data_raw[idx] & 0x00ff0000) != 0) out_data[idx] = out_data[idx] | mask;
 					}
 				}
+				file.close();
 			}
-			fs.close(*file);
 		}
 		else if (startsWith(info.filename, "layer"))
 		{
 			int layer_idx;
 			fromCString(info.filename + 5, lengthOf(info.filename) - 5, &layer_idx);
 			StaticString<MAX_PATH_LENGTH> layer_path(dir, "/", info.filename);
-			FS::IFile* file = fs.open(fs.getDefaultDevice(), Path(layer_path), FS::Mode::OPEN_AND_READ);
+			FS::OSFileStream file;
 			TGAHeader header;
 			Array<u8> tmp_data(allocator);
-			if (!Texture::loadTGA(*file, header, tmp_data, layer_path))
-			{
+
+			if (!file.open(Path(layer_path), FS::Mode::OPEN_AND_READ)) {
 				g_log_error.log("Renderer") << "Failed to load " << layer_path;
-				fs.close(*file);
 			}
-			else
-			{
+			else if (!Texture::loadTGA(file, header, tmp_data, layer_path)) {
+				g_log_error.log("Renderer") << "Failed to load " << layer_path;
+				file.close();
+			}
+			else {
 				const u32* tmp_data_raw = (const u32*)&tmp_data[0];
 				for (int y = 0; y < header.height; ++y)
 				{
@@ -945,23 +961,22 @@ void TerrainEditor::mergeSplatmap(const char* dir)
 						}
 					}
 				}
+				file.close();
 			}
-			fs.close(*file);
 		}
 	}
 	destroyFileIterator(file_iter);
 
-	FS::IFile* out_file = fs.open(fs.getDefaultDevice(), out_path, FS::Mode::CREATE_AND_WRITE);
-	if (!out_file)
-	{
+	FS::OSFileStream out_file;
+	if (!out_file.open(out_path, FS::Mode::CREATE_AND_WRITE)) {
 		g_log_error.log("Renderer") << "Failed to save " << out_path;
 		return;
 	}
-	if (!Texture::saveTGA(out_file, splatmap_tga_header.width, splatmap_tga_header.height, 4, (u8*)&out_data[0], out_path, allocator))
+	if (!Texture::saveTGA(&out_file, splatmap_tga_header.width, splatmap_tga_header.height, 4, (u8*)&out_data[0], out_path, allocator))
 	{
 		g_log_error.log("Renderer") << "Failed to save " << out_path;
 	}
-	fs.close(*out_file);
+	out_file.close();
 }
 
 

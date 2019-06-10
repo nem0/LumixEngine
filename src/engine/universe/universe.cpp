@@ -677,7 +677,8 @@ void Universe::serialize(OutputBlob& serializer)
 {
 	serializer.write((i32)m_entities.size());
 	if (!m_entities.empty()) {
-		serializer.write(&m_entities[0], sizeof(m_entities[0]) * m_entities.size());
+		serializer.write(&m_entities[0], m_entities.byte_size());
+		serializer.write(&m_transforms[0], m_transforms.byte_size());
 	}
 	serializer.write((i32)m_names.size());
 	for (const EntityName& name : m_names) {
@@ -696,8 +697,12 @@ void Universe::deserialize(InputBlob& serializer)
 	i32 count;
 	serializer.read(count);
 	m_entities.resize(count);
+	m_transforms.resize(count);
 
-	if (count > 0) serializer.read(&m_entities[0], sizeof(m_entities[0]) * m_entities.size());
+	if (count > 0) {
+		serializer.read(&m_entities[0], m_entities.byte_size());
+		serializer.read(&m_transforms[0], m_transforms.byte_size());
+	}
 
 	serializer.read(count);
 	for (int i = 0; i < count; ++i)
@@ -845,6 +850,12 @@ ComponentUID Universe::getComponent(EntityRef entity, ComponentType component_ty
 	if ((mask & (u64(1) << component_type.index)) == 0) return ComponentUID::INVALID;
 	IScene* scene = m_component_type_map[component_type.index].scene;
 	return ComponentUID(entity, component_type, scene);
+}
+
+
+u64 Universe::getComponentsMask(EntityRef entity) const
+{
+	return m_entities[entity.index].components;
 }
 
 

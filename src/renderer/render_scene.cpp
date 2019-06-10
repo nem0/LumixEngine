@@ -5,6 +5,7 @@
 #include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/fs/file_system.h"
+#include "engine/fs/os_file.h"
 #include "engine/geometry.h"
 #include "engine/job_system.h"
 #include "engine/log.h"
@@ -1428,7 +1429,7 @@ public:
 		i32 size = 0;
 		serializer.read(size);
 		m_model_instances.reserve(size);
-        m_mesh_sort_data.reserve(size);
+		m_mesh_sort_data.reserve(size);
 		for (int i = 0; i < size; ++i)
 		{
 			auto& r = m_model_instances.emplace();
@@ -1720,11 +1721,11 @@ public:
 		return m_point_lights[entity];
 	}
 	
-    
-    const MeshSortData* getMeshSortData() const override
-    {
-        return m_mesh_sort_data.empty() ? nullptr : m_mesh_sort_data.begin();
-    }
+	
+	const MeshSortData* getMeshSortData() const override
+	{
+		return m_mesh_sort_data.empty() ? nullptr : m_mesh_sort_data.begin();
+	}
 
 
 	const ModelInstance* getModelInstances() const override
@@ -1761,10 +1762,14 @@ public:
 
 	void onEntityMoved(EntityRef entity)
 	{
-		const int index = entity.index;
+		const u64 cmp_mask = m_universe.getComponentsMask(entity);
+		if ((cmp_mask & m_render_cmps_mask) == 0) {
+			return;
+		}
+
 		if (m_culling_system->isAdded(entity)) {
 			if (m_universe.hasComponent(entity, MODEL_INSTANCE_TYPE)) {
-				ModelInstance& r = m_model_instances[index];
+				ModelInstance& r = m_model_instances[entity.index];
 				const float radius = m_universe.getScale(entity) * r.model->getBoundingRadius();
 				const DVec3 position = m_universe.getPosition(entity);
 				m_culling_system->setRadius(entity, radius);
@@ -1806,6 +1811,7 @@ public:
 			}
 		}
 	}
+
 
 	Engine& getEngine() const override { return m_engine; }
 
@@ -2158,23 +2164,21 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	static unsigned int LUA_compareTGA(RenderSceneImpl* scene, const char* path, const char* path_preimage, int min_diff)
 	{
 		auto& fs = scene->m_engine.getFileSystem();
-		auto file1 = fs.open(fs.getDefaultDevice(), Path(path), FS::Mode::OPEN_AND_READ);
-		auto file2 = fs.open(fs.getDefaultDevice(), Path(path_preimage), FS::Mode::OPEN_AND_READ);
-		if (!file1)
+		FS::OSFileStream file1, file2;
+		if (!file1.open(Path(path), FS::Mode::OPEN_AND_READ))
 		{
-			if (file2) fs.close(*file2);
 			g_log_error.log("render_test") << "Failed to open " << path;
 			return 0xffffFFFF;
 		}
-		else if (!file2)
+		else if (!file2.open(Path(path_preimage), FS::Mode::OPEN_AND_READ))
 		{
-			fs.close(*file1);
+			file1.close();
 			g_log_error.log("render_test") << "Failed to open " << path_preimage;
 			return 0xffffFFFF;
 		}
-		unsigned int result = Texture::compareTGA(file1, file2, min_diff, scene->m_allocator);
-		fs.close(*file1);
-		fs.close(*file2);
+		unsigned int result = Texture::compareTGA(&file1, &file2, min_diff, scene->m_allocator);
+		file1.close();
+		file2.close();
 		return result;
 	}
 
@@ -3358,13 +3362,13 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 			updateBoneAttachment(m_bone_attachments[entity]);
 		}
 
-        while (m_mesh_sort_data.size() < m_model_instances.size()) {
-            m_mesh_sort_data.emplace();
-        }
-        if(r.meshes) {
-            m_mesh_sort_data[entity.index].layer = r.meshes[0].layer;
-            m_mesh_sort_data[entity.index].sort_key = r.meshes[0].sort_key;
-        }
+		while (m_mesh_sort_data.size() < m_model_instances.size()) {
+			m_mesh_sort_data.emplace();
+		}
+		if(r.meshes) {
+			m_mesh_sort_data[entity.index].layer = r.meshes[0].layer;
+			m_mesh_sort_data[entity.index].sort_key = r.meshes[0].sort_key;
+		}
 	}
 
 
@@ -3662,13 +3666,14 @@ private:
 	Renderer& m_renderer;
 	Engine& m_engine;
 	CullingSystem* m_culling_system;
+	u64 m_render_cmps_mask;
 
 	EntityPtr m_active_global_light_entity;
 	HashMap<EntityRef, PointLight> m_point_lights;
 
 	HashMap<EntityRef, Decal> m_decals;
 	Array<ModelInstance> m_model_instances;
-    Array<MeshSortData> m_mesh_sort_data;
+	Array<MeshSortData> m_mesh_sort_data;
 	HashMap<EntityRef, GlobalLight> m_global_lights;
 	HashMap<EntityRef, Camera> m_cameras;
 	EntityPtr m_active_camera;
@@ -3755,8 +3760,9 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	, m_time(0)
 	, m_is_updating_attachments(false)
 	, m_material_decal_map(m_allocator)
-    , m_mesh_sort_data(m_allocator)
+	, m_mesh_sort_data(m_allocator)
 {
+
 	m_universe.entityTransformed().bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
 	m_universe.entityDestroyed().bind<RenderSceneImpl, &RenderSceneImpl::onEntityDestroyed>(this);
 	m_culling_system = CullingSystem::create(m_allocator, engine.getPageAllocator());
@@ -3765,8 +3771,10 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 
 	MaterialManager& manager = m_renderer.getMaterialManager();
 
+	m_render_cmps_mask = 0;
 	for (auto& i : COMPONENT_INFOS)
 	{
+		m_render_cmps_mask |= (u64)1 << i.type.index;
 		universe.registerComponentType(i.type, this, i.creator, i.destroyer, i.serialize, i.deserialize);
 	}
 }
@@ -3793,8 +3801,8 @@ void RenderScene::registerLuaAPI(lua_State* L)
 
 	#define REGISTER_FUNCTION(F)\
 		do { \
-		auto f = &LuaWrapper::wrapMethod<RenderSceneImpl, decltype(&RenderSceneImpl::F), &RenderSceneImpl::F>; \
-		LuaWrapper::createSystemFunction(L, "Renderer", #F, f); \
+			auto f = &LuaWrapper::wrapMethod<RenderSceneImpl, decltype(&RenderSceneImpl::F), &RenderSceneImpl::F>; \
+			LuaWrapper::createSystemFunction(L, "Renderer", #F, f); \
 		} while(false) \
 
 	REGISTER_FUNCTION(setGlobalLODMultiplier);

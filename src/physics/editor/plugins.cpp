@@ -589,7 +589,7 @@ struct PhysicsUIPlugin final : public StudioApp::GUIPlugin
 	void onActorGUI()
 	{
 		if (!ImGui::CollapsingHeader("Actors")) return;
-
+		/*
 		auto* scene = static_cast<PhysicsScene*>(m_editor.getUniverse()->getScene(crc32("physics")));
 		int count = scene->getActorCount();
 		if (!count) return;
@@ -619,7 +619,9 @@ struct PhysicsUIPlugin final : public StudioApp::GUIPlugin
 			ImGui::NextColumn();
 			ImGui::PopID();
 		}
-		ImGui::Columns();
+		ImGui::Columns();*/
+		ASSERT(false);
+		// TODO
 	}
 
 
