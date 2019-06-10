@@ -77,7 +77,8 @@ public:
 	void destroyComponent(EntityRef entity, ComponentType type);
 	void onComponentCreated(EntityRef entity, ComponentType component_type, IScene* scene);
 	void onComponentDestroyed(EntityRef entity, ComponentType component_type, IScene* scene);
-	bool hasComponent(EntityRef entity, ComponentType component_type) const;
+    u64 getComponentsMask(EntityRef entity) const;
+    bool hasComponent(EntityRef entity, ComponentType component_type) const;
 	ComponentUID getComponent(EntityRef entity, ComponentType type) const;
 	ComponentUID getFirstComponent(EntityRef entity) const;
 	ComponentUID getNextComponent(const ComponentUID& cmp) const;

@@ -11,7 +11,6 @@ namespace Lumix
 {
 namespace FS
 {
-class DiskFileDevice;
 class FileSystem;
 }
 
@@ -52,7 +51,6 @@ public:
 	virtual const PlatformData& getPlatformData() = 0;
 
 	virtual FS::FileSystem& getFileSystem() = 0;
-	virtual FS::DiskFileDevice* getDiskFileDevice() = 0;
 	virtual InputSystem& getInputSystem() = 0;
 	virtual PluginManager& getPluginManager() = 0;
 	virtual ResourceManagerHub& getResourceManager() = 0;

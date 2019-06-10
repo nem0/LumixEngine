@@ -5,7 +5,7 @@
 #include "editor/world_editor.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
-#include "engine/fs/disk_file_device.h"
+#include "engine/fs/os_file.h"
 #include "engine/log.h"
 #include "engine/path_utils.h"
 #include "engine/profiler.h"
@@ -47,7 +47,7 @@ AssetBrowser::AssetBrowser(StudioApp& app)
 	IAllocator& allocator = m_editor.getAllocator();
 	m_filter[0] = '\0';
 
-	const char* base_path = m_editor.getEngine().getDiskFileDevice()->getBasePath();
+	const char* base_path = m_editor.getEngine().getFileSystem().getBasePath();
 
 	StaticString<MAX_PATH_LENGTH> path(base_path, ".lumix");
 	OS::makePath(path);
@@ -593,23 +593,23 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* bu
 
 FS::IFile* AssetBrowser::beginSaveResource(Resource& resource)
 {
-	FS::FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
 	// use temporary because otherwise the resource is reloaded during saving
 	StaticString<MAX_PATH_LENGTH> tmp_path(resource.getPath().c_str(), ".tmp");
-	FS::IFile* file = fs.open(fs.getDefaultDevice(), Path(tmp_path), FS::Mode::CREATE_AND_WRITE);
-	if (!file)
+	FS::OSFileStream* f = LUMIX_NEW(m_app.getWorldEditor().getAllocator(), FS::OSFileStream);
+	if (!f->open(Path(tmp_path), FS::Mode::CREATE_AND_WRITE))
 	{
+		LUMIX_DELETE(m_app.getWorldEditor().getAllocator(), f);
 		g_log_error.log("Editor") << "Could not save file " << resource.getPath().c_str();
 		return nullptr;
 	}
-	return file;
+	return f;
 }
 
 
 void AssetBrowser::endSaveResource(Resource& resource, FS::IFile& file, bool success)
 {
-	FS::FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
-	fs.close(file);
+	file.close();
+	LUMIX_DELETE(m_app.getWorldEditor().getAllocator(), &file);
 
 	if (!success) return;
 
@@ -619,8 +619,8 @@ void AssetBrowser::endSaveResource(Resource& resource, FS::IFile& file, bool suc
 	StaticString<MAX_PATH_LENGTH> tmp_path(resource.getPath().c_str(), ".tmp");
 	src_full_path.data[0] = 0;
 	dest_full_path.data[0] = 0;
-	src_full_path << engine.getDiskFileDevice()->getBasePath() << tmp_path;
-	dest_full_path << engine.getDiskFileDevice()->getBasePath() << resource.getPath().c_str();
+	src_full_path << engine.getFileSystem().getBasePath() << tmp_path;
+	dest_full_path << engine.getFileSystem().getBasePath() << resource.getPath().c_str();
 
 	OS::deleteFile(dest_full_path);
 
@@ -673,7 +673,7 @@ void AssetBrowser::openInExternalEditor(Resource* resource) const
 
 void AssetBrowser::openInExternalEditor(const char* path) const
 {
-	StaticString<MAX_PATH_LENGTH> full_path(m_editor.getEngine().getDiskFileDevice()->getBasePath());
+	StaticString<MAX_PATH_LENGTH> full_path(m_editor.getEngine().getFileSystem().getBasePath());
 	full_path << path;
 	OS::shellExecuteOpen(full_path);
 }

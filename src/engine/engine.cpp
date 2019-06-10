@@ -4,7 +4,6 @@
 #include "engine/debug/debug.h"
 #include "engine/fs/disk_file_device.h"
 #include "engine/fs/file_system.h"
-#include "engine/fs/memory_file_device.h"
 #include "engine/fs/os_file.h"
 #include "engine/input_system.h"
 #include "engine/iplugin.h"
@@ -462,25 +461,7 @@ public:
 		luaL_openlibs(m_state);
 		registerLuaAPI();
 
-		//JobSystem::init(m_allocator);
-		if (!fs)
-		{
-			m_file_system = FS::FileSystem::create(m_allocator);
-
-			m_mem_file_device = LUMIX_NEW(m_allocator, FS::MemoryFileDevice)(m_allocator);
-			m_disk_file_device = LUMIX_NEW(m_allocator, FS::DiskFileDevice)("disk", working_dir, m_allocator);
-
-			m_file_system->mount(m_mem_file_device);
-			m_file_system->mount(m_disk_file_device);
-			m_file_system->setDefaultDevice("memory:disk");
-			m_file_system->setSaveGameDevice("memory:disk");
-		}
-		else
-		{
-			m_file_system = fs;
-			m_mem_file_device = nullptr;
-			m_disk_file_device = nullptr;
-		}
+		m_file_system = FS::FileSystem::create(working_dir, m_allocator);
 
 		m_resource_manager.init(*m_file_system);
 		m_prefab_resource_manager.create(PrefabResource::TYPE, m_resource_manager);
@@ -935,7 +916,7 @@ public:
 		inst->L = L;
 		inst->lua_func = luaL_ref(L, LUA_REGISTRYINDEX);
 		cb.bind<Callback, &Callback::invoke>(inst);
-		fs.openAsync(fs.getDefaultDevice(), inst->path, FS::Mode::OPEN_AND_READ, cb);
+		fs.openAsync(inst->path, FS::Mode::OPEN_AND_READ, cb);
 		return 0;
 	}
 
@@ -1169,6 +1150,7 @@ public:
 
 	static int LUA_packageLoader(lua_State* L)
 	{
+		/*
 		const char* module = LuaWrapper::toType<const char*>(L, 1);
 		StaticString<MAX_PATH_LENGTH> tmp(module);
 		tmp << ".lua";
@@ -1176,7 +1158,7 @@ public:
 		auto* engine = (Engine*)lua_touserdata(L, -1);
 		lua_pop(L, 1);
 		auto& fs = engine->getFileSystem();
-		auto* file = fs.open(fs.getDefaultDevice(), Path(tmp), FS::Mode::OPEN_AND_READ);
+		auto* file = fs.open(Path(tmp), FS::Mode::OPEN_AND_READ);
 		if (!file)
 		{
 			g_log_error.log("Engine") << "Failed to open file " << tmp;
@@ -1189,7 +1171,10 @@ public:
 			g_log_error.log("Engine") << "Failed to load package " << tmp << ": " << lua_tostring(L, -1);
 		}
 		if (file) fs.close(*file);
-		return 1;
+		return 1;*/
+		ASSERT(false);
+		// TODO
+		return 0;
 	}
 
 	
@@ -1205,12 +1190,7 @@ public:
 		Timer::destroy(m_fps_timer);
 		PluginManager::destroy(m_plugin_manager);
 		if (m_input_system) InputSystem::destroy(*m_input_system);
-		if (m_disk_file_device)
-		{
-			FS::FileSystem::destroy(m_file_system);
-			LUMIX_DELETE(m_allocator, m_mem_file_device);
-			LUMIX_DELETE(m_allocator, m_disk_file_device);
-		}
+		FS::FileSystem::destroy(m_file_system);
 
 		m_prefab_resource_manager.destroy();
 		lua_close(m_state);
@@ -1290,7 +1270,6 @@ public:
 
 
 	FS::FileSystem& getFileSystem() override { return *m_file_system; }
-	FS::DiskFileDevice* getDiskFileDevice() override { return m_disk_file_device; }
 
 	void startGame(Universe& context) override
 	{
@@ -1595,8 +1574,6 @@ private:
 	PageAllocator m_page_allocator;
 
 	FS::FileSystem* m_file_system;
-	FS::MemoryFileDevice* m_mem_file_device;
-	FS::DiskFileDevice* m_disk_file_device;
 
 	ResourceManagerHub m_resource_manager;
 	

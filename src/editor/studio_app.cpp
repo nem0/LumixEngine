@@ -1013,7 +1013,7 @@ public:
 		if (OS::getSaveFilename(tmp, lengthOf(tmp), "Prefab files\0*.fab\0", "fab"))
 		{
 			PathUtils::normalize(tmp, filename, lengthOf(tmp));
-			const char* base_path = m_engine->getDiskFileDevice()->getBasePath();
+			const char* base_path = m_engine->getFileSystem().getBasePath();
 			if (startsWith(filename, base_path))
 			{
 				m_editor->getPrefabSystem().savePrefab(Path(filename + stringLength(base_path)));

@@ -283,7 +283,7 @@ function defaultConfigurations()
 		buildoptions { "/wd4503"}
 		
 	configuration {}
-		files { "lumix.natvis" }
+		files { "lumix.natvis", "../.editorconfig" }
 
 end
 

@@ -213,6 +213,11 @@ namespace Lumix
 				return m_current_node->m_value;
 			}
 
+			const value_type& value() const
+			{
+				return m_current_node->m_value;
+			}
+
 			value_type& operator*()
 			{
 				return value();

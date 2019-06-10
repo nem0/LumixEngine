@@ -140,7 +140,7 @@ void Resource::doLoad()
 	const u32 hash = m_path.getHash();
 	const StaticString<MAX_PATH_LENGTH> res_path(".lumix/assets/", hash, ".res");
 
-	m_async_op = fs.openAsync(fs.getDefaultDevice(), Path(res_path), FS::Mode::OPEN_AND_READ, cb);
+	m_async_op = fs.openAsync(Path(res_path), FS::Mode::OPEN_AND_READ, cb);
 }
 
 

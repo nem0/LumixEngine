@@ -97,7 +97,7 @@ struct AssetCompilerImpl : AssetCompiler
 		m_watcher = FileSystemWatcher::create(".", app.getWorldEditor().getAllocator());
 		m_watcher->getCallback().bind<AssetCompilerImpl, &AssetCompilerImpl::onFileChanged>(this);
 		m_task.create("Asset compiler", true);
-		const char* base_path = m_app.getWorldEditor().getEngine().getDiskFileDevice()->getBasePath();
+		const char* base_path = m_app.getWorldEditor().getEngine().getFileSystem().getBasePath();
 		StaticString<MAX_PATH_LENGTH> path(base_path, ".lumix/assets");
 		OS::makePath(path);
 		ResourceManagerHub& rm = app.getWorldEditor().getEngine().getResourceManager();
@@ -302,7 +302,7 @@ struct AssetCompilerImpl : AssetCompiler
 		}
 
 		const u64 list_last_modified = OS::getLastModified(list_path);
-		const char* base_path = m_app.getWorldEditor().getEngine().getDiskFileDevice()->getBasePath();
+		const char* base_path = m_app.getWorldEditor().getEngine().getFileSystem().getBasePath();
 		processDir(base_path, stringLength(base_path), list_last_modified);
 	}
 

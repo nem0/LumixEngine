@@ -1,6 +1,5 @@
 #include "profiler_ui.h"
 #include "engine/fibers.h"
-#include "engine/fs/file_events_device.h"
 #include "engine/fs/file_system.h"
 #include "engine/fs/os_file.h"
 #include "engine/job_system.h"
@@ -99,8 +98,6 @@ struct ProfilerUIImpl final : public ProfilerUI
 		: m_main_allocator(allocator)
 		, m_resource_manager(engine.getResourceManager())
 		, m_logs(allocator)
-		, m_open_files(allocator)
-		, m_device(allocator)
 		, m_engine(engine)
 	{
 		m_allocation_size_from = 0;
@@ -113,27 +110,6 @@ struct ProfilerUIImpl final : public ProfilerUI
 		m_resource_filter[0] = 0;
 
 		m_timer = Timer::create(engine.getAllocator());
-		m_device.OnEvent.bind<ProfilerUIImpl, &ProfilerUIImpl::onFileSystemEvent>(this);
-		engine.getFileSystem().mount(&m_device);
-		const auto& devices = engine.getFileSystem().getDefaultDevice();
-		char tmp[200] = "";
-		int count = 0;
-		while (devices.m_devices[count] != nullptr) ++count;
-		for (int i = count - 1; i >= 0; --i)
-		{
-			catString(tmp, ":");
-			catString(tmp, devices.m_devices[i]->name());
-			if (equalStrings(devices.m_devices[i]->name(), "memory"))
-			{
-				catString(tmp, ":events");
-			}
-		}
-		engine.getFileSystem().setDefaultDevice(tmp);
-		m_sort_order = NOT_SORTED;
-		setMemory(m_transfer_rates, 0, sizeof(m_transfer_rates));
-		m_current_transfer_rate = 0;
-		m_bytes_read = 0;
-		m_next_transfer_rate_time = 0;
 	}
 
 
@@ -144,227 +120,15 @@ struct ProfilerUIImpl final : public ProfilerUI
 			m_engine.getFileSystem().updateAsyncTransactions();
 		}
 
-		m_engine.getFileSystem().unMount(&m_device);
-		const auto& devices = m_engine.getFileSystem().getDefaultDevice();
-		char tmp[200] = "";
-		int count = 0;
-		while (devices.m_devices[count] != nullptr) ++count;
-		for (int i = count - 1; i >= 0; --i)
-		{
-			if (!equalStrings(devices.m_devices[i]->name(), "events"))
-			{
-				if(i < count - 1) catString(tmp, ":");
-				catString(tmp, devices.m_devices[i]->name());
-			}
-		}
-		m_engine.getFileSystem().setDefaultDevice(tmp);
-
 		m_allocation_root->clear(m_allocator);
 		LUMIX_DELETE(m_allocator, m_allocation_root);
 		Timer::destroy(m_timer);
 	}
 
 
-	void onFileSystemEvent(const FS::Event& event)
-	{
-		if (event.type == FS::EventType::OPEN_BEGIN)
-		{
-			auto& file = m_open_files.emplace();
-			file.start = m_timer->getTimeSinceStart();
-			file.last_read = file.start;
-			file.bytes = 0;
-			file.handle = event.handle;
-			copyString(file.path, event.path);
-		}
-		else if (event.type == FS::EventType::OPEN_FINISHED && event.ret == 0)
-		{
-			for (int i = 0; i < m_open_files.size(); ++i)
-			{
-				if (m_open_files[i].handle == event.handle)
-				{
-					m_open_files.eraseFast(i);
-					break;
-				}
-			}
-		}
-		else if (event.type == FS::EventType::READ_FINISHED)
-		{
-			for (int i = 0; i < m_open_files.size(); ++i)
-			{
-				if (m_open_files[i].handle == event.handle)
-				{
-					m_open_files[i].bytes += event.param;
-					MT::atomicAdd(&m_bytes_read, event.param);
-					m_open_files[i].last_read = m_timer->getTimeSinceStart();
-					return;
-				}
-			}
-			ASSERT(false);
-		}
-		else if (event.type == FS::EventType::CLOSE_FINISHED)
-		{
-			for (int i = 0; i < m_open_files.size(); ++i)
-			{
-				if (m_open_files[i].handle == event.handle)
-				{
-					auto* log = m_queue.alloc(false);
-					if (!log)
-					{
-						m_open_files.eraseFast(i);
-						break;
-					}
-					log->bytes = m_open_files[i].bytes;
-					log->time = m_open_files[i].last_read - m_open_files[i].start;
-					copyString(log->path, m_open_files[i].path);
-					m_open_files.eraseFast(i);
-					m_queue.push(log, true);
-					break;
-				}
-			}
-		}
-	}
-
-
-	void sortByDuration()
-	{
-		if (m_logs.empty()) return;
-
-		m_sort_order = m_sort_order == TIME_ASC ? TIME_DESC : TIME_ASC;
-		auto asc_comparer = [](const void* data1, const void* data2) -> int{
-			float t1 = static_cast<const Log*>(data1)->time;
-			float t2 = static_cast<const Log*>(data2)->time;
-			return t1 < t2 ? -1 : (t1 > t2 ? 1 : 0);
-		};
-		auto desc_comparer = [](const void* data1, const void* data2) -> int{
-			float t1 = static_cast<const Log*>(data1)->time;
-			float t2 = static_cast<const Log*>(data2)->time;
-			return t1 > t2 ? -1 : (t1 < t2 ? 1 : 0);
-		};
-		if (m_sort_order == TIME_ASC)
-		{
-			qsort(&m_logs[0], m_logs.size(), sizeof(m_logs[0]), asc_comparer);
-		}
-		else
-		{
-			qsort(&m_logs[0], m_logs.size(), sizeof(m_logs[0]), desc_comparer);
-		}
-	}
-
-
-	void sortByBytesRead()
-	{
-		if (m_logs.empty()) return;
-
-		m_sort_order = m_sort_order == BYTES_READ_ASC ? BYTES_READ_DESC : BYTES_READ_ASC;
-		auto asc_comparer = [](const void* data1, const void* data2) -> int{
-			return static_cast<const Log*>(data1)->bytes - static_cast<const Log*>(data2)->bytes;
-		};
-		auto desc_comparer = [](const void* data1, const void* data2) -> int{
-			return static_cast<const Log*>(data2)->bytes - static_cast<const Log*>(data1)->bytes;
-		};
-		if (m_sort_order == BYTES_READ_ASC)
-		{
-			qsort(&m_logs[0], m_logs.size(), sizeof(m_logs[0]), asc_comparer);
-		}
-		else
-		{
-			qsort(&m_logs[0], m_logs.size(), sizeof(m_logs[0]), desc_comparer);
-		}
-	}
-
-
-	void onGUIFileSystem()
-	{
-		if (!ImGui::CollapsingHeader("File system")) return;
-		auto getter = [](void* data, int index) -> float {
-			auto* ui = (ProfilerUIImpl*)data;
-			int abs_index = (ui->m_current_transfer_rate + index) % lengthOf(ui->m_transfer_rates);
-			return ui->m_transfer_rates[abs_index] / 1000.0f;
-		};
-
-		ImGui::PlotLines("kB/s",
-			getter,
-			this,
-			lengthOf(m_transfer_rates),
-			0,
-			nullptr,
-			FLT_MAX,
-			FLT_MAX,
-			ImVec2(0, 100));
-
-		ImGui::InputText("filter###fs_filter", m_filter, lengthOf(m_filter));
-
-		if(ImGui::Button("Clear")) m_logs.clear();
-
-		if(ImGui::BeginChild("list"))
-		{
-			ImGui::Columns(3);
-			ImGui::Text("File");
-			ImGui::NextColumn();
-
-			const char* duration_label = "Duration (ms)";
-			if (m_sort_order == TIME_ASC)
-			{
-				duration_label = "Duration (ms) < ";
-			}
-			else if (m_sort_order == TIME_DESC)
-			{
-				duration_label = "Duration (ms) >";
-			}
-			if (ImGui::Selectable(duration_label))
-			{
-				sortByDuration();
-			}
-			ImGui::NextColumn();
-
-			const char* bytes_read_label = "Bytes read (kB)";
-			if(m_sort_order == BYTES_READ_ASC) bytes_read_label = "Bytes read (kB) <";
-			else if(m_sort_order == BYTES_READ_DESC) bytes_read_label = "Bytes read (kB) >";
-			if(ImGui::Selectable(bytes_read_label))
-			{
-				sortByBytesRead();
-			}
-			ImGui::NextColumn();
-			ImGui::Separator();
-			for (auto& log : m_logs)
-			{
-				if (m_filter[0] == 0 || stristr(log.path, m_filter) != 0)
-				{
-					ImGui::Text("%s", log.path);
-					ImGui::NextColumn();
-					ImGui::Text("%f", log.time * 1000.0f);
-					ImGui::NextColumn();
-					ImGui::Text("%.3f", (float)((double)log.bytes / 1000.0f));
-					ImGui::NextColumn();
-				}
-			}
-			ImGui::Columns(1);
-		}
-		ImGui::EndChild();
-	}
-
-
 	void onGUI() override
 	{
 		PROFILE_FUNCTION();
-		while (!m_queue.isEmpty())
-		{
-			auto* log = m_queue.pop(false);
-			if (!log) break;
-			m_logs.push(*log);
-			m_queue.dealoc(log);
-			m_sort_order = NOT_SORTED;
-		}
-
-		m_next_transfer_rate_time -= m_engine.getLastTimeDelta();
-		if (m_next_transfer_rate_time < 0)
-		{
-			m_next_transfer_rate_time = 0.3f;
-			m_transfer_rates[m_current_transfer_rate] = m_bytes_read;
-			m_current_transfer_rate =
-				(m_current_transfer_rate + 1) % lengthOf(m_transfer_rates);
-			m_bytes_read = 0;
-		}
 
 		if (!m_is_open) return;
 		if (ImGui::Begin("Profiler", &m_is_open))
@@ -372,37 +136,9 @@ struct ProfilerUIImpl final : public ProfilerUI
 			onGUICPUProfiler();
 			onGUIMemoryProfiler();
 			onGUIResources();
-			onGUIFileSystem();
 		}
 		ImGui::End();
 	}
-
-
-	struct OpenedFile
-	{
-		uintptr handle;
-		float start;
-		float last_read;
-		int bytes;
-		char path[MAX_PATH_LENGTH];
-	};
-
-
-	struct Log
-	{
-		char path[MAX_PATH_LENGTH];
-		float time;
-		int bytes;
-	};
-
-	enum SortOrder
-	{
-		NOT_SORTED,
-		TIME_ASC,
-		TIME_DESC,
-		BYTES_READ_ASC,
-		BYTES_READ_DESC
-	};
 
 
 	struct AllocationStackNode
@@ -469,17 +205,9 @@ struct ProfilerUIImpl final : public ProfilerUI
 	u64 m_zoom = DEFAULT_ZOOM;
 	char m_filter[100];
 	char m_resource_filter[100];
-	Array<OpenedFile> m_open_files;
-	MT::LockFreeFixedQueue<Log, 512> m_queue;
 	Array<Log> m_logs;
-	FS::FileEventsDevice m_device;
 	Engine& m_engine;
 	Timer* m_timer;
-	int m_transfer_rates[100];
-	int m_current_transfer_rate;
-	volatile int m_bytes_read;
-	float m_next_transfer_rate_time;
-	SortOrder m_sort_order;
 	float m_autopause = -33.3333f;
 	bool m_show_context_switches = false;
 	bool m_gpu_open = false;

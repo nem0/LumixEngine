@@ -1,3 +1,4 @@
+#include "engine/array.h"
 #include "engine/fs/disk_file_device.h"
 #include "engine/iallocator.h"
 #include "engine/fs/file_system.h"
@@ -13,24 +14,22 @@ namespace Lumix
 	{
 		struct DiskFile final : public IFile
 		{
-			DiskFile(IFile* fallthrough, DiskFileDevice& device, IAllocator& allocator)
+			DiskFile(DiskFileDevice& device, IAllocator& allocator)
 				: m_device(device)
 				, m_allocator(allocator)
-				, m_fallthrough(fallthrough)
+				, m_data(allocator)
 			{
-				m_use_fallthrough = false;
 			}
 
 
 			~DiskFile()
 			{
-				if (m_fallthrough) m_fallthrough->release();
 			}
 
 
-			IFileDevice& getDevice() override
+			IFileDevice* getDevice() override
 			{
-				return m_device;
+				return &m_device;
 			}
 
 			bool open(const Path& path, Mode mode) override
@@ -45,70 +44,59 @@ namespace Lumix
 					copyString(tmp, m_device.getBasePath());
 					catString(tmp, path.c_str());
 				}
-				bool want_read = (mode & Mode::READ) != 0;
-				if (want_read && !OsFile::fileExists(tmp) && m_fallthrough)
-				{
-					m_use_fallthrough = true;
-					return m_fallthrough->open(path, mode);
-				}
-				return m_file.open(tmp, mode);
+				if (!m_file.open(tmp, mode)) return false;
+				
+				m_data.resize((int)m_file.size());
+				if (!m_file.read(m_data.begin(), m_data.byte_size())) return false;
+
+				return m_file.seek(FS::SeekMode::BEGIN, 0);
 			}
 
 			void close() override
 			{
-				if (m_fallthrough) m_fallthrough->close();
 				m_file.close();
-				m_use_fallthrough = false;
 			}
 
 			bool read(void* buffer, size_t size) override
 			{
-				if (m_use_fallthrough) return m_fallthrough->read(buffer, size);
 				return m_file.read(buffer, size);
 			}
 
 			bool write(const void* buffer, size_t size) override
 			{
-				if (m_use_fallthrough) return m_fallthrough->write(buffer, size);
 				return m_file.write(buffer, size);
 			}
 
 			const void* getBuffer() const override
 			{
-				if (m_use_fallthrough) return m_fallthrough->getBuffer();
-				return nullptr;
+				return m_data.begin();
 			}
 
 			size_t size() override
 			{
-				if (m_use_fallthrough) return m_fallthrough->size();
 				return m_file.size();
 			}
 
 			bool seek(SeekMode base, size_t pos) override
 			{
-				if (m_use_fallthrough) return m_fallthrough->seek(base, pos);
 				return m_file.seek(base, pos);
 			}
 
 			size_t pos() override
 			{
-				if (m_use_fallthrough) return m_fallthrough->pos();
 				return m_file.pos();
 			}
 
+			Array<u8> m_data;
 			DiskFileDevice& m_device;
 			IAllocator& m_allocator;
 			OsFile m_file;
-			IFile* m_fallthrough;
-			bool m_use_fallthrough;
 		};
 
 
-		DiskFileDevice::DiskFileDevice(const char* name, const char* base_path, IAllocator& allocator)
+		DiskFileDevice::DiskFileDevice(const char* base_path, IAllocator& allocator)
 			: m_allocator(allocator)
 		{
-			copyString(m_name, name);
 			PathUtils::normalize(base_path, m_base_path, lengthOf(m_base_path));
 			if (m_base_path[0] != '\0') catString(m_base_path, "/");
 		}
@@ -124,9 +112,9 @@ namespace Lumix
 			LUMIX_DELETE(m_allocator, file);
 		}
 
-		IFile* DiskFileDevice::createFile(IFile* fallthrough)
+		IFile* DiskFileDevice::createFile()
 		{
-			return LUMIX_NEW(m_allocator, DiskFile)(fallthrough, *this, m_allocator);
+			return LUMIX_NEW(m_allocator, DiskFile)(*this, m_allocator);
 		}
 	} // namespace FS
 } // namespace Lumix

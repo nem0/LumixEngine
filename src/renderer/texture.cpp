@@ -1,4 +1,5 @@
 #include "engine/fs/file_system.h"
+#include "engine/fs/os_file.h"
 #include "engine/log.h"
 #include "engine/math_utils.h"
 #include "engine/path_utils.h"
@@ -236,10 +237,13 @@ static void saveTGA(Texture& texture)
 		return;
 	}
 
-	FS::FileSystem& fs = texture.getResourceManager().getOwner().getFileSystem();
-	FS::IFile* file = fs.open(fs.getDefaultDevice(), texture.getPath(), FS::Mode::CREATE_AND_WRITE);
+	FS::OSFileStream file;
+	if (!file.open(texture.getPath(), FS::Mode::CREATE_AND_WRITE)) {
+		g_log_error.log("Renderer") << "Failed to create file " << texture.getPath();
+		return;
+	}
 
-	Texture::saveTGA(file,
+	Texture::saveTGA(&file,
 		texture.width,
 		texture.height,
 		texture.bytes_per_pixel,
@@ -247,7 +251,7 @@ static void saveTGA(Texture& texture)
 		texture.getPath(),
 		texture.allocator);
 
-	fs.close(*file);
+	file.close();
 }
 
 
@@ -258,11 +262,14 @@ void Texture::save()
 	PathUtils::getExtension(ext, 5, getPath().c_str());
 	if (equalStrings(ext, "raw") && bytes_per_pixel == 2)
 	{
-		FS::FileSystem& fs = m_resource_manager.getOwner().getFileSystem();
-		FS::IFile* file = fs.open(fs.getDefaultDevice(), getPath(), FS::Mode::CREATE_AND_WRITE);
+		FS::OSFileStream file;
+		if (!file.open(getPath(), FS::Mode::CREATE_AND_WRITE)) {
+			g_log_error.log("Renderer") << "Failed to create file " << getPath();
+			return;
+		}
 
-		file->write(&data[0], data.size() * sizeof(data[0]));
-		fs.close(*file);
+		file.write(&data[0], data.size() * sizeof(data[0]));
+		file.close();
 	}
 	else if (equalStrings(ext, "tga") && bytes_per_pixel == 4)
 	{

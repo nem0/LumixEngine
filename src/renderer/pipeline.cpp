@@ -198,8 +198,7 @@ void PipelineResource::unload()
 bool PipelineResource::load(FS::IFile& file)
 {
 	content.resize((int)file.size());
-	file.read(content.begin(), content.size());
-	return true;
+	return file.read(content.begin(), content.size());
 }
 
 
@@ -454,12 +453,9 @@ struct PipelineImpl final : Pipeline
 		lua_pushvalue(m_lua_state, LUA_GLOBALSINDEX);
 		lua_setfield(m_lua_state, -2, "__index");
 
-		if (m_renderer.getEngine().getDiskFileDevice())
-		{
-			lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
-			lua_pushstring(m_lua_state, m_renderer.getEngine().getDiskFileDevice()->getBasePath());
-			lua_setfield(m_lua_state, -2, "LUA_PATH");
-		}
+		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
+		lua_pushstring(m_lua_state, m_renderer.getEngine().getFileSystem().getBasePath());
+		lua_setfield(m_lua_state, -2, "LUA_PATH");
 
 		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
 		lua_pushlightuserdata(m_lua_state, this);

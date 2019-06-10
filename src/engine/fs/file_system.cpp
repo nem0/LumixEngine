@@ -50,7 +50,9 @@ typedef Array<IFileDevice*> DevicesTable;
 
 void IFile::release()
 {
-	getDevice().destroyFile(this);
+	if(getDevice()) {
+		getDevice()->destroyFile(this);
+	}
 }
 
 
@@ -122,17 +124,14 @@ private:
 class FileSystemImpl final : public FileSystem
 {
 public:
-	explicit FileSystemImpl(IAllocator& allocator)
+	explicit FileSystemImpl(const char* base_path, IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_pending(m_allocator)
 		, m_devices(m_allocator)
 		, m_in_progress(m_allocator)
 		, m_last_id(0)
 	{
-		m_disk_device.m_devices[0] = nullptr;
-		m_memory_device.m_devices[0] = nullptr;
-		m_default_device.m_devices[0] = nullptr;
-		m_save_game_device.m_devices[0] = nullptr;
+		m_disk_device = LUMIX_NEW(m_allocator, DiskFileDevice)(base_path, m_allocator);
 		m_task = LUMIX_NEW(m_allocator, FSTask)(&m_transaction_queue, m_allocator);
 		m_task->create("Filesystem", true);
 	}
@@ -152,6 +151,7 @@ public:
 		{
 			close(*i.m_file);
 		}
+		LUMIX_DELETE(m_allocator, m_disk_device);
 	}
 
 	BaseProxyAllocator& getAllocator() { return m_allocator; }
@@ -160,84 +160,12 @@ public:
 	bool hasWork() const override { return !m_in_progress.empty() || !m_pending.empty(); }
 
 
-	bool mount(IFileDevice* device) override
+	const char* getBasePath() const override { return m_disk_device->getBasePath(); }
+
+
+	u32 openAsync(const Path& file, int mode, const ReadCallback& call_back) override
 	{
-		for (int i = 0; i < m_devices.size(); i++)
-		{
-			if (m_devices[i] == device)
-			{
-				return false;
-			}
-		}
-
-		if (equalStrings(device->name(), "memory"))
-		{
-			m_memory_device.m_devices[0] = device;
-			m_memory_device.m_devices[1] = nullptr;
-		}
-		else if (equalStrings(device->name(), "disk"))
-		{
-			m_disk_device.m_devices[0] = device;
-			m_disk_device.m_devices[1] = nullptr;
-		}
-
-		m_devices.push(device);
-		return true;
-	}
-
-	bool unMount(IFileDevice* device) override
-	{
-		for (int i = 0; i < m_devices.size(); i++)
-		{
-			if (m_devices[i] == device)
-			{
-				m_devices.eraseFast(i);
-				return true;
-			}
-		}
-
-		return false;
-	}
-
-
-	IFile* createFile(const DeviceList& device_list)
-	{
-		IFile* prev = nullptr;
-		for (int i = 0; i < lengthOf(device_list.m_devices); ++i)
-		{
-			if (!device_list.m_devices[i])
-			{
-				break;
-			}
-			prev = device_list.m_devices[i]->createFile(prev);
-		}
-		return prev;
-	}
-
-
-	IFile* open(const DeviceList& device_list, const Path& file, Mode mode) override
-	{
-		IFile* prev = createFile(device_list);
-
-		if (prev)
-		{
-			if (prev->open(file, mode))
-			{
-				return prev;
-			}
-			prev->release();
-			return nullptr;
-		}
-		return nullptr;
-	}
-
-
-	u32 openAsync(const DeviceList& device_list,
-		const Path& file,
-		int mode,
-		const ReadCallback& call_back) override
-	{
-		IFile* prev = createFile(device_list);
+		IFile* prev = m_disk_device->createFile();
 
 		if (prev)
 		{
@@ -281,42 +209,6 @@ public:
 		}
 
 	}
-
-
-	void setDefaultDevice(const char* dev) override { fillDeviceList(dev, m_default_device); }
-
-
-	void fillDeviceList(const char* dev, DeviceList& device_list) override
-	{
-		const char* token = nullptr;
-
-		int device_index = 0;
-		const char* end = dev + stringLength(dev);
-
-		while (end > dev)
-		{
-			token = reverseFind(dev, token, ':');
-			char device[32];
-			if (token)
-			{
-				copyNString(device, (int)sizeof(device), token + 1, int(end - token - 1));
-			}
-			else
-			{
-				copyNString(device, (int)sizeof(device), dev, int(end - dev));
-			}
-			end = token;
-			device_list.m_devices[device_index] = getDevice(device);
-			ASSERT(device_list.m_devices[device_index]);
-			++device_index;
-		}
-		device_list.m_devices[device_index] = nullptr;
-	}
-
-
-	const DeviceList& getMemoryDevice() const override { return m_memory_device; }
-	const DeviceList& getDiskDevice() const override { return m_disk_device; }
-	void setSaveGameDevice(const char* dev) override { fillDeviceList(dev, m_save_game_device); }
 
 
 	void close(IFile& file) override
@@ -382,19 +274,6 @@ public:
 		}
 	}
 
-	const DeviceList& getDefaultDevice() const override { return m_default_device; }
-
-	const DeviceList& getSaveGameDevice() const override { return m_save_game_device; }
-
-	IFileDevice* getDevice(const char* device)
-	{
-		for (int i = 0; i < m_devices.size(); ++i)
-		{
-			if (equalStrings(m_devices[i]->name(), device)) return m_devices[i];
-		}
-
-		return nullptr;
-	}
 
 	static void closeAsync(IFile&, bool) {}
 
@@ -403,20 +282,17 @@ private:
 	FSTask* m_task;
 	DevicesTable m_devices;
 
+	DiskFileDevice* m_disk_device;
 	ItemsTable m_pending;
 	TransQueue m_transaction_queue;
 	InProgressQueue m_in_progress;
 
-	DeviceList m_disk_device;
-	DeviceList m_memory_device;
-	DeviceList m_default_device;
-	DeviceList m_save_game_device;
 	u32 m_last_id;
 };
 
-FileSystem* FileSystem::create(IAllocator& allocator)
+FileSystem* FileSystem::create(const char* base_path, IAllocator& allocator)
 {
-	return LUMIX_NEW(allocator, FileSystemImpl)(allocator);
+	return LUMIX_NEW(allocator, FileSystemImpl)(base_path, allocator);
 }
 
 void FileSystem::destroy(FileSystem* fs)
