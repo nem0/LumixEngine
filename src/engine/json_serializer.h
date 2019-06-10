@@ -9,19 +9,15 @@ namespace Lumix
 
 
 struct IAllocator;
+struct IInputStream;
+struct IOutputStream;
 class Path;
-
-
-namespace FS
-{
-	struct IFile;
-}
 
 
 class LUMIX_ENGINE_API JsonSerializer
 {
 	public:
-		JsonSerializer(FS::IFile& file, const Path& path);
+		JsonSerializer(IOutputStream& file, const Path& path);
 		void operator=(const JsonSerializer&) = delete;
 		JsonSerializer(const JsonSerializer&) = delete;
 
@@ -57,7 +53,7 @@ class LUMIX_ENGINE_API JsonSerializer
 
 	private:
 		bool m_is_first_in_block;
-		FS::IFile& m_file;
+		IOutputStream& m_file;
 };
 
 
@@ -65,7 +61,7 @@ class LUMIX_ENGINE_API JsonDeserializer
 {
 	friend class ErrorProxy;
 public:
-	JsonDeserializer(FS::IFile& file, const Path& path, IAllocator& allocator);
+	JsonDeserializer(IInputStream& file, const Path& path, IAllocator& allocator);
 	void operator=(const JsonDeserializer&) = delete;
 	JsonDeserializer(const JsonDeserializer&) = delete;
 	~JsonDeserializer();
@@ -117,7 +113,7 @@ private:
 
 private:
 	bool m_is_first_in_block;
-	FS::IFile& m_file;
+	IInputStream& m_file;
 	const char* m_token;
 	int m_token_size;
 	bool m_is_string_token;

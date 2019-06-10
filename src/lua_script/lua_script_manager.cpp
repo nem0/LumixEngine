@@ -27,10 +27,10 @@ void LuaScript::unload()
 }
 
 
-bool LuaScript::load(FS::IFile& file)
+bool LuaScript::load(u64 size, void* mem)
 {
-	m_source_code.set((const char*)file.getBuffer(), (int)file.size());
-	m_size = file.size();
+	m_source_code.set((const char*)mem, (int)size);
+	m_size = size;
 	return true;
 }
 

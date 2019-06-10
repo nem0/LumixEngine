@@ -28,7 +28,7 @@ Resource::Resource(const Path& path, ResourceManager& resource_manager, IAllocat
 	, m_size()
 	, m_cb(allocator)
 	, m_resource_manager(resource_manager)
-	, m_async_op(FS::FileSystem::INVALID_ASYNC)
+	, m_async_op(FS::AsyncHandle::invalid())
 {
 }
 
@@ -65,9 +65,9 @@ void Resource::checkState()
 }
 
 
-void Resource::fileLoaded(FS::IFile& file, bool success)
+void Resource::fileLoaded(u64 size, const u8* mem, bool success)
 {
-	m_async_op = FS::FileSystem::INVALID_ASYNC;
+	m_async_op = FS::AsyncHandle::invalid();
 	if (m_desired_state != State::READY) return;
 	
 	ASSERT(m_current_state != State::READY);
@@ -80,28 +80,28 @@ void Resource::fileLoaded(FS::IFile& file, bool success)
 		--m_empty_dep_count;
 		++m_failed_dep_count;
 		checkState();
-		m_async_op = FS::FileSystem::INVALID_ASYNC;
+		m_async_op = FS::AsyncHandle::invalid();
 		return;
 	}
 
-	if (!load(file)) {
+	if (!load(size, mem)) {
 		++m_failed_dep_count;
 	}
 
 	ASSERT(m_empty_dep_count > 0);
 	--m_empty_dep_count;
 	checkState();
-	m_async_op = FS::FileSystem::INVALID_ASYNC;
+	m_async_op = FS::AsyncHandle::invalid();
 }
 
 
 void Resource::doUnload()
 {
-	if (m_async_op != FS::FileSystem::INVALID_ASYNC)
+	if (m_async_op.isValid())
 	{
 		FS::FileSystem& fs = m_resource_manager.getOwner().getFileSystem();
-		fs.cancelAsync(m_async_op);
-		m_async_op = FS::FileSystem::INVALID_ASYNC;
+		fs.cancel(m_async_op);
+		m_async_op = FS::AsyncHandle::invalid();
 	}
 
 	m_desired_state = State::EMPTY;
@@ -132,15 +132,16 @@ void Resource::doLoad()
 	if (m_desired_state == State::READY) return;
 	m_desired_state = State::READY;
 
-	if (m_async_op != FS::FileSystem::INVALID_ASYNC) return;
+	if (m_async_op.isValid()) return;
+
 	FS::FileSystem& fs = m_resource_manager.getOwner().getFileSystem();
-	FS::ReadCallback cb;
+	FS::ContentCallback cb;
 	cb.bind<Resource, &Resource::fileLoaded>(this);
 
 	const u32 hash = m_path.getHash();
 	const StaticString<MAX_PATH_LENGTH> res_path(".lumix/assets/", hash, ".res");
 
-	m_async_op = fs.openAsync(Path(res_path), FS::Mode::OPEN_AND_READ, cb);
+	m_async_op = fs.getContent(Path(res_path), cb);
 }
 
 

@@ -9,8 +9,8 @@ namespace Lumix
 
 
 struct IAllocator;
-class InputBlob;
-class OutputBlob;
+struct IInputStream;
+struct IOutputStream;
 
 
 class PathInternal
@@ -63,8 +63,8 @@ public:
 	explicit PathManager(IAllocator& allocator);
 	~PathManager();
 
-	void serialize(OutputBlob& serializer);
-	void deserialize(InputBlob& serializer);
+	void serialize(IOutputStream& serializer);
+	void deserialize(IInputStream& serializer);
 
 	void clear();
 	static const Path& getEmptyPath();

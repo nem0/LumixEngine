@@ -1,8 +1,6 @@
 #include "engine/engine.h"
-#include "engine/blob.h"
 #include "engine/crc32.h"
 #include "engine/debug/debug.h"
-#include "engine/fs/disk_file_device.h"
 #include "engine/fs/file_system.h"
 #include "engine/fs/os_file.h"
 #include "engine/input_system.h"
@@ -19,6 +17,7 @@
 #include "engine/profiler.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
+#include "engine/stream.h"
 #include "engine/timer.h"
 #include "engine/universe/component.h"
 #include "engine/universe/universe.h"
@@ -392,7 +391,7 @@ void registerCFunction(lua_State* L, const char* name, lua_CFunction f)
 static const u32 SERIALIZED_ENGINE_MAGIC = 0x5f4c454e; // == '_LEN'
 
 
-static FS::OsFile g_error_file;
+static FS::OSOutputFile g_error_file;
 static bool g_is_error_file_open = false;
 
 
@@ -449,7 +448,7 @@ public:
 		Profiler::setThreadName("Worker");
 		installUnhandledExceptionHandler();
 
-		g_is_error_file_open = g_error_file.open("error.log", FS::Mode::CREATE_AND_WRITE);
+		g_is_error_file_open = g_error_file.open("error.log");
 
 		g_log_error.getCallback().bind<logErrorToFile>();
 		g_log_info.getCallback().bind<showLogInVS>();
@@ -527,7 +526,7 @@ public:
 			if (lua_isnumber(L, -1))
 			{
 				float f = (float)lua_tonumber(L, -1);
-				InputBlob input_blob(&f, sizeof(f));
+				InputMemoryStream input_blob(&f, sizeof(f));
 				prop.setValue(cmp, -1, input_blob);
 			}
 		}
@@ -539,7 +538,7 @@ public:
 			if (lua_isnumber(L, -1))
 			{
 				int i = (int)lua_tointeger(L, -1);
-				InputBlob input_blob(&i, sizeof(i));
+				InputMemoryStream input_blob(&i, sizeof(i));
 				prop.setValue(cmp, -1, input_blob);
 			}
 
@@ -552,7 +551,7 @@ public:
 			if (lua_isnumber(L, -1))
 			{
 				int i = (int)lua_tointeger(L, -1);
-				InputBlob input_blob(&i, sizeof(i));
+				InputMemoryStream input_blob(&i, sizeof(i));
 				prop.setValue(cmp, -1, input_blob);
 			}
 
@@ -565,7 +564,7 @@ public:
 			if (lua_istable(L, -1))
 			{
 				auto v = LuaWrapper::toType<IVec2>(L, -1);
-				InputBlob input_blob(&v, sizeof(v));
+				InputMemoryStream input_blob(&v, sizeof(v));
 				prop.setValue(cmp, -1, input_blob);
 			}
 		}
@@ -577,7 +576,7 @@ public:
 			if (lua_istable(L, -1))
 			{
 				auto v = LuaWrapper::toType<Vec2>(L, -1);
-				InputBlob input_blob(&v, sizeof(v));
+				InputMemoryStream input_blob(&v, sizeof(v));
 				prop.setValue(cmp, -1, input_blob);
 			}
 		}
@@ -589,7 +588,7 @@ public:
 			if (lua_istable(L, -1))
 			{
 				auto v = LuaWrapper::toType<Vec3>(L, -1);
-				InputBlob input_blob(&v, sizeof(v));
+				InputMemoryStream input_blob(&v, sizeof(v));
 				prop.setValue(cmp, -1, input_blob);
 			}
 		}
@@ -601,7 +600,7 @@ public:
 			if (lua_istable(L, -1))
 			{
 				auto v = LuaWrapper::toType<Vec4>(L, -1);
-				InputBlob input_blob(&v, sizeof(v));
+				InputMemoryStream input_blob(&v, sizeof(v));
 				prop.setValue(cmp, -1, input_blob);
 			}
 		}
@@ -613,7 +612,7 @@ public:
 			if (lua_isstring(L, -1))
 			{
 				const char* str = lua_tostring(L, -1);
-				InputBlob input_blob(str, stringLength(str) + 1);
+				InputMemoryStream input_blob(str, stringLength(str) + 1);
 				prop.setValue(cmp, -1, input_blob);
 			}
 		}
@@ -625,7 +624,7 @@ public:
 			if (lua_isboolean(L, -1))
 			{
 				bool b = lua_toboolean(L, -1) != 0;
-				InputBlob input_blob(&b, sizeof(b));
+				InputMemoryStream input_blob(&b, sizeof(b));
 				prop.setValue(cmp, -1, input_blob);
 			}
 		}
@@ -637,7 +636,7 @@ public:
 			if (lua_isstring(L, -1))
 			{
 				const char* str = lua_tostring(L, -1);
-				InputBlob input_blob(str, stringLength(str) + 1);
+				InputMemoryStream input_blob(str, stringLength(str) + 1);
 				prop.setValue(cmp, -1, input_blob);
 			}
 		}
@@ -663,7 +662,7 @@ public:
 				for (int i = 0, c = prop.getEnumCount(cmp); i < c; ++i) {
 					if (equalStrings(prop.getEnumName(cmp, i), str)) {
 						const int value = prop.getEnumValue(cmp, i);
-						InputBlob input_blob(&value, sizeof(value));
+						InputMemoryStream input_blob(&value, sizeof(value));
 						prop.setValue(cmp, -1, input_blob);
 					}
 				}
@@ -852,7 +851,7 @@ public:
 		auto* path = LuaWrapper::checkArg<const char*>(L, 3);
 		if (!lua_isfunction(L, 4)) LuaWrapper::argError(L, 4, "function");
 		FS::FileSystem& fs = engine->getFileSystem();
-		FS::ReadCallback cb;
+		FS::ContentCallback cb;
 		struct Callback
 		{
 			~Callback()
@@ -860,7 +859,7 @@ public:
 				luaL_unref(L, LUA_REGISTRYINDEX, lua_func);
 			}
 
-			void invoke(FS::IFile& file, bool success)
+			void invoke(u64 size, const u8* mem, bool success)
 			{
 				if (!success)
 				{
@@ -868,7 +867,7 @@ public:
 				}
 				else
 				{
-					InputBlob blob(file.getBuffer(), (int)file.size());
+					InputMemoryStream blob(mem, size);
 					#pragma pack(1)
 						struct Header
 						{
@@ -916,7 +915,7 @@ public:
 		inst->L = L;
 		inst->lua_func = luaL_ref(L, LUA_REGISTRYINDEX);
 		cb.bind<Callback, &Callback::invoke>(inst);
-		fs.openAsync(inst->path, FS::Mode::OPEN_AND_READ, cb);
+		fs.getContent(inst->path, cb);
 		return 0;
 	}
 
@@ -1374,7 +1373,7 @@ public:
 	float getFPS() const override { return m_fps; }
 
 
-	void serializerSceneVersions(OutputBlob& serializer, Universe& ctx)
+	void serializerSceneVersions(OutputMemoryStream& serializer, Universe& ctx)
 	{
 		serializer.write(ctx.getScenes().size());
 		for (auto* scene : ctx.getScenes())
@@ -1385,7 +1384,7 @@ public:
 	}
 
 
-	void serializePluginList(OutputBlob& serializer)
+	void serializePluginList(OutputMemoryStream& serializer)
 	{
 		serializer.write((i32)m_plugin_manager->getPlugins().size());
 		for (auto* plugin : m_plugin_manager->getPlugins())
@@ -1395,7 +1394,7 @@ public:
 	}
 
 
-	bool hasSupportedSceneVersions(InputBlob& serializer, Universe& ctx)
+	bool hasSupportedSceneVersions(InputMemoryStream& serializer, Universe& ctx)
 	{
 		i32 count;
 		serializer.read(count);
@@ -1416,7 +1415,7 @@ public:
 	}
 
 
-	bool hasSerializedPlugins(InputBlob& serializer)
+	bool hasSerializedPlugins(InputMemoryStream& serializer)
 	{
 		i32 count;
 		serializer.read(count);
@@ -1434,7 +1433,7 @@ public:
 	}
 
 
-	u32 serialize(Universe& ctx, OutputBlob& serializer) override
+	u32 serialize(Universe& ctx, IOutputStream& serializer) override
 	{
 		SerializedEngineHeader header;
 		header.m_magic = SERIALIZED_ENGINE_MAGIC; // == '_LEN'
@@ -1457,7 +1456,7 @@ public:
 	}
 
 
-	bool deserialize(Universe& ctx, InputBlob& serializer) override
+	bool deserialize(Universe& ctx, IInputStream& serializer) override
 	{
 		SerializedEngineHeader header;
 		serializer.read(header);

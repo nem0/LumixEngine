@@ -5,6 +5,7 @@
 #include "engine/path_utils.h"
 #include "engine/profiler.h"
 #include "engine/resource_manager.h"
+#include "engine/stream.h"
 #include "renderer/renderer.h"
 #include "renderer/texture.h"
 #include "renderer/texture_manager.h"
@@ -132,7 +133,7 @@ u32 Texture::getPixel(float x, float y) const
 }
 
 
-unsigned int Texture::compareTGA(FS::IFile* file1, FS::IFile* file2, int difference, IAllocator& allocator)
+unsigned int Texture::compareTGA(IInputStream* file1, IInputStream* file2, int difference, IAllocator& allocator)
 {
 	TGAHeader header1, header2;
 	file1->read(&header1, sizeof(header1));
@@ -181,7 +182,7 @@ unsigned int Texture::compareTGA(FS::IFile* file1, FS::IFile* file2, int differe
 }
 
 
-bool Texture::saveTGA(FS::IFile* file,
+bool Texture::saveTGA(IOutputStream* file,
 	int width,
 	int height,
 	int bytes_per_pixel,
@@ -237,8 +238,8 @@ static void saveTGA(Texture& texture)
 		return;
 	}
 
-	FS::OSFileStream file;
-	if (!file.open(texture.getPath(), FS::Mode::CREATE_AND_WRITE)) {
+	FS::OSOutputFile file;
+	if (!file.open(texture.getPath().c_str())) {
 		g_log_error.log("Renderer") << "Failed to create file " << texture.getPath();
 		return;
 	}
@@ -262,8 +263,8 @@ void Texture::save()
 	PathUtils::getExtension(ext, 5, getPath().c_str());
 	if (equalStrings(ext, "raw") && bytes_per_pixel == 2)
 	{
-		FS::OSFileStream file;
-		if (!file.open(getPath(), FS::Mode::CREATE_AND_WRITE)) {
+		FS::OSOutputFile file;
+		if (!file.open(getPath().c_str())) {
 			g_log_error.log("Renderer") << "Failed to create file " << getPath();
 			return;
 		}
@@ -315,7 +316,7 @@ void Texture::onDataUpdated(int x, int y, int w, int h)
 }
 
 
-bool loadRaw(Texture& texture, FS::IFile& file, IAllocator& allocator)
+bool loadRaw(Texture& texture, IInputStream& file, IAllocator& allocator)
 {
 	PROFILE_FUNCTION();
 	size_t size = file.size() - 3;
@@ -368,7 +369,7 @@ static void flipVertical(u32* image, int width, int height)
 }
 
 
-bool Texture::loadTGA(FS::IFile& file, TGAHeader& header, Array<u8>& data, const char* path)
+bool Texture::loadTGA(IInputStream& file, TGAHeader& header, Array<u8>& data, const char* path)
 {
 	PROFILE_FUNCTION();
 	file.read(&header, sizeof(header));
@@ -455,7 +456,7 @@ bool Texture::loadTGA(FS::IFile& file, TGAHeader& header, Array<u8>& data, const
 }
 
 
-bool Texture::loadTGA(FS::IFile& file)
+bool Texture::loadTGA(IInputStream& file)
 {
 	PROFILE_FUNCTION();
 	TGAHeader header;
@@ -599,7 +600,7 @@ void Texture::removeDataReference()
 }
 
 
-static bool loadDDS(Texture& texture, FS::IFile& file)
+static bool loadDDS(Texture& texture, IInputStream& file)
 {
 	ffr::TextureInfo info;
 	const u8* data = (const u8*)file.getBuffer();
@@ -632,10 +633,11 @@ u32 Texture::getFFRFlags() const
 }
 
 
-bool Texture::load(FS::IFile& file)
+bool Texture::load(u64 size, const u8* mem)
 {
 	PROFILE_FUNCTION();
 	char ext[4] = {};
+	InputMemoryStream file(mem, size);
 	if (!file.read(ext, 3)) return false;
 	u32 flags;
 	if (!file.read(&flags, sizeof(flags))) return false;

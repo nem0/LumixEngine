@@ -1,66 +1,63 @@
 #pragma once
 
-#include "engine/fs/file_system.h"
 #include "engine/lumix.h"
+#include "engine/stream.h"
 
 namespace Lumix
 {
-	struct IAllocator;
 
-	namespace FS
-	{
-		class LUMIX_ENGINE_API OsFile
-		{
-		public:
-			OsFile();
-			~OsFile();
+struct IAllocator;
 
-			bool open(const char* path, Mode mode);
-			void close();
-			void flush();
-
-			bool write(const void* data, size_t size);
-			bool writeText(const char* text);
-			bool read(void* data, size_t size);
-
-			size_t size();
-			size_t pos();
-
-			bool seek(SeekMode base, size_t pos);
-
-			OsFile& operator <<(const char* text);
-			OsFile& operator <<(char c) { write(&c, sizeof(c)); return *this; }
-			OsFile& operator <<(i32 value);
-			OsFile& operator <<(u32 value);
-			OsFile& operator <<(u64 value);
-			OsFile& operator <<(float value);
-
-			static bool fileExists(const char* path);
-
-		private:
-			void* m_handle;
-		};
-
+namespace FS
+{
 	
-		struct OSFileStream : FS::IFile 
-		{
-			bool open(const Path& path, FS::Mode mode) override;
-			void close() override;
+class LUMIX_ENGINE_API OSInputFile final : public IInputStream
+{
+public:
+	OSInputFile();
+	~OSInputFile();
 
-			bool read(void* buffer, size_t size) override;
-			bool write(const void* buffer, size_t size) override;
+	bool open(const char* path);
+	void close();
 
-			const void* getBuffer() const override;
-			size_t size() override;
+	bool read(void* data, u64 size) override;
+	const void* getBuffer() const override { return nullptr; }
 
-			bool seek(FS::SeekMode base, size_t pos) override;
-			size_t pos() override;
+	u64 size() const override;
+	u64 pos();
+
+	bool seek(size_t pos);
 	
-			FS::IFileDevice* getDevice() override;
+private:
+	void* m_handle;
+};
 	
-			FS::OsFile file;
-		};
 
-	} // namespace FS
+class LUMIX_ENGINE_API OSOutputFile final : public IOutputStream
+{
+public:
+	OSOutputFile();
+	~OSOutputFile();
+
+	bool open(const char* path);
+	void close();
+	void flush();
+
+	bool write(const void* data, u64 size) override;
+
+	size_t pos();
+
+	OSOutputFile& operator <<(const char* text);
+	OSOutputFile& operator <<(char c) { write(&c, sizeof(c)); return *this; }
+	OSOutputFile& operator <<(i32 value);
+	OSOutputFile& operator <<(u32 value);
+	OSOutputFile& operator <<(u64 value);
+	OSOutputFile& operator <<(float value);
+
+private:
+	void* m_handle;
+};
+	
+} // namespace FS
 
 } // namespace Lumix

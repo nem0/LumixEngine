@@ -1,3 +1,4 @@
+#include "engine/stream.h"
 #include "font_manager.h"
 #include "renderer/texture.h"
 #include "renderer/texture_manager.h"
@@ -19,13 +20,12 @@ FontResource::FontResource(const Path& path, ResourceManager& manager, IAllocato
 }
 
 
-bool FontResource::load(FS::IFile& file)
+bool FontResource::load(u64 size, const u8* mem)
 {
-	int size = (int)file.size();
 	if (size <= 0) return false;
 	
-	m_file_data.resize(size);
-	file.read(&m_file_data[0], m_file_data.size());
+	m_file_data.resize((int)size);
+	memcpy(m_file_data.begin(), mem, size);
 	return true;
 }
 

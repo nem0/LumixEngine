@@ -7,6 +7,8 @@
 
 namespace Lumix
 {
+struct IInputStream;
+struct IOutputStream;
 class Renderer;
 namespace FS
 {
@@ -63,15 +65,15 @@ class LUMIX_RENDERER_API Texture final : public Resource
 		u32 getPixel(float x, float y) const;
 		u32 getFFRFlags() const;
 
-		static unsigned int compareTGA(FS::IFile* file1, FS::IFile* file2, int difference, IAllocator& allocator);
-		static bool saveTGA(FS::IFile* file,
+		static unsigned int compareTGA(IInputStream* file1, IInputStream* file2, int difference, IAllocator& allocator);
+		static bool saveTGA(IOutputStream* file,
 			int width,
 			int height,
 			int bytes_per_pixel,
 			const u8* image_dest,
 			const Path& path,
 			IAllocator& allocator);
-		static bool loadTGA(FS::IFile& file, TGAHeader& header, Array<u8>& data, const char* path);
+		static bool loadTGA(IInputStream& file, TGAHeader& header, Array<u8>& data, const char* path);
 
 		static const ResourceType TYPE;
 
@@ -92,8 +94,8 @@ class LUMIX_RENDERER_API Texture final : public Resource
 
 	private:
 		void unload() override;
-		bool load(FS::IFile& file) override;
-		bool loadTGA(FS::IFile& file);
+		bool load(u64 size, const u8* mem) override;
+		bool loadTGA(IInputStream& file);
 };
 
 

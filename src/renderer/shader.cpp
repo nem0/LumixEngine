@@ -398,8 +398,8 @@ int include(lua_State* L)
 	}
 
 	FS::FileSystem& fs = shader->m_renderer.getEngine().getFileSystem();
-	FS::OSFileStream file;
-	if (!file.open(Path(path), FS::Mode::OPEN_AND_READ)) {
+	FS::OSInputFile file;
+	if (!file.open(path)) {
 		g_log_error.log("Renderer") << "Failed to open include " << path << " included from " << shader->getPath();
 		return 0;
 	}
@@ -419,7 +419,7 @@ int include(lua_State* L)
 } // namespace LuaAPI
 
 
-bool Shader::load(FS::IFile& file)
+bool Shader::load(u64 size, const u8* mem)
 {
 	lua_State* L = luaL_newstate();
 	luaL_openlibs(L);
@@ -466,13 +466,13 @@ bool Shader::load(FS::IFile& file)
 	lua_pushinteger(L, (int)Mesh::AttributeSemantic::INSTANCE2);
 	lua_setglobal(L, "SEMANTICS_INSTANCE2");
 
-	const StringView content((const char*)file.getBuffer(), (int)file.size());
+	const StringView content((const char*)mem, (int)size);
 	if (!LuaWrapper::execute(L, content, getPath().c_str(), 0)) {
 		lua_close(L);
 		return false;
 	}
 
-	m_size = file.size();
+	m_size = size;
 	lua_close(L);
 	return true;
 

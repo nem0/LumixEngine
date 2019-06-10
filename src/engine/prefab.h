@@ -1,9 +1,9 @@
 #pragma once
 
 
-#include "engine/blob.h"
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
+#include "engine/stream.h"
 
 
 namespace Lumix
@@ -23,7 +23,7 @@ struct LUMIX_ENGINE_API PrefabResource final : public Resource
 {
 	PrefabResource(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
 		: Resource(path, resource_manager, allocator)
-		, blob(allocator)
+		, data(allocator)
 	{
 	}
 
@@ -31,19 +31,18 @@ struct LUMIX_ENGINE_API PrefabResource final : public Resource
 	ResourceType getType() const override { return TYPE; }
 
 
-	void unload() override { blob.clear(); }
+	void unload() override { data.clear(); }
 
 
-	bool load(FS::IFile& file) override
+	bool load(u64 size, const u8* mem) override
 	{
-		file.getContents(blob);
+		data.resize((int)size);
+		copyMemory(data.begin(), mem, size);
 		return true;
 	}
 
 
-	OutputBlob blob;
-
-
+	Array<u8> data;
 	static const ResourceType TYPE;
 };
 

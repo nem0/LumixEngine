@@ -2,15 +2,15 @@
 
 #include "engine/array.h"
 #include "engine/base_proxy_allocator.h"
-#include "engine/blob.h"
 #include "engine/delegate_list.h"
-#include "engine/fs/disk_file_device.h"
+#include "engine/fs/os_file.h"
 #include "engine/mt/lock_free_fixed_queue.h"
 #include "engine/mt/task.h"
 #include "engine/mt/transaction.h"
 #include "engine/path.h"
 #include "engine/profiler.h"
 #include "engine/queue.h"
+#include "engine/stream.h"
 #include "engine/string.h"
 
 
@@ -31,9 +31,8 @@ enum TransFlags
 
 struct AsyncItem
 {
-	IFile* m_file;
+	OSInputFile m_file;
 	ReadCallback m_cb;
-	Mode m_mode;
 	u32 m_id;
 	char m_path[MAX_PATH_LENGTH];
 	u8 m_flags;
@@ -45,30 +44,6 @@ typedef MT::Transaction<AsyncItem> AsynTrans;
 typedef MT::LockFreeFixedQueue<AsynTrans, C_MAX_TRANS> TransQueue;
 typedef Queue<AsynTrans*, C_MAX_TRANS> InProgressQueue;
 typedef Array<AsyncItem> ItemsTable;
-typedef Array<IFileDevice*> DevicesTable;
-
-
-void IFile::release()
-{
-	if(getDevice()) {
-		getDevice()->destroyFile(this);
-	}
-}
-
-
-IFile& IFile::operator<<(const char* text)
-{
-	write(text, stringLength(text));
-	return *this;
-}
-
-
-void IFile::getContents(OutputBlob& blob)
-{
-	size_t tmp = size();
-	blob.resize((int)tmp);
-	read(blob.getMutableData(), tmp);
-}
 
 
 class FSTask final : public MT::Task
@@ -97,7 +72,7 @@ public:
 				PROFILE_BLOCK("open");
 				Profiler::blockColor(0, 0xff, 0);
 				Profiler::recordString(tr->data.m_path);
-				const bool opened = tr->data.m_file->open(Path(tr->data.m_path), tr->data.m_mode);
+				const bool opened = tr->data.m_file.open(tr->data.m_path);
 				if (!opened) Profiler::blockColor(0xff, 0, 0);
 				tr->data.m_flags |= opened ? E_SUCCESS : E_FAIL;
 			}
@@ -105,9 +80,7 @@ public:
 			{
 				PROFILE_BLOCK("close");
 				Profiler::blockColor(0, 0, 0xff);
-				tr->data.m_file->close();
-				tr->data.m_file->release();
-				tr->data.m_file = nullptr;
+				tr->data.m_file.close();
 			}
 			tr->setCompleted();
 		}
@@ -127,11 +100,9 @@ public:
 	explicit FileSystemImpl(const char* base_path, IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_pending(m_allocator)
-		, m_devices(m_allocator)
 		, m_in_progress(m_allocator)
 		, m_last_id(0)
 	{
-		m_disk_device = LUMIX_NEW(m_allocator, DiskFileDevice)(base_path, m_allocator);
 		m_task = LUMIX_NEW(m_allocator, FSTask)(&m_transaction_queue, m_allocator);
 		m_task->create("Filesystem", true);
 	}
@@ -145,13 +116,12 @@ public:
 		{
 			auto* trans = m_in_progress.front();
 			m_in_progress.pop();
-			if (trans->data.m_file) close(*trans->data.m_file);
+			trans->data.m_file.close();
 		}
 		for (auto& i : m_pending)
 		{
-			close(*i.m_file);
+			i.m_file.close();
 		}
-		LUMIX_DELETE(m_allocator, m_disk_device);
 	}
 
 	BaseProxyAllocator& getAllocator() { return m_allocator; }
@@ -160,12 +130,27 @@ public:
 	bool hasWork() const override { return !m_in_progress.empty() || !m_pending.empty(); }
 
 
-	const char* getBasePath() const override { return m_disk_device->getBasePath(); }
+	const char* getBasePath() const override { return m_base_path; }
 
 
-	u32 openAsync(const Path& file, int mode, const ReadCallback& call_back) override
+	void read(AsyncHandle handle, u64 offset, u64 size, const ReadCallback& callback) override
 	{
-		IFile* prev = m_disk_device->createFile();
+		ASSERT(false);
+		// TODO
+	}
+
+
+	AsyncHandle getContent(const Path& file, const ContentCallback& callback) override
+	{
+		ASSERT(false);
+		// TODO
+		return AsyncHandle::invalid();
+	}
+
+
+	AsyncHandle open(const Path& file, const OpenCallback& callback) override
+	{
+/*		IFile* prev = m_disk_device->createFile();
 
 		if (prev)
 		{
@@ -181,14 +166,18 @@ public:
 			if (m_last_id == INVALID_ASYNC) m_last_id = 0;
 			return item.m_id;
 		}
-
-		return INVALID_ASYNC;
+		*/
+		ASSERT(false);
+		// TODO
+		return AsyncHandle::invalid();
 	}
 
 
-	void cancelAsync(u32 id) override
+	void cancel(AsyncHandle async) override
 	{
-		if (id == INVALID_ASYNC) return;
+		ASSERT(false);
+		// TODO
+/*		if (id == INVALID_ASYNC) return;
 
 		for (int i = 0, c = m_pending.size(); i < c; ++i)
 		{
@@ -206,32 +195,28 @@ public:
 				iter.value()->data.m_flags |= E_CANCELED;
 				return;
 			}
-		}
+		}*/
 
 	}
 
 
-	void close(IFile& file) override
+	void close(AsyncHandle handle) override
 	{
-		file.close();
-		file.release();
-	}
-
-
-	void closeAsync(IFile& file) override
-	{
+		/*
 		AsyncItem& item = m_pending.emplace();
 
 		item.m_file = &file;
 		item.m_cb.bind<closeAsync>();
 		item.m_mode = 0;
-		item.m_flags = E_CLOSE;
+		item.m_flags = E_CLOSE;*/
+		// TODO
+		ASSERT(false);
 	}
 
 
 	void updateAsyncTransactions() override
 	{
-		PROFILE_FUNCTION();
+		/*PROFILE_FUNCTION();
 		while (!m_in_progress.empty())
 		{
 			AsynTrans* tr = m_in_progress.front();
@@ -242,7 +227,7 @@ public:
 
 			if ((tr->data.m_flags & E_CANCELED) == 0)
 			{
-				tr->data.m_cb.invoke(*tr->data.m_file, !!(tr->data.m_flags & E_SUCCESS));
+				tr->data.m_cb.invoke(tr->data.m_file, !!(tr->data.m_flags & E_SUCCESS));
 			}
 			if ((tr->data.m_flags & (E_SUCCESS | E_FAIL)) != 0)
 			{
@@ -271,21 +256,18 @@ public:
 				m_pending.erase(0);
 			}
 			can_add--;
-		}
+		}*/
+		// TODO
+		ASSERT(false);
 	}
-
-
-	static void closeAsync(IFile&, bool) {}
 
 private:
 	BaseProxyAllocator m_allocator;
 	FSTask* m_task;
-	DevicesTable m_devices;
-
-	DiskFileDevice* m_disk_device;
 	ItemsTable m_pending;
 	TransQueue m_transaction_queue;
 	InProgressQueue m_in_progress;
+	char m_base_path[MAX_PATH_LENGTH];
 
 	u32 m_last_id;
 };

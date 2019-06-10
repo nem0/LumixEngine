@@ -48,7 +48,7 @@ static void loadStyle(lua_State* L)
 }
 
 
-static void saveStyle(FS::OsFile& file)
+static void saveStyle(FS::OSOutputFile& file)
 {
 	auto& style = ImGui::GetStyle();
 	file << "style = {";
@@ -295,8 +295,8 @@ bool Settings::getValue(const char* name, bool default_value) const
 bool Settings::save()
 {
 	auto& actions = m_app.getActions();
-	FS::OsFile file;
-	if (!file.open(SETTINGS_PATH, FS::Mode::CREATE_AND_WRITE)) return false;
+	FS::OSOutputFile file;
+	if (!file.open(SETTINGS_PATH)) return false;
 
 	file << "window = { x = " << m_window.x 
 		<< ", y = " << m_window.y 

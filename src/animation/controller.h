@@ -59,7 +59,7 @@ public:
 	void create() { onCreated(State::READY); }
 	void destroy() { doUnload(); }
 	void unload() override;
-	bool load(FS::IFile& file) override;
+	bool load(u64 size, const u8* mem) override;
 	ComponentInstance* createInstance(IAllocator& allocator) const;
 	void serialize(OutputBlob& blob);
 	bool deserialize(InputBlob& blob, int& version);

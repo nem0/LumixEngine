@@ -8,9 +8,9 @@ namespace Lumix
 {
 
 struct DVec3;
-class InputBlob;
+class InputMemoryStream;
+class OutputMemoryStream;
 struct LocalRigidTransform;
-class OutputBlob;
 struct Quat;
 struct RigidTransform;
 class string;
@@ -102,7 +102,7 @@ struct LUMIX_ENGINE_API IDeserializer
 
 struct LUMIX_ENGINE_API TextSerializer final : public ISerializer
 {
-	TextSerializer(OutputBlob& _blob, ISaveEntityGUIDMap& _entity_map)
+	TextSerializer(OutputMemoryStream& _blob, ISaveEntityGUIDMap& _entity_map)
 		: blob(_blob)
 		, entity_map(_entity_map)
 	{
@@ -130,14 +130,14 @@ struct LUMIX_ENGINE_API TextSerializer final : public ISerializer
 	void write(const char* label, const char* value)  override;
 	EntityGUID getGUID(EntityRef entity) override;
 
-	OutputBlob& blob;
+	OutputMemoryStream& blob;
 	ISaveEntityGUIDMap& entity_map;
 };
 
 
 struct LUMIX_ENGINE_API TextDeserializer final : public IDeserializer
 {
-	TextDeserializer(InputBlob& _blob, ILoadEntityGUIDMap& _entity_map)
+	TextDeserializer(InputMemoryStream& _blob, ILoadEntityGUIDMap& _entity_map)
 		: blob(_blob)
 		, entity_map(_entity_map)
 	{
@@ -170,7 +170,7 @@ struct LUMIX_ENGINE_API TextDeserializer final : public IDeserializer
 	u32 readU32();
 	u64 readU64();
 
-	InputBlob& blob;
+	InputMemoryStream& blob;
 	ILoadEntityGUIDMap& entity_map;
 };
 

@@ -5,7 +5,6 @@
 #include "editor/studio_app.h"
 #include "editor/world_editor.h"
 #include "engine/array.h"
-#include "engine/blob.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/fs/os_file.h"
@@ -417,7 +416,7 @@ public:
 			m_resources.insert(prefab_res.getPath().getHash(), &prefab_res);
 			prefab_res.getResourceManager().load(prefab_res);
 		}
-		InputBlob blob(prefab_res.blob.getData(), prefab_res.blob.getPos());
+		InputMemoryStream blob(prefab_res.data.begin(), prefab_res.data.byte_size());
 		Array<EntityRef> entities(m_editor.getAllocator());
 		LoadEntityGUIDMap entity_map(entities);
 		TextDeserializer deserializer(blob, entity_map);
@@ -437,7 +436,7 @@ public:
 		}
 
 		int entity_idx = 0;
-		while (blob.getPosition() < blob.getSize() && entity_idx < count)
+		while (blob.getPosition() < blob.size() && entity_idx < count)
 		{
 			u64 prefab;
 			deserializer.read(&prefab);
@@ -588,8 +587,8 @@ public:
 		u64 prefab = getPrefab(entity);
 		if (prefab != 0) entity = getPrefabRoot(entity);
 
-		FS::OsFile file;
-		if (!file.open(path.c_str(), FS::Mode::CREATE_AND_WRITE))
+		FS::OSOutputFile file;
+		if (!file.open(path.c_str()))
 		{
 			g_log_error.log("Editor") << "Failed to create " << path.c_str();
 			return;
@@ -597,7 +596,7 @@ public:
 
 		Array<EntityRef> entities(m_editor.getAllocator());
 		gatherHierarchy(entity, true, entities);
-		OutputBlob blob(m_editor.getAllocator());
+		OutputMemoryStream blob(m_editor.getAllocator());
 		SaveEntityGUIDMap entity_map(entities);
 		TextSerializer serializer(blob, entity_map);
 
@@ -623,7 +622,7 @@ public:
 	}
 
 
-	void serialize(OutputBlob& serializer) override
+	void serialize(IOutputStream& serializer) override
 	{
 		serializer.write(m_prefabs.size());
 		if(!m_prefabs.empty()) serializer.write(&m_prefabs[0], m_prefabs.size() * sizeof(m_prefabs[0]));
@@ -641,7 +640,7 @@ public:
 	}
 
 
-	void deserialize(InputBlob& serializer) override
+	void deserialize(IInputStream& serializer) override
 	{
 		int count;
 		serializer.read(count);

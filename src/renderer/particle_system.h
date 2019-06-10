@@ -40,7 +40,7 @@ public:
 
 	ResourceType getType() const override { return TYPE; }
 	void unload() override;
-	bool load(FS::IFile& file) override;
+	bool load(u64 size, const u8* mem) override;
 	const OutputBlob& getBytecode() const { return m_bytecode; }
 	int getEmitByteOffset() const { return m_emit_byte_offset; }
 	int getOutputByteOffset() const { return m_output_byte_offset; }

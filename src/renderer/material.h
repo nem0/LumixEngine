@@ -91,7 +91,7 @@ public:
 	bool isTextureDefine(u8 define_idx) const;
 	void setTexture(int i, Texture* texture);
 	void setTexturePath(int i, const Path& path);
-	bool save(FS::IFile& file);
+	bool save(IOutputStream& file);
 	int getUniformCount() const { return m_uniforms.size(); }
 	Uniform& getUniform(int index) { return m_uniforms[index]; }
 	const Uniform& getUniform(int index) const { return m_uniforms[index]; }
@@ -117,7 +117,7 @@ private:
 
 	void onBeforeReady() override;
 	void unload() override;
-	bool load(FS::IFile& file) override;
+	bool load(u64 size, const u8* mem) override;
 
 	void deserializeUniforms(lua_State* L);
 

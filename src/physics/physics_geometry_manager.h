@@ -76,7 +76,7 @@ class PhysicsGeometry final : public Resource
 		IAllocator& getAllocator();
 
 		void unload() override;
-		bool load(FS::IFile& file) override;
+		bool load(u64 size, const u8* mem) override;
 
 };
 

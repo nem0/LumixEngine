@@ -16,10 +16,10 @@ namespace Lumix
 
 struct ComponentUID;
 struct IDeserializer;
-class InputBlob;
+struct IInputStream;
+struct IOutputStream;
 struct IScene;
 struct ISerializer;
-class OutputBlob;
 struct PrefabResource;
 
 
@@ -144,8 +144,8 @@ public:
 
 	void serializeComponent(ISerializer& serializer, ComponentType type, EntityRef entity);
 	void deserializeComponent(IDeserializer& serializer, EntityRef entity, ComponentType type, int scene_version);
-	void serialize(OutputBlob& serializer);
-	void deserialize(InputBlob& serializer);
+	void serialize(IOutputStream& serializer);
+	void deserialize(IInputStream& serializer);
 
 	IScene* getScene(ComponentType type) const;
 	IScene* getScene(u32 hash) const;

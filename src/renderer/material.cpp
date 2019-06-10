@@ -6,6 +6,7 @@
 #include "engine/path_utils.h"
 #include "engine/profiler.h"
 #include "engine/resource_manager.h"
+#include "engine/stream.h"
 #include "renderer/material_manager.h"
 #include "renderer/pipeline.h"
 #include "renderer/renderer.h"
@@ -147,7 +148,7 @@ void Material::unload()
 }
 
 
-bool Material::save(FS::IFile& file)
+bool Material::save(IOutputStream& file)
 {
 	if(!isReady()) return false;
 	if(!m_shader) return false;
@@ -751,7 +752,7 @@ int texture(lua_State* L)
 } // namespace LuaAPI
 
 
-bool Material::load(FS::IFile& file)
+bool Material::load(u64 size, const u8* mem)
 {
 	PROFILE_FUNCTION();
 
@@ -782,7 +783,7 @@ bool Material::load(FS::IFile& file)
 
 	m_custom_flags = 0;
 
-	const StringView content((const char*)file.getBuffer(), (int)file.size());
+	const StringView content((const char*)mem, (int)size);
 	if (!LuaWrapper::execute(L, content, getPath().c_str(), 0)) {
 		lua_close(L);
 		return false;
@@ -838,7 +839,7 @@ bool Material::load(FS::IFile& file)
 		return false;
 	}
 
-	m_size = file.size();
+	m_size = size;
 	return true;
 }
 

@@ -79,7 +79,7 @@ class Animation final : public Resource
 		IAllocator& getAllocator() const;
 
 		void unload() override;
-		bool load(FS::IFile& file) override;
+		bool load(u64 size, const u8* mem) override;
 
 	private:
 		int	m_frame_count;
