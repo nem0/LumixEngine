@@ -71,7 +71,7 @@ protected:
 	virtual void onBeforeReady() {}
 	virtual void onBeforeEmpty() {}
 	virtual void unload() = 0;
-	virtual bool load(FS::IFile& file) = 0;
+	virtual bool load(u64 size, const u8* mem) = 0;
 
 	void onCreated(State state);
 	void doUnload();
@@ -90,7 +90,7 @@ protected:
 
 private:
 	void doLoad();
-	void fileLoaded(FS::IFile& file, bool success);
+	void fileLoaded(u64 size, const u8* mem, bool success);
 	void onStateChanged(State old_state, State new_state, Resource&);
 	u32 addRef() { return ++m_ref_count; }
 	u32 remRef() { return --m_ref_count; }
@@ -104,7 +104,7 @@ private:
 	u16 m_ref_count;
 	u16 m_failed_dep_count;
 	State m_current_state;
-	u32 m_async_op;
+	FS::AsyncHandle m_async_op;
 }; // class Resource
 
 

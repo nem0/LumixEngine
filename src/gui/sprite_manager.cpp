@@ -2,6 +2,7 @@
 #include "engine/json_serializer.h"
 #include "engine/log.h"
 #include "engine/resource_manager.h"
+#include "engine/stream.h"
 #include "renderer/texture.h"
 #include "renderer/texture_manager.h"
 #include "renderer/renderer.h"
@@ -64,10 +65,11 @@ bool Sprite::save(JsonSerializer& serializer)
 }
 
 
-bool Sprite::load(FS::IFile& file)
+bool Sprite::load(u64 size, void* mem)
 {
 	auto& manager = (SpriteManager&)getResourceManager();
 	IAllocator& allocator = manager.m_allocator;
+	InputMemoryStream file(mem, size);
 	JsonDeserializer serializer(file, getPath(), allocator);
 	serializer.deserializeObjectBegin();
 	while (!serializer.isObjectEnd())

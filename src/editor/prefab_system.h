@@ -10,9 +10,9 @@ namespace Lumix
 
 struct DVec3;
 struct IDeserializer;
-class InputBlob;
+struct IInputStream;
+struct IOutputStream;
 struct ISerializer;
-class OutputBlob;
 class Path;
 struct PrefabResource;
 struct Quat;
@@ -30,8 +30,8 @@ public:
 	static void destroyEditorPlugins(StudioApp& app);
 
 	virtual ~PrefabSystem() {}
-	virtual void serialize(OutputBlob& serializer) = 0;
-	virtual void deserialize(InputBlob& serializer) = 0;
+	virtual void serialize(IOutputStream& serializer) = 0;
+	virtual void deserialize(IInputStream& serializer) = 0;
 	virtual void serialize(ISerializer& serializer) = 0;
 	virtual void deserialize(IDeserializer& serializer) = 0;
 	virtual EntityPtr instantiatePrefab(PrefabResource& prefab, const DVec3& pos, const Quat& rot, float scale) = 0;

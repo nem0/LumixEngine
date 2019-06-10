@@ -815,8 +815,8 @@ void TerrainEditor::splitSplatmap(const char* dir)
 			}
 		}
 
-		FS::OSFileStream file;
-		if (!file.open(out_path, FS::Mode::CREATE_AND_WRITE)) {
+		FS::OSOutputFile file;
+		if (!file.open(out_path_str)) {
 			g_log_error.log("Renderer") << "Failed to create file " << out_path;
 		}
 		else {
@@ -841,8 +841,8 @@ void TerrainEditor::splitSplatmap(const char* dir)
 			}
 		}
 
-		FS::OSFileStream file;
-		if (!file.open(out_path, FS::Mode::CREATE_AND_WRITE)) {
+		FS::OSOutputFile file;
+		if (!file.open(out_path_str)) {
 			g_log_error.log("Renderer") << "Failed to create file " << out_path;
 		}
 		else {
@@ -877,8 +877,8 @@ void TerrainEditor::mergeSplatmap(const char* dir)
 	Array<u8> out_data_array(allocator);
 	TGAHeader splatmap_tga_header;
 
-	FS::OSFileStream file;
-	if (!file.open(out_path, FS::Mode::OPEN_AND_READ))
+	FS::OSInputFile file;
+	if (!file.open(out_path.c_str()))
 	{
 		g_log_error.log("Renderer") << "Failed to open " << out_path;
 		return;
@@ -889,7 +889,7 @@ void TerrainEditor::mergeSplatmap(const char* dir)
 		g_log_error.log("Renderer") << "Failed to load " << out_path;
 		return;
 	}
-	fs.close(file);
+	file.close();
 	u32* out_data = (u32*)&out_data_array[0];
 
 	using namespace OS;
@@ -906,10 +906,10 @@ void TerrainEditor::mergeSplatmap(const char* dir)
 			int grass_idx;
 			fromCString(info.filename + 5, lengthOf(info.filename) - 5, &grass_idx);
 			StaticString<MAX_PATH_LENGTH> grass_path(dir, "/", info.filename);
-			FS::OSFileStream file;
+			FS::OSInputFile file;
 			TGAHeader header;
 			Array<u8> tmp_data(allocator);
-			if(!file.open(Path(grass_path), FS::Mode::OPEN_AND_READ)) {
+			if(!file.open(grass_path)) {
 				g_log_error.log("Renderer") << "Failed to load " << grass_path;
 			}
 			else if (!Texture::loadTGA(file, header, tmp_data, grass_path))
@@ -937,11 +937,11 @@ void TerrainEditor::mergeSplatmap(const char* dir)
 			int layer_idx;
 			fromCString(info.filename + 5, lengthOf(info.filename) - 5, &layer_idx);
 			StaticString<MAX_PATH_LENGTH> layer_path(dir, "/", info.filename);
-			FS::OSFileStream file;
+			FS::OSInputFile file;
 			TGAHeader header;
 			Array<u8> tmp_data(allocator);
 
-			if (!file.open(Path(layer_path), FS::Mode::OPEN_AND_READ)) {
+			if (!file.open(layer_path)) {
 				g_log_error.log("Renderer") << "Failed to load " << layer_path;
 			}
 			else if (!Texture::loadTGA(file, header, tmp_data, layer_path)) {
@@ -967,8 +967,8 @@ void TerrainEditor::mergeSplatmap(const char* dir)
 	}
 	destroyFileIterator(file_iter);
 
-	FS::OSFileStream out_file;
-	if (!out_file.open(out_path, FS::Mode::CREATE_AND_WRITE)) {
+	FS::OSOutputFile out_file;
+	if (!out_file.open(out_path.c_str())) {
 		g_log_error.log("Renderer") << "Failed to save " << out_path;
 		return;
 	}

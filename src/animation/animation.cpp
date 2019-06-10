@@ -1,11 +1,11 @@
 #include "animation/animation.h"
-#include "engine/blob.h"
 #include "engine/fs/file_system.h"
 #include "engine/log.h"
 #include "engine/matrix.h"
 #include "engine/profiler.h"
 #include "engine/quat.h"
 #include "engine/resource_manager.h"
+#include "engine/stream.h"
 #include "engine/vec.h"
 #include "renderer/model.h"
 #include "renderer/pose.h"
@@ -236,11 +236,12 @@ void Animation::getRelativePose(float time, Pose& pose, Model& model, BoneMask* 
 }
 
 
-bool Animation::load(FS::IFile& file)
+bool Animation::load(u64 mem_size, const u8* mem)
 {
 	m_bones.clear();
 	m_mem.clear();
 	Header header;
+	InputMemoryStream file(mem, mem_size);
 	file.read(&header, sizeof(header));
 	if (header.magic != HEADER_MAGIC)
 	{
@@ -268,10 +269,10 @@ bool Animation::load(FS::IFile& file)
 	m_bones.resize(bone_count);
 	if (bone_count == 0) return true;
 
-	int size = int(file.size() - file.pos());
+	int size = int(file.size() - file.getPosition());
 	m_mem.resize(size);
 	file.read(&m_mem[0], size);
-	InputBlob blob(&m_mem[0], size);
+	InputMemoryStream blob(&m_mem[0], size);
 	for (int i = 0; i < m_bones.size(); ++i)
 	{
 		m_bones[i].name = blob.read<u32>();

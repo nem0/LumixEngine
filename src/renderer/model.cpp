@@ -9,6 +9,7 @@
 #include "engine/path_utils.h"
 #include "engine/profiler.h"
 #include "engine/resource_manager.h"
+#include "engine/stream.h"
 #include "engine/vec.h"
 #include "renderer/material.h"
 #include "renderer/pose.h"
@@ -278,7 +279,7 @@ void Model::getPose(Pose& pose)
 }
 
 
-static bool parseVertexDecl(FS::IFile& file, ffr::VertexDecl* vertex_decl, Mesh::AttributeSemantic* semantics)
+static bool parseVertexDecl(IInputStream& file, ffr::VertexDecl* vertex_decl, Mesh::AttributeSemantic* semantics)
 {
 	u32 attribute_count;
 	file.read(&attribute_count, sizeof(attribute_count));
@@ -329,7 +330,7 @@ void Model::onBeforeReady()
 }
 
 
-bool Model::parseBones(FS::IFile& file)
+bool Model::parseBones(InputMemoryStream& file)
 {
 	int bone_count;
 	file.read(&bone_count, sizeof(bone_count));
@@ -445,7 +446,7 @@ static int getAttributeOffset(Mesh& mesh, Mesh::AttributeSemantic attr)
 }
 
 
-bool Model::parseMeshes(FS::IFile& file, FileVersion version)
+bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 {
 	int object_count = 0;
 	file.read(&object_count, sizeof(object_count));
@@ -545,7 +546,7 @@ bool Model::parseMeshes(FS::IFile& file, FileVersion version)
 }
 
 
-bool Model::parseLODs(FS::IFile& file)
+bool Model::parseLODs(InputMemoryStream& file)
 {
 	i32 lod_count;
 	file.read(&lod_count, sizeof(lod_count));
@@ -563,10 +564,11 @@ bool Model::parseLODs(FS::IFile& file)
 }
 
 
-bool Model::load(FS::IFile& file)
+bool Model::load(u64 size, const u8* mem)
 {
 	PROFILE_FUNCTION();
 	FileHeader header;
+	InputMemoryStream file(mem, size);
 	file.read(&header, sizeof(header));
 
 	if (header.magic != FILE_MAGIC)

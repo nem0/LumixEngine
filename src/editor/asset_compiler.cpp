@@ -5,7 +5,6 @@
 #include "editor/world_editor.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
-#include "engine/fs/disk_file_device.h"
 #include "engine/fs/os_file.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
@@ -106,9 +105,9 @@ struct AssetCompilerImpl : AssetCompiler
 
 	~AssetCompilerImpl()
 	{
-		FS::OsFile file;
+		FS::OSOutputFile file;
 		// TODO make this safe - i.e. handle case when program gets interrupted while writing the file
-		if (file.open(".lumix/assets/_list.txt", FS::Mode::CREATE_AND_WRITE)) {
+		if (file.open(".lumix/assets/_list.txt")) {
 			file << "resources = {\n";
 			for (auto& i : m_resources) {
 				for (const Path& j : i) {
@@ -237,9 +236,9 @@ struct AssetCompilerImpl : AssetCompiler
 
 	void onInitFinished() override
 	{
-		FS::OsFile file;
+		FS::OSInputFile file;
 		const char* list_path = ".lumix/assets/_list.txt";
-		if(file.open(list_path, FS::Mode::OPEN_AND_READ)) {
+		if(file.open(list_path)) {
 			Array<char> content(m_app.getWorldEditor().getAllocator());
 			content.resize((int)file.size());
 			file.read(content.begin(), content.byte_size());
@@ -363,10 +362,10 @@ struct AssetCompilerImpl : AssetCompiler
 	bool getMeta(const Path& res, void* user_ptr, void (*callback)(void*, lua_State*)) const override
 	{
 		const PathUtils::FileInfo info(res.c_str());
-		FS::OsFile file;
+		FS::OSInputFile file;
 		const StaticString<MAX_PATH_LENGTH> meta_path(info.m_dir, info.m_basename, ".meta");
 		
-		if (!file.open(meta_path, FS::Mode::OPEN_AND_READ)) return nullptr;
+		if (!file.open(meta_path)) return nullptr;
 
 		Array<char> buf(m_app.getWorldEditor().getAllocator());
 		buf.resize((int)file.size());
@@ -399,10 +398,10 @@ struct AssetCompilerImpl : AssetCompiler
 	void updateMeta(const Path& res, const char* src) const override
 	{
 		const PathUtils::FileInfo info(res.c_str());
-		FS::OsFile file;
+		FS::OSOutputFile file;
 		const StaticString<MAX_PATH_LENGTH> meta_path(info.m_dir, info.m_basename, ".meta");
 				
-		if (!file.open(meta_path, FS::Mode::CREATE_AND_WRITE)) {
+		if (!file.open(meta_path)) {
 			g_log_error.log("Editor") << "Could not create " << meta_path;
 			return;
 		}

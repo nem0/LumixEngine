@@ -1,6 +1,6 @@
 #include "serializer.h"
-#include "engine/blob.h"
 #include "engine/matrix.h"
+#include "engine/stream.h"
 
 
 namespace Lumix
@@ -401,11 +401,11 @@ void TextDeserializer::read(i8* value)
 }
 
 
-static int getStringLength(const InputBlob& blob)
+static int getStringLength(const InputMemoryStream& blob)
 {
 	u8* string_start = (u8*)blob.getData() + blob.getPosition();
 	u8* c = string_start;
-	u8* end = (u8*)blob.getData() + blob.getSize();
+	u8* end = (u8*)blob.getData() + blob.size();
 
 	if (*c != '"') return 0;
 	++c;

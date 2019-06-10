@@ -1,5 +1,4 @@
 #include "universe.h"
-#include "engine/blob.h"
 #include "engine/crc32.h"
 #include "engine/iplugin.h"
 #include "engine/log.h"
@@ -328,7 +327,7 @@ EntityRef Universe::cloneEntity(EntityRef entity)
 	setScale(clone, tr.scale);
 	setParent(parent, clone);
 
-	OutputBlob blob_out(m_allocator);
+	OutputMemoryStream blob_out(m_allocator);
 	blob_out.reserve(1024);
 	for (ComponentUID cmp = getFirstComponent(entity); cmp.isValid(); cmp = getNextComponent(cmp))
 	{
@@ -340,7 +339,7 @@ EntityRef Universe::cloneEntity(EntityRef entity)
 		TextSerializer serializer(blob_out, save_map);
 		serializeComponent(serializer, cmp.type, entity);
 		
-		InputBlob blob_in(blob_out);
+		InputMemoryStream blob_in(blob_out);
 		struct : ILoadEntityGUIDMap
 		{
 			EntityPtr get(EntityGUID guid) override { return { (int)guid.value }; }
@@ -673,7 +672,7 @@ void Universe::deserializeComponent(IDeserializer& serializer, EntityRef entity,
 }
 
 
-void Universe::serialize(OutputBlob& serializer)
+void Universe::serialize(IOutputStream& serializer)
 {
 	serializer.write((i32)m_entities.size());
 	if (!m_entities.empty()) {
@@ -692,7 +691,7 @@ void Universe::serialize(OutputBlob& serializer)
 }
 
 
-void Universe::deserialize(InputBlob& serializer)
+void Universe::deserialize(IInputStream& serializer)
 {
 	i32 count;
 	serializer.read(count);
@@ -745,7 +744,7 @@ EntityPtr Universe::instantiatePrefab(const PrefabResource& prefab,
 	const Quat& rot,
 	float scale)
 {
-	InputBlob blob(prefab.blob.getData(), prefab.blob.getPos());
+	InputMemoryStream blob(prefab.data.begin(), prefab.data.byte_size());
 	Array<EntityRef> entities(m_allocator);
 	PrefabEntityGUIDMap entity_map(entities);
 	TextDeserializer deserializer(blob, entity_map);
@@ -764,7 +763,7 @@ EntityPtr Universe::instantiatePrefab(const PrefabResource& prefab,
 	{
 		entities.push(createEntity({0, 0, 0}, {0, 0, 0, 1}));
 	}
-	while (blob.getPosition() < blob.getSize() && entity_idx < count)
+	while (blob.getPosition() < blob.size() && entity_idx < count)
 	{
 		u64 prefab;
 		deserializer.read(&prefab);

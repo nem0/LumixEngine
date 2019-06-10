@@ -32,7 +32,7 @@ struct PipelineResource : Resource
 	PipelineResource(const Path& path, ResourceManager& owner, IAllocator& allocator);
 
 	void unload() override;
-	bool load(FS::IFile& file) override;
+	bool load(u64 size, const u8* mem) override;
 	ResourceType getType() const override { return TYPE; }
 
 	Array<char> content;

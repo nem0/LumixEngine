@@ -2835,7 +2835,8 @@ public:
 			m_selected_entities.clear();
 			load(*m_game_mode_file);
 		}
-		m_engine->getFileSystem().close(*m_game_mode_file);
+		m_game_mode_file->close();
+		m_game_mode_file->release();
 		m_game_mode_file = nullptr;
 		if(m_selected_entity_on_game_mode.isValid()) {
 			EntityRef e = (EntityRef)m_selected_entity_on_game_mode;

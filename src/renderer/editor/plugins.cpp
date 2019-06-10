@@ -2000,17 +2000,16 @@ struct RenderInterfaceImpl final : public RenderInterface
 
 	bool saveTexture(Engine& engine, const char* path_cstr, const void* pixels, int w, int h) override
 	{
-		FS::FileSystem& fs = engine.getFileSystem();
 		Path path(path_cstr);
 		FS::OSFileStream file;
 		if (!file.open(path, FS::Mode::CREATE_AND_WRITE)) return false;
 
 		if (!Texture::saveTGA(&file, w, h, 4, (const u8*)pixels, path, engine.getAllocator())) {
-			fs.close(file);
+			file.close();
 			return false;
 		}
 
-		fs.close(file);
+		file.close();
 		return true;
 	}
 

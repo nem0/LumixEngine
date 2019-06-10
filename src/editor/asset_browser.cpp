@@ -591,12 +591,12 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* bu
 }
 
 
-FS::IFile* AssetBrowser::beginSaveResource(Resource& resource)
+IOutputStream* AssetBrowser::beginSaveResource(Resource& resource)
 {
 	// use temporary because otherwise the resource is reloaded during saving
 	StaticString<MAX_PATH_LENGTH> tmp_path(resource.getPath().c_str(), ".tmp");
-	FS::OSFileStream* f = LUMIX_NEW(m_app.getWorldEditor().getAllocator(), FS::OSFileStream);
-	if (!f->open(Path(tmp_path), FS::Mode::CREATE_AND_WRITE))
+	FS::OSOutputFile* f = LUMIX_NEW(m_app.getWorldEditor().getAllocator(), FS::OSOutputFile);
+	if (!f->open(tmp_path))
 	{
 		LUMIX_DELETE(m_app.getWorldEditor().getAllocator(), f);
 		g_log_error.log("Editor") << "Could not save file " << resource.getPath().c_str();
@@ -606,9 +606,9 @@ FS::IFile* AssetBrowser::beginSaveResource(Resource& resource)
 }
 
 
-void AssetBrowser::endSaveResource(Resource& resource, FS::IFile& file, bool success)
+void AssetBrowser::endSaveResource(Resource& resource, IOutputStream& file, bool success)
 {
-	file.close();
+	static_cast<FS::OSOutputFile&>(file).close();
 	LUMIX_DELETE(m_app.getWorldEditor().getAllocator(), &file);
 
 	if (!success) return;

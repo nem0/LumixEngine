@@ -16,7 +16,7 @@ namespace detail
 {
 
 
-template <> Path readFromStream<Path>(InputBlob& stream)
+template <> Path readFromStream<Path>(InputMemoryStream& stream)
 {
 	const char* c_str = (const char*)stream.getData() + stream.getPosition();
 	Path path(c_str);
@@ -25,21 +25,21 @@ template <> Path readFromStream<Path>(InputBlob& stream)
 }
 
 
-template <> void writeToStream<const Path&>(OutputBlob& stream, const Path& path)
+template <> void writeToStream<const Path&>(OutputMemoryStream& stream, const Path& path)
 {
 	const char* str = path.c_str();
 	stream.write(str, stringLength(str) + 1);
 }
 
 
-template <> void writeToStream<Path>(OutputBlob& stream, Path path)
+template <> void writeToStream<Path>(OutputMemoryStream& stream, Path path)
 {
 	const char* str = path.c_str();
 	stream.write(str, stringLength(str) + 1);
 }
 
 
-template <> const char* readFromStream<const char*>(InputBlob& stream)
+template <> const char* readFromStream<const char*>(InputMemoryStream& stream)
 {
 	const char* c_str = (const char*)stream.getData() + stream.getPosition();
 	stream.skip(stringLength(c_str) + 1);
@@ -47,7 +47,7 @@ template <> const char* readFromStream<const char*>(InputBlob& stream)
 }
 
 
-template <> void writeToStream<const char*>(OutputBlob& stream, const char* value)
+template <> void writeToStream<const char*>(OutputMemoryStream& stream, const char* value)
 {
 	stream.write(value, stringLength(value) + 1);
 }

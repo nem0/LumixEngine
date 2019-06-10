@@ -24,7 +24,7 @@ public:
 	ResourceType getType() const override { return TYPE; }
 
 	void unload() override { m_file_data.free(); }
-	bool load(FS::IFile& file) override;
+	bool load(u64 size, const u8* mem) override;
 	Font* addRef(int font_size);
 	void removeRef(Font& font);
 

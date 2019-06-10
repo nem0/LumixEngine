@@ -1,10 +1,10 @@
 #pragma once
 
 
-#include "engine/blob.h"
 #include "engine/lumix.h"
 #include "engine/metaprogramming.h"
 #include "engine/resource.h"
+#include "engine/stream.h"
 #include "engine/universe/component.h"
 
 
@@ -65,8 +65,8 @@ struct PropertyBase
 	virtual ~PropertyBase() {}
 
 	virtual void visit(IAttributeVisitor& visitor) const = 0;
-	virtual void setValue(ComponentUID cmp, int index, InputBlob& stream) const = 0;
-	virtual void getValue(ComponentUID cmp, int index, OutputBlob& stream) const = 0;
+	virtual void setValue(ComponentUID cmp, int index, InputMemoryStream& stream) const = 0;
+	virtual void getValue(ComponentUID cmp, int index, OutputMemoryStream& stream) const = 0;
 
 	const char* name;
 	const char* getter_code = "";
@@ -103,21 +103,21 @@ namespace detail
 {
 
 
-template <typename T> void writeToStream(OutputBlob& stream, T value)
+template <typename T> void writeToStream(OutputMemoryStream& stream, T value)
 {
 	stream.write(value);
 }
 	
-template <typename T> T readFromStream(InputBlob& stream)
+template <typename T> T readFromStream(InputMemoryStream& stream)
 {
 	return stream.read<T>();
 }
 
-template <> LUMIX_ENGINE_API Path readFromStream<Path>(InputBlob& stream);
-template <> LUMIX_ENGINE_API void writeToStream<Path>(OutputBlob& stream, Path);
-template <> LUMIX_ENGINE_API void writeToStream<const Path&>(OutputBlob& stream, const Path& path);
-template <> LUMIX_ENGINE_API const char* readFromStream<const char*>(InputBlob& stream);
-template <> LUMIX_ENGINE_API void writeToStream<const char*>(OutputBlob& stream, const char* path);
+template <> LUMIX_ENGINE_API Path readFromStream<Path>(InputMemoryStream& stream);
+template <> LUMIX_ENGINE_API void writeToStream<Path>(OutputMemoryStream& stream, Path);
+template <> LUMIX_ENGINE_API void writeToStream<const Path&>(OutputMemoryStream& stream, const Path& path);
+template <> LUMIX_ENGINE_API const char* readFromStream<const char*>(InputMemoryStream& stream);
+template <> LUMIX_ENGINE_API void writeToStream<const char*>(OutputMemoryStream& stream, const char* path);
 
 
 template <typename Getter> struct GetterProxy;
@@ -126,7 +126,7 @@ template <typename R, typename C>
 struct GetterProxy<R(C::*)(EntityRef, int)>
 {
 	using Getter = R(C::*)(EntityRef, int);
-	static void invoke(OutputBlob& stream, C* inst, Getter getter, EntityRef entity, int index)
+	static void invoke(OutputMemoryStream& stream, C* inst, Getter getter, EntityRef entity, int index)
 	{
 		R value = (inst->*getter)(entity, index);
 		writeToStream(stream, value);
@@ -137,7 +137,7 @@ template <typename R, typename C>
 struct GetterProxy<R(C::*)(EntityRef)>
 {
 	using Getter = R(C::*)(EntityRef);
-	static void invoke(OutputBlob& stream, C* inst, Getter getter, EntityRef entity, int index)
+	static void invoke(OutputMemoryStream& stream, C* inst, Getter getter, EntityRef entity, int index)
 	{
 		R value = (inst->*getter)(entity);
 		writeToStream(stream, value);
@@ -151,7 +151,7 @@ template <typename C, typename A>
 struct SetterProxy<void (C::*)(EntityRef, int, A)>
 {
 	using Setter = void (C::*)(EntityRef, int, A);
-	static void invoke(InputBlob& stream, C* inst, Setter setter, EntityRef entity, int index)
+	static void invoke(InputMemoryStream& stream, C* inst, Setter setter, EntityRef entity, int index)
 	{
 		using Value = RemoveCR<A>;
 		auto value = readFromStream<Value>(stream);
@@ -163,7 +163,7 @@ template <typename C, typename A>
 struct SetterProxy<void (C::*)(EntityRef, A)>
 {
 	using Setter = void (C::*)(EntityRef, A);
-	static void invoke(InputBlob& stream, C* inst, Setter setter, EntityRef entity, int index)
+	static void invoke(InputMemoryStream& stream, C* inst, Setter setter, EntityRef entity, int index)
 	{
 		using Value = RemoveCR<A>;
 		auto value = readFromStream<Value>(stream);
@@ -322,7 +322,7 @@ struct ComponentBase
 template <typename Getter, typename Setter, typename Descriptor>
 struct EnumProperty : IEnumProperty
 {
-	void getValue(ComponentUID cmp, int index, OutputBlob& stream) const override
+	void getValue(ComponentUID cmp, int index, OutputMemoryStream& stream) const override
 	{
 		using C = typename ClassOf<Getter>::Type;
 		C* inst = static_cast<C*>(cmp.scene);
@@ -330,7 +330,7 @@ struct EnumProperty : IEnumProperty
 		detail::GetterProxy<Getter>::invoke(stream, inst, getter, (EntityRef)cmp.entity, index);
 	}
 
-	void setValue(ComponentUID cmp, int index, InputBlob& stream) const override
+	void setValue(ComponentUID cmp, int index, InputMemoryStream& stream) const override
 	{
 		using C = typename ClassOf<Getter>::Type;
 		C* inst = static_cast<C*>(cmp.scene);
@@ -377,7 +377,7 @@ struct EnumProperty : IEnumProperty
 template <typename Getter, typename Setter, typename Counter, typename Namer>
 struct DynEnumProperty : IEnumProperty
 {
-	void getValue(ComponentUID cmp, int index, OutputBlob& stream) const override
+	void getValue(ComponentUID cmp, int index, OutputMemoryStream& stream) const override
 	{
 		using C = typename ClassOf<Getter>::Type;
 		C* inst = static_cast<C*>(cmp.scene);
@@ -385,7 +385,7 @@ struct DynEnumProperty : IEnumProperty
 		detail::GetterProxy<Getter>::invoke(stream, inst, getter, (EntityRef)cmp.entity, index);
 	}
 
-	void setValue(ComponentUID cmp, int index, InputBlob& stream) const override
+	void setValue(ComponentUID cmp, int index, InputMemoryStream& stream) const override
 	{
 		using C = typename ClassOf<Getter>::Type;
 		C* inst = static_cast<C*>(cmp.scene);
@@ -422,7 +422,7 @@ struct DynEnumProperty : IEnumProperty
 template <typename Getter, typename Setter, typename Counter>
 struct SampledFuncProperty : ISampledFuncProperty
 {
-	void getValue(ComponentUID cmp, int index, OutputBlob& stream) const override
+	void getValue(ComponentUID cmp, int index, OutputMemoryStream& stream) const override
 	{
 		ASSERT(index == -1);
 		using C = typename ClassOf<Getter>::Type;
@@ -433,7 +433,7 @@ struct SampledFuncProperty : ISampledFuncProperty
 		stream.write(values, sizeof(float) * 2 * count);
 	}
 
-	void setValue(ComponentUID cmp, int index, InputBlob& stream) const override
+	void setValue(ComponentUID cmp, int index, InputMemoryStream& stream) const override
 	{
 		ASSERT(index == -1);
 		using C = typename ClassOf<Getter>::Type;
@@ -458,14 +458,14 @@ struct SampledFuncProperty : ISampledFuncProperty
 template <typename Getter, typename Setter, typename... Attributes>
 struct BlobProperty : IBlobProperty
 {
-	void getValue(ComponentUID cmp, int index, OutputBlob& stream) const override
+	void getValue(ComponentUID cmp, int index, OutputMemoryStream& stream) const override
 	{
 		using C = typename ClassOf<Getter>::Type;
 		C* inst = static_cast<C*>(cmp.scene);
 		(inst->*getter)((EntityRef)cmp.entity, stream);
 	}
 
-	void setValue(ComponentUID cmp, int index, InputBlob& stream) const override
+	void setValue(ComponentUID cmp, int index, InputMemoryStream& stream) const override
 	{
 		using C = typename ClassOf<Getter>::Type;
 		C* inst = static_cast<C*>(cmp.scene);
@@ -490,14 +490,14 @@ struct CommonProperty : Property<T>
 		apply([&](auto& x) { visitor.visit(x); }, attributes);
 	}
 
-	void getValue(ComponentUID cmp, int index, OutputBlob& stream) const override
+	void getValue(ComponentUID cmp, int index, OutputMemoryStream& stream) const override
 	{
 		using C = typename ClassOf<Getter>::Type;
 		C* inst = static_cast<C*>(cmp.scene);
 		detail::GetterProxy<Getter>::invoke(stream, inst, getter, (EntityRef)cmp.entity, index);
 	}
 
-	void setValue(ComponentUID cmp, int index, InputBlob& stream) const override
+	void setValue(ComponentUID cmp, int index, InputMemoryStream& stream) const override
 	{
 		using C = typename ClassOf<Getter>::Type;
 		C* inst = static_cast<C*>(cmp.scene);
@@ -520,7 +520,7 @@ struct ArrayProperty : IArrayProperty
 	bool canAddRemove() const override { return true; }
 
 
-	void setValue(ComponentUID cmp, int index, InputBlob& stream) const override
+	void setValue(ComponentUID cmp, int index, InputMemoryStream& stream) const override
 	{
 		ASSERT(index == -1);
 
@@ -543,7 +543,7 @@ struct ArrayProperty : IArrayProperty
 					prop.setValue(cmp, index, *stream);
 				}
 
-				InputBlob* stream;
+				InputMemoryStream* stream;
 				int index;
 				ComponentUID cmp;
 
@@ -556,7 +556,7 @@ struct ArrayProperty : IArrayProperty
 	}
 
 
-	void getValue(ComponentUID cmp, int index, OutputBlob& stream) const override
+	void getValue(ComponentUID cmp, int index, OutputMemoryStream& stream) const override
 	{
 		ASSERT(index == -1);
 		int count = getCount(cmp);
@@ -570,7 +570,7 @@ struct ArrayProperty : IArrayProperty
 					prop.getValue(cmp, index, *stream);
 				}
 
-				OutputBlob* stream;
+				OutputMemoryStream* stream;
 				int index;
 				ComponentUID cmp;
 
@@ -632,7 +632,7 @@ struct ConstArrayProperty : IArrayProperty
 	bool canAddRemove() const override { return false; }
 
 
-	void setValue(ComponentUID cmp, int index, InputBlob& stream) const override
+	void setValue(ComponentUID cmp, int index, InputMemoryStream& stream) const override
 	{
 		ASSERT(index == -1);
 
@@ -649,7 +649,7 @@ struct ConstArrayProperty : IArrayProperty
 					prop.setValue(cmp, index, *stream);
 				}
 
-				InputBlob* stream;
+				InputMemoryStream* stream;
 				int index;
 				ComponentUID cmp;
 
@@ -662,7 +662,7 @@ struct ConstArrayProperty : IArrayProperty
 	}
 
 
-	void getValue(ComponentUID cmp, int index, OutputBlob& stream) const override
+	void getValue(ComponentUID cmp, int index, OutputMemoryStream& stream) const override
 	{
 		ASSERT(index == -1);
 		int count = getCount(cmp);
@@ -676,7 +676,7 @@ struct ConstArrayProperty : IArrayProperty
 					prop.getValue(cmp, index, *stream);
 				}
 
-				OutputBlob* stream;
+				OutputMemoryStream* stream;
 				int index;
 				ComponentUID cmp;
 

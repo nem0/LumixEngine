@@ -53,8 +53,8 @@ public:
 	void openInExternalEditor(Resource* resource) const;
 	void openInExternalEditor(const char* path) const;
 	bool resourceList(char* buf, int max_size, ResourceType type, float height) const;
-	FS::IFile* beginSaveResource(Resource& resource);
-	void endSaveResource(Resource& resource, FS::IFile& file, bool success);
+	IOutputStream* beginSaveResource(Resource& resource);
+	void endSaveResource(Resource& resource, IOutputStream& file, bool success);
 
 public:
 	bool m_is_open;

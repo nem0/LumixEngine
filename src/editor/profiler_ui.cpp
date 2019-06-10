@@ -189,7 +189,6 @@ struct ProfilerUIImpl final : public ProfilerUI
 	void showAllocationTree(AllocationStackNode* node, int column) const;
 	AllocationStackNode* getOrCreate(AllocationStackNode* my_node,
 		Debug::StackNode* external_node, size_t size);
-	void saveResourceList() const;
 
 	DefaultAllocator m_allocator;
 	Debug::Allocator& m_main_allocator;
@@ -230,42 +229,6 @@ static const char* getResourceStateString(Resource::State state)
 	}
 
 	return "Unknown";
-}
-
-
-void ProfilerUIImpl::saveResourceList() const
-{
-	FS::OsFile file;
-	if (file.open("resources.csv", FS::Mode::CREATE_AND_WRITE))
-	{
-		auto& managers = m_resource_manager.getAll();
-		for (auto* i : managers)
-		{
-			auto& resources = i->getResourceTable();
-			for (auto& res : resources)
-			{
-				file.write(res->getPath().c_str(), res->getPath().length());
-				file.write(", ", 2);
-				char tmp[50];
-				toCString(res->size() / 1024.0f, tmp, lengthOf(tmp), 3);
-				file.write(tmp, stringLength(tmp));
-				file.write("KB, ", 4);
-
-				const char* state = getResourceStateString(res->getState());
-				file.write(state, stringLength(state));
-
-				file.write(", ", 4);
-				toCString(res->getRefCount(), tmp, lengthOf(tmp));
-				file.write(tmp, stringLength(tmp));
-				file.write("\n", 4);
-			}
-		}
-		file.close();
-	}
-	else
-	{
-		g_log_error.log("Editor") << "Failed to save resource list to resources.csv";
-	}
 }
 
 
@@ -335,19 +298,6 @@ void ProfilerUIImpl::onGUIResources()
 		ImGui::NextColumn();
 
 		ImGui::Columns(1);
-	}
-
-	static int saved_displayed = 0;
-
-	if (saved_displayed > 0)
-	{
-		--saved_displayed;
-		ImGui::Text("Saved");
-	}
-	else if (ImGui::Button("Save"))
-	{
-		saved_displayed = 180;
-		saveResourceList();
 	}
 	ImGui::Unindent();
 }

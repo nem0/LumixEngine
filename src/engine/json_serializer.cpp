@@ -3,6 +3,7 @@
 #include "engine/log.h"
 #include "engine/math_utils.h"
 #include "engine/path.h"
+#include "engine/stream.h"
 #include <cstdlib>
 
 
@@ -40,14 +41,14 @@ private:
 };
 
 
-JsonSerializer::JsonSerializer(FS::IFile& file, const Path& path)
+JsonSerializer::JsonSerializer(IOutputStream& file, const Path& path)
 	: m_file(file)
 {
 	m_is_first_in_block = true;
 }
 
 
-JsonDeserializer::JsonDeserializer(FS::IFile& file,
+JsonDeserializer::JsonDeserializer(IInputStream& file,
 	const Path& path,
 	IAllocator& allocator)
 	: m_file(file)

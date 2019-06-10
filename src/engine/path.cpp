@@ -1,10 +1,10 @@
 #include "engine/lumix.h"
 #include "engine/path.h"
 
-#include "engine/blob.h"
 #include "engine/crc32.h"
 #include "engine/mt/sync.h"
 #include "engine/path_utils.h"
+#include "engine/stream.h"
 #include "engine/string.h"
 
 
@@ -37,7 +37,7 @@ namespace Lumix
 	}
 
 
-	void PathManager::serialize(OutputBlob& serializer)
+	void PathManager::serialize(IOutputStream& serializer)
 	{
 		MT::SpinLock lock(m_mutex);
 		clear();
@@ -49,7 +49,7 @@ namespace Lumix
 	}
 
 
-	void PathManager::deserialize(InputBlob& serializer)
+	void PathManager::deserialize(IInputStream& serializer)
 	{
 		MT::SpinLock lock(m_mutex);
 		i32 size;

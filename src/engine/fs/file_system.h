@@ -15,94 +15,35 @@ namespace FS
 {
 
 
-struct IFileDevice;
+using OpenCallback = Delegate<void()>;
+using ContentCallback = Delegate<void(u64, const u8*, bool)>;
+using ReadCallback = Delegate<void(u64, u64, void*)>;
 
 
-struct Mode
-{
-	enum Value
-	{
-		NONE = 0,
-		READ = 0x1,
-		WRITE = READ << 1,
-		OPEN = WRITE << 1,
-		CREATE = OPEN << 1,
-
-		CREATE_AND_WRITE = CREATE | WRITE,
-		OPEN_AND_READ = OPEN | READ
-	};
-
-	Mode() : value(0) {}
-	Mode(Value _value) : value(_value) { }
-	Mode(i32 _value) : value(_value) { }
-	operator Value() const { return (Value)value; }
-	i32 value;
-};
-
-
-struct SeekMode
-{
-	enum Value
-	{
-		BEGIN = 0,
-		END,
-		CURRENT,
-	};
-	SeekMode(Value _value) : value(_value) {}
-	SeekMode(u32 _value) : value(_value) {}
-	operator Value() { return (Value)value; }
+struct AsyncHandle {
+	static AsyncHandle invalid() { return AsyncHandle(0xffFFffFF); }
+	explicit AsyncHandle(u32 value) : value(value) {}
 	u32 value;
+	bool isValid() const { return value != 0xffFFffFF; }
 };
-
-
-struct LUMIX_ENGINE_API IFile
-{
-	IFile() {}
-	virtual ~IFile() {}
-
-	virtual bool open(const Path& path, Mode mode) = 0;
-	virtual void close() = 0;
-
-	virtual bool read(void* buffer, size_t size) = 0;
-	virtual bool write(const void* buffer, size_t size) = 0;
-
-	virtual const void* getBuffer() const = 0;
-	virtual size_t size() = 0;
-
-	virtual bool seek(SeekMode base, size_t pos) = 0;
-	virtual size_t pos() = 0;
-
-	IFile& operator << (const char* text);
-	void getContents(OutputBlob& blob);
-
-	void release();
-
-protected:
-	virtual IFileDevice* getDevice() = 0;
-
-};
-
-
-typedef Delegate<void(IFile&, bool)> ReadCallback;
 
 
 class LUMIX_ENGINE_API FileSystem
 {
 public:
-	static const u32 INVALID_ASYNC = 0xffffFFFF;
 	static FileSystem* create(const char* base_path, IAllocator& allocator);
 	static void destroy(FileSystem* fs);
 
-	FileSystem() {}
 	virtual ~FileSystem() {}
 	
 	virtual const char* getBasePath() const = 0;
 
-	virtual u32 openAsync(const Path& file, int mode, const ReadCallback& call_back) = 0;
-	virtual void cancelAsync(u32 id) = 0;
+	virtual AsyncHandle getContent(const Path& file, const ContentCallback& callback) = 0;
+	virtual AsyncHandle open(const Path& file, const OpenCallback& callback) = 0;
+	virtual void read(AsyncHandle handle, u64 offset, u64 size, const ReadCallback& callback) = 0;
+	virtual void cancel(AsyncHandle handle) = 0;
 
-	virtual void close(IFile& file) = 0;
-	virtual void closeAsync(IFile& file) = 0;
+	virtual void close(AsyncHandle handle) = 0;
 
 	virtual void updateAsyncTransactions() = 0;
 

@@ -26,6 +26,7 @@ class Model;
 struct Pose;
 class Renderer;
 class ResourceManagerHub;
+class InputMemoryStream;
 
 
 namespace FS
@@ -220,13 +221,13 @@ private:
 	Model(const Model&);
 	void operator=(const Model&);
 
-	bool parseBones(FS::IFile& file);
-	bool parseMeshes(FS::IFile& file, FileVersion version);
-	bool parseLODs(FS::IFile& file);
+	bool parseBones(InputMemoryStream& file);
+	bool parseMeshes(InputMemoryStream& file, FileVersion version);
+	bool parseLODs(InputMemoryStream& file);
 	int getBoneIdx(const char* name);
 
 	void unload() override;
-	bool load(FS::IFile& file) override;
+	bool load(u64 size, const u8* mem) override;
 
 private:
 	IAllocator& m_allocator;
