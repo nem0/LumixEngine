@@ -97,16 +97,18 @@ struct FileSystemImpl final : public FileSystem
 	}
 
 
-	void setDataDir(const char* dir) override
+
+	const char* getBasePath() const override { return m_base_path; }
+
+
+	void setBasePath(const char* dir) override
 	{ 
-		m_data_dir = dir;
+		m_base_path = dir; 
 		if (!endsWith(dir, "/") && !endsWith(dir, "\\")) {
-			m_data_dir << '/';
+			m_base_path << '/';
 		}
 	}
 
-
-	const char* getBasePath() const override { return m_base_path; }
 
 
 	AsyncHandle getContent(const Path& file, const ContentCallback& callback) override
@@ -167,7 +169,6 @@ struct FileSystemImpl final : public FileSystem
 
 	BaseProxyAllocator m_allocator;
 	FSTask* m_task;
-	StaticString<MAX_PATH_LENGTH> m_data_dir;
 	StaticString<MAX_PATH_LENGTH> m_base_path;
 	Array<AsyncItem> m_queue;
 	Array<AsyncItem> m_finished;
@@ -197,11 +198,10 @@ int FSTask::task()
 
 		bool success = true;
 		OS::InputFile file;
-		StaticString<MAX_PATH_LENGTH> tmp_base_path(m_fs.m_base_path, path);
-		StaticString<MAX_PATH_LENGTH> tmp_data_dir(m_fs.m_data_dir, path);
+		StaticString<MAX_PATH_LENGTH> full_path(m_fs.m_base_path, path);
 		Array<u8> data(m_fs.m_allocator);
 		
-		if (file.open(tmp_data_dir) || file.open(tmp_base_path)) {
+		if (file.open(full_path)) {
 			data.resize((int)file.size());
 			if (!file.read(data.begin(), data.byte_size())) {
 				success = false;

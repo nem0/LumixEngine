@@ -26,8 +26,8 @@ public:
 	static void destroy(FileSystem* fs);
 
 	virtual ~FileSystem() {}
-	
-	virtual void setDataDir(const char* dir) = 0;
+
+	virtual void setBasePath(const char* path) = 0;
 	virtual const char* getBasePath() const = 0;
 	virtual void updateAsyncTransactions() = 0;
 	virtual bool hasWork() = 0;

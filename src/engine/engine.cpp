@@ -442,7 +442,6 @@ public:
 		, m_time_multiplier(1.0f)
 		, m_paused(false)
 		, m_next_frame(false)
-		, m_working_dir(working_dir)
 	{
 		g_log_info.log("Core") << "Creating engine...";
 		Profiler::setThreadName("Worker");
@@ -1215,9 +1214,6 @@ public:
 	PageAllocator& getPageAllocator() override { return m_page_allocator; }
 
 
-	const char* getWorkingDirectory() const override { return m_working_dir; }
-
-
 	Universe& createUniverse(bool set_lua_globals) override
 	{
 		Universe* universe = LUMIX_NEW(m_allocator, Universe)(m_allocator);
@@ -1594,7 +1590,6 @@ private:
 	lua_State* m_state;
 	HashMap<int, Resource*> m_lua_resources;
 	int m_last_lua_resource_idx;
-	StaticString<MAX_PATH_LENGTH> m_working_dir;
 };
 
 
