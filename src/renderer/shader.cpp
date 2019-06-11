@@ -399,7 +399,7 @@ int include(lua_State* L)
 
 	FileSystem& fs = shader->m_renderer.getEngine().getFileSystem();
 	OS::InputFile file;
-	if (!file.open(path)) {
+	if (!fs.open(path, &file)) {
 		g_log_error.log("Renderer") << "Failed to open include " << path << " included from " << shader->getPath();
 		return 0;
 	}

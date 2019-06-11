@@ -2171,22 +2171,23 @@ public:
 	};
 
 
-	static bool deserialize(Universe& universe
+	bool deserialize(Universe& universe
 		, const char* basedir
 		, const char* basename
 		, PrefabSystem& prefab_system
 		, EntityGUIDMap& entity_map
-		, IAllocator& allocator)
+		, IAllocator& allocator) const
 	{
 		PROFILE_FUNCTION();
 		
 		entity_map.clear();
 		StaticString<MAX_PATH_LENGTH> scn_dir(basedir, "/", basename, "/scenes/");
-		auto scn_file_iter = OS::createFileIterator(scn_dir, allocator);
+		OS::FileIterator* scn_file_iter = m_engine->getFileSystem().createFileIterator(scn_dir);
 		Array<u8> data(allocator);
+		FileSystem& fs = m_engine->getFileSystem();
 		OS::InputFile file;
-		auto loadFile = [&file, &data, &entity_map](const char* filepath, auto callback) {
-			if (file.open(filepath))
+		auto loadFile = [&file, &data, &entity_map, &fs](const char* filepath, auto callback) {
+			if (fs.open(filepath, &file))
 			{
 				if (file.size() > 0)
 				{
@@ -2233,7 +2234,7 @@ public:
 		OS::destroyFileIterator(scn_file_iter);
 		
 		StaticString<MAX_PATH_LENGTH> dir(basedir, "/", basename, "/");
-		auto file_iter = OS::createFileIterator(dir, allocator);
+		auto file_iter = m_engine->getFileSystem().createFileIterator(dir);
 		while (OS::getNextFile(file_iter, &info))
 		{
 			if (info.is_directory) continue;
@@ -2249,7 +2250,7 @@ public:
 		}
 		OS::destroyFileIterator(file_iter);
 		
-		file_iter = OS::createFileIterator(dir, allocator);
+		file_iter = m_engine->getFileSystem().createFileIterator(dir);
 		while (OS::getNextFile(file_iter, &info))
 		{
 			if (info.is_directory) continue;
@@ -2319,6 +2320,9 @@ public:
 				file.write(blob.getData(), blob.getPos());
 				file.close();
 			}
+			else {
+				g_log_error.log("Editor") << "Failed to save " << path;
+			}
 		};
 		for (IScene* scene : m_universe->getScenes())
 		{
@@ -2364,7 +2368,7 @@ public:
 	void clearUniverseDir(const char* dir)
 	{
 		OS::FileInfo info;
-		auto file_iter = OS::createFileIterator(dir, m_allocator);
+		OS::FileIterator* file_iter = m_engine->getFileSystem().createFileIterator(dir);
 		while (OS::getNextFile(file_iter, &info))
 		{
 			if (info.is_directory) continue;
@@ -3593,7 +3597,7 @@ public:
 		m_undo_index = -1;
 		FileSystem& fs = m_engine->getFileSystem();
 		OS::InputFile file;
-		if (file.open(path.c_str()))
+		if (fs.open(path.c_str(), &file))
 		{
 			JsonDeserializer serializer(file, path, m_allocator);
 			serializer.deserializeObjectBegin();

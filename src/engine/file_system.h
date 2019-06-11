@@ -8,7 +8,12 @@ namespace Lumix
 struct IAllocator;
 class Path;
 template <typename T> class Delegate;
-
+namespace OS
+{
+	struct FileIterator;
+	class InputFile;
+	class OutputFile;
+}
 
 class LUMIX_ENGINE_API FileSystem
 {
@@ -26,6 +31,10 @@ public:
 	static void destroy(FileSystem* fs);
 
 	virtual ~FileSystem() {}
+
+	virtual OS::FileIterator* createFileIterator(const char* dir) = 0;
+	virtual bool open(const char* path, OS::InputFile* file) = 0;
+	virtual bool open(const char* path, OS::OutputFile* file) = 0;
 
 	virtual void setBasePath(const char* path) = 0;
 	virtual const char* getBasePath() const = 0;

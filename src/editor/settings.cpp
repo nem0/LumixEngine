@@ -1,5 +1,6 @@
 #include "settings.h"
 #include "engine/debug/debug.h"
+#include "engine/file_system.h"
 #include "engine/engine.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
@@ -296,7 +297,8 @@ bool Settings::save()
 {
 	auto& actions = m_app.getActions();
 	OS::OutputFile file;
-	if (!file.open(SETTINGS_PATH)) return false;
+	FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+	if (!fs.open(SETTINGS_PATH, &file)) return false;
 
 	file << "window = { x = " << m_window.x 
 		<< ", y = " << m_window.y 

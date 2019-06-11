@@ -145,6 +145,29 @@ struct FileSystemImpl final : public FileSystem
 	}
 
 
+	bool open(const char* path, OS::InputFile* file) override
+	{
+		ASSERT(file);
+		StaticString<MAX_PATH_LENGTH> full_path(m_base_path, path);
+		return file->open(full_path);
+	}
+
+
+	bool open(const char* path, OS::OutputFile* file) override
+	{
+		ASSERT(file);
+		StaticString<MAX_PATH_LENGTH> full_path(m_base_path, path);
+		return file->open(full_path);
+	}
+
+
+	OS::FileIterator* createFileIterator(const char* dir) override
+	{
+		StaticString<MAX_PATH_LENGTH> path(m_base_path, dir);
+		return OS::createFileIterator(path, m_allocator);
+	}
+
+
 	void updateAsyncTransactions() override
 	{
 		PROFILE_FUNCTION();

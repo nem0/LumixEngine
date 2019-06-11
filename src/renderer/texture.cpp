@@ -239,7 +239,8 @@ static void saveTGA(Texture& texture)
 	}
 
 	OS::OutputFile file;
-	if (!file.open(texture.getPath().c_str())) {
+	FileSystem& fs = texture.getResourceManager().getOwner().getFileSystem();
+	if (!fs.open(texture.getPath().c_str(), &file)) {
 		g_log_error.log("Renderer") << "Failed to create file " << texture.getPath();
 		return;
 	}
@@ -263,8 +264,9 @@ void Texture::save()
 	PathUtils::getExtension(ext, 5, getPath().c_str());
 	if (equalStrings(ext, "raw") && bytes_per_pixel == 2)
 	{
+		FileSystem& fs = m_resource_manager.getOwner().getFileSystem();
 		OS::OutputFile file;
-		if (!file.open(getPath().c_str())) {
+		if (!fs.open(getPath().c_str(), &file)) {
 			g_log_error.log("Renderer") << "Failed to create file " << getPath();
 			return;
 		}

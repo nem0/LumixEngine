@@ -11,3 +11,4 @@ obj/
 data/.lumix
 data/error.log
 data/studio.ini
+.lumixuser

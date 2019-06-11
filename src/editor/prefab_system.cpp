@@ -587,8 +587,9 @@ public:
 		u64 prefab = getPrefab(entity);
 		if (prefab != 0) entity = getPrefabRoot(entity);
 
+		FileSystem& fs = m_editor.getEngine().getFileSystem();
 		OS::OutputFile file;
-		if (!file.open(path.c_str()))
+		if (!fs.open(path.c_str(), &file))
 		{
 			g_log_error.log("Editor") << "Failed to create " << path.c_str();
 			return;

@@ -138,7 +138,8 @@ void AssetBrowser::changeDir(const char* path)
 
 
 	IAllocator& allocator = m_app.getWorldEditor().getAllocator();
-	OS::FileIterator* iter = OS::createFileIterator(m_dir, allocator);
+	FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+	OS::FileIterator* iter = fs.createFileIterator(m_dir);
 	OS::FileInfo info;
 
 	const AssetCompiler& compiler = m_app.getAssetCompiler();
@@ -596,7 +597,8 @@ IOutputStream* AssetBrowser::beginSaveResource(Resource& resource)
 	// use temporary because otherwise the resource is reloaded during saving
 	StaticString<MAX_PATH_LENGTH> tmp_path(resource.getPath().c_str(), ".tmp");
 	OS::OutputFile* f = LUMIX_NEW(m_app.getWorldEditor().getAllocator(), OS::OutputFile);
-	if (!f->open(tmp_path))
+	FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+	if (!fs.open(tmp_path, f))
 	{
 		LUMIX_DELETE(m_app.getWorldEditor().getAllocator(), f);
 		g_log_error.log("Editor") << "Could not save file " << resource.getPath().c_str();
