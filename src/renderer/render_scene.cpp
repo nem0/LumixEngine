@@ -1,21 +1,21 @@
 #include "render_scene.h"
 
 #include "engine/array.h"
-#include "engine/blob.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
-#include "engine/fs/file_system.h"
-#include "engine/fs/os_file.h"
+#include "engine/file_system.h"
 #include "engine/geometry.h"
 #include "engine/job_system.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
 #include "engine/math_utils.h"
+#include "engine/os.h"
 #include "engine/plugin_manager.h"
 #include "engine/profiler.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/serializer.h"
+#include "engine/stream.h"
 #include "engine/universe/universe.h"
 #include "engine/viewport.h"
 #include "lua_script/lua_script_system.h"
@@ -1142,7 +1142,7 @@ public:
 	}
 
 
-	void serializeBoneAttachments(OutputBlob& serializer)
+	void serializeBoneAttachments(IOutputStream& serializer)
 	{
 		serializer.write((i32)m_bone_attachments.size());
 		for (auto& attachment : m_bone_attachments)
@@ -1154,7 +1154,7 @@ public:
 		}
 	}
 
-	void serializeCameras(OutputBlob& serializer)
+	void serializeCameras(IOutputStream& serializer)
 	{
 		serializer.write((i32)m_cameras.size());
 		for (auto& camera : m_cameras)
@@ -1168,7 +1168,7 @@ public:
 		}
 	}
 
-	void serializeLights(OutputBlob& serializer)
+	void serializeLights(IOutputStream& serializer)
 	{
 		serializer.write((i32)m_point_lights.size());
 		for (const PointLight& pl : m_point_lights) {
@@ -1183,7 +1183,7 @@ public:
 		serializer.write(m_active_global_light_entity);
 	}
 
-	void serializeModelInstances(OutputBlob& serializer)
+	void serializeModelInstances(IOutputStream& serializer)
 	{
 		serializer.write((i32)m_model_instances.size());
 		for (auto& r : m_model_instances)
@@ -1198,7 +1198,7 @@ public:
 		}
 	}
 
-	void serializeTerrains(OutputBlob& serializer)
+	void serializeTerrains(IOutputStream& serializer)
 	{
 		serializer.write((i32)m_terrains.size());
 		for (auto* terrain : m_terrains)
@@ -1208,7 +1208,7 @@ public:
 		}
 	}
 
-	void serializeTextMeshes(OutputBlob& serializer)
+	void serializeTextMeshes(IOutputStream& serializer)
 	{
 		serializer.write(m_text_meshes.size());
 		for (int i = 0, n = m_text_meshes.size(); i < n; ++i)
@@ -1223,7 +1223,7 @@ public:
 		}
 	}
 
-	void deserializeTextMeshes(InputBlob& serializer)
+	void deserializeTextMeshes(IInputStream& serializer)
 	{
 		int count;
 		serializer.read(count);
@@ -1248,7 +1248,7 @@ public:
 	}
 
 
-	void deserializeDecals(InputBlob& serializer)
+	void deserializeDecals(IInputStream& serializer)
 	{
 		ResourceManagerHub& manager = m_engine.getResourceManager();
 		int count;
@@ -1270,7 +1270,7 @@ public:
 	}
 
 
-	void serializeDecals(OutputBlob& serializer)
+	void serializeDecals(IOutputStream& serializer)
 	{
 		serializer.write(m_decals.size());
 		for (auto& decal : m_decals)
@@ -1282,7 +1282,7 @@ public:
 	}
 
 
-	void serializeEnvironmentProbes(OutputBlob& serializer)
+	void serializeEnvironmentProbes(IOutputStream& serializer)
 	{
 		i32 count = m_environment_probes.size();
 		serializer.write(count);
@@ -1301,7 +1301,7 @@ public:
 	}
 
 
-	void deserializeEnvironmentProbes(InputBlob& serializer)
+	void deserializeEnvironmentProbes(InputMemoryStream& serializer)
 	{
 		i32 count;
 		serializer.read(count);
@@ -1343,7 +1343,7 @@ public:
 	}
 
 
-	void deserializeBoneAttachments(InputBlob& serializer)
+	void deserializeBoneAttachments(InputMemoryStream& serializer)
 	{
 		i32 count;
 		serializer.read(count);
@@ -1362,7 +1362,7 @@ public:
 	}
 
 
-	void deserializeParticleEmitters(InputBlob& serializer)
+	void deserializeParticleEmitters(InputMemoryStream& serializer)
 	{
 		const int count = serializer.read<int>();
 		m_particle_emitters.reserve(count);
@@ -1380,7 +1380,7 @@ public:
 	}
 
 
-	void serializeParticleEmitters(OutputBlob& serializer)
+	void serializeParticleEmitters(IOutputStream& serializer)
 	{
 		serializer.write(m_particle_emitters.size());
 		for (auto* emitter : m_particle_emitters)
@@ -1390,7 +1390,7 @@ public:
 	}
 
 
-	void serialize(OutputBlob& serializer) override
+	void serialize(OutputMemoryStream& serializer) override
 	{
 		serializeCameras(serializer);
 		serializeModelInstances(serializer);
@@ -1404,7 +1404,7 @@ public:
 	}
 
 
-	void deserializeCameras(InputBlob& serializer)
+	void deserializeCameras(InputMemoryStream& serializer)
 	{
 		i32 size;
 		serializer.read(size);
@@ -1424,7 +1424,7 @@ public:
 		}
 	}
 
-	void deserializeModelInstances(InputBlob& serializer)
+	void deserializeModelInstances(IInputStream& serializer)
 	{
 		i32 size = 0;
 		serializer.read(size);
@@ -1459,7 +1459,7 @@ public:
 		}
 	}
 
-	void deserializeLights(InputBlob& serializer)
+	void deserializeLights(IInputStream& serializer)
 	{
 		i32 size = 0;
 		serializer.read(size);
@@ -1483,7 +1483,7 @@ public:
 		serializer.read(m_active_global_light_entity);
 	}
 
-	void deserializeTerrains(InputBlob& serializer)
+	void deserializeTerrains(InputMemoryStream& serializer)
 	{
 		i32 size = 0;
 		serializer.read(size);
@@ -1498,7 +1498,7 @@ public:
 	}
 
 
-	void deserialize(InputBlob& serializer) override
+	void deserialize(InputMemoryStream& serializer) override
 	{
 		deserializeCameras(serializer);
 		deserializeModelInstances(serializer);
@@ -2164,13 +2164,13 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	static unsigned int LUA_compareTGA(RenderSceneImpl* scene, const char* path, const char* path_preimage, int min_diff)
 	{
 		auto& fs = scene->m_engine.getFileSystem();
-		FS::OSFileStream file1, file2;
-		if (!file1.open(Path(path), FS::Mode::OPEN_AND_READ))
+		OS::InputFile file1, file2;
+		if (!file1.open(path))
 		{
 			g_log_error.log("render_test") << "Failed to open " << path;
 			return 0xffffFFFF;
 		}
-		else if (!file2.open(Path(path_preimage), FS::Mode::OPEN_AND_READ))
+		else if (!file2.open(path_preimage))
 		{
 			file1.close();
 			g_log_error.log("render_test") << "Failed to open " << path_preimage;

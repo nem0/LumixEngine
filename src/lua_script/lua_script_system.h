@@ -71,16 +71,16 @@ public:
 	virtual void enableScript(EntityRef entity, int scr_index, bool enable) = 0;
 	virtual bool isScriptEnabled(EntityRef entity, int scr_index) const = 0;
 	virtual void moveScript(EntityRef entity, int scr_index, bool up) = 0;
-	virtual void serializeScript(EntityRef entity, int scr_index, OutputBlob& blob) = 0;
-	virtual void deserializeScript(EntityRef entity, int scr_index, InputBlob& blob) = 0;
+	virtual void serializeScript(EntityRef entity, int scr_index, OutputMemoryStream& blob) = 0;
+	virtual void deserializeScript(EntityRef entity, int scr_index, InputMemoryStream& blob) = 0;
 	virtual void setPropertyValue(EntityRef entity, int scr_index, const char* name, const char* value) = 0;
 	virtual void getPropertyValue(EntityRef entity, int scr_index, const char* property_name, char* out, int max_size) = 0;
 	virtual int getPropertyCount(EntityRef entity, int scr_index) = 0;
 	virtual const char* getPropertyName(EntityRef entity, int scr_index, int prop_index) = 0;
 	virtual Property::Type getPropertyType(EntityRef entity, int scr_index, int prop_index) = 0;
 	virtual ResourceType getPropertyResourceType(EntityRef entity, int scr_index, int prop_index) = 0;
-	virtual void getScriptData(EntityRef entity, OutputBlob& blob) = 0;
-	virtual void setScriptData(EntityRef entity, InputBlob& blob) = 0;
+	virtual void getScriptData(EntityRef entity, OutputMemoryStream& blob) = 0;
+	virtual void setScriptData(EntityRef entity, InputMemoryStream& blob) = 0;
 };
 
 

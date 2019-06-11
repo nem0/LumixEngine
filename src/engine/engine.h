@@ -9,16 +9,13 @@ struct lua_State;
 
 namespace Lumix
 {
-namespace FS
-{
-class FileSystem;
-}
 
 struct ComponentUID;
+class FileSystem;
 struct IAllocator;
-struct IInputStream;
+class InputMemoryStream;
 class InputSystem;
-struct IOutputStream;
+class OutputMemoryStream;
 class PageAllocator;
 class Path;
 class PathManager;
@@ -39,9 +36,7 @@ public:
 public:
 	virtual ~Engine() {}
 
-	static Engine* create(const char* working_dir,
-		FS::FileSystem* fs,
-		IAllocator& allocator);
+	static Engine* create(const char* working_dir, IAllocator& allocator);
 	static void destroy(Engine* engine, IAllocator& allocator);
 
 	virtual const char* getWorkingDirectory() const = 0;
@@ -50,7 +45,7 @@ public:
 	virtual void setPlatformData(const PlatformData& data) = 0;
 	virtual const PlatformData& getPlatformData() = 0;
 
-	virtual FS::FileSystem& getFileSystem() = 0;
+	virtual FileSystem& getFileSystem() = 0;
 	virtual InputSystem& getInputSystem() = 0;
 	virtual PluginManager& getPluginManager() = 0;
 	virtual ResourceManagerHub& getResourceManager() = 0;
@@ -61,8 +56,8 @@ public:
 	virtual void stopGame(Universe& context) = 0;
 
 	virtual void update(Universe& context) = 0;
-	virtual u32 serialize(Universe& ctx, IOutputStream& serializer) = 0;
-	virtual bool deserialize(Universe& ctx, IInputStream& serializer) = 0;
+	virtual u32 serialize(Universe& ctx, OutputMemoryStream& serializer) = 0;
+	virtual bool deserialize(Universe& ctx, InputMemoryStream& serializer) = 0;
 	virtual float getFPS() const = 0;
 	virtual double getTime() const = 0;
 	virtual float getLastTimeDelta() const = 0;

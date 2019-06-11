@@ -5,12 +5,12 @@
 #include "animation/events.h"
 #include "animation/state_machine.h"
 #include "editor/world_editor.h"
-#include "engine/blob.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/log.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
+#include "engine/stream.h"
 #include "engine/universe/universe.h"
 #include "ui_builder.h"
 #include <cmath>
@@ -294,7 +294,7 @@ void Node::onGuiEvents(Anim::EventArray& events, const char* label, bool show_ti
 }
 
 
-void Node::serialize(OutputBlob& blob)
+void Node::serialize(OutputMemoryStream& blob)
 {
 	blob.write(pos);
 	blob.write(size);
@@ -302,7 +302,7 @@ void Node::serialize(OutputBlob& blob)
 }
 
 
-void Node::deserialize(InputBlob& blob)
+void Node::deserialize(InputMemoryStream& blob)
 {
 	blob.read(pos);
 	blob.read(size);
@@ -525,7 +525,7 @@ bool Edge::draw(ImDrawList* draw, const ImVec2& canvas_screen_pos, bool selected
 }
 
 
-void Edge::serialize(OutputBlob& blob)
+void Edge::serialize(OutputMemoryStream& blob)
 {
 	blob.write(m_from->engine_cmp->uid);
 	blob.write(m_to->engine_cmp->uid);
@@ -533,7 +533,7 @@ void Edge::serialize(OutputBlob& blob)
 }
 
 
-void Edge::deserialize(InputBlob& blob)
+void Edge::deserialize(InputMemoryStream& blob)
 {
 	int uid;
 	blob.read(uid);
@@ -575,8 +575,8 @@ struct Blend1DNode::RootEdge : public Component
 		m_parent->removeChild(this);
 	}
 
-	void serialize(OutputBlob& blob) override {}
-	void deserialize(InputBlob& blob) override {}
+	void serialize(OutputMemoryStream& blob) override {}
+	void deserialize(InputMemoryStream& blob) override {}
 	bool hitTest(const ImVec2& on_canvas_pos) const override
 	{
 		ImVec2 a = getEdgeStartPoint(m_parent->getRootNode(), m_to, true);
@@ -724,7 +724,7 @@ void LayersNode::onGUI()
 }
 
 
-void LayersNode::serialize(OutputBlob& blob)
+void LayersNode::serialize(OutputMemoryStream& blob)
 {
 	Container::serialize(blob);
 	blob.write(m_masks.size());
@@ -732,7 +732,7 @@ void LayersNode::serialize(OutputBlob& blob)
 }
 
 
-void LayersNode::deserialize(InputBlob& blob)
+void LayersNode::deserialize(InputMemoryStream& blob)
 {
 	Container::deserialize(blob);
 	int count = blob.read<int>();
@@ -837,7 +837,7 @@ void Blend1DNode::removeChild(Component* component)
 }
 
 
-void Blend1DNode::serialize(OutputBlob& blob)
+void Blend1DNode::serialize(OutputMemoryStream& blob)
 {
 	Container::serialize(blob);
 	m_root_node->serialize(blob);
@@ -849,7 +849,7 @@ void Blend1DNode::serialize(OutputBlob& blob)
 }
 
 
-void Blend1DNode::deserialize(InputBlob& blob)
+void Blend1DNode::deserialize(InputMemoryStream& blob)
 {
 	Container::deserialize(blob);
 
@@ -913,8 +913,8 @@ bool Container::isFixed(Node& node) const
 void Container::pasteNode(const ImVec2& pos_on_canvas)
 {
 	/*IAnimationEditor& editor = m_controller.getEditor();
-	OutputBlob& copy_buffer = editor.getCopyBuffer();
-	InputBlob blob(copy_buffer);
+	OutputMemoryStream& copy_buffer = editor.getCopyBuffer();
+	InputMemoryStream blob(copy_buffer);
 	Anim::Component::Type type;
 	blob.read(type);
 	Node* node = editor.createNode(m_controller, this, type, pos_on_canvas);
@@ -928,7 +928,7 @@ void Container::contextMenu(const ImVec2& canvas_screen_pos)
 	if (!ImGui::BeginPopup("context_menu")) return;
 
 	IAnimationEditor& editor = m_controller.getEditor();
-	OutputBlob& copy_buffer = editor.getCopyBuffer();
+	OutputMemoryStream& copy_buffer = editor.getCopyBuffer();
 	ImVec2 pos_on_canvas = ImGui::GetMousePos() - canvas_screen_pos;
 	if (ImGui::BeginMenu("Create"))
 	{
@@ -1121,7 +1121,7 @@ AnimationNode::AnimationNode(Anim::Component* engine_cmp, Container* parent, Con
 }
 
 
-void AnimationNode::deserialize(InputBlob& blob)
+void AnimationNode::deserialize(InputMemoryStream& blob)
 {
 	Node::deserialize(blob);
 	auto& input_decl = m_controller.getEngineResource()->m_input_decl;
@@ -1350,8 +1350,8 @@ struct EntryEdge : public Component
 		m_parent->removeEntry(*this);
 	}
 
-	void serialize(OutputBlob& blob) override {}
-	void deserialize(InputBlob& blob) override {}
+	void serialize(OutputMemoryStream& blob) override {}
+	void deserialize(InputMemoryStream& blob) override {}
 	bool hitTest(const ImVec2& on_canvas_pos) const override
 	{
 		ImVec2 a = getEdgeStartPoint(m_parent->getEntryNode(), m_to, true);
@@ -1485,7 +1485,7 @@ void StateMachine::compile()
 }
 
 
-void Container::deserialize(InputBlob& blob)
+void Container::deserialize(InputMemoryStream& blob)
 {
 	Node::deserialize(blob);
 	int size;
@@ -1527,7 +1527,7 @@ void Container::compile()
 }
 
 
-void Container::serialize(OutputBlob& blob)
+void Container::serialize(OutputMemoryStream& blob)
 {
 	Node::serialize(blob);
 	blob.write(m_editor_cmps.size());
@@ -1552,7 +1552,7 @@ void StateMachine::createNode(Anim::Component::Type type, int uid, const ImVec2&
 }
 
 
-void StateMachine::deserialize(InputBlob& blob)
+void StateMachine::deserialize(InputMemoryStream& blob)
 {
 	Container::deserialize(blob);
 	m_entry_node->deserialize(blob);
@@ -1570,7 +1570,7 @@ void StateMachine::deserialize(InputBlob& blob)
 }
 
 
-void StateMachine::serialize(OutputBlob& blob)
+void StateMachine::serialize(OutputMemoryStream& blob)
 {
 	Container::serialize(blob);
 	m_entry_node->serialize(blob);
@@ -1758,7 +1758,7 @@ ControllerResource::~ControllerResource()
 }
 
 
-void ControllerResource::serialize(OutputBlob& blob)
+void ControllerResource::serialize(OutputMemoryStream& blob)
 {
 	m_root->compile();
 	
@@ -1785,7 +1785,7 @@ void ControllerResource::serialize(OutputBlob& blob)
 }
 
 
-bool ControllerResource::deserialize(InputBlob& blob, Engine& engine, IAllocator& allocator)
+bool ControllerResource::deserialize(InputMemoryStream& blob, Engine& engine, IAllocator& allocator)
 {
 	LUMIX_DELETE(m_allocator, m_engine_resource);
 	LUMIX_DELETE(m_allocator, m_root);
@@ -2009,7 +2009,7 @@ void ControllerResource::AnimationSet::Value::setValue(const Path& new_path)
 }
 
 
-/*void ControllerResource::AnimationSlot::serialize(OutputBlob& blob)
+/*void ControllerResource::AnimationSlot::serialize(OutputMemoryStream& blob)
 {
 	blob.write(name);
 	u32 hash = crc32(name);
@@ -2026,7 +2026,7 @@ void ControllerResource::AnimationSet::Value::setValue(const Path& new_path)
 }
 
 
-void ControllerResource::AnimationSlot::deserialize(InputBlob& blob)
+void ControllerResource::AnimationSlot::deserialize(InputMemoryStream& blob)
 {
 	blob.read(name);
 	u32 hash = crc32(name);

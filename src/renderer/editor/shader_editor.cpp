@@ -1,11 +1,11 @@
 #include "shader_editor.h"
 #include "editor/utils.h"
-#include "engine/blob.h"
 #include "engine/crc32.h"
-#include "engine/fs/os_file.h"
 #include "engine/log.h"
 #include "engine/math_utils.h"
+#include "engine/os.h"
 #include "engine/path_utils.h"
+#include "engine/stream.h"
 #include "engine/string.h"
 #include <cstdio>
 
@@ -246,19 +246,19 @@ struct VertexOutputNode : public ShaderEditor::Node
 	}
 
 
-	void save(OutputBlob& blob) override
+	void save(OutputMemoryStream& blob) override
 	{
 		blob.write(m_output);
 	}
 
 
-	void load(InputBlob& blob) override
+	void load(InputMemoryStream& blob) override
 	{
 		blob.read(m_output);
 	}
 
 
-	void generate(OutputBlob& blob) override
+	void generate(OutputMemoryStream& blob) override
 	{
 		if (!m_inputs[0])
 		{
@@ -302,10 +302,10 @@ struct VertexInputNode : public ShaderEditor::Node
 	}
 
 
-	void save(OutputBlob& blob) override { blob.write((int)m_input); }
+	void save(OutputMemoryStream& blob) override { blob.write((int)m_input); }
 
 
-	void load(InputBlob& blob) override
+	void load(InputMemoryStream& blob) override
 	{
 		int tmp;
 		blob.read(tmp);
@@ -313,7 +313,7 @@ struct VertexInputNode : public ShaderEditor::Node
 	}
 
 
-	void printReference(OutputBlob& blob) override
+	void printReference(OutputMemoryStream& blob) override
 	{
 		for (auto& i : VERTEX_INPUTS)
 		{
@@ -340,7 +340,7 @@ struct VertexInputNode : public ShaderEditor::Node
 	}
 
 
-	void generate(OutputBlob&) override {}
+	void generate(OutputMemoryStream&) override {}
 
 
 	void onGUI() override
@@ -359,7 +359,7 @@ struct VertexInputNode : public ShaderEditor::Node
 };
 
 
-static void writeVertexShaderHeader(OutputBlob& blob,
+static void writeVertexShaderHeader(OutputMemoryStream& blob,
 	const Array<ShaderEditor::Node*>& vertex_nodes)
 {
 	blob << "$input ";
@@ -454,7 +454,7 @@ struct ShaderEditor::ICommand
 };
 
 
-void ShaderEditor::Node::printReference(OutputBlob& blob)
+void ShaderEditor::Node::printReference(OutputMemoryStream& blob)
 {
 	blob << "v" << m_id;
 }
@@ -507,8 +507,8 @@ struct OperatorNode : public ShaderEditor::Node
 	}
 
 
-	void save(OutputBlob& blob) override { int o = m_operation; blob.write(o); }
-	void load(InputBlob& blob) override { int o; blob.read(o); m_operation = (Operation)o; }
+	void save(OutputMemoryStream& blob) override { int o = m_operation; blob.write(o); }
+	void load(InputMemoryStream& blob) override { int o; blob.read(o); m_operation = (Operation)o; }
 
 
 	ShaderEditor::ValueType getOutputType(int) const override
@@ -517,7 +517,7 @@ struct OperatorNode : public ShaderEditor::Node
 	}
 
 
-	void generate(OutputBlob& blob) override
+	void generate(OutputMemoryStream& blob) override
 	{
 		if(!m_inputs[0]) return;
 		if(!m_inputs[1]) return;
@@ -586,12 +586,12 @@ struct Vec4MergeNode : public ShaderEditor::Node
 	}
 
 
-	void save(OutputBlob&) override {}
-	void load(InputBlob&) override {}
+	void save(OutputMemoryStream&) override {}
+	void load(InputMemoryStream&) override {}
 	ShaderEditor::ValueType getOutputType(int) const override { return ShaderEditor::ValueType::VEC4; }
 
 
-	void generate(OutputBlob& blob) override 
+	void generate(OutputMemoryStream& blob) override 
 	{
 		blob << "\tvec4 v" << m_id << ";\n";
 
@@ -660,8 +660,8 @@ struct FunctionNode : public ShaderEditor::Node
 	}
 
 
-	void save(OutputBlob& blob) override { blob.write(m_function); }
-	void load(InputBlob& blob) override { blob.read(m_function); }
+	void save(OutputMemoryStream& blob) override { blob.write(m_function); }
+	void load(InputMemoryStream& blob) override { blob.read(m_function); }
 	ShaderEditor::ValueType getOutputType(int) const override
 	{
 		if (m_inputs[0]) return getInputType(0);
@@ -669,7 +669,7 @@ struct FunctionNode : public ShaderEditor::Node
 	}
 
 
-	void generate(OutputBlob& blob) override
+	void generate(OutputMemoryStream& blob) override
 	{
 		if(m_inputs[0])
 		{
@@ -717,15 +717,15 @@ struct BinaryFunctionNode : public ShaderEditor::Node
 	}
 
 
-	void save(OutputBlob& blob) override { blob.write(m_function); }
-	void load(InputBlob& blob) override { blob.read(m_function); }
+	void save(OutputMemoryStream& blob) override { blob.write(m_function); }
+	void load(InputMemoryStream& blob) override { blob.read(m_function); }
 	ShaderEditor::ValueType getOutputType(int) const override
 	{
 		return BINARY_FUNCTIONS[m_function].output_type(*this);
 	}
 
 
-	void generate(OutputBlob& blob) override
+	void generate(OutputMemoryStream& blob) override
 	{
 		m_inputs[0]->generate(blob);
 		m_inputs[1]->generate(blob);
@@ -778,12 +778,12 @@ struct InstanceMatrixNode : public ShaderEditor::Node
 	}
 
 
-	void save(OutputBlob&) override {}
-	void load(InputBlob&) override {}
+	void save(OutputMemoryStream&) override {}
+	void load(InputMemoryStream&) override {}
 	ShaderEditor::ValueType getOutputType(int) const override { return ShaderEditor::ValueType::MATRIX4; }
 
 
-	void generate(OutputBlob& blob) override
+	void generate(OutputMemoryStream& blob) override
 	{
 		blob << "\tmat4 v" << m_id << ";\n";
 
@@ -812,13 +812,13 @@ struct FloatConstNode : public ShaderEditor::Node
 		m_outputs.push(nullptr);
 	}
 
-	void save(OutputBlob& blob) override { blob.write(m_value); }
-	void load(InputBlob& blob) override { blob.read(m_value); }
+	void save(OutputMemoryStream& blob) override { blob.write(m_value); }
+	void load(InputMemoryStream& blob) override { blob.read(m_value); }
 	ShaderEditor::ValueType getOutputType(int) const override { return ShaderEditor::ValueType::FLOAT; }
 
-	void generate(OutputBlob&) override	{}
+	void generate(OutputMemoryStream&) override	{}
 
-	void printReference(OutputBlob& blob) override
+	void printReference(OutputMemoryStream& blob) override
 	{
 		blob << m_value;
 	}
@@ -838,11 +838,11 @@ struct ColorConstNode : public ShaderEditor::Node
 		m_outputs.push(nullptr);
 	}
 
-	void save(OutputBlob& blob) override { blob.write(m_color); }
-	void load(InputBlob& blob) override { blob.read(m_color); }
+	void save(OutputMemoryStream& blob) override { blob.write(m_color); }
+	void load(InputMemoryStream& blob) override { blob.read(m_color); }
 	ShaderEditor::ValueType getOutputType(int) const override { return ShaderEditor::ValueType::VEC4; }
 
-	void generate(OutputBlob& blob) override
+	void generate(OutputMemoryStream& blob) override
 	{
 		blob << "\tconst vec4 v" << m_id << " = vec4(" << m_color[0] << ", " << m_color[1] << ", "
 			 << m_color[2] << ", " << m_color[3] << ");\n";
@@ -864,11 +864,11 @@ struct SampleNode : public ShaderEditor::Node
 		m_texture = 0;
 	}
 
-	void save(OutputBlob& blob) override { blob.write(m_texture); }
-	void load(InputBlob& blob) override { blob.read(m_texture); }
+	void save(OutputMemoryStream& blob) override { blob.write(m_texture); }
+	void load(InputMemoryStream& blob) override { blob.read(m_texture); }
 	ShaderEditor::ValueType getOutputType(int) const override { return ShaderEditor::ValueType::VEC4; }
 
-	void generate(OutputBlob& blob) override
+	void generate(OutputMemoryStream& blob) override
 	{
 		if (!m_inputs[0])
 		{
@@ -907,9 +907,9 @@ struct FragmentInputNode : public ShaderEditor::Node
 		m_vertex_output = VertexOutput::WPOS;
 	}
 
-	void save(OutputBlob& blob) override { blob.write(m_vertex_output); }
-	void load(InputBlob& blob) override { blob.read(m_vertex_output); }
-	void generate(OutputBlob&) override {}
+	void save(OutputMemoryStream& blob) override { blob.write(m_vertex_output); }
+	void load(InputMemoryStream& blob) override { blob.read(m_vertex_output); }
+	void generate(OutputMemoryStream&) override {}
 
 
 	ShaderEditor::ValueType getOutputType(int index) const override
@@ -918,7 +918,7 @@ struct FragmentInputNode : public ShaderEditor::Node
 	}
 
 
-	void printReference(OutputBlob& blob) override
+	void printReference(OutputMemoryStream& blob) override
 	{
 		blob << getVertexOutputBGFXName(m_vertex_output);
 	}
@@ -951,7 +951,7 @@ struct PositionOutputNode : public ShaderEditor::Node
 	}
 
 
-	void generate(OutputBlob& blob) override
+	void generate(OutputMemoryStream& blob) override
 	{
 		if(!m_inputs[0])
 		{
@@ -980,7 +980,7 @@ struct FragmentOutputNode : public ShaderEditor::Node
 	}
 
 
-	void generate(OutputBlob& blob) override
+	void generate(OutputMemoryStream& blob) override
 	{
 		if (!m_inputs[0])
 		{
@@ -1015,7 +1015,7 @@ struct MixNode : public ShaderEditor::Node
 		return getInputType(1);
 	}
 
-	void generate(OutputBlob& blob) override
+	void generate(OutputMemoryStream& blob) override
 	{
 		if (!m_inputs[0] || !m_inputs[1] || !m_inputs[2])
 		{
@@ -1057,8 +1057,8 @@ struct PassNode : public ShaderEditor::Node
 	}
 
 
-	void save(OutputBlob& blob) override { blob.writeString(m_pass); }
-	void load(InputBlob& blob) override { blob.readString(m_pass, lengthOf(m_pass)); }
+	void save(OutputMemoryStream& blob) override { blob.writeString(m_pass); }
+	void load(InputMemoryStream& blob) override { blob.readString(m_pass, lengthOf(m_pass)); }
 
 
 	ShaderEditor::ValueType getOutputType(int) const override
@@ -1072,9 +1072,9 @@ struct PassNode : public ShaderEditor::Node
 	}
 
 
-	void generateBeforeMain(OutputBlob&) override {}
+	void generateBeforeMain(OutputMemoryStream&) override {}
 
-	void generate(OutputBlob& blob) override 
+	void generate(OutputMemoryStream& blob) override 
 	{
 		const char* defs[] = { "#ifdef ", "#ifndef " };
 		for (int i = 0; i < 2; ++i)
@@ -1111,11 +1111,11 @@ struct BuiltinUniformNode : public ShaderEditor::Node
 	}
 
 
-	void save(OutputBlob& blob) override { blob.write(m_uniform); }
-	void load(InputBlob& blob) override { blob.read(m_uniform); }
+	void save(OutputMemoryStream& blob) override { blob.write(m_uniform); }
+	void load(InputMemoryStream& blob) override { blob.read(m_uniform); }
 
 
-	void printReference(OutputBlob& blob) override
+	void printReference(OutputMemoryStream& blob) override
 	{
 		blob << BUILTIN_UNIFORMS[m_uniform].bgfx_name;
 	}
@@ -1127,9 +1127,9 @@ struct BuiltinUniformNode : public ShaderEditor::Node
 	}
 
 
-	void generateBeforeMain(OutputBlob&) override {}
+	void generateBeforeMain(OutputMemoryStream&) override {}
 
-	void generate(OutputBlob&) override {}
+	void generate(OutputMemoryStream&) override {}
 
 	void onGUI() override
 	{
@@ -1155,24 +1155,24 @@ struct UniformNode : public ShaderEditor::Node
 		m_name[0] = 0;
 	}
 
-	void save(OutputBlob& blob) override { blob.write(m_type); }
-	void load(InputBlob& blob) override { blob.read(m_type); }
+	void save(OutputMemoryStream& blob) override { blob.write(m_type); }
+	void load(InputMemoryStream& blob) override { blob.read(m_type); }
 	ShaderEditor::ValueType getOutputType(int) const override { return m_value_type; }
 
 
-	void printReference(OutputBlob& blob) override
+	void printReference(OutputMemoryStream& blob) override
 	{
 		blob << m_name;
 	}
 
 
-	void generateBeforeMain(OutputBlob& blob) override
+	void generateBeforeMain(OutputMemoryStream& blob) override
 	{
 		blob << "uniform " << getValueTypeName(m_value_type) << " " << m_name << ";\n";
 	}
 
 
-	void generate(OutputBlob&) override {}
+	void generate(OutputMemoryStream&) override {}
 
 
 	void onGUI() override
@@ -1378,14 +1378,14 @@ struct RemoveNodeCommand : public ShaderEditor::ICommand
 
 	void undo() override
 	{
-		InputBlob blob(m_blob);
+		InputMemoryStream blob(m_blob);
 		auto& node = m_editor.loadNode(blob, m_shader_type);
 		m_editor.loadNodeConnections(blob, node);
 	}
 
 
 	ShaderEditor::ShaderType m_shader_type;
-	OutputBlob m_blob;
+	OutputMemoryStream m_blob;
 	int m_node_id;
 };
 
@@ -1485,14 +1485,14 @@ void ShaderEditor::generate(const char* path, ShaderType shader_type)
 		catString(sc_path, "_vs.sc");
 	}
 
-	FS::OsFile file;
-	if(!file.open(sc_path, FS::Mode::CREATE_AND_WRITE))
+	OS::OutputFile file;
+	if(!file.open(sc_path))
 	{
 		g_log_error.log("Editor") << "Could not create file " << sc_path;
 		return;
 	}
 
-	OutputBlob blob(m_allocator);
+	OutputMemoryStream blob(m_allocator);
 	blob.reserve(4096);
 
 	if(shader_type == ShaderType::FRAGMENT)
@@ -1599,7 +1599,7 @@ void ShaderEditor::createConnection(Node* node, int pin_index, bool is_input)
 }
 
 
-void ShaderEditor::saveNode(OutputBlob& blob, Node& node)
+void ShaderEditor::saveNode(OutputMemoryStream& blob, Node& node)
 {
 	int type = (int)node.m_type;
 	blob.write(node.m_id);
@@ -1610,7 +1610,7 @@ void ShaderEditor::saveNode(OutputBlob& blob, Node& node)
 }
 
 
-void ShaderEditor::saveNodeConnections(OutputBlob& blob, Node& node)
+void ShaderEditor::saveNodeConnections(OutputMemoryStream& blob, Node& node)
 {
 	int inputs_count = node.m_inputs.size();
 	blob.write(inputs_count);
@@ -1636,14 +1636,14 @@ void ShaderEditor::saveNodeConnections(OutputBlob& blob, Node& node)
 
 void ShaderEditor::save(const char* path)
 {
-	FS::OsFile file;
-	if(!file.open(path, FS::Mode::CREATE_AND_WRITE)) 
+	OS::OutputFile file;
+	if(!file.open(path)) 
 	{
 		g_log_error.log("Editor") << "Could not save shader " << path;
 		return;
 	}
 
-	OutputBlob blob(m_allocator);
+	OutputMemoryStream blob(m_allocator);
 	blob.reserve(4096);
 	for (int i = 0; i < lengthOf(m_textures); ++i)
 	{
@@ -1736,7 +1736,7 @@ ShaderEditor::Node* ShaderEditor::createNode(int type)
 }
 
 
-ShaderEditor::Node& ShaderEditor::loadNode(InputBlob& blob, ShaderType shader_type)
+ShaderEditor::Node& ShaderEditor::loadNode(InputMemoryStream& blob, ShaderType shader_type)
 {
 	int type;
 	int id;
@@ -1759,7 +1759,7 @@ ShaderEditor::Node& ShaderEditor::loadNode(InputBlob& blob, ShaderType shader_ty
 }
 
 
-void ShaderEditor::loadNodeConnections(InputBlob& blob, Node& node)
+void ShaderEditor::loadNodeConnections(InputMemoryStream& blob, Node& node)
 {
 	int size;
 	blob.read(size);
@@ -1795,8 +1795,8 @@ void ShaderEditor::load()
 
 	clear();
 
-	FS::OsFile file;
-	if (!file.open(path, FS::Mode::OPEN_AND_READ))
+	OS::InputFile file;
+	if (!file.open(path))
 	{
 		g_log_error.log("Editor") << "Failed to load shader " << path;
 		return;
@@ -1813,7 +1813,7 @@ void ShaderEditor::load()
 	}
 	file.close();
 
-	InputBlob blob(&data[0], data_size);
+	InputMemoryStream blob(&data[0], data_size);
 	for (int i = 0; i < lengthOf(m_textures); ++i)
 	{
 		blob.readString(m_textures[i], lengthOf(m_textures[i]));
@@ -2119,7 +2119,7 @@ void ShaderEditor::newGraph()
 }
 
 
-void ShaderEditor::generatePasses(OutputBlob& blob)
+void ShaderEditor::generatePasses(OutputMemoryStream& blob)
 {
 	const char* passes[32];
 	int pass = 0;
@@ -2159,14 +2159,14 @@ void ShaderEditor::generateMain(const char* path)
 	catString(shd_path, info.m_basename);
 	catString(shd_path, ".shd");
 
-	FS::OsFile file;
-	if (!file.open(shd_path, FS::Mode::CREATE_AND_WRITE))
+	OS::OutputFile file;
+	if (!file.open(shd_path))
 	{
 		g_log_error.log("Editor") << "Could not generate " << shd_path;
 		return;
 	}
 
-	OutputBlob blob(m_allocator);
+	OutputMemoryStream blob(m_allocator);
 	generatePasses(blob);
 	file.write(blob.getData(), blob.getPos());
 

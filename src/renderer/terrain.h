@@ -20,7 +20,6 @@ class LIFOAllocator;
 class Material;
 struct Mesh;
 class Model;
-class OutputBlob;
 struct RayCastModelHit;
 class Renderer;
 class RenderScene;
@@ -122,8 +121,8 @@ class Terrain
 		void getInfos(Array<TerrainInfo>& infos, const ShiftedFrustum& frustum, const DVec3& lod_ref_point);
 
 		RayCastModelHit castRay(const DVec3& origin, const Vec3& dir);
-		void serialize(OutputBlob& serializer);
-		void deserialize(InputBlob& serializer, Universe& universe, RenderScene& scene);
+		void serialize(IOutputStream& serializer);
+		void deserialize(IInputStream& serializer, Universe& universe, RenderScene& scene);
 
 		void addGrassType(int index);
 		void removeGrassType(int index);

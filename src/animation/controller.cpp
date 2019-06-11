@@ -1,8 +1,8 @@
 #include "controller.h"
 #include "animation/animation.h"
-#include "engine/blob.h"
 #include "engine/log.h"
 #include "engine/resource_manager.h"
+#include "engine/stream.h"
 
 
 namespace Lumix
@@ -63,15 +63,15 @@ void ControllerResource::unload()
 }
 
 
-bool ControllerResource::load(FS::IFile& file)
+bool ControllerResource::load(u64 size, const u8* mem)
 {
-	InputBlob blob(file.getBuffer(), (int)file.size());
+	InputMemoryStream blob(mem, (int)size);
 	int version;
 	return deserialize(blob, version);
 }
 
 
-bool ControllerResource::deserialize(InputBlob& blob, int& version)
+bool ControllerResource::deserialize(InputMemoryStream& blob, int& version)
 {
 	version = -1;
 	Header header;
@@ -173,7 +173,7 @@ bool ControllerResource::deserialize(InputBlob& blob, int& version)
 }
 
 
-void ControllerResource::serialize(OutputBlob& blob)
+void ControllerResource::serialize(OutputMemoryStream& blob)
 {
 	Header header;
 	blob.write(header);

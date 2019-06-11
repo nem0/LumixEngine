@@ -9,14 +9,14 @@
 #include "editor/ieditor_command.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
-#include "engine/blob.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
-#include "engine/fs/os_file.h"
 #include "engine/log.h"
+#include "engine/os.h"
 #include "engine/path.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
+#include "engine/stream.h"
 #include "engine/universe/universe.h"
 #include "ui_builder.h"
 
@@ -270,7 +270,7 @@ struct DestroyAnimEdgeCommand : IEditorCommand
 		Container* container = (Container*)m_controller.getByUID(m_original_container_uid);
 		container->createEdge(m_from_uid, m_to_uid, m_edge_uid);
 		Edge* edge = (Edge*)container->getByUID(m_edge_uid);
-		InputBlob input(m_original_values);
+		InputMemoryStream input(m_original_values);
 		edge->deserialize(input);
 	}
 
@@ -296,7 +296,7 @@ struct DestroyAnimEdgeCommand : IEditorCommand
 	int m_edge_uid;
 	int m_from_uid;
 	int m_to_uid;
-	OutputBlob m_original_values;
+	OutputMemoryStream m_original_values;
 	int m_original_container_uid;
 };
 
@@ -335,7 +335,7 @@ struct DestroyNodeCommand : IEditorCommand
 		auto* container = (Container*)m_controller.getByUID(m_original_container);
 		container->createNode(m_cmp_type, m_node_uid, ImVec2(0, 0));
 		Component* cmp = m_controller.getByUID(m_node_uid);
-		InputBlob input(m_original_values);
+		InputMemoryStream input(m_original_values);
 		cmp->engine_cmp->deserialize(input
 			, (Anim::Container*)container->engine_cmp
 			, (int)Anim::ControllerResource::Version::LAST);
@@ -365,7 +365,7 @@ struct DestroyNodeCommand : IEditorCommand
 
 	ControllerResource& m_controller;
 	int m_node_uid;
-	OutputBlob m_original_values;
+	OutputMemoryStream m_original_values;
 	int m_original_container;
 	Anim::Component::Type m_cmp_type;
 };
@@ -432,7 +432,7 @@ public:
 	~AnimationEditor();
 
 	IAllocator& getAllocator() override { return m_resource->getAllocator(); }
-	OutputBlob& getCopyBuffer() override;
+	OutputMemoryStream& getCopyBuffer() override;
 	void update(float time_delta) override;
 	const char* getName() const override { return "animation_editor"; }
 	void setContainer(Container* container) override { m_container = container; }
@@ -492,7 +492,7 @@ private:
 	bool m_is_playing = false;
 	bool m_is_focused = false;
 	u32 m_current_group_type;
-	OutputBlob m_copy_buffer;
+	OutputMemoryStream m_copy_buffer;
 };
 
 
@@ -691,7 +691,7 @@ void AnimationEditor::endCommandGroup()
 }
 
 
-OutputBlob& AnimationEditor::getCopyBuffer()
+OutputMemoryStream& AnimationEditor::getCopyBuffer()
 {
 	return m_copy_buffer;
 }
@@ -784,12 +784,16 @@ void AnimationEditor::save()
 		!OS::getSaveFilename(m_path.data, lengthOf(m_path.data), "Animation controllers\0*.act\0", ""))
 		return;
 	IAllocator& allocator = m_app.getWorldEditor().getAllocator();
-	OutputBlob blob(allocator);
+	OutputMemoryStream blob(allocator);
 	m_resource->serialize(blob);
-	FS::OsFile file;
-	file.open(m_path, FS::Mode::CREATE_AND_WRITE);
-	file.write(blob.getData(), blob.getPos());
-	file.close();
+	OS::OutputFile file;
+	if (file.open(m_path)) {
+		file.write(blob.getData(), blob.getPos());
+		file.close();
+	}
+	else {
+		g_log_error.log("Animation") << "Failed to create file " << m_path;
+	}
 }
 
 
@@ -838,25 +842,29 @@ void AnimationEditor::loadFromEntity()
 void AnimationEditor::load()
 {
 	IAllocator& allocator = m_app.getWorldEditor().getAllocator();
-	FS::OsFile file;
-	file.open(m_path, FS::Mode::OPEN_AND_READ);
-	Array<u8> data(allocator);
-	data.resize((int)file.size());
-	file.read(&data[0], data.size());
-	InputBlob blob(&data[0], data.size());
-	if (m_resource->deserialize(blob, m_app.getWorldEditor().getEngine(), allocator))
-	{
-		m_container = (Container*)m_resource->getRoot();
+	OS::InputFile file;
+	if (file.open(m_path)) {
+		Array<u8> data(allocator);
+		data.resize((int)file.size());
+		file.read(&data[0], data.size());
+		InputMemoryStream blob(&data[0], data.size());
+		if (m_resource->deserialize(blob, m_app.getWorldEditor().getEngine(), allocator))
+		{
+			m_container = (Container*)m_resource->getRoot();
+		}
+		else
+		{
+			LUMIX_DELETE(allocator, m_resource);
+			Engine& engine = m_app.getWorldEditor().getEngine();
+			auto* manager = engine.getResourceManager().get(Anim::ControllerResource::TYPE);
+			m_resource = LUMIX_NEW(allocator, ControllerResource)(*this, *manager, allocator);
+			m_container = (Container*)m_resource->getRoot();
+		}
+		file.close();
 	}
-	else
-	{
-		LUMIX_DELETE(allocator, m_resource);
-		Engine& engine = m_app.getWorldEditor().getEngine();
-		auto* manager = engine.getResourceManager().get(Anim::ControllerResource::TYPE);
-		m_resource = LUMIX_NEW(allocator, ControllerResource)(*this, *manager, allocator);
-		m_container = (Container*)m_resource->getRoot();
+	else {
+		g_log_error.log("Animation") << "Failed to open file " << m_path;
 	}
-	file.close();
 }
 
 

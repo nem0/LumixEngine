@@ -5,12 +5,12 @@
 #include "editor/world_editor.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
-#include "engine/fs/os_file.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
 #include "engine/mt/atomic.h"
 #include "engine/mt/sync.h"
 #include "engine/mt/task.h"
+#include "engine/os.h"
 #include "engine/path_utils.h"
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
@@ -105,7 +105,7 @@ struct AssetCompilerImpl : AssetCompiler
 
 	~AssetCompilerImpl()
 	{
-		FS::OSOutputFile file;
+		OS::OutputFile file;
 		// TODO make this safe - i.e. handle case when program gets interrupted while writing the file
 		if (file.open(".lumix/assets/_list.txt")) {
 			file << "resources = {\n";
@@ -236,7 +236,7 @@ struct AssetCompilerImpl : AssetCompiler
 
 	void onInitFinished() override
 	{
-		FS::OSInputFile file;
+		OS::InputFile file;
 		const char* list_path = ".lumix/assets/_list.txt";
 		if(file.open(list_path)) {
 			Array<char> content(m_app.getWorldEditor().getAllocator());
@@ -362,7 +362,7 @@ struct AssetCompilerImpl : AssetCompiler
 	bool getMeta(const Path& res, void* user_ptr, void (*callback)(void*, lua_State*)) const override
 	{
 		const PathUtils::FileInfo info(res.c_str());
-		FS::OSInputFile file;
+		OS::InputFile file;
 		const StaticString<MAX_PATH_LENGTH> meta_path(info.m_dir, info.m_basename, ".meta");
 		
 		if (!file.open(meta_path)) return nullptr;
@@ -398,7 +398,7 @@ struct AssetCompilerImpl : AssetCompiler
 	void updateMeta(const Path& res, const char* src) const override
 	{
 		const PathUtils::FileInfo info(res.c_str());
-		FS::OSOutputFile file;
+		OS::OutputFile file;
 		const StaticString<MAX_PATH_LENGTH> meta_path(info.m_dir, info.m_basename, ".meta");
 				
 		if (!file.open(meta_path)) {

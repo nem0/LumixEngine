@@ -5,9 +5,9 @@
 #include "editor/world_editor.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
-#include "engine/fs/os_file.h"
 #include "engine/log.h"
 #include "engine/path_utils.h"
+#include "engine/os.h"
 #include "engine/profiler.h"
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
@@ -595,7 +595,7 @@ IOutputStream* AssetBrowser::beginSaveResource(Resource& resource)
 {
 	// use temporary because otherwise the resource is reloaded during saving
 	StaticString<MAX_PATH_LENGTH> tmp_path(resource.getPath().c_str(), ".tmp");
-	FS::OSOutputFile* f = LUMIX_NEW(m_app.getWorldEditor().getAllocator(), FS::OSOutputFile);
+	OS::OutputFile* f = LUMIX_NEW(m_app.getWorldEditor().getAllocator(), OS::OutputFile);
 	if (!f->open(tmp_path))
 	{
 		LUMIX_DELETE(m_app.getWorldEditor().getAllocator(), f);
@@ -608,7 +608,7 @@ IOutputStream* AssetBrowser::beginSaveResource(Resource& resource)
 
 void AssetBrowser::endSaveResource(Resource& resource, IOutputStream& file, bool success)
 {
-	static_cast<FS::OSOutputFile&>(file).close();
+	static_cast<OS::OutputFile&>(file).close();
 	LUMIX_DELETE(m_app.getWorldEditor().getAllocator(), &file);
 
 	if (!success) return;

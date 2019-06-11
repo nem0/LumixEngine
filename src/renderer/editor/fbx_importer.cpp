@@ -260,11 +260,11 @@ void FBXImporter::gatherAnimations(const ofbx::IScene& scene)
 }
 
 
-static int findSubblobIndex(const OutputBlob& haystack, const OutputBlob& needle, const Array<int>& subblobs, int first_subblob)
+static int findSubblobIndex(const OutputMemoryStream& haystack, const OutputMemoryStream& needle, const Array<int>& subblobs, int first_subblob)
 {
 	const u8* data = (const u8*)haystack.getData();
 	const u8* needle_data = (const u8*)needle.getData();
-	int step_size = needle.getPos();
+	int step_size = (int)needle.getPos();
 	int idx = first_subblob;
 	while(idx != -1)
 	{
@@ -311,7 +311,7 @@ static u32 packF4u(const Vec3& vec)
 }
 
 
-void FBXImporter::writePackedVec3(const ofbx::Vec3& vec, const Matrix& mtx, OutputBlob* blob) const
+void FBXImporter::writePackedVec3(const ofbx::Vec3& vec, const Matrix& mtx, OutputMemoryStream* blob) const
 {
 	Vec3 v = toLumixVec3(vec);
 	v = (mtx * Vec4(v, 0)).xyz();
@@ -323,14 +323,14 @@ void FBXImporter::writePackedVec3(const ofbx::Vec3& vec, const Matrix& mtx, Outp
 }
 
 
-static void writeUV(const ofbx::Vec2& uv, OutputBlob* blob)
+static void writeUV(const ofbx::Vec2& uv, OutputMemoryStream* blob)
 {
 	Vec2 tex_cooords = {(float)uv.x, 1 - (float)uv.y};
 	blob->write(tex_cooords);
 }
 
 
-static void writeColor(const ofbx::Vec4& color, OutputBlob* blob)
+static void writeColor(const ofbx::Vec4& color, OutputMemoryStream* blob)
 {
 	u8 rgba[4];
 	rgba[0] = u8(color.x * 255);
@@ -341,7 +341,7 @@ static void writeColor(const ofbx::Vec4& color, OutputBlob* blob)
 }
 
 
-static void writeSkin(const FBXImporter::Skin& skin, OutputBlob* blob)
+static void writeSkin(const FBXImporter::Skin& skin, OutputMemoryStream* blob)
 {
 	blob->write(skin.joints);
 	blob->write(skin.weights);
@@ -418,7 +418,7 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg)
 		import_mesh.transform_matrix = transform_matrix;
 		import_mesh.transform_matrix.inverse();
 
-		OutputBlob blob(allocator);
+		OutputMemoryStream blob(allocator);
 		int vertex_size = getVertexSize(mesh);
 		import_mesh.vertex_data.reserve(vertex_count * vertex_size);
 
@@ -472,7 +472,7 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg)
 			{
 				subblobs.push(first_subblob[first_byte]);
 				first_subblob[first_byte] = subblobs.size() - 1;
-				import_mesh.indices.push(import_mesh.vertex_data.getPos() / vertex_size);
+				import_mesh.indices.push((int)import_mesh.vertex_data.getPos() / vertex_size);
 				import_mesh.vertex_data.write(blob.getData(), vertex_size);
 			}
 			else
@@ -570,8 +570,8 @@ bool FBXImporter::setSource(const char* filename)
 		bones.clear();
 	}
 
-	FS::OsFile file;
-	if (!file.open(filename, FS::Mode::OPEN_AND_READ)) return false;
+	OS::InputFile file;
+	if (!file.open(filename)) return false;
 
 	Array<u8> data(allocator);
 	data.resize((int)file.size());
@@ -708,8 +708,8 @@ static bool saveAsDDS(const u8* image_data,
 		return false;
 	}
 
-	FS::OsFile file;
-	if (!file.open(dest_path, FS::Mode::CREATE_AND_WRITE)) {
+	OS::OutputFile file;
+	if (!file.open(dest_path)) {
 		crn_free_block(data);
 		return false;
 	}
@@ -772,7 +772,7 @@ void FBXImporter::writeMaterials(const char* src, const ImportConfig& cfg)
 		const u32 hash = crc32(mat_src);
 
 		const StaticString<MAX_PATH_LENGTH> path(cfg.output_dir, hash, ".res");
-		if (!out_file.open(path, FS::Mode::CREATE_AND_WRITE))
+		if (!out_file.open(path))
 		{
 			g_log_error.log("FBX") << "Failed to create " << path;
 			continue;
@@ -987,7 +987,7 @@ void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 			int frame_count = split->to_frame - split->from_frame;
 
 			StaticString<MAX_PATH_LENGTH> tmp(src_info.m_dir, anim.output_filename, split->name, ".ani");
-			if (!out_file.open(tmp, FS::Mode::CREATE_AND_WRITE))
+			if (!out_file.open(tmp))
 			{
 				g_log_error.log("FBX") << "Failed to create " << tmp;
 				continue;
@@ -1335,7 +1335,7 @@ void FBXImporter::writeGeometry(int mesh_idx)
 {
 	AABB aabb = {{0, 0, 0}, {0, 0, 0}};
 	float radius_squared = 0;
-	OutputBlob vertices_blob(allocator);
+	OutputMemoryStream vertices_blob(allocator);
 	const ImportMesh& import_mesh = meshes[mesh_idx];
 	
 	bool are_indices_16_bit = areIndices16Bit(import_mesh);
@@ -1375,7 +1375,7 @@ void FBXImporter::writeGeometry()
 {
 	AABB aabb = {{0, 0, 0}, {0, 0, 0}};
 	float radius_squared = 0;
-	OutputBlob vertices_blob(allocator);
+	OutputMemoryStream vertices_blob(allocator);
 	for (const ImportMesh& import_mesh : meshes)
 	{
 		if (!import_mesh.import) continue;
@@ -1654,7 +1654,7 @@ void FBXImporter::writeModelHeader()
 }
 
 
-void FBXImporter::writePhysicsHeader(FS::OsFile& file) const
+void FBXImporter::writePhysicsHeader(OS::OutputFile& file) const
 {
 	PhysicsGeometry::Header header;
 	header.m_magic = PhysicsGeometry::HEADER_MAGIC;
@@ -1664,7 +1664,7 @@ void FBXImporter::writePhysicsHeader(FS::OsFile& file) const
 }
 
 
-void FBXImporter::writePhysicsTriMesh(FS::OsFile& file)
+void FBXImporter::writePhysicsTriMesh(OS::OutputFile& file)
 {
 	i32 count = 0;
 	for (auto& mesh : meshes)
@@ -1705,8 +1705,8 @@ bool FBXImporter::writePhysics(const char* basename, const char* output_dir)
 	PathBuilder phy_path(output_dir);
 	OS::makePath(phy_path);
 	phy_path << "/" << basename << ".phy";
-	FS::OsFile file;
-	if (!file.open(phy_path, FS::Mode::CREATE_AND_WRITE))
+	OS::OutputFile file;
+	if (!file.open(phy_path))
 	{
 		g_log_error.log("Editor") << "Could not create file " << phy_path;
 		return false;
@@ -1749,12 +1749,12 @@ void FBXImporter::writePrefab(const char* src, const ImportConfig& cfg)
 	{
 		EntityGUID get(EntityPtr entity) override { return {(u64)entity.index}; }
 	};
-	FS::OsFile file;
+	OS::OutputFile file;
 	PathUtils::FileInfo file_info(src);
 	StaticString<MAX_PATH_LENGTH> tmp(file_info.m_dir, "/", file_info.m_basename, ".fab");
-	if (!file.open(tmp, FS::Mode::CREATE_AND_WRITE)) return;
+	if (!file.open(tmp)) return;
 
-	OutputBlob blob(allocator);
+	OutputMemoryStream blob(allocator);
 	SaveEntityGUIDMap entity_map;
 	TextSerializer serializer(blob, entity_map);
 
@@ -1813,7 +1813,7 @@ void FBXImporter::writeSubmodels(const char* src, const ImportConfig& cfg)
 		makeLowercase(hash_str.data, stringLength(hash_str), hash_str);
 		const StaticString<MAX_PATH_LENGTH> out_path(cfg.output_dir, crc32(hash_str), ".res");
 		OS::makePath(cfg.output_dir);
-		if (!out_file.open(out_path, FS::Mode::CREATE_AND_WRITE)) {
+		if (!out_file.open(out_path)) {
 			g_log_error.log("FBX") << "Failed to create " << out_path;
 			return;
 		}
@@ -1860,7 +1860,7 @@ void FBXImporter::writeModel(const char* output_mesh_filename, const char* ext, 
 	qsort(&meshes[0], meshes.size(), sizeof(meshes[0]), cmpMeshes);
 	StaticString<MAX_PATH_LENGTH> out_path(cfg.output_dir, output_mesh_filename, ext);
 	OS::makePath(cfg.output_dir);
-	if (!out_file.open(out_path, FS::Mode::CREATE_AND_WRITE))
+	if (!out_file.open(out_path))
 	{
 		g_log_error.log("FBX") << "Failed to create " << out_path;
 		return;

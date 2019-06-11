@@ -4,9 +4,9 @@
 #include "animation/property_animation.h"
 #include "animation/controller.h"
 #include "engine/base_proxy_allocator.h"
-#include "engine/blob.h"
 #include "engine/engine.h"
 #include "engine/reflection.h"
+#include "engine/stream.h"
 #include "engine/universe/universe.h"
 #include "renderer/model.h"
 #include <cfloat>
@@ -35,7 +35,7 @@ struct AnimSetProperty : public Reflection::IEnumProperty
 	}
 
 
-	void getValue(ComponentUID cmp, int index, OutputBlob& stream) const override
+	void getValue(ComponentUID cmp, int index, OutputMemoryStream& stream) const override
 	{
 		AnimationScene* scene = static_cast<AnimationScene*>(cmp.scene);
 		int value = scene->getControllerDefaultSet((EntityRef)cmp.entity);
@@ -43,7 +43,7 @@ struct AnimSetProperty : public Reflection::IEnumProperty
 	}
 
 
-	void setValue(ComponentUID cmp, int index, InputBlob& stream) const override
+	void setValue(ComponentUID cmp, int index, InputMemoryStream& stream) const override
 	{
 		AnimationScene* scene = static_cast<AnimationScene*>(cmp.scene);
 		int value = stream.read<int>();

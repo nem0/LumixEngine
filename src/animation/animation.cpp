@@ -1,5 +1,5 @@
 #include "animation/animation.h"
-#include "engine/fs/file_system.h"
+#include "engine/file_system.h"
 #include "engine/log.h"
 #include "engine/matrix.h"
 #include "engine/profiler.h"

@@ -2,7 +2,7 @@
 #include "ffr/ffr.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
-#include "engine/fs/file_system.h"
+#include "engine/file_system.h"
 #include "engine/geometry.h"
 #include "engine/job_system.h"
 #include "engine/log.h"
@@ -192,10 +192,11 @@ void PipelineResource::unload()
 }
 
 
-bool PipelineResource::load(FS::IFile& file)
+bool PipelineResource::load(u64 size, const u8* mem)
 {
-	content.resize((int)file.size());
-	return file.read(content.begin(), content.size());
+	content.resize((int)size);
+	memcpy(content.begin(), mem, size);
+	return true;
 }
 
 
@@ -1071,12 +1072,12 @@ struct PipelineImpl final : Pipeline
 			{
 				PROFILE_FUNCTION();
 				ffr::pushDebugGroup("particles");
-				InputBlob blob(m_data);
+				InputMemoryStream blob(m_data);
 				ffr::VertexDecl instance_decl;
 				instance_decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false);
 				const u64 blend_state = ffr::getBlendStateBits(ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA, ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA);
 				ffr::setState(blend_state);
-				while(blob.getPosition() < blob.getSize()) {
+				while(blob.getPosition() < blob.size()) {
 					ShaderRenderData* shader_data = blob.read<ShaderRenderData*>();
 					const int byte_size = blob.read<int>();
 					const int instances_count = blob.read<int>();
@@ -1100,7 +1101,7 @@ struct PipelineImpl final : Pipeline
 				ffr::popDebugGroup();
 			}
 
-			OutputBlob m_data;
+			OutputMemoryStream m_data;
 			PipelineImpl* m_pipeline;
 			CameraParams m_camera_params;
 		};

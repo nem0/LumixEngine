@@ -1,5 +1,4 @@
 #include "particle_system.h"
-#include "engine/blob.h"
 #include "engine/crc32.h"
 #include "engine/lua_wrapper.h"
 #include "engine/math_utils.h"
@@ -7,6 +6,7 @@
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/simd.h"
+#include "engine/stream.h"
 #include "editor/gizmo.h"
 #include "editor/world_editor.h"
 #include "renderer/material.h"
@@ -96,7 +96,7 @@ struct Compiler
 		float value;
 	};
 
-	Compiler(OutputBlob& bytecode) 
+	Compiler(OutputMemoryStream& bytecode) 
 		: m_bytecode(bytecode) 
 	{
 		m_streams[0].type = DataStream::CONST;
@@ -273,7 +273,7 @@ struct Compiler
 	int m_constants_count = 0;
 	int m_outputs_count = 0;
 	int m_bytecode_offset = 0;
-	OutputBlob& m_bytecode;
+	OutputMemoryStream& m_bytecode;
 	bool m_error = false;
 };
 
@@ -294,7 +294,7 @@ void ParticleEmitterResource::setMaterial(const Path& path)
 }
 
 
-bool ParticleEmitterResource::load(FS::IFile& file)
+bool ParticleEmitterResource::load(u64 size, const u8* mem)
 {
 	// TODO reuse state
 	lua_State* L = luaL_newstate();
@@ -327,7 +327,7 @@ bool ParticleEmitterResource::load(FS::IFile& file)
 
 	#undef DEFINE_LUA_FUNC
 
-	if(luaL_loadbuffer(L, (const char*)file.getBuffer(), file.size(), getPath().c_str()) != 0) {
+	if(luaL_loadbuffer(L, (const char*)mem, size, getPath().c_str()) != 0) {
 		g_log_error.log("Renderer") << lua_tostring(L, -1);
 		lua_pop(L, 1);
 		lua_close(L);
@@ -357,7 +357,7 @@ bool ParticleEmitterResource::load(FS::IFile& file)
 	}
 	lua_pop(L, 1);
 	compiler.m_bytecode.write(Instructions::END);
-	m_emit_byte_offset = compiler.m_bytecode.getPos();
+	m_emit_byte_offset = (int)compiler.m_bytecode.getPos();
 
 	lua_getfield(L, LUA_GLOBALSINDEX, "emit");
 	if(lua_isfunction(L, -1)) {
@@ -382,7 +382,7 @@ bool ParticleEmitterResource::load(FS::IFile& file)
 	lua_pop(L, 1);
 	compiler.m_bytecode.write(Instructions::END);
 
-	m_output_byte_offset = compiler.m_bytecode.getPos();
+	m_output_byte_offset = (int)compiler.m_bytecode.getPos();
 	lua_getfield(L, LUA_GLOBALSINDEX, "output");
 	if(lua_isfunction(L, -1)) {
 		if(lua_pcall(L, 0, 0, 0) != 0) {
@@ -435,7 +435,7 @@ void ParticleEmitter::setResource(ParticleEmitterResource* res)
 }
 
 
-float ParticleEmitter::readSingleValue(InputBlob& blob) const
+float ParticleEmitter::readSingleValue(InputMemoryStream& blob) const
 {
 	const auto type = blob.read<Compiler::DataStream::Type>();
 	switch(type) {
@@ -467,9 +467,9 @@ void ParticleEmitter::emit(const float* args)
 	}
 
 
-	const OutputBlob& bytecode = m_resource->getBytecode();
+	const OutputMemoryStream& bytecode = m_resource->getBytecode();
 	const u8* emit_bytecode = (const u8*)bytecode.getData() + m_resource->getEmitByteOffset();
-	InputBlob blob(emit_bytecode, bytecode.getPos() - m_resource->getEmitByteOffset());
+	InputMemoryStream blob(emit_bytecode, bytecode.getPos() - m_resource->getEmitByteOffset());
 	for (;;) {
 		const u8 instruction = blob.read<u8>();
 		switch((Instructions)instruction) {
@@ -505,14 +505,14 @@ void ParticleEmitter::emit(const float* args)
 static bool isWhitespace(char c) { return c == ' ' || c == '\n' || c == '\r' || c == '\t'; }
 
 
-void ParticleEmitter::serialize(OutputBlob& blob)
+void ParticleEmitter::serialize(IOutputStream& blob)
 {
 	blob.write(m_entity);
 	blob.writeString(m_resource ? m_resource->getPath().c_str() : "");
 }
 
 
-void ParticleEmitter::deserialize(InputBlob& blob, ResourceManagerHub& manager)
+void ParticleEmitter::deserialize(IInputStream& blob, ResourceManagerHub& manager)
 {
 	blob.read(m_entity);
 	char path[MAX_PATH_LENGTH];
@@ -536,7 +536,7 @@ void ParticleEmitter::kill(int particle_index)
 }
 
 
-void ParticleEmitter::execute(InputBlob& blob, int particle_index)
+void ParticleEmitter::execute(InputMemoryStream& blob, int particle_index)
 {
 	if (particle_index >= m_particles_count) return;
 	for (;;)
@@ -605,8 +605,8 @@ void ParticleEmitter::update(float dt)
 
 	m_emit_buffer.clear();
 	m_constants[0].value = dt;
-	const OutputBlob& bytecode = m_resource->getBytecode();
-	InputBlob blob(bytecode.getData(), bytecode.getPos());
+	const OutputMemoryStream& bytecode = m_resource->getBytecode();
+	InputMemoryStream blob(bytecode.getData(), bytecode.getPos());
 	// TODO
 	Array<float4> reg_mem(m_allocator);
 	reg_mem.resize(m_resource->getRegistersCount() * ((m_particles_count + 3) >> 2));
@@ -742,8 +742,8 @@ void ParticleEmitter::update(float dt)
 	}
 
 	end:
-		InputBlob emit_buffer(m_emit_buffer);
-		while (emit_buffer.getPosition() < emit_buffer.getSize())
+		InputMemoryStream emit_buffer(m_emit_buffer);
+		while (emit_buffer.getPosition() < emit_buffer.size())
 		{
 			u8 count = emit_buffer.read<u8>();
 			float args[16];
@@ -765,9 +765,9 @@ void ParticleEmitter::fillInstanceData(const DVec3& cam_pos, float* data)
 		// TODO
 	ASSERT(false);
 /*
-	const OutputBlob& bytecode = m_resource->getBytecode();
+	const OutputMemoryStream& bytecode = m_resource->getBytecode();
 	const int offset = m_resource->getOutputByteOffset();
-	InputBlob blob((u8*)bytecode.getData() + offset, bytecode.getPos());
+	InputMemoryStream blob((u8*)bytecode.getData() + offset, bytecode.getPos());
 	
 	// TODO
 	m_constants[1].value = cam_pos.x;
@@ -876,7 +876,7 @@ bgfx::InstanceDataBuffer ParticleEmitter::generateInstanceBuffer() const
 	bgfx::allocInstanceDataBuffer(&buffer, m_particles_count, stride);
 
 	
-	InputBlob blob(&m_bytecode[0] + m_output_bytecode_offset, m_bytecode.size() - m_output_bytecode_offset);
+	InputMemoryStream blob(&m_bytecode[0] + m_output_bytecode_offset, m_bytecode.size() - m_output_bytecode_offset);
 
 	int output_idx = 0;
 	for (;;)

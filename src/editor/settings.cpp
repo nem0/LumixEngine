@@ -1,11 +1,11 @@
 #include "settings.h"
-#include "editor/studio_app.h"
-#include "editor/world_editor.h"
+#include "engine/debug/debug.h"
 #include "engine/engine.h"
-#include "engine/fs/os_file.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
-#include "engine/debug/debug.h"
+#include "engine/os.h"
+#include "editor/studio_app.h"
+#include "editor/world_editor.h"
 #include "imgui/imgui.h"
 #include "utils.h"
 #include <lua.hpp>
@@ -48,7 +48,7 @@ static void loadStyle(lua_State* L)
 }
 
 
-static void saveStyle(FS::OSOutputFile& file)
+static void saveStyle(OS::OutputFile& file)
 {
 	auto& style = ImGui::GetStyle();
 	file << "style = {";
@@ -295,7 +295,7 @@ bool Settings::getValue(const char* name, bool default_value) const
 bool Settings::save()
 {
 	auto& actions = m_app.getActions();
-	FS::OSOutputFile file;
+	OS::OutputFile file;
 	if (!file.open(SETTINGS_PATH)) return false;
 
 	file << "window = { x = " << m_window.x 

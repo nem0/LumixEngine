@@ -6,10 +6,10 @@
 #include "editor/utils.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
-#include "engine/fs/os_file.h"
 #include "engine/geometry.h"
 #include "engine/json_serializer.h"
 #include "engine/log.h"
+#include "engine/os.h"
 #include "engine/path_utils.h"
 #include "engine/plugin_manager.h"
 #include "engine/prefab.h"
@@ -798,7 +798,7 @@ void TerrainEditor::splitSplatmap(const char* dir)
 
 	WorldEditor& editor = m_app.getWorldEditor();
 	IAllocator& allocator = editor.getAllocator();
-	FS::FileSystem& fs = editor.getEngine().getFileSystem();
+	FileSystem& fs = editor.getEngine().getFileSystem();
 	Array<u32> out_data(allocator);
 	int layers_count = diffuse->layers;
 	for (int i = 0; i < layers_count; ++i)
@@ -815,7 +815,7 @@ void TerrainEditor::splitSplatmap(const char* dir)
 			}
 		}
 
-		FS::OSOutputFile file;
+		OS::OutputFile file;
 		if (!file.open(out_path_str)) {
 			g_log_error.log("Renderer") << "Failed to create file " << out_path;
 		}
@@ -841,7 +841,7 @@ void TerrainEditor::splitSplatmap(const char* dir)
 			}
 		}
 
-		FS::OSOutputFile file;
+		OS::OutputFile file;
 		if (!file.open(out_path_str)) {
 			g_log_error.log("Renderer") << "Failed to create file " << out_path;
 		}
@@ -872,12 +872,12 @@ void TerrainEditor::mergeSplatmap(const char* dir)
 
 	WorldEditor& editor = m_app.getWorldEditor();
 	IAllocator& allocator = editor.getAllocator();
-	FS::FileSystem& fs = editor.getEngine().getFileSystem();
+	FileSystem& fs = editor.getEngine().getFileSystem();
 	Path out_path = splatmap->getPath();
 	Array<u8> out_data_array(allocator);
 	TGAHeader splatmap_tga_header;
 
-	FS::OSInputFile file;
+	OS::InputFile file;
 	if (!file.open(out_path.c_str()))
 	{
 		g_log_error.log("Renderer") << "Failed to open " << out_path;
@@ -906,7 +906,7 @@ void TerrainEditor::mergeSplatmap(const char* dir)
 			int grass_idx;
 			fromCString(info.filename + 5, lengthOf(info.filename) - 5, &grass_idx);
 			StaticString<MAX_PATH_LENGTH> grass_path(dir, "/", info.filename);
-			FS::OSInputFile file;
+			OS::InputFile file;
 			TGAHeader header;
 			Array<u8> tmp_data(allocator);
 			if(!file.open(grass_path)) {
@@ -937,7 +937,7 @@ void TerrainEditor::mergeSplatmap(const char* dir)
 			int layer_idx;
 			fromCString(info.filename + 5, lengthOf(info.filename) - 5, &layer_idx);
 			StaticString<MAX_PATH_LENGTH> layer_path(dir, "/", info.filename);
-			FS::OSInputFile file;
+			OS::InputFile file;
 			TGAHeader header;
 			Array<u8> tmp_data(allocator);
 
@@ -967,7 +967,7 @@ void TerrainEditor::mergeSplatmap(const char* dir)
 	}
 	destroyFileIterator(file_iter);
 
-	FS::OSOutputFile out_file;
+	OS::OutputFile out_file;
 	if (!out_file.open(out_path.c_str())) {
 		g_log_error.log("Renderer") << "Failed to save " << out_path;
 		return;

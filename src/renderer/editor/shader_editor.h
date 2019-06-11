@@ -10,8 +10,8 @@ namespace Lumix
 {
 
 
-class InputBlob;
-class OutputBlob;
+class InputMemoryStream;
+class OutputMemoryStream;
 
 
 class ShaderEditor
@@ -47,11 +47,11 @@ public:
 	{
 		Node(int type, ShaderEditor& editor);
 
-		virtual void save(OutputBlob& /*blob*/) {}
-		virtual void load(InputBlob& /*blob*/) {}
-		virtual void generate(OutputBlob& blob) = 0;
-		virtual void printReference(OutputBlob& blob);
-		virtual void generateBeforeMain(OutputBlob& /*blob*/) {}
+		virtual void save(OutputMemoryStream& /*blob*/) {}
+		virtual void load(InputMemoryStream& /*blob*/) {}
+		virtual void generate(OutputMemoryStream& blob) = 0;
+		virtual void printReference(OutputMemoryStream& blob);
+		virtual void generateBeforeMain(OutputMemoryStream& /*blob*/) {}
 		virtual ValueType getOutputType(int /*index*/) const { return ValueType::FLOAT; }
 		virtual ~Node();
 
@@ -81,10 +81,10 @@ public:
 	void addNode(Node* node, const ImVec2& pos, ShaderType type);
 	void destroyNode(Node* node);
 	Node* getNodeByID(int id);
-	Node& loadNode(InputBlob& blob, ShaderType type);
-	void loadNodeConnections(InputBlob& blob, Node& node);
-	void saveNode(OutputBlob& blob, Node& node);
-	void saveNodeConnections(OutputBlob& blob, Node& node);
+	Node& loadNode(InputMemoryStream& blob, ShaderType type);
+	void loadNodeConnections(InputMemoryStream& blob, Node& node);
+	void saveNode(OutputMemoryStream& blob, Node& node);
+	void saveNodeConnections(OutputMemoryStream& blob, Node& node);
 	bool hasFocus() const { return m_is_focused; }
 	void undo();
 	void redo();
@@ -96,7 +96,7 @@ public:
 
 private:
 	void generateMain(const char* path);
-	void generatePasses(OutputBlob& blob);
+	void generatePasses(OutputMemoryStream& blob);
 	void generate(const char* path, ShaderType shader_type);
 	void newGraph();
 	void save(const char* path);

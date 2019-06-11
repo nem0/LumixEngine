@@ -239,8 +239,8 @@ public:
 	virtual RigidTransform getRagdollBoneTransform(RagdollBone* bone) = 0;
 	virtual void setRagdollBoneTransform(RagdollBone* bone, const RigidTransform& matrix) = 0;
 	virtual void changeRagdollBoneJoint(RagdollBone* child, int type) = 0;
-	virtual void getRagdollData(EntityRef entity, OutputBlob& blob) = 0;
-	virtual void setRagdollData(EntityRef entity, InputBlob& blob) = 0;
+	virtual void getRagdollData(EntityRef entity, OutputMemoryStream& blob) = 0;
+	virtual void setRagdollData(EntityRef entity, InputMemoryStream& blob) = 0;
 	virtual void setRagdollBoneKinematicRecursive(RagdollBone* bone, bool is_kinematic) = 0;
 	virtual void setRagdollBoneKinematic(RagdollBone* bone, bool is_kinematic) = 0;
 	virtual bool isRagdollBoneKinematic(RagdollBone* bone) = 0;

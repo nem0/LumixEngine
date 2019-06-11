@@ -2,8 +2,8 @@
 
 
 #include "editor/ieditor_command.h"
-#include "engine/blob.h"
 #include "engine/metaprogramming.h"
+#include "engine/stream.h"
 
 
 namespace Lumix
@@ -427,7 +427,7 @@ struct SerializeVisitor
 		}
 	}
 
-	OutputBlob* blob;
+	OutputMemoryStream* blob;
 };
 
 
@@ -496,7 +496,7 @@ struct DeserializeVisitor
 		visit(name, value, adder, remover);
 	}
 
-	InputBlob* blob;
+	InputMemoryStream* blob;
 };
 
 template <typename RootGetter>
@@ -550,7 +550,7 @@ struct RemoveArrayItemCommand : PathCommand<RootGetter>
 
 		auto f = [this](const auto& value) {
 			DeserializeVisitor v;
-			InputBlob input_blob(blob);
+			InputMemoryStream input_blob(blob);
 			v.blob = &input_blob;
 			decltype(auto) x = value.getValue();
 			v.visit("", x);
@@ -590,7 +590,7 @@ struct RemoveArrayItemCommand : PathCommand<RootGetter>
 	const char* getType() override { return "remove_array_item"; }
 	bool merge(IEditorCommand& command) override { return false; }
 
-	OutputBlob blob;
+	OutputMemoryStream blob;
 	int index;
 };
 

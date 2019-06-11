@@ -5,7 +5,6 @@
 #include "animation/events.h"
 #include "animation/property_animation.h"
 #include "engine/base_proxy_allocator.h"
-#include "engine/blob.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/lua_wrapper.h"
@@ -14,6 +13,7 @@
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/serializer.h"
+#include "engine/stream.h"
 #include "engine/universe/universe.h"
 #include "renderer/model.h"
 #include "renderer/pose.h"
@@ -251,7 +251,7 @@ struct AnimationSceneImpl final : public AnimationScene
 	}
 
 
-	const OutputBlob& getEventStream() const override
+	const OutputMemoryStream& getEventStream() const override
 	{
 		return m_event_stream;
 	}
@@ -514,7 +514,7 @@ struct AnimationSceneImpl final : public AnimationScene
 	}
 
 
-	void serialize(OutputBlob& serializer) override
+	void serialize(OutputMemoryStream& serializer) override
 	{
 		serializer.write((i32)m_animables.size());
 		for (const Animable& animable : m_animables)
@@ -552,7 +552,7 @@ struct AnimationSceneImpl final : public AnimationScene
 	}
 
 
-	void deserialize(InputBlob& serializer) override
+	void deserialize(InputMemoryStream& serializer) override
 	{
 		i32 count;
 		serializer.read(count);
@@ -1079,7 +1079,7 @@ struct AnimationSceneImpl final : public AnimationScene
 					cmp.type = curve.cmp_type;
 					cmp.scene = m_universe.getScene(cmp.type);
 					cmp.entity = entity;
-					InputBlob blob(&v, sizeof(v));
+					InputMemoryStream blob(&v, sizeof(v));
 					curve.property->setValue(cmp, -1, blob);
 					break;
 				}
@@ -1147,9 +1147,9 @@ struct AnimationSceneImpl final : public AnimationScene
 
 	void processEventStream()
 	{
-		InputBlob blob(m_event_stream);
+		InputMemoryStream blob(m_event_stream);
 		u32 set_input_type = crc32("set_input");
-		while (blob.getPosition() < blob.getSize())
+		while (blob.getPosition() < blob.size())
 		{
 			u32 type;
 			u8 size;
@@ -1257,7 +1257,7 @@ struct AnimationSceneImpl final : public AnimationScene
 	AssociativeArray<EntityRef, SharedController> m_shared_controllers;
 	RenderScene* m_render_scene;
 	bool m_is_game_running;
-	OutputBlob m_event_stream;
+	OutputMemoryStream m_event_stream;
 };
 
 

@@ -6,14 +6,11 @@
 #include "editor/prefab_system.h"
 #include "engine/array.h"
 #include "engine/associative_array.h"
-#include "engine/blob.h"
 #include "engine/command_line_parser.h"
 #include "engine/crc32.h"
 #include "engine/delegate_list.h"
 #include "engine/engine.h"
-#include "engine/fs/disk_file_device.h"
-#include "engine/fs/file_system.h"
-#include "engine/fs/os_file.h"
+#include "engine/file_system.h"
 #include "engine/geometry.h"
 #include "engine/iplugin.h"
 #include "engine/json_serializer.h"
@@ -28,6 +25,7 @@
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
 #include "engine/serializer.h"
+#include "engine/stream.h"
 #include "engine/timer.h"
 #include "engine/universe/universe.h"
 #include "engine/viewport.h"
@@ -43,7 +41,7 @@ static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("m
 static const ComponentType CAMERA_TYPE = Reflection::getComponentType("camera");
 
 
-static void load(ComponentUID cmp, int index, InputBlob& blob)
+static void load(ComponentUID cmp, int index, InputMemoryStream& blob)
 {
 	int count = blob.read<int>();
 	for (int i = 0; i < count; ++i)
@@ -699,7 +697,7 @@ struct GatherResourcesVisitor : Reflection::ISimpleComponentVisitor
 		if (!attr) return;
 		auto* resource_attr = (Reflection::ResourceAttribute*)attr;
 
-		OutputBlob tmp(editor->getAllocator());
+		OutputMemoryStream tmp(editor->getAllocator());
 		prop.getValue(cmp, index, tmp);
 		Path path((const char*)tmp.getData());
 		Resource* resource = resource_manager->load(resource_attr->type, path);
@@ -724,14 +722,14 @@ struct SaveVisitor : Reflection::ISimpleComponentVisitor
 	void visitProperty(const Reflection::PropertyBase& prop) override
 	{
 		stream->write(crc32(prop.name));
-		int size = stream->getPos();
+		int size = (int)stream->getPos();
 		stream->write(size);
 		prop.getValue(cmp, index, *stream);
-		*(int*)((u8*)stream->getData() + size) = stream->getPos() - size - sizeof(int);
+		*(int*)((u8*)stream->getData() + size) = (int)stream->getPos() - size - sizeof(int);
 	}
 
 	ComponentUID cmp;
-	OutputBlob* stream;
+	OutputMemoryStream* stream;
 	int index = -1;
 };
 
@@ -798,7 +796,7 @@ public:
 	void undo() override
 	{
 		m_property->addItem(m_component, m_index);
-		InputBlob old_values(m_old_values);
+		InputMemoryStream old_values(m_old_values);
 		load(m_component, m_index, old_values);
 	}
 
@@ -813,7 +811,7 @@ private:
 	ComponentUID m_component;
 	int m_index;
 	const Reflection::IArrayProperty *m_property;
-	OutputBlob m_old_values;
+	OutputMemoryStream m_old_values;
 };
 
 
@@ -997,7 +995,7 @@ public:
 
 	bool execute() override
 	{
-		InputBlob blob(m_new_value);
+		InputMemoryStream blob(m_new_value);
 		for (EntityPtr entity : m_entities) {
 			if(entity.isValid()) {
 				ComponentUID component = m_editor.getUniverse()->getComponent((EntityRef)entity, m_component_type);
@@ -1011,7 +1009,7 @@ public:
 
 	void undo() override
 	{
-		InputBlob blob(m_old_value);
+		InputMemoryStream blob(m_old_value);
 		for (EntityPtr entity : m_entities) {
 			if (entity.isValid()) {
 				ComponentUID component = m_editor.getUniverse()->getComponent((EntityRef)entity, m_component_type);
@@ -1048,8 +1046,8 @@ private:
 	WorldEditor& m_editor;
 	ComponentType m_component_type;
 	Array<EntityPtr> m_entities;
-	OutputBlob m_new_value;
-	OutputBlob m_old_value;
+	OutputMemoryStream m_new_value;
+	OutputMemoryStream m_old_value;
 	int m_index;
 	const Reflection::PropertyBase* m_property;
 };
@@ -1421,7 +1419,7 @@ private:
 		void undo() override
 		{
 			Universe* universe = m_editor.getUniverse();
-			InputBlob blob(m_old_values);
+			InputMemoryStream blob(m_old_values);
 			for (int i = 0; i < m_entities.size(); ++i)
 			{
 				universe->emplaceEntity(m_entities[i]);
@@ -1484,7 +1482,7 @@ private:
 		WorldEditorImpl& m_editor;
 		Array<EntityRef> m_entities;
 		Array<Transform> m_transformations;
-		OutputBlob m_old_values;
+		OutputMemoryStream m_old_values;
 		Array<Resource*> m_resources;
 	};
 
@@ -1578,7 +1576,7 @@ private:
 			cmp.scene = universe->getScene(m_cmp_type);
 			cmp.type = m_cmp_type;
 			ASSERT(cmp.scene);
-			InputBlob blob(m_old_values);
+			InputMemoryStream blob(m_old_values);
 			for (EntityRef entity : m_entities)
 			{
 				cmp.entity = entity;
@@ -1628,7 +1626,7 @@ private:
 		Array<EntityRef> m_entities;
 		ComponentType m_cmp_type;
 		WorldEditorImpl& m_editor;
-		OutputBlob m_old_values;
+		OutputMemoryStream m_old_values;
 		Array<Resource*> m_resources;
 	};
 
@@ -2081,8 +2079,8 @@ public:
 		StaticString<MAX_PATH_LENGTH> dir(m_engine->getFileSystem().getBasePath(), "universes/");
 		OS::makePath(dir);
 		StaticString<MAX_PATH_LENGTH> path(dir, basename, ".unv");
-		FS::OSFileStream file;
-		if (file.open(Path(path), FS::Mode::CREATE_AND_WRITE)){
+		OS::OutputFile file;
+		if (file.open(path)) {
 			save(file);
 			file.close();
 		}
@@ -2186,15 +2184,15 @@ public:
 		StaticString<MAX_PATH_LENGTH> scn_dir(basedir, "/", basename, "/scenes/");
 		auto scn_file_iter = OS::createFileIterator(scn_dir, allocator);
 		Array<u8> data(allocator);
-		FS::OsFile file;
+		OS::InputFile file;
 		auto loadFile = [&file, &data, &entity_map](const char* filepath, auto callback) {
-			if (file.open(filepath, FS::Mode::OPEN_AND_READ))
+			if (file.open(filepath))
 			{
 				if (file.size() > 0)
 				{
 					data.resize((int)file.size());
 					file.read(&data[0], data.size());
-					InputBlob blob(&data[0], data.size());
+					InputMemoryStream blob(&data[0], data.size());
 					TextDeserializer deserializer(blob, entity_map);
 					callback(deserializer);
 				}
@@ -2241,7 +2239,6 @@ public:
 			if (info.is_directory) continue;
 			if (info.filename[0] == '.') continue;
 
-			FS::OsFile file;
 			StaticString<MAX_PATH_LENGTH> filepath(dir, info.filename);
 			char tmp[32];
 			PathUtils::getBasename(tmp, lengthOf(tmp), filepath);
@@ -2258,7 +2255,6 @@ public:
 			if (info.is_directory) continue;
 			if (info.filename[0] == '.') continue;
 
-			FS::OsFile file;
 			StaticString<MAX_PATH_LENGTH> filepath(dir, info.filename);
 			char tmp[32];
 			PathUtils::getBasename(tmp, lengthOf(tmp), filepath);
@@ -2314,11 +2310,11 @@ public:
 		OS::makePath(dir + "scenes/");
 		OS::makePath(dir + "systems/");
 
-		FS::OsFile file;
-		OutputBlob blob(m_allocator);
+		OS::OutputFile file;
+		OutputMemoryStream blob(m_allocator);
 		TextSerializer serializer(blob, m_entity_map);
 		auto saveFile = [&file, &blob](const char* path) {
-			if (file.open(path, FS::Mode::CREATE_AND_WRITE))
+			if (file.open(path))
 			{
 				file.write(blob.getData(), blob.getPos());
 				file.close();
@@ -2388,13 +2384,13 @@ public:
 	}
 
 
-	void save(FS::IFile& file)
+	void save(IOutputStream& file)
 	{
 		while (m_engine->getFileSystem().hasWork()) m_engine->getFileSystem().updateAsyncTransactions();
 
 		ASSERT(m_universe);
 
-		OutputBlob blob(m_allocator);
+		OutputMemoryStream blob(m_allocator);
 		blob.reserve(64 * 1024);
 
 		Header header = {0xffffFFFF, (int)SerializedVersion::LATEST, 0, 0};
@@ -2403,7 +2399,7 @@ public:
 
 		header.engine_hash = m_engine->serialize(*m_universe, blob);
 		m_prefab_system->serialize(blob);
-		header.hash = crc32((const u8*)blob.getData() + hashed_offset, blob.getPos() - hashed_offset);
+		header.hash = crc32((const u8*)blob.getData() + hashed_offset, (int)blob.getPos() - hashed_offset);
 		*(Header*)blob.getData() = header;
 		file.write(blob.getData(), blob.getPos());
 
@@ -2824,7 +2820,6 @@ public:
 		if (reload)
 		{
 			m_universe_destroyed.invoke();
-			m_game_mode_file->seek(FS::SeekMode::BEGIN, 0);
 			StaticString<64> name(m_universe->getName());
 			m_engine->destroyUniverse(*m_universe);
 			
@@ -2833,11 +2828,10 @@ public:
 			m_universe->setName(name);
 			m_universe->entityDestroyed().bind<WorldEditorImpl, &WorldEditorImpl::onEntityDestroyed>(this);
 			m_selected_entities.clear();
-			load(*m_game_mode_file);
+            InputMemoryStream file(m_game_mode_file);
+			load(file);
 		}
-		m_game_mode_file->close();
-		m_game_mode_file->release();
-		m_game_mode_file = nullptr;
+		m_game_mode_file.clear();
 		if(m_selected_entity_on_game_mode.isValid()) {
 			EntityRef e = (EntityRef)m_selected_entity_on_game_mode;
 			selectEntities(&e, 1, false);
@@ -2938,14 +2932,14 @@ public:
 		ComponentUID clone(entity, src.type, scene);
 
 		const Reflection::ComponentBase* cmp_desc = Reflection::getComponent(src.type);
-		OutputBlob stream(m_allocator);
+		OutputMemoryStream stream(m_allocator);
 		
 		SaveVisitor save;
 		save.stream = &stream;
 		save.cmp = src;
 		cmp_desc->visit(save);
 
-		InputBlob blob(stream);
+		InputMemoryStream blob(stream);
 		::Lumix::load(clone, -1, blob);
 	}
 
@@ -3022,7 +3016,7 @@ public:
 	#pragma pack()
 
 
-	void load(FS::IFile& file)
+	void load(IInputStream& file)
 	{
 		m_is_loading = true;
 		ASSERT(file.getBuffer());
@@ -3037,7 +3031,7 @@ public:
 
 		Timer* timer = Timer::create(m_allocator);
 		g_log_info.log("Editor") << "Parsing universe...";
-		InputBlob blob(file.getBuffer(), (int)file.size());
+		InputMemoryStream blob(file.getBuffer(), (int)file.size());
 		u32 hash = 0;
 		blob.read(hash);
 		header.version = -1;
@@ -3054,7 +3048,7 @@ public:
 			u32 engine_hash = 0;
 			blob.read(engine_hash);
 		}
-		if (crc32((const u8*)blob.getData() + hashed_offset, blob.getSize() - hashed_offset) != hash)
+		if (crc32((const u8*)blob.getData() + hashed_offset, (int)blob.size() - hashed_offset) != hash)
 		{
 			Timer::destroy(timer);
 			g_log_error.log("Editor") << "Corrupted file.";
@@ -3118,6 +3112,7 @@ public:
 		, m_engine(&engine)
 		, m_entity_map(m_allocator)
 		, m_is_guid_pseudorandom(false)
+        , m_game_mode_file(m_allocator)
 	{
 		m_viewport.is_ortho = false;
 		m_viewport.pos = DVec3(0);
@@ -3551,8 +3546,8 @@ public:
 	{
 		if (m_undo_stack.empty()) return;
 
-		FS::OSFileStream file;
-		if (file.open(path, FS::Mode::CREATE_AND_WRITE))
+		OS::OutputFile file;
+		if (file.open(path.c_str()))
 		{
 			JsonSerializer serializer(file, path);
 			serializer.beginObject();
@@ -3596,9 +3591,9 @@ public:
 	{
 		destroyUndoStack();
 		m_undo_index = -1;
-		FS::FileSystem& fs = m_engine->getFileSystem();
-		FS::OSFileStream file;
-		if (file.open(path, FS::Mode::OPEN_AND_READ))
+		FileSystem& fs = m_engine->getFileSystem();
+		OS::InputFile file;
+		if (file.open(path.c_str()))
 		{
 			JsonDeserializer serializer(file, path, m_allocator);
 			serializer.deserializeObjectBegin();
@@ -3693,14 +3688,14 @@ public:
 
 	bool runTest(const char* dir, const char* name) override
 	{
-		FS::FileSystem& fs = m_engine->getFileSystem();
+		FileSystem& fs = m_engine->getFileSystem();
 		while (fs.hasWork()) fs.updateAsyncTransactions();
 		newUniverse();
 		Path undo_stack_path(dir, name, ".json");
 		executeUndoStack(undo_stack_path);
 
-		OutputBlob blob0(m_allocator);
-		OutputBlob blob1(m_allocator);
+		OutputMemoryStream blob0(m_allocator);
+		OutputMemoryStream blob1(m_allocator);
 		Universe& tpl_universe = m_engine->createUniverse(true);
 		PrefabSystem* prefab_system = PrefabSystem::create(*this);
 		EntityGUIDMap entity_guid_map(m_allocator);
@@ -3753,8 +3748,8 @@ public:
 					bool* is_same;
 					ComponentUID cmp;
 					ComponentUID other_cmp;
-					OutputBlob* blob0;
-					OutputBlob* blob1;
+					OutputMemoryStream* blob0;
+					OutputMemoryStream* blob1;
 				} visitor;
 				visitor.is_same = &is_same;
 				visitor.cmp = cmp;
@@ -3819,7 +3814,7 @@ private:
 	bool m_is_orbit;
 	bool m_is_toggle_selection;
 	SnapMode m_snap_mode;
-	FS::IFile* m_game_mode_file;
+	OutputMemoryStream m_game_mode_file;
 	Engine* m_engine;
 	OS::WindowHandle m_window;
 	EntityPtr m_selected_entity_on_game_mode;
@@ -3836,7 +3831,7 @@ private:
 	Array<IEditorCommand*> m_undo_stack;
 	AssociativeArray<u32, EditorCommandCreator> m_editor_command_creators;
 	int m_undo_index;
-	OutputBlob m_copy_buffer;
+	OutputMemoryStream m_copy_buffer;
 	bool m_is_loading;
 	Universe* m_universe;
 	EntityGUIDMap m_entity_map;
@@ -3860,7 +3855,7 @@ public:
 	}
 
 
-	PasteEntityCommand(WorldEditor& editor, const OutputBlob& copy_buffer, bool identity = false)
+	PasteEntityCommand(WorldEditor& editor, const OutputMemoryStream& copy_buffer, bool identity = false)
 		: m_copy_buffer(copy_buffer)
 		, m_editor(editor)
 		, m_position(editor.getCameraRaycastHit())
@@ -3870,7 +3865,7 @@ public:
 	}
 
 
-	PasteEntityCommand(WorldEditor& editor, const DVec3& pos, const OutputBlob& copy_buffer, bool identity = false)
+	PasteEntityCommand(WorldEditor& editor, const DVec3& pos, const OutputMemoryStream& copy_buffer, bool identity = false)
 		: m_copy_buffer(copy_buffer)
 		, m_editor(editor)
 		, m_position(pos)
@@ -3886,7 +3881,7 @@ public:
 		serializer.serialize("pos_y", m_position.y);
 		serializer.serialize("pos_z", m_position.z);
 		serializer.serialize("identity", m_identity);
-		serializer.serialize("size", m_copy_buffer.getPos());
+		serializer.serialize("size", (int)m_copy_buffer.getPos());
 		serializer.beginArray("data");
 		for (int i = 0; i < m_copy_buffer.getPos(); ++i)
 		{
@@ -3933,7 +3928,7 @@ public:
 
 			Array<EntityRef> entities;
 		} map(m_editor.getAllocator());
-		InputBlob input_blob(m_copy_buffer);
+		InputMemoryStream input_blob(m_copy_buffer);
 		TextDeserializer deserializer(input_blob, map);
 
 		Universe& universe = *m_editor.getUniverse();
@@ -4027,7 +4022,7 @@ public:
 
 
 private:
-	OutputBlob m_copy_buffer;
+	OutputMemoryStream m_copy_buffer;
 	WorldEditor& m_editor;
 	DVec3 m_position;
 	Array<EntityRef> m_entities;

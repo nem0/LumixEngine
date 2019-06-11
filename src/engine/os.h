@@ -2,6 +2,7 @@
 
 
 #include "lumix.h"
+#include "stream.h"
 
 
 namespace Lumix
@@ -75,6 +76,57 @@ struct Interface
     virtual void onInit() = 0;
     virtual void onIdle() = 0;
 };
+
+	
+class LUMIX_ENGINE_API InputFile final : public IInputStream
+{
+public:
+	InputFile();
+	~InputFile();
+
+	bool open(const char* path);
+	void close();
+
+	bool read(void* data, u64 size) override;
+	const void* getBuffer() const override { return nullptr; }
+
+	u64 size() const override;
+	u64 pos();
+
+	bool seek(size_t pos);
+	
+private:
+	void* m_handle;
+};
+	
+
+class LUMIX_ENGINE_API OutputFile final : public IOutputStream
+{
+public:
+	OutputFile();
+	~OutputFile();
+
+	bool open(const char* path);
+	void close();
+	void flush();
+    bool isError() const { return m_is_error; }
+
+	bool write(const void* data, u64 size) override;
+
+	size_t pos();
+
+	OutputFile& operator <<(const char* text);
+	OutputFile& operator <<(char c) { write(&c, sizeof(c)); return *this; }
+	OutputFile& operator <<(i32 value);
+	OutputFile& operator <<(u32 value);
+	OutputFile& operator <<(u64 value);
+	OutputFile& operator <<(float value);
+
+private:
+	void* m_handle;
+    bool m_is_error;
+};
+	
 
 struct FileInfo {
 	bool is_directory;

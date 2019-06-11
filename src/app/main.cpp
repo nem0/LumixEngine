@@ -1,11 +1,8 @@
-#include "engine/blob.h"
 #include "engine/command_line_parser.h"
 #include "engine/crc32.h"
 #include "engine/debug/debug.h"
 #include "engine/engine.h"
-#include "engine/fs/disk_file_device.h"
-#include "engine/fs/file_system.h"
-#include "engine/fs/os_file.h"
+#include "engine/file_system.h"
 #include "engine/input_system.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
@@ -14,6 +11,7 @@
 #include "engine/path_utils.h"
 #include "engine/plugin_manager.h"
 #include "engine/profiler.h"
+#include "engine/stream.h"
 #include "engine/timer.h"
 #include "engine/universe/universe.h"
 #include "gui/gui_system.h"
@@ -131,9 +129,7 @@ public:
 		#else
 			current_dir[0] = '\0';
 		#endif
-		m_file_system = FS::FileSystem::create(current_dir, m_allocator);
-
-		m_engine = Engine::create(current_dir, m_file_system, m_allocator);
+		m_engine = Engine::create(current_dir, m_allocator);
 		ffr::preinit(m_allocator);
 		
 		OS::InitWindowArgs create_win_args = {};
@@ -226,7 +222,7 @@ public:
 	}
 
 
-	void universeFileLoaded(FS::IFile& file, bool success)
+	void universeFileLoaded(u64 size, const u8* mem, bool success)
 	{
 		if (!success)
 		{
@@ -234,8 +230,8 @@ public:
 			return;
 		}
 
-		ASSERT(file.getBuffer());
-		InputBlob blob(file.getBuffer(), (int)file.size());
+		ASSERT(mem);
+		InputMemoryStream blob(mem, (int)size);
 		#pragma pack(1)
 			struct Header
 			{
@@ -247,7 +243,7 @@ public:
 		#pragma pack()
 		Header header;
 		blob.read(header);
-		if (crc32((const u8*)blob.getData() + sizeof(header), blob.getSize() - sizeof(header)) != header.hash)
+		if (crc32((const u8*)blob.getData() + sizeof(header), (int)blob.size() - sizeof(header)) != header.hash)
 		{
 			g_log_error.log("App") << "Universe corrupted";
 			return;
@@ -281,9 +277,9 @@ public:
 	{
 		copyString(m_universe_path, path);
 		auto& fs = m_engine->getFileSystem();
-		FS::ReadCallback file_read_cb;
-		file_read_cb.bind<Runner, &Runner::universeFileLoaded>(this);
-		fs.openAsync(Path(m_universe_path), FS::Mode::OPEN_AND_READ, file_read_cb);
+		FileSystem::ContentCallback cb;
+		cb.bind<Runner, &Runner::universeFileLoaded>(this);
+		fs.getContent(Path(m_universe_path), cb);
 	}
 
 
@@ -294,7 +290,6 @@ public:
 		LUMIX_DELETE(m_allocator, m_gui_interface);
 
 		m_engine->destroyUniverse(*m_universe);
-		FS::FileSystem::destroy(m_file_system);
 		Pipeline::destroy(m_pipeline);
 		Engine::destroy(m_engine, m_allocator);
 		m_engine = nullptr;
@@ -375,7 +370,6 @@ private:
 	char m_universe_path[MAX_PATH_LENGTH];
 	Universe* m_universe;
 	Pipeline* m_pipeline;
-	FS::FileSystem* m_file_system;
 	Timer* m_frame_timer;
 	GUIInterface* m_gui_interface;
 	bool m_window_mode;

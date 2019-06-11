@@ -6,7 +6,6 @@
 #include "engine/log.h"
 #include "engine/math_utils.h"
 #include "engine/mt/atomic.h"
-#include "engine/mt/lock_free_fixed_queue.h"
 #include "engine/mt/sync.h"
 #include "engine/mt/task.h"
 #include "engine/mt/thread.h"

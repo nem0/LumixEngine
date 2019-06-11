@@ -22,12 +22,11 @@ void Clip::unload()
 }
 
 
-bool Clip::load(FS::IFile& file)
+bool Clip::load(u64 size, const u8* mem)
 {
 	PROFILE_FUNCTION();
 	short* output = nullptr;
-	auto res = stb_vorbis_decode_memory(
-		(unsigned char*)file.getBuffer(), (int)file.size(), &m_channels, &m_sample_rate, &output);
+	auto res = stb_vorbis_decode_memory((unsigned char*)mem, (int)size, &m_channels, &m_sample_rate, &output);
 	if (res <= 0) return false;
 
 	m_data.resize(res * m_channels);

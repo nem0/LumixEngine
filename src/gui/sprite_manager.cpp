@@ -65,7 +65,7 @@ bool Sprite::save(JsonSerializer& serializer)
 }
 
 
-bool Sprite::load(u64 size, void* mem)
+bool Sprite::load(u64 size, const u8* mem)
 {
 	auto& manager = (SpriteManager&)getResourceManager();
 	IAllocator& allocator = manager.m_allocator;

@@ -173,7 +173,7 @@ ResourceManagerHub::ResourceManagerHub(IAllocator& allocator)
 ResourceManagerHub::~ResourceManagerHub() = default;
 
 
-void ResourceManagerHub::init(FS::FileSystem& fs)
+void ResourceManagerHub::init(FileSystem& fs)
 {
 	m_file_system = &fs;
 }

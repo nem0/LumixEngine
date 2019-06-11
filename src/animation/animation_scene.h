@@ -12,7 +12,7 @@ namespace Lumix
 {
 
 struct IAllocator;
-class OutputBlob;
+class OutputMemoryStream;
 class Path;
 
 namespace Anim
@@ -28,7 +28,7 @@ struct AnimationScene : public IScene
 	static void destroy(AnimationScene& scene);
 	static void registerLuaAPI(lua_State* L);
 
-	virtual const OutputBlob& getEventStream() const = 0;
+	virtual const OutputMemoryStream& getEventStream() const = 0;
 	virtual Path getPropertyAnimation(EntityRef entity) = 0;
 	virtual void setPropertyAnimation(EntityRef entity, const Path& path) = 0;
 	virtual bool isPropertyAnimatorEnabled(EntityRef entity) = 0;

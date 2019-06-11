@@ -3,7 +3,6 @@
 #include "audio_device.h"
 #include "audio_system.h"
 #include "clip_manager.h"
-#include "engine/blob.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/iallocator.h"
@@ -12,6 +11,7 @@
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/serializer.h"
+#include "engine/stream.h"
 #include "engine/universe/universe.h"
 #include "lua_script/lua_script_system.h"
 
@@ -270,9 +270,9 @@ struct AudioSceneImpl final : public AudioScene
 	{
 		if (!m_animation_scene) return;
 		
-		InputBlob blob(m_animation_scene->getEventStream());
+		InputMemoryStream blob(m_animation_scene->getEventStream());
 		u32 sound_type = crc32("sound");
-		while (blob.getPosition() < blob.getSize())
+		while (blob.getPosition() < blob.size())
 		{
 			u32 type;
 			u8 size;
@@ -529,7 +529,7 @@ struct AudioSceneImpl final : public AudioScene
 	}
 
 
-	void serialize(OutputBlob& serializer) override
+	void serialize(OutputMemoryStream& serializer) override
 	{
 		serializer.write(m_listener.entity);
 		serializer.write(m_clips.size());
@@ -566,7 +566,7 @@ struct AudioSceneImpl final : public AudioScene
 	}
 
 
-	void deserialize(InputBlob& serializer) override
+	void deserialize(InputMemoryStream& serializer) override
 	{
 		clear();
 

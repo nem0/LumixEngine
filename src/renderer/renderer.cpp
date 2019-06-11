@@ -5,10 +5,8 @@
 #include "engine/crc32.h"
 #include "engine/debug/debug.h"
 #include "engine/engine.h"
-#include "engine/fs/os_file.h"
 #include "engine/log.h"
 #include "engine/job_system.h"
-#include "engine/mt/lock_free_fixed_queue.h"
 #include "engine/mt/atomic.h"
 #include "engine/mt/sync.h"
 #include "engine/mt/task.h"
@@ -212,7 +210,7 @@ struct BoneProperty : Reflection::IEnumProperty
 	}
 
 
-	void getValue(ComponentUID cmp, int index, OutputBlob& stream) const override
+	void getValue(ComponentUID cmp, int index, OutputMemoryStream& stream) const override
 	{
 		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
 		int value = scene->getBoneAttachmentBone((EntityRef)cmp.entity);
@@ -220,7 +218,7 @@ struct BoneProperty : Reflection::IEnumProperty
 	}
 
 
-	void setValue(ComponentUID cmp, int index, InputBlob& stream) const override
+	void setValue(ComponentUID cmp, int index, InputMemoryStream& stream) const override
 	{
 		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
 		int value = stream.read<int>();
